@@ -405,6 +405,11 @@
               <FilePath>applications\ns_storage.c</FilePath>
             </File>
             <File>
+              <FileName>safety_gpio.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>applications\safety_gpio.c</FilePath>
+            </File>
+            <File>
               <FileName>main.c</FileName>
               <FileType>1</FileType>
               <FilePath>applications\main.c</FilePath>
