@@ -410,6 +410,11 @@
               <FilePath>applications\safety_gpio.c</FilePath>
             </File>
             <File>
+              <FileName>step_pwm.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>applications\step_pwm.c</FilePath>
+            </File>
+            <File>
               <FileName>current_adc.c</FileName>
               <FileType>1</FileType>
               <FilePath>applications\current_adc.c</FilePath>
