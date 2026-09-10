@@ -410,6 +410,11 @@
               <FilePath>applications\safety_gpio.c</FilePath>
             </File>
             <File>
+              <FileName>adxl345.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>applications\adxl345.c</FilePath>
+            </File>
+            <File>
               <FileName>main.c</FileName>
               <FileType>1</FileType>
               <FilePath>applications\main.c</FilePath>
