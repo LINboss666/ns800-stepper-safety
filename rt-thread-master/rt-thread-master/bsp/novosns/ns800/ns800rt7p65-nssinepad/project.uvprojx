@@ -410,6 +410,11 @@
               <FilePath>applications\safety_gpio.c</FilePath>
             </File>
             <File>
+              <FileName>safety_state.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>applications\safety_state.c</FilePath>
+            </File>
+            <File>
               <FileName>tmc2209.c</FileName>
               <FileType>1</FileType>
               <FilePath>applications\tmc2209.c</FilePath>
