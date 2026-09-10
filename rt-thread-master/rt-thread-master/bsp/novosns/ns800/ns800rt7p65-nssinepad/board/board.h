@@ -28,7 +28,7 @@ extern "C"
 
 extern int Image$$RW_RT_HEAD$$Limit;
 #define HEAP_BEGIN      (&Image$$RW_RT_HEAD$$Limit)
-#define HEAP_END        ((uint32_t)&Image$$RW_RT_HEAD$$Limit + 0x4000)
+#define HEAP_END        ((uint32_t)&Image$$RW_RT_HEAD$$Limit + 0x8000)
 
 
 /*******************************************************************************

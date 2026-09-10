@@ -24,7 +24,7 @@ LR_IROM1 0x08000000 0x00080000  {    ; load region size_region
 ;    startup_*.o(HEAP)
   }
 
-  RW_RT_HEAD 0x20012000 EMPTY 0x4000 {
+  RW_RT_HEAD 0x20012000 EMPTY 0x8000 {
 
   }
 

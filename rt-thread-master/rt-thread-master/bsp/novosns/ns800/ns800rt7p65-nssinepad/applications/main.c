@@ -11,13 +11,27 @@
 #include <rtthread.h>
 #include <rtdevice.h>
 #include <board.h>
+#include "drv_gpio.h"
 
 /* defined the LED1 pin: GPIO_68 = PC4 */
 #define LED1_PIN    PIN_NUM(GPIO_68)
 
+/* Onboard U4 (PA19/J2-13) and the external flash module (PF12/J2-12) share
+ * SPI1. Both CS must idle HIGH from boot, otherwise a floating CS can select
+ * the wrong device and corrupt the other one's transfers. */
+static void flash_cs_idle_high(void)
+{
+    rt_pin_mode(PIN_NUM(GPIOA, GPIO_PIN_19), PIN_MODE_OUTPUT);
+    rt_pin_write(PIN_NUM(GPIOA, GPIO_PIN_19), PIN_HIGH);
+    rt_pin_mode(PIN_NUM(GPIOF, GPIO_PIN_12), PIN_MODE_OUTPUT);
+    rt_pin_write(PIN_NUM(GPIOF, GPIO_PIN_12), PIN_HIGH);
+}
+
 int main(void)
 {
     rt_pin_mode(LED1_PIN, PIN_MODE_OUTPUT);
+
+    flash_cs_idle_high();
 
     while (1)
     {
