@@ -66,12 +66,16 @@ static void pwm_test(int argc, char **argv)
         return;
     }
 
-    /* 安全检查: 仅在 MCU_DRV_ENABLE=LOW(驱动禁止)时允许输出 */
+    /* 安全检查(BUG-011-3): "不知道是否安全=按不安全处理"。
+     * safety_pin 解析失败或读到的不是 LOW, 一律拒绝输出 */
     {
         rt_base_t en = safety_pin(PIN_NAME_DRV_ENABLE);
-        if (en >= 0 && rt_pin_read(en) != PIN_LOW)
+        rt_bool_t drv_safe = (en >= 0) && (rt_pin_read(en) == PIN_LOW);
+
+        if (!drv_safe)
         {
-            rt_kprintf("[STEP] REFUSED: MCU_DRV_ENABLE!=LOW, 先保证驱动禁止\n");
+            rt_kprintf("[STEP] REFUSED: MCU_DRV_ENABLE unknown or not LOW (pin=%d)\n",
+                       (int)en);
             return;
         }
     }
@@ -95,6 +99,15 @@ static void pwm_test(int argc, char **argv)
                hz, period_ns);
 }
 MSH_CMD_EXPORT(pwm_test, control STEP pulse output: pwm_test <hz>|stop);
+
+void step_pwm_force_stop(void)
+{
+    if (step_pwm != RT_NULL)
+    {
+        rt_pwm_disable(step_pwm, STEP_PWM_CH);
+    }
+    step_enabled = RT_FALSE;   /* 设备未找到也清状态; 幂等可重入 */
+}
 
 static void step_status(void)
 {

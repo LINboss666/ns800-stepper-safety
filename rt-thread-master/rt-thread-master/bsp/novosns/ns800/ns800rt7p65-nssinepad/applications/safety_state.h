@@ -61,7 +61,8 @@ struct sample_frame
 
 const char    *safety_state_name(safety_state_t s);
 rt_err_t       safety_post_event(rt_uint32_t event);
-void           safety_enter_fault(rt_uint32_t code);
+void           safety_force_shutdown(rt_uint32_t code);  /* 统一安全停机入口(BUG-011-1) */
+void           safety_enter_fault(rt_uint32_t code);     /* 兼容别名, 内部走 force_shutdown */
 safety_state_t safety_state_get(void);
 rt_uint32_t    safety_fault_get(void);
 
