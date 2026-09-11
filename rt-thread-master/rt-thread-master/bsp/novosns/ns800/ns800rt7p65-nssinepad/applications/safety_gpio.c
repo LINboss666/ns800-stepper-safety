@@ -150,74 +150,36 @@ rt_base_t safety_pin(const char *name)
     return (p != RT_NULL) ? p->pin : -RT_ERROR;
 }
 
-/* ==== 临时诊断(BUG-009): 端口F pin21 寄存器级探测, 破案后删除 ==== */
+/* ==== 诊断工具(BUG-009 未完全破案, 保留): 端口F pin21 寄存器级探测,
+ * 详情见 调试记录.md BUG-009。主要嫌疑: 双核 CPU2 抢占 GPIO 锁存 ==== */
 #include "drv_gpio.h"
 
 static void pf21_probe(void)
 {
     GPIO_TypeDef *pt = GPIOF;
-    volatile rt_uint32_t *mux2 = (volatile rt_uint32_t *)(&pt->MUX1) + 1;
-    volatile rt_uint32_t *gmux2 = (volatile rt_uint32_t *)(&pt->GMUX1) + 1;
     rt_uint32_t mask = 0x1UL << 21;
+    volatile rt_uint32_t *regs = (volatile rt_uint32_t *)pt;
+    int i, j;
 
-    rt_kprintf("[P] before: DIR21=%d DAT=%08X DATR21=%d MUX2=%08X GMUX2=%08X\n",
-               (int)((pt->DIR.WORDVAL >> 21) & 1), pt->DAT.WORDVAL,
-               (int)((pt->DATR.WORDVAL >> 21) & 1), *mux2, *gmux2);
+    /* 全寄存器 dump: 12字 x 2行(偏移0x00~0x5C) */
+    for (i = 0; i < 12; ++i)
+    {
+        rt_kprintf("[P] F+%02X:\n", i * 8);
+        for (j = 0; j < 2; ++j)
+            rt_kprintf(" %08X", regs[i * 2 + j]);
+        rt_kprintf("\n");
+    }
 
+    /* AMSEL bit21 检查: 猜测偏移见 dump, 这里显式清一遍 */
+    GPIO_setAnalogMode(pt, GPIO_PIN_21, GPIO_ANALOG_DISABLED);
     GPIO_setPadConfig(pt, GPIO_PIN_21, GPIO_PIN_TYPE_STD);
     GPIO_setDirectionMode(pt, GPIO_PIN_21, GPIO_DIR_MODE_OUT);
     GPIO_setPinConfig(pt, GPIO_PIN_21, ALT0_FUNCTION);
-
-    /* 实验1: 直接写 DAT 寄存器(绕过 SET/CLR) */
-    WRITE_REG(pt->DAT.WORDVAL, pt->DAT.WORDVAL & ~(1u << 21));
-    rt_kprintf("[P] direct DAT clear: DAT21=%d DATR21=%d' + NL + '",
-               (int)((pt->DAT.WORDVAL >> 21) & 1),
-               (int)((pt->DATR.WORDVAL >> 21) & 1));
-
-    /* 实验2: 开漏 + 写低 */
-    GPIO_setPadConfig(pt, GPIO_PIN_21, GPIO_PIN_TYPE_OD);
     GPIO_clearPin(pt, GPIO_PIN_21);
-    rt_kprintf("[P] OD + clr: DAT21=%d' + NL + '",
-               (int)((pt->DAT.WORDVAL >> 21) & 1));
-    GPIO_setPadConfig(pt, GPIO_PIN_21, GPIO_PIN_TYPE_STD);
-
-    /* 实验3: 写低后延时再读 5 次, 看是否被弹回 */
-    GPIO_clearPin(pt, GPIO_PIN_21);
-    {
-        int i;
-        for (i = 0; i < 5; ++i)
-        {
-            rt_thread_mdelay(20);
-            rt_kprintf("[P] t+%dms: DAT21=%d' + NL + '", (i + 1) * 20,
-                       (int)((pt->DAT.WORDVAL >> 21) & 1));
-        }
-    }
-
-    GPIO_clearPin(pt, GPIO_PIN_21);
-    rt_kprintf("[P] master0: w0 r=%d (DATR=%d)' + NL + '",
-               (int)((pt->DAT.WORDVAL >> 21) & 1),
-               (int)((pt->DATR.WORDVAL >> 21) & 1));
-
-    csel1[2] = csel3 | (1u << 20);             /* master 1 */
-    GPIO_clearPin(pt, GPIO_PIN_21);
-    rt_kprintf("[P] master1: w0 r=%d (DATR=%d)' + NL + '",
-               (int)((pt->DAT.WORDVAL >> 21) & 1),
-               (int)((pt->DATR.WORDVAL >> 21) & 1));
-
-    csel1[2] = csel3;                          /* 恢复原值 */
-    GPIO_clearPin(pt, GPIO_PIN_21);
-
-    rt_kprintf("[P] after OUT+CLR: DIR21=%d DAT21=%d DATR21=%d MUX2=%08X GMUX2=%08X\n",
-               (int)((pt->DIR.WORDVAL >> 21) & 1), (int)((pt->DAT.WORDVAL >> 21) & 1),
-               (int)((pt->DATR.WORDVAL >> 21) & 1), *mux2, *gmux2);
-
-    GPIO_setPin(pt, GPIO_PIN_21);
-    rt_kprintf("[P] after SET: DAT21=%d DATR21=%d\n",
-               (int)((pt->DAT.WORDVAL >> 21) & 1),
-               (int)((pt->DATR.WORDVAL >> 21) & 1));
-    GPIO_clearPin(pt, GPIO_PIN_21);   /* 恢复安全低 */
-    rt_kprintf("[P] end CLR: DAT21=%d DATR21=%d\n",
-               (int)((pt->DAT.WORDVAL >> 21) & 1),
-               (int)((pt->DATR.WORDVAL >> 21) & 1));
+    rt_thread_mdelay(50);
+    rt_kprintf("[P] final DAT21=%d DATR21=%d\n", 
+               (int)((pt->DAT.WORDVAL & mask) ? 1 : 0),
+               (int)((pt->DATR.WORDVAL & mask) ? 1 : 0));
 }
+
 MSH_CMD_EXPORT(pf21_probe, BUG-009 register level probe for PF.21);
