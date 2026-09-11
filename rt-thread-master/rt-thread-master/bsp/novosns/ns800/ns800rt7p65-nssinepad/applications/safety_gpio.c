@@ -26,7 +26,9 @@ struct safety_pin
 
 static struct safety_pin safety_pins[] =
 {
-    { PIN_NAME_DRV_ENABLE, -1, PIN_MODE_OUTPUT, PIN_LOW,  "MCU_DRV_ENABLE(默认禁止!)" },
+    /* BUG-009: 实测与未知驱动源争抢(写低时网络 2.37V), 暂改 Hi-Z 避免持续
+     * 对灌电流; 使能状态视为不可信(pwm 联锁已拒真)。待 FAE/换脚后恢复输出 */
+    { PIN_NAME_DRV_ENABLE, -1, PIN_MODE_INPUT,  PIN_LOW,  "MCU_DRV_ENABLE(Hi-Z 待查, 状态不可信)" },
     { PIN_NAME_TMC_DIR,    -1, PIN_MODE_OUTPUT, PIN_LOW,  "TMC_DIR" },
     { PIN_NAME_TMC_DIAG,   -1, PIN_MODE_INPUT,  0,        "TMC_DIAG" },
     { PIN_NAME_LIMIT_MIN,  -1, PIN_MODE_INPUT,  0,        "LIMIT_MIN" },
