@@ -72,9 +72,11 @@ static rt_err_t safety_gpio_setup(void)
             continue;
         }
 
-        rt_pin_mode(p->pin, p->mode);
+        /* BUG-009 建议(手册防毛刺): 输出脚先写锁存值再切方向,
+         * 输入→输出切换瞬间即为目标安全电平 */
         if (p->mode == PIN_MODE_OUTPUT)
             rt_pin_write(p->pin, p->level);
+        rt_pin_mode(p->pin, p->mode);
     }
 
     sg_ready    = (e == RT_EOK) ? RT_TRUE : RT_FALSE;
@@ -154,32 +156,109 @@ rt_base_t safety_pin(const char *name)
  * 详情见 调试记录.md BUG-009。主要嫌疑: 双核 CPU2 抢占 GPIO 锁存 ==== */
 #include "drv_gpio.h"
 
-static void pf21_probe(void)
+/* ==== 诊断工具 v2(BUG-009, DAT/DATR 语义已按官方手册修正:
+ *  DAT=焊盘实际电平(rt_pin_read 用), DATR=输出锁存(软件写的值)) ==== */
+#define PF21_SYSCON_AHBCPUSELEN1  (*(volatile rt_uint32_t *)0x40037300)
+#define PF21_GPIOFCPUSELEN_BIT    (1u << 21)
+
+/* 手册推荐的安全输出配置顺序: 先清锁存, 再开数字/复用/方向 */
+static void pf21_config_output(void)
 {
     GPIO_TypeDef *pt = GPIOF;
-    rt_uint32_t mask = 0x1UL << 21;
-    volatile rt_uint32_t *regs = (volatile rt_uint32_t *)pt;
-    int i, j;
-
-    /* 全寄存器 dump: 12字 x 2行(偏移0x00~0x5C) */
-    for (i = 0; i < 12; ++i)
-    {
-        rt_kprintf("[P] F+%02X:\n", i * 8);
-        for (j = 0; j < 2; ++j)
-            rt_kprintf(" %08X", regs[i * 2 + j]);
-        rt_kprintf("\n");
-    }
-
-    /* AMSEL bit21 检查: 猜测偏移见 dump, 这里显式清一遍 */
+    GPIO_clearPin(pt, GPIO_PIN_21);
     GPIO_setAnalogMode(pt, GPIO_PIN_21, GPIO_ANALOG_DISABLED);
     GPIO_setPadConfig(pt, GPIO_PIN_21, GPIO_PIN_TYPE_STD);
-    GPIO_setDirectionMode(pt, GPIO_PIN_21, GPIO_DIR_MODE_OUT);
     GPIO_setPinConfig(pt, GPIO_PIN_21, ALT0_FUNCTION);
-    GPIO_clearPin(pt, GPIO_PIN_21);
-    rt_thread_mdelay(50);
-    rt_kprintf("[P] final DAT21=%d DATR21=%d\n", 
-               (int)((pt->DAT.WORDVAL & mask) ? 1 : 0),
-               (int)((pt->DATR.WORDVAL & mask) ? 1 : 0));
+    GPIO_setDirectionMode(pt, GPIO_PIN_21, GPIO_DIR_MODE_OUT);
 }
 
-MSH_CMD_EXPORT(pf21_probe, BUG-009 register level probe for PF.21);
+static void pf21_diag(void)
+{
+    GPIO_TypeDef *pt = GPIOF;
+    volatile rt_uint32_t *csel3 = (volatile rt_uint32_t *)((char *)&pt->CSEL1 + 8);
+
+    pf21_config_output();
+    rt_thread_mdelay(100);
+
+    rt_kprintf("[D] GPFDIR.bit21(output)  = %d (expect 1)\n", 
+               (int)((pt->DIR.WORDVAL >> 21) & 1));
+    rt_kprintf("[D] GPFAMSEL.bit21(analog)= %d (expect 0)\n", 
+               (int)((pt->AMSEL.WORDVAL >> 21) & 1));
+    rt_kprintf("[D] GPFODR.bit21(open-dr) = %d (expect 0)\n", 
+               (int)((pt->ODR.WORDVAL >> 21) & 1));
+    rt_kprintf("[D] GPFMUX2[11:10]        = %d (expect 0=GPIO)\n", 
+               (int)((pt->MUX2.WORDVAL >> 10) & 3));
+    rt_kprintf("[D] GPFGMUX2[11:10]       = %d\n", 
+               (int)((pt->GMUX2.WORDVAL >> 10) & 3));
+    rt_kprintf("[D] GPFDATR21(latch)      = %d (wrote 0)\n", 
+               (int)((pt->DATR.WORDVAL >> 21) & 1));
+    rt_kprintf("[D] GPFDAT21(pad level)   = %d\n", 
+               (int)((pt->DAT.WORDVAL >> 21) & 1));
+
+    rt_kprintf("[D] AHBCPUSELEN1.bit21(GPIOFCPUSELEN) = %d\n", 
+               (int)((PF21_SYSCON_AHBCPUSELEN1 >> 21) & 1));
+    rt_kprintf("[D] GPFCSEL3.PF21(master) = %d (0=M0 1=M1, 仅门控=1时有效)\n", 
+               (int)((*csel3 >> 20) & 1));
+    rt_kprintf("[D] CPU2 status: 无独立状态寄存器(头文件未定义), 见开发进度待办\n");
+
+    /* 门控实验: 打开 GPIOF CSEL 使能后, 归属切换才真正生效 */
+    PF21_SYSCON_AHBCPUSELEN1 |= PF21_GPIOFCPUSELEN_BIT;
+    *csel3 &= ~(1u << 20);          /* PF21 -> master0 */
+    GPIO_clearPin(pt, GPIO_PIN_21);
+    rt_thread_mdelay(50);
+    rt_kprintf("[D] gate=1 master0: latch=%d pad=%d\n", 
+               (int)((pt->DATR.WORDVAL >> 21) & 1),
+               (int)((pt->DAT.WORDVAL >> 21) & 1));
+    *csel3 |= (1u << 20);           /* PF21 -> master1 */
+    GPIO_clearPin(pt, GPIO_PIN_21);
+    rt_thread_mdelay(50);
+    rt_kprintf("[D] gate=1 master1: latch=%d pad=%d\n", 
+               (int)((pt->DATR.WORDVAL >> 21) & 1),
+               (int)((pt->DAT.WORDVAL >> 21) & 1));
+    *csel3 &= ~(1u << 20);
+    GPIO_clearPin(pt, GPIO_PIN_21);
+    rt_uint32_t mask = 0x1UL << 21;
+    /* 判别实验: 输入+内部上/下拉, 区分"网络外部强上拉"vs"输出驱动损坏" */
+    GPIO_setPinConfig(pt, GPIO_PIN_21, ALT0_FUNCTION);
+    GPIO_setDirectionMode(pt, GPIO_PIN_21, GPIO_DIR_MODE_IN);
+    GPIO_setPadConfig(pt, GPIO_PIN_21, GPIO_PIN_TYPE_PULLDOWN);
+    rt_thread_mdelay(20);
+    rt_kprintf("[D] in+pulldown: pad=%d (0=no strong ext pull-up; 1=strong ext pull-up)\n",
+               (int)((pt->DAT.WORDVAL & mask) ? 1 : 0));
+    GPIO_setPadConfig(pt, GPIO_PIN_21, GPIO_PIN_TYPE_PULLUP);
+    rt_thread_mdelay(20);
+    rt_kprintf("[D] in+pullup  : pad=%d (1=internal pull-up wins, no strong ext pull-down)\n",
+               (int)((pt->DAT.WORDVAL & mask) ? 1 : 0));
+    GPIO_setPadConfig(pt, GPIO_PIN_21, GPIO_PIN_TYPE_STD);
+    GPIO_setDirectionMode(pt, GPIO_PIN_21, GPIO_DIR_MODE_OUT);
+    GPIO_clearPin(pt, GPIO_PIN_21);
+    rt_kprintf("[D] final: latch=%d pad=%d\n",
+               (int)((pt->DATR.WORDVAL >> 21) & 1),
+               (int)((pt->DAT.WORDVAL >> 21) & 1));
+}
+MSH_CMD_EXPORT(pf21_diag, BUG-009 v2 full diag with corrected DAT/DATR semantics);
+
+/* 慢速 A/B 测试: 低/高各 2 秒交替 3 轮, 配合万用表看 J4-20.
+ * 仅允许 J4-20 未接任何外部电路时运行! */
+static void pf21_ab(void)
+{
+    GPIO_TypeDef *pt = GPIOF;
+    int round;
+    pf21_config_output();
+    for (round = 1; round <= 3; ++round)
+    {
+        GPIO_clearPin(pt, GPIO_PIN_21);
+        rt_thread_mdelay(2000);
+        rt_kprintf("[AB] r%d LOW : DATR=%d DAT=%d\n", round,
+                   (int)((pt->DATR.WORDVAL >> 21) & 1),
+                   (int)((pt->DAT.WORDVAL >> 21) & 1));
+        GPIO_setPin(pt, GPIO_PIN_21);
+        rt_thread_mdelay(2000);
+        rt_kprintf("[AB] r%d HIGH: DATR=%d DAT=%d\n", round,
+                   (int)((pt->DATR.WORDVAL >> 21) & 1),
+                   (int)((pt->DAT.WORDVAL >> 21) & 1));
+    }
+    GPIO_clearPin(pt, GPIO_PIN_21);
+    rt_kprintf("[AB] end LOW (safe)\n");
+}
+MSH_CMD_EXPORT(pf21_ab, BUG-009 slow LOW/HIGH A/B for multimeter watch);
