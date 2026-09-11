@@ -167,6 +167,44 @@ static void pf21_probe(void)
     GPIO_setPadConfig(pt, GPIO_PIN_21, GPIO_PIN_TYPE_STD);
     GPIO_setDirectionMode(pt, GPIO_PIN_21, GPIO_DIR_MODE_OUT);
     GPIO_setPinConfig(pt, GPIO_PIN_21, ALT0_FUNCTION);
+
+    /* 实验1: 直接写 DAT 寄存器(绕过 SET/CLR) */
+    WRITE_REG(pt->DAT.WORDVAL, pt->DAT.WORDVAL & ~(1u << 21));
+    rt_kprintf("[P] direct DAT clear: DAT21=%d DATR21=%d' + NL + '",
+               (int)((pt->DAT.WORDVAL >> 21) & 1),
+               (int)((pt->DATR.WORDVAL >> 21) & 1));
+
+    /* 实验2: 开漏 + 写低 */
+    GPIO_setPadConfig(pt, GPIO_PIN_21, GPIO_PIN_TYPE_OD);
+    GPIO_clearPin(pt, GPIO_PIN_21);
+    rt_kprintf("[P] OD + clr: DAT21=%d' + NL + '",
+               (int)((pt->DAT.WORDVAL >> 21) & 1));
+    GPIO_setPadConfig(pt, GPIO_PIN_21, GPIO_PIN_TYPE_STD);
+
+    /* 实验3: 写低后延时再读 5 次, 看是否被弹回 */
+    GPIO_clearPin(pt, GPIO_PIN_21);
+    {
+        int i;
+        for (i = 0; i < 5; ++i)
+        {
+            rt_thread_mdelay(20);
+            rt_kprintf("[P] t+%dms: DAT21=%d' + NL + '", (i + 1) * 20,
+                       (int)((pt->DAT.WORDVAL >> 21) & 1));
+        }
+    }
+
+    GPIO_clearPin(pt, GPIO_PIN_21);
+    rt_kprintf("[P] master0: w0 r=%d (DATR=%d)' + NL + '",
+               (int)((pt->DAT.WORDVAL >> 21) & 1),
+               (int)((pt->DATR.WORDVAL >> 21) & 1));
+
+    csel1[2] = csel3 | (1u << 20);             /* master 1 */
+    GPIO_clearPin(pt, GPIO_PIN_21);
+    rt_kprintf("[P] master1: w0 r=%d (DATR=%d)' + NL + '",
+               (int)((pt->DAT.WORDVAL >> 21) & 1),
+               (int)((pt->DATR.WORDVAL >> 21) & 1));
+
+    csel1[2] = csel3;                          /* 恢复原值 */
     GPIO_clearPin(pt, GPIO_PIN_21);
 
     rt_kprintf("[P] after OUT+CLR: DIR21=%d DAT21=%d DATR21=%d MUX2=%08X GMUX2=%08X\n",
