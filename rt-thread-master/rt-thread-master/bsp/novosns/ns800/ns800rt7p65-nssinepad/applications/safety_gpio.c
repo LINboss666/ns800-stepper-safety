@@ -150,3 +150,36 @@ rt_base_t safety_pin(const char *name)
     return (p != RT_NULL) ? p->pin : -RT_ERROR;
 }
 
+/* ==== 临时诊断(BUG-009): 端口F pin21 寄存器级探测, 破案后删除 ==== */
+#include "drv_gpio.h"
+
+static void pf21_probe(void)
+{
+    GPIO_TypeDef *pt = GPIOF;
+    volatile rt_uint32_t *mux2 = (volatile rt_uint32_t *)(&pt->MUX1) + 1;
+    volatile rt_uint32_t *gmux2 = (volatile rt_uint32_t *)(&pt->GMUX1) + 1;
+    rt_uint32_t mask = 0x1UL << 21;
+
+    rt_kprintf("[P] before: DIR21=%d DAT=%08X DATR21=%d MUX2=%08X GMUX2=%08X\n",
+               (int)((pt->DIR.WORDVAL >> 21) & 1), pt->DAT.WORDVAL,
+               (int)((pt->DATR.WORDVAL >> 21) & 1), *mux2, *gmux2);
+
+    GPIO_setPadConfig(pt, GPIO_PIN_21, GPIO_PIN_TYPE_STD);
+    GPIO_setDirectionMode(pt, GPIO_PIN_21, GPIO_DIR_MODE_OUT);
+    GPIO_setPinConfig(pt, GPIO_PIN_21, ALT0_FUNCTION);
+    GPIO_clearPin(pt, GPIO_PIN_21);
+
+    rt_kprintf("[P] after OUT+CLR: DIR21=%d DAT21=%d DATR21=%d MUX2=%08X GMUX2=%08X\n",
+               (int)((pt->DIR.WORDVAL >> 21) & 1), (int)((pt->DAT.WORDVAL >> 21) & 1),
+               (int)((pt->DATR.WORDVAL >> 21) & 1), *mux2, *gmux2);
+
+    GPIO_setPin(pt, GPIO_PIN_21);
+    rt_kprintf("[P] after SET: DAT21=%d DATR21=%d\n",
+               (int)((pt->DAT.WORDVAL >> 21) & 1),
+               (int)((pt->DATR.WORDVAL >> 21) & 1));
+    GPIO_clearPin(pt, GPIO_PIN_21);   /* 恢复安全低 */
+    rt_kprintf("[P] end CLR: DAT21=%d DATR21=%d\n",
+               (int)((pt->DAT.WORDVAL >> 21) & 1),
+               (int)((pt->DATR.WORDVAL >> 21) & 1));
+}
+MSH_CMD_EXPORT(pf21_probe, BUG-009 register level probe for PF.21);
