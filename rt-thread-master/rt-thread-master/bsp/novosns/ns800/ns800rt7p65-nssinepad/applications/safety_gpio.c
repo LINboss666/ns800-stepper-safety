@@ -223,11 +223,11 @@ static void pf21_diag(void)
     GPIO_setDirectionMode(pt, GPIO_PIN_21, GPIO_DIR_MODE_IN);
     GPIO_setPadConfig(pt, GPIO_PIN_21, GPIO_PIN_TYPE_PULLDOWN);
     rt_thread_mdelay(20);
-    rt_kprintf("[D] in+pulldown: pad=%d (0=no strong ext pull-up; 1=strong ext pull-up)\n",
+    rt_kprintf("[D] in+pulldown: pad=%d (sample still HIGH; DMM on J4-20 needed)\n",
                (int)((pt->DAT.WORDVAL & mask) ? 1 : 0));
     GPIO_setPadConfig(pt, GPIO_PIN_21, GPIO_PIN_TYPE_PULLUP);
     rt_thread_mdelay(20);
-    rt_kprintf("[D] in+pullup  : pad=%d (1=internal pull-up wins, no strong ext pull-down)\n",
+    rt_kprintf("[D] in+pullup  : pad=%d (sample still HIGH; DMM on J4-20 needed)\n",
                (int)((pt->DAT.WORDVAL & mask) ? 1 : 0));
     GPIO_setPadConfig(pt, GPIO_PIN_21, GPIO_PIN_TYPE_STD);
     GPIO_setDirectionMode(pt, GPIO_PIN_21, GPIO_DIR_MODE_OUT);
@@ -235,6 +235,16 @@ static void pf21_diag(void)
     rt_kprintf("[D] final: latch=%d pad=%d\n",
                (int)((pt->DATR.WORDVAL >> 21) & 1),
                (int)((pt->DAT.WORDVAL >> 21) & 1));
+
+    /* 对照组: PA.2(TMC_DIR) 同为 safety_gpio 输出脚且此前回读一致,
+     * 若 PA.2 latch==pad 而 PF21 latch!=pad, 更利于 FAE 定位 */
+    {
+        GPIO_TypeDef *pa = GPIOA;
+        rt_uint32_t m2 = 0x1UL << 2;
+        rt_kprintf("[D] control PA.2: latch=%d pad=%d (expect equal)\n",
+                   (int)((pa->DATR.WORDVAL & m2) ? 1 : 0),
+                   (int)((pa->DAT.WORDVAL & m2) ? 1 : 0));
+    }
 }
 MSH_CMD_EXPORT(pf21_diag, BUG-009 v2 full diag with corrected DAT/DATR semantics);
 
