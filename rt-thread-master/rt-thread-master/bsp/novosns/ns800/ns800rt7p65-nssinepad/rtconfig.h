@@ -446,6 +446,7 @@
 #define BSP_USING_ADC
 #define BSP_USING_SPI
 #define BSP_USING_SPI1
+#define BSP_USING_SPI3
 #define BSP_USING_EPWM
 #define BSP_USING_EPWM1
 /* end of On-chip Peripheral Drivers */

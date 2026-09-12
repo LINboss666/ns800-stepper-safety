@@ -77,19 +77,23 @@ static struct ns800_spi_config spi_config[] =
 #endif
 #ifdef BSP_USING_SPI3
     {
+        /* 2026-09-12 fix: old entry (GPIOC 0/1/2 @ ALT7) does not match the
+         * vendor mux table - GPIO_64/65 have no ALT7, GPIO_66 ALT7=EMIF1_A12,
+         * so the bus was silently dead. Correct SPI3 group per mux table:
+         * SIMO=GPIO_50(PB18) SOMI=GPIO_51(PB19) CLK=GPIO_52(PB20) @ ALT6. */
         .name = "spi3",
         .Instance = SPI3,
         .rx_irq_type = SPI3_RX_IRQn,
         .tx_irq_type = SPI3_TX_IRQn,
-        .sck_port = GPIOC,
-        .sck_pin = GPIO_PIN_0,
-        .sck_mux = ALT7_FUNCTION,
-        .mosi_port = GPIOC,
-        .mosi_pin = GPIO_PIN_1,
-        .mosi_mux = ALT7_FUNCTION,
-        .miso_port = GPIOC,
-        .miso_pin = GPIO_PIN_2,
-        .miso_mux = ALT7_FUNCTION,
+        .sck_port = GPIOB,
+        .sck_pin = GPIO_PIN_20,
+        .sck_mux = ALT6_FUNCTION,
+        .mosi_port = GPIOB,
+        .mosi_pin = GPIO_PIN_18,
+        .mosi_mux = ALT6_FUNCTION,
+        .miso_port = GPIOB,
+        .miso_pin = GPIO_PIN_19,
+        .miso_mux = ALT6_FUNCTION,
     },
 #endif
 #ifdef BSP_USING_SPI4

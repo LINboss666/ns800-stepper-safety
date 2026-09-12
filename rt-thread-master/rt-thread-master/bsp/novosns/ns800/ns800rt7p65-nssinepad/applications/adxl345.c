@@ -1,13 +1,16 @@
 /*
- * adxl345.c - ADXL345 三轴加速度计驱动 (SPI1 共享总线, 交接文档 §6.2)
+ * adxl345.c - ADXL345 三轴加速度计驱动 (硬件 SPI3 独占总线, 交接文档 §6.2)
  *
- * 硬件: CS=PA.20(J2-14), INT1=PA.21(J2-15, EXT5, 暂未用)
+ * 硬件: CS=PA.20(J2-14, 软件 CS), INT1=PA.21(J2-15, EXT5, 暂未用)
+ * 总线: spi3 = SCK=GPIO_52(J3-34), MOSI(SIMO)=GPIO_50(J3-36),
+ *       MISO(SOMI)=GPIO_51(J3-35), 全部 ALT6 (2026-09-12 修正 BSP SPI3 引脚表,
+ *       原 PC0/1/2@ALT7 与官方 mux 表不符, 详见 调试记录.md)
  * 时序: 4线 SPI Mode3(CPOL=1,CPHA=1), 1MHz bring-up(上限5MHz), 8bit
  * 协议: 地址字节 bit7=RW(1读), bit6=MB(多字节自增)
  *
  * 防复发(调试记录.md):
  *   BUG-001 CS 常高: safety_gpio 上电已把 PA.20 拉高, 这里发送前再次确保
- *   BUG-002 rt_spi_configure 返回 -RT_EBUSY 不算错误(总线被 Flash 占用)
+ *   BUG-002 rt_spi_configure 返回 -RT_EBUSY 不算错误(总线被其它设备占用)
  *
  * 状态: 代码就绪; DEVID=0xE5 待接线验证. 读不到 0xE5 时如实报错,
  *       按交接文档 §6.2 检查单排查, 禁止继续配置.
@@ -18,7 +21,7 @@
 #include "project_board.h"
 #include "safety_gpio.h"
 
-#define ADXL_BUS_NAME   SENSOR_SPI_BUS_NAME     /* "spi1" */
+#define ADXL_BUS_NAME   SENSOR_SPI_BUS_NAME     /* "spi3" */
 #define ADXL_DEV_NAME   "adxl345"
 #define ADXL_SPI_HZ     1000000u
 
@@ -109,6 +112,31 @@ static void imu_id(void)
                    id, ADXL_DEVID_VAL);
 }
 MSH_CMD_EXPORT(imu_id, read ADXL345 DEVID register);
+/* 只读探测: 验证 spi3 总线/设备注册/DEVID, 不写任何 ADXL345 寄存器 */
+static void imu_probe(void)
+{
+    rt_err_t e = adxl_attach();
+    rt_uint8_t id1 = 0, id2 = 0;
+
+    if (e != RT_EOK) { rt_kprintf("[IMU] attach failed: %d\n", e); return; }
+    rt_pin_write(safety_pin(PIN_NAME_IMU_CS), PIN_HIGH);
+
+    rt_kprintf("[IMU] bus=%s dev=%s cs=%s mode=3 hz=%u\n",
+               ADXL_BUS_NAME, ADXL_DEV_NAME, PIN_NAME_IMU_CS, ADXL_SPI_HZ);
+
+    e = adxl_read_reg(ADXL_DEVID, &id1);
+    if (e != RT_EOK) { rt_kprintf("[IMU] read#1 failed: %d\n", e); return; }
+    e = adxl_read_reg(ADXL_DEVID, &id2);
+    if (e != RT_EOK) { rt_kprintf("[IMU] read#2 failed: %d\n", e); return; }
+
+    rt_kprintf("[IMU] DEVID read#1=0x%02X read#2=0x%02X (expect 0x%02X twice)\n",
+               id1, id2, ADXL_DEVID_VAL);
+    if (id1 == ADXL_DEVID_VAL && id2 == ADXL_DEVID_VAL)
+        rt_kprintf("[IMU] SPI3/ADXL345 PROBE OK\n");
+    else
+        rt_kprintf("[IMU] SPI3 bus alive but no valid ADXL345 reply\n");
+}
+MSH_CMD_EXPORT(imu_probe, read-only probe of spi3 bus and ADXL345 DEVID);
 
 static void imu_raw(void)
 {

@@ -25,7 +25,11 @@
 #define PIN_NAME_LIMIT_MAX      "PF.15"  /* J4-25  GPIO25 max limit IRQ (EXTI15) */
 #define PIN_NAME_ESTOP          "PC.6"   /* J4-40  GPIO70 e-stop sense IRQ (EXTI6) */
 
-/* ===== SPI bus devices (shared spi1) ===== */
+/* ===== SPI bus devices ===== */
+/* Flash 独占硬件 SPI1 (PA16/17/18, J2-9/10/11)。
+ * ADXL345 使用硬件 SPI3: 2026-09-12 修正 BSP drv_spi.c SPI3 引脚表(原 PC0/1/2@ALT7
+ * 与官方 mux 表不符, GPIO_64/65/66 无 SPI3 复用, 详见 调试记录.md)。
+ * SPI3 引脚组: SCK=GPIO_52(J3-34) MOSI(SIMO)=GPIO_50(J3-36) MISO(SOMI)=GPIO_51(J3-35) @ALT6 */
 #define PIN_NAME_FLASH_CS       "PF.12"  /* J2-12  GPIO22 expansion flash CS */
 #define PIN_NAME_IMU_CS         "PA.20"  /* J2-14  GPIO20 ADXL345 CS */
 #define PIN_NAME_IMU_INT1       "PA.21"  /* J2-15  GPIO21 ADXL345 INT1 IRQ (EXTI5) */
@@ -38,7 +42,7 @@
 
 /* ===== Devices ===== */
 #define TMC_UART_DEVICE_NAME    "uart2"      /* PB6 TX / PB7 RX */
-#define SENSOR_SPI_BUS_NAME     "spi1"
+#define SENSOR_SPI_BUS_NAME     "spi3"   /* IMU 专用, Flash 仍为 spi1 */
 #define CURRENT_ADC_DEVICE_NAME "adc0"       /* ADCA, PH2 = channel 15 */
 #define CURRENT_ADC_CHANNEL     15
 #define EPWM_STEP_DEV_NAME      "epwm1"      /* verify exact name against local drv_epwm.c before use */
