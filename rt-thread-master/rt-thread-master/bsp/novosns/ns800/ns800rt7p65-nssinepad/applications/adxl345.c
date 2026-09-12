@@ -159,6 +159,7 @@ static void imu_raw(void)
     adxl_write_reg(ADXL_BW_RATE, 0x0A);            /* 100Hz */
     adxl_write_reg(ADXL_DATA_FORMAT, 0x00);        /* ±2g, 非全分辨率 */
     adxl_write_reg(ADXL_POWER_CTL, 0x08);          /* measure */
+    rt_thread_mdelay(10);                          /* é¦å¸§è½¬æ¢æªå°±ç»ªæ¶ä¼è¯»å°å¨ 0 */
 
     e = adxl_read_regs(ADXL_DATAX0, buf, 6);
     if (e != RT_EOK) { rt_kprintf("[IMU] read XYZ failed: %d\n", e); return; }
