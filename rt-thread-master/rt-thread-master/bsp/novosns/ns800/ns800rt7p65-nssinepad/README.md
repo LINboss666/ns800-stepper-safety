@@ -123,8 +123,10 @@ UV4 -b 编译（0 错误）→ UV4 -f 烧录 → pyocd 复位 → COM5 串口读
 | `imu_id` / `imu_raw` | ADXL345 DEVID / 三轴原始值 | 代码就绪，待接线验证 |
 | `current_raw` | 母线电流 ADC 原始值 | 代码就绪，待标定 |
 | `pwm_test <hz>` | STEP 输出测试（默认不使能） | 代码就绪，频率待示波器验收 |
-| `tmc_uart_probe` / `tmc_status` | TMC2209 寄存器探测 | 代码就绪，待扩展板 |
-| `tmc_crc_test` | CRC 算法自测（纯软件） | ✅ 可验证 |
+| `tmc_scan` | 只读扫描地址0..3找 TMC2209 | ✅ 真机 FOUND (addr0) |
+| `tmc_uart_probe` / `tmc_status` | IFCNT写握手 / GSTAT+版本 | ✅ 真机验证 (IFCNT+1) |
+| `tmc_regs` | 关键寄存器只读快照 | ✅ 真机验证 |
+| `tmc_crc_test` | CRC 算法自测（官方向量） | ✅ 真机 PASS |
 
 ## 7. 安全红线（任何修改不得违反）
 

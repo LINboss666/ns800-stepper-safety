@@ -325,6 +325,35 @@ static void tmc_scan(void)
 }
 MSH_CMD_EXPORT(tmc_scan, read-only scan addr 0..3 IOIN for TMC2209);
 
+/* 寄存器快照: 全部 READ, 零 WRITE, 记录上电基线供日后电机配置/FAE 比对 */
+static void tmc_regs(void)
+{
+    static const struct { rt_uint8_t reg; const char *name; } regs[] = {
+        { TMC_REG_GCONF,    "GCONF   " },
+        { TMC_REG_GSTAT,    "GSTAT   " },
+        { TMC_REG_IFCNT,    "IFCNT   " },
+        { TMC_REG_IOIN,     "IOIN    " },
+        { 0x22,             "VACTUAL " },
+        { 0x6C,             "CHOPCONF" },
+        { TMC_REG_SG_RESULT,"SGRESULT" },
+    };
+    int i;
+
+    if (tmc_uart_open() != RT_EOK) return;
+
+    rt_kprintf("[TMC] register snapshot (read-only, addr %d):\n", TMC_ADDR_DEFAULT);
+    for (i = 0; i < (int)(sizeof(regs) / sizeof(regs[0])); ++i)
+    {
+        rt_uint32_t v = 0;
+        rt_err_t e = tmc_read_reg(TMC_ADDR_DEFAULT, regs[i].reg, &v);
+        if (e == RT_EOK)
+            rt_kprintf("[TMC] %s (0x%02X) = 0x%08X\n", regs[i].name, regs[i].reg, v);
+        else
+            rt_kprintf("[TMC] %s (0x%02X) = READ FAILED\n", regs[i].name, regs[i].reg);
+    }
+}
+MSH_CMD_EXPORT(tmc_regs, dump TMC2209 key registers read-only);
+
 static void tmc_status(void)
 {
     rt_uint32_t gstat = 0, ioin = 0;
