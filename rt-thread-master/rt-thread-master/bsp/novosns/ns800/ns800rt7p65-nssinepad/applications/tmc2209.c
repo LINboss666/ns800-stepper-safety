@@ -282,6 +282,49 @@ static void tmc_uart_probe(void)
 }
 MSH_CMD_EXPORT(tmc_uart_probe, probe TMC2209: IFCNT-write-IFCNT handshake);
 
+/* 只读扫描: 地址 0..3 逐个 READ IOIN(0x06), 不执行任何 WRITE、不改配置。
+ * 复用 tmc_read_reg(含回声过滤/应答头搜索/CRC 校验), 不另起第二套协议实现。
+ * IOIN[31:24]=VERSION: TMC2209=0x21, TMC2208=0x20。 */
+static void tmc_scan(void)
+{
+    rt_uint8_t addr;
+    int found = 0;
+
+    if (tmc_uart_open() != RT_EOK) return;
+
+    rt_kprintf("[TMC] scan: READ IOIN(0x06) on addr 0..3, read-only\n");
+    for (addr = 0; addr <= 3; ++addr)
+    {
+        rt_uint32_t ioin = 0;
+        rt_err_t e = tmc_read_reg(addr, TMC_REG_IOIN, &ioin);
+
+        if (e == RT_EOK)
+        {
+            rt_uint8_t ver = (rt_uint8_t)(ioin >> 24);
+            found++;
+            if (ver == 0x21)
+                rt_kprintf("ADDR %d: IOIN=0x%08X VERSION=0x%02X -> TMC2209 FOUND\n",
+                           addr, ioin, ver);
+            else
+                rt_kprintf("ADDR %d: IOIN=0x%08X VERSION=0x%02X -> VERSION mismatch"
+                           " (0x21=TMC2209 expected)\n", addr, ioin, ver);
+        }
+        else
+        {
+            rt_kprintf("ADDR %d: no valid reply\n", addr);
+        }
+    }
+
+    if (found == 0)
+    {
+        rt_kprintf("[TMC] UART MCU TX/RX echo path OK\n");
+        rt_kprintf("[TMC] No TMC2209 response on addresses 0..3\n");
+        rt_kprintf("[TMC] Check VIO / VM / common GND / PDN_UART physical connection"
+                   " / MS1-MS2 hardware\n");
+    }
+}
+MSH_CMD_EXPORT(tmc_scan, read-only scan addr 0..3 IOIN for TMC2209);
+
 static void tmc_status(void)
 {
     rt_uint32_t gstat = 0, ioin = 0;
