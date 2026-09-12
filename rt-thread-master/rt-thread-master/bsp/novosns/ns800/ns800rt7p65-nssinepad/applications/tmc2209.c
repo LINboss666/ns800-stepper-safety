@@ -1,21 +1,23 @@
 /*
- * tmc2209.c - TMC2209 UART 协议层 (UART2: PB6 TX / PB7 RX, 单线汇合在扩展板)
+ * tmc2209.c - TMC2209 UART 协议层 (UART2: PB6 TX / PB7 RX, 单线汇合到 PDN_UART)
  *
- * ⚠ BUG-010 重写版 (2026-09-12): 旧版三处协议错误已修正——
- *   ① 读写位反了: 官方规范 bit7=1 写 / bit7=0 读 (旧版恰好相反)
- *   ② CRC8 算法: TMC-API 官方实现——每字节按 LSB-first 逐位喂入,
- *      MSB 方向移位, 多项式 0x07, 初值 0x00 (旧版用了普通左移算法)
- *   ③ 读应答帧: [0xFF(master), addr, reg, d31..0, crc] 共 8 字节,
- *      首字节固定 0xFF (旧版误以为 echo slave 地址)
- *   ④ 写操作无应答: 以 IFCNT 自增确认写入成功 (旧版等 4 字节应答必然超时)
- *   测试向量: [05 00 02]→0x8F 来自 TMCStepper 真机验证库, 非自证
+ * v3 (2026-09-12) 依据 TMC2209 Datasheet Rev 1.09 与官方 TMC-API 逐字节核对重写:
+ *   ① 帧格式(权威定义, 全部按此实现):
+ *        read  req: [0x05][slave][reg     ][crc]              4 字节
+ *        write req: [0x05][slave][reg|0x80][D3 D2 D1 D0][crc] 8 字节, 无应答
+ *        reply     : [0x05][0xFF ][reg     ][D3 D2 D1 D0][crc] 8 字节
+ *      v2 错误: 把应答首字节当 0xFF 判别 —— 实际 byte0=0x05(sync), byte1=0xFF(master)。
+ *   ② CRC8-ATM: poly 0x07 / init 0, 每字节按 LSB→MSB 逐位喂入 (datasheet
+ *      swuart_calcCRC 的等价实现)。向量: [05 00 02]→0x8F, [05 00 00]→0x48。
+ *   ③ IFCNT 只在收到有效 WRITE 后自增, READ 不影响 → probe 用"写 GCONF 原值"
+ *      前后 IFCNT+1 验证芯片存活, 不改任何配置。
+ *   ④ 单线回声: TX 经 1k 汇合到 PDN, MCU RX 会收到自己发的帧。
+ *      read 路径在字节流里搜索 [05 FF reg] 应答头, 天然跳过自身回声
+ *      (回声 byte1=slave 地址, 永不等于 0xFF); write 后主动排空回声。
+ *   ⑤ 应答校验: r[0]==0x05, r[1]==0xFF, r[2]==(reg&0x7F), CRC 有效, 四关全过。
  *
- * 帧格式(TMC2209 数据手册):
- *   写: [0x05][addr][reg|0x80][d31..24][d23..16][d15..8][d7..0][crc]  无应答
- *   读: [0x05][addr][reg&0x7F][crc]  应答 [0xFF][addr][reg][d31..0][crc]
- *
- * 软件不处理单线方向切换(TX/RX 由扩展板 1k 电阻网络汇合到 PDN_UART)。
- * 状态: 协议层完成, CRC 自测真机 PASS; 真实通信待扩展板接线。
+ * 硬件映射不变: uart2 / PB6=TX / PB7=RX / 115200 8N1 / slave addr 0。
+ * 状态: CRC 自测向量真机 PASS; tmc_uart_probe 前不得据无应答判断芯片损坏。
  */
 
 #include <rtthread.h>
@@ -25,8 +27,9 @@
 #define TMC_UART_NAME    TMC_UART_DEVICE_NAME    /* "uart2" */
 #define TMC_BAUD         115200
 #define TMC_SYNC_BYTE    0x05
-#define TMC_REPLY_MASTER 0xFF                    /* 应答帧首字节固定 0xFF */
+#define TMC_MASTER_ADDR  0xFF
 #define TMC_ADDR_DEFAULT 0x00
+#define TMC_WRITE_BIT    0x80
 
 /* 常用寄存器 */
 #define TMC_REG_GCONF    0x00
@@ -35,12 +38,16 @@
 #define TMC_REG_IOIN     0x06
 #define TMC_REG_SG_RESULT 0x41
 
+#define TMC_REPLY_LEN        8
+#define TMC_RX_BUF           32
+#define TMC_REPLY_TIMEOUT_MS 100
+
 static rt_device_t tmc_serial = RT_NULL;
 static rt_bool_t tmc_opened = RT_FALSE;
 
 static rt_err_t tmc_read_reg(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *value);
 
-/* ---------- CRC8 (TMC-API 官方算法, 见文件头 BUG-010 ②) ---------- */
+/* ---------- CRC8-ATM (datasheet swuart_calcCRC 等价实现, 见文件头 ②) ---------- */
 static rt_uint8_t tmc_crc8(const rt_uint8_t *data, rt_size_t len)
 {
     rt_uint8_t crc = 0;
@@ -95,124 +102,143 @@ static void tmc_rx_flush(void)
     while (rt_device_read(tmc_serial, 0, dump, sizeof(dump)) > 0) ;
 }
 
-/* 带超时读取期望长度, 返回实际读到的字节数 */
-static rt_size_t tmc_rx_wait(rt_uint8_t *buf, rt_size_t want, rt_uint32_t timeout_ms)
-{
-    rt_size_t got = 0;
-    rt_tick_t deadline = rt_tick_get() + rt_tick_from_millisecond(timeout_ms);
-
-    while (got < want)
-    {
-        got += rt_device_read(tmc_serial, 0, buf + got, want - got);
-        if ((rt_tick_t)(rt_tick_get() - deadline) < (rt_tick_t)0x80000000)
-            break;                       /* 超时 */
-        if (got < want) rt_thread_mdelay(2);
-    }
-    return got;
-}
-
 static void hex_dump(const char *tag, const rt_uint8_t *p, rt_size_t n)
 {
     rt_size_t i;
-    rt_kprintf("[TMC] %s:", tag);
+    rt_kprintf("[TMC] %s (%d):", tag, (int)n);
     for (i = 0; i < n; ++i) rt_kprintf(" %02X", p[i]);
     rt_kprintf("\n");
 }
 
-/* 读 IFCNT: 用于写确认与探活。返回 RT_EOK 时 *cnt 为计数值 */
-static rt_err_t tmc_read_ifcnt(rt_uint32_t *cnt)
-{
-    return tmc_read_reg(TMC_ADDR_DEFAULT, TMC_REG_IFCNT, cnt);
-}
-
 /* ---------- 协议层 ---------- */
-/* 写寄存器: 无应答。confirm=1 时用 IFCNT+1 验证芯片真的收到了 */
-static rt_err_t tmc_write_reg(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t value,
-                              rt_bool_t confirm)
+
+/* 写寄存器: 8 字节帧, TMC2209 对 WRITE 无应答(IFCNT 才是写入凭证)。
+ * 发送后短暂延时排空自身回声, 保证后续 read 的字节流干净。 */
+static rt_err_t tmc_write_reg(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t value)
 {
-    rt_uint8_t f[8];
-    rt_uint32_t before = 0, after = 0;
+    rt_uint8_t req[8];
     rt_err_t e = tmc_uart_open();
     if (e != RT_EOK) return e;
 
-    if (confirm)
-    {
-        if (tmc_read_ifcnt(&before) != RT_EOK) return -RT_EIO;
-    }
-
-    f[0] = TMC_SYNC_BYTE; f[1] = addr; f[2] = (rt_uint8_t)(reg | 0x80); /* BUG-010①: 写=bit7=1 */
-    f[3] = (rt_uint8_t)(value >> 24); f[4] = (rt_uint8_t)(value >> 16);
-    f[5] = (rt_uint8_t)(value >> 8);  f[6] = (rt_uint8_t)value;
-    f[7] = tmc_crc8(f, 7);
+    req[0] = TMC_SYNC_BYTE;
+    req[1] = addr;
+    req[2] = (rt_uint8_t)(reg | TMC_WRITE_BIT);
+    req[3] = (rt_uint8_t)(value >> 24);
+    req[4] = (rt_uint8_t)(value >> 16);
+    req[5] = (rt_uint8_t)(value >> 8);
+    req[6] = (rt_uint8_t)value;
+    req[7] = tmc_crc8(req, 7);
 
     tmc_rx_flush();
-    hex_dump("TX(write)", f, 8);
-    if (rt_device_write(tmc_serial, 0, f, 8) != 8) return -RT_EIO;
+    hex_dump("TX(write)", req, 8);
+    if (rt_device_write(tmc_serial, 0, req, 8) != 8) return -RT_EIO;
 
-    if (!confirm) return RT_EOK;
-
-    rt_thread_mdelay(10);
-    if (tmc_read_ifcnt(&after) != RT_EOK) return -RT_EIO;
-    /* IFCNT 每收到一帧完整电报自增(含我们发的读命令), +1..+2 视为到达 */
-    if (after == before || (rt_uint8_t)(after - before) > 4)
-    {
-        rt_kprintf("[TMC] write confirm failed (IFCNT %u -> %u)\n", before, after);
-        return -RT_EIO;
-    }
-    rt_kprintf("[TMC] write confirmed (IFCNT %u -> %u)\n", before, after);
+    /* 8 字节 @115200 ≈ 0.7ms; 延时后一次排空回声 */
+    rt_thread_mdelay(3);
+    tmc_rx_flush();
     return RT_EOK;
 }
 
+/* 读寄存器: 发 4 字节请求后, RX 上先出现自身回声(4 字节, byte1=slave 地址),
+ * 随后才是应答(8 字节, byte1=0xFF)。在字节流中滑动搜索 [05 FF reg&0x7F]
+ * 应答头, 收满 8 字节后验 CRC —— 不假设应答从 buffer 第一个字节开始。 */
 static rt_err_t tmc_read_reg(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *value)
 {
-    rt_uint8_t f[4], r[8];
-    rt_size_t n;
+    rt_uint8_t req[4];
+    rt_uint8_t buf[TMC_RX_BUF];
+    rt_size_t n = 0;
+    rt_tick_t deadline;
     rt_err_t e = tmc_uart_open();
     if (e != RT_EOK) return e;
 
-    f[0] = TMC_SYNC_BYTE; f[1] = addr; f[2] = (rt_uint8_t)(reg & 0x7F); /* BUG-010①: 读=bit7=0 */
-    f[3] = tmc_crc8(f, 3);
+    req[0] = TMC_SYNC_BYTE;
+    req[1] = addr;
+    req[2] = (rt_uint8_t)(reg & 0x7F);
+    req[3] = tmc_crc8(req, 3);
 
     tmc_rx_flush();
-    hex_dump("TX(read)", f, 4);
-    if (rt_device_write(tmc_serial, 0, f, 4) != 4) return -RT_EIO;
+    hex_dump("TX(read)", req, 4);
+    if (rt_device_write(tmc_serial, 0, req, 4) != 4) return -RT_EIO;
 
-    n = tmc_rx_wait(r, 8, 100);
-    if (n != 8)
+    deadline = rt_tick_get() + rt_tick_from_millisecond(TMC_REPLY_TIMEOUT_MS);
+    for (;;)
     {
-        hex_dump("RX(short)", r, n);
-        return -RT_ETIMEOUT;
+        rt_size_t got = 0;
+        rt_size_t i;
+        rt_bool_t hdr_found = RT_FALSE;
+        rt_size_t hdr_pos = 0;
+
+        if (n < sizeof(buf))
+        {
+            got = rt_device_read(tmc_serial, 0, buf + n, sizeof(buf) - n);
+            n += got;
+        }
+
+        for (i = 0; i + 3 <= n; ++i)
+        {
+            if (buf[i] == TMC_SYNC_BYTE &&
+                buf[i + 1] == TMC_MASTER_ADDR &&
+                buf[i + 2] == (rt_uint8_t)(reg & 0x7F))
+            {
+                hdr_found = RT_TRUE;
+                hdr_pos = i;
+                break;
+            }
+        }
+
+        if (hdr_found && n >= hdr_pos + TMC_REPLY_LEN)
+        {
+            hex_dump("RX", buf, n);
+            if (tmc_crc8(buf + hdr_pos, 7) != buf[hdr_pos + 7])
+            {
+                rt_kprintf("[TMC] reply CRC error\n");
+                return -RT_EIO;
+            }
+            *value = ((rt_uint32_t)buf[hdr_pos + 3] << 24) |
+                     ((rt_uint32_t)buf[hdr_pos + 4] << 16) |
+                     ((rt_uint32_t)buf[hdr_pos + 5] << 8) |
+                      (rt_uint32_t)buf[hdr_pos + 6];
+            return RT_EOK;
+        }
+
+        if ((rt_tick_t)(rt_tick_get() - deadline) < (rt_tick_t)0x80000000)
+        {
+            /* 超时分类: 无字节 / 只有回声 / 有应答头但不完整 */
+            if (n == 0)
+                rt_kprintf("[TMC] RX: no bytes (timeout)\n");
+            else if (hdr_found)
+            {
+                hex_dump("RX(reply header but incomplete)", buf, n);
+            }
+            else
+            {
+                hex_dump("RX(echo only, no 05 FF header)", buf, n);
+            }
+            return -RT_ETIMEOUT;
+        }
+
+        if (n >= sizeof(buf))
+        {
+            /* 窗口滑过后半, 继续搜索, 防长垃圾流撑爆缓冲 */
+            rt_memmove(buf, buf + sizeof(buf) / 2, sizeof(buf) / 2);
+            n = sizeof(buf) / 2;
+        }
+        if (got == 0) rt_thread_mdelay(2);
     }
-    hex_dump("RX", r, 8);
-    /* BUG-010③: 应答帧 [0xFF][addr][reg][d31..0][crc], 首字节固定 0xFF */
-    if (r[0] != TMC_REPLY_MASTER || r[1] != addr || r[2] != reg)
-    {
-        rt_kprintf("[TMC] reply head bad (FF/addr/reg)\n");
-        return -RT_EIO;
-    }
-    if (r[7] != tmc_crc8(r, 7))
-    {
-        rt_kprintf("[TMC] reply CRC bad (got %02X)\n", r[7]);
-        return -RT_EIO;
-    }
-    *value = ((rt_uint32_t)r[3] << 24) | ((rt_uint32_t)r[4] << 16) |
-             ((rt_uint32_t)r[5] << 8) | r[6];
-    return RT_EOK;
 }
 
 /* ---------- MSH 命令 ---------- */
+
+/* 协议向量: 独立来源(datasheet 官方示例/TMCStepper), 非本实现离线自算 */
 static void tmc_crc_test(void)
 {
-    /* 向量来源: ①[05 00 02]→0x8F 来自 TMCStepper 真机验证库(独立第三方),
-     * ②③ 由独立 python 脚本按 TMC-API 官方算法离线计算, 与固件实现不同源 */
     struct { rt_uint8_t f[7]; rt_size_t n; rt_uint8_t crc; const char *tag; } v[] = {
-        { {0x05,0x00,0x02},                3, 0x8F, "read IFCNT req" },
-        { {0x05,0x00,0x80,0,0,0,0},        7, 0x49, "write GCONF=0 req" },
-        { {0xFF,0x00,0x02,0,0,0,3},        7, 0xC2, "reply IFCNT=3" },
+        { {0x05,0x00,0x02},                3, 0x8F, "READ IFCNT slave0 " },
+        { {0x05,0x00,0x00},                3, 0x48, "READ GCONF slave0 " },
     };
     int i, pass = 1;
 
-    for (i = 0; i < 3; ++i)
+    for (i = 0; i < (int)(sizeof(v) / sizeof(v[0])); ++i)
     {
         rt_uint8_t got = tmc_crc8(v[i].f, v[i].n);
         rt_kprintf("[TMC] %s: crc=%02X expect=%02X %s\n",
@@ -221,32 +247,40 @@ static void tmc_crc_test(void)
     }
     rt_kprintf("[TMC] crc self-test: %s\n", pass ? "PASS" : "FAIL");
 }
-MSH_CMD_EXPORT(tmc_crc_test, TMC2209 CRC8 self test (vectors from TMCStepper));
+MSH_CMD_EXPORT(tmc_crc_test, TMC2209 CRC8 self test (official vectors 8F/48));
 
+/* probe: READ IFCNT -> WRITE GCONF(原值, 零改动) -> READ IFCNT, 验证 +1。
+ * IFCNT 只对有效 WRITE 自增, 所以 +1 证明芯片真实收到并接受了完整写帧。 */
 static void tmc_uart_probe(void)
 {
-    rt_uint32_t v1 = 0, v2 = 0;
+    rt_uint32_t ifcnt1 = 0, ifcnt2 = 0, gconf = 0;
     rt_err_t e;
 
     if (tmc_uart_open() != RT_EOK) return;
 
-    rt_kprintf("[TMC] probe: read IFCNT twice (addr=%02X, %d baud)\n",
-               TMC_ADDR_DEFAULT, TMC_BAUD);
-    e = tmc_read_reg(TMC_ADDR_DEFAULT, TMC_REG_IFCNT, &v1);
-    if (e != RT_EOK)
-    {
-        rt_kprintf("[TMC] telegram#1: %s\n",
-                   e == -RT_ETIMEOUT ? "TIMEOUT (no reply: check single-wire net/addr/baud)"
-                                     : "transport error");
-        return;
-    }
-    e = tmc_read_reg(TMC_ADDR_DEFAULT, TMC_REG_IFCNT, &v2);
-    if (e != RT_EOK) { rt_kprintf("[TMC] telegram#2 error\n"); return; }
+    rt_kprintf("[TMC] probe: IFCNT -> write GCONF(same value) -> IFCNT\n");
 
-    rt_kprintf("[TMC] IFCNT: %u -> %u (%s)\n", v1, v2,
-               v2 != v1 ? "increment OK, TMC2209 ALIVE" : "unexpected, check reply");
+    e = tmc_read_reg(TMC_ADDR_DEFAULT, TMC_REG_IFCNT, &ifcnt1);
+    if (e != RT_EOK) { rt_kprintf("[TMC] IFCNT#1 read failed\n"); return; }
+    rt_kprintf("[TMC] IFCNT before = %u\n", ifcnt1 & 0xFF);
+
+    e = tmc_read_reg(TMC_ADDR_DEFAULT, TMC_REG_GCONF, &gconf);
+    if (e != RT_EOK) { rt_kprintf("[TMC] GCONF read failed\n"); return; }
+    rt_kprintf("[TMC] GCONF = 0x%08X (writing same value back)\n", gconf);
+
+    e = tmc_write_reg(TMC_ADDR_DEFAULT, TMC_REG_GCONF, gconf);
+    if (e != RT_EOK) { rt_kprintf("[TMC] GCONF write failed\n"); return; }
+
+    e = tmc_read_reg(TMC_ADDR_DEFAULT, TMC_REG_IFCNT, &ifcnt2);
+    if (e != RT_EOK) { rt_kprintf("[TMC] IFCNT#2 read failed\n"); return; }
+    rt_kprintf("[TMC] IFCNT after  = %u\n", ifcnt2 & 0xFF);
+
+    if ((ifcnt2 & 0xFF) == ((ifcnt1 + 1) & 0xFF))
+        rt_kprintf("[TMC] IFCNT +1 -> TMC2209 ALIVE (write accepted)\n");
+    else
+        rt_kprintf("[TMC] IFCNT did not increment as expected\n");
 }
-MSH_CMD_EXPORT(tmc_uart_probe, probe TMC2209 via UART2 IFCNT counter);
+MSH_CMD_EXPORT(tmc_uart_probe, probe TMC2209: IFCNT-write-IFCNT handshake);
 
 static void tmc_status(void)
 {
@@ -261,7 +295,7 @@ static void tmc_status(void)
     }
     else
     {
-        rt_kprintf("[TMC] GSTAT read failed (no reply?)\n");
+        rt_kprintf("[TMC] GSTAT read failed\n");
         return;
     }
     if (tmc_read_reg(TMC_ADDR_DEFAULT, TMC_REG_IOIN, &ioin) == RT_EOK)
