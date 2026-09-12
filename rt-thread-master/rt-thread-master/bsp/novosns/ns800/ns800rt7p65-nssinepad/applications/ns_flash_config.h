@@ -8,7 +8,6 @@
  * onboard U4 net at J2-13/PA19. Both CS must idle HIGH (see main.c) or MISO
  * contention corrupts reads. Storage/blackbox targets the external module. */
 #define NSF_CS_PIN         PIN_NUM(GPIOF, GPIO_PIN_12) /* J2-12 external module */
-#define NSF_ONBOARD_CS_PIN PIN_NUM(GPIOA, GPIO_PIN_19) /* J2-13 onboard U4 */
 #define NSF_IMU_CS_PIN     PIN_NUM(GPIOA, GPIO_PIN_20) /* J2-14 */
 #define NSF_SPI_HZ         1000000u
 #define NSF_CAPACITY       0x800000u

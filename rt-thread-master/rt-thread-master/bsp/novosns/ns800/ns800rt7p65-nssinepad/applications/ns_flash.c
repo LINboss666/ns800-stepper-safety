@@ -95,14 +95,12 @@ rt_err_t ns_flash_init(void)
     uint8_t id[3], cmd = 0x9f;
     rt_err_t e;
 	      if (get_pin_info(NSF_CS_PIN) == RT_NULL ||
-        get_pin_info(NSF_ONBOARD_CS_PIN) == RT_NULL ||
         get_pin_info(NSF_IMU_CS_PIN) == RT_NULL)
     {
         rt_kprintf(
-            "[FLASH] invalid CS mapping: flash=%d onboard=%d imu=%d\n",
-            (int)NSF_CS_PIN,
-            (int)NSF_ONBOARD_CS_PIN,
-            (int)NSF_IMU_CS_PIN);
+            "[FLASH] invalid CS mapping: flash=%d imu=%d\n",
+            (int)NSF_CS_PIN);
+            
 
         return -RT_EINVAL;
     }
@@ -115,9 +113,6 @@ rt_err_t ns_flash_init(void)
         if (!rt_device_find(NSF_BUS_NAME)) { e = -RT_ERROR; goto out; }
         /* Never reuse an unknown registered device/CS. */
         if (rt_device_find(NSF_DEVICE_NAME)) { e = -RT_EBUSY; goto out; }
-        rt_pin_write(NSF_ONBOARD_CS_PIN, PIN_HIGH);
-        rt_pin_mode(NSF_ONBOARD_CS_PIN, PIN_MODE_OUTPUT);
-        rt_pin_write(NSF_ONBOARD_CS_PIN, PIN_HIGH);
         rt_pin_write(NSF_IMU_CS_PIN, PIN_HIGH);
         rt_pin_mode(NSF_IMU_CS_PIN, PIN_MODE_OUTPUT);
         rt_pin_write(NSF_IMU_CS_PIN, PIN_HIGH);

@@ -33,14 +33,14 @@
 | TMC2209 UART | J1-37/40 | PB6/PB7 | — | UART2 TX/RX |
 | SPI1 总线 | J2-9/10/11 | PA16/PA17/PA18 | — | MOSI/MISO/SCK（Flash+IMU 共享） |
 | Flash CS | J2-12 | PF12 | `PF.12` | 外接 W25Q64 模块（已验证） |
-| 板载 Flash 位 | J2-13 | PA19 | `PA.19` | U4 未焊接，CS 保持常高 |
+| 板载 Flash 位 | J2-13 | PA19 | — | U4 未焊接；BUG-009 迁移后此脚闲置 |
 | IMU CS / INT1 | J2-14/15 | PA20/PA21 | `PA.20` / `PA.21` | ADXL345（INT1=EXTI5） |
 | TMC_STEP | J4-18 | PA0 | — | EPWM1_A（channel 0） |
 | 保留 | J4-17 | PA1 | — | EPWM1_B（**禁止做 DIR**） |
 | TMC_DIR | J4-16 | PA2 | `PA.2` | 方向输出 |
 | TMC_DIAG | J4-15 | PA3 | `PA.3` | 堵转诊断输入（EXTI3） |
 | LIMIT_MIN | J4-19 | PF14 | `PF.14` | 下限位（EXTI14） |
-| MCU_DRV_ENABLE | J4-20 | PF21 | `PF.21` | 软件使能许可，**上电默认 LOW** |
+| MCU_DRV_ENABLE | J4-21 | PC23 | `PC.23` | 软件使能许可，**上电默认 LOW**（⚠ 原 PF.21/J4-20 焊盘缺陷弃用，见 调试记录 BUG-009） |
 | LIMIT_MAX | J4-25 | PF15 | `PF.15` | 上限位（EXTI15） |
 | BUZZER | J4-26 | PC19 | `PC.19` | 蜂鸣器 |
 | ESTOP_SENSE | J4-40 | PC6 | `PC.6` | 急停检测（EXTI6） |
@@ -114,7 +114,7 @@ UV4 -b 编译（0 错误）→ UV4 -f 烧录 → pyocd 复位 → COM5 串口读
 
 | 命令 | 功能 | 状态 |
 |---|---|---|
-| `flash_id` | 读板载 U4 位（PA19）JEDEC ID | 可用（U4 未焊，预期读 FF） |
+| ~~`flash_id`~~ | 板载 U4 测试命令已随迁移移除（U4 未焊） | — |
 | `flash_info` | 模块（PF12）识别信息+分区表 | ✅ 已验证 |
 | `flash_unlock` | 清除模块 BP/WPS 写保护位 | ✅ 已验证 |
 | `flash_test run` | 破坏性测试（仅 0x7FF000 扇区） | ✅ 已验证 |

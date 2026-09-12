@@ -15,7 +15,9 @@
 /* ===== Motor control ===== */
 #define PIN_NAME_TMC_DIR        "PA.2"   /* J4-16  GPIO2  direction output */
 #define PIN_NAME_TMC_DIAG       "PA.3"   /* J4-15  GPIO3  stall/diag IRQ (EXTI3) */
-#define PIN_NAME_DRV_ENABLE     "PF.21"  /* J4-20  GPIO31 software drive permit, default LOW */
+/* BUG-009: DRV_ENABLE 从 PF.21(J4-20) 迁移到 PC.23(J4-21)——PF21 焊盘被芯片内
+ * 另一驱动源顶高(推挽低只能拉到2.37V), 输出不可用, 详见 调试记录.md BUG-009 */
+#define PIN_NAME_DRV_ENABLE     "PC.23"  /* J4-21  GPIO87 software drive permit, default LOW */
 /* STEP = PA0 / EPWM1_A (J4-18), PA1 reserved EPWM1_B - never reuse PA1 */
 
 /* ===== Safety inputs ===== */

@@ -385,11 +385,6 @@
           <GroupName>Applications</GroupName>
           <Files>
             <File>
-              <FileName>flash_demo.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>applications\flash_demo.c</FilePath>
-            </File>
-            <File>
               <FileName>ns_flash.c</FileName>
               <FileType>1</FileType>
               <FilePath>applications\ns_flash.c</FilePath>
