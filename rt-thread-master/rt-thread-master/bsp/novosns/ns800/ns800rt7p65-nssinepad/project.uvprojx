@@ -415,6 +415,11 @@
               <FilePath>applications\supervisor.c</FilePath>
             </File>
             <File>
+              <FileName>diagnosis.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>applications\diagnosis.c</FilePath>
+            </File>
+            <File>
               <FileName>safety_thread.c</FileName>
               <FileType>1</FileType>
               <FilePath>applications\safety_thread.c</FilePath>

@@ -20,6 +20,7 @@
 #include "motor.h"
 #include "sensor_service.h"
 #include "supervisor.h"
+#include "diagnosis.h"
 
 /* ---------- system_status ---------- */
 
@@ -129,6 +130,7 @@ int supervisor_init(void)
      * 按需初始化(motor_init 由 safety selftest 调用, sensor/safety thread 在此拉起)。 */
     safety_thread_init();
     sensor_service_init();
+    diagnosis_init();
     return RT_EOK;
 }
 INIT_APP_EXPORT(supervisor_init);
