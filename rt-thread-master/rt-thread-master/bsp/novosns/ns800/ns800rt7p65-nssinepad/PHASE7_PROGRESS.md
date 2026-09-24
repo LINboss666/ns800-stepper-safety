@@ -4,7 +4,7 @@
 
 ## 当前阶段
 
-Phase 7-A（底层模块正式化 + 当前状态清理）— **进行中 → 本轮收尾**
+Phase 7-B（Runtime Core）— **代码完成，真机冒烟待板连接**
 
 ## 完成项
 
@@ -24,9 +24,33 @@ Phase 7-A（底层模块正式化 + 当前状态清理）— **进行中 → 本
   README 架构/命令表、开发进度 Phase 6 状态、project_board.h LIMIT 注释与
   底部旧 PF21 注释、adxl345/current_adc 旧"未接线"注释
 
+## Phase 7-B 完成项（本轮，双提交）
+
+- **phase7-b: add motor and sensor runtime services**
+  - `motor.h/.c` Motor Service：init/arm/disarm/set_direction/set_target_hz/start/
+    stop/emergency_stop/get_snapshot；状态 IDLE/ACCEL/CRUISE/DECEL/FAULT；
+    线性斜坡线程（prio 8, 10ms）；**MOTOR_HARDWARE_ENABLE_PATH_VALIDATED=false →
+    motor_arm 一律拒绝（失效安全门）**；pwm_test 在 motor 非 IDLE 时拒绝执行
+  - `sensor_service.h/.c` sensor_frame_t + Sensor Thread（prio 7, 100Hz）；
+    源失败清 valid 位保留旧值（禁止 0 冒充）；SG_RESULT 10Hz 分频；
+    MSH: sensor_status / sensor_snapshot
+  - current_adc read_raw 改单次快读+EMA（64 点均值保留给诊断命令）
+- **phase7-b: implement safety thread and guarded state machine**
+  - `safety_state.h/.c` 正式状态机：白名单转换表 safety_transition()（业务禁止直写）、
+    safety_force_shutdown 唯一旁路（停 STEP→DRV_EN LOW→锁存）、启动自检
+    （required=GPIO/PWM/DRV_ENABLE_LOW/TMC；degraded=IMU/ADC/Flash）、
+    fault_reset 实测源+人工命令、EVT_SOFT_FAULT、FAULT_SOFT
+  - `safety_thread.h/.c` Safety Thread（prio 4）rt_event_recv 消费
+    ESTOP/LIMIT_MIN/LIMIT_MAX/TMC_DIAG/MULTI/SOFT → 分类 force_shutdown；
+    estop_isr 只 post 事件（§14.3 纪律）；EXTI 注册运行门默认关闭
+    （safety_irq_attach 显式开启，防悬空 interrupt storm）
+  - `supervisor.h/.c` system_status + runtime_selftest（软件级：非法转换拒绝/
+    arm 门禁/故障停机链/事件处理/sensor valid，测毕恢复 READY）
+  - safety_events_ready() 启动门（Safety Thread 等状态机事件系统就绪）
+
 ## 未完成项（后续阶段）
 
-- Phase 7-B：Sensor Thread / Motor Service / Safety Thread / EXTI→事件链
+- Phase 7-B 遗留：真机冒烟（板未连 USB，NOT EXECUTED）；ESTOP EXTI 实测
 - Phase 7-C：诊断帧、速度分区阈值、多源一致性判据
 - Phase 7-D：黑匣子（RAM ring + ns_storage 落盘）、全链路联调、对照实验准备
 - IMU INT1 中断功能验证（EXTI5，线已接）
@@ -41,8 +65,8 @@ Phase 7-A（底层模块正式化 + 当前状态清理）— **进行中 → 本
 
 ## Build 状态
 
-- Keil UV4 -b：本轮 0 error / 0 warning（ARM Compiler 6.24）
-- 烧录冒烟：见下
+- Keil UV4 -b：0 error / 0 warning（ARM Compiler 6.24，Phase 7-A 与 7-B 均实跑）
+- 烧录冒烟：Phase 7-B NOT EXECUTED（开发板未连 USB）
 
 ## Hardware pending
 

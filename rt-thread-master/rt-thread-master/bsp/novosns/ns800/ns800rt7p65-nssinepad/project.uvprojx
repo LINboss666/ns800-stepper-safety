@@ -410,6 +410,26 @@
               <FilePath>applications\safety_state.c</FilePath>
             </File>
             <File>
+              <FileName>supervisor.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>applications\supervisor.c</FilePath>
+            </File>
+            <File>
+              <FileName>safety_thread.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>applications\safety_thread.c</FilePath>
+            </File>
+            <File>
+              <FileName>sensor_service.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>applications\sensor_service.c</FilePath>
+            </File>
+            <File>
+              <FileName>motor.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>applications\motor.c</FilePath>
+            </File>
+            <File>
               <FileName>tmc2209.c</FileName>
               <FileType>1</FileType>
               <FilePath>applications\tmc2209.c</FilePath>
