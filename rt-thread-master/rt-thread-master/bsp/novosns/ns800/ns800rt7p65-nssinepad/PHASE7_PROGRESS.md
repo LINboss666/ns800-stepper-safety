@@ -4,7 +4,7 @@
 
 ## 当前阶段
 
-Phase 7-C（Diagnosis Engine + Runtime Configuration）— **代码完成，真机验证待板连接**
+**Phase 7 全部软件阶段（A/B/C/D）完成** — 待 on-target 冒烟 + 硬件联动
 
 ## 完成项
 
@@ -67,11 +67,42 @@ Phase 7-C（Diagnosis Engine + Runtime Configuration）— **代码完成，真�
     MSH: config_show/config_default/config_save/config_load
   - diagnosis 阈值改为每帧从 project_config 同步（diagnosis_init/selftest 也同步）
 
+## Phase 7-D 完成项（本轮，双提交）
+
+- **phase7-d: add fault blackbox and system supervisor**
+  - `blackbox.h/.c`：100Hz 静态 RAM 环（pre 200 帧=2s + post 100 帧=1s，
+    ≈10.8KB BSS 零 malloc）；触发 O(1)（Safety 只置标志，绝不等待 Flash）；
+    worker（prio 18）逐帧 ns_log_submit + 队列满 flush 重试（不暴力打爆队列）；
+    valid 位映射 NS_VALID_*；MSH blackbox_status/dump/clear/selftest
+  - main.c 升级为启动入口（七阶段编排 + 状态打印 + 板载心跳）；
+    supervisor 增加 UI 管理线程（prio 20，LED/蜂鸣器单一写者，
+    `UI_OUTPUT_ENABLED=false` 极性未确认安全全灭[hardware pending]）
+  - safety_force_shutdown 挂接 blackbox_trigger（O(1)）
+  - project_config 默认 pre=2s/post=1s
+- **整体软件 review**（结论写下方 Software Review）
+- **phase7-d: finalize embedded software and documentation**：四文档同步 +
+  三级验证标注体系（BOARD-TESTED / SOFTWARE-VERIFIED / HARDWARE-PENDING）
+
+## Software Review 结论（2026-09-13 静态审查）
+
+- 线程优先级：Safety(4)>Sensor(7)>Motor(8)>Diagnosis(9)>Blackbox(18)>UI(20)>Shell(30) ✅ 符合方案
+- 栈尺寸：safety 1024(静态)/sensor 1024/motor 768/diag 1024/bb 1024/ui 512 ✅
+- 阻塞路径：Safety 线程零 Flash 零 SPI/UART ✅；Flash 重 IO 全在 bb worker ✅
+- 互斥/事件：mot_lock 单一互斥无嵌套；s_frame 临界区拷贝；事件 ISR 安全 ✅
+- tick 回绕：deadline 比较全部使用无符号回绕安全写法 ✅
+- 计数溢出：persistence 计数带衰减钳制；seq 允许回绕 ✅
+- NULL/错误路径：全部读 API 检查返回；health 跟踪失败路径 ✅
+- ⚠ 已记录风险：INIT_APP 执行顺序依赖链接顺序（当前恰好满足
+  safety_gpio→safety_state→supervisor）；sensor 线程在 TMC 失联时每 10 帧
+  有 100ms 超时占用（降速不阻塞）；ss_state 转换无锁（当前多写者场景仅
+  Safety Thread + MSH，实际冲突面小，Phase D 联调观察项）
+
 ## 未完成项（后续阶段）
 
-- Phase 7-A/B 遗留：真机冒烟（板未连 USB，NOT EXECUTED）；ESTOP EXTI 实测
-- Phase 7-D：Blackbox（RAM ring + ns_storage 落盘 + pre/post 窗口）、
-  最终 UI/演示流程、对照实验
+- Phase 7 全阶段遗留：on-target 冒烟（板未连 USB，NOT EXECUTED）；
+  ESTOP EXTI 实测；diag/blackbox selftest 上板执行
+- 硬件联动：电机+ADC 联合测试（四级方案已备）、使能链验收、INT1、
+  STEP 示波器验收、ENN 浮空实验、标定流程
 - Phase 7-D：黑匣子（RAM ring + ns_storage 落盘）、全链路联调、对照实验准备
 - IMU INT1 中断功能验证（EXTI5，线已接）
 - SPI2/SPI4 硬件验证（BUG-013 候选 mux 组，仅静态核验）

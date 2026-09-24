@@ -128,6 +128,11 @@ UV4 -b 编译（0 错误）→ UV4 -f 烧录 → pyocd 复位 → COM5 串口读
 | `tmc_uart_probe` / `tmc_status` | IFCNT写握手 / GSTAT+版本 | ✅ 真机验证 (IFCNT+1) |
 | `tmc_regs` | 关键寄存器只读快照 | ✅ 真机验证 |
 | `tmc_crc_test` | CRC 算法自测（官方向量） | ✅ 真机 PASS |
+| `runtime_selftest` | 软件级运行自检(门禁/停机链/valid 位) | 🖥 软件就绪, 上板待执行 |
+| `system_selftest` / `system_status` | 安全自检重跑 / 全子系统状态 | 🖥 软件就绪 |
+| `diag_status` / `diag_mode` / `diag_selftest` | 诊断引擎状态/模式/合成注入自检 | 🖥 软件就绪(合成验证) |
+| `config_show/default/save/load` | 运行时配置查看/恢复/持久化/加载 | 🖥 软件就绪 |
+| `blackbox_status/dump/clear/selftest` | 黑匣子状态/回读/清除/落盘自检 | 🖥 软件就绪(写真实 Flash) |
 
 ## 7. 安全红线（任何修改不得违反）
 
@@ -149,7 +154,15 @@ UV4 -b 编译（0 错误）→ UV4 -f 烧录 → pyocd 复位 → COM5 串口读
 | Agent 交接文档 | 引脚冻结、验证状态标记、Agent 约束 |
 | RevA 方案 docx | 扩展板硬件设计（原理图前方案） |
 
-## 9. 版本管理
+## 9. 验证状态标注体系
+
+| 标注 | 含义 |
+|---|---|
+| **BOARD-TESTED** | 已在真实硬件上验证并留有记录 |
+| **SOFTWARE-VERIFIED** | 软件逻辑已验证(编译 0/0 + 自检设计), 但尚未在板上执行 |
+| **HARDWARE-PENDING** | 依赖硬件到位/标定/验收的事项 |
+
+## 10. 版本管理
 
 - GitHub：`LINboss666/ns800-stepper-safety`（私有，比赛提交时转公开）
 - 每完成一个阶段提交一次，提交信息为中文，注明改动原因与验证结果
