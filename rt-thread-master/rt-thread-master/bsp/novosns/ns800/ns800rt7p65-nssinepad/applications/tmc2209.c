@@ -23,12 +23,13 @@
 #include <rtthread.h>
 #include <rtdevice.h>
 #include "project_board.h"
+#include "app_health.h"
+#include "tmc2209.h"
 
 #define TMC_UART_NAME    TMC_UART_DEVICE_NAME    /* "uart2" */
 #define TMC_BAUD         115200
 #define TMC_SYNC_BYTE    0x05
 #define TMC_MASTER_ADDR  0xFF
-#define TMC_ADDR_DEFAULT 0x00
 #define TMC_WRITE_BIT    0x80
 
 /* 常用寄存器 */
@@ -226,6 +227,79 @@ static rt_err_t tmc_read_reg(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *value
         if (got == 0) rt_thread_mdelay(2);
     }
 }
+
+/* ---------- 正式 API (tmc2209.h, Phase 7-A) ----------
+ * 只封装已验证的底层 tmc_read_reg/tmc_write_reg, 不改协议实现。
+ * health 语义: OK=链路通且最近一次传输成功; DEGRADED=链路通但最近失败;
+ * FAILED=uart2 打不开; UNINIT=未初始化。 */
+
+static subsys_health_t tmc_health = SUBSYS_UNINIT;
+
+static void tmc_health_after_xfer(rt_err_t e)
+{
+    if (tmc_health == SUBSYS_UNINIT) return;      /* 未 init 时不越级判定 */
+    if (tmc_health == SUBSYS_FAILED) return;
+    tmc_health = (e == RT_EOK) ? SUBSYS_OK : SUBSYS_DEGRADED;
+}
+
+rt_err_t tmc2209_init(void)
+{
+    rt_err_t e = tmc_uart_open();
+
+    tmc_health = (e == RT_EOK) ? SUBSYS_OK : SUBSYS_FAILED;
+    return e;
+}
+
+rt_err_t tmc2209_read_register(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *value)
+{
+    rt_err_t e = tmc_read_reg(addr, reg, value);
+
+    tmc_health_after_xfer(e);
+    return e;
+}
+
+rt_err_t tmc2209_write_register_confirmed(rt_uint8_t addr, rt_uint8_t reg,
+                                          rt_uint32_t value)
+{
+    rt_uint32_t before = 0, after = 0;
+    rt_err_t e;
+
+    e = tmc2209_read_register(addr, TMC_REG_IFCNT, &before);
+    if (e != RT_EOK) return e;
+
+    e = tmc_write_reg(addr, reg, value);
+    if (e != RT_EOK) { tmc_health_after_xfer(e); return e; }
+
+    e = tmc2209_read_register(addr, TMC_REG_IFCNT, &after);
+    if (e != RT_EOK) return e;
+
+    /* IFCNT 只对有效 WRITE 自增: +1 = 芯片接受了完整写帧 */
+    if ((after & 0xFF) != ((before + 1) & 0xFF))
+        return -RT_EIO;
+
+    tmc_health_after_xfer(RT_EOK);
+    return RT_EOK;
+}
+
+rt_err_t tmc2209_read_sg_result(rt_uint16_t *sg_result)
+{
+    rt_uint32_t v = 0;
+    rt_err_t e = tmc2209_read_register(TMC_ADDR_DEFAULT, TMC_REG_SG_RESULT, &v);
+
+    if (e == RT_EOK) *sg_result = (rt_uint16_t)(v & 0x03FF);  /* SG_RESULT 10bit */
+    return e;
+}
+
+rt_err_t tmc2209_read_status(rt_uint8_t *gstat)
+{
+    rt_uint32_t v = 0;
+    rt_err_t e = tmc2209_read_register(TMC_ADDR_DEFAULT, TMC_REG_GSTAT, &v);
+
+    if (e == RT_EOK) *gstat = (rt_uint8_t)(v & 0xFF);
+    return e;
+}
+
+subsys_health_t tmc2209_get_health(void) { return tmc_health; }
 
 /* ---------- MSH 命令 ---------- */
 
