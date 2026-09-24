@@ -59,9 +59,10 @@ Phase 7-B（Runtime Core）— **代码完成，真机冒烟待板连接**
 ## 最新 commit
 
 - 分支 `phase7/full-embedded-software`
-- `phase7-a: formalize hardware driver APIs` = fa08d9c（代码）
-- `phase7-a: sync project docs and retire legacy diagnostics` = 本次文档提交
-- main 分支停在 1b3757e（Phase 7-A 从 main 分叉）
+- main 分支停在 1b3757e
+- phase7/full-embedded-software 分支：
+  - Phase 7-A：fa08d9c（API）+ a33b64b（文档）
+  - Phase 7-B：8548ccc（motor+sensor）+ c90792a（safety thread+状态机+supervisor，HEAD）
 
 ## Build 状态
 
