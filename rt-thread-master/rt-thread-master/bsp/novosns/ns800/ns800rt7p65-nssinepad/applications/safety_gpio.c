@@ -156,6 +156,7 @@ rt_base_t safety_pin(const char *name)
 
 /* ==== 诊断工具(BUG-009 未完全破案, 保留): 端口F pin21 寄存器级探测,
  * 详情见 调试记录.md BUG-009。主要嫌疑: 双核 CPU2 抢占 GPIO 锁存 ==== */
+#ifdef NS800_ENABLE_LEGACY_PF21_DIAG
 #include "drv_gpio.h"
 
 /* ==== 诊断工具 v2(BUG-009, DAT/DATR 语义已按官方手册修正:
@@ -274,3 +275,4 @@ static void pf21_ab(void)
     rt_kprintf("[AB] end LOW (safe)\n");
 }
 MSH_CMD_EXPORT(pf21_ab, BUG-009 slow LOW/HIGH A/B for multimeter watch);
+#endif /* NS800_ENABLE_LEGACY_PF21_DIAG */

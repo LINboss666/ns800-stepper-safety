@@ -49,6 +49,7 @@
 
 /* J4 connector reference (from handoff section 4, frozen):
  * RUN_LED=J4-38, WARN_LED=J4-37, FAULT_LED=J4-36 (do NOT use old J4-36/35/34 order)
- * LIMIT_MIN=J4-19(PF.14), MCU_DRV_ENABLE=J4-20(PF.21), LIMIT_MAX=J4-25(PF.15) */
+ * LIMIT_MIN=J4-19(PF.14), MCU_DRV_ENABLE=J4-21(PC.23, PF.21/J4-20 弃用见 BUG-009),
+ * LIMIT_MAX=J4-25(PF.15) */
 
 #endif /* PROJECT_BOARD_H */

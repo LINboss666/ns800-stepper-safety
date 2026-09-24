@@ -60,11 +60,12 @@ applications/
 ├── ns_flash_config.h   Flash 总线/CS/分区配置
 ├── ns_flash_shell.c    flash_info/unlock/test/verify 等命令
 ├── ns_storage.c/h      事件记录存储层（异步 Logger 线程）
+├── app_health.h        统一子系统健康约定(UNINIT/OK/DEGRADED/FAILED)
 ├── safety_gpio.c/h     安全 GPIO 初始化 + pin_status/safety_status 命令
-├── adxl345.c/h         ADXL345 驱动 + imu_id/imu_raw 命令
-├── current_adc.c/h     母线电流采样 + current_raw 命令
+├── adxl345.c/h         ADXL345 驱动(硬件 spi3)正式 API + imu_probe/imu_id/imu_raw 命令
+├── current_adc.c/h     母线电流采样正式 API(标定/滤波) + current_raw 命令
 ├── step_pwm.c/h        EPWM1 STEP 输出 + pwm_test 命令（默认不使能）
-├── tmc2209.c/h         TMC2209 UART 协议层（CRC 校验）+ tmc_* 命令
+├── tmc2209.c/h         TMC2209 UART 协议层(已真机验证)正式 API + tmc_* 命令
 └── safety_state.c/h    安全状态机骨架（NORMAL→...→MANUAL_CLEAR）
 ```
 
@@ -120,8 +121,8 @@ UV4 -b 编译（0 错误）→ UV4 -f 烧录 → pyocd 复位 → COM5 串口读
 | `flash_test run` | 破坏性测试（仅 0x7FF000 扇区） | ✅ 已验证 |
 | `flash_verify` | 只读保留校验 | ✅ 已验证 |
 | `pin_status` / `safety_status` | 安全输入电平/初始化状态 | 代码就绪，待接线验证 |
-| `imu_id` / `imu_raw` | ADXL345 DEVID / 三轴原始值 | 代码就绪，待接线验证 |
-| `current_raw` | 母线电流 ADC 原始值 | 代码就绪，待标定 |
+| `imu_probe` / `imu_id` / `imu_raw` | SPI3 探测 / DEVID / 三轴 mg 值 | ✅ 真机验证 (DEVID=0xE5, 合成≈1g) |
+| `current_raw` | 母线电流 ADC 原始值(mv/ma/健康状态) | ✅ 链路验证；标定待零点校准 |
 | `pwm_test <hz>` | STEP 输出测试（默认不使能） | 代码就绪，频率待示波器验收 |
 | `tmc_scan` | 只读扫描地址0..3找 TMC2209 | ✅ 真机 FOUND (addr0) |
 | `tmc_uart_probe` / `tmc_status` | IFCNT写握手 / GSTAT+版本 | ✅ 真机验证 (IFCNT+1) |
