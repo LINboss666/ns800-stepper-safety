@@ -22,6 +22,7 @@
 #include "ns_flash.h"
 #include "motor.h"
 #include "step_pwm.h"
+#include "blackbox.h"
 
 /* ---------- 状态机私有状态 ---------- */
 static volatile safety_state_t ss_state = SAFETY_BOOT;
@@ -115,7 +116,10 @@ void safety_force_shutdown(rt_uint32_t code)
                        " is the only guard !!\n");
     }
 
-    /* ③④ 锁存(旁路转换: 安全动作不受白名单限制) */
+    /* ③ 黑匣子触发: O(1) 置标志, Safety 线程绝不等待 Flash */
+    blackbox_trigger(code);
+
+    /* ④ 锁存(旁路转换: 安全动作不受白名单限制) */
     ss_state = SAFETY_FAULT_LATCHED;
     rt_kprintf("[SS] ==> FAULT_LATCHED code=%u (STEP stopped, DRV_ENABLE=LOW)\n",
                code);

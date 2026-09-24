@@ -11,7 +11,10 @@
 
 #include <rtthread.h>
 
-/* 幂等: 注册 MSH 命令(system_status / runtime_selftest) */
+/* 幂等: 注册 MSH 命令(system_status / runtime_selftest)并拉起 UI 管理线程 */
 int supervisor_init(void);
+
+/* 全子系统状态打印(main 与 MSH system_status 共用) */
+void system_status(void);
 
 #endif /* SUPERVISOR_H */

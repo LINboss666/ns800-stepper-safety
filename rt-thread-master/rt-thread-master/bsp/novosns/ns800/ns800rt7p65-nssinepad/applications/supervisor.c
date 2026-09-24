@@ -19,6 +19,7 @@
 #include "tmc2209.h"
 #include "motor.h"
 #include "sensor_service.h"
+#include "blackbox.h"
 #include "supervisor.h"
 #include "diagnosis.h"
 
@@ -26,7 +27,7 @@
 
 static rt_uint8_t ns_flash_ok_cached = 0;   /* 自检时记录 */
 
-static void system_status(void)
+void system_status(void)
 {
     motor_snapshot_t snap;
 
@@ -121,7 +122,93 @@ static void runtime_selftest(void)
 }
 MSH_CMD_EXPORT(runtime_selftest, software-level runtime self test (no motion));
 
+/* 完整系统自检: 重跑安全自检(required/degraded)+打印状态。
+ * 注意: 失败会进入 FAULT_LATCHED, 需 fault_reset 恢复。 */
+static void system_selftest(void)
+{
+    rt_err_t e = safety_run_selftest();
+
+    if (e == RT_EOK)
+        safety_transition(SAFETY_READY);
+    else
+        safety_force_shutdown(FAULT_SELF_TEST);
+    system_status();
+}
+MSH_CMD_EXPORT(system_selftest, rerun safety selftest and print full status);
+
 /* ---------- 初始化 ---------- */
+
+/* ---------- LED/蜂鸣器统一管理(单一写者) ----------
+ * ⚠ UI_OUTPUT_ENABLED=RT_FALSE: 扩展板 LED/蜂鸣器驱动极性未实物确认,
+ * 安全默认全灭。极性确认后置 RT_TRUE, 模式逻辑即生效。硬件 pending。 */
+#ifndef UI_OUTPUT_ENABLED
+#define UI_OUTPUT_ENABLED   RT_FALSE
+#endif
+
+static rt_base_t ui_run = -1, ui_warn = -1, ui_fault = -1, ui_buzz = -1;
+static rt_uint32_t ui_ticks = 0;
+static rt_thread_t ui_tid = RT_NULL;
+
+static void ui_write(rt_base_t pin, rt_uint8_t on)
+{
+    if (pin < 0) return;
+    if (!UI_OUTPUT_ENABLED) { rt_pin_write(pin, PIN_LOW); return; }
+    rt_pin_write(pin, on ? PIN_HIGH : PIN_LOW);
+}
+
+static void ui_thread_entry(void *param)
+{
+    (void)param;
+
+    ui_run   = safety_pin(PIN_NAME_RUN_LED);
+    ui_warn  = safety_pin(PIN_NAME_WARN_LED);
+    ui_fault = safety_pin(PIN_NAME_FAULT_LED);
+    ui_buzz  = safety_pin(PIN_NAME_BUZZER);
+
+    while (1)
+    {
+        safety_state_t st = safety_state_get();
+        rt_uint8_t run = 0, warn = 0, fault = 0, buzz = 0;
+        rt_uint32_t phase = (ui_ticks / 5) % 2;      /* 500ms 半周期 */
+
+        switch (st)
+        {
+        case SAFETY_INIT:
+        case SAFETY_SELF_TEST:
+        case SAFETY_BOOT:
+            warn = phase; break;                     /* 慢闪: 初始化中 */
+        case SAFETY_READY:
+        case SAFETY_MANUAL_CLEAR:
+            run = 1; break;                          /* 常亮: 就绪 */
+        case SAFETY_RUN:
+            run = phase; break;                      /* 闪烁: 运行 */
+        case SAFETY_LOAD_WARNING:
+            warn = (ui_ticks / 2) % 2; break;        /* 快闪: 告警 */
+        case SAFETY_ABNORMAL:
+            warn = 1; fault = phase; break;
+        case SAFETY_FAULT_LATCHED:
+        case SAFETY_ESTOP:
+            fault = 1; buzz = 1; break;              /* 常亮+鸣: 锁死 */
+        default: break;
+        }
+
+        ui_write(ui_run,   run);
+        ui_write(ui_warn,  warn);
+        ui_write(ui_fault, fault);
+        ui_write(ui_buzz,  buzz);
+
+        ui_ticks++;
+        rt_thread_mdelay(100);
+    }
+}
+
+static void ui_manager_init(void)
+{
+    if (ui_tid != RT_NULL) return;
+    ui_tid = rt_thread_create("ui", ui_thread_entry, RT_NULL,
+                              512, 20, 10);          /* 最低优先级 */
+    if (ui_tid != RT_NULL) rt_thread_startup(ui_tid);
+}
 
 int supervisor_init(void)
 {
@@ -131,6 +218,8 @@ int supervisor_init(void)
     safety_thread_init();
     sensor_service_init();
     diagnosis_init();
+    blackbox_init();
+    ui_manager_init();
     return RT_EOK;
 }
 INIT_APP_EXPORT(supervisor_init);

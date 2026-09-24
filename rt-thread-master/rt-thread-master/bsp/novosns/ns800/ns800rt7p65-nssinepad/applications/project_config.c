@@ -42,8 +42,8 @@ void project_config_defaults(void)
     cfg.impact_frames      = 2;
     cfg.hysteresis_frames  = 100;   /* 1.0s */
 
-    cfg.pre_fault_ms  = 3000;       /* Phase 7-D 黑匣子窗口 */
-    cfg.post_fault_ms = 500;
+    cfg.pre_fault_ms  = 2000;       /* Phase 7-D 黑匣子窗口(默认 2s/1s) */
+    cfg.post_fault_ms = 1000;
 }
 
 /* ---------- 范围校验 ---------- */

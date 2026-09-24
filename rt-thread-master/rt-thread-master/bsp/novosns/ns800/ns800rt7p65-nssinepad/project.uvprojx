@@ -425,6 +425,11 @@
               <FilePath>applications\project_config.c</FilePath>
             </File>
             <File>
+              <FileName>blackbox.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>applications\blackbox.c</FilePath>
+            </File>
+            <File>
               <FileName>safety_thread.c</FileName>
               <FileType>1</FileType>
               <FilePath>applications\safety_thread.c</FilePath>
