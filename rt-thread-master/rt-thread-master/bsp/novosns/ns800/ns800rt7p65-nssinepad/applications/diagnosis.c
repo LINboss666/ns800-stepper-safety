@@ -29,33 +29,40 @@
 #include "motor.h"
 #include "safety_state.h"
 #include "current_adc.h"
+#include "project_config.h"
 #include "diagnosis.h"
 
-/* ---------- 内嵌默认阈值 ---------- */
+/* ---------- 阈值(Phase 7-C-2: 由 project_config 持久化驱动) ----------
+ * dt 每帧从 project_config 同步; 配置非法时 config 层保证为安全默认值。 */
 typedef struct
 {
-    rt_uint32_t band_hz[2];                    /* 低/中, 中/高 边界 */
-    rt_int32_t  sg_warn[3], sg_stall[3];       /* [0]=低速 [1]=中速 [2]=高速 */
+    rt_uint32_t band_hz[2];
+    rt_int32_t  sg_warn[3], sg_stall[3];
     float       cur_warn_ma[3], cur_stall_ma[3];
     rt_uint32_t vib_impact_mg;
-    rt_uint32_t persist_warn;                  /* LOAD_WARNING/SUSPECT 帧数 */
-    rt_uint32_t persist_stall;                 /* CONFIRMED/OVERLOAD 帧数 */
-    rt_uint32_t impact_frames;                 /* IMPACT 最短持续帧数 */
-    rt_uint32_t hysteresis_frames;             /* 恢复所需连续干净帧 */
+    rt_uint32_t persist_warn;
+    rt_uint32_t persist_stall;
+    rt_uint32_t impact_frames;
+    rt_uint32_t hysteresis_frames;
 } diag_thresholds_t;
 
-static diag_thresholds_t dt = {
-    .band_hz       = {200, 1000},
-    .sg_warn       = { 30, 100, 200},
-    .sg_stall      = { 15,  50, 100},
-    .cur_warn_ma   = { 300.f,  500.f,  800.f},
-    .cur_stall_ma  = { 800.f, 1200.f, 1500.f},
-    .vib_impact_mg = 2500,
-    .persist_warn  = 50,          /* 0.5s @100Hz */
-    .persist_stall = 100,         /* 1.0s */
-    .impact_frames = 2,
-    .hysteresis_frames = 100,     /* 1.0s */
-};
+static diag_thresholds_t dt;
+
+static void diag_sync_config(void)
+{
+    const project_config_t *c = project_config_get();
+
+    dt.band_hz[0] = c->band_hz[0];  dt.band_hz[1] = c->band_hz[1];
+    rt_memcpy(dt.sg_warn,  c->sg_warn,  sizeof(dt.sg_warn));
+    rt_memcpy(dt.sg_stall, c->sg_stall, sizeof(dt.sg_stall));
+    rt_memcpy(dt.cur_warn_ma,  c->cur_warn_ma,  sizeof(dt.cur_warn_ma));
+    rt_memcpy(dt.cur_stall_ma, c->cur_stall_ma, sizeof(dt.cur_stall_ma));
+    dt.vib_impact_mg    = c->vib_impact_mg;
+    dt.persist_warn     = c->persist_warn;
+    dt.persist_stall    = c->persist_stall;
+    dt.impact_frames    = c->impact_frames;
+    dt.hysteresis_frames = c->hysteresis_frames;
+}
 
 /* ---------- 引擎状态 ---------- */
 #define DIAG_VIB_WIN 16
@@ -269,6 +276,7 @@ static void diag_thread_entry(void *param)
 
     while (1)
     {
+        diag_sync_config();              /* 阈值跟随持久化配置(每帧同步) */
         if (sensor_service_get_latest(&f) == RT_EOK && f.seq != 0)
         {
             in.timestamp   = f.timestamp;
@@ -292,6 +300,7 @@ rt_err_t diagnosis_init(void)
 {
     if (d_tid != RT_NULL) return RT_EOK;    /* 幂等 */
 
+    diag_sync_config();                     /* 初始阈值来自持久化配置 */
     diag_reset();
     d_tid = rt_thread_create("diag", diag_thread_entry, RT_NULL,
                              1024, 9, 10);  /* prio 9, 100Hz */

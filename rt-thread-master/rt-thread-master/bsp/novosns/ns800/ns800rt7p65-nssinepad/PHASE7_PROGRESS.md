@@ -4,7 +4,7 @@
 
 ## 当前阶段
 
-Phase 7-B（Runtime Core）— **代码完成，真机冒烟待板连接**
+Phase 7-C（Diagnosis Engine + Runtime Configuration）— **代码完成，真机验证待板连接**
 
 ## 完成项
 
@@ -48,10 +48,30 @@ Phase 7-B（Runtime Core）— **代码完成，真机冒烟待板连接**
     arm 门禁/故障停机链/事件处理/sensor valid，测毕恢复 READY）
   - safety_events_ready() 启动门（Safety Thread 等状态机事件系统就绪）
 
+## Phase 7-C 完成项（本轮，双提交）
+
+- **phase7-c: implement multi-source diagnosis engine**（9334d2b）
+  - `diagnosis.h/.c`：prio 9 线程 100Hz 消费最新 sensor_frame；
+    特征=SG/电流 EMA 滤波+Δ、振动滑窗 RMS/峰值、速度分带、加减速相位；
+    判定=NORMAL/LOAD_WARNING/IMPACT/OVERLOAD/STALL_SUSPECT/STALL_CONFIRMED/
+    SENSOR_FAULT
+  - 反误报纪律：单 sample 永不 severe（persistence）；SG 阈值分带；sensor
+    missing 冻结特征只计 bad（禁止当 0）；SG/电流判据仅 CRUISE；
+    CONFIRMED 需 SG+电流双源；恢复 hysteresis
+  - 模式 MONITOR_ONLY 默认；ACTIVE_PROTECTION 需电流已标定（标定门禁），
+    severe 边沿 → EVT_MULTI_FAULT 交 Safety（引擎不碰 Flash）
+  - diag_selftest：7 场景确定性合成输入（软件级，非硬件验证）
+- **phase7-c: add persistent calibration and threshold config**
+  - `project_config.h/.c`：magic/version/范围三重校验；非法→安全默认+DEGRADED；
+    标定合法自动下发 current_adc；ns_params 双副本持久化；
+    MSH: config_show/config_default/config_save/config_load
+  - diagnosis 阈值改为每帧从 project_config 同步（diagnosis_init/selftest 也同步）
+
 ## 未完成项（后续阶段）
 
-- Phase 7-B 遗留：真机冒烟（板未连 USB，NOT EXECUTED）；ESTOP EXTI 实测
-- Phase 7-C：诊断帧、速度分区阈值、多源一致性判据
+- Phase 7-A/B 遗留：真机冒烟（板未连 USB，NOT EXECUTED）；ESTOP EXTI 实测
+- Phase 7-D：Blackbox（RAM ring + ns_storage 落盘 + pre/post 窗口）、
+  最终 UI/演示流程、对照实验
 - Phase 7-D：黑匣子（RAM ring + ns_storage 落盘）、全链路联调、对照实验准备
 - IMU INT1 中断功能验证（EXTI5，线已接）
 - SPI2/SPI4 硬件验证（BUG-013 候选 mux 组，仅静态核验）

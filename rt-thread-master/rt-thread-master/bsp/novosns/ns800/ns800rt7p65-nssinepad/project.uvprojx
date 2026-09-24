@@ -420,6 +420,11 @@
               <FilePath>applications\diagnosis.c</FilePath>
             </File>
             <File>
+              <FileName>project_config.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>applications\project_config.c</FilePath>
+            </File>
+            <File>
               <FileName>safety_thread.c</FileName>
               <FileType>1</FileType>
               <FilePath>applications\safety_thread.c</FilePath>
