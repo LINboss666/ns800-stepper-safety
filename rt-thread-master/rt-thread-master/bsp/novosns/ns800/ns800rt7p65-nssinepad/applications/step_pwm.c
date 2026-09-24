@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include "project_board.h"
 #include "safety_gpio.h"
+#include "motor.h"
 
 #define STEP_PWM_DEV    EPWM_STEP_DEV_NAME    /* "epwm1" */
 #define STEP_PWM_CH     0                     /* EPWMX_A = PA0 */
@@ -50,6 +51,17 @@ static void pwm_test(int argc, char **argv)
     }
 
     if (step_find() != RT_EOK) return;
+
+    /* Phase 7-B: 正式运动服务接管后, 诊断命令仅在 IDLE 态允许 */
+    {
+        motor_snapshot_t snap;
+        if (motor_get_snapshot(&snap) == RT_EOK && snap.state != MOTOR_IDLE)
+        {
+            rt_kprintf("[STEP] REFUSED: motor active (state=%d), use motor API\n",
+                       snap.state);
+            return;
+        }
+    }
 
     if (rt_strcmp(argv[1], "stop") == 0)
     {

@@ -86,21 +86,23 @@ rt_err_t current_adc_init(void)
 
 rt_err_t current_adc_read_raw(rt_uint32_t *raw)
 {
-    rt_uint32_t mean;
-    rt_err_t e = cur_sample_mean(&mean, RT_NULL, RT_NULL);
+    rt_uint32_t sample;
 
-    if (e != RT_EOK) return e;
+    if (cur_adc == RT_NULL || !cur_enabled) return -RT_ERROR;
 
-    /* EMA 滤波(轻量): cur_ema = cur_ema + (mean - cur_ema) * 25% */
-    if (!cur_ema_valid) { cur_ema_raw = mean; cur_ema_valid = RT_TRUE; }
+    /* 单次快读(线程 100Hz 可用); 平滑交给 EMA, 64 点均值只用于诊断命令 */
+    sample = rt_adc_read(cur_adc, CUR_ADC_CH);
+
+    /* EMA 滤波(轻量): cur_ema = cur_ema + (sample - cur_ema) * 25% */
+    if (!cur_ema_valid) { cur_ema_raw = sample; cur_ema_valid = RT_TRUE; }
     else
     {
-        rt_int32_t diff = (rt_int32_t)mean - (rt_int32_t)cur_ema_raw;
+        rt_int32_t diff = (rt_int32_t)sample - (rt_int32_t)cur_ema_raw;
         cur_ema_raw = (rt_uint32_t)((rt_int32_t)cur_ema_raw +
                                     (diff * CUR_EMA_ALPHA_PCT) / 100);
     }
 
-    *raw = mean;
+    *raw = sample;
     return RT_EOK;
 }
 

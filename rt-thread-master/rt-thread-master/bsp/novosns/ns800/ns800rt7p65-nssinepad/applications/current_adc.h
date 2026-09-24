@@ -20,8 +20,8 @@
 /* 幂等初始化: 查找 adc0 并使能 CH15。RT_EOK = 可读(raw 层面)。 */
 rt_err_t current_adc_init(void);
 
-/* 读取 CH15 原始码(12bit, 0~4095, 内部 64 点平均 + EMA 更新)。
- * RT_EOK 时 *raw 有效。 */
+/* 读取 CH15 原始码(12bit, 0~4095, 单次快读 + EMA 状态更新; 适合 100Hz 线程)。
+ * RT_EOK 时 *raw 有效; 滤波值用 current_adc_get_filtered_raw()。 */
 rt_err_t current_adc_read_raw(rt_uint32_t *raw);
 
 /* 原始码 → 毫伏(线性: raw × 3300 / 4095)。RT_EOK 时 *mv 有效。 */
