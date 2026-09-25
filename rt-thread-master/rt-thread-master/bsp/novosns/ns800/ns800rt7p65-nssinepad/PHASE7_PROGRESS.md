@@ -189,6 +189,31 @@ HARDWARE-PENDING，deferred to evening on-target validation）。
   但**没有任何代码路径**会写入 MEASURED，待标定命令与真机条件）
 - 新发现（真机，未修）：`current_raw` 64 点突发出现过 `min=1677` 对 `mean=2067`
   的单点离群（折算约 −498 mA），像 ADC 首样点/建立时间伪影；无仪器不下结论
+  → **2026-09-26 Phase 8-C 复核：该离群确实复现且更大**（30 次爆发 1920 样点：
+  最大低偏离 436 counts、最大高偏离 343 counts；`burst_mean` 本身极稳 2058–2069）。
+  注意**高侧离群更常见**（6/30 对 2/30），所以"首样点伪影"这个猜测不成立的方向
+  已被削弱；`ema` 未被单点拖走。仍未加任何滤波/丢弃逻辑，成因待示波器。
+
+## Phase 8-C 稳定性验证补充（2026-09-26 00:00–00:20，HEAD `14e91db` / 固件 `e40a9b9`）
+
+四条核心外设路径的应力结果与分级见 `PHASE8_HARDWARE_VALIDATION_20260925.md`
+「Phase 8-C」节，摘要：Flash `BOARD-TESTED / STABILITY-VALIDATED`（20/20 身份、
+专用扇区写读保持、重启只读校验、logstat 零变化）；TMC UART 传输
+`BOARD-TESTED`（100/100 + 20/20 + IFCNT 写确认，0 超时/0 CRC 错/0 失败）；
+IMU 采样 `BOARD-TESTED / BASIC SAMPLING STABILITY`（70/70 传输，姿态主轴随旋转
+正确转移）；ADC 采集路径 `BOARD-TESTED`（30/30 完成，0 读失败，换算一致性核实）。
+
+本轮新登记、**未修补**的问题：
+
+- **F-IMU-01**：`imu_raw` 出现 1/70 次 `X=Y=Z=-3 mg`（= raw −1 = 六字节全 `0xFF`）
+  却仍 `health=OK` —— `adxl345_read_raw()` 只看传输返回码，传输成功就无条件置 OK，
+  于是"总线未被驱动"的垃圾帧被当有效测量发布（与"sensor missing ≠ 0"红线相邻）。
+- **TMC2209 物理在位不可靠**：跨 8-B1/8-C 已累计 3 次整链路失联
+  （`tmc_scan` addr0..3 全无应答、只收到自身回显 → `[REQ FAIL] TMC2209 link` →
+  `FAULT_LATCHED code=8`、mask `0xB`），重新插好后恢复。fail-closed 表现正确，
+  但插座/接触本身是硬件问题，TMC 的稳定性数据只描述"插好之后"。
+- `GSTAT=01`（reset 位）在 120/120 次读取里恒为 1，读清未被清掉，待查（按任务要求
+  不单独计为失败）。
 
 ## 真机验证事实库（勿重测、勿降级）
 

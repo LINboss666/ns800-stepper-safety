@@ -157,8 +157,89 @@ TMC2209 stall/DIAG 事件可产生）。把三路实测 + 一路未知混成一�
 
 ---
 
+## Phase 8-C：核心外设最终稳定性验证（2026-09-26 00:00–00:20）
+
+会话元数据：
+
+| 项 | 值 |
+|---|---|
+| 测试时 repo HEAD | `14e91db` |
+| 固件源码提交 | `e40a9b9`（`7f46f06`/`14e91db` 已用 `git diff --name-only` 核实为**仅文档**） |
+| 镜像 banner | `RT-Thread 5.3.0 build Sep 26 2026 00:00:39` |
+| clean Rebuild All | 0 Error / 0 Warning，`Code=129306 RO=46578 RW=2200 ZI=83212`（与 `e40a9b9` 构建逐项相同） |
+| 烧录 | `Erase Done.Programming Done.Verify OK.` |
+| 控制台 / 硬件 | COM5 115200 8N1，NSSinePad-NS800RT7P65x V1.2，**电机未连接** |
+
+### 先记录一次套件中断（不得掩盖的间歇性硬件故障）
+
+00:01 与 00:02 两次启动都是 `[SS] [REQ FAIL] TMC2209 link` → `FAULT_LATCHED code=8`、
+`arm mask=0xB`、`Motor state=4`；`tmc_scan` 在 **addr 0..3 全无有效应答**，只收到自身回显。
+按 §2 要求当时**停住整套件**并向用户报告；用户重新插好模块后，00:07 启动得到
+`[REQ OK] TMC2209 (IOIN=0x21000040)` → `state=READY`，套件才继续。
+
+连同 Phase8-B1 的同型事件，`TMC2209 物理在位/接触` 已累计 **3 次失联**
+（23:27、00:01、00:02）与 2 次正常（23:44、00:07 起）。这是接线/插座可靠性问题，
+不是软件问题；下面的 TMC 稳定性数据只描述"插好之后"的传输质量，
+**不能外推为"插座可靠"**。
+
+### 分项结果
+
+| 子系统 | 方法与轮次 | 原始结果 | 判定 | 证据边界 | 剩余工作 |
+|---|---|---|---|---|---|
+| **W25Q64 / SPI1** | `flash_info` ×20；`flash_test run` ×1（仅 0x7FF000–0x7FFFFF，`NS_TEST_BASE/SIZE` 已核源码确认与 params 0x000000–0x00FFFF、events 0x010000–0x10FFFF 不相交）；`msh reboot`；`flash_verify`；`flash_logstat` 前后 | 20/20 提示符完整、JEDEC 唯一值 `EF 40 17`（`SR1=00 SR2=00 SR3=FF` 每次一致）、无 SPI/超时/身份错乱；erase + 600B 跨页写 + 整扇区比对 **PASS**；重启后只读保持校验 **PASS**；logstat 前后完全相同 `slots=1533/4096 valid=1533 bad=0 queued=0 completed=0 failed=0 queue_dropped=0 last_error=0`；`[Config] valid=YES` 未受影响 | **BOARD-TESTED / STABILITY-VALIDATED** | 只证明器件+存储路径的稳定读写与保持；`SR3=FF` 的含义未深究；未测写保护策略 | 无（该路径可冻结） |
+| **ADXL345 / SPI3** | `imu_probe`；`imu_raw` ×50 + 追加 ×20；静置 70 帧 + 旋转 90° 后 5 帧 + 轻敲窗口 30 帧 + 用诊断 100Hz 滑窗峰值连续读 `diag_status` ×50 | DEVID `0xE5`/`0xE5`；**传输 70/70 全部返回且 `health=OK`**；静置模长 1011–1026 mg；旋转后主轴由 `Z+=932` 变为 `X+=939`（`Z=-436`），模长 ≈1034 mg（5/5）；**发现 1 个异常帧（第 27/50 次）`X=Y=Z=-3 mg` 且 `health=OK`**；轻敲尖峰两种采样方式都未接住（`imu_raw` 30 帧最大模长仅 1048；`vib_peak` 50 次读数 1025–1062，无 >1100） | 传输与姿态响应 **BOARD-TESTED / BASIC SAMPLING STABILITY**；⚠ 数据完整性有一例缺陷；轻敲瞬态 **未证实**（不下 PASS） | 见下"缺陷 F-IMU-01"；不声称标定精度、带宽、频率响应、INT1/FIFO | 复现并定位全 0xFF 读；轻敲需改用连续采集（如黑匣子/高速采样）才能判 |
+| **TMC2209 / UART2** | `tmc_crc_test`；`tmc_scan`；`tmc_status` ×100；`tmc_regs` ×20；`tmc_uart_probe` ×1 | CRC 官方向量 PASS（`crc=8F/48`）；addr0 `IOIN=0x21000040 VERSION=0x21 FOUND`，addr1..3 无应答（符合预期）；**100/100 每次 GSTAT 与 IOIN 均成功、`VERSION=0x21` 100/100**；0 超时 / 0 CRC 错 / 0 READ FAILED / 0 丢失提示符 / 0 echo-only；`tmc_regs` 20/20 共 140 行寄存器全有效，`IOIN=0x21000040` 20/20，`GCONF=0x101`、`CHOPCONF=0x15010053` 与历史基线一致、`VACTUAL=0`、`SGRESULT=0`；写确认路径 `IFCNT 0 → 1`，GCONF 原值回写且回读仍 `0x101` | **BOARD-TESTED / UART TRANSPORT STABILITY**（插好之后） | `IOIN` bit0 记录为 0（历史某次为 1）**但不解释 ENN**——使能链硬件阻塞；不声称电机驱动、SG 堵转性能、DIAG 极性、ENN 链 | 插座/接触可靠性；`GSTAT=01` 在 120/120 次读取里恒为 1（读清位未被清掉）需查 |
+| **电流 ADC / ADCA CH15** | `current_raw` ×30（每命令 64 样点，共 1920 样点） | 30/30 完成、**0 ADC 读失败**；`burst_mean` 均值 2063.8、范围 **2058–2069**（极紧）；单样点总体范围 **min 1622 / max 2412**；最大低偏离 **436 counts**（第 10 次爆发）、最大高偏离 **343 counts**（第 21 次）；`burst_mean-min>100` 的爆发 **2/30**，`max-burst_mean>100` 的爆发 **6/30**；`ema` 始终跟随均值（2062–2071） | **BOARD-TESTED / ACQUISITION PATH** | 上一轮 ~390-count 低离群**已复现且更大**，且**高侧离群更常见**；换算一致性已核（`mV=raw*3300/4095` 误差 <0.001 mV；`mA=(mV-1650)/0.6` 与打印值差 <1 mA，即整数截断） | 离群成因需示波器/前端拓扑确认；**不升级为** MEASURED / CALIBRATED / CURRENT ACCURACY VALIDATED；`cal source` 全程 `THEORETICAL(NOT measured) health=DEGRADED`（30/30） |
+
+### 套件结束后的跨子系统状态（无应力导致的退化）
+
+`state=READY fault=0 irq_gate=CLOSED polarity=not-confirmed protect_ready=NO` ·
+`Motor state=0 armed=0 mask=0x9 (arm REFUSED)` · `Sensor thread=running seq=52210` ·
+`TMC OK` · `IMU OK` · `ADC DEGRADED cal=THEORETICAL` · `Diag verdict=NORMAL mode=MONITOR_ONLY
+cur_filt=21 mA vib rms=1021 peak=1025` · `flash_logstat` 与基线逐字段相同。
+
+### 缺陷 F-IMU-01（本轮发现，**未修补**）
+
+`imu_raw` 第 27/50 次返回 `X=-3 Y=-3 Z=-3 mg` 且 `health=OK`。按
+`adxl345.c` 的换算 `mg = raw*39/10`，−3 mg 对应 **raw = −1**，即六个数据字节全为
+`0xFF` —— 典型的"总线未被驱动/CS 或连线毛刺"图形。而
+`adxl345_read_raw()` 只在 `adxl_read_regs()` 返回码失败时置 DEGRADED，
+**传输成功就无条件 `adxl_health = SUBSYS_OK`**，因此一帧全 1 的垃圾数据被当作有效
+测量发布（`vib_mg≈1` 的假"安静"样点会进诊断的 16 点滑窗；它不会伪造 IMPACT，
+但会稀释真实振动）。
+
+发生率：本轮 1/70（≈1.4%）。这与"sensor missing ≠ 0"这条红线是相邻问题：
+项目已经防住"读失败写 0"，但没防住"读成功而数据明显非法"。
+**本轮只登记，不改代码**（会话禁止源码改动）。
+
+---
+
+## 明确推迟到新扩展板的项（本文件不得被解读为已完成）
+
+- `MCU_DRV_ENABLE → U9 → DRV_ENABLE_SAFE → Q1 → TMC_ENN` 完整使能链
+- `ESTOP` 物理极性与通断行为
+- `LIMIT_MIN` / `LIMIT_MAX` 物理极性与通断行为
+- `TMC_DIAG` 真实故障源极性与 EXTI 触发
+- STEP / DIR 实际波形与物理验证
+- 任何电机运转
+- `MEASURED` 电流标定（当前无任何代码路径写入 MEASURED）
+- `DIAG_MODE_ACTIVE_PROTECTION`（受 MEASURED 门禁保护，仍不可开启）
+
+Phase8-A 的硬件阻塞记录（上方）保持有效，后续轮次不得覆盖或删除。
+
+---
+
 ## 原始日志（本地，不入库）
 
-- `C:\Users\LMX\qoder_logs\ns800\` 下按轮次保存的 COM5 原始字节转写
-  （`transcript.log` 及 `round*.log` / `ns800_ontarget_20260925_transcript.log`）
-- Phase 7 上板轮：同目录；Keil `build_agent*.log` / `flash_agent.log` 在 BSP 目录（未提交）
+- `C:\Users\LMX\qoder_logs\ns800\` 下按轮次保存的 COM5 原始字节转写：
+  - Phase 8-C：`c8_boot.log`(REQ FAIL 启动) / `c8_boot2.log`(READY 启动) /
+    `c8_reboot.log` / `c8_base.log` / `c8_flash20.log` / `c8flashtest.log` /
+    `c8_verify.log` / `c8_imu50.log` / `c8_imu20b.log` / `c8_imu_rot.log` /
+    `c8_imu_tap.log` / `c8_tap2.log` / `c8_tmcbase.log` / `c8_tmc100.log` /
+    `c8_tmc20regs.log` / `c8_ifcnt.log` / `c8_adc30.log` / `c8_final.log`
+  - Phase 8-B1：`phase8_b1_20260925_transcript.log`
+  - Phase 7 上板：`ns800_ontarget_20260925_transcript.log`、`round1_validation.log`、
+    `round2_pre_commentfix.log`
+- Keil 日志在 BSP 目录（未提交）：`build_c.log`、`flash_c.log`
+- 主机侧测试夹具：`stress.ps1`（prompt-wait 循环，20 次重试打开端口）、
+  `serial_monitor.ps1`、`send.sh` —— 本地工具，未入库

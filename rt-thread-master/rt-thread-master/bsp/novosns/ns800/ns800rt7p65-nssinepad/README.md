@@ -138,21 +138,21 @@ UV4 -b 编译（0 错误）→ UV4 -f 烧录 → pyocd 复位 → COM5 串口读
 | ~~`flash_id`~~ | 板载 U4 测试命令已随迁移移除（U4 未焊） | — |
 | `flash_info` | 模块（PF12）识别信息+分区表 | ✅ 已验证 |
 | `flash_unlock` | 清除模块 BP/WPS 写保护位 | ✅ 已验证 |
-| `flash_test run` | 破坏性测试（仅 0x7FF000 扇区） | ✅ 已验证 |
-| `flash_verify` | 只读保留校验 | ✅ 已验证 |
+| `flash_test run` | 破坏性测试（仅 0x7FF000 扇区） | ✅ 已验证；2026-09-26 稳定性轮：`flash_info` 20/20 唯一 JEDEC `EF 40 17`，一次专用扇区 erase+跨页写+整扇区比对 PASS，且裸 `flash_test`(无 run) 被拒绝执行 |
+| `flash_verify` | 只读保留校验 | ✅ 已验证；2026-09-26 重启后只读保持校验 PASS，`flash_logstat` 前后逐字段相同(1533 slots / bad=0)，params 与事件区未受影响 |
 | `pin_status` / `safety_status` | 安全输入电平/初始化状态（pin_status 对 DRV_ENABLE 做写+回读并标注 READBACK FAIL） | 代码就绪，待接线验证 |
 | `safety_irq_status` | 查看 EXTI 门/极性声明/四路 raw 电平/protection_ready | 🖥 软件就绪（Fix A 新增） |
 | `safety_irq_enable` / `safety_irq_disable` | 人工开/关四路 EXTI 门；**未做极性 CONFIRM 一律拒绝** | 🖥 软件就绪（Fix A 新增，禁止在接线未实测前开） |
 | `safety_polarity_confirm CONFIRM` | 操作员声明极性已实测（必须带字面量 CONFIRM；软件不做推断） | 🖥 软件就绪（硬件仍 HARDWARE-PENDING） |
-| `imu_probe` / `imu_id` / `imu_raw` | SPI3 探测 / DEVID / 三轴 mg 值 | ✅ 真机验证 (DEVID=0xE5, 合成≈1g) |
-| `current_raw` | 母线电流突发统计 + mV/mA | ✅ raw/min/max 链路曾真机验证；⚠ mV/mA 列在 Fix B 之前打印的是**未初始化值**，历史数字不可信 → 该列现为 🖥 待上板复核 |
+| `imu_probe` / `imu_id` / `imu_raw` | SPI3 探测 / DEVID / 三轴 mg 值 | ✅ 真机验证 (DEVID=0xE5, 合成≈1g)；2026-09-26 稳定性轮 70/70 传输成功、旋转 90° 后重力主轴正确由 Z 转移到 X。⚠ 记入缺陷 **F-IMU-01**：1/70 次返回 `X=Y=Z=-3mg`(=六字节全 `0xFF`) 却仍 `health=OK`，未修 |
+| `current_raw` | 母线电流突发统计 + mV/mA | ✅ 采集路径真机验证（2026-09-26：30 次爆发/1920 样点，0 读失败，`mV=raw*3300/4095`、`mA=(mV-1650)/0.6` 一致性核实）。⚠ 单样点存在 sporadic 离群（最大低 −436 / 高 +343 counts，`burst_mean` 本身 2058–2069 极稳），成因未定；mA 仍是 **THEORETICAL**，不得当实测电流 |
 | `pwm_test <hz>` / `pwm_test stop` | STEP 输出诊断（须过 Motor 借用门；stop 永远允许） | 代码就绪，频率待示波器验收 |
 | `motor_status` | 电机快照 + 四门禁失败位掩码 | 🖥 软件就绪（Fix A 新增） |
 | `motor_arm` / `motor_disarm` | 申请/解除使能（**当前必返回 REFUSED，属预期**） | 🖥 软件就绪（Fix A 新增） |
 | `motor_dir <0\|1>` / `motor_target <hz>` / `motor_start` / `motor_stop` | 方向（仅静止）/目标步频/起动/受控停止 | 🖥 软件就绪（Fix A 新增，全部只走正式 API） |
 | `tmc_scan` | 只读扫描地址0..3找 TMC2209 | ✅ 真机 FOUND (addr0) |
-| `tmc_uart_probe` / `tmc_status` | IFCNT写握手 / GSTAT+版本 | ✅ 真机验证 (IFCNT+1) |
-| `tmc_regs` | 关键寄存器只读快照 | ✅ 真机验证 |
+| `tmc_uart_probe` / `tmc_status` | IFCNT写握手 / GSTAT+版本 | ✅ 真机验证 (IFCNT+1)；2026-09-26 传输稳定性：`tmc_status` **100/100** 全部读到 `VERSION=0x21`，0 超时/0 CRC 错/0 失败/0 丢提示符。⚠ 模块**物理在位**跨两轮失联 3 次(插好即恢复)，稳定性结论仅限"插好之后" |
+| `tmc_regs` | 关键寄存器只读快照 | ✅ 真机验证；2026-09-26 **20/20** 共 140 行寄存器全有效，`GCONF=0x101`/`CHOPCONF=0x15010053` 与历史基线一致。`IOIN` bit0 已记录但**不解释 ENN**（使能链硬件阻塞） |
 | `tmc_crc_test` | CRC 算法自测（官方向量） | ✅ 真机 PASS |
 | `runtime_selftest` | 软件级运行自检：bootstrap 完成度 / 非法转换 / **四门掩码（含第 4 门参与证明）** / 停机链 / valid 位 / 收尾再确认 arm 仍被拒 | ✅ 真机 ALL PASS（@e40a9b9，含故障恢复后 Motor 回 IDLE） |
 | `system_selftest` / `system_status` | 安全自检重跑 / 全子系统状态（含 Boot 行、gate mask、DRV_ENABLE 实测） | ✅ 真机执行 |
