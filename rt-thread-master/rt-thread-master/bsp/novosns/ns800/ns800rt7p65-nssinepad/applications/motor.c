@@ -1,5 +1,5 @@
 /*
- * motor.c - 步进电机运动服务 (Phase 7-B, 审查修复 P0-4/P1-8/9/10)
+ * motor.c - 步进电机运动服务 (Phase 7-B, Fix A 门禁/回读/所有权加固)
  *
  * 结构: EPWM1_A 输出 STEP 脉冲, PA.2 输出 DIR, PC.23 输出使能"请求"。
  * 斜坡线程(优先级 8, 10ms 节拍)按线性斜率把 current_hz 推向 target_hz。
@@ -7,25 +7,40 @@
  * 安全:
  *   - MOTOR_HARDWARE_ENABLE_PATH_VALIDATED=RT_FALSE 期间 motor_arm() 一律拒绝
  *     (ENN 硬件链未验收: J4-21 终验未做 + 扩展板使能链 PCB 漏画)。
- *   - DRV_ENABLE 请求脚常态 LOW; 仅 arm 成功且运行时拉高。
- *   - P0-4: PWM apply 失败 → fail-closed(PWM off + armed=0 + target/current=0
- *     + DRV_ENABLE LOW)并 post EVT_SOFT_FAULT 交 Safety 锁死。
- *     释放 mot_lock 之后才发事件, 避免重入死锁。
+ *   - DRV_ENABLE 常态 LOW; 仅 arm 成功且运行时拉高。
  *   - P1-9: motor_start 成功前必须完成 READY→RUN 状态转换(经 safety_transition,
  *     禁止直写私有 state); 斜坡减速到 0 后 RUN→READY。Fault 仍只能走 Safety。
  *   - P1-10: arm 时 DRV_ENABLE 写失败 → 回滚 armed/输出(fail closed)。
  *   - P1-8: 斜坡每步 clamp 到 target(消除目标附近振荡); mot_ramp_step 为纯函数,
  *     motor_ramp_selftest 做确定性验证。
  *
- * 与 pwm_test(诊断)的关系: motor 非 IDLE 时 pwm_test 拒绝执行, 防止双写 EPWM。
+ * Fix A 加固:
+ *   - A3: motor_arm 四道门禁(使能链验收 / 状态 READY / 本子系统健康 /
+ *     safety_protection_ready())全部无条件求值并保留失败位掩码, 供真机确认
+ *     第 4 门确实参与判定。任何一门失败都拒绝。
+ *   - A7: PC.23 是安全关键输出, rt_pin_write 无返回值 → 一律经
+ *     safety_drv_enable_write() 做"写 + settle + 回读 (+重试 1 次)"确认。
+ *     回读只证明 MCU 焊盘电平, 不替代 ENN 整链硬件验收。
+ *     motor_emergency_stop() 现在向上传播确认失败(safety_force_shutdown 会
+ *     记录 CRITICAL 并仍然锁存 FAULT_LATCHED)。
+ *     motor_init() 若连初始 LOW 都无法确认 → health=FAILED 且不创建斜坡线程。
+ *   - A8: motor_set_direction() 只允许完全静止(current_hz==0 且 IDLE/FAULT);
+ *     开环步进运行中翻 DIR 等同注入丢步/堵转。
+ *   - A9: EPWM1 ch0 生产 owner = 本服务。诊断 pwm_test 必须过
+ *     motor_pwm_grant_to_diag(); 反向由 step_pwm_output_active() 挡住 start。
+ *   - A10: 增加 motor_status/arm/disarm/dir/target/start/stop MSH 表面,
+ *     全部只调正式 API, 不直接写 GPIO/PWM。
  */
 
 #include <rtthread.h>
 #include <rtdevice.h>
+#include <stdlib.h>
 #include "project_board.h"
 #include "safety_gpio.h"
 #include "motor.h"
 #include "safety_state.h"
+#include "safety_thread.h"
+#include "step_pwm.h"
 
 #define MOTOR_PWM_DEV       EPWM_STEP_DEV_NAME   /* "epwm1" */
 #define MOTOR_PWM_CH        0                    /* EPWMX_A = PA0 */
@@ -47,16 +62,6 @@ static struct rt_mutex mot_lock;
 static rt_bool_t mot_lock_ok = RT_FALSE;
 static rt_thread_t mot_tid = RT_NULL;
 
-static rt_err_t mot_drv_en_request(rt_uint8_t level)
-{
-    rt_base_t en = safety_pin(PIN_NAME_DRV_ENABLE);
-
-    if (en < 0) return -RT_ERROR;
-    rt_pin_write(en, level ? PIN_HIGH : PIN_LOW);
-    mot.drv_en_request = level;
-    return RT_EOK;
-}
-
 static void mot_lock_take(void)
 {
     if (mot_lock_ok) rt_mutex_take(&mot_lock, RT_WAITING_FOREVER);
@@ -65,6 +70,22 @@ static void mot_lock_take(void)
 static void mot_lock_release(void)
 {
     if (mot_lock_ok) rt_mutex_release(&mot_lock);
+}
+
+/* ---------- Fix A / A7: DRV_ENABLE 写 + 回读确认 ----------
+ * 唯一允许写 PC.23 的地方(经由 safety_gpio 的确认实现)。成功才更新影子字段,
+ * 因此 drv_en_request 语义 = "最近一次经回读确认的焊盘电平"。
+ * 调用约定: 不得持 mot_lock 调用(内部会更新快照字段并可能 mdelay)。 */
+static rt_err_t mot_drv_en_request(rt_uint8_t level)
+{
+    rt_err_t e = safety_drv_enable_write(level);
+
+    if (e == RT_EOK)
+        mot.drv_en_request = level;
+    else
+        rt_kprintf("[MOT] !! DRV_ENABLE %s NOT verified (err=%d) - pad state unknown\n",
+                   level ? "HIGH" : "LOW", (int)e);
+    return e;
 }
 
 /* 立即关 STEP 输出 */
@@ -114,7 +135,8 @@ static rt_uint32_t mot_ramp_step(rt_uint32_t cur, rt_uint32_t tgt,
 static void mot_fail_closed(void)
 {
     mot_pwm_output_off();
-    mot_drv_en_request(0);
+    if (mot_drv_en_request(0) != RT_EOK)
+        rt_kprintf("[MOT] !! FAIL-CLOSED but DRV_ENABLE LOW UNVERIFIED !!\n");
     safety_post_event(EVT_SOFT_FAULT);
     rt_kprintf("[MOT] FAIL-CLOSED (pwm error), EVT_SOFT_FAULT posted\n");
 }
@@ -128,6 +150,7 @@ static void motor_ramp_entry(void *param)
     {
         rt_uint32_t tgt;
         rt_uint8_t was_moving;
+        rt_uint8_t armed;
 
         mot_lock_take();
         tgt = mot.target_hz;
@@ -145,11 +168,12 @@ static void motor_ramp_entry(void *param)
         {
             was_moving = (mot.state == MOTOR_CRUISE ||
                           mot.state == MOTOR_ACCEL || mot.state == MOTOR_DECEL);
+            armed = mot.armed;                      /* Fix A: 锁内取快照 */
             mot.state = (tgt == 0) ? MOTOR_IDLE : MOTOR_CRUISE;
             mot_lock_release();
 
             /* P1-9: 减速到 0(受控停止完成) → RUN 回 READY(经 transition API) */
-            if (tgt == 0 && was_moving && mot.armed)
+            if (tgt == 0 && was_moving && armed)
             {
                 if (safety_transition(SAFETY_READY) != RT_EOK)
                     rt_kprintf("[MOT] RUN->READY transition refused\n");
@@ -188,6 +212,35 @@ static void motor_ramp_entry(void *param)
     }
 }
 
+/* ---------- Fix A / A11: 门禁矩阵(纯只读 无副作用) ----------
+ * 返回"失败门"位掩码; 0 = 四门全通。全部无条件求值, 这样真机可以看到
+ * 第 4 门(safety_protection_ready)确实参与判定, 而不是被前面的门短路掉。 */
+rt_uint32_t motor_get_gate_fail_mask(void)
+{
+    rt_uint32_t bad = 0;
+
+    if (!MOTOR_HARDWARE_ENABLE_PATH_VALIDATED)        bad |= MOT_GATE_ENABLE_PATH;
+    if (safety_state_get() != SAFETY_READY)           bad |= MOT_GATE_NOT_READY;
+    if (mot.health == SUBSYS_FAILED || !mot_dev_ok)   bad |= MOT_GATE_UNHEALTHY;
+    if (!safety_protection_ready())                   bad |= MOT_GATE_NOT_PROTECTED;
+
+    return bad;
+}
+
+static void mot_print_gate_fail(rt_uint32_t bad)
+{
+    rt_kprintf("[MOT] arm gate mask=0x%X:", bad);
+    if (bad & MOT_GATE_ENABLE_PATH)   rt_kprintf(" enable-path-not-validated");
+    if (bad & MOT_GATE_NOT_READY)     rt_kprintf(" safety-not-READY");
+    if (bad & MOT_GATE_UNHEALTHY)     rt_kprintf(" subsystem-unhealthy");
+    if (bad & MOT_GATE_NOT_PROTECTED) rt_kprintf(" protection-not-ready");
+    rt_kprintf("\n");
+    rt_kprintf("[MOT] gate4 detail: irq_gate=%s polarity=%s gpio_ready=%s\n",
+               safety_irq_attached() ? "OPEN" : "CLOSED",
+               safety_polarity_validated() ? "CONFIRMED" : "not-confirmed",
+               safety_gpio_ready() ? "YES" : "NO");
+}
+
 /* ---------- 正式 API (motor.h) ---------- */
 
 rt_err_t motor_init(void)
@@ -219,7 +272,16 @@ rt_err_t motor_init(void)
     mot.target_hz = 0;
     mot.armed = 0;
     mot_lock_release();
-    mot_drv_en_request(0);                      /* 请求=LOW(默认禁止) */
+
+    /* Fix A / A7: 初始"禁能"必须是经回读确认的 LOW, 否则不创建斜坡线程 */
+    e = mot_drv_en_request(0);
+    if (e != RT_EOK)
+    {
+        rt_kprintf("[MOT] init FAILED: DRV_ENABLE LOW unverified - no ramp thread\n");
+        mot_dev_ok = RT_FALSE;
+        mot.health = SUBSYS_FAILED;
+        return e;
+    }
 
     mot_tid = rt_thread_create("motor", motor_ramp_entry, RT_NULL,
                                MOTOR_THREAD_STACK, MOTOR_THREAD_PRIO, 10);
@@ -227,55 +289,57 @@ rt_err_t motor_init(void)
     rt_thread_startup(mot_tid);
 
     mot.health = SUBSYS_OK;
-    rt_kprintf("[MOT] init OK (enable-path-validated=%s, arm gate ACTIVE)\n",
+    rt_kprintf("[MOT] init OK (enable-path-validated=%s, arm gate ACTIVE,"
+               " DRV_ENABLE LOW verified)\n",
                MOTOR_HARDWARE_ENABLE_PATH_VALIDATED ? "YES" : "NO");
     return RT_EOK;
 }
 
 rt_err_t motor_arm(void)
 {
+    rt_uint32_t bad;
     rt_err_t e;
 
-    /* 门禁 1: 硬件使能链未验收 —— 刻意的失效安全门 */
-    if (!MOTOR_HARDWARE_ENABLE_PATH_VALIDATED)
+    /* Fix A / A3: 四门全部求值后统一判定(见 motor_get_gate_fail_mask) */
+    bad = motor_get_gate_fail_mask();
+    if (bad)
     {
-        rt_kprintf("[MOT] arm REFUSED: hardware enable path NOT validated\n");
-        return -RT_EPERM;
-    }
-    /* 门禁 2: 安全状态机必须在 READY */
-    if (safety_state_get() != SAFETY_READY)
-    {
-        rt_kprintf("[MOT] arm REFUSED: safety state=%s (need READY)\n",
-                   safety_state_name(safety_state_get()));
-        return -RT_EPERM;
-    }
-    /* 门禁 3: 子系统健康 */
-    if (mot.health == SUBSYS_FAILED || !mot_dev_ok)
-    {
-        rt_kprintf("[MOT] arm REFUSED: motor subsystem health=%s\n",
-                   subsys_health_name(mot.health));
+        rt_kprintf("[MOT] arm REFUSED (gates failing)\n");
+        mot_print_gate_fail(bad);
         return -RT_EPERM;
     }
 
-    /* P1-10: 先写使能请求, 成功才置 armed; 失败回滚 fail-closed */
+    /* 诊断输出仍占用 EPWM ch0 时禁止 arm(所有权未交回) */
+    if (step_pwm_output_active())
+    {
+        rt_kprintf("[MOT] arm REFUSED: pwm_test still owns EPWM1 ch0"
+                   " (run 'pwm_test stop')\n");
+        return -RT_EBUSY;
+    }
+
+    /* P1-10: 先写使能请求(含回读确认), 成功才置 armed; 失败回滚 fail-closed */
     e = mot_drv_en_request(1);
     if (e != RT_EOK)
     {
-        rt_kprintf("[MOT] arm FAILED: DRV_ENABLE write error (%d), rollback\n", e);
+        rt_kprintf("[MOT] arm FAILED: DRV_ENABLE HIGH not verified (%d),"
+                   " rollback fail-closed\n", (int)e);
         mot_lock_take();
         mot.armed = 0;
         mot.current_hz = 0;
         mot.target_hz = 0;
         mot_pwm_output_off();
+        mot.state = MOTOR_FAULT;
         mot_lock_release();
-        mot_drv_en_request(0);
+        if (mot_drv_en_request(0) != RT_EOK)
+            rt_kprintf("[MOT] !! rollback LOW ALSO UNVERIFIED - pad unknown !!\n");
+        safety_post_event(EVT_SOFT_FAULT);
         return e;
     }
 
     mot_lock_take();
     mot.armed = 1;
     mot_lock_release();
-    rt_kprintf("[MOT] ARMED (drv_en request=HIGH)\n");
+    rt_kprintf("[MOT] ARMED (drv_en request=HIGH readback verified)\n");
     return RT_EOK;
 }
 
@@ -291,22 +355,39 @@ rt_err_t motor_disarm(void)
     mot.state = MOTOR_IDLE;
     mot_lock_release();
 
-    e = mot_drv_en_request(0);                  /* P1-10: 检查并报告 */
+    e = mot_drv_en_request(0);                  /* P1-10 + A7: 回读确认 */
     if (e != RT_EOK)
-        rt_kprintf("[MOT] disarm WARNING: DRV_ENABLE write failed (%d)\n", e);
+        rt_kprintf("[MOT] !! disarm: DRV_ENABLE LOW UNVERIFIED (%d) !!\n", (int)e);
     rt_kprintf("[MOT] DISARMED\n");
     return e;
 }
 
+/* Fix A / A8: 只允许完全静止时改方向 */
 rt_err_t motor_set_direction(rt_uint8_t dir)
 {
-    rt_base_t d = safety_pin(PIN_NAME_TMC_DIR);
+    rt_base_t d;
+    rt_bool_t at_rest;
 
+    mot_lock_take();
+    at_rest = (mot.current_hz == 0) &&
+              (mot.state == MOTOR_IDLE || mot.state == MOTOR_FAULT);
+    if (!at_rest)
+    {
+        rt_kprintf("[MOT] dir REFUSED: not at rest (state=%d hz=%u) -"
+                   " DIR change mid-run injects a stall\n",
+                   mot.state, mot.current_hz);
+        mot_lock_release();
+        return -RT_EBUSY;
+    }
+    mot_lock_release();
+
+    d = safety_pin(PIN_NAME_TMC_DIR);
     if (d < 0) return -RT_ERROR;
     rt_pin_write(d, dir ? PIN_HIGH : PIN_LOW);
     mot_lock_take();
     mot.dir = dir ? 1 : 0;
     mot_lock_release();
+    rt_kprintf("[MOT] dir=%u (at rest)\n", dir ? 1u : 0u);
     return RT_EOK;
 }
 
@@ -322,6 +403,13 @@ rt_err_t motor_set_target_hz(rt_uint32_t hz)
 rt_err_t motor_start(void)
 {
     rt_uint8_t armed, has_target;
+
+    if (step_pwm_output_active())
+    {
+        rt_kprintf("[MOT] start REFUSED: pwm_test owns EPWM1 ch0"
+                   " (run 'pwm_test stop')\n");
+        return -RT_EBUSY;
+    }
 
     mot_lock_take();
     armed = mot.armed;
@@ -345,6 +433,14 @@ rt_err_t motor_start(void)
     {
         rt_kprintf("[MOT] start REFUSED: safety state=%s\n",
                    safety_state_name(safety_state_get()));
+        return -RT_EPERM;
+    }
+
+    /* 运动前再次确认安全保护链仍就绪(arm 与 start 之间门可能已关) */
+    if (!safety_protection_ready())
+    {
+        rt_kprintf("[MOT] start REFUSED: protection chain no longer ready\n");
+        safety_post_event(EVT_SOFT_FAULT);
         return -RT_EPERM;
     }
 
@@ -374,11 +470,15 @@ rt_err_t motor_emergency_stop(void)
     mot.state = MOTOR_FAULT;
     mot_lock_release();
 
-    e = mot_drv_en_request(0);                  /* P1-10: 检查并报告 */
+    /* P1-10 + A7: 回读确认并把结果传播给调用方(safety_force_shutdown 会记录
+     * CRITICAL 但依然锁存 FAULT_LATCHED)。绝不吞掉失败。 */
+    e = mot_drv_en_request(0);
     if (e != RT_EOK)
-        rt_kprintf("[MOT] estop WARNING: DRV_ENABLE write failed (%d)\n", e);
-    rt_kprintf("[MOT] EMERGENCY STOP\n");
-    return RT_EOK;
+        rt_kprintf("[MOT] !! EMERGENCY STOP but DRV_ENABLE LOW UNVERIFIED (%d) !!\n",
+                   (int)e);
+    rt_kprintf("[MOT] EMERGENCY STOP (drv_en LOW %s)\n",
+               e == RT_EOK ? "verified" : "UNVERIFIED");
+    return e;
 }
 
 rt_err_t motor_get_snapshot(motor_snapshot_t *snap)
@@ -391,6 +491,47 @@ rt_err_t motor_get_snapshot(motor_snapshot_t *snap)
 }
 
 subsys_health_t motor_get_health(void) { return mot.health; }
+
+/* ---------- Fix A / A9: EPWM1 ch0 诊断借用门 ----------
+ * Motor Service 是该通道唯一生产 owner; pwm_test 只有在本服务完全静止且
+ * 使能脚实测 LOW 时才可借用。全部条件在锁内取一致快照后判定。 */
+rt_err_t motor_pwm_grant_to_diag(void)
+{
+    motor_snapshot_t snap;
+
+    if (motor_get_snapshot(&snap) != RT_EOK)
+    {
+        rt_kprintf("[MOT] grant REFUSED: snapshot failed\n");
+        return -RT_ERROR;
+    }
+    if (snap.armed)
+    {
+        rt_kprintf("[MOT] grant REFUSED: motor is ARMED\n");
+        return -RT_EPERM;
+    }
+    if (snap.state != MOTOR_IDLE)
+    {
+        rt_kprintf("[MOT] grant REFUSED: motor state=%d (need IDLE)\n", snap.state);
+        return -RT_EBUSY;
+    }
+    if (snap.current_hz != 0)
+    {
+        rt_kprintf("[MOT] grant REFUSED: current_hz=%u still nonzero\n",
+                   snap.current_hz);
+        return -RT_EBUSY;
+    }
+    if (snap.target_hz != 0)
+    {
+        rt_kprintf("[MOT] grant REFUSED: target_hz=%u pending\n", snap.target_hz);
+        return -RT_EBUSY;
+    }
+    if (!safety_drv_enable_is_low())
+    {
+        rt_kprintf("[MOT] grant REFUSED: DRV_ENABLE pad not confirmed LOW\n");
+        return -RT_EPERM;
+    }
+    return RT_EOK;
+}
 
 /* ---------- P1-8: 斜坡确定性自测(纯软件) ---------- */
 static void motor_ramp_selftest(void)
@@ -425,3 +566,59 @@ static void motor_ramp_selftest(void)
     rt_kprintf("[MOT-ST] %s\n", pass ? "PASS" : "FAILED");
 }
 MSH_CMD_EXPORT(motor_ramp_selftest, deterministic ramp step selftest);
+
+/* ---------- Fix A / A10: Motor MSH 表面(全部只走正式 API) ---------- */
+
+static void cmd_motor_status(void)
+{
+    motor_snapshot_t snap;
+    rt_uint32_t bad;
+
+    if (motor_get_snapshot(&snap) != RT_EOK)
+    { rt_kprintf("[MOT] snapshot failed\n"); return; }
+
+    rt_kprintf("[MOT] state=%d cur=%u tgt=%u accel=%u decel=%u dir=%u\n",
+               snap.state, snap.current_hz, snap.target_hz,
+               snap.accel_hz_s, snap.decel_hz_s, snap.dir);
+    rt_kprintf("[MOT] armed=%d drv_en_verified_pad=%d health=%s\n",
+               snap.armed, snap.drv_en_request, subsys_health_name(snap.health));
+    bad = motor_get_gate_fail_mask();
+    rt_kprintf("[MOT] arm gate fail mask=0x%X (%s)\n", bad,
+               bad ? "arm will be REFUSED" : "all four gates pass");
+    if (bad) mot_print_gate_fail(bad);
+}
+MSH_CMD_EXPORT_ALIAS(cmd_motor_status, motor_status, show motor state and arm gate mask);
+
+static void cmd_motor_arm(void)      { (void)motor_arm(); }
+MSH_CMD_EXPORT_ALIAS(cmd_motor_arm, motor_arm, request arm through the four gates);
+
+static void cmd_motor_disarm(void)   { (void)motor_disarm(); }
+MSH_CMD_EXPORT_ALIAS(cmd_motor_disarm, motor_disarm, disarm and verify DRV_ENABLE LOW);
+
+static void cmd_motor_dir(int argc, char **argv)
+{
+    if (argc != 2 || (argv[1][0] != '0' && argv[1][0] != '1'))
+    { rt_kprintf("usage: motor_dir 0 or 1\n"); return; }
+    (void)motor_set_direction((rt_uint8_t)(argv[1][0] - '0'));
+}
+MSH_CMD_EXPORT_ALIAS(cmd_motor_dir, motor_dir, set DIR only when fully at rest);
+
+static void cmd_motor_target(int argc, char **argv)
+{
+    rt_err_t e;
+    long v;
+
+    if (argc != 2) { rt_kprintf("usage: motor_target <hz>\n"); return; }
+    v = strtol(argv[1], RT_NULL, 10);
+    if (v < 0) { rt_kprintf("[MOT] bad hz (negative or not a number)\n"); return; }
+    e = motor_set_target_hz((rt_uint32_t)v);
+    rt_kprintf("[MOT] set target %d Hz: %s\n", (int)v,
+               e == RT_EOK ? "OK" : "REJECTED(over MOTOR_MAX_HZ)");
+}
+MSH_CMD_EXPORT_ALIAS(cmd_motor_target, motor_target, set ramp target frequency in Hz);
+
+static void cmd_motor_start(void)    { (void)motor_start(); }
+MSH_CMD_EXPORT_ALIAS(cmd_motor_start, motor_start, start motion through the formal API);
+
+static void cmd_motor_stop(void)     { (void)motor_stop(); }
+MSH_CMD_EXPORT_ALIAS(cmd_motor_stop, motor_stop, controlled ramp down to zero);

@@ -9,6 +9,14 @@
  *   MANUAL_CLEAR → READY(内部重跑自检)
  *
  * ss_state 为私有; 业务代码一律走 safety_transition()。
+ *
+ * Fix A 启动编排: safety_state_boot() 只建事件系统/互斥并推进 BOOT→INIT→
+ * SELF_TEST; 启动自检与最终 READY 决策由 supervisor_boot stage 11 调
+ * safety_startup_selftest() 完成 —— Safety 线程必须先于慢速 Flash 扫描存在。
+ *
+ * Fix A 唯一停机路径: 硬件事件(ESTOP/LIMIT/DIAG)与软件故障(MULTI/SOFT)都只调
+ * safety_force_shutdown(); 停 STEP 与 DRV_ENABLE "写+回读"由 motor.c 的
+ * motor_emergency_stop() 负责, 本模块只做独立焊盘复核(不重复写)。
  */
 
 #include <rtthread.h>
@@ -115,31 +123,32 @@ rt_err_t safety_transition(safety_state_t next)
 /* 统一安全停机(唯一旁路): 顺序不可变 */
 void safety_force_shutdown(rt_uint32_t code)
 {
+    rt_err_t estop_e;
+    rt_bool_t pad_low;
+
     if (ss_lock_ok) rt_mutex_take(&ss_lock, RT_WAITING_FOREVER);
     ss_fault_code = code;
 
-    /* ① 停 STEP(幂等; 含 pwm disable) */
-    motor_emergency_stop();
+    /* ① 停 STEP + DRV_ENABLE 请求 LOW(写+回读, 由 Motor Service 统一持有;
+     *    幂等)。返回值 = 使能脚写入是否经回读确认(Fix A: 不再吞掉)。 */
+    estop_e = motor_emergency_stop();
     step_pwm_force_stop();
 
-    /* ② DRV_ENABLE 请求 LOW; 引脚解析失败时大告警(只剩硬件 ENN 链兜底) */
-    {
-        rt_base_t en = safety_pin(PIN_NAME_DRV_ENABLE);
-        if (en >= 0)
-            rt_pin_write(en, PIN_LOW);
-        else
-            rt_kprintf("[SS] !! DRV_ENABLE unresolved, hardware ENN chain"
-                       " is the only guard !!\n");
-    }
+    /* ② 独立复核焊盘电平(不复写): 不知道=不安全 */
+    pad_low = safety_drv_enable_is_low();
+    if (!pad_low)
+        rt_kprintf("[SS] !! CRITICAL: DRV_ENABLE pad NOT confirmed LOW (write_err=%d)"
+                   " - hardware ENN chain is the only guard !!\n", (int)estop_e);
 
     /* ③ 黑匣子触发: O(1) 置标志, Safety 线程绝不等待 Flash */
     blackbox_trigger(code);
 
-    /* ④ 锁存(旁路转换: 安全动作不受白名单限制) */
+    /* ④ 锁存(旁路转换: 安全动作不受白名单限制)。
+     * 即使 ② 复核失败也必须锁存 —— 回读失败绝不等于可以继续运动。 */
     ss_state = SAFETY_FAULT_LATCHED;
     if (ss_lock_ok) rt_mutex_release(&ss_lock);
-    rt_kprintf("[SS] ==> FAULT_LATCHED code=%u (STEP stopped, DRV_ENABLE=LOW)\n",
-               code);
+    rt_kprintf("[SS] ==> FAULT_LATCHED code=%u (STEP stopped, DRV_ENABLE LOW %s)\n",
+               code, pad_low ? "verified" : "UNVERIFIED!!");
 }
 
 void safety_enter_fault(rt_uint32_t code) { safety_force_shutdown(code); }
@@ -190,16 +199,18 @@ rt_err_t safety_run_selftest(void)
     }
     else rt_kprintf("[SS] [REQ OK] PWM device\n");
 
-    /* ---- required ③ DRV_ENABLE 请求脚必须实测 LOW ---- */
+    /* ---- required ③ DRV_ENABLE 必须"写 LOW + 回读确认"(Fix A) ----
+     * 只读不够: 写不进/被顶高的焊盘读起来可能是 LOW 但不可控。回读只证明
+     * MCU 焊盘电平, 不替代 ENN 整链硬件验收。 */
     {
-        rt_base_t en = safety_pin(PIN_NAME_DRV_ENABLE);
-        if (en < 0 || rt_pin_read(en) != PIN_LOW)
+        rt_err_t de = safety_drv_enable_write(0);
+        if (de != RT_EOK)
         {
-            rt_kprintf("[SS] [REQ FAIL] DRV_ENABLE not LOW (read=%d)\n",
-                       (en >= 0) ? rt_pin_read(en) : -1);
+            rt_kprintf("[SS] [REQ FAIL] DRV_ENABLE LOW not verified (err=%d)\n",
+                       (int)de);
             required_fail = -RT_ERROR;
         }
-        else rt_kprintf("[SS] [REQ OK] DRV_ENABLE=LOW\n");
+        else rt_kprintf("[SS] [REQ OK] DRV_ENABLE=LOW (write+readback verified)\n");
     }
 
     /* ---- required ④ TMC2209 链路(初始化 + IOIN 读) ---- */
@@ -289,6 +300,14 @@ static void fault_reset(void)
                    level == src[i].safe ? "safe" : "!!ACTIVE!!");
         if (level != src[i].safe) active = RT_TRUE;
     }
+    /* Fix A: 安全关键输出无法确认 LOW 时一律拒绝清除 —— 清除之后就是重新
+     * 自检→READY→arm 的路径, 使能脚不可控就不允许走通。 */
+    if (!safety_drv_enable_is_low())
+    {
+        rt_kprintf("[SS] fault_reset REFUSED: DRV_ENABLE pad not confirmed LOW\n");
+        if (ss_lock_ok) rt_mutex_release(&ss_lock);
+        return;
+    }
     if (active)
     {
         rt_kprintf("[SS] fault_reset REFUSED: source still active\n");
@@ -322,29 +341,56 @@ static void ss_test(void)
 }
 MSH_CMD_EXPORT(ss_test, exercise shutdown-latch-measure-clear chain);
 
-/* ---------- 初始化: BOOT → INIT → 自检(自动启动) → READY/FAULT ---------- */
+/* ---------- Fix A: 启动分两段 ----------
+ * stage 2: safety_state_boot()      事件系统 + 互斥 + BOOT→INIT→SELF_TEST
+ *          (必须早于任何慢速 Flash/存储动作, 让 Safety 事件消费者尽早就位)
+ * stage 11: safety_startup_selftest() required 自检 + 最终 READY 决策 */
 
 rt_err_t safety_state_boot(void)
 {
     if (ss_inited) return RT_EOK;           /* P1-8: 幂等 */
 
-    if (rt_event_init(&ss_event, "ss_evt", RT_IPC_FLAG_PRIO) != RT_EOK)
-        return -RT_ERROR;
     if (rt_mutex_init(&ss_lock, "ss", RT_IPC_FLAG_PRIO) != RT_EOK)
         return -RT_ERROR;
     ss_lock_ok = RT_TRUE;
+
+    if (rt_event_init(&ss_event, "ss_evt", RT_IPC_FLAG_PRIO) != RT_EOK)
+    {
+        rt_mutex_detach(&ss_lock);
+        ss_lock_ok = RT_FALSE;
+        return -RT_ERROR;
+    }
     ss_inited = RT_TRUE;
 
-    ss_state = SAFETY_INIT;
-    rt_kprintf("[SS] state machine inited, running startup self-test\n");
+    rt_kprintf("[SS] state machine inited (event+lock), BOOT->INIT->SELF_TEST\n");
 
+    /* 转换失败(理论上不可能: 静态初值就是 BOOT)不撤销事件系统 ——
+     * 状态机停在非 SELF_TEST 状态本身就是 fail closed, 但 Safety 线程
+     * 仍需一个可用的事件消费者。 */
+    if (safety_transition(SAFETY_INIT) != RT_EOK) return -RT_ERROR;
     if (safety_transition(SAFETY_SELF_TEST) != RT_EOK) return -RT_ERROR;
+    return RT_EOK;
+}
 
-    if (safety_run_selftest() == RT_EOK)
-        safety_transition(SAFETY_READY);
+/* bootstrap stage 11 / system_selftest 共用: required 自检 + READY 决策 */
+rt_err_t safety_startup_selftest(void)
+{
+    rt_err_t required = safety_run_selftest();
+
+    if (required == RT_EOK)
+    {
+        if (safety_transition(SAFETY_READY) != RT_EOK)
+        {
+            rt_kprintf("[SS] !! SELF_TEST->READY refused (state=%s) - fail closed\n",
+                       safety_state_name(safety_state_get()));
+            return -RT_ERROR;
+        }
+    }
     else
+    {
         safety_force_shutdown(FAULT_SELF_TEST);
+    }
 
     safety_state();
-    return RT_EOK;
+    return required;
 }

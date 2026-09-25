@@ -44,6 +44,7 @@ typedef enum
 #define FAULT_IMU_COMM      7u
 #define FAULT_SELF_TEST     8u
 #define FAULT_SOFT          9u   /* 软件/自检触发 */
+#define FAULT_BOOT          10u  /* Fix A: supervisor_boot required stage 失败 */
 
 /* 事件位(rt_event; ISR 内只允许 safety_post_event) */
 #define EVT_ESTOP        (1u << 0)
@@ -67,11 +68,17 @@ void safety_enter_fault(rt_uint32_t code);
 /* 事件置位: ISR 与线程均可调用(rt_event_send 实现, ISR 安全)。 */
 rt_err_t safety_post_event(rt_uint32_t event);
 
-/* 启动/重跑自检: required 全过 → READY; required 失败 → FAULT_LATCHED。
- * degraded(IMU/ADC/Flash)失败只标记降级。返回 RT_EOK = 进入 READY。 */
+/* required 项检查(不改状态机): required 全过返回 RT_EOK。
+ * degraded(IMU/ADC/Flash)失败只标记降级, 不阻塞。 */
 rt_err_t safety_run_selftest(void);
 
-/* P1-8: bootstrap 显式调用(幂等): 事件系统 + BOOT->INIT + 启动自检 */
+/* Fix A: bootstrap stage 11 使用 —— 跑 required 自检并做最终 READY 决策:
+ * 通过 → SELF_TEST→READY; 失败 → safety_force_shutdown(FAULT_SELF_TEST)。
+ * 返回 RT_EOK 仅代表已进入 READY(状态机可能已被更高优先故障改写)。 */
+rt_err_t safety_startup_selftest(void);
+
+/* Fix A: bootstrap 显式调用(幂等), 只做事件系统 + 互斥 + BOOT→INIT→SELF_TEST。
+ * 不再内联跑启动自检(那属于 stage 11, 见 safety_startup_selftest)。 */
 rt_err_t safety_state_boot(void);
 
 /* 人工故障清除(实测故障源安全才放行; 供 MSH 与 runtime_selftest) */

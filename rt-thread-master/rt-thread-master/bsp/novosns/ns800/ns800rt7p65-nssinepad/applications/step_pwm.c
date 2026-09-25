@@ -4,9 +4,13 @@
  * 设备: "epwm1"(drv_epwm.c EPWM_DRV_INIT 命名), channel 0 = EPWMX_A
  * API:  rt_pwm_set(dev, ch, period_ns, pulse_ns) + rt_pwm_enable/disable
  *
- * 安全设计(交接文档 §17.1):
+ * 安全设计(交接文档 §17.1 + Fix A):
  *   - 上电绝不自动使能输出, 必须 pwm_test 显式命令
- *   - pwm_test 只在 drv_enable 禁止状态下允许运行(电机无供电)
+ *   - EPWM1 ch0 的生产 owner 是 Motor Service; pwm_test 只是诊断借用, 必须先
+ *     过 motor_pwm_grant_to_diag() 借用门(未 armed + current_hz==0 +
+ *     target_hz==0 + state==IDLE + DRV_ENABLE 焊盘实测 LOW), 否则拒绝。
+ *     这条门的意义: 不允许和 Motor 斜坡线程并发写同一通道。
+ *   - pwm_test stop 永远允许(朝安全方向)
  *   - 频率正确性尚未示波器验收(BUG-008), 命令输出会提示未验收
  */
 
@@ -16,6 +20,7 @@
 #include "project_board.h"
 #include "safety_gpio.h"
 #include "motor.h"
+#include "step_pwm.h"
 
 #define STEP_PWM_DEV    EPWM_STEP_DEV_NAME    /* "epwm1" */
 #define STEP_PWM_CH     0                     /* EPWMX_A = PA0 */
@@ -52,22 +57,22 @@ static void pwm_test(int argc, char **argv)
 
     if (step_find() != RT_EOK) return;
 
-    /* Phase 7-B: 正式运动服务接管后, 诊断命令仅在 IDLE 态允许 */
-    {
-        motor_snapshot_t snap;
-        if (motor_get_snapshot(&snap) == RT_EOK && snap.state != MOTOR_IDLE)
-        {
-            rt_kprintf("[STEP] REFUSED: motor active (state=%d), use motor API\n",
-                       snap.state);
-            return;
-        }
-    }
-
+    /* stop 永远允许: 朝安全方向的动作不受所有权门限制 */
     if (rt_strcmp(argv[1], "stop") == 0)
     {
         rt_pwm_disable(step_pwm, STEP_PWM_CH);
         step_enabled = RT_FALSE;
-        rt_kprintf("[STEP] output disabled\n");
+        rt_kprintf("[STEP] output disabled (diagnostic ownership released)\n");
+        return;
+    }
+
+    /* Fix A: EPWM1 ch0 借用门 —— Motor Service 是生产 owner。
+     * 要求: 未 armed + current_hz==0 + target_hz==0 + state==IDLE +
+     *       DRV_ENABLE 焊盘实测 LOW。拒绝原因由 grant 函数自行打印。 */
+    if (motor_pwm_grant_to_diag() != RT_EOK)
+    {
+        rt_kprintf("[STEP] REFUSED: EPWM1 ch0 not granted (motor owns it or"
+                   " enable pad unverified). Use the motor API instead.\n");
         return;
     }
 
@@ -76,20 +81,6 @@ static void pwm_test(int argc, char **argv)
     {
         rt_kprintf("[STEP] hz out of range (1~200000)\n");
         return;
-    }
-
-    /* 安全检查(BUG-011-3): "不知道是否安全=按不安全处理"。
-     * safety_pin 解析失败或读到的不是 LOW, 一律拒绝输出 */
-    {
-        rt_base_t en = safety_pin(PIN_NAME_DRV_ENABLE);
-        rt_bool_t drv_safe = (en >= 0) && (rt_pin_read(en) == PIN_LOW);
-
-        if (!drv_safe)
-        {
-            rt_kprintf("[STEP] REFUSED: MCU_DRV_ENABLE unknown or not LOW (pin=%d)\n",
-                       (int)en);
-            return;
-        }
     }
 
     period_ns = 1000000000u / hz;
@@ -109,8 +100,16 @@ static void pwm_test(int argc, char **argv)
     step_enabled = RT_TRUE;
     rt_kprintf("[STEP] output %u Hz (period %u ns) - UNVERIFIED, 需示波器确认\n",
                hz, period_ns);
+    rt_kprintf("[STEP] motor_start/motor_arm are blocked while this is on;"
+               " run 'pwm_test stop' to release\n");
 }
-MSH_CMD_EXPORT(pwm_test, control STEP pulse output: pwm_test <hz>|stop);
+MSH_CMD_EXPORT(pwm_test, control STEP pulse output: pwm_test hz or stop);
+
+/* Fix A: 诊断输出是否正占用 EPWM1 ch0(Motor Service 的互斥门) */
+rt_bool_t step_pwm_output_active(void)
+{
+    return step_enabled ? RT_TRUE : RT_FALSE;
+}
 
 void step_pwm_force_stop(void)
 {

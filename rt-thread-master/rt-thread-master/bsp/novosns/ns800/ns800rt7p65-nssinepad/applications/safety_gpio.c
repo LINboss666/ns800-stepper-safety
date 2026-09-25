@@ -6,14 +6,19 @@
  *   2. 上电即建立安全默认态: MCU_DRV_ENABLE=LOW(最重要), DIR=LOW,
  *      IMU CS 常高, LED/蜂鸣器安全电平, 安全输入配置为普通输入
  *   3. 提供 pin_status / safety_status 命令查看实时电平
+ *   4. Fix A: MCU_DRV_ENABLE 是唯一由本模块持有的"安全关键输出", 对外只暴露
+ *      写后回读确认的 safety_drv_enable_write(); rt_pin_write 无返回值,
+ *      裸写无法证明焊盘真的到了目标电平(参 BUG-009 PF21 被顶高)。
  *
- * 注意: 初始化失败只打印告警, 绝不因"默认 GPIO 状态"误使能驱动。
- * IRQ(EstI/DIAG/限位) 暂用普通输入轮询查看, 中断在接线验证后启用(EXTI 无冲突)。
+ * 注意: 初始化失败现在向上传播(Fix A), 由 supervisor_boot stage 1 fail closed;
+ *       绝不允许"默认 GPIO 状态"误使能驱动。
+ * 中断(EstI/DIAG/限位)注册在 safety_thread.c safety_irq_attach() (显式门控)。
  */
 
 #include <rtthread.h>
 #include <rtdevice.h>
 #include "project_board.h"
+#include "safety_gpio.h"
 
 struct safety_pin
 {
@@ -44,6 +49,8 @@ static struct safety_pin safety_pins[] =
 
 static rt_bool_t sg_ready = RT_FALSE;
 static rt_err_t  sg_first_err = RT_EOK;
+/* 最近一次 DRV_ENABLE 回读实测电平; -1 = 从未成功确认(含引脚未解析) */
+static volatile rt_int32_t sg_drv_en_last_read = -1;
 
 static struct safety_pin *find_pin(const char *name)
 {
@@ -89,11 +96,71 @@ rt_err_t safety_gpio_boot(void)
     rt_err_t e = safety_gpio_setup();
 
     if (e != RT_EOK)
-        rt_kprintf("[SAFETY] init FAILED (%d) - 驱动保持禁止, 禁止进入 READY\n", e);
-    else
-        rt_kprintf("[SAFETY] init OK - MCU_DRV_ENABLE=LOW, 输出安全态已建立\n");
+    {
+        rt_kprintf("[SAFETY] gpio init FAILED (%d) - 驱动保持禁止, 禁止进入 READY\n", e);
+        return e;
+    }
 
-    return RT_EOK;  /* 初始化失败不阻塞系统, 安全态已兜底 */
+    /* 安全关键输出必须"写 + 回读"确认, 裸写不算建立安全态(Fix A) */
+    e = safety_drv_enable_write(0);
+    if (e != RT_EOK)
+    {
+        rt_kprintf("[SAFETY] MCU_DRV_ENABLE LOW NOT verified (%d) - FAIL CLOSED\n", e);
+        sg_ready   = RT_FALSE;
+        sg_first_err = e;
+        return e;
+    }
+
+    rt_kprintf("[SAFETY] init OK - MCU_DRV_ENABLE=LOW(readback verified), "
+               "输出安全态已建立\n");
+    return RT_EOK;
+}
+
+/* ---------- MCU_DRV_ENABLE: 写 + 回读确认(Fix A) ----------
+ * level: 1=请求使能(HIGH) 0=禁止(LOW)。readback 只证明 MCU 焊盘实际电平,
+ * 不替代 ENN 整链硬件验收(HARDWARE-PENDING)。调用方禁止用 rt_pin_write 裸写。 */
+#define DRV_EN_SETTLE_MS 1u
+#define DRV_EN_TRIES     2u
+
+rt_err_t safety_drv_enable_write(rt_uint8_t level)
+{
+    rt_base_t en = safety_pin(PIN_NAME_DRV_ENABLE);
+    rt_int32_t want = level ? PIN_HIGH : PIN_LOW;
+    rt_int32_t got = -1;
+    rt_uint32_t i;
+
+    if (en < 0)
+    {
+        rt_kprintf("[SAFETY] !! DRV_ENABLE pin (%s) unresolved - CANNOT verify\n",
+                   PIN_NAME_DRV_ENABLE);
+        sg_drv_en_last_read = -1;
+        return -RT_EINVAL;
+    }
+
+    for (i = 0; i < DRV_EN_TRIES; ++i)
+    {
+        rt_pin_write(en, (rt_uint8_t)want);
+        rt_thread_mdelay(DRV_EN_SETTLE_MS);
+        got = (rt_int32_t)rt_pin_read(en);
+        sg_drv_en_last_read = got;
+        if (got == want)
+            return RT_EOK;
+        rt_kprintf("[SAFETY] DRV_ENABLE readback mismatch: want=%d got=%d (try %u)\n",
+                   (int)want, (int)got, i + 1);
+    }
+
+    rt_kprintf("[SAFETY] !! CRITICAL: DRV_ENABLE READBACK FAILURE (want=%d got=%d)"
+               " pad %s !!\n", (int)want, (int)got,
+                   level ? "NOT driven HIGH" : "NOT confirmed LOW");
+    return -RT_EIO;
+}
+
+rt_bool_t safety_drv_enable_is_low(void)
+{
+    rt_base_t en = safety_pin(PIN_NAME_DRV_ENABLE);
+
+    if (en < 0) return RT_FALSE;             /* 不知道=不安全 */
+    return (rt_pin_read(en) == PIN_LOW) ? RT_TRUE : RT_FALSE;
 }
 
 static void pin_status(void)
@@ -111,7 +178,16 @@ static void pin_status(void)
         }
         if (p->mode == PIN_MODE_OUTPUT)
         {
-            /* 诊断: 重新写默认电平并回读, 检测写不进/被覆写的情况 */
+            /* 诊断: 重新写默认电平并回读, 检测写不进/被覆写的情况。
+             * DRV_ENABLE 走统一的安全关键路径 helper(Fix A), 不裸写。 */
+            if (rt_strcmp(p->name, PIN_NAME_DRV_ENABLE) == 0)
+            {
+                rt_err_t ev = safety_drv_enable_write(0);
+                rt_kprintf("%-10s %-6d w%d r=%-7d %s%s\n", p->name, (int)p->pin,
+                           p->level, rt_pin_read(p->pin), p->desc,
+                           ev == RT_EOK ? "" : "  !! READBACK FAIL !!");
+                continue;
+            }
             rt_pin_write(p->pin, p->level);
             rt_kprintf("%-10s %-6d w%d r=%-7d %s\n", p->name, (int)p->pin,
                        p->level, rt_pin_read(p->pin), p->desc);
@@ -136,6 +212,11 @@ static void safety_status(void)
     if (p != RT_NULL && p->pin >= 0)
         rt_kprintf("[SAFETY] MCU_DRV_ENABLE = %d (%s)\n", rt_pin_read(p->pin),
                    rt_pin_read(p->pin) == PIN_LOW ? "禁止(安全)" : "!!已使能!!");
+    else
+        rt_kprintf("[SAFETY] !! MCU_DRV_ENABLE pin unresolved - 无软件保障 !!\n");
+
+    rt_kprintf("[SAFETY] DRV_ENABLE last write+readback verified = %d (-1 = never verified)\n",
+               (int)sg_drv_en_last_read);
 
     p = find_pin(PIN_NAME_ESTOP);
     if (p != RT_NULL && p->pin >= 0)
