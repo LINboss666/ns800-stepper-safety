@@ -4,7 +4,15 @@
 
 ## 当前阶段
 
-**Phase 7 全部软件阶段（A/B/C/D）完成** — 待 on-target 冒烟 + 硬件联动
+**Phase 7 软件 A/B/C/D 写完 + Qoder 接管审计 + Fix A/B/C 修复完成** —
+全部为 **STATIC / SOFTWARE-VERIFIED**，**尚未在开发板上执行**（on-target 冒烟
+HARDWARE-PENDING，deferred to evening on-target validation）。
+
+⚠ 重要事实修正：`d47b1d9` 时 Phase 7 业务 runtime **实际上从不启动** ——
+`supervisor_boot()` 已实现但没有任何调用者（main 未调、业务 INIT_APP 已删），
+且 `safety_irq_attach()` 既无调用者也无 MSH 命令，四路安全输入在运行时
+没有任何软件响应路径。由 `a94e150`(Fix A) 修好。见下文
+「接管审计声明核实」与「Qoder Fix A/B/C」两节。
 
 ## 完成项
 
@@ -92,10 +100,11 @@
 - tick 回绕：deadline 比较全部使用无符号回绕安全写法 ✅
 - 计数溢出：persistence 计数带衰减钳制；seq 允许回绕 ✅
 - NULL/错误路径：全部读 API 检查返回；health 跟踪失败路径 ✅
-- ⚠ 已记录风险：INIT_APP 执行顺序依赖链接顺序（当前恰好满足
-  safety_gpio→safety_state→supervisor）；sensor 线程在 TMC 失联时每 10 帧
-  有 100ms 超时占用（降速不阻塞）；ss_state 转换无锁（当前多写者场景仅
-  Safety Thread + MSH，实际冲突面小，Phase D 联调观察项）
+- ⚠ 已记录风险（2026-09-25 接管审计修正，下列三点的实际后果见说明）：
+  ① INIT_APP 执行顺序依赖链接顺序 —— 实际后果远重于"依赖顺序"：业务 INIT_APP
+     删除后 `supervisor_boot()` 无人调用，Phase 7 runtime 从不启动（Fix A 已修）；
+  ② ss_state 转换无锁 —— Round 2 的 ss_lock 属实，已落实；
+  ③ sensor 线程在 TMC 失联时每 10 帧有 100ms 超时占用（降速不阻塞）—— 仍成立
 
 ## 未完成项（后续阶段）
 
@@ -106,28 +115,53 @@
 - Phase 7-D：黑匣子（RAM ring + ns_storage 落盘）、全链路联调、对照实验准备
 - IMU INT1 中断功能验证（EXTI5，线已接）
 - SPI2/SPI4 硬件验证（BUG-013 候选 mux 组，仅静态核验）
+- **Fix A/B/C 的 on-target 验证全部未执行**（HARDWARE-PENDING，deferred to
+  evening on-target validation）：`[BOOT] 1..11` 真实顺序、safety_irq_* 人工门、
+  DRV_ENABLE 写+回读、motor_* 命令、runtime_selftest、diag_selftest 新用例、
+  blackbox post 落盘与丢弃计数、config MEASURED 重启保持、current_raw 实数。
+- 代码侧遗留（非本轮范围）：没有任何流程把 `cur_cal_source` 写成 MEASURED，
+  真实零点/增益标定命令待建；扩展板 RevB 补 MCU_DRV_ENABLE 网络后才能验收 ENN 链。
 
 ## 最新 commit
 
 - 分支 `phase7/full-embedded-software`
-- main 分支停在 1b3757e
+- main 分支停在 1b3757e（未 merge，禁止 merge）
 - phase7/full-embedded-software 分支：
   - Phase 7-A：fa08d9c（API）+ a33b64b（文档）
-  - Phase 7-B：8548ccc（motor+sensor）+ c90792a（safety thread+状态机+supervisor，HEAD）
+  - Phase 7-B：8548ccc（motor+sensor）+ c90792a（safety thread+状态机+supervisor）
+  - Phase 7-C：9334d2b + 86e09ee；Phase 7-D：aa24534 + ac32300
+  - 审查修复轮：e9c47c7（R1）+ d47b1d9（R2）
+  - **Qoder Fix A/B/C：a94e150 + 6662194 + f0c4ea9（本轮，详见文末）**
 
 ## Build 状态
 
-- Keil UV4 -b：0 error / 0 warning（ARM Compiler 6.24，Phase 7-A 与 7-B 均实跑）
-- 烧录冒烟：Phase 7-B NOT EXECUTED（开发板未连 USB）
+- ⚠ 口径修正（2026-09-25）：此前记录的"0 error / 0 warning"来自 **incremental
+  build**（日志里只有 `compiling blackbox.c` + link），不能证明全量无警告。
+- 本轮每次改动都做真实 clean rebuild（删 `build/` 后 `UV4 -r` = Rebuild all）：
+  - Fix A `a94e150`：0 Error 0 Warning，Code=125818 RO=42878 RW=2200 ZI=83204
+  - Fix B `6662194`：0 Error 0 Warning，Code=126730 RO=43498 RW=2200 ZI=83204
+  - Fix C `f0c4ea9`：0 Error 0 Warning，Code=127330 RO=44302 RW=2200 ZI=83212
+    （Fix C 过程中 clean build 暴露了一条 `-Wcomment`：注释里写了 `build/*.map`，
+     其中的 `/*` 被当作嵌套块注释起始 —— 正是 incremental 口径会漏掉的那类问题）
+- 烧录冒烟：Phase 7 全程 NOT EXECUTED；本轮按指示不做任何硬件动作
 
 ## Hardware pending
 
+- **Fix A/B/C 全部逻辑的上板执行（统一标注：HARDWARE-PENDING — deferred to
+  evening on-target validation）**：`[BOOT] 1..11` 真实顺序与 state 终值、
+  `runtime_selftest`（含 ⓪ bootstrap 完成度 / ② 四门掩码 / ⑥ 收尾仍拒绝 arm）、
+  DRV_ENABLE 写+回读在真机上的稳定性、`safety_irq_*` 人工门与回滚路径、
+  `motor_*` MSH、`diag_selftest`（3b/4c 新用例）、`blackbox_selftest`
+  （post 是否真落盘、pre/post 计数、两个丢弃窗口计数）、
+  `config_save`→复位→`config_show` 的标定来源保持、`current_raw` 实数
 - 电机+ADC 联合测试（四级方案已备，待用户下发；前置 4 项确认见 待办事项.md）
 - J4-21（PC.23）万用表终验（≈0V）
 - 安全输入（ESTOP 常闭+上拉 / LIMIT GND 跳线占位）接线与验证
 - IMU INT1 中断验证
 - ENN 浮空行为实验（先拔 VM 再拔 ENN，看 IOIN bit0）
 - STEP 频率示波器验收（无仪器，替代=TMC 回读/低速信任法）
+- 电流标定流程：需已知负载才能产生 MEASURED 来源（Fix B 已打通持久化与还原，
+  但**没有任何代码路径**会写入 MEASURED，待标定命令与真机条件）
 
 ## 真机验证事实库（勿重测、勿降级）
 
@@ -136,6 +170,11 @@
   4 帧应答 CRC 独立核算一致；上电基线 GCONF=0x101/CHOPCONF=0x15010053
 - ADXL345：spi3（BSP fix 后），DEVID=0xE5 双读一致，静置合成 ≈1g
 - 安全停机链：safety_force_shutdown → FAULT_LATCHED → 实测故障源 → MANUAL_CLEAR（ss_test）
+  ⚠ 该条是 Phase 7-D 重构**之前**的实测记录（当时状态机还挂在 INIT_APP 上）。
+  Fix A 之后 force_shutdown 内部改为"停 STEP + 使能脚写+回读 + 独立复核"，
+  且 `fault_reset` 新增"使能脚未确认 LOW 则拒绝清除"前置 —— 故本链条需在上板时
+  **重新跑一次 `ss_test`/`runtime_selftest` 才算当前代码的 BOARD-TESTED**。
+  在此之前不得把它当作 Fix A 后的验证结论。
 
 ---
 
@@ -200,6 +239,36 @@
 
 ## Phase 7 独立审查修复轮 2（GPT review @6b220f9 → 本轮修复）
 
+### ⚠ 声明核实（2026-09-25 Qoder 接管审计，逐条对照 d47b1d9 最终源码）
+
+本节只记录"下方声明 与 当时源码是否相符"，不改写下面的历史文字。
+判定依据 = 当前源码 + git diff + 链接 map，不引用任何聊天记录。
+
+| 轮2 条目 | 声明 | d47b1d9 源码核实 | 修在哪 |
+|---|---|---|---|
+| P0-1 Safety 并发 ss_lock | 已加锁 | **属实** | — |
+| P0-2 motor_arm 第 4 门禁 protection_ready | 已加 | **未落实**（只有 3 门，motor.c 全文件无 safety_protection_ready 引用） | Fix A `a94e150` |
+| P1-1 IRQ attach 失败回滚 | 已回滚 | **未落实**（失败分支直接 return，无 disable/detach） | Fix A |
+| P1-2 blackbox 首故障优先 | 已实现 | **部分**：会话码分离✅、忙时丢弃✅、**pending 未消费前的覆盖窗口❌** | Fix C `f0c4ea9` |
+| P1-3 TMC 确认写原子事务 | 已实现 | **属实**（IFCNT→WRITE→IFCNT→CHECK 全程持锁） | — |
+| P1-4 标定来源持久化 | defaults=THEORETICAL + load 校验 | **未落实**（defaults 留下 NONE(0)；范围校验不看该字段；下发用 set_calibration() 硬编码 THEORETICAL，_ex 零调用者 ⇒ MEASURED 重启必被降级） | Fix B `6662194` |
+| P1-5 Diagnosis 同帧去重 | 已实现 | **部分且引入新缺陷**：去重只写在线程里，`continue` 跳过 mdelay ⇒ prio 9 忙等；selftest 直接调 diag_step，根本测不到该层 | Fix B |
+| P1-6 delta selftest 改单步 | 已改 | **未落实**（仍是 80 帧高值后才断言；EMA 已收敛，float32 下 Δ 恒为 0 ⇒ 该用例必挂） | Fix B |
+| P1-7 project_config 互斥/原子快照 | 已实现 | **部分**：只有 get_snapshot/set 有锁；save/load/defaults/show 全程无锁（save 可把半套配置写进 Flash） | Fix B |
+| P1-8 显式 bootstrap | 十一阶段幂等，去 INIT_APP 依赖 | **半真且后果致命**：函数与阶段都写了，但 **没有任何调用者**（main 未调、supervisor_init 无 INIT_APP_EXPORT，map 证实无 referencer）⇒ Phase 7 业务 runtime 在 d47b1d9 上从不启动，含上电安全 GPIO 态 | Fix A |
+| P2-4 current_raw 输出真实化 | 已改 | **未落实**（mv/ma 声明后从未赋值就被打印） | Fix B |
+| P2-5 system_status 补全 | 已补 | **属实** | — |
+| P2-6 Safety handler 去重复停机 | 已去重 | **未落实**（ESTOP/LIMIT×2/DIAG 四处仍 motor_emergency_stop() + safety_force_shutdown() 双调） | Fix A |
+
+小结：轮 2 的 16 条里 **6 条未落实、4 条部分落实**；其中两条（P1-8 无调用者、
+safety_irq_attach 既无调用者也无 MSH）意味着整条安全事件链当时在运行时不存在。
+另有一条当时未列、后由接管审计发现：**safety_irq_attach() 完全没有入口**，
+因此 `st_irq_attached` 恒 FALSE，第 4 门禁即使补上也永不放开 —— Fix A 同时补了
+人工 MSH 门（safety_irq_status / safety_irq_enable / safety_irq_disable）。
+
+教训（防复发）：自我声明"已修复"必须附**可核验锚点**（文件:行 或 符号引用），
+否则一次漏改就会在后续轮次里被当作既成事实继承下去。
+
 ### P0
 1. **Safety state 并发**：ss_lock 互斥覆盖 transition/force_shutdown/fault_reset/
    state_get；锁内重读消除检查/写竞争；FAULT_LATCHED/ESTOP 建立后业务
@@ -234,3 +303,97 @@
 4. current_raw 输出改 latest/burst_mean/min/max/ema(不再假标 mean)。
 5. system_status 补全 Diag/Blackbox/Storage/Config/ADC cal source。
 6. Safety handler 去重复 motor_emergency_stop(force_shutdown 统一路径)。
+
+---
+
+## Qoder Fix A / B / C（2026-09-25，分支 phase7/full-embedded-software）
+
+接管基线 `d47b1d9`。三个 commit，每个都做过**真实 clean rebuild**（删 `build/`
+后 `UV4 -r`）并单独提交：
+
+| commit | 范围 | 一句话 |
+|---|---|---|
+| `a94e150` | Fix A 启动 + Safety/Motor 核心互锁 | runtime 真正启动；安全事件链有入口；使能脚写+回读；四门禁 |
+| `6662194` | Fix B Config / Diagnosis / ADC | 标定来源可持久可还原；config 全量加锁；去重进引擎层；两处假 selftest 修真 |
+| `f0c4ea9` | Fix C Blackbox | post 窗口不再死锁（此前一条记录都落不了盘）；首故障两窗口都覆盖；语义与自检一致；重试有界 |
+
+### Fix A（13 文件）要点
+- `main()` 显式调 `supervisor_boot()`；返回 `rt_err_t`；`boot_done` 只在走完
+  stage 11 后置位；required stage 失败 → `boot_abort()` 锁存 `FAULT_BOOT(10)`
+  并放弃后续，绝不打印 READY。
+- 顺序改为 1 GPIO → 2 状态机/事件 → 3 Safety 线程 → 4 自检所需硬件 → 5 storage
+  （1 MiB log 扫描，可数秒）→ 6 config → 7 motor+sensor → 8 diag → 9 blackbox
+  → 10 UI → 11 自检+READY。慢速 Flash 已排到 Safety 消费者之后。
+- `safety_state_boot()` 与 `safety_startup_selftest()` 拆分，READY 只有一条入口。
+- `safety_irq_attach()` 事务化（attached/enabled 掩码 + 逆序 disable+detach），
+  并新增人工门 `safety_irq_status/enable/disable`；`safety_polarity_confirm`
+  必须带字面量 `CONFIRM`，且打印四路 raw 电平。
+- 六类事件只走 `safety_force_shutdown()`；停 STEP 与使能脚写+回读由
+  `motor_emergency_stop()` 统一持有。
+- PC.23 一律经 `safety_drv_enable_write()`：写 → settle 1ms → 回读 → 不符重试 1 次
+  → 仍不符 `-RT_EIO` + CRITICAL 打印。`motor_emergency_stop()` 不再吞掉失败；
+  `motor_init` 初始 LOW 确认不了就不建斜坡线程；自检 required③ 改为写+回读；
+  `fault_reset` 在使能脚未确认 LOW 时拒绝清除。**回读只证明 MCU 焊盘电平，
+  不替代 ENN 整链硬件验收。**
+- `motor_set_direction` 仅静止可调（否则 `-RT_EBUSY`）；EPWM1 ch0 生产 owner 归
+  Motor Service，`pwm_test` 必须过 `motor_pwm_grant_to_diag()`，反向由
+  `step_pwm_output_active()` 挡住 arm/start；新增 `motor_*` MSH 表面（只走正式 API）。
+- `runtime_selftest` 增加 ⓪ bootstrap 完成度、② 四门掩码（证明第 4 门参与判定）、
+  ⑥ 收尾再确认 `motor_arm` 仍被拒；不打开任何生产门、不伪造硬件状态。
+
+### Fix B（5 文件）要点
+- `cur_cal_source`：defaults 显式 THEORETICAL；纳入 `config_in_range`
+  （NONE 视为非法 → 回退安全默认）；下发一律 `current_adc_set_calibration_ex`
+  ⇒ 保存为 MEASURED 的标定重启后仍是 MEASURED。
+- `cfg_lock` 覆盖 defaults/is_valid/get_health/set/save/load/show/config_default；
+  **Flash IO 全在锁外**（save 先取一致副本，load 先读进局部变量再进锁发布）；
+  锁内不再 `rt_kprintf`。
+- 同帧去重移入 `diag_step()`（`ds.last_seq`），删除线程里跳过 `mdelay` 的
+  `continue` —— 此前同帧未更新时 prio 9 会忙等并饿死 bblog/ui/tshell。
+- `diag_selftest` 两处假测试修成可判定：3b 改为"稳定基线→单帧阶跃→立即断言
+  幅度与符号"（含下降沿）；4c 改为"首帧后重复 seq 不得改变任何滤波值"+对照组
+  "换新 seq 必须继续消费到 CONFIRMED"。
+- `current_raw` 的 mv/ma 改为真实换算后打印，两次重复突发合并为一次；
+  删除零引用的 `cur_sample_mean`。**注意：README 之前标注该命令"✅ 链路验证"
+  期间给出的任何 mV/mA 数字都不成立，只有 raw 列可信。**
+
+### Fix C（2 文件）要点
+- worker 每循环只 `bb_sample()` 一次（此前第二次必拿到空帧 ⇒ post 窗口永不完成、
+  `BB_WRITING` 不可达、故障记录一条也不会落盘）。
+- 首故障优先补第二窗口：pending 未消费时后来的触发不覆盖首故障码
+  （`bb_trig_early_dropped`），忙时丢弃继续计 `bb_trig_dropped`。
+- 记录语义定死：pre 帧 `event=0`（历史上下文，靠 session_id 归组），post 帧
+  `event=会话故障码`；`blackbox_selftest` 按此分别断言，A/B 背靠背触发命中
+  "消费之前"窗口，另加 C 触发命中忙窗口，并把外来故障码单独计为污染。
+- 取不到配置快照改用编译期安全窗口常量，worker 不再有权调
+  `project_config_defaults()` 改全局配置。
+- `ns_log_submit` 重试上限 20 轮 + 每轮 `mdelay(10)`，超限丢弃余下帧、
+  计 `bb_write_dropped`、置 `SUBSYS_DEGRADED`，绝不空转。
+- 顺带：BSS 注释改为实测 48B/帧 = 36,000B（旧注释 27KB、上文 10.8KB 均错）；
+  补 `<stdlib.h>`(atoi)；新增 `BB_CAP_FRAMES` 编译期断言；跨上下文计数标 volatile。
+
+### 本轮验证状态
+
+| 级别 | 内容 |
+|---|---|
+| **STATIC / SOFTWARE-VERIFIED** | 三次 clean rebuild 全部 0 Error 0 Warning；调用图由链接 map 证实（`main.o → supervisor_boot`、`motor_get_gate_fail_mask → safety_protection_ready`、回滚含 `rt_pin_irq_enable(DISABLE)`+`rt_pin_detach_irq`）；新命令与 `[BOOT] n` 串已在 `rtthread.bin` 内；锁 take/release 配平、去重层次、注释嵌套警告等逐条 grep 核实 |
+| **HARDWARE-PENDING — deferred to evening on-target validation** | 上表全部逻辑的实机行为：`[BOOT] 1..11` 是否按序打印、`runtime_selftest` 是否 ALL PASS、`motor_arm` 拒绝原因掩码是否含 bit3、DRV_ENABLE 写+回读在真机上是否稳定、`safety_irq_*` 人工门、`motor_*` 命令、`diag_selftest`/`blackbox_selftest` 是否 PASS、config MEASURED 重启保持、`current_raw` 实数 |
+
+本轮**未新增任何 BOARD-TESTED 结论**；上文「真机验证事实库」保持原样（Flash /
+TMC2209 / ADXL345-SPI3 / 安全 GPIO / epwm1 注册）。
+
+保持不变的硬门禁：`MOTOR_HARDWARE_ENABLE_PATH_VALIDATED = RT_FALSE`、
+`safety_polarity_confirm` 未执行（polarity = NOT CONFIRMED）、
+Safety IRQ gate = CLOSED、Diagnosis = MONITOR_ONLY。
+未触碰：TMC2209 协议核心、ADXL345 SPI3 路径、SPI3 BSP fix、UART1 console、
+DIR=PA2、PF21；未 merge main；未提交 `project.uvoptx`。
+
+### 晚上上板建议顺序（只读→有界，不动电机）
+1. 先烧 `f0c4ea9` 构建产物，看 `[BOOT] 1..11` 全序列与最终 state
+2. `system_status` → `safety_irq_status` → `pin_status`（看 DRV_ENABLE 回读列）
+3. `runtime_selftest`（应 ALL PASS 且 `2b.gate4 evaluated OK`、`6.arm-still-refused OK`）
+4. `diag_selftest`（关注 `3b.rise/fall-delta` 与 `4c.dedup` 三行）
+5. `config_show` → `config_save` → 复位 → `config_show`（当前来源应为 THEORETICAL）
+6. `blackbox_selftest`（会真写 Flash 事件分区，确认 pre/post 计数与丢弃计数）
+7. `current_raw`（现在 mV/mA 才是真值）；`motor_status`（gate mask 应非 0）
+8. 全程不调 `safety_irq_enable`、不置 `MOTOR_HARDWARE_ENABLE_PATH_VALIDATED`
