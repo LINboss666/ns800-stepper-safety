@@ -154,14 +154,19 @@ UV4 -b 编译（0 错误）→ UV4 -f 烧录 → pyocd 复位 → COM5 串口读
 | `tmc_uart_probe` / `tmc_status` | IFCNT写握手 / GSTAT+版本 | ✅ 真机验证 (IFCNT+1) |
 | `tmc_regs` | 关键寄存器只读快照 | ✅ 真机验证 |
 | `tmc_crc_test` | CRC 算法自测（官方向量） | ✅ 真机 PASS |
-| `runtime_selftest` | 软件级运行自检：bootstrap 完成度 / 非法转换 / **四门掩码（含第 4 门参与证明）** / 停机链 / valid 位 / 收尾再确认 arm 仍被拒 | 🖥 软件就绪, 上板待执行 |
-| `system_selftest` / `system_status` | 安全自检重跑 / 全子系统状态（含 Boot 行、gate mask、DRV_ENABLE 实测） | 🖥 软件就绪 |
-| `diag_status` / `diag_mode` / `diag_selftest` | 诊断引擎状态/模式/合成注入自检（Fix B 重写 3b 与 4c 两条用例） | 🖥 软件就绪(合成验证) |
-| `config_show/default/save/load` | 运行时配置查看/恢复/持久化/加载（Fix B：标定来源可持久可还原） | 🖥 软件就绪 |
-| `blackbox_status/dump/clear/selftest` | 黑匣子状态/回读/清除/落盘自检（Fix C：post 窗口此前收不满，自检此前必挂） | 🖥 软件就绪(写真实 Flash) |
+| `runtime_selftest` | 软件级运行自检：bootstrap 完成度 / 非法转换 / **四门掩码（含第 4 门参与证明）** / 停机链 / valid 位 / 收尾再确认 arm 仍被拒 | ✅ 真机 ALL PASS（@e40a9b9，含故障恢复后 Motor 回 IDLE） |
+| `system_selftest` / `system_status` | 安全自检重跑 / 全子系统状态（含 Boot 行、gate mask、DRV_ENABLE 实测） | ✅ 真机执行 |
+| `diag_status` / `diag_mode` / `diag_selftest` | 诊断引擎状态/模式/合成注入自检（Fix B 重写 3b 与 4c 两条用例） | ✅ 真机 ALL PASS（首轮 @03d6438 曾 FAILED，D4 修的是用例预算而非阈值） |
+| `config_show/default/save/load` | 运行时配置查看/恢复/持久化/加载（Fix B：标定来源可持久可还原） | ✅ 真机 save→reboot→load 一致 |
+| `blackbox_status/dump/clear/selftest` | 黑匣子状态/回读/清除/落盘自检（Fix C：post 窗口此前收不满，自检此前必挂） | ✅ 真机 PASS（300 帧真实落盘 + BB_WRITING 窗口丢弃实测）；`blackbox_clear` 未执行（破坏性） |
 
 > 🖥 = 编译与静态检查通过，**未在开发板执行**；上表所有 🖥 项统一为
 > HARDWARE-PENDING — deferred to evening on-target validation。
+> ✅ 2026-09-25 更新：Phase 7 运行时相关 🖥 行已按真机结果改写；仍属 🖥 /
+> HARDWARE-PENDING 的只有依赖外部硬件的项（真实电机、实测电流标定、
+> ESTOP/限位物理极性、Safety EXTI 开闸、`MCU_DRV_ENABLE → U9 → Q1 → TMC_ENN`
+> 使能链 —— 最后一项是**当前 PCB revision 上硬件阻塞**，见
+> `PHASE8_HARDWARE_VALIDATION_20260925.md`）。
 
 ## 7. 安全红线（任何修改不得违反）
 

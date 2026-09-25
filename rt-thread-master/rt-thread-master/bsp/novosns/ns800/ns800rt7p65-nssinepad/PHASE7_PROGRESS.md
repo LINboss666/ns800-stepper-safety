@@ -4,8 +4,18 @@
 
 ## 当前阶段
 
-**Phase 7 软件 A/B/C/D 写完 + Qoder 接管审计 + Fix A/B/C 修复完成** —
-全部为 **STATIC / SOFTWARE-VERIFIED**，**尚未在开发板上执行**（on-target 冒烟
+**Phase 7 已收官并通过真机验证** — 最终基线 `e40a9b9`
+(fix: close phase7 on-target validation defects)，2026-09-25 上板执行完整验证，
+结论见文末「Phase 7 真机上板验证」一节，标注 **BOARD-TESTED**。
+
+> 口径修正（2026-09-25 21:30）：本节此前写"全部为 STATIC / SOFTWARE-VERIFIED，
+> 尚未在开发板上执行"，那是 Fix A/B/C 轮的状态，已过期。中间确实有一轮
+> (`03d6438`) 上板暴露出 6 项缺陷（D1 电流单位 ×1000、O1 故障恢复后电机停在
+> FAULT、D2/D3 打印缺陷、D4/D5 两个自检在正确代码上必挂），由 `e40a9b9` 修复
+> 并复验通过 —— 静态推理把这些标成"SOFTWARE-VERIFIED"是错的，自检必须真跑。
+
+历史状态（保留备查）：**Phase 7 软件 A/B/C/D 写完 + Qoder 接管审计 + Fix A/B/C 修复完成** —
+当时全部为 **STATIC / SOFTWARE-VERIFIED**，**尚未在开发板上执行**（on-target 冒烟
 HARDWARE-PENDING，deferred to evening on-target validation）。
 
 ⚠ 重要事实修正：`d47b1d9` 时 Phase 7 业务 runtime **实际上从不启动** ——
@@ -131,7 +141,10 @@ HARDWARE-PENDING，deferred to evening on-target validation）。
   - Phase 7-B：8548ccc（motor+sensor）+ c90792a（safety thread+状态机+supervisor）
   - Phase 7-C：9334d2b + 86e09ee；Phase 7-D：aa24534 + ac32300
   - 审查修复轮：e9c47c7（R1）+ d47b1d9（R2）
-  - **Qoder Fix A/B/C：a94e150 + 6662194 + f0c4ea9（本轮，详见文末）**
+  - Qoder Fix A/B/C：a94e150 + 6662194 + f0c4ea9
+  - Qoder Fix D（文档/声明核实）：a3bc079 + 8a7528b + f6cfc42
+  - Qoder Fix E（自检隔离 + 触发语义）：`03d6438`
+  - **首轮真机验证修复轮（BOARD-TESTED 基线）：`e40a9b9`**
 
 ## Build 状态
 
@@ -143,17 +156,29 @@ HARDWARE-PENDING，deferred to evening on-target validation）。
   - Fix C `f0c4ea9`：0 Error 0 Warning，Code=127330 RO=44302 RW=2200 ZI=83212
     （Fix C 过程中 clean build 暴露了一条 `-Wcomment`：注释里写了 `build/*.map`，
      其中的 `/*` 被当作嵌套块注释起始 —— 正是 incremental 口径会漏掉的那类问题）
-- 烧录冒烟：Phase 7 全程 NOT EXECUTED；本轮按指示不做任何硬件动作
+- 烧录冒烟：Phase 7 软件轮（Fix A/B/C/D/E）按指示不做任何硬件动作，当时的
+  「烧录未执行」记录属实但已过期 —— 2026-09-25 晚完成上板，见下条与文末新节。
+- 上板轮 clean rebuild（同样删 `build/` 后 `UV4 -r`，口径与上面一致）：
+  - `03d6438`（上板基线）：0 Error 0 Warning，Code=128354 RO=45822 RW=2200 ZI=83212
+  - `e40a9b9`（真机缺陷修复，**当前最终基线**）：0 Error 0 Warning，
+    Code=129306 RO=46578 RW=2200 ZI=83212
+  - 两轮均 `UV4 -f` 烧录成功：Erase Done / Programming Done / Verify OK
+  - ⚠ 注意：两次构建产物不可能逐字节相同 —— RT-Thread banner 内嵌
+    `__DATE__/__TIME__`，用二进制比对判断"源码未变"是无效的，只能比 Program Size
+    与源码 diff。
 
 ## Hardware pending
 
-- **Fix A/B/C 全部逻辑的上板执行（统一标注：HARDWARE-PENDING — deferred to
-  evening on-target validation）**：`[BOOT] 1..11` 真实顺序与 state 终值、
-  `runtime_selftest`（含 ⓪ bootstrap 完成度 / ② 四门掩码 / ⑥ 收尾仍拒绝 arm）、
-  DRV_ENABLE 写+回读在真机上的稳定性、`safety_irq_*` 人工门与回滚路径、
-  `motor_*` MSH、`diag_selftest`（3b/4c 新用例）、`blackbox_selftest`
-  （post 是否真落盘、pre/post 计数、两个丢弃窗口计数）、
-  `config_save`→复位→`config_show` 的标定来源保持、`current_raw` 实数
+- ~~Fix A/B/C 全部逻辑的上板执行（HARDWARE-PENDING）~~ → **已于 2026-09-25 完成**：
+  `[BOOT] 1..11`、`runtime_selftest`、DRV_ENABLE 写+回读、`motor_*` 门拒、
+  `diag_selftest`、`blackbox_selftest`、`config_save`→复位→`config_show`、
+  `current_raw` 全部真机执行并通过（详见文末「Phase 7 真机上板验证」）。
+  `safety_irq_*` 人工门只验证了**保持 CLOSED** 这一侧，开闸路径仍未验证（见下）。
+- **MCU_DRV_ENABLE → U9 → DRV_ENABLE_SAFE → Q1 → TMC_ENN 完整使能链**：
+  **HARDWARE-BLOCKED ON CURRENT PCB REVISION**（`MCU_DRV_ENABLE` 节点未在连接器/
+  测试点引出）。用户决定不飞线，延到 RevB。详见 `PHASE8_HARDWARE_VALIDATION_20260925.md`
+- Safety EXTI 开闸（`safety_irq_enable`）与四路真实极性：仍 **HARDWARE-PENDING**；
+  `TMC_DIAG` 真实故障源极性本轮明确不验证（无电机、无真实 stall/DIAG 事件）
 - 电机+ADC 联合测试（四级方案已备，待用户下发；前置 4 项确认见 待办事项.md）
 - J4-21（PC.23）万用表终验（≈0V）
 - 安全输入（ESTOP 常闭+上拉 / LIMIT GND 跳线占位）接线与验证
@@ -162,6 +187,8 @@ HARDWARE-PENDING，deferred to evening on-target validation）。
 - STEP 频率示波器验收（无仪器，替代=TMC 回读/低速信任法）
 - 电流标定流程：需已知负载才能产生 MEASURED 来源（Fix B 已打通持久化与还原，
   但**没有任何代码路径**会写入 MEASURED，待标定命令与真机条件）
+- 新发现（真机，未修）：`current_raw` 64 点突发出现过 `min=1677` 对 `mean=2067`
+  的单点离群（折算约 −498 mA），像 ADC 首样点/建立时间伪影；无仪器不下结论
 
 ## 真机验证事实库（勿重测、勿降级）
 
@@ -170,11 +197,30 @@ HARDWARE-PENDING，deferred to evening on-target validation）。
   4 帧应答 CRC 独立核算一致；上电基线 GCONF=0x101/CHOPCONF=0x15010053
 - ADXL345：spi3（BSP fix 后），DEVID=0xE5 双读一致，静置合成 ≈1g
 - 安全停机链：safety_force_shutdown → FAULT_LATCHED → 实测故障源 → MANUAL_CLEAR（ss_test）
-  ⚠ 该条是 Phase 7-D 重构**之前**的实测记录（当时状态机还挂在 INIT_APP 上）。
-  Fix A 之后 force_shutdown 内部改为"停 STEP + 使能脚写+回读 + 独立复核"，
-  且 `fault_reset` 新增"使能脚未确认 LOW 则拒绝清除"前置 —— 故本链条需在上板时
-  **重新跑一次 `ss_test`/`runtime_selftest` 才算当前代码的 BOARD-TESTED**。
-  在此之前不得把它当作 Fix A 后的验证结论。
+  ✅ 该链条已在**当前代码**上重跑并升级为本轮的实测结论（旧条是 Phase 7-D 重构
+  之前的记录，当时状态机还挂在 INIT_APP 上）：`runtime_selftest` 在 `e40a9b9`
+  上两次 ALL PASS —— `EVT_SOFT_FAULT` → `[MOT] EMERGENCY STOP (drv_en LOW verified)`
+  → `FAULT_LATCHED code=9` → 四路实测源 safe → `motor_disarm` 恢复 IDLE →
+  `MANUAL_CLEAR` → 重跑 required 自检 → `READY` → 收尾 `motor_arm` 仍被拒。
+- MCU 侧使能脚（**只是 MCU 引脚本身，不含扩展板链路**）：PC.23 / IO87 配置为
+  OUTPUT，写 LOW 后回读 = 0，`safety_drv_enable_write()` 写+回读在 boot、自检、
+  紧急停机、disarm 四处均确认；`pin_status` 列 `PC.23 w0 r=0`
+- Phase 7 业务 runtime 启动：`[BOOT] 1..11` 全序列真机打印，终态 `READY`
+  （`bootstrap-complete=YES abort-stage=0`）—— 修复了 `d47b1d9` 时代
+  "runtime 从不启动"的 P0
+- TMC2209 身份（本分支）：`tmc_status` → `IOIN version=0x21`，`GSTAT=01`
+- ADXL345（本分支）：`imu_id` → `DEVID=0xE5`；静置合成幅值 ≈1000 mg（含 1g 基线）
+- W25Q64（本分支）：`flash_info` → `JEDEC=EF 40 17`，8 MiB，params A:000000/B:001000，
+  events 010000-10FFFF（4096 槽）
+- 外部 Flash 参数持久化：`config_save` → `reboot` → `[CFG] loaded OK` +
+  `valid=YES` + 全部阈值逐项一致（**本轮唯一一次真实写/读参数区成功**）
+- 黑匣子真实落盘：`runtime_selftest` 触发的会话写入 300 帧（pre 200 + post 100），
+  `last_err=0`、`write_drops=0`；`blackbox_selftest` PASS：session 恰好 +1、
+  600 条记录可读回、pre `event=0` / post `event=9`、无任何外来故障码污染，
+  并实测到 `BB_WRITING` 窗口丢弃（Fix E 的那条路径真机走通）
+- 电流换算路径（修正后）：`current_raw` → ~1.666 V → **二十几 mA** 量级，
+  仍标 `THEORETICAL(NOT measured)`；`diag_status cur_filt` 同量级（修复前是
+  35459 "mA"，即 µA 冒充 mA）
 
 ---
 
@@ -377,10 +423,13 @@ safety_irq_attach 既无调用者也无 MSH）意味着整条安全事件链当�
 | 级别 | 内容 |
 |---|---|
 | **STATIC / SOFTWARE-VERIFIED** | 三次 clean rebuild 全部 0 Error 0 Warning；调用图由链接 map 证实（`main.o → supervisor_boot`、`motor_get_gate_fail_mask → safety_protection_ready`、回滚含 `rt_pin_irq_enable(DISABLE)`+`rt_pin_detach_irq`）；新命令与 `[BOOT] n` 串已在 `rtthread.bin` 内；锁 take/release 配平、去重层次、注释嵌套警告等逐条 grep 核实 |
-| **HARDWARE-PENDING — deferred to evening on-target validation** | 上表全部逻辑的实机行为：`[BOOT] 1..11` 是否按序打印、`runtime_selftest` 是否 ALL PASS、`motor_arm` 拒绝原因掩码是否含 bit3、DRV_ENABLE 写+回读在真机上是否稳定、`safety_irq_*` 人工门、`motor_*` 命令、`diag_selftest`/`blackbox_selftest` 是否 PASS、config MEASURED 重启保持、`current_raw` 实数 |
+| **HARDWARE-PENDING — deferred to evening on-target validation** | （当时的口径，已于 2026-09-25 晚执行完毕，见文末新节）上表全部逻辑的实机行为：`[BOOT] 1..11` 是否按序打印、`runtime_selftest` 是否 ALL PASS、`motor_arm` 拒绝原因掩码是否含 bit3、DRV_ENABLE 写+回读在真机上是否稳定、`safety_irq_*` 人工门、`motor_*` 命令、`diag_selftest`/`blackbox_selftest` 是否 PASS、config MEASURED 重启保持、`current_raw` 实数 |
 
-本轮**未新增任何 BOARD-TESTED 结论**；上文「真机验证事实库」保持原样（Flash /
-TMC2209 / ADXL345-SPI3 / 安全 GPIO / epwm1 注册）。
+本轮**未新增任何 BOARD-TESTED 结论**（该轮的自述，属实）；上文「真机验证事实库」
+保持原样（Flash / TMC2209 / ADXL345-SPI3 / 安全 GPIO / epwm1 注册）。
+> ⚠ 补注：该轮把 `diag_selftest` / `sensor_selftest` 的断言当作"确定性可过"记为
+> SOFTWARE-VERIFIED，是**错误的** —— 真机第一次跑就暴露 4 条断言在正确代码上必挂
+> （见文末 D4/D5）。教训：纯软件自检也必须真机跑一次才算数。
 
 保持不变的硬门禁：`MOTOR_HARDWARE_ENABLE_PATH_VALIDATED = RT_FALSE`、
 `safety_polarity_confirm` 未执行（polarity = NOT CONFIRMED）、
@@ -397,3 +446,55 @@ DIR=PA2、PF21；未 merge main；未提交 `project.uvoptx`。
 6. `blackbox_selftest`（会真写 Flash 事件分区，确认 pre/post 计数与丢弃计数）
 7. `current_raw`（现在 mV/mA 才是真值）；`motor_status`（gate mask 应非 0）
 8. 全程不调 `safety_irq_enable`、不置 `MOTOR_HARDWARE_ENABLE_PATH_VALIDATED`
+
+> ✅ 2026-09-25 晚：上述顺序已按此执行（并在 `03d6438` 与 `e40a9b9` 上各跑一遍），
+> 结果见下一节。第 2 步的 `ui_status` / `current_adc_status` 当时是计划文本里的
+> **不存在的命令**，实际用 `safety_status` / `pin_status` / `step_status` /
+> `current_raw` 覆盖；源码里从来没有导出过这两个名字（grep 全仓 0 命中）。
+
+---
+
+## Phase 7 真机上板验证（2026-09-25 20:45–21:30，@03d6438 → 修复 → @e40a9b9）
+
+板：NSSinePad-NS800RT7P65x V1.2；控制台 COM5 115200 8N1；DAPLink
+`0700000105d3ff39…908`；**步进电机未连接**；全程无飞线、无 Gate 开启。
+
+### 结论：`e40a9b9` = BOARD-TESTED 基线（已打 tag `v0.7-phase7-software-board-validated`）
+
+逐项实测通过：
+
+- `[BOOT] 1 safe-gpio … 11 startup-selftest OK -> state=READY`，`abort-stage=0`
+- 终态 `Safety state=READY fault=0`，`degraded=0x00`
+- `runtime_selftest` **ALL PASS**（`final state=READY motor=0`）
+- 故障恢复闭环：`FAULT_LATCHED` → `fault_reset` 实测四源 safe → `motor_disarm`
+  → Motor `IDLE` → `MANUAL_CLEAR` → 重跑 required 自检 → `READY` → 收尾 arm 仍拒
+- MCU PC.23 / IO87 OUTPUT 写 LOW + 回读 = 0（boot / 自检 / 紧急停机 / disarm 四处）
+- `motor_arm` 仍拒绝，`arm gate fail mask=0x9`（bit0 使能链 + bit3 保护未就绪）
+- TMC2209 UART：`IOIN version=0x21`；ADXL345 SPI3：`DEVID=0xE5`；
+  W25Q64 SPI1：`JEDEC=EF 40 17`
+- `config_save` → `reboot` → `config_show`：`valid=YES`，全部阈值逐项一致
+- 黑匣子真实 Flash：300 帧落盘、`blackbox_selftest` PASS、首故障优先（含
+  `BB_WRITING` 窗口丢弃实测）、600 条读回无任何外来故障码
+- `diag_selftest` **ALL PASS**；`sensor_selftest` **PASS**
+- 电流换算修正后：~1.666 V → 二十几 mA，仍标 `THEORETICAL`
+- 最终源码 clean Rebuild All：0 Error / 0 Warning，
+  `Code=129306 RO=46578 RW=2200 ZI=83212`
+
+首轮（@`03d6438`）真机暴露并已修复的 6 项缺陷：D1 电流 ×1000、D2 枚举喂 `%s`、
+D3 `rt_kprintf` 不支持浮点、D4 `diag_selftest` 预算与引擎模型矛盾、
+D5 `sensor_selftest` 把 DEGRADED(未标定) 当读失败、O1 恢复后 Motor 停在 `MOTOR_FAULT`。
+细节见该提交的 message 与代码注释。
+
+### 明确**不**声称已验证（不得由上述结果外推）
+
+- ❌ 真实电机运动（任何频率/方向/加减速）—— 电机未接
+- ❌ 实测电流标定（`MEASURED` 来源）—— 无任何写入路径，ACTIVE_PROTECTION 仍被门禁拒绝
+- ❌ ESTOP / LIMIT_MIN / LIMIT_MAX 的**物理极性** —— 见 Phase 8-B1 文档
+- ❌ Safety EXTI 开闸路径（`safety_irq_enable`）—— 门保持 CLOSED，极性未确认前不得开
+- ❌ 真实 TMC2209 故障（DIAG0/stall）触发的安全链 —— 无电机、无真实事件
+- ❌ 完整 `MCU_DRV_ENABLE → U9 → DRV_ENABLE_SAFE → Q1 → TMC_ENN` 使能链 ——
+  **当前 PCB revision 上硬件阻塞**，详见 `PHASE8_HARDWARE_VALIDATION_20260925.md`
+
+保持不变的硬门禁（真机复核）：`MOTOR_HARDWARE_ENABLE_PATH_VALIDATED=FALSE`、
+polarity `NOT confirmed`、`irq_gate=CLOSED`、`protection_ready=NO`、
+Diagnosis `MONITOR_ONLY`、STEP `enabled=no`、DRV_ENABLE pad LOW。
