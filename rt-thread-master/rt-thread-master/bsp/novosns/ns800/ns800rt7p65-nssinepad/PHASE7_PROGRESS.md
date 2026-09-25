@@ -249,7 +249,7 @@ HARDWARE-PENDING，deferred to evening on-target validation）。
 | P0-1 Safety 并发 ss_lock | 已加锁 | **属实** | — |
 | P0-2 motor_arm 第 4 门禁 protection_ready | 已加 | **未落实**（只有 3 门，motor.c 全文件无 safety_protection_ready 引用） | Fix A `a94e150` |
 | P1-1 IRQ attach 失败回滚 | 已回滚 | **未落实**（失败分支直接 return，无 disable/detach） | Fix A |
-| P1-2 blackbox 首故障优先 | 已实现 | **部分**：会话码分离✅、忙时丢弃✅、**pending 未消费前的覆盖窗口❌** | Fix C `f0c4ea9` |
+| P1-2 blackbox 首故障优先 | 已实现 | **部分**：会话码分离✅、忙时丢弃✅、**pending 未消费前的覆盖窗口❌** | Fix C `f0c4ea9` 只补了"消费前"一个窗口；**捕获/写盘期间后续 trigger 仍会挂成 pending、本轮落盘后长出第二个 session** —— 由 Fix E（本轮，见文末）补齐 |
 | P1-3 TMC 确认写原子事务 | 已实现 | **属实**（IFCNT→WRITE→IFCNT→CHECK 全程持锁） | — |
 | P1-4 标定来源持久化 | defaults=THEORETICAL + load 校验 | **未落实**（defaults 留下 NONE(0)；范围校验不看该字段；下发用 set_calibration() 硬编码 THEORETICAL，_ex 零调用者 ⇒ MEASURED 重启必被降级） | Fix B `6662194` |
 | P1-5 Diagnosis 同帧去重 | 已实现 | **部分且引入新缺陷**：去重只写在线程里，`continue` 跳过 mdelay ⇒ prio 9 忙等；selftest 直接调 diag_step，根本测不到该层 | Fix B |

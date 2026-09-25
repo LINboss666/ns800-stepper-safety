@@ -26,7 +26,11 @@ typedef struct
     float       current_ma;     /* 未标定时为理论换算值(DEGRADED) */
     rt_uint8_t  valid_current;  /* 同上语义 */
     rt_uint8_t  fresh_current;
-    rt_uint8_t  current_calibrated;
+    /* Fix E: 标定来源三态而不是含糊布尔。取值为 current_adc_cal_source_t:
+     *   NONE=无标定 / THEORETICAL=理论默认系数 / MEASURED=实测量值。
+     *   旧字段 current_calibrated 的含义是 "source != NONE", 对 THEORETICAL 也为
+     *   1, 会被读成"已实测" —— 已废弃。判据请查 current_adc_cal_source()。 */
+    rt_uint8_t  current_cal_source;
     /* TMC (tmc2209_read_sg_result, 10Hz 分频) */
     rt_uint16_t sg_result;
     rt_uint8_t  valid_sg;       /* 1=上次 SG 采样有效(10Hz 分频期间保留) */

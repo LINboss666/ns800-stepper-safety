@@ -10,10 +10,13 @@
  *
  * Safety Thread 纪律: trigger 只置标志(关中断最小临界), 零等待零 Flash 操作。
  *
- * 触发策略(Fix C / C2: 首故障优先, 两个窗口都覆盖):
- *   1) pending 标志尚未被 worker 消费 → 后来的触发不覆盖首个故障码,
- *      计 early_drop;
- *   2) 已在捕获/写盘中 → 丢弃并计 busy_drop, 绝不产生第二个 session。
+ * 触发策略(Fix C / C2 首故障优先, Fix E 补 WRITING 窗口):
+ *   trigger 在一个关中断临界内同时判 pending 标志与 worker 状态:
+ *   1) pending 标志未消费 → 后来的触发不覆盖首个故障码, 计 early_drop;
+ *   2) worker 正忙(采 post 或在写 Flash)→ 丢弃且**不留 pending**, 计 busy_drop。
+ *      否则该触发会在本轮落盘结束、状态清回 IDLE 后被接受成第二个 session。
+ *   3) 两者都不成立才接受为首故障。
+ *   ⇒ 一次故障只产生一个 session; 绝不产生陈旧第二 session 掩盖首故障。
  *
  * 记录语义(Fix C / C3, 与 blackbox_selftest 一致):
  *   pre  窗口记录: event = 0        (故障发生前的历史上下文, 本身不是事件)

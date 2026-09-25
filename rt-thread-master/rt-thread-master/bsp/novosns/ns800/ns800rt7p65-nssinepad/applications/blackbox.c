@@ -297,6 +297,9 @@ static void blackbox_entry(void *param)
             }
             else
             {
+                /* Fix E 后的兜底: trigger 侧已按 bb_state != BB_IDLE 丢弃,
+                 * 正常不会再有"忙时才发现 pending"的情况。保留这道同语义
+                 * 判定, 因为 bb_state 是跨线程 volatile, 不依赖"绝不可能"。 */
                 bb_trig_dropped++;              /* busy: 只丢弃, 不改 session code */
                 rt_kprintf("[BB] trigger DROPPED (busy, dropped=%u)\n",
                            bb_trig_dropped);
@@ -320,23 +323,32 @@ static void blackbox_entry(void *param)
 /* ---------- 正式 API (blackbox.h) ---------- */
 
 /* 故障触发(O(1), Safety Thread / 状态机调用): 只置标志, 零等待零 Flash。
- * Fix C / C2 首故障优先: pending 标志还没被 worker 消费时, 后来的触发绝不
- * 覆盖首个故障码 —— 旧实现在这个窗口里会用 B 顶掉 A(两次触发都发生在消费前
- * 是真实场景: 多源同时判 severe / EXTI 抖动连发), 落盘的是 B 而 A 被静默丢弃。
- * "已进入捕获/写盘"之后的丢弃由 worker 侧计数(bb_trig_dropped), 这里计数
- * 消费之前的到达(bb_trig_early_dropped)。 */
+ *
+ * 首故障优先 —— 一个关中断临界内同时判 pending 标志与 worker 状态(Fix E):
+ *   - bb_pending_flag 已置: A 的码已锁存但还没被消费 → 绝不覆盖(early_drop)。
+ *   - bb_state != BB_IDLE: 正在采集 post 或正在写盘 → 丢弃且**不留 pending**。
+ *     旧实现在这里漏判: pending 已被 worker 消费成 FALSE 时, B 会被写进
+ *     bb_pending_*; 等 A 落盘完成、worker 把状态清回 BB_IDLE 后的那一步,
+ *     B 就被接受成第二个 session —— 违反"捕获/写盘期间后续触发必须丢弃"。
+ *   - 两者都不成立才接受为首故障。
+ * 计数分工: 消费前到达计 bb_trig_early_dropped; 因捕获/写盘在忙而丢弃计
+ * bb_trig_dropped(worker 侧另有一道同语义的兜底判定)。 */
 void blackbox_trigger(rt_uint32_t fault_code)
 {
-    rt_base_t level = rt_hw_interrupt_disable();  /* P1-2: flag+code 对的最小临界 */
+    rt_base_t level = rt_hw_interrupt_disable();  /* flag + state + code 最小临界 */
 
-    if (!bb_pending_flag)
+    if (bb_pending_flag)
     {
-        bb_pending_code = fault_code;
-        bb_pending_flag = RT_TRUE;
+        bb_trig_early_dropped++;      /* 首故障已锁存待消费, 本次不覆盖 */
+    }
+    else if (bb_state != BB_IDLE)
+    {
+        bb_trig_dropped++;            /* 捕获/写盘忙: 丢弃, 不产生第二 session */
     }
     else
     {
-        bb_trig_early_dropped++;      /* 首故障已锁存, 本次不覆盖 */
+        bb_pending_code = fault_code;
+        bb_pending_flag = RT_TRUE;
     }
 
     rt_hw_interrupt_enable(level);
@@ -421,63 +433,119 @@ static void blackbox_clear(void)
 }
 MSH_CMD_EXPORT(blackbox_clear, destructive clear of event log partition);
 
-/* 软件自检: 真实触发 → 等待(session 递增 + 本会话真的写了帧 + 回 IDLE)
- * → 落盘回读核对。会真实写 Flash 事件分区, 需要 Flash 在位。
- * 软件级验证, 非整机硬件验证。
+/* 软件自检: 真实触发 → 等待(本会话真的写完 + 回 IDLE)→ 落盘回读核对。
+ * 会真实写 Flash 事件分区, 需要 Flash 在位。软件级验证, 非整机硬件验证。
  *
- * Fix C 修正的三点:
- *   - 旧实现把 B 触发放在 A 之后 10ms, 那时 worker 多半已经消费掉 A 的 pending,
- *     所以它测的是"捕获中丢弃"(bb_trig_dropped), 而不是"C2 消费之前不覆盖"。
- *     现在 A、B 背靠背触发(测早到窗口), 另外补一个 C 测捕获/写盘忙窗口。
- *     注: bblog(18) 优先级高于 tshell(20), 两次调用之间 worker 仍可能抢先消费,
- *     所以"早到丢弃"与"忙时丢弃"具体计在哪一边是不确定的 —— 断言只要求
- *     两个窗口合计至少丢弃一次, 并且任何记录都不得带 B/C 的故障码。
- *   - 旧等待条件 bb_written_total > 0 会被*历史*会话满足; 现在要求本会话增量。
- *   - 旧断言"本会话全部记录 event == FAULT_SOFT"与 pre 窗口记录的语义矛盾
- *     (pre 帧 event 恒为 NS_EVENT_TEST), 只要 pre_n>0 必挂。现在按 pre(=0)/
- *     post(=触发码)分别断言, 并单独断言"绝不允许出现 B/C 的故障码"。 */
+ * 覆盖的四个语义(Fix C 引入, Fix E 补齐 WRITING 窗口):
+ *   1) A/B 背靠背触发 → "pending 未消费"窗口不覆盖首故障码(early_drop)。
+ *   2) worker 进入忙状态后再触发 C → 必须 busy_drop, 且**不得留下 pending**。
+ *      关键断言是第 3 条: A 落盘完成、状态清回 IDLE 之后, 只允许出现
+ *      sess0+1 这一个 session —— 旧实现漏判 bb_state 时, C 会在下一拍被
+ *      接受成第二个 session, 只测 POST_COLLECT 不测这条路径就发现不了。
+ *   3) 排空后 bb_session 必须恰为 sess0+1(第二 session 即回归)。
+ *   4) 记录语义: pre 帧 event==0, post 帧 event==FAULT_SOFT,
+ *      任何 B/C/D 的故障码出现在记录里都算污染。
+ *
+ * 说明两处诚实的不确定性:
+ *   - bblog(18) 优先级高于 tshell(20), A/B 两次调用之间 worker 仍可能抢先消费,
+ *     所以第 1 条只能断言"早到/忙时两个计数器合计至少加一", 不断言具体哪边。
+ *   - BB_WRITING 的时长取决于 Flash 与 logger 队列, 轮询观测到就顺带覆盖
+ *     (POST_COLLECT 与 WRITING 走 trigger 里同一个 bb_state != BB_IDLE 分支,
+ *      所以第 2 条在 POST_COLLECT 上是确定性覆盖); 观测不到则如实报 NOTE。
+ *   - 旧实现把 C 触发固定放在 A 之后 50ms, 既没断言"必须 busy_drop", 也没检查
+ *     会不会长出第二个 session, 等于没测这条规则。 */
 static void blackbox_selftest(void)
 {
     ns_fault_sample_t s;
     ns_log_stats_t st0, st1;
     rt_uint32_t seq, before, after, i, sess0, written0, drop0, edrop0;
+    rt_uint32_t drop_before, drop_after, seen_state;
     rt_uint32_t checked = 0, pre_recs = 0, post_recs = 0, bad = 0, pollute = 0;
-    int pass = 1, found = 0;
+    int pass = 1, found = 0, writing_covered = 0;
     unsigned long wait;
 
     if (blackbox_init() != RT_EOK) { rt_kprintf("[BB-ST] init failed\n"); return; }
     if (ns_storage_init() != RT_EOK)
     { rt_kprintf("[BB-ST] SKIP: storage not available\n"); return; }
     if (ns_log_stats(&st0) != RT_EOK) { rt_kprintf("[BB-ST] stats failed\n"); return; }
-    before  = st0.valid_records;
-    sess0   = bb_session;
+    before   = st0.valid_records;
+    sess0    = bb_session;
     written0 = bb_written_total;
     drop0    = bb_trig_dropped;
     edrop0   = bb_trig_early_dropped;
 
-    rt_kprintf("[BB-ST] A=SOFT then B=LIM_MIN back-to-back (pre-consumption window),"
-               " waiting for session %u...\n", sess0 + 1);
+    rt_kprintf("[BB-ST] A=SOFT B=LIM_MIN back-to-back; then busy-window C and D\n");
     blackbox_trigger(FAULT_SOFT);         /* A: 首故障, 必须胜出 */
-    blackbox_trigger(FAULT_LIMIT_MIN);    /* B: 消费之前到达 -> 必须被丢弃 */
+    blackbox_trigger(FAULT_LIMIT_MIN);    /* B: 未消费窗口到达 -> 不得覆盖 */
 
-    /* C: 落在捕获/写盘的忙窗口(post 窗口要 ~1s, 50ms 时必然仍在采集) */
-    rt_thread_mdelay(50);
-    blackbox_trigger(FAULT_ESTOP);
+    /* ---- 覆盖 2: 等 worker 进入忙状态, 再触发 C ---- */
+    for (wait = 0; wait < 500u; ++wait)
+    {
+        if (bb_state != BB_IDLE) break;
+        rt_thread_mdelay(1);
+    }
+    seen_state = (rt_uint32_t)bb_state;
+    if (seen_state == BB_IDLE)
+    { rt_kprintf("[BB-ST] FAIL: never observed busy state (session=%u written=%u)\n",
+                 bb_session, bb_written_total); pass = 0; }
+    else
+    {
+        drop_before = bb_trig_dropped;
+        blackbox_trigger(FAULT_ESTOP);            /* C: 忙窗口触发(多为 POST_COLLECT) */
+        rt_thread_mdelay(2);
+        drop_after = bb_trig_dropped;
+        rt_kprintf("[BB-ST] C in state=%u: busy_drop %u -> %u\n",
+                   (int)seen_state, drop_before, drop_after);
+        if (drop_after <= drop_before)
+        { rt_kprintf("[BB-ST] FAIL: busy trigger C was NOT dropped"
+                     " (would create a second session)\n"); pass = 0; }
+    }
 
-    /* 等本会话真的写完: session 递增 + 回到 IDLE + 落盘帧数有增量, 最多 20s */
-    for (wait = 0; wait < 2000u; ++wait)
+    /* ---- 覆盖 2b: 尽量抓一次 BB_WRITING(同一分支, 观测不到只报 NOTE) ---- */
+    for (wait = 0; wait < 3000u; ++wait)
+    {
+        if (bb_state == BB_WRITING)
+        {
+            drop_before = bb_trig_dropped;
+            blackbox_trigger(FAULT_TMC_COMM);     /* D: 正在写 Flash 时到达 */
+            rt_thread_mdelay(2);
+            writing_covered = (bb_trig_dropped > drop_before) ? 1 : -1;
+            if (writing_covered < 0)
+            { rt_kprintf("[BB-ST] FAIL: trigger D during BB_WRITING not dropped\n");
+              pass = 0; writing_covered = 0; }
+            else rt_kprintf("[BB-ST] D in BB_WRITING: dropped OK\n");
+            break;
+        }
+        if (bb_state == BB_IDLE && bb_written_total > written0) break;  /* 已排空 */
+        rt_thread_mdelay(1);
+    }
+    if (!writing_covered)
+        rt_kprintf("[BB-ST] NOTE: BB_WRITING not observed this run (flash too fast?)"
+                   " - same guard branch as POST_COLLECT\n");
+
+    /* ---- 覆盖 3: 排空 + 余量, 然后要求 session 计数恰好 +1 ---- */
+    for (wait = 0; wait < 2500u; ++wait)
     {
         if (bb_session >= sess0 + 1 && bb_state == BB_IDLE &&
             bb_written_total > written0)
             break;
         rt_thread_mdelay(10);
     }
-    if (bb_session < sess0 + 1 || bb_state != BB_IDLE)
+    rt_thread_mdelay(200);     /* 若 C/D 被误留成 pending, 这里会长出第二个 session */
+
+    if (bb_state != BB_IDLE)
     { rt_kprintf("[BB-ST] FAIL: not drained (state=%d written=%u/%u)\n",
                  (int)bb_state, bb_written_total, written0); return; }
     if (bb_written_total <= written0)
     { rt_kprintf("[BB-ST] FAIL: session wrote 0 frames (post window stuck?)\n");
       return; }
+    if (bb_session != sess0 + 1)
+    { rt_kprintf("[BB-ST] FAIL: session went %u -> %u, expected exactly +1"
+                 " (busy-window trigger leaked a second capture)\n",
+                 sess0, bb_session); pass = 0; }
+    else
+        rt_kprintf("[BB-ST] session exactly +1 (%u -> %u): first-fault-wins held\n",
+                   sess0, bb_session);
 
     if (ns_log_stats(&st1) != RT_EOK) { rt_kprintf("[BB-ST] stats failed\n"); return; }
     after = st1.valid_records;
@@ -485,18 +553,24 @@ static void blackbox_selftest(void)
                before, after, bb_written_total - written0);
     if (after <= before) { rt_kprintf("[BB-ST] FAIL: no new records\n"); return; }
 
-    /* 回读本会话全部记录: pre 帧 event==0, post 帧 event==FAULT_SOFT;
-     * 任何其它取值(尤其是 B 的 FAULT_LIMIT_MIN)都说明首故障被污染。 */
+    /* ---- 覆盖 4: 回读按 pre/post 分类, 外来故障码算污染 ----
+     * 明确按 sess0+1(A 那一轮)过滤, 而不是当前的 bb_session: 万一上面那条
+     * "恰好 +1"断言失败真的多长出一个 session, 这里仍会核对 A 的记录。 */
     for (i = 0; i < st1.used_slots; ++i)
     {
         rt_uint32_t slot = (st1.used_slots - 1 - i) % NS_LOG_SLOTS;
         if (ns_log_read_slot(slot, &s, &seq) != RT_EOK) continue;
-        if (s.session_id != bb_session) continue;
+        if (s.session_id != sess0 + 1) continue;
         found = 1; checked++;
-        if (s.event == 0)            pre_recs++;
-        else if (s.event == FAULT_SOFT) post_recs++;
-        else { bad++;
-               if (s.event == FAULT_LIMIT_MIN || s.event == FAULT_ESTOP) pollute++; }
+        if (s.event == 0)                 pre_recs++;
+        else if (s.event == FAULT_SOFT)   post_recs++;
+        else
+        {
+            bad++;
+            if (s.event == FAULT_LIMIT_MIN || s.event == FAULT_ESTOP ||
+                s.event == FAULT_TMC_COMM)
+                pollute++;
+        }
         if (checked <= 2 || (s.event != 0 && s.event != FAULT_SOFT))
             rt_kprintf("[BB-ST] readback ses=%u ev=%u valid=%02X flags=%08X\n",
                        s.session_id, s.event, s.valid, s.flags);
@@ -506,14 +580,14 @@ static void blackbox_selftest(void)
     { rt_kprintf("[BB-ST] FAIL: session records not found\n"); pass = 0; }
     if (bad)
     { rt_kprintf("[BB-ST] FAIL: %u record(s) with unexpected event"
-                 " (B pollution=%u)\n", bad, pollute); pass = 0; }
+                 " (B/C/D pollution=%u)\n", bad, pollute); pass = 0; }
     if (!post_recs)
     { rt_kprintf("[BB-ST] FAIL: no post-fault record carries the trigger code\n");
       pass = 0; }
-    /* 首故障优先必须真的计了数(两个窗口之一) */
+    /* 覆盖 1: A/B 背靠背必须至少丢掉一次(早到或忙, 见上说不确定性) */
     if (bb_trig_early_dropped <= edrop0 && bb_trig_dropped <= drop0)
-    { rt_kprintf("[BB-ST] FAIL: second trigger was neither early-dropped"
-                 " nor busy-dropped\n"); pass = 0; }
+    { rt_kprintf("[BB-ST] FAIL: trigger B was neither early- nor busy-dropped\n");
+      pass = 0; }
     rt_kprintf("[BB-ST] records=%u pre(event0)=%u post(event=SOFT)=%u"
                " early_drop=%u busy_drop=%u write_dropped=%u\n",
                checked, pre_recs, post_recs,
