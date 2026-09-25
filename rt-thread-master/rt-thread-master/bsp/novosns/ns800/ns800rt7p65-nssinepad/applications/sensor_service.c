@@ -160,7 +160,21 @@ rt_err_t sensor_service_get_latest(sensor_frame_t *out)
 
 subsys_health_t sensor_service_get_health(void) { return s_health; }
 
-/* ---------- MSH (sensor_status / sensor_snapshot) ---------- */
+/* ---------- MSH (sensor_status / sensor_snapshot) ----------
+ * Fix D: 电流"是否已标定"一律按 current_adc_cal_source() 显示成三种明确来源,
+ * 不再用 current_adc_is_calibrated()(= source != NONE) 当 YES/NO 标签。
+ * 原因: Fix B 之后 defaults 的来源是 THEORETICAL, is_calibrated() 会返回 TRUE,
+ * 打印成 "calibrated=YES" 就成了把理论默认系数冒充实测 —— 本项目明令禁止。 */
+
+static const char *s_cal_source_name(void)
+{
+    switch (current_adc_cal_source())
+    {
+    case CURRENT_ADC_CAL_MEASURED:    return "MEASURED";
+    case CURRENT_ADC_CAL_THEORETICAL: return "THEORETICAL(default)";
+    default:                          return "NONE";
+    }
+}
 
 static void sensor_status(void)
 {
@@ -173,8 +187,9 @@ static void sensor_status(void)
                subsys_health_name(current_adc_get_health()),
                subsys_health_name(tmc2209_get_health()),
                subsys_health_name(motor_get_health()));
-    rt_kprintf("[SNS] current calibrated=%s (未标定时 mA 为理论换算)\n",
-               current_adc_is_calibrated() ? "YES" : "NO");
+    rt_kprintf("[SNS] current cal source=%s%s\n", s_cal_source_name(),
+               current_adc_cal_source() == CURRENT_ADC_CAL_MEASURED ?
+               "" : "  -> mA is NOT a measured current, do not use as evidence");
 }
 MSH_CMD_EXPORT(sensor_status, show sensor service and source healths);
 
@@ -188,10 +203,10 @@ static void sensor_snapshot(void)
     rt_kprintf("[SNS] frame seq=%u tick=%u\n", f.seq, f.timestamp);
     rt_kprintf("[SNS] imu  [%s] ax=%d ay=%d az=%d vib=%d mg\n",
                f.valid_imu ? "VALID" : "STALE", f.ax, f.ay, f.az, f.vib_mg);
-    rt_kprintf("[SNS] curr [%s] raw=%u ema=%u ma=%d cal=%d\n",
+    rt_kprintf("[SNS] curr [%s] raw=%u ema=%u ma=%d cal_field=%d cal_source=%s\n",
                f.valid_current ? "VALID" : "STALE",
                f.current_raw, f.current_filtered, (int)f.current_ma,
-               f.current_calibrated);
+               f.current_calibrated, s_cal_source_name());
     rt_kprintf("[SNS] sg   [%s] SG_RESULT=%u\n",
                f.valid_sg ? "VALID" : "STALE", f.sg_result);
     rt_kprintf("[SNS] mot  state=%d step_hz=%u dir=%d\n",

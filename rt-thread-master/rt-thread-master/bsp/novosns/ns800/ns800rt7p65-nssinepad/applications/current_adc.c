@@ -172,13 +172,28 @@ rt_err_t current_adc_boot(void)
 /* ---------- MSH 命令 (薄封装, current_raw 保留) ----------
  * Fix B: mv/ma 必须由真实采样换算后才打印。旧实现声明了 mv/ma 却从未赋值,
  * 直接 (int)mv / (int)ma 打印未初始化栈值(未定义行为), 因此历史上该命令给出
- * 的任何 mV/mA 数字都不成立, 只有 raw 列可信。 */
+ * 的任何 mV/mA 数字都不成立, 只有 raw 列可信。
+ *
+ * Fix D: 标定标签一律按 current_adc_cal_source() 判定, 不用 is_calibrated()。
+ * 因为 Fix B 把 defaults 的来源从 NONE 改成 THEORETICAL 之后,
+ * is_calibrated()(= source != NONE) 变成 TRUE —— 拿它当"已标定"标签会让理论
+ * 默认系数冒充实测, 正是本项目禁止的那类误导。 */
+
+static const char *cur_cal_label(void)
+{
+    switch (current_adc_cal_source())
+    {
+    case CURRENT_ADC_CAL_MEASURED:    return "MEASURED";
+    case CURRENT_ADC_CAL_THEORETICAL: return "THEORETICAL(NOT measured)";
+    default:                          return "NO-CALIBRATION";
+    }
+}
 
 static void current_raw(void)
 {
     rt_uint32_t raw = 0, sum = 0, min = 0xFFFFFFFF, max = 0, mean;
     int i, n = CUR_SAMPLES;
-    float mv, ma;
+    float mv, ma, mv_mean, ma_mean;
 
     if (current_adc_init() != RT_EOK)
     {
@@ -198,19 +213,24 @@ static void current_raw(void)
     }
     mean = sum / (rt_uint32_t)n;
 
-    /* 换算基于最后一次真实采样值 */
-    mv = current_adc_raw_to_mv(raw);
-    ma = current_adc_raw_to_ma(raw);
+    /* 换算基于真实采样值(全部先算后打印) */
+    mv      = current_adc_raw_to_mv(raw);
+    ma      = current_adc_raw_to_ma(raw);
+    mv_mean = current_adc_raw_to_mv(mean);
+    ma_mean = current_adc_raw_to_ma(mean);
 
     rt_kprintf("[CUR] latest=%u burst_mean=%u min=%u max=%u ema=%u (n=%d)\n",
                raw, mean, min, max, current_adc_get_filtered_raw(), n);
-    rt_kprintf("[CUR] latest-sample %s: %d.%03d mV, %d mA (health=%s)\n",
-               current_adc_is_calibrated() ? "calibrated" : "THEORETICAL(not measured)",
-               (int)mv, ((int)(mv * 1000.0f)) % 1000, (int)ma,
-               subsys_health_name(current_adc_get_health()));
-    rt_kprintf("[CUR] burst-mean sample: %d.%03d mV, %d mA\n",
-               (int)current_adc_raw_to_mv(mean),
-               ((int)(current_adc_raw_to_mv(mean) * 1000.0f)) % 1000,
-               (int)current_adc_raw_to_ma(mean));
+    rt_kprintf("[CUR] cal source=%s health=%s\n",
+               cur_cal_label(), subsys_health_name(current_adc_get_health()));
+    rt_kprintf("[CUR] latest-sample : %d.%03d mV, %d mA\n",
+               (int)mv, ((int)(mv * 1000.0f)) % 1000, (int)ma);
+    rt_kprintf("[CUR] burst-mean    : %d.%03d mV, %d mA\n",
+               (int)mv_mean, ((int)(mv_mean * 1000.0f)) % 1000, (int)ma_mean);
+    if (current_adc_cal_source() != CURRENT_ADC_CAL_MEASURED)
+        rt_kprintf("[CUR] !! mA above is a %s conversion, NOT a measured current."
+                   " Do not use it as protection evidence until MEASURED.\n",
+                   current_adc_cal_source() == CURRENT_ADC_CAL_THEORETICAL ?
+                   "theoretical-default" : "no-calibration");
 }
 MSH_CMD_EXPORT(current_raw, sample bus current ADC ch15 with min/max/mean);
