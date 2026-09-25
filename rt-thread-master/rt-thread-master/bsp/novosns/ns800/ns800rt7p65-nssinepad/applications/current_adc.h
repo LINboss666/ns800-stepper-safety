@@ -6,9 +6,11 @@
  *
  * 约定(见 app_health.h):
  *   - 读函数非 RT_EOK 时输出参数无效
- *   - 标定: current_adc_set_calibration() 设置 offset/gain 并置 calibration_valid;
- *     未标定时(read_ma)使用理论默认值换算, health=DEGRADED —— 数值仅供参考,
- *     调用方必须检查 current_adc_is_calibrated(), 禁止把理论值当实测电流
+ *   - 标定: 来源三态 NONE / THEORETICAL / MEASURED。
+ *     ⚠ Fix B 之后 current_adc_is_calibrated() 的含义是"来源 != NONE", 它在
+ *     THEORETICAL(理论默认系数)时也返回 TRUE —— 因此**判断"是否可作为实测电流
+ *     使用"必须查 current_adc_cal_source() == CURRENT_ADC_CAL_MEASURED**,
+ *     不得用 is_calibrated() 当"已实测"证据(health 也仅在 MEASURED 时为 OK)。
  *   - 轻量滤波: 内部维护 raw 的 EMA(指数滑动平均), 每次 read_raw 更新
  */
 #ifndef CURRENT_ADC_H
@@ -46,7 +48,8 @@ float current_adc_raw_to_ma(rt_uint32_t raw);
 rt_err_t current_adc_read_mv(float *mv);
 
 /* 毫伏 → 电流 mA(用当前 offset/gain, 未标定时为理论默认)。
- * RT_EOK 时 *ma 有效但可能是理论值 —— 用 current_adc_is_calibrated() 区分。 */
+ * RT_EOK 时 *ma 有效但可能是理论换算值 —— 判断能否当实测电流用
+ * current_adc_cal_source() == CURRENT_ADC_CAL_MEASURED, 不要用 is_calibrated()。 */
 rt_err_t current_adc_read_ma(float *ma);
 
 /* 设置标定(source=THEORETICAL): 理论默认值, 不得冒充实测。 */
