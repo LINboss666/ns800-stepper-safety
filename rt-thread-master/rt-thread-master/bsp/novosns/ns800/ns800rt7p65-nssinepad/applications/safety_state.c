@@ -269,6 +269,7 @@ static void fault_reset(void)
         { "TMC_DIAG",  PIN_NAME_TMC_DIAG,  0 },
     };
     int i;
+    rt_err_t e;
     rt_bool_t active = RT_FALSE;
     safety_state_t st;
 
@@ -314,6 +315,22 @@ static void fault_reset(void)
         if (ss_lock_ok) rt_mutex_release(&ss_lock);
         return;
     }
+
+    /* O1: 接受故障清除的同时, 必须把 Motor Service 一起带回 IDLE。
+     * 否则会出现 Safety=READY / Motor=MOTOR_FAULT 的不一致状态(真机
+     * runtime_selftest 复现过)。走正式 disarm: 清 armed/target_hz/current_hz、
+     * 停 STEP、写 DRV_ENABLE LOW 并回读。回读不确认就不进 MANUAL_CLEAR,
+     * 也就同时关掉了 "重跑自检 -> READY -> 重新 arm" 这条路。
+     * 锁序 ss_lock -> mot_lock 与 safety_force_shutdown() 现有路径一致。 */
+    e = motor_disarm();
+    if (e != RT_EOK)
+    {
+        rt_kprintf("[SS] fault_reset REFUSED: motor recovery disarm failed (%d)"
+                   " - DRV_ENABLE LOW not re-verified, staying latched\n", (int)e);
+        if (ss_lock_ok) rt_mutex_release(&ss_lock);
+        return;
+    }
+    rt_kprintf("[SS] motor recovered: state=IDLE, DRV_ENABLE LOW verified\n");
 
     ss_fault_code = FAULT_NONE;
     ss_state = SAFETY_MANUAL_CLEAR;

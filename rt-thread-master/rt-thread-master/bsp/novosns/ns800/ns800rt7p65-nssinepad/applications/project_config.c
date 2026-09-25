@@ -243,6 +243,16 @@ rt_err_t project_config_load(void)
 
 /* ---------- MSH: config_show / config_default / config_save / config_load ---------- */
 
+/* D3: 本项目的 rt_kprintf 走 RT-Thread 自带 vsprintf, 不支持浮点 —— 真机上
+ * "%.1f/%.3f" 被原样打印成 "%f", 标定系数从来没能显示过。这里按定点放大后
+ * 拆成整数部分+小数部分打印, 不打开全局 float printf。
+ * 四舍五入(远离 0); 负号单独打, 小数部分取幅值, 避免 "-0.-5" 这类输出。 */
+static rt_int32_t cfg_round_scaled(float v, rt_int32_t mult)
+{
+    float a = v * (float)mult;
+    return (a >= 0.0f) ? (rt_int32_t)(a + 0.5f) : (rt_int32_t)(a - 0.5f);
+}
+
 static void config_show(void)
 {
     project_config_t s;
@@ -253,11 +263,18 @@ static void config_show(void)
 
     rt_kprintf("[CFG] valid=%s version=0x%08X\n",
                project_config_is_valid() ? "YES" : "NO(safe defaults)", s.version);
-    rt_kprintf("[CFG] cal: offset=%.1f mV gain=%.3f V/A source=%s(%u)\n",
-               s.cur_offset_mv, s.cur_gain_v_per_a,
-               s.cur_cal_source == CURRENT_ADC_CAL_MEASURED ? "MEASURED" :
-               s.cur_cal_source == CURRENT_ADC_CAL_THEORETICAL ? "THEORETICAL" : "NONE",
-               (unsigned)s.cur_cal_source);
+    {
+        rt_int32_t o = cfg_round_scaled(s.cur_offset_mv, 10);      /* 0.1 mV */
+        rt_int32_t g = cfg_round_scaled(s.cur_gain_v_per_a, 1000);  /* mV/A   */
+
+        rt_kprintf("[CFG] cal: offset=%s%d.%d mV gain=%s%d.%03d V/A source=%s(%u)\n",
+                   o < 0 ? "-" : "", (int)(o / 10), (int)(o < 0 ? -o % 10 : o % 10),
+                   g < 0 ? "-" : "", (int)(g / 1000),
+                   (int)(g < 0 ? -g % 1000 : g % 1000),
+                   s.cur_cal_source == CURRENT_ADC_CAL_MEASURED ? "MEASURED" :
+                   s.cur_cal_source == CURRENT_ADC_CAL_THEORETICAL ? "THEORETICAL" : "NONE",
+                   (unsigned)s.cur_cal_source);
+    }
     rt_kprintf("[CFG] bands: %u / %u Hz\n", s.band_hz[0], s.band_hz[1]);
     for (i = 0; i < 3; ++i)
         rt_kprintf("[CFG] band%d: sg_warn=%d sg_stall=%d cur_warn=%d mA cur_stall=%d mA\n",

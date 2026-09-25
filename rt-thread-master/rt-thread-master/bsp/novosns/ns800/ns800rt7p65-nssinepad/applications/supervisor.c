@@ -56,6 +56,19 @@ static int boot_abort_stage = 0;
 
 /* ---------- system_status ---------- */
 
+/* D2: 诊断模式必须走显式枚举→字符串映射。旧实现把 diag_mode_t 枚举值直接
+ * 传给 %s, MONITOR_ONLY(0) 被当成 NULL 指针, 真机打印 "mode=(null)"。
+ * 未知取值如实报 UNKNOWN, 不猜。 */
+static const char *diag_mode_name(diag_mode_t m)
+{
+    switch (m)
+    {
+    case DIAG_MODE_MONITOR_ONLY:        return "MONITOR_ONLY";
+    case DIAG_MODE_ACTIVE_PROTECTION:   return "ACTIVE_PROTECTION";
+    default:                            return "UNKNOWN";
+    }
+}
+
 void system_status(void)
 {
     motor_snapshot_t snap;
@@ -111,7 +124,7 @@ void system_status(void)
                cfg->cur_cal_source);
     rt_kprintf("[Diag]   %s verdict=%d mode=%s\n",
                subsys_health_name(diagnosis_get_health()),
-               diagnosis_get_verdict(), diagnosis_get_mode());
+               diagnosis_get_verdict(), diag_mode_name(diagnosis_get_mode()));
     rt_kprintf("[Blackbox] %s\n", subsys_health_name(blackbox_get_health()));
     rt_kprintf("[UI]     led/buzzer output=%s (polarity hardware-pending)\n",
                UI_OUTPUT_ENABLED ? "ENABLED" : "SAFE-OFF");

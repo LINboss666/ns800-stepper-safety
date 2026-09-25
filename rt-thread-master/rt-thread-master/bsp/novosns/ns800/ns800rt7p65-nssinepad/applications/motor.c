@@ -299,6 +299,7 @@ rt_err_t motor_arm(void)
 {
     rt_uint32_t bad;
     rt_err_t e;
+    motor_snapshot_t snap;
 
     /* Fix A / A3: 四门全部求值后统一判定(见 motor_get_gate_fail_mask) */
     bad = motor_get_gate_fail_mask();
@@ -306,6 +307,24 @@ rt_err_t motor_arm(void)
     {
         rt_kprintf("[MOT] arm REFUSED (gates failing)\n");
         mot_print_gate_fail(bad);
+        return -RT_EPERM;
+    }
+
+    /* O1(真机发现): 四门之外还要求电机本体确实停在"可以安全使能"的位置。
+     * MOTOR_FAULT 是紧急停机的锁存态, 未走 disarm/恢复就再次 arm 会让 armed
+     * 标志叠加在故障态上。取一次一致快照后判定, 不改动上面四门。 */
+    if (motor_get_snapshot(&snap) != RT_EOK)
+    {
+        rt_kprintf("[MOT] arm REFUSED: snapshot failed\n");
+        return -RT_ERROR;
+    }
+    if (snap.state != MOTOR_IDLE || snap.armed != 0 ||
+        snap.current_hz != 0 || snap.target_hz != 0)
+    {
+        rt_kprintf("[MOT] arm REFUSED: not at rest (state=%d armed=%d hz=%u tgt=%u)"
+                   " - must be IDLE/armed=0/hz=0, run motor_disarm first\n",
+                   (int)snap.state, (int)snap.armed,
+                   snap.current_hz, snap.target_hz);
         return -RT_EPERM;
     }
 

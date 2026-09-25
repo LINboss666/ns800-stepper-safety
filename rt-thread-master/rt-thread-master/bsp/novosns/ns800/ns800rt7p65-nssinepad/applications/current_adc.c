@@ -105,8 +105,10 @@ float current_adc_raw_to_mv(rt_uint32_t raw)
 
 float current_adc_raw_to_ma(rt_uint32_t raw)
 {
-    return (current_adc_raw_to_mv(raw) - cur_offset_mv)
-           / cur_gain_v_per_a * 1000.0f;
+    /* 量纲: mV / (V/A) = mA, 已经是 mA —— 早期实现又多乘了 1000, 把 µA 当成 mA
+     * 输出(真机实测 ~1.664V 报成 23504 mA, 实际 23 mA), 与本文件头注释
+     * "Ibus(mA) ≈ (Vmv - 1650)/0.6" 矛盾。系数由标定时写入, 不在这里换算。 */
+    return (current_adc_raw_to_mv(raw) - cur_offset_mv) / cur_gain_v_per_a;
 }
 
 rt_err_t current_adc_read_mv(float *mv)

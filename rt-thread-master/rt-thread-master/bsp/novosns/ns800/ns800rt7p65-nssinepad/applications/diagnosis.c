@@ -494,6 +494,24 @@ static void s_feed_missing(diag_engine_t *e)
     diag_engine_step(e, &in);
 }
 
+/* D4: 测试预算必须由引擎自身的模型推出来, 不能拍脑袋写死帧数。
+ *
+ * EMA 是 x += (target-x)*0.2, 即每帧残差 *0.8。要把滤波值推过任意阈值判据
+ * (最坏余量按 1 个单位算), 需要的帧数 n 满足 0.8^n <= 1/|初值差|。
+ * 0.8^64 ≈ 6.4e-7, 即 64 帧足以让 |初值差| 高达 ~1.6e6 的量收敛到 1 个单位
+ * 以内 —— 本项目合成输入的最大跨度(SG<=1023, 电流数千 mA)远小于它。 */
+#define DIAG_EMA_SETTLE_FRAMES 64
+
+/* 振动脉冲的恢复上界: vib_peak 是 DIAG_VIB_WIN 窗口的最大值, 尖峰要先完整
+ * 滑出窗口(= 窗口长度帧)才会停止抬高 vib_impact_cnt; 之后该计数每帧只减 1,
+ * 要从峰值减到 impact_frames 以下才算解除。窗口期内它一直在加, 峰值上界为
+ * spike_frames + 窗口长度, 所以总上界如下(另加 EMA 余量, 循环命中即停)。 */
+static rt_uint32_t s_impact_recovery_bound(rt_uint32_t spike_frames)
+{
+    return DIAG_VIB_WIN + spike_frames + dt.impact_frames +
+           DIAG_EMA_SETTLE_FRAMES;
+}
+
 static void diag_selftest(void)
 {
     diag_engine_t t;                 /* 独立测试上下文(不进生产状态) */
@@ -526,7 +544,10 @@ static void diag_selftest(void)
     rt_kprintf("[SELFTEST-D] 1.single-sample-no-severe: %s\n", verdict_name(v));
     if (v == DIAG_STALL_CONFIRMED || v == DIAG_OVERLOAD) pass = 0;
 
-    /* 场景2: IMPACT —— 振动尖峰短持续, 之后自动恢复 */
+    /* 场景2: IMPACT —— 尖峰短持续, 之后必须自动回 NORMAL。
+     * D4: 旧实现喂 5 个干净帧就断言 NORMAL —— 但 vib_peak 是 16 点滑窗的
+     * 最大值, 尖峰还在窗口里时 peak 始终超阈值, 该断言在正确代码上必挂。
+     * 改成"喂到 NORMAL 为止, 但必须在数学上界之内"。 */
     diag_engine_reset(&t);
     for (i = 0; i < 50; ++i) s_feed(&t, 500, 150.0f, 1000, (int)MOTOR_CRUISE, 500);
     s_feed(&t, 500, 150.0f, 3000, (int)MOTOR_CRUISE, 500);
@@ -534,10 +555,22 @@ static void diag_selftest(void)
     v = t.st.verdict;
     rt_kprintf("[SELFTEST-D] 2.impact: %s\n", verdict_name(v));
     if (v != DIAG_IMPACT) pass = 0;
-    for (i = 0; i < 5; ++i) s_feed(&t, 500, 150.0f, 1000, (int)MOTOR_CRUISE, 500);
-    v = t.st.verdict;
-    rt_kprintf("[SELFTEST-D] 2.impact-recovery: %s\n", verdict_name(v));
-    if (v != DIAG_NORMAL) pass = 0;
+    {
+        rt_uint32_t bound = s_impact_recovery_bound(2), used = 0;
+
+        while (used < bound)
+        {
+            s_feed(&t, 500, 150.0f, 1000, (int)MOTOR_CRUISE, 500);
+            used++;
+            if (t.st.verdict == DIAG_NORMAL) break;
+        }
+        v = t.st.verdict;
+        rt_kprintf("[SELFTEST-D] 2.impact-recovery: %s after %u clean frames"
+                   " (bound=%u, win=%d, impact_frames=%u)\n",
+                   verdict_name(v), used, bound, (int)DIAG_VIB_WIN,
+                   dt.impact_frames);
+        if (v != DIAG_NORMAL) pass = 0;
+    }
 
     /* 场景3: 慢过载 LOAD_WARNING —— 电流超 warn 持续 */
     diag_engine_reset(&t);
@@ -576,17 +609,54 @@ static void diag_selftest(void)
         { rt_kprintf("[SELFTEST-D] 3b fall FAIL\n"); pass = 0; }
     }
 
-    /* 场景4: 堵转 —— SG 崩 + 电流升, 先 SUSPECT 后 CONFIRMED(persistence) */
+    /* 场景4: 堵转 —— SG 崩 + 电流升, 先 SUSPECT 后 CONFIRMED(persistence)。
+     * D4: 旧预算(60 帧 / 80 帧)小于"EMA 收敛 + persistence"的实际需要 ——
+     * sg_filt 从 500 收敛到 80 要 ~14 帧才跨过 sg_warn, 剩下的帧数不够
+     * persist_warn; CONFIRMED 更是要 persist_stall=100 帧的连续条件, 80 帧
+     * 预算数学上不可能达成。现在预算 = 保守收敛帧数 + 配置里的 persistence
+     * + 余量, 阈值本身一个都不改。 */
     diag_engine_reset(&t);
     for (i = 0; i < 50; ++i) s_feed(&t, 500, 150.0f, 1000, (int)MOTOR_CRUISE, 500);
-    for (i = 0; i < 60; ++i) s_feed(&t, 80, 600.0f, 1000, (int)MOTOR_CRUISE, 500);
-    v = t.st.verdict;
-    rt_kprintf("[SELFTEST-D] 4.stall-suspect: %s\n", verdict_name(v));
-    if (v != DIAG_STALL_SUSPECT) pass = 0;
-    for (i = 0; i < 80; ++i) s_feed(&t, 20, 900.0f, 1000, (int)MOTOR_CRUISE, 500);
-    v = t.st.verdict;
-    rt_kprintf("[SELFTEST-D] 4.stall-confirmed: %s\n", verdict_name(v));
-    if (v != DIAG_STALL_CONFIRMED) pass = 0;
+    {
+        rt_uint32_t n_suspect, n_confirm;
+        rt_uint32_t i2;
+
+        /* 前置条件: 合成输入必须真的落在 band1(500Hz) 的两级阈值之间 ——
+         * 80 在 sg_stall 与 sg_warn 之间(只触发 SUSPECT), 20 低于 sg_stall
+         * (触发 CONFIRMED), 600 在电流 warn 与 stall 之间(不判 OVERLOAD)。
+         * 若阈值被改成不满足这些关系, 本用例就没有意义: 直接判失败, 不静默放过。 */
+        if (!(dt.sg_stall[1] < 80 && 80 < dt.sg_warn[1]) ||
+            !(20 < dt.sg_stall[1]) ||
+            !(dt.cur_warn_ma[1] < 600.0f && 600.0f < dt.cur_stall_ma[1]))
+        {
+            rt_kprintf("[SELFTEST-D] 4 PRECONDITION FAIL: synthetic inputs"
+                       " (sg 80/20, cur 600) do not fit band1 thresholds"
+                       " (sg_warn=%d sg_stall=%d cur_warn=%d cur_stall=%d)"
+                       " - test invalid\n",
+                       dt.sg_warn[1], dt.sg_stall[1],
+                       (int)dt.cur_warn_ma[1], (int)dt.cur_stall_ma[1]);
+            pass = 0;
+        }
+
+        n_suspect = DIAG_EMA_SETTLE_FRAMES + dt.persist_warn + 16;
+        n_confirm = DIAG_EMA_SETTLE_FRAMES + dt.persist_stall + 16;
+        rt_kprintf("[SELFTEST-D] 4 budgets: suspect=%u confirm=%u frames"
+                   " (settle=%d warn=%u stall=%u)\n",
+                   n_suspect, n_confirm, DIAG_EMA_SETTLE_FRAMES,
+                   dt.persist_warn, dt.persist_stall);
+
+        for (i2 = 0; i2 < n_suspect; ++i2)
+            s_feed(&t, 80, 600.0f, 1000, (int)MOTOR_CRUISE, 500);
+        v = t.st.verdict;
+        rt_kprintf("[SELFTEST-D] 4.stall-suspect: %s\n", verdict_name(v));
+        if (v != DIAG_STALL_SUSPECT) pass = 0;
+
+        for (i2 = 0; i2 < n_confirm; ++i2)
+            s_feed(&t, 20, 900.0f, 1000, (int)MOTOR_CRUISE, 500);
+        v = t.st.verdict;
+        rt_kprintf("[SELFTEST-D] 4.stall-confirmed: %s\n", verdict_name(v));
+        if (v != DIAG_STALL_CONFIRMED) pass = 0;
+    }
     /* ACTIVE 模式下的停机隔离只能靠 may_report 保证, 这里顺带确认本上下文
      * 从未被允许上报(自检结束时 severe_latched 允许为真, 但不得 post 事件) */
     rt_kprintf("[SELFTEST-D] 4.may_report=%d (must be 0)\n", (int)t.may_report);

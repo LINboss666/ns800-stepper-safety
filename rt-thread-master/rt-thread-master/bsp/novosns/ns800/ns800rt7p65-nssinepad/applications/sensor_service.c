@@ -271,21 +271,39 @@ static void sensor_selftest(void)
     rt_memset(&f, 0, sizeof(f));
     s_collect(&f, &test_prev, &test_seq);            /* 不碰 s_prev / s_seq */
 
-    /* 垃圾 valid 位(0xAB 非零)必须被真实采集结果覆盖:
-     * 不健康源 → valid=0; 健康源 → valid=1 + fresh=1 */
+    /* 垃圾 valid 位(0xAB 非零)必须被真实采集结果覆盖。
+     * D5: valid/fresh 表达的是"这一帧到底读到没有", 与标定来源无关 ——
+     *   读不出(FAILED)      -> valid 必须 0
+     *   读得出(OK/DEGRADED) -> valid=1 且 fresh=1
+     * 电流通道的 DEGRADED 只表示标定来源是 THEORETICAL
+     * (current_adc.c: health = (cal_source==MEASURED) ? OK : DEGRADED),
+     * 采样本身成功; 旧断言拿 "health != OK" 推 "valid 必须 0", 在正确代码上
+     * 必挂(真机复现)。IMU / TMC 的 DEGRADED 含义不同(adxl345.c 传输失败、
+     * tmc2209.c 读失败), 所以这两个源继续用 != OK 当"读不出"的判据。 */
     if (adxl345_get_health() != SUBSYS_OK && f.valid_imu != 0)
     { rt_kprintf("[SNS-ST] imu valid FAIL (unhealthy but valid=%d)\n", f.valid_imu);
       pass = 0; }
-    if (current_adc_get_health() != SUBSYS_OK && f.valid_current != 0)
-    { rt_kprintf("[SNS-ST] adc valid FAIL\n"); pass = 0; }
     if (tmc2209_get_health() != SUBSYS_OK && f.valid_sg != 0)
     { rt_kprintf("[SNS-ST] sg valid FAIL\n"); pass = 0; }
+    if (current_adc_get_health() == SUBSYS_FAILED && f.valid_current != 0)
+    { rt_kprintf("[SNS-ST] adc valid FAIL (FAILED but valid=%d)\n", f.valid_current);
+      pass = 0; }
+    if (current_adc_get_health() != SUBSYS_FAILED && current_adc_get_health() != SUBSYS_UNINIT &&
+        (f.valid_current != 1 || f.fresh_current != 1))
+    { rt_kprintf("[SNS-ST] adc readable but valid/fresh FAIL (h=%s v=%d f=%d)\n",
+                 subsys_health_name(current_adc_get_health()),
+                 f.valid_current, f.fresh_current);
+      pass = 0; }
 
-    /* fresh 位: IMU/电流每帧采样 → fresh 应为 1(若对应源健康) */
+    /* 标定来源是另一件事, 单独断言: DEGRADED 只允许来自"未实测", 绝不反过来
+     * 用健康度冒充标定来源。 */
+    if (current_adc_get_health() == SUBSYS_DEGRADED &&
+        f.current_cal_source == (rt_uint8_t)CURRENT_ADC_CAL_MEASURED)
+    { rt_kprintf("[SNS-ST] DEGRADED yet claims MEASURED calibration\n"); pass = 0; }
+
+    /* fresh 位: IMU 每帧采样 → fresh 应为 1(若对应源健康) */
     if (adxl345_get_health() == SUBSYS_OK && f.fresh_imu != 1)
     { rt_kprintf("[SNS-ST] imu fresh FAIL\n"); pass = 0; }
-    if (current_adc_get_health() == SUBSYS_OK && f.fresh_current != 1)
-    { rt_kprintf("[SNS-ST] adc fresh FAIL\n"); pass = 0; }
 
     /* 帧内标定来源现在是三态值, 不再是含糊的布尔 */
     rt_kprintf("[SNS-ST] current_cal_source=%u (%s)\n",
