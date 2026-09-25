@@ -8,6 +8,8 @@
  *
  * 反误报纪律:
  *   - 单个 sample 永不直接判 severe(persistence 计数)
+ *   - 同一源帧序号只处理一次(P1-5/Fix B: 去重在 diag_step() 引擎内, 不在线程里,
+ *     因此 diag_selftest 直接调引擎也能覆盖这一层)
  *   - SG 阈值按速度分带(低速 SG 不可靠 → 阈值收敛)
  *   - sensor missing ≠ 0: 无效数据冻结特征, 只累计 sensor_bad
  *   - 加减速相位抑制 SG 判据(SG 在斜坡期天然漂移)

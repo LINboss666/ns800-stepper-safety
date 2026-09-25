@@ -1,13 +1,16 @@
 /*
- * project_config.h - 运行时配置持久化 (Phase 7-C)
+ * project_config.h - 运行时配置持久化 (Phase 7-C, Fix B 加固)
  *
  * 存储: ns_params_save/load(双副本 4KiB + CRC + commit, ≤224B, 应用自管 schema)。
- * 结构: magic + version + 校准 + 速度分带 + SG/电流/振动阈值 + persistence +
- *       滞回 + 黑匣子预/后故障时间(Phase 7-D 用)。
+ * 结构: magic + version + 校准(含来源) + 速度分带 + SG/电流/振动阈值 +
+ *       persistence + 滞回 + 黑匣子预/后故障时间。
  *
- * 纪律: load 时 magic/version/范围三重校验, 任一失败 → 安全默认值 +
+ * 纪律: load 时 magic/version/范围(含标定来源)多重校验, 任一失败 → 安全默认值 +
  *       config invalid(DEGRADED), 绝不带病使用未知参数。
- *       电流标定合法时自动下发 current_adc_set_calibration()。
+ *       Fix B: 标定来源(cur_cal_source)真正生效 —— defaults 恒为 THEORETICAL,
+ *       保存为 MEASURED 的标定重启后仍是 MEASURED(下发走
+ *       current_adc_set_calibration_ex, 不再被无条件降级成 THEORETICAL)。
+ *       全部 cfg 读写在内部互斥内完成; Flash IO 一律在锁外。
  */
 #ifndef PROJECT_CONFIG_H
 #define PROJECT_CONFIG_H
@@ -22,7 +25,8 @@ typedef struct
 {
     rt_uint32_t magic;
     rt_uint32_t version;
-    /* 电流标定(P1-4: source 随配置持久化, MEASURED 重启后保留) */
+    /* 电流标定(P1-4 字段 + Fix B 生效): 来源随配置持久化、参与校验、load 还原。
+     * 合法取值仅 THEORETICAL / MEASURED(NONE 视为非法 → 回退安全默认)。 */
     float cur_offset_mv;                 /* 零电流电压 mV */
     float cur_gain_v_per_a;              /* V→A 系数 */
     rt_uint8_t cur_cal_source;           /* current_adc_cal_source_t */

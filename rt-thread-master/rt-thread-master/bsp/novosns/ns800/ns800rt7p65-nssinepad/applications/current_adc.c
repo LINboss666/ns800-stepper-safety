@@ -7,6 +7,12 @@
  *   用户前端的实际分流/增益待确认 → 标定前 read_ma 结果为理论默认换算
  *   (health=DEGRADED), 标定后视为实测。
  *
+ * Fix B: 标定来源(NONE/THEORETICAL/MEASURED)是配置的一部分。project_config 现在
+ *   通过 current_adc_set_calibration_ex() 原样还原来源, 所以保存为 MEASURED 的
+ *   标定重启后仍是 MEASURED; 加载失败/未标定时显式回到 THEORETICAL。
+ *   ⚠ 目前没有任何代码路径会把来源写成 MEASURED —— 真实零点/增益标定流程仍属
+ *   实验阶段(HARDWARE-PENDING), 需要开发板与已知负载。
+ *
  * 正式 API 见 current_adc.h; current_raw 为薄封装 MSH 命令。
  */
 
@@ -36,28 +42,6 @@ static current_adc_cal_source_t cur_cal_source = CURRENT_ADC_CAL_NONE;
 /* 轻量滤波状态 */
 static rt_uint32_t cur_ema_raw = 0;
 static rt_bool_t cur_ema_valid = RT_FALSE;
-
-static rt_err_t cur_sample_mean(rt_uint32_t *mean_out,
-                                rt_uint32_t *min_out, rt_uint32_t *max_out)
-{
-    rt_uint32_t raw, sum = 0, min = 0xFFFFFFFF, max = 0;
-    int i;
-
-    if (cur_adc == RT_NULL || !cur_enabled) return -RT_ERROR;
-
-    for (i = 0; i < CUR_SAMPLES; ++i)
-    {
-        raw = rt_adc_read(cur_adc, CUR_ADC_CH);
-        sum += raw;
-        if (raw < min) min = raw;
-        if (raw > max) max = raw;
-        rt_thread_mdelay(1);
-    }
-    *mean_out = sum / CUR_SAMPLES;
-    if (min_out) *min_out = min;
-    if (max_out) *max_out = max;
-    return RT_EOK;
-}
 
 /* ---------- 正式 API (current_adc.h) ---------- */
 
@@ -185,11 +169,14 @@ rt_err_t current_adc_boot(void)
     return e;
 }
 
-/* ---------- MSH 命令 (薄封装, current_raw 保留) ---------- */
+/* ---------- MSH 命令 (薄封装, current_raw 保留) ----------
+ * Fix B: mv/ma 必须由真实采样换算后才打印。旧实现声明了 mv/ma 却从未赋值,
+ * 直接 (int)mv / (int)ma 打印未初始化栈值(未定义行为), 因此历史上该命令给出
+ * 的任何 mV/mA 数字都不成立, 只有 raw 列可信。 */
 
 static void current_raw(void)
 {
-    rt_uint32_t raw, mean, sum = 0, min = 0xFFFFFFFF, max = 0;
+    rt_uint32_t raw = 0, sum = 0, min = 0xFFFFFFFF, max = 0, mean;
     int i, n = CUR_SAMPLES;
     float mv, ma;
 
@@ -200,31 +187,30 @@ static void current_raw(void)
         return;
     }
 
-    /* 保留原 min/max 展示: 单独采一轮 */
+    /* 一次 64 点突发同时得到 sum/min/max(旧实现把同一个突发跑了两遍) */
     for (i = 0; i < n; ++i)
     {
-        raw = rt_adc_read(cur_adc, CUR_ADC_CH);
-        if (raw < min) min = raw;
-        if (raw > max) max = raw;
-        rt_thread_mdelay(1);
-    }
-
-    /* min/max: 单独 64 点诊断突发(真实统计) */
-    for (i = 0; i < n; ++i)
-    {
-        raw = rt_adc_read(cur_adc, CUR_ADC_CH);
+        raw = (rt_uint32_t)rt_adc_read(cur_adc, CUR_ADC_CH);
         sum += raw;
         if (raw < min) min = raw;
         if (raw > max) max = raw;
         rt_thread_mdelay(1);
     }
-    mean = sum / n;
+    mean = sum / (rt_uint32_t)n;
+
+    /* 换算基于最后一次真实采样值 */
+    mv = current_adc_raw_to_mv(raw);
+    ma = current_adc_raw_to_ma(raw);
 
     rt_kprintf("[CUR] latest=%u burst_mean=%u min=%u max=%u ema=%u (n=%d)\n",
                raw, mean, min, max, current_adc_get_filtered_raw(), n);
-    rt_kprintf("[CUR] %s: %d.%03d mV, %d mA (health=%s)\n",
-               current_adc_is_calibrated() ? "calibrated" : "theoretical",
-               (int)mv, (int)(mv * 1000) % 1000, (int)ma,
+    rt_kprintf("[CUR] latest-sample %s: %d.%03d mV, %d mA (health=%s)\n",
+               current_adc_is_calibrated() ? "calibrated" : "THEORETICAL(not measured)",
+               (int)mv, ((int)(mv * 1000.0f)) % 1000, (int)ma,
                subsys_health_name(current_adc_get_health()));
+    rt_kprintf("[CUR] burst-mean sample: %d.%03d mV, %d mA\n",
+               (int)current_adc_raw_to_mv(mean),
+               ((int)(current_adc_raw_to_mv(mean) * 1000.0f)) % 1000,
+               (int)current_adc_raw_to_ma(mean));
 }
 MSH_CMD_EXPORT(current_raw, sample bus current ADC ch15 with min/max/mean);

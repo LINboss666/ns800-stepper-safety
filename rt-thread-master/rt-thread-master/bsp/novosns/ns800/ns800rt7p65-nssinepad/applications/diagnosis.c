@@ -82,11 +82,11 @@ typedef struct
     rt_uint32_t vib_impact_cnt;
     rt_uint32_t sensor_bad_cnt;
     rt_uint32_t clean_cnt;               /* 滞回恢复计数 */
+    rt_uint32_t last_seq;                /* Fix B: 已消费的源帧序号(引擎内去重) */
     diag_verdict_t verdict;
 } diag_state_t;
 
 static diag_state_t ds;
-static rt_uint32_t d_last_seq = 0;    /* P1-5: 上一已消费源帧序号 */
 static diag_mode_t d_mode = DIAG_MODE_MONITOR_ONLY;
 static rt_bool_t d_severe_latched = RT_FALSE;   /* severe 事件只发上升沿 */
 static rt_thread_t d_tid = RT_NULL;
@@ -134,8 +134,7 @@ static const char *verdict_name(diag_verdict_t v)
 
 void diag_reset(void)
 {
-    rt_memset(&ds, 0, sizeof(ds));
-    d_last_seq = 0;
+    rt_memset(&ds, 0, sizeof(ds));       /* 含 Fix B: ds.last_seq = 0 */
     ds.speed_band = -1;
     ds.verdict = DIAG_NORMAL;
     d_severe_latched = RT_FALSE;
@@ -166,6 +165,15 @@ diag_verdict_t diag_step(const diag_input_t *in)
 {
     rt_int32_t band;
     rt_uint8_t cruise;
+
+    /* ---- Fix B: 同帧去重放进引擎(P1-5 的真正落点) ----
+     * 旧实现只在 Diagnosis Thread 里判重, 于是 diag_selftest 直接调 diag_step
+     * 时根本测不到这一层; 而且线程用 continue 跳过了循环尾部的 mdelay, 造成
+     * prio 9 忙等。现在: 重复 seq 不推进任何特征/计数器/persistence, 直接返回
+     * 当前判定; seq==0 视为"调用方未提供序号"(如合成注入), 不做去重。 */
+    if (in->seq != 0 && in->seq == ds.last_seq)
+        return ds.verdict;
+    if (in->seq != 0) ds.last_seq = in->seq;
 
     /* ---- sensor missing: 冻结特征, 只累计 bad(禁止当 0 参与判据) ---- */
     if (!in->sg_valid || !in->cur_valid || !in->imu_valid)
@@ -281,7 +289,10 @@ diag_verdict_t diag_step(const diag_input_t *in)
     return ds.verdict;
 }
 
-/* ---------- 线程: 消费最新 sensor_frame ---------- */
+/* ---------- 线程: 消费最新 sensor_frame ----------
+ * Fix B: 循环尾部无条件 mdelay(10)。旧实现用 "if (f.seq == d_last_seq) continue;"
+ * 跳过 mdelay, 在同帧未更新时会把 prio 9 线程变成忙等, 饿死 prio >= 9 的
+ * bblog(18)/ui(20)/tshell(20)。同帧去重现在由 diag_step() 负责。 */
 
 static void diag_thread_entry(void *param)
 {
@@ -295,8 +306,6 @@ static void diag_thread_entry(void *param)
         diag_sync_config();              /* 阈值跟随持久化配置(每帧同步) */
         if (sensor_service_get_latest(&f) == RT_EOK && f.seq != 0)
         {
-            if (f.seq == d_last_seq) continue;   /* P1-5: 同帧不重复计数 */
-            d_last_seq = f.seq;
             in.seq         = f.seq;
             in.timestamp   = f.timestamp;
             in.sg_valid    = f.valid_sg;
@@ -307,7 +316,7 @@ static void diag_thread_entry(void *param)
             in.vib_mg      = f.vib_mg;
             in.motor_state = f.motor_state;
             in.step_hz     = f.step_hz;
-            diag_step(&in);
+            diag_step(&in);              /* 重复 seq 由引擎直接返回当前判定 */
         }
         rt_thread_mdelay(10);               /* 100Hz */
     }
@@ -475,13 +484,34 @@ static void diag_selftest(void)
     v = diagnosis_get_verdict();
     rt_kprintf("[SELFTEST-D] 3.slow-overload: %s\n", verdict_name(v));
     if (v != DIAG_LOAD_WARNING) pass = 0;
-    /* P1-6: delta 真实性 —— 刚喂入上升序列, cur_delta 必须 > 0 */
+
+    /* 场景3b(P1-6 重写): Δ 真实性 = 稳定基线 → 单帧阶跃 → 立即断言幅度与符号。
+     * 旧实现是在 80 帧高值"已经收敛之后"才检查 cur_delta>0: float32 在 600 附近
+     * 的 ULP 约 6e-5, 约 67 帧后 EMA 步进小于半 ULP 而完全停住, Δ 恒等于 0.0f,
+     * 该断言必然失败且无法证明 Δ 计算正确 —— 属假测试。 */
     {
-        float sgf, sgd, cf, cd;
+        float sgf, sgd, cf, cd, base_cd;
+
+        diag_reset();
+        for (i = 0; i < 60; ++i) s_feed(500, 150.0f, 1000, (int)MOTOR_CRUISE, 500);
+        diag_get_features(&sgf, &sgd, &cf, &base_cd);   /* 基线: Δ 应已停住 */
+        if (base_cd >= 1.0f || base_cd <= -1.0f)
+        { rt_kprintf("[SELFTEST-D] 3b baseline not stable (d=%d)\n", (int)base_cd);
+          pass = 0; }
+        s_feed(500, 600.0f, 1000, (int)MOTOR_CRUISE, 500);   /* 单帧上升阶跃 */
         diag_get_features(&sgf, &sgd, &cf, &cd);
-        rt_kprintf("[SELFTEST-D] 3b.delta: cur_delta=%d (expect >0 after rise)\n",
-                   (int)cd);
-        if (cd <= 0) pass = 0;
+        rt_kprintf("[SELFTEST-D] 3b.rise-delta: base=%d then %d (expect ~+90)\n",
+                   (int)base_cd, (int)cd);
+        if (cd < 50.0f)
+        { rt_kprintf("[SELFTEST-D] 3b rise FAIL\n"); pass = 0; }
+
+        diag_reset();
+        for (i = 0; i < 60; ++i) s_feed(500, 900.0f, 1000, (int)MOTOR_CRUISE, 500);
+        s_feed(500, 200.0f, 1000, (int)MOTOR_CRUISE, 500);   /* 单帧下降阶跃 */
+        diag_get_features(&sgf, &sgd, &cf, &cd);
+        rt_kprintf("[SELFTEST-D] 3b.fall-delta: %d (expect ~-140)\n", (int)cd);
+        if (cd > -50.0f)
+        { rt_kprintf("[SELFTEST-D] 3b fall FAIL\n"); pass = 0; }
     }
 
     /* 场景4: 堵转 —— SG 崩 + 电流升, 先 SUSPECT 后 CONFIRMED(persistence) */
@@ -502,21 +532,52 @@ static void diag_selftest(void)
     rt_kprintf("[SELFTEST-D] 4b.hysteresis-hold: %s\n", verdict_name(v));
     if (v == DIAG_NORMAL) { rt_kprintf("[SELFTEST-D] 4b FAIL\n"); pass = 0; }
 
-    /* 场景4c: 同帧 dedup —— 相同 seq 重复喂, persistence 不得累计 */
+    /* 场景4c(P1-5 重写): 同帧去重 —— 现在测的是真去重层(diag_step 内部)。
+     * 旧实现只断言"不 CONFIRMED", 而去重当时写在线程里, diag_step 根本看不到
+     * seq, 于是 100 次同 seq 调用会正常累计 persistence 并判成 CONFIRMED ——
+     * 该用例在正确代码上必挂。现在额外要求: 首帧之后的 99 次重复调用
+     * 完全不得改变滤波值(一次算术都不做)。 */
     diag_reset();
     for (i = 0; i < 60; ++i) s_feed(500, 150.0f, 1000, (int)MOTOR_CRUISE, 500);
     {
         diag_input_t dup;
-        dup.seq = 777; dup.timestamp = 0;
+        float sgf1, sgd1, cf1, cd1, sgf2, sgd2, cf2, cd2;
+
+        dup.seq = 90210; dup.timestamp = 0;
         dup.sg_valid = 1; dup.sg = 20;              /* stall 特征 */
         dup.cur_valid = 1; dup.current_ma = 900.0f;
         dup.imu_valid = 1; dup.vib_mg = 1000;
         dup.motor_state = (rt_uint8_t)MOTOR_CRUISE; dup.step_hz = 500;
-        for (i = 0; i < 100; ++i) diag_step(&dup);   /* 同一 seq 喂 100 次 */
+
+        diag_step(&dup);                            /* 第 1 次: 正常消费 */
+        diag_get_features(&sgf1, &sgd1, &cf1, &cd1);
+        for (i = 0; i < 99; ++i) diag_step(&dup);   /* 同 seq 再喂 99 次 */
+        diag_get_features(&sgf2, &sgd2, &cf2, &cd2);
+
+        rt_kprintf("[SELFTEST-D] 4c.dedup: cur_filt %d vs %d (must be identical)\n",
+                   (int)cf1, (int)cf2);
+        if (cf1 != cf2 || sgf1 != sgf2 || cd1 != cd2)
+        { rt_kprintf("[SELFTEST-D] 4c FAIL: duplicate frame was re-processed\n");
+          pass = 0; }
+
+        v = diagnosis_get_verdict();
+        rt_kprintf("[SELFTEST-D] 4c.dedup verdict: %s (expect not CONFIRMED)\n",
+                   verdict_name(v));
+        if (v == DIAG_STALL_CONFIRMED)
+        { rt_kprintf("[SELFTEST-D] 4c FAIL: persistence accumulated on one frame\n");
+          pass = 0; }
+
+        /* 对照: 每帧换新 seq 必须立刻重新被处理并累计到 CONFIRMED
+         * (证明去重不是"永远不干活") */
+        for (i = 0; i < 150; ++i)
+        { dup.seq = (rt_uint32_t)(90211 + i); diag_step(&dup); }
+        v = diagnosis_get_verdict();
+        rt_kprintf("[SELFTEST-D] 4c.control new-seq verdict: %s (expect CONFIRMED)\n",
+                   verdict_name(v));
+        if (v != DIAG_STALL_CONFIRMED)
+        { rt_kprintf("[SELFTEST-D] 4c control FAIL: engine stopped consuming\n");
+          pass = 0; }
     }
-    v = diagnosis_get_verdict();
-    rt_kprintf("[SELFTEST-D] 4c.dedup: %s (expect not CONFIRMED)\n", verdict_name(v));
-    if (v == DIAG_STALL_CONFIRMED) pass = 0;
 
     /* 场景5: sensor missing —— 不当 0, 持续后 SENSOR_FAULT */
     diag_reset();
