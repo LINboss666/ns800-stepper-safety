@@ -68,7 +68,8 @@ MCU IO87
 - 固件：`e40a9b9`，未做任何改动；**IRQ 门全程保持 CLOSED**（纯轮询读数，不开 EXTI）
 - **未执行** `safety_polarity_confirm` / `safety_irq_enable`（见下“全局极性为何不确认”）
 - 步进电机**未连接**
-- 当前软件**假设**（本轮就是要测它，不作为前提）：safe = LOW，触发 = HIGH，IRQ 模式 RISING
+- 当前软件**假设**（本轮原计划验证它，实际未做通断操作，见下"结果"）：
+  safe = LOW，触发 = HIGH，IRQ 模式 RISING。**该假设仍是未经实测的假设。**
 
 | 信号 | MCU 脚 | IO | 软件假设 safe |
 |---|---|---|---|
@@ -77,9 +78,66 @@ MCU IO87
 | LIMIT_MAX | PF.15 | IO25 | LOW |
 | TMC_DIAG | PA.3 | IO3 | LOW（本轮不验证） |
 
-### 结果
+### 基线门禁（§6）实测
 
-（待实测填写）
+本轮出现两种基线状态，都与软件无关，只反映硬件在位情况：
+
+| 时刻 | 链路 | stage 11 结果 | 终态 |
+|---|---|---|---|
+| 23:27 / 23:4x（模块未在位或未上电） | `RX(echo only, no 05 FF header)`，`tmc_scan` 0..3 **全无有效应答** | `[SS] [REQ FAIL] TMC2209 link` → `required=FAIL` | `FAULT_LATCHED code=8` (FAULT_SELF_TEST)，`arm mask=0xB`，`[Diag] verdict=6 = SENSOR_FAULT`，`[MOT] EMERGENCY STOP (drv_en LOW verified)` |
+| 23:44（模块插回、重上电后复位） | `IFCNT 0→1 ALIVE`，`IOIN=0x21000040` | `[SS] [REQ OK] TMC2209` → `required=PASS` | **`state=READY fault_code=0`**，`irq_gate=CLOSED`，`polarity=not-confirmed`，`protect_ready=NO`，`arm mask=0x9 (REFUSED)`，`Motor state=0`，`MONITOR_ONLY` |
+
+> ✅ 顺带得到的真实故障注入证据（不是合成测试）：TMC2209 链路缺失这种**物理**
+> 故障下，required 自检把它判为致命项、拒绝进入 READY、锁存 `code=8`、把
+> `motor_arm` 掩码从 `0x9` 加到 `0xB`，并让诊断在 `MONITOR_ONLY` 下报
+> `SENSOR_FAULT` —— 全链路 fail-closed 成立，且复位后链路恢复即自动回到 READY。
+> 这一条只能算**当前代码**在真实硬件故障上的行为记录（23:27 与 23:44 两次），
+> 不能外推成"EXTI/极性已验证"。
+
+### 结果：三路安全输入物理极性 —— **本轮未测量**
+
+用户在会话中明确选择**不测试三路安全输入**；且此前状态为"只有部分或都没接"
+（与 `待办事项.md` 2026-09-13 的记录一致：ESTOP 未接、限位只做 GND 跳线占位）。
+
+因此本轮**不产生任何 PASS/FAIL 极性结论**，只登记空闲原始电平读数
+（`safety_irq_status` @23:43:25 与 `pin_status` @23:43:20，IRQ 门 CLOSED，纯轮询）：
+
+| 信号 | 脚 | 空闲 raw | 触发态 raw | 极性结论 |
+|---|---|---|---|---|
+| ESTOP | PC.6 / IO70 | **0** | 未测 | HARDWARE-PENDING（未做通断操作） |
+| LIMIT_MIN | PF.14 / IO24 | **0** | 未测 | HARDWARE-PENDING |
+| LIMIT_MAX | PF.15 / IO25 | **0** | 未测 | HARDWARE-PENDING |
+| TMC_DIAG | PA.3 / IO3 | **0** | 无法产生真实事件（电机未接，本轮 TMC 链路一度整体不应答） | HARDWARE-PENDING |
+
+⚠ 「空闲读到 0」**不等于** "safe=LOW 已验证"：未接线的输入读到什么都有可能，
+它只证明 MCU 侧该脚当前解析为 0。真正的极性需要"操作源 → 观察翻转 → 恢复"三步，
+本轮没有做，所以也不得写进事实库。
+
+### 意外发现（安全相关，未解释，留给下次）
+
+模块拔出/插回前后，`IOIN` 的低-bit 状态**发生变化**：
+
+- 21:23（本会话之前，模块在位）：`IOIN=0x21000041`
+- 23:44（重新插回后，`tmc_regs` 三次一致）：`IOIN=0x21000040` → **bit0 由 1 变 0**
+  （bit6 仍为 1 = PDN_UART 高；`GSTAT=0x01` 说明期间发生过复位；
+  `VACTUAL=0`、`SGRESULT=0`、`GCONF=0x101`、`CHOPCONF=0x15010053` 与历史基线一致）
+
+即 **TMC 侧 `ENN` 输入的状态位翻转了**，而软件没有任何改动（同一 `e40a9b9` 镜像，
+banner `build Sep 25 2026 21:25:16`）。我不在这里断言它的含义：TMC2209 `IOIN` bit0
+报的是引脚电平还是"禁用"语义、以及 ENN 悬空时算什么，正是
+`待办事项.md` 里既存的「**ENN 浮空行为实验**」要回答的问题。**接电机之前必须先搞清
+这一位为什么变**；当前无风险仅因为：电机未接、`VACTUAL=0`、无 STEP 输出、
+MCU 侧 PC.23 实测并回读为 LOW。
+
+这也再次印证 RevB 需要 `TMC_ENN` 与 `DRV_ENABLE_SAFE` 测试点的理由。
+
+### 本轮结论（不随测量结果变化的部分）
+
+- 全局极性：**NOT CONFIRMED**（未执行 `safety_polarity_confirm`）
+- Safety IRQ gate：**CLOSED**（未执行 `safety_irq_enable`）
+- `protection_ready`：**NO**
+- `motor_arm`：**REFUSED**（mask 0x9）
+- 步进电机：**未连接**；`MOTOR_HARDWARE_ENABLE_PATH_VALIDATED` 保持 `FALSE`
 
 ---
 
