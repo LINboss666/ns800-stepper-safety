@@ -136,3 +136,62 @@
   4 帧应答 CRC 独立核算一致；上电基线 GCONF=0x101/CHOPCONF=0x15010053
 - ADXL345：spi3（BSP fix 后），DEVID=0xE5 双读一致，静置合成 ≈1g
 - 安全停机链：safety_force_shutdown → FAULT_LATCHED → 实测故障源 → MANUAL_CLEAR（ss_test）
+
+---
+
+## Phase 7 独立审查修复轮（GPT review @ac32300 → 本轮修复）
+
+### P0（全部修复）
+1. **blackbox 确定性越界**：旧实现把 pre 200 帧拷进 bb_post[100] 数组。
+   重构为单一捕获区 bb_cap[450](编译期断言) + 独立 pre 环 300；
+   pre 不足只写实际帧数（开机前 2s 不造假历史）；触发策略=捕获/写盘中
+   新触发忽略并计数（首个故障优先）；selftest 竞态修复（等待 session
+   递增且回 IDLE，非轮询瞬时状态）。
+2. **sensor_frame 栈垃圾**：s_collect 基帧=显式上一帧（静态 s_prev，零初始化）；
+   新增 fresh_imu/fresh_current/fresh_sg 位区分"本帧采样"与"保留值"；
+   失败源 valid=0（垃圾可留在值字段但不得标有效）；
+   sensor_selftest 用 0xAB 模式注入验证 valid/fresh 行为。
+3. **LIMIT/DIAG 生产者缺失**：safety_irq_attach 一次性注册四路 EXTI
+   （ESTOP=EXTI6/LIMIT_MIN=EXTI14/LIMIT_MAX=EXTI15/DIAG=EXTI3，与冻结表一致），
+   ISR 只 post 事件；门默认关闭；旧 DIAG 轮询移除（避免双触发）。
+4. **motor PWM 失败 fail-closed**：apply 失败 → PWM off + armed=0 +
+   target/current=0 + DRV_ENABLE LOW + post EVT_SOFT_FAULT（锁外发事件防死锁）。
+
+### P1（全部修复）
+5. 存储顺序：project_config_init 显式先 ns_storage_init（失败→安全默认+DEGRADED）；
+   blackbox WRITING 前再验（失败→session 丢弃+DEGRADED）。
+6. diagnosis delta：保存旧值再更新 EMA（原来恒 0）；selftest 场景 3b 断言
+   上升序列 cur_delta>0。
+7. 标定来源：NONE/THEORETICAL/MEASURED 三态；set_calibration 固定
+   THEORETICAL；只有 MEASURED 允许 diag ACTIVE（门禁改 cal_source 判断）；
+   config_default/save/reboot 均无法绕过（default 恒 THEORETICAL）。
+8. 斜坡 clamp：mot_ramp_step 每步夹到 target（消除 1990→2010→1990 振荡）；
+   motor_ramp_selftest 确定性验证（含 1990→2000 与 15→0 两类边界）。
+9. Motor/Safety 联动：motor_start 成功前必须 READY→RUN transition（拒绝则
+   不起转）；减速到 0 后 RUN→READY；均经 transition API，禁止直写私有 state。
+10. motor_arm 回滚：DRV_ENABLE 写成功才置 armed，失败回滚 fail-closed；
+    disarm/emergency_stop 检查并报告使能写入结果。
+11. TMC UART 事务互斥：tmc_xfer_lock 覆盖 flush+TX+RX+parse 全事务
+    （write_register_confirmed 整体持锁）；周期 SG 默认关闭 hex_dump
+    （TMC_TRACE_VERBOSE 编译门）；IFCNT mismatch → health DEGRADED。
+12. ADXL 恢复：DEGRADED 状态 read 时受控重试 init（重验 DEVID+重配置）；
+    rt_spi_configure 非 RT_EOK 一律失败并 detach（"EBUSY 稍后生效"无官方依据，
+    BUG-002 workaround 随 spi1 共总线时代一并退役——ADXL 现独占 spi3）。
+13. current_adc 单帧单采：read_measurement 一次完成 raw/mv/ma（EMA 推一次），
+    raw→mv→ma 纯换算 API；sensor 服务改用之（原一帧双采双推 EMA）。
+14. 振动 64bit：平方/RMS 累加改 rt_uint64_t（±16g 极端值下 32bit 会溢出），
+    新增 d_isqrt64。
+15. runtime_selftest：MANUAL_CLEAR→READY 改为实际重跑 required selftest，
+    不允许测试命令直接 transition。
+
+### Blackbox 完整性（同步核验）
+- pre 不足 → pre_n=实际帧数 ✅；多触发策略=首故障优先+丢弃计数 ✅；
+- 数字输入持久化到 record.flags 位域 [11:8] ✅；
+- NS_VALID_STEP 不再借用（含义=step_hz 字段有效）✅；
+- config pre/post 范围收紧到 100~3000/100~1500ms 并真实生效
+  （blackbox 每循环从 config 同步夹取）✅
+
+### 文档小修
+- project_board.h LIMIT_MIN 注释 J4-25→J4-19（GPIO25→GPIO24 同步修正）✅
+- system_status 增补 Storage/Config 行（Safety/Motor/Sensor/TMC/IMU/ADC/
+  Storage/Config/Diagnosis/Blackbox/Flash 全覆盖）✅

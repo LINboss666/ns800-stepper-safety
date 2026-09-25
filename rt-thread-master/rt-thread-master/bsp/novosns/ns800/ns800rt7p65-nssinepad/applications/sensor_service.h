@@ -18,16 +18,19 @@ typedef struct
     /* IMU (adxl345_read_raw) */
     rt_int16_t  ax, ay, az;             /* 原始码 */
     rt_int16_t  vib_mg;                 /* 振动幅值: isqrt(mx²+my²+mz²) mg */
-    rt_uint8_t  valid_imu;
+    rt_uint8_t  valid_imu;      /* 1=当前值有效(本次采样成功或保留上次成功值) */
+    rt_uint8_t  fresh_imu;      /* 1=本帧实际重新采样(区分保留值) */
     /* 电流 (current_adc) */
     rt_uint32_t current_raw;    /* 最新单次 raw */
     rt_uint32_t current_filtered;       /* EMA */
     float       current_ma;     /* 未标定时为理论换算值(DEGRADED) */
-    rt_uint8_t  valid_current;
+    rt_uint8_t  valid_current;  /* 同上语义 */
+    rt_uint8_t  fresh_current;
     rt_uint8_t  current_calibrated;
     /* TMC (tmc2209_read_sg_result, 10Hz 分频) */
     rt_uint16_t sg_result;
-    rt_uint8_t  valid_sg;
+    rt_uint8_t  valid_sg;       /* 1=上次 SG 采样有效(10Hz 分频期间保留) */
+    rt_uint8_t  fresh_sg;       /* 1=本帧实际重采样 SG */
     /* 运动 (motor_get_snapshot) */
     rt_uint32_t step_hz;
     rt_uint8_t  motor_state;    /* motor_state_t */

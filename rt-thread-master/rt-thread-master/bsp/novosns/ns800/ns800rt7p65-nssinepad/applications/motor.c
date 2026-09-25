@@ -1,5 +1,5 @@
 /*
- * motor.c - 步进电机运动服务 (Phase 7-B)
+ * motor.c - 步进电机运动服务 (Phase 7-B, 审查修复 P0-4/P1-8/9/10)
  *
  * 结构: EPWM1_A 输出 STEP 脉冲, PA.2 输出 DIR, PC.23 输出使能"请求"。
  * 斜坡线程(优先级 8, 10ms 节拍)按线性斜率把 current_hz 推向 target_hz。
@@ -8,7 +8,14 @@
  *   - MOTOR_HARDWARE_ENABLE_PATH_VALIDATED=RT_FALSE 期间 motor_arm() 一律拒绝
  *     (ENN 硬件链未验收: J4-21 终验未做 + 扩展板使能链 PCB 漏画)。
  *   - DRV_ENABLE 请求脚常态 LOW; 仅 arm 成功且运行时拉高。
- *   - motor_emergency_stop() 供安全线程直接调用, 立即断输出。
+ *   - P0-4: PWM apply 失败 → fail-closed(PWM off + armed=0 + target/current=0
+ *     + DRV_ENABLE LOW)并 post EVT_SOFT_FAULT 交 Safety 锁死。
+ *     释放 mot_lock 之后才发事件, 避免重入死锁。
+ *   - P1-9: motor_start 成功前必须完成 READY→RUN 状态转换(经 safety_transition,
+ *     禁止直写私有 state); 斜坡减速到 0 后 RUN→READY。Fault 仍只能走 Safety。
+ *   - P1-10: arm 时 DRV_ENABLE 写失败 → 回滚 armed/输出(fail closed)。
+ *   - P1-8: 斜坡每步 clamp 到 target(消除目标附近振荡); mot_ramp_step 为纯函数,
+ *     motor_ramp_selftest 做确定性验证。
  *
  * 与 pwm_test(诊断)的关系: motor 非 IDLE 时 pwm_test 拒绝执行, 防止双写 EPWM。
  */
@@ -60,7 +67,7 @@ static void mot_lock_release(void)
     if (mot_lock_ok) rt_mutex_release(&mot_lock);
 }
 
-/* 立即关 STEP 输出(不修改 mot.current_hz 语义之外的斜坡状态) */
+/* 立即关 STEP 输出 */
 static void mot_pwm_output_off(void)
 {
     if (mot_dev_ok)
@@ -83,6 +90,35 @@ static rt_err_t mot_pwm_apply(rt_uint32_t hz)
     return rt_pwm_enable(mot_pwm, MOTOR_PWM_CH);
 }
 
+/* ---------- P1-8: 斜坡纯函数(每步 clamp 到 target) ---------- */
+static rt_uint32_t mot_ramp_step(rt_uint32_t cur, rt_uint32_t tgt,
+                                 rt_uint32_t accel, rt_uint32_t decel)
+{
+    rt_int32_t n;
+
+    if (cur == tgt) return cur;
+    if (cur < tgt)
+    {
+        n = (rt_int32_t)cur + (rt_int32_t)(accel * MOTOR_RAMP_PERIOD_MS / 1000);
+        if (n > (rt_int32_t)tgt) n = (rt_int32_t)tgt;   /* clamp: 不越过目标 */
+        return (rt_uint32_t)n;
+    }
+    n = (rt_int32_t)cur - (rt_int32_t)(decel * MOTOR_RAMP_PERIOD_MS / 1000);
+    if (n < (rt_int32_t)tgt) n = (rt_int32_t)tgt;       /* clamp: 不越过目标 */
+    return (rt_uint32_t)n;
+}
+
+/* ---------- P0-4: fail-closed(PWM apply 失败路径) ----------
+ * 调用约定: 必须在 mot_lock 释放后调用(内部不再拿锁),
+ * 事件 → Safety Thread → force_shutdown → motor_emergency_stop(幂等)。 */
+static void mot_fail_closed(void)
+{
+    mot_pwm_output_off();
+    mot_drv_en_request(0);
+    safety_post_event(EVT_SOFT_FAULT);
+    rt_kprintf("[MOT] FAIL-CLOSED (pwm error), EVT_SOFT_FAULT posted\n");
+}
+
 /* 斜坡线程: 10ms 节拍, 线性逼近 target */
 static void motor_ramp_entry(void *param)
 {
@@ -91,8 +127,7 @@ static void motor_ramp_entry(void *param)
     while (1)
     {
         rt_uint32_t tgt;
-        rt_int32_t step;
-        rt_uint8_t running;
+        rt_uint8_t was_moving;
 
         mot_lock_take();
         tgt = mot.target_hz;
@@ -104,28 +139,27 @@ static void motor_ramp_entry(void *param)
             continue;
         }
 
-        running = mot.armed;
-        if (!running) tgt = 0;
+        if (!mot.armed) tgt = 0;
 
         if (mot.current_hz == tgt)
         {
+            was_moving = (mot.state == MOTOR_CRUISE ||
+                          mot.state == MOTOR_ACCEL || mot.state == MOTOR_DECEL);
             mot.state = (tgt == 0) ? MOTOR_IDLE : MOTOR_CRUISE;
             mot_lock_release();
+
+            /* P1-9: 减速到 0(受控停止完成) → RUN 回 READY(经 transition API) */
+            if (tgt == 0 && was_moving && mot.armed)
+            {
+                if (safety_transition(SAFETY_READY) != RT_EOK)
+                    rt_kprintf("[MOT] RUN->READY transition refused\n");
+            }
             rt_thread_mdelay(MOTOR_RAMP_PERIOD_MS);
             continue;
         }
 
-        /* 线性斜坡: 每 10ms 步进 slope/100 */
-        step = (mot.current_hz < tgt)
-             ? (rt_int32_t)(mot.accel_hz_s * MOTOR_RAMP_PERIOD_MS / 1000)
-             : -(rt_int32_t)(mot.decel_hz_s * MOTOR_RAMP_PERIOD_MS / 1000);
-
-        if (step < 0 && (rt_uint32_t)(-step) > mot.current_hz)
-            mot.current_hz = 0;
-        else
-            mot.current_hz = (rt_uint32_t)((rt_int32_t)mot.current_hz + step);
-
-        if (mot.current_hz > MOTOR_MAX_HZ) mot.current_hz = MOTOR_MAX_HZ;
+        mot.current_hz = mot_ramp_step(mot.current_hz, tgt,
+                                       mot.accel_hz_s, mot.decel_hz_s);
 
         if (mot.current_hz == 0)
         {
@@ -136,11 +170,14 @@ static void motor_ramp_entry(void *param)
         {
             if (mot_pwm_apply(mot.current_hz) != RT_EOK)
             {
+                /* P0-4: fail-closed(锁内只改状态, 锁外发事件) */
                 mot_pwm_output_off();
+                mot.armed = 0;
+                mot.current_hz = 0;
+                mot.target_hz = 0;
                 mot.state = MOTOR_FAULT;
                 mot_lock_release();
-                rt_kprintf("[MOT] pwm apply FAILED at %u Hz -> FAULT\n",
-                           mot.current_hz);
+                mot_fail_closed();
                 continue;
             }
             mot.state = (mot.current_hz < tgt) ? MOTOR_ACCEL
@@ -220,16 +257,32 @@ rt_err_t motor_arm(void)
         return -RT_EPERM;
     }
 
+    /* P1-10: 先写使能请求, 成功才置 armed; 失败回滚 fail-closed */
+    e = mot_drv_en_request(1);
+    if (e != RT_EOK)
+    {
+        rt_kprintf("[MOT] arm FAILED: DRV_ENABLE write error (%d), rollback\n", e);
+        mot_lock_take();
+        mot.armed = 0;
+        mot.current_hz = 0;
+        mot.target_hz = 0;
+        mot_pwm_output_off();
+        mot_lock_release();
+        mot_drv_en_request(0);
+        return e;
+    }
+
     mot_lock_take();
     mot.armed = 1;
-    e = mot_drv_en_request(1);
     mot_lock_release();
     rt_kprintf("[MOT] ARMED (drv_en request=HIGH)\n");
-    return e;
+    return RT_EOK;
 }
 
 rt_err_t motor_disarm(void)
 {
+    rt_err_t e;
+
     mot_lock_take();
     mot.armed = 0;
     mot.target_hz = 0;
@@ -237,9 +290,12 @@ rt_err_t motor_disarm(void)
     mot_pwm_output_off();
     mot.state = MOTOR_IDLE;
     mot_lock_release();
-    mot_drv_en_request(0);
+
+    e = mot_drv_en_request(0);                  /* P1-10: 检查并报告 */
+    if (e != RT_EOK)
+        rt_kprintf("[MOT] disarm WARNING: DRV_ENABLE write failed (%d)\n", e);
     rt_kprintf("[MOT] DISARMED\n");
-    return RT_EOK;
+    return e;
 }
 
 rt_err_t motor_set_direction(rt_uint8_t dir)
@@ -270,25 +326,46 @@ rt_err_t motor_start(void)
     mot_lock_take();
     armed = mot.armed;
     has_target = (mot.target_hz > 0);
-    if (armed && has_target && mot.state == MOTOR_IDLE)
-        mot.state = MOTOR_ACCEL;
     mot_lock_release();
 
     if (!armed)      { rt_kprintf("[MOT] start REFUSED: not armed\n");  return -RT_EPERM; }
     if (!has_target) { rt_kprintf("[MOT] start REFUSED: target_hz=0\n"); return -RT_EPERM; }
+
+    /* P1-9: 运动前建立合法 READY→RUN(经 transition API, 拒绝则不起转) */
+    if (safety_state_get() == SAFETY_READY)
+    {
+        rt_err_t e = safety_transition(SAFETY_RUN);
+        if (e != RT_EOK)
+        {
+            rt_kprintf("[MOT] start REFUSED: READY->RUN transition refused\n");
+            return e;
+        }
+    }
+    else if (safety_state_get() != SAFETY_RUN)
+    {
+        rt_kprintf("[MOT] start REFUSED: safety state=%s\n",
+                   safety_state_name(safety_state_get()));
+        return -RT_EPERM;
+    }
+
+    mot_lock_take();
+    if (mot.state == MOTOR_IDLE) mot.state = MOTOR_ACCEL;
+    mot_lock_release();
     return RT_EOK;
 }
 
 rt_err_t motor_stop(void)
 {
     mot_lock_take();
-    mot.target_hz = 0;      /* 斜坡自动减速到 0 → IDLE(armed 保持) */
+    mot.target_hz = 0;      /* 斜坡自动减速到 0 → IDLE + RUN→READY(保持 armed) */
     mot_lock_release();
     return RT_EOK;
 }
 
 rt_err_t motor_emergency_stop(void)
 {
+    rt_err_t e;
+
     mot_lock_take();
     mot.armed = 0;
     mot.target_hz = 0;
@@ -296,7 +373,10 @@ rt_err_t motor_emergency_stop(void)
     mot_pwm_output_off();
     mot.state = MOTOR_FAULT;
     mot_lock_release();
-    mot_drv_en_request(0);
+
+    e = mot_drv_en_request(0);                  /* P1-10: 检查并报告 */
+    if (e != RT_EOK)
+        rt_kprintf("[MOT] estop WARNING: DRV_ENABLE write failed (%d)\n", e);
     rt_kprintf("[MOT] EMERGENCY STOP\n");
     return RT_EOK;
 }
@@ -311,3 +391,37 @@ rt_err_t motor_get_snapshot(motor_snapshot_t *snap)
 }
 
 subsys_health_t motor_get_health(void) { return mot.health; }
+
+/* ---------- P1-8: 斜坡确定性自测(纯软件) ---------- */
+static void motor_ramp_selftest(void)
+{
+    struct { rt_uint32_t cur, tgt; rt_uint32_t expect; } up[] = {
+        { 0,    1000, 20   },      /* accel 2000Hz/s × 10ms = 20Hz/步 */
+        { 1990, 2000, 2000 },      /* clamp: 不越过目标(原 2010 振荡 bug) */
+        { 2000, 2000, 2000 },
+    };
+    struct { rt_uint32_t cur, tgt; rt_uint32_t expect; } dn[] = {
+        { 1000, 0,    980  },      /* decel */
+        { 15,   0,    0    },      /* clamp: 不越过 0(负值) */
+    };
+    int i, pass = 1;
+
+    for (i = 0; i < (int)(sizeof(up) / sizeof(up[0])); ++i)
+    {
+        rt_uint32_t n = mot_ramp_step(up[i].cur, up[i].tgt,
+                                      MOTOR_DEFAULT_ACCEL, MOTOR_DEFAULT_DECEL);
+        rt_kprintf("[MOT-ST] up %u->%u: %u %s\n", up[i].cur, up[i].tgt, n,
+                   n == up[i].expect ? "OK" : "FAIL");
+        if (n != up[i].expect) pass = 0;
+    }
+    for (i = 0; i < (int)(sizeof(dn) / sizeof(dn[0])); ++i)
+    {
+        rt_uint32_t n = mot_ramp_step(dn[i].cur, dn[i].tgt,
+                                      MOTOR_DEFAULT_ACCEL, MOTOR_DEFAULT_DECEL);
+        rt_kprintf("[MOT-ST] dn %u->%u: %u %s\n", dn[i].cur, dn[i].tgt, n,
+                   n == dn[i].expect ? "OK" : "FAIL");
+        if (n != dn[i].expect) pass = 0;
+    }
+    rt_kprintf("[MOT-ST] %s\n", pass ? "PASS" : "FAILED");
+}
+MSH_CMD_EXPORT(motor_ramp_selftest, deterministic ramp step selftest);

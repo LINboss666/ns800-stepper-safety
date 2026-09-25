@@ -69,6 +69,10 @@ rt_err_t diagnosis_set_mode(diag_mode_t mode);
 diag_mode_t diagnosis_get_mode(void);
 
 diag_verdict_t diagnosis_get_verdict(void);
+
+/* 特征值读取(selftest 用): 任一指针可 NULL */
+void diag_get_features(float *sg_filt, float *sg_delta,
+                       float *cur_filt, float *cur_delta);
 subsys_health_t diagnosis_get_health(void);
 
 /* 帧内振动特征(供 selftest/记录): mg 值的整数幅值 */

@@ -17,12 +17,28 @@
 #include <rtthread.h>
 #include "app_health.h"
 
+/* 标定来源(P1-7): 理论默认值绝不能冒充实测标定 */
+typedef enum
+{
+    CURRENT_ADC_CAL_NONE = 0,
+    CURRENT_ADC_CAL_THEORETICAL,
+    CURRENT_ADC_CAL_MEASURED,
+} current_adc_cal_source_t;
+
 /* 幂等初始化: 查找 adc0 并使能 CH15。RT_EOK = 可读(raw 层面)。 */
 rt_err_t current_adc_init(void);
 
 /* 读取 CH15 原始码(12bit, 0~4095, 单次快读 + EMA 状态更新; 适合 100Hz 线程)。
  * RT_EOK 时 *raw 有效; 滤波值用 current_adc_get_filtered_raw()。 */
 rt_err_t current_adc_read_raw(rt_uint32_t *raw);
+
+/* P1-13: 一次采样完成 raw/mv/ma, 保证同一采样周期, EMA 只推一次。
+ * mv/ma 传 RT_NULL 可省略。RT_EOK 时非 NULL 输出全部有效。 */
+rt_err_t current_adc_read_measurement(rt_uint32_t *raw, float *mv, float *ma);
+
+/* 纯换算(不采样): raw → mv / ma(用当前 offset/gain) */
+float current_adc_raw_to_mv(rt_uint32_t raw);
+float current_adc_raw_to_ma(rt_uint32_t raw);
 
 /* 原始码 → 毫伏(线性: raw × 3300 / 4095)。RT_EOK 时 *mv 有效。 */
 rt_err_t current_adc_read_mv(float *mv);
@@ -31,14 +47,18 @@ rt_err_t current_adc_read_mv(float *mv);
  * RT_EOK 时 *ma 有效但可能是理论值 —— 用 current_adc_is_calibrated() 区分。 */
 rt_err_t current_adc_read_ma(float *ma);
 
-/* 设置标定并置 calibration_valid=TRUE:
- *   offset_mv : 零电流时的 ADC 电压(mV), 理论默认 1650
- *   gain_v_per_a : V→A 换算系数(分流Ω×放大倍数), 理论默认 0.6
- * 返回 RT_EOK 后 read_ma 的结果视为标定值。 */
+/* 设置标定(source=THEORETICAL): 理论默认值, 不得冒充实测。 */
 rt_err_t current_adc_set_calibration(float offset_mv, float gain_v_per_a);
 
-/* 是否已标定(未标定时 read_ma 结果为理论默认换算) */
+/* 设置标定(显式来源): 只有 MEASURED 才允许 diagnosis ACTIVE_PROTECTION。 */
+rt_err_t current_adc_set_calibration_ex(float offset_mv, float gain_v_per_a,
+                                        current_adc_cal_source_t source);
+
+/* 是否已标定(来源 != NONE; 区分来源用 current_adc_cal_source()) */
 rt_bool_t current_adc_is_calibrated(void);
+
+/* 当前标定来源 */
+current_adc_cal_source_t current_adc_cal_source(void);
 
 /* 获取最近一次 EMA 滤波后的 raw 值(诊断/记录用) */
 rt_uint32_t current_adc_get_filtered_raw(void);

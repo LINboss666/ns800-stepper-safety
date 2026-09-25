@@ -78,8 +78,9 @@ static rt_bool_t config_in_range(const project_config_t *c)
         c->impact_frames < 1 || c->impact_frames > 100 ||
         c->hysteresis_frames < 1 || c->hysteresis_frames > 2000)
         return RT_FALSE;
-    if (c->pre_fault_ms > 10000 || c->post_fault_ms > 5000)
-        return RT_FALSE;
+    if (c->pre_fault_ms < 100 || c->pre_fault_ms > 3000 ||
+        c->post_fault_ms < 100 || c->post_fault_ms > 1500)
+        return RT_FALSE;   /* 与 blackbox 静态缓冲容量一致(300/150 帧) */
     return RT_TRUE;
 }
 
@@ -207,6 +208,15 @@ int project_config_init(void)
 {
     project_config_defaults();
     cfg_health = SUBSYS_DEGRADED;   /* 加载成功前按降级处理 */
+
+    /* P1-5: 显式保证 ns_storage_init 先于 config load / blackbox logging,
+     * 不依赖偶然的 INIT_APP 链接顺序; 失败 → 安全默认 + DEGRADED */
+    if (ns_storage_init() != RT_EOK)
+    {
+        rt_kprintf("[CFG] storage init FAILED -> safe defaults, DEGRADED\n");
+        return RT_EOK;
+    }
+
     project_config_load();          /* 失败→默认+DEGRADED, 成功→OK */
     return RT_EOK;
 }

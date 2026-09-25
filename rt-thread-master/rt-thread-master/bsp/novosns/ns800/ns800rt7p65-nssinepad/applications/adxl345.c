@@ -97,8 +97,14 @@ static rt_err_t adxl_attach(void)
     cfg.mode = RT_SPI_MASTER | RT_SPI_MODE_3 | RT_SPI_MSB;
     cfg.max_hz = ADXL_SPI_HZ;
     e = rt_spi_configure(adxl_dev, &cfg);
-    /* BUG-002: -RT_EBUSY = 配置待总线空闲后生效, 放行 */
-    if (e != RT_EOK && e != -RT_EBUSY) return e;
+    /* P1-12: -RT_EBUSY"稍后生效"语义无官方依据 → configure 非 RT_EOK
+     * 一律失败并 detach(下次 init 干净重试)。
+     * (BUG-002 的放行是 SPI1 共总线时代 workaround, ADXL 现独占 spi3) */
+    if (e != RT_EOK)
+    {
+        rt_spi_bus_detach_device(adxl_dev);
+        return e;
+    }
 
     adxl_attached = RT_TRUE;
     return RT_EOK;
@@ -149,6 +155,9 @@ rt_err_t adxl345_read_raw(rt_int16_t *x, rt_int16_t *y, rt_int16_t *z)
     rt_uint8_t buf[6] = {0};
     rt_err_t e;
 
+    /* P1-12: DEGRADED 允许受控恢复 —— 重跑 init(幂等, 重验 DEVID+重配置) */
+    if (adxl_health == SUBSYS_DEGRADED)
+        adxl345_init();
     if (adxl_health != SUBSYS_OK) return -RT_ERROR;   /* 禁止用 0 冒充有效测量 */
     rt_pin_write(safety_pin(PIN_NAME_IMU_CS), PIN_HIGH);
 

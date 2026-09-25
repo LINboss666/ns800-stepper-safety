@@ -45,8 +45,17 @@
 
 static rt_device_t tmc_serial = RT_NULL;
 static rt_bool_t tmc_opened = RT_FALSE;
+static struct rt_mutex tmc_xfer_lock;      /* P1-11: 完整事务串行化 */
+static rt_bool_t tmc_lock_ok = RT_FALSE;
+
+/* P1-11: 周期 SG 读取默认关闭 hex_dump; 调试时置 1 重编 */
+#ifndef TMC_TRACE_VERBOSE
+#define TMC_TRACE_VERBOSE  0
+#endif
 
 static rt_err_t tmc_read_reg(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *value);
+static rt_err_t tmc_read_reg_locked(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *value);
+static rt_err_t tmc_write_reg_locked(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t value);
 
 /* ---------- CRC8-ATM (datasheet swuart_calcCRC 等价实现, 见文件头 ②) ---------- */
 static rt_uint8_t tmc_crc8(const rt_uint8_t *data, rt_size_t len)
@@ -93,6 +102,15 @@ static rt_err_t tmc_uart_open(void)
         rt_kprintf("[TMC] uart open failed\n");
         return -RT_ERROR;
     }
+    if (!tmc_lock_ok)
+    {
+        if (rt_mutex_init(&tmc_xfer_lock, "tmc", RT_IPC_FLAG_PRIO) != RT_EOK)
+        {
+            tmc_opened = RT_FALSE;
+            return -RT_ERROR;
+        }
+        tmc_lock_ok = RT_TRUE;
+    }
     tmc_opened = RT_TRUE;
     return RT_EOK;
 }
@@ -114,12 +132,11 @@ static void hex_dump(const char *tag, const rt_uint8_t *p, rt_size_t n)
 /* ---------- 协议层 ---------- */
 
 /* 写寄存器: 8 字节帧, TMC2209 对 WRITE 无应答(IFCNT 才是写入凭证)。
- * 发送后短暂延时排空自身回声, 保证后续 read 的字节流干净。 */
-static rt_err_t tmc_write_reg(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t value)
+ * 发送后短暂延时排空自身回声, 保证后续 read 的字节流干净。
+ * P1-11: 完整事务(flush+TX+排空)持锁串行化。 */
+static rt_err_t tmc_write_reg_locked(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t value)
 {
     rt_uint8_t req[8];
-    rt_err_t e = tmc_uart_open();
-    if (e != RT_EOK) return e;
 
     req[0] = TMC_SYNC_BYTE;
     req[1] = addr;
@@ -131,7 +148,9 @@ static rt_err_t tmc_write_reg(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t value
     req[7] = tmc_crc8(req, 7);
 
     tmc_rx_flush();
+#if TMC_TRACE_VERBOSE
     hex_dump("TX(write)", req, 8);
+#endif
     if (rt_device_write(tmc_serial, 0, req, 8) != 8) return -RT_EIO;
 
     /* 8 字节 @115200 ≈ 0.7ms; 延时后一次排空回声 */
@@ -140,17 +159,25 @@ static rt_err_t tmc_write_reg(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t value
     return RT_EOK;
 }
 
+static rt_err_t tmc_write_reg(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t value)
+{
+    rt_err_t e;
+    if (tmc_uart_open() != RT_EOK) return -RT_ERROR;
+    if (tmc_lock_ok) rt_mutex_take(&tmc_xfer_lock, RT_WAITING_FOREVER);
+    e = tmc_write_reg_locked(addr, reg, value);
+    if (tmc_lock_ok) rt_mutex_release(&tmc_xfer_lock);
+    return e;
+}
+
 /* 读寄存器: 发 4 字节请求后, RX 上先出现自身回声(4 字节, byte1=slave 地址),
  * 随后才是应答(8 字节, byte1=0xFF)。在字节流中滑动搜索 [05 FF reg&0x7F]
  * 应答头, 收满 8 字节后验 CRC —— 不假设应答从 buffer 第一个字节开始。 */
-static rt_err_t tmc_read_reg(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *value)
+static rt_err_t tmc_read_reg_locked(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *value)
 {
     rt_uint8_t req[4];
     rt_uint8_t buf[TMC_RX_BUF];
     rt_size_t n = 0;
     rt_tick_t deadline;
-    rt_err_t e = tmc_uart_open();
-    if (e != RT_EOK) return e;
 
     req[0] = TMC_SYNC_BYTE;
     req[1] = addr;
@@ -158,7 +185,9 @@ static rt_err_t tmc_read_reg(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *value
     req[3] = tmc_crc8(req, 3);
 
     tmc_rx_flush();
+#if TMC_TRACE_VERBOSE
     hex_dump("TX(read)", req, 4);
+#endif
     if (rt_device_write(tmc_serial, 0, req, 4) != 4) return -RT_EIO;
 
     deadline = rt_tick_get() + rt_tick_from_millisecond(TMC_REPLY_TIMEOUT_MS);
@@ -189,7 +218,9 @@ static rt_err_t tmc_read_reg(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *value
 
         if (hdr_found && n >= hdr_pos + TMC_REPLY_LEN)
         {
+#if TMC_TRACE_VERBOSE
             hex_dump("RX", buf, n);
+#endif
             if (tmc_crc8(buf + hdr_pos, 7) != buf[hdr_pos + 7])
             {
                 rt_kprintf("[TMC] reply CRC error\n");
@@ -226,6 +257,17 @@ static rt_err_t tmc_read_reg(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *value
         }
         if (got == 0) rt_thread_mdelay(2);
     }
+}
+
+/* P1-11: 读事务(flush+TX+RX+parse)持锁串行化, 防 MSH 与线程交叉访问 */
+static rt_err_t tmc_read_reg(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *value)
+{
+    rt_err_t e;
+    if (tmc_uart_open() != RT_EOK) return -RT_ERROR;
+    if (tmc_lock_ok) rt_mutex_take(&tmc_xfer_lock, RT_WAITING_FOREVER);
+    e = tmc_read_reg_locked(addr, reg, value);
+    if (tmc_lock_ok) rt_mutex_release(&tmc_xfer_lock);
+    return e;
 }
 
 /* ---------- 正式 API (tmc2209.h, Phase 7-A) ----------
@@ -275,7 +317,12 @@ rt_err_t tmc2209_write_register_confirmed(rt_uint8_t addr, rt_uint8_t reg,
 
     /* IFCNT 只对有效 WRITE 自增: +1 = 芯片接受了完整写帧 */
     if ((after & 0xFF) != ((before + 1) & 0xFF))
+    {
+        rt_kprintf("[TMC] IFCNT mismatch (%u -> %u)\n",
+                   before & 0xFF, after & 0xFF);
+        tmc_health_after_xfer(-RT_EIO);      /* P1-11: 健康联动 DEGRADED */
         return -RT_EIO;
+    }
 
     tmc_health_after_xfer(RT_EOK);
     return RT_EOK;

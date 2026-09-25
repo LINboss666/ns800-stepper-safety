@@ -98,10 +98,18 @@ static rt_uint32_t d_isqrt(rt_uint32_t n)
     return x;
 }
 
+static rt_uint32_t d_isqrt64(rt_uint64_t n)   /* P1-14: 64bit 版本 */
+{
+    rt_uint64_t x = n, y = 1;
+    if (n == 0) return 0;
+    while (x > y) { x = (x + y) / 2; y = n / x; }
+    return (rt_uint32_t)x;
+}
+
 rt_uint32_t diag_vib_magnitude(rt_int16_t mg_x, rt_int16_t mg_y, rt_int16_t mg_z)
 {
-    rt_int32_t x = mg_x, y = mg_y, z = mg_z;
-    return d_isqrt((rt_uint32_t)(x * x + y * y + z * z));
+    rt_int64_t x = mg_x, y = mg_y, z = mg_z;   /* P1-14: 64bit 中间量 */
+    return d_isqrt64((rt_uint64_t)(x * x + y * y + z * z));
 }
 
 static const char *verdict_name(diag_verdict_t v)
@@ -166,23 +174,27 @@ diag_verdict_t diag_step(const diag_input_t *in)
     }
     ds.sensor_bad_cnt = 0;
 
-    /* ---- 特征: EMA 滤波 + Δ ---- */
-    ds.sg_delta  = ds.sg_filt  - ds.sg_filt;
-    ds.cur_delta = ds.cur_filt - ds.cur_filt;
+    /* ---- 特征: EMA 滤波 + Δ(P1-6: 保存旧值再更新, Δ 才是真实帧间变化) ---- */
+    float old_sg  = ds.sg_filt;
+    float old_cur = ds.cur_filt;
     ds.sg_filt  += ((float)in->sg        - ds.sg_filt)  * 0.2f;
     ds.cur_filt += (in->current_ma       - ds.cur_filt) * 0.2f;
+    ds.sg_delta  = ds.sg_filt  - old_sg;
+    ds.cur_delta = ds.cur_filt - old_cur;
 
     /* ---- 振动滑窗: RMS + peak ---- */
     ds.vib_win[ds.vib_idx] = (rt_uint32_t)(in->vib_mg < 0 ? 0 : in->vib_mg);
     ds.vib_idx = (rt_uint8_t)((ds.vib_idx + 1) % DIAG_VIB_WIN);
     {
-        rt_uint32_t i, acc = 0, peak = 0;
+        rt_uint32_t i, peak = 0;
+        rt_uint64_t acc = 0;                 /* P1-14: 64bit 防平方溢出 */
         for (i = 0; i < DIAG_VIB_WIN; ++i)
         {
-            acc += ds.vib_win[i] * ds.vib_win[i];
+            rt_uint64_t s2 = (rt_uint64_t)ds.vib_win[i] * ds.vib_win[i];
+            acc += s2;
             if (ds.vib_win[i] > peak) peak = ds.vib_win[i];
         }
-        ds.vib_rms  = (float)d_isqrt(acc / DIAG_VIB_WIN);
+        ds.vib_rms  = (float)d_isqrt64(acc / DIAG_VIB_WIN);
         ds.vib_peak = (float)peak;
     }
 
@@ -317,11 +329,12 @@ rt_err_t diagnosis_set_mode(diag_mode_t mode)
 {
     if (mode == DIAG_MODE_ACTIVE_PROTECTION)
     {
-        /* 标定门禁: 未完成真实电机标定前禁止 soft ACTIVE_PROTECTION */
-        if (!current_adc_is_calibrated())
+        /* P1-7 标定门禁: 只有 MEASURED 来源才允许 ACTIVE_PROTECTION;
+         * 理论默认值(THEORETICAL)不得驱动保护动作 */
+        if (current_adc_cal_source() != CURRENT_ADC_CAL_MEASURED)
         {
-            rt_kprintf("[DIAG] ACTIVE REFUSED: current not calibrated"
-                       " (run zero/gain calibration first)\n");
+            rt_kprintf("[DIAG] ACTIVE REFUSED: calibration source=%d"
+                       " (need MEASURED)\n", current_adc_cal_source());
             return -RT_EPERM;
         }
         diag_reset();
@@ -335,6 +348,15 @@ rt_err_t diagnosis_set_mode(diag_mode_t mode)
 
 diag_mode_t diagnosis_get_mode(void) { return d_mode; }
 diag_verdict_t diagnosis_get_verdict(void) { return ds.verdict; }
+
+void diag_get_features(float *sg_filt, float *sg_delta,
+                       float *cur_filt, float *cur_delta)
+{
+    if (sg_filt)  *sg_filt  = ds.sg_filt;
+    if (sg_delta) *sg_delta = ds.sg_delta;
+    if (cur_filt) *cur_filt = ds.cur_filt;
+    if (cur_delta) *cur_delta = ds.cur_delta;
+}
 subsys_health_t diagnosis_get_health(void) { return d_health; }
 
 /* ---------- MSH ---------- */
@@ -443,6 +465,14 @@ static void diag_selftest(void)
     v = diagnosis_get_verdict();
     rt_kprintf("[SELFTEST-D] 3.slow-overload: %s\n", verdict_name(v));
     if (v != DIAG_LOAD_WARNING) pass = 0;
+    /* P1-6: delta 真实性 —— 刚喂入上升序列, cur_delta 必须 > 0 */
+    {
+        float sgf, sgd, cf, cd;
+        diag_get_features(&sgf, &sgd, &cf, &cd);
+        rt_kprintf("[SELFTEST-D] 3b.delta: cur_delta=%d (expect >0 after rise)\n",
+                   (int)cd);
+        if (cd <= 0) pass = 0;
+    }
 
     /* 场景4: 堵转 —— SG 崩 + 电流升, 先 SUSPECT 后 CONFIRMED(persistence) */
     diag_reset();

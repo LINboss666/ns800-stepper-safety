@@ -20,6 +20,7 @@
 #include "motor.h"
 #include "sensor_service.h"
 #include "blackbox.h"
+#include "project_config.h"
 #include "supervisor.h"
 #include "diagnosis.h"
 
@@ -61,6 +62,12 @@ void system_status(void)
                current_adc_is_calibrated() ? "YES" : "NO");
     rt_kprintf("[Flash]  %s (spi1, BUG-013 static verified)\n",
                ns_flash_ok_cached ? "OK(selftest)" : "UNTESTED-this-boot");
+    rt_kprintf("[Storage]%s (ns_params/log)\n",
+               project_config_get_health() == SUBSYS_OK ? " OK"
+               : " DEGRADED(safe defaults)");
+    rt_kprintf("[Config] %s valid=%s\n",
+               subsys_health_name(project_config_get_health()),
+               project_config_is_valid() ? "YES" : "NO");
 }
 MSH_CMD_EXPORT(system_status, print all subsystem healths and states);
 
@@ -111,9 +118,14 @@ static void runtime_selftest(void)
     else rt_kprintf("[SELFTEST] 5.sensor-valid ok (imu valid=%d adc valid=%d)\n",
                     f.valid_imu, f.valid_current);
 
-    /* 恢复: MANUAL_CLEAR → READY(白名单允许; 不重跑自检, 自检已在启动时跑过) */
+    /* P1-15: 恢复必须实际重跑 required selftest, 不允许命令直接 transition */
     if (safety_state_get() == SAFETY_MANUAL_CLEAR)
-        safety_transition(SAFETY_READY);
+    {
+        if (safety_run_selftest() == RT_EOK)
+            safety_transition(SAFETY_READY);
+        else
+            safety_force_shutdown(FAULT_SELF_TEST);
+    }
 
     motor_get_snapshot(&snap);
     rt_kprintf("[SELFTEST] %s (final state=%s motor=%d)\n",

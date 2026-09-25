@@ -24,6 +24,7 @@
 #define SENSOR_SG_DIV         10          /* SG_RESULT 10Hz 分频 */
 
 static sensor_frame_t s_frame;              /* 最新帧(临界区保护) */
+static sensor_frame_t s_prev;               /* 上一帧基(零初始化=全 valid 0, 无栈垃圾) */
 static rt_uint32_t s_seq = 0;
 static rt_thread_t s_tid = RT_NULL;
 static subsys_health_t s_health = SUBSYS_UNINIT;
@@ -38,7 +39,11 @@ static rt_uint32_t s_isqrt(rt_uint32_t n)
     return x;
 }
 
-/* 单帧采集: 每源独立 try, 失败清 valid 位, 保留上次值 */
+/* 单帧采集(Phase 7 review P0-2):
+ * 基帧 = 上一帧(显式复制, 非栈垃圾); 每源独立 try:
+ *   成功 → 更新值 + valid=1 + fresh=1
+ *   失败 → valid=0 + fresh=0(值字段保留上次成功值, 调用方看 valid)
+ * SG 10Hz 分频: 非采样帧 fresh_sg=0, valid_sg 沿用(上次成功样本仍在窗内) */
 static void s_collect(sensor_frame_t *f)
 {
     rt_int16_t mx, my, mz;
@@ -48,36 +53,39 @@ static void s_collect(sensor_frame_t *f)
     rt_base_t p;
     rt_err_t e;
 
+    *f = s_prev;                        /* 基帧: 显式上一帧(s_prev 静态零初始化, 无栈垃圾) */
     f->timestamp = rt_tick_get();
 
     /* IMU */
     if (adxl345_read_mg(&mx, &my, &mz) == RT_EOK)
     {
         f->ax = mx; f->ay = my; f->az = mz;
-        f->vib_mg = (rt_int16_t)s_isqrt((rt_uint32_t)(mx * mx + my * my + mz * mz));
-        f->valid_imu = 1;
+        f->vib_mg = (rt_int16_t)s_isqrt((rt_uint32_t)(
+            (rt_int32_t)mx * mx + (rt_int32_t)my * my + (rt_int32_t)mz * mz));
+        f->valid_imu = 1; f->fresh_imu = 1;
     }
-    else f->valid_imu = 0;              /* 保留上次值, 只清有效位 */
+    else { f->valid_imu = 0; f->fresh_imu = 0; }
 
-    /* 电流 */
-    if (current_adc_read_raw(&raw) == RT_EOK)
+    /* 电流(单次采样一次换算, 不重复推 EMA) */
+    if (current_adc_read_measurement(&raw, RT_NULL, &ma) == RT_EOK)
     {
         f->current_raw = raw;
         f->current_filtered = current_adc_get_filtered_raw();
-        if (current_adc_read_ma(&ma) == RT_EOK) f->current_ma = ma;
-        f->valid_current = 1;
+        f->current_ma = ma;
+        f->valid_current = 1; f->fresh_current = 1;
         f->current_calibrated = current_adc_is_calibrated() ? 1 : 0;
     }
-    else f->valid_current = 0;
+    else { f->valid_current = 0; f->fresh_current = 0; }
 
-    /* TMC SG_RESULT: 10Hz 分频(读失败只清位, 不置 0 冒充) */
+    /* TMC SG_RESULT: 10Hz 分频 */
     if ((s_seq % SENSOR_SG_DIV) == 0)
     {
         rt_uint16_t sg = 0;
         e = tmc2209_read_sg_result(&sg);
-        if (e == RT_EOK) { f->sg_result = sg; f->valid_sg = 1; }
-        else f->valid_sg = 0;
+        if (e == RT_EOK) { f->sg_result = sg; f->valid_sg = 1; f->fresh_sg = 1; }
+        else { f->valid_sg = 0; f->fresh_sg = 0; }
     }
+    else f->fresh_sg = 0;               /* 非采样帧: 值与 valid 沿用, fresh=0 */
 
     /* 运动快照 */
     if (motor_get_snapshot(&snap) == RT_EOK)
@@ -97,6 +105,7 @@ static void s_collect(sensor_frame_t *f)
     p = safety_pin(PIN_NAME_TMC_DIAG);
     if (p >= 0) f->tmc_diag = rt_pin_read(p) ? 1 : 0;
 
+    s_prev = *f;                        /* 成为本帧基 */
     f->seq = ++s_seq;
 }
 
@@ -108,7 +117,7 @@ static void sensor_thread_entry(void *param)
     {
         sensor_frame_t f;
 
-        s_collect(&f);
+        s_collect(&f);   /* f 由 s_collect 从 s_prev 基帧构建 */
         rt_enter_critical();
         s_frame = f;
         rt_exit_critical();
@@ -123,6 +132,7 @@ rt_err_t sensor_service_init(void)
     if (s_tid != RT_NULL) return RT_EOK;        /* 幂等 */
 
     rt_memset(&s_frame, 0, sizeof(s_frame));    /* 初值 0 + valid 全 0 = 无数据 */
+    rt_memset(&s_prev, 0, sizeof(s_prev));      /* 基帧同样显式清零 */
 
     s_tid = rt_thread_create("sensor", sensor_thread_entry, RT_NULL,
                              SENSOR_THREAD_STACK, SENSOR_THREAD_PRIO, 10);
@@ -187,3 +197,38 @@ static void sensor_snapshot(void)
                f.estop, f.limit_min, f.limit_max, f.tmc_diag);
 }
 MSH_CMD_EXPORT(sensor_snapshot, dump latest sensor frame with valid bits);
+
+/* P0-2 软件自检: 验证 s_collect 的基帧管理 ——
+ * 以 0xAB 模式注入"垃圾基帧", 采集后失败源的 valid 位必须清零
+ * (垃圾值可保留在值字段但不得被标有效), fresh 位符合采样节拍。
+ * 纯软件验证(真实源状态以当前硬件为准)。 */
+static void sensor_selftest(void)
+{
+    sensor_frame_t f;
+    int pass = 1;
+
+    rt_kprintf("[SNS-ST] inject 0xAB-pattern base frame...\n");
+    rt_memset(&f, 0xAB, sizeof(f));        /* 垃圾基帧: 值与 valid 位全 0xAB */
+    s_collect(&f);                          /* 用真实源状态采集一帧 */
+
+    /* 垃圾 valid 位(0xAB 非零)必须被真实采集结果覆盖:
+     * 不健康源 → valid=0; 健康源 → valid=1 + fresh=1 */
+    if (adxl345_get_health() != SUBSYS_OK && f.valid_imu != 0)
+    { rt_kprintf("[SNS-ST] imu valid FAIL (unhealthy but valid=%d)\n", f.valid_imu); pass = 0; }
+    if (current_adc_get_health() != SUBSYS_OK && f.valid_current != 0)
+    { rt_kprintf("[SNS-ST] adc valid FAIL\n"); pass = 0; }
+    if (tmc2209_get_health() != SUBSYS_OK && f.valid_sg != 0)
+    { rt_kprintf("[SNS-ST] sg valid FAIL\n"); pass = 0; }
+
+    /* fresh 位: IMU/电流每帧采样 → fresh 应为 1(若对应源健康) */
+    if (adxl345_get_health() == SUBSYS_OK && f.fresh_imu != 1)
+    { rt_kprintf("[SNS-ST] imu fresh FAIL\n"); pass = 0; }
+    if (current_adc_get_health() == SUBSYS_OK && f.fresh_current != 1)
+    { rt_kprintf("[SNS-ST] adc fresh FAIL\n"); pass = 0; }
+
+    rt_kprintf("[SNS-ST] frame: imu[v=%d f=%d] cur[v=%d f=%d] sg[v=%d f=%d]\n",
+               f.valid_imu, f.fresh_imu, f.valid_current, f.fresh_current,
+               f.valid_sg, f.fresh_sg);
+    rt_kprintf("[SNS-ST] %s\n", pass ? "PASS" : "FAILED");
+}
+MSH_CMD_EXPORT(sensor_selftest, verify frame base management and valid/fresh bits);

@@ -31,6 +31,7 @@ static subsys_health_t cur_health = SUBSYS_UNINIT;
 static float cur_offset_mv = 1650.0f;     /* 理论默认: 1.65V 中点 */
 static float cur_gain_v_per_a = 0.6f;     /* 理论默认: 30mΩ × 20V/V */
 static rt_bool_t cur_calibrated = RT_FALSE;
+static current_adc_cal_source_t cur_cal_source = CURRENT_ADC_CAL_NONE;
 
 /* 轻量滤波状态 */
 static rt_uint32_t cur_ema_raw = 0;
@@ -79,21 +80,21 @@ rt_err_t current_adc_init(void)
     }
     cur_enabled = RT_TRUE;
 
-    /* 已使能可读: 未标定=DEGRADED(理论换算), 已标定=OK */
-    cur_health = cur_calibrated ? SUBSYS_OK : SUBSYS_DEGRADED;
+    /* 已使能可读: MEASURED 标定=OK, 理论换算=DEGRADED */
+    cur_health = (cur_cal_source == CURRENT_ADC_CAL_MEASURED) ? SUBSYS_OK
+                                                              : SUBSYS_DEGRADED;
     return RT_EOK;
 }
 
-rt_err_t current_adc_read_raw(rt_uint32_t *raw)
+rt_err_t current_adc_read_measurement(rt_uint32_t *raw, float *mv, float *ma)
 {
     rt_uint32_t sample;
 
     if (cur_adc == RT_NULL || !cur_enabled) return -RT_ERROR;
 
-    /* 单次快读(线程 100Hz 可用); 平滑交给 EMA, 64 点均值只用于诊断命令 */
+    /* 单次快读; EMA 一帧只推一次(P1-13: raw 与换算同源) */
     sample = rt_adc_read(cur_adc, CUR_ADC_CH);
 
-    /* EMA 滤波(轻量): cur_ema = cur_ema + (sample - cur_ema) * 25% */
     if (!cur_ema_valid) { cur_ema_raw = sample; cur_ema_valid = RT_TRUE; }
     else
     {
@@ -103,41 +104,68 @@ rt_err_t current_adc_read_raw(rt_uint32_t *raw)
     }
 
     *raw = sample;
+    if (mv != RT_NULL) *mv = current_adc_raw_to_mv(sample);
+    if (ma != RT_NULL) *ma = current_adc_raw_to_ma(sample);
     return RT_EOK;
+}
+
+rt_err_t current_adc_read_raw(rt_uint32_t *raw)
+{
+    return current_adc_read_measurement(raw, RT_NULL, RT_NULL);
+}
+
+float current_adc_raw_to_mv(rt_uint32_t raw)
+{
+    return (float)raw * CUR_VREF_MV / CUR_RAW_MAX;
+}
+
+float current_adc_raw_to_ma(rt_uint32_t raw)
+{
+    return (current_adc_raw_to_mv(raw) - cur_offset_mv)
+           / cur_gain_v_per_a * 1000.0f;
 }
 
 rt_err_t current_adc_read_mv(float *mv)
 {
     rt_uint32_t raw;
-    rt_err_t e = current_adc_read_raw(&raw);
-
-    if (e != RT_EOK) return e;
-    *mv = (float)raw * CUR_VREF_MV / CUR_RAW_MAX;
-    return RT_EOK;
+    return current_adc_read_measurement(&raw, mv, RT_NULL);
 }
 
 rt_err_t current_adc_read_ma(float *ma)
 {
-    float mv;
-    rt_err_t e = current_adc_read_mv(&mv);
-
-    if (e != RT_EOK) return e;
-    *ma = (mv - cur_offset_mv) / cur_gain_v_per_a * 1000.0f;
-    return RT_EOK;
+    rt_uint32_t raw;
+    return current_adc_read_measurement(&raw, RT_NULL, ma);
 }
 
-rt_err_t current_adc_set_calibration(float offset_mv, float gain_v_per_a)
+static rt_err_t cal_apply(float offset_mv, float gain_v_per_a,
+                          current_adc_cal_source_t source)
 {
     if (gain_v_per_a <= 0.0f) return -RT_EINVAL;
 
     cur_offset_mv = offset_mv;
     cur_gain_v_per_a = gain_v_per_a;
-    cur_calibrated = RT_TRUE;
-    if (cur_enabled) cur_health = SUBSYS_OK;
+    cur_cal_source = source;
+    cur_calibrated = (source != CURRENT_ADC_CAL_NONE) ? RT_TRUE : RT_FALSE;
+    if (cur_enabled)
+        cur_health = (source == CURRENT_ADC_CAL_MEASURED) ? SUBSYS_OK
+                                                          : SUBSYS_DEGRADED;
     return RT_EOK;
 }
 
+rt_err_t current_adc_set_calibration(float offset_mv, float gain_v_per_a)
+{
+    /* 理论默认值来源: 明确标 THEORETICAL, 绝不冒充实测(P1-7) */
+    return cal_apply(offset_mv, gain_v_per_a, CURRENT_ADC_CAL_THEORETICAL);
+}
+
+rt_err_t current_adc_set_calibration_ex(float offset_mv, float gain_v_per_a,
+                                        current_adc_cal_source_t source)
+{
+    return cal_apply(offset_mv, gain_v_per_a, source);
+}
+
 rt_bool_t current_adc_is_calibrated(void) { return cur_calibrated; }
+current_adc_cal_source_t current_adc_cal_source(void) { return cur_cal_source; }
 rt_uint32_t current_adc_get_filtered_raw(void) { return cur_ema_raw; }
 subsys_health_t current_adc_get_health(void) { return cur_health; }
 
@@ -180,12 +208,12 @@ static void current_raw(void)
         rt_thread_mdelay(1);
     }
 
-    if (current_adc_read_mv(&mv) != RT_EOK || current_adc_read_ma(&ma) != RT_EOK)
+    if (current_adc_read_measurement(&raw, &mv, &ma) != RT_EOK)
     {
         rt_kprintf("[CUR] read failed\n");
         return;
     }
-    (void)cur_sample_mean(&mean, RT_NULL, RT_NULL);
+    mean = raw;
 
     rt_kprintf("[CUR] raw mean=%u min=%u max=%u ema=%u (n=%d)\n",
                mean, min, max, current_adc_get_filtered_raw(), n);
