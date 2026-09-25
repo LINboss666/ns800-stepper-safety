@@ -306,14 +306,21 @@ rt_err_t tmc2209_write_register_confirmed(rt_uint8_t addr, rt_uint8_t reg,
     rt_uint32_t before = 0, after = 0;
     rt_err_t e;
 
-    e = tmc2209_read_register(addr, TMC_REG_IFCNT, &before);
-    if (e != RT_EOK) return e;
+    /* P1-3: 整个 READ IFCNT → WRITE → READ IFCNT → CHECK 必须在同一把
+     * tmc_xfer_lock 内完成, 否则其它 writer 插入会使 IFCNT 误判。
+     * 事务边界: tmc_uart_open 之后取锁, 全部 locked helper 操作完释放。
+     * locked helper 不再自行取锁(避免嵌套)。 */
+    if (tmc_uart_open() != RT_EOK) return -RT_ERROR;
+    if (tmc_lock_ok) rt_mutex_take(&tmc_xfer_lock, RT_WAITING_FOREVER);
 
-    e = tmc_write_reg(addr, reg, value);
-    if (e != RT_EOK) { tmc_health_after_xfer(e); return e; }
+    e = tmc_read_reg_locked(addr, TMC_REG_IFCNT, &before);
+    if (e != RT_EOK) goto out;
 
-    e = tmc2209_read_register(addr, TMC_REG_IFCNT, &after);
-    if (e != RT_EOK) return e;
+    e = tmc_write_reg_locked(addr, reg, value);
+    if (e != RT_EOK) { tmc_health_after_xfer(e); goto out; }
+
+    e = tmc_read_reg_locked(addr, TMC_REG_IFCNT, &after);
+    if (e != RT_EOK) goto out;
 
     /* IFCNT 只对有效 WRITE 自增: +1 = 芯片接受了完整写帧 */
     if ((after & 0xFF) != ((before + 1) & 0xFF))
@@ -321,11 +328,16 @@ rt_err_t tmc2209_write_register_confirmed(rt_uint8_t addr, rt_uint8_t reg,
         rt_kprintf("[TMC] IFCNT mismatch (%u -> %u)\n",
                    before & 0xFF, after & 0xFF);
         tmc_health_after_xfer(-RT_EIO);      /* P1-11: 健康联动 DEGRADED */
-        return -RT_EIO;
+        e = -RT_EIO;
+        goto out;
     }
 
     tmc_health_after_xfer(RT_EOK);
-    return RT_EOK;
+    e = RT_EOK;
+
+out:
+    if (tmc_lock_ok) rt_mutex_release(&tmc_xfer_lock);
+    return e;
 }
 
 rt_err_t tmc2209_read_sg_result(rt_uint16_t *sg_result)

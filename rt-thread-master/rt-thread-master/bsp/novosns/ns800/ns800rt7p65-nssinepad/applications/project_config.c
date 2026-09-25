@@ -15,6 +15,8 @@
 static project_config_t cfg;
 static rt_bool_t cfg_valid = RT_FALSE;      /* 加载/设置是否通过校验 */
 static subsys_health_t cfg_health = SUBSYS_UNINIT;
+static struct rt_mutex cfg_lock;            /* P1-7: 原子发布/快照 */
+static rt_bool_t cfg_lock_ok = RT_FALSE;
 
 /* ---------- 默认值 ---------- */
 
@@ -93,7 +95,14 @@ static void config_apply_calibration(void)
 
 /* ---------- 正式 API (project_config.h) ---------- */
 
-const project_config_t *project_config_get(void) { return &cfg; }
+rt_err_t project_config_get_snapshot(project_config_t *out)
+{
+    if (out == RT_NULL) return -RT_EINVAL;
+    if (cfg_lock_ok) rt_mutex_take(&cfg_lock, RT_WAITING_FOREVER);
+    *out = cfg;                        /* P1-7: 原子快照 */
+    if (cfg_lock_ok) rt_mutex_release(&cfg_lock);
+    return RT_EOK;
+}
 rt_bool_t project_config_is_valid(void) { return cfg_valid; }
 subsys_health_t project_config_get_health(void)
 { return cfg_valid ? SUBSYS_OK : SUBSYS_DEGRADED; }
@@ -102,10 +111,11 @@ rt_err_t project_config_set(const project_config_t *c)
 {
     if (c == RT_NULL) return -RT_EINVAL;
     if (!config_in_range(c)) return -RT_EINVAL;
-    cfg = *c;
+    if (cfg_lock_ok) rt_mutex_take(&cfg_lock, RT_WAITING_FOREVER);
+    cfg = *c;                          /* P1-7: 整套原子发布 */
     cfg_valid = RT_TRUE;
-    if (cfg_health == SUBSYS_UNINIT) cfg_health = SUBSYS_OK;
-    else cfg_health = SUBSYS_OK;
+    cfg_health = SUBSYS_OK;
+    if (cfg_lock_ok) rt_mutex_release(&cfg_lock);
     config_apply_calibration();
     return RT_EOK;
 }
@@ -130,12 +140,14 @@ rt_err_t project_config_load(void)
     if (e != RT_EOK)
     {
         cfg_health = SUBSYS_DEGRADED;
+        config_apply_calibration();  /* P1-4: 显式回 THEORETICAL, 不残留 RAM MEASURED */
         rt_kprintf("[CFG] load failed (%d) -> safe defaults\n", e);
         return e;
     }
     if (len != sizeof(tmp))
     {
         cfg_health = SUBSYS_DEGRADED;
+        config_apply_calibration();  /* P1-4: 显式回 THEORETICAL */
         rt_kprintf("[CFG] load size mismatch (%d != %d) -> safe defaults\n",
                    (int)len, (int)sizeof(tmp));
         return -RT_EINVAL;
@@ -143,6 +155,7 @@ rt_err_t project_config_load(void)
     if (!config_in_range(&tmp))
     {
         cfg_health = SUBSYS_DEGRADED;
+        config_apply_calibration();  /* P1-4: 显式回 THEORETICAL */
         rt_kprintf("[CFG] load validation FAILED (magic/version/range) -> safe defaults\n");
         return -RT_EINVAL;
     }
@@ -204,8 +217,14 @@ MSH_CMD_EXPORT(config_load, load configuration from flash with validation);
 
 /* ---------- 初始化 ---------- */
 
-int project_config_init(void)
+rt_err_t project_config_boot(void)
 {
+    if (cfg_lock_ok) return RT_EOK;    /* P1-8: 幂等 */
+
+    if (rt_mutex_init(&cfg_lock, "cfg", RT_IPC_FLAG_PRIO) != RT_EOK)
+        return -RT_ERROR;
+    cfg_lock_ok = RT_TRUE;
+
     project_config_defaults();
     cfg_health = SUBSYS_DEGRADED;   /* 加载成功前按降级处理 */
 
@@ -214,10 +233,10 @@ int project_config_init(void)
     if (ns_storage_init() != RT_EOK)
     {
         rt_kprintf("[CFG] storage init FAILED -> safe defaults, DEGRADED\n");
+        config_apply_calibration();  /* P1-4: 显式回 THEORETICAL, 不残留 RAM MEASURED */
         return RT_EOK;
     }
 
     project_config_load();          /* 失败→默认+DEGRADED, 成功→OK */
     return RT_EOK;
 }
-INIT_APP_EXPORT(project_config_init);

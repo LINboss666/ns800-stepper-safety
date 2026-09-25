@@ -169,9 +169,9 @@ current_adc_cal_source_t current_adc_cal_source(void) { return cur_cal_source; }
 rt_uint32_t current_adc_get_filtered_raw(void) { return cur_ema_raw; }
 subsys_health_t current_adc_get_health(void) { return cur_health; }
 
-/* ---------- MSH 命令 (薄封装, current_raw 保留) ---------- */
+/* ---------- boot (P1-8: bootstrap 显式调用, 不用 INIT_APP) ---------- */
 
-static int current_adc_init_msh(void)
+rt_err_t current_adc_boot(void)
 {
     rt_err_t e = current_adc_init();
 
@@ -179,16 +179,17 @@ static int current_adc_init_msh(void)
         rt_kprintf("[CUR] init FAILED (%d), health=%s\n",
                    e, subsys_health_name(current_adc_get_health()));
     else
-        rt_kprintf("[CUR] adc0 ch15 enabled, calibrated=%s, health=%s\n",
-                   current_adc_is_calibrated() ? "YES" : "NO(theoretical only)",
+        rt_kprintf("[CUR] adc0 ch15 enabled, cal_source=%d, health=%s\n",
+                   current_adc_cal_source(),
                    subsys_health_name(current_adc_get_health()));
-    return RT_EOK;
+    return e;
 }
-INIT_APP_EXPORT(current_adc_init_msh);
+
+/* ---------- MSH 命令 (薄封装, current_raw 保留) ---------- */
 
 static void current_raw(void)
 {
-    rt_uint32_t raw, mean, min = 0xFFFFFFFF, max = 0;
+    rt_uint32_t raw, mean, sum = 0, min = 0xFFFFFFFF, max = 0;
     int i, n = CUR_SAMPLES;
     float mv, ma;
 
@@ -208,15 +209,19 @@ static void current_raw(void)
         rt_thread_mdelay(1);
     }
 
-    if (current_adc_read_measurement(&raw, &mv, &ma) != RT_EOK)
+    /* min/max: 单独 64 点诊断突发(真实统计) */
+    for (i = 0; i < n; ++i)
     {
-        rt_kprintf("[CUR] read failed\n");
-        return;
+        raw = rt_adc_read(cur_adc, CUR_ADC_CH);
+        sum += raw;
+        if (raw < min) min = raw;
+        if (raw > max) max = raw;
+        rt_thread_mdelay(1);
     }
-    mean = raw;
+    mean = sum / n;
 
-    rt_kprintf("[CUR] raw mean=%u min=%u max=%u ema=%u (n=%d)\n",
-               mean, min, max, current_adc_get_filtered_raw(), n);
+    rt_kprintf("[CUR] latest=%u burst_mean=%u min=%u max=%u ema=%u (n=%d)\n",
+               raw, mean, min, max, current_adc_get_filtered_raw(), n);
     rt_kprintf("[CUR] %s: %d.%03d mV, %d mA (health=%s)\n",
                current_adc_is_calibrated() ? "calibrated" : "theoretical",
                (int)mv, (int)(mv * 1000) % 1000, (int)ma,

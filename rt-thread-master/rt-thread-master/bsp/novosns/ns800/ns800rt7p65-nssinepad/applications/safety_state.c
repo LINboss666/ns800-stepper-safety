@@ -53,6 +53,12 @@ const char *safety_state_name(safety_state_t s)
     }
 }
 
+/* P0-1: 状态修改串行化 —— transition/force_shutdown/fault_reset 全部
+ * 经 ss_lock; FAULT_LATCHED/ESTOP 建立后普通业务 transition 无法覆盖
+ * (白名单 + 锁内重读双重防护)。ISR 不持锁(仍只 post event)。 */
+static struct rt_mutex         ss_lock;
+static rt_bool_t               ss_lock_ok = RT_FALSE;
+
 /* 转换白名单 */
 static rt_bool_t transition_allowed(safety_state_t from, safety_state_t to)
 {
@@ -81,18 +87,27 @@ static rt_bool_t transition_allowed(safety_state_t from, safety_state_t to)
 
 rt_err_t safety_transition(safety_state_t next)
 {
-    safety_state_t from = ss_state;
+    safety_state_t from;
 
-    if (from == next) return RT_EOK;
+    if (ss_lock_ok) rt_mutex_take(&ss_lock, RT_WAITING_FOREVER);
+    from = ss_state;                       /* P0-1: 锁内重读, 消除检查/写竞争 */
+
+    if (from == next)
+    {
+        if (ss_lock_ok) rt_mutex_release(&ss_lock);
+        return RT_EOK;
+    }
 
     if (!transition_allowed(from, next))
     {
         rt_kprintf("[SS] transition REFUSED: %s -> %s (not allowed)\n",
                    safety_state_name(from), safety_state_name(next));
+        if (ss_lock_ok) rt_mutex_release(&ss_lock);
         return -RT_EPERM;
     }
 
     ss_state = next;
+    if (ss_lock_ok) rt_mutex_release(&ss_lock);
     rt_kprintf("[SS] %s -> %s\n", safety_state_name(from), safety_state_name(next));
     return RT_EOK;
 }
@@ -100,6 +115,7 @@ rt_err_t safety_transition(safety_state_t next)
 /* 统一安全停机(唯一旁路): 顺序不可变 */
 void safety_force_shutdown(rt_uint32_t code)
 {
+    if (ss_lock_ok) rt_mutex_take(&ss_lock, RT_WAITING_FOREVER);
     ss_fault_code = code;
 
     /* ① 停 STEP(幂等; 含 pwm disable) */
@@ -121,6 +137,7 @@ void safety_force_shutdown(rt_uint32_t code)
 
     /* ④ 锁存(旁路转换: 安全动作不受白名单限制) */
     ss_state = SAFETY_FAULT_LATCHED;
+    if (ss_lock_ok) rt_mutex_release(&ss_lock);
     rt_kprintf("[SS] ==> FAULT_LATCHED code=%u (STEP stopped, DRV_ENABLE=LOW)\n",
                code);
 }
@@ -133,7 +150,14 @@ rt_err_t safety_post_event(rt_uint32_t event)
     return rt_event_send(&ss_event, event);
 }
 
-safety_state_t safety_state_get(void) { return ss_state; }
+safety_state_t safety_state_get(void)
+{
+    safety_state_t s;
+    if (ss_lock_ok) rt_mutex_take(&ss_lock, RT_WAITING_FOREVER);
+    s = ss_state;
+    if (ss_lock_ok) rt_mutex_release(&ss_lock);
+    return s;
+}
 
 struct rt_event *safety_event_handle(void) { return &ss_event; }
 rt_bool_t safety_events_ready(void) { return ss_inited; }
@@ -235,12 +259,15 @@ static void fault_reset(void)
     };
     int i;
     rt_bool_t active = RT_FALSE;
-    safety_state_t st = ss_state;
+    safety_state_t st;
 
+    if (ss_lock_ok) rt_mutex_take(&ss_lock, RT_WAITING_FOREVER);
+    st = ss_state;
     if (st != SAFETY_FAULT_LATCHED && st != SAFETY_ESTOP)
     {
         rt_kprintf("[SS] fault_reset: not latched (state=%s)\n",
                    safety_state_name(st));
+        if (ss_lock_ok) rt_mutex_release(&ss_lock);
         return;
     }
 
@@ -262,10 +289,16 @@ static void fault_reset(void)
                    level == src[i].safe ? "safe" : "!!ACTIVE!!");
         if (level != src[i].safe) active = RT_TRUE;
     }
-    if (active) { rt_kprintf("[SS] fault_reset REFUSED: source still active\n"); return; }
+    if (active)
+    {
+        rt_kprintf("[SS] fault_reset REFUSED: source still active\n");
+        if (ss_lock_ok) rt_mutex_release(&ss_lock);
+        return;
+    }
 
     ss_fault_code = FAULT_NONE;
     ss_state = SAFETY_MANUAL_CLEAR;
+    if (ss_lock_ok) rt_mutex_release(&ss_lock);
     rt_kprintf("[SS] ==> MANUAL_CLEAR (重跑自检进 READY 后仍需重新 arm)\n");
 }
 MSH_CMD_EXPORT(fault_reset, measure fault sources then clear latched fault);
@@ -291,10 +324,15 @@ MSH_CMD_EXPORT(ss_test, exercise shutdown-latch-measure-clear chain);
 
 /* ---------- 初始化: BOOT → INIT → 自检(自动启动) → READY/FAULT ---------- */
 
-static int safety_state_init(void)
+rt_err_t safety_state_boot(void)
 {
+    if (ss_inited) return RT_EOK;           /* P1-8: 幂等 */
+
     if (rt_event_init(&ss_event, "ss_evt", RT_IPC_FLAG_PRIO) != RT_EOK)
         return -RT_ERROR;
+    if (rt_mutex_init(&ss_lock, "ss", RT_IPC_FLAG_PRIO) != RT_EOK)
+        return -RT_ERROR;
+    ss_lock_ok = RT_TRUE;
     ss_inited = RT_TRUE;
 
     ss_state = SAFETY_INIT;
@@ -310,4 +348,3 @@ static int safety_state_init(void)
     safety_state();
     return RT_EOK;
 }
-INIT_APP_EXPORT(safety_state_init);

@@ -25,8 +25,10 @@ typedef enum
     CURRENT_ADC_CAL_MEASURED,
 } current_adc_cal_source_t;
 
-/* 幂等初始化: 查找 adc0 并使能 CH15。RT_EOK = 可读(raw 层面)。 */
+/* 幂等初始化: 查找 adc0 并使能 CH15。RT_EOK = 可读(raw 层面)。
+ * P1-8: bootstrap 显式调用, 不再用 INIT_APP。 */
 rt_err_t current_adc_init(void);
+rt_err_t current_adc_boot(void);
 
 /* 读取 CH15 原始码(12bit, 0~4095, 单次快读 + EMA 状态更新; 适合 100Hz 线程)。
  * RT_EOK 时 *raw 有效; 滤波值用 current_adc_get_filtered_raw()。 */

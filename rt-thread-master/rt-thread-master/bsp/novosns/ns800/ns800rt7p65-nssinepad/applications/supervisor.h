@@ -11,8 +11,14 @@
 
 #include <rtthread.h>
 
-/* 幂等: 注册 MSH 命令(system_status / runtime_selftest)并拉起 UI 管理线程 */
+/* P1-8: 显式业务层 bootstrap(幂等), 替代 INIT_APP 链接顺序依赖 */
+void supervisor_boot(void);
+
+/* 兼容入口(内部调 supervisor_boot) */
 int supervisor_init(void);
+
+/* 全子系统状态打印(main 与 MSH system_status 共用) */
+void system_status(void);
 
 /* 全子系统状态打印(main 与 MSH system_status 共用) */
 void system_status(void);

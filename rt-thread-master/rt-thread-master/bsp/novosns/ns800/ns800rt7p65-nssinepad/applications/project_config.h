@@ -16,15 +16,16 @@
 #include "app_health.h"
 
 #define PROJ_CFG_MAGIC     0x4E533343u      /* "NS3C" */
-#define PROJ_CFG_VERSION   0x00010001u
+#define PROJ_CFG_VERSION   0x00010002u
 
 typedef struct
 {
     rt_uint32_t magic;
     rt_uint32_t version;
-    /* 电流标定 */
+    /* 电流标定(P1-4: source 随配置持久化, MEASURED 重启后保留) */
     float cur_offset_mv;                 /* 零电流电压 mV */
     float cur_gain_v_per_a;              /* V→A 系数 */
+    rt_uint8_t cur_cal_source;           /* current_adc_cal_source_t */
     /* 速度分带边界(Hz) */
     rt_uint32_t band_hz[2];
     /* SG 阈值(每速度带; 低于 warn=负载抬升, 低于 stall=堵转特征) */
@@ -45,11 +46,11 @@ typedef struct
     rt_uint32_t post_fault_ms;
 } project_config_t;
 
-/* INIT_APP: load+校验, 非法→默认(DEGRADED); 标定合法则下发 current_adc */
-int project_config_init(void);
+/* P1-8: bootstrap 显式调用(幂等, 含 ns_storage_init 前置)。 */
+rt_err_t project_config_boot(void);
 
-/* 当前生效配置(只读指针) */
-const project_config_t *project_config_get(void);
+/* P1-7: 原子快照(Diagnosis/Blackbox 用; 不暴露可被并发修改的指针) */
+rt_err_t project_config_get_snapshot(project_config_t *out);
 
 /* 设置并校验(范围非法拒绝, 不改现有)。 */
 rt_err_t project_config_set(const project_config_t *cfg);

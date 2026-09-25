@@ -71,6 +71,9 @@ rt_err_t safety_post_event(rt_uint32_t event);
  * degraded(IMU/ADC/Flash)失败只标记降级。返回 RT_EOK = 进入 READY。 */
 rt_err_t safety_run_selftest(void);
 
+/* P1-8: bootstrap 显式调用(幂等): 事件系统 + BOOT->INIT + 启动自检 */
+rt_err_t safety_state_boot(void);
+
 /* 人工故障清除(实测故障源安全才放行; 供 MSH 与 runtime_selftest) */
 void safety_fault_reset_manual(void);
 

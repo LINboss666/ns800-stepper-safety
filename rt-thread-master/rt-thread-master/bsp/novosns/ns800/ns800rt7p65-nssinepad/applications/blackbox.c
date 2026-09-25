@@ -49,8 +49,9 @@ static bb_frame_t bb_cap[BB_CAP_FRAMES];
 typedef enum { BB_IDLE = 0, BB_POST_COLLECT, BB_WRITING } bb_state_t;
 
 static volatile bb_state_t bb_state = BB_IDLE;
-static volatile rt_uint32_t bb_trig_code = 0;
-static volatile rt_bool_t bb_trig_flag = RT_FALSE;
+static volatile rt_uint32_t bb_pending_code = 0;
+static volatile rt_bool_t bb_pending_flag = RT_FALSE;
+static rt_uint32_t bb_session_fault_code = 0;   /* P1-2: 会话锁存故障码 */
 static rt_uint16_t bb_ring_idx = 0;
 static rt_uint16_t bb_ring_count = 0;       /* 开机以来实际喂入的帧数 */
 static rt_uint16_t bb_post_idx = 0;         /* 捕获区写游标(pre+post) */
@@ -90,7 +91,7 @@ static void bb_sample(bb_frame_t *f)
     f->valid_current= s.valid_current;
     f->valid_sg     = s.valid_sg;
     f->valid_safety = s.valid_safety;
-    f->fault_code   = (bb_state == BB_POST_COLLECT) ? bb_trig_code : 0;
+    f->fault_code   = (bb_state == BB_POST_COLLECT) ? bb_session_fault_code : 0;
     f->seq          = s.seq;
 }
 
@@ -137,16 +138,18 @@ static void blackbox_entry(void *param)
 
     while (1)
     {
-        /* ---- 0. 生效窗口同步(config → 夹取到容量) ---- */
-        {
-            const project_config_t *c = project_config_get();
-            bb_pre_eff  = c->pre_fault_ms  / 10;
-            bb_post_eff = c->post_fault_ms / 10;
-            if (bb_pre_eff  < 1) bb_pre_eff  = 1;
-            if (bb_pre_eff  > BB_PRE_FRAMES)  bb_pre_eff  = BB_PRE_FRAMES;
-            if (bb_post_eff < 1) bb_post_eff = 1;
-            if (bb_post_eff > BB_POST_FRAMES) bb_post_eff = BB_POST_FRAMES;
-        }
+        /* ---- 0. 生效窗口同步(config 快照 → 夹取到容量) ---- */
+        project_config_t cs;
+        const project_config_t *c = &cs;
+
+        if (project_config_get_snapshot(&cs) != RT_EOK)
+            project_config_defaults();          /* 拿不到快照(不应发生)→默认窗口 */
+        bb_pre_eff  = c->pre_fault_ms  / 10;
+        bb_post_eff = c->post_fault_ms / 10;
+        if (bb_pre_eff  < 1) bb_pre_eff  = 1;
+        if (bb_pre_eff  > BB_PRE_FRAMES)  bb_pre_eff  = BB_PRE_FRAMES;
+        if (bb_post_eff < 1) bb_post_eff = 1;
+        if (bb_post_eff > BB_POST_FRAMES) bb_post_eff = BB_POST_FRAMES;
 
         /* ---- 1. 采样入 pre 环(常态) ---- */
         rt_memset(&f, 0, sizeof(f));
@@ -159,7 +162,7 @@ static void blackbox_entry(void *param)
         }
 
         /* ---- 2. 触发(策略: 捕获/写盘中忽略新触发, 首个故障优先) ---- */
-        if (bb_trig_flag)
+        if (bb_pending_flag)
         {
             if (bb_state == BB_IDLE)
             {
@@ -169,19 +172,20 @@ static void blackbox_entry(void *param)
                 for (i = 0; i < pre_n; ++i)
                     bb_cap[i] = bb_ring[(bb_ring_idx + BB_PRE_FRAMES - pre_n + i)
                                         % BB_PRE_FRAMES];
+                bb_session_fault_code = bb_pending_code;  /* 锁存本会话故障码 */
                 bb_last_pre_n = pre_n;
                 bb_post_idx = pre_n;            /* post 帧接在 pre 段之后 */
                 bb_state = BB_POST_COLLECT;
                 rt_kprintf("[BB] trigger code=%u session=%u pre_n=%u\n",
-                           bb_trig_code, bb_session, pre_n);
+                           bb_session_fault_code, bb_session, pre_n);
             }
             else
             {
-                bb_trig_dropped++;
+                bb_trig_dropped++;              /* busy: 只丢弃, 不改 session code */
                 rt_kprintf("[BB] trigger DROPPED (busy, dropped=%u)\n",
                            bb_trig_dropped);
             }
-            bb_trig_flag = RT_FALSE;    /* 无论接受与否都消费标志 */
+            bb_pending_flag = RT_FALSE;         /* 无论接受与否都消费标志 */
         }
 
         /* ---- 3. post 收集(接在捕获区 pre_n 之后) ---- */
@@ -236,8 +240,10 @@ static void blackbox_entry(void *param)
 
 void blackbox_trigger(rt_uint32_t fault_code)
 {
-    bb_trig_code = fault_code;
-    bb_trig_flag = RT_TRUE;                     /* O(1), 无阻塞 */
+    rt_base_t level = rt_hw_interrupt_disable();  /* P1-2: flag+code 对的最小临界 */
+    bb_pending_code = fault_code;
+    bb_pending_flag = RT_TRUE;
+    rt_hw_interrupt_enable(level);
 }
 
 rt_err_t blackbox_init(void)
@@ -329,9 +335,12 @@ static void blackbox_selftest(void)
     before = st0.valid_records;
     sess0 = bb_session;
 
-    rt_kprintf("[BB-ST] trigger (fault=SOFT), waiting for session %u...\n",
+    rt_kprintf("[BB-ST] trigger A (fault=SOFT), waiting for session %u...\n",
                sess0 + 1);
     blackbox_trigger(FAULT_SOFT);
+    /* P1-2: busy 期间触发 B —— 应被丢弃, 不污染 session fault code */
+    rt_thread_mdelay(10);
+    blackbox_trigger(FAULT_LIMIT_MIN);
 
     /* 竞态修复: 等 session 递增且状态回到 IDLE(写完), 最多 20s */
     for (wait = 0; wait < 2000; ++wait)
@@ -349,21 +358,22 @@ static void blackbox_selftest(void)
     rt_kprintf("[BB-ST] valid records: %u -> %u\n", before, after);
     if (after <= before) { rt_kprintf("[BB-ST] FAIL: no new records\n"); return; }
 
-    /* 回读本 session 最新一条, 核对 event == 触发码(FAULT_SOFT=9) */
-    for (i = 0; i < st1.used_slots && !found; ++i)
+    /* 回读本 session 全部记录: 核对 event 全 == 触发码 A(FAULT_SOFT=9),
+     * 并验证 busy 期间的 B 触发(FAULT_LIMIT_MIN)只被丢弃不污染 */
+    rt_uint32_t checked = 0, bad = 0;
+    for (i = 0; i < st1.used_slots; ++i)
     {
         rt_uint32_t slot = (st1.used_slots - 1 - i) % NS_LOG_SLOTS;
         if (ns_log_read_slot(slot, &s, &seq) != RT_EOK) continue;
-        if (s.session_id == bb_session)
-        {
-            found = 1;
+        if (s.session_id != bb_session) continue;
+        found = 1; checked++;
+        if (s.event != FAULT_SOFT) bad++;
+        if (checked <= 2)
             rt_kprintf("[BB-ST] readback ses=%u ev=%u valid=%02X flags=%08X\n",
                        s.session_id, s.event, s.valid, s.flags);
-            if (s.event != FAULT_SOFT)
-            { rt_kprintf("[BB-ST] FAIL: event mismatch\n"); pass = 0; }
-        }
     }
     if (!found) { rt_kprintf("[BB-ST] FAIL: session records not found\n"); pass = 0; }
+    else if (bad) { rt_kprintf("[BB-ST] FAIL: %u records polluted\n", bad); pass = 0; }
 
     rt_kprintf("[BB-ST] %s\n", pass ? "PASS (software+flash path)" : "FAILED");
 }

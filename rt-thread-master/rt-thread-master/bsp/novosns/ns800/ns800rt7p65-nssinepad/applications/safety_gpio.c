@@ -26,8 +26,6 @@ struct safety_pin
 
 static struct safety_pin safety_pins[] =
 {
-    /* BUG-009: 实测与未知驱动源争抢(写低时网络 2.37V), 暂改 Hi-Z 避免持续
-     * 对灌电流; 使能状态视为不可信(pwm 联锁已拒真)。待 FAE/换脚后恢复输出 */
     { PIN_NAME_DRV_ENABLE, -1, PIN_MODE_OUTPUT,  PIN_LOW,  "MCU_DRV_ENABLE(J4-21, default LOW!)" },
     { PIN_NAME_TMC_DIR,    -1, PIN_MODE_OUTPUT, PIN_LOW,  "TMC_DIR" },
     { PIN_NAME_TMC_DIAG,   -1, PIN_MODE_INPUT,  0,        "TMC_DIAG" },
@@ -86,7 +84,7 @@ static rt_err_t safety_gpio_setup(void)
     return e;
 }
 
-static int safety_gpio_init(void)
+rt_err_t safety_gpio_boot(void)
 {
     rt_err_t e = safety_gpio_setup();
 
@@ -97,7 +95,6 @@ static int safety_gpio_init(void)
 
     return RT_EOK;  /* 初始化失败不阻塞系统, 安全态已兜底 */
 }
-INIT_APP_EXPORT(safety_gpio_init);
 
 static void pin_status(void)
 {

@@ -30,6 +30,11 @@ rt_err_t safety_irq_attach(void);
 /* 门控状态查询(已注册=1) */
 rt_bool_t safety_irq_attached(void);
 
+/* P0-2: Safety 保护就绪(电机 arm 前置门禁之一):
+ * IRQ gate OPEN + 极性已真机验证 + 四路输入可解析且当前全部处于安全电平。
+ * 极性验证标志默认 FALSE(HARDWARE-PENDING), 由真机极性验证流程置位。 */
+rt_bool_t safety_protection_ready(void);
+
 subsys_health_t safety_thread_get_health(void);
 
 #endif /* SAFETY_THREAD_H */

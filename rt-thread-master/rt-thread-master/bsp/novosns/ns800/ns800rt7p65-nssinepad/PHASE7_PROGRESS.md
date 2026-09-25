@@ -195,3 +195,42 @@
 - project_board.h LIMIT_MIN 注释 J4-25→J4-19（GPIO25→GPIO24 同步修正）✅
 - system_status 增补 Storage/Config 行（Safety/Motor/Sensor/TMC/IMU/ADC/
   Storage/Config/Diagnosis/Blackbox/Flash 全覆盖）✅
+
+---
+
+## Phase 7 独立审查修复轮 2（GPT review @6b220f9 → 本轮修复）
+
+### P0
+1. **Safety state 并发**：ss_lock 互斥覆盖 transition/force_shutdown/fault_reset/
+   state_get；锁内重读消除检查/写竞争；FAULT_LATCHED/ESTOP 建立后业务
+   transition 无法覆盖(白名单+锁双重)；runtime_selftest 3b 验证。
+2. **motor arm 保护前置**：safety_protection_ready()(IRQ gate OPEN + 极性
+   验证标志 + 四路可解析且全处安全电平)；motor_arm 第 4 门禁；
+   safety_polarity_confirm 命令供真机极性验证后人工置位(默认 FALSE)。
+
+### P1
+1. IRQ attach 事务化：任一步失败回滚全部已 enable/detach，gate 保持 CLOSED；
+   四路极性配置表(placeholder rising, HARDWARE-PENDING)。
+2. blackbox first-fault-wins：pending_code/flag 与 session_fault_code 分离；
+   busy 期间触发只 dropped 计数绝不污染 session；flag+code 用
+   rt_hw_interrupt_disable 最小临界；blackbox_selftest 注入 A+B 双触发验证。
+3. TMC confirmed write 原子事务：READ IFCNT+WRITE+READ IFCNT+CHECK 整体
+   持 tmc_xfer_lock(locked helper 避免嵌套)；事务边界注释。
+4. 标定来源持久化：config v2(0x00010002) 加 cur_cal_source 字段；
+   load 校验+defaults=THEORETICAL；load 失败显式回 THEORETICAL 不残留
+   RAM MEASURED；config_show/system_status 打印 source。
+5. Diagnosis 帧去重：d_last_seq 同帧跳过(persistence/hysteresis 不重复计数)；
+   diag_input_t 加 seq；selftest 场景 4c 同 seq 100 次不 CONFIRMED。
+6. delta selftest 改单步：稳定基线→单帧 step→立即验符号(非收敛后检查)。
+7. project_config 互斥+原子快照 get_snapshot；Diagnosis/Blackbox 用快照；
+   set 整套原子发布；移除暴露的内部指针 get()。
+8. 显式 bootstrap：supervisor_boot 十一阶段序列(幂等)，业务模块全部去
+   INIT_APP 依赖。
+
+### P2
+1. project_board.h LIMIT_MIN=J4-19 行内注释修正。
+2. valid_safety=四路全部成功解析/read 才置 1。
+3. current ADC 状态输出 NONE/THEORETICAL/MEASURED 三态。
+4. current_raw 输出改 latest/burst_mean/min/max/ema(不再假标 mean)。
+5. system_status 补全 Diag/Blackbox/Storage/Config/ADC cal source。
+6. Safety handler 去重复 motor_emergency_stop(force_shutdown 统一路径)。

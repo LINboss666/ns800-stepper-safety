@@ -95,15 +95,19 @@ static void s_collect(sensor_frame_t *f)
         f->dir = snap.dir;
     }
 
-    /* 安全输入直读(电平语义待接线冻结, 只报原始值) */
-    p = safety_pin(PIN_NAME_ESTOP);
-    if (p >= 0) { f->estop = rt_pin_read(p) ? 1 : 0; f->valid_safety = 1; }
-    p = safety_pin(PIN_NAME_LIMIT_MIN);
-    if (p >= 0) f->limit_min = rt_pin_read(p) ? 1 : 0;
-    p = safety_pin(PIN_NAME_LIMIT_MAX);
-    if (p >= 0) f->limit_max = rt_pin_read(p) ? 1 : 0;
-    p = safety_pin(PIN_NAME_TMC_DIAG);
-    if (p >= 0) f->tmc_diag = rt_pin_read(p) ? 1 : 0;
+    /* P2-2: 安全输入直读 —— 四路全部成功解析/read 才置 valid_safety=1 */
+    {
+        rt_base_t pe = safety_pin(PIN_NAME_ESTOP);
+        rt_base_t pn = safety_pin(PIN_NAME_LIMIT_MIN);
+        rt_base_t px = safety_pin(PIN_NAME_LIMIT_MAX);
+        rt_base_t pd = safety_pin(PIN_NAME_TMC_DIAG);
+
+        if (pe >= 0) { f->estop = rt_pin_read(pe) ? 1 : 0; }
+        if (pn >= 0) { f->limit_min = rt_pin_read(pn) ? 1 : 0; }
+        if (px >= 0) { f->limit_max = rt_pin_read(px) ? 1 : 0; }
+        if (pd >= 0) { f->tmc_diag = rt_pin_read(pd) ? 1 : 0; }
+        f->valid_safety = (pe >= 0 && pn >= 0 && px >= 0 && pd >= 0) ? 1 : 0;
+    }
 
     s_prev = *f;                        /* 成为本帧基 */
     f->seq = ++s_seq;

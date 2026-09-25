@@ -50,7 +50,9 @@ static diag_thresholds_t dt;
 
 static void diag_sync_config(void)
 {
-    const project_config_t *c = project_config_get();
+    project_config_t cs;
+    if (project_config_get_snapshot(&cs) != RT_EOK) return;
+    const project_config_t *c = &cs;
 
     dt.band_hz[0] = c->band_hz[0];  dt.band_hz[1] = c->band_hz[1];
     rt_memcpy(dt.sg_warn,  c->sg_warn,  sizeof(dt.sg_warn));
@@ -84,6 +86,7 @@ typedef struct
 } diag_state_t;
 
 static diag_state_t ds;
+static rt_uint32_t d_last_seq = 0;    /* P1-5: 上一已消费源帧序号 */
 static diag_mode_t d_mode = DIAG_MODE_MONITOR_ONLY;
 static rt_bool_t d_severe_latched = RT_FALSE;   /* severe 事件只发上升沿 */
 static rt_thread_t d_tid = RT_NULL;
@@ -132,6 +135,7 @@ static const char *verdict_name(diag_verdict_t v)
 void diag_reset(void)
 {
     rt_memset(&ds, 0, sizeof(ds));
+    d_last_seq = 0;
     ds.speed_band = -1;
     ds.verdict = DIAG_NORMAL;
     d_severe_latched = RT_FALSE;
@@ -291,6 +295,9 @@ static void diag_thread_entry(void *param)
         diag_sync_config();              /* 阈值跟随持久化配置(每帧同步) */
         if (sensor_service_get_latest(&f) == RT_EOK && f.seq != 0)
         {
+            if (f.seq == d_last_seq) continue;   /* P1-5: 同帧不重复计数 */
+            d_last_seq = f.seq;
+            in.seq         = f.seq;
             in.timestamp   = f.timestamp;
             in.sg_valid    = f.valid_sg;
             in.sg          = f.sg_result;
@@ -400,10 +407,12 @@ MSH_CMD_EXPORT(diag_mode, switch diagnosis mode: diag_mode monitor|active);
 
 /* ---------- diag_selftest: 确定性合成输入(非硬件验证) ---------- */
 
+static rt_uint32_t s_feed_seq = 0;
 static void s_feed(rt_uint16_t sg, float ma, rt_int16_t vib,
                    rt_uint8_t mstate, rt_uint32_t hz)
 {
     diag_input_t in;
+    in.seq = ++s_feed_seq;
     in.timestamp = 0;
     in.sg_valid = 1; in.sg = sg;
     in.cur_valid = 1; in.current_ma = ma;
@@ -415,6 +424,7 @@ static void s_feed(rt_uint16_t sg, float ma, rt_int16_t vib,
 static void s_feed_missing(void)
 {
     diag_input_t in;
+    in.seq = ++s_feed_seq;
     in.timestamp = 0;
     in.sg_valid = 0; in.sg = 0;
     in.cur_valid = 0; in.current_ma = 0;
@@ -491,6 +501,22 @@ static void diag_selftest(void)
     v = diagnosis_get_verdict();
     rt_kprintf("[SELFTEST-D] 4b.hysteresis-hold: %s\n", verdict_name(v));
     if (v == DIAG_NORMAL) { rt_kprintf("[SELFTEST-D] 4b FAIL\n"); pass = 0; }
+
+    /* 场景4c: 同帧 dedup —— 相同 seq 重复喂, persistence 不得累计 */
+    diag_reset();
+    for (i = 0; i < 60; ++i) s_feed(500, 150.0f, 1000, (int)MOTOR_CRUISE, 500);
+    {
+        diag_input_t dup;
+        dup.seq = 777; dup.timestamp = 0;
+        dup.sg_valid = 1; dup.sg = 20;              /* stall 特征 */
+        dup.cur_valid = 1; dup.current_ma = 900.0f;
+        dup.imu_valid = 1; dup.vib_mg = 1000;
+        dup.motor_state = (rt_uint8_t)MOTOR_CRUISE; dup.step_hz = 500;
+        for (i = 0; i < 100; ++i) diag_step(&dup);   /* 同一 seq 喂 100 次 */
+    }
+    v = diagnosis_get_verdict();
+    rt_kprintf("[SELFTEST-D] 4c.dedup: %s (expect not CONFIRMED)\n", verdict_name(v));
+    if (v == DIAG_STALL_CONFIRMED) pass = 0;
 
     /* 场景5: sensor missing —— 不当 0, 持续后 SENSOR_FAULT */
     diag_reset();

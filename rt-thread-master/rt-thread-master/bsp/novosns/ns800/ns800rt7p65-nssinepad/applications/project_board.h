@@ -21,7 +21,7 @@
 /* STEP = PA0 / EPWM1_A (J4-18), PA1 reserved EPWM1_B - never reuse PA1 */
 
 /* ===== Safety inputs ===== */
-#define PIN_NAME_LIMIT_MIN      "PF.14"  /* J4-25  GPIO25 min limit IRQ (EXTI14) */
+#define PIN_NAME_LIMIT_MIN      "PF.14"  /* J4-19  GPIO24 min limit IRQ (EXTI14) */
 #define PIN_NAME_LIMIT_MAX      "PF.15"  /* J4-25  GPIO25 max limit IRQ (EXTI15) */
 #define PIN_NAME_ESTOP          "PC.6"   /* J4-40  GPIO70 e-stop sense IRQ (EXTI6) */
 

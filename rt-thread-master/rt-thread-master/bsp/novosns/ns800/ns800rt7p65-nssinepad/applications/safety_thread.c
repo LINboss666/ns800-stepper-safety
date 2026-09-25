@@ -34,6 +34,9 @@ static rt_uint8_t safety_stack[SAFETY_THREAD_STACK];
 static rt_bool_t st_thread_up = RT_FALSE;
 static subsys_health_t st_health = SUBSYS_UNINIT;
 static rt_bool_t st_irq_attached = RT_FALSE;
+/* P0-2: 输入极性/接线验证标志 —— 默认 FALSE(HARDWARE-PENDING)。
+ * 真机完成 NC 极性验证后由 safety_polarity_confirm 命令置位(内存态)。 */
+static rt_bool_t st_polarity_validated = RT_FALSE;
 
 /* ---------- ISR 回调: 只置事件(§14.3 纪律) ---------- */
 static void estop_isr(void *args)     { rt_uint32_t e = EVT_ESTOP;     (void)args; safety_post_event(e); }
@@ -170,4 +173,32 @@ rt_err_t safety_irq_attach(void)
 }
 
 rt_bool_t safety_irq_attached(void) { return st_irq_attached; }
+
+rt_bool_t safety_protection_ready(void)
+{
+    struct { const char *name; } inputs[] = {
+        { PIN_NAME_ESTOP }, { PIN_NAME_LIMIT_MIN },
+        { PIN_NAME_LIMIT_MAX }, { PIN_NAME_TMC_DIAG },
+    };
+    int i;
+
+    if (!st_irq_attached || !st_polarity_validated) return RT_FALSE;
+    if (!safety_gpio_ready()) return RT_FALSE;
+
+    /* 四路可解析且当前全部处于安全电平(0, NC+上拉方案) */
+    for (i = 0; i < (int)(sizeof(inputs) / sizeof(inputs[0])); ++i)
+    {
+        rt_base_t pin = safety_pin(inputs[i].name);
+        if (pin < 0 || rt_pin_read(pin) != PIN_LOW) return RT_FALSE;
+    }
+    return RT_TRUE;
+}
+
+/* 真机极性验证完成后的人工确认命令(硬件 pending, 默认不调用) */
+static void safety_polarity_confirm(void)
+{
+    st_polarity_validated = RT_TRUE;
+    rt_kprintf("[SAFETY] input polarity MARKED VALIDATED (operator confirm)\n");
+}
+MSH_CMD_EXPORT(safety_polarity_confirm, mark input polarity as hardware-validated);
 subsys_health_t safety_thread_get_health(void) { return st_health; }

@@ -47,6 +47,7 @@ typedef enum
 /* 引擎单步输入(由 sensor_frame 提取; selftest 可注入合成值) */
 typedef struct
 {
+    rt_uint32_t seq;            /* 源帧序号(P1-5 dedup 用) */
     rt_uint32_t timestamp;
     rt_uint8_t  sg_valid;       rt_uint16_t sg;          /* 0~1023 */
     rt_uint8_t  cur_valid;      float current_ma;        /* mA */
