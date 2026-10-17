@@ -106,7 +106,8 @@ void system_status(void)
     rt_kprintf("[Sensor] thread=%s\n",
                subsys_health_name(sensor_service_get_health()));
 
-    rt_kprintf("[TMC]    %s\n", subsys_health_name(tmc2209_get_health()));
+    rt_kprintf("[TMC]    %s drive_cfg=%s\n", subsys_health_name(tmc2209_get_health()),
+               tmc_drv_cfg_state_name(tmc2209_get_config_state()));
     rt_kprintf("[IMU]    %s\n", subsys_health_name(adxl345_get_health()));
     rt_kprintf("[ADC]    %s cal=%s\n",
                subsys_health_name(current_adc_get_health()),
@@ -231,7 +232,8 @@ static void runtime_selftest(void)
      *    FALSE)。四门无条件求值, 所以掩码必须显示第 4 门确实参与判定。 */
     gates = motor_get_gate_fail_mask();
     rt_kprintf("[SELFTEST] 2.arm gate fail mask=0x%X"
-               " (bit0 enable-path bit1 READY bit2 health bit3 protection)\n", gates);
+               " (bit0 enable-path bit1 READY bit2 health bit3 protection"
+               " bit4 drive-config)\n", gates);
     if (!(gates & MOT_GATE_ENABLE_PATH))
     { rt_kprintf("[SELFTEST] 2a.enable-path gate unexpectedly OPEN\n"); pass = 0; }
     else

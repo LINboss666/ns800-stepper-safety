@@ -41,6 +41,7 @@
 #include "safety_state.h"
 #include "safety_thread.h"
 #include "step_pwm.h"
+#include "tmc2209.h"
 
 #define MOTOR_PWM_DEV       EPWM_STEP_DEV_NAME   /* "epwm1" */
 #define MOTOR_PWM_CH        0                    /* EPWMX_A = PA0 */
@@ -223,6 +224,11 @@ rt_uint32_t motor_get_gate_fail_mask(void)
     if (safety_state_get() != SAFETY_READY)           bad |= MOT_GATE_NOT_READY;
     if (mot.health == SUBSYS_FAILED || !mot_dev_ok)   bad |= MOT_GATE_UNHEALTHY;
     if (!safety_protection_ready())                   bad |= MOT_GATE_NOT_PROTECTED;
+    /* Phase 8-F2 第 5 门: TMC2209 驱动参数未下发(或下发失败)时禁止使能。
+     * 复位默认下 IHOLD_IRUN 没有可用的运转电流档位, 芯片实际电流状态未知;
+     * 在"未知电流 + 安全链未验收"的板子上通电属危险动作 → 必须 CONFIGURED。 */
+    if (tmc2209_get_config_state() != TMC_DRV_CONFIGURED)
+        bad |= MOT_GATE_NO_DRV_CONFIG;
 
     return bad;
 }
@@ -234,11 +240,14 @@ static void mot_print_gate_fail(rt_uint32_t bad)
     if (bad & MOT_GATE_NOT_READY)     rt_kprintf(" safety-not-READY");
     if (bad & MOT_GATE_UNHEALTHY)     rt_kprintf(" subsystem-unhealthy");
     if (bad & MOT_GATE_NOT_PROTECTED) rt_kprintf(" protection-not-ready");
+    if (bad & MOT_GATE_NO_DRV_CONFIG) rt_kprintf(" drive-config-not-applied");
     rt_kprintf("\n");
     rt_kprintf("[MOT] gate4 detail: irq_gate=%s polarity=%s gpio_ready=%s\n",
                safety_irq_attached() ? "OPEN" : "CLOSED",
                safety_polarity_validated() ? "CONFIRMED" : "not-confirmed",
                safety_gpio_ready() ? "YES" : "NO");
+    rt_kprintf("[MOT] gate5 detail: tmc_drive_cfg=%s\n",
+               tmc_drv_cfg_state_name(tmc2209_get_config_state()));
 }
 
 /* ---------- 正式 API (motor.h) ---------- */

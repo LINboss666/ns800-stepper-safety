@@ -33,6 +33,7 @@
 #define MOT_GATE_NOT_READY     (1u << 1)   /* 安全状态机不在 READY */
 #define MOT_GATE_UNHEALTHY     (1u << 2)   /* 本子系统不健康/无 PWM 设备 */
 #define MOT_GATE_NOT_PROTECTED (1u << 3)   /* Fix A: Safety 保护链未就绪 */
+#define MOT_GATE_NO_DRV_CONFIG (1u << 4)   /* Phase 8-F2: TMC 驱动参数未下发/下发失败 */
 
 typedef enum
 {
@@ -60,14 +61,16 @@ typedef struct
  * DRV_ENABLE 写 LOW 并回读确认(确认失败 → health=FAILED, 返回错误)。 */
 rt_err_t motor_init(void);
 
-/* 申请使能。门禁(四项全部满足才放行, Fix A):
+/* 申请使能。门禁(五项全部满足才放行):
  *   1. MOTOR_HARDWARE_ENABLE_PATH_VALIDATED == RT_TRUE   (硬件链验收)
  *   2. safety 状态机处于 READY                            (状态机放行)
  *   3. 本子系统健康且 PWM 设备可用                        (软件健康)
  *   4. safety_protection_ready() == TRUE                  (IRQ 门 OPEN +
  *      极性操作员 CONFIRM + 四路输入实测安全电平)
- * 四项全部无条件求值(均为无副作用只读), 拒绝原因以位掩码保留, 便于真机确认
- * 第 4 门确实参与判定。 */
+ *   5. TMC2209 驱动参数已 CONFIGURED                      (Phase 8-F2: 电流档位
+ *      未知/未下发时不得使能; apply 失败即长期占住此门)
+ * 五项全部无条件求值(均为无副作用只读), 拒绝原因以位掩码保留, 便于真机确认
+ * 第 4、5 门确实参与判定。 */
 rt_err_t motor_arm(void);
 
 /* 解除使能: 停脉冲 + DRV_ENABLE 写 LOW 并回读确认 + 回 IDLE(不经 DECEL)。
@@ -102,8 +105,8 @@ subsys_health_t motor_get_health(void);
 
 /* ---------- Fix A: 门禁可观测性 + EPWM 所有权借用门 ---------- */
 
-/* 只读计算四门当前状态: 返回"失败门"位掩码(0 = 全通, 允许 arm)。
- * 无副作用, 供 runtime_selftest/MSH 证明第 4 门确实参与判定。 */
+/* 只读计算五门当前状态: 返回"失败门"位掩码(0 = 全通, 允许 arm)。
+ * 无副作用, 供 runtime_selftest/MSH 证明第 4、5 门确实参与判定。 */
 rt_uint32_t motor_get_gate_fail_mask(void);
 
 /* 诊断命令(pwm_test)借用 EPWM1 ch0 的许可门: 全部满足才返回 RT_EOK 并打印
