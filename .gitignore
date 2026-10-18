@@ -1,0 +1,38 @@
+# ===== 默认全部忽略，白名单放行（106个BSP占1.3G，只跟踪本项目需要的部分）=====
+/*
+!/rt-thread-master
+/rt-thread-master/*
+!/rt-thread-master/rt-thread-master
+
+# --- RT-Thread 内核与公共组件 ---
+/rt-thread-master/rt-thread-master/*
+!/rt-thread-master/rt-thread-master/bsp
+/rt-thread-master/rt-thread-master/bsp/*
+!/rt-thread-master/rt-thread-master/bsp/novosns
+!/rt-thread-master/rt-thread-master/src
+!/rt-thread-master/rt-thread-master/libcpu
+!/rt-thread-master/rt-thread-master/include
+!/rt-thread-master/rt-thread-master/components
+!/rt-thread-master/rt-thread-master/tools
+!/rt-thread-master/rt-thread-master/Kconfig
+!/rt-thread-master/rt-thread-master/Kconfig.full
+!/rt-thread-master/rt-thread-master/Kconfig.short
+!/rt-thread-master/rt-thread-master/SConstruct
+!/rt-thread-master/rt-thread-master/SConscript
+!/rt-thread-master/rt-thread-master/README.md
+!/rt-thread-master/rt-thread-master/ChangeLog.md
+
+# ===== 构建产物与本地文件（全局）=====
+__pycache__/
+*.pyc
+build/
+*.uvguix.*
+.config.old
+*.log
+
+# ===== 窄例外（Phase 8-F2d-R3, 用户任务书要求的 GitHub 交付）=====
+# 只放行: 本忽略文件自身(让忽略策略可被审查) + 手写主机验证源码 + 轻量审查文本。
+# 其余"默认全忽略"与构建产物/隐私禁令原样保留, 不放开 build/ 与日志目录。
+!/.gitignore
+!/tests/
+!/reports/

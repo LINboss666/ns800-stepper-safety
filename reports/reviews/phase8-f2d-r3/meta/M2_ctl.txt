@@ -1,0 +1,44 @@
+# 元负例子链 M2_ctl
+## verdict_matrix
+OK | N1_only_V1_injected_fail | rc 真实=1 自报=1 期望=1 | V1=RAN/0/1 V2=RAN/0/0 (期望 V1=RAN/0/1 V2=RAN/0/0)
+OK | N2_only_V2_injected_fail | rc 真实=1 自报=1 期望=1 | V1=RAN/0/0 V2=RAN/0/1 (期望 V1=RAN/0/0 V2=RAN/0/1)
+OK | N3_V1_stale_exe_not_reused | rc 真实=1 自报=1 期望=1 | V1=COMPILE_FAILED/1/127 V2=RAN/0/0 (期望 V1=COMPILE_FAILED/1/127 V2=RAN/0/0)
+OK | N4_fw_calc_selftest_FAILED | rc 真实=2 自报=2 期望=2 | V1=RAN/0/2 V2=RAN/0/2 (期望 V1=RAN/0/2 V2=RAN/0/2)
+OK | N5_fw_cfg_selftest_INCOMPLETE | rc 真实=2 自报=2 期望=2 | V1=RAN/0/2 V2=RAN/0/0 (期望 V1=RAN/0/2 V2=RAN/0/0)
+OK | N6_helper_thread_create_fail | rc 真实=3 自报=3 期望=3 | V1=RAN/0/3 V2=RAN/0/3 (期望 V1=RAN/0/3 V2=RAN/0/3)
+OK | N7_helper_thread_startup_fail | rc 真实=3 自报=3 期望=3 | V1=RAN/0/3 V2=RAN/0/3 (期望 V1=RAN/0/3 V2=RAN/0/3)
+OK | N8_gstat_expect_table_tamper | rc 真实=1 自报=1 期望=1 | V1=RAN/0/1 V2=RAN/0/0 (期望 V1=RAN/0/1 V2=RAN/0/0)
+OK | N9_probe_writeback_V1 | rc 真实=1 自报=1 期望=1 | V1=RAN/0/1 V2=NOT_RUN/NOT_RUN/NOT_RUN (期望 V1=RAN/0/1 V2=NOT_RUN/NOT_RUN/NOT_RUN)
+OK | N10_probe_writeback_V2 | rc 真实=1 自报=1 期望=1 | V1=NOT_RUN/NOT_RUN/NOT_RUN V2=RAN/0/1 (期望 V1=NOT_RUN/NOT_RUN/NOT_RUN V2=RAN/0/1)
+OK | N10b_writeback_both_variants | rc 真实=1 自报=1 期望=1 | V1=RAN/0/1 V2=RAN/0/1 (期望 V1=RAN/0/1 V2=RAN/0/1)
+## case_rc_ledger
+N1_only_V1_injected_fail	class=OK	runner_proc_rc=1	runner_reported_rc=1	expected_rc=1	V1=RAN/0/1 V2=RAN/0/0
+N2_only_V2_injected_fail	class=OK	runner_proc_rc=1	runner_reported_rc=1	expected_rc=1	V1=RAN/0/0 V2=RAN/0/1
+N3_V1_stale_exe_not_reused	class=OK	runner_proc_rc=1	runner_reported_rc=1	expected_rc=1	V1=COMPILE_FAILED/1/127 V2=RAN/0/0
+N4_fw_calc_selftest_FAILED	class=OK	runner_proc_rc=2	runner_reported_rc=2	expected_rc=2	V1=RAN/0/2 V2=RAN/0/2
+N5_fw_cfg_selftest_INCOMPLETE	class=OK	runner_proc_rc=2	runner_reported_rc=2	expected_rc=2	V1=RAN/0/2 V2=RAN/0/0
+N6_helper_thread_create_fail	class=OK	runner_proc_rc=3	runner_reported_rc=3	expected_rc=3	V1=RAN/0/3 V2=RAN/0/3
+N7_helper_thread_startup_fail	class=OK	runner_proc_rc=3	runner_reported_rc=3	expected_rc=3	V1=RAN/0/3 V2=RAN/0/3
+N8_gstat_expect_table_tamper	class=OK	runner_proc_rc=1	runner_reported_rc=1	expected_rc=1	V1=RAN/0/1 V2=RAN/0/0
+N9_probe_writeback_V1	class=OK	runner_proc_rc=1	runner_reported_rc=1	expected_rc=1	V1=RAN/0/1 V2=NOT_RUN/NOT_RUN/NOT_RUN
+N10_probe_writeback_V2	class=OK	runner_proc_rc=1	runner_reported_rc=1	expected_rc=1	V1=NOT_RUN/NOT_RUN/NOT_RUN V2=RAN/0/1
+N10b_writeback_both_variants	class=OK	runner_proc_rc=1	runner_reported_rc=1	expected_rc=1	V1=RAN/0/1 V2=RAN/0/1
+## 子链控制台尾部
+SKIP(不在请求集合) N12_workspace_clean_regression
+
+############ 判定汇总 ############
+OK | N1_only_V1_injected_fail
+OK | N2_only_V2_injected_fail
+OK | N3_V1_stale_exe_not_reused
+OK | N4_fw_calc_selftest_FAILED
+OK | N5_fw_cfg_selftest_INCOMPLETE
+OK | N6_helper_thread_create_fail
+OK | N7_helper_thread_startup_fail
+OK | N8_gstat_expect_table_tamper
+OK | N9_probe_writeback_V1
+OK | N10_probe_writeback_V2
+OK | N10b_writeback_both_variants
+
+执行集合(11) 与请求集合(11) 一致: 是
+类别计数: OK=11 NOT-DETECTED=0 INFRA-FAIL=0
+RUNNER(run_negatives): 所有负例按预期被检出且身份齐备; 干净回归通过 (rc=0)

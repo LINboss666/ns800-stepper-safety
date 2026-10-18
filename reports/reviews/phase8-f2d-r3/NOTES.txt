@@ -1,0 +1,17 @@
+# 证据目录说明（Phase 8-F2d-R3）
+
+1. 生成方式：`bash tests/host/run_negatives.sh`（基线 de93b19，仓库外工作区），随后由脚本摘录。
+   原始完整日志与被篡改副本留在本地工作区，不入库；这里只放核查执行、身份与出口值所需的文本。
+2. 三个退出码的区分：
+   - `runner_proc_rc` = runner **进程真实**退出码（由调用方直接测得）
+   - `runner_reported_rc` = `runner_status.txt` 里 runner **自报**的 RUNNER_RC
+   - `expected_rc` = 该用例登记的**预期**值
+   两者不一致即判 `INFRA-FAIL`（回执失真），不得算检出。见 `neg_case_rc_ledger.txt`。
+3. 类别语义：`OK` 预期成立；`NOT-DETECTED` 跑了但没抓到（漏检）；`INFRA-FAIL` 没执行/编译意外/
+   回执坏。三者永不合并成"PASS"。
+4. 脱敏：证据里的工作区绝对路径 `C:/Users/<用户名>/AppData/Local/Temp` 统一替换为 `%TEMP%`
+   （纯路径改写，未改任何判定内容、计数或失败文本）；仓库根 `D:/ns800` 保留，与前几轮交付一致。
+   原件在本地工作区可逐字节复核。
+5. Keil：本轮**未重建**（固件源码 0 改动），`keil_rebuild_all_from_r2.txt` 是沿用 F2d-R2 的原始
+   Rebuild All 日志；`keil_dependency_excerpt_sys_errno.txt` 是当时构建生成的真实 `build/*.d` 摘录。
+   主机通过 ≠ 目标硬件通过。

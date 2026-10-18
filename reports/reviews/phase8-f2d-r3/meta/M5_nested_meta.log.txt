@@ -1,0 +1,15 @@
+############ 元负例(按原因验收; 基线 de93b197a9381813eab9011b88b529f4f4dcdc16; 请求集合 M1) ############
+injected(mode=fd7b_blinding, replacements=1) -> %TEMP%/ns800-host-chain/meta/M5_nested/blinded/host_main.c
+    子链 M1: rc=4 矩阵行数=1
+      [X] 子链 rc=4 期望=1
+      [X] N10b_writeback_both_variants 类别='INFRA-FAIL' 期望='NOT-DETECTED'
+      [X] N10b_writeback_both_variants 原因缺 /V2\.run:期望=1 实际=0/ (行: INFRA-FAIL | N10b_writeback_both_variants | rc 真实=65 自报=65 期望=1 | V1=COMPILE_FAILED/65/127 V2=COMPILE_FAILED/65/127 (期望 V1=RAN/0/1 V2=RAN/0/1)  runner.proc_rc:期望=1 实际=65  V1.state:期望=RAN 实际=COMPILE_FAILED  V1.build:期望=0 实际=65  V1.run:期望=1 实际=127  V2.state:期望=RAN 实际=COMPILE_FAILED  V2.build:期望=0 实际=65  V2.run:期望=1 实际=127  V1.executed:期望=1 实际=0  V1.out_bytes:期望=>0 实际=ABSENT  V2.executed:期望=1 实际=0  V2.out_bytes:期望=>0 实际=ABSENT 缺席身份: V1[\[FAIL\] FD3 probe\(活链路\)] V2[\[FAIL\] FD7b 已提交快照后再 probe: 写帧增量 1\(应 0\)])
+      [.] N10b_writeback_both_variants 原因含 /FD7b/
+      [.] 执行集合与请求集合一致(1 例)
+  => META-LEAK | M1_blinded_fd7b (不符 3 项)
+
+############ 元负例汇总表 ############
+META-LEAK | M1_blinded_fd7b | 不符 3 项: 子链 rc=4 期望=1 N10b_writeback_both_variants 类别='INFRA-FAIL' 期望='NOT-DETECTED' N10b_writeback_both_variants 原因缺 /V2\.run:期望=1 实际=0/ (行: INFRA-FAIL | N10b_writeback_both_variants | rc 真实=65 自报=65 期望=1 | V1=COMPILE_FAILED/65/127 V2=COMPILE_FAILED/65/127 (期望 V1=RAN/0/1 V2=RAN/0/1)  runner.proc_rc:期望=1 实际=65  V1.state:期望=RAN 实际=COMPILE_FAILED  V1.build:期望=0 实际=65  V1.run:期望=1 实际=127  V2.state:期望=RAN 实际=COMPILE_FAILED  V2.build:期望=0 实际=65  V2.run:期望=1 实际=127  V1.executed:期望=1 实际=0  V1.out_bytes:期望=>0 实际=ABSENT  V2.executed:期望=1 实际=0  V2.out_bytes:期望=>0 实际=ABSENT 缺席身份: V1[\[FAIL\] FD3 probe\(活链路\)] V2[\[FAIL\] FD7b 已提交快照后再 probe: 写帧增量 1\(应 0\)])
+
+已执行元负例组: M1 / 请求组: M1
+RUNNER(meta): 有元负例被放过、原因不符、对照组失败或集合不符 (rc=1)

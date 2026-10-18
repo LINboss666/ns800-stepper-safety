@@ -1,0 +1,36 @@
+# N10b_writeback_both_variants
+## runner_status.txt(自报值; 真实进程码见 neg_case_rc_ledger.txt)
+V1_BUILD_RC=0
+V1_RUN_RC=1
+V1_STATE=RAN
+V1_EXECUTED=1
+V1_EXE=PRESENT
+V1_OUT_BYTES=15179
+V2_BUILD_RC=0
+V2_RUN_RC=1
+V2_STATE=RAN
+V2_EXECUTED=1
+V2_EXE=PRESENT
+V2_OUT_BYTES=15266
+RUNNER_RC=1
+REPO_ROOT=D:/ns800
+SRC_APP=%TEMP%/ns800-host-chain/negatives/snap_writeback/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications
+HOST_SRC=/d/ns800/tests/host/host_main.c
+SHIM_DIR=/d/ns800/tests/host/shim
+V1_EXTRA=
+V2_EXTRA=
+GCC=/c/Program Files (x86)/Dev-Cpp/MinGW64/bin/gcc.exe
+## V1 判定/身份行
+  [FAIL] FD2 probe(死链路): WRITE 帧 0 个(应 0), 读请求 3 个后 fail-closed 退出
+  [FAIL] FD3 probe(活链路): 读请求 6(应 3) WRITE 帧 1(应 0) 芯片 GCONF=00000101->00000101 IFCNT=0->1
+结论: NOT PASSED -> 判据失败 2 项; 详见上方 [FAIL]/[BADRESULT]/[MISSING] 行
+PROCESS RC=1 (0=通过)
+## V2 判定/身份行
+  [FAIL] FD7b 已提交快照后再 probe: 写帧增量 1(应 0) 读请求 6(应 3) 芯片 GCONF 仍 =00000141
+结论: NOT PASSED -> 判据失败 1 项; 详见上方 [FAIL]/[BADRESULT]/[MISSING] 行
+PROCESS RC=1 (0=通过)
+## 执行证据
+v1: DONE rc=1 exe=%TEMP%/ns800-host-chain/negatives/N10b_writeback_both_variants/host_v1.exe out_bytes=15179
+
+v2: DONE rc=1 exe=%TEMP%/ns800-host-chain/negatives/N10b_writeback_both_variants/host_v2.exe out_bytes=15266
+

@@ -1,0 +1,162 @@
+{
+  "phase": "Phase 8-F2d-R3",
+  "title": "出口对账与 GitHub 交付迁移",
+  "recorded_at": "2026-10-18",
+  "review_status": "本地自检通过, 等待 ChatGPT Work 独立复审; 不进入 F2e/F3",
+  "delivery": "GitHub 分支交付, 本轮不生成 ZIP(用户 2026-10-18 新要求)",
+  "branch": "phase8/tmc-drive-config",
+  "baseline_commit": "de93b197a9381813eab9011b88b529f4f4dcdc16",
+  "final_commit": "（本文件在提交之前生成, 不自我引用自己的最终 SHA; 最终 full SHA 见推送后的交付消息。当时 HEAD=de93b197a9381813eab9011b88b529f4f4dcdc16）",
+  "final_commit_identity": "author=LMX <237816241+LINboss666@users.noreply.github.com> committer=LMX <237816241+LINboss666@users.noreply.github.com>",
+  "remote_readback": {
+    "refs/heads/main": "1b3757eec550802a3973e66790af422d81d3d373",
+    "refs/heads/phase7/full-embedded-software": "6d3fbc559d45673d7550eb73dec5a4ade5bb34df",
+    "refs/heads/phase8/tmc-drive-config": "de93b197a9381813eab9011b88b529f4f4dcdc16",
+    "refs/tags/v0.7-phase7-software-board-validated": "097935fec5a6f2467261ab1ad449ff0b1d398250"
+  },
+  "git_diff_scope_this_round": [],
+  "firmware_changed": false,
+  "host_env": {
+    "bash": "5.2.37(1)-release",
+    "gcc": "/c/Program Files (x86)/Dev-Cpp/MinGW64/bin/gcc.exe (gcc.exe (tdm64-1) 4.9.2)",
+    "python": "Python 3.12.5",
+    "git": "git version 2.49.0.windows.1",
+    "os": "Windows 10.0.26100 x64 (MINGW64 Git Bash)"
+  },
+  "fixes": {
+    "R2-NEW-01": {
+      "problem": "run_case 保存 outer=$? 后弃用, 判定与显示的 outer 全来自状态文件自报 RUNNER_RC",
+      "fix": "三个 rc 分别记录(runner_proc_rc/runner_reported_rc/expected_rc)并双重核对; 自报!=真实 => INFRA-FAIL(回执失真), 期望非零而真实为 0 => NOT-DETECTED",
+      "regression_case": "M3: 隔离 runner 副本末尾 exit \"$overall\" 改 exit 0, 状态文件原样",
+      "evidence_line": "INFRA-FAIL | N1_only_V1_injected_fail | rc 真实=0 自报=1 期望=1 | V1=RAN/0/1 V2=RAN/0/0 (期望 V1=RAN/0/1 V2=RAN/0/0)  runner.proc_rc:期望=1 实际=0  runner.reported_rc:期望=0 实际=1"
+    },
+    "R2-NEW-02": {
+      "problem": "want() 只认完整名但注释/示例写前缀 => ONLY=N10b 时 0 例执行仍报全通过 rc=0",
+      "fix": "完整名或无歧义前缀; 未知/零匹配/歧义一律 rc=4 并列出候选; 收尾核对请求集合==执行集合且非空",
+      "regression_case": "M4: ONLY=N1(歧义) / ONLY=ZZZ_no_such_case(未知) / ONLY=N10b(前缀正例)",
+      "evidence_lines": [
+        "FATAL: ONLY 里的选择 \"N1\" 歧义, 命中 5 个: N1_only_V1_injected_fail N10_probe_writeback_V2 N10b_writeback_both_variants N11_clean_snapshot_regression N12_workspace_clean_regression",
+        "FATAL: ONLY 里的选择 \"ZZZ_no_such_case\" 不匹配任何用例(已登记: N1_only_V1_injected_fail N2_only_V2_injected_fail N3_V1_stale_exe_not_reused N4_fw_calc_selftest_FAILED N5_fw_cfg_selftest_INCOMPLETE N6_helper_thread_create_fail N7_helper_thread_startup_fail N8_gstat_expect_table_tamper N9_probe_writeback_V1 N10_pro",
+        "执行集合(1) 与请求集合(1) 一致: 是"
+      ]
+    },
+    "R2-NEW-03": {
+      "problem": "元负例助手只判子链 rc 非零, 拒绝类别与原因仅打印不验收",
+      "fix": "按原因核对 rc/用例身份/失败类别/原因文本/集合一致性; 缺矩阵空矩阵意外错误一律不得记 META-OK",
+      "regression_case": "M5: 给 M1 致盲场景换必然编译失败的桩(错误归因), 助手必须拒绝",
+      "m1_expected_reason": "NOT-DETECTED | N10b_writeback_both_variants | rc 真实=1 自报=1 期望=1 | V1=RAN/0/1 V2=RAN/0/0 (期望 V1=RAN/0/1 V2=RAN/0/1)  V2.run:期望=1 实际=0 缺席身份: V2[\\[FAIL\\] FD7b 已提交快照后再 probe: 写帧增量 1\\(应 0\\)]",
+      "m5_nested_verdict_line": "  => META-LEAK | M1_blinded_fd7b (不符 3 项)"
+    }
+  },
+  "migration": {
+    "tests_host": [
+      "env.sh",
+      "build_and_run.sh",
+      "run_negatives.sh",
+      "run_meta_negatives.sh",
+      "inject.py",
+      "host_main.c",
+      "shim/rtthread.h",
+      "shim/rtdevice.h",
+      "probe_errcodes.py",
+      "probe_errcodes.c",
+      "README.md"
+    ],
+    "reports": [
+      "reports/agent_handoffs/phase8-f2d-r3.md",
+      "reports/agent_handoffs/phase8-f2d-r3.json",
+      "reports/reviews/phase8-f2d-r3/"
+    ],
+    "path_resolution": "从 git 仓库根解析; REPO_ROOT/SRC_APP/HOST_SRC/SHIM_DIR/GCC/OUT_DIR/NEG_WORK/META_WORK/WORK_ROOT 均可覆盖; 工作区强制在仓库外(脚本内断言)",
+    "compiler_detect": "GCC 优先 -> PATH gcc/cc -> 常见 MinGW 位置; 找不到直接报错退出",
+    "continuity": "host_main.c / shim/rtthread.h / shim/rtdevice.h / probe_errcodes.c 与 F2d-R2 交付副本逐字节相同(cmp 验证); 三个 sh 为本轮改造版",
+    "gitignore_exception": "!/.gitignore, !/tests/, !/reports/ 三行 + tests/host/.gitignore 屏蔽 _out/、*.exe、*.o、*.s 等生成物; 其余默认全忽略与 build//*.log 禁令不变"
+  },
+  "results": {
+    "normal_V1": "HOST TEST SUMMARY: CHECK_PASS=25 CHECK_FAIL=0 BAD_SELFTEST=0 MISSING_CASE=0",
+    "normal_V2": "HOST TEST SUMMARY: CHECK_PASS=22 CHECK_FAIL=0 BAD_SELFTEST=0 MISSING_CASE=0",
+    "neg_cases": {
+      "rows": 13,
+      "OK": 13,
+      "NOT-DETECTED": 0,
+      "INFRA-FAIL": 0
+    },
+    "meta": {
+      "M1_blinded_fd7b": "META-OK",
+      "M1_control_unblinded": "CONTROL-OK",
+      "M2_stubbed_compile": "META-OK",
+      "M2_control_real_compiler": "CONTROL-OK",
+      "M3_runner_exit_zero_lost": "META-OK",
+      "M3_control_unmodified": "CONTROL-OK",
+      "M4_selection_semantics": "META-OK",
+      "M5_wrong_reason_guard": "META-OK"
+    },
+    "m2_infra_rows": 11,
+    "rc_ledger_sample": "N1_only_V1_injected_fail\tclass=OK\trunner_proc_rc=1\trunner_reported_rc=1\texpected_rc=1\tV1=RAN/0/1 V2=RAN/0/0",
+    "keil": {
+      "note": "沿用 F2d-R2 原始日志(build_f2d_r2_final.log), 本轮未重建; 固件源码 0 改动",
+      "errors": 0,
+      "warnings": 0,
+      "program_size": "Code=144082 RO-data=60130 RW-data=2204 ZI-data=83400",
+      "units": "131 C + 2 asm = 133",
+      "carried_over_from": "phase8 f2d-r2 (build_f2d_r2_final.log)"
+    }
+  },
+  "deviations": [
+    "env_work_root 里 `cd && pwd -W || cd && pwd` 的结合顺序使两条 pwd 都执行, 工作区路径含换行 -> 快照目录指向不存在 -> N1/N2 双双 COMPILE_FAILED 且 N3 以 FATAL 终止(链失败而非假通过, 但根因是我方脚本缺陷, 已改为单一赋值)",
+    "元负例集合对账把'组键'和'显示名'混用: 8 组逐组都判 META-OK/CONTROL-OK, 但收尾把请求集合(M1/M1c/...)与实际执行组(显示名 M1_blinded_fd7b/...)比对时全部判未执行, 总行 rc=1 —— 由真实运行检出, 已用 CUR_GROUP 显式记录组键; 这条本身说明'按原因验收'必须连集合一致性一起判",
+    "set -u 下空数组未初始化: run_negatives 的 NOT_RAN 与 meta 的 TABLE/CHECK_NOTES/REQUESTED_META/META_NOT_RAN 全部显式 =() 初始化(前一处曾在命令替换里报 unbound variable, 只影响汇总行显示, 不影响判定)",
+    "run_meta_negatives 的 need_all_class 参数顺序 bug(shift 后仍引用 $2)导致 M2 段中断、整条元负例链 rc=1; 已修正为 <用例列表> <期望类别>",
+    "上一轮记录过的三个通用陷阱仍然有效: patch 回环的临时目录必须在仓库外; core.autocrlf 会造成 假失配; Windows tar 解不开中文名归档",
+    "本轮未重建 Keil(固件源码 0 改动), 沿用 R2 原始日志并在证据目录显式标注",
+    ".gitignore 此前是**未被跟踪但生效**的本地文件; 本轮把它纳入跟踪, 所以提交里看到的是整份文件的新增, 相对原本的本地内容实际只多了三行放行(!/.gitignore, !/tests/, !/reports/)加上一份 tests/host/.gitignore"
+  ],
+  "safety": {
+    "gate_macros": [
+      "MOTOR_HARDWARE_ENABLE_PATH_VALIDATED=RT_FALSE",
+      "TMC_DRIVE_CONFIG_HW_VALIDATED=RT_FALSE",
+      "STEP_DIAG_ISOLATED_ENV_CONFIRMED=RT_FALSE"
+    ],
+    "flashed": false,
+    "board_reset": false,
+    "com5_touched": false,
+    "real_tmc_write": false,
+    "motor_connected": false,
+    "step_output": false,
+    "safety_gates_changed": false,
+    "keil_target_changed": false,
+    "app_dir_changed": false,
+    "force_push": false,
+    "history_rewritten": false,
+    "zip_delivered": false
+  },
+  "not_verified": [
+    "真机 UART 时序/超时",
+    "优先级继承与反转",
+    "motor 线程栈高水位",
+    "守卫物理停机时延上界",
+    "rt_pwm_disable 返回值",
+    "ENN 端电压",
+    "STEP 波形",
+    "真实寄存器读写",
+    "跨平台主机复跑(本轮 Windows+MinGW 单一环境)"
+  ],
+  "open_risks": [
+    "RISK-03",
+    "RISK-03a",
+    "RISK-04"
+  ],
+  "evidence_paths": [
+    "reports/reviews/phase8-f2d-r3/neg_verdict_matrix.txt",
+    "reports/reviews/phase8-f2d-r3/neg_case_rc_ledger.txt",
+    "reports/reviews/phase8-f2d-r3/normal_v1_summary.txt",
+    "reports/reviews/phase8-f2d-r3/normal_v2_summary.txt",
+    "reports/reviews/phase8-f2d-r3/negatives/",
+    "reports/reviews/phase8-f2d-r3/meta/",
+    "reports/reviews/phase8-f2d-r3/chain_summary.txt",
+    "reports/reviews/phase8-f2d-r3/keil_rebuild_all_from_r2.txt",
+    "reports/reviews/phase8-f2d-r3/keil_dependency_excerpt_sys_errno.txt",
+    "reports/reviews/phase8-f2d-r3/verification_source_hashes.txt"
+  ],
+  "next_step": "等待独立复审; 通过前不进 F2e/F3; 上板与三宏翻转需单独授权"
+}

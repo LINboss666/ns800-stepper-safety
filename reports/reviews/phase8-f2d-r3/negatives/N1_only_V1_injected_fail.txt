@@ -1,0 +1,34 @@
+# N1_only_V1_injected_fail
+## runner_status.txt(自报值; 真实进程码见 neg_case_rc_ledger.txt)
+V1_BUILD_RC=0
+V1_RUN_RC=1
+V1_STATE=RAN
+V1_EXECUTED=1
+V1_EXE=PRESENT
+V1_OUT_BYTES=15190
+V2_BUILD_RC=0
+V2_RUN_RC=0
+V2_STATE=RAN
+V2_EXECUTED=1
+V2_EXE=PRESENT
+V2_OUT_BYTES=15262
+RUNNER_RC=1
+REPO_ROOT=D:/ns800
+SRC_APP=%TEMP%/ns800-host-chain/negatives/pristine/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications
+HOST_SRC=/d/ns800/tests/host/host_main.c
+SHIM_DIR=/d/ns800/tests/host/shim
+V1_EXTRA=-DHOST_INJECT_VARIANT_FAIL=1
+V2_EXTRA=
+GCC=/c/Program Files (x86)/Dev-Cpp/MinGW64/bin/gcc.exe
+## V1 判定/身份行
+  [FAIL] 注入: 本变体故意判失败(HOST_INJECT_VARIANT_FAIL=1)
+结论: NOT PASSED -> 判据失败 1 项; 详见上方 [FAIL]/[BADRESULT]/[MISSING] 行
+PROCESS RC=1 (0=通过)
+## V2 判定/身份行
+结论: ALL PASS (判据 + 固件自测终态 + 必需用例齐备性 全部满足)
+PROCESS RC=0 (0=通过)
+## 执行证据
+v1: DONE rc=1 exe=%TEMP%/ns800-host-chain/negatives/N1_only_V1_injected_fail/host_v1.exe out_bytes=15190
+
+v2: DONE rc=0 exe=%TEMP%/ns800-host-chain/negatives/N1_only_V1_injected_fail/host_v2.exe out_bytes=15262
+

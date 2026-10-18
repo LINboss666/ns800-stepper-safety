@@ -1,0 +1,14 @@
+# tests/host 验证源码 SHA-256 清单
+# 生成时间(UTC): 2026-10-18T15:10:42Z
+# 用途: 复核上面的日志是哪一版脚本跑出来的; 清单本身不含生成物
+ebadbe9be2f5554d1a5d29200c95883f68d7657952b58069ecd0ae4453c4fb28  tests/host/README.md
+70f549b59b4f88471249b287886f0662c4d8fd2042a9a0d18ef9607d13753ee4  tests/host/build_and_run.sh
+e61cc840275e61e4ff20700a9a633189ee0f5308f55290a2f0ffc821d68d61ba  tests/host/env.sh
+e2b05444e1e8cdfcfd0ebcbb0251a67f007e682db78b6badc2bcf257500839eb  tests/host/host_main.c
+c0d2ec735d59d73ce8b9b50b0157c167d38553b38e49704fb09e65a6cee556c6  tests/host/inject.py
+06870f71c9d89b124a9641c7721891517a8058f484fe6448bc60898ab2167395  tests/host/probe_errcodes.c
+a5142df17c1fa7da8f61dfeacc3bb01778508346bc28e80eb90475144bcf200a  tests/host/probe_errcodes.py
+f4278ce336dbe788f6a2e3b60b0af4b895be9fe999513d4722ac550d9552f514  tests/host/run_meta_negatives.sh
+ae0f6021f3c205c785e0d8ef773bd6ff958fe8218efcbac5192cdbb508774ade  tests/host/run_negatives.sh
+0cc79a1ab02a6548ff265bd368993d5c17e9877d5c4706f765dd74c99ea39a1a  tests/host/shim/rtdevice.h
+e1aa4c87c0d6752194ca2d5563c6ac677330588a788c8fe8371d0a1526b943b0  tests/host/shim/rtthread.h

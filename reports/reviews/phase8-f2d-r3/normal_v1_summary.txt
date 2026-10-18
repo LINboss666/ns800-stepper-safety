@@ -1,0 +1,9 @@
+# N12 工作树干净回归中 v1 的判定行(全文留本地: %TEMP%/ns800-host-chain/negatives/N12_workspace_clean_regression/v1_out.txt)
+[TMC-ST] ALL PASS (纯算术, 未与芯片通信)
+[TMC-CFG-ST] ALL PASS (T1..T21, 假总线局部实例, 未访问 uart2; T14 允许 SKIP, 其余必须成立)
+[MOT-GUARD] ALL PASS (G1..G10 纯判定, 未碰硬件、未改生产状态)
+HOST TEST SUMMARY: CHECK_PASS=25 CHECK_FAIL=0 BAD_SELFTEST=0 MISSING_CASE=0
+结论: ALL PASS (判据 + 固件自测终态 + 必需用例齐备性 全部满足)
+PROCESS RC=0 (0=通过)
+# 执行证据 marker
+DONE rc=0 exe=%TEMP%/ns800-host-chain/negatives/N12_workspace_clean_regression/host_v1.exe out_bytes=15115

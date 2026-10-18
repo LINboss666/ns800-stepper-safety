@@ -1,0 +1,11 @@
+# tests/host 的生成物一律不入库（手写脚本与夹具本身要跟踪）
+_out/
+*.exe
+*.o
+*.obj
+*.axf
+*.bin
+*.s
+probe_errcodes.json
+armclang_errcode_evidence.txt
+__pycache__/
