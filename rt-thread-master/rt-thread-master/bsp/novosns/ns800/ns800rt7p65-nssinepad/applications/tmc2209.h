@@ -10,8 +10,8 @@
  *
  * 约定(见 app_health.h):
  *   - 读函数非 RT_EOK 时输出参数无效
- *   - WRITE 在 TMC2209 上无应答; write_register_confirmed() 用 IFCNT 自增验证
- *     写入被芯片接受(禁止用 OTP 做测试)
+ *   - WRITE 在 TMC2209 上无应答; 写帧的到达凭证只有 IFCNT 自增(禁止用 OTP 做测试)。
+ *     F2d 起"写 + IFCNT 确认"收为配置事务内部实现, 不再对外提供裸写入口
  *   - health: OK=链路通且最近一次传输成功; DEGRADED=链路通但最近一次失败;
  *     FAILED=uart2 打不开; UNINIT=尚未初始化
  */
@@ -32,23 +32,34 @@
 #define TMC_REG_SG_RESULT 0x41
 
 /* 幂等初始化: 打开 uart2(115200 8N1)。RT_EOK = 链路层就绪。
- * 注意: 链路就绪 ≠ 芯片在位, 在位验证用 tmc2209_write_register_confirmed()
- * 或 MSH 命令 tmc_uart_probe / tmc_scan。 */
+ * 注意: 链路就绪 ≠ 芯片在位。在位/身份用只读手段核实 —— MSH 命令 tmc_scan
+ * (READ IOIN 逐地址)或 tmc_uart_probe(F2d 起严格只读, 持配置事务锁读 IOIN/GSTAT/
+ * IFCNT)。二者都**证明不了"写帧能到达"**; 写到达凭证只有 IFCNT+1 确认, 而那属于
+ * 配置事务内部(见下方写入口审计), 未过编译期门与运行态门禁时不得为诊断而触发。 */
 rt_err_t tmc2209_init(void);
 
 /* 读寄存器。addr 一般为 TMC_ADDR_DEFAULT。RT_EOK 时 *value 有效。 */
 rt_err_t tmc2209_read_register(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *value);
 
-/* 写寄存器 + 到达确认: 发送 WRITE 帧后读 IFCNT 前后各一次,
- * 验证 (after == before+1) mod 256 —— TMC2209 对 WRITE 无应答,
- * IFCNT 自增是写入被接受的唯一凭证。确认失败返回错误。 */
-rt_err_t tmc2209_write_register_confirmed(rt_uint8_t addr, rt_uint8_t reg,
-                                          rt_uint32_t value);
+/* ---------- F2d(F2c-NEW-01)写入口审计 ----------
+ * 曾经对外的两条真实写路径的现在状态, 逐条核实过调用方:
+ *   tmc_write_reg()                     已删除。它只持单次传输锁、不做到达确认,
+ *                                       唯一调用点是旧 tmc_uart_probe() 的
+ *                                       "把预读到的 GCONF 原值写回去"。
+ *   tmc2209_write_register_confirmed()  改为 tmc2209.c 文件内静态(实现与 IFCNT
+ *                                       确认语义一字未改)。唯一调用方
+ *                                       tmc_cfg_hw_write() 位于配置事务内部:
+ *                                       tmc_cfg_apply_ctx() 先非阻塞持 txn 锁,
+ *                                       再求值运行态门禁, 全通才发写。
+ * 头文件里不再出现任何"能直接写真实寄存器"的接口。 */
 
 /* 读 StallGuard 结果(0x41)。电机静止时通常接近 0; 驱动使能转动后有意义。 */
 rt_err_t tmc2209_read_sg_result(rt_uint16_t *sg_result);
 
-/* 读全局状态 GSTAT(0x01): bit0 reset / bit1 driver_error / bit2 sg2。 */
+/* 读全局状态 GSTAT(0x01)。位名按官方 Rev.1.09 第 25 页寄存器表(DATASHEET-CONFIRMED):
+ * bit0=reset / bit1=drv_err / bit2=uv_cp(电荷泵欠压)。
+ * F2d(F2c-NEW-02)更正: 旧注释/打印把 bit2 写成 sg2 —— StallGuard2 的结果在
+ * SG_RESULT(0x41), GSTAT 里没有 sg2, 沿用会误导故障方向。 */
 rt_err_t tmc2209_read_status(rt_uint8_t *gstat);
 
 /* 子系统健康(UNINIT/OK/DEGRADED/FAILED) */

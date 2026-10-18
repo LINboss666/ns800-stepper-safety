@@ -151,7 +151,7 @@ UV4 -b 编译（0 错误）→ UV4 -f 烧录 → pyocd 复位 → COM5 串口读
 | `motor_arm` / `motor_disarm` | 申请/解除使能（**当前必返回 REFUSED，属预期**） | 🖥 软件就绪（Fix A 新增） |
 | `motor_dir <0\|1>` / `motor_target <hz>` / `motor_start` / `motor_stop` | 方向（仅静止）/目标步频/起动/受控停止 | 🖥 软件就绪（Fix A 新增，全部只走正式 API） |
 | `tmc_scan` | 只读扫描地址0..3找 TMC2209 | ✅ 真机 FOUND (addr0) |
-| `tmc_uart_probe` / `tmc_status` | IFCNT写握手 / GSTAT+版本 | ✅ 真机验证 (IFCNT+1)；2026-09-26 传输稳定性：`tmc_status` **100/100** 全部读到 `VERSION=0x21`，0 超时/0 CRC 错/0 失败/0 丢提示符。⚠ 模块**物理在位**跨两轮失联 3 次(插好即恢复)，稳定性结论仅限"插好之后" |
+| `tmc_uart_probe` / `tmc_status` | **F2d 起 probe 严格只读**：持配置事务锁读 IOIN/GSTAT/IFCNT，0 个 WRITE 帧 | 🖥 **软件侧改动，尚未上板复测**。历史真机记录（属**旧版**行为）：2026-09-12/09-26 用"写 GCONF 原值→IFCNT+1"握手实测 ALIVE，`tmc_status` **100/100** 全部读到 `VERSION=0x21`，0 超时/0 CRC 错/0 失败/0 丢提示符。⚠ 那条写回被 F2c 独立复审判为绕过事务锁与写入门禁（F2c-NEW-01），F2d 已删除 → 这两个命令现在**只证明芯片应答了读，不再证明写帧到达**（写到达凭证只存在于配置事务内部，未过门禁前不得触发）。另：GSTAT bit2 按 Rev.1.09 改为 `uv_cp`（旧版误标 `sg2`）。⚠ 模块**物理在位**跨两轮失联 3 次(插好即恢复)，稳定性结论仅限"插好之后" |
 | `tmc_regs` | 关键寄存器只读快照 | ✅ 真机验证；2026-09-26 **20/20** 共 140 行寄存器全有效，`GCONF=0x101`/`CHOPCONF=0x15010053` 与历史基线一致。`IOIN` bit0 已记录但**不解释 ENN**（使能链硬件阻塞） |
 | `tmc_crc_test` | CRC 算法自测（官方向量） | ✅ 真机 PASS |
 | `runtime_selftest` | 软件级运行自检：bootstrap 完成度 / 非法转换 / **四门掩码（含第 4 门参与证明）** / 停机链 / valid 位 / 收尾再确认 arm 仍被拒 | ✅ 真机 ALL PASS（@e40a9b9，含故障恢复后 Motor 回 IDLE） |

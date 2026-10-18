@@ -9,15 +9,17 @@
  *      v2 错误: 把应答首字节当 0xFF 判别 —— 实际 byte0=0x05(sync), byte1=0xFF(master)。
  *   ② CRC8-ATM: poly 0x07 / init 0, 每字节按 LSB→MSB 逐位喂入 (datasheet
  *      swuart_calcCRC 的等价实现)。向量: [05 00 02]→0x8F, [05 00 00]→0x48。
- *   ③ IFCNT 只在收到有效 WRITE 后自增, READ 不影响 → probe 用"写 GCONF 原值"
- *      前后 IFCNT+1 验证芯片存活, 不改任何配置。
+ *   ③ IFCNT 只在收到有效 WRITE 后自增, 读访问不改变其值 → 它是"写帧到达"的唯一凭证。
+ *      F2d 起这条凭证只在配置事务内部使用(写入门禁 + txn 锁); 诊断命令一律只读,
+ *      不再用"把 GCONF 原值写回去 + IFCNT+1"证明芯片存活(旧做法的问题见 F2c-NEW-01)。
  *   ④ 单线回声: TX 经 1k 汇合到 PDN, MCU RX 会收到自己发的帧。
  *      read 路径在字节流里搜索 [05 FF reg] 应答头, 天然跳过自身回声
  *      (回声 byte1=slave 地址, 永不等于 0xFF); write 后主动排空回声。
  *   ⑤ 应答校验: r[0]==0x05, r[1]==0xFF, r[2]==(reg&0x7F), CRC 有效, 四关全过。
  *
  * 硬件映射不变: uart2 / PB6=TX / PB7=RX / 115200 8N1 / slave addr 0。
- * 状态: CRC 自测向量真机 PASS; tmc_uart_probe 前不得据无应答判断芯片损坏。
+ * 状态: CRC 自测向量真机 PASS。F2d 起 tmc_uart_probe 严格只读: 读不到合法应答
+ * 只能说明"这条读没成功", 既不能证明芯片损坏, 也不再证明"写帧能到达"。
  */
 
 #include <rtthread.h>
@@ -59,6 +61,20 @@ static rt_bool_t tmc_lock_ok = RT_FALSE;
 static rt_err_t tmc_read_reg(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *value);
 static rt_err_t tmc_read_reg_locked(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *value);
 static rt_err_t tmc_write_reg_locked(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t value);
+/* F2d(F2c-NEW-01): 写帧的唯一发起点收进文件内 —— 语义(写 + IFCNT 到达确认)一字
+ * 未改, 只是不再对外暴露。头文件里"在位验证用 write_register_confirmed()"那句
+ * 作废: 任何不持有配置事务的写入口, 本身就是绕过写入门禁的入口。 */
+static rt_err_t tmc2209_write_register_confirmed(rt_uint8_t addr, rt_uint8_t reg,
+                                                 rt_uint32_t value);
+/* F2d(F2c-NEW-02): GSTAT 位解码(纯函数, 不碰总线), 诊断打印与主机测试共用。 */
+typedef struct
+{
+    rt_uint8_t reset;    /* GSTAT[0] 复位过 */
+    rt_uint8_t drv_err;  /* GSTAT[1] 过温/短路关断过 */
+    rt_uint8_t uv_cp;    /* GSTAT[2] 电荷泵欠压(旧代码误标 sg2) */
+    rt_uint8_t unknown;  /* 手册只定义低 3 位: 高位非 0 = 不是已知形状 */
+} tmc_gstat_dec_t;
+static void tmc_gstat_decode(rt_uint32_t gstat, tmc_gstat_dec_t *out);
 /* F2b: 配置实例的同步对象初始化(定义在文件后段, init 里要先调)。F2c R02: 返回状态。 */
 static rt_err_t tmc_cfg_prod_sync(void);
 
@@ -164,15 +180,9 @@ static rt_err_t tmc_write_reg_locked(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_
     return RT_EOK;
 }
 
-static rt_err_t tmc_write_reg(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t value)
-{
-    rt_err_t e;
-    if (tmc_uart_open() != RT_EOK) return -RT_ERROR;
-    if (tmc_lock_ok) rt_mutex_take(&tmc_xfer_lock, RT_WAITING_FOREVER);
-    e = tmc_write_reg_locked(addr, reg, value);
-    if (tmc_lock_ok) rt_mutex_release(&tmc_xfer_lock);
-    return e;
-}
+/* F2d(F2c-NEW-01): 这里原先还有一个 tmc_write_reg() —— 只持单次传输锁、不做任何
+ * 到达确认与门禁检查的裸写包装, 唯一调用点是旧 probe。它已被删除, 写帧只能由
+ * tmc2209_write_register_confirmed() 发出(见下方写入口审计)。 */
 
 /* 读寄存器: 发 4 字节请求后, RX 上先出现自身回声(4 字节, byte1=slave 地址),
  * 随后才是应答(8 字节, byte1=0xFF)。在字节流中滑动搜索 [05 FF reg&0x7F]
@@ -276,7 +286,8 @@ static rt_err_t tmc_read_reg(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *value
 }
 
 /* ---------- 正式 API (tmc2209.h, Phase 7-A) ----------
- * 只封装已验证的底层 tmc_read_reg/tmc_write_reg, 不改协议实现。
+ * 只封装已验证的底层读/写实现, 不改协议实现。读走 tmc_read_reg; 写只走带 IFCNT
+ * 到达确认的 tmc2209_write_register_confirmed()(F2d 起为本文件私有)。
  * health 语义: OK=链路通且最近一次传输成功; DEGRADED=链路通但最近失败;
  * FAILED=uart2 打不开; UNINIT=未初始化。 */
 
@@ -315,8 +326,17 @@ rt_err_t tmc2209_read_register(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *val
     return e;
 }
 
-rt_err_t tmc2209_write_register_confirmed(rt_uint8_t addr, rt_uint8_t reg,
-                                          rt_uint32_t value)
+/* ---------- F2d 写入口审计: 本文件里唯一能发出 WRITE 帧的函数 ----------
+ * 调用方(全仓库搜索 applications 目录下的 .c, 逐个核实):
+ *   tmc_cfg_hw_write() —— 唯一调用方。它在配置事务内部: tmc_cfg_apply_ctx() 先
+ *   非阻塞持 txn 锁、再求值运行态门禁(编译期门 + 电机静止未 armed + DRV_ENABLE
+ *   焊盘 LOW + Safety READY + 无锁存故障 + 链路健康), 全部通过才轮到这里的写。
+ * 用途: 下发 GCONF/CHOPCONF/IHOLD_IRUN/TPOWERDOWN 四个配置寄存器。
+ * 自 F2d 起本函数为文件私有: 诊断命令(MSH)与其它模块都无法再直接触发一次真实
+ * 写, 也就无法重演 F2c-NEW-01 那类"读旧值→写回"的跨事务状态污染。
+ * 语义(含 IFCNT 前后各读一次、必须在同一把 xfer 锁内)与 F2c 完全一致。 */
+static rt_err_t tmc2209_write_register_confirmed(rt_uint8_t addr, rt_uint8_t reg,
+                                                 rt_uint32_t value)
 {
     rt_uint32_t before = 0, after = 0;
     rt_err_t e;
@@ -397,38 +417,112 @@ static void tmc_crc_test(void)
 }
 MSH_CMD_EXPORT(tmc_crc_test, TMC2209 CRC8 self test (official vectors 8F/48));
 
-/* probe: READ IFCNT -> WRITE GCONF(原值, 零改动) -> READ IFCNT, 验证 +1。
- * IFCNT 只对有效 WRITE 自增, 所以 +1 证明芯片真实收到并接受了完整写帧。 */
+/* GSTAT(0x01) 位解码: 纯函数, 只拆位、不产生任何总线动作(F2c-NEW-02 的测试对象)。
+ * 位名按 TMC2209 Datasheet Rev.1.09 第 25 页 GSTAT 寄存器表人工核对(证据等级
+ * DATASHEET-CONFIRMED, 不是本板实测):
+ *   bit0 reset   上次读 GSTAT 之后发生过复位, 所有寄存器已清回复位值
+ *   bit1 drv_err 上次读 GSTAT 之后因过温或短路检测被关断过(细节读 DRV_STATUS)
+ *   bit2 uv_cp   电荷泵欠压, 此时驱动被禁用(该标志不打锁, 无需清除)
+ * 旧实现把 bit2 打成 sg2: StallGuard2 的结果在 SG_RESULT(0x41), 与 GSTAT 无关,
+ * 换器件或查故障时会把人引向错误的方向。 */
+static void tmc_gstat_decode(rt_uint32_t gstat, tmc_gstat_dec_t *out)
+{
+    out->reset   = (rt_uint8_t)(gstat & 1u);
+    out->drv_err = (rt_uint8_t)((gstat >> 1) & 1u);
+    out->uv_cp   = (rt_uint8_t)((gstat >> 2) & 1u);
+    out->unknown = ((gstat & ~0x7u) != 0u) ? 1u : 0u;
+}
+
+/* ---------- F2d(F2c-NEW-01): probe 改为**严格只读**的身份/状态检查 ----------
+ * 旧做法 READ GCONF -> WRITE GCONF(原值) -> READ IFCNT 有两条硬伤:
+ *   ① 那条 WRITE 既不在配置事务(apply/arm 共用的 txn 锁)之内, 也不在写入门禁
+ *      之后, 只受"单次传输锁"保护;
+ *   ② 它的写值是**预读到的旧值**。与并发 apply 交错时(预读旧 GCONF=0x101 ->
+ *      另一线程提交新值 0x141 -> probe 把 0x101 写回), pdn_disable 等安全相关位
+ *      会静默回退, 而软件快照仍停在 CONFIGURED —— 快照与芯片实值分离。
+ * 现在: 整段读集在同一个 txn 里完成(非阻塞 try-take, 拿不到就一条都不读),
+ * 全程不发出任何 WRITE 帧。
+ * 如实声明代价: 只读命令再也证明不了"写帧能到达"。写到达凭证只有配置事务内部的
+ * IFCNT+1 确认, 而那要先过编译期门与运行态门禁 —— 未验收前不得为诊断而触发。
+ * txn 持有时长: 链路死了第一次读就退出(最多 1 次超时); 链路活着时三条读各约
+ * 1~2 ms。因此本命令不会长时间挡住 motor_arm / 守卫复核。 */
 static void tmc_uart_probe(void)
 {
-    rt_uint32_t ifcnt1 = 0, ifcnt2 = 0, gconf = 0;
-    rt_err_t e;
+    rt_uint32_t ioin = 0, gstat = 0, ifcnt = 0;
+    rt_err_t txn, e;
+    int reads = 0;
 
-    if (tmc_uart_open() != RT_EOK) return;
+    /* 与 apply / motor_arm 用同一把事务锁: 诊断的读集不能跨在配置序列中间 */
+    txn = tmc2209_cfg_txn_begin();
+    if (txn != RT_EOK)
+    {
+        rt_kprintf("[TMC] probe REFUSED (%d): 配置事务不可用或被占用 -> 不发出任何总线读\n",
+                   (int)txn);
+        return;
+    }
 
-    rt_kprintf("[TMC] probe: IFCNT -> write GCONF(same value) -> IFCNT\n");
+    if (tmc_uart_open() != RT_EOK)
+    {
+        rt_kprintf("[TMC] probe: uart2 打不开, 未发出任何总线读\n");
+        tmc2209_cfg_txn_end();
+        return;
+    }
 
-    e = tmc_read_reg(TMC_ADDR_DEFAULT, TMC_REG_IFCNT, &ifcnt1);
-    if (e != RT_EOK) { rt_kprintf("[TMC] IFCNT#1 read failed\n"); return; }
-    rt_kprintf("[TMC] IFCNT before = %u\n", ifcnt1 & 0xFF);
+    rt_kprintf("[TMC] probe: 只读身份检查 txn-held IOIN+GSTAT+IFCNT (0 个 WRITE 帧)\n");
 
-    e = tmc_read_reg(TMC_ADDR_DEFAULT, TMC_REG_GCONF, &gconf);
-    if (e != RT_EOK) { rt_kprintf("[TMC] GCONF read failed\n"); return; }
-    rt_kprintf("[TMC] GCONF = 0x%08X (writing same value back)\n", gconf);
+    e = tmc_read_reg(TMC_ADDR_DEFAULT, TMC_REG_IOIN, &ioin);
+    reads++;
+    if (e != RT_EOK)
+    {
+        /* 链路/供电/在位有问题时不再逐条锤死总线: 一条读失败就结束(txn 立即归还) */
+        rt_kprintf("[TMC] IOIN read failed (%d) -> 无法确认身份; 这不等于芯片损坏\n",
+                   (int)e);
+        tmc2209_cfg_txn_end();
+        return;
+    }
+    rt_kprintf("[TMC] IOIN = 0x%08X VERSION = 0x%02X -> %s\n",
+               (unsigned)ioin, (unsigned)((ioin >> 24) & 0xFFu),
+               (((ioin >> 24) & 0xFFu) == 0x21u)
+                   ? "TMC2209 (0x21) 身份一致"
+                   : "VERSION 非 0x21: 不是 TMC2209(0x20=TMC2208)");
 
-    e = tmc_write_reg(TMC_ADDR_DEFAULT, TMC_REG_GCONF, gconf);
-    if (e != RT_EOK) { rt_kprintf("[TMC] GCONF write failed\n"); return; }
+    if (tmc_read_reg(TMC_ADDR_DEFAULT, TMC_REG_GSTAT, &gstat) == RT_EOK)
+    {
+        tmc_gstat_dec_t gs;
+        rt_uint8_t lo = (rt_uint8_t)(gstat & 0xFFu);
 
-    e = tmc_read_reg(TMC_ADDR_DEFAULT, TMC_REG_IFCNT, &ifcnt2);
-    if (e != RT_EOK) { rt_kprintf("[TMC] IFCNT#2 read failed\n"); return; }
-    rt_kprintf("[TMC] IFCNT after  = %u\n", ifcnt2 & 0xFF);
-
-    if ((ifcnt2 & 0xFF) == ((ifcnt1 + 1) & 0xFF))
-        rt_kprintf("[TMC] IFCNT +1 -> TMC2209 ALIVE (write accepted)\n");
+        tmc_gstat_decode(gstat, &gs);
+        reads++;
+        rt_kprintf("[TMC] GSTAT = 0x%02X reset=%u drv_err=%u uv_cp=%u\n",
+                   (unsigned)lo, gs.reset, gs.drv_err, gs.uv_cp);
+        if (gs.unknown)
+            rt_kprintf("[TMC] !! GSTAT=0x%08X 含手册未定义的高位(只定义 bit0..bit2)\n",
+                       (unsigned)gstat);
+        if (gs.uv_cp)
+            rt_kprintf("[TMC] !! uv_cp=1: 电荷泵欠压, 此时驱动被禁用(不是 StallGuard)\n");
+    }
     else
-        rt_kprintf("[TMC] IFCNT did not increment as expected\n");
+    {
+        reads++;
+        rt_kprintf("[TMC] GSTAT read failed\n");
+    }
+
+    if (tmc_read_reg(TMC_ADDR_DEFAULT, TMC_REG_IFCNT, &ifcnt) == RT_EOK)
+    {
+        reads++;
+        rt_kprintf("[TMC] IFCNT = %u (只读观察: 手册规定读不改变它; 本命令未写任何寄存器)\n",
+                   (unsigned)(ifcnt & 0xFFu));
+    }
+    else
+    {
+        reads++;
+        rt_kprintf("[TMC] IFCNT read failed\n");
+    }
+
+    tmc2209_cfg_txn_end();
+    rt_kprintf("[TMC] probe 结束: 读事务 %d 次, WRITE 帧 0 个\n", reads);
 }
-MSH_CMD_EXPORT(tmc_uart_probe, probe TMC2209: IFCNT-write-IFCNT handshake);
+MSH_CMD_EXPORT(tmc_uart_probe, read-only TMC2209 identity probe IOIN GSTAT IFCNT);
 
 /* 只读扫描: 地址 0..3 逐个 READ IOIN(0x06), 不执行任何 WRITE、不改配置。
  * 复用 tmc_read_reg(含回声过滤/应答头搜索/CRC 校验), 不另起第二套协议实现。
@@ -510,8 +604,14 @@ static void tmc_status(void)
 
     if (tmc_read_reg(TMC_ADDR_DEFAULT, TMC_REG_GSTAT, &gstat) == RT_EOK)
     {
-        rt_kprintf("[TMC] GSTAT=%02X (reset=%d drv_err=%d sg2=%d)\n",
-                   (rt_uint8_t)gstat, gstat & 1, (gstat >> 1) & 1, (gstat >> 2) & 1);
+        tmc_gstat_dec_t gs;
+
+        tmc_gstat_decode(gstat, &gs);
+        rt_kprintf("[TMC] GSTAT=%02X (reset=%u drv_err=%u uv_cp=%u)\n",
+                   (unsigned)(gstat & 0xFFu), gs.reset, gs.drv_err, gs.uv_cp);
+        if (gs.unknown)
+            rt_kprintf("[TMC] !! GSTAT=0x%08X 含手册未定义的高位(只定义 bit0..bit2)\n",
+                       (unsigned)gstat);
     }
     else
     {
