@@ -66,7 +66,11 @@ subsys_health_t tmc2209_get_health(void);
 
 /* 待写寄存器补全 */
 #define TMC_REG_CHOPCONF     0x6C
-#define TMC_REG_TPOWERDOWN   0x3C
+#define TMC_REG_TPOWERDOWN   0x11    /* ⚠ F2 曾误写为 0x3C(未经核实的猜测):
+                                      * 芯片对任意地址的 WRITE 都会让 IFCNT 自增,
+                                      * 所以写错地址不会被到达确认发现。
+                                      * 现按官方确认表定为 0x11, 并由
+                                      * tmc_cfg_selftest + 编译期断言钉住。 */
 
 /* GCONF 位(Rev.1.09 §5.1: bit0 复位默认 1, bit8 复位默认 1) */
 #define TMC_GCONF_I_SCALE_ANALOG    (1u << 0)   /* 1 = 用 VREF 引脚电压作电流基准 */
@@ -151,5 +155,24 @@ rt_bool_t tmc_change_is_current_safe(rt_uint8_t vsense_old, rt_uint8_t vsense_ne
  * 任一步失败 → 立即中止并置 TMC_DRV_FAILED(不回滚、不继续写)。
  * 返回 -RT_EPERM = 硬件门禁未开放(编译期), 此时不产生任何总线写且状态不变。 */
 rt_err_t tmc2209_apply_config(void);
+
+/* 配置有效性复核(F2a): TMC 断电/复位/重连后寄存器会回到默认值, 而 MCU 侧
+ * 状态不会自动知道 → 不能"UART 又能通了"就当作电流配置仍然有效。
+ * 本函数把已下发的 GCONF/CHOPCONF 目标值与芯片现值逐项比对:
+ *   RT_EOK    = 一致, 配置仍有效
+ *   -RT_EPERM = 尚未 CONFIGURED / 链路不健康(不猜, 直接判不可信)
+ *   -RT_EIO   = 现值与已下发值不符 或 读不到 → 状态立即降级为 FAILED
+ * 只在明确需要的地方调用(motor_arm 决策点、tmc_config_show), 不放进周期任务,
+ * 以免每次状态打印都产生总线流量。 */
+rt_err_t tmc2209_config_integrity_check(void);
+
+/* 供 motor 门禁使用的纯状态判定(无总线访问、无副作用):
+ * 只有 TMC_DRV_CONFIGURED 才返回 RT_TRUE。链路/复位后的真实性由
+ * motor_arm() 额外调用 tmc2209_config_integrity_check() 把关。 */
+rt_bool_t tmc2209_drive_config_ok_for_arm(void);
+
+/* 已下发配置的只读快照(供诊断显示; 未成功下发过则返回 RT_FALSE)。 */
+rt_bool_t tmc2209_get_applied_config(rt_uint32_t *gconf, rt_uint32_t *chop,
+                                      tmc_drv_config_t *out);
 
 #endif /* TMC2209_H */

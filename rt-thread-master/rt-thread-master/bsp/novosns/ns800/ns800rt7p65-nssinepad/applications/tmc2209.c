@@ -509,18 +509,39 @@ static void tmc_status(void)
 }
 MSH_CMD_EXPORT(tmc_status, read TMC2209 GSTAT/IOIN);
 
-/* ================= Phase 8-F2: 驱动参数配置(软件准备, 默认不启用) =================
+/* ================= Phase 8-F2/F2a: 驱动参数配置(软件准备, 默认不启用) =========
  *
  * 编译期硬门禁: 当前扩展板 U5 与门异常 / 急停非门异常 / TMC_ENN 实测约 0V /
- * H2 限位未接, 安全链未验收 → 必须保持 RT_FALSE; 翻转它需要单独提交 + 硬件验证
- * 记录。门禁为 FALSE 时本节的 apply 不向总线发出任何写, 状态也不改变。
+ * H2 限位未接, 安全链未验收 → 必须保持 RT_FALSE; 翻转需单独提交 + 硬件验证记录。
+ * 门禁为 FALSE 时 apply 不向总线发出任何写, 也不改变状态。
  * apply 只写配置寄存器: 不碰 ENN / MCU_DRV_ENABLE, 不写 VACTUAL, 不产生 STEP。 */
 #ifndef TMC_DRIVE_CONFIG_HW_VALIDATED
 #define TMC_DRIVE_CONFIG_HW_VALIDATED   RT_FALSE
 #endif
 
-/* 计划参数, 位置初始化:
- * { irun, ihold, ihold_delay, tpowerdown, vsense, mstep_reg_select, mres }
+/* ---- F2a: 寄存器地址/位定义编译期钉住 --------------------------------------
+ * 写错地址是"沉默失败": 芯片对任意地址的 WRITE 都应答并让 IFCNT 自增, 到达
+ * 确认发现不了地址错误(F2 就把 TPOWERDOWN 误写成 0x3C)。故在此用编译期断言
+ * 把官方确认值固定下来 —— 条件为假时数组长度 -1, 直接编译失败。 */
+#define TMC_CFG_STATIC_ASSERT(cond, tag) \
+    typedef char tmc_cfg_static_assert_##tag[((cond) ? 1 : -1)]
+
+TMC_CFG_STATIC_ASSERT(TMC_REG_GCONF      == 0x00, gconf_addr);
+TMC_CFG_STATIC_ASSERT(TMC_REG_CHOPCONF   == 0x6C, chopconf_addr);
+TMC_CFG_STATIC_ASSERT(TMC_REG_IHOLD_IRUN == 0x10, ihold_irun_addr);
+TMC_CFG_STATIC_ASSERT(TMC_REG_TPOWERDOWN == 0x11, tpowerdown_addr);
+TMC_CFG_STATIC_ASSERT(TMC_GCONF_PDN_DISABLE  == (1u << 6),    gconf_pdn_disable_bit);
+TMC_CFG_STATIC_ASSERT(TMC_GCONF_I_SCALE_ANALOG == (1u << 0),  gconf_iscale_bit);
+TMC_CFG_STATIC_ASSERT(TMC_GCONF_MSTEP_REG_SELECT == (1u << 7), gconf_mstepsel_bit);
+TMC_CFG_STATIC_ASSERT(TMC_CHOPCONF_VSENSE == 0x00020000u, chopconf_vsense_bit17);
+TMC_CFG_STATIC_ASSERT(TMC_CHOPCONF_TOFF_MASK == 0x0Fu,     chopconf_toff_bits);
+TMC_CFG_STATIC_ASSERT(TMC_IHOLD_MASK == 0x1Fu,             ihold_field_mask);
+TMC_CFG_STATIC_ASSERT(TMC_IRUN_SHIFT == 8 && TMC_IRUN_MASK == 0x1F00u, irun_field);
+TMC_CFG_STATIC_ASSERT(TMC_IHOLDDELAY_SHIFT == 16 &&
+                      TMC_IHOLDDELAY_MASK == 0x000F0000u,  iholddelay_field);
+
+/* ---- 待下发计划参数 ---------------------------------------------------------
+ * 位置初始化: { irun, ihold, ihold_delay, tpowerdown, vsense, mstep_sel, mres }
  * ⚠ 全部为"待验证配置", 不是已实测事实。 */
 static const tmc_drv_config_t tmc_cfg_planned = { 20, 8, 4, 8, 1, 0, 0 };
 
@@ -529,10 +550,49 @@ static const tmc_drv_config_t tmc_cfg_planned = { 20, 8, 4, 8, 1, 0, 0 };
 #define TMC_CFG_RSENSE_MOHM   110u
 #define TMC_CFG_VREF_MV       1270u
 
-static tmc_drv_cfg_state_t tmc_cfg_state = TMC_DRV_UNCONFIGURED;
-static rt_uint8_t tmc_cfg_fail_reg = 0;         /* 失败发生在哪个寄存器(0=无) */
-static rt_err_t   tmc_cfg_last_err = RT_EOK;
+/* 目标值(由上面计划参数推导, 单元测试逐项核对, 防手改漂移) */
+#define TMC_CFG_TGT_GCONF     0x00000141u   /* 基线 0x101 | pdn_disable(bit6) */
+#define TMC_CFG_TGT_CHOPCONF  0x15030053u   /* 基线 | vsense(bit17) */
+#define TMC_CFG_TGT_IHOLD_IRUN 0x00041408u  /* ihold=8 irun=20 dly=4 */
+#define TMC_CFG_TGT_TPOWERDOWN 0x00000008u
 
+/* ---- 配置生命周期状态 ---- */
+static tmc_drv_cfg_state_t tmc_cfg_state = TMC_DRV_UNCONFIGURED;
+static rt_uint8_t tmc_cfg_fail_reg  = 0;         /* 失败发生在哪个寄存器(0=无) */
+static rt_err_t   tmc_cfg_last_err  = RT_EOK;
+static rt_bool_t  tmc_cfg_fail_from_integrity = RT_FALSE;
+
+/* 成功下发后的快照: 断电/复位后芯片寄存器回默认值, 而 MCU 侧不会自动知道,
+ * 只能靠"已下发值 vs 现值"比对照出来。 */
+static rt_uint32_t      tmc_cfg_done_gconf = 0;
+static rt_uint32_t      tmc_cfg_done_chop = 0;
+static tmc_drv_config_t tmc_cfg_done;
+static rt_bool_t        tmc_cfg_done_valid = RT_FALSE;
+
+/* ---- 总线接缝: 配置序列只经它访问硬件, 便于用假总线做离线测试 ------------ */
+typedef struct
+{
+    rt_err_t (*open) (void);
+    rt_err_t (*read) (rt_uint8_t reg, rt_uint32_t *v);
+    rt_err_t (*write)(rt_uint8_t reg, rt_uint32_t v);   /* 内含 IFCNT 到达确认 */
+} tmc_cfg_bus_t;
+
+static rt_err_t tmc_cfg_hw_open(void)  { return tmc2209_init(); }
+static rt_err_t tmc_cfg_hw_read(rt_uint8_t reg, rt_uint32_t *v)
+{
+    return tmc2209_read_register(TMC_ADDR_DEFAULT, reg, v);
+}
+static rt_err_t tmc_cfg_hw_write(rt_uint8_t reg, rt_uint32_t v)
+{
+    return tmc2209_write_register_confirmed(TMC_ADDR_DEFAULT, reg, v);
+}
+static const tmc_cfg_bus_t tmc_cfg_bus_real =
+{
+    tmc_cfg_hw_open, tmc_cfg_hw_read, tmc_cfg_hw_write
+};
+static const tmc_cfg_bus_t *tmc_cfg_bus = &tmc_cfg_bus_real;
+
+/* ---- 纯函数: 状态名 / 理论电流 / 打包 / 方向守卫 ---- */
 const char *tmc_drv_cfg_state_name(tmc_drv_cfg_state_t s)
 {
     switch (s)
@@ -551,6 +611,16 @@ void tmc2209_get_planned_config(tmc_drv_config_t *out)
     if (out != RT_NULL) *out = tmc_cfg_planned;
 }
 
+rt_bool_t tmc2209_get_applied_config(rt_uint32_t *gconf, rt_uint32_t *chop,
+                                      tmc_drv_config_t *out)
+{
+    if (!tmc_cfg_done_valid) return RT_FALSE;
+    if (gconf) *gconf = tmc_cfg_done_gconf;
+    if (chop)  *chop  = tmc_cfg_done_chop;
+    if (out)   *out   = tmc_cfg_done;
+    return RT_TRUE;
+}
+
 /* CS*1000。手册: "IRUN, IHOLD: 1/32 to 32/32 of full-scale current" */
 rt_uint32_t tmc_cs_milli(rt_uint8_t field)
 {
@@ -559,8 +629,8 @@ rt_uint32_t tmc_cs_milli(rt_uint8_t field)
 }
 
 /* I_peak[mA] = V_FS/(RSENSE+Rds) × CS × min(VREF,2.5V)/2.5V。
- * 口径由手册自身的算例校准: "set vsense for max. 180mV at sense resistor
- * (0R15: 1.1A peak)" → 0.18V/(0.15+0.02) = 1.06A ≈ 1.1A peak。 */
+ * 口径由手册自身算例校准: "set vsense for max. 180mV at sense resistor
+ * (0R15: 1.1A peak)" -> 0.18V/(0.15+0.02) = 1.06A ≈ 1.1A peak。 */
 rt_uint32_t tmc_current_peak_ma(rt_uint32_t vfs_mv, rt_uint32_t rsense_mohm,
                                 rt_uint32_t vref_mv, rt_uint8_t irun)
 {
@@ -568,7 +638,7 @@ rt_uint32_t tmc_current_peak_ma(rt_uint32_t vfs_mv, rt_uint32_t rsense_mohm,
     rt_uint32_t rtot = rsense_mohm + TMC_SENSE_RDS_MOHM;
 
     if (rtot == 0u) return 0u;
-    if (vref_mv > TMC_VREF_FULL_MV) vref_mv = TMC_VREF_FULL_MV;   /* ≥2.5V=100% */
+    if (vref_mv > TMC_VREF_FULL_MV) vref_mv = TMC_VREF_FULL_MV;   /* >=2.5V=100% */
 
     num = (rt_uint64_t)vfs_mv * 1000ull
           * (rt_uint64_t)tmc_cs_milli(irun)
@@ -577,7 +647,6 @@ rt_uint32_t tmc_current_peak_ma(rt_uint32_t vfs_mv, rt_uint32_t rsense_mohm,
     return (rt_uint32_t)num;
 }
 
-/* I_rms = I_peak/√2 (定点 + 四舍五入) */
 rt_uint32_t tmc_current_rms_ma(rt_uint32_t vfs_mv, rt_uint32_t rsense_mohm,
                                rt_uint32_t vref_mv, rt_uint8_t irun)
 {
@@ -598,35 +667,37 @@ rt_uint32_t tmc_ihold_irun_pack(const tmc_drv_config_t *c)
 }
 
 /* vsense 由 1 改回 0 会把满量程从 180mV 抬到 325mV(约 1.8 倍)。手册要求换
- * vsense 时同步下调 IRUN 以防过流 —— 但 IHOLD_IRUN 只写不可读, 芯片里现在
- * 是哪一档无从回读核实。因此任何 1->0 方向一律拒绝: 要改回去只能断电复位
- * 后从已知起点重新下发整套配置。 */
+ * vsense 时同步下调 IRUN 以防过流 —— 而 IHOLD_IRUN 只写不可读, 芯片里现在是
+ * 哪一档无从回读核实, 因此该方向一律拒绝: 要改回去只能断电复位后从已知起点
+ * 重新下发整套配置。 */
 rt_bool_t tmc_change_is_current_safe(rt_uint8_t vsense_old, rt_uint8_t vsense_new)
 {
     if (vsense_old == 1u && vsense_new == 0u) return RT_FALSE;
     return RT_TRUE;
 }
 
-/* 写 + IFCNT 到达确认 +(可读寄存器)读回比对。 */
-static rt_err_t tmc_cfg_write_one(rt_uint8_t reg, rt_uint32_t val, rt_bool_t readable)
+/* ---- RMW 计算(纯函数, 便于离线断言"不粗暴覆盖无关字段") ---- */
+rt_uint32_t tmc_gconf_next(rt_uint32_t cur, const tmc_drv_config_t *c)
 {
-    rt_err_t    e = tmc2209_write_register_confirmed(TMC_ADDR_DEFAULT, reg, val);
-    rt_uint32_t rb = 0;
-
-    if (e != RT_EOK) return e;                        /* IFCNT 未 +1 = 未被接受 */
-    if (!readable)   return RT_EOK;                   /* 只写寄存器: 不要求读回 */
-
-    e = tmc2209_read_register(TMC_ADDR_DEFAULT, reg, &rb);
-    if (e != RT_EOK) return e;
-    if (rb != val)
-    {
-        rt_kprintf("[TMC-CFG] readback MISMATCH reg=0x%02X wrote=%08X read=%08X\n",
-                   reg, (unsigned)val, (unsigned)rb);
-        return -RT_EIO;
-    }
-    return RT_EOK;
+    rt_uint32_t v = cur & ~(TMC_GCONF_I_SCALE_ANALOG | TMC_GCONF_PDN_DISABLE |
+                            TMC_GCONF_MSTEP_REG_SELECT);
+    v |= TMC_GCONF_I_SCALE_ANALOG | TMC_GCONF_PDN_DISABLE;
+    if (c->mstep_reg_select) v |= TMC_GCONF_MSTEP_REG_SELECT;
+    return v;
 }
 
+rt_uint32_t tmc_chopconf_next(rt_uint32_t cur, const tmc_drv_config_t *c)
+{
+    rt_uint32_t v = cur & ~TMC_CHOPCONF_VSENSE;
+    if (c->vsense) v |= TMC_CHOPCONF_VSENSE;
+    if (c->mstep_reg_select)
+        v = (v & ~((rt_uint32_t)TMC_CHOPCONF_MRES_MASK << TMC_CHOPCONF_MRES_SHIFT))
+            | (((rt_uint32_t)c->mres & TMC_CHOPCONF_MRES_MASK)
+               << TMC_CHOPCONF_MRES_SHIFT);
+    return v;
+}
+
+/* ---- 失败与写入 ---- */
 static rt_err_t tmc_cfg_fail(rt_uint8_t reg, rt_err_t e, const char *stage)
 {
     tmc_cfg_fail_reg = reg;
@@ -638,14 +709,36 @@ static rt_err_t tmc_cfg_fail(rt_uint8_t reg, rt_err_t e, const char *stage)
     return (e == RT_EOK) ? -RT_ERROR : e;
 }
 
-rt_err_t tmc2209_apply_config(void)
+/* 写 + IFCNT 到达确认 +(可读寄存器)读回比对。只写寄存器不发非法读。 */
+static rt_err_t tmc_cfg_write_one(rt_uint8_t reg, rt_uint32_t val, rt_bool_t readable)
+{
+    rt_err_t    e = tmc_cfg_bus->write(reg, val);
+    rt_uint32_t rb = 0;
+
+    if (e != RT_EOK) return e;                    /* IFCNT 未 +1 = 芯片没接受 */
+    if (!readable)   return RT_EOK;               /* 只写: 不读回 */
+
+    e = tmc_cfg_bus->read(reg, &rb);
+    if (e != RT_EOK) return e;
+    if (rb != val)
+    {
+        rt_kprintf("[TMC-CFG] readback MISMATCH reg=0x%02X wrote=%08X read=%08X\n",
+                   reg, (unsigned)val, (unsigned)rb);
+        return -RT_EIO;
+    }
+    return RT_EOK;
+}
+
+/* 配置序列本体。allow_hw 由调用方决定: 生产路径传编译期门禁, 离线自测传 TRUE
+ * 但同时必须把 tmc_cfg_bus 换成假总线(见 tmc_cfg_selftest), 因此自测不会碰 UART。 */
+static rt_err_t tmc_cfg_run(const tmc_drv_config_t *c, const tmc_cfg_bus_t *bus,
+                            rt_bool_t allow_hw)
 {
     rt_uint32_t gconf = 0, chop = 0, new_g, new_c;
     rt_uint8_t  old_vs;
     rt_err_t    e;
-    const tmc_drv_config_t c = tmc_cfg_planned;
 
-    if (!TMC_DRIVE_CONFIG_HW_VALIDATED)
+    if (!allow_hw)
     {
         rt_kprintf("[TMC-CFG] REFUSED: 硬件安全链未验收"
                    " (TMC_DRIVE_CONFIG_HW_VALIDATED=FALSE) - 未发出任何总线写,"
@@ -654,77 +747,133 @@ rt_err_t tmc2209_apply_config(void)
     }
     if (tmc_cfg_state == TMC_DRV_CONFIGURING) return -RT_EBUSY;
 
-    if (tmc2209_init() != RT_EOK)
+    tmc_cfg_bus = bus;
+    if (tmc_cfg_bus->open() != RT_EOK)
         return tmc_cfg_fail(0, -RT_ERROR, "uart-open");
 
     tmc_cfg_state = TMC_DRV_CONFIGURING;
     rt_kprintf("[TMC-CFG] apply start: irun=%u ihold=%u dly=%u tpd=%u vsense=%u\n",
-               c.irun, c.ihold, c.ihold_delay, c.tpowerdown, c.vsense);
+               c->irun, c->ihold, c->ihold_delay, c->tpowerdown, c->vsense);
 
     /* ---- 1) GCONF: 只置 i_scale_analog + pdn_disable, 其余保留(含 OTP 派生位) */
-    e = tmc2209_read_register(TMC_ADDR_DEFAULT, TMC_REG_GCONF, &gconf);
+    e = tmc_cfg_bus->read(TMC_REG_GCONF, &gconf);
     if (e != RT_EOK) return tmc_cfg_fail(TMC_REG_GCONF, e, "GCONF-read");
 
     /* internal_Rsense=1 时 VREF 引脚被内部拉到 GND, 外部 0.11R 模型与 VREF
-     * 分档一起失效 → 不是"写不进去"而是"算了也不对", 必须 fail closed。 */
+     * 分档一起失效 -> 不是"写不进去"而是"算了也不对", 必须 fail closed。 */
     if (gconf & TMC_GCONF_INTERNAL_RSENSE)
         return tmc_cfg_fail(TMC_REG_GCONF, -RT_EPERM, "GCONF.internal_Rsense=1");
 
-    new_g = (gconf & ~(TMC_GCONF_I_SCALE_ANALOG | TMC_GCONF_PDN_DISABLE |
-                        TMC_GCONF_MSTEP_REG_SELECT))
-            | TMC_GCONF_I_SCALE_ANALOG | TMC_GCONF_PDN_DISABLE;
-    if (c.mstep_reg_select) new_g |= TMC_GCONF_MSTEP_REG_SELECT;
-
+    new_g = tmc_gconf_next(gconf, c);
     rt_kprintf("[TMC-CFG] GCONF %08X -> %08X\n",
                (unsigned)gconf, (unsigned)new_g);
     e = tmc_cfg_write_one(TMC_REG_GCONF, new_g, RT_TRUE);
     if (e != RT_EOK) return tmc_cfg_fail(TMC_REG_GCONF, e, "GCONF-write");
 
     /* ---- 2) CHOPCONF: 只动 vsense(及可选 MRES), TOFF/HSTRT/HEND/TBL 全保留 */
-    e = tmc2209_read_register(TMC_ADDR_DEFAULT, TMC_REG_CHOPCONF, &chop);
+    e = tmc_cfg_bus->read(TMC_REG_CHOPCONF, &chop);
     if (e != RT_EOK) return tmc_cfg_fail(TMC_REG_CHOPCONF, e, "CHOPCONF-read");
 
     old_vs = (chop & TMC_CHOPCONF_VSENSE) ? 1u : 0u;
-    if (!tmc_change_is_current_safe(old_vs, c.vsense))
+    if (!tmc_change_is_current_safe(old_vs, c->vsense))
         return tmc_cfg_fail(TMC_REG_CHOPCONF, -RT_EPERM, "CHOPCONF.overcurrent-dir");
 
-    new_c = chop & ~TMC_CHOPCONF_VSENSE;
-    if (c.vsense) new_c |= TMC_CHOPCONF_VSENSE;
-    if (c.mstep_reg_select)
-        new_c = (new_c &
-                 ~((rt_uint32_t)TMC_CHOPCONF_MRES_MASK << TMC_CHOPCONF_MRES_SHIFT))
-                | (((rt_uint32_t)c.mres & TMC_CHOPCONF_MRES_MASK)
-                   << TMC_CHOPCONF_MRES_SHIFT);
-
-    /* 不变式: TOFF 必须原样保留(TOFF=0 会关断所有桥, 属意外副作用) */
+    /* 不变式: TOFF 必须原样保留且非 0(TOFF=0 会关断所有桥) */
+    new_c = tmc_chopconf_next(chop, c);
     if ((new_c & TMC_CHOPCONF_TOFF_MASK) != (chop & TMC_CHOPCONF_TOFF_MASK))
         return tmc_cfg_fail(TMC_REG_CHOPCONF, -RT_EINVAL, "CHOPCONF.TOFF-changed");
+    if ((new_c & TMC_CHOPCONF_TOFF_MASK) == 0u)
+        return tmc_cfg_fail(TMC_REG_CHOPCONF, -RT_EINVAL, "CHOPCONF.TOFF-zero");
 
     rt_kprintf("[TMC-CFG] CHOPCONF %08X -> %08X (vsense %u -> %u)\n",
-               (unsigned)chop, (unsigned)new_c, old_vs, c.vsense);
+               (unsigned)chop, (unsigned)new_c, old_vs, c->vsense);
     e = tmc_cfg_write_one(TMC_REG_CHOPCONF, new_c, RT_TRUE);
     if (e != RT_EOK) return tmc_cfg_fail(TMC_REG_CHOPCONF, e, "CHOPCONF-write");
 
     /* ---- 3) IHOLD_IRUN: 只写寄存器, 到达凭证只有 IFCNT+1 ---- */
-    rt_kprintf("[TMC-CFG] IHOLD_IRUN <- %08X (write-only, 不要求读回)\n",
-               (unsigned)tmc_ihold_irun_pack(&c));
-    e = tmc_cfg_write_one(TMC_REG_IHOLD_IRUN, tmc_ihold_irun_pack(&c), RT_FALSE);
+    rt_kprintf("[TMC-CFG] IHOLD_IRUN <- %08X (只写, 不读回)\n",
+               (unsigned)tmc_ihold_irun_pack(c));
+    e = tmc_cfg_write_one(TMC_REG_IHOLD_IRUN, tmc_ihold_irun_pack(c), RT_FALSE);
     if (e != RT_EOK) return tmc_cfg_fail(TMC_REG_IHOLD_IRUN, e, "IHOLD_IRUN-write");
 
-    /* ---- 4) TPOWERDOWN ---- */
-    rt_kprintf("[TMC-CFG] TPOWERDOWN <- %u\n", c.tpowerdown);
-    e = tmc_cfg_write_one(TMC_REG_TPOWERDOWN, c.tpowerdown, RT_FALSE);
+    /* ---- 4) TPOWERDOWN: 同样按只写处理(不做非法读回) ---- */
+    rt_kprintf("[TMC-CFG] TPOWERDOWN(0x%02X) <- %u\n",
+               TMC_REG_TPOWERDOWN, c->tpowerdown);
+    e = tmc_cfg_write_one(TMC_REG_TPOWERDOWN, c->tpowerdown, RT_FALSE);
     if (e != RT_EOK) return tmc_cfg_fail(TMC_REG_TPOWERDOWN, e, "TPOWERDOWN-write");
 
-    tmc_cfg_state  = TMC_DRV_CONFIGURED;
-    tmc_cfg_fail_reg = 0;
-    tmc_cfg_last_err = RT_EOK;
+    /* 全部到位: 存快照供 integrity 复核 */
+    tmc_cfg_done_gconf = new_g;
+    tmc_cfg_done_chop  = new_c;
+    tmc_cfg_done       = *c;
+    tmc_cfg_done_valid = RT_TRUE;
+    tmc_cfg_state      = TMC_DRV_CONFIGURED;
+    tmc_cfg_fail_reg   = 0;
+    tmc_cfg_last_err   = RT_EOK;
+    tmc_cfg_fail_from_integrity = RT_FALSE;
     rt_kprintf("[TMC-CFG] CONFIGURED (各次写入均经 IFCNT 确认; GCONF/CHOPCONF"
                " 读回一致)。电流值仍为理论计算, 未实测。\n");
     return RT_EOK;
 }
 
-/* ---------- MSH: 配置查看 / 受控下发 / 纯计算自检 ---------- */
+rt_err_t tmc2209_apply_config(void)
+{
+    return tmc_cfg_run(&tmc_cfg_planned, &tmc_cfg_bus_real,
+                       TMC_DRIVE_CONFIG_HW_VALIDATED);
+}
+
+rt_bool_t tmc2209_drive_config_ok_for_arm(void)
+{
+    return (tmc_cfg_state == TMC_DRV_CONFIGURED) ? RT_TRUE : RT_FALSE;
+}
+
+/* 见头文件说明: 芯片断电/复位后寄存器回默认, 必须在这里被照出来。 */
+rt_err_t tmc2209_config_integrity_check(void)
+{
+    rt_uint32_t v = 0;
+    subsys_health_t h = tmc2209_get_health();
+
+    if (tmc_cfg_state != TMC_DRV_CONFIGURED || !tmc_cfg_done_valid)
+        return -RT_EPERM;
+
+    /* 链路本身已不可信时不猜: 直接降级(读不到 != 配置还在) */
+    if (h == SUBSYS_FAILED || h == SUBSYS_DEGRADED)
+    {
+        tmc_cfg_fail_from_integrity = RT_TRUE;
+        return tmc_cfg_fail(0, -RT_EIO, "integrity:link-not-healthy");
+    }
+
+    v = 0;
+    if (tmc_cfg_bus->read(TMC_REG_GCONF, &v) != RT_EOK)
+    {
+        tmc_cfg_fail_from_integrity = RT_TRUE;
+        return tmc_cfg_fail(TMC_REG_GCONF, -RT_EIO, "integrity:GCONF-read");
+    }
+    if (v != tmc_cfg_done_gconf)
+    {
+        rt_kprintf("[TMC-CFG] !! GCONF 已偏离下发值 (%08X != %08X) - 芯片可能断电/复位\n",
+                   (unsigned)v, (unsigned)tmc_cfg_done_gconf);
+        tmc_cfg_fail_from_integrity = RT_TRUE;
+        return tmc_cfg_fail(TMC_REG_GCONF, -RT_EIO, "integrity:GCONF-mismatch");
+    }
+
+    v = 0;
+    if (tmc_cfg_bus->read(TMC_REG_CHOPCONF, &v) != RT_EOK)
+    {
+        tmc_cfg_fail_from_integrity = RT_TRUE;
+        return tmc_cfg_fail(TMC_REG_CHOPCONF, -RT_EIO, "integrity:CHOPCONF-read");
+    }
+    if (v != tmc_cfg_done_chop)
+    {
+        rt_kprintf("[TMC-CFG] !! CHOPCONF 已偏离下发值 (%08X != %08X) - vsense 档可能已丢\n",
+                   (unsigned)v, (unsigned)tmc_cfg_done_chop);
+        tmc_cfg_fail_from_integrity = RT_TRUE;
+        return tmc_cfg_fail(TMC_REG_CHOPCONF, -RT_EIO, "integrity:CHOPCONF-mismatch");
+    }
+    return RT_EOK;
+}
+
+/* ---------- MSH: 配置查看 / 受控下发 / 离线自检 ---------- */
 
 static void tmc_config_show(void)
 {
@@ -734,16 +883,19 @@ static void tmc_config_show(void)
     rt_uint32_t hold = tmc_current_rms_ma(vfs, TMC_CFG_RSENSE_MOHM, TMC_CFG_VREF_MV, c.ihold);
     rt_uint32_t v = 0;
 
-    rt_kprintf("[TMC-CFG] state=%s fail_reg=0x%02X last_err=%d\n",
+    rt_kprintf("[TMC-CFG] state=%s fail_reg=0x%02X last_err=%d from_integrity=%d\n",
                tmc_drv_cfg_state_name(tmc_cfg_state),
-               tmc_cfg_fail_reg, (int)tmc_cfg_last_err);
+               tmc_cfg_fail_reg, (int)tmc_cfg_last_err,
+               (int)tmc_cfg_fail_from_integrity);
     rt_kprintf("[TMC-CFG] hw_write_gate=%s (安全链验收后才可翻转)\n",
                TMC_DRIVE_CONFIG_HW_VALIDATED ? "OPEN" : "CLOSED");
     rt_kprintf("[TMC-CFG] planned irun=%u ihold=%u dly=%u tpd=%u vsense=%u mstep_sel=%u mres=%u\n",
                c.irun, c.ihold, c.ihold_delay, c.tpowerdown,
                c.vsense, c.mstep_reg_select, c.mres);
-    rt_kprintf("[TMC-CFG] IHOLD_IRUN packed=0x%08X (只写寄存器, 不要求读回)\n",
-               (unsigned)tmc_ihold_irun_pack(&c));
+    rt_kprintf("[TMC-CFG] targets GCONF=%08X CHOPCONF=%08X IHOLD_IRUN=%08X TPOWERDOWN(0x%02X)=%02X\n",
+               (unsigned)TMC_CFG_TGT_GCONF, (unsigned)TMC_CFG_TGT_CHOPCONF,
+               (unsigned)TMC_CFG_TGT_IHOLD_IRUN, TMC_REG_TPOWERDOWN,
+               (unsigned)TMC_CFG_TGT_TPOWERDOWN);
     rt_kprintf("[TMC-CFG] 理论: V_FS=%umV Rsense=%umO(+%umO Rds) VREF=%umV\n",
                (unsigned)vfs, (unsigned)TMC_CFG_RSENSE_MOHM,
                (unsigned)TMC_SENSE_RDS_MOHM, (unsigned)TMC_CFG_VREF_MV);
@@ -751,6 +903,10 @@ static void tmc_config_show(void)
                " (电机额定 1500 mA RMS)\n", (unsigned)run, (unsigned)hold);
     rt_kprintf("[TMC-CFG] !! 理论值, 未实测: VREF 为万用表读数(未在本固件核实),"
                " RSENSE 为商品页暂定值。不得当作实测电流使用。\n");
+
+    if (tmc_cfg_state == TMC_DRV_CONFIGURED)
+        rt_kprintf("[TMC-CFG] applied snapshot: GCONF=%08X CHOPCONF=%08X\n",
+                   (unsigned)tmc_cfg_done_gconf, (unsigned)tmc_cfg_done_chop);
 
     if (tmc2209_read_register(TMC_ADDR_DEFAULT, TMC_REG_GCONF, &v) == RT_EOK)
         rt_kprintf("[TMC-CFG] live GCONF=%08X i_scale_analog=%u internal_Rsense=%u"
@@ -764,8 +920,7 @@ static void tmc_config_show(void)
 
     v = 0;
     if (tmc2209_read_register(TMC_ADDR_DEFAULT, TMC_REG_CHOPCONF, &v) == RT_EOK)
-        rt_kprintf("[TMC-CFG] live CHOPCONF=%08X TOFF=%u vsense=%u MRES=%u"
-                   " (vsense 位定义待人工核对 Rev1.09)\n",
+        rt_kprintf("[TMC-CFG] live CHOPCONF=%08X TOFF=%u vsense(bit17)=%u MRES=%u\n",
                    (unsigned)v, (unsigned)(v & TMC_CHOPCONF_TOFF_MASK),
                    (unsigned)((v & TMC_CHOPCONF_VSENSE) ? 1u : 0u),
                    (unsigned)((v >> TMC_CHOPCONF_MRES_SHIFT) & TMC_CHOPCONF_MRES_MASK));
@@ -813,7 +968,6 @@ static void tmc_calc_selftest(void)
     { rt_kprintf("[TMC-ST] CS bound FAIL (%u/%u)\n",
                  (unsigned)tmc_cs_milli(31u), (unsigned)tmc_cs_milli(0u)); pass = 0; }
 
-    /* VREF 分档必须封顶在 2.5V: 3.3V 与 2.5V 应给出同一结果 */
     if (tmc_current_rms_ma(180u, 110u, 3300u, 20u) !=
         tmc_current_rms_ma(180u, 110u, 2500u, 20u))
     { rt_kprintf("[TMC-ST] VREF clamp FAIL\n"); pass = 0; }
@@ -828,7 +982,6 @@ static void tmc_calc_selftest(void)
         ((v & TMC_IHOLDDELAY_MASK) >> TMC_IHOLDDELAY_SHIFT) != 4u)
     { rt_kprintf("[TMC-ST] pack/unpack roundtrip FAIL\n"); pass = 0; }
 
-    /* 方向守卫: 0->1(降满量程)允许; 任何 1->0(抬满量程)必须拒绝 */
     if (!tmc_change_is_current_safe(0u, 1u))
     { rt_kprintf("[TMC-ST] safe direction 0->1 wrongly refused\n"); pass = 0; }
     if (tmc_change_is_current_safe(1u, 0u))
@@ -839,3 +992,272 @@ static void tmc_calc_selftest(void)
     rt_kprintf("[TMC-ST] %s (纯算术, 未与芯片通信)\n", pass ? "ALL PASS" : "FAILED");
 }
 MSH_CMD_EXPORT(tmc_calc_selftest, offline theoretical current and packing selftest);
+
+/* ---------- F2a: 假总线离线自测(完全不碰 UART) ----------
+ * 覆盖: 目标值/位域/RMW 不越界、只写寄存器不非法读回、IFCNT 失败即停止后续写、
+ * 中途失败置 FAILED、配置丢失被 integrity 照出、门禁与 arm 判定的真值表。
+ * 结束后必须还原 tmc_cfg_bus 与 tmc_cfg_state, 否则会污染生产状态。 */
+#define TMC_FX_LOG_MAX  24
+
+static struct
+{
+    rt_uint8_t  reg;
+    rt_uint32_t val;
+    rt_uint8_t  is_write;
+} tmc_fx_log[TMC_FX_LOG_MAX];
+static int tmc_fx_n;
+static int tmc_fx_fail_write_nth;        /* 第 N 次 write 返回失败(1 基, <=0=不失败) */
+static int tmc_fx_writes;                 /* 已发生的 write 次数 */
+static rt_uint32_t tmc_fx_gconf, tmc_fx_chop;
+
+static rt_err_t tmc_fx_open(void)  { return RT_EOK; }
+
+static rt_err_t tmc_fx_read(rt_uint8_t reg, rt_uint32_t *v)
+{
+    if (tmc_fx_n < TMC_FX_LOG_MAX)
+    {
+        tmc_fx_log[tmc_fx_n].reg = reg;
+        tmc_fx_log[tmc_fx_n].val = 0;
+        tmc_fx_log[tmc_fx_n].is_write = 0;
+        tmc_fx_n++;
+    }
+    if (reg == TMC_REG_GCONF)      *v = tmc_fx_gconf;
+    else if (reg == TMC_REG_CHOPCONF) *v = tmc_fx_chop;
+    else return -RT_EIO;            /* 其它寄存器(含只写的 0x10/0x11)本测试不建模 */
+    return RT_EOK;
+}
+
+static rt_err_t tmc_fx_write(rt_uint8_t reg, rt_uint32_t val)
+{
+    tmc_fx_writes++;
+    if (tmc_fx_fail_write_nth > 0 && tmc_fx_writes == tmc_fx_fail_write_nth)
+        return -RT_EIO;              /* 模拟 IFCNT 未 +1 = 写入未被接受 */
+    if (tmc_fx_n < TMC_FX_LOG_MAX)
+    {
+        tmc_fx_log[tmc_fx_n].reg = reg;
+        tmc_fx_log[tmc_fx_n].val = val;
+        tmc_fx_log[tmc_fx_n].is_write = 1;
+        tmc_fx_n++;
+    }
+    if (reg == TMC_REG_GCONF)      tmc_fx_gconf = val;
+    else if (reg == TMC_REG_CHOPCONF) tmc_fx_chop = val;
+    return RT_EOK;
+}
+
+static const tmc_cfg_bus_t tmc_cfg_bus_fake =
+{
+    tmc_fx_open, tmc_fx_read, tmc_fx_write
+};
+
+static int tmc_fx_find_write(rt_uint8_t reg, rt_uint32_t *val)
+{
+    int i;
+    for (i = 0; i < tmc_fx_n; ++i)
+        if (tmc_fx_log[i].is_write && tmc_fx_log[i].reg == reg)
+        { if (val) *val = tmc_fx_log[i].val; return 1; }
+    return 0;
+}
+static int tmc_fx_any_read_of(rt_uint8_t reg)
+{
+    int i;
+    for (i = 0; i < tmc_fx_n; ++i)
+        if (!tmc_fx_log[i].is_write && tmc_fx_log[i].reg == reg) return 1;
+    return 0;
+}
+static int tmc_fx_write_count_of(rt_uint8_t reg)
+{
+    int i, n = 0;
+    for (i = 0; i < tmc_fx_n; ++i)
+        if (tmc_fx_log[i].is_write && tmc_fx_log[i].reg == reg) n++;
+    return n;
+}
+static void tmc_fx_reset(void)
+{
+    rt_memset(tmc_fx_log, 0, sizeof(tmc_fx_log));
+    tmc_fx_n = 0;
+    tmc_fx_writes = 0;
+    tmc_fx_fail_write_nth = 0;
+    tmc_fx_gconf = 0x00000101u;     /* 手册复位默认 */
+    tmc_fx_chop  = 0x15010053u;     /* 本轮真机读回的上电基线 */
+}
+
+static rt_bool_t tmc_fx_run_expect_ok(rt_bool_t set_health_ok_unused)
+{
+    (void)set_health_ok_unused;
+    return (tmc_cfg_run(&tmc_cfg_planned, &tmc_cfg_bus_fake, RT_TRUE) == RT_EOK)
+           ? RT_TRUE : RT_FALSE;
+}
+
+static void tmc_cfg_selftest(void)
+{
+    tmc_drv_cfg_state_t saved_state = tmc_cfg_state;
+    const tmc_cfg_bus_t *saved_bus  = tmc_cfg_bus;
+    rt_uint32_t v = 0;
+    int pass = 1;
+
+    rt_kprintf("[TMC-CFG-ST] 假总线离线自测, 不使用 uart2\n");
+
+    /* --- T1: 正常全流程 -> CONFIGURED, 四个目标值逐项核对 --- */
+    tmc_fx_reset();
+    if (!tmc_fx_run_expect_ok(RT_TRUE))
+    { rt_kprintf("[TMC-CFG-ST] T1 apply 未成功\n"); pass = 0; }
+    if (tmc_cfg_state != TMC_DRV_CONFIGURED)
+    { rt_kprintf("[TMC-CFG-ST] T1 state=%s 应为 CONFIGURED\n",
+                 tmc_drv_cfg_state_name(tmc_cfg_state)); pass = 0; }
+
+    if (!tmc_fx_find_write(TMC_REG_GCONF, &v) || v != TMC_CFG_TGT_GCONF)
+    { rt_kprintf("[TMC-CFG-ST] T1 GCONF 目标错: %08X (期望 %08X)\n",
+                 (unsigned)v, (unsigned)TMC_CFG_TGT_GCONF); pass = 0; }
+    if (!tmc_fx_find_write(TMC_REG_CHOPCONF, &v) || v != TMC_CFG_TGT_CHOPCONF)
+    { rt_kprintf("[TMC-CFG-ST] T1 CHOPCONF 目标错: %08X (期望 %08X)\n",
+                 (unsigned)v, (unsigned)TMC_CFG_TGT_CHOPCONF); pass = 0; }
+    if (!tmc_fx_find_write(TMC_REG_IHOLD_IRUN, &v) || v != TMC_CFG_TGT_IHOLD_IRUN)
+    { rt_kprintf("[TMC-CFG-ST] T1 IHOLD_IRUN 目标错: %08X (期望 %08X)\n",
+                 (unsigned)v, (unsigned)TMC_CFG_TGT_IHOLD_IRUN); pass = 0; }
+    if (!tmc_fx_find_write(TMC_REG_TPOWERDOWN, &v) || v != TMC_CFG_TGT_TPOWERDOWN)
+    { rt_kprintf("[TMC-CFG-ST] T1 TPOWERDOWN 目标错: %08X (期望 %08X)\n",
+                 (unsigned)v, (unsigned)TMC_CFG_TGT_TPOWERDOWN); pass = 0; }
+
+    /* --- T2: 位域细节: vsense=bit17 置起, bit18 与 TOFF/HSTRT/HEND/TBL 不受扰动 --- */
+    {
+        rt_uint32_t base = 0x15010053u, nxt = tmc_chopconf_next(base, &tmc_cfg_planned);
+        rt_kprintf("[TMC-CFG-ST] T2 CHOPCONF %08X -> %08X\n",
+                   (unsigned)base, (unsigned)nxt);
+        if (!(nxt & (1u << 17)))
+        { rt_kprintf("[TMC-CFG-ST] T2 bit17 未置起\n"); pass = 0; }
+        if (nxt & (1u << 18))
+        { rt_kprintf("[TMC-CFG-ST] T2 bit18 被意外修改\n"); pass = 0; }
+        if ((nxt & 0xFu) != (base & 0xFu) || (nxt & 0xFu) == 0u)
+        { rt_kprintf("[TMC-CFG-ST] T2 TOFF 未保持非零\n"); pass = 0; }
+        if ((nxt & 0x7F0u) != (base & 0x7F0u))
+        { rt_kprintf("[TMC-CFG-ST] T2 HSTRT/HEND 低位被改\n"); pass = 0; }
+        if ((nxt & 0x00018000u) != (base & 0x00018000u))
+        { rt_kprintf("[TMC-CFG-ST] T2 TBL 被改\n"); pass = 0; }
+        /* 最强 RMW 断言: 除 vsense(bit17) 外不得有任何一位变化 */
+        if (((nxt ^ base) & ~TMC_CHOPCONF_VSENSE) != 0u)
+        { rt_kprintf("[TMC-CFG-ST] T2 越界改动非 vsense 位 (xor=%08X)\n",
+                     (unsigned)(nxt ^ base)); pass = 0; }
+    }
+
+    /* --- T3: GCONF 只加 bit6, 保留 bit0/bit8, 不动 bit1(OTP 位) --- */
+    {
+        rt_uint32_t base = 0x00000101u, nxt = tmc_gconf_next(base, &tmc_cfg_planned);
+        rt_kprintf("[TMC-CFG-ST] T3 GCONF %08X -> %08X\n",
+                   (unsigned)base, (unsigned)nxt);
+        if (nxt != 0x00000141u)
+        { rt_kprintf("[TMC-CFG-ST] T3 结果非 0x141\n"); pass = 0; }
+        if (!(nxt & (1u << 6)))
+        { rt_kprintf("[TMC-CFG-ST] T3 pdn_disable 未置起\n"); pass = 0; }
+        if (!(nxt & 1u))
+        { rt_kprintf("[TMC-CFG-ST] T3 i_scale_analog 被清\n"); pass = 0; }
+        if (!(nxt & (1u << 8)))
+        { rt_kprintf("[TMC-CFG-ST] T3 multistep_filt 被清\n"); pass = 0; }
+        if (nxt & (1u << 1))
+        { rt_kprintf("[TMC-CFG-ST] T3 意外置起 internal_Rsense\n"); pass = 0; }
+        /* 只允许 i_scale_analog / pdn_disable / mstep_reg_select 三位变化 */
+        if (((nxt ^ base) & ~(1u | (1u << 6) | (1u << 7))) != 0u)
+        { rt_kprintf("[TMC-CFG-ST] T3 越界改动其它 GCONF 位 (xor=%08X)\n",
+                     (unsigned)(nxt ^ base)); pass = 0; }
+    }
+
+    /* --- T4: 只写寄存器不得被读回(0x10/0x11 无读操作) --- */
+    if (tmc_fx_any_read_of(TMC_REG_IHOLD_IRUN) ||
+        tmc_fx_any_read_of(TMC_REG_TPOWERDOWN))
+    { rt_kprintf("[TMC-CFG-ST] T4 对只写寄存器发起了读\n"); pass = 0; }
+    /* 可读寄存器必须既有写也有读回 */
+    if (tmc_fx_write_count_of(TMC_REG_GCONF) < 1 ||
+        !tmc_fx_any_read_of(TMC_REG_GCONF))
+    { rt_kprintf("[TMC-CFG-ST] T4 GCONF 缺少预读/读回\n"); pass = 0; }
+    if (tmc_fx_write_count_of(TMC_REG_CHOPCONF) < 1 ||
+        !tmc_fx_any_read_of(TMC_REG_CHOPCONF))
+    { rt_kprintf("[TMC-CFG-ST] T4 CHOPCONF 缺少预读/读回\n"); pass = 0; }
+
+    /* --- T5: integrity 在配置一致时通过 --- */
+    if (tmc2209_config_integrity_check() != RT_EOK)
+    { rt_kprintf("[TMC-CFG-ST] T5 integrity 误判失败\n"); pass = 0; }
+    if (!tmc2209_drive_config_ok_for_arm())
+    { rt_kprintf("[TMC-CFG-ST] T5 CONFIGURED 却不容许 arm\n"); pass = 0; }
+
+    /* --- T6: 模拟芯片断电/复位(寄存器回默认) -> integrity 必须照出来并降级 --- */
+    tmc_fx_gconf = 0x00000101u;
+    tmc_fx_chop  = 0x15010053u;
+    if (tmc2209_config_integrity_check() == RT_EOK)
+    { rt_kprintf("[TMC-CFG-ST] T6 芯片复位后 integrity 仍说 OK\n"); pass = 0; }
+    if (tmc_cfg_state != TMC_DRV_FAILED)
+    { rt_kprintf("[TMC-CFG-ST] T6 状态未变 FAILED(%s)\n",
+                 tmc_drv_cfg_state_name(tmc_cfg_state)); pass = 0; }
+    if (tmc2209_drive_config_ok_for_arm())
+    { rt_kprintf("[TMC-CFG-ST] T6 配置已丢却仍容许 arm\n"); pass = 0; }
+    rt_kprintf("[TMC-CFG-ST] T6 失联/复位 -> FAILED, arm 拒绝 (fail-closed OK)\n");
+
+    /* --- T7: IFCNT 在第 2 次写(CHOPCONF)失败 -> 必须立即停止后续写 --- */
+    tmc_fx_reset();
+    tmc_cfg_state = TMC_DRV_UNCONFIGURED;
+    tmc_fx_fail_write_nth = 2;
+    if (tmc_cfg_run(&tmc_cfg_planned, &tmc_cfg_bus_fake, RT_TRUE) == RT_EOK)
+    { rt_kprintf("[TMC-CFG-ST] T7 写失败却返回成功\n"); pass = 0; }
+    if (tmc_cfg_state != TMC_DRV_FAILED)
+    { rt_kprintf("[TMC-CFG-ST] T7 状态=%s 应为 FAILED\n",
+                 tmc_drv_cfg_state_name(tmc_cfg_state)); pass = 0; }
+    if (tmc_fx_write_count_of(TMC_REG_IHOLD_IRUN) || tmc_fx_write_count_of(TMC_REG_TPOWERDOWN))
+    { rt_kprintf("[TMC-CFG-ST] T7 失败后仍继续写后续寄存器\n"); pass = 0; }
+    rt_kprintf("[TMC-CFG-ST] T7 第 2 次写失败 -> 已停止, 后续 0 次写\n");
+
+    /* --- T8: 第 1 次写就失败(链路死) -> FAILED 且不写任何后续 --- */
+    tmc_fx_reset();
+    tmc_cfg_state = TMC_DRV_UNCONFIGURED;
+    tmc_fx_fail_write_nth = 1;
+    if (tmc_cfg_run(&tmc_cfg_planned, &tmc_cfg_bus_fake, RT_TRUE) == RT_EOK)
+    { rt_kprintf("[TMC-CFG-ST] T8 首次写失败却返回成功\n"); pass = 0; }
+    if (tmc_fx_write_count_of(TMC_REG_CHOPCONF) || tmc_fx_write_count_of(TMC_REG_TPOWERDOWN))
+    { rt_kprintf("[TMC-CFG-ST] T8 首写失败后仍继续\n"); pass = 0; }
+
+    /* --- T9: 未配置 / 失败态下 arm 判定必须为假 --- */
+    tmc_cfg_state = TMC_DRV_UNCONFIGURED;
+    if (tmc2209_drive_config_ok_for_arm())
+    { rt_kprintf("[TMC-CFG-ST] T9 UNCONFIGURED 却容许 arm\n"); pass = 0; }
+    tmc_cfg_state = TMC_DRV_FAILED;
+    if (tmc2209_drive_config_ok_for_arm())
+    { rt_kprintf("[TMC-CFG-ST] T9 FAILED 却容许 arm\n"); pass = 0; }
+    tmc_cfg_state = TMC_DRV_CONFIGURING;
+    if (tmc2209_drive_config_ok_for_arm())
+    { rt_kprintf("[TMC-CFG-ST] T9 CONFIGURING 却容许 arm\n"); pass = 0; }
+    if (tmc2209_config_integrity_check() != -RT_EPERM)
+    { rt_kprintf("[TMC-CFG-ST] T9 非 CONFIGURED 时 integrity 应拒绝\n"); pass = 0; }
+
+    /* --- T10: 过流方向 1->0 与 TOFF=0 的芯片都必须中止 --- */
+    tmc_fx_reset();
+    tmc_fx_chop = 0x15030053u;                 /* 已是 vsense=1 */
+    tmc_cfg_state = TMC_DRV_UNCONFIGURED;
+    {
+        tmc_drv_config_t down = tmc_cfg_planned;
+        down.vsense = 0;
+        if (tmc_cfg_run(&down, &tmc_cfg_bus_fake, RT_TRUE) == RT_EOK)
+        { rt_kprintf("[TMC-CFG-ST] T10 1->0 方向未被拒\n"); pass = 0; }
+        if (tmc_fx_write_count_of(TMC_REG_IHOLD_IRUN))
+        { rt_kprintf("[TMC-CFG-ST] T10 拒绝后仍写了电流档\n"); pass = 0; }
+    }
+    tmc_fx_reset();
+    tmc_fx_chop = 0x15010050u;                 /* TOFF=0, 桥全关 */
+    tmc_cfg_state = TMC_DRV_UNCONFIGURED;
+    if (tmc_cfg_run(&tmc_cfg_planned, &tmc_cfg_bus_fake, RT_TRUE) == RT_EOK)
+    { rt_kprintf("[TMC-CFG-ST] T10 TOFF=0 基线竟通过\n"); pass = 0; }
+    if (tmc_fx_write_count_of(TMC_REG_CHOPCONF))
+    { rt_kprintf("[TMC-CFG-ST] T10 TOFF 非法时仍写了 CHOPCONF\n"); pass = 0; }
+
+    /* --- 还原生产上下文(关键: 自测不得污染状态) --- */
+    tmc_cfg_bus   = saved_bus;
+    tmc_cfg_state = saved_state;
+    tmc_cfg_done_valid = RT_FALSE;
+    tmc_cfg_fail_from_integrity = RT_FALSE;
+    tmc_cfg_fail_reg = 0;
+    tmc_cfg_last_err = RT_EOK;
+    if (tmc_cfg_bus != &tmc_cfg_bus_real)
+    { rt_kprintf("[TMC-CFG-ST] RESTORE FAIL: 总线未还原\n"); pass = 0; }
+    rt_kprintf("[TMC-CFG-ST] 已还原 state=%s, 总线=real\n",
+               tmc_drv_cfg_state_name(tmc_cfg_state));
+
+    rt_kprintf("[TMC-CFG-ST] %s (T1..T10, 假总线, 未访问 uart2)\n",
+               pass ? "ALL PASS" : "FAILED");
+}
+MSH_CMD_EXPORT(tmc_cfg_selftest, offline fake-bus drive config state machine selftest);

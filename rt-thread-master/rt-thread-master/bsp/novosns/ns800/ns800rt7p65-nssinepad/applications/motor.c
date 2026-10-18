@@ -224,11 +224,12 @@ rt_uint32_t motor_get_gate_fail_mask(void)
     if (safety_state_get() != SAFETY_READY)           bad |= MOT_GATE_NOT_READY;
     if (mot.health == SUBSYS_FAILED || !mot_dev_ok)   bad |= MOT_GATE_UNHEALTHY;
     if (!safety_protection_ready())                   bad |= MOT_GATE_NOT_PROTECTED;
-    /* Phase 8-F2 第 5 门: TMC2209 驱动参数未下发(或下发失败)时禁止使能。
+    /* Phase 8-F2 第 5 门: TMC2209 驱动参数未下发(或下发失败/已丢失)时禁止使能。
      * 复位默认下 IHOLD_IRUN 没有可用的运转电流档位, 芯片实际电流状态未知;
-     * 在"未知电流 + 安全链未验收"的板子上通电属危险动作 → 必须 CONFIGURED。 */
-    if (tmc2209_get_config_state() != TMC_DRV_CONFIGURED)
-        bad |= MOT_GATE_NO_DRV_CONFIG;
+     * 在"未知电流 + 安全链未验收"的板子上通电属危险动作。
+     * 这里只用纯状态判定(本函数被 system_status 等只读路径反复调用, 不得产生
+     * 总线流量); 总线级复核在 motor_arm() 决策点单独进行。 */
+    if (!tmc2209_drive_config_ok_for_arm())     bad |= MOT_GATE_NO_DRV_CONFIG;
 
     return bad;
 }
@@ -316,6 +317,18 @@ rt_err_t motor_arm(void)
     {
         rt_kprintf("[MOT] arm REFUSED (gates failing)\n");
         mot_print_gate_fail(bad);
+        return -RT_EPERM;
+    }
+
+    /* F2a: 门掩码只看软件状态, 不查总线。但"状态说 CONFIGURED"并不等于芯片里
+     * 还是那套配置 —— TMC 断电/复位后寄存器会回到默认(电流档与 vsense 全丢),
+     * 而 UART 照样能通。arm 是真正通电前的最后一个决策点, 在这里做一次实值
+     * 复核; 复核失败会立即把状态打成 FAILED, 于是第 5 门重新闭合。 */
+    if (tmc2209_config_integrity_check() != RT_EOK)
+    {
+        rt_kprintf("[MOT] arm REFUSED: 驱动配置完整性复核未通过"
+                   " (芯片可能已断电/复位/重连)\n");
+        mot_print_gate_fail(motor_get_gate_fail_mask());
         return -RT_EPERM;
     }
 
