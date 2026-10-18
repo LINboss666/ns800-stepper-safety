@@ -418,13 +418,15 @@ static void tmc_crc_test(void)
 MSH_CMD_EXPORT(tmc_crc_test, TMC2209 CRC8 self test (official vectors 8F/48));
 
 /* GSTAT(0x01) 位解码: 纯函数, 只拆位、不产生任何总线动作(F2c-NEW-02 的测试对象)。
- * 位名按 TMC2209 Datasheet Rev.1.09 第 25 页 GSTAT 寄存器表人工核对(证据等级
- * DATASHEET-CONFIRMED, 不是本板实测):
+ * 位名按 TMC2209 Datasheet Rev.1.09 **印刷第 24 页**的 GSTAT 寄存器表人工核对
+ * (IOIN 表跨到第 25 页; 证据等级 DATASHEET-CONFIRMED, 不是本板实测):
  *   bit0 reset   上次读 GSTAT 之后发生过复位, 所有寄存器已清回复位值
  *   bit1 drv_err 上次读 GSTAT 之后因过温或短路检测被关断过(细节读 DRV_STATUS)
  *   bit2 uv_cp   电荷泵欠压, 此时驱动被禁用(该标志不打锁, 无需清除)
- * 旧实现把 bit2 打成 sg2: StallGuard2 的结果在 SG_RESULT(0x41), 与 GSTAT 无关,
- * 换器件或查故障时会把人引向错误的方向。 */
+ * 三个标志的清除方式都是"写 1 清"(GSTAT 可写), 不能从"上次读之后"这句话推导成
+ * 读清零 —— 本轮不增加任何清除写, 只如实描述语义。
+ * 旧实现把 bit2 打成 sg2: TMC2209 的 SG_RESULT(0x41) 是 **StallGuard4** 的结果,
+ * (GSTAT 里根本没有 sg2), 与 GSTAT 无关, 换器件或查故障时会把人引向错误方向。 */
 static void tmc_gstat_decode(rt_uint32_t gstat, tmc_gstat_dec_t *out)
 {
     out->reset   = (rt_uint8_t)(gstat & 1u);
@@ -444,8 +446,15 @@ static void tmc_gstat_decode(rt_uint32_t gstat, tmc_gstat_dec_t *out)
  * 全程不发出任何 WRITE 帧。
  * 如实声明代价: 只读命令再也证明不了"写帧能到达"。写到达凭证只有配置事务内部的
  * IFCNT+1 确认, 而那要先过编译期门与运行态门禁 —— 未验收前不得为诊断而触发。
- * txn 持有时长: 链路死了第一次读就退出(最多 1 次超时); 链路活着时三条读各约
- * 1~2 ms。因此本命令不会长时间挡住 motor_arm / 守卫复核。 */
+ * ⚠ 不要把它理解成"本命令有确定的占用上界"(F2d-R1 勘误, 撤回上一轮的错误说法):
+ *   - 本函数是 void。上面看到的 -RT_EBUSY / -RT_ENOSYS 是**内部取锁的结果**与诊断
+ *     输出, 不是返回值; 调用方无法据此区分"拒做"与"做完"。
+ *   - 链路死了确实第一条读就退出, 但"一次读"本身没有硬上界可保证: 读路径要先无限
+ *     等待 tmc_xfer_lock(单次传输锁), 之后才有 TMC_REPLY_TIMEOUT_MS 的应答窗口。
+ *     IOIN 成功不代表后面 GSTAT/IFCNT 不会各自再走满一次超时。
+ *   - 因此 probe 与 motor_arm / 守卫复核争用同一把 txn 时的最坏占用**未测量**,
+ *     仍然登记为 RISK-03; 主机侧 FD2 只覆盖"从第一条读起就完全无应答"这一条路径,
+ *     不覆盖锁争用或中途失联。要给出上界需要单独改锁结构 + 上板实测, 本轮不做。 */
 static void tmc_uart_probe(void)
 {
     rt_uint32_t ioin = 0, gstat = 0, ifcnt = 0;

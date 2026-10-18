@@ -56,10 +56,11 @@ rt_err_t tmc2209_read_register(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *val
 /* 读 StallGuard 结果(0x41)。电机静止时通常接近 0; 驱动使能转动后有意义。 */
 rt_err_t tmc2209_read_sg_result(rt_uint16_t *sg_result);
 
-/* 读全局状态 GSTAT(0x01)。位名按官方 Rev.1.09 第 25 页寄存器表(DATASHEET-CONFIRMED):
- * bit0=reset / bit1=drv_err / bit2=uv_cp(电荷泵欠压)。
- * F2d(F2c-NEW-02)更正: 旧注释/打印把 bit2 写成 sg2 —— StallGuard2 的结果在
- * SG_RESULT(0x41), GSTAT 里没有 sg2, 沿用会误导故障方向。 */
+/* 读全局状态 GSTAT(0x01)。位名按官方 Rev.1.09 **印刷第 24 页**寄存器表
+ * (DATASHEET-CONFIRMED): bit0=reset / bit1=drv_err / bit2=uv_cp(电荷泵欠压);
+ * 三位均为"写 1 清除", 不是读清。
+ * F2d(F2c-NEW-02)更正: 旧注释/打印把 bit2 写成 sg2 —— TMC2209 的 SG_RESULT(0x41)
+ * 是 StallGuard4 的结果, GSTAT 里没有 sg2, 沿用会误导故障方向。 */
 rt_err_t tmc2209_read_status(rt_uint8_t *gstat);
 
 /* 子系统健康(UNINIT/OK/DEGRADED/FAILED) */

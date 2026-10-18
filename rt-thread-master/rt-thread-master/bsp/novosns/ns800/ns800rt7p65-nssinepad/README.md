@@ -18,14 +18,22 @@
 
 异常发生时：停止 EPWM STEP 脉冲 + MCU_DRV_ENABLE 写 LOW 并**回读确认** →
 状态机进入 FAULT_LATCHED（禁止自动重启）→ 后台线程把故障前后数据写入 W25Q64 Flash。
-（注：扩展板 Rev A 缺 MCU_DRV_ENABLE 网络，当前 ENN 直挂 3.3V 恒禁用，见 §7 与 BUG-009。）
+（历史注：**Rev A** 扩展板缺 `MCU_DRV_ENABLE` 网络，当时 ENN 直挂 3.3V 恒禁用。
+  **2026-10-18 更新（新扩展板）**：许可网络**已引出**可测；当前使能链不通的真因是级联
+  逻辑器件损坏 —— **U5 与门异常 + 急停非门异常**，实测 `TMC_ENN` 约 0V。结论不变
+  （整链未验收 → `motor_arm()` 一律拒绝），但理由变了：焊盘写 LOW 并回读成功**证明不了**
+  TMC_ENN 已禁能。详见 `PHASE8_HARDWARE_VALIDATION_20260925.md` 的 2026-10-18 更正段。）
 
 ## 2. 硬件平台
 
 - **MCU**：NOVOSENSE NS800RT7P65D（Cortex-M7，1024KB FLASH / 770KB RAM）
 - **开发板**：NSSinePad-NS800RT7P65x V1.2（板载 DAPLink 调试器）
 - **外接模块**（杜邦线阶段）：W25Q64 Flash 模块（**SPI1**、CS=PF.12，已验证）；ADXL345 模块（**SPI3**，已验证）；TMC2209 StepStick（UART2，已验证）
-- **扩展板**：Rev.A 原理图设计阶段（详见《硬件扩展板详细方案_RevA.docx》）；⚠ Rev A **漏画 MCU_DRV_ENABLE 网络**，故软件使能许可当前不作用于 ENN，RevB 待补
+- **扩展板**：Rev.A 原理图（详见《硬件扩展板详细方案_RevA.docx》）。⚠ 历史事实：Rev A **漏画
+  `MCU_DRV_ENABLE`** 网络，软件使能许可当时不作用于 ENN。
+  **2026-10-18 覆盖**：现用的新扩展板该网络**已引出**；当前阻塞改为 **U5 与门 + 急停非门损坏**
+  （`TMC_ENN` 实测约 0V），不得据此改接线或飞线；RevB 测试点需求（`MCU_DRV_ENABLE` /
+  `DRV_ENABLE_SAFE` / `TMC_ENN` / `ESTOP_OK`）仍然有效 —— 那是分段排障需要，与能否引出无关。
 
 ### 引脚映射（冻结，修改需重新做 Pinmux 冲突分析）
 
@@ -92,6 +100,15 @@ Flash logger worker(RT_THREAD_PRIORITY_MAX-3) > UI(20) ≈ tshell(20)。
 motor+sensor → diagnosis → blackbox → UI → 启动自检 + READY 决策。
 
 ## 4. 构建与烧录
+
+> **⚠ 2026-10-18 起覆盖说明（Phase 8-F2b 之后，读这段再看下面的命令）**
+> 下面"方式二/自动化验证流程"里的 **烧录（`UV4 -f`）与复位（`pyocd reset`）是历史流程
+> 记录，不是对 Agent 的执行授权**。自 2026-10-18 起，各阶段的授权范围由任务书逐轮给出；
+> Phase 8-F2c/F2d/F2d-R1 明确要求**只构建、不烧录、不复位、不操作 COM5、不写真实
+> TMC2209 寄存器、不接电机、不输出 STEP**。Keil 工程的 `AfterBuild` 只有一条
+> `fromelf --bin`（产物转换），不含任何烧录/复位步骤。
+> 硬件阻塞项（U5 与门 / 急停非门损坏、ENN 与软件请求不一致、H2 限位未接、IO70 语义冲突）
+> 与守卫时延风险按交接文档保留为未闭环；软件源码验收与真实运动授权是两道不同的闸。
 
 ### 方式一：Keil μVision（图形界面）
 
@@ -165,8 +182,11 @@ UV4 -b 编译（0 错误）→ UV4 -f 烧录 → pyocd 复位 → COM5 串口读
 > ✅ 2026-09-25 更新：Phase 7 运行时相关 🖥 行已按真机结果改写；仍属 🖥 /
 > HARDWARE-PENDING 的只有依赖外部硬件的项（真实电机、实测电流标定、
 > ESTOP/限位物理极性、Safety EXTI 开闸、`MCU_DRV_ENABLE → U9 → Q1 → TMC_ENN`
-> 使能链 —— 最后一项是**当前 PCB revision 上硬件阻塞**，见
-> `PHASE8_HARDWARE_VALIDATION_20260925.md`）。
+> 使能链（2026-10-18 更新：新扩展板许可网络已引出，阻塞项改为 U5 与门 / 急停非门损坏；
+> 整链仍未验收）—— 见 `PHASE8_HARDWARE_VALIDATION_20260925.md`。另外主机侧验证链的
+> 三项证据等级要分清：**Keil 0/0 只算编译通过**；**主机夹具 T1..T21 / G1..G10 / FD* 通过**
+> 只算逻辑与状态机通过（假芯片在内存里，无 UART 时序、无目标栈余量）；**真机通过**必须
+> 单独上板取证，本表未记任何"真机通过"的运动/写寄存器项。
 
 ## 7. 安全红线（任何修改不得违反）
 
