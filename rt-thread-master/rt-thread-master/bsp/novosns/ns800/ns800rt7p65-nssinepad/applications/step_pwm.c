@@ -4,14 +4,19 @@
  * 设备: "epwm1"(drv_epwm.c EPWM_DRV_INIT 命名), channel 0 = EPWMX_A
  * API:  rt_pwm_set(dev, ch, period_ns, pulse_ns) + rt_pwm_enable/disable
  *
- * 安全设计(交接文档 §17.1 + Fix A):
+ * 安全设计(交接文档 §17.1 + Fix A + F2b P0-A):
  *   - 上电绝不自动使能输出, 必须 pwm_test 显式命令
  *   - EPWM1 ch0 的生产 owner 是 Motor Service; pwm_test 只是诊断借用, 必须先
- *     过 motor_pwm_grant_to_diag() 借用门(未 armed + current_hz==0 +
- *     target_hz==0 + state==IDLE + DRV_ENABLE 焊盘实测 LOW), 否则拒绝。
- *     这条门的意义: 不允许和 Motor 斜坡线程并发写同一通道。
+ *     过 motor_pwm_grant_to_diag() 借用门, 否则拒绝。该门 F2b 起有两层:
+ *     ① STEP 输出许可 —— MOTOR_HARDWARE_ENABLE_PATH_VALIDATED 或
+ *        STEP_DIAG_ISOLATED_ENV_CONFIRMED 至少一个为 TRUE。现板两个都是 FALSE:
+ *        与门/非门损坏使"DRV_ENABLE 焊盘 LOW"无法证明 TMC_ENN 已禁能, 所以只要
+ *        接着电机, STEP 输出就可能真实驱动它 —— 光靠"电机未 armed"挡不住。
+ *     ② 所有权 —— 未 armed + current_hz==0 + target_hz==0 + state==IDLE +
+ *        DRV_ENABLE 焊盘实测 LOW(不允许与 Motor 斜坡线程并发写同一通道)。
  *   - pwm_test stop 永远允许(朝安全方向)
- *   - 频率正确性尚未示波器验收(BUG-008), 命令输出会提示未验收
+ *   - 频率正确性尚未示波器验收(BUG-008); 要量波形需先在 TMC 模块拔出的隔离环境
+ *     下人工确认 STEP_DIAG_ISOLATED_ENV_CONFIRMED
  */
 
 #include <rtthread.h>
@@ -66,13 +71,12 @@ static void pwm_test(int argc, char **argv)
         return;
     }
 
-    /* Fix A: EPWM1 ch0 借用门 —— Motor Service 是生产 owner。
-     * 要求: 未 armed + current_hz==0 + target_hz==0 + state==IDLE +
-     *       DRV_ENABLE 焊盘实测 LOW。拒绝原因由 grant 函数自行打印。 */
+    /* F2b P0-A: STEP 输出许可 + EPWM1 ch0 借用门(两层, 见文件头)。
+     * 拒绝原因由 grant 函数自己打印(它会说明是许可还是所有权挡住了)。 */
     if (motor_pwm_grant_to_diag() != RT_EOK)
     {
-        rt_kprintf("[STEP] REFUSED: EPWM1 ch0 not granted (motor owns it or"
-                   " enable pad unverified). Use the motor API instead.\n");
+        rt_kprintf("[STEP] REFUSED: STEP 输出未获许可(使能链未验收/未确认隔离环境)"
+                   " 或 EPWM1 ch0 仍由 Motor 占用。改用 motor_* 正式 API。\n");
         return;
     }
 

@@ -54,15 +54,31 @@ rt_err_t tmc2209_read_status(rt_uint8_t *gstat);
 /* 子系统健康(UNINIT/OK/DEGRADED/FAILED) */
 subsys_health_t tmc2209_get_health(void);
 
-/* ================= Phase 8-F2: 驱动参数配置(软件准备, 默认不启用) =================
+/* ================= Phase 8-F2/F2b: 驱动参数配置(软件准备, 默认不启用) =================
  *
  * 本轮只做"能让配置写下去、能证明写下去、写不成就不许使能"的软件能力。
- * 真实写入被编译期硬门禁 TMC_DRIVE_CONFIG_HW_VALIDATED 挡住:
- * 当前扩展板 U5 与门异常 / 急停非门异常 / TMC_ENN 实测约 0V / H2 限位未接,
- * 安全链未验收 → 该门禁必须保持 RT_FALSE, 直到硬件验证完成并经单独提交翻转。
+ * 真实写入被两层独立挡住, 两层都必须通过:
+ *   ① 编译期硬门禁 TMC_DRIVE_CONFIG_HW_VALIDATED —— 当前扩展板 U5 与门损坏 /
+ *      急停非门损坏 / TMC_ENN 实测约 0V / H2 限位未接, 安全链未验收 → 必须保持
+ *      RT_FALSE, 直到硬件验收完成并经单独提交翻转。
+ *      (事实更正 2026-10-18: MCU_DRV_ENABLE 节点在新扩展板上**已引出**, 阻塞项是
+ *       门电路损坏, 不是"漏画未引出"。焊盘回读 LOW 因级联门损坏而无法证明
+ *       TMC_ENN 已禁能 —— 这正是"编译期前置验收不能替代每次操作条件检查"的原因。)
+ *   ② 运行态写入门禁 tmc2209_get_write_gate_mask() —— 每次 apply 都重新求值:
+ *      电机必须完全静止且未 armed、DRV_ENABLE 焊盘实测 LOW、Safety 状态机为
+ *      READY 且无锁存故障、UART 链路健康、配置事务未被占用。任一项不过 →
+ *      不发出任何总线写、状态不变。
  *
  * apply 只做"写寄存器"这一件事: 不碰 ENN / MCU_DRV_ENABLE, 不写 VACTUAL,
  * 不产生 STEP, 不会让电机转动。 */
+
+/* ⚠ 硬件安全链验收开关(真实寄存器写入的编译期门, 见上)。
+ * RT_FALSE = tmc2209_apply_config() 一位都不写。翻转必须: ①使能链真机验收完成
+ * (含 ENN 端实测, 而不是只看 MCU 焊盘) ②单独提交并附验证记录 ③运行态门禁同时全通。
+ * 定义放在头文件, 使 runtime_selftest / system_status 等模块都能如实报告门的状态。 */
+#ifndef TMC_DRIVE_CONFIG_HW_VALIDATED
+#define TMC_DRIVE_CONFIG_HW_VALIDATED   RT_FALSE
+#endif
 
 /* 待写寄存器补全 */
 #define TMC_REG_CHOPCONF     0x6C
@@ -80,10 +96,10 @@ subsys_health_t tmc2209_get_health(void);
 #define TMC_GCONF_MSTEP_REG_SELECT  (1u << 7)   /* 0 = 微步由 MS1/MS2 引脚决定 */
 #define TMC_GCONF_MULTISTEP_FILT    (1u << 8)
 
-/* CHOPCONF 位 —— ⚠ vsense 的 bit17/bit18 归属本轮无法从 Rev1.09 文本抽取核实
- * (该寄存器表在 PDF 中为图形)。当前实测 CHOPCONF=0x15010053 时 bit17 与 bit18
- * 同为 0, 故两种假设都读作 vsense=0(V_FS=325mV, 与手册"Default is 325mV"自洽),
- * 无法自证。开启写入门禁之前必须由人工对照手册 §5.5 复核本行。 */
+/* CHOPCONF 位。vsense 位归属已按官方 Rev.1.09 寄存器表人工核对: bit17 = vsense
+ * (0 -> V_FS 325mV 低灵敏度, 1 -> 180mV 高灵敏度), bit18 属 TOFF/DRV 保留侧。
+ * 证据等级: DATASHEET-CONFIRMED(人工对照手册), 仍非本板实测。
+ * ⚠ 本板从未写入过 CHOPCONF, 开启写入门禁前必须先做一次真机写+读回核实。 */
 #define TMC_CHOPCONF_TOFF_MASK      0x0000000Fu
 #define TMC_CHOPCONF_HSTRT_SHIFT    4
 #define TMC_CHOPCONF_HEND_SHIFT     7
@@ -92,10 +108,11 @@ subsys_health_t tmc2209_get_health(void);
 #define TMC_CHOPCONF_MRES_SHIFT     24
 #define TMC_CHOPCONF_MRES_MASK      0x0Fu
 
-/* IHOLD_IRUN(0x30) 字段布局 —— ⚠ 同样属"未经本轮核实"的假设(按 IHOLD[4:0]、
- * IRUN[12:8]、IHOLDDELAY[19:16], GTCFG/GTCTG 保持 0)。该寄存器为只写:
- * 不得要求读回, 到达凭证只有 IFCNT+1。偏移错误会导致电流档位设错而芯片仍应答,
- * 因此 tmc_calc_selftest 的打包/解包断言 + 人工核对是开启门禁的前置条件。 */
+/* IHOLD_IRUN(0x10) 字段布局: IHOLD[4:0] / IRUN[12:8] / IHOLDDELAY[19:16]
+ * (地址 0x10 与位域均已按官方 Rev.1.09 寄存器表人工核对; 旧注释误写为 0x30)。
+ * 该寄存器为只写: 不得要求读回, 到达凭证只有 IFCNT+1 —— 因此偏移/数值错了芯片
+ * 照样应答, 电流档位却设错。开启写入门禁的前置条件仍是"真机写后用电流实测验证",
+ * 而不是本文件的任何算术。 */
 #define TMC_IHOLD_MASK              0x0000001Fu
 #define TMC_IRUN_SHIFT              8
 #define TMC_IRUN_MASK               0x00001F00u
@@ -152,23 +169,50 @@ rt_bool_t tmc_change_is_current_safe(rt_uint8_t vsense_old, rt_uint8_t vsense_ne
 
 /* 逐项下发配置: GCONF(RMW) -> CHOPCONF(RMW) -> IHOLD_IRUN -> TPOWERDOWN。
  * 每次写入都读 IFCNT 前后验证 +1; 可读寄存器(GCONF/CHOPCONF)追加读回比对。
- * 任一步失败 → 立即中止并置 TMC_DRV_FAILED(不回滚、不继续写)。
- * 返回 -RT_EPERM = 硬件门禁未开放(编译期), 此时不产生任何总线写且状态不变。 */
+ * 任一步失败 → 立即中止并置 TMC_DRV_FAILED(不回滚、不继续写), 同时**失效已下发
+ * 快照**(否则旧快照会被当作有效配置继续放行)。
+ * 写入前先求值运行态门禁: 返回 -RT_EPERM 且**不产生任何总线写**的情况有两类
+ * (①编译期宏为 FALSE, ②运行态任一条件不满足), 具体见 write gate 位掩码。
+ * 返回 -RT_EBUSY = 另一条配置/arm 事务正持有 txn 锁。 */
 rt_err_t tmc2209_apply_config(void);
 
-/* 配置有效性复核(F2a): TMC 断电/复位/重连后寄存器会回到默认值, 而 MCU 侧
+/* 运行态写入门禁位掩码(纯只读, 不产生总线流量; 0 = 全部通过)。
+ * 各位定义见 TMC_WGATE_*, 供 apply 自检与 system_status 打印。 */
+rt_uint32_t tmc2209_get_write_gate_mask(void);
+
+#define TMC_WGATE_HW_NOT_VALIDATED (1u << 0)  /* 编译期安全链验收宏为 FALSE */
+#define TMC_WGATE_MOTOR_NOT_QUIET  (1u << 1)  /* 电机 armed / 非 IDLE / hz 非 0 / 快照取不到 */
+#define TMC_WGATE_DRV_PAD_NOT_LOW  (1u << 2)  /* DRV_ENABLE 焊盘未实测 LOW */
+#define TMC_WGATE_NOT_READY        (1u << 3)  /* Safety 状态机不是 READY */
+#define TMC_WGATE_FAULT_LATCHED    (1u << 4)  /* 存在未清除的故障码 */
+#define TMC_WGATE_LINK_UNHEALTHY   (1u << 5)  /* UART 链路 FAILED/DEGRADED/UNINIT */
+#define TMC_WGATE_TXN_BUSY         (1u << 6)  /* 配置/arm 事务锁被占用 */
+
+/* F2b P1-D: 配置事务串行化。apply 与 motor_arm 的"查状态→复核→请求使能"整段
+ * 必须持有同一把 txn 锁, 否则二者交错会出现"arm 复核通过后 apply 改了电流档"
+ * 这类 TOCTOU。begin 为非阻塞 try-take(忙返回 -RT_EBUSY, 调用方必须 fail closed),
+ * 同线程可重入(RT-Thread 互斥量带持有计数), 故 arm 段内的完整性复核不会自锁。
+ * ⚠ Safety 停机路径(safety_force_shutdown / motor_emergency_stop)一律不调用
+ *   begin —— 停机绝不能被配置事务阻塞。 */
+rt_err_t tmc2209_cfg_txn_begin(void);
+void     tmc2209_cfg_txn_end(void);
+
+/* 配置有效性复核(F2a/F2b): TMC 断电/复位/重连后寄存器会回到默认值, 而 MCU 侧
  * 状态不会自动知道 → 不能"UART 又能通了"就当作电流配置仍然有效。
  * 本函数把已下发的 GCONF/CHOPCONF 目标值与芯片现值逐项比对:
  *   RT_EOK    = 一致, 配置仍有效
- *   -RT_EPERM = 尚未 CONFIGURED / 链路不健康(不猜, 直接判不可信)
- *   -RT_EIO   = 现值与已下发值不符 或 读不到 → 状态立即降级为 FAILED
- * 只在明确需要的地方调用(motor_arm 决策点、tmc_config_show), 不放进周期任务,
- * 以免每次状态打印都产生总线流量。 */
+ *   -RT_EPERM = 尚未 CONFIGURED / 快照已失效(不猜, 直接判不可信)
+ *   -RT_EIO   = 现值与已下发值不符 或 读不到/链路不健康 → 状态立即降级为 FAILED
+ *   -RT_EBUSY = 另一条配置/arm 事务正在进行, 此刻无法复核(调用方必须拒绝使能)
+ * 调用点: motor_arm 决策点、motor_start 关联检查、Motor 线程周期守卫(F2b P1-E)、
+ * tmc_config_show。守卫有固定周期上限, 其余均为事件驱动。 */
 rt_err_t tmc2209_config_integrity_check(void);
 
 /* 供 motor 门禁使用的纯状态判定(无总线访问、无副作用):
- * 只有 TMC_DRV_CONFIGURED 才返回 RT_TRUE。链路/复位后的真实性由
- * motor_arm() 额外调用 tmc2209_config_integrity_check() 把关。 */
+ * 只有 TMC_DRV_CONFIGURED **且已下发快照仍有效** 才返回 RT_TRUE。F2b 起加了
+ * 后半条件: 配置失败/失联/复位/重新配置中都必须让本门立刻闭合, 不能等到
+ * 下一次完整性复核才发现。链路/复位后的真实值由 tmc2209_config_integrity_check()
+ * 在 arm 决策点与运行期守卫中把关。 */
 rt_bool_t tmc2209_drive_config_ok_for_arm(void);
 
 /* 已下发配置的只读快照(供诊断显示; 未成功下发过则返回 RT_FALSE)。 */

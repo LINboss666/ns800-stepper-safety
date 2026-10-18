@@ -101,7 +101,10 @@ void system_status(void)
     else
         rt_kprintf("[Motor] snapshot failed\n");
     rt_kprintf("[Motor] arm gate fail mask=0x%X (%s)\n", gates,
-               gates ? "arm REFUSED" : "all four gates pass");
+               gates ? "arm REFUSED" : "all five gates pass");
+    rt_kprintf("[TMC]    runtime write gate mask=0x%X (0=运行态条件全通,"
+               " 编译期门未翻转前仍然一位不写)\n",
+               (unsigned)tmc2209_get_write_gate_mask());
 
     rt_kprintf("[Sensor] thread=%s\n",
                subsys_health_name(sensor_service_get_health()));
@@ -227,9 +230,10 @@ static void runtime_selftest(void)
         rt_kprintf("[SELFTEST] 1.illegal-transition REFUSED ok\n");
     else { rt_kprintf("[SELFTEST] 1.illegal-transition FAIL (e=%d)\n", e); pass = 0; }
 
-    /* ② Fix A / A11: motor arm 四门禁矩阵。禁止为了测试临时打开任何生产门
-     *    (MOTOR_HARDWARE_ENABLE_PATH_VALIDATED 与 st_polarity_validated 保持
-     *    FALSE)。四门无条件求值, 所以掩码必须显示第 4 门确实参与判定。 */
+    /* ② Fix A / A11 + F2: motor arm 五门禁矩阵。禁止为了测试临时打开任何生产门
+     *    (MOTOR_HARDWARE_ENABLE_PATH_VALIDATED / STEP_DIAG_ISOLATED_ENV_CONFIRMED /
+     *    TMC_DRIVE_CONFIG_HW_VALIDATED 与 st_polarity_validated 全部保持 FALSE)。
+     *    五门无条件求值, 所以掩码必须显示第 4、5 门确实参与判定。 */
     gates = motor_get_gate_fail_mask();
     rt_kprintf("[SELFTEST] 2.arm gate fail mask=0x%X"
                " (bit0 enable-path bit1 READY bit2 health bit3 protection"
@@ -252,6 +256,30 @@ static void runtime_selftest(void)
     if (!safety_protection_ready())
         rt_kprintf("[SELFTEST] 2d.protection-gate CLOSED ok (default)\n");
     else { rt_kprintf("[SELFTEST] 2d.protection-gate unexpectedly OPEN\n"); pass = 0; }
+
+    /* ②e F2b P0-A: STEP 诊断借用门。使能链未验收且未确认隔离环境时, 任何能输出
+     *    STEP 的诊断路径都必须被拒 —— 现板与门/非门损坏, "焊盘 LOW"证明不了
+     *    TMC_ENN 已禁能, 所以这一步是在证明"接上电机也发不出脉冲"。 */
+    if (!MOTOR_HARDWARE_ENABLE_PATH_VALIDATED && !STEP_DIAG_ISOLATED_ENV_CONFIRMED)
+    {
+        e = motor_pwm_grant_to_diag();          /* 纯只读判定, 不碰 PWM/GPIO */
+        if (e != RT_EOK)
+            rt_kprintf("[SELFTEST] 2e.step-diag-permission REFUSED ok (e=%d)\n", (int)e);
+        else { rt_kprintf("[SELFTEST] 2e FAIL: STEP 输出被许可(危险)\n"); pass = 0; }
+    }
+    else rt_kprintf("[SELFTEST] 2e.step-diag-permission SKIP (某许可宏已翻转)\n");
+
+    /* ②f F2b P0-B: 配置写入的运行态门禁必须至少挡住编译期那一位(纯只读, 无 UART) */
+    {
+        rt_uint32_t wg = tmc2209_get_write_gate_mask();
+
+        rt_kprintf("[SELFTEST] 2f.tmc-write-gate mask=0x%X\n", wg);
+        if (!TMC_DRIVE_CONFIG_HW_VALIDATED && !(wg & TMC_WGATE_HW_NOT_VALIDATED))
+        { rt_kprintf("[SELFTEST] 2f FAIL: 编译期门 FALSE 却没反映到运行态掩码\n"); pass = 0; }
+        else if (wg)
+            rt_kprintf("[SELFTEST] 2f.write-gate CLOSED ok (apply 不会发出任何写)\n");
+        else rt_kprintf("[SELFTEST] 2f 注意: 运行态门禁全通(仍受编译期门约束)\n");
+    }
 
     /* ③ 故障停机链 + 事件处理 + P0-1 串行化验证:
      * SOFT_FAULT 事件 → FAULT_LATCHED 后, 尝试业务恢复转换必须被拒 */

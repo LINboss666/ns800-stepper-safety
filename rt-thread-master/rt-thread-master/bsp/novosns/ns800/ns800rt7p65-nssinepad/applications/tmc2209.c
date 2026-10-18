@@ -25,6 +25,9 @@
 #include "project_board.h"
 #include "app_health.h"
 #include "tmc2209.h"
+#include "motor.h"          /* F2b P0-B: 运行态写入门禁要读电机静止/armed 状态 */
+#include "safety_gpio.h"    /* F2b P0-B: DRV_ENABLE 焊盘是否实测 LOW */
+#include "safety_state.h"   /* F2b P0-B: Safety 状态机与锁存故障码 */
 
 #define TMC_UART_NAME    TMC_UART_DEVICE_NAME    /* "uart2" */
 #define TMC_BAUD         115200
@@ -56,6 +59,8 @@ static rt_bool_t tmc_lock_ok = RT_FALSE;
 static rt_err_t tmc_read_reg(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *value);
 static rt_err_t tmc_read_reg_locked(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *value);
 static rt_err_t tmc_write_reg_locked(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t value);
+/* F2b: 配置实例的同步对象初始化(定义在文件后段, init 里要先调) */
+static void tmc_cfg_prod_sync(void);
 
 /* ---------- CRC8-ATM (datasheet swuart_calcCRC 等价实现, 见文件头 ②) ---------- */
 static rt_uint8_t tmc_crc8(const rt_uint8_t *data, rt_size_t len)
@@ -288,6 +293,11 @@ rt_err_t tmc2209_init(void)
 {
     rt_err_t e = tmc_uart_open();
 
+    /* F2b: 配置执行器的两把锁随子系统一起就绪(本函数在 bootstrap 单线程阶段调用,
+     * 之后才有 motor/diagnosis 线程)。链路打不开时实例仍然可用, 只是门禁会因
+     * health != SUBSYS_OK 一直拒绝写入 —— 与"不猜"的纪律一致。 */
+    tmc_cfg_prod_sync();
+
     tmc_health = (e == RT_EOK) ? SUBSYS_OK : SUBSYS_FAILED;
     return e;
 }
@@ -509,15 +519,13 @@ static void tmc_status(void)
 }
 MSH_CMD_EXPORT(tmc_status, read TMC2209 GSTAT/IOIN);
 
-/* ================= Phase 8-F2/F2a: 驱动参数配置(软件准备, 默认不启用) =========
+/* ================= Phase 8-F2/F2a/F2b: 驱动参数配置(软件准备, 默认不启用) ====
  *
- * 编译期硬门禁: 当前扩展板 U5 与门异常 / 急停非门异常 / TMC_ENN 实测约 0V /
+ * 编译期硬门禁 TMC_DRIVE_CONFIG_HW_VALIDATED 定义在 tmc2209.h(便于其它模块如实
+ * 报告门的状态)。当前扩展板 U5 与门损坏 / 急停非门损坏 / TMC_ENN 实测约 0V /
  * H2 限位未接, 安全链未验收 → 必须保持 RT_FALSE; 翻转需单独提交 + 硬件验证记录。
- * 门禁为 FALSE 时 apply 不向总线发出任何写, 也不改变状态。
+ * F2b 起它还只是第一层: apply 在此之后还要过运行态门禁(见 tmc_cfg_gate_prod)。
  * apply 只写配置寄存器: 不碰 ENN / MCU_DRV_ENABLE, 不写 VACTUAL, 不产生 STEP。 */
-#ifndef TMC_DRIVE_CONFIG_HW_VALIDATED
-#define TMC_DRIVE_CONFIG_HW_VALIDATED   RT_FALSE
-#endif
 
 /* ---- F2a: 寄存器地址/位定义编译期钉住 --------------------------------------
  * 写错地址是"沉默失败": 芯片对任意地址的 WRITE 都应答并让 IFCNT 自增, 到达
@@ -556,41 +564,193 @@ static const tmc_drv_config_t tmc_cfg_planned = { 20, 8, 4, 8, 1, 0, 0 };
 #define TMC_CFG_TGT_IHOLD_IRUN 0x00041408u  /* ihold=8 irun=20 dly=4 */
 #define TMC_CFG_TGT_TPOWERDOWN 0x00000008u
 
-/* ---- 配置生命周期状态 ---- */
-static tmc_drv_cfg_state_t tmc_cfg_state = TMC_DRV_UNCONFIGURED;
-static rt_uint8_t tmc_cfg_fail_reg  = 0;         /* 失败发生在哪个寄存器(0=无) */
-static rt_err_t   tmc_cfg_last_err  = RT_EOK;
-static rt_bool_t  tmc_cfg_fail_from_integrity = RT_FALSE;
+/* ---- F2b: 配置执行器的状态放进实例 (P1-C / P1-D) --------------------------
+ * 审核意见(P1-C): 自测只保存 state 与 bus, 退出时强制 done_valid=FALSE 并清零
+ * fail 元数据, 没有保存/恢复 done_gconf/done_chop/done; 而且把全局 tmc_cfg_bus
+ * 临时换成假总线, 其它线程在此期间可能踩到假总线。根因是"执行器状态是全局的"。
+ * 现在整套状态 + 接缝 + 同步都在 tmc_cfg_ctx_t 里:
+ *   - 生产: 文件静态实例 tmc_cfg_prod, 只有公共 API 经它访问硬件
+ *   - 自测: 栈上局部实例 + 静态假总线 vtable + 实例私有数据, 生产实例零接触
+ * 锁纪律 (P1-D):
+ *   txn  : 事务锁, 覆盖"整段序列"(apply / 完整性复核 / motor_arm 的决策段)。
+ *          只在 UI/Motor 线程取; Safety 停机路径绝不取 -> 停机永不被配置事务阻塞。
+ *          非阻塞 try-take, 取不到就返回 -RT_EBUSY 让调用方 fail closed。
+ *          顺序: 先 txn 后 lock; 反向禁止。
+ *   lock : 叶锁, 只保护状态字段与快照的读改写。持有期间不做 UART、不调用任何
+ *          其它子系统 API -> 不可能与其它锁构成环。
+ * 两把锁未 init 时(lock_ok/txn_ok=FALSE)自动跳过, 与本工程既有 idiom 一致。 */
 
-/* 成功下发后的快照: 断电/复位后芯片寄存器回默认值, 而 MCU 侧不会自动知道,
- * 只能靠"已下发值 vs 现值"比对照出来。 */
-static rt_uint32_t      tmc_cfg_done_gconf = 0;
-static rt_uint32_t      tmc_cfg_done_chop = 0;
-static tmc_drv_config_t tmc_cfg_done;
-static rt_bool_t        tmc_cfg_done_valid = RT_FALSE;
-
-/* ---- 总线接缝: 配置序列只经它访问硬件, 便于用假总线做离线测试 ------------ */
 typedef struct
 {
-    rt_err_t (*open) (void);
-    rt_err_t (*read) (rt_uint8_t reg, rt_uint32_t *v);
-    rt_err_t (*write)(rt_uint8_t reg, rt_uint32_t v);   /* 内含 IFCNT 到达确认 */
+    rt_err_t (*open) (void *priv);
+    rt_err_t (*read) (void *priv, rt_uint8_t reg, rt_uint32_t *v);
+    rt_err_t (*write)(void *priv, rt_uint8_t reg, rt_uint32_t v); /* 内含 IFCNT 到达确认 */
+    rt_bool_t (*link_healthy)(void *priv);  /* FALSE = 链路不可信, 不猜 */
 } tmc_cfg_bus_t;
 
-static rt_err_t tmc_cfg_hw_open(void)  { return tmc2209_init(); }
-static rt_err_t tmc_cfg_hw_read(rt_uint8_t reg, rt_uint32_t *v)
+/* 运行态写入门禁提供者: 返回 TMC_WGATE_* 位掩码(0=全通)。生产实例查真实子系统,
+ * 自测实例返回受控值 —— 这样"门禁拒绝写入"本身也是可离线断言的对象。 */
+typedef rt_uint32_t (*tmc_cfg_gate_fn)(void *priv);
+
+typedef struct
 {
+    /* 生命周期状态 */
+    tmc_drv_cfg_state_t state;
+    rt_uint8_t  fail_reg;                    /* 失败发生在哪个寄存器(0=无) */
+    rt_err_t    last_err;
+    rt_bool_t   fail_from_integrity;
+    /* 成功下发后的快照: 断电/复位后芯片寄存器回默认值, 而 MCU 侧不会自动知道,
+     * 只能靠"已下发值 vs 现值"比对照出来。done_valid=FALSE = 这份快照不可信。 */
+    rt_uint32_t      done_gconf;
+    rt_uint32_t      done_chop;
+    tmc_drv_config_t done;
+    rt_bool_t        done_valid;
+    /* 接缝: bus/gate 是无状态 vtable, 实例数据一律经 priv */
+    const tmc_cfg_bus_t *bus;
+    tmc_cfg_gate_fn      gate;
+    void                *priv;
+    /* 同步 */
+    struct rt_mutex lock;
+    struct rt_mutex txn;
+    rt_bool_t       lock_ok;
+    rt_bool_t       txn_ok;
+} tmc_cfg_ctx_t;
+
+static void tmc_cfg_lock(tmc_cfg_ctx_t *ctx)
+{
+    if (ctx->lock_ok) rt_mutex_take(&ctx->lock, RT_WAITING_FOREVER);
+}
+
+static void tmc_cfg_unlock(tmc_cfg_ctx_t *ctx)
+{
+    if (ctx->lock_ok) rt_mutex_release(&ctx->lock);
+}
+
+/* 非阻塞取事务锁。未 init(无 RTOS/早期上下文)视为取到, 释放端同样空操作。 */
+static rt_bool_t tmc_cfg_txn_take(tmc_cfg_ctx_t *ctx)
+{
+    if (!ctx->txn_ok) return RT_TRUE;
+    return (rt_mutex_take(&ctx->txn, RT_WAITING_NO) == RT_EOK) ? RT_TRUE : RT_FALSE;
+}
+
+static void tmc_cfg_txn_give(tmc_cfg_ctx_t *ctx)
+{
+    if (ctx->txn_ok) (void)rt_mutex_release(&ctx->txn);
+}
+
+static void tmc_cfg_ctx_init(tmc_cfg_ctx_t *ctx, const tmc_cfg_bus_t *bus,
+                             tmc_cfg_gate_fn gate, void *priv,
+                             const char *nm_lock, const char *nm_txn)
+{
+    rt_memset(ctx, 0, sizeof(*ctx));
+    ctx->state     = TMC_DRV_UNCONFIGURED;
+    ctx->bus       = bus;
+    ctx->gate      = gate;
+    ctx->priv      = priv;
+    ctx->lock_ok   = RT_FALSE;
+    ctx->txn_ok    = RT_FALSE;
+    if (rt_mutex_init(&ctx->lock, nm_lock, RT_IPC_FLAG_PRIO) == RT_EOK)
+        ctx->lock_ok = RT_TRUE;
+    if (rt_mutex_init(&ctx->txn, nm_txn, RT_IPC_FLAG_PRIO) == RT_EOK)
+        ctx->txn_ok = RT_TRUE;
+}
+
+static void tmc_cfg_ctx_detach(tmc_cfg_ctx_t *ctx)
+{
+    if (ctx->txn_ok)  (void)rt_mutex_detach(&ctx->txn);
+    if (ctx->lock_ok) (void)rt_mutex_detach(&ctx->lock);
+    ctx->txn_ok  = RT_FALSE;
+    ctx->lock_ok = RT_FALSE;
+}
+
+/* ---- 生产接缝: 真实 UART2(协议层的 write 已内含 IFCNT 到达确认) ---- */
+static rt_err_t tmc_cfg_hw_open(void *priv)
+{
+    (void)priv;
+    return tmc2209_init();
+}
+
+static rt_err_t tmc_cfg_hw_read(void *priv, rt_uint8_t reg, rt_uint32_t *v)
+{
+    (void)priv;
     return tmc2209_read_register(TMC_ADDR_DEFAULT, reg, v);
 }
-static rt_err_t tmc_cfg_hw_write(rt_uint8_t reg, rt_uint32_t v)
+
+static rt_err_t tmc_cfg_hw_write(void *priv, rt_uint8_t reg, rt_uint32_t v)
 {
+    (void)priv;
     return tmc2209_write_register_confirmed(TMC_ADDR_DEFAULT, reg, v);
 }
+
+/* 只有 SUBSYS_OK 算健康: DEGRADED(最近一次传输失败)/FAILED(uart2 打不开)/
+ * UNINIT(未初始化)一律不可信 -> 配置写入与完整性复核都 fail closed。 */
+static rt_bool_t tmc_cfg_hw_link_healthy(void *priv)
+{
+    (void)priv;
+    return (tmc2209_get_health() == SUBSYS_OK) ? RT_TRUE : RT_FALSE;
+}
+
 static const tmc_cfg_bus_t tmc_cfg_bus_real =
 {
-    tmc_cfg_hw_open, tmc_cfg_hw_read, tmc_cfg_hw_write
+    tmc_cfg_hw_open, tmc_cfg_hw_read, tmc_cfg_hw_write, tmc_cfg_hw_link_healthy
 };
-static const tmc_cfg_bus_t *tmc_cfg_bus = &tmc_cfg_bus_real;
+
+/* ---------- 生产运行态门禁 (P0-B) ----------
+ * 每次 apply 之前重新求值, 不用"宏以前置硬件验收"替代"每次操作的条件检查"。
+ * 本函数全部是纯只读(不产生任何 UART 流量), 可以在 system_status 里直接打印。
+ * ⚠ 调用点已持有 txn, 因此这里取 mot_lock 的顺序是 txn -> mot_lock。 */
+static rt_uint32_t tmc_cfg_gate_prod(void *priv)
+{
+    rt_uint32_t bad = 0;
+    motor_snapshot_t snap;
+
+    (void)priv;
+
+    if (!TMC_DRIVE_CONFIG_HW_VALIDATED)      bad |= TMC_WGATE_HW_NOT_VALIDATED;
+
+    /* 改电流档/斩波器参数时电机必须彻底停着且未使能 */
+    if (motor_get_snapshot(&snap) != RT_EOK) bad |= TMC_WGATE_MOTOR_NOT_QUIET;
+    else if (snap.armed || snap.state != MOTOR_IDLE ||
+             snap.current_hz != 0u || snap.target_hz != 0u)
+                                             bad |= TMC_WGATE_MOTOR_NOT_QUIET;
+
+    /* 驱动必须处于禁能请求(焊盘实测 LOW)。注意: 现板与门/非门损坏, 这条只能证明
+     * MCU 侧的请求电平, 证明不了 TMC_ENN 已禁能 —— 所以它必要但不充分, 编译期
+     * 那道门不会因为本位通过就允许翻转。 */
+    if (!safety_drv_enable_is_low())         bad |= TMC_WGATE_DRV_PAD_NOT_LOW;
+    if (safety_state_get() != SAFETY_READY)  bad |= TMC_WGATE_NOT_READY;
+    if (safety_fault_get() != FAULT_NONE)    bad |= TMC_WGATE_FAULT_LATCHED;
+    if (!tmc_cfg_hw_link_healthy(RT_NULL))   bad |= TMC_WGATE_LINK_UNHEALTHY;
+
+    return bad;
+}
+
+static void tmc_cfg_print_gate(rt_uint32_t bad)
+{
+    rt_kprintf("[TMC-CFG] write gate mask=0x%X:", (unsigned)bad);
+    if (bad & TMC_WGATE_HW_NOT_VALIDATED) rt_kprintf(" hw-chain-not-validated(compile)");
+    if (bad & TMC_WGATE_MOTOR_NOT_QUIET)  rt_kprintf(" motor-not-quiet");
+    if (bad & TMC_WGATE_DRV_PAD_NOT_LOW)  rt_kprintf(" drv-enable-pad-not-low");
+    if (bad & TMC_WGATE_NOT_READY)        rt_kprintf(" safety-not-READY");
+    if (bad & TMC_WGATE_FAULT_LATCHED)    rt_kprintf(" fault-not-cleared");
+    if (bad & TMC_WGATE_LINK_UNHEALTHY)   rt_kprintf(" uart-link-unhealthy");
+    rt_kprintf("\n");
+}
+
+/* ---- 生产实例 ---- */
+static tmc_cfg_ctx_t tmc_cfg_prod;
+static rt_bool_t     tmc_cfg_prod_ready = RT_FALSE;
+
+/* 幂等。由 tmc2209_init()(bootstrap 阶段, 单线程)完成; 万一在此之前被调用,
+ * 未 init 的实例两个锁标志都是 FALSE, 读路径退化为无锁读零值 -> state 为
+ * UNCONFIGURED, 判定依旧 fail closed。 */
+static void tmc_cfg_prod_sync(void)
+{
+    if (tmc_cfg_prod_ready) return;
+    tmc_cfg_ctx_init(&tmc_cfg_prod, &tmc_cfg_bus_real, tmc_cfg_gate_prod, RT_NULL,
+                     "tmcCfgL", "tmcCfgT");
+    tmc_cfg_prod_ready = RT_TRUE;
+}
 
 /* ---- 纯函数: 状态名 / 理论电流 / 打包 / 方向守卫 ---- */
 const char *tmc_drv_cfg_state_name(tmc_drv_cfg_state_t s)
@@ -604,21 +764,39 @@ const char *tmc_drv_cfg_state_name(tmc_drv_cfg_state_t s)
     default:                   return "UNKNOWN";
     }
 }
-tmc_drv_cfg_state_t tmc2209_get_config_state(void) { return tmc_cfg_state; }
+/* F2b: 生产状态的读取一律经 ctx 叶锁取一致值(此前是无锁裸读)。 */
+tmc_drv_cfg_state_t tmc2209_get_config_state(void)
+{
+    tmc_drv_cfg_state_t s;
+
+    tmc_cfg_lock(&tmc_cfg_prod);
+    s = tmc_cfg_prod.state;
+    tmc_cfg_unlock(&tmc_cfg_prod);
+    return s;
+}
 
 void tmc2209_get_planned_config(tmc_drv_config_t *out)
 {
     if (out != RT_NULL) *out = tmc_cfg_planned;
 }
 
+/* P1-D: 快照有效性由 done_valid 单点决定。配置开始/失败/失联/复位都会把它清掉,
+ * 所以这里不会把"上一轮的旧值"当成已下发的有效配置返回。 */
 rt_bool_t tmc2209_get_applied_config(rt_uint32_t *gconf, rt_uint32_t *chop,
-                                      tmc_drv_config_t *out)
+                                     tmc_drv_config_t *out)
 {
-    if (!tmc_cfg_done_valid) return RT_FALSE;
-    if (gconf) *gconf = tmc_cfg_done_gconf;
-    if (chop)  *chop  = tmc_cfg_done_chop;
-    if (out)   *out   = tmc_cfg_done;
-    return RT_TRUE;
+    rt_bool_t valid;
+
+    tmc_cfg_lock(&tmc_cfg_prod);
+    valid = tmc_cfg_prod.done_valid;
+    if (valid)
+    {
+        if (gconf) *gconf = tmc_cfg_prod.done_gconf;
+        if (chop)  *chop  = tmc_cfg_prod.done_chop;
+        if (out)   *out   = tmc_cfg_prod.done;
+    }
+    tmc_cfg_unlock(&tmc_cfg_prod);
+    return valid;
 }
 
 /* CS*1000。手册: "IRUN, IHOLD: 1/32 to 32/32 of full-scale current" */
@@ -697,28 +875,43 @@ rt_uint32_t tmc_chopconf_next(rt_uint32_t cur, const tmc_drv_config_t *c)
     return v;
 }
 
-/* ---- 失败与写入 ---- */
-static rt_err_t tmc_cfg_fail(rt_uint8_t reg, rt_err_t e, const char *stage)
+/* ---- 失败提交与单项写入(F2b: 全部经 ctx, 并在锁内一次性提交) ---- */
+
+/* P1-D: 任何失败/失联/芯片复位都必须让 done_valid 立即失效 —— 否则上一轮快照会
+ * 继续被 tmc2209_get_applied_config() 当作"已下发的有效配置"返回, 第 5 门也不会
+ * 重新闭合。打印放在叶锁之外, 保持锁内不做什么耗时/可阻塞的事。 */
+static rt_err_t tmc_cfg_fail_ctx(tmc_cfg_ctx_t *ctx, rt_uint8_t reg, rt_err_t e,
+                                 const char *stage, rt_bool_t from_integrity)
 {
-    tmc_cfg_fail_reg = reg;
-    tmc_cfg_last_err = e;
-    tmc_cfg_state = TMC_DRV_FAILED;
+    rt_err_t ret = (e == RT_EOK) ? -RT_ERROR : e;
+
+    tmc_cfg_lock(ctx);
+    ctx->fail_reg            = reg;
+    ctx->last_err            = ret;
+    ctx->fail_from_integrity = from_integrity;
+    ctx->state               = TMC_DRV_FAILED;
+    ctx->done_valid          = RT_FALSE;
+    tmc_cfg_unlock(ctx);
+
     rt_kprintf("[TMC-CFG] FAILED at %s (reg=0x%02X err=%d) - 序列已中止, 芯片可能"
-               "处于部分配置状态; 禁止使能, 需重新 apply 或断电复位\n",
-               stage, reg, (int)e);
-    return (e == RT_EOK) ? -RT_ERROR : e;
+               "处于部分配置状态; 已下发快照作废, 禁止使能, 需重新 apply 或断电复位\n",
+               stage, reg, (int)ret);
+    return ret;
 }
 
-/* 写 + IFCNT 到达确认 +(可读寄存器)读回比对。只写寄存器不发非法读。 */
-static rt_err_t tmc_cfg_write_one(rt_uint8_t reg, rt_uint32_t val, rt_bool_t readable)
+/* 写 + IFCNT 到达确认 +(可读寄存器)读回比对。只写寄存器不发非法读。
+ * -RT_EIO 有三条来源: 写未被芯片接受 / 读回传输失败 / 读回值与写入值不符。
+ * 第三条(F2b 新增用例覆盖)意味着"IFCNT+1 但内容不对", 同样必须中止。 */
+static rt_err_t tmc_cfg_write_one_ctx(tmc_cfg_ctx_t *ctx, rt_uint8_t reg,
+                                      rt_uint32_t val, rt_bool_t readable)
 {
-    rt_err_t    e = tmc_cfg_bus->write(reg, val);
+    rt_err_t    e = ctx->bus->write(ctx->priv, reg, val);
     rt_uint32_t rb = 0;
 
     if (e != RT_EOK) return e;                    /* IFCNT 未 +1 = 芯片没接受 */
     if (!readable)   return RT_EOK;               /* 只写: 不读回 */
 
-    e = tmc_cfg_bus->read(reg, &rb);
+    e = ctx->bus->read(ctx->priv, reg, &rb);
     if (e != RT_EOK) return e;
     if (rb != val)
     {
@@ -729,148 +922,282 @@ static rt_err_t tmc_cfg_write_one(rt_uint8_t reg, rt_uint32_t val, rt_bool_t rea
     return RT_EOK;
 }
 
-/* 配置序列本体。allow_hw 由调用方决定: 生产路径传编译期门禁, 离线自测传 TRUE
- * 但同时必须把 tmc_cfg_bus 换成假总线(见 tmc_cfg_selftest), 因此自测不会碰 UART。 */
-static rt_err_t tmc_cfg_run(const tmc_drv_config_t *c, const tmc_cfg_bus_t *bus,
-                            rt_bool_t allow_hw)
+/* 配置序列本体。
+ * P0-B: 运行态门禁在任何总线访问(连 open 都在其后)之前求值, 不通过就一位不写、
+ *       状态与快照保持原样。
+ * P1-D: 整段被 ctx 的 txn 锁串行化; 进入 CONFIGURING 即作废旧快照, 成功后才提交
+ *       新快照。自测把 ctx 换成局部实例(假总线), 不需要临时篡改生产全局。 */
+static rt_err_t tmc_cfg_apply_ctx(tmc_cfg_ctx_t *ctx, const tmc_drv_config_t *c)
 {
-    rt_uint32_t gconf = 0, chop = 0, new_g, new_c;
+    rt_uint32_t gconf = 0, chop = 0, new_g = 0, new_c = 0, gates;
     rt_uint8_t  old_vs;
     rt_err_t    e;
 
-    if (!allow_hw)
+    if (!tmc_cfg_txn_take(ctx))
     {
-        rt_kprintf("[TMC-CFG] REFUSED: 硬件安全链未验收"
-                   " (TMC_DRIVE_CONFIG_HW_VALIDATED=FALSE) - 未发出任何总线写,"
-                   " 状态保持 %s\n", tmc_drv_cfg_state_name(tmc_cfg_state));
+        rt_kprintf("[TMC-CFG] REFUSED: 配置/arm 事务正在进行(-RT_EBUSY),"
+                   " 本次不发出任何总线写\n");
+        return -RT_EBUSY;
+    }
+
+    gates = (ctx->gate != RT_NULL) ? ctx->gate(ctx->priv) : 0u;
+    if (gates != 0u)
+    {
+        rt_kprintf("[TMC-CFG] REFUSED: 写入门禁未通过 - 未发出任何总线写,"
+                   " 状态保持 %s\n", tmc_drv_cfg_state_name(ctx->state));
+        tmc_cfg_print_gate(gates);
+        tmc_cfg_txn_give(ctx);
         return -RT_EPERM;
     }
-    if (tmc_cfg_state == TMC_DRV_CONFIGURING) return -RT_EBUSY;
 
-    tmc_cfg_bus = bus;
-    if (tmc_cfg_bus->open() != RT_EOK)
-        return tmc_cfg_fail(0, -RT_ERROR, "uart-open");
+    tmc_cfg_lock(ctx);
+    if (ctx->state == TMC_DRV_CONFIGURING)
+    {
+        tmc_cfg_unlock(ctx);
+        tmc_cfg_txn_give(ctx);
+        rt_kprintf("[TMC-CFG] REFUSED: 上一次配置尚未结束(CONFIGURING)\n");
+        return -RT_EBUSY;
+    }
+    ctx->state      = TMC_DRV_CONFIGURING;
+    ctx->done_valid = RT_FALSE;           /* 重新下发期间旧快照不可信 */
+    tmc_cfg_unlock(ctx);
 
-    tmc_cfg_state = TMC_DRV_CONFIGURING;
     rt_kprintf("[TMC-CFG] apply start: irun=%u ihold=%u dly=%u tpd=%u vsense=%u\n",
                c->irun, c->ihold, c->ihold_delay, c->tpowerdown, c->vsense);
 
+    if (ctx->bus->open(ctx->priv) != RT_EOK)
+    {
+        e = tmc_cfg_fail_ctx(ctx, 0, -RT_ERROR, "uart-open", RT_FALSE);
+        goto out;
+    }
+
     /* ---- 1) GCONF: 只置 i_scale_analog + pdn_disable, 其余保留(含 OTP 派生位) */
-    e = tmc_cfg_bus->read(TMC_REG_GCONF, &gconf);
-    if (e != RT_EOK) return tmc_cfg_fail(TMC_REG_GCONF, e, "GCONF-read");
+    e = ctx->bus->read(ctx->priv, TMC_REG_GCONF, &gconf);
+    if (e != RT_EOK)
+    {
+        e = tmc_cfg_fail_ctx(ctx, TMC_REG_GCONF, e, "GCONF-read", RT_FALSE);
+        goto out;
+    }
 
     /* internal_Rsense=1 时 VREF 引脚被内部拉到 GND, 外部 0.11R 模型与 VREF
      * 分档一起失效 -> 不是"写不进去"而是"算了也不对", 必须 fail closed。 */
     if (gconf & TMC_GCONF_INTERNAL_RSENSE)
-        return tmc_cfg_fail(TMC_REG_GCONF, -RT_EPERM, "GCONF.internal_Rsense=1");
+    {
+        e = tmc_cfg_fail_ctx(ctx, TMC_REG_GCONF, -RT_EPERM,
+                             "GCONF.internal_Rsense=1", RT_FALSE);
+        goto out;
+    }
 
     new_g = tmc_gconf_next(gconf, c);
     rt_kprintf("[TMC-CFG] GCONF %08X -> %08X\n",
                (unsigned)gconf, (unsigned)new_g);
-    e = tmc_cfg_write_one(TMC_REG_GCONF, new_g, RT_TRUE);
-    if (e != RT_EOK) return tmc_cfg_fail(TMC_REG_GCONF, e, "GCONF-write");
+    e = tmc_cfg_write_one_ctx(ctx, TMC_REG_GCONF, new_g, RT_TRUE);
+    if (e != RT_EOK)
+    {
+        e = tmc_cfg_fail_ctx(ctx, TMC_REG_GCONF, e, "GCONF-write", RT_FALSE);
+        goto out;
+    }
 
     /* ---- 2) CHOPCONF: 只动 vsense(及可选 MRES), TOFF/HSTRT/HEND/TBL 全保留 */
-    e = tmc_cfg_bus->read(TMC_REG_CHOPCONF, &chop);
-    if (e != RT_EOK) return tmc_cfg_fail(TMC_REG_CHOPCONF, e, "CHOPCONF-read");
+    e = ctx->bus->read(ctx->priv, TMC_REG_CHOPCONF, &chop);
+    if (e != RT_EOK)
+    {
+        e = tmc_cfg_fail_ctx(ctx, TMC_REG_CHOPCONF, e, "CHOPCONF-read", RT_FALSE);
+        goto out;
+    }
 
     old_vs = (chop & TMC_CHOPCONF_VSENSE) ? 1u : 0u;
     if (!tmc_change_is_current_safe(old_vs, c->vsense))
-        return tmc_cfg_fail(TMC_REG_CHOPCONF, -RT_EPERM, "CHOPCONF.overcurrent-dir");
+    {
+        e = tmc_cfg_fail_ctx(ctx, TMC_REG_CHOPCONF, -RT_EPERM,
+                             "CHOPCONF.overcurrent-dir", RT_FALSE);
+        goto out;
+    }
 
     /* 不变式: TOFF 必须原样保留且非 0(TOFF=0 会关断所有桥) */
     new_c = tmc_chopconf_next(chop, c);
     if ((new_c & TMC_CHOPCONF_TOFF_MASK) != (chop & TMC_CHOPCONF_TOFF_MASK))
-        return tmc_cfg_fail(TMC_REG_CHOPCONF, -RT_EINVAL, "CHOPCONF.TOFF-changed");
+    {
+        e = tmc_cfg_fail_ctx(ctx, TMC_REG_CHOPCONF, -RT_EINVAL,
+                             "CHOPCONF.TOFF-changed", RT_FALSE);
+        goto out;
+    }
     if ((new_c & TMC_CHOPCONF_TOFF_MASK) == 0u)
-        return tmc_cfg_fail(TMC_REG_CHOPCONF, -RT_EINVAL, "CHOPCONF.TOFF-zero");
+    {
+        e = tmc_cfg_fail_ctx(ctx, TMC_REG_CHOPCONF, -RT_EINVAL,
+                             "CHOPCONF.TOFF-zero", RT_FALSE);
+        goto out;
+    }
 
     rt_kprintf("[TMC-CFG] CHOPCONF %08X -> %08X (vsense %u -> %u)\n",
                (unsigned)chop, (unsigned)new_c, old_vs, c->vsense);
-    e = tmc_cfg_write_one(TMC_REG_CHOPCONF, new_c, RT_TRUE);
-    if (e != RT_EOK) return tmc_cfg_fail(TMC_REG_CHOPCONF, e, "CHOPCONF-write");
+    e = tmc_cfg_write_one_ctx(ctx, TMC_REG_CHOPCONF, new_c, RT_TRUE);
+    if (e != RT_EOK)
+    {
+        e = tmc_cfg_fail_ctx(ctx, TMC_REG_CHOPCONF, e, "CHOPCONF-write", RT_FALSE);
+        goto out;
+    }
 
     /* ---- 3) IHOLD_IRUN: 只写寄存器, 到达凭证只有 IFCNT+1 ---- */
     rt_kprintf("[TMC-CFG] IHOLD_IRUN <- %08X (只写, 不读回)\n",
                (unsigned)tmc_ihold_irun_pack(c));
-    e = tmc_cfg_write_one(TMC_REG_IHOLD_IRUN, tmc_ihold_irun_pack(c), RT_FALSE);
-    if (e != RT_EOK) return tmc_cfg_fail(TMC_REG_IHOLD_IRUN, e, "IHOLD_IRUN-write");
+    e = tmc_cfg_write_one_ctx(ctx, TMC_REG_IHOLD_IRUN, tmc_ihold_irun_pack(c), RT_FALSE);
+    if (e != RT_EOK)
+    {
+        e = tmc_cfg_fail_ctx(ctx, TMC_REG_IHOLD_IRUN, e, "IHOLD_IRUN-write", RT_FALSE);
+        goto out;
+    }
 
     /* ---- 4) TPOWERDOWN: 同样按只写处理(不做非法读回) ---- */
     rt_kprintf("[TMC-CFG] TPOWERDOWN(0x%02X) <- %u\n",
                TMC_REG_TPOWERDOWN, c->tpowerdown);
-    e = tmc_cfg_write_one(TMC_REG_TPOWERDOWN, c->tpowerdown, RT_FALSE);
-    if (e != RT_EOK) return tmc_cfg_fail(TMC_REG_TPOWERDOWN, e, "TPOWERDOWN-write");
+    e = tmc_cfg_write_one_ctx(ctx, TMC_REG_TPOWERDOWN, c->tpowerdown, RT_FALSE);
+    if (e != RT_EOK)
+    {
+        e = tmc_cfg_fail_ctx(ctx, TMC_REG_TPOWERDOWN, e, "TPOWERDOWN-write", RT_FALSE);
+        goto out;
+    }
 
-    /* 全部到位: 存快照供 integrity 复核 */
-    tmc_cfg_done_gconf = new_g;
-    tmc_cfg_done_chop  = new_c;
-    tmc_cfg_done       = *c;
-    tmc_cfg_done_valid = RT_TRUE;
-    tmc_cfg_state      = TMC_DRV_CONFIGURED;
-    tmc_cfg_fail_reg   = 0;
-    tmc_cfg_last_err   = RT_EOK;
-    tmc_cfg_fail_from_integrity = RT_FALSE;
+    /* 全部到位: 一次性提交快照与 CONFIGURED */
+    tmc_cfg_lock(ctx);
+    ctx->done_gconf = new_g;
+    ctx->done_chop  = new_c;
+    ctx->done       = *c;
+    ctx->done_valid = RT_TRUE;
+    ctx->state      = TMC_DRV_CONFIGURED;
+    ctx->fail_reg   = 0;
+    ctx->last_err   = RT_EOK;
+    ctx->fail_from_integrity = RT_FALSE;
+    tmc_cfg_unlock(ctx);
     rt_kprintf("[TMC-CFG] CONFIGURED (各次写入均经 IFCNT 确认; GCONF/CHOPCONF"
                " 读回一致)。电流值仍为理论计算, 未实测。\n");
-    return RT_EOK;
+    e = RT_EOK;
+
+out:
+    tmc_cfg_txn_give(ctx);
+    return e;
 }
 
 rt_err_t tmc2209_apply_config(void)
 {
-    return tmc_cfg_run(&tmc_cfg_planned, &tmc_cfg_bus_real,
-                       TMC_DRIVE_CONFIG_HW_VALIDATED);
+    tmc_cfg_prod_sync();
+    return tmc_cfg_apply_ctx(&tmc_cfg_prod, &tmc_cfg_planned);
+}
+
+/* 运行态门禁的只读观察口(system_status / tmc_config_show 用, 不产生总线流量)。 */
+rt_uint32_t tmc2209_get_write_gate_mask(void)
+{
+    return tmc_cfg_gate_prod(RT_NULL);
+}
+
+/* P1-C 修复点: 必须同时看 state 和 done_valid。只看 state 会让"状态仍是
+ * CONFIGURED 而快照已作废"的组合从第 5 门假通过(旧版自测退出时正是这个组合)。 */
+static rt_bool_t tmc_cfg_ok_for_arm_ctx(tmc_cfg_ctx_t *ctx)
+{
+    rt_bool_t ok;
+
+    tmc_cfg_lock(ctx);
+    ok = (ctx->state == TMC_DRV_CONFIGURED && ctx->done_valid) ? RT_TRUE : RT_FALSE;
+    tmc_cfg_unlock(ctx);
+    return ok;
 }
 
 rt_bool_t tmc2209_drive_config_ok_for_arm(void)
 {
-    return (tmc_cfg_state == TMC_DRV_CONFIGURED) ? RT_TRUE : RT_FALSE;
+    return tmc_cfg_ok_for_arm_ctx(&tmc_cfg_prod);
 }
 
-/* 见头文件说明: 芯片断电/复位后寄存器回默认, 必须在这里被照出来。 */
-rt_err_t tmc2209_config_integrity_check(void)
+/* ---------- F2b P1-D: 配置事务的外部串行化口(motor_arm 决策段用) ----------
+ * 非阻塞: 取不到就返回 -RT_EBUSY, 调用方必须拒绝使能(fail closed)。
+ * 同线程可重入(RT-Thread 互斥量带持有计数), 所以 arm 段内的完整性复核不会自锁。
+ * ⚠ 停机路径(motor_emergency_stop / safety_force_shutdown)不得调用本函数 ——
+ *   紧急停机永远不能被配置事务挡住。 */
+rt_err_t tmc2209_cfg_txn_begin(void)
 {
-    rt_uint32_t v = 0;
-    subsys_health_t h = tmc2209_get_health();
+    if (!tmc_cfg_prod.txn_ok) return RT_EOK;         /* 未 init: 无并发可言 */
+    return (rt_mutex_take(&tmc_cfg_prod.txn, RT_WAITING_NO) == RT_EOK)
+           ? RT_EOK : -RT_EBUSY;
+}
 
-    if (tmc_cfg_state != TMC_DRV_CONFIGURED || !tmc_cfg_done_valid)
-        return -RT_EPERM;
+void tmc2209_cfg_txn_end(void)
+{
+    if (tmc_cfg_prod.txn_ok) (void)rt_mutex_release(&tmc_cfg_prod.txn);
+}
 
-    /* 链路本身已不可信时不猜: 直接降级(读不到 != 配置还在) */
-    if (h == SUBSYS_FAILED || h == SUBSYS_DEGRADED)
+/* 见头文件说明: 芯片断电/复位后寄存器回默认, 必须在这里被照出来。
+ * F2b: 快照/状态先在叶锁内取一致副本, UART 读在锁外做(只由 txn 串行化),
+ * 因此本函数不会持叶锁跨越总线调用。 */
+static rt_err_t tmc_cfg_integrity_ctx(tmc_cfg_ctx_t *ctx)
+{
+    rt_uint32_t tgt_g = 0, tgt_c = 0, v = 0;
+    tmc_drv_cfg_state_t st;
+    rt_bool_t valid;
+    rt_err_t  e;
+
+    if (!tmc_cfg_txn_take(ctx)) return -RT_EBUSY;   /* 正在 apply/arm: 此刻无法复核 */
+
+    tmc_cfg_lock(ctx);
+    st    = ctx->state;
+    valid = ctx->done_valid;
+    tgt_g = ctx->done_gconf;
+    tgt_c = ctx->done_chop;
+    tmc_cfg_unlock(ctx);
+
+    if (st != TMC_DRV_CONFIGURED || !valid)
     {
-        tmc_cfg_fail_from_integrity = RT_TRUE;
-        return tmc_cfg_fail(0, -RT_EIO, "integrity:link-not-healthy");
+        e = -RT_EPERM;                    /* 尚未 CONFIGURED / 快照已失效: 不猜 */
+        goto out;
+    }
+
+    /* 链路本身已不可信时不猜: 读不到 != 配置还在 */
+    if (!ctx->bus->link_healthy(ctx->priv))
+    {
+        e = tmc_cfg_fail_ctx(ctx, 0, -RT_EIO, "integrity:link-not-healthy", RT_TRUE);
+        goto out;
     }
 
     v = 0;
-    if (tmc_cfg_bus->read(TMC_REG_GCONF, &v) != RT_EOK)
+    if (ctx->bus->read(ctx->priv, TMC_REG_GCONF, &v) != RT_EOK)
     {
-        tmc_cfg_fail_from_integrity = RT_TRUE;
-        return tmc_cfg_fail(TMC_REG_GCONF, -RT_EIO, "integrity:GCONF-read");
+        e = tmc_cfg_fail_ctx(ctx, TMC_REG_GCONF, -RT_EIO,
+                             "integrity:GCONF-read", RT_TRUE);
+        goto out;
     }
-    if (v != tmc_cfg_done_gconf)
+    if (v != tgt_g)
     {
         rt_kprintf("[TMC-CFG] !! GCONF 已偏离下发值 (%08X != %08X) - 芯片可能断电/复位\n",
-                   (unsigned)v, (unsigned)tmc_cfg_done_gconf);
-        tmc_cfg_fail_from_integrity = RT_TRUE;
-        return tmc_cfg_fail(TMC_REG_GCONF, -RT_EIO, "integrity:GCONF-mismatch");
+                   (unsigned)v, (unsigned)tgt_g);
+        e = tmc_cfg_fail_ctx(ctx, TMC_REG_GCONF, -RT_EIO,
+                             "integrity:GCONF-mismatch", RT_TRUE);
+        goto out;
     }
 
     v = 0;
-    if (tmc_cfg_bus->read(TMC_REG_CHOPCONF, &v) != RT_EOK)
+    if (ctx->bus->read(ctx->priv, TMC_REG_CHOPCONF, &v) != RT_EOK)
     {
-        tmc_cfg_fail_from_integrity = RT_TRUE;
-        return tmc_cfg_fail(TMC_REG_CHOPCONF, -RT_EIO, "integrity:CHOPCONF-read");
+        e = tmc_cfg_fail_ctx(ctx, TMC_REG_CHOPCONF, -RT_EIO,
+                             "integrity:CHOPCONF-read", RT_TRUE);
+        goto out;
     }
-    if (v != tmc_cfg_done_chop)
+    if (v != tgt_c)
     {
         rt_kprintf("[TMC-CFG] !! CHOPCONF 已偏离下发值 (%08X != %08X) - vsense 档可能已丢\n",
-                   (unsigned)v, (unsigned)tmc_cfg_done_chop);
-        tmc_cfg_fail_from_integrity = RT_TRUE;
-        return tmc_cfg_fail(TMC_REG_CHOPCONF, -RT_EIO, "integrity:CHOPCONF-mismatch");
+                   (unsigned)v, (unsigned)tgt_c);
+        e = tmc_cfg_fail_ctx(ctx, TMC_REG_CHOPCONF, -RT_EIO,
+                             "integrity:CHOPCONF-mismatch", RT_TRUE);
+        goto out;
     }
-    return RT_EOK;
+    e = RT_EOK;
+
+out:
+    tmc_cfg_txn_give(ctx);
+    return e;
+}
+
+rt_err_t tmc2209_config_integrity_check(void)
+{
+    tmc_cfg_prod_sync();
+    return tmc_cfg_integrity_ctx(&tmc_cfg_prod);
 }
 
 /* ---------- MSH: 配置查看 / 受控下发 / 离线自检 ---------- */
@@ -881,14 +1208,30 @@ static void tmc_config_show(void)
     rt_uint32_t vfs = c.vsense ? TMC_SENSE_VFS_180_MV : TMC_SENSE_VFS_325_MV;
     rt_uint32_t run  = tmc_current_rms_ma(vfs, TMC_CFG_RSENSE_MOHM, TMC_CFG_VREF_MV, c.irun);
     rt_uint32_t hold = tmc_current_rms_ma(vfs, TMC_CFG_RSENSE_MOHM, TMC_CFG_VREF_MV, c.ihold);
-    rt_uint32_t v = 0;
+    rt_uint32_t v = 0, gates, snap_g = 0, snap_c = 0;
+    tmc_drv_cfg_state_t st;
+    rt_uint8_t  fail_reg;
+    rt_err_t    last_err;
+    rt_bool_t   from_integrity, snap_valid;
 
-    rt_kprintf("[TMC-CFG] state=%s fail_reg=0x%02X last_err=%d from_integrity=%d\n",
-               tmc_drv_cfg_state_name(tmc_cfg_state),
-               tmc_cfg_fail_reg, (int)tmc_cfg_last_err,
-               (int)tmc_cfg_fail_from_integrity);
-    rt_kprintf("[TMC-CFG] hw_write_gate=%s (安全链验收后才可翻转)\n",
-               TMC_DRIVE_CONFIG_HW_VALIDATED ? "OPEN" : "CLOSED");
+    tmc_cfg_lock(&tmc_cfg_prod);
+    st             = tmc_cfg_prod.state;
+    fail_reg       = tmc_cfg_prod.fail_reg;
+    last_err       = tmc_cfg_prod.last_err;
+    from_integrity = tmc_cfg_prod.fail_from_integrity;
+    snap_valid     = tmc_cfg_prod.done_valid;
+    snap_g         = tmc_cfg_prod.done_gconf;
+    snap_c         = tmc_cfg_prod.done_chop;
+    tmc_cfg_unlock(&tmc_cfg_prod);
+
+    rt_kprintf("[TMC-CFG] state=%s fail_reg=0x%02X last_err=%d from_integrity=%d"
+               " snapshot_valid=%d\n", tmc_drv_cfg_state_name(st),
+               fail_reg, (int)last_err, (int)from_integrity, (int)snap_valid);
+    gates = tmc2209_get_write_gate_mask();
+    rt_kprintf("[TMC-CFG] hw_write_gate(compile)=%s runtime_gate_mask=0x%X\n",
+               TMC_DRIVE_CONFIG_HW_VALIDATED ? "OPEN" : "CLOSED", (unsigned)gates);
+    if (gates) tmc_cfg_print_gate(gates);
+    else rt_kprintf("[TMC-CFG] !! 运行态门禁全通, 但编译期门未翻转前仍然一位不写\n");
     rt_kprintf("[TMC-CFG] planned irun=%u ihold=%u dly=%u tpd=%u vsense=%u mstep_sel=%u mres=%u\n",
                c.irun, c.ihold, c.ihold_delay, c.tpowerdown,
                c.vsense, c.mstep_reg_select, c.mres);
@@ -904,9 +1247,11 @@ static void tmc_config_show(void)
     rt_kprintf("[TMC-CFG] !! 理论值, 未实测: VREF 为万用表读数(未在本固件核实),"
                " RSENSE 为商品页暂定值。不得当作实测电流使用。\n");
 
-    if (tmc_cfg_state == TMC_DRV_CONFIGURED)
+    if (snap_valid)
         rt_kprintf("[TMC-CFG] applied snapshot: GCONF=%08X CHOPCONF=%08X\n",
-                   (unsigned)tmc_cfg_done_gconf, (unsigned)tmc_cfg_done_chop);
+                   (unsigned)snap_g, (unsigned)snap_c);
+    else
+        rt_kprintf("[TMC-CFG] applied snapshot: 无效(从未成功下发, 或已因失败/失联作废)\n");
 
     if (tmc2209_read_register(TMC_ADDR_DEFAULT, TMC_REG_GCONF, &v) == RT_EOK)
         rt_kprintf("[TMC-CFG] live GCONF=%08X i_scale_analog=%u internal_Rsense=%u"
@@ -933,10 +1278,13 @@ static void tmc_config_apply(int argc, char **argv)
     if (argc != 2 || rt_strcmp(argv[1], "CONFIRM") != 0)
     {
         rt_kprintf("usage: tmc_config_apply CONFIRM\n");
-        rt_kprintf("当前状态: %s, 硬件门禁=%s。写入会改变驱动电流档位, 因此必须"
-                   "显式 CONFIRM 且门禁已开放。\n",
-                   tmc_drv_cfg_state_name(tmc_cfg_state),
-                   TMC_DRIVE_CONFIG_HW_VALIDATED ? "OPEN" : "CLOSED");
+        rt_kprintf("当前状态: %s, 编译期门禁=%s, 运行态门禁 mask=0x%X。\n",
+                   tmc_drv_cfg_state_name(tmc2209_get_config_state()),
+                   TMC_DRIVE_CONFIG_HW_VALIDATED ? "OPEN" : "CLOSED",
+                   (unsigned)tmc2209_get_write_gate_mask());
+        rt_kprintf("写入会改变驱动电流档位, 因此必须显式 CONFIRM, 且编译期门与"
+                   "全部运行态条件同时满足(电机静止未 armed、DRV_ENABLE 实测 LOW、"
+                   "Safety=READY 无锁存故障、UART 健康)。\n");
         return;
     }
     (void)tmc2209_apply_config();
@@ -993,271 +1341,608 @@ static void tmc_calc_selftest(void)
 }
 MSH_CMD_EXPORT(tmc_calc_selftest, offline theoretical current and packing selftest);
 
-/* ---------- F2a: 假总线离线自测(完全不碰 UART) ----------
- * 覆盖: 目标值/位域/RMW 不越界、只写寄存器不非法读回、IFCNT 失败即停止后续写、
- * 中途失败置 FAILED、配置丢失被 integrity 照出、门禁与 arm 判定的真值表。
- * 结束后必须还原 tmc_cfg_bus 与 tmc_cfg_state, 否则会污染生产状态。 */
-#define TMC_FX_LOG_MAX  24
+/* ---------- F2b: 假总线离线自测(局部实例, 不碰生产 ctx, 不碰 UART) ----------
+ * 相对 F2a 的加强(逐条对应审核报告 P1-C / P1-D / P2-F):
+ *   1) 状态全部放进栈上局部实例 tmc_cfg_ctx_t + 静态假总线 vtable + 实例私有数据,
+ *      生产实例零接触, 并用 T18 逐项比对证明(旧版会强制 done_valid=FALSE、
+ *      清零 fail 元数据、把全局总线换成假的)。
+ *   2) 假总线建模 IFCNT: 只有"被接受"的写才自增, 被拒的写不改寄存器内容;
+ *      另有 open 失败、回读污染、链路健康、运行门禁四类注入。
+ *   3) 断言基于有序事件序列(预读→写→读回的先后位置), 而不是"曾经读过"。
+ *   4) 新增失败路径 T11..T17: 回读不符 / internal_Rsense=1 / 运行门禁每一位 /
+ *      跨线程占用事务 / open 失败 / CONFIGURING 窗口 / 快照替换。
+ * ⚠ 本自测只在假总线上运行, 不代表任何真机行为; 上板执行为 HARDWARE-PENDING。 */
 
-static struct
+#define TMC_FX_LOG_MAX  40
+
+typedef struct
 {
     rt_uint8_t  reg;
     rt_uint32_t val;
     rt_uint8_t  is_write;
-} tmc_fx_log[TMC_FX_LOG_MAX];
-static int tmc_fx_n;
-static int tmc_fx_fail_write_nth;        /* 第 N 次 write 返回失败(1 基, <=0=不失败) */
-static int tmc_fx_writes;                 /* 已发生的 write 次数 */
-static rt_uint32_t tmc_fx_gconf, tmc_fx_chop;
+} tmc_fx_ev_t;
 
-static rt_err_t tmc_fx_open(void)  { return RT_EOK; }
-
-static rt_err_t tmc_fx_read(rt_uint8_t reg, rt_uint32_t *v)
+typedef struct
 {
-    if (tmc_fx_n < TMC_FX_LOG_MAX)
+    tmc_fx_ev_t log[TMC_FX_LOG_MAX];
+    int      n;               /* 已记录事件数 */
+    int      writes;          /* 发起过的 write 次数(含未被接受的) */
+    int      opens;           /* 发起过的 open 次数 */
+    int      ifcnt;           /* 模型 IFCNT: 仅"被接受的写"自增 */
+    int      fail_write_nth;  /* 第 N 次 write 不被接受(1 基, <=0=不失败) */
+    rt_uint32_t gconf, chop;  /* 芯片里当前的可读寄存器值 */
+    rt_uint8_t  corrupt_reg;  /* 非 0xFF: 对该寄存器的下一次读返回污染值 */
+    rt_bool_t   open_fail;
+    rt_bool_t   link_ok;
+    rt_uint32_t gate_mask;    /* 注入给运行态门禁提供者的位掩码 */
+} tmc_fx_t;
+
+static void tmc_fx_log(tmc_fx_t *fx, rt_uint8_t reg, rt_uint32_t val, rt_uint8_t w)
+{
+    if (fx->n < TMC_FX_LOG_MAX)
     {
-        tmc_fx_log[tmc_fx_n].reg = reg;
-        tmc_fx_log[tmc_fx_n].val = 0;
-        tmc_fx_log[tmc_fx_n].is_write = 0;
-        tmc_fx_n++;
+        fx->log[fx->n].reg = reg;
+        fx->log[fx->n].val = val;
+        fx->log[fx->n].is_write = w;
+        fx->n++;
     }
-    if (reg == TMC_REG_GCONF)      *v = tmc_fx_gconf;
-    else if (reg == TMC_REG_CHOPCONF) *v = tmc_fx_chop;
-    else return -RT_EIO;            /* 其它寄存器(含只写的 0x10/0x11)本测试不建模 */
+}
+
+static rt_err_t tmc_fx_open(void *priv)
+{
+    tmc_fx_t *fx = (tmc_fx_t *)priv;
+
+    fx->opens++;
+    return fx->open_fail ? -RT_ERROR : RT_EOK;
+}
+
+static rt_err_t tmc_fx_read(void *priv, rt_uint8_t reg, rt_uint32_t *v)
+{
+    tmc_fx_t *fx = (tmc_fx_t *)priv;
+    rt_uint32_t out;
+
+    tmc_fx_log(fx, reg, 0, 0);
+    if (reg == TMC_REG_GCONF)           out = fx->gconf;
+    else if (reg == TMC_REG_CHOPCONF)   out = fx->chop;
+    else return -RT_EIO;      /* 只写寄存器(0x10/0x11): 真机上读它也没有意义 */
+
+    if (fx->corrupt_reg == reg)
+    {
+        fx->corrupt_reg = 0xFF;         /* 一次性: "写进去了但现值不对" */
+        out ^= 0x00000001u;
+    }
+    *v = out;
     return RT_EOK;
 }
 
-static rt_err_t tmc_fx_write(rt_uint8_t reg, rt_uint32_t val)
+/* IFCNT 语义: 被接受的写 -> ifcnt++ 且寄存器更新; 未被接受的写 -> 两者都不发生,
+ * 调用方(write_one)拿到错误并中止。这就是真机"IFCNT 没 +1"的等价模型。 */
+static rt_err_t tmc_fx_write(void *priv, rt_uint8_t reg, rt_uint32_t val)
 {
-    tmc_fx_writes++;
-    if (tmc_fx_fail_write_nth > 0 && tmc_fx_writes == tmc_fx_fail_write_nth)
-        return -RT_EIO;              /* 模拟 IFCNT 未 +1 = 写入未被接受 */
-    if (tmc_fx_n < TMC_FX_LOG_MAX)
-    {
-        tmc_fx_log[tmc_fx_n].reg = reg;
-        tmc_fx_log[tmc_fx_n].val = val;
-        tmc_fx_log[tmc_fx_n].is_write = 1;
-        tmc_fx_n++;
-    }
-    if (reg == TMC_REG_GCONF)      tmc_fx_gconf = val;
-    else if (reg == TMC_REG_CHOPCONF) tmc_fx_chop = val;
+    tmc_fx_t *fx = (tmc_fx_t *)priv;
+
+    fx->writes++;
+    if (fx->fail_write_nth > 0 && fx->writes == fx->fail_write_nth)
+        return -RT_EIO;
+
+    fx->ifcnt++;
+    tmc_fx_log(fx, reg, val, 1);
+    if (reg == TMC_REG_GCONF)         fx->gconf = val;
+    else if (reg == TMC_REG_CHOPCONF) fx->chop  = val;
     return RT_EOK;
+}
+
+static rt_bool_t tmc_fx_link(void *priv)
+{
+    return ((tmc_fx_t *)priv)->link_ok ? RT_TRUE : RT_FALSE;
+}
+
+static rt_uint32_t tmc_fx_gate(void *priv)
+{
+    return ((tmc_fx_t *)priv)->gate_mask;
 }
 
 static const tmc_cfg_bus_t tmc_cfg_bus_fake =
 {
-    tmc_fx_open, tmc_fx_read, tmc_fx_write
+    tmc_fx_open, tmc_fx_read, tmc_fx_write, tmc_fx_link
 };
 
-static int tmc_fx_find_write(rt_uint8_t reg, rt_uint32_t *val)
+static void tmc_fx_reset(tmc_fx_t *fx)
 {
-    int i;
-    for (i = 0; i < tmc_fx_n; ++i)
-        if (tmc_fx_log[i].is_write && tmc_fx_log[i].reg == reg)
-        { if (val) *val = tmc_fx_log[i].val; return 1; }
-    return 0;
-}
-static int tmc_fx_any_read_of(rt_uint8_t reg)
-{
-    int i;
-    for (i = 0; i < tmc_fx_n; ++i)
-        if (!tmc_fx_log[i].is_write && tmc_fx_log[i].reg == reg) return 1;
-    return 0;
-}
-static int tmc_fx_write_count_of(rt_uint8_t reg)
-{
-    int i, n = 0;
-    for (i = 0; i < tmc_fx_n; ++i)
-        if (tmc_fx_log[i].is_write && tmc_fx_log[i].reg == reg) n++;
-    return n;
-}
-static void tmc_fx_reset(void)
-{
-    rt_memset(tmc_fx_log, 0, sizeof(tmc_fx_log));
-    tmc_fx_n = 0;
-    tmc_fx_writes = 0;
-    tmc_fx_fail_write_nth = 0;
-    tmc_fx_gconf = 0x00000101u;     /* 手册复位默认 */
-    tmc_fx_chop  = 0x15010053u;     /* 本轮真机读回的上电基线 */
+    rt_memset(fx, 0, sizeof(*fx));
+    fx->corrupt_reg = 0xFFu;
+    fx->gconf    = 0x00000101u;         /* 手册复位默认(bit0 + bit8 = 1) */
+    fx->chop     = 0x15010053u;         /* 本轮真机读回的上电基线 */
+    fx->link_ok  = RT_TRUE;
+    fx->gate_mask = 0u;
 }
 
-static rt_bool_t tmc_fx_run_expect_ok(rt_bool_t set_health_ok_unused)
+static int tmc_fx_find_write(tmc_fx_t *fx, rt_uint8_t reg, rt_uint32_t *val)
 {
-    (void)set_health_ok_unused;
-    return (tmc_cfg_run(&tmc_cfg_planned, &tmc_cfg_bus_fake, RT_TRUE) == RT_EOK)
-           ? RT_TRUE : RT_FALSE;
+    int i;
+    for (i = 0; i < fx->n; ++i)
+        if (fx->log[i].is_write && fx->log[i].reg == reg)
+        { if (val) *val = fx->log[i].val; return 1; }
+    return 0;
+}
+
+static int tmc_fx_any_read_of(tmc_fx_t *fx, rt_uint8_t reg)
+{
+    int i;
+    for (i = 0; i < fx->n; ++i)
+        if (!fx->log[i].is_write && fx->log[i].reg == reg) return 1;
+    return 0;
+}
+
+static int tmc_fx_write_count_of(tmc_fx_t *fx, rt_uint8_t reg)
+{
+    int i, n = 0;
+    for (i = 0; i < fx->n; ++i)
+        if (fx->log[i].is_write && fx->log[i].reg == reg) n++;
+    return n;
+}
+
+/* 一次干净下发的完整轨迹是固定的 8 步。只断言"某寄存器被读过"证明不了写后
+ * 读回, 位置断言才行(P2-F 第 1 条)。 */
+static int tmc_fx_seq_ok(tmc_fx_t *fx, const tmc_fx_ev_t *exp, int n_exp)
+{
+    int i;
+
+    if (fx->n != n_exp) return 0;
+    for (i = 0; i < n_exp; ++i)
+        if (fx->log[i].is_write != exp[i].is_write ||
+            fx->log[i].reg      != exp[i].reg)      return 0;
+    return 1;
+}
+
+static void tmc_fx_seq_dump(tmc_fx_t *fx)
+{
+    int i;
+
+    rt_kprintf("[TMC-CFG-ST] 事件序列(%d):", fx->n);
+    for (i = 0; i < fx->n && i < TMC_FX_LOG_MAX; ++i)
+        rt_kprintf(" %c%02X", fx->log[i].is_write ? 'w' : 'r', fx->log[i].reg);
+    rt_kprintf(" (writes=%d accepted=%d opens=%d)\n", fx->writes, fx->ifcnt, fx->opens);
+}
+
+static rt_bool_t tmc_fx_apply(tmc_cfg_ctx_t *t, const tmc_drv_config_t *c)
+{
+    return (tmc_cfg_apply_ctx(t, c) == RT_EOK) ? RT_TRUE : RT_FALSE;
+}
+
+/* ---- 生产实例可见状态取一份副本, 用于证明自测没有改动它 ---- */
+typedef struct
+{
+    tmc_drv_cfg_state_t state;
+    rt_uint8_t  fail_reg;
+    rt_err_t    last_err;
+    rt_bool_t   fail_from_integrity;
+    rt_bool_t   done_valid;
+    rt_uint32_t done_gconf, done_chop;
+    tmc_drv_config_t done;
+    const void *bus;
+    const void *gate;
+    void       *priv;
+} tmc_prod_probe_t;
+
+static void tmc_prod_probe(tmc_prod_probe_t *p)
+{
+    tmc_cfg_lock(&tmc_cfg_prod);
+    p->state  = tmc_cfg_prod.state;
+    p->fail_reg = tmc_cfg_prod.fail_reg;
+    p->last_err = tmc_cfg_prod.last_err;
+    p->fail_from_integrity = tmc_cfg_prod.fail_from_integrity;
+    p->done_valid = tmc_cfg_prod.done_valid;
+    p->done_gconf = tmc_cfg_prod.done_gconf;
+    p->done_chop  = tmc_cfg_prod.done_chop;
+    p->done       = tmc_cfg_prod.done;
+    p->bus        = (const void *)tmc_cfg_prod.bus;
+    p->gate       = (const void *)tmc_cfg_prod.gate;
+    p->priv       = tmc_cfg_prod.priv;
+    tmc_cfg_unlock(&tmc_cfg_prod);
+}
+
+static int tmc_prod_probe_same(const tmc_prod_probe_t *a, const tmc_prod_probe_t *b)
+{
+    return (a->state  == b->state  && a->fail_reg == b->fail_reg &&
+            a->last_err == b->last_err &&
+            a->fail_from_integrity == b->fail_from_integrity &&
+            a->done_valid == b->done_valid &&
+            a->done_gconf == b->done_gconf && a->done_chop == b->done_chop &&
+            a->done.irun == b->done.irun && a->done.ihold == b->done.ihold &&
+            a->done.ihold_delay == b->done.ihold_delay &&
+            a->done.tpowerdown == b->done.tpowerdown &&
+            a->done.vsense == b->done.vsense &&
+            a->done.mstep_reg_select == b->done.mstep_reg_select &&
+            a->done.mres == b->done.mres &&
+            a->bus == b->bus && a->gate == b->gate && a->priv == b->priv) ? 1 : 0;
+}
+
+/* ---- 跨线程占用 txn: 只有真的第二个线程持锁, 才能测出 -RT_EBUSY fail closed
+ * (同线程重入是 RT-Thread 互斥量的正常语义, motor_arm 段内复核正依赖它) ---- */
+static rt_sem_t tmc_fx_s_held, tmc_fx_s_free;
+static volatile rt_bool_t tmc_fx_hold_have, tmc_fx_hold_done;
+
+static void tmc_fx_hold_entry(void *param)
+{
+    tmc_cfg_ctx_t *t = (tmc_cfg_ctx_t *)param;
+
+    tmc_fx_hold_have = tmc_cfg_txn_take(t);
+    rt_sem_release(tmc_fx_s_held);                  /* "锁在我手上" */
+    rt_sem_take(tmc_fx_s_free, RT_WAITING_FOREVER);
+    if (tmc_fx_hold_have) tmc_cfg_txn_give(t);
+    tmc_fx_hold_done = RT_TRUE;
+}
+
+static void tmc_fx_hold_release_wait(void)
+{
+    int i;
+
+    rt_sem_release(tmc_fx_s_free);
+    for (i = 0; i < 40 && !tmc_fx_hold_done; ++i) rt_thread_mdelay(5);
+    if (tmc_fx_s_held != RT_NULL) rt_sem_delete(tmc_fx_s_held);
+    if (tmc_fx_s_free != RT_NULL) rt_sem_delete(tmc_fx_s_free);
+    tmc_fx_s_held = RT_NULL;
+    tmc_fx_s_free = RT_NULL;
+}
+
+/* 返回 1 = 另一线程确实已持有 txn(可以断言 busy); 0 = 建不起线程, SKIP。 */
+static int tmc_fx_busy_setup(tmc_cfg_ctx_t *t)
+{
+    rt_thread_t th;
+    int i;
+
+    tmc_fx_hold_have = RT_FALSE;
+    tmc_fx_hold_done = RT_FALSE;
+    tmc_fx_s_held = rt_sem_create("fxcHeld", 0, RT_IPC_FLAG_FIFO);
+    tmc_fx_s_free = rt_sem_create("fxcFree", 0, RT_IPC_FLAG_FIFO);
+    th = rt_thread_create("fxcHold", tmc_fx_hold_entry, t, 768, 22, 10);
+    if (tmc_fx_s_held == RT_NULL || tmc_fx_s_free == RT_NULL || th == RT_NULL)
+    {
+        if (th != RT_NULL) rt_thread_delete(th);
+        if (tmc_fx_s_held != RT_NULL) rt_sem_delete(tmc_fx_s_held);
+        if (tmc_fx_s_free != RT_NULL) rt_sem_delete(tmc_fx_s_free);
+        tmc_fx_s_held = RT_NULL;
+        tmc_fx_s_free = RT_NULL;
+        return 0;
+    }
+    rt_thread_startup(th);
+    for (i = 0; i < 100 && !tmc_fx_hold_have && !tmc_fx_hold_done; ++i)
+        rt_thread_mdelay(5);                        /* 最多 500ms 等它拿锁 */
+    if (!tmc_fx_hold_have)
+    {
+        tmc_fx_hold_release_wait();
+        return 0;
+    }
+    return 1;
 }
 
 static void tmc_cfg_selftest(void)
 {
-    tmc_drv_cfg_state_t saved_state = tmc_cfg_state;
-    const tmc_cfg_bus_t *saved_bus  = tmc_cfg_bus;
+    static const tmc_fx_ev_t exp_seq[8] = {
+        { TMC_REG_GCONF,      0u, 0u }, { TMC_REG_GCONF,      0u, 1u },
+        { TMC_REG_GCONF,      0u, 0u }, { TMC_REG_CHOPCONF,   0u, 0u },
+        { TMC_REG_CHOPCONF,   0u, 1u }, { TMC_REG_CHOPCONF,   0u, 0u },
+        { TMC_REG_IHOLD_IRUN, 0u, 1u }, { TMC_REG_TPOWERDOWN, 0u, 1u }
+    };
+    static const rt_uint32_t gate_bits[6] = {
+        TMC_WGATE_HW_NOT_VALIDATED, TMC_WGATE_MOTOR_NOT_QUIET,
+        TMC_WGATE_DRV_PAD_NOT_LOW,  TMC_WGATE_NOT_READY,
+        TMC_WGATE_FAULT_LATCHED,    TMC_WGATE_LINK_UNHEALTHY
+    };
+    tmc_prod_probe_t probe_before, probe_after;
+    tmc_drv_config_t c2 = { 10, 4, 4, 8, 1, 1, 0 };
+    tmc_cfg_ctx_t t;
+    tmc_fx_t fx;
     rt_uint32_t v = 0;
-    int pass = 1;
+    rt_err_t e;
+    int pass = 1, i, busy;
 
-    rt_kprintf("[TMC-CFG-ST] 假总线离线自测, 不使用 uart2\n");
+    tmc_prod_probe(&probe_before);
+    rt_kprintf("[TMC-CFG-ST] 假总线离线自测(局部实例), 不使用 uart2\n");
 
-    /* --- T1: 正常全流程 -> CONFIGURED, 四个目标值逐项核对 --- */
-    tmc_fx_reset();
-    if (!tmc_fx_run_expect_ok(RT_TRUE))
+    tmc_fx_reset(&fx);
+    tmc_cfg_ctx_init(&t, &tmc_cfg_bus_fake, tmc_fx_gate, &fx, "tfxCfgL", "tfxCfgT");
+
+    /* --- T1: 正常全流程 -> CONFIGURED + 四个目标值 + 完整有序事件序列 --- */
+    if (!tmc_fx_apply(&t, &tmc_cfg_planned))
     { rt_kprintf("[TMC-CFG-ST] T1 apply 未成功\n"); pass = 0; }
-    if (tmc_cfg_state != TMC_DRV_CONFIGURED)
+    if (t.state != TMC_DRV_CONFIGURED)
     { rt_kprintf("[TMC-CFG-ST] T1 state=%s 应为 CONFIGURED\n",
-                 tmc_drv_cfg_state_name(tmc_cfg_state)); pass = 0; }
-
-    if (!tmc_fx_find_write(TMC_REG_GCONF, &v) || v != TMC_CFG_TGT_GCONF)
+                 tmc_drv_cfg_state_name(t.state)); pass = 0; }
+    if (!tmc_fx_find_write(&fx, TMC_REG_GCONF, &v) || v != TMC_CFG_TGT_GCONF)
     { rt_kprintf("[TMC-CFG-ST] T1 GCONF 目标错: %08X (期望 %08X)\n",
                  (unsigned)v, (unsigned)TMC_CFG_TGT_GCONF); pass = 0; }
-    if (!tmc_fx_find_write(TMC_REG_CHOPCONF, &v) || v != TMC_CFG_TGT_CHOPCONF)
+    if (!tmc_fx_find_write(&fx, TMC_REG_CHOPCONF, &v) || v != TMC_CFG_TGT_CHOPCONF)
     { rt_kprintf("[TMC-CFG-ST] T1 CHOPCONF 目标错: %08X (期望 %08X)\n",
                  (unsigned)v, (unsigned)TMC_CFG_TGT_CHOPCONF); pass = 0; }
-    if (!tmc_fx_find_write(TMC_REG_IHOLD_IRUN, &v) || v != TMC_CFG_TGT_IHOLD_IRUN)
+    if (!tmc_fx_find_write(&fx, TMC_REG_IHOLD_IRUN, &v) || v != TMC_CFG_TGT_IHOLD_IRUN)
     { rt_kprintf("[TMC-CFG-ST] T1 IHOLD_IRUN 目标错: %08X (期望 %08X)\n",
                  (unsigned)v, (unsigned)TMC_CFG_TGT_IHOLD_IRUN); pass = 0; }
-    if (!tmc_fx_find_write(TMC_REG_TPOWERDOWN, &v) || v != TMC_CFG_TGT_TPOWERDOWN)
+    if (!tmc_fx_find_write(&fx, TMC_REG_TPOWERDOWN, &v) || v != TMC_CFG_TGT_TPOWERDOWN)
     { rt_kprintf("[TMC-CFG-ST] T1 TPOWERDOWN 目标错: %08X (期望 %08X)\n",
                  (unsigned)v, (unsigned)TMC_CFG_TGT_TPOWERDOWN); pass = 0; }
+    if (!tmc_fx_seq_ok(&fx, exp_seq, 8))
+    { rt_kprintf("[TMC-CFG-ST] T1 事件序列不符(应 r00 w00 r00 r6c w6c r6c w10 w11)\n");
+      tmc_fx_seq_dump(&fx); pass = 0; }
+    if (fx.writes != 4 || fx.ifcnt != 4 || fx.opens != 1)
+    { rt_kprintf("[TMC-CFG-ST] T1 IFCNT/open 计数错 writes=%d accepted=%d opens=%d\n",
+                 fx.writes, fx.ifcnt, fx.opens); pass = 0; }
+    if (!tmc_cfg_ok_for_arm_ctx(&t))
+    { rt_kprintf("[TMC-CFG-ST] T1 CONFIGURED 却不容许 arm\n"); pass = 0; }
 
-    /* --- T2: 位域细节: vsense=bit17 置起, bit18 与 TOFF/HSTRT/HEND/TBL 不受扰动 --- */
+    /* --- T2: CHOPCONF 位域: vsense=bit17, 除 bit17 外不得有任何一位变化 --- */
     {
         rt_uint32_t base = 0x15010053u, nxt = tmc_chopconf_next(base, &tmc_cfg_planned);
+
         rt_kprintf("[TMC-CFG-ST] T2 CHOPCONF %08X -> %08X\n",
                    (unsigned)base, (unsigned)nxt);
-        if (!(nxt & (1u << 17)))
-        { rt_kprintf("[TMC-CFG-ST] T2 bit17 未置起\n"); pass = 0; }
-        if (nxt & (1u << 18))
-        { rt_kprintf("[TMC-CFG-ST] T2 bit18 被意外修改\n"); pass = 0; }
+        if (!(nxt & (1u << 17))) { rt_kprintf("[TMC-CFG-ST] T2 bit17 未置起\n"); pass = 0; }
+        if (nxt & (1u << 18))    { rt_kprintf("[TMC-CFG-ST] T2 bit18 被意外修改\n"); pass = 0; }
         if ((nxt & 0xFu) != (base & 0xFu) || (nxt & 0xFu) == 0u)
         { rt_kprintf("[TMC-CFG-ST] T2 TOFF 未保持非零\n"); pass = 0; }
         if ((nxt & 0x7F0u) != (base & 0x7F0u))
         { rt_kprintf("[TMC-CFG-ST] T2 HSTRT/HEND 低位被改\n"); pass = 0; }
         if ((nxt & 0x00018000u) != (base & 0x00018000u))
         { rt_kprintf("[TMC-CFG-ST] T2 TBL 被改\n"); pass = 0; }
-        /* 最强 RMW 断言: 除 vsense(bit17) 外不得有任何一位变化 */
         if (((nxt ^ base) & ~TMC_CHOPCONF_VSENSE) != 0u)
         { rt_kprintf("[TMC-CFG-ST] T2 越界改动非 vsense 位 (xor=%08X)\n",
                      (unsigned)(nxt ^ base)); pass = 0; }
     }
 
-    /* --- T3: GCONF 只加 bit6, 保留 bit0/bit8, 不动 bit1(OTP 位) --- */
+    /* --- T3: GCONF 只允许 i_scale_analog/pdn_disable/mstep_reg_select 三位变化 --- */
     {
         rt_uint32_t base = 0x00000101u, nxt = tmc_gconf_next(base, &tmc_cfg_planned);
+
         rt_kprintf("[TMC-CFG-ST] T3 GCONF %08X -> %08X\n",
                    (unsigned)base, (unsigned)nxt);
-        if (nxt != 0x00000141u)
-        { rt_kprintf("[TMC-CFG-ST] T3 结果非 0x141\n"); pass = 0; }
-        if (!(nxt & (1u << 6)))
-        { rt_kprintf("[TMC-CFG-ST] T3 pdn_disable 未置起\n"); pass = 0; }
-        if (!(nxt & 1u))
-        { rt_kprintf("[TMC-CFG-ST] T3 i_scale_analog 被清\n"); pass = 0; }
-        if (!(nxt & (1u << 8)))
-        { rt_kprintf("[TMC-CFG-ST] T3 multistep_filt 被清\n"); pass = 0; }
-        if (nxt & (1u << 1))
-        { rt_kprintf("[TMC-CFG-ST] T3 意外置起 internal_Rsense\n"); pass = 0; }
-        /* 只允许 i_scale_analog / pdn_disable / mstep_reg_select 三位变化 */
+        if (nxt != 0x00000141u) { rt_kprintf("[TMC-CFG-ST] T3 结果非 0x141\n"); pass = 0; }
+        if (!(nxt & (1u << 6))) { rt_kprintf("[TMC-CFG-ST] T3 pdn_disable 未置起\n"); pass = 0; }
+        if (!(nxt & 1u))        { rt_kprintf("[TMC-CFG-ST] T3 i_scale_analog 被清\n"); pass = 0; }
+        if (!(nxt & (1u << 8))) { rt_kprintf("[TMC-CFG-ST] T3 multistep_filt 被清\n"); pass = 0; }
+        if (nxt & (1u << 1))    { rt_kprintf("[TMC-CFG-ST] T3 意外置起 internal_Rsense\n"); pass = 0; }
         if (((nxt ^ base) & ~(1u | (1u << 6) | (1u << 7))) != 0u)
         { rt_kprintf("[TMC-CFG-ST] T3 越界改动其它 GCONF 位 (xor=%08X)\n",
                      (unsigned)(nxt ^ base)); pass = 0; }
     }
 
-    /* --- T4: 只写寄存器不得被读回(0x10/0x11 无读操作) --- */
-    if (tmc_fx_any_read_of(TMC_REG_IHOLD_IRUN) ||
-        tmc_fx_any_read_of(TMC_REG_TPOWERDOWN))
+    /* --- T4: 只写寄存器不得被读; 读回必须紧跟在对应写之后(位置由序列保证) --- */
+    if (tmc_fx_any_read_of(&fx, TMC_REG_IHOLD_IRUN) ||
+        tmc_fx_any_read_of(&fx, TMC_REG_TPOWERDOWN))
     { rt_kprintf("[TMC-CFG-ST] T4 对只写寄存器发起了读\n"); pass = 0; }
-    /* 可读寄存器必须既有写也有读回 */
-    if (tmc_fx_write_count_of(TMC_REG_GCONF) < 1 ||
-        !tmc_fx_any_read_of(TMC_REG_GCONF))
-    { rt_kprintf("[TMC-CFG-ST] T4 GCONF 缺少预读/读回\n"); pass = 0; }
-    if (tmc_fx_write_count_of(TMC_REG_CHOPCONF) < 1 ||
-        !tmc_fx_any_read_of(TMC_REG_CHOPCONF))
-    { rt_kprintf("[TMC-CFG-ST] T4 CHOPCONF 缺少预读/读回\n"); pass = 0; }
+    if (fx.log[2].is_write != 0u || fx.log[2].reg != TMC_REG_GCONF ||
+        fx.log[5].is_write != 0u || fx.log[5].reg != TMC_REG_CHOPCONF)
+    { rt_kprintf("[TMC-CFG-ST] T4 读回不在写之后的位置\n"); pass = 0; }
 
-    /* --- T5: integrity 在配置一致时通过 --- */
-    if (tmc2209_config_integrity_check() != RT_EOK)
+    /* --- T5: 配置一致 + 链路健康 -> integrity 通过(健康由实例注入, 不读全局) --- */
+    if (tmc_cfg_integrity_ctx(&t) != RT_EOK)
     { rt_kprintf("[TMC-CFG-ST] T5 integrity 误判失败\n"); pass = 0; }
-    if (!tmc2209_drive_config_ok_for_arm())
-    { rt_kprintf("[TMC-CFG-ST] T5 CONFIGURED 却不容许 arm\n"); pass = 0; }
 
-    /* --- T6: 模拟芯片断电/复位(寄存器回默认) -> integrity 必须照出来并降级 --- */
-    tmc_fx_gconf = 0x00000101u;
-    tmc_fx_chop  = 0x15010053u;
-    if (tmc2209_config_integrity_check() == RT_EOK)
+    /* --- T6: 芯片断电/复位(寄存器回默认) -> 照出并降级 + 作废快照 --- */
+    fx.gconf = 0x00000101u;
+    fx.chop  = 0x15010053u;
+    if (tmc_cfg_integrity_ctx(&t) == RT_EOK)
     { rt_kprintf("[TMC-CFG-ST] T6 芯片复位后 integrity 仍说 OK\n"); pass = 0; }
-    if (tmc_cfg_state != TMC_DRV_FAILED)
+    if (t.state != TMC_DRV_FAILED)
     { rt_kprintf("[TMC-CFG-ST] T6 状态未变 FAILED(%s)\n",
-                 tmc_drv_cfg_state_name(tmc_cfg_state)); pass = 0; }
-    if (tmc2209_drive_config_ok_for_arm())
+                 tmc_drv_cfg_state_name(t.state)); pass = 0; }
+    if (t.done_valid != RT_FALSE)
+    { rt_kprintf("[TMC-CFG-ST] T6 复位后旧快照仍标为有效\n"); pass = 0; }
+    if (tmc_cfg_ok_for_arm_ctx(&t))
     { rt_kprintf("[TMC-CFG-ST] T6 配置已丢却仍容许 arm\n"); pass = 0; }
-    rt_kprintf("[TMC-CFG-ST] T6 失联/复位 -> FAILED, arm 拒绝 (fail-closed OK)\n");
+    rt_kprintf("[TMC-CFG-ST] T6 失联/复位 -> FAILED + 快照作废, arm 拒绝 (fail-closed OK)\n");
 
-    /* --- T7: IFCNT 在第 2 次写(CHOPCONF)失败 -> 必须立即停止后续写 --- */
-    tmc_fx_reset();
-    tmc_cfg_state = TMC_DRV_UNCONFIGURED;
-    tmc_fx_fail_write_nth = 2;
-    if (tmc_cfg_run(&tmc_cfg_planned, &tmc_cfg_bus_fake, RT_TRUE) == RT_EOK)
+    /* --- T6b: 链路不健康(读不到 != 配置还在) -> 同样降级 --- */
+    tmc_fx_reset(&fx); t.state = TMC_DRV_UNCONFIGURED; t.done_valid = RT_FALSE;
+    if (!tmc_fx_apply(&t, &tmc_cfg_planned))
+    { rt_kprintf("[TMC-CFG-ST] T6b 前置 apply 未成功\n"); pass = 0; }
+    fx.link_ok = RT_FALSE;
+    if (tmc_cfg_integrity_ctx(&t) != -RT_EIO)
+    { rt_kprintf("[TMC-CFG-ST] T6b 链路不健康时 integrity 未判失败\n"); pass = 0; }
+    if (t.state != TMC_DRV_FAILED || t.done_valid != RT_FALSE)
+    { rt_kprintf("[TMC-CFG-ST] T6b 失联后状态/快照未失效(%s valid=%d)\n",
+                 tmc_drv_cfg_state_name(t.state), (int)t.done_valid); pass = 0; }
+
+    /* --- T7: 第 2 次写未被接受 -> 立即停止后续写, IFCNT 不涨, 内容不变 --- */
+    tmc_fx_reset(&fx); t.state = TMC_DRV_UNCONFIGURED; t.done_valid = RT_FALSE;
+    fx.fail_write_nth = 2;
+    if (tmc_cfg_apply_ctx(&t, &tmc_cfg_planned) == RT_EOK)
     { rt_kprintf("[TMC-CFG-ST] T7 写失败却返回成功\n"); pass = 0; }
-    if (tmc_cfg_state != TMC_DRV_FAILED)
+    if (t.state != TMC_DRV_FAILED)
     { rt_kprintf("[TMC-CFG-ST] T7 状态=%s 应为 FAILED\n",
-                 tmc_drv_cfg_state_name(tmc_cfg_state)); pass = 0; }
-    if (tmc_fx_write_count_of(TMC_REG_IHOLD_IRUN) || tmc_fx_write_count_of(TMC_REG_TPOWERDOWN))
+                 tmc_drv_cfg_state_name(t.state)); pass = 0; }
+    if (tmc_fx_write_count_of(&fx, TMC_REG_IHOLD_IRUN) ||
+        tmc_fx_write_count_of(&fx, TMC_REG_TPOWERDOWN))
     { rt_kprintf("[TMC-CFG-ST] T7 失败后仍继续写后续寄存器\n"); pass = 0; }
-    rt_kprintf("[TMC-CFG-ST] T7 第 2 次写失败 -> 已停止, 后续 0 次写\n");
+    if (fx.writes != 2 || fx.ifcnt != 1 || fx.chop != 0x15010053u)
+    { rt_kprintf("[TMC-CFG-ST] T7 IFCNT 模型错 writes=%d accepted=%d chop=%08X\n",
+                 fx.writes, fx.ifcnt, (unsigned)fx.chop); pass = 0; }
 
-    /* --- T8: 第 1 次写就失败(链路死) -> FAILED 且不写任何后续 --- */
-    tmc_fx_reset();
-    tmc_cfg_state = TMC_DRV_UNCONFIGURED;
-    tmc_fx_fail_write_nth = 1;
-    if (tmc_cfg_run(&tmc_cfg_planned, &tmc_cfg_bus_fake, RT_TRUE) == RT_EOK)
+    /* --- T8: 第 1 次写就失败 -> FAILED、不写后续、快照作废 --- */
+    tmc_fx_reset(&fx); t.state = TMC_DRV_UNCONFIGURED; t.done_valid = RT_FALSE;
+    fx.fail_write_nth = 1;
+    if (tmc_cfg_apply_ctx(&t, &tmc_cfg_planned) == RT_EOK)
     { rt_kprintf("[TMC-CFG-ST] T8 首次写失败却返回成功\n"); pass = 0; }
-    if (tmc_fx_write_count_of(TMC_REG_CHOPCONF) || tmc_fx_write_count_of(TMC_REG_TPOWERDOWN))
+    if (tmc_fx_write_count_of(&fx, TMC_REG_CHOPCONF) ||
+        tmc_fx_write_count_of(&fx, TMC_REG_TPOWERDOWN))
     { rt_kprintf("[TMC-CFG-ST] T8 首写失败后仍继续\n"); pass = 0; }
+    if (t.done_valid != RT_FALSE)
+    { rt_kprintf("[TMC-CFG-ST] T8 失败后快照仍有效\n"); pass = 0; }
 
-    /* --- T9: 未配置 / 失败态下 arm 判定必须为假 --- */
-    tmc_cfg_state = TMC_DRV_UNCONFIGURED;
-    if (tmc2209_drive_config_ok_for_arm())
+    /* --- T9: 非 CONFIGURED / 快照失效 四种组合 arm 判定必假、integrity 必拒 --- */
+    tmc_fx_reset(&fx);
+    t.state = TMC_DRV_UNCONFIGURED; t.done_valid = RT_FALSE;
+    if (tmc_cfg_ok_for_arm_ctx(&t))
     { rt_kprintf("[TMC-CFG-ST] T9 UNCONFIGURED 却容许 arm\n"); pass = 0; }
-    tmc_cfg_state = TMC_DRV_FAILED;
-    if (tmc2209_drive_config_ok_for_arm())
+    t.state = TMC_DRV_FAILED;
+    if (tmc_cfg_ok_for_arm_ctx(&t))
     { rt_kprintf("[TMC-CFG-ST] T9 FAILED 却容许 arm\n"); pass = 0; }
-    tmc_cfg_state = TMC_DRV_CONFIGURING;
-    if (tmc2209_drive_config_ok_for_arm())
+    t.state = TMC_DRV_CONFIGURING;
+    if (tmc_cfg_ok_for_arm_ctx(&t))
     { rt_kprintf("[TMC-CFG-ST] T9 CONFIGURING 却容许 arm\n"); pass = 0; }
-    if (tmc2209_config_integrity_check() != -RT_EPERM)
-    { rt_kprintf("[TMC-CFG-ST] T9 非 CONFIGURED 时 integrity 应拒绝\n"); pass = 0; }
+    if (tmc_cfg_integrity_ctx(&t) != -RT_EPERM)
+    { rt_kprintf("[TMC-CFG-ST] T9 非 CONFIGURED 时 integrity 应拒绝(-RT_EPERM)\n"); pass = 0; }
+    /* P1-C 的关键回归: state=CONFIGURED 但快照已废 -> 第 5 门必须闭合。
+     * 旧版只有"state"一个条件, 这个组合会从门里假通过。 */
+    t.state = TMC_DRV_CONFIGURED; t.done_valid = RT_FALSE;
+    if (tmc_cfg_ok_for_arm_ctx(&t))
+    { rt_kprintf("[TMC-CFG-ST] T9 CONFIGURED+快照失效 却容许 arm\n"); pass = 0; }
+    if (tmc_cfg_integrity_ctx(&t) != -RT_EPERM)
+    { rt_kprintf("[TMC-CFG-ST] T9 快照失效时 integrity 应拒绝\n"); pass = 0; }
 
-    /* --- T10: 过流方向 1->0 与 TOFF=0 的芯片都必须中止 --- */
-    tmc_fx_reset();
-    tmc_fx_chop = 0x15030053u;                 /* 已是 vsense=1 */
-    tmc_cfg_state = TMC_DRV_UNCONFIGURED;
+    /* --- T10: 过流方向 1->0 与 TOFF=0 基线都必须中止且不写电流档 --- */
+    tmc_fx_reset(&fx); fx.chop = 0x15030053u;
+    t.state = TMC_DRV_UNCONFIGURED; t.done_valid = RT_FALSE;
     {
         tmc_drv_config_t down = tmc_cfg_planned;
+
         down.vsense = 0;
-        if (tmc_cfg_run(&down, &tmc_cfg_bus_fake, RT_TRUE) == RT_EOK)
+        if (tmc_cfg_apply_ctx(&t, &down) == RT_EOK)
         { rt_kprintf("[TMC-CFG-ST] T10 1->0 方向未被拒\n"); pass = 0; }
-        if (tmc_fx_write_count_of(TMC_REG_IHOLD_IRUN))
+        if (tmc_fx_write_count_of(&fx, TMC_REG_IHOLD_IRUN))
         { rt_kprintf("[TMC-CFG-ST] T10 拒绝后仍写了电流档\n"); pass = 0; }
     }
-    tmc_fx_reset();
-    tmc_fx_chop = 0x15010050u;                 /* TOFF=0, 桥全关 */
-    tmc_cfg_state = TMC_DRV_UNCONFIGURED;
-    if (tmc_cfg_run(&tmc_cfg_planned, &tmc_cfg_bus_fake, RT_TRUE) == RT_EOK)
+    tmc_fx_reset(&fx); fx.chop = 0x15010050u;       /* TOFF=0, 桥全关 */
+    t.state = TMC_DRV_UNCONFIGURED;
+    if (tmc_cfg_apply_ctx(&t, &tmc_cfg_planned) == RT_EOK)
     { rt_kprintf("[TMC-CFG-ST] T10 TOFF=0 基线竟通过\n"); pass = 0; }
-    if (tmc_fx_write_count_of(TMC_REG_CHOPCONF))
+    if (tmc_fx_write_count_of(&fx, TMC_REG_CHOPCONF))
     { rt_kprintf("[TMC-CFG-ST] T10 TOFF 非法时仍写了 CHOPCONF\n"); pass = 0; }
 
-    /* --- 还原生产上下文(关键: 自测不得污染状态) --- */
-    tmc_cfg_bus   = saved_bus;
-    tmc_cfg_state = saved_state;
-    tmc_cfg_done_valid = RT_FALSE;
-    tmc_cfg_fail_from_integrity = RT_FALSE;
-    tmc_cfg_fail_reg = 0;
-    tmc_cfg_last_err = RT_EOK;
-    if (tmc_cfg_bus != &tmc_cfg_bus_real)
-    { rt_kprintf("[TMC-CFG-ST] RESTORE FAIL: 总线未还原\n"); pass = 0; }
-    rt_kprintf("[TMC-CFG-ST] 已还原 state=%s, 总线=real\n",
-               tmc_drv_cfg_state_name(tmc_cfg_state));
+    /* --- T11(新): 写被接受(IFCNT+1)但读回不符 -> FAILED 且停后续写 --- */
+    tmc_fx_reset(&fx); t.state = TMC_DRV_UNCONFIGURED; t.done_valid = RT_FALSE;
+    fx.corrupt_reg = TMC_REG_GCONF;
+    if (tmc_cfg_apply_ctx(&t, &tmc_cfg_planned) == RT_EOK)
+    { rt_kprintf("[TMC-CFG-ST] T11 回读污染竟通过\n"); pass = 0; }
+    if (t.state != TMC_DRV_FAILED || t.done_valid != RT_FALSE)
+    { rt_kprintf("[TMC-CFG-ST] T11 状态/快照未失效(%s valid=%d)\n",
+                 tmc_drv_cfg_state_name(t.state), (int)t.done_valid); pass = 0; }
+    if (tmc_fx_write_count_of(&fx, TMC_REG_CHOPCONF) ||
+        tmc_fx_write_count_of(&fx, TMC_REG_IHOLD_IRUN))
+    { rt_kprintf("[TMC-CFG-ST] T11 回读不符后仍写了后续寄存器\n"); pass = 0; }
+    if (fx.ifcnt != 1)
+    { rt_kprintf("[TMC-CFG-ST] T11 IFCNT 应只 +1 (=%d)\n", fx.ifcnt); pass = 0; }
 
-    rt_kprintf("[TMC-CFG-ST] %s (T1..T10, 假总线, 未访问 uart2)\n",
+    /* --- T12(新): internal_Rsense=1 -> VREF 模型失效, 必须在任何写之前拒绝 --- */
+    tmc_fx_reset(&fx); t.state = TMC_DRV_UNCONFIGURED; t.done_valid = RT_FALSE;
+    fx.gconf |= TMC_GCONF_INTERNAL_RSENSE;
+    if (tmc_cfg_apply_ctx(&t, &tmc_cfg_planned) == RT_EOK)
+    { rt_kprintf("[TMC-CFG-ST] T12 internal_Rsense=1 竟通过\n"); pass = 0; }
+    if (fx.writes != 0 || fx.opens != 1)
+    { rt_kprintf("[TMC-CFG-ST] T12 判定前就产生了总线动作 writes=%d opens=%d\n",
+                 fx.writes, fx.opens); pass = 0; }
+
+    /* --- T13(新): 运行态门禁每一位都必须挡住(零 open、零写、状态与快照不变) --- */
+    for (i = 0; i < 6; ++i)
+    {
+        tmc_fx_reset(&fx);
+        t.state = TMC_DRV_UNCONFIGURED; t.done_valid = RT_FALSE;
+        fx.gate_mask = gate_bits[i];
+        e = tmc_cfg_apply_ctx(&t, &tmc_cfg_planned);
+        if (e != -RT_EPERM)
+        { rt_kprintf("[TMC-CFG-ST] T13 bit%d 门禁返回 %d 应为 -RT_EPERM\n",
+                     i, (int)e); pass = 0; }
+        if (fx.opens != 0 || fx.writes != 0)
+        { rt_kprintf("[TMC-CFG-ST] T13 bit%d 被挡但仍 opens=%d writes=%d\n",
+                     i, fx.opens, fx.writes); pass = 0; }
+        if (t.state != TMC_DRV_UNCONFIGURED || t.done_valid != RT_FALSE)
+        { rt_kprintf("[TMC-CFG-ST] T13 bit%d 拒绝后状态/快照被改动\n", i); pass = 0; }
+        fx.gate_mask = 0u;
+    }
+    /* 全通时必须真的写得下去(证明上面的拒绝不是"永远拒绝") */
+    tmc_fx_reset(&fx); t.state = TMC_DRV_UNCONFIGURED; t.done_valid = RT_FALSE;
+    if (!tmc_fx_apply(&t, &tmc_cfg_planned))
+    { rt_kprintf("[TMC-CFG-ST] T13 门禁全通却未能下发\n"); pass = 0; }
+
+    /* --- T14(新): 事务被另一线程占用 -> apply/integrity 都 -RT_EBUSY 且零总线动作 --- */
+    busy = tmc_fx_busy_setup(&t);
+    if (busy)
+    {
+        tmc_fx_reset(&fx);
+        if (tmc_cfg_apply_ctx(&t, &tmc_cfg_planned) != -RT_EBUSY)
+        { rt_kprintf("[TMC-CFG-ST] T14 事务占用时 apply 未返回 -RT_EBUSY\n"); pass = 0; }
+        if (tmc_cfg_integrity_ctx(&t) != -RT_EBUSY)
+        { rt_kprintf("[TMC-CFG-ST] T14 事务占用时 integrity 未返回 -RT_EBUSY\n"); pass = 0; }
+        if (fx.opens != 0 || fx.writes != 0)
+        { rt_kprintf("[TMC-CFG-ST] T14 busy 期间仍有总线动作 opens=%d writes=%d\n",
+                     fx.opens, fx.writes); pass = 0; }
+        tmc_fx_hold_release_wait();
+        tmc_fx_reset(&fx); t.state = TMC_DRV_UNCONFIGURED; t.done_valid = RT_FALSE;
+        if (!tmc_fx_apply(&t, &tmc_cfg_planned))
+        { rt_kprintf("[TMC-CFG-ST] T14 锁释放后 apply 仍失败\n"); pass = 0; }
+        rt_kprintf("[TMC-CFG-ST] T14 跨线程占用 -> -RT_EBUSY fail closed OK\n");
+    }
+    else rt_kprintf("[TMC-CFG-ST] T14 SKIP: 线程/信号量建不起来, 未测跨线程占用\n");
+
+    /* 同线程重入(motor_arm 段内复核依赖): 持有 txn 时 integrity 不得报 busy */
+    if (tmc_cfg_txn_take(&t))
+    {
+        if (tmc_cfg_integrity_ctx(&t) == -RT_EBUSY)
+        { rt_kprintf("[TMC-CFG-ST] T14b 同线程重入被误判 busy\n"); pass = 0; }
+        tmc_cfg_txn_give(&t);
+    }
+
+    /* --- T15(新): open 失败 -> FAILED、零 write、快照作废 --- */
+    tmc_fx_reset(&fx); t.state = TMC_DRV_UNCONFIGURED; t.done_valid = RT_FALSE;
+    fx.open_fail = RT_TRUE;
+    if (tmc_cfg_apply_ctx(&t, &tmc_cfg_planned) == RT_EOK)
+    { rt_kprintf("[TMC-CFG-ST] T15 open 失败却返回成功\n"); pass = 0; }
+    if (fx.writes != 0 || fx.opens != 1 || t.done_valid != RT_FALSE)
+    { rt_kprintf("[TMC-CFG-ST] T15 open 失败路径异常 writes=%d opens=%d valid=%d\n",
+                 fx.writes, fx.opens, (int)t.done_valid); pass = 0; }
+
+    /* --- T16(新): CONFIGURING 窗口内旧快照不可用, 且二次 apply 被拒 --- */
+    tmc_fx_reset(&fx);
+    tmc_cfg_lock(&t);
+    t.state = TMC_DRV_CONFIGURING; t.done_valid = RT_FALSE;
+    tmc_cfg_unlock(&t);
+    if (tmc_cfg_ok_for_arm_ctx(&t))
+    { rt_kprintf("[TMC-CFG-ST] T16 CONFIGURING 窗口容许 arm\n"); pass = 0; }
+    if (tmc_cfg_apply_ctx(&t, &tmc_cfg_planned) != -RT_EBUSY)
+    { rt_kprintf("[TMC-CFG-ST] T16 CONFIGURING 时二次 apply 未被拒\n"); pass = 0; }
+    t.state = TMC_DRV_UNCONFIGURED;
+
+    /* --- T17(新): 二次 apply 成功必须替换快照, 且只在成功末尾恢复 valid --- */
+    tmc_fx_reset(&fx); t.state = TMC_DRV_UNCONFIGURED; t.done_valid = RT_FALSE;
+    tmc_cfg_lock(&t); t.done_gconf = 0xDEADBEEFu; t.done_chop = 0xCAFEBABEu; tmc_cfg_unlock(&t);
+    if (!tmc_fx_apply(&t, &c2))
+    { rt_kprintf("[TMC-CFG-ST] T17 二次 apply 未成功\n"); pass = 0; }
+    if (t.done_gconf == 0xDEADBEEFu || t.done_chop == 0xCAFEBABEu)
+    { rt_kprintf("[TMC-CFG-ST] T17 快照未被新值替换(g=%08X c=%08X)\n",
+                 (unsigned)t.done_gconf, (unsigned)t.done_chop); pass = 0; }
+    if (t.done_valid != RT_TRUE || t.state != TMC_DRV_CONFIGURED ||
+        t.done.irun != c2.irun || t.done.vsense != c2.vsense ||
+        t.done.mstep_reg_select != c2.mstep_reg_select)
+    { rt_kprintf("[TMC-CFG-ST] T17 快照内容/状态不符\n"); pass = 0; }
+    if (tmc_cfg_integrity_ctx(&t) != RT_EOK)
+    { rt_kprintf("[TMC-CFG-ST] T17 新快照 integrity 未通过\n"); pass = 0; }
+
+    /* --- T18(新, P1-C 证明): 整轮自测必须没碰过生产实例 --- */
+    tmc_prod_probe(&probe_after);
+    if (!tmc_prod_probe_same(&probe_before, &probe_after))
+    {
+        rt_kprintf("[TMC-CFG-ST] T18 FAIL: 生产 ctx 被自测改动 (state %s->%s,"
+                   " snapshot_valid %d->%d, gconf %08X->%08X)\n",
+                   tmc_drv_cfg_state_name(probe_before.state),
+                   tmc_drv_cfg_state_name(probe_after.state),
+                   (int)probe_before.done_valid, (int)probe_after.done_valid,
+                   (unsigned)probe_before.done_gconf, (unsigned)probe_after.done_gconf);
+        pass = 0;
+    }
+    else rt_kprintf("[TMC-CFG-ST] T18 生产 ctx 未被改动(state=%s, snapshot_valid=%d)\n",
+                    tmc_drv_cfg_state_name(probe_after.state),
+                    (int)probe_after.done_valid);
+
+    /* --- T19(新): 生产实例的 arm 判定必须与快照有效性自洽 --- */
+    if (tmc2209_drive_config_ok_for_arm() &&
+        !tmc2209_get_applied_config(RT_NULL, RT_NULL, RT_NULL))
+    { rt_kprintf("[TMC-CFG-ST] T19 arm 放行却没有有效快照(判定不自洽)\n"); pass = 0; }
+    if (tmc2209_get_write_gate_mask() == 0u)
+        rt_kprintf("[TMC-CFG-ST] T19 注意: 运行态门禁全通(编译期门仍挡住任何写入)\n");
+
+    tmc_cfg_ctx_detach(&t);
+
+    rt_kprintf("[TMC-CFG-ST] %s (T1..T19, 假总线局部实例, 未访问 uart2)\n",
                pass ? "ALL PASS" : "FAILED");
 }
 MSH_CMD_EXPORT(tmc_cfg_selftest, offline fake-bus drive config state machine selftest);
