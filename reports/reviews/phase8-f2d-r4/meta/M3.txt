@@ -1,0 +1,20 @@
+# 元负例子链 M3
+## verdict_matrix
+INFRA-FAIL | N1_only_V1_injected_fail | rc 真实=0 自报=1 期望=1 | V1=RAN/0/1 V2=RAN/0/0 (期望 V1=RAN/0/1 V2=RAN/0/0)  runner.proc_rc:期望=1 实际=0  runner.reported_rc:期望=0 实际=1
+## case_rc_ledger
+N1_only_V1_injected_fail	class=INFRA-FAIL	runner_proc_rc=0	runner_reported_rc=1	expected_rc=1	V1=RAN/0/1 V2=RAN/0/0
+## 子链控制台尾部
+SKIP(不在请求集合) N7_helper_thread_startup_fail
+SKIP(不在请求集合) N8_gstat_expect_table_tamper
+SKIP(不在请求集合) N9_probe_writeback_V1
+SKIP(不在请求集合) N10_probe_writeback_V2
+SKIP(不在请求集合) N10b_writeback_both_variants
+SKIP(不在请求集合) N11_clean_snapshot_regression
+SKIP(不在请求集合) N12_workspace_clean_regression
+
+############ 判定汇总 ############
+INFRA-FAIL | N1_only_V1_injected_fail |   runner.proc_rc:期望=1 实际=0  runner.reported_rc:期望=0 实际=1
+
+执行集合(1) 与请求集合(1) 一致: 是
+类别计数: OK=0 NOT-DETECTED=0 INFRA-FAIL=1
+RUNNER(run_negatives): 基础设施故障/回执不一致 —— 有负例没真正执行或自报与真实 rc 不符 (rc=4)

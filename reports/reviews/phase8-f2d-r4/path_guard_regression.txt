@@ -1,0 +1,51 @@
+############ 路径守卫沙盒回归 (沙盒=/tmp/tmp.tnEmHdDEyt) ############
+-- 1) 仓库根本身
+  [PASS] repo_root: 入口拒绝, rc=4
+  [PASS] repo_root: 日志含 GUARD-REJECT 原因
+  [PASS] repo_root: 标记文件 /tmp/tmp.tnEmHdDEyt/repo/REPO_KEEP.txt 未被删除/改写
+-- 2) 仓内子目录(先删后拒的那个原始复现)
+  [PASS] repo_sub: 入口拒绝, rc=4
+  [PASS] repo_sub: 日志含 GUARD-REJECT 原因
+  [PASS] repo_sub: 标记文件 /tmp/tmp.tnEmHdDEyt/repo/scratch_out/CHILD_KEEP.txt 未被删除/改写
+  [PASS] repo_sub_runner: runner 拒绝危险 OUT_DIR, rc=4
+  [PASS] repo_sub_runner: 日志含 GUARD-REJECT
+  [PASS] repo_sub_runner: 标记文件保留
+  [PASS] repo_sub_runner: 被拒后没有创建目标目录
+-- 3) 包含仓库的祖先目录
+  [PASS] ancestor: 入口拒绝, rc=4
+  [PASS] ancestor: 日志含 GUARD-REJECT 原因
+  [PASS] ancestor: 标记文件 /tmp/tmp.tnEmHdDEyt/ANCESTOR_KEEP.txt 未被删除/改写
+  [PASS] 祖先场景: 仓库内文件仍完好
+-- 4) 含 .. 规范化后落回仓内
+  [PASS] dotdot_in: 入口拒绝, rc=4
+  [PASS] dotdot_in: 日志含 GUARD-REJECT 原因
+  [PASS] dotdot_in: 标记文件 /tmp/tmp.tnEmHdDEyt/repo/scratch_out/CHILD_KEEP.txt 未被删除/改写
+  [PASS] dotdot_in2: 入口拒绝, rc=4
+  [PASS] dotdot_in2: 日志含 GUARD-REJECT 原因
+  [PASS] dotdot_in2: 标记文件 /tmp/tmp.tnEmHdDEyt/repo/scratch_out/CHILD_KEEP.txt 未被删除/改写
+-- 5) 文件系统根与空值
+  [PASS] fs_root: 入口拒绝, rc=4
+  [PASS] fs_root: 日志含 GUARD-REJECT 原因
+  [PASS] fs_root: 标记文件 /tmp/tmp.tnEmHdDEyt/ANCESTOR_KEEP.txt 未被删除/改写
+  [PASS] 空值: 入口拒绝
+  [PASS] 空值: 明确拒绝而非静默改用别的路径
+-- 6) 同前缀兄弟目录不得被误拒(不是字符串前缀匹配)
+  [PASS] repo-sibling 被接受 => /tmp/tmp.tnEmHdDEyt/repo-sibling
+  [PASS] 兄弟目录场景未伤及沙盒仓库
+-- 7) 含空格的有效仓外路径可用
+  [PASS] 含空格路径被接受 => /tmp/tmp.tnEmHdDEyt/valid out dir
+  [PASS] 含空格路径可正常创建与写入
+-- 8) 规范化输出确实是绝对路径且不含尾斜杠
+  [PASS] 规范化结果=/tmp/tmp.tnEmHdDEyt/outside/y (绝对、无尾斜杠、.. 已消解)
+-- 9) 链接落点的真实能力边界(如实记录, 不夸大)
+  [NOTE] 本机 MSYS 把目录软链表现为普通目录(test -L 为假, realpath/pwd -P 都不解析),
+         所以"经由链接绕回仓内"这一条**不声称**被词法守卫覆盖。
+         实际保护改成不依赖链接可见性: 只删本工具写过哨兵文件的目录 =>
+  [PASS]   该场景沙盒仓库文件完好(未被 rm 波及)
+-- 10) 无哨兵的已存在仓外目录: 必须拒绝且不删内容
+  [PASS] 无哨兵的已存在目录被拒绝, rc=4
+  [PASS] 拒绝原因明确指向缺少哨兵
+  [PASS] 无哨兵目录里的文件未被删除
+
+############ 结果: PASS=34 FAIL=0 ############
+全部断言成立: 危险目录在任何文件操作之前被拒绝, 标记文件零丢失。

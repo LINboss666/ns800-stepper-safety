@@ -32,7 +32,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="${REPO:-$(env_repo_root)}"
 BASE_HEAD="${BASE_HEAD:-$(env_default_head)}"
 PY="${PY:-python}"
-WORK="${META_WORK:-$(env_work_root)/meta}"
+WORK="${META_WORK-$(env_work_root)/meta}"   # 显式空值 => 拒绝而非静默替换
 ONLY_META="${ONLY_META:-}"
 META_DEEP="${META_DEEP:-0}"
 M1_GCC="${M1_GCC:-}"
@@ -85,7 +85,12 @@ inject_copy() {                        # inject_copy <源> <目标> <模式>
 sub_chain() {                          # sub_chain <子目录名> [env 赋值...]
     local name="$1"; shift
     local w="$WORK/$name"
+    if [ -e "$w" ] && [ ! -f "$w/.ns800_host_work" ]; then
+        die "子链目录已存在且无哨兵, 拒绝 rm -rf: $w"
+    fi
     rm -rf "$w"; mkdir -p "$w" || die "无法创建 $w"
+    printf 'sentinel
+' > "$w/.ns800_host_work"
     ( cd "$HERE" && env "$@" NEG_WORK="$w" NEG_META_SKIP=1 BASE_HEAD="$BASE_HEAD" \
         bash "$HERE/run_negatives.sh" ) > "$WORK/$name.runner.log" 2>&1
     CUR_RC=$?
@@ -140,8 +145,17 @@ verdict() {                            # verdict <显示名> <通过标签> <失
 }
 
 # ---------------- 准备工作区(必须仓库外) ----------------
-case "$WORK" in "$REPO"*) die "元负例工作区不能落在仓库内: $WORK" ;; esac
+# R4-A: 守卫在 rm/mkdir 之前(与 negatives/normal 共用同一规则), 同样只删有哨兵的目录
+if ! WORK="$(require_outside_repo "$WORK" "META_WORK")"; then
+    die "元负例工作区被守卫拒绝(未执行任何 rm/mkdir, 现场保持原样)"
+fi
+WORK_SENTINEL="$WORK/.ns800_host_work"
+if [ -e "$WORK" ] && [ ! -f "$WORK_SENTINEL" ]; then
+    die "目标已存在但没有本工具的哨兵文件, 拒绝 rm -rf: $WORK"
+fi
 rm -rf "$WORK"; mkdir -p "$WORK" || die "无法建立 $WORK"
+printf 'sentinel: 本目录由 tests/host/run_meta_negatives.sh 创建, 允许其清理
+' > "$WORK_SENTINEL"
 BLIND="$WORK/blinded"; RUNDIR="$WORK/runner_tampered"; mkdir -p "$BLIND" "$RUNDIR"
 STUB="$WORK/gcc_stub_65.sh"
 cat > "$STUB" <<'STUBEOF'

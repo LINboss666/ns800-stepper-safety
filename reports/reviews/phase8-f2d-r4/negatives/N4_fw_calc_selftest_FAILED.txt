@@ -1,0 +1,30 @@
+# N4_fw_calc_selftest_FAILED
+## runner_status.txt(自报值; 真实进程码见 neg_case_rc_ledger.txt)
+V1_BUILD_RC=0
+V1_RUN_RC=2
+V1_STATE=RAN
+V1_EXECUTED=1
+V1_EXE=PRESENT
+V1_OUT_BYTES=15173
+V2_BUILD_RC=0
+V2_RUN_RC=2
+V2_STATE=RAN
+V2_EXECUTED=1
+V2_EXE=PRESENT
+V2_OUT_BYTES=15320
+RUNNER_RC=2
+REPO_ROOT=D:/ns800
+SRC_APP=/tmp/ns800-host-chain/negatives/snap_calc/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications
+HOST_SRC=/d/ns800/tests/host/host_main.c
+SHIM_DIR=/d/ns800/tests/host/shim
+V1_EXTRA=
+V2_EXTRA=
+GCC=/c/Program Files (x86)/Dev-Cpp/MinGW64/bin/gcc.exe
+## V1 判定/身份行
+  [BADRESULT] 自测终态 A1 tmc_calc_selftest = FAILED  <-- 计入总判定, 不得算通过
+结论: NOT PASSED -> 必需自测终态不合规 1 项; 详见上方 [FAIL]/[BADRESULT]/[MISSING] 行
+PROCESS RC=2 (0=通过)
+## V2 判定/身份行
+  [BADRESULT] 自测终态 A1 tmc_calc_selftest = FAILED  <-- 计入总判定, 不得算通过
+结论: NOT PASSED -> 必需自测终态不合规 1 项; 详见上方 [FAIL]/[BADRESULT]/[MISSING] 行
+PROCESS RC=2 (0=通过)

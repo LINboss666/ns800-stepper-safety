@@ -1,0 +1,21 @@
+# R3-NEW-02 纠正说明(复审 §5)
+
+事实: R3 的 reports/reviews/phase8-f2d-r3/verification_source_hashes.txt 本机自校 11/11,
+但按远端提交对象逐项复算为 **10/11**, 唯一失配是 tests/host/probe_errcodes.c。
+
+| 对象 | SHA-256 | 字节数 |
+|---|---|---|
+| R3 清单里的值(=工作树字节, CRLF) | 06870f71c9d89b124a9641c7721891517a8058f484fe6448bc60898ab2167395 | 1062 |
+| 远端 Git blob(LF)               | 09812e88be3d2003044b9cf7a560dd113a071ed0dc2c5fd292e25a5273233878 | 1030 |
+
+根因: 本机 core.autocrlf=true, 签出时把该文件写成 CRLF; R3 清单是对**工作树字节**求哈希,
+而远端审查读的是 **blob 字节**。CRLF 全部转成 LF 后两份内容一致 —— 探针逻辑没有变化,
+也不是生产驱动缺陷。
+
+纠正: R4 起清单由 tests/host/make_source_manifest.sh 生成, 字节语义 = **Git blob**
+(从索引 `git cat-file blob ':<path>'` 取), 工作树字节若不同则另列一段并加标签, 不作为校验对象;
+推送后必须用 `--verify origin/<分支> <清单>` 对远端提交对象逐项复算, 索引/远端结果分别报告。
+R3 那份清单保留原样(不删改历史工件), 以本文件标注其为已被纠正的旧工件。
+
+措辞撤回: R3 回执/交接中"probe_errcodes.c 与 R2 原工件逐字节相同"的说法不准确,
+正确表述是"**CRLF 规范化为 LF 后内容一致**"; host_main.c 与两份 shim 仍是逐字节相同。

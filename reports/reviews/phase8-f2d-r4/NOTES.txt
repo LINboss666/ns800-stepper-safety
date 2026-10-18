@@ -1,0 +1,21 @@
+# 证据目录说明（Phase 8-F2d-R4）
+
+1. 生成方式：`bash tests/host/run_negatives.sh`（BASE_HEAD=8edfd8b8…，工作区在仓库外）跑完整链，
+   再 `bash tests/host/test_path_guard.sh`（只在 mktemp 新建的一次性沙盒里）跑路径守卫回归；
+   由脚本摘录成下面的文本。原始完整日志、二进制、隔离快照与被篡改副本不入库。
+2. 三个 rc 的区分同 R3：`runner_proc_rc`（进程真实）/ `runner_reported_rc`（状态文件自报）/
+   `expected_rc`（登记预期）。见 `neg_case_rc_ledger.txt`。
+3. 类别语义：`OK` 预期成立；`NOT-DETECTED` 跑了但没抓到；`INFRA-FAIL` 没执行 / 编译意外 / 回执坏。
+4. 本轮新增证据：
+   - `path_guard_regression.txt` —— 危险目录**在任何文件操作之前**被拒绝且标记文件零丢失；
+     同前缀兄弟目录与含空格路径不被误拒；无哨兵的已存在仓外目录不被删。
+   - `r3_hash_manifest_correction.txt` —— R3 清单 11/11 与远端 10/11 的差异、根因（CRLF 工作树 vs
+     LF blob）、纠正方式与措辞撤回。
+   - `source_hashes.txt` —— 由 `tests/host/make_source_manifest.sh --out` 从**索引 blob** 生成，
+     字节语义 = Git blob 原始字节；末尾另列的带标签段落是工作树字节，仅供本地对照，不作校验对象。
+   - `remote_blob_verification.txt` —— 推送之后用 `--verify origin/<分支>` 对**远端提交对象**逐项复算
+     的结果（因先生成后提交，该文件随第二个提交入库，属于预期时序）。
+5. 脱敏：证据中的工作区绝对路径里的本机用户名统一替换为 `%TEMP%`（纯路径改写；判定内容、计数、
+   失败文本一律未改）。原件留在本地工作区可逐字节复核。仓库根 `D:/ns800` 按前几轮惯例保留。
+6. Keil：本轮**未重建**（固件与 Keil 工程相对基线 0 差异），`keil_rebuild_all_from_r2.txt` 是沿用
+   F2d-R2 的 Rebuild All 原始日志；主机通过不等于目标硬件通过。

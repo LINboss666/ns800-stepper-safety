@@ -1,0 +1,25 @@
+# 验证源码哈希清单 —— 字节语义 = Git blob 原始字节(对象库内容)
+# 生成时间(UTC): 2026-10-18T16:15:03Z   生成方式: git cat-file blob ':<path>' | sha256sum
+# 前缀: tests/host   来源: 索引(已 git add, 尚未提交 => 提交后请用 --verify 对远端对象复核)
+# 每行: <sha256>  <路径>   (清单本身不包含自己)
+05fe31dfdc21c656d77ba1e0a349de6d581b557f3ea5b94d8e5f29555469387e  tests/host/README.md
+0752c7160bb3eb1a7c8104eca9179bd4e3cbc5651b6ccb16ecdcfe87b795c3c3  tests/host/make_source_manifest.sh
+09812e88be3d2003044b9cf7a560dd113a071ed0dc2c5fd292e25a5273233878  tests/host/probe_errcodes.c
+0cc79a1ab02a6548ff265bd368993d5c17e9877d5c4706f765dd74c99ea39a1a  tests/host/shim/rtdevice.h
+24c97a41aec7949b8454d8726131a359dadaf6db7383d0da05e5794ee5ede98e  tests/host/.gitignore
+5f7f9ca0c21aca3b4fcf4b106c15a910a8f33c314b153a98949c5a08294c901a  tests/host/run_meta_negatives.sh
+614b35efbf7c05865d7e728fc0b771947220fee0cf0f2b482d3ca1e4186f2ed2  tests/host/build_and_run.sh
+84f1603de7303b24da589039675c0030bd9513086c1c29f1b635792aecba2980  tests/host/env.sh
+89f1e7a9c5a7c0b7574b81f2ddf8f2e058e16de079b67e7f9ffb6fae55fd1254  tests/host/test_path_guard.sh
+92969f0836003f72cef898a71cd8bb879d7f7112c7443e96dfcb95f9e8aa00a0  tests/host/run_negatives.sh
+a5142df17c1fa7da8f61dfeacc3bb01778508346bc28e80eb90475144bcf200a  tests/host/probe_errcodes.py
+c0d2ec735d59d73ce8b9b50b0157c167d38553b38e49704fb09e65a6cee556c6  tests/host/inject.py
+e1aa4c87c0d6752194ca2d5563c6ac677330588a788c8fe8371d0a1526b943b0  tests/host/shim/rtthread.h
+e2b05444e1e8cdfcfd0ebcbb0251a67f007e682db78b6badc2bcf257500839eb  tests/host/host_main.c
+
+# 条目数: 14
+#
+# 另列标签【仅供本地对照, 不是清单的校验对象】: 下列文件的工作树字节与 blob 字节不同
+# (通常是 core.autocrlf 在签出时改写换行)。远端审查请以**上面的 blob 哈希**为准。
+# --- worktree-bytes (labeled separately, not the verification target) ---
+06870f71c9d89b124a9641c7721891517a8058f484fe6448bc60898ab2167395  tests/host/probe_errcodes.c

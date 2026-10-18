@@ -1,0 +1,6 @@
+# 元负例子链 M4_ambiguous
+## verdict_matrix
+(无矩阵: 该场景在执行前被拒绝)
+## case_rc_ledger
+## 子链控制台尾部
+FATAL: ONLY 里的选择 "N1" 歧义, 命中 5 个: N1_only_V1_injected_fail N10_probe_writeback_V2 N10b_writeback_both_variants N11_clean_snapshot_regression N12_workspace_clean_regression

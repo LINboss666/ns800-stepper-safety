@@ -1,0 +1,27 @@
+# 真实 Keil 构建依赖文件的最小片段 (Phase 8-F2d-R2 附证)
+# 生成时间: 2026-10-18T12:16:10Z (UTC) / 本地 2026-10-18T20:16:10+0800
+# 来源: rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/build/tmc2209.d 与 build/motor.d 的前 8 行, 逐字节摘录, 未编辑
+# 由 R2 的 Keil Rebuild All (build_f2d_r2_final.log, 0 Error/0 Warning) 重新生成
+# 用途: 独立复核 R04 的依赖事实 —— 目标固件里 <sys/types.h>/<sys/errno.h> 实际解析到
+#       components/libc/compilers/common/extension/sys/*, 因此 rtdef.h 走 RT_USING_LIBC 错误码分支
+# 边界: .d 是构建生成物, 按仓库规则不入 Git; 这里只摘录判定所需行, 原文件仍在 build/ 目录
+
+===== build/tmc2209.d (前 8 行) =====
+./build/tmc2209.o: applications\tmc2209.c ..\..\..\..\include\rtthread.h \
+  rtconfig.h ..\..\..\..\include\rtdef.h ..\..\..\..\include\rtsched.h \
+  ..\..\..\..\include\rttypes.h \
+  ..\..\..\..\components\libc\compilers\common\extension\sys\types.h \
+  ..\..\..\..\components\libc\compilers\common\extension\sys\errno.h \
+  ..\..\..\..\include\rtcompiler.h ..\..\..\..\include\klibc\kerrno.h \
+  ..\..\..\..\include\rtservice.h ..\..\..\..\include\rtm.h \
+  ..\..\..\..\include\rtatomic.h ..\..\..\..\include\rthw.h \
+
+===== build/motor.d (前 8 行) =====
+./build/motor.o: applications\motor.c ..\..\..\..\include\rtthread.h \
+  rtconfig.h ..\..\..\..\include\rtdef.h ..\..\..\..\include\rtsched.h \
+  ..\..\..\..\include\rttypes.h \
+  ..\..\..\..\components\libc\compilers\common\extension\sys\types.h \
+  ..\..\..\..\components\libc\compilers\common\extension\sys\errno.h \
+  ..\..\..\..\include\rtcompiler.h ..\..\..\..\include\klibc\kerrno.h \
+  ..\..\..\..\include\rtservice.h ..\..\..\..\include\rtm.h \
+  ..\..\..\..\include\rtatomic.h ..\..\..\..\include\rthw.h \

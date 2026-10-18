@@ -1,0 +1,20 @@
+# 元负例子链 M4_prefix
+## verdict_matrix
+OK | N10b_writeback_both_variants | rc 真实=1 自报=1 期望=1 | V1=RAN/0/1 V2=RAN/0/1 (期望 V1=RAN/0/1 V2=RAN/0/1)
+## case_rc_ledger
+N10b_writeback_both_variants	class=OK	runner_proc_rc=1	runner_reported_rc=1	expected_rc=1	V1=RAN/0/1 V2=RAN/0/1
+## 子链控制台尾部
+injected(mode=probe_writeback, replacements=1) -> %TEMP%/ns800-host-chain/meta/M4_prefix/snap_writeback/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/tmc2209.c
+SKIP(不在请求集合) N9_probe_writeback_V1
+SKIP(不在请求集合) N10_probe_writeback_V2
+OK | N10b_writeback_both_variants | rc 真实=1 自报=1 期望=1 | V1=RAN/0/1 V2=RAN/0/1 (期望 V1=RAN/0/1 V2=RAN/0/1)
+--- N10b_writeback_both_variants: OK
+SKIP(不在请求集合) N11_clean_snapshot_regression
+SKIP(不在请求集合) N12_workspace_clean_regression
+
+############ 判定汇总 ############
+OK | N10b_writeback_both_variants
+
+执行集合(1) 与请求集合(1) 一致: 是
+类别计数: OK=1 NOT-DETECTED=0 INFRA-FAIL=0
+RUNNER(run_negatives): 所有负例按预期被检出且身份齐备; 干净回归通过 (rc=0)

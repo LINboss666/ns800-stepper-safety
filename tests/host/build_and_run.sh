@@ -23,7 +23,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 
 REPO_ROOT="${REPO_ROOT:-$(env_repo_root)}"
 SRC_APP="${SRC_APP:-$REPO_ROOT/$(env_app_rel)}"
-OUT_DIR="${OUT_DIR:-$HERE/_out}"
+OUT_DIR="${OUT_DIR-$(env_work_root)/out}"   # 显式空值交给守卫拒绝   # R4-A: 默认输出改到仓库外($HERE/_out 曾在仓内)
 HOST_SRC="${HOST_SRC:-$HERE/host_main.c}"
 SHIM_DIR="${SHIM_DIR:-$HERE/shim}"          # 元负例把 runner 副本放到别处时仍可显式指定
 V1_EXTRA="${V1_EXTRA:-}"
@@ -46,13 +46,18 @@ if [ -z "$GCC_RESOLVED" ] || [ ! -x "$GCC_RESOLVED" ]; then
     note "FATAL: 未找到可用主机编译器(设 GCC=<路径> 或把 gcc 放进 PATH)"; exit 127
 fi
 GCC="$GCC_RESOLVED"
+# R4-A: 工作目录验证早于编译器检查与任何文件操作
+if ! OUT_DIR="$(require_outside_repo "$OUT_DIR" "OUT_DIR")"; then
+    note "FATAL: OUT_DIR 被工作目录守卫拒绝(未创建目录, 未重定向, 未编译)"
+    exit 4
+fi
 [ -f "$HOST_SRC" ] || { note "FATAL: 夹具源不存在: $HOST_SRC"; exit 127; }
 [ -d "$SRC_APP" ]  || { note "FATAL: 源码快照目录不存在: $SRC_APP"; exit 127; }
-mkdir -p "$OUT_DIR"
 note "runner   : $HOST_SRC"
 note "SRC_APP  : $SRC_APP"
 note "OUT_DIR  : $OUT_DIR"
 note "compiler : $("$GCC" --version | head -1)"
+mkdir -p "$OUT_DIR" || { note "FATAL: 无法创建 OUT_DIR"; exit 4; }
 
 run_variant() {
     local tag="$1" tag_lc extra exe marker brc rrc run_flag

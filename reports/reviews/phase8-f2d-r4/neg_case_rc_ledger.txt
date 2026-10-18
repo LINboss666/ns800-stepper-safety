@@ -1,0 +1,13 @@
+N1_only_V1_injected_fail	class=OK	runner_proc_rc=1	runner_reported_rc=1	expected_rc=1	V1=RAN/0/1 V2=RAN/0/0
+N2_only_V2_injected_fail	class=OK	runner_proc_rc=1	runner_reported_rc=1	expected_rc=1	V1=RAN/0/0 V2=RAN/0/1
+N3_V1_stale_exe_not_reused	class=OK	runner_proc_rc=1	runner_reported_rc=1	expected_rc=1	V1=COMPILE_FAILED/1/127 V2=RAN/0/0
+N4_fw_calc_selftest_FAILED	class=OK	runner_proc_rc=2	runner_reported_rc=2	expected_rc=2	V1=RAN/0/2 V2=RAN/0/2
+N5_fw_cfg_selftest_INCOMPLETE	class=OK	runner_proc_rc=2	runner_reported_rc=2	expected_rc=2	V1=RAN/0/2 V2=RAN/0/0
+N6_helper_thread_create_fail	class=OK	runner_proc_rc=3	runner_reported_rc=3	expected_rc=3	V1=RAN/0/3 V2=RAN/0/3
+N7_helper_thread_startup_fail	class=OK	runner_proc_rc=3	runner_reported_rc=3	expected_rc=3	V1=RAN/0/3 V2=RAN/0/3
+N8_gstat_expect_table_tamper	class=OK	runner_proc_rc=1	runner_reported_rc=1	expected_rc=1	V1=RAN/0/1 V2=RAN/0/0
+N9_probe_writeback_V1	class=OK	runner_proc_rc=1	runner_reported_rc=1	expected_rc=1	V1=RAN/0/1 V2=NOT_RUN/NOT_RUN/NOT_RUN
+N10_probe_writeback_V2	class=OK	runner_proc_rc=1	runner_reported_rc=1	expected_rc=1	V1=NOT_RUN/NOT_RUN/NOT_RUN V2=RAN/0/1
+N10b_writeback_both_variants	class=OK	runner_proc_rc=1	runner_reported_rc=1	expected_rc=1	V1=RAN/0/1 V2=RAN/0/1
+N11_clean_snapshot_regression	class=OK	runner_proc_rc=0	runner_reported_rc=0	expected_rc=0	V1=RAN/0/0 V2=RAN/0/0
+N12_workspace_clean_regression	class=OK	runner_proc_rc=0	runner_reported_rc=0	expected_rc=0	V1=RAN/0/0 V2=RAN/0/0

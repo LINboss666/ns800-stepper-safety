@@ -191,9 +191,13 @@ UV4 -b 编译（0 错误）→ UV4 -f 烧录 → pyocd 复位 → COM5 串口读
 > 只算逻辑与状态机通过（假芯片在内存里，无 UART 时序、无目标栈余量）；**真机通过**必须
 > 单独上板取证，本表未记任何"真机通过"的运动/写寄存器项。
 > 自 Phase 8-F2d-R3 起，这条主机验证链本身已进仓库：脚本与夹具在 `tests/host/`
-> （`bash tests/host/run_negatives.sh` 跑负例+元负例全链），逐例矩阵、真实/自报退出码台账、
-> 元负例原因行等文本证据在 `reports/reviews/<阶段>/`，阶段交接在 `reports/agent_handoffs/`；
-> 构建产物与被篡改副本一律留在仓库外工作区，不入库。
+> （`bash tests/host/run_negatives.sh` 跑负例+元负例全链，`bash tests/host/test_path_guard.sh`
+> 跑工作目录守卫的沙盒回归），逐例矩阵、真实/自报退出码台账、元负例原因行等文本证据在
+> `reports/reviews/<阶段>/`，阶段交接在 `reports/agent_handoffs/`。
+> 自 F2d-R4 起，构建产物、隔离快照与被篡改副本**默认**落在仓库外工作区，且三个入口在任何
+> `rm`/`mkdir`/重定向/编译之前先验证路径（拒绝仓库内路径、文件系统根与包住仓库的祖先目录），
+> 只清理本工具自己写过哨兵文件的目录。（勘误：R3 曾写"一律在仓外"，但当时 `build_and_run.sh`
+> 的默认 `OUT_DIR` 仍是仓内 `tests/host/_out` —— 该默认值已在 R4 改为仓外。）
 
 ## 7. 安全红线（任何修改不得违反）
 

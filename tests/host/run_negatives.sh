@@ -35,7 +35,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 
 REPO="${REPO:-$(env_repo_root)}"
 BASE_HEAD="${BASE_HEAD:-$(env_default_head)}"
-WORK="${NEG_WORK:-$(env_work_root)/negatives}"
+WORK="${NEG_WORK-$(env_work_root)/negatives}"   # 显式空值 => 由守卫拒绝, 不静默改用默认路径
 RUNNER_SCRIPT="${RUNNER_SCRIPT:-$HERE/build_and_run.sh}"
 APPREL="$(env_app_rel)"
 APPREL_ABS="$REPO/$APPREL"
@@ -214,7 +214,13 @@ run_case() {                       # run_case <name> [env 赋值...]
 
     selected "$name" || { echo "SKIP(不在请求集合) $name"; return 0; }
 
+    # 同样只删自己标过的目录: 存在但无哨兵 => 视为他人现场, 拒绝并保留内容
+    if [ -e "$out" ] && [ ! -f "$out/.ns800_host_work" ]; then
+        die_infra "用例输出目录已存在且无哨兵文件, 拒绝 rm -rf: $out"
+    fi
     rm -rf "$out"; mkdir -p "$out" || die_infra "无法创建输出目录 $out"
+    printf 'sentinel
+' > "$out/.ns800_host_work"
     run_v1="${EXP_RUNV1[$name]}"; run_v2="${EXP_RUNV2[$name]}"
 
     if [ "$name" = "N3_V1_stale_exe_not_reused" ]; then
@@ -234,6 +240,9 @@ run_case() {                       # run_case <name> [env 赋值...]
 
     local -a RUNENV=()
     RUNENV+=("SHIM_DIR=$HERE/shim")
+    # 把仓库上下文显式交给 runner: 元负例会把 runner 复制到仓库外的别的目录,
+    # 副本自己 git rev-parse 找不到仓库根 => 会在写状态回执之前退出, 场景就失真了。
+    RUNENV+=("REPO_ROOT=$REPO")
     [ -z "$GCC_OVERRIDE" ] || RUNENV+=("GCC=$GCC_OVERRIDE")
     [ -z "$HOST_SRC_OVERRIDE" ] || RUNENV+=("HOST_SRC=$HOST_SRC_OVERRIDE")
 
@@ -395,8 +404,19 @@ EOF2
 
 # ------------------------------------------------------------------ 主流程
 resolve_selection
-rm -rf "$WORK"; mkdir -p "$WORK" || die_infra "无法准备工作目录 $WORK(必须在仓库外)"
-case "$WORK" in "$REPO"*) die_infra "工作目录不能落在仓库内: $WORK" ;; esac
+# R4-A: 守卫在 rm/mkdir **之前** —— 先解析并验证, 通过后才允许清理/创建。
+# 另外只删"本工具自己建过的目录": 目录里有哨兵文件才允许 rm -rf, 否则视为别人的现场并拒绝。
+# 这条不依赖软链可见性(本机 MSYS 把目录软链当普通目录, realpath/test -L 都看不出来)。
+if ! WORK="$(require_outside_repo "$WORK" "NEG_WORK")"; then
+    die_infra "工作目录被守卫拒绝(未执行任何 rm/mkdir/编译, 现场保持原样)"
+fi
+WORK_SENTINEL="$WORK/.ns800_host_work"
+if [ -e "$WORK" ] && [ ! -f "$WORK_SENTINEL" ]; then
+    die_infra "目标已存在但没有本工具的哨兵文件, 拒绝 rm -rf: $WORK"
+fi
+rm -rf "$WORK"; mkdir -p "$WORK" || die_infra "无法准备工作目录 $WORK"
+printf 'sentinel: 本目录由 tests/host/run_negatives.sh 创建, 允许其清理; 删除此行即视为他人现场
+' > "$WORK_SENTINEL"
 : > "$WORK/verdict_matrix.txt"
 : > "$WORK/case_rc_ledger.txt"
 [ -f "$RUNNER_SCRIPT" ] || die_infra "runner 脚本不存在: $RUNNER_SCRIPT"
