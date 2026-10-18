@@ -181,9 +181,12 @@ UV4 -b 编译（0 错误）→ UV4 -f 烧录 → pyocd 复位 → COM5 串口读
 > HARDWARE-PENDING — deferred to evening on-target validation。
 > ✅ 2026-09-25 更新：Phase 7 运行时相关 🖥 行已按真机结果改写；仍属 🖥 /
 > HARDWARE-PENDING 的只有依赖外部硬件的项（真实电机、实测电流标定、
-> ESTOP/限位物理极性、Safety EXTI 开闸、`MCU_DRV_ENABLE → U9 → Q1 → TMC_ENN`
-> 使能链（2026-10-18 更新：新扩展板许可网络已引出，阻塞项改为 U5 与门 / 急停非门损坏；
-> 整链仍未验收）—— 见 `PHASE8_HARDWARE_VALIDATION_20260925.md`。另外主机侧验证链的
+> ESTOP/限位物理极性、Safety EXTI 开闸、使能链（⚠ **位号说明 2026-10-18**：Phase 7 文档里
+> 把这条链记作 `MCU_DRV_ENABLE → U9 → DRV_ENABLE_SAFE → Q1 → TMC_ENN`，其中 **U9 是历史遗留
+> 标位，尚未对着原理图核实**；已核实的只有 —— 新扩展板 `MCU_DRV_ENABLE` 网络已引出、级联
+> 逻辑里的**与门是 U5**、当前不通的直接原因是 U5 与门 + 急停非门损坏、`TMC_ENN` 实测约 0V。
+> 器件位号一律以核实后的原理图为准，**不得据此改接线或飞线**。整链仍未验收，
+> 见 `PHASE8_HARDWARE_VALIDATION_20260925.md`。另外主机侧验证链的
 > 三项证据等级要分清：**Keil 0/0 只算编译通过**；**主机夹具 T1..T21 / G1..G10 / FD* 通过**
 > 只算逻辑与状态机通过（假芯片在内存里，无 UART 时序、无目标栈余量）；**真机通过**必须
 > 单独上板取证，本表未记任何"真机通过"的运动/写寄存器项。
