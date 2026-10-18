@@ -171,13 +171,15 @@ rt_bool_t tmc_change_is_current_safe(rt_uint8_t vsense_old, rt_uint8_t vsense_ne
  * 每次写入都读 IFCNT 前后验证 +1; 可读寄存器(GCONF/CHOPCONF)追加读回比对。
  * 任一步失败 → 立即中止并置 TMC_DRV_FAILED(不回滚、不继续写), 同时**失效已下发
  * 快照**(否则旧快照会被当作有效配置继续放行)。
- * 写入前先求值运行态门禁: 返回 -RT_EPERM 且**不产生任何总线写**的情况有两类
- * (①编译期宏为 FALSE, ②运行态任一条件不满足), 具体见 write gate 位掩码。
- * 返回 -RT_EBUSY = 另一条配置/arm 事务正持有 txn 锁。 */
+ * 写入前先求值运行态门禁, 返回码把"条件不满足"和"无法串行化"分开(F2c R02):
+ *   RT_EOK      已下发并确认
+ *   -RT_EPERM   门禁不通过(编译期宏 FALSE 或任一运行态条件不满足): 不产生任何总线动作(连 open 都不调), 状态与快照不变
+ *   -RT_EBUSY   另一条配置/arm 事务正持有 txn 锁
+ *   -RT_ENOSYS  执行器互斥量没建起来(无法串行化) —— 一律拒绝, 绝不退化成"无锁也能写" */
 rt_err_t tmc2209_apply_config(void);
 
 /* 运行态写入门禁位掩码(纯只读, 不产生总线流量; 0 = 全部通过)。
- * 各位定义见 TMC_WGATE_*, 供 apply 自检与 system_status 打印。 */
+ * 各位定义见 TMC_WGATE_*, 供 apply 自检与 system_status/motor_status 打印。 */
 rt_uint32_t tmc2209_get_write_gate_mask(void);
 
 #define TMC_WGATE_HW_NOT_VALIDATED (1u << 0)  /* 编译期安全链验收宏为 FALSE */
@@ -186,7 +188,7 @@ rt_uint32_t tmc2209_get_write_gate_mask(void);
 #define TMC_WGATE_NOT_READY        (1u << 3)  /* Safety 状态机不是 READY */
 #define TMC_WGATE_FAULT_LATCHED    (1u << 4)  /* 存在未清除的故障码 */
 #define TMC_WGATE_LINK_UNHEALTHY   (1u << 5)  /* UART 链路 FAILED/DEGRADED/UNINIT */
-#define TMC_WGATE_TXN_BUSY         (1u << 6)  /* 配置/arm 事务锁被占用 */
+#define TMC_WGATE_NOT_SYNCED       (1u << 6)  /* F2c R02: 执行器的锁没建起来 = 无法串行化 */
 
 /* F2b P1-D: 配置事务串行化。apply 与 motor_arm 的"查状态→复核→请求使能"整段
  * 必须持有同一把 txn 锁, 否则二者交错会出现"arm 复核通过后 apply 改了电流档"
@@ -204,15 +206,19 @@ void     tmc2209_cfg_txn_end(void);
  *   -RT_EPERM = 尚未 CONFIGURED / 快照已失效(不猜, 直接判不可信)
  *   -RT_EIO   = 现值与已下发值不符 或 读不到/链路不健康 → 状态立即降级为 FAILED
  *   -RT_EBUSY = 另一条配置/arm 事务正在进行, 此刻无法复核(调用方必须拒绝使能)
- * 调用点: motor_arm 决策点、motor_start 关联检查、Motor 线程周期守卫(F2b P1-E)、
- * tmc_config_show。守卫有固定周期上限, 其余均为事件驱动。 */
+ *   -RT_ENOSYS = 执行器互斥量不可用, 无法保证复核期间没有并发写 → 同样拒绝
+ * 调用点: motor_arm 决策点、motor_start 起转前复核(F2c R03)、Motor 线程周期守卫
+ * (F2b P1-E)、以及**显式**巡检命令 tmc_drv_probe/motor_drv_guard_probe。
+ * ⚠ 本函数会真实读 GCONF/CHOPCONF(UART 流量), 且失败会把生产配置状态打成 FAILED,
+ *   因此绝不允许放进"纯软件"真值表自测 —— 见 motor.c 的 R04 拆分。 */
 rt_err_t tmc2209_config_integrity_check(void);
 
 /* 供 motor 门禁使用的纯状态判定(无总线访问、无副作用):
  * 只有 TMC_DRV_CONFIGURED **且已下发快照仍有效** 才返回 RT_TRUE。F2b 起加了
  * 后半条件: 配置失败/失联/复位/重新配置中都必须让本门立刻闭合, 不能等到
- * 下一次完整性复核才发现。链路/复位后的真实值由 tmc2209_config_integrity_check()
- * 在 arm 决策点与运行期守卫中把关。 */
+ * 下一次完整性复核才发现。F2c R02 再加一条: 执行器的锁不可用时一律返回 RT_FALSE
+ * (状态无法原子读取, 不猜)。链路/复位后的真实值由
+ * tmc2209_config_integrity_check() 在 arm 决策点、start 起转前与运行期守卫把关。 */
 rt_bool_t tmc2209_drive_config_ok_for_arm(void);
 
 /* 已下发配置的只读快照(供诊断显示; 未成功下发过则返回 RT_FALSE)。 */

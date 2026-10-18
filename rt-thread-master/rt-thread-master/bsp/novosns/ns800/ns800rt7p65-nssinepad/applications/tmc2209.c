@@ -59,8 +59,8 @@ static rt_bool_t tmc_lock_ok = RT_FALSE;
 static rt_err_t tmc_read_reg(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *value);
 static rt_err_t tmc_read_reg_locked(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *value);
 static rt_err_t tmc_write_reg_locked(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t value);
-/* F2b: 配置实例的同步对象初始化(定义在文件后段, init 里要先调) */
-static void tmc_cfg_prod_sync(void);
+/* F2b: 配置实例的同步对象初始化(定义在文件后段, init 里要先调)。F2c R02: 返回状态。 */
+static rt_err_t tmc_cfg_prod_sync(void);
 
 /* ---------- CRC8-ATM (datasheet swuart_calcCRC 等价实现, 见文件头 ②) ---------- */
 static rt_uint8_t tmc_crc8(const rt_uint8_t *data, rt_size_t len)
@@ -292,14 +292,19 @@ static void tmc_health_after_xfer(rt_err_t e)
 rt_err_t tmc2209_init(void)
 {
     rt_err_t e = tmc_uart_open();
+    rt_err_t e2;
 
-    /* F2b: 配置执行器的两把锁随子系统一起就绪(本函数在 bootstrap 单线程阶段调用,
-     * 之后才有 motor/diagnosis 线程)。链路打不开时实例仍然可用, 只是门禁会因
-     * health != SUBSYS_OK 一直拒绝写入 —— 与"不猜"的纪律一致。 */
-    tmc_cfg_prod_sync();
+    /* F2b/F2c: 配置执行器的两把锁随子系统一起就绪(本函数在 bootstrap 单线程阶段
+     * 调用, 之后才有 motor/diagnosis 线程)。
+     * F2c R02: 锁创建失败 = 执行器无法串行化 = 子系统判 FAILED 并把错误上抛,
+     * 不再出现"链路 OK 但关键区没有互斥"的中间态。 */
+    e2 = tmc_cfg_prod_sync();
 
-    tmc_health = (e == RT_EOK) ? SUBSYS_OK : SUBSYS_FAILED;
-    return e;
+    if (e != RT_EOK)      tmc_health = SUBSYS_FAILED;
+    else if (e2 != RT_EOK) tmc_health = SUBSYS_FAILED;
+    else                  tmc_health = SUBSYS_OK;
+
+    return (e != RT_EOK) ? e : e2;
 }
 
 rt_err_t tmc2209_read_register(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *value)
@@ -626,10 +631,12 @@ static void tmc_cfg_unlock(tmc_cfg_ctx_t *ctx)
     if (ctx->lock_ok) rt_mutex_release(&ctx->lock);
 }
 
-/* 非阻塞取事务锁。未 init(无 RTOS/早期上下文)视为取到, 释放端同样空操作。 */
+/* F2c R02: 事务锁不可用 = 无法串行化 = **拒绝操作**, 不再退化成"无锁也放行"。
+ * 内核未就绪与互斥量创建失败都走这条路: apply/integrity 得到 -RT_ENOSYS, 第 5 门
+ * 保持闭合。宁可下发不了配置, 也不能带着未知并发状态写芯片。 */
 static rt_bool_t tmc_cfg_txn_take(tmc_cfg_ctx_t *ctx)
 {
-    if (!ctx->txn_ok) return RT_TRUE;
+    if (!ctx->txn_ok) return RT_FALSE;
     return (rt_mutex_take(&ctx->txn, RT_WAITING_NO) == RT_EOK) ? RT_TRUE : RT_FALSE;
 }
 
@@ -638,9 +645,10 @@ static void tmc_cfg_txn_give(tmc_cfg_ctx_t *ctx)
     if (ctx->txn_ok) (void)rt_mutex_release(&ctx->txn);
 }
 
-static void tmc_cfg_ctx_init(tmc_cfg_ctx_t *ctx, const tmc_cfg_bus_t *bus,
-                             tmc_cfg_gate_fn gate, void *priv,
-                             const char *nm_lock, const char *nm_txn)
+/* 返回 RT_EOK 当且仅当**两把锁都**创建成功; 失败时实例保持"未同步"(不可操作)。 */
+static rt_err_t tmc_cfg_ctx_init(tmc_cfg_ctx_t *ctx, const tmc_cfg_bus_t *bus,
+                                 tmc_cfg_gate_fn gate, void *priv,
+                                 const char *nm_lock, const char *nm_txn)
 {
     rt_memset(ctx, 0, sizeof(*ctx));
     ctx->state     = TMC_DRV_UNCONFIGURED;
@@ -649,10 +657,17 @@ static void tmc_cfg_ctx_init(tmc_cfg_ctx_t *ctx, const tmc_cfg_bus_t *bus,
     ctx->priv      = priv;
     ctx->lock_ok   = RT_FALSE;
     ctx->txn_ok    = RT_FALSE;
-    if (rt_mutex_init(&ctx->lock, nm_lock, RT_IPC_FLAG_PRIO) == RT_EOK)
-        ctx->lock_ok = RT_TRUE;
-    if (rt_mutex_init(&ctx->txn, nm_txn, RT_IPC_FLAG_PRIO) == RT_EOK)
-        ctx->txn_ok = RT_TRUE;
+    if (rt_mutex_init(&ctx->lock, nm_lock, RT_IPC_FLAG_PRIO) != RT_EOK)
+        return -RT_ENOSYS;
+    ctx->lock_ok = RT_TRUE;
+    if (rt_mutex_init(&ctx->txn, nm_txn, RT_IPC_FLAG_PRIO) != RT_EOK)
+    {
+        (void)rt_mutex_detach(&ctx->lock);
+        ctx->lock_ok = RT_FALSE;
+        return -RT_ENOSYS;
+    }
+    ctx->txn_ok = RT_TRUE;
+    return RT_EOK;
 }
 
 static void tmc_cfg_ctx_detach(tmc_cfg_ctx_t *ctx)
@@ -695,7 +710,11 @@ static const tmc_cfg_bus_t tmc_cfg_bus_real =
     tmc_cfg_hw_open, tmc_cfg_hw_read, tmc_cfg_hw_write, tmc_cfg_hw_link_healthy
 };
 
-/* ---------- 生产运行态门禁 (P0-B) ----------
+/* ---- 生产实例(声明在门禁函数之前, 门禁要读它的锁状态) ---- */
+static tmc_cfg_ctx_t tmc_cfg_prod;
+static rt_bool_t     tmc_cfg_prod_ready = RT_FALSE;
+
+/* ---------- 生产运行态门禁 (P0-B / F2c R02) ----------
  * 每次 apply 之前重新求值, 不用"宏以前置硬件验收"替代"每次操作的条件检查"。
  * 本函数全部是纯只读(不产生任何 UART 流量), 可以在 system_status 里直接打印。
  * ⚠ 调用点已持有 txn, 因此这里取 mot_lock 的顺序是 txn -> mot_lock。 */
@@ -705,6 +724,10 @@ static rt_uint32_t tmc_cfg_gate_prod(void *priv)
     motor_snapshot_t snap;
 
     (void)priv;
+
+    /* R02: 两把锁没建起来 = 无法保证写入序列与 arm/复核互斥 → 直接挡住 */
+    if (!tmc_cfg_prod_ready || !tmc_cfg_prod.lock_ok || !tmc_cfg_prod.txn_ok)
+                                             bad |= TMC_WGATE_NOT_SYNCED;
 
     if (!TMC_DRIVE_CONFIG_HW_VALIDATED)      bad |= TMC_WGATE_HW_NOT_VALIDATED;
 
@@ -728,6 +751,7 @@ static rt_uint32_t tmc_cfg_gate_prod(void *priv)
 static void tmc_cfg_print_gate(rt_uint32_t bad)
 {
     rt_kprintf("[TMC-CFG] write gate mask=0x%X:", (unsigned)bad);
+    if (bad & TMC_WGATE_NOT_SYNCED)       rt_kprintf(" executor-not-synced(NO-LOCK=refuse)");
     if (bad & TMC_WGATE_HW_NOT_VALIDATED) rt_kprintf(" hw-chain-not-validated(compile)");
     if (bad & TMC_WGATE_MOTOR_NOT_QUIET)  rt_kprintf(" motor-not-quiet");
     if (bad & TMC_WGATE_DRV_PAD_NOT_LOW)  rt_kprintf(" drv-enable-pad-not-low");
@@ -737,19 +761,25 @@ static void tmc_cfg_print_gate(rt_uint32_t bad)
     rt_kprintf("\n");
 }
 
-/* ---- 生产实例 ---- */
-static tmc_cfg_ctx_t tmc_cfg_prod;
-static rt_bool_t     tmc_cfg_prod_ready = RT_FALSE;
-
-/* 幂等。由 tmc2209_init()(bootstrap 阶段, 单线程)完成; 万一在此之前被调用,
- * 未 init 的实例两个锁标志都是 FALSE, 读路径退化为无锁读零值 -> state 为
- * UNCONFIGURED, 判定依旧 fail closed。 */
-static void tmc_cfg_prod_sync(void)
+/* 幂等。**只有两把锁都创建成功才置 prod_ready**(R02); 失败时保持未同步, 于是
+ * 门禁带 TMC_WGATE_NOT_SYNCED、apply/integrity 得到 -RT_ENOSYS、第 5 门闭合。
+ * 由 tmc2209_init()(bootstrap 单线程阶段)调用; 在此之前被调用也只是"未同步"。 */
+static rt_err_t tmc_cfg_prod_sync(void)
 {
-    if (tmc_cfg_prod_ready) return;
-    tmc_cfg_ctx_init(&tmc_cfg_prod, &tmc_cfg_bus_real, tmc_cfg_gate_prod, RT_NULL,
-                     "tmcCfgL", "tmcCfgT");
+    rt_err_t e;
+
+    if (tmc_cfg_prod_ready) return RT_EOK;
+    e = tmc_cfg_ctx_init(&tmc_cfg_prod, &tmc_cfg_bus_real, tmc_cfg_gate_prod,
+                         RT_NULL, "tmcCfgL", "tmcCfgT");
+    if (e != RT_EOK)
+    {
+        rt_kprintf("[TMC-CFG] !! CRITICAL: 执行器互斥量创建失败(%d) -> "
+                   "配置写入与复核一律拒绝(-RT_ENOSYS), 第 5 门保持闭合\n", (int)e);
+        tmc_cfg_prod_ready = RT_FALSE;
+        return e;
+    }
     tmc_cfg_prod_ready = RT_TRUE;
+    return RT_EOK;
 }
 
 /* ---- 纯函数: 状态名 / 理论电流 / 打包 / 方向守卫 ---- */
@@ -933,6 +963,14 @@ static rt_err_t tmc_cfg_apply_ctx(tmc_cfg_ctx_t *ctx, const tmc_drv_config_t *c)
     rt_uint8_t  old_vs;
     rt_err_t    e;
 
+    /* F2c R02: 先把"锁不可用"与"锁被占用"分开 —— 前者是能力缺失(ENOSYS),
+     * 后者是并发时序(EBUSY)。两种都在产生任何总线动作之前拒绝。 */
+    if (!ctx->txn_ok)
+    {
+        rt_kprintf("[TMC-CFG] REFUSED: 执行器互斥量不可用(-RT_ENOSYS),"
+                   " 无法串行化 -> 不发出任何总线写\n");
+        return -RT_ENOSYS;
+    }
     if (!tmc_cfg_txn_take(ctx))
     {
         rt_kprintf("[TMC-CFG] REFUSED: 配置/arm 事务正在进行(-RT_EBUSY),"
@@ -1091,11 +1129,13 @@ rt_uint32_t tmc2209_get_write_gate_mask(void)
 }
 
 /* P1-C 修复点: 必须同时看 state 和 done_valid。只看 state 会让"状态仍是
- * CONFIGURED 而快照已作废"的组合从第 5 门假通过(旧版自测退出时正是这个组合)。 */
+ * CONFIGURED 而快照已作废"的组合从第 5 门假通过(旧版自测退出时正是这个组合)。
+ * F2c R02: 叶锁不可用时连状态都无法原子读取 -> 不猜, 直接返回 FALSE(门闭合)。 */
 static rt_bool_t tmc_cfg_ok_for_arm_ctx(tmc_cfg_ctx_t *ctx)
 {
     rt_bool_t ok;
 
+    if (!ctx->lock_ok) return RT_FALSE;
     tmc_cfg_lock(ctx);
     ok = (ctx->state == TMC_DRV_CONFIGURED && ctx->done_valid) ? RT_TRUE : RT_FALSE;
     tmc_cfg_unlock(ctx);
@@ -1110,11 +1150,16 @@ rt_bool_t tmc2209_drive_config_ok_for_arm(void)
 /* ---------- F2b P1-D: 配置事务的外部串行化口(motor_arm 决策段用) ----------
  * 非阻塞: 取不到就返回 -RT_EBUSY, 调用方必须拒绝使能(fail closed)。
  * 同线程可重入(RT-Thread 互斥量带持有计数), 所以 arm 段内的完整性复核不会自锁。
+ * F2c R02: 互斥量不可用返回 -RT_ENOSYS(能力缺失), 不再是"无锁也放行"的 RT_EOK。
  * ⚠ 停机路径(motor_emergency_stop / safety_force_shutdown)不得调用本函数 ——
  *   紧急停机永远不能被配置事务挡住。 */
 rt_err_t tmc2209_cfg_txn_begin(void)
 {
-    if (!tmc_cfg_prod.txn_ok) return RT_EOK;         /* 未 init: 无并发可言 */
+    if (!tmc_cfg_prod.txn_ok)
+    {
+        rt_kprintf("[MOT] cfg txn BEGIN refused: 执行器互斥量不可用(-RT_ENOSYS)\n");
+        return -RT_ENOSYS;
+    }
     return (rt_mutex_take(&tmc_cfg_prod.txn, RT_WAITING_NO) == RT_EOK)
            ? RT_EOK : -RT_EBUSY;
 }
@@ -1134,6 +1179,8 @@ static rt_err_t tmc_cfg_integrity_ctx(tmc_cfg_ctx_t *ctx)
     rt_bool_t valid;
     rt_err_t  e;
 
+    /* F2c R02: 没有事务锁就无从保证"复核期间没有并发写" -> 拒绝(不猜) */
+    if (!ctx->txn_ok) return -RT_ENOSYS;
     if (!tmc_cfg_txn_take(ctx)) return -RT_EBUSY;   /* 正在 apply/arm: 此刻无法复核 */
 
     tmc_cfg_lock(ctx);
@@ -1341,16 +1388,26 @@ static void tmc_calc_selftest(void)
 }
 MSH_CMD_EXPORT(tmc_calc_selftest, offline theoretical current and packing selftest);
 
-/* ---------- F2b: 假总线离线自测(局部实例, 不碰生产 ctx, 不碰 UART) ----------
+/* ---------- F2b/F2c: 假总线离线自测(局部实例, 不碰生产 ctx, 不碰 UART) ----------
  * 相对 F2a 的加强(逐条对应审核报告 P1-C / P1-D / P2-F):
  *   1) 状态全部放进栈上局部实例 tmc_cfg_ctx_t + 静态假总线 vtable + 实例私有数据,
  *      生产实例零接触, 并用 T18 逐项比对证明(旧版会强制 done_valid=FALSE、
  *      清零 fail 元数据、把全局总线换成假的)。
  *   2) 假总线建模 IFCNT: 只有"被接受"的写才自增, 被拒的写不改寄存器内容;
- *      另有 open 失败、回读污染、链路健康、运行门禁四类注入。
+ *      另有 open 失败、读污染、链路健康、运行门禁四类注入。
  *   3) 断言基于有序事件序列(预读→写→读回的先后位置), 而不是"曾经读过"。
  *   4) 新增失败路径 T11..T17: 回读不符 / internal_Rsense=1 / 运行门禁每一位 /
  *      跨线程占用事务 / open 失败 / CONFIGURING 窗口 / 快照替换。
+ * F2c 再加强(对应复审 R01 / R02 / R06 / R03):
+ *   R01 读污染改为"**该寄存器的第 N 次读**"注入: apply 是先读基线再写再读回,
+ *       旧的一次性注入会被基线预读消费掉, 于是 T11 期待的回读不符永远不出现
+ *       (复审报告指出的确定性测试缺陷)。现在 T11 用 nth=2 命中"写后读回",
+ *       并新增 T11b/T11c/T12b 覆盖"基线预读本身被污染"这条独立路径。
+ *   R02 局部实例锁不可用时: 所有依赖事务锁的用例判 SKIP, 且整体不得打印 PASS;
+ *       另加 T21 断言"锁不可用 → apply/integrity/arm 判定全部拒绝"。
+ *   R06 T14 的辅助线程必须确认退出后才销毁 IPC, 销毁前不删 semaphore。
+ *   R03 T20 走"下发→模拟芯片复位→复核→拒绝"整条序列, 正是 motor_start 起转前
+ *       新增复核所依赖的状态机行为。
  * ⚠ 本自测只在假总线上运行, 不代表任何真机行为; 上板执行为 HARDWARE-PENDING。 */
 
 #define TMC_FX_LOG_MAX  40
@@ -1371,7 +1428,10 @@ typedef struct
     int      ifcnt;           /* 模型 IFCNT: 仅"被接受的写"自增 */
     int      fail_write_nth;  /* 第 N 次 write 不被接受(1 基, <=0=不失败) */
     rt_uint32_t gconf, chop;  /* 芯片里当前的可读寄存器值 */
-    rt_uint8_t  corrupt_reg;  /* 非 0xFF: 对该寄存器的下一次读返回污染值 */
+    int      rd_gconf, rd_chop;       /* 每个可读寄存器被读过几次(F2c R01) */
+    rt_uint8_t  corrupt_reg;  /* 被注入污染的寄存器(0xFF=不注入) */
+    int         corrupt_nth;  /* 该寄存器的第 N 次读(1 基)返回污染值; 0=不注入 */
+    rt_uint32_t corrupt_xor;  /* 污染方式: 返回值 XOR 该掩码 */
     rt_bool_t   open_fail;
     rt_bool_t   link_ok;
     rt_uint32_t gate_mask;    /* 注入给运行态门禁提供者的位掩码 */
@@ -1400,17 +1460,20 @@ static rt_err_t tmc_fx_read(void *priv, rt_uint8_t reg, rt_uint32_t *v)
 {
     tmc_fx_t *fx = (tmc_fx_t *)priv;
     rt_uint32_t out;
+    int nth;
 
-    tmc_fx_log(fx, reg, 0, 0);
-    if (reg == TMC_REG_GCONF)           out = fx->gconf;
-    else if (reg == TMC_REG_CHOPCONF)   out = fx->chop;
-    else return -RT_EIO;      /* 只写寄存器(0x10/0x11): 真机上读它也没有意义 */
+    if (reg == TMC_REG_GCONF)      { nth = ++fx->rd_gconf; out = fx->gconf; }
+    else if (reg == TMC_REG_CHOPCONF) { nth = ++fx->rd_chop;  out = fx->chop; }
+    else { tmc_fx_log(fx, reg, 0, 0); return -RT_EIO; }  /* 只写寄存器: 读它没有意义 */
 
-    if (fx->corrupt_reg == reg)
-    {
-        fx->corrupt_reg = 0xFF;         /* 一次性: "写进去了但现值不对" */
-        out ^= 0x00000001u;
-    }
+    /* F2c R01: 注入按"该寄存器的第 N 次读"命中, 不再是一次性消费。
+     * apply 的读序是 基线读(1) -> 写 -> 读回(2), 所以:
+     *   nth=2 才是"写进去了但现值不对"(回读不符), nth=1 是"基线预读被污染"。
+     * 旧实现把注入挂在第一次读上, T11 期待的失败永远不会发生(复审 R01)。 */
+    if (fx->corrupt_nth > 0 && fx->corrupt_reg == reg && nth == fx->corrupt_nth)
+        out ^= fx->corrupt_xor;
+
+    tmc_fx_log(fx, reg, out, 0);
     *v = out;
     return RT_EOK;
 }
@@ -1559,7 +1622,10 @@ static int tmc_prod_probe_same(const tmc_prod_probe_t *a, const tmc_prod_probe_t
 }
 
 /* ---- 跨线程占用 txn: 只有真的第二个线程持锁, 才能测出 -RT_EBUSY fail closed
- * (同线程重入是 RT-Thread 互斥量的正常语义, motor_arm 段内复核正依赖它) ---- */
+ * (同线程重入是 RT-Thread 互斥量的正常语义, motor_arm 段内复核正依赖它) ----
+ * F2c R06: 辅助线程的 IPC 生命周期必须与它的退出确认绑定。旧写法最多等 200ms
+ * 就无条件删 semaphore, 也没检查 rt_thread_startup 的返回值 —— 那种类竞态一旦
+ * 发生, 测出来的东西混进了测试基础设施自身的不稳定, 而不是业务行为。 */
 static rt_sem_t tmc_fx_s_held, tmc_fx_s_free;
 static volatile rt_bool_t tmc_fx_hold_have, tmc_fx_hold_done;
 
@@ -1568,30 +1634,39 @@ static void tmc_fx_hold_entry(void *param)
     tmc_cfg_ctx_t *t = (tmc_cfg_ctx_t *)param;
 
     tmc_fx_hold_have = tmc_cfg_txn_take(t);
-    rt_sem_release(tmc_fx_s_held);                  /* "锁在我手上" */
+    rt_sem_release(tmc_fx_s_held);                  /* "锁在我手上"(或拿锁失败) */
     rt_sem_take(tmc_fx_s_free, RT_WAITING_FOREVER);
     if (tmc_fx_hold_have) tmc_cfg_txn_give(t);
-    tmc_fx_hold_done = RT_TRUE;
+    tmc_fx_hold_done = RT_TRUE;                     /* 必须是最后一件事 */
 }
 
-static void tmc_fx_hold_release_wait(void)
+/* 返回 1 = worker 已确认退出、IPC 已销毁; 0 = 未确认退出(**保留** IPC, 宁可泄漏
+ * 两个对象也不能删除 worker 仍在使用的 semaphore), 调用方必须据此判 FAIL。 */
+static int tmc_fx_hold_release_wait(void)
 {
     int i;
 
+    if (tmc_fx_s_free == RT_NULL) return 1;         /* 没建过, 无需清理 */
     rt_sem_release(tmc_fx_s_free);
-    for (i = 0; i < 40 && !tmc_fx_hold_done; ++i) rt_thread_mdelay(5);
+    for (i = 0; i < 400 && !tmc_fx_hold_done; ++i)
+        rt_thread_mdelay(5);                        /* 最多 2s 等它退出 */
+    if (!tmc_fx_hold_done) return 0;                /* 未确认 -> 不碰 IPC */
     if (tmc_fx_s_held != RT_NULL) rt_sem_delete(tmc_fx_s_held);
     if (tmc_fx_s_free != RT_NULL) rt_sem_delete(tmc_fx_s_free);
     tmc_fx_s_held = RT_NULL;
     tmc_fx_s_free = RT_NULL;
+    return 1;
 }
 
-/* 返回 1 = 另一线程确实已持有 txn(可以断言 busy); 0 = 建不起线程, SKIP。 */
-static int tmc_fx_busy_setup(tmc_cfg_ctx_t *t)
+/* 返回 1 = 另一线程确实已持有 txn(可以断言 busy);
+ *     0 = 线程/信号量建不起来或没拿到锁(SKIP, 不据此判业务 FAIL);
+ * *infra_ok 出参: 0 = 清理未确认(IPC 被保留), 业务 FAIL 必须置起。 */
+static int tmc_fx_busy_setup(tmc_cfg_ctx_t *t, int *infra_ok)
 {
     rt_thread_t th;
     int i;
 
+    *infra_ok = 1;
     tmc_fx_hold_have = RT_FALSE;
     tmc_fx_hold_done = RT_FALSE;
     tmc_fx_s_held = rt_sem_create("fxcHeld", 0, RT_IPC_FLAG_FIFO);
@@ -1606,12 +1681,21 @@ static int tmc_fx_busy_setup(tmc_cfg_ctx_t *t)
         tmc_fx_s_free = RT_NULL;
         return 0;
     }
-    rt_thread_startup(th);
-    for (i = 0; i < 100 && !tmc_fx_hold_have && !tmc_fx_hold_done; ++i)
-        rt_thread_mdelay(5);                        /* 最多 500ms 等它拿锁 */
+    if (rt_thread_startup(th) != RT_EOK)
+    {
+        /* 线程从未运行 -> 它没碰过任何 IPC, 直接销毁对象是安全的 */
+        rt_thread_delete(th);
+        rt_sem_delete(tmc_fx_s_held);
+        rt_sem_delete(tmc_fx_s_free);
+        tmc_fx_s_held = RT_NULL;
+        tmc_fx_s_free = RT_NULL;
+        return 0;
+    }
+    for (i = 0; i < 400 && !tmc_fx_hold_have && !tmc_fx_hold_done; ++i)
+        rt_thread_mdelay(5);                        /* 最多 2s 等它拿锁 */
     if (!tmc_fx_hold_have)
     {
-        tmc_fx_hold_release_wait();
+        if (!tmc_fx_hold_release_wait()) *infra_ok = 0;
         return 0;
     }
     return 1;
@@ -1625,10 +1709,11 @@ static void tmc_cfg_selftest(void)
         { TMC_REG_CHOPCONF,   0u, 1u }, { TMC_REG_CHOPCONF,   0u, 0u },
         { TMC_REG_IHOLD_IRUN, 0u, 1u }, { TMC_REG_TPOWERDOWN, 0u, 1u }
     };
-    static const rt_uint32_t gate_bits[6] = {
-        TMC_WGATE_HW_NOT_VALIDATED, TMC_WGATE_MOTOR_NOT_QUIET,
-        TMC_WGATE_DRV_PAD_NOT_LOW,  TMC_WGATE_NOT_READY,
-        TMC_WGATE_FAULT_LATCHED,    TMC_WGATE_LINK_UNHEALTHY
+    static const rt_uint32_t gate_bits[7] = {
+        TMC_WGATE_NOT_SYNCED,       TMC_WGATE_HW_NOT_VALIDATED,
+        TMC_WGATE_MOTOR_NOT_QUIET,  TMC_WGATE_DRV_PAD_NOT_LOW,
+        TMC_WGATE_NOT_READY,        TMC_WGATE_FAULT_LATCHED,
+        TMC_WGATE_LINK_UNHEALTHY
     };
     tmc_prod_probe_t probe_before, probe_after;
     tmc_drv_config_t c2 = { 10, 4, 4, 8, 1, 1, 0 };
@@ -1636,13 +1721,21 @@ static void tmc_cfg_selftest(void)
     tmc_fx_t fx;
     rt_uint32_t v = 0;
     rt_err_t e;
-    int pass = 1, i, busy;
+    int pass = 1, i, busy, infra_ok = 1;
 
     tmc_prod_probe(&probe_before);
     rt_kprintf("[TMC-CFG-ST] 假总线离线自测(局部实例), 不使用 uart2\n");
 
     tmc_fx_reset(&fx);
-    tmc_cfg_ctx_init(&t, &tmc_cfg_bus_fake, tmc_fx_gate, &fx, "tfxCfgL", "tfxCfgT");
+    /* F2c R02: 局部实例的两把锁建不起来就没有任何串行化前提 -> 明确 SKIP 并直接
+     * 返回, **不得打印 PASS/ALL PASS**(旧写法即便锁失败也会继续跑完并报总结果)。 */
+    if (tmc_cfg_ctx_init(&t, &tmc_cfg_bus_fake, tmc_fx_gate, &fx,
+                         "tfxCfgL", "tfxCfgT") != RT_EOK)
+    {
+        rt_kprintf("[TMC-CFG-ST] INCOMPLETE/SKIP: 局部实例互斥量创建失败,"
+                   " 不执行任何用例, 不判定 PASS\n");
+        return;
+    }
 
     /* --- T1: 正常全流程 -> CONFIGURED + 四个目标值 + 完整有序事件序列 --- */
     if (!tmc_fx_apply(&t, &tmc_cfg_planned))
@@ -1809,9 +1902,11 @@ static void tmc_cfg_selftest(void)
     if (tmc_fx_write_count_of(&fx, TMC_REG_CHOPCONF))
     { rt_kprintf("[TMC-CFG-ST] T10 TOFF 非法时仍写了 CHOPCONF\n"); pass = 0; }
 
-    /* --- T11(新): 写被接受(IFCNT+1)但读回不符 -> FAILED 且停后续写 --- */
+    /* --- T11(F2c 修正 R01): 写被接受(IFCNT+1)但**写后读回**不符 -> FAILED ---
+     * 注入必须命中该寄存器的第 2 次读(第 1 次是 apply 的基线预读)。旧的一次性
+     * 注入挂在第 1 次读上, 于是"回读不符"这条路径从未真的被测到。 */
     tmc_fx_reset(&fx); t.state = TMC_DRV_UNCONFIGURED; t.done_valid = RT_FALSE;
-    fx.corrupt_reg = TMC_REG_GCONF;
+    fx.corrupt_reg = TMC_REG_GCONF; fx.corrupt_nth = 2; fx.corrupt_xor = 0x1u;
     if (tmc_cfg_apply_ctx(&t, &tmc_cfg_planned) == RT_EOK)
     { rt_kprintf("[TMC-CFG-ST] T11 回读污染竟通过\n"); pass = 0; }
     if (t.state != TMC_DRV_FAILED || t.done_valid != RT_FALSE)
@@ -1820,8 +1915,39 @@ static void tmc_cfg_selftest(void)
     if (tmc_fx_write_count_of(&fx, TMC_REG_CHOPCONF) ||
         tmc_fx_write_count_of(&fx, TMC_REG_IHOLD_IRUN))
     { rt_kprintf("[TMC-CFG-ST] T11 回读不符后仍写了后续寄存器\n"); pass = 0; }
-    if (fx.ifcnt != 1)
-    { rt_kprintf("[TMC-CFG-ST] T11 IFCNT 应只 +1 (=%d)\n", fx.ifcnt); pass = 0; }
+    if (fx.ifcnt != 1 || fx.rd_gconf != 2)
+    { rt_kprintf("[TMC-CFG-ST] T11 注入未命中回读 (ifcnt=%d rd_gconf=%d 应 1/2)\n",
+                 fx.ifcnt, fx.rd_gconf); pass = 0; }
+    if (t.fail_reg != TMC_REG_GCONF)
+    { rt_kprintf("[TMC-CFG-ST] T11 fail_reg=0x%02X 应为 GCONF\n", t.fail_reg); pass = 0; }
+
+    /* --- T11b(F2c 新增): **基线预读**被污染(GCONF 第 1 次读 bit0 被清) ---
+     * 这条路径读回是发现不了的(读回比的是"我们写下去的值")。可断言的真实保护是:
+     * 安全相关的位(i_scale_analog / pdn_disable)由 tmc_gconf_next 自己强制,
+     * 污染位不会泄漏进写入值 —— 写入值仍必须等于 0x141。 */
+    tmc_fx_reset(&fx); t.state = TMC_DRV_UNCONFIGURED; t.done_valid = RT_FALSE;
+    fx.corrupt_reg = TMC_REG_GCONF; fx.corrupt_nth = 1; fx.corrupt_xor = 0x1u;
+    if (tmc_cfg_apply_ctx(&t, &tmc_cfg_planned) != RT_EOK)
+    { rt_kprintf("[TMC-CFG-ST] T11b 基线 bit0 污染竟导致下发失败\n"); pass = 0; }
+    if (!tmc_fx_find_write(&fx, TMC_REG_GCONF, &v) || v != TMC_CFG_TGT_GCONF)
+    { rt_kprintf("[TMC-CFG-ST] T11b 写入值带上污染位: %08X (应 %08X)\n",
+                 (unsigned)v, (unsigned)TMC_CFG_TGT_GCONF); pass = 0; }
+    if (fx.rd_gconf != 2 || fx.ifcnt != 4)
+    { rt_kprintf("[TMC-CFG-ST] T11b 读序/IFCNT 异常 rd=%d accepted=%d\n",
+                 fx.rd_gconf, fx.ifcnt); pass = 0; }
+
+    /* --- T11c(F2c 新增): 基线预读被污染成 TOFF=0 -> 必须拒绝写 CHOPCONF ---
+     * TOFF=0 会关断所有桥。我们**无法**分辨"芯片真是 0"还是"读被污染", 两种都
+     * 按不可信拒绝(fail closed), 且绝不下发电流档。 */
+    tmc_fx_reset(&fx); t.state = TMC_DRV_UNCONFIGURED; t.done_valid = RT_FALSE;
+    fx.corrupt_reg = TMC_REG_CHOPCONF; fx.corrupt_nth = 1; fx.corrupt_xor = 0x3u;
+    if (tmc_cfg_apply_ctx(&t, &tmc_cfg_planned) == RT_EOK)
+    { rt_kprintf("[TMC-CFG-ST] T11c 基线 TOFF 被污染成 0 竟通过\n"); pass = 0; }
+    if (tmc_fx_write_count_of(&fx, TMC_REG_CHOPCONF) ||
+        tmc_fx_write_count_of(&fx, TMC_REG_IHOLD_IRUN))
+    { rt_kprintf("[TMC-CFG-ST] T11c CHOPCONF 非法基线仍写了\n"); pass = 0; }
+    if (t.fail_reg != TMC_REG_CHOPCONF)
+    { rt_kprintf("[TMC-CFG-ST] T11c fail_reg=0x%02X 应为 CHOPCONF\n", t.fail_reg); pass = 0; }
 
     /* --- T12(新): internal_Rsense=1 -> VREF 模型失效, 必须在任何写之前拒绝 --- */
     tmc_fx_reset(&fx); t.state = TMC_DRV_UNCONFIGURED; t.done_valid = RT_FALSE;
@@ -1832,8 +1958,18 @@ static void tmc_cfg_selftest(void)
     { rt_kprintf("[TMC-CFG-ST] T12 判定前就产生了总线动作 writes=%d opens=%d\n",
                  fx.writes, fx.opens); pass = 0; }
 
-    /* --- T13(新): 运行态门禁每一位都必须挡住(零 open、零写、状态与快照不变) --- */
-    for (i = 0; i < 6; ++i)
+    /* --- T12b(F2c 新增): 基线读被污染成 internal_Rsense=1 -> 同样拒绝且零写 ---
+     * 分辨不了"真是 OTP 位"还是"读被污染", 两种都拒绝(宁可不下发)。 */
+    tmc_fx_reset(&fx); t.state = TMC_DRV_UNCONFIGURED; t.done_valid = RT_FALSE;
+    fx.corrupt_reg = TMC_REG_GCONF; fx.corrupt_nth = 1;
+    fx.corrupt_xor = TMC_GCONF_INTERNAL_RSENSE;
+    if (tmc_cfg_apply_ctx(&t, &tmc_cfg_planned) == RT_EOK)
+    { rt_kprintf("[TMC-CFG-ST] T12b 基线污染成 internal_Rsense=1 竟通过\n"); pass = 0; }
+    if (fx.writes != 0)
+    { rt_kprintf("[TMC-CFG-ST] T12b 拒绝前仍写了 %d 次\n", fx.writes); pass = 0; }
+
+    /* --- T13(F2c 扩到 7 位): 运行态门禁每一位都必须挡住(零 open、零写、状态与快照不变) --- */
+    for (i = 0; i < 7; ++i)
     {
         tmc_fx_reset(&fx);
         t.state = TMC_DRV_UNCONFIGURED; t.done_valid = RT_FALSE;
@@ -1854,8 +1990,11 @@ static void tmc_cfg_selftest(void)
     if (!tmc_fx_apply(&t, &tmc_cfg_planned))
     { rt_kprintf("[TMC-CFG-ST] T13 门禁全通却未能下发\n"); pass = 0; }
 
-    /* --- T14(新): 事务被另一线程占用 -> apply/integrity 都 -RT_EBUSY 且零总线动作 --- */
-    busy = tmc_fx_busy_setup(&t);
+    /* --- T14(新): 事务被另一线程占用 -> apply/integrity 都 -RT_EBUSY 且零总线动作 ---
+     * F2c R06: 辅助线程/信号量建不起来只是 SKIP(不判业务失败), 但**清理未确认**
+     * (worker 没确认退出, IPC 被有意保留)必须判 FAIL —— 不能把测试基础设施自身
+     * 的竞态当成业务行为, 也不能在 worker 还在用的时候删掉 semaphore。 */
+    busy = tmc_fx_busy_setup(&t, &infra_ok);
     if (busy)
     {
         tmc_fx_reset(&fx);
@@ -1866,13 +2005,16 @@ static void tmc_cfg_selftest(void)
         if (fx.opens != 0 || fx.writes != 0)
         { rt_kprintf("[TMC-CFG-ST] T14 busy 期间仍有总线动作 opens=%d writes=%d\n",
                      fx.opens, fx.writes); pass = 0; }
-        tmc_fx_hold_release_wait();
+        if (!tmc_fx_hold_release_wait())
+        { rt_kprintf("[TMC-CFG-ST] T14 FAIL: worker 未确认退出, IPC 已保留(不删)\n");
+          pass = 0; }
         tmc_fx_reset(&fx); t.state = TMC_DRV_UNCONFIGURED; t.done_valid = RT_FALSE;
         if (!tmc_fx_apply(&t, &tmc_cfg_planned))
         { rt_kprintf("[TMC-CFG-ST] T14 锁释放后 apply 仍失败\n"); pass = 0; }
         rt_kprintf("[TMC-CFG-ST] T14 跨线程占用 -> -RT_EBUSY fail closed OK\n");
     }
-    else rt_kprintf("[TMC-CFG-ST] T14 SKIP: 线程/信号量建不起来, 未测跨线程占用\n");
+    else rt_kprintf("[TMC-CFG-ST] T14 SKIP: 线程/信号量不可用, 未测跨线程占用\n");
+    if (!infra_ok) pass = 0;
 
     /* 同线程重入(motor_arm 段内复核依赖): 持有 txn 时 integrity 不得报 busy */
     if (tmc_cfg_txn_take(&t))
@@ -1917,6 +2059,57 @@ static void tmc_cfg_selftest(void)
     if (tmc_cfg_integrity_ctx(&t) != RT_EOK)
     { rt_kprintf("[TMC-CFG-ST] T17 新快照 integrity 未通过\n"); pass = 0; }
 
+    /* --- T20(F2c R03): arm 后芯片断电/复位 -> 复核必须持续拒绝, 重新下发才恢复 ---
+     * motor_start 起转前新加的正是这步复核(F2c R03)。这里在实例上把整条序列跑完:
+     * 下发成功 -> 复核通过 -> 模拟模块断电重上电(寄存器回默认) -> 复核失败且第 5
+     * 门闭合 -> 第二次复核仍失败(不能"第二次就好了") -> 重新下发才能恢复。 */
+    tmc_fx_reset(&fx); t.state = TMC_DRV_UNCONFIGURED; t.done_valid = RT_FALSE;
+    if (!tmc_fx_apply(&t, &tmc_cfg_planned))
+    { rt_kprintf("[TMC-CFG-ST] T20 前置下发未成功\n"); pass = 0; }
+    if (tmc_cfg_integrity_ctx(&t) != RT_EOK)
+    { rt_kprintf("[TMC-CFG-ST] T20 复位前复核竟失败\n"); pass = 0; }
+    fx.gconf = 0x00000101u; fx.chop = 0x15010053u;        /* 模块断电后重上电 */
+    if (tmc_cfg_integrity_ctx(&t) == RT_EOK)
+    { rt_kprintf("[TMC-CFG-ST] T20 芯片复位未被照出\n"); pass = 0; }
+    if (tmc_cfg_ok_for_arm_ctx(&t))
+    { rt_kprintf("[TMC-CFG-ST] T20 复位后第 5 门竟仍放行\n"); pass = 0; }
+    if (tmc_cfg_integrity_ctx(&t) == RT_EOK)
+    { rt_kprintf("[TMC-CFG-ST] T20 第二次复核竟通过(降级不持久)\n"); pass = 0; }
+    t.state = TMC_DRV_UNCONFIGURED; t.done_valid = RT_FALSE;
+    if (!tmc_fx_apply(&t, &tmc_cfg_planned))
+    { rt_kprintf("[TMC-CFG-ST] T20 重新下发未能恢复\n"); pass = 0; }
+    if (!tmc_cfg_ok_for_arm_ctx(&t))
+    { rt_kprintf("[TMC-CFG-ST] T20 重新下发后仍不容许 arm\n"); pass = 0; }
+    rt_kprintf("[TMC-CFG-ST] T20 复位->持续拒绝->重新下发恢复 OK\n");
+
+    /* --- T21(F2c R02): 执行器锁不可用 -> 写/复核/arm 判定全部拒绝 ---
+     * 这是"rt_mutex_init 失败"或"内核未就绪"的形状。旧实现在这种情况下反而当
+     * 成"没有并发, 放行", 正好违反 fail-closed。 */
+    {
+        tmc_cfg_ctx_t u;
+        tmc_fx_t ux;
+
+        tmc_fx_reset(&ux);
+        if (tmc_cfg_ctx_init(&u, &tmc_cfg_bus_fake, tmc_fx_gate, &ux,
+                             "tfxCgL2", "tfxCgT2") == RT_EOK)
+        {
+            tmc_cfg_ctx_detach(&u);           /* 只留下"锁不可用"这个状态 */
+            u.state = TMC_DRV_CONFIGURED;     /* 假装以前成功下发过 */
+            u.done_valid = RT_TRUE;
+            if (tmc_cfg_apply_ctx(&u, &tmc_cfg_planned) != -RT_ENOSYS)
+            { rt_kprintf("[TMC-CFG-ST] T21 无锁实例竟允许 apply\n"); pass = 0; }
+            if (tmc_cfg_integrity_ctx(&u) != -RT_ENOSYS)
+            { rt_kprintf("[TMC-CFG-ST] T21 无锁实例竟允许复核\n"); pass = 0; }
+            if (tmc_cfg_ok_for_arm_ctx(&u))
+            { rt_kprintf("[TMC-CFG-ST] T21 无锁实例竟容许 arm\n"); pass = 0; }
+            if (ux.opens != 0 || ux.writes != 0)
+            { rt_kprintf("[TMC-CFG-ST] T21 无锁实例仍产生了总线动作(%d/%d)\n",
+                         ux.opens, ux.writes); pass = 0; }
+            rt_kprintf("[TMC-CFG-ST] T21 锁不可用 -> ENOSYS 拒绝, 第 5 门闭合 OK\n");
+        }
+        else rt_kprintf("[TMC-CFG-ST] T21 SKIP: 第二个局部实例建不起来\n");
+    }
+
     /* --- T18(新, P1-C 证明): 整轮自测必须没碰过生产实例 --- */
     tmc_prod_probe(&probe_after);
     if (!tmc_prod_probe_same(&probe_before, &probe_after))
@@ -1942,7 +2135,7 @@ static void tmc_cfg_selftest(void)
 
     tmc_cfg_ctx_detach(&t);
 
-    rt_kprintf("[TMC-CFG-ST] %s (T1..T19, 假总线局部实例, 未访问 uart2)\n",
-               pass ? "ALL PASS" : "FAILED");
+    rt_kprintf("[TMC-CFG-ST] %s (T1..T21, 假总线局部实例, 未访问 uart2;"
+               " T14 允许 SKIP, 其余必须成立)\n", pass ? "ALL PASS" : "FAILED");
 }
 MSH_CMD_EXPORT(tmc_cfg_selftest, offline fake-bus drive config state machine selftest);

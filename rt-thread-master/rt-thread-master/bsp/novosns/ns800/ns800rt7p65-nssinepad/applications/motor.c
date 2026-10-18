@@ -62,10 +62,29 @@
 #define MOTOR_DEFAULT_DECEL 2000u
 #define MOTOR_MAX_HZ        20000u
 
-/* F2b P1-E: 运行期驱动配置复核周期。只在 armed 时才会产生 UART 流量, 且上限固定
- * (200ms 一次, 每次两段可读寄存器回读), 不会挤占斜坡节拍。 */
+/* F2b P1-E: 运行期驱动配置复核周期。只在 armed 时才产生 UART 流量。
+ *
+ * ⚠ F2c R05 —— 200ms 是**复核周期**, 不是停机时延, 两者不能混为一谈:
+ *   1) 检测延迟最坏 = 周期 200ms + 本轮复核耗时。复核 = 2 次可读寄存器回读,
+ *      每次上限 TMC_REPLY_TIMEOUT_MS=100ms(内部 2ms 轮询), 故一轮复核 ≤ ~205ms,
+ *      合计最坏 ≈ **405ms** 才可能触发作出反应(不含调度抖动)。
+ *   2) 复核跑在斜坡线程(prio 8, 栈 MOTOR_THREAD_STACK=768B)内, 期间 10ms 节拍被
+ *      阻塞, STEP 仍以最后设置的频率继续输出(PWM 硬件自由运行) —— 复核失败之前
+ *      脉冲不会停。栈余量与真实阻塞时长均未上板实测(NOT TESTED)。
+ *   3) 判定为停机后的动作是**立即**的: rt_pwm_disable + DRV_ENABLE 写 LOW 并回读,
+ *      不经斜坡; 但 rt_pwm_disable 的返回值当前未判定, ENN 端电平也未实测。
+ *   4) 因此: 软件守卫是第二层, 最终切断必须由独立硬件(ENN/急停链)承担; 硬件链
+ *      未验收期间 motor 根本不能 armed, 这条路径实际不可达。
+ *   5) 是否把 UART 守卫从斜坡线程解耦(独立低优先级线程 + 事件传递):**待上板实测
+ *      复核阻塞时长与栈占用之后再决定**, 不在没有测量的情况下先改结构。
+ *   ❌ 任何材料都不得写"200ms 内必停"。 */
 #define MOTOR_DRV_GUARD_PERIOD_MS 200u
 #define MOTOR_DRV_GUARD_TICKS  (MOTOR_DRV_GUARD_PERIOD_MS / MOTOR_RAMP_PERIOD_MS)
+
+/* 守卫周期必须大于一个斜坡节拍, 否则每次 10ms 节拍都会跑一段 UART 复核(把节拍
+ * 拖成阻塞式)。周期被改成小于 20ms 时这里直接编译失败, 和 tmc2209.c 的寄存器
+ * 断言同一套路 —— 写错不会报错的配置项就用编译期钉住。 */
+typedef char mot_guard_ticks_sane[(MOTOR_DRV_GUARD_TICKS >= 2u) ? 1 : -1];
 
 static struct rt_device_pwm *mot_pwm = RT_NULL;
 static rt_bool_t mot_dev_ok = RT_FALSE;
@@ -593,6 +612,7 @@ rt_err_t motor_start(void)
 {
     rt_uint8_t armed, has_target;
     rt_uint32_t bad;
+    rt_err_t te;
 
     if (step_pwm_output_active())
     {
@@ -610,8 +630,7 @@ rt_err_t motor_start(void)
     if (!has_target) { rt_kprintf("[MOT] start REFUSED: target_hz=0\n"); return -RT_EPERM; }
 
     /* F2b P1-E: arm 与 start 之间驱动配置可能已经失联/被复位打掉(第 5 门重新闭合),
-     * 起转前重新求值五门。第 5 门用的是纯状态判定(不产生 UART 流量), 真正的实值
-     * 复核由斜坡线程的周期守卫负责。 */
+     * 起转前重新求值五门。第 5 门用的是纯状态判定(不产生 UART 流量)。 */
     bad = motor_get_gate_fail_mask();
     if (bad)
     {
@@ -623,6 +642,30 @@ rt_err_t motor_start(void)
     if (tmc2209_get_health() == SUBSYS_FAILED)
     {
         rt_kprintf("[MOT] start REFUSED: TMC 链路 FAILED(无法确认驱动配置)\n");
+        (void)safety_post_event(EVT_SOFT_FAULT);
+        return -RT_EPERM;
+    }
+
+    /* F2c R03: 上面两道都还是**软件状态**判定。arm 之后 TMC 模块断电/复位再恢复
+     * UART 时, 软件 CONFIGURED 可以仍然是 TRUE(只有实值回读才能照出来), 于是
+     * motor_start 会带着芯片里的默认电流档进入 RUN 并输出 STEP, 一直等到下一次
+     * armed 周期守卫才发现。起转前必须在配置事务内做一次芯片实值复核。
+     * ⚠ 这缩小了窗口但消不掉它(微秒级复位竞争仍然在), 最终切断必须由独立的
+     *   ENN/急停硬件承担 —— 见本文件头的 R05 记录。 */
+    te = tmc2209_cfg_txn_begin();
+    if (te != RT_EOK)
+    {
+        rt_kprintf("[MOT] start REFUSED: 配置事务不可用/被占用(%d),"
+                   " 此刻无法复核芯片实值\n", (int)te);
+        return te;
+    }
+    te = tmc2209_config_integrity_check();          /* 同线程重入, 不会自锁 */
+    tmc2209_cfg_txn_end();
+    if (te != RT_EOK)
+    {
+        rt_kprintf("[MOT] start REFUSED: 芯片配置实值复核未通过(%d)"
+                   " - 可能已断电/复位/重连, 需重新 apply + arm\n", (int)te);
+        mot_print_gate_fail(motor_get_gate_fail_mask());
         (void)safety_post_event(EVT_SOFT_FAULT);
         return -RT_EPERM;
     }
@@ -834,18 +877,51 @@ static void motor_drv_guard_selftest(void)
             out.busy_streak != t[i].streak) pass = 0;
     }
 
-    /* 生产链路的接线检查: 判定的输入来自第 5 门与复核接口本身。 */
+    /* F2c R04: 本自测**只**做纯判定。判定的两个输入接口在这里做"无副作用自洽"
+     * 检查(两者都不碰总线): 第 5 门放行必须同时存在有效快照。
+     * ⚠ 绝不调用 tmc2209_config_integrity_check() —— 它会真读 GCONF/CHOPCONF,
+     *   并且失败会把生产配置状态打成 FAILED(复审 R04 指出的污染)。生产链路的实
+     *   值巡检已拆到独立命令 motor_drv_guard_probe。 */
     cfg_ok = tmc2209_drive_config_ok_for_arm();
-    rt_kprintf("[MOT-GUARD] 生产状态: drive_config_ok=%s, integrity=%d, gate mask=0x%X\n",
-               cfg_ok ? "YES" : "NO", (int)tmc2209_config_integrity_check(),
-               (unsigned)motor_get_gate_fail_mask());
+    rt_kprintf("[MOT-GUARD] 纯判定自测: drive_config_ok=%s, gate mask=0x%X,"
+               " write-gate mask=0x%X (本命令不产生任何 UART 流量)\n",
+               cfg_ok ? "YES" : "NO", (unsigned)motor_get_gate_fail_mask(),
+               (unsigned)tmc2209_get_write_gate_mask());
     if (cfg_ok && !tmc2209_get_applied_config(RT_NULL, RT_NULL, RT_NULL))
     { rt_kprintf("[MOT-GUARD] arm 放行却无有效快照(判定不自洽)\n"); pass = 0; }
 
-    rt_kprintf("[MOT-GUARD] %s (纯判定, 未停过任何真实输出)\n",
+    rt_kprintf("[MOT-GUARD] %s (G1..G10 纯判定, 未碰硬件、未改生产状态)\n",
                pass ? "ALL PASS" : "FAILED");
 }
 MSH_CMD_EXPORT(motor_drv_guard_selftest, offline truth table for the runtime drive-config guard);
+
+/* ---------- F2c R04: 生产链路实值巡检(与纯真值表自测分开) ----------
+ * ⚠ 本命令会真实读 GCONF/CHOPCONF(产生 UART 流量); 若复核不过, 生产配置状态会被
+ *   打成 FAILED, 第 5 门随之闭合 —— 这是**期望行为**(失联就该被照出来), 但它是
+ *   有副作用的动作, 所以不放进"纯软件"自测里。 */
+static void motor_drv_guard_probe(void)
+{
+    rt_err_t e;
+
+    rt_kprintf("[MOT-PROBE] 生产驱动配置巡检: 会真实读芯片寄存器, 失败将使配置降级为 FAILED\n");
+    rt_kprintf("[MOT-PROBE] state=%s ok_for_arm=%s health=%s gate mask=0x%X"
+               " write-gate mask=0x%X\n",
+               tmc_drv_cfg_state_name(tmc2209_get_config_state()),
+               tmc2209_drive_config_ok_for_arm() ? "YES" : "NO",
+               subsys_health_name(tmc2209_get_health()),
+               (unsigned)motor_get_gate_fail_mask(),
+               (unsigned)tmc2209_get_write_gate_mask());
+    e = tmc2209_config_integrity_check();
+    rt_kprintf("[MOT-PROBE] integrity=%d (0=OK, -EPERM=未CONFIGURED/快照作废,"
+               " -EIO=实值不符或读不到, -EBUSY=事务占用, -ENOSYS=锁不可用)\n", (int)e);
+    if (e != RT_EOK)
+        rt_kprintf("[MOT-PROBE] 复核后 state=%s, gate mask=0x%X\n",
+                   tmc_drv_cfg_state_name(tmc2209_get_config_state()),
+                   (unsigned)motor_get_gate_fail_mask());
+    rt_kprintf("[MOT-PROBE] 守卫计数: stops=%u last_reason=%u\n",
+               (unsigned)mot.guard_stops, (unsigned)mot.guard_reason);
+}
+MSH_CMD_EXPORT(motor_drv_guard_probe, inspect live TMC drive config (reads the chip));
 
 /* ---------- Fix A / A10: Motor MSH 表面(全部只走正式 API) ---------- */
 

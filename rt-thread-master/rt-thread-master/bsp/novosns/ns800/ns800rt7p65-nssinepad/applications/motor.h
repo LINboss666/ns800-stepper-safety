@@ -21,9 +21,11 @@
  *
  * 斜坡: 线性 current_hz → target_hz，accel_hz_s/decel_hz_s 可调，10ms 节拍。
  *
- * 运行期驱动配置守卫(F2b P1-E): armed 期间按固定周期上限复核 TMC 配置完整性,
- * 失联/复位/配置丢失 → 立即停 STEP + 请求 DRV_ENABLE LOW(回读确认) + FAULT +
- * EVT_SOFT_FAULT。这是软件层的第二道响应, 不替代也不延迟硬件独立切断。
+ * 运行期驱动配置守卫(F2b P1-E / F2c R03·R05): armed 期间按固定周期(200ms)复核
+ * TMC 配置完整性, 失联/复位/配置丢失 → 停 STEP + 请求 DRV_ENABLE LOW(回读确认) +
+ * FAULT + EVT_SOFT_FAULT; motor_start 起转前额外持配置事务做一次芯片实值复核。
+ * ⚠ 这是软件层第二响应, 检测延迟最坏 ≈ 周期 + 一轮复核(≈400ms 量级, 未上板实测),
+ *   不能当作停机时延指标, 也不能替代硬件独立切断。详见 motor.c 的 R05 记录。
  */
 #ifndef MOTOR_H
 #define MOTOR_H
