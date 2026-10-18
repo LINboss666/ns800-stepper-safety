@@ -199,6 +199,16 @@ UV4 -b 编译（0 错误）→ UV4 -f 烧录 → pyocd 复位 → COM5 串口读
 > 只清理本工具自己写过哨兵文件的目录。（勘误：R3 曾写"一律在仓外"，但当时 `build_and_run.sh`
 > 的默认 `OUT_DIR` 仍是仓内 `tests/host/_out` —— 该默认值已在 R4 改为仓外。）
 
+> **2026-10-19 收口**：ChatGPT Work 对 `32f3a416bdf8c20e96d3ae41f314c236c96b5d61` 给出
+> **`SOFTWARE_REVIEW_GO`（限定软件与主机验证工具范围）**，F2d + R1–R4 的工具修复循环结束；
+> 结论细节与必须保留的 5 条限制见 `开发进度.md` 同日小节。**这不改变上表任何真机状态**：
+> 依赖外部硬件的项仍是 HARDWARE-PENDING / NOT TESTED，三道硬件宏仍 `RT_FALSE`。
+> 下一步的**板级安全链验收方案**（优先 RISK-04）已成文为草案：
+> [`reports/plans/phase8-safety-chain-acceptance-draft.md`](../../../../../../reports/plans/phase8-safety-chain-acceptance-draft.md)，
+> 状态 `DRAFT` / `NOT EXECUTED` / 待独立审查与用户执行授权；其中 L0–L3 每一层的执行状态都是
+> `NOT EXECUTED`，写下来不等于风险关闭，也不授权烧录、复位、串口、接线、通断电测量、
+> 真实寄存器写入或运动试验。
+
 ## 7. 安全红线（任何修改不得违反）
 
 1. UART1 (PA12/13) 永远是 console；TMC 只用 UART2 (PB6/PB7)

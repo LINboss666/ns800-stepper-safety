@@ -1,0 +1,118 @@
+{
+  "task_id": "phase8-f2d-closeout-safety-plan",
+  "title": "F2d 软件收口（SOFTWARE_REVIEW_GO）+ 板级安全链验收方案草案",
+  "nature": "文档更新与方案设计; 不启动 F2e/F3, 不是新一轮工具返修",
+  "recorded_at": "2026-10-19",
+  "branch": "phase8/tmc-drive-config",
+  "review_subject_sha": "32f3a416bdf8c20e96d3ae41f314c236c96b5d61",
+  "this_round_doc_commit_sha": "（不自我引用; 推送后在交付消息给出）",
+  "review_verdict_recorded": "SOFTWARE_REVIEW_GO（限定软件与主机验证工具范围）, F2d+R1-R4 工具修复循环收口, 无新增返修项",
+  "verdict_source": "用户转交的 ChatGPT Work 复审结论（本 Agent 未看到完整聊天, 不虚构报告 URL）",
+  "frozen_objects_untouched": {
+    "main": "1b3757eec550802a3973e66790af422d81d3d373",
+    "phase7_docs_branch": "6d3fbc559d45673d7550eb73dec5a4ade5bb34df",
+    "board_tag": "097935fec5a6f2467261ab1ad449ff0b1d398250"
+  },
+  "allowed_paths_only": {
+    "changed_files": [
+      "reports/agent_handoffs/phase8-f2d-closeout-safety-plan.json",
+      "reports/agent_handoffs/phase8-f2d-closeout-safety-plan.md",
+      "reports/plans/phase8-safety-chain-acceptance-draft.md",
+      "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/README.md",
+      "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/开发进度.md",
+      "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/待办事项.md"
+    ],
+    "count": 6,
+    "outside_allowed_paths": []
+  },
+  "production_untouched": {
+    "files": [],
+    "count": 0
+  },
+  "macros_still_false": {
+    "MOTOR_HARDWARE_ENABLE_PATH_VALIDATED": "RT_FALSE",
+    "STEP_DIAG_ISOLATED_ENV_CONFIRMED": "RT_FALSE",
+    "TMC_DRIVE_CONFIG_HW_VALIDATED": "RT_FALSE"
+  },
+  "checks": {
+    "baseline_matches_remote": true,
+    "worktree_clean_at_start_of_round": true,
+    "untracked_new_files_now": 3,
+    "git_diff_check_clean": true,
+    "plan_file_exists": true,
+    "relative_link_from_bsp_resolves": true,
+    "risk_numbering_consistent": [
+      "RISK-03",
+      "RISK-03a",
+      "RISK-04"
+    ],
+    "identity_local": "237816241+LINboss666@users.noreply.github.com",
+    "reran_host_chain": false,
+    "ran_keil": false
+  },
+  "not_executed": [
+    "草案 L0 只读资料核对",
+    "L1 断电检查",
+    "L2 无电机无 STEP 板级上电检查",
+    "L3 停机时延测量准备",
+    "RISK-04 闭环",
+    "RISK-03/03a 上界证明",
+    "全部真机项 (NOT TESTED)"
+  ],
+  "limits_preserved": [
+    "哈希清单只覆盖 tests/host 的 14 个文件, 不是全仓或 reports 的哈希证明",
+    "MSYS 目录软链/junction 落点识别未被证明, 哨兵只降低误删风险",
+    "Keil 证据是 F2d-R2 历史构建日志, 不是新构建",
+    "RISK-03/03a/04 继续开放; 历史真机结果不被抹去也不算本轮结果",
+    "不授权烧录/复位/串口/接线/通断电测量/真实寄存器写入/运动试验"
+  ],
+  "open_questions_in_draft": [
+    "与门位号 U5 与 U9 冲突未解, 急停非门无位号, Q1/R10/3V3 上拉无仓库内依据",
+    "板版本自相矛盾: PHASE8:5 称当前为 RevA, :38-40 称 RevA 是旧板、现用新扩展板",
+    "原理图/网表不在仓库 (README.md:32 引用的 RevA 方案文档缺失)",
+    "TMC_ENN 约 0V 缺测量点/仪器/日期表, 只能按历史断言处理",
+    "IO70 语义冲突: 源码只把 IO70/GPIO70 用于 PC.6 急停, README 点名冲突但无解释",
+    "H2 在仓库内从未定义 (README:110 与 tmc2209 注释写 'H2 限位未接')",
+    "急停/限位物理极性从未通断实测: NOT CONFIRMED, Safety IRQ gate CLOSED",
+    "待办事项:45 的 on-target 冒烟条目已过期 (PHASE7_PROGRESS:172 记 2026-09-25 完成) — 只登记不改写",
+    "无示波器/逻辑分析仪则 L2 的 D1-D3 与 L3 时延无法形成有效证据"
+  ],
+  "materials_needed_from_user": [
+    "现板版本与原理图/网表 (或缺 BOM+逻辑器件型号与接线, 或同意以实测重建真值表)",
+    "与门/非门实际位号与型号、Q1 型号与接线、R10 与 3V3 上拉参数",
+    "TMC2209 数据手册中 ENN 有效电平条目的版号与页码",
+    "仪器条件: 示波器/逻辑分析仪是否可用, 万用表型号",
+    "急停与限位实际接线形式 (NC/NO)",
+    "断电检查与无电机上电检查各自何时授权"
+  ],
+  "hard_boundary": {
+    "hardware_actions_executed": false,
+    "flashed": false,
+    "reset": false,
+    "com5_touched": false,
+    "tmc_rw_sent": false,
+    "motor_connected": false,
+    "step_output": false,
+    "poweron_measure": false,
+    "poweroff_measure": false,
+    "rewire": false,
+    "macros_flipped": false,
+    "gates_changed": false,
+    "zip_delivered": false,
+    "force_push": false,
+    "history_rewritten": false,
+    "rules_or_allowlist_changed": false
+  },
+  "stop_point": "文档与草案 push + 远端回读后 STOP; 等 ChatGPT 独立审查草案与用户补材料; 不自动执行方案",
+  "files": {
+    "plan_draft": "reports/plans/phase8-safety-chain-acceptance-draft.md",
+    "handoff_md": "reports/agent_handoffs/phase8-f2d-closeout-safety-plan.md",
+    "handoff_json": "reports/agent_handoffs/phase8-f2d-closeout-safety-plan.json",
+    "stage_docs_updated": [
+      "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/README.md",
+      "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/开发进度.md",
+      "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/待办事项.md"
+    ]
+  },
+  "next_step_owner": "用户决定: 补材料 / 让草案过独立审查 / 分别授权 L1、L2"
+}
