@@ -74,12 +74,12 @@ case "$cmd" in
         echo "FATAL: 找不到引用 $rev"; exit 4; }
     ok=0; bad=0; miss=0
     while IFS= read -r line; do
+        # 只吃 blob 段: 遇到"另列的工作树哈希"段就停, 否则会把工作树值当 blob 值验出假失配
+        case "$line" in *worktree-bytes*) echo "(下面的工作树哈希段不参与远端校验)"; break ;; esac
         case "$line" in
         ''|\#*) continue ;;
         esac
         h="${line%%  *}"; p="${line#*  }"
-        # 只吃 blob 段: 遇到另列的工作树段就停
-        case "$h" in ---*) break ;; esac
         [ ${#h} -eq 64 ] || continue
         if ! git_b cat-file blob "$rev:$p" > /dev/null 2>&1; then
             printf 'MISSING  %s\n' "$p"; miss=$((miss+1)); continue

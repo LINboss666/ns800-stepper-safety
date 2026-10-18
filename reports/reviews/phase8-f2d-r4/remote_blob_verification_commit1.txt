@@ -1,0 +1,12 @@
+# 远端 blob 逐项复验 —— 对 F2d-R4 第一个提交
+# 时间(UTC): 2026-10-18T16:20:56Z
+# 被验引用: origin/phase8/tmc-drive-config = 3d1b9a08ec1dfd735ae79f51253f205278fdfa81 (git fetch 后的远端提交对象)
+# 被验清单: reports/reviews/phase8-f2d-r4/source_hashes.txt (该提交内版本, 由索引 blob 生成)
+# 命令: bash tests/host/make_source_manifest.sh --verify origin/phase8/tmc-drive-config reports/reviews/phase8-f2d-r4/source_hashes.txt
+
+(下面的工作树哈希段不参与远端校验)
+VERIFY rev=origin/phase8/tmc-drive-config : OK=14 MISMATCH=0 MISSING=0
+verify_exit=0
+
+# 说明: 清单只对 tests/host/* 的 blob 字节求哈希; 工作树字节不同的文件(本轮 1 个,
+# probe_errcodes.c 的 CRLF/LF)另列在清单尾部且不参与远端校验。
