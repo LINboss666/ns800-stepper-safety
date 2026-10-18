@@ -1,0 +1,14 @@
+# 远端 blob 逐项复验 —— 对 F2d-R4 第二个提交（当前远端最新）
+# 时间(UTC): 2026-10-18T16:21:36Z
+# 被验引用: origin/phase8/tmc-drive-config = 4a693668f8733b71ef62f4ac7c55843f4c78de6c
+# 命令: bash tests/host/make_source_manifest.sh --verify origin/phase8/tmc-drive-config reports/reviews/phase8-f2d-r4/source_hashes.txt
+# 说明: 清单由修正后的 make_source_manifest.sh 从**索引 blob** 重出, 覆盖 tests/host 全部 14 个文件
+#       (含第 2 步里自身被修改的 make_source_manifest.sh), 因此本文件是对第 2 个提交的闭环。
+
+(下面的工作树哈希段不参与远端校验)
+VERIFY rev=origin/phase8/tmc-drive-config : OK=14 MISMATCH=0 MISSING=0
+verify_exit=0
+
+# 索引侧与远端侧结果分别记录:
+#   提交 1 (3d1b9a08) -> remote_blob_verification_commit1.txt : OK=14 MISMATCH=0 MISSING=0
+#   提交 2 (4a69366) -> 本文件

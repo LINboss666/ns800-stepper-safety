@@ -1,0 +1,157 @@
+{
+  "phase": "Phase 8-F2d-R4",
+  "title": "工作目录保护前置 + 哈希清单字节语义纠正",
+  "recorded_at": "2026-10-19",
+  "review_status": "本地自检通过, 等待 ChatGPT Work 独立复审; 不进入 F2e/F3",
+  "delivery": "GitHub 分支交付, 不生成 ZIP",
+  "branch": "phase8/tmc-drive-config",
+  "baseline_commit": "8edfd8b86d7793230fb7bcdf448b1211a0632ef5",
+  "final_commit_note": "本报告在提交之前生成, 不自我引用最终 SHA; 最终 full SHA 见推送后的交付消息",
+  "remote_readback": {
+    "refs/heads/main": "1b3757eec550802a3973e66790af422d81d3d373",
+    "refs/heads/phase7/full-embedded-software": "6d3fbc559d45673d7550eb73dec5a4ade5bb34df",
+    "refs/heads/phase8/tmc-drive-config": "4a693668f8733b71ef62f4ac7c55843f4c78de6c",
+    "refs/tags/v0.7-phase7-software-board-validated": "097935fec5a6f2467261ab1ad449ff0b1d398250"
+  },
+  "commit_sequence": [
+    {
+      "seq": 1,
+      "sha": "3d1b9a08ec1dfd735ae79f51253f205278fdfa81",
+      "content": "守卫前置 + 哨兵式删除 + 沙盒回归 + blob 清单工具 + R4 证据与阶段文档"
+    },
+    {
+      "seq": 2,
+      "sha": "4a693668f8733b71ef62f4ac7c55843f4c78de6c",
+      "content": "修正 --verify 的分段边界(会把另列的工作树哈希段当成 blob 验出假失配), 用修正后的工具重出清单"
+    },
+    {
+      "seq": 3,
+      "sha": "（本报告所在提交; 不自我引用）",
+      "content": "两个提交的远端 blob 复验结果 + 本交接记录"
+    }
+  ],
+  "manifest_verification": {
+    "against_commit1": "OK=14 MISMATCH=0 MISSING=0 (remote_blob_verification_commit1.txt)",
+    "against_commit2": "OK=14 MISMATCH=0 MISSING=0 (remote_blob_verification_commit2.txt)"
+  },
+  "scope": {
+    "applications_changed": 0,
+    "keil_project_changed": 0,
+    "allowed_paths": [
+      "tests/host/",
+      "reports/",
+      "BSP 阶段文档"
+    ]
+  },
+  "R3-NEW-01": {
+    "problem": "run_negatives.sh 先 rm -rf 工作目录再做仓内检查; 复审在独立沙盒复现'入口返回 4 但标记文件已被删'",
+    "fix": [
+      "三个入口共用 env.sh::require_outside_repo, 在任何 rm/mkdir/重定向/编译之前规范化并验证路径",
+      "拒绝: 空值(不静默改用默认)、文件系统根、仓库根、仓内子目录、包含仓库的祖先目录",
+      "按目录成分比较而非字符串前缀(同前缀兄弟目录不误拒); 处理 . 与 ..; cygpath 转换; Windows 大小写不敏感",
+      "build_and_run.sh 默认 OUT_DIR 从仓内 tests/host/_out 改为仓库外",
+      "只删本工具写过哨兵 .ns800_host_work 的目录(工作区与各用例输出目录都适用), 无哨兵即拒绝 rm 并保留内容"
+    ],
+    "platform_limit": "本机 MSYS 把目录软链表现为普通目录(test -L 为假, realpath/pwd -P 不解析), 因此不声称词法守卫覆盖'经由链接绕回仓内'; 实际保护为哨兵式删除, 回归里如实打印 [NOTE]",
+    "regression": "tests/host/test_path_guard.sh: 只在新建的一次性沙盒(内含假 git 仓库与 KEEP 标记)里跑",
+    "regression_summary": "结果: PASS=34 FAIL=0"
+  },
+  "R3-NEW-02": {
+    "problem": "R3 清单本机 11/11 但远端实校 10/11; probe_errcodes.c 是工作树 CRLF(1062B) vs 远端 blob LF(1030B) 的字节语义差异",
+    "fix": [
+      "新增 tests/host/make_source_manifest.sh: 清单字节语义 = Git blob 原始字节(从索引取)",
+      "工作树字节不同则另列一段并加标签, 不作为校验对象",
+      "推送后用 --verify origin/<分支> <清单> 对远端提交对象逐项复算, 索引/远端结果分别报告"
+    ],
+    "retraction": "撤回'probe_errcodes.c 与 R2 原工件逐字节相同'; 正确表述为 CRLF 规范化为 LF 后一致; host_main.c 与两份 shim 仍逐字节相同",
+    "not_a_finding": "非探针逻辑变化, 非生产驱动缺陷"
+  },
+  "results": {
+    "normal_V1": "HOST TEST SUMMARY: CHECK_PASS=25 CHECK_FAIL=0 BAD_SELFTEST=0 MISSING_CASE=0",
+    "normal_V2": "HOST TEST SUMMARY: CHECK_PASS=22 CHECK_FAIL=0 BAD_SELFTEST=0 MISSING_CASE=0",
+    "neg_cases": {
+      "rows": 13,
+      "OK": 13,
+      "NOT-DETECTED": 0,
+      "INFRA-FAIL": 0
+    },
+    "meta": {
+      "M1_blinded_fd7b": "META-OK",
+      "M1_control_unblinded": "CONTROL-OK",
+      "M2_stubbed_compile": "META-OK",
+      "M2_control_real_compiler": "CONTROL-OK",
+      "M3_runner_exit_zero_lost": "META-OK",
+      "M3_control_unmodified": "CONTROL-OK",
+      "M4_selection_semantics": "META-OK",
+      "M5_wrong_reason_guard": "META-OK"
+    },
+    "path_guard": {
+      "pass": 34,
+      "fail": 0
+    },
+    "m3_reason_line": "INFRA-FAIL | N1_only_V1_injected_fail | rc 真实=0 自报=1 期望=1 | V1=RAN/0/1 V2=RAN/0/0 (期望 V1=RAN/0/1 V2=RAN/0/0)  runner.proc_rc:期望=1 实际=0  runner.reported_rc:期望=0 实际=1",
+    "rc_ledger_sample": "N1_only_V1_injected_fail\tclass=OK\trunner_proc_rc=1\trunner_reported_rc=1\texpected_rc=1\tV1=RAN/0/1 V2=RAN/0/0",
+    "keil": "本轮未重建(固件与 Keil 工程 0 改动); 沿用 F2d-R2 原始 0 Error/0 Warning 日志并显式标注"
+  },
+  "deviations": [
+    "哨兵规则首次生效时把**上一轮遗留、没有哨兵**的默认工作区判为现场并拒绝删除(整链 rc=4)。这是设计行为而非新缺陷: 人工确认该目录只含本工具产物后删除, 再以新工作区重跑",
+    "M3 场景插线错误(本轮实跑检出): 被复制到仓外的 runner 副本自行 git rev-parse 找不到仓库根, 在写状态回执之前 exit 4, 于是 M3 拿到 '缺 runner_status.txt' 而不是预期的出口码失配。元负例框架按'缺矩阵/空矩阵不得记 META-OK'把这一不合格场景判成 META-LEAK 并整体非零(没有放行), 根因在我方: run_negatives 现在显式把 REPO_ROOT 传给 runner, 修好后 M3 稳定给出 rc 真实=0 自报=1 期望=1 + 两处 runner rc 失配",
+    "test_path_guard.sh 首版有 `local a=1 b=$a` 写法, 同一语句内引用尚未赋值的变量在 set -u 下报 unbound variable; 拆成两条 local 后正常",
+    "env.sh 一次编辑留下悬空 `|| {`(语法错误), 导致守卫函数未定义; 回归里'拒绝原因必须是 GUARD-REJECT' 的断言因此失败, 把这条假拒绝抓了出来 —— 说明断言不能只看退出码",
+    "上一轮记录过的三个通用陷阱仍然有效: patch 回环的临时目录必须在仓库外; core.autocrlf 造成假失配; Windows tar 解不开中文名归档"
+  ],
+  "safety": {
+    "gate_macros": [
+      "MOTOR_HARDWARE_ENABLE_PATH_VALIDATED=RT_FALSE",
+      "TMC_DRIVE_CONFIG_HW_VALIDATED=RT_FALSE",
+      "STEP_DIAG_ISOLATED_ENV_CONFIRMED=RT_FALSE"
+    ],
+    "flashed": false,
+    "board_reset": false,
+    "com5_touched": false,
+    "real_tmc_write": false,
+    "motor_connected": false,
+    "step_output": false,
+    "safety_gates_changed": false,
+    "keil_target_changed": false,
+    "app_or_keil_changed": false,
+    "force_push": false,
+    "history_rewritten": false,
+    "zip_delivered": false,
+    "destructive_tests": "路径删除保护只在新建沙盒里验证, 未拿真实项目目录试"
+  },
+  "not_verified": [
+    "真机 UART 时序/超时",
+    "优先级继承与反转",
+    "motor 线程栈高水位",
+    "守卫物理停机时延上界",
+    "rt_pwm_disable 返回值",
+    "ENN 端电压",
+    "STEP 波形",
+    "真实寄存器读写",
+    "本轮未重建 Keil",
+    "经由目录软链/junction 绕回仓内的词法识别(本机不可见, 由哨兵式删除兜住)"
+  ],
+  "open_risks": [
+    "RISK-03",
+    "RISK-03a",
+    "RISK-04"
+  ],
+  "evidence_paths": [
+    "reports/reviews/phase8-f2d-r4/path_guard_regression.txt",
+    "reports/reviews/phase8-f2d-r4/neg_verdict_matrix.txt",
+    "reports/reviews/phase8-f2d-r4/neg_case_rc_ledger.txt",
+    "reports/reviews/phase8-f2d-r4/normal_v1_summary.txt",
+    "reports/reviews/phase8-f2d-r4/normal_v2_summary.txt",
+    "reports/reviews/phase8-f2d-r4/negatives/",
+    "reports/reviews/phase8-f2d-r4/meta/",
+    "reports/reviews/phase8-f2d-r4/chain_summary.txt",
+    "reports/reviews/phase8-f2d-r4/source_hashes.txt",
+    "reports/reviews/phase8-f2d-r4/remote_blob_verification.txt",
+    "reports/reviews/phase8-f2d-r4/r3_hash_manifest_correction.txt",
+    "reports/reviews/phase8-f2d-r4/keil_rebuild_all_from_r2.txt",
+    "reports/reviews/phase8-f2d-r4/keil_dependency_excerpt_sys_errno.txt",
+    "reports/reviews/phase8-f2d-r4/NOTES.txt"
+  ],
+  "next_step": "等待独立复审; 通过前不进 F2e/F3; 上板与三宏翻转需单独授权"
+}

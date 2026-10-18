@@ -13,8 +13,11 @@
      LF blob）、纠正方式与措辞撤回。
    - `source_hashes.txt` —— 由 `tests/host/make_source_manifest.sh --out` 从**索引 blob** 生成，
      字节语义 = Git blob 原始字节；末尾另列的带标签段落是工作树字节，仅供本地对照，不作校验对象。
-   - `remote_blob_verification.txt` —— 推送之后用 `--verify origin/<分支>` 对**远端提交对象**逐项复算
-     的结果（因先生成后提交，该文件随第二个提交入库，属于预期时序）。
+   - `remote_blob_verification_commit1.txt` / `remote_blob_verification_commit2.txt` —— 推送之后
+     `git fetch` 再用 `--verify origin/<分支> <清单>` 对**远端提交对象**逐项复算的结果，分别对应
+     第 1 个提交（守卫与清单工具主体）与第 2 个提交（校验器分段边界修正 + 用修正后的工具重出的清单）。
+     两次都是 OK=14 / MISMATCH=0 / MISSING=0。清单只覆盖 tests/host，故这些证据文件本身不参与清单，
+     第 3 个提交（远端复验结果 + 交接记录）不会让清单失效。
 5. 脱敏：证据中的工作区绝对路径里的本机用户名统一替换为 `%TEMP%`（纯路径改写；判定内容、计数、
    失败文本一律未改）。原件留在本地工作区可逐字节复核。仓库根 `D:/ns800` 按前几轮惯例保留。
 6. Keil：本轮**未重建**（固件与 Keil 工程相对基线 0 差异），`keil_rebuild_all_from_r2.txt` 是沿用
