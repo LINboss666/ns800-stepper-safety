@@ -1,0 +1,192 @@
+{
+  "task_id": "phase8-safety-plan-doc-fix",
+  "title": "Phase 8 安全链验收草案 v0.2：按独立审查 PLAN-01~PLAN-04 修订 + 纳入原理图文本层",
+  "nature": "documents-only",
+  "recorded_at": "2026-10-19",
+  "branch": "phase8/tmc-drive-config",
+  "baseline_sha": "f52f6374a36847b7e2f719eb1fa6cdab0a85e6dc",
+  "review_subject_sha": "32f3a416bdf8c20e96d3ae41f314c236c96b5d61",
+  "this_round_doc_commit_sha": "given in the delivery message after push (no self-reference)",
+  "review_verdict_recorded": {
+    "software_closeout": "SOFTWARE_REVIEW_GO remains valid; F2d closeout record accepted",
+    "draft_status": "layered framework accepted, but NOT an executable acceptance sheet yet",
+    "rework_scope": "PLAN-01..PLAN-04 document fixes only; NOT a new tool rework round",
+    "source": "user-forwarded ChatGPT Work review (Phase8_Closeout_SafetyPlan_Review_and_Doc_Fixes.md)",
+    "full_conversation_access": false,
+    "fabricated_report_url": false
+  },
+  "frozen_objects_untouched": {
+    "main": "1b3757eec550802a3973e66790af422d81d3d373",
+    "phase7/full-embedded-software": "6d3fbc559d45673d7550eb73dec5a4ade5bb34df",
+    "tag_v0.7-phase7-software-board-validated": "097935fec5a6f2467261ab1ad449ff0b1d398250",
+    "tag_target_firmware": "e40a9b95ef709e6a80444f9f3949dfdd70ba96ba",
+    "changed": false
+  },
+  "allowed_paths_only": {
+    "limit": 6,
+    "count": 6,
+    "files": [
+      "reports/plans/phase8-safety-chain-acceptance-draft.md",
+      "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/README.md",
+      "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/开发进度.md",
+      "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/待办事项.md",
+      "reports/agent_handoffs/phase8-safety-plan-doc-fix.md",
+      "reports/agent_handoffs/phase8-safety-plan-doc-fix.json"
+    ],
+    "outside_allowed_paths": []
+  },
+  "production_untouched": {
+    "diff_target": "f52f6374a36847b7e2f719eb1fa6cdab0a85e6dc",
+    "paths": [
+      "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications",
+      "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/project.uvprojx",
+      "tests/host",
+      "reports/reviews"
+    ],
+    "count": 0
+  },
+  "macros_still_false": {
+    "MOTOR_HARDWARE_ENABLE_PATH_VALIDATED": "RT_FALSE (applications/motor.h:38)",
+    "STEP_DIAG_ISOLATED_ENV_CONFIRMED": "RT_FALSE (applications/motor.h:48)",
+    "TMC_DRIVE_CONFIG_HW_VALIDATED": "RT_FALSE (applications/tmc2209.h:92)"
+  },
+  "checks": {
+    "baseline_head_matches_expected": true,
+    "worktree_clean_before_start": true,
+    "git_diff_check_clean": true,
+    "relative_link_from_bsp_resolves": true,
+    "risk_numbering_consistent": ["RISK-03", "RISK-03a", "RISK-04"],
+    "draft_state_markers": { "NOT_EXECUTED_occurrences": 15, "status": "DRAFT / NOT EXECUTED / 尚非可执行验收单" },
+    "identity_local": "237816241+LINboss666@users.noreply.github.com",
+    "identity_global_touched": false,
+    "private_email_or_username_in_handoff": false,
+    "schematic_pdf_hashed": "7b5d5325d4f73f43da916149d1972e95a048d6138ea83f98476f5d2fd5b05a0f",
+    "schematic_pdf_bytes": 305535,
+    "schematic_pdf_committed": false,
+    "msh_command_surface_diff_vs_frozen": {
+      "method": "git show e40a9b9:.../applications vs HEAD, MSH_CMD_EXPORT set",
+      "head_count": 59,
+      "frozen_count": 53,
+      "only_in_head": ["motor_drv_guard_probe", "motor_drv_guard_selftest", "tmc_cfg_selftest", "tmc_calc_selftest", "tmc_config_apply", "tmc_config_show"],
+      "runtime_selftest_content_diff": "frozen build has no 2e/2f steps (SELFTEST lines 25 vs 32)"
+    }
+  },
+  "schematic_read": {
+    "file": "SCH_Schematic1_2026-10-19.pdf",
+    "title_block": {
+      "board": "NS800_Stepper_Safety_RevA",
+      "sheet": "Schematic1 / P1",
+      "version": "V1.0",
+      "created": "2026-08-16",
+      "updated": "2026-10-19",
+      "tool": "嘉立创EDA"
+    },
+    "method": "self-written content-stream parser (no pdftoppm; poppler lacks Adobe-GB1/UniGB-UCS2-H CMap); 603 positioned text items; net-to-pin association by text adjacency, no netlist, no visual page render",
+    "resolved": {
+      "and_gate": "U5 = QN74LVC1G08DBVR (1=A MCU_DRV_ENABLE, 2=B ESTOP_OK, 3=GND, 4=Y DRV_ENABLE_SAFE, 5=VCC)",
+      "u9": "TMC2209SILENTSTEPSTICK module body, NOT the AND gate (old claim voided)",
+      "estop_inverter": "U13 = SN74LVC1G14DBVR-MS (2=A ESTOP_SENSE, 4=Y ESTOP_OK)",
+      "limit_inverters": ["U12 (LIMIT_MIN)", "U11 (LIMIT_MAX)"],
+      "inverter_transistor": "Q1 = BSS138, gate via R9 1k, R8 100k gate-source pull-down, drain = TMC_ENN",
+      "enn_pull_up": "R10 10k from TMC_ENN to 3V3",
+      "permit_pull_down": "R7 100k between MCU_DRV_ENABLE node and GND",
+      "estop_input_network": "NC contact -> ESTOP_NC -> R6 1k -> ESTOP_SENSE (R5 10k pull-up to 3V3, C7 100nF) -> U13",
+      "enn_to_mcu": "not present on any MCU-side connector in this drawing",
+      "limits_in_hardware_and_gate": false,
+      "h2_definition": "2x6 connector: 1=LIMIT_MIN_OK, 2=LIMIT_MAX_OK, 3=RUN_LED_CTRL, 4=WARN_LED_CTRL, 5=FAULT_LED_CTRL, 6=BUZZER_CTRL, 7=+5V, 8/9=GND"
+    },
+    "confidence": {
+      "definite": ["designators", "part numbers", "pin names/numbers", "net names", "resistor/capacitor values"],
+      "high_confidence_inference": ["double-row header net-to-pin mapping (validated on H7 pin1/pin10 and H2 pin1..6 against two independent user-handover readings)"],
+      "unvalidated": ["H6 module-socket pin mapping (no independent corroboration)", "single-row headers H3/H4/H5/H9/H10", "wire-level connectivity without netlist", "cross-sheet connections"]
+    },
+    "caveat": "board-revision identity vs this RevA drawing is still unconfirmed (X-3); reading a drawing is not a measurement"
+  },
+  "official_reference_added": {
+    "part": "TMC2209",
+    "document": "Datasheet Rev.1.09, 2023-02-16",
+    "enn_polarity": "printed page 9, section 2.2: ENN is an active-low enable input; driving it high turns the power stage off and floats the outputs; a low level alone does not assert torque or motion",
+    "ioin_bit0": "printed page 24, GENERAL CONFIGURATION REGISTERS: IOIN (0x06) bit0 = ENN",
+    "url": "https://www.analog.com/media/en/technical-documentation/data-sheets/TMC2209_datasheet_rev1.09.pdf",
+    "removed_from_user_material_requests": "datasheet page number request"
+  },
+  "plan_fixes": {
+    "PLAN-01": "restored 2026-10-18 handover physical facts as source class [U] with explicit not-independently-measured caveat; withdrew 'IO70 treated as PC.6 estop input'; withdrew 'H2 undefined' (drawing + handover both define it, the board is simply unplugged); added conflict register X-1..X-4, no cherry-picking",
+    "PLAN-02": "D6 rewritten as command side-effect grading table (real UART / state change / GPIO-PWM effect / applicable config state / present in frozen firmware); unauthorized commands marked DEFERRED and excluded from mandatory first-pass static checks; integrity=-EPERM-before-real-read documented, integrity=0 must not be demanded; no new diagnostic entry added",
+    "PLAN-03": "L3 split into detection / decision-request / execution intervals; distribution explicitly cannot prove worst-case bound; unbounded RT_WAITING_FOREVER paths listed; no thread refactor decided",
+    "PLAN-04": "D3 criterion changed to actual TMC_ENN staying on the disabled side; D2 marked BLOCKED_METHOD; C1 historical resistances demoted to historical reference; C4 made a precondition for any estop/limit stimulus, re-test of damaged parts conditioned on the user's repair decision"
+  },
+  "not_executed": {
+    "reran_host_chain": false,
+    "ran_negative_or_meta_cases": false,
+    "ran_path_guard_sandbox": false,
+    "wrote_new_verification_script": false,
+    "ran_keil": false,
+    "flipped_any_macro": false,
+    "modified_safety_gate": false,
+    "modified_pin_naming_or_safety_code": false,
+    "hardware_actions": 0,
+    "flashed": false,
+    "reset": false,
+    "com5_touched": false,
+    "real_tmc_read_or_write": false,
+    "motor_connected": false,
+    "step_output": false,
+    "powered_measurement": false,
+    "unpowered_measurement": false,
+    "wiring_change_or_jumper_or_part_swap": false,
+    "zip_produced": false,
+    "force_push": false,
+    "history_rewritten": false,
+    "merged": false,
+    "executed_any_case_of_the_plan": false
+  },
+  "history_preserved": {
+    "stage_docs": "overlay notes dated 2026-10-19 only; deleted lines are anchor lines authored by this agent on the same day (date lines, one table cell, one own todo item, one README sentence it extends)",
+    "old_failures_and_evidence_removed": false,
+    "software_review_go_revoked": false,
+    "historical_pending_marked_as_passed_in_bulk": false
+  },
+  "open_conflicts": [
+    "X-1 PC.6/IO70: handover says wired to TMC_ENN as feedback, software still names/explains it as estop input, drawing routes neither to the MCU",
+    "X-2 H2: drawing and handover both define the limit/LED/buzzer connector; board is unplugged, so limit protection capability is still 0 (not closed)",
+    "X-3 board revision: drawing says RevA V1.0 updated 2026-10-19 while PHASE8 text calls the in-use board a newer expansion board",
+    "X-4 field readings vs drawing derivation: Q1 gate ~3.3V with TMC_ENN ~0V contradicts the derived table row for permit=0; not adjudicated here"
+  ],
+  "materials_needed_from_user": [
+    "D-1 correspondence between the in-use board and this NS800_Stepper_Safety_RevA / V1.0 drawing",
+    "D-2 netlist / BOM+pin wiring table / legible zoomed screenshot so wire attribution can be verified",
+    "D-3 physical wiring confirmation of PC.6 / IO70 (estop input vs ENN feedback, which terminals)",
+    "D-4 external contact form of estop and limits (NC/NO, connected or not; H2 unplugged)",
+    "D-5 instrument availability (oscilloscope / logic analyzer, multimeter model)"
+  ],
+  "authorization_separated_from_materials": {
+    "L1_unpowered_check": "needs its own authorization",
+    "L2_unmotorized_powered_check": "needs its own authorization",
+    "L3_latency_injection": "needs its own authorization",
+    "one_grant_does_not_cover_others": true,
+    "repair_decision_owner": "user only"
+  },
+  "hard_boundary": {
+    "no_hardware_authorization": true,
+    "plan_describes_future_actions_only": true,
+    "not_entering_F2e_or_F3": true,
+    "no_new_tool_rework_round": true,
+    "schematic_pdf_not_committed": true,
+    "scratch_parser_not_committed": true
+  },
+  "files": {
+    "modified": [
+      "reports/plans/phase8-safety-chain-acceptance-draft.md",
+      "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/README.md",
+      "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/开发进度.md",
+      "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/待办事项.md"
+    ],
+    "added": [
+      "reports/agent_handoffs/phase8-safety-plan-doc-fix.md",
+      "reports/agent_handoffs/phase8-safety-plan-doc-fix.json"
+    ]
+  },
+  "stop_point": "push docs to phase8/tmc-drive-config, read back full SHA with git ls-remote, then STOP and wait for independent review of draft v0.2",
+  "next_step_owner": "ChatGPT Work independent review of v0.2 + user supplying D-1..D-5; no hardware execution authorized"
+}
