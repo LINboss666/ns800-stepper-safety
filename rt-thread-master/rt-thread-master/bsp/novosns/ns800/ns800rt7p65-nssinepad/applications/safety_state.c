@@ -296,7 +296,9 @@ rt_err_t safety_run_selftest(void)
  *   - 实测源 = **本配置的活动保护输入**(限位宏关闭时只剩 DIAG; 限位启用时是反相后的
  *     LIMIT_*_OK, HIGH=安全)。
  *   - PC.6 不作为急停源出现在这里 —— 它是 TMC_ENN 反馈; 清除前必须**另外**确认
- *     最终反馈确实在禁能侧(HIGH)。确认不到就绝不打印"最终禁能已确认", 也不清除。 */
+ *     最终反馈确实在禁能侧(HIGH)。确认不到就绝不打印"最终禁能已确认", 也不清除。
+ *   - IO70-NEW-01: 清除路径最后一次改变许可的动作是 disarm, 因此禁能侧反馈确认
+ *     在 disarm **之前和之后各做一次**, 以后一次为准(坏样本必须参与清除决策)。 */
 static void fault_reset(void)
 {
     struct { const char *name; const char *pin; rt_int32_t safe; } src[] = {
@@ -387,8 +389,30 @@ static void fault_reset(void)
         if (ss_lock_ok) rt_mutex_release(&ss_lock);
         return;
     }
-    rt_kprintf("[SS] motor recovered: state=IDLE, DRV_ENABLE LOW verified,"
-               " ENN feedback on disabled side confirmed\n");
+    /* IO70-NEW-01 (2026-10-21 复审): disarm 是本路径上**最后一次可能改变许可**的动作,
+     * 它自己又会写 LOW 并读一次反馈。上面第 355 行的预检查用的更早的样本, 不能代表
+     * disarm 之后的真实状态 —— 所以这里必须在 disarm 之后再取一次有界确认, 并让它
+     * 参与清除决策。反馈不匹配/样本不可得/仍在过渡 => 保持锁存与非零故障码。
+     * ⚠ 停 STEP 与撤销许可已经由 motor_disarm() 照做, 这里**不**回退那些动作;
+     *   确认只做 `rt_pin_read` + 有界采样, 不递归调用停机或状态机。
+     * 锁序仍是 ss_lock -> (disarm 内部短暂取放 mot_lock), 与 safety_force_shutdown 一致;
+     * 有界窗口 = DRV_FB_TRIES 次 × DRV_FB_SETTLE_MS, 不是时延上界声明。 */
+    {
+        safety_fb_verdict_t fv2 = SAFETY_FB_NO_SAMPLE;
+        rt_err_t fe2 = safety_drv_feedback_confirm(0u, &fv2);
+
+        if (fe2 != RT_EOK)
+        {
+            rt_kprintf("[SS] fault_reset REFUSED: ENN feedback not re-confirmed AFTER"
+                       " disarm (verdict=%s err=%d) - 保持锁存, 不清故障码,"
+                       " 不打印'最终禁能已确认'\n",
+                       safety_fb_verdict_name(fv2), (int)fe2);
+            if (ss_lock_ok) rt_mutex_release(&ss_lock);
+            return;
+        }
+        rt_kprintf("[SS] motor recovered: state=IDLE, DRV_ENABLE LOW verified,"
+                   " ENN feedback on disabled side confirmed (post-disarm re-check)\n");
+    }
 
     ss_fault_code = FAULT_NONE;
     ss_state = SAFETY_MANUAL_CLEAR;

@@ -301,15 +301,21 @@ rt_bool_t safety_protection_ready(void)
         if (pin < 0 || rt_pin_read(pin) != st_inputs[i].safe_level) return RT_FALSE;
     }
 
-    /* 静止(未建立使能请求)时还必须看到 ENN 反馈确实在禁能侧; 已经请求使能时
-     * 这一条**不适用**(否则 arm 之后正常的 ENN LOW 会让 start 永远失败),
-     * 使能侧的一致性由 motor.c 在 arm/start/运行守卫决策点按请求态判定。 */
+    /* ENN 反馈条件按**当前已确认的许可请求侧**判定(IO70-NEW-02, 2026-10-21 复审):
+     *   请求为 LOW / 从未确认 => 期望禁能侧一致(许可 LOW + 反馈 HIGH);
+     *   请求为 HIGH        => 期望使能侧一致(许可 HIGH + 反馈 LOW)。
+     * 原实现是"请求 HIGH 就整个跳过反馈条件", 那会让硬件切断(反馈仍 HIGH)或样本丢失
+     * 时本接口谎报就绪。换成按请求侧取反期望之后, arm 之后正常的 ENN LOW 仍然就绪,
+     * 不再制造 arm->start 阶段死锁, 同时 CUT_BY_HARDWARE / PAD_MISMATCH / NO_SAMPLE
+     * 一律不放行。motor.c 在 arm/start/运行守卫上的同源判定继续独立生效(不依赖此处)。 */
     {
         rt_int32_t req = -1, pad = -1, fb = -1;
         rt_bool_t  fb_ok = RT_FALSE;
+        rt_uint8_t want;
 
         safety_fb_snapshot(&req, &pad, &fb, &fb_ok);
-        if (req != PIN_HIGH && safety_fb_now(0u) != SAFETY_FB_OK) return RT_FALSE;
+        want = (req == PIN_HIGH) ? 1u : 0u;
+        if (safety_fb_now(want) != SAFETY_FB_OK) return RT_FALSE;
     }
     return RT_TRUE;
 }

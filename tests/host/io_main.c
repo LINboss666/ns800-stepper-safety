@@ -77,6 +77,9 @@ static int             chain_lag_left;
 static rt_int32_t      chain_cached = PIN_HIGH;
 static int             flap_toggle;
 static int             pad_stuck;
+/* 一次性注入: 下一次向许可脚写 LOW 时把外部链切成指定模型(模拟"清除路径里
+ * 最后一次许可动作之后反馈才变坏")。-1 = 未布防。 */
+static int             flip_on_low_write = -1;
 
 int  io_dev_find_calls, io_dev_open_calls, io_dev_read_calls, io_dev_write_calls;
 int  io_pwm_set_calls, io_pwm_enable_calls, io_pwm_disable_calls;
@@ -117,6 +120,7 @@ void io_sim_reset(void)
     chain_cached = PIN_HIGH;
     flap_toggle = 0;
     pad_stuck = 0;
+    flip_on_low_write = -1;
     io_dev_find_calls = io_dev_open_calls = io_dev_read_calls = io_dev_write_calls = 0;
     io_pwm_set_calls = io_pwm_enable_calls = io_pwm_disable_calls = 0;
     io_fake_bus_reads = 0;
@@ -178,6 +182,10 @@ int  io_sim_chain_mode(void) { return chain_mode; }
 void io_sim_set_lag(int n)   { chain_mode = IO_CHAIN_LAG; chain_lag_left = n; }
 void io_sim_set_pad_stuck(int on) { pad_stuck = on; }
 void io_sim_fail_attach(const char *n, int times) { int i = pin_find(n); if (i >= 0) pins[i].fail_attach = times; }
+/* 布防一次性注入: 下一次对许可脚写 LOW 时把外部链切成 mode; 切成之后保持该模式
+ * (物理上"坏的就是硬件", 不自动复原)。返回 1 表示仍在等待这次写。 */
+void io_sim_flip_chain_on_disable_write(int mode) { flip_on_low_write = mode; }
+int  io_sim_flip_armed(void) { return flip_on_low_write >= 0 ? 1 : 0; }
 void io_event_clear_counts(void) { int i; for (i = 0; i < 32; ++i) io_event_post_counts[i] = 0; }
 
 /* 使能链模型: 输入是许可焊盘与故障注入模式, 输出是反馈脚应当呈现的电平。
@@ -263,6 +271,14 @@ void rt_pin_write(rt_base_t pin, rt_base_t value)
         pins[pin].level = value;
         if (rt_strcmp(pins[pin].name, PIN_NAME_DRV_ENABLE) == 0 && chain_mode == IO_CHAIN_LAG)
             chain_lag_left = 99;             /* 焊盘一变, 滞后模型重新拖住不跟随 */
+        if (rt_strcmp(pins[pin].name, PIN_NAME_DRV_ENABLE) == 0 &&
+            value == PIN_LOW && flip_on_low_write >= 0)
+        {
+            chain_mode = flip_on_low_write;  /* 一次性: 许可撤销这一刻外部链变坏 */
+            flip_on_low_write = -1;
+            chain_lag_left = 0;
+            flap_toggle = 0;
+        }
     }
     LeaveCriticalSection(&io_lock);
 }
@@ -1045,6 +1061,51 @@ static void cases_host_override_paths(void)
           fm("start rc=%d armed=%d state=%d (must NOT demand ENN HIGH after arm)",
              (int)e, (int)s.armed, (int)s.state));
 
+    /* ---------- IO4c~IO4f: 已建立使能请求时, 保护就绪必须改按**使能侧**判定 ----------
+     * (复审 IO70-NEW-02: 原实现"req==HIGH 就整个跳过反馈条件"是错的, 应当换期望侧。)
+     * 这里用唯一受控写入口建立请求 HIGH 而**不 arm** —— arm 会让斜坡线程每拍的运行守卫
+     * 抢先关断, 破坏"直接读保护就绪 API"的前提; 被测函数本身不取 mot_lock。 */
+    (void)motor_stop();                         /* 先收脉冲, 保持后面用例可控 */
+    (void)motor_disarm();
+    io_sim_set_chain(IO_CHAIN_IDEAL);
+    e = safety_drv_enable_write(1u);            /* 请求 HIGH 且回读确认 */
+    ok = (e == RT_EOK) && safety_protection_ready();
+    CHECK("IO4c-ready_true_on_enabled_side_ideal", ok,
+          fm("write rc=%d protection_ready=%s verdict(enable)=%s",
+             (int)e, safety_protection_ready() ? "YES" : "NO",
+             safety_fb_verdict_name(safety_fb_now(1u))));
+
+    io_sim_set_chain(IO_CHAIN_ESTOP_CUT);       /* 请求 HIGH 但硬件把 ENN 顶在禁能侧 */
+    ok = !safety_protection_ready();
+    CHECK("IO4d-ready_false_when_cut_by_hardware", ok,
+          fm("protection_ready=%s verdict=%s (must be NO)",
+             safety_protection_ready() ? "YES" : "NO",
+             safety_fb_verdict_name(safety_fb_now(1u))));
+
+    io_sim_set_chain(IO_CHAIN_NO_WIRE);         /* 样本不可得同样不得放行 */
+    ok = !safety_protection_ready();
+    CHECK("IO4e-ready_false_when_sample_lost", ok,
+          fm("protection_ready=%s verdict=%s (must be NO)",
+             safety_protection_ready() ? "YES" : "NO",
+             safety_fb_verdict_name(safety_fb_now(1u))));
+
+    io_sim_set_chain(IO_CHAIN_IDEAL);
+    e = safety_drv_enable_write(0u);            /* 回到禁能侧: 仍应就绪 */
+    ok = (e == RT_EOK) && safety_protection_ready();
+    CHECK("IO4f-ready_true_again_after_disable_request", ok,
+          fm("write LOW rc=%d protection_ready=%s verdict(disabled)=%s",
+             (int)e, safety_protection_ready() ? "YES" : "NO",
+             safety_fb_verdict_name(safety_fb_now(0u))));
+
+    /* 恢复 IO4 结束时的前提(armed + 理想链 + 正在运行), 让 IO5/IO6/IO7 照原样继续 */
+    recover_to_ready();
+    open_protection_gate();
+    io_set_cfg_ok(RT_TRUE, TMC_DRV_CONFIGURED);
+    (void)motor_arm();
+    (void)motor_set_direction(1);
+    (void)motor_set_target_hz(500);
+    (void)motor_start();
+
     /* ---------- IO5: 运行中硬件链切断 -> 守卫停机(无 UART 路径) ---------- */
     io_event_clear_counts();
     io_sim_set_chain(IO_CHAIN_ESTOP_CUT);
@@ -1139,6 +1200,88 @@ static void cases_host_override_paths(void)
     CHECK("IO7c-clear_allowed_once_feedback_ideal",
           safety_state_get() == SAFETY_MANUAL_CLEAR,
           fm("state=%s", safety_state_name(safety_state_get())));
+
+    /* ---------- IO7d/IO7e/IO7f: 预检查过了, 但清除路径**最后一次许可动作**(disarm)
+     * 又把反馈读坏 => 必须保持锁存, 不得打印"最终禁能已确认"(复审 IO70-NEW-01)。
+     * 注入点是一次性"向许可脚写 LOW"时切换外部链模型, 因此 fault_reset 里先跑的
+     * safety_drv_feedback_confirm(0) 仍然是 OK —— 坏样本只出现在 disarm 之后。 */
+    io_sim_set_chain(IO_CHAIN_IDEAL);
+    set_ready_state();
+    open_protection_gate();
+    io_set_cfg_ok(RT_TRUE, TMC_DRV_CONFIGURED);
+    (void)motor_arm();
+    (void)motor_set_target_hz(500);
+    (void)motor_start();
+    io_event_clear_counts();
+    (void)io_sim_fire(PIN_NAME_TMC_DIAG, PIN_HIGH);
+    ok = wait_latched(FAULT_TMC_DIAG, 1500);
+    io_sim_set_level(PIN_NAME_TMC_DIAG, PIN_LOW);
+    {
+        int pwm_before = io_pwm_disable_calls;
+        int wr_before  = io_sim_write_calls(PIN_NAME_DRV_ENABLE);
+
+        io_sim_flip_chain_on_disable_write(IO_CHAIN_STUCK_ENABLED);
+        safety_fault_reset_manual();
+        CHECK("IO7d-latch_kept_when_disarm_reads_stuck_enabled",
+              ok && safety_state_get() == SAFETY_FAULT_LATCHED &&
+              safety_fault_get() == FAULT_TMC_DIAG &&
+              io_sim_write_calls(PIN_NAME_DRV_ENABLE) > wr_before &&
+              io_sim_last_write(PIN_NAME_DRV_ENABLE) == PIN_LOW &&
+              io_pwm_disable_calls > pwm_before &&
+              io_sim_flip_armed() == 0,
+              fm("state=%s fault=%u pad=%d write_delta=%d pwm_delta=%d flip_consumed=%d",
+                 safety_state_name(safety_state_get()), (unsigned)safety_fault_get(),
+                 (int)io_sim_last_write(PIN_NAME_DRV_ENABLE),
+                 io_sim_write_calls(PIN_NAME_DRV_ENABLE) - wr_before,
+                 io_pwm_disable_calls - pwm_before, io_sim_flip_armed()));
+    }
+
+    /* 同一个锁存状态下换"样本丢失"再复现一次(反馈脚读不到也不得清除) */
+    io_sim_set_chain(IO_CHAIN_IDEAL);
+    safety_fault_reset_manual();                    /* 先清掉, 重新走一次锁存 */
+    set_ready_state();
+    io_set_cfg_ok(RT_TRUE, TMC_DRV_CONFIGURED);
+    (void)motor_arm();
+    (void)motor_set_target_hz(500);
+    (void)motor_start();
+    (void)io_sim_fire(PIN_NAME_TMC_DIAG, PIN_HIGH);
+    ok = wait_latched(FAULT_TMC_DIAG, 1500);
+    io_sim_set_level(PIN_NAME_TMC_DIAG, PIN_LOW);
+    {
+        int wr_before = io_sim_write_calls(PIN_NAME_DRV_ENABLE);
+
+        io_sim_flip_chain_on_disable_write(IO_CHAIN_NO_WIRE);
+        safety_fault_reset_manual();
+        CHECK("IO7e-latch_kept_when_disarm_loses_sample",
+              ok && safety_state_get() == SAFETY_FAULT_LATCHED &&
+              safety_fault_get() == FAULT_TMC_DIAG &&
+              io_sim_write_calls(PIN_NAME_DRV_ENABLE) > wr_before &&
+              io_sim_flip_armed() == 0,
+              fm("state=%s fault=%u write_delta=%d flip_consumed=%d verdict=%s",
+                 safety_state_name(safety_state_get()), (unsigned)safety_fault_get(),
+                 io_sim_write_calls(PIN_NAME_DRV_ENABLE) - wr_before,
+                 io_sim_flip_armed(), safety_fb_verdict_name(safety_fb_now(0u))));
+    }
+
+    /* 对照组: 不布防注入 => 清除必须成功且故障码归零(证明上面两条不是必然失败) */
+    io_sim_set_chain(IO_CHAIN_IDEAL);
+    safety_fault_reset_manual();
+    set_ready_state();
+    io_set_cfg_ok(RT_TRUE, TMC_DRV_CONFIGURED);
+    (void)motor_arm();
+    (void)motor_set_target_hz(500);
+    (void)motor_start();
+    (void)io_sim_fire(PIN_NAME_TMC_DIAG, PIN_HIGH);
+    ok = wait_latched(FAULT_TMC_DIAG, 1500);
+    io_sim_set_level(PIN_NAME_TMC_DIAG, PIN_LOW);
+    safety_fault_reset_manual();
+    CHECK("IO7f-control_clear_succeeds_without_flip",
+          ok && safety_state_get() == SAFETY_MANUAL_CLEAR &&
+          safety_fault_get() == FAULT_NONE && io_sim_flip_armed() == 0,
+          fm("state=%s fault=%u", safety_state_name(safety_state_get()),
+             (unsigned)safety_fault_get()));
+    set_ready_state();
+    open_protection_gate();
 
     /* ---------- IO8: 样本不可得 / 焊盘写不进 / 就绪不得恒真 ---------- */
     io_sim_set_pad_stuck(1);

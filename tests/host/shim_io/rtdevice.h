@@ -107,6 +107,10 @@ int         io_sim_chain_mode(void);
 void        io_sim_set_lag(int n);                    /* LAG 模型: 还需几次读才跟随 */
 void        io_sim_set_pad_stuck(int on);             /* 焊盘写不进(回读不符) */
 void        io_sim_fail_attach(const char *name, int times);  /* 注册 IRQ 失败 N 次 */
+/* 一次性注入: 下一次向许可脚写 LOW 时把外部链切成 mode(模拟"清除路径最后一次许可
+ * 动作之后反馈才变坏")。io_sim_flip_armed()=1 表示还在等这次写, =0 表示已消耗或没布防。 */
+void        io_sim_flip_chain_on_disable_write(int mode);
+int         io_sim_flip_armed(void);
 int         io_sim_fire(const char *name, rt_int32_t new_level);
 
 extern int  io_dev_find_calls;

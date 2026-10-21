@@ -50,10 +50,12 @@ rt_bool_t safety_polarity_validated(void);
 
 /* P0-2 / A3: Safety 保护就绪(motor_arm 第 4 门禁):
  * IRQ gate OPEN + 极性操作员 CONFIRM + gpio ready + **活动输入集合**逐路处于各自安全电平
- * (限位 ENABLED 时 HIGH=安全; DIAG 沿用 LOW=安全)，再加上"静止侧条件": 当前没有已确认的
- * 使能请求(请求为 LOW 或从未确认)时, ENN 反馈必须在禁能侧一致。
- * ⚠ 已请求使能时不再要求反馈为 HIGH —— 否则 arm 之后正常的 ENN LOW 会让 start 永远失败;
- *   使能侧一致性由 motor.c 在 arm/start/运行守卫按请求态判定。
+ * (限位 ENABLED 时 HIGH=安全; DIAG 沿用 LOW=安全)，再加 ENN 反馈一致性条件：
+ * **按当前已确认的许可请求侧取期望** —— 没有已确认使能请求(请求 LOW 或从未确认)时要求
+ * 禁能侧一致(许可 LOW + 反馈 HIGH)，请求已确认为 HIGH 时要求使能侧一致(许可 HIGH + 反馈 LOW)。
+ * ⚠ IO70-NEW-02(2026-10-21 复审)修正: 已请求使能时**不是跳过**反馈条件, 而是改用使能侧期望;
+ *   这样 arm 之后正常的 ENN LOW 仍然就绪(不制造 arm->start 死锁), 而 CUT_BY_HARDWARE /
+ *   PAD_MISMATCH / NO_SAMPLE 一律判不就绪。motor.c 在 arm/start/运行守卫另做同源判定。
  * 两个前置标志默认均 FALSE(HARDWARE-PENDING), 只能人工按实测结果置位; 复位后不自动恢复。 */
 rt_bool_t safety_protection_ready(void);
 

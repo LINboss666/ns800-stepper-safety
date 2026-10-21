@@ -53,10 +53,15 @@ TARGET_CASES="IO9a-arm_refused_by_enable_path_macro IO9b-no_HIGH_write_on_refuse
 IO9c-step_diag_denied IO9e-txn_balanced_after_refusal IO9f-start_refused_not_armed \
 IO9d-write_gate_has_fb_bit_and_macro_bit"
 OVERRIDE_CASES="IO4a-arm_confirms_enabled_side IO4b-start_passes_after_arm_no_phase_deadlock \
+IO4c-ready_true_on_enabled_side_ideal IO4d-ready_false_when_cut_by_hardware \
+IO4e-ready_false_when_sample_lost IO4f-ready_true_again_after_disable_request \
 IO5a-runtime_guard_stops_on_cut IO5b-feedback_event_and_latch \
 IO5c-stop_actions_not_skipped IO6b1-arm_ok_on_ideal_chain \
 IO6b2-cut_request_rolls_back_to_low IO6c-no_start_while_feedback_inconsistent \
 IO7a-clear_refused_while_fb_stuck_enabled IO7c-clear_allowed_once_feedback_ideal \
+IO7d-latch_kept_when_disarm_reads_stuck_enabled \
+IO7e-latch_kept_when_disarm_loses_sample \
+IO7f-control_clear_succeeds_without_flip \
 IO8b-pad_write_not_sticking_reported IO8c-ready_never_hardwired_true"
 
 VARIANTS="off_target on_target off_ovr on_ovr illegal"
