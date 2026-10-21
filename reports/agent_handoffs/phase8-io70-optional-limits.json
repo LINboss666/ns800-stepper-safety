@@ -453,5 +453,97 @@
       "未把 BLOCKED_METHOD 或 BLOCKED_INSTRUMENT 写成已解决",
       "未新增诊断命令、占位跳线或自造的合规激励方案"
     ]
+  },
+  "checklist_review_merge": {
+    "recorded_at": "2026-10-21",
+    "review_document": "NS800_SafetyChecklist_v04_Review_9cf8279_20261021.md",
+    "review_subject_sha": "9cf82793c3740361d5e94301ec0606a594c8089e",
+    "baseline_sha": "296c369607ea69c201f797b80950b76ff312c0e0",
+    "split_conclusion": {
+      "go_registration": "ACCEPTED (软件返修保持收口; GO 接受对象固定为 296c369, 不得改成文档提交 SHA)",
+      "checklist_execution": "HOLD - H 节需三项操作性更正 + 两组勘误",
+      "new_software_defects": 0,
+      "software_go_revoked": false,
+      "hardware_authorized": false,
+      "further_code_or_keil_cycles": "not required by the review"
+    },
+    "corrections_merged": {
+      "V04-01_h09_command_side_effects": {
+        "issue": "H-09 把 pin_status 当作串口只读观测; 实际它会写 GPIO",
+        "verified_in_source": "safety_gpio.c:317 起的 pin_status 对 DRV_ENABLE 调 safety_drv_enable_write(0), 对其余 PIN_MODE_OUTPUT 脚调 rt_pin_write(p->pin, p->level)",
+        "fix": "从 H-09/H.4/H.5 的被动观测集合移除 pin_status 并标注'有 GPIO 写副作用, 本步不调用'; 不改函数, 不新增替代命令",
+        "tmc_regs": "完整登记 7 个寄存器 READ (GCONF/GSTAT/IFCNT/IOIN/VACTUAL 0x22/CHOPCONF 0x6C/SG_RESULT), 零 WRITE, 只从 IOIN 原始值取 ENN = IOIN & 1; 同时如实说明它影响链路健康度/失联计数",
+        "runtime_selftest": "不为取 2g 行而执行整命令 (会投 EVT_SOFT_FAULT -> 锁存 -> 尝试清除), 仍按 D6 保持 DEFERRED",
+        "frame_semantics": "区分'串口 READ 请求帧'与'寄存器 WRITE 帧', 本清单只允许前者; 未获真实串口读授权前仍 NOT EXECUTED",
+        "allowed_observation_set": [
+          "safety_status",
+          "motor_status",
+          "system_status(需逐项核对后)",
+          "tmc_regs(7 READ)"
+        ],
+        "motor_status_verified_read_only": "motor_get_gate_fail_mask -> safety_protection_ready / tmc2209_drive_config_ok_for_arm (tmc_cfg_ok_for_arm_ctx 只读 ctx) / safety_fb_now; motor.c 的写只存在于 mot_drv_en_request(:116) 与 motor_set_direction(:687)"
+      },
+      "V04-02_power_state_transition": {
+        "issue": "S1(上电拔模块) 与 S2(上电在位) 之间缺明确的断电-余压确认-插回-重新上电顺序",
+        "merged_text": "任何模块插拔/测线变化/装配切换都不在上电状态进行; 按 P-5 覆盖 VM + 逻辑供电 + 可能供电的 USB/调试并确认电源轨降到断电判据后才进入获授权的拆装; 记录模块方向/针位/装配状态; 来源或判据不清楚 -> BLOCKED_POWER_STATE 不插拔; S1 前的'模块拔出'同样适用; 不以仅断 VM 代替所有逻辑电源已断",
+        "note": "这是执行顺序缺项的更正, 不代表已经发生过热插拔"
+      },
+      "V04-03_measurement_and_firmware_scope": {
+        "h08": "删除'万用表 DC 证明无 STEP 脉冲'判据; 只记录静态 ENN/PC.6 电压与许可条件; DIR 是方向电平不是运动脉冲; 波形/瞬态留给示波器或逻辑分析仪步骤, 仪器不足记 NOT VERIFIED / BLOCKED_INSTRUMENT",
+        "firmware_scope": "每轮记录板上实际固件版本; '三宏挡住 STEP' 只适用新源码逻辑门; 核实差异: e40a9b9 的 motor_pwm_grant_to_diag 只查快照/armed/state/current_hz/target_hz/许可 LOW, 无新版 motor.c:877 的双宏入口检查与禁能侧反馈条件; 检查期间不调用任何 STEP/运动诊断入口",
+        "sampling": "H-06/H-08/H-09 与 D1/D7/H.4 的'同一时刻'改为'同一稳定工况下分次采样 + 记录测点次序与时间 + 首尾复核关键参考点'; 期间状态变化则该轮不作静态一致性判断; 真正同时捕获需多通道时基仪器(H-10/H-13); 不把串口与手工多点读数说成同步采样 (H.0 新增第 6 条)",
+        "h09_conclusion": "只限于'此次稳定工况下三源采样一致'; 全 HIGH 静态一致不证明线路完整或急停动态切断; 保留 BLOCKED_METHOD, 不据此关闭 RISK-04"
+      },
+      "S5_1_params_scoped_to_affected_steps": {
+        "h1_reworded": "H.1 从'待填参数表'改为'现场条件表', 每项只阻塞它实际影响的步骤",
+        "drawing_trace_upgraded": "同一 PDF(SHA-256 7b5d5325…) 已由云端实际渲染并图形追线: U13->U5->R9/Q1、R7 对 GND、R10 上拉 3V3 不再依赖文本相邻推断",
+        "p1_narrowed": "网表只影响 PC.6<->H6-5 支线的'设计内连接'定性与 H-02/H-03 的合格值; 单列'用户确认接线; 连续性未测'; 不阻塞 S0/S1 准备与执行, 也不阻塞步骤编排",
+        "p4_is_authorization": "P-4 是烧录授权不是资料; 未授权只阻塞 H-09, 不阻塞文档准备与独立获批的 S0 检查",
+        "p6_p7_self_fill": "P-6 允许在获授权的 H-01 现场读丝印后填写(不要求先完成 H-01 才能开始 H-01); P-7 由执行人预填, 不作为反复索取的硬件资料",
+        "h03_in_circuit": "H-03 量到的是在板等效电阻, 不等于单颗标称值; 不得拆焊或割支路'量准'; 不得用蜂鸣器响代替电阻判据; 经 R9 路径同理",
+        "estop_divider_estimate": "R5=10k/R6=1k 理想常闭接地 -> ESTOP_SENSE ≈ 3.3*1/(10+1) ≈ 0.30 V; 明确为工程估算, 非实测、非验收容差, 不要求读到 0.000 V",
+        "no_requestion": "现板版本、PC.6 归属、两个坏门是否更换不再作为待用户回答问题; 限位配置已关闭 -> 不再索取限位接线材料"
+      },
+      "S5_2_h3_status_timing_typo": {
+        "was": "每步执行前把状态改为 EXECUTED-PASS/FAIL (写反)",
+        "now": "执行前维持 NOT EXECUTED 或真实受阻标 BLOCKED_*; 仅在操作完成、证据保存并按判据核对后才标 EXECUTED-PASS/EXECUTED-FAIL; 可写 IN_PROGRESS; 不得预先写 PASS; H.0/本节/交接口径一致",
+        "explicit_note": "文案笔误, 不据此推断已预填或伪造任何证据"
+      }
+    },
+    "other_merged_sections": {
+      "F": "新增 dated 覆盖: 历史 Qoder 文本层限制保留为可复核性声明; 本次云端已实际渲染并追线, 不再把旧工具限制当作全部步骤的统一阻塞理由; 未用 TI 同系列器件手册代替图纸上 QN 品牌器件的电气参数证明",
+      "B1_3": "禁令限定为: 本清单不把 PC.6 当独立急停输入刺激、不执行 safety_irq_enable/safety_polarity_confirm、不自动打开任何软件门; 未来获授权的真实触点检查按 H-04/H-07/H-12, 不再自相矛盾",
+      "header_and_I": "头部加'清单审查状态'行与 v0.4.1 日期; 新增 I 节逐条更正记录(含审查项 vs 我核到的代码事实)",
+      "D_row_D2_C1": "D-2 与 C1 的前置与阻塞范围按 §5.1 收窄"
+    },
+    "draft_version": "v0.4.1",
+    "docs_only": {
+      "code_or_tests_changed": false,
+      "keil_project_changed": false,
+      "macros_changed": false,
+      "host_regressions_rerun": false,
+      "keil_rerun": false,
+      "reason": "审查 §6: 差异必须仍只有文档, 且不需要再开代码/工具/Keil 循环",
+      "new_runner_or_meta_or_hash_tools": false,
+      "r4_guard_rerun": false,
+      "zip_produced": false,
+      "pushed_history_rewritten": false
+    },
+    "hardware_still_not_executed": [
+      "无上电",
+      "无断电测量",
+      "无烧录",
+      "无复位",
+      "无 COM5",
+      "无真实 TMC 读写",
+      "无接线改动",
+      "无电机连接",
+      "无 STEP 输出",
+      "无宏翻转",
+      "H 节一步都未执行",
+      "BLOCKED_METHOD 与 BLOCKED_INSTRUMENT 未写成已解决"
+    ],
+    "next_step_owner": "用户: 三项现场信息(万用表型号 / 全部供电来源 / 急停端子与触点既有记录) -> 再由用户决定是否授权对应硬件操作; 不要求测量、不要求同意烧录、不要求一次填完 P-1..P-7",
+    "stop_point": "合并完成并 push + ls-remote 回读后 STOP: 等清单审查方复核更正文本; 硬件执行仍需用户明确授权"
   }
 }

@@ -238,3 +238,35 @@ C 节顶部加双向指针，E 节把授权类别对到 S0–S3，G 节加 v0.4"
 三道硬件宏与 `SAFETY_LIMIT_INPUTS_ENABLED` 全部仍 `RT_FALSE`。
 本轮同样**零硬件动作**：没上电、没断电测量、没烧录、没复位、没接触 COM5、没读写真实 TMC、
 没改接线、没接电机、没输出 STEP、没翻宏。草案仍是 `DRAFT`，判据需复审方 + 用户确认后才谈执行授权。
+
+## 11. 清单审查（`NS800_SafetyChecklist_v04_Review_9cf8279_20261021.md`）合并记录
+
+审查对象 `9cf8279`，结论**分开记录**：对 `296c369` 的 **GO 登记接受**（接受对象固定为 `296c369`，
+未改成文档提交 SHA），但 **H 节清单执行保持 `HOLD`**，给出三项操作性更正 + 两组勘误，
+并明确**不需要再开代码、主机工具或 Keil 返修循环**、本轮无新增软件缺陷结论、未授权任何硬件动作。
+
+**合并前我逐项读了源码核实（没有照抄审查结论）**：
+
+| 审查点 | 我核到的事实 | 出处 |
+|---|---|---|
+| V04-01 `pin_status` 有写副作用 | 对 `DRV_ENABLE` 调 `safety_drv_enable_write(0)`（含 settle + 回读重试），对其余 `PIN_MODE_OUTPUT` 脚 `rt_pin_write(p->pin, p->level)` → 确属主动动作 | `applications/safety_gpio.c:317` 起 |
+| V04-01 `tmc_regs` 不止读 IOIN | 读集合 = GCONF、GSTAT、IFCNT、IOIN、VACTUAL(`0x22`)、CHOPCONF(`0x6C`)、SG_RESULT 共 **7 个 READ**，函数内无 WRITE 调用；会影响链路健康度/失联计数 | `applications/tmc2209.c` 的 `tmc_regs` 数组 |
+| V04-01 `motor_status`/`safety_status` 可用 | 状态路径只做状态读与 `rt_pin_read`：`motor_get_gate_fail_mask` → `safety_protection_ready`/`tmc2209_drive_config_ok_for_arm`（`tmc_cfg_ok_for_arm_ctx` 只读 ctx 状态）/`safety_fb_now`；motor.c 的写只在 `mot_drv_en_request`(`:116`) 与 `motor_set_direction`(`:687`) | `applications/motor.c`、`tmc2209.c:1249-1263` |
+| V04-02 缺断电转换 | 原文 P-5 只写在 S0 前置，S1→S2 之间无"结束供电→余压确认→插回→重新上电"的顺序 | 草案 v0.4 H.2 |
+| V04-03 冻结固件无新版 STEP 门禁 | `e40a9b9` 的 `motor_pwm_grant_to_diag` 只检查快照/`armed`/`state`/`current_hz`/`target_hz`/许可 LOW，**没有**双宏入口检查；新版在 `motor.c:877` 才要求 `MOTOR_HARDWARE_ENABLE_PATH_VALIDATED || STEP_DIAG_ISOLATED_ENV_CONFIRMED` 之外还加禁能侧反馈 | `git show e40a9b9:…/motor.c:517-560` vs `motor.c:877` |
+| §5.1 分压估算 | `3.3 × 1/(10+1) ≈ 0.30 V` 与图纸 R5=10 k/R6=1 k 一致；工程估算，非实测非容差 | 草案 B2/H-06 |
+| §5.2 H.3 时点写反 | 原文确实写"每步执行**前**改为 EXECUTED-PASS/FAIL" → 更正为完成并留证后才标，可用 `IN_PROGRESS`，不得预写 PASS | 草案 v0.4 H.3 |
+
+已合并到草案（升到 **v0.4.1**，新增 **I 节**更正记录）：H-09 调用集合收窄（移除 `pin_status`、完整登记
+7 个 READ、不为取 2g 跑 `runtime_selftest`、区分 READ 请求帧与 WRITE 帧）、H.0 与 S1/S2 之间的供电状态
+转换规则（`BLOCKED_POWER_STATE`）、H-08 判据与 `DIR` 措辞、S2 固件适用性规则（每轮记录实际固件版本）、
+"同一时刻"全部改为"同一稳定工况下分次采样 + 记录次序与时间 + 首尾复核参考点"（H.0 新增第 6 条）、
+H.1 改为"每项只阻塞它实际影响的步骤"、H-03 在板等效电阻与蜂鸣器判据告诫、D1/D6/D7 与 C1 同步、
+F 节 dated 覆盖（云端已实际渲染并图形追线）、B1 ③ 禁令范围限定。BSP `开发进度.md` / `待办事项.md`
+同步 v0.4.1 与 HOLD 口径；本节与 JSON `checklist_review_merge` 记录合并内容。
+
+**边界**：本轮差异**只有文档**（未改源码/测试/Keil 工程/宏/门禁，未新增诊断命令、GPIO 裸写、跳线、
+受控写握手或验证平台；未重跑主机回归与 Keil —— 因为审查明确不需要，且差异必须仍只有文档；
+未开新审查/元负例体系、未重跑 R4 守卫、未生成 ZIP、未改写已推送提交）。仍**零硬件动作**、
+清单一步都没执行、板上仍是冻结固件 `e40a9b9`；RISK-03/03a/04 继续开放；
+`BLOCKED_METHOD`（H-11）与 `BLOCKED_INSTRUMENT`（H-10/H-13）**没有被写成已解决**。
