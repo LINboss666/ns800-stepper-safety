@@ -55,13 +55,30 @@
   ],
   "test_files_changed_or_added": [
     "tests/host/host_main.c",
+    "tests/host/inject.py",
     "tests/host/io_main.c",
     "tests/host/run_io_behavior.sh",
     "tests/host/shim_io/rtdevice.h",
     "tests/host/shim_io/rtthread.h"
   ],
-  "doc_files_changed": [],
-  "changed_file_count_vs_baseline": 17,
+  "doc_files_changed": [
+    "reports/plans/phase8-safety-chain-acceptance-draft.md",
+    "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/README.md",
+    "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/开发进度.md",
+    "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/待办事项.md"
+  ],
+  "evidence_and_handoff_files_added": [
+    "reports/agent_handoffs/phase8-io70-optional-limits.json",
+    "reports/agent_handoffs/phase8-io70-optional-limits.md",
+    "reports/reviews/phase8-io70-optional-limits/NOTES.txt",
+    "reports/reviews/phase8-io70-optional-limits/io_case_ledger.txt",
+    "reports/reviews/phase8-io70-optional-limits/io_reverse_verification.txt",
+    "reports/reviews/phase8-io70-optional-limits/keil_rebuild_all.txt",
+    "reports/reviews/phase8-io70-optional-limits/regression_v1v2_negatives_meta.txt"
+  ],
+  "code_file_count_vs_baseline": 18,
+  "changed_file_count_vs_baseline": 29,
+  "file_count_reconciliation_note": "18 代码/测试(生产 12 + 主机与工具 6) + 4 文档 + 7 证据与交接 = 29，与 git diff-tree 9ace7d0..HEAD 的 29 行逐一对账；本项在首版 JSON 里写成 doc 0 个、总数 17，是漏登记，推送后单独修正并另起一次提交（未改写已推送提交）",
   "project_uvprojx_diff_vs_baseline": "empty",
   "uvprojx_host_macros_injected": false,
   "real_vs_stub_in_new_io_chain": {
