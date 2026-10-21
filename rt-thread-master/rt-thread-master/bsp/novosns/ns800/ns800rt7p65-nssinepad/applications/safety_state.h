@@ -33,11 +33,15 @@ typedef enum
     SAFETY_MANUAL_CLEAR,   /* 人工确认清除, 需重自检+重新 arm */
 } safety_state_t;
 
-/* 故障码 */
+/* 故障码
+ * ⚠ 已用编号与数值是黑匣子持久化格式的一部分, **不得重排/复用**; 只允许追加。
+ * 2026-10-21 追加 FAULT_DRV_FEEDBACK: ENN 状态反馈与驱动请求不一致(说停没停 /
+ * 要动没让动 / 样本不可得)。它不代表"读到了急停按钮状态" —— 板上急停是纯硬件链,
+ * 软件没有独立急停输入(见 safety_thread.h 文件头)。 */
 #define FAULT_NONE          0u
-#define FAULT_ESTOP         1u
-#define FAULT_LIMIT_MIN     2u
-#define FAULT_LIMIT_MAX     3u
+#define FAULT_ESTOP         1u   /* 历史码: 保留给软件停机 API/黑匣子兼容, 现无 GPIO 生产者 */
+#define FAULT_LIMIT_MIN     2u   /* 限位宏 ENABLED 时由 EXTI14 下降沿产生 */
+#define FAULT_LIMIT_MAX     3u   /* 限位宏 ENABLED 时由 EXTI15 下降沿产生 */
 #define FAULT_TMC_DIAG      4u
 #define FAULT_MULTI_SOURCE  5u
 #define FAULT_TMC_COMM      6u
@@ -45,15 +49,17 @@ typedef enum
 #define FAULT_SELF_TEST     8u
 #define FAULT_SOFT          9u   /* 软件/自检触发 */
 #define FAULT_BOOT          10u  /* Fix A: supervisor_boot required stage 失败 */
+#define FAULT_DRV_FEEDBACK  11u  /* 追加(2026-10-21): 驱动请求与 ENN 反馈不一致 */
 
 /* 事件位(rt_event; ISR 内只允许 safety_post_event) */
-#define EVT_ESTOP        (1u << 0)
-#define EVT_LIMIT_MIN    (1u << 1)
-#define EVT_LIMIT_MAX    (1u << 2)
+#define EVT_ESTOP        (1u << 0)   /* 历史位: 保留, 当前没有 GPIO 生产者 */
+#define EVT_LIMIT_MIN    (1u << 1)   /* 仅限位宏 ENABLED 时有生产者 */
+#define EVT_LIMIT_MAX    (1u << 2)   /* 仅限位宏 ENABLED 时有生产者 */
 #define EVT_TMC_DIAG     (1u << 3)
 #define EVT_MULTI_FAULT  (1u << 4)
 #define EVT_FAULT_CLEAR  (1u << 5)
 #define EVT_SOFT_FAULT   (1u << 6)
+#define EVT_DRV_FEEDBACK (1u << 7)   /* 追加(2026-10-21): 反馈不一致, 由 motor 守卫/决策点投递 */
 
 /* 受保护转换: 白名单外一律拒绝并打印。返回 RT_EOK = 已切换。 */
 rt_err_t safety_transition(safety_state_t next);

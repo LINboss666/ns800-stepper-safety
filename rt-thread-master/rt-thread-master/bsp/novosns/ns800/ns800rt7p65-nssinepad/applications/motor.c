@@ -239,9 +239,12 @@ static void mot_guard_shutdown(rt_uint8_t reason)
 
     if (mot_drv_en_request(0) != RT_EOK)
         rt_kprintf("[MOT] !! GUARD STOP but DRV_ENABLE LOW UNVERIFIED !!\n");
-    (void)safety_post_event(EVT_SOFT_FAULT);
-    rt_kprintf("[MOT] DRV GUARD: 驱动配置失效(reason=%d) -> 已停 STEP、请求使能 LOW、"
-               "置 FAULT 并上报软故障。!! 这是软件层第二响应, 不替代硬件独立切断 !!\n",
+    /* 反馈不一致类停机如实投 EVT_DRV_FEEDBACK(黑匣子记 FAULT_DRV_FEEDBACK),
+     * 不假冒急停按钮; 其余配置守卫原因沿用 EVT_SOFT_FAULT。 */
+    (void)safety_post_event(reason == MOT_GUARD_ENN_FEEDBACK ? EVT_DRV_FEEDBACK
+                                                             : EVT_SOFT_FAULT);
+    rt_kprintf("[MOT] DRV GUARD: 驱动配置/反馈异常(reason=%d) -> 已停 STEP、请求使能 LOW、"
+               "置 FAULT 并上报。!! 这是软件层第二响应, 不替代硬件独立切断 !!\n",
                (int)reason);
 }
 
@@ -259,6 +262,7 @@ static void motor_ramp_entry(void *param)
         rt_uint8_t was_moving;
         rt_uint8_t armed;
         rt_uint8_t guard_due = 0u;
+        rt_uint8_t fb_stopped = 0u;
 
         /* ---------- F2b P1-E: 驱动配置运行期守卫(只在 armed 时复核) ----------
          * armed 与"本轮是否到复核周期"在锁内一次取定; 复核本身必须在锁外做
@@ -273,7 +277,25 @@ static void motor_ramp_entry(void *param)
         armed = mot.armed;
         mot_lock_release();
 
+        /* 追加(2026-10-21): armed 期每拍先做一次**无 UART、无延时**的 ENN 反馈复核
+         * (单次 rt_pin_read)。已确认的许可请求是 HIGH, 所以期望反馈 = LOW;
+         * 不一致(硬件急停把 ENN 拉高 / 级联逻辑故障 / 样本不可得)立即停机,
+         * 并跳过本拍的 UART 复核 —— 停机优先, 且不在已决定停机的拍上再阻塞。
+         * ⚠ 这缩小了软件层响应窗口, 但仍然是软件第二响应, 不构成时延上界证明。 */
         if (armed)
+        {
+            safety_fb_verdict_t fv = safety_fb_now(1u);
+
+            if (fv != SAFETY_FB_OK)
+            {
+                rt_kprintf("[MOT] runtime guard: ENN feedback %s while request=ENABLE"
+                           " (expected LOW) -> 停机\n", safety_fb_verdict_name(fv));
+                mot_guard_shutdown(MOT_GUARD_ENN_FEEDBACK);
+                fb_stopped = 1u;
+            }
+        }
+
+        if (armed && !fb_stopped)
         {
             motor_guard_in_t  in;
             motor_guard_out_t out;
@@ -353,6 +375,19 @@ static void motor_ramp_entry(void *param)
  * 返回"失败门"位掩码; 0 = 五门全通。全部无条件求值, 这样真机可以看到
  * 第 4 门(safety_protection_ready)与第 5 门(驱动参数已下发)确实参与判定,
  * 而不是被前面的门短路掉。 */
+/* ---------- 2026-10-21: ENN 状态反馈与许可请求的一致性 ----------
+ * 请求态基准 = 最近一次**经回读确认**的许可电平(sg_drv_en_request), 不是 READY/IDLE
+ * 状态推断: motor_stop 只停脉冲并保持 armed, 此时驱动请求仍然是"使能"。
+ * 从未确认过请求一律按禁能侧判定(fail closed)。 */
+static rt_uint8_t mot_fb_request_basis(void)
+{
+    rt_int32_t req = -1, pad = -1, fb = -1;
+    rt_bool_t  fb_ok = RT_FALSE;
+
+    safety_fb_snapshot(&req, &pad, &fb, &fb_ok);
+    return (req == PIN_HIGH) ? 1u : 0u;
+}
+
 rt_uint32_t motor_get_gate_fail_mask(void)
 {
     rt_uint32_t bad = 0;
@@ -367,6 +402,9 @@ rt_uint32_t motor_get_gate_fail_mask(void)
      * 这里只用纯状态判定(本函数被 system_status 等只读路径反复调用, 不得产生
      * 总线流量); 总线级复核在 motor_arm() 决策点单独进行。 */
     if (!tmc2209_drive_config_ok_for_arm())     bad |= MOT_GATE_NO_DRV_CONFIG;
+    /* 追加第 6 位(不复用旧位): 最终 ENN 反馈必须与当前许可请求一致。
+     * 单次采样判定(2 次 rt_pin_read, 无延时、无 UART), 读不到/矛盾都算失败。 */
+    if (safety_fb_now(mot_fb_request_basis()) != SAFETY_FB_OK)  bad |= MOT_GATE_FB_MISMATCH;
 
     return bad;
 }
@@ -379,6 +417,7 @@ static void mot_print_gate_fail(rt_uint32_t bad)
     if (bad & MOT_GATE_UNHEALTHY)     rt_kprintf(" subsystem-unhealthy");
     if (bad & MOT_GATE_NOT_PROTECTED) rt_kprintf(" protection-not-ready");
     if (bad & MOT_GATE_NO_DRV_CONFIG) rt_kprintf(" drive-config-not-applied");
+    if (bad & MOT_GATE_FB_MISMATCH)   rt_kprintf(" enn-feedback-mismatch");
     rt_kprintf("\n");
     rt_kprintf("[MOT] gate4 detail: irq_gate=%s polarity=%s gpio_ready=%s\n",
                safety_irq_attached() ? "OPEN" : "CLOSED",
@@ -386,6 +425,9 @@ static void mot_print_gate_fail(rt_uint32_t bad)
                safety_gpio_ready() ? "YES" : "NO");
     rt_kprintf("[MOT] gate5 detail: tmc_drive_cfg=%s\n",
                tmc_drv_cfg_state_name(tmc2209_get_config_state()));
+    rt_kprintf("[MOT] gate6 detail: request_basis=%s enn_feedback_verdict=%s (PC.6=TMC_ENN)\n",
+               mot_fb_request_basis() ? "ENABLED" : "DISABLED",
+               safety_fb_verdict_name(safety_fb_now(mot_fb_request_basis())));
 }
 
 /* ---------- 正式 API (motor.h) ---------- */
@@ -521,6 +563,21 @@ rt_err_t motor_arm(void)
         goto out;
     }
 
+    /* 追加(2026-10-21): 发出使能请求之前, 必须先确认当前确实处在"已禁能且反馈一致"一侧。
+     * 反馈读不到/矛盾就不请求使能(不猜), 也不改动任何已经执行的关闭动作。 */
+    {
+        safety_fb_verdict_t fv = SAFETY_FB_NO_SAMPLE;
+        rt_err_t fe = safety_drv_feedback_confirm(0u, &fv);
+
+        if (fe != RT_EOK)
+        {
+            rt_kprintf("[MOT] arm REFUSED: 请求使能前未确认 ENN 反馈在禁能侧"
+                       " (err=%d verdict=%s)\n", (int)fe, safety_fb_verdict_name(fv));
+            e = -RT_EPERM;
+            goto out;
+        }
+    }
+
     /* P1-10: 先写使能请求(含回读确认), 成功才置 armed; 失败回滚 fail-closed */
     e = mot_drv_en_request(1);
     if (e != RT_EOK)
@@ -540,10 +597,39 @@ rt_err_t motor_arm(void)
         goto out;
     }
 
+    /* 追加(2026-10-21): 焊盘已经到 HIGH, 还必须在**有界**窗口内确认最终 ENN 反馈到了
+     * "未施加禁能"侧(LOW)。不一致 = 硬件没有接受这个请求(硬件急停链切断、级联逻辑
+     * 故障、反馈线断开都可能, 软件无法区分) => 撤销请求、回滚、投递反馈不一致事件。
+     * 绝不把"软件想开"当成"驱动已开"。 */
+    {
+        safety_fb_verdict_t fv = SAFETY_FB_NO_SAMPLE;
+        rt_err_t fe = safety_drv_feedback_confirm(1u, &fv);
+
+        if (fe != RT_EOK)
+        {
+            rt_kprintf("[MOT] arm FAILED: ENN feedback not on enabled side"
+                       " (err=%d verdict=%s) - rollback fail-closed\n",
+                       (int)fe, safety_fb_verdict_name(fv));
+            mot_lock_take();
+            mot.armed = 0;
+            mot.current_hz = 0;
+            mot.target_hz = 0;
+            mot_pwm_output_off();
+            mot.state = MOTOR_FAULT;
+            mot_lock_release();
+            if (mot_drv_en_request(0) != RT_EOK)
+                rt_kprintf("[MOT] !! rollback LOW ALSO UNVERIFIED - pad unknown !!\n");
+            (void)safety_post_event(EVT_DRV_FEEDBACK);
+            e = -RT_EPERM;
+            goto out;
+        }
+    }
+
     mot_lock_take();
     mot.armed = 1;
     mot_lock_release();
-    rt_kprintf("[MOT] ARMED (drv_en request=HIGH readback verified)\n");
+    rt_kprintf("[MOT] ARMED (drv_en request=HIGH readback verified,"
+               " ENN feedback=LOW confirmed)\n");
     e = RT_EOK;
 
 out:
@@ -566,7 +652,14 @@ rt_err_t motor_disarm(void)
     e = mot_drv_en_request(0);                  /* P1-10 + A7: 回读确认 */
     if (e != RT_EOK)
         rt_kprintf("[MOT] !! disarm: DRV_ENABLE LOW UNVERIFIED (%d) !!\n", (int)e);
-    rt_kprintf("[MOT] DISARMED\n");
+    /* 追加(2026-10-21): 如实报告最终 ENN 反馈。没确认到禁能侧时**绝不**打印成"整链已安全"。
+     * 关闭动作(停 STEP + 请求 LOW)已经照做, 这一步只是不谎报。 */
+    {
+        safety_fb_verdict_t fv = safety_fb_now(0u);
+
+        rt_kprintf("[MOT] DISARMED (ENN feedback=%s%s)\n", safety_fb_verdict_name(fv),
+                   fv == SAFETY_FB_OK ? "" : " - 最终禁能**未确认**, 不得称整链已安全");
+    }
     return e;
 }
 
@@ -670,6 +763,24 @@ rt_err_t motor_start(void)
         return -RT_EPERM;
     }
 
+    /* 追加(2026-10-21): 起转前按**使能侧请求**重新确认最终 ENN 反馈。
+     * 这是 arm 之后的第二阶段判定(不能沿用禁能侧期望, 否则正常的 ENN LOW 会让
+     * start 永远失败): armed 且许可焊盘已确认 HIGH 时, 期望反馈 = LOW。
+     * 不一致(硬件急停切断/级联故障/反馈断开) => 不起转 + 投递反馈不一致事件。 */
+    {
+        safety_fb_verdict_t fv = SAFETY_FB_NO_SAMPLE;
+        rt_err_t fe = safety_drv_feedback_confirm(1u, &fv);
+
+        if (fe != RT_EOK)
+        {
+            rt_kprintf("[MOT] start REFUSED: ENN feedback 不在使能侧(expected LOW)"
+                       " (err=%d verdict=%s) - 不起转\n", (int)fe,
+                       safety_fb_verdict_name(fv));
+            (void)safety_post_event(EVT_DRV_FEEDBACK);
+            return -RT_EPERM;
+        }
+    }
+
     /* P1-9: 运动前建立合法 READY→RUN(经 transition API, 拒绝则不起转) */
     if (safety_state_get() == SAFETY_READY)
     {
@@ -727,8 +838,16 @@ rt_err_t motor_emergency_stop(void)
     if (e != RT_EOK)
         rt_kprintf("[MOT] !! EMERGENCY STOP but DRV_ENABLE LOW UNVERIFIED (%d) !!\n",
                    (int)e);
-    rt_kprintf("[MOT] EMERGENCY STOP (drv_en LOW %s)\n",
-               e == RT_EOK ? "verified" : "UNVERIFIED");
+    /* 追加(2026-10-21): 反馈状态如实报告。停 STEP 与撤销许可**总是**先做,
+     * 反馈读不到只影响"最终禁能是否已确认"这句话, 不影响动作本身。 */
+    {
+        safety_fb_verdict_t fv = safety_fb_now(0u);
+
+        rt_kprintf("[MOT] EMERGENCY STOP (drv_en LOW %s, ENN feedback %s%s)\n",
+                   e == RT_EOK ? "verified" : "UNVERIFIED",
+                   safety_fb_verdict_name(fv),
+                   fv == SAFETY_FB_OK ? "" : " -> final disable NOT confirmed");
+    }
     return e;
 }
 
@@ -797,6 +916,18 @@ rt_err_t motor_pwm_grant_to_diag(void)
     {
         rt_kprintf("[MOT] grant REFUSED: DRV_ENABLE pad not confirmed LOW\n");
         return -RT_EPERM;
+    }
+    /* 追加(2026-10-21): 借用 STEP 输出之前, 还要看**最终** ENN 反馈是否真在禁能侧。
+     * 宏翻转仍然只放开"许可", 这一条不因此放松: 反馈不一致就拒绝出脉冲。 */
+    {
+        safety_fb_verdict_t fv = safety_fb_now(0u);
+
+        if (fv != SAFETY_FB_OK)
+        {
+            rt_kprintf("[MOT] grant REFUSED: ENN feedback not on disabled side (verdict=%s)\n",
+                       safety_fb_verdict_name(fv));
+            return -RT_EPERM;
+        }
     }
     return RT_EOK;
 }
@@ -939,12 +1070,30 @@ static void cmd_motor_status(void)
     rt_kprintf("[MOT] armed=%d drv_en_verified_pad=%d health=%s\n",
                snap.armed, snap.drv_en_request, subsys_health_name(snap.health));
     rt_kprintf("[MOT] drv-guard: stops=%u last_reason=%u "
-               "(0=none 1=cfg-lost 2=integrity 3=txn-busy-limit)\n",
+               "(0=none 1=cfg-lost 2=integrity 3=txn-busy-limit 4=enn-feedback)\n",
                (unsigned)snap.guard_stops, (unsigned)snap.guard_reason);
     bad = motor_get_gate_fail_mask();
     rt_kprintf("[MOT] arm gate fail mask=0x%X (%s)\n", bad,
-               bad ? "arm will be REFUSED" : "all five gates pass");
+               bad ? "arm will be REFUSED" : "all gate conditions pass");
     if (bad) mot_print_gate_fail(bad);
+    /* 追加(2026-10-21): 请求 / 焊盘 / 最终反馈三者分列, 不混为一谈 */
+    {
+        rt_int32_t req = -1, pad = -1, fb = -1;
+        rt_bool_t  fb_ok = RT_FALSE;
+        rt_uint8_t want  = mot_fb_request_basis();
+
+        safety_fb_snapshot(&req, &pad, &fb, &fb_ok);
+        rt_kprintf("[MOT] drive request=%s pad=%d expected_ENN=%s ENN_feedback=%d(%s)"
+                   " verdict=%s\n",
+                   req < 0 ? "NEVER-VERIFIED" : (req == PIN_HIGH ? "HIGH" : "LOW"),
+                   (int)pad, want ? "LOW" : "HIGH", (int)fb,
+                   fb_ok ? "resolved" : "UNRESOLVED/no-sample",
+                   safety_fb_verdict_name(safety_fb_now(want)));
+        rt_kprintf("[MOT] limit inputs=%s (SAFETY_LIMIT_INPUTS_ENABLED;"
+                   " OFF => DISABLED_BY_CONFIG, 不解析/不读/不注册)\n",
+                   safety_limit_inputs_enabled() ? "ENABLED (HIGH=safe, LOW=trigger)"
+                                                 : "DISABLED_BY_CONFIG");
+    }
     rt_kprintf("[MOT] step-diag permission=%s (enable-path / isolated-env 两个宏"
                "至少一个为 TRUE 才允许输出 STEP)\n",
                (MOTOR_HARDWARE_ENABLE_PATH_VALIDATED ||

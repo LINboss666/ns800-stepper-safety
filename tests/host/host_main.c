@@ -339,6 +339,57 @@ rt_err_t safety_drv_enable_write(rt_uint8_t level)
 }
 rt_bool_t safety_drv_enable_is_low(void) { return shim_pad_low ? RT_TRUE : RT_FALSE; }
 
+/* ---- 2026-10-21 新增依赖的**合法默认桩**(仅供旧链隔离 motor.c / tmc2209.c) ----
+ * 旧链把 safety_gpio/safety_thread/safety_state 整体替换成桩, 因此这里给"反馈与请求
+ * 一致"的默认值, 目的是**不改变**旧链既有的 25/22 断言与 13 例负例身份; 它只证明
+ * motor/tmc 的逻辑在"反馈正常"前提下行为不变。真实安全模块(含反馈判定)的覆盖在
+ * tests/host/io_main.c + run_io_behavior.sh 里, 不能拿本桩冒充。
+ * 需要反证时可用 shim_fb_ok=RT_FALSE 让反馈判定不成立(旧链默认不这么做)。 */
+static const char *const shim_fb_names[] = {
+    "OK", "TRANSITION", "CUT_BY_HARDWARE", "UNEXPECTED_ENABLE", "PAD_MISMATCH", "NO_SAMPLE"
+};
+rt_bool_t shim_fb_ok = RT_TRUE;
+
+const char *safety_fb_verdict_name(safety_fb_verdict_t v)
+{
+    if ((int)v < 0 || (int)v > 5) return "UNKNOWN";
+    return shim_fb_names[(int)v];
+}
+
+safety_fb_verdict_t safety_fb_evaluate(rt_uint8_t want_enabled, rt_int32_t pad, rt_bool_t pad_ok,
+                                       rt_int32_t fb, rt_bool_t fb_ok)
+{
+    (void)want_enabled; (void)pad; (void)pad_ok; (void)fb; (void)fb_ok;
+    return shim_fb_ok ? SAFETY_FB_OK : SAFETY_FB_NO_SAMPLE;
+}
+
+safety_fb_verdict_t safety_fb_now(rt_uint8_t want_enabled)
+{
+    if (shim_fb_ok) return SAFETY_FB_OK;
+    return want_enabled ? SAFETY_FB_CUT_BY_HARDWARE : SAFETY_FB_UNEXPECTED_ENABLE;
+}
+
+rt_err_t safety_drv_feedback_confirm(rt_uint8_t want_enabled, safety_fb_verdict_t *out)
+{
+    safety_fb_verdict_t v = safety_fb_now(want_enabled);
+    if (out) *out = v;
+    return (v == SAFETY_FB_OK) ? RT_EOK : -RT_EIO;
+}
+
+void safety_fb_snapshot(rt_int32_t *out_request, rt_int32_t *out_pad,
+                        rt_int32_t *out_fb, rt_bool_t *out_fb_resolved)
+{
+    rt_int32_t pad = shim_pad_low ? PIN_LOW : PIN_HIGH;
+
+    if (out_request)     *out_request = pad;
+    if (out_pad)         *out_pad     = pad;
+    if (out_fb)          *out_fb      = (pad == PIN_HIGH) ? PIN_LOW : PIN_HIGH;
+    if (out_fb_resolved) *out_fb_resolved = RT_TRUE;
+}
+
+/* 旧链按目标配置(LIMIT-OFF)运行; 限位开启分支的真实覆盖在 io_main.c。 */
+rt_bool_t safety_limit_inputs_enabled(void) { return RT_FALSE; }
+
 const char *safety_state_name(safety_state_t s)
 {
     switch (s)

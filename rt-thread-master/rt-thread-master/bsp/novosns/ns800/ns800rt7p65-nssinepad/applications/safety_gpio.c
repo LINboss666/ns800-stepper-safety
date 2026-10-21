@@ -12,7 +12,12 @@
  *
  * 注意: 初始化失败现在向上传播(Fix A), 由 supervisor_boot stage 1 fail closed;
  *       绝不允许"默认 GPIO 状态"误使能驱动。
- * 中断(EstI/DIAG/限位)注册在 safety_thread.c safety_irq_attach() (显式门控)。
+ * 中断(DIAG + 可选限位)注册在 safety_thread.c safety_irq_attach() (显式门控)。
+ *
+ * 2026-10-21 输入职责更正(用户确认接线 + RevA 图纸): PC.6/J4-40 读的是板上 TMC_ENN 网络
+ * (扩展板 H6-5), 属于**驱动使能状态反馈**, 不是急停感测输入; 本模块只把它当被动输入读,
+ * 并新增"按请求态判定反馈"的纯函数 + 有界确认入口(见 safety_gpio.h)。硬件急停没有送进 MCU,
+ * 软件不存在独立急停输入。限位两路由 SAFETY_LIMIT_INPUTS_ENABLED 决定是否存在于本表内。
  */
 
 #include <rtthread.h>
@@ -34,9 +39,12 @@ static struct safety_pin safety_pins[] =
     { PIN_NAME_DRV_ENABLE, -1, PIN_MODE_OUTPUT,  PIN_LOW,  "MCU_DRV_ENABLE(J4-21, default LOW!)" },
     { PIN_NAME_TMC_DIR,    -1, PIN_MODE_OUTPUT, PIN_LOW,  "TMC_DIR" },
     { PIN_NAME_TMC_DIAG,   -1, PIN_MODE_INPUT,  0,        "TMC_DIAG" },
-    { PIN_NAME_LIMIT_MIN,  -1, PIN_MODE_INPUT,  0,        "LIMIT_MIN" },
-    { PIN_NAME_LIMIT_MAX,  -1, PIN_MODE_INPUT,  0,        "LIMIT_MAX" },
-    { PIN_NAME_ESTOP,      -1, PIN_MODE_INPUT,  0,        "ESTOP_SENSE" },
+#if SAFETY_LIMIT_INPUTS_ENABLED == RT_TRUE
+    /* 限位宏 ENABLED: 两路 OK 信号进入解析/配置/读取(极性: HIGH=安全, LOW=触发) */
+    { PIN_NAME_LIMIT_MIN,  -1, PIN_MODE_INPUT,  0,        "LIMIT_MIN_OK(HIGH=safe)" },
+    { PIN_NAME_LIMIT_MAX,  -1, PIN_MODE_INPUT,  0,        "LIMIT_MAX_OK(HIGH=safe)" },
+#endif
+    { PIN_NAME_ENN_FEEDBACK, -1, PIN_MODE_INPUT, 0,       "ENN_FEEDBACK(J4-40=H6-5/TMC_ENN, 只读)" },
     { PIN_NAME_IMU_CS,     -1, PIN_MODE_OUTPUT, PIN_HIGH, "IMU_CS(常高防总线竞争)" },
     { PIN_NAME_FLASH_CS,   -1, PIN_MODE_OUTPUT, PIN_HIGH, "FLASH_CS(常高)" },
     { PIN_NAME_BUZZER,     -1, PIN_MODE_OUTPUT, PIN_LOW,  "BUZZER(静默)" },
@@ -51,6 +59,8 @@ static rt_bool_t sg_ready = RT_FALSE;
 static rt_err_t  sg_first_err = RT_EOK;
 /* 最近一次 DRV_ENABLE 回读实测电平; -1 = 从未成功确认(含引脚未解析) */
 static volatile rt_int32_t sg_drv_en_last_read = -1;
+/* 最近一次**经回读确认成功**的许可请求电平(不是裸写请求); -1 = 从未确认 */
+static volatile rt_int32_t sg_drv_en_request = -1;
 
 static struct safety_pin *find_pin(const char *name)
 {
@@ -66,6 +76,20 @@ static rt_err_t safety_gpio_setup(void)
 {
     int i;
     rt_err_t e = RT_EOK;
+
+    /* ENN 反馈脚只能是被动输入: 表里被改成 OUTPUT 就 fail closed, 不静默变成可驱动。 */
+    for (i = 0; i < (int)SAFETY_PIN_COUNT; ++i)
+    {
+        if (rt_strcmp(safety_pins[i].name, PIN_NAME_ENN_FEEDBACK) == 0 &&
+            safety_pins[i].mode != PIN_MODE_INPUT)
+        {
+            rt_kprintf("[SAFETY] !! ENN_FEEDBACK(%s) must stay PIN_MODE_INPUT - FAIL CLOSED\n",
+                       PIN_NAME_ENN_FEEDBACK);
+            sg_ready     = RT_FALSE;
+            sg_first_err = -RT_EPERM;
+            return -RT_EPERM;
+        }
+    }
 
     for (i = 0; i < (int)SAFETY_PIN_COUNT; ++i)
     {
@@ -144,7 +168,10 @@ rt_err_t safety_drv_enable_write(rt_uint8_t level)
         got = (rt_int32_t)rt_pin_read(en);
         sg_drv_en_last_read = got;
         if (got == want)
+        {
+            sg_drv_en_request = want;      /* 只有回读一致才算"请求已建立" */
             return RT_EOK;
+        }
         rt_kprintf("[SAFETY] DRV_ENABLE readback mismatch: want=%d got=%d (try %u)\n",
                    (int)want, (int)got, i + 1);
     }
@@ -161,6 +188,133 @@ rt_bool_t safety_drv_enable_is_low(void)
 
     if (en < 0) return RT_FALSE;             /* 不知道=不安全 */
     return (rt_pin_read(en) == PIN_LOW) ? RT_TRUE : RT_FALSE;
+}
+
+/* ---------- ENN 状态反馈判定(2026-10-21: PC.6 = 板上 TMC_ENN, 不是急停输入) ----------
+ * 期望关系(RevA 图纸 U5/U13/Q1 + R10 上拉 + 手册 §2.2 推导, 未实测):
+ *   请求禁能(want=0): 焊盘 LOW 且 反馈 HIGH(=1) → 一致
+ *   请求使能(want=1): 焊盘 HIGH 且 反馈 LOW(=0) → 一致
+ * 反馈 LOW 只说明"没有施加禁能", 不能证明存在转矩; 反馈读不到/矛盾一律按不成立处理。 */
+#define DRV_FB_TRIES      3u        /* 有界窗口: 最多 3 次采样(测试可见, 非物理时延上界) */
+#define DRV_FB_SETTLE_MS  1u
+
+static const char *const sg_fb_names[] = {
+    "OK", "TRANSITION", "CUT_BY_HARDWARE", "UNEXPECTED_ENABLE",
+    "PAD_MISMATCH", "NO_SAMPLE"
+};
+
+const char *safety_fb_verdict_name(safety_fb_verdict_t v)
+{
+    if ((int)v < 0 || (int)v >= (int)(sizeof(sg_fb_names) / sizeof(sg_fb_names[0])))
+        return "UNKNOWN";
+    return sg_fb_names[(int)v];
+}
+
+safety_fb_verdict_t safety_fb_evaluate(rt_uint8_t want_enabled,
+                                       rt_int32_t pad, rt_bool_t pad_ok,
+                                       rt_int32_t fb,  rt_bool_t fb_ok)
+{
+    rt_int32_t want_pad = want_enabled ? PIN_HIGH : PIN_LOW;
+    rt_int32_t want_fb  = want_enabled ? PIN_LOW  : PIN_HIGH;
+
+    if (!pad_ok || !fb_ok) return SAFETY_FB_NO_SAMPLE;   /* 不知道=不成立 */
+    if (pad != want_pad)   return SAFETY_FB_PAD_MISMATCH;
+    if (fb  == want_fb)    return SAFETY_FB_OK;
+    /* 焊盘已到请求侧但反馈在另一侧: 区分"说停没停"与"要动没让动" */
+    return want_enabled ? SAFETY_FB_CUT_BY_HARDWARE : SAFETY_FB_UNEXPECTED_ENABLE;
+}
+
+/* 单次采样读反馈脚。返回 FALSE = 引脚未解析或电平不是合法 0/1(不猜)。 */
+static rt_bool_t sg_fb_read(rt_int32_t *out)
+{
+    rt_base_t   fb  = safety_pin(PIN_NAME_ENN_FEEDBACK);
+    rt_int32_t  val;
+
+    if (fb < 0) return RT_FALSE;
+    val = (rt_int32_t)rt_pin_read(fb);
+    if (val != PIN_HIGH && val != PIN_LOW) return RT_FALSE;
+    if (out != RT_NULL) *out = val;
+    return RT_TRUE;
+}
+
+static rt_bool_t sg_pad_read(rt_int32_t *out)
+{
+    rt_base_t  en = safety_pin(PIN_NAME_DRV_ENABLE);
+    rt_int32_t val;
+
+    if (en < 0) return RT_FALSE;
+    val = (rt_int32_t)rt_pin_read(en);
+    if (val != PIN_HIGH && val != PIN_LOW) return RT_FALSE;
+    if (out != RT_NULL) *out = val;
+    return RT_TRUE;
+}
+
+safety_fb_verdict_t safety_fb_now(rt_uint8_t want_enabled)
+{
+    rt_int32_t pad = -1, fb = -1;
+    rt_bool_t  pad_ok = sg_pad_read(&pad);
+    rt_bool_t  fb_ok  = sg_fb_read(&fb);
+
+    return safety_fb_evaluate(want_enabled, pad, pad_ok, fb, fb_ok);
+}
+
+rt_err_t safety_drv_feedback_confirm(rt_uint8_t want_enabled, safety_fb_verdict_t *out)
+{
+    safety_fb_verdict_t first, v = SAFETY_FB_NO_SAMPLE;
+    rt_bool_t stable = RT_TRUE;
+    rt_uint32_t i;
+
+    first = safety_fb_now(want_enabled);
+    v = first;
+    for (i = 1; i < DRV_FB_TRIES; ++i)
+    {
+        if (v == SAFETY_FB_OK) break;
+        rt_thread_mdelay(DRV_FB_SETTLE_MS);
+        v = safety_fb_now(want_enabled);
+        if (v != first) stable = RT_FALSE;
+    }
+
+    if (out != RT_NULL) *out = v;
+    if (v == SAFETY_FB_OK) return RT_EOK;
+    /* 样本在窗口内变化过 => 这是"过渡未确认", 绝不记成功, 也不谎称稳定矛盾 */
+    if (!stable)
+    {
+        if (out != RT_NULL) *out = SAFETY_FB_TRANSITION;
+        rt_kprintf("[SAFETY] ENN feedback still TRANSITIONING after %u bounded samples\n",
+                   DRV_FB_TRIES);
+        return -RT_ETIMEOUT;
+    }
+    if (v == SAFETY_FB_NO_SAMPLE)
+    {
+        rt_kprintf("[SAFETY] !! ENN feedback sample INVALID (pin unresolved/bad level)"
+                   " - 不判为就绪/确认\n");
+        return -RT_EINVAL;
+    }
+    rt_kprintf("[SAFETY] !! ENN feedback %s for request=%d (bounded tries=%u, stable)\n",
+               safety_fb_verdict_name(v), (int)want_enabled, DRV_FB_TRIES);
+    return -RT_EIO;
+}
+
+void safety_fb_snapshot(rt_int32_t *out_request, rt_int32_t *out_pad,
+                        rt_int32_t *out_fb, rt_bool_t *out_fb_resolved)
+{
+    rt_int32_t fb = -1, pad = -1;
+    rt_bool_t  fb_ok  = sg_fb_read(&fb);
+    rt_bool_t  pad_ok = sg_pad_read(&pad);
+
+    if (out_request     != RT_NULL) *out_request     = sg_drv_en_request;
+    if (out_pad         != RT_NULL) *out_pad         = pad_ok ? pad : -1;
+    if (out_fb          != RT_NULL) *out_fb          = fb_ok ? fb  : -1;
+    if (out_fb_resolved != RT_NULL) *out_fb_resolved = fb_ok ? RT_TRUE : RT_FALSE;
+}
+
+rt_bool_t safety_limit_inputs_enabled(void)
+{
+#if SAFETY_LIMIT_INPUTS_ENABLED == RT_TRUE
+    return RT_TRUE;
+#else
+    return RT_FALSE;
+#endif
 }
 
 static void pin_status(void)
@@ -218,10 +372,42 @@ static void safety_status(void)
     rt_kprintf("[SAFETY] DRV_ENABLE last write+readback verified = %d (-1 = never verified)\n",
                (int)sg_drv_en_last_read);
 
-    p = find_pin(PIN_NAME_ESTOP);
-    if (p != RT_NULL && p->pin >= 0)
-        rt_kprintf("[SAFETY] ESTOP_SENSE 原始电平 = %d (有效电平待接线确认)\n",
-                   rt_pin_read(p->pin));
+    /* ENN 反馈(2026-10-21 职责更正): PC.6 读的是板上 TMC_ENN, 不是急停按钮 */
+    {
+        rt_int32_t req = -1, pad = -1, fb = -1;
+        rt_bool_t  fb_ok = RT_FALSE;
+
+        safety_fb_snapshot(&req, &pad, &fb, &fb_ok);
+        rt_kprintf("[SAFETY] ENN_FEEDBACK(%s = 板上 TMC_ENN) raw=%d resolved=%s "
+                   "[只读输入, 非急停感测; HIGH=禁能侧, LOW=未施加禁能(不保证转矩)]\n",
+                   PIN_NAME_ENN_FEEDBACK, (int)fb, fb_ok ? "YES" : "NO");
+        if (req < 0)
+        {
+            rt_kprintf("[SAFETY] drive request = NEVER-VERIFIED -> feedback verdict = NO_SAMPLE\n");
+        }
+        else
+        {
+            rt_uint8_t want = (req == PIN_HIGH) ? 1u : 0u;
+            rt_kprintf("[SAFETY] request=%s pad=%d expected_FB=%s FB=%d -> verdict=%s\n",
+                       want ? "ENABLE(HIGH)" : "DISABLE(LOW)", (int)pad,
+                       want ? "LOW" : "HIGH", (int)fb,
+                       safety_fb_verdict_name(safety_fb_now(want)));
+        }
+    }
+
+    rt_kprintf("[SAFETY] LIMIT inputs = %s\n",
+               safety_limit_inputs_enabled()
+                   ? "ENABLED: HIGH=safe / LOW=trIGGER (falling IRQ), 仍需实物接线与极性验收"
+                   : "DISABLED_BY_CONFIG (限位实现保留, 不解析/不配置/不读/不注册 IRQ)");
+    if (safety_limit_inputs_enabled())
+    {
+        p = find_pin(PIN_NAME_LIMIT_MIN);
+        if (p != RT_NULL && p->pin >= 0)
+            rt_kprintf("[SAFETY] LIMIT_MIN_OK raw=%d (safe=1)\n", (int)rt_pin_read(p->pin));
+        p = find_pin(PIN_NAME_LIMIT_MAX);
+        if (p != RT_NULL && p->pin >= 0)
+            rt_kprintf("[SAFETY] LIMIT_MAX_OK raw=%d (safe=1)\n", (int)rt_pin_read(p->pin));
+    }
 }
 MSH_CMD_EXPORT(safety_status, show safety subsystem state);
 rt_bool_t safety_gpio_ready(void) { return sg_ready; }

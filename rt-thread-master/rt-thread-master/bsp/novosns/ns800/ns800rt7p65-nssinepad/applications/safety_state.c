@@ -14,9 +14,13 @@
  * SELF_TEST; 启动自检与最终 READY 决策由 supervisor_boot stage 11 调
  * safety_startup_selftest() 完成 —— Safety 线程必须先于慢速 Flash 扫描存在。
  *
- * Fix A 唯一停机路径: 硬件事件(ESTOP/LIMIT/DIAG)与软件故障(MULTI/SOFT)都只调
+ * Fix A 唯一停机路径: 硬件事件(限位/DIAG, 按本配置的活动集合)与软件故障(MULTI/SOFT)都只调
  * safety_force_shutdown(); 停 STEP 与 DRV_ENABLE "写+回读"由 motor.c 的
- * motor_emergency_stop() 负责, 本模块只做独立焊盘复核(不重复写)。
+ * motor_emergency_stop() 负责, 本模块只做独立焊盘复核(不重复写) + 单次 ENN 反馈采样报告。
+ * ⚠ 反馈读不到**不会**跳过关闭动作, 只会让"整链已安全/最终禁能已确认"这类话说不出口,
+ *   并且不允许清除故障(见 fault_reset)。
+ * ⚠ 2026-10-21: PC.6 是 TMC_ENN 反馈输入, 不是急停源; 板上急停不经 MCU, 软件没有独立
+ *   急停输入。EVT_ESTOP/FAULT_ESTOP/SAFETY_ESTOP 作为历史编号保留(黑匣子兼容)。
  */
 
 #include <rtthread.h>
@@ -125,12 +129,14 @@ void safety_force_shutdown(rt_uint32_t code)
 {
     rt_err_t estop_e;
     rt_bool_t pad_low;
+    safety_fb_verdict_t fb_v;
 
     if (ss_lock_ok) rt_mutex_take(&ss_lock, RT_WAITING_FOREVER);
     ss_fault_code = code;
 
     /* ① 停 STEP + DRV_ENABLE 请求 LOW(写+回读, 由 Motor Service 统一持有;
-     *    幂等)。返回值 = 使能脚写入是否经回读确认(Fix A: 不再吞掉)。 */
+     *    幂等)。返回值 = 使能脚写入是否经回读确认(Fix A: 不再吞掉)。
+     * ⚠ 反馈读不到**绝不跳过**这些关闭动作: 先停, 再报告反馈状态。 */
     estop_e = motor_emergency_stop();
     step_pwm_force_stop();
 
@@ -140,6 +146,14 @@ void safety_force_shutdown(rt_uint32_t code)
         rt_kprintf("[SS] !! CRITICAL: DRV_ENABLE pad NOT confirmed LOW (write_err=%d)"
                    " - hardware ENN chain is the only guard !!\n", (int)estop_e);
 
+    /* ②b 追加(2026-10-21): 单次采样看最终 ENN 反馈是否真到了禁能侧(高)。
+     *    这一条只影响"能不能声称整链已安全", 不影响①②的动作与④的锁存。 */
+    fb_v = safety_fb_now(0u);
+    if (fb_v != SAFETY_FB_OK)
+        rt_kprintf("[SS] !! ENN feedback NOT on disabled side (verdict=%s)"
+                   " - 不打印'最终禁能已确认'; 关闭动作已照做, 故障仍锁存\n",
+                   safety_fb_verdict_name(fb_v));
+
     /* ③ 黑匣子触发: O(1) 置标志, Safety 线程绝不等待 Flash */
     blackbox_trigger(code);
 
@@ -147,8 +161,9 @@ void safety_force_shutdown(rt_uint32_t code)
      * 即使 ② 复核失败也必须锁存 —— 回读失败绝不等于可以继续运动。 */
     ss_state = SAFETY_FAULT_LATCHED;
     if (ss_lock_ok) rt_mutex_release(&ss_lock);
-    rt_kprintf("[SS] ==> FAULT_LATCHED code=%u (STEP stopped, DRV_ENABLE LOW %s)\n",
-               code, pad_low ? "verified" : "UNVERIFIED!!");
+    rt_kprintf("[SS] ==> FAULT_LATCHED code=%u (STEP stopped, DRV_ENABLE LOW %s,"
+               " ENN feedback %s)\n", code, pad_low ? "verified" : "UNVERIFIED!!",
+               safety_fb_verdict_name(fb_v));
 }
 
 void safety_enter_fault(rt_uint32_t code) { safety_force_shutdown(code); }
@@ -213,6 +228,22 @@ rt_err_t safety_run_selftest(void)
         else rt_kprintf("[SS] [REQ OK] DRV_ENABLE=LOW (write+readback verified)\n");
     }
 
+    /* ---- required ③b ENN 反馈必须在禁能侧(2026-10-21 输入职责更正) ----
+     * PC.6 读的是板上 TMC_ENN(H6-5)。自检时驱动请求应当是禁能, 所以期望反馈=HIGH。
+     * 反馈读不到/矛盾 → required FAIL(不猜、不用"焊盘 LOW"代替), 但不跳过上面的关闭动作。 */
+    {
+        safety_fb_verdict_t fv = SAFETY_FB_NO_SAMPLE;
+        rt_err_t fe = safety_drv_feedback_confirm(0u, &fv);
+
+        if (fe != RT_EOK)
+        {
+            rt_kprintf("[SS] [REQ FAIL] ENN feedback not confirmed on disabled side"
+                       " (err=%d verdict=%s)\n", (int)fe, safety_fb_verdict_name(fv));
+            required_fail = -RT_ERROR;
+        }
+        else rt_kprintf("[SS] [REQ OK] ENN feedback = disabled side (PC.6=H6-5/TMC_ENN)\n");
+    }
+
     /* ---- required ④ TMC2209 链路(初始化 + IOIN 读) ---- */
     if (tmc2209_init() != RT_EOK ||
         tmc2209_read_register(TMC_ADDR_DEFAULT, TMC_REG_IOIN, &v) != RT_EOK)
@@ -259,14 +290,21 @@ rt_err_t safety_run_selftest(void)
 /* ---------- MSH 命令 ---------- */
 
 /* 显式故障清除: 仅 FAULT_LATCHED/ESTOP 且实测故障源安全 → MANUAL_CLEAR。
- * 之后必须 MANUAL_CLEAR→READY(重跑自检)→ 重新 arm。 */
+ * 之后必须 MANUAL_CLEAR→READY(重跑自检)→ 重新 arm。
+ *
+ * 2026-10-21 适配:
+ *   - 实测源 = **本配置的活动保护输入**(限位宏关闭时只剩 DIAG; 限位启用时是反相后的
+ *     LIMIT_*_OK, HIGH=安全)。
+ *   - PC.6 不作为急停源出现在这里 —— 它是 TMC_ENN 反馈; 清除前必须**另外**确认
+ *     最终反馈确实在禁能侧(HIGH)。确认不到就绝不打印"最终禁能已确认", 也不清除。 */
 static void fault_reset(void)
 {
-    struct { const char *name; const char *pin; int safe; } src[] = {
-        { "ESTOP",     PIN_NAME_ESTOP,     0 },
-        { "LIMIT_MIN", PIN_NAME_LIMIT_MIN, 0 },
-        { "LIMIT_MAX", PIN_NAME_LIMIT_MAX, 0 },
-        { "TMC_DIAG",  PIN_NAME_TMC_DIAG,  0 },
+    struct { const char *name; const char *pin; rt_int32_t safe; } src[] = {
+#if SAFETY_LIMIT_INPUTS_ENABLED == RT_TRUE
+        { "LIMIT_MIN_OK", PIN_NAME_LIMIT_MIN, PIN_HIGH },
+        { "LIMIT_MAX_OK", PIN_NAME_LIMIT_MAX, PIN_HIGH },
+#endif
+        { "TMC_DIAG",     PIN_NAME_TMC_DIAG,  PIN_LOW  },
     };
     int i;
     rt_err_t e;
@@ -283,6 +321,10 @@ static void fault_reset(void)
         return;
     }
 
+    rt_kprintf("[SS] fault_reset: active protection inputs = %d"
+               " (SAFETY_LIMIT_INPUTS_ENABLED=%s)\n", (int)(sizeof(src)/sizeof(src[0])),
+               safety_limit_inputs_enabled() ? "RT_TRUE" : "RT_FALSE");
+
     /* BUG-011-2: 实测故障源, 不看状态位猜 */
     for (i = 0; i < (int)(sizeof(src) / sizeof(src[0])); ++i)
     {
@@ -297,9 +339,9 @@ static void fault_reset(void)
         }
         level = rt_pin_read(pin);
         rt_kprintf("[SS] %s level=%d (safe=%d) %s\n",
-                   src[i].name, level, src[i].safe,
-                   level == src[i].safe ? "safe" : "!!ACTIVE!!");
-        if (level != src[i].safe) active = RT_TRUE;
+                   src[i].name, level, (int)src[i].safe,
+                   level == (int)src[i].safe ? "safe" : "!!ACTIVE!!");
+        if (level != (int)src[i].safe) active = RT_TRUE;
     }
     /* Fix A: 安全关键输出无法确认 LOW 时一律拒绝清除 —— 清除之后就是重新
      * 自检→READY→arm 的路径, 使能脚不可控就不允许走通。 */
@@ -308,6 +350,21 @@ static void fault_reset(void)
         rt_kprintf("[SS] fault_reset REFUSED: DRV_ENABLE pad not confirmed LOW\n");
         if (ss_lock_ok) rt_mutex_release(&ss_lock);
         return;
+    }
+    /* 追加: 最终 ENN 反馈必须确认在禁能侧, 否则"整链已安全"这句话不成立。 */
+    {
+        safety_fb_verdict_t fv = SAFETY_FB_NO_SAMPLE;
+        rt_err_t fe = safety_drv_feedback_confirm(0u, &fv);
+
+        if (fe != RT_EOK)
+        {
+            rt_kprintf("[SS] fault_reset REFUSED: ENN feedback not confirmed on the"
+                       " disabled side (verdict=%s err=%d) - 不打印'最终禁能已确认',"
+                       " 保持锁存\n", safety_fb_verdict_name(fv), (int)fe);
+            if (ss_lock_ok) rt_mutex_release(&ss_lock);
+            return;
+        }
+        rt_kprintf("[SS] ENN feedback confirmed DISABLED side (verdict=OK)\n");
     }
     if (active)
     {
@@ -330,7 +387,8 @@ static void fault_reset(void)
         if (ss_lock_ok) rt_mutex_release(&ss_lock);
         return;
     }
-    rt_kprintf("[SS] motor recovered: state=IDLE, DRV_ENABLE LOW verified\n");
+    rt_kprintf("[SS] motor recovered: state=IDLE, DRV_ENABLE LOW verified,"
+               " ENN feedback on disabled side confirmed\n");
 
     ss_fault_code = FAULT_NONE;
     ss_state = SAFETY_MANUAL_CLEAR;

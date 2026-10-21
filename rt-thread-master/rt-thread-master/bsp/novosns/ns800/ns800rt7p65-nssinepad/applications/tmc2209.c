@@ -846,10 +846,14 @@ static rt_uint32_t tmc_cfg_gate_prod(void *priv)
              snap.current_hz != 0u || snap.target_hz != 0u)
                                              bad |= TMC_WGATE_MOTOR_NOT_QUIET;
 
-    /* 驱动必须处于禁能请求(焊盘实测 LOW)。注意: 现板与门/非门损坏, 这条只能证明
-     * MCU 侧的请求电平, 证明不了 TMC_ENN 已禁能 —— 所以它必要但不充分, 编译期
-     * 那道门不会因为本位通过就允许翻转。 */
+    /* 驱动必须处于禁能请求(焊盘实测 LOW)。注意: 焊盘 LOW 只证明 MCU 侧的请求电平,
+     * 证明不了 TMC_ENN 已禁能 —— 所以它必要但不充分, 编译期那道门不会因为本位通过
+     * 就允许翻转。 */
     if (!safety_drv_enable_is_low())         bad |= TMC_WGATE_DRV_PAD_NOT_LOW;
+    /* 追加(2026-10-21): 还要看**最终** ENN 状态反馈(PC.6 = 板上 TMC_ENN / H6-5)是否真在
+     * 禁能侧(HIGH)。单次采样判定, 无延时、无 UART 流量, 可以在只读状态路径里调用。
+     * 反馈读不到/矛盾 => 一位都不写。 */
+    if (safety_fb_now(0u) != SAFETY_FB_OK)   bad |= TMC_WGATE_ENN_FB_NOT_DISABLED;
     if (safety_state_get() != SAFETY_READY)  bad |= TMC_WGATE_NOT_READY;
     if (safety_fault_get() != FAULT_NONE)    bad |= TMC_WGATE_FAULT_LATCHED;
     if (!tmc_cfg_hw_link_healthy(RT_NULL))   bad |= TMC_WGATE_LINK_UNHEALTHY;
@@ -864,6 +868,8 @@ static void tmc_cfg_print_gate(rt_uint32_t bad)
     if (bad & TMC_WGATE_HW_NOT_VALIDATED) rt_kprintf(" hw-chain-not-validated(compile)");
     if (bad & TMC_WGATE_MOTOR_NOT_QUIET)  rt_kprintf(" motor-not-quiet");
     if (bad & TMC_WGATE_DRV_PAD_NOT_LOW)  rt_kprintf(" drv-enable-pad-not-low");
+    if (bad & TMC_WGATE_ENN_FB_NOT_DISABLED)
+                                          rt_kprintf(" enn-feedback-not-disabled");
     if (bad & TMC_WGATE_NOT_READY)        rt_kprintf(" safety-not-READY");
     if (bad & TMC_WGATE_FAULT_LATCHED)    rt_kprintf(" fault-not-cleared");
     if (bad & TMC_WGATE_LINK_UNHEALTHY)   rt_kprintf(" uart-link-unhealthy");

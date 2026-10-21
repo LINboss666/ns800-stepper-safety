@@ -29,4 +29,45 @@ rt_err_t safety_drv_enable_write(rt_uint8_t level);
 /* 只读实测: 焊盘当前是否确认为 LOW(禁止驱动)。引脚未解析一律返回 FALSE。 */
 rt_bool_t safety_drv_enable_is_low(void);
 
+/* ---------- ENN 状态反馈(PC.6 = 板上 TMC_ENN 网络, 被动输入) ----------
+ * 依据: 用户 2026-10-21 确认该脚接到扩展板 H6-5/TMC_ENN; TMC2209 Datasheet
+ * Rev.1.09 印刷第 9 页 §2.2 —— ENN 低有效使能输入, 拉高则功率级关断、输出浮空。
+ * 因此反馈 HIGH = 在禁能侧, 反馈 LOW = 在未施加禁能侧(**不等于一定有转矩**)。
+ * 这颗脚不是急停输入, 软件不得把它当"独立急停感测", 也不得据此区分切断原因。
+ * ⚠ 读到的数字电平只说明焊盘上看到什么, 不证明反馈线没断/不与模块脚断开 ——
+ *   线路完整性仍属硬件验收(RISK-04)。 */
+typedef enum
+{
+    SAFETY_FB_OK = 0,             /* 焊盘=请求 且 反馈=请求对应的期望侧 */
+    SAFETY_FB_TRANSITION,         /* 焊盘已到请求侧, 反馈仍在另一侧(可能是传播中, 不算确认) */
+    SAFETY_FB_CUT_BY_HARDWARE,    /* 请求使能但反馈在禁能侧(硬件链切断: 急停/逻辑器件) */
+    SAFETY_FB_UNEXPECTED_ENABLE,  /* 请求禁能但反馈在使能侧(说停没停, 最危险) */
+    SAFETY_FB_PAD_MISMATCH,       /* 焊盘实测与请求不符(写不进/被顶高) */
+    SAFETY_FB_NO_SAMPLE           /* 反馈脚或许可脚未解析 / 读不出有效样本 */
+} safety_fb_verdict_t;
+
+/* 纯函数(无副作用, 可被生产链与主机用例共用): 按请求态判定一组观测样本。 */
+safety_fb_verdict_t safety_fb_evaluate(rt_uint8_t want_enabled,
+                                       rt_int32_t pad, rt_bool_t pad_ok,
+                                       rt_int32_t fb,  rt_bool_t fb_ok);
+
+const char *safety_fb_verdict_name(safety_fb_verdict_t v);
+
+/* 单次采样判定(不延时、不写、不产生 UART 流量): 供只读状态路径与写入门禁用。 */
+safety_fb_verdict_t safety_fb_now(rt_uint8_t want_enabled);
+
+/* 决策点用的**有界**确认: 在有限的 settle/重试窗口内采到一致样本才算 OK。
+ * 窗口是测试可见的配置常数, **不是**停机时延或物理时序上界(RISK-03 仍开放)。
+ * RT_EOK=与请求一致; -RT_EINVAL=引脚未解析; -RT_EIO=组合矛盾;
+ * -RT_ETIMEOUT=有界窗口内仍停在过渡态。调用方失败时必须按 fail-closed 处理。 */
+rt_err_t safety_drv_feedback_confirm(rt_uint8_t want_enabled, safety_fb_verdict_t *out);
+
+/* 只读快照: 许可请求(最近一次经回读确认的电平)/焊盘实测/反馈实测与解析状态。
+ * 指针可为 RT_NULL。不产生任何写动作或总线流量。 */
+void safety_fb_snapshot(rt_int32_t *out_request, rt_int32_t *out_pad,
+                        rt_int32_t *out_fb, rt_bool_t *out_fb_resolved);
+
+/* 本配置里两路可选限位是否处于启用状态(= SAFETY_LIMIT_INPUTS_ENABLED)。 */
+rt_bool_t safety_limit_inputs_enabled(void);
+
 #endif /* SAFETY_GPIO_H */

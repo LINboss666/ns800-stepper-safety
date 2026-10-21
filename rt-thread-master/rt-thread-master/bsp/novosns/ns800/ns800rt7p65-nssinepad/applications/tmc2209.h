@@ -70,14 +70,21 @@ subsys_health_t tmc2209_get_health(void);
  *
  * 本轮只做"能让配置写下去、能证明写下去、写不成就不许使能"的软件能力。
  * 真实写入被两层独立挡住, 两层都必须通过:
- *   ① 编译期硬门禁 TMC_DRIVE_CONFIG_HW_VALIDATED —— 当前扩展板 U5 与门损坏 /
- *      急停非门损坏 / TMC_ENN 实测约 0V / H2 限位未接, 安全链未验收 → 必须保持
+ *   ① 编译期硬门禁 TMC_DRIVE_CONFIG_HW_VALIDATED —— 安全链未验收 → 必须保持
  *      RT_FALSE, 直到硬件验收完成并经单独提交翻转。
- *      (事实更正 2026-10-18: MCU_DRV_ENABLE 节点在新扩展板上**已引出**, 阻塞项是
- *       门电路损坏, 不是"漏画未引出"。焊盘回读 LOW 因级联门损坏而无法证明
- *       TMC_ENN 已禁能 —— 这正是"编译期前置验收不能替代每次操作条件检查"的原因。)
+ *      (事实更正 2026-10-18: MCU_DRV_ENABLE 节点在新扩展板上**已引出**, 当时的阻塞项是
+ *       级联门电路损坏, 不是"漏画未引出"; 焊盘回读 LOW 证明不了 TMC_ENN 已禁能 ——
+ *       这正是"编译期前置验收不能替代每次操作条件检查"的原因。
+ *       状态更新 2026-10-21: 用户报告损坏的 U5 与门与急停反相器**已更换**(用户报告,
+ *       未提供更换后的读数/波形)。"许可脚约 0V / Q1 栅约 3.3V / TMC_ENN 约 0V /
+ *       U5 输入约 0V 而输出约 3.3V" 是**维修前历史读数**, 不得继续当作当前状态;
+ *       换件也**不等于**验收通过 → 现记"更换完成(用户报告) + 维修后安全链待验收"。
+ *       两路行程限位的实现保留, 由 project_board.h 的 SAFETY_LIMIT_INPUTS_ENABLED
+ *       控制, 目标配置默认 RT_FALSE(不要求接 H2, 也不因未接而阻塞当前禁用配置)。)
  *   ② 运行态写入门禁 tmc2209_get_write_gate_mask() —— 每次 apply 都重新求值:
- *      电机必须完全静止且未 armed、DRV_ENABLE 焊盘实测 LOW、Safety 状态机为
+ *      电机必须完全静止且未 armed、DRV_ENABLE 焊盘实测 LOW、**最终 ENN 状态反馈
+ *      (PC.6 = 板上 TMC_ENN / H6-5)确认在禁能侧**(2026-10-21 追加
+ *      TMC_WGATE_ENN_FB_NOT_DISABLED, 焊盘 LOW 单独不再充分)、Safety 状态机为
  *      READY 且无锁存故障、UART 链路健康、配置事务未被占用。任一项不过 →
  *      不发出任何总线写、状态不变。
  *
@@ -201,6 +208,10 @@ rt_uint32_t tmc2209_get_write_gate_mask(void);
 #define TMC_WGATE_FAULT_LATCHED    (1u << 4)  /* 存在未清除的故障码 */
 #define TMC_WGATE_LINK_UNHEALTHY   (1u << 5)  /* UART 链路 FAILED/DEGRADED/UNINIT */
 #define TMC_WGATE_NOT_SYNCED       (1u << 6)  /* F2c R02: 执行器的锁没建起来 = 无法串行化 */
+/* 追加(2026-10-21, 不复用旧位): 最终 ENN 状态反馈(PC.6 = 板上 TMC_ENN / H6-5)没有确认在
+ * 禁能侧。bit2 只证明 MCU 焊盘 LOW(请求侧), 在级联逻辑损坏/断电复位等情况下证明不了
+ * 驱动真的被禁能 —— 写电流档/斩波器参数之前必须看最终反馈。 */
+#define TMC_WGATE_ENN_FB_NOT_DISABLED (1u << 7)
 
 /* F2b P1-D: 配置事务串行化。apply 与 motor_arm 的"查状态→复核→请求使能"整段
  * 必须持有同一把 txn 锁, 否则二者交错会出现"arm 复核通过后 apply 改了电流档"

@@ -14,11 +14,14 @@
  * 绝不允许打印 READY。boot_done 只在走到最后才置位。
  *
  * runtime_selftest: 软件级测试(不依赖真实运动), 覆盖:
- *   bootstrap 是否真正执行 / 非法状态转换拒绝 / motor arm 四门禁矩阵(不打开
+ *   bootstrap 是否真正执行 / 非法状态转换拒绝 / motor arm 门禁矩阵(不打开
  *   任何生产门) / P0-1 故障后业务转换拒绝 / 故障停机链(事件→Safety Thread→
  *   FAULT_LATCHED) / fault_reset 实测源 / sensor valid 位处理;
  *   恢复必须实际重跑 required selftest(P1-15); 收尾再次确认真实 motor_arm
  *   仍然被拒(没有伪造硬件门禁)。
+ *   2g(2026-10-21 追加): 分列报告许可请求 / 焊盘实测 / 最终 ENN 反馈, 并校验
+ *   掩码 bit5 与判定一致; 限位配置如实标 ENABLED / DISABLED_BY_CONFIG。
+ *   ⚠ PC.6 现在是 TMC_ENN 状态反馈输入, 软件不再有独立急停输入; 板上急停是纯硬件链。
  */
 
 #include <rtthread.h>
@@ -94,6 +97,26 @@ void system_status(void)
                subsys_health_name(safety_thread_get_health()),
                safety_drv_enable_is_low() ? "YES" : "NO/unknown");
 
+    /* 追加(2026-10-21): 许可请求 / MCU 焊盘实测 / 最终 ENN 反馈三者分列。
+     * PC.6 = 板上 TMC_ENN(H6-5)状态反馈, **不是**急停按钮输入; 板上急停是纯硬件链。
+     * 全部是只读采样: 不写脚、不产生 UART 流量。 */
+    {
+        rt_int32_t req = -1, pad = -1, fb = -1;
+        rt_bool_t  fb_ok = RT_FALSE;
+        rt_uint8_t want;
+
+        safety_fb_snapshot(&req, &pad, &fb, &fb_ok);
+        want = (req == PIN_HIGH) ? 1u : 0u;
+        rt_kprintf("[Safety] request=%s pad=%d expected_ENN=%s ENN_fb=%d(%s) verdict=%s\n",
+                   req < 0 ? "NEVER-VERIFIED" : (req == PIN_HIGH ? "HIGH" : "LOW"),
+                   (int)pad, want ? "LOW" : "HIGH", (int)fb,
+                   fb_ok ? "resolved" : "NO-SAMPLE",
+                   safety_fb_verdict_name(safety_fb_now(want)));
+        rt_kprintf("[Safety] limit_inputs=%s (HIGH=safe/LOW=trigger when ENABLED);"
+                   " e-stop=hardware-only, no MCU e-stop input\n",
+                   safety_limit_inputs_enabled() ? "ENABLED" : "DISABLED_BY_CONFIG");
+    }
+
     if (motor_get_snapshot(&snap) == RT_EOK)
         rt_kprintf("[Motor] state=%d cur=%u tgt=%u armed=%d drv_en_verified=%d health=%s\n",
                    snap.state, snap.current_hz, snap.target_hz, snap.armed,
@@ -101,7 +124,7 @@ void system_status(void)
     else
         rt_kprintf("[Motor] snapshot failed\n");
     rt_kprintf("[Motor] arm gate fail mask=0x%X (%s)\n", gates,
-               gates ? "arm REFUSED" : "all five gates pass");
+               gates ? "arm REFUSED" : "all gate conditions pass (incl. ENN feedback)");
     rt_kprintf("[TMC]    runtime write gate mask=0x%X (0=运行态条件全通,"
                " 编译期门未翻转前仍然一位不写)\n",
                (unsigned)tmc2209_get_write_gate_mask());
@@ -237,7 +260,7 @@ static void runtime_selftest(void)
     gates = motor_get_gate_fail_mask();
     rt_kprintf("[SELFTEST] 2.arm gate fail mask=0x%X"
                " (bit0 enable-path bit1 READY bit2 health bit3 protection"
-               " bit4 drive-config)\n", gates);
+               " bit4 drive-config bit5 enn-feedback)\n", gates);
     if (!(gates & MOT_GATE_ENABLE_PATH))
     { rt_kprintf("[SELFTEST] 2a.enable-path gate unexpectedly OPEN\n"); pass = 0; }
     else
@@ -279,6 +302,43 @@ static void runtime_selftest(void)
         else if (wg)
             rt_kprintf("[SELFTEST] 2f.write-gate CLOSED ok (apply 不会发出任何写)\n");
         else rt_kprintf("[SELFTEST] 2f 注意: 运行态门禁全通(仍受编译期门约束)\n");
+    }
+
+    /* ②g F2b/2026-10-21: ENN 状态反馈(PC.6 = 板上 TMC_ENN / H6-5)与限位配置如实报告。
+     *    纯只读(2 次 rt_pin_read), 不写脚、不产生 UART 流量、不要求特定电平 ——
+     *    反馈本身正常与否属于硬件事实(换件后待验收), 本步只证明:
+     *      1) 三件事被分开报告: 许可请求 / MCU 焊盘实测 / 最终 ENN 反馈;
+     *      2) 追加的第 6 位掩码确实与判定结果一致(不一致 = 掩码没反映真实状态)。
+     *    ⚠ 通过本步**不等于**反馈线完整性或整链已验收(RISK-04 仍开放)。 */
+    {
+        rt_int32_t req = -1, pad = -1, fb = -1;
+        rt_bool_t  fb_ok = RT_FALSE;
+        rt_uint8_t want;
+        safety_fb_verdict_t fv;
+        rt_uint32_t g2;
+
+        safety_fb_snapshot(&req, &pad, &fb, &fb_ok);
+        want = (req == PIN_HIGH) ? 1u : 0u;
+        fv   = safety_fb_now(want);
+        g2   = motor_get_gate_fail_mask();
+
+        rt_kprintf("[SELFTEST] 2g.enn-feedback request=%s pad=%d expected_ENN=%s"
+                   " fb=%d(%s) verdict=%s\n",
+                   req < 0 ? "NEVER-VERIFIED" : (req == PIN_HIGH ? "HIGH" : "LOW"),
+                   (int)pad, want ? "LOW" : "HIGH", (int)fb,
+                   fb_ok ? "resolved" : "NO-SAMPLE", safety_fb_verdict_name(fv));
+        rt_kprintf("[SELFTEST] 2g.limit_inputs=%s (HIGH=safe/LOW=trigger when ENABLED);"
+                   " PC.6 is TMC_ENN feedback, NOT an e-stop input;"
+                   " board e-stop = hardware chain only\n",
+                   safety_limit_inputs_enabled() ? "ENABLED" : "DISABLED_BY_CONFIG");
+        if ((fv != SAFETY_FB_OK) != ((g2 & MOT_GATE_FB_MISMATCH) != 0u))
+        {
+            rt_kprintf("[SELFTEST] 2g FAIL: 反馈判定(%s)与掩码 bit5(0x%X)不一致\n",
+                       safety_fb_verdict_name(fv), (unsigned)g2);
+            pass = 0;
+        }
+        else rt_kprintf("[SELFTEST] 2g.feedback-gate consistent ok (mask=0x%X)\n",
+                        (unsigned)g2);
     }
 
     /* ③ 故障停机链 + 事件处理 + P0-1 串行化验证:

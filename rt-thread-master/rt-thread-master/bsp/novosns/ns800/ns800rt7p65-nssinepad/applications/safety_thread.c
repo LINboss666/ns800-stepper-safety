@@ -18,9 +18,18 @@
  *     safety_polarity_confirm CONFIRM(操作员实测极性的声明, 软件不自动判定)。
  *   - 默认不注册任何 EXTI: 悬空输入注册中断会造成 interrupt storm。
  *
- * P0-3: 四路输入(ESTOP=EXTI6 / LIMIT_MIN=EXTI14 / LIMIT_MAX=EXTI15 /
- * DIAG=EXTI3, 与冻结表一致无冲突)是 EVT_ESTOP / EVT_LIMIT_MIN /
- * EVT_LIMIT_MAX / EVT_TMC_DIAG 的唯一生产者(旧 DIAG 轮询已移除, 避免双触发)。
+ * P0-3: 输入生产者登记(与冻结表一致, EXTI 无冲突)。
+ *
+ * 2026-10-21 输入职责更正(用户确认 PC.6 实际接扩展板 H6-5/TMC_ENN + RevA 图纸核对):
+ *   - **PC.6 不再是急停输入**，也不注册任何 ISR；它是驱动使能状态**反馈**(被动读)，
+ *     判定在 safety_gpio.c 的反馈接口里做。板上急停是纯硬件链(常闭→U13→U5→Q1)，
+ *     图纸上没有送进 MCU 的网络，因此**软件不存在独立急停输入**。
+ *   - 两路行程限位由 SAFETY_LIMIT_INPUTS_ENABLED 决定：RT_FALSE(目标默认)时**完全不进入**
+ *     解析/配置/读取/IRQ 注册，也不参与就绪与故障清除；RT_TRUE 时按反相后的 OK 信号
+ *     **HIGH=安全、LOW=触发、下降沿 IRQ**接入。
+ *   - DIAG 保持原语义与极性依据，不受限位宏影响。
+ *   - EVT_ESTOP / EVT_LIMIT_* 事件位与 FAULT_* 编号为黑匣子兼容**原样保留**；限位宏关闭时
+ *     它们没有 GPIO 生产者，软件停机 API 与锁存路径仍然保留(见 safety_state.c)。
  */
 
 #include <rtthread.h>
@@ -36,7 +45,8 @@
 #define SAFETY_RECV_TIMEOUT   500     /* ms; 超时仅用于线程节拍 */
 
 #define SAFETY_EVT_MASK_ALL   (EVT_ESTOP | EVT_LIMIT_MIN | EVT_LIMIT_MAX | \
-                               EVT_TMC_DIAG | EVT_MULTI_FAULT | EVT_SOFT_FAULT)
+                               EVT_TMC_DIAG | EVT_MULTI_FAULT | EVT_SOFT_FAULT | \
+                               EVT_DRV_FEEDBACK)
 
 static struct rt_thread safety_thread;
 static rt_uint8_t safety_stack[SAFETY_THREAD_STACK];
@@ -44,29 +54,37 @@ static rt_bool_t st_thread_up = RT_FALSE;
 static subsys_health_t st_health = SUBSYS_UNINIT;
 static rt_bool_t st_irq_attached = RT_FALSE;
 /* P0-2: 输入极性/接线验证标志 —— 默认 FALSE(HARDWARE-PENDING)。
- * 真机完成 NC 极性验证后由 safety_polarity_confirm CONFIRM 置位(内存态,
- * 掉电不复位也不自动恢复)。软件不做任何极性推断。 */
+ * 真机完成极性验证后由 safety_polarity_confirm CONFIRM 置位(内存态,
+ * 掉电不复位也不自动恢复)。软件不做任何极性推断, 用户"确认接了哪根线"
+ * 也不等于本标志被置位。 */
 static rt_bool_t st_polarity_validated = RT_FALSE;
 
 /* ---------- ISR 回调: 只置事件(§14.3 纪律) ---------- */
-static void estop_isr(void *args)    { (void)args; safety_post_event(EVT_ESTOP); }
+#if SAFETY_LIMIT_INPUTS_ENABLED == RT_TRUE
 static void lim_min_isr(void *args)  { (void)args; safety_post_event(EVT_LIMIT_MIN); }
 static void lim_max_isr(void *args)  { (void)args; safety_post_event(EVT_LIMIT_MAX); }
+#endif
 static void tmc_diag_isr(void *args) { (void)args; safety_post_event(EVT_TMC_DIAG); }
 
-/* 四路安全输入(注册顺序固定; bit i 用于 attach 事务掩码) */
+/* 活动安全输入登记表(注册顺序固定; bit i 用于 attach 事务掩码)。
+ * safe_level/irq_mode 来自 RevA 图纸: 限位经 U12/U11 反相 → HIGH=未触发, 断开=下降沿触发;
+ * DIAG 沿用原有"上升沿=报警"注册(其物理极性仍是 HARDWARE-PENDING, 未在本轮改动)。 */
 struct safety_input
 {
     const char         *name;
-    void (*isr)(void *args);
+    void              (*isr)(void *args);
+    rt_uint8_t          irq_mode;
+    rt_int32_t          safe_level;
+    const char         *label;
 };
 
 static const struct safety_input st_inputs[] =
 {
-    { PIN_NAME_ESTOP,     estop_isr    },   /* bit 0 */
-    { PIN_NAME_LIMIT_MIN, lim_min_isr  },   /* bit 1 */
-    { PIN_NAME_LIMIT_MAX, lim_max_isr  },   /* bit 2 */
-    { PIN_NAME_TMC_DIAG,  tmc_diag_isr },   /* bit 3 */
+#if SAFETY_LIMIT_INPUTS_ENABLED == RT_TRUE
+    { PIN_NAME_LIMIT_MIN, lim_min_isr,  PIN_IRQ_MODE_FALLING, PIN_HIGH, "LIMIT_MIN_OK" }, /* bit 0 */
+    { PIN_NAME_LIMIT_MAX, lim_max_isr,  PIN_IRQ_MODE_FALLING, PIN_HIGH, "LIMIT_MAX_OK" }, /* bit 1 */
+#endif
+    { PIN_NAME_TMC_DIAG,  tmc_diag_isr, PIN_IRQ_MODE_RISING,  PIN_LOW,  "TMC_DIAG"      },
 };
 
 #define ST_INPUT_N ((int)(sizeof(st_inputs) / sizeof(st_inputs[0])))
@@ -76,6 +94,8 @@ static void safety_handle_events(rt_uint32_t ev)
 {
     if (ev & EVT_ESTOP)
     {
+        /* 历史事件位(黑匣子/状态机兼容保留): 2026-10-21 起**没有 GPIO 生产者** ——
+         * PC.6 是 TMC_ENN 反馈, 板上急停不经 MCU。软件停机 API 与锁存路径仍然保留。 */
         rt_kprintf("[SAFETY] EVT_ESTOP\n");
         safety_force_shutdown(FAULT_ESTOP);
         safety_transition(SAFETY_ESTOP);   /* FAULT_LATCHED -> ESTOP(白名单允许) */
@@ -109,6 +129,14 @@ static void safety_handle_events(rt_uint32_t ev)
     {
         rt_kprintf("[SAFETY] EVT_SOFT_FAULT\n");
         safety_force_shutdown(FAULT_SOFT);
+        return;
+    }
+    if (ev & EVT_DRV_FEEDBACK)
+    {
+        /* 追加(2026-10-21): 驱动请求与最终 TMC_ENN 反馈不一致(说停没停 / 要动没让动 /
+         * 样本不可得)。如实报成"反馈不一致", 不假冒已读到急停按钮状态。 */
+        rt_kprintf("[SAFETY] EVT_DRV_FEEDBACK (drive request vs TMC_ENN feedback mismatch)\n");
+        safety_force_shutdown(FAULT_DRV_FEEDBACK);
         return;
     }
 }
@@ -188,7 +216,7 @@ static void st_irq_rollback(rt_uint32_t attached, rt_uint32_t enabled,
     st_irq_attached = RT_FALSE;
 }
 
-/* 四路 EXTI 注册(一次全开; 极性=上升沿, NC 断开/报警线拉高=触发)。
+/* 活动安全输入的 EXTI 注册(一次全开; 每路用自己的极性/边沿, 见 st_inputs)。
  * Fix A: 事务化 —— 任一步失败逆序 disable+detach, 门保持 CLOSED。可重复调用。 */
 rt_err_t safety_irq_attach(void)
 {
@@ -211,14 +239,15 @@ rt_err_t safety_irq_attach(void)
 
         if (pin < 0)
         {
-            rt_kprintf("[SAFETY] irq attach: %s pin unresolved\n", st_inputs[i].name);
+            rt_kprintf("[SAFETY] irq attach: %s pin unresolved\n", st_inputs[i].label);
             e = -RT_EINVAL;
             break;
         }
-        e = rt_pin_attach_irq(pin, PIN_IRQ_MODE_RISING, st_inputs[i].isr, RT_NULL);
+        e = rt_pin_attach_irq(pin, (rt_uint32_t)st_inputs[i].irq_mode,
+                              st_inputs[i].isr, RT_NULL);
         if (e != RT_EOK)
         {
-            rt_kprintf("[SAFETY] attach %s failed (%d)\n", st_inputs[i].name, e);
+            rt_kprintf("[SAFETY] attach %s failed (%d)\n", st_inputs[i].label, e);
             break;
         }
         attached |= 1u << i;
@@ -226,7 +255,7 @@ rt_err_t safety_irq_attach(void)
         e = rt_pin_irq_enable(pin, PIN_IRQ_ENABLE);
         if (e != RT_EOK)
         {
-            rt_kprintf("[SAFETY] enable %s failed (%d)\n", st_inputs[i].name, e);
+            rt_kprintf("[SAFETY] enable %s failed (%d)\n", st_inputs[i].label, e);
             break;
         }
         enabled |= 1u << i;
@@ -242,9 +271,10 @@ rt_err_t safety_irq_attach(void)
     }
 
     st_irq_attached = RT_TRUE;
-    rt_kprintf("[SAFETY] 4x EXTI attached (ESTOP/LIM_MIN/LIM_MAX/DIAG, rising)."
-               " Gate OPEN.\n");
-    rt_kprintf("[SAFETY] ensure NC->GND wiring before arming!\n");
+    rt_kprintf("[SAFETY] IRQ gate OPEN: %d active protection input(s) registered"
+               " (limits: falling edge / HIGH=safe; diag: rising)\n", ST_INPUT_N);
+    rt_kprintf("[SAFETY] PC.6 = TMC_ENN feedback input, NOT an IRQ source;"
+               " board e-stop cuts the chain in hardware, never via MCU\n");
     return RT_EOK;
 }
 
@@ -252,7 +282,7 @@ rt_err_t safety_irq_attach(void)
 static void st_irq_detach_all(void)
 {
     st_irq_rollback((1u << ST_INPUT_N) - 1u, (1u << ST_INPUT_N) - 1u, "detach");
-    rt_kprintf("[SAFETY] IRQ gate CLOSED - 四路安全输入无软件响应路径\n");
+    rt_kprintf("[SAFETY] IRQ gate CLOSED - 活动安全输入(%d 路)无软件响应路径\n", ST_INPUT_N);
 }
 
 rt_bool_t safety_irq_attached(void) { return st_irq_attached; }
@@ -264,11 +294,22 @@ rt_bool_t safety_protection_ready(void)
     if (!st_irq_attached || !st_polarity_validated) return RT_FALSE;
     if (!safety_gpio_ready()) return RT_FALSE;
 
-    /* 四路可解析且当前全部处于安全电平(0, NC+上拉方案) */
+    /* 活动输入逐路按各自的 safe_level 判定(限位宏关闭时循环里只有 DIAG)。 */
     for (i = 0; i < ST_INPUT_N; ++i)
     {
         rt_base_t pin = safety_pin(st_inputs[i].name);
-        if (pin < 0 || rt_pin_read(pin) != PIN_LOW) return RT_FALSE;
+        if (pin < 0 || rt_pin_read(pin) != st_inputs[i].safe_level) return RT_FALSE;
+    }
+
+    /* 静止(未建立使能请求)时还必须看到 ENN 反馈确实在禁能侧; 已经请求使能时
+     * 这一条**不适用**(否则 arm 之后正常的 ENN LOW 会让 start 永远失败),
+     * 使能侧的一致性由 motor.c 在 arm/start/运行守卫决策点按请求态判定。 */
+    {
+        rt_int32_t req = -1, pad = -1, fb = -1;
+        rt_bool_t  fb_ok = RT_FALSE;
+
+        safety_fb_snapshot(&req, &pad, &fb, &fb_ok);
+        if (req != PIN_HIGH && safety_fb_now(0u) != SAFETY_FB_OK) return RT_FALSE;
     }
     return RT_TRUE;
 }
@@ -289,10 +330,26 @@ static void st_print_inputs(void)
         rt_base_t pin = safety_pin(st_inputs[i].name);
 
         if (pin < 0)
-            rt_kprintf("[SAFETY] %-11s pin=UNRESOLVED raw=-\n", st_inputs[i].name);
+            rt_kprintf("[SAFETY] %-12s pin=UNRESOLVED raw=- safe=%d (counts as NOT ready)\n",
+                       st_inputs[i].label, (int)st_inputs[i].safe_level);
         else
-            rt_kprintf("[SAFETY] %-11s pin=%d raw=%d\n",
-                       st_inputs[i].name, (int)pin, (int)rt_pin_read(pin));
+            rt_kprintf("[SAFETY] %-12s pin=%d raw=%d safe=%d irq=%s %s\n",
+                       st_inputs[i].label, (int)pin, (int)rt_pin_read(pin),
+                       (int)st_inputs[i].safe_level,
+                       st_inputs[i].irq_mode == PIN_IRQ_MODE_FALLING ? "FALLING" : "RISING",
+                       rt_pin_read(pin) == st_inputs[i].safe_level ? "[safe]" : "[!!ACTIVE!!]");
+    }
+
+    rt_kprintf("[SAFETY] LIMIT inputs config = %s (SAFETY_LIMIT_INPUTS_ENABLED;"
+               " OFF => PF.14/PF.15 不解析/不配置/不读/不注册, 也不参与就绪判定)\n",
+               safety_limit_inputs_enabled() ? "ENABLED" : "DISABLED_BY_CONFIG");
+    {
+        rt_base_t fb = safety_pin(PIN_NAME_ENN_FEEDBACK);
+
+        rt_kprintf("[SAFETY] %-12s pin=%s raw=%s = TMC_ENN feedback (HIGH=disabled side)."
+                   " NOT an e-stop input, no IRQ registered on it\n",
+                   "PC.6(ENN_FB)", fb < 0 ? "UNRESOLVED" : "ok",
+                   fb < 0 ? "-" : ((rt_pin_read(fb) == PIN_HIGH) ? "HIGH" : "LOW"));
     }
 }
 
@@ -322,9 +379,11 @@ static void safety_irq_enable(void)
     {
         rt_kprintf("[SAFETY] irq enable REFUSED: input polarity NOT confirmed\n");
         rt_kprintf("[SAFETY] hardware wiring is HARDWARE-PENDING. After measuring\n");
-        rt_kprintf("[SAFETY] NC+pull-up levels by hand run:\n");
+        rt_kprintf("[SAFETY] the ACTIVE inputs by hand (limits: HIGH=safe via U12/U11;\n");
+        rt_kprintf("[SAFETY] diag: as documented) run:\n");
         rt_kprintf("[SAFETY]   safety_polarity_confirm CONFIRM\n");
         rt_kprintf("[SAFETY] Dangling inputs with EXTI enabled cause interrupt storm.\n");
+        rt_kprintf("[SAFETY] PC.6(TMC_ENN feedback) is not part of this gate - it has no IRQ.\n");
         return;
     }
     (void)safety_irq_attach();
@@ -340,7 +399,7 @@ static void safety_irq_disable(void)
     }
     st_irq_detach_all();
 }
-MSH_CMD_EXPORT(safety_irq_disable, close safety EXTI gate and detach all four);
+MSH_CMD_EXPORT(safety_irq_disable, close safety EXTI gate and detach active inputs);
 
 /* 真机极性验证完成后的人工声明(硬件 pending, 软件不做任何推断)。
  * Fix A: 必须带字面量参数 CONFIRM —— 无参数/错参数一律拒绝, 防误触。 */
@@ -353,11 +412,14 @@ static void safety_polarity_confirm(int argc, char **argv)
         return;
     }
 
-    rt_kprintf("[SAFETY] current raw input levels (operator must have MEASURED these):\n");
+    rt_kprintf("[SAFETY] current raw levels of the ACTIVE protection inputs"
+               " (operator must have MEASURED these):\n");
     st_print_inputs();
     rt_kprintf("[SAFETY] NOTE: this is an OPERATOR DECLARATION. Software does NOT\n");
     rt_kprintf("[SAFETY]       verify wiring. Status stays HARDWARE-PENDING for the\n");
     rt_kprintf("[SAFETY]       hardware chain; only the polarity flag changes here.\n");
+    rt_kprintf("[SAFETY]       User-confirmed wire names / gate replacement are NOT a\n");
+    rt_kprintf("[SAFETY]       measurement and never set this flag by themselves.\n");
 
     st_polarity_validated = RT_TRUE;
     rt_kprintf("[SAFETY] input polarity MARKED VALIDATED (operator confirm)\n");

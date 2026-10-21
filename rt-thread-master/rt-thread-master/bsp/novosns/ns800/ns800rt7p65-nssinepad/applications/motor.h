@@ -26,6 +26,21 @@
  * FAULT + EVT_SOFT_FAULT; motor_start 起转前额外持配置事务做一次芯片实值复核。
  * ⚠ 这是软件层第二响应, 检测延迟最坏 ≈ 周期 + 一轮复核(≈400ms 量级, 未上板实测),
  *   不能当作停机时延指标, 也不能替代硬件独立切断。详见 motor.c 的 R05 记录。
+ *
+ * ENN 状态反馈适配(2026-10-21, 用户确认 PC.6 = 扩展板 H6-5/TMC_ENN + RevA 图纸核对):
+ *   - 判定按**当前许可请求态**做, 不看 READY/IDLE 单一状态(motor_stop 停脉冲但仍 armed):
+ *       请求禁能 → 期望 焊盘 LOW + 反馈 HIGH
+ *       请求使能 → 期望 焊盘 HIGH + 反馈 LOW
+ *     因此 arm 前(禁能侧)与 arm 后(start 前, 使能侧)两阶段各自成立, 不存在
+ *     "PC6 必须一直为高否则永远 start 失败"的阶段死锁。
+ *   - 接到实际决策点: 门掩码/臂成前/臂成后确认/start 前/armed 期每拍(无 UART 路径)/
+ *     disarm·紧急停机的报告/故障清除(fault_reset)/TMC 静止写门/诊断 STEP 借用门。
+ *   - 反馈读不到时**照旧**停 STEP、撤销许可并锁存故障, 只是不允许声称整链已安全。
+ *   - 反馈 LOW 不证明有转矩; 反馈 HIGH 不证明模块真的断电; 线路完整性仍属硬件验收。
+ *   - 有界确认窗口(safety_gpio 的 DRV_FB_TRIES/SETTLE_MS)是**测试可见常数**,
+ *     不是停机时延上界; RISK-03/03a 继续开放, 本轮不重构线程。
+ *   - 行程限位由 SAFETY_LIMIT_INPUTS_ENABLED(project_board.h)决定是否进入活动输入集,
+ *     与"硬件验证宏"职责不同, 互不替代。
  */
 #ifndef MOTOR_H
 #define MOTOR_H
@@ -48,18 +63,23 @@
 #define STEP_DIAG_ISOLATED_ENV_CONFIRMED       RT_FALSE
 #endif
 
-/* motor_arm() 门禁位定义(motor_arm_gate_mask()/motor_get_gate_fail_mask 用) */
+/* motor_arm() 门禁位定义(motor_arm_gate_mask()/motor_get_gate_fail_mask 用)。
+ * bit0..bit4 是既有五门, **含义不得重排或复用**; bit5 是 2026-10-21 **追加**的
+ * ENN 反馈门(第 4 门内部已按新的活动输入集合适配, 不是把就绪写成恒真)。 */
 #define MOT_GATE_ENABLE_PATH   (1u << 0)   /* 硬件使能链未验收 */
 #define MOT_GATE_NOT_READY     (1u << 1)   /* 安全状态机不在 READY */
 #define MOT_GATE_UNHEALTHY     (1u << 2)   /* 本子系统不健康/无 PWM 设备 */
 #define MOT_GATE_NOT_PROTECTED (1u << 3)   /* Fix A: Safety 保护链未就绪 */
 #define MOT_GATE_NO_DRV_CONFIG (1u << 4)   /* Phase 8-F2: TMC 驱动参数未下发/下发失败 */
+#define MOT_GATE_FB_MISMATCH   (1u << 5)   /* 追加: 最终 ENN 反馈与当前许可请求不一致 */
 
-/* 运行期配置守卫(F2b P1-E)导致停机的原因码, 写入快照 guard_reason */
+/* 运行期配置守卫(F2b P1-E)导致停机的原因码, 写入快照 guard_reason。
+ * 0..3 为既有编码; 4 是 2026-10-21 追加的反馈不一致(不复用旧值)。 */
 #define MOT_GUARD_NONE          0u
 #define MOT_GUARD_CFG_LOST      1u   /* 驱动配置状态/快照已不再有效 */
 #define MOT_GUARD_INTEGRITY     2u   /* 复核读不到 或 现值偏离已下发值(断电/复位) */
 #define MOT_GUARD_TXN_BUSY      3u   /* 配置事务连续占用超过上限, 无法复核 */
+#define MOT_GUARD_ENN_FEEDBACK  4u   /* 追加: 请求与 TMC_ENN 反馈不一致(反馈, 不是急停按钮) */
 #define MOT_GUARD_BUSY_MAX      3u   /* 上面这条的上限(单位: 守卫周期) */
 
 typedef enum
@@ -90,16 +110,19 @@ typedef struct
  * DRV_ENABLE 写 LOW 并回读确认(确认失败 → health=FAILED, 返回错误)。 */
 rt_err_t motor_init(void);
 
-/* 申请使能。门禁(五项全部满足才放行):
+/* 申请使能。门禁(五项全部满足才放行, 2026-10-21 追加第 6 位反馈条件):
  *   1. MOTOR_HARDWARE_ENABLE_PATH_VALIDATED == RT_TRUE   (硬件链验收)
  *   2. safety 状态机处于 READY                            (状态机放行)
  *   3. 本子系统健康且 PWM 设备可用                        (软件健康)
  *   4. safety_protection_ready() == TRUE                  (IRQ 门 OPEN +
- *      极性操作员 CONFIRM + 四路输入实测安全电平)
+ *      极性操作员 CONFIRM + **活动输入集合**逐路实测安全电平;
+ *      限位宏关闭时该集合只有 DIAG, 且 PC.6 不再当作急停输入)
  *   5. TMC2209 驱动参数已 CONFIGURED                      (Phase 8-F2: 电流档位
  *      未知/未下发时不得使能; apply 失败即长期占住此门)
- * 五项全部无条件求值(均为无副作用只读), 拒绝原因以位掩码保留, 便于真机确认
- * 第 4、5 门确实参与判定。 */
+ *   6. (追加 MOT_GATE_FB_MISMATCH)最终 ENN 反馈与当前许可请求一致
+ * 全部门禁无条件求值(均为无副作用只读), 拒绝原因以位掩码保留, 便于真机确认各门
+ * 确实参与判定。arm 内部还额外做: 请求前确认禁能侧反馈一致 → 写 HIGH+回读 →
+ * 有界确认使能侧反馈一致, 任一步不成就回滚撤销许可并投递反馈不一致事件。 */
 rt_err_t motor_arm(void);
 
 /* 解除使能: 停脉冲 + DRV_ENABLE 写 LOW 并回读确认 + 回 IDLE(不经 DECEL)。
