@@ -379,6 +379,79 @@
       "sensor_service estop field / blackbox flags bit8 / valid_safety semantics (registered, out of scope)",
       "wire attribution evidence for TMC_ENN <-> PC.6 (drawing does not show it; user confirmation only)"
     ],
-    "stop_point_rework": "push to phase8/tmc-drive-config, git ls-remote full-SHA read-back + remote blob re-verify, then STOP for the reviewer's re-review; no hardware execution, no motion test, no automatic F2e/F3 entry"
+    "stop_point_rework": "push to phase8/tmc-drive-config, git ls-remote full-SHA read-back + remote blob re-verify, then STOP for the reviewer's re-review; no hardware execution, no motion test, no automatic F2e/F3 entry",
+    "review_result": {
+      "review_document": "NS800_IO70_Rework_Review_296c369_20261021.md",
+      "conclusion": "SOFTWARE_REVIEW_GO",
+      "accepted_sha": "296c369607ea69c201f797b80950b76ff312c0e0",
+      "accepted_tree": "61999121d2c913a7dfcbda96dde269076b9b6127",
+      "items_closed": [
+        "IO70-NEW-01",
+        "IO70-NEW-02"
+      ],
+      "new_rework_items": 0,
+      "scope_limit": "已审源码 + 主机逻辑 + 验证接入；不构成硬件安全链验收，不授权任何硬件动作",
+      "reviewer_independent_checks": [
+        "独立检出固定 SHA、读 Git 对象与 diff、重跑 ls-remote、工作树 clean、冻结对象回读一致",
+        "复用仓外复现夹具直接调用本次生产代码: flip/lost 保持 FAULT_LATCHED fault=9, control 得 MANUAL_CLEAR fault=0; arm 后切断 protection_ready=0 gate_mask=0x28 (LIMIT-OFF/ON 一致)",
+        "把新夹具与 runner 配回 cd337b4 生产原文复现 4 个修前 FAIL (cases=40 pass=36 fail=4, BASELINE_RUNNER_RC=1)",
+        "Linux/GCC 13.3.0 独立复跑: 138 PASS、非法宏拒绝、反向 2/2+2/2+3/3、旧链 V1 25 / V2 22 / 13 例 / 8 组",
+        "独立确认相对 cd337b4 未改 motor.*/tmc2209.*/supervisor.c/sensor_service.c/project.uvprojx"
+      ],
+      "reviewer_disclosed_limits": [
+        "元负例首轮组合运行终态不完整, 分两组补齐后才核验终态 => 不声称一次未中断的连贯全绿",
+        "云端未重跑 Keil、未取完整原始构建日志; 尺寸数字仅作链接结果记录",
+        "pthread 兼容头环境不等于原生 Windows/目标 RT-Thread 的调度、优先级继承、中断或物理时序验证"
+      ]
+    }
+  },
+  "acceptance_checklist_v04": {
+    "date": "2026-10-21",
+    "file": "reports/plans/phase8-safety-chain-acceptance-draft.md",
+    "status": "DRAFT / NOT EXECUTED / 判据仍待复审方与用户确认",
+    "nature": "纯文档: 把 C 节矩阵落成 H 节有序步骤; 未执行清单中任何一步",
+    "sections_added": [
+      "H.0 使用规则",
+      "H.1 待填参数 P-1..P-7",
+      "H.2 步骤 S0..S3 (H-01..H-13)",
+      "H.3 记录模板",
+      "H.4 步骤与 C 节用例映射",
+      "H.5 本轮新增的软件侧依据"
+    ],
+    "power_state_groups": {
+      "S0": "断电 (H-01..H-04)",
+      "S1": "上电且 TMC 模块拔出 (H-05..H-07)",
+      "S2": "上电、模块在位、电机未接 (H-08..H-12)",
+      "S3": "停机时延三段 (H-13)"
+    },
+    "still_blocked": {
+      "H-11": "BLOCKED_METHOD - 把 MCU_DRV_ENABLE 合法拉到 HIGH 的合规激励方法未定; 明令禁止裸 GPIO/临时命令/跳线/翻宏 (= 旧 D2)",
+      "H-10": "BLOCKED_INSTRUMENT - 复位保持期与上电瞬态需要示波器/逻辑分析仪, 当前无示波器 (= 旧 D3)",
+      "H-13": "BLOCKED_INSTRUMENT + 指标未批准 + 依赖 H-11 合法激励 (= 旧 L3)",
+      "H-07/H-12": "依赖 P-2 触点形式定论 (D-4) 才能排期"
+    },
+    "firmware_scope_rule": "仪表类步骤与固件版本无关; 依赖新打印/新 2g 自检行的 H-09 必须先取得 P-4 烧录授权 —— 禁止用冻结固件 e40a9b9 的旧 PC.6(急停) 打印冒充 ENN 反馈证据",
+    "params_needed": [
+      "P-1 网表/BOM+连线表 (=D-2)",
+      "P-2 急停/限位触点形式与端子 (=D-4)",
+      "P-3 仪器条件 (=D-5)",
+      "P-4 是否允许烧录 296c369",
+      "P-5 整机断电的确切动作",
+      "P-6 换件后器件料号 (无则记未记录)",
+      "P-7 执行人/板卡/时间与记录载体"
+    ],
+    "docs_updated": [
+      "BSP README.md (覆盖说明新增第 ⑤ 条 GO)",
+      "BSP 开发进度.md (阶段表状态行 + GO 小节 + 头部修改时间)",
+      "BSP 待办事项.md (🔴 首条改为 GO 收口 + H 节参数/授权前置)",
+      "reports/plans/phase8-safety-chain-acceptance-draft.md (v0.4: H 节 + 头部 GO 行 + A27 引用 + C/E/G/D 节交叉指针)"
+    ],
+    "not_executed": [
+      "未执行 H 节任何步骤",
+      "无上电/断电测量/烧录/复位/串口/真实寄存器读写",
+      "未改接线/换器件/接电机/输出 STEP/翻宏",
+      "未把 BLOCKED_METHOD 或 BLOCKED_INSTRUMENT 写成已解决",
+      "未新增诊断命令、占位跳线或自造的合规激励方案"
+    ]
   }
 }
