@@ -1,0 +1,72 @@
+# 既有回归链在返修后源码上的真实执行（2026-10-21）
+# 链入口: bash tests/host/run_negatives.sh（含 run_meta_negatives.sh 子链）
+# 链基线(BASE_HEAD，即被编译快照): 762604ebe98a986113e87c964600b2bffb0a4f4d
+#   —— 这正是 IO70-NEW-01/02 返修提交，因此本文件描述的是**最终源码**，不是修复前的 cd337b4。
+# ⚠ 旧链(host_main.c)仍把 safety_gpio/safety_thread/safety_state/step_pwm 整体替换为桩：
+#   它的 25/22 不覆盖本轮被改的真实安全模块；真实覆盖只在新 I/O 链(见 io_rework_ledger.txt)。
+#   本轮未放宽旧链任何断言；旧链桩里"反馈一致"的默认值未改动。
+
+## 1. 干净快照回归 N11 / 工作树回归 N12 的 V1/V2 判据计数（未放宽）
+
+```text
+HOST TEST SUMMARY: CHECK_PASS=25 CHECK_FAIL=0 BAD_SELFTEST=0 MISSING_CASE=0     <- V1(目标三宏 FALSE)
+HOST TEST SUMMARY: CHECK_PASS=22 CHECK_FAIL=0 BAD_SELFTEST=0 MISSING_CASE=0     <- V2(仅主机覆盖)
+  V1 build=0 run=0 state=RAN    V2 build=0 run=0 state=RAN
+```
+
+N12_workspace_clean_regression 同为 CHECK_PASS=25 / CHECK_PASS=22，其余三项均 0。
+
+## 2. 13 例负例矩阵（真实 / 自报 / 期望三个 rc，逐例判定）
+
+```text
+OK | N1_only_V1_injected_fail | rc 真实=1 自报=1 期望=1 | V1=RAN/0/1 V2=RAN/0/0 (期望 V1=RAN/0/1 V2=RAN/0/0)
+OK | N2_only_V2_injected_fail | rc 真实=1 自报=1 期望=1 | V1=RAN/0/0 V2=RAN/0/1 (期望 V1=RAN/0/0 V2=RAN/0/1)
+OK | N3_V1_stale_exe_not_reused | rc 真实=1 自报=1 期望=1 | V1=COMPILE_FAILED/1/127 V2=RAN/0/0 (期望 V1=COMPILE_FAILED/1/127 V2=RAN/0/0)
+OK | N4_fw_calc_selftest_FAILED | rc 真实=2 自报=2 期望=2 | V1=RAN/0/2 V2=RAN/0/2 (期望 V1=RAN/0/2 V2=RAN/0/2)
+OK | N5_fw_cfg_selftest_INCOMPLETE | rc 真实=2 自报=2 期望=2 | V1=RAN/0/2 V2=RAN/0/0 (期望 V1=RAN/0/2 V2=RAN/0/0)
+OK | N6_helper_thread_create_fail | rc 真实=3 自报=3 期望=3 | V1=RAN/0/3 V2=RAN/0/3 (期望 V1=RAN/0/3 V2=RAN/0/3)
+OK | N7_helper_thread_startup_fail | rc 真实=3 自报=3 期望=3 | V1=RAN/0/3 V2=RAN/0/3 (期望 V1=RAN/0/3 V2=RAN/0/3)
+OK | N8_gstat_expect_table_tamper | rc 真实=1 自报=1 期望=1 | V1=RAN/0/1 V2=RAN/0/0 (期望 V1=RAN/0/1 V2=RAN/0/0)
+OK | N9_probe_writeback_V1 | rc 真实=1 自报=1 期望=1 | V1=RAN/0/1 V2=NOT_RUN/NOT_RUN/NOT_RUN (期望 同)
+OK | N10_probe_writeback_V2 | rc 真实=1 自报=1 期望=1 | V1=NOT_RUN/NOT_RUN/NOT_RUN V2=RAN/0/1 (期望 同)
+OK | N10b_writeback_both_variants | rc 真实=1 自报=1 期望=1 | V1=RAN/0/1 V2=RAN/0/1 (期望 V1=RAN/0/1 V2=RAN/0/1)
+OK | N11_clean_snapshot_regression | rc 真实=0 自报=0 期望=0 | V1=RAN/0/0 V2=RAN/0/0 (期望 V1=RAN/0/0 V2=RAN/0/0)
+OK | N12_workspace_clean_regression | rc 真实=0 自报=0 期望=0 | V1=RAN/0/0 V2=RAN/0/0 (期望 V1=RAN/0/0 V2=RAN/0/0)
+```
+
+合计 OK=13 / NOT-DETECTED=0 / INFRA-FAIL=0；失败身份（类别名 + 每变体 RAN/COMPILE_FAILED/NOT_RUN +
+三个 rc）与登记表逐项一致，N3 仍证明"编译失败不跑旧产物"，N9/N10/N10b 仍证明写回投毒被拒绝。
+
+## 3. 8 组元负例与对照（按**正确原因**被拒绝）
+
+```text
+META-OK | M1_blinded_fd7b
+CONTROL-OK | M1_control_unblinded
+META-OK | M2_stubbed_compile
+CONTROL-OK | M2_control_real_compiler
+META-OK | M3_runner_exit_zero_lost
+CONTROL-OK | M3_control_unmodified
+META-OK | M4_selection_semantics
+META-OK | M5_wrong_reason_guard
+
+已执行元负例组: M1 M1c M2 M2c M3 M3c M4 M5 / 请求组: M1 M1c M2 M2c M3 M4 M5
+RUNNER(meta): 全部元负例按**正确原因**被拒绝, 对照组按预期通过, 集合一致 (rc=0)
+```
+
+M4 子链明细（选择语义，本轮仍真执行）：歧义前缀在执行前被拒绝且 0 例被误跑（rc=4）；
+未知选择被拒绝并列出登记表（rc=4）；无歧义前缀真跑 1 例且集合一致（rc=0）。
+M5 证明"原因不符"不会被记成 META-OK（嵌套链以 rc=4 INFRA 失败，与正确原因 rc=1/NOT-DETECTED 不同）。
+
+## 4. 链尾与真实退出码
+
+```text
+RUNNER(run_negatives): 所有负例按预期被检出且身份齐备; 干净回归通过 (rc=0)
+RUNNER(meta) rc=0
+本次后台执行的真实进程退出码 = 0
+```
+
+## 5. 本轮未做
+
+- 未重跑 R4 路径守卫沙盒（该路径本轮未改动，任务书第 7 节明确不需要）。
+- 未修改旧链任何断言、判据计数或失败标准；未扩建 runner/元负例/哈希工具。
+- 未生成 ZIP，未 force push，未改写已推送提交（cd337b4 保持原样，返修另起新提交）。

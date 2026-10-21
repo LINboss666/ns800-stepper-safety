@@ -129,6 +129,9 @@ B1/B2/B3、L0/L1/L2 与 D6/D7、C9、D 表关闭两项、E 节维修后验收准
 
 ## 8. 停止点
 
+（本节记录**首次交付**的停止点；独立复审已给出 `SOFTWARE_REVIEW_REWORK` 与两项返修，
+其修复与复跑见第 9 节。第 1～7 节的口径保留原文不改写，其中"证据文件清单"不含第 9 节新增的三份。）
+
 普通提交 + 普通 push 到 `phase8/tmc-drive-config`，`git ls-remote` 回读完整 SHA 与本地 HEAD 一致后 **STOP**：
 
 - 等待 ChatGPT 对**实际源码**的独立复审；不拿 F2d 的旧 `SOFTWARE_REVIEW_GO` 代替本轮审核；
@@ -136,3 +139,64 @@ B1/B2/B3、L0/L1/L2 与 D6/D7、C9、D 表关闭两项、E 节维修后验收准
 - 不自动进入运动测试，不重开 F2d 工具返修；
 - 用户本轮已确认的三项（现板=该图纸、`PC.6`=H6-5 反馈、坏门已更换）**不再作为待回答问题**；
   仍缺的只有：连线归属证据（网表/截图）、外部触点形式、仪器条件。
+
+## 9. 独立复审返修（同日追加，返修基线 = 审查对象 `cd337b4d013f7ef7f579ea57a42fdcc820befafb`）
+
+复审件：`NS800_IO70_Review_cd337b4_20261021.md`，结论 **SOFTWARE_REVIEW_REWORK**（两项，修复后再审）。
+本报告不重开 F2d/R1–R4 工具循环，也不把第 1～7 节的历史口径改写。返修范围按复审 §7 限定执行。
+
+### 9.1 IO70-NEW-01（P1）：故障清除忽略"最后一次关闭动作已观测到的坏反馈"
+
+缺陷（`safety_state.c:fault_reset`）：顺序是 预检查 `safety_drv_feedback_confirm(0)` →
+`motor_disarm()`（内部再写许可 LOW 并读一次 ENN）→ 清故障码 → 进 `MANUAL_CLEAR`。
+`disarm` 读到的 `UNEXPECTED_ENABLE` / `NO_SAMPLE` 只打印警告，返回值仍是焊盘写入结果，
+于是外层打印 `ENN feedback on disabled side confirmed` 并把故障码归零。
+
+修复：在 **disarm 之后**（清除路径上最后一次可能改变许可的动作）再做一次同源的有界禁能侧确认；
+不匹配 / 样本不可得 / 窗口内仍在过渡 ⇒ 保持原锁存与非零故障码，且不打印"最终禁能已确认"。
+约束都守住了：停 STEP 与撤销许可由 `motor_disarm()` **先行照做、不回退**；确认函数只做
+`rt_pin_read` + 有界采样，不在底层 GPIO 路径递归调用停机或状态机；锁序仍是 `ss_lock` →
+（`disarm` 内部短暂取放 `mot_lock`），与 `safety_force_shutdown()` 一致；有界窗口仍是既有
+`DRV_FB_TRIES × DRV_FB_SETTLE_MS`，**不是**时延上界声明；`motor_disarm()` 公开返回值语义未改
+（选择"清除后复核"方案而非"让 disarm 传播失败"，因此 `motor.h` 无需改注释）。
+
+### 9.2 IO70-NEW-02（P2）：已建立使能请求后保护就绪跳过反馈检查
+
+缺陷（`safety_thread.c:safety_protection_ready`）：`if (req != PIN_HIGH && safety_fb_now(0u) != OK) return FALSE;`
+—— 请求为 HIGH 时**整个跳过**反馈条件，故 `CUT_BY_HARDWARE` / `NO_SAMPLE` 也返回就绪。
+
+修复：按当前已确认请求侧取期望 —— `want = (req == PIN_HIGH) ? 1 : 0`，再要求
+`safety_fb_now(want) == SAFETY_FB_OK`。这样 arm 之后正常的 ENN LOW 仍就绪（不制造 arm→start 死锁），
+而 `CUT_BY_HARDWARE` / `PAD_MISMATCH` / `NO_SAMPLE` 一律不放行。活动输入集合、IRQ 门、人工极性确认
+等原有条件与 `motor.c` 在 arm/start/运行守卫上的同源判定都保留不变；`safety_thread.h` 接口注释同步。
+
+### 9.3 新增用例与"修前 FAIL"实证
+
+台账新增 7 个必需用例（登记在 `run_io_behavior.sh` 的 `OVERRIDE_CASES`，LIMIT-OFF/ON 两个 OVERRIDE
+变体各自真执行）：`IO4c/IO4d/IO4e/IO4f`（就绪 API 按请求侧判定的直接断言）与
+`IO7d/IO7e/IO7f`（预检查过了但 disarm 把反馈读坏 ⇒ 保持锁存；`IO7f` 为不布防对照）。
+仿真核新增一次性注入 `io_sim_flip_chain_on_disable_write()` + `io_sim_flip_armed()`
+（下一次向许可脚写 LOW 时切坏外部链），仅存在于 `tests/host/`，不进生产、不进 Keil。
+
+- 修前（生产源码 = `cd337b4`，用例已加，`ONLY=off_ovr`）：`IO4d`、`IO4e`、`IO7d`、`IO7e` 四例 **FAIL**，
+  `SUMMARY|cases=40|pass=36|fail=4`，proc_rc=1，runner `FAIL (rc=1)` —— 用例确实抓到这两项缺陷。
+- 修后（同一 runner）：`off_target 27` / `on_target 29` / `off_ovr 40` / `on_ovr 42` = **138 例全部 PASS**，
+  自报 `fail=0`、逐变体 proc_rc=0、非法宏值仍被编译拒绝，runner rc=0。
+- 三项反向验证复跑仍 META-OK（命中 2/2、2/2、3/3 个指定业务失败身份）。
+- 既有回归在返修提交上重跑：V1 `CHECK_PASS=25`、V2 `CHECK_PASS=22`（其余三项 0）、
+  13 例负例 OK=13（真实/自报/期望 rc 一致）、8 组元负例与对照全部按正确原因被拒 / 对照通过，
+  链真实 rc=0。旧链断言未放宽，`tests/host/host_main.c` 本轮未改动。
+- Keil `UV4 -r`（Rebuild All）：**0 Error / 0 Warning**，UV4 退出码 0，131 编译单元，
+  `Code=147610 RO-data=64214 RW-data=2176 ZI-data=83404`（返修前 147522/64038/2176/83404）。
+  构建钩子再次只读复核：BeforeCompile/BeforeMake 关闭且命令为空，AfterMake 仅 `fromelf --bin`；
+  工程内主机注入宏/夹具命中数 0；三道硬件宏仍 `RT_FALSE`，`SAFETY_LIMIT_INPUTS_ENABLED` 仍默认 `RT_FALSE`。
+
+返修改动文件（6 个）：`applications/safety_state.c`、`applications/safety_thread.c/.h`、
+`tests/host/io_main.c`、`tests/host/run_io_behavior.sh`、`tests/host/shim_io/rtdevice.h`。
+新增证据（3 份，脱敏文本）：`io_rework_ledger.txt`、`regression_rerun_after_rework.txt`、
+`keil_rebuild_all_after_rework.txt`。未触碰 UART/配置算法、Keil 工程、线程结构、黑匣子格式、
+`sensor_service.c`；未重跑未改动的 R4 路径守卫；未新建 runner/元负例/哈希工具。
+
+返修后仍**未执行任何硬件动作**（不烧录、不复位、不接触 COM5、不向真实 TMC 读写、不通断电测量、
+不改线、不接电机、不输出 STEP、不翻硬件门禁宏）。新逻辑仍未在板上运行（板上仍是冻结固件 `e40a9b9`）。
+第 6 节登记的 `sensor_service`/黑匣子字段语义与 RISK-03/03a/04 继续开放。

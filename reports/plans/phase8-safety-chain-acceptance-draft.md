@@ -11,6 +11,7 @@
 | 上一轮文档基线 | `f52f6374a36847b7e2f719eb1fa6cdab0a85e6dc`（v0.1 草案 + F2d 软件收口） |
 | 代码复审对象 | `32f3a416bdf8c20e96d3ae41f314c236c96b5d61`（`SOFTWARE_REVIEW_GO`，限定软件与主机验证工具范围） |
 | 本轮实现提交 | `c8d9719f7b222c919d4d06cb8ad7455baf5cad94`（输入职责适配 + 新主机 I/O 链 + Keil 0/0；**未烧录**，板上仍是冻结固件） |
+| 同轮返修 | 复审件 `NS800_IO70_Review_cd337b4_20261021.md`（`SOFTWARE_REVIEW_REWORK`，审查对象 `cd337b4`）→ IO70-NEW-01/02 已于 `762604ebe98a986113e87c964600b2bffb0a4f4d` 关闭，等待对返修源码的再审（见 A27） |
 | 代码状态 | 三道硬件宏仍 `RT_FALSE`；`SAFETY_LIMIT_INPUTS_ENABLED` 目标默认 `RT_FALSE`（限位实现保留，开启分支只在主机侧执行过） |
 | 优先风险 | **RISK-04 = 更换后硬件链与反馈一致性待验收** > RISK-03 / RISK-03a（停机时延无上界证明） |
 
@@ -79,6 +80,7 @@ SHA-256 `7b5d5325d4f73f43da916149d1972e95a048d6138ea83f98476f5d2fd5b05a0f`，305
 | A24 | 板上固件仍是**冻结固件** `e40a9b95ef709e6a80444f9f3949dfdd70ba96ba`（标签 `v0.7-phase7-software-board-validated` 的目标提交）。把该提交与分支 HEAD 的 MSH 导出表逐项对比：`motor_drv_guard_probe`、`motor_drv_guard_selftest`、`tmc_cfg_selftest`、`tmc_calc_selftest`、`tmc_config_apply`、`tmc_config_show` **只存在于分支 HEAD，板上固件里没有**；`runtime_selftest` 两边都有但内容不同（Phase 8 的 2e/2f 两步不在冻结版中：冻结版 `supervisor.c` 无 `step-diag-permission`/`write-gate` 检查，`SELFTEST` 行数 25 vs 32）。没有新的烧录证据就不能假定新命令已上板 | `[S]` `git show e40a9b9:…/applications` 与 HEAD 对比（本轮实际执行，纯仓库内只读） |
 | A25 | **2026-10-21 固件已按新职责适配（离线开发与主机验证，未上板）**：`PC.6` 更名 ENN 反馈输入且不注册 ISR；新增"按许可请求态"判定的反馈纯函数 + 有界确认（3 次采样，`safety_gpio.c`），接进 `motor_arm`（请求前确认禁能侧、写后确认使能侧，失败回滚撤销许可）、`motor_start`（起转前按使能侧确认）、armed 期每拍无 UART 复核（新原因 `MOT_GUARD_ENN_FEEDBACK=4`）、`motor_disarm`/`motor_emergency_stop` 报告、`fault_reset`（未确认禁能侧不得清除故障）、TMC 静止写门（新位 `TMC_WGATE_ENN_FB_NOT_DISABLED`）、诊断 STEP 借用门；门禁掩码追加 `bit5 MOT_GATE_FB_MISMATCH`，故障码追加 `FAULT_DRV_FEEDBACK=11`、事件位 `EVT_DRV_FEEDBACK=bit7`（**只追加，未重排旧编号**）；两路限位改为 `SAFETY_LIMIT_INPUTS_ENABLED` 控制（默认关闭；开启时 HIGH=安全、LOW=触发、下降沿） | `[S]` 提交 `c8d9719`；证据：`reports/reviews/phase8-io70-optional-limits/`（新 I/O 链 4 变体 124 例真执行、3 项反向验证命中业务失败身份、既有 V1 25/V2 22 + 13 例 + 8 组不变、Keil Rebuild All 0/0）。**这些都不构成硬件验收** |
 | A26 | **遗留依赖（本轮未顺手改）**：`applications/sensor_service.c` 在允许清单之外，仍用别名 `PIN_NAME_ESTOP` 读同一颗脚，并把该电平写进传感器帧 `estop` 字段与黑匣子 `record.flags` bit8；限位宏关闭时两路限位不再被解析，`sensor_frame.valid_safety`（要求四路可解析）会变为 0，数字输入组按 N/A 记录。需要单独一轮把帧字段语义与 `valid_safety` 判据改成"按活动输入集合" | `[S]` `APP/sensor_service.c:116-128`、`APP/blackbox.c:139-156`（本轮只读核对，未修改） |
+| A27 | **2026-10-21 独立复审给出的两项返修已关闭（软件侧，仍非硬件验收）**：① IO70-NEW-01 —— `fault_reset` 原先在"预检查通过 → `motor_disarm()` 再写许可 LOW 并读一次反馈 → 清故障码"的顺序里，把 `disarm` 读到的 `UNEXPECTED_ENABLE`/`NO_SAMPLE` 只当打印，现改为在 **disarm 之后**再做一次同源有界禁能侧确认，失败保持锁存与非零故障码（关断动作照做、不回退、不递归取锁）；② IO70-NEW-02 —— `safety_protection_ready()` 原先在已确认使能请求时**跳过**反馈条件，现改为按请求侧取期望（请求 HIGH 时期望反馈 LOW），`CUT_BY_HARDWARE`/`PAD_MISMATCH`/`NO_SAMPLE` 一律不放行，`arm→start` 正向路径仍通过。新增 7 个必需用例（`IO4c~IO4f`、`IO7d~IO7f`）+ 仿真核一次性注入 `io_sim_flip_chain_on_disable_write()`；**修前** 4 例 FAIL、**修后** 4 变体 138 例全 PASS、3 项反向仍 META-OK、既有链 V1 25/V2 22 + 13 例 + 8 组 rc=0、Keil 仍 0/0 | `[S]` 复审件 `NS800_IO70_Review_cd337b4_20261021.md`（结论 `SOFTWARE_REVIEW_REWORK`）；返修提交 `762604e`；证据 `reports/reviews/phase8-io70-optional-limits/io_rework_ledger.txt` 等三份。**主机侧结论，板上未运行** |
 
 ### A2. 图纸 / 现场记录 / 文档三者冲突登记（不择一采信）
 

@@ -1,0 +1,92 @@
+# 独立复审返修（IO70-NEW-01 / IO70-NEW-02）后的 I/O 行为链台账
+# 复审件: NS800_IO70_Review_cd337b4_20261021.md（结论 SOFTWARE_REVIEW_REWORK）
+# 返修基线: cd337b4d013f7ef7f579ea57a42fdcc820befafb
+# 修复提交: 见本文件末尾"提交"行；运行日期: 2026-10-21（北京时间）
+# 链入口: bash tests/host/run_io_behavior.sh（反向: REVERSE=1 bash 同脚本）
+# 编译器: gcc.exe (tdm64-1) 4.9.2；OUT_DIR=<WORK>/ns800-host-chain/io（先过 require_outside_repo）
+# ⚠ 本文件是真实 stdout 的脱敏摘录（私有临时路径统一写成 <WORK>/），判定文本未删改。
+
+## 0. 修前复现（证明新增用例确实能抓到这两项缺陷）
+
+运行环境 = 未修复的生产源码（cd337b4）+ 新增用例，`ONLY=off_ovr`：
+
+```text
+CASE|IO4d-ready_false_when_cut_by_hardware|FAIL|protection_ready=YES verdict=CUT_BY_HARDWARE (must be NO)
+CASE|IO4e-ready_false_when_sample_lost|FAIL|protection_ready=YES verdict=NO_SAMPLE (must be NO)
+CASE|IO7d-latch_kept_when_disarm_reads_stuck_enabled|FAIL|state=MANUAL_CLEAR fault=0 pad=0 write_delta=1 pwm_delta=1 flip_consumed=0
+CASE|IO7e-latch_kept_when_disarm_loses_sample|FAIL|state=MANUAL_CLEAR fault=0 write_delta=1 flip_consumed=0 verdict=NO_SAMPLE
+VARIANT|limit=OFF|gates=OVERRIDE
+SUMMARY|cases=40|pass=36|fail=4
+```
+
+runner 判定：`off_ovr | NOT-DETECTED 判FAIL=0 自报fail=4 proc_rc=1 用例=33/40` → `IO RUNNER RESULT: FAIL (rc=1)`。
+
+与复审第 2、3 节的独立复现逐条对应：
+- IO70-NEW-01：`state=MANUAL_CLEAR fault=0` 而 `flip_consumed=0`（一次性注入确已在 disarm 的
+  LOW 写时被消耗）且 `write_delta=1 / pwm_delta=1`（关断动作照做）—— 已观测到坏反馈仍完成清除。
+- IO70-NEW-02：`protection_ready=YES` 而 `verdict=CUT_BY_HARDWARE / NO_SAMPLE` —— 已请求使能时
+  保护就绪整个跳过了反馈条件。
+
+## 1. 修后四变体矩阵（同一份生产源码，只改预处理宏）
+
+```text
+############ 独立 I/O 行为链 (基线 cd337b4d013f7ef7f579ea57a42fdcc820befafb) ############
+off_target | OK 必需用例=27 全部PASS 自报fail=0 proc_rc=0 (输出 6706 字节)
+on_target  | OK 必需用例=29 全部PASS 自报fail=0 proc_rc=0 (输出 7992 字节)
+off_ovr    | OK 必需用例=40 全部PASS 自报fail=0 proc_rc=0 (输出 14557 字节)
+on_ovr     | OK 必需用例=42 全部PASS 自报fail=0 proc_rc=0 (输出 16637 字节)
+IO1_CFG-illegal_macro_rejected | OK(拒绝编译 rc=1) —— 配置合法性成立
+
+IO RUNNER RESULT: PASS (rc=0) —— 4 个变体的必需用例全部真执行且判 PASS, 非法宏值被编译拒绝
+```
+
+用例总数 27+29+40+42 = **138**（首次交付为 124；本轮 off_ovr/on_ovr 各 +7）。
+每个变体的必需用例 id 由 runner 逐项核对"出现一次且判 PASS"，缺例/重复/FAIL 均计入失败；
+`proc_rc` 是二进制真实退出码，与自报 `SUMMARY|fail=` 分别记录。
+
+## 2. 本轮新增的 7 个用例（登记在 OVERRIDE_CASES，LIMIT-OFF/ON 两个 OVERRIDE 变体各自执行）
+
+| id | 断言（全部用生产 API 返回值/状态 + 仿真计数，无文本搜索） |
+|---|---|
+| IO4c-ready_true_on_enabled_side_ideal | `safety_drv_enable_write(1)` rc=EOK 且 `safety_protection_ready()`=TRUE（理想链，请求 HIGH、反馈 LOW） |
+| IO4d-ready_false_when_cut_by_hardware | 同一请求 HIGH 下把外部链切成 ESTOP_CUT ⇒ `safety_protection_ready()`=FALSE（verdict=CUT_BY_HARDWARE） |
+| IO4e-ready_false_when_sample_lost | 切成 NO_WIRE ⇒ FALSE（verdict=NO_SAMPLE） |
+| IO4f-ready_true_again_after_disable_request | 写回 LOW（禁能侧）⇒ 重新 TRUE |
+| IO7d-latch_kept_when_disarm_reads_stuck_enabled | 预检查 OK，disarm 写 LOW 那一刻切成 STUCK_ENABLED ⇒ 仍为 FAULT_LATCHED、故障码保持 FAULT_TMC_DIAG、LOW 写与 pwm_disable 计数已增加、注入已被消耗 |
+| IO7e-latch_kept_when_disarm_loses_sample | 同上切成 NO_WIRE ⇒ 锁存与故障码保持 |
+| IO7f-control_clear_succeeds_without_flip | 对照组：不布防注入 ⇒ MANUAL_CLEAR 且 fault=FAULT_NONE（证明上两条不是必然失败） |
+
+IO4c~IO4f 刻意**不 arm**（用唯一受控写入口建立请求），因为斜坡线程的运行守卫在 armed 时每拍就会
+关断，会破坏"直接读保护就绪 API"的前提；被测函数本身不取 `mot_lock`，因此无需在夹具里持锁。
+IO4a/IO4b（真实 arm→start 正路径）与 IO5a~IO5c、IO6b1/b2/c、IO7a/IO7c 全部原样保留、未放宽。
+
+仿真核新增一次性注入原语（仅存在于 tests/host，不进生产、不进 Keil）：
+`io_sim_flip_chain_on_disable_write(mode)` + `io_sim_flip_armed()`，
+在下一次对 `PIN_NAME_DRV_ENABLE` 写 LOW 时把外部链切成指定模型并保持该模型。
+
+## 3. 三项反向验证（修后复跑，仓外副本 + tests/host/inject.py）
+
+```text
+=== 反向验证(3 项, 仓外副本) ===
+injected(mode=rev_limits_forced_off, replacements=1) -> <WORK>/ns800-host-chain/io/reverse/R1_limits_forced_when_macro_off/app/safety_gpio.c
+  命中期望失败身份: IO1OFF-limits_not_resolved
+  命中期望失败身份: IO1OFF-limits_never_touched
+injected(mode=rev_limits_polarity_on, replacements=1) -> <WORK>/ns800-host-chain/io/reverse/R2_limit_polarity_flipped/app/safety_thread.c
+  命中期望失败身份: IO1ON-falling_edge_for_limits
+  命中期望失败身份: IO1ON-both_high_is_safe
+injected(mode=rev_fb_always_match, replacements=1) -> <WORK>/ns800-host-chain/io/reverse/R3_fb_mismatch_forced_match/app/safety_gpio.c
+  命中期望失败身份: IO3b-unexpected_enable_refused
+  命中期望失败身份: IO5a-runtime_guard_stops_on_cut
+  命中期望失败身份: IO6b2-cut_request_rolls_back_to_low
+
+R1_limits_forced_when_macro_off | META-OK 命中 2/2 个业务失败身份 (variant=off_target proc_rc=1)
+R2_limit_polarity_flipped       | META-OK 命中 2/2 个业务失败身份 (variant=on_target proc_rc=1)
+R3_fb_mismatch_forced_match     | META-OK 命中 3/3 个业务失败身份 (variant=on_ovr proc_rc=1)
+IO REVERSE RESULT: PASS —— 三项注入均命中指定业务失败身份(不是编译失败/崩溃)
+```
+
+## 4. 提交
+
+- 返修实现与用例：`fix: 关闭 IO70-NEW-01/02（disarm 之后复核反馈、就绪按请求侧判定）`（短 SHA 762604e）
+- 交付提交（含本文件与回归/Keil 证据、交接与文档同步）：短 SHA 见下一节回归与 Keil 证据文件及交付消息，
+  本文件不自引用最终完整 SHA（避免为交接自引用循环追加提交）。

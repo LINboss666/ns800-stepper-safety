@@ -1,0 +1,43 @@
+# Keil MDK Rebuild All（UV4 -r）—— 2026-10-21，IO70-NEW-01/02 返修之后
+# 工程: bsp/novosns/ns800/ns800rt7p65-nssinepad/project.uvprojx
+#   相对返修基线 cd337b4 与相对最初任务基线 9ace7d0 均为 **0 差异**（本轮未动工程文件）
+# 被编译源码 = 返修提交 762604e（safety_state.c / safety_thread.c / safety_thread.h 为本轮生产改动）
+# 原始日志 *.log 按仓库规则不入库；以下为关键行摘录（未删改判定文本）。
+
+```text
+linking...
+Program Size: Code=147610 RO-data=64214 RW-data=2176 ZI-data=83404
+After Build - User command #1: fromelf --bin .\build\rt-thread.axf --output rtthread.bin
+".\build\rt-thread.axf" - 0 Error(s), 0 Warning(s).
+Build Time Elapsed:  00:00:08
+```
+
+- UV4 退出码: 0（= 无错误无警告）
+- 编译单元计数（`compiling *.c` 行数）: **131**
+- 与返修前（`Code=147522 RO-data=64038 RW-data=2176 ZI-data=83404`）相比 Code +88、RO-data +176，
+  RW/ZI 不变 —— 与"新增一次有界反馈复核 + 就绪改按请求侧判定 + 相应打印文本"的改动量级一致。
+  ⚠ 尺寸变化只是链接结果，不证明任何物理时序或硬件行为。
+
+## 构建钩子只读复核（构建前执行，未修改工程）
+
+```text
+<BeforeCompile>  RunUserProg1=0  RunUserProg2=0  UserProg1Name=(空) UserProg2Name=(空)
+<BeforeMake>     RunUserProg1=0  RunUserProg2=0  UserProg1Name=(空) UserProg2Name=(空)
+<AfterMake>      RunUserProg1=1  RunUserProg2=0  UserProg1Name=fromelf --bin !L --output rtthread.bin
+```
+
+结论: 只有构建与 bin 格式转换，**没有**烧录、复位、串口或任何下载器调用；因此本次构建不构成硬件动作。
+主机侧注入未泄漏进目标: `project.uvprojx` 中 `IO_GATE_HOST_OVERRIDE` / `HOST_GATE_OVERRIDE` /
+`shim_io` / `io_main` 命中数 = 0（LIMIT-ON 分支同样只在主机侧编译执行）。
+
+## 目标配置里的门与宏（构建后复核）
+
+```text
+applications/motor.h:53         #define MOTOR_HARDWARE_ENABLE_PATH_VALIDATED   RT_FALSE
+applications/motor.h:63         #define STEP_DIAG_ISOLATED_ENV_CONFIRMED       RT_FALSE
+applications/tmc2209.h:99       #define TMC_DRIVE_CONFIG_HW_VALIDATED          RT_FALSE
+applications/project_board.h:52 #define SAFETY_LIMIT_INPUTS_ENABLED   RT_FALSE   (默认关闭)
+```
+
+三道硬件验证宏未被翻转；限位的"功能启用宏"与"硬件验证宏"职责不同，互不替代。
+编译/链接通过不证明物理时序、引脚连接或硬件安全链通过 —— 更换门电路后的安全链仍待板级验收（RISK-04）。

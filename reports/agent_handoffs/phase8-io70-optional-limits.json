@@ -223,5 +223,162 @@
     "private_email_in_docs": false
   },
   "stop_point": "push to phase8/tmc-drive-config, read back full SHA via git ls-remote, then STOP for independent source review; no hardware execution, no motion test",
-  "next_step_owner": "ChatGPT independent source review + user authorization for any board-level check"
+  "next_step_owner": "ChatGPT independent source review + user authorization for any board-level check",
+  "rework": {
+    "recorded_at": "2026-10-21",
+    "review_document": "NS800_IO70_Review_cd337b4_20261021.md",
+    "review_conclusion": "SOFTWARE_REVIEW_REWORK (2 items; re-review after both are fixed)",
+    "rework_baseline_sha": "cd337b4d013f7ef7f579ea57a42fdcc820befafb",
+    "fix_checkpoint_sha": "762604ebe98a986113e87c964600b2bffb0a4f4d",
+    "item_IO70-NEW-01": {
+      "severity": "P1",
+      "location": "applications/safety_state.c fault_reset()",
+      "defect": "pre-check confirm(0) passed, then motor_disarm() re-wrote the permit LOW and re-read ENN; UNEXPECTED_ENABLE/NO_SAMPLE there was only printed, so the clear path still printed final-confirmation and zeroed the fault code",
+      "fix": "re-run the same bounded disabled-side confirm AFTER disarm; mismatch / no-sample / still-transition keeps the latch and the non-zero fault code and never prints final confirmation",
+      "constraints_kept": [
+        "stop-STEP + permit revoke are still executed first by disarm (not rolled back)",
+        "no recursive shutdown/state-machine call from the GPIO feedback path (confirm only does rt_pin_read + bounded sampling)",
+        "lock order unchanged: ss_lock -> (disarm's brief mot_lock), same as safety_force_shutdown()",
+        "bounded window is the existing DRV_FB_TRIES x DRV_FB_SETTLE_MS, not a latency-bound claim",
+        "motor_disarm() public return semantics unchanged (re-check chosen over propagating failure; motor.h untouched)"
+      ],
+      "reproduced_before_fix": "IO7d/IO7e FAIL on cd337b4 with the new cases: state=MANUAL_CLEAR fault=0 while flip_consumed=0, write_delta=1, pwm_delta=1"
+    },
+    "item_IO70-NEW-02": {
+      "severity": "P2",
+      "location": "applications/safety_thread.c safety_protection_ready() + safety_thread.h contract comment",
+      "defect": "the old line skipped the feedback condition entirely once an enable request was confirmed, so CUT_BY_HARDWARE / NO_SAMPLE still reported ready",
+      "fix": "expect per confirmed request side: want = (req==PIN_HIGH) ? 1 : 0, then require safety_fb_now(want)==OK; armed + normal ENN LOW stays ready (no arm->start deadlock), CUT_BY_HARDWARE / PAD_MISMATCH / NO_SAMPLE refuse",
+      "unchanged": [
+        "active input set + per-input safe_level",
+        "IRQ gate OPEN requirement",
+        "operator polarity confirmation default FALSE",
+        "motor.c arm/start/runtime-guard same-source decisions",
+        "bit5 gate mask and runtime guard behaviour (review confirmed those were already correct)"
+      ]
+    },
+    "new_cases": [
+      "IO4c-ready_true_on_enabled_side_ideal",
+      "IO4d-ready_false_when_cut_by_hardware",
+      "IO4e-ready_false_when_sample_lost",
+      "IO4f-ready_true_again_after_disable_request",
+      "IO7d-latch_kept_when_disarm_reads_stuck_enabled",
+      "IO7e-latch_kept_when_disarm_loses_sample",
+      "IO7f-control_clear_succeeds_without_flip"
+    ],
+    "sim_primitive_added": "io_sim_flip_chain_on_disable_write(mode) + io_sim_flip_armed(): one-shot chain flip on the next permit LOW write; tests/host only, not compiled into the Keil target",
+    "pre_fix_run": {
+      "variant": "off_ovr",
+      "source": "cd337b4 + new cases",
+      "summary": "cases=40 pass=36 fail=4",
+      "failed_ids": [
+        "IO4d-ready_false_when_cut_by_hardware",
+        "IO4e-ready_false_when_sample_lost",
+        "IO7d-latch_kept_when_disarm_reads_stuck_enabled",
+        "IO7e-latch_kept_when_disarm_loses_sample"
+      ],
+      "proc_rc": 1,
+      "runner_rc": 1
+    },
+    "post_fix_io_chain": {
+      "off_target": 27,
+      "on_target": 29,
+      "off_ovr": 40,
+      "on_ovr": 42,
+      "case_lines_pass": 138,
+      "case_lines_fail": 0,
+      "runner_rc": 0,
+      "illegal_macro_still_rejected": true,
+      "old_chain_assertions_loosened": false
+    },
+    "reverse_verification_rerun": {
+      "R1": "META-OK 2/2 (off_target proc_rc=1)",
+      "R2": "META-OK 2/2 (on_target proc_rc=1)",
+      "R3": "META-OK 3/3 (on_ovr proc_rc=1)",
+      "runner_rc": 0,
+      "compile_error_or_crash_counted_as_detection": false
+    },
+    "existing_regression_rerun": {
+      "chain_base_head_sha": "762604ebe98a986113e87c964600b2bffb0a4f4d",
+      "V1_CHECK_PASS": 25,
+      "V2_CHECK_PASS": 22,
+      "CHECK_FAIL_or_BAD_SELFTEST_or_MISSING_CASE": 0,
+      "negatives_total": 13,
+      "negatives_ok": 13,
+      "meta_and_controls": "M1 M1c M2 M2c M3 M3c M4 M5 all as expected (rejected for the correct reasons)",
+      "chain_real_rc": 0,
+      "host_main_c_changed_this_round": false,
+      "r4_path_guard_rerun": false,
+      "r4_reason": "guard code untouched this round; review section 7 item 3 says no re-run needed"
+    },
+    "keil": {
+      "command": "UV4 -r project.uvprojx -j0",
+      "errors": 0,
+      "warnings": 0,
+      "uv4_exit_code": 0,
+      "compiled_units": 131,
+      "size": "Code=147610 RO-data=64214 RW-data=2176 ZI-data=83404",
+      "size_delta_vs_pre_rework": "Code +88, RO-data +176, RW/ZI unchanged (link result only; proves no physical behaviour)",
+      "hooks": {
+        "before_compile": "disabled/empty",
+        "before_make": "disabled/empty",
+        "after_make": "fromelf --bin only",
+        "flash_or_reset_or_serial_hook": false
+      },
+      "project_uvprojx_diff_vs_rework_baseline": "empty",
+      "host_override_or_shim_in_target_hits": 0,
+      "target_macros": {
+        "MOTOR_HARDWARE_ENABLE_PATH_VALIDATED": "RT_FALSE",
+        "STEP_DIAG_ISOLATED_ENV_CONFIRMED": "RT_FALSE",
+        "TMC_DRIVE_CONFIG_HW_VALIDATED": "RT_FALSE",
+        "SAFETY_LIMIT_INPUTS_ENABLED": "RT_FALSE (LIMIT-ON branch host-only)"
+      }
+    },
+    "files_changed_in_rework": [
+      "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/safety_state.c",
+      "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/safety_thread.c",
+      "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/safety_thread.h",
+      "tests/host/io_main.c",
+      "tests/host/run_io_behavior.sh",
+      "tests/host/shim_io/rtdevice.h"
+    ],
+    "evidence_added_in_rework": [
+      "reports/reviews/phase8-io70-optional-limits/io_rework_ledger.txt",
+      "reports/reviews/phase8-io70-optional-limits/regression_rerun_after_rework.txt",
+      "reports/reviews/phase8-io70-optional-limits/keil_rebuild_all_after_rework.txt"
+    ],
+    "scope_notes": {
+      "first_delivery_counts_untouched": true,
+      "field_meaning": "doc_files_changed / changed_file_count_vs_baseline above describe the FIRST delivery against task baseline 9ace7d0; this object lists the rework's own files",
+      "not_touched": [
+        "UART / register configuration algorithm",
+        "Keil project & target settings",
+        "thread architecture",
+        "blackbox format",
+        "sensor_service.c",
+        "R4 path guard & hash tooling",
+        "runner / meta-negative frameworks"
+      ]
+    },
+    "not_executed_still": {
+      "flashed": false,
+      "reset": false,
+      "com5_touched": false,
+      "real_tmc_read_or_write": false,
+      "powered_or_unpowered_measurement": false,
+      "wiring_change": false,
+      "motor_connected": false,
+      "step_output": false,
+      "hardware_macros_flipped": false,
+      "new_code_running_on_board": false,
+      "board_firmware_still": "e40a9b95ef709e6a80444f9f3949dfdd70ba96ba (frozen)"
+    },
+    "open_after_rework": [
+      "RISK-03 / RISK-03a: stop-latency bound and blocking paths (untouched this round)",
+      "RISK-04: post-repair hardware chain and feedback consistency still need board-level acceptance under separate user authorization",
+      "sensor_service estop field / blackbox flags bit8 / valid_safety semantics (registered, out of scope)",
+      "wire attribution evidence for TMC_ENN <-> PC.6 (drawing does not show it; user confirmation only)"
+    ],
+    "stop_point_rework": "push to phase8/tmc-drive-config, git ls-remote full-SHA read-back + remote blob re-verify, then STOP for the reviewer's re-review; no hardware execution, no motion test, no automatic F2e/F3 entry"
+  }
 }
