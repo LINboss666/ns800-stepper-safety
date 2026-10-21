@@ -205,6 +205,103 @@ run_variant() {
     return 0
 }
 
+# ---- 反向验证(三项): 只改**仓库外**的生产源码副本, 必须命中指定业务失败身份 ----
+# 判定纪律: 注入没落地 / 副本编译失败 / 进程崩溃都算 INFRA-FAIL, 不算"检出";
+# 只有"链跑起来了, 但指定的用例没有判 FAIL"才算 NOT-DETECTED。
+PY="${PY:-python}"
+
+variant_flags() {
+    case "$1" in
+        off_target) echo "" ;;
+        on_target)  echo "$LIMIT_ON" ;;
+        off_ovr)    echo "$OVR" ;;
+        on_ovr)     echo "$LIMIT_ON $OVR" ;;
+    esac
+}
+
+reverse_case() {
+    local name="$1" variant="$2" target="$3" mode="$4"; shift 4
+    local ids="$*" work exe rc hit=0 miss=0 id extra
+    local brc
+
+    work="$OUT_DIR/reverse/$name"
+    rm -rf "$work"
+    mkdir -p "$work" || { note "  $name: 无法建副本目录(基础设施故障)"; remember 4; return; }
+    cp -r "$SRC_APP" "$work/app" || { note "  $name: 源码副本失败"; remember 4; return; }
+    if ! "$PY" "$HERE/inject.py" "$work/app/$target" "$mode"; then
+        note "  $name: 注入未落地 => 判基础设施故障, 不当作检出"
+        matrix+=("$name | INFRA-FAIL 注入未落地($mode)"); remember 4; return
+    fi
+    if ! grep -q "NEGATIVE-INJECTION" "$work/app/$target"; then
+        note "  $name: 副本里没有注入标记"
+        matrix+=("$name | INFRA-FAIL 无注入标记"); remember 4; return
+    fi
+    exe="$work/io.exe"
+    extra="$(variant_flags "$variant")"
+    # shellcheck disable=SC2086
+    "$GCC" $FLAGS $extra -I "$SHIM_DIR" -I "$work/app" "$IO_MAIN" -o "$exe" \
+        > "$work/build.txt" 2>&1
+    brc=$?
+    if [ "$brc" -ne 0 ]; then
+        tail -12 "$work/build.txt"
+        note "  $name: 被注入副本编译失败 rc=$brc => 不算检出"
+        matrix+=("$name | INFRA-FAIL 副本编译失败 rc=$brc"); remember 4; return
+    fi
+    "$exe" > "$work/out.txt" 2>&1
+    rc=$?
+    if [ "$rc" -eq 0 ]; then
+        matrix+=("$name | NOT-DETECTED 注入后仍 rc=0 (proc) —— 业务失败身份完全没出现")
+        note "  $name: 注入后链仍然通过 => 没检出"; detected_fail=1; remember 1; return
+    fi
+    for id in $ids; do
+        if grep -q "^CASE|$id|FAIL|" "$work/out.txt"; then
+            hit=$((hit+1))
+            note "  命中期望失败身份: $id"
+        else
+            miss=$((miss+1)); note "  未命中期望失败身份: $id"
+        fi
+    done
+    if [ "$miss" -ne 0 ]; then
+        matrix+=("$name | NOT-DETECTED 命中=$hit 缺失=$miss proc_rc=$rc")
+        detected_fail=1; remember 1; return
+    fi
+    matrix+=("$name | META-OK 命中 $hit/$((hit+miss)) 个业务失败身份 (variant=$variant proc_rc=$rc)")
+}
+
+run_reverse_checks() {
+    note ""
+    note "=== 反向验证(3 项, 仓外副本) ==="
+    reverse_case R1_limits_forced_when_macro_off off_target safety_gpio.c rev_limits_forced_off \
+        IO1OFF-limits_not_resolved IO1OFF-limits_never_touched
+    reverse_case R2_limit_polarity_flipped on_target safety_thread.c rev_limits_polarity_on \
+        IO1ON-falling_edge_for_limits IO1ON-both_high_is_safe
+    reverse_case R3_fb_mismatch_forced_match on_ovr safety_gpio.c rev_fb_always_match \
+        IO3b-unexpected_enable_refused IO5a-runtime_guard_stops_on_cut \
+        IO6b2-cut_request_rolls_back_to_low
+}
+
+REVERSE="${REVERSE:-0}"
+
+if [ "$REVERSE" = "1" ]; then
+    note "############ 独立 I/O 链 —— 反向验证模式 ############"
+    note "SRC_APP=$SRC_APP"
+    note "OUT_DIR=$OUT_DIR"
+    run_reverse_checks
+    note ""
+    note "=== 反向验证汇总 ==="
+    for m in "${matrix[@]}"; do note "$m"; done
+    {
+        echo "IO_REVERSE_RC=$overall"
+        for m in "${matrix[@]}"; do echo "$m"; done
+    } > "$OUT_DIR/io_reverse_status.txt"
+    if [ "$overall" -eq 0 ]; then
+        note "IO REVERSE RESULT: PASS —— 三项注入均命中指定业务失败身份(不是编译失败/崩溃)"
+    else
+        note "IO REVERSE RESULT: FAIL (rc=$overall)"
+    fi
+    exit "$overall"
+fi
+
 for v in $VARIANTS; do
     want="0"
     [ "$v" = "illegal" ] && want="1"

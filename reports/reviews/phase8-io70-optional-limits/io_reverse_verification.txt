@@ -1,0 +1,27 @@
+# I/O 反向验证（三项）—— 2026-10-21
+
+方式：把本轮生产源码**整份复制到仓库外**的一次性副本，用 `tests/host/inject.py`（唯一注入实现，
+锚点必须恰好命中 1 次，否则终止）改副本，再用**同一套**夹具与判据重新编译执行。
+判定要求：必须命中指定的**业务失败身份**（相应用例判 FAIL），**编译意外失败或进程崩溃不算检出**。
+副本与产物不入库；跑完即弃。链入口：`REVERSE=1 bash tests/host/run_io_behavior.sh`（真实 rc=0）。
+
+| # | 注入模式 | 被改文件（副本内） | 注入含义 | 变体 | 期望命中的失败身份 | 结果 |
+|---|---|---|---|---|---|---|
+| R1 | `rev_limits_forced_off` | `safety_gpio.c`：把引脚表限位行的 `#if SAFETY_LIMIT_INPUTS_ENABLED == RT_TRUE` 改成 `#if 1` | **宏关闭时仍然强制解析/配置限位**（正是任务书禁止的行为） | off_target | `IO1OFF-limits_not_resolved`、`IO1OFF-limits_never_touched` | META-OK 命中 2/2（proc rc=1） |
+| R2 | `rev_limits_polarity_on` | `safety_thread.c`：LIMIT_MIN 行改成 `PIN_IRQ_MODE_RISING` + `PIN_LOW` 安全 | **宏开启时把反相后的 OK 信号错当成 LOW 安全/上升沿** | on_target | `IO1ON-falling_edge_for_limits`、`IO1ON-both_high_is_safe` | META-OK 命中 2/2（proc rc=1） |
+| R3 | `rev_fb_always_match` | `safety_gpio.c`：`safety_fb_evaluate()` 里去掉 `fb == want_fb` 比较，焊盘一到请求侧就直接 `return SAFETY_FB_OK` | **把与请求不符的 ENN 反馈强行当匹配** | on_ovr | `IO3b-unexpected_enable_refused`、`IO5a-runtime_guard_stops_on_cut`、`IO6b2-cut_request_rolls_back_to_low` | META-OK 命中 3/3（proc rc=1） |
+
+## 这些注入分别证明了哪条判据不是空转
+
+- R1 → `IO1OFF-*` 只在"限位确实不参与解析/配置/读取/注册"时才可能通过：把限位强行塞回关闭配置就会失败，
+  说明宏关闭分支不是"写个 RT_FALSE 但照旧读脚"。
+- R2 → `IO1ON-falling_edge_for_limits` 逐路核对注册边沿与安全电平，`IO1ON-both_high_is_safe` 要求
+  两路 OK=HIGH 才算就绪；把极性写反（LOW 安全/上升沿）立即被抓，说明限位开启分支真的在用图纸的反相语义。
+- R3 → `IO3b`/`IO5a`/`IO6b2` 分别覆盖"禁能侧矛盾必须拒绝""armed 期反馈被切断必须停机"
+  "请求未被硬件接受必须回滚撤销许可"，把反馈强行判匹配会让这三条一起失败，
+  说明反馈判定接进了真实决策点，而不是只打印。
+
+## 边界
+
+- 只改副本，不改仓库内生产源码；注入过的二进制与副本目录在仓库外，随工作区丢弃。
+- 三项都**只**要求"命中对应业务失败身份"，不新增元测试框架、不复用 R4 的路径守卫去测别的方向。

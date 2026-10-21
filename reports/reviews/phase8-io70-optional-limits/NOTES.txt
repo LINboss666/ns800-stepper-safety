@@ -1,0 +1,78 @@
+# Phase 8 (2026-10-21) IO70/ENN 反馈适配 + 宏控可选限位 —— 证据与边界说明
+
+任务 ID：`phase8-io70-optional-limits`；分支：`phase8/tmc-drive-config`；
+任务书起点：`9ace7d0cd8bb04dacaf74e101388e540ca49e349`；实现检查点：`c8d9719f7b222c919d4d06cb8ad7455baf5cad94`。
+本目录只放**脱敏文本证据**：原始构建日志（`*.log`）、二进制、编译产物、被注入的源码副本一律不入库。
+
+## 1. 文件与角色
+
+| 文件 | 内容 |
+|---|---|
+| `io_case_ledger.txt` | 新 I/O 链 4 个变体的逐用例台账（124 条 CASE 行 + 每变体 SUMMARY + runner 台账） |
+| `io_reverse_verification.txt` | 三项反向验证：注入模式、被改文件、期望命中的业务失败身份、结果 |
+| `regression_v1v2_negatives_meta.txt` | 既有回归：V1/V2 判据计数、13 例逐例真实/自报/期望 rc、8 组元负例/对照判定 |
+| `keil_rebuild_all.txt` | Keil Rebuild All 关键行（0 Error / 0 Warning、Program Size、编译单元数）与构建钩子只读检查结论 |
+
+## 2. 新 I/O 链里"真编译/真调用"与"桩"的分界（必须与结论一起读）
+
+**真实编译并被调用的生产模块**（`tests/host/io_main.c` 直接 `#include` 本轮改过的源码文件）：
+
+- `applications/safety_gpio.c` —— 引脚表、写+回读、`safety_fb_evaluate/now/drv_feedback_confirm/snapshot`
+- `applications/safety_thread.c` —— 活动输入集合选择、IRQ 事务化注册/回滚、`safety_protection_ready()`、事件处理
+- `applications/safety_state.c` —— 状态机与锁、`safety_force_shutdown()`、`fault_reset()` 实测源、启动自检
+- `applications/motor.c` —— 门禁掩码（含新增 bit5）、`motor_arm`（请求前/写后两段反馈确认）、
+  `motor_start` 起转前确认、armed 期每拍无 UART 反馈复核、`motor_disarm` / `motor_emergency_stop` /
+  `motor_pwm_grant_to_diag`
+
+**仿真/桩（不代表这些模块被验收）**：
+
+- RT-Thread 原语：`shim_io/rtthread.h` + `io_main.c` 实现（mutex=CRITICAL_SECTION 同线程可重入、
+  event=CS+条件变量真实跨线程收发、thread=CreateThread）。**不模拟**优先级继承、tick 调度、中断上下文。
+- GPIO/PWM/设备：`shim_io/rtdevice.h` + `io_main.c` 仿真核（引脚电平/模式/读写与注册计数、
+  使能链真值模型 5 种：理想 / 急停切断 / 卡使能 / 滞后 / 断线 / 抖动）。
+  真实串口、下载器、物理 PWM 输出在本夹具中**不存在**，设备 open/read/write 计数全程为 0（IO10 判据）。
+- 外设与配置服务：`tmc2209_*`（假总线，读计数可见）、`adxl345_*`、`current_adc_*`、`ns_flash_*`、
+  `blackbox_*`（只计数）、`step_pwm_*` —— 都是桩。
+- 本轮**未**在新链中编译：`supervisor.c`、`tmc2209.c`、`diagnosis.c`、`sensor_service.c`、
+  `project_config.c`、`ns_storage.c`、`ns_flash.c`、`blackbox.c`、`step_pwm.c`。
+  其中 `tmc2209.c` 的新写门位仍由旧链（真编译 tmc2209.c）+ 源码静态检查覆盖，
+  `supervisor.c` 的状态输出属于打印改动。
+
+**因此**：新链证明的是"本轮改动的安全输入职责、反馈判定与门禁接入的**逻辑行为**"，
+不是物理时序、不是引脚连接、不是硬件安全链验收。
+
+## 3. 旧链的角色（未放宽）
+
+`tests/host/host_main.c` 只新增了"反馈与请求一致"的**合法默认桩**（`safety_fb_*`、
+`safety_drv_feedback_confirm`、`safety_limit_inputs_enabled` 返回 RT_FALSE），
+目的是让旧链继续只编译 `tmc2209.c + motor.c` 且**不改变**既有判据：
+V1 `CHECK_PASS=25`、V2 `CHECK_PASS=22`，13 例负例矩阵与 8 组元负例/对照全部按原身份通过，
+整链真实 rc=0。旧链仍是被桩替换模块的隔离测试，**不能**冒充真实安全模块覆盖 —— 真实覆盖在第 2 节的新链里。
+
+## 4. 本轮未做（NOT EXECUTED / NOT TESTED）
+
+- 未烧录、未复位、未连接或操作 COM5、未向真实 TMC2209 发任何读写、未接电机、未输出 STEP、
+  未通电测量、未断电测量、未改接线/飞线/换器件。
+- 未翻转三道硬件验证宏（`MOTOR_HARDWARE_ENABLE_PATH_VALIDATED` /
+  `STEP_DIAG_ISOLATED_ENV_CONFIRMED` / `TMC_DRIVE_CONFIG_HW_VALIDATED` 仍 `RT_FALSE`），
+  未修改工程配置、寄存器协议、黑匣子格式、事件位/故障码编号（只追加 `FAULT_DRV_FEEDBACK=11`
+  与 `EVT_DRV_FEEDBACK=bit7`、掩码位 `MOT_GATE_FB_MISMATCH=bit5`、守卫原因 `MOT_GUARD_ENN_FEEDBACK=4`）。
+- 未解决 RISK-03 / RISK-03a（停机时延上界与无限等锁路径），未重构线程；
+  `safety_drv_feedback_confirm()` 的 3 次×1 ms 窗口是**测试可见常数**，不是物理时延上界。
+- 未重跑 R4 的路径守卫沙盒（该路径本轮未改动），未扩建哈希工具；
+  R4 的 `tests/host` 14 文件清单仍是 R4 的历史证明，**不覆盖**本轮新增的
+  `io_main.c` / `run_io_behavior.sh` / `shim_io/`。
+- 限位开启分支只在主机侧编译执行：`SAFETY_LIMIT_INPUTS_ENABLED=RT_TRUE` 的分支
+  **没有**在 Keil 目标里构建过（目标只构建默认关闭配置），也不等于物理限位验收。
+- 板上固件仍按冻结版 `e40a9b95ef709e6a80444f9f3949dfdd70ba96ba` 记录；本轮新源码**未烧录**，
+  不得声称板上已运行本轮逻辑。
+
+## 5. 依赖与偏差（如实上报，未顺手重构）
+
+- `applications/sensor_service.c`（本轮允许清单之外）仍用 `PIN_NAME_ESTOP` 这个名字读**同一颗脚**，
+  并把该电平写进传感器帧 `estop` 字段与黑匣子 `record.flags` bit8。为了不改该文件与黑匣子格式，
+  `project_board.h` 保留了**文档化别名** `#define PIN_NAME_ESTOP PIN_NAME_ENN_FEEDBACK`。
+  后果：限位宏关闭时两路限位不再被解析，`sensor_frame.valid_safety`（要求四路都可解析）会变为 0，
+  黑匣子数字输入组按"N/A"记录；且 `estop` 位承载的其实是 ENN 反馈电平。
+  → 需要单独一轮把帧字段/注释与 `valid_safety` 判据改成"按活动输入集合"，本轮不动。
+- 本轮不新增 MSH 命令、不新增运行时开关：宏切换靠重新编译；`tests/host` 判定不依赖文本搜索。

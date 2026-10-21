@@ -1,0 +1,17 @@
+# Keil MDK Rebuild All (UV4 -r) —— 2026-10-21, 本轮实现之后
+# 工程: bsp/novosns/ns800/ns800rt7p65-nssinepad/project.uvprojx (相对基线 0 差异, 未加任何主机宏/仿真源)
+# 构建钩子只读检查: BeforeCompile/BeforeMake 均 RunUserProg=0 且命令为空;
+#                  AfterMake 只有一条 fromelf --bin(产物格式转换)。无烧录/复位/串口动作。
+# 原始日志 *.log 按仓库规则不入库; 以下为关键行摘录。
+
+linking...
+Program Size: Code=147522 RO-data=64038 RW-data=2176 ZI-data=83404
+After Build - User command #1: fromelf --bin .\build\rt-thread.axf --output rtthread.bin
+".\build\rt-thread.axf" - 0 Error(s), 0 Warning(s).
+Build Time Elapsed:  00:00:12
+
+编译单元(compiling ...)计数: 131
+UV4 退出码: 0 (= 无错误无警告)
+结果: 0 Error(s), 0 Warning(s)
+
+# 三道硬件验证宏仍为 RT_FALSE; SAFETY_LIMIT_INPUTS_ENABLED 目标默认 RT_FALSE(限位开启分支只在主机侧编译执行)

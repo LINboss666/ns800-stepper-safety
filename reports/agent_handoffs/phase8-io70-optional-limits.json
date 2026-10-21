@@ -1,0 +1,210 @@
+{
+  "task_id": "phase8-io70-optional-limits",
+  "title": "IO70/PC.6 改为 TMC_ENN 状态反馈适配 + SAFETY_LIMIT_INPUTS_ENABLED 宏控可选限位",
+  "nature": "offline-firmware + host-verification + Keil build + GitHub delivery",
+  "recorded_at": "2026-10-21",
+  "branch": "phase8/tmc-drive-config",
+  "taskbook": "NS800_IO70_OptionalLimits_Qoder_Task_20261021.md (supersedes the 2026-10-19 limits-removal draft; not stacked)",
+  "baseline_sha": "9ace7d0cd8bb04dacaf74e101388e540ca49e349",
+  "implementation_checkpoint_sha": "c8d9719f7b222c919d4d06cb8ad7455baf5cad94",
+  "this_round_final_commit_sha": "given in the delivery message after push (no self-reference)",
+  "review_subject_sha_unchanged": "32f3a416bdf8c20e96d3ae41f314c236c96b5d61",
+  "old_software_review_go_still_valid": true,
+  "old_review_does_not_replace_this_round_review": true,
+  "user_confirmed_facts_not_requestioned": [
+    "in-use expansion board == SCH_Schematic1_2026-10-19.pdf (NS800_Stepper_Safety_RevA / V1.0)",
+    "PC.6 wire is on H6-5 / TMC_ENN = ENN state feedback (old H5-5 designator void)",
+    "two damaged gates (U5 AND + e-stop inverter) replaced per user report; part numbers not recorded",
+    "limits keep their implementation behind SAFETY_LIMIT_INPUTS_ENABLED, default off"
+  ],
+  "user_reports_treated_as_history": "pre-repair readings (permit ~0V, Q1 gate ~3.3V, TMC_ENN ~0V, U5 in ~0V out ~3.3V) are repair-prior history, not current state",
+  "risk_status_after": {
+    "RISK-04": "reworded: replaced-hardware chain and feedback consistency pending acceptance (NOT closed)",
+    "RISK-03 / RISK-03a": "still open; unbounded RT_WAITING_FOREVER paths untouched; no thread refactor",
+    "limits_in_off_config": "DISABLED_BY_CONFIG (not a PASS, not a blocker of the current disabled config)"
+  },
+  "macros": {
+    "MOTOR_HARDWARE_ENABLE_PATH_VALIDATED": "RT_FALSE",
+    "STEP_DIAG_ISOLATED_ENV_CONFIRMED": "RT_FALSE",
+    "TMC_DRIVE_CONFIG_HW_VALIDATED": "RT_FALSE",
+    "SAFETY_LIMIT_INPUTS_ENABLED_default": "RT_FALSE",
+    "illegal_macro_value_rejected_at_compile": true
+  },
+  "appended_only_not_reordered": {
+    "gate_bit": "MOT_GATE_FB_MISMATCH = bit5",
+    "guard_reason": "MOT_GUARD_ENN_FEEDBACK = 4",
+    "fault_code": "FAULT_DRV_FEEDBACK = 11",
+    "event_bit": "EVT_DRV_FEEDBACK = 1<<7",
+    "write_gate_bit": "TMC_WGATE_ENN_FB_NOT_DISABLED = 1<<7",
+    "blackbox_format_changed": false,
+    "existing_numbers_reused_or_reordered": false
+  },
+  "production_files_changed": [
+    "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/motor.c",
+    "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/motor.h",
+    "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/project_board.h",
+    "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/safety_gpio.c",
+    "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/safety_gpio.h",
+    "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/safety_state.c",
+    "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/safety_state.h",
+    "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/safety_thread.c",
+    "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/safety_thread.h",
+    "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/supervisor.c",
+    "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/tmc2209.c",
+    "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/tmc2209.h"
+  ],
+  "test_files_changed_or_added": [
+    "tests/host/host_main.c",
+    "tests/host/io_main.c",
+    "tests/host/run_io_behavior.sh",
+    "tests/host/shim_io/rtdevice.h",
+    "tests/host/shim_io/rtthread.h"
+  ],
+  "doc_files_changed": [],
+  "changed_file_count_vs_baseline": 17,
+  "project_uvprojx_diff_vs_baseline": "empty",
+  "uvprojx_host_macros_injected": false,
+  "real_vs_stub_in_new_io_chain": {
+    "real_compiled_production": [
+      "safety_gpio.c",
+      "safety_thread.c",
+      "safety_state.c",
+      "motor.c"
+    ],
+    "simulated": [
+      "RT mutex/event/thread (shim_io, non-target scheduling)",
+      "GPIO/PWM/device sim",
+      "enable-chain truth model (ideal / estop-cut / stuck-enabled / lag / no-wire / flapping)"
+    ],
+    "fake_services": [
+      "tmc2209_*",
+      "adxl345_*",
+      "current_adc_*",
+      "ns_flash_*",
+      "blackbox_*",
+      "step_pwm_*"
+    ],
+    "not_compiled_in_new_chain": [
+      "supervisor.c",
+      "tmc2209.c",
+      "diagnosis.c",
+      "sensor_service.c",
+      "project_config.c",
+      "ns_storage.c",
+      "ns_flash.c",
+      "blackbox.c",
+      "step_pwm.c"
+    ],
+    "old_chain_still_stubs_safety_modules": true,
+    "old_chain_results_do_not_cover_real_safety_modules": true
+  },
+  "io_chain": {
+    "entry": "bash tests/host/run_io_behavior.sh",
+    "case_lines_pass": 124,
+    "case_lines_fail": 0,
+    "variants_seen_in_ledger": 4,
+    "runner_matrix": [
+      "off_target | OK 必需用例=27 全部PASS 自报fail=0 proc_rc=0 (输出 6683 字节)",
+      "on_target | OK 必需用例=29 全部PASS 自报fail=0 proc_rc=0 (输出 7969 字节)",
+      "off_ovr | OK 必需用例=33 全部PASS 自报fail=0 proc_rc=0 (输出 10317 字节)",
+      "on_ovr | OK 必需用例=35 全部PASS 自报fail=0 proc_rc=0 (输出 11992 字节)",
+      "IO1_CFG-illegal_macro_rejected | OK(拒绝编译 rc=1)"
+    ],
+    "work_dir_passed_require_outside_repo": true,
+    "compile_failure_never_runs_stale_binary": true,
+    "no_text_grep_verdicts": true
+  },
+  "reverse_verification": {
+    "mode": "out-of-repo copy of production sources patched by tests/host/inject.py, rebuilt with the same harness",
+    "entries": [
+      "R1_limits_forced_when_macro_off",
+      "R2_limit_polarity_flipped",
+      "R3_fb_mismatch_forced_match"
+    ],
+    "all_hit_expected_business_failure_ids": true,
+    "compile_error_or_crash_counted_as_detection": false
+  },
+  "existing_regression": {
+    "V1_CHECK_PASS": 25,
+    "V2_CHECK_PASS": 22,
+    "CHECK_FAIL_or_BAD_SELFTEST_or_MISSING_CASE": 0,
+    "negatives_total": 13,
+    "negatives_ok": 13,
+    "meta_control_groups": "M1 M1c M2 M2c M3 M3c M4 M5 all as expected",
+    "chain_real_rc": 0,
+    "assertions_loosened": false,
+    "path_guard_r4_re_run": false,
+    "path_guard_reason": "R4 guard code untouched this round"
+  },
+  "keil": {
+    "command": "UV4 -r project.uvprojx -j0 -o build_agent.log",
+    "errors": 0,
+    "warnings": 0,
+    "uv4_exit_code": 0,
+    "size_line": [
+      "Program Size: Code=147522 RO-data=64038 RW-data=2176 ZI-data=83404  "
+    ],
+    "compiled_units": 131,
+    "build_hooks_readonly_check": {
+      "before_compile": "disabled/empty",
+      "before_make": "disabled/empty",
+      "after_make": "fromelf --bin only",
+      "flash_or_reset_or_serial_hook": false
+    },
+    "target_config_limit_macro": "RT_FALSE (LIMIT-ON branch never built for target)"
+  },
+  "not_executed": {
+    "flashed": false,
+    "reset": false,
+    "com5_touched": false,
+    "real_tmc_read_or_write": false,
+    "powered_measurement": false,
+    "unpowered_measurement": false,
+    "motor_connected": false,
+    "step_output": false,
+    "wiring_change_or_part_swap": false,
+    "hardware_macros_flipped": false,
+    "safety_gate_weakened": false,
+    "protection_ready_made_always_true": false,
+    "limits_deleted": false,
+    "new_msh_command_or_runtime_switch": false,
+    "controlled_write_handshake_added": false,
+    "zip_produced": false,
+    "force_push": false,
+    "history_rewritten": false,
+    "merged": false,
+    "on_board_acceptance_of_new_code": false
+  },
+  "deviations_and_dependencies": [
+    "sensor_service.c (outside allowed set) still reads the same pad via the documented alias PIN_NAME_ESTOP and stores it in frame field estop / blackbox record.flags bit8; frame naming and valid_safety (needs all four resolvable) need a separate round to follow the active input set",
+    "safety_limit_inputs_enabled() implemented as an expression so the reverse-injection anchor on the pin table stays unique",
+    "sim models a lost feedback pad as an invalid sample (non 0/1) because firmware caches pin numbers at boot"
+  ],
+  "open_questions_for_next_round": [
+    "netlist / BOM+pin wiring table or legible zoomed screenshot for wire attribution (drawing does not show TMC_ENN <-> PC.6 although the user confirms the wire)",
+    "external contact form of e-stop and limits (NC/NO, connected or not; H2 unplugged)",
+    "instrument availability (scope / logic analyser, multimeter model)",
+    "what constitutes a compliant way to raise the permit for L2/D2 while all three hardware macros stay FALSE (still BLOCKED_METHOD)"
+  ],
+  "files": {
+    "handoff": [
+      "reports/agent_handoffs/phase8-io70-optional-limits.md",
+      "reports/agent_handoffs/phase8-io70-optional-limits.json"
+    ],
+    "evidence": [
+      "reports/reviews/phase8-io70-optional-limits/io_case_ledger.txt",
+      "reports/reviews/phase8-io70-optional-limits/io_reverse_verification.txt",
+      "reports/reviews/phase8-io70-optional-limits/regression_v1v2_negatives_meta.txt",
+      "reports/reviews/phase8-io70-optional-limits/keil_rebuild_all.txt",
+      "reports/reviews/phase8-io70-optional-limits/NOTES.txt"
+    ],
+    "raw_logs_or_binaries_committed": false
+  },
+  "identity": {
+    "local_user_email": "237816241+LINboss666@users.noreply.github.com",
+    "global_changed": false,
+    "private_email_in_docs": false
+  },
+  "stop_point": "push to phase8/tmc-drive-config, read back full SHA via git ls-remote, then STOP for independent source review; no hardware execution, no motion test",
+  "next_step_owner": "ChatGPT independent source review + user authorization for any board-level check"
+}

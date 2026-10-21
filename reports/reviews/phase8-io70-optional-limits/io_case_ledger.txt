@@ -1,0 +1,156 @@
+# 独立 I/O 行为链 —— 用例台账 (生成时间 2026-10-21, 主机 gcc 4.9.2, 源码 = 本轮工作树)
+# 判定全部来自生产 API 返回值 + 仿真计数器; 本文件只是执行台账, 不含私有路径。
+# 变体: off_target/on_target = 三道硬件宏 RT_FALSE(目标默认); off_ovr/on_ovr = 仅主机覆盖三宏以走通 arm/start 正路径。
+
+===== variant off_target =====
+VARIANT|limit=OFF|gates=TARGET
+BOOT|OK|state=READY ready=YES
+CASE|IO1_CFG-limit_macro|PASS|safety_limit_inputs_enabled=0 expect=RT_FALSE
+CASE|IO1_CFG-diag_always_active|PASS|DIAG attach_calls=1 edge=0 (must stay RISING, unaffected by limit macro)
+CASE|IO2-fb_pin_is_input|PASS|PC.6 last_mode=0 (INPUT=0)
+CASE|IO2-fb_no_irq_registered|PASS|PC.6 attach=0 enable=0 (must be 0)
+CASE|IO2-fb_edges_post_no_estop|PASS|estop event count before=0 after=0 (both must be 0)
+CASE|IO3a-disabled_ok|PASS|pad=LOW fb=HIGH rc=0 verdict=OK
+CASE|IO3b-unexpected_enable_refused|PASS|rc=-12 verdict=UNEXPECTED_ENABLE gate_bit5=SET protection_ready=NO
+CASE|IO3c-no_sample_refused|PASS|rc=-5 verdict=NO_SAMPLE (invalid level is never treated as ready)
+CASE|IO3e-pure_truth_table|PASS|mismatched rows=0 (9 rows)
+CASE|IO6a-transition_bounded_not_success|PASS|rc=-117 verdict=TRANSITION fb_reads=3 (window = DRV_FB_TRIES=3, never 0/infinite)
+CASE|IO10a-feedback_readonly_no_bus|PASS|bus_delta=0 dev_delta=0 pin_reads_delta=6 (UART must stay 0)
+CASE|IO10b-no_real_device_io_total|PASS|device open=0 read/write=0 (must be 0 for the whole run)
+CASE|IO2d-fb_never_written|PASS|PC.6 write_calls=0
+CASE|IO1OFF-limits_not_resolved|PASS|safety_pin(PF.14)=-255 PF.15=-255 (must be <0: not in the active table)
+CASE|IO1OFF-limits_never_touched|PASS|limit mode/read/attach calls min=0/0/0 max=0/0/0 (all must be 0)
+CASE|IO1OFF-unwired_limits_do_not_block_ready|PASS|protection_ready=YES with PF.14/15 both LOW in the sim (must be YES)
+CASE|IO1OFF-diag_still_real_producer|PASS|diag event posts=1 latched_fault=4 state=FAULT_LATCHED
+CASE|IO1OFF-fault_clear_not_blocked_by_limits|PASS|state=MANUAL_CLEAR (expect MANUAL_CLEAR)
+CASE|IO9a-arm_refused_by_enable_path_macro|PASS|rc=-8 mask=0x1
+CASE|IO9b-no_HIGH_write_on_refused_arm|PASS|PC.23 last_write=0 (must stay LOW)
+CASE|IO9e-txn_balanced_after_refusal|PASS|txn begin=1 end=1 (delta must be 1/1)
+CASE|IO9c-step_diag_denied|PASS|grant rc=-8 pwm_enable_delta=0
+CASE|IO9f-start_refused_not_armed|PASS|start rc=-8 armed=0
+CASE|IO9d-write_gate_has_fb_bit_and_macro_bit|PASS|mask_macro=0x1 mask_stuck=0x81 mask_ideal=0x1
+CASE|IO8d-ready_ok_before_pin_dead|PASS|protection_ready=YES baseline (gate open, chain ideal)
+CASE|IO8e-dead_feedback_pin_refuses_ready|PASS|protection_ready=NO after PC.6 sample lost (must be NO)
+CASE|IO8f-arm_refused_with_dead_feedback|PASS|motor_arm rc=-8
+SUMMARY|cases=27|pass=27|fail=0
+
+===== variant on_target =====
+VARIANT|limit=ON|gates=TARGET
+BOOT|OK|state=READY ready=YES
+CASE|IO1_CFG-limit_macro|PASS|safety_limit_inputs_enabled=1 expect=RT_TRUE
+CASE|IO1_CFG-diag_always_active|PASS|DIAG attach_calls=1 edge=0 (must stay RISING, unaffected by limit macro)
+CASE|IO2-fb_pin_is_input|PASS|PC.6 last_mode=0 (INPUT=0)
+CASE|IO2-fb_no_irq_registered|PASS|PC.6 attach=0 enable=0 (must be 0)
+CASE|IO2-fb_edges_post_no_estop|PASS|estop event count before=0 after=0 (both must be 0)
+CASE|IO3a-disabled_ok|PASS|pad=LOW fb=HIGH rc=0 verdict=OK
+CASE|IO3b-unexpected_enable_refused|PASS|rc=-12 verdict=UNEXPECTED_ENABLE gate_bit5=SET protection_ready=NO
+CASE|IO3c-no_sample_refused|PASS|rc=-5 verdict=NO_SAMPLE (invalid level is never treated as ready)
+CASE|IO3e-pure_truth_table|PASS|mismatched rows=0 (9 rows)
+CASE|IO6a-transition_bounded_not_success|PASS|rc=-117 verdict=TRANSITION fb_reads=3 (window = DRV_FB_TRIES=3, never 0/infinite)
+CASE|IO10a-feedback_readonly_no_bus|PASS|bus_delta=0 dev_delta=0 pin_reads_delta=6 (UART must stay 0)
+CASE|IO10b-no_real_device_io_total|PASS|device open=0 read/write=0 (must be 0 for the whole run)
+CASE|IO2d-fb_never_written|PASS|PC.6 write_calls=0
+CASE|IO1ON-limits_resolved_input_mode|PASS|min=4 max=5 mode=0/0
+CASE|IO1ON-falling_edge_for_limits|PASS|edges min=1 max=1 diag=0
+CASE|IO1ON-both_high_is_safe|PASS|protection_ready=YES with both OK=HIGH
+CASE|IO1ON-any_low_refuses_ready|PASS|protection_ready=NO with LIMIT_MIN LOW (must be NO)
+CASE|IO1ON-falling_irq_posts_limit_event|PASS|limit_min event posts=1 latched_fault=2 state=FAULT_LATCHED
+CASE|IO1ON-invalid_sample_refuses_ready|PASS|protection_ready=NO with LIMIT_MAX sample=2 (must be NO)
+CASE|IO1ON-limit_irq_attach_failure_rolls_back|PASS|attach rc ok=1 gate=CLOSED ready=NO detach_min=3
+CASE|IO9a-arm_refused_by_enable_path_macro|PASS|rc=-8 mask=0x1
+CASE|IO9b-no_HIGH_write_on_refused_arm|PASS|PC.23 last_write=0 (must stay LOW)
+CASE|IO9e-txn_balanced_after_refusal|PASS|txn begin=1 end=1 (delta must be 1/1)
+CASE|IO9c-step_diag_denied|PASS|grant rc=-8 pwm_enable_delta=0
+CASE|IO9f-start_refused_not_armed|PASS|start rc=-8 armed=0
+CASE|IO9d-write_gate_has_fb_bit_and_macro_bit|PASS|mask_macro=0x1 mask_stuck=0x81 mask_ideal=0x1
+CASE|IO8d-ready_ok_before_pin_dead|PASS|protection_ready=YES baseline (gate open, chain ideal)
+CASE|IO8e-dead_feedback_pin_refuses_ready|PASS|protection_ready=NO after PC.6 sample lost (must be NO)
+CASE|IO8f-arm_refused_with_dead_feedback|PASS|motor_arm rc=-8
+SUMMARY|cases=29|pass=29|fail=0
+
+===== variant off_ovr =====
+VARIANT|limit=OFF|gates=OVERRIDE
+BOOT|OK|state=READY ready=YES
+CASE|IO1_CFG-limit_macro|PASS|safety_limit_inputs_enabled=0 expect=RT_FALSE
+CASE|IO1_CFG-diag_always_active|PASS|DIAG attach_calls=1 edge=0 (must stay RISING, unaffected by limit macro)
+CASE|IO2-fb_pin_is_input|PASS|PC.6 last_mode=0 (INPUT=0)
+CASE|IO2-fb_no_irq_registered|PASS|PC.6 attach=0 enable=0 (must be 0)
+CASE|IO2-fb_edges_post_no_estop|PASS|estop event count before=0 after=0 (both must be 0)
+CASE|IO3a-disabled_ok|PASS|pad=LOW fb=HIGH rc=0 verdict=OK
+CASE|IO3b-unexpected_enable_refused|PASS|rc=-12 verdict=UNEXPECTED_ENABLE gate_bit5=SET protection_ready=NO
+CASE|IO3c-no_sample_refused|PASS|rc=-5 verdict=NO_SAMPLE (invalid level is never treated as ready)
+CASE|IO3e-pure_truth_table|PASS|mismatched rows=0 (9 rows)
+CASE|IO6a-transition_bounded_not_success|PASS|rc=-117 verdict=TRANSITION fb_reads=3 (window = DRV_FB_TRIES=3, never 0/infinite)
+CASE|IO10a-feedback_readonly_no_bus|PASS|bus_delta=0 dev_delta=0 pin_reads_delta=6 (UART must stay 0)
+CASE|IO10b-no_real_device_io_total|PASS|device open=0 read/write=0 (must be 0 for the whole run)
+CASE|IO2d-fb_never_written|PASS|PC.6 write_calls=0
+CASE|IO1OFF-limits_not_resolved|PASS|safety_pin(PF.14)=-255 PF.15=-255 (must be <0: not in the active table)
+CASE|IO1OFF-limits_never_touched|PASS|limit mode/read/attach calls min=0/0/0 max=0/0/0 (all must be 0)
+CASE|IO1OFF-unwired_limits_do_not_block_ready|PASS|protection_ready=YES with PF.14/15 both LOW in the sim (must be YES)
+CASE|IO1OFF-diag_still_real_producer|PASS|diag event posts=1 latched_fault=4 state=FAULT_LATCHED
+CASE|IO1OFF-fault_clear_not_blocked_by_limits|PASS|state=MANUAL_CLEAR (expect MANUAL_CLEAR)
+CASE|IO4a-arm_confirms_enabled_side|PASS|arm rc=0 armed=1 pad_write=1 fb=OK
+CASE|IO4b-start_passes_after_arm_no_phase_deadlock|PASS|start rc=0 armed=1 state=1 (must NOT demand ENN HIGH after arm)
+CASE|IO5a-runtime_guard_stops_on_cut|PASS|fault=1 armed=0 guard_reason=4 stops=1
+CASE|IO5b-feedback_event_and_latch|PASS|latched=1 evt_bits7=1 fault=11 state=FAULT_LATCHED
+CASE|IO5c-stop_actions_not_skipped|PASS|pwm_disable=10 pad=0 (shutdown must still be attempted)
+CASE|IO6b1-arm_ok_on_ideal_chain|PASS|arm rc=0 pad=1 writes=1
+CASE|IO6b2-cut_request_rolls_back_to_low|PASS|arm rc=-8 armed=0 pad=0 write_delta=3 state=4
+CASE|IO6c-no_start_while_feedback_inconsistent|PASS|start rc=-8 armed=0 safety=FAULT_LATCHED verdict=PAD_MISMATCH
+CASE|IO7a-clear_refused_while_fb_stuck_enabled|PASS|latched=1 state=FAULT_LATCHED fault=4
+CASE|IO7c-clear_allowed_once_feedback_ideal|PASS|state=MANUAL_CLEAR
+CASE|IO8b-pad_write_not_sticking_reported|PASS|safety_drv_enable_write(1) rc=-12 (must fail, not pretend)
+CASE|IO8c-ready_never_hardwired_true|PASS|protection_ready=NO with gate CLOSED (limit macro=OFF)
+CASE|IO8d-ready_ok_before_pin_dead|PASS|protection_ready=YES baseline (gate open, chain ideal)
+CASE|IO8e-dead_feedback_pin_refuses_ready|PASS|protection_ready=NO after PC.6 sample lost (must be NO)
+CASE|IO8f-arm_refused_with_dead_feedback|PASS|motor_arm rc=-8
+SUMMARY|cases=33|pass=33|fail=0
+
+===== variant on_ovr =====
+VARIANT|limit=ON|gates=OVERRIDE
+BOOT|OK|state=READY ready=YES
+CASE|IO1_CFG-limit_macro|PASS|safety_limit_inputs_enabled=1 expect=RT_TRUE
+CASE|IO1_CFG-diag_always_active|PASS|DIAG attach_calls=1 edge=0 (must stay RISING, unaffected by limit macro)
+CASE|IO2-fb_pin_is_input|PASS|PC.6 last_mode=0 (INPUT=0)
+CASE|IO2-fb_no_irq_registered|PASS|PC.6 attach=0 enable=0 (must be 0)
+CASE|IO2-fb_edges_post_no_estop|PASS|estop event count before=0 after=0 (both must be 0)
+CASE|IO3a-disabled_ok|PASS|pad=LOW fb=HIGH rc=0 verdict=OK
+CASE|IO3b-unexpected_enable_refused|PASS|rc=-12 verdict=UNEXPECTED_ENABLE gate_bit5=SET protection_ready=NO
+CASE|IO3c-no_sample_refused|PASS|rc=-5 verdict=NO_SAMPLE (invalid level is never treated as ready)
+CASE|IO3e-pure_truth_table|PASS|mismatched rows=0 (9 rows)
+CASE|IO6a-transition_bounded_not_success|PASS|rc=-117 verdict=TRANSITION fb_reads=3 (window = DRV_FB_TRIES=3, never 0/infinite)
+CASE|IO10a-feedback_readonly_no_bus|PASS|bus_delta=0 dev_delta=0 pin_reads_delta=6 (UART must stay 0)
+CASE|IO10b-no_real_device_io_total|PASS|device open=0 read/write=0 (must be 0 for the whole run)
+CASE|IO2d-fb_never_written|PASS|PC.6 write_calls=0
+CASE|IO1ON-limits_resolved_input_mode|PASS|min=4 max=5 mode=0/0
+CASE|IO1ON-falling_edge_for_limits|PASS|edges min=1 max=1 diag=0
+CASE|IO1ON-both_high_is_safe|PASS|protection_ready=YES with both OK=HIGH
+CASE|IO1ON-any_low_refuses_ready|PASS|protection_ready=NO with LIMIT_MIN LOW (must be NO)
+CASE|IO1ON-falling_irq_posts_limit_event|PASS|limit_min event posts=1 latched_fault=2 state=FAULT_LATCHED
+CASE|IO1ON-invalid_sample_refuses_ready|PASS|protection_ready=NO with LIMIT_MAX sample=2 (must be NO)
+CASE|IO1ON-limit_irq_attach_failure_rolls_back|PASS|attach rc ok=1 gate=CLOSED ready=NO detach_min=3
+CASE|IO4a-arm_confirms_enabled_side|PASS|arm rc=0 armed=1 pad_write=1 fb=OK
+CASE|IO4b-start_passes_after_arm_no_phase_deadlock|PASS|start rc=0 armed=1 state=1 (must NOT demand ENN HIGH after arm)
+CASE|IO5a-runtime_guard_stops_on_cut|PASS|fault=1 armed=0 guard_reason=4 stops=1
+CASE|IO5b-feedback_event_and_latch|PASS|latched=1 evt_bits7=1 fault=11 state=FAULT_LATCHED
+CASE|IO5c-stop_actions_not_skipped|PASS|pwm_disable=10 pad=0 (shutdown must still be attempted)
+CASE|IO6b1-arm_ok_on_ideal_chain|PASS|arm rc=0 pad=1 writes=1
+CASE|IO6b2-cut_request_rolls_back_to_low|PASS|arm rc=-8 armed=0 pad=0 write_delta=2 state=4
+CASE|IO6c-no_start_while_feedback_inconsistent|PASS|start rc=-8 armed=0 safety=READY verdict=PAD_MISMATCH
+CASE|IO7a-clear_refused_while_fb_stuck_enabled|PASS|latched=1 state=FAULT_LATCHED fault=4
+CASE|IO7c-clear_allowed_once_feedback_ideal|PASS|state=MANUAL_CLEAR
+CASE|IO8b-pad_write_not_sticking_reported|PASS|safety_drv_enable_write(1) rc=-12 (must fail, not pretend)
+CASE|IO8c-ready_never_hardwired_true|PASS|protection_ready=NO with gate CLOSED (limit macro=ON)
+CASE|IO8d-ready_ok_before_pin_dead|PASS|protection_ready=YES baseline (gate open, chain ideal)
+CASE|IO8e-dead_feedback_pin_refuses_ready|PASS|protection_ready=NO after PC.6 sample lost (must be NO)
+CASE|IO8f-arm_refused_with_dead_feedback|PASS|motor_arm rc=-8
+SUMMARY|cases=35|pass=35|fail=0
+
+===== runner 台账 =====
+IO_RUNNER_RC=0
+IO_DETECTED_FAIL=0
+off_target | OK 必需用例=27 全部PASS 自报fail=0 proc_rc=0 (输出 6683 字节)
+on_target | OK 必需用例=29 全部PASS 自报fail=0 proc_rc=0 (输出 7969 字节)
+off_ovr | OK 必需用例=33 全部PASS 自报fail=0 proc_rc=0 (输出 10317 字节)
+on_ovr | OK 必需用例=35 全部PASS 自报fail=0 proc_rc=0 (输出 11992 字节)
+IO1_CFG-illegal_macro_rejected | OK(拒绝编译 rc=1)

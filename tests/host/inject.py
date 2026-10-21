@@ -37,6 +37,20 @@ SUBS = {
     'runner_exit_zero': [(
         'exit "$overall"',
         'exit 0   # NEGATIVE-INJECTION(runner_exit_zero): 故意丢掉出口码')],
+
+    # ---- 2026-10-21 I/O 反向验证(三项, 只改**仓库外生产源码副本**) ----
+    # R1: 限位宏关闭时仍强制把两路限位纳入解析/配置 => 应由 IO1OFF-* 抓到(目标 safety_gpio.c)
+    'rev_limits_forced_off': [(
+        '#if SAFETY_LIMIT_INPUTS_ENABLED == RT_TRUE',
+        '#if 1   /* NEGATIVE-INJECTION(rev_limits_forced_off): 宏关闭也强制启用限位 */')],
+    # R2: 限位宏开启时把"反相后的 OK 信号"写成 LOW 安全/上升沿 => 应由 IO1ON-* 抓到
+    'rev_limits_polarity_on': [(
+        '{ PIN_NAME_LIMIT_MIN, lim_min_isr,  PIN_IRQ_MODE_FALLING, PIN_HIGH, "LIMIT_MIN_OK" }, /* bit 0 */',
+        '{ PIN_NAME_LIMIT_MIN, lim_min_isr,  PIN_IRQ_MODE_RISING,  PIN_LOW,  "LIMIT_MIN_OK" }, /* NEGATIVE-INJECTION(rev_limits_polarity_on) */')],
+    # R3: 把与请求不符的 ENN 反馈强行当匹配 => 应由 IO3b / IO5a / IO6b2 抓到
+    'rev_fb_always_match': [(
+        'if (fb  == want_fb)    return SAFETY_FB_OK;',
+        'return SAFETY_FB_OK;   /* NEGATIVE-INJECTION(rev_fb_always_match) */')],
 }
 
 

@@ -1,0 +1,45 @@
+# 既有回归(最终源码, 2026-10-21) —— V1/V2 + 13 例负例 + 8 组元负例/对照
+# 本轮任务起点 9ace7d0cd8bb04dacaf74e101388e540ca49e349; 链默认 BASE_HEAD = 运行时的 HEAD,
+# 即本轮实现检查点 c8d9719f7b222c919d4d06cb8ad7455baf5cad94(已含实现改动)。
+# 链入口: bash tests/host/run_negatives.sh ; 整链真实 rc=0
+
+## 干净快照回归 N11 的 V1/V2 判据计数(未放宽)
+HOST TEST SUMMARY: CHECK_PASS=25 CHECK_FAIL=0 BAD_SELFTEST=0 MISSING_CASE=0
+HOST TEST SUMMARY: CHECK_PASS=22 CHECK_FAIL=0 BAD_SELFTEST=0 MISSING_CASE=0
+
+## 逐例矩阵(13 例, 真实/自报/期望三个 rc + 每变体状态)
+############ 负例与回归全链 (基线 c8d9719f7b222c919d4d06cb8ad7455baf5cad94, 逐例预期矩阵 + 出口对账) ############
+请求集合(13): N1_only_V1_injected_fail N2_only_V2_injected_fail N3_V1_stale_exe_not_reused N4_fw_calc_selftest_FAILED N5_fw_cfg_selftest_INCOMPLETE N6_helper_thread_create_fail N7_helper_thread_startup_fail N8_gstat_expect_table_tamper N9_probe_writeback_V1 N10_probe_writeback_V2 N10b_writeback_both_variants N11_clean_snapshot_regression N12_workspace_clean_regression
+OK | N1_only_V1_injected_fail | rc 真实=1 自报=1 期望=1 | V1=RAN/0/1 V2=RAN/0/0 (期望 V1=RAN/0/1 V2=RAN/0/0)
+--- N1_only_V1_injected_fail: OK
+OK | N2_only_V2_injected_fail | rc 真实=1 自报=1 期望=1 | V1=RAN/0/0 V2=RAN/0/1 (期望 V1=RAN/0/0 V2=RAN/0/1)
+--- N2_only_V2_injected_fail: OK
+OK | N3_V1_stale_exe_not_reused | rc 真实=1 自报=1 期望=1 | V1=COMPILE_FAILED/1/127 V2=RAN/0/0 (期望 V1=COMPILE_FAILED/1/127 V2=RAN/0/0)
+--- N3_V1_stale_exe_not_reused: OK
+injected(mode=calc_anchor, replacements=1) -> <WORK>/ns800-host-chain/negatives/snap_calc/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/tmc2209.c
+OK | N4_fw_calc_selftest_FAILED | rc 真实=2 自报=2 期望=2 | V1=RAN/0/2 V2=RAN/0/2 (期望 V1=RAN/0/2 V2=RAN/0/2)
+--- N4_fw_calc_selftest_FAILED: OK
+OK | N5_fw_cfg_selftest_INCOMPLETE | rc 真实=2 自报=2 期望=2 | V1=RAN/0/2 V2=RAN/0/0 (期望 V1=RAN/0/2 V2=RAN/0/0)
+--- N5_fw_cfg_selftest_INCOMPLETE: OK
+OK | N6_helper_thread_create_fail | rc 真实=3 自报=3 期望=3 | V1=RAN/0/3 V2=RAN/0/3 (期望 V1=RAN/0/3 V2=RAN/0/3)
+--- N6_helper_thread_create_fail: OK
+OK | N7_helper_thread_startup_fail | rc 真实=3 自报=3 期望=3 | V1=RAN/0/3 V2=RAN/0/3 (期望 V1=RAN/0/3 V2=RAN/0/3)
+--- N7_helper_thread_startup_fail: OK
+injected(mode=gstat_expect, replacements=1) -> <WORK>/ns800-host-chain/negatives/harness_gstat/host_main.c
+OK | N8_gstat_expect_table_tamper | rc 真实=1 自报=1 期望=1 | V1=RAN/0/1 V2=RAN/0/0 (期望 V1=RAN/0/1 V2=RAN/0/0)
+--- N8_gstat_expect_table_tamper: OK
+
+## 元负例/对照判定
+META-OK | M1_blinded_fd7b
+CONTROL-OK | M1_control_unblinded
+META-OK | M2_stubbed_compile
+CONTROL-OK | M2_control_real_compiler
+META-OK | M3_runner_exit_zero_lost
+CONTROL-OK | M3_control_unmodified
+META-OK | M4_selection_semantics
+META-OK | M5_wrong_reason_guard
+
+## 链尾
+RUNNER(run_negatives): 所有负例按预期被检出且身份齐备; 干净回归通过 (rc=0)
+RUNNER(meta): 全部元负例按**正确原因**被拒绝, 对照组按预期通过, 集合一致 (rc=0)
+RUNNER(meta) rc=0

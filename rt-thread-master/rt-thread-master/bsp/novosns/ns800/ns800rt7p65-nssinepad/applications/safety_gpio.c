@@ -310,11 +310,8 @@ void safety_fb_snapshot(rt_int32_t *out_request, rt_int32_t *out_pad,
 
 rt_bool_t safety_limit_inputs_enabled(void)
 {
-#if SAFETY_LIMIT_INPUTS_ENABLED == RT_TRUE
-    return RT_TRUE;
-#else
-    return RT_FALSE;
-#endif
+    /* 写成表达式而不是第二个 #if, 是为了让反向验证注入能用唯一锚点命中引脚表那道 #if */
+    return (SAFETY_LIMIT_INPUTS_ENABLED == RT_TRUE) ? RT_TRUE : RT_FALSE;
 }
 
 static void pin_status(void)

@@ -48,6 +48,14 @@
   或一定转动**）；印刷第 24 页 GENERAL CONFIGURATION REGISTERS：IOIN（`0x06`）**bit0 = ENN**。
   官方 PDF：<https://www.analog.com/media/en/technical-documentation/data-sheets/TMC2209_datasheet_rev1.09.pdf>。
   整链真值表（`MCU_DRV_ENABLE`/急停经 U5/U13 与 Q1 之后）仍需现板电路依据，见草案 B2 与 D-1/D-2。
+  **2026-10-21 再覆盖（用户确认，固件已适配）**：① 现用扩展板**就是**这份 `RevA / V1.0` 图纸
+  （"旧 RevA 漏画 / 新扩展板已引出"两种说法指同一张板，冲突收口）；② `PC.6` 现有线接 **H6-5 =
+  `TMC_ENN`**，作 ENN 状态反馈（旧"H5-5"位号作废）；③ 用户报告损坏的 **U5 与门与急停反相器已更换**
+  （料号未记录，换件后读数/波形尚未提供 → 状态是"换件完成 + 待验收"，旧读数转为**维修前历史**）；
+  ④ 固件侧本轮已按此职责适配（`PC.6` 改名+去掉急停 ISR+按请求态判定反馈并接进
+  arm/start/运行守卫/disarm/故障清除/TMC 写门），两路限位改为 `SAFETY_LIMIT_INPUTS_ENABLED`
+  控制、**目标默认 `RT_FALSE`**（实现保留，不删除）；三道硬件验证宏仍 `RT_FALSE`，
+  新源码**未烧录**，板上仍是冻结固件 `e40a9b9`。
 
 ### 引脚映射（冻结，修改需重新做 Pinmux 冲突分析）
 
@@ -64,11 +72,11 @@
 | 保留 | J4-17 | PA1 | — | EPWM1_B（**禁止做 DIR**） |
 | TMC_DIR | J4-16 | PA2 | `PA.2` | 方向输出 |
 | TMC_DIAG | J4-15 | PA3 | `PA.3` | 堵转诊断输入（EXTI3） |
-| LIMIT_MIN | J4-19 | PF14 | `PF.14` | 下限位（EXTI14） |
+| LIMIT_MIN | J4-19 | PF14 | `PF.14` | 下限位 `LIMIT_MIN_OK`（EXTI14）；**HIGH=安全、LOW=触发、下降沿**。是否进入解析/配置/读取/IRQ 由 `SAFETY_LIMIT_INPUTS_ENABLED` 决定（目标默认 `RT_FALSE`=完全不参与，非验收 PASS） |
 | MCU_DRV_ENABLE | J4-21 | PC23 | `PC.23` | 软件使能许可，**上电默认 LOW**（⚠ 原 PF.21/J4-20 焊盘缺陷弃用，见 调试记录 BUG-009） |
-| LIMIT_MAX | J4-25 | PF15 | `PF.15` | 上限位（EXTI15） |
+| LIMIT_MAX | J4-25 | PF15 | `PF.15` | 上限位 `LIMIT_MAX_OK`（EXTI15）；HIGH=安全、LOW=触发、下降沿；同样受 `SAFETY_LIMIT_INPUTS_ENABLED` 控制 |
 | BUZZER | J4-26 | PC19 | `PC.19` | 蜂鸣器 |
-| ESTOP_SENSE | J4-40 | PC6 | `PC.6` | 急停检测（EXTI6） |
+| ESTOP_SENSE（**2026-10-21 更名 ENN_FEEDBACK**） | J4-40 | PC6 | `PC.6` | **TMC_ENN 状态反馈输入**（用户确认实物接扩展板 H6-5）；被动只读、不注册 IRQ。⚠ 旧名 ESTOP_SENSE 与"急停感测/上升沿触发"的解释**作废**——板上急停是纯硬件链(常闭→U13→U5→Q1)，图纸上没有送进 MCU 的网络，软件不存在独立急停输入。`PIN_NAME_ESTOP` 仅作为 `sensor_service.c` 所需的文档化别名存在 |
 | RUN/WARN/FAULT LED | J4-38/37/36 | PC8/PC9/PC10 | `PC.8`/`PC.9`/`PC.10` | 状态灯 |
 | CURRENT_ADC | J1-3 | PH2 | — | ADCA CH15 |
 
@@ -129,6 +137,12 @@ motor+sensor → diagnosis → blackbox → UI → 启动自检 + READY 决策�
 > "IO70 语义冲突"的真实内容也不是 IO87/IO70 编号混淆，而是 **`PC.6` 实物按 `TMC_ENN` 反馈接线
 > （2026-10-18 用户交接）vs 软件仍按急停输入命名与解释 vs 图纸两者都没有**；在该脚物理职责核对
 > 清楚之前，禁止任何急停输入刺激、EXTI 开闸与极性确认动作。详见验收方案草案 X-1/X-2。
+> **2026-10-21 收口（上面两句的当时状态已被解决，原文保留）**：用户确认 `PC.6` = H6-5/`TMC_ENN`
+> 反馈，固件本轮按此实现（改名、不注册急停 ISR、按许可请求态判定反馈），"软件声称存在独立急停输入"
+> 的说法作废；H2 也已由图纸+交接共同定义为限位/LED/蜂鸣器连接器，现状是**未插接且限位宏
+> `SAFETY_LIMIT_INPUTS_ENABLED=RT_FALSE`** → 限位保护能力 0，记 `DISABLED_BY_CONFIG`。
+> **仍开放的**：换件后的硬件链与反馈一致性实测（RISK-04）、停机时延上界与无界等锁路径
+> （RISK-03 / 03a）、`TMC_ENN`↔`PC.6` 这条反馈支线的连线归属（图纸未画，需网表/截图）。
 
 ### 方式一：Keil μVision（图形界面）
 
