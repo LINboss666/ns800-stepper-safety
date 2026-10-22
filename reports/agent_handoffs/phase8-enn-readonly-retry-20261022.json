@@ -1,0 +1,194 @@
+{
+  "task_id": "phase8-enn-readonly-retry-20261022",
+  "repository": "https://github.com/LINboss666/ns800-stepper-safety",
+  "branch": "phase8/tmc-drive-config",
+  "base_sha": "84f60cc20d3b65f2a7ae88ff1305eed58924e9a7",
+  "source_sha": "296c369607ea69c201f797b80950b76ff312c0e0",
+  "recorded_at": "2026-10-22",
+  "nature": "offline read-only recovery + one bounded whitelisted console round; NOT motion test, NOT enable-chain acceptance, NOT software rework",
+  "frozen_objects_untouched": {
+    "main": "1b3757eec550802a3973e66790af422d81d3d373",
+    "phase7_full_embedded_software": "6d3fbc559d45673d7550eb73dec5a4ade5bb34df",
+    "v0_7_tag_object": "097935fec5a6f2467261ab1ad449ff0b1d398250",
+    "tag_points_firmware": "e40a9b95ef709e6a80444f9f3949dfdd70ba96ba"
+  },
+  "startup_state": {
+    "local_head": "84f60cc20d3b65f2a7ae88ff1305eed58924e9a7",
+    "remote_readback": "84f60cc20d3b65f2a7ae88ff1305eed58924e9a7",
+    "worktree_clean": true,
+    "remote_deviation": "none (no serial-phase abort from baseline mismatch)"
+  },
+  "firmware_identity": {
+    "level": "USER_REPORTED_E40",
+    "reported_sha": "e40a9b95ef709e6a80444f9f3949dfdd70ba96ba",
+    "read_back_this_round": false,
+    "note": "不由内核版本或本地 bin 反推板上 Git SHA"
+  },
+  "scope_status": {
+    "code_changed": false,
+    "tests_changed": false,
+    "keil_project_changed": false,
+    "macros_or_gates_changed": false,
+    "new_diagnostic_entry_added": false,
+    "host_matrix_or_meta_rerun": false,
+    "keil_rebuild": false,
+    "readme_or_progress_or_todo_or_draft_changed": false,
+    "zip_produced": false,
+    "delivery": "GitHub 普通提交 + 普通 push（仅本轮允许的三个路径）",
+    "serial_console": {
+      "port": "COM5",
+      "settings": "115200 8N1",
+      "adapter": "板载 DAPLink 虚拟 CDC (README.md:30, :188)",
+      "opened_by": "Qoder（用户明确授权：\"由我打开 COM5 执行（115200 8N1，仅白名单三条）\"）",
+      "reset_observed_on_open": false,
+      "reset_claim_scope": "仅本轮两次打开均未出现启动横幅；不推翻 §3 保守前提，不作通用结论",
+      "user_terminal_preempted": false,
+      "ports_enumerated": false,
+      "baud_trial_used": false
+    },
+    "hardware_actions_actually_performed": [
+      "打开 COM5 -> 发送白名单只读命令 x2 轮 -> 关闭端口"
+    ],
+    "hardware_actions_not_performed": [
+      "未烧录", "未用调试器下载或复位", "未主动切换 DTR/RTS", "未改变供电/断电", "未插拔模块",
+      "未改接线（跳线由用户自行拆除，USER_REPORTED）", "未接电机", "未输出 STEP",
+      "未向真实 TMC 写任何寄存器（含原值回写）", "未拉高 IO87", "未驱动 IO70",
+      "未开 IRQ 门", "未执行极性确认"
+    ]
+  },
+  "recovered_failure_point": {
+    "search_scope": "一次集中检索：BSP/PHASE8_HARDWARE_VALIDATION_20260925.md、BSP/调试记录.md、BSP/PHASE7_PROGRESS.md、reports/plans/phase8-safety-chain-acceptance-draft.md、本机历史 COM5 转写目录",
+    "items": [
+      {
+        "id": "R-1",
+        "what": "早先直接把 IO87 -> TMC_ENN 相连的测试",
+        "kind": "物理跳线接法（绕过 U5/Q1 级联）",
+        "status": "已作废，不得引用为使能链验证结论",
+        "writes_gpio_or_regs": "改接线；不涉寄存器",
+        "source": "PHASE8:57 / 草案 A14"
+      },
+      {
+        "id": "R-2",
+        "what": "PF.21(GPIO31/J4-20，旧版 MCU_DRV_ENABLE) 锁存=0 而焊盘被顶在 2.37~3.3V",
+        "kind": "历史排障 BUG-009，最终换脚迁移到 PC.23",
+        "status": "OPEN / physical validation pending（旧脚弃用）",
+        "writes_gpio_or_regs": "含 GPIO 配置写（pf21_diag）+ 用户万用表实测",
+        "source": "BSP/调试记录.md:204-254"
+      },
+      {
+        "id": "R-3",
+        "what": "tmc_uart_probe 用写 GCONF 原值 -> IFCNT+1 证明写帧到达",
+        "kind": "旧版写回投毒（F2c-NEW-01 判定，新版已删除）",
+        "status": "本轮及新版均禁止；e40 仍存在该写路径（tmc2209.c:162,404）",
+        "writes_gpio_or_regs": "含寄存器 WRITE",
+        "source": "BSP/调试记录.md:353 / README.md:205"
+      },
+      {
+        "id": "R-4",
+        "what": "motor_arm 被门禁拒绝（arm gate fail mask=0xB, arm REFUSED）",
+        "kind": "软件门禁正常拒绝（非硬件失败、非 UART 无回复）",
+        "status": "本轮同样存在（实测 mask=0xB），未调用 motor_arm",
+        "writes_gpio_or_regs": "无",
+        "source": "历史转写 phase8_b1_20260925_transcript.log:82,95,295 + 本轮第 2 节"
+      },
+      {
+        "id": "R-5",
+        "what": "\"级联逻辑器件损坏（U5 与门 + 急停非门异常），实测 TMC_ENN 约 0V\"",
+        "kind": "确定性根因表述 -> 本轮按任务书 §2 撤回确定性",
+        "status": "降级为解释候选；原始记录保留未删（本轮不允许改 PHASE8/README/开发进度/待办/草案，故仅登记在本文）",
+        "writes_gpio_or_regs": "无",
+        "source": "PHASE8:40"
+      }
+    ],
+    "no_local_record_found_for": "2026-10-21 提出的\"把 IO87 拉高\"那次：本机转写目录最新文件停在 2026-10-18，仓库与交接中亦无 10-21/10-22 的命令级原始记录 -> 明确写未找到，不猜命令",
+    "reason_categories_distinguished": [
+      "旧物理解释错误（R-1/R-5）",
+      "软件门禁正常拒绝（R-4）",
+      "UART 无有效回复（本轮未出现）",
+      "板上版本不明（USER_REPORTED_E40，未读回）"
+    ]
+  },
+  "command_side_effect_check": {
+    "e40_safety_status": "走 st_inputs 打印 pin=%d raw=%d；PC.6 在该版本命名为 ESTOP_SENSE -> 只取原始 0/1，不采信急停语义",
+    "e40_motor_status": "四道门掩码（bit0..bit3），提示 all four gates pass；无新版 bit5 MOT_GATE_FB_MISMATCH",
+    "e40_tmc_regs": "7 个 READ：GCONF/GSTAT/IFCNT/IOIN/VACTUAL(0x22)/CHOPCONF(0x6C)/SG_RESULT(0x41)；该命令无寄存器 WRITE，但确实发送 READ 请求帧，并影响链路健康度/计数",
+    "banned_commands_and_why": {
+      "tmc_uart_probe": "e40 会写回 GCONF（原值回写也算写）",
+      "pin_status": "对 DRV_ENABLE 调 safety_drv_enable_write(0)，对其余输出脚 rt_pin_write 重写默认电平",
+      "runtime_selftest": "投 EVT_SOFT_FAULT -> 锁存 -> 尝试清除",
+      "motor_arm_or_start_or_target_or_dir": "会请求使能或运动",
+      "pwm_test_or_config_apply_or_irq_enable_or_polarity_confirm": "STEP/配置/软件门",
+      "pf21_legacy_diag": "操作弃用脚且含 GPIO 配置写"
+    },
+    "gstat_bit2_name": "uv_cp（Rev.1.09），不用旧 sg2",
+    "official_basis": "TMC2209 Datasheet Rev.1.09 印刷 p9 §2.2、p24 IOIN(0x06) bit0=ENN"
+  },
+  "tests": {
+    "round_1": {
+      "samples": [
+        {"t": "17:29:47.314", "cmd": "safety_status", "raw": "ready=YES first_err=0; MCU_DRV_ENABLE = 0; DRV_ENABLE last write+readback verified = 0; ESTOP_SENSE(PC.6) = 1"},
+        {"t": "17:29:50.729", "cmd": "motor_status", "raw": "state=4 cur=0 tgt=0 accel=2000 decel=2000 dir=0; armed=0 drv_en_verified_pad=0 health=OK; arm gate fail mask=0xB (arm will be REFUSED); gate4 detail: irq_gate=CLOSED polarity=not-confirmed gpio_ready=YES"},
+        {"t": "17:29:54.130", "cmd": "tmc_regs", "raw": "GCONF=0x00000101 GSTAT=0x00000001 IFCNT=0x00000000 IOIN=0x21000041 VACTUAL=0x00000000 CHOPCONF=0x15010053 SGRESULT=0x00000000"}
+      ],
+      "step4_safety_status_after_tmc_regs": "MISSING_FROM_TRANSCRIPT（脚本以 rc=0 结束但未写出该块，原因未查明；不声称轮 1 完成四步）",
+      "gate_banner_seen": false,
+      "gate_state_bad": false,
+      "proc_rc": 0
+    },
+    "round_2": {
+      "samples": [
+        {"t": "17:31:41.851", "cmd": "safety_status", "raw": "与轮 1 逐项一致"},
+        {"t": "17:31:45.223", "cmd": "motor_status", "raw": "与轮 1 逐项一致"},
+        {"t": "17:31:48.626", "cmd": "tmc_regs", "raw": "七个值与轮 1 全同（含 IFCNT=0x00000000, IOIN=0x21000041）"},
+        {"t": "17:31:54.966", "cmd": "safety_status#2 (脚本缺陷: 标签被当命令发出)", "raw": "safety_status#2: command not found.（无副作用）"}
+      ],
+      "cross_sample_consistency": "轮 1 与轮 2 的 safety_status/motor_status 逐项相同，期间未触碰接线或供电 -> 同轮首尾一致成立；tmc_regs 之后的复核由轮 2 首个 safety_status 等效补足（如实标注）",
+      "proc_rc": 0
+    },
+    "computed": {
+      "version_from_ioin": "0x21 (= TMC2209, 符合预期)",
+      "enn_bit0": 1,
+      "ioin_bits": "0x21000041 -> bit0=1(ENN 禁能侧), bit6=1(PDN_UART 高)",
+      "gpio70_raw": 1,
+      "permit": "pad=0 且 write+readback verified=0 (LOW)",
+      "motor": "armed=0, cur=0, tgt=0, VACTUAL=0",
+      "gstat": "0x00000001 (reset 位)",
+      "ifcnt_round1": 0,
+      "ifcnt_round2": 0,
+      "ifcnt_interpretation_limit": "按任务书 §C：不变不能单独证明总线上绝无 WRITE；未据此归因，未扩大测试"
+    },
+    "rounds_used": 2,
+    "rounds_max": 2,
+    "extra_address_scan": false,
+    "retry_of_failed_step": false,
+    "result_label": "READONLY_DISABLED_SIDE_CONSISTENT",
+    "labels_not_awarded": [
+      "RISK-04 未关闭",
+      "急停独立切断未验证",
+      "IO87 高低跟随未验证",
+      "反馈支线物理连通性未验证（METER_NOT_MEASURED_THIS_RUN）",
+      "新版反馈判定/bit5 门未上板（板上为 e40）",
+      "停机时延未测（RISK-03/03a 开放）"
+    ]
+  },
+  "evidence_paths": [
+    "reports/agent_handoffs/phase8-enn-readonly-retry-20261022.md",
+    "reports/agent_handoffs/phase8-enn-readonly-retry-20261022.json",
+    "reports/reviews/phase8-enn-readonly-retry-20261022/round1_transcript.txt",
+    "reports/reviews/phase8-enn-readonly-retry-20261022/round2_transcript.txt",
+    "reports/reviews/phase8-enn-readonly-retry-20261022/readonly_round_decoded.txt"
+  ],
+  "known_limitations": [
+    "固件身份仅 USER_REPORTED_E40，本轮未读回 Flash 哈希/版本标识；不得据 e40 的打印语义解释新版逻辑",
+    "无本轮万用表读数 -> 静态 HIGH 一致不证明反馈支线连通（METER_NOT_MEASURED_THIS_RUN）",
+    "IO87 主动 HIGH -> ENN LOW 的跟随未执行：现有合规入口不存在 -> ENABLE_TRANSITION_NOT_EXECUTED / BLOCKED_METHOD（新版三宏 RT_FALSE；e40 的 motor_arm 被 mask=0xB 拒绝；跳线/裸 GPIO/翻宏均被禁止）",
+    "接线现状（跳线已拆除、恢复原状）为 USER_REPORTED，Qoder 未独立核实；VM/外供路数与电压仍不完整",
+    "IFCNT 两轮均为 0，与 2026-09-12 的 1->2 记录不一致，原因未查明；未据此下结论",
+    "历史 IOIN=0x21000040 与本轮 0x21000041 的差异只登记不解释（期间装配/供电/接线变化未知）",
+    "本轮第 4 步采样在轮 1 未落入转写、轮 2 因脚本缺陷失败（已如实登记，等效复核由轮 2 首样补足）",
+    "打开 COM5 未观察到重启只是本轮观测，不构成\"CDC 打开永不复位目标\"的通用结论",
+    "PHASE8:40 的\"门芯片损坏\"确定性表述本轮只登记撤回、未改写原文件（不在允许路径内）",
+    "RISK-03/03a/04 继续开放；不进入 F2e/F3、不开展运动或使能试验、不新建工具返修循环"
+  ],
+  "stop_reason": "AWAITING_INDEPENDENT_REVIEW — 白名单只读两轮已用满（§C 上限），恢复结论与只读结论已交付；IO87 主动使能仍 BLOCKED_METHOD，硬件执行需用户另行授权，独立审核前不推进任何硬件动作"
+}

@@ -1,0 +1,37 @@
+# 板上 COM5 原始转写（已脱敏：本地绝对路径与用户名替换为 <LOCAL-TMP>/<USER>；判定文本未删改）
+# 端口 115200 8N1；只发送白名单命令 safety_status / motor_status / tmc_regs
+# 非打印字节来自打开端口后的线路噪声/残留，不构成任何判据。
+
+﻿=== round start 2026-10-22T17:29:45.1870559+08:00 ===
+----[pre-listen]----
+??i??i!?DB???i??i!?DB?DB'?i??i!?DB?DB'?i??DH!?DB'????D?DB'Ug@!????i!??i!??`#'?i!?S!?DB'????i!?DH!?DB'????i!?DH!?DB'????i!?DH!?DB'????D?DB'?i!???DB'?i!??DB'?i!??i!??DB'?i!?ag@!?DB'`#'?i!?i!?DB'j#'?i!?DH!?DB'????D?DB'`#'
+>>> safety_status  @ 17:29:47.314
+----[safety_status]----
+safety_status
+[SAFETY] ready=YES first_err=0
+[SAFETY] MCU_DRV_ENABLE = 0 (??????(??????))
+[SAFETY] DRV_ENABLE last write+readback verified = 0 (-1 = never verified)
+[SAFETY] ESTOP_SENSE ???????????? = 1 (???????????????????????????)
+msh >
+>>> motor_status  @ 17:29:50.729
+----[motor_status]----
+motor_status
+[MOT] state=4 cur=0 tgt=0 accel=2000 decel=2000 dir=0
+[MOT] armed=0 drv_en_verified_pad=0 health=OK
+[MOT] arm gate fail mask=0xB (arm will be REFUSED)
+[MOT] arm gate mask=0xB: enable-path-not-validated safety-not-READY protection-not-ready
+[MOT] gate4 detail: irq_gate=CLOSED polarity=not-confirmed gpio_ready=YES
+msh >
+>>> tmc_regs  @ 17:29:54.130
+----[tmc_regs]----
+tmc_regs
+[TMC] register snapshot (read-only, addr 0):
+[TMC] GCONF    (0x00) = 0x00000101
+[TMC] GSTAT    (0x01) = 0x00000001
+[TMC] IFCNT    (0x02) = 0x00000000
+[TMC] IOIN     (0x06) = 0x21000041
+[TMC] VACTUAL  (0x22) = 0x00000000
+[TMC] CHOPCONF (0x6C) = 0x15010053
+[TMC] SGRESULT (0x41) = 0x00000000
+msh >
+=== round end 2026-10-22T17:30:00.4680304+08:00 ===

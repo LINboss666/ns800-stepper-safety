@@ -1,0 +1,62 @@
+# 只读复查解码表（2026-10-22，任务 phase8-enn-readonly-retry-20261022）
+
+固件身份：**USER_REPORTED_E40**（用户历史转交 `e40a9b95ef709e6a80444f9f3949dfdd70ba96ba`；本轮未读回 Flash 哈希/版本标识，
+未据此推断板上 Git SHA）。控制台 COM5 / 115200 / 8N1（板载 DAPLink 虚拟 CDC）。
+本轮**只发送白名单三条**：`safety_status`、`motor_status`、`tmc_regs`。
+未发送：`pin_status`、`tmc_uart_probe`、`runtime_selftest`、`motor_arm`、`motor_start`、`motor_target`、`motor_dir`、
+`pwm_test`、`tmc_config_apply`、IRQ 开闸/极性确认、任何 PF21 遗留诊断、任何未审核命令；未发复位命令。
+
+## 1. 采样次序与原始读数（两轮）
+
+| 轮 | 时刻 | 命令 | 关键原始值 |
+|---|---|---|---|
+| 1 | 17:29:47.314 | `safety_status` | `ready=YES first_err=0`；`MCU_DRV_ENABLE = 0`；`DRV_ENABLE last write+readback verified = 0`；`ESTOP_SENSE … = 1`（**版本语义：e40 把 PC.6 命名成 ESTOP_SENSE，只取原始 0/1**） |
+| 1 | 17:29:50.729 | `motor_status` | `state=4 cur=0 tgt=0 accel=2000 decel=2000 dir=0`；`armed=0 drv_en_verified_pad=0 health=OK`；`arm gate fail mask=0xB (arm will be REFUSED)`；`gate4 detail: irq_gate=CLOSED polarity=not-confirmed gpio_ready=YES` |
+| 1 | 17:29:54.130 | `tmc_regs` | `GCONF=0x00000101` `GSTAT=0x00000001` `IFCNT=0x00000000` `IOIN=0x21000041` `VACTUAL=0x00000000` `CHOPCONF=0x15010053` `SGRESULT=0x00000000` |
+| 2 | 17:31:41.851 | `safety_status` | 与轮 1 逐项一致（`MCU_DRV_ENABLE = 0`、readback verified=0、`PC.6` 原始=1） |
+| 2 | 17:31:45.223 | `motor_status` | 与轮 1 逐项一致（`armed=0`、`cur=0`、`tgt=0`、mask=0xB） |
+| 2 | 17:31:48.626 | `tmc_regs` | 与轮 1 **七个值全部相同**（含 `IFCNT=0x00000000`、`IOIN=0x21000041`） |
+| 2 | 17:31:54.966 | （应为第 4 次 `safety_status`） | **本轮失败**：我的脚本把标签当命令发出，msh 回 `safety_status#2: command not found.` → 无副作用，但 tmc_regs 之后的那次采样未取到（见第 4 节） |
+
+跨采样状态核对：轮 1 `tmc_regs` 之后到轮 2 开头的 `safety_status` 之间未改动任何接线/供电，
+两次 `safety_status` 与两次 `motor_status` 逐项一致 → 按任务书 §C3 "同轮首尾一致"的要求成立；
+轮 2 的失败第 4 步由轮 2 首个 `safety_status` 等效补足，如实标注而非掩盖。
+
+## 2. 从原始值计算（按任务书 §C 公式）
+
+| 量 | 计算 | 结果 | 预期（许可 LOW 时） |
+|---|---|---|---|
+| `VERSION` | `(IOIN >> 24) & 0xFF` | **0x21** | 0x21 = TMC2209 ✓ |
+| `ENN`（芯片侧） | `IOIN & 1` | **1** | 1（禁能侧）✓ |
+| IOIN 其余位 | `0x21000041` → bit6=1 | PDN_UART 引脚为高 | 与历史基线（`0x21000041`/`0x21000040`）同字段 |
+| GPIO70 原始（`PC.6`） | `safety_status` 的 `= 1` | **1** | 1（禁能侧）✓ |
+| 许可侧 | pad=0 且 write+readback verified=0 | **LOW** | LOW ✓ |
+| 电机侧 | `armed=0`、`cur=0`、`tgt=0`、`VACTUAL=0` | 静止/未 armed/无目标 | ✓（且本轮不请求 arm/start） |
+| `GSTAT` | `0x00000001` | reset 位=1（bit2 名称按 Rev.1.09 为 **`uv_cp`**，不得沿用旧打印的 `sg2`） | 仅登记 |
+| `IFCNT` | 轮 1=0，轮 2=0 | **两轮均为 0** | 按任务书 §C：**不变不能单独证明总线上绝无 WRITE**；本条只作记录，不据此归因，也不再扩大测试（历史 2026-09-12 探针记录曾见 1→2，本轮 0/0 与其原因未查明） |
+
+## 3. 本轮结果标签（不升级、不收口）
+
+- **`READONLY_DISABLED_SIDE_CONSISTENT`**：两轮许可 LOW + GPIO70 原始=1 + 有效 TMC2209 应答且 `IOIN.bit0=1` 三源一致。
+  仅表示"此次稳定工况下三源采样一致"。
+- **`METER_NOT_MEASURED_THIS_RUN`**：本轮没有新的万用表读数（UT39A+ 未使用），因此**不证明**反馈支线连通性
+  （断线/上拉同样可能看起来一致），也不证明"无 STEP 脉冲"、复位毛刺或停机时延。
+- **`ENABLE_TRANSITION_NOT_EXECUTED / BLOCKED_METHOD`**：IO87 主动 HIGH → ENN LOW 的跟随仍未执行，
+  现有合规入口不存在（新版三宏 `RT_FALSE`；板上 e40 的 `motor_arm` 被 mask=0xB 拒绝，本轮也未调用它）。
+  `motor_status` 显示门禁拒绝 **不等于** 执行过 `motor_arm`。
+- **未关闭**：RISK-04（换件后整链）、RISK-03 / RISK-03a（停机时延与无界等锁）继续开放；
+  不宣称急停独立切断或许可高低跟随通过；不据此进入 F2e/F3 或运动试验。
+- 板上固件身份仍为 **USER_REPORTED_E40**，本轮未读回版本标识；新版（`296c369`）的反馈判定/`bit5` 门
+  **不能说成已上板**——本轮 e40 的 mask 里没有新版 `MOT_GATE_FB_MISMATCH(bit5)`。
+
+## 4. 失败与偏差（原样登记）
+
+1. 轮 1 脚本的第 4 步（`tmc_regs` 之后复核 `safety_status`）**没有落入转写**：脚本以 rc=0 结束但未写出该次采样，
+   原因未查明；不谎称轮 1 完成了四步。
+2. 轮 2 同一步骤**因我的脚本缺陷失败**：把采样标签 `safety_status#2` 当作命令发出，目标回
+   `command not found.`（无副作用）。因此 §C3 要求的"成功 READ 后再采一次"由轮 2 首个 `safety_status`
+   等效补足，且已按上表如实标注。
+3. 打开 COM5（DAPLink CDC）两轮均未观察到启动横幅/重启迹象 → 记录为**本轮观测**：
+   "在该板、该端口、该脚本参数下，打开端口未触发目标复位"。这不是通用结论，也不推翻
+   任务书 §3 关于"打开端口可能复位"的保守前提；仓库里仍无正式的跨项目证明。
+4. 按任务书 §C4 停止扩大测试：**最多两轮已用满**，未做地址扫描、未加任何额外命令、未重试失败项。
