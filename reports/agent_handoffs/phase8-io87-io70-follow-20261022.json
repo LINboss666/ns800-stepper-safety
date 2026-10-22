@@ -1,0 +1,144 @@
+{
+  "task_id": "PHASE8-IO87-IO70-FOLLOW-20261022",
+  "taskbook": "NS800_IO87_IO70_Follow_Qoder_Task_20261022.md",
+  "repository": "https://github.com/LINboss666/ns800-stepper-safety",
+  "branch": "phase8/tmc-drive-config",
+  "base_sha": "a3434353fc5de3c10eb48318d4031568ff761323",
+  "source_sha_software_go": "296c369607ea69c201f797b80950b76ff312c0e0",
+  "recorded_at": "2026-10-22",
+  "nature": "user-authorized bounded GPIO diagnostic exception; NOT motor_arm, NOT motion test, NOT release of software safety gates",
+  "scope_status": "DELIVERED_PENDING_INDEPENDENT_REVIEW",
+  "startup_state": {
+    "local_head": "a3434353fc5de3c10eb48318d4031568ff761323",
+    "remote_readback": "a3434353fc5de3c10eb48318d4031568ff761323",
+    "worktree_clean": true,
+    "foreign_changes_found": false,
+    "os": "Windows 11 (10.0.26100), Git Bash + powershell -NoProfile -File",
+    "frozen_objects": {
+      "main": "1b3757eec550802a3973e66790af422d81d3d373",
+      "phase7": "6d3fbc559d45673d7550eb73dec5a4ade5bb34df",
+      "v0_7_tag": "097935fec5a6f2467261ab1ad449ff0b1d398250"
+    }
+  },
+  "firmware_identity": {
+    "level": "USER_REPORTED_E40",
+    "reported_sha": "e40a9b95ef709e6a80444f9f3949dfdd70ba96ba",
+    "flash_read_back": false,
+    "note": "software GO object is not proof of the on-board image"
+  },
+  "live_preconditions": {
+    "confirmed_by": "operator at 2026-10-22 20:32 (not from old records)",
+    "motor_physically_unconnected": true,
+    "module_seated": true,
+    "power_normal": true,
+    "operator_present": true,
+    "known_analog_anomaly_at_start": "NOT_MEASURED (1.6-1.7 V history not re-measured this round)",
+    "user_recovery_report": "可能是前面我没有给VM供电导致的现在又可以了 -> USER_REPORTED + unverified cause hypothesis"
+  },
+  "command_capability_check": {
+    "pin_msh_export": "e40 components/drivers/pin/dev_pin.c:382 MSH_CMD_EXPORT_ALIAS(_pin_cmd, pin,...) inside #ifdef RT_USING_FINSH (:176)",
+    "rtconfig": "e40 rtconfig.h:121 RT_USING_FINSH, :157 RT_USING_PIN",
+    "pin_read_format": "pin[%d] = high|low via rt_pin_read (pad level)",
+    "pin_write_prints_anything": false,
+    "write_confirmation": "pin write issues rt_pin_write only; prompt return is NOT proof of write; all levels proven by pin read",
+    "bsp_map": "drv_gpio.c:153 [87] = PIN_ENTRY(GPIO_87); runtime confirmed PC.23 : 87 and PC.6 : 70",
+    "banned_commands_not_sent": ["pin mode", "pin_status", "runtime_selftest", "tmc_uart_probe", "motor_arm", "motor_start", "motor_target", "motor_dir", "pwm_test", "tmc config commands", "any TMC UART command", "any write to PC.6", "fault clear", "irq enable", "polarity confirm"]
+  },
+  "tests": {
+    "preflight": {
+      "pin_num_PC23": 87,
+      "pin_num_PC6": 70,
+      "motor_status": "state=4 (MOTOR_FAULT, pre-existing, not cleared, motor_arm never called) cur=0 tgt=0 armed=0",
+      "initial_io87": "low",
+      "initial_io70": "high",
+      "ok": true
+    },
+    "low_capability_gate": {
+      "cmd": "pin write PC.23 low -> pin read PC.23 / pin read PC.6",
+      "result": "pin[87] = low, pin[70] = high",
+      "proven_before_any_high": true
+    },
+    "rounds": [
+      {"round": 1, "pre": "low/high", "high_window": "high/low", "post_low": "low/high", "ms_high_to_low_issue": 199, "complete_as_expected": true},
+      {"round": 2, "pre": "low/high", "high_window": "high/low", "post_low": "low/high", "ms_high_to_low_issue": 229, "complete_as_expected": true},
+      {"round": 3, "pre": "low/high", "high_window": "high/low", "post_low": "low/high", "ms_high_to_low_issue": 201, "complete_as_expected": true}
+    ],
+    "rounds_attempted": 3,
+    "rounds_max": 3,
+    "high_budget_ms_host_side": 2000,
+    "budget_is_not_a_latency_proof": true,
+    "stop_conditions_hit": [],
+    "timeouts_or_unmatched_replies": 0,
+    "reply_lines_parsed": 30,
+    "final_state_section_D": {"io87": "low", "io70": "high", "armed": 0, "cur": 0, "tgt": 0, "same_session": true},
+    "cleanup": {"finally_executed": true, "first_low_confirmed": true, "extra_low_needed": false, "result": "FINAL_STATE_LOW_CONFIRMED", "final_state_unknown": false},
+    "result_label": "GPIO_FOLLOW_PASS",
+    "offline_parser_selfcheck": {
+      "synthetic_cases": 9,
+      "cases_checked": ["all-correct", "missing-high-window-reply", "command-not-found-polluted", "io70-stays-high", "io87-never-high", "pre-state-io70-low", "recovery-not-confirmed", "echo-only-no-readback", "echo-only-buffer-must-be-NO-REPLY"],
+      "false_pass_possible": false,
+      "rc": 0,
+      "real_gpio_fault_injection": false
+    }
+  },
+  "what_this_proves": [
+    "许可 HIGH -> ENN/IO70 到使能侧(low)、许可 LOW -> 回禁能侧(high)，三轮数字层面一致跟随",
+    "三个 HIGH 窗口内 ENN 被拉低 => DRV_ENABLE_SAFE=1 => ESTOP_OK 当时为高（与门放行），与'非门恒 0V'的猜测不相符",
+    "IO70 随 IO87 同步翻转 3/3，与'反馈支线完全断路'在数字层面不相容"
+  ],
+  "what_this_does_not_prove": [
+    "ANALOG_NOT_VERIFIED: 本轮无任何仪表读数；数字 high/low 不等于 ENN 电压合格；1.6-1.7 V 历史异常未消失也未被复测",
+    "ESTOP_OK 为高的原因未测（实体常闭触点是否真按图接好 = D-4/P-2 缺项）；急停独立切断未验证",
+    "反馈支线物理连续性未验证",
+    "不证明转矩/线圈电流/运动；不证明无 STEP 波形（本轮未观测波形）",
+    "不证明复位瞬态、停机最坏时延；RISK-03/03a 开放",
+    "RISK-04 不关闭；不声称 VM 未供电是此前根因；不声称 TMC 配置写/IFCNT 握手通过（本轮未发任何 TMC UART 命令）",
+    "新版 296c369 的反馈判定与可选限位逻辑仍无板上运行证据（e40 无 bit5 反馈门）"
+  ],
+  "deviations_and_notes": [
+    "预监听 drained 286 字节：未作证据、未定性为噪声或残留",
+    "state=4 (MOTOR_FAULT) 为既有故障态，本轮按任务书未清除、未走恢复",
+    "吸取上轮教训：脚本改为纯 ASCII（PS 5.1 按 ANSI 读无 BOM 文件会导致中文注释解析失败），并把发送文本与日志标签分离，本轮未误发白名单外命令",
+    "HIGH 窗口每个只做了 2 次读回，不能声称捕获转换时刻或任何时延界",
+    "finally 清理在主机侧执行，无法保证断线/崩溃时必然运行（本轮全程可用并已确认 LOW）"
+  ],
+  "evidence_paths": [
+    "reports/agent_handoffs/phase8-io87-io70-follow-20261022.md",
+    "reports/agent_handoffs/phase8-io87-io70-follow-20261022.json",
+    "reports/reviews/phase8-io87-io70-follow-20261022/transcript.txt",
+    "reports/reviews/phase8-io87-io70-follow-20261022/state_ledger.csv",
+    "reports/reviews/phase8-io87-io70-follow-20261022/io87_follow.ps1",
+    "reports/reviews/phase8-io87-io70-follow-20261022/NOTES.txt"
+  ],
+  "known_limitations": [
+    "板上固件身份仍为 USER_REPORTED_E40（未读回哈希）",
+    "GPIO 直写绕过软件请求态记账，因此内部 request/verified 字段不作为焊盘证据",
+    "无任何本轮模拟电压数据（NOT_MEASURED）",
+    "急停链放行只代表当时的 ESTOP_OK 为高，不代表急停功能或触点接线已验收",
+    "主机时间预算（199/229/201 ms）不是硬件时延证明",
+    "本任务的 GPIO 授权不延伸为日常绕过门禁的控制方式"
+  ],
+  "hardware_actions_performed": [
+    "打开 COM5（115200 8N1）一次并关闭",
+    "pin write PC.23 low x5 / high x3（每次 HIGH 后 <=230 ms 即发 LOW）",
+    "pin read PC.23 x12 / pin read PC.6 x12",
+    "pin num x2 / motor_status x3"
+  ],
+  "hardware_actions_not_performed": [
+    "未烧录、未调试器下载、未复位", "未改变供电/断电、未热插拔模块、未改线、未换件",
+    "未接电机、未输出 STEP", "未写 PC.6、未执行 pin mode",
+    "未发送任何 TMC UART 命令（含 tmc_uart_probe 的原值回写）",
+    "未调用 motor_arm/start/target/dir、pwm_test、故障清除、runtime_selftest、pin_status",
+    "未开 IRQ 门、未做人工极性确认、未把任何硬件验证宏置 TRUE",
+    "未 merge、未 force push、未重写历史、未触碰 main/冻结分支/标签",
+    "未重建 Keil、未重跑主机矩阵/负例/元负例/路径守卫（无源码改动）"
+  ],
+  "git": {
+    "commit_type": "normal commit + normal push to the development branch",
+    "identity": "repo-local public noreply (no global or account setting changed)",
+    "zip_produced": false,
+    "history_rewritten": false,
+    "final_sha_note": "reported in the delivery message after push; not self-referenced inside this file"
+  },
+  "stop_reason": "AWAITING_INDEPENDENT_REVIEW - GPIO 跟随诊断已按授权完成并撤回收 LOW 终态；不进入 F2e/F3、不烧录新版、不开宏、不接电机；物理层下一轮需用户决定"
+}

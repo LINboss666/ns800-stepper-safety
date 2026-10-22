@@ -1,0 +1,90 @@
+# NOTES - PHASE8-IO87-IO70-FOLLOW-20261022（IO87 → ENN / IO70 高低跟随检查）
+
+任务 ID：`PHASE8-IO87-IO70-FOLLOW-20261022`　日期：2026-10-22（北京时间）
+基线：`a3434353fc5de3c10eb48318d4031568ff761323`（本地与远端一致，工作树 clean）
+软件 GO 对象：`296c369…`（**不是**板上固件身份证明）　板上固件：`USER_REPORTED_E40`（未读回 Flash）
+判定：**`GPIO_FOLLOW_PASS`（三轮完整且逐态符合预期）+ `ANALOG_NOT_VERIFIED`（本轮无仪表读数）**
+
+## 1. 实际发出的命令（全部在任务书白名单内）
+
+| 命令 | 次数 | 用途 |
+|---|---|---|
+| `pin num PC.23` / `pin num PC.6` | 各 1 | 映射现场确认 → `PC.23 : 87`、`PC.6 : 70` |
+| `motor_status` | 3 | 预检 / 终态确认（armed=0、cur=0、tgt=0；state=4 为既有 MOTOR_FAULT 态，未清除、未调用 motor_arm） |
+| `pin write PC.23 low` | 5 | B 段能力验证 1 次 + 三轮各 1 次撤许可 + finally 清理 1 次 |
+| `pin write PC.23 high` | 3 | 三轮 HIGH 激励，每轮一次 |
+| `pin read PC.23` / `pin read PC.6` | 各 12 | 逐态实际读回（`pin[87] = …` / `pin[70] = …`） |
+
+未发送：`pin mode`、任何对 `PC.6` 的写、`pin_status`、`runtime_selftest`、`tmc_uart_probe`、任何
+`motor_arm/start/target/dir`、`pwm_test`、故障清除、以及**任何 TMC UART 命令**（本轮不需要）。
+串口：COM5 / 115200 / 8N1（复用既有连接参数），打开一次、结束关闭；未切换 DTR/RTS，未遍历其他端口。
+
+## 2. 逐态结果（原始值见 transcript.txt / state_ledger.csv）
+
+| 轮 | 激励前 IO87/IO70 | HIGH 窗口 IO87/IO70 | LOW 恢复后 IO87/IO70 | HIGH→LOW 发令间隔 |
+|---|---|---|---|---|
+| 1 | low / high | **high / low** | low / high | 199 ms |
+| 2 | low / high | **high / low** | low / high | 229 ms |
+| 3 | low / high | **high / low** | low / high | 201 ms |
+| 终态 D | — | — | low / high（`armed=0 cur=0 tgt=0`） | — |
+| finally 清理 | — | — | low / high（`FINAL_STATE_LOW_CONFIRMED`） | — |
+
+`HIGH→LOW 发令间隔` 是**主机操作预算**（任务书上限 2000 ms），不是 RT-Thread 或硬件的停机时延证明。
+观察到的另一事实：三轮里 IO70 在 HIGH 窗口内**已经读到 low**，撤 LOW 后**又读到 high**，
+即 IO70 随 IO87 同步翻转 3/3 —— 这在数字层面与"反馈支线完全断路"不相容，但仍不等于物理连续性/电压合格（见第 4 节）。
+
+## 3. 离线解析器自检（合成样例，不碰硬件；§7 要求）
+
+判定逻辑要求"正则命中 + 捕获值等于期望电平"，命令回显不参与判定。八个合成用例全部按预期分类：
+
+| 合成情形 | 判定 | 期望 |
+|---|---|---|
+| 全部正确 | `GPIO_FOLLOW_PASS` | ✓ |
+| HIGH 窗口两条读回缺失 | `DRIVE_NOT_ESTABLISHED` | ✓ |
+| 被 `command not found` 污染（无读回） | `DRIVE_NOT_ESTABLISHED` | ✓ |
+| HIGH 窗口 IO70 仍 high | `ENABLE_PATH_NOT_OBSERVED` | ✓ |
+| HIGH 窗口 IO87 未 high | `DRIVE_NOT_ESTABLISHED` | ✓ |
+| 激励前 IO70 已 low | `DISABLE_SIDE_MISMATCH` | ✓ |
+| 撤 LOW 后未回到 low/high | `INCOMPLETE_RECOVERY_NOT_CONFIRMED` | ✓ |
+| 只有回显、无读回 | `DRIVE_NOT_ESTABLISHED` | ✓ |
+| 单测"仅命令回显"缓冲区 | `NO-REPLY`（不得当读回） | ✓ |
+
+自检结论 `SELF-CHECK PASS`（rc=0），未做真实 GPIO 故障注入。
+
+## 4. 本轮结论的边界（不升级）
+
+- `GPIO_FOLLOW_PASS` **只**证明：在本次条件下，MCU 把 `PC.23` 驱动 HIGH 时，`PC.6` 读到 LOW；驱动 LOW 时读到 HIGH。
+  即"许可信号能穿过当前硬件链让 ENN 在禁能侧与使能侧之间切换"。
+- 由此可推出的**观察**（仍是数字层面）：三个 HIGH 窗口内 ENN 被拉低 ⇒ `DRV_ENABLE_SAFE`=1 ⇒ **U5 的另一路输入
+  `ESTOP_OK` 当时为高**，即急停腿**没有**阻断。这与"非门一直输出 0V"的猜测**不相符**。
+  但 `ESTOP_OK` 为高的**原因**（常闭触点确实接好并闭合？还是别的下拉路径？）本轮未测——
+  实体急停触点形式仍是 D-4/P-2 缺项，**不得**据此宣布急停接线正确或急停独立切断已验证。
+- **`ANALOG_NOT_VERIFIED`（默认保留）**：本轮没有任何仪表读数。MCU 数字读回的 high/low 不等于
+  ENN 电压合格；此前记录的 1.6–1.7 V 异常**不会**因为读到 high 而自动消失。
+  按 Rev.1.09 以 VIO=3.3 V 为参考的逻辑界限是 LOW ≤0.99 V、HIGH ≥2.31 V，工程预期接近 0/3.3 V，
+  这是逻辑界限，不是要求人为调到边界，也不是本轮实测值。
+- 不关闭 RISK-03/03a/04；不宣布复位瞬态、STEP 波形、停机时延、反馈线连通性、运动验收通过。
+- 不声称"VM 没供电就是此前异常根因"：本轮未为复现原因切换 VM，也没有当时的供电原始证据；
+  用户的"可能是前面没给 VM 供电，现在又可以了"只按 `USER_REPORTED` + 待验证假设登记。
+- 不声称通过 TMC 配置写 / IFCNT 握手：本轮控制的是 MCU GPIO 的串口命令，与 TMC 寄存器 WRITE 是不同动作。
+- 直接写 GPIO 绕过软件请求态记账：因此本轮全部以 `pin read` 实际读回为依据；
+  `motor_status` 的 `drv_en_verified_pad` 等内部字段**未**用作焊盘电平证据。
+
+## 5. 偏差与真实情况（不粉饰）
+
+1. 本轮采集脚本一次跑通，三轮无中断、无超时、无 `command not found`；30 条 REPLY 全部可配对（见 transcript）。
+2. 预监听阶段 drained 286 字节，**未用作证据、未定性**（同一台机器上此前观察到该 CDC 打开时会有残余字节，来源未证实）。
+3. 吸取上轮教训后脚本改为**纯 ASCII**（PowerShell 5.1 会把无 BOM 文件按 ANSI 读，中文注释会导致解析失败），
+   并把"发送文本"和"日志标签"彻底分离，杜绝上轮 `safety_status#2` 那类误发。本轮未误发任何白名单外命令。
+4. `motor_status` 全程 `state=4`（e40 枚举 MOTOR_FAULT）：属既有故障态，本轮**未**清除、**未**调用 `motor_arm`、
+   未走恢复路径 —— 任务书 §5-A5 明确既有 FAULT 本身不要求清除。
+5. 主机 finally 清理不能保证在断线或进程崩溃时必然执行；本轮串口全程可用，清理已确认（`FINAL_STATE_LOW_CONFIRMED`）。
+6. HIGH 窗口内只做了 2 次读回（IO87、IO70），未做多次采样，因此**不能**声称捕获了转换时刻或任何时延界。
+
+## 6. 文件与范围
+
+- 本目录：`transcript.txt`（含发送命令、REPLY 与主机时间）、`state_ledger.csv`（逐态台账）、
+  `io87_follow.ps1`（实际使用的采集脚本，路径已脱敏为 `<WORK>\io87_follow`）、本 `NOTES.txt`。
+- 脱敏只替换本地工作路径/用户名等字段，**未**删改任何判定文本或失败正文。
+- 生产源码 / 测试 / Keil 工程 / 宏 / 门禁 / `.gitignore`：**0 改动**（Git 差异核对）。
+  未重建 Keil、未重跑主机矩阵/负例/元负例/路径守卫（无源码改动）。

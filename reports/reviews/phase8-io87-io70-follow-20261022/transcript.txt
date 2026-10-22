@@ -1,0 +1,82 @@
+20:32:10.396  port opened COM5 115200 8N1 at 2026-10-22T20:32:10.3949969+08:00
+20:32:11.632  pre-listen drained bytes=286 (content not used as evidence)
+20:32:11.634  == A5 preflight ==
+20:32:11.640  >>> pin num PC.23
+20:32:11.706    REPLY: PC.23 : 87
+20:32:11.708  >>> pin num PC.6
+20:32:11.739    REPLY: PC.6 : 70
+20:32:11.752  >>> motor_status
+20:32:11.784    REPLY: [MOT] state=4 cur=0 tgt=0 accel=2000 decel=2000 dir=0 /  / [MOT] armed=0
+20:32:11.787  >>> pin read PC.23
+20:32:11.816    REPLY: pin[87] = low
+20:32:11.819  >>> pin read PC.6
+20:32:11.861    REPLY: pin[70] = high
+20:32:11.865  == B LOW capability ==
+20:32:11.866  >>> pin write PC.23 low
+20:32:12.001  >>> pin read PC.23
+20:32:12.031    REPLY: pin[87] = low
+20:32:12.034  >>> pin read PC.6
+20:32:12.062    REPLY: pin[70] = high
+20:32:12.066  == ROUND 1 ==
+20:32:12.067  >>> pin read PC.23
+20:32:12.093    REPLY: pin[87] = low
+20:32:12.095  >>> pin read PC.6
+20:32:12.125    REPLY: pin[70] = high
+20:32:12.128  >>> pin write PC.23 high
+20:32:12.264  >>> pin read PC.23
+20:32:12.295    REPLY: pin[87] = high
+20:32:12.296  >>> pin read PC.6
+20:32:12.325    REPLY: pin[70] = low
+20:32:12.328  >>> pin write PC.23 low
+20:32:12.454  >>> pin read PC.23
+20:32:12.483    REPLY: pin[87] = low
+20:32:12.485  >>> pin read PC.6
+20:32:12.515    REPLY: pin[70] = high
+20:32:12.520  ROUND 1 complete and as expected (199 ms HIGH window)
+20:32:13.728  == ROUND 2 ==
+20:32:13.730  >>> pin read PC.23
+20:32:13.774    REPLY: pin[87] = low
+20:32:13.777  >>> pin read PC.6
+20:32:13.822    REPLY: pin[70] = high
+20:32:13.827  >>> pin write PC.23 high
+20:32:13.961  >>> pin read PC.23
+20:32:14.008    REPLY: pin[87] = high
+20:32:14.010  >>> pin read PC.6
+20:32:14.053    REPLY: pin[70] = low
+20:32:14.055  >>> pin write PC.23 low
+20:32:14.195  >>> pin read PC.23
+20:32:14.240    REPLY: pin[87] = low
+20:32:14.242  >>> pin read PC.6
+20:32:14.287    REPLY: pin[70] = high
+20:32:14.290  ROUND 2 complete and as expected (229 ms HIGH window)
+20:32:15.502  == ROUND 3 ==
+20:32:15.504  >>> pin read PC.23
+20:32:15.534    REPLY: pin[87] = low
+20:32:15.537  >>> pin read PC.6
+20:32:15.565    REPLY: pin[70] = high
+20:32:15.568  >>> pin write PC.23 high
+20:32:15.706  >>> pin read PC.23
+20:32:15.737    REPLY: pin[87] = high
+20:32:15.739  >>> pin read PC.6
+20:32:15.768    REPLY: pin[70] = low
+20:32:15.770  >>> pin write PC.23 low
+20:32:15.895  >>> pin read PC.23
+20:32:15.924    REPLY: pin[87] = low
+20:32:15.926  >>> pin read PC.6
+20:32:15.956    REPLY: pin[70] = high
+20:32:15.968  ROUND 3 complete and as expected (201 ms HIGH window)
+20:32:17.186  == D final check ==
+20:32:17.188  >>> pin read PC.23
+20:32:17.217    REPLY: pin[87] = low
+20:32:17.219  >>> pin read PC.6
+20:32:17.248    REPLY: pin[70] = high
+20:32:17.249  >>> motor_status
+20:32:17.279    REPLY: [MOT] state=4 cur=0 tgt=0 accel=2000 decel=2000 dir=0 /  / [MOT] armed=0
+20:32:17.282  == CLEANUP LOW ==
+20:32:17.283  >>> pin write PC.23 low
+20:32:17.607  >>> pin read PC.23
+20:32:17.636    REPLY: pin[87] = low
+20:32:17.639  >>> pin read PC.6
+20:32:17.668    REPLY: pin[70] = high
+20:32:17.669  FINAL_STATE_LOW_CONFIRMED
+20:32:17.673  VERDICT=GPIO_FOLLOW_PASS

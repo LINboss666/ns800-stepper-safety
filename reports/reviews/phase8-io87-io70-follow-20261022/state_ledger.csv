@@ -1,0 +1,17 @@
+host_time,round,phase,cmd,expect_io87,actual_io87,expect_io70,actual_io70,ms_from_high,note
+20:32:11.749,0,A5-num,pin num PC.23,-,got=87,-,-,0,expect 87
+20:32:11.750,0,A5-num,pin num PC.6,-,-,-,got=70,0,expect 70
+20:32:11.786,0,A5-motor,motor_status,-,-,-,-,0,armed=0 cur=0 tgt=0
+20:32:11.863,0,A5-initial,pin read,low,low,high,high,0,preflight initial state
+20:32:12.065,0,B-low,pin write low + reads,low,low,high,high,0,capability proven
+20:32:12.126,1,pre,pin read both,low,low,high,high,0,before HIGH
+20:32:12.453,1,high-window,write high; 2 reads; write low,high->low,high,low,low,199,HIGH budget 2000ms
+20:32:12.518,1,post-low,pin read both,low,low,high,high,,after LOW
+20:32:13.824,2,pre,pin read both,low,low,high,high,0,before HIGH
+20:32:14.194,2,high-window,write high; 2 reads; write low,high->low,high,low,low,229,HIGH budget 2000ms
+20:32:14.290,2,post-low,pin read both,low,low,high,high,,after LOW
+20:32:15.567,3,pre,pin read both,low,low,high,high,0,before HIGH
+20:32:15.894,3,high-window,write high; 2 reads; write low,high->low,high,low,low,201,HIGH budget 2000ms
+20:32:15.967,3,post-low,pin read both,low,low,high,high,,after LOW
+20:32:17.281,final,D-final,pin read + motor_status,low,low,high,high,,armed=0 cur=0 tgt=0
+20:32:17.671,cleanup,finally,pin write low + reads,low,low,high,high,,cleanup result
