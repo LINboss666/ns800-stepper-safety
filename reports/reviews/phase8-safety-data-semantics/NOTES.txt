@@ -1,0 +1,86 @@
+NOTES - phase8-safety-data-semantics (2026-10-22/23, 离线)
+
+1. 范围与身份
+   - 任务书: NS800_Safety_Data_Semantics_Qoder_Task_20261022.md (ID phase8-safety-data-semantics)
+   - 开发基线: 9430dabb86227a819e23e2269a7e4694acd7c2dd (本地=远端, 工作树当时 clean)
+   - 实现 checkpoint(被本次全部验证实际执行的对象): e974d488408630348401c1b7a13606a61d6fab7a
+   - 历史软件 GO 接受对象仍是 296c369607ea69c201f797b80950b76ff312c0e0, 不随本轮改变;
+     本轮有生产源码改动 => 必须等独立复审, 不自动继承 GO。
+   - 板上固件身份: 仍 USER_REPORTED_E40 (本轮未读回 Flash, 未烧录)。
+
+2. 真实模块 / 显式桩(不得混称)
+   真编译并执行: applications/sensor_service.c (s_collect/sensor_snapshot/自检隔离)
+                applications/blackbox.c (bb_sample/bb_to_sample/版本解释/blackbox_dump)
+   显式可注入桩(tests/host/sd_main.c): safety_pin() + rt_pin_* (可注入 -1/2/7 非法读数,
+                计 resolve/read/write/mode/attach)、safety_state_get()、adxl345/current_adc/
+                tmc2209/motor 假服务(计 UART 读次数)、project_config_get_snapshot()、
+                ns_storage/ns_log 内存环(64 槽)。
+   RT-Thread 原语: tests/host/shim_sd/{rtthread.h,rtdevice.h}; 线程**不真起**(rt_thread_create
+                返回假句柄), kprintf 走捕获缓冲, 只在 SD09/SD10 用作"输出即行为"的判定。
+   不在本链编译: safety_gpio.c/safety_thread.c/safety_state.c/motor.c/tmc2209.c/diagnosis.c/
+                supervisor.c/ns_storage.c/ns_flash* —— 因此本链证明的是数据语义与离线逻辑,
+                不是硬件行为, 也不是真实存储介质行为。
+
+3. 用例集合(逐变体登记, 不把不适用 ID 记成已执行)
+   - off_target 必需 21 条: SD01, SD01b, SD05b + 18 条共用(SD03~SD11 及子项)
+   - on_target  必需 20 条: SD02, SD02b + 同一批共用
+   - SD05b(陈旧限位值不得算有效)只在 OFF 有意义(ON 时限位本来就活动), 因此 OFF 专属。
+   - SD03/SD04 的遍历按变体的活动集合自动限定(OFF 2 源、ON 4 源), 详见台账 detail 字段。
+
+4. 真实失败与修正(原样保留, 不写成一直全绿; 三条都是夹具缺陷, 未放宽任何期望)
+   a) 编译期: sd06_production_context_isolation() 里第二段用了未声明的 seq
+      => error: 'seq' undeclared; 补声明后通过。生产代码未改。
+   b) SD05c 首跑 FAIL "失败后重新读到即恢复有效: MISS"
+      根因: 夹具的 sim_inject_unresolved() 把 handle 置 -1, 恢复步骤只重设了读数,
+      没恢复解析句柄 => ENN 仍解析不出来。补 sim_restore_resolved() 后 PASS。
+      生产代码未改, 期望未改。
+   c) SD11c 首跑 FAIL "offsetof(flags)=44 (期望 56)"
+      根因: 我把**结构体字段偏移**与 ns_storage.c 的**页面内偏移**混为一谈。实测
+      sizeof(ns_fault_sample_t)=48, offsetof(flags)=44; 页面偏移 56 = 12B 记录头 + 44,
+      属于 ns_storage.c 的序列化布局, 本轮未改该文件也不在本链编译范围。
+      修正后的判据: 结构大小 48 / flags 仍是末字段(@44) / bb_frame_t 48 不变;
+      页面偏移与 CRC 不变性由"该文件零改动 + 结构未变"共同保证(交付处按 git diff 核对)。
+   d) 工具使用失误(不影响判定): 第一次 REVERSE=1 复用了同一 OUT_DIR, runner 开头的
+      清理把正常变体的 *_out.txt 删掉了。随后用 SD_OUT_DIR=<LOCAL-TMP>/ns800-host-chain/sd_rev
+      分离重跑, 正常链与反向链各留一份原始产物; 两份证据都来自真实执行, 未挑选轮次。
+
+5. 内存差异(任务书 §4.2 要求报告)
+   - sizeof(sensor_frame_t): 52 -> 56 (+4B; 两个掩码字节超出了原有 padding)
+   - sizeof(bb_frame_t):     48 -> 48 (用两个掩码替换未使用的 valid_safety 聚合副本,
+                              落在原来的 3 字节填充里; blackbox.c 有编译期断言)
+   - sizeof(ns_fault_sample_t)=48、flags 偏移不变 => 外层存储格式未动
+   - Keil Rebuild All(同一工程, 上一轮 2026-10-21 返修后基准对比):
+       Code 147610 -> 148530 (+920)   RO-data 64214 -> 64730 (+516)
+       RW-data 2176 -> 2176 (0)        ZI-data 83404 -> 83412 (+8)
+     ZI 的 +8 与两处 sensor_frame_t 静态实例(s_frame + s_prev, 各 +4)一致;
+     黑匣子 35.2KB BSS 未增长。RO 增量为新增解释函数的字符串与版本表。
+
+6. flags 应用载荷映射(语义版本 1; 不是 LOG1 外层版本, 也不是硬件验收版本)
+   7:0 fault_code(不变) | 11:8 电平 bit8=ENN 反馈, 9=LIMIT_MIN, 10=LIMIT_MAX, 11=DIAG(位置不变)
+   15:12 active | 19:16 motor_state(不变) | 23:20 safety_state(不变) | 27:24 valid
+   31:28 = 1
+   dump 分派: 1 => 按新定义逐路标注 VALID/INVALID_NO_SAMPLE/DISABLED_BY_CONFIG;
+              0 => LEGACY_UNVERSIONED, 只打印 raw_flags, 不追认 bit8 的角色与可读性;
+              其他 => UNKNOWN_SCHEMA, 同样只保留 raw, 绝不默认成 V1。
+   旧记录不迁移、不重写、不清空; 直接用 ns_log API 的其他测试记录不会自动变成新格式。
+
+7. 消费者审计结论(全量搜索 applications/)
+   - PIN_NAME_ESTOP: 删除前只剩 sensor_service.c 一处使用 => 改名后无生产消费者, 别名已删;
+     FAULT_ESTOP / SAFETY_ESTOP 等历史事件与状态枚举**保留未动**。
+   - sensor_frame_t 的其他读者: diagnosis.c(只用 sg/current/imu/motor/step_hz)、
+     supervisor.c runtime_selftest(只用 valid_imu/valid_current) => 不受字段改名影响。
+   - record.flags 的读者: blackbox.c(打包+解释)、ns_flash_shell.c:133 只打印原始 32 位
+     (不解释语义, 保持 raw, 无需改)。
+   - valid_safety 的消费者只有 sensor_snapshot 的显示与 blackbox 的旧拷贝(已换成两掩码)。
+
+8. 未验 / 不作为本轮结论(与任务书 §2 §9 一致)
+   - 板上未运行本轮源码: 真实 sensor_selftest / blackbox_selftest **未执行**(它们可能发
+     UART 或写真实 Flash); 真实 Flash/分区/CRC 行为未测, 只保证格式与偏移未改。
+   - LIMIT-ON 只在主机命令行覆盖编译, 未进目标构建, 不代表限位上板验收。
+   - 不证明: 保护能力、停机时延/上界(RISK-03/03a)、复位瞬态、STEP 波形、线路连续性、
+     急停安全等级、新版已上板、TMC 写握手、运动。RISK-04-b 仍开放。
+   - 本轮零硬件动作: 未开 COM5/任何串口、未读写真实 GPIO、未读写 TMC 寄存器、未烧录、
+     未复位、未下载、未动供电/模块/接线/SW1、未接电机、未输出 STEP、未清故障、未动 IRQ/
+     极性、未翻任何宏、未运行历史 PowerShell 采集器(T-01/T-02 保持 HOLD, 未触碰)。
+   - 四道宏核查: MOTOR_HARDWARE_ENABLE_PATH_VALIDATED / STEP_DIAG_ISOLATED_ENV_CONFIRMED /
+     TMC_DRIVE_CONFIG_HW_VALIDATED / SAFETY_LIMIT_INPUTS_ENABLED 全部仍 RT_FALSE。

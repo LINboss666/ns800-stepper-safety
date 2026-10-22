@@ -1,0 +1,166 @@
+{
+  "task_id": "phase8-safety-data-semantics",
+  "taskbook": "NS800_Safety_Data_Semantics_Qoder_Task_20261022.md",
+  "repository": "https://github.com/LINboss666/ns800-stepper-safety",
+  "branch": "phase8/tmc-drive-config",
+  "base_sha": "9430dabb86227a819e23e2269a7e4694acd7c2dd",
+  "tested_commit": "e974d488408630348401c1b7a13606a61d6fab7a",
+  "source_sha_software_go": "296c369607ea69c201f797b80950b76ff312c0e0",
+  "recorded_at": "2026-10-23 (Asia/Shanghai)",
+  "nature": "离线固件 + 主机验证 + Keil；零硬件动作；不命名为 F2e/F3",
+  "board_firmware_identity": "USER_REPORTED_E40 (e40a9b95ef709e6a80444f9f3949dfdd70ba96ba)；本轮未读回 Flash、未烧录",
+  "production_changes": {
+    "applications/safety_io_semantics.h": "新增：SAI 位序、SAI_ACTIVE_MASK(OFF=0x9 / ON=0xF)、flags 位移与掩码、语义版本 1、版本枚举与解释函数原型",
+    "applications/sensor_service.h": "estop → enn_feedback；新增 sai_active/sai_valid；valid_safety 改为对活动集合的聚合判据",
+    "applications/sensor_service.c": "有效集合每帧重算；只有严格等于 PIN_LOW/PIN_HIGH 才算读到；配置关闭的限位连 safety_pin() 都不调用；输出三态 VALID/INVALID_NO_SAMPLE/DISABLED_BY_CONFIG",
+    "applications/blackbox.h": "注释更正：bit8 历史名字叫 estop，实际是同一颗 TMC_ENN 反馈脚，不是急停状态",
+    "applications/blackbox.c": "bb_frame_t 用两掩码替换未使用的 valid_safety 副本(仍 48B，编译期断言)；电平+active+valid 来自同一源帧；flags v1 打包；新增生产解释函数并被 blackbox_dump 使用",
+    "applications/project_board.h": "删除遗留别名 PIN_NAME_ESTOP(已无生产消费者)；FAULT_ESTOP 等历史枚举保留"
+  },
+  "flags_layout_version_1": {
+    "7:0": "fault_code(保持)",
+    "11:8": "电平：bit8=ENN 反馈, 9=LIMIT_MIN, 10=LIMIT_MAX, 11=DIAG(位置保持)",
+    "15:12": "安全输入 active mask",
+    "19:16": "motor_state(保持)",
+    "23:20": "safety_state(保持)",
+    "27:24": "安全输入 valid mask",
+    "31:28": "应用安全输入语义版本 = 1(不是 LOG1 外层存储版本，也不是硬件验收版本)"
+  },
+  "legacy_record_policy": [
+    "版本 0 → LEGACY_UNVERSIONED：bit8 的 ESTOP/ENN 角色与活动/有效集合不可追认，只打印 raw_flags",
+    "其他版本 → UNKNOWN_SCHEMA：保留 raw，绝不默认成 V1",
+    "旧记录不迁移、不重写、不清空",
+    "其他直接使用 ns_log API 的测试记录不会自动变成新黑匣子格式"
+  ],
+  "size_and_memory": {
+    "sizeof_sensor_frame_t": "52 → 56 (+4B)",
+    "sizeof_bb_frame_t": "48 → 48(掩码落在原 3 字节填充内，编译期断言)",
+    "sizeof_ns_fault_sample_t": "48(offsetof(flags)=44 未变；ns_storage.c 本轮零改动)",
+    "keil_program_size": "Code 147610→148530 (+920)，RO 64214→64730 (+516)，RW 2176→2176 (0)，ZI 83404→83412 (+8)",
+    "zi_note": "ZI +8 与 s_frame + s_prev 两处静态实例各 +4 一致；黑匣子 35.2KB BSS 未增长；未扩大任何数组或存储格式"
+  },
+  "host_chain": {
+    "runner": "tests/host/run_safety_data_semantics.sh",
+    "fixture": "tests/host/sd_main.c",
+    "shim": "tests/host/shim_sd/rtthread.h + rtdevice.h",
+    "really_compiled_production": ["applications/sensor_service.c", "applications/blackbox.c"],
+    "explicit_stubs": [
+      "safety_pin()",
+      "rt_pin_get/read/write/mode/attach_irq(可注入 -1/2/7 非法读数并计数)",
+      "safety_state_get()",
+      "adxl345_/current_adc_/tmc2209_/motor_ 假服务(计 UART 读次数)",
+      "project_config_get_snapshot()",
+      "ns_storage/ns_log 内存环(64 槽)",
+      "RT-Thread 原语：线程不真起，rt_kprintf 走捕获缓冲"
+    ],
+    "not_compiled": ["safety_gpio.c", "safety_thread.c", "safety_state.c", "motor.c", "tmc2209.c", "diagnosis.c", "supervisor.c", "ns_storage.c", "ns_flash*"],
+    "variants": {
+      "off_target": {"required_cases": 21, "proc_rc": 0, "self_reported_fail": 0, "missing": 0, "duplicate": 0, "unregistered": 0},
+      "on_target": {"required_cases": 20, "proc_rc": 0, "self_reported_fail": 0, "missing": 0, "duplicate": 0, "unregistered": 0}
+    },
+    "variant_specific_ids": {
+      "off_target_only": ["SD01-off-masks-limits-never-touched", "SD01b-off-output-disabled-not-safe", "SD05b-stale-limit-values-not-valid"],
+      "on_target_only": ["SD02-on-all-four-active-limit-low-still-valid", "SD02b-on-output-trigger-state-is-valid"]
+    },
+    "runner_rc": 0
+  },
+  "reverse_validations": {
+    "mode": "REVERSE=1；只改仓库外一次性副本；注入锚点必须恰好命中一次",
+    "R1_aggregate_requires_all_four": {
+      "target": "sensor_service.c",
+      "expected_failure_ids": ["SD01-off-masks-limits-never-touched"],
+      "result": "META-OK",
+      "proc_rc": 1
+    },
+    "R2_valid_mask_equals_active": {
+      "target": "blackbox.c",
+      "expected_failure_ids": ["SD07-same-source-frame-propagates", "SD07b-no-recompute-at-write-time", "SD10b-dump-shows-version-and-per-channel-readability"],
+      "result": "META-OK",
+      "proc_rc": 1
+    },
+    "clean_control": "未注入源码的两个正常变体全 PASS 即为干净对照",
+    "no_new_meta_negative_framework": true
+  },
+  "existing_regression": {
+    "build_and_run": "V1 CHECK_PASS=25 FAIL=0 BAD_SELFTEST=0 MISSING_CASE=0；V2 22/0/0/0；RUNNER RESULT PASS，rc=0",
+    "run_io_behavior": "off_target 27 / on_target 29 / off_ovr 40 / on_ovr 42(合计 138)全 PASS；非法限位宏值编译被拒绝(rc=1)；rc=0",
+    "not_repeated_by_task_instruction": ["run_negatives 13 例", "run_meta_negatives M1-M5", "test_path_guard", "sw1_cut.ps1 自检"],
+    "public_tools_unchanged": true
+  },
+  "keil": {
+    "command": "UV4.exe -r project.uvprojx -j0 -o <LOCAL-TMP>/ns800_keil_sd_rebuild.log",
+    "tool_exit_code": 0,
+    "result": "0 Error(s), 0 Warning(s)，131 个编译单元(含 sensor_service.c 与 blackbox.c)",
+    "hooks_read_only_check": "BeforeMake 两条均关闭；AfterMake 仅 fromelf --bin；无下载/复位/串口钩子，也未执行",
+    "project_isolation": "project.uvprojx 未改；sd_main/shim_sd/io_main/host_main 命中数均为 0",
+    "target_selftests_executed": false
+  },
+  "consumer_audit": {
+    "PIN_NAME_ESTOP": "删除前仅 sensor_service.c 一处使用；删除后全仓无生产消费者",
+    "sensor_frame_t_readers": ["diagnosis.c(只用 sg/current/imu/motor/step_hz)", "supervisor.c runtime_selftest(只用 valid_imu/valid_current)"],
+    "record_flags_readers": ["blackbox.c(打包+解释)", "ns_flash_shell.c:133(只打印原始 32 位，不解释，保持原样)"],
+    "valid_safety_consumers": ["sensor_snapshot 显示", "blackbox 旧拷贝(已换成两掩码)"],
+    "preserved_despite_rename": ["FAULT_ESTOP", "SAFETY_ESTOP", "其余历史事件/状态/故障码枚举"]
+  },
+  "real_failures_and_corrections": [
+    "sd_main.c 编译错误：sd06 第二段使用未声明的 seq → 补声明(生产代码未改)",
+    "SD05c 首跑 FAIL：夹具只恢复了读数没恢复解析句柄(handle=-1 残留)→ 补 sim_restore_resolved()；期望未放宽",
+    "SD11c 首跑 FAIL：把结构体字段偏移(44)与 ns_storage.c 页面偏移(56)混淆 → 判据改为结构大小/末字段偏移/bb_frame_t 不变，页面不变性由该文件零改动保证",
+    "工具使用失误：首次 REVERSE=1 复用同一 OUT_DIR，runner 清理删掉正常变体 *_out.txt → 用独立 SD_OUT_DIR 重跑；两份证据均来自真实执行，未挑选轮次"
+  ],
+  "frozen_and_boundaries": {
+    "macros": "MOTOR_HARDWARE_ENABLE_PATH_VALIDATED / STEP_DIAG_ISOLATED_ENV_CONFIRMED / TMC_DRIVE_CONFIG_HW_VALIDATED / SAFETY_LIMIT_INPUTS_ENABLED 全部仍 RT_FALSE",
+    "hardware_actions_this_round": "none",
+    "forbidden_not_touched": [
+      "COM5 或任何串口",
+      "真实 GPIO 读写",
+      "真实 TMC 寄存器访问",
+      "烧录/复位/下载",
+      "供电/接线/模块/SW1 操作",
+      "接电机",
+      "输出 STEP",
+      "清故障",
+      "IRQ 开闸/极性确认",
+      "翻转宏或改门禁",
+      "sw1_cut.ps1(T-01/T-02 保持 HOLD，本轮未修未运行)"
+    ],
+    "not_tested": [
+      "新源码在板上运行",
+      "真实 Flash 写入行为",
+      "限位硬件能力",
+      "保护能力",
+      "停机时延与上界(RISK-03/03a)",
+      "复位与上电瞬态",
+      "STEP 波形",
+      "反馈线连续性",
+      "外接 NC 按钮/断线容错/工业安全等级(RISK-04-b)",
+      "TMC 写握手",
+      "运动"
+    ]
+  },
+  "evidence_paths": [
+    "reports/agent_handoffs/phase8-safety-data-semantics.md",
+    "reports/agent_handoffs/phase8-safety-data-semantics.json",
+    "reports/reviews/phase8-safety-data-semantics/sd_chain_ledger.txt",
+    "reports/reviews/phase8-safety-data-semantics/sd_reverse_result.txt",
+    "reports/reviews/phase8-safety-data-semantics/existing_regression_summary.txt",
+    "reports/reviews/phase8-safety-data-semantics/keil_rebuild_all_after.txt",
+    "reports/reviews/phase8-safety-data-semantics/NOTES.txt"
+  ],
+  "known_limitations": [
+    "主机链只证明数据语义与离线逻辑；单一主机环境，不等同目标机行为",
+    "存储侧是内存环模拟；页面布局/CRC/分区不变性由『该文件零改动 + 结构未变』保证，未重跑真实 Flash 驱动",
+    "LIMIT-ON 分支只在主机通过，不等于限位上板验收",
+    "自检全绿不等于事实被独立复审",
+    "静态电气与现有 SW1 功能的 PASS (USER_CONFIRMED)(草案 A29)不因本轮改动而扩大范围"
+  ],
+  "git": {
+    "commit_type": "normal commit + normal push on the development branch",
+    "identity": "repo-local public noreply only",
+    "zip_produced": false,
+    "history_rewritten": false,
+    "merge_or_force": false,
+    "final_sha_note": "在 push 后的交付回执给出并 git ls-remote 回读，正文不自引用"
+  },
+  "stop_reason": "AWAITING_INDEPENDENT_REVIEW —— 离线语义修正与主机/Keil 验证已完成并落盘；板上未运行，未关闭任何动态/时序风险，不进 F2e/F3"
+}

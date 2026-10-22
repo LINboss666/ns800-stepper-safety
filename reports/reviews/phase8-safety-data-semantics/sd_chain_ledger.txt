@@ -1,0 +1,144 @@
+phase8-safety-data-semantics 主机语义链证据
+被测提交 = 实现 checkpoint(完整 SHA 记在交接 JSON 的 tested_commit)
+编译器: gcc (tdm64-1) 4.9.2, -std=gnu11 -Wall -Wextra -Wno-unused-function
+真编译的生产模块: applications/sensor_service.c + applications/blackbox.c
+其余为 sd_main.c 内的显式可注入桩: GPIO/rt_pin_*、safety_pin()、safety_state_get()、
+  adxl345/current_adc/tmc2209/motor 假服务、project_config 快照、内存版 ns_storage/ns_log
+RT-Thread 原语来自 tests/host/shim_sd(线程不真起; kprintf 走捕获缓冲)
+本机路径已脱敏为 <LOCAL-TMP>/<LOCAL-USER>；判定文本原样保留, 未挑选轮次
+
+===== runner 控制台 (外层 rc=0) =====
+###### 安全数据语义链 (基线 e974d488408630348401c1b7a13606a61d6fab7a) ######
+SRC_APP=D:/ns800/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications
+SHIM_DIR=/d/ns800/tests/host/shim_sd
+OUT_DIR=<LOCAL-TMP>/ns800-host-chain/sd
+compiler=gcc.exe (tdm64-1) 4.9.2
+
+=== 变体 off_target ===
+
+=== 变体 on_target ===
+
+=== 语义链矩阵 ===
+off_target | OK 必需用例=21 全部PASS 自报fail=0 proc_rc=0 (输出 4564 字节)
+on_target | OK 必需用例=20 全部PASS 自报fail=0 proc_rc=0 (输出 4349 字节)
+
+SD RUNNER RESULT: PASS (rc=0) —— 两个变体的必需用例全部真执行且判 PASS
+
+===== off_target 原始输出 (CASE 台账 + 生产打印) =====
+VARIANT|limit_inputs=OFF active_mask=09 schema=1
+[SNS] sensor thread started (100Hz, prio 7)
+[BB] blackbox ready (ring=300 cap=450 frames @100Hz, prio 18)
+CASE|SD01-off-masks-limits-never-touched|PASS|active=09 valid=09 group=1 lim_min_res=0 lim_max_res=0 lim_reads=0/0 mode=0 attach=0
+[SNS] frame seq=1 tick=25927734
+[SNS] imu  [VALID] ax=12 ay=-34 az=998 vib=998 mg
+[SNS] curr [VALID] raw=2048 ema=4321 ma=512 cal_source=THEORETICAL(default)  (NOT measured)
+[SNS] sg   [VALID] SG_RESULT=777
+[SNS] mot  state=4 step_hz=0 dir=0
+[SNS] safe active=09 valid=09 group=ALL-READ
+[SNS]      enn_fb=1[VALID] | lim_min=0[DISABLED_BY_CONFIG] | lim_max=0[DISABLED_BY_CONFIG] | diag=1[VALID]
+[SNS]      (PC.6=TMC_ENN 反馈, 非急停输入; 禁用字段显示 DISABLED_BY_CONFIG, 活动但无样本显示 INVALID_NO_SAMPLE)
+CASE|SD01b-off-output-disabled-not-safe|PASS|snapshot 三态输出检查: OK
+CASE|SD03-parse-fail-clears-only-that-valid-bit|PASS|适用活动源=2 个, 违规判定数=0 (首个失败源索引=-1)
+CASE|SD04-illegal-reading-never-becomes-valid-high|PASS|注入(源,非法值)组合=6, 被判有效/被写脏的次数=0
+CASE|SD05-dirty-baseframe-does-not-pollute|PASS|脏基帧后 active=09 valid=01 group=0 (基帧曾是 FF/FF)
+CASE|SD05b-stale-limit-values-not-valid|PASS|限位陈旧值不被当有效: OK (valid=01 active=09)
+CASE|SD05c-recovery-makes-source-valid-again|PASS|失败后重新读到即恢复有效: OK
+CASE|SD06-private-context-isolated-and-divider-kept|PASS|live seq 25->25, prev 变化=0, 私有 seq=25, uart sg 调用=6
+CASE|SD06b-valid-fresh-division-semantics-kept|PASS|非分频帧 sg[v=1 f=0] imu[v=1 f=1] cur[v=1 f=1]
+CASE|SD07-same-source-frame-propagates|PASS|flags=11349100 active=09 valid=01 schema=V1 diag_state=1
+CASE|SD07b-no-recompute-at-write-time|PASS|捕获帧不变: valid=01 (DIAG 仍 INVALID)
+CASE|SD08-flags-position-vector-against-independent-expectation|PASS|flags=19349B07 期望=19349B07
+CASE|SD08b-legacy-valid-and-event-fields-unchanged|PASS|valid=1F (STEP 未被借用作安全输入), session=0
+CASE|SD08c-pre-post-event-responsibility-kept|PASS|pre event=0 / post event=11 且 flags[7:0]=11: OK
+CASE|SD09-schema-dispatch-by-record-not-by-board|PASS|版本判定: legacy=1 unknown=2 v1=0
+[BB] dump last 10 of used=2:
+[BB] slot=1 ses=9 t=0 ev=0 valid=08 flags=E0340507 sg=0 ma=0 vib=0 hz=0
+[BB]      sai_schema=UNKNOWN_SCHEMA raw_flags=E0340507 —— 不按新定义解释, 不称其为已确认的急停/ENN 状态
+[BB] slot=0 ses=9 t=0 ev=0 valid=08 flags=00340507 sg=0 ma=0 vib=0 hz=0
+[BB]      sai_schema=LEGACY_UNVERSIONED raw_flags=00340507 —— 不按新定义解释, 不称其为已确认的急停/ENN 状态
+[BB] dump done (2 shown)
+CASE|SD09b-dump-keeps-legacy-raw-uninterpreted|PASS|dump 文本: legacy=1 unknown=1 未被补解释=1
+[SNS] frame seq=1 tick=25927734
+[SNS] imu  [VALID] ax=12 ay=-34 az=998 vib=998 mg
+[SNS] curr [VALID] raw=2048 ema=4321 ma=512 cal_source=THEORETICAL(default)  (NOT measured)
+[SNS] sg   [VALID] SG_RESULT=777
+[SNS] mot  state=4 step_hz=0 dir=0
+[SNS] safe active=09 valid=01 group=INCOMPLETE
+[SNS]      enn_fb=1[VALID] | lim_min=0[DISABLED_BY_CONFIG] | lim_max=0[DISABLED_BY_CONFIG] | diag=0[INVALID_NO_SAMPLE]
+[SNS]      (PC.6=TMC_ENN 反馈, 非急停输入; 禁用字段显示 DISABLED_BY_CONFIG, 活动但无样本显示 INVALID_NO_SAMPLE)
+CASE|SD10a-snapshot-distinguishes-valid-invalid-disabled|PASS|snapshot: enn/diag/限位三态齐备且无急停虚构 = OK
+[BB] dump last 10 of used=2:
+[BB] slot=1 ses=0 t=0 ev=0 valid=00 flags=00340507 sg=0 ma=0 vib=0 hz=0
+[BB]      sai_schema=LEGACY_UNVERSIONED raw_flags=00340507 —— 不按新定义解释, 不称其为已确认的急停/ENN 状态
+[BB] slot=0 ses=0 t=0 ev=5 valid=08 flags=11009505 sg=0 ma=0 vib=0 hz=0
+[BB]      sai_schema=V1 active=09 valid=01 enn_fb=1[VALID] lim_min=0[DISABLED_BY_CONFIG] lim_max=1[DISABLED_BY_CONFIG] diag=0[INVALID_NO_SAMPLE] (禁用或无样本的电平位不代表测量结果)
+[BB] dump done (2 shown)
+CASE|SD10b-dump-shows-version-and-per-channel-readability|PASS|dump: V1 与旧格式并存且逐路标注可读性 = OK
+CASE|SD11a-no-gpio-write-in-sampling-or-conversion|PASS|gpio writes=0 mode=0 attach=0 (必须全 0)
+CASE|SD11b-uart-only-the-divided-sg-read|PASS|sg UART 读=3 (25 帧, 分频 10 ⇒ 3 次; 无写入口可用)
+CASE|SD11c-layout-and-storage-offsets-unchanged|PASS|sizeof(ns_fault_sample_t)=48 offsetof(flags)=44 sizeof(bb_frame_t)=48 sizeof(sensor_frame_t)=56
+SUMMARY|cases=21 pass=21 fail=0
+
+----- off_target 编译日志(空 = 0 warning 0 error) -----
+
+===== on_target 原始输出 (CASE 台账 + 生产打印) =====
+VARIANT|limit_inputs=ON active_mask=0F schema=1
+[SNS] sensor thread started (100Hz, prio 7)
+[BB] blackbox ready (ring=300 cap=450 frames @100Hz, prio 18)
+CASE|SD02-on-all-four-active-limit-low-still-valid|PASS|active=0F valid=0F group=1 lim_min=0 res=1 rd=1
+[SNS] frame seq=1 tick=25930968
+[SNS] imu  [VALID] ax=12 ay=-34 az=998 vib=998 mg
+[SNS] curr [VALID] raw=2048 ema=4321 ma=512 cal_source=THEORETICAL(default)  (NOT measured)
+[SNS] sg   [VALID] SG_RESULT=777
+[SNS] mot  state=4 step_hz=0 dir=0
+[SNS] safe active=0F valid=0F group=ALL-READ
+[SNS]      enn_fb=1[VALID] | lim_min=0[VALID] | lim_max=1[VALID] | diag=1[VALID]
+[SNS]      (PC.6=TMC_ENN 反馈, 非急停输入; 禁用字段显示 DISABLED_BY_CONFIG, 活动但无样本显示 INVALID_NO_SAMPLE)
+CASE|SD02b-on-output-trigger-state-is-valid|PASS|ON 变体输出: OK
+CASE|SD03-parse-fail-clears-only-that-valid-bit|PASS|适用活动源=4 个, 违规判定数=0 (首个失败源索引=-1)
+CASE|SD04-illegal-reading-never-becomes-valid-high|PASS|注入(源,非法值)组合=12, 被判有效/被写脏的次数=0
+CASE|SD05-dirty-baseframe-does-not-pollute|PASS|脏基帧后 active=0F valid=07 group=0 (基帧曾是 FF/FF)
+CASE|SD05c-recovery-makes-source-valid-again|PASS|失败后重新读到即恢复有效: OK
+CASE|SD06-private-context-isolated-and-divider-kept|PASS|live seq 25->25, prev 变化=0, 私有 seq=25, uart sg 调用=6
+CASE|SD06b-valid-fresh-division-semantics-kept|PASS|非分频帧 sg[v=1 f=0] imu[v=1 f=1] cur[v=1 f=1]
+CASE|SD07-same-source-frame-propagates|PASS|flags=1734F700 active=0F valid=07 schema=V1 diag_state=1
+CASE|SD07b-no-recompute-at-write-time|PASS|捕获帧不变: valid=07 (DIAG 仍 INVALID)
+CASE|SD08-flags-position-vector-against-independent-expectation|PASS|flags=1F34FB07 期望=1F34FB07
+CASE|SD08b-legacy-valid-and-event-fields-unchanged|PASS|valid=1F (STEP 未被借用作安全输入), session=0
+CASE|SD08c-pre-post-event-responsibility-kept|PASS|pre event=0 / post event=11 且 flags[7:0]=11: OK
+CASE|SD09-schema-dispatch-by-record-not-by-board|PASS|版本判定: legacy=1 unknown=2 v1=0
+[BB] dump last 10 of used=2:
+[BB] slot=1 ses=9 t=0 ev=0 valid=08 flags=E0340507 sg=0 ma=0 vib=0 hz=0
+[BB]      sai_schema=UNKNOWN_SCHEMA raw_flags=E0340507 —— 不按新定义解释, 不称其为已确认的急停/ENN 状态
+[BB] slot=0 ses=9 t=0 ev=0 valid=08 flags=00340507 sg=0 ma=0 vib=0 hz=0
+[BB]      sai_schema=LEGACY_UNVERSIONED raw_flags=00340507 —— 不按新定义解释, 不称其为已确认的急停/ENN 状态
+[BB] dump done (2 shown)
+CASE|SD09b-dump-keeps-legacy-raw-uninterpreted|PASS|dump 文本: legacy=1 unknown=1 未被补解释=1
+[SNS] frame seq=1 tick=25930968
+[SNS] imu  [VALID] ax=12 ay=-34 az=998 vib=998 mg
+[SNS] curr [VALID] raw=2048 ema=4321 ma=512 cal_source=THEORETICAL(default)  (NOT measured)
+[SNS] sg   [VALID] SG_RESULT=777
+[SNS] mot  state=4 step_hz=0 dir=0
+[SNS] safe active=0F valid=07 group=INCOMPLETE
+[SNS]      enn_fb=1[VALID] | lim_min=1[VALID] | lim_max=1[VALID] | diag=0[INVALID_NO_SAMPLE]
+[SNS]      (PC.6=TMC_ENN 反馈, 非急停输入; 禁用字段显示 DISABLED_BY_CONFIG, 活动但无样本显示 INVALID_NO_SAMPLE)
+CASE|SD10a-snapshot-distinguishes-valid-invalid-disabled|PASS|snapshot: enn/diag/限位三态齐备且无急停虚构 = OK
+[BB] dump last 10 of used=2:
+[BB] slot=1 ses=0 t=0 ev=0 valid=00 flags=00340507 sg=0 ma=0 vib=0 hz=0
+[BB]      sai_schema=LEGACY_UNVERSIONED raw_flags=00340507 —— 不按新定义解释, 不称其为已确认的急停/ENN 状态
+[BB] slot=0 ses=0 t=0 ev=5 valid=08 flags=1700F505 sg=0 ma=0 vib=0 hz=0
+[BB]      sai_schema=V1 active=0F valid=07 enn_fb=1[VALID] lim_min=0[VALID] lim_max=1[VALID] diag=0[INVALID_NO_SAMPLE] (禁用或无样本的电平位不代表测量结果)
+[BB] dump done (2 shown)
+CASE|SD10b-dump-shows-version-and-per-channel-readability|PASS|dump: V1 与旧格式并存且逐路标注可读性 = OK
+CASE|SD11a-no-gpio-write-in-sampling-or-conversion|PASS|gpio writes=0 mode=0 attach=0 (必须全 0)
+CASE|SD11b-uart-only-the-divided-sg-read|PASS|sg UART 读=3 (25 帧, 分频 10 ⇒ 3 次; 无写入口可用)
+CASE|SD11c-layout-and-storage-offsets-unchanged|PASS|sizeof(ns_fault_sample_t)=48 offsetof(flags)=44 sizeof(bb_frame_t)=48 sizeof(sensor_frame_t)=56
+SUMMARY|cases=20 pass=20 fail=0
+
+----- on_target 编译日志(空 = 0 warning 0 error) -----
+
+===== sd_status.txt =====
+SD_RUNNER_RC=0
+SD_DETECTED_FAIL=0
+off_target | OK 必需用例=21 全部PASS 自报fail=0 proc_rc=0 (输出 4564 字节)
+on_target | OK 必需用例=20 全部PASS 自报fail=0 proc_rc=0 (输出 4349 字节)

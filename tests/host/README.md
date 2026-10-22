@@ -31,7 +31,23 @@ bash tests/host/run_negatives.sh                 # 13 例负例/回归 + 自动�
 bash tests/host/run_meta_negatives.sh            # 只跑元负例(M1..M5 + 对照组)
 ONLY="N10b" bash tests/host/run_negatives.sh     # 无歧义前缀, 只跑 1 例
 bash tests/host/test_path_guard.sh               # 工作目录守卫的沙盒回归(只用新建的一次性假仓库)
+bash tests/host/run_io_behavior.sh               # 独立 I/O 行为链(io_main.c + shim_io, 4 变体 138 例)
+REVERSE=1 bash tests/host/run_io_behavior.sh     # 该链的 3 项反向注入(只改仓外副本)
+bash tests/host/run_safety_data_semantics.sh     # 安全数据语义链(sd_main.c + shim_sd, OFF/ON 两变体)
+REVERSE=1 bash tests/host/run_safety_data_semantics.sh   # 该链的 2 项反向注入
 ```
+
+三条链**并列且互不复用夹具**, 因为"真编译哪几个生产模块"不同:
+
+| 链 | 真编译的生产模块 | 桩 |
+|---|---|---|
+| `build_and_run.sh` (`host_main.c` + `shim/`) | `tmc2209.c` + `motor.c` | 安全 GPIO/线程/状态/STEP 全为桩 |
+| `run_io_behavior.sh` (`io_main.c` + `shim_io/`) | `safety_gpio.c` `safety_thread.c` `safety_state.c` `motor.c` | 传感器/存储/黑匣子等为假服务 |
+| `run_safety_data_semantics.sh` (`sd_main.c` + `shim_sd/`) | `sensor_service.c` + `blackbox.c` | GPIO/RT 原语/其他传感器/电机/状态/`ns_log`(内存环) |
+
+语义链的存储侧只是**内存环模拟** `ns_log_submit/read_slot/stats`, 不重建真实 Flash 驱动;
+它的线程不真起(`rt_thread_create` 返回假句柄), `rt_kprintf` 走捕获缓冲, 捕获文本仅用于
+"输出本身就是被测行为"的用例(逐路三态显示、旧记录只留 raw), 其余判定一律来自掩码/返回值/计数器。
 
 N3 的先决步骤：脚本会先在仓库外做一次 V1-only 正常构建，取得可用的 `host_v1.exe`
 作为"陈旧产物样本"，再把它预置进 N3 输出目录并制造编译失败；准备失败直接以 rc=4 终止，

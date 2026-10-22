@@ -81,7 +81,9 @@
 | MCU_DRV_ENABLE | J4-21 | PC23 | `PC.23` | 软件使能许可，**上电默认 LOW**（⚠ 原 PF.21/J4-20 焊盘缺陷弃用，见 调试记录 BUG-009） |
 | LIMIT_MAX | J4-25 | PF15 | `PF.15` | 上限位 `LIMIT_MAX_OK`（EXTI15）；HIGH=安全、LOW=触发、下降沿；同样受 `SAFETY_LIMIT_INPUTS_ENABLED` 控制 |
 | BUZZER | J4-26 | PC19 | `PC.19` | 蜂鸣器 |
-| ESTOP_SENSE（**2026-10-21 更名 ENN_FEEDBACK**） | J4-40 | PC6 | `PC.6` | **TMC_ENN 状态反馈输入**（用户确认实物接扩展板 H6-5）；被动只读、不注册 IRQ。⚠ 旧名 ESTOP_SENSE 与"急停感测/上升沿触发"的解释**作废**——板上急停是纯硬件链(常闭→U13→U5→Q1)，图纸上没有送进 MCU 的网络，软件不存在独立急停输入。`PIN_NAME_ESTOP` 仅作为 `sensor_service.c` 所需的文档化别名存在 |
+| ESTOP_SENSE（**2026-10-21 更名 ENN_FEEDBACK**） | J4-40 | PC6 | `PC.6` | **TMC_ENN 状态反馈输入**（用户确认实物接扩展板 H6-5）；被动只读、不注册 IRQ。⚠ 旧名 ESTOP_SENSE 与"急停感测/上升沿触发"的解释**作废**——板上急停是纯硬件链(常闭→U13→U5→Q1)，图纸上没有送进 MCU 的网络，软件不存在独立急停输入。`PIN_NAME_ESTOP` 别名已于 **2026-10-22** 的 `phase8-safety-data-semantics` 删除（当时已无生产消费者）；
+传感器帧字段同步改名 `enn_feedback`，并与 `sai_active`/`sai_valid` 两掩码一起写进黑匣子 `record.flags`
+（含应用语义版本 1；旧记录按 `LEGACY_UNVERSIONED` 只保留 raw，不追认 bit8 的角色） |
 | RUN/WARN/FAULT LED | J4-38/37/36 | PC8/PC9/PC10 | `PC.8`/`PC.9`/`PC.10` | 状态灯 |
 | CURRENT_ADC | J1-3 | PH2 | — | ADCA CH15 |
 
@@ -109,11 +111,12 @@ applications/
 ├── safety_state.c/h    安全状态机(白名单转换 + ss_lock) + force_shutdown 唯一停机路径 + 启动自检
 ├── safety_thread.c/h   Safety 线程(prio 4) + 四路 EXTI 事务化注册 + 人工 IRQ 门 MSH
 ├── motor.c/h           Motor Service(斜坡/四门禁/回读/所有权) + motor_* MSH
-├── sensor_service.c/h  统一 100Hz 采样帧(seq/valid/fresh 位) + sensor_status/snapshot/selftest
+├── sensor_service.c/h  统一 100Hz 采样帧(seq/valid/fresh + 安全输入 active/valid 掩码) + sensor_status/snapshot/selftest
 │  ── 诊断/记录层 (Phase 7-C/D) ──
 ├── diagnosis.c/h       多源融合判据引擎(同帧去重在引擎内) + diag_status/mode/selftest
 ├── project_config.c/h  阈值+标定来源持久化(全量互斥, Flash IO 在锁外) + config_* 命令
-└── blackbox.c/h        故障黑匣子(pre/post 捕获 + 首故障优先 + 有界重试落盘) + blackbox_*
+├── safety_io_semantics.h 安全输入数据语义：位序(ENN/MIN/MAX/DIAG)、active/valid 掩码、黑匣子 flags 布局与应用语义版本
+└── blackbox.c/h        故障黑匣子(pre/post 捕获 + 首故障优先 + 有界重试落盘；记录按自身语义版本解释，旧记录只留 raw) + blackbox_*
 ```
 
 （旧版此列表里的 `flash_demo.c` 已随板载 U4 位测试移除而删除。）

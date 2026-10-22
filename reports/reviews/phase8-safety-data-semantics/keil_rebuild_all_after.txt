@@ -1,0 +1,31 @@
+Keil MDK Rebuild All (phase8-safety-data-semantics, 实现 checkpoint 之后)
+工程: bsp/novosns/ns800/ns800rt7p65-nssinepad/project.uvprojx
+命令: UV4.exe -r project.uvprojx -j0 -o <LOCAL-TMP>/ns800_keil_sd_rebuild.log
+真实工具退出码: 0
+
+--- 构建钩子只读核查(构建前完成, 未执行任何下载/复位/串口钩子) ---
+BeforeMake: RunUserProg1=0 RunUserProg2=0 (两条都关闭, 名称为空)
+AfterMake : RunUserProg1=1 -> "fromelf --bin !L --output rtthread.bin" (仅产物转换)
+            RunUserProg2=0
+结论: 无 JLink/烧录/复位/串口命令; 本轮同样没有执行 fromelf 之外的任何后处理
+
+--- 工程隔离核查 ---
+project.uvprojx 内 sd_main / shim_sd / io_main / host_main 命中数: 0 (主机测试源与 shim 不进目标工程)
+project.uvprojx 内 safety_io_semantics 命中数: 0 (新增的是头文件, 由 .c 相对包含, 无需登记)
+project.uvprojx 本轮未修改
+
+脱敏与格式说明: 本机路径已归一为 <LOCAL-TMP>; 为通过 git diff --check, 构建日志摘录的**行尾多余空格**已去除,
+其余(数值、顺序、单元名)原样保留, 未挑选或改写任何构建结果。
+
+--- 摘录 ---
+*** Using Compiler 'V6.24', folder: 'C:\Keil_v5\ARM\ARMCLANG\Bin'
+Rebuild target 'rt-thread'
+Program Size: Code=148530 RO-data=64730 RW-data=2176 ZI-data=83412
+After Build - User command #1: fromelf --bin .\build\rt-thread.axf --output rtthread.bin
+".\build\rt-thread.axf" - 0 Error(s), 0 Warning(s).
+Build Time Elapsed:  00:00:13
+
+编译单元总数: 131
+本轮改动涉及的单元: compiling blackbox.c..., compiling sensor_service.c...
+上一轮同工程基准(2026-10-21 返修后): Code=147610 RO-data=64214 RW-data=2176 ZI-data=83404
+差异说明见 NOTES.txt 的"内存差异"一节

@@ -1,0 +1,48 @@
+phase8-safety-data-semantics 主机语义链证据
+被测提交 = 实现 checkpoint(完整 SHA 记在交接 JSON 的 tested_commit)
+编译器: gcc (tdm64-1) 4.9.2, -std=gnu11 -Wall -Wextra -Wno-unused-function
+真编译的生产模块: applications/sensor_service.c + applications/blackbox.c
+其余为 sd_main.c 内的显式可注入桩: GPIO/rt_pin_*、safety_pin()、safety_state_get()、
+  adxl345/current_adc/tmc2209/motor 假服务、project_config 快照、内存版 ns_storage/ns_log
+RT-Thread 原语来自 tests/host/shim_sd(线程不真起; kprintf 走捕获缓冲)
+本机路径已脱敏为 <LOCAL-TMP>/<LOCAL-USER>；判定文本原样保留, 未挑选轮次
+
+===== 反向验证控制台 (外层 rc=0 = 两项均命中指定业务失败身份) =====
+###### 安全数据语义链 (基线 e974d488408630348401c1b7a13606a61d6fab7a) ######
+SRC_APP=D:/ns800/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications
+SHIM_DIR=/d/ns800/tests/host/shim_sd
+OUT_DIR=<LOCAL-TMP>/ns800-host-chain/sd_rev
+compiler=gcc.exe (tdm64-1) 4.9.2
+
+=== 反向验证(2 项, 仓外一次性副本) ===
+INJECTED R1_aggregate_requires_all_four
+  命中期望失败身份: SD01-off-masks-limits-never-touched
+INJECTED R2_valid_mask_equals_active
+  命中期望失败身份: SD07-same-source-frame-propagates
+  命中期望失败身份: SD07b-no-recompute-at-write-time
+  命中期望失败身份: SD10b-dump-shows-version-and-per-channel-readability
+
+=== 反向验证汇总 ===
+R1_aggregate_requires_all_four | META-OK 命中 1 个业务失败身份 (variant=off_target proc_rc=1)
+R2_valid_mask_equals_active | META-OK 命中 3 个业务失败身份 (variant=off_target proc_rc=1)
+SD REVERSE RESULT: PASS —— 两项注入均命中指定业务失败身份(不是编译失败/崩溃)
+
+===== R1_aggregate_requires_all_four (注入目标 sensor_service.c) =====
+副本内 NEGATIVE-INJECTION 标记数: 1
+被注入运行中的 FAIL 行:
+CASE|SD01-off-masks-limits-never-touched|FAIL|active=09 valid=09 group=0 lim_min_res=0 lim_max_res=0 lim_reads=0/0 mode=0 attach=0
+CASE|SD05c-recovery-makes-source-valid-again|FAIL|失败后重新读到即恢复有效: MISS
+SUMMARY|cases=21 pass=19 fail=2
+
+===== R2_valid_mask_equals_active (注入目标 blackbox.c) =====
+副本内 NEGATIVE-INJECTION 标记数: 1
+被注入运行中的 FAIL 行:
+CASE|SD07-same-source-frame-propagates|FAIL|flags=19349100 active=09 valid=09 schema=V1 diag_state=0
+CASE|SD07b-no-recompute-at-write-time|FAIL|捕获帧不变: valid=09 (DIAG 仍 INVALID)
+CASE|SD10b-dump-shows-version-and-per-channel-readability|FAIL|dump: V1 与旧格式并存且逐路标注可读性 = MISS
+SUMMARY|cases=21 pass=18 fail=3
+
+===== sd_reverse_status.txt =====
+SD_REVERSE_RC=0
+R1_aggregate_requires_all_four | META-OK 命中 1 个业务失败身份 (variant=off_target proc_rc=1)
+R2_valid_mask_equals_active | META-OK 命中 3 个业务失败身份 (variant=off_target proc_rc=1)
