@@ -56,8 +56,8 @@ bash tests/host/sd_runner_rework_check.sh        # 该 runner 两个入口的返
 回归入口是 `bash tests/host/sd_runner_rework_check.sh`（真实调用同一个 runner，不另写复制判定的自检器）：
 
 - **SD-NEW-01（ONLY 零执行却 PASS）**：`ONLY` 在**任何** `rm` / `mkdir` / 重定向 / 编译之前验证。
-  只接受完整变体名 `off_target` / `on_target`；未知词、合法词夹带未知词、空值或纯空白、
-  重复词，以及 `ONLY` 与 `REVERSE=1` 的组合，一律 `rc=4` 拒绝且**不动任何文件**。
+  **未设置或 `ONLY=''`(空串)＝默认跑两个变体**（这是默认路径，不是零执行）；**只含空白**的 `ONLY`、
+  未知词、合法词夹带未知词、重复词，以及 `ONLY` 与 `REVERSE=1` 的组合，一律 `rc=4` 拒绝且**不动任何文件**。
   汇总只声明**实际执行集合**，未执行的显式写 `NOT_RUN`；只有默认(两变体)选择全部执行并通过，
   才会说"两个变体全部真执行"。
 - **SD-NEW-02（异常终止被算成反向成功）**：反向项记 `META-OK` 必须同时满足

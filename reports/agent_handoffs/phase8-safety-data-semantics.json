@@ -172,13 +172,16 @@
       "tests/host/run_safety_data_semantics.sh",
       "tests/host/sd_runner_rework_check.sh",
       "tests/host/README.md",
-      "rt-thread-master/.../ns800rt7p65-nssinepad/README.md",
-      "reports/plans/phase8-safety-chain-acceptance-draft.md",
       "reports/agent_handoffs/phase8-safety-data-semantics.md",
       "reports/agent_handoffs/phase8-safety-data-semantics.json",
+      "reports/plans/phase8-safety-chain-acceptance-draft.md",
       "reports/reviews/phase8-safety-data-semantics/rework_runner_scenarios.txt",
-      "reports/reviews/phase8-safety-data-semantics/rework_runner_fix_notes.txt"
+      "reports/reviews/phase8-safety-data-semantics/rework_runner_fix_notes.txt",
+      "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/README.md",
+      "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/开发进度.md",
+      "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/待办事项.md"
     ],
+    "changed_files_note": "完整增量 = 11 个文件(复审 §4.3 指出此前此处只列 9 项且含缩写路径, 已在下一次正常交接编辑中补齐; 可执行代码差异只有两个 shell 文件)",
     "production_sources_untouched": "全部 APP 源码/头、sd_main.c 夹具、shim_sd、env.sh、既有 runner/期望、project.uvprojx、宏、门禁均未改",
     "SD-NEW-01": {
       "defect": "未知 ONLY 被静默忽略 => 零执行仍打印 PASS 且外层 rc=0",
@@ -203,5 +206,36 @@
     "not_rerun_and_reason": "APP 与既有夹具冻结 => 按复审 §6.3 不重跑 Keil、V1/V2、138 例 I/O、旧 13 例负例、M1-M5、R4 守卫、SW1 工具与任何硬件动作；原因＝相关源未变，不冒称本轮重新执行",
     "hardware_actions_this_rework": "none",
     "stop_reason": "AWAITING_INDEPENDENT_REVIEW —— 本轮只应审 runner 两处入口与 §6.3 的有限验证"
+  },
+  "recheck_689c8b3": {
+    "review_file": "NS800_Safety_Data_Semantics_Recheck_689c8b3_20261023.md",
+    "reviewed_sha": "689c8b3a8f565df9facbb142b90639aaa127aa78",
+    "verdict": "SOFTWARE_REVIEW_GO",
+    "accepted_object": "689c8b3a8f565df9facbb142b90639aaa127aa78（其中生产源码仍是 e974d488… 的原文）",
+    "scope_of_go": "安全数据语义实现 + 本轮 SD-NEW-01/02 修复 + 指定主机验证范围；历史 IO70 软件 GO 对象 296c369 保留不回写",
+    "items_closed": ["SD-NEW-01", "SD-NEW-02"],
+    "new_blocking_items": 0,
+    "cloud_reruns_reproduced": [
+      "默认语义链 OFF 21/21、ON 20/20，外层 rc=0",
+      "有限回归脚本 通过 21 / 不符 0 / 环境故障 0，真实 rc=0",
+      "未知/混合/空白/重复 ONLY 与 REVERSE+ONLY 各真实 rc=4，目录未创建、KEEP 保留",
+      "合法单变体 rc=0 且 on_target 明确 NOT_RUN",
+      "未注入反向对照 rc=1 + 完整 21 例台账 + 指定身份命中，外层 rc=0",
+      "exit3 注入子进程 3、SIGTERM 注入子进程 143，两者均 INFRA-FAIL 外层 4，无 META-OK（平台退出码差异由『非 0 非 1』通用规则覆盖）",
+      "删除必需 CASE 并把 SUMMARY 同步改成 20 例 => 因缺少必需 id 拒绝（rc=4，不是仅靠总数不一致）",
+      "删除 SUMMARY => 因终态缺失拒绝（rc=4）；未篡改输出只读结构对照 rc=0"
+    ],
+    "not_re_run_by_cloud_or_agent": "Keil、V1/V2、138 例 I/O、旧 13 例负例、M1-M5、R4/SW1 与任何硬件动作；相关源与旧夹具未变，沿用上一轮已审证据，不冒称本轮重新执行",
+    "non_blocking_records": [
+      "空串措辞：ONLY 未设置或为空串 = 默认跑两变体（不是零执行），只含空白的 ONLY 才拒绝。已在 runner 注释与 tests/host/README.md 写清，行为未变；措辞改动后本机复跑快路径：5 类拒绝仍各 rc=4 且未创建任何目录，默认链仍 OFF 21 / ON 20 全 PASS rc=0（异常注入两类需 4 次编译，判定逻辑与包装器未触碰故未重复跑）",
+      "小回归脚本的探针检查有限：S4 用单个 if 无法区分『探针编译失败』与『探针构建成功后非零退出』，S5 也未逐项机械断言具体原因；不得仅凭该脚本总 PASS 对未知编译器环境宣称注入通道成立。本次云端已另行直接核实构建产物/退出码/逐项原因。换编译器时再自然拆开判断，本轮不新建工具验证框架",
+      "回归脚本部分中文摘要经 cut -c 截断到 UTF-8 多字节中间，只影响可读性；测试真实 rc 为 0，原始子日志未截断",
+      "JSON changed_files 此前只列 9 项且含缩写路径，实际为 11 项：本次已补齐",
+      "blackbox.c 尺寸注释『0 填充』不准确一项继续保留待改（48B 断言本身正确），不为注释单独改 APP 或重建 Keil"
+    ],
+    "boundary_after_go": "不授权烧录、串口/GPIO/TMC 访问、开宏、接线、STEP 或电机运动；板上仍 USER_REPORTED_E40 且无读回证据；静态电气与现有 SW1 的 PASS (USER_CONFIRMED) 保持原范围；RISK-03/03a 与 RISK-04-b 继续开放；sw1_cut.ps1 的 T-01/T-02 保持 HOLD；外接 NC/工业安全等级仍是未来扩展",
+    "suggested_next_mainline_not_authorized": "安全停机路径可靠性（无界等锁与 UART 阻塞如何影响停机、PWM 关闭失败是否被误记为已停止）—— 复审只给方向，未下达任务书，不自动开工",
+    "recorded_at": "2026-10-23 (Asia/Shanghai)",
+    "stop_reason": "工作包收口登记完成；下一项软件任务需用户另行下达任务书与授权"
   }
 }
