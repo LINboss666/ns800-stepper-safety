@@ -1,0 +1,2 @@
+# A-section offline self-test run summary (rc is the script's real process exit code)
+rc=0 mode=SelfTest position=A end=2026-10-22T22:30:00.9882914+08:00

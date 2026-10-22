@@ -1,0 +1,19 @@
+=== SELFTEST PASS ===
+identify-normal                                OK    OBSERVED io70=low ms=118
+baseline-anomaly-uses-literal-PC23             OK    tx=pin read PC.23;pin read PC.6;pin write PC.23 low;pin read PC.23;pin read PC.6
+baseline-anomaly-sends-no-high                 OK    no HIGH write
+baseline-anomaly-not-pass                      OK    BLOCKED_BASELINE
+cleanup-io70-missing-cannot-pass               OK    FINAL_STATE_UNKNOWN
+mixed-error-output-rejected                    OK    INVALID_OUTPUT
+echo-only-refused                              OK    NO_REPLY
+conflicting-replies-refused                    OK    CONFLICTING_REPLIES
+cut-observed-two-adjacent-samples              OK    CUT_OBSERVED pairs=2 ms=838
+cut-cleanup-confirmed                          OK    LOW_AND_HIGH_CONFIRMED
+cut-no-low-before-evidence                     OK    high@2 low@13
+interference-soft-low-detected                 OK    INTERFERENCE_SOFT_LOW
+budget-spent-skips-window-and-cleans-up        OK    WAIT LOW_AND_HIGH_CONFIRMED
+budget-only-one-high-ever-issued               OK    high count=1
+budget-cleanup-uses-literal-LOW                OK    tx=pin read PC.23;pin read PC.6;pin write PC.23 high;pin read PC.23;pin read PC.6;pin write PC.23 low;pin read PC.23;pin read PC.6
+serial-exception-attempts-literal-LOW          OK    LOW_AND_HIGH_CONFIRMED_ON_2ND tx=pin read PC.23;pin read PC.6;pin write PC.23 high;pin read PC.23;pin write PC.23 low;pin read PC.23;pin read PC.6;pin write PC.23 low;pin read PC.23;pin read PC.6
+serial-exception-cleanup-confirmed             OK    LOW_AND_HIGH_CONFIRMED_ON_2ND
+non-whitelist-command-refused                  OK    guard
