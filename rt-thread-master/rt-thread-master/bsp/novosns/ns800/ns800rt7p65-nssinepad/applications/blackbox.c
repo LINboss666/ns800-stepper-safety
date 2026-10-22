@@ -5,7 +5,8 @@
  *   P0-1 旧实现把 pre 200 帧拷进 bb_post[100] 数组 → 确定性越界。
  *        现改为单一捕获区 bb_cap[BB_CAP_FRAMES](编译期断言) +
  *        独立 pre 环 bb_ring; pre 不足时只写实际帧数(开机前 2s 不造假历史)。
- *   数字输入持久化: estop/limit_min/limit_max/diag 存 record.flags 位域。
+ *   数字输入持久化: enn_feedback/limit_min/limit_max/diag 存 record.flags 位域,
+ *     并带 active/valid 掩码与应用语义版本(见 safety_io_semantics.h)。
  *   NS_VALID_STEP 不再借用为 valid_safety —— 数字输入在 flags 位域,
  *   NS_VALID_STEP 表示 step_hz 字段有效。
  *
@@ -38,6 +39,7 @@
 #include "app_health.h"
 #include "project_board.h"
 #include "safety_gpio.h"
+#include "safety_io_semantics.h"
 #include "sensor_service.h"
 #include "safety_state.h"
 #include "project_config.h"
@@ -58,11 +60,16 @@ typedef struct
     rt_uint32_t step_hz;
     rt_uint8_t  motor_state, dir;
     rt_uint8_t  safety_state;
-    rt_uint8_t  estop, limit_min, limit_max, tmc_diag;
-    rt_uint8_t  valid_imu, valid_current, valid_sg, valid_safety;
+    rt_uint8_t  enn_feedback, limit_min, limit_max, tmc_diag;
+    rt_uint8_t  valid_imu, valid_current, valid_sg;
+    rt_uint8_t  sai_active, sai_valid;   /* 取代未使用的 valid_safety 聚合副本(用原 padding) */
     rt_uint32_t fault_code;      /* 触发时锁存的故障码(仅 post 区帧有效; pre 区=0) */
     rt_uint32_t seq;
 } bb_frame_t;
+
+/* 尺寸纪律(任务书 §4.2): 两个掩码替换原聚合副本后, 帧大小**不得**增长。
+ * 旧布局 11 个 u8 + 3 个填充字节 → 新布局 12 个 u8 + 0 填充, 仍为 48B/帧。 */
+typedef char bb_frame_size_unchanged[(sizeof(bb_frame_t) == 48u) ? 1 : -1];
 
 /* 静态内存(实测本结构 48B/帧, 非旧注释写的 36B):
  *   bb_ring 300×48 = 14,400B + bb_cap 450×48 = 21,600B = 36,000B ≈ 35.2KB BSS
@@ -121,12 +128,14 @@ static void bb_sample(bb_frame_t *f)
     f->motor_state  = s.motor_state;
     f->dir          = s.dir;
     f->safety_state = (rt_uint8_t)safety_state_get();
-    f->estop        = s.estop;  f->limit_min = s.limit_min;
+    /* 电平 + 活动/有效掩码全部取自**同一源帧**(任务书 §4.2: 禁止落盘时按当前配置
+     * 重算, 否则历史捕获帧的含义会和落盘时的配置分离)。 */
+    f->enn_feedback = s.enn_feedback; f->limit_min = s.limit_min;
     f->limit_max    = s.limit_max;  f->tmc_diag = s.tmc_diag;
+    f->sai_active   = s.sai_active; f->sai_valid = s.sai_valid;
     f->valid_imu    = s.valid_imu;
     f->valid_current= s.valid_current;
     f->valid_sg     = s.valid_sg;
-    f->valid_safety = s.valid_safety;
     f->fault_code   = (bb_state == BB_POST_COLLECT) ? bb_session_fault_code : 0;
     f->seq          = s.seq;
 }
@@ -136,13 +145,25 @@ static void bb_sample(bb_frame_t *f)
  *   pre 窗口的帧是该故障发生*之前*的历史上下文, 本身不是事件 → event = 0,
  *   靠 session_id 归组。旧实现把 pre 帧标成 NS_EVENT_TEST(=1), 既与
  *   FAULT_ESTOP(=1) 数值撞车, 又与 blackbox_selftest 的期望互相矛盾。
- * flags 位域: [7:0]=fault_code [11:8]=estop/lim_min/lim_max/diag
- *             [19:16]=motor_state [23:20]=safety_state
+ * flags 应用载荷(语义版本 1, 见 safety_io_semantics.h):
+ *   [7:0]   fault_code        [11:8] 四路数字电平(bit8=ENN 反馈/9=min/10=max/11=diag)
+ *   [15:12] 安全输入 active   [19:16] motor_state
+ *   [23:20] safety_state      [27:24] 安全输入 valid
+ *   [31:28] 应用安全输入语义版本 = 1(**不是** LOG1 外层存储版本, 也不是硬件验收版本)
+ * 旧格式(版本 0)的 bit8 曾被叫作 estop; 那是**同一个 ENN 反馈脚**的历史命名,
+ * 但旧记录里没有 active/valid, 因此其角色与可读性**不可追认**(见 dump 的分派)。
  * valid: SG/CURRENT/ACCEL/VIBRATION 按帧内 valid 位;
- *        STEP 表示 step_hz 字段有效(帧存在即有效), 不再借用为 safety。 */
+ *        STEP 表示 step_hz 字段有效(帧存在即有效), 不拿它代表安全输入。 */
 static void bb_to_sample(const bb_frame_t *f, ns_fault_sample_t *s)
 {
+    rt_uint32_t levels;
+
     rt_memset(s, 0, sizeof(*s));
+    levels = ((rt_uint32_t)(f->enn_feedback & 1u) << SAI_BIT_ENN)       |
+             ((rt_uint32_t)(f->limit_min     & 1u) << SAI_BIT_LIMIT_MIN) |
+             ((rt_uint32_t)(f->limit_max     & 1u) << SAI_BIT_LIMIT_MAX) |
+             ((rt_uint32_t)(f->tmc_diag      & 1u) << SAI_BIT_DIAG);
+
     s->session_id = bb_session;
     s->time_ms    = f->timestamp;
     s->event      = f->fault_code;      /* 0 = pre 窗口上下文帧 */
@@ -152,17 +173,72 @@ static void bb_to_sample(const bb_frame_t *f, ns_fault_sample_t *s)
     s->ax_mg      = f->ax; s->ay_mg = f->ay; s->az_mg = f->az;
     s->step_hz    = (rt_int32_t)f->step_hz;
     s->vibration_mg = f->vib;
-    s->flags      = ((rt_uint32_t)(f->fault_code  & 0xFF) <<  0) |
-                    ((rt_uint32_t)(f->estop       & 0x01) <<  8) |
-                    ((rt_uint32_t)(f->limit_min   & 0x01) <<  9) |
-                    ((rt_uint32_t)(f->limit_max   & 0x01) << 10) |
-                    ((rt_uint32_t)(f->tmc_diag    & 0x01) << 11) |
-                    ((rt_uint32_t)(f->motor_state & 0x0F) << 16) |
-                    ((rt_uint32_t)(f->safety_state& 0x0F) << 20);
+    s->flags      = BBFL_PACK_FAULT(f->fault_code)                  |
+                    BBFL_PACK(levels,        BBFL_SHIFT_LEVEL)     |
+                    BBFL_PACK(f->sai_active, BBFL_SHIFT_ACTIVE)    |
+                    BBFL_PACK(f->motor_state, BBFL_SHIFT_MOTOR)    |
+                    BBFL_PACK(f->safety_state, BBFL_SHIFT_SAFETY)  |
+                    BBFL_PACK(f->sai_valid,  BBFL_SHIFT_VALID)     |
+                    BBFL_PACK(BBFL_SCHEMA_CURRENT, BBFL_SHIFT_SCHEMA);
     if (f->valid_sg)      s->valid |= NS_VALID_SG;
     if (f->valid_current) s->valid |= NS_VALID_CURRENT;
     if (f->valid_imu)     s->valid |= NS_VALID_ACCEL | NS_VALID_VIBRATION;
     s->valid |= NS_VALID_STEP;
+}
+
+/* ---------- 记录解释(生产实现, dump 与主机链共用同一份) ----------
+ * 只做"按语义版本读字段", 不参与任何安全判定。 */
+
+const char *bb_sai_schema_name(bb_sai_schema_t s)
+{
+    switch (s)
+    {
+    case BB_SAI_SCHEMA_V1:     return "V1";
+    case BB_SAI_SCHEMA_LEGACY: return "LEGACY_UNVERSIONED";
+    default:                   return "UNKNOWN_SCHEMA";
+    }
+}
+
+bb_sai_schema_t blackbox_sai_schema(rt_uint32_t flags)
+{
+    rt_uint32_t v = BBFL_UNPACK(flags, BBFL_SHIFT_SCHEMA);
+
+    if (v == BBFL_SCHEMA_CURRENT) return BB_SAI_SCHEMA_V1;
+    if (v == BBFL_SCHEMA_LEGACY)  return BB_SAI_SCHEMA_LEGACY;
+    return BB_SAI_SCHEMA_UNKNOWN;
+}
+
+rt_uint32_t blackbox_sai_levels(rt_uint32_t flags)
+{
+    return BBFL_UNPACK(flags, BBFL_SHIFT_LEVEL);
+}
+
+rt_uint32_t blackbox_sai_active(rt_uint32_t flags)
+{
+    return BBFL_UNPACK(flags, BBFL_SHIFT_ACTIVE);
+}
+
+rt_uint32_t blackbox_sai_valid(rt_uint32_t flags)
+{
+    return BBFL_UNPACK(flags, BBFL_SHIFT_VALID);
+}
+
+/* 单路可读性: 禁用 / 活动且读到 / 活动但没读到。bit 用 SAI_MASK_* 。 */
+bb_sai_read_t blackbox_sai_read_state(rt_uint32_t flags, rt_uint32_t bit)
+{
+    if ((blackbox_sai_active(flags) & bit) == 0) return BB_SAI_READ_DISABLED;
+    if ((blackbox_sai_valid(flags) & bit) != 0)  return BB_SAI_READ_VALID;
+    return BB_SAI_READ_INVALID;
+}
+
+static const char *bb_sai_read_name(bb_sai_read_t r)
+{
+    switch (r)
+    {
+    case BB_SAI_READ_VALID:    return "VALID";
+    case BB_SAI_READ_INVALID:  return "INVALID_NO_SAMPLE";
+    default:                   return "DISABLED_BY_CONFIG";
+    }
 }
 
 /* ---------- worker: 一次采样喂 pre 环 / post 区 + 触发 + 异步落盘 ----------
@@ -400,6 +476,36 @@ static void blackbox_status(void)
 }
 MSH_CMD_EXPORT(blackbox_status, show blackbox capture and flash status);
 
+/* 按记录自身的语义版本解释安全输入载荷(V1=本布局; 版本0=LEGACY_UNVERSIONED;
+ * 其他=UNKNOWN_SCHEMA, 绝不默认成版本 1)。dump 与主机链共用同一生产实现。 */
+static void bb_dump_sai(rt_uint32_t flags)
+{
+    bb_sai_schema_t sch = blackbox_sai_schema(flags);
+    rt_uint32_t lv  = blackbox_sai_levels(flags);
+    rt_uint32_t act = blackbox_sai_active(flags);
+    rt_uint32_t vld = blackbox_sai_valid(flags);
+    static const rt_uint32_t order[4] =
+        { SAI_MASK_ENN, SAI_MASK_LIMIT_MIN, SAI_MASK_LIMIT_MAX, SAI_MASK_DIAG };
+    static const char *const label[4] =
+        { "enn_fb", "lim_min", "lim_max", "diag" };
+    rt_uint32_t k;
+
+    rt_kprintf("[BB]      sai_schema=%s", bb_sai_schema_name(sch));
+    if (sch == BB_SAI_SCHEMA_V1)
+    {
+        rt_kprintf(" active=%02X valid=%02X", act, vld);
+        for (k = 0; k < 4u; ++k)
+            rt_kprintf(" %s=%d[%s]", label[k], (int)((lv & order[k]) ? 1u : 0u),
+                       bb_sai_read_name(blackbox_sai_read_state(flags, order[k])));
+        rt_kprintf(" (禁用或无样本的电平位不代表测量结果)\n");
+    }
+    else
+    {
+        rt_kprintf(" raw_flags=%08X —— 不按新定义解释,"
+                   " 不称其为已确认的急停/ENN 状态\n", flags);
+    }
+}
+
 static void blackbox_dump(int argc, char **argv)
 {
     ns_fault_sample_t s;
@@ -419,6 +525,11 @@ static void blackbox_dump(int argc, char **argv)
         rt_kprintf("[BB] slot=%u ses=%u t=%u ev=%u valid=%02X flags=%08X sg=%d ma=%d vib=%d hz=%d\n",
                    slot, s.session_id, s.time_ms, s.event, s.valid, s.flags,
                    (int)s.sg, (int)s.current_ma, (int)s.vibration_mg, (int)s.step_hz);
+        /* 按**记录自身的语义版本**解释, 不按"日志来自哪块板"推断:
+         *   V1 = 本布局, 电平只能用该记录自己的 active/valid 读;
+         *   版本 0 = LEGACY_UNVERSIONED, bit8 的 ESTOP/ENN 角色与活动/有效集合
+         *   不可追认 ⇒ 只保留 raw; 其他 = UNKNOWN_SCHEMA, 绝不默认成版本 1。 */
+        bb_dump_sai(s.flags);
         shown++;
     }
     rt_kprintf("[BB] dump done (%u shown)\n", shown);

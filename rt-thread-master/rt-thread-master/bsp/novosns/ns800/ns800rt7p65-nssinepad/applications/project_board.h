@@ -35,11 +35,10 @@
  * 反馈 HIGH = 功率级已关断/输出浮空(禁能侧); 反馈 LOW = 未施加禁能(不保证有转矩)。 */
 #define PIN_NAME_ENN_FEEDBACK   "PC.6"   /* J4-40  GPIO70 TMC_ENN state feedback (input only) */
 
-/* ⚠ 遗留别名(本轮不授权改 sensor_service.c/blackbox): 传感器帧的 estop 位与黑匣子
- * record.flags bit8 历史名字叫 estop, 读的正是这颗脚。这里把它指向同一颗 ENN 反馈脚,
- * 使未修改的模块继续可编译; 该位的**真实含义已变为 ENN 反馈电平**, 需要单独一轮改名。
- * 安全逻辑(safety_gpio/safety_thread/safety_state/motor)一律不再使用本别名。 */
-#define PIN_NAME_ESTOP          PIN_NAME_ENN_FEEDBACK
+/* 遗留别名 PIN_NAME_ESTOP 已于 2026-10-22 删除: 它存在的唯一理由是让 sensor_service.c
+ * 的黑匣子"estop"字段继续读这颗脚。该字段已改名 enn_feedback, 帧/记录里同时带
+ * active/valid 掩码与应用语义版本(见 safety_io_semantics.h), 全仓已无生产消费者。
+ * 注意: FAULT_ESTOP / SAFETY_ESTOP 等**历史事件与状态枚举保留**, 它们与本别名无关。 */
 
 /* ===== 可选行程限位(功能启用开关, 与"硬件验证宏"职责不同, 不可互相替代) =====
  * RT_FALSE(目标默认): 两路限位不进解析/配置/读取/IRQ 注册, 也不参与就绪与故障清除判定;

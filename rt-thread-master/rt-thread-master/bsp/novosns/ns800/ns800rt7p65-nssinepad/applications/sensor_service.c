@@ -53,6 +53,22 @@ static rt_uint32_t s_isqrt(rt_uint32_t n)
     return x;
 }
 
+/* 读一路安全输入(2026-10-22 语义修正): 解析成功 **且** rt_pin_read 严格等于
+ * PIN_LOW/PIN_HIGH 才算本帧读到。-1、2 之类的非法桩读数/驱动错误码不得经布尔
+ * 转换被当成有效 HIGH(旧实现 `rt_pin_read(p) ? 1 : 0` 正是这个缺陷)。
+ * 读不到时不写 *out_level —— 值字段保留基帧值仅供调试, 不得用作本帧有效样本。 */
+static rt_bool_t s_read_sai_input(const char *pin_name, rt_uint8_t *out_level)
+{
+    rt_base_t p = safety_pin(pin_name);
+    rt_int32_t lv;
+
+    if (p < 0) return RT_FALSE;
+    lv = rt_pin_read(p);
+    if (lv != (rt_int32_t)PIN_LOW && lv != (rt_int32_t)PIN_HIGH) return RT_FALSE;
+    *out_level = (rt_uint8_t)lv;
+    return RT_TRUE;
+}
+
 /* 单帧采集(Phase 7 review P0-2 + Fix E):
  * 基帧与帧序号由调用方提供/回写, 本函数不碰任何文件静态 ⇒ 可在自检里用
  * 独立的 test_prev/test_seq 复现同一套逻辑。每源独立 try:
@@ -113,18 +129,32 @@ static void s_collect(sensor_frame_t *f, sensor_frame_t *base_prev,
         f->dir = snap.dir;
     }
 
-    /* P2-2: 安全输入直读 —— 四路全部成功解析/read 才置 valid_safety=1 */
+    /* P2-2 → 2026-10-22 数据语义修正: 原始电平 / 活动集合 / 有效集合三者分开。
+     *   - active 只由配置决定(SAI_ACTIVE_MASK), **绝不因解析或采样失败而缩小**;
+     *   - valid 每帧重算, 不沿用上一帧(基帧里的脏 valid 位在这里被本帧结果覆盖);
+     *   - 配置关闭的限位连 safety_pin() 都不调用 ⇒ 不解析、不读 GPIO、不配置、无 IRQ;
+     *   - 旧实现要求"四路全部解析成功"才置 valid_safety, 而目标限位是关闭的,
+     *     于是整组安全采样被误标 N/A —— 现在按活动集合判定。 */
     {
-        rt_base_t pe = safety_pin(PIN_NAME_ESTOP);
-        rt_base_t pn = safety_pin(PIN_NAME_LIMIT_MIN);
-        rt_base_t px = safety_pin(PIN_NAME_LIMIT_MAX);
-        rt_base_t pd = safety_pin(PIN_NAME_TMC_DIAG);
+        rt_uint8_t valid = 0;
 
-        if (pe >= 0) { f->estop = rt_pin_read(pe) ? 1 : 0; }
-        if (pn >= 0) { f->limit_min = rt_pin_read(pn) ? 1 : 0; }
-        if (px >= 0) { f->limit_max = rt_pin_read(px) ? 1 : 0; }
-        if (pd >= 0) { f->tmc_diag = rt_pin_read(pd) ? 1 : 0; }
-        f->valid_safety = (pe >= 0 && pn >= 0 && px >= 0 && pd >= 0) ? 1 : 0;
+        f->sai_active = (rt_uint8_t)SAI_ACTIVE_MASK;
+
+        if (s_read_sai_input(PIN_NAME_ENN_FEEDBACK, &f->enn_feedback))
+            valid |= SAI_MASK_ENN;
+        if ((f->sai_active & SAI_MASK_LIMIT_MIN) != 0 &&
+            s_read_sai_input(PIN_NAME_LIMIT_MIN, &f->limit_min))
+            valid |= SAI_MASK_LIMIT_MIN;
+        if ((f->sai_active & SAI_MASK_LIMIT_MAX) != 0 &&
+            s_read_sai_input(PIN_NAME_LIMIT_MAX, &f->limit_max))
+            valid |= SAI_MASK_LIMIT_MAX;
+        if ((f->sai_active & SAI_MASK_DIAG) != 0 &&
+            s_read_sai_input(PIN_NAME_TMC_DIAG, &f->tmc_diag))
+            valid |= SAI_MASK_DIAG;
+
+        f->sai_valid    = valid;
+        f->valid_safety = (f->sai_active != 0 &&
+                           (valid & f->sai_active) == f->sai_active) ? 1 : 0;
     }
 
     *base_prev = *f;                    /* 成为下一帧的基 */
@@ -215,6 +245,14 @@ static void sensor_status(void)
 }
 MSH_CMD_EXPORT(sensor_status, show sensor service and source healths);
 
+static const char *s_sai_state_name(rt_uint8_t active, rt_uint8_t valid,
+                                    rt_uint8_t bit)
+{
+    if ((active & bit) == 0)  return "DISABLED_BY_CONFIG";
+    if (valid & bit)          return "VALID";
+    return "INVALID_NO_SAMPLE";
+}
+
 static void sensor_snapshot(void)
 {
     sensor_frame_t f;
@@ -235,9 +273,17 @@ static void sensor_snapshot(void)
                f.valid_sg ? "VALID" : "STALE", f.sg_result);
     rt_kprintf("[SNS] mot  state=%d step_hz=%u dir=%d\n",
                f.motor_state, f.step_hz, f.dir);
-    rt_kprintf("[SNS] safe [%s] estop=%d lim_min=%d lim_max=%d diag=%d\n",
-               f.valid_safety ? "READ" : "N/A",
-               f.estop, f.limit_min, f.limit_max, f.tmc_diag);
+    /* 安全输入: 活动/有效两个掩码 + 每路三态, 严禁把"禁用"和"读失败"混成一个 N/A。
+     * enn_fb 是 TMC_ENN 反馈电平, 不是急停状态, 也不指示切断原因。 */
+    rt_kprintf("[SNS] safe active=%02X valid=%02X group=%s\n",
+               f.sai_active, f.sai_valid, f.valid_safety ? "ALL-READ" : "INCOMPLETE");
+    rt_kprintf("[SNS]      enn_fb=%d[%s] | lim_min=%d[%s] | lim_max=%d[%s] | diag=%d[%s]\n",
+               f.enn_feedback, s_sai_state_name(f.sai_active, f.sai_valid, SAI_MASK_ENN),
+               f.limit_min,  s_sai_state_name(f.sai_active, f.sai_valid, SAI_MASK_LIMIT_MIN),
+               f.limit_max,  s_sai_state_name(f.sai_active, f.sai_valid, SAI_MASK_LIMIT_MAX),
+               f.tmc_diag,   s_sai_state_name(f.sai_active, f.sai_valid, SAI_MASK_DIAG));
+    rt_kprintf("[SNS]      (PC.6=TMC_ENN 反馈, 非急停输入; 禁用字段显示 DISABLED_BY_CONFIG,"
+               " 活动但无样本显示 INVALID_NO_SAMPLE)\n");
 }
 MSH_CMD_EXPORT(sensor_snapshot, dump latest sensor frame with valid bits);
 

@@ -11,6 +11,7 @@
 
 #include <rtthread.h>
 #include "app_health.h"
+#include "safety_io_semantics.h"
 
 typedef struct
 {
@@ -39,11 +40,19 @@ typedef struct
     rt_uint32_t step_hz;
     rt_uint8_t  motor_state;    /* motor_state_t */
     rt_uint8_t  dir;
-    /* 安全输入电平 (safety_gpio 直读, 无上拉前浮空值仅供参考) */
-    rt_uint8_t  estop;
+    /* 安全输入电平 (safety_gpio 直读, 无上拉前浮空值仅供参考)
+     * 2026-10-22 数据语义修正: 这颗脚是 **PC.6 = H6-5/TMC_ENN 被动状态反馈**,
+     * 不是急停输入。MCU 没有独立的急停 GPIO, 因此:
+     *   enn_feedback=HIGH → 功率级处于禁能侧; =LOW → 未施加禁能(**不证明有转矩**);
+     *   任何电平都不能用来判断"是哪种原因切断"。旧字段名 estop 已废止。 */
+    rt_uint8_t  enn_feedback;
     rt_uint8_t  limit_min;
     rt_uint8_t  limit_max;
     rt_uint8_t  tmc_diag;
+    rt_uint8_t  sai_active;     /* 活动输入掩码(SAI_* 位序), 只由配置决定 */
+    rt_uint8_t  sai_valid;      /* 本帧真正读到并符合 PIN_LOW/PIN_HIGH 的掩码 */
+    /* 聚合标志: active!=0 且 (valid & active)==active。它**不是**保护就绪、
+     * 安全电平或线路完整性证明; 限位/ENN 读到"触发态"仍算有效样本。 */
     rt_uint8_t  valid_safety;
     rt_uint32_t seq;            /* 帧序号 */
 } sensor_frame_t;

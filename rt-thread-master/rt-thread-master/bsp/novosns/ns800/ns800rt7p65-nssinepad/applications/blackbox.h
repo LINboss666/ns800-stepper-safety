@@ -21,7 +21,9 @@
  * 记录语义(Fix C / C3, 与 blackbox_selftest 一致):
  *   pre  窗口记录: event = 0        (故障发生前的历史上下文, 本身不是事件)
  *   post 窗口记录: event = 会话故障码
- *   两者靠 record.session_id 归组; estop/limit/diag 数字输入存 record.flags 位域。
+ *   两者靠 record.session_id 归组; ENN 反馈/限位/DIAG 的原始电平、active 与 valid
+ *   掩码以及应用语义版本存 record.flags(safety_io_semantics.h)。bit8 历史上叫
+ *   estop, 实际读的是同一颗 TMC_ENN 反馈脚 —— 解释旧记录时不得称其为急停状态。
  *
  * pre 不足: 开机未满一个 pre 窗口时只写实际已采帧数(pre_n), 不把全 0 当有效历史。
  * 落盘: 逐帧 ns_log_submit, 队列满时有界重试 + 睡眠(Fix C / C5); 超限则丢弃本
