@@ -147,5 +147,74 @@
     "history_rewritten": false,
     "final_sha_note": "given in the delivery message after push, not self-referenced here"
   },
-  "stop_reason": "AWAITING_INDEPENDENT_REVIEW - 一次授权的一次性诊断已完成并撤许可（SW1 留在阻断位）；不进 F2e/F3，不烧录、不写 TMC、不输出 STEP、不接电机、不开宏；物理层电压测量与 SW1 pin 冲突由用户决定是否另开一轮"
+  "stop_reason": "AWAITING_INDEPENDENT_REVIEW - 一次授权的一次性诊断已完成并撤许可（SW1 留在阻断位）；不进 F2e/F3，不烧录、不写 TMC、不输出 STEP、不接电机、不开宏；物理层电压测量与 SW1 pin 冲突由用户决定是否另开一轮",
+  "review_f5f7cbf": {
+    "review_file": "NS800_SW1_Cut_Review_f5f7cbf_20261022.md",
+    "review_date": "2026-10-22",
+    "reviewed_sha": "f5f7cbfe69b9e58bbec55c11a261e2fa9a72b3cc",
+    "verdict": "CONDITIONAL_GO",
+    "evidence_label": "SW1_HARDWARE_CUT_EVIDENCE_GO",
+    "retest_required": false,
+    "accepted": [
+      "C 段：许可仍读到 HIGH 时操作 SW1 使 IO70 由 LOW 变 HIGH，两组相邻阻断样本前后各有 IO87=HIGH 读回，取证之后才发 LOW",
+      "末态 IO87=LOW / IO70=HIGH 与 armed=0 cur=0 tgt=0（提交记录支持，云端离线对账）",
+      "命令计数 68（pin read PC.23 31 / pin read PC.6 31 / write high 2 / write low 3 / motor_status 1）与回执一致",
+      "两份完整接收文本内未见 command not found / Parameter invalid / 启动横幅"
+    ],
+    "errata": [
+      "离线自检实为 18 项 Check（selftest.txt 18 条 OK），本文件与 NOTES 第 21/29 行、a5a5026 提交信息写的 17 项作废；非白名单守卫是第 18 项",
+      "CSV 的 2609/2671 ms 是开始读该对 GPIO 之前的循环时刻，不是 IO70 读回到达时刻（到达时刻见 command_trace 的 22:40:19.245 / 22:40:19.308）",
+      "117/120 ms 与 2733/2735 ms 是计时起点与记录位置差异，均在本轮预算内，都不是硬件响应时间或停机时延上界"
+    ],
+    "deviations": [
+      "B 段只做一侧短探针（run_identify_23 的 2-3），另一侧由 C 段动态观察到；不得写成两侧短探针均已执行",
+      "本轮两个完整会话没有 pin num，也没有 HIGH 之前的 motor_status（唯一一次在 C 段末尾）：§2 的'预检'改口径为引用上一轮 4edcf5e 记录 + 本轮读回标签 pin[87]/pin[70] 的间接对应，不是本轮独立预检",
+      "脚本 Identify/Cut 入口未机械强制映射与运动状态前置检查",
+      "原任务 A/B/C 全量逐项无偏差完成这一宽泛表述被复审拒绝"
+    ],
+    "tool_reuse": {
+      "status": "HOLD",
+      "T-01": "sw1_cut.ps1:264-281 cutPairs 只累计不重置，HIGH/HIGH→HIGH/LOW→HIGH/HIGH 的非相邻序列也会判 CUT_OBSERVED",
+      "T-02": "sw1_cut.ps1:447-455 terminal 段 Read-Pair / Query-Motor 只写台账，不检查 ok/电平/armed/cur/tgt，异常终态不降级 rc",
+      "other_limits": [
+        "Query-Level 正则未锚定整行且首次匹配即返回，同值重复不拒",
+        "部分 Ad-Poll 接收（含开口初始接收）只存档不检查 DISQUALIFIERS，'新启动信息一律拒绝'过强",
+        "cut-no-low-before-evidence 只比较第一个 LOW 与 HIGH 的发送先后，不核对是否晚于阻断样本",
+        "自检串口异常场景自带 catch/cleanup，未覆盖 main 的全部退出判定",
+        "rx_full.txt 为解码文本且 CR/LF 统一为 \\n，不是可逐字节重建的原始 UART 采样",
+        "3 次早期自检失败仅事后描述、无原始输出，身份 AGENT_REPORTED"
+      ],
+      "resolution": "封存为本次采集的历史工具；确需复用时只做局部修复并离线覆盖分隔序列与终态异常两条路径，不重做本次硬件、不新建通用元负例体系"
+    },
+    "user_confirmation_registration": {
+      "statement": "我确认电气层和急停链我检查过了，按我的确认登记",
+      "statement_date": "2026-10-22",
+      "registered_as": "PASS (USER_CONFIRMED)",
+      "scope": "现有板卡的静态电气检查 + 现有 SW1 急停链连线/功能检查",
+      "provided_by": "用户自行现场检查；经复审件 §8 转交登记",
+      "not": [
+        "不是 Agent 或云端实测",
+        "没有测点、数值、仪器型号、参考地、供电条件与方法细节，这些继续留空，不伪造",
+        "不覆盖复位/上电瞬态、STEP 波形、最坏停机时延、外接 NC 按钮、断线容错、工业安全等级、新版 296c369 上板、TMC 写握手、运动"
+      ],
+      "per_run_markers": "ANALOG_NOT_VERIFIED / METER_NOT_MEASURED_THIS_RUN 在两次采集记录内原文保留，含义限定为'那两次 Agent 采集没有仪表数据'，不再用于否定用户另行完成的现场检查",
+      "draft_rows": ["A28", "A29", "A30", "A31", "X-5", "J 节"]
+    },
+    "risk04_subitems": {
+      "4a_static_and_existing_sw1_function": "PASS (USER_CONFIRMED)，按用户现场检查收口",
+      "4b_transient_waveform_latency_continuity_external_nc_wire_break_safety_level_new_firmware": "仍开放 NOT_VERIFIED / NOT_TESTED",
+      "risk03_03a": "继续开放（无界等锁与停机时延上界未证明）",
+      "numbering": "不新增风险编号，沿用 RISK-04 与子项 a/b"
+    },
+    "supersedes_stop_reason": "本节的复审发生在 stop_reason 之后：五点静态读数不再是静态验收的强制前置（复审 §8.1），SW1 pin 序冲突改记'端子/位置对应有待核对'（复审 §5.2，草案 X-5），不判实物接反",
+    "hardware_actions_this_merge": "none（未开 COM5、未读写 GPIO/TMC、未烧录复位、未碰供电接线、未接电机、未输出 STEP、未改宏、未执行 PowerShell）",
+    "changed_files_this_merge": [
+      "reports/plans/phase8-safety-chain-acceptance-draft.md",
+      "reports/agent_handoffs/phase8-sw1-hardware-cut-20261022.md",
+      "reports/agent_handoffs/phase8-sw1-hardware-cut-20261022.json",
+      "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/待办事项.md",
+      "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/开发进度.md"
+    ],
+    "stop_reason": "AWAITING_USER_DECISION - 复审已接受证据并完成用户确认登记；工具 HOLD、动态/时序类验收仍开放；不进 F2e/F3，不烧录、不写 TMC、不输出 STEP、不接电机、不开宏"
+  }
 }
