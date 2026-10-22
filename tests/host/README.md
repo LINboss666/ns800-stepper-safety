@@ -35,6 +35,7 @@ bash tests/host/run_io_behavior.sh               # 独立 I/O 行为链(io_main.
 REVERSE=1 bash tests/host/run_io_behavior.sh     # 该链的 3 项反向注入(只改仓外副本)
 bash tests/host/run_safety_data_semantics.sh     # 安全数据语义链(sd_main.c + shim_sd, OFF/ON 两变体)
 REVERSE=1 bash tests/host/run_safety_data_semantics.sh   # 该链的 2 项反向注入
+bash tests/host/sd_runner_rework_check.sh        # 该 runner 两个入口的返修回归(全在仓外沙盒)
 ```
 
 三条链**并列且互不复用夹具**, 因为"真编译哪几个生产模块"不同:
@@ -48,6 +49,25 @@ REVERSE=1 bash tests/host/run_safety_data_semantics.sh   # 该链的 2 项反向
 语义链的存储侧只是**内存环模拟** `ns_log_submit/read_slot/stats`, 不重建真实 Flash 驱动;
 它的线程不真起(`rt_thread_create` 返回假句柄), `rt_kprintf` 走捕获缓冲, 捕获文本仅用于
 "输出本身就是被测行为"的用例(逐路三态显示、旧记录只留 raw), 其余判定一律来自掩码/返回值/计数器。
+
+### 语义链 runner 的入口纪律(2026-10-23 返修, 复审件 §4/§6)
+
+独立复审复现出两个**误报通过**入口，已按下述规则关闭；两条判据都由 runner 自己执行，
+回归入口是 `bash tests/host/sd_runner_rework_check.sh`（真实调用同一个 runner，不另写复制判定的自检器）：
+
+- **SD-NEW-01（ONLY 零执行却 PASS）**：`ONLY` 在**任何** `rm` / `mkdir` / 重定向 / 编译之前验证。
+  只接受完整变体名 `off_target` / `on_target`；未知词、合法词夹带未知词、空值或纯空白、
+  重复词，以及 `ONLY` 与 `REVERSE=1` 的组合，一律 `rc=4` 拒绝且**不动任何文件**。
+  汇总只声明**实际执行集合**，未执行的显式写 `NOT_RUN`；只有默认(两变体)选择全部执行并通过，
+  才会说"两个变体全部真执行"。
+- **SD-NEW-02（异常终止被算成反向成功）**：反向项记 `META-OK` 必须同时满足
+  副本构建成功 + 夹具**合同退出码 `rc=1`** + 完整且自洽的适用台账(必需 id 唯一出现、无未登记用例、
+  `SUMMARY` 恰好一条且 `cases/pass/fail` 与实际行对齐) + 指定业务失败身份全部命中。
+  非 0 非 1 的退出(信号/异常终止，Linux 143、本机实测 3 等)或台账不完整 ⇒ `INFRA-FAIL`(外层 `rc=4`)，
+  不得记 `META-OK`；`rc=0` 或缺少期望身份 ⇒ `NOT-DETECTED`(外层 `rc=1`)。
+  R1 附带 `SD05c` 失败是当前已知结果，runner 如实登记为"额外失败"但**不改变判定**，判据未被放宽。
+- **台账复核入口** `SD_VALIDATE_FILE=<既有输出> SD_VALIDATE_VARIANT=<变体>`：只复核产物台账，
+  不编译、不运行、不创建或清理任何目录；用于回归"删一条必需 CASE"和"删 SUMMARY"两类不完整输出。
 
 N3 的先决步骤：脚本会先在仓库外做一次 V1-only 正常构建，取得可用的 `host_v1.exe`
 作为"陈旧产物样本"，再把它预置进 N3 输出目录并制造编译失败；准备失败直接以 rc=4 终止，

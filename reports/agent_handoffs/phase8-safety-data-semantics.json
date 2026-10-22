@@ -162,5 +162,46 @@
     "merge_or_force": false,
     "final_sha_note": "在 push 后的交付回执给出并 git ls-remote 回读，正文不自引用"
   },
-  "stop_reason": "AWAITING_INDEPENDENT_REVIEW —— 离线语义修正与主机/Keil 验证已完成并落盘；板上未运行，未关闭任何动态/时序风险，不进 F2e/F3"
+  "stop_reason": "AWAITING_INDEPENDENT_REVIEW —— 离线语义修正与主机/Keil 验证已完成并落盘；板上未运行，未关闭任何动态/时序风险，不进 F2e/F3",
+  "rework_2399d28": {
+    "review_file": "NS800_Safety_Data_Semantics_Review_2399d28_20261023.md",
+    "review_verdict": "SOFTWARE_REVIEW_REWORK",
+    "rework_baseline_sha": "2399d282c5aac8aa6026ef1281b53084ad0e72a8",
+    "scope": "只修新增主机 runner 的两个错误通过入口(均 P1，验证工具)；生产实现被复审 §2 认可、§3 独立复跑通过",
+    "changed_files": [
+      "tests/host/run_safety_data_semantics.sh",
+      "tests/host/sd_runner_rework_check.sh",
+      "tests/host/README.md",
+      "rt-thread-master/.../ns800rt7p65-nssinepad/README.md",
+      "reports/plans/phase8-safety-chain-acceptance-draft.md",
+      "reports/agent_handoffs/phase8-safety-data-semantics.md",
+      "reports/agent_handoffs/phase8-safety-data-semantics.json",
+      "reports/reviews/phase8-safety-data-semantics/rework_runner_scenarios.txt",
+      "reports/reviews/phase8-safety-data-semantics/rework_runner_fix_notes.txt"
+    ],
+    "production_sources_untouched": "全部 APP 源码/头、sd_main.c 夹具、shim_sd、env.sh、既有 runner/期望、project.uvprojx、宏、门禁均未改",
+    "SD-NEW-01": {
+      "defect": "未知 ONLY 被静默忽略 => 零执行仍打印 PASS 且外层 rc=0",
+      "fix": "ONLY 在任何 rm/mkdir/重定向/编译之前验证；只接受完整名称 off_target/on_target；未知词、混合词、空或纯空白、重复词、ONLY 与 REVERSE=1 组合 => rc=4 且不动文件；披露选择集合/实际执行集合/NOT_RUN，只有默认两变体都真执行才声明两者全部执行",
+      "verified": "5 个拒绝场景 rc=4 且沙盒 KEEP 完好、目标目录未创建；ONLY=off_target => rc=0 且只声明 off_target，on_target 标 NOT_RUN"
+    },
+    "SD-NEW-02": {
+      "defect": "反向只看 rc!=0，SIGTERM/异常终止(复审实测 143)被记 META-OK",
+      "fix": "META-OK 需同时满足：构建成功 + 合同退出码 rc=1 + validate_ledger(必需 id 唯一、无未登记、SUMMARY 唯一且 cases/pass/fail 与实际行对齐、pass+fail==cases) + 指定 FAIL 身份全部命中；非 0 非 1 => INFRA-FAIL(外层 4)；rc=0 或缺身份 => NOT-DETECTED(外层 1)；台账校验函数由正常变体与反向共用",
+      "verified": "仓外 -Wl,--wrap=main 包装编译器把失败运行的退出改成非合同值：exit3 与 sigterm 两种注入下 R1/R2 均为 INFRA-FAIL rc=3，外层 rc=4，无 META-OK；同编译器未注入对照 => 两项 META-OK，外层 rc=0；本机 raise(SIGTERM) 实际也返回 3，故按通用『非 0 非 1』规则拒绝，不特判 143 或 rc>=128",
+      "judgment_not_weakened": "R1 附带 SD05c 失败按复审 §6.2.4 登记为额外失败但不改变判定(META-OK 行内记 实际FAIL行=2 额外失败=1)"
+    },
+    "truncated_output_rejection": {
+      "missing_required_case": "rc=4，缺席: SD01-off-masks-limits-never-touched(同时把 SUMMARY 计数改为与实际一致以隔离唯一失配点)",
+      "missing_summary": "rc=4，SUMMARY 行 0 条(必须恰好 1 条)",
+      "positive_control": "未篡改副本 rc=0，台账合同成立",
+      "wrapper_probe": "先用最小程序证明 --wrap 通道确实改变退出码，否则整项记环境故障而不算检出"
+    },
+    "rework_check_summary": "sd_runner_rework_check.sh: 通过=21 不符=0 环境故障=0，外层 rc=0",
+    "count_erratum": "上一轮回执的『18 个改动路径』是远端 blob 抽样数；完整增量为 21 文件 +2405/-41(6 APP + 5 tests/host + 7 reports + 3 BSP 文档)；evidence_paths 从不声称是全部改动清单",
+    "logged_not_fixed_this_round": "blackbox.c 尺寸注释『新布局…0 填充』不准确(旧 padding 3B=SG 后 2B + 故障码前 1B，新结构仍有 SG 后 2B)；48B 断言本身正确。复审 §6.1 冻结 APP 源码，故只登记，留待下次真实生产改动修正注释",
+    "not_rerun_and_reason": "APP 与既有夹具冻结 => 按复审 §6.3 不重跑 Keil、V1/V2、138 例 I/O、旧 13 例负例、M1-M5、R4 守卫、SW1 工具与任何硬件动作；原因＝相关源未变，不冒称本轮重新执行",
+    "hardware_actions_this_rework": "none",
+    "stop_reason": "AWAITING_INDEPENDENT_REVIEW —— 本轮只应审 runner 两处入口与 §6.3 的有限验证"
+  }
 }

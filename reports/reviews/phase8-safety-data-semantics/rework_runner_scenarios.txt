@@ -1,0 +1,148 @@
+phase8-safety-data-semantics runner 返修证据(2026-10-23, 最终脚本产物)
+复审件: NS800_Safety_Data_Semantics_Review_2399d28_20261023.md (结论 SOFTWARE_REVIEW_REWORK)
+返修基线: 2399d282c5aac8aa6026ef1281b53084ad0e72a8
+本轮唯一代码修改对象: tests/host/run_safety_data_semantics.sh; 新增有限回归 tests/host/sd_runner_rework_check.sh
+所有场景都真实调用同一个 runner, 沙盒为仓库外一次性目录(路径归一为 <LOCAL-SANDBOX>)。
+APP 源码/头、sd_main.c 夹具、shim_sd、env.sh、既有 runner 与期望、Keil 工程本轮均未修改。
+
+格式说明: 为通过 git diff --check, 摘录中的**行尾多余空格**已去除; 判定文本、rc 数值与顺序未改。
+
+===== A. sd_runner_rework_check.sh 场景矩阵(外层 rc=0) =====
+SD_REWORK_PASS=21
+SD_REWORK_FAIL=0
+SD_REWORK_INFRA=0
+S1-unknown ONLY 拒绝 | 期望rc=4 实际rc=4 | OK: REJECT(ONLY): 未知选择词 'ZZZ_NO_VARIANT'(只接受完�
+S1-unknown 前置拒绝核查 | 未创建任何目录且 KEEP 标记完好 | OK
+S1-mixed ONLY 拒绝 | 期望rc=4 实际rc=4 | OK: REJECT(ONLY): 未知选择词 'ZZZ'(只接受完整名称: o
+S1-mixed 前置拒绝核查 | 未创建任何目录且 KEEP 标记完好 | OK
+S1-blank ONLY 拒绝 | 期望rc=4 实际rc=4 | OK: REJECT(ONLY): 显式设置了 ONLY 但没有有效选择词(
+S1-blank 前置拒绝核查 | 未创建任何目录且 KEEP 标记完好 | OK
+S1-dup ONLY 拒绝 | 期望rc=4 实际rc=4 | OK: REJECT(ONLY): 重复词 'off_target'
+S1-dup 前置拒绝核查 | 未创建任何目录且 KEEP 标记完好 | OK
+S2 REVERSE+ONLY 组合 | 期望rc=4 实际rc=4 | OK: REJECT: REVERSE=1 不接受 ONLY 选择(反向两项固定�
+S2 前置拒绝核查 | 未创建任何目录且 KEEP 标记完好 | OK
+S3 合法单变体退出码 | 期望rc=0 实际rc=0 | OK: off_target 真执行
+S3 汇总措辞 | 只声明 off_target, on_target 标 NOT_RUN | OK
+S4 包装器可用性 | 探针被改成非 1 退出, 注入通道成立 | OK
+S5-exit3 异常反向退出码 | 期望rc=4 实际rc=4 | OK: 2 条 INFRA-FAIL
+S5-exit3 不得 META-OK | 无 META-OK, 外层判基础设施故障 | OK
+S5-sigterm 异常反向退出码 | 期望rc=4 实际rc=4 | OK: 2 条 INFRA-FAIL
+S5-sigterm 不得 META-OK | 无 META-OK, 外层判基础设施故障 | OK
+S7 未注入同编译器对照 | 期望rc=0 实际rc=0 | OK: 2 条 META-OK
+S8 删除必需用例(SD01-off-masks-limits-never-touched) | 期望rc=4 实际rc=4 | OK: 缺席: SD01-off-masks-limits-never-touched
+S9 删除 SUMMARY 行 | 期望rc=4 实际rc=4 | OK: SUMMARY 行 0 条(必须恰好 1 条
+S9b 未篡改副本的正对照必须成立 | 期望rc=0 实际rc=0 | OK: VALIDATE RESULT: 台账合同成立(结构完整�
+
+===== B. ONLY 拒绝场景原文(任何文件操作之前) =====
+--- log_unknown.txt ---
+REJECT(ONLY): 未知选择词 'ZZZ_NO_VARIANT'(只接受完整名称: off_target on_target)
+FATAL: ONLY 选择被拒绝; 未创建目录、未清理、未重定向、未编译
+
+--- log_mixed.txt ---
+REJECT(ONLY): 未知选择词 'ZZZ'(只接受完整名称: off_target on_target)
+FATAL: ONLY 选择被拒绝; 未创建目录、未清理、未重定向、未编译
+
+--- log_blank.txt ---
+REJECT(ONLY): 显式设置了 ONLY 但没有有效选择词(空或纯空白) —— 不能当作已执行
+FATAL: ONLY 选择被拒绝; 未创建目录、未清理、未重定向、未编译
+
+--- log_dup.txt ---
+REJECT(ONLY): 重复词 'off_target' —— 明确拒绝, 不做隐式归并
+FATAL: ONLY 选择被拒绝; 未创建目录、未清理、未重定向、未编译
+
+--- log_reverse_only.txt ---
+REJECT: REVERSE=1 不接受 ONLY 选择(反向两项固定覆盖 off_target 的完整台账) —— 不静默忽略参数
+
+===== C. 合法单变体 ONLY=off_target(只声明实际执行集合) =====
+###### 安全数据语义链 (基线 2399d282c5aac8aa6026ef1281b53084ad0e72a8) ######
+ONLY=off_target  选择模式=explicit  选择集合=off_target
+off_target | OK 必需用例=21 全部PASS 自报fail=0 proc_rc=0 (输出 4564 字节)
+选择集合=off_target (模式=explicit)
+实际执行集合=off_target
+NOT_RUN: on_target (未被 ONLY 选择)
+SD RUNNER RESULT: PASS (rc=0) —— 仅对实际执行集合(off_target)声明通过; 未选择侧见上方 NOT_RUN
+
+===== D. 异常退出注入(非合同退出码) =====
+--- log_abn_exit3.txt ---
+  R1_aggregate_requires_all_four: 子进程 rc=3 不是合同的正常业务失败 1(异常终止/信号) => 基础设施故障, 不算检出
+  R2_valid_mask_equals_active: 子进程 rc=3 不是合同的正常业务失败 1(异常终止/信号) => 基础设施故障, 不算检出
+R1_aggregate_requires_all_four | INFRA-FAIL 非合同退出码 rc=3
+R2_valid_mask_equals_active | INFRA-FAIL 非合同退出码 rc=3
+实际执行集合=reverse:R1_aggregate_requires_all_four reverse:R2_valid_mask_equals_active
+SD REVERSE RESULT: FAIL (rc=4; 1=未检出, 4=基础设施故障/非合同退出/台账不成立)
+
+--- log_abn_sigterm.txt ---
+  R1_aggregate_requires_all_four: 子进程 rc=3 不是合同的正常业务失败 1(异常终止/信号) => 基础设施故障, 不算检出
+  R2_valid_mask_equals_active: 子进程 rc=3 不是合同的正常业务失败 1(异常终止/信号) => 基础设施故障, 不算检出
+R1_aggregate_requires_all_four | INFRA-FAIL 非合同退出码 rc=3
+R2_valid_mask_equals_active | INFRA-FAIL 非合同退出码 rc=3
+实际执行集合=reverse:R1_aggregate_requires_all_four reverse:R2_valid_mask_equals_active
+SD REVERSE RESULT: FAIL (rc=4; 1=未检出, 4=基础设施故障/非合同退出/台账不成立)
+
+===== E. 同一编译器未注入对照 =====
+  额外失败身份(登记但不改变判定): SD05c-recovery-makes-source-valid-again
+R1_aggregate_requires_all_four | META-OK 命中 1 个业务失败身份 (variant=off_target proc_rc=1 必需用例=21 实际FAIL行=2 额外失败=1)
+R2_valid_mask_equals_active | META-OK 命中 3 个业务失败身份 (variant=off_target proc_rc=1 必需用例=21 实际FAIL行=3 额外失败=0)
+SD REVERSE RESULT: PASS —— 两项注入均以合同退出码 rc=1 命中指定业务失败身份(构建成功且台账完整自洽)
+
+===== F. 不完整输出必须被真实校验器拒绝 =====
+--- log_missing_case.txt ---
+###### 台账复核模式(不编译/不运行/不动任何目录) ######
+SD_VALIDATE_FILE=/tmp/sd_rework_0DKkCw/doc_missing_case.txt  变体=off_target
+  缺席: SD01-off-masks-limits-never-touched
+  台账: 缺席=1 重复=0 => 必需用例未全部/唯一执行
+VALIDATE RESULT: 拒绝 —— 台账合同不成立
+
+--- log_no_summary.txt ---
+###### 台账复核模式(不编译/不运行/不动任何目录) ######
+SD_VALIDATE_FILE=/tmp/sd_rework_0DKkCw/doc_no_summary.txt  变体=off_target
+  台账: SUMMARY 行 0 条(必须恰好 1 条)
+VALIDATE RESULT: 拒绝 —— 台账合同不成立
+
+--- log_ok_validate.txt ---
+###### 台账复核模式(不编译/不运行/不动任何目录) ######
+SD_VALIDATE_FILE=/tmp/sd_rework_0DKkCw/out_control/reverse/R1_aggregate_requires_all_four/out.txt  变体=off_target
+VALIDATE RESULT: 台账合同成立(结构完整且计数自洽)
+
+===== G. 修复后默认语义链(两变体) =====
+###### 安全数据语义链 (基线 2399d282c5aac8aa6026ef1281b53084ad0e72a8) ######
+SRC_APP=D:/ns800/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications
+SHIM_DIR=/d/ns800/tests/host/shim_sd
+OUT_DIR=/tmp/ns800-host-chain/sd
+compiler=gcc.exe (tdm64-1) 4.9.2
+ONLY=<未设置>  选择模式=default  选择集合=off_target on_target
+
+=== 变体 off_target ===
+
+=== 变体 on_target ===
+
+=== 语义链矩阵 ===
+off_target | OK 必需用例=21 全部PASS 自报fail=0 proc_rc=0 (输出 4564 字节)
+on_target | OK 必需用例=20 全部PASS 自报fail=0 proc_rc=0 (输出 4349 字节)
+
+选择集合=off_target on_target (模式=default)
+实际执行集合=off_target on_target
+
+SD RUNNER RESULT: PASS (rc=0) —— 两个变体的必需用例全部真执行且判 PASS
+===== H. 修复后正常反向(合同 rc=1 + 完整 21 例台账) =====
+###### 安全数据语义链 (基线 2399d282c5aac8aa6026ef1281b53084ad0e72a8) ######
+SRC_APP=D:/ns800/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications
+SHIM_DIR=/d/ns800/tests/host/shim_sd
+OUT_DIR=/tmp/ns800-host-chain/sd_rev_final
+compiler=gcc.exe (tdm64-1) 4.9.2
+ONLY=<未设置>  选择模式=default  选择集合=off_target on_target
+
+=== 反向验证(2 项, 仓外一次性副本; 本轮未与 ONLY 组合) ===
+INJECTED R1_aggregate_requires_all_four
+  命中期望失败身份: SD01-off-masks-limits-never-touched
+  额外失败身份(登记但不改变判定): SD05c-recovery-makes-source-valid-again
+INJECTED R2_valid_mask_equals_active
+  命中期望失败身份: SD07-same-source-frame-propagates
+  命中期望失败身份: SD07b-no-recompute-at-write-time
+  命中期望失败身份: SD10b-dump-shows-version-and-per-channel-readability
+
+=== 反向验证汇总 ===
+R1_aggregate_requires_all_four | META-OK 命中 1 个业务失败身份 (variant=off_target proc_rc=1 必需用例=21 实际FAIL行=2 额外失败=1)
+R2_valid_mask_equals_active | META-OK 命中 3 个业务失败身份 (variant=off_target proc_rc=1 必需用例=21 实际FAIL行=3 额外失败=0)
+实际执行集合=reverse:R1_aggregate_requires_all_four reverse:R2_valid_mask_equals_active
+SD REVERSE RESULT: PASS —— 两项注入均以合同退出码 rc=1 命中指定业务失败身份(构建成功且台账完整自洽)

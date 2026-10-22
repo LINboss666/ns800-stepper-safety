@@ -16,9 +16,21 @@
 # 编译失败不跑旧产物; 逐 id 台账必须"出现恰好一次且判 PASS"; 缺席/重复=基础设施故障(4),
 # 判 FAIL 或自报 fail≠0 或进程 rc≠0 = 检出失败(1); 最外层真实退出码反映失败。
 #
+# 返修(复审件 NS800_Safety_Data_Semantics_Review_2399d28_20261023.md §4/§6)补的两条入口纪律:
+#   SD-NEW-01  ONLY 在**任何清理/创建/重定向/编译之前**验证: 只接受已知完整变体名; 未知词、
+#              合法词夹带未知词、空或纯空白、重复词, 以及 ONLY 与 REVERSE=1 的组合, 一律 rc=4
+#              拒绝且不动任何文件。汇总只声明**实际执行集合**, 未执行的显式 NOT_RUN;
+#              只有默认(两变体)选择全部执行且通过, 才说"两个变体全部真执行"。
+#   SD-NEW-02  反向"检测成功"必须同时满足: 副本构建成功 + 夹具**合同退出码 rc=1** + 完整且自洽的
+#              适用台账 + 唯一 SUMMARY + 指定 FAIL 身份全部成立 + 判 FAIL 的必需用例数与命中身份
+#              数一致。非 0 非 1 的退出(信号/异常终止)或台账不完整 => INFRA-FAIL(4), 不得记
+#              META-OK; rc=0 或缺少期望身份 => NOT-DETECTED(1)。原 R1/R2 判据未放宽
+#              (R1 附带 SD05c 失败是当前已知结果, 不算基础设施故障)。
+#
 # 用法: bash tests/host/run_safety_data_semantics.sh
 #       SD_OUT_DIR=<仓外目录> SRC_APP=<快照目录> GCC=<编译器> ONLY=off_target REVERSE=1 ...
-# 退出码: 0=通过; 1=检出失败; 4=基础设施故障; 127=环境缺失
+#       SD_VALIDATE_FILE=<既有输出文件> SD_VALIDATE_VARIANT=off_target   # 只复核台账, 不编译不运行
+# 退出码: 0=通过; 1=检出失败; 4=基础设施/参数故障或被选择却未执行; 127=环境缺失
 
 set -u -o pipefail
 
@@ -58,23 +70,108 @@ SD05b-stale-limit-values-not-valid"
 ON_ONLY_CASES="SD02-on-all-four-active-limit-low-still-valid
 SD02b-on-output-trigger-state-is-valid"
 
-VARIANTS="off_target on_target"
+KNOWN_VARIANTS="off_target on_target"
+VARIANTS="$KNOWN_VARIANTS"
 
 overall=0
 detected_fail=0
 declare -a matrix=()
-declare -a NOT_RAN=()
+declare -a SELECTED=()
+declare -a EXECUTED=()
+declare -a SELECTED_NOT_RUN=()
+SELECT_MODE="default"
 
 note() { printf '%s\n' "$*"; }
 remember() { case "$1" in ''|*[!0-9]*) return 0 ;; esac
              if [ "$overall" -eq 0 ] && [ "$1" -ne 0 ]; then overall="$1"; fi; }
 file_bytes() { if [ -f "$1" ]; then wc -c <"$1" | tr -d ' '; else echo ABSENT; fi; }
 
-want_variant() {
-    [ -z "$ONLY" ] && return 0
-    local v
-    for v in $ONLY; do [ "$v" = "$1" ] && return 0; done
-    return 1
+# ---------- SD-NEW-01: ONLY 在任何文件操作之前验证 ----------
+# 成功: 选择写入 SELECTED, SELECT_MODE=default|explicit, 返回 0
+# 拒绝: 打印原因并返回 1(调用方立即 rc=4, 不创建/不清理/不重定向/不编译)
+validate_only() {
+    local tok s
+    SELECTED=()
+    if [ -z "$ONLY" ]; then
+        for tok in $KNOWN_VARIANTS; do SELECTED+=("$tok"); done
+        SELECT_MODE="default"
+        return 0
+    fi
+    set -- $ONLY                                  # 词分割: 空串或纯空白 => $# == 0
+    if [ "$#" -eq 0 ]; then
+        note "REJECT(ONLY): 显式设置了 ONLY 但没有有效选择词(空或纯空白) —— 不能当作已执行"
+        return 1
+    fi
+    for tok in "$@"; do
+        case " $KNOWN_VARIANTS " in
+            *" $tok "*) : ;;
+            *) note "REJECT(ONLY): 未知选择词 '$tok'(只接受完整名称: $KNOWN_VARIANTS)"; return 1 ;;
+        esac
+        for s in ${SELECTED[@]+"${SELECTED[@]}"}; do
+            if [ "$s" = "$tok" ]; then
+                note "REJECT(ONLY): 重复词 '$tok' —— 明确拒绝, 不做隐式归并"
+                return 1
+            fi
+        done
+        SELECTED+=("$tok")
+    done
+    SELECT_MODE="explicit"
+    return 0
+}
+
+# ---------- 台账与 SUMMARY 合同校验(正常变体与反向共用同一实现) ----------
+# 结果写入 LED_*; 返回 0 = 结构完整且计数自洽(逐 id 的 PASS/FAIL 由调用方处置), 4 = 基础设施故障
+validate_ledger() {                               # validate_ledger <输出文件> <变体>
+    local out="$1" name="$2" r id cnt sumline
+    LED_MISSING=0; LED_DUP=0; LED_UNREG=0; LED_REQ_FAILS=0
+    LED_CASES=0; LED_PASSN=0; LED_FAILN=0; LED_SUMMARIES=0
+    LED_REPORTED_CASES="MISSING"; LED_REPORTED_PASS="MISSING"; LED_REPORTED_FAIL="MISSING"
+    LED_REQ="$(required_of "$name")"
+
+    if [ ! -s "$out" ]; then note "  台账: 输出文件缺失或为空: $out"; return 4; fi
+
+    LED_CASES="$(grep -cE '^CASE\|' "$out")"
+    LED_PASSN="$(grep -cE '^CASE\|[^|]*\|PASS\|' "$out")"
+    LED_FAILN="$(grep -cE '^CASE\|[^|]*\|FAIL\|' "$out")"
+    LED_SUMMARIES="$(grep -cE '^SUMMARY\|' "$out")"
+    if [ "$LED_SUMMARIES" -ne 1 ]; then
+        note "  台账: SUMMARY 行 $LED_SUMMARIES 条(必须恰好 1 条)"
+        return 4
+    fi
+    sumline="$(grep -E '^SUMMARY\|' "$out" | head -1)"
+    LED_REPORTED_CASES="$(printf '%s' "$sumline" | sed -n 's/.*cases=\([0-9]*\).*/\1/p')"
+    LED_REPORTED_PASS="$(printf '%s' "$sumline" | sed -n 's/.*pass=\([0-9]*\).*/\1/p')"
+    LED_REPORTED_FAIL="$(printf '%s' "$sumline" | sed -n 's/.*fail=\([0-9]*\).*/\1/p')"
+    for r in "$LED_REPORTED_CASES" "$LED_REPORTED_PASS" "$LED_REPORTED_FAIL"; do
+        [ "$r" = "MISSING" ] && { note "  台账: SUMMARY 字段不全: $sumline"; return 4; }
+    done
+    if [ "$LED_REPORTED_CASES" != "$LED_CASES" ] || [ "$LED_REPORTED_PASS" != "$LED_PASSN" ] \
+       || [ "$LED_REPORTED_FAIL" != "$LED_FAILN" ] \
+       || [ "$((LED_REPORTED_PASS + LED_REPORTED_FAIL))" -ne "$LED_REPORTED_CASES" ]; then
+        note "  台账: SUMMARY 与实际行不一致 cases=$LED_REPORTED_CASES/$LED_CASES pass=$LED_REPORTED_PASS/$LED_PASSN fail=$LED_REPORTED_FAIL/$LED_FAILN"
+        return 4
+    fi
+
+    for r in $LED_REQ; do
+        cnt="$(grep -c "^CASE|$r|" "$out")"
+        if [ "$cnt" -eq 0 ]; then LED_MISSING=$((LED_MISSING+1)); note "  缺席: $r"
+        elif [ "$cnt" -gt 1 ]; then LED_DUP=$((LED_DUP+1)); note "  重复执行: $r ($cnt 次)"; fi
+    done
+    for id in $(grep -E '^CASE\|' "$out" | sed 's/^CASE|\([^|]*\)|.*/\1/' | sort -u); do
+        case " $LED_REQ " in *" $id "*) : ;; *) LED_UNREG=$((LED_UNREG+1)); note "  未登记用例: $id" ;; esac
+    done
+    if [ "$LED_UNREG" -ne 0 ]; then
+        note "  台账: 出现 $LED_UNREG 个未登记用例(偷偷加用例不算通过)"
+        return 4
+    fi
+    if [ "$LED_MISSING" -ne 0 ] || [ "$LED_DUP" -ne 0 ]; then
+        note "  台账: 缺席=$LED_MISSING 重复=$LED_DUP => 必需用例未全部/唯一执行"
+        return 4
+    fi
+    for r in $LED_REQ; do
+        [ "$(grep -c "^CASE|$r|PASS|" "$out")" = "1" ] || LED_REQ_FAILS=$((LED_REQ_FAILS+1))
+    done
+    return 0
 }
 
 required_of() {
@@ -90,6 +187,33 @@ variant_flags() {
         on_target)  echo "-DSAFETY_LIMIT_INPUTS_ENABLED=RT_TRUE" ;;
     esac
 }
+
+# ---------- 入口参数验证(在任何 rm/mkdir/重定向/编译之前) ----------
+REVERSE="${REVERSE:-0}"
+
+# 只复核既有产物的台账(供返修回归使用): 不编译、不运行、不创建或清理任何目录
+if [ -n "${SD_VALIDATE_FILE:-}" ]; then
+    V="${SD_VALIDATE_VARIANT:-off_target}"
+    case " $KNOWN_VARIANTS " in *" $V "*) : ;; *) note "FATAL: SD_VALIDATE_VARIANT 未知: $V"; exit 4 ;; esac
+    note "###### 台账复核模式(不编译/不运行/不动任何目录) ######"
+    note "SD_VALIDATE_FILE=$SD_VALIDATE_FILE  变体=$V"
+    if validate_ledger "$SD_VALIDATE_FILE" "$V"; then
+        note "VALIDATE RESULT: 台账合同成立(结构完整且计数自洽)"
+        exit 0
+    fi
+    note "VALIDATE RESULT: 拒绝 —— 台账合同不成立"
+    exit 4
+fi
+
+# ONLY 与 REVERSE 的组合必须显式处理, 不得静默忽略参数
+if [ "$REVERSE" = "1" ] && [ -n "$ONLY" ]; then
+    note "REJECT: REVERSE=1 不接受 ONLY 选择(反向两项固定覆盖 off_target 的完整台账) —— 不静默忽略参数"
+    exit 4
+fi
+if ! validate_only; then
+    note "FATAL: ONLY 选择被拒绝; 未创建目录、未清理、未重定向、未编译"
+    exit 4
+fi
 
 GCC_RESOLVED="$(env_detect_gcc || true)"
 if [ -z "$GCC_RESOLVED" ] || [ ! -x "$GCC_RESOLVED" ]; then
@@ -122,6 +246,7 @@ note "SRC_APP=$SRC_APP"
 note "SHIM_DIR=$SHIM_DIR"
 note "OUT_DIR=$OUT_DIR"
 note "compiler=$("$GCC" --version | head -1)"
+note "ONLY=${ONLY:-<未设置>}  选择模式=$SELECT_MODE  选择集合=${SELECTED[*]}"
 
 build_variant() {
     local name="$1" extra="$2"
@@ -145,46 +270,26 @@ build_variant() {
 run_variant() {
     local name="$1"
     local exe="$OUT_DIR/${name}.exe" out="$OUT_DIR/${name}_out.txt"
-    local proc_rc reported_fail rc_line req missing dup badverdict unreg r id cnt passline
+    local proc_rc
 
     "$exe" > "$out" 2>&1
     proc_rc=$?
+    EXECUTED+=("$name")
 
-    rc_line="$(grep -E '^SUMMARY\|' "$out" | tail -1)"
-    reported_fail="$(printf '%s' "$rc_line" | sed -n 's/.*fail=\([0-9]*\).*/\1/p')"
-    [ -n "$reported_fail" ] || reported_fail="MISSING"
-
-    req="$(required_of "$name")"
-    missing=0; dup=0; badverdict=0
-    for r in $req; do
-        cnt="$(grep -c "^CASE|$r|" "$out")"
-        passline="$(grep -c "^CASE|$r|PASS|" "$out")"
-        if [ "$cnt" -eq 0 ]; then missing=$((missing+1)); note "  缺席: $r"
-        elif [ "$cnt" -gt 1 ]; then dup=$((dup+1)); note "  重复执行: $r ($cnt 次)"
-        elif [ "$passline" -ne 1 ]; then badverdict=$((badverdict+1))
-             note "  判 FAIL: $(grep "^CASE|$r|" "$out" | head -1)"
-        fi
-    done
-    # 反向检查: 输出里出现的 id 必须都在台账内(防止偷偷加没登记的用例)
-    unreg=0
-    for id in $(grep -E '^CASE\|' "$out" | sed 's/^CASE|\([^|]*\)|.*/\1/' | sort -u); do
-        case " $req " in *" $id "*) : ;; *) unreg=$((unreg+1)); note "  未登记用例: $id" ;; esac
-    done
-
-    if [ "$missing" -ne 0 ] || [ "$dup" -ne 0 ] || [ "$unreg" -ne 0 ]; then
-        matrix+=("$name | INFRA-FAIL 缺席=$missing 重复=$dup 未登记=$unreg (proc_rc=$proc_rc)")
-        note "  基础设施故障: 必需用例未全部/唯一执行, 或有未登记用例"
+    if ! validate_ledger "$out" "$name"; then
+        matrix+=("$name | INFRA-FAIL 台账合同不成立 (proc_rc=$proc_rc)")
+        note "  基础设施故障: 台账缺失/重复/未登记, 或 SUMMARY 缺失/不唯一/计数不自洽"
         remember 4
         return 0
     fi
-    if [ "$badverdict" -ne 0 ] || [ "$reported_fail" != "0" ] || [ "$proc_rc" -ne 0 ]; then
-        matrix+=("$name | NOT-DETECTED 判FAIL=$badverdict 自报fail=$reported_fail proc_rc=$proc_rc")
+    if [ "$LED_REQ_FAILS" -ne 0 ] || [ "$LED_REPORTED_FAIL" != "0" ] || [ "$proc_rc" -ne 0 ]; then
+        matrix+=("$name | NOT-DETECTED 必需用例判FAIL=$LED_REQ_FAILS 自报fail=$LED_REPORTED_FAIL proc_rc=$proc_rc")
         note "  检出失败: 有用例判 FAIL"
         detected_fail=1
         remember 1
         return 0
     fi
-    matrix+=("$name | OK 必需用例=$(printf '%s\n' $req | grep -c .) 全部PASS 自报fail=0 proc_rc=0 (输出 $(file_bytes "$out") 字节)")
+    matrix+=("$name | OK 必需用例=$(printf '%s\n' $LED_REQ | grep -c .) 全部PASS 自报fail=0 proc_rc=0 (输出 $(file_bytes "$out") 字节)")
     return 0
 }
 
@@ -207,7 +312,7 @@ PYEOF
 
 reverse_case() {            # reverse_case <name> <variant> <target-file> <old> <new> <ids...>
     local name="$1" variant="$2" target="$3" old_txt="$4" new_txt="$5"; shift 5
-    local ids="$*" work exe brc rc hit=0 miss=0 id extra out
+    local ids="$*" work exe brc rc hit=0 miss=0 id extra out r extras nextra
 
     work="$OUT_DIR/reverse/$name"
     rm -rf "$work"
@@ -234,10 +339,22 @@ reverse_case() {            # reverse_case <name> <variant> <target-file> <old> 
     fi
     "$exe" > "$out" 2>&1
     rc=$?
+    EXECUTED+=("reverse:$name")
+
+    # SD-NEW-02: 夹具的正常失败合同是 rc=1; 其它非零退出(信号/异常终止)判基础设施故障
+    if [ "$rc" -ne 0 ] && [ "$rc" -ne 1 ]; then
+        note "  $name: 子进程 rc=$rc 不是合同的正常业务失败 1(异常终止/信号) => 基础设施故障, 不算检出"
+        matrix+=("$name | INFRA-FAIL 非合同退出码 rc=$rc"); remember 4; return
+    fi
     if [ "$rc" -eq 0 ]; then
         note "  $name: 注入后链仍然通过 => 没检出"
         matrix+=("$name | NOT-DETECTED 注入后 proc_rc=0"); detected_fail=1; remember 1; return
     fi
+    if ! validate_ledger "$out" "$variant"; then
+        note "  $name: 异常运行的台账不完整/不自洽 => 基础设施故障, 不算检出"
+        matrix+=("$name | INFRA-FAIL 台账合同不成立 (rc=$rc)"); remember 4; return
+    fi
+
     for id in $ids; do
         if grep -q "^CASE|$id|FAIL|" "$out"; then hit=$((hit+1)); note "  命中期望失败身份: $id"
         else miss=$((miss+1)); note "  未命中期望失败身份: $id"; fi
@@ -246,14 +363,23 @@ reverse_case() {            # reverse_case <name> <variant> <target-file> <old> 
         matrix+=("$name | NOT-DETECTED 命中=$hit 缺失=$miss proc_rc=$rc")
         detected_fail=1; remember 1; return
     fi
-    matrix+=("$name | META-OK 命中 $hit 个业务失败身份 (variant=$variant proc_rc=$rc)")
+    # 额外失败身份**如实列出但不改变判定**: 复审 §6.2.4 明确 R1 附带 SD05c 失败是当前已知
+    # 结果, 不能误当基础设施故障; 检出的判据是"构建成功 + rc=1 + 完整自洽台账 + 期望身份成立"。
+    extras=""; nextra=0
+    for r in $LED_REQ; do
+        if grep -q "^CASE|$r|FAIL|" "$out"; then
+            case " $ids " in *" $r "*) : ;; *) extras="$extras $r"; nextra=$((nextra+1)) ;; esac
+        fi
+    done
+    if [ "$nextra" -ne 0 ]; then
+        note "  额外失败身份(登记但不改变判定):$extras"
+    fi
+    matrix+=("$name | META-OK 命中 $hit 个业务失败身份 (variant=$variant proc_rc=$rc 必需用例=$(printf '%s\n' $LED_REQ | grep -c .) 实际FAIL行=$LED_FAILN 额外失败=$nextra)")
 }
-
-REVERSE="${REVERSE:-0}"
 
 if [ "$REVERSE" = "1" ]; then
     note ""
-    note "=== 反向验证(2 项, 仓外一次性副本) ==="
+    note "=== 反向验证(2 项, 仓外一次性副本; 本轮未与 ONLY 组合) ==="
     # R1: 聚合有效性退回"必须四路均解析/有效" —— OFF 变体必须命中 SD01
     reverse_case R1_aggregate_requires_all_four off_target sensor_service.c \
 '        f->valid_safety = (f->sai_active != 0 &&
@@ -270,20 +396,25 @@ if [ "$REVERSE" = "1" ]; then
     note ""
     note "=== 反向验证汇总 ==="
     for m in "${matrix[@]}"; do note "$m"; done
+    note "实际执行集合=${EXECUTED[*]:-<无>}"
     {
         echo "SD_REVERSE_RC=$overall"
+        echo "SD_EXECUTED=${EXECUTED[*]:-<none>}"
         for m in "${matrix[@]}"; do echo "$m"; done
     } > "$OUT_DIR/sd_reverse_status.txt"
     if [ "$overall" -eq 0 ]; then
-        note "SD REVERSE RESULT: PASS —— 两项注入均命中指定业务失败身份(不是编译失败/崩溃)"
+        note "SD REVERSE RESULT: PASS —— 两项注入均以合同退出码 rc=1 命中指定业务失败身份(构建成功且台账完整自洽)"
     else
-        note "SD REVERSE RESULT: FAIL (rc=$overall)"
+        note "SD REVERSE RESULT: FAIL (rc=$overall; 1=未检出, 4=基础设施故障/非合同退出/台账不成立)"
     fi
     exit "$overall"
 fi
 
 for v in $VARIANTS; do
-    if ! want_variant "$v"; then NOT_RAN+=("$v"); continue; fi
+    case " ${SELECTED[*]} " in
+        *" $v "*) : ;;
+        *) continue ;;
+    esac
     note ""
     note "=== 变体 $v ==="
     build_variant "$v" "$(variant_flags "$v")"
@@ -294,18 +425,40 @@ done
 note ""
 note "=== 语义链矩阵 ==="
 for m in "${matrix[@]}"; do note "$m"; done
-if [ ${#NOT_RAN[@]} -gt 0 ]; then note "未执行变体(ONLY 选择): ${NOT_RAN[*]}"; fi
+
+# 实际选择 vs 实际执行: 被选择却没跑完的显式 NOT_RUN, 不为未执行侧背书
+for v in $SELECTED; do
+    case " ${EXECUTED[*]-} " in *" $v "*) : ;; *) SELECTED_NOT_RUN+=("$v") ;; esac
+done
+note ""
+note "选择集合=${SELECTED[*]} (模式=$SELECT_MODE)"
+note "实际执行集合=${EXECUTED[*]:-<无>}"
+for v in ${SELECTED_NOT_RUN[@]+"${SELECTED_NOT_RUN[@]}"}; do note "NOT_RUN: $v (被选择但未完成执行)"; done
+for v in $KNOWN_VARIANTS; do
+    case " ${SELECTED[*]} " in
+        *" $v "*) : ;;
+        *) note "NOT_RUN: $v (未被 ONLY 选择)" ;;
+    esac
+done
 
 {
     echo "SD_RUNNER_RC=$overall"
     echo "SD_DETECTED_FAIL=$detected_fail"
+    echo "SD_SELECT_MODE=$SELECT_MODE"
+    echo "SD_SELECTED=${SELECTED[*]}"
+    echo "SD_EXECUTED=${EXECUTED[*]:-<none>}"
+    echo "SD_SELECTED_NOT_RUN=${SELECTED_NOT_RUN[*]-}"
     for m in "${matrix[@]}"; do echo "$m"; done
 } > "$OUT_DIR/sd_status.txt"
 
 note ""
-if [ "$overall" -eq 0 ]; then
-    note "SD RUNNER RESULT: PASS (rc=0) —— 两个变体的必需用例全部真执行且判 PASS"
+if [ "$overall" -eq 0 ] && [ "${#SELECTED_NOT_RUN[@]}" -eq 0 ] && [ "${#EXECUTED[@]}" -gt 0 ]; then
+    if [ "$SELECT_MODE" = "default" ]; then
+        note "SD RUNNER RESULT: PASS (rc=0) —— 两个变体的必需用例全部真执行且判 PASS"
+    else
+        note "SD RUNNER RESULT: PASS (rc=0) —— 仅对实际执行集合(${EXECUTED[*]})声明通过; 未选择侧见上方 NOT_RUN"
+    fi
 else
-    note "SD RUNNER RESULT: FAIL (rc=$overall; 1=检出失败, 4=基础设施故障) 详见 $OUT_DIR"
+    note "SD RUNNER RESULT: FAIL (rc=$overall; 1=检出失败, 4=基础设施故障/台账不成立/被选择却未执行) 详见 $OUT_DIR"
 fi
 exit "$overall"

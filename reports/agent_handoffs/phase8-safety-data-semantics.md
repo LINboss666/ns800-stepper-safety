@@ -124,3 +124,66 @@ ZI 的 +8 与 `s_frame`+`s_prev` 两处静态实例各 +4 一致；黑匣子 35.
 
 **`AWAITING_INDEPENDENT_REVIEW`。** 只证明数据语义与离线逻辑一致；不进 F2e/F3，不烧录、
 不写 TMC、不输出 STEP、不接电机、不翻宏、不动串口与硬件。
+
+## 9. 独立复审返修（同日追加，2026-10-23；返修基线 = 复审对象 `2399d28`）
+
+复审件：`NS800_Safety_Data_Semantics_Review_2399d28_20261023.md`
+**结论：`SOFTWARE_REVIEW_REWORK`，返修仅限新增主机 runner 的两个错误通过入口（均 P1，验证工具）。**
+生产实现被复审 §2 认可，并在 §3 由审查端（Linux + GCC 13.3 + 仓外兼容头）**独立复跑通过**
+（默认 OFF 21 / ON 20、两项反向、V1 25 / V2 22、I/O 138 例，外层 rc 均为 0）；
+**不重做生产代码、不重建 Keil、不重做硬件、不扩大既有验证框架**。
+
+### 9.1 本轮实际改动（只动 runner 与其文档/证据）
+
+| 文件 | 改动 |
+|---|---|
+| `tests/host/run_safety_data_semantics.sh` | SD-NEW-01 + SD-NEW-02 两处入口（见 9.2） |
+| `tests/host/sd_runner_rework_check.sh` **（新增）** | 两个缺陷的有限回归：真实调用同一个 runner，断言其打印身份与真实退出码，**不另写复制判定的"自检器"**；全部在 `mktemp -d` 仓外沙盒内进行 |
+| `tests/host/README.md` | 入口纪律、台账复核模式、新回归入口 |
+| BSP `README.md` | 修复复审 §5 指出的"引脚表 ENN 行被拆成三行导致 GFM 表格断开" |
+| `reports/plans/phase8-safety-chain-acceptance-draft.md` | A26 追加"已由 `e974d48` 关闭"的日期覆盖指向（原文保留，不改写历史描述） |
+| 本 MD/JSON + `reports/reviews/phase8-safety-data-semantics/rework_*.txt` | 返修记录与场景证据 |
+
+**未改**：全部 APP 源码/头（含 `sd_main.c` 夹具、两份 shim、`env.sh`、既有 runner 与期望）、
+`project.uvprojx`、宏、门禁、身份设置；旧证据与旧脚本原样保留。
+
+### 9.2 两个入口的修法与真实回归结果
+
+| 缺陷 | 修法 | 真实结果 |
+|---|---|---|
+| **SD-NEW-01** 未知 `ONLY` 零执行却 PASS（复审复现 `ONLY=ZZZ_NO_VARIANT` → 目录内无 exe、外层 rc=0） | `ONLY` 在**任何** `rm`/`mkdir`/重定向/编译**之前**验证：只接受完整名称 `off_target`/`on_target`；未知词、合法词夹带未知词、空或纯空白、重复词，以及 `ONLY` 与 `REVERSE=1` 组合一律 `rc=4` 且不动任何文件；新增"选择集合 / 实际执行集合 / NOT_RUN"三段披露，只有默认两变体都真执行且通过才声明"两个变体全部真执行" | 5 个拒绝场景全部 `rc=4`，每次核对"目标目录未被创建 + 沙盒 KEEP 标记完好"；合法单变体 `ONLY=off_target` → `rc=0`、只声明 `off_target`、`on_target` 标 `NOT_RUN`，不再出现"两个变体全部真执行"措辞 |
+| **SD-NEW-02** 反向异常终止被算成检测成功（复审复现 SIGTERM → `proc_rc=143` 仍 `META-OK`、外层 rc=0） | `META-OK` 必须同时满足：副本构建成功 + 夹具**合同退出码 `rc=1`** + 完整且自洽台账（必需 id 唯一出现、无未登记用例、`SUMMARY` 恰好一条且 `cases/pass/fail` 与实际行对齐、`pass+fail==cases`）+ 指定业务失败身份全部命中。非 0 非 1 退出（信号/异常终止）或台账不完整 ⇒ `INFRA-FAIL`（外层 `rc=4`）；`rc=0` 或缺期望身份 ⇒ `NOT-DETECTED`（外层 `rc=1`）。台账校验抽成 `validate_ledger()`，**正常变体与反向共用同一实现** | 用仓外 `-Wl,--wrap=main` 包装编译器（不改仓库任何源）把"本应 rc=1"的失败运行改成非合同退出：`exit3` 与 `sigterm` 两种注入下 R1/R2 **均记 `INFRA-FAIL 非合同退出码 rc=3`，外层 `rc=4`，无 META-OK**（本机 `raise(SIGTERM)` 实测也返回 3，故按"非 0 非 1"通用规则拒绝，**不特判 143 也不只看 rc≥128**）；同一编译器未注入的对照 → 两项 `META-OK`、外层 `rc=0` |
+| 判据未放宽（复审 §6.2.4） | R1 附带 `SD05c` 失败是当前已知结果：runner 如实登记为"额外失败"但**不改变判定** —`R1 … META-OK 命中 1 个业务失败身份 (proc_rc=1 必需用例=21 实际FAIL行=2 额外失败=1)`、`R2 … 命中 3 个 (实际FAIL行=3 额外失败=0)` | 正常反向外层 `rc=0`；默认链 OFF 21 / ON 20 全 PASS `rc=0` |
+
+`sd_runner_rework_check.sh` 汇总：**通过=21 不符=0 环境故障=0 → `SD REWORK CHECK RESULT: PASS`，外层 rc=0**。
+其中"删一条必需 CASE（同时把 SUMMARY 计数改成与实际行一致，以隔离出唯一失配点）"→ `rc=4 缺席: SD01-…`；
+"删 SUMMARY 行"→ `rc=4 SUMMARY 行 0 条(必须恰好 1 条)`；未篡改副本的正对照 → `rc=0 台账合同成立`；
+包装器自身先用最小程序证明 `--wrap` 通道有效（探针确实变成非 1 退出），否则整项记环境故障而不算检出。
+
+### 9.3 计数勘误（复审 §1/§5，本轮更正）
+
+上一轮回执口头说的"18 个改动路径"是**远端 blob 对账的抽样数**；完整增量实为 **21 个文件，+2405 / −41**
+（6 个 APP + 5 个 `tests/host` + 7 个 `reports` + 3 份 BSP 文档）。JSON 的 `evidence_paths` 从不声称是
+全部改动清单，该计数错误不代表文件缺失。
+
+### 9.4 登记但**不在本轮修**的一项
+
+复审 §5 指出 `blackbox.c` 的尺寸注释"新布局…0 填充"不准确：48B 断言本身正确，实际是旧结构总 padding 3B
+（SG 后 2B、故障码前 1B），新结构仍保留 SG 后 2B，靠替换聚合副本后多出的 1B 占掉尾部 1B padding，
+帧大小没有增长。因复审 §6.1 明确"全部 APP 源码/头均不改，且不要求单独生产改动/Keil 重建"，
+本轮**只在文档登记该勘误**，留待下一次真实生产改动时一并修正注释。
+
+### 9.5 未重跑项与原因（不冒称为本轮重新执行）
+
+APP 源码与既有测试夹具本轮**冻结**，因此按复审 §6.3 不重跑：Keil、V1/V2、138 例 I/O、旧 13 例负例、
+M1–M5、R4 路径守卫、SW1 工具与任何硬件动作。原因如实记录为"相关源未变"；上一轮的真实结果见 §5 与
+`existing_regression_summary.txt`。
+
+### 9.6 本轮边界
+
+零硬件动作（未开串口、未读写真实 GPIO/TMC、未烧录/复位/下载、未动供电/模块/接线/SW1、未接电机、
+未输出 STEP、未清故障、未动 IRQ/极性/门禁、未翻宏、未运行历史 PowerShell 采集器）；
+四道目标宏仍 `RT_FALSE`；板上固件身份仍 `USER_REPORTED_E40`；RISK-03/03a 与 RISK-04-b 不变；
+`sw1_cut.ps1` 的 T-01/T-02 仍 HOLD；静态电气与现有 SW1 的 `PASS (USER_CONFIRMED)` 作用域不变。
+
+**STOP：`AWAITING_INDEPENDENT_REVIEW`（本轮只应审 runner 两处入口与 §6.3 的有限验证）。**
