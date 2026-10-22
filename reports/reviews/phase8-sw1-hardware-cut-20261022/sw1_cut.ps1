@@ -240,7 +240,13 @@ function Do-Cut {
     if (-not $b.ok) { return @{ verdict = 'BLOCKED_BASELINE'; reason = $b.reason } }
     if ($LeadInSec -gt 0) {
         Add-Trace ('LEAD-IN ' + $LeadInSec + 's in LOW state before HIGH window')
-        for ($i = $LeadInSec; $i -gt 0; $i--) { Add-Trace ('  starting in ' + $i + 's'); Start-Sleep -m 1000 }
+        for ($i = $LeadInSec; $i -gt 0; $i--) {
+            Add-Trace ('  starting in ' + $i + 's')
+            try { [Console]::Beep(500, 70) } catch { }
+            Start-Sleep -m 1000
+        }
+        Add-Trace '  T-0: HIGH window opens on the next line'
+        try { [Console]::Beep(1400, 250) } catch { }
     }
     $sw = [Diagnostics.Stopwatch]::StartNew()
     Ad-Send $LITERAL_HIGH; Start-Sleep -m 40; [void](Ad-Poll)
@@ -253,7 +259,7 @@ function Do-Cut {
         return @{ verdict = 'ENABLE_SIDE_NOT_BUILT'; cleanup = $c; reason = ('io70=' + $a70.level) }
     }
     Add-Trace 'HIGH WINDOW OPEN - operator: flip SW1 to the BLOCK position NOW and hold'
-    try { [Console]::Beep(880, 400) } catch { }
+    try { [Console]::Beep(1200, 500); Start-Sleep -m 120; [Console]::Beep(1200, 500) } catch { }
     $seq = @()
     $prev87 = 'high'
     $cutPairs = 0

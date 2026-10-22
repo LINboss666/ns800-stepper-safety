@@ -1,0 +1,151 @@
+{
+  "task_id": "PHASE8-SW1-HARDWARE-CUT-20261022",
+  "taskbook": "NS800_SW1_Hardware_Cut_Qoder_Task_20261022.md",
+  "repository": "https://github.com/LINboss666/ns800-stepper-safety",
+  "branch": "phase8/tmc-drive-config",
+  "base_sha": "4edcf5e3333aa64ef2ce1f84bb3b903ad395c2c7",
+  "source_sha_software_go": "296c369607ea69c201f797b80950b76ff312c0e0",
+  "a_section_checkpoint_sha": "a5a5026",
+  "recorded_at": "2026-10-22",
+  "nature": "separately user-authorized one-off GPIO diagnostic (slide existing SW1 + bounded PC.23 LOW/HIGH); NOT motion test, NOT e-stop safety-level acceptance, NOT release of software gates",
+  "startup_state": {
+    "local_head_equals_remote": true,
+    "worktree_clean": true,
+    "board_firmware_identity": "USER_REPORTED_E40",
+    "flash_hash_read_back": false,
+    "frozen_objects_untouched": ["main", "phase7/full-embedded-software", "v0.7 tag object"]
+  },
+  "live_preconditions": {
+    "source": "operator confirmed live at run time (USER_CONFIRMED_LIVE), not old records",
+    "motor_physically_unconnected": true,
+    "module_seated": true,
+    "power_normal": true,
+    "operator_present_with_switch_in_reach": true,
+    "sw1_present_and_operable": true
+  },
+  "previous_round_carryover": {
+    "count_erratum_applied": "上一轮 4edcf5e 的 NOTES/JSON 把 pin read 写成各 12 次、motor_status 3 次；按云端复算应为各 13 次、2 次。本轮数字全部由 command_trace 机械统计",
+    "old_script_sealed": "io87_follow.ps1 按复审 F-01 封存（初态异常分支会拼成 PC.87、清理未联合 IO70、超预算不降级）；旧文件与旧记录原样保留、未修改、未运行",
+    "review_items_acknowledged": ["F-01", "F-02", "F-03", "F-04", "F-05"]
+  },
+  "a_section_tool": {
+    "file": "reports/reviews/phase8-sw1-hardware-cut-20261022/sw1_cut.ps1",
+    "requirements_implemented": [
+      "literal-only permit writes: 'pin write PC.23 low|high'; IO70 read-only; non-whitelist command throws at the send layer",
+      "full RX stream (rx_full.txt) kept separately from selected replies (command_trace.txt); bytes arriving at open are stored, never used as a reply",
+      "query INVALID/NO_REPLY on: echo-only, timeout, conflicting duplicates, 'command not found', 'Parameter invalid', boot banner; serial exceptions not swallowed",
+      "cleanup decision requires IO87=low AND IO70=high jointly; at most one extra LOW; otherwise FINAL_STATE_UNKNOWN with non-zero rc",
+      "monotonic host budget decoupled from level matching; on overrun the window breaks, literal LOW goes first, no further HIGH, and rc is non-zero (not just a log line)",
+      "any attempted HIGH path reaches LOW via finally; rc=0 only when everything passed",
+      "fresh run id and refusal to overwrite existing output; no rm -rf, no background retry"
+    ],
+    "offline_selftest": {
+      "drives_real_control_flow": true,
+      "separate_parallel_checker_copied_logic": false,
+      "assertions": 17,
+      "fails": 0,
+      "real_rc": 0,
+      "cases": ["normal identify observation", "baseline anomaly must send literal PC.23 and never HIGH", "cleanup without IO70 cannot pass", "mixed error output rejected", "echo-only refused", "conflicting replies refused", "cut observed with two adjacent samples", "no LOW before evidence", "interference soft-LOW detected", "budget spent skips window and cleans up", "only one HIGH ever", "cleanup uses literal LOW", "serial exception still attempts LOW", "non-whitelist refused"],
+      "real_defects_found_by_selftest_before_hardware": 3,
+      "defect_note": "两处是合成场景队列编排错、一处是 $script:out 变量名错；先修工具与场景再复跑，未修改期望值凑绿",
+      "hardware_fault_injection": false
+    }
+  },
+  "sw1_position_finding": {
+    "user_reported_before_run": "短接 2-3 是允许",
+    "extracted_drawing_expectation": "1-2 经 R6 接地 -> ESTOP_OK 高 -> 放行；2-3 因 pin3 悬空 + R5 上拉 -> ESTOP_OK 低 -> 阻断",
+    "measured": "2-3 = ALLOW (permit HIGH 时 pin[70] = low)，1-2 = BLOCK（同一 HIGH 窗口内拨到 1-2 后 pin[70] = high）",
+    "conflict_registered": "实物 SW1 导通关系与图纸标注的 pin 角色不一致；按任务书 §5 记冲突，不改图纸解释，不指定谁错，不判器件坏",
+    "next_round_owner": "pin 级实测/网表定论"
+  },
+  "tests": {
+    "preflight": {"pc23_num": 87, "pc6_num": 70, "armed": 0, "cur": 0, "tgt": 0, "initial": "io87=low io70=high"},
+    "command_counts_from_trace": {
+      "pin read PC.23": 31, "pin read PC.6": 31,
+      "pin write PC.23 high": 2, "pin write PC.23 low": 3, "motor_status": 1,
+      "total_sent": 68, "pin_level_replies_parsed": 62
+    },
+    "identify_probe_2_3": {"io87_in_window": "high", "io70_in_window": "low", "ms_high_to_low": 117, "budget_ms": 1000, "recovery": "low/high", "rc": 0},
+    "cut_window": {
+      "high_to_low_issue_ms": 2733, "budget_ms": 10000,
+      "window_pairs": 23,
+      "allow_side_samples": "1255..2546 ms: io87=high, io70=low (multiple adjacent)",
+      "block_side_samples": [[2609, "high/high"], [2671, "high/high"]],
+      "low_written_before_evidence": false,
+      "io87_high_around_block_samples": true,
+      "operator_action": "user flipped SW1 2-3 -> 1-2 during the window and held it there",
+      "verdict": "CUT_OBSERVED", "rc": 0
+    },
+    "high_signals_total": 2,
+    "high_signals_max_allowed": 3,
+    "result_label": "SW1_HARDWARE_CUT_DIGITAL_PASS",
+    "cleanup": {"joint_io87_low_and_io70_high": true, "extra_low_needed": false, "final_state": "low/high", "terminal_motor_status": "armed=0 cur=0 tgt=0"},
+    "stop_labels_not_triggered": ["DRIVE_NOT_ESTABLISHED", "ENABLE_SIDE_NOT_BUILT", "INTERFERENCE_SOFT_LOW", "LOST_SAMPLE", "FINAL_STATE_UNKNOWN"]
+  },
+  "what_this_proves": [
+    "在本次 e40 固件与当前装配/供电下：实际许可仍为 HIGH 时，操作已安装的 SW1 使 IO70 在同一连续 HIGH 窗口内由 LOW 变 HIGH（硬件链被急停侧阻断），随后撤许可成功",
+    "实测确定 SW1 的 2-3 为允许侧、1-2 为阻断侧（与图纸标注的 pin 角色相反，已记冲突）"
+  ],
+  "what_this_does_not_prove": [
+    "ANALOG_NOT_VERIFIED / METER_NOT_MEASURED_THIS_RUN: 本轮无任何仪表读数；U13/U5/Q1 栅/H6-5 的实际电压、逻辑电平是否落在 Rev.1.09 阈值内均未验证",
+    "反馈支线完整连续性、TMC 芯片端 ENN 电压、无 STEP 波形、复位瞬态、停机最坏时延",
+    "外接 NC 急停按钮、断线容错、急停安全等级（本轮只验已装 SW1 的阻断功能）",
+    "新版 296c369 已上板、TMC 写握手、线圈电流/转矩/运动",
+    "RISK-03/03a/04 关闭，或任何硬件验证宏可以置 TRUE",
+    "相邻分次读回不证明两次采样之间每一瞬间的焊盘电平；连续波形仍需仪器",
+    "云端只能核对提交记录，不是现场见证",
+    "'此前 VM 未供电是根因' 仍是未验证假设（本轮未切换 VM）"
+  ],
+  "deviations": [
+    "HIGH 窗口内未做仪表测量（任务书也禁止延长窗口或用表笔多点测量）",
+    "state=4（既有 MOTOR_FAULT）未清除，未走恢复路径",
+    "识别探针与 C 段分两个进程运行，各自新建 run 目录，未复用旧输出",
+    "本轮无失败轮次；A 段自检曾出现 3 个真实失败（工具/场景自身），已在接硬件前修复"
+  ],
+  "hardware_actions_performed": [
+    "打开/关闭 COM5（115200 8N1）各 2 次，未主动切换 DTR/RTS，未复位",
+    "pin write PC.23 high x2（117 ms 与 2733 ms 两个窗口）",
+    "pin write PC.23 low x3（含两次清理，均联合确认 low+high）",
+    "pin read PC.23 x31 / pin read PC.6 x31 / motor_status x1（只读）",
+    "用户拨动已安装 SW1 一次（2-3 -> 1-2，保持）"
+  ],
+  "hardware_actions_not_performed": [
+    "未烧录/调试器下载/复位", "未改变供电或断电、未插拔模块、未改线、未换件",
+    "未接电机、未输出 STEP、未写 PC.6、未执行 pin mode",
+    "未发任何 TMC UART 命令（含 tmc_uart_probe 原值回写）",
+    "未调用 motor_arm/start/target/dir、pwm_test、故障清除、runtime_selftest、pin_status",
+    "未开 IRQ 门、未做极性确认、未把任何硬件验证宏置 TRUE",
+    "未 merge、未 force、未重写历史、未生成 ZIP、未重建 Keil、未重跑主机矩阵/负例/元负例/路径守卫"
+  ],
+  "evidence_paths": [
+    "reports/agent_handoffs/phase8-sw1-hardware-cut-20261022.md",
+    "reports/agent_handoffs/phase8-sw1-hardware-cut-20261022.json",
+    "reports/reviews/phase8-sw1-hardware-cut-20261022/sw1_cut.ps1",
+    "reports/reviews/phase8-sw1-hardware-cut-20261022/selftest.txt",
+    "reports/reviews/phase8-sw1-hardware-cut-20261022/selftest_summary.txt",
+    "reports/reviews/phase8-sw1-hardware-cut-20261022/run_identify_23/command_trace.txt",
+    "reports/reviews/phase8-sw1-hardware-cut-20261022/run_identify_23/rx_full.txt",
+    "reports/reviews/phase8-sw1-hardware-cut-20261022/run_identify_23/state_ledger.csv",
+    "reports/reviews/phase8-sw1-hardware-cut-20261022/run_identify_23/summary.txt",
+    "reports/reviews/phase8-sw1-hardware-cut-20261022/run_cut_1/command_trace.txt",
+    "reports/reviews/phase8-sw1-hardware-cut-20261022/run_cut_1/rx_full.txt",
+    "reports/reviews/phase8-sw1-hardware-cut-20261022/run_cut_1/state_ledger.csv",
+    "reports/reviews/phase8-sw1-hardware-cut-20261022/run_cut_1/summary.txt",
+    "reports/reviews/phase8-sw1-hardware-cut-20261022/NOTES.txt"
+  ],
+  "known_limitations": [
+    "板上固件身份仍是 USER_REPORTED_E40；新版反馈判定/可选限位无板上运行证据",
+    "所有电平来自 MCU 数字读回，不是仪器电压；本轮无万用表数据",
+    "SW1 pin 角色与图纸冲突未定论，需要 pin 级实测或网表",
+    "主机时间预算（117 ms / 2733 ms）不是硬件响应或停机时延证明",
+    "急停独立切断只验到'已装 SW1 能阻断'，未验外接按钮/断线容错/安全等级"
+  ],
+  "git": {
+    "commit_type": "normal commit + normal push on the development branch",
+    "identity": "repo-local public noreply only",
+    "zip_produced": false,
+    "history_rewritten": false,
+    "final_sha_note": "given in the delivery message after push, not self-referenced here"
+  },
+  "stop_reason": "AWAITING_INDEPENDENT_REVIEW - 一次授权的一次性诊断已完成并撤许可（SW1 留在阻断位）；不进 F2e/F3，不烧录、不写 TMC、不输出 STEP、不接电机、不开宏；物理层电压测量与 SW1 pin 冲突由用户决定是否另开一轮"
+}

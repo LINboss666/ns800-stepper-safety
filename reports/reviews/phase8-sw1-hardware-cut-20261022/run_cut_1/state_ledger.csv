@@ -1,0 +1,81 @@
+host_time,section,cmd_or_event,expect,actual,ms_from_ref,note
+22:39:49.113,cut/pre/io87,pin read PC.23,-,low,,ok
+22:39:49.144,cut/pre/io70,pin read PC.6,-,high,,ok
+22:39:49.149,cut/pre,baseline,low/high,low/high,,
+22:40:16.656,cut/establish/io87,pin read PC.23,-,high,,ok
+22:40:16.687,cut/establish/io70,pin read PC.6,-,low,,ok
+22:40:17.866,cut/win/io87,pin read PC.23,-,high,,ok
+22:40:17.897,cut/win/io70,pin read PC.6,-,low,,ok
+22:40:17.899,cut,window,search io70=high under io87=high,high/low,1255,
+22:40:17.943,cut/win/io87,pin read PC.23,-,high,,ok
+22:40:17.975,cut/win/io70,pin read PC.6,-,low,,ok
+22:40:17.976,cut,window,search io70=high under io87=high,high/low,1323,
+22:40:18.006,cut/win/io87,pin read PC.23,-,high,,ok
+22:40:18.049,cut/win/io70,pin read PC.6,-,low,,ok
+22:40:18.050,cut,window,search io70=high under io87=high,high/low,1399,
+22:40:18.084,cut/win/io87,pin read PC.23,-,high,,ok
+22:40:18.116,cut/win/io70,pin read PC.6,-,low,,ok
+22:40:18.117,cut,window,search io70=high under io87=high,high/low,1474,
+22:40:18.163,cut/win/io87,pin read PC.23,-,high,,ok
+22:40:18.193,cut/win/io70,pin read PC.6,-,low,,ok
+22:40:18.194,cut,window,search io70=high under io87=high,high/low,1540,
+22:40:18.224,cut/win/io87,pin read PC.23,-,high,,ok
+22:40:18.255,cut/win/io70,pin read PC.6,-,low,,ok
+22:40:18.256,cut,window,search io70=high under io87=high,high/low,1617,
+22:40:18.286,cut/win/io87,pin read PC.23,-,high,,ok
+22:40:18.316,cut/win/io70,pin read PC.6,-,low,,ok
+22:40:18.317,cut,window,search io70=high under io87=high,high/low,1679,
+22:40:18.347,cut/win/io87,pin read PC.23,-,high,,ok
+22:40:18.379,cut/win/io70,pin read PC.6,-,low,,ok
+22:40:18.380,cut,window,search io70=high under io87=high,high/low,1740,
+22:40:18.409,cut/win/io87,pin read PC.23,-,high,,ok
+22:40:18.441,cut/win/io70,pin read PC.6,-,low,,ok
+22:40:18.442,cut,window,search io70=high under io87=high,high/low,1803,
+22:40:18.473,cut/win/io87,pin read PC.23,-,high,,ok
+22:40:18.504,cut/win/io70,pin read PC.6,-,low,,ok
+22:40:18.505,cut,window,search io70=high under io87=high,high/low,1865,
+22:40:18.535,cut/win/io87,pin read PC.23,-,high,,ok
+22:40:18.567,cut/win/io70,pin read PC.6,-,low,,ok
+22:40:18.568,cut,window,search io70=high under io87=high,high/low,1928,
+22:40:18.597,cut/win/io87,pin read PC.23,-,high,,ok
+22:40:18.627,cut/win/io70,pin read PC.6,-,low,,ok
+22:40:18.628,cut,window,search io70=high under io87=high,high/low,1991,
+22:40:18.659,cut/win/io87,pin read PC.23,-,high,,ok
+22:40:18.689,cut/win/io70,pin read PC.6,-,low,,ok
+22:40:18.690,cut,window,search io70=high under io87=high,high/low,2051,
+22:40:18.720,cut/win/io87,pin read PC.23,-,high,,ok
+22:40:18.750,cut/win/io70,pin read PC.6,-,low,,ok
+22:40:18.751,cut,window,search io70=high under io87=high,high/low,2113,
+22:40:18.781,cut/win/io87,pin read PC.23,-,high,,ok
+22:40:18.810,cut/win/io70,pin read PC.6,-,low,,ok
+22:40:18.811,cut,window,search io70=high under io87=high,high/low,2174,
+22:40:18.843,cut/win/io87,pin read PC.23,-,high,,ok
+22:40:18.873,cut/win/io70,pin read PC.6,-,low,,ok
+22:40:18.874,cut,window,search io70=high under io87=high,high/low,2234,
+22:40:18.904,cut/win/io87,pin read PC.23,-,high,,ok
+22:40:18.935,cut/win/io70,pin read PC.6,-,low,,ok
+22:40:18.936,cut,window,search io70=high under io87=high,high/low,2298,
+22:40:18.966,cut/win/io87,pin read PC.23,-,high,,ok
+22:40:18.997,cut/win/io70,pin read PC.6,-,low,,ok
+22:40:18.997,cut,window,search io70=high under io87=high,high/low,2359,
+22:40:19.027,cut/win/io87,pin read PC.23,-,high,,ok
+22:40:19.059,cut/win/io70,pin read PC.6,-,low,,ok
+22:40:19.060,cut,window,search io70=high under io87=high,high/low,2421,
+22:40:19.090,cut/win/io87,pin read PC.23,-,high,,ok
+22:40:19.122,cut/win/io70,pin read PC.6,-,low,,ok
+22:40:19.123,cut,window,search io70=high under io87=high,high/low,2483,
+22:40:19.153,cut/win/io87,pin read PC.23,-,high,,ok
+22:40:19.185,cut/win/io70,pin read PC.6,-,low,,ok
+22:40:19.186,cut,window,search io70=high under io87=high,high/low,2546,
+22:40:19.216,cut/win/io87,pin read PC.23,-,high,,ok
+22:40:19.246,cut/win/io70,pin read PC.6,-,high,,ok
+22:40:19.248,cut,window,search io70=high under io87=high,high/high,2609,
+22:40:19.279,cut/win/io87,pin read PC.23,-,high,,ok
+22:40:19.310,cut/win/io70,pin read PC.6,-,high,,ok
+22:40:19.310,cut,window,search io70=high under io87=high,high/high,2671,
+22:40:19.434,cut/cleanup/io87,pin read PC.23,-,low,,ok
+22:40:19.465,cut/cleanup/io70,pin read PC.6,-,high,,ok
+22:40:19.466,cut,cleanup-1,low AND high,low/high,,joint=True
+22:40:19.511,terminal/io87,pin read PC.23,-,low,,ok
+22:40:19.557,terminal/io70,pin read PC.6,-,high,,ok
+22:40:19.609,terminal,pin read + motor_status,low/high/armed0,low/high/armed=0,,

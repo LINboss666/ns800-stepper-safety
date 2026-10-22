@@ -1,0 +1,12 @@
+=== full received text (raw, as polled; selected replies are in command_trace.txt) ===
+22:39:19.647|pin read PC.23\n\npin[87] = low\n\nmsh >
+22:39:19.707|pin read PC.6\n\npin[70] = high\n\nmsh >
+22:39:19.769|pin write PC.23 high\n\nmsh >
+22:39:19.800|pin read PC.23\n\npin[87] = high\n\nmsh >
+22:39:19.831|pin read PC.6\n\npin[70] = low\n\nmsh >
+22:39:19.910|pin write PC.23 low\n\nmsh >
+22:39:19.941|pin read PC.23\n\npin[87] = low\n\nmsh >
+22:39:19.987|pin read PC.6\n\npin[70] = high\n\nmsh >
+22:39:20.065|pin write PC.23 low\n\nmsh >
+22:39:20.096|pin read PC.23\n\npin[87] = low\n\nmsh >
+22:39:20.125|pin read PC.6\n\npin[70] = high\n\nmsh >

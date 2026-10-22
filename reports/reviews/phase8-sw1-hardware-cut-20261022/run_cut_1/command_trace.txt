@@ -1,0 +1,143 @@
+
+mode=Cut runid=20261022_223948 start=2026-10-22T22:39:49.0268334+08:00
+COM5 opened 115200 8N1
+SEND 22:39:49.057 pin read PC.23
+  REPLY pin[87] = low
+SEND 22:39:49.114 pin read PC.6
+  REPLY pin[70] = high
+LEAD-IN 25s in LOW state before HIGH window
+  starting in 25s
+  starting in 24s
+  starting in 23s
+  starting in 22s
+  starting in 21s
+  starting in 20s
+  starting in 19s
+  starting in 18s
+  starting in 17s
+  starting in 16s
+  starting in 15s
+  starting in 14s
+  starting in 13s
+  starting in 12s
+  starting in 11s
+  starting in 10s
+  starting in 9s
+  starting in 8s
+  starting in 7s
+  starting in 6s
+  starting in 5s
+  starting in 4s
+  starting in 3s
+  starting in 2s
+  starting in 1s
+  T-0: HIGH window opens on the next line
+SEND 22:40:16.578 pin write PC.23 high
+SEND 22:40:16.623 pin read PC.23
+  REPLY pin[87] = high
+SEND 22:40:16.657 pin read PC.6
+  REPLY pin[70] = low
+HIGH WINDOW OPEN - operator: flip SW1 to the BLOCK position NOW and hold
+SEND 22:40:17.836 pin read PC.23
+  REPLY pin[87] = high
+SEND 22:40:17.867 pin read PC.6
+  REPLY pin[70] = low
+SEND 22:40:17.900 pin read PC.23
+  REPLY pin[87] = high
+SEND 22:40:17.943 pin read PC.6
+  REPLY pin[70] = low
+SEND 22:40:17.977 pin read PC.23
+  REPLY pin[87] = high
+SEND 22:40:18.008 pin read PC.6
+  REPLY pin[70] = low
+SEND 22:40:18.051 pin read PC.23
+  REPLY pin[87] = high
+SEND 22:40:18.086 pin read PC.6
+  REPLY pin[70] = low
+SEND 22:40:18.118 pin read PC.23
+  REPLY pin[87] = high
+SEND 22:40:18.163 pin read PC.6
+  REPLY pin[70] = low
+SEND 22:40:18.194 pin read PC.23
+  REPLY pin[87] = high
+SEND 22:40:18.225 pin read PC.6
+  REPLY pin[70] = low
+SEND 22:40:18.257 pin read PC.23
+  REPLY pin[87] = high
+SEND 22:40:18.288 pin read PC.6
+  REPLY pin[70] = low
+SEND 22:40:18.318 pin read PC.23
+  REPLY pin[87] = high
+SEND 22:40:18.348 pin read PC.6
+  REPLY pin[70] = low
+SEND 22:40:18.381 pin read PC.23
+  REPLY pin[87] = high
+SEND 22:40:18.410 pin read PC.6
+  REPLY pin[70] = low
+SEND 22:40:18.443 pin read PC.23
+  REPLY pin[87] = high
+SEND 22:40:18.474 pin read PC.6
+  REPLY pin[70] = low
+SEND 22:40:18.506 pin read PC.23
+  REPLY pin[87] = high
+SEND 22:40:18.536 pin read PC.6
+  REPLY pin[70] = low
+SEND 22:40:18.569 pin read PC.23
+  REPLY pin[87] = high
+SEND 22:40:18.598 pin read PC.6
+  REPLY pin[70] = low
+SEND 22:40:18.629 pin read PC.23
+  REPLY pin[87] = high
+SEND 22:40:18.659 pin read PC.6
+  REPLY pin[70] = low
+SEND 22:40:18.691 pin read PC.23
+  REPLY pin[87] = high
+SEND 22:40:18.721 pin read PC.6
+  REPLY pin[70] = low
+SEND 22:40:18.752 pin read PC.23
+  REPLY pin[87] = high
+SEND 22:40:18.782 pin read PC.6
+  REPLY pin[70] = low
+SEND 22:40:18.812 pin read PC.23
+  REPLY pin[87] = high
+SEND 22:40:18.844 pin read PC.6
+  REPLY pin[70] = low
+SEND 22:40:18.875 pin read PC.23
+  REPLY pin[87] = high
+SEND 22:40:18.905 pin read PC.6
+  REPLY pin[70] = low
+SEND 22:40:18.937 pin read PC.23
+  REPLY pin[87] = high
+SEND 22:40:18.967 pin read PC.6
+  REPLY pin[70] = low
+SEND 22:40:18.998 pin read PC.23
+  REPLY pin[87] = high
+SEND 22:40:19.028 pin read PC.6
+  REPLY pin[70] = low
+SEND 22:40:19.061 pin read PC.23
+  REPLY pin[87] = high
+SEND 22:40:19.091 pin read PC.6
+  REPLY pin[70] = low
+SEND 22:40:19.124 pin read PC.23
+  REPLY pin[87] = high
+SEND 22:40:19.154 pin read PC.6
+  REPLY pin[70] = low
+SEND 22:40:19.187 pin read PC.23
+  REPLY pin[87] = high
+SEND 22:40:19.218 pin read PC.6
+  REPLY pin[70] = high
+SEND 22:40:19.250 pin read PC.23
+  REPLY pin[87] = high
+SEND 22:40:19.280 pin read PC.6
+  REPLY pin[70] = high
+SEND 22:40:19.313 pin write PC.23 low
+SEND 22:40:19.385 pin read PC.23
+  REPLY pin[87] = low
+SEND 22:40:19.435 pin read PC.6
+  REPLY pin[70] = high
+CUT result verdict=CUT_OBSERVED pairs=2 ms=2733 cleanup=LOW_AND_HIGH_CONFIRMED
+SEND 22:40:19.473 pin read PC.23
+  REPLY pin[87] = low
+SEND 22:40:19.512 pin read PC.6
+  REPLY pin[70] = high
+SEND 22:40:19.560 motor_status

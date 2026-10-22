@@ -1,0 +1,31 @@
+
+mode=Identify runid=20261022_223919 start=2026-10-22T22:39:19.5695720+08:00
+COM5 opened 115200 8N1
+SEND 22:39:19.599 pin read PC.23
+  REPLY pin[87] = low
+SEND 22:39:19.664 pin read PC.6
+  REPLY pin[70] = high
+SEND 22:39:19.716 pin write PC.23 high
+SEND 22:39:19.769 pin read PC.23
+  REPLY pin[87] = high
+SEND 22:39:19.802 pin read PC.6
+  REPLY pin[70] = low
+SEND 22:39:19.836 pin write PC.23 low
+SEND 22:39:19.910 pin read PC.23
+  REPLY pin[87] = low
+SEND 22:39:19.944 pin read PC.6
+  REPLY pin[70] = high
+IDENTIFY result:
+Name                           Value
+----                           -----
+verdict                        OBSERVED
+io70                           low
+ms                             117
+
+
+
+SEND 22:39:20.000 pin write PC.23 low
+SEND 22:39:20.065 pin read PC.23
+  REPLY pin[87] = low
+SEND 22:39:20.099 pin read PC.6
+  REPLY pin[70] = high

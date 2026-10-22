@@ -1,0 +1,12 @@
+host_time,section,cmd_or_event,expect,actual,ms_from_ref,note
+22:39:19.663,identify-SW1_2-3/pre/io87,pin read PC.23,-,low,,ok
+22:39:19.708,identify-SW1_2-3/pre/io70,pin read PC.6,-,high,,ok
+22:39:19.714,identify-SW1_2-3/pre,baseline,low/high,low/high,,
+22:39:19.801,identify-SW1_2-3/high/io87,pin read PC.23,-,high,,ok
+22:39:19.832,identify-SW1_2-3/high/io70,pin read PC.6,-,low,,ok
+22:39:19.943,identify-SW1_2-3/post/io87,pin read PC.23,-,low,,ok
+22:39:19.988,identify-SW1_2-3/post/io70,pin read PC.6,-,high,,ok
+22:39:19.989,identify-SW1_2-3,result,io87=high,io70=low,117,position SW1_2-3
+22:39:20.098,final/cleanup/io87,pin read PC.23,-,low,,ok
+22:39:20.126,final/cleanup/io70,pin read PC.6,-,high,,ok
+22:39:20.129,final,cleanup-1,low AND high,low/high,,joint=True
