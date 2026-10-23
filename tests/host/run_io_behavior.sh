@@ -110,6 +110,14 @@ printf 'ns800-host-chain io runner work dir (safe to delete by this tool only)\n
     > "$OUT_DIR/.ns800_host_work" || { note "FATAL: 哨兵写不进去"; exit 4; }
 
 FLAGS="-std=gnu11 -Wall -Wextra -Wno-unused-function"
+HAL_DRV="${HAL_DRV:-$REPO_ROOT/rt-thread-master/rt-thread-master/bsp/novosns/ns800/libraries/HAL_Drivers/drivers}"
+# CP3 §9 第 1/7 项: 与 S1/F2d 链同一组最小兼容头(真实 drv_epwm.h 照常编译)。
+COMPAT_DIR="$OUT_DIR/compat"
+mkdir -p "$COMPAT_DIR" || { note "FATAL: 无法创建兼容头目录"; exit 4; }
+printf '#ifndef NS800_HOST_RTDEF_COMPAT_H\n#define NS800_HOST_RTDEF_COMPAT_H\n#include <rtthread.h>\n#endif\n' > "$COMPAT_DIR/rtdef.h" || { note "FATAL: 兼容头写不进去"; exit 4; }
+printf '#ifndef NS800_HOST_RTHW_COMPAT_H\n#define NS800_HOST_RTHW_COMPAT_H\n#include <rtthread.h>\nrt_base_t rt_hw_interrupt_disable(void);\nvoid rt_hw_interrupt_enable(rt_base_t level);\n#endif\n' > "$COMPAT_DIR/rthw.h" || { note "FATAL: rthw 兼容头写不进去"; exit 4; }
+[ -f "$HAL_DRV/drv_epwm.h" ] || { note "FATAL: 真实 drv_epwm.h 不存在: $HAL_DRV/drv_epwm.h"; exit 127; }
+INCS=(-I "$SHIM_DIR" -I "$SRC_APP" -I "$COMPAT_DIR" -I "$HAL_DRV")
 LIMIT_ON="-DSAFETY_LIMIT_INPUTS_ENABLED=RT_TRUE"
 OVR="-DIO_GATE_HOST_OVERRIDE -DMOTOR_HARDWARE_ENABLE_PATH_VALIDATED=RT_TRUE \
      -DSTEP_DIAG_ISOLATED_ENV_CONFIRMED=RT_TRUE -DTMC_DRIVE_CONFIG_HW_VALIDATED=RT_TRUE"
@@ -137,7 +145,7 @@ build_variant() {
 
     rm -f "$exe" "$marker"
     # shellcheck disable=SC2086
-    "$GCC" $FLAGS $extra -I "$SHIM_DIR" -I "$SRC_APP" "$IO_MAIN" -o "$exe" > "$log" 2>&1
+    "$GCC" $FLAGS $extra "${INCS[@]}" "$IO_MAIN" -o "$exe" > "$log" 2>&1
     rc=$?
     if [ "$want_fail" = "1" ]; then
         if [ "$rc" -ne 0 ]; then
@@ -244,7 +252,7 @@ reverse_case() {
     exe="$work/io.exe"
     extra="$(variant_flags "$variant")"
     # shellcheck disable=SC2086
-    "$GCC" $FLAGS $extra -I "$SHIM_DIR" -I "$work/app" "$IO_MAIN" -o "$exe" \
+    "$GCC" $FLAGS $extra -I "$SHIM_DIR" -I "$work/app" -I "$COMPAT_DIR" -I "$HAL_DRV" "$IO_MAIN" -o "$exe" \
         > "$work/build.txt" 2>&1
     brc=$?
     if [ "$brc" -ne 0 ]; then

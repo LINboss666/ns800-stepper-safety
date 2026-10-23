@@ -464,6 +464,131 @@ rt_bool_t step_pwm_off_confirmed(void) { return RT_TRUE; }
 void      step_pwm_clear_stop_latch(void) { }
 
 /* ======================= 真实的固件源码 ======================= */
+/* ===================================================================== */
+/* CP3 §9 第 1/5/7 项: V1/V2 链现在也编到 stop_priority + 新的许可/驱动叶子  */
+/*   端口全部在**夹具侧**; 生产实现(stop_priority.c / motor.c / tmc2209.c) */
+/*   按真实源码编译, 不换成桩。每个可观察量都是独立注入量: 中断掩码 / 裸写  */
+/*   请求 / 实际 pad / 确认返回 / PWM 与 UART 叶子。                        */
+/* ===================================================================== */
+#include "drv_epwm.h"
+#include "rthw.h"
+
+static int s_intr_masked, s_intr_depth;
+static int shim_low_raw_calls, shim_high_raw_calls;
+static rt_err_t shim_permit_raw_rc = RT_EOK;    /* 裸写请求结果(独立注入) */
+
+rt_base_t rt_hw_interrupt_disable(void)
+{
+    rt_base_t old = (rt_base_t)s_intr_masked;
+    s_intr_masked = 1;
+    s_intr_depth++;
+    return old;
+}
+void rt_hw_interrupt_enable(rt_base_t level)
+{
+    s_intr_masked = (int)level;
+    if (s_intr_depth > 0) s_intr_depth--;
+}
+int  shim_win_masked(void)  { return s_intr_masked; }
+int  shim_win_depth(void)   { return s_intr_depth; }
+
+rt_base_t safety_drv_permit_pin(void) { return 23; }   /* 与 safety_pin() 桩一致 */
+
+static rt_err_t shim_permit_raw(rt_uint8_t level)
+{
+    rt_pin_write(23, (rt_base_t)level);
+    if (level) shim_high_raw_calls++; else shim_low_raw_calls++;
+    shim_pad_low = (level == 0u) ? RT_TRUE : RT_FALSE;
+    /* CP3 §9 第 5 项: 许可"实际 pad / 最后请求电平"两条写入口都要如实留痕 ——
+     * S2 之后 HIGH 只经带门的 raw 入口发出, 旧观测点(safety_drv_enable_write)
+     * 不再覆盖它。计数不合并(H 组的"写次数"判据保持原义), 只记录**最后请求电平**。 */
+    shim_last_drv_enable_level = level;
+    return shim_permit_raw_rc;
+}
+rt_err_t safety_drv_permit_low_raw_held(void)  { return shim_permit_raw(0u); }
+rt_err_t safety_drv_permit_high_raw_held(void) { return shim_permit_raw(1u); }
+int  shim_permit_low_raw_calls(void)   { return shim_low_raw_calls; }
+int  shim_permit_high_raw_calls(void)  { return shim_high_raw_calls; }
+void shim_set_permit_raw_rc(rt_err_t r){ shim_permit_raw_rc = r; }
+
+/* 确认只看**实际 pad 电平**, 与"写请求是否被接受"互不代替 */
+rt_err_t safety_drv_permit_confirm_read(rt_uint8_t level)
+{
+    rt_bool_t low_now = (shim_pad_low == RT_TRUE) ? RT_TRUE : RT_FALSE;
+    return ((level == 0u) ? low_now : !low_now) ? RT_EOK : -RT_EIO;
+}
+rt_err_t safety_drv_permit_confirm_low(void) { return safety_drv_permit_confirm_read(0u); }
+
+/* 真实 drv_epwm.h 的 prepare/commit 叶子(本链只需可观察地接受/拒绝) */
+static int s_epwm_prepare_calls, s_epwm_commit_calls;
+int ns800_epwm_prepare(struct rt_device_pwm *device, rt_uint32_t channel,
+                       rt_uint32_t period_ns, rt_uint32_t pulse_ns,
+                       struct ns800_epwm_prepared *out)
+{
+    (void)device;
+    if (out == RT_NULL) return -RT_EINVAL;
+    memset(out, 0, sizeof(*out));
+    out->channel = channel; out->period_ns = period_ns; out->pulse_ns = pulse_ns;
+    out->valid = 1u;
+    s_epwm_prepare_calls++;
+    return RT_EOK;
+}
+int ns800_epwm_commit_prepared_held(struct rt_device_pwm *device,
+                                    const struct ns800_epwm_prepared *prepared)
+{
+    if (prepared == RT_NULL || prepared->valid != 1u) return -RT_EINVAL;
+    s_epwm_commit_calls++;
+    return (int)rt_pwm_set(device, (int)prepared->channel,
+                           prepared->period_ns, prepared->pulse_ns);
+}
+int shim_epwm_prepare_calls(void) { return s_epwm_prepare_calls; }
+int shim_epwm_commit_calls(void)  { return s_epwm_commit_calls; }
+
+/* CP2 之后 tmc2209.c 走"带预算的整帧写"(真实 HAL 叶子在本链外, 见交接的未覆盖清单)。
+ * 端口照做同一条预算判据, 字节交给既有的帧仿真器 rt_device_write。 */
+rt_bool_t ns800_intr_masked(void) { return s_intr_masked ? RT_TRUE : RT_FALSE; }
+rt_err_t ns800_uart_write_budgeted(rt_device_t dev, const rt_uint8_t *buf, rt_size_t len,
+                                   rt_tick_t start, rt_tick_t eff_end,
+                                   rt_size_t *out_written)
+{
+    rt_size_t w;
+
+    if (out_written != RT_NULL) *out_written = 0;
+    if (dev == RT_NULL || buf == RT_NULL) return -RT_EIO;
+    if ((rt_tick_t)(rt_tick_get() - start) >= (rt_tick_t)(eff_end - start))
+        return -RT_ETIMEOUT;
+    w = rt_device_write(dev, 0, buf, len);
+    if (out_written != RT_NULL) *out_written = w;
+    return (w == len) ? RT_EOK : -RT_EIO;
+}
+
+#include "stop_priority.c"   /* 真实协调层(不是桩): V1/V2 链与固件共用同一份实现 */
+
+/* CP3 §9 第 2/7 项: 本链的**线程/中断上下文**端口。
+ * 真实构建里这两个量由 RT-Thread 内核给出; 主机侧必须显式表态, 不能靠
+ * "rt_thread_self 恰好非空"蒙过 tmc2209.c 的可等待上下文门(§6.2)。
+ * 本链是单线程模型: 没有 ISR; 在 PRIMASK 窗口内 rt_thread_self() 一律返回空,
+ * 于是"窗口内不许等待"这条判据在主机上也真的走拒绝分支, 而不是靠运气。 */
+rt_bool_t rt_interrupt_get_nest(void) { return RT_FALSE; }
+rt_thread_t rt_thread_self(void)
+{
+    return s_intr_masked ? RT_NULL : (rt_thread_t)(void *)0x1;
+}
+
+/* motor.c 的"只通知已保护过的事实"入口(safety_state.c 不在本链编译)。
+ * 与 safety_post_event 共用同一个计数 => 既有 H 组/FD 组用例的"投递次数"判据不变。 */
+rt_err_t safety_notify_trip_done(rt_uint32_t event, rt_uint32_t epoch)
+{
+    (void)event;
+    (void)epoch;
+    shim_post_event_calls++;
+    return RT_EOK;
+}
+
+rt_bool_t safety_trip_pending(void) { return RT_FALSE; }
+
+static sp_token_t host_gtok;   /* CP3 §9 第 4 项: 借用入口的出参身份 */
+
 #include "tmc2209.c"
 #include "motor.c"
 
@@ -709,7 +834,10 @@ int main(void)
 
     /* H1 P0-A: STEP 诊断输出许可必须为拒 */
     en_before = shim_pwm_enable_calls;
-    CHECK(motor_pwm_grant_to_diag() != RT_EOK,
+    /* CP3 §9 第 4 项: 借用入口现在返回**真实预约身份**; 被拒时不得写出身份。 */
+    host_gtok.owner = SP_NONE;
+    host_gtok.epoch = 0u;
+    CHECK(motor_pwm_grant_to_diag(&host_gtok) != RT_EOK,
           "H1 P0-A: 使能链未验收且未确认隔离环境 -> STEP 借用被拒(pwm_enable=%d 未变)",
           en_before == shim_pwm_enable_calls);
 
@@ -789,8 +917,14 @@ int main(void)
         int rr0 = shim_frame_read_reqs, wf0 = shim_frame_write_frames;
         unsigned ifcnt0 = shim_chip[0x02];
 
+        /* CP2/CP3 §10.1: 底层写入口改为"带预算 + 结构化观测"(不再自己重开时间表);
+         * 夹具按一次独立写建一份 125ms 预算, 观测块留档。 */
+        tmc_budget_t hb;
+        tmc_xfer_stat_t hs;
+        memset(&hs, 0, sizeof(hs));
+        if (!tmc_budget_open(&hb, TMC_BUD_READ_MS)) return 1;
         e = tmc2209_write_register_confirmed(TMC_ADDR_DEFAULT, TMC_REG_GCONF,
-                                             shim_chip[0x00]);
+                                             shim_chip[0x00], &hb, &hs);
         CHECK(e == RT_EOK &&
               shim_frame_read_reqs - rr0 == 2 &&          /* IFCNT 前后各读一次 */
               shim_frame_write_frames - wf0 == 1 &&        /* 恰好 1 个 WRITE 帧 */
@@ -914,8 +1048,18 @@ int main(void)
     /* ================= V2: 主机侧正向覆盖(仅主机, 非发布配置) ================= */
     printf("\n[C] V2 正向覆盖(主机把三个宏当 TRUE 编译, 生产实例接假芯片)\n");
 
-    CHECK(motor_pwm_grant_to_diag() == RT_EOK,
-          "C1 P0-A: 隔离环境确认后 STEP 借用被允许(证明拒绝来自那两条宏)");
+    host_gtok.owner = SP_NONE;
+    host_gtok.epoch = 0u;
+    CHECK(motor_pwm_grant_to_diag(&host_gtok) == RT_EOK &&
+          host_gtok.owner == SP_DIAG && host_gtok.epoch != 0u,
+          "C1 P0-A: 隔离环境确认后 STEP 借用被允许并交回真实身份(owner=%d epoch=%u)"
+          "(证明拒绝来自那两条宏)", (int)host_gtok.owner,
+          (unsigned)host_gtok.epoch);
+    /* 借用是**真预约**(CP3 §9 第 4 项): 不交回就会一直挡住后面的 motor_arm
+     * (那正是"Motor 与诊断互斥"的合同内容)。这里用生产 API 正式归还,
+     * 让 C2/C3 之后的正向覆盖继续走"无人持有"的起点。 */
+    if (sp_release(&host_gtok) != RT_EOK)
+        printf("  [BADRESULT] C1 借用身份归还失败(后续用例起点不干净)\n");
 
     host_prod_use_fake_chip();
     e = tmc2209_apply_config();
@@ -1041,8 +1185,12 @@ int main(void)
      * 与芯片现值分离 -> 复核必须照出来并把门闭合。F2d 之后诊断命令到不了这一步,
      * 因为写帧的唯一发起点是文件私有的, 且只在持有 txn + 过完门禁的序列里被调用。 */
     {
+        tmc_budget_t hb2;
+        tmc_xfer_stat_t hs2;
+        memset(&hs2, 0, sizeof(hs2));
+        if (!tmc_budget_open(&hb2, TMC_BUD_READ_MS)) return 1;
         e = tmc2209_write_register_confirmed(TMC_ADDR_DEFAULT, TMC_REG_GCONF,
-                                             0x00000101u);
+                                             0x00000101u, &hb2, &hs2);
         CHECK(e == RT_EOK && shim_chip[0x00] == 0x00000101u,
               "FD8a 旧值写回成功(芯片=%08X, 快照=%08X) —— 分离确实发生了",
               (unsigned)shim_chip[0x00], (unsigned)tmc_cfg_prod.done_gconf);

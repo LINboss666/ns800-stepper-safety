@@ -14,6 +14,7 @@
 
 #include <rtthread.h>
 #include "stop_result.h"
+#include "stop_priority.h"   /* 2026-10-23 S2 CP3: sp_proof_t(最终提交窗口内的镜像写) */
 
 /* Fix A: 诊断命令 pwm_test 当前是否占用 EPWM1 ch0。
  * S1 判据(保守)在 S2 改为读 canonical: RESERVED/RUNNING/HELD_UNKNOWN/历史失败锁存
@@ -30,10 +31,14 @@ void step_pwm_get_stop_state(mot_stop_result_t *out_result, rt_err_t *out_rc,
  * 尝试过但失败/未取得设备/仍带着未复核的失败锁存 → 返回 FALSE。 */
 rt_bool_t step_pwm_off_confirmed(void);
 
-/* 统一停机(safety_force_shutdown)与人工恢复复核的诊断侧**慢整理**:
- * 共享模块的真实关断已经由那一次短保护做过, 本函数**不产生任何硬件动作**、
- * **从不投递事件**(S1 返修 R03 的自激禁止继续成立), 只把 canonical 结果抄进镜像。 */
-void step_pwm_reconcile_after_trip(void);
+/* 统一停机(safety_force_shutdown)与人工恢复的**最终提交窗口内**的诊断侧落位:
+ * 共享模块的真实关断已由那一次短保护做过, 本函数**不产生任何硬件动作**、
+ * **从不投递事件**(S1 返修 R03 的自激禁止继续成立), 只把 canonical 结果抄进镜像。
+ * ⚠ 调用方必须已在同一个短临界区内(身份检查与镜像写同窗); 原无身份的
+ *   step_pwm_reconcile_after_trip() 已删除 —— 它是"检查在内、作用在外"的旧形状。 */
+
+/* 慢整理/恢复**最终提交窗口内**的诊断镜像写(调用方已持短临界区)。 */
+void step_pwm_shadow_from_proof_held(const sp_proof_t *pf);
 
 /* 人工恢复**最终提交窗口内**的诊断字段复位。
  * ⚠ 调用方必须已在同一个短临界区内(rt_hw_interrupt_disable 之后)且已确认恢复票据

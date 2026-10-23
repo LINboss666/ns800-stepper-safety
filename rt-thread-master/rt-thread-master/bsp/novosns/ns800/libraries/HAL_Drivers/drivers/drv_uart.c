@@ -466,6 +466,11 @@ static int ns800_putc(struct rt_serial_device *serial, char c)
  * 上下文纪律(§10.2): 必须是普通线程上下文(调用者持现有 TMC xfer 锁)。ISR 与
  * 已关中断两种一律拒绝 —— 前者的 rt_thread_mdelay 非法, 后者会让 tick 不推进而
  * 使这个按 tick 判定的循环永不退出(与 stop_priority 禁止清单同一事实)。 */
+rt_bool_t ns800_intr_masked(void)
+{
+    return (__get_PRIMASK() != 0u) ? RT_TRUE : RT_FALSE;
+}
+
 rt_err_t ns800_uart_write_budgeted(rt_device_t dev, const rt_uint8_t *data,
                                    rt_size_t size, rt_tick_t start, rt_tick_t total,
                                    rt_size_t *written)

@@ -104,7 +104,18 @@ typedef struct
     rt_size_t          rx_bytes;
     rt_size_t          flush_bytes;
     rt_tick_t          used;
+    /* R4(2026-10-23 CP3 §6.1): IFCNT 不符的细节也**只记账不打印** —— 打印要排在
+     * 那次短保护之后(控制台逐字符忙等, 每字符 ≤BSP_NS800_UART_TX_TIMEOUT)。 */
+    rt_uint8_t         ifcnt_before;
+    rt_uint8_t         ifcnt_after;
+    rt_bool_t          ifcnt_checked;
 } tmc_xfer_stat_t;
+
+/* 不一致的种类(供保护之后的摘要如实分列, 底层错误出口一律不打印)。 */
+#define TMC_CFG_FAIL_NONE      0u
+#define TMC_CFG_FAIL_READBACK  1u   /* 写后读回: 内容 != 下发内容 */
+#define TMC_CFG_FAIL_DRIFT     2u   /* 完整性复核: 现值 != 已下发值 */
+#define TMC_CFG_FAIL_IFCNT     3u   /* IFCNT 未 +1: 芯片没接受这一帧 */
 
 /* ms -> tick, **不允许舍成 0**(§10.2): 舍成 0 的预算等于"立即超时", 会让一次
  * 本来合法的调用直接失败, 也会掩盖真实的等待。 */
@@ -145,9 +156,18 @@ static rt_bool_t tmc_budget_expired(const tmc_budget_t *b)
  * 底层写入口本身再拒一次(drv_uart.c 里读 PRIMASK), 因为那时 tick 不再推进。 */
 static rt_bool_t tmc_ctx_ok_for_wait(const char *who)
 {
-    if (rt_thread_self() == RT_NULL)
+    /* R4(2026-10-23 CP3 §6.2): 旧判据 rt_thread_self()!=NULL **不成立** —— 被中断的
+     * 线程上下文里它同样非空, 于是 ISR 里照样允许了 mdelay/等 mutex。换成三条实测:
+     *   ① rt_interrupt_get_nest() != 0 => 中断上下文;
+     *   ② ns800_intr_masked() => PRIMASK 已屏蔽, tick 不推进, 按 tick 的超时永不退出;
+     *   ③ rt_thread_self()==NULL => 没有线程对象, 不能 take/mdelay。
+     * 拒绝路径只在"线程上下文且未关中断"时才打印(否则日志本身就是一次不可控等待)。
+     * ⚠ 这是**源码结构合同**(哪个入口在哪种上下文被拒), 不是目标机最坏时延的证明。 */
+    if (rt_interrupt_get_nest() != 0 || ns800_intr_masked() ||
+        rt_thread_self() == RT_NULL)
     {
-        rt_kprintf("[TMC] %s REFUSED: ISR/无内核线程上下文不允许等待\n", who);
+        if (rt_interrupt_get_nest() == 0 && !ns800_intr_masked())
+            rt_kprintf("[TMC] %s REFUSED: 非可等待上下文(无线程对象)\n", who);
         return RT_FALSE;
     }
     return RT_TRUE;
@@ -388,6 +408,21 @@ static rt_err_t tmc_tx_frame(const rt_uint8_t *frame, rt_size_t len,
         if (st) { st->reason = TMC_XFER_TX_FAILED; st->rc = -RT_EIO; }
         return -RT_EIO;
     }
+    /* R4(2026-10-23 CP3 §6.3): 最后一个字节发出之后、**返回成功之前**再查同一条
+     * start/total(与阶段上限)。这一帧整体可能被抢占到越过期限之后才发完 —— 不能
+     * 倒推"超期时物理上绝未发出字节", 也不能让一次已过期的发布被上层当成"还有
+     * 一次可用的配置窗口"。不重开预算, 也不倒扣已发出的事实。 */
+    used = rt_tick_get() - b->start;
+    if (used >= b->total)
+    {
+        if (st) { st->reason = TMC_XFER_BUDGET_EXHAUSTED; st->rc = -RT_ETIMEOUT; }
+        return -RT_ETIMEOUT;
+    }
+    if (used >= eff)
+    {
+        if (st) { st->reason = TMC_XFER_TX_FAILED; st->rc = -RT_ETIMEOUT; }
+        return -RT_ETIMEOUT;                    /* 阶段期限已过: 不发布成功 */
+    }
     if (st) st->reason = TMC_XFER_OK;
     return RT_EOK;
 }
@@ -517,12 +552,21 @@ static rt_err_t tmc_read_reg_locked(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t
                 return -RT_EIO;
             }
             /* CRC/帧通过之后、**发布成功之前**再查一次总预算与剩余阶段:
-             * 过期帧不得算成一次成功的读(§10.4)。 */
+             * 过期帧不得算成一次成功的读(§10.4)。
+             * R4(2026-10-23 CP3 §6.3): 只查总预算**不够** —— 阶段期限 eff_end 已过而
+             * 总预算尚有余时, 这一样是一帧迟到的应答, 不能算成本次读的凭证。
+             * 回绕安全比较与上面的超时判据同一套写法。 */
             if (tmc_remaining(b) == 0)
             {
                 if (st) { st->reason = TMC_XFER_BUDGET_EXHAUSTED; st->rc = -RT_ETIMEOUT;
                           st->rx_bytes = n; }
                 return -RT_ETIMEOUT;
+            }
+            if ((rt_tick_t)(rt_tick_get() - eff_end) < (rt_tick_t)0x80000000)
+            {
+                if (st) { st->reason = TMC_XFER_RX_TIMEOUT_PART; st->rc = -RT_ETIMEOUT;
+                          st->rx_bytes = n; }
+                return -RT_ETIMEOUT;            /* 阶段超期的完整帧: 不发布成功 */
             }
             *value = ((rt_uint32_t)buf[hdr_pos + 3] << 24) |
                      ((rt_uint32_t)buf[hdr_pos + 4] << 16) |
@@ -771,8 +815,12 @@ static rt_err_t tmc2209_write_register_confirmed(rt_uint8_t addr, rt_uint8_t reg
     /* IFCNT 只对有效 WRITE 自增: +1 = 芯片接受了完整写帧 */
     if ((after & 0xFF) != ((before + 1) & 0xFF))
     {
-        rt_kprintf("[TMC] IFCNT mismatch (%u -> %u)\n",
-                   before & 0xFF, after & 0xFF);
+        /* R4(2026-10-23 CP3 §6.1): 这里**不打印**。旧顺序先 rt_kprintf 再返回给上层
+         * 的失败保护出口, 等于把降险动作排在日志之后(控制台每字符最多忙等 6000ms)。
+         * 细节记进 st, 由保护完成后的那条摘要打印。 */
+        st->ifcnt_before  = (rt_uint8_t)(before & 0xFFu);
+        st->ifcnt_after   = (rt_uint8_t)(after & 0xFFu);
+        st->ifcnt_checked = RT_TRUE;
         tmc_health_after_xfer(-RT_EIO);      /* P1-11: 健康联动 DEGRADED */
         st->reason = TMC_XFER_NOT_ARRIVED;
         e = -RT_EIO;
@@ -1177,6 +1225,12 @@ typedef struct
      * 于是同一波错误不会出现第二轮 rt_pwm_disable。 */
     rt_uint32_t     op_epoch;
     rt_bool_t       op_protected;
+    /* R4(2026-10-23 CP3 §6.1): "期望值 / 实得值 / 不一致种类"。底层错误出口一律
+     * **不打印**(打印必须排在保护之后), 这三个字段把细节留给保护完成后的摘要。 */
+    rt_uint32_t     fail_exp;
+    rt_uint32_t     fail_got;
+    rt_uint8_t      fail_kind;
+    rt_uint32_t     view_invalid_kept;   /* 晚到的旧成功想清失效标记被拒的次数 */
     /* ---------- 2026-10-23 S2(任务书 §10.4)----------
      * 守卫/门禁不能在 Motor 的预算之前无限等待叶锁, 所以给它们一份**固定复制的
      * 无等待有效性摘要**; 摘要的更新与"失效标记"和上面的状态字段遵守同一个短临界
@@ -1192,15 +1246,19 @@ typedef struct
 
 /* 摘要发布: 调用方**已经**持有叶锁(或处于建线程之前的单线程阶段)。
  * 窗口内只做固定字段赋值, 不取锁、不打印、不碰总线。 */
-static void tmc_cfg_view_publish(tmc_cfg_ctx_t *ctx)
+/* R4(2026-10-23 CP3 §6.3): 清失效标记必须绑到**那一次成功提交的身份**上。
+ * `commit_same_gen` = 调用方在同一个短窗口里核对过"总预算仍有余 + 失效代次未变 +
+ * 协调层 epoch 仍是本操作进入时那一代", 且这次提交确实把状态推到了 CONFIGURED。
+ * 只看旧 ctx 里"仍 CONFIGURED/done_valid"就无条件清, 会让一次**晚到的旧成功**
+ * 把新故障留下的失效标记抹掉(门重新开)。 */
+static void tmc_cfg_view_publish(tmc_cfg_ctx_t *ctx, rt_uint8_t commit_same_gen)
 {
     rt_uint8_t healthy;
     rt_base_t  lvl = sp_win_begin();
 
-    /* 只有"CONFIGURED 且快照有效"这一次完整成功才覆盖作废标记; 其它发布只是把当前
-     * 权威状态抄进摘要, 作废位保持不变(所以一次失效会一直挡住门, 直到重新成功下发)。 */
     healthy = (ctx->state == TMC_DRV_CONFIGURED && ctx->done_valid) ? 1u : 0u;
-    if (healthy) ctx->view_force_invalid = 0u;
+    if (healthy && commit_same_gen) ctx->view_force_invalid = 0u;
+    else if (healthy) ctx->view_invalid_kept++;      /* 晚到成功: 保留失效, 只计数 */
 
     ctx->view.state      = (rt_uint8_t)ctx->state;
     ctx->view.done_valid = ctx->done_valid ? 1u : 0u;
@@ -1619,7 +1677,10 @@ static rt_err_t tmc_cfg_fail_ctx(tmc_cfg_ctx_t *ctx, rt_uint8_t reg, rt_err_t e,
         pf.valid = RT_FALSE;
         if (!ctx->op_protected)
         {
-            (void)sp_trip_for_operation(ctx->op_epoch, FAULT_TMC_DIAG, EVT_TMC_DIAG,
+            /* R4(2026-10-23 CP3 §6.3): UART/IFCNT/读回这一类是**软件通信**失败,
+             * 用 FAULT_TMC_COMM + 既有软故障事件; 不再冒充物理 TMC_DIAG 引脚事件
+             * (那个码属于诊断输入脚的真实电平)。既有故障数值一个都没有重排。 */
+            (void)sp_trip_for_operation(ctx->op_epoch, FAULT_TMC_COMM, EVT_SOFT_FAULT,
                                         MOT_STOP_SRC_GUARD_STOP, &pf);
             ctx->op_protected = RT_TRUE;        /* 本操作只保护一次(不论成败) */
         }
@@ -1641,12 +1702,23 @@ static rt_err_t tmc_cfg_fail_ctx(tmc_cfg_ctx_t *ctx, rt_uint8_t reg, rt_err_t e,
     ctx->fail_from_integrity = from_integrity;
     ctx->state               = TMC_DRV_FAILED;
     ctx->done_valid          = RT_FALSE;
-    tmc_cfg_view_publish(ctx);
+    tmc_cfg_view_publish(ctx, 0u);            /* 失败发布: 绝不覆盖作废标记 */
     tmc_cfg_lock_give(ctx, taken);
 
+    /* 短保护在上面已经做完 —— 这里才是这次失败允许出现打印的位置(§6.1)。 */
     rt_kprintf("[TMC-CFG] FAILED at %s (reg=0x%02X err=%d) - 序列已中止, 芯片可能"
-               "处于部分配置状态; 已下发快照作废, 禁止使能, 需重新 apply 或断电复位\n",
+               "处于部分配置状态; 已下发快照作废, 禁止使能, 需重新 apply 或断电复位"
+               " [短保护已先做过, 本行在保护之后]\n",
                stage, reg, (int)ret);
+    if (ctx->fail_kind != TMC_CFG_FAIL_NONE)
+    {
+        rt_kprintf("[TMC-CFG]   不一致细节 kind=%s: 期望=%08X 实得=%08X\n",
+                   ctx->fail_kind == TMC_CFG_FAIL_READBACK ? "readback"
+                 : (ctx->fail_kind == TMC_CFG_FAIL_DRIFT ? "integrity-drift"
+                                                         : "ifcnt"),
+                   (unsigned)ctx->fail_exp, (unsigned)ctx->fail_got);
+        ctx->fail_kind = TMC_CFG_FAIL_NONE;     /* 一次事实只报一次, 不污染下一条 */
+    }
     return ret;
 }
 
@@ -1668,8 +1740,11 @@ static rt_err_t tmc_cfg_write_one_ctx(tmc_cfg_ctx_t *ctx, rt_uint8_t reg,
     if (e != RT_EOK) return e;
     if (rb != val)
     {
-        rt_kprintf("[TMC-CFG] readback MISMATCH reg=0x%02X wrote=%08X read=%08X\n",
-                   reg, (unsigned)val, (unsigned)rb);
+        /* R4(2026-10-23 CP3 §6.1): 读回不符 = 一次通信/内容不一致的事实。本层只
+         * **记账**(期望/实得/种类), 打印由外层保护之后的失败摘要完成。 */
+        ctx->fail_exp  = val;
+        ctx->fail_got  = rb;
+        ctx->fail_kind = TMC_CFG_FAIL_READBACK;
         return -RT_EIO;
     }
     return RT_EOK;
@@ -1761,16 +1836,15 @@ static rt_err_t tmc_cfg_apply_ctx(tmc_cfg_ctx_t *ctx, const tmc_drv_config_t *c)
     }
     ctx->state      = TMC_DRV_CONFIGURING;
     ctx->done_valid = RT_FALSE;           /* 重新下发期间旧快照不可信 */
-    tmc_cfg_view_publish(ctx);
+    tmc_cfg_view_publish(ctx, 0u);
     gen0 = ctx->view.gen;
     inv0 = ctx->view.inv_gen;
     tmc_cfg_lock_give(ctx, taken);
     (void)gen0;                           /* 代次以 inv_gen/epoch 为准, 保留读法以便审查 */
 
-    rt_kprintf("[TMC-CFG] apply start: irun=%u ihold=%u dly=%u tpd=%u vsense=%u"
-               " (总预算=%ums, op_epoch=%u)\n",
-               c->irun, c->ihold, c->ihold_delay, c->tpowerdown, c->vsense,
-               TMC_BUD_APPLY_MS, (unsigned)(ctx == &tmc_cfg_prod ? ctx->op_epoch : 0u));
+    /* R4(2026-10-23 CP3 §6.1): 预算区内的**进度打印**一律取消(旧实现在每一段之前
+     * rt_kprintf, 而控制台逐字符忙等会把端到端预算吞掉)。参数与身份改由
+     * 完成/失败后的那条摘要给出(CONFIGURED 摘要 / FAILED 摘要), 信息不丢。 */
 
     if (ctx->bus->open(ctx->priv, b, &st) != RT_EOK)
     {
@@ -1797,8 +1871,6 @@ static rt_err_t tmc_cfg_apply_ctx(tmc_cfg_ctx_t *ctx, const tmc_drv_config_t *c)
     }
 
     new_g = tmc_gconf_next(gconf, c);
-    rt_kprintf("[TMC-CFG] GCONF %08X -> %08X\n",
-               (unsigned)gconf, (unsigned)new_g);
     e = tmc_cfg_write_one_ctx(ctx, TMC_REG_GCONF, new_g, RT_TRUE, b, &st);
     if (e != RT_EOK)
     {
@@ -1837,8 +1909,6 @@ static rt_err_t tmc_cfg_apply_ctx(tmc_cfg_ctx_t *ctx, const tmc_drv_config_t *c)
         goto out;
     }
 
-    rt_kprintf("[TMC-CFG] CHOPCONF %08X -> %08X (vsense %u -> %u)\n",
-               (unsigned)chop, (unsigned)new_c, old_vs, c->vsense);
     e = tmc_cfg_write_one_ctx(ctx, TMC_REG_CHOPCONF, new_c, RT_TRUE, b, &st);
     if (e != RT_EOK)
     {
@@ -1847,8 +1917,6 @@ static rt_err_t tmc_cfg_apply_ctx(tmc_cfg_ctx_t *ctx, const tmc_drv_config_t *c)
     }
 
     /* ---- 3) IHOLD_IRUN: 只写寄存器, 到达凭证只有 IFCNT+1 ---- */
-    rt_kprintf("[TMC-CFG] IHOLD_IRUN <- %08X (只写, 不读回)\n",
-               (unsigned)tmc_ihold_irun_pack(c));
     e = tmc_cfg_write_one_ctx(ctx, TMC_REG_IHOLD_IRUN, tmc_ihold_irun_pack(c),
                               RT_FALSE, b, &st);
     if (e != RT_EOK)
@@ -1859,8 +1927,6 @@ static rt_err_t tmc_cfg_apply_ctx(tmc_cfg_ctx_t *ctx, const tmc_drv_config_t *c)
     }
 
     /* ---- 4) TPOWERDOWN: 同样按只写处理(不做非法读回) ---- */
-    rt_kprintf("[TMC-CFG] TPOWERDOWN(0x%02X) <- %u\n",
-               TMC_REG_TPOWERDOWN, c->tpowerdown);
     e = tmc_cfg_write_one_ctx(ctx, TMC_REG_TPOWERDOWN, c->tpowerdown, RT_FALSE, b, &st);
     if (e != RT_EOK)
     {
@@ -1886,33 +1952,57 @@ static rt_err_t tmc_cfg_apply_ctx(tmc_cfg_ctx_t *ctx, const tmc_drv_config_t *c)
         ret = -RT_EBUSY;
         goto out;
     }
-    if (inv0 != tmc_cfg_view_inv_gen(ctx) ||
-        (ctx == &tmc_cfg_prod && sp_epoch() != ctx->op_epoch))
+    /* R4(2026-10-23 CP3 §6.3): **最终比较与最终提交在同一个短窗口里**
+     * (叶锁已在窗口外持有)。旧写法先在窗口外比 inv_gen/epoch, 比完再写字段并
+     * 发布摘要 —— 两次窗口之间落下一个可被抢占的空隙, 期间的新故障会被这次
+     * "旧成功"覆盖。窗口内只有字段赋值与摘要复制(不取锁/不打印/不碰总线)。 */
     {
+        rt_base_t lvl  = sp_win_begin();
+        rt_bool_t fresh = RT_FALSE;
+
+        if (inv0 == ctx->view.inv_gen &&
+            (ctx != &tmc_cfg_prod || sp_epoch() == ctx->op_epoch) &&
+            tmc_remaining(b) != 0)
+        {
+            ctx->done_gconf = new_g;
+            ctx->done_chop  = new_c;
+            ctx->done       = *c;
+            ctx->done_valid = RT_TRUE;
+            ctx->state      = TMC_DRV_CONFIGURED;
+            ctx->fail_reg   = 0;
+            ctx->last_err   = RT_EOK;
+            ctx->fail_from_integrity = RT_FALSE;
+            ctx->fail_kind  = TMC_CFG_FAIL_NONE;
+            tmc_cfg_view_publish(ctx, 1u);      /* 同一代的成功提交: 允许清失效标记 */
+            fresh = RT_TRUE;
+        }
+        sp_win_end(lvl);
         tmc_cfg_lock_give(ctx, taken);
-        ret = tmc_cfg_fail_ctx(ctx, 0, -RT_EPERM, "apply-stale-success", RT_FALSE, b);
-        rt_kprintf("[TMC-CFG] !! 晚到的 apply 成功被拒绝提交"
-                   " (inv_gen %u -> %u, op_epoch=%u / 现在=%u) - 旧成功不刷新健康\n",
-                   inv0, tmc_cfg_view_inv_gen(ctx),
-                   (unsigned)(ctx == &tmc_cfg_prod ? ctx->op_epoch : 0u),
-                   (unsigned)sp_epoch());
-        goto out;
+
+        if (!fresh)
+        {
+            ret = tmc_cfg_fail_ctx(ctx, 0, -RT_EPERM, "apply-stale-success",
+                                   RT_FALSE, b);
+            rt_kprintf("[TMC-CFG] !! 晚到的 apply 成功被拒绝提交"
+                       " (inv_gen %u -> %u, op_epoch=%u / 现在=%u, 剩余预算=%u tick)"
+                       " - 旧成功不刷新健康\n",
+                       inv0, tmc_cfg_view_inv_gen(ctx),
+                       (unsigned)(ctx == &tmc_cfg_prod ? ctx->op_epoch : 0u),
+                       (unsigned)sp_epoch(), (unsigned)tmc_remaining(b));
+            goto out;
+        }
     }
-    ctx->done_gconf = new_g;
-    ctx->done_chop  = new_c;
-    ctx->done       = *c;
-    ctx->done_valid = RT_TRUE;
-    ctx->state      = TMC_DRV_CONFIGURED;
-    ctx->fail_reg   = 0;
-    ctx->last_err   = RT_EOK;
-    ctx->fail_from_integrity = RT_FALSE;
-    tmc_cfg_view_publish(ctx);
-    tmc_cfg_lock_give(ctx, taken);
     rt_kprintf("[TMC-CFG] CONFIGURED (各次写入均经 IFCNT 确认; GCONF/CHOPCONF"
                " 读回一致)。电流值仍为理论计算, 未实测。"
-               " [本次预算: 已用 %u tick / 总 %u tick, flush=%uB, TX=%uB]\n",
+               " [本次预算: 已用 %u tick / 总 %u tick, flush=%uB, TX=%uB;"
+               " irun=%u ihold=%u dly=%u tpd=%u vsense=%u GCONF %08X->%08X"
+               " CHOPCONF %08X->%08X op_epoch=%u]\n",
                (unsigned)(rt_tick_get() - b->start), (unsigned)b->total,
-               (unsigned)st.flush_bytes, (unsigned)st.tx_written);
+               (unsigned)st.flush_bytes, (unsigned)st.tx_written,
+               (unsigned)c->irun, (unsigned)c->ihold, (unsigned)c->ihold_delay,
+               (unsigned)c->tpowerdown, (unsigned)c->vsense,
+               (unsigned)gconf, (unsigned)new_g, (unsigned)chop, (unsigned)new_c,
+               (unsigned)(ctx == &tmc_cfg_prod ? ctx->op_epoch : 0u));
     ret = RT_EOK;
 
 out:
@@ -2017,10 +2107,14 @@ static rt_err_t tmc_cfg_integrity_ctx(tmc_cfg_ctx_t *ctx)
 
     if (tmc_cfg_lock_take(ctx, b, &taken) != RT_EOK)
     {
-        /* 读不到权威快照: 作废摘要(门闭合), 不猜、也不 FOREVER 等 */
-        tmc_cfg_view_invalidate(ctx);
-        tmc_cfg_txn_give(ctx);
-        return -RT_EBUSY;
+        /* R4(2026-10-23 CP3 §6.3): 这里**已经进入了本次复核操作**(txn 已取得、预算已开),
+         * 所以不能只回一个 -RT_EBUSY 让上层按"事务忙连击"去延迟处理 —— 已进入操作的
+         * 锁/预算失败一律按**本次操作的身份**立即保护一次(fail_ctx 内部只保护一次)。
+         * 仍然不 FOREVER 等同一把锁, 也仍然作废摘要把门闭合。
+         * ⚠ 保留容忍的只有**最外层 txn 的 WAITING_NO 竞争**(上面那条 -RT_EBUSY),
+         *    那一次还没进入任何操作, 也没有产生任何总线动作。 */
+        e = tmc_cfg_fail_ctx(ctx, 0, -RT_EBUSY, "integrity:leaf-lock", RT_TRUE, b);
+        goto out;                    /* 唯一出口: txn 必须在 out 归还, 不许直接 return */
     }
     st    = ctx->state;
     valid = ctx->done_valid;
@@ -2050,8 +2144,9 @@ static rt_err_t tmc_cfg_integrity_ctx(tmc_cfg_ctx_t *ctx)
     }
     if (v != tgt_g)
     {
-        rt_kprintf("[TMC-CFG] !! GCONF 已偏离下发值 (%08X != %08X) - 芯片可能断电/复位\n",
-                   (unsigned)v, (unsigned)tgt_g);
+        ctx->fail_exp  = tgt_g;                 /* 期望=已下发快照 */
+        ctx->fail_got  = v;                     /* 实得=芯片现值 */
+        ctx->fail_kind = TMC_CFG_FAIL_DRIFT;
         e = tmc_cfg_fail_ctx(ctx, TMC_REG_GCONF, -RT_EIO,
                              "integrity:GCONF-mismatch", RT_TRUE, b);
         goto out;
@@ -2066,8 +2161,9 @@ static rt_err_t tmc_cfg_integrity_ctx(tmc_cfg_ctx_t *ctx)
     }
     if (v != tgt_c)
     {
-        rt_kprintf("[TMC-CFG] !! CHOPCONF 已偏离下发值 (%08X != %08X) - vsense 档可能已丢\n",
-                   (unsigned)v, (unsigned)tgt_c);
+        ctx->fail_exp  = tgt_c;
+        ctx->fail_got  = v;
+        ctx->fail_kind = TMC_CFG_FAIL_DRIFT;
         e = tmc_cfg_fail_ctx(ctx, TMC_REG_CHOPCONF, -RT_EIO,
                              "integrity:CHOPCONF-mismatch", RT_TRUE, b);
         goto out;

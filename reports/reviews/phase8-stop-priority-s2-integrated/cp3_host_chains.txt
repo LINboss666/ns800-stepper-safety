@@ -1,0 +1,113 @@
+CP3 §10.3/§10.4 本轮实际执行的既有链与目标构建(逐条记录命令、变体与真实 rc)
+
+脱敏规则(本目录三份 cp3_*.txt 一致): 仅把本机用户目录 `C:\Users\<登录名>` 与其 Git-Bash 写法 `/c/Users/<登录名>` 替换为 `C:\Users\<USER>` / `/c/Users/<USER>`; 其余(命令、时间戳、路径尾段、日志正文、失败与警告原文)一字未改, 失败内容不改成成功。
+
+
+==============================================================================
+### run_stop_result_s1.sh  (S1 关断结果可信链, target/host_ovr)
+status 文件: C:/Users/LMX/AppData/Local/Temp/ns800-host-chain/s1/20261023T181252Z-2674/s1_status.txt
+S1_RUNNER_RC=0
+S1_DETECTED_FAIL=0
+run_id=20261023T181252Z-2674
+baseline=4641d491c6ff1251730c99f6ad14eb4424f1dbac
+target | OK 必需用例=50 全部PASS 实际行数=50 自报 fail=0 proc_rc=0
+host_ovr | OK 必需用例=65 全部PASS 实际行数=65 自报 fail=0 proc_rc=0
+
+  s1/20261023T064645Z-154 -> SUMMARY|cases=45 pass=45 fail=0 pre_bad=0
+  s1/20261023T064645Z-154 -> SUMMARY|cases=36 pass=36 fail=0 pre_bad=0
+  s1/20261023T065039Z-1807 -> SUMMARY|cases=45 pass=45 fail=0 pre_bad=0
+  s1/20261023T065039Z-1807 -> SUMMARY|cases=36 pass=36 fail=0 pre_bad=0
+  s1/20261023T070248Z-10040 -> SUMMARY|cases=45 pass=45 fail=0 pre_bad=0
+  s1/20261023T070248Z-10040 -> SUMMARY|cases=36 pass=36 fail=0 pre_bad=0
+  s1/20261023T084657Z-1545 -> SUMMARY|cases=64 pass=64 fail=0 pre_bad=0
+  s1/20261023T084657Z-1545 -> SUMMARY|cases=48 pass=48 fail=0 pre_bad=0
+  s1/20261023T085159Z-647 -> SUMMARY|cases=64 pass=64 fail=0 pre_bad=0
+  s1/20261023T085159Z-647 -> SUMMARY|cases=48 pass=48 fail=0 pre_bad=0
+  s1/20261023T173747Z-883 -> SUMMARY|cases=50 pass=49 fail=1 pre_bad=0
+  s1/20261023T173933Z-452 -> SUMMARY|cases=50 pass=49 fail=1 pre_bad=0
+  s1/20261023T174046Z-865 -> SUMMARY|cases=65 pass=61 fail=4 pre_bad=3 ; RESULT|RECOVERY-NOT-ESTABLISHED (前置按业务失败计)
+  s1/20261023T174046Z-865 -> SUMMARY|cases=50 pass=50 fail=0 pre_bad=0
+  s1/20261023T174707Z-1792 -> SUMMARY|cases=50 pass=50 fail=0 pre_bad=1 ; RESULT|RECOVERY-NOT-ESTABLISHED (前置按业务失败计)
+  s1/20261023T174737Z-1270 -> SUMMARY|cases=65 pass=64 fail=1 pre_bad=0
+  s1/20261023T174737Z-1270 -> SUMMARY|cases=50 pass=50 fail=0 pre_bad=1 ; RESULT|RECOVERY-NOT-ESTABLISHED (前置按业务失败计)
+  s1/20261023T174846Z-354 -> SUMMARY|cases=65 pass=65 fail=0 pre_bad=0
+  s1/20261023T174846Z-354 -> SUMMARY|cases=50 pass=50 fail=0 pre_bad=0
+  s1/20261023T175321Z-337 -> SUMMARY|cases=65 pass=65 fail=0 pre_bad=0
+  s1/20261023T175321Z-337 -> SUMMARY|cases=50 pass=50 fail=0 pre_bad=0
+  s1/20261023T181252Z-2674 -> SUMMARY|cases=65 pass=65 fail=0 pre_bad=0
+  s1/20261023T181252Z-2674 -> SUMMARY|cases=50 pass=50 fail=0 pre_bad=0
+==============================================================================
+### build_and_run.sh       (F2d V1/V2 主机链)
+status 文件: C:/Users/LMX/AppData/Local/Temp/ns800-host-chain/out/runner_status.txt
+V1_BUILD_RC=0
+V1_RUN_RC=0
+V1_STATE=RAN
+V1_EXECUTED=1
+V1_EXE=PRESENT
+V1_OUT_BYTES=14791
+V2_BUILD_RC=0
+V2_RUN_RC=0
+V2_STATE=RAN
+V2_EXECUTED=1
+V2_EXE=PRESENT
+V2_OUT_BYTES=14532
+RUNNER_RC=0
+REPO_ROOT=D:/ns800
+SRC_APP=D:/ns800/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications
+HOST_SRC=/d/ns800/tests/host/host_main.c
+SHIM_DIR=/d/ns800/tests/host/shim
+V1_EXTRA=
+V2_EXTRA=
+GCC=/c/Program Files (x86)/Dev-Cpp/MinGW64/bin/gcc.exe
+
+  out/out -> HOST TEST SUMMARY: CHECK_PASS=25 CHECK_FAIL=0 BAD_SELFTEST=0 MISSING_CASE=0
+  out/out -> HOST TEST SUMMARY: CHECK_PASS=22 CHECK_FAIL=0 BAD_SELFTEST=0 MISSING_CASE=0
+==============================================================================
+### run_io_behavior.sh     (I/O 行为链 4 变体 + 非法宏值)
+status 文件: C:/Users/LMX/AppData/Local/Temp/ns800-host-chain/io/io_status.txt
+IO_RUNNER_RC=0
+IO_DETECTED_FAIL=0
+off_target | OK 必需用例=27 全部PASS 自报fail=0 proc_rc=0 (输出 9049 字节)
+on_target | OK 必需用例=29 全部PASS 自报fail=0 proc_rc=0 (输出 10335 字节)
+off_ovr | OK 必需用例=40 全部PASS 自报fail=0 proc_rc=0 (输出 23127 字节)
+on_ovr | OK 必需用例=42 全部PASS 自报fail=0 proc_rc=0 (输出 23574 字节)
+IO1_CFG-illegal_macro_rejected | OK(拒绝编译 rc=1)
+
+  io/io -> SUMMARY|cases=40|pass=40|fail=0
+  io/io -> SUMMARY|cases=27|pass=27|fail=0
+  io/io -> SUMMARY|cases=42|pass=42|fail=0
+  io/io -> SUMMARY|cases=29|pass=29|fail=0
+==============================================================================
+### run_safety_data_semantics.sh (安全输入数据语义链)
+status 文件: C:/Users/LMX/AppData/Local/Temp/ns800-host-chain/sd/sd_status.txt
+SD_RUNNER_RC=0
+SD_DETECTED_FAIL=0
+SD_SELECT_MODE=default
+SD_SELECTED=off_target on_target
+SD_EXECUTED=off_target on_target
+SD_SELECTED_NOT_RUN=
+off_target | OK 必需用例=21 全部PASS 自报fail=0 proc_rc=0 (输出 4566 字节)
+on_target | OK 必需用例=20 全部PASS 自报fail=0 proc_rc=0 (输出 4351 字节)
+
+  sd/sd -> SUMMARY|cases=21 pass=21 fail=0
+  sd/sd -> SUMMARY|cases=20 pass=20 fail=0
+==============================================================================
+### Keil Rebuild All(armclang V6.24, 只构建不烧录)
+*** Using Compiler 'V6.24', folder: 'C:\Keil_v5\ARM\ARMCLANG\Bin'
+Build target 'rt-thread'
+Note: source file 'packages\novosns-series-latest\NS800RT7XXX\StdDriver\Src\adc.c' - object file renamed from '.\build\Src_adc.o' to '.\build\src_adc.o'.compiling step_pwm.c...
+compiling supervisor.c...
+compiling stop_priority.c...
+compiling safety_state.c...
+compiling sensor_service.c...
+compiling motor.c...
+compiling diagnosis.c...
+compiling tmc2209.c...
+compiling drv_common.c...
+compiling main.c...
+compiling drv_uart.c...
+linking...
+Program Size: Code=168018 RO-data=74602 RW-data=2188 ZI-data=83696  
+After Build - User command #1: fromelf --bin .\build\rt-thread.axf --output rtthread.bin
+".\build\rt-thread.axf" - 0 Error(s), 0 Warning(s).
+Build Time Elapsed:  00:00:05

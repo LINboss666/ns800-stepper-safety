@@ -31,6 +31,9 @@ V2_EXTRA="${V2_EXTRA:-}"
 RUN_V1="${RUN_V1:-1}"
 RUN_V2="${RUN_V2:-1}"
 FLAGS="-std=gnu11 -Wall -Wextra -Wno-unused-function"
+# CP3 §9 第 1/7 项: 本链也要编真实公开 drv_epwm.h(它只用到 <rtdef.h> 的定型类型),
+# 由输出目录里生成的最小兼容头转发到夹具 rtthread.h; 不改 SDK 文件。
+HAL_DRV="${HAL_DRV:-$REPO_ROOT/rt-thread-master/rt-thread-master/bsp/novosns/ns800/libraries/HAL_Drivers/drivers}"
 # -Wno-unused-function: 夹具把 MSH_CMD_EXPORT 定义成空宏, 固件里的静态命令函数在主机侧
 # 没有调用点 -> 这类告警与固件正确性无关。目标平台权威构建仍是 Keil Rebuild All(要求 0/0),
 # 本脚本只负责行为执行。
@@ -59,6 +62,18 @@ note "OUT_DIR  : $OUT_DIR"
 note "compiler : $("$GCC" --version | head -1)"
 mkdir -p "$OUT_DIR" || { note "FATAL: 无法创建 OUT_DIR"; exit 4; }
 
+# CP3 §9 第 1/7 项的最小兼容头(输出目录内生成, 不复制/不修改 SDK 文件)
+COMPAT_DIR="$OUT_DIR/compat"
+mkdir -p "$COMPAT_DIR" || { note "FATAL: 无法创建兼容头目录"; exit 4; }
+printf '#ifndef NS800_HOST_RTDEF_COMPAT_H\n#define NS800_HOST_RTDEF_COMPAT_H\n#include <rtthread.h>\n#endif\n' > "$COMPAT_DIR/rtdef.h" || { note "FATAL: 兼容头写不进去"; exit 4; }
+printf '#ifndef NS800_HOST_RTHW_COMPAT_H\n#define NS800_HOST_RTHW_COMPAT_H\n#include <rtthread.h>\nrt_base_t rt_hw_interrupt_disable(void);\nvoid rt_hw_interrupt_enable(rt_base_t level);\n#endif\n' > "$COMPAT_DIR/rthw.h" || { note "FATAL: rthw 兼容头写不进去"; exit 4; }
+printf '#ifndef NS800_HOST_DRVCOMMON_COMPAT_H\n#define NS800_HOST_DRVCOMMON_COMPAT_H\n#include <rtthread.h>\n#include <rtdevice.h>\n/* 只给 drv_uart.h 的声明用到的 SDK 聚合类型一个**主机侧**占位:\n * 本链不编译 drv_uart.c(真实 TX 等待叶子不在主机执行, 见交接的未覆盖清单),\n * 只需要头文件能过语法。这些类型在目标上来自 Novosns 寄存器头。 */\ntypedef struct { int host_placeholder; } UART_TypeDef;\ntypedef struct { int host_placeholder; } GPIO_TypeDef;\ntypedef int  IRQn_Type;\ntypedef unsigned int GPIO_PinNum;\ntypedef unsigned int GPIO_AltFunc;\ntypedef unsigned int GPIO_Direction;
+typedef struct { int host_placeholder; } rt_serial_device_placeholder;
+struct rt_serial_device { int host_placeholder; };\n#endif\n' > "$COMPAT_DIR/drv_common.h" || { note "FATAL: drv_common 兼容头写不进去"; exit 4; }
+[ -f "$HAL_DRV/drv_epwm.h" ] || { note "FATAL: 真实 drv_epwm.h 不存在: $HAL_DRV/drv_epwm.h"; exit 127; }
+# COMPAT_DIR 必须在 HAL_DRV **之前**: drv_common.h 用最小主机占位, drv_epwm.h 用真实公开头。
+INCS=(-I "$SHIM_DIR" -I "$SRC_APP" -I "$COMPAT_DIR" -I "$HAL_DRV")
+
 run_variant() {
     local tag="$1" tag_lc extra exe marker brc rrc run_flag
     tag_lc="$(printf '%s' "$tag" | tr 'A-Z' 'a-z')"
@@ -80,7 +95,7 @@ run_variant() {
     rm -f "$exe"
     if [ "$tag" = "V1" ]; then
         # shellcheck disable=SC2086
-        "$GCC" $FLAGS $extra -I "$SHIM_DIR" -I "$SRC_APP" "$HOST_SRC" -o "$exe" \
+        "$GCC" $FLAGS $extra "${INCS[@]}" "$HOST_SRC" -o "$exe" \
             > "$OUT_DIR/${tag_lc}_build.txt" 2>&1
     else
         # shellcheck disable=SC2086
@@ -88,7 +103,7 @@ run_variant() {
               -DMOTOR_HARDWARE_ENABLE_PATH_VALIDATED=RT_TRUE \
               -DSTEP_DIAG_ISOLATED_ENV_CONFIRMED=RT_TRUE \
               -DTMC_DRIVE_CONFIG_HW_VALIDATED=RT_TRUE \
-              $extra -I "$SHIM_DIR" -I "$SRC_APP" "$HOST_SRC" -o "$exe" \
+              $extra "${INCS[@]}" "$HOST_SRC" -o "$exe" \
               > "$OUT_DIR/${tag_lc}_build.txt" 2>&1
     fi
     brc=$?

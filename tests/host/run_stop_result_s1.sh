@@ -59,6 +59,9 @@ SRC_APP="${SRC_APP:-$REPO_ROOT/$(env_app_rel)}"
 SHIM_DIR="${SHIM_DIR:-$HERE/shim_ps}"
 PS_MAIN="${PS_MAIN:-$HERE/ps_main.c}"
 PY="${PY:-python}"
+# CP3 §9 第 1 项: 编译**真实的公开 drv_epwm.h**(不拷进输出目录, 不动 SDK),
+# 只补一个最小的 <rtdef.h> 兼容头(它在该头里只用于拿 rt_uint32_t 等定型类型)。
+HAL_DRV="${HAL_DRV:-$REPO_ROOT/rt-thread-master/rt-thread-master/bsp/novosns/ns800/libraries/HAL_Drivers/drivers}"
 
 # ---- 用例台账(必须与 ps_main.c 里 CHECK 的 id 一字不差) ----
 COMMON_CASES="PS01a-init_disable_fail_rc PS01b-init_disable_fail_still_low \
@@ -89,8 +92,10 @@ PS14b-consumer_latches_so_manual_recovery_is_reachable \
 PS14c-plain_success_after_handoff_does_not_self_recover \
 PS14d-active_input_still_refuses_recovery \
 PS14e-manual_recovery_clears_after_plain_failure \
-PS14f-unified_shutdown_never_posts_events"
+PS14f-unified_shutdown_never_posts_events \
+PS16a-window_forbidden_calls_zero"
 TARGET_ONLY_CASES="PS11a-arm_refused_by_enable_path_macro PS11b-diag_step_denied \
+PS11b2-gate_check_is_read_only \
 PS11c-tmc_write_gate_has_macro_bit PS11d-status_queries_have_no_side_effects \
 PS11e-snapshot_and_readonly_agree"
 # 下面这些 id 的**前置**(诊断持有输出 / arm 成功 / 斜坡真的跑)在目标四宏 FALSE 下
@@ -167,6 +172,18 @@ printf 'ns800-host-chain stop-result-s1 runner work dir (run_id=%s)\n' "$RUN_ID"
 
 FLAGS="-std=gnu11 -Wall -Wextra -Wno-unused-function"
 
+# CP3 §9 第 1 项的最小兼容层: 真实 drv_epwm.h 里只用到 <rtdef.h> 的定型类型,
+# 由本目录生成的 rtdef.h 转发到夹具的 rtthread.h(不复制 SDK 文件, 不改 SDK)。
+COMPAT_DIR="$OUT_DIR/compat"
+mkdir -p "$COMPAT_DIR" || { note "FATAL: 无法创建兼容头目录"; exit 4; }
+printf '#ifndef NS800_HOST_RTDEF_COMPAT_H\n#define NS800_HOST_RTDEF_COMPAT_H\n#include <rtthread.h>\n#endif\n' \
+    > "$COMPAT_DIR/rtdef.h" || { note "FATAL: 兼容头写不进去"; exit 4; }
+printf '#ifndef NS800_HOST_RTHW_COMPAT_H\n#define NS800_HOST_RTHW_COMPAT_H\n#include <rtthread.h>\nrt_base_t rt_hw_interrupt_disable(void);\nvoid rt_hw_interrupt_enable(rt_base_t level);\n#endif\n' \
+    > "$COMPAT_DIR/rthw.h" || { note "FATAL: rthw 兼容头写不进去"; exit 4; }
+[ -f "$HAL_DRV/drv_epwm.h" ] || { note "FATAL: 真实 drv_epwm.h 不存在: $HAL_DRV/drv_epwm.h"; exit 127; }
+note "drv_epwm.h=$HAL_DRV/drv_epwm.h (真实公开头) compat=$COMPAT_DIR/{rtdef.h,rthw.h}"
+INCS=(-I "$SHIM_DIR" -I "$SRC_APP" -I "$HAL_DRV" -I "$COMPAT_DIR")
+
 note "###### 关断结果可信链 S1 (基线 $(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || echo UNKNOWN)) ######"
 note "run_id=$RUN_ID"
 note "SRC_APP=$SRC_APP"
@@ -238,7 +255,7 @@ build_run_variant() {
 
     rm -f "$exe" "$marker" "$out"
     # shellcheck disable=SC2086
-    "$GCC" $FLAGS $extra -I "$SHIM_DIR" -I "$SRC_APP" "$PS_MAIN" -o "$exe" > "$log" 2>&1
+    "$GCC" $FLAGS $extra "${INCS[@]}" "$PS_MAIN" -o "$exe" > "$log" 2>&1
     vrc=$?
     if [ "$vrc" -ne 0 ]; then
         tail -20 "$log"
@@ -325,7 +342,7 @@ PYEOF
     cp "$SRC_APP"/*.h "$work/app/" 2>/dev/null
     # shellcheck disable=SC2086
     "$GCC" $FLAGS $(variant_flags "$variant") -I "$SHIM_DIR" -I "$work/app" -I "$SRC_APP" \
-        "$PS_MAIN" -o "$exe" > "$work/build.txt" 2>&1
+        -I "$HAL_DRV" -I "$COMPAT_DIR" "$PS_MAIN" -o "$exe" > "$work/build.txt" 2>&1
     brc=$?
     if [ "$brc" -ne 0 ]; then
         tail -12 "$work/build.txt"

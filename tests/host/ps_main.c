@@ -68,6 +68,9 @@ static void ps_cap_clear(void) { ps_cap_len = 0; ps_cap[0] = '\0'; }
 
 static void ps_kprintf(const char *fmt, ...)
 {
+    /* 控制台在目标上是逐字符忙等(每字符 ≤BSP_NS800_UART_TX_TIMEOUT=6000ms), 属于
+     * 短窗口内的禁止项; 这里只**观察**(掩码为 1 才计数), 不改任何行为。 */
+    ps_win_note("rt_kprintf");
     va_list ap;
     char tmp[1024];
     int n;
@@ -100,7 +103,7 @@ static struct rt_thread c_thread_store[4];
 rt_err_t rt_mutex_init(struct rt_mutex *m, const char *name, rt_uint16_t flags)
 { (void)flags; if (m) { m->name = name; m->inited = RT_TRUE; } return RT_EOK; }
 rt_err_t rt_mutex_take(struct rt_mutex *m, rt_int32_t t)
-{ (void)m; (void)t; c_mutex_take++; return RT_EOK; }
+{ (void)m; (void)t; c_mutex_take++; ps_win_note("rt_mutex_take"); return RT_EOK; }
 rt_err_t rt_mutex_release(struct rt_mutex *m)
 { (void)m; c_mutex_release++; return RT_EOK; }
 rt_err_t rt_mutex_detach(struct rt_mutex *m) { (void)m; return RT_EOK; }
@@ -470,6 +473,110 @@ subsys_health_t blackbox_get_health(void) { return SUBSYS_OK; }
 /* ===================================================================== */
 /* 真实的被测生产源码                                                      */
 /* ===================================================================== */
+
+/* ===================================================================== */
+/* CP3 §9 第 1/2/5 项: stop_priority 与真实 drv_epwm.h 需要的可编程端口    */
+/*   这一节全部是**夹具侧端口**, 不改生产代码; 每类观察量都是独立注入量:   */
+/*     raw 写请求结果(enable_write_rc) / 实际焊盘电平(pad_level) /          */
+/*     确认返回(safety_drv_permit_confirm_read 只看 pad_level) /            */
+/*     ENN 反馈(fb_dis/fb_en/fb_confirm_rc) 四者互不代替。                  */
+/*   中断掩码按"递归保存"的真实语义模拟: disable 返回**进入前**的值,        */
+/*   enable 把掩码恢复成传入的那个值 —— 与 Cortex-M 的 PRIMASK 一致。       */
+/*   窗口内的禁止项(取锁/睡眠/控制台/设备读写)由 ps_win_violations() 计数,  */
+/*   任何非 0 都表示"生产代码在临界区里做了不许做的事"。                    */
+/* ===================================================================== */
+static volatile int s_intr_masked;      /* 1 = 已屏蔽(PRIMASK 语义) */
+static int          s_intr_depth;
+static int          s_win_violations;   /* 窗口内禁止项命中次数 */
+
+rt_base_t rt_hw_interrupt_disable(void)
+{
+    rt_base_t old = (rt_base_t)s_intr_masked;
+    s_intr_masked = 1;
+    s_intr_depth++;
+    return old;
+}
+
+void rt_hw_interrupt_enable(rt_base_t level)
+{
+    s_intr_masked = (int)level;
+    if (s_intr_depth > 0) s_intr_depth--;
+}
+
+int  ps_win_masked(void)      { return s_intr_masked; }
+int  ps_win_depth(void)       { return s_intr_depth; }
+int  ps_win_violations(void)  { return s_win_violations; }
+static const char *s_win_last;
+/* 只在"当前确实屏蔽着中断"时计数; 生产路径在门外调用同一个函数则不记。 */
+void ps_win_note(const char *what)
+{
+    if (s_intr_masked) { s_win_violations++; s_win_last = what; }
+}
+const char *ps_win_last_item(void) { return s_win_last ? s_win_last : "(none)"; }
+void ps_win_violations_clear(void) { s_win_violations = 0; s_win_last = RT_NULL; }
+
+/* ---- 许可脚(PC.23 的等价物): 裸写请求 vs 实际焊盘 vs 回读确认, 三者分列 ---- */
+rt_base_t safety_drv_permit_pin(void) { return safety_pin(PIN_NAME_DRV_ENABLE); }
+
+static rt_err_t permit_raw_write(rt_uint8_t level)
+{
+    rt_base_t p = safety_pin(PIN_NAME_DRV_ENABLE);
+
+    if (p < 0) return -RT_ENOSYS;
+    if (level) writes_high++; else writes_low++;
+    rt_pin_write(p, level);                 /* 桩按 pin 表更新 pad_level */
+    last_enable_ret = enable_write_rc;      /* 裸写请求的返回结果(独立注入) */
+    return enable_write_rc;
+}
+
+rt_err_t safety_drv_permit_low_raw_held(void)  { return permit_raw_write(0u); }
+rt_err_t safety_drv_permit_high_raw_held(void) { return permit_raw_write(1u); }
+
+/* 确认 = 只看**实际焊盘电平**, 与"写请求是否被接受"互不代替 */
+rt_err_t safety_drv_permit_confirm_read(rt_uint8_t level)
+{
+    return (pad_level == (rt_int32_t)level) ? RT_EOK : -RT_EIO;
+}
+
+rt_err_t safety_drv_permit_confirm_low(void) { return safety_drv_permit_confirm_read(0u); }
+
+/* ---- 真实 drv_epwm.h 的 prepare/commit 端口(门外纯计算 + 门内整数写) ---- */
+#include "drv_epwm.h"          /* 真实公开头(struct ns800_epwm_prepared 的唯一定义处) */
+static rt_err_t rc_prepare = RT_EOK;
+void ps_sim_epwm_set_prepare_rc(rt_err_t r) { rc_prepare = r; }
+
+int ns800_epwm_prepare(struct rt_device_pwm *device, rt_uint32_t channel,
+                       rt_uint32_t period_ns, rt_uint32_t pulse_ns,
+                       struct ns800_epwm_prepared *out)
+{
+    (void)device;
+    if (out == RT_NULL) return -RT_EINVAL;
+    if (rc_prepare != RT_EOK) return (int)rc_prepare;
+    memset(out, 0, sizeof(*out));
+    out->channel      = channel;
+    out->count_mode   = 2u;              /* EPWM_COUNTER_MODE_UP_DOWN(桩侧固定值) */
+    out->clock_div    = 1u;              /* EPWM_CLOCK_DIVIDER_2 */
+    out->hs_clock_div = 0u;              /* EPWM_HSCLOCK_DIVIDER_1 */
+    out->period_ns    = period_ns;
+    out->pulse_ns     = pulse_ns;
+    out->tb_period    = (rt_uint16_t)(period_ns / 10u);
+    out->cmp_val      = (rt_uint16_t)(pulse_ns / 10u);
+    out->valid        = 1u;
+    return RT_EOK;
+}
+
+/* 门内提交: 只记一次"整数写"并复用 rt_pwm_set 的注入结果(不写回计数模式)。
+ * ⚠ 这是**端口桩**, 不等于真实 HAL 叶子; C10 用另一条链真编译 drv_epwm.c。 */
+int ns800_epwm_commit_prepared_held(struct rt_device_pwm *device,
+                                    const struct ns800_epwm_prepared *prepared)
+{
+    if (prepared == RT_NULL || prepared->valid != 1u) return -RT_EINVAL;
+    return (int)rt_pwm_set(device, (int)prepared->channel,
+                           prepared->period_ns, prepared->pulse_ns);
+}
+
+#include "stop_priority.c"
+
 #include "step_pwm.c"
 #include "motor.c"
 #include "safety_state.c"
@@ -635,6 +742,18 @@ static void cases_init(void)
              mot_stop_result_name(res), (int)lat));
 }
 
+/* 前置专用 helper: "诊断侧最近一次关断被驱动接受"(不等于 off_confirmed 那个收紧门;
+ * 锁存位只能由人工恢复清除, 用它当前置会把恢复前的这条路永久堵死)。 */
+static rt_bool_t step_pwm_get_off_accepted_for_pre(void)
+{
+    mot_stop_result_t r;
+    rt_err_t          rc;
+    rt_bool_t         lat;
+
+    step_pwm_get_stop_state(&r, &rc, &lat);
+    return (r == MOT_STOP_API_ACCEPTED) ? RT_TRUE : RT_FALSE;
+}
+
 /* ---------------------------------------------------------------------- */
 /* PS02/PS03: emergency_stop 的两步结果                                   */
 /* ---------------------------------------------------------------------- */
@@ -760,28 +879,37 @@ static void cases_disarm(void)
 /* ---------------------------------------------------------------------- */
 static void cases_diag_never_held(void)
 {
-    rt_err_t e;
     mot_stop_result_t dres;
     rt_err_t drc;
     rt_bool_t dlat;
     int d0;
+    int ev0;
 
     /* 前置不成立时**不跳过本组用例**: 记一次 PRE-FAIL 让后续断言自己判 FAIL,
      * 这样"必需 id 缺席"永远不会发生(缺例按纪律是基础设施故障)。 */
     if (!recover_clean()) g_pre_bad++;
     d0 = ps_sim_pwm_disable_calls();
+    ev0 = ps_event_sends();
     ps_sim_pwm_set_rc(RT_EOK, RT_EOK, -RT_EIO);   /* 就算注入失败也不该被尝试 */
-    e = step_pwm_force_stop();
+    /* CP3 §9 第 3 项: 原 step_pwm_force_stop() 是被点名删除的**旁路**(它会让统一停机
+     * 与 fault_reset 各关一次共享模块)。同一业务断言改走**生产入口** `pwm_test stop`
+     * —— 它内部就是那条唯一的 checked 关断路径, "诊断未持有"分支必须: 不动共享模块、
+     * 不新置失败锁存、不伪造一次成功、**也不投任何事件**(无自激)。 */
+    msh_pwm_test("stop");
     step_pwm_get_stop_state(&dres, &drc, &dlat);
     CHECK("PS05h-not-held-close_is_not_a_failure",
-          e == RT_EOK && dlat == RT_FALSE && dres == MOT_STOP_NOT_ATTEMPTED &&
+          dlat == RT_FALSE && dres == MOT_STOP_NOT_ATTEMPTED &&
           step_pwm_output_active() == RT_FALSE &&
           step_pwm_off_confirmed() == RT_TRUE &&
-          ps_sim_pwm_disable_calls() == d0,
-          fm("rc=%d disable %d->%d last=%s latched=%d active=%d off_confirmed=%d",
-             (int)e, d0, ps_sim_pwm_disable_calls(), mot_stop_result_name(dres),
+          ps_sim_pwm_disable_calls() == d0 &&
+          ps_event_sends() == ev0 &&
+          ps_cap_has("无需关断动作") == 1,
+          fm("disable %d->%d last=%s latched=%d active=%d off_confirmed=%d"
+             " event=%d->%d 无动作日志=%d",
+             d0, ps_sim_pwm_disable_calls(), mot_stop_result_name(dres),
              (int)dlat, (int)step_pwm_output_active(),
-             (int)step_pwm_off_confirmed()));
+             (int)step_pwm_off_confirmed(), ev0, ps_event_sends(),
+             ps_cap_has("无需关断动作")));
 
     ps_cap_clear();
     ((ps_cmd0_t)ps_mshref_step_status)();
@@ -807,6 +935,8 @@ static void cases_diag_ovr(void)
     rt_err_t drc;
     rt_bool_t dlat;
     int en0, d0;
+    rt_uint32_t epoch0;
+    sp_token_t gtok;
 
     /* 前置不成立时**不跳过本组用例**: 记一次 PRE-FAIL 让后续断言自己判 FAIL,
      * 这样"必需 id 缺席"永远不会发生(缺例按纪律是基础设施故障)。 */
@@ -818,18 +948,32 @@ static void cases_diag_ovr(void)
 
     ps_sim_pwm_set_rc(RT_EOK, RT_EOK, -RT_EIO);
     d0 = ps_sim_pwm_disable_calls();
-    e = step_pwm_force_stop();
+    epoch0 = sp_epoch();
+    /* CP3 §9 第 3 项: 原 step_pwm_force_stop() 是会造成重复 disable 的旁路, 已删除。
+     * 同一业务断言改走**生产入口** `pwm_test stop`(内部就是那条唯一的 checked 关断
+     * 路径); 该入口返回 void, 所以"关断失败"这一事实改由 canonical 镜像的原始 rc
+     * 来判(drc), 与输出是否仍持有/锁存/结果分列的判据一字未减。 */
+    msh_pwm_test("stop");
     step_pwm_get_stop_state(&dres, &drc, &dlat);
     CHECK("PS05a-force_stop_fail_keeps_owner",
-          e == -RT_EIO && step_pwm_output_active() == RT_TRUE &&
+          drc == -RT_EIO && step_pwm_output_active() == RT_TRUE &&
           step_pwm_off_confirmed() == RT_FALSE && dlat == RT_TRUE &&
-          dres == MOT_STOP_API_FAILED && ps_sim_pwm_disable_calls() == d0 + 1,
-          fm("rc=%d active=%d off_confirmed=%d latched=%d last=%s",
-             (int)e, (int)step_pwm_output_active(), (int)step_pwm_off_confirmed(),
-             (int)dlat, mot_stop_result_name(dres)));
+          dres == MOT_STOP_API_FAILED &&
+          /* S2 计数逐项解释(CP3 §10.4): 一次 `pwm_test stop` 失败 = **两个不同代次**的动作:
+           *   ① checked 关断路径自己的那一次 disable(诊断这一路);
+           *   ② 失败交给既有链时 safety_post_event 的"新的显式保护请求"(§4.2 明确允许,
+           *      每次都换 epoch), 它自己再做一次短保护。
+           * 这不是同一动作内的重试/覆盖 —— 下面额外断言 epoch 确实前进了(强于旧的
+           * "恰好一次"), 而失败不释放所有权/锁存/结果分列的判据一字未减。 */
+          ps_sim_pwm_disable_calls() == d0 + 2 && sp_epoch() > epoch0,
+          fm("diag_rc=%d active=%d off_confirmed=%d latched=%d last=%s"
+             " disable %d->%d epoch %u->%u",
+             (int)drc, (int)step_pwm_output_active(), (int)step_pwm_off_confirmed(),
+             (int)dlat, mot_stop_result_name(dres), d0, ps_sim_pwm_disable_calls(),
+             (unsigned)epoch0, (unsigned)sp_epoch()));
 
     /* 再试一次仍然失败 => 所有权仍未交回(不谎报 "released") */
-    (void)step_pwm_force_stop();
+    msh_pwm_test("stop");
     step_pwm_get_stop_state(&dres, &drc, &dlat);
     CHECK("PS05b-repeat_stop_still_not_released",
           step_pwm_output_active() == RT_TRUE && drc == -RT_EIO &&
@@ -844,12 +988,18 @@ static void cases_diag_ovr(void)
     CHECK("PS05c-new_diag_enable_refused", ps_sim_pwm_enable_calls() == en0,
           fm("enable 次数 %d->%d (必须不变)", en0, ps_sim_pwm_enable_calls()));
 
-    /* 借用门在六道门之外因锁存而拒绝(把 Motor 侧/许可/反馈都保持干净) */
-    e = motor_pwm_grant_to_diag();
+    /* 借用门在六道门之外因锁存而拒绝(把 Motor 侧/许可/反馈都保持干净)。
+     * CP3 §9 第 4 项: 真借用调用必须带 out_token; 被拒时身份不得被写出。 */
+    gtok.owner = SP_NONE;
+    gtok.epoch = 0u;
+    e = motor_pwm_grant_to_diag(&gtok);
     CHECK("PS05f-grant_refused_by_diag_latch",
-          e == -RT_EPERM && step_pwm_off_confirmed() == RT_FALSE,
-          fm("grant rc=%d off_confirmed=%d (宏全开也不放行未复核的关断失败)",
-             (int)e, (int)step_pwm_off_confirmed()));
+          e == -RT_EPERM && step_pwm_off_confirmed() == RT_FALSE &&
+          gtok.owner == SP_NONE && gtok.epoch == 0u,
+          fm("grant rc=%d off_confirmed=%d token=(owner=%d,epoch=%u)"
+             " (宏全开也不放行未复核的关断失败)",
+             (int)e, (int)step_pwm_off_confirmed(), (int)gtok.owner,
+             (unsigned)gtok.epoch));
 
     /* Motor 接管被拒(所有权保守判据) */
     e = motor_arm();
@@ -866,9 +1016,13 @@ static void cases_diag_ovr(void)
           fm("捕获含 no(安全)=%d 含 UNKNOWN=%d",
              ps_cap_has("no(安全)"), ps_cap_has("UNKNOWN")));
 
-    /* 交回通道: 一次成功的关断被接受 => 释放所有权(锁存仍在, 由人工恢复清除) */
+    /* 交回通道: 一次成功的关断被接受 => 释放所有权(锁存仍在, 由人工恢复清除)。
+     * CP3 §9 第 3 项: 走**生产入口** `pwm_test stop`(内部即那条唯一的 checked 关断),
+     * 前置是否成立改由 canonical 的诊断结果判定, 不依赖已删除的旁路返回码。 */
     ps_sim_pwm_set_rc(RT_EOK, RT_EOK, RT_EOK);
-    if (step_pwm_force_stop() != RT_EOK)
+    msh_pwm_test("stop");
+    step_pwm_get_stop_state(&dres, &drc, &dlat);
+    if (dres != MOT_STOP_API_ACCEPTED)
     { g_pre_bad++; printf("PRE-FAIL|diag-owner-not-released\n"); }
     step_pwm_get_stop_state(&dres, &drc, &dlat);
     CHECK("PS05g-owner_released_success_latch_kept",
@@ -899,7 +1053,12 @@ static void cases_shutdown(void)
         printf("PRE-FAIL|shutdown-diag-not-owner (诊断未能持有通道)\n");
         want_dis = 1;                             /* 那就只要求 Motor 侧那一次 */
     }
-    else want_dis = 2;
+    /* S2(CP3 §10.4"共享实际动作导致计数变化逐项解释"): 统一停机的短保护在**一个**
+     * 窗口里对共享的 epwm1 时间基做**一次** rt_pwm_disable, Motor 侧与诊断侧看的
+     * 是同一次实际动作(§4.2 明确禁止同一波停机里的第二次 disable, 那会让后一次的
+     * 成功掩盖前一次的失败)。所以 want_dis 从 S1 的"+2(两路各一次)"改成"+1(一次共享)"。
+     * 两路各自的**结果/所有权/锁存**判据一字未减: PS06c/PS10b/PS05x/PS14x 仍然分列断言。 */
+    else want_dis = 1;
 #endif
     ps_sim_pwm_set_rc(RT_EOK, RT_EOK, -RT_EIO);   /* 两路关断都会失败 */
     d0 = ps_sim_pwm_disable_calls();
@@ -935,7 +1094,11 @@ static void cases_shutdown(void)
     /* 收口: 让诊断侧真实成功一次以交回所有权(失败锁存**不**在这里清, 由 PS09 的
      * 人工恢复路径负责) —— 否则后面的用例会被"还占着通道"假性挡住。 */
     ps_sim_pwm_set_rc(RT_EOK, RT_EOK, RT_EOK);
-    if (step_pwm_force_stop() != RT_EOK)
+    msh_pwm_test("stop");
+    /* 同 PS09 的理由: 锁存仍在时 output_active 的保守判据仍为真, 前置要看的是
+     * "这次诊断关断被驱动接受 + 预约身份已交回", 不是那个收紧的门禁位。 */
+    if (step_pwm_get_off_accepted_for_pre() != RT_TRUE ||
+        sp_owner_is(SP_DIAG) == RT_TRUE)
     { g_pre_bad++; printf("PRE-FAIL|shutdown-diag-still-owned\n"); }
 #endif
 }
@@ -991,7 +1154,21 @@ static void cases_clear(void)
              ps_enable_write_calls(1)));
 
     /* 前置: 诊断侧也由生产路径自己取得一次成功关断(不伪造) */
-    if (step_pwm_force_stop() != RT_EOK)
+    /* CP3 §9 第 3 项: 原 step_pwm_force_stop() 是被点名删除的旁路(会和统一停机/
+     * fault_reset 各关一次共享模块)。同一前置改走**生产入口** `pwm_test stop`,
+     * 判据换成"诊断侧确有有效关断结果且不谎称持有"。 */
+    ps_sim_pwm_set_rc(RT_EOK, RT_EOK, RT_EOK);
+    msh_pwm_test("stop");
+    /* CP3 §10.4 适配说明: 这里**不能**用 step_pwm_off_confirmed() 当前置。它按合同把
+     * "未复核的历史关断失败锁存"也算无效(那是给 arm/start/借用门的收紧判据), 而锁存
+     * 只能由 fault_reset 的人工恢复清除 —— 拿它当前置会把这条路永久堵死(S2-C13 反例)。
+     * 前置真正要的是"这次诊断关断被驱动接受 + 预约身份已交回"。 */
+    /* 前置要的是"诊断侧不再欠着这个通道":
+     *  - host_ovr: 诊断真持有过, 这次关断被驱动接受且预约已交回;
+     *  - target  : 诊断借用门在宏 FALSE 下从未放行(NOT_ATTEMPTED, 也没有失败锁存),
+     *              此时"要求一次 API_ACCEPTED"反而会把合法的前置判成失败。
+     * 两个变体共同的、也是这条前置真正要保护的事实 = owner 已不是 SP_DIAG。 */
+    if (sp_owner_is(SP_DIAG) == RT_TRUE)
     { g_pre_bad++; printf("PRE-FAIL|diag_retry_not_accepted\n"); }
     en0 = ps_sim_pwm_enable_calls();
     safety_fault_reset_manual();
@@ -1038,7 +1215,12 @@ static void cases_enn(void)
         printf("PRE-FAIL|enn-diag-not-owner (诊断未能持有通道)\n");
         want_dis = 1;
     }
-    else want_dis = 2;
+    /* S2(CP3 §10.4"共享实际动作导致计数变化逐项解释"): 统一停机的短保护在**一个**
+     * 窗口里对共享的 epwm1 时间基做**一次** rt_pwm_disable, Motor 侧与诊断侧看的
+     * 是同一次实际动作(§4.2 明确禁止同一波停机里的第二次 disable, 那会让后一次的
+     * 成功掩盖前一次的失败)。所以 want_dis 从 S1 的"+2(两路各一次)"改成"+1(一次共享)"。
+     * 两路各自的**结果/所有权/锁存**判据一字未减: PS06c/PS10b/PS05x/PS14x 仍然分列断言。 */
+    else want_dis = 1;
 #endif
     ps_set_fb(0u, SAFETY_FB_NO_SAMPLE);
     ps_set_fb(1u, SAFETY_FB_NO_SAMPLE);
@@ -1072,7 +1254,10 @@ static void cases_enn(void)
     ps_sim_pwm_set_rc(RT_EOK, RT_EOK, RT_EOK);
 #ifdef PS_GATE_HOST_OVERRIDE
     /* 先把诊断侧的关断结果做成"有效"(真实成功一次), 这样拒绝原因就只剩后置复核 */
-    if (step_pwm_force_stop() != RT_EOK)
+    ps_sim_pwm_set_rc(RT_EOK, RT_EOK, RT_EOK);
+    msh_pwm_test("stop");               /* 同上: 生产入口, 不再用已删除的旁路 */
+    if (step_pwm_get_off_accepted_for_pre() != RT_TRUE ||
+        sp_owner_is(SP_DIAG) == RT_TRUE)
     {
         g_pre_bad++;
         printf("PRE-FAIL|enn10c-diag-not-off (诊断侧关断没能重取成功结果)\n");
@@ -1100,7 +1285,8 @@ static void cases_target_gates(void)
     rt_err_t rc;
     mot_stop_result_t res;
     motor_snapshot_t sn;
-    int high0, en0, dis0, wr0, bus0;
+    sp_token_t gtok;
+    int high0, en0, dis0, wr0, bus0, en1, dis1;
 
     /* 前置不成立时**不跳过本组用例**: 记一次 PRE-FAIL 让后续断言自己判 FAIL,
      * 这样"必需 id 缺席"永远不会发生(缺例按纪律是基础设施故障)。 */
@@ -1115,11 +1301,29 @@ static void cases_target_gates(void)
              ps_enable_write_calls(1)));
 
     en0 = ps_sim_pwm_enable_calls();
-    e = motor_pwm_grant_to_diag();
+    /* CP3 §9 第 4 项: 借用入口现在**返回真实预约身份**(sp_token_t), 目标宏下被拒时
+     * 不得留下任何预约(owner 仍是 NONE)。同时新增只读体检入口 motor_diag_gate_check():
+     * 状态查询一类路径只能用它, 不许在查询里产生预约。 */
+    gtok.owner = SP_NONE;
+    gtok.epoch = 0u;
+    e = motor_pwm_grant_to_diag(&gtok);
     CHECK("PS11b-diag_step_denied",
-          e == -RT_EPERM && ps_sim_pwm_enable_calls() == en0,
-          fm("grant rc=%d enable 次数 %d->%d", (int)e, en0,
-             ps_sim_pwm_enable_calls()));
+          e == -RT_EPERM && ps_sim_pwm_enable_calls() == en0 &&
+          gtok.owner == SP_NONE && gtok.epoch == 0u &&
+          sp_owner_is(SP_NONE) == RT_TRUE,
+          fm("grant rc=%d enable 次数 %d->%d token=(owner=%d,epoch=%u) owner_is_none=%d",
+             (int)e, en0, ps_sim_pwm_enable_calls(), (int)gtok.owner,
+             (unsigned)gtok.epoch, (int)sp_owner_is(SP_NONE)));
+    /* 只读体检: 同一拒绝条件, 但**不产生预约**(逐项零副作用) */
+    en1 = ps_sim_pwm_enable_calls();
+    dis1 = ps_sim_pwm_disable_calls();
+    e = motor_diag_gate_check();
+    CHECK("PS11b2-gate_check_is_read_only",
+          e == -RT_EPERM && ps_sim_pwm_enable_calls() == en1 &&
+          ps_sim_pwm_disable_calls() == dis1 && sp_owner_is(SP_NONE) == RT_TRUE,
+          fm("diag_gate_check rc=%d enable %d->%d disable=%d owner_is_none=%d",
+             (int)e, en1, ps_sim_pwm_enable_calls(), dis1,
+             (int)sp_owner_is(SP_NONE)));
 
     m = tmc2209_get_write_gate_mask();
     CHECK("PS11c-tmc_write_gate_has_macro_bit",
@@ -1472,13 +1676,23 @@ static void cases_fault_handoff(void)
     bits0 = (int)ps_event_bits();
     e = motor_disarm();
     motor_get_stop_state(&res, RT_NULL, RT_NULL, &lat);
+    /* S2(2026-10-23 CP3 适配, 任务书 §8.2): 状态查询**先读 canonical 抑制位**,
+     * 所以一次失败关断留下的抑制必须"立刻可观测"为 FAULT_LATCHED —— 原先 S1 断言的
+     * "disarm 之后 Safety 仍是 READY" 描述的是 disarm 不**直接写** SS 状态, 这一点
+     * 仍然成立(写 SS 状态的仍然是消费者), 但视图已按抑制位收紧。
+     * 判据因此换成三条更强/更具体的事实: ①状态可观测为 FAULT_LATCHED;
+     * ②该事实来自 canonical 抑制(sp_inhibited()); ③待整理义务确实留给了消费者
+     * (safety_trip_pending()), 由 PS14b 的消费者真正落位并只触发一次黑匣子。 */
     CHECK("PS14a-disarm_pwmfail_posts_software_fault_once",
           e == -RT_EIO && lat == RT_TRUE && res == MOT_STOP_API_FAILED &&
           ps_event_sends() == ev0 + 1 && ps_event_last() == (rt_uint32_t)EVT_SOFT_FAULT &&
-          safety_state_get() == SAFETY_READY,
-          fm("disarm rc=%d event %d->%d last=0x%X bits0=0x%X safety=%s latch=%d",
+          safety_state_get() == SAFETY_FAULT_LATCHED &&
+          sp_inhibited() == RT_TRUE && safety_trip_pending() == RT_TRUE,
+          fm("disarm rc=%d event %d->%d last=0x%X bits0=0x%X safety=%s latch=%d"
+             " inhibited=%d trip_pending=%d",
              (int)e, ev0, ps_event_sends(), (unsigned)ps_event_last(),
-             (unsigned)bits0, safety_state_name(safety_state_get()), (int)lat));
+             (unsigned)bits0, safety_state_name(safety_state_get()), (int)lat,
+             (int)sp_inhibited(), (int)safety_trip_pending()));
 
     /* ② 既有消费者接管(桩): 统一停机 -> 合法故障态, 人工恢复入口从此可达 */
     safety_force_shutdown(FAULT_SOFT);            /* == safety_thread 消费 EVT_SOFT_FAULT */
@@ -1695,6 +1909,14 @@ int main(void)
 #else
     cases_target_gates();
 #endif
+
+    /* CP3 §9 第 2/5 项的总账: 整条链跑完之后, "在 PRIMASK 窗口内取锁/睡眠/打印"
+     * 必须一次都没有发生过。计数由端口在每个可疑入口按当前掩码状态累加。 */
+    CHECK("PS16a-window_forbidden_calls_zero",
+          ps_win_violations() == 0,
+          fm("窗口内禁止项命中=%d 最后一次=%s 结束时掩码=%d 深度=%d",
+             ps_win_violations(), ps_win_last_item(),
+             ps_win_masked(), ps_win_depth()));
 
     printf("SUMMARY|cases=%d pass=%d fail=%d pre_bad=%d\n",
            g_run, g_pass, g_fail, g_pre_bad);

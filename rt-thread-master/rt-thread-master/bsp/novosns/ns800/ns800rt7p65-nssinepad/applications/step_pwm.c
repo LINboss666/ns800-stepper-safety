@@ -150,13 +150,13 @@ static rt_err_t step_pwm_disable_checked(rt_uint8_t src)
     return e;
 }
 
-/* 统一停机(safety_force_shutdown)的诊断侧**慢整理**: 共享模块的真实关断已由那次
- * 短保护做过, 这里**不再另关一次**(那会形成同一波停机里的第二次 disable)。
- * 本函数只把 canonical 结果抄进本模块镜像, 不产生任何硬件动作。 */
-void step_pwm_reconcile_after_trip(void)
+/* R1: 慢整理/恢复提交窗口内的诊断镜像写(调用方已持短临界区, 本函数不开窗口、
+ * 不取锁、不打印、不碰硬件)。 */
+void step_pwm_shadow_from_proof_held(const sp_proof_t *pf)
 {
-    step_stop_mirror();
-    if (!step_pwm_diag_holds()) step_enabled = RT_FALSE;
+    if (pf == RT_NULL || !pf->valid) return;
+    sp_view_diag_held(&step_stop_result, &step_stop_rc, &step_stop_latched);
+    if (!sp_diag_output_active_held()) step_enabled = RT_FALSE;
 }
 
 /* 人工恢复最终提交窗内的诊断字段复位(调用方已持短临界区, 不取锁、不打印、不碰硬件)。
@@ -188,7 +188,6 @@ static void pwm_test(int argc, char **argv)
     rt_uint32_t period_ns;
     struct ns800_epwm_prepared prepared;
     sp_token_t  tok;
-    rt_bool_t   tok_held = RT_FALSE;
     rt_base_t   lvl;
     rt_err_t    e;
 
@@ -259,7 +258,6 @@ static void pwm_test(int argc, char **argv)
                    " 或 EPWM1 ch0 仍由 Motor 占用。改用 motor_* 正式 API。\n");
         return;
     }
-    tok_held = RT_TRUE;
 
     /* 换算在**门外**做(浮点/除法不进短临界区), 门内只有固定整数寄存器写。 */
     period_ns = 1000000000u / hz;

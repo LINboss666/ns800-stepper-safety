@@ -12,8 +12,8 @@
   "checkpoint_status": {
     "CP1": "实现完成 + Keil 0/0 + 仓外单线程冒烟 67/67",
     "CP2": "实现完成 + Keil 0/0; 预算链路真执行为 0",
-    "CP3": "未开始(夹具接入项已定位)",
-    "CP4": "未开始"
+    "CP3": "R1-R6 实现修复完成 + §10.2 修后证明 13/13 + 夹具接入 6/7 项完成 + 四条既有链与 Keil 全绿；**第 6 项(反向锚)与 S2-C01..C20 未执行**",
+    "CP4": "未开始(C01-C20 与两类反向仍在)"
   },
   "modified_files": [
     "applications/stop_priority.h (新增)",
@@ -105,10 +105,54 @@
     "drv_epwm configuration_convert 在冻结模式下取 signal_freq 未初始化(随计数模式取源变更一并消除); 其频率后果未上板验证"
   ],
   "next_steps": [
-    "CP3: 接入夹具 7 项(s1_chain_before_after.txt [C])",
-    "CP3: 建 run_stop_priority_s2.sh 执行 C01-C20 适用集合",
-    "CP3: 两类必要反向 + 两项 S1 反向锚点重指",
-    "CP4: 集中回归 + Keil + 最终交接 + push + ls-remote 回读"
+    "建 shim_s2 + sp_conc_main.c + run_stop_priority_s2.sh, 真执行 S2-C01..C20(target/host_ovr 分测)",
+    "S2 两类反向 + S1 两项反向锚点重指(逐失败身份, 不用崩溃/编译失败算检出)",
+    "再一次集中回归 + Keil + 交接 + push + ls-remote 回读"
   ],
-  "stop_claim": "NO SOFTWARE_REVIEW_GO claimed by Agent; 本轮不称 §11 验证完成"
+  "stop_claim": "STOP: AWAITING_INDEPENDENT_IMPLEMENTATION_REVIEW; Agent 不自授 SOFTWARE_REVIEW_GO; 无板级/串口/GPIO/TMC/STEP/电机授权; 四宏保持 RT_FALSE; RISK-03/03a 与物理 RISK-04-b 继续开放",
+  "cp3_task_book": "NS800_S2_CP3_Review_and_Completion_Task_4641d49_20261023.md",
+  "cp3_baseline_commit": "4641d491c6ff1251730c99f6ad14eb4424f1dbac",
+  "cp3_fixes": {
+    "R1": "pending 改 peek+ack 同窗、确认带 epoch/请求电平、force_shutdown 与事件消费者合并为 ss_reconcile_once、一次提交一次黑匣子",
+    "R2": "arm/start/ramp 全用局部 token 快照 + 唯一 out + ce_sub 参与判定",
+    "R3": "DIR 在 mot_lock + 一个短窗口内重核全部静止/可信关闭/owner/phase 并同窗写 DIR",
+    "R4": "保护前打印全部取消(IFCNT/读回/GCONF/CHOPCONF/apply 进度)、上下文改 rt_interrupt_get_nest+PRIMASK+线程、RX 查阶段期限、TX 末字节后复查、integrity 叶锁失败即保护、apply 最终比较与提交同窗、view_publish 绑代次清失效、通信失败用 FAULT_TMC_COMM",
+    "R5": "HIGH/RUN 生产接口自守编译期许可(HIGH 仅 MOTOR; Motor RUN 另需 phase>=ARMED; 诊断 RUN 双宏; 非法 owner 拒绝)",
+    "R6": "SP_EPOCH_MAX=0xFFFFFFFF; can_advance 与 advance 成败对齐; 边界失败不返回 EOK 且保持抑制; 恢复 valid 预检本次 PWM/许可写与确认同 ticket; 快照可判定首错有效性",
+    "self_introduced_fixed": [
+      "stop_priority.h 注释内 */ 提前闭合",
+      "sp_diag/motor_output_active 丢失 sp_win() 赋值(未初始化 l)",
+      "sp_copy_proof_held 误用 sp.diag_off_confirmed_held",
+      "sp_can_advance_held 前向声明位置"
+    ]
+  },
+  "cp3_verification": {
+    "baseline_probe": "12/12 基线观察成立(未修复 4641d49, gcc 4.9.2); rc=0 不代表软件 PASS",
+    "post_fix_proofs": "13/13 缺陷未复现(含 2 正向对照 + 1 边界恢复对照 + target API 拒绝)",
+    "s1_chain": "target 50/50 PASS, host_ovr 65/65 PASS (48/64 合同保留并适配 + PS11b2 + PS16a)",
+    "f2d_v1_v2": "V1 25/0, V2 22/0, RUNNER PASS",
+    "io_chain": "27/29/40/42 全部 PASS + 非法宏值被编译期拒绝",
+    "sd_chain": "两变体 PASS",
+    "keil": "0 Error 0 Warning; Code=168018 RO=74602 RW=2188 ZI=83696",
+    "NOT_executed": [
+      "S2-C01..C20 全部",
+      "S2 两类局部反向",
+      "S1 两项反向的锚点重指",
+      "真实 drv_epwm.c/drv_uart.c HAL 叶子"
+    ]
+  },
+  "cp3_fixture_items": {
+    "1_drv_epwm_header_and_ports": "done",
+    "2_irq_thread_model": "partial(无真实线程/ISR 队列)",
+    "3_removed_force_stop": "done",
+    "4_grant_out_token": "done",
+    "5_gpio_raw_vs_confirm": "done",
+    "6_reverse_anchors": "NOT DONE",
+    "7_compile_new_module": "done(stop_priority 真编入 S1/F2d/IO 三条链)"
+  },
+  "evidence_files_new": [
+    "reports/reviews/phase8-stop-priority-s2-integrated/cp3_baseline_observation.txt",
+    "reports/reviews/phase8-stop-priority-s2-integrated/cp3_post_fix_proofs.txt",
+    "reports/reviews/phase8-stop-priority-s2-integrated/cp3_host_chains.txt"
+  ]
 }

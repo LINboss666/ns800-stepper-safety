@@ -257,28 +257,27 @@ static void mot_res_clear(void)
 /* 配置的整数寄存器提交与(需要时的)启动必须在同一个 token 门内, 中间不得再开第二个窗口:
  * 换算已由 ns800_epwm_prepare() 在门外做完, 门内只有固定数目的寄存器写。
  * 时间基处于冻结时写比较值不产生边沿, 而 drv_epwm 已不再由配置路径回写计数模式,
- * 所以"开始输出"只能是显式的 sp_pwm_start_held()。 */
-static rt_err_t mot_pwm_commit_gated(const struct ns800_epwm_prepared *prepared)
+ * 所以"开始输出"只能是显式的 sp_pwm_start_held()。
+ * R2(2026-10-23): 门用的是**调用方那一次操作的 token 快照**, 不是可变全局 mot_res ——
+ * 否则"旧操作在慢步骤之后重新去读全局"就等于把旧动作换了新身份(审查探针
+ * old-start-adopts-new-token)。快照失配时本函数一个寄存器都不写。 */
+static rt_err_t mot_pwm_commit_gated(const sp_token_t *tok,
+                                     const struct ns800_epwm_prepared *prepared)
 {
     rt_base_t lvl;
     rt_err_t  e, e2;
 
-    if (!mot_res_ok)
+    if (tok == RT_NULL || (tok->epoch == 0u && tok->owner == SP_NONE))
     {
-        rt_kprintf("[MOT] PWM 提交被拒: 没有有效预约(需先 motor_arm)\n");
+        rt_kprintf("[MOT] PWM 提交被拒: 本次操作没有有效预约(需先 motor_arm)\n");
         return -RT_EPERM;
     }
-    e = sp_enter_token(&mot_res, &lvl);
-    if (e != RT_EOK)
-    {
-        mot_res_clear();
-        return e;
-    }
+    e = sp_enter_token(tok, &lvl);
+    if (e != RT_EOK) return e;
     e2 = ns800_epwm_commit_prepared_held(mot_pwm, prepared);
     if (e2 != RT_EOK) { sp_leave_token(lvl); return e2; }
-    e2 = sp_pwm_start_held(&mot_res);
+    e2 = sp_pwm_start_held(tok);
     sp_leave_token(lvl);
-    if (e2 != RT_EOK) mot_res_clear();
     return e2;
 }
 
@@ -289,10 +288,12 @@ static rt_err_t mot_pwm_commit_gated(const struct ns800_epwm_prepared *prepared)
  * ⚠ 返回非 EOK 时抑制与许可 LOW 已在同一窗口做过, 调用方**不得**再补第二次关断
  *   (S1-R1 R04 的"一个动作内 disable 恰好一次、首错不被后一次成功覆盖"继续成立)。
  * 调用约定不变: 多数调用点持 mot_lock(镜像写需要它); motor_init 在斜坡线程建立之前调用。 */
-static rt_err_t mot_pwm_output_off(rt_uint8_t src)
+static rt_err_t mot_pwm_output_off(rt_uint8_t src, sp_proof_t *pf)
 {
-    rt_err_t e = sp_off_attempt(SP_MOTOR, src, FAULT_SOFT, EVT_SOFT_FAULT, 0, RT_NULL);
+    rt_err_t e;
 
+    if (pf != RT_NULL) rt_memset(pf, 0, sizeof(*pf));
+    e = sp_off_attempt(SP_MOTOR, src, FAULT_SOFT, EVT_SOFT_FAULT, 0, pf);
     mot_stop_mirror();
     if (e != RT_EOK)
         rt_kprintf("[MOT] !! STEP 关断未确认 (rc=%d, src=%s): 输出状态未知; 同一短临界区内"
@@ -323,16 +324,13 @@ static void mot_record_zero_cmd(rt_uint8_t src)
 
 /* 设置指定频率的 50% 占空比脉冲; hz==0 时走同一条 checked 关断路径 */
 /* 许可 HIGH 的门内提交: 资格判定与 GPIO SET 写在同一个短临界区(见 stop_priority.h)。 */
-static rt_err_t mot_permit_high_gated(void)
+static rt_err_t mot_permit_high_gated(const sp_token_t *tok, sp_proof_t *pf)
 {
-    sp_proof_t pf;
-    rt_err_t   e = sp_commit_permit_high(&mot_res, &pf);
-
-    if (e != RT_EOK) mot_res_clear();
-    return e;
+    if (tok == RT_NULL) return -RT_EINVAL;
+    return sp_commit_permit_high(tok, pf);     /* 许可判定 + SET 写在同一窗口(R5 还要过编译期门) */
 }
 
-static rt_err_t mot_pwm_apply(rt_uint32_t hz)
+static rt_err_t mot_pwm_apply(rt_uint32_t hz, const sp_token_t *tok, sp_proof_t *pf)
 {
     rt_err_t e;
 
@@ -342,14 +340,14 @@ static rt_err_t mot_pwm_apply(rt_uint32_t hz)
         return -RT_ENOSYS;
     }
     if (hz == 0)
-        return mot_pwm_output_off(MOT_STOP_SRC_RAMP_ZERO);
+        return mot_pwm_output_off(MOT_STOP_SRC_RAMP_ZERO, pf);
     {
         struct ns800_epwm_prepared prepared;
 
         e = ns800_epwm_prepare(mot_pwm, (rt_uint32_t)MOTOR_PWM_CH,
                                1000000000u / hz, 500000000u / hz, &prepared);
         if (e != RT_EOK) return e;
-        e = mot_pwm_commit_gated(&prepared);
+        e = mot_pwm_commit_gated(tok, &prepared);
         mot_stop_mirror();
         if (e == RT_EOK) mot.stop_result = MOT_STOP_OUTPUT_REQUESTED;
         return e;
@@ -381,9 +379,21 @@ static rt_uint32_t mot_ramp_step(rt_uint32_t cur, rt_uint32_t tgt,
  * 不再第二次调用 rt_pwm_disable —— 之前"回退里连关两次"会让第二次的成功覆盖第一次
  * 的失败(stop_rc/src 都被改写), 与 §4.1/§4.2"每个返回值都被消费、一个动作不互相
  * 覆盖"相矛盾。撤销许可与投递事件仍然照做, 失败也不跳过。 */
-static void mot_fail_closed(rt_err_t pwm_e)
+static void mot_fail_closed(const sp_proof_t *pf)
 {
-    rt_err_t ge = mot_drv_en_request(0);
+    rt_err_t ge;
+
+    /* R1/R2(2026-10-23 CP3): 如果上面那次关断**已经失败**, sp 在同一个短窗口里就
+     * 发出过许可 LOW 裸写(request_level=0 且 written) —— 这里不再第二次写 LOW,
+     * 只做带 settle 的回读确认(并绑定本次 proof 那一代的身份)。
+     * 只有"关断被正常接受、没有形成故障事实"的那一支才还需要主动请求 LOW。
+     * 与 S1-R1 R04 同源: 同一个动作里的第二次同方向写只会掩盖第一次的原始结果。 */
+    if (pf != RT_NULL && pf->valid && pf->permit.written &&
+        pf->permit.request_level == 0u)
+        ge = motor_trip_observe(pf);
+    else
+        ge = mot_drv_en_request(0);
+    rt_err_t pwm_e  = (pf != RT_NULL && pf->valid) ? pf->pwm.raw_rc : RT_EOK;
 
     if (ge != RT_EOK)
         rt_kprintf("[MOT] !! FAIL-CLOSED but DRV_ENABLE LOW UNVERIFIED (%d) !!\n",
@@ -391,8 +401,10 @@ static void mot_fail_closed(rt_err_t pwm_e)
     if (pwm_e != RT_EOK)
         rt_kprintf("[MOT] !! FAIL-CLOSED but STEP 关断未确认 (rc=%d): 输出状态未知,"
                    " 已锁存待人工恢复, 不因后续成功而抹掉首错 !!\n", (int)pwm_e);
-    /* S2: 本次动作已经在 sp 的窗口里形成抑制并完成两个降险动作 => 只通知, 不再关闭 */
-    (void)safety_notify_trip_done(EVT_SOFT_FAULT, sp_epoch());
+    /* S2: 本次动作已经在 sp 的窗口里形成抑制并完成两个降险动作 => 只通知, 不再关闭。
+     * R1(2026-10-23): 通知里带的是**这次动作那一代**的 epoch, 不是重采的当前值。 */
+    (void)safety_notify_trip_done(EVT_SOFT_FAULT,
+                                  (pf != RT_NULL && pf->valid) ? pf->epoch : sp_epoch());
     rt_kprintf("[MOT] FAIL-CLOSED (pwm error), EVT_SOFT_FAULT notified (已保护, 待整理)"
                " [stop=%s enable-low=%s]\n",
                mot_stop_result_name(mot.stop_result),
@@ -403,21 +415,24 @@ static void mot_fail_closed(rt_err_t pwm_e)
  * 与 mot_fail_closed() 的区别只有一个: 关断**已经**由调用点做过并记了真实 rc,
  * 这里不再第二次调用 rt_pwm_disable(S1 不引入自动重试), 只做撤销许可 + 投一次事件。
  * 事件由 Safety 线程消费 -> safety_force_shutdown -> motor_emergency_stop(幂等)。 */
-static void mot_stop_unconfirmed_close(rt_err_t pwm_rc, rt_uint8_t src)
+static void mot_stop_unconfirmed_close(const sp_proof_t *pf)
 {
+    rt_err_t pwm_rc = (pf != RT_NULL && pf->valid) ? pf->pwm.raw_rc : RT_EOK;
+    rt_uint8_t src  = (pf != RT_NULL && pf->valid) ? pf->pwm.src : MOT_STOP_SRC_RAMP_ZERO;
+
     /* S2(2026-10-23): 调用点那一次 mot_pwm_output_off() 失败时, sp 已经在**同一个**短
      * 临界区里追加了抑制/换 epoch/许可 LOW 裸写 —— 这里不再第二次写 LOW(那只是重复
      * 同一个动作并拖进 2×1ms 回读延时), 只做**确认**(纯 rt_pin_read + 有界采样)。
      * S1 的"关断失败不跳过撤销许可"仍然成立: LOW 请求已经发出并被记账。 */
-    rt_err_t ge = safety_drv_permit_confirm_low();
-
-    (void)sp_note_low_confirmed(ge);
+    /* R1(2026-10-23): 观察 + 身份化确认(只写进 proof 那一代; 失配记 -RT_EINTR)。 */
+    rt_err_t ge = motor_trip_observe(pf);
     rt_kprintf("[MOT] !! STEP 关断未确认 (rc=%d src=%s): 许可 LOW 裸写已在门内发出(%s)"
                " -> 置 FAULT 并上报一次; 不宣称'输出已停止'\n",
                (int)pwm_rc, mot_stop_src_name(src),
                ge == RT_EOK ? "LOW verified" : "LOW UNVERIFIED");
     /* 短保护已做过 => 只通知, 消费者不再关第二次(任务书 §4.3/§8.1)。 */
-    (void)safety_notify_trip_done(EVT_SOFT_FAULT, sp_epoch());
+    (void)safety_notify_trip_done(EVT_SOFT_FAULT,
+                                  (pf != RT_NULL && pf->valid) ? pf->epoch : sp_epoch());
 }
 
 /* ---------- F2b P1-E: 运行期驱动配置守卫的纯判定 ----------
@@ -474,28 +489,23 @@ void motor_guard_decide(const motor_guard_in_t *in, motor_guard_out_t *out)
  * 返回对外错误码: PWM 关断失败优先, 否则本次调用点已有的第一个错误/许可确认结果。 */
 static rt_err_t mot_arm_rollback(rt_uint32_t code, rt_uint32_t ev, rt_err_t first_err)
 {
-    rt_err_t pe = sp_off_attempt(SP_MOTOR, MOT_STOP_SRC_ARM_ROLLBACK, code, ev, 1,
-                                 RT_NULL);
-    rt_err_t ge;
+    sp_proof_t pf;
+    rt_err_t   pe, ge;
 
-    mot_res_clear();
-    mot_lock_take();
-    mot_stop_mirror();                           /* 镜像写需要持 mot_lock */
-    mot.armed     = 0;
-    mot.current_hz = 0;
-    mot.target_hz  = 0;
-    mot.state      = MOTOR_FAULT;
-    mot_lock_release();
-
-    ge = safety_drv_permit_confirm_low();          /* 只确认, 不再第二次写 LOW */
-    (void)sp_note_low_confirmed(ge);
+    rt_memset(&pf, 0, sizeof(pf));
+    pe = sp_off_attempt(SP_MOTOR, MOT_STOP_SRC_ARM_ROLLBACK, code, ev, 1, &pf);
+    ge = motor_trip_observe(&pf);               /* 只确认, 不再第二次写 LOW */
+    /* R1(2026-10-23): 这一支的关断可能被驱动**接受**(那就不形成 inhibit/pending),
+     * 也可能失败并在同一短窗口内追加抑制 —— 两种都仍是"本次动作那一代",
+     * 所以过**同代门**落位; 期间已被新故障/人工恢复换掉代次则整笔放弃。 */
+    (void)motor_commit_off(&pf, MOT_COMMIT_ROLLBACK);
     if (ge != RT_EOK)
         rt_kprintf("[MOT] !! rollback: DRV_ENABLE LOW UNVERIFIED (%d)"
                    " - 裸写已在同一短临界区内发出 !!\n", (int)ge);
     if (pe != RT_EOK)
         rt_kprintf("[MOT] !! rollback: STEP 关断也未确认 (rc=%d) -> 输出状态未知,"
                    " 已在同窗追加抑制并锁存待人工恢复\n", (int)pe);
-    (void)safety_notify_trip_done(ev, sp_epoch());
+    (void)safety_notify_trip_done(ev, pf.epoch);
     return mot_stop_merge(pe, (first_err != RT_EOK) ? first_err : ge);
 }
 
@@ -505,7 +515,10 @@ static rt_err_t mot_arm_rollback(rt_uint32_t code, rt_uint32_t ev, rt_err_t firs
  * current_hz 清零而宣称"输出已停"。 */
 static void mot_guard_shutdown(rt_uint8_t reason, rt_uint32_t op_epoch)
 {
-    rt_err_t pe;
+    rt_err_t   pe;
+    rt_err_t   ge;
+    rt_err_t   te;
+    sp_proof_t gpf;
     rt_uint32_t ev = (reason == MOT_GUARD_ENN_FEEDBACK) ? EVT_DRV_FEEDBACK : EVT_SOFT_FAULT;
     rt_uint32_t code = (reason == MOT_GUARD_ENN_FEEDBACK) ? FAULT_DRV_FEEDBACK : FAULT_SOFT;
 
@@ -515,31 +528,44 @@ static void mot_guard_shutdown(rt_uint8_t reason, rt_uint32_t op_epoch)
      * sp_trip_for_operation() —— 如果这一拍里更底层(例如 TMC 配置事务的失败出口)
      * 已经保护过, epoch 已经变化, 它会返回 -RT_EINTR 并且**不做第二轮关闭**;
      * 守卫随后的状态整理与通知照做, 所以仍然不会出现"判定为停机但没动作"。 */
-    (void)sp_trip_for_operation(op_epoch, code, ev, MOT_STOP_SRC_GUARD_STOP, RT_NULL);
-    mot_stop_mirror();
-    pe = (rt_err_t)mot.stop_rc;
+    /* R2(2026-10-23): 这条路径可能"底层已经保护过"(返回 -RT_EINTR + 当前事实)。
+     * 无论哪条分支, 守卫都拿**同一次调用带回的 proof** 做后续整理, 不再自行重采数字;
+     * 底层已保护时这里就不会出现第二轮 rt_pwm_disable。 */
+    rt_memset(&gpf, 0, sizeof(gpf));
+    te = sp_trip_for_operation(op_epoch, code, ev, MOT_STOP_SRC_GUARD_STOP, &gpf);
+    pe = gpf.valid ? (rt_err_t)gpf.pwm.raw_rc : RT_EOK;
 
+    /* R1(2026-10-23 §3.2/§4.3): 本拍的整理**全部**绑在这一次 proof 带回的那一代上:
+     *   te==RT_EOK    => 这一代是守卫自己做的短保护;
+     *   te==-RT_EINTR => 更底层(配置事务/别的层)已在本拍内保护过, gpf 就是**那一次**
+     *                    的真实 proof —— 照样整理, 但绝不第二轮 disable;
+     *   两种都要过 pending 门(抑制仍在本代、pending 仍属本代)才落位。
+     * 若期间已经人工恢复 + 新预约(这一代不再是"待整理的故障事实"), **整笔放弃**:
+     * 不清新的 Motor 影子/armed/状态, 也不重复通知(审查探针 stale-slow-reconcile)。
+     * 这里也**不再**调用 mot_pwm_output_off(): 第二次 disable 会让"后一次成功"
+     * 掩盖第一次的失败(S1-R1 R04), 还会在已抑制之后再推进一代 epoch。 */
+    ge = motor_trip_observe(&gpf);
+    /* 归因统计与状态落位**分开**: guard_stops/guard_reason 记的是"本拍守卫确实要求过
+     * 停机"这一事实, 它不能因为"同一代的整理已由消费者先做完(身份门这次不放行)"而丢失
+     * —— 否则操作员再也看不出这次停机来自哪一路。真正受身份门约束的只有影子与状态。 */
     mot_lock_take();
-    mot.armed = 0;
-    mot.target_hz = 0;
-    mot.current_hz = 0;
-    /* S2(2026-10-23): 这里**不再**调用 mot_pwm_output_off() —— 上面那次 sp_trip_fast
-     * 已经在同一个不依赖锁的窗口里做过真实冻结并记了原始 rc(pe 就是它的结果)。
-     * 守卫路径第二次 disable 会把第一次的失败被"后一次成功"掩盖(S1-R1 R04 禁止的形状),
-     * 也会在已经抑制之后再推进一代 epoch。 */
-    mot.state = MOTOR_FAULT;
     if (mot.guard_stops < 0xFFFFu) mot.guard_stops++;
     mot.guard_reason = reason;
     mot_lock_release();
+    if (!motor_commit_off(&gpf, MOT_COMMIT_TRIP))
+        rt_kprintf("[MOT] DRV GUARD: 本拍影子/状态落位由**这一代的整理者**做"
+                   " (trip rc=%d, proof epoch=%u 已不是待整理的那一代)"
+                   " - 归因已记录, 不重复写新预约的影子\n",
+                   (int)te, (unsigned)gpf.epoch);
 
-    if (safety_drv_permit_confirm_low() != RT_EOK)
+    if (ge != RT_EOK)
         rt_kprintf("[MOT] !! GUARD STOP but DRV_ENABLE LOW UNVERIFIED (裸写已发出) !!\n");
     if (pe != RT_EOK)
         rt_kprintf("[MOT] !! GUARD STOP but STEP 关断未确认 (rc=%d) -> 输出状态未知,"
                    " current_hz=0 只是软件命令值 !!\n", (int)pe);
     /* 原因分列保留(反馈不一致如实记 EVT_DRV_FEEDBACK, 不假冒急停按钮), 但只**通知**:
      * 短保护已经在本函数开头做过, 消费者不得再关一次共享模块。 */
-    (void)safety_notify_trip_done(ev, sp_epoch());
+    (void)safety_notify_trip_done(ev, gpf.epoch);
     rt_kprintf("[MOT] DRV GUARD: 驱动配置/反馈异常(reason=%d) -> 已请求停 STEP(src=guard)"
                "、请求使能 LOW、置 FAULT 并上报。!! 这是软件层第二响应, 不替代硬件独立切断"
                " !! [stop=%s]\n", (int)reason, mot_stop_result_name(mot.stop_result));
@@ -571,6 +597,8 @@ static void motor_ramp_tick(void)
     rt_uint8_t armed;
     rt_uint8_t guard_due = 0u;
     rt_uint8_t fb_stopped = 0u;
+    sp_token_t tick_res;
+    sp_proof_t apf;   /* R1: apply/ramp-zero 失败支的本次动作凭证 */
     /* S2(§4.2): 本拍开始时取一次协调层 epoch, 贯穿这一拍的所有失败出口。
      * 底层(TMC 配置事务)若已保护过, epoch 会变, 守卫的短保护就自动让位,
      * 同一波错误里不会出现第二次 rt_pwm_disable。 */
@@ -601,10 +629,15 @@ static void motor_ramp_tick(void)
 
         if (fv != SAFETY_FB_OK)
         {
-            rt_kprintf("[MOT] runtime guard: ENN feedback %s while request=ENABLE"
-                       " (expected LOW) -> 停机\n", safety_fb_verdict_name(fv));
+            /* R4(2026-10-23 §6.1): **先保护, 后打印**。旧顺序在这里先 rt_kprintf
+             * 再停机, 而控制台逐字符忙等(每字符 ≤BSP_NS800_UART_TX_TIMEOUT=6000ms),
+             * 等于把降险动作排在日志之后。名字表是静态字符串, 先取指针即可。 */
+            const char *fbn = safety_fb_verdict_name(fv);
+
             mot_guard_shutdown(MOT_GUARD_ENN_FEEDBACK, op_epoch);
             fb_stopped = 1u;
+            rt_kprintf("[MOT] runtime guard: ENN feedback %s while request=ENABLE"
+                       " (expected LOW) -> 停机(保护已先做)\n", fbn);
         }
     }
 
@@ -626,6 +659,10 @@ static void motor_ramp_tick(void)
 
     mot_lock_take();
     tgt = mot.target_hz;
+    /* R2: 本拍所有 PWM 提交只用**拍初在锁内复制的**预约快照。慢步骤(UART 复核、
+     * 反馈采样、apply)之后绝不回头再读全局 mot_res, 否则一次新的 arm 会把旧拍子
+     * 的动作升级成新身份。 */
+    tick_res = mot_res;
 
     if (mot.state == MOTOR_IDLE || mot.state == MOTOR_FAULT)
     {
@@ -666,36 +703,43 @@ static void motor_ramp_tick(void)
 
     if (mot.current_hz == 0)
     {
-        rt_err_t pe = mot_pwm_output_off(MOT_STOP_SRC_RAMP_ZERO);
+        sp_proof_t rzpf;
+        rt_err_t   pe = mot_pwm_output_off(MOT_STOP_SRC_RAMP_ZERO, &rzpf);
 
         if (pe != RT_EOK)
         {
             /* 合同 4.2: 斜坡减到 0 但关断未确认 => **不算**正常 IDLE 完成,
              * 不做 RUN→READY(下一拍 state=FAULT 直接跳过该分支), 走故障处置。
-             * 频率字段清零只是软件命令值, 输出状态未知并已锁存。 */
-            mot.armed = 0;
-            mot.target_hz = 0;
-            mot.current_hz = 0;
-            mot.state = MOTOR_FAULT;
+             * 频率字段清零只是软件命令值, 输出状态未知并已锁存。
+             * R1(2026-10-23): 字段落位改由**身份受检的提交窗口**做(锁在窗口外取),
+             * 旧写法是在锁内无条件清 armed/hz/state —— 那正是"旧慢整理改写新状态"
+             * 的形状; 门不过时整笔放弃, 由这一代真正的整理者落位。 */
             mot_lock_release();
-            mot_stop_unconfirmed_close(pe, MOT_STOP_SRC_RAMP_ZERO);
+            if (motor_commit_off(&rzpf, MOT_COMMIT_TRIP))
+                mot_stop_unconfirmed_close(&rzpf);
+            else
+                rt_kprintf("[MOT] ramp-zero 关断失败支的落位**整笔放弃**"
+                           " (proof epoch=%u 已被取代) - 不动新预约\n",
+                           (unsigned)rzpf.epoch);
             return;
         }
         mot.state = (tgt == 0) ? MOTOR_IDLE : MOTOR_ACCEL;
     }
     else
     {
-        if (mot_pwm_apply(mot.current_hz) != RT_EOK)
+        if (mot_pwm_apply(mot.current_hz, &tick_res, &apf) != RT_EOK)
         {
-            /* P0-4: fail-closed(锁内只改状态, 锁外发事件) */
-            rt_err_t ae = mot_pwm_output_off(MOT_STOP_SRC_APPLY_FAIL);
+            /* P0-4: fail-closed。R1(2026-10-23): 这**不是**故障短保护(apply 失败后
+             * 的那一次关断可能被驱动正常接受, 不形成 inhibit/pending), 所以过**同代门**
+             * 落位; 锁内不再无条件清 armed/hz/state。 */
+            (void)mot_pwm_output_off(MOT_STOP_SRC_APPLY_FAIL, &apf);
 
-            mot.armed = 0;
-            mot.current_hz = 0;
-            mot.target_hz = 0;
-            mot.state = MOTOR_FAULT;
             mot_lock_release();
-            mot_fail_closed(ae);                  /* R04: 携带这一次的真实关断结果 */
+            if (motor_commit_off(&apf, MOT_COMMIT_ROLLBACK))
+                mot_fail_closed(&apf);            /* R04: 携带这一次的真实关断结果 */
+            else
+                rt_kprintf("[MOT] apply 失败支的落位**整笔放弃**(proof epoch=%u 已被取代)"
+                           " - 不动新预约, 只如实记录\n", (unsigned)apf.epoch);
             return;
         }
         mot.state = (mot.current_hz < tgt) ? MOTOR_ACCEL
@@ -805,8 +849,9 @@ static void mot_print_gate_fail(rt_uint32_t bad)
 
 rt_err_t motor_init(void)
 {
-    rt_err_t e;
-    rt_err_t pe;
+    rt_err_t   e;
+    rt_err_t   pe;
+    sp_proof_t ipf;   /* R1: 初始化那一次关断带回的凭证(建线程前无并发, 但身份纪律一样) */
 
     if (mot_tid != RT_NULL) return RT_EOK;      /* 幂等 */
 
@@ -828,8 +873,9 @@ rt_err_t motor_init(void)
          * 并且明确作废 mot_dev_ok, 不留"旧 dev_ok=TRUE 配 NULL 句柄"的陈旧组合。 */
         /* 无设备: 协调层记 DEV_UNAVAILABLE/未尝试(绝不调用 NULL 句柄), 并仍独立尝试许可 LOW。 */
         (void)sp_bind_permit_pin(safety_drv_permit_pin());
+        rt_memset(&ipf, 0, sizeof(ipf));
         pe = sp_off_attempt(SP_MOTOR, MOT_STOP_SRC_INIT, FAULT_SOFT, EVT_SOFT_FAULT,
-                            0, RT_NULL);
+                            0, &ipf);
         mot_pwm    = RT_NULL;
         mot_dev_ok = RT_FALSE;
         mot_lock_take();
@@ -839,8 +885,10 @@ rt_err_t motor_init(void)
         mot.target_hz = 0;
         mot.armed = 0;
         mot_lock_release();
+        /* R1: 建线程之前没有并发, 但确认照样绑定"这次动作那一代"的 proof,
+         * 让所有许可确认都走同一张身份门(不给"重采当前 epoch"留活口)。 */
         e = safety_drv_permit_confirm_low();
-        (void)sp_note_low_confirmed(e);
+        (void)sp_note_permit_confirmed_for(ipf.valid ? ipf.epoch : sp_epoch(), 0u, e);
         rt_kprintf("[MOT] init FAILED: %s 未取得 -> 仍已请求许可 LOW (%s, rc=%d);"
                    " STEP 侧=dev-unavailable(rc=%d), 不创建斜坡线程,"
                    " health=FAILED [设备不可用与 LOW 的原始结果分别留档]\n",
@@ -855,7 +903,7 @@ rt_err_t motor_init(void)
     (void)sp_bind_pwm(mot_pwm, MOTOR_PWM_CH);
     (void)sp_bind_permit_pin(safety_drv_permit_pin());
 
-    pe = mot_pwm_output_off(MOT_STOP_SRC_INIT);
+    pe = mot_pwm_output_off(MOT_STOP_SRC_INIT, &ipf);
     mot_lock_take();
     mot.state = MOTOR_IDLE;
     mot.current_hz = 0;
@@ -903,7 +951,13 @@ rt_err_t motor_arm(void)
     rt_uint32_t bad;
     rt_err_t e;
     rt_bool_t reserved_here = RT_FALSE;
+    rt_bool_t published = RT_FALSE;
+    rt_err_t ce_sub = RT_EOK;
+    sp_token_t local_res;
     motor_snapshot_t snap;
+
+    local_res.owner = SP_NONE;
+    local_res.epoch = 0u;
 
     /* F2b P1-D: "查门 → 完整性复核 → 请求使能"整段必须与 apply 互斥, 否则复核刚
      * 通过、电流档就被并发的配置写改掉(审核报告点名的 TOCTOU)。非阻塞取锁:
@@ -980,13 +1034,16 @@ rt_err_t motor_arm(void)
 
     /* S2(2026-10-23): 最后一次慢校验之前先取本次预约身份。此后 HIGH 写、armed 提交、
      * 每拍 PWM 提交都要与它比 epoch+owner —— 期间任何新故障都会换 epoch 并撤销资格。 */
-    if (sp_reserve(SP_MOTOR, &mot_res) != RT_EOK)
+    if (sp_reserve(SP_MOTOR, &local_res) != RT_EOK)
     {
         rt_kprintf("[MOT] arm REFUSED: 取不到 STEP 通道预约(已抑制/饱和/他人持有/未复核失败)\n");
         e = -RT_EPERM;
         goto out;
     }
-    mot_res_ok = RT_TRUE;
+    /* R2(2026-10-23): 预约只存在于本次调用的局部快照 local_res 里。全局 mot_res 要等
+     * HIGH 已确认、ENN 反馈一致、armed 提交通过门的**同一个窗口**才发布 —— 中途任何
+     * 失败都不会留下一个"全局已经认为 Motor 持有"的半截状态, 也不给旧操作升级身份的
+     * 机会(审查探针 old-start-adopts-new-token 的另一半根因)。 */
     reserved_here = RT_TRUE;
 
     /* 追加(2026-10-21): 发出使能请求之前, 必须先确认当前确实处在"已禁能且反馈一致"一侧。
@@ -1008,26 +1065,36 @@ rt_err_t motor_arm(void)
      * 必须在同一个短临界区内完成(sp_commit_permit_high); settle/回读在门外做, 而**每一次
      * 重写都是新的开启动作**, 因此重试也必须重新过门(不再用无身份的裸写入口)。 */
     {
-        rt_err_t ce;
+        rt_err_t   ce;
+        sp_proof_t pf;
 
-        e = mot_permit_high_gated();
+        pf.valid = RT_FALSE;
+        e = mot_permit_high_gated(&local_res, &pf);
         if (e == RT_EOK)
         {
             ce = safety_drv_permit_confirm_read(1u);
-            (void)sp_note_permit_confirmed(&mot_res, ce);
-            if (ce != RT_EOK)
+            ce_sub = sp_note_permit_confirmed(&local_res, 1u, ce);
+            if (ce_sub != RT_EOK)
+                rt_kprintf("[MOT] arm: HIGH 确认提交被拒(%d) - 本预约已被更新的一代取代\n",
+                           (int)ce_sub);
+            if (ce != RT_EOK && ce_sub == RT_EOK)
             {
-                e = mot_permit_high_gated();               /* 重试: 再过一次门 */
+                e = mot_permit_high_gated(&local_res, &pf);       /* 重试: 再过一次门 */
                 if (e == RT_EOK)
                 {
                     ce = safety_drv_permit_confirm_read(1u);
-                    (void)sp_note_permit_confirmed(&mot_res, ce);
+                    ce_sub = sp_note_permit_confirmed(&local_res, 1u, ce);
                 }
                 if (ce != RT_EOK) e = (ce != RT_EOK) ? ce : e;
             }
+            else if (ce != RT_EOK) e = ce;
         }
-        mot.drv_en_request = (e == RT_EOK) ? PIN_HIGH : mot.drv_en_request;
+        /* R2: "确认成功"与"提交成功"是两件事。ce=EOK 但确认提交被身份检查拒绝时,
+         * 不得把 drv_en_request/armed 标成成功(原实现正是丢了 ce_sub)。 */
+        mot.drv_en_request = (e == RT_EOK && ce_sub == RT_EOK) ? PIN_HIGH
+                             : mot.drv_en_request;
     }
+    if (ce_sub != RT_EOK && e == RT_EOK) e = ce_sub;
     if (e != RT_EOK)
     {
         rt_kprintf("[MOT] arm FAILED: DRV_ENABLE HIGH not verified (%d),"
@@ -1060,14 +1127,28 @@ rt_err_t motor_arm(void)
     {
         rt_base_t lvl;
 
-        if (sp_enter_token(&mot_res, &lvl) != RT_EOK)
+        if (sp_enter_token(&local_res, &lvl) != RT_EOK)
         {
             mot_lock_release();
-            mot_res_clear();
-            rt_kprintf("[MOT] arm REFUSED: 提交 armed 前预约已失效(新故障/新预约)\n");
-            return -RT_EPERM;
+            rt_kprintf("[MOT] arm REFUSED: 提交 armed 前预约已失效(新故障/新预约)"
+                       " - 走统一出口归还 txn(不得从这里直接 return)\n");
+            e = -RT_EPERM;
+            goto out;
         }
-        mot.armed = 1;
+        /* R5: HIGH 裸写 + 回读 + ENN 确认之后, 由这个提交把 canonical 抬到 SP_ARMED;
+         * 同一窗口内发布本次调用的局部身份与 mot.armed, 检查与写之间没有空隙。 */
+        if (sp_arm_commit_held(&local_res) != RT_EOK)
+        {
+            sp_leave_token(lvl);
+            mot_lock_release();
+            rt_kprintf("[MOT] arm REFUSED: armed 提交时身份已失效\n");
+            e = -RT_EPERM;
+            goto out;
+        }
+        mot_res      = local_res;
+        mot_res_ok   = RT_TRUE;
+        published    = RT_TRUE;
+        mot.armed    = 1;
         sp_leave_token(lvl);
     }
     mot_lock_release();
@@ -1082,9 +1163,9 @@ out:
      * 且绝不改动新 owner —— 不存在"旧 arm 的尾巴撤销新预约"这条路。 */
     if (e != RT_EOK)
     {
-        if (reserved_here && mot_res_ok && sp_get_phase() == SP_RESERVED)
-            (void)sp_release(&mot_res);
-        if (reserved_here) mot_res_clear();
+        if (reserved_here && !published && sp_get_phase() == SP_RESERVED)
+            (void)sp_release(&local_res);      /* 只归还本次调用取得的、仍未运行的预约 */
+        if (reserved_here && !published) mot_res_clear();
     }
     tmc2209_cfg_txn_end();
     return e;
@@ -1094,6 +1175,7 @@ rt_err_t motor_disarm(void)
 {
     rt_err_t pe;
     rt_err_t ge;
+    sp_proof_t dpf;
 
     mot_lock_take();
     mot.armed = 0;
@@ -1102,19 +1184,19 @@ rt_err_t motor_disarm(void)
     mot_lock_release();
 
     /* S2: 关断、失败时的追加抑制/许可 LOW、成功时的"LOW + 撤销预约 + 换 epoch"
-     * 全在同一个短临界区内完成(本函数不再自己持 mot_lock)。 */
+     * 全在同一个短临界区内完成(本函数不再自己持 mot_lock)。
+     * R1(2026-10-23): 这次动作**带回 proof**, 之后的确认与落位都只用它那一代的身份;
+     * 旧写法是先无身份地清 mot_res/mirror/state, 再重采 sp_epoch() 提交确认, 期间
+     * 新故障/新预约都会被这次旧 disarm 改写(§3.2 第 6 条禁止的形状)。
+     * 成功撤销预约会换 epoch, 失败会追加抑制并留下 pending —— 两种都不再有有效身份,
+     * 但都要"仍是这一代"才落位(同代门)。 */
+    rt_memset(&dpf, 0, sizeof(dpf));
     pe = sp_off_attempt(SP_MOTOR, MOT_STOP_SRC_DISARM, FAULT_SOFT, EVT_SOFT_FAULT,
-                        1, RT_NULL);
-    mot_res_clear();            /* 成功已撤销预约(换 epoch); 失败被抑制 —— 两种都不再有有效身份 */
-    mot_lock_take();
-    mot_stop_mirror();                            /* 镜像写与状态写同锁(§9 影子写点收口) */
-    /* 合同 4.2/4.4: 关断未被驱动接受时**不**回到"正常可启动 IDLE" —— 进 MOTOR_FAULT,
-     * 于是 motor_arm 的静止检查与第 7 位一起把后续 arm/start 挡住(只收紧, 不放松)。 */
-    mot.state = (pe == RT_EOK) ? MOTOR_IDLE : MOTOR_FAULT;
-    mot_lock_release();
-
-    ge = safety_drv_permit_confirm_low();        /* 写+settle+回读(禁能方向, 允许无身份) */
-    (void)sp_note_low_confirmed(ge);
+                        1, &dpf);
+    ge = motor_trip_observe(&dpf);
+    if (!motor_commit_off(&dpf, MOT_COMMIT_DISARM))
+        rt_kprintf("[MOT] disarm: 本次落位身份已失效(proof epoch=%u)"
+                   " - 不写新预约的影子/身份\n", (unsigned)dpf.epoch);
     if (ge != RT_EOK)
         rt_kprintf("[MOT] !! disarm: DRV_ENABLE LOW UNVERIFIED (%d) - 裸写已在门内发出 !!\n",
                    (int)ge);
@@ -1129,7 +1211,7 @@ rt_err_t motor_disarm(void)
      * - 统一停机/紧急停机的失败分支**不**投事件 => 不会形成"消费事件->停机失败->
      *   再投同事件"的自激; fault_reset 内部再调本函数时若又投一次, 结果只是再次
      *   锁存, 方向保守。 */
-    if (pe != RT_EOK) (void)safety_notify_trip_done(EVT_SOFT_FAULT, sp_epoch());
+    if (pe != RT_EOK) (void)safety_notify_trip_done(EVT_SOFT_FAULT, dpf.epoch);
     /* 追加(2026-10-21): 如实报告最终 ENN 反馈。没确认到禁能侧时**绝不**打印成"整链已安全"。
      * 关闭动作(停 STEP + 请求 LOW)已经照做, 这一步只是不谎报。 */
     {
@@ -1181,30 +1263,63 @@ rt_err_t motor_set_direction(rt_uint8_t dir)
         mot_lock_release();
         return -RT_EPERM;
     }
-    mot_lock_release();
+    /* R3: 这里**不**提前释放 mot_lock —— 下面的短窗口要在持锁状态下复核软件静止
+     * 条件(mot.* 由本锁保护), 放锁就等于把"检查"与"写"重新拆开。 */
 
+    /* R3(2026-10-23, 审查探针 dir-check-write-race): 原来在这里释放 mot_lock 后再
+     * 单独开窗口只重查 inhibit 位 —— 一次**正常**的 start/ramp 不会置 inhibit,
+     * 于是"检查通过 → 旧流程启动 → 旧 DIR 写照样落下"。现在按任务书要求的形状做:
+     * 数值 pin 提前解析, **持有 mot_lock** 期间开一个短窗口, 在同一个窗口里同时重核
+     * ①软件静止(mot.* 由本锁保护) ②canonical 的抑制/饱和 ③两路关断锁存与
+     * "该路仍持有输出"标志 ④当前 owner 与 phase(诊断/UNKNOWN/RUNNING 都拒),
+     * 通过才写 DIR 寄存器与 mot.dir; 退出窗口后才放锁与打印。
+     * 窗口内不取锁、不打印、不延时; canonical 用 sp_peek_held() 同窗复制,
+     * 不在窗口里再调带窗口的读取函数。 */
     d = safety_pin(PIN_NAME_TMC_DIR);
-    if (d < 0) return -RT_ERROR;
-    /* S2(任务书 §9): DIR 本身不启动输出, 但"检查后被新启动越过"同样是竞争 ——
-     * 静止/关断可信这两道复核与实际 DIR 写在**同一个**短窗口里重核一次抑制位
-     * (新故障一旦形成, DIR 写就不再发生)。窗口内只有一次寄存器写。
-     * mot_lock 已在上面释放, 这里不再取放它(锁与窗口是两个层次的东西)。 */
+    if (d < 0)
     {
-        rt_base_t lvl = sp_win_begin();
-        rt_bool_t inhibited = sp_inhibited_held();
+        mot_lock_release();
+        return -RT_ERROR;
+    }
+    {
+        rt_base_t      lvl = sp_win_begin();
+        sp_snapshot_t  c;
+        rt_bool_t      rest, off_ok, permitted;
 
-        if (!inhibited) rt_pin_write(d, dir ? PIN_HIGH : PIN_LOW);
-        sp_win_end(lvl);
-        if (inhibited)
+        sp_peek_held(&c);
+        rest = (mot.current_hz == 0) &&
+               (mot.state == MOTOR_IDLE || mot.state == MOTOR_FAULT);
+        off_ok = (c.motor_stop_latched || c.diag_stop_latched ||
+                  c.motor_output_active || c.diag_output_active ||
+                  c.owner == SP_DIAG || c.owner == SP_HELD_UNKNOWN)
+                     ? RT_FALSE : RT_TRUE;
+        permitted = (!c.inhibit && !c.exhausted && rest && off_ok &&
+                     c.phase != SP_RUNNING) ? RT_TRUE : RT_FALSE;
+        if (permitted)
         {
-            rt_kprintf("[MOT] dir REFUSED: 写入窗口内已出现停机抑制\n");
-            return -RT_EPERM;
+            rt_pin_write(d, dir ? PIN_HIGH : PIN_LOW);
+            mot.dir = dir ? 1 : 0;
+        }
+        sp_win_end(lvl);
+
+        if (!permitted)
+        {
+            rt_bool_t was_rest = rest;
+            mot_lock_release();
+            rt_kprintf("[MOT] dir REFUSED: 写入窗口内复核未通过 (at_rest=%s"
+                       " inhibit=%s latched(motor=%s diag=%s) output(motor=%s diag=%s)"
+                       " owner=%s phase=%s) - 不用一个 inhibit 位代替全部静止条件\n",
+                       was_rest ? "yes" : "no", c.inhibit ? "YES" : "no",
+                       c.motor_stop_latched ? "YES" : "no",
+                       c.diag_stop_latched ? "YES" : "no",
+                       c.motor_output_active ? "YES" : "no",
+                       c.diag_output_active ? "YES" : "no",
+                       sp_owner_name(c.owner), sp_phase_name(c.phase));
+            return was_rest ? -RT_EPERM : -RT_EBUSY;
         }
     }
-    mot_lock_take();
-    mot.dir = dir ? 1 : 0;
     mot_lock_release();
-    rt_kprintf("[MOT] dir=%u (at rest)\n", dir ? 1u : 0u);
+    rt_kprintf("[MOT] dir=%u (at rest, 全部条件与 DIR 写同窗)\n", dir ? 1u : 0u);
     return RT_EOK;
 }
 
@@ -1223,6 +1338,15 @@ rt_err_t motor_start(void)
     rt_uint8_t armed, has_target;
     rt_uint32_t bad;
     rt_err_t te;
+    /* R2(2026-10-23): 本命令的身份快照。开始处(第一次慢操作之前)在 mot_lock 内复制
+     * 一次, 之后只用这份; 慢 UART/反馈之后**绝不**回头再读全局 mot_res —— 否则
+     * "旧 start 期间发生了故障+人工恢复+新 arm"时, 旧 start 会拿着新预约通过最终的
+     * 开启动作, 让新预约的非零目标被旧命令启动(审查探针 old-start-adopts-new-token)。 */
+    sp_token_t start_res;
+    rt_bool_t  have_res = RT_FALSE;
+
+    start_res.owner = SP_NONE;
+    start_res.epoch = 0u;
 
     if (step_pwm_output_active())
     {
@@ -1234,6 +1358,8 @@ rt_err_t motor_start(void)
     mot_lock_take();
     armed = mot.armed;
     has_target = (mot.target_hz > 0);
+    start_res = mot_res;                       /* 快照, 不是引用 */
+    have_res  = mot_res_ok ? RT_TRUE : RT_FALSE;
     mot_lock_release();
 
     if (!armed)      { rt_kprintf("[MOT] start REFUSED: not armed\n");  return -RT_EPERM; }
@@ -1323,21 +1449,24 @@ rt_err_t motor_start(void)
         return -RT_EPERM;
     }
 
+    /* 最终的状态提交: 用**本命令开始时那份快照**过门(R2), 且 canonical 的 SP_RUNNING
+     * 只能由真实的 rt_pwm_enable 成功建立(R5) —— 这里不再抢先 phase_set(SP_RUNNING),
+     * 否则"还没碰过硬件"就被记成硬件在跑。实际起转由斜坡线程的第一拍
+     * mot_pwm_apply() → mot_pwm_commit_gated() → sp_pwm_start_held() 完成。 */
     mot_lock_take();
     {
         rt_base_t lvl;
 
         if (mot.state == MOTOR_IDLE)
         {
-            if (sp_enter_token(&mot_res, &lvl) != RT_EOK)
+            if (!have_res || sp_enter_token(&start_res, &lvl) != RT_EOK)
             {
                 mot_lock_release();
-                mot_res_clear();
-                rt_kprintf("[MOT] start REFUSED: 起转提交前预约已失效(新故障/新预约)\n");
+                rt_kprintf("[MOT] start REFUSED: 起转提交前本命令的预约快照已失效"
+                           " (新故障/新预约/已恢复换代) - 不动新身份, 也不写运行态\n");
                 return -RT_EPERM;
             }
             mot.state = MOTOR_ACCEL;
-            (void)sp_phase_set(&mot_res, SP_RUNNING);
             sp_leave_token(lvl);
         }
         mot_lock_release();
@@ -1361,29 +1490,28 @@ rt_err_t motor_stop(void)
     return RT_EOK;
 }
 
-/* 短保护之后的 Motor 侧**慢整理**(任务书 §4.2"先动作, 再慢整理"的后半段):
- * 只做快照镜像、软件状态位、带回读的许可确认与日志 —— 不再产生任何关断动作。
- * `pe` 必须是那次短保护返回的**原始** PWM 错误(不得由本函数重新猜测)。
- * 对外合同不变: 失败优先返回 PWM 关断错误, 许可确认结果独立留档。 */
-rt_err_t motor_reconcile_after_trip(rt_err_t pe)
+/* 显式紧急停机(合同 PS02/PS03 不变: PWM 关断失败优先, 否则许可确认结果)。
+ * S2 CP3 R1(2026-10-23 §3.2): 原来的"慢整理"入口 motor_reconcile_after_trip(pwm_rc)
+ * 只有 rc 没有身份 —— 它会无条件清 mot_res/armed/target/current/state, 再从
+ * sp_epoch() 重采一个身份给这次旧整理"续命", 于是人工恢复 + 新预约之后旧整理仍
+ * 能把新状态打回故障影子(审查探针 stale-slow-reconcile / late-low-confirmation)。
+ * 现在三段固定: 短保护带回 proof → 窗口外的身份化观察 → **一个**短窗口里的
+ * 身份门 + 影子 + 字段落位; 门不过则整笔放弃(由这一代真正的整理者落位)。
+ * ⚠ 这里**不** ack pending: 义务的唯一消费者是 safety_state 的统一慢整理入口,
+ *    它带着同一身份再落一次位(幂等的固定字段写)并触发**一次**黑匣子。 */
+rt_err_t motor_emergency_stop(void)
 {
-    rt_err_t ge;
+    sp_proof_t pf;
+    rt_err_t   pe, ge;
+    safety_fb_verdict_t fv;
 
-    mot_res_clear();
-    mot_lock_take();
-    mot_stop_mirror();                            /* 镜像写与状态写同锁 */
-    mot.armed = 0;
-    mot.target_hz = 0;
-    mot.current_hz = 0;
-    mot.state = MOTOR_FAULT;
-    mot_lock_release();
-
-    /* P1-10 + A7: 回读确认并把结果传播给调用方(safety_force_shutdown 会记录
-     * CRITICAL 但依然锁存 FAULT_LATCHED)。绝不吞掉失败。
-     * S1: 关断失败**不**豁免撤销许可, 撤销成功也**不**掩盖关断失败。
-     * S2: LOW 裸写已由短保护在同一窗口发出, 这里只做带 settle 的**回读确认**。 */
-    ge = safety_drv_permit_confirm_low();
-    (void)sp_note_low_confirmed(ge);
+    rt_memset(&pf, 0, sizeof(pf));
+    pe = sp_trip_fast(FAULT_SOFT, EVT_SOFT_FAULT, MOT_STOP_SRC_ESTOP, &pf);
+    ge = motor_trip_observe(&pf);
+    if (!motor_commit_off(&pf, MOT_COMMIT_TRIP))
+        rt_kprintf("[MOT] !! EMERGENCY STOP 的慢整理**整笔放弃**(proof epoch=%u 已被"
+                   " 更新的一代取代或已整理) - 关断动作已照做, 影子由那一代的整理者落位\n",
+                   (unsigned)pf.epoch);
     if (ge != RT_EOK)
         rt_kprintf("[MOT] !! EMERGENCY STOP but DRV_ENABLE LOW UNVERIFIED (%d)"
                    " - 裸写已在同一短临界区内发出 !!\n", (int)ge);
@@ -1392,25 +1520,14 @@ rt_err_t motor_reconcile_after_trip(rt_err_t pe)
                    " 不能称'输出已停止', 失败已锁存待人工恢复 !!\n", (int)pe);
     /* 追加(2026-10-21): 反馈状态如实报告。停 STEP 与撤销许可**总是**先做,
      * 反馈读不到只影响"最终禁能是否已确认"这句话, 不影响动作本身。 */
-    {
-        safety_fb_verdict_t fv = safety_fb_now(0u);
-
-        rt_kprintf("[MOT] EMERGENCY STOP (drv_en LOW %s, ENN feedback %s%s, STEP %s)\n",
-                   ge == RT_EOK ? "verified" : "UNVERIFIED",
-                   safety_fb_verdict_name(fv),
-                   fv == SAFETY_FB_OK ? "" : " -> final disable NOT confirmed",
-                   mot_stop_result_name(mot.stop_result));
-    }
+    fv = safety_fb_now(0u);
+    rt_kprintf("[MOT] EMERGENCY STOP (drv_en LOW %s, ENN feedback %s%s, STEP %s)\n",
+               ge == RT_EOK ? "verified" : "UNVERIFIED",
+               safety_fb_verdict_name(fv),
+               fv == SAFETY_FB_OK ? "" : " -> final disable NOT confirmed",
+               mot_stop_result_name(mot.stop_result));
     /* 返回值: PWM 关断失败优先, 否则许可写确认结果; 两个原始 rc 均另存。 */
     return mot_stop_merge(pe, ge);
-}
-
-rt_err_t motor_emergency_stop(void)
-{
-    /* S2(2026-10-23): 本函数不再自己等 mot_lock 才去关断 —— 短保护(冻结 + 许可 LOW +
-     * 抑制 + 换 epoch + 两个原始结果)在一个不依赖任何锁的窗口里先做完。 */
-    return motor_reconcile_after_trip(
-        sp_trip_fast(FAULT_SOFT, EVT_SOFT_FAULT, MOT_STOP_SRC_ESTOP, RT_NULL));
 }
 
 /* ---------- 人工恢复用的锁接入与窗口内字段复位(任务书 §7) ----------
@@ -1423,12 +1540,128 @@ rt_err_t motor_emergency_stop(void)
  *                               不碰硬件 —— 硬件状态已由那次带票据的复核确认。
  *   motor_unlock_for_recovery() 窗口外释放。
  * ⚠ 这三个入口只允许 safety_state.c 的 fault_reset() 使用, 不导出 MSH 命令。 */
-rt_err_t motor_lock_for_recovery(void)
+/* R1/R2(2026-10-23): 需要"持 mot_lock 才允许写镜像/提交状态"的两处(人工恢复的
+ * 最终提交、慢整理的提交窗口)统一走这一对**有返回码**的取放: 互斥量不可用一律返回
+ * 错误, 调用方必须放弃本次提交(fail closed)。原来那对静默容忍 !mot_lock_ok 的
+ * mot_lock_take()/mot_lock_release() 只用于不涉及提交判定的普通读改写。 */
+rt_err_t motor_lock_take_checked(void)
 {
     if (!mot_lock_ok) return -RT_EIO;          /* 互斥量没建起来 = 不敢提交 */
     rt_mutex_take(&mot_lock, RT_WAITING_FOREVER);
     return RT_EOK;
 }
+
+/* ---------- R1(2026-10-23 CP3): 身份受检的 Motor 侧慢整理 ----------
+ * §3.2 的"确定修复"落到 Motor 这一路是三段, 顺序固定:
+ *   1) proof 由**动作本身**带回(sp_trip_fast / sp_trip_for_operation / sp_off_attempt
+ *      的 out 参数)。此后所有确认与落位只用 pf->epoch, 不再重采 sp_epoch() ——
+ *      重采等于给旧动作换一个新身份(任务书 §3.2 第 6 条禁止的形状)。
+ *   2) motor_trip_observe(): 窗口外的带回读确认(safety_drv_permit_confirm_low 有
+ *      settle/重试, 进不了临界区), 确认只提交进 pf->epoch 那一代。
+ *   3) motor_commit_off(): mot_lock 在窗口外取, 身份门 + 影子 + 字段落在**同一个**
+ *      短窗口里; 门不过 => 整笔放弃, 一个字段都不写。
+ * 两种门的区别:
+ *   pending 门(sp_reconcile_gate_held): 这次动作**构成一条待整理的故障事实**
+ *     (短保护/守卫/显式急停: inhibit + pending + 同一代) 才落位; 人工恢复或新故障
+ *     换掉这一代 => 放弃, 不回写新的健康预约。
+ *   同代门(sp_op_current_held): 用于**没有形成故障事实**的单次关断(arm 回滚里 disable
+ *     被接受 / disarm 成功): 那时既无 inhibit 也无 pending, 用前者会把合法落位挡死。
+ */
+void motor_shadow_from_proof_held(const sp_proof_t *pf)
+{
+    mot_stop_result_t res;
+    rt_uint8_t        src;
+    rt_err_t          rc;
+    rt_bool_t         lat;
+
+    if (pf == RT_NULL || !pf->valid) return;
+    sp_view_motor_held(&res, &src, &rc, &lat);
+    mot.stop_result       = (rt_uint8_t)res;
+    if (res != MOT_STOP_NOT_ATTEMPTED) mot.stop_src = src;
+    mot.stop_rc           = (rt_int16_t)rc;
+    mot.stop_fail_latched = lat ? 1u : 0u;
+}
+
+/* 短窗口内的故障字段落位: 调用方必须已持 mot_lock 且已过身份门。 */
+void motor_fault_fields_held(void)
+{
+    mot_res_clear();
+    mot.armed      = 0;
+    mot.current_hz = 0;
+    mot.target_hz  = 0;
+    mot.state      = MOTOR_FAULT;
+}
+
+static rt_bool_t mot_commit_gated(const sp_proof_t *pf, rt_bool_t need_pending,
+                                  rt_uint8_t state_after)
+{
+    rt_base_t l;
+    rt_bool_t ok = RT_FALSE;
+
+    if (pf == RT_NULL || !pf->valid) return RT_FALSE;
+    if (motor_lock_take_checked() != RT_EOK)
+    {
+        rt_kprintf("[MOT] 慢整理**未提交**: 取不到 mot_lock(互斥量不可用) -"
+                   " 不做无锁写, 也不 ack\n");
+        return RT_FALSE;
+    }
+    l = sp_win_begin();
+    if (need_pending ? sp_reconcile_gate_held(pf->epoch)
+                    : sp_op_current_held(pf->epoch))
+    {
+        motor_shadow_from_proof_held(pf);
+        mot_res_clear();
+        mot.armed      = 0;
+        mot.current_hz = 0;
+        mot.target_hz  = 0;
+        mot.state      = state_after;
+        ok = RT_TRUE;
+    }
+    sp_win_end(l);
+    motor_lock_give_checked();
+    if (!ok)
+        rt_kprintf("[MOT] 慢整理**整笔放弃**: 本次 proof 那一代已被更新的一代取代"
+                   " (epoch=%u) - 不写新影子, 不动新预约/新 pending\n",
+                   (unsigned)pf->epoch);
+    return ok;
+}
+
+rt_bool_t motor_commit_off(const sp_proof_t *pf, int mode)
+{
+    if (mode == MOT_COMMIT_DISARM)
+    {
+        rt_bool_t off_ok = (pf != RT_NULL && pf->valid &&
+                            pf->pwm.result == MOT_STOP_API_ACCEPTED) ? RT_TRUE : RT_FALSE;
+
+        return mot_commit_gated(pf, RT_FALSE,
+                                off_ok ? (rt_uint8_t)MOTOR_IDLE : (rt_uint8_t)MOTOR_FAULT);
+    }
+    return mot_commit_gated(pf, mode == MOT_COMMIT_TRIP ? RT_TRUE : RT_FALSE,
+                            (rt_uint8_t)MOTOR_FAULT);
+}
+
+/* 窗口外: 带回读的许可 LOW 确认 + 身份化提交。返回许可回读的**原始** rc。 */
+rt_err_t motor_trip_observe(const sp_proof_t *pf)
+{
+    rt_err_t ge;
+    rt_err_t ie;
+
+    if (pf == RT_NULL || !pf->valid)
+    {
+        /* 没有 proof 就没有身份: 只观察, **不**把结果提交进任何一代的 canonical 记录。 */
+        rt_kprintf("[MOT] 许可 LOW 回读**未提交**: 调用点没有带回 proof -"
+                   " 不做无身份确认\n");
+        return safety_drv_permit_confirm_low();
+    }
+    ge = safety_drv_permit_confirm_low();          /* 只确认, 不再第二次写 LOW */
+    ie = sp_note_permit_confirmed_for(pf->epoch, 0u, ge);
+    if (ie == -RT_EINTR)
+        rt_kprintf("[MOT] 许可 LOW 回读确认**未提交**(身份失配: epoch=%u 已被更新的一代"
+                   " 请求/人工恢复取代, read_rc=%d) - 不写进新记录, 也不反向写 LOW\n",
+                   (unsigned)pf->epoch, (int)ge);
+    return ge;
+}
+
 
 void motor_recovery_fields_held(void)
 {
@@ -1442,7 +1675,7 @@ void motor_recovery_fields_held(void)
     mot.drv_en_request    = PIN_LOW;
 }
 
-void motor_unlock_for_recovery(void)
+void motor_lock_give_checked(void)
 {
     if (mot_lock_ok) rt_mutex_release(&mot_lock);
 }

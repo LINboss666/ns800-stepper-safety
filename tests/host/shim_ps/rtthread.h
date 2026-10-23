@@ -91,7 +91,9 @@ rt_thread_t rt_thread_create(const char *name, void (*entry)(void *), void *para
 rt_err_t    rt_thread_startup(rt_thread_t t);
 rt_err_t    rt_thread_delete(rt_thread_t t);
 
-static inline void rt_thread_mdelay(rt_int32_t ms) { (void)ms; }  /* 单线程夹具: 不等 */
+void ps_win_note(const char *what);   /* CP3 §9 第 2/5 项: 窗口内禁止项观察(定义在 ps_main.c) */
+static inline void rt_thread_mdelay(rt_int32_t ms)
+{ (void)ms; ps_win_note("rt_thread_mdelay"); }  /* 单线程夹具: 不等, 但**计数** */
 static inline rt_tick_t rt_tick_get(void) { return 0u; }          /* 不参与任何判定 */
 
 #define rt_memset    memset

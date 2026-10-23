@@ -228,20 +228,40 @@ rt_err_t motor_diag_gate_check(void);
  * 不产生任何新的关断动作; `pwm_rc` 必须是那次短保护返回的原始 PWM 错误。
  * 调用方: safety_force_shutdown()(整理阶段)与 motor_emergency_stop()(自己做短保护)。
  * 返回对外合同与 motor_emergency_stop() 相同(PWM 失败优先, 否则许可确认结果)。 */
-rt_err_t motor_reconcile_after_trip(rt_err_t pwm_rc);
+/* ---------- 2026-10-23 S2 CP3 R1: 慢整理拆成"观察"与"身份受检提交"两段 ----------
+ * 原 motor_reconcile_after_trip(pwm_rc) 无身份: 它清 mot_res/armed/target/current 之前
+ * 只比过一次 inhibit, 人工恢复 + 新预约之后旧慢整理仍能把新状态写回故障影子
+ * (审查探针 stale-slow-reconcile)。现在两段分开:
+ *   motor_trip_observe()  窗口外的带回读确认(有 settle/重试, 不能在临界区里跑),
+ *                         确认只写进**这次 proof 那一代**, 失配返回 -RT_EINTR。
+ *   motor_commit_off()    mot_lock 在窗口**外**取得(取不到就不提交) + **一个**短窗口里
+ *                         做身份门与字段落位。返回 FALSE = 整笔放弃(不写新影子、
+ *                         不动新预约/新 pending), 调用方如实记录。
+ * 统一慢整理(safety_state 的 ss_reconcile_once)在自己的窗口里直接调
+ * motor_shadow_from_proof_held() + motor_fault_fields_held(), 不经过本函数。 */
+rt_err_t  motor_trip_observe(const sp_proof_t *pf);      /* 返回许可回读原始 rc */
+
+#define MOT_COMMIT_TRIP     0   /* 短保护/守卫/显式急停: pending 门 + MOTOR_FAULT */
+#define MOT_COMMIT_ROLLBACK 1   /* arm 回滚那次关断: 同代门 + MOTOR_FAULT */
+#define MOT_COMMIT_DISARM   2   /* disarm: 同代门, 关断被接受回 IDLE, 否则 FAULT */
+rt_bool_t motor_commit_off(const sp_proof_t *pf, int mode);
 
 /* ---------- 2026-10-23 S2: 人工恢复的最终提交接入点(任务书 §7) ----------
  * fault_reset 需要在**一个**短临界区里同时落 Motor 影子、Safety 状态与 canonical,
  * 因此这里给三个专用入口(锁在窗口**外**取放, 窗口内只有固定字段赋值):
- *   motor_lock_for_recovery()    窗口外取 mot_lock; 互斥量不可用返回 -RT_EIO,
+ *   motor_lock_take_checked()    窗口外取 mot_lock; 互斥量不可用返回 -RT_EIO,
  *                                调用方一律**不提交**(fail closed)。
  *   motor_recovery_fields_held() 调用方必须已在同一窗口内且已确认恢复票据有效。
- *   motor_unlock_for_recovery()  窗口外释放。
+ *   motor_shadow_from_proof_held() 同窗口内把一次复核带回的 proof 抄进 Motor 影子。
+ *   motor_lock_give_checked()    窗口外释放。
  * ⚠ 唯一合法调用点 = safety_state.c 的 fault_reset(); 不导出 MSH 命令, 没有第二条
  *   恢复路径。原 motor_clear_stop_latch() 因此删除(无身份的公共清除口 = 旁路)。 */
-rt_err_t motor_lock_for_recovery(void);
+rt_err_t motor_lock_take_checked(void);
 void     motor_recovery_fields_held(void);
-void     motor_unlock_for_recovery(void);
+void     motor_shadow_from_proof_held(const sp_proof_t *pf);
+/* 短窗口内的 Motor 故障字段落位(调用方已持 mot_lock 且已过身份门)。 */
+void     motor_fault_fields_held(void);
+void     motor_lock_give_checked(void);
 
 /* ---------- 2026-10-23 S1: 关断结果的可观测性(只读, 不产生总线流量) ----------
  * out_result/out_src/out_rc 反映**最近一次** STEP 关断尝试; *out_latched 是
