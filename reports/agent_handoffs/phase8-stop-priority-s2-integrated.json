@@ -1,0 +1,114 @@
+{
+  "task_id": "phase8-stop-priority-s2-integrated",
+  "task_book_file": "NS800_S2_Integrated_Implementation_Qoder_Task_1348eb0_20261023.md",
+  "nature": "软件实现 + 必要主机验证 + Keil 构建 + 普通提交/push; 硬件动作不授权",
+  "branch": "phase8/tmc-drive-config",
+  "base_commit": "1348eb098ce51e40303b2685bce19d67da67e276",
+  "cp1_commit": "6726fa60721c1da2ec578a15a04d2ca899e470d3",
+  "head_commit": "776a91e669dcac84e53d49e4838611a2a4454705",
+  "tested_commit": "776a91e669dcac84e53d49e4838611a2a4454705",
+  "remote_push": "NOT_PUSHED (本轮记录; 下一步随最终交接推送并 ls-remote 回读)",
+  "overall_status": "IN_PROGRESS",
+  "checkpoint_status": {
+    "CP1": "实现完成 + Keil 0/0 + 仓外单线程冒烟 67/67",
+    "CP2": "实现完成 + Keil 0/0; 预算链路真执行为 0",
+    "CP3": "未开始(夹具接入项已定位)",
+    "CP4": "未开始"
+  },
+  "modified_files": [
+    "applications/stop_priority.h (新增)",
+    "applications/stop_priority.c (新增)",
+    "applications/motor.c",
+    "applications/motor.h",
+    "applications/step_pwm.c",
+    "applications/step_pwm.h",
+    "applications/safety_state.c",
+    "applications/safety_state.h",
+    "applications/safety_thread.c",
+    "applications/safety_gpio.c",
+    "applications/safety_gpio.h",
+    "applications/supervisor.c",
+    "applications/tmc2209.c",
+    "libraries/HAL_Drivers/drivers/drv_epwm.c",
+    "libraries/HAL_Drivers/drivers/drv_epwm.h",
+    "libraries/HAL_Drivers/drivers/drv_uart.c",
+    "libraries/HAL_Drivers/drivers/drv_uart.h",
+    "project.uvprojx (stop_priority.c 加入 rt-thread target)"
+  ],
+  "deleted_public_api": [
+    "motor_clear_stop_latch()",
+    "step_pwm_force_stop()",
+    "step_pwm_clear_stop_latch()"
+  ],
+  "protocol": {
+    "shared_words": "不是五个字段; canonical 完整字段见 stop_priority.h 的 sp_snapshot_t(epoch/owner/phase/inhibit/exhausted/motor_stop_latched/diag_stop_latched/diag_ever_reserved/metadata_pending/first_fault_code/reason_events/pwm{attempted,result,raw_rc,src,epoch}/permit{written,write_rc,src,write_epoch,confirmed,confirm_rc,confirm_epoch}/first_unrecovered/trips/merged/stale_dropped)",
+    "short_protection": "sp_protect_held: advance->retain->rt_pwm_disable->独立许可 LOW 裸写->owner 判定->proof 复制, 全部在同一个 PRIMASK 窗口内(不使用发布/认领/执行三段式)",
+    "run_capable_commit": "许可 HIGH / PWM 寄存器提交 / rt_pwm_enable / armed=1 / RUN 提交 / 诊断 enabled 提交 均在资格判定所在的同一窗口内",
+    "forbidden_in_window": "取锁, rt_thread_mdelay, UART, rt_kprintf, 动态分配, 循环重试, 浮点",
+    "root_cause_evidence": "drv_uart.c:403-427 按 rt_tick_get() 判超时 + PRIMASK 屏蔽 SysTick => 窗口内 tick 不推进",
+    "barrier": "MMIO 后 __DSB()/主机侧等价的 seq_cst fence, 再恢复中断; 不在目标上新增空屏障宏",
+    "epoch_bits": "24 位; 到 0x00FFFFFF 即 exhausted, 禁止新预约与人工恢复, 每次显式保护仍照做关闭"
+  },
+  "lock_order": [
+    "ss_lock -> mot_lock -> 短窗口 (fault_reset 最终提交)",
+    "txn -> mot_lock (配置门禁)",
+    "短窗口内不取任何锁"
+  ],
+  "budget_table_ms": {
+    "read_standalone": 125,
+    "integrity_total": 250,
+    "confirmed_write_total": 400,
+    "apply_total": 1500,
+    "cfg_lock_per_take": 10,
+    "xfer_lock_per_take": 20,
+    "tx_frame_stage": 20,
+    "flush_time": 2,
+    "flush_bytes_max": 256
+  },
+  "raw_result_handling": "PWM 与许可分列; 对外 PWM 优先; first_unrecovered 保存首个未恢复失败的原始 rc; 一次后续成功不抹首错",
+  "verification": {
+    "keil_cp1_rebuild_all": "0 Error / 0 Warning; Code=160186 RO=71958 RW=2188 ZI=83576",
+    "keil_cp2_rebuild_all": "0 Error / 0 Warning; Code=164602 RO=72758 RW=2188 ZI=83616",
+    "s1_chain_pre_change_baseline": "PASS: target 48/48, host_ovr 64/64 (SRC_APP=1348eb0 的 applications)",
+    "s1_chain_on_s2_tree": "COMPILE_FAILED (rc=4 基础设施故障): 夹具缺 drv_epwm.h; ps_main.c 仍调用已删除的 step_pwm_force_stop 与 0 参数的 motor_pwm_grant_to_diag",
+    "s2_cases_C01_C20_executed": [],
+    "s2_cases_applicability": "C01..C20 全部适用; 全部 NOT EXECUTED(见交接 §7 的阻塞点列)",
+    "host_smoke_stop_priority": "仓外临时夹具, 67 断言全 PASS, rc=0; 仅单线程合同, 不等于 C01-C20",
+    "reverses_executed": [],
+    "reverses_required": [
+      "去掉真实写提交门(旧 set/旧 token 越门)",
+      "去掉底层 TX/flush 预算或恢复 epoch 检查"
+    ],
+    "regressions_not_run": [
+      "build_and_run.sh (V1/V2)",
+      "run_io_behavior.sh",
+      "run_safety_data_semantics.sh",
+      "run_meta_negatives.sh"
+    ]
+  },
+  "not_tested_boundaries": [
+    "停机时延上界(RISK-03/03a)",
+    "整链物理验收(RISK-04-b)",
+    "STEP 波形/频率(BUG-008)",
+    "任意 shell/其它核/NMI/HardFault 场景(协议只覆盖本核普通可屏蔽上下文)",
+    "armed 路径真机行为(未烧录)"
+  ],
+  "four_macros": {
+    "MOTOR_HARDWARE_ENABLE_PATH_VALIDATED": "RT_FALSE",
+    "STEP_DIAG_ISOLATED_ENV_CONFIRMED": "RT_FALSE",
+    "SAFETY_LIMIT_INPUTS_ENABLED": "RT_FALSE",
+    "TMC_DRIVE_CONFIG_HW_VALIDATED": "RT_FALSE"
+  },
+  "hardware_actions": [],
+  "hardware_status": "零硬件动作 (AGENT_REPORTED): 未烧录/未接串口/未动 GPIO/TMC/STEP/电机/未跑真机 selftest",
+  "known_defects_fixed_in_pass": [
+    "drv_epwm configuration_convert 在冻结模式下取 signal_freq 未初始化(随计数模式取源变更一并消除); 其频率后果未上板验证"
+  ],
+  "next_steps": [
+    "CP3: 接入夹具 7 项(s1_chain_before_after.txt [C])",
+    "CP3: 建 run_stop_priority_s2.sh 执行 C01-C20 适用集合",
+    "CP3: 两类必要反向 + 两项 S1 反向锚点重指",
+    "CP4: 集中回归 + Keil + 最终交接 + push + ls-remote 回读"
+  ],
+  "stop_claim": "NO SOFTWARE_REVIEW_GO claimed by Agent; 本轮不称 §11 验证完成"
+}

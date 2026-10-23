@@ -1,0 +1,116 @@
+phase8-stop-priority-s2-integrated  构建与主机执行证据 (CP1+CP2)
+生成时间: 2026-10-23 (本地)   基线 analyzed_commit=1348eb098ce51e40303b2685bce19d67da67e276
+本轮提交: CP1=6726fa60721c1da2ec578a15a04d2ca899e470d3  CP2=776a91e669dcac84e53d49e4838611a2a4454705
+证据分级: DIRECTLY_VERIFIED = 本轮亲自在本机执行并读取原始输出
+========================================================================
+
+[E1] Keil Rebuild All (CP1 树, 提交 6726fa6 的内容)
+     DIRECTLY_VERIFIED
+     命令: UV4.exe -r project.uvprojx -t rt-thread -j0 -o <仓外日志>
+     Target=rt-thread  Compiler=ARMCLANG V6.24 (C:/Keil_v5/ARM/ARMCLANG/Bin)
+     *** Using Compiler 'V6.24', folder: 'C:\Keil_v5\ARM\ARMCLANG\Bin'
+     Program Size: Code=160186 RO-data=71958 RW-data=2188 ZI-data=83576
+     ".\build\rt-thread.axf" - 0 Error(s), 0 Warning(s).
+     Build Time Elapsed:  00:00:10
+
+[E2] Keil Rebuild All (CP2 树, 提交 776a91e 的内容)
+     DIRECTLY_VERIFIED  同一命令, 全量重建
+     *** Using Compiler 'V6.24', folder: 'C:\Keil_v5\ARM\ARMCLANG\Bin'
+     Program Size: Code=164602 RO-data=72758 RW-data=2188 ZI-data=83616
+     ".\build\rt-thread.axf" - 0 Error(s), 0 Warning(s).
+     Build Time Elapsed:  00:00:09
+     相对 CP1 的增量: Code +416B, RO-data +200B, ZI-data +40B(RW 不变) —— 与本轮
+     新增的预算/摘要/协调层代码量一致, 未见异常膨胀。0 Error / 0 Warning 两次都是
+     Rebuild All(不是增量)的结果。
+
+[E3] stop_priority 主机冒烟(仓外临时夹具, 不是 §11 的 S2 正式链)
+     DIRECTLY_VERIFIED
+     编译器: gcc.exe (tdm64-1) 4.9.2  C:/Program Files (x86)/Dev-Cpp/MinGW64/bin/gcc.exe
+     命令:
+       gcc -std=gnu99 -Wall -I shim -I <applications> \
+           <仓外>/sp_smoke.c <applications>/stop_priority.c -o sp_smoke.exe
+       ./sp_smoke.exe   => rc=0, 汇总 PASS=67 FAIL=0
+     夹具性质: 单线程可判定的合同检查。rt_hw_interrupt_disable/enable 用真实
+     Win32 CRITICAL_SECTION 串行化短窗口; rt_pwm_enable/rt_pwm_disable 与许可
+     裸写是**可编程计数的桩**(可注入失败); 不冒称模拟总线/示波器, 也不是目标板。
+     原始输出逐行如下(未删改):
+
+     == S2 CP1 stop_priority 冒烟 ==
+     [1] sp_trip_fast 正常路径
+       PASS  两条动作都成功 => 返回 EOK
+       PASS  真实 rt_pwm_disable 恰好一次
+       PASS  许可 LOW 独立尝试一次(与 pe 无关)
+       PASS  inhibit 已置位
+       PASS  关断被接受 => owner 交回 none(不是 HELD_UNKNOWN)
+       PASS  canonical 结果=API_ACCEPTED
+       PASS  裸写已发出但**不**冒充回读确认
+       PASS  proof 带本次 epoch
+       PASS  首故障码保留
+       PASS  pending 已建立(慢整理可拾取)
+     [2] 同一波内的第二个较弱故障
+       PASS  首故障码不被后来者覆盖
+       PASS  第二个原因位被合并保留
+       PASS  新的显式保护请求仍照做关闭(每次一代)
+     [3] reserve -> HIGH/启动必须在同一 token 门内
+       PASS  保护后通道无人持有
+       PASS  保护后处于抑制
+       PASS  抑制期间预约被拒(fail closed)
+       PASS  预约成功并换 epoch
+       PASS  token 与 canonical 一致
+       PASS  本代身份可无等待复核
+       PASS  同代 phase 设置被接受
+       PASS  HIGH 的真实寄存器写发生在门内(一次)
+       PASS  HIGH 成功 => phase=ARMED
+       PASS  PWM 启动走同一条门(Motor 已 ARMED 才放行)
+       PASS  只有 API 成功才记 OUTPUT_REQUESTED/RUNNING
+       PASS  旧 token 过不了门(已抑制)
+       PASS  旧 token 不能写 HIGH
+       PASS  旧 token 不能起转
+       PASS  旧身份的两个写点次数仍为 0 增量
+     [4] 诊断持有期间 Motor disarm 无权撤销诊断身份
+       PASS  诊断预约成功(借用门后的身份)
+       PASS  诊断曾占用被记录(不伪造从未使用)
+       PASS  共享模块的关断照做(朝安全方向)
+       PASS  但**不**撤销别的 owner 的预约
+       PASS  诊断自己 stop 时把自己的预约撤销
+     [5] sp_off_attempt 失败路径(合同: disable 恰好一次)
+       PASS  返回该次 disable 的真实错误(不被掩盖)
+       PASS  同一次动作内 rt_pwm_disable 恰好一次(无隐式第二次)
+       PASS  失败分支在同一窗口内追加许可 LOW
+       PASS  失败 => 同窗形成抑制
+       PASS  失败 => 输出状态未知, 谁都不许认领
+       PASS  Motor 侧关断失败锁存
+       PASS  失败换 epoch(旧恢复票据自然失效)
+       PASS  保存的是**首个未恢复**失败的原始结果
+     [6] 失败后再来一次成功的显式停机
+       PASS  新的显式停机允许再次真实关闭
+       PASS  一次后续成功**不**解除历史锁存(合同 4.4)
+       PASS  仍保持抑制: 解除只走人工恢复的最终提交
+     [7] 人工恢复闭环
+       PASS  抑制中可取恢复票据
+       PASS  带票据的安全关闭复核成功(一次真实关闭 + LOW)
+       PASS  复核自己只关一次
+       PASS  复核自己只发一次许可 LOW 裸写
+       PASS  复核成功**不**换 epoch(否则自废票据)
+       PASS  复核成功本身不清历史锁存(留给最终提交)
+       PASS  最终窗口内票据仍有效(结果属于本代)
+       PASS  最终提交成功
+       PASS  抑制已解除
+       PASS  已由本次复核覆盖的历史锁存被清(S2-C13: 不永久卡死)
+       PASS  取消 owner 并换 epoch
+       PASS  诊断语义回到'从未占用'(恢复后不堵死借用门)
+       PASS  恢复后可以重新预约(仍需重新 arm)
+     [8] 合并故障后旧恢复不得清新一代
+       PASS  取到票据 A
+       PASS  旧票据的复核被拒(已有更新的一代), 且不改变新状态
+       PASS  被拒的复核没有偷偷做第二次关断
+       PASS  旧票据最终提交判定为无效
+       PASS  旧恢复不能清掉新故障的抑制/锁存
+       PASS  抑制保持
+     [9] 设备缺失(初始化出口形状)
+       PASS  未取得句柄 => 返回未实现, 不冒充成功
+       PASS  绝不对 NULL 句柄调用 PWM API
+       PASS  无设备也独立尝试许可 LOW
+       PASS  记为 dev-unavailable + 锁存
+     
+     == 汇总: PASS=67 FAIL=0 ==

@@ -1,0 +1,101 @@
+phase8-stop-priority-s2-integrated  S1 回归链的修前/修后对照与待接入清单
+生成时间: 2026-10-23 (本地)
+证据分级: DIRECTLY_VERIFIED = 本轮亲自在本机执行并读取原始输出(两个 run 用同一个
+          runner、同一台机器、同一个 gcc(tdm64-1 4.9.2), 只有 SRC_APP 指向的源码不同)
+
+========================================================================
+[A] 修前对照(基线树 1348eb0 的 applications, 即 S1-R1 已审 GO 的那份生产源码)
+========================================================================
+命令(输出目录在仓库外, 由 runner 自身的 require_outside_repo 强制):
+  git archive 1348eb0 <applications 相对路径> | tar -x -C /tmp/ns800_s2/base
+  PS_OUT_DIR=/tmp/ns800_s2/s1_base \
+  SRC_APP=/tmp/ns800_s2/base/<...>/applications \
+  bash tests/host/run_stop_result_s1.sh
+
+原始输出(节选, 未删改):
+  ###### 关断结果可信链 S1 (基线 776a91e669dcac84e53d49e4838611a2a4454705) ######
+  run_id=20261023T153014Z-1325
+  compiler=gcc.exe (tdm64-1) 4.9.2
+  === 变体 target ===
+    target 真实进程 rc=0 输出 31725 字节
+    台账: 必需=48 唯一出现=48 实际行数=48 SUMMARY(cases=48 pass=48 fail=0) 自洽=1
+  === 变体 host_ovr ===
+    host_ovr 真实进程 rc=0 输出 55189 字节
+    台账: 必需=64 唯一出现=64 实际行数=64 SUMMARY(cases=64 pass=64 fail=0) 自洽=1
+  S1 RUNNER RESULT: PASS (rc=0)
+
+  => 结论: S1 链本身在修前是好的(48/64 全通过), 下面 [B] 的失败不是夹具环境坏了,
+     而是 S2 的结构变化还没有接入夹具。
+
+  ⚠ 一处必须如实说明的偏差: 该 runner 打印的"基线"取自 **git HEAD**(现在 = 776a91e,
+     即 CP2 提交), 不是它实际编译的 SRC_APP。所以台账头部写的基线号与本次喂进去的
+     源码版本(1348eb0)不一致 —— 这是 runner 的自述口径问题(它拿 HEAD 当基线标签),
+     不影响用例的执行与判定, 已在此记录, 留给 CP4 一并校准或在本轮交接里说明。
+
+========================================================================
+[B] 修后(S2 树, 提交 776a91e) 的真实状态: 编译不过 => 本轮未获得任何 S1 回归 PASS
+========================================================================
+命令:
+  PS_OUT_DIR=/tmp/ns800_s2/s1_<时间戳> bash tests/host/run_stop_result_s1.sh
+
+原始输出(节选, 未删改):
+  === 变体 target ===
+  In file included from D:/ns800/tests/host/ps_main.c:473:0:
+  .../applications/step_pwm.c:58:108: fatal error: drv_epwm.h: No such file or directory
+   #include "drv_epwm.h"          /* ns800_epwm_prepare / commit_prepared_held(...) */
+  compilation terminated.
+    target 编译失败 rc=1 => 不运行二进制(旧产物已删除)
+  === 变体 host_ovr ===
+    (同一条 fatal error)
+    host_ovr 编译失败 rc=1 => 不运行二进制(旧产物已删除)
+  target | COMPILE_FAILED rc=1
+  host_ovr | COMPILE_FAILED rc=1
+  S1 RUNNER RESULT: FAIL (rc=4; 1=检出失败, 4=基础设施故障)
+
+  => 判定纪律: 编译失败**不跑旧产物**, 因此本轮 S1 链没有任何用例被记为执行或 PASS。
+     这是"基础设施故障(4)"而不是"检出失败(1)", 也绝不是通过。
+
+========================================================================
+[C] 已定位的夹具接入项(CP3 的工作清单, 逐条来自真实报错, 不是猜测)
+========================================================================
+1) tests/host/shim_ps/ 缺 drv_epwm.h: motor.c/step_pwm.c 在 S2 需要
+   struct ns800_epwm_prepared + ns800_epwm_prepare() +
+   ns800_epwm_commit_prepared_held() 的声明(生产头在 HAL_Drivers/drivers,
+   不在本链 -I 路径里, 也不应把整份 SDK 拖进夹具)。
+   → 需要一份**最小声明 + 可编程桩**的 shim(本轮已在仓外做过一次尝试并验证可行方向,
+     桩需记录调用次数并可注入失败)。
+2) tests/host/shim_ps/rtthread.h 没有 rt_hw_interrupt_disable/enable, 也没有 rthw.h:
+   stop_priority.c 与 stop_priority.h 依赖它们。主机侧必须用**真实的串行化原语**
+   (Win32 CRITICAL_SECTION 或 pthread mutex)实现这一对, 且窗口内不得有可阻塞调用
+   —— 这正是 §11"主机 IRQ 模型必须串行化该本核短窗口"的要求。
+3) ps_main.c:774 仍调用 step_pwm_force_stop() —— S2 已删除该函数(它正是统一停机里
+   的"第二次 disable")。对应断言必须改写为 S2 形状: 停机波内共享模块只关一次,
+   诊断侧只整理镜像; "force_stop 不投事件"这条合同要重新表达为
+   "step_pwm_reconcile_after_trip() 不产生硬件动作且不投事件"。
+4) ps_main.c:1118 以 0 个参数调用 motor_pwm_grant_to_diag() —— S2 改为
+   motor_pwm_grant_to_diag(sp_token_t *out)(借用门 + 真正的 SP_DIAG 预约),
+   只读体检改用 motor_diag_gate_check()。夹具两处都要按用途分开接。
+5) ps_main.c 需要新增 safety_gpio 的 S2 接缝桩: safety_drv_permit_pin /
+   safety_drv_permit_low_raw_held / safety_drv_permit_high_raw_held
+   (stop_priority.c 的窗口内裸写点), 以及带计数的确认入口。
+6) 两项 S1 反向的注入锚已随架构重排失效(rev_motor_off_ignores_failure 锚在旧的
+   mot_stop_record(...) 表达式上; rev_diag_fail_releases_owner 锚在旧的
+   "step_stop_result = MOT_STOP_API_FAILED; step_stop_latched = RT_TRUE;" 上)。
+   → 等价合同要重指到新的真实写点: 反向①改为 sp_note_pwm_held 把失败映射成
+     API_ACCEPTED; 反向②改为 sp_off_attempt 失败分支释放/清空 owner。
+   → 另按 §11.2 追加两项 S2 反向: 去掉真实写提交门(旧 token/旧 set 越门)与
+     去掉 TX/flush 预算或恢复 epoch 检查。
+7) 新增 stop_priority.c 进入编译集合(生产源码, 与 motor/step/safety 一起编进一个 TU)。
+
+========================================================================
+[D] 本轮没有执行的既有链(如实列出, 不假称通过)
+========================================================================
+NOT EXECUTED(本轮):
+  - run_stop_result_s1.sh 的两个变体(见 [B]: 编译失败)
+  - 上述两项 S1 局部反向(REVERSE=1, 锚点待重指, 见 [C].6)
+  - build_and_run.sh(V1/V2)、run_io_behavior.sh(I/O 四变体)、
+    run_safety_data_semantics.sh(SD)与元负例 run_meta_negatives.sh
+    理由: §11.2 把它们排在"集中一轮"里; 而集中轮的前置是 [C] 的夹具接入完成。
+  - 目标板 runtime_selftest / 任何上板验证(本轮零硬件动作, 见交接的 hardware_actions)
+  - §11.1 的 S2-C01..C20: **一条都没有执行**(夹具尚未建; [E3] 的仓外冒烟不能算,
+    它是单线程合同检查, 不含真实锁占用、并发接缝与预算叶子)
