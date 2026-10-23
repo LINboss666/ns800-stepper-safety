@@ -503,15 +503,19 @@ static rt_err_t mot_arm_rollback(rt_uint32_t code, rt_uint32_t ev, rt_err_t firs
  * 与 mot_fail_closed() 同一条 fail-closed 路径。
  * S1: STEP 关断结果与许可撤销结果分别记账; 关断失败**不**跳过撤销许可, 也不因为
  * current_hz 清零而宣称"输出已停"。 */
-static void mot_guard_shutdown(rt_uint8_t reason)
+static void mot_guard_shutdown(rt_uint8_t reason, rt_uint32_t op_epoch)
 {
     rt_err_t pe;
     rt_uint32_t ev = (reason == MOT_GUARD_ENN_FEEDBACK) ? EVT_DRV_FEEDBACK : EVT_SOFT_FAULT;
     rt_uint32_t code = (reason == MOT_GUARD_ENN_FEEDBACK) ? FAULT_DRV_FEEDBACK : FAULT_SOFT;
 
     /* S2(2026-10-23): 第一次降险**不等**任何锁与控制台 —— 短保护先做(冻结 + 许可 LOW +
-     * 抑制 + 换 epoch + 记账), 然后才是本线程的状态整理、日志与一次通知。 */
-    (void)sp_trip_fast(code, ev, MOT_STOP_SRC_GUARD_STOP, RT_NULL);
+     * 抑制 + 换 epoch + 记账), 然后才是本线程的状态整理、日志与一次通知。
+     * 任务书 §4.2/§10.4 的去重: 用**本拍开始时**采的 op_epoch 走
+     * sp_trip_for_operation() —— 如果这一拍里更底层(例如 TMC 配置事务的失败出口)
+     * 已经保护过, epoch 已经变化, 它会返回 -RT_EINTR 并且**不做第二轮关闭**;
+     * 守卫随后的状态整理与通知照做, 所以仍然不会出现"判定为停机但没动作"。 */
+    (void)sp_trip_for_operation(op_epoch, code, ev, MOT_STOP_SRC_GUARD_STOP, RT_NULL);
     mot_stop_mirror();
     pe = (rt_err_t)mot.stop_rc;
 
@@ -567,6 +571,10 @@ static void motor_ramp_tick(void)
     rt_uint8_t armed;
     rt_uint8_t guard_due = 0u;
     rt_uint8_t fb_stopped = 0u;
+    /* S2(§4.2): 本拍开始时取一次协调层 epoch, 贯穿这一拍的所有失败出口。
+     * 底层(TMC 配置事务)若已保护过, epoch 会变, 守卫的短保护就自动让位,
+     * 同一波错误里不会出现第二次 rt_pwm_disable。 */
+    rt_uint32_t op_epoch = sp_epoch();
 
     /* ---------- F2b P1-E: 驱动配置运行期守卫(只在 armed 时复核) ----------
      * armed 与"本轮是否到复核周期"在锁内一次取定; 复核本身必须在锁外做
@@ -595,7 +603,7 @@ static void motor_ramp_tick(void)
         {
             rt_kprintf("[MOT] runtime guard: ENN feedback %s while request=ENABLE"
                        " (expected LOW) -> 停机\n", safety_fb_verdict_name(fv));
-            mot_guard_shutdown(MOT_GUARD_ENN_FEEDBACK);
+            mot_guard_shutdown(MOT_GUARD_ENN_FEEDBACK, op_epoch);
             fb_stopped = 1u;
         }
     }
@@ -612,7 +620,7 @@ static void motor_ramp_tick(void)
         in.busy_streak  = mot_ramp_guard_busy;
         motor_guard_decide(&in, &out);
         mot_ramp_guard_busy = out.busy_streak;
-        if (out.stop) mot_guard_shutdown(out.reason);
+        if (out.stop) mot_guard_shutdown(out.reason, op_epoch);
     }
     else mot_ramp_guard_busy = 0u;
 

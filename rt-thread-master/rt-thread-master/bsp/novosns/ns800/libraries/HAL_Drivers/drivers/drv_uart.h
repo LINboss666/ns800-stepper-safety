@@ -71,5 +71,14 @@ struct ns800_uart
 
 int rt_hw_uart_init(void);
 
+/* 2026-10-23 S2(任务书 §10.3): 整帧带预算发送, 仅供 TMC 生产路径调用。
+ * start/total 用**调用者那一次操作的同一个 start**(不得在被抢占后重开等待),
+ * 返回 RT_EOK 当且仅当 *written == size; 预算耗尽返回 -RT_ETIMEOUT 并把已经写出的
+ * 字节数留在 *written 里, 上下文非法(ISR/已关中断)返回 -RT_EBUSY, 参数或设备不在
+ * 已注册表里返回 -RT_EINVAL。定义见 drv_uart.c(含 SDK 叶子无等待的本地依据)。 */
+rt_err_t ns800_uart_write_budgeted(rt_device_t dev, const rt_uint8_t *data,
+                                   rt_size_t size, rt_tick_t start, rt_tick_t total,
+                                   rt_size_t *written);
+
 #endif  /* __DRV_USART_H__ */
 

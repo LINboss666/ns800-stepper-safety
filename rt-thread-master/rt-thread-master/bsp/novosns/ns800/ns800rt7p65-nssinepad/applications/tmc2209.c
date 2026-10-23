@@ -30,6 +30,8 @@
 #include "motor.h"          /* F2b P0-B: 运行态写入门禁要读电机静止/armed 状态 */
 #include "safety_gpio.h"    /* F2b P0-B: DRV_ENABLE 焊盘是否实测 LOW */
 #include "safety_state.h"   /* F2b P0-B: Safety 状态机与锁存故障码 */
+#include "stop_priority.h"   /* 2026-10-23 S2: 失败先保护(去重)+ 无等待摘要的窗口原语 */
+#include "drv_uart.h"        /* 2026-10-23 S2 §10.3: ns800_uart_write_budgeted(整帧预算) */
 
 #define TMC_UART_NAME    TMC_UART_DEVICE_NAME    /* "uart2" */
 #define TMC_BAUD         115200
@@ -53,19 +55,145 @@ static rt_bool_t tmc_opened = RT_FALSE;
 static struct rt_mutex tmc_xfer_lock;      /* P1-11: 完整事务串行化 */
 static rt_bool_t tmc_lock_ok = RT_FALSE;
 
+/* ---------- 2026-10-23 S2(任务书 §10.1): 初始软件预算 ----------
+ * 这些是**保守的可配置软件预算**, 不是已测物理性能, 也不是最坏停机指标; 目标上不
+ * 满足时报告实际证据由审查方调整, 不得为了凑绿静默放宽。
+ * 为什么要显式建一套: 底层 ns800_putc 的等待上限是 6000ms 每字符(rtconfig.h 的
+ * BSP_NS800_UART_TX_TIMEOUT), 而 TMC 的读事务原先只有一个 100ms 的 RX deadline,
+ * TX/flush/取锁全都无界 —— "单次读 100ms"这句话在最坏路径上根本不成立。 */
+#define TMC_BUD_READ_MS          125u   /* 单次独立读总预算(锁+flush+TX+RX) */
+#define TMC_BUD_INTEGRITY_MS     250u   /* integrity: 两个寄存器**共用**, 不各开一份 */
+#define TMC_BUD_CONFIRM_MS       400u   /* confirmed write: 前后读 + 写帧 + 确认共用 */
+#define TMC_BUD_APPLY_MS        1500u   /* 整个 apply: 所有帧共用, 子调用取剩余 */
+#define TMC_BUD_CFG_LOCK_MS       10u   /* cfg 状态锁单次等待上限 */
+#define TMC_BUD_XFER_LOCK_MS      20u   /* UART xfer 锁单次等待上限 */
+#define TMC_BUD_TX_FRAME_MS       20u   /* 单帧 TX 阶段上限(整帧, 不是每字符重给) */
+#define TMC_BUD_FLUSH_MS           2u   /* 单次 flush: 时间上限 */
+#define TMC_BUD_FLUSH_MAX_BYTES  256u   /* 单次 flush: 字节上限(任一先到即洪泛) */
+
+/* 一次操作的预算: **只在真正的外层建一次**, 子调用始终沿用同一个 start。 */
+typedef struct
+{
+    rt_tick_t start;
+    rt_tick_t total;
+} tmc_budget_t;
+
+/* 结构化失败原因(§10.4: 底层只返回无打印的结构化错误, 打印在保护之后的外层)。 */
+typedef enum
+{
+    TMC_XFER_OK = 0,
+    TMC_XFER_NO_DEVICE,       /* 未取得设备句柄 / 未打开 */
+    TMC_XFER_BAD_CONTEXT,     /* ISR 或已关中断上下文: 一律拒绝 */
+    TMC_XFER_BUDGET_EXHAUSTED,/* 总预算已耗尽(不重开、不映射成成功) */
+    TMC_XFER_LOCK_BUSY,       /* 本层没拿到锁 => 也绝不 release */
+    TMC_XFER_RX_FLOOD,        /* flush 超过字节/时间双上限: 不能称输入已清空 */
+    TMC_XFER_TX_FAILED,       /* 预算内没写完(部分发送如实报 written) */
+    TMC_XFER_RX_TIMEOUT_ECHO, /* 只有自身回声, 没有应答头 */
+    TMC_XFER_RX_TIMEOUT_PART, /* 有应答头但不完整 */
+    TMC_XFER_RX_CRC,          /* CRC/帧解析错误 */
+    TMC_XFER_NOT_ARRIVED,     /* IFCNT 没有 +1: 芯片没接受这一帧(内容对也不算到达) */
+    TMC_XFER_STALE            /* 操作身份已过期(晚到结果不发布) */
+} tmc_xfer_reason_t;
+
+/* 一次传输的可判定观测: 原始 rc 与原因、实际字节数分列, 不互相替代。 */
+typedef struct
+{
+    rt_err_t           rc;
+    tmc_xfer_reason_t  reason;
+    rt_size_t          tx_written;
+    rt_size_t          rx_bytes;
+    rt_size_t          flush_bytes;
+    rt_tick_t          used;
+} tmc_xfer_stat_t;
+
+/* ms -> tick, **不允许舍成 0**(§10.2): 舍成 0 的预算等于"立即超时", 会让一次
+ * 本来合法的调用直接失败, 也会掩盖真实的等待。 */
+static rt_bool_t tmc_budget_ms2tick(rt_uint32_t ms, rt_tick_t *out)
+{
+    rt_tick_t t = rt_tick_from_millisecond(ms);
+
+    if (t == 0 || t >= (rt_tick_t)0x80000000) return RT_FALSE;
+    *out = t;
+    return RT_TRUE;
+}
+
+/* 外层建一次预算; total_ms 非法(0/过大/舍成 0)时返回 FALSE 且不写 *b。 */
+static rt_bool_t tmc_budget_open(tmc_budget_t *b, rt_uint32_t total_ms)
+{
+    rt_tick_t t;
+
+    if (b == RT_NULL || !tmc_budget_ms2tick(total_ms, &t)) return RT_FALSE;
+    b->start = rt_tick_get();
+    b->total = t;
+    return RT_TRUE;
+}
+
+/* 任务书 §10.2 给的形式(逐字采用): used 与 total 比较, 用减法避免 tick 回绕误判。 */
+static rt_tick_t tmc_remaining(const tmc_budget_t *b)
+{
+    rt_tick_t used = rt_tick_get() - b->start;
+
+    return used >= b->total ? 0 : b->total - used;
+}
+
+static rt_bool_t tmc_budget_expired(const tmc_budget_t *b)
+{
+    return (b == RT_NULL) ? RT_TRUE : ((tmc_remaining(b) == 0) ? RT_TRUE : RT_FALSE);
+}
+
+/* 所有 UART/预算入口的上下文门(§10.2): ISR(无线程)一律拒绝。已关中断由带预算的
+ * 底层写入口本身再拒一次(drv_uart.c 里读 PRIMASK), 因为那时 tick 不再推进。 */
+static rt_bool_t tmc_ctx_ok_for_wait(const char *who)
+{
+    if (rt_thread_self() == RT_NULL)
+    {
+        rt_kprintf("[TMC] %s REFUSED: ISR/无内核线程上下文不允许等待\n", who);
+        return RT_FALSE;
+    }
+    return RT_TRUE;
+}
+
+static const char *tmc_xfer_reason_name(tmc_xfer_reason_t r)
+{
+    switch (r)
+    {
+    case TMC_XFER_OK:              return "ok";
+    case TMC_XFER_NO_DEVICE:       return "no-device";
+    case TMC_XFER_BAD_CONTEXT:     return "bad-context";
+    case TMC_XFER_BUDGET_EXHAUSTED:return "budget-exhausted";
+    case TMC_XFER_LOCK_BUSY:       return "lock-busy";
+    case TMC_XFER_RX_FLOOD:        return "rx-flood";
+    case TMC_XFER_TX_FAILED:       return "tx-failed";
+    case TMC_XFER_RX_TIMEOUT_ECHO: return "rx-timeout-echo";
+    case TMC_XFER_RX_TIMEOUT_PART: return "rx-timeout-partial";
+    case TMC_XFER_RX_CRC:          return "rx-crc";
+    case TMC_XFER_NOT_ARRIVED:     return "ifcnt-not-arrived";
+    case TMC_XFER_STALE:           return "stale-identity";
+    default:                       return "?";
+    }
+}
+
 /* P1-11: 周期 SG 读取默认关闭 hex_dump; 调试时置 1 重编 */
 #ifndef TMC_TRACE_VERBOSE
 #define TMC_TRACE_VERBOSE  0
 #endif
 
-static rt_err_t tmc_read_reg(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *value);
-static rt_err_t tmc_read_reg_locked(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *value);
-static rt_err_t tmc_write_reg_locked(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t value);
+/* 2026-10-23 S2: 全部读/写路径带上**同一次操作的预算**与结构化观测(任务书 §10.4)。
+ * 预算由最外层建一次(tmc_read_reg / confirmed write / apply / integrity), 子调用
+ * 一律沿用, 绝不在每层重新起表。 */
+static rt_err_t tmc_read_reg(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *value,
+                             const tmc_budget_t *b, tmc_xfer_stat_t *st);
+static rt_err_t tmc_read_reg_locked(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *value,
+                                    const tmc_budget_t *b, tmc_xfer_stat_t *st);
+static rt_err_t tmc_write_reg_locked(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t value,
+                                     const tmc_budget_t *b, tmc_xfer_stat_t *st);
 /* F2d(F2c-NEW-01): 写帧的唯一发起点收进文件内 —— 语义(写 + IFCNT 到达确认)一字
  * 未改, 只是不再对外暴露。头文件里"在位验证用 write_register_confirmed()"那句
  * 作废: 任何不持有配置事务的写入口, 本身就是绕过写入门禁的入口。 */
 static rt_err_t tmc2209_write_register_confirmed(rt_uint8_t addr, rt_uint8_t reg,
-                                                 rt_uint32_t value);
+                                                 rt_uint32_t value,
+                                                 const tmc_budget_t *b,
+                                                 tmc_xfer_stat_t *st);
 /* F2d(F2c-NEW-02): GSTAT 位解码(纯函数, 不碰总线), 诊断打印与主机测试共用。 */
 typedef struct
 {
@@ -136,11 +264,77 @@ static rt_err_t tmc_uart_open(void)
     return RT_EOK;
 }
 
-static void tmc_rx_flush(void)
+/* 单次 flush: **时间与字节双上限**(§10.1), 任一先到即结束。
+ * 旧实现是 `while (rt_device_read(...) > 0);` —— 无界: 对端持续吐字节(或 RX 线路
+ * 噪声/握手卡住)时它可以永远排空不完, 而且它发生在"发请求之前", 于是 TX 会在一个
+ * 根本不确定的等待之后才发出。
+ * 超限一律报 RX_FLOOD: **不能继续 TX 并称输入已经清空**(§10.4) —— 残留字节会让
+ * 后面的应答搜索把垃圾当帧, 那比"这一次读不到"更危险。 */
+static rt_err_t tmc_rx_flush(const tmc_budget_t *b, tmc_xfer_stat_t *st)
 {
-    rt_uint8_t dump[32];
-    while (rt_device_read(tmc_serial, 0, dump, sizeof(dump)) > 0) ;
+    rt_uint8_t  dump[32];
+    rt_uint32_t got_total = 0;
+    rt_tick_t   start = rt_tick_get();
+    rt_tick_t   cap   = rt_tick_from_millisecond(TMC_BUD_FLUSH_MS);
+
+    if (cap == 0 || cap >= (rt_tick_t)0x80000000) cap = 2;
+    if (tmc_serial == RT_NULL)
+    {
+        if (st) { st->reason = TMC_XFER_NO_DEVICE; st->rc = -RT_EIO; }
+        return -RT_EIO;
+    }
+    if (b != RT_NULL && tmc_remaining(b) == 0)
+    {
+        if (st) { st->reason = TMC_XFER_BUDGET_EXHAUSTED; st->rc = -RT_ETIMEOUT; }
+        return -RT_ETIMEOUT;
+    }
+
+    for (;;)
+    {
+        rt_size_t got = rt_device_read(tmc_serial, 0, dump, sizeof(dump));
+
+        if (got == 0) break;
+        got_total += (rt_uint32_t)got;
+        if (got_total > TMC_BUD_FLUSH_MAX_BYTES)
+        {
+            if (st)
+            {
+                st->flush_bytes = got_total;
+                st->reason = TMC_XFER_RX_FLOOD;
+                st->rc = -RT_EIO;
+            }
+            return -RT_EIO;
+        }
+        if ((rt_tick_t)(rt_tick_get() - start) >= cap)
+        {
+            if (st)
+            {
+                st->flush_bytes = got_total;
+                st->reason = TMC_XFER_RX_FLOOD;   /* 时间上限先到也是"没排干净" */
+                st->rc = -RT_ETIMEOUT;
+            }
+            return -RT_ETIMEOUT;
+        }
+        /* 整笔操作总预算优先: flush 阶段上限不能把总预算拖过去后还算成功 */
+        if (b != RT_NULL && tmc_remaining(b) == 0)
+        {
+            if (st)
+            {
+                st->flush_bytes = got_total;
+                st->reason = TMC_XFER_BUDGET_EXHAUSTED;
+                st->rc = -RT_ETIMEOUT;
+            }
+            return -RT_ETIMEOUT;
+        }
+    }
+    if (st) st->flush_bytes = got_total;
+    return RT_EOK;
 }
+
+/* S2: 现在**全部**调用点都在 #if TMC_TRACE_VERBOSE 里(底层不再自行打印超时/CRC 的
+ * 字节流 —— 打印必须排在保护之后, 见外层出口), 所以默认配置下它未被使用。 */
+static void hex_dump(const char *tag, const rt_uint8_t *p, rt_size_t n)
+    __attribute__((unused));
 
 static void hex_dump(const char *tag, const rt_uint8_t *p, rt_size_t n)
 {
@@ -152,12 +346,62 @@ static void hex_dump(const char *tag, const rt_uint8_t *p, rt_size_t n)
 
 /* ---------- 协议层 ---------- */
 
+/* 整帧带预算发送(§10.3 末段的算法): 先在同一 b->start 上算 used, 过期就直接失败;
+ * 否则 effective_total = min(total, used + 单帧阶段上限), 把**原 start**与
+ * effective_total 一起交给底层 —— 不先算 remaining 再在可能被抢占之后以新的 start
+ * 重开一次等待(那样总预算会被"分段重置")。 */
+static rt_err_t tmc_tx_frame(const rt_uint8_t *frame, rt_size_t len,
+                             const tmc_budget_t *b, tmc_xfer_stat_t *st)
+{
+    rt_tick_t used, eff, cap;
+    rt_size_t written = 0;
+    rt_err_t  e;
+
+    if (b == RT_NULL)                              /* 没有预算 = 不接受该调用 */
+    {
+        if (st) { st->reason = TMC_XFER_BUDGET_EXHAUSTED; st->rc = -RT_EINVAL; }
+        return -RT_EINVAL;
+    }
+    used = rt_tick_get() - b->start;
+    if (used >= b->total)
+    {
+        if (st) { st->reason = TMC_XFER_BUDGET_EXHAUSTED; st->rc = -RT_ETIMEOUT; }
+        return -RT_ETIMEOUT;
+    }
+    cap = rt_tick_from_millisecond(TMC_BUD_TX_FRAME_MS);
+    if (cap == 0 || cap >= (rt_tick_t)0x80000000)
+        cap = 1;                                   /* 换算异常时**不**放大成无界 */
+    eff = b->total;
+    if ((used + cap) < eff) eff = used + cap;
+
+    e = ns800_uart_write_budgeted(tmc_serial, frame, len, b->start, eff, &written);
+    if (st) st->tx_written = written;
+    if (e != RT_EOK)
+    {
+        if (st) st->reason = (e == -RT_ETIMEOUT) ? TMC_XFER_TX_FAILED
+                                                 : TMC_XFER_NO_DEVICE;
+        if (st) st->rc = e;
+        return e;
+    }
+    if (written != len)                            /* 返回码与 written 不能互替 */
+    {
+        if (st) { st->reason = TMC_XFER_TX_FAILED; st->rc = -RT_EIO; }
+        return -RT_EIO;
+    }
+    if (st) st->reason = TMC_XFER_OK;
+    return RT_EOK;
+}
+
 /* 写寄存器: 8 字节帧, TMC2209 对 WRITE 无应答(IFCNT 才是写入凭证)。
  * 发送后短暂延时排空自身回声, 保证后续 read 的字节流干净。
- * P1-11: 完整事务(flush+TX+排空)持锁串行化。 */
-static rt_err_t tmc_write_reg_locked(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t value)
+ * P1-11: 完整事务(flush+TX+排空)持锁串行化 —— 锁由外层取, 本函数不再自己取。
+ * S2(§10.3/§10.4): TX 走带预算的整帧写(不再逐字符吃 6000ms 上限), flush 有时间+
+ * 字节双上限且**排不干净就不发这一帧**; 底层只返回结构化原因, 不在这里打印。 */
+static rt_err_t tmc_write_reg_locked(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t value,
+                                     const tmc_budget_t *b, tmc_xfer_stat_t *st)
 {
     rt_uint8_t req[8];
+    rt_err_t   e;
 
     req[0] = TMC_SYNC_BYTE;
     req[1] = addr;
@@ -168,16 +412,17 @@ static rt_err_t tmc_write_reg_locked(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_
     req[6] = (rt_uint8_t)value;
     req[7] = tmc_crc8(req, 7);
 
-    tmc_rx_flush();
+    e = tmc_rx_flush(b, st);
+    if (e != RT_EOK) return e;                     /* 洪泛/过期: 一位都不发 */
 #if TMC_TRACE_VERBOSE
     hex_dump("TX(write)", req, 8);
 #endif
-    if (rt_device_write(tmc_serial, 0, req, 8) != 8) return -RT_EIO;
+    e = tmc_tx_frame(req, 8, b, st);
+    if (e != RT_EOK) return e;
 
     /* 8 字节 @115200 ≈ 0.7ms; 延时后一次排空回声 */
     rt_thread_mdelay(3);
-    tmc_rx_flush();
-    return RT_EOK;
+    return tmc_rx_flush(b, st);
 }
 
 /* F2d(F2c-NEW-01): 这里原先还有一个 tmc_write_reg() —— 只持单次传输锁、不做任何
@@ -186,26 +431,55 @@ static rt_err_t tmc_write_reg_locked(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_
 
 /* 读寄存器: 发 4 字节请求后, RX 上先出现自身回声(4 字节, byte1=slave 地址),
  * 随后才是应答(8 字节, byte1=0xFF)。在字节流中滑动搜索 [05 FF reg&0x7F]
- * 应答头, 收满 8 字节后验 CRC —— 不假设应答从 buffer 第一个字节开始。 */
-static rt_err_t tmc_read_reg_locked(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *value)
+ * 应答头, 收满 8 字节后验 CRC —— 不假设应答从 buffer 第一个字节开始。
+ * S2(§10.4): RX 的等待上限是 **min(原 100ms 阶段上限, 总剩余)**, 并且每次空轮
+ * 2ms 都不能越过所剩预算后仍接受结果; 完整帧/CRC 通过之后、发布 value/成功之前
+ * 还要再查一次总预算 —— "读到了但已经过期"同样不算成功(晚到的成功不得刷新健康)。
+ * 失败只填 st 里的结构化原因, 打印交给外层(先保护, 后打印)。 */
+static rt_err_t tmc_read_reg_locked(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *value,
+                                    const tmc_budget_t *b, tmc_xfer_stat_t *st)
 {
     rt_uint8_t req[4];
     rt_uint8_t buf[TMC_RX_BUF];
-    rt_size_t n = 0;
-    rt_tick_t deadline;
+    rt_size_t  n = 0;
+    rt_tick_t  stage_cap;
+    rt_tick_t  eff_end;            /* 绝对 tick: RX 阶段不得越过它 */
+    rt_err_t   e;
+
+    if (b == RT_NULL)
+    {
+        if (st) { st->reason = TMC_XFER_BUDGET_EXHAUSTED; st->rc = -RT_EINVAL; }
+        return -RT_EINVAL;
+    }
+    if (value == RT_NULL)
+    {
+        if (st) { st->reason = TMC_XFER_NO_DEVICE; st->rc = -RT_EINVAL; }
+        return -RT_EINVAL;
+    }
 
     req[0] = TMC_SYNC_BYTE;
     req[1] = addr;
     req[2] = (rt_uint8_t)(reg & 0x7F);
     req[3] = tmc_crc8(req, 3);
 
-    tmc_rx_flush();
+    e = tmc_rx_flush(b, st);
+    if (e != RT_EOK) return e;
 #if TMC_TRACE_VERBOSE
     hex_dump("TX(read)", req, 4);
 #endif
-    if (rt_device_write(tmc_serial, 0, req, 4) != 4) return -RT_EIO;
+    e = tmc_tx_frame(req, 4, b, st);
+    if (e != RT_EOK) return e;
 
-    deadline = rt_tick_get() + rt_tick_from_millisecond(TMC_REPLY_TIMEOUT_MS);
+    /* RX 阶段上限 = min(100ms, 总剩余), 锚在**同一个 b->start**上(不重开表) */
+    stage_cap = rt_tick_from_millisecond(TMC_REPLY_TIMEOUT_MS);
+    if (stage_cap == 0 || stage_cap >= (rt_tick_t)0x80000000) stage_cap = 1;
+    {
+        rt_tick_t used = rt_tick_get() - b->start;
+        rt_tick_t left = (used >= b->total) ? 0 : (b->total - used);
+
+        eff_end = b->start + ((stage_cap < left) ? stage_cap : left);
+    }
+
     for (;;)
     {
         rt_size_t got = 0;
@@ -238,28 +512,37 @@ static rt_err_t tmc_read_reg_locked(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t
 #endif
             if (tmc_crc8(buf + hdr_pos, 7) != buf[hdr_pos + 7])
             {
-                rt_kprintf("[TMC] reply CRC error\n");
+                if (st) { st->reason = TMC_XFER_RX_CRC; st->rc = -RT_EIO;
+                          st->rx_bytes = n; }
                 return -RT_EIO;
+            }
+            /* CRC/帧通过之后、**发布成功之前**再查一次总预算与剩余阶段:
+             * 过期帧不得算成一次成功的读(§10.4)。 */
+            if (tmc_remaining(b) == 0)
+            {
+                if (st) { st->reason = TMC_XFER_BUDGET_EXHAUSTED; st->rc = -RT_ETIMEOUT;
+                          st->rx_bytes = n; }
+                return -RT_ETIMEOUT;
             }
             *value = ((rt_uint32_t)buf[hdr_pos + 3] << 24) |
                      ((rt_uint32_t)buf[hdr_pos + 4] << 16) |
                      ((rt_uint32_t)buf[hdr_pos + 5] << 8) |
                       (rt_uint32_t)buf[hdr_pos + 6];
+            if (st) { st->reason = TMC_XFER_OK; st->rc = RT_EOK; st->rx_bytes = n; }
             return RT_EOK;
         }
 
-        if ((rt_tick_t)(rt_tick_get() - deadline) < (rt_tick_t)0x80000000)
+        /* 与旧实现同一套回绕安全比较: (now - end) < 2^31 表示 now 已经越过 end */
+        if ((rt_tick_t)(rt_tick_get() - eff_end) < (rt_tick_t)0x80000000)
         {
-            /* 超时分类: 无字节 / 只有回声 / 有应答头但不完整 */
-            if (n == 0)
-                rt_kprintf("[TMC] RX: no bytes (timeout)\n");
-            else if (hdr_found)
+            /* 超时分类保留(无字节 / 只有回声 / 有头但不完整), 但**不**在这里打印 */
+            if (st)
             {
-                hex_dump("RX(reply header but incomplete)", buf, n);
-            }
-            else
-            {
-                hex_dump("RX(echo only, no 05 FF header)", buf, n);
+                st->rx_bytes = n;
+                st->reason = (n == 0) ? TMC_XFER_RX_TIMEOUT_ECHO
+                           : (hdr_found ? TMC_XFER_RX_TIMEOUT_PART
+                                        : TMC_XFER_RX_TIMEOUT_ECHO);
+                st->rc = -RT_ETIMEOUT;
             }
             return -RT_ETIMEOUT;
         }
@@ -270,18 +553,104 @@ static rt_err_t tmc_read_reg_locked(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t
             rt_memmove(buf, buf + sizeof(buf) / 2, sizeof(buf) / 2);
             n = sizeof(buf) / 2;
         }
-        if (got == 0) rt_thread_mdelay(2);
+        if (got == 0)
+        {
+            rt_tick_t left = (rt_tick_t)(eff_end - rt_tick_get());
+
+            /* 空轮 2ms 不能越过所剩预算(否则超时后仍可能"读到"并算成功) */
+            if (tmc_remaining(b) == 0)
+            {
+                if (st) { st->reason = TMC_XFER_BUDGET_EXHAUSTED; st->rc = -RT_ETIMEOUT;
+                          st->rx_bytes = n; }
+                return -RT_ETIMEOUT;
+            }
+            rt_thread_mdelay((left < 2) ? 1 : 2);
+        }
     }
 }
 
-/* P1-11: 读事务(flush+TX+RX+parse)持锁串行化, 防 MSH 与线程交叉访问 */
-static rt_err_t tmc_read_reg(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *value)
+/* P1-11: 读事务(flush+TX+RX+parse)持锁串行化, 防 MSH 与线程交叉访问。
+ * S2(§10.2/§10.4):
+ *   - 本函数是**独立读的外层**: 调用者没给预算时自己按 125ms 建一次(由上层
+ *     tmc2209_read_register 传入的那份优先, 不在这里重开);
+ *   - 取锁改为带上限(20ms 且不超过总剩余)并**逐调用点检查**, 只有本层真正拿到
+ *     的锁才 release;
+ *   - armed 期间不懒初始化 UART/设备: 未就绪直接报错, 由调用方先保护。 */
+static rt_err_t tmc_xfer_take(const tmc_budget_t *b, rt_bool_t *taken)
 {
-    rt_err_t e;
-    if (tmc_uart_open() != RT_EOK) return -RT_ERROR;
-    if (tmc_lock_ok) rt_mutex_take(&tmc_xfer_lock, RT_WAITING_FOREVER);
-    e = tmc_read_reg_locked(addr, reg, value);
-    if (tmc_lock_ok) rt_mutex_release(&tmc_xfer_lock);
+    rt_tick_t cap, left, wait;
+
+    *taken = RT_FALSE;
+    if (!tmc_lock_ok) return -RT_ENOSYS;               /* 锁不可用 = 能力缺失 */
+    cap = rt_tick_from_millisecond(TMC_BUD_XFER_LOCK_MS);
+    if (cap == 0 || cap >= (rt_tick_t)0x80000000) cap = 1;
+    left = (b != RT_NULL) ? tmc_remaining(b) : cap;
+    if (left == 0) return -RT_ETIMEOUT;
+    wait = (cap < left) ? cap : left;
+    if (rt_mutex_take(&tmc_xfer_lock, wait) != RT_EOK) return -RT_EBUSY;
+    *taken = RT_TRUE;
+    return RT_EOK;
+}
+
+static void tmc_xfer_give(rt_bool_t taken)
+{
+    if (taken) (void)rt_mutex_release(&tmc_xfer_lock);
+}
+
+static rt_err_t tmc_read_reg(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *value,
+                             const tmc_budget_t *b_in, tmc_xfer_stat_t *st)
+{
+    tmc_budget_t      own;
+    const tmc_budget_t *b = b_in;
+    rt_bool_t         taken = RT_FALSE;
+    rt_err_t          e;
+
+    if (b == RT_NULL)
+    {
+        if (!tmc_budget_open(&own, TMC_BUD_READ_MS))
+        {
+            if (st) { st->reason = TMC_XFER_BUDGET_EXHAUSTED; st->rc = -RT_EINVAL; }
+            return -RT_EINVAL;
+        }
+        b = &own;
+    }
+    if (!tmc_ctx_ok_for_wait("read_reg"))
+    {
+        if (st) { st->reason = TMC_XFER_BAD_CONTEXT; st->rc = -RT_EBUSY; }
+        return -RT_EBUSY;
+    }
+    if (!tmc_opened)
+    {
+        motor_snapshot_t snap;
+
+        /* armed 路径不懒初始化: 拿不到静止证据就当"未就绪", 让调用方先保护 */
+        if (motor_get_snapshot(&snap) != RT_EOK || snap.armed ||
+            snap.state != MOTOR_IDLE)
+        {
+            if (st) { st->reason = TMC_XFER_NO_DEVICE; st->rc = -RT_EIO; }
+            return -RT_EIO;
+        }
+        if (tmc_uart_open() != RT_EOK)
+        {
+            if (st) { st->reason = TMC_XFER_NO_DEVICE; st->rc = -RT_ERROR; }
+            return -RT_ERROR;
+        }
+    }
+    e = tmc_xfer_take(b, &taken);
+    if (e != RT_EOK)
+    {
+        if (st)
+        {
+            st->reason = (e == -RT_EBUSY) ? TMC_XFER_LOCK_BUSY
+                       : (e == -RT_ETIMEOUT) ? TMC_XFER_BUDGET_EXHAUSTED
+                                             : TMC_XFER_NO_DEVICE;
+            st->rc = e;
+        }
+        return e;                                 /* 没拿到锁绝不 release */
+    }
+    e = tmc_read_reg_locked(addr, reg, value, b, st);
+    tmc_xfer_give(taken);
+    if (st) st->used = rt_tick_get() - b->start;
     return e;
 }
 
@@ -320,7 +689,7 @@ rt_err_t tmc2209_init(void)
 
 rt_err_t tmc2209_read_register(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *value)
 {
-    rt_err_t e = tmc_read_reg(addr, reg, value);
+    rt_err_t e = tmc_read_reg(addr, reg, value, RT_NULL, RT_NULL);
 
     tmc_health_after_xfer(e);
     return e;
@@ -334,27 +703,69 @@ rt_err_t tmc2209_read_register(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *val
  * 用途: 下发 GCONF/CHOPCONF/IHOLD_IRUN/TPOWERDOWN 四个配置寄存器。
  * 自 F2d 起本函数为文件私有: 诊断命令(MSH)与其它模块都无法再直接触发一次真实
  * 写, 也就无法重演 F2c-NEW-01 那类"读旧值→写回"的跨事务状态污染。
- * 语义(含 IFCNT 前后各读一次、必须在同一把 xfer 锁内)与 F2c 完全一致。 */
+ * 语义(含 IFCNT 前后各读一次、必须在同一把 xfer 锁内)与 F2c 完全一致。
+ * S2(§10.1/§10.4): confirmed write 的**总预算 400ms 由前/后读、写帧与确认共用**,
+ * 不在每个寄存器重新起表; 调用方给了预算就沿用(b==NULL 时本层按 400ms 建一次)。
+ * 取锁改为带上限且**只有本层拿到的锁才释放**; 发布成功之前再查一次预算。
+ * 失败一律先填结构化原因, 打印留给外层(外层先保护, 后打印)。 */
 static rt_err_t tmc2209_write_register_confirmed(rt_uint8_t addr, rt_uint8_t reg,
-                                                 rt_uint32_t value)
+                                                 rt_uint32_t value,
+                                                 const tmc_budget_t *b_in,
+                                                 tmc_xfer_stat_t *st_in)
 {
-    rt_uint32_t before = 0, after = 0;
-    rt_err_t e;
+    rt_uint32_t         before = 0, after = 0;
+    tmc_budget_t        own;
+    const tmc_budget_t *b = b_in;
+    tmc_xfer_stat_t     local;
+    tmc_xfer_stat_t    *st = st_in;
+    rt_bool_t           taken = RT_FALSE;
+    rt_err_t            e;
+
+    if (b == RT_NULL)
+    {
+        if (!tmc_budget_open(&own, TMC_BUD_CONFIRM_MS))
+            return -RT_EINVAL;
+        b = &own;
+    }
+    if (st == RT_NULL)
+    {
+        rt_memset(&local, 0, sizeof(local));
+        st = &local;
+    }
+    if (!tmc_ctx_ok_for_wait("write_confirmed"))
+    {
+        st->reason = TMC_XFER_BAD_CONTEXT;
+        st->rc = -RT_EBUSY;
+        return -RT_EBUSY;
+    }
+    if (tmc_uart_open() != RT_EOK)
+    {
+        st->reason = TMC_XFER_NO_DEVICE;
+        st->rc = -RT_ERROR;
+        return -RT_ERROR;
+    }
 
     /* P1-3: 整个 READ IFCNT → WRITE → READ IFCNT → CHECK 必须在同一把
      * tmc_xfer_lock 内完成, 否则其它 writer 插入会使 IFCNT 误判。
      * 事务边界: tmc_uart_open 之后取锁, 全部 locked helper 操作完释放。
      * locked helper 不再自行取锁(避免嵌套)。 */
-    if (tmc_uart_open() != RT_EOK) return -RT_ERROR;
-    if (tmc_lock_ok) rt_mutex_take(&tmc_xfer_lock, RT_WAITING_FOREVER);
+    e = tmc_xfer_take(b, &taken);
+    if (e != RT_EOK)
+    {
+        st->reason = (e == -RT_EBUSY) ? TMC_XFER_LOCK_BUSY
+                   : (e == -RT_ETIMEOUT) ? TMC_XFER_BUDGET_EXHAUSTED
+                                         : TMC_XFER_NO_DEVICE;
+        st->rc = e;
+        return e;                          /* 没拿到锁: 一位都不发, 也绝不 release */
+    }
 
-    e = tmc_read_reg_locked(addr, TMC_REG_IFCNT, &before);
+    e = tmc_read_reg_locked(addr, TMC_REG_IFCNT, &before, b, st);
     if (e != RT_EOK) goto out;
 
-    e = tmc_write_reg_locked(addr, reg, value);
+    e = tmc_write_reg_locked(addr, reg, value, b, st);
     if (e != RT_EOK) { tmc_health_after_xfer(e); goto out; }
 
-    e = tmc_read_reg_locked(addr, TMC_REG_IFCNT, &after);
+    e = tmc_read_reg_locked(addr, TMC_REG_IFCNT, &after, b, st);
     if (e != RT_EOK) goto out;
 
     /* IFCNT 只对有效 WRITE 自增: +1 = 芯片接受了完整写帧 */
@@ -363,15 +774,25 @@ static rt_err_t tmc2209_write_register_confirmed(rt_uint8_t addr, rt_uint8_t reg
         rt_kprintf("[TMC] IFCNT mismatch (%u -> %u)\n",
                    before & 0xFF, after & 0xFF);
         tmc_health_after_xfer(-RT_EIO);      /* P1-11: 健康联动 DEGRADED */
+        st->reason = TMC_XFER_NOT_ARRIVED;
         e = -RT_EIO;
         goto out;
     }
-
+    /* 到达确认成立, 但**发布成功之前**还要看总预算: 过期的一次成功不能刷新健康,
+     * 也不能让调用方以为还有一次可用的配置窗口(§10.4)。 */
+    if (tmc_remaining(b) == 0)
+    {
+        st->reason = TMC_XFER_BUDGET_EXHAUSTED;
+        e = -RT_ETIMEOUT;
+        goto out;
+    }
     tmc_health_after_xfer(RT_EOK);
     e = RT_EOK;
 
 out:
-    if (tmc_lock_ok) rt_mutex_release(&tmc_xfer_lock);
+    st->rc = e;
+    st->used = rt_tick_get() - b->start;
+    tmc_xfer_give(taken);                       /* 只有本层拿到的锁才释放 */
     return e;
 }
 
@@ -479,7 +900,7 @@ static void tmc_uart_probe(void)
 
     rt_kprintf("[TMC] probe: 只读身份检查 txn-held IOIN+GSTAT+IFCNT (0 个 WRITE 帧)\n");
 
-    e = tmc_read_reg(TMC_ADDR_DEFAULT, TMC_REG_IOIN, &ioin);
+    e = tmc_read_reg(TMC_ADDR_DEFAULT, TMC_REG_IOIN, &ioin, RT_NULL, RT_NULL);
     reads++;
     if (e != RT_EOK)
     {
@@ -495,7 +916,7 @@ static void tmc_uart_probe(void)
                    ? "TMC2209 (0x21) 身份一致"
                    : "VERSION 非 0x21: 不是 TMC2209(0x20=TMC2208)");
 
-    if (tmc_read_reg(TMC_ADDR_DEFAULT, TMC_REG_GSTAT, &gstat) == RT_EOK)
+    if (tmc_read_reg(TMC_ADDR_DEFAULT, TMC_REG_GSTAT, &gstat, RT_NULL, RT_NULL) == RT_EOK)
     {
         tmc_gstat_dec_t gs;
         rt_uint8_t lo = (rt_uint8_t)(gstat & 0xFFu);
@@ -516,7 +937,7 @@ static void tmc_uart_probe(void)
         rt_kprintf("[TMC] GSTAT read failed\n");
     }
 
-    if (tmc_read_reg(TMC_ADDR_DEFAULT, TMC_REG_IFCNT, &ifcnt) == RT_EOK)
+    if (tmc_read_reg(TMC_ADDR_DEFAULT, TMC_REG_IFCNT, &ifcnt, RT_NULL, RT_NULL) == RT_EOK)
     {
         reads++;
         rt_kprintf("[TMC] IFCNT = %u (只读观察: 手册规定读不改变它; 本命令未写任何寄存器)\n",
@@ -547,7 +968,7 @@ static void tmc_scan(void)
     for (addr = 0; addr <= 3; ++addr)
     {
         rt_uint32_t ioin = 0;
-        rt_err_t e = tmc_read_reg(addr, TMC_REG_IOIN, &ioin);
+        rt_err_t e = tmc_read_reg(addr, TMC_REG_IOIN, &ioin, RT_NULL, RT_NULL);
 
         if (e == RT_EOK)
         {
@@ -596,7 +1017,7 @@ static void tmc_regs(void)
     for (i = 0; i < (int)(sizeof(regs) / sizeof(regs[0])); ++i)
     {
         rt_uint32_t v = 0;
-        rt_err_t e = tmc_read_reg(TMC_ADDR_DEFAULT, regs[i].reg, &v);
+        rt_err_t e = tmc_read_reg(TMC_ADDR_DEFAULT, regs[i].reg, &v, RT_NULL, RT_NULL);
         if (e == RT_EOK)
             rt_kprintf("[TMC] %s (0x%02X) = 0x%08X\n", regs[i].name, regs[i].reg, v);
         else
@@ -611,7 +1032,7 @@ static void tmc_status(void)
 
     if (tmc_uart_open() != RT_EOK) return;
 
-    if (tmc_read_reg(TMC_ADDR_DEFAULT, TMC_REG_GSTAT, &gstat) == RT_EOK)
+    if (tmc_read_reg(TMC_ADDR_DEFAULT, TMC_REG_GSTAT, &gstat, RT_NULL, RT_NULL) == RT_EOK)
     {
         tmc_gstat_dec_t gs;
 
@@ -627,7 +1048,7 @@ static void tmc_status(void)
         rt_kprintf("[TMC] GSTAT read failed\n");
         return;
     }
-    if (tmc_read_reg(TMC_ADDR_DEFAULT, TMC_REG_IOIN, &ioin) == RT_EOK)
+    if (tmc_read_reg(TMC_ADDR_DEFAULT, TMC_REG_IOIN, &ioin, RT_NULL, RT_NULL) == RT_EOK)
         rt_kprintf("[TMC] IOIN version=0x%02X (0x21=2209 0x20=2208)\n",
                    (rt_uint8_t)(ioin >> 24));
 }
@@ -696,15 +1117,36 @@ static const tmc_drv_config_t tmc_cfg_planned = { 20, 8, 4, 8, 1, 0, 0 };
 
 typedef struct
 {
-    rt_err_t (*open) (void *priv);
-    rt_err_t (*read) (void *priv, rt_uint8_t reg, rt_uint32_t *v);
-    rt_err_t (*write)(void *priv, rt_uint8_t reg, rt_uint32_t v); /* 内含 IFCNT 到达确认 */
+    rt_err_t (*open) (void *priv, const tmc_budget_t *b, tmc_xfer_stat_t *st);
+    rt_err_t (*read) (void *priv, rt_uint8_t reg, rt_uint32_t *v,
+                      const tmc_budget_t *b, tmc_xfer_stat_t *st);
+    /* 内含 IFCNT 到达确认 */
+    rt_err_t (*write)(void *priv, rt_uint8_t reg, rt_uint32_t v,
+                      const tmc_budget_t *b, tmc_xfer_stat_t *st);
     rt_bool_t (*link_healthy)(void *priv);  /* FALSE = 链路不可信, 不猜 */
 } tmc_cfg_bus_t;
 
 /* 运行态写入门禁提供者: 返回 TMC_WGATE_* 位掩码(0=全通)。生产实例查真实子系统,
  * 自测实例返回受控值 —— 这样"门禁拒绝写入"本身也是可离线断言的对象。 */
 typedef rt_uint32_t (*tmc_cfg_gate_fn)(void *priv);
+
+/* 2026-10-23 S2(§10.4): 无等待有效性摘要的类型(字段含义见下面 ctx 里的注释)。 */
+typedef struct
+{
+    rt_uint32_t      gen;
+    rt_uint32_t      inv_gen;
+    rt_uint8_t       state;
+    rt_uint8_t       done_valid;
+    rt_uint8_t       invalid;
+    rt_uint8_t       fail_reg;
+    rt_uint8_t       fail_from_integrity;
+    rt_int16_t       last_err;
+    /* 已下发快照的固定复制: 守卫/状态命令读这些值时**不取叶锁**。
+     * 权威写入仍在叶锁里; 摘要只在每次权威提交/作废的同一短窗口内更新。 */
+    rt_uint32_t      done_gconf;
+    rt_uint32_t      done_chop;
+    tmc_drv_config_t done;
+} tmc_cfg_view_t;
 
 typedef struct
 {
@@ -728,16 +1170,123 @@ typedef struct
     struct rt_mutex txn;
     rt_bool_t       lock_ok;
     rt_bool_t       txn_ok;
+    rt_uint8_t      view_force_invalid;   /* 作废标记: 一次完整的成功应用才覆盖它 */
+    /* S2(§10.4): 本实例**这一次操作**的协调层身份与"是否已保护过"。
+     * 只有生产实例使用(op_epoch 在进入 apply/integrity 时采集一次); 序列里第一个
+     * 失败出口据此做一次保护, 后续层再失败时 sp_trip_for_operation 会返回 -RT_EINTR,
+     * 于是同一波错误不会出现第二轮 rt_pwm_disable。 */
+    rt_uint32_t     op_epoch;
+    rt_bool_t       op_protected;
+    /* ---------- 2026-10-23 S2(任务书 §10.4)----------
+     * 守卫/门禁不能在 Motor 的预算之前无限等待叶锁, 所以给它们一份**固定复制的
+     * 无等待有效性摘要**; 摘要的更新与"失效标记"和上面的状态字段遵守同一个短临界
+     * 区纪律(stop_priority 的窗口原语), 里面只有字段赋值。
+     *   gen     : 每次发布 +1(配置开始/失败失效/成功应用等相关状态变化都要换代)
+     *   inv_gen : 失效代次 —— 晚到的 apply 成功只有在 inv_gen 未变且预算有效时才
+     *             能提交, 否则保留失效(不把旧成功刷成新健康)
+     *   invalid : 1 = 摘要作废(锁不可得/预算耗尽/协调层已保护过) —— 门一律闭合
+     * ⚠ 摘要只用于"要不要放行"的判定; 真正的读改写仍要在叶锁里。 NOT_SYNCED 门不因
+     *   摘要而放松, 摘要健康也不能跳过完整性复核。 */
+    tmc_cfg_view_t view;
 } tmc_cfg_ctx_t;
 
-static void tmc_cfg_lock(tmc_cfg_ctx_t *ctx)
+/* 摘要发布: 调用方**已经**持有叶锁(或处于建线程之前的单线程阶段)。
+ * 窗口内只做固定字段赋值, 不取锁、不打印、不碰总线。 */
+static void tmc_cfg_view_publish(tmc_cfg_ctx_t *ctx)
 {
-    if (ctx->lock_ok) rt_mutex_take(&ctx->lock, RT_WAITING_FOREVER);
+    rt_uint8_t healthy;
+    rt_base_t  lvl = sp_win_begin();
+
+    /* 只有"CONFIGURED 且快照有效"这一次完整成功才覆盖作废标记; 其它发布只是把当前
+     * 权威状态抄进摘要, 作废位保持不变(所以一次失效会一直挡住门, 直到重新成功下发)。 */
+    healthy = (ctx->state == TMC_DRV_CONFIGURED && ctx->done_valid) ? 1u : 0u;
+    if (healthy) ctx->view_force_invalid = 0u;
+
+    ctx->view.state      = (rt_uint8_t)ctx->state;
+    ctx->view.done_valid = ctx->done_valid ? 1u : 0u;
+    ctx->view.fail_reg   = ctx->fail_reg;
+    ctx->view.fail_from_integrity = ctx->fail_from_integrity ? 1u : 0u;
+    ctx->view.last_err   = (rt_int16_t)ctx->last_err;
+    ctx->view.done_gconf = ctx->done_gconf;
+    ctx->view.done_chop  = ctx->done_chop;
+    ctx->view.done       = ctx->done;
+    ctx->view.invalid    = (healthy && ctx->view_force_invalid == 0u &&
+                            ctx->lock_ok && ctx->txn_ok) ? 0u : 1u;
+    ctx->view.gen++;
+    sp_win_end(lvl);
 }
 
-static void tmc_cfg_unlock(tmc_cfg_ctx_t *ctx)
+/* 作废标记(不取锁, 供"拿不到锁/预算耗尽"的路径使用): 只置摘要, 不改权威字段 ——
+ * 权威字段的写入仍要在下一次成功取到锁时完成。 */
+static void tmc_cfg_view_invalidate(tmc_cfg_ctx_t *ctx)
 {
-    if (ctx->lock_ok) rt_mutex_release(&ctx->lock);
+    rt_base_t lvl = sp_win_begin();
+
+    ctx->view_force_invalid = 1u;
+    ctx->view.invalid       = 1u;
+    ctx->view.done_valid    = 0u;
+    ctx->view.inv_gen++;
+    ctx->view.gen++;
+    sp_win_end(lvl);
+}
+
+/* 无等待读取摘要(守卫/门禁专用)。 */
+static rt_bool_t tmc_cfg_view_ok_for_arm(const tmc_cfg_ctx_t *ctx)
+{
+    rt_bool_t ok;
+    rt_base_t lvl = sp_win_begin();
+
+    ok = (ctx->view.state == (rt_uint8_t)TMC_DRV_CONFIGURED &&
+          ctx->view.done_valid != 0u && ctx->view.invalid == 0u)
+           ? RT_TRUE : RT_FALSE;
+    sp_win_end(lvl);
+    return ok;
+}
+
+static rt_uint32_t tmc_cfg_view_gen(const tmc_cfg_ctx_t *ctx)
+{
+    rt_uint32_t g;
+    rt_base_t   lvl = sp_win_begin();
+
+    g = ctx->view.gen;
+    sp_win_end(lvl);
+    return g;
+}
+
+static rt_uint32_t tmc_cfg_view_inv_gen(const tmc_cfg_ctx_t *ctx)
+{
+    rt_uint32_t g;
+    rt_base_t   lvl = sp_win_begin();
+
+    g = ctx->view.inv_gen;
+    sp_win_end(lvl);
+    return g;
+}
+
+/* S2(任务书 §10.2/§10.4): 叶锁改为**带上限且逐调用点检查** —— 单次等待上限 10ms,
+ * 同时不超过本次操作的剩余总预算; 拿不到就返回错误, 调用方必须走"作废/拒绝"分支,
+ * 而且**只有本层真正取得的锁才释放**(否则会把别人的临界区踩开)。
+ * 原来的无返回 tmc_cfg_lock()/tmc_cfg_unlock()(FOREVER 等待)已全部删除。 */
+static rt_err_t tmc_cfg_lock_take(tmc_cfg_ctx_t *ctx, const tmc_budget_t *b,
+                                 rt_bool_t *taken)
+{
+    rt_tick_t cap, left, wait;
+
+    *taken = RT_FALSE;
+    if (!ctx->lock_ok) return -RT_ENOSYS;                 /* 能力缺失: 不猜 */
+    cap = rt_tick_from_millisecond(TMC_BUD_CFG_LOCK_MS);
+    if (cap == 0 || cap >= (rt_tick_t)0x80000000) cap = 1;
+    left = (b != RT_NULL) ? tmc_remaining(b) : cap;
+    if (left == 0) return -RT_ETIMEOUT;                   /* 预算已尽: 不再等 */
+    wait = (cap < left) ? cap : left;
+    if (rt_mutex_take(&ctx->lock, wait) != RT_EOK) return -RT_EBUSY;
+    *taken = RT_TRUE;
+    return RT_EOK;
+}
+
+static void tmc_cfg_lock_give(tmc_cfg_ctx_t *ctx, rt_bool_t taken)
+{
+    if (taken) (void)rt_mutex_release(&ctx->lock);
 }
 
 /* F2c R02: 事务锁不可用 = 无法串行化 = **拒绝操作**, 不再退化成"无锁也放行"。
@@ -787,23 +1336,35 @@ static void tmc_cfg_ctx_detach(tmc_cfg_ctx_t *ctx)
     ctx->lock_ok = RT_FALSE;
 }
 
-/* ---- 生产接缝: 真实 UART2(协议层的 write 已内含 IFCNT 到达确认) ---- */
-static rt_err_t tmc_cfg_hw_open(void *priv)
+/* ---- 生产接缝: 真实 UART2(协议层的 write 已内含 IFCNT 到达确认) ----
+ * S2: 三个接缝都改成"沿用外层预算 + 结构化观测"。open 仍然是幂等的
+ * tmc2209_init()(只在 apply 的第一步与显式初始化路径上调用); 运行期守卫/巡检的
+ * 读路径不再懒初始化, 见 tmc_read_reg。 */
+static rt_err_t tmc_cfg_hw_open(void *priv, const tmc_budget_t *b,
+                                tmc_xfer_stat_t *st)
 {
     (void)priv;
+    if (b != RT_NULL && tmc_remaining(b) == 0)
+    {
+        if (st) { st->reason = TMC_XFER_BUDGET_EXHAUSTED; st->rc = -RT_ETIMEOUT; }
+        return -RT_ETIMEOUT;                    /* 预算已尽: 不发起一次可能很慢的 open */
+    }
     return tmc2209_init();
 }
 
-static rt_err_t tmc_cfg_hw_read(void *priv, rt_uint8_t reg, rt_uint32_t *v)
+static rt_err_t tmc_cfg_hw_read(void *priv, rt_uint8_t reg, rt_uint32_t *v,
+                                const tmc_budget_t *b, tmc_xfer_stat_t *st)
 {
     (void)priv;
-    return tmc2209_read_register(TMC_ADDR_DEFAULT, reg, v);
+    /* 子调用**沿用**外层那一次预算, 不在这里重开一张表 */
+    return tmc_read_reg(TMC_ADDR_DEFAULT, reg, v, b, st);
 }
 
-static rt_err_t tmc_cfg_hw_write(void *priv, rt_uint8_t reg, rt_uint32_t v)
+static rt_err_t tmc_cfg_hw_write(void *priv, rt_uint8_t reg, rt_uint32_t v,
+                                 const tmc_budget_t *b, tmc_xfer_stat_t *st)
 {
     (void)priv;
-    return tmc2209_write_register_confirmed(TMC_ADDR_DEFAULT, reg, v);
+    return tmc2209_write_register_confirmed(TMC_ADDR_DEFAULT, reg, v, b, st);
 }
 
 /* 只有 SUBSYS_OK 算健康: DEGRADED(最近一次传输失败)/FAILED(uart2 打不开)/
@@ -909,15 +1470,24 @@ const char *tmc_drv_cfg_state_name(tmc_drv_cfg_state_t s)
     default:                   return "UNKNOWN";
     }
 }
-/* F2b: 生产状态的读取一律经 ctx 叶锁取一致值(此前是无锁裸读)。 */
+/* F2b: 生产状态的读取一律取一致值(此前是无锁裸读)。
+ * S2(§10.4): 状态命令/守卫这类**只读观察口**改读无等待摘要 —— 它们不能为了打印
+ * 一次状态而去等一把可能被 apply 长时间持有的叶锁; 摘要与权威字段的提交遵守
+ * 同一个短临界区纪律, 所以读到的永远是"某一次完整提交的结果"。 */
+static void tmc_cfg_view_get(const tmc_cfg_ctx_t *ctx, tmc_cfg_view_t *out)
+{
+    rt_base_t lvl = sp_win_begin();
+
+    *out = ctx->view;
+    sp_win_end(lvl);
+}
+
 tmc_drv_cfg_state_t tmc2209_get_config_state(void)
 {
-    tmc_drv_cfg_state_t s;
+    tmc_cfg_view_t v;
 
-    tmc_cfg_lock(&tmc_cfg_prod);
-    s = tmc_cfg_prod.state;
-    tmc_cfg_unlock(&tmc_cfg_prod);
-    return s;
+    tmc_cfg_view_get(&tmc_cfg_prod, &v);
+    return (tmc_drv_cfg_state_t)v.state;
 }
 
 void tmc2209_get_planned_config(tmc_drv_config_t *out)
@@ -926,22 +1496,20 @@ void tmc2209_get_planned_config(tmc_drv_config_t *out)
 }
 
 /* P1-D: 快照有效性由 done_valid 单点决定。配置开始/失败/失联/复位都会把它清掉,
- * 所以这里不会把"上一轮的旧值"当成已下发的有效配置返回。 */
+ * 所以这里不会把"上一轮的旧值"当成已下发的有效配置返回。
+ * ⚠ 返回值来自摘要: 作废(invalid)时一个字段都不写出, 与旧实现"锁内判 valid"的
+ *   语义一致, 但不会因为取锁而阻塞守卫。 */
 rt_bool_t tmc2209_get_applied_config(rt_uint32_t *gconf, rt_uint32_t *chop,
                                      tmc_drv_config_t *out)
 {
-    rt_bool_t valid;
+    tmc_cfg_view_t v;
 
-    tmc_cfg_lock(&tmc_cfg_prod);
-    valid = tmc_cfg_prod.done_valid;
-    if (valid)
-    {
-        if (gconf) *gconf = tmc_cfg_prod.done_gconf;
-        if (chop)  *chop  = tmc_cfg_prod.done_chop;
-        if (out)   *out   = tmc_cfg_prod.done;
-    }
-    tmc_cfg_unlock(&tmc_cfg_prod);
-    return valid;
+    tmc_cfg_view_get(&tmc_cfg_prod, &v);
+    if (v.invalid || !v.done_valid) return RT_FALSE;
+    if (gconf) *gconf = v.done_gconf;
+    if (chop)  *chop  = v.done_chop;
+    if (out)   *out   = v.done;
+    return RT_TRUE;
 }
 
 /* CS*1000。手册: "IRUN, IHOLD: 1/32 to 32/32 of full-scale current" */
@@ -1024,19 +1592,57 @@ rt_uint32_t tmc_chopconf_next(rt_uint32_t cur, const tmc_drv_config_t *c)
 
 /* P1-D: 任何失败/失联/芯片复位都必须让 done_valid 立即失效 —— 否则上一轮快照会
  * 继续被 tmc2209_get_applied_config() 当作"已下发的有效配置"返回, 第 5 门也不会
- * 重新闭合。打印放在叶锁之外, 保持锁内不做什么耗时/可阻塞的事。 */
+ * 重新闭合。打印放在叶锁之外, 保持锁内不做什么耗时/可阻塞的事。
+ *
+ * 2026-10-23 S2(任务书 §10.4)本函数的顺序被硬性规定为:
+ *   ① 生产实例先**保护**(而不是先等叶锁或先打印): 用 sp_trip_for_operation(本次操作
+ *      开始时记下的 op_epoch) —— 同一次 UART/配置事务里已经有别层保护过时它会返回
+ *      -RT_EINTR 并且**不再做第二轮关闭**, 这样上层(motor 守卫)消费同一错误时也不会
+ *      重复降险; 自测的局部假 ctx 绝不触发真实生产模块(判定用 ctx==&tmc_cfg_prod)。
+ *   ② 然后才做"写 FAILED 字段": 叶锁改为带上限, **拿不到/预算耗尽**时用短临界区的
+ *      作废标记让摘要失效(门立即闭合), 绝不为了写字段再去 FOREVER 等同一把锁。
+ *   ③ 最后才是打印(此时物理降险已经做完)。
+ * ⚠ 保护用的是"操作开始时的 epoch", 不是每层重采当前 epoch —— 后者会让每一层都
+ *   认为自己才是第一个保护的层, 于是一波错误里出现多次 disable(§4.2 明确禁止)。 */
 static rt_err_t tmc_cfg_fail_ctx(tmc_cfg_ctx_t *ctx, rt_uint8_t reg, rt_err_t e,
-                                 const char *stage, rt_bool_t from_integrity)
+                                 const char *stage, rt_bool_t from_integrity,
+                                 const tmc_budget_t *b)
 {
-    rt_err_t ret = (e == RT_EOK) ? -RT_ERROR : e;
+    rt_err_t  ret = (e == RT_EOK) ? -RT_ERROR : e;
+    rt_bool_t taken = RT_FALSE;
+    rt_err_t  le;
 
-    tmc_cfg_lock(ctx);
+    if (ctx == &tmc_cfg_prod)
+    {
+        sp_proof_t pf;
+
+        pf.valid = RT_FALSE;
+        if (!ctx->op_protected)
+        {
+            (void)sp_trip_for_operation(ctx->op_epoch, FAULT_TMC_DIAG, EVT_TMC_DIAG,
+                                        MOT_STOP_SRC_GUARD_STOP, &pf);
+            ctx->op_protected = RT_TRUE;        /* 本操作只保护一次(不论成败) */
+        }
+    }
+
+    le = tmc_cfg_lock_take(ctx, b, &taken);
+    if (le != RT_EOK)
+    {
+        /* 锁不可得: 不猜、也不 FOREVER 等 —— 用无等待作废标记把摘要打死, 门闭合。
+         * 权威字段留给下一次能拿到锁的提交; 保护动作(①)已经做过了。 */
+        tmc_cfg_view_invalidate(ctx);
+        rt_kprintf("[TMC-CFG] FAILED at %s (reg=0x%02X err=%d) - 叶锁不可得(%d):"
+                   " 已保护并**作废摘要**(第 5 门闭合), 不等待同一把锁去写 FAILED 字段\n",
+                   stage, reg, (int)ret, (int)le);
+        return ret;
+    }
     ctx->fail_reg            = reg;
     ctx->last_err            = ret;
     ctx->fail_from_integrity = from_integrity;
     ctx->state               = TMC_DRV_FAILED;
     ctx->done_valid          = RT_FALSE;
-    tmc_cfg_unlock(ctx);
+    tmc_cfg_view_publish(ctx);
+    tmc_cfg_lock_give(ctx, taken);
 
     rt_kprintf("[TMC-CFG] FAILED at %s (reg=0x%02X err=%d) - 序列已中止, 芯片可能"
                "处于部分配置状态; 已下发快照作废, 禁止使能, 需重新 apply 或断电复位\n",
@@ -1046,17 +1652,19 @@ static rt_err_t tmc_cfg_fail_ctx(tmc_cfg_ctx_t *ctx, rt_uint8_t reg, rt_err_t e,
 
 /* 写 + IFCNT 到达确认 +(可读寄存器)读回比对。只写寄存器不发非法读。
  * -RT_EIO 有三条来源: 写未被芯片接受 / 读回传输失败 / 读回值与写入值不符。
- * 第三条(F2b 新增用例覆盖)意味着"IFCNT+1 但内容不对", 同样必须中止。 */
+ * 第三条(F2b 新增用例覆盖)意味着"IFCNT+1 但内容不对", 同样必须中止。
+ * S2: 沿用外层预算与结构化观测 —— 子调用**不重开**一张时间表。 */
 static rt_err_t tmc_cfg_write_one_ctx(tmc_cfg_ctx_t *ctx, rt_uint8_t reg,
-                                      rt_uint32_t val, rt_bool_t readable)
+                                      rt_uint32_t val, rt_bool_t readable,
+                                      const tmc_budget_t *b, tmc_xfer_stat_t *st)
 {
-    rt_err_t    e = ctx->bus->write(ctx->priv, reg, val);
+    rt_err_t    e = ctx->bus->write(ctx->priv, reg, val, b, st);
     rt_uint32_t rb = 0;
 
     if (e != RT_EOK) return e;                    /* IFCNT 未 +1 = 芯片没接受 */
     if (!readable)   return RT_EOK;               /* 只写: 不读回 */
 
-    e = ctx->bus->read(ctx->priv, reg, &rb);
+    e = ctx->bus->read(ctx->priv, reg, &rb, b, st);
     if (e != RT_EOK) return e;
     if (rb != val)
     {
@@ -1067,16 +1675,36 @@ static rt_err_t tmc_cfg_write_one_ctx(tmc_cfg_ctx_t *ctx, rt_uint8_t reg,
     return RT_EOK;
 }
 
+
 /* 配置序列本体。
  * P0-B: 运行态门禁在任何总线访问(连 open 都在其后)之前求值, 不通过就一位不写、
  *       状态与快照保持原样。
  * P1-D: 整段被 ctx 的 txn 锁串行化; 进入 CONFIGURING 即作废旧快照, 成功后才提交
- *       新快照。自测把 ctx 换成局部实例(假总线), 不需要临时篡改生产全局。 */
+ *       新快照。自测把 ctx 换成局部实例(假总线), 不需要临时篡改生产全局。
+ * 2026-10-23 S2(任务书 §10.1/§10.4):
+ *   - **整个 apply 一份 1500ms 总预算**, 所有帧(GCONF 读/写/回读、CHOPCONF 读/写/
+ *     回读、IHOLD_IRUN、TPOWERDOWN 与各自的 IFCNT 确认)共用同一 b->start;
+ *     子调用只取剩余, 绝不每到一层重开一张表。剩余为零 => -RT_ETIMEOUT, 不拿
+ *     FOREVER, 也不把零错误映射成成功。
+ *   - 生产实例在本层记下 op_epoch(=进入时的协调层 epoch)并复位 op_protected:
+ *     序列里第一个失败出口用 sp_trip_for_operation(op_epoch) 保护一次, 之后各层
+ *     都**不会**再做第二轮关闭。
+ *   - 成功提交必须同时满足: 预算仍有剩余、失效代次未变(inv_gen 相同)、协调层
+ *     epoch 仍等于 op_epoch。任何一条不满足 => 保留失效, 晚到的成功**不**刷新
+ *     健康/done_valid/守卫新鲜度(§10.4)。 */
 static rt_err_t tmc_cfg_apply_ctx(tmc_cfg_ctx_t *ctx, const tmc_drv_config_t *c)
 {
     rt_uint32_t gconf = 0, chop = 0, new_g = 0, new_c = 0, gates;
     rt_uint8_t  old_vs;
     rt_err_t    e;
+    rt_err_t    ret = RT_EOK;
+    tmc_budget_t     own;
+    const tmc_budget_t *b = RT_NULL;
+    tmc_xfer_stat_t  st;
+    rt_bool_t     taken = RT_FALSE;
+    rt_uint32_t   gen0, inv0;
+
+    rt_memset(&st, 0, sizeof(st));
 
     /* F2c R02: 先把"锁不可用"与"锁被占用"分开 —— 前者是能力缺失(ENOSYS),
      * 后者是并发时序(EBUSY)。两种都在产生任何总线动作之前拒绝。 */
@@ -1093,6 +1721,19 @@ static rt_err_t tmc_cfg_apply_ctx(tmc_cfg_ctx_t *ctx, const tmc_drv_config_t *c)
         return -RT_EBUSY;
     }
 
+    if (!tmc_budget_open(&own, TMC_BUD_APPLY_MS))
+    {
+        rt_kprintf("[TMC-CFG] REFUSED: apply 预算非法(舍成 0 或过大) -> 不发出任何总线写\n");
+        tmc_cfg_txn_give(ctx);
+        return -RT_EINVAL;
+    }
+    b = &own;
+    if (ctx == &tmc_cfg_prod)
+    {
+        ctx->op_epoch     = sp_epoch();
+        ctx->op_protected = RT_FALSE;
+    }
+
     gates = (ctx->gate != RT_NULL) ? ctx->gate(ctx->priv) : 0u;
     if (gates != 0u)
     {
@@ -1103,32 +1744,46 @@ static rt_err_t tmc_cfg_apply_ctx(tmc_cfg_ctx_t *ctx, const tmc_drv_config_t *c)
         return -RT_EPERM;
     }
 
-    tmc_cfg_lock(ctx);
+    if (tmc_cfg_lock_take(ctx, b, &taken) != RT_EOK)
+    {
+        /* 连"进入 CONFIGURING"都写不了: 作废摘要(门闭合), 不发任何总线写 */
+        tmc_cfg_view_invalidate(ctx);
+        rt_kprintf("[TMC-CFG] REFUSED: 叶锁不可得/预算已尽 -> 不作废旧快照之外的任何事\n");
+        tmc_cfg_txn_give(ctx);
+        return -RT_EBUSY;
+    }
     if (ctx->state == TMC_DRV_CONFIGURING)
     {
-        tmc_cfg_unlock(ctx);
+        tmc_cfg_lock_give(ctx, taken);
         tmc_cfg_txn_give(ctx);
         rt_kprintf("[TMC-CFG] REFUSED: 上一次配置尚未结束(CONFIGURING)\n");
         return -RT_EBUSY;
     }
     ctx->state      = TMC_DRV_CONFIGURING;
     ctx->done_valid = RT_FALSE;           /* 重新下发期间旧快照不可信 */
-    tmc_cfg_unlock(ctx);
+    tmc_cfg_view_publish(ctx);
+    gen0 = ctx->view.gen;
+    inv0 = ctx->view.inv_gen;
+    tmc_cfg_lock_give(ctx, taken);
+    (void)gen0;                           /* 代次以 inv_gen/epoch 为准, 保留读法以便审查 */
 
-    rt_kprintf("[TMC-CFG] apply start: irun=%u ihold=%u dly=%u tpd=%u vsense=%u\n",
-               c->irun, c->ihold, c->ihold_delay, c->tpowerdown, c->vsense);
+    rt_kprintf("[TMC-CFG] apply start: irun=%u ihold=%u dly=%u tpd=%u vsense=%u"
+               " (总预算=%ums, op_epoch=%u)\n",
+               c->irun, c->ihold, c->ihold_delay, c->tpowerdown, c->vsense,
+               TMC_BUD_APPLY_MS, (unsigned)(ctx == &tmc_cfg_prod ? ctx->op_epoch : 0u));
 
-    if (ctx->bus->open(ctx->priv) != RT_EOK)
+    if (ctx->bus->open(ctx->priv, b, &st) != RT_EOK)
     {
-        e = tmc_cfg_fail_ctx(ctx, 0, -RT_ERROR, "uart-open", RT_FALSE);
+        e = tmc_cfg_fail_ctx(ctx, 0, -RT_ERROR, "uart-open", RT_FALSE, b);
+        ret = e;
         goto out;
     }
 
     /* ---- 1) GCONF: 只置 i_scale_analog + pdn_disable, 其余保留(含 OTP 派生位) */
-    e = ctx->bus->read(ctx->priv, TMC_REG_GCONF, &gconf);
+    e = ctx->bus->read(ctx->priv, TMC_REG_GCONF, &gconf, b, &st);
     if (e != RT_EOK)
     {
-        e = tmc_cfg_fail_ctx(ctx, TMC_REG_GCONF, e, "GCONF-read", RT_FALSE);
+        ret = tmc_cfg_fail_ctx(ctx, TMC_REG_GCONF, e, "GCONF-read", RT_FALSE, b);
         goto out;
     }
 
@@ -1136,34 +1791,34 @@ static rt_err_t tmc_cfg_apply_ctx(tmc_cfg_ctx_t *ctx, const tmc_drv_config_t *c)
      * 分档一起失效 -> 不是"写不进去"而是"算了也不对", 必须 fail closed。 */
     if (gconf & TMC_GCONF_INTERNAL_RSENSE)
     {
-        e = tmc_cfg_fail_ctx(ctx, TMC_REG_GCONF, -RT_EPERM,
-                             "GCONF.internal_Rsense=1", RT_FALSE);
+        ret = tmc_cfg_fail_ctx(ctx, TMC_REG_GCONF, -RT_EPERM,
+                               "GCONF.internal_Rsense=1", RT_FALSE, b);
         goto out;
     }
 
     new_g = tmc_gconf_next(gconf, c);
     rt_kprintf("[TMC-CFG] GCONF %08X -> %08X\n",
                (unsigned)gconf, (unsigned)new_g);
-    e = tmc_cfg_write_one_ctx(ctx, TMC_REG_GCONF, new_g, RT_TRUE);
+    e = tmc_cfg_write_one_ctx(ctx, TMC_REG_GCONF, new_g, RT_TRUE, b, &st);
     if (e != RT_EOK)
     {
-        e = tmc_cfg_fail_ctx(ctx, TMC_REG_GCONF, e, "GCONF-write", RT_FALSE);
+        ret = tmc_cfg_fail_ctx(ctx, TMC_REG_GCONF, e, "GCONF-write", RT_FALSE, b);
         goto out;
     }
 
     /* ---- 2) CHOPCONF: 只动 vsense(及可选 MRES), TOFF/HSTRT/HEND/TBL 全保留 */
-    e = ctx->bus->read(ctx->priv, TMC_REG_CHOPCONF, &chop);
+    e = ctx->bus->read(ctx->priv, TMC_REG_CHOPCONF, &chop, b, &st);
     if (e != RT_EOK)
     {
-        e = tmc_cfg_fail_ctx(ctx, TMC_REG_CHOPCONF, e, "CHOPCONF-read", RT_FALSE);
+        ret = tmc_cfg_fail_ctx(ctx, TMC_REG_CHOPCONF, e, "CHOPCONF-read", RT_FALSE, b);
         goto out;
     }
 
     old_vs = (chop & TMC_CHOPCONF_VSENSE) ? 1u : 0u;
     if (!tmc_change_is_current_safe(old_vs, c->vsense))
     {
-        e = tmc_cfg_fail_ctx(ctx, TMC_REG_CHOPCONF, -RT_EPERM,
-                             "CHOPCONF.overcurrent-dir", RT_FALSE);
+        ret = tmc_cfg_fail_ctx(ctx, TMC_REG_CHOPCONF, -RT_EPERM,
+                               "CHOPCONF.overcurrent-dir", RT_FALSE, b);
         goto out;
     }
 
@@ -1171,48 +1826,78 @@ static rt_err_t tmc_cfg_apply_ctx(tmc_cfg_ctx_t *ctx, const tmc_drv_config_t *c)
     new_c = tmc_chopconf_next(chop, c);
     if ((new_c & TMC_CHOPCONF_TOFF_MASK) != (chop & TMC_CHOPCONF_TOFF_MASK))
     {
-        e = tmc_cfg_fail_ctx(ctx, TMC_REG_CHOPCONF, -RT_EINVAL,
-                             "CHOPCONF.TOFF-changed", RT_FALSE);
+        ret = tmc_cfg_fail_ctx(ctx, TMC_REG_CHOPCONF, -RT_EINVAL,
+                               "CHOPCONF.TOFF-changed", RT_FALSE, b);
         goto out;
     }
     if ((new_c & TMC_CHOPCONF_TOFF_MASK) == 0u)
     {
-        e = tmc_cfg_fail_ctx(ctx, TMC_REG_CHOPCONF, -RT_EINVAL,
-                             "CHOPCONF.TOFF-zero", RT_FALSE);
+        ret = tmc_cfg_fail_ctx(ctx, TMC_REG_CHOPCONF, -RT_EINVAL,
+                               "CHOPCONF.TOFF-zero", RT_FALSE, b);
         goto out;
     }
 
     rt_kprintf("[TMC-CFG] CHOPCONF %08X -> %08X (vsense %u -> %u)\n",
                (unsigned)chop, (unsigned)new_c, old_vs, c->vsense);
-    e = tmc_cfg_write_one_ctx(ctx, TMC_REG_CHOPCONF, new_c, RT_TRUE);
+    e = tmc_cfg_write_one_ctx(ctx, TMC_REG_CHOPCONF, new_c, RT_TRUE, b, &st);
     if (e != RT_EOK)
     {
-        e = tmc_cfg_fail_ctx(ctx, TMC_REG_CHOPCONF, e, "CHOPCONF-write", RT_FALSE);
+        ret = tmc_cfg_fail_ctx(ctx, TMC_REG_CHOPCONF, e, "CHOPCONF-write", RT_FALSE, b);
         goto out;
     }
 
     /* ---- 3) IHOLD_IRUN: 只写寄存器, 到达凭证只有 IFCNT+1 ---- */
     rt_kprintf("[TMC-CFG] IHOLD_IRUN <- %08X (只写, 不读回)\n",
                (unsigned)tmc_ihold_irun_pack(c));
-    e = tmc_cfg_write_one_ctx(ctx, TMC_REG_IHOLD_IRUN, tmc_ihold_irun_pack(c), RT_FALSE);
+    e = tmc_cfg_write_one_ctx(ctx, TMC_REG_IHOLD_IRUN, tmc_ihold_irun_pack(c),
+                              RT_FALSE, b, &st);
     if (e != RT_EOK)
     {
-        e = tmc_cfg_fail_ctx(ctx, TMC_REG_IHOLD_IRUN, e, "IHOLD_IRUN-write", RT_FALSE);
+        ret = tmc_cfg_fail_ctx(ctx, TMC_REG_IHOLD_IRUN, e, "IHOLD_IRUN-write",
+                               RT_FALSE, b);
         goto out;
     }
 
     /* ---- 4) TPOWERDOWN: 同样按只写处理(不做非法读回) ---- */
     rt_kprintf("[TMC-CFG] TPOWERDOWN(0x%02X) <- %u\n",
                TMC_REG_TPOWERDOWN, c->tpowerdown);
-    e = tmc_cfg_write_one_ctx(ctx, TMC_REG_TPOWERDOWN, c->tpowerdown, RT_FALSE);
+    e = tmc_cfg_write_one_ctx(ctx, TMC_REG_TPOWERDOWN, c->tpowerdown, RT_FALSE, b, &st);
     if (e != RT_EOK)
     {
-        e = tmc_cfg_fail_ctx(ctx, TMC_REG_TPOWERDOWN, e, "TPOWERDOWN-write", RT_FALSE);
+        ret = tmc_cfg_fail_ctx(ctx, TMC_REG_TPOWERDOWN, e, "TPOWERDOWN-write",
+                               RT_FALSE, b);
         goto out;
     }
 
-    /* 全部到位: 一次性提交快照与 CONFIGURED */
-    tmc_cfg_lock(ctx);
+    /* 全部到位: 一次性提交快照与 CONFIGURED —— 但**晚到的成功不得刷新健康**:
+     * 预算必须仍有剩余、失效代次必须没变、生产实例的协调层 epoch 必须还是进入时
+     * 那一代(期间发生过任何保护/预约/释放/恢复都意味着这次下发已经不算数)。 */
+    if (tmc_remaining(b) == 0)
+    {
+        ret = tmc_cfg_fail_ctx(ctx, 0, -RT_ETIMEOUT, "apply-budget-exhausted",
+                               RT_FALSE, b);
+        goto out;
+    }
+    if (tmc_cfg_lock_take(ctx, b, &taken) != RT_EOK)
+    {
+        tmc_cfg_view_invalidate(ctx);
+        rt_kprintf("[TMC-CFG] apply 末尾无法提交(叶锁不可得/预算已尽)"
+                   " -> 摘要作废, 保持不 CONFIGURED\n");
+        ret = -RT_EBUSY;
+        goto out;
+    }
+    if (inv0 != tmc_cfg_view_inv_gen(ctx) ||
+        (ctx == &tmc_cfg_prod && sp_epoch() != ctx->op_epoch))
+    {
+        tmc_cfg_lock_give(ctx, taken);
+        ret = tmc_cfg_fail_ctx(ctx, 0, -RT_EPERM, "apply-stale-success", RT_FALSE, b);
+        rt_kprintf("[TMC-CFG] !! 晚到的 apply 成功被拒绝提交"
+                   " (inv_gen %u -> %u, op_epoch=%u / 现在=%u) - 旧成功不刷新健康\n",
+                   inv0, tmc_cfg_view_inv_gen(ctx),
+                   (unsigned)(ctx == &tmc_cfg_prod ? ctx->op_epoch : 0u),
+                   (unsigned)sp_epoch());
+        goto out;
+    }
     ctx->done_gconf = new_g;
     ctx->done_chop  = new_c;
     ctx->done       = *c;
@@ -1221,14 +1906,18 @@ static rt_err_t tmc_cfg_apply_ctx(tmc_cfg_ctx_t *ctx, const tmc_drv_config_t *c)
     ctx->fail_reg   = 0;
     ctx->last_err   = RT_EOK;
     ctx->fail_from_integrity = RT_FALSE;
-    tmc_cfg_unlock(ctx);
+    tmc_cfg_view_publish(ctx);
+    tmc_cfg_lock_give(ctx, taken);
     rt_kprintf("[TMC-CFG] CONFIGURED (各次写入均经 IFCNT 确认; GCONF/CHOPCONF"
-               " 读回一致)。电流值仍为理论计算, 未实测。\n");
-    e = RT_EOK;
+               " 读回一致)。电流值仍为理论计算, 未实测。"
+               " [本次预算: 已用 %u tick / 总 %u tick, flush=%uB, TX=%uB]\n",
+               (unsigned)(rt_tick_get() - b->start), (unsigned)b->total,
+               (unsigned)st.flush_bytes, (unsigned)st.tx_written);
+    ret = RT_EOK;
 
 out:
     tmc_cfg_txn_give(ctx);
-    return e;
+    return (ret == RT_EOK) ? RT_EOK : ret;
 }
 
 rt_err_t tmc2209_apply_config(void)
@@ -1245,15 +1934,21 @@ rt_uint32_t tmc2209_get_write_gate_mask(void)
 
 /* P1-C 修复点: 必须同时看 state 和 done_valid。只看 state 会让"状态仍是
  * CONFIGURED 而快照已作废"的组合从第 5 门假通过(旧版自测退出时正是这个组合)。
- * F2c R02: 叶锁不可用时连状态都无法原子读取 -> 不猜, 直接返回 FALSE(门闭合)。 */
+ * F2c R02: 叶锁不可用时连状态都无法原子读取 -> 不猜, 直接返回 FALSE(门闭合)。
+ * S2(§10.4): 生产实例改读**固定复制的无等待摘要** —— 配置状态读取不能在 Motor 守卫
+ * 的预算之前无限等待叶锁(自测实例的字段是测试直接 pokes 的, 仍以权威字段为准)。
+ * 摘要作废时一律 FALSE, 所以这道门只会更紧, 不会因为换了读法而放松。 */
 static rt_bool_t tmc_cfg_ok_for_arm_ctx(tmc_cfg_ctx_t *ctx)
 {
-    rt_bool_t ok;
+    rt_bool_t ok = RT_FALSE;
+    rt_bool_t taken = RT_FALSE;
 
     if (!ctx->lock_ok) return RT_FALSE;
-    tmc_cfg_lock(ctx);
+    if (ctx == &tmc_cfg_prod) return tmc_cfg_view_ok_for_arm(ctx);
+
+    if (tmc_cfg_lock_take(ctx, RT_NULL, &taken) != RT_EOK) return RT_FALSE;
     ok = (ctx->state == TMC_DRV_CONFIGURED && ctx->done_valid) ? RT_TRUE : RT_FALSE;
-    tmc_cfg_unlock(ctx);
+    tmc_cfg_lock_give(ctx, taken);
     return ok;
 }
 
@@ -1286,24 +1981,52 @@ void tmc2209_cfg_txn_end(void)
 
 /* 见头文件说明: 芯片断电/复位后寄存器回默认, 必须在这里被照出来。
  * F2b: 快照/状态先在叶锁内取一致副本, UART 读在锁外做(只由 txn 串行化),
- * 因此本函数不会持叶锁跨越总线调用。 */
+ * 因此本函数不会持叶锁跨越总线调用。
+ * S2(§10.4): 运行期观察到错误**先短保护**, 再做 cfg 状态的慢整理与日志 —— 保护发生在
+ * tmc_cfg_fail_ctx() 的第一步(生产实例, 且按 op_epoch 去重), 打印都在其后。
+ * 拿不到叶锁/预算耗尽时不 FOREVER 等: 作废摘要即可让门闭合。 */
 static rt_err_t tmc_cfg_integrity_ctx(tmc_cfg_ctx_t *ctx)
 {
     rt_uint32_t tgt_g = 0, tgt_c = 0, v = 0;
     tmc_drv_cfg_state_t st;
     rt_bool_t valid;
-    rt_err_t  e;
+    rt_err_t  e = RT_EOK;
+    tmc_budget_t         own;
+    const tmc_budget_t  *b = RT_NULL;
+    tmc_xfer_stat_t      xs;
+    rt_bool_t            taken = RT_FALSE;
 
     /* F2c R02: 没有事务锁就无从保证"复核期间没有并发写" -> 拒绝(不猜) */
     if (!ctx->txn_ok) return -RT_ENOSYS;
     if (!tmc_cfg_txn_take(ctx)) return -RT_EBUSY;   /* 正在 apply/arm: 此刻无法复核 */
 
-    tmc_cfg_lock(ctx);
+    /* S2(§10.1): integrity 的**两个寄存器共用一份 250ms 预算**, 不为每个寄存器
+     * 重开 250ms; 生产实例在这里记一次 op_epoch(序列里第一个失败出口负责保护一次)。 */
+    if (!tmc_budget_open(&own, TMC_BUD_INTEGRITY_MS))
+    {
+        tmc_cfg_txn_give(ctx);
+        return -RT_EINVAL;
+    }
+    b = &own;
+    if (ctx == &tmc_cfg_prod)
+    {
+        ctx->op_epoch     = sp_epoch();
+        ctx->op_protected = RT_FALSE;
+    }
+    rt_memset(&xs, 0, sizeof(xs));
+
+    if (tmc_cfg_lock_take(ctx, b, &taken) != RT_EOK)
+    {
+        /* 读不到权威快照: 作废摘要(门闭合), 不猜、也不 FOREVER 等 */
+        tmc_cfg_view_invalidate(ctx);
+        tmc_cfg_txn_give(ctx);
+        return -RT_EBUSY;
+    }
     st    = ctx->state;
     valid = ctx->done_valid;
     tgt_g = ctx->done_gconf;
     tgt_c = ctx->done_chop;
-    tmc_cfg_unlock(ctx);
+    tmc_cfg_lock_give(ctx, taken);
 
     if (st != TMC_DRV_CONFIGURED || !valid)
     {
@@ -1314,15 +2037,15 @@ static rt_err_t tmc_cfg_integrity_ctx(tmc_cfg_ctx_t *ctx)
     /* 链路本身已不可信时不猜: 读不到 != 配置还在 */
     if (!ctx->bus->link_healthy(ctx->priv))
     {
-        e = tmc_cfg_fail_ctx(ctx, 0, -RT_EIO, "integrity:link-not-healthy", RT_TRUE);
+        e = tmc_cfg_fail_ctx(ctx, 0, -RT_EIO, "integrity:link-not-healthy", RT_TRUE, b);
         goto out;
     }
 
     v = 0;
-    if (ctx->bus->read(ctx->priv, TMC_REG_GCONF, &v) != RT_EOK)
+    if (ctx->bus->read(ctx->priv, TMC_REG_GCONF, &v, b, &xs) != RT_EOK)
     {
         e = tmc_cfg_fail_ctx(ctx, TMC_REG_GCONF, -RT_EIO,
-                             "integrity:GCONF-read", RT_TRUE);
+                             "integrity:GCONF-read", RT_TRUE, b);
         goto out;
     }
     if (v != tgt_g)
@@ -1330,15 +2053,15 @@ static rt_err_t tmc_cfg_integrity_ctx(tmc_cfg_ctx_t *ctx)
         rt_kprintf("[TMC-CFG] !! GCONF 已偏离下发值 (%08X != %08X) - 芯片可能断电/复位\n",
                    (unsigned)v, (unsigned)tgt_g);
         e = tmc_cfg_fail_ctx(ctx, TMC_REG_GCONF, -RT_EIO,
-                             "integrity:GCONF-mismatch", RT_TRUE);
+                             "integrity:GCONF-mismatch", RT_TRUE, b);
         goto out;
     }
 
     v = 0;
-    if (ctx->bus->read(ctx->priv, TMC_REG_CHOPCONF, &v) != RT_EOK)
+    if (ctx->bus->read(ctx->priv, TMC_REG_CHOPCONF, &v, b, &xs) != RT_EOK)
     {
         e = tmc_cfg_fail_ctx(ctx, TMC_REG_CHOPCONF, -RT_EIO,
-                             "integrity:CHOPCONF-read", RT_TRUE);
+                             "integrity:CHOPCONF-read", RT_TRUE, b);
         goto out;
     }
     if (v != tgt_c)
@@ -1346,7 +2069,19 @@ static rt_err_t tmc_cfg_integrity_ctx(tmc_cfg_ctx_t *ctx)
         rt_kprintf("[TMC-CFG] !! CHOPCONF 已偏离下发值 (%08X != %08X) - vsense 档可能已丢\n",
                    (unsigned)v, (unsigned)tgt_c);
         e = tmc_cfg_fail_ctx(ctx, TMC_REG_CHOPCONF, -RT_EIO,
-                             "integrity:CHOPCONF-mismatch", RT_TRUE);
+                             "integrity:CHOPCONF-mismatch", RT_TRUE, b);
+        goto out;
+    }
+    /* 两个寄存器都对上, 但**发布"复核通过"之前**再看一次总预算与协调层身份:
+     * 一次过期的成功不能刷新守卫新鲜度, 也不能盖掉期间新出现的故障(§10.4)。 */
+    if (tmc_remaining(b) == 0)
+    {
+        e = tmc_cfg_fail_ctx(ctx, 0, -RT_ETIMEOUT, "integrity:expired", RT_TRUE, b);
+        goto out;
+    }
+    if (ctx == &tmc_cfg_prod && sp_epoch() != ctx->op_epoch)
+    {
+        e = tmc_cfg_fail_ctx(ctx, 0, -RT_EPERM, "integrity:stale-success", RT_TRUE, b);
         goto out;
     }
     e = RT_EOK;
@@ -1376,15 +2111,20 @@ static void tmc_config_show(void)
     rt_err_t    last_err;
     rt_bool_t   from_integrity, snap_valid;
 
-    tmc_cfg_lock(&tmc_cfg_prod);
-    st             = tmc_cfg_prod.state;
-    fail_reg       = tmc_cfg_prod.fail_reg;
-    last_err       = tmc_cfg_prod.last_err;
-    from_integrity = tmc_cfg_prod.fail_from_integrity;
-    snap_valid     = tmc_cfg_prod.done_valid;
-    snap_g         = tmc_cfg_prod.done_gconf;
-    snap_c         = tmc_cfg_prod.done_chop;
-    tmc_cfg_unlock(&tmc_cfg_prod);
+    /* S2(§8.2): 查询先取无等待摘要再打印, 不为输出一条状态而去等一把可能正被 apply
+     * 持有的叶锁, 也不执行任何新的保护/真实配置。 */
+    {
+        tmc_cfg_view_t v;
+
+        tmc_cfg_view_get(&tmc_cfg_prod, &v);
+        st             = (tmc_drv_cfg_state_t)v.state;
+        fail_reg       = v.fail_reg;
+        last_err       = (rt_err_t)v.last_err;
+        from_integrity = v.fail_from_integrity ? RT_TRUE : RT_FALSE;
+        snap_valid     = v.done_valid ? RT_TRUE : RT_FALSE;
+        snap_g         = v.done_gconf;
+        snap_c         = v.done_chop;
+    }
 
     rt_kprintf("[TMC-CFG] state=%s fail_reg=0x%02X last_err=%d from_integrity=%d"
                " snapshot_valid=%d\n", tmc_drv_cfg_state_name(st),
@@ -1563,20 +2303,26 @@ static void tmc_fx_log(tmc_fx_t *fx, rt_uint8_t reg, rt_uint32_t val, rt_uint8_t
     }
 }
 
-static rt_err_t tmc_fx_open(void *priv)
+/* S2: 假总线接缝同步加上"预算 + 结构化观测"两个参数。假总线本身没有任何可阻塞的
+ * 等待(纯内存读写), 所以预算对它没有实际约束; 但它**必须**继续接受调用方沿用的那
+ * 一份预算, 才能证明生产序列真的把同一个 b->start 一路传到最里层。 */
+static rt_err_t tmc_fx_open(void *priv, const tmc_budget_t *b, tmc_xfer_stat_t *st)
 {
     tmc_fx_t *fx = (tmc_fx_t *)priv;
 
+    (void)b; (void)st;
     fx->opens++;
     return fx->open_fail ? -RT_ERROR : RT_EOK;
 }
 
-static rt_err_t tmc_fx_read(void *priv, rt_uint8_t reg, rt_uint32_t *v)
+static rt_err_t tmc_fx_read(void *priv, rt_uint8_t reg, rt_uint32_t *v,
+                            const tmc_budget_t *b, tmc_xfer_stat_t *st)
 {
     tmc_fx_t *fx = (tmc_fx_t *)priv;
     rt_uint32_t out;
     int nth;
 
+    (void)b; (void)st;
     if (reg == TMC_REG_GCONF)      { nth = ++fx->rd_gconf; out = fx->gconf; }
     else if (reg == TMC_REG_CHOPCONF) { nth = ++fx->rd_chop;  out = fx->chop; }
     else { tmc_fx_log(fx, reg, 0, 0); return -RT_EIO; }  /* 只写寄存器: 读它没有意义 */
@@ -1595,10 +2341,12 @@ static rt_err_t tmc_fx_read(void *priv, rt_uint8_t reg, rt_uint32_t *v)
 
 /* IFCNT 语义: 被接受的写 -> ifcnt++ 且寄存器更新; 未被接受的写 -> 两者都不发生,
  * 调用方(write_one)拿到错误并中止。这就是真机"IFCNT 没 +1"的等价模型。 */
-static rt_err_t tmc_fx_write(void *priv, rt_uint8_t reg, rt_uint32_t val)
+static rt_err_t tmc_fx_write(void *priv, rt_uint8_t reg, rt_uint32_t val,
+                             const tmc_budget_t *b, tmc_xfer_stat_t *st)
 {
     tmc_fx_t *fx = (tmc_fx_t *)priv;
 
+    (void)b; (void)st;
     fx->writes++;
     if (fx->fail_write_nth > 0 && fx->writes == fx->fail_write_nth)
         return -RT_EIO;
@@ -1701,27 +2449,56 @@ typedef struct
     const void *bus;
     const void *gate;
     void       *priv;
+    rt_uint8_t  probe_via_view;   /* 1 = 叶锁没拿到, 本次探针读的是无等待摘要 */
 } tmc_prod_probe_t;
 
 static void tmc_prod_probe(tmc_prod_probe_t *p)
 {
-    tmc_cfg_lock(&tmc_cfg_prod);
-    p->state  = tmc_cfg_prod.state;
-    p->fail_reg = tmc_cfg_prod.fail_reg;
-    p->last_err = tmc_cfg_prod.last_err;
-    p->fail_from_integrity = tmc_cfg_prod.fail_from_integrity;
-    p->done_valid = tmc_cfg_prod.done_valid;
-    p->done_gconf = tmc_cfg_prod.done_gconf;
-    p->done_chop  = tmc_cfg_prod.done_chop;
-    p->done       = tmc_cfg_prod.done;
-    p->bus        = (const void *)tmc_cfg_prod.bus;
-    p->gate       = (const void *)tmc_cfg_prod.gate;
-    p->priv       = tmc_cfg_prod.priv;
-    tmc_cfg_unlock(&tmc_cfg_prod);
+    rt_bool_t taken = RT_FALSE;
+
+    /* S2(§10.2/§10.4): 叶锁不再 FOREVER 等。取不到时改用**无等待摘要**填可读字段,
+     * 三个接缝指针留 NULL 并把 probe_via_view 置 1 —— 比较函数把这一位也一起比,
+     * 所以"前后都走同一条路"仍然成立, 而"一次走锁一次走摘要"会被照出来。 */
+    if (tmc_cfg_lock_take(&tmc_cfg_prod, RT_NULL, &taken) == RT_EOK)
+    {
+        p->state  = tmc_cfg_prod.state;
+        p->fail_reg = tmc_cfg_prod.fail_reg;
+        p->last_err = tmc_cfg_prod.last_err;
+        p->fail_from_integrity = tmc_cfg_prod.fail_from_integrity;
+        p->done_valid = tmc_cfg_prod.done_valid;
+        p->done_gconf = tmc_cfg_prod.done_gconf;
+        p->done_chop  = tmc_cfg_prod.done_chop;
+        p->done       = tmc_cfg_prod.done;
+        p->bus        = (const void *)tmc_cfg_prod.bus;
+        p->gate       = (const void *)tmc_cfg_prod.gate;
+        p->priv       = tmc_cfg_prod.priv;
+        p->probe_via_view = 0u;
+        tmc_cfg_lock_give(&tmc_cfg_prod, taken);
+        return;
+    }
+    {
+        tmc_cfg_view_t v;
+
+        tmc_cfg_view_get(&tmc_cfg_prod, &v);
+        p->state  = (tmc_drv_cfg_state_t)v.state;
+        p->fail_reg = v.fail_reg;
+        p->last_err = (rt_err_t)v.last_err;
+        p->fail_from_integrity = v.fail_from_integrity ? RT_TRUE : RT_FALSE;
+        p->done_valid = v.done_valid ? RT_TRUE : RT_FALSE;
+        p->done_gconf = v.done_gconf;
+        p->done_chop  = v.done_chop;
+        p->done       = v.done;
+        p->bus        = (const void *)tmc_cfg_prod.bus;
+        p->gate       = (const void *)tmc_cfg_prod.gate;
+        p->priv       = tmc_cfg_prod.priv;
+        p->probe_via_view = 1u;
+    }
 }
 
 static int tmc_prod_probe_same(const tmc_prod_probe_t *a, const tmc_prod_probe_t *b)
 {
+    /* ⚠ probe_via_view **不**参与比较: 它只是"这次探针走锁还是走摘要"的诊断位,
+     *   把它们当成相等性的一部分会让自测对锁时序敏感(那正是本轮要消除的东西)。 */
     return (a->state  == b->state  && a->fail_reg == b->fail_reg &&
             a->last_err == b->last_err &&
             a->fail_from_integrity == b->fail_from_integrity &&
@@ -2150,9 +2927,19 @@ static void tmc_cfg_selftest(void)
 
     /* --- T16(新): CONFIGURING 窗口内旧快照不可用, 且二次 apply 被拒 --- */
     tmc_fx_reset(&fx);
-    tmc_cfg_lock(&t);
-    t.state = TMC_DRV_CONFIGURING; t.done_valid = RT_FALSE;
-    tmc_cfg_unlock(&t);
+    /* S2: 连自测的 poke 也走"带上限的取锁"这一套纪律; 取不到就判"用例不可判定",
+     * 不静默跳过(否则这条用例会假通过)。测试实例读的是权威字段, 不是摘要。 */
+    {
+        rt_bool_t taken = RT_FALSE;
+
+        if (tmc_cfg_lock_take(&t, RT_NULL, &taken) == RT_EOK)
+        {
+            t.state = TMC_DRV_CONFIGURING; t.done_valid = RT_FALSE;
+            tmc_cfg_lock_give(&t, taken);
+        }
+        else
+        { rt_kprintf("[TMC-CFG-ST] T16 取不到叶锁 -> 用例不可判定\n"); pass = 0; }
+    }
     if (tmc_cfg_ok_for_arm_ctx(&t))
     { rt_kprintf("[TMC-CFG-ST] T16 CONFIGURING 窗口容许 arm\n"); pass = 0; }
     if (tmc_cfg_apply_ctx(&t, &tmc_cfg_planned) != -RT_EBUSY)
@@ -2161,7 +2948,16 @@ static void tmc_cfg_selftest(void)
 
     /* --- T17(新): 二次 apply 成功必须替换快照, 且只在成功末尾恢复 valid --- */
     tmc_fx_reset(&fx); t.state = TMC_DRV_UNCONFIGURED; t.done_valid = RT_FALSE;
-    tmc_cfg_lock(&t); t.done_gconf = 0xDEADBEEFu; t.done_chop = 0xCAFEBABEu; tmc_cfg_unlock(&t);
+    {
+        rt_bool_t taken = RT_FALSE;
+
+        if (tmc_cfg_lock_take(&t, RT_NULL, &taken) == RT_EOK)
+        {
+            t.done_gconf = 0xDEADBEEFu; t.done_chop = 0xCAFEBABEu;
+            tmc_cfg_lock_give(&t, taken);
+        }
+        else { rt_kprintf("[TMC-CFG-ST] T17 取不到叶锁 -> 用例不可判定\n"); pass = 0; }
+    }
     if (!tmc_fx_apply(&t, &c2))
     { rt_kprintf("[TMC-CFG-ST] T17 二次 apply 未成功\n"); pass = 0; }
     if (t.done_gconf == 0xDEADBEEFu || t.done_chop == 0xCAFEBABEu)

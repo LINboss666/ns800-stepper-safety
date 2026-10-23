@@ -444,6 +444,72 @@ static int ns800_putc(struct rt_serial_device *serial, char c)
     return 1;
 }
 
+/* ---------- 2026-10-23 S2(任务书 §10.3): 带预算的整帧发送 ----------
+ * 只给 TMC 生产路径使用; 不改通用 serial 框架, 也不改 console(uart1)的全局
+ * tx_block_timeout, 更不是临时把共享 tx_block_timeout 改成"每调用一个值"来冒充
+ * per-call deadline。
+ *
+ * 为什么必须有它(drv_uart.c / dev_serial.c 亲读): ns800_putc() 的等待用的是
+ * uart->tx_block_timeout(本工程 rtconfig.h: BSP_NS800_UART_TX_TIMEOUT=6000ms/字符),
+ * 而 _serial_poll_tx 是**逐字符** putc、只在 putc 返回 <0 时才中止 —— 于是一帧
+ * 8 字节最坏可以占用 8×6000ms, 上层任何"按帧/按事务"的超时都形同虚设。
+ *
+ * 叶子写点的本地依据(SDK 亲读, 不是凭函数名断言):
+ *   uart.h:696 static inline bool UART_isSpaceAvailable() => 单次
+ *     READ_BIT(uart->STAT.WORDVAL, UART_STAT_TDRE_M), 无循环无等待;
+ *   uart.h:757 static inline void UART_writeChar() => 单次
+ *     TYPE8(&uart->DATA.WORDVAL) = data, 无等待。
+ * 所以本函数的循环是**唯一**的等待点, 预算可以直接锚在它上面; 不存在"内层还有一
+ * 个未知等待"的情形(需要等待时用的是这两个叶子, 不是 UART_writeCharArray —— 后者
+ * 内含两处无界 while, 本文件不调用)。
+ *
+ * 上下文纪律(§10.2): 必须是普通线程上下文(调用者持现有 TMC xfer 锁)。ISR 与
+ * 已关中断两种一律拒绝 —— 前者的 rt_thread_mdelay 非法, 后者会让 tick 不推进而
+ * 使这个按 tick 判定的循环永不退出(与 stop_priority 禁止清单同一事实)。 */
+rt_err_t ns800_uart_write_budgeted(rt_device_t dev, const rt_uint8_t *data,
+                                   rt_size_t size, rt_tick_t start, rt_tick_t total,
+                                   rt_size_t *written)
+{
+    struct ns800_uart *uart = RT_NULL;
+    rt_size_t i;
+    rt_size_t n_obj;
+
+    if (written != RT_NULL) *written = 0;
+    if (dev == RT_NULL || data == RT_NULL || written == RT_NULL) return -RT_EINVAL;
+    if (total == 0 || total >= (rt_tick_t)0x80000000) return -RT_EINVAL;
+    if (rt_thread_self() == RT_NULL) return -RT_EBUSY;
+#if defined(__ARM_ARCH) && (__ARM_ARCH >= 7)
+    if (__get_PRIMASK() != 0u) return -RT_EBUSY;
+#endif
+
+    /* 在**已注册**的对象表里匹配实际 dev; 匹配不到就拒绝, 不对任意指针做
+     * container_of 后解引用(rt_hw_uart_init 用 uart_obj[i].serial 注册设备)。 */
+    n_obj = sizeof(uart_obj) / sizeof(uart_obj[0]);
+    for (i = 0; i < n_obj; ++i)
+    {
+        if (&uart_obj[i].serial.parent == dev)
+        {
+            uart = &uart_obj[i];
+            break;
+        }
+    }
+    if (uart == RT_NULL || uart->handle.Instance == RT_NULL) return -RT_EINVAL;
+
+    for (i = 0; i < size; )
+    {
+        if ((rt_tick_t)(rt_tick_get() - start) >= total) return -RT_ETIMEOUT;
+        if (!UART_isSpaceAvailable(uart->handle.Instance))
+        {
+            rt_thread_mdelay(1);        /* 线程、窗口外; 总预算继续流逝 */
+            continue;
+        }
+        UART_writeChar(uart->handle.Instance, data[i]);
+        ++i;
+        *written = i;
+    }
+    return RT_EOK;
+}
+
 static int ns800_getc(struct rt_serial_device *serial)
 {
     struct ns800_uart *uart;
