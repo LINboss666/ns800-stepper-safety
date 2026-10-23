@@ -23,6 +23,10 @@
 #include <stdio.h>
 #include <string.h>
 
+/* 2026-10-23 S1: step_pwm 桩要用 mot_stop_result_t(本链在此处还不知道生产头,
+ * 因为下面的桩写在 #include "motor.c" 之前)。 */
+#include "stop_result.h"
+
 /* ======================= 夹具: 计数器与可控输入 ======================= */
 int shim_dev_find_calls, shim_dev_open_calls, shim_dev_read_calls;
 int shim_dev_write_calls, shim_pwm_enable_calls, shim_pwm_disable_calls;
@@ -443,8 +447,21 @@ rt_bool_t safety_polarity_validated(void) { return shim_protection_ready ? RT_TR
 rt_bool_t safety_protection_ready(void) { return shim_protection_ready ? RT_TRUE : RT_FALSE; }
 subsys_health_t safety_thread_get_health(void) { return SUBSYS_OK; }
 
-void      step_pwm_force_stop(void)     { shim_step_owned_by_diag = RT_FALSE; }
-rt_bool_t step_pwm_output_active(void)  { return shim_step_owned_by_diag ? RT_TRUE : RT_FALSE; }
+/* step_pwm 桩: 本链不编译真实 step_pwm.c(见文件头)。
+ * 2026-10-23 S1 同步新接口: force_stop 返回 rt_err_t; 桩一律返回"驱动接受了关断"
+ * (RT_EOK)并释放所有权 —— 这是**桩自己的真实返回值**, 由被测 motor.c 消费后记进
+ * stop_result; 桩不替固件伪造成功状态。off_confirmed 相应返回 TRUE。 */
+rt_err_t  step_pwm_force_stop(void)   { shim_step_owned_by_diag = RT_FALSE; return RT_EOK; }
+rt_bool_t step_pwm_output_active(void){ return shim_step_owned_by_diag ? RT_TRUE : RT_FALSE; }
+void      step_pwm_get_stop_state(mot_stop_result_t *out_result, rt_err_t *out_rc,
+                                  rt_bool_t *out_latched)
+{
+    if (out_result)  *out_result  = MOT_STOP_API_ACCEPTED;
+    if (out_rc)      *out_rc      = RT_EOK;
+    if (out_latched) *out_latched = RT_FALSE;
+}
+rt_bool_t step_pwm_off_confirmed(void) { return RT_TRUE; }
+void      step_pwm_clear_stop_latch(void) { }
 
 /* ======================= 真实的固件源码 ======================= */
 #include "tmc2209.c"

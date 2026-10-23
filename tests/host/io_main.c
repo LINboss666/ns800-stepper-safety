@@ -564,8 +564,23 @@ void blackbox_trigger(rt_uint32_t code) { (void)code; f_bb_triggers++; }
 subsys_health_t blackbox_get_health(void) { return SUBSYS_OK; }
 int  io_blackbox_trigger_count(void) { return f_bb_triggers; }
 
-void      step_pwm_force_stop(void)      { f_diag_owner = RT_FALSE; io_pwm_disable_calls++; }
-rt_bool_t step_pwm_output_active(void)   { return f_diag_owner; }
+/* step_pwm 桩(本链不编译真实 step_pwm.c)。
+ * 2026-10-23 S1 同步新接口签名与真实返回值: force_stop 返回 rt_err_t, 桩一律回
+ * RT_EOK(= 驱动接受了关断)并释放所有权 + 计一次 disable; off_confirmed 相应为 TRUE。
+ * 桩**不**替固件伪造成功 —— 被测 motor.c 的 stop_result 来自它自己那次
+ * rt_pwm_disable() 的真实返回(shim_io 里恒为 RT_EOK), 诊断侧这三个接口只是被
+ * 真 safety_state.c 调用的假服务, 默认值不构成任何断言前置。 */
+rt_err_t  step_pwm_force_stop(void)   { f_diag_owner = RT_FALSE; io_pwm_disable_calls++; return RT_EOK; }
+rt_bool_t step_pwm_output_active(void){ return f_diag_owner; }
+void      step_pwm_get_stop_state(mot_stop_result_t *out_result, rt_err_t *out_rc,
+                                  rt_bool_t *out_latched)
+{
+    if (out_result)  *out_result  = MOT_STOP_API_ACCEPTED;
+    if (out_rc)      *out_rc      = RT_EOK;
+    if (out_latched) *out_latched = RT_FALSE;
+}
+rt_bool_t step_pwm_off_confirmed(void)     { return RT_TRUE; }
+void      step_pwm_clear_stop_latch(void)  { }
 
 /* ===================================================================== */
 /* 真实的被测生产源码                                                      */

@@ -41,12 +41,25 @@
  *     不是停机时延上界; RISK-03/03a 继续开放, 本轮不重构线程。
  *   - 行程限位由 SAFETY_LIMIT_INPUTS_ENABLED(project_board.h)决定是否进入活动输入集,
  *     与"硬件验证宏"职责不同, 互不替代。
+ *
+ * STEP 关断结果可信(2026-10-23, phase8-stop-result-s1 / S1):
+ *   - `rt_pwm_disable()` 的返回值不再被吞掉: 每个关断调用点都走 checked 路径并把真实 rc
+ *     记进快照(stop_result/stop_src/stop_rc, 见 stop_result.h)。
+ *   - 关断失败或未取得设备句柄 => stop_fail_latched=1 + 第 7 门 MOT_GATE_STOP_UNCONFIRMED,
+ *     拒绝新的 arm/start/诊断借用; 该位**只新增、只收紧**, 前六道门的条件一字未改。
+ *   - 解除锁存只允许走 fault_reset() 的人工恢复复核(全部门查完才清); 一次后续成功的
+ *     普通 stop 只更新"当前关断结果", 不清锁存、不解 Safety 故障、不自动重启。
+ *   - API 返回 RT_EOK 只称"驱动接受了关断请求", **不是**示波器证明无脉冲;
+ *     "current_hz==0 / target_hz==0"只称软件命令值。
+ *   - 本轮(S1)不处理锁等待、UART 阻塞、在途 arm/enable 与停机的竞争 —— 那是 S2;
+ *     不重构线程, 不宣称任何停机时延上界。
  */
 #ifndef MOTOR_H
 #define MOTOR_H
 
 #include <rtthread.h>
 #include "app_health.h"
+#include "stop_result.h"
 
 /* ⚠ 硬件使能链验收开关(见上)。RT_FALSE = motor_arm 拒绝。 */
 #ifndef MOTOR_HARDWARE_ENABLE_PATH_VALIDATED
@@ -54,11 +67,15 @@
 #endif
 
 /* ⚠ STEP 诊断隔离环境人工确认开关(F2b P0-A)。
- * RT_FALSE = pwm_test 等任何能输出 STEP 的诊断路径一律拒绝: 现板与门/非门损坏,
- * "DRV_ENABLE 焊盘 LOW"证明不了 TMC_ENN 已禁能, 所以 STEP 一旦输出就可能真实驱动
- * 电机。只有在 TMC 模块拔出 / 功率级断开、只为示波器量 STEP 频率时, 才允许由操作员
- * 人工翻转本宏并在验证记录里写明隔离条件 —— 它不能替代使能链验收(那仍是
- * MOTOR_HARDWARE_ENABLE_PATH_VALIDATED)。两个宏都为 TRUE 时也不需要本宏。 */
+ * RT_FALSE = pwm_test 等任何能输出 STEP 的诊断路径一律拒绝。理由的当前口径
+ * (2026-10-23 S1 更正): "DRV_ENABLE 焊盘 LOW"证明不了 TMC_ENN 已禁能 —— 这是**使能链
+ * 尚未完成验收**(未烧录新版、未做波形/瞬态验收, 属授权范围); 维修前记录的"与门/非门
+ * 损坏"不是当前已证实故障(静态电气与现有 SW1 功能已由用户确认 PASS (USER_CONFIRMED))。
+ * 因为 STEP 一旦输出就可能真实驱动电机。只有在 TMC 模块拔出 / 功率级断开、只为示波器
+ * 量 STEP 频率时, 才允许由操作员人工翻转本宏并在验证记录里写明隔离条件 —— 它不能替代
+ * 使能链验收(那仍是 MOTOR_HARDWARE_ENABLE_PATH_VALIDATED)。两个宏都为 TRUE 时也不需要本宏。
+ * ⚠ 2026-10-23 S1 又追加了一层与宏无关的条件: 关断失败锁存期间连借用申请都直接拒绝
+ *   (见 motor_pwm_grant_to_diag), 翻宏也不能越过未复核的关断失败。 */
 #ifndef STEP_DIAG_ISOLATED_ENV_CONFIRMED
 #define STEP_DIAG_ISOLATED_ENV_CONFIRMED       RT_FALSE
 #endif
@@ -72,6 +89,10 @@
 #define MOT_GATE_NOT_PROTECTED (1u << 3)   /* Fix A: Safety 保护链未就绪 */
 #define MOT_GATE_NO_DRV_CONFIG (1u << 4)   /* Phase 8-F2: TMC 驱动参数未下发/下发失败 */
 #define MOT_GATE_FB_MISMATCH   (1u << 5)   /* 追加: 最终 ENN 反馈与当前许可请求不一致 */
+/* 追加第 7 位(2026-10-23 S1, 只新增不复用旧位): STEP 关断结果不可信 —— 曾有
+ * rt_pwm_disable 失败/未取得设备, 且未经人工恢复复核。这一位**只收紧**拒绝条件:
+ * 它不替代前六道门, 也不因"频率字段已经是 0"而清零。 */
+#define MOT_GATE_STOP_UNCONFIRMED (1u << 6)
 
 /* 运行期配置守卫(F2b P1-E)导致停机的原因码, 写入快照 guard_reason。
  * 0..3 为既有编码; 4 是 2026-10-21 追加的反馈不一致(不复用旧值)。 */
@@ -94,7 +115,7 @@ typedef enum
 typedef struct
 {
     motor_state_t state;
-    rt_uint32_t current_hz;     /* 当前输出步频(0=静止) */
+    rt_uint32_t current_hz;     /* 当前输出步频(0=软件命令值为 0, 见 stop_result) */
     rt_uint32_t target_hz;      /* 目标步频 */
     rt_uint32_t accel_hz_s;     /* 加速斜率 Hz/s */
     rt_uint32_t decel_hz_s;     /* 减速斜率 Hz/s */
@@ -104,6 +125,14 @@ typedef struct
     rt_uint16_t guard_stops;    /* F2b P1-E: 运行期配置守卫触发的停机次数 */
     rt_uint8_t  guard_reason;   /* 最近一次守卫停机的原因码(MOT_GUARD_*) */
     subsys_health_t health;
+    /* ---- 2026-10-23 S1 追加(只追加在末尾, 旧字段次序不变) ---- *
+     * stop_result/stop_src/stop_rc 描述**最近一次 STEP 关断尝试**;
+     * current_hz==0 不等于 stop_result==MOT_STOP_API_ACCEPTED。
+     * stop_fail_latched 一旦置位只能由人工恢复复核清除(见 safety_state.c)。 */
+    rt_uint8_t  stop_result;        /* mot_stop_result_t */
+    rt_uint8_t  stop_src;           /* MOT_STOP_SRC_* */
+    rt_int16_t  stop_rc;            /* 最近一次 rt_pwm_disable() 的原始返回值 */
+    rt_uint8_t  stop_fail_latched;  /* 1 = 曾有关断失败/未取得设备, 未经人工恢复 */
 } motor_snapshot_t;
 
 /* 幂等初始化: 查找 epwm1、建立斜坡线程、状态 IDLE、
@@ -120,13 +149,18 @@ rt_err_t motor_init(void);
  *   5. TMC2209 驱动参数已 CONFIGURED                      (Phase 8-F2: 电流档位
  *      未知/未下发时不得使能; apply 失败即长期占住此门)
  *   6. (追加 MOT_GATE_FB_MISMATCH)最终 ENN 反馈与当前许可请求一致
- * 全部门禁无条件求值(均为无副作用只读), 拒绝原因以位掩码保留, 便于真机确认各门
- * 确实参与判定。arm 内部还额外做: 请求前确认禁能侧反馈一致 → 写 HIGH+回读 →
- * 有界确认使能侧反馈一致, 任一步不成就回滚撤销许可并投递反馈不一致事件。 */
+ *   7. (追加 2026-10-23 S1 MOT_GATE_STOP_UNCONFIRMED)STEP 关断结果可信: 曾有关断
+ *      失败/未取得设备且未经 fault_reset 人工恢复复核时拒绝。arm 内部还额外做:
+ *      请求前确认禁能侧反馈一致 → 写 HIGH+回读 → 有界确认使能侧反馈一致, 任一步
+ *      不成就回滚撤销许可(回滚里的关断也走 checked 路径并记账)并投递事件;
+ *      回滚时若 PWM 也失败, arm 返回 PWM 错误(许可错误其次)。 */
 rt_err_t motor_arm(void);
 
-/* 解除使能: 停脉冲 + DRV_ENABLE 写 LOW 并回读确认 + 回 IDLE(不经 DECEL)。
- * 返回 DRV_ENABLE 写确认结果(-RT_EIO = 焊盘未确认 LOW)。 */
+/* 解除使能: 停脉冲 + DRV_ENABLE 写 LOW 并回读确认 + 回 IDLE(不经斜坡)。
+ * 2026-10-23 S1: 返回值 = **PWM 关断结果与许可写确认结果两者中较早出现的失败**
+ * (两者都失败时返回 PWM 错误); 许可失败返回 -RT_EIO, 关断失败返回 rt_pwm_disable 的错误。
+ * 两个原始 rc 分别保存在快照 stop_rc 与日志里, 调用方不得把任何非零都解释成
+ * "只是 GPIO 失败"。失败时函数仍已照做两步关闭动作, 不回退。 */
 rt_err_t motor_disarm(void);
 
 /* 方向: dir=0/1 (PA.2 电平)。
@@ -146,8 +180,9 @@ rt_err_t motor_stop(void);
 
 /* 紧急停机(唯一被 safety_force_shutdown 调用的停机入口):
  * 立即关 PWM 输出 + DRV_ENABLE 写 LOW 并回读确认 + state=FAULT。幂等。
- * 返回值 = DRV_ENABLE 回读确认结果; 非 RT_EOK 表示焊盘未确认 LOW,
- * 调用方必须记录 CRITICAL(状态机仍会锁存 FAULT_LATCHED)。 */
+ * 2026-10-23 S1: 返回值 = PWM 关断失败优先、否则许可写确认结果; 两者原始 rc 均另存。
+ * 非 RT_EOK 表示"关断或许可至少有一步未确认成功", **绝不**等于"输出仍在运行"的确认,
+ * 也绝不因为某一步失败就跳过另一步。调用方必须记录 CRITICAL 并仍锁存 FAULT_LATCHED。 */
 rt_err_t motor_emergency_stop(void);
 
 /* 快照(线程安全, 内部互斥拷贝)。 */
@@ -169,6 +204,20 @@ rt_uint32_t motor_get_gate_fail_mask(void);
  * 且 DRV_ENABLE 焊盘实测 LOW。全部满足才返回 RT_EOK, 拒绝原因由本函数打印。
  * 正式 Motor Service 才是 EPWM 的生产 owner。 */
 rt_err_t motor_pwm_grant_to_diag(void);
+
+/* ---------- 2026-10-23 S1: 关断结果的可观测性(只读, 不产生总线流量) ----------
+ * out_result/out_src/out_rc 反映**最近一次** STEP 关断尝试; *out_latched 是
+ * "曾有关断失败或未取得设备"的锁存位, 只能由 fault_reset 的复核路径清零。
+ * 快照里的 current_hz/target_hz 为 0 **不能**替代本函数的结论。 */
+void motor_get_stop_state(mot_stop_result_t *out_result, rt_uint8_t *out_src,
+                          rt_err_t *out_rc, rt_bool_t *out_latched);
+
+/* ⚠ 解除 STEP 关断失败锁存。**唯一合法调用点 = safety_state.c 的 fault_reset()**,
+ * 且只在全部复核成立之后调用: 活动输入实测安全 + 许可焊盘 LOW + ENN 前后两次有界确认
+ * + motor_disarm() 成功 + 两条输出路径**本次**都有 API 接受的关断结果。
+ * 不导出 MSH 命令, 没有第二条恢复路径; 普通 disarm、状态查询、一次重试成功都不得调用
+ * (那等于绕过人工恢复门)。一次成功只更新"当前关断结果", 不清本锁存。 */
+void motor_clear_stop_latch(void);
 
 /* F2b P1-E 用: 运行期守卫的纯判定函数(不碰硬件、不产生总线流量)。
  * in->due=0 表示本轮未到复核周期。动作只有 NONE / STOP 两种, STOP 由调用方

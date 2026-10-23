@@ -6,8 +6,12 @@
  *
  * 安全:
  *   - MOTOR_HARDWARE_ENABLE_PATH_VALIDATED=RT_FALSE 期间 motor_arm() 一律拒绝
- *     (事实更正 2026-10-18: 新扩展板 MCU_DRV_ENABLE 已引出, 当前阻塞项是 U5 与门
+ *     (事实更正 2026-10-18: 新扩展板 MCU_DRV_ENABLE 已引出, 当时记录的阻塞项是 U5 与门
  *     损坏 + 急停非门损坏, TMC_ENN 实测约 0V → 焊盘回读 LOW 证明不了驱动已禁能)。
+ *     > **2026-10-23 措辞更正(S1 任务书 §5)**: 上面那句"与门/非门损坏"是**维修前的历史
+ *     > 解释**, 不是当前已证实的故障: 静态电气与现有 SW1 急停功能已由用户自行检查确认
+ *     > 为 PASS (USER_CONFIRMED)(草案 A29)。四个硬件宏仍为 RT_FALSE 的原因是**授权范围**
+ *     > (未烧录新版固件、未做瞬态/波形/时延验收), 不是"已证实门芯片坏"。逻辑本身不变。
  *   - DRV_ENABLE 常态 LOW; 仅 arm 成功且运行时拉高。
  *   - F2b P0-A: STEP 诊断借用门在此前只查"焊盘 LOW + 电机静止", 上面那条事实使它
  *     不再充分 → 现在必须 MOTOR_HARDWARE_ENABLE_PATH_VALIDATED 或
@@ -22,6 +26,15 @@
  *   - P1-10: arm 时 DRV_ENABLE 写失败 → 回滚 armed/输出(fail closed)。
  *   - P1-8: 斜坡每步 clamp 到 target(消除目标附近振荡); mot_ramp_step 为纯函数,
  *     motor_ramp_selftest 做确定性验证。
+ *   - S1(2026-10-23, 关断结果可信): 本文件里所有 STEP 关断都走**唯一**的
+ *     mot_pwm_output_off(src), 它保留 rt_pwm_disable 的真实返回值并记账
+ *     (stop_result / stop_src / stop_rc / stop_fail_latched, 见 stop_result.h)。
+ *     失败或未取得设备 => 锁存, 触发第 7 门 MOT_GATE_STOP_UNCONFIRMED, 只收紧;
+ *     解除只发生在 safety_state.c 的 fault_reset() 人工恢复复核里。
+ *     motor_disarm()/motor_emergency_stop() 的返回值 = **PWM 关断失败优先**,
+ *     许可写确认结果其次, 两个原始 rc 各自留档; 任一步失败都不豁免另一步动作。
+ *     `rt_pwm_disable()==RT_EOK` 一律只称"驱动 API 接受了关断请求"。
+ *     本轮**不**改锁/UART/线程结构, 不宣称停机时延上界(S2 待办)。
  *
  * Fix A 加固:
  *   - A3: motor_arm 五道门禁(使能链验收 / 状态 READY / 本子系统健康 /
@@ -65,19 +78,25 @@
 /* F2b P1-E: 运行期驱动配置复核周期。只在 armed 时才产生 UART 流量。
  *
  * ⚠ F2c R05 —— 200ms 是**复核周期**, 不是停机时延, 两者不能混为一谈:
- *   1) 检测延迟最坏 = 周期 200ms + 本轮复核耗时。复核 = 2 次可读寄存器回读,
- *      每次上限 TMC_REPLY_TIMEOUT_MS=100ms(内部 2ms 轮询), 故一轮复核 ≤ ~205ms,
- *      合计最坏 ≈ **405ms** 才可能触发作出反应(不含调度抖动)。
+ *   1) 按下述口径估算的"检测窗口" = 周期 200ms + 本轮复核耗时。复核 = 2 次可读寄存器
+ *      回读, 每次上限 TMC_REPLY_TIMEOUT_MS=100ms(内部 2ms 轮询), 故一轮复核 ≤ ~205ms,
+ *      合计 ≈ **405ms** 才可能触发作出反应(不含调度抖动)。
+ *      > **2026-10-23 S1 更正**: 这个 405ms **不是最坏停机时延上界** —— 它没有计入
+ *        ss_lock / mot_lock / TMC 配置事务 / UART xfer 的等待(RT_WAITING_FOREVER 路径
+ *        本轮一律未改, 见任务书 §3 与 §4.5), 因此不能称"可靠上界", 只是软件复核周期本身
+ *        的量级估计(未上板实测)。停机时延上界仍属 RISK-03/03a, 待 S2 与上板验证。
  *   2) 复核跑在斜坡线程(prio 8, 栈 MOTOR_THREAD_STACK=768B)内, 期间 10ms 节拍被
  *      阻塞, STEP 仍以最后设置的频率继续输出(PWM 硬件自由运行) —— 复核失败之前
  *      脉冲不会停。栈余量与真实阻塞时长均未上板实测(NOT TESTED)。
  *   3) 判定为停机后的动作是**立即**的: rt_pwm_disable + DRV_ENABLE 写 LOW 并回读,
- *      不经斜坡; 但 rt_pwm_disable 的返回值当前未判定, ENN 端电平也未实测。
+ *      不经斜坡。2026-10-23 S1 起 rt_pwm_disable 的返回值**已被判定并向上传播**
+ *      (失败 => 锁存 + 拒绝 arm/start/诊断借用); 但"API 接受关断"仍不等于示波器证明
+ *      无脉冲, ENN 端电平也未做波形实测。
  *   4) 因此: 软件守卫是第二层, 最终切断必须由独立硬件(ENN/急停链)承担; 硬件链
  *      未验收期间 motor 根本不能 armed, 这条路径实际不可达。
  *   5) 是否把 UART 守卫从斜坡线程解耦(独立低优先级线程 + 事件传递):**待上板实测
  *      复核阻塞时长与栈占用之后再决定**, 不在没有测量的情况下先改结构。
- *   ❌ 任何材料都不得写"200ms 内必停"。 */
+ *   ❌ 任何材料都不得写"200ms 内必停", 也不得写"400/405ms 是停机上界"。 */
 #define MOTOR_DRV_GUARD_PERIOD_MS 200u
 #define MOTOR_DRV_GUARD_TICKS  (MOTOR_DRV_GUARD_PERIOD_MS / MOTOR_RAMP_PERIOD_MS)
 
@@ -91,7 +110,10 @@ static rt_bool_t mot_dev_ok = RT_FALSE;
 static motor_snapshot_t mot = {
     MOTOR_IDLE, 0, 0, MOTOR_DEFAULT_ACCEL, MOTOR_DEFAULT_DECEL, 0, 0, 0,
     0, MOT_GUARD_NONE,
-    SUBSYS_UNINIT
+    SUBSYS_UNINIT,
+    /* 2026-10-23 S1 追加(与 motor_snapshot_t 末尾新字段一一对应):
+     * stop_result / stop_src / stop_rc / stop_fail_latched */
+    MOT_STOP_NOT_ATTEMPTED, MOT_STOP_SRC_NONE, 0, 0
 };
 static struct rt_mutex mot_lock;
 static rt_bool_t mot_lock_ok = RT_FALSE;
@@ -123,27 +145,128 @@ static rt_err_t mot_drv_en_request(rt_uint8_t level)
     return e;
 }
 
-/* 立即关 STEP 输出 */
-static void mot_pwm_output_off(void)
+/* ---------- 2026-10-23 S1: 关断结果的语义与记账 ----------
+ * 这三个函数是 stop_result.h 承诺的**唯一**语义解释处; 判定只读状态, 不碰硬件。 */
+const char *mot_stop_result_name(mot_stop_result_t r)
 {
-    if (mot_dev_ok)
-        rt_pwm_disable(mot_pwm, MOTOR_PWM_CH);
+    switch (r)
+    {
+    case MOT_STOP_NOT_ATTEMPTED:      return "not-attempted";
+    case MOT_STOP_DEV_UNAVAILABLE:    return "dev-unavailable(output-UNKNOWN)";
+    case MOT_STOP_OUTPUT_REQUESTED:   return "output-requested(running)";
+    case MOT_STOP_CMD_ZERO_UNCONFIRMED: return "cmd-0hz-unconfirmed";
+    case MOT_STOP_API_ACCEPTED:       return "api-accepted(驱动接受关断, 非波形证明)";
+    case MOT_STOP_API_FAILED:         return "api-failed(output-UNKNOWN)";
+    default:                          return "?";
+    }
 }
 
-/* 设置指定频率的 50% 占空比脉冲; hz==0 时关闭输出 */
+const char *mot_stop_src_name(rt_uint8_t src)
+{
+    switch (src)
+    {
+    case MOT_STOP_SRC_NONE:          return "none";
+    case MOT_STOP_SRC_INIT:          return "init";
+    case MOT_STOP_SRC_RAMP_ZERO:     return "ramp-zero";
+    case MOT_STOP_SRC_APPLY_FAIL:    return "apply-fail";
+    case MOT_STOP_SRC_ARM_ROLLBACK:  return "arm-rollback";
+    case MOT_STOP_SRC_GUARD_STOP:    return "guard-stop";
+    case MOT_STOP_SRC_FAIL_CLOSED:   return "fail-closed";
+    case MOT_STOP_SRC_DISARM:        return "disarm";
+    case MOT_STOP_SRC_ESTOP:         return "emergency-stop";
+    case MOT_STOP_SRC_DIAG_TEST:     return "pwm_test-stop";
+    case MOT_STOP_SRC_DIAG_FORCE:    return "force-stop";
+    case MOT_STOP_SRC_STOP_CMD:      return "motor_stop-cmd";
+    default:                         return "?";
+    }
+}
+
+rt_bool_t mot_stop_result_is_off(mot_stop_result_t r)
+{
+    return (r == MOT_STOP_API_ACCEPTED) ? RT_TRUE : RT_FALSE;
+}
+
+rt_bool_t mot_stop_result_is_uncertain(mot_stop_result_t r)
+{
+    return (r == MOT_STOP_API_FAILED || r == MOT_STOP_DEV_UNAVAILABLE)
+               ? RT_TRUE : RT_FALSE;
+}
+
+/* 记账(无硬件动作)。调用约定与 mot_drv_en_request() 同: 不自行取 mot_lock,
+ * 由调用方在锁内(或初始化单线程期)调用; 一次动作只记一次, 不自动重试。
+ * 失败/未知一律**置位** stop_fail_latched; 成功**不清**该位 —— 它只能由
+ * fault_reset 的人工恢复复核经 motor_clear_stop_latch() 清除(合同 4.4)。 */
+static void mot_stop_record(mot_stop_result_t result, rt_uint8_t src, rt_err_t rc)
+{
+    mot.stop_result = result;
+    mot.stop_src    = src;
+    mot.stop_rc     = rc;
+    if (mot_stop_result_is_uncertain(result))
+        mot.stop_fail_latched = 1;
+}
+
+/* 立即关 STEP 输出 —— 本文件唯一的 STEP 关断入口, 保留真实错误码(合同 4.2)。
+ * 返回 RT_EOK 只说明**驱动 API 接受了关断请求**, 不说明示波器上看不到脉冲。 */
+static rt_err_t mot_pwm_output_off(rt_uint8_t src)
+{
+    rt_err_t e;
+
+    if (!mot_dev_ok)
+    {
+        mot_stop_record(MOT_STOP_DEV_UNAVAILABLE, src, -RT_ENOSYS);
+        rt_kprintf("[MOT] !! STEP 关断**未尝试**: %s 设备句柄未取得 -> 输出状态未知"
+                   " (不称'已停止')\n", MOTOR_PWM_DEV);
+        return -RT_ENOSYS;
+    }
+    e = rt_pwm_disable(mot_pwm, MOTOR_PWM_CH);
+    mot_stop_record(e == RT_EOK ? MOT_STOP_API_ACCEPTED : MOT_STOP_API_FAILED, src, e);
+    if (e != RT_EOK)
+        rt_kprintf("[MOT] !! rt_pwm_disable FAILED (rc=%d, src=%s): STEP 输出状态未知,"
+                   " 频率字段清零不能替代它\n", (int)e, mot_stop_src_name(src));
+    return e;
+}
+
+/* 停机动作里 PWM 与许可(ENABLE)是**两个独立结果**: 两者都失败时对外返回 PWM 错误,
+ * 两个原始 rc 各自留档(快照 stop_rc + 日志), 调用方不得把非零一律解释成"GPIO 失败"。 */
+static rt_err_t mot_stop_merge(rt_err_t pwm_e, rt_err_t gpio_e)
+{
+    if (pwm_e != RT_EOK) return pwm_e;
+    return gpio_e;
+}
+
+/* 记录"软件已把目标命令值写成 0Hz"(合同 4.2 最后一条): 这不是一次关断动作, 更不
+ * 是"输出已关断"的证明。调用约定: 持 mot_lock。已有的失败/未知记录**不被命令覆盖**
+ * (未知比"已请求停"更严重, 必须一直照出来直到人工恢复复核)。 */
+static void mot_record_zero_cmd(rt_uint8_t src)
+{
+    if (mot.stop_result == MOT_STOP_API_FAILED ||
+        mot.stop_result == MOT_STOP_DEV_UNAVAILABLE)
+        return;
+    mot.stop_result = MOT_STOP_CMD_ZERO_UNCONFIRMED;
+    mot.stop_src    = src;
+}
+
+/* 设置指定频率的 50% 占空比脉冲; hz==0 时走同一条 checked 关断路径 */
 static rt_err_t mot_pwm_apply(rt_uint32_t hz)
 {
     rt_err_t e;
 
-    if (!mot_dev_ok) return -RT_ERROR;
-    if (hz == 0)
+    if (!mot_dev_ok)
     {
-        rt_pwm_disable(mot_pwm, MOTOR_PWM_CH);
-        return RT_EOK;
+        mot_stop_record(MOT_STOP_DEV_UNAVAILABLE, MOT_STOP_SRC_NONE, -RT_ENOSYS);
+        return -RT_ENOSYS;
     }
+    if (hz == 0)
+        return mot_pwm_output_off(MOT_STOP_SRC_RAMP_ZERO);
     e = rt_pwm_set(mot_pwm, MOTOR_PWM_CH, 1000000000u / hz, 500000000u / hz);
     if (e != RT_EOK) return e;
-    return rt_pwm_enable(mot_pwm, MOTOR_PWM_CH);
+    e = rt_pwm_enable(mot_pwm, MOTOR_PWM_CH);
+    if (e == RT_EOK)
+    {
+        /* 已请求非零输出: 之前那次"关断成功"不再描述当前通道状态 */
+        mot.stop_result = MOT_STOP_OUTPUT_REQUESTED;
+    }
+    return e;
 }
 
 /* ---------- P1-8: 斜坡纯函数(每步 clamp 到 target) ---------- */
@@ -166,14 +289,41 @@ static rt_uint32_t mot_ramp_step(rt_uint32_t cur, rt_uint32_t tgt,
 
 /* ---------- P0-4: fail-closed(PWM apply 失败路径) ----------
  * 调用约定: 必须在 mot_lock 释放后调用(内部不再拿锁),
- * 事件 → Safety Thread → force_shutdown → motor_emergency_stop(幂等)。 */
-static void mot_fail_closed(void)
+ * 事件 → Safety Thread → force_shutdown → motor_emergency_stop(幂等)。
+ * S1(合同 4.2/4.3): 关断与撤销许可**都要做**, 但两步结果分开记 —— 关断没成功
+ * 不豁免许可撤销, 许可撤销成功也不能把关断失败说成"输出已停"。 */
+static void mot_fail_closed(rt_uint8_t src)
 {
-    mot_pwm_output_off();
-    if (mot_drv_en_request(0) != RT_EOK)
-        rt_kprintf("[MOT] !! FAIL-CLOSED but DRV_ENABLE LOW UNVERIFIED !!\n");
+    rt_err_t pe = mot_pwm_output_off(src);
+    rt_err_t ge = mot_drv_en_request(0);
+
+    if (ge != RT_EOK)
+        rt_kprintf("[MOT] !! FAIL-CLOSED but DRV_ENABLE LOW UNVERIFIED (%d) !!\n",
+                   (int)ge);
+    if (pe != RT_EOK)
+        rt_kprintf("[MOT] !! FAIL-CLOSED but STEP 关断未确认 (rc=%d src=%s) ->"
+                   " 输出状态未知, 已锁存待人工恢复 !!\n",
+                   (int)pe, mot_stop_src_name(src));
     safety_post_event(EVT_SOFT_FAULT);
-    rt_kprintf("[MOT] FAIL-CLOSED (pwm error), EVT_SOFT_FAULT posted\n");
+    rt_kprintf("[MOT] FAIL-CLOSED (pwm error), EVT_SOFT_FAULT posted"
+               " [stop=%s enable-low=%s]\n",
+               mot_stop_result_name(mot.stop_result),
+               ge == RT_EOK ? "verified" : "UNVERIFIED");
+}
+
+/* STEP 关断未确认时的后续 fail-closed 动作(调用约定: mot_lock 已释放)。
+ * 与 mot_fail_closed() 的区别只有一个: 关断**已经**由调用点做过并记了真实 rc,
+ * 这里不再第二次调用 rt_pwm_disable(S1 不引入自动重试), 只做撤销许可 + 投一次事件。
+ * 事件由 Safety 线程消费 -> safety_force_shutdown -> motor_emergency_stop(幂等)。 */
+static void mot_stop_unconfirmed_close(rt_err_t pwm_rc, rt_uint8_t src)
+{
+    rt_err_t ge = mot_drv_en_request(0);
+
+    rt_kprintf("[MOT] !! STEP 关断未确认 (rc=%d src=%s): 仍已撤销驱动许可(%s)"
+               " -> 置 FAULT 并上报一次; 不宣称'输出已停止'\n",
+               (int)pwm_rc, mot_stop_src_name(src),
+               ge == RT_EOK ? "LOW verified" : "LOW UNVERIFIED");
+    (void)safety_post_event(EVT_SOFT_FAULT);
 }
 
 /* ---------- F2b P1-E: 运行期驱动配置守卫的纯判定 ----------
@@ -224,14 +374,18 @@ void motor_guard_decide(const motor_guard_in_t *in, motor_guard_out_t *out)
 }
 
 /* 守卫判定为停机时的执行动作。调用约定: 不得持 mot_lock 调用(内部会再取一次),
- * 与 mot_fail_closed() 同一条 fail-closed 路径。 */
+ * 与 mot_fail_closed() 同一条 fail-closed 路径。
+ * S1: STEP 关断结果与许可撤销结果分别记账; 关断失败**不**跳过撤销许可, 也不因为
+ * current_hz 清零而宣称"输出已停"。 */
 static void mot_guard_shutdown(rt_uint8_t reason)
 {
+    rt_err_t pe;
+
     mot_lock_take();
     mot.armed = 0;
     mot.target_hz = 0;
     mot.current_hz = 0;
-    mot_pwm_output_off();
+    pe = mot_pwm_output_off(MOT_STOP_SRC_GUARD_STOP);
     mot.state = MOTOR_FAULT;
     if (mot.guard_stops < 0xFFFFu) mot.guard_stops++;
     mot.guard_reason = reason;
@@ -239,134 +393,171 @@ static void mot_guard_shutdown(rt_uint8_t reason)
 
     if (mot_drv_en_request(0) != RT_EOK)
         rt_kprintf("[MOT] !! GUARD STOP but DRV_ENABLE LOW UNVERIFIED !!\n");
+    if (pe != RT_EOK)
+        rt_kprintf("[MOT] !! GUARD STOP but STEP 关断未确认 (rc=%d) -> 输出状态未知,"
+                   " current_hz=0 只是软件命令值 !!\n", (int)pe);
     /* 反馈不一致类停机如实投 EVT_DRV_FEEDBACK(黑匣子记 FAULT_DRV_FEEDBACK),
      * 不假冒急停按钮; 其余配置守卫原因沿用 EVT_SOFT_FAULT。 */
     (void)safety_post_event(reason == MOT_GUARD_ENN_FEEDBACK ? EVT_DRV_FEEDBACK
                                                              : EVT_SOFT_FAULT);
-    rt_kprintf("[MOT] DRV GUARD: 驱动配置/反馈异常(reason=%d) -> 已停 STEP、请求使能 LOW、"
-               "置 FAULT 并上报。!! 这是软件层第二响应, 不替代硬件独立切断 !!\n",
-               (int)reason);
+    rt_kprintf("[MOT] DRV GUARD: 驱动配置/反馈异常(reason=%d) -> 已请求停 STEP(src=guard)"
+               "、请求使能 LOW、置 FAULT 并上报。!! 这是软件层第二响应, 不替代硬件独立切断"
+               " !! [stop=%s]\n", (int)reason, mot_stop_result_name(mot.stop_result));
 }
 
-/* 斜坡线程: 10ms 节拍, 线性逼近 target */
+/* ---------- 2026-10-23 S1: 斜坡节拍体抽成单步函数(生产行为等价) ----------
+ * 为什么抽: 任务书 §4.5 允许"为测试作小型静态单步函数抽取, 须保持生产调用顺序与
+ * 线程周期, 说明前后等价"。抽成一次一拍之后, 主机链可以**确定性地执行一拍**,
+ * 直接证明"斜坡减到 0 / apply 失败回退 / 运行守卫停机"三条路径真的走了生产关断
+ * 路径并消费了错误, 而不是只测一个纯 helper。
+ * 等价性论证(逐条, 供复审核对):
+ *   1) 原循环体每条分支的结尾都是 `rt_thread_mdelay(MOTOR_RAMP_PERIOD_MS); continue;`,
+ *      或不落到分支尾的同一句; 现在把这句 mdelay **唯一地**放到外层 entry 里,
+ *      分支内改成 return —— 控制流一一对应, 没有新增/删除/换序任何动作。
+ *   2) 原先在栈上的 guard_ctr / guard_busy_streak 是"线程生命周期内持久"的状态;
+ *      改成文件内 static 后仍然只有斜坡路径读写(单一 owner), 取值序列不变。
+ *      本服务的线程只由 motor_init() 创建一次, 不存在两份并行实例。
+ *   3) 顺序不变: 守卫计数 → ENN 每拍反馈复核 → 配置守卫判定 → 取 target →
+ *      状态判定 → 斜坡步进 → 关断/apply → 解锁; mot_lock 的取放点一字未动。
+ *   4) 生产入口 motor_ramp_entry() 仍是 `while(1){ tick(); mdelay(10); }`,
+ *      目标上的周期与行为不变(本轮不重构线程, S2 才动)。 */
+static rt_uint32_t mot_ramp_guard_ctr;
+static rt_uint8_t  mot_ramp_guard_busy;
+
+static void motor_ramp_tick(void)
+{
+    rt_uint32_t tgt;
+    rt_uint8_t was_moving;
+    rt_uint8_t armed;
+    rt_uint8_t guard_due = 0u;
+    rt_uint8_t fb_stopped = 0u;
+
+    /* ---------- F2b P1-E: 驱动配置运行期守卫(只在 armed 时复核) ----------
+     * armed 与"本轮是否到复核周期"在锁内一次取定; 复核本身必须在锁外做
+     * (UART 会阻塞, 持 mot_lock 会拖停斜坡)。 */
+    mot_lock_take();
+    if (mot.armed)
+    {
+        mot_ramp_guard_ctr++;
+        if (mot_ramp_guard_ctr >= MOTOR_DRV_GUARD_TICKS)
+        { mot_ramp_guard_ctr = 0; guard_due = 1u; }
+    }
+    else mot_ramp_guard_ctr = 0;
+    armed = mot.armed;
+    mot_lock_release();
+
+    /* 追加(2026-10-21): armed 期每拍先做一次**无 UART、无延时**的 ENN 反馈复核
+     * (单次 rt_pin_read)。已确认的许可请求是 HIGH, 所以期望反馈 = LOW;
+     * 不一致(硬件急停把 ENN 拉高 / 级联逻辑故障 / 样本不可得)立即停机,
+     * 并跳过本拍的 UART 复核 —— 停机优先, 且不在已决定停机的拍上再阻塞。
+     * ⚠ 这缩小了软件层响应窗口, 但仍然是软件第二响应, 不构成时延上界证明。 */
+    if (armed)
+    {
+        safety_fb_verdict_t fv = safety_fb_now(1u);
+
+        if (fv != SAFETY_FB_OK)
+        {
+            rt_kprintf("[MOT] runtime guard: ENN feedback %s while request=ENABLE"
+                       " (expected LOW) -> 停机\n", safety_fb_verdict_name(fv));
+            mot_guard_shutdown(MOT_GUARD_ENN_FEEDBACK);
+            fb_stopped = 1u;
+        }
+    }
+
+    if (armed && !fb_stopped)
+    {
+        motor_guard_in_t  in;
+        motor_guard_out_t out;
+
+        in.armed = 1u;
+        in.cfg_state_ok = tmc2209_drive_config_ok_for_arm() ? 1u : 0u;
+        in.due          = guard_due;
+        in.integrity    = guard_due ? tmc2209_config_integrity_check() : RT_EOK;
+        in.busy_streak  = mot_ramp_guard_busy;
+        motor_guard_decide(&in, &out);
+        mot_ramp_guard_busy = out.busy_streak;
+        if (out.stop) mot_guard_shutdown(out.reason);
+    }
+    else mot_ramp_guard_busy = 0u;
+
+    mot_lock_take();
+    tgt = mot.target_hz;
+
+    if (mot.state == MOTOR_IDLE || mot.state == MOTOR_FAULT)
+    {
+        mot_lock_release();
+        return;
+    }
+
+    if (!mot.armed) tgt = 0;
+
+    if (mot.current_hz == tgt)
+    {
+        was_moving = (mot.state == MOTOR_CRUISE ||
+                      mot.state == MOTOR_ACCEL || mot.state == MOTOR_DECEL);
+        armed = mot.armed;                      /* Fix A: 锁内取快照 */
+        mot.state = (tgt == 0) ? MOTOR_IDLE : MOTOR_CRUISE;
+        mot_lock_release();
+
+        /* P1-9: 减速到 0(受控停止完成) → RUN 回 READY(经 transition API) */
+        if (tgt == 0 && was_moving && armed)
+        {
+            if (safety_transition(SAFETY_READY) != RT_EOK)
+                rt_kprintf("[MOT] RUN->READY transition refused\n");
+        }
+        return;
+    }
+
+    mot.current_hz = mot_ramp_step(mot.current_hz, tgt,
+                                   mot.accel_hz_s, mot.decel_hz_s);
+
+    if (mot.current_hz == 0)
+    {
+        rt_err_t pe = mot_pwm_output_off(MOT_STOP_SRC_RAMP_ZERO);
+
+        if (pe != RT_EOK)
+        {
+            /* 合同 4.2: 斜坡减到 0 但关断未确认 => **不算**正常 IDLE 完成,
+             * 不做 RUN→READY(下一拍 state=FAULT 直接跳过该分支), 走故障处置。
+             * 频率字段清零只是软件命令值, 输出状态未知并已锁存。 */
+            mot.armed = 0;
+            mot.target_hz = 0;
+            mot.current_hz = 0;
+            mot.state = MOTOR_FAULT;
+            mot_lock_release();
+            mot_stop_unconfirmed_close(pe, MOT_STOP_SRC_RAMP_ZERO);
+            return;
+        }
+        mot.state = (tgt == 0) ? MOTOR_IDLE : MOTOR_ACCEL;
+    }
+    else
+    {
+        if (mot_pwm_apply(mot.current_hz) != RT_EOK)
+        {
+            /* P0-4: fail-closed(锁内只改状态, 锁外发事件) */
+            mot_pwm_output_off(MOT_STOP_SRC_APPLY_FAIL);
+            mot.armed = 0;
+            mot.current_hz = 0;
+            mot.target_hz = 0;
+            mot.state = MOTOR_FAULT;
+            mot_lock_release();
+            mot_fail_closed(MOT_STOP_SRC_FAIL_CLOSED);
+            return;
+        }
+        mot.state = (mot.current_hz < tgt) ? MOTOR_ACCEL
+                  : (mot.current_hz > tgt) ? MOTOR_DECEL : MOTOR_CRUISE;
+    }
+    mot_lock_release();
+}
+
+/* 斜坡线程: 10ms 节拍, 线性逼近 target(节拍体见 motor_ramp_tick) */
 static void motor_ramp_entry(void *param)
 {
-    rt_uint32_t guard_ctr = 0;
-    rt_uint8_t  guard_busy_streak = 0;
-
     (void)param;
 
     while (1)
     {
-        rt_uint32_t tgt;
-        rt_uint8_t was_moving;
-        rt_uint8_t armed;
-        rt_uint8_t guard_due = 0u;
-        rt_uint8_t fb_stopped = 0u;
-
-        /* ---------- F2b P1-E: 驱动配置运行期守卫(只在 armed 时复核) ----------
-         * armed 与"本轮是否到复核周期"在锁内一次取定; 复核本身必须在锁外做
-         * (UART 会阻塞, 持 mot_lock 会拖停斜坡)。 */
-        mot_lock_take();
-        if (mot.armed)
-        {
-            guard_ctr++;
-            if (guard_ctr >= MOTOR_DRV_GUARD_TICKS) { guard_ctr = 0; guard_due = 1u; }
-        }
-        else guard_ctr = 0;
-        armed = mot.armed;
-        mot_lock_release();
-
-        /* 追加(2026-10-21): armed 期每拍先做一次**无 UART、无延时**的 ENN 反馈复核
-         * (单次 rt_pin_read)。已确认的许可请求是 HIGH, 所以期望反馈 = LOW;
-         * 不一致(硬件急停把 ENN 拉高 / 级联逻辑故障 / 样本不可得)立即停机,
-         * 并跳过本拍的 UART 复核 —— 停机优先, 且不在已决定停机的拍上再阻塞。
-         * ⚠ 这缩小了软件层响应窗口, 但仍然是软件第二响应, 不构成时延上界证明。 */
-        if (armed)
-        {
-            safety_fb_verdict_t fv = safety_fb_now(1u);
-
-            if (fv != SAFETY_FB_OK)
-            {
-                rt_kprintf("[MOT] runtime guard: ENN feedback %s while request=ENABLE"
-                           " (expected LOW) -> 停机\n", safety_fb_verdict_name(fv));
-                mot_guard_shutdown(MOT_GUARD_ENN_FEEDBACK);
-                fb_stopped = 1u;
-            }
-        }
-
-        if (armed && !fb_stopped)
-        {
-            motor_guard_in_t  in;
-            motor_guard_out_t out;
-
-            in.armed = 1u;
-            in.cfg_state_ok = tmc2209_drive_config_ok_for_arm() ? 1u : 0u;
-            in.due          = guard_due;
-            in.integrity    = guard_due ? tmc2209_config_integrity_check() : RT_EOK;
-            in.busy_streak  = guard_busy_streak;
-            motor_guard_decide(&in, &out);
-            guard_busy_streak = out.busy_streak;
-            if (out.stop) mot_guard_shutdown(out.reason);
-        }
-        else guard_busy_streak = 0u;
-
-        mot_lock_take();
-        tgt = mot.target_hz;
-
-        if (mot.state == MOTOR_IDLE || mot.state == MOTOR_FAULT)
-        {
-            mot_lock_release();
-            rt_thread_mdelay(MOTOR_RAMP_PERIOD_MS);
-            continue;
-        }
-
-        if (!mot.armed) tgt = 0;
-
-        if (mot.current_hz == tgt)
-        {
-            was_moving = (mot.state == MOTOR_CRUISE ||
-                          mot.state == MOTOR_ACCEL || mot.state == MOTOR_DECEL);
-            armed = mot.armed;                      /* Fix A: 锁内取快照 */
-            mot.state = (tgt == 0) ? MOTOR_IDLE : MOTOR_CRUISE;
-            mot_lock_release();
-
-            /* P1-9: 减速到 0(受控停止完成) → RUN 回 READY(经 transition API) */
-            if (tgt == 0 && was_moving && armed)
-            {
-                if (safety_transition(SAFETY_READY) != RT_EOK)
-                    rt_kprintf("[MOT] RUN->READY transition refused\n");
-            }
-            rt_thread_mdelay(MOTOR_RAMP_PERIOD_MS);
-            continue;
-        }
-
-        mot.current_hz = mot_ramp_step(mot.current_hz, tgt,
-                                       mot.accel_hz_s, mot.decel_hz_s);
-
-        if (mot.current_hz == 0)
-        {
-            mot_pwm_output_off();
-            mot.state = (tgt == 0) ? MOTOR_IDLE : MOTOR_ACCEL;
-        }
-        else
-        {
-            if (mot_pwm_apply(mot.current_hz) != RT_EOK)
-            {
-                /* P0-4: fail-closed(锁内只改状态, 锁外发事件) */
-                mot_pwm_output_off();
-                mot.armed = 0;
-                mot.current_hz = 0;
-                mot.target_hz = 0;
-                mot.state = MOTOR_FAULT;
-                mot_lock_release();
-                mot_fail_closed();
-                continue;
-            }
-            mot.state = (mot.current_hz < tgt) ? MOTOR_ACCEL
-                      : (mot.current_hz > tgt) ? MOTOR_DECEL : MOTOR_CRUISE;
-        }
-        mot_lock_release();
+        motor_ramp_tick();
         rt_thread_mdelay(MOTOR_RAMP_PERIOD_MS);
     }
 }
@@ -405,8 +596,46 @@ rt_uint32_t motor_get_gate_fail_mask(void)
     /* 追加第 6 位(不复用旧位): 最终 ENN 反馈必须与当前许可请求一致。
      * 单次采样判定(2 次 rt_pin_read, 无延时、无 UART), 读不到/矛盾都算失败。 */
     if (safety_fb_now(mot_fb_request_basis()) != SAFETY_FB_OK)  bad |= MOT_GATE_FB_MISMATCH;
+    /* 追加第 7 位(2026-10-23 S1, 只在既有位之后追加): STEP 关断结果不可信 ——
+     * 曾有一次 rt_pwm_disable 失败或未取得设备句柄, 且未经 fault_reset 人工恢复复核。
+     * 这一位**只收紧**: 前六道门一字未改, 也不会因为 current_hz==0 而清零。 */
+    if (mot.stop_fail_latched)                     bad |= MOT_GATE_STOP_UNCONFIRMED;
 
     return bad;
+}
+
+/* ---------- 2026-10-23 S1: 关断结果观测与人工恢复专用清除口 ---------- */
+void motor_get_stop_state(mot_stop_result_t *out_result, rt_uint8_t *out_src,
+                          rt_err_t *out_rc, rt_bool_t *out_latched)
+{
+    mot_stop_result_t res;
+    rt_uint8_t        src;
+    rt_err_t          rc;
+    rt_uint8_t        lat;
+
+    mot_lock_take();
+    res = mot.stop_result;
+    src = mot.stop_src;
+    rc  = (rt_err_t)mot.stop_rc;
+    lat = mot.stop_fail_latched;
+    mot_lock_release();
+
+    if (out_result)  *out_result  = res;
+    if (out_src)     *out_src     = src;
+    if (out_rc)      *out_rc      = rc;
+    if (out_latched) *out_latched = lat ? RT_TRUE : RT_FALSE;
+}
+
+/* ⚠ **调用方审计(合同 4.4)**: 本函数唯一的合法调用点是 safety_state.c 的
+ * fault_reset() —— 且只在"活动输入实测安全 + 许可焊盘 LOW + ENN 前后两次有界确认
+ * + disarm 返回成功 + 两条输出路径**本次**都有 API 接受的关断结果"全部成立之后调用。
+ * 除此之外不得有第二个调用者: 普通 disarm、状态查询、一次重试成功都**不能**解除
+ * 关断失败锁存(那正是"绕过人工恢复门")。本函数不新增 MSH 命令, 没有旁路。 */
+void motor_clear_stop_latch(void)
+{
+    mot_lock_take();
+    mot.stop_fail_latched = 0;
+    mot_lock_release();
 }
 
 static void mot_print_gate_fail(rt_uint32_t bad)
@@ -418,6 +647,7 @@ static void mot_print_gate_fail(rt_uint32_t bad)
     if (bad & MOT_GATE_NOT_PROTECTED) rt_kprintf(" protection-not-ready");
     if (bad & MOT_GATE_NO_DRV_CONFIG) rt_kprintf(" drive-config-not-applied");
     if (bad & MOT_GATE_FB_MISMATCH)   rt_kprintf(" enn-feedback-mismatch");
+    if (bad & MOT_GATE_STOP_UNCONFIRMED) rt_kprintf(" step-stop-unconfirmed");
     rt_kprintf("\n");
     rt_kprintf("[MOT] gate4 detail: irq_gate=%s polarity=%s gpio_ready=%s\n",
                safety_irq_attached() ? "OPEN" : "CLOSED",
@@ -428,6 +658,11 @@ static void mot_print_gate_fail(rt_uint32_t bad)
     rt_kprintf("[MOT] gate6 detail: request_basis=%s enn_feedback_verdict=%s (PC.6=TMC_ENN)\n",
                mot_fb_request_basis() ? "ENABLED" : "DISABLED",
                safety_fb_verdict_name(safety_fb_now(mot_fb_request_basis())));
+    rt_kprintf("[MOT] gate7 detail: motor_stop=%s src=%s rc=%d latched=%s |"
+               " diag_off_confirmed=%s (current_hz=0 是命令值, 不构成关断证明)\n",
+               mot_stop_result_name(mot.stop_result), mot_stop_src_name(mot.stop_src),
+               (int)mot.stop_rc, mot.stop_fail_latched ? "YES" : "no",
+               step_pwm_off_confirmed() ? "YES" : "NO");
 }
 
 /* ---------- 正式 API (motor.h) ---------- */
@@ -435,6 +670,7 @@ static void mot_print_gate_fail(rt_uint32_t bad)
 rt_err_t motor_init(void)
 {
     rt_err_t e;
+    rt_err_t pe;
 
     if (mot_tid != RT_NULL) return RT_EOK;      /* 幂等 */
 
@@ -449,12 +685,14 @@ rt_err_t motor_init(void)
     if (mot_pwm == RT_NULL)
     {
         rt_kprintf("[MOT] %s not found (check BSP_USING_EPWM1)\n", MOTOR_PWM_DEV);
+        /* S1: 设备句柄都没取得 => STEP 关断"未尝试, 结果未知", 如实锁存 */
+        mot_stop_record(MOT_STOP_DEV_UNAVAILABLE, MOT_STOP_SRC_INIT, -RT_ENOSYS);
         mot.health = SUBSYS_FAILED;
         return -RT_ERROR;
     }
     mot_dev_ok = RT_TRUE;
 
-    mot_pwm_output_off();
+    pe = mot_pwm_output_off(MOT_STOP_SRC_INIT);
     mot_lock_take();
     mot.state = MOTOR_IDLE;
     mot.current_hz = 0;
@@ -462,8 +700,18 @@ rt_err_t motor_init(void)
     mot.armed = 0;
     mot_lock_release();
 
-    /* Fix A / A7: 初始"禁能"必须是经回读确认的 LOW, 否则不创建斜坡线程 */
+    /* Fix A / A7: 初始"禁能"必须是经回读确认的 LOW, 否则不创建斜坡线程。
+     * S1(合同 4.2): 上一步关断失败**不豁免**这一步 —— 撤销许可总要先试;
+     * 反过来这一步成功也不能把关断失败说成"初始化已安全"。 */
     e = mot_drv_en_request(0);
+    if (pe != RT_EOK)
+    {
+        rt_kprintf("[MOT] init FAILED: STEP 关断未被驱动接受 (rc=%d) -> 不创建斜坡线程,"
+                   " health=FAILED, 不称'已停止' [许可 LOW %s, 两者原始 rc 均留档]\n",
+                   (int)pe, e == RT_EOK ? "已回读确认" : "未确认");
+        mot.health = SUBSYS_FAILED;
+        return mot_stop_merge(pe, e);
+    }
     if (e != RT_EOK)
     {
         rt_kprintf("[MOT] init FAILED: DRV_ENABLE LOW unverified - no ramp thread\n");
@@ -479,8 +727,11 @@ rt_err_t motor_init(void)
 
     mot.health = SUBSYS_OK;
     rt_kprintf("[MOT] init OK (enable-path-validated=%s, arm gate ACTIVE,"
-               " DRV_ENABLE LOW verified)\n",
-               MOTOR_HARDWARE_ENABLE_PATH_VALIDATED ? "YES" : "NO");
+               " DRV_ENABLE LOW verified, STEP=%s)\n",
+               MOTOR_HARDWARE_ENABLE_PATH_VALIDATED ? "YES" : "NO",
+               mot_stop_result_name(mot.stop_result));
+    rt_kprintf("[MOT]   注: STEP=api-accepted 只说明驱动**接受了关断请求**,"
+               " 不是示波器证明无脉冲(BUG-008 仍未验收)\n");
     return RT_EOK;
 }
 
@@ -488,6 +739,7 @@ rt_err_t motor_arm(void)
 {
     rt_uint32_t bad;
     rt_err_t e;
+    rt_err_t pe = RT_EOK;
     motor_snapshot_t snap;
 
     /* F2b P1-D: "查门 → 完整性复核 → 请求使能"整段必须与 apply 互斥, 否则复核刚
@@ -588,12 +840,16 @@ rt_err_t motor_arm(void)
         mot.armed = 0;
         mot.current_hz = 0;
         mot.target_hz = 0;
-        mot_pwm_output_off();
+        pe = mot_pwm_output_off(MOT_STOP_SRC_ARM_ROLLBACK);
         mot.state = MOTOR_FAULT;
         mot_lock_release();
         if (mot_drv_en_request(0) != RT_EOK)
             rt_kprintf("[MOT] !! rollback LOW ALSO UNVERIFIED - pad unknown !!\n");
+        if (pe != RT_EOK)
+            rt_kprintf("[MOT] !! rollback 时 STEP 关断也未确认 (rc=%d) -> 锁存待人工恢复\n",
+                       (int)pe);
         safety_post_event(EVT_SOFT_FAULT);
+        e = mot_stop_merge(pe, e);
         goto out;
     }
 
@@ -614,13 +870,16 @@ rt_err_t motor_arm(void)
             mot.armed = 0;
             mot.current_hz = 0;
             mot.target_hz = 0;
-            mot_pwm_output_off();
+            pe = mot_pwm_output_off(MOT_STOP_SRC_ARM_ROLLBACK);
             mot.state = MOTOR_FAULT;
             mot_lock_release();
             if (mot_drv_en_request(0) != RT_EOK)
                 rt_kprintf("[MOT] !! rollback LOW ALSO UNVERIFIED - pad unknown !!\n");
+            if (pe != RT_EOK)
+                rt_kprintf("[MOT] !! rollback 时 STEP 关断也未确认 (rc=%d) -> 锁存待人工恢复\n",
+                           (int)pe);
             (void)safety_post_event(EVT_DRV_FEEDBACK);
-            e = -RT_EPERM;
+            e = mot_stop_merge(pe, -RT_EPERM);
             goto out;
         }
     }
@@ -639,28 +898,38 @@ out:
 
 rt_err_t motor_disarm(void)
 {
-    rt_err_t e;
+    rt_err_t pe;
+    rt_err_t ge;
 
     mot_lock_take();
     mot.armed = 0;
     mot.target_hz = 0;
     mot.current_hz = 0;
-    mot_pwm_output_off();
-    mot.state = MOTOR_IDLE;
+    pe = mot_pwm_output_off(MOT_STOP_SRC_DISARM);
+    /* 合同 4.2/4.4: 关断未被驱动接受时**不**回到"正常可启动 IDLE" —— 进 MOTOR_FAULT,
+     * 于是 motor_arm 的静止检查与第 7 位一起把后续 arm/start 挡住(只收紧, 不放松)。 */
+    mot.state = (pe == RT_EOK) ? MOTOR_IDLE : MOTOR_FAULT;
     mot_lock_release();
 
-    e = mot_drv_en_request(0);                  /* P1-10 + A7: 回读确认 */
-    if (e != RT_EOK)
-        rt_kprintf("[MOT] !! disarm: DRV_ENABLE LOW UNVERIFIED (%d) !!\n", (int)e);
+    ge = mot_drv_en_request(0);                  /* P1-10 + A7: 回读确认 */
+    if (ge != RT_EOK)
+        rt_kprintf("[MOT] !! disarm: DRV_ENABLE LOW UNVERIFIED (%d) !!\n", (int)ge);
+    if (pe != RT_EOK)
+        rt_kprintf("[MOT] !! disarm: STEP 关断未确认 (rc=%d) -> 输出状态未知,"
+                   " state=FAULT 并锁存, 不回 IDLE !!\n", (int)pe);
     /* 追加(2026-10-21): 如实报告最终 ENN 反馈。没确认到禁能侧时**绝不**打印成"整链已安全"。
      * 关闭动作(停 STEP + 请求 LOW)已经照做, 这一步只是不谎报。 */
     {
         safety_fb_verdict_t fv = safety_fb_now(0u);
 
-        rt_kprintf("[MOT] DISARMED (ENN feedback=%s%s)\n", safety_fb_verdict_name(fv),
+        rt_kprintf("[MOT] DISARM (动作已做: STEP %s / 许可 LOW %s / ENN feedback=%s%s)\n",
+                   mot_stop_result_name(mot.stop_result),
+                   ge == RT_EOK ? "verified" : "UNVERIFIED",
+                   safety_fb_verdict_name(fv),
                    fv == SAFETY_FB_OK ? "" : " - 最终禁能**未确认**, 不得称整链已安全");
     }
-    return e;
+    /* 两个原始 rc 各自留档(日志 + 快照 stop_rc), 对外失败优先返回 PWM 关断错误。 */
+    return mot_stop_merge(pe, ge);
 }
 
 /* Fix A / A8: 只允许完全静止时改方向 */
@@ -697,6 +966,7 @@ rt_err_t motor_set_target_hz(rt_uint32_t hz)
     if (hz > MOTOR_MAX_HZ) return -RT_EINVAL;
     mot_lock_take();
     mot.target_hz = hz;
+    if (hz == 0) mot_record_zero_cmd(MOT_STOP_SRC_STOP_CMD);
     mot_lock_release();
     return RT_EOK;
 }
@@ -814,41 +1084,56 @@ rt_err_t motor_start(void)
 
 rt_err_t motor_stop(void)
 {
+    mot_stop_result_t res;
+
     mot_lock_take();
     mot.target_hz = 0;      /* 斜坡自动减速到 0 → IDLE + RUN→READY(保持 armed) */
+    /* S1: 此刻只是**软件命令**要停, STEP 是否真的关断要等斜坡线程的那一次
+     * checked 关断结果 —— 这里绝不打印"输出已停止"。 */
+    mot_record_zero_cmd(MOT_STOP_SRC_STOP_CMD);
+    res = mot.stop_result;
     mot_lock_release();
+    rt_kprintf("[MOT] stop requested: target_hz=0 (软件命令值), STEP 实际关断结果见"
+               " stop_result(当前=%s)\n", mot_stop_result_name(res));
     return RT_EOK;
 }
 
 rt_err_t motor_emergency_stop(void)
 {
-    rt_err_t e;
+    rt_err_t pe;
+    rt_err_t ge;
 
     mot_lock_take();
     mot.armed = 0;
     mot.target_hz = 0;
     mot.current_hz = 0;
-    mot_pwm_output_off();
+    pe = mot_pwm_output_off(MOT_STOP_SRC_ESTOP);
     mot.state = MOTOR_FAULT;
     mot_lock_release();
 
     /* P1-10 + A7: 回读确认并把结果传播给调用方(safety_force_shutdown 会记录
-     * CRITICAL 但依然锁存 FAULT_LATCHED)。绝不吞掉失败。 */
-    e = mot_drv_en_request(0);
-    if (e != RT_EOK)
+     * CRITICAL 但依然锁存 FAULT_LATCHED)。绝不吞掉失败。
+     * S1: 关断失败**不**豁免撤销许可, 撤销成功也**不**掩盖关断失败。 */
+    ge = mot_drv_en_request(0);
+    if (ge != RT_EOK)
         rt_kprintf("[MOT] !! EMERGENCY STOP but DRV_ENABLE LOW UNVERIFIED (%d) !!\n",
-                   (int)e);
+                   (int)ge);
+    if (pe != RT_EOK)
+        rt_kprintf("[MOT] !! EMERGENCY STOP but STEP 关断未确认 (rc=%d):"
+                   " 不能称'输出已停止', 失败已锁存待人工恢复 !!\n", (int)pe);
     /* 追加(2026-10-21): 反馈状态如实报告。停 STEP 与撤销许可**总是**先做,
      * 反馈读不到只影响"最终禁能是否已确认"这句话, 不影响动作本身。 */
     {
         safety_fb_verdict_t fv = safety_fb_now(0u);
 
-        rt_kprintf("[MOT] EMERGENCY STOP (drv_en LOW %s, ENN feedback %s%s)\n",
-                   e == RT_EOK ? "verified" : "UNVERIFIED",
+        rt_kprintf("[MOT] EMERGENCY STOP (drv_en LOW %s, ENN feedback %s%s, STEP %s)\n",
+                   ge == RT_EOK ? "verified" : "UNVERIFIED",
                    safety_fb_verdict_name(fv),
-                   fv == SAFETY_FB_OK ? "" : " -> final disable NOT confirmed");
+                   fv == SAFETY_FB_OK ? "" : " -> final disable NOT confirmed",
+                   mot_stop_result_name(mot.stop_result));
     }
-    return e;
+    /* 返回值: PWM 关断失败优先, 否则许可写确认结果; 两个原始 rc 均另存。 */
+    return mot_stop_merge(pe, ge);
 }
 
 rt_err_t motor_get_snapshot(motor_snapshot_t *snap)
@@ -864,10 +1149,13 @@ subsys_health_t motor_get_health(void) { return mot.health; }
 
 /* ---------- Fix A / A9 + F2b P0-A: EPWM1 ch0 诊断借用门 ----------
  * Motor Service 是该通道唯一生产 owner。F2b 起第一道条件是 **STEP 输出许可**:
- * 审核报告 P0-A 指出的漏洞正是"只查 armed/静止/焊盘 LOW"。在现板 U5 与门损坏 +
- * 急停非门损坏的情况下, MCU 焊盘 LOW 只能证明 MCU 侧的请求电平, 证明不了 TMC_ENN
- * 已禁能(实测 TMC_ENN 约 0V = 驱动侧仍是"使能"语义), 所以电机一旦接上, pwm_test
- * 输出的 STEP 会真实驱动电机 —— 即使 motor_arm() 被五门挡着也一样。
+ * 审核报告 P0-A 指出的漏洞正是"只查 armed/静止/焊盘 LOW"。在(维修前记录的)U5 与门 +
+ * 急停非门损坏情形下, MCU 焊盘 LOW 只能证明 MCU 侧的请求电平, 证明不了 TMC_ENN
+ * 已禁能(当时的实测记录是 TMC_ENN 约 0V = 驱动侧仍是"使能"语义), 所以电机一旦接上,
+ * pwm_test 输出的 STEP 会真实驱动电机 —— 即使 motor_arm() 被门挡着也一样。
+ * > 2026-10-23 S1 更正: "门芯片损坏"不是当前已证实故障(静态电气与现有 SW1 功能已由
+ * > 用户确认为 PASS (USER_CONFIRMED)); 本门继续拒绝的原因是**使能链验收仍未完成**
+ * > (未烧录新版、未做波形/瞬态验收, 属授权范围), 结论与逻辑都不变。
  * 因此在硬件链验收完成之前, 除非操作员在隔离环境(TMC 模块拔出 / 功率级断开)下
  * 人工确认并置 STEP_DIAG_ISOLATED_ENV_CONFIRMED, 否则任何 STEP 输出一律拒绝。 */
 rt_err_t motor_pwm_grant_to_diag(void)
@@ -879,8 +1167,10 @@ rt_err_t motor_pwm_grant_to_diag(void)
         rt_kprintf("[MOT] STEP diag REFUSED: 使能链未验收且未确认隔离环境"
                    " (MOTOR_HARDWARE_ENABLE_PATH_VALIDATED=FALSE,"
                    " STEP_DIAG_ISOLATED_ENV_CONFIRMED=FALSE)\n");
-        rt_kprintf("[MOT]   现板与门/非门损坏 -> DRV_ENABLE 焊盘 LOW 证明不了 TMC_ENN"
-                   " 已禁能, 输出 STEP 等同于可能真实驱动电机。\n");
+        rt_kprintf("[MOT]   使能链未验收期间, DRV_ENABLE 焊盘 LOW 不能证明 TMC_ENN 已禁能"
+                   " (历史测量记录过 TMC_ENN 约 0V; 门芯片损坏是**维修前**的解释,"
+                   " 当前静态功能已由用户确认 PASS, 见本文件头 2026-10-23 更正),"
+                   " 输出 STEP 等同于可能真实驱动电机。\n");
         rt_kprintf("[MOT]   要量 STEP 频率: 先拔出 TMC 模块/断开功率级, 再由操作员"
                    "翻转 STEP_DIAG_ISOLATED_ENV_CONFIRMED 并留证。\n");
         return -RT_EPERM;
@@ -928,6 +1218,22 @@ rt_err_t motor_pwm_grant_to_diag(void)
                        safety_fb_verdict_name(fv));
             return -RT_EPERM;
         }
+    }
+    /* 追加(2026-10-23 S1, 合同 4.4): 关断结果不可信期间禁止新的诊断借用 ——
+     * 一次没被确认的关断失败之上再 enable, 等于用新动作覆盖未处理的失败。
+     * 两个来源分别检查(Motor 侧锁存 / 诊断侧未确认), 只收紧, 不改上面既有条件。 */
+    if (mot.stop_fail_latched)
+    {
+        rt_kprintf("[MOT] grant REFUSED: Motor 侧 STEP 关断失败/未知仍锁存"
+                   " (stop=%s rc=%d) - 需 fault_reset 人工恢复\n",
+                   mot_stop_result_name(mot.stop_result), (int)mot.stop_rc);
+        return -RT_EPERM;
+    }
+    if (!step_pwm_off_confirmed())
+    {
+        rt_kprintf("[MOT] grant REFUSED: 诊断侧关断未确认(失败或未取得设备)"
+                   " - 不释放借用, 也不允许新的 enable\n");
+        return -RT_EPERM;
     }
     return RT_EOK;
 }
@@ -1072,6 +1378,14 @@ static void cmd_motor_status(void)
     rt_kprintf("[MOT] drv-guard: stops=%u last_reason=%u "
                "(0=none 1=cfg-lost 2=integrity 3=txn-busy-limit 4=enn-feedback)\n",
                (unsigned)snap.guard_stops, (unsigned)snap.guard_reason);
+    /* 追加(2026-10-23 S1): 关断结果单独一列。state=IDLE / current_hz=0 **不能**
+     * 推出"STEP 已关断" —— 只有 result=api-accepted 才叫驱动接受了关断请求。 */
+    rt_kprintf("[MOT] STEP stop: result=%s src=%s rc=%d fail_latched=%u"
+               " | diag_off_confirmed=%s\n",
+               mot_stop_result_name((mot_stop_result_t)snap.stop_result),
+               mot_stop_src_name(snap.stop_src), (int)snap.stop_rc,
+               (unsigned)snap.stop_fail_latched,
+               step_pwm_off_confirmed() ? "YES" : "NO");
     bad = motor_get_gate_fail_mask();
     rt_kprintf("[MOT] arm gate fail mask=0x%X (%s)\n", bad,
                bad ? "arm will be REFUSED" : "all gate conditions pass");

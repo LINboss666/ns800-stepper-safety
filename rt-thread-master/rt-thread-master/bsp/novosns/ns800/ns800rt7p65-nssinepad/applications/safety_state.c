@@ -21,6 +21,20 @@
  *   并且不允许清除故障(见 fault_reset)。
  * ⚠ 2026-10-21: PC.6 是 TMC_ENN 反馈输入, 不是急停源; 板上急停不经 MCU, 软件没有独立
  *   急停输入。EVT_ESTOP/FAULT_ESTOP/SAFETY_ESTOP 作为历史编号保留(黑匣子兼容)。
+ *
+ * 关断结果可信(2026-10-23, phase8-stop-result-s1 / S1):
+ *   - safety_force_shutdown() 现在**收集两条输出路径**的关断结果(Motor 生产路径 +
+ *     诊断借用路径), 谁失败都不跳过另一条关闭动作, 也**不再**打印"STEP stopped";
+ *     故障码/格式不变(软件关断失败沿用投递方给的 code, 通常是 FAULT_SOFT), 详细 rc
+ *     保存在快照 stop_rc 与本日志里。黑匣子仍只触发一次, 不重复投事件 => 没有
+ *     "消费事件→停机失败→再投同事件"的自激。
+ *   - fault_reset() 增加一道**只收紧**的复核: 两条输出路径本次都必须拿到"驱动 API
+ *     接受关断"的有效结果(诊断侧从未占用该通道算有效, 不虚构成功), 加上原有的
+ *     活动输入实测 + 许可焊盘 LOW + ENN 前后两次有界确认 + disarm 成功, 全部成立才
+ *     进 MANUAL_CLEAR。S1 的关断失败锁存**只在这里**解除(motor_clear_stop_latch /
+ *     step_pwm_clear_stop_latch), 没有 MSH 旁路; 一次后续成功的普通 stop 不清锁存、
+ *     不解 Safety 故障、不自动使能。
+ *   - 本轮不处理锁等待/UART 阻塞/在途 arm-enable 竞争(S2), 不宣称停机时延上界。
  */
 
 #include <rtthread.h>
@@ -128,22 +142,33 @@ rt_err_t safety_transition(safety_state_t next)
 void safety_force_shutdown(rt_uint32_t code)
 {
     rt_err_t estop_e;
+    rt_err_t diag_e;
     rt_bool_t pad_low;
     safety_fb_verdict_t fb_v;
+    mot_stop_result_t m_res;
+    mot_stop_result_t d_res;
+    rt_uint8_t        m_src;
+    rt_err_t          m_rc;
+    rt_err_t          d_rc;
+    rt_bool_t         m_lat;
+    rt_bool_t         d_lat;
+    rt_bool_t         step_off_ok;
 
     if (ss_lock_ok) rt_mutex_take(&ss_lock, RT_WAITING_FOREVER);
     ss_fault_code = code;
 
     /* ① 停 STEP + DRV_ENABLE 请求 LOW(写+回读, 由 Motor Service 统一持有;
-     *    幂等)。返回值 = 使能脚写入是否经回读确认(Fix A: 不再吞掉)。
-     * ⚠ 反馈读不到**绝不跳过**这些关闭动作: 先停, 再报告反馈状态。 */
+     *    幂等)。S1: 返回值 = **PWM 关断失败优先**, 否则使能脚写入回读结果;
+     *    两个原始 rc 各自留档, 不得把非零一律解释成"只是 GPIO 失败"。
+     *    诊断侧走同一条 checked 关断路径, 失败则**不**释放诊断所有权。
+     * ⚠ 反馈读不到/任一路失败**绝不跳过**另一条关闭动作(合同 4.3)。 */
     estop_e = motor_emergency_stop();
-    step_pwm_force_stop();
+    diag_e  = step_pwm_force_stop();
 
     /* ② 独立复核焊盘电平(不复写): 不知道=不安全 */
     pad_low = safety_drv_enable_is_low();
     if (!pad_low)
-        rt_kprintf("[SS] !! CRITICAL: DRV_ENABLE pad NOT confirmed LOW (write_err=%d)"
+        rt_kprintf("[SS] !! CRITICAL: DRV_ENABLE pad NOT confirmed LOW (estop_rc=%d)"
                    " - hardware ENN chain is the only guard !!\n", (int)estop_e);
 
     /* ②b 追加(2026-10-21): 单次采样看最终 ENN 反馈是否真到了禁能侧(高)。
@@ -154,16 +179,41 @@ void safety_force_shutdown(rt_uint32_t code)
                    " - 不打印'最终禁能已确认'; 关闭动作已照做, 故障仍锁存\n",
                    safety_fb_verdict_name(fb_v));
 
-    /* ③ 黑匣子触发: O(1) 置标志, Safety 线程绝不等待 Flash */
+    /* ②c 追加(2026-10-23 S1): STEP 关断结果分列核对。
+     *    两条输出路径(Motor 生产路径 / 诊断借用路径)各自如实报告; 只要有一条没有
+     *    有效关断结果, 就**绝不**打印"STEP stopped"这类话。故障码与格式不变(沿用
+     *    投递方给的 code), 详细 rc 由快照 stop_rc 与本日志保存。 */
+    motor_get_stop_state(&m_res, &m_src, &m_rc, &m_lat);
+    step_pwm_get_stop_state(&d_res, &d_rc, &d_lat);
+    step_off_ok = (mot_stop_result_is_off(m_res) && step_pwm_off_confirmed())
+                      ? RT_TRUE : RT_FALSE;
+    if (step_off_ok)
+        rt_kprintf("[SS] STEP: 两条输出路径都没有未确认的关断"
+                   " (motor=%s src=%s / diag=%s) - 仍不等于示波器证明无脉冲\n",
+                   mot_stop_result_name(m_res), mot_stop_src_name(m_src),
+                   d_res == MOT_STOP_NOT_ATTEMPTED ? "诊断从未占用该通道"
+                                                   : "驱动已接受关断");
+    else
+        rt_kprintf("[SS] !! STEP 关断**未确认**: motor=%s(src=%s rc=%d latched=%s)"
+                   " diag=%s(rc=%d latched=%s) -> 不谎称输出已停,"
+                   " 后续 arm/start/诊断借用/故障清除全部拒绝, 直到人工恢复复核\n",
+                   mot_stop_result_name(m_res), mot_stop_src_name(m_src), (int)m_rc,
+                   m_lat ? "YES" : "no", mot_stop_result_name(d_res), (int)d_rc,
+                   d_lat ? "YES" : "no");
+
+    /* ③ 黑匣子触发: O(1) 置标志, Safety 线程绝不等待 Flash。
+     *    无论上面的结果如何都只此一次(不重复触发, 也不因失败而跳过)。 */
     blackbox_trigger(code);
 
     /* ④ 锁存(旁路转换: 安全动作不受白名单限制)。
      * 即使 ② 复核失败也必须锁存 —— 回读失败绝不等于可以继续运动。 */
     ss_state = SAFETY_FAULT_LATCHED;
     if (ss_lock_ok) rt_mutex_release(&ss_lock);
-    rt_kprintf("[SS] ==> FAULT_LATCHED code=%u (STEP stopped, DRV_ENABLE LOW %s,"
-               " ENN feedback %s)\n", code, pad_low ? "verified" : "UNVERIFIED!!",
-               safety_fb_verdict_name(fb_v));
+    rt_kprintf("[SS] ==> FAULT_LATCHED code=%u (DRV_ENABLE LOW %s, ENN feedback %s,"
+               " STEP %s, motor_rc=%d diag_rc=%d)\n", code,
+               pad_low ? "verified" : "UNVERIFIED!!", safety_fb_verdict_name(fb_v),
+               step_off_ok ? "off-confirmed(api)" : "NOT-confirmed(unknown)",
+               (int)estop_e, (int)diag_e);
 }
 
 void safety_enter_fault(rt_uint32_t code) { safety_force_shutdown(code); }
@@ -312,6 +362,14 @@ static void fault_reset(void)
     rt_err_t e;
     rt_bool_t active = RT_FALSE;
     safety_state_t st;
+    mot_stop_result_t m_res;
+    mot_stop_result_t d_res;
+    rt_uint8_t        m_src;
+    rt_err_t          m_rc;
+    rt_err_t          d_rc;
+    rt_bool_t         m_lat;
+    rt_bool_t         d_lat;
+    rt_bool_t         diag_off_valid;
 
     if (ss_lock_ok) rt_mutex_take(&ss_lock, RT_WAITING_FOREVER);
     st = ss_state;
@@ -385,7 +443,8 @@ static void fault_reset(void)
     if (e != RT_EOK)
     {
         rt_kprintf("[SS] fault_reset REFUSED: motor recovery disarm failed (%d)"
-                   " - DRV_ENABLE LOW not re-verified, staying latched\n", (int)e);
+                   " - PWM 关断或许可撤销至少一步未确认(失败优先返回 PWM 错误),"
+                   " 保持锁存\n", (int)e);
         if (ss_lock_ok) rt_mutex_release(&ss_lock);
         return;
     }
@@ -413,9 +472,44 @@ static void fault_reset(void)
         rt_kprintf("[SS] motor recovered: state=IDLE, DRV_ENABLE LOW verified,"
                    " ENN feedback on disabled side confirmed (post-disarm re-check)\n");
     }
+    /* 追加(2026-10-23 S1, 合同 4.4): **两条输出路径**都必须有本次有效的关断结果才允许
+     * 清除 —— disarm 里那次 mot_pwm_output_off() 就是 Motor 侧的最新一次尝试, 诊断侧
+     * 用 step_pwm_off_confirmed()(从未占用该通道的情况算有效, 不虚构成功)。
+     * PWM 仍失败/未知 => 保持锁存与非零故障码, 不打印"最终禁能已确认"。
+     * ⚠ 这一步只**读**状态, 不再调用停机/清故障/关断动作; 解除 S1 锁存是下面唯一一处
+     *   motor_clear_stop_latch()/step_pwm_clear_stop_latch() 调用, 都在全部复核通过之后。 */
+    motor_get_stop_state(&m_res, &m_src, &m_rc, &m_lat);
+    step_pwm_get_stop_state(&d_res, &d_rc, &d_lat);
+    /* 诊断侧"有效"的两种情形: ①最近一次尝试被驱动接受; ②这条路径从未被用过
+     * (没占用过通道 => 没有需要确认的关断, 不虚构一次成功)。
+     * ⚠ 这里**故意不**用 step_pwm_off_confirmed()(它把失败锁存也算无效, 是给
+     *   arm/start/诊断借用用的收紧门): 用在那儿会把人工恢复这条路堵死。 */
+    diag_off_valid = (mot_stop_result_is_off(d_res) ||
+                      (d_res == MOT_STOP_NOT_ATTEMPTED && !step_pwm_output_active()))
+                         ? RT_TRUE : RT_FALSE;
+    if (!mot_stop_result_is_off(m_res) || !diag_off_valid)
+    {
+        rt_kprintf("[SS] fault_reset REFUSED: STEP 关断结果无效"
+                   " (motor=%s src=%s rc=%d latched=%s / diag=%s rc=%d latched=%s)"
+                   " - 保持锁存, 不清故障码, 不进 MANUAL_CLEAR\n",
+                   mot_stop_result_name(m_res), mot_stop_src_name(m_src), (int)m_rc,
+                   m_lat ? "YES" : "no", mot_stop_result_name(d_res), (int)d_rc,
+                   d_lat ? "YES" : "no");
+        if (ss_lock_ok) rt_mutex_release(&ss_lock);
+        return;
+    }
+    rt_kprintf("[SS] STEP 关断结果有效(Motor 侧=驱动接受关断; 诊断侧=%s) -"
+               " 仍非波形证明, motor src=%s, diag latched=%s\n",
+               mot_stop_result_is_off(d_res) ? "最近一次尝试被接受"
+                                             : "从未占用该通道",
+               mot_stop_src_name(m_src), d_lat ? "YES" : "no");
 
     ss_fault_code = FAULT_NONE;
     ss_state = SAFETY_MANUAL_CLEAR;
+    /* 人工恢复复核已全部通过 —— 这里才是 S1 关断失败锁存的唯一解除点。
+     * 之后仍需 MANUAL_CLEAR→READY(重跑自检)→ 重新 arm, 不会自动输出。 */
+    if (m_lat) motor_clear_stop_latch();
+    if (d_lat) step_pwm_clear_stop_latch();
     if (ss_lock_ok) rt_mutex_release(&ss_lock);
     rt_kprintf("[SS] ==> MANUAL_CLEAR (重跑自检进 READY 后仍需重新 arm)\n");
 }
