@@ -62,6 +62,14 @@ int         ps_sim_pwm_enable_calls(void);
 int         ps_sim_pwm_disable_calls(void);
 int         ps_sim_pwm_running(void);           /* 模拟输出是否仍在跑(桩的真相) */
 void        ps_sim_pwm_force_running(int on);   /* 前置: 造出"输出确实在跑"的状态 */
+/* R04(2026-10-23 返修)追加: 接下来 n 次 disable 强制返回 fail_rc, 之后回到注入值。
+ * 默认 n=0(关闭)。用来照出"同一动作里第二次关断覆盖第一次失败", 失败仍不动
+ * "模拟输出是否仍在跑"这条真相。 */
+void        ps_sim_pwm_disable_seq(int n, rt_err_t fail_rc);
+int         ps_sim_pwm_disable_seq_left(void);
+/* 生产代码用 NULL 设备句柄调 rt_pwm_* 的次数: R02 用它证明"设备未取得"的出口
+ * 不会留下 mot_dev_ok=TRUE 配 NULL 句柄的陈旧组合(必须恒 0)。 */
+int         ps_sim_pwm_null_calls(void);
 
 /* GPIO: 引脚表与许可脚行为 */
 void        ps_sim_add_pin(const char *name, rt_int32_t init_level);

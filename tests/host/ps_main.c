@@ -94,7 +94,7 @@ static int ps_cap_has(const char *needle) { return strstr(ps_cap, needle) != RT_
 /* RT 原语(单线程夹具: 不起线程、不阻塞)                                  */
 /* ===================================================================== */
 static int c_mutex_take, c_mutex_release, c_event_send, c_thread_create, c_thread_startup;
-static rt_uint32_t c_event_bits;
+static rt_uint32_t c_event_bits, c_event_last;
 static struct rt_thread c_thread_store[4];
 
 rt_err_t rt_mutex_init(struct rt_mutex *m, const char *name, rt_uint16_t flags)
@@ -108,7 +108,7 @@ rt_err_t rt_mutex_detach(struct rt_mutex *m) { (void)m; return RT_EOK; }
 rt_err_t rt_event_init(struct rt_event *e, const char *name, rt_uint8_t flag)
 { (void)flag; if (e) { e->name = name; e->inited = RT_TRUE; } return RT_EOK; }
 rt_err_t rt_event_send(struct rt_event *e, rt_uint32_t event)
-{ (void)e; c_event_send++; c_event_bits |= event; return RT_EOK; }
+{ (void)e; c_event_send++; c_event_bits |= event; c_event_last = event; return RT_EOK; }
 rt_err_t rt_event_recv(struct rt_event *e, rt_uint32_t ev, rt_uint32_t fl,
                        rt_int32_t to, rt_uint32_t *out)
 { (void)e; (void)ev; (void)fl; (void)to; if (out) *out = 0; return -RT_ETIMEOUT; }
@@ -150,6 +150,9 @@ static int       dev_present = 1;
 static rt_err_t  rc_set = RT_EOK, rc_enable = RT_EOK, rc_disable = RT_EOK;
 static int       calls_set, calls_enable, calls_disable;
 static int       out_running;          /* 模拟输出是否仍在跑(桩的独立真相) */
+static int       disable_seq_fail_left;/* R04: 前 N 次 disable 强制返回 disable_seq_rc */
+static rt_err_t  disable_seq_rc = -RT_EIO;
+static int       pwm_null_calls;         /* 生产代码拿 NULL 句柄调 PWM 的次数(必须恒 0) */
 
 /* 许可写 / 许可脚实测 / ENN 反馈: 三个独立注入量 */
 static rt_err_t  enable_write_rc = RT_EOK;
@@ -179,22 +182,32 @@ rt_device_t rt_device_find(const char *name)
 }
 
 rt_err_t rt_pwm_set(struct rt_device_pwm *p, int ch, rt_uint32_t per, rt_uint32_t pul)
-{ (void)p; (void)ch; (void)per; (void)pul; calls_set++; return rc_set; }
+{ (void)ch; (void)per; (void)pul; calls_set++; if (p == RT_NULL) pwm_null_calls++; return rc_set; }
 
 rt_err_t rt_pwm_enable(struct rt_device_pwm *p, int ch)
 {
-    (void)p; (void)ch; calls_enable++;
+    (void)ch; calls_enable++; if (p == RT_NULL) pwm_null_calls++;
     if (rc_enable == RT_EOK) out_running = 1;     /* 只有 enable 成功才认为"输出在跑" */
     return rc_enable;
 }
 
 /* ⚠ 桩语义核心: disable 失败时**不动** out_running —— 桩不替固件把输出清掉。
- * "软件自称已停但模拟侧还在跑"会被 ps_sim_pwm_running() 直接照出来。 */
+ * "软件自称已停但模拟侧还在跑"会被 ps_sim_pwm_running() 直接照出来。
+ * R04(2026-10-23 返修)追加"前 N 次失败、其后成功"的逐次序列(默认关闭), 用来
+ * 照出"同一个停机动作里第二次关断覆盖第一次失败"的形状。 */
 rt_err_t rt_pwm_disable(struct rt_device_pwm *p, int ch)
 {
+    rt_err_t e = rc_disable;
+
     (void)p; (void)ch; calls_disable++;
-    if (rc_disable == RT_EOK) out_running = 0;
-    return rc_disable;
+    if (p == RT_NULL) pwm_null_calls++;
+    if (disable_seq_fail_left > 0)
+    {
+        disable_seq_fail_left--;
+        e = disable_seq_rc;
+    }
+    if (e == RT_EOK) out_running = 0;
+    return e;
 }
 
 static int pin_find(const char *name)
@@ -251,6 +264,11 @@ int  ps_sim_pwm_enable_calls(void)   { return calls_enable; }
 int  ps_sim_pwm_disable_calls(void)  { return calls_disable; }
 int  ps_sim_pwm_running(void)        { return out_running; }
 void ps_sim_pwm_force_running(int on){ out_running = on; }
+/* R04 用: 接下来 n 次 rt_pwm_disable 返回 fail_rc, 之后的回到 ps_sim_pwm_set_rc 的值 */
+void ps_sim_pwm_disable_seq(int n, rt_err_t fail_rc)
+{ disable_seq_fail_left = n; disable_seq_rc = fail_rc; }
+int ps_sim_pwm_disable_seq_left(void) { return disable_seq_fail_left; }
+int ps_sim_pwm_null_calls(void)       { return pwm_null_calls; }
 
 void ps_sim_set_pad_stuck(int on)     { pad_stuck = on; }
 void ps_sim_set_pad_level(rt_int32_t lv) { pad_level = lv; }
@@ -274,6 +292,7 @@ int  ps_fb_confirm_calls(void)         { return fb_confirm_calls; }
 int  ps_bb_triggers(void)              { return bb_triggers; }
 int  ps_event_sends(void)              { return c_event_send; }
 rt_uint32_t ps_event_bits(void)        { return c_event_bits; }
+rt_uint32_t ps_event_last(void)        { return c_event_last; }
 void ps_event_bits_clear(void)         { c_event_bits = 0; }
 void ps_set_protect(int r, int i, int p, int g)
 { protect_ready = r; irq_attached = i; polarity_ok = p; gpio_ready = g; }
@@ -291,12 +310,13 @@ void ps_sim_reset(void)
     rc_set = rc_enable = rc_disable = RT_EOK;
     calls_set = calls_enable = calls_disable = 0;
     out_running = 0;
+    disable_seq_fail_left = 0; disable_seq_rc = -RT_EIO; pwm_null_calls = 0;
     enable_write_rc = RT_EOK; last_enable_ret = RT_EOK; pad_level = PIN_LOW; pad_stuck = 0;
     writes_low = writes_high = 0;
     fb_dis = fb_en = SAFETY_FB_OK; fb_confirm_rc = RT_EOK;
     fb_confirm_calls = fb_now_calls = 0; confirm_fail_after = -1;
     bb_triggers = 0;
-    c_mutex_take = c_mutex_release = c_event_send = 0; c_event_bits = 0;
+    c_mutex_take = c_mutex_release = c_event_send = 0; c_event_bits = 0; c_event_last = 0;
     c_thread_create = c_thread_startup = 0;
     protect_ready = irq_attached = polarity_ok = gpio_ready = 1;
     f_cfg_ok = RT_TRUE; f_cfg_state = TMC_DRV_CONFIGURED; f_tmc_health = SUBSYS_OK;
@@ -1203,10 +1223,14 @@ static void cases_ramp(void)
     ps_sim_pwm_set_rc(-RT_EIO, RT_EOK, -RT_EIO); /* set 失败 + 关断也失败 */
     motor_ramp_tick();                           /* 20Hz 的 apply 失败 -> fail-closed */
     stop_state(&res, &src, RT_NULL, &lat);
+    /* 2026-10-23 返修 R04 更新本条: 复审指出"回退里连关两次并用第二次的结果覆盖
+     * 第一次的失败"不是产品要求, 动作合同改为**一次 checked 关断 + 携带其结果**
+     * 完成 LOW/事件。原来的 `>= 2` 次数断言不是业务判据, 现按要求改为恰好一次,
+     * 并保留/加强"失败被消费、来源正确、LOW 动作、锁存/FAULT、事件次数"这些判据。 */
     CHECK("PS07c-apply_fail_failclosed_consumes",
           snap_state() == MOTOR_FAULT &&
-          ps_sim_pwm_disable_calls() >= d0 + 2 &&
-          (src == MOT_STOP_SRC_APPLY_FAIL || src == MOT_STOP_SRC_FAIL_CLOSED) &&
+          ps_sim_pwm_disable_calls() == d0 + 1 &&
+          src == MOT_STOP_SRC_APPLY_FAIL &&
           res == MOT_STOP_API_FAILED && lat == RT_TRUE &&
           ps_event_sends() == ev0 + 1,
           fm("state=%d disable +%d src=%s stop=%s latched=%d event +%d",
@@ -1270,6 +1294,365 @@ static void cases_ramp(void)
 }
 #endif /* PS_GATE_HOST_OVERRIDE */
 
+/* ---------------------------------------------------------------------- */
+/* R01(=S1-NEW-01): 关断失败/未知期间不得把"软件 0Hz"当物理静止写 DIR       */
+/* ---------------------------------------------------------------------- */
+static void cases_direction(void)
+{
+    rt_err_t e;
+    rt_bool_t lat;
+    mot_stop_result_t res;
+    int w0;
+
+    if (!recover_clean()) g_pre_bad++;
+    ps_sim_pwm_set_rc(RT_EOK, RT_EOK, -RT_EIO);
+    safety_force_shutdown(FAULT_SOFT);            /* 生产统一停机: 关断失败 */
+    motor_get_stop_state(&res, RT_NULL, RT_NULL, &lat);
+    w0 = ps_sim_pin_write_calls(PIN_NAME_TMC_DIR);
+    e = motor_set_direction(1);
+    CHECK("PS12a-dir_refused_while_stop_uncertain",
+          e != RT_EOK && ps_sim_pin_write_calls(PIN_NAME_TMC_DIR) == w0 &&
+          lat == RT_TRUE && snap_state() == MOTOR_FAULT && snap_cur_hz() == 0u,
+          fm("dir rc=%d DIR 写 %d->%d latch=%d state=%d cur=%u(命令值) -"
+             " 已知关断失败不得据 0Hz 改方向", (int)e, w0,
+             ps_sim_pin_write_calls(PIN_NAME_TMC_DIR), (int)lat,
+             snap_state(), (unsigned)snap_cur_hz()));
+
+    /* 对照: 两条路径都关断成功 + 许可 LOW + 锁存已人工复核清除 => 静止仍可设方向 */
+    if (!recover_clean()) g_pre_bad++;
+    motor_get_stop_state(&res, RT_NULL, RT_NULL, &lat);
+    w0 = ps_sim_pin_write_calls(PIN_NAME_TMC_DIR);
+    e = motor_set_direction(1);
+    CHECK("PS12b-dir_still_allowed_when_all_closes_ok",
+          lat == RT_FALSE && res == MOT_STOP_API_ACCEPTED && e == RT_EOK &&
+          ps_sim_pin_write_calls(PIN_NAME_TMC_DIR) == w0 + 1 &&
+          ps_sim_last_write(PIN_NAME_TMC_DIR) == PIN_HIGH,
+          fm("dir rc=%d DIR 写 %d->%d last=%d latch=%d - 正常静止能力保留(只收紧)",
+             (int)e, w0, ps_sim_pin_write_calls(PIN_NAME_TMC_DIR),
+             (int)ps_sim_last_write(PIN_NAME_TMC_DIR), (int)lat));
+    (void)motor_set_direction(0);
+}
+
+#ifdef PS_GATE_HOST_OVERRIDE
+static rt_bool_t run_to_real_output(int hz)
+{
+    if (!arm_for_ramp()) return RT_FALSE;
+    ps_sim_pwm_set_rc(RT_EOK, RT_EOK, RT_EOK);
+    (void)motor_set_target_hz((rt_uint32_t)hz);
+    if (motor_start() != RT_EOK)
+    { g_pre_bad++; printf("PRE-FAIL|run_to_real_output start\n"); return RT_FALSE; }
+    motor_ramp_tick();
+    return ps_sim_pwm_running() ? RT_TRUE : RT_FALSE;
+}
+
+static void cases_direction_ovr(void)
+{
+    rt_err_t e;
+    rt_bool_t lat;
+    int w0;
+
+    /* 真实 arm/start/斜坡让模拟 PWM 确实在跑, 然后注入"关断失败 + 许可 LOW 失败 +
+     * 焊盘仍 HIGH + 禁能侧反馈矛盾", 走生产统一停机, 再看 DIR。 */
+    if (!run_to_real_output(100))
+        g_pre_bad++;   /* 前置不成立也继续: 必需 id 不能缺席(缺例=基础设施故障) */
+    ps_sim_pwm_set_rc(RT_EOK, RT_EOK, -RT_EIO);
+    ps_set_enable_write_rc(-RT_EIO);
+    ps_sim_set_pad_level(PIN_HIGH);
+    ps_set_fb(0u, SAFETY_FB_PAD_MISMATCH);
+    safety_force_shutdown(FAULT_SOFT);
+    w0 = ps_sim_pin_write_calls(PIN_NAME_TMC_DIR);
+    e = motor_set_direction(1);
+    motor_get_stop_state(RT_NULL, RT_NULL, RT_NULL, &lat);
+    CHECK("PS12c-dir_refused_while_real_output_running",
+          e != RT_EOK && ps_sim_pin_write_calls(PIN_NAME_TMC_DIR) == w0 &&
+          ps_sim_pwm_running() == 1 && lat == RT_TRUE &&
+          safety_state_get() == SAFETY_FAULT_LATCHED,
+          fm("dir rc=%d DIR 写 %d->%d running=%d latch=%d safety=%s pad=%d",
+             (int)e, w0, ps_sim_pin_write_calls(PIN_NAME_TMC_DIR),
+             ps_sim_pwm_running(), (int)lat,
+             safety_state_name(safety_state_get()),
+             (int)ps_sim_level(PIN_NAME_DRV_ENABLE)));
+    /* 诊断侧 owner 未交回时同样不得借"FAULT+0Hz"改方向(只收紧, 不动正常能力) */
+    ps_set_enable_write_rc(RT_EOK);
+    ps_set_fb(0u, SAFETY_FB_OK);
+}
+#endif /* PS_GATE_HOST_OVERRIDE */
+
+/* ---------------------------------------------------------------------- */
+/* R02(=S1-NEW-02): init 找不到 PWM 设备的出口仍要尝试撤销许可             */
+/*   ⚠ 本组必须在任何"成功 init"之前跑(motor_init 幂等, 线程建起来后走不到该出口) */
+/* ---------------------------------------------------------------------- */
+static void cases_init_missing(void)
+{
+    rt_err_t e;
+    mot_stop_result_t res;
+    rt_uint8_t src;
+    rt_err_t rc;
+    rt_bool_t lat;
+    int tc0, low0, nul0;
+
+    ps_sim_set_pad_level(PIN_HIGH);               /* 许可脚初态 HIGH */
+    ps_sim_dev_set_present(0);                    /* 设备取不到 */
+    tc0 = ps_sim_thread_create_calls();
+    low0 = ps_enable_write_calls(0);
+    nul0 = ps_sim_pwm_null_calls();
+    e = motor_init();
+    motor_get_stop_state(&res, &src, &rc, &lat);
+    CHECK("PS13a-missing_dev_still_requests_low",
+          ps_enable_write_calls(0) == low0 + 1 &&
+          ps_sim_last_write(PIN_NAME_DRV_ENABLE) == PIN_LOW &&
+          ps_sim_level(PIN_NAME_DRV_ENABLE) == PIN_LOW,
+          fm("LOW 写 %d->%d last=%d 焊盘实测=%d - 错误出口也要降级",
+             low0, ps_enable_write_calls(0),
+             (int)ps_sim_last_write(PIN_NAME_DRV_ENABLE),
+             (int)ps_sim_level(PIN_NAME_DRV_ENABLE)));
+    CHECK("PS13b-missing_dev_keeps_both_rc_no_thread_no_null_pwm",
+          e == -RT_ERROR && rc == -RT_ENOSYS && res == MOT_STOP_DEV_UNAVAILABLE &&
+          src == MOT_STOP_SRC_INIT && lat == RT_TRUE &&
+          ps_sim_thread_create_calls() == tc0 &&
+          motor_get_health() == SUBSYS_FAILED &&
+          ps_sim_pwm_null_calls() == nul0,
+          fm("init rc=%d stop=%s stop_rc=%d latch=%d threads=%d null_pwm_calls=%d"
+             " health=%s", (int)e, mot_stop_result_name(res), (int)rc, (int)lat,
+             ps_sim_thread_create_calls() - tc0, ps_sim_pwm_null_calls() - nul0,
+             subsys_health_name(motor_get_health())));
+
+    /* 双失败对照: 连许可 LOW 也写不进 => 两个原始结果各自留档, 仍然不建线程 */
+    ps_set_enable_write_rc(-RT_EIO);
+    ps_sim_set_pad_level(PIN_HIGH);
+    low0 = ps_enable_write_calls(0);
+    e = motor_init();
+    motor_get_stop_state(&res, RT_NULL, &rc, RT_NULL);
+    CHECK("PS13c-missing_dev_and_low_both_fail_kept",
+          e == -RT_ERROR && ps_enable_write_calls(0) == low0 + 1 &&
+          rc == -RT_ENOSYS && ps_last_enable_write_rc() == -RT_EIO &&
+          res == MOT_STOP_DEV_UNAVAILABLE && motor_get_health() == SUBSYS_FAILED &&
+          ps_sim_thread_create_calls() == tc0,
+          fm("init rc=%d stop_rc=%d low_rc=%d LOW 写=%d - 不被互相掩盖",
+             (int)e, (int)rc, (int)ps_last_enable_write_rc(),
+             ps_enable_write_calls(0)));
+    ps_set_enable_write_rc(RT_EOK);
+
+    /* 设备重新出现: 只能按既有初始化条件重来, 且不得沿用陈旧 dev_ok(必须真实调一次
+     * 关断且从不带 NULL 句柄) */
+    ps_sim_dev_set_present(1);
+    ps_sim_pwm_set_rc(RT_EOK, RT_EOK, -RT_EIO);
+    nul0 = ps_sim_pwm_null_calls();
+    low0 = ps_sim_pwm_disable_calls();
+    e = motor_init();
+    motor_get_stop_state(&res, RT_NULL, &rc, RT_NULL);
+    CHECK("PS13d-device_back_re-attempts_real_close_no_stale_flag",
+          e == -RT_EIO && res == MOT_STOP_API_FAILED && rc == -RT_EIO &&
+          ps_sim_pwm_disable_calls() == low0 + 1 &&
+          ps_sim_pwm_null_calls() == nul0 &&
+          ps_sim_thread_create_calls() == tc0,
+          fm("init rc=%d stop=%s rc=%d disable %d->%d null=%d threads=%d"
+             " - 陈旧 mot_dev_ok 会在这里现形", (int)e, mot_stop_result_name(res),
+             (int)rc, low0, ps_sim_pwm_disable_calls(),
+             ps_sim_pwm_null_calls() - nul0, ps_sim_thread_create_calls() - tc0));
+    ps_sim_pwm_set_rc(RT_EOK, RT_EOK, RT_EOK);
+}
+
+/* ---------------------------------------------------------------------- */
+/* R03(=S1-NEW-03): 普通 disarm 失败要交接给既有故障/人工恢复链            */
+/*   被测代码只负责**投事件**; Safety 消费者(safety_thread.c 未在本链编译)   */
+/*   是用 safety_force_shutdown 显式模拟的**桩**, 不冒称新线程端到端测试。   */
+/* ---------------------------------------------------------------------- */
+static void cases_fault_handoff(void)
+{
+    rt_err_t e;
+    rt_bool_t lat;
+    mot_stop_result_t res;
+    int ev0, bits0;
+
+    /* ① 干净 READY 起步, 只用普通外部入口; 失败必须自己把故障交出去 */
+    if (!recover_clean()) g_pre_bad++;
+    ps_sim_pwm_set_rc(RT_EOK, RT_EOK, -RT_EIO);
+    ev0 = ps_event_sends();
+    bits0 = (int)ps_event_bits();
+    e = motor_disarm();
+    motor_get_stop_state(&res, RT_NULL, RT_NULL, &lat);
+    CHECK("PS14a-disarm_pwmfail_posts_software_fault_once",
+          e == -RT_EIO && lat == RT_TRUE && res == MOT_STOP_API_FAILED &&
+          ps_event_sends() == ev0 + 1 && ps_event_last() == (rt_uint32_t)EVT_SOFT_FAULT &&
+          safety_state_get() == SAFETY_READY,
+          fm("disarm rc=%d event %d->%d last=0x%X bits0=0x%X safety=%s latch=%d",
+             (int)e, ev0, ps_event_sends(), (unsigned)ps_event_last(),
+             (unsigned)bits0, safety_state_name(safety_state_get()), (int)lat));
+
+    /* ② 既有消费者接管(桩): 统一停机 -> 合法故障态, 人工恢复入口从此可达 */
+    safety_force_shutdown(FAULT_SOFT);            /* == safety_thread 消费 EVT_SOFT_FAULT */
+    CHECK("PS14b-consumer_latches_so_manual_recovery_is_reachable",
+          safety_state_get() == SAFETY_FAULT_LATCHED &&
+          safety_fault_get() == (rt_uint32_t)FAULT_SOFT,
+          fm("safety=%s code=%u", safety_state_name(safety_state_get()),
+             (unsigned)safety_fault_get()));
+
+    /* ③ 一次普通成功不自动清锁存(仍然不能绕过人工恢复门) */
+    ps_sim_pwm_set_rc(RT_EOK, RT_EOK, RT_EOK);
+    (void)motor_disarm();
+    motor_get_stop_state(&res, RT_NULL, RT_NULL, &lat);
+    CHECK("PS14c-plain_success_after_handoff_does_not_self_recover",
+          res == MOT_STOP_API_ACCEPTED && lat == RT_TRUE &&
+          safety_state_get() == SAFETY_FAULT_LATCHED &&
+          gate_bit(MOT_GATE_STOP_UNCONFIRMED) == RT_TRUE,
+          fm("stop=%s latch=%d safety=%s", mot_stop_result_name(res), (int)lat,
+             safety_state_name(safety_state_get())));
+
+    /* ④ 坏条件仍然拒绝(限位宏关闭 => 活动输入只有 DIAG; 这里把 DIAG 置成触发) */
+    ps_sim_set_level(PIN_NAME_TMC_DIAG, PIN_HIGH);
+    safety_fault_reset_manual();
+    CHECK("PS14d-active_input_still_refuses_recovery",
+          safety_state_get() == SAFETY_FAULT_LATCHED &&
+          safety_fault_get() != (rt_uint32_t)FAULT_NONE,
+          fm("safety=%s code=%u (DIAG 触发时不得清除)",
+             safety_state_name(safety_state_get()), (unsigned)safety_fault_get()));
+    ps_sim_set_level(PIN_NAME_TMC_DIAG, PIN_LOW);
+
+    /* ⑤ 人工复核通过后确实恢复(不需要额外再制造一次故障) */
+    safety_fault_reset_manual();
+    motor_get_stop_state(&res, RT_NULL, RT_NULL, &lat);
+    CHECK("PS14e-manual_recovery_clears_after_plain_failure",
+          safety_state_get() == SAFETY_MANUAL_CLEAR &&
+          safety_fault_get() == (rt_uint32_t)FAULT_NONE && lat == RT_FALSE,
+          fm("safety=%s code=%u latch=%d stop=%s",
+             safety_state_name(safety_state_get()), (unsigned)safety_fault_get(),
+             (int)lat, mot_stop_result_name(res)));
+
+    /* ⑥ 不自激: 统一停机 + force_stop 失败期间不产生任何新事件 */
+    if (!recover_clean()) g_pre_bad++;
+    ps_sim_pwm_set_rc(RT_EOK, RT_EOK, -RT_EIO);
+    ev0 = ps_event_sends();
+    safety_force_shutdown(FAULT_SOFT);
+    CHECK("PS14f-unified_shutdown_never_posts_events",
+          ps_event_sends() == ev0 &&
+          safety_state_get() == SAFETY_FAULT_LATCHED,
+          fm("event %d->%d safety=%s (停机内部零投递)", ev0, ps_event_sends(),
+             safety_state_name(safety_state_get())));
+    ps_sim_pwm_set_rc(RT_EOK, RT_EOK, RT_EOK);
+    if (!recover_clean()) g_pre_bad++;
+}
+
+#ifdef PS_GATE_HOST_OVERRIDE
+/* 诊断侧同一个形状: pwm_test stop 失败 => 投事件; step_pwm_force_stop 本身不投 */
+static void cases_fault_handoff_diag(void)
+{
+    mot_stop_result_t dres;
+    rt_err_t drc;
+    rt_bool_t dlat;
+    int ev0;
+
+    if (!recover_clean()) g_pre_bad++;
+    ps_sim_pwm_set_rc(RT_EOK, RT_EOK, RT_EOK);
+    msh_pwm_test("1000");
+    if (step_pwm_output_active() != RT_TRUE)
+    { g_pre_bad++; printf("PRE-FAIL|diag-handoff-not-owner\n"); }
+    ps_sim_pwm_set_rc(RT_EOK, RT_EOK, -RT_EIO);
+    ev0 = ps_event_sends();
+    msh_pwm_test("stop");
+    CHECK("PS14g-diag_stop_fail_posts_software_fault_once",
+          ps_event_sends() == ev0 + 1 &&
+          ps_event_last() == (rt_uint32_t)EVT_SOFT_FAULT &&
+          step_pwm_output_active() == RT_TRUE,
+          fm("event %d->%d last=0x%X owner=%d", ev0, ps_event_sends(),
+             (unsigned)ps_event_last(), (int)step_pwm_output_active()));
+
+    /* 统一停机内部调 force_stop 时**不得**再投一次(否则自激) */
+    ev0 = ps_event_sends();
+    safety_force_shutdown(FAULT_SOFT);
+    CHECK("PS14h-force_stop_inside_shutdown_stays_silent",
+          ps_event_sends() == ev0 &&
+          safety_state_get() == SAFETY_FAULT_LATCHED &&
+          step_pwm_output_active() == RT_TRUE,
+          fm("event %d->%d safety=%s owner=%d", ev0, ps_event_sends(),
+             safety_state_name(safety_state_get()),
+             (int)step_pwm_output_active()));
+
+    /* 从此人工恢复入口可达: 成功一次关断 -> reset -> MANUAL_CLEAR + 锁存清零 */
+    ps_sim_pwm_set_rc(RT_EOK, RT_EOK, RT_EOK);
+    safety_fault_reset_manual();
+    step_pwm_get_stop_state(&dres, &drc, &dlat);
+    CHECK("PS14i-diag_failure_manual_recovers",
+          safety_state_get() == SAFETY_MANUAL_CLEAR &&
+          safety_fault_get() == (rt_uint32_t)FAULT_NONE &&
+          dlat == RT_FALSE && dres == MOT_STOP_API_ACCEPTED,
+          fm("safety=%s code=%u diag_latched=%d diag=%s",
+             safety_state_name(safety_state_get()), (unsigned)safety_fault_get(),
+             (int)dlat, mot_stop_result_name(dres)));
+    if (!recover_clean()) g_pre_bad++;
+}
+#endif /* PS_GATE_HOST_OVERRIDE */
+
+/* ---------------------------------------------------------------------- */
+/* R04(=S1-NEW-04): apply 失败回退只走一次 checked 关断, 首错不被覆盖       */
+/* ---------------------------------------------------------------------- */
+#ifdef PS_GATE_HOST_OVERRIDE
+static void cases_apply_sequence(void)
+{
+    mot_stop_result_t res;
+    rt_uint8_t src;
+    rt_err_t rc;
+    rt_bool_t lat;
+    int d0, ev0, low0, high0;
+
+    /* 序列: 本次动作的第一次 disable 返回 -EIO, 之后回到成功 —— 修前的形状是
+     * "连关两次 + 用第二次的成功覆盖第一次的失败"。 */
+    if (!run_to_real_output(100))
+        g_pre_bad++;   /* 前置不成立也继续: 必需 id 不能缺席(缺例=基础设施故障) */
+    d0 = ps_sim_pwm_disable_calls();
+    ev0 = ps_event_sends();
+    low0 = ps_enable_write_calls(0);
+    ps_sim_pwm_set_rc(-RT_EIO, RT_EOK, RT_EOK);   /* apply(set) 失败 */
+    ps_sim_pwm_disable_seq(1, -RT_EIO);           /* 第一次关断失败, 之后成功 */
+    motor_ramp_tick();                            /* 走生产回退路径 */
+    stop_state(&res, &src, &rc, &lat);
+    CHECK("PS15a-apply_fail_single_checked_disable_keeps_first_error",
+          ps_sim_pwm_disable_calls() == d0 + 1 &&
+          ps_sim_pwm_disable_seq_left() == 0 &&
+          rc == -RT_EIO && res == MOT_STOP_API_FAILED &&
+          src == MOT_STOP_SRC_APPLY_FAIL && lat == RT_TRUE &&
+          ps_enable_write_calls(0) == low0 + 1 && ps_event_sends() == ev0 + 1 &&
+          snap_state() == MOTOR_FAULT,
+          fm("disable %d->%d seq_left=%d stop_rc=%d stop=%s src=%s latch=%d"
+             " LOW %d->%d event +%d state=%d", d0, ps_sim_pwm_disable_calls(),
+             ps_sim_pwm_disable_seq_left(), (int)rc, mot_stop_result_name(res),
+             mot_stop_src_name(src), (int)lat, low0, ps_enable_write_calls(0),
+             ps_event_sends() - ev0, snap_state()));
+
+    /* 之后一次真正成功的关断: 可以更新"当前结果", 但首错证据(锁存/门禁/事件计数)
+     * 不被抹掉 —— 成功把 state 带回 IDLE 是既有语义, 关键是锁存仍需人工恢复。 */
+    ps_sim_pwm_set_rc(RT_EOK, RT_EOK, RT_EOK);
+    ev0 = ps_event_sends();
+    high0 = ps_enable_write_calls(1);
+    (void)motor_disarm();
+    stop_state(&res, RT_NULL, &rc, &lat);
+    CHECK("PS15b-later_success_does_not_erase_first_error",
+          res == MOT_STOP_API_ACCEPTED && rc == RT_EOK && lat == RT_TRUE &&
+          gate_bit(MOT_GATE_STOP_UNCONFIRMED) == RT_TRUE &&
+          motor_arm() != RT_EOK && ps_enable_write_calls(1) == high0 &&
+          ps_event_sends() == ev0,
+          fm("stop=%s rc=%d latch=%d bit7=%d arm rc=%d HIGH 写 %d->%d event +%d",
+             mot_stop_result_name(res), (int)rc, (int)lat,
+             (int)gate_bit(MOT_GATE_STOP_UNCONFIRMED), (int)motor_arm(),
+             high0, ps_enable_write_calls(1), ps_event_sends() - ev0));
+
+    /* 对照: 关断本来就成功 => 一次调用、ACCEPTED、无锁存 */
+    if (!run_to_real_output(100))
+        g_pre_bad++;   /* 前置不成立也继续: 必需 id 不能缺席(缺例=基础设施故障) */
+    d0 = ps_sim_pwm_disable_calls();
+    ps_sim_pwm_set_rc(-RT_EIO, RT_EOK, RT_EOK);
+    motor_ramp_tick();
+    stop_state(&res, &src, &rc, &lat);
+    CHECK("PS15c-apply_fail_control_all_ok_single_close",
+          ps_sim_pwm_disable_calls() == d0 + 1 && rc == RT_EOK &&
+          res == MOT_STOP_API_ACCEPTED && src == MOT_STOP_SRC_APPLY_FAIL &&
+          lat == RT_FALSE && snap_state() == MOTOR_FAULT,
+          fm("disable %d->%d stop=%s rc=%d latch=%d", d0,
+             ps_sim_pwm_disable_calls(), mot_stop_result_name(res), (int)rc,
+             (int)lat));
+}
+#endif /* PS_GATE_HOST_OVERRIDE */
+
 /* ===================================================================== */
 int main(void)
 {
@@ -1289,7 +1672,9 @@ int main(void)
     printf("VARIANT|target\n");
 #endif
 
-    /* 顺序是刻意的: cases_init 之前还不能有正常运行的斜坡线程(PS01c 才判得住) */
+    /* 顺序是刻意的: cases_init_missing/cases_init 之前还不能有正常运行的斜坡线程
+     * (PS01c 与 PS13b 的"线程=0"才判得住); R03/R04 组放在最后, 各自先走生产恢复。 */
+    cases_init_missing();
     cases_init();
     cases_estop();
     cases_disarm();
@@ -1300,7 +1685,12 @@ int main(void)
     cases_shutdown();
     cases_clear();
     cases_enn();
+    cases_direction();
+    cases_fault_handoff();
 #ifdef PS_GATE_HOST_OVERRIDE
+    cases_direction_ovr();
+    cases_fault_handoff_diag();
+    cases_apply_sequence();
     cases_ramp();
 #else
     cases_target_gates();

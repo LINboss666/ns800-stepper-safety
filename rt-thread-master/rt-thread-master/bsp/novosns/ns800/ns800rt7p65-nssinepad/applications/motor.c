@@ -290,20 +290,20 @@ static rt_uint32_t mot_ramp_step(rt_uint32_t cur, rt_uint32_t tgt,
 /* ---------- P0-4: fail-closed(PWM apply 失败路径) ----------
  * 调用约定: 必须在 mot_lock 释放后调用(内部不再拿锁),
  * 事件 → Safety Thread → force_shutdown → motor_emergency_stop(幂等)。
- * S1(合同 4.2/4.3): 关断与撤销许可**都要做**, 但两步结果分开记 —— 关断没成功
- * 不豁免许可撤销, 许可撤销成功也不能把关断失败说成"输出已停"。 */
-static void mot_fail_closed(rt_uint8_t src)
+ * 2026-10-23 返修 R04: 关断**由调用点做一次**并把真实结果作为入参带进来, 本函数
+ * 不再第二次调用 rt_pwm_disable —— 之前"回退里连关两次"会让第二次的成功覆盖第一次
+ * 的失败(stop_rc/src 都被改写), 与 §4.1/§4.2"每个返回值都被消费、一个动作不互相
+ * 覆盖"相矛盾。撤销许可与投递事件仍然照做, 失败也不跳过。 */
+static void mot_fail_closed(rt_err_t pwm_e)
 {
-    rt_err_t pe = mot_pwm_output_off(src);
     rt_err_t ge = mot_drv_en_request(0);
 
     if (ge != RT_EOK)
         rt_kprintf("[MOT] !! FAIL-CLOSED but DRV_ENABLE LOW UNVERIFIED (%d) !!\n",
                    (int)ge);
-    if (pe != RT_EOK)
-        rt_kprintf("[MOT] !! FAIL-CLOSED but STEP 关断未确认 (rc=%d src=%s) ->"
-                   " 输出状态未知, 已锁存待人工恢复 !!\n",
-                   (int)pe, mot_stop_src_name(src));
+    if (pwm_e != RT_EOK)
+        rt_kprintf("[MOT] !! FAIL-CLOSED but STEP 关断未确认 (rc=%d): 输出状态未知,"
+                   " 已锁存待人工恢复, 不因后续成功而抹掉首错 !!\n", (int)pwm_e);
     safety_post_event(EVT_SOFT_FAULT);
     rt_kprintf("[MOT] FAIL-CLOSED (pwm error), EVT_SOFT_FAULT posted"
                " [stop=%s enable-low=%s]\n",
@@ -535,13 +535,14 @@ static void motor_ramp_tick(void)
         if (mot_pwm_apply(mot.current_hz) != RT_EOK)
         {
             /* P0-4: fail-closed(锁内只改状态, 锁外发事件) */
-            mot_pwm_output_off(MOT_STOP_SRC_APPLY_FAIL);
+            rt_err_t ae = mot_pwm_output_off(MOT_STOP_SRC_APPLY_FAIL);
+
             mot.armed = 0;
             mot.current_hz = 0;
             mot.target_hz = 0;
             mot.state = MOTOR_FAULT;
             mot_lock_release();
-            mot_fail_closed(MOT_STOP_SRC_FAIL_CLOSED);
+            mot_fail_closed(ae);                  /* R04: 携带这一次的真实关断结果 */
             return;
         }
         mot.state = (mot.current_hz < tgt) ? MOTOR_ACCEL
@@ -685,8 +686,19 @@ rt_err_t motor_init(void)
     if (mot_pwm == RT_NULL)
     {
         rt_kprintf("[MOT] %s not found (check BSP_USING_EPWM1)\n", MOTOR_PWM_DEV);
-        /* S1: 设备句柄都没取得 => STEP 关断"未尝试, 结果未知", 如实锁存 */
+        /* S1 + 返修 R02(=S1-NEW-02): 设备句柄都没取得 => STEP 关断"未尝试,
+         * 结果未知", 如实锁存。但这个错误出口**也必须尝试撤销许可** ——
+         * 不能因为"没拿到 PWM 设备"就跳过 PC.23 的降级动作(这里不调用任何
+         * PWM API, 所以不会碰 NULL 句柄); 设备不可用与 LOW 的原始结果分别留档,
+         * 并且明确作废 mot_dev_ok, 不留"旧 dev_ok=TRUE 配 NULL 句柄"的陈旧组合。 */
         mot_stop_record(MOT_STOP_DEV_UNAVAILABLE, MOT_STOP_SRC_INIT, -RT_ENOSYS);
+        mot_pwm    = RT_NULL;
+        mot_dev_ok = RT_FALSE;
+        e = mot_drv_en_request(0);
+        rt_kprintf("[MOT] init FAILED: %s 未取得 -> 仍已请求许可 LOW (%s, rc=%d);"
+                   " STEP 侧=dev-unavailable(rc=-RT_ENOSYS), 不创建斜坡线程,"
+                   " health=FAILED [设备不可用与 LOW 的原始结果分别留档]\n",
+                   MOTOR_PWM_DEV, e == RT_EOK ? "已回读确认" : "未确认", (int)e);
         mot.health = SUBSYS_FAILED;
         return -RT_ERROR;
     }
@@ -917,6 +929,15 @@ rt_err_t motor_disarm(void)
     if (pe != RT_EOK)
         rt_kprintf("[MOT] !! disarm: STEP 关断未确认 (rc=%d) -> 输出状态未知,"
                    " state=FAULT 并锁存, 不回 IDLE !!\n", (int)pe);
+    /* 追加(2026-10-23 返修 R03 = S1-NEW-03): 普通 disarm 遇到关断失败时, 把故障交给
+     * **既有**链: 投一次 EVT_SOFT_FAULT -> Safety 线程消费 -> safety_force_shutdown()
+     * 统一停机 + FAULT_LATCHED + 黑匣子, 于是"按提示执行 fault_reset"这条路从此可达。
+     * - 这里只投事件: 不改 Safety 状态、不拿 ss_lock(事件投递与 ss_lock 无关),
+     *   不新增 MSH 恢复旁路;
+     * - 统一停机/紧急停机的失败分支**不**投事件 => 不会形成"消费事件->停机失败->
+     *   再投同事件"的自激; fault_reset 内部再调本函数时若又投一次, 结果只是再次
+     *   锁存, 方向保守。 */
+    if (pe != RT_EOK) (void)safety_post_event(EVT_SOFT_FAULT);
     /* 追加(2026-10-21): 如实报告最终 ENN 反馈。没确认到禁能侧时**绝不**打印成"整链已安全"。
      * 关闭动作(停 STEP + 请求 LOW)已经照做, 这一步只是不谎报。 */
     {
@@ -932,15 +953,22 @@ rt_err_t motor_disarm(void)
     return mot_stop_merge(pe, ge);
 }
 
-/* Fix A / A8: 只允许完全静止时改方向 */
+/* Fix A / A8: 只允许完全静止时改方向。
+ * 2026-10-23 返修 R01(=S1-NEW-01): "静止"必须包含 **STEP 关断已被确认**这一层 ——
+ * 关断失败/未取得设备(以及诊断侧 owner 未交回)期间, current_hz==0 与 state=FAULT 都
+ * 只是软件侧状态, 输出可能仍在走, 此时翻 DIR 等于在"可能运行中"翻方向。只收紧这一种
+ * 情形: 原来的"非静止拒 -RT_EBUSY"与正常静止时设方向的能力都不动。 */
 rt_err_t motor_set_direction(rt_uint8_t dir)
 {
     rt_base_t d;
     rt_bool_t at_rest;
+    rt_bool_t stop_unconfirmed;
 
     mot_lock_take();
     at_rest = (mot.current_hz == 0) &&
               (mot.state == MOTOR_IDLE || mot.state == MOTOR_FAULT);
+    stop_unconfirmed = (mot.stop_fail_latched || !step_pwm_off_confirmed())
+                           ? RT_TRUE : RT_FALSE;
     if (!at_rest)
     {
         rt_kprintf("[MOT] dir REFUSED: not at rest (state=%d hz=%u) -"
@@ -948,6 +976,16 @@ rt_err_t motor_set_direction(rt_uint8_t dir)
                    mot.state, mot.current_hz);
         mot_lock_release();
         return -RT_EBUSY;
+    }
+    if (stop_unconfirmed)
+    {
+        rt_kprintf("[MOT] dir REFUSED: STEP 关断未确认 (stop=%s rc=%d"
+                   " latched=%u diag_off_confirmed=%s) - hz=0/FAULT 只是软件状态,"
+                   " 不能当物理静止\n", mot_stop_result_name(mot.stop_result),
+                   (int)mot.stop_rc, (unsigned)mot.stop_fail_latched,
+                   step_pwm_off_confirmed() ? "YES" : "NO");
+        mot_lock_release();
+        return -RT_EPERM;
     }
     mot_lock_release();
 

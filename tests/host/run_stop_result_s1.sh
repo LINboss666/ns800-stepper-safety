@@ -14,6 +14,24 @@
 #             用于走通"诊断持有输出 / arm / 斜坡 / 守卫"这些目标宏下不可达的前置;
 #             PS05a..g / PS07* / PS09c 因此只在 host_ovr 登记(见下方台账注释)。
 #
+# 2026-10-23 返修(R01..R04 = S1-NEW-01..04)追加的 ID:
+#   PS12a/PS12b(两变体)      关断失败期间拒写 DIR / 正常静止仍可设置(只收紧)
+#   PS12c(仅 host_ovr)       真实 arm+start+斜坡让模拟输出在跑、关断与许可都失败后 DIR 仍被拒
+#   PS13a..PS13d(两变体)     init 拿不到设备句柄的出口: 仍请求许可 LOW、两个原始 rc 分列、
+#                            不建线程、绝不用 NULL 句柄调 PWM、设备回来后重新真实关断
+#   PS14a..PS14f(两变体)     普通 disarm 失败投**一次** EVT_SOFT_FAULT 交给既有链 -> 统一停机
+#                            (消费者是**桩**: safety_thread.c 未在本链编译, 不冒称新线程端到端)
+#                            -> 锁存仍在 -> 坏输入仍拒 -> 人工 reset 可达 MANUAL_CLEAR -> 停机零投递
+#   PS14g/h/i(仅 host_ovr)   诊断侧同一形状: pwm_test stop 失败投一次、force_stop 在统一停机
+#                            内部绝不投事件、人工 reset 能恢复
+#   PS15a/b/c(仅 host_ovr)   apply 失败回退只做一次 checked 关断并携带其真实结果;
+#                            之后一次成功只更新"当前结果", 不抹掉首错证据(锁存/门禁/事件计数)
+#
+# 同一轮把 PS07c 的"至少调用两次 disable"改成"恰好一次": 复审指出第二次是多余关断, 且会
+# 用后一次的成功覆盖前一次的失败(stop_rc/来源都被改写), "两次"从来不是产品要求(任务书
+# §4.1/§4.2 与返修 §6.2 R04)。业务判据(失败被消费、来源正确、LOW 动作、锁存/FAULT、
+# 事件次数)全部保留并加强; 既有 138 例与 V1/V2 的断言未放宽。
+#
 # 判定纪律(沿用 R2/R3/R4 与 SD-NEW-01/02 的收口结果, 不新建通用平台):
 #   - 任何 rm / mkdir / 重定向 / 编译**之前**先过 require_outside_repo; 只删带本工具
 #     哨兵 .ns800_host_work 的目录; 每种运行用独立 run_id 目录, 保留旧结果。
@@ -60,7 +78,18 @@ PS08c-successful_stop_no_auto_recover \
 PS09a-manual_clear_after_off_confirmed PS09b-no_auto_output_or_enable_after_clear \
 PS10a-nosample_still_attempts_both_closes \
 PS10b-enn_unknown_and_pwm_fail_recorded_separately \
-PS10c-post_disarm_recheck_still_bites"
+PS10c-post_disarm_recheck_still_bites \
+PS12a-dir_refused_while_stop_uncertain PS12b-dir_still_allowed_when_all_closes_ok \
+PS13a-missing_dev_still_requests_low \
+PS13b-missing_dev_keeps_both_rc_no_thread_no_null_pwm \
+PS13c-missing_dev_and_low_both_fail_kept \
+PS13d-device_back_re-attempts_real_close_no_stale_flag \
+PS14a-disarm_pwmfail_posts_software_fault_once \
+PS14b-consumer_latches_so_manual_recovery_is_reachable \
+PS14c-plain_success_after_handoff_does_not_self_recover \
+PS14d-active_input_still_refuses_recovery \
+PS14e-manual_recovery_clears_after_plain_failure \
+PS14f-unified_shutdown_never_posts_events"
 TARGET_ONLY_CASES="PS11a-arm_refused_by_enable_path_macro PS11b-diag_step_denied \
 PS11c-tmc_write_gate_has_macro_bit PS11d-status_queries_have_no_side_effects \
 PS11e-snapshot_and_readonly_agree"
@@ -74,7 +103,14 @@ PS05g-owner_released_success_latch_kept \
 PS07a-ramp_zero_fail_not_normal_idle PS07b-ramp_zero_fail_consumes_error \
 PS07c-apply_fail_failclosed_consumes PS07d-guard_stop_uses_checked_off \
 PS07d2-guard_stop_latches_on_fail PS07e-arm_rollback_pwm_rc_first \
-PS09c-arm_works_again_after_recovery"
+PS09c-arm_works_again_after_recovery \
+PS12c-dir_refused_while_real_output_running \
+PS14g-diag_stop_fail_posts_software_fault_once \
+PS14h-force_stop_inside_shutdown_stays_silent \
+PS14i-diag_failure_manual_recovers \
+PS15a-apply_fail_single_checked_disable_keeps_first_error \
+PS15b-later_success_does_not_erase_first_error \
+PS15c-apply_fail_control_all_ok_single_close"
 
 VARIANTS="target host_ovr"
 

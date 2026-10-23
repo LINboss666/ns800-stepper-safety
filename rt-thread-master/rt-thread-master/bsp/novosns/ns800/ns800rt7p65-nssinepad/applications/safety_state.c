@@ -28,12 +28,20 @@
  *     故障码/格式不变(软件关断失败沿用投递方给的 code, 通常是 FAULT_SOFT), 详细 rc
  *     保存在快照 stop_rc 与本日志里。黑匣子仍只触发一次, 不重复投事件 => 没有
  *     "消费事件→停机失败→再投同事件"的自激。
- *   - fault_reset() 增加一道**只收紧**的复核: 两条输出路径本次都必须拿到"驱动 API
- *     接受关断"的有效结果(诊断侧从未占用该通道算有效, 不虚构成功), 加上原有的
- *     活动输入实测 + 许可焊盘 LOW + ENN 前后两次有界确认 + disarm 成功, 全部成立才
- *     进 MANUAL_CLEAR。S1 的关断失败锁存**只在这里**解除(motor_clear_stop_latch /
+ *   - fault_reset() 增加一道**只收紧**的复核: Motor 侧必须拿到本次"驱动 API 接受关断"
+ *     的有效结果(由它自己调的 motor_disarm() 产生), 诊断侧必须"最近一次尝试被接受"或
+ *     "从未占用该通道"(不虚构一次成功) —— 为此 2026-10-23 返修 R03 让 fault_reset 在
+ *     判定前先调一次 step_pwm_force_stop() 刷新诊断侧, 与 Motor 侧的刷新对称(纯朝安全
+ *     方向: 只请求关断, 不开许可、不投事件)。其余原条件不变: 活动输入实测 + 许可焊盘
+ *     LOW + ENN 前后两次有界确认 + disarm 成功, 全部成立才进 MANUAL_CLEAR。
+ *     S1 的关断失败锁存**只在这里**解除(motor_clear_stop_latch /
  *     step_pwm_clear_stop_latch), 没有 MSH 旁路; 一次后续成功的普通 stop 不清锁存、
  *     不解 Safety 故障、不自动使能。
+ *   - 返修 R03(=S1-NEW-03): 普通外部入口(motor_disarm / pwm_test stop)遇到关断失败时
+ *     投**一次** EVT_SOFT_FAULT 交给既有链(Safety 线程消费 → 本文件的
+ *     safety_force_shutdown → FAULT_LATCHED + 黑匣子), 否则"跑 fault_reset"这句话在
+ *     Safety 仍为 READY 时兑现不了(fault_reset 只接受已锁存的故障)。统一停机与
+ *     step_pwm_force_stop() 的失败分支不投事件 => 不构成自激。
  *   - 本轮不处理锁等待/UART 阻塞/在途 arm-enable 竞争(S2), 不宣称停机时延上界。
  */
 
@@ -370,6 +378,7 @@ static void fault_reset(void)
     rt_bool_t         m_lat;
     rt_bool_t         d_lat;
     rt_bool_t         diag_off_valid;
+    rt_err_t          diag_e;
 
     if (ss_lock_ok) rt_mutex_take(&ss_lock, RT_WAITING_FOREVER);
     st = ss_state;
@@ -478,6 +487,12 @@ static void fault_reset(void)
      * PWM 仍失败/未知 => 保持锁存与非零故障码, 不打印"最终禁能已确认"。
      * ⚠ 这一步只**读**状态, 不再调用停机/清故障/关断动作; 解除 S1 锁存是下面唯一一处
      *   motor_clear_stop_latch()/step_pwm_clear_stop_latch() 调用, 都在全部复核通过之后。 */
+    /* 追加(2026-10-23 返修 R03 = S1-NEW-03): 诊断侧也必须拿到一次**新鲜**的关断结果,
+     * 才谈得上"本次两条输出路径都有效" —— 与上面 motor_disarm() 刷新 Motor 侧对称。
+     * 这一步纯朝安全方向: 只请求关断, 不开许可、不出脉冲、不写黑匣子之外的事件
+     * (step_pwm_force_stop() 不投事件, 因此不会形成自激); 失败就照实拒绝清除。
+     * 没有这一步, 普通 `pwm_test stop` 失败过的板子在"先成功关断再说"之前永远恢复不了。 */
+    diag_e = step_pwm_force_stop();
     motor_get_stop_state(&m_res, &m_src, &m_rc, &m_lat);
     step_pwm_get_stop_state(&d_res, &d_rc, &d_lat);
     /* 诊断侧"有效"的两种情形: ①最近一次尝试被驱动接受; ②这条路径从未被用过
@@ -490,11 +505,11 @@ static void fault_reset(void)
     if (!mot_stop_result_is_off(m_res) || !diag_off_valid)
     {
         rt_kprintf("[SS] fault_reset REFUSED: STEP 关断结果无效"
-                   " (motor=%s src=%s rc=%d latched=%s / diag=%s rc=%d latched=%s)"
-                   " - 保持锁存, 不清故障码, 不进 MANUAL_CLEAR\n",
+                   " (motor=%s src=%s rc=%d latched=%s / diag=%s rc=%d latched=%s"
+                   " force_stop_rc=%d) - 保持锁存, 不清故障码, 不进 MANUAL_CLEAR\n",
                    mot_stop_result_name(m_res), mot_stop_src_name(m_src), (int)m_rc,
                    m_lat ? "YES" : "no", mot_stop_result_name(d_res), (int)d_rc,
-                   d_lat ? "YES" : "no");
+                   d_lat ? "YES" : "no", (int)diag_e);
         if (ss_lock_ok) rt_mutex_release(&ss_lock);
         return;
     }

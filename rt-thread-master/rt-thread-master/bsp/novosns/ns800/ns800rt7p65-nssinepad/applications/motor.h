@@ -24,7 +24,9 @@
  * 运行期驱动配置守卫(F2b P1-E / F2c R03·R05): armed 期间按固定周期(200ms)复核
  * TMC 配置完整性, 失联/复位/配置丢失 → 停 STEP + 请求 DRV_ENABLE LOW(回读确认) +
  * FAULT + EVT_SOFT_FAULT; motor_start 起转前额外持配置事务做一次芯片实值复核。
- * ⚠ 这是软件层第二响应, 检测延迟最坏 ≈ 周期 + 一轮复核(≈400ms 量级, 未上板实测),
+ * ⚠ 这是软件层第二响应。检测延迟的量级估计是"周期 + 一轮复核(≈400ms 量级)":
+ *   **不是最坏停机时延** —— 它没计入 ss_lock/mot_lock/UART xfer 的等待(本轮未改),
+ *   也没有上板实测(2026-10-23 措辞收窄, 详见 motor.c 的 R05/S1 记录与 S2 待办)。
  *   不能当作停机时延指标, 也不能替代硬件独立切断。详见 motor.c 的 R05 记录。
  *
  * ENN 状态反馈适配(2026-10-21, 用户确认 PC.6 = 扩展板 H6-5/TMC_ENN + RevA 图纸核对):
@@ -160,13 +162,22 @@ rt_err_t motor_arm(void);
  * 2026-10-23 S1: 返回值 = **PWM 关断结果与许可写确认结果两者中较早出现的失败**
  * (两者都失败时返回 PWM 错误); 许可失败返回 -RT_EIO, 关断失败返回 rt_pwm_disable 的错误。
  * 两个原始 rc 分别保存在快照 stop_rc 与日志里, 调用方不得把任何非零都解释成
- * "只是 GPIO 失败"。失败时函数仍已照做两步关闭动作, 不回退。 */
+ * "只是 GPIO 失败"。失败时函数仍已照做两步关闭动作, 不回退。
+ * 追加(2026-10-23 返修 R03 = S1-NEW-03): 关断失败时本函数**投一次**
+ * EVT_SOFT_FAULT 交给既有链(Safety 线程消费 → safety_force_shutdown → 统一停机 +
+ * FAULT_LATCHED + 黑匣子), 使"按提示执行 fault_reset"的人工恢复入口从此可达;
+ * 本函数不直接改 Safety 状态、不拿 ss_lock。统一停机/紧急停机的失败分支不投事件
+ * (不自激)。 */
 rt_err_t motor_disarm(void);
 
 /* 方向: dir=0/1 (PA.2 电平)。
  * Fix A: 只允许在完全静止时设置 —— current_hz==0 且 state ∈ {IDLE, FAULT}。
  * 运动中(斜坡/巡航)一律拒绝 -RT_EBUSY: 开环步进运行中翻 DIR 等同注入丢步/堵转。
- * 静止 armed(state==IDLE 且已 arm)允许设置, 供"接线定方向后再生成"流程。 */
+ * 静止 armed(state==IDLE 且已 arm)允许设置, 供"接线定方向后再生成"流程。
+ * ⚠ 2026-10-23 返修 R01(=S1-NEW-01)追加一层**只收紧**的判据: STEP 关断失败/未取得
+ * 设备(stop_fail_latched)或诊断侧 owner 未交回(step_pwm_off_confirmed()==FALSE)期间,
+ * "0Hz + FAULT"只是软件命令值, 不能当物理静止 —— 一律拒绝并返回 -RT_EPERM, 一次 DIR
+ * 写都不产生; 解除只能走 fault_reset 的人工恢复复核。两条原判据与非静止拒绝码不变。 */
 rt_err_t motor_set_direction(rt_uint8_t dir);
 
 /* 设置目标步频(armed 后由斜坡趋近; 未 armed 仅记录)。0 等效减速停。 */

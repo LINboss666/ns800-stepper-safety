@@ -37,6 +37,7 @@
 #include <stdlib.h>
 #include "project_board.h"
 #include "safety_gpio.h"
+#include "safety_state.h"      /* 返修 R03: pwm_test stop 失败时投递既有软件故障事件 */
 #include "motor.h"
 #include "step_pwm.h"
 
@@ -153,8 +154,18 @@ static void pwm_test(int argc, char **argv)
         rt_err_t se = step_pwm_disable_checked(MOT_STOP_SRC_DIAG_TEST);
 
         if (se != RT_EOK)
+        {
             rt_kprintf("[STEP] stop NOT confirmed (rc=%d): 不宣称输出已关闭,"
-                       " 诊断所有权未交回\n", (int)se);
+                       " 诊断所有权未交回 - 交给既有软件故障链\n", (int)se);
+            /* 2026-10-23 返修 R03(=S1-NEW-03): 操作员在 msh 里敲 `pwm_test stop`
+             * 失败时也要把故障交给**既有**链(投一次 EVT_SOFT_FAULT -> Safety 线程消费
+             * -> safety_force_shutdown 统一停机 + FAULT_LATCHED + 黑匣子), 否则底层
+             * 锁存住却只在"已锁存的故障"上才有恢复入口, fault_reset 会直接回
+             * "not latched(state=READY)", 人工恢复不可达。
+             * ⚠ 只有这个**外部命令入口**投事件: 统一停机用的 step_pwm_force_stop()
+             *   绝不投, 否则会形成"消费事件 -> 停机再次失败 -> 再投同事件"的自激。 */
+            (void)safety_post_event(EVT_SOFT_FAULT);
+        }
         return;
     }
 
