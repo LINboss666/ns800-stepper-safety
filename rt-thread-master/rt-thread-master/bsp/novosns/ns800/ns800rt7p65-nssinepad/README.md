@@ -62,6 +62,26 @@
   **该 GO 只覆盖已审源码、主机逻辑与验证接入**，不构成硬件安全链验收，也不授权任何硬件动作；
   RISK-04 仍是"换件后待验收"，维修后清单见草案 H 节（全部 `NOT EXECUTED`）。
 
+  **2026-10-23 追加（安全停机可靠性 S1，离线，未上板）**：`rt_pwm_disable()` 的返回值不再被吞掉——
+  Motor 与诊断各只有**一条** checked 关断入口，返回 `RT_EOK` 一律只称"**驱动 API 接受了关断请求**"，
+  不等于示波器证明无脉冲；`current_hz/target_hz == 0` 只称软件命令值。快照末尾追加
+  `stop_result/stop_src/stop_rc/stop_fail_latched`（旧字段次序、既有枚举数字、黑匣子格式未重排）；
+  `motor_disarm()`/`motor_emergency_stop()` 返回值 = **PWM 关断失败优先**、两个原始 rc 分别留档，
+  关断失败**不豁免**撤销许可、许可成功也**不掩盖**关断失败；`motor_init()` 关断失败仍撤许可，
+  但不创建斜坡线程、`health=FAILED`、不称 init 成功。诊断侧 disable 失败**不释放所有权**、
+  `step_pwm_output_active()` 保守挡住 Motor 接管、不允许再 enable 覆盖未处理失败，`step_status`
+  不再写 `no(安全)`。新增第 7 门 `MOT_GATE_STOP_UNCONFIRMED`（**只新增、只收紧**，前六道门与四个宏
+  条件一字未改）；`fault_reset()` 要求两条输出路径本次都有有效关断结果才清除，S1 锁存只在这条人工
+  恢复复核后解除（无 MSH 旁路）。统一停机不再打印 `STEP stopped`、黑匣子仍只一次、内部不投事件。
+  新增第四套并列主机链 `tests/host/run_stop_result_s1.sh`（真编译 `step_pwm.c`+`motor.c`+
+  `safety_state.c`；target 36 例 / host_ovr 45 例 rc=0 + 两项仓外反向）；既有 V1/V2、I/O 138 例、
+  负例+元负例、SD 41 例全部重跑未放宽；Keil **0 Error / 0 Warning**。
+  **S2 未做**：无界等锁（`ss_lock`/`mot_lock`/UART xfer 的 `RT_WAITING_FOREVER`）、UART 阻塞对停机的
+  影响、在途 arm/enable 竞争、线程重构 —— 本轮不声称任何停机时延上界，RISK-03/03a 与 RISK-04-b
+  继续开放。四道宏仍 `RT_FALSE`，新源码**未烧录**，板上仍是冻结固件 `e40a9b9`；
+  证据 `reports/reviews/phase8-stop-result-s1/`，交接 `reports/agent_handoffs/phase8-stop-result-s1.md`，
+  状态 `STOP: AWAITING_INDEPENDENT_REVIEW`。
+
 ### 引脚映射（冻结，修改需重新做 Pinmux 冲突分析）
 
 | 信号 | 排针 | MCU | RT-Thread Pin | 功能 |
@@ -104,11 +124,13 @@ applications/
 ├── adxl345.c/h         ADXL345 驱动(硬件 spi3 独占)正式 API + imu_probe/imu_id/imu_raw
 ├── current_adc.c/h     母线电流采样正式 API(标定来源 NONE/THEORETICAL/MEASURED + EMA) + current_raw
 ├── tmc2209.c/h         TMC2209 UART 协议层(已真机验证)正式 API + tmc_* 命令
-├── step_pwm.c/h        EPWM1 STEP 输出 + pwm_test 诊断命令（须过 Motor 借用门）
+├── step_pwm.c/h        EPWM1 STEP 输出 + pwm_test 诊断命令（须过 Motor 借用门；关断走 checked 路径，
+│                        失败不释放所有权、不谎报已停；S1 起 force_stop 返回真实 rt_err_t）
 │  ── 安全/运行时层 (Phase 7-B) ──
+├── stop_result.h       STEP 关断结果语义(未尝试/未取得设备/已请求输出/命令0Hz/API接受/API失败)与来源枚举(S1 新增)
 ├── safety_state.c/h    安全状态机(白名单转换 + ss_lock) + force_shutdown 唯一停机路径 + 启动自检
 ├── safety_thread.c/h   Safety 线程(prio 4) + 四路 EXTI 事务化注册 + 人工 IRQ 门 MSH
-├── motor.c/h           Motor Service(斜坡/四门禁/回读/所有权) + motor_* MSH
+├── motor.c/h           Motor Service(斜坡/七门禁/回读/所有权/关断结果记账) + motor_* MSH
 ├── sensor_service.c/h  统一 100Hz 采样帧(seq/valid/fresh + 安全输入 active/valid 掩码) + sensor_status/snapshot/selftest
 │  ── 诊断/记录层 (Phase 7-C/D) ──
 ├── diagnosis.c/h       多源融合判据引擎(同帧去重在引擎内) + diag_status/mode/selftest

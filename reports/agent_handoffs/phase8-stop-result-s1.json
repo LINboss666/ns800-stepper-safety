@@ -1,0 +1,123 @@
+{
+  "task_id": "phase8-stop-result-s1",
+  "taskbook": "NS800_Stop_Result_S1_Qoder_Task_20261023.md",
+  "repository": "https://github.com/LINboss666/ns800-stepper-safety",
+  "branch": "phase8/tmc-drive-config",
+  "base_sha": "1c45823d7b498706f166fc856521b8d564870748",
+  "tested_commit": "62873bd8aa851ae3010dd1c04cba0aa3e1e22821",
+  "remote_at_start": "1c45823d7b498706f166fc856521b8d564870748 (无他人前进，未 reset/覆盖)",
+  "recorded_at": "2026-10-23 (Asia/Shanghai)",
+  "nature": "离线固件 + 主机注入验证 + Keil 编译；零硬件动作；不命名为 F2e/F3；S2 未开始",
+  "single_objective": "PWM 关断 API 失败时，软件不得返回停机成功、不得释放诊断所有权、不得允许清除故障或重新输出；仍须尝试撤销驱动许可，并如实记录每一步结果",
+  "board_firmware_identity": "USER_REPORTED_E40 (e40a9b95ef709e6a80444f9f3949dfdd70ba96ba)；本轮未读回 Flash、未烧录",
+  "diffstat": "12 files changed, 2808 insertions(+), 206 deletions(-)",
+  "production_changes": {
+    "applications/stop_result.h": "新增(本轮唯一新增头)：关断结果语义(未尝试/未取得设备/已请求输出/命令0Hz未确认/API接受/API失败) + 调用来源枚举 + is_off/is_uncertain + 名称函数；不含判定逻辑",
+    "applications/motor.h": "快照末尾追加 stop_result/stop_src/stop_rc/stop_fail_latched(旧字段次序不变)；新增第7门 MOT_GATE_STOP_UNCONFIRMED=(1u<<6)；声明 motor_get_stop_state()/motor_clear_stop_latch()；改写 disarm/estop 返回值合同",
+    "applications/motor.c": "唯一 checked 关断入口 mot_pwm_output_off(src) 保留真实 rc 并记账；init/ramp到0/apply失败/arm回滚/守卫停机/disarm/estop 全部消费结果；PWM 与许可两个原始 rc 分列留档，对外失败优先返回 PWM；motor_stop()/target=0 只记软件命令值；斜坡循环体抽成 motor_ramp_tick()(等价性论证写在注释)；注释按 2026-10-23 口径更正",
+    "applications/step_pwm.h/.c": "step_pwm_force_stop() 返回 rt_err_t；pwm_test stop 与统一停机共用 step_pwm_disable_checked()；失败不释放诊断所有权、不允许再 enable 覆盖未处理失败；未持有/持有却无句柄/曾失败三种情形分开；step_status 不再写 no(安全)；新增 get_stop_state/off_confirmed/clear_stop_latch",
+    "applications/safety_state.c": "safety_force_shutdown() 收集两路关断结果(任一路失败都不跳过另一路)、不再打印 STEP stopped、黑匣子仍一次、内部不投事件；fault_reset() 增加两条输出路径本次均有有效关断结果的只收紧复核，保留 IO70 的 disarm 后置 ENN 确认；S1 锁存唯一解除点"
+  },
+  "return_value_contract": {
+    "rt_pwm_disable()==RT_EOK": "只称 驱动 API 接受关断请求，不是示波器证明无脉冲",
+    "motor_disarm/motor_emergency_stop": "返回值 = PWM 关断失败优先，否则许可写确认结果；两个原始 rc 分别保存在快照 stop_rc 与日志",
+    "motor_init": "关断失败 => 仍尝试许可 LOW，但不创建斜坡线程、health=FAILED、不称 init 成功/已停止",
+    "step_pwm_output_active": "仍启用 或 关断失败/未取得设备 => TRUE(保守阻止 Motor 接管)",
+    "step_pwm_off_confirmed": "从未占用该通道 或 最近一次 API 接受且未持有；带未复核锁存时一律 FALSE",
+    "latch_release": "只有 fault_reset() 全部人工恢复复核通过之后调用 motor_clear_stop_latch()/step_pwm_clear_stop_latch()；无 MSH 旁路；一次后续成功的普通 stop 不清锁存、不解 Safety 故障、不自动使能"
+  },
+  "gate_bits": {
+    "existing_six": "MOT_GATE_ENABLE_PATH..MOT_GATE_FB_MISMATCH (bit0..bit5) 条件一字未改",
+    "added_this_round": "MOT_GATE_STOP_UNCONFIRMED = 1u<<6 (只新增、只收紧)",
+    "next_free_bit_after_this_round": "1u<<7"
+  },
+  "not_changed": ["TMC 驱动/配置/UART 算法", "安全 GPIO 与 IRQ 线程", "传感器/标定/诊断算法", "刚 GO 的帧与黑匣子语义/存储格式", "底层 PWM 与 RT-Thread 驱动", "project.uvprojx", ".gitignore", "公共 env.sh", "已审 runner 与 inject.py", "旧证据/旧采集脚本"],
+  "host_chain": {
+    "runner": "tests/host/run_stop_result_s1.sh",
+    "fixture": "tests/host/ps_main.c",
+    "shim": "tests/host/shim_ps/rtthread.h + rtdevice.h",
+    "really_compiled_production": ["applications/step_pwm.c", "applications/motor.c", "applications/safety_state.c"],
+    "stub_discipline": [
+      "PWM 每个 API 的 rc 可独立注入；disable 失败时桩**保留输出运行**，不替固件清掉",
+      "许可写结果 / 许可脚实测电平 / ENN 反馈判定 = 三个独立注入量",
+      "前置已关断一律由生产路径真实取得(真调 force_stop/disarm 且桩返回成功)，不伪造成功状态过门",
+      "单线程确定性夹具：rt_thread_create 只计次数，斜坡一拍由夹具调用生产 motor_ramp_tick() 单步执行"
+    ],
+    "variants": {
+      "target": "四道硬件宏全部 RT_FALSE(目标发布配置)，必需 36 例全部 PASS，proc_rc=0",
+      "host_ovr": "-DPS_GATE_HOST_OVERRIDE + 三道宏仅主机置 TRUE，必需 45 例全部 PASS，proc_rc=0"
+    },
+    "ovr_only_ids_reason": "PS05a..g / PS07* / PS09c 的前置(诊断持有通道、arm 成功、斜坡真跑)在目标四宏 FALSE 下不可达；目标变体用 PS11* 与 PS05h/PS05i 覆盖同一批代码路径的可达部分",
+    "ledger_discipline": "逐 id 出现恰好一次且判 PASS；缺席/重复/未登记/SUMMARY 与实际行数对不上 = 基础设施故障(4)；判 FAIL 或 rc!=0 = 检出失败(1)；正常与反向共用同一个 validate_ledger()"
+  },
+  "reverse_checks": [
+    {
+      "name": "rev_motor_off_ignores_failure",
+      "variant": "target",
+      "file": "applications/motor.c (仓外一次性副本)",
+      "injection": "关断 helper 恒记 MOT_STOP_API_ACCEPTED 并把 rc 覆写成 RT_EOK",
+      "expected_failed_ids": ["PS01a-init_disable_fail_rc", "PS02a-estop_pwmfail_returns_pwm_rc", "PS04a-disarm_fail_rc_is_pwm"],
+      "result": "META-OK 命中 3/3；构建成功；真实 rc=1；台账完整自洽(36 例)；额外 FAIL 14 例如实登记"
+    },
+    {
+      "name": "rev_diag_fail_releases_owner",
+      "variant": "host_ovr",
+      "file": "applications/step_pwm.c (仓外一次性副本)",
+      "injection": "失败分支清 step_enabled 且不置锁存(退回 S1 之前的错误语义)",
+      "expected_failed_ids": ["PS05a-force_stop_fail_keeps_owner", "PS05b-repeat_stop_still_not_released"],
+      "result": "META-OK 命中 2/2；构建成功；真实 rc=1；台账完整自洽(45 例)；额外 FAIL 12 例如实登记",
+      "first_attempt_was": "第一次判成 INFRA-FAIL(夹具 rc=2)：前置不成立时 return 跳过整组用例导致必需 id 缺席；已改为继续执行让断言自己 FAIL 并把前置不成立按业务失败计 rc=1"
+    }
+  ],
+  "existing_regressions": {
+    "build_and_run": "V1 25/25、V2 22/22，runner rc=0；旧 ID 与断言未改",
+    "run_io_behavior": "off_target 27 / on_target 29 / off_ovr 40 / on_ovr 42 = 138 例全 PASS，rc=0；斜坡体抽取前后逐条结果一致",
+    "run_negatives": "13 例全 OK(执行集合=请求集合) + 元负例 M1 M1c M2 M2c M3 M3c M4 M5 全 META-OK/CONTROL-OK，rc=0；run_negatives.sh 已内含元负例子链故未重复跑",
+    "run_safety_data_semantics": "OFF 21 / ON 20 全 PASS，rc=0(源与夹具未改，仅因 motor.h 可能影响编译而重跑)",
+    "not_rerun": ["R4/SW1 采集与验收工具(未改，sw1_cut.ps1 的 T-01/T-02 仍 HOLD)", "sd_runner_rework_check.sh(该 runner 未改)"]
+  },
+  "keil": {
+    "command": "UV4.exe -r project.uvprojx -j0 -o <仓外日志>",
+    "tool_rc": 0,
+    "result": "0 Error(s), 0 Warning(s)",
+    "program_size": "Code=151866 RO-data=68918 RW-data=2184 ZI-data=83428",
+    "delta_vs_previous_round": "Code +3336, RO +4188, RW +8, ZI +16（上一轮 Code=148530 RO=64730 RW=2176 ZI=83412）",
+    "ro_note": "RO 增量主要来自新增中文日志字面量；逐项归属未单独测量，不做超出数据的解释",
+    "hooks_readonly_verified": "BeforeMake RunUserProg1/2=0；AfterMake 仅 fromelf --bin（无下载/复位/串口）；未执行烧录或任何调试会话",
+    "macros": "四道宏仍 RT_FALSE；主机覆盖与测试源不进工程"
+  },
+  "real_failures_fixed_this_round": [
+    "拒绝日志里含有字面量 STEP stopped，触发自家 PS06c 负向判据 -> 改措辞，判据未放宽",
+    "PS09a 在 target 变体首次 FAIL：诊断从未占用被错误要求等于 API 接受 -> 承认未占用为有效，不虚构成功",
+    "fault_reset 初版用 off_confirmed() 判恢复门，把锁存算无效导致人工恢复永远不通过(鸡生蛋) -> 恢复门看当前结果有效性，收紧门才用带锁存判据",
+    "诊断侧未持有句柄被误记 DEV_UNAVAILABLE+锁存 -> 分开 未持有/持有无句柄/失败未知 三种情形",
+    "PS07d 第二轮没产生关断动作(守卫只在 armed 时复核) -> 第二次尝试前按生产路径重新 arm",
+    "反向②第一次被判 INFRA-FAIL：前置不成立时跳过用例造成缺例 -> 不跳过 + 前置按业务失败计",
+    "既有夹具需同步 step_pwm_force_stop 新签名并补三个只读桩(桩返回真实语义值，不伪造成功)"
+  ],
+  "unverified_and_boundaries": [
+    "未上板：不读回、不烧录、不开串口、不写真实 GPIO/TMC；板上仍是 USER_REPORTED_E40",
+    "API 接受关断 != 无脉冲；STEP 波形仍未示波器验收(BUG-008 未闭)",
+    "停机时延无结论：本轮未测、未改锁与 UART；405ms 注释去掉上界误导表述，保留未测量口径；RISK-03/03a、RISK-04-b 继续开放",
+    "S2 未做：ss_lock/mot_lock/配置事务/UART 的 RT_WAITING_FOREVER、在途 arm/enable 与停机竞争、线程重构；本轮不声称在途取消已验证",
+    "主机链不模拟调度/优先级继承/中断上下文，不把宿主耗时当目标时延",
+    "门芯片损坏是维修前的历史解释；静态电气与现有 SW1 功能已按用户确认登记 PASS (USER_CONFIRMED)，本轮未索取重复测量",
+    "四个硬件宏仍因授权范围保持 FALSE，本轮一个都没翻转"
+  ],
+  "artifacts": {
+    "handoff": ["reports/agent_handoffs/phase8-stop-result-s1.md", "reports/agent_handoffs/phase8-stop-result-s1.json"],
+    "evidence": [
+      "reports/reviews/phase8-stop-result-s1/NOTES.txt",
+      "reports/reviews/phase8-stop-result-s1/disable_call_site_audit.txt",
+      "reports/reviews/phase8-stop-result-s1/s1_chain_ledger.txt",
+      "reports/reviews/phase8-stop-result-s1/s1_reverse_result.txt",
+      "reports/reviews/phase8-stop-result-s1/existing_regression_summary.txt",
+      "reports/reviews/phase8-stop-result-s1/keil_rebuild_all_after.txt"
+    ],
+    "outside_repo_kept": "Keil 完整日志、各 runner 工作目录与 exe/构建产物一律留仓外(独立 run_id，旧结果保留)；未生成 ZIP",
+    "docs_sync": ["BSP 开发进度.md", "BSP 待办事项.md", "tests/host/README.md"]
+  },
+  "hardware_authorization": "NONE —— 不开串口/调试会话，不读写真实 GPIO/TMC，不烧录/复位/下载，不改供电/模块/接线/SW1，不接电机、不输出 STEP，不开 IRQ/改极性/清真机故障、不翻四道宏、不运行历史采集工具。主机模拟调用这些 API 不等于允许对真实板执行。",
+  "status": "STOP: AWAITING_INDEPENDENT_REVIEW",
+  "next_step_owner": "独立复审方（按实际代码）；本 Agent 不自动开始 S2/F2e/F3"
+}

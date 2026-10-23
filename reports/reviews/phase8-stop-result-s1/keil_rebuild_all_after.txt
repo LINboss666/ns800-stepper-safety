@@ -1,0 +1,20 @@
+# Keil Rebuild All（离线编译，零硬件动作）project.uvprojx / ARMCLANG
+# 命令: UV4.exe -r project.uvprojx -j0 -o <仓外日志>   工具退出码=0(0=无错误无警告)
+# tested_commit=62873bd8aa851ae3010dd1c04cba0aa3e1e22821
+
+## 构建钩子只读复核（改前改后一致，未执行下载/复位/串口）
+BeforeMake: RunUserProg1=0 RunUserProg2=0（两个用户程序名均为空）
+AfterMake : RunUserProg1=1 -> "fromelf --bin !L --output rtthread.bin"（仅生成 bin, 无下载/复位/串口）
+BeforeCompile/PostBuild 未启用其他用户程序
+
+## 结果摘录（原样）
+Program Size: Code=151866 RO-data=68918 RW-data=2184 ZI-data=83428  
+".\build\rt-thread.axf" - 0 Error(s), 0 Warning(s).
+Build Time Elapsed:  00:00:13
+
+## 与上一轮(安全数据语义 GO 后)的尺寸差异
+上一轮: Code=148530 RO-data=64730 RW-data=2176 ZI-data=83412
+本轮: Program Size: Code=151866 RO-data=68918 RW-data=2184 ZI-data=83428  
+增量  : Code +3336, RO +4188, RW +8, ZI +16
+# RO 增量主要来自本轮新增的中文日志字面量(如实报告用的 rt_kprintf 文本)，不是新增逻辑本身；
+# 逐项归属未做单独测量，此处不做超出数据的解释。四道宏仍 RT_FALSE，主机测试源与 shim 不进工程。

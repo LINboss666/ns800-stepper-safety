@@ -1,0 +1,53 @@
+# STEP 关断(disable)调用点与返回值消费审计 —— 行号取自 tested_commit=62873bd8aa851ae3010dd1c04cba0aa3e1e22821 的当前源码
+# 口径: 生产代码里 rt_pwm_disable() 的直接调用点只有 2 个; 其余全部经由这两条 checked 入口。
+
+## 1) 直接调用 rt_pwm_disable() 的位置（全仓 applications 范围）
+rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/motor.c:221:    e = rt_pwm_disable(mot_pwm, MOTOR_PWM_CH);
+rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/step_pwm.c:98:    e = rt_pwm_disable(step_pwm, STEP_PWM_CH);
+
+## 2) Motor 侧唯一关断入口 mot_pwm_output_off(src) 的全部调用点 + 结果消费方式
+#  返回值一律被具名变量接住并参与控制流(无 void 吞掉); 记账进快照 stop_result/stop_src/stop_rc/stop_fail_latched
+210:static rt_err_t mot_pwm_output_off(rt_uint8_t src)
+260:        return mot_pwm_output_off(MOT_STOP_SRC_RAMP_ZERO);
+297:    rt_err_t pe = mot_pwm_output_off(src);
+388:    pe = mot_pwm_output_off(MOT_STOP_SRC_GUARD_STOP);
+516:        rt_err_t pe = mot_pwm_output_off(MOT_STOP_SRC_RAMP_ZERO);
+538:            mot_pwm_output_off(MOT_STOP_SRC_APPLY_FAIL);
+695:    pe = mot_pwm_output_off(MOT_STOP_SRC_INIT);
+843:        pe = mot_pwm_output_off(MOT_STOP_SRC_ARM_ROLLBACK);
+873:            pe = mot_pwm_output_off(MOT_STOP_SRC_ARM_ROLLBACK);
+908:    pe = mot_pwm_output_off(MOT_STOP_SRC_DISARM);
+1110:    pe = mot_pwm_output_off(MOT_STOP_SRC_ESTOP);
+
+## 3) 诊断侧唯一关断入口 step_pwm_disable_checked(src) 的调用点
+64:static rt_err_t step_pwm_disable_checked(rt_uint8_t src)
+153:        rt_err_t se = step_pwm_disable_checked(MOT_STOP_SRC_DIAG_TEST);
+250:    return step_pwm_disable_checked(MOT_STOP_SRC_DIAG_FORCE);
+
+## 4) 停机动作返回值传播(谁消费、怎么解释)
+#  motor_disarm()/motor_emergency_stop(): return mot_stop_merge(pwm_rc, gpio_rc) —— PWM 失败优先, 两个原始 rc 各自留档
+231:static rt_err_t mot_stop_merge(rt_err_t pwm_e, rt_err_t gpio_e)
+713:        return mot_stop_merge(pe, e);
+852:        e = mot_stop_merge(pe, e);
+882:            e = mot_stop_merge(pe, -RT_EPERM);
+932:    return mot_stop_merge(pe, ge);
+1136:    return mot_stop_merge(pe, ge);
+#  safety_force_shutdown: estop_e=motor_emergency_stop(); diag_e=step_pwm_force_stop(); 两者都执行不跳过
+165:    estop_e = motor_emergency_stop();
+166:    diag_e  = step_pwm_force_stop();
+#  fault_reset: 读 motor_get_stop_state()/step_pwm_get_stop_state() 后才决定是否清除
+186:    motor_get_stop_state(&m_res, &m_src, &m_rc, &m_lat);
+187:    step_pwm_get_stop_state(&d_res, &d_rc, &d_lat);
+481:    motor_get_stop_state(&m_res, &m_src, &m_rc, &m_lat);
+482:    step_pwm_get_stop_state(&d_res, &d_rc, &d_lat);
+#  锁存清除口(唯一调用点=人工恢复复核之后)
+rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/motor.c:198: * fault_reset 的人工恢复复核经 motor_clear_stop_latch() 清除(合同 4.4)。 */
+rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/safety_state.c:480:     *   motor_clear_stop_latch()/step_pwm_clear_stop_latch() 调用, 都在全部复核通过之后。 */
+rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/safety_state.c:511:    if (m_lat) motor_clear_stop_latch();
+rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/safety_state.c:512:    if (d_lat) step_pwm_clear_stop_latch();
+rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/step_pwm.c:51: * 解除只由 step_pwm_clear_stop_latch() 执行, 其唯一合法调用点是 fault_reset() 的
+
+## 5) 审计结论
+#  - 不再存在"写 0 频率即视为已关断"的路径: mot_pwm_apply(0) 也委派给 checked 入口(motor.c:260)
+#  - 未新增自动重试: 每个停机动作内 disable 至多调用一次(mot_fail_closed 沿用原有结构, 见 motor.c:297)
+#  - 诊断侧"未持有/未取得句柄/曾失败"三种情形在 step_pwm.c:64-118 分开表述, 不互相冒充

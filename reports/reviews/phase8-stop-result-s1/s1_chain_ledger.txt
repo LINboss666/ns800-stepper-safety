@@ -1,0 +1,102 @@
+# S1 关断结果可信链 —— 逐例台账（真实执行输出；已脱敏，不含本机绝对路径）
+# tested_commit=62873bd8aa851ae3010dd1c04cba0aa3e1e22821
+# runner=tests/host/run_stop_result_s1.sh  fixture=tests/host/ps_main.c  shim=tests/host/shim_ps/
+# 真编译并真执行的生产源文件: applications/step_pwm.c + applications/motor.c + applications/safety_state.c
+# 夹具 run_id: normal=20261023T070248Z-10040 (仓外独立目录, 旧结果保留)
+
+## run_id / 基线 / 编译器 / 矩阵（runner 自报 + 真实进程 rc）
+S1_RUNNER_RC=0
+S1_DETECTED_FAIL=0
+run_id=20261023T070248Z-10040
+baseline=62873bd8aa851ae3010dd1c04cba0aa3e1e22821
+target | OK 必需用例=36 全部PASS 实际行数=36 自报 fail=0 proc_rc=0
+host_ovr | OK 必需用例=45 全部PASS 实际行数=45 自报 fail=0 proc_rc=0
+
+### 变体 target（四道硬件宏全部 RT_FALSE = 目标发布配置）—— 逐例结果
+VARIANT|target
+CASE|PS01a-init_disable_fail_rc|PASS|init rc=-12 (期望透传 rt_pwm_disable 的 -RT_EIO, 不称成功)
+CASE|PS01b-init_disable_fail_still_low|PASS|关断失败仍尝试撤销许可: LOW 写 0->1, 焊盘实测=0
+CASE|PS01c-init_no_ramp_thread_not_healthy|PASS|thread create=0(startup=0) health=FAILED
+CASE|PS01d-init_records_unknown_and_latches|PASS|stop=api-failed(output-UNKNOWN) src=init rc=-12 latched=1
+CASE|PS01e-init_success_control_creates_thread|PASS|init rc=0 create=1 startup=1 health=OK
+CASE|PS01f-init_success_updates_but_keeps_latch|PASS|stop=api-accepted(驱动接受关断, 非波形证明) latched=1 (一次成功只更新当前结果, 不清锁存)
+CASE|PS02a-estop_pwmfail_returns_pwm_rc|PASS|rc=-12 stop_rc=-12 (PWM 失败优先返回)
+CASE|PS02b-estop_pwmfail_low_action_counted|PASS|disable 4->5, LOW 写 4->5
+CASE|PS02c-estop_pwmfail_output_still_running|PASS|桩侧模拟输出仍在运行=1 (disable 失败时桩不清输出)
+CASE|PS02d-estop_pwmfail_records_unknown|PASS|stop=api-failed(output-UNKNOWN) src=emergency-stop latched=1
+CASE|PS03a-both_fail_keeps_both_rc|PASS|outer=-12 pwm_stop_rc=-12 gpio_write_rc=-8 (两项原始 rc 都留档)
+CASE|PS03b-gpio_only_fail_keeps_gpio_rc|PASS|outer=-8 stop=api-accepted(驱动接受关断, 非波形证明) (只有许可写失败时返回它的 rc)
+CASE|PS03c-all_ok_returns_eok_only_api_accepted|PASS|rc=0 stop=api-accepted(驱动接受关断, 非波形证明) running=0 state=4 (EOK 只称驱动接受了关断请求)
+CASE|PS04a-disarm_fail_rc_is_pwm|PASS|disarm rc=-12 stop_rc=-12 stop=api-failed(output-UNKNOWN) (不得解释成只是 GPIO 失败)
+CASE|PS04b-disarm_fail_not_clean_idle|PASS|state=4(FAULT=4) armed=0 latched=1 src=disarm - 不回正常可启动 IDLE
+CASE|PS04c-arm_refused_with_bit7|PASS|arm rc=-8 mask=0x41 bit7=1
+CASE|PS04d-no_high_write_on_refused_takeover|PASS|start rc=-8 HIGH 写次数 0->0 armed=0 (拒绝路径不得请求使能)
+CASE|PS05h-not-held-close_is_not_a_failure|PASS|rc=0 disable 13->13 last=not-attempted latched=0 active=0 off_confirmed=1
+CASE|PS05i-never-held_status_no_false_claim|PASS|捕获: no(安全)=0 UNKNOWN=0 not-attempted=1
+CASE|PS06a-motor_close_and_low_always_attempted|PASS|disable 15->16 (want +1: motor), LOW 写 15->16
+CASE|PS06b-latches_with_one_blackbox_trigger|PASS|state=FAULT_LATCHED code=9 bb 4->5
+CASE|PS06c-no_false_step_stopped|PASS|捕获含 'STEP stopped'=0 含 'NOT-confirmed'=1
+CASE|PS06d-no_event_self_excitation|PASS|停机内部 event send 0->0 bits=0x0
+CASE|PS08a-clear_refused_when_pwm_uncertain|PASS|state=FAULT_LATCHED code=9 (保持锁存与非零故障码)
+CASE|PS08b-clear_still_runs_input_and_enn_checks|PASS|ENN 有界确认 2->3, DIAG 实测读=5 (原检查没被跳过)
+CASE|PS08c-successful_stop_no_auto_recover|PASS|stop=api-accepted(驱动接受关断, 非波形证明) latched=1 state=FAULT_LATCHED bit7=1 HIGH 写 0->0
+CASE|PS09a-manual_clear_after_off_confirmed|PASS|state=MANUAL_CLEAR code=0 motor_latched=0 diag_latched=0 stop=api-accepted(驱动接受关断, 非波形证明) src=disarm rc=0 diag=not-attempted
+CASE|PS09b-no_auto_output_or_enable_after_clear|PASS|enable 0->0 motor_state=0 armed=0 safety=MANUAL_CLEAR (仍需自检+重新 arm)
+CASE|PS10a-nosample_still_attempts_both_closes|PASS|disable 19->20(want +1) LOW 写 19->20 state=FAULT_LATCHED code=9
+CASE|PS10b-enn_unknown_and_pwm_fail_recorded_separately|PASS|stop=api-failed(output-UNKNOWN) pad_low=1 (ENN 无样本没有抹掉 PWM 失败, 反之亦然)
+CASE|PS10c-post_disarm_recheck_still_bites|PASS|state=FAULT_LATCHED code=9 (后置 ENN 复核仍然拒绝清除)
+CASE|PS11a-arm_refused_by_enable_path_macro|PASS|arm rc=-8 mask=0x1 HIGH 写=0
+CASE|PS11b-diag_step_denied|PASS|grant rc=-8 enable 次数 0->0
+CASE|PS11c-tmc_write_gate_has_macro_bit|PASS|write gate mask=0x1
+CASE|PS11d-status_queries_have_no_side_effects|PASS|disable 22->22 enable 0->0 write 22->22 bus 0->0
+CASE|PS11e-snapshot_and_readonly_agree|PASS|snap stop=4 src=7 rc=0 latched=0 armed=0 vs api stop=4 src=7 rc=0
+SUMMARY|cases=36 pass=36 fail=0 pre_bad=0
+
+### 变体 host_ovr（-DPS_GATE_HOST_OVERRIDE + 三道宏仅主机置 TRUE）—— 逐例结果
+VARIANT|host_ovr
+CASE|PS01a-init_disable_fail_rc|PASS|init rc=-12 (期望透传 rt_pwm_disable 的 -RT_EIO, 不称成功)
+CASE|PS01b-init_disable_fail_still_low|PASS|关断失败仍尝试撤销许可: LOW 写 0->1, 焊盘实测=0
+CASE|PS01c-init_no_ramp_thread_not_healthy|PASS|thread create=0(startup=0) health=FAILED
+CASE|PS01d-init_records_unknown_and_latches|PASS|stop=api-failed(output-UNKNOWN) src=init rc=-12 latched=1
+CASE|PS01e-init_success_control_creates_thread|PASS|init rc=0 create=1 startup=1 health=OK
+CASE|PS01f-init_success_updates_but_keeps_latch|PASS|stop=api-accepted(驱动接受关断, 非波形证明) latched=1 (一次成功只更新当前结果, 不清锁存)
+CASE|PS02a-estop_pwmfail_returns_pwm_rc|PASS|rc=-12 stop_rc=-12 (PWM 失败优先返回)
+CASE|PS02b-estop_pwmfail_low_action_counted|PASS|disable 4->5, LOW 写 4->5
+CASE|PS02c-estop_pwmfail_output_still_running|PASS|桩侧模拟输出仍在运行=1 (disable 失败时桩不清输出)
+CASE|PS02d-estop_pwmfail_records_unknown|PASS|stop=api-failed(output-UNKNOWN) src=emergency-stop latched=1
+CASE|PS03a-both_fail_keeps_both_rc|PASS|outer=-12 pwm_stop_rc=-12 gpio_write_rc=-8 (两项原始 rc 都留档)
+CASE|PS03b-gpio_only_fail_keeps_gpio_rc|PASS|outer=-8 stop=api-accepted(驱动接受关断, 非波形证明) (只有许可写失败时返回它的 rc)
+CASE|PS03c-all_ok_returns_eok_only_api_accepted|PASS|rc=0 stop=api-accepted(驱动接受关断, 非波形证明) running=0 state=4 (EOK 只称驱动接受了关断请求)
+CASE|PS04a-disarm_fail_rc_is_pwm|PASS|disarm rc=-12 stop_rc=-12 stop=api-failed(output-UNKNOWN) (不得解释成只是 GPIO 失败)
+CASE|PS04b-disarm_fail_not_clean_idle|PASS|state=4(FAULT=4) armed=0 latched=1 src=disarm - 不回正常可启动 IDLE
+CASE|PS04c-arm_refused_with_bit7|PASS|arm rc=-8 mask=0x40 bit7=1
+CASE|PS04d-no_high_write_on_refused_takeover|PASS|start rc=-8 HIGH 写次数 0->0 armed=0 (拒绝路径不得请求使能)
+CASE|PS05h-not-held-close_is_not_a_failure|PASS|rc=0 disable 13->13 last=not-attempted latched=0 active=0 off_confirmed=1
+CASE|PS05i-never-held_status_no_false_claim|PASS|捕获: no(安全)=0 UNKNOWN=0 not-attempted=1
+CASE|PS05a-force_stop_fail_keeps_owner|PASS|rc=-12 active=1 off_confirmed=0 latched=1 last=api-failed(output-UNKNOWN)
+CASE|PS05b-repeat_stop_still_not_released|PASS|active=1 last_rc=-12 latched=1 running=1
+CASE|PS05c-new_diag_enable_refused|PASS|enable 次数 1->1 (必须不变)
+CASE|PS05f-grant_refused_by_diag_latch|PASS|grant rc=-8 off_confirmed=0 (宏全开也不放行未复核的关断失败)
+CASE|PS05d-motor_takeover_refused|PASS|arm rc=-23 active=1 armed=0
+CASE|PS05e-step_status_not_reported_safe|PASS|捕获含 no(安全)=0 含 UNKNOWN=1
+CASE|PS05g-owner_released_success_latch_kept|PASS|active=1 latched=1 last=api-accepted(驱动接受关断, 非波形证明) (成功后所有权交回, 但锁存保留)
+CASE|PS06a-motor_close_and_low_always_attempted|PASS|disable 20->22 (want +2: motor + diag), LOW 写 17->18
+CASE|PS06b-latches_with_one_blackbox_trigger|PASS|state=FAULT_LATCHED code=9 bb 5->6
+CASE|PS06c-no_false_step_stopped|PASS|捕获含 'STEP stopped'=0 含 'NOT-confirmed'=1
+CASE|PS06d-no_event_self_excitation|PASS|停机内部 event send 0->0 bits=0x0
+CASE|PS08a-clear_refused_when_pwm_uncertain|PASS|state=FAULT_LATCHED code=9 (保持锁存与非零故障码)
+CASE|PS08b-clear_still_runs_input_and_enn_checks|PASS|ENN 有界确认 2->3, DIAG 实测读=6 (原检查没被跳过)
+CASE|PS08c-successful_stop_no_auto_recover|PASS|stop=api-accepted(驱动接受关断, 非波形证明) latched=1 state=FAULT_LATCHED bit7=1 HIGH 写 0->0
+CASE|PS09a-manual_clear_after_off_confirmed|PASS|state=MANUAL_CLEAR code=0 motor_latched=0 diag_latched=0 stop=api-accepted(驱动接受关断, 非波形证明) src=disarm rc=0 diag=api-accepted(驱动接受关断, 非波形证明)
+CASE|PS09b-no_auto_output_or_enable_after_clear|PASS|enable 2->2 motor_state=0 armed=0 safety=MANUAL_CLEAR (仍需自检+重新 arm)
+CASE|PS10a-nosample_still_attempts_both_closes|PASS|disable 26->28(want +2) LOW 写 21->22 state=FAULT_LATCHED code=9
+CASE|PS10b-enn_unknown_and_pwm_fail_recorded_separately|PASS|stop=api-failed(output-UNKNOWN) pad_low=1 (ENN 无样本没有抹掉 PWM 失败, 反之亦然)
+CASE|PS10c-post_disarm_recheck_still_bites|PASS|state=FAULT_LATCHED code=9 (后置 ENN 复核仍然拒绝清除)
+CASE|PS07a-ramp_zero_fail_not_normal_idle|PASS|state=4 safety=RUN running=1 current_hz=0(命令值) disable 31->32
+CASE|PS07b-ramp_zero_fail_consumes_error|PASS|stop=api-failed(output-UNKNOWN) src=ramp-zero rc=-12 latched=1 event 0->1
+CASE|PS07c-apply_fail_failclosed_consumes|PASS|state=4 disable +2 src=fail-closed stop=api-failed(output-UNKNOWN) latched=1 event +1
+CASE|PS07d-guard_stop_uses_checked_off|PASS|state=4 src=guard-stop disable 38->39 stop=api-accepted(驱动接受关断, 非波形证明) latched=0
+CASE|PS07d2-guard_stop_latches_on_fail|PASS|stop=api-failed(output-UNKNOWN) src=guard-stop latched=1 disable 41->42
+CASE|PS07e-arm_rollback_pwm_rc_first|PASS|arm rc=-12 stop_rc=-12 src=arm-rollback latched=1 LOW 写=37
+CASE|PS09c-arm_works_again_after_recovery|PASS|arm rc=0 mask=0x0
+SUMMARY|cases=45 pass=45 fail=0 pre_bad=0

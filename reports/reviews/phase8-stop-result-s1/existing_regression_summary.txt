@@ -1,0 +1,52 @@
+# 既有回归（本轮实际修改 motor/safety_state/step_pwm + 夹具签名，按要求全部重跑一次）
+# tested_commit=62873bd8aa851ae3010dd1c04cba0aa3e1e22821；旧 ID 与断言未改、无全局 override、无跳过
+
+## 1) tests/host/build_and_run.sh  (V1=发布三宏 FALSE / V2=仅主机覆盖)
+V1 build rc = 0  (log: v1_build.txt)
+HOST TEST SUMMARY: CHECK_PASS=25 CHECK_FAIL=0 BAD_SELFTEST=0 MISSING_CASE=0
+V2 build rc = 0  (log: v2_build.txt)
+HOST TEST SUMMARY: CHECK_PASS=22 CHECK_FAIL=0 BAD_SELFTEST=0 MISSING_CASE=0
+  RUNNER RESULT: PASS (rc=0)
+
+## 2) tests/host/run_io_behavior.sh  (真编译 safety_gpio/thread/state + motor)
+off_target | OK 必需用例=27 全部PASS 自报fail=0 proc_rc=0 (输出 8502 字节)
+on_target | OK 必需用例=29 全部PASS 自报fail=0 proc_rc=0 (输出 9788 字节)
+off_ovr | OK 必需用例=40 全部PASS 自报fail=0 proc_rc=0 (输出 20337 字节)
+on_ovr | OK 必需用例=42 全部PASS 自报fail=0 proc_rc=0 (输出 22425 字节)
+IO RUNNER RESULT: PASS (rc=0) —— 4 个变体的必需用例全部真执行且判 PASS, 非法宏值被编译拒绝
+
+## 3) tests/host/run_negatives.sh  (13 例负例 + 自动调用元负例 M1..M5, 不重复跑同一组)
+执行集合(13) 与请求集合(13) 一致: 是
+类别计数: OK=13 NOT-DETECTED=0 INFRA-FAIL=0
+RUNNER(run_negatives): 所有负例按预期被检出且身份齐备; 干净回归通过 (rc=0)
+      [.] 执行集合与请求集合一致(1 例)
+  => META-OK | M1_blinded_fd7b
+      [.] 执行集合与请求集合一致(1 例)
+  => CONTROL-OK | M1_control_unblinded
+      [.] 执行集合与请求集合一致(11 例)
+  => META-OK | M2_stubbed_compile
+      [.] 执行集合与请求集合一致(11 例)
+  => CONTROL-OK | M2_control_real_compiler
+  => META-OK | M3_runner_exit_zero_lost
+  => CONTROL-OK | M3_control_unmodified
+  => META-OK | M4_selection_semantics
+  => META-OK | M5_wrong_reason_guard
+META-OK | M1_blinded_fd7b
+CONTROL-OK | M1_control_unblinded
+META-OK | M2_stubbed_compile
+CONTROL-OK | M2_control_real_compiler
+META-OK | M3_runner_exit_zero_lost
+CONTROL-OK | M3_control_unmodified
+META-OK | M4_selection_semantics
+META-OK | M5_wrong_reason_guard
+已执行元负例组: M1 M1c M2 M2c M3 M3c M4 M5 / 请求组: M1 M1c M2 M2c M3 M4 M5
+
+## 4) tests/host/run_safety_data_semantics.sh  (源与夹具未改, 因 motor.h 可能影响编译 → 默认 OFF/ON 各跑一次)
+off_target | OK 必需用例=21 全部PASS 自报fail=0 proc_rc=0 (输出 4564 字节)
+on_target | OK 必需用例=20 全部PASS 自报fail=0 proc_rc=0 (输出 4349 字节)
+SD RUNNER RESULT: PASS (rc=0) —— 两个变体的必需用例全部真执行且判 PASS
+
+## 5) 本轮不重跑项与原因（不冒称为本轮重新执行）
+#  - R4/SW1 采集与验收工具未改、且 sw1_cut.ps1 的 T-01/T-02 仍 HOLD → 未运行任何采集脚本
+#  - sd_runner_rework_check.sh(SD-NEW-01/02 返修回归)未改该 runner → 不重跑; 新 S1 runner 直接沿用同一纪律
+#  - inject.py / env.sh / 已审 runner 零改动(git status 可核): 本轮新增的是**并列**的第四套链

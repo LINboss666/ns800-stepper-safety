@@ -1,0 +1,94 @@
+phase8-stop-result-s1 · 证据包说明（NOTES）
+=================================================================
+任务书: NS800_Stop_Result_S1_Qoder_Task_20261023.md（ID `phase8-stop-result-s1`）
+仓库/分支: LINboss666/ns800-stepper-safety @ phase8/tmc-drive-config
+开发基线: 1c45823d7b498706f166fc856521b8d564870748（开工前远端该分支仍等于此值，无他人前进）
+tested_commit（生产内容）: 62873bd8aa851ae3010dd1c04cba0aa3e1e22821
+本轮性质: 离线固件 + 主机注入验证 + Keil 编译 + 普通 commit/push；**零硬件授权**。
+
+本包文件
+-----------------------------------------------------------------
+- disable_call_site_audit.txt      STEP 关断调用点与返回值消费审计（行号取自 tested_commit）
+- s1_chain_ledger.txt              新链 target(36) / host_ovr(45) 逐例真实结果
+- s1_reverse_result.txt            两项仓外反向注入的真实 rc 与指定失败身份
+- existing_regression_summary.txt  既有 V1/V2、I/O 138 例、13 例负例+元负例、SD 41 例的重跑结果
+- keil_rebuild_all_after.txt       Rebuild All 的钩子只读复核、0 Error/0 Warning 与尺寸
+- NOTES.txt                        本文件：真实失败与修正、未验边界、口径
+
+1. 唯一目标是怎么落的
+-----------------------------------------------------------------
+"PWM 关断 API 失败时，软件不能返回停机成功 / 不得释放诊断所有权 / 不得允许清除故障或
+重新输出；仍须尝试撤销驱动许可，并如实记录每一步结果。" 落点：
+
+- 语义: applications/stop_result.h 把"关断结果""许可(PC.23)写确认""ENN(PC.6)反馈"分成
+  三件独立的事；`rt_pwm_disable()==RT_EOK` 一律只称"驱动 API 接受了关断请求"。
+- 记账: 快照末尾追加 stop_result/stop_src/stop_rc/stop_fail_latched（旧字段次序、既有枚举
+  数字、黑匣子格式均未重排）；motor_status / step_status / gate7 detail 分列显示。
+- 传播: motor_disarm()/motor_emergency_stop() 返回值 = PWM 失败优先，两个原始 rc 各自留档；
+  init 关断失败仍尝试许可 LOW，但不建斜坡线程、health=FAILED、不称 init 成功；
+  ramp 到 0 / apply 失败回退 / arm 回滚 / 守卫停机 四条路径全部消费真实结果。
+- 收紧: 第 7 门 MOT_GATE_STOP_UNCONFIRMED（只在前六道位之后追加，1u<<6），失败或未取得
+  设备一律锁存；诊断侧失败不释放 owner，且不允许再 enable 覆盖未处理的失败。
+- 恢复: fault_reset 增加"两条输出路径本次都有有效关断结果"的复核；PWM 仍失败/未知则
+  保持锁存与非零故障码。S1 锁存的解除点只有 fault_reset 复核之后（无 MSH 旁路，
+  motor_clear_stop_latch/step_pwm_clear_stop_latch 各只有一个调用者，见审计表）。
+- 不自激: 统一停机内部不投事件；黑匣子仍只触发一次；故障码编号与格式未动
+  （软件关断失败沿用投递方给的 code，通常是 FAULT_SOFT），详细 rc 由快照与日志保存。
+
+2. 本轮真实失败与修正（原样保留，不粉饰）
+-----------------------------------------------------------------
+1) PS06c 首次 FAIL：我给"关断未确认"写的拒绝日志里包含字面量 `STEP stopped`
+   （句子是"不打印'STEP stopped'"），于是"不得出现该字样"的判据被自家文案触发。
+   修正＝改措辞为"不谎称输出已停"，判据本身没有放宽。
+2) PS09a（target 变体）首次 FAIL：断言要求诊断侧最近一次结果=API 接受，但目标宏下诊断
+   从未持有该通道，结果恒为 not-attempted。修正＝把"从未占用该通道"承认为有效情形之一
+   （不虚构一次成功关断），并把"带锁存的收紧门"与"恢复门"分开。
+3) 人工恢复被自家判据堵死（鸡生蛋）：fault_reset 最初用 step_pwm_off_confirmed() 判断
+   诊断侧，而该函数把"失败锁存"也算无效 → 锁存永远清不掉。修正＝恢复门只看"当前结果是否
+   有效"，arm/start/诊断借用才使用带锁存的 off_confirmed()。
+4) 诊断侧"未持有句柄"被误判成"未取得设备 + 锁存"：初版只检查句柄，凡是没跑过 pwm_test
+   的路径 force_stop 都记 DEV_UNAVAILABLE 并锁存，导致夹具的恢复前置一直失败。
+   修正＝区分三种情形：未持有输出（无需动作，不谎报也不新置锁存）/ 持有输出却无句柄（未知，
+   锁存）/ disable 失败（未知，锁存且不释放所有权）。
+5) PS07d 第二轮 FAIL：运行守卫只在 armed 时复核，上一轮停机已把 armed 清 0，第二次 20 拍
+   根本没产生关断动作。修正＝第二次尝试前先按生产路径重新 arm（不改被测代码）。
+6) 反向②第一次被判成 INFRA-FAIL（rc=2）：夹具的前置不成立时我 `return` 跳过了整组用例，
+   造成"必需 id 缺席"——这正是上一轮 SD-NEW-01 教训的同类形状。修正＝前置不成立不再跳过
+   用例（继续执行让断言自己判 FAIL），且前置不成立按**业务失败**计 rc=1；只有夹具真的
+   跑不起来（FATAL）才用 rc=2，那种情况 runner 一律判基础设施故障。
+7) 既有夹具必须跟签名：step_pwm_force_stop 由 void 改 rt_err_t，host_main.c / io_main.c
+   两处桩同步，并补 step_pwm_get_stop_state / step_pwm_off_confirmed /
+   step_pwm_clear_stop_latch 三个桩。桩一律返回真实语义的值（EOK=驱动接受关断），
+   不替固件伪造成功状态；既有 138 例与 V1/V2 未放宽并全部通过。
+
+3. 本轮做过的一次结构性改动（请复审重点核这一条）
+-----------------------------------------------------------------
+motor.c 的斜坡线程循环体被抽成 `static void motor_ramp_tick(void)`，
+`motor_ramp_entry()` 变成 `while(1){ tick(); mdelay(10); }`。原因与等价性论证写在
+motor.c 的 S1 注释里（mdelay 唯一化、guard 计数器由栈上改文件内 static、取锁点与
+分支顺序不变）。改后既有 I/O 行为链 138 例逐条结果与改前一致（见回归摘要）。
+主机链用这个单步入口来确定性执行"斜坡减到 0""apply 失败回退""守卫停机"三拍，
+因此本轮**没有**改动线程结构、锁顺序或 UART 算法。
+
+4. 未验与边界（不得被读成已完成）
+-----------------------------------------------------------------
+- 板上固件仍是 USER_REPORTED_E40；本轮不读回 Flash、不烧录、不开串口、不碰 GPIO/TMC。
+- `rt_pwm_disable()==RT_EOK` 只称"驱动接受了关断请求"；STEP 是否真无脉冲仍需示波器验收
+  （BUG-008 未闭），主机桩的"模拟输出是否仍在跑"不是波形证据。
+- 停机时延没有上界结论：本轮未测量、也未改锁等待与 UART 阻塞；405ms 那段注释已去掉
+  "可靠上界"的误导表述，保留未测量口径。RISK-03/03a、RISK-04-b 继续开放。
+- S2 明确未做：ss_lock/mot_lock/TMC 配置事务/UART xfer 的 RT_WAITING_FOREVER、
+  在途 arm/enable 与停机的竞争、线程重构。本轮不声称"在途操作取消已验证"。
+- 主机链是单线程确定性夹具（rt_thread_create 只计次数），不模拟调度、优先级继承、
+  中断上下文；PS05a..g / PS07* / PS09c 的前置（诊断持有通道、arm 成功、斜坡真跑）在
+  目标四宏 FALSE 下不可达，因此那组 ID 只登记在 host_ovr 变体，目标变体用 PS11* 与
+  PS05h/PS05i 覆盖同一批代码路径的可达部分。
+- RO-data +4188 的增量主要来自新增中文日志字面量；逐项归属未单独测量，不做超出数据的解释。
+- 门芯片损坏是**维修前**的历史解释：静态电气与现有 SW1 急停功能已按用户确认登记为
+  PASS (USER_CONFIRMED)；四个硬件宏仍因授权范围保持 RT_FALSE，本轮未翻转任何一个。
+- 旧证据、旧采集脚本、已审 runner、inject.py、env.sh、project.uvprojx、.gitignore 均未改动。
+
+5. 交付判定
+-----------------------------------------------------------------
+本包只证明"软件与主机验证工具"范围内的行为，待独立复审；不构成硬件授权，不启动 S2/F2e/F3。
+STOP 状态见交接件 reports/agent_handoffs/phase8-stop-result-s1.md。

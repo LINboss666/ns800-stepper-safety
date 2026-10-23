@@ -36,15 +36,29 @@ REVERSE=1 bash tests/host/run_io_behavior.sh     # 该链的 3 项反向注入(�
 bash tests/host/run_safety_data_semantics.sh     # 安全数据语义链(sd_main.c + shim_sd, OFF/ON 两变体)
 REVERSE=1 bash tests/host/run_safety_data_semantics.sh   # 该链的 2 项反向注入
 bash tests/host/sd_runner_rework_check.sh        # 该 runner 两个入口的返修回归(全在仓外沙盒)
+bash tests/host/run_stop_result_s1.sh            # 关断结果可信链(ps_main.c + shim_ps, target/host_ovr)
+REVERSE=1 bash tests/host/run_stop_result_s1.sh  # 该链的 2 项反向注入(只改仓外单文件副本)
 ```
 
-三条链**并列且互不复用夹具**, 因为"真编译哪几个生产模块"不同:
+四条链**并列且互不复用夹具**, 因为"真编译哪几个生产模块"不同:
 
 | 链 | 真编译的生产模块 | 桩 |
 |---|---|---|
 | `build_and_run.sh` (`host_main.c` + `shim/`) | `tmc2209.c` + `motor.c` | 安全 GPIO/线程/状态/STEP 全为桩 |
 | `run_io_behavior.sh` (`io_main.c` + `shim_io/`) | `safety_gpio.c` `safety_thread.c` `safety_state.c` `motor.c` | 传感器/存储/黑匣子等为假服务 |
 | `run_safety_data_semantics.sh` (`sd_main.c` + `shim_sd/`) | `sensor_service.c` + `blackbox.c` | GPIO/RT 原语/其他传感器/电机/状态/`ns_log`(内存环) |
+| `run_stop_result_s1.sh` (`ps_main.c` + `shim_ps/`) | `step_pwm.c` + `motor.c` + `safety_state.c` | RT 原语(单线程确定性)、安全 GPIO/线程、TMC、传感器、存储、黑匣子 |
+
+关断结果链(S1)的三条桩纪律：`rt_pwm_disable` 的返回码可注入，且桩**独立**保存"模拟输出是否
+仍在跑"——**disable 失败时桩保留输出运行，不替固件把输出清掉**；许可写结果、许可脚实测电平、
+ENN 反馈判定是三个独立注入量；前置"已关断"一律由生产路径自己真实取得，不伪造成功状态过门。
+它的斜坡节拍由夹具直接单步调用生产 `motor_ramp_tick()`（`rt_thread_create` 只计次数），
+所以是确定性的，也**不**模拟调度竞争与停机时延——那属 S2。判定仍只用生产 API 返回值/状态 +
+`ps_sim_*` 计数；仅有的两处文本判据是任务书明文要求的"输出本身就是被测行为"
+（`step_status` 不得写 `no(安全)`、统一停机不得写 `STEP stopped`）。
+该 runner 不设 `ONLY`/只读校验等可选入口；台账判据与反向判据共用同一个 `validate_ledger()`：
+必需 id 出现恰好一次且判 PASS，缺席/重复/未登记/SUMMARY 与实跑行数对不上算基础设施故障，
+反向还要求副本构建成功 + 夹具合同退出码 `rc=1` + 台账自洽 + 指定失败身份全部命中。
 
 语义链的存储侧只是**内存环模拟** `ns_log_submit/read_slot/stats`, 不重建真实 Flash 驱动;
 它的线程不真起(`rt_thread_create` 返回假句柄), `rt_kprintf` 走捕获缓冲, 捕获文本仅用于

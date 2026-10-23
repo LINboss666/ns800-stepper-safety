@@ -1,0 +1,57 @@
+# S1 反向验证（两项，只改**仓库外**一次性副本；不修改仓库源码，不新增 M 系列）
+# tested_commit=62873bd8aa851ae3010dd1c04cba0aa3e1e22821   run_id=20261023T070306Z-10552
+# 判据(与正向同一个 validate_ledger): 副本构建成功 + 夹具合同退出码 rc=1 + 完整自洽台账 + 指定 FAIL 身份全部命中
+# 非 0/1 退出(信号/异常/夹具不自洽) => INFRA-FAIL, 不算检出; rc=0 或缺期望身份 => NOT-DETECTED
+
+## 注入 ① rev_motor_off_ignores_failure (variant=target, 文件=applications/motor.c)
+锚点(恰命中 1 次): mot_stop_record(e == RT_EOK ? MOT_STOP_API_ACCEPTED : MOT_STOP_API_FAILED, src, e);
+改为: 恒记 MOT_STOP_API_ACCEPTED 并把 e 覆写成 RT_EOK —— 即"关断 helper 忽略失败并返回成功"(S1 之前的缺陷形状)
+
+## 注入 ② rev_diag_fail_releases_owner (variant=host_ovr, 文件=applications/step_pwm.c)
+锚点(恰命中 1 次): step_stop_result = MOT_STOP_API_FAILED; + step_stop_latched = RT_TRUE;
+改为: 记失败但清 step_enabled 且**不置锁存** —— 即"诊断关断失败仍释放所有权"
+
+## runner 结果（原样）
+S1_REVERSE_RC=0
+run_id=20261023T070306Z-10552
+rev_motor_off_ignores_failure | META-OK 命中 3/3 个业务失败身份 (variant=target proc_rc=1 额外FAIL=14)
+rev_diag_fail_releases_owner | META-OK 命中 2/2 个业务失败身份 (variant=host_ovr proc_rc=1 额外FAIL=12)
+
+## 注入 ① 的期望失败身份命中情况
+(命中判定见下方 runner 汇总; 逐例 FAIL 行见 反向副本输出)
+CASE|PS01a-init_disable_fail_rc|FAIL|init rc=0 (期望透传 rt_pwm_disable 的 -RT_EIO, 不称成功)
+CASE|PS01c-init_no_ramp_thread_not_healthy|FAIL|thread create=1(startup=1) health=OK
+CASE|PS01d-init_records_unknown_and_latches|FAIL|stop=api-accepted(驱动接受关断, 非波形证明) src=init rc=0 latched=0
+CASE|PS01f-init_success_updates_but_keeps_latch|FAIL|stop=api-accepted(驱动接受关断, 非波形证明) latched=0 (一次成功只更新当前结果, 不清锁存)
+CASE|PS02a-estop_pwmfail_returns_pwm_rc|FAIL|rc=0 stop_rc=0 (PWM 失败优先返回)
+CASE|PS02d-estop_pwmfail_records_unknown|FAIL|stop=api-accepted(驱动接受关断, 非波形证明) src=emergency-stop latched=0
+CASE|PS03a-both_fail_keeps_both_rc|FAIL|outer=-8 pwm_stop_rc=0 gpio_write_rc=-8 (两项原始 rc 都留档)
+CASE|PS04a-disarm_fail_rc_is_pwm|FAIL|disarm rc=0 stop_rc=0 stop=api-accepted(驱动接受关断, 非波形证明) (不得解释成只是 GPIO 失败)
+CASE|PS04b-disarm_fail_not_clean_idle|FAIL|state=0(FAULT=4) armed=0 latched=0 src=disarm - 不回正常可启动 IDLE
+CASE|PS04c-arm_refused_with_bit7|FAIL|arm rc=-8 mask=0x1 bit7=0
+CASE|PS06c-no_false_step_stopped|FAIL|捕获含 'STEP stopped'=0 含 'NOT-confirmed'=0
+CASE|PS08a-clear_refused_when_pwm_uncertain|FAIL|state=MANUAL_CLEAR code=0 (保持锁存与非零故障码)
+CASE|PS08c-successful_stop_no_auto_recover|FAIL|stop=api-accepted(驱动接受关断, 非波形证明) latched=0 state=MANUAL_CLEAR bit7=0 HIGH 写 0->0
+CASE|PS10b-enn_unknown_and_pwm_fail_recorded_separately|FAIL|stop=api-accepted(驱动接受关断, 非波形证明) pad_low=1 (ENN 无样本没有抹掉 PWM 失败, 反之亦然)
+
+## 注入 ② 的期望失败身份命中情况
+CASE|PS05a-force_stop_fail_keeps_owner|FAIL|rc=-12 active=0 off_confirmed=0 latched=0 last=api-failed(output-UNKNOWN)
+CASE|PS05b-repeat_stop_still_not_released|FAIL|active=0 last_rc=-12 latched=0 running=1
+CASE|PS05d-motor_takeover_refused|FAIL|arm rc=0 active=0 armed=1
+CASE|PS05g-owner_released_success_latch_kept|FAIL|active=0 latched=0 last=api-failed(output-UNKNOWN) (成功后所有权交回, 但锁存保留)
+CASE|PS09a-manual_clear_after_off_confirmed|FAIL|state=FAULT_LATCHED code=9 motor_latched=1 diag_latched=0 stop=api-accepted(驱动接受关断, 非波形证明) src=disarm rc=0 diag=api-failed(output-UNKNOWN)
+CASE|PS07a-ramp_zero_fail_not_normal_idle|FAIL|state=0 safety=FAULT_LATCHED running=0 current_hz=0(命令值) disable 26->26
+CASE|PS07b-ramp_zero_fail_consumes_error|FAIL|stop=cmd-0hz-unconfirmed src=motor_stop-cmd rc=0 latched=1 event 0->0
+CASE|PS07c-apply_fail_failclosed_consumes|FAIL|state=0 disable +0 src=disarm stop=api-accepted(驱动接受关断, 非波形证明) latched=1 event +0
+CASE|PS07d-guard_stop_uses_checked_off|FAIL|state=0 src=disarm disable 28->28 stop=api-accepted(驱动接受关断, 非波形证明) latched=1
+CASE|PS07d2-guard_stop_latches_on_fail|FAIL|stop=api-accepted(驱动接受关断, 非波形证明) src=disarm latched=1 disable 29->29
+CASE|PS07e-arm_rollback_pwm_rc_first|FAIL|arm rc=-8 stop_rc=0 src=disarm latched=1 LOW 写=29
+CASE|PS09c-arm_works_again_after_recovery|FAIL|arm rc=-8 mask=0x42
+
+## 副本 SUMMARY 行(证明完整用例集合真的执行过, 不是零执行)
+SUMMARY|cases=45 pass=33 fail=12 pre_bad=21
+SUMMARY|cases=36 pass=22 fail=14 pre_bad=0
+
+## 正常对照(同一 commit, 未注入)
+target: 必需 36 例全部 PASS, proc_rc=0
+host_ovr: 必需 45 例全部 PASS, proc_rc=0
