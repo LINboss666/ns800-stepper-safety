@@ -12,11 +12,12 @@ phase8-stop-result-s1-r1 · 限定返修证据包说明（NOTES）
 本包文件
 -----------------------------------------------------------------
 - pre_post_four_items.txt          四项修前（仓外 78a1333 快照）与修后同一 ID 的真实逐例结果
-- call_site_audit_correction.txt   上一版调用点审计两条不成立结论的 dated 覆盖更正
+- call_site_audit_correction.txt   上一版调用点审计**总结性结论**的 dated 覆盖更正（历史观察保留）
 - s1_chain_ledger_after_rework.txt 修后 target 48 例 / host_ovr 64 例逐例台账
 - s1_reverse_after_rework.txt      既有两项反向在修后的重跑（构建成功 + rc=1 + 台账自洽 + 身份命中）
 - existing_regression_summary.txt  本轮实际重跑与未重跑项及依据
 - keil_rebuild_all_after.txt       钩子只读复核 + 0 Error/0 Warning + 尺寸
+- go_registration_and_claims_calibration.txt  复审 GO 登记与三条证据口径校准（复审件 §5，文档轮新增）
 - NOTES.txt                        本文件
 
 1. 四项修法与调用方合同
@@ -99,3 +100,12 @@ R04（S1-NEW-04，P2）apply 失败回退只做一次 checked 关断并携带其
 -----------------------------------------------------------------
 只证明"软件与主机验证工具"范围内的行为，待独立复审；不授权任何硬件动作，不启动
 S2/F2e/F3。状态见交接件 reports/agent_handoffs/phase8-stop-result-s1.md 第 11 节。
+
+5. 复审结论登记（2026-10-23 同日追加）
+-----------------------------------------------------------------
+独立复审件 NS800_S1_R1_Independent_Review_32a311a_20261023.md 给出 **SOFTWARE_REVIEW_GO**：
+S1-NEW-01..04 关闭，无新增阻断返修项，S1＋R1 在软件与指定主机验证范围收口；接受对象固定为
+32a311a（生产内容等同 tested_commit 8ca4f6a）。该 GO 不覆盖目标 RT 调度、PWM 物理波形与停机
+时延，也不授权任何硬件动作。本目录随后只做过一次**文档轮**口径登记与更正（见
+go_registration_and_claims_calibration.txt），未改生产源码与夹具，因此本目录内的全部数字仍
+是 8ca4f6a 一轮的真实执行，未被重跑冒充。

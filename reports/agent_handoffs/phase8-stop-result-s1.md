@@ -187,6 +187,8 @@ Keil Rebuild All **0 Error / 0 Warning**，`Code=152090 RO=69338 RW=2184 ZI=8342
 `disable_call_site_audit.txt` 曾声称"每个返回值都被具名变量接住"与"每动作至多一次关断"，
 其中两条与 `motor.c:538` 的实际不符 —— 复审 §4 要求 dated 覆盖：更正见
 `reports/reviews/phase8-stop-result-s1-r1/call_site_audit_correction.txt`；旧文件原样保留。
+（**本小节措辞以第 13.2 节为准**：应撤回的是那两条**总结性结论**，旧审计调用表里 `538` 那一行
+没有具名接收者是**当时正确**的历史观察，属证据、保留不撤回。）
 
 ### 11.5 本轮真实失败与修正
 
@@ -199,3 +201,66 @@ R03 第一版被诊断侧陈旧失败二次死锁、PS15b 断言写错观测量�
 `STOP: AWAITING_INDEPENDENT_REVIEW` —— 返修对象 `8ca4f6a`，等待独立复审按实际代码判定；
 本轮不登记 GO（复审 §6.1 明确"本轮 S1 结论 REWORK，不得先登记 GO"），不自动开始 S2/F2e/F3，
 不做任何硬件动作。S2 的无界等锁、UART 阻塞与在途 arm/enable 竞争仍未处理，无停机时延上界。
+
+## 13. 独立复审结论与 GO 登记（2026-10-23 同日，本轮＝文档轮）
+
+复审件：`NS800_S1_R1_Independent_Review_32a311a_20261023.md`
+**结论 `SOFTWARE_REVIEW_GO`（限定软件与指定主机验证范围）** —— `S1-NEW-01..04` 关闭，
+**无新增阻断返修项**，S1＋R1 收口；最终接受与阶段推进由用户决定。
+
+登记口径（复审 §6 原文口径）：
+
+> 2026-10-23：独立复审 `SOFTWARE_REVIEW_GO`，接受 `32a311a76284796ad535d1f7956e5dc101520561`，
+> 生产实现与 tested_commit 为 `8ca4f6aca62779d18345c9c3af44e5419d5c2985`。S1-NEW-01..04 关闭，
+> 无新增阻断返修项，S1＋R1 的软件与指定主机验证工作包收口。云端 Linux/GCC13.3 独立复跑修后
+> 48/64、两项反向、V1/V2、I/O 138 及 6 个补充场景通过；Keil 仅核阅 Agent 本轮 0/0 摘录，
+> 未由云端重建。本 GO 不覆盖目标 RT 调度、PWM 物理波形或停机时延，也不授权任何硬件动作。
+
+### 13.1 复审端的独立执行（与本 Agent 证据相互独立）
+
+修后 `target 48/48`、`host_ovr 64/64`（pre_bad=0，进程 0／runner 0）；Motor 反向命中
+`PS01a/PS02a/PS04a`、诊断反向命中 `PS05a/PS05b`（各自构建成功 + 进程 1 + 完整台账，总出口 0）；
+`V1 25 / V2 22`、I/O 138 例、修前同夹具对照 `44/48` 与 `47/64`、以及 6 个新进程补充场景全部按其
+真实结果记录。Keil 为 `AGENT_REPORTED`（云端未重建），真板／波形／最坏时延 `NOT_TESTED`。
+
+### 13.2 三条口径合并（复审 §5，均**不**新增返修项）
+
+1. **应撤回的是结论，不是历史观察**：上一版审计里应撤回的是"返回值一律被具名变量接住"与
+   "每个停机动作内 disable 至多一次"这两条**总结**；调用表中 `motor.c:538` 那一行（无具名接收者）
+   是当时**正确**的观察，保留、不改写成"当时就对"。已按此改写 `call_site_audit_correction.txt`
+   的开头表述（正文调用表未动，复审确认其正确）。
+2. **`PS12c` 的焊盘前提**：仓库夹具那行打印的 `pad=` 取自引脚表 level 且未置 `pad_stuck`，
+   因此 `pad=0` **不能**证明"许可实际保持 HIGH"。R01 的该前提由复审端独立探针显式置
+   `pad_stuck`＋读 `pad_level` 取得（`pad=1 running=1 dir_rc=-8 dir_writes=0`）。本轮**未改夹具**
+   （改前提就要重跑该链）；以后复用该场景时同步完善前提与观测。
+3. **总数不得用选摘充当**：修前真实总数是 `target fail=4`、`host_ovr fail=17`（另选摘条目数不是
+   总数）；反向的"额外 FAIL=19/22"是各变体**总 FAIL 数**（含已命中的指定身份），不是"另有 19/22 项"。
+   修前 host 的 `pre_bad=21` 说明串行前置会挡住后续用例，故 `PS15a` 修前那一行不能单独当作 R04
+   的独立复现 —— R04 由新进程探针直接复现并在修后确认。
+
+另：`safety_state.c` 中 `fault_reset()` 旁"这里只读、不再关断"一类旧措辞已被本轮新增的
+`step_pwm_force_stop()` 刷新行为覆盖；按复审 §5.3 **不为注释单独改 APP／重建 Keil**，已登记为
+BSP `待办事项.md` 的未决项，等下次真实生产改动时一并整理。
+
+### 13.3 本轮（文档轮）改了什么
+
+只改文档与证据文字：本 MD/JSON、BSP `README.md`／`开发进度.md`／`待办事项.md`、
+`tests/host/README.md`、r1 证据目录内 `NOTES.txt`／`call_site_audit_correction.txt` 的表述，
+并新增 `reports/reviews/phase8-stop-result-s1-r1/go_registration_and_claims_calibration.txt`。
+**生产 `.c/.h`、夹具、shim、runner、Keil 工程一律未动 ⇒ 未重跑任何链**，引用的数字全部来自
+`62873bd`（首轮）与 `8ca4f6a`（返修轮）的真实执行。
+
+顺带校准**返修轮（r1）的生产范围**（复审 §1）：实际变更只有 `motor.c`、`motor.h`、`step_pwm.c`、
+`step_pwm.h`、`safety_state.c` 五个文件 —— `stop_result.h` 是**首轮**新增的语义头，r1 零改动；
+两份头文件只改注释/契约文案，未改结构字段、枚举值或接口签名。第 2 节表格里那行 `stop_result.h`
+属于首轮记录，不应被读成 r1 的增量。范围数字：`78a1333..32a311a` = 21 文件 `+1267/−66`；
+`8ca4f6a..32a311a` 的 `.c/.h/.sh` 差异为空。
+
+## 14. STOP（覆盖第 12 节的上一状态）
+
+`STOP: SOFTWARE_REVIEW_GO_REGISTERED / AWAITING_USER_DECISION` —— S1＋R1 在**软件与指定主机
+验证范围**收口，接受对象 `32a311a`。本 GO **不等于**"安全停机可靠性全部完成"：下一主线是 **S2
+的方案制定**（锁等待、UART 阻塞、在途 arm/enable 与停机的优先关系），其**尚未设计、尚未验收、
+任务书未下达**，未经用户授权不得开工。F2e/F3、烧录、串口、GPIO/TMC、STEP／运动、开宏同样
+不在本结论内；板上仍是 `USER_REPORTED_E40`，RISK-03/03a 与 RISK-04-b 开放，`sw1_cut.ps1`
+T-01/T-02 仍 HOLD。

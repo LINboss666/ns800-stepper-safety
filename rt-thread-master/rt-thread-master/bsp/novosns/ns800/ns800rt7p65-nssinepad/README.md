@@ -74,13 +74,16 @@
   条件一字未改）；`fault_reset()` 要求两条输出路径本次都有有效关断结果才清除，S1 锁存只在这条人工
   恢复复核后解除（无 MSH 旁路）。统一停机不再打印 `STEP stopped`、黑匣子仍只一次、内部不投事件。
   新增第四套并列主机链 `tests/host/run_stop_result_s1.sh`（真编译 `step_pwm.c`+`motor.c`+
-  `safety_state.c`；返修后 target 48 例 / host_ovr 64 例 rc=0 + 两项仓外反向 META-OK）；既有 V1/V2、I/O 138 例、
-  负例+元负例、SD 41 例全部重跑未放宽；Keil **0 Error / 0 Warning**。
+  `safety_state.c`；**首轮**登记 `target 36 例 / host_ovr 45 例`，rc=0 + 两项仓外反向 META-OK）；
+  **首轮**把既有链全部重跑且未放宽：V1 25 / V2 22、I/O 138 例、13 例负例 + 元负例 M1..M5、SD 41 例；
+  Keil **0 Error / 0 Warning**（`Code=151866 RO=68918 RW=2184 ZI=83428`）。
+  ⚠ 同轮限定返修（下段）把用例登记扩到 48/64，**返修轮只重跑** S1 链 + V1/V2 + I/O 138 例 + Keil，
+  旧负例/M 系列/SD/R4/SW1 未重跑而是沿用首轮 `62873bd` 的 rc=0 证据 —— 引用时不得写成"每轮全量重跑"。
   **S2 未做**：无界等锁（`ss_lock`/`mot_lock`/UART xfer 的 `RT_WAITING_FOREVER`）、UART 阻塞对停机的
   影响、在途 arm/enable 竞争、线程重构 —— 本轮不声称任何停机时延上界，RISK-03/03a 与 RISK-04-b
   继续开放。四道宏仍 `RT_FALSE`，新源码**未烧录**，板上仍是冻结固件 `e40a9b9`；
   证据 `reports/reviews/phase8-stop-result-s1/`，交接 `reports/agent_handoffs/phase8-stop-result-s1.md`，
-  状态 `STOP: AWAITING_INDEPENDENT_REVIEW`。
+  状态 `STOP: AWAITING_INDEPENDENT_REVIEW`（随后被下面的返修段与其后的 GO 登记段覆盖）。
 
   **2026-10-23 同轮限定返修（`phase8-stop-result-s1-r1`，基线 `78a1333` → tested_commit `8ca4f6a`）**：
   复审给出 **REWORK**（主链与既有回归云端独立复跑通过，5 个补充失败场景复现 4 项合同遗漏），
@@ -90,11 +93,29 @@
   `pwm_test stop` 关断失败各投一次 `EVT_SOFT_FAULT` 交给既有链（统一停机与 `force_stop` 不投 ⇒ 不自激），
   并让 `fault_reset` 判定前刷新诊断侧以打掉"锁存 vs 人工恢复"死锁；**R04** apply 失败回退合并为
   **一次** checked 关断并携带其真实结果（`PS07c` 次数断言相应改为"恰好一次"）。
-  修前用仓外 `78a1333` 快照复现 8 条真实 FAIL；修后 `target 48/48`、`host_ovr 64/64`，两项既有反向
-  仍 META-OK（`rc=1` + 台账自洽 + 指定身份），`V1 25/V2 22` 与 I/O 138 例重跑 rc=0，
+  修前用仓外 `78a1333` 快照跑同一份夹具，真实总数 `target fail=4`、`host_ovr fail=17`（文档中按四项
+  选摘的身份条目不是总数；host 侧 `pre_bad=21` 表示串行前置会挡住后续用例）；修后 `target 48/48`、
+  `host_ovr 64/64`，两项既有反向仍 META-OK（`rc=1` + 台账自洽 + 指定身份，其"额外 FAIL=19/22"是各
+  变体总 FAIL 数而非额外项），`V1 25/V2 22` 与 I/O 138 例重跑 rc=0，
   Keil **0 Error / 0 Warning**（`Code=152090 RO=69338 RW=2184 ZI=83428`，**RW/ZI 与首轮一致**）。
   证据 `reports/reviews/phase8-stop-result-s1-r1/`（含对上一版调用点审计的 dated 更正），
-  交接第 11–12 节；**本轮不登记 GO**，仍 `STOP: AWAITING_INDEPENDENT_REVIEW`，未做任何硬件动作。
+  交接第 11–12 节；该轮按任务书 §6.1 **不登记 GO**，当时 `STOP: AWAITING_INDEPENDENT_REVIEW`。
+
+  **2026-10-23 返修复审登记 `SOFTWARE_REVIEW_GO`（件 `NS800_S1_R1_Independent_Review_32a311a_20261023.md`）**：
+  接受对象 **`32a311a76284796ad535d1f7956e5dc101520561`**（生产内容等同 tested_commit `8ca4f6a`，
+  两提交间 `.c/.h/.sh` 零差异）；**S1-NEW-01..04 关闭，无新增阻断返修项**，S1＋R1 的**软件与指定主机
+  验证范围**收口。云端 Linux/GCC 13.3 独立复跑：修后 48/64、两项局部反向（指定身份全部命中）、
+  `V1 25/V2 22`、I/O 138 例、修前同夹具对照 44/48 与 47/64，以及 6 个新宿主进程补充场景全部按其真实
+  结果记录；**Keil 只核阅本 Agent 的 0/0 摘录，云端未重建**；真板/波形/最坏时延 `NOT_TESTED`。
+  同轮合并复审 §5 三条口径（详见 `go_registration_and_claims_calibration.txt` 与交接第 13 节）：
+  ①应撤回的是旧审计的两条**总结结论**，`motor.c:538` 无具名接收者那一行是当时**正确**的历史观察、
+  保留；②`PS12c` 那行的 `pad=0` **不证明**"许可实际保持 HIGH"（夹具未置 `pad_stuck`），该前提由复审端
+  独立探针取得；③修前/反向的**总数不得用选摘充当**。`safety_state.c` 里 `fault_reset` 旁的旧"只读、
+  不再关断"措辞按 §5.3 留待下次真实生产改动整理，本轮**不为注释改 APP、未重建 Keil、未重跑任何链**。
+  **本 GO 不等于安全停机可靠性全部完成**：不覆盖目标 RT-Thread 调度、PWM 物理波形与停机时延，
+  不授权烧录/串口/GPIO/TMC/STEP/运动/开宏，也不启动 S2/F2e/F3 —— S2 仅被列为下一主线，**尚未设计、
+  任务书未下达**。四道宏仍 `RT_FALSE`，板上仍 `USER_REPORTED_E40`，RISK-03/03a 与 RISK-04-b 开放，
+  `sw1_cut.ps1` T-01/T-02 仍 HOLD。状态 **`STOP: SOFTWARE_REVIEW_GO_REGISTERED / AWAITING_USER_DECISION`**。
 
 ### 引脚映射（冻结，修改需重新做 Pinmux 冲突分析）
 

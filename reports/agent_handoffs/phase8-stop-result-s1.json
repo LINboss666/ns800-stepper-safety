@@ -140,7 +140,8 @@
       "reports/reviews/phase8-stop-result-s1/s1_chain_ledger.txt",
       "reports/reviews/phase8-stop-result-s1/s1_reverse_result.txt",
       "reports/reviews/phase8-stop-result-s1/existing_regression_summary.txt",
-      "reports/reviews/phase8-stop-result-s1/keil_rebuild_all_after.txt"
+      "reports/reviews/phase8-stop-result-s1/keil_rebuild_all_after.txt",
+      "reports/reviews/phase8-stop-result-s1-r1/go_registration_and_claims_calibration.txt"
     ],
     "outside_repo_kept": "Keil 完整日志、各 runner 工作目录与 exe/构建产物一律留仓外(独立 run_id，旧结果保留)；未生成 ZIP",
     "docs_sync": [
@@ -150,10 +151,10 @@
     ]
   },
   "hardware_authorization": "NONE —— 不开串口/调试会话，不读写真实 GPIO/TMC，不烧录/复位/下载，不改供电/模块/接线/SW1，不接电机、不输出 STEP，不开 IRQ/改极性/清真机故障、不翻四道宏、不运行历史采集工具。主机模拟调用这些 API 不等于允许对真实板执行。",
-  "status": "STOP: AWAITING_INDEPENDENT_REVIEW (返修对象 8ca4f6a; 本轮不登记 GO)",
-  "next_step_owner": "独立复审方（按实际代码）；本 Agent 不自动开始 S2/F2e/F3",
+  "status": "STOP: SOFTWARE_REVIEW_GO_REGISTERED / AWAITING_USER_DECISION (S1+R1 软件与指定主机验证范围收口, 接受对象 32a311a)",
+  "next_step_owner": "用户决定。下一主线 S2(锁等待/UART 阻塞/在途 arm-enable 与停机的优先关系)尚未设计、任务书未下达, 未经用户授权不得开工; 本 GO 不等于安全停机可靠性全部完成",
   "first_round_tested_commit": "62873bd8aa851ae3010dd1c04cba0aa3e1e22821",
-  "latest_delivery_head": "8ca4f6aca62779d18345c9c3af44e5419d5c2985",
+  "latest_delivery_head": "32a311a76284796ad535d1f7956e5dc101520561",
   "rework_r1": {
     "task_id": "phase8-stop-result-s1-r1",
     "taskbook": "NS800_Stop_Result_S1_Review_and_Rework_78a1333_20261023.md 第 6 节",
@@ -231,5 +232,36 @@
       "安全 GPIO/IRQ 线程",
       "锁序与 FOREVER 等待(S2 范围)"
     ]
-  }
+  },
+  "review_r1": {
+    "review_document": "NS800_S1_R1_Independent_Review_32a311a_20261023.md",
+    "decision": "SOFTWARE_REVIEW_GO (限定软件与指定主机验证范围)",
+    "accepted_sha": "32a311a76284796ad535d1f7956e5dc101520561",
+    "production_content_equals": "8ca4f6aca62779d18345c9c3af44e5419d5c2985 (8ca4f6a..32a311a 的 .c/.h/.sh 零差异)",
+    "items_closed": [
+      "S1-NEW-01/R01",
+      "S1-NEW-02/R02",
+      "S1-NEW-03/R03",
+      "S1-NEW-04/R04"
+    ],
+    "new_blocking_items": "无",
+    "independent_reruns": {
+      "s1_after": "target 48/48, host_ovr 64/64, pre_bad=0, 进程0 + runner0",
+      "s1_reverse": "Motor 命中 PS01a/PS02a/PS04a; 诊断命中 PS05a/PS05b; 各自构建成功+进程1+完整台账; 总出口0",
+      "v1_v2": "25/0/0/0 与 22/0/0/0 (仓外 pthread 兼容层)",
+      "io": "27/29/40/42 共 138 例全 PASS, 非法宏值编译被拒, runner0",
+      "pre_fix_control": "78a1333 的 37 个 APP blob 导出仓外: target 44/48, host_ovr 47/64, 进程分别1, runner1",
+      "supplemental_probes": "6 个新宿主进程场景修后全部进程0",
+      "keil": "AGENT_REPORTED —— 云端未重建, 只核阅本轮 0 Error/0 Warning 摘录",
+      "board_waveform_latency": "NOT_TESTED"
+    },
+    "calibration_5": {
+      "audit_wording": "应撤回的是旧审计的两条总结结论(返回值一律被具名变量接住 / 每个停机动作内 disable 至多一次); 调用表中 motor.c:538 无具名接收者那一行是当时正确的历史观察, 保留不撤回、也不改写成当时就对",
+      "PS12c_pad_premise": "仓库夹具未置 pad_stuck 且该行 pad= 取自引脚表 level, 故 pad=0 不证明许可实际保持 HIGH; R01 的该前提由复审端独立探针置 pad_stuck + 读 pad_level 取得(pad=1 running=1 dir_rc=-8 dir_writes=0)。本轮未改夹具",
+      "totals": "修前真实总数 target fail=4 / host_ovr fail=17(选摘条目数不是总数); 反向 19/22 是各变体总 FAIL 数(含指定身份), 不是额外项; 修前 host pre_bad=21 说明串行前置会挡住后续用例, PS15a 那一行不能单独当作 R04 的独立复现",
+      "stale_comment": "safety_state.c 里 fault_reset 旁'这里只读、不再关断'旧措辞已被新的 step_pwm_force_stop() 刷新覆盖; 按 §5.3 不为注释单独改 APP/重建 Keil, 已登记为待办未决项"
+    },
+    "this_doc_round": "只改文档与证据文字; 生产 .c/.h、夹具、shim、runner、Keil 工程零改动 => 不重跑任何链, 引用数字全部来自 62873bd 与 8ca4f6a 的真实执行"
+  },
+  "go_registration": "2026-10-23：独立复审 SOFTWARE_REVIEW_GO，接受 32a311a76284796ad535d1f7956e5dc101520561，生产实现与 tested_commit 为 8ca4f6aca62779d18345c9c3af44e5419d5c2985。S1-NEW-01..04 关闭，无新增阻断返修项，S1＋R1 的软件与指定主机验证工作包收口。云端 Linux/GCC13.3 独立复跑修后 48/64、两项反向、V1/V2、I/O 138 及 6 个补充场景通过；Keil 仅核阅 Agent 本轮 0/0 摘录，未由云端重建。本 GO 不覆盖目标 RT 调度、PWM 物理波形或停机时延，也不授权任何硬件动作。"
 }

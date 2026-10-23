@@ -1,0 +1,67 @@
+# S1-R1 独立复审 GO 登记 + 证据口径校准(2026-10-23)
+# 复审件: NS800_S1_R1_Independent_Review_32a311a_20261023.md —— 结论 SOFTWARE_REVIEW_GO(限定软件与指定主机验证范围)
+# S1-NEW-01..04 关闭, 无新增阻断返修项。本文件只做口径登记与校准, 不含新的执行结果。
+
+## 1) 接受对象与身份
+
+- 建议接受对象(本 GO 固定): 32a311a76284796ad535d1f7956e5dc101520561
+- 生产实现 / 本轮 tested_commit:  8ca4f6aca62779d18345c9c3af44e5419d5c2985
+  复审确认 8ca4f6a..32a311a 的 .c/.h/.sh **零差异**, 最后一提交只是文档与证据,
+  故"云端实际执行的是最终 HEAD, 其可执行内容等同 tested_commit"。
+- 返修起点 78a1333c9338332cbe03d64d8a6f61babacbcb00; 首轮实现 62873bd8aa851ae3010dd1c04cba0aa3e1e22821。
+- 本 GO **不覆盖**: 目标 RT-Thread 调度、PWM 物理波形、停机时延; 也不授权任何硬件动作。
+- 历史接受对象不回写: IO70 GO `296c369`、安全数据语义 GO `689c8b3`、上一轮 S1 首轮件均保持原文。
+- **本轮(r1)实际生产变更范围**(与复审 §1 一致): motor.c、motor.h、step_pwm.c、step_pwm.h、
+  safety_state.c 五个文件; **stop_result.h 本轮零改动**(它是首轮新增的语义头), 两份头文件只改
+  注释/契约文案, **未改结构字段、枚举值或接口签名**。范围差异: 78a1333..32a311a = 21 文件
+  +1267/−66(已用 git diff --shortstat 复核); 8ca4f6a..32a311a 的 .c/.h/.sh 差异为**空**。
+
+## 2) 复审独立复跑到的(与本目录 Agent 证据相互独立)
+
+| 项目 | 复审端结果 |
+|---|---|
+| 修后 S1 target / host_ovr | 48/48、64/64 PASS, pre_bad=0, 进程 0 + runner 0 |
+| Motor 局部反向 | 构建成功, 进程 1, 48 例完整, PS01a/PS02a/PS04a 指定 FAIL, runner 认可 |
+| 诊断局部反向 | 构建成功, 进程 1, 64 例完整, PS05a/PS05b 指定 FAIL, runner 认可 |
+| V1/V2 | 25/0/0/0、22/0/0/0, 构建/进程/runner 均 0(仓外 pthread 兼容层) |
+| I/O | 27/29/40/42 共 138 例全 PASS, 非法宏值编译被拒, runner 0 |
+| 修前同夹具对照 | 78a1333 的 37 个 APP .c/.h 原始 blob 导出仓外: target 44/48、host_ovr 47/64, 进程分别 1, runner 1 |
+| 6 个补充场景(新宿主进程) | 修后全部进程 0, 见 pre_post_four_items.txt 与本节末 |
+| Keil | 仅核阅 Agent 本轮 0/0 摘录 —— **AGENT_REPORTED, 云端未重建** |
+| 真板/波形/最坏时延 | NOT_TESTED |
+
+## 3) 三条口径校准(复审件 §5, 不新增返修项、不新起工具)
+
+### 5.1 PS12c 的焊盘前提
+仓库夹具在 `PS12c` 里设置了许可相关的错误码, 但**没有**置 `pad_stuck`, 且该行的 `pad=` 打印取自
+引脚表的 level 字段。因此本目录与台账里的 `PS12c ... pad=0` **不能**被解释成"许可焊盘实际保持 HIGH"
+这一前提已被证明。R01 的"关断失败+许可仍 HIGH"前提是由复审端**独立探针**显式置 `pad_stuck` 并读
+`pad_level` 取得的(原样: `dir: pwm_stop_rc=-12 dir_rc=-8 dir_writes=0 running=1 pad=1 state=4
+safety=FAULT_LATCHED cur=0 latch=1`)。⇒ R01 关闭有独立依据; 但复用 `PS12c` 这一场景时应同步完善
+前提与观测, 不得声称原 `pad=0` 已证明 HIGH。本轮未改夹具(改前提就要重跑该链, 不属于本次口径登记)。
+
+### 5.2 修前串行失败的归因
+修前 host_ovr 变体 `pre_bad=21`: 用例是串行执行的, 上游恢复前置失败会挡住后面的用例。因此例如
+`PS15a` 在修前显示"disable 次数未增加", 是前置未满足的结果, **不能单凭这一行**说已独立复现 R04 的
+"连关两次、后一次成功覆盖前一次失败"。该缺陷由上一轮审查件的**新进程独立探针**直接复现
+(`apply_sequence: disable_calls=2 last_rc=0 src=fail-closed`), 本轮新进程探针再确认已变为
+`disable_calls=1 last_rc=-12 src=apply-fail`。⇒ 证据链充分, 无需再开一套修前工具。
+
+### 5.3 "额外 FAIL=19/22" 的读法
+`s1_reverse_after_rework.txt` 里 target=19、host_ovr=22 是各变体的**总 FAIL 数**(包含已命中的指定
+身份), 不是"指定身份之外另有 19/22 项"。不影响检出结论, 但引用时不得当额外数。
+同理本目录 `pre_post_four_items.txt` 只**选摘**了与四项对应的 FAIL 行, 修前真实总数是
+target fail=4、host_ovr fail=17(见其汇总行), 选摘条目数不得充当总数。
+
+### 5.4 fault_reset 相邻旧注释
+`safety_state.c` 中 `fault_reset()` 旁"这里只读、不再关断"一类旧措辞已被本轮新增的
+`diag_e = step_pwm_force_stop();` 实际行为覆盖。按复审件 §5.3 明确"待下次真实生产改动时整理即可,
+不为注释单独改 APP/重建 Keil" ⇒ **本轮不改生产源码**, 已作为未决项登记在 BSP `待办事项.md`。
+
+## 4) 本轮(文档轮)改了什么、没改什么
+
+- 改: 阶段文档与交接的 GO 登记、`tests/host/README.md` 与 BSP `README.md` 的两轮划分与总数口径、
+  `call_site_audit_correction.txt` 开头的措辞更正(见该文件顶部 dated 说明)。
+- 未改: 任何生产 `.c/.h`、夹具 `ps_main.c`/`shim_ps/`/runner、Keil 工程、旧原始证据(含首轮
+  `phase8-stop-result-s1/` 全部文件)。⇒ 因此**不重跑**任何链, 本轮所有数字均引自既有真实执行
+  (首轮 `62873bd` 或返修轮 `8ca4f6a`), 不冒称本轮重新执行。
