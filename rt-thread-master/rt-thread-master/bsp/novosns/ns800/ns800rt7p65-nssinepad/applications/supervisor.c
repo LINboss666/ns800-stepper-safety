@@ -285,7 +285,10 @@ static void runtime_selftest(void)
      *    TMC_ENN 已禁能, 所以这一步是在证明"接上电机也发不出脉冲"。 */
     if (!MOTOR_HARDWARE_ENABLE_PATH_VALIDATED && !STEP_DIAG_ISOLATED_ENV_CONFIRMED)
     {
-        e = motor_pwm_grant_to_diag();          /* 纯只读判定, 不碰 PWM/GPIO */
+        /* 2026-10-23 S2: 这里要的是**体检判定**, 不是通道权 —— 借用门现在会发
+         * 真正的 SP_DIAG 预约(motor_pwm_grant_to_diag(&token)), 自测路径绝不能取
+         * 预约(那会把通道 owner 从 none 改成 diag)。只读门用 motor_diag_gate_check()。 */
+        e = motor_diag_gate_check();           /* 纯只读判定, 不碰 PWM/GPIO, 不预约 */
         if (e != RT_EOK)
             rt_kprintf("[SELFTEST] 2e.step-diag-permission REFUSED ok (e=%d)\n", (int)e);
         else { rt_kprintf("[SELFTEST] 2e FAIL: STEP 输出被许可(危险)\n"); pass = 0; }

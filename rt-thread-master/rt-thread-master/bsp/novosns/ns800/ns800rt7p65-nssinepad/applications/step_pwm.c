@@ -28,6 +28,21 @@
  *        "未持有输出"写成"no(安全)"; ④ 一次后续成功只更新当前结果, 锁存只能由
  *        fault_reset() 的人工恢复复核解除(step_pwm_clear_stop_latch)。
  *     返回 RT_EOK 只称"驱动 API 接受了关断请求", 不是示波器证明无脉冲。
+ *   > **2026-10-23 S2 更新(停机优先协调层, phase8-stop-priority-s2)**: 上面这段的
+ *   > **语义合同全部保留**, 但实现位置变了 —— 关断结果、所有权与失败锁存的 canonical
+ *   > 记账搬到 stop_priority, 因为 Motor 与诊断共用同一个 epwm1 时间基, 两处各记一份
+ *   > 会互相看不见(诊断"从未占用"与 Motor"关断失败"在同一次停机里必须同代)。替换:
+ *   >   · step_pwm_force_stop() **删除** —— 它做的正是统一停机里的"第二次 disable";
+ *   >     统一停机与人工恢复复核的诊断侧改用 step_pwm_reconcile_after_trip()
+ *   >     (只把 canonical 结果抄进本模块镜像, 不碰硬件、不投事件);
+ *   >   · step_pwm_clear_stop_latch() **删除** —— 无身份的公共清除口等于旁路;
+ *   >     锁存改由 fault_reset 的**最终提交窗口**内 step_pwm_recovery_fields_held()
+ *   >     与 sp_finish_recovery_held() 一起解除(同一代票据成立才提交);
+ *   >   · 新的开启流程: 先校验 hz → 与协调层绑定的句柄/通道做一致性核对 →
+ *   >     motor_pwm_grant_to_diag(&token)(借用门 + **真正的 SP_DIAG 预约**) →
+ *   >     门外 ns800_epwm_prepare() → **同一个 token 窗口内**提交寄存器并启动;
+ *   >     失败出口归还仍有效且未运行的本次预约(旧 token 撤销不了新 owner);
+ *   >   · pwm_test stop 失败仍只通知一次(不自激), 且失败分支不再补第二次关闭。
  *   - 频率正确性尚未示波器验收(BUG-008); 要量波形需先在 TMC 模块拔出的隔离环境
  *     下人工确认 STEP_DIAG_ISOLATED_ENV_CONFIRMED
  */
@@ -39,6 +54,8 @@
 #include "safety_gpio.h"
 #include "safety_state.h"      /* 返修 R03: pwm_test stop 失败时投递既有软件故障事件 */
 #include "motor.h"
+#include "stop_priority.h"
+#include "drv_epwm.h"          /* ns800_epwm_prepare / commit_prepared_held(门外准备 + 门内提交) */
 #include "step_pwm.h"
 
 #define STEP_PWM_DEV    EPWM_STEP_DEV_NAME    /* "epwm1" */
@@ -46,30 +63,60 @@
 
 static struct rt_device_pwm *step_pwm = RT_NULL;
 static rt_bool_t step_enabled = RT_FALSE;
-/* 2026-10-23 S1: 诊断侧关断结果单独记账, 不与许可/反馈混为一谈。
- * step_stop_latched 在任一关断失败或未取得设备时**置位并保持**: 一次后续成功的关断
- * 只更新"当前关断结果", 不解除锁存(合同 4.4 —— 一次重试成功不得绕过人工恢复门)。
- * 解除只由 step_pwm_clear_stop_latch() 执行, 其唯一合法调用点是 fault_reset() 的
- * 人工恢复复核。它也不清 Safety 故障锁存(那条路同样只走 fault_reset)。 */
+/* 2026-10-23 S2: 诊断侧的关断结果、所有权与失败锁存的**canonical** 记账搬进了
+ * stop_priority（Motor 与诊断共用同一个 epwm1 时间基，两路各自记一份会互相看不见）。
+ * 本文件的 step_stop_result/rc/latched 退化为**镜像**，只由 sp 的视图刷新，不再由
+ * 本地直接下结论；对外 API(step_pwm_output_active / off_confirmed / get_stop_state)
+ * 的语义与 S1 合同保持一致：
+ *   ① 失败/未知不释放所有权，一次后续成功不清历史锁存(合同 4.4)；
+ *   ② "诊断从未占用该通道"仍是 NOT_ATTEMPTED，不伪造一次 API 调用；
+ *   ③ 历史锁存只能由 fault_reset 的最终提交解除(经 sp)，没有 MSH 旁路。 */
 static mot_stop_result_t step_stop_result = MOT_STOP_NOT_ATTEMPTED;
 static rt_err_t          step_stop_rc      = RT_EOK;
 static rt_bool_t         step_stop_latched = RT_FALSE;
 
-/* 唯一的 checked 关断路径: pwm_test stop 与 step_pwm_force_stop 都走这里。
- * 三种情形必须分开(合同 4.3 "对未持有/设备未取得的情况明确区分"):
- *   1) 本模块没有持有输出(从未 enable, 或上一次关断已被接受) => 无事可做: 返回 EOK,
- *      **不**记成一次硬件关断成功, 也**不**新置失败锁存; 已有的失败锁存原样保留。
- *   2) 持有输出但拿不到设备句柄 => "未尝试, 输出状态未知" + 锁存(真异常)。
- *   3) 持有输出且 rt_pwm_disable 失败 => "输出状态未知" + 锁存 + 不释放所有权。
- * 失败时**不**释放所有权(step_enabled 保持 TRUE), 也不假装输出已关闭。 */
+/* 把 canonical 的诊断视图抄进本模块镜像。调用方需保证不与其他镜像写并发
+ * (诊断路径只有 msh 线程, 且 sp 内部用自己的短窗口取快照)。 */
+static void step_stop_mirror(void)
+{
+    mot_stop_result_t res;
+    rt_err_t          rc;
+    rt_bool_t         lat;
+
+    sp_view_diag(&res, &rc, &lat);
+    step_stop_result = res;
+    step_stop_rc     = rc;
+    step_stop_latched = lat;
+}
+
+/* 诊断侧**当前**是否真的持有/欠着这个通道：正在由诊断 owner 持有，或带着一次
+ * 未复核的关断失败。两种都不是时，pwm_test stop 不该动共享模块（否则会把一次
+ * 新的 Motor 预约凭空打断，违反任务书 §4.3）。 */
+static rt_bool_t step_pwm_diag_holds(void)
+{
+    return (sp_owner_is(SP_DIAG) || sp_diag_stop_latched()) ? RT_TRUE : RT_FALSE;
+}
+
+/* 唯一的 checked 关断路径: pwm_test stop 与统一停机的诊断整理都走这里。
+ * 2026-10-23 S2 的变化与不变之处:
+ *   - 实际 rt_pwm_disable 与结果登记在**同一个短临界区**里由 sp 完成, 且失败时
+ *     同窗追加抑制/换 epoch/许可 LOW, **不做第二次 disable**(S1-R1 R04 合同不变);
+ *   - 三种情形仍然分开(合同 4.3):
+ *     1) 诊断既没持有也没有未复核的失败 => 无事可做: 返回 EOK, 不记成一次硬件
+ *        关断成功, 不新置失败锁存, 也不碰 Motor 的预约;
+ *     2) 持有输出但驱动侧未取得设备句柄 => sp 记 DEV_UNAVAILABLE/未尝试 + 锁存,
+ *        绝不对 NULL 句柄调用 API;
+ *     3) 持有输出且 rt_pwm_disable 失败 => "输出状态未知" + 锁存 + 不释放所有权。
+ *   - 成功时在同一短提交里写许可 LOW 并撤销诊断预约(换 epoch) —— 与 disarm 同形。
+ * ⚠ 本函数**从不投递事件**(S1 返修 R03 的自激禁止仍成立): 需要通知外部入口的是
+ *   pwm_test stop 那条分支, 统一停机的整理路径只调用 step_pwm_reconcile_after_trip()。 */
 static rt_err_t step_pwm_disable_checked(rt_uint8_t src)
 {
     rt_err_t e;
 
-    if (!step_enabled)
+    if (!step_pwm_diag_holds())
     {
-        /* 本模块没有持有输出: 没有需要关断的诊断输出。这**不是**一次硬件关断证明,
-         * 也不新置失败锁存; 已有的锁存原样保留(只能由人工恢复复核清除)。 */
+        step_stop_mirror();
         if (step_stop_latched && step_stop_rc != RT_EOK)
         {
             rt_kprintf("[STEP] 未持有输出, 但最近一次关断仍失败(rc=%d src=%s):"
@@ -78,45 +125,48 @@ static rt_err_t step_pwm_disable_checked(rt_uint8_t src)
             return step_stop_rc;
         }
         rt_kprintf("[STEP] 未持有输出(%s), 本次无需关断动作 - 不构成一次硬件关断证明;"
-                   " 失败锁存=%s\n",
-                   step_stop_result == MOT_STOP_NOT_ATTEMPTED ? "从未占用该通道"
+                   " 失败锁存=%s; 不去动 Motor 的预约\n",
+                   step_stop_result == MOT_STOP_NOT_ATTEMPTED ? "诊断从未占用该通道"
                                                               : "上次关断已被接受",
                    step_stop_latched ? "仍置位, 待 fault_reset 人工恢复" : "未置位");
         return RT_EOK;
     }
 
-    if (step_pwm == RT_NULL)
-    {
-        step_stop_result  = MOT_STOP_DEV_UNAVAILABLE;
-        step_stop_rc      = -RT_ENOSYS;
-        step_stop_latched = RT_TRUE;
-        rt_kprintf("[STEP] !! 持有输出却未取得 %s 设备句柄: 关断**未尝试**(src=%s),"
-                   " 状态=未知 (不称'已停止', 也不宣布所有权已交回)\n",
-                   STEP_PWM_DEV, mot_stop_src_name(src));
-        return -RT_ENOSYS;
-    }
-
-    e = rt_pwm_disable(step_pwm, STEP_PWM_CH);
-    step_stop_rc = e;
+    e = sp_off_attempt(SP_DIAG, src, FAULT_SOFT, EVT_SOFT_FAULT, 1, RT_NULL);
+    step_stop_mirror();
     if (e == RT_EOK)
     {
-        step_stop_result = MOT_STOP_API_ACCEPTED;
-        step_enabled     = RT_FALSE;    /* 只有 API 接受关断后才交回所有权 */
-        /* 注意: 这里**不**清 step_stop_latched —— 一次后续成功只更新"当前关断结果",
-         * 解除锁存只能由 fault_reset() 的人工恢复复核做(合同 4.4)。 */
+        step_enabled = RT_FALSE;          /* 只有 canonical 关断被接受才交回所有权 */
         rt_kprintf("[STEP] disable accepted by driver (src=%s) - 只称驱动接受了关断"
                    "请求, 不等于示波器证明无脉冲\n", mot_stop_src_name(src));
     }
     else
     {
-        step_stop_result  = MOT_STOP_API_FAILED;
-        step_stop_latched = RT_TRUE;
-        rt_kprintf("[STEP] !! rt_pwm_disable FAILED (rc=%d src=%s): 输出状态未知,"
-                   " 诊断所有权**不释放**, motor 接管与新诊断输出都会被拒,"
-                   " 直到 fault_reset 人工恢复复核通过\n",
+        rt_kprintf("[STEP] !! 关断未确认 (rc=%d src=%s): 输出状态未知,"
+                   " 诊断所有权**不释放**, 已在同一短临界区内追加抑制并请求许可 LOW,"
+                   " motor 接管与新诊断输出都会被拒, 直到 fault_reset 人工恢复复核通过\n",
                    (int)e, mot_stop_src_name(src));
     }
     return e;
+}
+
+/* 统一停机(safety_force_shutdown)的诊断侧**慢整理**: 共享模块的真实关断已由那次
+ * 短保护做过, 这里**不再另关一次**(那会形成同一波停机里的第二次 disable)。
+ * 本函数只把 canonical 结果抄进本模块镜像, 不产生任何硬件动作。 */
+void step_pwm_reconcile_after_trip(void)
+{
+    step_stop_mirror();
+    if (!step_pwm_diag_holds()) step_enabled = RT_FALSE;
+}
+
+/* 人工恢复最终提交窗内的诊断字段复位(调用方已持短临界区, 不取锁、不打印、不碰硬件)。
+ * 本次复核的那一次真实关断结果由 sp 在同一窗口内一并规范化。 */
+void step_pwm_recovery_fields_held(void)
+{
+    step_enabled        = RT_FALSE;
+    step_stop_result    = MOT_STOP_NOT_ATTEMPTED;
+    step_stop_rc        = RT_EOK;
+    step_stop_latched   = RT_FALSE;
 }
 
 static rt_err_t step_find(void)
@@ -136,7 +186,11 @@ static void pwm_test(int argc, char **argv)
 {
     rt_uint32_t hz;
     rt_uint32_t period_ns;
-    rt_err_t e;
+    struct ns800_epwm_prepared prepared;
+    sp_token_t  tok;
+    rt_bool_t   tok_held = RT_FALSE;
+    rt_base_t   lvl;
+    rt_err_t    e;
 
     if (argc != 2)
     {
@@ -148,7 +202,7 @@ static void pwm_test(int argc, char **argv)
 
     /* 2026-10-23 S1: stop 必须先于"设备是否找得到"被处理 —— 找不到句柄也要如实
      * 报"未尝试成功/状态未知", 而不是静默 return 让操作员以为已经停了。
-     * 走与统一停机**同一条** checked 路径, 不另写一份关断代码。 */
+     * 走与统一停机**同一条** checked 关断路径, 不另写一份关断代码。 */
     if (rt_strcmp(argv[1], "stop") == 0)
     {
         rt_err_t se = step_pwm_disable_checked(MOT_STOP_SRC_DIAG_TEST);
@@ -158,38 +212,18 @@ static void pwm_test(int argc, char **argv)
             rt_kprintf("[STEP] stop NOT confirmed (rc=%d): 不宣称输出已关闭,"
                        " 诊断所有权未交回 - 交给既有软件故障链\n", (int)se);
             /* 2026-10-23 返修 R03(=S1-NEW-03): 操作员在 msh 里敲 `pwm_test stop`
-             * 失败时也要把故障交给**既有**链(投一次 EVT_SOFT_FAULT -> Safety 线程消费
-             * -> safety_force_shutdown 统一停机 + FAULT_LATCHED + 黑匣子), 否则底层
-             * 锁存住却只在"已锁存的故障"上才有恢复入口, fault_reset 会直接回
-             * "not latched(state=READY)", 人工恢复不可达。
-             * ⚠ 只有这个**外部命令入口**投事件: 统一停机用的 step_pwm_force_stop()
-             *   绝不投, 否则会形成"消费事件 -> 停机再次失败 -> 再投同事件"的自激。 */
+             * 失败时也要把故障交给**既有**链, 否则底层锁存住却只在"已锁存的故障"上
+             * 才有恢复入口, fault_reset 会直接回 "not latched(state=READY)"。
+             * ⚠ 只有这个**外部命令入口**投事件: 统一停机的诊断整理不投。
+             * 2026-10-23 S2: 失败分支里 sp_off_attempt 已经在同一个短临界区内做过
+             *   "冻结 + 许可 LOW + 抑制 + 换 epoch", 所以这里走 post_event 是**新的
+             *   显式保护请求**(§4.2 允许, 每次都是新的一代), 由 Safety 线程只做慢整理。 */
             (void)safety_post_event(EVT_SOFT_FAULT);
         }
         return;
     }
 
-    if (step_find() != RT_EOK) return;
-
-    /* F2b P0-A: STEP 输出许可 + EPWM1 ch0 借用门(两层, 见文件头)。
-     * 拒绝原因由 grant 函数自己打印(它会说明是许可还是所有权挡住了)。 */
-    if (motor_pwm_grant_to_diag() != RT_EOK)
-    {
-        rt_kprintf("[STEP] REFUSED: STEP 输出未获许可(使能链未验收/未确认隔离环境)"
-                   " 或 EPWM1 ch0 仍由 Motor 占用。改用 motor_* 正式 API。\n");
-        return;
-    }
-
-    /* 追加(2026-10-23 S1, 合同 4.3): 诊断侧关断曾失败且未经人工恢复复核 => 不允许
-     * 再执行一次 enable 去覆盖那个未处理的失败(stop 方向永远仍然允许)。 */
-    if (step_stop_latched)
-    {
-        rt_kprintf("[STEP] REFUSED: 本模块仍带着一次**未确认的关断**"
-                   " (last=%s rc=%d) - 不用新的 enable 覆盖它, 需 fault_reset 复核\n",
-                   mot_stop_result_name(step_stop_result), (int)step_stop_rc);
-        return;
-    }
-
+    /* 任务书 §9: **先校验 hz, 后预约** —— 参数错误不该留下一次半途预约。 */
     hz = atoi(argv[1]);
     if (hz == 0 || hz > 200000)
     {
@@ -197,21 +231,69 @@ static void pwm_test(int argc, char **argv)
         return;
     }
 
+    if (step_find() != RT_EOK) return;
+
+    /* 诊断借用必须与 Motor 用**同一个** epwm1 实例与同一通道(任务书 §4.2):
+     * 时间基是整个模块共享的, 各自假定另一路设备会让"冻结"冻错对象。 */
+    {
+        struct rt_device_pwm *bound = RT_NULL;
+        int                   bch   = -1;
+
+        sp_get_bound(&bound, &bch, RT_NULL);
+        if (bound != step_pwm || bch != STEP_PWM_CH)
+        {
+            rt_kprintf("[STEP] REFUSED: 诊断句柄与协调层绑定的实例不一致"
+                       " (diag=%p ch=%d / bound=%p ch=%d) - 时间基是共享的, 不能各关各的\n",
+                       (void *)step_pwm, STEP_PWM_CH, (void *)bound, bch);
+            return;
+        }
+    }
+
+    /* F2b P0-A: STEP 输出许可 + EPWM1 ch0 借用门(两层, 见文件头)。
+     * 2026-10-23 S2: 这道门现在**返回真正的预约身份**(sp_reserve(SP_DIAG)),
+     * 只返回 EOK 的旧只读检查不能当预约(任务书 §9)。
+     * 拒绝原因由 grant 函数自己打印(它会说明是许可、反馈还是协调状态挡住了)。 */
+    if (motor_pwm_grant_to_diag(&tok) != RT_EOK)
+    {
+        rt_kprintf("[STEP] REFUSED: STEP 输出未获许可(使能链未验收/未确认隔离环境)"
+                   " 或 EPWM1 ch0 仍由 Motor 占用。改用 motor_* 正式 API。\n");
+        return;
+    }
+    tok_held = RT_TRUE;
+
+    /* 换算在**门外**做(浮点/除法不进短临界区), 门内只有固定整数寄存器写。 */
     period_ns = 1000000000u / hz;
-    /* 占空比固定 50%, STEP 脉冲 TMC2209 只看边沿 */
-    e = rt_pwm_set(step_pwm, STEP_PWM_CH, period_ns, period_ns / 2);
-    if (e != RT_EOK)
+    if (ns800_epwm_prepare(step_pwm, (rt_uint32_t)STEP_PWM_CH,
+                           period_ns, period_ns / 2, &prepared) != RT_EOK)
     {
-        rt_kprintf("[STEP] pwm_set failed: %d\n", e);
+        rt_kprintf("[STEP] prepare failed (hz=%u) - 未预约生效的输出未改变\n", hz);
+        (void)sp_release(&tok);
         return;
     }
-    e = rt_pwm_enable(step_pwm, STEP_PWM_CH);
-    if (e != RT_EOK)
+
+    /* 资格判定 + 寄存器提交 + 启动在**同一个窗口**内(任务书 §4.4): 禁止"门内检查、
+     * 门外写", 否则停机可以插在两者之间而旧流程照样把时间基拉起来。 */
+    if (sp_enter_token(&tok, &lvl) != RT_EOK)
     {
-        rt_kprintf("[STEP] pwm_enable failed: %d\n", e);
+        rt_kprintf("[STEP] REFUSED: 预约在提交前已失效(新故障或新 owner)\n");
         return;
     }
-    step_enabled = RT_TRUE;
+    e = ns800_epwm_commit_prepared_held(step_pwm, &prepared);
+    if (e == RT_EOK) e = sp_pwm_start_held(&tok);
+    sp_leave_token(lvl);
+    if (e != RT_EOK)
+    {
+        /* 提交/启动失败: 该窗口内没有任何输出被启动。身份仍有效就把预约交回去,
+         * 失配(新故障已撤销)就不做第二次关断, 也不去动新 owner。 */
+        if (sp_release(&tok) == RT_EOK)
+            rt_kprintf("[STEP] 预约已归还 (未产生输出)\n");
+        rt_kprintf("[STEP] commit/enable failed: %d - 不记录'输出已启动'\n", (int)e);
+        return;
+    }
+
+    step_enabled      = RT_TRUE;
+    step_stop_result  = MOT_STOP_OUTPUT_REQUESTED;
+    step_stop_rc      = RT_EOK;
     rt_kprintf("[STEP] output %u Hz (period %u ns) - UNVERIFIED, 需示波器确认\n",
                hz, period_ns);
     rt_kprintf("[STEP] motor_start/motor_arm are blocked while this is on;"
@@ -220,46 +302,36 @@ static void pwm_test(int argc, char **argv)
 MSH_CMD_EXPORT(pwm_test, control STEP pulse output: pwm_test hz or stop);
 
 /* Fix A + S1: 诊断输出是否仍占用(或**未确认可交回**)EPWM1 ch0。
- * 保守判据: 仍启用 或 关断失败/未取得设备 ⇒ TRUE, Motor Service 不得接管。 */
+ * 保守判据(任务书 §9): RESERVED / RUNNING / HELD_UNKNOWN / 历史失败锁存都阻止接管;
+ * 判定全部取自 canonical(sp), 本地镜像不参与门。 */
 rt_bool_t step_pwm_output_active(void)
 {
-    if (step_enabled) return RT_TRUE;
-    if (step_stop_latched) return RT_TRUE;
-    return RT_FALSE;
+    return sp_diag_output_active();
 }
 
 void step_pwm_get_stop_state(mot_stop_result_t *out_result, rt_err_t *out_rc,
                              rt_bool_t *out_latched)
 {
-    if (out_result)  *out_result  = step_stop_result;
-    if (out_rc)      *out_rc      = step_stop_rc;
-    if (out_latched) *out_latched = step_stop_latched;
+    rt_bool_t lat;
+    mot_stop_result_t res;
+    rt_err_t  rc;
+
+    sp_view_diag(&res, &rc, &lat);
+    if (out_result)  *out_result  = res;
+    if (out_rc)      *out_rc      = rc;
+    if (out_latched) *out_latched = lat;
 }
 
-/* 诊断通道是否已经有**有效**的关断结果:
- *   - 从未启用、也从未尝试关断 => TRUE(该通道没被诊断占用过, 不是"虚构的一次成功关断");
- *   - 尝试过关断 => 只有最近一次 API 接受、当前未持有输出、且没有未复核的失败锁存
- *     才算 TRUE。失败锁存期间即使后来又成功一次, 也仍然是 FALSE(合同 4.4)。 */
+/* 诊断通道是否已经有**有效**的关断结果(从未占用该通道算有效, 不虚构一次成功;
+ * 历史失败锁存期间即使后来又成功一次也仍然无效)。判定全在 canonical 里。 */
 rt_bool_t step_pwm_off_confirmed(void)
 {
-    if (step_stop_latched) return RT_FALSE;
-    if (step_stop_result == MOT_STOP_NOT_ATTEMPTED)
-        return step_enabled ? RT_FALSE : RT_TRUE;
-    return (step_stop_result == MOT_STOP_API_ACCEPTED && !step_enabled)
-               ? RT_TRUE : RT_FALSE;
+    return sp_diag_off_confirmed();
 }
 
-/* ⚠ 调用方审计(合同 4.4): 唯一合法调用点 = safety_state.c 的 fault_reset(),
- * 且只在全部人工恢复复核成立之后。不导出 MSH 命令, 没有第二条恢复路径。 */
-void step_pwm_clear_stop_latch(void)
-{
-    step_stop_latched = RT_FALSE;
-}
-
-rt_err_t step_pwm_force_stop(void)
-{
-    return step_pwm_disable_checked(MOT_STOP_SRC_DIAG_FORCE);
-}
+/* 统一停机/人工恢复复核的诊断侧整理与恢复窗口内的字段复位见上面
+ * step_pwm_reconcile_after_trip() / step_pwm_recovery_fields_held(); 原
+ * step_pwm_force_stop() 已删除 —— 它做的正是那"第二次 disable"。 */
 
 static void step_status(void)
 {

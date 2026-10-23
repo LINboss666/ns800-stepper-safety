@@ -153,6 +153,17 @@ rt_err_t safety_drv_enable_write(rt_uint8_t level)
     rt_int32_t got = -1;
     rt_uint32_t i;
 
+    /* S2(2026-10-23): 拉高许可是**唯一**能让驱动器得电的软件动作, 因此它不再是"谁都能调"的
+     * 入口 —— 生产的 HIGH 必须经 stop_priority 的 token 门(资格判定与寄存器写在同一短临界区,
+     * 见 applications/stop_priority.h)。这里只保留禁能方向与启动/自检/维护用途。
+     * ⚠ 这是把"旁路"关在门外, 不宣称能挡住通用 `pin` 命令一类的维护写(见 README/审计的权限边界)。 */
+    if (level)
+    {
+        rt_kprintf("[SAFETY] !! safety_drv_enable_write(HIGH) REFUSED: 生产使能必须走 "
+                   "sp_commit_permit_high() 的 token 门(资格与写同窗) - 本次不写引脚\n");
+        return -RT_EPERM;
+    }
+
     if (en < 0)
     {
         rt_kprintf("[SAFETY] !! DRV_ENABLE pin (%s) unresolved - CANNOT verify\n",
@@ -188,6 +199,67 @@ rt_bool_t safety_drv_enable_is_low(void)
 
     if (en < 0) return RT_FALSE;             /* 不知道=不安全 */
     return (rt_pin_read(en) == PIN_LOW) ? RT_TRUE : RT_FALSE;
+}
+
+/* ---------- S2(2026-10-23): 短窗口可用的裸动作 与 门外的确认 ----------
+ * sg_permit_raw_write: 一次 rt_pin_write(本 HAL 落到 GPIO 的 SET/CLR 寄存器, 单写、
+ * 无读改写、无循环, 见 drv_gpio.c 的 ns800rt7_pin_write) —— 可以在关中断窗口内调用。
+ * 它**不**回读、**不**延时、**不**打印; 返回 EOK 只说明写请求已发出。 */
+static rt_err_t sg_permit_raw_write(rt_uint8_t level)
+{
+    rt_base_t en = safety_pin(PIN_NAME_DRV_ENABLE);
+
+    if (en < 0) return -RT_ENOSYS;            /* 引脚未解析: 未尝试, 不是"已禁能" */
+    rt_pin_write(en, level ? PIN_HIGH : PIN_LOW);
+    return RT_EOK;
+}
+
+rt_base_t safety_drv_permit_pin(void)
+{
+    return safety_pin(PIN_NAME_DRV_ENABLE);
+}
+
+rt_err_t safety_drv_permit_low_raw_held(void)
+{
+    return sg_permit_raw_write(0u);
+}
+
+rt_err_t safety_drv_permit_high_raw_held(void)
+{
+    return sg_permit_raw_write(1u);
+}
+
+rt_err_t safety_drv_permit_confirm_read(rt_uint8_t level)
+{
+    rt_base_t   en = safety_pin(PIN_NAME_DRV_ENABLE);
+    rt_int32_t  want = level ? PIN_HIGH : PIN_LOW;
+    rt_uint32_t i;
+
+    if (en < 0) return -RT_EINVAL;
+    for (i = 0; i < DRV_EN_TRIES; ++i)
+    {
+        rt_thread_mdelay(DRV_EN_SETTLE_MS);
+        if (rt_pin_read(en) == want)
+        {
+            sg_drv_en_last_read = want;
+            sg_drv_en_request   = want;      /* 实测一致才算"请求已建立" */
+            return RT_EOK;
+        }
+        rt_kprintf("[SAFETY] DRV_ENABLE readback(poll) want=%d got=%d (try %u) - "
+                   "如需重写必须重新经 sp_commit_permit_high() 的门\n",
+                   (int)want, (int)rt_pin_read(en), i + 1);
+    }
+    return -RT_EIO;
+}
+
+/* 线程上下文(窗口外)的许可 LOW 确认: **只回读, 不再写**。
+ * 2026-10-23 S2: 短保护已经在同一个不依赖锁的窗口里发出过 LOW 裸写(唯一的写动作),
+ * 本函数的职责只是"带 settle 的复核"(rt_pin_read × 至多 DRV_EN_TRIES 次)。
+ * 若在这里再写一次, 就把"一次动作"变成两次, 也会让日志上的 rc 归属含糊;
+ * 启动安全态与显式取消仍可直接用 safety_drv_enable_write(0) 走"写+回读"。 */
+rt_err_t safety_drv_permit_confirm_low(void)
+{
+    return safety_drv_permit_confirm_read(0u);
 }
 
 /* ---------- ENN 状态反馈判定(2026-10-21: PC.6 = 板上 TMC_ENN, 不是急停输入) ----------

@@ -62,6 +62,7 @@
 #include <rtthread.h>
 #include "app_health.h"
 #include "stop_result.h"
+#include "stop_priority.h"   /* 2026-10-23 S2: sp_token_t(诊断借用预约身份) */
 
 /* ⚠ 硬件使能链验收开关(见上)。RT_FALSE = motor_arm 拒绝。 */
 #ifndef MOTOR_HARDWARE_ENABLE_PATH_VALIDATED
@@ -212,9 +213,35 @@ rt_uint32_t motor_get_gate_fail_mask(void);
  * STEP_DIAG_ISOLATED_ENV_CONFIRMED 至少一个为 TRUE(现板两个都是 FALSE → 一律拒绝),
  * 因为焊盘 LOW 在门电路损坏的板子上证明不了驱动已禁能。
  * 之后才轮到所有权条件: 未 armed、state==IDLE、current_hz==0、target_hz==0、
- * 且 DRV_ENABLE 焊盘实测 LOW。全部满足才返回 RT_EOK, 拒绝原因由本函数打印。
+ * 且 DRV_ENABLE 焊盘实测 LOW、两侧关断锁存都已复核。
+ * 2026-10-23 S2(任务书 §9): 全部通过后本函数**再取一个真正的 SP_DIAG 预约身份**
+ * 写进 *out_token —— 只返回 EOK 的旧只读判定不能当预约(那正是"停机落在借用序列
+ * 间隙里之后, 旧流程照样能 enable"的洞)。拒绝原因由本函数自己打印。
  * 正式 Motor Service 才是 EPWM 的生产 owner。 */
-rt_err_t motor_pwm_grant_to_diag(void);
+rt_err_t motor_pwm_grant_to_diag(sp_token_t *out_token);
+
+/* 只读借用门(不做预约、不产生任何硬件动作), 供 runtime_selftest 一类"体检"路径使用。
+ * ⚠ 它**不**代表取得通道权; 要输出必须走上面的 motor_pwm_grant_to_diag()。 */
+rt_err_t motor_diag_gate_check(void);
+
+/* 短保护之后的 Motor 侧**慢整理**(快照镜像 + 软件状态 + 带回读的许可确认 + 日志)。
+ * 不产生任何新的关断动作; `pwm_rc` 必须是那次短保护返回的原始 PWM 错误。
+ * 调用方: safety_force_shutdown()(整理阶段)与 motor_emergency_stop()(自己做短保护)。
+ * 返回对外合同与 motor_emergency_stop() 相同(PWM 失败优先, 否则许可确认结果)。 */
+rt_err_t motor_reconcile_after_trip(rt_err_t pwm_rc);
+
+/* ---------- 2026-10-23 S2: 人工恢复的最终提交接入点(任务书 §7) ----------
+ * fault_reset 需要在**一个**短临界区里同时落 Motor 影子、Safety 状态与 canonical,
+ * 因此这里给三个专用入口(锁在窗口**外**取放, 窗口内只有固定字段赋值):
+ *   motor_lock_for_recovery()    窗口外取 mot_lock; 互斥量不可用返回 -RT_EIO,
+ *                                调用方一律**不提交**(fail closed)。
+ *   motor_recovery_fields_held() 调用方必须已在同一窗口内且已确认恢复票据有效。
+ *   motor_unlock_for_recovery()  窗口外释放。
+ * ⚠ 唯一合法调用点 = safety_state.c 的 fault_reset(); 不导出 MSH 命令, 没有第二条
+ *   恢复路径。原 motor_clear_stop_latch() 因此删除(无身份的公共清除口 = 旁路)。 */
+rt_err_t motor_lock_for_recovery(void);
+void     motor_recovery_fields_held(void);
+void     motor_unlock_for_recovery(void);
 
 /* ---------- 2026-10-23 S1: 关断结果的可观测性(只读, 不产生总线流量) ----------
  * out_result/out_src/out_rc 反映**最近一次** STEP 关断尝试; *out_latched 是
@@ -222,13 +249,6 @@ rt_err_t motor_pwm_grant_to_diag(void);
  * 快照里的 current_hz/target_hz 为 0 **不能**替代本函数的结论。 */
 void motor_get_stop_state(mot_stop_result_t *out_result, rt_uint8_t *out_src,
                           rt_err_t *out_rc, rt_bool_t *out_latched);
-
-/* ⚠ 解除 STEP 关断失败锁存。**唯一合法调用点 = safety_state.c 的 fault_reset()**,
- * 且只在全部复核成立之后调用: 活动输入实测安全 + 许可焊盘 LOW + ENN 前后两次有界确认
- * + motor_disarm() 成功 + 两条输出路径**本次**都有 API 接受的关断结果。
- * 不导出 MSH 命令, 没有第二条恢复路径; 普通 disarm、状态查询、一次重试成功都不得调用
- * (那等于绕过人工恢复门)。一次成功只更新"当前关断结果", 不清本锁存。 */
-void motor_clear_stop_latch(void);
 
 /* F2b P1-E 用: 运行期守卫的纯判定函数(不碰硬件、不产生总线流量)。
  * in->due=0 表示本轮未到复核周期。动作只有 NONE / STOP 两种, STOP 由调用方

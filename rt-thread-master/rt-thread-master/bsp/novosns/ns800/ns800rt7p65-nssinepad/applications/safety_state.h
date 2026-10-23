@@ -65,7 +65,11 @@ typedef enum
 rt_err_t safety_transition(safety_state_t next);
 
 /* 统一安全停机(唯一旁路): 停 STEP → DRV_ENABLE 请求 LOW → 锁存 FAULT_LATCHED。
- * 任何故障路径必须走这里, 禁止业务代码只改状态不停输出。 */
+ * 任何故障路径必须走这里, 禁止业务代码只改状态不停输出。
+ * 2026-10-23 S2 顺序变更(任务书 §8.1): **先**在取 ss_lock/打印之前做一次短保护
+ * (两条独立降险动作 + 抑制 + 换 epoch + 两个原始结果都在同一个不依赖锁的窗口里),
+ * **再**做线程慢整理。慢整理不再另关一次共享模块(那会形成同一波停机里的第二次
+ * disable, 让第一次的失败被第二次的成功掩盖)。 */
 void safety_force_shutdown(rt_uint32_t code);
 
 /* 兼容别名 */
@@ -73,6 +77,32 @@ void safety_enter_fault(rt_uint32_t code);
 
 /* 事件置位: ISR 与线程均可调用(rt_event_send 实现, ISR 安全)。 */
 rt_err_t safety_post_event(rt_uint32_t event);
+
+/* ---------- 2026-10-23 S2: "先保护, 再通知"的两条入口(任务书 §8.1) ----------
+ * safety_post_event() 对**故障类**事件现在做两件事: ①在当前上下文同步执行一次
+ * 短保护(不等任何锁、不打印、不碰 UART, 两条独立降险动作在同一窗口内完成),
+ * ②再把事件交给 Safety 线程做慢整理。因此:
+ *   - "投递成功"不再等于"已停机"(停机在投递方手里已经做过);
+ *   - "投递失败"也不再能让停机漏做(动作先于投递)。
+ * SAFETY_EVT_FAULT_MASK 显式列出故障类事件位; EVT_FAULT_CLEAR 不在其中
+ * (人工清除继续不作为自动恢复入口)。 */
+#define SAFETY_EVT_FAULT_MASK   (EVT_ESTOP | EVT_LIMIT_MIN | EVT_LIMIT_MAX | \
+                                 EVT_TMC_DIAG | EVT_MULTI_FAULT | EVT_SOFT_FAULT | \
+                                 EVT_DRV_FEEDBACK)
+
+/* 只通知"同一操作里**已经**做过的短保护", 供 §4.3 的失败回退、守卫与 disarm 使用。
+ * 它**绝不**再调一次关断: 消费者(Safety 线程)也不得把这条通知重新解释成一次新的
+ * 保护请求 —— 这正是"消费事件→停机再失败→再投同事件"自激的禁止方式。
+ * epoch 只用于日志/审计配对, 不参与判定。不导出 MSH 命令。 */
+rt_err_t safety_notify_trip_done(rt_uint32_t event, rt_uint32_t epoch);
+
+/* Safety 线程的**慢整理**入口(事件已经由投递方保护过): 只整理当前仍有效的 pending
+ * 事实(状态锁存、回读复核、反馈采样、日志、黑匣子一次), 不重复关共享模块。 */
+void safety_reconcile_trip(rt_uint32_t code, rt_uint32_t event);
+
+/* 只读: 协调层是否还压着一次"已保护但未被整理"的事实(通知失败/没有 Safety 线程时
+ * 状态命令必须能看见它, 不得打印"全部整理完成")。 */
+rt_bool_t safety_trip_pending(void);
 
 /* required 项检查(不改状态机): required 全过返回 RT_EOK。
  * degraded(IMU/ADC/Flash)失败只标记降级, 不阻塞。 */

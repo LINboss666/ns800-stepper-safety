@@ -1,5 +1,13 @@
 /*
  * step_pwm.h - STEP 输出控制对外接口
+ *
+ * 2026-10-23 S2: 诊断侧的实际关断、所有权与失败锁存的 canonical 记账统一在
+ * stop_priority(共享 epwm1 时间基只有一处真相)。本模块只保留①借用门内的
+ * prepare→门→commit/enable 流程, ②给 Motor Service 与状态命令用的语义视图,
+ * ③统一停机的诊断侧**慢整理**(不再另关一次共享模块)。
+ * 因此原 `step_pwm_force_stop()` 与 `step_pwm_clear_stop_latch()` 两个对外入口
+ * 在本轮被替换: 前者会被 safety_force_shutdown()/fault_reset 重复关断, 后者会
+ * 绕开人工恢复的最终提交 —— 两者的职责分别由下面两个函数承担。
  */
 #ifndef STEP_PWM_H
 #define STEP_PWM_H
@@ -7,23 +15,13 @@
 #include <rtthread.h>
 #include "stop_result.h"
 
-/* 强制停止 STEP 输出(安全停机统一入口使用, 任何状态可调)。
- * 2026-10-23 S1: 返回 rt_pwm_disable 的真实结果 —— 设备缺失、尚未尝试、软件频率 0
- * 都不能冒充"驱动已接受关断"; 持有输出却拿不到句柄、或 disable 失败, 一律"输出状态
- * 未知"并**保留诊断所有权**(不释放), 该模块也不允许再用一次 enable 覆盖未处理的失败。
- * ⚠ 本函数**从不投递事件**(2026-10-23 返修 R03): 它被 safety_force_shutdown() 调用,
- *   在停机失败分支里再投事件会形成"消费事件→停机再失败→再投"的自激。投递只发生在
- *   外部命令入口 `pwm_test stop`(见 ps 链 PS14g/PS14h 两条用例)。
- * 返回 RT_EOK 仅表示驱动 API 接受了关断请求, 不是"示波器证明无脉冲"。幂等, 不自动重试。 */
-rt_err_t step_pwm_force_stop(void);
-
 /* Fix A: 诊断命令 pwm_test 当前是否占用 EPWM1 ch0。
- * 2026-10-23 S1: 判据保守化 —— 输出仍启用 **或** 最近一次关断失败/未知 都返回 TRUE,
- * Motor Service 必须拒绝接管(不能把"未取得设备"或"关断没确认"当成通道已空闲)。 */
+ * S1 判据(保守)在 S2 改为读 canonical: RESERVED/RUNNING/HELD_UNKNOWN/历史失败锁存
+ * 任一成立都返回 TRUE, Motor Service 必须拒绝接管。 */
 rt_bool_t step_pwm_output_active(void);
 
-/* 只读: 诊断侧最近一次关断结果与原始 rc; *out_latched = 关断曾失败/未取得设备且未经
- * 人工恢复复核(一次后续成功**不**清该位)。 */
+/* 只读语义视图(判定全在 canonical): 最近一次诊断侧关断结果与原始 rc;
+ * *out_latched = 关断曾失败/未取得设备且未经人工恢复复核(一次后续成功**不**清该位)。 */
 void step_pwm_get_stop_state(mot_stop_result_t *out_result, rt_err_t *out_rc,
                              rt_bool_t *out_latched);
 
@@ -32,8 +30,15 @@ void step_pwm_get_stop_state(mot_stop_result_t *out_result, rt_err_t *out_rc,
  * 尝试过但失败/未取得设备/仍带着未复核的失败锁存 → 返回 FALSE。 */
 rt_bool_t step_pwm_off_confirmed(void);
 
-/* ⚠ 解除诊断侧关断失败锁存。**唯一合法调用点 = safety_state.c 的 fault_reset()**,
- * 在全部人工恢复复核成立之后; 不导出 MSH 命令, 没有第二条恢复路径。 */
-void step_pwm_clear_stop_latch(void);
+/* 统一停机(safety_force_shutdown)与人工恢复复核的诊断侧**慢整理**:
+ * 共享模块的真实关断已经由那一次短保护做过, 本函数**不产生任何硬件动作**、
+ * **从不投递事件**(S1 返修 R03 的自激禁止继续成立), 只把 canonical 结果抄进镜像。 */
+void step_pwm_reconcile_after_trip(void);
+
+/* 人工恢复**最终提交窗口内**的诊断字段复位。
+ * ⚠ 调用方必须已在同一个短临界区内(rt_hw_interrupt_disable 之后)且已确认恢复票据
+ *   有效; 不取锁、不打印、不碰硬件。canonical 的锁存由 sp_finish_recovery_held()
+ *   在同一窗口清除 —— 没有第二条恢复路径, 也不导出 MSH 命令。 */
+void step_pwm_recovery_fields_held(void);
 
 #endif /* STEP_PWM_H */

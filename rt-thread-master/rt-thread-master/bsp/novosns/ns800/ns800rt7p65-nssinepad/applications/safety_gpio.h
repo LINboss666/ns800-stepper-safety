@@ -67,6 +67,28 @@ rt_err_t safety_drv_feedback_confirm(rt_uint8_t want_enabled, safety_fb_verdict_
 void safety_fb_snapshot(rt_int32_t *out_request, rt_int32_t *out_pad,
                         rt_int32_t *out_fb, rt_bool_t *out_fb_resolved);
 
+/* ---------- S2(2026-10-23, 停机优先): 裸动作与确认分离 ----------
+ * 短保护窗口内**只能**调用下面的 raw 入口：单次寄存器写、无日志、无延时、无循环。
+ * rt_pin_write() 返回 void ⇒ 返回 RT_EOK 只表示"写请求已发给 GPIO 寄存器"，
+ * **不**表示焊盘实测到位；焊盘确认仍然是 safety_drv_enable_write()/回读那一条合同。 */
+
+/* 已解析的许可**数值** pin（PC.23 -> 数值），<0 表示未解析。绑定后由 stop_priority 缓存，
+ * 窗口内不再做字符串查找。 */
+rt_base_t safety_drv_permit_pin(void);
+
+/* 许可 LOW / HIGH 的裸写。HIGH 只允许由 stop_priority 的 token 门调用（生产旁路见下）。 */
+rt_err_t safety_drv_permit_low_raw_held(void);
+rt_err_t safety_drv_permit_high_raw_held(void);
+
+/* 线程上下文用的许可 LOW **确认**（写 + settle + 回读，沿用 2 次×1ms 上限；
+ * 数值是测试可见常数，不是停机时延上界）。返回 RT_EOK 才允许记 confirmed。 */
+rt_err_t safety_drv_permit_confirm_low(void);
+
+/* 只读确认(不写脚): 用于"已在 token 门内写过 HIGH"之后的 settle+回读复核。
+ * 不匹配时的**重试**必须重新调用 sp_commit_permit_high() —— 每一次重写都是一次开启动作。
+ * 上限沿用 DRV_EN_TRIES/SETTLE_MS(测试可见常数, 不是停机时延上界)。 */
+rt_err_t safety_drv_permit_confirm_read(rt_uint8_t level);
+
 /* 本配置里两路可选限位是否处于启用状态(= SAFETY_LIMIT_INPUTS_ENABLED)。 */
 rt_bool_t safety_limit_inputs_enabled(void);
 

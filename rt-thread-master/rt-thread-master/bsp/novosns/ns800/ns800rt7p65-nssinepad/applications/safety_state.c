@@ -43,6 +43,29 @@
  *     Safety 仍为 READY 时兑现不了(fault_reset 只接受已锁存的故障)。统一停机与
  *     step_pwm_force_stop() 的失败分支不投事件 => 不构成自激。
  *   - 本轮不处理锁等待/UART 阻塞/在途 arm-enable 竞争(S2), 不宣称停机时延上界。
+ *
+ * 停机优先(S2, 2026-10-23, phase8-stop-priority-s2-integrated)顺序重排:
+ *   - safety_force_shutdown() 现在**先**在 stop_priority 的一个不依赖任何锁的短临界区
+ *     里完成两条独立降险动作(STEP 冻结 + 许可 LOW 裸写)并就地记两个原始结果, **再**
+ *     做线程慢整理(焊盘回读、ENN 采样、分列核对、黑匣子一次、状态锁存)。控制台打印
+ *     不再排在降险之前(逐字符忙等, 每字符上限 6000ms)。
+ *   - 慢整理**不再**调用 motor_emergency_stop()/step_pwm_force_stop(): 同一波停机里的
+ *     第二次 disable 会让第一次的失败被第二次的成功掩盖。改为
+ *     motor_reconcile_after_trip(原始 pe) + step_pwm_reconcile_after_trip()。
+ *   - safety_post_event() 对故障类事件先同步做一次短保护再投递; 已经保护过的路径改用
+ *     safety_notify_trip_done()(只交接事实, 绝不再关一次), 消费者走
+ *     safety_reconcile_trip() —— "消费事件→停机再失败→再投同事件"的自激仍不可能。
+ *   - safety_state_get()/safety_fault 视图先读 canonical 抑制位(不先 FOREVER 等 ss_lock),
+ *     非故障转换在抑制期间一律拒绝; 启动自检在开始捕获 epoch、进 READY 前比较该 epoch。
+ *   - fault_reset() 改为"慢复核 + 一次最终提交": 票据=当时的 epoch, 用
+ *     sp_recovery_probe_off() 取代会换 epoch 的普通 motor_disarm(), 诊断侧不再另关一次,
+ *     mot_lock 在窗口外取得且取不到就不提交, 最终在**一个**短临界区里核对票据并清
+ *     canonical 锁存/取消 owner/清故障码/写 MANUAL_CLEAR/换 epoch/最后清抑制。
+ *     S1 的两处锁存清除口(motor_clear_stop_latch / step_pwm_clear_stop_latch)已删除,
+ *     代之以同窗口内的 motor_recovery_fields_held() / step_pwm_recovery_fields_held()。
+ *   - 仍未处理: 停机时延上界(RISK-03/03a)与整链物理验收(RISK-04-b)继续开放;
+ *     本机制只协调本核普通可屏蔽上下文, 不涵盖 NMI/HardFault、另一核或其它总线主设备,
+ *     也不涵盖未走本协议的维护旁路写(通用 pin 命令、pin_status、selftest 初始化写)。
  */
 
 #include <rtthread.h>
@@ -57,6 +80,7 @@
 #include "motor.h"
 #include "step_pwm.h"
 #include "blackbox.h"
+#include "stop_priority.h"
 
 /* ---------- 状态机私有状态 ---------- */
 static volatile safety_state_t ss_state = SAFETY_BOOT;
@@ -126,6 +150,19 @@ rt_err_t safety_transition(safety_state_t next)
     if (ss_lock_ok) rt_mutex_take(&ss_lock, RT_WAITING_FOREVER);
     from = ss_state;                       /* P0-1: 锁内重读, 消除检查/写竞争 */
 
+    /* S2(2026-10-23, 任务书 §8.2): 抑制期间的**非故障**转换一律拒绝。
+     * 白名单一字未改, 只在这一道门上收紧: 协调层已经保护过之后, 迟到的旧 ramp
+     * RUN→READY、旧自检成功、旧配置成功都不能把状态机拉回"可 arm"的 READY。
+     * FAULT_LATCHED/ESTOP 两个方向不挡(停机与急停永远允许继续锁存)。 */
+    if (next != SAFETY_FAULT_LATCHED && next != SAFETY_ESTOP && sp_inhibited())
+    {
+        rt_kprintf("[SS] transition REFUSED: %s -> %s"
+                   " (协调层已抑制, 需 fault_reset 人工恢复复核)\n",
+                   safety_state_name(from), safety_state_name(next));
+        if (ss_lock_ok) rt_mutex_release(&ss_lock);
+        return -RT_EPERM;
+    }
+
     if (from == next)
     {
         if (ss_lock_ok) rt_mutex_release(&ss_lock);
@@ -146,11 +183,44 @@ rt_err_t safety_transition(safety_state_t next)
     return RT_EOK;
 }
 
-/* 统一安全停机(唯一旁路): 顺序不可变 */
-void safety_force_shutdown(rt_uint32_t code)
+/* ---------- 2026-10-23 S2: 事件分类与"先保护"的三条入口(任务书 §8.1) ----------
+ * 优先级保留: 多位事件按现有优先级取**主故障码**(急停类不被较弱事件覆盖), 原因位
+ * 合并进协调层的 reason_events(不在这里做二次仲裁)。 */
+static rt_uint32_t ss_code_for_event(rt_uint32_t event)
 {
-    rt_err_t estop_e;
-    rt_err_t diag_e;
+    if (event & EVT_ESTOP)        return FAULT_ESTOP;
+    if (event & EVT_LIMIT_MIN)    return FAULT_LIMIT_MIN;
+    if (event & EVT_LIMIT_MAX)    return FAULT_LIMIT_MAX;
+    if (event & EVT_TMC_DIAG)     return FAULT_TMC_DIAG;
+    if (event & EVT_MULTI_FAULT)  return FAULT_MULTI_SOURCE;
+    if (event & EVT_DRV_FEEDBACK) return FAULT_DRV_FEEDBACK;
+    return FAULT_SOFT;                       /* EVT_SOFT_FAULT 及其它软件故障 */
+}
+
+static rt_uint32_t ss_events_for_code(rt_uint32_t code)
+{
+    switch (code)
+    {
+    case FAULT_ESTOP:         return EVT_ESTOP;
+    case FAULT_LIMIT_MIN:     return EVT_LIMIT_MIN;
+    case FAULT_LIMIT_MAX:     return EVT_LIMIT_MAX;
+    case FAULT_TMC_DIAG:      return EVT_TMC_DIAG;
+    case FAULT_MULTI_SOURCE:  return EVT_MULTI_FAULT;
+    case FAULT_DRV_FEEDBACK:  return EVT_DRV_FEEDBACK;
+    case FAULT_SOFT:
+    case FAULT_SELF_TEST:
+    case FAULT_BOOT:          return EVT_SOFT_FAULT;
+    default:                  return 0u;     /* FAULT_NONE: 不带事件位 */
+    }
+}
+
+/* 慢整理(不产生任何关断动作): 独立复核焊盘、单次 ENN 反馈采样、两条输出路径的
+ * 结果分列核对、黑匣子触发、状态锁存。
+ * `pe/le` = 那一次短保护返回的**原始** PWM 错误与许可裸写错误(由调用方带入,
+ * 本函数绝不重新猜测); 各子系统自己的镜像整理已由 motor_reconcile_after_trip() /
+ * step_pwm_reconcile_after_trip() 做过。 */
+static void ss_slow_reconcile(rt_uint32_t code, rt_err_t pe, rt_err_t le)
+{
     rt_bool_t pad_low;
     safety_fb_verdict_t fb_v;
     mot_stop_result_t m_res;
@@ -165,32 +235,24 @@ void safety_force_shutdown(rt_uint32_t code)
     if (ss_lock_ok) rt_mutex_take(&ss_lock, RT_WAITING_FOREVER);
     ss_fault_code = code;
 
-    /* ① 停 STEP + DRV_ENABLE 请求 LOW(写+回读, 由 Motor Service 统一持有;
-     *    幂等)。S1: 返回值 = **PWM 关断失败优先**, 否则使能脚写入回读结果;
-     *    两个原始 rc 各自留档, 不得把非零一律解释成"只是 GPIO 失败"。
-     *    诊断侧走同一条 checked 关断路径, 失败则**不**释放诊断所有权。
-     * ⚠ 反馈读不到/任一路失败**绝不跳过**另一条关闭动作(合同 4.3)。 */
-    estop_e = motor_emergency_stop();
-    diag_e  = step_pwm_force_stop();
-
     /* ② 独立复核焊盘电平(不复写): 不知道=不安全 */
     pad_low = safety_drv_enable_is_low();
     if (!pad_low)
-        rt_kprintf("[SS] !! CRITICAL: DRV_ENABLE pad NOT confirmed LOW (estop_rc=%d)"
-                   " - hardware ENN chain is the only guard !!\n", (int)estop_e);
+        rt_kprintf("[SS] !! CRITICAL: DRV_ENABLE pad NOT confirmed LOW (estop_rc=%d"
+                   " low_rc=%d) - hardware ENN chain is the only guard !!\n",
+                   (int)pe, (int)le);
 
-    /* ②b 追加(2026-10-21): 单次采样看最终 ENN 反馈是否真到了禁能侧(高)。
-     *    这一条只影响"能不能声称整链已安全", 不影响①②的动作与④的锁存。 */
+    /* ②b 单次采样看最终 ENN 反馈是否真到了禁能侧(高)。
+     *    这一条只影响"能不能声称整链已安全", 不影响②③④的动作与锁存。 */
     fb_v = safety_fb_now(0u);
     if (fb_v != SAFETY_FB_OK)
         rt_kprintf("[SS] !! ENN feedback NOT on disabled side (verdict=%s)"
                    " - 不打印'最终禁能已确认'; 关闭动作已照做, 故障仍锁存\n",
                    safety_fb_verdict_name(fb_v));
 
-    /* ②c 追加(2026-10-23 S1): STEP 关断结果分列核对。
-     *    两条输出路径(Motor 生产路径 / 诊断借用路径)各自如实报告; 只要有一条没有
-     *    有效关断结果, 就**绝不**打印"STEP stopped"这类话。故障码与格式不变(沿用
-     *    投递方给的 code), 详细 rc 由快照 stop_rc 与本日志保存。 */
+    /* ②c STEP 关断结果分列核对(两条输出路径各自的语义视图, 全部读 canonical)。
+     *    只要有一条没有有效关断结果, 就**绝不**打印"STEP stopped"这类话。
+     *    故障码与格式不变(沿用投递方给的 code), 详细 rc 由快照与本日志保存。 */
     motor_get_stop_state(&m_res, &m_src, &m_rc, &m_lat);
     step_pwm_get_stop_state(&d_res, &d_rc, &d_lat);
     step_off_ok = (mot_stop_result_is_off(m_res) && step_pwm_off_confirmed())
@@ -221,20 +283,120 @@ void safety_force_shutdown(rt_uint32_t code)
                " STEP %s, motor_rc=%d diag_rc=%d)\n", code,
                pad_low ? "verified" : "UNVERIFIED!!", safety_fb_verdict_name(fb_v),
                step_off_ok ? "off-confirmed(api)" : "NOT-confirmed(unknown)",
-               (int)estop_e, (int)diag_e);
+               (int)pe, (int)le);
+}
+
+/* 统一安全停机(唯一旁路)。
+ * 2026-10-23 S2 顺序: ①**先**做短保护(取 ss_lock 与任何打印之前, 两条独立降险动作
+ * 在同一窗口内完成并记原始结果) → ②Motor/诊断各自的慢整理 → ③状态机锁存与日志。
+ * 慢阶段**不再**调用 motor_emergency_stop()/step_pwm_force_stop(): 那会构成同一波
+ * 停机里的第二次 disable, 并用第二次的成功掩盖第一次的失败。 */
+void safety_force_shutdown(rt_uint32_t code)
+{
+    sp_proof_t proof;
+    rt_err_t   pe;
+
+    proof.valid = RT_FALSE;
+    pe = sp_trip_fast(code, ss_events_for_code(code), MOT_STOP_SRC_ESTOP, &proof);
+    /* Motor 侧整理: 镜像 + 软件状态 + 带回读的许可确认(有 settle, 只能在门外) */
+    (void)motor_reconcile_after_trip(pe);
+    step_pwm_reconcile_after_trip();
+    ss_slow_reconcile(code, pe,
+                      proof.valid ? proof.permit.write_rc : RT_EOK);
+}
+
+/* Safety 线程消费"已经保护过"的通知: 只整理当前仍有效的 pending 事实。
+ * pending 由 sp 的 metadata_pending 提供, 取走即清 —— 于是"一次有效故障整理只触发
+ * 一次黑匣子"(§8.1), 重复通知/迟到的第二条同事件不会再次触发, 也不会再关一次。 */
+void safety_reconcile_trip(rt_uint32_t code, rt_uint32_t event)
+{
+    sp_proof_t proof;
+    rt_uint32_t pcode = code;
+    rt_bool_t   had;
+
+    proof.valid = RT_FALSE;
+    had = sp_take_pending(&pcode, RT_NULL, &proof);
+    if (!had)
+    {
+        rt_kprintf("[SS] reconcile: 没有待整理的事实(重复通知或已整理过)"
+                   " code=%u -> 不再触发黑匣子、不再关断\n", code);
+        if (sp_inhibited() && ss_lock_ok)
+        {
+            /* 仍然要保证状态机与"已抑制"这一事实一致(只改状态, 不碰硬件)。 */
+            rt_mutex_take(&ss_lock, RT_WAITING_FOREVER);
+            if (ss_state != SAFETY_FAULT_LATCHED && ss_state != SAFETY_ESTOP)
+            {
+                ss_fault_code = (rt_uint32_t)pcode;
+                ss_state      = SAFETY_FAULT_LATCHED;
+            }
+            rt_mutex_release(&ss_lock);
+        }
+        return;
+    }
+    if (event == 0u) event = ss_events_for_code(pcode);
+    (void)motor_reconcile_after_trip(proof.valid ? proof.pwm.raw_rc : RT_EOK);
+    step_pwm_reconcile_after_trip();
+    ss_slow_reconcile(pcode,
+                      proof.valid ? proof.pwm.raw_rc : RT_EOK,
+                      proof.valid ? proof.permit.write_rc : RT_EOK);
+    (void)event;
 }
 
 void safety_enter_fault(rt_uint32_t code) { safety_force_shutdown(code); }
 
+/* 故障类事件: 先在本上下文做一次短保护(不等任何锁), 再把事件交给 Safety 线程。
+ * 投递失败只影响"谁去做慢整理", 不影响已经做完的物理降险(§8.1)。 */
 rt_err_t safety_post_event(rt_uint32_t event)
 {
-    if (!ss_inited) return -RT_ERROR;
+    if (event & SAFETY_EVT_FAULT_MASK)
+    {
+        (void)sp_trip_fast(ss_code_for_event(event), event,
+                           MOT_STOP_SRC_ESTOP, RT_NULL);
+    }
+    if (!ss_inited)
+    {
+        rt_kprintf("[SS] !! 事件系统未就绪: 已执行短保护, 但慢整理无人消费"
+                   " (pending=%s) - 状态命令会照实显示, 不打印'全部整理完成'\n",
+                   safety_trip_pending() ? "YES" : "no");
+        return -RT_ERROR;
+    }
     return rt_event_send(&ss_event, event);
+}
+
+/* 只通知, 不再关一次共享模块(见 safety_state.h)。非故障类事件一律拒绝: 那个方向
+ * 没有"已经保护过"的事实可交接。 */
+rt_err_t safety_notify_trip_done(rt_uint32_t event, rt_uint32_t epoch)
+{
+    rt_err_t e;
+
+    if ((event & SAFETY_EVT_FAULT_MASK) == 0u) return -RT_EINVAL;
+    if (!ss_inited) return -RT_ERROR;
+    e = rt_event_send(&ss_event, event);
+    if (e != RT_EOK)
+        rt_kprintf("[SS] notify trip done 投递失败(%d): 保护已做(epoch=%u),"
+                   " pending=%s - 慢整理待 Safety 接收超时路径自行拾取\n",
+                   (int)e, epoch, safety_trip_pending() ? "YES" : "no");
+    return e;
+}
+
+rt_bool_t safety_trip_pending(void)
+{
+    sp_snapshot_t snap;
+
+    sp_get(&snap);
+    return snap.metadata_pending ? RT_TRUE : RT_FALSE;
 }
 
 safety_state_t safety_state_get(void)
 {
     safety_state_t s;
+
+    /* S2(2026-10-23): 已经形成的抑制必须**立刻**可观测 —— 不先等 ss_lock。
+     * 否则协调层已停机而慢整理还排在锁后面(人工恢复正持锁做慢复核)时, 所有调用方
+     * (包括 motor_get_gate_fail_mask 的第 2 门)会看到陈旧的 READY/RUN, 或跟着一起
+     * 卡在那把锁上。查询本身不触发任何保护动作。 */
+    if (sp_inhibited()) return SAFETY_FAULT_LATCHED;
+
     if (ss_lock_ok) rt_mutex_take(&ss_lock, RT_WAITING_FOREVER);
     s = ss_state;
     if (ss_lock_ok) rt_mutex_release(&ss_lock);
@@ -378,13 +540,39 @@ static void fault_reset(void)
     rt_bool_t         m_lat;
     rt_bool_t         d_lat;
     rt_bool_t         diag_off_valid;
-    rt_err_t          diag_e;
+    rt_bool_t         tripped = RT_FALSE;
+    rt_uint32_t       ticket = 0u;
+    sp_proof_t        proof;
 
+    /* ---------- 2026-10-23 S2 人工恢复(任务书 §7): 慢复核 + 一次最终提交 ----------
+     * 恢复自己仍然经 ss_lock 串行化; 快保护从不等 ss_lock, 所以"恢复正持锁做慢复核"
+     * 不再挡住第一次关断。所有可能等待的锁都在**关中断之前**取, 最终只开**一次**
+     * 短临界区。锁序沿用 ss_lock -> mot_lock, 不引入从 mot 等 ss 的反序。 */
     if (ss_lock_ok) rt_mutex_take(&ss_lock, RT_WAITING_FOREVER);
     st = ss_state;
-    if (st != SAFETY_FAULT_LATCHED && st != SAFETY_ESTOP)
+    proof.valid = RT_FALSE;
+
+    /* 第 1 步: 逻辑故障态 + 恢复票据(=当时的 epoch)。
+     * "协调层已抑制但慢整理还没跑完"时状态机可能仍是旧的 RUN/READY, 因此抑制位
+     * 本身就是待人工恢复的权威判据(§7 第 1 步); 反过来"状态已锁存但协调层没有抑制
+     * 记录"(启动早期/历史路径)时, 先按**新的显式保护请求**做一次短保护, 让票据与
+     * 后面的复核落在同一代上 —— 只收紧, 不放松任何门。
+     * exhausted(epoch 已饱和)一律拒绝: 禁止新的预约与人工恢复, 如实报需重新启动,
+     * 本任务不执行真实复位。 */
+    if (sp_epoch_exhausted())
     {
-        rt_kprintf("[SS] fault_reset: not latched (state=%s)\n",
+        rt_kprintf("[SS] fault_reset REFUSED: epoch 已饱和(exhausted) - 人工恢复与新的"
+                   "预约都被禁止, 需**重新启动**; 每次显式保护仍照做关闭, 本轮不做真实复位\n");
+        if (ss_lock_ok) rt_mutex_release(&ss_lock);
+        return;
+    }
+    if (!sp_inhibited() && (st == SAFETY_FAULT_LATCHED || st == SAFETY_ESTOP))
+        (void)sp_trip_fast(ss_fault_code ? ss_fault_code : FAULT_SOFT, 0u,
+                           MOT_STOP_SRC_DISARM, &proof);
+    tripped = sp_recovery_start(&ticket);
+    if (!tripped && st != SAFETY_FAULT_LATCHED && st != SAFETY_ESTOP)
+    {
+        rt_kprintf("[SS] fault_reset: not latched (state=%s, 无抑制记录)\n",
                    safety_state_name(st));
         if (ss_lock_ok) rt_mutex_release(&ss_lock);
         return;
@@ -442,29 +630,42 @@ static void fault_reset(void)
         return;
     }
 
-    /* O1: 接受故障清除的同时, 必须把 Motor Service 一起带回 IDLE。
-     * 否则会出现 Safety=READY / Motor=MOTOR_FAULT 的不一致状态(真机
-     * runtime_selftest 复现过)。走正式 disarm: 清 armed/target_hz/current_hz、
-     * 停 STEP、写 DRV_ENABLE LOW 并回读。回读不确认就不进 MANUAL_CLEAR,
-     * 也就同时关掉了 "重跑自检 -> READY -> 重新 arm" 这条路。
-     * 锁序 ss_lock -> mot_lock 与 safety_force_shutdown() 现有路径一致。 */
-    e = motor_disarm();
+    /* 第 3 步(§7): **带票据的专用复核**取代普通 motor_disarm() —— 后者会换 epoch,
+     * 那等于把自己的票据作废。sp_recovery_probe_off() 先在同一个短临界区里确认
+     * ticket 仍有效且抑制仍在, 然后才做一次**真实**关断 + 许可 LOW 裸写并记账:
+     *   成功: 不换 epoch(票据继续有效), 不清历史锁存(那是最终提交的事);
+     *   失败: 构成新失败 -> 换 epoch + 保持抑制, 本次恢复自然失效(旧票据不再能用)。
+     * O1 要求的一致性(Safety 清除时 Motor 必须一起回 IDLE)由第 6 步窗口内的
+     * motor_recovery_fields_held() 兑现, 而不是靠一次会换 epoch 的普通 disarm。 */
+    e = sp_recovery_probe_off(ticket, &proof);
     if (e != RT_EOK)
     {
-        rt_kprintf("[SS] fault_reset REFUSED: motor recovery disarm failed (%d)"
+        rt_kprintf("[SS] fault_reset REFUSED: 安全关闭复核失败 (%d)"
                    " - PWM 关断或许可撤销至少一步未确认(失败优先返回 PWM 错误),"
-                   " 保持锁存\n", (int)e);
+                   " 已换 epoch 并保持抑制, 本次票据自然失效, 保持锁存\n", (int)e);
         if (ss_lock_ok) rt_mutex_release(&ss_lock);
         return;
     }
-    /* IO70-NEW-01 (2026-10-21 复审): disarm 是本路径上**最后一次可能改变许可**的动作,
-     * 它自己又会写 LOW 并读一次反馈。上面第 355 行的预检查用的更早的样本, 不能代表
-     * disarm 之后的真实状态 —— 所以这里必须在 disarm 之后再取一次有界确认, 并让它
-     * 参与清除决策。反馈不匹配/样本不可得/仍在过渡 => 保持锁存与非零故障码。
-     * ⚠ 停 STEP 与撤销许可已经由 motor_disarm() 照做, 这里**不**回退那些动作;
-     *   确认只做 `rt_pin_read` + 有界采样, 不递归调用停机或状态机。
-     * 锁序仍是 ss_lock -> (disarm 内部短暂取放 mot_lock), 与 safety_force_shutdown 一致;
-     * 有界窗口 = DRV_FB_TRIES 次 × DRV_FB_SETTLE_MS, 不是时延上界声明。 */
+    /* 复核发出的 LOW 裸写之后补一次带 settle 的回读确认(线程上下文, 窗口外)。
+     * 确认只写进"本次这一代"的影子: 票据已失效时不反向破坏新的预约。 */
+    {
+        rt_err_t ge = safety_drv_permit_confirm_low();
+
+        (void)sp_note_low_confirmed(ge);
+        if (ge != RT_EOK)
+        {
+            rt_kprintf("[SS] fault_reset REFUSED: 复核后的 DRV_ENABLE LOW 回读未确认"
+                       " (%d) - 保持锁存, 不进 MANUAL_CLEAR\n", (int)ge);
+            if (ss_lock_ok) rt_mutex_release(&ss_lock);
+            return;
+        }
+    }
+    /* IO70-NEW-01 (2026-10-21 复审): 安全关闭复核是本路径上**最后一次可能改变许可**
+     * 的动作, 上面第 2 步的预检查用的是更早的样本, 不能代表复核之后的真实状态 ——
+     * 所以这里必须在复核之后再取一次有界确认, 并让它参与清除决策。
+     * ⚠ 停 STEP 与撤销许可已由那次复光照做, 这里**不**回退那些动作; 确认只做
+     *   `rt_pin_read` + 有界采样, 不递归调用停机或状态机。
+     * 有界窗口 = DRV_FB_TRIES 次 × DRV_FB_SETTLE_MS, 不是时延上界声明(RISK-03)。 */
     {
         safety_fb_verdict_t fv2 = SAFETY_FB_NO_SAMPLE;
         rt_err_t fe2 = safety_drv_feedback_confirm(0u, &fv2);
@@ -472,27 +673,21 @@ static void fault_reset(void)
         if (fe2 != RT_EOK)
         {
             rt_kprintf("[SS] fault_reset REFUSED: ENN feedback not re-confirmed AFTER"
-                       " disarm (verdict=%s err=%d) - 保持锁存, 不清故障码,"
+                       " 安全关闭复核 (verdict=%s err=%d) - 保持锁存, 不清故障码,"
                        " 不打印'最终禁能已确认'\n",
                        safety_fb_verdict_name(fv2), (int)fe2);
             if (ss_lock_ok) rt_mutex_release(&ss_lock);
             return;
         }
-        rt_kprintf("[SS] motor recovered: state=IDLE, DRV_ENABLE LOW verified,"
-                   " ENN feedback on disabled side confirmed (post-disarm re-check)\n");
+        rt_kprintf("[SS] motor recovered: DRV_ENABLE LOW verified,"
+                   " ENN feedback on disabled side confirmed (post-recheck)\n");
     }
-    /* 追加(2026-10-23 S1, 合同 4.4): **两条输出路径**都必须有本次有效的关断结果才允许
-     * 清除 —— disarm 里那次 mot_pwm_output_off() 就是 Motor 侧的最新一次尝试, 诊断侧
-     * 用 step_pwm_off_confirmed()(从未占用该通道的情况算有效, 不虚构成功)。
-     * PWM 仍失败/未知 => 保持锁存与非零故障码, 不打印"最终禁能已确认"。
-     * ⚠ 这一步只**读**状态, 不再调用停机/清故障/关断动作; 解除 S1 锁存是下面唯一一处
-     *   motor_clear_stop_latch()/step_pwm_clear_stop_latch() 调用, 都在全部复核通过之后。 */
-    /* 追加(2026-10-23 返修 R03 = S1-NEW-03): 诊断侧也必须拿到一次**新鲜**的关断结果,
-     * 才谈得上"本次两条输出路径都有效" —— 与上面 motor_disarm() 刷新 Motor 侧对称。
-     * 这一步纯朝安全方向: 只请求关断, 不开许可、不出脉冲、不写黑匣子之外的事件
-     * (step_pwm_force_stop() 不投事件, 因此不会形成自激); 失败就照实拒绝清除。
-     * 没有这一步, 普通 `pwm_test stop` 失败过的板子在"先成功关断再说"之前永远恢复不了。 */
-    diag_e = step_pwm_force_stop();
+    /* 第 4 步(§7): 诊断侧的**本次结果刷新** = 复用上面那一次真实关断的结果,
+     * 不再另关一次共享模块(那正是任务书 §4.2 禁止的"同一波停机里的第二次 disable")。
+     * 共享实际动作如实说明: Motor 侧与诊断侧看的是同一个 epwm1 时间基上的同一次
+     * rt_pwm_disable; "诊断从未占用"仍然保持 NOT_ATTEMPTED, 不伪造一次 API 调用。
+     * ⚠ 这一步只读状态、只抄镜像, 不产生硬件动作、不投事件。 */
+    step_pwm_reconcile_after_trip();
     motor_get_stop_state(&m_res, &m_src, &m_rc, &m_lat);
     step_pwm_get_stop_state(&d_res, &d_rc, &d_lat);
     /* 诊断侧"有效"的两种情形: ①最近一次尝试被驱动接受; ②这条路径从未被用过
@@ -505,11 +700,11 @@ static void fault_reset(void)
     if (!mot_stop_result_is_off(m_res) || !diag_off_valid)
     {
         rt_kprintf("[SS] fault_reset REFUSED: STEP 关断结果无效"
-                   " (motor=%s src=%s rc=%d latched=%s / diag=%s rc=%d latched=%s"
-                   " force_stop_rc=%d) - 保持锁存, 不清故障码, 不进 MANUAL_CLEAR\n",
+                   " (motor=%s src=%s rc=%d latched=%s / diag=%s rc=%d latched=%s)"
+                   " - 保持锁存, 不清故障码, 不进 MANUAL_CLEAR\n",
                    mot_stop_result_name(m_res), mot_stop_src_name(m_src), (int)m_rc,
                    m_lat ? "YES" : "no", mot_stop_result_name(d_res), (int)d_rc,
-                   d_lat ? "YES" : "no", (int)diag_e);
+                   d_lat ? "YES" : "no");
         if (ss_lock_ok) rt_mutex_release(&ss_lock);
         return;
     }
@@ -519,14 +714,56 @@ static void fault_reset(void)
                                              : "从未占用该通道",
                mot_stop_src_name(m_src), d_lat ? "YES" : "no");
 
-    ss_fault_code = FAULT_NONE;
-    ss_state = SAFETY_MANUAL_CLEAR;
-    /* 人工恢复复核已全部通过 —— 这里才是 S1 关断失败锁存的唯一解除点。
-     * 之后仍需 MANUAL_CLEAR→READY(重跑自检)→ 重新 arm, 不会自动输出。 */
-    if (m_lat) motor_clear_stop_latch();
-    if (d_lat) step_pwm_clear_stop_latch();
+    /* 第 5 步(§7): mot_lock 必须在窗口**外**取(锁序 ss_lock -> mot_lock 不变);
+     * 取不到锁一律**不提交** —— 互斥量没建起来也按取不到处理(fail closed)。 */
+    if (motor_lock_for_recovery() != RT_EOK)
+    {
+        rt_kprintf("[SS] fault_reset REFUSED: 取不到 mot_lock, 不做任何提交"
+                   " - 保持锁存\n");
+        if (ss_lock_ok) rt_mutex_release(&ss_lock);
+        return;
+    }
+
+    /* 第 6 步(§7): **只开一次**短临界区, 在里面完成整体提交并重新核对票据:
+     *   比较 epoch==ticket / inhibit / 非 exhausted / 本次两路结果属于这一代
+     *   → sp_finish_recovery_held(清 canonical 锁存、取消 owner 与运行影子、
+     *     清故障原因、换 epoch、**最后**清抑制)
+     *   → 只有它成功才写 Motor 影子、诊断影子、ss_fault_code、ss_state。
+     * 期间任何新故障都已经换过 epoch, 所以**新故障一定赢**(恢复被拒, 抑制与锁存
+     * 保持); 而历史锁存(代次早于本票据)由这次复核的真实关断结果覆盖清除, 不会
+     * 永久卡死(S2-C12/S2-C13/S2-C14)。
+     * ⚠ 单核 + PRIMASK 屏蔽下, 窗口内的中间状态对外不可观测; 本线程仍持 ss_lock 与
+     *   mot_lock, 因此这里没有"检查与写之间的可抢占空隙"。窗口内只有字段赋值。 */
+    {
+        rt_base_t lvl = sp_win_begin();
+        rt_bool_t ok  = sp_recovery_valid_held(ticket, &proof);
+
+        if (ok) ok = sp_finish_recovery_held(ticket);
+        if (ok)
+        {
+            motor_recovery_fields_held();
+            step_pwm_recovery_fields_held();
+            ss_fault_code = FAULT_NONE;
+            ss_state      = SAFETY_MANUAL_CLEAR;
+        }
+        sp_win_end(lvl);
+        motor_unlock_for_recovery();
+
+        if (!ok)
+        {
+            rt_kprintf("[SS] fault_reset REFUSED: 最终提交前已出现更新的一代请求"
+                       " (inhibit 与锁存保持, 未写 MANUAL_CLEAR)\n");
+            if (ss_lock_ok) rt_mutex_release(&ss_lock);
+            return;
+        }
+    }
+    /* 第 7 步: 先放锁再打印(控制台是逐字符忙等, 不能占着锁做)。
+     * 进入 MANUAL_CLEAR 不自动自检、不自动 arm、不出 STEP; 后续 required 自检通过
+     * 才 READY, 之后仍需操作员重新 arm。 */
     if (ss_lock_ok) rt_mutex_release(&ss_lock);
-    rt_kprintf("[SS] ==> MANUAL_CLEAR (重跑自检进 READY 后仍需重新 arm)\n");
+    rt_kprintf("[SS] ==> MANUAL_CLEAR (重跑自检进 READY 后仍需重新 arm)"
+               " [本次覆盖的历史关断锁存: motor=%s diag=%s, 票据 epoch=%u]\n",
+               m_lat ? "已清" : "无", d_lat ? "已清" : "无", ticket);
 }
 MSH_CMD_EXPORT(fault_reset, measure fault sources then clear latched fault);
 
@@ -580,13 +817,29 @@ rt_err_t safety_state_boot(void)
     return RT_EOK;
 }
 
-/* bootstrap stage 11 / system_selftest 共用: required 自检 + READY 决策 */
+/* bootstrap stage 11 / system_selftest 共用: required 自检 + READY 决策。
+ * 2026-10-23 S2(任务书 §8.2): 进入时捕获协调层 epoch, 最终 READY 提交前比较该 epoch。
+ * 自检期间任何保护/预约/正式释放/人工恢复都会推进 epoch, 于是"迟到的旧自检成功"
+ * 不能跨代把状态机拉进 READY —— 尤其不能把一次人工恢复后的 MANUAL_CLEAR 直接当成
+ * "自检成功"。这里只做身份接入, selftest 的产品含义与步骤一字未改, 本轮也不上板跑。 */
 rt_err_t safety_startup_selftest(void)
 {
+    rt_uint32_t epoch0 = sp_epoch();
     rt_err_t required = safety_run_selftest();
 
     if (required == RT_EOK)
     {
+        rt_uint32_t epoch1 = sp_epoch();
+
+        if (epoch1 != epoch0 || sp_inhibited())
+        {
+            rt_kprintf("[SS] !! SELF_TEST->READY refused: 自检期间协调层已换代"
+                       " (epoch %u -> %u, inhibit=%s, pending=%s) - 需重跑自检,"
+                       " 不把旧一次成功当结论\n",
+                       epoch0, epoch1, sp_inhibited() ? "YES" : "no",
+                       safety_trip_pending() ? "YES" : "no");
+            return -RT_EPERM;
+        }
         if (safety_transition(SAFETY_READY) != RT_EOK)
         {
             rt_kprintf("[SS] !! SELF_TEST->READY refused (state=%s) - fail closed\n",

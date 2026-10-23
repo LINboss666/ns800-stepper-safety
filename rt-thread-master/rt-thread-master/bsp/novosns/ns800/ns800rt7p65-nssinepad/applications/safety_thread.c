@@ -89,54 +89,62 @@ static const struct safety_input st_inputs[] =
 
 #define ST_INPUT_N ((int)(sizeof(st_inputs) / sizeof(st_inputs[0])))
 
-/* ---------- 事件处理(线程上下文) ---------- */
+/* ---------- 事件处理(线程上下文) ----------
+ * 2026-10-23 S2(任务书 §8.1): 到这里的事件**都已经被投递方保护过** ——
+ * safety_post_event() 对故障类事件先同步做一次短保护, safety_notify_trip_done() 只
+ * 交接"已经保护过"的事实。因此本函数一律走 safety_reconcile_trip()(慢整理: 状态锁存
+ * + 回读复核 + 黑匣子一次), **不再**调用 safety_force_shutdown() 重做一遍关断;
+ * 否则同一波停机里会出现第二次 rt_pwm_disable, 让第一次的失败被第二次的成功掩盖。
+ * 动作之前的 rt_kprintf 全部移到动作之后: 控制台是逐字符忙等(每字符上限
+ * BSP_NS800_UART_TX_TIMEOUT=6000ms), 它不能再排在降险动作前面。 */
 static void safety_handle_events(rt_uint32_t ev)
 {
     if (ev & EVT_ESTOP)
     {
         /* 历史事件位(黑匣子/状态机兼容保留): 2026-10-21 起**没有 GPIO 生产者** ——
          * PC.6 是 TMC_ENN 反馈, 板上急停不经 MCU。软件停机 API 与锁存路径仍然保留。 */
-        rt_kprintf("[SAFETY] EVT_ESTOP\n");
-        safety_force_shutdown(FAULT_ESTOP);
+        safety_reconcile_trip(FAULT_ESTOP, EVT_ESTOP);
         safety_transition(SAFETY_ESTOP);   /* FAULT_LATCHED -> ESTOP(白名单允许) */
+        rt_kprintf("[SAFETY] EVT_ESTOP -> 已整理(短保护由投递方执行)\n");
         return;
     }
     if (ev & EVT_LIMIT_MIN)
     {
-        rt_kprintf("[SAFETY] EVT_LIMIT_MIN\n");
-        safety_force_shutdown(FAULT_LIMIT_MIN);
+        safety_reconcile_trip(FAULT_LIMIT_MIN, EVT_LIMIT_MIN);
+        rt_kprintf("[SAFETY] EVT_LIMIT_MIN -> 已整理\n");
         return;
     }
     if (ev & EVT_LIMIT_MAX)
     {
-        rt_kprintf("[SAFETY] EVT_LIMIT_MAX\n");
-        safety_force_shutdown(FAULT_LIMIT_MAX);
+        safety_reconcile_trip(FAULT_LIMIT_MAX, EVT_LIMIT_MAX);
+        rt_kprintf("[SAFETY] EVT_LIMIT_MAX -> 已整理\n");
         return;
     }
     if (ev & EVT_TMC_DIAG)
     {
-        rt_kprintf("[SAFETY] EVT_TMC_DIAG\n");
-        safety_force_shutdown(FAULT_TMC_DIAG);
+        safety_reconcile_trip(FAULT_TMC_DIAG, EVT_TMC_DIAG);
+        rt_kprintf("[SAFETY] EVT_TMC_DIAG -> 已整理\n");
         return;
     }
     if (ev & EVT_MULTI_FAULT)
     {
-        rt_kprintf("[SAFETY] EVT_MULTI_FAULT\n");
-        safety_force_shutdown(FAULT_MULTI_SOURCE);
+        safety_reconcile_trip(FAULT_MULTI_SOURCE, EVT_MULTI_FAULT);
+        rt_kprintf("[SAFETY] EVT_MULTI_FAULT -> 已整理\n");
         return;
     }
     if (ev & EVT_SOFT_FAULT)
     {
-        rt_kprintf("[SAFETY] EVT_SOFT_FAULT\n");
-        safety_force_shutdown(FAULT_SOFT);
+        safety_reconcile_trip(FAULT_SOFT, EVT_SOFT_FAULT);
+        rt_kprintf("[SAFETY] EVT_SOFT_FAULT -> 已整理\n");
         return;
     }
     if (ev & EVT_DRV_FEEDBACK)
     {
         /* 追加(2026-10-21): 驱动请求与最终 TMC_ENN 反馈不一致(说停没停 / 要动没让动 /
          * 样本不可得)。如实报成"反馈不一致", 不假冒已读到急停按钮状态。 */
-        rt_kprintf("[SAFETY] EVT_DRV_FEEDBACK (drive request vs TMC_ENN feedback mismatch)\n");
-        safety_force_shutdown(FAULT_DRV_FEEDBACK);
+        safety_reconcile_trip(FAULT_DRV_FEEDBACK, EVT_DRV_FEEDBACK);
+        rt_kprintf("[SAFETY] EVT_DRV_FEEDBACK -> 已整理"
+                   " (drive request vs TMC_ENN feedback mismatch)\n");
         return;
     }
 }
@@ -160,7 +168,20 @@ static void safety_thread_entry(void *param)
                           RT_EVENT_FLAG_OR | RT_EVENT_FLAG_CLEAR,
                           rt_tick_from_millisecond(SAFETY_RECV_TIMEOUT), &ev);
         if (e == RT_EOK && ev)
+        {
             safety_handle_events(ev);
+            continue;
+        }
+        /* 追加(2026-10-23 S2, 任务书 §8.1): 接收超时也要检查"已保护但未整理"的事实。
+         * 投递方可能在 rt_event_send 之前就失败(事件系统竞态/投递返回错误), 那时
+         * 物理降险已经做过, 只有 pending 位记录着它 —— 不捡起来就会长期停在
+         * "状态机还是旧值 + canonical 已抑制"的不一致上。 */
+        if (safety_trip_pending())
+        {
+            rt_kprintf("[SAFETY] 超时拾取 pending 事实(投递未成功/无事件): 只做整理,"
+                       " 不重复关断\n");
+            safety_reconcile_trip(FAULT_SOFT, 0u);
+        }
     }
 }
 

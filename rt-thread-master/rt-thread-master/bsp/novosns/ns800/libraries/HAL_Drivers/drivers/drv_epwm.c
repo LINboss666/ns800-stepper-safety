@@ -286,52 +286,6 @@ static void ns800_epwm_gpio_init(const struct ns800_epwm_pin_config *pin_config)
     GPIO_setQualificationMode(pin_config->port_b, pin_config->pin_b, GPIO_QUAL_SYNC);
 }
 
-static rt_err_t configuration_convert(struct ns800_epwm *device,
-                            struct rt_pwm_configuration *rt_conf,
-                            struct ns800_signal_params *signal_params)
-{
-    float deadband_val = 0.0f;
-    const struct ns800_epwm_config *epwm_config;
-
-    epwm_config = device->epwm_config;
-
-    if ((EPWMX_A != rt_conf->channel) && (EPWMX_B != rt_conf->channel))
-    {
-        return -RT_EINVAL;
-    }
-
-    if ((rt_conf->pulse > rt_conf->period) || (RT_FALSE == (!!rt_conf->period)))
-    {
-        return -RT_EINVAL;
-    }
-
-    if (epwm_config->count_mode == EPWM_COUNTER_MODE_UP_DOWN)
-    {
-        signal_params->signal_freq = 1.0f / ((float)rt_conf->period / 1000000.0f);
-    }
-    else if (epwm_config->count_mode < EPWM_COUNTER_MODE_UP_DOWN)
-    {
-        signal_params->signal_freq = 1.0f / ((float)rt_conf->period / 1000000.0f) / 2.0f;
-    }
-
-    signal_params->duty_val = ((float)rt_conf->pulse / (float)rt_conf->period);
-    signal_params->sys_clk_freq = (float)RCC_getPclk1Frequency();
-    signal_params->invert_signal_b = (rt_conf->complementary == RT_TRUE);
-    signal_params->count_mode = READ_BIT(epwm_config->instance->TBCTL.WORDVAL,
-                                        EPWM_TBCTL_CTRMODE_M);
-    signal_params->clock_div = epwm_config->clock_div;
-    signal_params->hs_clock_div = epwm_config->hs_clock_div;
-    signal_params->dead_band_val = 0;
-
-    if (signal_params->hs_clock_div <= EPWM_HSCLOCK_DIVIDER_4)
-    {
-        deadband_val = (float)rt_conf->dead_time / (10.0f * (float)(1U << (uint16_t)signal_params->hs_clock_div));
-        signal_params->dead_band_val = deadband_val;
-    }
-
-    return RT_EOK;
-}
-
 static void ns800_epwm_hw_init(EPWM_TypeDef *epwm)
 {
     EPWM_setClockPrescaler(epwm, EPWM_CLOCK_DIVIDER_1, EPWM_HSCLOCK_DIVIDER_2);
@@ -362,67 +316,139 @@ static void ns800_epwm_hw_init(EPWM_TypeDef *epwm)
     EPWM_disableFallingEdgeDelayCountShadowLoadMode(epwm);
 }
 
-static void ns800_epwm_configure_signal(rt_int32_t channel, EPWM_TypeDef *epwm, const struct ns800_signal_params *signal_params)
+/* ---- S2(2026-10-23): 把"算"与"写"拆开 ------------------------------------------------
+ *
+ * 旧形状(问题): configure_signal() 既做浮点换算又写寄存器, 而它的入参里带着**在
+ * configuration_convert() 时抓到的计数模式**, 于是"设频率"这件事本身包含一次
+ * "把 TBCTL 写回运行模式"的动作。停机已经把时间基写成 STOP_FREEZE 之后, 一次横跨
+ * 读-算-写的旧 set 会把运行模式恢复回来。
+ *
+ * 新形状: ns800_epwm_prepare() 只做校验与换算(无寄存器写、无副作用, 可以慢慢算);
+ * ns800_epwm_configure_regs() 只做固定数目的整数寄存器写, **不写计数模式**;
+ * ns800_epwm_commit_prepared_held() 是给 token 门内用的提交入口。
+ * 启动运行只能由 ns800_epwm_drv_enable() 显式完成。
+ * ------------------------------------------------------------------ */
+
+int ns800_epwm_prepare(struct rt_device_pwm *device, rt_uint32_t channel,
+                       rt_uint32_t period_ns, rt_uint32_t pulse_ns,
+                       struct ns800_epwm_prepared *out)
 {
+    struct ns800_epwm *epwm_dev;
+    const struct ns800_epwm_config *cfg;
+    struct ns800_signal_params sp;
     float time_base_clock = 0.0F;
-    uint16_t time_base_period = 0U, cmp_val = 0U;
+    rt_uint16_t tb_period = 0U, cmp_val = 0U;
 
-    EPWM_setClockPrescaler(epwm, signal_params->clock_div, signal_params->hs_clock_div);
-    EPWM_setTimeBaseCounterMode(epwm, signal_params->count_mode);
-
-    time_base_clock = ((float)signal_params->sys_clk_freq / (float)(1U << (uint16_t)signal_params->clock_div));
-
-    if (signal_params->hs_clock_div <= EPWM_HSCLOCK_DIVIDER_4)
+    if (out == RT_NULL || device == RT_NULL)
     {
-        time_base_clock /= (float)(1U << (uint16_t)signal_params->hs_clock_div);
+        return -RT_EINVAL;
+    }
+    out->valid = 0U;
+
+    epwm_dev = rt_container_of(device, struct ns800_epwm, epwm_device);
+    if (epwm_dev == RT_NULL || epwm_dev->epwm_config == RT_NULL)
+    {
+        return -RT_EINVAL;
+    }
+    cfg = epwm_dev->epwm_config;
+
+    if ((channel != (rt_uint32_t)EPWMX_A) && (channel != (rt_uint32_t)EPWMX_B))
+    {
+        return -RT_EINVAL;
+    }
+    if ((pulse_ns > period_ns) || (period_ns == 0U))
+    {
+        return -RT_EINVAL;
+    }
+
+    /* 与旧 configuration_convert 同一套换算, 但计数模式取**驱动配置值**(见上文注释)。 */
+    sp.count_mode       = cfg->count_mode;
+    sp.clock_div        = cfg->clock_div;
+    sp.hs_clock_div     = cfg->hs_clock_div;
+    sp.signal_freq      = 1.0f / ((float)period_ns / 1000000.0f);
+    if (cfg->count_mode != (uint32_t)EPWM_COUNTER_MODE_UP_DOWN)
+    {
+        sp.signal_freq /= 2.0f;
+    }
+    sp.duty_val         = (float)pulse_ns / (float)period_ns;
+    sp.sys_clk_freq     = (float)RCC_getPclk1Frequency();
+    sp.invert_signal_b  = RT_FALSE;
+    sp.dead_band_val    = 0;
+
+    time_base_clock = ((float)sp.sys_clk_freq / (float)(1U << (uint16_t)sp.clock_div));
+    if (sp.hs_clock_div <= EPWM_HSCLOCK_DIVIDER_4)
+    {
+        time_base_clock /= (float)(1U << (uint16_t)sp.hs_clock_div);
     }
     else
     {
-        time_base_clock /= (float)(2U * (uint16_t)signal_params->hs_clock_div);
+        time_base_clock /= (float)(2U * (uint16_t)sp.hs_clock_div);
     }
 
-    if (signal_params->count_mode == EPWM_COUNTER_MODE_UP)
+    if (sp.count_mode == (uint32_t)EPWM_COUNTER_MODE_UP)
     {
-        time_base_period = (uint16_t)((time_base_clock / signal_params->signal_freq) - 1.0f);
-        cmp_val = (uint16_t)(signal_params->duty_val * (float)(time_base_period + 1U));
+        tb_period = (uint16_t)((time_base_clock / sp.signal_freq) - 1.0f);
+        cmp_val   = (uint16_t)(sp.duty_val * (float)(tb_period + 1U));
     }
-    else if (signal_params->count_mode == EPWM_COUNTER_MODE_DOWN)
+    else if (sp.count_mode == (uint32_t)EPWM_COUNTER_MODE_DOWN)
     {
-        time_base_period = (uint16_t)((time_base_clock / signal_params->signal_freq) - 1.0f);
-        cmp_val = (uint16_t)((float)(time_base_period + 1U) - (signal_params->duty_val * (float)(time_base_period + 1U)));
+        tb_period = (uint16_t)((time_base_clock / sp.signal_freq) - 1.0f);
+        cmp_val   = (uint16_t)((float)(tb_period + 1U) - (sp.duty_val * (float)(tb_period + 1U)));
     }
     else
     {
-        time_base_period = (uint16_t)(time_base_clock / (2.0f * signal_params->signal_freq));
-        cmp_val = (uint16_t)(((float)time_base_period - ((signal_params->duty_val * (float)time_base_period))) + 0.5f);
+        tb_period = (uint16_t)(time_base_clock / (2.0f * sp.signal_freq));
+        cmp_val   = (uint16_t)(((float)tb_period - (sp.duty_val * (float)tb_period)) + 0.5f);
     }
 
-    EPWM_setTimeBasePeriod(epwm, time_base_period);
+    out->channel         = channel;
+    out->count_mode      = sp.count_mode;
+    out->clock_div       = sp.clock_div;
+    out->hs_clock_div    = sp.hs_clock_div;
+    out->tb_period       = tb_period;
+    out->cmp_val         = cmp_val;
+    out->dead_band_val   = (rt_uint16_t)sp.dead_band_val;
+    out->invert_signal_b = RT_FALSE;
+    out->period_ns       = period_ns;
+    out->pulse_ns        = pulse_ns;
+    out->valid           = 1U;
+    return RT_EOK;
+}
+
+/* 固定数目的整数寄存器写。**不写 TBCTL 的计数模式** => 提交配置不可能把已冻结的时间基
+ * 恢复成运行; 分支只依赖 prepare 已算好的整数, 窗口内没有浮点/循环/IPC/日志。 */
+static void ns800_epwm_configure_regs(EPWM_TypeDef *epwm,
+                                      const struct ns800_epwm_prepared *p)
+{
+    EPWM_setClockPrescaler(epwm, (EPWM_ClockDivider)p->clock_div,
+                           (EPWM_HSClockDivider)p->hs_clock_div);
+
+    EPWM_setTimeBasePeriod(epwm, p->tb_period);
     EPWM_disablePhaseShiftLoad(epwm);
     EPWM_setPhaseShift(epwm, 0U);
     EPWM_setTimeBaseCounter(epwm, 0U);
 
-    if (channel == EPWMX_A)
+    if ((int)p->channel == EPWMX_A)
     {
         EPWM_setCounterCompareShadowLoadMode(epwm, EPWM_COUNTER_COMPARE_A, EPWM_COMP_LOAD_ON_CNTR_ZERO);
-        EPWM_setCounterCompareValue(epwm, EPWM_COUNTER_COMPARE_A, cmp_val);
+        EPWM_setCounterCompareValue(epwm, EPWM_COUNTER_COMPARE_A, p->cmp_val);
     }
-    else if(channel == EPWMX_B)
+    else if ((int)p->channel == EPWMX_B)
     {
         EPWM_setCounterCompareShadowLoadMode(epwm, EPWM_COUNTER_COMPARE_B, EPWM_COMP_LOAD_ON_CNTR_ZERO);
-        EPWM_setCounterCompareValue(epwm, EPWM_COUNTER_COMPARE_B, cmp_val);
+        EPWM_setCounterCompareValue(epwm, EPWM_COUNTER_COMPARE_B, p->cmp_val);
     }
 
-    if (signal_params->count_mode == EPWM_COUNTER_MODE_UP)
+    if (p->count_mode == (uint32_t)EPWM_COUNTER_MODE_UP)
     {
-        if (channel == EPWMX_A)
+        if ((int)p->channel == EPWMX_A)
         {
             EPWM_setActionQualifierAction(epwm, EPWM_AQ_OUTPUT_A, EPWM_AQ_OUTPUT_HIGH, EPWM_AQ_OUTPUT_ON_TIMEBASE_ZERO);
             EPWM_setActionQualifierAction(epwm, EPWM_AQ_OUTPUT_A, EPWM_AQ_OUTPUT_LOW, EPWM_AQ_OUTPUT_ON_TIMEBASE_UP_CMPA);
         }
-        else if(channel == EPWMX_B)
+        else if ((int)p->channel == EPWMX_B)
         {
-            if (signal_params->invert_signal_b == RT_TRUE)
+            if (p->invert_signal_b == (rt_uint32_t)RT_TRUE)
             {
                 EPWM_setActionQualifierAction(epwm, EPWM_AQ_OUTPUT_B, EPWM_AQ_OUTPUT_LOW, EPWM_AQ_OUTPUT_ON_TIMEBASE_ZERO);
                 EPWM_setActionQualifierAction(epwm, EPWM_AQ_OUTPUT_B, EPWM_AQ_OUTPUT_HIGH, EPWM_AQ_OUTPUT_ON_TIMEBASE_UP_CMPB);
@@ -434,16 +460,16 @@ static void ns800_epwm_configure_signal(rt_int32_t channel, EPWM_TypeDef *epwm, 
             }
         }
     }
-    else if ((signal_params->count_mode == EPWM_COUNTER_MODE_DOWN))
+    else if (p->count_mode == (uint32_t)EPWM_COUNTER_MODE_DOWN)
     {
-        if (channel == EPWMX_A)
+        if ((int)p->channel == EPWMX_A)
         {
             EPWM_setActionQualifierAction(epwm, EPWM_AQ_OUTPUT_A, EPWM_AQ_OUTPUT_HIGH, EPWM_AQ_OUTPUT_ON_TIMEBASE_ZERO);
             EPWM_setActionQualifierAction(epwm, EPWM_AQ_OUTPUT_A, EPWM_AQ_OUTPUT_LOW, EPWM_AQ_OUTPUT_ON_TIMEBASE_DOWN_CMPA);
         }
-        else if(channel == EPWMX_B)
+        else if ((int)p->channel == EPWMX_B)
         {
-            if (signal_params->invert_signal_b == RT_TRUE)
+            if (p->invert_signal_b == (rt_uint32_t)RT_TRUE)
             {
                 EPWM_setActionQualifierAction(epwm, EPWM_AQ_OUTPUT_B, EPWM_AQ_OUTPUT_LOW, EPWM_AQ_OUTPUT_ON_TIMEBASE_ZERO);
                 EPWM_setActionQualifierAction(epwm, EPWM_AQ_OUTPUT_B, EPWM_AQ_OUTPUT_HIGH, EPWM_AQ_OUTPUT_ON_TIMEBASE_DOWN_CMPB);
@@ -455,17 +481,17 @@ static void ns800_epwm_configure_signal(rt_int32_t channel, EPWM_TypeDef *epwm, 
             }
         }
     }
-    else // UP_DOWN 对称模式
+    else /* UP_DOWN: 与旧实现同一分支 */
     {
-        if (channel == EPWMX_A)
+        if ((int)p->channel == EPWMX_A)
         {
             EPWM_setActionQualifierAction(epwm, EPWM_AQ_OUTPUT_A, EPWM_AQ_OUTPUT_LOW, EPWM_AQ_OUTPUT_ON_TIMEBASE_ZERO);
             EPWM_setActionQualifierAction(epwm, EPWM_AQ_OUTPUT_A, EPWM_AQ_OUTPUT_HIGH, EPWM_AQ_OUTPUT_ON_TIMEBASE_UP_CMPA);
             EPWM_setActionQualifierAction(epwm, EPWM_AQ_OUTPUT_A, EPWM_AQ_OUTPUT_LOW, EPWM_AQ_OUTPUT_ON_TIMEBASE_DOWN_CMPA);
         }
-        else if(channel == EPWMX_B)
+        else if ((int)p->channel == EPWMX_B)
         {
-            if (signal_params->invert_signal_b == RT_TRUE)
+            if (p->invert_signal_b == (rt_uint32_t)RT_TRUE)
             {
                 EPWM_setActionQualifierAction(epwm, EPWM_AQ_OUTPUT_B, EPWM_AQ_OUTPUT_HIGH, EPWM_AQ_OUTPUT_ON_TIMEBASE_ZERO);
                 EPWM_setActionQualifierAction(epwm, EPWM_AQ_OUTPUT_B, EPWM_AQ_OUTPUT_LOW, EPWM_AQ_OUTPUT_ON_TIMEBASE_UP_CMPB);
@@ -486,33 +512,57 @@ static void ns800_epwm_configure_signal(rt_int32_t channel, EPWM_TypeDef *epwm, 
     EPWM_setDeadBandDelayMode(epwm, EPWM_DB_RED, RT_TRUE);
     EPWM_setRisingEdgeDelayCountShadowLoadMode(epwm, EPWM_RED_LOAD_ON_CNTR_ZERO);
     EPWM_disableRisingEdgeDelayCountShadowLoadMode(epwm);
-    EPWM_setRisingEdgeDelayCount(epwm, (uint16_t)signal_params->dead_band_val);
+    EPWM_setRisingEdgeDelayCount(epwm, p->dead_band_val);
 
     EPWM_setDeadBandDelayMode(epwm, EPWM_DB_FED, RT_TRUE);
     EPWM_setFallingEdgeDelayCountShadowLoadMode(epwm, EPWM_FED_LOAD_ON_CNTR_ZERO);
     EPWM_disableFallingEdgeDelayCountShadowLoadMode(epwm);
-    EPWM_setFallingEdgeDelayCount(epwm, (uint16_t)signal_params->dead_band_val);
+    EPWM_setFallingEdgeDelayCount(epwm, p->dead_band_val);
+}
+
+/* token 门内的提交入口: 调用方已经屏蔽中断并通过资格检查; 本函数只做固定数目的寄存器写
+ * 与两个驱动侧字段赋值。窗口结束后由调用方 __DSB() 再恢复中断。 */
+int ns800_epwm_commit_prepared_held(struct rt_device_pwm *device,
+                                    const struct ns800_epwm_prepared *prepared)
+{
+    struct ns800_epwm *epwm_dev;
+
+    if (device == RT_NULL || prepared == RT_NULL || prepared->valid == 0U)
+    {
+        return -RT_EINVAL;
+    }
+    epwm_dev = rt_container_of(device, struct ns800_epwm, epwm_device);
+
+    ns800_epwm_configure_regs(epwm_dev->epwm_config->instance, prepared);
+
+    epwm_dev->current_period = prepared->period_ns;
+    epwm_dev->current_pulse  = prepared->pulse_ns;
+    return RT_EOK;
 }
 
 static rt_err_t ns800_epwm_drv_set(struct ns800_epwm *device, struct rt_pwm_configuration *rt_conf)
 {
     rt_err_t ret;
-    struct ns800_signal_params signal_params;
 
     RT_ASSERT(RT_NULL != device);
     RT_ASSERT(RT_NULL != device->epwm_config);
     RT_ASSERT(RT_NULL != rt_conf);
 
-    ret = configuration_convert(device, rt_conf, &signal_params);
-    if (ret != RT_EOK)
+    /* S2: 通用 set 路径同样不再写回计数模式(见 ns800_epwm_configure_regs), 因此它
+     * 不再是一次"可启动输出"的写。换算在 prepare 里做, 寄存器提交与旧实现同一套写。 */
     {
-        return ret;
+        struct ns800_epwm_prepared prepared;
+
+        ret = ns800_epwm_prepare(&device->epwm_device, (rt_uint32_t)rt_conf->channel,
+                                 rt_conf->period, rt_conf->pulse, &prepared);
+        if (ret != RT_EOK)
+        {
+            return ret;
+        }
+        ns800_epwm_configure_regs(device->epwm_config->instance, &prepared);
+        device->current_period = prepared.period_ns;
+        device->current_pulse  = prepared.pulse_ns;
     }
-
-    device->current_period = rt_conf->period;
-    device->current_pulse = rt_conf->pulse;
-
-    ns800_epwm_configure_signal(rt_conf->channel, device->epwm_config->instance, &signal_params);
 
     return ret;
 }
