@@ -1,0 +1,324 @@
+================================================================================
+phase8-stop-priority-s2a · 只读源码审计 (S2-A 停机优先关系)
+================================================================================
+任务性质: DESIGN ONLY —— 本轮不改动任何生产源码/测试/工程, 不运行任何测试或构建。
+本文件只登记"读了什么、看到什么、能推出什么、不能推出什么"。
+
+0. 基线 / 工具 / 时间
+--------------------------------------------------------------------------------
+仓库            https://github.com/LINboss666/ns800-stepper-safety
+分支            phase8/tmc-drive-config
+本轮审计对象    b410da36a383a367e448cdf1f0fad58eb28b7530  (analyzed_commit)
+                提交时间 2026-10-23T17:50:42+08:00; 该提交为 S1-R1 的 GO 登记(纯文档)
+返修起点        78a1333c9338332cbe03d64d8a6f61babacbcb00
+S1-R1 tested_commit / GO 生产内容 8ca4f6aca62779d18345c9c3af44e5419d5c2985
+GO 接受对象     32a311a76284796ad535d1f7956e5dc101520561
+历史工作包      IO70 GO 296c369607ea69c201f797b80950b76ff312c0e0
+                安全数据语义 GO 689c8b3a8f565df9facbb142b90639aaa127aa78
+
+只读核对(实际执行, 全部退出码 0):
+  git rev-parse --abbrev-ref HEAD            -> phase8/tmc-drive-config
+  git rev-parse HEAD                         -> b410da36a383a367e448cdf1f0fad58eb28b7530
+  git status --porcelain | wc -l             -> 0        (工作树 clean, 无他人改动)
+  git -c http.proxy=http://127.0.0.1:7892 ls-remote origin refs/heads/... :
+      refs/heads/phase8/tmc-drive-config      b410da36a383a367e448cdf1f0fad58eb28b7530  (与本地相同)
+      refs/heads/main                         1b3757eec550802a3973e66790af422d81d3d373  (冻结, 未移动)
+      refs/heads/phase7/full-embedded-software 6d3fbc559d45673d7550eb73dec5a4ade5bb34df (冻结)
+      refs/tags/v0.7-phase7-software-board-validated            097935fec5a6f2467261ab1ad449ff0b1d398250
+      refs/tags/v0.7-phase7-software-board-validated^{}         e40a9b95ef709e6a80444f9f3949dfdd70ba96ba
+  结论: 本地=远端=任务书固定基线, 未 reset/覆盖/rebase, 未移动冻结对象。
+
+工具与环境(不记录本机名/账号):
+  Windows 10.0.26100 / Git Bash (MINGW64_NT x86_64, MSYS 3.5.7)
+  git version 2.49.0.windows.1
+  Python 3.12.5 (仅用于 NUL 安全的路径枚举与 JSON 校验, 未参与任何"验证判定")
+  未运行: Keil/编译器/主机测试链/采集脚本 —— 本轮为只读设计审计, 不产生任何 PASS/FAIL 判定。
+
+路径缩写(不是路径本身, 全文按此展开):
+  ROOT = rt-thread-master/rt-thread-master                       (相对仓库根 D:/ns800)
+  BSP  = ROOT/bsp/novosns/ns800/ns800rt7p65-nssinepad
+  APP  = BSP/applications
+  HAL  = ROOT/bsp/novosns/ns800/libraries/HAL_Drivers/drivers
+  STD  = BSP/packages/novosns-series-latest/NS800RT7XXX
+
+1. 证据等级定义
+--------------------------------------------------------------------------------
+DV   = 本轮由执行 Agent 亲自读到源码/配置文件原文并摘录行号
+AC   = 由只读检索子代理收集、执行 Agent 已抽查同一文件同一结论的关键行(抽查项在条目后注明)
+AC!  = 由子代理收集、本轮未逐行复核 —— 引用时降级, 不作为设计前提
+ED   = 工程推导(基于 DV 事实的推理, 不是已实现特性)
+TBD  = 未知/未测量, 禁止在此之上写结论
+NF   = NOT FOUND / 在"所列范围"内未发现(不等于不存在, 见 §10 的口径约束)
+
+2. 线程与上下文清单(DV)
+--------------------------------------------------------------------------------
+| 线程名 | 优先级 | 栈 | 创建点 | 与停机/使能的关系 |
+| safety | 4 | 1024 (静态数组) | APP/safety_thread.c:43-44,175-177 | force_shutdown 的唯一常规执行者 |
+| sensor | 7 | 1024 | APP/sensor_service.c:35-36,190-191 | 不触碰停机/使能(本轮未审其内部) |
+| motor  | 8 | 768  | APP/motor.c:71-72,735-736 | 斜坡线程: ENN 每拍复核、200ms 配置守卫(内含 UART)、apply/ramp 关断与使能提交 |
+| diag   | 9 | 1024 | APP/diagnosis.c:370-371 | 投 EVT_MULTI_FAULT (APP/diagnosis.c:183) |
+| main   | 10 | 2048 | BSP/rtconfig.h:118-119 | supervisor_boot(含 boot_abort -> safety_force_shutdown) |
+| bblog  | 18 | 1024 | APP/blackbox.c:444-445 | 只消费 blackbox_trigger 置的标志; 停机路径不等待它 |
+| tshell | 20 | 4096 | BSP/rtconfig.h:121-125 | 所有 MSH 命令的实际执行上下文: motor_arm/start/disarm/dir、pwm_test、fault_reset、ss_test、runtime_selftest、system_selftest、pin |
+| flog   | RT_THREAD_PRIORITY_MAX-3 = 29 | 见 ns_storage | APP/ns_storage.c:152-153 + APP/ns_flash_config.h:21 | 存储 worker, 停机路径不等待它 |
+| fxcHold| 22 | 768 | APP/tmc2209.c:1789 | 本轮未展开(不在停机链上, 归属见 §10 NF 条目) |
+
+单核证据(DV): BSP/rtconfig.h:69 `#define RT_CPUS_NR 1`; BSP/.config:116 `# CONFIG_RT_USING_SMP is not set`;
+工程编译 src/cpu_up.c 与 src/scheduler_up.c(BSP/project.uvprojx:1662-1664, 2222-2224)。
+CPU: Cortex-M7(BSP/project.uvprojx:21 CPUTYPE("Cortex-M7")), 内核 5.3.0(rtconfig.h:110 RT_VER_NUM 0x50300)。
+`rt_hw_interrupt_disable()` = `MRS r0,PRIMASK / CPSID I`(ROOT/libcpu/arm/cortex-m7/context_rvds.S:38-43),
+`rt_hw_interrupt_enable()` = `MSR PRIMASK,r0`(同文件 :48-51) —— 关中断是**全局掩码**(含 GPIO EXTI 与 UART RX),
+不是 BASEPRI 分级掩码。含义见 design §5.4。
+tick = 1000/s(rtconfig.h:73), 无 soft timer(BSP/.config:131 not set) => `rt_thread_mdelay()` 走线程自身定时器+调度,
+是**让出 CPU** 的等待(不是忙等)。
+
+3. 停机入口 -> 首次保护动作 的等待表(DV, 行号取 b410da3)
+--------------------------------------------------------------------------------
+"首次保护动作"定义 = 第一条能真正减少危险输出的硬件动作: STEP 关断寄存器写 或 许可(PC.23)写 LOW。
+
+E1 硬件事件(GPIO ISR) -> Safety 线程
+   ISR: APP/safety_thread.c:64-67 只 safety_post_event(); 门默认 CLOSED(APP/safety_thread.c:55 st_irq_attached
+        初值 FALSE; 打开需 safety_polarity_confirm CONFIRM + safety_irq_enable, :377-397)。
+   消费: :159-163 rt_event_recv(有 500ms 超时) -> :93-142 先 rt_kprintf 再 safety_force_shutdown(code)。
+   停机前等待: (a) 该分支的 rt_kprintf(控制台为忙等, 见 §5 W-7); (b) force_shutdown 内 ss_lock FOREVER(:165);
+   (c) motor_emergency_stop 内 mot_lock FOREVER(motor.c:1144)。
+   首个硬件动作: motor.c:1148 rt_pwm_disable -> HAL STOP_FREEZE。
+
+E2 软件故障(普通 disarm / pwm_test stop 关断失败) —— S1-R1 R03 新增
+   motor.c:940 与 step_pwm.c:167 (void)safety_post_event(EVT_SOFT_FAULT) -> 同 E1 消费链。
+   投递点**不等** ss_lock; 但"投成功"不等于"已被执行"(见 §6 R-4)。
+
+E3 运行守卫(armed 期) —— motor.c 线程内
+   ENN 每拍: motor.c:454-465 safety_fb_now(1u)(纯 rt_pin_read) -> 不一致立刻 mot_guard_shutdown(:380-406)。
+   配置守卫: motor.c:467-480, 200ms 一次(motor.c:100-101) -> tmc2209_config_integrity_check()(UART, 见 §5 W-5)
+   -> 判停 -> mot_guard_shutdown。
+   mot_guard_shutdown 内部: mot_lock(:384) -> mot_pwm_output_off(:388) -> 解锁(:392)
+   -> mot_drv_en_request(0)(:394, 内含 mdelay) -> rt_kprintf x N -> 投事件(:401)。
+   注: 该路径自己就做了两个硬件动作, 不等 Safety 线程。
+
+E4 紧急停机(统一停机内部调用)
+   safety_state.c:173 -> motor.c:1139-1175。顺序: 取 mot_lock -> armed=0/目标清零 -> STEP off -> state=FAULT
+   -> 解锁 -> 许可 LOW(带 settle+回读) -> 打印 -> 返回合并 rc。
+
+E5 诊断侧关断
+   safety_state.c:174 step_pwm_force_stop() -> step_pwm.c:259-262 -> step_pwm_disable_checked(:65-120)
+   -> 仅当 step_enabled 为真才 rt_pwm_disable(:99); 未持有时返回 EOK 且不记为一次硬件关断(:69-86)。
+   外部命令入口 pwm_test stop: step_pwm.c:152-170。
+
+E6 故障清除路径(人工恢复)也做保护动作
+   safety_state.c:495 step_pwm_force_stop(); :451 motor_disarm()。全部在**持有 ss_lock** 期间。
+
+E7 启动期/自检失败
+   supervisor.c:420 boot_abort -> safety_force_shutdown(FAULT_BOOT); supervisor.c:381;
+   safety_state.c:599(自检 required 失败), :545(ss_test MSH)。上下文 = main / tshell。
+
+E8 受控减速(不是安全停机, 必须区分)
+   motor.c:1123-1137 motor_stop() 只把 target_hz 写 0 并记 CMD_ZERO_UNCONFIRMED; 真正的 STEP off
+   由斜坡线程在下一拍做到 0 时执行(motor.c:514-531)。=> 它既不是 disarm 也不是故障停机。
+
+4. 使能 / 输出提交入口(DV) —— 停机必须能挡住的所有"开"方向动作
+--------------------------------------------------------------------------------
+C1 许可(PC.23=IO87)写 HIGH: **唯一**生产提交点 motor.c:846 mot_drv_en_request(1)
+   -> safety_gpio.c:149-183 safety_drv_enable_write(1): rt_pin_write -> mdelay(1) -> rt_pin_read, 最多 2 次。
+   资格判定发生在 motor.c:821(第二次门求值) —— 与 :846 之间还夹着 motor.c:830-843 的有界反馈确认(mdelay)。
+C2 Motor STEP 输出 enable: motor.c:263 rt_pwm_enable(在 mot_lock 内, 由 :535 的 mot_pwm_apply 调用)。
+C3 诊断 STEP 输出 enable: step_pwm.c:208 rt_pwm_enable —— **无任何锁**, 与 grant 判定(:176)和
+   step_enabled 提交(:214)分三步, 中间还有 :202 的 rt_pwm_set 与参数解析。
+C4 armed 提交: motor.c:899-901(mot_lock 内 mot.armed=1), 位于 C1 与 :872-897 的使能侧反馈确认之后。
+C5 起转提交: motor.c:1117-1119(仅当 state==IDLE 才改 ACCEL), 之前 :1093/:1110 是状态与保护链复查。
+C6 恢复后重新就绪: safety_state.c:522-529(写 MANUAL_CLEAR 并清两条 S1 锁存) -> 需重跑自检 + 重新 arm。
+C7 旁路写入者(不属于 Motor/诊断协调, 但改的是同一批寄存器):
+   - RT-Thread 通用 `pin` 命令: ROOT/components/drivers/pin/dev_pin.c:382 MSH_CMD_EXPORT_ALIAS(_pin_cmd, pin)
+     -> 直接 rt_pin_write 任意引脚, **不经** safety_drv_enable_write/mot_lock/ss_lock。
+   - `pin_status`(safety_gpio.c:317-352): 对 DRV_ENABLE 调 safety_drv_enable_write(0)(:336), 对其余输出脚
+     rt_pin_write 重写默认电平(:342) —— 名义"看电平", 实际主动写。
+   - `system_selftest`/`runtime_selftest` -> safety_run_selftest(safety_state.c:251-346): 从 tshell 直接
+     写许可 LOW(:279)、重跑 motor_init(:268)、跑 UART/Flash(:306,:333), **不持** ss_lock/mot_lock。
+   - DIR 写: motor.c:994 rt_pin_write(S1-R1 R01 已在 motor.c:970/:988 前加了关断未确认的拒绝)。
+   - LED/蜂鸣器: supervisor.c:169-170 rt_pin_write(非安全输出, UI_OUTPUT_ENABLED 门)。
+   - 遗留 PF21 寄存器级诊断(safety_gpio.c:420-539)在 `NS800_ENABLE_LEGACY_PF21_DIAG` 下; 该宏在工程 Define
+     与全部头文件中均未定义(DV: 全仓 grep 只命中该文件的 #ifdef/#endif 两行) => **未编译进目标**。
+
+5. 锁 / 阻塞点表(DV + AC)
+--------------------------------------------------------------------------------
+W-1 ss_lock (APP/safety_state.c:93, 静态初始化 :561) —— 取用全部 RT_WAITING_FOREVER:
+     :126 safety_transition, :165 safety_force_shutdown, :238 safety_state_get, :383 fault_reset。
+     取锁返回值**全部未检查**(if (ss_lock_ok) rt_mutex_take(...); 无返回值接收)。
+     持锁期间做的事(关键): force_shutdown :173-219 —— 内含 motor_emergency_stop(取 mot_lock + PWM 写 +
+     许可写含 mdelay)、step_pwm_force_stop、rt_pin_read、**5 处 rt_kprintf(:179,186,199/205,220)**、
+     blackbox_trigger; fault_reset :383-528 —— 内含 ≥2 次 safety_drv_feedback_confirm(最多 3×mdelay(1) each)、
+     2 次许可 LOW 相关动作(motor_disarm)、≥10 处 rt_kprintf。
+     ss_lock_ok==FALSE(初始化失败)时**跳过取锁继续写共享状态**(:126/:165/:238/:383 同一 idiom)。
+W-2 mot_lock (motor.c:118, init :680) —— FOREVER, 返回值同样未检查; 持锁期间的硬件动作:
+     motor.c:1144-1150(取锁 -> STEP off -> 解锁), :916-924(disarm), :483-551(斜坡拍内含 rt_pwm_set/enable),
+     :967-990(DIR 判定), :617-627/:637-639/:1180-1182(状态读取)。
+     不在锁内但被约定的例外: mot_drv_en_request 明确"不得持 mot_lock 调用"(motor.c:135 注释), 它写
+     mot.drv_en_request(motor.c:141) => 该字段的更新在锁外(见 R-6)。
+W-3 tmc_xfer_lock (tmc2209.c:53, init :128) —— FOREVER: :282, :349(单帧传输锁)。
+W-4 tmc 配置 ctx->lock —— FOREVER(:735); ctx->txn —— **RT_WAITING_NO**(:749, 拿不到就返回 -RT_EBUSY)。
+     => "所有 TMC 锁都无界"是错的: txn 是非阻塞, lock/xfer 是 FOREVER。
+W-5 配置完整性复核(在 motor 线程内, 每 200ms 一次): tmc2209.c:190-276 tmc_read_reg_locked ——
+     rt_device_write(:206, 走忙等 poll_tx) + deadline 轮询(:208 deadline 取值, 我亲自 grep;
+     :218 rt_device_read, :251 到期比较, :273 got==0 时 mdelay(2)) +
+     超时出口返回 -RT_ETIMEOUT(函数内, 具体行号本轮未逐行核对, 属 AC)。
+     TMC_REPLY_TIMEOUT_MS=100ms(tmc2209.c:49, DV), 一轮 2 个寄存器 => 约 ≤205ms
+     (motor.c:81-83 的既有口径), **不含**调度抖动与 W-3/W-4 的等待。
+     另有 tmc2209.c:142 `while (rt_device_read(...) > 0);` 清空 FIFO 的循环 —— 退出条件是"读到 0"。
+W-6 许可写: safety_gpio.c:164-177, 每次尝试 = rt_pin_write + rt_thread_mdelay(1) + rt_pin_read, 上限 2 次
+     => 单次调用最坏 2 次 mdelay + 2 轮日志, 全部在 W-1/W-2 的持锁窗口内(经由 E3/E4/E6)。
+W-7 控制台(DV, 关键): rt_kprintf -> _kputs -> rt_device_write(uart1) ——
+     BSP/rtconfig.h:106-108 RT_USING_CONSOLE / RT_CONSOLEBUF_SIZE=128 / RT_CONSOLE_DEVICE_NAME="uart1";
+     BSP/.config:179 `# CONFIG_RT_USING_THREADSAFE_PRINTF is not set` => kservice.c 的 CONSOLE_TAKE/RELEASE
+     是**空宏**(AC!, 本轮未亲读 kservice 该段, 仅由 .config 与子代理摘录推得) => 控制台无互斥。
+     控制台以 RT_DEVICE_FLAG_STREAM 打开、**没有** RT_DEVICE_FLAG_INT_TX => 写走 poll 分支:
+     ROOT/components/drivers/serial/dev_serial.c:1020-1046 rt_serial_write 选择 _serial_poll_tx(:1044),
+     其循环为逐字符 putc(AC: 子代理摘录 :377-403; 本轮未逐行复核)。
+     HAL 叶子: HAL/drv_uart.c:429-445 ns800_putc -> :403-427 ns800_wait_tx_space
+     `while (!UART_isSpaceAvailable(...)) { if ((rt_tick_get()-start_tick) > timeout_tick) return -RT_ETIMEOUT; }`
+     —— **忙等不让出 CPU**, 上限 BSP_NS800_UART_TX_TIMEOUT=6000(BSP/rtconfig.h:440, DV) 毫秒/字符。
+     可下的结论: 一次 rt_kprintf 的耗时没有上界保证, 且在 TX 卡住时会以调用者优先级忙等;
+     在 Safety(4) 或 boosted tshell 上下文里会饿死更低优先级线程。
+     不可下的结论: 实际多少 ms(未测, TBD), 以及 uart1 是否可能与 uart2 共享同一 HAL 忙等实现细节(未逐行核对)。
+W-8 黑匣子触发不阻塞(DV): APP/blackbox.c:412-429 blackbox_trigger 只 rt_hw_interrupt_disable + 置
+     bb_pending_flag/code, 已有 pending 则**不覆盖**并计数 bb_trig_early_dropped(:416-419)。
+W-9 事件投递(DV): safety_post_event(safety_state.c:229-233) 先判 ss_inited 否则 -RT_ERROR;
+     内核 rt_event_send(src/ipc.c, 本轮亲读函数体)只做 spin_lock_irqsave + `event->set |= set` + 唤醒等待者;
+     set==0 返回 -RT_ERROR。=> **返回值只表示"标志已置"**, 不表示有人收到/执行; 若 safety 线程不存在
+     (safety_thread_init 失败, safety_thread.c:175-181)则标志被置位但永不被消费。
+W-10 内核互斥语义(本轮亲读关键行): 递归取同一 mutex 只增 hold 不阻塞(src/ipc.c 属 AC, 但
+     rt_mutex_init **强制** flag=RT_IPC_FLAG_PRIO, 我亲自读到 src/ipc.c:1031 前后
+     "flag can only be RT_IPC_FLAG_PRIO ... mutex->parent.parent.flag = RT_IPC_FLAG_PRIO;")
+     优先级继承存在且**不受单独宏控制**(DV: src/ipc.c:1425-1430 `if (priority < mutex->priority) ...
+     _thread_update_priority(mutex->owner, priority, RT_UNINTERRUPTIBLE); /* TODO */`)
+     —— rtconfig.h 里没有 *INHERIT* 宏(DV: grep 只命中 MAIN/FINSH 两项), 但继承代码在
+     `#ifdef RT_USING_MUTEX`(src/ipc.c:828, rtconfig.h:92 已定义)之内 => 继承对本工程是**生效**的。
+     含义(ED): 无界优先级反转被继承挡住, 但**持锁者自己的等待**(mdelay / 控制台忙等 / 另一把锁)
+     不会被继承缩短; 且 boost 后持锁者以等待者的优先级跑, 忙等会饿死其余全部线程。
+W-11 device 层(DV): rt_device_control **不检查 ref_count**(components/drivers/core/device.c:419-431 +
+     宏 device_control = dev->control/:44-53), 而 rt_device_write 检查 ref_count 并返回 0(:380-399)。
+     => 应用的 epwm1 **从未 rt_device_open**(DV: APP 内 rt_device_open 只有 tmc2209.c:120 一处),
+     但 rt_pwm_enable/disable 仍会到达驱动 —— "没 open"不会让关断静默变空操作。
+     RT_USING_DEBUG/断言在本板生效(rtconfig.h:84-85, AC!) => 传 RT_NULL 设备是断言/panic 而不是错误返回。
+
+6. 交错表(STATIC_INTERLEAVING —— 静态推演, 不是运行复现)
+--------------------------------------------------------------------------------
+R-1 停机 vs 在途 arm(许可已 HIGH、armed 未提交)
+  A = tshell(20) 在 motor.c:846 之后(许可 HIGH, sg_drv_en_request=HIGH); 停在 :872-897 的
+      safety_drv_feedback_confirm(1u) 里 mdelay(1) 时。
+  B = safety(4) 此时因守卫/事件执行 force_shutdown: ss_lock(空闲) -> motor.c:1144 mot_lock ->
+      STEP off -> :1155 许可 LOW(sg_drv_en_request=LOW)。
+  恢复 A: :874 的反馈确认按"期望使能侧"读 -> 许可已被拉 LOW => verdict 不是 OK -> A 走 :888-895 回滚
+  (再关 STEP + 再拉 LOW + 投 EVT_DRV_FEEDBACK)。方向保守, **但**在 B 已锁存 FAULT_LATCHED 之后再发生
+  一次"回滚 + 投事件", 事件链会再次 force_shutdown(自激风险取决于幂等与合并, 见 design §5.6)。
+  若 :874 的确认在 B 拉 LOW **之前**就返回 OK(反馈线响应慢/采样恰好读到旧值), A 继续到 :900 提交 armed=1
+  => **停机之后**许可仍被拉回 HIGH(arm 在 :821 之后再没有看过 Safety 状态)。=> S2-P04/P05 要打的洞。
+
+R-2 停机 vs 诊断 enable(step_pwm 无锁窗口)
+  A = tshell(20) 过 step_pwm.c:176 grant(Motor 侧 armed=0/静止/焊盘 LOW 都成立), 停在 :202/:208 之前。
+  B = safety(4) force_shutdown -> step_pwm.c:261->:65 step_enabled 仍为 FALSE => 走 :69-86 "未持有输出",
+      返回 EOK, **不**关通道、**不**置锁存。
+  恢复 A: :208 rt_pwm_enable -> :214 step_enabled=TRUE => STEP 在 Safety=FAULT_LATCHED 之后开始输出,
+      且 Motor/诊断两侧都没有任何"这次开过输出"的记录(mot.stop_result 仍停在上一关断结果)。
+  注: 目标构建里这条路径被 STEP_DIAG_ISOLATED_ENV/MOTOR_HARDWARE 两个宏挡在 grant(:1203), 因此
+      **今天不可达**; 但它是宏翻转为 TRUE 后第一时间生效的结构缺陷, 必须在 S2 方案里解决, 不能靠宏。
+
+R-3 停机 vs 斜坡线程取到旧目标
+  A = motor(8) 在 motor.c:483 取 mot_lock, :484 读 target_hz, :511 步进到非零, :535 mot_pwm_apply
+      -> rt_pwm_set(:261) + rt_pwm_enable(:263)(仍在 mot_lock 内), 提交 stop_result=OUTPUT_REQUESTED。
+  B = safety(4) 想在 A 之前关断: motor.c:1144 mot_lock —— 只能等 A。
+  结论: 这段靠 mot_lock 序列化, STEP 不会在关断后**被斜坡重新打开**(A 的 enable 一定早于 B 的 disable
+      或晚于 B 的整个动作但被 armed=0/state=FAULT 挡住下一次拍)。
+      但反过来: 若 rt_pwm_set/enable 在设备层卡住(未测, TBD), **B 的首次关断动作被 mot_lock 挡住**,
+      许可 LOW 也在 :1155 之后 => 一条"只为设频率"的调用可以推迟真正的关断。
+      这是"首次保护动作与慢处理必须分开"的直接证据(而不是猜测)。
+
+R-4 "投了事件"不等于"已停"
+  A = motor(8) 守卫判停后在 motor.c:401 (void)safety_post_event(...); 自己已经在 :388/:394 做了两个硬件动作。
+  B = 若 ss_lock 被 tshell 的 fault_reset 持有(:383-528, 内含多个 mdelay 与 ~10 次 rt_kprintf),
+      safety 线程消费到事件后只能在 :165 等待; 期间 Motor 已停, 但 Safety 状态仍是旧的(READY),
+      fault_reset 正在往 MANUAL_CLEAR 走。
+  恢复 B: force_shutdown 拿到锁后**无条件**重做停机动作并把状态写成 FAULT_LATCHED(:218),
+      把 fault_reset 刚清的锁存与 MANUAL_CLEAR 之后的语义搅在一起(顺序取决于 A/B 谁先写)。
+      注意 fault_reset 在 :526-527 清锁存是在它自己的临界区内 —— **较新的失败锁存可能被这一次恢复抹掉**。
+  => 需要"代次/epoch"而不是"再查一次": design §5.5、用例 S2-P09。
+
+R-5 fault_reset(慢) vs 新故障
+  同 R-4 的锁关系; 补充一条: fault_reset 自己 :451 调 motor_disarm, disarm 失败时 motor.c:940 会**再投一次**
+  EVT_SOFT_FAULT。tshell(20) 持锁期间被 boost 到 4, 与 safety(4) 同优先级 => safety 阻塞到 fault_reset
+  全部复核与打印做完。可下的结论: 停机请求的"首次保护动作"可以被一次人工恢复的有界采样+日志推迟;
+  不可下的结论: 推迟多少 ms(未测)。
+
+R-6 影子字段竞争(数据正确性, 不阻塞)
+  mot.drv_en_request 由 mot_drv_en_request 在**锁外**写(motor.c:141); safety_drv_enable_write 也被
+  pin_status(safety_gpio.c:336)/selftest(safety_state.c:279) 从 tshell 直接调用, 它们只更新
+  sg_drv_en_request(safety_gpio.c:172) 不更新 mot 影子 => mot_fb_request_basis(motor.c:574-581) 与
+  safety_protection_ready(safety_thread.c:311-319) 可能基于**不同的**"最近请求"判定。
+  另: mot.stop_fail_latched 被 motor.c:1263(motor_pwm_grant_to_diag)**无锁直接读**。
+
+R-7 系统级: 关中断窗口 vs 事件/ISR
+  blackbox_trigger(blackbox.c:414) 与 rt_event_send(src/ipc.c, DV 函数体)都用 spin_lock_irqsave;
+  Cortex-M7 上 rt_hw_interrupt_disable = CPSID I(全掩码) => 若在关中断窗口里做 STEP off + 许可写,
+  期间的 GPIO EXTI/DIAG 与 UART RX 中断会被推迟(设计必须量化窗口内指令数, 见 design §5.4)。
+
+7. 四宏与冻结范围检查(DV)
+--------------------------------------------------------------------------------
+APP/motor.h:67-68      MOTOR_HARDWARE_ENABLE_PATH_VALIDATED = RT_FALSE
+APP/motor.h:81-82      STEP_DIAG_ISOLATED_ENV_CONFIRMED     = RT_FALSE
+APP/tmc2209.h:98-99    TMC_DRIVE_CONFIG_HW_VALIDATED        = RT_FALSE
+APP/project_board.h:50-51 SAFETY_LIMIT_INPUTS_ENABLED       = RT_FALSE
+BSP/project.uvprojx:341 Target Define 不含上述四宏、不含 PS_GATE_HOST_OVERRIDE/IO_GATE_HOST_OVERRIDE/
+HOST_GATE_OVERRIDE(即主机覆盖变体不进工程)。
+本轮**未改**任何文件: `git status --porcelain` = 0 行(开始与结束时各一次)。
+本轮**未运行**: Keil、任何 tests/host 链、反向/元负例、PowerShell 采集器; 因此本文件没有 PASS/FAIL/REPRODUCED
+之类的判定字样。
+
+8. 与 S1 合同的一致性检查(DV, 只读)
+--------------------------------------------------------------------------------
+保持不变的机制(本轮未动代码, 仅确认其调用形状):
+ - 两个原始 rc 分列: motor.c:231-235 mot_stop_merge + :1157/:928 日志分别报告 PWM 与许可结果。
+ - 失败锁存只由人工恢复清除: motor.c:635-640 / step_pwm.c:254-257 的唯一调用点在 safety_state.c:526-527。
+ - 诊断失败不释放所有权: step_pwm.c:101-118(仅 EOK 才 step_enabled=FALSE)。
+ - 统一停机不投事件: safety_state.c:150-225 无 safety_post_event; step_pwm.c:259-262(force_stop)不投。
+ - 第 7 门只追加: motor.h:95 MOT_GATE_STOP_UNCONFIRMED = 1u<<6(motor.c:603 消费)。
+ API 能力的真实边界(新事实, DV): HAL/drv_epwm.c:588-593 的 disable = 一次 MODIFY_REG(TBCTL.CTRMODE=
+ STOP_FREEZE)后**无条件 return RT_EOK**; STD/StdDriver/Inc/epwm.h:2521-2524(AC!)显示该 helper 返回 void。
+ 另外框架层 rt_pwm_disable(channel<=0) 会先对 HAL 发一个 **PWMN_CMD_ENABLE**(rt_drv_pwm.c:189-191),
+ ns800 的 switch 不认该命令 => default 返回 -RT_EINVAL(drv_epwm.c:625-627), 但该值被 :196 的
+ result 覆盖后再不上抛。可下的结论: (i) 该驱动**不会**因关断失败返回非 EOK(除非设备指针为 NULL),
+ (ii) enable/disable 是**整个 EPWM 模块**的时间基模式, 不是 per-channel, (iii) S1 的"api-failed 锁存"在
+ 当前驱动能力下几乎不可达 => 设计必须把"关断的可信度"落到"寄存器写已发生 + 反馈/波形另行证明",
+ 不能把 EOK 读成"通道已停"。不可下的结论: STOP_FREEZE 后 PA0 的实际电平/波形(TBD, 无示波器, 未上板)。
+
+9. 本轮实际读过的文件(DV)
+--------------------------------------------------------------------------------
+APP: motor.c(全文 1491 行)、motor.h(255)、step_pwm.c(287)、step_pwm.h、stop_result.h、
+     safety_state.c(605)、safety_thread.c(436)、safety_gpio.c(540)、tmc2209.c(部分: 100-290,
+     330-380, 440-540, 680-790, 820-940, 1030-1080, 1260-1275, 1780-1795 —— 锁与传输相关段)、
+     supervisor.c(330-430)、project_board.h、diagnosis.c(365-375 线程参数 + 183 投事件)、
+     blackbox.c(410-448)、ns_storage.c(145-158)、ns_flash_config.h
+BSP: rtconfig.h(关键行 grep 逐条亲验)、.config(关键行)、project.uvprojx(Define/设备/hooks/libcpu 文件表, AC)
+HAL/内核: drv_epwm.c(560-670)、drv_gpio.c(grep: ops 表/SYSCON/interrupt disable 用法, AC)、
+     drv_uart.c(AC!: putc/wait_tx_space 循环体)、dev_serial.c(AC!: rt_serial_write 分发/poll_tx)、
+     device.c(38-53, 337-431 亲读)、rt_drv_pwm.c(140-200 亲读 + register 函数亲读)、
+     src/ipc.c(亲读: rt_event_send 函数体、rt_mutex_init 强制 PRIO flag、PI 代码 1425-1430)、
+     libcpu/arm/cortex-m7/context_rvds.S(38-51 亲读)、components/drivers/pin/dev_pin.c(:382 grep)
+文档: reports/agent_handoffs/phase8-stop-result-s1.md §11-14 与 .json、
+     reports/reviews/phase8-stop-result-s1-r1/{go_registration_and_claims_calibration,call_site_audit_correction,NOTES}.txt、
+     tests/host/README.md(S1 段)、BSP README/开发进度/待办事项(S1/S2 相关段)、
+     rt-thread-master/rt-thread-master/AGENTS.md(全文)、根 .gitignore、tests/host/.gitignore
+
+10. "未发现"的口径与本轮未展开的范围
+--------------------------------------------------------------------------------
+- 本轮在 APP 范围内**未发现** ss_lock 与 mot_lock 的 ABBA 反向持锁(所有观察到的是 ss->mot;
+  txn->mot 见 tmc2209.c:829 注释与 motor.c:760/907 的 arm 结构)。这是"在所列范围没发现", 不是证明。
+- 未发现 ss_lock 的递归取用(safety_state_get 是否在持 ss_lock 时被再次调用)逐路径复核;
+  已确认存在 motor_get_gate_fail_mask -> safety_state_get 的取锁链(motor.c:588), 因此**递归风险必须在
+  实现轮以真实调用图复核**(hold 递归不会死锁, 但会掩盖错误配对释放, src/ipc.c hold++ 属 AC)。
+- 未展开: sensor_service/diagnosis/project_config/ns_flash/ns_storage 的内部阻塞(它们与停机链的关系
+  只在"是否被 force_shutdown 调用"层面核对: 答案是没有, 除 blackbox_trigger 之外)。
+- tmc2209.c:1789 的 "fxcHold" 线程(prio 22)本轮未展开其职责, 因此不能断言它不参与总线竞争。
+- 未测量: 任何时间量(锁等待、控制台忙等、UART 复核占用、关中断窗口时长、栈余量)。全部 TBD。
+- 板卡未核验: 板上固件身份仍是 USER_REPORTED_E40(e40a9b9), 本轮不读回、不烧录。
+- AC! 条目(kservice 的 CONSOLE_TAKE 空宏、dev_serial poll_tx 循环体、drv_uart 忙等循环、epwm.h helper 返回
+  void)是子代理摘录, 本轮只在 rtconfig/.config 层面确认了**使能条件**(无 THREADSAFE_PRINTF、无 DMA、
+  无 INT_TX 打开控制台)。把它们当作设计前提之前, 实现轮需要逐行复核同一函数。

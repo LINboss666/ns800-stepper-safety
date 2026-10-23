@@ -1,0 +1,194 @@
+{
+  "task_id": "phase8-stop-priority-s2a",
+  "taskbook": "NS800_Stop_Priority_S2A_Qoder_Task_20261023.md",
+  "nature": "DESIGN ONLY: 只读审计 + 方案设计; 生产代码与测试代码本轮冻结",
+  "repository": "https://github.com/LINboss666/ns800-stepper-safety",
+  "branch": "phase8/tmc-drive-config",
+  "baseline_sha": "b410da36a383a367e448cdf1f0fad58eb28b7530",
+  "analyzed_commit": "b410da36a383a367e448cdf1f0fad58eb28b7530",
+  "scope": "DESIGN_ONLY",
+  "recorded_at": "2026-10-23 (Asia/Shanghai)",
+  "prior_objects": {
+    "s1_r1_go_accepted": "32a311a76284796ad535d1f7956e5dc101520561",
+    "s1_r1_tested_commit": "8ca4f6aca62779d18345c9c3af44e5419d5c2985",
+    "s1_first_round_tested_commit": "62873bd8aa851ae3010dd1c04cba0aa3e1e22821",
+    "rework_base": "78a1333c9338332cbe03d64d8a6f61babacbcb00",
+    "io70_go": "296c369607ea69c201f797b80950b76ff312c0e0",
+    "data_semantics_go": "689c8b3a8f565df9facbb142b90639aaa127aa78"
+  },
+  "baseline_verification": {
+    "method": "只读: git rev-parse / git status --porcelain / git -c http.proxy ls-remote",
+    "local_head_equals_baseline": true,
+    "remote_head_equals_baseline": true,
+    "working_tree_clean": true,
+    "frozen_refs_readback": {
+      "main": "1b3757eec550802a3973e66790af422d81d3d373",
+      "phase7_full_embedded_software": "6d3fbc559d45673d7550eb73dec5a4ade5bb34df",
+      "v0_7_tag_object": "097935fec5a6f2467261ab1ad449ff0b1d398250",
+      "v0_7_dereferenced": "e40a9b95ef709e6a80444f9f3949dfdd70ba96ba"
+    },
+    "reset_or_overwrite_or_rebase": "NONE",
+    "agents_md": "rt-thread-master/rt-thread-master/AGENTS.md 全文已读; 四份文档均为任务书明确指定",
+    "gitignore": "根 .gitignore 与 tests/host/.gitignore 已读, 产物与隐私禁令保持"
+  },
+  "single_objective": "回答: 停机怎样摆脱阻塞, 并保证进行中的 arm/enable 不会在停机之后重新开启输出。 只交方案, 不实现, 不做硬件动作; S1 已接受的合同全部保持。",
+  "actual_changes": [
+    "新增 reports/plans/phase8-stop-priority-s2a-design.md",
+    "新增 reports/reviews/phase8-stop-priority-s2a/source_audit.txt",
+    "新增 reports/agent_handoffs/phase8-stop-priority-s2a.md",
+    "新增 reports/agent_handoffs/phase8-stop-priority-s2a.json"
+  ],
+  "frozen_and_unchanged": "全部 APP/HAL/内核源码与头文件、tests/ 及其 runner/shim/期望、Keil 工程、.gitignore、旧证据与旧报告; fault_reset 旁陈旧注释、PS12c 前提、sw1_cut.ps1 T-01/T-02 均不在本轮修复",
+  "four_macros": {
+    "MOTOR_HARDWARE_ENABLE_PATH_VALIDATED": "RT_FALSE (applications/motor.h:67-68)",
+    "STEP_DIAG_ISOLATED_ENV_CONFIRMED": "RT_FALSE (applications/motor.h:81-82)",
+    "TMC_DRIVE_CONFIG_HW_VALIDATED": "RT_FALSE (applications/tmc2209.h:98-99)",
+    "SAFETY_LIMIT_INPUTS_ENABLED": "RT_FALSE, 实现保留 (applications/project_board.h:50-51)",
+    "keil_target_define": "不含四宏, 也不含任何主机覆盖宏 (project.uvprojx:341)"
+  },
+  "target_configuration_evidence": {
+    "kernel": "RT-Thread 5.3.0 (rtconfig.h:110), Cortex-M7 (project.uvprojx:21 CPUTYPE)",
+    "cores": "单核: rtconfig.h:69 RT_CPUS_NR 1; .config:116 SMP not set; 工程编译 cpu_up.c/scheduler_up.c",
+    "priorities": "rtconfig.h:71-72 RT_THREAD_PRIORITY_MAX 32; main 10 (:119); tshell 20 (:124)",
+    "tick": "rtconfig.h:73 RT_TICK_PER_SECOND 1000; .config:131 soft timer not set",
+    "console": "rtconfig.h:106-108 uart1, 缓冲 128; .config:179 RT_USING_THREADSAFE_PRINTF not set",
+    "uart_tx_timeout": "rtconfig.h:440 BSP_NS800_UART_TX_TIMEOUT 6000",
+    "mutex": "rtconfig.h:92 RT_USING_MUTEX; src/ipc.c:1425-1430 优先级继承存在(不受独立宏控制)",
+    "irq_mask": "libcpu/arm/cortex-m7/context_rvds.S:38-43 rt_hw_interrupt_disable = MRS PRIMASK/CPSID I (全掩码)",
+    "peripheral_ownership": "board/board.c:140-143,180-190 DUAL_CORE_ENABLE=0 => AHB/APB CPUSEL 写 0(本核)"
+  },
+  "key_findings": [
+    "首次降险动作(EPWM 冻结 + 许可 LOW)排在 RT_WAITING_FOREVER 的 ss_lock/mot_lock 之后; fault_reset 在 ss_lock 内做有界反馈确认(mdelay)+disarm+>=10 次控制台写",
+    "控制台逐字符忙等(drv_uart ns800_wait_tx_space), 无互斥, 上限 6000ms/字符; 事件分支在任何保护动作之前先打印(safety_thread.c:99-141)",
+    "优先级继承挡住无界反转, 但不缩短持锁者自身的 mdelay/忙等; boost 后忙等会饿死其余线程",
+    "motor_arm 是 7 步无序列化边界的使能序列, 对 Safety 状态的最后一次读取发生在写 HIGH 之前 => 停机后可重新拉高许可 (STATIC_INTERLEAVING R-1)",
+    "诊断侧 step_pwm 无任何锁, grant->set->enable->提交 四步之间停机只做未持有输出分支返回 EOK => 停机后可开始出脉冲 (R-2; 目标宏下今天不可达但不该靠宏)",
+    "TMC 锁分两类: xfer/cfg lock 是 FOREVER, cfg txn 是 RT_WAITING_NO; 不得笼统写所有 TMC 锁都无界",
+    "drv_epwm.c:588-593 disable 是一次 TBCTL 写后无条件 return EOK, 且 enable/disable 是模块级而非 per-channel; 框架对 channel 0 还先发 PWMN_CMD_ENABLE(-RT_EINVAL 被覆盖丢弃) => S1 的 api-failed 锁存在本驱动上几乎不可达 (设计阻断 B-4)",
+    "rt_device_control 不检查 ref_count => epwm1 未 open 仍能到达驱动; RT_USING_DEBUG 断言生效 => NULL 设备是断言而非错误返回",
+    "rt_event_send 只置标志+唤醒, 返回值不表示已执行; Safety 线程不存在时事件被静默搁置 => 投了事件不等于已停机",
+    "旁路写入者在协调机制之外: 通用 pin 命令(dev_pin.c:382)、pin_status 主动重写(safety_gpio.c:336,342)、system_selftest/runtime_selftest 不持锁写许可; pf21_diag/pf21_ab 因宏未定义未编译进目标",
+    "影子字段竞争: mot.drv_en_request 锁外写(motor.c:141), pin_status/selftest 只更新 sg_drv_en_request => 两个观察点可能基于不同的最近请求; motor.c:1263 无锁直读 stop_fail_latched"
+  ],
+  "interleavings_static": [
+    "R-1 停机 vs 在途 arm",
+    "R-2 停机 vs 诊断 enable(无锁)",
+    "R-3 停机 vs 斜坡旧目标(由 mot_lock 序列化, 但反向会阻塞关断)",
+    "R-4 投递不等于执行 + 恢复期搅扰",
+    "R-5 fault_reset 慢 vs 新故障",
+    "R-6 影子字段竞争",
+    "R-7 关中断窗口 vs ISR/事件"
+  ],
+  "recommendation": {
+    "chosen": "方案 A: 短保护阶段 + 抑制代次(generation) + 使能提交门",
+    "state": "单个对齐 32 位字承载 inhibit+generation(+owner); 所有突变在 rt_hw_interrupt_disable/enable 的固定指令数窗口内",
+    "fast_path": "形成请求 + EPWM 冻结 + GPIO CLR 许可; 不取互斥量/不打印/不碰 UART/不延时; 回读、反馈、日志、黑匣子、S1 富记账全部后置",
+    "commit_gate": "慢校验在锁外, 提交在比较门内; token 携带 (owner, gen); 越过门才允许写使能寄存器; 线性化点 = frozen->running 那一次寄存器写",
+    "recovery": "fault_reset 慢校验移出 ss_lock; 只在代次未变时清除; 新故障 bump 代次 => 新故障赢; MANUAL_CLEAR 不自动 arm/enable",
+    "uart": "快路径零 UART; 复核保持截止期(TMC_REPLY_TIMEOUT_MS / -RT_ETIMEOUT), 结果绑定 (gen, config_epoch); 晚到结果丢弃且不得复活许可; 忙不得无限掩盖过期",
+    "s1_relationship": "stop_fail_latched = 证据位, inhibit = 权限位, 职责不同; 两者仍只在 fault_reset 同一条人工恢复路上解除",
+    "alternatives": "B 单一输出执行者线程(需要 A 的无锁首动作才有意义, 列为后续可能第二步); C 仅加锁超时+提交前复查(不满足 I1/I4/I5, 不可单独采用)",
+    "approval_note": "推荐不等于批准实现"
+  },
+  "invariants": [
+    "I1 请求可见性",
+    "I2 动作独立性",
+    "I3 快路径无阻塞源",
+    "I4 线性化点唯一",
+    "I5 恢复单调(新故障不被旧恢复清掉)",
+    "I6 证据不丢",
+    "I7 可启动性不被永久封死",
+    "I8 S1 合同零回退"
+  ],
+  "planned_cases": [
+    "S2-P01 ss_lock 被他线程真实持有",
+    "S2-P02 mot_lock 被他线程真实持有",
+    "S2-P03 UART 卡住/过期与忙不得掩盖",
+    "S2-P04 arm 提交前暂停",
+    "S2-P05 arm 已写 HIGH 未提交 armed",
+    "S2-P06 诊断 grant 后停机",
+    "S2-P07 诊断 set 后 enable 前停机 + 斜坡旧任务",
+    "S2-P08 最窄提交窗口(原子协调可证伪)",
+    "S2-P09 新故障 vs fault_reset / 多次停机 / 延迟结果",
+    "S2-P10 PWM/许可/反馈/事件各类失败仍不跳过独立动作",
+    "S2-P11 真正常对照(受控减速与成功 disarm 不形成抑制)"
+  ],
+  "planned_cases_status": "PLANNED / NOT EXECUTED (本轮一律不填结果)",
+  "design_completeness": {
+    "status": "PARTIAL-可审",
+    "done": [
+      "现状入口/等待表",
+      "静态交错表",
+      "推荐方案覆盖 I1-I8 的所有开启提交与人工恢复竞争",
+      "可证伪计划用例",
+      "最小实现工作包 WP1-WP4"
+    ],
+    "blockers": [
+      {
+        "id": "B-1",
+        "what": "关中断窗口可接受长度与 UART RX/EXTI 丢失容忍度",
+        "proof": "纯源码: drv_uart RX ISR + dev_serial 环形缓冲溢出行为",
+        "hardware": false
+      },
+      {
+        "id": "B-2",
+        "what": "GPIO/EPWM 区域缓存/缓冲属性, 外设写是否需 DSB",
+        "proof": "纯源码: board.c/cpuport.c 的 MPU 与 cache 配置 + 厂商手册记版本",
+        "hardware": false
+      },
+      {
+        "id": "B-3",
+        "what": "EPWM 模块级冻结对同实例其它通道/功能的旁影响",
+        "proof": "纯源码: 全仓 EPWM1 使用者与 drv_set 写入面",
+        "hardware": false
+      },
+      {
+        "id": "B-4",
+        "what": "rt_pwm_disable 恒返回 EOK => S1 api-failed 在本驱动几乎不可达; 关断可信需驱动能力层定义",
+        "proof": "需波形(无示波器, BLOCKED_INSTRUMENT)或驱动级写后回读 TBCTL 的可行性评估",
+        "hardware": true
+      },
+      {
+        "id": "B-5",
+        "what": "通用 pin/pin_status/selftest 能否触及 PC.23(旁路写入口边界)",
+        "proof": "纯源码: rt_pin_get 与引脚编号映射核对; 本轮不改通用驱动不删命令",
+        "hardware": false
+      }
+    ],
+    "unmeasured_all_TBD": [
+      "锁等待时长",
+      "控制台忙等实际耗时",
+      "UART 复核占用",
+      "关中断窗口长度",
+      "栈余量",
+      "最坏停机时延",
+      "STEP 冻结后 PA0 波形/电平"
+    ]
+  },
+  "open_questions_for_reviewer": [
+    "抑制/代次的 owner 归属放 safety_state.c 还是新建 stop_priority.h/.c",
+    "WP1-WP3 是否分三次独立复审(推荐)还是一次实现轮做完",
+    "B-1/B-2/B-3 是否允许纯源码补证关闭; B-4 是否要求修订 S1 的 api-failed 语义",
+    "旁路写入口是否要求纳入协调机制(涉及通用驱动)"
+  ],
+  "tests_executed": [],
+  "hardware_actions": [],
+  "not_done": "未运行 Keil/任何 tests 链/反向/元负例/PowerShell 采集器; 只读检索不是功能测试, 故无 TEST_PASS/REPRODUCED; 未生成 ZIP; 未新建测试框架或 checker; 未更新多份 BSP 阶段文档",
+  "historical_test_references": {
+    "policy": "引用历史测试必须带旧提交, 不写成本轮重新执行",
+    "s1_first_round": "62873bd: target 36 / host_ovr 45, 反向 2 项, V1 25/V2 22, I/O 138, 13 例+M1..M5, SD 41, Keil 0/0",
+    "s1_r1": "8ca4f6a: target 48/48, host_ovr 64/64, 两项反向 META-OK, V1/V2 与 I/O 138 rc=0, Keil 0/0 (Code=152090 RO=69338 RW=2184 ZI=83428)",
+    "not_rerun_this_round": "全部 —— 本轮零测试执行"
+  },
+  "evidence_paths": [
+    "reports/plans/phase8-stop-priority-s2a-design.md",
+    "reports/reviews/phase8-stop-priority-s2a/source_audit.txt",
+    "reports/agent_handoffs/phase8-stop-priority-s2a.md",
+    "reports/agent_handoffs/phase8-stop-priority-s2a.json"
+  ],
+  "board_identity": "USER_REPORTED_E40 (e40a9b95ef709e6a80444f9f3949dfdd70ba96ba); 本轮未读回 Flash, 未烧录",
+  "risks_still_open": "RISK-03/03a (停机时延/阻塞) 与 RISK-04-b (瞬态/波形/连续性定量/外接 NC/断线容错/安全等级/新版上板) 继续开放; 结构性消除某个 FOREVER 不等于 RISK-03/03a 关闭",
+  "next_action": "AWAITING_INDEPENDENT_DESIGN_REVIEW",
+  "status": "STOP: AWAITING_INDEPENDENT_DESIGN_REVIEW (不登记 S2 实现 GO, 不进入实现/返修/板级/F2e/F3)",
+  "next_step_owner": "ChatGPT 审方案 + 用户决定后另下实现任务书; 未经新授权不得开工, 本任务书不构成任何硬件授权"
+}
