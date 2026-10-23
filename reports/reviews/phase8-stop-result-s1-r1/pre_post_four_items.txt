@@ -1,0 +1,56 @@
+# S1-NEW-01..04 修前(仓外 78a1333 快照) vs 修后(tested_commit=8ca4f6aca62779d18345c9c3af44e5419d5c2985) 同一 ID 真实逐例结果
+# 修前运行方式: git archive 78a1333 applications/ 解到仓外目录, 用同一份 ps_main.c 与 shim_ps 编译(-I 指向快照), 生产源码零修改
+# 修后运行方式: tests/host/run_stop_result_s1.sh 默认 SRC_APP=工作树(=tested_commit), run_id 独立目录
+
+## R01 motor_set_direction —— 关断未确认时仍放行 DIR 写
+[修前 target]
+CASE|PS12a-dir_refused_while_stop_uncertain|FAIL|dir rc=0 DIR 写 0->1 latch=1 state=4 cur=0(命令值) - 已知关断失败不得据 0Hz 改方向
+[修前 host_ovr]
+CASE|PS12c-dir_refused_while_real_output_running|FAIL|dir rc=0 DIR 写 3->4 running=1 latch=1 safety=FAULT_LATCHED pad=0
+[修后 target]
+CASE|PS12a-dir_refused_while_stop_uncertain|PASS|dir rc=-8 DIR 写 0->0 latch=1 state=4 cur=0(命令值) - 已知关断失败不得据 0Hz 改方向
+[修后 host_ovr]
+CASE|PS12c-dir_refused_while_real_output_running|PASS|dir rc=-8 DIR 写 2->2 running=1 latch=1 safety=FAULT_LATCHED pad=0
+
+## R02 motor_init 拿不到 PWM 句柄的出口未尝试撤销许可
+[修前 target]
+CASE|PS13a-missing_dev_still_requests_low|FAIL|LOW 写 0->0 last=-1 焊盘实测=0 - 错误出口也要降级
+CASE|PS13c-missing_dev_and_low_both_fail_kept|FAIL|init rc=-255 stop_rc=-45 low_rc=0 LOW 写=0 - 不被互相掩盖
+[修后 target]
+CASE|PS13a-missing_dev_still_requests_low|PASS|LOW 写 0->1 last=0 焊盘实测=0 - 错误出口也要降级
+CASE|PS13c-missing_dev_and_low_both_fail_kept|PASS|init rc=-255 stop_rc=-45 low_rc=-12 LOW 写=2 - 不被互相掩盖
+
+## R03 普通 disarm / pwm_test stop 失败没有交给故障链, 人工恢复不可达
+[修前 target]
+CASE|PS14a-disarm_pwmfail_posts_software_fault_once|FAIL|disarm rc=-12 event 0->0 last=0x0 bits0=0x0 safety=READY latch=1
+[修前 host_ovr]
+CASE|PS14g-diag_stop_fail_posts_software_fault_once|FAIL|event 0->0 last=0x0 owner=1
+CASE|PS14i-diag_failure_manual_recovers|FAIL|safety=FAULT_LATCHED code=9 diag_latched=1 diag=api-failed(output-UNKNOWN)
+[修后 target]
+CASE|PS14a-disarm_pwmfail_posts_software_fault_once|PASS|disarm rc=-12 event 2->3 last=0x40 bits0=0x40 safety=READY latch=1
+[修后 host_ovr]
+CASE|PS14g-diag_stop_fail_posts_software_fault_once|PASS|event 3->4 last=0x40 owner=1
+CASE|PS14h-force_stop_inside_shutdown_stays_silent|PASS|event 4->4 safety=FAULT_LATCHED owner=1
+CASE|PS14i-diag_failure_manual_recovers|PASS|safety=MANUAL_CLEAR code=0 diag_latched=0 diag=api-accepted(驱动接受关断, 非波形证明)
+
+## R04 apply 回退连关两次并用后一次成功覆盖前一次失败
+[修前 host_ovr]
+CASE|PS15a-apply_fail_single_checked_disable_keeps_first_error|FAIL|disable 52->52 seq_left=1 stop_rc=0 stop=api-accepted(驱动接受关断, 非波形证明) src=disarm latch=1 LOW 43->43 event +0 state=0
+CASE|PS07c-apply_fail_failclosed_consumes|FAIL|state=0 disable +0 src=disarm stop=api-accepted(驱动接受关断, 非波形证明) latched=1 event +0
+[修后 host_ovr]
+CASE|PS15a-apply_fail_single_checked_disable_keeps_first_error|PASS|disable 53->54 seq_left=0 stop_rc=-12 stop=api-failed(output-UNKNOWN) src=apply-fail latch=1 LOW 45->46 event +1 state=4
+CASE|PS15b-later_success_does_not_erase_first_error|PASS|stop=api-accepted(驱动接受关断, 非波形证明) rc=0 latch=1 bit7=1 arm rc=-8 HIGH 写 2->2 event +0
+CASE|PS15c-apply_fail_control_all_ok_single_close|PASS|disable 57->58 stop=api-accepted(驱动接受关断, 非波形证明) rc=0 latch=0
+CASE|PS07c-apply_fail_failclosed_consumes|PASS|state=4 disable +1 src=apply-fail stop=api-failed(output-UNKNOWN) latched=1 event +1
+
+## 汇总行(证明两侧都是完整台账, 不是零执行)
+[修前 target]
+SUMMARY|cases=48 pass=44 fail=4 pre_bad=0
+[修前 host_ovr]
+SUMMARY|cases=64 pass=47 fail=17 pre_bad=21
+[修后 target]
+SUMMARY|cases=48 pass=48 fail=0 pre_bad=0
+[修后 host_ovr]
+SUMMARY|cases=64 pass=64 fail=0 pre_bad=0
+
+修后两个变体的进程退出码均为 0(runner rc=0); 修前分别 1/1, 失败身份与上面四条一致。

@@ -74,13 +74,27 @@
   条件一字未改）；`fault_reset()` 要求两条输出路径本次都有有效关断结果才清除，S1 锁存只在这条人工
   恢复复核后解除（无 MSH 旁路）。统一停机不再打印 `STEP stopped`、黑匣子仍只一次、内部不投事件。
   新增第四套并列主机链 `tests/host/run_stop_result_s1.sh`（真编译 `step_pwm.c`+`motor.c`+
-  `safety_state.c`；target 36 例 / host_ovr 45 例 rc=0 + 两项仓外反向）；既有 V1/V2、I/O 138 例、
+  `safety_state.c`；返修后 target 48 例 / host_ovr 64 例 rc=0 + 两项仓外反向 META-OK）；既有 V1/V2、I/O 138 例、
   负例+元负例、SD 41 例全部重跑未放宽；Keil **0 Error / 0 Warning**。
   **S2 未做**：无界等锁（`ss_lock`/`mot_lock`/UART xfer 的 `RT_WAITING_FOREVER`）、UART 阻塞对停机的
   影响、在途 arm/enable 竞争、线程重构 —— 本轮不声称任何停机时延上界，RISK-03/03a 与 RISK-04-b
   继续开放。四道宏仍 `RT_FALSE`，新源码**未烧录**，板上仍是冻结固件 `e40a9b9`；
   证据 `reports/reviews/phase8-stop-result-s1/`，交接 `reports/agent_handoffs/phase8-stop-result-s1.md`，
   状态 `STOP: AWAITING_INDEPENDENT_REVIEW`。
+
+  **2026-10-23 同轮限定返修（`phase8-stop-result-s1-r1`，基线 `78a1333` → tested_commit `8ca4f6a`）**：
+  复审给出 **REWORK**（主链与既有回归云端独立复跑通过，5 个补充失败场景复现 4 项合同遗漏），
+  本轮只修这四项：**R01** `motor_set_direction` 不再把"软件 0Hz + FAULT"当物理静止（关断未确认 ⇒
+  拒 `-RT_EPERM` 且零 DIR 写，只收紧）；**R02** `motor_init` 取不到 PWM 句柄的错误出口仍请求许可 LOW、
+  作废 `mot_dev_ok`、两个原始 rc 分列、绝不用 NULL 句柄调 PWM；**R03** 普通 `motor_disarm`/
+  `pwm_test stop` 关断失败各投一次 `EVT_SOFT_FAULT` 交给既有链（统一停机与 `force_stop` 不投 ⇒ 不自激），
+  并让 `fault_reset` 判定前刷新诊断侧以打掉"锁存 vs 人工恢复"死锁；**R04** apply 失败回退合并为
+  **一次** checked 关断并携带其真实结果（`PS07c` 次数断言相应改为"恰好一次"）。
+  修前用仓外 `78a1333` 快照复现 8 条真实 FAIL；修后 `target 48/48`、`host_ovr 64/64`，两项既有反向
+  仍 META-OK（`rc=1` + 台账自洽 + 指定身份），`V1 25/V2 22` 与 I/O 138 例重跑 rc=0，
+  Keil **0 Error / 0 Warning**（`Code=152090 RO=69338 RW=2184 ZI=83428`，**RW/ZI 与首轮一致**）。
+  证据 `reports/reviews/phase8-stop-result-s1-r1/`（含对上一版调用点审计的 dated 更正），
+  交接第 11–12 节；**本轮不登记 GO**，仍 `STOP: AWAITING_INDEPENDENT_REVIEW`，未做任何硬件动作。
 
 ### 引脚映射（冻结，修改需重新做 Pinmux 冲突分析）
 

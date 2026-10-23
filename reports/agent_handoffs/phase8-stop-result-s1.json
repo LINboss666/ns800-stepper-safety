@@ -4,7 +4,7 @@
   "repository": "https://github.com/LINboss666/ns800-stepper-safety",
   "branch": "phase8/tmc-drive-config",
   "base_sha": "1c45823d7b498706f166fc856521b8d564870748",
-  "tested_commit": "62873bd8aa851ae3010dd1c04cba0aa3e1e22821",
+  "tested_commit": "8ca4f6aca62779d18345c9c3af44e5419d5c2985",
   "remote_at_start": "1c45823d7b498706f166fc856521b8d564870748 (无他人前进，未 reset/覆盖)",
   "recorded_at": "2026-10-23 (Asia/Shanghai)",
   "nature": "离线固件 + 主机注入验证 + Keil 编译；零硬件动作；不命名为 F2e/F3；S2 未开始",
@@ -31,12 +31,27 @@
     "added_this_round": "MOT_GATE_STOP_UNCONFIRMED = 1u<<6 (只新增、只收紧)",
     "next_free_bit_after_this_round": "1u<<7"
   },
-  "not_changed": ["TMC 驱动/配置/UART 算法", "安全 GPIO 与 IRQ 线程", "传感器/标定/诊断算法", "刚 GO 的帧与黑匣子语义/存储格式", "底层 PWM 与 RT-Thread 驱动", "project.uvprojx", ".gitignore", "公共 env.sh", "已审 runner 与 inject.py", "旧证据/旧采集脚本"],
+  "not_changed": [
+    "TMC 驱动/配置/UART 算法",
+    "安全 GPIO 与 IRQ 线程",
+    "传感器/标定/诊断算法",
+    "刚 GO 的帧与黑匣子语义/存储格式",
+    "底层 PWM 与 RT-Thread 驱动",
+    "project.uvprojx",
+    ".gitignore",
+    "公共 env.sh",
+    "已审 runner 与 inject.py",
+    "旧证据/旧采集脚本"
+  ],
   "host_chain": {
     "runner": "tests/host/run_stop_result_s1.sh",
     "fixture": "tests/host/ps_main.c",
     "shim": "tests/host/shim_ps/rtthread.h + rtdevice.h",
-    "really_compiled_production": ["applications/step_pwm.c", "applications/motor.c", "applications/safety_state.c"],
+    "really_compiled_production": [
+      "applications/step_pwm.c",
+      "applications/motor.c",
+      "applications/safety_state.c"
+    ],
     "stub_discipline": [
       "PWM 每个 API 的 rc 可独立注入；disable 失败时桩**保留输出运行**，不替固件清掉",
       "许可写结果 / 许可脚实测电平 / ENN 反馈判定 = 三个独立注入量",
@@ -56,7 +71,11 @@
       "variant": "target",
       "file": "applications/motor.c (仓外一次性副本)",
       "injection": "关断 helper 恒记 MOT_STOP_API_ACCEPTED 并把 rc 覆写成 RT_EOK",
-      "expected_failed_ids": ["PS01a-init_disable_fail_rc", "PS02a-estop_pwmfail_returns_pwm_rc", "PS04a-disarm_fail_rc_is_pwm"],
+      "expected_failed_ids": [
+        "PS01a-init_disable_fail_rc",
+        "PS02a-estop_pwmfail_returns_pwm_rc",
+        "PS04a-disarm_fail_rc_is_pwm"
+      ],
       "result": "META-OK 命中 3/3；构建成功；真实 rc=1；台账完整自洽(36 例)；额外 FAIL 14 例如实登记"
     },
     {
@@ -64,7 +83,10 @@
       "variant": "host_ovr",
       "file": "applications/step_pwm.c (仓外一次性副本)",
       "injection": "失败分支清 step_enabled 且不置锁存(退回 S1 之前的错误语义)",
-      "expected_failed_ids": ["PS05a-force_stop_fail_keeps_owner", "PS05b-repeat_stop_still_not_released"],
+      "expected_failed_ids": [
+        "PS05a-force_stop_fail_keeps_owner",
+        "PS05b-repeat_stop_still_not_released"
+      ],
       "result": "META-OK 命中 2/2；构建成功；真实 rc=1；台账完整自洽(45 例)；额外 FAIL 12 例如实登记",
       "first_attempt_was": "第一次判成 INFRA-FAIL(夹具 rc=2)：前置不成立时 return 跳过整组用例导致必需 id 缺席；已改为继续执行让断言自己 FAIL 并把前置不成立按业务失败计 rc=1"
     }
@@ -74,7 +96,10 @@
     "run_io_behavior": "off_target 27 / on_target 29 / off_ovr 40 / on_ovr 42 = 138 例全 PASS，rc=0；斜坡体抽取前后逐条结果一致",
     "run_negatives": "13 例全 OK(执行集合=请求集合) + 元负例 M1 M1c M2 M2c M3 M3c M4 M5 全 META-OK/CONTROL-OK，rc=0；run_negatives.sh 已内含元负例子链故未重复跑",
     "run_safety_data_semantics": "OFF 21 / ON 20 全 PASS，rc=0(源与夹具未改，仅因 motor.h 可能影响编译而重跑)",
-    "not_rerun": ["R4/SW1 采集与验收工具(未改，sw1_cut.ps1 的 T-01/T-02 仍 HOLD)", "sd_runner_rework_check.sh(该 runner 未改)"]
+    "not_rerun": [
+      "R4/SW1 采集与验收工具(未改，sw1_cut.ps1 的 T-01/T-02 仍 HOLD)",
+      "sd_runner_rework_check.sh(该 runner 未改)"
+    ]
   },
   "keil": {
     "command": "UV4.exe -r project.uvprojx -j0 -o <仓外日志>",
@@ -105,7 +130,10 @@
     "四个硬件宏仍因授权范围保持 FALSE，本轮一个都没翻转"
   ],
   "artifacts": {
-    "handoff": ["reports/agent_handoffs/phase8-stop-result-s1.md", "reports/agent_handoffs/phase8-stop-result-s1.json"],
+    "handoff": [
+      "reports/agent_handoffs/phase8-stop-result-s1.md",
+      "reports/agent_handoffs/phase8-stop-result-s1.json"
+    ],
     "evidence": [
       "reports/reviews/phase8-stop-result-s1/NOTES.txt",
       "reports/reviews/phase8-stop-result-s1/disable_call_site_audit.txt",
@@ -115,9 +143,93 @@
       "reports/reviews/phase8-stop-result-s1/keil_rebuild_all_after.txt"
     ],
     "outside_repo_kept": "Keil 完整日志、各 runner 工作目录与 exe/构建产物一律留仓外(独立 run_id，旧结果保留)；未生成 ZIP",
-    "docs_sync": ["BSP 开发进度.md", "BSP 待办事项.md", "tests/host/README.md"]
+    "docs_sync": [
+      "BSP 开发进度.md",
+      "BSP 待办事项.md",
+      "tests/host/README.md"
+    ]
   },
   "hardware_authorization": "NONE —— 不开串口/调试会话，不读写真实 GPIO/TMC，不烧录/复位/下载，不改供电/模块/接线/SW1，不接电机、不输出 STEP，不开 IRQ/改极性/清真机故障、不翻四道宏、不运行历史采集工具。主机模拟调用这些 API 不等于允许对真实板执行。",
-  "status": "STOP: AWAITING_INDEPENDENT_REVIEW",
-  "next_step_owner": "独立复审方（按实际代码）；本 Agent 不自动开始 S2/F2e/F3"
+  "status": "STOP: AWAITING_INDEPENDENT_REVIEW (返修对象 8ca4f6a; 本轮不登记 GO)",
+  "next_step_owner": "独立复审方（按实际代码）；本 Agent 不自动开始 S2/F2e/F3",
+  "first_round_tested_commit": "62873bd8aa851ae3010dd1c04cba0aa3e1e22821",
+  "latest_delivery_head": "8ca4f6aca62779d18345c9c3af44e5419d5c2985",
+  "rework_r1": {
+    "task_id": "phase8-stop-result-s1-r1",
+    "taskbook": "NS800_Stop_Result_S1_Review_and_Rework_78a1333_20261023.md 第 6 节",
+    "review_decision_on_previous": "REWORK（复审 §5；§6.1 明确本轮不得先登记 GO）",
+    "base_sha": "78a1333c9338332cbe03d64d8a6f61babacbcb00",
+    "reviewed_implementation": "62873bd8aa851ae3010dd1c04cba0aa3e1e22821",
+    "tested_commit": "8ca4f6aca62779d18345c9c3af44e5419d5c2985",
+    "scope": "只修 S1-NEW-01..04；不启动 S2/F2e/F3；零硬件授权；不放宽既有六道门与四个宏",
+    "items": {
+      "R01": "motor_set_direction 追加只收紧判据 stop_fail_latched || !step_pwm_off_confirmed() -> -RT_EPERM 且零 DIR 写(motor.c:970/988)；原 -RT_EBUSY 与正常静止设置能力不变",
+      "R02": "motor_init 设备未取得出口仍调 mot_drv_en_request(0)(motor.c:696-697)；作废 mot_dev_ok/句柄，设备不可用(-RT_ENOSYS 记入 stop_rc)与 LOW 原始结果分列；不建线程、health=FAILED、对外仍 -RT_ERROR；桩新增 NULL 句柄计数(全用例恒 0)",
+      "R03": "motor_disarm(motor.c:940) 与 pwm_test stop(step_pwm.c:167) 各投一次 EVT_SOFT_FAULT 交给既有链(-> 统一停机 + FAULT_LATCHED + 黑匣子)；emergency_stop/force_shutdown/force_stop 失败分支绝不投事件；配套: fault_reset 判定前调 step_pwm_force_stop() 刷新诊断侧(safety_state.c:495)，否则诊断侧陈旧 api-failed 让人工恢复永不通过",
+      "R04": "apply 失败回退只做一次 checked 关断并把真实 rc 交给 mot_fail_closed(ae)(motor.c:538->297)，不再连关两次；MOT_STOP_SRC_FAIL_CLOSED 保留枚举值但不再是 disable 来源；PS07c 由“至少两次”改为“恰好一次”，业务判据保留并加强"
+    },
+    "new_case_ids": {
+      "both_variants": [
+        "PS12a",
+        "PS12b",
+        "PS13a",
+        "PS13b",
+        "PS13c",
+        "PS13d",
+        "PS14a",
+        "PS14b",
+        "PS14c",
+        "PS14d",
+        "PS14e",
+        "PS14f"
+      ],
+      "host_ovr_only": [
+        "PS12c",
+        "PS14g",
+        "PS14h",
+        "PS14i",
+        "PS15a",
+        "PS15b",
+        "PS15c"
+      ]
+    },
+    "fixture_additions": [
+      "逐次 disable 失败序列桩(默认关闭)",
+      "NULL 设备句柄调 PWM 的计数",
+      "最近一次事件 bit(ps_event_last)"
+    ],
+    "pre_fix_evidence": "仓外 git archive 78a1333 快照 + 同一份夹具: target PS12a/PS13a/PS13c/PS14a FAIL, host_ovr PS12c/PS14g/PS14i/PS15a-c/PS07c FAIL(逐条见 pre_post_four_items.txt)",
+    "post_fix": {
+      "target": "48/48 PASS, runner rc=0",
+      "host_ovr": "64/64 PASS, runner rc=0",
+      "reverse": "rev_motor_off_ignores_failure META-OK 3/3(proc_rc=1, 额外FAIL=19); rev_diag_fail_releases_owner META-OK 2/2(proc_rc=1, 额外FAIL=22)"
+    },
+    "regressions_rerun": {
+      "build_and_run": "V1 25 / V2 22, rc=0",
+      "run_io_behavior": "27/29/40/42=138 例全 PASS, rc=0",
+      "keil": "0 Error 0 Warning; Code=152090 RO=69338 RW=2184 ZI=83428"
+    },
+    "regressions_not_rerun_reason": "host_main.c/io_main.c/env.sh/旧 runner/inject.py 本轮零改动 -> 按 §6.4.3 不重复 13 例负例、M1..M5、SD 41 例与 R4/SW1；沿用 62873bd 一轮的 rc=0 证据(明确标注沿用)",
+    "memory_delta_vs_first_round": "Code +224, RO +420, RW 0, ZI 0",
+    "audit_correction": "disable 调用点审计中『所有返回值都被具名接住』『每动作至多一次关断』两条对上轮 motor.c:538 不成立，按 call_site_audit_correction.txt 做 dated 覆盖；旧证据原文未改动",
+    "real_failures_this_round": [
+      "夹具前置失败时 return 跳过整组用例造成缺例(反向被判 INFRA-FAIL) -> 改为继续执行让断言自己 FAIL",
+      "R03 第一版：fault_reset 未刷新诊断侧导致人工恢复二次死锁",
+      "PS15b 断言错把 state 写死为 FAULT，改为观测锁存/门禁/事件计数",
+      "shell 内嵌 Python 的字面 \n 被折叠 -> 一次锚点失配与一处 C 字符串缺终止符(编译立即报错)",
+      "Keil 第一次 -o 指向不存在的仓外目录: rc=0 但没有日志，重跑后才拿到 0/0 与尺寸"
+    ],
+    "evidence_dir": "reports/reviews/phase8-stop-result-s1-r1/",
+    "unchanged_frozen": [
+      "Keil 工程",
+      ".gitignore",
+      "公共 env.sh",
+      "已审 runner 与 inject.py",
+      "旧证据与旧采集脚本",
+      "黑匣子/存储格式与刚 GO 的数据语义",
+      "TMC/UART 算法",
+      "安全 GPIO/IRQ 线程",
+      "锁序与 FOREVER 等待(S2 范围)"
+    ]
+  }
 }

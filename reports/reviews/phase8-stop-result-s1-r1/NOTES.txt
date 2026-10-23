@@ -1,0 +1,101 @@
+phase8-stop-result-s1-r1 · 限定返修证据包说明（NOTES）
+=================================================================
+任务书：NS800_Stop_Result_S1_Review_and_Rework_78a1333_20261023.md 第 6 节
+任务 ID：phase8-stop-result-s1-r1
+仓库/分支：LINboss666/ns800-stepper-safety @ phase8/tmc-drive-config
+固定开发基线：78a1333c9338332cbe03d64d8a6f61babacbcb00（开工前本地=远端=该值）
+被返修实现：62873bd8aa851ae3010dd1c04cba0aa3e1e22821
+本轮实现 checkpoint（=tested_commit）：8ca4f6aca62779d18345c9c3af44e5419d5c2985
+上一接受基线：1c45823（安全数据语义 GO 对象 689c8b3、历史 IO70 GO 296c369 均未改写）
+性质：离线代码/测试/Keil + 普通 commit/push；**零硬件授权**；不启动 S2/F2e/F3
+
+本包文件
+-----------------------------------------------------------------
+- pre_post_four_items.txt          四项修前（仓外 78a1333 快照）与修后同一 ID 的真实逐例结果
+- call_site_audit_correction.txt   上一版调用点审计两条不成立结论的 dated 覆盖更正
+- s1_chain_ledger_after_rework.txt 修后 target 48 例 / host_ovr 64 例逐例台账
+- s1_reverse_after_rework.txt      既有两项反向在修后的重跑（构建成功 + rc=1 + 台账自洽 + 身份命中）
+- existing_regression_summary.txt  本轮实际重跑与未重跑项及依据
+- keil_rebuild_all_after.txt       钩子只读复核 + 0 Error/0 Warning + 尺寸
+- NOTES.txt                        本文件
+
+1. 四项修法与调用方合同
+-----------------------------------------------------------------
+R01（S1-NEW-01，P1）DIR 不得把"软件 0Hz"当物理静止
+- motor.c:970 在 `motor_set_direction()` 内计算
+  `stop_unconfirmed = mot.stop_fail_latched || !step_pwm_off_confirmed()`；
+  命中则 motor.c:988 返回 -RT_EPERM，**一次 DIR 写都不产生**（用例断言 DIR 写次数不变）。
+- 只收紧：原来"非静止 -RT_EBUSY"与"正常静止可设方向"两条能力都不动（PS12b/PS15 对照）。
+- 调用方合同：DIR 只在"STEP 关断已被驱动接受（或诊断从未占用该通道）且无人工未复核的
+  失败锁存"时才允许写；解除只走 fault_reset 的人工恢复复核。
+
+R02（S1-NEW-02，P1）init 拿不到 PWM 句柄的错误出口仍要降级
+- motor.c:696-697：`mot_pwm = RT_NULL; mot_dev_ok = RT_FALSE;` 之后
+  `e = mot_drv_en_request(0)` —— 走既有许可 LOW 接口，不调用任何 PWM API
+  （桩侧"NULL 句柄调用 PWM"计数在全部用例里恒 0）。
+- 设备不可用记入快照 `stop_rc = -RT_ENOSYS`，LOW 的原始返回值单独留档并打印；
+  health=FAILED、不创建斜坡线程、返回值仍是既有的 -RT_ERROR（未改对外语义）。
+- 设备重新出现后只能走既有初始化条件（PS13d 证明它重新真实调用一次关断，
+  不会沿用陈旧 dev_ok）。
+
+R03（S1-NEW-03，P2）普通外部入口的关断失败必须能进入既有故障/人工恢复链
+- motor.c:940 `motor_disarm()` 关断失败 ⇒ `(void)safety_post_event(EVT_SOFT_FAULT)` 一次；
+  step_pwm.c:167 `pwm_test stop` 失败 ⇒ 同样投一次。二者都不直接改 Safety 状态、
+  不拿 ss_lock、不新增 MSH 命令。
+- 既有链：Safety 线程消费事件 ⇒ safety_force_shutdown ⇒ 统一停机 + FAULT_LATCHED +
+  黑匣子一次；此后 `fault_reset` 的人工恢复入口可达（PS14b/PS14e/PS14i）。
+- 不自激：`motor_emergency_stop()`、`safety_force_shutdown()`、`step_pwm_force_stop()`
+  的失败分支一律**不**投事件（PS06d/PS14f/PS14h 三条独立判据）。
+- 配套（本轮发现的第二层死锁）：`fault_reset()` 在判定前先调一次
+  `step_pwm_force_stop()`（safety_state.c:495）刷新诊断侧结果，与它自己调
+  `motor_disarm()` 刷新 Motor 侧对称。缺这一步时，普通 `pwm_test stop` 失败过的
+  诊断侧会一直留着 api-failed，而恢复门的判据正是"本次有有效关断结果" ⇒
+  人工恢复永远不通过。该动作纯朝安全方向（只请求关断），失败即照实拒绝清除。
+
+R04（S1-NEW-04，P2）apply 失败回退只做一次 checked 关断并携带其真实结果
+- motor.c:538 `rt_err_t ae = mot_pwm_output_off(MOT_STOP_SRC_APPLY_FAIL);`
+  → motor.c:297 `mot_fail_closed(ae)`：撤销许可 LOW + 投事件 + 如实报告首错，
+  **不再**第二次调用 rt_pwm_disable（`MOT_STOP_SRC_FAIL_CLOSED` 保留为枚举值但不再是
+  disable 的来源，未复用旧号）。
+- 不新增自动重试；"每动作至多一次关断、首错不被后一次成功覆盖"由 PS15a/PS15b 证明
+  （用桩的"前 N 次失败"逐次序列：第一次 -EIO、其后 EOK）。
+- 相应更新 PS07c 的"至少两次 disable"次数断言为"恰好一次"，理由已写入 runner 注释：
+  次数从来不是产品要求，业务判据（失败被消费/来源/LOW/锁存/事件次数）保留并加强。
+
+2. 本轮真实失败与修正（原样保留）
+-----------------------------------------------------------------
+1) 修前取证第一次跑出"缺例"：夹具里 `run_to_real_output()` 失败时我 `return` 跳过整组
+   用例 ⇒ 必需 id 缺席 ⇒ 反向判据按纪律记 INFRA-FAIL 而不是检出。改为"前置不成立也
+   继续执行、让断言自己判 FAIL"，并加 `null_pwm_calls`/`event_last` 观测点。
+2) R03 第一次实现后 host_ovr 仍有 21 个前置失败：`fault_reset` 只看诊断侧"最近一次结果",
+   而普通 `pwm_test stop` 失败后没有任何路径再刷新它 ⇒ 人工恢复与后续组全部卡死。
+   这就是上面 R03 的"配套"一条（诊断侧刷新），不是把判据放宽。
+3) PS15b 第一版断言写死了"状态必须仍是 FAULT"：实际成功 disarm 把 state 带回 IDLE 是
+   既有语义，锁存/门禁/事件计数才是"首错未被抹掉"的正确观测量 ⇒ 改成断言
+   latch + bit7 + arm 仍拒 + 无 HIGH 写 + 事件计数不变。
+4) 两处 shell 内嵌 Python 的字面量 `\\n` 被工具层折叠成真换行，导致一次锚点匹配失败和
+   一处 C 字符串缺终止符（编译立刻报错，未产生"看着像通过"的中间态）。修法是改用
+   chr(92) 构造或走编辑工具，不靠肉眼猜转义。
+5) 第一次 Keil 运行 `-o` 指向不存在的仓外目录 ⇒ UV4 rc=0 但日志根本没生成，我差点把
+   "rc=0 + 没有日志"当成通过。补建目录后重跑才拿到 `0 Error(s), 0 Warning(s)` 与尺寸。
+
+3. 未验与边界（不得被读成已完成）
+-----------------------------------------------------------------
+- 未上板：不读回 Flash、不烧录、不开串口/调试器、不写真实 GPIO/TMC、不接电机、不出 STEP；
+  板上仍是 USER_REPORTED_E40；四道宏全部保持 RT_FALSE。
+- DIR 用例里的"输出仍在跑"是主机桩的模拟状态，不是物理 STEP/电机观察；DIR 真实危害
+  （运行中翻向导致丢步/堵转）仍未上板测量。
+- 主机链仍是单线程确定性夹具：R03 的"消费者"是**显式桩**（safety_thread.c 不在本链编译，
+  用 safety_force_shutdown 代表既有消费者），不冒称新线程端到端测试。
+- 停机时延无结论：本轮未改锁与 UART；RISK-03/03a、RISK-04-b 继续开放；S2 未开工。
+- 事件投递在真机上的时序仍依赖 Safety 线程的实际调度（本轮未测）；投一次 EVT_SOFT_FAULT
+  不改变"最终切断必须由独立硬件承担"的判断。
+- 门芯片损坏仍是维修前历史解释；静态电气与现有 SW1 功能维持 PASS (USER_CONFIRMED)，
+  本轮未索取重复测量；sw1_cut.ps1 的 T-01/T-02 仍 HOLD。
+- 未新增黑匣子字段/版本，未重排枚举与门位，未改 Keil 工程、.gitignore、公共 env、
+  已审 runner、inject.py 与旧证据。
+
+4. 交付判定
+-----------------------------------------------------------------
+只证明"软件与主机验证工具"范围内的行为，待独立复审；不授权任何硬件动作，不启动
+S2/F2e/F3。状态见交接件 reports/agent_handoffs/phase8-stop-result-s1.md 第 11 节。

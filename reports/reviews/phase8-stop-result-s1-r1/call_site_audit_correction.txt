@@ -1,0 +1,35 @@
+# STEP 关断调用点审计的日期覆盖更正(2026-10-23 返修, tested_commit=8ca4f6aca62779d18345c9c3af44e5419d5c2985)
+# 上一版 disable_call_site_audit.txt 的原文不改动(它是当时的真实观察); 其中
+#   "motor.c:538 直接调用 mot_pwm_output_off 不接返回值" 与"停机动作内 disable 至多一次"
+#   两条结论**不成立**, 复审 S1-NEW-04 指出后由本轮 R04 修好。按 dated 覆盖记录如下。
+
+## 更正后的事实(取当前源码行号)
+# 1) 生产里 rt_pwm_disable 的直接调用点仍然只有 2 个:
+rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/motor.c:221:    e = rt_pwm_disable(mot_pwm, MOTOR_PWM_CH);
+rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/step_pwm.c:99:    e = rt_pwm_disable(step_pwm, STEP_PWM_CH);
+# 2) Motor 侧关断入口 mot_pwm_output_off(src) 的调用点(全部由具名变量接住或由返回链上抛):
+210:static rt_err_t mot_pwm_output_off(rt_uint8_t src)
+260:        return mot_pwm_output_off(MOT_STOP_SRC_RAMP_ZERO);
+388:    pe = mot_pwm_output_off(MOT_STOP_SRC_GUARD_STOP);
+516:        rt_err_t pe = mot_pwm_output_off(MOT_STOP_SRC_RAMP_ZERO);
+538:            rt_err_t ae = mot_pwm_output_off(MOT_STOP_SRC_APPLY_FAIL);
+707:    pe = mot_pwm_output_off(MOT_STOP_SRC_INIT);
+855:        pe = mot_pwm_output_off(MOT_STOP_SRC_ARM_ROLLBACK);
+885:            pe = mot_pwm_output_off(MOT_STOP_SRC_ARM_ROLLBACK);
+920:    pe = mot_pwm_output_off(MOT_STOP_SRC_DISARM);
+1148:    pe = mot_pwm_output_off(MOT_STOP_SRC_ESTOP);
+#    motor.c:538 现在是 `rt_err_t ae = mot_pwm_output_off(MOT_STOP_SRC_APPLY_FAIL);`,
+#    ae 作为入参交给 mot_fail_closed(ae)(motor.c:297), 该函数内**不再**第二次关断;
+#    MOT_STOP_SRC_FAIL_CLOSED 因此不再是 disable 的来源, 只保留为枚举值(不复用旧号)。
+# 3) 诊断侧 step_pwm_disable_checked(src): 调用点 pwm_test stop(step_pwm.c:167 附近)
+#    与 step_pwm_force_stop(); 只有**外部命令入口** pwm_test stop 投 EVT_SOFT_FAULT,
+#    force_stop 绝不投(防自激)。
+65:static rt_err_t step_pwm_disable_checked(rt_uint8_t src)
+154:        rt_err_t se = step_pwm_disable_checked(MOT_STOP_SRC_DIAG_TEST);
+167:            (void)safety_post_event(EVT_SOFT_FAULT);
+261:    return step_pwm_disable_checked(MOT_STOP_SRC_DIAG_FORCE);
+# 4) 错误出口也降级: motor.c:696-697 —— 设备未取得分支现在置 mot_dev_ok=RT_FALSE
+#    并调用 mot_drv_en_request(0), 不调用任何 PWM API(桩侧 NULL 句柄计数恒 0)。
+# 5) fault_reset 在判定前刷新诊断侧: safety_state.c:495 diag_e = step_pwm_force_stop();
+#    Motor 侧刷新仍是它自己调的 motor_disarm()(与 IO70-NEW-01 的后置确认并存, 未替代)。
+# 6) DIR 的静止判据新增一层只收紧的门: motor.c:970 stop_unconfirmed / :988 -RT_EPERM。

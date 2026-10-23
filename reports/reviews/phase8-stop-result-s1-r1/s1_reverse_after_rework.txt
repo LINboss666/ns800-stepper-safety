@@ -1,0 +1,7 @@
+# S1 返修后两项既有反向重跑 (run_id=20261023T085222Z-1324)
+S1_REVERSE_RC=0
+run_id=20261023T085222Z-1324
+rev_motor_off_ignores_failure | META-OK 命中 3/3 个业务失败身份 (variant=target proc_rc=1 额外FAIL=19)
+rev_diag_fail_releases_owner | META-OK 命中 2/2 个业务失败身份 (variant=host_ovr proc_rc=1 额外FAIL=22)
+
+# 判据与正向同一个 validate_ledger(): 构建成功 + 合同 rc=1 + 完整自洽台账 + 指定身份全部命中

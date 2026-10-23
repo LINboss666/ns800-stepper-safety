@@ -60,6 +60,17 @@ ENN 反馈判定是三个独立注入量；前置"已关断"一律由生产路�
 必需 id 出现恰好一次且判 PASS，缺席/重复/未登记/SUMMARY 与实跑行数对不上算基础设施故障，
 反向还要求副本构建成功 + 夹具合同退出码 `rc=1` + 台账自洽 + 指定失败身份全部命中。
 
+关断结果链的同轮限定返修（`phase8-stop-result-s1-r1`，tested_commit `8ca4f6a`）：复审补了 4 项
+合同遗漏，用例登记随之扩到 `target 48 / host_ovr 64`——新增 `PS12*`（关断未确认时不得改 DIR）、
+`PS13*`（`motor_init` 拿不到句柄的出口仍要撤许可、不调 NULL PWM、不留陈旧 `dev_ok`）、
+`PS14*`（普通 `motor_disarm`/`pwm_test stop` 失败各投一次 `EVT_SOFT_FAULT` 交给既有链，统一停机与
+`force_stop` 绝不投）、`PS15*`（apply 回退只做一次 checked 关断且首错不被后一次成功覆盖）。
+夹具为此加两个观测点：`ps_sim_pwm_disable_seq()`（前 N 次 disable 强制失败，默认关闭）与
+`ps_sim_pwm_null_calls()`（用 NULL 句柄调 PWM 的次数，必须恒 0）；`PS07c` 的"至少两次 disable"
+按修正后的动作合同改为"恰好一次"（次数不是产品要求，业务判据保留并加强）。
+R03 用例里"Safety 消费者"是**显式桩**（`safety_thread.c` 不在本链编译，用 `safety_force_shutdown`
+代表既有消费者），不冒称新线程端到端测试。
+
 语义链的存储侧只是**内存环模拟** `ns_log_submit/read_slot/stats`, 不重建真实 Flash 驱动;
 它的线程不真起(`rt_thread_create` 返回假句柄), `rt_kprintf` 走捕获缓冲, 捕获文本仅用于
 "输出本身就是被测行为"的用例(逐路三态显示、旧记录只留 raw), 其余判定一律来自掩码/返回值/计数器。

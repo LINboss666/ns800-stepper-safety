@@ -1,0 +1,33 @@
+# Keil Rebuild All（离线编译，零硬件动作）project.uvprojx / ARMCLANG
+# tested_commit = 8ca4f6aca62779d18345c9c3af44e5419d5c2985
+# 命令: UV4.exe -r project.uvprojx -j0 -o <仓外日志>    工具退出码 0 = 无错误无警告
+
+## 构建钩子只读复核（本轮未执行任何下载 / 复位 / 串口动作）
+BeforeCompile / BeforeMake: RunUserProg1=0, RunUserProg2=0, 两个用户程序名均为空
+AfterMake: RunUserProg1=1, 命令 = fromelf --bin（仅由 axf 生成 rtthread.bin）
+工程文件 project.uvprojx 本轮零改动（返修只落在应用层 .c/.h 与 tests/host）
+
+## 结果摘录（原样）
+build log 末尾:
+  Program Size: Code=152090 RO-data=69338 RW-data=2184 ZI-data=83428
+  ".\build\rt-thread.axf" - 0 Error(s), 0 Warning(s).
+  Build Time Elapsed:  00:00:09
+工具退出码: 0
+
+## 与 S1 首轮（62873bd）的尺寸差异
+首轮: Code=151866 RO-data=68918 RW-data=2184 ZI-data=83428
+本轮: Code=152090 RO-data=69338 RW-data=2184 ZI-data=83428
+增量: Code +224, RO +420, RW 0, ZI 0
+说明: 四项返修没有增加任何 RAM 占用（未新增结构字段、未新增静态实例、未新增线程/栈）；
+RO 增量仍是新增中文日志字面量。逐项归属未单独测量，此处不做超出数据的解释。
+
+## 编译单元与配置
+Rebuild All 全量重建；本轮改动的 motor.c / step_pwm.c / safety_state.c 与
+motor.h / step_pwm.h / stop_result.h 均在工程内。主机测试源 ps_main.c、shim_ps/、
+run_stop_result_s1.sh 与 host_ovr 的 -D 覆盖一律不进工程；四道宏
+MOTOR_HARDWARE_ENABLE_PATH_VALIDATED / STEP_DIAG_ISOLATED_ENV_CONFIRMED /
+TMC_DRIVE_CONFIG_HW_VALIDATED / SAFETY_LIMIT_INPUTS_ENABLED 在目标源码内仍为 RT_FALSE。
+
+## 未做的事
+未烧录、未复位、未开串口、未读写真实 GPIO/TMC；板上固件仍是 USER_REPORTED_E40。
+本文件是 Agent 本轮真实运行的摘录（区别于上一轮云端未运行 Keil 的 AGENT_REPORTED 层级）。

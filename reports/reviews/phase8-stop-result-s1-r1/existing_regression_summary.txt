@@ -1,0 +1,35 @@
+# 返修后回归 (tested_commit=8ca4f6aca62779d18345c9c3af44e5419d5c2985)
+# 全部在独立 run_id 仓外目录执行; 真实进程 rc 与 runner rc 分列
+
+## 本轮实际重跑
+[S1 关断结果链]
+target | OK 必需用例=48 全部PASS 实际行数=48 自报 fail=0 proc_rc=0
+host_ovr | OK 必需用例=64 全部PASS 实际行数=64 自报 fail=0 proc_rc=0
+S1 RUNNER RESULT: PASS (rc=0) —— target 与 host_ovr 两个变体的必需用例全部真执行且判 PASS
+rev_motor_off_ignores_failure | META-OK 命中 3/3 个业务失败身份 (variant=target proc_rc=1 额外FAIL=19)
+rev_diag_fail_releases_owner | META-OK 命中 2/2 个业务失败身份 (variant=host_ovr proc_rc=1 额外FAIL=22)
+
+[V1/V2 build_and_run]
+HOST TEST SUMMARY: CHECK_PASS=25 CHECK_FAIL=0 BAD_SELFTEST=0 MISSING_CASE=0
+HOST TEST SUMMARY: CHECK_PASS=22 CHECK_FAIL=0 BAD_SELFTEST=0 MISSING_CASE=0
+  RUNNER RESULT: PASS (rc=0)
+
+[I/O 行为链 138 例]
+off_target | OK 必需用例=27 全部PASS 自报fail=0 proc_rc=0 (输出 8502 字节)
+on_target | OK 必需用例=29 全部PASS 自报fail=0 proc_rc=0 (输出 9788 字节)
+off_ovr | OK 必需用例=40 全部PASS 自报fail=0 proc_rc=0 (输出 20345 字节)
+on_ovr | OK 必需用例=42 全部PASS 自报fail=0 proc_rc=0 (输出 22417 字节)
+IO RUNNER RESULT: PASS (rc=0) —— 4 个变体的必需用例全部真执行且判 PASS, 非法宏值被编译拒绝
+
+## 本轮未重跑项与依据（不冒称为本轮重新执行）
+- 13 例旧负例 + 元负例 M1..M5：任务书 §6.4.3 明确"既有夹具未改则本轮不要求重跑"。
+  本轮 host_main.c / io_main.c / env.sh / run_negatives.sh / run_meta_negatives.sh /
+  inject.py 全部零改动（`git show --stat` 可核），故沿用 S1 首轮 tested_commit
+  62873bd 的结果：OK=13 / NOT-DETECTED=0 / INFRA-FAIL=0，元负例
+  M1 M1c M2 M2c M3 M3c M4 M5 全 META-OK 或 CONTROL-OK，rc=0
+  （见 reports/reviews/phase8-stop-result-s1/existing_regression_summary.txt 第 3 节）。
+- SD 41 例（OFF 21 / ON 20）：本轮未改数据结构与对外 API —— motor.h 只改注释与 DIR
+  契约文案，快照字段无新增，§6.4.3 触发条件未满足；沿用 62873bd 一轮的 rc=0 结果。
+- R4/SW1 采集与验收工具：未改动且 sw1_cut.ps1 的 T-01/T-02 仍 HOLD，未运行任何采集脚本。
+- 旧证据（phase8-stop-result-s1/）全部原样保留；上一版审计中与事实不符的两条结论按
+  本目录 call_site_audit_correction.txt 做 dated 覆盖，不把旧日志改成"当时就对"。
