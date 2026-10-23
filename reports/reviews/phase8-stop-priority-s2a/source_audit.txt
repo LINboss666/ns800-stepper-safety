@@ -127,17 +127,22 @@ C3 诊断 STEP 输出 enable: step_pwm.c:208 rt_pwm_enable —— **无任何锁
 C4 armed 提交: motor.c:899-901(mot_lock 内 mot.armed=1), 位于 C1 与 :872-897 的使能侧反馈确认之后。
 C5 起转提交: motor.c:1117-1119(仅当 state==IDLE 才改 ACCEL), 之前 :1093/:1110 是状态与保护链复查。
 C6 恢复后重新就绪: safety_state.c:522-529(写 MANUAL_CLEAR 并清两条 S1 锁存) -> 需重跑自检 + 重新 arm。
-C7 旁路写入者(不属于 Motor/诊断协调, 但改的是同一批寄存器):
-   - RT-Thread 通用 `pin` 命令: ROOT/components/drivers/pin/dev_pin.c:382 MSH_CMD_EXPORT_ALIAS(_pin_cmd, pin)
-     -> 直接 rt_pin_write 任意引脚, **不经** safety_drv_enable_write/mot_lock/ss_lock。
-   - `pin_status`(safety_gpio.c:317-352): 对 DRV_ENABLE 调 safety_drv_enable_write(0)(:336), 对其余输出脚
-     rt_pin_write 重写默认电平(:342) —— 名义"看电平", 实际主动写。
-   - `system_selftest`/`runtime_selftest` -> safety_run_selftest(safety_state.c:251-346): 从 tshell 直接
+C7 旁路写入者(不属于 Motor/诊断协调, 但改的是同一批寄存器) ——
+   ⚠ 2026-10-23 r1 按审查件 §4.6 分成三类, **不得混成一种写**:
+   - ① 通用 `pin` 命令: ROOT/components/drivers/pin/dev_pin.c:382 MSH_CMD_EXPORT_ALIAS(_pin_cmd, pin)
+     -> 有效引脚号的 write **直达 rt_pin_write**, 不经 safety_drv_enable_write/mot_lock/ss_lock
+     => **足以构成维护旁路**(能把许可写成 HIGH)。
+   - ② `pin_status`(safety_gpio.c:317-352): 对 DRV_ENABLE 调 safety_drv_enable_write(0)(:336) ——
+     写的是 **LOW(降险方向), 不是 HIGH**; 但它同时改 `sg_drv_en_request/sg_drv_en_last_read` 影子,
+     并对其余输出脚 `rt_pin_write(p->pin, p->level)`(:342) 重写默认电平 => "名义只读、实际主动写"。
+   - ③ `system_selftest`/`runtime_selftest` -> safety_run_selftest(safety_state.c:251-346): 从 tshell 直接
      写许可 LOW(:279)、重跑 motor_init(:268)、跑 UART/Flash(:306,:333), **不持** ss_lock/mot_lock。
    - DIR 写: motor.c:994 rt_pin_write(S1-R1 R01 已在 motor.c:970/:988 前加了关断未确认的拒绝)。
    - LED/蜂鸣器: supervisor.c:169-170 rt_pin_write(非安全输出, UI_OUTPUT_ENABLED 门)。
    - 遗留 PF21 寄存器级诊断(safety_gpio.c:420-539)在 `NS800_ENABLE_LEGACY_PF21_DIAG` 下; 该宏在工程 Define
      与全部头文件中均未定义(DV: 全仓 grep 只命中该文件的 #ifdef/#endif 两行) => **未编译进目标**。
+   ⇒ 审查件 §5 的口径: 若这些维护通道被排除在协调保证之外, 必须显式写出权限边界,
+     **不得**给出"任意 shell 操作下全局安全"的承诺。本轮不改通用驱动、不删命令。
 
 5. 锁 / 阻塞点表(DV + AC)
 --------------------------------------------------------------------------------
@@ -166,19 +171,29 @@ W-5 配置完整性复核(在 motor 线程内, 每 200ms 一次): tmc2209.c:190-
      另有 tmc2209.c:142 `while (rt_device_read(...) > 0);` 清空 FIFO 的循环 —— 退出条件是"读到 0"。
 W-6 许可写: safety_gpio.c:164-177, 每次尝试 = rt_pin_write + rt_thread_mdelay(1) + rt_pin_read, 上限 2 次
      => 单次调用最坏 2 次 mdelay + 2 轮日志, 全部在 W-1/W-2 的持锁窗口内(经由 E3/E4/E6)。
-W-7 控制台(DV, 关键): rt_kprintf -> _kputs -> rt_device_write(uart1) ——
+W-7 控制台(2026-10-23 r1 起整条升级为 DV, 我亲自读到每一层):
+     rt_kprintf -> _kputs -> rt_device_write(uart1) ——
      BSP/rtconfig.h:106-108 RT_USING_CONSOLE / RT_CONSOLEBUF_SIZE=128 / RT_CONSOLE_DEVICE_NAME="uart1";
-     BSP/.config:179 `# CONFIG_RT_USING_THREADSAFE_PRINTF is not set` => kservice.c 的 CONSOLE_TAKE/RELEASE
-     是**空宏**(AC!, 本轮未亲读 kservice 该段, 仅由 .config 与子代理摘录推得) => 控制台无互斥。
-     控制台以 RT_DEVICE_FLAG_STREAM 打开、**没有** RT_DEVICE_FLAG_INT_TX => 写走 poll 分支:
-     ROOT/components/drivers/serial/dev_serial.c:1020-1046 rt_serial_write 选择 _serial_poll_tx(:1044),
-     其循环为逐字符 putc(AC: 子代理摘录 :377-403; 本轮未逐行复核)。
-     HAL 叶子: HAL/drv_uart.c:429-445 ns800_putc -> :403-427 ns800_wait_tx_space
+     BSP/.config:179 `# CONFIG_RT_USING_THREADSAFE_PRINTF is not set` => src/kservice.c:328-330(#ifdef 在 :245, #endif :332) 的
+     CONSOLE_TAKE / CONSOLE_RELEASE / PRINTF_BUFFER_TAKE 取 **空宏分支**(亲读) => 控制台无互斥、无自旋锁。
+     src/kservice.c:339-362 _kputs: console_device 非空则 rt_device_write(:76 相对行), 否则 rt_hw_console_output。
+     控制台以 RT_DEVICE_OFLAG_RDWR|RT_DEVICE_FLAG_STREAM 打开且**不带** RT_DEVICE_FLAG_INT_TX
+     => components/drivers/serial/dev_serial.c:1020-1046 rt_serial_write 落到 `_serial_poll_tx`(:1044, 亲读);
+     components/drivers/serial/dev_serial.c:377-403 `_serial_poll_tx`: `while(length)` 逐字符
+     `serial->ops->putc(...)`, **putc<0 就 break 并返回短计数**(亲读) => 串口层本身不无限循环,
+     阻塞点在 HAL 的 putc 里; STREAM 模式下 '\n' 前还会补发 '\r'(字符数翻倍)。
+     HAL/drv_uart.c:429-445 ns800_putc -> :403-427 ns800_wait_tx_space:
      `while (!UART_isSpaceAvailable(...)) { if ((rt_tick_get()-start_tick) > timeout_tick) return -RT_ETIMEOUT; }`
-     —— **忙等不让出 CPU**, 上限 BSP_NS800_UART_TX_TIMEOUT=6000(BSP/rtconfig.h:440, DV) 毫秒/字符。
-     可下的结论: 一次 rt_kprintf 的耗时没有上界保证, 且在 TX 卡住时会以调用者优先级忙等;
-     在 Safety(4) 或 boosted tshell 上下文里会饿死更低优先级线程。
-     不可下的结论: 实际多少 ms(未测, TBD), 以及 uart1 是否可能与 uart2 共享同一 HAL 忙等实现细节(未逐行核对)。
+     —— **忙等, 不让出 CPU**, 靠 rt_tick_get() 判超时; 上限 tx_block_timeout =
+     BSP_NS800_UART_TX_TIMEOUT = 6000 (HAL/drv_uart.c:30-46 与 BSP/rtconfig.h:440, 亲读;
+     RT_USING_SERIAL_V2 未定义 => 取 #else 分支的 6000, 不是 0)。
+     ⇒ 可下的结论: 一次 rt_kprintf 的耗时没有上界保证; TX 卡住时以**调用者优先级**独占 CPU,
+       期间低于该优先级的线程得不到运行, 但仍可能被更高优先级线程与可响应中断抢占
+       (2026-10-23 r1 按审查件 §4.3 修正措辞, **不写"饿死全部线程"**)。
+     ⇒ 新推论(与 r1 方案直接相关, 见 design P-20): 该超时依赖 tick 推进; 一旦在
+       `rt_hw_interrupt_disable`(CPSID I) 的窗口内调用任何按 tick 判超时的等待, tick 不推进 => 永不超时。
+       所以"短窗口内只允许纯寄存器写"是这条源码事实的直接后果, 不是工程偏好。
+     ⇒ 不可下的结论: 实际多少 ms(未测, TBD)。
 W-8 黑匣子触发不阻塞(DV): APP/blackbox.c:412-429 blackbox_trigger 只 rt_hw_interrupt_disable + 置
      bb_pending_flag/code, 已有 pending 则**不覆盖**并计数 bb_trig_early_dropped(:416-419)。
 W-9 事件投递(DV): safety_post_event(safety_state.c:229-233) 先判 ss_inited 否则 -RT_ERROR;
@@ -198,20 +213,34 @@ W-11 device 层(DV): rt_device_control **不检查 ref_count**(components/driver
      宏 device_control = dev->control/:44-53), 而 rt_device_write 检查 ref_count 并返回 0(:380-399)。
      => 应用的 epwm1 **从未 rt_device_open**(DV: APP 内 rt_device_open 只有 tmc2209.c:120 一处),
      但 rt_pwm_enable/disable 仍会到达驱动 —— "没 open"不会让关断静默变空操作。
-     RT_USING_DEBUG/断言在本板生效(rtconfig.h:84-85, AC!) => 传 RT_NULL 设备是断言/panic 而不是错误返回。
+     ⚠ NULL 的处理要分层(2026-10-23 r1 按审查件 §4.2 更正, 我之前把两层混写成"传 NULL 就是断言"):
+       - 直接 `rt_device_control(RT_NULL, ...)` 才命中 `RT_ASSERT(dev != RT_NULL)`
+         (components/drivers/core/device.c:419-431, 且 RT_USING_DEBUG/RT_DEBUGING_ASSERT 在本板生效,
+          rtconfig.h:84-85 属 AC) => 那是断言/panic 路径。
+       - 但 APP 实际用的**包装层**先判空并返回错误码: `rt_drv_pwm.c:143-199` 的
+         `rt_pwm_enable()` / `rt_pwm_disable()` 都以 `if (!device) return -RT_EIO;` 开头(亲读)
+         => 传 RT_NULL 的 PWM 句柄得到的是 `-RT_EIO`, 不是断言。实现轮不得依赖"断言不会发生",
+            也不得反过来把断言当成 PWM API 的行为。
 
 6. 交错表(STATIC_INTERLEAVING —— 静态推演, 不是运行复现)
 --------------------------------------------------------------------------------
-R-1 停机 vs 在途 arm(许可已 HIGH、armed 未提交)
-  A = tshell(20) 在 motor.c:846 之后(许可 HIGH, sg_drv_en_request=HIGH); 停在 :872-897 的
-      safety_drv_feedback_confirm(1u) 里 mdelay(1) 时。
-  B = safety(4) 此时因守卫/事件执行 force_shutdown: ss_lock(空闲) -> motor.c:1144 mot_lock ->
-      STEP off -> :1155 许可 LOW(sg_drv_en_request=LOW)。
-  恢复 A: :874 的反馈确认按"期望使能侧"读 -> 许可已被拉 LOW => verdict 不是 OK -> A 走 :888-895 回滚
-  (再关 STEP + 再拉 LOW + 投 EVT_DRV_FEEDBACK)。方向保守, **但**在 B 已锁存 FAULT_LATCHED 之后再发生
-  一次"回滚 + 投事件", 事件链会再次 force_shutdown(自激风险取决于幂等与合并, 见 design §5.6)。
-  若 :874 的确认在 B 拉 LOW **之前**就返回 OK(反馈线响应慢/采样恰好读到旧值), A 继续到 :900 提交 armed=1
-  => **停机之后**许可仍被拉回 HIGH(arm 在 :821 之后再没有看过 Safety 状态)。=> S2-P04/P05 要打的洞。
+R-1 停机 vs 在途 arm ——(2026-10-23 r1 按审查件 §4.4 拆成两条; v1 把两者混成一条并挂在错误的行号上)
+  R-1a **许可被重新拉 HIGH** 的真实形状(这才是 S2-P04/P05 要打洞的地方):
+    A = tshell(20) 执行 motor_arm, 已过 :830-843 的**禁能侧**反馈确认(返回 RT_EOK),
+        停在 :846 `mot_drv_en_request(1)` **调用之前**(此时还没写任何 HIGH)。
+    B = safety(4) 执行 force_shutdown: ss_lock(空闲) -> motor.c:1144 mot_lock -> STEP off ->
+        :1155 许可 LOW -> 写 FAULT_LATCHED(:218)。
+    恢复 A: :846 把许可写 HIGH, :872-897 的使能侧确认按"期望 LOW(未施加禁能)"读 ——
+        级联逻辑正常时确实会变 LOW => 确认通过 => :899-901 提交 armed=1。
+        结果: **停机之后许可被重新拉 HIGH 且 armed=1**, 而 arm 在 :821 之后再也没有看过 Safety 状态
+        (:588 那次 `safety_state_get()` 在 :821, 早于 B 的锁存)。
+  R-1b **陈旧 armed 提交**(与 R-1a 不同, 不能混为一谈):
+    A 已过 :846(HIGH 已写)与 :872-897(使能侧确认已返回), 停在 :899 之前;
+    B 完整执行停机并把许可拉 LOW、置 FAULT_LATCHED。
+    恢复 A: 只写 `mot.armed = 1`(motor.c:900 —— **这一行不碰任何 GPIO/PWM 寄存器**),
+    得到的是"Safety=FAULT_LATCHED 且 Motor armed=1"的状态不一致, 由后续门禁(disarm/arm 拒绝)兜住,
+    **不构成**许可被重新拉 HIGH。v1 从 :900 直接推出"许可重新 HIGH"是错的, 已作废。
+
 
 R-2 停机 vs 诊断 enable(step_pwm 无锁窗口)
   A = tshell(20) 过 step_pwm.c:176 grant(Motor 侧 armed=0/静止/焊盘 LOW 都成立), 停在 :202/:208 之前。
@@ -320,5 +349,88 @@ HAL/内核: drv_epwm.c(560-670)、drv_gpio.c(grep: ops 表/SYSCON/interrupt disa
 - 未测量: 任何时间量(锁等待、控制台忙等、UART 复核占用、关中断窗口时长、栈余量)。全部 TBD。
 - 板卡未核验: 板上固件身份仍是 USER_REPORTED_E40(e40a9b9), 本轮不读回、不烧录。
 - AC! 条目(kservice 的 CONSOLE_TAKE 空宏、dev_serial poll_tx 循环体、drv_uart 忙等循环、epwm.h helper 返回
-  void)是子代理摘录, 本轮只在 rtconfig/.config 层面确认了**使能条件**(无 THREADSAFE_PRINTF、无 DMA、
-  无 INT_TX 打开控制台)。把它们当作设计前提之前, 实现轮需要逐行复核同一函数。
+  void)是子代理摘录, **S2-A v1 时**只在 rtconfig/.config 层面确认了使能条件(无 THREADSAFE_PRINTF、无 DMA、
+  无 INT_TX 打开控制台)。⇒ 2026-10-23 r1 已按本节 §11(3)/(4)/(5) **亲自读到同一函数**, 其中
+  CONSOLE_TAKE 空宏、poll_tx 循环、wait_tx_space 忙等、rt_pin_write/rt_pwm_* 包装层四条**升级为 DV**
+  (W-7 已改写); 仅剩 `STD/StdDriver/Inc/epwm.h` 的 helper 内部实现仍属 AC!(该头文件未被 Git 跟踪,
+  云端亦读不到 —— 与审查件 §2.2 的口径一致), 它影响的是"EPWM_setTimeBaseCounterMode 单条写还是多条写",
+  不影响 NEW-05 的结论(模式写回的**位置**在 :371, 已亲读)。
+
+11. 2026-10-23 同轮限定修正 (S2A-NEW-01..05) 追加的亲读补证
+--------------------------------------------------------------------------------
+审查件 `NS800_S2A_Design_Review_and_R1_Task_f4b47e3_20261023.md` 第 3 节给出五项静态反例, 第 4 节给出
+事实校准。为把它们当作设计前提, 我本轮**亲自**读了下列原文(不再是子代理摘录):
+
+(1) EPWM 的 set 路径会**恢复计数模式**(= NEW-05 的根据):
+    HAL/drv_epwm.c:497-518  ns800_epwm_drv_set = configuration_convert(...) + configure_signal(...)
+    HAL/drv_epwm.c:318-319  signal_params->count_mode = READ_BIT(epwm_config->instance->TBCTL.WORDVAL,
+                                                                 EPWM_TBCTL_CTRMODE_M);   /* 读当前模式 */
+    HAL/drv_epwm.c:370-371  EPWM_setClockPrescaler(...); EPWM_setTimeBaseCounterMode(epwm,
+                                                                 signal_params->count_mode);  /* 写回旧模式 */
+    HAL/drv_epwm.c:380-440  configure_signal 余下部分: 只有 if/else 与寄存器写, **无 for/while 循环**;
+                            但含浮点除法(:372-379 时间基时钟计算)。
+    HAL/drv_epwm.c:336-345  ns800_epwm_hw_init 在 :340 写 STOP_FREEZE(降险方向, 启动期)。
+    ⇒ 结论(DV): `rt_pwm_set` **不是**无害准备动作, 它与 enable 一样能把时间基带回 RUN;
+      "所有 enable 进门"这句 v1 口号不足以覆盖, 已按函数列出清单(见 design §5.7)。
+
+(2) UART 复核的真实等待序(= NEW-04 的根据):
+    APP/tmc2209.c:1299  if (!tmc_cfg_txn_take(ctx)) return -RT_EBUSY;   /* WAITING_NO, 只有这一段非阻塞 */
+    APP/tmc2209.c:1301  tmc_cfg_lock(ctx);                              /* :735 FOREVER, 未检查返回值 */
+    APP/tmc2209.c:282   rt_mutex_take(&tmc_xfer_lock, RT_WAITING_FOREVER);
+    APP/tmc2209.c:139-142 static void tmc_rx_flush(void){ while (rt_device_read(tmc_serial,0,dump,32) > 0) ; }
+                        /* 无迭代上限、无 tick 截止: 持续有数据就不结束 */
+    APP/tmc2209.c:206   rt_device_write(...,4) != 4 -> -RT_EIO          /* 每字符 <=6000ms 忙等(P-14) */
+    APP/tmc2209.c:208   deadline = rt_tick_get() + rt_tick_from_millisecond(TMC_REPLY_TIMEOUT_MS);
+                        ⇒ 100ms **只约束 RX**; 其前的两把 FOREVER 锁与 flush/TX 都不在预算内(DV)。
+    APP/tmc2209.c:58    #define TMC_TRACE_VERBOSE 0                     /* 诊断打印默认关闭(DV) */
+
+(3) 缓存与外设区(= 审查件 §4.5 要求的屏障/缓存依据, 本轮源码闭合):
+    HAL/drv_common.c:119-120  #define BSP_SCB_ENABLE_I_CACHE / #define BSP_SCB_ENABLE_D_CACHE
+                              —— 是**文件内无条件 define**, 不是 Kconfig 项(我在 rtconfig.h/.config 里
+                              均未找到对应配置, DV) => :126-133 的 SCB_EnableICache()/SCB_EnableDCache()
+                              在本构建**实际执行**。
+    STD/Device/Inc/NS800RT7P65x.h:34211 EPWM1_BASE = 0x40000000UL; :34238 GPIOA_BASE = 0x400A0000UL;
+                              ⇒ 两者都落在 ARMv7-M 默认存储映射的外设(Device)区(0x4000_0000-0x5FFF_FFFF):
+                              D-Cache 开着也不会缓存这些地址(ED, 依默认映射规则; 本工程未见 MPU 编程)。
+    STD/StdDriver/Inc/syscon.h:449 #define SYSCON_UNLOCK  SYSCON->UNLOCK.WORDVAL = 0x55AA6699; __DSB()
+                              ⇒ 厂商自己就在"写完 SYSCON 立刻依赖效果"的地方插 __DSB(DV)。
+    ⇒ 设计规则(design §9 B-2 已闭合): 门内写完外设寄存器后若**在同一窗口内**回读并据值判定, 必须插
+      屏障; 跨窗口的回读由既有 settle+回读覆盖。Device 区允许写缓冲, 因此"写完即生效"不作断言;
+      物理完成时刻仍需实测(M-3)。
+    外设锁: HAL/drv_epwm.c:645,667 与 HAL/drv_gpio.c:508 的 SYSCON_LOCK 只锁 SYSCON 自身(与 UNLOCK 成对),
+      未见对外设数据寄存器重新上锁的动作(DV, 有限范围: 本仓 bsp/novosns/ns800 内 grep)。
+
+(4) PWM/引脚包装层(DV, 校准 v1 的两处口径):
+    ROOT/components/drivers/misc/rt_drv_pwm.c:143-199 —— rt_pwm_enable/disable **先** `if (!device)
+      return -RT_EIO;`(=> 传 RT_NULL 句柄得到错误码, 不是断言; v1 的"NULL 即 panic"只适用于直接
+      rt_device_control(NULL,...))。两函数都先发一个 PWMN_CMD_*(ns800 不认, 返回 -RT_EINVAL 后被
+      :196/:167 的第二次 control 结果覆盖, 不上抛)。
+    ROOT/components/drivers/pin/dev_pin.c:146-160 rt_pin_mode/write/read = 裸 ops 分发, 无锁无引用计数;
+    HAL/drv_gpio.c:342-361 ns800rt7_pin_write = get_pin_info 越界检查 + GPIO_setPin/GPIO_clearPin;
+    HAL/drv_gpio.c:273-286 get_pin_info = 表内边界检查(DV) => 许可 LOW/HIGH 的单次写是**有界寄存器写**,
+      可以放进掩码窗口(design §5.3/§5.4 的依据)。
+
+(5) 窗口内 tick 冻结(DV, 决定协议形状的新推论):
+    libcpu/arm/cortex-m7/context_rvds.S:38-43 `MRS r0,PRIMASK / CPSID I` 屏蔽**全部**可屏蔽中断,
+    含 SysTick => 在窗口内 `rt_tick_get()` 不推进 => HAL/drv_uart.c:403-427 那种"按 tick 判超时"的
+    忙等若被放进窗口将**永不返回**。⇒ 短窗口只能包纯寄存器写; 任何 settle/回读重试必须在窗口外。
+
+(6) 数量与措辞校准(审查件 §4.7): 本轮设计使用 **5 个共享字**(gate/step_rc/perm_rc/reason/stats)+
+    一张状态机表, v1 报告"四个函数/四个字段"的计数与"单字对齐即原子"的暗示均作废; 复合事务的
+    一致性只来自"同一窗口内读-改-写同一个决策字", 不等于 `|=`/`++` 在窗口外也原子。
+
+(7) 本轮**没有**推翻的既有结论: 线程/优先级清单(§2)、W-1..W-4 的锁性质、W-8/W-9/W-10、
+    E1..E8 入口清单、C1..C6 使能提交清单、四宏与冻结检查(§7) —— 审查件 §2 亦确认"等待链调查可保留"。
+
+(8) 与审查件的对应: NEW-01→design §5.3/§7-D1; NEW-02→§5.5/§7-D2/§7-D8; NEW-03→§5.2+§5.4/§7-D3/§7-D4;
+    NEW-04→§5.6/§7-D5; NEW-05→§5.7/§7-D6/新增用例 P12。逐条映射另见表 12。
+
+12. NEW -> 方案 -> 静态表 -> 未决 的逐条映射(供复审对账)
+--------------------------------------------------------------------------------
+| NEW | 方案位置 | 静态表 | 仍开放 |
+|---|---|---|---|
+| 01 | design §5.1 转移表 / §5.3 门内危险写 / §5.4 认领 | D1, D7, D8 | 窗口时长实测(B-1) |
+| 02 | design §5.5 REQ 每请求自增 + 票据 + CLEARING + 身份清除 | D2, D8 | 位宽/饱和策略需审查确认 |
+| 03 | design §5.2 发布/执行分离 + §5.4 发布者执行 + §5.8 三处 S1 兼容 | D3, D4 | Safety 不可用时的"整理"仅降级为可见, 不假装一致 |
+| 04 | design §5.6 分段预算表(锁/flush/TX/RX/日志) | D5 | 各段数值 TBD(未测) |
+| 05 | design §5.7 按函数清单 + (i)/(ii) 两方案 | D6 + 新用例 P12 | 选 (i) 需窄改 HAL 一条语句, 待批准 |

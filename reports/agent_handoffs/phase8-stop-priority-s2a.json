@@ -14,7 +14,8 @@
     "s1_first_round_tested_commit": "62873bd8aa851ae3010dd1c04cba0aa3e1e22821",
     "rework_base": "78a1333c9338332cbe03d64d8a6f61babacbcb00",
     "io70_go": "296c369607ea69c201f797b80950b76ff312c0e0",
-    "data_semantics_go": "689c8b3a8f565df9facbb142b90639aaa127aa78"
+    "data_semantics_go": "689c8b3a8f565df9facbb142b90639aaa127aa78",
+    "s2a_v1_delivered": "f4b47e3f145833ffbf7705f09d8343bd1c84fa15"
   },
   "baseline_verification": {
     "method": "只读: git rev-parse / git status --porcelain / git -c http.proxy ls-remote",
@@ -189,6 +190,131 @@
   "board_identity": "USER_REPORTED_E40 (e40a9b95ef709e6a80444f9f3949dfdd70ba96ba); 本轮未读回 Flash, 未烧录",
   "risks_still_open": "RISK-03/03a (停机时延/阻塞) 与 RISK-04-b (瞬态/波形/连续性定量/外接 NC/断线容错/安全等级/新版上板) 继续开放; 结构性消除某个 FOREVER 不等于 RISK-03/03a 关闭",
   "next_action": "AWAITING_INDEPENDENT_DESIGN_REVIEW",
-  "status": "STOP: AWAITING_INDEPENDENT_DESIGN_REVIEW (不登记 S2 实现 GO, 不进入实现/返修/板级/F2e/F3)",
-  "next_step_owner": "ChatGPT 审方案 + 用户决定后另下实现任务书; 未经新授权不得开工, 本任务书不构成任何硬件授权"
+  "status": "STOP: AWAITING_INDEPENDENT_DESIGN_REVIEW (S2-A v2; 设计返修 r1 已交付, 不登记实现 GO)",
+  "next_step_owner": "ChatGPT 审方案 + 用户决定后另下实现任务书; 未经新授权不得开工, 本任务书不构成任何硬件授权",
+  "document_base": "f4b47e3f145833ffbf7705f09d8343bd1c84fa15",
+  "rework_s2a_r1": {
+    "task_id": "phase8-stop-priority-s2a-r1",
+    "review_document": "NS800_S2A_Design_Review_and_R1_Task_f4b47e3_20261023.md",
+    "decision": "DESIGN_REWORK (只修正 S2-A 设计, 不进入生产实现)",
+    "s1_r1_go_status": "保持: SOFTWARE_REVIEW_GO 接受 32a311a, 生产 8ca4f6a, 不撤回不重开",
+    "scope": "DESIGN ONLY; 改动严格限既有四份文件",
+    "baseline_check": {
+      "local_head": "f4b47e3f145833ffbf7705f09d8343bd1c84fa15",
+      "remote_head": "f4b47e3f145833ffbf7705f09d8343bd1c84fa15",
+      "working_tree_clean": true,
+      "frozen_refs_moved": false,
+      "agents_md_local_only": "rt-thread-master/rt-thread-master/AGENTS.md 与 SDK epwm.h 未被远端跟踪, 本地/远端可见性分开记录"
+    },
+    "fixes": [
+      {
+        "id": "NEW-01",
+        "level": "P1",
+        "v1_defect": "资格判定在掩码窗口内, 真正危险写在窗口外 => commit 返回后被抢占, 旧操作仍可开启",
+        "fix_where": "design §5.1 状态转移表 / §5.3 sp_run_commit 在窗口内执行 rt_pwm_enable 与许可 HIGH / §5.4 认领",
+        "static_table": [
+          "D1",
+          "D7",
+          "D8"
+        ],
+        "open": "窗口时长需实测 (B-1)"
+      },
+      {
+        "id": "NEW-02",
+        "level": "P1",
+        "v1_defect": "只在 inhibit 0->1 时 bump 代次; fault_reset 恰在 inhibit=1 时开始 => 恢复中的新请求(含同原因重复)不 bump, 旧恢复仍能清除新故障",
+        "fix_where": "design §5.5: REQ 每个请求自增 + ticket 三处比较 + CLEARING 态 + latch_req==ticket 身份清除 + 20 位饱和即拒绝恢复(不回绕)",
+        "static_table": [
+          "D2",
+          "D8"
+        ],
+        "open": "REQ 位宽与饱和策略待审查确认"
+      },
+      {
+        "id": "NEW-03",
+        "level": "P1",
+        "v1_defect": "§5.2 允许 ISR 全程而 §5.3 只允许半程; 首发布者是 ISR 时动作可能永不做; 单一 inhibit/first 无法表达已发布/待做/已记录",
+        "fix_where": "design §5.2 发布只产生义务并返回动作掩码 / §5.4 发布者自己执行 + 任何上下文可认领 PENDING / meta_pending 暴露未整理",
+        "static_table": [
+          "D3",
+          "D4"
+        ],
+        "s1_compat_fixed": [
+          "owner 不再提前归 NONE: 失败/未知置 HELD_UNKNOWN",
+          "sp_step_rc 与 sp_perm_rc 两个独立字, 不存 merge 值",
+          "快路径调用真实 rt_pwm_disable 并用其返回值记账; 许可区分 WRITTEN 与 CONFIRMED",
+          "S1-R1 R04 的单次动作合同与后续显式停机不冲突(审查件 §3/§4.1)"
+        ],
+        "open": "Safety 不可用时只保证已降险+未整理可见, 不宣称状态机一致"
+      },
+      {
+        "id": "NEW-04",
+        "level": "P1",
+        "v1_defect": "100ms 只约束 RX; 其前 cfg lock/xfer lock 为 FOREVER, tmc_rx_flush 为 while(read>0) 无上限, TX 每字符 <=6000ms 忙等 => 同线程守卫可不返回",
+        "fix_where": "design §5.6 分段预算表: txn/cfg lock/xfer lock/flush 双上限/TX 预算/RX/日志, 总预算自入口起算, 过期即 publish+execute; ENN 每拍检查的最坏推迟变为有界",
+        "static_table": [
+          "D5"
+        ],
+        "open": "各段数值 TBD(未测); 不新建线程"
+      },
+      {
+        "id": "NEW-05",
+        "level": "P1",
+        "v1_defect": "rt_pwm_set 经 configuration_convert(drv_epwm.c:318-319) 读 TBCTL 模式, 经 configure_signal(:371) 写回 => 停机后旧 set 会把时间基带回 RUN, 不是无害准备动作",
+        "fix_where": "design §5.7: 按函数列出危险/降险清单; 方案 (i) 窄改 :371 使配置写不恢复 CTRMODE(推荐, 无并发时逐位等价) 或 (ii) 整段 set 进窗口(时长需实测); 新增用例 P12 覆盖该接缝",
+        "static_table": [
+          "D6"
+        ],
+        "open": "选 (i) 需批准窄改 HAL 一条语句"
+      }
+    ],
+    "calibrations": [
+      "B-4 重新定性为驱动观测能力/硬件未验边界, 不构成 S1 返工; 不把示波器列为设计前置",
+      "NULL 分两层: rt_pwm_enable/disable(NULL) 返回 -RT_EIO(rt_drv_pwm.c:143-199 亲读); 断言只在直接 rt_device_control(NULL,...)",
+      "R-1 拆两条: motor.c:900 只写 armed 不碰 GPIO; 真正的重新 HIGH 必须停在 :843/:846 之间(审计 R-1a/R-1b)",
+      "控制台链整条升级为 DV: kservice.c:328-330(#ifdef 245/#endif 332) 空宏 + dev_serial.c:1020-1046 -> :377-403 + drv_uart.c:403-427 按 tick 忙等; 措辞不再写'饿死全部线程'",
+      "共享状态为五个字(gate/step_rc/perm_rc/reason/stats) + 一张状态机; 删除'四个函数/四个字段'与'单字对齐即原子'",
+      "旁路分三类: pin write 直达 rt_pin_write(足够旁路) / pin_status 对许可写 LOW(降险但改影子) / selftest 会 init+写输出; 不承诺任意 shell 下全局安全",
+      "PRIMASK 论证范围限定为本核普通可屏蔽上下文; 另一核与 NMI/HardFault/DMA 列为模型边界 M-1"
+    ],
+    "new_read_evidence": [
+      "drv_epwm.c:497-518/318-319/370-371/380-440(无 for/while)/336-345",
+      "tmc2209.c:1299/1301/282/139-142/206/208/58(TMC_TRACE_VERBOSE=0)",
+      "drv_common.c:119-120 I/D-Cache 为文件内无条件 #define => 本构建实际开启; 未见 MPU 编程",
+      "NS800RT7P65x.h:34211 EPWM1_BASE=0x40000000 / :34238 GPIOA_BASE=0x400A0000 => 默认映射外设(Device)区, 不被缓存; syscon.h:449 的 SYSCON_UNLOCK 自带 __DSB => 同窗口回读需屏障",
+      "dev_pin.c:146-160 与 drv_gpio.c:273-286/342-361 => 许可单次写有界, 可进窗口",
+      "context_rvds.S:38-43 + drv_uart.c:403-427 => 窗口内 tick 不推进, 按 tick 判超时的等待放进窗口永不返回"
+    ],
+    "completeness": {
+      "verdict": "PARTIAL-可审 (v1 的'已覆盖 I1-I8'作废)",
+      "done": [
+        "NEW-01..05 逐条对答",
+        "D1..D8 静态反例表(STATIC_REASONING/NOT_EXECUTED)",
+        "S2-P01..P12 用例前置/接缝/断言重写",
+        "按函数列出危险/降险写清单",
+        "可源码闭合的 B-2/B-3/B-5 本轮收齐"
+      ],
+      "still_open": [
+        "B-1 窗口时长与中断丢失容忍(需实测)",
+        "M-1 另一核/其它总线主设备",
+        "M-2 同 EPWM 实例其它通道用途",
+        "M-3 写缓冲完成时刻",
+        "NEW-05 (i)/(ii) 与 REQ 位宽/饱和策略需裁定"
+      ]
+    },
+    "implementation_packages_reordered": [
+      "WP1 纵向小闭环: 发布/真实写提交/撤销/恢复票据一起做, 不接受先门后恢复的切法",
+      "WP2 UART 端到端预算(§5.6 分段)",
+      "WP3 目标机测量(后置, 需仪表与新授权; 结构性消除 FOREVER != 关闭 RISK-03/03a)"
+    ],
+    "tests_executed": [],
+    "hardware_actions": [],
+    "frozen_check": "生产 APP/HAL/内核/头、tests/、Keil 工程、.gitignore、旧证据与 f4b47e3 逐 blob 零差异; 四宏仍 RT_FALSE; 板上仍 USER_REPORTED_E40",
+    "artifacts": [
+      "reports/plans/phase8-stop-priority-s2a-design.md (v2)",
+      "reports/reviews/phase8-stop-priority-s2a/source_audit.txt (+§11/§12)",
+      "reports/agent_handoffs/phase8-stop-priority-s2a.md (+第 9 节)",
+      "reports/agent_handoffs/phase8-stop-priority-s2a.json (本 rework_s2a_r1 块)"
+    ]
+  }
 }
