@@ -149,7 +149,13 @@ rt_err_t safety_transition(safety_state_t next)
     rt_bool_t inh_refuse, white_refuse;
     rt_base_t lvl;
 
-    if (ss_lock_ok) rt_mutex_take(&ss_lock, RT_WAITING_FOREVER);
+    /* CP4 K1(§3): 锁的**真实返回值**参与判定 —— 取用失败一律不写(也不 release 一把
+     * 没到手的锁)。尚未创建 ss_lock 只发生在 supervisor_boot 的单线程早期, 那条容忍
+     * 保持不变; 已经建好却取不到就是错误, 必须传播给调用方。 */
+    if (ss_lock_ok)
+    {
+        if (rt_mutex_take(&ss_lock, RT_WAITING_FOREVER) != RT_EOK) return -RT_EIO;
+    }
     from = ss_state;                       /* P0-1: 锁内重读, 消除检查/写竞争 */
 
     /* S2(2026-10-23, 任务书 §8.2): 抑制期间的**非故障**转换一律拒绝。
@@ -190,6 +196,105 @@ rt_err_t safety_transition(safety_state_t next)
     if (ss_lock_ok) rt_mutex_release(&ss_lock);
     rt_kprintf("[SS] %s -> %s\n", safety_state_name(from), safety_state_name(next));
     return RT_EOK;
+}
+
+/* CP4 K1(§3): 状态锁的有返回码取放。互斥量不可用或取用失败都返回错误, 调用方必须
+ * 放弃整笔提交(fail closed), 并且**不 release** 一把没到手的锁。锁序保持
+ * ss_lock -> mot_lock -> 短窗口, 与 fault_reset/慢整理同一条, 不引入反序。 */
+rt_err_t safety_lock_take_checked(void)
+{
+    if (!ss_lock_ok) return -RT_EIO;       /* 锁还没建起来 = 不敢提交 */
+    return rt_mutex_take(&ss_lock, RT_WAITING_FOREVER);
+}
+
+void safety_lock_give_checked(void)
+{
+    if (ss_lock_ok) rt_mutex_release(&ss_lock);
+}
+
+/* CP4 K2(§4.2/§4.3): **身份化**的状态落位, 供"Motor 影子 + Safety 状态"必须整笔提交的
+ * 场合使用。调用方必须**已经在**同一个短窗口内(并且已持 ss_lock, 按锁序也应已持
+ * mot_lock)。窗口内只有纯比较与一次字段赋值: 不取锁、不打印、不碰硬件、不延时。
+ * 三条判据一次核完: ①协调层 epoch 仍是 expected_epoch(本命令的原身份)
+ * ②抑制位(非故障方向不许跨越)③白名单。任一不满足 => ss_state 一字不改。 */
+rt_err_t safety_transition_held(rt_uint32_t expected_epoch, safety_state_t next)
+{
+    safety_state_t from = ss_state;
+    sp_snapshot_t  c;
+
+    sp_peek_held(&c);
+    if (c.epoch != expected_epoch)
+    {
+        /* 期间发生过保护/预约/正式释放/人工恢复: 这次提交属于别人那一代, 整笔放弃。 */
+        return -RT_EINTR;
+    }
+    if (from == next) return RT_EOK;
+    if (next != SAFETY_FAULT_LATCHED && next != SAFETY_ESTOP && c.inhibit)
+        return -RT_EPERM;
+    if (!transition_allowed(from, next)) return -RT_EPERM;
+    ss_state = next;
+    return RT_EOK;
+}
+
+/* 自己取 ss_lock、只开**一个**短窗口做"比较 + 写", 放锁之后才打印。
+ * 原写法(先比 epoch, 之后再另一次加锁区间写)在两者之间落下一次换代空隙 —— 正是
+ * 审查探针 old-selftest-ready-after-new-run 的形状。 */
+rt_err_t safety_transition_for(rt_uint32_t expected_epoch, safety_state_t next)
+{
+    safety_state_t from;
+    rt_bool_t      ss_held = RT_FALSE;
+    rt_err_t       e;
+    rt_base_t      lvl;
+
+    if (ss_lock_ok)
+    {
+        if (rt_mutex_take(&ss_lock, RT_WAITING_FOREVER) != RT_EOK) return -RT_EIO;
+        ss_held = RT_TRUE;
+    }
+    from = ss_state;
+    lvl  = sp_win_begin();
+    e    = safety_transition_held(expected_epoch, next);
+    sp_win_end(lvl);
+    if (ss_held) rt_mutex_release(&ss_lock);
+
+    if (e != RT_EOK)
+    {
+        rt_kprintf("[SS] transition_for REFUSED: %s -> %s (身份 epoch=%u / 现在=%u,"
+                   " inhibit=%s) rc=%d - 比较与写在同一窗口内完成, 不跨越换代空隙\n",
+                   safety_state_name(from), safety_state_name(next),
+                   (unsigned)expected_epoch, (unsigned)sp_epoch(),
+                   sp_inhibited() ? "YES" : "no", (int)e);
+        return e;
+    }
+    if (from != next)
+        rt_kprintf("[SS] %s -> %s (identity epoch=%u)\n",
+                   safety_state_name(from), safety_state_name(next),
+                   (unsigned)expected_epoch);
+    return RT_EOK;
+}
+
+/* ---------- CP4 K5(§7): 停机路径上的"日志不参与降险" ----------
+ * 事实依据: 控制台是逐字符忙等(ns800_putc 每字符最多 BSP_NS800_UART_TX_TIMEOUT=6000ms),
+ * 而 PRIMASK 屏蔽期 tick 不推进 —— 所以在 ISR / 已关中断 / 没有线程对象这三种上下文里
+ * 打印, 等于把"第一次降险已经做完"这件事重新排在一个长等待后面。
+ * 本文件对这两种上下文只**抑制输出**: 原始错误码留在返回值里, 事件系统状态用计数记账,
+ * 由线程侧 safety_isr_event_stats() 查询; 两条降险动作(冻结 + 许可 LOW)本身照做不误。 */
+static rt_bool_t ss_log_ctx_ok(void)
+{
+    return (rt_interrupt_get_nest() == 0 && !sp_intr_masked() &&
+            rt_thread_self() != RT_NULL) ? RT_TRUE : RT_FALSE;
+}
+
+static rt_uint32_t ss_evt_no_system;        /* 事件系统未就绪(含 ISR 早期)次数 */
+static rt_uint32_t ss_evt_send_fail;        /* rt_event_send 返回失败次数 */
+static rt_uint32_t ss_evt_log_suppressed;   /* 因上下文不允许而被抑制的日志条数 */
+
+void safety_isr_event_stats(rt_uint32_t *no_system, rt_uint32_t *send_fail,
+                            rt_uint32_t *log_suppressed)
+{
+    if (no_system)      *no_system      = ss_evt_no_system;
+    if (send_fail)      *send_fail      = ss_evt_send_fail;
+    if (log_suppressed) *log_suppressed = ss_evt_log_suppressed;
 }
 
 /* ---------- 2026-10-23 S2: 事件分类与"先保护"的三条入口(任务书 §8.1) ----------
@@ -243,53 +348,61 @@ static rt_err_t ss_reconcile_once(rt_uint32_t fallback_code)
     sp_proof_t proof;
     rt_uint32_t pcode = fallback_code;
     rt_uint32_t events = 0u;
-    rt_bool_t   had, acked = RT_FALSE, mot_held = RT_FALSE;
+    rt_bool_t   had, acked = RT_FALSE, mot_held = RT_FALSE, ss_held = RT_FALSE;
     rt_bool_t   pad_low, step_off_ok;
     rt_bool_t   m_lat, d_lat;
     safety_fb_verdict_t fb_v;
     mot_stop_result_t m_res, d_res;
     rt_uint8_t  m_src;
-    rt_err_t    m_rc, d_rc, pe, ge;
+    rt_err_t    m_rc, d_rc, pe, ge, low_read_rc = RT_EOK;
     rt_base_t   lvl;
 
     rt_memset(&proof, 0, sizeof(proof));
     had = sp_pending_peek(&proof, &pcode, &events);
     if (!had)
     {
+        /* CP4 K1(§3): 这里原来还留着**第二条**慢整理路径 —— 先在锁外读 inhibit 与
+         * 快照, 取到 ss_lock 之后**不带任何 epoch 门**地把 ss_state 补写成
+         * FAULT_LATCHED。主路径的门保护不了这条旁路: 一条重复通知可以踩着"更早一次
+         * 采样留下的旧快照"把已经恢复并重新运行的状态机打回故障态(审查探针
+         * empty-pending-stale-reconcile: running=1 / SS=FAULT_LATCHED / inhibit=0)。
+         * 现在没有 pending 就**直接返回, 什么都不写**; 全部故障落位只由有效 pending
+         * 的统一提交(下面那一个窗口)做。 */
         rt_kprintf("[SS] reconcile: 没有待整理的事实(重复通知或已整理过)"
-                   " code=%u -> 不再触发黑匣子、不再关断\n", fallback_code);
-        /* 只保证状态机与"已抑制"这一事实一致(不碰硬件、不动 pending、不改故障原因)。
-         * 故障码取 canonical 当前那一代, 不用调用方带来的旧 code。 */
-        if (sp_inhibited() && ss_lock_ok)
-        {
-            sp_snapshot_t s;
-
-            sp_get(&s);
-            rt_mutex_take(&ss_lock, RT_WAITING_FOREVER);
-            if (ss_state != SAFETY_FAULT_LATCHED && ss_state != SAFETY_ESTOP)
-            {
-                ss_fault_code = s.first_fault_code;
-                ss_state      = SAFETY_FAULT_LATCHED;
-            }
-            rt_mutex_release(&ss_lock);
-        }
+                   " code=%u -> 不触发黑匣子、不关断, 也**不补写任何状态**\n",
+                   fallback_code);
         return RT_EOK;
     }
 
-    /* ② 窗口外的观察(带 settle 的回读 + 单次采样), 不写任何状态。 */
+    /* ② 窗口外的观察(带 settle 的回读 + 单次采样), 不写任何状态。
+     * CP4 K1(§3): "电平观察成功"与"确认未提交"是两个结论 —— 提交被身份门拒绝时
+     * 不能算已确认, 下面如实分列报告(观察到的原始 rc 仍然保留, 不丢事实)。 */
     pe = proof.valid ? proof.pwm.raw_rc : RT_EOK;
-    ge = motor_trip_observe(&proof);
+    ge = motor_trip_observe(&proof, &low_read_rc);
+    if (ge != RT_EOK && low_read_rc == RT_EOK)
+        rt_kprintf("[SS] 许可 LOW **确认未提交**(身份失配) - 回读本身成功(raw=%d),"
+                   " 但不写进别的一代; 本次对外按未确认处理\n", (int)low_read_rc);
     pad_low = safety_drv_enable_is_low();
     fb_v = safety_fb_now(0u);
 
-    /* ③ 线程锁在窗口外取。ss_lock 还没创建 = supervisor_boot 的早期失败出口
-     *    (此刻斜坡线程与 Safety 线程都还不存在), 记为 boot 阶段继续;
-     *    已经建好 ss_lock 却取不到 mot_lock 才是真的"取不到锁" => 不 ack、不落位。 */
-    if (ss_lock_ok) rt_mutex_take(&ss_lock, RT_WAITING_FOREVER);
-    if (motor_lock_take_checked() == RT_EOK) mot_held = RT_TRUE;
-    else if (ss_lock_ok)
+    /* ③ 线程锁在窗口外取。ss_lock **还没创建** = supervisor_boot 的早期失败出口
+     *    (此刻斜坡线程与 Safety 线程都还不存在), 那一次单线程整理照做;
+     *    已经建好锁却**取用失败**才是真的锁错误 —— CP4 K1(§3)要求它必须实际传播:
+     *    不写 Motor/SS/诊断、不 ack、不触发黑匣子, 而且**未取得的锁不 release**。 */
+    if (ss_lock_ok)
     {
-        rt_mutex_release(&ss_lock);
+        if (rt_mutex_take(&ss_lock, RT_WAITING_FOREVER) != RT_EOK)
+        {
+            rt_kprintf("[SS] reconcile **未提交**: ss_lock 取用失败 -> 不写状态、不 ack、"
+                       "不触发黑匣子; 义务保持 pending\n");
+            return -RT_EIO;
+        }
+        ss_held = RT_TRUE;
+    }
+    if (motor_lock_take_checked() == RT_EOK) mot_held = RT_TRUE;
+    else
+    {
+        if (ss_held) rt_mutex_release(&ss_lock);
         rt_kprintf("[SS] reconcile **未提交**: 取不到 mot_lock -> 不 ack、不做无锁写;"
                    " 这一代的整理义务保持 pending, 由下一次消费或人工恢复处理\n");
         return -RT_EIO;
@@ -310,7 +423,7 @@ static rt_err_t ss_reconcile_once(rt_uint32_t fallback_code)
     if (!acked)
     {
         if (mot_held) motor_lock_give_checked();
-        if (ss_lock_ok) rt_mutex_release(&ss_lock);
+        if (ss_held) rt_mutex_release(&ss_lock);
         rt_kprintf("[SS] reconcile **整笔丢弃**: proof epoch=%u 已被更新的一代取代"
                    " (新故障/新预约/已恢复) - 不写新影子, 不动新 pending, 不触发旧黑匣子\n",
                    (unsigned)proof.epoch);
@@ -320,7 +433,7 @@ static rt_err_t ss_reconcile_once(rt_uint32_t fallback_code)
     /* ⑤ 一次有效提交只触发一次黑匣子(O(1) 置标志, 仍持 ss_lock, 不等 Flash)。 */
     blackbox_trigger(pcode);
     if (mot_held) motor_lock_give_checked();
-    if (ss_lock_ok) rt_mutex_release(&ss_lock);
+    if (ss_held) rt_mutex_release(&ss_lock);
 
     /* ⑥ 放锁之后的如实报告: 两条输出路径分列 + 最终禁能是否确认。 */
     if (!pad_low)
@@ -389,9 +502,17 @@ rt_err_t safety_post_event(rt_uint32_t event)
     }
     if (!ss_inited)
     {
-        rt_kprintf("[SS] !! 事件系统未就绪: 已执行短保护, 但慢整理无人消费"
-                   " (pending=%s) - 状态命令会照实显示, 不打印'全部整理完成'\n",
-                   safety_trip_pending() ? "YES" : "no");
+        /* CP4 K5(§7): 首条故障很可能来自尚未起线程/尚未建事件系统的上下文(ISR 或
+         * 启动早期)。两条降险动作上面的 sp_trip_fast 已在同一窗口内做完并记了原始
+         * 结果, 这里只登记"慢整理这一次没有消费者"的事实; **不打印**除非确实是
+         * 可安全忙等控制台的线程上下文。 */
+        ss_evt_no_system++;
+        if (ss_log_ctx_ok())
+            rt_kprintf("[SS] !! 事件系统未就绪: 已执行短保护, 但慢整理无人消费"
+                       " (pending=%s) - 状态命令会照实显示, 不打印'全部整理完成'\n",
+                       safety_trip_pending() ? "YES" : "no");
+        else
+            ss_evt_log_suppressed++;
         return -RT_ERROR;
     }
     return rt_event_send(&ss_event, event);
@@ -407,9 +528,16 @@ rt_err_t safety_notify_trip_done(rt_uint32_t event, rt_uint32_t epoch)
     if (!ss_inited) return -RT_ERROR;
     e = rt_event_send(&ss_event, event);
     if (e != RT_EOK)
-        rt_kprintf("[SS] notify trip done 投递失败(%d): 保护已做(epoch=%u),"
-                   " pending=%s - 慢整理待 Safety 接收超时路径自行拾取\n",
-                   (int)e, epoch, safety_trip_pending() ? "YES" : "no");
+    {
+        /* K5(§7): 投递失败同样只记账 + 返回原始错误; ISR/窗口内不打印。 */
+        ss_evt_send_fail++;
+        if (ss_log_ctx_ok())
+            rt_kprintf("[SS] notify trip done 投递失败(%d): 保护已做(epoch=%u),"
+                       " pending=%s - 慢整理待 Safety 接收超时路径自行拾取\n",
+                       (int)e, epoch, safety_trip_pending() ? "YES" : "no");
+        else
+            ss_evt_log_suppressed++;
+    }
     return e;
 }
 
@@ -582,7 +710,17 @@ static void fault_reset(void)
      * 恢复自己仍然经 ss_lock 串行化; 快保护从不等 ss_lock, 所以"恢复正持锁做慢复核"
      * 不再挡住第一次关断。所有可能等待的锁都在**关中断之前**取, 最终只开**一次**
      * 短临界区。锁序沿用 ss_lock -> mot_lock, 不引入从 mot 等 ss 的反序。 */
-    if (ss_lock_ok) rt_mutex_take(&ss_lock, RT_WAITING_FOREVER);
+    /* CP4 K1(§3): ss_lock 取用失败一律**不提交**(不写状态、不清锁存、不 ack)。
+     * 下面的每条早退都只在"确实拿到了锁"时才 release。 */
+    if (ss_lock_ok)
+    {
+        if (rt_mutex_take(&ss_lock, RT_WAITING_FOREVER) != RT_EOK)
+        {
+            rt_kprintf("[SS] fault_reset REFUSED: ss_lock 取用失败 - 不做任何提交,"
+                       " 保持锁存\n");
+            return;
+        }
+    }
     st = ss_state;
     proof.valid = RT_FALSE;
 
@@ -686,12 +824,20 @@ static void fault_reset(void)
      * 确认一律返回 -RT_EINTR 并且**不**写进那一代的记录。 */
     {
         rt_err_t ge = safety_drv_permit_confirm_low();
+        rt_err_t ie = sp_note_permit_confirmed_for(ticket, 0u, ge);
 
-        (void)sp_note_permit_confirmed_for(ticket, 0u, ge);
-        if (ge != RT_EOK)
+        if (ge != RT_EOK || ie != RT_EOK)
         {
+            /* CP4 K4(§6.3): "LOW 回读未确认"与"确认提交被身份门拒绝"都是恢复流程里的
+             * **新失败** —— 必须换代 + 保持抑制, 让这张票据自然失效, 而不是只打印一句
+             * 拒绝就回到原状(原实现只有 pe!=EOK 才换代, 票据在 LOW 失败后仍然"有效")。
+             * 首错与历史锁存都不在这里清: 新换代的那一代继续带着同一条待整理义务。 */
+            rt_err_t ne = sp_recovery_note_failure(ticket, FAULT_SOFT, 0u, &proof);
+
             rt_kprintf("[SS] fault_reset REFUSED: 复核后的 DRV_ENABLE LOW 回读未确认"
-                       " (%d) - 保持锁存, 不进 MANUAL_CLEAR\n", (int)ge);
+                       " (read=%d 提交=%d) - 已按**新失败**换代并保持抑制(票据失效,"
+                       " note rc=%d, 现在 epoch=%u), 保持锁存, 不进 MANUAL_CLEAR\n",
+                       (int)ge, (int)ie, (int)ne, (unsigned)sp_epoch());
             if (ss_lock_ok) rt_mutex_release(&ss_lock);
             return;
         }
@@ -705,13 +851,20 @@ static void fault_reset(void)
     {
         safety_fb_verdict_t fv2 = SAFETY_FB_NO_SAMPLE;
         rt_err_t fe2 = safety_drv_feedback_confirm(0u, &fv2);
+        rt_err_t ee2 = sp_note_enn_confirmed_for(ticket, 0u, fe2);
 
-        if (fe2 != RT_EOK)
+        if (fe2 != RT_EOK || ee2 != RT_EOK)
         {
+            /* K4(§6.3) + K6.2(§8.2): ENN 复核结果必须**记进票据那一代**才作数;
+             * 失败或提交被拒都算恢复流程里的新失败 -> 换代 + 保持抑制。 */
+            rt_err_t ne = sp_recovery_note_failure(ticket, FAULT_DRV_FEEDBACK,
+                                                  EVT_DRV_FEEDBACK, &proof);
+
             rt_kprintf("[SS] fault_reset REFUSED: ENN feedback not re-confirmed AFTER"
-                       " 安全关闭复核 (verdict=%s err=%d) - 保持锁存, 不清故障码,"
+                       " 安全关闭复核 (verdict=%s err=%d 提交=%d) - 已按新失败换代并"
+                       "保持抑制(票据失效, note rc=%d), 保持锁存, 不清故障码,"
                        " 不打印'最终禁能已确认'\n",
-                       safety_fb_verdict_name(fv2), (int)fe2);
+                       safety_fb_verdict_name(fv2), (int)fe2, (int)ee2, (int)ne);
             if (ss_lock_ok) rt_mutex_release(&ss_lock);
             return;
         }
@@ -869,22 +1022,22 @@ rt_err_t safety_startup_selftest(void)
 
     if (required == RT_EOK)
     {
-        rt_uint32_t epoch1 = sp_epoch();
+        /* CP4 K2(§4.3): 原来的形状是"先比 epoch(比完就放手), 之后再另开一次加锁区间
+         * 写 READY" —— 两者之间落下一次保护/恢复/新预约, 旧自检就把**别人那一代**的
+         * 状态机拉回可 arm 的 READY(审查探针 old-selftest-ready-after-new-run:
+         * 恢复 + 新运行之后旧自检仍返回 0 并把 SS 写成 READY)。
+         * 现在比较、白名单与写在 ss_lock 下的**同一个**短窗口里一次完成。 */
+        rt_err_t te = safety_transition_for(epoch0, SAFETY_READY);
 
-        if (epoch1 != epoch0 || sp_inhibited())
+        if (te != RT_EOK)
         {
-            rt_kprintf("[SS] !! SELF_TEST->READY refused: 自检期间协调层已换代"
-                       " (epoch %u -> %u, inhibit=%s, pending=%s) - 需重跑自检,"
-                       " 不把旧一次成功当结论\n",
-                       epoch0, epoch1, sp_inhibited() ? "YES" : "no",
+            rt_kprintf("[SS] !! SELF_TEST->READY refused (rc=%d): 自检期间协调层已换代或被"
+                       "抑制 (进入时 epoch=%u / 现在=%u, inhibit=%s, pending=%s) -"
+                       " 需重跑自检, 不把旧一次成功当结论\n",
+                       (int)te, epoch0, (unsigned)sp_epoch(),
+                       sp_inhibited() ? "YES" : "no",
                        safety_trip_pending() ? "YES" : "no");
-            return -RT_EPERM;
-        }
-        if (safety_transition(SAFETY_READY) != RT_EOK)
-        {
-            rt_kprintf("[SS] !! SELF_TEST->READY refused (state=%s) - fail closed\n",
-                       safety_state_name(safety_state_get()));
-            return -RT_ERROR;
+            return (te == -RT_EIO) ? -RT_EIO : -RT_EPERM;
         }
     }
     else

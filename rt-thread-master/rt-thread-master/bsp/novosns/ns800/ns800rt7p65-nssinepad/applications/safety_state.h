@@ -64,6 +64,32 @@ typedef enum
 /* 受保护转换: 白名单外一律拒绝并打印。返回 RT_EOK = 已切换。 */
 rt_err_t safety_transition(safety_state_t next);
 
+/* ---------- CP4 K1/K2(§3/§4): 身份化状态提交与有返回码的状态锁 ----------
+ * 原形状是"先无身份地比较 epoch, 之后再另一次加锁区间里写状态" —— 比较通过到取得
+ * 状态锁之间任何新保护/恢复/预约都会让那次写落到**别人那一代**(审查探针
+ * old-selftest-ready-after-new-run)。现在:
+ *   safety_transition_for()   本命令自己的身份化提交: ss_lock 在窗口外取(取用失败
+ *                             返回错误, 一律不写), **一个**短窗口里核对
+ *                             "协调层 epoch 仍是 expected_epoch + 抑制位 + 白名单",
+ *                             三条全过才写 ss_state。
+ *   safety_lock_take_checked()/safety_lock_give_checked()
+ *                             给需要"ss_lock -> mot_lock -> 同一短窗口"整体提交的
+ *                             调用方(Motor 的 READY->RUN 与 RUN->READY)。锁序不变。
+ *   safety_transition_held()  调用方**已在**同一窗口内: 只做纯比较 + 一次字段赋值,
+ *                             不取锁、不打印、不碰硬件。返回非 EOK 时调用方必须
+ *                             放弃整笔提交。
+ * ⚠ 三个入口都**不**放松白名单: 非法转换与抑制期间的非故障转换仍然拒绝。 */
+rt_err_t safety_transition_for(rt_uint32_t expected_epoch, safety_state_t next);
+rt_err_t safety_lock_take_checked(void);
+void     safety_lock_give_checked(void);
+rt_err_t safety_transition_held(rt_uint32_t expected_epoch, safety_state_t next);
+
+/* CP4 K5(§7): ISR / 已关中断 / 无线程对象这三种上下文里, 事件系统的两条错误出口
+ * 一律**不打印**(事实仍留在返回值与 pending 里)。本函数把被抑制的输出换成可查询的
+ * 计数, 线程侧随时读得到 —— 不是静默吞 rc。 */
+void     safety_isr_event_stats(rt_uint32_t *no_system, rt_uint32_t *send_fail,
+                                rt_uint32_t *log_suppressed);
+
 /* 统一安全停机(唯一旁路): 停 STEP → DRV_ENABLE 请求 LOW → 锁存 FAULT_LATCHED。
  * 任何故障路径必须走这里, 禁止业务代码只改状态不停输出。
  * 2026-10-23 S2 顺序变更(任务书 §8.1): **先**在取 ss_lock/打印之前做一次短保护

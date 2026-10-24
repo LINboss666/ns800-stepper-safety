@@ -438,7 +438,33 @@ rt_err_t  tmc2209_read_register(rt_uint8_t a, rt_uint8_t r, rt_uint32_t *v)
 { (void)a; fake_bus_reads++; if (v) *v = 0x12340000u | r; return RT_EOK; }
 rt_err_t  tmc2209_cfg_txn_begin(void) { cfg_txn_begins++; return RT_EOK; }
 void      tmc2209_cfg_txn_end(void)   { cfg_txn_ends++; }
-rt_err_t  tmc2209_config_integrity_check(void) { fake_bus_reads++; return f_integrity; }
+/* CP4 K3(§5.3): 生产侧现在有"带调用方原身份 + 本次结果摘要"的复核版本。
+ * 桩保持同一事实源(f_integrity / fake_bus_reads), 并把摘要按"本次未保护"回填 ——
+ * 保护与否由生产侧 sp 决定, 桩不冒充配置层做过保护。 */
+rt_uint32_t f_cfg_view_gen = 1u;
+rt_uint32_t tmc2209_config_view_generation(void) { return f_cfg_view_gen; }
+void        ps_set_cfg_view_gen(rt_uint32_t g)   { f_cfg_view_gen = g; }
+
+rt_err_t tmc2209_config_integrity_check_for(rt_uint32_t expected_epoch,
+                                           tmc_op_result_t *out)
+{
+    fake_bus_reads++;
+    if (out != NULL)
+    {
+        memset(out, 0, sizeof(*out));
+        out->prod      = RT_TRUE;
+        out->op_epoch  = expected_epoch;
+        out->rc        = f_integrity;
+        out->protect   = SP_PROTECT_NONE;
+        out->proof.valid = RT_FALSE;
+    }
+    return f_integrity;
+}
+
+rt_err_t  tmc2209_config_integrity_check(void)
+{
+    return tmc2209_config_integrity_check_for((rt_uint32_t)sp_epoch(), NULL);
+}
 rt_bool_t tmc2209_get_applied_config(rt_uint32_t *g, rt_uint32_t *c, tmc_drv_config_t *o)
 {
     if (!f_cfg_ok) return RT_FALSE;
@@ -514,6 +540,18 @@ void ps_win_note(const char *what)
 }
 const char *ps_win_last_item(void) { return s_win_last ? s_win_last : "(none)"; }
 void ps_win_violations_clear(void) { s_win_violations = 0; s_win_last = RT_NULL; }
+
+/* ---- CP4 K5(§7): 上下文门的两条输入在夹具里的等价物 ----
+ * s_isr_nest 只由测试显式置位(模拟"首条故障来自 ISR"的情境); rt_thread_self()
+ * 在屏蔽窗口内返回空 —— 与目标上"窗口里没有可等待上下文"同一事实。
+ * ⚠ 这不是完整 ISR 队列/nest 模型(那属于 S2 并发链的 C03/C04)。 */
+static int s_isr_nest;
+void ps_isr_set(int v) { s_isr_nest = v; }
+rt_bool_t rt_interrupt_get_nest(void) { return s_isr_nest ? RT_TRUE : RT_FALSE; }
+rt_thread_t rt_thread_self(void)
+{
+    return (s_intr_masked || s_isr_nest) ? RT_NULL : &c_thread_store[0];
+}
 
 /* ---- 许可脚(PC.23 的等价物): 裸写请求 vs 实际焊盘 vs 回读确认, 三者分列 ---- */
 rt_base_t safety_drv_permit_pin(void) { return safety_pin(PIN_NAME_DRV_ENABLE); }
@@ -934,7 +972,7 @@ static void cases_diag_ovr(void)
     mot_stop_result_t dres;
     rt_err_t drc;
     rt_bool_t dlat;
-    int en0, d0;
+    int en0, d0, ev0 = 0;
     rt_uint32_t epoch0;
     sp_token_t gtok;
 
@@ -948,6 +986,7 @@ static void cases_diag_ovr(void)
 
     ps_sim_pwm_set_rc(RT_EOK, RT_EOK, -RT_EIO);
     d0 = ps_sim_pwm_disable_calls();
+    ev0 = ps_event_sends();
     epoch0 = sp_epoch();
     /* CP3 §9 第 3 项: 原 step_pwm_force_stop() 是会造成重复 disable 的旁路, 已删除。
      * 同一业务断言改走**生产入口** `pwm_test stop`(内部就是那条唯一的 checked 关断
@@ -959,18 +998,25 @@ static void cases_diag_ovr(void)
           drc == -RT_EIO && step_pwm_output_active() == RT_TRUE &&
           step_pwm_off_confirmed() == RT_FALSE && dlat == RT_TRUE &&
           dres == MOT_STOP_API_FAILED &&
-          /* S2 计数逐项解释(CP3 §10.4): 一次 `pwm_test stop` 失败 = **两个不同代次**的动作:
-           *   ① checked 关断路径自己的那一次 disable(诊断这一路);
-           *   ② 失败交给既有链时 safety_post_event 的"新的显式保护请求"(§4.2 明确允许,
-           *      每次都换 epoch), 它自己再做一次短保护。
-           * 这不是同一动作内的重试/覆盖 —— 下面额外断言 epoch 确实前进了(强于旧的
-           * "恰好一次"), 而失败不释放所有权/锁存/结果分列的判据一字未减。 */
-          ps_sim_pwm_disable_calls() == d0 + 2 && sp_epoch() > epoch0,
+          /* CP4 K3(§5.2)改了这里的动作次数合同, 逐项解释(计数变化不是放宽门禁):
+           *   原 CP3 形状 = ①checked 关断那一次 disable + ②失败分支再走
+           *   safety_post_event() 的"新显式保护请求"(又一次 disable + LOW), 共 2 次;
+           *   现在 = ①那一次关断**失败时已在同一个短临界区内**追加抑制/换 epoch/
+           *   留 pending(sp_off_attempt_for), 失败分支只**通知**既有链, 不再补第二轮
+           *   关断 —— 于是 disable 恰好 1 次。任务书 §5.2 原文: "正常关闭自身失败时
+           *   升级抑制复用**刚才那一次** disable 结果, 不第二次 disable …
+           *   不能用加一轮关断掩盖错误"。
+           * 保留并加强的业务判据: 失败不释放所有权 / 锁存 / 结果与原始 rc 分列 /
+           * **换代确实发生**(epoch 前进) / **义务真的留下了**(pending) /
+           * **既有链确实收到一次**(event 恰好 +1)。 */
+          ps_sim_pwm_disable_calls() == d0 + 1 && sp_epoch() > epoch0 &&
+          safety_trip_pending() == RT_TRUE && ps_event_sends() == ev0 + 1,
           fm("diag_rc=%d active=%d off_confirmed=%d latched=%d last=%s"
-             " disable %d->%d epoch %u->%u",
+             " disable %d->%d epoch %u->%u pending=%s event %d->%d",
              (int)drc, (int)step_pwm_output_active(), (int)step_pwm_off_confirmed(),
-             (int)dlat, mot_stop_result_name(dres), d0, ps_sim_pwm_disable_calls(),
-             (unsigned)epoch0, (unsigned)sp_epoch()));
+             (int)dlat, mot_stop_result_name(dres), d0,
+             ps_sim_pwm_disable_calls(), (unsigned)epoch0, (unsigned)sp_epoch(),
+             safety_trip_pending() ? "YES" : "no", ev0, ps_event_sends()));
 
     /* 再试一次仍然失败 => 所有权仍未交回(不谎报 "released") */
     msh_pwm_test("stop");

@@ -525,7 +525,32 @@ rt_err_t tmc2209_read_register(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *val
 rt_err_t tmc2209_cfg_txn_begin(void) { io_cfg_txn_begins++; return RT_EOK; }
 void     tmc2209_cfg_txn_end(void)   { io_cfg_txn_ends++; }
 
-rt_err_t tmc2209_config_integrity_check(void) { io_fake_bus_reads++; return f_integrity; }
+/* CP4 K3(§5.3)/K6.2(§8.2): 生产侧新增"带原身份 + 本次结果摘要"的复核与摘要代次
+ * 读取。桩与上面同源(f_integrity), 摘要按"本次未保护"回填 —— 保护与否由生产侧决定。 */
+rt_uint32_t io_cfg_view_gen = 1u;
+rt_uint32_t tmc2209_config_view_generation(void) { return io_cfg_view_gen; }
+void        io_set_cfg_view_gen(rt_uint32_t g)   { io_cfg_view_gen = g; }
+
+rt_err_t tmc2209_config_integrity_check_for(rt_uint32_t expected_epoch,
+                                           tmc_op_result_t *out)
+{
+    io_fake_bus_reads++;
+    if (out != RT_NULL)
+    {
+        memset(out, 0, sizeof(*out));
+        out->prod        = RT_TRUE;
+        out->op_epoch    = expected_epoch;
+        out->rc          = f_integrity;
+        out->protect     = SP_PROTECT_NONE;
+        out->proof.valid = RT_FALSE;
+    }
+    return f_integrity;
+}
+
+rt_err_t tmc2209_config_integrity_check(void)
+{
+    return tmc2209_config_integrity_check_for(sp_epoch(), RT_NULL);
+}
 
 rt_bool_t tmc2209_get_applied_config(rt_uint32_t *gconf, rt_uint32_t *chop,
                                      tmc_drv_config_t *out)
@@ -613,6 +638,16 @@ void rt_hw_interrupt_enable(rt_base_t level)
 }
 int  io_win_masked(void) { return s_intr_masked; }
 int  io_win_depth(void)  { return s_intr_depth; }
+
+/* ---- CP4 K5(§7): 上下文门的夹具等价物(不是完整 ISR 队列模型) ---- */
+static struct rt_thread io_self_thread;
+static int s_io_isr_nest;
+void io_isr_set(int v) { s_io_isr_nest = v; }
+rt_bool_t rt_interrupt_get_nest(void) { return s_io_isr_nest ? RT_TRUE : RT_FALSE; }
+rt_thread_t rt_thread_self(void)
+{
+    return (s_intr_masked || s_io_isr_nest) ? RT_NULL : &io_self_thread;
+}
 
 static int s_io_prepare_calls, s_io_commit_calls;
 int ns800_epwm_prepare(struct rt_device_pwm *device, rt_uint32_t channel,

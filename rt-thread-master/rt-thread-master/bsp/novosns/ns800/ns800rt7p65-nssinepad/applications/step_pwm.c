@@ -108,12 +108,14 @@ static rt_bool_t step_pwm_diag_holds(void)
  *        绝不对 NULL 句柄调用 API;
  *     3) 持有输出且 rt_pwm_disable 失败 => "输出状态未知" + 锁存 + 不释放所有权。
  *   - 成功时在同一短提交里写许可 LOW 并撤销诊断预约(换 epoch) —— 与 disarm 同形。
- * ⚠ 本函数**从不投递事件**(S1 返修 R03 的自激禁止仍成立): 需要通知外部入口的是
- *   pwm_test stop 那条分支, 统一停机的整理路径只调用 step_pwm_reconcile_after_trip()。 */
-static rt_err_t step_pwm_disable_checked(rt_uint8_t src)
+ * ⚠ 本函数**从不投递事件**(S1 返修 R03 的自激禁止仍成立), 也从不"另关一次":
+ *   统一停机与人工恢复复核的诊断侧整理只走 step_pwm_shadow_from_proof_held()。 */
+static rt_err_t step_pwm_disable_checked(rt_uint32_t op_epoch, rt_uint8_t src,
+                                         sp_proof_t *pf)
 {
     rt_err_t e;
 
+    if (pf != RT_NULL) rt_memset(pf, 0, sizeof(*pf));
     if (!step_pwm_diag_holds())
     {
         step_stop_mirror();
@@ -132,7 +134,10 @@ static rt_err_t step_pwm_disable_checked(rt_uint8_t src)
         return RT_EOK;
     }
 
-    e = sp_off_attempt(SP_DIAG, src, FAULT_SOFT, EVT_SOFT_FAULT, 1, RT_NULL);
+    /* CP4 K3(§5.1): 带**本次 stop 命令入口**采到的代次身份。身份已被更新的一代取代时
+     * sp 在一个寄存器写都不发的情况下返回 -RT_EINTR —— 迟到的旧 stop 不再停掉新 owner
+     * 的输出, 也不清它的 owner/影子/pending。 */
+    e = sp_off_attempt_for(op_epoch, SP_DIAG, src, FAULT_SOFT, EVT_SOFT_FAULT, 1, pf);
     step_stop_mirror();
     if (e == RT_EOK)
     {
@@ -204,7 +209,9 @@ static void pwm_test(int argc, char **argv)
      * 走与统一停机**同一条** checked 关断路径, 不另写一份关断代码。 */
     if (rt_strcmp(argv[1], "stop") == 0)
     {
-        rt_err_t se = step_pwm_disable_checked(MOT_STOP_SRC_DIAG_TEST);
+        sp_proof_t spf;
+        rt_uint32_t op_epoch = sp_epoch();     /* 本命令的原身份(第一次动作之前) */
+        rt_err_t    se = step_pwm_disable_checked(op_epoch, MOT_STOP_SRC_DIAG_TEST, &spf);
 
         if (se != RT_EOK)
         {
@@ -213,11 +220,12 @@ static void pwm_test(int argc, char **argv)
             /* 2026-10-23 返修 R03(=S1-NEW-03): 操作员在 msh 里敲 `pwm_test stop`
              * 失败时也要把故障交给**既有**链, 否则底层锁存住却只在"已锁存的故障"上
              * 才有恢复入口, fault_reset 会直接回 "not latched(state=READY)"。
-             * ⚠ 只有这个**外部命令入口**投事件: 统一停机的诊断整理不投。
-             * 2026-10-23 S2: 失败分支里 sp_off_attempt 已经在同一个短临界区内做过
-             *   "冻结 + 许可 LOW + 抑制 + 换 epoch", 所以这里走 post_event 是**新的
-             *   显式保护请求**(§4.2 允许, 每次都是新的一代), 由 Safety 线程只做慢整理。 */
-            (void)safety_post_event(EVT_SOFT_FAULT);
+             * CP4 K3(§5.1/§5.2)改了交接方式: 这一次关断失败**已经在同一个短临界区**
+             * 内建立了抑制/换 epoch/留 pending, 所以这里只**通知**(带那次动作的代次),
+             * 不再 safety_post_event() —— 后者等于同一波里再来一次真实关断。
+             * ⚠ 身份失配(-RT_EINTR, 迟到的旧 stop)同样只通知/只如实报告, 不动新 owner。 */
+            if (spf.valid) (void)safety_notify_trip_done(EVT_SOFT_FAULT, spf.epoch);
+            else           (void)safety_notify_trip_done(EVT_SOFT_FAULT, op_epoch);
         }
         return;
     }

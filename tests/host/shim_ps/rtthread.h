@@ -102,6 +102,14 @@ static inline rt_tick_t rt_tick_get(void) { return 0u; }          /* 不参与�
 #define rt_strlen    strlen
 #define rt_snprintf  snprintf
 
+/* CP4 K5(§7): 生产代码的可等待/可打印上下文门需要这两条真实 RT-Thread API。
+ * 本链是单线程模型: 没有真 ISR —— 中断嵌套由 ps_isr_set() 显式置位, 而
+ * rt_thread_self() 在"已屏蔽窗口内"返回空(与目标上 PRIMASK 期内不许 mdelay/打印
+ * 同一事实), 门外返回一个假线程对象。 */
+rt_bool_t   rt_interrupt_get_nest(void);
+rt_thread_t rt_thread_self(void);
+void        ps_isr_set(int v);
+
 /* 生产代码里的 rt_kprintf 由 ps_main.c 在本宏之后 #undef 并换成 ps_kprintf(tee)。
  * 默认值只是"别人在包含前不小心用了它"的兜底。 */
 #ifndef rt_kprintf

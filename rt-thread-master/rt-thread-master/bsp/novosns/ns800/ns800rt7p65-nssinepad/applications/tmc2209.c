@@ -1225,6 +1225,10 @@ typedef struct
      * 于是同一波错误不会出现第二轮 rt_pwm_disable。 */
     rt_uint32_t     op_epoch;
     rt_bool_t       op_protected;
+    /* CP4 K3(§5.3): 本次操作的保护**结果三态**与那一次带回的 proof, 供 Motor 消费 ——
+     * Motor 因此既不会第二轮关闭, 也不会把"过期丢弃"当成"我这次已经保护完"。 */
+    rt_uint8_t      op_protect;      /* sp_protect_outcome_t */
+    sp_proof_t      op_proof;
     /* R4(2026-10-23 CP3 §6.1): "期望值 / 实得值 / 不一致种类"。底层错误出口一律
      * **不打印**(打印必须排在保护之后), 这三个字段把细节留给保护完成后的摘要。 */
     rt_uint32_t     fail_exp;
@@ -1672,7 +1676,8 @@ static rt_err_t tmc_cfg_fail_ctx(tmc_cfg_ctx_t *ctx, rt_uint8_t reg, rt_err_t e,
 
     if (ctx == &tmc_cfg_prod)
     {
-        sp_proof_t pf;
+        sp_proof_t           pf;
+        sp_protect_outcome_t oc = SP_PROTECT_NONE;
 
         pf.valid = RT_FALSE;
         if (!ctx->op_protected)
@@ -1681,8 +1686,10 @@ static rt_err_t tmc_cfg_fail_ctx(tmc_cfg_ctx_t *ctx, rt_uint8_t reg, rt_err_t e,
              * 用 FAULT_TMC_COMM + 既有软故障事件; 不再冒充物理 TMC_DIAG 引脚事件
              * (那个码属于诊断输入脚的真实电平)。既有故障数值一个都没有重排。 */
             (void)sp_trip_for_operation(ctx->op_epoch, FAULT_TMC_COMM, EVT_SOFT_FAULT,
-                                        MOT_STOP_SRC_GUARD_STOP, &pf);
+                                        MOT_STOP_SRC_GUARD_STOP, &pf, &oc);
             ctx->op_protected = RT_TRUE;        /* 本操作只保护一次(不论成败) */
+            ctx->op_protect   = (rt_uint8_t)oc;
+            ctx->op_proof     = pf;
         }
     }
 
@@ -1781,6 +1788,17 @@ static rt_err_t tmc_cfg_apply_ctx(tmc_cfg_ctx_t *ctx, const tmc_drv_config_t *c)
 
     rt_memset(&st, 0, sizeof(st));
 
+    /* CP4 K3(§5.3): 操作身份与"本次结果"在**任何早退之前**复位。原写法把 op_epoch 记在
+     * 预算打开之后, 于是 txn/gate 早退的返回值仍配着一份**上一次操作**留下的
+     * op_protected/op_proof —— 那正是"拿文件全局最后一次结果跨操作拼接"的形状。 */
+    if (ctx == &tmc_cfg_prod)
+    {
+        ctx->op_epoch     = sp_epoch();
+        ctx->op_protected = RT_FALSE;
+        ctx->op_protect   = SP_PROTECT_NONE;
+        rt_memset(&ctx->op_proof, 0, sizeof(ctx->op_proof));
+    }
+
     /* F2c R02: 先把"锁不可用"与"锁被占用"分开 —— 前者是能力缺失(ENOSYS),
      * 后者是并发时序(EBUSY)。两种都在产生任何总线动作之前拒绝。 */
     if (!ctx->txn_ok)
@@ -1803,11 +1821,8 @@ static rt_err_t tmc_cfg_apply_ctx(tmc_cfg_ctx_t *ctx, const tmc_drv_config_t *c)
         return -RT_EINVAL;
     }
     b = &own;
-    if (ctx == &tmc_cfg_prod)
-    {
-        ctx->op_epoch     = sp_epoch();
-        ctx->op_protected = RT_FALSE;
-    }
+    /* op_epoch/op_protected 已在入口复位(CP4 K3), 这里**不再**重采当前 epoch ——
+     * 重采会把 txn 等待期间发生的任何保护/预约都算成"本操作自己的身份"。 */
 
     gates = (ctx->gate != RT_NULL) ? ctx->gate(ctx->priv) : 0u;
     if (gates != 0u)
@@ -2042,6 +2057,13 @@ static rt_bool_t tmc_cfg_ok_for_arm_ctx(tmc_cfg_ctx_t *ctx)
     return ok;
 }
 
+/* CP4 §8.2: Core 的 HIGH/ARMED 门需要"授权那次 HIGH 的配置摘要代次" —— 无等待读取。 */
+rt_uint32_t tmc2209_config_view_generation(void)
+{
+    tmc_cfg_prod_sync();
+    return tmc_cfg_view_gen(&tmc_cfg_prod);
+}
+
 rt_bool_t tmc2209_drive_config_ok_for_arm(void)
 {
     return tmc_cfg_ok_for_arm_ctx(&tmc_cfg_prod);
@@ -2075,7 +2097,25 @@ void tmc2209_cfg_txn_end(void)
  * S2(§10.4): 运行期观察到错误**先短保护**, 再做 cfg 状态的慢整理与日志 —— 保护发生在
  * tmc_cfg_fail_ctx() 的第一步(生产实例, 且按 op_epoch 去重), 打印都在其后。
  * 拿不到叶锁/预算耗尽时不 FOREVER 等: 作废摘要即可让门闭合。 */
-static rt_err_t tmc_cfg_integrity_ctx(tmc_cfg_ctx_t *ctx)
+/* CP4 K3(§5.3): 把"本次操作的结果"抄给调用方。三态与 proof 都来自**这一次**调用在
+ * ctx 里留下的记录(生产实例由 txn 串行化, 局部假实例恒为 NONE/无效)。 */
+static void tmc_op_result_fill(tmc_cfg_ctx_t *ctx, rt_err_t rc, tmc_op_result_t *out)
+{
+    rt_bool_t prod;
+
+    if (out == RT_NULL) return;
+    rt_memset(out, 0, sizeof(*out));
+    prod = (ctx == &tmc_cfg_prod) ? RT_TRUE : RT_FALSE;
+    out->prod     = prod;
+    out->rc       = rc;
+    out->op_epoch = prod ? ctx->op_epoch : 0u;
+    out->protect  = prod ? (sp_protect_outcome_t)ctx->op_protect : SP_PROTECT_NONE;
+    if (prod && out->protect != SP_PROTECT_NONE) out->proof = ctx->op_proof;
+    else out->proof.valid = RT_FALSE;
+}
+
+static rt_err_t tmc_cfg_integrity_ctx_for(tmc_cfg_ctx_t *ctx, rt_uint32_t expected_epoch,
+                                          tmc_op_result_t *out)
 {
     rt_uint32_t tgt_g = 0, tgt_c = 0, v = 0;
     tmc_drv_cfg_state_t st;
@@ -2086,23 +2126,41 @@ static rt_err_t tmc_cfg_integrity_ctx(tmc_cfg_ctx_t *ctx)
     tmc_xfer_stat_t      xs;
     rt_bool_t            taken = RT_FALSE;
 
+    /* CP4 K3(§5.3): 先复位"本次操作"的身份与结果, 再碰任何锁 —— 早退的 -RT_ENOSYS /
+     * -RT_EBUSY 也必须带一个**干净**的结果(NONE 保护 + proof 无效), 否则调用方会把
+     * 上一次操作留下的保护当成这次的。 */
+    if (ctx == &tmc_cfg_prod)
+    {
+        ctx->op_epoch     = (expected_epoch != 0u) ? expected_epoch : sp_epoch();
+        ctx->op_protected = RT_FALSE;
+        ctx->op_protect   = SP_PROTECT_NONE;
+        rt_memset(&ctx->op_proof, 0, sizeof(ctx->op_proof));
+    }
+
     /* F2c R02: 没有事务锁就无从保证"复核期间没有并发写" -> 拒绝(不猜) */
-    if (!ctx->txn_ok) return -RT_ENOSYS;
-    if (!tmc_cfg_txn_take(ctx)) return -RT_EBUSY;   /* 正在 apply/arm: 此刻无法复核 */
+    if (!ctx->txn_ok)
+    {
+        tmc_op_result_fill(ctx, -RT_ENOSYS, out);
+        return -RT_ENOSYS;
+    }
+    if (!tmc_cfg_txn_take(ctx))          /* 正在 apply/arm: 此刻无法复核 */
+    {
+        /* 这不是"已经进入操作后的失败": 没有产生任何总线动作, 因此**不**在这里保护,
+         * 也不产生新 pending; 调用方按 rc 拒绝本次使能/起转(C16 的取得/归还平衡)。 */
+        tmc_op_result_fill(ctx, -RT_EBUSY, out);
+        return -RT_EBUSY;
+    }
 
     /* S2(§10.1): integrity 的**两个寄存器共用一份 250ms 预算**, 不为每个寄存器
      * 重开 250ms; 生产实例在这里记一次 op_epoch(序列里第一个失败出口负责保护一次)。 */
     if (!tmc_budget_open(&own, TMC_BUD_INTEGRITY_MS))
     {
         tmc_cfg_txn_give(ctx);
+        tmc_op_result_fill(ctx, -RT_EINVAL, out);
         return -RT_EINVAL;
     }
     b = &own;
-    if (ctx == &tmc_cfg_prod)
-    {
-        ctx->op_epoch     = sp_epoch();
-        ctx->op_protected = RT_FALSE;
-    }
+    /* op_epoch/op_protected 已在入口按调用方身份复位(CP4 K3): 本函数**不再**重采。 */
     rt_memset(&xs, 0, sizeof(xs));
 
     if (tmc_cfg_lock_take(ctx, b, &taken) != RT_EOK)
@@ -2184,13 +2242,29 @@ static rt_err_t tmc_cfg_integrity_ctx(tmc_cfg_ctx_t *ctx)
 
 out:
     tmc_cfg_txn_give(ctx);
+    tmc_op_result_fill(ctx, e, out);
     return e;
 }
 
+/* 自测与非 Motor 调用点继续用这一条(不带身份, 出参为空)。 */
+static rt_err_t tmc_cfg_integrity_ctx(tmc_cfg_ctx_t *ctx)
+{
+    return tmc_cfg_integrity_ctx_for(ctx, 0u, RT_NULL);
+}
+
+/* 普通查询接口保留(巡检命令等), 内部仍串行化在生产事务里, 只是自己采样身份。 */
 rt_err_t tmc2209_config_integrity_check(void)
 {
     tmc_cfg_prod_sync();
-    return tmc_cfg_integrity_ctx(&tmc_cfg_prod);
+    return tmc_cfg_integrity_ctx_for(&tmc_cfg_prod, 0u, RT_NULL);
+}
+
+/* CP4 K3(§5.3): 带调用方原身份的复核 + 本次操作的结果摘要。 */
+rt_err_t tmc2209_config_integrity_check_for(rt_uint32_t expected_epoch,
+                                           tmc_op_result_t *out)
+{
+    tmc_cfg_prod_sync();
+    return tmc_cfg_integrity_ctx_for(&tmc_cfg_prod, expected_epoch, out);
 }
 
 /* ---------- MSH: 配置查看 / 受控下发 / 离线自检 ---------- */

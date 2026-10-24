@@ -482,10 +482,17 @@ rt_err_t ns800_uart_write_budgeted(rt_device_t dev, const rt_uint8_t *data,
     if (written != RT_NULL) *written = 0;
     if (dev == RT_NULL || data == RT_NULL || written == RT_NULL) return -RT_EINVAL;
     if (total == 0 || total >= (rt_tick_t)0x80000000) return -RT_EINVAL;
-    if (rt_thread_self() == RT_NULL) return -RT_EBUSY;
-#if defined(__ARM_ARCH) && (__ARM_ARCH >= 7)
-    if (__get_PRIMASK() != 0u) return -RT_EBUSY;
-#endif
+    /* CP4 K5(§7): HAL **自己**守上下文, 不能假设"自己永远是那个已做过前置检查的
+     * TMC 包装层的唯一调用者"。三条判据与 tmc2209.c 的前置检查同一套:
+     *   ① rt_interrupt_get_nest() != 0 => 中断上下文(原实现只看 rt_thread_self(),
+     *      被中断打断的主线程仍然非 NULL, 那条判据不成立);
+     *   ② ns800_intr_masked() => PRIMASK 已屏蔽, SysTick 被挡住, 而这个循环按
+     *      rt_tick_get() 判超时 => 永不退出;
+     *   ③ rt_thread_self() == NULL => 没有线程对象, rt_thread_mdelay 非法。
+     * 拒绝路径不打印、不延时, 只回原始错误码。 */
+    if (rt_interrupt_get_nest() != 0u) return -RT_EBUSY;
+    if (ns800_intr_masked())            return -RT_EBUSY;
+    if (rt_thread_self() == RT_NULL)    return -RT_EBUSY;
 
     /* 在**已注册**的对象表里匹配实际 dev; 匹配不到就拒绝, 不对任意指针做
      * container_of 后解引用(rt_hw_uart_init 用 uart_obj[i].serial 注册设备)。 */
@@ -512,6 +519,10 @@ rt_err_t ns800_uart_write_budgeted(rt_device_t dev, const rt_uint8_t *data,
         ++i;
         *written = i;
     }
+    /* CP4 K5(§7): 末字节之后、返回成功之前**再查一次原 start/total**。
+     * 过期时如实返回 -RT_ETIMEOUT, 但 *written 保持**已经发出去的真实字节数** ——
+     * 不声称"过期前物理上绝未发送"(那一层软件证明不了)。 */
+    if ((rt_tick_t)(rt_tick_get() - start) >= total) return -RT_ETIMEOUT;
     return RT_EOK;
 }
 

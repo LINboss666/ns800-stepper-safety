@@ -224,22 +224,22 @@ rt_err_t motor_pwm_grant_to_diag(sp_token_t *out_token);
  * ⚠ 它**不**代表取得通道权; 要输出必须走上面的 motor_pwm_grant_to_diag()。 */
 rt_err_t motor_diag_gate_check(void);
 
-/* 短保护之后的 Motor 侧**慢整理**(快照镜像 + 软件状态 + 带回读的许可确认 + 日志)。
- * 不产生任何新的关断动作; `pwm_rc` 必须是那次短保护返回的原始 PWM 错误。
- * 调用方: safety_force_shutdown()(整理阶段)与 motor_emergency_stop()(自己做短保护)。
- * 返回对外合同与 motor_emergency_stop() 相同(PWM 失败优先, 否则许可确认结果)。 */
-/* ---------- 2026-10-23 S2 CP3 R1: 慢整理拆成"观察"与"身份受检提交"两段 ----------
+/* ---------- 2026-10-23 S2 CP3 R1 / CP4 K1: 慢整理拆成"观察"与"身份受检提交"两段 ----------
  * 原 motor_reconcile_after_trip(pwm_rc) 无身份: 它清 mot_res/armed/target/current 之前
  * 只比过一次 inhibit, 人工恢复 + 新预约之后旧慢整理仍能把新状态写回故障影子
  * (审查探针 stale-slow-reconcile)。现在两段分开:
- *   motor_trip_observe()  窗口外的带回读确认(有 settle/重试, 不能在临界区里跑),
- *                         确认只写进**这次 proof 那一代**, 失配返回 -RT_EINTR。
+ *   motor_trip_observe()  窗口外的带回读确认(有 settle/重试, 不能在临界区里跑)。
+ *                         CP4 K1(§3): **两个**结论都要能拿到 —— 返回值是"确认是否
+ *                         提交进了 proof 那一代"(EOK / -RT_EINTR / -RT_EINVAL),
+ *                         *out_read_rc 是带回读的**原始** rc。原来只回 read rc, 于是
+ *                         "回读成功但提交被身份门拒绝"在调用方那里仍然是"LOW 已确认",
+ *                         并且存在向新记录补写旧结果的风险(现在由 sp 的门挡住, 不写)。
  *   motor_commit_off()    mot_lock 在窗口**外**取得(取不到就不提交) + **一个**短窗口里
  *                         做身份门与字段落位。返回 FALSE = 整笔放弃(不写新影子、
  *                         不动新预约/新 pending), 调用方如实记录。
  * 统一慢整理(safety_state 的 ss_reconcile_once)在自己的窗口里直接调
  * motor_shadow_from_proof_held() + motor_fault_fields_held(), 不经过本函数。 */
-rt_err_t  motor_trip_observe(const sp_proof_t *pf);      /* 返回许可回读原始 rc */
+rt_err_t  motor_trip_observe(const sp_proof_t *pf, rt_err_t *out_read_rc);
 
 #define MOT_COMMIT_TRIP     0   /* 短保护/守卫/显式急停: pending 门 + MOTOR_FAULT */
 #define MOT_COMMIT_ROLLBACK 1   /* arm 回滚那次关断: 同代门 + MOTOR_FAULT */
@@ -256,6 +256,9 @@ rt_bool_t motor_commit_off(const sp_proof_t *pf, int mode);
  *   motor_lock_give_checked()    窗口外释放。
  * ⚠ 唯一合法调用点 = safety_state.c 的 fault_reset(); 不导出 MSH 命令, 没有第二条
  *   恢复路径。原 motor_clear_stop_latch() 因此删除(无身份的公共清除口 = 旁路)。 */
+/* CP4 K1(§3): 必须返回 rt_mutex_take 的**真实**结果。原来只核 mot_lock_ok, 然后把
+ * take 的返回值丢掉、一律回 EOK —— "取锁失败不 ack / 不落位 / 不触发黑匣子"的调用方
+ * 因此永远收不到错误(审查探针 reconcile-ignores-lock-error)。 */
 rt_err_t motor_lock_take_checked(void);
 void     motor_recovery_fields_held(void);
 void     motor_shadow_from_proof_held(const sp_proof_t *pf);

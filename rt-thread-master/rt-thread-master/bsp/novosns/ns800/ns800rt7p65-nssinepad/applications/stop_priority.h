@@ -81,6 +81,13 @@ typedef struct {
     rt_err_t     confirm_rc;
     rt_uint32_t  confirm_epoch;
     rt_uint8_t  confirmed_level;    /* 本次确认针对的电平 */
+    /* CP4 §8.2: ARMED 的最终提交除"焊盘回读确认"外, 还要有**同代 ENN 反馈复核成功**
+     * 与"授权这次 HIGH 的那份配置有效性摘要仍是同一代"两条证据; 四条都绑 epoch。 */
+    rt_bool_t    enn_ok;
+    rt_err_t     enn_rc;
+    rt_uint32_t  enn_epoch;
+    rt_uint8_t   enn_level;
+    rt_uint32_t  cfg_view_gen;       /* 授权这次 HIGH 的配置摘要代次 */
 } sp_permit_rec_t;
 
 #define SP_PERMIT_LEVEL_NONE  2u    /* 尚无许可请求记录 */
@@ -110,6 +117,8 @@ typedef struct {
     rt_uint32_t      stale_dropped;    /* 身份失配被丢弃的晚到结果次数 */
     rt_uint32_t      advance_failed;   /* 计数到顶(饱和)次数 */
     sp_pwm_rec_t     pwm;              /* 模块最近一次实际关断 */
+    sp_pwm_rec_t     diag_pwm;         /* K6.1: 诊断那一路自己的最近一次实际关断 */
+    rt_uint32_t      last_trip_epoch;  /* 最近一次短保护**建立**的那一代(K3 三态判定) */
     sp_permit_rec_t  permit;           /* 最近一次许可动作 */
     sp_pwm_rec_t     first_unrecovered;        /* 首个未恢复的 **PWM** 失败 */
     rt_bool_t        first_unrecovered_valid;
@@ -131,6 +140,10 @@ typedef struct {
     /* R1(2026-10-23 CP3): 两路各自"未复核的关断失败锁存"也随 proof 一起带走,
      * 这样慢整理与人工恢复的判定**只用这一代的数字**, 不必再去读活的 canonical
      * (读活值 = 给旧动作续命的另一种写法)。 */
+    /* CP4 K3/K4(§6.2/§6.3): 这次动作**自己那一代**是否带着抑制义务。消费方据此
+     * 决定走 pending 门还是同代门 —— 一次"清理成功但许可 LOW 失败"的结果已经形成
+     * 故障义务, 不能再按正常关闭落位。 */
+    rt_bool_t         inhibit;
     rt_bool_t         motor_stop_latched;
     rt_bool_t         diag_stop_latched;
     rt_uint32_t       first_fault_code;
@@ -141,6 +154,21 @@ typedef struct {
 rt_err_t sp_bind_pwm(struct rt_device_pwm *pwm, int channel);
 rt_err_t sp_bind_permit_pin(rt_base_t numeric_pin);
 void     sp_get_bound(struct rt_device_pwm **out_pwm, int *out_ch, rt_base_t *out_pin);
+
+/* K3(§5.3): 一次"为某条操作做短保护"的请求有三种**完全不同**的结果, 调用方必须
+ * 分开处理, 不能把 valid=TRUE 一律读成"这次操作已经保护完":
+ *   BY_THIS_CALL      —— 本次调用自己完成了换代 + 两条降险动作;
+ *   ALREADY_PROTECTED —— 当前代仍是一条待整理的故障(可能由同一次操作里更底层做过,
+ *                        也可能是另一条并发故障): 本次**不做**第二轮关闭, 只能用
+ *                        带回的当前事实整理自己那一路, 且落位仍要过同一代门;
+ *   SUPERSEDED        —— 已经换到无抑制的新健康代(人工恢复/新预约/正式释放): 本次
+ *                        结论**过期丢弃**, 既不称"已保护", 也不得据此写任何状态。 */
+typedef enum {
+    SP_PROTECT_NONE = 0,
+    SP_PROTECT_BY_THIS_CALL,
+    SP_PROTECT_ALREADY_PROTECTED,
+    SP_PROTECT_SUPERSEDED
+} sp_protect_outcome_t;
 
 /* ---------- 短保护（新显式请求；不依赖 owner，不做认领） ---------- */
 /* 无条件执行一次短保护：换 epoch + 置 inhibit + 一次实际关断 + 独立许可 LOW + 记账。
@@ -154,7 +182,8 @@ rt_err_t sp_trip_fast(rt_uint32_t code, rt_uint32_t events, rt_uint8_t src,
  * R2(2026-10-23): out 在两条路径上都可用, 因为调用方(motor 守卫)必须能对
  * "底层已保护"这一事实做同样的状态整理。 */
 rt_err_t sp_trip_for_operation(rt_uint32_t expected_epoch, rt_uint32_t code,
-                               rt_uint32_t events, rt_uint8_t src, sp_proof_t *out);
+                               rt_uint32_t events, rt_uint8_t src, sp_proof_t *out,
+                               sp_protect_outcome_t *outcome);
 
 /* §4.3：普通 ramp-zero / apply 回退 / disarm / pwm_test stop —— 实际 disable 与登记
  * **同窗**；该次失败时在同一窗口内追加抑制/换 epoch/许可 LOW，且**不做第二次 disable**。
@@ -163,18 +192,38 @@ rt_err_t sp_trip_for_operation(rt_uint32_t expected_epoch, rt_uint32_t code,
  *   inhibit) —— 用于 motor_disarm / pwm_test stop。
  * release_on_ok=FALSE: 成功只登记结果并保留预约(Motor 回到 ARMED) —— 用于受控减速到零。
  * 失败时两条都一样: 同窗追加抑制/换 epoch/许可 LOW，且**绝不**做第二次 rt_pwm_disable。 */
-rt_err_t sp_off_attempt(sp_owner_t who, rt_uint8_t src, rt_uint32_t code,
-                        rt_uint32_t events, int release_on_ok, sp_proof_t *out);
+/* CP4 K3(§5.1)/K4(§6.1): 这条**必须**带上原操作的代次身份 expected_epoch(命令入口
+ * 第一次等待之前采的快照)。检查在窗口内、在任何 rt_pwm_disable / 许可 LOW 真实写
+ * **之前**完成: 失配 => 一个寄存器写都不发, 不清新 owner, 不写新影子, 不产生新 pending,
+ * 只把当前事实带回(旧回滚无权动新预约)。
+ * 成功那次动作的 proof.epoch / pwm.epoch / permit.write_epoch 与之后的确认
+ * expected_epoch **同代**(§6.1: 不允许"关断记在旧代、proof 发在新代")。
+ * 返回值优先序(§6.2): PWM 失败 > 许可失败 > 换代/边界失败; 各 raw 字段独立留档。 */
+rt_err_t sp_off_attempt_for(rt_uint32_t expected_epoch, sp_owner_t who, rt_uint8_t src,
+                            rt_uint32_t code, rt_uint32_t events, int release_on_ok,
+                            sp_proof_t *out);
 
 /* ---------- 预约 / 阶段 / 释放 ---------- */
 rt_err_t sp_reserve(sp_owner_t want, sp_token_t *out);      /* NONE -> RESERVED, 换 epoch */
-rt_err_t sp_phase_set(const sp_token_t *t, sp_phase_t phase);
+/* CP4 K2(§4.1): **受检预约**。在同一窗口里先核对"当前 epoch 仍是这条命令入口处采到的
+ * expected_epoch"(命令原身份), 再做 inhibit/owner/锁存/饱和检查, 才分配新 epoch 并
+ * 发出新 token。失配返回 -RT_EINTR 并且**不产生预约、不产生任何硬件动作** ——
+ * 于是"旧 arm 在保护/恢复之后接着把新预约拿走"这条路从根上断掉。
+ * ⚠ 调用方不得把失配重试成"再去取一个新 token"。 */
+rt_err_t sp_reserve_for(rt_uint32_t expected_epoch, sp_owner_t want, sp_token_t *out);
 rt_err_t sp_release(const sp_token_t *t);                    /* 正式释放, 换 epoch */
+/* 原 sp_phase_set() 已删除(§8.2): 无生产调用者的通用 phase 写等于"手动升级 ARMED/RUNNING"
+ * 的旁路。phase 只能由 sp_reserve/sp_reserve_for(RESERVED)、sp_arm_commit*(ARMED, 需要
+ * 同代 HIGH 已确认 + ENN 复核成功 + 配置摘要同代)与 sp_pwm_start_held(RUNNING, 需要真实
+ * rt_pwm_enable 成功)建立。 */
 
 /* ---------- 真正的 RUN-capable 提交（资格判定与实际写同窗） ----------
  * R5(2026-10-23): 这些新增的生产接口**自己**也守编译期许可, 不依赖"每个调用者永远
- * 不出错": HIGH 只允许 SP_MOTOR 且要求 MOTOR_HARDWARE_ENABLE_PATH_VALIDATED;
- * Motor RUN 还要同一许可 + 本预约 phase 已到 ARMED; 诊断 RUN 保留原双宏合同
+ * 不出错": HIGH 只允许 SP_MOTOR 且要求 MOTOR_HARDWARE_ENABLE_PATH_VALIDATED
+ * 与 TMC_DRIVE_CONFIG_HW_VALIDATED, 并要求**同代无等待配置有效性摘要**仍然放行
+ * (CP4 §8.2: 读取不取锁/不碰 UART/不延时); Motor RUN 还要同一许可 + 本预约 phase 已
+ * 到 ARMED; ARMED 本身只能由"同 token 的 HIGH 已请求且已确认 + 同代 ENN 复核成功 +
+ * 授权那次 HIGH 的配置摘要代次未变"提交。诊断 RUN 保留原双宏合同
  * (MOTOR_HARDWARE_ENABLE_PATH_VALIDATED 或 STEP_DIAG_ISOLATED_ENV_CONFIRMED)。
  * stop/LOW/保护在所有宏 FALSE 时继续允许 —— 朝安全方向的动作用永不设许可门。
  * 非法 owner 取值(既不是 MOTOR 也不是 DIAG)一律拒绝。 */
@@ -210,6 +259,11 @@ rt_err_t sp_note_permit_confirmed_for(rt_uint32_t expected_epoch,
  * drv_en_request/armed 标成成功(R2)。 */
 rt_err_t sp_note_permit_confirmed(const sp_token_t *t, rt_uint8_t requested_level,
                                   rt_err_t rc);
+/* CP4 K6.2(§8.2): ENN 反馈复核的成功也要**绑到那一代的那次请求**上才作数 ——
+ * ARMED 的最终提交(sp_arm_commit_held)同时核对 HIGH 确认与本条, 二者都必须是
+ * token 那一代。失配只计数(stale_dropped), 不写新记录。 */
+rt_err_t sp_note_enn_confirmed_for(rt_uint32_t expected_epoch, rt_uint8_t requested_level,
+                                   rt_err_t rc);
 /* epoch 还能不能前进(饱和预检): 恢复/预约的最终提交在改字段之前用它。 */
 rt_bool_t  sp_can_advance(void);
 
@@ -241,6 +295,14 @@ rt_bool_t   sp_inhibited(void);
 /* 已处于窗口内的调用方专用(不再自己开关中断): 供"复核+一次寄存器写"同窗的场合,
  * 例如 motor_set_direction 在同一个窗口里重核全部静止条件再写 DIR。 */
 rt_bool_t   sp_inhibited_held(void);
+/* CP4 K5(§7): 供上层判断"当前上下文能不能打印"。判据与窗口的存在条件同一套事实:
+ * 目标上直接读 PRIMASK(任何来源的屏蔽都算); 主机夹具里由本模块自己的嵌套深度给出
+ * (夹具的 rt_hw_interrupt_disable/enable 替身不暴露 PRIMASK)。 */
+rt_bool_t   sp_intr_masked(void);
+/* CP4 K5(§7): 供上层判断"当前上下文能不能打印"。判据与窗口的存在条件同一套事实:
+ * 目标上直接读 PRIMASK(任何来源的屏蔽都算); 主机夹具里由本模块自己的嵌套深度给出
+ * (夹具的 rt_hw_interrupt_disable/enable 替身不暴露 PRIMASK)。 */
+rt_bool_t   sp_intr_masked(void);
 /* epoch 已饱和: 禁止新的预约与人工恢复(每次显式保护仍照做关闭)。 */
 rt_bool_t   sp_epoch_exhausted(void);
 rt_uint32_t sp_epoch(void);
@@ -265,6 +327,13 @@ rt_base_t   sp_win_begin(void);
 void        sp_win_end(rt_base_t saved);
 rt_bool_t   sp_recovery_start(rt_uint32_t *ticket);        /* 需 inhibit 且非 exhausted */
 rt_err_t    sp_recovery_probe_off(rt_uint32_t ticket, sp_proof_t *out);
+/* CP4 K4(§6.3): 恢复复核**之后**在窗口外发现的问题(LOW 回读未确认、确认提交被拒、
+ * ENN 再确认失败)同样是新失败 —— 本函数在票据仍成立的那个代里换 epoch + 保持抑制 +
+ * 留 pending, 使旧票据自然失效(不是只有 pe!=EOK 才换代)。
+ * 票据已被更新的一代取代时返回 -RT_EINTR 且**不改任何状态**。
+ * 返回: EOK=已按新失败换代; -RT_EPERM=撞顶(抑制与 exhausted 保持); -RT_EINTR=过期。 */
+rt_err_t    sp_recovery_note_failure(rt_uint32_t ticket, rt_uint32_t code,
+                                     rt_uint32_t events, sp_proof_t *out);
 rt_bool_t   sp_recovery_valid(rt_uint32_t ticket, sp_proof_t *proof);
 /* 已在窗口内的调用方专用的两个视图(不再自己开关中断): 慢整理的最终提交窗口要
  * "身份检查 + 抄镜像"同窗, 视图本身不得再开一层窗口。 */

@@ -114,6 +114,13 @@ struct rt_thread
 };
 typedef struct rt_thread *rt_thread_t;
 
+/* CP4 K5(§7): 生产代码的可等待/可打印上下文门需要的两条真实 RT-Thread API。
+ * I/O 链同样是单线程模型: 中断嵌套由 io_isr_set() 显式置位, rt_thread_self() 在
+ * 已屏蔽窗口内返回空(与目标上 PRIMASK 期内不许 mdelay/打印同一事实)。 */
+rt_bool_t   rt_interrupt_get_nest(void);
+rt_thread_t rt_thread_self(void);
+void        io_isr_set(int v);
+
 rt_err_t      rt_thread_init(struct rt_thread *t, const char *name,
                              void (*entry)(void *), void *param,
                              rt_uint8_t *stack, rt_uint32_t stack_size,

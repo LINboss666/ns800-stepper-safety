@@ -425,6 +425,31 @@ rt_err_t safety_transition(safety_state_t next)
     { shim_state = next; return RT_EOK; }
     return -RT_EPERM;
 }
+/* CP4 K1/K2(§3/§4.2): 生产侧新增的身份化状态提交端口。本链不编 safety_state.c,
+ * 所以这里按**与原 safety_transition 相同的白名单语义**实现, 并单独计数 ——
+ * 于是"旧命令跨越换代写状态机"这类形状在本链仍然可观测, 而不是被桩蒙混过去。
+ * expected_epoch 在桩里**不参与**判定(协调层的真实代次判定由 stop_priority 生产码
+ * 负责, 本链照样编到它)。 */
+int shim_transition_held_calls, shim_transition_for_calls;
+rt_err_t safety_lock_take_checked(void) { return RT_EOK; }
+void     safety_lock_give_checked(void) { }
+rt_err_t safety_transition_held(rt_uint32_t expected_epoch, safety_state_t next)
+{
+    (void)expected_epoch;
+    shim_transition_held_calls++;
+    if (next == SAFETY_RUN) shim_transition_to_run++;
+    if ((shim_state == SAFETY_READY && next == SAFETY_RUN) ||
+        (shim_state == SAFETY_RUN && next == SAFETY_READY)  ||
+        (next == SAFETY_FAULT_LATCHED))
+    { shim_state = next; return RT_EOK; }
+    return -RT_EPERM;
+}
+rt_err_t safety_transition_for(rt_uint32_t expected_epoch, safety_state_t next)
+{
+    shim_transition_for_calls++;
+    return safety_transition_held(expected_epoch, next);
+}
+
 void safety_force_shutdown(rt_uint32_t code) { shim_state = SAFETY_FAULT_LATCHED; shim_fault = code; }
 void safety_enter_fault(rt_uint32_t code)    { shim_state = SAFETY_FAULT_LATCHED; shim_fault = code; }
 rt_err_t safety_post_event(rt_uint32_t event)

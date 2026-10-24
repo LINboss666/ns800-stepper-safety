@@ -20,6 +20,7 @@
 
 #include <rtthread.h>
 #include "app_health.h"
+#include "stop_priority.h"   /* CP4 §5.3: 一次操作的结果摘要要带身份与 proof */
 
 #define TMC_ADDR_DEFAULT 0    /* 单芯片网络, 默认 slave 地址 0 */
 
@@ -243,6 +244,32 @@ rt_err_t tmc2209_config_integrity_check(void);
  * (状态无法原子读取, 不猜)。链路/复位后的真实值由
  * tmc2209_config_integrity_check() 在 arm 决策点、start 起转前与运行期守卫把关。 */
 rt_bool_t tmc2209_drive_config_ok_for_arm(void);
+
+/* ---------- CP4 K3(§5.3): 一次操作自带的结果摘要 ----------
+ * TMC 的失败**不能**只通过一个裸 rc 交回给 Motor, 再由 Motor 投递事件重新保护一遍:
+ * 那既会在同一波错误里产生第二轮关断, 也会让 Motor 重采 epoch 给自己的旧动作续命。
+ * 本结构是那一次操作**自己**的结论: 原 epoch、原始 rc、保护到底是谁做的、以及那一次
+ * 保护带回的 proof。
+ * ⚠ 只有生产实例(串行化在配置事务内)可能产生保护; 自测的局部假实例一律 NONE。
+ * ⚠ 不得拿"文件里最后一次结果"跨操作拼接: 每次调用在入口复位这三个字段, 出参只描述
+ *    本次调用(未进入操作就失败时 protect=NONE 且 proof.valid=FALSE)。 */
+typedef struct {
+    rt_uint32_t          op_epoch;   /* 本次操作进入时的协调层代次(命令原身份) */
+    rt_err_t             rc;         /* 本次操作的原始结论, 不做美化 */
+    sp_protect_outcome_t protect;    /* 本次保护 / 同一次已保护 / 过期丢弃 / 未保护 */
+    sp_proof_t           proof;      /* protect != NONE 时是那一次保护带回的事实 */
+    rt_bool_t            prod;       /* FALSE = 自测局部实例(从未碰生产模块) */
+} tmc_op_result_t;
+
+/* 带调用方原身份的复核: expected_epoch 必须是**这条命令在第一次可能等待之前**采到的
+ * 代次(arm / start / 运行守卫各用自分快照), expected_epoch=0 才退回"就地采样";
+ * 序列里的失败保护也绑在这份身份上。out 可以为 NULL(只要裸返回值)。 */
+rt_err_t tmc2209_config_integrity_check_for(rt_uint32_t expected_epoch,
+                                           tmc_op_result_t *out);
+
+/* 无等待读取配置有效性摘要的代次(CP4 §8.2: Core 的 HIGH 与 ARMED 提交要核对
+ * "授权那次 HIGH 的摘要代次未变")。不取锁、不碰 UART、不延时。 */
+rt_uint32_t tmc2209_config_view_generation(void);
 
 /* 已下发配置的只读快照(供诊断显示; 未成功下发过则返回 RT_FALSE)。 */
 rt_bool_t tmc2209_get_applied_config(rt_uint32_t *gconf, rt_uint32_t *chop,
