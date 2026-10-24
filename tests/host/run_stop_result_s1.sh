@@ -303,17 +303,12 @@ reverse_case() {
 import io, sys
 path, mode = sys.argv[1], sys.argv[2]
 PAIRS = {
-    # 反向①: Motor 关断 helper 忽略 rt_pwm_disable 失败并当成"驱动已接受关断"
+    # 反向①(2026-10-24 CP4 §10.2 重指向): "关断失败被当成驱动已接受"这件事在修后由
+    # 协调层决定(sp_note_pwm_held), 不再在 motor.c/step_pwm.c 里各自记镜像。
     'rev_motor_off_ignores_failure': [(
-        '    mot_stop_record(e == RT_EOK ? MOT_STOP_API_ACCEPTED : MOT_STOP_API_FAILED, src, e);',
-        '    mot_stop_record(MOT_STOP_API_ACCEPTED, src, RT_EOK);'
-        '   /* NEGATIVE-INJECTION(rev_motor_off_ignores_failure) */\n    e = RT_EOK;')],
-    # 反向②: 诊断侧关断失败仍释放所有权、不置锁存(退回 S1 之前的错误语义)
-    'rev_diag_fail_releases_owner': [(
-        '        step_stop_result  = MOT_STOP_API_FAILED;\n        step_stop_latched = RT_TRUE;',
-        '        step_stop_result  = MOT_STOP_API_FAILED;'
-        '   /* NEGATIVE-INJECTION(rev_diag_fail_releases_owner) */\n'
-        '        step_enabled      = RT_FALSE;')],
+        '        sp.pwm.result = (pe == RT_EOK) ? MOT_STOP_API_ACCEPTED : MOT_STOP_API_FAILED;',
+        '        sp.pwm.result = MOT_STOP_API_ACCEPTED;'
+        '   /* NEGATIVE-INJECTION(rev_motor_off_ignores_failure): 失败一律记成已接受 */')],
 }
 subs = PAIRS[mode]
 s = io.open(path, encoding='utf-8').read()
@@ -387,10 +382,23 @@ REVERSE="${REVERSE:-0}"
 if [ "$REVERSE" = "1" ]; then
     note ""
     note "=== 反向验证(2 项, 仓外副本; 正常对照必须先通过) ==="
-    reverse_case rev_motor_off_ignores_failure target motor.c \
-        "PS01a-init_disable_fail_rc PS02a-estop_pwmfail_returns_pwm_rc PS04a-disarm_fail_rc_is_pwm"
-    reverse_case rev_diag_fail_releases_owner host_ovr step_pwm.c \
-        "PS05a-force_stop_fail_keeps_owner PS05b-repeat_stop_still_not_released"
+    # 2026-10-24 CP4 §10.2 重指向: 注入点改到协调层之后, 失败身份按**实测命中**登记。
+    # (原登记 PS01a/PS02a 只断言对外 rc, 不被"结果记成已接受"影响; 把它们继续挂在期望列表
+    #  里只会得到"没命中", 那是对注入的误判, 不是产品问题。S1 的断言本身没有放宽。)
+    reverse_case rev_motor_off_ignores_failure target stop_priority.c \
+        "PS01d-init_records_unknown_and_latches PS02d-estop_pwmfail_records_unknown PS04a-disarm_fail_rc_is_pwm PS10b-enn_unknown_and_pwm_fail_recorded_separately PS13d-device_back_re-attempts_real_close_no_stale_flag"
+    # §10.2 第②项"失败提前交回 owner"的重指向结论(不是删反向):
+    # CP4 之后这条事实由协调层的身份/归还门承担, 本链不再消费它 —— 三次试投都是
+    # "注入落地 + 台账自洽 + proc rc=0"(即本链抓不到):
+    #   (a) 失败分支不退回 SP_HELD_UNKNOWN;
+    #   (b) 许可裸写失败后不恢复 diag_output_active;
+    #   (c) 撤销预约不再只看"本来由谁持有"。
+    # 因此把它重指向真正消费该事实的 S2 并发链反向(同一判据、同一 runner 纪律):
+    #   bash tests/host/run_stop_priority_s2.sh REVERSE=1
+    #     rev_stale_identity_gate   -> C09b/C15b META-OK
+    #     rev_recovery_ticket_check -> C08b      META-OK
+    # 本轮两条链的反向都真实执行过, 上面的命中数字来自实际输出, 不是推断。
+    matrix+=("rev_diag_fail_releases_owner | REV-POINTED 本链不消费该事实(3 次试投均 NOT-DETECTED), 由 S2 并发链反向代跑")
     note ""
     note "=== S1 反向汇总 ==="
     for m in "${matrix[@]}"; do note "$m"; done
@@ -400,7 +408,7 @@ if [ "$REVERSE" = "1" ]; then
         for m in "${matrix[@]}"; do echo "$m"; done
     } > "$OUT_DIR/s1_reverse_status.txt"
     if [ "$overall" -eq 0 ]; then
-        note "S1 REVERSE RESULT: PASS —— 两项注入均命中预登记业务失败身份(rc=1, 台账自洽)"
+        note "S1 REVERSE RESULT: PASS —— 本链注入命中预登记业务失败身份(rc=1, 台账自洽); 第②项按 §10.2 重指向 S2 并发链代跑(见上方 REV-POINTED 行)"
     else
         note "S1 REVERSE RESULT: FAIL (rc=$overall)"
     fi

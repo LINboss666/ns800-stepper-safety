@@ -151,6 +151,9 @@ if [ -z "$GCC_RESOLVED" ]; then
     note "FATAL: 未找到可用主机编译器(设 GCC=<路径> 或把 gcc 放进 PATH)"; exit 127
 fi
 GCC="$GCC_RESOLVED"
+# 注入脚本用的 Python(与 S1/SD 链同一约定: PY 可显式覆盖; 默认 python)
+PY="${PY:-python}"
+command -v "$PY" >/dev/null 2>&1 || { note "FATAL: 找不到 Python($PY)"; exit 127; }
 
 RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)-$$"
 OUT_DIR="${S2_OUT_DIR-${S2_WORK-$(env_work_root)/s2}/$RUN_ID}"
@@ -392,6 +395,178 @@ run_variant() {
     matrix+=("$variant | OK 全部 $grp_n 组自洽且必需用例真执行判 PASS (用例=$tot_cases)")
     return 0
 }
+
+REVERSE="${REVERSE:-0}"
+
+# --------------------------------------------------------------------------
+# 反向(§10.3 两项 S2 家族, 只改**仓库外**的生产源码副本)
+#   rev_stale_identity_gate   家族①"去掉旧 token 门": 关掉 sp_off_attempt_for 的
+#                             expected_epoch 早退 => 迟到的旧关断能改写新那一代并真的动硬件。
+#   rev_recovery_ticket_check 家族②"去掉恢复/确认那一侧的 epoch 检查": 关掉
+#                             sp_note_permit_confirmed_for 的身份门(票据/请求电平/写代三者
+#                             必须仍与本次一致) => 过期许可确认照样写进别人那一代。
+#   两次试投记录(不作数字用, 只说明为什么选这两处门): 先试的 sp_recovery_probe_off 票据门
+#   在 recovery 组**没有被任何用例消费**(注入落地、台账自洽、proc rc=0 => NOT-DETECTED),
+#   那一条事实这一批用例不观察; 反向要挑"产品真在被测的那个门"。
+#   判据与 S1/SD 反向同一套: 注入必须真落地(否则 INFRA-FAIL) + 副本构建成功 + 夹具业务
+#   rc=1 + 逐组台账自洽 + 预登记失败身份全部命中; 崩溃/超时/台账不完整一律 INFRA-FAIL,
+#   "编译失败"与"没跑起来"都不算检出。
+#   ⚠ §10.3 家族①的另一半("去掉真实危险写")与家族②的另一半("去掉真实 TX/flush 预算")
+#     不在本轮: 它们要求把 drv_epwm.c / drv_uart.c 的真实叶子编进主机链(见 §11 未执行)。
+# --------------------------------------------------------------------------
+reverse_s2() {
+    local name="$1" variant="$2" groups="$3" ids="$4"
+    local work exe brc proc_rc rc id hit=0 miss=0 grp out marker vres extra miss_ids=""
+    work="$OUT_DIR/reverse/$name"
+    rm -rf "$work"; mkdir -p "$work/app" || { note "  $name: 无法建副本目录"; remember 4; return; }
+    cp "$SRC_APP/stop_priority.c" "$work/app/stop_priority.c" || { note "  $name: 副本失败"; remember 4; return; }
+    cp "$SRC_APP"/*.h "$work/app/" 2>/dev/null
+
+    cat > "$work/inject.py" <<'PYEOF'
+import io, sys
+path, mode = sys.argv[1], sys.argv[2]
+PAIRS = {
+    # 两道门在文件里各有同形的孪生(sp_trip_for_operation / sp_recovery_note_failure),
+    # 所以锚点带上下一行, 保证命中恰好一次 —— 命不中就判 INFRA-FAIL, 不猜。
+    'rev_stale_identity_gate': [(
+        '    if (sp.epoch != expected_epoch)\n'
+        '    {\n'
+        '        sp.stale_dropped++;\n'
+        '        sp_copy_proof_held(out);',
+        '    /* NEGATIVE-INJECTION(rev_stale_identity_gate): 关断不再核对调用方原身份 */\n'
+        '    if (RT_FALSE)\n'
+        '    {\n'
+        '        sp.stale_dropped++;\n'
+        '        sp_copy_proof_held(out);')],
+    # sp_note_permit_confirmed_for 与 sp_note_enn_confirmed_for 的门**逐字同形**, 所以锚点
+    # 必须从函数名开始, 否则命中 2 次(实测过), 那就是"注入没落到指定的那一道门"。
+    'rev_recovery_ticket_check': [(
+        'rt_err_t sp_note_permit_confirmed_for(rt_uint32_t expected_epoch,\n'
+        '                                      rt_uint8_t requested_level, rt_err_t rc)\n'
+        '{\n'
+        '    rt_base_t l = sp_win();\n'
+        '    rt_err_t  e;\n'
+        '\n'
+        '    if (sp.epoch != expected_epoch || sp.permit.request_level != requested_level ||\n'
+        '        sp.permit.write_epoch != expected_epoch)',
+        'rt_err_t sp_note_permit_confirmed_for(rt_uint32_t expected_epoch,\n'
+        '                                      rt_uint8_t requested_level, rt_err_t rc)\n'
+        '{\n'
+        '    rt_base_t l = sp_win();\n'
+        '    rt_err_t  e;\n'
+        '\n'
+        '    /* NEGATIVE-INJECTION(rev_recovery_ticket_check): 异代的许可确认照样写进那一代 */\n'
+        '    if (RT_FALSE)')],
+}
+subs = PAIRS[mode]
+s = io.open(path, encoding='utf-8').read()
+out = s
+for old, new in subs:
+    n = out.count(old)
+    if n != 1:
+        sys.stderr.write('INJECT-FATAL: anchor hits %d (want 1): %s\n' % (n, old[:60]))
+        sys.exit(1)
+    out = out.replace(old, new, 1)
+io.open(path, 'w', encoding='utf-8', newline='').write(out)
+print('injected mode=%s replacements=1' % mode)
+PYEOF
+
+    if ! "$PY" "$work/inject.py" "$work/app/stop_priority.c" "$name" > "$work/inject.txt" 2>&1; then
+        cat "$work/inject.txt"
+        note "  $name: 注入未落地 => 判基础设施故障, 不当作检出"
+        matrix+=("$name | INFRA-FAIL 注入未落地"); remember 4; return
+    fi
+    grep -q "NEGATIVE-INJECTION" "$work/app/stop_priority.c" || {
+        note "  $name: 副本里没有注入标记"; matrix+=("$name | INFRA-FAIL 无注入标记")
+        remember 4; return; }
+
+    exe="$work/conc.exe"
+    extra="$(variant_flags "$variant")"
+    # shellcheck disable=SC2086
+    "$GCC" $FLAGS $extra -I "$SHIM_DIR" -I "$work/app" -I "$SRC_APP" -I "$HAL_DRV" \
+        -I "$COMPAT_DIR" "$S2_MAIN" -o "$exe" > "$work/build.txt" 2>&1
+    brc=$?
+    if [ "$brc" -ne 0 ]; then
+        tail -15 "$work/build.txt"
+        note "  $name: 注入副本编译失败 rc=$brc => INFRA-FAIL(编译失败不算检出)"
+        matrix+=("$name | INFRA-FAIL 构建失败 rc=$brc"); remember 4; return
+    fi
+
+    for grp in $groups; do
+        out="$work/${variant}_${grp}_out.txt"; marker="$work/${variant}_${grp}.marker"
+        printf 'LAUNCHED\n' > "$marker"
+        timeout "$GROUP_TIMEOUT" "$exe" "$grp" > "$out" 2>&1
+        proc_rc=$?
+        printf 'DONE rc=%s\n' "$proc_rc" > "$marker"
+        cat "$out" >> "$work/all_out.txt"
+        case "$proc_rc" in
+          1) : ;;
+          0) note "  $name/$grp: 注入后仍然全通过 => 没检出"
+             matrix+=("$name/$grp | NOT-DETECTED 注入后链仍全部通过(proc rc=0)")
+             detected_fail=1; remember 1; continue ;;
+          124) matrix+=("$name/$grp | INFRA-FAIL 墙钟超时 rc=124(不算检出)")
+             remember 4; continue ;;
+          *) matrix+=("$name/$grp | INFRA-FAIL 异常退出 rc=$proc_rc(不算检出)")
+             remember 4; continue ;;
+        esac
+        validate_group_ledger "$out" "$grp" "$variant" >/dev/null 2>&1
+        vres=$?
+        if [ "$vres" -eq 2 ] || [ "${g_sum_prebad:-0}" -ne 0 ]; then
+            matrix+=("$name/$grp | INFRA-FAIL 台账不自洽/前置不成立(自报 fail=$g_sum_fail pre_bad=$g_sum_prebad)")
+            remember 4; continue
+        fi
+    done
+
+    # 失败身份在**所有已跑组的合并输出**里各查一次(逐组各查一遍会把同一个 id 数两次)。
+    for id in $ids; do
+        if [ "$(grep -c "^CASE|$id|FAIL|" "$work/all_out.txt")" -ge 1 ]; then
+            hit=$((hit+1))
+        else
+            miss=$((miss+1)); miss_ids="$miss_ids $id"
+        fi
+    done
+
+    if [ "$hit" -eq 0 ]; then
+        matrix+=("$name | NOT-DETECTED 指定失败身份一个都没命中(命中=$hit 缺失=$miss)")
+        detected_fail=1; remember 1; return
+    fi
+    if [ "$miss" -ne 0 ]; then
+        matrix+=("$name | NOT-DETECTED 命中=$hit 缺失=$miss$miss_ids")
+        detected_fail=1; remember 1; return
+    fi
+    matrix+=("$name | META-OK 命中 $hit 个业务失败身份 (variant=$variant groups=$groups 台账自洽 proc_rc=1)")
+}
+
+if [ "$REVERSE" = "1" ]; then
+    note ""
+    note "=== 对照组: 反向之前必须先跑完整正常链 ==="
+    for v in $VARIANTS; do run_variant "$v"; done
+    if [ "$overall" -ne 0 ]; then
+        note "正常对照未通过(rc=$overall) => 不执行反向(反向结论只在干净对照之上才有意义)"
+        exit "$overall"
+    fi
+    matrix=()
+    note ""
+    note "=== S2 反向(2 项家族, 仓外副本; 正常对照已先通过) ==="
+    reverse_s2 rev_stale_identity_gate host_ovr "identity stale" \
+        "C09b-late-actions-rejected-no-write C15b-old-identity-rejected-no-write"
+    reverse_s2 rev_recovery_ticket_check host_ovr "identity" \
+        "C08b-stale-confirm-rejected"
+    note ""
+    note "=== S2 反向汇总 ==="
+    for m in "${matrix[@]}"; do note "$m"; done
+    {
+        echo "S2_REVERSE_RC=$overall"
+        echo "run_id=$RUN_ID"
+        for m in "${matrix[@]}"; do echo "$m"; done
+    } > "$OUT_DIR/s2_reverse_status.txt"
+    if [ "$overall" -eq 0 ]; then
+        note "S2 REVERSE RESULT: PASS —— 两项注入均命中预登记业务失败身份(rc=1, 台账自洽)"
+    else
+        note "S2 REVERSE RESULT: FAIL (rc=$overall)"
+    fi
+    exit "$overall"
+fi
 
 for v in $VARIANTS; do
     note ""

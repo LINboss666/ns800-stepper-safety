@@ -38,6 +38,11 @@
 #define SP_BARRIER() __atomic_thread_fence(__ATOMIC_SEQ_CST)
 #endif
 
+/* 读 PRIMASK 的原语(仅目标分支使用, 见 sp_intr_masked)。 */
+#if defined(__ARM_ARCH) && (__ARM_ARCH >= 7)
+#define SP_READ_PRIMASK(v)  __asm__ __volatile__ ("mrs %0, primask" : "=r"(v))
+#endif
+
 /* R5(2026-10-23): 新增的生产接口(HIGH / RUN)自己守编译期许可, 不依赖"每个调用者
  * 永远不出错"。这两个宏就是目标工程里那份公开配置(motor.h / project_board.h),
  * 主机夹具要么用真实头, 要么在命令行显式 -D 覆盖 —— 两条构建走同一分支逻辑。 */
@@ -105,8 +110,16 @@ static void sp_end(rt_base_t l)
 
 rt_bool_t sp_intr_masked(void)
 {
+    rt_uint32_t pm = 0u;
+
 #if defined(__ARM_ARCH) && (__ARM_ARCH >= 7)
-    if (__get_PRIMASK() != 0u) return RT_TRUE;
+    /* 目标: 读**真实** PRIMASK —— 别人屏蔽的窗口也算(只靠本模块的嵌套计数会把
+     * "别处已关中断"说成可以打印/可以忙等)。与上面的 __DSB 同一条原则: 这条原语
+     * 由本模块自带, 不依赖上游是否恰好包含了 CMSIS 设备头。 */
+    SP_READ_PRIMASK(pm);
+    if (pm != 0u) return RT_TRUE;
+#else
+    (void)pm;
 #endif
     return (sp_win_nest > 0) ? RT_TRUE : RT_FALSE;
 }
