@@ -5,15 +5,18 @@
   "branch": "phase8/tmc-drive-config",
   "base_commit": "1348eb098ce51e40303b2685bce19d67da67e276",
   "cp1_commit": "6726fa60721c1da2ec578a15a04d2ca899e470d3",
-  "head_commit": "51385772a7aed9b367a1ad5e33c80d7283e5d225",
-  "tested_commit": "51385772a7aed9b367a1ad5e33c80d7283e5d225",
-  "remote_push": "NOT_PUSHED (本轮记录; 下一步随最终交接推送并 ls-remote 回读)",
-  "overall_status": "IN_PROGRESS",
+  "head_commit": "bcdec631266239008734271ba75beab435bf30eb",
+  "tested_commit": "bcdec631266239008734271ba75beab435bf30eb",
+  "remote_push": "PUSHED; ls-remote 回读 refs/heads/phase8/tmc-drive-config = bcdec631266239008734271ba75beab435bf30eb 与本地 HEAD 一致; [D.0] 七个文件 7/7 blob SHA 与 7/7 字节长度均已由复审端独立核对",
+  "overall_status": "SOFTWARE_REVIEW_GO_REGISTERED (限定软件与主机验证合同) / AWAITING_USER_DECISION",
   "checkpoint_status": {
     "CP1": "实现完成 + Keil 0/0 + 仓外单线程冒烟 67/67",
     "CP2": "实现完成 + Keil 0/0; 预算链路真执行为 0",
     "CP3": "R1-R6 实现修复完成 + §10.2 修后证明 13/13 + 夹具接入 6/7 项完成 + 四条既有链与 Keil 全绿；**第 6 项(反向锚)与 S2-C01..C20 未执行**",
-    "CP4": "未开始(C01-C20 与两类反向仍在)"
+    "CP4": "已完成(0fdd080->2fbac9a/5138577): K1-K6 + 并发夹具 C01..C20 部分 + 修后证明; 复审 bd8548c 时确认两项 P1 已修, 整体仍 IMPLEMENTATION_REWORK",
+    "CP5": "已完成(bd8548c): 真实 HAL 叶子接入 + C10/C16/C17/C18 真执行 + 五项反向家族; 独立复审确认两项 P1, 剩余三组转 CP6",
+    "CP6": "已完成并收口(c84457b 代码/证据 + bcdec631 交接): §2 EPWM 纳秒换算、§3 真实 cfg/xfer 叶锁有界等待、§4 N7 实际身份根因与取证原文; 复审给出 SOFTWARE_REVIEW_GO(接受 bcdec631), 无新增必须返修的生产缺陷",
+    "GO 登记轮": "本文档轮(纯文档): 生产/夹具/runner/工程零改动 => 未重跑任何链; 登记件 reports/reviews/phase8-stop-priority-s2-integrated/go_registration_cp6.txt, 证据 [E] 段含本地现存 CP6 Keil 全文"
   },
   "modified_files": [
     "applications/stop_priority.h (新增)",
@@ -105,11 +108,11 @@
     "drv_epwm configuration_convert 在冻结模式下取 signal_freq 未初始化(随计数模式取源变更一并消除); 其频率后果未上板验证"
   ],
   "next_steps": [
-    "建 shim_s2 + sp_conc_main.c + run_stop_priority_s2.sh, 真执行 S2-C01..C20(target/host_ovr 分测)",
-    "S2 两类反向 + S1 两项反向锚点重指(逐失败身份, 不用崩溃/编译失败算检出)",
-    "再一次集中回归 + Keil + 交接 + push + ls-remote 回读"
+    "准备目标机测量与后续集成验收任务书(复审 §5): 把窗口时长、实际预算、输出/许可关断表现与开放风险(B-1/M-2/M-3、RISK-03/03a、RISK-04-b、BUG-008)逐项对应",
+    "实际板级执行沿用另行授权门: 本轮与 GO 本身都不授予烧录/串口/GPIO/TMC/STEP/电机/Flash/供电/接线/SW1/清故障/selftest 权限",
+    "后续若改动生产实现或夹具, 按实际变更重新检查; 未变代码不机械重跑全部历史链"
   ],
-  "stop_claim": "STOP: AWAITING_INDEPENDENT_IMPLEMENTATION_REVIEW; Agent 不自授 SOFTWARE_REVIEW_GO; 无板级/串口/GPIO/TMC/STEP/电机授权; 四宏保持 RT_FALSE; RISK-03/03a 与物理 RISK-04-b 继续开放",
+  "stop_claim": "STOP: SOFTWARE_REVIEW_GO_REGISTERED(限定软件与主机验证合同) / AWAITING_USER_DECISION; 无烧录/串口/GPIO/TMC/STEP/电机/Flash/SW1 权限; 四宏保持 RT_FALSE; RISK-03/03a、物理 RISK-04-b、M-2、BUG-008 继续开放; 本 Agent 不自行启动目标机测量或 F2e/F3",
   "cp3_task_book": "NS800_S2_CP3_Review_and_Completion_Task_4641d49_20261023.md",
   "cp3_baseline_commit": "4641d491c6ff1251730c99f6ad14eb4424f1dbac",
   "cp3_fixes": {
@@ -153,7 +156,9 @@
   "evidence_files_new": [
     "reports/reviews/phase8-stop-priority-s2-integrated/cp3_baseline_observation.txt",
     "reports/reviews/phase8-stop-priority-s2-integrated/cp3_post_fix_proofs.txt",
-    "reports/reviews/phase8-stop-priority-s2-integrated/cp3_host_chains.txt"
+    "reports/reviews/phase8-stop-priority-s2-integrated/cp3_host_chains.txt",
+    "reports/reviews/phase8-stop-priority-s2-integrated/go_registration_cp6.txt",
+    "reports/reviews/phase8-stop-priority-s2-integrated/cp4_baseline_observation.txt#E"
   ],
   "cp4_task_book": "NS800_S2_CP3_Independent_Review_and_CP4_Task_0fdd080_20261024.md",
   "cp4_task_id": "phase8-stop-priority-s2-cp4",
@@ -213,7 +218,7 @@
   "cp4_status": "S2 CP4 六组返修已实现并同批验收; S2 整体仍 IN_PROGRESS; Agent 不声称 SOFTWARE_REVIEW_GO",
   "head_commit_prev_cp3": "776a91e669dcac84e53d49e4838611a2a4454705",
   "tested_commit_prev_cp3": "776a91e669dcac84e53d49e4838611a2a4454705",
-  "tested_commit_note": "CP4 终字节: Keil Rebuild All、全部主机链与 12 项修后证明都取自该提交的 git archive 干净导出(无脏文件)",
+  "tested_commit_note": "CP6 定稿字节: 复审端在 bcdec631 上独立复跑 S1/S2 正反向、真实叶子四组、20006 次数值检查、上下文机制探针与三段重生成; c84457b..bcdec631 只改交接 MD/JSON => 生产与测试字节等同 c84457b",
   "cp5_addendum": {
     "date": "2026-10-24",
     "task_id": "phase8-stop-priority-s2-hal-closeout",
@@ -384,5 +389,53 @@
       "板上仍按 USER_REPORTED_E40; SD 数据语义本批未改; CP4 六份不可恢复 stdout 未重造"
     ],
     "stop_claim": "STOP: AWAITING_INDEPENDENT_IMPLEMENTATION_REVIEW; NO SOFTWARE_REVIEW_GO claimed by Agent"
+  },
+  "go_registration": {
+    "review_document": "NS800_S2_CP6_Independent_Review_SOFTWARE_REVIEW_GO_bcdec631_20261025.md",
+    "decision": "SOFTWARE_REVIEW_GO（限定 S2 生产实现 + 本次声明的主机验证合同）",
+    "accepted_sha": "bcdec631266239008734271ba75beab435bf30eb",
+    "implementation_sha": "c84457b3e4f8960d14a750e87553b33c845d71a2",
+    "rework_base_sha": "bd8548cce8dfc7643dfc8dfa0884d5d2ea940d4d",
+    "production_content_equals": "c84457b（c84457b..bcdec631 仅改交接 MD/JSON，生产与测试字节相同）",
+    "scope_of_batch": "bd8548c..bcdec631 = 10 路径 +1510/-117；生产改动仅 drv_epwm_leaf.inc，其余为夹具、生成源、runner、交接与证据",
+    "items_closed": [
+      "CP6 §2 EPWM 纳秒换算 + 窄化前范围检查 + 门外分频选择（数值/代码边界关闭）",
+      "CP6 §3 cfg/xfer 真实叶锁的有界等待、min(cap,remaining)、恰好一次保护与先保护后日志",
+      "CP6 §4 N7 按实际失败身份关闭夹具级屏蔽位串扰 + 取证原文入库 + [C.10] 引用更正"
+    ],
+    "new_blocking_items": "无",
+    "independent_reruns": {
+      "s1": "target 50/50、host_ovr 65/65，进程 rc=0、台账自洽",
+      "s1_reverse_1": "META-OK，命中预登记 5/5 失败身份，业务进程 rc=1",
+      "s1_reverse_2": "由 S2 rev_fail_returns_owner_early 真注入具名检出；REV-HANDED-OFF 不单独算检出",
+      "s2_forward": "target 17 组 23/23；host_ovr 17 组 79/79；pre_bad=0；SKIP 行 target 14 / host_ovr 1",
+      "s2_reverse": "五类反向全部 META-OK（旧关闭身份/许可确认身份/配置写 token/TX-flush 预算/失败提前归还 owner），每类业务进程 rc=1 且台账完整",
+      "leaf_groups": "EPWM 10/10、TMC 锁 15/15、UART 7/7、预算 6/6（含在 79 条之内）",
+      "epwm_extra_probe": "samples=20006 fail=0 prepare_register_writes=0 worst_updown_period_error_ns=2560；开 undefined 与 float-cast-overflow 后构建与运行均 rc=0 且无诊断",
+      "n7_context_probe": "修前 other_thread_in_window=1 main_masked=1 main_self_present=0 tmc_wait_allowed=0；修后 …=0 …=1 …=1（双线程屏障固定同一接缝）",
+      "generators": "三段生成器仓外重生成 rc=0；CRLF→LF 归一化后与已提交夹具完全一致",
+      "handoff_json": "实际 json.loads 解析成功",
+      "fixture_unpatched": "原夹具可直接运行，无需 CP5 时的仓外条件变量修补；仅 -mthreads→-pthread 参数适配，生产与仓内夹具未打补丁"
+    },
+    "agent_reported_only": {
+      "v1_v2": "V1=25/0/0/0、V2=22/0/0/0",
+      "io": "四变体 27/29/40/42 + 非法宏值拒绝编译",
+      "negatives": "13/13 OK（N7 的 V1/V2=RAN/0/3）",
+      "meta_negatives": "M1..M5 META-OK",
+      "keil": "Rebuild All 0 Error / 0 Warning，Code=173762 RO=76806 RW=2188 ZI=83784；全文已追加为证据 [E.3]；[C.6] 是 CP4 批次原文，不得当作 CP6 构建日志",
+      "n7_ab": "同负载 A/B：修前 24 次命中 2 次 FD7/FD8 签名（rc=1/FAIL=6/MISSING=3），修后 24/24 全部 rc=3/0 FAIL/3 MISSING"
+    },
+    "corrections_registered": [
+      "[C.10] 中「另一次全量运行 OK=13」缺留存工件支撑，已按实际两份日志更正（[D.2b]），旧引用不再用于当前通过判据",
+      "runner 的 `| xargs note` 状态输出缺陷已修；交接 JSON 一处非法转义已修（此前整份无法解析）",
+      "复审 §4 的空白检查提示（证据引用空行尾空格）为非阻断项，按「不改写原始结果来做绿」保留原样"
+    ],
+    "not_covered": [
+      "目标 RT-Thread 调度、PWM 物理波形、最坏停机时延（RISK-03/03a）",
+      "BUG-008 实测波形/频率/占空比与停机电气表现；物理 RISK-04-b；M-2 同实例其它通道",
+      "任何硬件动作权限（烧录/复位/串口/调试器/设备扫描/GPIO/TMC/STEP/电机/Flash/供电/接线/SW1/真机清故障/selftest）—— 均未授予，板上仍 USER_REPORTED_E40"
+    ],
+    "next_phase_pointer": "目标机测量与后续集成验收任务书（沿用另行授权门）；S1/F2d 已接受范围保留；SD 语义未改不重复执行",
+    "this_round_reruns": "无 —— 纯文档轮，生产/夹具/shim/runner/Keil 工程零改动"
   }
 }

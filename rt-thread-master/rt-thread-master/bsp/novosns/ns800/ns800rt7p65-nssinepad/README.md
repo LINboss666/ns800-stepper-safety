@@ -117,6 +117,32 @@
   任务书未下达**。四道宏仍 `RT_FALSE`，板上仍 `USER_REPORTED_E40`，RISK-03/03a 与 RISK-04-b 开放，
   `sw1_cut.ps1` T-01/T-02 仍 HOLD。状态 **`STOP: SOFTWARE_REVIEW_GO_REGISTERED / AWAITING_USER_DECISION`**。
 
+  **2026-10-24/25 下一主线 S2（停机优先协调层）已实现并收口，`SOFTWARE_REVIEW_GO` 接受
+  `bcdec631266239008734271ba75beab435bf30eb`**（件
+  `NS800_S2_CP6_Independent_Review_SOFTWARE_REVIEW_GO_bcdec631_20261025.md`；登记件
+  `reports/reviews/phase8-stop-priority-s2-integrated/go_registration_cp6.txt`，交接
+  `phase8-stop-priority-s2-integrated.md/.json`）。轮次链：设计 v1/v2 `f4b47e3`→`1348eb0`
+  （设计审查 `DESIGN_REWORK` 后修正）→ CP1 `6726fa6`（`stop_priority.c/.h` + Motor/诊断/状态机/
+  恢复闭环）→ CP2 `776a91e`（TMC/UART 真预算 + 错误先保护）→ CP3 `0fdd080`（R1–R6）→
+  CP4 `5138577`（K1–K6 + 并发夹具）→ CP5 `bd8548c`（**真实 HAL 叶子**接入 + 五项反向家族）→
+  CP6 `c84457b`/`bcdec63`（EPWM 纳秒换算、真实 cfg/xfer 叶锁有界等待、N7 实际身份根因）。
+  关闭的三组：**§2** `drv_epwm_leaf.inc` 的 prepare 按纳秒与真实计数关系（UP_DOWN 一周期
+  = 2·TBPRD、UP/DOWN = TBPRD+1）全 uint64 计算，TBPRD/CMP **先判 16 位可表达再窄化**，默认分频
+  能表达则沿用、低频在门外选合法分频，门内仍只做固定整数写且不写回 TBCTL 计数模式；**§3** 夹具
+  区分 `RT_WAITING_NO`/有限等待/FOREVER，由**另一条真线程**持生产 cfg/xfer 叶锁、业务线程经生产
+  复核与读事务入口竞争，观察到 10/20ms 上限内到期、`min(cap, 剩余预算)`、预算为 0 时不尝试取锁、
+  受理后恰好保护一次（PWM/LOW 各一次 + inhibit/pending + 原身份 proof）且先保护后日志；
+  **§4** N7 负例的漏检按留存原文的实际失败身份（FD7/FD8 六项，`C5e` 当时 PASS）定位为夹具把
+  PRIMASK 屏蔽位做成**进程级全局**、与真 Motor 线程互相串扰，改为线程局部后消除，期望 rc 与断言
+  未放宽。主机链计数：S1 `target 50 / host_ovr 65`、S2 `target 23 / host_ovr 79`（真实叶子四组
+  EPWM 10 / TMC 锁 15 / UART 7 / 预算 6 含在 79 内）、五类反向全部 META-OK；Keil Rebuild All
+  **0 Error / 0 Warning**（`Code=173762 RO=76806 RW=2188 ZI=83784`，全文见证据 [E.3]）。
+  **本 GO 限定软件与主机验证合同**：EPWM 数值与叶锁时间预算都建立在**寄存器模型 + 受控时钟**上，
+  不覆盖目标 RT-Thread 调度、PWM 物理波形与最坏停机时延；`BUG-008`、`RISK-03/03a`、
+  物理 `RISK-04-b`、`M-2`（同 EPWM 实例其它通道用途）继续开放。四道宏仍 `RT_FALSE`，板上仍
+  `USER_REPORTED_E40`，无任何硬件动作权限。下一步按复审 §5 是**准备目标机测量与集成验收任务书**，
+  实际板级执行沿用另行授权门。
+
 ### 引脚映射（冻结，修改需重新做 Pinmux 冲突分析）
 
 | 信号 | 排针 | MCU | RT-Thread Pin | 功能 |

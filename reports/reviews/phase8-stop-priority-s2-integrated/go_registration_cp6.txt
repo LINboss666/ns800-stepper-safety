@@ -1,0 +1,46 @@
+# S2 CP6 独立复审 GO 登记（2026-10-25，Asia/Shanghai）
+# 复审件：NS800_S2_CP6_Independent_Review_SOFTWARE_REVIEW_GO_bcdec631_20261025.md
+# 结论：SOFTWARE_REVIEW_GO —— 限定「S2 生产实现 + 本次声明的主机验证合同」。
+# 本文件只做身份与口径登记，不含新的执行结果；详细原始输出在同目录 cp4_baseline_observation.txt 的 [D]/[E] 段。
+
+## 1) 接受对象与身份
+
+- 本 GO 固定接受对象：`bcdec631266239008734271ba75beab435bf30eb`（远端 `phase8/tmc-drive-config` ls-remote 回读一致）
+- CP6 代码与证据提交：`c84457b3e4f8960d14a750e87553b33c845d71a2`；`c84457b..bcdec631` 只改交接 MD/JSON ⇒ 生产与测试字节相同
+- 返修起点：`bd8548cce8dfc7643dfc8dfa0884d5d2ea940d4d`（CP5 收口，独立复审当时判 IMPLEMENTATION_REWORK）
+- 实际范围：`bd8548c..bcdec631` = 10 路径 / +1510 / −117；**生产改动只有 `libraries/HAL_Drivers/drivers/drv_epwm_leaf.inc`**，
+  其余为夹具（`leaf_main.c`、`sp_conc_main.c`、`host_main.c`）、生成源（`sp_conc_gen/*`）、runner（`run_stop_priority_s2.sh`）、交接与证据
+- 身份核对：证据 [D.0] 的 7 个文件 **7/7 Git blob SHA 与 7/7 字节长度**均与远端一致（复审 §1）
+- 冻结引用未动：main `1b3757ee…`、phase7/full-embedded-software `6d3fbc55…`、标签对象 `097935fe…` → 解引用 `e40a9b95…`（板上固件身份）
+
+## 2) 关闭的三组软件阻断（复审 §3）
+
+| 组 | 关闭内容 | 判定 |
+|---|---|---|
+| §2 EPWM 数值 | prepare 按纳秒与真实计数关系算（UP_DOWN=2·TBPRD、UP/DOWN=TBPRD+1），全 uint64 中间量、TBPRD/CMP 先判 16 位可表达再窄化；默认分频能表达则沿用，低频在门外选合法分频；提交仍是 token 门内固定整数写，不写回 TBCTL.CTRMODE | **关闭软件单位与越界问题**；20006 个数值检查 0 失败、prepare 寄存器写 0；BUG-008 波形/实际频率占空比继续开放 |
+| §3 cfg/xfer 叶锁 | 夹具区分 NO/有限/FOREVER；另一条真线程持生产 cfg/xfer 锁，业务线程经生产复核与读事务入口竞争；观察到 10/20 tick 上限内两次到期仍只 PWM/LOW 各一次、原身份 proof/outcome、inhibit/pending、摘要作废、第三方 trylock 与归还平衡 14/14、`min(cap,remaining)=3`、预算为 0 时不尝试取锁 | **关闭缺失的叶锁验证**；时间仍是寄存器模型+受控时钟，目标机等待与最坏停机时长由 RISK-03/03a 承接 |
+| §4 N7 与取证 | 按留存原文的**实际失败身份**（FD7/FD8 六项，C5e 当时 PASS）定位：V1/V2 有真实 Motor 线程，原进程级 `s_intr_masked/s_intr_depth` 使主线程观察到别人的屏蔽位，真实 `tmc_ctx_ok_for_wait()` 据此静默拒绝；改为线程局部后不再串扰；期望 rc、缺席身份与断言均未放宽 | **关闭夹具模型问题**；上轮 C5 接缝静态候选未被冒充为根因；[C.10] 缺工件支撑的「另一次全量 OK=13」已更正（[D.2b]），旧引用不再用于通过判据 |
+
+## 3) 来源等级（复审 §4）
+
+- **云端实际执行**：S1/S2 正反向、真实叶子四组、20006 次数值检查、上下文机制探针、仓外三段重生成、JSON 解析。
+- **远端证据读取 / AGENT_REPORTED**（云端未执行 Windows/Keil 工具链）：V1=25、V2=22；I/O 27/29/40/42 + 非法宏拒绝；
+  负例 13/13、元负例 M1–M5；Keil Rebuild All 0 Error / 0 Warning（Code=173762、RO=76806、RW=2188、ZI=83784）。
+  本批 Keil **全文**已按复审 §4 的许可追加进 `cp4_baseline_observation.txt` 的 [E.3]（未重复构建）；
+  [C.6] 仍是上一批（CP4）的 Keil 原文，不得被说成 CP6 的构建日志。
+- **本 Agent 本地执行**：同负载 N7 A/B（修前 2/24 命中该签名，修后 24/24 干净）与最新 N7 的 V1/V2=RAN/0/3。
+
+## 4) 保留边界与下一步
+
+1. 四目标宏独立源码回读仍 `RT_FALSE`（motor.h:69/:83、project_board.h:51、tmc2209.h:100）；`host_ovr` 只存在于命令行覆盖。
+2. 板上状态继续按 `USER_REPORTED_E40`；BUG-008 波形、RISK-03/03a、物理 RISK-04-b、M-2（同 EPWM 实例其它通道用途）
+   及既有硬件待确认项保持开放；既有 USER_CONFIRMED 静态电气与 SW1 结果保留，不重复索取。
+3. 本 GO **不授予**烧录、复位、串口、调试器、设备扫描、真实 GPIO/TMC/STEP/电机/Flash、供电、接线、SW1、
+   真机清故障或 selftest 权限；不覆盖目标 RT-Thread 调度、PWM 物理波形与最坏停机时延。
+4. S2 软件返修轮在此收口。下一步是**准备目标机测量与后续集成验收任务书**（把窗口时长、实际预算、输出/许可关断表现
+   与开放风险逐项对应），实际板级执行沿用另行授权门；原已接受的 S1/F2d 范围保留，SD 数据语义未改不重复执行。
+5. 复审 §4 的格式提示（证据引用块空行的尾空格）为非阻断项，按「不改写原始结果来做绿」保留原样，登记于此。
+6. 若后续修改相关生产实现或夹具，应按实际变更重新检查；既有未变代码不机械重跑全部历史链。
+
+状态：`STOP: SOFTWARE_REVIEW_GO_REGISTERED（限定软件与主机验证合同）/ AWAITING_USER_DECISION`
+—— 本 Agent 不自行启动目标机测量、F2e/F3 或任何硬件动作。
