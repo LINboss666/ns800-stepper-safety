@@ -307,5 +307,82 @@
       ],
       "verdict_claimed_by_agent": "STOP: AWAITING_INDEPENDENT_IMPLEMENTATION_REVIEW"
     }
+  },
+  "cp6_addendum": {
+    "task_book_id": "phase8-stop-priority-s2-cp6-closeout",
+    "base_commit": "bd8548cce8dfc7643dfc8dfa0884d5d2ea940d4d",
+    "head_commit": "c84457b3e4f8960d14a750e87553b33c845d71a2",
+    "s2_epwm_ns_fix": {
+      "file": "libraries/HAL_Drivers/drivers/drv_epwm_leaf.inc",
+      "shape": "prepare 门外纯 uint64 计算 + 门内固定整数写; 不写 TBCTL.CTRMODE",
+      "oracle": "夹具按 SDK 分因子表反推 ns 周期(不是重算生产公式)",
+      "measured": {
+        "1kHz_50pct": "TBPRD=50000 CMP=25000 counts=100000 反推 1000000ns 界限 +20",
+        "20kHz_50pct": "TBPRD=2500 CMP=1250 反推 50000ns",
+        "20Hz_first_ramp": "选到 cd=3 hs=5 (总分频 80) TBPRD=62500 精确",
+        "1Hz": "选到 cd=7 hs=6 (总分频 1536) TBPRD=65104 反推 999997440ns 误差 2560 <= 15360",
+        "invalid_inputs": "六种非法/不可表达输入全部 -RT_EINVAL + valid=0 + 寄存器写增量 0"
+      },
+      "cases": "epwm_leaf 7 -> 10 (C10g/C10h/C10i 新增, 未删既有断言)"
+    },
+    "s3_leaf_locks": {
+      "condvar_init_fixed": true,
+      "wait_forms": "NO / FOREVER / 有限 timeout 三态可区分, 有限等待每轮 1ms 墙钟 + 1 tick 脚本时钟",
+      "held_by": "另一条真线程用生产 tmc_cfg_lock_take()/tmc_xfer_take() 持有",
+      "entered_via": [
+        "tmc2209_config_integrity_check_for()",
+        "tmc2209_read_register()",
+        "tmc_read_reg()",
+        "tmc_cfg_lock_take()"
+      ],
+      "measured": {
+        "cfg_cap_wait_ms": 10,
+        "xfer_cap_wait_ms": 20,
+        "min_of_cap_and_remaining": "cfg=3 (min(10,3)); xfer=3 (min(20,3))",
+        "zero_budget": "-RT_ETIMEOUT 且取锁调用增量 0",
+        "protect_once": "cuts=1 lows=1 inhibit=1 pending=1(FAULT_TMC_COMM) protect=BY_THIS_CALL proof.valid=1",
+        "permit_high_precondition": "前置观测为 HIGH, 结束时 LOW, HIGH 期间错误打印 0",
+        "take_release_balance": "真实取得 == 真实归还 (14/14)",
+        "non_taker_cannot_release": "第三方 trylock 仍 -RT_EBUSY; 持有者归还后 EOK"
+      },
+      "cases": "tmc_lock 7 -> 15 (C16d/C16d2/C16d3/C16e/C16e2/C16e3/C16f/C16f2)",
+      "production_changed": false,
+      "s2_expect_host_ovr": "68 -> 79"
+    },
+    "s4_n7_root_cause": {
+      "recorded_identity": "V2 CHECK_PASS=15 CHECK_FAIL=6 MISSING_CASE=3 -> PROCESS RC=1; 6 FAIL = FD7a/FD7b/FD7c + FD8a/FD8b/FD8c (apply=-RT_EBUSY)",
+      "task_book_static_candidate": "C5 armed/notify 接缝 —— 本次不成立(那一次 C5e 是 PASS)",
+      "actual_mechanism": "host_main.c 的 PRIMASK 屏蔽位是进程级全局, 而本链有真 motor 线程; 别的线程在窗口内时主线程被判不可等待 -> tmc_ctx_ok_for_wait 静默拒绝",
+      "fix": "屏蔽位/嵌套深度改 __thread (夹具模型, 不改判据/期望 rc/不加 sleep)",
+      "ab_same_load": "修前 24 次: rc=1/FAIL=6 ×2, rc=3/FAIL=0/MISSING=3 ×22; 修后 24 次: 全部 rc=3",
+      "not_a_reproduction_of_original_run": true,
+      "n7_final": "OK | N7_helper_thread_startup_fail | rc 真实=3 自报=3 期望=3 | V1=RAN/0/3 V2=RAN/0/3 (期望 V1=RAN/0/3 V2=RAN/0/3)"
+    },
+    "s4_forensics": {
+      "appended_section": "[D] in reports/reviews/phase8-stop-priority-s2-integrated/cp4_baseline_observation.txt",
+      "preserved_logs_included": [
+        "negatives_flake_record.txt",
+        "negatives.txt"
+      ],
+      "correction": "[C.10] 引用的 OK=13 全量在留存工件里不存在(实际是 OK=9/INFRA-FAIL=3 与 OK=12/NOT-DETECTED=1); 更正登记在 [D.2b], 原文未删除",
+      "runner_note_xargs_fixed": true,
+      "handoff_json_escape_repaired": true
+    },
+    "verification": {
+      "s1": "target 必需 50 条全 PASS; host_ovr 必需 65 条全 PASS; rc=0; 反向: PASS —— 本链注入命中预登记业务失败身份(rc=1, 台账自洽); 第②项按 §10.2 重指向 S2 并发链代跑(见上方 REV-POINTED 行)",
+      "s2": "正向(REVERSE=1 的完整对照阶段): target 17 组 用例=23 全 PASS(SKIP 行 14, 整族按声明跳过); host_ovr 17 组 用例=79 全 PASS(叶子链 epwm_leaf 10 / tmc_lock 15 / uart_leaf 7 / budget_leaf 6, 期望用例数与实跑一致); 5 个反向家族 META-OK ×5 -> S2 REVERSE RESULT=PASS",
+      "v1v2": "V1 rc=0, V2 rc=0; 两份终态: CHECK_PASS=25 CHECK_FAIL=0 BAD_SELFTEST=0 MISSING_CASE=0 | CHECK_PASS=22 CHECK_FAIL=0 BAD_SELFTEST=0 MISSING_CASE=0",
+      "io": "off_target | OK 必需用例=27 全部PASS 自报fail=0 proc_rc=0 (输出 8396 字节); on_target | OK 必需用例=29 全部PASS 自报fail=0 proc_rc=0 (输出 9682 字节); off_ovr | OK 必需用例=40 全部PASS 自报fail=0 proc_rc=0 (输出 23778 字节); on_ovr | OK 必需用例=42 全部PASS 自报fail=0 proc_rc=0 (输出 26194 字节); PASS (rc=0) —— 4 个变体的必需用例全部真执行且判 PASS, 非法宏值被编译拒绝",
+      "negatives": "OK=13 NOT-DETECTED=0 INFRA-FAIL=0; 所有负例按预期被检出且身份齐备; 干净回归通过 (rc=0); N7 本轮判定: OK | N7_helper_thread_startup_fail | rc 真实=3 自报=3 期望=3 | V1=RAN/0/3 V2=RAN/0/3 (期望 V1=RAN/0/3 V2=RAN/0/3)",
+      "meta": "元负例 META-OK 行数=10; 末行: META-OK | M5_wrong_reason_guard",
+      "keil": "Rebuild All 退出码=0; 尾部 0 Error / 0 Warning; 日志 141 行; .inc 包含证据: build/project_rt-thread.dep 列出 drv_epwm_leaf.inc 与 drv_uart_txleaf.inc 各 1 处; 日志尾部 '0 Error(s), 0 Warning(s)', Code=173762 RO=76806 RW=2188 ZI=83784"
+    },
+    "boundaries": [
+      "EPWM ns/计数/分频反推与叶锁时间预算都是寄存器模型+受控时间, 不等于物理验收",
+      "BUG-008 波形/频率/占空比实测、RISK-03/03a、物理 RISK-04-b 继续开放; M-2 保留",
+      "四个目标宏独立源码回读仍 RT_FALSE; 无烧录/串口/真实 GPIO/TMC/STEP/电机/Flash/SW1 动作",
+      "板上仍按 USER_REPORTED_E40; SD 数据语义本批未改; CP4 六份不可恢复 stdout 未重造"
+    ],
+    "stop_claim": "STOP: AWAITING_INDEPENDENT_IMPLEMENTATION_REVIEW; NO SOFTWARE_REVIEW_GO claimed by Agent"
   }
 }

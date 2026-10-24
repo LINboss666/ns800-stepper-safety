@@ -564,3 +564,142 @@ RISK-03/03a and physical RISK-04-b remain open
   实际=1)`, 而三次独立复跑与另一次全量运行都是 `OK=13 / NOT-DETECTED=0 / INFRA-FAIL=0`。
   根因本轮未定位, 作为开放项登记, 不记为通过; 两份原始日志都保留在证据目录
   (negatives.txt 与 negatives_flake_record.txt)。元负例 M1..M5 均 META-OK。
+
+---
+
+## CP6 追加(任务书 `phase8-stop-priority-s2-cp6-closeout`, 接续 bd8548c)
+
+日期: 2026-10-25(Asia/Shanghai)。本轮在同一批里收 §2(EPWM 纳秒换算)、§3(真实 cfg/xfer
+叶锁的有界等待)、§4(N7 根因 + 取证原文)与 §5(集中回归/Keil/交付)。未 rebase、未 force、
+未 merge; 起点 HEAD = `bd8548cce8dfc7643dfc8dfa0884d5d2ea940d4d`, 本轮定稿 = `c84457b3e4f8960d14a750e87553b33c845d71a2`。
+
+### 1. §2 P1: EPWM 换算按纳秒重做, 窄化前先判可表达
+
+生产文件 `libraries/HAL_Drivers/drivers/drv_epwm_leaf.inc` 的 `ns800_epwm_prepare()` 整段
+重写(其余形状一字未改: prepare 门外纯计算 -> token 门内固定整数写, 不写 TBCTL.CTRMODE):
+
+- 单位: 调用方传 ns(RT-Thread PWM 契约、motor.c/step_pwm.c 的 `1000000000u / hz`), 不再把
+  period 当微秒用; SDK 原式把频率小了 1000 倍, 1kHz 请求得到 5.0e7 个计数再窄化成 uint16_t
+  (未定义行为, 云端观察到的 61568 不是合同)。
+- 算法: 全 uint64 整数。`counts = round(period_ns*clk/(div*1e9))`; UP_DOWN 的
+  `TBPRD = round(counts/2)`(一周期 = 2*TBPRD 个计数), UP/DOWN 的 `TBPRD = round(counts)-1`
+  (一周期 = TBPRD+1); 比较值按模式的"高电平计数"关系给(UP: CMP=off; DOWN: scale-off;
+  UP_DOWN: tb-off), 50% 在三种模式下都保持 50%。**先判范围再窄化**: TBPRD 与 CMP 任一超出
+  16 位、或 counts 低于模式下限(UP_DOWN<4 / UP|DOWN<2)、或 period_ns 超出驱动 ns 域(>1e9)、
+  时钟为 0/异常大、计数模式非法(含 STOP_FREEZE)、分频枚举越界 => `-RT_EINVAL`、`valid=0`、
+  零寄存器写。极限占空比的口径写在函数头注释里(需要 CMP=TBPRD+1=65536 的那一端明确拒绝)。
+- 分频因子: 按 SDK 枚举原文分 CLKDIV=2^n 与 HSPCLKDIV=1/2/4/6/8/10/12/14 两张表;
+  **原配分频能表达就沿用**(不引入无关变化), 否则在全组合里取最小可用总分频, 使 20Hz 斜坡
+  首拍与 1Hz 这类合法低频也能表达 —— 正常启动不再"首拍因范围错误而停机"。分频作用于整个
+  EPWM 实例 => M-2 硬件边界保留, 本轮不据此翻宏。
+
+夹具侧(同一批真实叶子, 不是端口桩):
+
+- C10 组从"用生产公式逐句重算"改为**行为反推 oracle**: 夹具按 SDK 枚举自己写分因子表,
+  由 `prepared` 里的枚举/计数反推回 ns 周期与占空比, 断言"请求 ns == 反推 ns(在声明的计数
+  舍入界限内)"。实测: 1kHz/50% -> TBPRD=50000、CMP=25000、counts=100000、反推 1,000,000ns
+  (界限 +20); 20kHz -> TBPRD=2500/CMP=1250/50,000ns; 20Hz 首拍 -> 选到 cd=3,hs=5(总分频 80)
+  TBPRD=62500 精确; 1Hz -> 选到 cd=7,hs=6(总分频 1536)TBPRD=65104, 反推 999,997,440ns,
+  误差 2560ns <= 声明界限 15360ns。
+- 新增 C10g(20kHz 反推)、C10h(20Hz+1Hz 分频选择)、C10i(六种非法/不可表达输入: 0 周期、
+  pulse>period、period 超出 ns 域、非法计数模式、时钟 0、时钟大到不可表达 —— 全部
+  rc=-RT_EINVAL、valid=0、寄存器写增量 0)。C10a..C10f 一条未删, epwm_leaf 由 7 条增至 10 条。
+- 脚本化时钟注入(`leaf_clock_force`)用于 C10i 的时钟无效/不可表达两种情形, 其余用例仍走
+  原 200MHz 链(RCC_getPclk1Frequency 单位 Hz 的依据在 shim_leaf/drv_common.h 里逐行引用)。
+- 旧换算缺陷的观察结论没有删除: [C.8] 里那条"STEP 频率换算分母口径"仍是历史登记, 本轮把它
+  从"未修的既存缺陷"变成"已修 + 有反推用例", 交接里两处并存说明。
+
+### 2. §3 P1 验证缺口: 真实 cfg/xfer 叶锁 + 三种等待形态
+
+夹具 `tests/host/leaf_main.c`:
+
+- 条件变量初始化器修正(`PTHREAD_COND_INITIALIZER`), 叶子链不再被 `[built-in] macro
+  expansion` 警告卡成 INFRA-FAIL; 本轮**没有**任何仓外补丁 —— 叶子链 15+10+7+6 条直接在
+  仓内字节上跑。
+- `rt_mutex_take()` 改成三形态可区分: `RT_WAITING_NO` 一次 trylock; `timeout<0` 真阻塞
+  (FOREVER); 有限 timeout 每轮真实 trylock + ~1ms 墙钟 + 脚本时钟 +1 tick, 走完即
+  `-RT_ETIMEOUT`。记账 `leaf_mtx_takes/taken/timeouts/releases/last_request/last_wait`;
+  不再"任意正数 = FOREVER", 脚本时钟与墙钟 1:1, 不会被别人续期。
+- 新增 8 条(全部由**另一条真线程**用生产 `tmc_cfg_lock_take()` / `tmc_xfer_take()` 取得并
+  持有叶锁, 主业务线程从生产入口进去):
+  - C16d: cfg 叶锁被持有 -> 生产复核入口 `tmc2209_config_integrity_check_for()` 在 10ms 上限
+    内到期(请求值实测 10, 到期次数 +2 = 受理出口 + fail_ctx 再取), 按本次身份(`op_epoch`,
+    先经生产 `sp_reserve`/`sp_release` 真实推进过一代)保护一次: PWM 关断与许可 LOW 各 1 次、
+    inhibit=1、pending=1(FAULT_TMC_COMM)、`protect=BY_THIS_CALL`、`proof.valid=1`, 且前置
+    把许可**观测为 HIGH**(结束为 LOW), HIGH 期间错误打印 0 次, 摘要作废(ok_for_arm=0)。
+    失败出口再取同一把锁也取不到, 但没有第二次关闭(cuts/lows 仍为 1/1)。
+  - C16d2/C16d3: 竞争失败者没把持有者的锁放掉(第三方 trylock 仍 -RT_EBUSY); 持有者真归还后
+    恢复可取; 全程 `真实取得 == 真实归还`(实测 14/14)。
+  - C16e/C16e3/C16e2: xfer 叶锁被持有 -> 生产公开读 `tmc2209_read_register()` 在 20ms 上限内
+    到期(实测请求 20), 零写帧零读请求、出参 value 未被改写; 同一把锁再用"外层预算只剩 3ms"
+    走生产读事务本体 `tmc_read_reg()` -> 等待值 = min(20,3)=3 且 `reason=LOCK_BUSY`;
+    归还后同一入口真读成功(GCONF=0x101)。
+  - C16f/C16f2: cfg 锁 `min(cap=10, 剩余=3)` 实测 3; 预算已尽时 `-RT_ETIMEOUT` 且**取锁调用
+    增量为 0**(不尝试)。
+  - tmc_lock 组由 7 条增至 15 条; 显式用例数 `S2_EXPECT_host_ovr` 68 -> 79(不删断言维持计数)。
+- 生产侧没有为本批改动: §3 要求的八条都在夹具/等待模型上成立, 未发现需要窄修的 TMC 预算或
+  失败出口缺陷(按任务书"没有发现缺陷就不要为了本轮有代码改动改产品")。
+
+### 3. §4 N7 根因(按现存原文的实际身份)与一处夹具模型修复
+
+- 读的是保留下来的 `negatives_flake_record.txt` 那一次(V2 `expected=3 actual=1`)对应的
+  **完整失败身份原文**: V2 `CHECK_PASS=15 CHECK_FAIL=6 BAD_SELFTEST=0 MISSING_CASE=3` ->
+  `PROCESS RC=1`; 六条 FAIL 是 FD7a/FD7b/FD7c + FD8a/FD8b/FD8c(apply=-23, probe 读不到),
+  三条 MISSING 恰是 N7 期望具名的缺席(C7 / FD4 / T14)。**同一次运行里 C5e 是 PASS** ——
+  任务书静态候选的那条 C5 接缝(armed 与 notify 交错)不是这次的根因, 因此没有为它增加会合,
+  也没有放宽任何期望 rc。
+- 实际机制: `tests/host/host_main.c` 的屏蔽位是**进程级全局**, 而本链从 `motor_init()`
+  起有一条真的生产线程(motor.c:1049 `rt_thread_create("motor", ...)`); 斜坡线程进自己的短
+  临界窗口时, 主线程的 `ns800_intr_masked()`/`rt_thread_self()` 一起变成"不可等待",
+  `tmc2209.c:157/:166 tmc_ctx_ok_for_wait()` 按设计**静默**拒绝 -> apply/probe 的读得到
+  -RT_EBUSY -> 六条判据 FAIL; 总返回码按"FAIL 优先于 MISSING"变成 1, 把 N7 的 rc=3 盖住。
+  目标上单核 + PRIMASK 期内不会被调度, 主线程根本观察不到"别人在屏蔽" => 夹具模型缺陷。
+- 修复(最小): 屏蔽位/嵌套深度改成 `__thread`(同一处声明), 判据、期望 rc、断言一字未动,
+  没有增加固定 sleep。同负载 A/B(6 路并发进程压 CPU, 各 24 次):
+  修前 `rc=1/FAIL=6` × 2, `rc=3/FAIL=0/MISSING=3` × 22; 修后 24/24 全部
+  `rc=3/FAIL=0/MISSING=3`。无负载单独复跑 20 次(修前字节)亦全部 rc=3。
+- ⚠ 这不是"重现了原来那一场运行": 是按现存原文的失败身份, 在同一判据下确定性复现并消除。
+  N7 的判定仍由 runner 的逐例预期矩阵给出(具名 MISSING + 真实 rc=3), 不用成功次数投票关项。
+
+### 4. §4 取证原文与 runner 状态输出
+
+- 同一份 `cp4_baseline_observation.txt` 追加 [D] 段(不另建取证平台): 现存两份负例日志全文
+  (`negatives_flake_record.txt` 与 `negatives.txt`, 只做绝对路径前缀的机械替换)、N7 那一次
+  V1/V2 的完整判定行原文、本轮 A/B 分布、定稿字节的最终正向/反向台账与负例/元负例真实退出码,
+  输入 bd8548c 与定稿 blob(带路径)一并登记。CP4 那六份已明确不可恢复的 stdout 未重造。
+- **对上一轮一句引用的更正(不删原文)**: [C.10] 第 2) 条曾写"另一次全量运行也是
+  `OK=13 / NOT-DETECTED=0` —— 见 negatives.txt"。按留存工件核对, 该目录里的两份分别是
+  `OK=9 / NOT-DETECTED=1 / INFRA-FAIL=3`(修注入配方之前)与 `OK=12 / NOT-DETECTED=1`(修之后),
+  **没有** `OK=13` 的那一份被留下 => 该引用没有对应工件支撑, 更正登记在 [D.2b]; N7 当时
+  两次都不是 OK(与本节根因一致)。本轮 `OK=13` 的证据是定稿字节上的**新一次**全量(见 §5),
+  不是拿旧日志改口。同样说明: 两份日志头部记的基线 SHA 是运行时的 HEAD(0b0f1661), 内容才是
+  后来的定稿字节 —— "定稿字节"与"SHA 标记"的口径在 [D.1]/[D.2] 里对齐。
+- S2 runner 的 `grep -c "^injected " ... | xargs -I{} note ...` 改成 shell 内变量后调用
+  `note`(note 是 shell 函数, xargs 里必然 `No such file or directory`); 本轮日志里
+  "注入替换 N 处"五行即修正后的真实输出。
+- 交接 JSON 里 CP5 遗留的一处非法转义(`%LOCALAPPDATA%\Temp` 的单反斜杠)使整份文件无法被
+  `json.loads` 解析; 本轮机械修复(反斜杠翻倍, 显示内容不变), 现可解析。
+
+### 5. §5 集中回归与 Keil(定稿字节)
+
+- S1: target 必需 50 条全 PASS; host_ovr 必需 65 条全 PASS; rc=0; 反向: PASS —— 本链注入命中预登记业务失败身份(rc=1, 台账自洽); 第②项按 §10.2 重指向 S2 并发链代跑(见上方 REV-POINTED 行)
+- S2 + 叶子链(REVERSE=1, 先过完整正常对照): 正向(REVERSE=1 的完整对照阶段): target 17 组 用例=23 全 PASS(SKIP 行 14, 整族按声明跳过); host_ovr 17 组 用例=79 全 PASS(叶子链 epwm_leaf 10 / tmc_lock 15 / uart_leaf 7 / budget_leaf 6, 期望用例数与实跑一致); 5 个反向家族 META-OK ×5 -> S2 REVERSE RESULT=PASS
+- V1V2 / I-O: V1 rc=0, V2 rc=0; 两份终态: CHECK_PASS=25 CHECK_FAIL=0 BAD_SELFTEST=0 MISSING_CASE=0 | CHECK_PASS=22 CHECK_FAIL=0 BAD_SELFTEST=0 MISSING_CASE=0 / I-O: off_target | OK 必需用例=27 全部PASS 自报fail=0 proc_rc=0 (输出 8396 字节); on_target | OK 必需用例=29 全部PASS 自报fail=0 proc_rc=0 (输出 9682 字节); off_ovr | OK 必需用例=40 全部PASS 自报fail=0 proc_rc=0 (输出 23778 字节); on_ovr | OK 必需用例=42 全部PASS 自报fail=0 proc_rc=0 (输出 26194 字节); PASS (rc=0) —— 4 个变体的必需用例全部真执行且判 PASS, 非法宏值被编译拒绝
+- 负例 13 例 + 元负例: OK=13 NOT-DETECTED=0 INFRA-FAIL=0; 所有负例按预期被检出且身份齐备; 干净回归通过 (rc=0); N7 本轮判定: OK | N7_helper_thread_startup_fail | rc 真实=3 自报=3 期望=3 | V1=RAN/0/3 V2=RAN/0/3 (期望 V1=RAN/0/3 V2=RAN/0/3) / 元负例 META-OK 行数=10; 末行: META-OK | M5_wrong_reason_guard
+- Keil Rebuild All(仅构建): Rebuild All 退出码=0; 尾部 0 Error / 0 Warning; 日志 141 行; .inc 包含证据: build/project_rt-thread.dep 列出 drv_epwm_leaf.inc 与 drv_uart_txleaf.inc 各 1 处; 日志尾部 '0 Error(s), 0 Warning(s)', Code=173762 RO=76806 RW=2188 ZI=83784
+
+### 6. 边界(不撤回既有结论)
+
+- EPWM 的 ns/计数/分频反推与脚本化时间预算都是**寄存器模型 + 受控时间**上的证明, 不等于
+  物理验收: BUG-008 波形/频率/占空比实测、RISK-03/03a、物理 RISK-04-b 继续开放;
+  分频选择作用于整个 EPWM 实例, M-2 保留。
+- 四个目标宏独立源码回读仍 RT_FALSE: motor.h:69 `MOTOR_HARDWARE_ENABLE_PATH_VALIDATED`、
+  motor.h:83 `STEP_DIAG_ISOLATED_ENV_CONFIRMED`、project_board.h:51
+  `SAFETY_LIMIT_INPUTS_ENABLED`、tmc2209.h:100 `TMC_DRIVE_CONFIG_HW_VALIDATED`;
+  host_ovr 只存在于命令行覆盖。
+- 本批无烧录/复位/串口/调试器/设备扫描/真实 GPIO/TMC/STEP/电机/Flash/供电/模块/接线/SW1/
+  真机清故障/selftest 动作; 板上状态仍按 USER_REPORTED_E40。
+- 原已接受的 S1/F2d 范围不撤回; SD 数据语义本批未改, 未机械重复。
+
+`STOP: AWAITING_INDEPENDENT_IMPLEMENTATION_REVIEW`
+`NO SOFTWARE_REVIEW_GO claimed by Agent`
