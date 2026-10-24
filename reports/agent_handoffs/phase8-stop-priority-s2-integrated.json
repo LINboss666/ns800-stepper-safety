@@ -287,7 +287,7 @@
         "首次 __get_PRIMASK Keil 构建错误原文"
       ],
       "handling": "不人为重造; 在定稿字节上完整重跑并附原始输出/构建命令/blob 全路径",
-      "evidence_root": "%LOCALAPPDATA%\Temp/ns800_cp5_ev/final_121406"
+      "evidence_root": "%LOCALAPPDATA%\\Temp/ns800_cp5_ev/final_121406"
     },
     "new_observation_not_fixed_this_batch": {
       "id": "STEP 频率换算分母口径",

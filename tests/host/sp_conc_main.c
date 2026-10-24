@@ -41,6 +41,8 @@
 #include <stdarg.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <errno.h>
+#include <time.h>
 
 #include "app_health.h"
 #include "project_board.h"
@@ -170,6 +172,36 @@ const char *s2_contend_name = "(none)";
 void s2_contend_clear(void) { s2_contend_hits = 0; s2_contend_name = "(none)"; }
 int  s2_seq_contend_seen(void) { return s2_contend_hits; }
 
+/* CP6 回归修正: "确实有线程在门外等"必须是一次**事件会合**, 不能是主线程按
+ * usleep(200) 的粒度自旋来猜。本机实测(2026-10-24, 满载时): 那条 2500×usleep(200) 的
+ * 猜测窗口会先走完, 于是同一条 C14b 偶发判 FAIL —— 观察时机缺陷, 不是产品行为变化。
+ * 现在竞争点在 trylock 失败处 broadcast, 等待方在条件量上等; guard_ms 只作死锁守卫,
+ * 到期原样返回"没等到", 不放宽任何判据。 */
+static pthread_mutex_t s2_contend_m = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t  s2_contend_c = PTHREAD_COND_INITIALIZER;
+
+/* 等到 s2_contend_hits 真的越过 base(= 至少一次"别的线程持有时 trylock 失败"的门外等待)。
+ * 返回 1=等到了; 0=墙钟守卫到期(调用方据此如实判失败)。 */
+static int s2_contend_wait_above(int base, int guard_ms)
+{
+    struct timespec dl;
+    int hit;
+
+    clock_gettime(CLOCK_REALTIME, &dl);
+    dl.tv_sec  += guard_ms / 1000;
+    dl.tv_nsec += (long)(guard_ms % 1000) * 1000000L;
+    if (dl.tv_nsec >= 1000000000L) { dl.tv_nsec -= 1000000000L; dl.tv_sec += 1; }
+
+    pthread_mutex_lock(&s2_contend_m);
+    while (s2_contend_hits == base)
+    {
+        if (pthread_cond_timedwait(&s2_contend_c, &s2_contend_m, &dl) == ETIMEDOUT) break;
+    }
+    hit = (s2_contend_hits > base) ? 1 : 0;
+    pthread_mutex_unlock(&s2_contend_m);
+    return hit;
+}
+
 rt_err_t rt_mutex_init(struct rt_mutex *m, const char *name, rt_uint16_t flags)
 {
     (void)flags;
@@ -208,6 +240,13 @@ rt_err_t rt_mutex_take(struct rt_mutex *m, rt_int32_t t)
         s2_contend_hits++;
         s2_contend_name = (m->name ? m->name : "?");
         s2_seq_set(S2_SEQ_CONTEND);
+        {
+            /* 先放行"是否在门外等"的会合等待者, 再真的阻塞到拿到为止(不抱着
+             * s2_contend_m 去等业务锁)。 */
+            pthread_mutex_lock(&s2_contend_m);
+            pthread_cond_broadcast(&s2_contend_c);
+            pthread_mutex_unlock(&s2_contend_m);
+        }
         e = pthread_mutex_lock(real);
     }
     return (e == 0) ? RT_EOK : RT_ERROR;
@@ -1902,12 +1941,8 @@ static void cases_recovery(void)
     c14_wait_stage(1);
     cont0 = s2_contend_hits;
     s2_spawn(c14_reset_thread, &r1);          /* B: 同一把 ss_lock 的真实竞争者 */
-    {
-        int spins = 0;
-
-        while (s2_contend_hits == cont0 && spins++ < 2500) usleep(200);
-        b_waited = (s2_contend_hits > cont0) ? 1 : 0;
-    }
+    /* CP6: 会合到"B 确实在门外被挡住"这一事件(墙钟 5s 只作死锁守卫)。 */
+    b_waited = s2_contend_wait_above(cont0, 5000);
     c14_release_a();                            /* 恢复最终窗口先成功 */
     c14_wait_stage(3);
     s2_join_all();

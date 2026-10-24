@@ -116,9 +116,9 @@ G_target_reject_host_ovr=""
 #   host_ovr:     C10/C16/C17/C18 全部真执行。
 # --------------------------------------------------------------------------
 G_epwm_leaf_target=""
-G_epwm_leaf_host_ovr="C10a-prepare-writes-zero-registers C10b-period-compare-mode-match C10c-valid-token-commits-registers C10d-frozen-tbctl-not-restored-by-config-commit C10e-stale-token-commit-writes-zero-registers C10e2-protection-itself-did-one-real-off-and-low C10f-legacy-set-keeps-frozen-timebase"
+G_epwm_leaf_host_ovr="C10a-prepare-writes-zero-registers C10b-period-compare-mode-match C10c-valid-token-commits-registers C10d-frozen-tbctl-not-restored-by-config-commit C10e-stale-token-commit-writes-zero-registers C10e2-protection-itself-did-one-real-off-and-low C10f-legacy-set-keeps-frozen-timebase C10g-20khz-roundtrip-50us C10h-low-frequency-dividers-selected C10i-invalid-or-inexpressible-zero-writes"
 G_tmc_lock_target=""
-G_tmc_lock_host_ovr="C16a-lock-held-refuses-within-budget C16a2-non-taker-cannot-release C16a3-owner-release-balances C16b-busy-call-does-not-clobber-active-op C16b2-real-failure-still-protects-exactly-once C16c-rx-flood-byte-cap-stops-before-tx C16c2-rx-flood-time-cap-stops-before-tx"
+G_tmc_lock_host_ovr="C16a-lock-held-refuses-within-budget C16a2-non-taker-cannot-release C16a3-owner-release-balances C16b-busy-call-does-not-clobber-active-op C16b2-real-failure-still-protects-exactly-once C16c-rx-flood-byte-cap-stops-before-tx C16c2-rx-flood-time-cap-stops-before-tx C16d-cfg-leaf-lock-held-bounded-fail-protects C16d2-holder-still-owns-cfg-lock-after-refusal C16d3-holder-release-restores-lock C16e-xfer-lock-held-bounded-fail-no-frame C16e2-xfer-lock-released-then-read-works C16e3-xfer-wait-is-min-of-cap-and-remaining C16f-wait-is-min-of-cap-and-remaining C16f2-exhausted-budget-does-not-attempt-lock"
 G_uart_leaf_target=""
 G_uart_leaf_host_ovr="C17a-no-space-expires-with-zero-written C17b-partial-send-keeps-raw-written C17c-expired-after-last-byte-not-a-success C17d-normal-frame-eok C17e-context-gates-reject-quietly C17f-late-complete-frame-not-a-success C17g-crc-error-rejected-and-protects-once"
 G_budget_leaf_target=""
@@ -150,8 +150,10 @@ S_budget_leaf_host_ovr=""
 # CP5 §4: recovery 组的 C14 拆成 C14a/C14b 两个**确定接缝** => 22->23 / 40->41。
 # CP5 §5: target 的叶子四组贡献 0 个 CASE(整族 SKIP) => 23 不变;
 # host_ovr 追加真实执行的 27 条(7+7+7+6) => 41 -> 68。
+# CP6 §2/§3: C10 追加 3 条数值反推用例(7->10)、C16 追加 8 条真实叶锁有界等待
+# (7->15) => 41 + (10+15+7+6)=38 => 68 -> 79。
 S2_EXPECT_target="${S2_EXPECT_target:-23}"
-S2_EXPECT_host_ovr="${S2_EXPECT_host_ovr:-68}"
+S2_EXPECT_host_ovr="${S2_EXPECT_host_ovr:-79}"
 
 VARIANTS="target host_ovr"
 
@@ -619,7 +621,10 @@ PYEOF
         note "  $name: 副本里没有注入标记"; matrix+=("$name | INFRA-FAIL 无注入标记")
         remember 4; return
     fi
-    grep -c "^injected " "$work/inject.txt" | xargs -I{} note "  $name: 注入替换 {} 处(逐条已核对恰好命中一次)"
+    # CP6 §4: note 是 shell 函数, 不能经 xargs 调用(云端实测五次 "xargs: note: No such
+    # file or directory")。先在 shell 内取数, 再直接调用 note。
+    inj_n="$(grep -c "^injected " "$work/inject.txt")"
+    note "  $name: 注入替换 $inj_n 处(逐条已核对恰好命中一次)"
 
     exe="$work/conc.exe"; lexec="$work/leaf.exe"
     extra="$(variant_flags "$variant")"

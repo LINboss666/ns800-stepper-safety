@@ -80,10 +80,14 @@ static void      leaf_asm_feed(rt_uint8_t b);
  * 的 SYSCLK_USE_PLL/SYSCLK_SOURCE_USE_HXTL + board.h:118-121(PLLM_40/PLLN_DIV1/PLLP_DIV2)
  * 与 board.h:171-175(HCLK=CPUCLK/2, APB1DIV=0) => 400000000>>1>>0 = 200000000。 */
 #define LEAF_PCLK1_HZ 200000000u
+static rt_uint32_t leaf_clock_force = 0xFFFFFFFFu;  /* 0xFFFFFFFF = 不注入 */
 uint32_t RCC_getPclk1Frequency(void)
 {
     ns800_leaf_pclk1_calls++;
     if (ns800_leaf_primask() != 0u) leaf_clock_in_window++;
+    /* CP6 §2(C10i): 允许把时钟换成无效值、或高到任何分频都表达不了目标周期的值,
+     * 用来评审 prepare 自己的范围检查。0xFFFFFFFF = 不注入(用原文链的 200MHz)。 */
+    if (leaf_clock_force != 0xFFFFFFFFu) return leaf_clock_force;
     return LEAF_PCLK1_HZ;
 }
 
@@ -406,17 +410,63 @@ rt_err_t rt_mutex_init(struct rt_mutex *m, const char *name, rt_uint16_t flags)
     m->name = name; m->inited = RT_TRUE;
     return RT_EOK;
 }
+/* CP6 §3.2: 三种等待形态必须可区分。上一轮把**任何正数 timeout**都变成无限阻塞
+ * (pthread_mutex_lock), 于是生产侧 tmc_cfg_lock_take / tmc_xfer_take 的 10/20ms 上限
+ * 在主机上根本没被验证。现在:
+ *   RT_WAITING_NO       -> 一次 trylock;
+ *   RT_WAITING_FOREVER  -> 真阻塞(死锁由 runner 的墙钟守卫兜住);
+ *   有限 timeout        -> 每秒毫秒级 trylock 轮询: 每轮真实睡 ~1ms **并把脚本时钟推进 1
+ *                         tick**(两者一一对应, 不存在"脚本时钟被别人续期"), 走完即失败。
+ * 请求值/结果/实际取得与归还次数全部记账, 用例据此判"是否真的在有界期限内失败"。 */
+static int leaf_mtx_takes, leaf_mtx_taken, leaf_mtx_timeouts, leaf_mtx_releases;
+static int leaf_mtx_last_wait;
+static rt_int32_t leaf_mtx_last_request;
+
 rt_err_t rt_mutex_take(struct rt_mutex *m, rt_int32_t timeout)
 {
     pthread_mutex_t *p;
     int e;
+    rt_int32_t waited = 0;
 
     if (m == RT_NULL || !m->inited) return -RT_EINVAL;
     ps_win_note("rt_mutex_take");                  /* 窗口内取锁 = 违规, 计数 */
     p = leaf_mtx_find(m, 1);
     if (p == RT_NULL) return -RT_EIO;
-    e = (timeout == RT_WAITING_NO) ? pthread_mutex_trylock(p) : pthread_mutex_lock(p);
-    return e ? -RT_EBUSY : RT_EOK;
+
+    leaf_mtx_takes++;
+    leaf_mtx_last_request = timeout;
+    leaf_mtx_last_wait = (int)timeout;
+
+    if (timeout == RT_WAITING_NO)
+    {
+        e = pthread_mutex_trylock(p);
+        if (e) return -RT_EBUSY;
+        leaf_mtx_taken++;
+        return RT_EOK;
+    }
+    if (timeout < 0)                                /* RT_WAITING_FOREVER: 真阻塞 */
+    {
+        e = pthread_mutex_lock(p);
+        if (e) return -RT_EBUSY;
+        leaf_mtx_taken++;
+        return RT_EOK;
+    }
+    for (;;)
+    {
+        if (pthread_mutex_trylock(p) == 0)
+        {
+            leaf_mtx_taken++;
+            return RT_EOK;
+        }
+        if (waited >= (int)timeout)
+        {
+            leaf_mtx_timeouts++;                    /* 有界等待**到期**, 不是无限阻塞 */
+            return -RT_ETIMEOUT;
+        }
+        usleep(1000);                               /* 墙钟 1ms */
+        leaf_advance(1);                            /* 脚本时钟同一毫秒 */
+        waited++;
+    }
 }
 rt_err_t rt_mutex_release(struct rt_mutex *m)
 {
@@ -425,7 +475,9 @@ rt_err_t rt_mutex_release(struct rt_mutex *m)
     if (m == RT_NULL) return -RT_EINVAL;
     p = leaf_mtx_find(m, 0);
     if (p == RT_NULL) return -RT_EINVAL;           /* 没登记过的锁 = 没取得, 不许归还 */
-    return pthread_mutex_unlock(p) ? -RT_EINVAL : RT_EOK;
+    if (pthread_mutex_unlock(p)) return -RT_EINVAL;
+    leaf_mtx_releases++;
+    return RT_EOK;
 }
 rt_err_t rt_mutex_detach(struct rt_mutex *m) { (void)m; return RT_EOK; }
 
@@ -657,6 +709,9 @@ static void leaf_state_clear(void)
     leaf_pad_low = 1;
     leaf_dev_present = 1;
     leaf_dev_open_calls = 0; leaf_dev_ctrl_calls = 0; leaf_dev_read_calls = 0;
+    leaf_mtx_takes = 0; leaf_mtx_taken = 0; leaf_mtx_timeouts = 0; leaf_mtx_releases = 0;
+    leaf_mtx_last_wait = 0; leaf_mtx_last_request = 0;
+    leaf_clock_force = 0xFFFFFFFFu;
     leaf_rx_drip = 0;
     memset(&leaf_epwm_regs, 0, sizeof(leaf_epwm_regs));
     memset(&leaf_uart_regs, 0, sizeof(leaf_uart_regs));
@@ -699,7 +754,7 @@ static int leaf_apply_configured(void)
 /* 8. 显式会合(C16b/C18d 的两线程接缝; 墙钟只防死锁, 不猜交错)               */
 /* ===================================================================== */
 static pthread_mutex_t leaf_pk_m = PTHREAD_MUTEX_INITIALIZER;
-static pthread_cond_t  leaf_pk_c = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t  leaf_pk_c = PTHREAD_COND_INITIALIZER;  /* CP6 §3: 不是 mutex 初始化器 */
 static int             leaf_pk_arrived;
 static int             leaf_pk_go;
 static int             leaf_pk_arm;
@@ -786,36 +841,71 @@ static int seq_or_timeout(const char *what, int rc)
     return 1;
 }
 
-/* ===================================================================== */
-/* 10. C10 —— 真实 EPWM 叶子 + 真实 token 门                                */
-/* ===================================================================== */
-/* 换算的期望值由夹具**独立复算**, 公式按 drv_epwm_leaf.inc 的原文形状逐条写在这里:
- *   signal_freq    = 1 / (period_ns / 1000000)          (原文: 分母是 1e6, 不是 1e9)
- *   (UP_DOWN 不除以 2; 其它模式才 /2)
- *   time_base_clock = pclk1 / 2^clock_div / 2^hs_clock_div
- *   UP_DOWN:  tb = (uint16)(tbc / (2*freq));  cmp = (uint16)((tb - duty*tb) + 0.5)
- * ⚠ 复算同时把一条**原文事实**摆出来: 对 period_ns=1 000 000(标称 1 kHz), 该公式得到的
- *   tb = 50 000 000, 截到 uint16 = 61568 —— 也就是"按 ns 应有的 50 000"与"按原文 µs 分母
- *   算出的截断值"不是同一个数。本批**不改**生产换算(超出 CP5 授权范围, 且 STEP 频率的
- *   实际波形本就是 BUG-008 的开放边界); 这条差异作为**新观察**登记进交接, 由独立审查定口径。
- */
-static void leaf_expect_updown(rt_uint32_t period_ns, rt_uint32_t pulse_ns,
-                               unsigned *tb_out, unsigned *cmp_out)
+/* CP6 §2: 数值判据改成**行为反推**(请求单位 + 寄存器里的分频/计数模式反算回 ns 周期),
+ * 不再"用同一套公式重算一遍再比对"。分频因子表按 SDK 枚举原文(EPWMH:61-70 / :80-89)
+ * 在夹具侧独立写出, 这就是独立 oracle: 它验的是"ns 请求 <-> 计数关系"成立。 */
+static const rt_uint32_t leaf_clkdiv_f[8] = { 1U, 2U, 4U, 8U, 16U, 32U, 64U, 128U };
+static const rt_uint32_t leaf_hsdiv_f[8]  = { 1U, 2U, 4U, 6U, 8U, 10U, 12U, 14U };
+
+/* 由 prepared 里的枚举与整数**反推**周期(ns)与高电平占空比(%)。 */
+static void leaf_roundtrip(const struct ns800_epwm_prepared *p, rt_uint64_t *period_ns,
+                           rt_uint64_t *counts_per_period, rt_uint64_t *duty_pct)
 {
-    double freq = 1.0 / ((double)period_ns / 1000000.0);
-    double tbc  = (double)LEAF_PCLK1_HZ / (double)(1u << (unsigned)EPWM_CLOCK_DIVIDER_2);
-    double duty = (double)pulse_ns / (double)period_ns;
-    unsigned long raw;
+    rt_uint64_t div = (rt_uint64_t)leaf_clkdiv_f[p->clock_div & 7u] *
+                      leaf_hsdiv_f[p->hs_clock_div & 7u];
+    rt_uint64_t tb = (rt_uint64_t)p->tb_period, cmp = (rt_uint64_t)p->cmp_val;
+    rt_uint64_t counts, high;
 
-    tbc /= (double)(1u << (unsigned)EPWM_HSCLOCK_DIVIDER_1);
-    raw = (unsigned long)(tbc / (2.0 * freq));
+    if ((rt_uint32_t)p->count_mode == (rt_uint32_t)EPWM_COUNTER_MODE_UP_DOWN)
     {
-        unsigned tb = (unsigned)(unsigned short)raw;         /* 与生产的 uint16 截断同形 */
-        unsigned cmp = (unsigned)(unsigned short)(((double)tb - duty * (double)tb) + 0.5);
-
-        *tb_out = tb;
-        *cmp_out = cmp;
+        counts = 2U * tb;                       /* 0 -> TBPRD -> 0 */
+        high   = 2U * ((tb > cmp) ? (tb - cmp) : 0U);
     }
+    else
+    {
+        counts = tb + 1U;                       /* 一个周期 = TBPRD+1 个计数 */
+        high   = ((rt_uint32_t)p->count_mode == (rt_uint32_t)EPWM_COUNTER_MODE_UP)
+                 ? cmp : (counts - cmp);
+    }
+    if (counts_per_period != RT_NULL) *counts_per_period = counts;
+    *period_ns = (counts * div * 1000000000ULL + (LEAF_PCLK1_HZ / 2U)) / LEAF_PCLK1_HZ;
+    *duty_pct  = (counts == 0U) ? 0U : (high * 100U) / counts;
+}
+
+/* 声明的计数舍入界限: UP_DOWN 一个周期随 TBPRD 步进 2 个计数, 其余 1 个计数。
+ * 界限 = (步进计数数) * 一个计数的时间(ns), 一个计数 = div/clk 秒。 */
+static rt_uint64_t leaf_round_bound_ns(const struct ns800_epwm_prepared *p)
+{
+    rt_uint64_t div = (rt_uint64_t)leaf_clkdiv_f[p->clock_div & 7u] *
+                      leaf_hsdiv_f[p->hs_clock_div & 7u];
+    rt_uint64_t step = ((rt_uint32_t)p->count_mode ==
+                        (rt_uint32_t)EPWM_COUNTER_MODE_UP_DOWN) ? 2U : 1U;
+
+    return (step * div * 1000000000ULL) / LEAF_PCLK1_HZ;
+}
+
+static rt_uint64_t leaf_abs_diff(rt_uint64_t a, rt_uint64_t b)
+{
+    return (a > b) ? (a - b) : (b - a);
+}
+
+/* 一次 prepare + 反推核对: 返回 1 表示 EOK/valid 且"反推周期在舍入界限内、占空比相符"。 */
+static int leaf_check_roundtrip(rt_uint32_t period_ns, rt_uint32_t pulse_ns,
+                                unsigned duty_pct_want, struct ns800_epwm_prepared *pr,
+                                rt_uint64_t *back_out, rt_uint64_t *bound_out,
+                                rt_uint64_t *counts_out)
+{
+    rt_uint64_t back, duty, counts, bound;
+    rt_err_t e;
+
+    memset(pr, 0, sizeof(*pr));
+    e = (rt_err_t)ns800_epwm_prepare(&leaf_epwm_obj[0].epwm_device, 0u,
+                                     period_ns, pulse_ns, pr);
+    if (e != RT_EOK || pr->valid != 1u) return 0;
+    leaf_roundtrip(pr, &back, &counts, &duty);
+    bound = leaf_round_bound_ns(pr);
+    *back_out = back; *bound_out = bound; *counts_out = counts;
+    return leaf_abs_diff(back, (rt_uint64_t)period_ns) <= bound && duty == duty_pct_want;
 }
 
 static void c10_group(void)
@@ -826,42 +916,40 @@ static void c10_group(void)
     rt_base_t lvl;
     rt_err_t e, gate;
     uint32_t w0;
+    rt_uint64_t back = 0, bound = 0, counts = 0;
+    int ok_b = 0, ok_g = 0;
 
-    /* ---- C10a prepare 一个寄存器都不写, 且换算在门外 ---- */
+    /* ---- C10a prepare 不写任何寄存器, 且换算只在门外(取时钟时未屏蔽中断) ---- */
     leaf_state_clear();
-    memset(&pr, 0, sizeof(pr));
     w0 = ns800_leaf_reg_writes;
     e = (rt_err_t)ns800_epwm_prepare(&leaf_epwm_obj[0].epwm_device, 0u,
                                      1000000u, 500000u, &pr);
     CHECK("C10a-prepare-writes-zero-registers",
           e == RT_EOK && pr.valid == 1u && ns800_leaf_reg_writes == w0 &&
-          leaf_clock_in_window == 0u && ns800_leaf_pclk1_calls == 1u,
+          leaf_clock_in_window == 0u && ns800_leaf_pclk1_calls >= 1u,
           fm("rc=%d valid=%u 寄存器写 %u->%u pclk_calls=%u 窗口内取时钟=%u",
              (int)e, (unsigned)pr.valid, (unsigned)w0,
              (unsigned)ns800_leaf_reg_writes, (unsigned)ns800_leaf_pclk1_calls,
              (unsigned)leaf_clock_in_window));
 
-    /* ---- C10b period/compare/模式与夹具独立复算一致(浮点换算真的按原文跑过) ---- */
-    {
-        unsigned tb_exp, cmp_exp;
+    /* ---- C10b 1kHz/50%: 行为判据(反推 ns 周期 + 原分频沿用), 不是"重算同一公式" ----
+     * 先算语句再拼台账: CHECK 的三个实参求值顺序未规定, 若 fm() 先于核对函数求值,
+     * 台账就会印出上一个用例的旧数字(上一版实测正是这样)。 */
+    ok_b = leaf_check_roundtrip(1000000u, 500000u, 50u, &pr, &back, &bound, &counts);
+    CHECK("C10b-period-compare-mode-match",
+          ok_b == 1 && (unsigned)pr.tb_period == 50000u &&
+          (unsigned)pr.cmp_val == 25000u && counts == 100000u &&
+          (unsigned)pr.clock_div == (unsigned)EPWM_CLOCK_DIVIDER_2 &&
+          (unsigned)pr.hs_clock_div == (unsigned)EPWM_HSCLOCK_DIVIDER_1,
+          fm("tb=%u cmp=%u counts=%u 反推周期=%uns(请求 1000000, 舍入界限 +%u) duty=50%% "
+             "分频沿用原配 cd=%u hs=%u",
+             (unsigned)pr.tb_period, (unsigned)pr.cmp_val, (unsigned)counts,
+             (unsigned)back, (unsigned)bound,
+             (unsigned)pr.clock_div, (unsigned)pr.hs_clock_div));
 
-        leaf_expect_updown(1000000u, 500000u, &tb_exp, &cmp_exp);
-        CHECK("C10b-period-compare-mode-match",
-              (unsigned)pr.tb_period == tb_exp && (unsigned)pr.cmp_val == cmp_exp &&
-              (unsigned)pr.count_mode == (unsigned)EPWM_COUNTER_MODE_UP_DOWN &&
-              (unsigned)pr.clock_div == (unsigned)EPWM_CLOCK_DIVIDER_2 &&
-              (unsigned)pr.hs_clock_div == (unsigned)EPWM_HSCLOCK_DIVIDER_1,
-              fm("tb=%u(独立复算%u, 未截断的原始值=50000000) cmp=%u(复算%u) mode=%u "
-                 "clk=%u hs=%u pclk=%uHz —— 分母 1e6 的口径差异按原文登记, 本批不改生产换算",
-                 (unsigned)pr.tb_period, tb_exp, (unsigned)pr.cmp_val, cmp_exp,
-                 (unsigned)pr.count_mode, (unsigned)pr.clock_div, (unsigned)pr.hs_clock_div,
-                 LEAF_PCLK1_HZ));
-    }
-
-    /* ---- C10c 有效身份提交: 模型寄存器收到 prepare 算好的整数 ---- */
+    /* ---- C10c 有效身份提交: 寄存器真的收到 prepare 算好的整数(写序仍是生产实现) ---- */
     if (leaf_pre(sp_reserve(SP_DIAG, &tok) == RT_EOK, "C10c reserve"))
     {
-        memset(&pf, 0, sizeof(pf));
         w0 = ns800_leaf_reg_writes;
         gate = sp_enter_token(&tok, &lvl);
         if (gate == RT_EOK)
@@ -880,13 +968,10 @@ static void c10_group(void)
         (void)sp_release(&tok);
     }
 
-    /* ---- C10d 冻结的时间基不被配置提交恢复(§5: 冻结 TBCTL 不被旧 set 恢复) ----
-     * 前置用 drv_epwm.c:641 的同一条 SDK 内联把时间基写成 STOP_FREEZE(即"停机已经发生"
-     * 之后的寄存器状态); 然后再用**有效身份**提交一次配置 —— 提交只允许改分频/周期/比较
-     * /AQ/DB, 决不能把计数模式写回运行(drv_epwm_leaf.inc:418-419 的承诺)。 */
+    /* ---- C10d 冻结的时间基不被配置提交恢复(有效身份, 只改整数不改计数模式) ---- */
     leaf_state_clear();
-    memset(&pr, 0, sizeof(pr));
     EPWM_setTimeBaseCounterMode(&leaf_epwm_regs, EPWM_COUNTER_MODE_STOP_FREEZE);
+    memset(&pr, 0, sizeof(pr));
     if (leaf_pre((rt_err_t)ns800_epwm_prepare(&leaf_epwm_obj[0].epwm_device, 0u,
                                               1000000u, 500000u, &pr) == RT_EOK &&
                  pr.valid == 1u, "C10d prepare") &&
@@ -915,9 +1000,7 @@ static void c10_group(void)
         (void)sp_release(&tok);
     }
 
-    /* ---- C10e §5 核心: prepare 已算完 -> 保护发生 -> 旧 token 提交必须一个寄存器都不写 ----
-     * 这是 §6 反向"取消配置真实写的资格检查必须被具名检出"的落点: 注入落在生产
-     * sp_enter_token 的身份门(窗口原语保持), 于是旧提交真的会写字, 本用例当场失败。 */
+    /* ---- C10e §5 核心: prepare 已算完 -> 保护发生 -> 旧 token 提交零寄存器写 ---- */
     leaf_state_clear();
     memset(&pr, 0, sizeof(pr));
     if (leaf_pre((rt_err_t)ns800_epwm_prepare(&leaf_epwm_obj[0].epwm_device, 0u,
@@ -942,11 +1025,12 @@ static void c10_group(void)
                      (int)gate, (unsigned)w0, (unsigned)ns800_leaf_reg_writes, leaf_highs));
             CHECK("C10e2-protection-itself-did-one-real-off-and-low",
                   leaf_cuts == 1 && leaf_lows == 1 && sp_inhibited(),
-                  fm("cuts=%d lows=%d inhibit=%d", leaf_cuts, leaf_lows, (int)sp_inhibited()));
+                  fm("cuts=%d lows=%d inhibit=%d", leaf_cuts, leaf_lows,
+                     (int)sp_inhibited()));
         }
     }
 
-    /* ---- C10f 旧 set 走 ops 路径: 冻结之后一次 rt_pwm_set 也只改整数, 不改计数模式 ---- */
+    /* ---- C10f 旧 set 路径(ops 顺序: prepare + configure_regs)同样不恢复冻结计数模式 ---- */
     leaf_state_clear();
     memset(&pf, 0, sizeof(pf));
     (void)sp_trip_fast(FAULT_SOFT, EVT_SOFT_FAULT, MOT_STOP_SRC_ESTOP, &pf);
@@ -962,6 +1046,91 @@ static void c10_group(void)
               fm("CTRMODE=%u(应 3) 寄存器写 %u->%u",
                  (unsigned)(leaf_epwm_regs.TBCTL.WORDVAL & EPWM_TBCTL_CTRMODE_M),
                  (unsigned)w_before, (unsigned)ns800_leaf_reg_writes));
+    }
+
+    /* ---- C10g 20kHz/50%: 原分频下 TBPRD=2500, 反推 50us ---- */
+    leaf_state_clear();
+    ok_g = leaf_check_roundtrip(50000u, 25000u, 50u, &pr, &back, &bound, &counts);
+    CHECK("C10g-20khz-roundtrip-50us",
+          ok_g == 1 && (unsigned)pr.tb_period == 2500u && (unsigned)pr.cmp_val == 1250u &&
+          counts == 5000u,
+          fm("tb=%u(应 2500) cmp=%u(应 1250) counts=%u 反推=%uns(请求 50000, 界限 +%u)",
+             (unsigned)pr.tb_period, (unsigned)pr.cmp_val, (unsigned)counts,
+             (unsigned)back, (unsigned)bound));
+
+    /* ---- C10h 低频(20Hz 斜坡首拍 / 1Hz): 必须**选到合法分频**而不是范围失败 ---- */
+    leaf_state_clear();
+    {
+        int ok20, ok1;
+        rt_uint32_t tb20, cd20, hd20, tb1, cd1, hd1;
+        rt_uint64_t back1 = 0, bound1 = 0, counts1 = 0;
+
+        ok20 = leaf_check_roundtrip(50000000u, 25000000u, 50u, &pr,
+                                    &back, &bound, &counts);
+        tb20 = (rt_uint32_t)pr.tb_period; cd20 = (rt_uint32_t)pr.clock_div;
+        hd20 = (rt_uint32_t)pr.hs_clock_div;
+        ok1 = leaf_check_roundtrip(1000000000u, 500000000u, 50u, &pr,
+                                   &back1, &bound1, &counts1);
+        tb1 = (rt_uint32_t)pr.tb_period; cd1 = (rt_uint32_t)pr.clock_div;
+        hd1 = (rt_uint32_t)pr.hs_clock_div;
+        /* 恒真判据(uint16 <= 65535)已去掉: 可表达性由"反推周期在舍入界限内 + "
+         * "分频确实偏离原配"承担。 */
+        CHECK("C10h-low-frequency-dividers-selected",
+              ok20 == 1 && counts >= 4u && tb20 >= 2u &&
+              (cd20 != (unsigned)EPWM_CLOCK_DIVIDER_2 ||
+               hd20 != (unsigned)EPWM_HSCLOCK_DIVIDER_1) &&
+              ok1 == 1 && counts1 >= 4u && tb1 >= 2u,
+              fm("20Hz: tb=%u cd=%u hs=%u 反推=%uns(界限 +%u) | "
+                 "1Hz: tb=%u cd=%u hs=%u 反推=%uns(界限 +%u) 误差=%uns",
+                 tb20, cd20, hd20, (unsigned)back, (unsigned)bound,
+                 tb1, cd1, hd1,
+                 (unsigned)back1, (unsigned)bound1,
+                 (unsigned)leaf_abs_diff(back1, 1000000000ULL)));
+    }
+
+    /* ---- C10i 非法/不可表达输入: prepare 失败、valid=0、一个寄存器都不写 ---- */
+    leaf_state_clear();
+    {
+        rt_err_t e_zero, e_pulse, e_mode, e_range, e_clock0, e_hard;
+        uint32_t w_all;
+
+        memset(&pr, 0xAA, sizeof(pr));
+        w_all = ns800_leaf_reg_writes;
+        e_zero  = (rt_err_t)ns800_epwm_prepare(&leaf_epwm_obj[0].epwm_device, 0u, 0u, 0u, &pr);
+        e_pulse = (rt_err_t)ns800_epwm_prepare(&leaf_epwm_obj[0].epwm_device, 0u,
+                                               1000000u, 1000001u, &pr);
+        e_range = (rt_err_t)ns800_epwm_prepare(&leaf_epwm_obj[0].epwm_device, 0u,
+                                               2000000000u, 1000000000u, &pr);
+        /* 非法计数模式: 另建一份配置为 STOP_FREEZE 的驱动对象(目标上属于配置错误) */
+        {
+            static struct ns800_epwm bad_obj[1];
+            static struct ns800_epwm_config bad_cfg;
+
+            bad_cfg = leaf_epwm_cfg;
+            bad_cfg.count_mode = EPWM_COUNTER_MODE_STOP_FREEZE;
+            bad_obj[0] = leaf_epwm_obj[0];
+            bad_obj[0].epwm_config = &bad_cfg;
+            e_mode = (rt_err_t)ns800_epwm_prepare(&bad_obj[0].epwm_device, 0u,
+                                                  1000000u, 500000u, &pr);
+        }
+        /* 时钟无效(0)与"任何分频都表达不了"的高时钟: 由脚本化时钟注入 */
+        leaf_clock_force = 0u;
+        e_clock0 = (rt_err_t)ns800_epwm_prepare(&leaf_epwm_obj[0].epwm_device, 0u,
+                                                1000000u, 500000u, &pr);
+        leaf_clock_force = 4000000000u;      /* 4GHz: 最大分频下也只能表达约 55us */
+        e_hard = (rt_err_t)ns800_epwm_prepare(&leaf_epwm_obj[0].epwm_device, 0u,
+                                              100000000u, 50000000u, &pr);
+        leaf_clock_force = 0xFFFFFFFFu;      /* 关掉注入, 回到默认 200MHz */
+
+        CHECK("C10i-invalid-or-inexpressible-zero-writes",
+              e_zero != RT_EOK && e_pulse != RT_EOK && e_range != RT_EOK &&
+              e_mode != RT_EOK && e_clock0 != RT_EOK && e_hard != RT_EOK &&
+              pr.valid == 0u && ns800_leaf_reg_writes == w_all,
+              fm("zero=%d pulse>period=%d range=%d mode=%d clk0=%d inexpressible=%d "
+                 "valid=%u 寄存器写 %u->%u",
+                 (int)e_zero, (int)e_pulse, (int)e_range, (int)e_mode, (int)e_clock0,
+                 (int)e_hard, (unsigned)pr.valid, (unsigned)w_all,
+                 (unsigned)ns800_leaf_reg_writes));
     }
 }
 
@@ -991,6 +1160,309 @@ static void c16_probe(void *arg)
     (void)arg;
     leaf_c16_trylock_rc = rt_mutex_take(&tmc_cfg_prod.txn, RT_WAITING_NO);
     if (leaf_c16_trylock_rc == RT_EOK) (void)rt_mutex_release(&tmc_cfg_prod.txn);
+}
+
+/* ---- CP6 §3: 真实 cfg / xfer **叶锁**被另一条线程持有(有界失败, 不是 txn 竞争) ----
+ *
+ * 上一轮 C16a/b 争的是最外层 ctx->txn(而且是 RT_WAITING_NO), 加上夹具把任何正数 timeout
+ * 都写成无限阻塞 => 生产侧 tmc_cfg_lock_take(<=10ms) / tmc_xfer_take(<=20ms) 的**有界**
+ * 失败从未被观察。现在(全部走**生产**取锁/归还函数, 没有桩直接回 EBUSY):
+ *   C16d: 另一条线程用 tmc_cfg_lock_take() 真持有 cfg 叶锁, 主线程从**生产复核入口**
+ *         tmc2209_config_integrity_check_for() 进去 => 受理之后在 10ms 上限内到期, 并按
+ *         本次身份保护一次(PWM 关断与许可 LOW 两条独立动作 + inhibit + 带回 proof/outcome),
+ *         而且许可在此之前**可观察地为 HIGH**(所以"日志时已 LOW"不是初始 LOW 下的空判据);
+ *         失败出口 fail_ctx 再取同一把锁也取不到 => 仍只有第一次那一个短保护、摘要作废。
+ *         竞争失败者不得把持有者的锁放掉(第三线程 trylock 仍须失败, 归还后恢复可取)。
+ *   C16e: 另一条线程用 tmc_xfer_take() 真持有 UART 事务叶锁, 主线程从**生产公开读**
+ *         tmc2209_read_register() 进去 => 在 20ms 上限内到期, 一个字节都不发; 归还后同一
+ *         入口真读成功。C16e3 再对同一把锁用"外层预算只剩 3ms"跑一次生产读事务本体
+ *         tmc_read_reg(与 integrity 的 ctx->bus->read 同一入口)=> 等待值取 min(20, 3)。
+ *   C16f: 同一把 cfg 锁, 把**外层预算**压到只剩 3ms(< 10ms 上限)=> 传给锁的等待值必须
+ *         是 min(cap, remaining)=3; 预算为 0 时连一次取锁调用都不许发生。
+ * ⚠ 时间是脚本化的: 这里证明的是同一预算与软件分支, 不是目标机最坏时延。墙钟只当死锁守卫。
+ */
+static pthread_mutex_t  leaf_hk_m = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t   leaf_hk_c = PTHREAD_COND_INITIALIZER;
+static int              leaf_hk_have;      /* 持有者已拿到锁 */
+static int              leaf_hk_release;   /* 主线程放行归还 */
+static int              leaf_hk_err;       /* 持有者自己的取锁结果 */
+static volatile int     leaf_hk_probe_done;/* 探针线程自己跑完的旗标(不 join) */
+static rt_bool_t        leaf_hk_taken;
+
+static void leaf_hk_reset(void)
+{
+    pthread_mutex_lock(&leaf_hk_m);
+    leaf_hk_have = 0; leaf_hk_release = 0; leaf_hk_err = 0; leaf_hk_taken = RT_FALSE;
+    pthread_mutex_unlock(&leaf_hk_m);
+}
+static void leaf_hk_signal_have(void)
+{
+    pthread_mutex_lock(&leaf_hk_m);
+    leaf_hk_have = 1;
+    pthread_cond_broadcast(&leaf_hk_c);
+    pthread_mutex_unlock(&leaf_hk_m);
+}
+/* 会合用条件量, 墙钟上限只防死锁(不靠它推进脚本时钟) */
+static int leaf_hk_wait_have(int ms)
+{
+    int i;
+
+    pthread_mutex_lock(&leaf_hk_m);
+    for (i = 0; i < ms && !leaf_hk_have; ++i)
+    {
+        pthread_mutex_unlock(&leaf_hk_m);
+        usleep(1000);
+        pthread_mutex_lock(&leaf_hk_m);
+    }
+    {
+        int r = leaf_hk_have ? 0 : -1;
+
+        pthread_mutex_unlock(&leaf_hk_m);
+        return r;
+    }
+}
+static void leaf_hk_ask_release(void)
+{
+    pthread_mutex_lock(&leaf_hk_m);
+    leaf_hk_release = 1;
+    pthread_cond_broadcast(&leaf_hk_c);
+    pthread_mutex_unlock(&leaf_hk_m);
+}
+static void leaf_hk_wait_release(void)
+{
+    pthread_mutex_lock(&leaf_hk_m);
+    while (!leaf_hk_release) pthread_cond_wait(&leaf_hk_c, &leaf_hk_m);
+    pthread_mutex_unlock(&leaf_hk_m);
+}
+
+/* 持有者: 用**生产**取锁函数拿 cfg 叶锁, 等到放行后用生产归还函数放掉。 */
+static void leaf_hold_cfg_lock(void *arg)
+{
+    const tmc_budget_t *b = (const tmc_budget_t *)arg;
+
+    leaf_hk_err = (int)tmc_cfg_lock_take(&tmc_cfg_prod, b, &leaf_hk_taken);
+    leaf_hk_signal_have();
+    leaf_hk_wait_release();
+    if (leaf_hk_taken) tmc_cfg_lock_give(&tmc_cfg_prod, leaf_hk_taken);
+}
+/* 持有者: 用**生产** tmc_xfer_take() 拿 UART 事务叶锁。 */
+static void leaf_hold_xfer_lock(void *arg)
+{
+    (void)arg;
+    leaf_hk_err = (int)tmc_xfer_take(RT_NULL, &leaf_hk_taken);
+    leaf_hk_signal_have();
+    leaf_hk_wait_release();
+    if (leaf_hk_taken) tmc_xfer_give(leaf_hk_taken);
+}
+/* 第三方线程: 只 trylock, 用来证明"锁仍在持有者手上"以及"归还后恢复可取"。 */
+static void leaf_probe_cfg_lock(void *arg)
+{
+    (void)arg;
+    leaf_c16_trylock_rc = rt_mutex_take(&tmc_cfg_prod.lock, RT_WAITING_NO);
+    if (leaf_c16_trylock_rc == RT_EOK) (void)rt_mutex_release(&tmc_cfg_prod.lock);
+    leaf_hk_probe_done = 1;
+}
+/* 起探针线程并等它自己跑完 —— **不能** join: 此刻持有者线程还挂在"等放行"上,
+ * join_all 会把它一起等死(本轮实测过一次死锁)。墙钟上限只防探针卡住。 */
+static int leaf_probe_wait_done(int ms)
+{
+    int i;
+
+    leaf_hk_probe_done = 0;
+    if (leaf_spawn(leaf_probe_cfg_lock, RT_NULL) != 0) return -1;
+    for (i = 0; i < ms && !leaf_hk_probe_done; ++i) usleep(1000);
+    return leaf_hk_probe_done ? 0 : -1;
+}
+
+static void c16_leaflock_cases(void)
+{
+    tmc_op_result_t res;
+    sp_proof_t      pp;
+    rt_uint32_t ep0 = 0u, pcode = 0u, pevents = 0u;
+    rt_bool_t     pend = RT_FALSE;
+    rt_uint32_t v = 0;
+    rt_err_t e;
+    int takes0, timeouts0;
+
+    /* ================= C16d: cfg 叶锁被另一条线程持有 ================= */
+    leaf_state_clear();
+    leaf_hk_reset();
+    if (!leaf_pre(leaf_bus_ready(), "C16d bus ready")) return;
+    if (!leaf_pre(leaf_apply_configured(), "C16d 先做一次成功 apply")) return;
+    {
+        sp_token_t t;
+
+        if (!leaf_pre(sp_reserve(SP_MOTOR, &t) == RT_EOK && sp_release(&t) == RT_EOK &&
+                      sp_epoch() > 0u, "C16d 真实地前进过一代")) return;
+    }
+    /* 前置: 许可**可观察地**为 HIGH(初始态是 LOW, 不这样置就无法区分"空判据") */
+    if (!leaf_pre(safety_drv_permit_high_raw_held() == RT_EOK &&
+                  leaf_pad_high_now() == 1, "C16d 前置: 观测到的许可为 HIGH")) return;
+    ep0 = sp_epoch();
+    if (!leaf_pre(leaf_spawn(leaf_hold_cfg_lock, RT_NULL) == 0, "C16d holder thread")) return;
+    if (!seq_or_timeout("C16d holder 已取到 cfg 锁", leaf_hk_wait_have(5000)))
+    { leaf_hk_ask_release(); leaf_join_all(); return; }
+    if (!leaf_pre(leaf_hk_err == 0 && leaf_hk_taken == RT_TRUE, "C16d holder 确实持有 cfg 锁"))
+    { leaf_hk_ask_release(); leaf_join_all(); return; }
+
+    takes0 = leaf_mtx_takes; timeouts0 = leaf_mtx_timeouts;
+    memset(&res, 0, sizeof(res));
+    res.rc = 999;
+    e = tmc2209_config_integrity_check_for(ep0, &res);   /* 生产复核入口 */
+    pend = sp_pending_peek(&pp, &pcode, &pevents);        /* 只读不清: 整理义务应当已建立 */
+    CHECK("C16d-cfg-leaf-lock-held-bounded-fail-protects",
+          e != RT_EOK && res.rc == e && ep0 > 0u && res.op_epoch == ep0 &&
+          leaf_mtx_takes > takes0 && leaf_mtx_timeouts > timeouts0 &&
+          leaf_mtx_last_request > 0 && leaf_mtx_last_request <= (rt_int32_t)TMC_BUD_CFG_LOCK_MS &&
+          leaf_cuts == 1 && leaf_lows == 1 && sp_inhibited() &&
+          pend == RT_TRUE && pcode == FAULT_TMC_COMM &&
+          res.protect == SP_PROTECT_BY_THIS_CALL && res.proof.valid == RT_TRUE &&
+          leaf_log_while_high == 0 && leaf_pad_high_now() == 0 &&
+          tmc2209_drive_config_ok_for_arm() == RT_FALSE,
+          fm("integrity rc=%d 身份=%u(本次 out.op_epoch=%u) 等待请求=%dms(上限 %d) "
+             "到期次数+%d cuts=%d lows=%d inhibit=%d pending=%d(code=%08X) "
+             "protect=%u proof.valid=%u "
+             "HIGH 期间错误打印=%d 结束时许可=%s 摘要可用=%d",
+             (int)e, (unsigned)ep0, (unsigned)res.op_epoch,
+             (int)leaf_mtx_last_request, (int)TMC_BUD_CFG_LOCK_MS,
+             leaf_mtx_timeouts - timeouts0, leaf_cuts, leaf_lows, (int)sp_inhibited(),
+             (int)pend, (unsigned)pcode,
+             (unsigned)res.protect, (unsigned)res.proof.valid, leaf_log_while_high,
+             leaf_pad_low ? "LOW" : "HIGH", (int)tmc2209_drive_config_ok_for_arm()));
+
+    /* 竞争失败者不得把持有者的锁放掉: 第三线程 trylock 仍须失败 */
+    if (seq_or_timeout("C16d 探针线程(持有者未放行, 不能 join)", leaf_probe_wait_done(5000)))
+    {
+        CHECK("C16d2-holder-still-owns-cfg-lock-after-refusal",
+              leaf_c16_trylock_rc == -RT_EBUSY,
+              fm("失败者返回后第三线程 trylock cfg=%d(必须 EBUSY: 锁仍在持有者手上)",
+                 (int)leaf_c16_trylock_rc));
+    }
+    leaf_hk_ask_release();
+    leaf_join_all();
+    if (seq_or_timeout("C16d 探针线程 2", leaf_probe_wait_done(5000)))
+    {
+        CHECK("C16d3-holder-release-restores-lock",
+              leaf_c16_trylock_rc == RT_EOK && leaf_cuts == 1 && leaf_lows == 1 &&
+              leaf_mtx_taken == leaf_mtx_releases && leaf_mtx_taken >= 2,
+              fm("持有者归还后 trylock cfg=%d(应 EOK), 全程关断=%d 次、LOW=%d 次"
+                 "(失败出口再取锁也没造成第二次关闭); 真实取得=%d 次 / 真实归还=%d 次",
+                 (int)leaf_c16_trylock_rc, leaf_cuts, leaf_lows,
+                 leaf_mtx_taken, leaf_mtx_releases));
+    }
+    leaf_join_all();
+
+    /* ================= C16e: xfer 叶锁被另一条线程持有 ================= */
+    leaf_state_clear();
+    leaf_hk_reset();
+    if (!leaf_pre(leaf_bus_ready(), "C16e bus ready")) return;
+    {
+        rt_uint32_t v0 = 0;
+
+        /* 前置: 先有一次**无竞争**的真读成功 => 叶锁由生产 tmc_uart_open() 建立,
+         * 否则持有者会拿到 -RT_ENOSYS(能力缺失), 那就不是竞争。 */
+        e = tmc2209_read_register(0, TMC_REG_GCONF, &v0);
+        if (!leaf_pre(e == RT_EOK && tmc_lock_ok == RT_TRUE, "C16e 前置: 无竞争读成功且锁已建立"))
+            return;
+    }
+    if (!leaf_pre(leaf_spawn(leaf_hold_xfer_lock, RT_NULL) == 0, "C16e holder")) return;
+    if (!seq_or_timeout("C16e holder 已取到 xfer 锁", leaf_hk_wait_have(5000)))
+    { leaf_hk_ask_release(); leaf_join_all(); return; }
+    if (!leaf_pre(leaf_hk_err == 0 && leaf_hk_taken == RT_TRUE, "C16e holder 确实持有 xfer 锁"))
+    { leaf_hk_ask_release(); leaf_join_all(); return; }
+    {
+        int t0 = leaf_mtx_takes, f0 = leaf_write_frames, rr0 = leaf_read_reqs;
+
+        e = tmc2209_read_register(0, TMC_REG_GCONF, &v);        /* 生产公开读 */
+        CHECK("C16e-xfer-lock-held-bounded-fail-no-frame",
+              e == -RT_EBUSY && leaf_mtx_takes > t0 && leaf_mtx_timeouts > 0 &&
+              leaf_mtx_last_request > 0 &&
+              leaf_mtx_last_request <= (rt_int32_t)TMC_BUD_XFER_LOCK_MS &&
+              leaf_write_frames == f0 && leaf_read_reqs == rr0,
+              fm("read rc=%d 等待请求=%dms(上限 %d) 到期=%d 写帧=%d 读请求=%d value=%08X",
+                 (int)e, (int)leaf_mtx_last_request, (int)TMC_BUD_XFER_LOCK_MS,
+                 leaf_mtx_timeouts, leaf_write_frames, leaf_read_reqs, (unsigned)v));
+    }
+    leaf_hk_ask_release();
+    leaf_join_all();
+    {
+        int rr1 = leaf_read_reqs;
+        rt_uint32_t v2 = 0;
+
+        e = tmc2209_read_register(0, TMC_REG_GCONF, &v2);
+        CHECK("C16e2-xfer-lock-released-then-read-works",
+              e == RT_EOK && leaf_read_reqs == rr1 + 1 && v2 == 0x00000101u,
+              fm("归还后再读 rc=%d 读请求=%d(前=%d) value=%08X",
+                 (int)e, leaf_read_reqs, rr1, (unsigned)v2));
+    }
+
+    /* C16e3: 同一把 xfer 叶锁, 但**外层预算**只剩 3ms(< 20ms 上限)=> 传给锁的等待值
+     * 必须是 min(20, 3); 到期后一个字节都不许发, 出参 value 也不许被改写。
+     * 走的是生产读事务本体 tmc_read_reg(与 integrity 的 ctx->bus->read 同一个入口)。 */
+    leaf_hk_reset();
+    if (!leaf_pre(leaf_spawn(leaf_hold_xfer_lock, RT_NULL) == 0, "C16e3 holder")) return;
+    if (!seq_or_timeout("C16e3 holder 已取到 xfer 锁", leaf_hk_wait_have(5000)))
+    { leaf_hk_ask_release(); leaf_join_all(); return; }
+    if (!leaf_pre(leaf_hk_err == 0 && leaf_hk_taken == RT_TRUE, "C16e3 holder 确实持有 xfer 锁"))
+    { leaf_hk_ask_release(); leaf_join_all(); return; }
+    {
+        tmc_budget_t    tight_x;
+        tmc_xfer_stat_t xs;
+        rt_uint32_t     v3 = 0xA5A5A5A5u;
+        int             f0 = leaf_write_frames, rr0 = leaf_read_reqs, t0 = leaf_mtx_takes;
+
+        (void)tmc_budget_open(&tight_x, 4u);
+        leaf_advance(1u);                       /* 用掉 1ms => 剩 3ms < 20ms 上限 */
+        memset(&xs, 0, sizeof(xs));
+        e = tmc_read_reg(0, TMC_REG_GCONF, &v3, &tight_x, &xs);
+        CHECK("C16e3-xfer-wait-is-min-of-cap-and-remaining",
+              e == -RT_EBUSY && xs.reason == TMC_XFER_LOCK_BUSY &&
+              leaf_mtx_takes > t0 && leaf_mtx_last_request == 3 && v3 == 0xA5A5A5A5u &&
+              leaf_write_frames == f0 && leaf_read_reqs == rr0,
+              fm("读事务 rc=%d reason=%d 传给锁的等待值=%dms(必须 =min(上限 20, 剩余 3)) "
+                 "value=%08X(必须没被改写) 写帧=%d 读请求=%d",
+                 (int)e, (int)xs.reason, (int)leaf_mtx_last_request, (unsigned)v3,
+                 leaf_write_frames, leaf_read_reqs));
+    }
+    leaf_hk_ask_release();
+    leaf_join_all();
+
+    /* ================= C16f: min(cap, 剩余预算) 与预算为 0 ================= */
+    leaf_state_clear();
+    leaf_hk_reset();
+    if (!leaf_pre(leaf_bus_ready(), "C16f bus ready")) return;
+    {
+        tmc_budget_t tight, dead;
+        rt_bool_t tk = RT_FALSE;
+        rt_err_t le2, le0;
+        int takes_before;
+
+        (void)tmc_budget_open(&tight, 4u);            /* 只剩 4ms */
+        leaf_advance(1u);                             /* 再用掉 1ms => 剩 3ms(<10ms 上限) */
+        if (!leaf_pre(leaf_spawn(leaf_hold_cfg_lock, &tight) == 0, "C16f holder")) return;
+        if (!seq_or_timeout("C16f holder 已取到 cfg 锁", leaf_hk_wait_have(5000)))
+        { leaf_hk_ask_release(); leaf_join_all(); return; }
+        takes_before = leaf_mtx_takes;
+        le2 = tmc_cfg_lock_take(&tmc_cfg_prod, &tight, &tk);        /* 主线程同一生产函数 */
+        CHECK("C16f-wait-is-min-of-cap-and-remaining",
+              le2 == -RT_EBUSY && tk == RT_FALSE && leaf_mtx_takes > takes_before &&
+              leaf_mtx_last_request == 3,
+              fm("叶锁 rc=%d(应 -RT_EBUSY) taken=%d 传给锁的等待值=%dms"
+                 "(必须 =min(上限 10, 剩余 3))",
+                 (int)le2, (int)tk, (int)leaf_mtx_last_request));
+        leaf_hk_ask_release();
+        leaf_join_all();
+
+        (void)tmc_budget_open(&dead, 4u);
+        leaf_advance(9u);                             /* 已过期限 => remaining = 0 */
+        tk = RT_FALSE;
+        takes_before = leaf_mtx_takes;
+        le0 = tmc_cfg_lock_take(&tmc_cfg_prod, &dead, &tk);
+        CHECK("C16f2-exhausted-budget-does-not-attempt-lock",
+              le0 == -RT_ETIMEOUT && tk == RT_FALSE && leaf_mtx_takes == takes_before,
+              fm("预算已尽 rc=%d(应 -RT_ETIMEOUT) taken=%d 取锁调用增量=%d(必须 0)",
+                 (int)le0, (int)tk, leaf_mtx_takes - takes_before));
+    }
 }
 
 static void c16_group(void)
@@ -1128,6 +1600,9 @@ static void c16_group(void)
         }
         leaf_rx_drip = 0;
     }
+
+    /* CP6 §3: 叶锁(而非最外层 txn)的有界失败与保护 */
+    c16_leaflock_cases();
 }
 
 /* ===================================================================== */
@@ -1400,6 +1875,10 @@ int main(int argc, char **argv)
 {
     const char *group = (argc > 1) ? argv[1] : "epwm_leaf";
     int gated = (MOTOR_HARDWARE_ENABLE_PATH_VALIDATED && TMC_DRIVE_CONFIG_HW_VALIDATED) ? 1 : 0;
+
+    /* 台账逐行立刻落盘: 某组一旦被 runner 的墙钟守卫杀掉, 已经跑过的那几行仍然是可读的
+     * 证据(重定向到文件时默认是满缓冲, 否则整份日志会随进程一起丢)。 */
+    setvbuf(stdout, RT_NULL, _IONBF, 0);
 
     leaf_uart_cfg.name = TMC_UART_DEVICE_NAME;
     leaf_uart_cfg.Instance = &leaf_uart_regs;

@@ -976,12 +976,8 @@ static void cases_recovery(void)
     c14_wait_stage(1);
     cont0 = s2_contend_hits;
     s2_spawn(c14_reset_thread, &r1);          /* B: 同一把 ss_lock 的真实竞争者 */
-    {
-        int spins = 0;
-
-        while (s2_contend_hits == cont0 && spins++ < 2500) usleep(200);
-        b_waited = (s2_contend_hits > cont0) ? 1 : 0;
-    }
+    /* CP6: 会合到"B 确实在门外被挡住"这一事件(墙钟 5s 只作死锁守卫)。 */
+    b_waited = s2_contend_wait_above(cont0, 5000);
     c14_release_a();                            /* 恢复最终窗口先成功 */
     c14_wait_stage(3);
     s2_join_all();

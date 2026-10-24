@@ -98,6 +98,36 @@ const char *s2_contend_name = "(none)";
 void s2_contend_clear(void) { s2_contend_hits = 0; s2_contend_name = "(none)"; }
 int  s2_seq_contend_seen(void) { return s2_contend_hits; }
 
+/* CP6 回归修正: "确实有线程在门外等"必须是一次**事件会合**, 不能是主线程按
+ * usleep(200) 的粒度自旋来猜。本机实测(2026-10-24, 满载时): 那条 2500×usleep(200) 的
+ * 猜测窗口会先走完, 于是同一条 C14b 偶发判 FAIL —— 观察时机缺陷, 不是产品行为变化。
+ * 现在竞争点在 trylock 失败处 broadcast, 等待方在条件量上等; guard_ms 只作死锁守卫,
+ * 到期原样返回"没等到", 不放宽任何判据。 */
+static pthread_mutex_t s2_contend_m = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t  s2_contend_c = PTHREAD_COND_INITIALIZER;
+
+/* 等到 s2_contend_hits 真的越过 base(= 至少一次"别的线程持有时 trylock 失败"的门外等待)。
+ * 返回 1=等到了; 0=墙钟守卫到期(调用方据此如实判失败)。 */
+static int s2_contend_wait_above(int base, int guard_ms)
+{
+    struct timespec dl;
+    int hit;
+
+    clock_gettime(CLOCK_REALTIME, &dl);
+    dl.tv_sec  += guard_ms / 1000;
+    dl.tv_nsec += (long)(guard_ms % 1000) * 1000000L;
+    if (dl.tv_nsec >= 1000000000L) { dl.tv_nsec -= 1000000000L; dl.tv_sec += 1; }
+
+    pthread_mutex_lock(&s2_contend_m);
+    while (s2_contend_hits == base)
+    {
+        if (pthread_cond_timedwait(&s2_contend_c, &s2_contend_m, &dl) == ETIMEDOUT) break;
+    }
+    hit = (s2_contend_hits > base) ? 1 : 0;
+    pthread_mutex_unlock(&s2_contend_m);
+    return hit;
+}
+
 rt_err_t rt_mutex_init(struct rt_mutex *m, const char *name, rt_uint16_t flags)
 {
     (void)flags;
@@ -136,6 +166,13 @@ rt_err_t rt_mutex_take(struct rt_mutex *m, rt_int32_t t)
         s2_contend_hits++;
         s2_contend_name = (m->name ? m->name : "?");
         s2_seq_set(S2_SEQ_CONTEND);
+        {
+            /* 先放行"是否在门外等"的会合等待者, 再真的阻塞到拿到为止(不抱着
+             * s2_contend_m 去等业务锁)。 */
+            pthread_mutex_lock(&s2_contend_m);
+            pthread_cond_broadcast(&s2_contend_c);
+            pthread_mutex_unlock(&s2_contend_m);
+        }
         e = pthread_mutex_lock(real);
     }
     return (e == 0) ? RT_EOK : RT_ERROR;
@@ -366,7 +403,8 @@ for raw_old, raw_new in REPL:
 
 # 端口层需要 pthread + 额外的 include 头
 ports = ports.replace('#include <stdarg.h>',
-                      '#include <stdarg.h>\n#include <pthread.h>\n#include <unistd.h>')
+                      '#include <stdarg.h>\n#include <pthread.h>\n#include <unistd.h>'
+                      '\n#include <errno.h>\n#include <time.h>')
 
 io.open(OUT, "w", encoding="utf-8", newline="\r\n").write(ports)
 print("ports written, bytes=", len(ports))

@@ -498,7 +498,17 @@ void      step_pwm_clear_stop_latch(void) { }
 #include "drv_epwm.h"
 #include "rthw.h"
 
-static int s_intr_masked, s_intr_depth;
+/* N7 根因修复(CP6 §4): 屏蔽状态必须是**每线程**的。本链从 motor_init 起就有一条真的
+ * 生产线程(motor 斜坡线程), 而目标上"别的线程正屏蔽"这种状态在主线程里根本观察不到
+ * (单核 + PRIMASK 期内不会被调度)。原来用进程级全局位 => 斜坡线程进自己的短临界窗口时,
+ * 主线程的 ns800_intr_masked()/rt_thread_self() 一起变成"不可等待", tmc_ctx_ok_for_wait
+ * 于是按设计**静默**拒绝(拒绝路径不许打印), apply/probe 的读拿到 -RT_EBUSY。满载时这条
+ * 交错反复命中, 把 FD7a/b/c + FD8a/b/c 六条判据打成 FAIL, 而总返回码按"FAIL 优先于
+ * MISSING"变成 1 => N7(helper_thread_startup_fail, 期望 rc=3 的具名 MISSING)被报成
+ * NOT-DETECTED。这是夹具模型缺陷, 不是产品行为。
+ * ⚠ 本链仍然**没有**跨线程的窗口互斥(目标上 PRIMASK 的独占性由 S2 并发链那条模型承担),
+ *    这里只把"谁屏蔽的"归回线程自己。 */
+static __thread int s_intr_masked, s_intr_depth;
 static int shim_low_raw_calls, shim_high_raw_calls;
 static rt_err_t shim_permit_raw_rc = RT_EOK;    /* 裸写请求结果(独立注入) */
 

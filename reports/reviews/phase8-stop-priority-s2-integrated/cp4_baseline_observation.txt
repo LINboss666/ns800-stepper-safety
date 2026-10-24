@@ -949,3 +949,498 @@ Build Time Elapsed:  00:00:10
      - 结论: 该例在**全量顺序**下偶发漏检一次, 单独跑稳定复现; 根因(与前后用例共享的
        工作目录/产物复用有关, 还是 V2 线程启动失败分支本身有时序依赖)**本轮未定位**,
        作为开放项交给独立审查, 不记为通过。元负例 M1..M5 五项在同一定稿字节上均 META-OK。
+
+--------------------------------------------------------------------------------
+[D] CP6(任务书 phase8-stop-priority-s2-cp6-closeout)收口: 原文证据追加
+--------------------------------------------------------------------------------
+[D.0] 输入身份
+  本轮续做起点(独立审查的只读回读树) = bd8548cce8dfc7643dfc8dfa0884d5d2ea940d4d
+  本轮定稿字节的工作树 blob(带路径; bytes=Git blob 长度):
+    282ae491bb7b152f3ab24024f801f0017286746d  生产  rt-thread-master/rt-thread-master/bsp/novosns/ns800/libraries/HAL_Drivers/drivers/drv_epwm_leaf.inc  bytes=17254
+    4b418f88d6987f0f7bed70719954f01bf480ef0f  夹具/runner  tests/host/leaf_main.c  bytes=89121
+    8caf16df489558551e59e330290861ad3b35f775  夹具/runner  tests/host/run_stop_priority_s2.sh  bytes=42382
+    bd648b898adce7e09213198fab0b7d5599b77a17  夹具/runner  tests/host/sp_conc_main.c  bytes=100632
+    cf3a97e2ce15f14eb36f17daed66202295461111  夹具/runner  tests/host/sp_conc_gen/gen_sp_conc_ports.py  bytes=17596
+    2c56801b0a504b9cc8e53b6857f040fda4802d53  夹具/runner  tests/host/sp_conc_gen/gen_sp_conc_body.py  bytes=58762
+    229d98dd186189c1a11e926cd9b1c6caefdd5216  夹具/runner  tests/host/host_main.c  bytes=57338
+
+[D.1] 现存负例日志原文(negatives_flake_record.txt) —— 来源 任务书 §4 点名要读的那一份(修注入配方之后的一次全量): 末尾类别计数 OK=12 / NOT-DETECTED=1(N7) / INFRA-FAIL=0, N7 的 V2 期望=3 实际=1 就记录在这里
+  两份的头部基线都记 0b0f1661(运行发生在 bd8548c 提交之前, 内容即后来的定稿字节;
+  这一点在 [C.10] 里被写成"定稿字节", 口径在此对齐: SHA 是运行时的 HEAD, 不是提交后)。
+  只做过一处机械替换: 与本机用户相关的绝对路径前缀(临时目录与仓库根)分别替换为 <临时根> 与 <仓根>;
+  行内容一字未改。
+  | ############ 负例与回归全链 (基线 0b0f1661d29d115ebe0b39b78cc6ea7cd6908533, 逐例预期矩阵 + 出口对账) ############
+  | 请求集合(13): N1_only_V1_injected_fail N2_only_V2_injected_fail N3_V1_stale_exe_not_reused N4_fw_calc_selftest_FAILED N5_fw_cfg_selftest_INCOMPLETE N6_helper_thread_create_fail N7_helper_thread_startup_fail N8_gstat_expect_table_tamper N9_probe_writeback_V1 N10_probe_writeback_V2 N10b_writeback_both_variants N11_clean_snapshot_regression N12_workspace_clean_regression
+  | OK | N1_only_V1_injected_fail | rc 真实=1 自报=1 期望=1 | V1=RAN/0/1 V2=RAN/0/0 (期望 V1=RAN/0/1 V2=RAN/0/0)
+  | --- N1_only_V1_injected_fail: OK
+  | OK | N2_only_V2_injected_fail | rc 真实=1 自报=1 期望=1 | V1=RAN/0/0 V2=RAN/0/1 (期望 V1=RAN/0/0 V2=RAN/0/1)
+  | --- N2_only_V2_injected_fail: OK
+  | OK | N3_V1_stale_exe_not_reused | rc 真实=1 自报=1 期望=1 | V1=COMPILE_FAILED/1/127 V2=RAN/0/0 (期望 V1=COMPILE_FAILED/1/127 V2=RAN/0/0)
+  | --- N3_V1_stale_exe_not_reused: OK
+  | injected(mode=calc_anchor, replacements=1) -> <临时根>/ns800_cp5_ev/final_121406/negatives2/snap_calc/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/tmc2209.c
+  | OK | N4_fw_calc_selftest_FAILED | rc 真实=2 自报=2 期望=2 | V1=RAN/0/2 V2=RAN/0/2 (期望 V1=RAN/0/2 V2=RAN/0/2)
+  | --- N4_fw_calc_selftest_FAILED: OK
+  | OK | N5_fw_cfg_selftest_INCOMPLETE | rc 真实=2 自报=2 期望=2 | V1=RAN/0/2 V2=RAN/0/0 (期望 V1=RAN/0/2 V2=RAN/0/0)
+  | --- N5_fw_cfg_selftest_INCOMPLETE: OK
+  | OK | N6_helper_thread_create_fail | rc 真实=3 自报=3 期望=3 | V1=RAN/0/3 V2=RAN/0/3 (期望 V1=RAN/0/3 V2=RAN/0/3)
+  | --- N6_helper_thread_create_fail: OK
+  | NOT-DETECTED | N7_helper_thread_startup_fail | rc 真实=3 自报=3 期望=3 | V1=RAN/0/3 V2=RAN/0/1 (期望 V1=RAN/0/3 V2=RAN/0/3)  V2.run:期望=3 实际=1
+  | --- N7_helper_thread_startup_fail: NOT-DETECTED  V2.run:期望=3 实际=1
+  | injected(mode=gstat_expect, replacements=1) -> <临时根>/ns800_cp5_ev/final_121406/negatives2/harness_gstat/host_main.c
+  | OK | N8_gstat_expect_table_tamper | rc 真实=1 自报=1 期望=1 | V1=RAN/0/1 V2=RAN/0/0 (期望 V1=RAN/0/1 V2=RAN/0/0)
+  | --- N8_gstat_expect_table_tamper: OK
+  | injected(mode=probe_writeback, replacements=1) -> <临时根>/ns800_cp5_ev/final_121406/negatives2/snap_writeback/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/tmc2209.c
+  | OK | N9_probe_writeback_V1 | rc 真实=1 自报=1 期望=1 | V1=RAN/0/1 V2=NOT_RUN/NOT_RUN/NOT_RUN (期望 V1=RAN/0/1 V2=NOT_RUN/NOT_RUN/NOT_RUN)
+  | --- N9_probe_writeback_V1: OK
+  | OK | N10_probe_writeback_V2 | rc 真实=1 自报=1 期望=1 | V1=NOT_RUN/NOT_RUN/NOT_RUN V2=RAN/0/1 (期望 V1=NOT_RUN/NOT_RUN/NOT_RUN V2=RAN/0/1)
+  | --- N10_probe_writeback_V2: OK
+  | OK | N10b_writeback_both_variants | rc 真实=1 自报=1 期望=1 | V1=RAN/0/1 V2=RAN/0/1 (期望 V1=RAN/0/1 V2=RAN/0/1)
+  | --- N10b_writeback_both_variants: OK
+  | OK | N11_clean_snapshot_regression | rc 真实=0 自报=0 期望=0 | V1=RAN/0/0 V2=RAN/0/0 (期望 V1=RAN/0/0 V2=RAN/0/0)
+  | --- N11_clean_snapshot_regression: OK
+  | OK | N12_workspace_clean_regression | rc 真实=0 自报=0 期望=0 | V1=RAN/0/0 V2=RAN/0/0 (期望 V1=RAN/0/0 V2=RAN/0/0)
+  | --- N12_workspace_clean_regression: OK
+  | 
+  | ############ 判定汇总 ############
+  | OK | N1_only_V1_injected_fail
+  | OK | N2_only_V2_injected_fail
+  | OK | N3_V1_stale_exe_not_reused
+  | OK | N4_fw_calc_selftest_FAILED
+  | OK | N5_fw_cfg_selftest_INCOMPLETE
+  | OK | N6_helper_thread_create_fail
+  | NOT-DETECTED | N7_helper_thread_startup_fail |   V2.run:期望=3 实际=1
+  | OK | N8_gstat_expect_table_tamper
+  | OK | N9_probe_writeback_V1
+  | OK | N10_probe_writeback_V2
+  | OK | N10b_writeback_both_variants
+  | OK | N11_clean_snapshot_regression
+  | OK | N12_workspace_clean_regression
+  | 
+  | 执行集合(13) 与请求集合(13) 一致: 是
+  | 类别计数: OK=12 NOT-DETECTED=1 INFRA-FAIL=0
+  | RUNNER(run_negatives): 有负例漏检或身份缺失 (rc=1)
+  | 
+  | FATAL: 目标已存在但没有本工具的哨兵文件, 拒绝 rm -rf: /tmp/ns800-host-chain/meta
+  | RUNNER(meta) rc=1
+  | 
+
+[D.2] 现存负例日志原文(negatives.txt) —— 来源 同一留存目录里的另一份全量原文(修注入配方之前): 末尾类别计数 OK=9 / NOT-DETECTED=1(N7) / INFRA-FAIL=3(N9/N10/N10b 因 inject.py 签名漂移编译失败), RUNNER rc=4; 另末段记录元负例入口因既有工作目录无哨兵被拒(rc=1)
+  两份的头部基线都记 0b0f1661(运行发生在 bd8548c 提交之前, 内容即后来的定稿字节;
+  这一点在 [C.10] 里被写成"定稿字节", 口径在此对齐: SHA 是运行时的 HEAD, 不是提交后)。
+  只做过一处机械替换: 与本机用户相关的绝对路径前缀(临时目录与仓库根)分别替换为 <临时根> 与 <仓根>;
+  行内容一字未改。
+  | ############ 负例与回归全链 (基线 0b0f1661d29d115ebe0b39b78cc6ea7cd6908533, 逐例预期矩阵 + 出口对账) ############
+  | 请求集合(13): N1_only_V1_injected_fail N2_only_V2_injected_fail N3_V1_stale_exe_not_reused N4_fw_calc_selftest_FAILED N5_fw_cfg_selftest_INCOMPLETE N6_helper_thread_create_fail N7_helper_thread_startup_fail N8_gstat_expect_table_tamper N9_probe_writeback_V1 N10_probe_writeback_V2 N10b_writeback_both_variants N11_clean_snapshot_regression N12_workspace_clean_regression
+  | OK | N1_only_V1_injected_fail | rc 真实=1 自报=1 期望=1 | V1=RAN/0/1 V2=RAN/0/0 (期望 V1=RAN/0/1 V2=RAN/0/0)
+  | --- N1_only_V1_injected_fail: OK
+  | OK | N2_only_V2_injected_fail | rc 真实=1 自报=1 期望=1 | V1=RAN/0/0 V2=RAN/0/1 (期望 V1=RAN/0/0 V2=RAN/0/1)
+  | --- N2_only_V2_injected_fail: OK
+  | OK | N3_V1_stale_exe_not_reused | rc 真实=1 自报=1 期望=1 | V1=COMPILE_FAILED/1/127 V2=RAN/0/0 (期望 V1=COMPILE_FAILED/1/127 V2=RAN/0/0)
+  | --- N3_V1_stale_exe_not_reused: OK
+  | injected(mode=calc_anchor, replacements=1) -> <临时根>/ns800_neg_123107/w1/snap_calc/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/tmc2209.c
+  | OK | N4_fw_calc_selftest_FAILED | rc 真实=2 自报=2 期望=2 | V1=RAN/0/2 V2=RAN/0/2 (期望 V1=RAN/0/2 V2=RAN/0/2)
+  | --- N4_fw_calc_selftest_FAILED: OK
+  | OK | N5_fw_cfg_selftest_INCOMPLETE | rc 真实=2 自报=2 期望=2 | V1=RAN/0/2 V2=RAN/0/0 (期望 V1=RAN/0/2 V2=RAN/0/0)
+  | --- N5_fw_cfg_selftest_INCOMPLETE: OK
+  | OK | N6_helper_thread_create_fail | rc 真实=3 自报=3 期望=3 | V1=RAN/0/3 V2=RAN/0/3 (期望 V1=RAN/0/3 V2=RAN/0/3)
+  | --- N6_helper_thread_create_fail: OK
+  | NOT-DETECTED | N7_helper_thread_startup_fail | rc 真实=3 自报=3 期望=3 | V1=RAN/0/3 V2=RAN/0/1 (期望 V1=RAN/0/3 V2=RAN/0/3)  V2.run:期望=3 实际=1
+  | --- N7_helper_thread_startup_fail: NOT-DETECTED  V2.run:期望=3 实际=1
+  | injected(mode=gstat_expect, replacements=1) -> <临时根>/ns800_neg_123107/w1/harness_gstat/host_main.c
+  | OK | N8_gstat_expect_table_tamper | rc 真实=1 自报=1 期望=1 | V1=RAN/0/1 V2=RAN/0/0 (期望 V1=RAN/0/1 V2=RAN/0/0)
+  | --- N8_gstat_expect_table_tamper: OK
+  | injected(mode=probe_writeback, replacements=1) -> <临时根>/ns800_neg_123107/w1/snap_writeback/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/tmc2209.c
+  | INFRA-FAIL | N9_probe_writeback_V1 | rc 真实=1 自报=1 期望=1 | V1=COMPILE_FAILED/1/127 V2=NOT_RUN/NOT_RUN/NOT_RUN (期望 V1=RAN/0/1 V2=NOT_RUN/NOT_RUN/NOT_RUN)  V1.state:期望=RAN 实际=COMPILE_FAILED  V1.build:期望=0 实际=1  V1.run:期望=1 实际=127  V1.executed:期望=1 实际=0  V1.out_bytes:期望=>0 实际=ABSENT 缺席身份: V1[\[FAIL\] FD2 probe\(死链路\)] V1[\[FAIL\] FD3 probe\(活链路\)]
+  | --- N9_probe_writeback_V1: INFRA-FAIL  V1.state:期望=RAN 实际=COMPILE_FAILED  V1.build:期望=0 实际=1  V1.run:期望=1 实际=127  V1.executed:期望=1 实际=0  V1.out_bytes:期望=>0 实际=ABSENT 缺席身份: V1[\[FAIL\] FD2 probe\(死链路\)] V1[\[FAIL\] FD3 probe\(活链路\)]
+  | INFRA-FAIL | N10_probe_writeback_V2 | rc 真实=1 自报=1 期望=1 | V1=NOT_RUN/NOT_RUN/NOT_RUN V2=COMPILE_FAILED/1/127 (期望 V1=NOT_RUN/NOT_RUN/NOT_RUN V2=RAN/0/1)  V2.state:期望=RAN 实际=COMPILE_FAILED  V2.build:期望=0 实际=1  V2.run:期望=1 实际=127  V2.executed:期望=1 实际=0  V2.out_bytes:期望=>0 实际=ABSENT 缺席身份: V2[\[FAIL\] FD7b 已提交快照后再 probe: 写帧增量 1\(应 0\)]
+  | --- N10_probe_writeback_V2: INFRA-FAIL  V2.state:期望=RAN 实际=COMPILE_FAILED  V2.build:期望=0 实际=1  V2.run:期望=1 实际=127  V2.executed:期望=1 实际=0  V2.out_bytes:期望=>0 实际=ABSENT 缺席身份: V2[\[FAIL\] FD7b 已提交快照后再 probe: 写帧增量 1\(应 0\)]
+  | INFRA-FAIL | N10b_writeback_both_variants | rc 真实=1 自报=1 期望=1 | V1=COMPILE_FAILED/1/127 V2=COMPILE_FAILED/1/127 (期望 V1=RAN/0/1 V2=RAN/0/1)  V1.state:期望=RAN 实际=COMPILE_FAILED  V1.build:期望=0 实际=1  V1.run:期望=1 实际=127  V2.state:期望=RAN 实际=COMPILE_FAILED  V2.build:期望=0 实际=1  V2.run:期望=1 实际=127  V1.executed:期望=1 实际=0  V1.out_bytes:期望=>0 实际=ABSENT  V2.executed:期望=1 实际=0  V2.out_bytes:期望=>0 实际=ABSENT 缺席身份: V1[\[FAIL\] FD3 probe\(活链路\)] V2[\[FAIL\] FD7b 已提交快照后再 probe: 写帧增量 1\(应 0\)]
+  | --- N10b_writeback_both_variants: INFRA-FAIL  V1.state:期望=RAN 实际=COMPILE_FAILED  V1.build:期望=0 实际=1  V1.run:期望=1 实际=127  V2.state:期望=RAN 实际=COMPILE_FAILED  V2.build:期望=0 实际=1  V2.run:期望=1 实际=127  V1.executed:期望=1 实际=0  V1.out_bytes:期望=>0 实际=ABSENT  V2.executed:期望=1 实际=0  V2.out_bytes:期望=>0 实际=ABSENT 缺席身份: V1[\[FAIL\] FD3 probe\(活链路\)] V2[\[FAIL\] FD7b 已提交快照后再 probe: 写帧增量 1\(应 0\)]
+  | OK | N11_clean_snapshot_regression | rc 真实=0 自报=0 期望=0 | V1=RAN/0/0 V2=RAN/0/0 (期望 V1=RAN/0/0 V2=RAN/0/0)
+  | --- N11_clean_snapshot_regression: OK
+  | OK | N12_workspace_clean_regression | rc 真实=0 自报=0 期望=0 | V1=RAN/0/0 V2=RAN/0/0 (期望 V1=RAN/0/0 V2=RAN/0/0)
+  | --- N12_workspace_clean_regression: OK
+  | 
+  | ############ 判定汇总 ############
+  | OK | N1_only_V1_injected_fail
+  | OK | N2_only_V2_injected_fail
+  | OK | N3_V1_stale_exe_not_reused
+  | OK | N4_fw_calc_selftest_FAILED
+  | OK | N5_fw_cfg_selftest_INCOMPLETE
+  | OK | N6_helper_thread_create_fail
+  | NOT-DETECTED | N7_helper_thread_startup_fail |   V2.run:期望=3 实际=1
+  | OK | N8_gstat_expect_table_tamper
+  | INFRA-FAIL | N9_probe_writeback_V1 |   V1.state:期望=RAN 实际=COMPILE_FAILED  V1.build:期望=0 实际=1  V1.run:期望=1 实际=127  V1.executed:期望=1 实际=0  V1.out_bytes:期望=>0 实际=ABSENT 缺席身份: V1[\[FAIL\] FD2 probe\(死链路\)] V1[\[FAIL\] FD3 probe\(活链路\)]
+  | INFRA-FAIL | N10_probe_writeback_V2 |   V2.state:期望=RAN 实际=COMPILE_FAILED  V2.build:期望=0 实际=1  V2.run:期望=1 实际=127  V2.executed:期望=1 实际=0  V2.out_bytes:期望=>0 实际=ABSENT 缺席身份: V2[\[FAIL\] FD7b 已提交快照后再 probe: 写帧增量 1\(应 0\)]
+  | INFRA-FAIL | N10b_writeback_both_variants |   V1.state:期望=RAN 实际=COMPILE_FAILED  V1.build:期望=0 实际=1  V1.run:期望=1 实际=127  V2.state:期望=RAN 实际=COMPILE_FAILED  V2.build:期望=0 实际=1  V2.run:期望=1 实际=127  V1.executed:期望=1 实际=0  V1.out_bytes:期望=>0 实际=ABSENT  V2.executed:期望=1 实际=0  V2.out_bytes:期望=>0 实际=ABSENT 缺席身份: V1[\[FAIL\] FD3 probe\(活链路\)] V2[\[FAIL\] FD7b 已提交快照后再 probe: 写帧增量 1\(应 0\)]
+  | OK | N11_clean_snapshot_regression
+  | OK | N12_workspace_clean_regression
+  | 
+  | 执行集合(13) 与请求集合(13) 一致: 是
+  | 类别计数: OK=9 NOT-DETECTED=1 INFRA-FAIL=3
+  | RUNNER(run_negatives): 基础设施故障/回执不一致 —— 有负例没真正执行或自报与真实 rc 不符 (rc=4)
+  | 
+  | FATAL: 目标已存在但没有本工具的哨兵文件, 拒绝 rm -rf: /tmp/ns800-host-chain/meta
+  | RUNNER(meta) rc=1
+  | 
+
+[D.2b] 对 [C.10] 一句引用的更正(不删除原文, 只更正登记)
+  [C.10] 第 2) 条写过"另一次全量运行(全 13 例全新工作目录)也是 类别计数: OK=13
+  NOT-DETECTED=0 INFRA-FAIL=0 —— 见 negatives.txt"。按留存工件核对: 该目录下只有上面
+  两份 negatives 日志, 一份 OK=9/INFRA-FAIL=3、一份 OK=12/NOT-DETECTED=1, **没有** OK=13
+  的那一份被留在仓外证据根里 => 那句引用没有对应工件支撑, 本轮如实更正(N7 当时确实
+  两次都不是 OK)。也不据此否定同一留存日志里其余 12 例的真实 rc。
+  13/13 OK 的证据由本批定稿字节上的新一次全量提供(见 [D.5]), 不是拿旧日志改口。
+
+[D.3] N7_helper_thread_startup_fail 那一次运行的完整失败身份(现存原文, 未重造)
+  runner 侧对账原文(<临时根>/ns800_cp5_ev/final_121406/negatives2/N7_helper_thread_startup_fail.log):
+  | runner   : <仓根>/tests/host/host_main.c
+  | SRC_APP  : <临时根>/ns800_cp5_ev/final_121406/negatives2/pristine/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications
+  | OUT_DIR  : <临时根>/ns800_cp5_ev/final_121406/negatives2/N7_helper_thread_startup_fail
+  | compiler : gcc.exe (tdm64-1) 4.9.2
+  | 
+  | === V1 (发布配置: 三个安全宏 = FALSE) ===
+  | V1 build rc = 0  (log: v1_build.txt)
+  | V1 run   rc = 3  (执行证据: v1_executed.marker)
+  | 
+  | =========================================================
+  | HOST TEST SUMMARY: CHECK_PASS=24 CHECK_FAIL=0 BAD_SELFTEST=0 MISSING_CASE=3
+  | 结论: NOT PASSED -> 必需用例未执行 3 项; 详见上方 [FAIL]/[BADRESULT]/[MISSING] 行
+  | PROCESS RC=3 (0=通过)
+  | =========================================================
+  | 
+  | === V2 (HOST_GATE_OVERRIDE + 三宏按 TRUE; 仅主机覆盖路径, 不进 Keil/正式固件) ===
+  | V2 build rc = 0  (log: v2_build.txt)
+  | V2 run   rc = 1  (执行证据: v2_executed.marker)
+  | 
+  | =========================================================
+  | HOST TEST SUMMARY: CHECK_PASS=15 CHECK_FAIL=6 BAD_SELFTEST=0 MISSING_CASE=3
+  | 结论: NOT PASSED -> 判据失败 6 项; 必需用例未执行 3 项; 详见上方 [FAIL]/[BADRESULT]/[MISSING] 行
+  | PROCESS RC=1 (0=通过)
+  | =========================================================
+  | 
+  | === RUNNER SUMMARY ===
+  |   V1 build=0 run=3 state=RAN    V2 build=0 run=1 state=RAN
+  |   RUNNER RESULT: FAIL (rc=3; 任一必需步骤非零即失败)
+  | 
+  V2 进程输出里的判定行原文(全部 [MISSING]/[FAIL]/终态):
+  |   [MISSING] 必需用例未执行: T14 跨线程占用 txn(fail closed) (在捕获里找不到 "[TMC-CFG-ST] ... T14 跨线程占用 -> -RT_EBUSY fail closed OK")
+  |   [MISSING] T14 走了 SKIP 分支: 关键并发用例未实际执行
+  |   [MISSING] 必需用例未执行: C7 motor_arm 遇 txn 占用(前置: 另一线程已确认持锁)
+  |   [FAIL] FD7a 真总线+假芯片: apply=-23 提交 4 个 WRITE 帧, 芯片 GCONF=00000101 = 快照
+  |   [FAIL] FD7b 已提交快照后再 probe: 写帧增量 0(应 0) 读请求 0(应 3) 芯片 GCONF 仍 =00000101
+  |   [FAIL] FD7c probe 之后复核仍通过, 第 5 门仍放行(快照与芯片未分离)
+  |   [FAIL] FD8a 旧值写回成功(芯片=00000101, 快照=00000141) —— 分离确实发生了
+  |   [FAIL] FD8b 复核抓到分离: integrity=-RT_EIO state=FAILED 快照作废 第 5 门闭合
+  |   [FAIL] FD8c 重新下发恢复: apply=-23 芯片=00000101 快照=00000141
+  | HOST TEST SUMMARY: CHECK_PASS=15 CHECK_FAIL=6 BAD_SELFTEST=0 MISSING_CASE=3
+  | 结论: NOT PASSED -> 判据失败 6 项; 必需用例未执行 3 项; 详见上方 [FAIL]/[BADRESULT]/[MISSING] 行
+  | PROCESS RC=1 (0=通过)
+  V1 进程输出里的判定行原文(同一次运行, V1 侧只有缺席没有额外 FAIL):
+  |   [MISSING] 必需用例未执行: T14 跨线程占用 txn(fail closed) (在捕获里找不到 "[TMC-CFG-ST] ... T14 跨线程占用 -> -RT_EBUSY fail closed OK")
+  |   [MISSING] T14 走了 SKIP 分支: 关键并发用例未实际执行
+  |   [MISSING] 必需用例未执行: FD4 probe 遇 txn 占用(前置: 另一线程已确认持锁)
+  | HOST TEST SUMMARY: CHECK_PASS=24 CHECK_FAIL=0 BAD_SELFTEST=0 MISSING_CASE=3
+  | PROCESS RC=3 (0=通过)
+
+[D.4] 按实际身份的复现与根因(CP6 §4.1/§4.3)
+  读原文得到的失败身份是 FD7a/FD7b/FD7c + FD8a/FD8b/FD8c 六条 [FAIL](apply=-23、
+  probe 读不到), **不是**任务书静态候选的那条 C5 接缝(那一次 C5e 是 PASS:
+  |   [PASS] C5e: 已上报软故障事件(post_event 0 -> 1)
+  同一次运行里 C7 / FD4 / T14 三条具名 MISSING 与 N7 期望的缺席身份一致(见 [D.3])。
+
+  源码事实(引用行号按定稿字节):
+    tests/host/host_main.c:511  屏蔽位/嵌套深度(修前: `static int s_intr_masked, s_intr_depth;` 进程级全局;
+                               修后: 同一处改成 `static __thread int ...`)
+    tests/host/host_main.c:584  ns800_intr_masked() 读它; :608 rt_thread_self() 在它置位时返回空
+    applications/tmc2209.c:157/:166 tmc_ctx_ok_for_wait() 三条件之一 ns800_intr_masked()
+                               => 拒绝并返回 -RT_EBUSY
+    applications/motor.c:1049   rt_thread_create("motor", motor_ramp_entry, ...) => 本链确实有第二条真线程
+    拒绝路径按设计**不打印**(日志本身是不可控等待), 所以那一次日志里看不到 refusal 行 —— 与
+    观察到的 "只有 -23、没有 REFUSED 行" 一致。
+  判定: 斜坡线程进入自己的短临界窗口时, 全局屏蔽位让主线程也被判成"不可等待上下文",
+  apply/probe 的读被生产门拒绝(-RT_EBUSY) => 六条判据 FAIL; 总返回码按"FAIL 优先于
+  MISSING"变成 1, 于是 rc=3 的具名缺席被盖住。目标上单核 + PRIMASK 期内不会被调度,
+  这种"看见别人屏蔽"的状态根本不存在 => 夹具模型缺陷, 不是产品行为。
+  修法(最小): 屏蔽状态改成每线程(tests/host/host_main.c 的 __thread), 不动任何判据、
+  不动期望 rc、不加固定 sleep; 本链仍不建模跨线程窗口互斥(那条由 S2 并发链承担)。
+
+  同负载 A/B(6 路并发进程压 CPU, 各 24 次, 只改上面这一处):
+    修前(基线 bd8548c 字节 + 同一注入): (rc=1 FAIL=6 MISSING=3)×2, (rc=3 FAIL=0 MISSING=3)×22
+    修后(每线程屏蔽位): (rc=3 FAIL=0 MISSING=3)×24
+    另: 无负载单独复跑 20 次(修前字节)全部 rc=3 / 0 FAIL / 3 MISSING —— 命中依赖负载。
+
+[D.5] 定稿字节上的最终负例链(13 例)真实退出码原文
+  | 请求集合(13): N1_only_V1_injected_fail N2_only_V2_injected_fail N3_V1_stale_exe_not_reused N4_fw_calc_selftest_FAILED N5_fw_cfg_selftest_INCOMPLETE N6_helper_thread_create_fail N7_helper_thread_startup_fail N8_gstat_expect_table_tamper N9_probe_writeback_V1 N10_probe_writeback_V2 N10b_writeback_both_variants N11_clean_snapshot_regression N12_workspace_clean_regression
+  | OK | N1_only_V1_injected_fail | rc 真实=1 自报=1 期望=1 | V1=RAN/0/1 V2=RAN/0/0 (期望 V1=RAN/0/1 V2=RAN/0/0)
+  | --- N1_only_V1_injected_fail: OK
+  | OK | N2_only_V2_injected_fail | rc 真实=1 自报=1 期望=1 | V1=RAN/0/0 V2=RAN/0/1 (期望 V1=RAN/0/0 V2=RAN/0/1)
+  | --- N2_only_V2_injected_fail: OK
+  | OK | N3_V1_stale_exe_not_reused | rc 真实=1 自报=1 期望=1 | V1=COMPILE_FAILED/1/127 V2=RAN/0/0 (期望 V1=COMPILE_FAILED/1/127 V2=RAN/0/0)
+  | --- N3_V1_stale_exe_not_reused: OK
+  | injected(mode=calc_anchor, replacements=1) -> <临时根>/ns800_cp6_ev/final_cp6/negatives/snap_calc/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/tmc2209.c
+  | OK | N4_fw_calc_selftest_FAILED | rc 真实=2 自报=2 期望=2 | V1=RAN/0/2 V2=RAN/0/2 (期望 V1=RAN/0/2 V2=RAN/0/2)
+  | --- N4_fw_calc_selftest_FAILED: OK
+  | OK | N5_fw_cfg_selftest_INCOMPLETE | rc 真实=2 自报=2 期望=2 | V1=RAN/0/2 V2=RAN/0/0 (期望 V1=RAN/0/2 V2=RAN/0/0)
+  | --- N5_fw_cfg_selftest_INCOMPLETE: OK
+  | OK | N6_helper_thread_create_fail | rc 真实=3 自报=3 期望=3 | V1=RAN/0/3 V2=RAN/0/3 (期望 V1=RAN/0/3 V2=RAN/0/3)
+  | --- N6_helper_thread_create_fail: OK
+  | OK | N7_helper_thread_startup_fail | rc 真实=3 自报=3 期望=3 | V1=RAN/0/3 V2=RAN/0/3 (期望 V1=RAN/0/3 V2=RAN/0/3)
+  | --- N7_helper_thread_startup_fail: OK
+  | injected(mode=gstat_expect, replacements=1) -> <临时根>/ns800_cp6_ev/final_cp6/negatives/harness_gstat/host_main.c
+  | OK | N8_gstat_expect_table_tamper | rc 真实=1 自报=1 期望=1 | V1=RAN/0/1 V2=RAN/0/0 (期望 V1=RAN/0/1 V2=RAN/0/0)
+  | --- N8_gstat_expect_table_tamper: OK
+  | injected(mode=probe_writeback, replacements=1) -> <临时根>/ns800_cp6_ev/final_cp6/negatives/snap_writeback/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/tmc2209.c
+  | OK | N9_probe_writeback_V1 | rc 真实=1 自报=1 期望=1 | V1=RAN/0/1 V2=NOT_RUN/NOT_RUN/NOT_RUN (期望 V1=RAN/0/1 V2=NOT_RUN/NOT_RUN/NOT_RUN)
+  | --- N9_probe_writeback_V1: OK
+  | OK | N10_probe_writeback_V2 | rc 真实=1 自报=1 期望=1 | V1=NOT_RUN/NOT_RUN/NOT_RUN V2=RAN/0/1 (期望 V1=NOT_RUN/NOT_RUN/NOT_RUN V2=RAN/0/1)
+  | --- N10_probe_writeback_V2: OK
+  | OK | N10b_writeback_both_variants | rc 真实=1 自报=1 期望=1 | V1=RAN/0/1 V2=RAN/0/1 (期望 V1=RAN/0/1 V2=RAN/0/1)
+  | --- N10b_writeback_both_variants: OK
+  | OK | N11_clean_snapshot_regression | rc 真实=0 自报=0 期望=0 | V1=RAN/0/0 V2=RAN/0/0 (期望 V1=RAN/0/0 V2=RAN/0/0)
+  | --- N11_clean_snapshot_regression: OK
+  | OK | N12_workspace_clean_regression | rc 真实=0 自报=0 期望=0 | V1=RAN/0/0 V2=RAN/0/0 (期望 V1=RAN/0/0 V2=RAN/0/0)
+  | --- N12_workspace_clean_regression: OK
+  | 
+  | ############ 判定汇总 ############
+  | OK | N1_only_V1_injected_fail
+  | OK | N2_only_V2_injected_fail
+  | OK | N3_V1_stale_exe_not_reused
+  | OK | N4_fw_calc_selftest_FAILED
+  | OK | N5_fw_cfg_selftest_INCOMPLETE
+  | OK | N6_helper_thread_create_fail
+  | OK | N7_helper_thread_startup_fail
+  | OK | N8_gstat_expect_table_tamper
+  | OK | N9_probe_writeback_V1
+  | OK | N10_probe_writeback_V2
+  | OK | N10b_writeback_both_variants
+  | OK | N11_clean_snapshot_regression
+  | OK | N12_workspace_clean_regression
+  | 
+  | 执行集合(13) 与请求集合(13) 一致: 是
+  | 类别计数: OK=13 NOT-DETECTED=0 INFRA-FAIL=0
+  | RUNNER(run_negatives): 所有负例按预期被检出且身份齐备; 干净回归通过 (rc=0)
+  | 
+  | ############ 元负例(按原因验收; 基线 bd8548cce8dfc7643dfc8dfa0884d5d2ea940d4d; 请求集合 M1 M1c M2 M2c M3 M4 M5) ############
+  | injected(mode=fd7b_blinding, replacements=1) -> <临时根>/ns800_cp6_ev/final_cp6/work/meta/blinded/host_main.c
+  |     子链 M1: rc=1 矩阵行数=1
+  |       [.] 子链 rc=1 (=1)
+  |       [.] N10b_writeback_both_variants 类别=NOT-DETECTED
+  |       [.] N10b_writeback_both_variants 原因含 /V2\.run:期望=1 实际=0/
+  |       [.] N10b_writeback_both_variants 原因含 /FD7b/
+  |       [.] 执行集合与请求集合一致(1 例)
+  |   => META-OK | M1_blinded_fd7b
+  |     子链 M1_ctl: rc=0 矩阵行数=1
+  |       [.] 子链 rc=0 (=0)
+  |       [.] N10b_writeback_both_variants 类别=OK
+  |       [.] 执行集合与请求集合一致(1 例)
+  |   => CONTROL-OK | M1_control_unblinded
+  |     子链 M2: rc=4 矩阵行数=11
+  |       [.] 子链 rc=4 (=4)
+  |       [.] N1_only_V1_injected_fail 原因含 /runner\.proc_rc:期望=1 实际=65/
+  |       [.] N1_only_V1_injected_fail 原因含 /COMPILE_FAILED/
+  |       [.] 执行集合与请求集合一致(11 例)
+  |   => META-OK | M2_stubbed_compile
+  |     子链 M2_ctl: rc=0 矩阵行数=11
+  |       [.] 子链 rc=0 (=0)
+  |       [.] 执行集合与请求集合一致(11 例)
+  |   => CONTROL-OK | M2_control_real_compiler
+  | injected(mode=runner_exit_zero, replacements=1) -> <临时根>/ns800_cp6_ev/final_cp6/work/meta/runner_tampered/build_and_run.sh
+  |     子链 M3: rc=4 矩阵行数=1
+  |       [.] 子链 rc=4 非零
+  |       [.] N1_only_V1_injected_fail 类别=INFRA-FAIL
+  |       [.] N1_only_V1_injected_fail 原因含 /runner\.proc_rc:期望=1 实际=0/
+  |       [.] N1_only_V1_injected_fail 原因含 /runner\.reported_rc:期望=0 实际=1/
+  |   => META-OK | M3_runner_exit_zero_lost
+  |     子链 M3_ctl: rc=0 矩阵行数=1
+  |       [.] 子链 rc=0 (=0)
+  |       [.] N1_only_V1_injected_fail 类别=OK
+  |       [.] N1_only_V1_injected_fail 原因含 /rc 真实=1 自报=1 期望=1/
+  |   => CONTROL-OK | M3_control_unmodified
+  |     子链 M4_ambiguous: rc=4 矩阵行数=无文件
+  |       [.] 子链 rc=4 (=4)
+  |       [.] 歧义前缀被拒绝并列出候选
+  |       [.] 歧义拒绝发生在执行之前(0 例被误跑)
+  |     子链 M4_unknown: rc=4 矩阵行数=无文件
+  |       [.] 子链 rc=4 (=4)
+  |       [.] 未知选择被拒绝并列出登记表
+  |     子链 M4_prefix: rc=0 矩阵行数=1
+  |       [.] 子链 rc=0 (=0)
+  |       [.] 无歧义前缀真跑 1 例且集合一致
+  |       [.] N10b_writeback_both_variants 类别=OK
+  |   => META-OK | M4_selection_semantics
+  |     嵌套(M1 + 编译桩) rc=1
+  |       [.] 嵌套助手未放行(rc=1)
+  |       [.] 未把错误原因记成 META-OK
+  |       [.] 明确报出 META-LEAK(原因不符)
+  |       [.] 嵌套子链确实以 rc=4(INFRA) 失败 => 与正确原因 rc=1/NOT-DETECTED 不同
+  |   => META-OK | M5_wrong_reason_guard
+  | 
+  | ############ 元负例汇总表 ############
+  | META-OK | M1_blinded_fd7b
+  | CONTROL-OK | M1_control_unblinded
+  | META-OK | M2_stubbed_compile
+  | CONTROL-OK | M2_control_real_compiler
+  | META-OK | M3_runner_exit_zero_lost
+  | CONTROL-OK | M3_control_unmodified
+  | META-OK | M4_selection_semantics
+  | META-OK | M5_wrong_reason_guard
+  | 
+  | 已执行元负例组: M1 M1c M2 M2c M3 M3c M4 M5 / 请求组: M1 M1c M2 M2c M3 M4 M5
+  | RUNNER(meta): 全部元负例按**正确原因**被拒绝, 对照组按预期通过, 集合一致 (rc=0)
+  | RUNNER(meta) rc=0
+  | 
+
+[D.6] 定稿字节上的最终正向台账
+  S1(run_stop_result_s1.sh):
+    | target | OK 必需用例=50 全部PASS 实际行数=50 自报 fail=0 proc_rc=0
+    | host_ovr | OK 必需用例=65 全部PASS 实际行数=65 自报 fail=0 proc_rc=0
+  S2 + 叶子链(run_stop_priority_s2.sh, 17 组×2 变体):
+    |   target 汇总: 组=17 用例=23 PASS=23 FAIL=0 SKIP行=14 pre_bad=0 期望用例=23
+    |   host_ovr 汇总: 组=17 用例=79 PASS=79 FAIL=0 SKIP行=1 pre_bad=0 期望用例=79
+  叶子链逐组台账(定稿字节, host_ovr):
+    |     台账: 必需=5 唯一出现=5 实际行数=5 SUMMARY(cases=5 pass=5 fail=0 pre_bad=0 skips=0) 自洽=1
+    |     台账: 必需=3 唯一出现=3 实际行数=3 SUMMARY(cases=3 pass=3 fail=0 pre_bad=0 skips=0) 自洽=1
+    |     台账: 必需=2 唯一出现=2 实际行数=2 SUMMARY(cases=2 pass=2 fail=0 pre_bad=0 skips=0) 自洽=1
+    |     台账: 必需=2 唯一出现=2 实际行数=2 SUMMARY(cases=2 pass=2 fail=0 pre_bad=0 skips=0) 自洽=1
+    |     台账: 必需=0 唯一出现=0 实际行数=0 SUMMARY(cases=0 pass=0 fail=0 pre_bad=0 skips=2) 自洽=1
+    |     台账: 必需=1 唯一出现=1 实际行数=1 SUMMARY(cases=1 pass=1 fail=0 pre_bad=0 skips=0) 自洽=1
+    |     台账: 必需=0 唯一出现=0 实际行数=0 SUMMARY(cases=0 pass=0 fail=0 pre_bad=0 skips=3) 自洽=1
+    |     台账: 必需=0 唯一出现=0 实际行数=0 SUMMARY(cases=0 pass=0 fail=0 pre_bad=0 skips=1) 自洽=1
+    |     台账: 必需=5 唯一出现=5 实际行数=5 SUMMARY(cases=5 pass=5 fail=0 pre_bad=0 skips=0) 自洽=1
+    |     台账: 必需=1 唯一出现=1 实际行数=1 SUMMARY(cases=1 pass=1 fail=0 pre_bad=0 skips=2) 自洽=1
+    |     台账: 必需=2 唯一出现=2 实际行数=2 SUMMARY(cases=2 pass=2 fail=0 pre_bad=0 skips=0) 自洽=1
+    |     台账: 必需=0 唯一出现=0 实际行数=0 SUMMARY(cases=0 pass=0 fail=0 pre_bad=0 skips=2) 自洽=1
+    |     台账: 必需=2 唯一出现=2 实际行数=2 SUMMARY(cases=2 pass=2 fail=0 pre_bad=0 skips=0) 自洽=1
+    |     台账: 必需=0 唯一出现=0 实际行数=0 SUMMARY(cases=0 pass=0 fail=0 pre_bad=0 skips=1) 自洽=1
+    |     台账: 必需=0 唯一出现=0 实际行数=0 SUMMARY(cases=0 pass=0 fail=0 pre_bad=0 skips=1) 自洽=1
+    |     台账: 必需=0 唯一出现=0 实际行数=0 SUMMARY(cases=0 pass=0 fail=0 pre_bad=0 skips=1) 自洽=1
+    |     台账: 必需=0 唯一出现=0 实际行数=0 SUMMARY(cases=0 pass=0 fail=0 pre_bad=0 skips=1) 自洽=1
+    |     台账: 必需=5 唯一出现=5 实际行数=5 SUMMARY(cases=5 pass=5 fail=0 pre_bad=0 skips=0) 自洽=1
+    |     台账: 必需=3 唯一出现=3 实际行数=3 SUMMARY(cases=3 pass=3 fail=0 pre_bad=0 skips=0) 自洽=1
+    |     台账: 必需=2 唯一出现=2 实际行数=2 SUMMARY(cases=2 pass=2 fail=0 pre_bad=0 skips=0) 自洽=1
+    |     台账: 必需=2 唯一出现=2 实际行数=2 SUMMARY(cases=2 pass=2 fail=0 pre_bad=0 skips=0) 自洽=1
+    |     台账: 必需=2 唯一出现=2 实际行数=2 SUMMARY(cases=2 pass=2 fail=0 pre_bad=0 skips=0) 自洽=1
+    |     台账: 必需=1 唯一出现=1 实际行数=1 SUMMARY(cases=1 pass=1 fail=0 pre_bad=0 skips=0) 自洽=1
+    |     台账: 必需=7 唯一出现=7 实际行数=7 SUMMARY(cases=7 pass=7 fail=0 pre_bad=0 skips=0) 自洽=1
+    |     台账: 必需=4 唯一出现=4 实际行数=4 SUMMARY(cases=4 pass=4 fail=0 pre_bad=0 skips=0) 自洽=1
+    |     台账: 必需=5 唯一出现=5 实际行数=5 SUMMARY(cases=5 pass=5 fail=0 pre_bad=0 skips=0) 自洽=1
+    |     台账: 必需=3 唯一出现=3 实际行数=3 SUMMARY(cases=3 pass=3 fail=0 pre_bad=0 skips=0) 自洽=1
+    |     台账: 必需=2 唯一出现=2 实际行数=2 SUMMARY(cases=2 pass=2 fail=0 pre_bad=0 skips=0) 自洽=1
+    |     台账: 必需=5 唯一出现=5 实际行数=5 SUMMARY(cases=5 pass=5 fail=0 pre_bad=0 skips=0) 自洽=1
+    |     台账: 必需=0 唯一出现=0 实际行数=0 SUMMARY(cases=0 pass=0 fail=0 pre_bad=0 skips=1) 自洽=1
+    |     台账: 必需=10 唯一出现=10 实际行数=10 SUMMARY(cases=10 pass=10 fail=0 pre_bad=0 skips=0) 自洽=1
+    |     台账: 必需=15 唯一出现=15 实际行数=15 SUMMARY(cases=15 pass=15 fail=0 pre_bad=0 skips=0) 自洽=1
+    |     台账: 必需=7 唯一出现=7 实际行数=7 SUMMARY(cases=7 pass=7 fail=0 pre_bad=0 skips=0) 自洽=1
+    |     台账: 必需=6 唯一出现=6 实际行数=6 SUMMARY(cases=6 pass=6 fail=0 pre_bad=0 skips=0) 自洽=1
+  V1V2(build_and_run.sh, 无注入):
+    | V1 build rc = 0  (log: v1_build.txt)
+    | V1 run   rc = 0  (执行证据: v1_executed.marker)
+    | HOST TEST SUMMARY: CHECK_PASS=25 CHECK_FAIL=0 BAD_SELFTEST=0 MISSING_CASE=0
+    | PROCESS RC=0 (0=通过)
+    | V2 build rc = 0  (log: v2_build.txt)
+    | V2 run   rc = 0  (执行证据: v2_executed.marker)
+    | HOST TEST SUMMARY: CHECK_PASS=22 CHECK_FAIL=0 BAD_SELFTEST=0 MISSING_CASE=0
+    | PROCESS RC=0 (0=通过)
+    |   V1 build=0 run=0 state=RAN    V2 build=0 run=0 state=RAN
+    |   RUNNER RESULT: PASS (rc=0)
+  I/O(run_io_behavior.sh):
+    |   illegal 宏值: 编译如预期被拒绝 (rc=1) —— 配置合法性成立
+    | off_target | OK 必需用例=27 全部PASS 自报fail=0 proc_rc=0 (输出 8396 字节)
+    | on_target | OK 必需用例=29 全部PASS 自报fail=0 proc_rc=0 (输出 9682 字节)
+    | off_ovr | OK 必需用例=40 全部PASS 自报fail=0 proc_rc=0 (输出 23778 字节)
+    | on_ovr | OK 必需用例=42 全部PASS 自报fail=0 proc_rc=0 (输出 26194 字节)
+    | IO1_CFG-illegal_macro_rejected | OK(拒绝编译 rc=1)
+    | IO RUNNER RESULT: PASS (rc=0) —— 4 个变体的必需用例全部真执行且判 PASS, 非法宏值被编译拒绝
+
+[D.7] 定稿字节上的最终反向台账
+  S1 反向:
+  S2 反向(5 家族, 先过完整正常对照):
+    |   rev_stale_identity_gate: 注入替换 2 处(逐条已核对恰好命中一次)
+    |   rev_permit_confirm_identity_gate: 注入替换 2 处(逐条已核对恰好命中一次)
+    |   rev_config_write_token_gate: 注入替换 2 处(逐条已核对恰好命中一次)
+    |   rev_tx_flush_budget: 注入替换 3 处(逐条已核对恰好命中一次)
+    |   rev_fail_returns_owner_early: 注入替换 2 处(逐条已核对恰好命中一次)
+    | rev_stale_identity_gate | META-OK 命中 2 个业务失败身份 (variant=host_ovr groups=identity stale 台账自洽 proc_rc=1)
+    | rev_permit_confirm_identity_gate | META-OK 命中 1 个业务失败身份 (variant=host_ovr groups=identity 台账自洽 proc_rc=1)
+    | rev_config_write_token_gate | META-OK 命中 1 个业务失败身份 (variant=host_ovr groups=epwm_leaf 台账自洽 proc_rc=1)
+    | rev_tx_flush_budget | META-OK 命中 2 个业务失败身份 (variant=host_ovr groups=uart_leaf tmc_lock 台账自洽 proc_rc=1)
+    | rev_fail_returns_owner_early | META-OK 命中 1 个业务失败身份 (variant=host_ovr groups=diag 台账自洽 proc_rc=1)
+    | S2 REVERSE RESULT: PASS —— 五项注入均命中预登记业务失败身份(rc=1, 台账自洽)
+  runner 状态输出缺陷修正: 五次 xargs 触发的 'xargs: note: No such file or directory'
+  已消除(改成 shell 内变量后调用 note), 上面 "注入替换 N 处" 五行即为本轮真实输出。
+
+[D.8] 元负例(M1..M5)与路径守卫真实退出码原文
+  |   => META-OK | M1_blinded_fd7b
+  |     子链 M1_ctl: rc=0 矩阵行数=1
+  |       [.] 子链 rc=0 (=0)
+  |       [.] N10b_writeback_both_variants 类别=OK
+  |       [.] 执行集合与请求集合一致(1 例)
+  |   => CONTROL-OK | M1_control_unblinded
+  |     子链 M2: rc=4 矩阵行数=11
+  |       [.] 子链 rc=4 (=4)
+  |       [.] N1_only_V1_injected_fail 原因含 /runner\.proc_rc:期望=1 实际=65/
+  |       [.] N1_only_V1_injected_fail 原因含 /COMPILE_FAILED/
+  |       [.] 执行集合与请求集合一致(11 例)
+  |   => META-OK | M2_stubbed_compile
+  |     子链 M2_ctl: rc=0 矩阵行数=11
+  |       [.] 子链 rc=0 (=0)
+  |       [.] 执行集合与请求集合一致(11 例)
+  |   => CONTROL-OK | M2_control_real_compiler
+  | injected(mode=runner_exit_zero, replacements=1) -> <临时根>/ns800_cp6_ev/final_cp6/meta/runner_tampered/build_and_run.sh
+  |     子链 M3: rc=4 矩阵行数=1
+  |       [.] 子链 rc=4 非零
+  |       [.] N1_only_V1_injected_fail 类别=INFRA-FAIL
+  |       [.] N1_only_V1_injected_fail 原因含 /runner\.proc_rc:期望=1 实际=0/
+  |       [.] N1_only_V1_injected_fail 原因含 /runner\.reported_rc:期望=0 实际=1/
+  |   => META-OK | M3_runner_exit_zero_lost
+  |     子链 M3_ctl: rc=0 矩阵行数=1
+  |       [.] 子链 rc=0 (=0)
+  |       [.] N1_only_V1_injected_fail 类别=OK
+  |       [.] N1_only_V1_injected_fail 原因含 /rc 真实=1 自报=1 期望=1/
+  |   => CONTROL-OK | M3_control_unmodified
+  |     子链 M4_ambiguous: rc=4 矩阵行数=无文件
+  |       [.] 子链 rc=4 (=4)
+  |       [.] 歧义前缀被拒绝并列出候选
+  |       [.] 歧义拒绝发生在执行之前(0 例被误跑)
+  |     子链 M4_unknown: rc=4 矩阵行数=无文件
+  |       [.] 子链 rc=4 (=4)
+  |       [.] 未知选择被拒绝并列出登记表
+  |     子链 M4_prefix: rc=0 矩阵行数=1
+  |       [.] 子链 rc=0 (=0)
+  |       [.] 无歧义前缀真跑 1 例且集合一致
+  |       [.] N10b_writeback_both_variants 类别=OK
+  |   => META-OK | M4_selection_semantics
+  |     嵌套(M1 + 编译桩) rc=1
+  |       [.] 嵌套助手未放行(rc=1)
+  |       [.] 未把错误原因记成 META-OK
+  |       [.] 明确报出 META-LEAK(原因不符)
+  |       [.] 嵌套子链确实以 rc=4(INFRA) 失败 => 与正确原因 rc=1/NOT-DETECTED 不同
+  |   => META-OK | M5_wrong_reason_guard
+  | 
+  | ############ 元负例汇总表 ############
+  | META-OK | M1_blinded_fd7b
+  | CONTROL-OK | M1_control_unblinded
+  | META-OK | M2_stubbed_compile
+  | CONTROL-OK | M2_control_real_compiler
+  | META-OK | M3_runner_exit_zero_lost
+  | CONTROL-OK | M3_control_unmodified
+  | META-OK | M4_selection_semantics
+  | META-OK | M5_wrong_reason_guard
+  | 
+  | 已执行元负例组: M1 M1c M2 M2c M3 M3c M4 M5 / 请求组: M1 M1c M2 M2c M3 M4 M5
+  | RUNNER(meta): 全部元负例按**正确原因**被拒绝, 对照组按预期通过, 集合一致 (rc=0)
+  | 
+
+[D.9] 本批未验范围与边界(不外推)
+  1) EPWM 数值修正在**寄存器模型 + 受控时钟**上验证: 证明的是 ns<->计数<->分频的反推关系
+     与「任何窄化前都有范围检查」, 不是目标机波形。BUG-008 的实测波形/频率/占空比与停机
+     电气验收继续开放; 分频选择作用于整个 EPWM 实例 => M-2「同实例其它通道用途待确认」保留。
+  2) cfg/xfer 叶锁的 10/20ms 与 min(cap, 剩余预算) 是**脚本化时间**: 证明的是同一预算与
+     软件分支, 不是目标机最坏时延; 墙钟只作死锁守卫。
+  3) N7 的根因按现存原文的实际身份定位并在夹具侧最小修复; 同负载 A/B 已给。
+     这不是「重现了原来那一场运行」, 而是同一判据下的确定性复现(修前 2/24 命中, 修后 24/24 干净)。
+  4) 板上状态仍按 USER_REPORTED_E40; 无烧录/复位/串口/调试器/设备扫描/真实 GPIO/TMC/STEP/
+     电机/Flash/供电/模块/接线/SW1/真机清故障/selftest 动作; 四个目标宏保持 RT_FALSE,
+     host_ovr 只存在于命令行覆盖。RISK-03/03a、物理 RISK-04-b 与既有硬件待确认项继续开放。
+  5) SD 数据语义本批未改, 不机械重复; CP4 那六份已明确不可恢复的 stdout 不重造。
