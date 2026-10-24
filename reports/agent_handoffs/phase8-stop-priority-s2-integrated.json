@@ -5,8 +5,8 @@
   "branch": "phase8/tmc-drive-config",
   "base_commit": "1348eb098ce51e40303b2685bce19d67da67e276",
   "cp1_commit": "6726fa60721c1da2ec578a15a04d2ca899e470d3",
-  "head_commit": "776a91e669dcac84e53d49e4838611a2a4454705",
-  "tested_commit": "776a91e669dcac84e53d49e4838611a2a4454705",
+  "head_commit": "51385772a7aed9b367a1ad5e33c80d7283e5d225",
+  "tested_commit": "51385772a7aed9b367a1ad5e33c80d7283e5d225",
   "remote_push": "NOT_PUSHED (本轮记录; 下一步随最终交接推送并 ls-remote 回读)",
   "overall_status": "IN_PROGRESS",
   "checkpoint_status": {
@@ -154,5 +154,64 @@
     "reports/reviews/phase8-stop-priority-s2-integrated/cp3_baseline_observation.txt",
     "reports/reviews/phase8-stop-priority-s2-integrated/cp3_post_fix_proofs.txt",
     "reports/reviews/phase8-stop-priority-s2-integrated/cp3_host_chains.txt"
-  ]
+  ],
+  "cp4_task_book": "NS800_S2_CP3_Independent_Review_and_CP4_Task_0fdd080_20261024.md",
+  "cp4_task_id": "phase8-stop-priority-s2-cp4",
+  "cp4_baseline_commit": "0fdd0801430a41f3fcf8e6032eb3a634442686de",
+  "cp4_commits": [
+    "05d0518 (K1-K6 + 并发夹具 + S2 runner + cp4 基线证据)",
+    "5138577 (终字节 Keil 修复 + S1/S2 反向重指向与接入)"
+  ],
+  "cp4_baseline_observations": {
+    "identity": "未改动的 0fdd080 仓外副本 + 任务书 §12 探针脚本逐字复制",
+    "reproduced": "12 / 12",
+    "note": "探针 rc=0 只表示该基线预期缺陷观察成立, 不是软件 PASS"
+  },
+  "cp4_fixes": {
+    "K1": "删 !had 旧状态补写旁路; motor_lock_take_checked/sd_lock/mot_lock 返回真实 rc; 锁失败不写不 ack 不留黑匣子; motor_trip_observe 区分观察成功与未提交",
+    "K2": "sp_reserve_for 原代校验; start 的 READY->RUN + ACCEL 单窗提交; 斜坡令牌首窗采集; safety_transition_for/_held 身份化提交; 自检比较+白名单+写同窗; 归零跳拍修复",
+    "K3": "写前身份门; 旧回滚不动新 owner; mot_fail_op 固定次序产生 inhibit+换代+pending; TMC 回传 _for(expected_epoch,result) 摘要; 保护先于打印与慢锁",
+    "K4": "proof/pwm/permit/confirm 同代; PWM>permit>边界 的对外优先序且 raw 分列; LOW 裸写失败不外传成成功; 恢复期 LOW/确认失败=新失败; 撞顶边界仍关闭但返回非 EOK",
+    "K5": "ISR/屏蔽上下文拒绝路径不打印, 改记账(no_system/send_fail/log_suppressed); ns800_uart_write_budgeted 自守三条上下文; 末字节后复核 start/total 且 written 真实",
+    "K6": "分 owner 诊断视图同源; HIGH/RUN 加编译期许可 + 同代配置摘要; sp_phase_set 删除; RUNNING 只来自真实 enable 成功; 四宏 FALSE 下关闭始终可用",
+    "fixture_found_product_defects": [
+      "sp_off_attempt_for 正式释放分支: 许可 LOW 单独失败不产生任何义务(已修)",
+      "sp_recovery_probe_off if 链漏掉 le-only 失败: 实测 permit.write_rc=-12 而 epoch 不动、advance_failed=0, 同时日志已声称已换 epoch(已修)"
+    ]
+  },
+  "cp4_verification": {
+    "S2_concurrency_forward": "target 13 组 22 例 + 10 条按声明 SKIP, host_ovr 13 组 40 例 + 1 条 SKIP, 台账逐组自洽 pre_bad=0, runner rc=0",
+    "S2_concurrency_cases": "C01/C01b/C01c/C02/C02b C03a/b/c C04a/b C05a/b/c/d C06 C07a/b C08a/b C09a/b/c C11a-d C12/C12b/C13/C14 C15a/b/c C19a/b C20a-e C21a/b",
+    "postfix_proofs": "§10.1 修后等价前置 12/12 PROVEN(pre=1 defect=0 safe=1, 含 control-healthy-cycle 对照); 4 项签名变化的观察改用新的等价入口",
+    "S1_reverses": "①重指到协调层 sp_note_pwm_held: META-OK 命中 PS01d/PS02d/PS04a/PS10b/PS13d; ②在本链不可观测(3 次试投均 proc rc=0), 按 §10.2 重指向 S2 链并登记 REV-POINTED",
+    "S2_reverses": "rev_stale_identity_gate -> C09b/C15b META-OK; rev_recovery_ticket_check -> C08b META-OK; 均要求副本构建成功+台账自洽+rc=1",
+    "regressions": "S1 target 50 / host_ovr 65; I/O 27/29/40/42 + 非法宏拒绝; SD 21/20; V1 25/0; V2 22/0 (终字节各真执行一次)",
+    "keil": "Rebuild All(-r) 0 Error(s) 0 Warning(s); Code=172978 RO=76562 RW=2188 ZI=83912; 第一次 -b 曾报 __get_PRIMASK 未声明(原文保留在证据 B.6, 已修)",
+    "four_macros_still_false": [
+      "motor.h:69",
+      "motor.h:83",
+      "project_board.h:51",
+      "tmc2209.h:100"
+    ]
+  },
+  "cp4_not_executed": [
+    "C10/C16/C17/C18: 未把 drv_epwm.c 与 drv_uart.c 的真实叶子编进主机链(现有夹具只是端口副本, 按 §9 不得称真实 HAL)",
+    "§10.3 家族①的'去掉真实危险写'与家族②的'去掉真实 TX/flush 预算'两半: 与上一条同因未执行",
+    "RISK-03/03a 停机时延上界、物理 RISK-04-b: 继续开放, 本轮不声称波形或物理证明",
+    "无烧录/串口/调试器/设备扫描/读 Flash/真实 GPIO/TMC/STEP/电机/供电动作"
+  ],
+  "cp4_evidence_files": {
+    "single_raw_file": "reports/reviews/phase8-stop-priority-s2-integrated/cp4_baseline_observation.txt (第一部分=基线 12 项, 第二部分=修后证明/并发链/反向/回归/Keil)",
+    "cp3_desensitized": [
+      "cp3_baseline_observation.txt",
+      "cp3_host_chains.txt",
+      "cp3_post_fix_proofs.txt"
+    ],
+    "desensitize_scope": "只替换用户目录与仓库绝对路径为 <USER>/<REPO>/<TMP>; 错误原文、时间戳、rc 一字未改",
+    "fixture_construction_source": "tests/host/sp_conc_gen/ (3 个生成脚本 + README)"
+  },
+  "cp4_status": "S2 CP4 六组返修已实现并同批验收; S2 整体仍 IN_PROGRESS; Agent 不声称 SOFTWARE_REVIEW_GO",
+  "head_commit_prev_cp3": "776a91e669dcac84e53d49e4838611a2a4454705",
+  "tested_commit_prev_cp3": "776a91e669dcac84e53d49e4838611a2a4454705",
+  "tested_commit_note": "CP4 终字节: Keil Rebuild All、全部主机链与 12 项修后证明都取自该提交的 git archive 干净导出(无脏文件)"
 }

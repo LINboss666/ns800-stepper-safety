@@ -1,7 +1,7 @@
 CP3 §10.2 修后证明 —— 在**本轮修复字节**上, 用与基线同一业务身份/前置/判据的等价
 前置逐项证明缺陷不再成立(修后 API 变化处按 §12 末段适配外围调用, 判据未放宽)。
 
-构造脚本(仓外): D:/ns800/_s2work/probe_cp3_proof.py  输出目录: C:/Users/<USER>/AppData/Local/Temp/s2cp3_proof
+构造脚本(仓外): <REPO>/_s2work/probe_cp3_proof.py  输出目录: C:/Users/<USER>/AppData/Local/Temp/s2cp3_proof
 判据: 每例 rc=0 == 该缺陷**未**复现(defect_still_reproduced=0); rc=1 == 仍复现(不允许);
       rc=2 == 前置不成立(不允许, 按基础设施故障对待, 不当作检出)。
 两条 control-* 是**正向对照**, 必须 rc=0 且业务结果非零变化。

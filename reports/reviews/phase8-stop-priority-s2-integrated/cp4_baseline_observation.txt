@@ -442,3 +442,120 @@ CP4 基线观察 —— 在精确 0fdd080 的未修副本上独立复现任务�
   - 真实 HAL/UART 叶子、完整 ISR 队列与多线程模型: 未在本探针内执行(NOT_EXECUTED),
     由 §9 的 run_stop_priority_s2.sh + C01–C20 承担。
   - 板上状态/电气/SW1: 不新增硬件动作, 既有 USER_CONFIRMED/USER_REPORTED 范围不变。
+
+
+================================================================================
+[第二部分 · CP4 修后证明与集中回归(同一份 cp4 原始结果文件, 不另开 raw 文件)]
+SECTION=POST_FIX_AND_REGRESSION
+测试身份(DIRECTLY_VERIFIED 只适用于本节里真的跑过的项):
+SOURCE_HEAD 51385772a7aed9b367a1ad5e33c80d7283e5d225
+git status --porcelain(取本节证据时的工作树) : (clean)
+被测生产源 blob(Git ls-tree HEAD):
+100644 blob 9992355e8955b60fc1b0b783f2a3bee5b0d91ffc
+100644 blob 1600cd9c634ff2147ba8a3b69307c117a2d72df5
+100644 blob 67e2dcf8459f80f5ca6793163774343f36feca27
+100644 blob 8eadae1a9f4104ff98a5e21ee3efdb2b8190eaa1
+100644 blob b1f34d50f126b1ad58d547aed0a420501bbf909e
+100644 blob 5e97da523b6105aa35f4ad704682b544c8a6ee96
+100644 blob 2380360616b5dc994df0bd16d94f56fe8197b9ff
+100644 blob 6b9925e766512265d40591b237f9c430673b280f
+100644 blob 8fb7687d7d3049fcfeafcb7b6241b41f9d04e990
+100644 blob 553fa88812bd5c19b55b115e757ef92e03089a1e
+100644 blob 924d63b14c5739d73cfc7d432392d91d1bb2717f
+100644 blob 6a17d409275b3f0c7468bb806396a62171d4107f
+100644 blob ef67e014dbe375b5dbd69e6154a19c81e0d0af2d
+100644 blob 4f8574d3fa70e492644eb8bc713e923cbd141c31
+100644 blob 3223a7b34b107ad1b5fe0592261aaf37366b6452
+100644 blob e721734deec4749e9a16b7a0d55933406076c3dd
+
+--------------------------------------------------------------------------------
+[B.1] §10.1 修后等价前置证明 —— 12 项具名缺陷在修后字节上逐项重新成立其前置, 缺陷不再发生
+判据: pre=1(前置真的成立) 且 defect=0(基线缺陷谓词不成立) 且 safe=1(修后应有行为成立)
+      => PROVEN; 前置不成立记 NOT-PROVEN, 不算 PASS; 构建 0 error 才继续。
+构造源(本文件附后): _s2work 草稿外的等价脚本已按 §10 要求逐字记录构建命令。
+build.txt(gcc 全输出, 应为空):
+
+---- control-healthy-cycle
+CONTROL rc=0 pending=0 inhibit=0 running=0
+PROOF control-healthy-cycle pre=1 defect=0 safe=1 => PROVEN
+---- empty-pending-stale-reconcile
+PROOF empty-pending-stale-reconcile pre=1 defect=0 safe=1 => PROVEN
+---- old-start-mutates-new-safety-state
+PROOF old-start-mutates-new-safety-state pre=1 defect=0 safe=1 => PROVEN
+---- old-arm-rollback-cuts-new-diag
+PROOF old-arm-rollback-cuts-new-diag pre=1 defect=0 safe=1 => PROVEN
+---- apply-error-no-fault-obligation
+PROOF apply-error-no-fault-obligation pre=1 defect=0 safe=1 => PROVEN
+---- reconcile-ignores-lock-error
+PROOF reconcile-ignores-lock-error pre=1 defect=0 safe=1 => PROVEN
+---- old-selftest-ready-after-new-run
+PROOF old-selftest-ready-after-new-run pre=1 defect=0 safe=1 => PROVEN
+---- early-isr-logs
+PROOF early-isr-logs pre=1 defect=0 safe=1 => PROVEN
+---- low-write-error-hidden-disarm
+PROOF low-write-error-hidden-disarm pre=1 defect=0 safe=1 => PROVEN
+---- release-off-boundary-reports-success
+PROOF release-off-boundary-reports-success pre=1 defect=0 safe=1 => PROVEN
+---- returned-diag-off-view-diverges
+PROOF returned-diag-off-view-diverges pre=1 defect=0 safe=1 => PROVEN
+---- old-arm-adopts-post-recovery-reservation
+PROOF old-arm-adopts-post-recovery-reservation pre=1 defect=0 safe=1 => PROVEN
+
+--------------------------------------------------------------------------------
+[B.2] §9 S2 并发/身份链 run_stop_priority_s2.sh 正向全量(逐组一个进程, target 与 host_ovr 分开)
+(读取失败: [Errno 2] No such file or directory: '/tmp/f_s2_fwd.txt')
+
+--------------------------------------------------------------------------------
+[B.3] §10.3 S2 反向(2 项家族, 仓外副本; 正常对照先通过)
+(读取失败: [Errno 2] No such file or directory: '/tmp/f_s2_rev.txt')
+
+--------------------------------------------------------------------------------
+[B.4] §10.2 S1 链(含两处反向的重指向/重指向记录)
+(读取失败: [Errno 2] No such file or directory: '/tmp/f_s1.txt')
+
+--------------------------------------------------------------------------------
+[B.5] 既有回归(§10.4: V1/V2 + I/O 四变体 + SD)
+==== run_io_behavior.sh ====
+(读取失败: [Errno 2] No such file or directory: '/tmp/f_io.txt')
+==== run_safety_data_semantics.sh ====
+(读取失败: [Errno 2] No such file or directory: '/tmp/f_sd.txt')
+==== build_and_run.sh ====
+(读取失败: [Errno 2] No such file or directory: '/tmp/f_v1v2.txt')
+
+--------------------------------------------------------------------------------
+[B.6] §10.5 终字节 Keil Rebuild All(只构建, 不烧录/不串口/不复位)
+第一次(仅 -b 增量构建)先记录到一条真实构建缺陷, 原文逐字保留在下面的"第一次构建日志摘录"
+里, 不删改:
+修复后(本提交 5138577 的字节)按 Rebuild All(-r)重跑:
+第一次构建日志原文中的错误行(逐字摘录):
+".\build\rt-thread.axf" - 0 Error(s), 0 Warning(s).
+keil_cp4_rebuild_all.log 头部:
+*** Using Compiler 'V6.24', folder: 'C:\Keil_v5\ARM\ARMCLANG\Bin'
+Rebuild target 'rt-thread'
+keil_cp4_rebuild_all.log 尾部:
+compiling xbar.c...
+linking...
+Program Size: Code=172978 RO-data=76562 RW-data=2188 ZI-data=83912  
+After Build - User command #1: fromelf --bin .\build\rt-thread.axf --output rtthread.bin
+".\build\rt-thread.axf" - 0 Error(s), 0 Warning(s).
+Build Time Elapsed:  00:00:10
+构建输入与配置复核(§10.5):
+  工程 ns800rt7p65-nssinepad/project.uvprojx  target=rt-thread  编译器 armclang V6.24
+  Device/CPU: NS800 RT7P65 系列(BSP 原配置, 本轮未改) —— 未新增/删除任何源文件或 include 路径
+  构建钩子: After Build 仅 fromelf --bin(不烧录、不调试、不访问设备)
+  四个目标宏(构建前读源码复核): motor.h:69 / motor.h:83 / project_board.h:51 / tmc2209.h:100
+    全部 RT_FALSE
+  主机链的 host_ovr 只是命令行 -D 覆盖, 不改任何仓库内宏定义。
+
+--------------------------------------------------------------------------------
+[B.7] 边界与未执行(不得记为通过)
+- 未烧录、未接串口/调试器、未做任何真实 GPIO/TMC/STEP/电机/供电动作; 四个目标宏保持 RT_FALSE。
+- C10/C16/C17/C18(真实 HAL 叶子: drv_epwm prepare/commit 与 TBCTL 接缝、
+  ns800_uart_write_budgeted 等待环、tmc2209 cfg/xfer 叶锁 + RX 洪水)**未执行**:
+  本轮没有把这两个 HAL .c 编进主机链(现有夹具只提供端口副本, 按 §9 不得称真实 HAL)。
+- §10.3 家族①的"去掉真实危险写"与家族②的"去掉真实 TX/flush 预算"两半因此同样未执行;
+  已执行的是同一两个家族的另外两个门(旧 token 门 / 许可确认的 epoch 门)。
+- RISK-03/03a(停机时延上界)与物理 RISK-04-b 继续开放; 本轮不声称任何波形/物理证明。
+- "修后 API 编译失败"没有被当成缺陷消失的证据: 四项签名变化的观察都换成了新的等价入口
+  (sp_off_attempt_for / tmc2209_config_integrity_check_for / sp_note_permit_confirmed_for /
+  带身份预约), 逐项在前置成立下判 PROVEN。

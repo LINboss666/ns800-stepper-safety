@@ -5,7 +5,7 @@ CP3 §10.3/§10.4 本轮实际执行的既有链与目标构建(逐条记录命�
 
 ==============================================================================
 ### run_stop_result_s1.sh  (S1 关断结果可信链, target/host_ovr)
-status 文件: C:/Users/LMX/AppData/Local/Temp/ns800-host-chain/s1/20261023T181252Z-2674/s1_status.txt
+status 文件: <TMP>/ns800-host-chain/s1/20261023T181252Z-2674/s1_status.txt
 S1_RUNNER_RC=0
 S1_DETECTED_FAIL=0
 run_id=20261023T181252Z-2674
@@ -38,7 +38,7 @@ host_ovr | OK 必需用例=65 全部PASS 实际行数=65 自报 fail=0 proc_rc=0
   s1/20261023T181252Z-2674 -> SUMMARY|cases=50 pass=50 fail=0 pre_bad=0
 ==============================================================================
 ### build_and_run.sh       (F2d V1/V2 主机链)
-status 文件: C:/Users/LMX/AppData/Local/Temp/ns800-host-chain/out/runner_status.txt
+status 文件: <TMP>/ns800-host-chain/out/runner_status.txt
 V1_BUILD_RC=0
 V1_RUN_RC=0
 V1_STATE=RAN
@@ -52,10 +52,10 @@ V2_EXECUTED=1
 V2_EXE=PRESENT
 V2_OUT_BYTES=14532
 RUNNER_RC=0
-REPO_ROOT=D:/ns800
-SRC_APP=D:/ns800/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications
-HOST_SRC=/d/ns800/tests/host/host_main.c
-SHIM_DIR=/d/ns800/tests/host/shim
+REPO_ROOT=<REPO>
+SRC_APP=<REPO>/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications
+HOST_SRC=<REPO>/tests/host/host_main.c
+SHIM_DIR=<REPO>/tests/host/shim
 V1_EXTRA=
 V2_EXTRA=
 GCC=/c/Program Files (x86)/Dev-Cpp/MinGW64/bin/gcc.exe
@@ -64,7 +64,7 @@ GCC=/c/Program Files (x86)/Dev-Cpp/MinGW64/bin/gcc.exe
   out/out -> HOST TEST SUMMARY: CHECK_PASS=22 CHECK_FAIL=0 BAD_SELFTEST=0 MISSING_CASE=0
 ==============================================================================
 ### run_io_behavior.sh     (I/O 行为链 4 变体 + 非法宏值)
-status 文件: C:/Users/LMX/AppData/Local/Temp/ns800-host-chain/io/io_status.txt
+status 文件: <TMP>/ns800-host-chain/io/io_status.txt
 IO_RUNNER_RC=0
 IO_DETECTED_FAIL=0
 off_target | OK 必需用例=27 全部PASS 自报fail=0 proc_rc=0 (输出 9049 字节)
@@ -79,7 +79,7 @@ IO1_CFG-illegal_macro_rejected | OK(拒绝编译 rc=1)
   io/io -> SUMMARY|cases=29|pass=29|fail=0
 ==============================================================================
 ### run_safety_data_semantics.sh (安全输入数据语义链)
-status 文件: C:/Users/LMX/AppData/Local/Temp/ns800-host-chain/sd/sd_status.txt
+status 文件: <TMP>/ns800-host-chain/sd/sd_status.txt
 SD_RUNNER_RC=0
 SD_DETECTED_FAIL=0
 SD_SELECT_MODE=default

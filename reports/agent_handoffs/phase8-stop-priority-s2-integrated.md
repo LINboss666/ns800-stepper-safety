@@ -340,6 +340,148 @@ tag `v0.7-*` 未触碰。
 2. 两项 S2 局部反向 + 把 S1 两项反向锚点重指到本轮真实动作/提交点，逐身份判定。
 3. 之后再一次集中回归 + Keil + 交接 + push + `ls-remote` 回读。
 
+## 20. CP4（phase8-stop-priority-s2-cp4，2026-10-24，修复与验收同批）
+
+起点身份：CP4 起点 = 远端回读 tree `0fdd0801430a41f3fcf8e6032eb3a634442686de`；本轮两个
+提交 = `05d0518`（K1–K6 + 夹具与 runner）与 `5138577`（终字节 Keil 修复 + 反向重指向）。
+冻结引用未动：main `1b3757ee…`、phase7 `6d3fbc55…`、tag object `097935fe…` → firmware
+`e40a9b95…`。工作树在取证据时为 clean（证据文件里逐字记录了 `SOURCE_HEAD` 与构建输入
+blob 清单）。
+
+### 20.1 §10.1 基线取证（DIRECTLY_VERIFIED）
+
+在**未改动**的 0fdd080 仓外副本上执行任务书 §12 探针脚本（逐字复制）：12 项具名缺陷观察
+全部复现，且数值与 §2 表一致（例如 `empty-pending-stale-reconcile running=1 ss=7
+inhibit=0 epoch=4`、`low-write-error-hidden-disarm rc=0 low_rc=-12 confirmed=0
+write_epoch=0 epoch=1`、`release-off-boundary-reports-success rc=0 epoch=4294967295
+advance_failed=1`、`returned-diag-off-view-diverges diag_result=4 diag_off_confirmed=0`）。
+`OBSERVATION_CHECKS 12 / 12`。**这里的 rc=0 只表示"该基线预期缺陷观察成立"，不是软件 PASS。**
+
+### 20.2 K1–K6 落地（生产代码）
+
+- **K1**：删 `ss_reconcile_once` 的 `!had` 旧状态补写旁路（只说明"没有待整理的事实"）；
+  `motor_lock_take_checked()` 返回 `rt_mutex_take` 的**真实**返回值；`ss_lock`/`mot_lock`
+  在 `ss_reconcile_once`/`fault_reset`/最终提交三处逐处判返回值，失败即**不写 Motor/SS/诊断、
+  不 ack、不触发黑匣子**；锁序 `ss → mot → 短窗口` 不变；`motor_trip_observe()` 让消费方
+  能区分"电平观察成功"与"确认未提交"（返回提交状态，`out_read_rc` 另给原始读结果）。
+- **K2**：身份覆盖整条命令 —— 新增 `sp_reserve_for(expected_epoch, want, out)`（arm 的
+  origin epoch 在入口、第一次等待之前捕获）；`motor_start` 的 `READY→RUN` 与 `MOTOR_ACCEL`
+  在**一次身份绑定提交**里完成；斜坡 tick 令牌改在**第一个** `mot_lock` 窗口采集（删掉后来
+  的二次采样）；普通状态提交走带检查入口 `safety_transition_for()/safety_transition_held()`；
+  启动自检的 epoch 比较 + 白名单 + READY 写在 `ss_lock` 下的同一个窗口；修掉"归零后提前
+  return 跳过 RUN→READY"；C20 断言 SS=READY、预约保留、可再启动。
+- **K3**：任何真实写之前先做 token/expected_epoch 检查的关闭；旧回滚一律不写硬件、不清新
+  owner、不留 pending；业务失败（prepare/commit/enable/ENN）经 `mot_fail_op()` 按固定次序
+  产生 inhibit+换代+pending（核原身份 → 换代/抑制/留 pending → 真实关闭一次 → 独立 LOW
+  一次 → 存两个 raw rc 与原业务错误 → 带回本次 proof → 窗口外才确认/整理/通知/打印）；
+  TMC 改为回传 `_for(expected_epoch, result)` 摘要，Motor 不再二次采样 epoch、不再二次保护；
+  `sp_trip_for_operation` 的 EINTR 分成"本次保护 / 同一次已保护 / 过期丢弃"；保护一律先于
+  打印与慢锁（含 arm `:1100/:1116`、start `:1402/:1419`）。
+- **K4**：一次关闭动作的 `proof.epoch`/`pwm.epoch`/`permit.write_epoch`/确认 `expected_epoch`
+  是同一个事实；PWM/LOW/确认/换代的返回值全部被消费，对外优先序 PWM > permit > 身份/边界，
+  raw 分列（LOW 裸写失败而焊盘碰巧为 LOW 时**不**把 API 返回改成成功）；恢复复核的 LOW-only
+  失败与确认失败都是新失败（换代 + 保持抑制）；边界（reserve/release/off/recovery）全判且
+  边界仍照做关闭但返回非 EOK；错误/边界处理不清首故障、不放松锁存。
+- **K5**：ISR/屏蔽上下文拒绝路径不打印（改为 raw 错误 + pending/notify 记账，
+  `ss_evt_no_system/ss_evt_send_fail/ss_evt_log_suppressed` 可查）；
+  `ns800_uart_write_budgeted` 自检 `rt_interrupt_get_nest()!=0 || ns800_intr_masked() ||
+  rt_thread_self()==NULL` 并无打印、无延时地拒绝；末字节后再核一次 `start/total` 且
+  `*written` 保持真实。
+- **K6**：分 owner 的诊断视图（`view_diag`/`diag_off_confirmed`/`diag_output_active`/proof）
+  同源于一套判据；HIGH/RUN 额外核 TMC 编译期许可 + 同代无等待配置摘要（不拿锁、不 UART、
+  不延时）；ARMED 只在同 token 的 HIGH 已写且已确认、必需 ENN 复核通过后才成立；
+  `sp_phase_set` 删除；RUNNING 只能来自真实 enable 成功；诊断保持双宏合同且永不取得 HIGH；
+  关闭动作在四宏全 FALSE 时始终可用。
+
+### 20.3 夹具实证抓到的两处真实产品缺陷（不是测试问题）
+
+1. `sp_off_attempt_for` 的"正式释放"分支只在 PWM 关断失败时追加义务；许可 LOW 裸写**单独**
+   失败时既不抑制也不留 pending，还停留在"撤销预约 + 输出影子已清空"的假事实上。
+2. `sp_recovery_probe_off` 的 if 链把 le-only 失败整支漏掉（第一个条件先命中并把 owner 清成
+   `SP_NONE`），夹具实测 `permit.write_rc=-12` 而 `epoch 7→7、advance_failed=0`，同时
+   `fault_reset` 已在打印"已换 epoch 并保持抑制"——那句话当时是假的。票据因此仍然"有效"，
+   正是 §6.3 禁止的形状。两处都已修（C05c/C12b 现真执行且 PASS）。
+
+### 20.4 §9 并发夹具与 C 集合（DIRECTLY_VERIFIED）
+
+`tests/host/sp_conc_main.c`：真实 pthread 互斥量（按持有线程递归计数 + 所有权，与
+RT-Thread `rt_mutex` 语义一致）、真实线程、全局独占短临界区（等价 PRIMASK 屏蔽期的不可抢占）、
+被屏蔽期间排队并在窗口结束后由同一线程交付的 ISR 队列、四个显式接缝（`rt_pwm_disable` /
+`permit_confirm_read` / `integrity_check_for` / `drv_feedback_confirm`）、可注入取锁错误与
+event 发送失败；墙钟 timeout 只作死锁守卫。构造源入库于 `tests/host/sp_conc_gen/`
+（三个生成脚本 + README；两种行尾检出生成逐字节一致的夹具，已各验一次）。
+
+`tests/host/run_stop_priority_s2.sh` 复用既有守卫/台账纪律：ONLY 先验证、执行集合披露、
+逐组逐 id 必需且出现恰好一次判 PASS、SKIP 只允许出现在本变体声明过的 id、`pre_bad!=0` 与
+异常退出/超时一律 INFRA-FAIL、变体用例总数对账。真实执行结果（同一终字节）：
+
+| 变体 | 组 | 用例 | 结果 |
+|---|---|---|---|
+| target | 13 | 22（另有 10 条按声明 SKIP） | 全部 PASS，runner rc=0 |
+| host_ovr | 13 | 40（1 条按声明 SKIP） | 全部 PASS，runner rc=0 |
+
+覆盖 ID：C01/C01b/C01c/C02/C02b、C03a/b/c、C04a/b、C05a/b/c/d、C06、C07a/b、C08a/b、
+C09a/b/c、C11a–d、C12/C12b/C13/C14、C15a/b/c、C19a/b、C20a–e、C21a/b。需要成功输出前提的
+用例在 host_ovr 真执行；目标 FALSE 的拒绝（C21a/b）真在 target 执行。C15c 的换代由**另一线程**
+完成（停机+恢复+新一轮 arm/start），不是同线程在接缝里重入业务。
+
+### 20.5 §10.1 修后证明 + §10.2/§10.3 反向 + §10.4 回归（DIRECTLY_VERIFIED）
+
+- 修后等价前置：12/12 项 `pre=1 defect=0 safe=1 => PROVEN`（含对照 `control-healthy-cycle`）；
+  四项签名变化的观察改用新的等价入口，未把"编译不过"当作缺陷消失。
+- S1 反向①（关断忽略失败）注入点重指到协调层结果判定：META-OK，命中
+  PS01d/PS02d/PS04a/PS10b/PS13d，额外 FAIL 12 例如实计入台账；原登记 PS01a/PS02a 只断言对外
+  rc，本注入触及不到，留着会把"注入没触及"误报成"没检出"。
+- S1 反向②（失败提前交回 owner）在本链**不可观测**：三次试投（不退回 HELD_UNKNOWN /
+  不恢复 `diag_output_active` / 撤销预约不看持有者）都是"注入落地 + 台账自洽 + proc rc=0"，
+  故按 §10.2 重指向 S2 并发链；runner 里以 `REV-POINTED` 行登记，不冒充本链检出。
+- §10.3 两项 S2 反向 META-OK：`rev_stale_identity_gate`（去掉 `sp_off_attempt_for` 的
+  expected_epoch 门）→ C09b/C15b 命中；`rev_recovery_ticket_check`（去掉
+  `sp_note_permit_confirmed_for` 的 epoch/电平/写代一致门）→ C08b 命中。两者均要求副本
+  构建成功 + 台账自洽 + 业务 rc=1；先试的 `sp_recovery_probe_off` 票据门在 recovery 组
+  没有任何用例消费（NOT-DETECTED），已据此改选门并把该记录写进注释。
+- 共享动作计数变化的解释：按 §5.2 的"一次关断"合同，普通 disarm 失败从"再关一次"改为
+  "复用同一次关闭结果 + 只 notify"，PS05a 的期望由 `disable ≥2` 重锚为 `disable==+1` 且
+  换代/pending/事件计数各判一次，失败与门禁断言未删弱。
+- 同批回归（终字节全部真执行）：S1 target 50 / host_ovr 65 PASS；I/O 四变体 27/29/40/42 +
+  非法宏值拒绝编译；SD 21/20；V1 25/0；V2 22/0。V1/V2 与 I/O 各跑一次；SD 因数据语义未动
+  只做一次全量（不机械重跑）。
+
+### 20.6 §10.5 Keil（DIRECTLY_VERIFIED，只构建）
+
+第一次 `-b` 增量构建暴露一条真实缺陷（原文保留在证据文件 B.6）：
+`stop_priority.c(109): error: call to undeclared function '__get_PRIMASK'` —— 本模块没有
+包含带进该 intrinsic 的设备/CMSIS 头。改为与文件内 `__DSB` 同一原则：本模块自带读 PRIMASK
+的原语（仅 `__ARM_ARCH>=7` 分支），语义反而更严（读真实 PRIMASK，别处关中断也算）。
+终字节 `Rebuild All(-r)`：**0 Error(s), 0 Warning(s)**，
+`Program Size: Code=172978 RO-data=76562 RW-data=2188 ZI-data=83912`；
+工程 target=rt-thread、armclang V6.24、After Build 仅 `fromelf --bin`（无烧录/下载钩子）；
+四个目标宏构建前复核仍全部 RT_FALSE（`motor.h:69`、`motor.h:83`、`project_board.h:51`、
+`tmc2209.h:100`）。
+
+### 20.7 §11 未执行（NOT_EXECUTED，不得当作通过）
+
+- **C10/C16/C17/C18 未执行**：本轮没有把 `drv_epwm.c`（prepare/commit 与 TBCTL 接缝）与
+  `drv_uart.c`（`ns800_uart_write_budgeted` 的等待环）编进主机链。现有夹具只提供端口副本，
+  按 §9 不得称真实 HAL；因此 §10.3 家族①的"去掉真实危险写"与家族②的"去掉真实 TX/flush
+  预算"两半同样未执行（已执行的是这两个家族的另两道门）。
+  下一步的具体做法：优先 SDK/寄存器 shim 直接编 `drv_epwm.c`/`drv_uart.c`；若需要最小函数
+  抽离，必须目标与主机共用同一实现并接入 Keil 工程，不允许复制伪算法。
+- 黑匣子持久化格式、无关内核/框架、既有故障数值：未改。
+- RISK-03/03a（停机时延上界）与物理 RISK-04-b 继续开放；本轮不声称任何波形或物理证明。
+- 无烧录、无串口/调试器、无设备扫描、无读 Flash、无真实 GPIO/TMC/STEP/电机/供电动作，
+  未执行真机清故障、自检或改 SW1。
+
+### 20.8 证据与工件
+
+同一 evidence 目录，cp4 只有**一个**原始结果文件
+`reports/reviews/phase8-stop-priority-s2-integrated/cp4_baseline_observation.txt`：第一部分
+= 基线 12 项观察（0fdd080），第二部分 = 修后证明、并发链、反向、回归与 Keil 的原始输出，
+逐节标 `SOURCE_HEAD` 与构建输入 blob 清单；AGENT_REPORTED / DIRECTLY_VERIFIED /
+NOT_EXECUTED 分列。三份 cp3 证据只做身份段脱敏（用户目录/仓库绝对路径 → `<USER>`/`<REPO>`），
+错误原文、时间戳与 rc 未改。`git diff --check`：源码/测试/runner 干净；证据文件里只剩 1 处
+行尾空白，来自 Keil 日志的 `Program Size: …` 原样捕获——按"证据不得改写"保留，不做格式化。
+
 STOP: AWAITING_INDEPENDENT_IMPLEMENTATION_REVIEW
 NO SOFTWARE_REVIEW_GO claimed by Agent
 NO board/serial/GPIO/TMC/STEP/motor authorization

@@ -39,9 +39,9 @@ REVIEW_PROBE arm-txn-leak reproduced=1
 
 
 ---- build.txt ----
-In file included from C:\Users\LMX\AppData\Local\Temp\s2cp3_base\review_probe.c:511:0:
-D:\ns800\rt-thread-master\rt-thread-master\bsp\novosns\ns800\ns800rt7p65-nssinepad\applications/step_pwm.c: In function 'pwm_test':
-D:\ns800\rt-thread-master\rt-thread-master\bsp\novosns\ns800\ns800rt7p65-nssinepad\applications/step_pwm.c:191:17: warning: variable 'tok_held' set but not used [-Wunused-but-set-variable]
+In file included from <TMP>\s2cp3_base\review_probe.c:511:0:
+<REPO>\rt-thread-master\rt-thread-master\bsp\novosns\ns800\ns800rt7p65-nssinepad\applications/step_pwm.c: In function 'pwm_test':
+<REPO>\rt-thread-master\rt-thread-master\bsp\novosns\ns800\ns800rt7p65-nssinepad\applications/step_pwm.c:191:17: warning: variable 'tok_held' set but not used [-Wunused-but-set-variable]
      rt_bool_t   tok_held = RT_FALSE;
                  ^
 
@@ -348,9 +348,9 @@ REVIEW_PROBE stale-slow-reconcile reproduced=1
 
 
 ---- target-build.txt ----
-In file included from C:\Users\LMX\AppData\Local\Temp\s2cp3_base\review_probe.c:511:0:
-D:\ns800\rt-thread-master\rt-thread-master\bsp\novosns\ns800\ns800rt7p65-nssinepad\applications/step_pwm.c: In function 'pwm_test':
-D:\ns800\rt-thread-master\rt-thread-master\bsp\novosns\ns800\ns800rt7p65-nssinepad\applications/step_pwm.c:191:17: warning: variable 'tok_held' set but not used [-Wunused-but-set-variable]
+In file included from <TMP>\s2cp3_base\review_probe.c:511:0:
+<REPO>\rt-thread-master\rt-thread-master\bsp\novosns\ns800\ns800rt7p65-nssinepad\applications/step_pwm.c: In function 'pwm_test':
+<REPO>\rt-thread-master\rt-thread-master\bsp\novosns\ns800\ns800rt7p65-nssinepad\applications/step_pwm.c:191:17: warning: variable 'tok_held' set but not used [-Wunused-but-set-variable]
      rt_bool_t   tok_held = RT_FALSE;
                  ^
 
