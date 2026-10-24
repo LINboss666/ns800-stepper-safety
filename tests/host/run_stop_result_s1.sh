@@ -398,7 +398,7 @@ if [ "$REVERSE" = "1" ]; then
     #     rev_stale_identity_gate   -> C09b/C15b META-OK
     #     rev_recovery_ticket_check -> C08b      META-OK
     # 本轮两条链的反向都真实执行过, 上面的命中数字来自实际输出, 不是推断。
-    matrix+=("rev_diag_fail_releases_owner | REV-POINTED 本链不消费该事实(3 次试投均 NOT-DETECTED), 由 S2 并发链反向代跑")
+    matrix+=("rev_diag_fail_releases_owner | REV-HANDED-OFF 本链不消费该事实(3 次试投均 NOT-DETECTED); CP5 §6 起由 S2 并发链的 rev_fail_returns_owner_early 在**C11d 真正经过的 release 失败分支**注入, 并把 C11d 扩到对 canonical owner==SP_HELD_UNKNOWN/锁存/输出未交回三者同时断言 => 具名检出(见 run_stop_priority_s2.sh REVERSE=1)")
     note ""
     note "=== S1 反向汇总 ==="
     for m in "${matrix[@]}"; do note "$m"; done

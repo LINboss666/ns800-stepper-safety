@@ -487,3 +487,80 @@ NO SOFTWARE_REVIEW_GO claimed by Agent
 NO board/serial/GPIO/TMC/STEP/motor authorization
 FOUR target macros remain RT_FALSE
 RISK-03/03a and physical RISK-04-b remain open
+
+
+--------------------------------------------------------------------------------
+
+## CP5 追加(2026-10-24): §5 真实 HAL 叶子接入完成 + §6 反向补齐 + §7 取证修复
+
+接续任务 ID `phase8-stop-priority-s2-hal-closeout`。起点 = 远端分支头 `2fbac9a`
+(本次独立 ls-remote 实读的完整 SHA 见下), 本轮提交前的工作树差异全部记录在下面。
+
+### 1. 本轮落地的生产改动
+- §2(P1) TMC 每次调用改用**局部 op 身份** `tmc_op_t{epoch/did_protect/outcome/proof}`,
+  贯穿 apply/integrity/fail_ctx/result_fill; 未取得 txn 的调用不再改写正在执行那笔操作
+  的身份, 出参只反映本调用; `expected_epoch` 的"0 当未指定"哨兵已去掉(0 是合法初始代次)。
+  共享 ctx 上只保留 `op_epoch/op_protect` 两个**受保护观测**字段(拿到事务锁才写)。
+- §3.1(P1) arm 失败摘要改为**先受检保护、后打印**; HIGH 已发出之后的两处最终提交拒绝
+  出口统一走 `mot_fail_op()`(带原 token), 不再只释放预约而遗留本次 HIGH。
+- §3.2 ramp 的 TMC 复核改为 `tmc2209_config_integrity_check_for(guard_epoch, &gres)`
+  (拍初快照身份), 守卫消费该局部结果/proof; 慢复核之后、写 Motor 的
+  current/target/state 之前, 持 mot_lock 复核本拍身份, 被取代就整笔丢弃并直接返回。
+- §5 HAL 侧只做**编译边界**调整: `ns800_intr_masked` + `ns800_uart_write_budgeted` 逐字
+  移入 `drivers/drv_uart_txleaf.inc`, EPWM 的三个叶子函数逐字移入
+  `drivers/drv_epwm_leaf.inc`, 私有结构共用声明放在 `drivers/drv_epwm_leaf.h`;
+  `drv_uart.c` / `drv_epwm.c` 在原位置 include 同一份文件。算法一行未改。
+
+### 2. §5 真实叶子链(C10/C16/C17/C18)已真实执行
+新增第二个夹具 `tests/host/leaf_main.c` + `tests/host/shim_leaf/`(最小 SDK/寄存器 shim,
+每条声明带本地 SDK 原文出处, 布局用 `_Static_assert` 钉住), 在**同一份 runner** 里作为
+第二二进制执行 4 个组 27 条用例:
+- C10(7): prepare 零寄存器写 / 换算在门外 / period-compare 与独立复算逐位一致 /
+  有效身份真写 20 个寄存器 / 冻结的 TBCTL.CTRMODE 不被配置提交恢复 /
+  **旧 token 提交寄存器写计数必须 0**(§5 核心) / 旧 set 路径同判据。
+- C16(7): 另一条真线程持事务锁时预算内拒绝且不产生保护与总线流量 / 未取得不归还 /
+  恰好一次归还 / **BUSY 的竞争调用不改活跃 op 身份**(§2 反例并入, 旧身份与活跃身份
+  是两个不同的数) / 真实失败仍恰好保护一次 / RX 洪泛的字节上限与时间上限都在 TX 之前。
+- C17(7): 真 TDRE 等待环的 无空间 / 部分发送(原始 written=3) / 末字节后被抢占才过期
+  (written=8 仍不发布成功) / 正常整帧对照 / ISR+掩码+空设备三条上下文判据静默拒绝 /
+  应答完整但迟到 / CRC 错 —— 失败一律先保护后日志(错误打印时许可仍 HIGH 的次数=0)。
+- C18(6): 一次 apply 只用同一条 1500 tick 外层预算跨 4 写 + 8 读 + 2×IFCNT(实测 87 tick,
+  写帧 4/读请求 12/IFCNT 4/GCONF 0x141/CHOPCONF 0x15030053) / 预算耗尽不重开也不发布
+  过期成功 / tick 跨回绕的两种判据 / 晚到的真实成功不刷新摘要与健康(state 仍非
+  CONFIGURED, ok_for_arm 仍 FALSE, 而芯片确实收到了那些写)。
+
+### 3. §6 反向: 命名准确化 + 三项新增(共 5 个家族)
+- 改名 `rev_recovery_ticket_check` → `rev_permit_confirm_identity_gate`, 并明说它没有
+  移除恢复最终票据判据(恢复最终窗口用 C14a/C14b 的确定接缝)。
+- `rev_config_write_token_gate`: 保持窗口原语, 只取消 `sp_enter_token` 的资格检查
+  → C10e 具名检出。
+- `rev_tx_flush_budget`: 去掉真实叶子的末字节预算复核 + 去掉真实 flush 字节上限
+  → C17c 与 C16c 具名检出(两处都是有限输入, 错误版本正常返回, 不拿墙钟 timeout 当检出)。
+- `rev_fail_returns_owner_early`: 先把 C11d 扩到对 canonical `owner==SP_HELD_UNKNOWN`、
+  锁存、输出未交回三者同时断言(夹具与生成源同步改, 重新生成逐字节一致), 再在 **C11d
+  真正经过的 release 失败分支**去掉那句收回 → 具名检出。
+  如实记录: 首轮注入落在 `release_on_ok=FALSE` 分支, 结果是 NOT-DETECTED, 改对分支后
+  才算覆盖。
+
+### 4. §7 取证缺口
+- 根因与逐条交代写在同一份原始结果文件的 **[C.0]** 节; CP4 遗留在 bash /tmp 的原始 stdout
+  与那条首次 `__get_PRIMASK` 构建错误原文均**不可恢复**, 没有人为重造, 只登记差异并在
+  定稿字节上完整重跑(构建命令行/manifest/blob 全路径/最终 Keil 全文都已附)。
+
+### 5. 结果与边界
+- S2 + 叶子链: target 23 例全 PASS; host_ovr 68 例全 PASS; 5 个反向家族均 META-OK
+  (业务 rc=1, 台账自洽, 预登记失败身份全部命中)。原始输出见同一份 cp4 结果文件 [C] 段。
+- Keil Rebuild All: 0 Error / 0 Warning(只构建); `.dep` 证明两个 `.inc` 真被目标编译包含。
+- 未烧录/未接串口/未做任何真实 GPIO/TMC/STEP/电机/Flash/供电/接线/SW1 动作;
+  四个目标宏保持 RT_FALSE; 板上状态按 USER_REPORTED_E40, RISK-03/03a 与物理 RISK-04-b
+  继续开放。新登记的 STEP 频率换算口径见 [C.8]。
+
+### 6. 负例链(13 例)的两件如实交代(CP5 §8)
+- `tests/host/inject.py` 的 `probe_writeback` 注入配方仍按 S2 之前的两参签名调用
+  `tmc_read_reg` / `tmc2209_write_register_confirmed`, 副本编译失败 => N9/N10/N10b 被记
+  INFRA-FAIL(编译失败不算检出)。本轮给同一处注入补 `(RT_NULL, RT_NULL)` 两个尾参,
+  断言与期望身份一字未改; 修后三例真执行并具名抓到 FD2/FD3/FD7b。
+- `N7_helper_thread_startup_fail` 在全量顺序下出现过一次 `NOT-DETECTED(V2.run 期望=3
+  实际=1)`, 而三次独立复跑与另一次全量运行都是 `OK=13 / NOT-DETECTED=0 / INFRA-FAIL=0`。
+  根因本轮未定位, 作为开放项登记, 不记为通过; 两份原始日志都保留在证据目录
+  (negatives.txt 与 negatives_flake_record.txt)。元负例 M1..M5 均 META-OK。

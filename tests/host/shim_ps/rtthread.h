@@ -92,9 +92,8 @@ rt_err_t    rt_thread_startup(rt_thread_t t);
 rt_err_t    rt_thread_delete(rt_thread_t t);
 
 void ps_win_note(const char *what);   /* CP3 §9 第 2/5 项: 窗口内禁止项观察(定义在 ps_main.c) */
-static inline void rt_thread_mdelay(rt_int32_t ms)
-{ (void)ms; ps_win_note("rt_thread_mdelay"); }  /* 单线程夹具: 不等, 但**计数** */
-static inline rt_tick_t rt_tick_get(void) { return 0u; }          /* 不参与任何判定 */
+/* ⚠ rt_thread_mdelay / rt_tick_get 的声明与实现在本文件末尾按 PS_LEAF_SCRIPTED_TIME
+ *   二选一(CP5 §5), 这里不再直接给"恒 0 时钟"的版本。 */
 
 #define rt_memset    memset
 #define rt_memmove   memmove
@@ -123,5 +122,23 @@ void        ps_isr_set(int v);
     const void *ps_mshref_##command = (const void *)(command)
 #define MSH_CMD_EXPORT_ALIAS(alias, cmd, desc) \
     const void *ps_mshref_##alias = (const void *)(alias)
+
+/* ---------------------------------------------------------------------------
+ * CP5 §5(仅主机叶子链): 真实 HAL 叶子 drv_uart_txleaf.inc 的等待循环按
+ * rt_tick_get() 判超时, 生产 TMC 预算(tmc2209.c)也按同一条时钟算 used/eff ——
+ * 那两条判据在"恒为 0 的单线程时钟"下**永远不会过期**, 用例就成了空判据。
+ * 因此叶子链定义 PS_LEAF_SCRIPTED_TIME, 把这两个原语降级成"由夹具脚本推进的"外部
+ * 实现; 其余三条链(S1/I-O/SD/V1V2/S2 并发)不定义它, 行为逐字不变。
+ * --------------------------------------------------------------------------- */
+#ifdef PS_LEAF_SCRIPTED_TIME
+#define RT_TICK_PER_SECOND 1000u        /* 与目标 rtconfig.h 同一数值(叶子链按 ms=tick) */
+rt_tick_t rt_tick_get(void);            /* 实现: leaf_main.c 的脚本化时钟 */
+rt_tick_t rt_tick_from_millisecond(rt_int32_t ms);
+void      rt_thread_mdelay(rt_int32_t ms);  /* 实现: 推进脚本时钟(不真是睡眠) */
+#else
+static inline void rt_thread_mdelay(rt_int32_t ms)
+{ (void)ms; ps_win_note("rt_thread_mdelay"); }  /* 单线程夹具: 不等, 但**计数** */
+static inline rt_tick_t rt_tick_get(void) { return 0u; }          /* 不参与任何判定 */
+#endif
 
 #endif /* SHIM_PS_RTTHREAD_H */

@@ -23,10 +23,15 @@ SUBS = {
     'probe_writeback': [(
         'rt_kprintf("[TMC] probe: 只读身份检查 txn-held IOIN+GSTAT+IFCNT (0 个 WRITE 帧)\\n");',
         'rt_kprintf("[TMC] probe: 只读身份检查 txn-held IOIN+GSTAT+IFCNT (0 个 WRITE 帧)\\n");\n'
-        '    { rt_uint32_t neg_old = 0u;                       /* NEGATIVE-INJECTION */\n'
-        '      (void)tmc_read_reg(TMC_ADDR_DEFAULT, TMC_REG_GCONF, &neg_old);\n'
-        '      (void)tmc2209_write_register_confirmed(TMC_ADDR_DEFAULT,\n'
-        '                                             TMC_REG_GCONF, neg_old); }')],
+        '    /* NEGATIVE-INJECTION: 身份检查顺手把读到的旧值写回(应被 FD3/FD7b 抓到)。\n'
+        '     * CP5 修注入本身: S2 §10.3 起 tmc_read_reg / tmc2209_write_register_confirmed\n'
+        '     * 都带 (预算, 传输统计) 两个尾参, 旧配方按两参调用 => 副本编译失败\n'
+        '     * (N9/N10/N10b 被记 INFRA-FAIL, 不是检出)。这里按当前签名给 RT_NULL 的\n'
+        '     * "无预算/不留统计"调用 —— 写帧仍真的发出去, 判据不变。 */\n'
+        '    { rt_uint32_t neg_old = 0u;\n'
+        '      (void)tmc_read_reg(TMC_ADDR_DEFAULT, TMC_REG_GCONF, &neg_old, RT_NULL, RT_NULL);\n'
+        '      (void)tmc2209_write_register_confirmed(TMC_ADDR_DEFAULT, TMC_REG_GCONF,\n'
+        '                                             neg_old, RT_NULL, RT_NULL); }')],
     # 元负例 M1(复现 A): 把 V2 的 FD7b 判据换成恒真 => 检测器失效, 链必须拒绝
     'fd7b_blinding': [(
         'CHECK(shim_frame_write_frames == wf0 && shim_chip[0x00] == gchip &&\n'

@@ -1716,14 +1716,22 @@ static void cases_diag(void)
     ps_sim_pwm_set_rc(RT_EOK, RT_EOK, -RT_EIO);
     msh_pwm("stop");
     sp_get(&s);
+    /* CP5 §6: 除了"一次关断 + 锁存/抑制/pending", 还必须对 **canonical 的 owner 与
+     * 输出未交回** 下断言 —— 否则"失败分支提前把 owner 交回 SP_NONE"这一类缺陷
+     * 在这里不可见(此前 S1 的"失败提前交回 owner"只有 REV-POINTED, 没有真注入)。 */
     CHECK("C11d-diag-fail-keeps-owner-single-close",
           ps_sim_pwm_disable_calls() == d0 + 1 &&
           step_pwm_output_active() == RT_TRUE && s.diag_stop_latched == RT_TRUE &&
-          s.inhibit == RT_TRUE && s.metadata_pending == RT_TRUE,
-          fm("disable %d->%d active=%s latch=%s inhibit=%s pending=%s",
+          s.inhibit == RT_TRUE && s.metadata_pending == RT_TRUE &&
+          s.owner == SP_HELD_UNKNOWN && sp_diag_output_active() == RT_TRUE &&
+          sp_diag_off_confirmed() == RT_FALSE,
+          fm("disable %d->%d active=%s latch=%s inhibit=%s pending=%s canonical_owner=%s "
+             "diag_output_active=%s diag_off_confirmed=%s",
              d0, ps_sim_pwm_disable_calls(), step_pwm_output_active() ? "YES" : "no",
              s.diag_stop_latched ? "YES" : "no", s.inhibit ? "YES" : "no",
-             s.metadata_pending ? "YES" : "no"));
+             s.metadata_pending ? "YES" : "no", sp_owner_name(s.owner),
+             sp_diag_output_active() ? "YES" : "no",
+             sp_diag_off_confirmed() ? "YES" : "no"));
     ps_sim_pwm_set_rc(RT_EOK, RT_EOK, RT_EOK);
 }
 

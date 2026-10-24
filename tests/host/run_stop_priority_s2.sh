@@ -50,13 +50,19 @@ REPO_ROOT="${REPO_ROOT:-$(env_repo_root)}"
 SRC_APP="${SRC_APP:-$REPO_ROOT/$(env_app_rel)}"
 SHIM_DIR="${SHIM_DIR:-$HERE/shim_ps}"
 S2_MAIN="${S2_MAIN:-$HERE/sp_conc_main.c}"
+LEAF_MAIN="${LEAF_MAIN:-$HERE/leaf_main.c}"
+LEAF_SHIM="${LEAF_SHIM:-$HERE/shim_leaf}"
 HAL_DRV="${HAL_DRV:-$REPO_ROOT/rt-thread-master/rt-thread-master/bsp/novosns/ns800/libraries/HAL_Drivers/drivers}"
 GROUP_TIMEOUT="${S2_GROUP_TIMEOUT:-60}"
 
 # ---------------------------------------------------------------- 组与逐变体登记表
 # 变量名不能叫 GROUPS: bash 里 $GROUPS 是保留数组(当前用户的组 ID 列表), 给它赋标量
 # 会让 `for g in $GROUPS` 遍历出 GID(本机实测=197121), 组名全部丢失。
-S2_GROUPS="lock isr isr_window off_matrix off_arm unknown identity diag recovery stale boundary healthy target_reject"
+# CP5 §5: 追加**真实 HAL 叶子链**的四个组(同一 runner、同一台账纪律, 但跑**第二个二进制**):
+#   epwm_leaf / tmc_lock / uart_leaf / budget_leaf  =>  C10 / C16 / C17 / C18
+# 其余十三组仍跑端口层那个二进制(它们测应用本体, 三段叶子是端口桩)。
+S2_GROUPS="lock isr isr_window off_matrix off_arm unknown identity diag recovery stale boundary healthy target_reject epwm_leaf tmc_lock uart_leaf budget_leaf"
+LEAF_GROUPS=" epwm_leaf tmc_lock uart_leaf budget_leaf "
 
 # 每组每变体**必需**(必须真执行且判 PASS)的用例 id; 名称与夹具里的 CASE id 逐字一致。
 G_lock_target="C01-fast-before-lock-then-wait C01b-commits-after-release-no-second-close C01c-ss-lock-error-no-ack C02-mot-lock-held-then-commits C02b-mot-lock-error-no-place"
@@ -102,6 +108,22 @@ G_healthy_host_ovr="C20a-healthy-run C20b-ramp-zero-ready-keeps-armed C20c-resta
 G_target_reject_target="C21a-target-false-refuses-open C21b-close-always-available"
 G_target_reject_host_ovr=""
 
+# --------------------------------------------------------------------------
+# CP5 §5 真实 HAL 叶子链(第二个二进制: tests/host/leaf_main.c)
+#   被测生产实现: stop_priority.c + tmc2209.c + drv_uart_txleaf.inc + drv_epwm_leaf.inc
+#   target 变体:  四宏 RT_FALSE => 编译期写入门禁直接挡住, 总线序列/预约前提不可达,
+#                 按声明整族 SKIP(不冒充真实执行); 两个变体都**必须干净编译**。
+#   host_ovr:     C10/C16/C17/C18 全部真执行。
+# --------------------------------------------------------------------------
+G_epwm_leaf_target=""
+G_epwm_leaf_host_ovr="C10a-prepare-writes-zero-registers C10b-period-compare-mode-match C10c-valid-token-commits-registers C10d-frozen-tbctl-not-restored-by-config-commit C10e-stale-token-commit-writes-zero-registers C10e2-protection-itself-did-one-real-off-and-low C10f-legacy-set-keeps-frozen-timebase"
+G_tmc_lock_target=""
+G_tmc_lock_host_ovr="C16a-lock-held-refuses-within-budget C16a2-non-taker-cannot-release C16a3-owner-release-balances C16b-busy-call-does-not-clobber-active-op C16b2-real-failure-still-protects-exactly-once C16c-rx-flood-byte-cap-stops-before-tx C16c2-rx-flood-time-cap-stops-before-tx"
+G_uart_leaf_target=""
+G_uart_leaf_host_ovr="C17a-no-space-expires-with-zero-written C17b-partial-send-keeps-raw-written C17c-expired-after-last-byte-not-a-success C17d-normal-frame-eok C17e-context-gates-reject-quietly C17f-late-complete-frame-not-a-success C17g-crc-error-rejected-and-protects-once"
+G_budget_leaf_target=""
+G_budget_leaf_host_ovr="C18a-single-budget-covers-subreads-and-ifcnt C18a2-summary-published-after-real-success C18b-budget-exhausts-without-reopening C18c-wraparound-with-room-succeeds C18c2-wraparound-expiry-is-unsigned-delta C18d-late-real-success-cannot-refresh-summary"
+
 # 每个 组×变体 **允许**的 SKIP id(与夹具内 SKIPV 的字面 id 一致)。
 S_off_arm_target="C05c C05d"
 S_off_arm_host_ovr=""
@@ -115,11 +137,21 @@ S_healthy_target="C20 C20d"
 S_healthy_host_ovr=""
 S_target_reject_target=""
 S_target_reject_host_ovr="C21"
+S_epwm_leaf_target="C10"
+S_epwm_leaf_host_ovr=""
+S_tmc_lock_target="C16"
+S_tmc_lock_host_ovr=""
+S_uart_leaf_target="C17"
+S_uart_leaf_host_ovr=""
+S_budget_leaf_target="C18"
+S_budget_leaf_host_ovr=""
 
 # 变体期望的用例总数(全开时): 少一组/少一个 id 都不算通过。
 # CP5 §4: recovery 组的 C14 拆成 C14a/C14b 两个**确定接缝** => 22->23 / 40->41。
+# CP5 §5: target 的叶子四组贡献 0 个 CASE(整族 SKIP) => 23 不变;
+# host_ovr 追加真实执行的 27 条(7+7+7+6) => 41 -> 68。
 S2_EXPECT_target="${S2_EXPECT_target:-23}"
-S2_EXPECT_host_ovr="${S2_EXPECT_host_ovr:-41}"
+S2_EXPECT_host_ovr="${S2_EXPECT_host_ovr:-68}"
 
 VARIANTS="target host_ovr"
 
@@ -163,6 +195,10 @@ if ! OUT_DIR="$(require_outside_repo "$OUT_DIR" "S2_OUT_DIR")"; then
     exit 4
 fi
 [ -f "$S2_MAIN" ]  || { note "FATAL: 夹具源不存在: $S2_MAIN"; exit 127; }
+[ -f "$LEAF_MAIN" ] || { note "FATAL: 真实叶子夹具源不存在: $LEAF_MAIN"; exit 127; }
+[ -d "$LEAF_SHIM" ] || { note "FATAL: 真实叶子 shim 目录不存在: $LEAF_SHIM"; exit 127; }
+[ -f "$HAL_DRV/drv_uart_txleaf.inc" ] || { note "FATAL: 真实 UART 叶子不存在"; exit 127; }
+[ -f "$HAL_DRV/drv_epwm_leaf.inc" ]   || { note "FATAL: 真实 EPWM 叶子不存在"; exit 127; }
 [ -d "$SHIM_DIR" ] || { note "FATAL: 兼容层目录不存在: $SHIM_DIR"; exit 127; }
 [ -d "$SRC_APP" ]  || { note "FATAL: 源码目录不存在: $SRC_APP"; exit 127; }
 [ -f "$HAL_DRV/drv_epwm.h" ] || { note "FATAL: 真实 drv_epwm.h 不存在"; exit 127; }
@@ -201,6 +237,9 @@ printf '#ifndef NS800_HOST_RTDEF_COMPAT_H\n#define NS800_HOST_RTDEF_COMPAT_H\n#i
 printf '#ifndef NS800_HOST_RTHW_COMPAT_H\n#define NS800_HOST_RTHW_COMPAT_H\n#include <rtthread.h>\nrt_base_t rt_hw_interrupt_disable(void);\nvoid rt_hw_interrupt_enable(rt_base_t level);\n#endif\n' \
     > "$COMPAT_DIR/rthw.h" || { note "FATAL: rthw 兼容头写不进去"; exit 4; }
 INCS=(-I "$SHIM_DIR" -I "$SRC_APP" -I "$HAL_DRV" -I "$COMPAT_DIR")
+# 叶子链: -I shim_leaf 必须**先于** shim_ps, 于是 <rtthread.h>/<rtdevice.h>/<drv_common.h>
+# 落到本链叠加层(内部再按相对路径 include shim_ps 的原文件)。
+LEAF_INCS=(-I "$LEAF_SHIM" "${INCS[@]}")
 
 note "###### 停机优先 S2 并发/身份链 (基线 $(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || echo UNKNOWN)) ######"
 note "run_id=$RUN_ID"
@@ -291,15 +330,16 @@ validate_group_ledger() {
 # 每个变体: 编译一次 -> 逐组真执行 -> 逐组台账 -> 变体汇总
 # --------------------------------------------------------------------------
 run_variant() {
-    local variant="$1" log exe extra vrc group out marker proc_rc vres
+    local variant="$1" log exe leaf_exe leaf_log extra vrc lrc group gexe out marker proc_rc vres
     local tot_cases=0 tot_pass=0 tot_fail=0 tot_prebad=0 tot_skip=0 grp_n=0 bad_grps=""
     local decided=0 n_sel
     n_sel="$(printf '%s\n' $SELECTED | grep -c .)"
     log="$OUT_DIR/${variant}_build.txt"; exe="$OUT_DIR/${variant}.exe"
+    leaf_exe="$OUT_DIR/${variant}_leaf.exe"; leaf_log="$OUT_DIR/${variant}_leaf_build.txt"
     extra="$(variant_flags "$variant")"
     case "$extra" in *__BAD_VARIANT__*) note "FATAL: 未知变体 $variant"; return 4;; esac
 
-    rm -f "$exe" "$log"
+    rm -f "$exe" "$log" "$leaf_exe" "$leaf_log"
     # shellcheck disable=SC2086
     "$GCC" $FLAGS $extra "${INCS[@]}" "$S2_MAIN" -o "$exe" > "$log" 2>&1
     vrc=$?
@@ -318,12 +358,40 @@ run_variant() {
         return 1
     fi
 
+    # ---- CP5 §5: 真实叶子链的第二个二进制(同样要求 0 warning; 失败即 INFRA-FAIL) ----
+    # shellcheck disable=SC2086
+    "$GCC" $FLAGS $extra -DPS_LEAF_SCRIPTED_TIME "${LEAF_INCS[@]}" "$LEAF_MAIN" \
+        -o "$leaf_exe" > "$leaf_log" 2>&1
+    lrc=$?
+    if [ "$lrc" -ne 0 ]; then
+        tail -20 "$leaf_log"
+        note "  $variant 叶子链编译失败 rc=$lrc => 不运行叶子组(旧产物已删除)"
+        matrix+=("$variant/leaf | COMPILE_FAILED rc=$lrc")
+        remember 4
+        leaf_exe=""
+    elif [ -s "$leaf_log" ]; then
+        note "  ⚠ $variant 叶子链构建有输出(要求 0 warning):"
+        sed 's/^/      /' "$leaf_log"
+        matrix+=("$variant/leaf | INFRA-FAIL 构建不干净(要求 0 warning)")
+        remember 4
+        leaf_exe=""
+    fi
+
     for group in $SELECTED; do
+        case "$LEAF_GROUPS" in
+            *" $group "*) gexe="$leaf_exe" ;;
+            *)            gexe="$exe" ;;
+        esac
+        if [ -z "$gexe" ]; then
+            note "  $variant/$group 所需二进制未建成 => INFRA-FAIL(不运行, 也不算通过)"
+            matrix+=("$variant/$group | INFRA-FAIL 所需二进制缺失(该二进制编译失败)")
+            remember 4; decided=$((decided+1)); bad_grps="$bad_grps $group"; continue
+        fi
         out="$OUT_DIR/${variant}_${group}_out.txt"
         marker="$OUT_DIR/${variant}_${group}.executed.marker"
         rm -f "$out" "$marker"
-        printf 'LAUNCHED exe=%s group=%s timeout=%ss\n' "$exe" "$group" "$GROUP_TIMEOUT" > "$marker"
-        timeout "$GROUP_TIMEOUT" "$exe" "$group" > "$out" 2>&1
+        printf 'LAUNCHED exe=%s group=%s timeout=%ss\n' "$gexe" "$group" "$GROUP_TIMEOUT" > "$marker"
+        timeout "$GROUP_TIMEOUT" "$gexe" "$group" > "$out" 2>&1
         proc_rc=$?
         printf 'DONE rc=%s bytes=%s\n' "$proc_rc" "$(file_bytes "$out")" >> "$marker"
         grp_n=$((grp_n+1))
@@ -403,17 +471,19 @@ REVERSE="${REVERSE:-0}"
 # 反向(§10.3 两项 S2 家族, 只改**仓库外**的生产源码副本)
 #   rev_stale_identity_gate   家族①"去掉旧 token 门": 关掉 sp_off_attempt_for 的
 #                             expected_epoch 早退 => 迟到的旧关断能改写新那一代并真的动硬件。
-#   rev_recovery_ticket_check 家族②"去掉恢复/确认那一侧的 epoch 检查": 关掉
-#                             sp_note_permit_confirmed_for 的身份门(票据/请求电平/写代三者
-#                             必须仍与本次一致) => 过期许可确认照样写进别人那一代。
+#   rev_permit_confirm_identity_gate 家族②(CP5 §6 命名更正): 关掉的是
+#                             sp_note_permit_confirmed_for 的确认身份门(请求电平/写代必须
+#                             仍与本次一致) => 过期许可确认照样写进别人那一代; 命中 C08b。
 #   两次试投记录(不作数字用, 只说明为什么选这两处门): 先试的 sp_recovery_probe_off 票据门
 #   在 recovery 组**没有被任何用例消费**(注入落地、台账自洽、proc rc=0 => NOT-DETECTED),
 #   那一条事实这一批用例不观察; 反向要挑"产品真在被测的那个门"。
 #   判据与 S1/SD 反向同一套: 注入必须真落地(否则 INFRA-FAIL) + 副本构建成功 + 夹具业务
 #   rc=1 + 逐组台账自洽 + 预登记失败身份全部命中; 崩溃/超时/台账不完整一律 INFRA-FAIL,
 #   "编译失败"与"没跑起来"都不算检出。
-#   ⚠ §10.3 家族①的另一半("去掉真实危险写")与家族②的另一半("去掉真实 TX/flush 预算")
-#     不在本轮: 它们要求把 drv_epwm.c / drv_uart.c 的真实叶子编进主机链(见 §11 未执行)。
+#   CP5 §6 起, "去掉配置真实写的 token 门""去掉真实 TX/flush 预算""失败提前交回 owner"
+#   三项已落在**真实叶子链**(drv_uart_txleaf.inc / drv_epwm_leaf.inc / tmc2209.c)与真实
+#   门上, 各带预登记失败身份(C10e / C17c+C16c / C11d)。异常、缺用例、前置失败、编译失败
+#   都不算检出; 反向只说"这道门被拆掉后这条业务断言当场失败", 不外推为整体安全证明。
 # --------------------------------------------------------------------------
 reverse_s2() {
     local name="$1" variant="$2" groups="$3" ids="$4"
@@ -421,15 +491,26 @@ reverse_s2() {
     work="$OUT_DIR/reverse/$name"
     rm -rf "$work"; mkdir -p "$work/app" || { note "  $name: 无法建副本目录"; remember 4; return; }
     cp "$SRC_APP/stop_priority.c" "$work/app/stop_priority.c" || { note "  $name: 副本失败"; remember 4; return; }
+    cp "$SRC_APP/tmc2209.c" "$work/app/tmc2209.c" || { note "  $name: tmc2209.c 副本失败"; remember 4; return; }
     cp "$SRC_APP"/*.h "$work/app/" 2>/dev/null
-
+    # CP5 §5/§6: 反向也要能落在**真实 HAL 叶子**上, 所以把两份 .inc 也复制出来。
+    mkdir -p "$work/hal" || { note "  $name: 无法建 hal 副本目录"; remember 4; return; }
+    for f in drv_uart_txleaf.inc drv_epwm_leaf.inc drv_epwm_leaf.h; do
+        cp "$HAL_DRV/$f" "$work/hal/$f" || { note "  $name: $f 副本失败"; remember 4; return; }
+    done
+    cp "$HAL_DRV"/drv_uart.h "$HAL_DRV"/drv_epwm.h "$work/hal/" 2>/dev/null
     cat > "$work/inject.py" <<'PYEOF'
-import io, sys
-path, mode = sys.argv[1], sys.argv[2]
+import io, os, sys
+work, mode = sys.argv[1], sys.argv[2]
+# CP5 §6: 注入可以落在**多个**生产文件上(协调层 / TMC 配置层 / 真实 UART 叶子), 每条替换
+# 都带文件键; 命不中恰好一次就整体失败(INFRA-FAIL), 不猜、不静默少注入。
+FILES = {'sp': os.path.join(work, 'app', 'stop_priority.c'),
+         'mc': os.path.join(work, 'app', 'tmc2209.c'),
+         'tx': os.path.join(work, 'hal', 'drv_uart_txleaf.inc')}
 PAIRS = {
-    # 两道门在文件里各有同形的孪生(sp_trip_for_operation / sp_recovery_note_failure),
-    # 所以锚点带上下一行, 保证命中恰好一次 —— 命不中就判 INFRA-FAIL, 不猜。
-    'rev_stale_identity_gate': [(
+    # 家族① "去掉旧 token 门": 关断不再核对调用方原身份。两道门在文件里各有同形的孪生
+    # (sp_trip_for_operation / sp_recovery_note_failure), 所以锚点带上下一行。
+    'rev_stale_identity_gate': [('sp',
         '    if (sp.epoch != expected_epoch)\n'
         '    {\n'
         '        sp.stale_dropped++;\n'
@@ -439,9 +520,11 @@ PAIRS = {
         '    {\n'
         '        sp.stale_dropped++;\n'
         '        sp_copy_proof_held(out);')],
-    # sp_note_permit_confirmed_for 与 sp_note_enn_confirmed_for 的门**逐字同形**, 所以锚点
-    # 必须从函数名开始, 否则命中 2 次(实测过), 那就是"注入没落到指定的那一道门"。
-    'rev_recovery_ticket_check': [(
+    # 家族②(CP5 §6 命名更正)改的是 **sp_note_permit_confirmed_for 的许可确认身份门**(命中
+    # C08b)。它与 sp_note_enn_confirmed_for 的门逐字同形, 所以锚点从函数名开始。
+    # ⚠ 本条**没有**移除恢复最终票据判据, 因此不得称"恢复最终提交 epoch 反向已覆盖";
+    #   恢复最终窗口的真实接缝由 C14a/C14b(确定接缝)+ 被测提交路径自己覆盖。
+    'rev_permit_confirm_identity_gate': [('sp',
         'rt_err_t sp_note_permit_confirmed_for(rt_uint32_t expected_epoch,\n'
         '                                      rt_uint8_t requested_level, rt_err_t rc)\n'
         '{\n'
@@ -456,47 +539,111 @@ PAIRS = {
         '    rt_base_t l = sp_win();\n'
         '    rt_err_t  e;\n'
         '\n'
-        '    /* NEGATIVE-INJECTION(rev_recovery_ticket_check): 异代的许可确认照样写进那一代 */\n'
+        '    /* NEGATIVE-INJECTION(rev_permit_confirm_identity_gate): 异代的许可确认照样写进那一代 */\n'
         '    if (RT_FALSE)')],
+    # 家族③(CP5 §6 新增) 去掉**配置真实写的 token 门**: 窗口原语(sp_win/sp_end)与提交
+    # 顺序都不动, 只取消资格检查 => 旧 token 也能进窗口并真的写寄存器 => C10e 具名检出。
+    'rev_config_write_token_gate': [('sp',
+        'rt_err_t sp_enter_token(const sp_token_t *t, rt_base_t *saved)\n'
+        '{\n'
+        '    rt_base_t l = sp_win();\n'
+        '\n'
+        '    if (!sp_token_ok_held(t))\n'
+        '    {\n'
+        '        sp.stale_dropped++;\n'
+        '        sp_end(l);\n'
+        '        return -RT_EPERM;\n'
+        '    }',
+        'rt_err_t sp_enter_token(const sp_token_t *t, rt_base_t *saved)\n'
+        '{\n'
+        '    rt_base_t l = sp_win();\n'
+        '\n'
+        '    /* NEGATIVE-INJECTION(rev_config_write_token_gate): 保留窗口原语, 只取消资格检查 */\n'
+        '    if (RT_FALSE)\n'
+        '    {\n'
+        '        sp.stale_dropped++;\n'
+        '        sp_end(l);\n'
+        '        return -RT_EPERM;\n'
+        '    }')],
+    # 家族④(CP5 §6 新增) 去掉**真实 TX/flush 预算**两处判据:
+    #   a) 真实 UART 叶子"末字节之后、返回成功之前再查同一条 start/total"(drv_uart_txleaf.inc)
+    #      => 过期帧被发布成功 => C17c 具名检出; 输入有限(空间一直有), 错误版本正常返回。
+    #   b) tmc2209.c 的 flush **字节上限**(排不干净就不发这一帧)=> 洪泛后照样发 TX
+    #      => C16c 具名检出; 320 字节是可排空的有限输入, 不靠墙钟 timeout。
+    'rev_tx_flush_budget': [
+        ('tx',
+         '    if ((rt_tick_t)(rt_tick_get() - start) >= total) return -RT_ETIMEOUT;\n'
+         '    return RT_EOK;',
+         '    /* NEGATIVE-INJECTION(rev_tx_flush_budget): 去掉末字节之后的原预算复核 */\n'
+         '    return RT_EOK;'),
+        ('mc',
+         '        if (got_total > TMC_BUD_FLUSH_MAX_BYTES)\n',
+         '        /* NEGATIVE-INJECTION(rev_tx_flush_budget): 去掉 flush 的字节上限 */\n'
+         '        if (got_total > (rt_uint32_t)0x7FFFFFFFu)\n')],
+    # 家族⑤(CP5 §6 新增) 关断失败分支**提前把 owner 交回**: 失败时 owner 应是
+    # SP_HELD_UNKNOWN(输出状态未确认, 谁都不许接管), 这里改成 SP_NONE
+    # => 扩充后的 C11d(canonical owner / 输出未交回)具名检出。
+    'rev_fail_returns_owner_early': [('sp',
+        '            sp_retain_held(code, events);\n'
+        '            sp.owner = SP_HELD_UNKNOWN;\n'
+        '            sp.trips++;',
+        # C11d 走的是 release_on_ok=TRUE 那条路(诊断 pwm_test stop / disarm):
+        # 生产在真正的 rt_pwm_disable 之前就把 owner 清成 SP_NONE(="提前交回"),
+        # 关断失败时必须把通道收回 SP_HELD_UNKNOWN。注入去掉这一句收回 => owner 停在
+        # SP_NONE, 扩充后的 C11d(canonical owner / 锁存 / 输出未交回)当场判 FAIL。
+        '            sp_retain_held(code, events);\n'
+        '            /* NEGATIVE-INJECTION(rev_fail_returns_owner_early): 失败后不再收回"未知持有" */\n'
+        '            sp.trips++;')],
 }
+
 subs = PAIRS[mode]
-s = io.open(path, encoding='utf-8').read()
-out = s
-for old, new in subs:
-    n = out.count(old)
+for key, old, new in subs:
+    path = FILES[key]
+    txt = io.open(path, encoding='utf-8').read()
+    n = txt.count(old)
     if n != 1:
-        sys.stderr.write('INJECT-FATAL: anchor hits %d (want 1): %s\n' % (n, old[:60]))
+        sys.stderr.write('INJECT-FATAL: %s anchor hits %d (want 1): %s\n' % (key, n, old[:70]))
         sys.exit(1)
-    out = out.replace(old, new, 1)
-io.open(path, 'w', encoding='utf-8', newline='').write(out)
-print('injected mode=%s replacements=1' % mode)
+    io.open(path, 'w', encoding='utf-8', newline='').write(txt.replace(old, new, 1))
+    print('injected mode=%s file=%s replacements=1' % (mode, key))
+print('injected mode=%s total=%d' % (mode, len(subs)))
 PYEOF
 
-    if ! "$PY" "$work/inject.py" "$work/app/stop_priority.c" "$name" > "$work/inject.txt" 2>&1; then
+    if ! "$PY" "$work/inject.py" "$work" "$name" > "$work/inject.txt" 2>&1; then
         cat "$work/inject.txt"
         note "  $name: 注入未落地 => 判基础设施故障, 不当作检出"
         matrix+=("$name | INFRA-FAIL 注入未落地"); remember 4; return
     fi
-    grep -q "NEGATIVE-INJECTION" "$work/app/stop_priority.c" || {
+    # 注入标记必须**真的出现在被改的那个副本文件**里(不是只要某个文件有标记就算)。
+    if ! grep -lq "NEGATIVE-INJECTION" "$work/app/stop_priority.c" "$work/app/tmc2209.c" "$work/hal/drv_uart_txleaf.inc" 2>/dev/null; then
         note "  $name: 副本里没有注入标记"; matrix+=("$name | INFRA-FAIL 无注入标记")
-        remember 4; return; }
+        remember 4; return
+    fi
+    grep -c "^injected " "$work/inject.txt" | xargs -I{} note "  $name: 注入替换 {} 处(逐条已核对恰好命中一次)"
 
-    exe="$work/conc.exe"
+    exe="$work/conc.exe"; lexec="$work/leaf.exe"
     extra="$(variant_flags "$variant")"
+    # 注入后的副本优先: -I "$work/app" 在 $SRC_APP 之前, -I "$work/hal" 在 $HAL_DRV 之前。
     # shellcheck disable=SC2086
     "$GCC" $FLAGS $extra -I "$SHIM_DIR" -I "$work/app" -I "$SRC_APP" -I "$HAL_DRV" \
         -I "$COMPAT_DIR" "$S2_MAIN" -o "$exe" > "$work/build.txt" 2>&1
     brc=$?
-    if [ "$brc" -ne 0 ]; then
-        tail -15 "$work/build.txt"
-        note "  $name: 注入副本编译失败 rc=$brc => INFRA-FAIL(编译失败不算检出)"
-        matrix+=("$name | INFRA-FAIL 构建失败 rc=$brc"); remember 4; return
+    # shellcheck disable=SC2086
+    "$GCC" $FLAGS $extra -DPS_LEAF_SCRIPTED_TIME -I "$LEAF_SHIM" -I "$work/app" \
+        -I "$work/hal" -I "$SHIM_DIR" -I "$SRC_APP" -I "$HAL_DRV" -I "$COMPAT_DIR" \
+        "$LEAF_MAIN" -o "$lexec" >> "$work/build.txt" 2>&1
+    lbrc=$?
+    if [ "$brc" -ne 0 ] || [ "$lbrc" -ne 0 ]; then
+        tail -20 "$work/build.txt"
+        note "  $name: 注入副本编译失败 conc=$brc leaf=$lbrc => INFRA-FAIL(编译失败不算检出)"
+        matrix+=("$name | INFRA-FAIL 构建失败 conc=$brc leaf=$lbrc"); remember 4; return
     fi
 
     for grp in $groups; do
+        case "$LEAF_GROUPS" in *" $grp "*) gexe="$lexec";; *) gexe="$exe";; esac
         out="$work/${variant}_${grp}_out.txt"; marker="$work/${variant}_${grp}.marker"
-        printf 'LAUNCHED\n' > "$marker"
-        timeout "$GROUP_TIMEOUT" "$exe" "$grp" > "$out" 2>&1
+        printf 'LAUNCHED exe=%s\n' "$gexe" > "$marker"
+        timeout "$GROUP_TIMEOUT" "$gexe" "$grp" > "$out" 2>&1
         proc_rc=$?
         printf 'DONE rc=%s\n' "$proc_rc" > "$marker"
         cat "$out" >> "$work/all_out.txt"
@@ -548,11 +695,18 @@ if [ "$REVERSE" = "1" ]; then
     fi
     matrix=()
     note ""
-    note "=== S2 反向(2 项家族, 仓外副本; 正常对照已先通过) ==="
+    note "=== S2 反向(5 项家族, 仓外副本; 正常对照已先通过) ==="
     reverse_s2 rev_stale_identity_gate host_ovr "identity stale" \
         "C09b-late-actions-rejected-no-write C15b-old-identity-rejected-no-write"
-    reverse_s2 rev_recovery_ticket_check host_ovr "identity" \
+    reverse_s2 rev_permit_confirm_identity_gate host_ovr "identity" \
         "C08b-stale-confirm-rejected"
+    # CP5 §6 新增三项(都落在**真实叶子/真实门**上):
+    reverse_s2 rev_config_write_token_gate host_ovr "epwm_leaf" \
+        "C10e-stale-token-commit-writes-zero-registers"
+    reverse_s2 rev_tx_flush_budget host_ovr "uart_leaf tmc_lock" \
+        "C17c-expired-after-last-byte-not-a-success C16c-rx-flood-byte-cap-stops-before-tx"
+    reverse_s2 rev_fail_returns_owner_early host_ovr "diag" \
+        "C11d-diag-fail-keeps-owner-single-close"
     note ""
     note "=== S2 反向汇总 ==="
     for m in "${matrix[@]}"; do note "$m"; done
@@ -562,7 +716,7 @@ if [ "$REVERSE" = "1" ]; then
         for m in "${matrix[@]}"; do echo "$m"; done
     } > "$OUT_DIR/s2_reverse_status.txt"
     if [ "$overall" -eq 0 ]; then
-        note "S2 REVERSE RESULT: PASS —— 两项注入均命中预登记业务失败身份(rc=1, 台账自洽)"
+        note "S2 REVERSE RESULT: PASS —— 五项注入均命中预登记业务失败身份(rc=1, 台账自洽)"
     else
         note "S2 REVERSE RESULT: FAIL (rc=$overall)"
     fi

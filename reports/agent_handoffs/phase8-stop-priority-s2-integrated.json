@@ -213,5 +213,99 @@
   "cp4_status": "S2 CP4 六组返修已实现并同批验收; S2 整体仍 IN_PROGRESS; Agent 不声称 SOFTWARE_REVIEW_GO",
   "head_commit_prev_cp3": "776a91e669dcac84e53d49e4838611a2a4454705",
   "tested_commit_prev_cp3": "776a91e669dcac84e53d49e4838611a2a4454705",
-  "tested_commit_note": "CP4 终字节: Keil Rebuild All、全部主机链与 12 项修后证明都取自该提交的 git archive 干净导出(无脏文件)"
+  "tested_commit_note": "CP4 终字节: Keil Rebuild All、全部主机链与 12 项修后证明都取自该提交的 git archive 干净导出(无脏文件)",
+  "cp5_addendum": {
+    "date": "2026-10-24",
+    "task_id": "phase8-stop-priority-s2-hal-closeout",
+    "start_head": "2fbac9adb79103a1d40695280d7b4cf412969483",
+    "local_head_before_commit": "0b0f1661d29d115ebe0b39b78cc6ea7cd6908533",
+    "sections_done": [
+      "§2",
+      "§3.1",
+      "§3.2",
+      "§4",
+      "§5",
+      "§6",
+      "§7",
+      "§8"
+    ],
+    "leaf_chain": {
+      "fixture": "tests/host/leaf_main.c",
+      "shim": [
+        "tests/host/shim_leaf/rtthread.h",
+        "tests/host/shim_leaf/rtdevice.h",
+        "tests/host/shim_leaf/drv_common.h"
+      ],
+      "production_under_test": [
+        "applications/stop_priority.c",
+        "applications/tmc2209.c",
+        "libraries/HAL_Drivers/drivers/drv_uart_txleaf.inc",
+        "libraries/HAL_Drivers/drivers/drv_epwm_leaf.inc",
+        "libraries/HAL_Drivers/drivers/drv_epwm_leaf.h"
+      ],
+      "groups": [
+        "epwm_leaf",
+        "tmc_lock",
+        "uart_leaf",
+        "budget_leaf"
+      ],
+      "cases_host_ovr": 27,
+      "target": "整族 SKIP(编译期写入门禁挡住, 前置不可达), 两个变体均要求干净编译"
+    },
+    "s2_totals": {
+      "target_cases": 23,
+      "host_ovr_cases": 68,
+      "groups": 17,
+      "variants": 2
+    },
+    "reverse_families": [
+      "rev_stale_identity_gate",
+      "rev_permit_confirm_identity_gate",
+      "rev_config_write_token_gate",
+      "rev_tx_flush_budget",
+      "rev_fail_returns_owner_early"
+    ],
+    "reverse_first_round_note": "rev_fail_returns_owner_early 首轮落在 release_on_ok=FALSE 分支 => NOT-DETECTED; 改到 C11d 真实经过的 release 失败分支后具名检出",
+    "keil": {
+      "command": "UV4.exe -r project.uvprojx -t rt-thread -j0",
+      "result": "0 Error(s), 0 Warning(s)",
+      "inc_inclusion_evidence": [
+        "  drv_uart.d: ..\\libraries\\HAL_Drivers\\drivers\\drv_uart_txleaf.inc",
+        "  drv_epwm.d: ..\\libraries\\HAL_Drivers\\drivers\\drv_epwm_leaf.h \\",
+        "  drv_epwm.d: ..\\libraries\\HAL_Drivers\\drivers\\drv_epwm_leaf.inc"
+      ]
+    },
+    "evidence_gap_recovery": {
+      "root_cause": "Windows 侧 Python 看不见 Git-Bash /tmp; runner OUT_DIR 当时在 /tmp",
+      "unrecoverable": [
+        "f_s2_fwd.txt",
+        "f_s2_rev.txt",
+        "f_s1.txt",
+        "f_io.txt",
+        "f_sd.txt",
+        "f_v1v2.txt",
+        "首次 __get_PRIMASK Keil 构建错误原文"
+      ],
+      "handling": "不人为重造; 在定稿字节上完整重跑并附原始输出/构建命令/blob 全路径",
+      "evidence_root": "%LOCALAPPDATA%\Temp/ns800_cp5_ev/final_121406"
+    },
+    "new_observation_not_fixed_this_batch": {
+      "id": "STEP 频率换算分母口径",
+      "where": "drv_epwm_leaf.inc 的 signal_freq = 1/(period_ns/1e6)",
+      "observed": "period_ns=1000000(标称 1kHz) => 原始 tb=50000000, 截到 uint16=61568; 夹具独立复算与生产逐位一致, 因此 C10b 判 PASS",
+      "why_untouched": "超出 CP5 授权范围; STEP 频率实际输出仍是 BUG-008 未示波器验收的开放项",
+      "asked_of_reviewer": "按 ns 修正换算, 还是维持 SDK 原文并把输出锁在 BUG-008"
+    },
+    "boundaries": {
+      "board_authorization": "none",
+      "four_target_macros": "RT_FALSE",
+      "open_risks": [
+        "BUG-008",
+        "RISK-03",
+        "RISK-03a",
+        "物理 RISK-04-b"
+      ],
+      "verdict_claimed_by_agent": "STOP: AWAITING_INDEPENDENT_IMPLEMENTATION_REVIEW"
+    }
+  }
 }

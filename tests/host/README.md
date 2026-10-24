@@ -38,6 +38,8 @@ REVERSE=1 bash tests/host/run_safety_data_semantics.sh   # 该链的 2 项反向
 bash tests/host/sd_runner_rework_check.sh        # 该 runner 两个入口的返修回归(全在仓外沙盒)
 bash tests/host/run_stop_result_s1.sh            # 关断结果可信链(ps_main.c + shim_ps, target/host_ovr)
 REVERSE=1 bash tests/host/run_stop_result_s1.sh  # 该链的 2 项反向注入(只改仓外单文件副本)
+bash tests/host/run_stop_priority_s2.sh          # 停机优先 S2 链: 端口层二进制(13 组)+ 真实 HAL 叶子二进制(4 组)
+REVERSE=1 bash tests/host/run_stop_priority_s2.sh # 该链的 5 项反向家族(仓外多文件副本)
 ```
 
 四条链**并列且互不复用夹具**, 因为"真编译哪几个生产模块"不同:
@@ -48,6 +50,13 @@ REVERSE=1 bash tests/host/run_stop_result_s1.sh  # 该链的 2 项反向注入(�
 | `run_io_behavior.sh` (`io_main.c` + `shim_io/`) | `safety_gpio.c` `safety_thread.c` `safety_state.c` `motor.c` | 传感器/存储/黑匣子等为假服务 |
 | `run_safety_data_semantics.sh` (`sd_main.c` + `shim_sd/`) | `sensor_service.c` + `blackbox.c` | GPIO/RT 原语/其他传感器/电机/状态/`ns_log`(内存环) |
 | `run_stop_result_s1.sh` (`ps_main.c` + `shim_ps/`) | `step_pwm.c` + `motor.c` + `safety_state.c` | RT 原语(单线程确定性)、安全 GPIO/线程、TMC、传感器、存储、黑匣子 |
+| `run_stop_priority_s2.sh` 第 1 个二进制 (`sp_conc_main.c` + `shim_ps/`) | `stop_priority.c` `step_pwm.c` `motor.c` `safety_state.c` | TMC/EPWM/UART 三段是**端口桩**(C01–C21 测应用与协调层) |
+| `run_stop_priority_s2.sh` 第 2 个二进制 (`leaf_main.c` + `shim_leaf/`) | `stop_priority.c` `tmc2209.c` + 真实叶子 `drv_uart_txleaf.inc` `drv_epwm_leaf.inc` | 应用层状态(motor 快照/安全状态/许可脚)是受控输入; 寄存器与时间用模型 |
+
+CP5 §5 的分工写在这里是因为两者**判据不同**: 端口链观察"生产应用有没有按协议调用", 叶子链观察
+"生产实现自己写进去的寄存器字节/次数、真 TDRE 等待环、真 cfg/xfer 锁与真 IFCNT"。叶子链的
+`shim_leaf/drv_common.h` 每条声明都注了本地 SDK 原文出处并用 `_Static_assert` 钉住寄存器偏移;
+它给出的是**寄存器模型 + 受控时间**的结论, 不是目标机最坏时延或真实波形(BUG-008 仍开放)。
 
 关断结果链(S1)的三条桩纪律：`rt_pwm_disable` 的返回码可注入，且桩**独立**保存"模拟输出是否
 仍在跑"——**disable 失败时桩保留输出运行，不替固件把输出清掉**；许可写结果、许可脚实测电平、
