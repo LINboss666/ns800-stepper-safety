@@ -101,10 +101,28 @@ int  s2_seq_wait(int bit, int ms)
 static pthread_t s2_thr[6];
 static int s2_thr_n;
 
+/* 线程入口桥接(任务书附录 A): 夹具的业务入口是 void (*)(void *), 而 pthread 要的是
+ * void *(*)(void *) —— 原写法用强转把两者当同一个, POSIX 下是**类型不符**(审查环境
+ * GCC 13.3 直接报 warning, 原 runner 按"构建不干净"判 INFRA-FAIL)。现在桥接函数调用
+ * 原入口后返回 NULL, 不压警告、也不改任何业务判据。 */
+struct s2_thread_call { void (*fn)(void *); void *arg; };
+static struct s2_thread_call s2_calls[6];
+
+static void *s2_thread_entry(void *p)
+{
+    struct s2_thread_call *c = (struct s2_thread_call *)p;
+
+    c->fn(c->arg);
+    return RT_NULL;
+}
+
 int s2_spawn(void (*fn)(void *), void *arg)
 {
     if (s2_thr_n >= (int)(sizeof(s2_thr) / sizeof(s2_thr[0]))) return -1;
-    if (pthread_create(&s2_thr[s2_thr_n], RT_NULL, (void *(*)(void *))fn, arg) != 0)
+    s2_calls[s2_thr_n].fn  = fn;
+    s2_calls[s2_thr_n].arg = arg;
+    if (pthread_create(&s2_thr[s2_thr_n], RT_NULL,
+                       s2_thread_entry, &s2_calls[s2_thr_n]) != 0)
         return -1;
     s2_thr_n++;
     return 0;

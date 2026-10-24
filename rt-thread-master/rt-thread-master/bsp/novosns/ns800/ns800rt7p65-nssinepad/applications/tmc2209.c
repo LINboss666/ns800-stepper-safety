@@ -1219,16 +1219,19 @@ typedef struct
     rt_bool_t       lock_ok;
     rt_bool_t       txn_ok;
     rt_uint8_t      view_force_invalid;   /* 作废标记: 一次完整的成功应用才覆盖它 */
-    /* S2(§10.4): 本实例**这一次操作**的协调层身份与"是否已保护过"。
-     * 只有生产实例使用(op_epoch 在进入 apply/integrity 时采集一次); 序列里第一个
-     * 失败出口据此做一次保护, 后续层再失败时 sp_trip_for_operation 会返回 -RT_EINTR,
-     * 于是同一波错误不会出现第二轮 rt_pwm_disable。 */
-    rt_uint32_t     op_epoch;
-    rt_bool_t       op_protected;
-    /* CP4 K3(§5.3): 本次操作的保护**结果三态**与那一次带回的 proof, 供 Motor 消费 ——
-     * Motor 因此既不会第二轮关闭, 也不会把"过期丢弃"当成"我这次已经保护完"。 */
-    rt_uint8_t      op_protect;      /* sp_protect_outcome_t */
-    sp_proof_t      op_proof;
+    /* CP5(§2): 这里原有 op_epoch/op_protected/op_protect/op_proof 四个**共享**字段,
+     * 用来给一次操作去重保护并拼装返回值。它们已整体删除 —— 复位发生在取得事务锁
+     * 之前, 于是"拿不到 txn、随后返回 -RT_EBUSY"的竞争调用会改写正在运行的那一笔的
+     * 身份(审查附录 B 实测: active_before=2 变 active_after=1, 真实总线错误被判成
+     * 过期丢弃, 关闭/LOW/抑制一个都没发生)。操作身份现在由每次调用**局部**的
+     * tmc_op_t 贯穿(见 tmc_op_t / tmc_op_init), 共享 ctx 不再参与身份判定。
+     * 序列里第一个失败出口仍只保护一次: 后续层失败时 sp_trip_for_operation 按本调用
+     * 的 op.epoch 返回 -RT_EINTR, 同一波错误不会出现第二轮 rt_pwm_disable。 */
+    /* CP5 §2: **只作观测**的"最近一次已受理操作"记录(仅生产实例写)。
+     * 它不参与当前调用的身份判定, 也不参与返回值拼装 —— 那两件事现在都用每次调用的
+     * 局部 tmc_op_t。写它的唯一时机是"本方已拿到事务锁、真正受理了这次操作"。 */
+    rt_uint32_t     op_epoch;                  /* 已受理操作的原身份 */
+    rt_uint8_t      op_protect;                /* 那次操作最终的保护三态(sp_protect_outcome_t) */
     /* R4(2026-10-23 CP3 §6.1): "期望值 / 实得值 / 不一致种类"。底层错误出口一律
      * **不打印**(打印必须排在保护之后), 这三个字段把细节留给保护完成后的摘要。 */
     rt_uint32_t     fail_exp;
@@ -1666,7 +1669,29 @@ rt_uint32_t tmc_chopconf_next(rt_uint32_t cur, const tmc_drv_config_t *c)
  *   ③ 最后才是打印(此时物理降险已经做完)。
  * ⚠ 保护用的是"操作开始时的 epoch", 不是每层重采当前 epoch —— 后者会让每一层都
  *   认为自己才是第一个保护的层, 于是一波错误里出现多次 disable(§4.2 明确禁止)。 */
-static rt_err_t tmc_cfg_fail_ctx(tmc_cfg_ctx_t *ctx, rt_uint8_t reg, rt_err_t e,
+/* CP5 §2: **每次调用独立**的操作对象, 贯穿 apply/integrity -> fail_ctx -> 结果拼装。
+ * 身份、"本操作是否已保护过"、保护三态与 proof 都跟着调用栈走:
+ *   - 未取得 txn 的竞争调用因此一个共享字段都不会碰;
+ *   - 结果在归还 txn 之前从这份局部副本拼好, 不受下一条操作影响;
+ *   - 最终提交核的是**本调用**的 op.epoch, 不是可变的 ctx 字段。 */
+typedef struct {
+    rt_uint32_t          epoch;        /* 原调用者身份(合法的 0 也照 0 判定) */
+    rt_bool_t            did_protect;  /* 本操作只保护一次(不论成败) */
+    sp_protect_outcome_t outcome;      /* 本次保护的三态 */
+    sp_proof_t           proof;
+} tmc_op_t;
+
+static void tmc_op_init(tmc_op_t *op, rt_uint32_t epoch)
+{
+    op->epoch       = epoch;
+    op->did_protect = RT_FALSE;
+    op->outcome     = SP_PROTECT_NONE;
+    rt_memset(&op->proof, 0, sizeof(op->proof));
+    op->proof.valid = RT_FALSE;
+}
+
+static rt_err_t tmc_cfg_fail_ctx(tmc_cfg_ctx_t *ctx, tmc_op_t *op,
+                                 rt_uint8_t reg, rt_err_t e,
                                  const char *stage, rt_bool_t from_integrity,
                                  const tmc_budget_t *b)
 {
@@ -1680,16 +1705,16 @@ static rt_err_t tmc_cfg_fail_ctx(tmc_cfg_ctx_t *ctx, rt_uint8_t reg, rt_err_t e,
         sp_protect_outcome_t oc = SP_PROTECT_NONE;
 
         pf.valid = RT_FALSE;
-        if (!ctx->op_protected)
+        if (!op->did_protect)
         {
             /* R4(2026-10-23 CP3 §6.3): UART/IFCNT/读回这一类是**软件通信**失败,
              * 用 FAULT_TMC_COMM + 既有软故障事件; 不再冒充物理 TMC_DIAG 引脚事件
              * (那个码属于诊断输入脚的真实电平)。既有故障数值一个都没有重排。 */
-            (void)sp_trip_for_operation(ctx->op_epoch, FAULT_TMC_COMM, EVT_SOFT_FAULT,
+            (void)sp_trip_for_operation(op->epoch, FAULT_TMC_COMM, EVT_SOFT_FAULT,
                                         MOT_STOP_SRC_GUARD_STOP, &pf, &oc);
-            ctx->op_protected = RT_TRUE;        /* 本操作只保护一次(不论成败) */
-            ctx->op_protect   = (rt_uint8_t)oc;
-            ctx->op_proof     = pf;
+            op->did_protect = RT_TRUE;          /* 本操作只保护一次(不论成败) */
+            op->outcome     = oc;
+            op->proof       = pf;
         }
     }
 
@@ -1785,19 +1810,12 @@ static rt_err_t tmc_cfg_apply_ctx(tmc_cfg_ctx_t *ctx, const tmc_drv_config_t *c)
     tmc_xfer_stat_t  st;
     rt_bool_t     taken = RT_FALSE;
     rt_uint32_t   gen0, inv0;
+    tmc_op_t      op;                     /* CP5 §2: 本调用私有的操作身份与结果 */
 
     rt_memset(&st, 0, sizeof(st));
-
-    /* CP4 K3(§5.3): 操作身份与"本次结果"在**任何早退之前**复位。原写法把 op_epoch 记在
-     * 预算打开之后, 于是 txn/gate 早退的返回值仍配着一份**上一次操作**留下的
-     * op_protected/op_proof —— 那正是"拿文件全局最后一次结果跨操作拼接"的形状。 */
-    if (ctx == &tmc_cfg_prod)
-    {
-        ctx->op_epoch     = sp_epoch();
-        ctx->op_protected = RT_FALSE;
-        ctx->op_protect   = SP_PROTECT_NONE;
-        rt_memset(&ctx->op_proof, 0, sizeof(ctx->op_proof));
-    }
+    /* CP5 §2: 身份在进入本函数时采一次(= 本操作的原身份), 之后**任何**早退都只带着
+     * 自己这份 op; 共享 ctx 不再被写过, 因此竞争者拿不到 txn 时也碰不到活跃操作。 */
+    tmc_op_init(&op, sp_epoch());
 
     /* F2c R02: 先把"锁不可用"与"锁被占用"分开 —— 前者是能力缺失(ENOSYS),
      * 后者是并发时序(EBUSY)。两种都在产生任何总线动作之前拒绝。 */
@@ -1813,6 +1831,9 @@ static rt_err_t tmc_cfg_apply_ctx(tmc_cfg_ctx_t *ctx, const tmc_drv_config_t *c)
                    " 本次不发出任何总线写\n");
         return -RT_EBUSY;
     }
+    /* CP5 §2: 事务锁在手 => 本次操作**被受理**, 这时才允许留下观测记录;
+     * 竞争者走上面那条 return, 一个共享字段都没改。 */
+    if (ctx == &tmc_cfg_prod) ctx->op_epoch = op.epoch;
 
     if (!tmc_budget_open(&own, TMC_BUD_APPLY_MS))
     {
@@ -1821,7 +1842,7 @@ static rt_err_t tmc_cfg_apply_ctx(tmc_cfg_ctx_t *ctx, const tmc_drv_config_t *c)
         return -RT_EINVAL;
     }
     b = &own;
-    /* op_epoch/op_protected 已在入口复位(CP4 K3), 这里**不再**重采当前 epoch ——
+    /* op(=本调用的局部身份)已在入口初始化(CP5 §2), 这里**不再**重采当前 epoch ——
      * 重采会把 txn 等待期间发生的任何保护/预约都算成"本操作自己的身份"。 */
 
     gates = (ctx->gate != RT_NULL) ? ctx->gate(ctx->priv) : 0u;
@@ -1863,7 +1884,7 @@ static rt_err_t tmc_cfg_apply_ctx(tmc_cfg_ctx_t *ctx, const tmc_drv_config_t *c)
 
     if (ctx->bus->open(ctx->priv, b, &st) != RT_EOK)
     {
-        e = tmc_cfg_fail_ctx(ctx, 0, -RT_ERROR, "uart-open", RT_FALSE, b);
+        e = tmc_cfg_fail_ctx(ctx, &op, 0, -RT_ERROR, "uart-open", RT_FALSE, b);
         ret = e;
         goto out;
     }
@@ -1872,7 +1893,7 @@ static rt_err_t tmc_cfg_apply_ctx(tmc_cfg_ctx_t *ctx, const tmc_drv_config_t *c)
     e = ctx->bus->read(ctx->priv, TMC_REG_GCONF, &gconf, b, &st);
     if (e != RT_EOK)
     {
-        ret = tmc_cfg_fail_ctx(ctx, TMC_REG_GCONF, e, "GCONF-read", RT_FALSE, b);
+        ret = tmc_cfg_fail_ctx(ctx, &op, TMC_REG_GCONF, e, "GCONF-read", RT_FALSE, b);
         goto out;
     }
 
@@ -1880,7 +1901,7 @@ static rt_err_t tmc_cfg_apply_ctx(tmc_cfg_ctx_t *ctx, const tmc_drv_config_t *c)
      * 分档一起失效 -> 不是"写不进去"而是"算了也不对", 必须 fail closed。 */
     if (gconf & TMC_GCONF_INTERNAL_RSENSE)
     {
-        ret = tmc_cfg_fail_ctx(ctx, TMC_REG_GCONF, -RT_EPERM,
+        ret = tmc_cfg_fail_ctx(ctx, &op, TMC_REG_GCONF, -RT_EPERM,
                                "GCONF.internal_Rsense=1", RT_FALSE, b);
         goto out;
     }
@@ -1889,7 +1910,7 @@ static rt_err_t tmc_cfg_apply_ctx(tmc_cfg_ctx_t *ctx, const tmc_drv_config_t *c)
     e = tmc_cfg_write_one_ctx(ctx, TMC_REG_GCONF, new_g, RT_TRUE, b, &st);
     if (e != RT_EOK)
     {
-        ret = tmc_cfg_fail_ctx(ctx, TMC_REG_GCONF, e, "GCONF-write", RT_FALSE, b);
+        ret = tmc_cfg_fail_ctx(ctx, &op, TMC_REG_GCONF, e, "GCONF-write", RT_FALSE, b);
         goto out;
     }
 
@@ -1897,14 +1918,14 @@ static rt_err_t tmc_cfg_apply_ctx(tmc_cfg_ctx_t *ctx, const tmc_drv_config_t *c)
     e = ctx->bus->read(ctx->priv, TMC_REG_CHOPCONF, &chop, b, &st);
     if (e != RT_EOK)
     {
-        ret = tmc_cfg_fail_ctx(ctx, TMC_REG_CHOPCONF, e, "CHOPCONF-read", RT_FALSE, b);
+        ret = tmc_cfg_fail_ctx(ctx, &op, TMC_REG_CHOPCONF, e, "CHOPCONF-read", RT_FALSE, b);
         goto out;
     }
 
     old_vs = (chop & TMC_CHOPCONF_VSENSE) ? 1u : 0u;
     if (!tmc_change_is_current_safe(old_vs, c->vsense))
     {
-        ret = tmc_cfg_fail_ctx(ctx, TMC_REG_CHOPCONF, -RT_EPERM,
+        ret = tmc_cfg_fail_ctx(ctx, &op, TMC_REG_CHOPCONF, -RT_EPERM,
                                "CHOPCONF.overcurrent-dir", RT_FALSE, b);
         goto out;
     }
@@ -1913,13 +1934,13 @@ static rt_err_t tmc_cfg_apply_ctx(tmc_cfg_ctx_t *ctx, const tmc_drv_config_t *c)
     new_c = tmc_chopconf_next(chop, c);
     if ((new_c & TMC_CHOPCONF_TOFF_MASK) != (chop & TMC_CHOPCONF_TOFF_MASK))
     {
-        ret = tmc_cfg_fail_ctx(ctx, TMC_REG_CHOPCONF, -RT_EINVAL,
+        ret = tmc_cfg_fail_ctx(ctx, &op, TMC_REG_CHOPCONF, -RT_EINVAL,
                                "CHOPCONF.TOFF-changed", RT_FALSE, b);
         goto out;
     }
     if ((new_c & TMC_CHOPCONF_TOFF_MASK) == 0u)
     {
-        ret = tmc_cfg_fail_ctx(ctx, TMC_REG_CHOPCONF, -RT_EINVAL,
+        ret = tmc_cfg_fail_ctx(ctx, &op, TMC_REG_CHOPCONF, -RT_EINVAL,
                                "CHOPCONF.TOFF-zero", RT_FALSE, b);
         goto out;
     }
@@ -1927,7 +1948,7 @@ static rt_err_t tmc_cfg_apply_ctx(tmc_cfg_ctx_t *ctx, const tmc_drv_config_t *c)
     e = tmc_cfg_write_one_ctx(ctx, TMC_REG_CHOPCONF, new_c, RT_TRUE, b, &st);
     if (e != RT_EOK)
     {
-        ret = tmc_cfg_fail_ctx(ctx, TMC_REG_CHOPCONF, e, "CHOPCONF-write", RT_FALSE, b);
+        ret = tmc_cfg_fail_ctx(ctx, &op, TMC_REG_CHOPCONF, e, "CHOPCONF-write", RT_FALSE, b);
         goto out;
     }
 
@@ -1936,7 +1957,7 @@ static rt_err_t tmc_cfg_apply_ctx(tmc_cfg_ctx_t *ctx, const tmc_drv_config_t *c)
                               RT_FALSE, b, &st);
     if (e != RT_EOK)
     {
-        ret = tmc_cfg_fail_ctx(ctx, TMC_REG_IHOLD_IRUN, e, "IHOLD_IRUN-write",
+        ret = tmc_cfg_fail_ctx(ctx, &op, TMC_REG_IHOLD_IRUN, e, "IHOLD_IRUN-write",
                                RT_FALSE, b);
         goto out;
     }
@@ -1945,7 +1966,7 @@ static rt_err_t tmc_cfg_apply_ctx(tmc_cfg_ctx_t *ctx, const tmc_drv_config_t *c)
     e = tmc_cfg_write_one_ctx(ctx, TMC_REG_TPOWERDOWN, c->tpowerdown, RT_FALSE, b, &st);
     if (e != RT_EOK)
     {
-        ret = tmc_cfg_fail_ctx(ctx, TMC_REG_TPOWERDOWN, e, "TPOWERDOWN-write",
+        ret = tmc_cfg_fail_ctx(ctx, &op, TMC_REG_TPOWERDOWN, e, "TPOWERDOWN-write",
                                RT_FALSE, b);
         goto out;
     }
@@ -1955,7 +1976,7 @@ static rt_err_t tmc_cfg_apply_ctx(tmc_cfg_ctx_t *ctx, const tmc_drv_config_t *c)
      * 那一代(期间发生过任何保护/预约/释放/恢复都意味着这次下发已经不算数)。 */
     if (tmc_remaining(b) == 0)
     {
-        ret = tmc_cfg_fail_ctx(ctx, 0, -RT_ETIMEOUT, "apply-budget-exhausted",
+        ret = tmc_cfg_fail_ctx(ctx, &op, 0, -RT_ETIMEOUT, "apply-budget-exhausted",
                                RT_FALSE, b);
         goto out;
     }
@@ -1976,7 +1997,7 @@ static rt_err_t tmc_cfg_apply_ctx(tmc_cfg_ctx_t *ctx, const tmc_drv_config_t *c)
         rt_bool_t fresh = RT_FALSE;
 
         if (inv0 == ctx->view.inv_gen &&
-            (ctx != &tmc_cfg_prod || sp_epoch() == ctx->op_epoch) &&
+            (ctx != &tmc_cfg_prod || sp_epoch() == op.epoch) &&
             tmc_remaining(b) != 0)
         {
             ctx->done_gconf = new_g;
@@ -1996,13 +2017,13 @@ static rt_err_t tmc_cfg_apply_ctx(tmc_cfg_ctx_t *ctx, const tmc_drv_config_t *c)
 
         if (!fresh)
         {
-            ret = tmc_cfg_fail_ctx(ctx, 0, -RT_EPERM, "apply-stale-success",
+            ret = tmc_cfg_fail_ctx(ctx, &op, 0, -RT_EPERM, "apply-stale-success",
                                    RT_FALSE, b);
             rt_kprintf("[TMC-CFG] !! 晚到的 apply 成功被拒绝提交"
                        " (inv_gen %u -> %u, op_epoch=%u / 现在=%u, 剩余预算=%u tick)"
                        " - 旧成功不刷新健康\n",
                        inv0, tmc_cfg_view_inv_gen(ctx),
-                       (unsigned)(ctx == &tmc_cfg_prod ? ctx->op_epoch : 0u),
+                       (unsigned)(ctx == &tmc_cfg_prod ? op.epoch : 0u),
                        (unsigned)sp_epoch(), (unsigned)tmc_remaining(b));
             goto out;
         }
@@ -2017,10 +2038,12 @@ static rt_err_t tmc_cfg_apply_ctx(tmc_cfg_ctx_t *ctx, const tmc_drv_config_t *c)
                (unsigned)c->irun, (unsigned)c->ihold, (unsigned)c->ihold_delay,
                (unsigned)c->tpowerdown, (unsigned)c->vsense,
                (unsigned)gconf, (unsigned)new_g, (unsigned)chop, (unsigned)new_c,
-               (unsigned)(ctx == &tmc_cfg_prod ? ctx->op_epoch : 0u));
+               (unsigned)(ctx == &tmc_cfg_prod ? op.epoch : 0u));
     ret = RT_EOK;
 
 out:
+    /* CP5 §2: 仍在事务锁**之内**留观测档, 然后才归还 —— 与"结果先拼装后归还"同一条纪律。 */
+    if (ctx == &tmc_cfg_prod) ctx->op_protect = (rt_uint8_t)op.outcome;
     tmc_cfg_txn_give(ctx);
     return (ret == RT_EOK) ? RT_EOK : ret;
 }
@@ -2097,9 +2120,11 @@ void tmc2209_cfg_txn_end(void)
  * S2(§10.4): 运行期观察到错误**先短保护**, 再做 cfg 状态的慢整理与日志 —— 保护发生在
  * tmc_cfg_fail_ctx() 的第一步(生产实例, 且按 op_epoch 去重), 打印都在其后。
  * 拿不到叶锁/预算耗尽时不 FOREVER 等: 作废摘要即可让门闭合。 */
-/* CP4 K3(§5.3): 把"本次操作的结果"抄给调用方。三态与 proof 都来自**这一次**调用在
- * ctx 里留下的记录(生产实例由 txn 串行化, 局部假实例恒为 NONE/无效)。 */
-static void tmc_op_result_fill(tmc_cfg_ctx_t *ctx, rt_err_t rc, tmc_op_result_t *out)
+/* CP5 §2(取代 CP4 K3 的"从 ctx 抄"): out 的三个字段**只**来自本调用的局部 op。
+ * 调用点在归还事务锁**之前**填好, 于是"下一条操作覆盖了 out 的来源"这种拼接不可能发生;
+ * 非生产实例(自测的局部假 ctx)恒为 NONE + 无效 proof。 */
+static void tmc_op_result_fill(const tmc_cfg_ctx_t *ctx, const tmc_op_t *op,
+                               rt_err_t rc, tmc_op_result_t *out)
 {
     rt_bool_t prod;
 
@@ -2108,9 +2133,9 @@ static void tmc_op_result_fill(tmc_cfg_ctx_t *ctx, rt_err_t rc, tmc_op_result_t 
     prod = (ctx == &tmc_cfg_prod) ? RT_TRUE : RT_FALSE;
     out->prod     = prod;
     out->rc       = rc;
-    out->op_epoch = prod ? ctx->op_epoch : 0u;
-    out->protect  = prod ? (sp_protect_outcome_t)ctx->op_protect : SP_PROTECT_NONE;
-    if (prod && out->protect != SP_PROTECT_NONE) out->proof = ctx->op_proof;
+    out->op_epoch = prod ? op->epoch : 0u;
+    out->protect  = prod ? op->outcome : SP_PROTECT_NONE;
+    if (prod && out->protect != SP_PROTECT_NONE) out->proof = op->proof;
     else out->proof.valid = RT_FALSE;
 }
 
@@ -2125,42 +2150,40 @@ static rt_err_t tmc_cfg_integrity_ctx_for(tmc_cfg_ctx_t *ctx, rt_uint32_t expect
     const tmc_budget_t  *b = RT_NULL;
     tmc_xfer_stat_t      xs;
     rt_bool_t            taken = RT_FALSE;
+    tmc_op_t             op;                     /* CP5 §2: 本调用私有 */
 
-    /* CP4 K3(§5.3): 先复位"本次操作"的身份与结果, 再碰任何锁 —— 早退的 -RT_ENOSYS /
-     * -RT_EBUSY 也必须带一个**干净**的结果(NONE 保护 + proof 无效), 否则调用方会把
-     * 上一次操作留下的保护当成这次的。 */
-    if (ctx == &tmc_cfg_prod)
-    {
-        ctx->op_epoch     = (expected_epoch != 0u) ? expected_epoch : sp_epoch();
-        ctx->op_protected = RT_FALSE;
-        ctx->op_protect   = SP_PROTECT_NONE;
-        rt_memset(&ctx->op_proof, 0, sizeof(ctx->op_proof));
-    }
+    /* CP5 §2: 身份**就是调用方传进来的 expected_epoch**, 不再把 0 当"未指定"哨兵 ——
+     * 0 是合法的初始代次, 按 0 判定才是对的(任务书 §2 第 4 条)。不带身份的公开 wrapper
+     * 现在自己采一次 epoch 再进来。早退(-RT_ENOSYS/-RT_EBUSY)也一定带着**本调用**的
+     * 干净结果: NONE 保护 + proof 无效。 */
+    tmc_op_init(&op, expected_epoch);
 
     /* F2c R02: 没有事务锁就无从保证"复核期间没有并发写" -> 拒绝(不猜) */
     if (!ctx->txn_ok)
     {
-        tmc_op_result_fill(ctx, -RT_ENOSYS, out);
+        tmc_op_result_fill(ctx, &op, -RT_ENOSYS, out);
         return -RT_ENOSYS;
     }
     if (!tmc_cfg_txn_take(ctx))          /* 正在 apply/arm: 此刻无法复核 */
     {
         /* 这不是"已经进入操作后的失败": 没有产生任何总线动作, 因此**不**在这里保护,
          * 也不产生新 pending; 调用方按 rc 拒绝本次使能/起转(C16 的取得/归还平衡)。 */
-        tmc_op_result_fill(ctx, -RT_EBUSY, out);
+        tmc_op_result_fill(ctx, &op, -RT_EBUSY, out);
         return -RT_EBUSY;
     }
+    /* CP5 §2: 同上, 拿到事务锁才算"受理了这次复核"。 */
+    if (ctx == &tmc_cfg_prod) ctx->op_epoch = op.epoch;
 
     /* S2(§10.1): integrity 的**两个寄存器共用一份 250ms 预算**, 不为每个寄存器
      * 重开 250ms; 生产实例在这里记一次 op_epoch(序列里第一个失败出口负责保护一次)。 */
     if (!tmc_budget_open(&own, TMC_BUD_INTEGRITY_MS))
     {
         tmc_cfg_txn_give(ctx);
-        tmc_op_result_fill(ctx, -RT_EINVAL, out);
+        tmc_op_result_fill(ctx, &op, -RT_EINVAL, out);
         return -RT_EINVAL;
     }
     b = &own;
-    /* op_epoch/op_protected 已在入口按调用方身份复位(CP4 K3): 本函数**不再**重采。 */
+    /* op 已在入口按调用方身份初始化(CP5 §2): 本函数**不再**重采。 */
     rt_memset(&xs, 0, sizeof(xs));
 
     if (tmc_cfg_lock_take(ctx, b, &taken) != RT_EOK)
@@ -2171,7 +2194,7 @@ static rt_err_t tmc_cfg_integrity_ctx_for(tmc_cfg_ctx_t *ctx, rt_uint32_t expect
          * 仍然不 FOREVER 等同一把锁, 也仍然作废摘要把门闭合。
          * ⚠ 保留容忍的只有**最外层 txn 的 WAITING_NO 竞争**(上面那条 -RT_EBUSY),
          *    那一次还没进入任何操作, 也没有产生任何总线动作。 */
-        e = tmc_cfg_fail_ctx(ctx, 0, -RT_EBUSY, "integrity:leaf-lock", RT_TRUE, b);
+        e = tmc_cfg_fail_ctx(ctx, &op, 0, -RT_EBUSY, "integrity:leaf-lock", RT_TRUE, b);
         goto out;                    /* 唯一出口: txn 必须在 out 归还, 不许直接 return */
     }
     st    = ctx->state;
@@ -2189,14 +2212,14 @@ static rt_err_t tmc_cfg_integrity_ctx_for(tmc_cfg_ctx_t *ctx, rt_uint32_t expect
     /* 链路本身已不可信时不猜: 读不到 != 配置还在 */
     if (!ctx->bus->link_healthy(ctx->priv))
     {
-        e = tmc_cfg_fail_ctx(ctx, 0, -RT_EIO, "integrity:link-not-healthy", RT_TRUE, b);
+        e = tmc_cfg_fail_ctx(ctx, &op, 0, -RT_EIO, "integrity:link-not-healthy", RT_TRUE, b);
         goto out;
     }
 
     v = 0;
     if (ctx->bus->read(ctx->priv, TMC_REG_GCONF, &v, b, &xs) != RT_EOK)
     {
-        e = tmc_cfg_fail_ctx(ctx, TMC_REG_GCONF, -RT_EIO,
+        e = tmc_cfg_fail_ctx(ctx, &op, TMC_REG_GCONF, -RT_EIO,
                              "integrity:GCONF-read", RT_TRUE, b);
         goto out;
     }
@@ -2205,7 +2228,7 @@ static rt_err_t tmc_cfg_integrity_ctx_for(tmc_cfg_ctx_t *ctx, rt_uint32_t expect
         ctx->fail_exp  = tgt_g;                 /* 期望=已下发快照 */
         ctx->fail_got  = v;                     /* 实得=芯片现值 */
         ctx->fail_kind = TMC_CFG_FAIL_DRIFT;
-        e = tmc_cfg_fail_ctx(ctx, TMC_REG_GCONF, -RT_EIO,
+        e = tmc_cfg_fail_ctx(ctx, &op, TMC_REG_GCONF, -RT_EIO,
                              "integrity:GCONF-mismatch", RT_TRUE, b);
         goto out;
     }
@@ -2213,7 +2236,7 @@ static rt_err_t tmc_cfg_integrity_ctx_for(tmc_cfg_ctx_t *ctx, rt_uint32_t expect
     v = 0;
     if (ctx->bus->read(ctx->priv, TMC_REG_CHOPCONF, &v, b, &xs) != RT_EOK)
     {
-        e = tmc_cfg_fail_ctx(ctx, TMC_REG_CHOPCONF, -RT_EIO,
+        e = tmc_cfg_fail_ctx(ctx, &op, TMC_REG_CHOPCONF, -RT_EIO,
                              "integrity:CHOPCONF-read", RT_TRUE, b);
         goto out;
     }
@@ -2222,7 +2245,7 @@ static rt_err_t tmc_cfg_integrity_ctx_for(tmc_cfg_ctx_t *ctx, rt_uint32_t expect
         ctx->fail_exp  = tgt_c;
         ctx->fail_got  = v;
         ctx->fail_kind = TMC_CFG_FAIL_DRIFT;
-        e = tmc_cfg_fail_ctx(ctx, TMC_REG_CHOPCONF, -RT_EIO,
+        e = tmc_cfg_fail_ctx(ctx, &op, TMC_REG_CHOPCONF, -RT_EIO,
                              "integrity:CHOPCONF-mismatch", RT_TRUE, b);
         goto out;
     }
@@ -2230,33 +2253,39 @@ static rt_err_t tmc_cfg_integrity_ctx_for(tmc_cfg_ctx_t *ctx, rt_uint32_t expect
      * 一次过期的成功不能刷新守卫新鲜度, 也不能盖掉期间新出现的故障(§10.4)。 */
     if (tmc_remaining(b) == 0)
     {
-        e = tmc_cfg_fail_ctx(ctx, 0, -RT_ETIMEOUT, "integrity:expired", RT_TRUE, b);
+        e = tmc_cfg_fail_ctx(ctx, &op, 0, -RT_ETIMEOUT, "integrity:expired", RT_TRUE, b);
         goto out;
     }
-    if (ctx == &tmc_cfg_prod && sp_epoch() != ctx->op_epoch)
+    if (ctx == &tmc_cfg_prod && sp_epoch() != op.epoch)
     {
-        e = tmc_cfg_fail_ctx(ctx, 0, -RT_EPERM, "integrity:stale-success", RT_TRUE, b);
+        e = tmc_cfg_fail_ctx(ctx, &op, 0, -RT_EPERM, "integrity:stale-success", RT_TRUE, b);
         goto out;
     }
     e = RT_EOK;
 
 out:
+    /* CP5 §2: 先按本调用的局部 op 拼装 out, **再**归还事务锁 —— 原顺序(give 之后
+     * 从共享 ctx 抄)会让下一条操作覆盖这次 out 的来源。 */
+    tmc_op_result_fill(ctx, &op, e, out);
+    if (ctx == &tmc_cfg_prod) ctx->op_protect = (rt_uint8_t)op.outcome;
     tmc_cfg_txn_give(ctx);
-    tmc_op_result_fill(ctx, e, out);
     return e;
 }
 
 /* 自测与非 Motor 调用点继续用这一条(不带身份, 出参为空)。 */
 static rt_err_t tmc_cfg_integrity_ctx(tmc_cfg_ctx_t *ctx)
 {
-    return tmc_cfg_integrity_ctx_for(ctx, 0u, RT_NULL);
+    /* CP5 §2: 就地采一次身份(不再有 0 哨兵)。本 wrapper 的语义就是"我现在这条
+     * 上下文刚开始", 与 _for 的"调用方原身份"是两回事, 由调用方自己选。 */
+    return tmc_cfg_integrity_ctx_for(ctx, sp_epoch(), RT_NULL);
 }
 
 /* 普通查询接口保留(巡检命令等), 内部仍串行化在生产事务里, 只是自己采样身份。 */
 rt_err_t tmc2209_config_integrity_check(void)
 {
     tmc_cfg_prod_sync();
-    return tmc_cfg_integrity_ctx_for(&tmc_cfg_prod, 0u, RT_NULL);
+    /* CP5 §2: 普通查询 wrapper 自己采一次 epoch, 不把 0 当哨兵传给 _for。 */
+    return tmc_cfg_integrity_ctx_for(&tmc_cfg_prod, sp_epoch(), RT_NULL);
 }
 
 /* CP4 K3(§5.3): 带调用方原身份的复核 + 本次操作的结果摘要。 */

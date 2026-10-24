@@ -810,11 +810,50 @@ static void c12_new_fault_during_reset(void)
     (void)safety_reconcile_trip(FAULT_SOFT, EVT_SOFT_FAULT);
 }
 
-static void fault_reset_thread(void *a)
+/* ---- CP5 §4: C14 用的确定接缝(条件量 + 已在的钩子点), 不再用睡眠猜交错 ----
+ * 停车点在 fault_reset 里"带票据复核已完成、最终提交之前"的那次
+ * safety_drv_permit_confirm_low(), 它正是夹具已有的 permit_confirm_read 钩子点,
+ * 所以不需要为测试在产品里新插桩。 */
+static pthread_mutex_t c14_m = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t  c14_c = PTHREAD_COND_INITIALIZER;
+static int  c14_stage;        /* 0 初始 / 1 A 停在最终提交前 / 2 放行 / 3 线程已退出 */
+static int  c14_parked;       /* 接缝确实被走到(不是空跑) */
+
+static void c14_park_here(void)
+{
+    pthread_mutex_lock(&c14_m);
+    c14_parked++;
+    c14_stage = 1;
+    pthread_cond_broadcast(&c14_c);
+    while (c14_stage < 2) pthread_cond_wait(&c14_c, &c14_m);
+    pthread_mutex_unlock(&c14_m);
+}
+
+static void c14_wait_stage(int want)
+{
+    pthread_mutex_lock(&c14_m);
+    while (c14_stage < want) pthread_cond_wait(&c14_c, &c14_m);
+    pthread_mutex_unlock(&c14_m);
+}
+
+static void c14_release_a(void)
+{
+    pthread_mutex_lock(&c14_m);
+    c14_stage = 2;
+    pthread_cond_broadcast(&c14_c);
+    pthread_mutex_unlock(&c14_m);
+}
+
+static void c14_reset_thread(void *a)
 {
     int *rc = (int *)a;
+
     fault_reset();
     *rc = 1;
+    pthread_mutex_lock(&c14_m);
+    if (c14_stage < 3) c14_stage = 3;
+    pthread_cond_broadcast(&c14_c);
+    pthread_mutex_unlock(&c14_m);
 }
 
 static void latch_then_prepare(int low_fail)
@@ -831,7 +870,10 @@ static void cases_recovery(void)
 {
     sp_snapshot_t s;
     rt_uint32_t e0;
+    rt_uint32_t new_ep = 0u;
+    safety_state_t mid_ss = SAFETY_BOOT;
     int d0, r0 = 0, r1 = 0;
+    int cont0 = 0, b_waited = 0, ok_b = 0, mid_inh = 0, new_pend = 0;
 
     /* C12: 恢复复核之后落下新故障 => 换代 + 保持锁存, 旧票据不清新故障 */
     latch_then_prepare(0);
@@ -882,22 +924,75 @@ static void cases_recovery(void)
                  (int)mot.state, (int)mot.armed, (int)pad_level));
     }
 
-    /* C14: 两条真 reset 线程 + 最终窗口前后的新请求 => 整体提交可线性化 */
+    /* ---- C14a: A 停在"复核已完成、最终提交前", 新故障先落地, 再放行 A ----
+     * 原来的 usleep(3000) 只能"看起来"让两条线程进入复核, 并不能证明新请求落在
+     * 最终提交之前还是之后(任务书 §4)。现在用条件量把先后钉死。 */
     latch_then_prepare(0);
-    s2_spawn(fault_reset_thread, &r0);
-    s2_spawn(fault_reset_thread, &r1);
-    usleep(3000);                            /* 让两条线程进到复核/等待里 */
+    pthread_mutex_lock(&c14_m);
+    c14_stage = 0;
+    pthread_mutex_unlock(&c14_m);
+    r0 = r1 = 0;
+    s2_set_hook(c14_park_here, "permit_confirm_read");
+    s2_spawn(c14_reset_thread, &r0);
+    c14_wait_stage(1);                        /* A 真的停在最终提交之前 */
+    /* ⚠ 这里**不能**调 safety_reconcile_trip(): A 停在接缝里仍持 ss_lock, 慢整理会
+     * 排在同一把锁上 => 主线程等 A、A 等主线程放行(本机实测被 60s 墙钟守卫抓到)。
+     * "新故障先落地"只需要短保护(不取任何锁), 它的可观察结果此刻已经成立;
+     * 慢整理放到 A 被拒并 join 之后做, 那时没人持锁。 */
     (void)sp_trip_fast(FAULT_SOFT, EVT_SOFT_FAULT, MOT_STOP_SRC_GUARD_STOP, RT_NULL);
-    (void)safety_reconcile_trip(FAULT_SOFT, EVT_SOFT_FAULT);
+    sp_get(&s);
+    new_ep = s.epoch;
+    new_pend = (s.metadata_pending == RT_TRUE) ? 1 : 0;   /* 放行前就已成立 */
+    c14_release_a();                          /* 才放行 A 的最终窗口 */
+    s2_join_all();
+    /* 这里**不**再 ack: 新故障留下的 pending 必须还是断言要看的那一条事实。 */
+    sp_get(&s);
+    CHECK("C14a-stale-ticket-refused-at-final-commit",
+          r0 == 1 && c14_parked == 1 && new_pend == 1 && s.epoch == new_ep &&
+          s.inhibit == RT_TRUE && ss_state != SAFETY_MANUAL_CLEAR &&
+          s.metadata_pending == RT_TRUE,
+          fm("A 完成=%d 停在接缝=%d epoch=%u(新故障=%u) inhibit=%s ss=%s pending=%s"
+             " - 旧票据不得在新故障那一代上清锁存", r0, c14_parked,
+             (unsigned)s.epoch, (unsigned)new_ep, s.inhibit ? "YES" : "no",
+             safety_state_name(ss_state), s.metadata_pending ? "YES" : "no"));
+
+    /* ---- C14b: A 的最终窗口先成功, B 真的在 ss_lock 门外等, 新故障随后保持 ---- */
+    latch_then_prepare(0);
+    pthread_mutex_lock(&c14_m);
+    c14_stage = 0;
+    pthread_mutex_unlock(&c14_m);
+    r0 = r1 = 0;
+    c14_parked = 0;
+    s2_set_hook(c14_park_here, "permit_confirm_read");
+    s2_spawn(c14_reset_thread, &r0);
+    c14_wait_stage(1);
+    cont0 = s2_contend_hits;
+    s2_spawn(c14_reset_thread, &r1);          /* B: 同一把 ss_lock 的真实竞争者 */
+    {
+        int spins = 0;
+
+        while (s2_contend_hits == cont0 && spins++ < 2500) usleep(200);
+        b_waited = (s2_contend_hits > cont0) ? 1 : 0;
+    }
+    c14_release_a();                            /* 恢复最终窗口先成功 */
+    c14_wait_stage(3);
     s2_join_all();
     sp_get(&s);
-    CHECK("C14-two-reset-threads-new-fault-wins",
-          r0 == 1 && r1 == 1 && s.inhibit == RT_TRUE &&
-          ss_state != SAFETY_MANUAL_CLEAR,
-          fm("两线程完成 r=%d/%d inhibit=%s ss=%s epoch=%u (旧 MANUAL_CLEAR 不覆盖"
-             "新故障: 最终窗口按票据换代整笔放弃)", r0, r1,
-             s.inhibit ? "YES" : "no", safety_state_name(ss_state),
-             (unsigned)s.epoch));
+    mid_ss = ss_state;
+    mid_inh = (s.inhibit == RT_TRUE) ? 1 : 0;
+    ok_b = (r0 == 1 && r1 == 1 && c14_parked == 1 && b_waited == 1 &&
+            mid_ss == SAFETY_MANUAL_CLEAR && mid_inh == 0);
+    (void)sp_trip_fast(FAULT_SOFT, EVT_SOFT_FAULT, MOT_STOP_SRC_GUARD_STOP, RT_NULL);
+    sp_get(&s);                               /* 不 ack: 要看的就是这条保持住的义务 */
+    CHECK("C14b-new-fault-after-commit-kept",
+          ok_b && s.inhibit == RT_TRUE &&
+          safety_state_get() == SAFETY_FAULT_LATCHED &&   /* canonical 视图: 抑制即锁存 */
+          s.metadata_pending == RT_TRUE,
+          fm("A=%d B=%d B 真在门外等=%d 接缝=%d 提交后 ss=%s inhibit=%d ->"
+             " 随后新故障: ss=%s inhibit=%s pending=%s epoch=%u", r0, r1, b_waited,
+             c14_parked, safety_state_name(mid_ss), mid_inh,
+             safety_state_name(ss_state), s.inhibit ? "YES" : "no",
+             s.metadata_pending ? "YES" : "no", (unsigned)s.epoch));
 }
 
 /* ===================================================================== */

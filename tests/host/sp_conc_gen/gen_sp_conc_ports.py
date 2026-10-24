@@ -46,16 +46,14 @@ rt_err_t rt_mutex_detach(struct rt_mutex *m) { (void)m; return RT_EOK; }""",
  *   那样"窗口内不许取锁"一旦破功就会死锁, 由 runner 的墙钟 timeout 抓到。 */
 #define S2_MAX_MTX 8
 /* RT-Thread 的 rt_mutex 是**按持有线程递归计数**的(同线程重入合法) —— 主机模型必须
- * 一致, 否则"持 ss_lock 时又触发一次要 ss_lock 的慢整理"会自我死锁
- * (2026-10-24 在 C12/C14 上实测到)。owned/count 只在 s2_mtx_tab 之外由锁所有者改,
- * 与 real 互斥量的持有关系一致。 */
+ * 一致, 否则"持 ss_lock 时又触发一次要 ss_lock 的慢整理"会自我死锁(2026-10-24 在
+ * C12/C14 上实测到)。CP5 §4: 递归与"非持有者不得偷放"现在**全部**由 PTHREAD_MUTEX_
+ * RECURSIVE 本体承担 —— 原来另存一份 owner/owned/count 元数据并在不持任何保护的情况下
+ * 读/写另一线程写的字段, 既是数据竞争, 也可能与真实持有关系脱节。元数据整块删除。 */
 typedef struct {
     struct rt_mutex *key;
     const char      *name;
     pthread_mutex_t  real;
-    pthread_t        owner;
-    int              owned;
-    int              count;
 } s2_slot;
 static s2_slot s2_mtx[S2_MAX_MTX];
 static int s2_mtx_n;
@@ -74,11 +72,14 @@ static pthread_mutex_t *s2_mtx_bind(struct rt_mutex *m, const char *name)
         if (s2_mtx[i].key == m) { out = &s2_mtx[i].real; break; }
     if (out == RT_NULL && s2_mtx_n < S2_MAX_MTX && m != RT_NULL)
     {
+        pthread_mutexattr_t attr;
+
         s2_mtx[s2_mtx_n].key  = m;
         s2_mtx[s2_mtx_n].name = name;
-        s2_mtx[s2_mtx_n].owned = 0;
-        s2_mtx[s2_mtx_n].count = 0;
-        pthread_mutex_init(&s2_mtx[s2_mtx_n].real, RT_NULL);
+        pthread_mutexattr_init(&attr);
+        pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
+        pthread_mutex_init(&s2_mtx[s2_mtx_n].real, &attr);
+        pthread_mutexattr_destroy(&attr);
         out = &s2_mtx[s2_mtx_n].real;
         s2_mtx_n++;
     }
@@ -107,7 +108,6 @@ rt_err_t rt_mutex_init(struct rt_mutex *m, const char *name, rt_uint16_t flags)
 rt_err_t rt_mutex_take(struct rt_mutex *m, rt_int32_t t)
 {
     pthread_mutex_t *real;
-    s2_slot *slot;
     int e;
 
     c_mutex_take++;
@@ -120,20 +120,10 @@ rt_err_t rt_mutex_take(struct rt_mutex *m, rt_int32_t t)
     }
     real = s2_mtx_bind(m, m ? m->name : RT_NULL);
     if (real == RT_NULL) return -RT_EINVAL;
-    slot = s2_mtx_slot_of(m);
-    if (slot != RT_NULL && slot->owned && pthread_equal(slot->owner, pthread_self()))
-    {
-        slot->count++;                       /* 同线程重入: 与 RT-Thread 语义一致 */
-        return RT_EOK;
-    }
     if (t == RT_WAITING_NO)
     {
-        if (pthread_mutex_trylock(real) != 0) return -RT_EBUSY;
-        if (slot != RT_NULL)
-        {
-            slot->owner = pthread_self(); slot->owned = 1; slot->count = 1;
-        }
-        return RT_EOK;
+        /* 递归 mutex: 同线程重入 trylock 直接成功 => 不会被误记成"门外竞争"。 */
+        return (pthread_mutex_trylock(real) == 0) ? RT_EOK : -RT_EBUSY;
     }
     /* 竞争观测点: trylock 拿不到 = **确实有别的线程持有**这把业务锁, 此时才记一次
      * "门外等待"并置序列位, 然后真阻塞。之前把 trylock 探测去掉(一律记)会让
@@ -141,14 +131,12 @@ rt_err_t rt_mutex_take(struct rt_mutex *m, rt_int32_t t)
     e = pthread_mutex_trylock(real);
     if (e != 0)
     {
+        /* 竞争观测点: trylock 失败 = **确实有别的线程持有**这把业务锁(同线程重入在上面
+         * 已经成功了), 这时才记一次"门外等待"并置序列位, 然后真阻塞到拿到为止。 */
         s2_contend_hits++;
         s2_contend_name = (m->name ? m->name : "?");
         s2_seq_set(S2_SEQ_CONTEND);
-        e = pthread_mutex_lock(real);              /* 真阻塞到拿到为止 */
-    }
-    if (e == 0 && slot != RT_NULL)
-    {
-        slot->owner = pthread_self(); slot->owned = 1; slot->count = 1;
+        e = pthread_mutex_lock(real);
     }
     return (e == 0) ? RT_EOK : RT_ERROR;
 }
@@ -156,18 +144,12 @@ rt_err_t rt_mutex_take(struct rt_mutex *m, rt_int32_t t)
 rt_err_t rt_mutex_release(struct rt_mutex *m)
 {
     pthread_mutex_t *real = s2_mtx_bind(m, m ? m->name : RT_NULL);
-    s2_slot *slot = s2_mtx_slot_of(m);
 
     c_mutex_release++;
     if (real == RT_NULL) return -RT_EINVAL;
-    if (slot != RT_NULL && slot->owned)
-    {
-        if (!pthread_equal(slot->owner, pthread_self()))
-            return -RT_EPERM;                    /* 不是自己的锁: 如实失败, 不偷放 */
-        if (--slot->count > 0) return RT_EOK;    /* 递归计数还没放完 */
-        slot->owned = 0;
-    }
-    return pthread_mutex_unlock(real) == 0 ? RT_EOK : RT_ERROR;
+    /* 递归 mutex 自己保证: 同线程多层只放到最后一层; 非持有者 unlock 返回 EPERM
+     * => 与产品语义一致的"不偷放", 不再需要(也不能有)跨线程裸读的元数据。 */
+    return pthread_mutex_unlock(real) == 0 ? RT_EOK : -RT_EPERM;
 }
 
 static s2_slot *s2_mtx_slot_of(struct rt_mutex *m)

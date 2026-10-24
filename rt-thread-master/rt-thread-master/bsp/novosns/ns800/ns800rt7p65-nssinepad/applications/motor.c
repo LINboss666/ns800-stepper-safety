@@ -649,6 +649,7 @@ static void motor_ramp_tick(void)
     rt_bool_t  tick_res_ok = RT_FALSE;
     sp_token_t tick_res;
     sp_proof_t apf;   /* R1: apply/ramp-zero 失败支的本次动作凭证 */
+    rt_uint32_t  guard_epoch;         /* CP5 §3.2: 与 tick_res 同源的守卫身份 */
 
     tick_res.owner = SP_NONE;
     tick_res.epoch = 0u;
@@ -675,6 +676,9 @@ static void motor_ramp_tick(void)
      * 此后本拍不再重采身份(见下面删除的那次 tick_res = mot_res)。 */
     tick_res   = mot_res;
     tick_res_ok = mot_res_ok;
+    /* CP5 §3.2: 本拍的守卫身份与 armed/tick_res 一起定下来(有预约用预约那一代,
+     * 没有预约才退到本拍入口的采样)。此后本拍不再重采身份。 */
+    guard_epoch = tick_res_ok ? tick_res.epoch : op_epoch;
     mot_lock_release();
 
     /* 追加(2026-10-21): armed 期每拍先做一次**无 UART、无延时**的 ENN 反馈复核
@@ -693,7 +697,7 @@ static void motor_ramp_tick(void)
              * 等于把降险动作排在日志之后。名字表是静态字符串, 先取指针即可。 */
             const char *fbn = safety_fb_verdict_name(fv);
 
-            mot_guard_shutdown(MOT_GUARD_ENN_FEEDBACK, op_epoch);
+            mot_guard_shutdown(MOT_GUARD_ENN_FEEDBACK, guard_epoch);
             fb_stopped = 1u;
             rt_kprintf("[MOT] runtime guard: ENN feedback %s while request=ENABLE"
                        " (expected LOW) -> 停机(保护已先做)\n", fbn);
@@ -704,20 +708,41 @@ static void motor_ramp_tick(void)
     {
         motor_guard_in_t  in;
         motor_guard_out_t out;
+        tmc_op_result_t   gres;   /* CP5 §3.2: 本次复核自己的结果与 proof */
 
         in.armed = 1u;
         in.cfg_state_ok = tmc2209_drive_config_ok_for_arm() ? 1u : 0u;
         in.due          = guard_due;
-        in.integrity    = guard_due ? tmc2209_config_integrity_check() : RT_EOK;
+        /* CP5 §3.2: 绑**拍初身份**复核并消费带回的 gres。原写法让 wrapper 就地重采
+         * 当前代 => 旧拍在换代之后仍按"新身份"触发保护, 等于给旧动作续命;
+         * 结果/proof 走 gres, 不再与另一份入口 epoch 拼接。 */
+        rt_memset(&gres, 0, sizeof(gres));
+        in.integrity    = guard_due
+            ? tmc2209_config_integrity_check_for(guard_epoch, &gres)
+            : RT_EOK;
         in.busy_streak  = mot_ramp_guard_busy;
         motor_guard_decide(&in, &out);
         mot_ramp_guard_busy = out.busy_streak;
-        if (out.stop) mot_guard_shutdown(out.reason, op_epoch);
+        if (out.stop) mot_guard_shutdown(out.reason, guard_epoch);
     }
     else mot_ramp_guard_busy = 0u;
 
     mot_lock_take();
     tgt = mot.target_hz;
+    /* CP5 §3.2: 慢复核(UART)之后、动本拍任何字段之前, 用同一把锁复核本拍身份仍然
+     * 成立。被新预约/新故障换掉时整拍放弃: 既不先把新预约的镜像改掉, 也不让旧的
+     * PWM token 在更晚的门上才失败 —— 下一拍自会以新身份重跑。 */
+    if (tick_res_ok && (!mot_res_ok || mot_res.epoch != tick_res.epoch ||
+                        mot_res.owner != tick_res.owner ||
+                        sp_epoch() != tick_res.epoch))
+    {
+        mot_lock_release();
+        rt_kprintf("[MOT] ramp: 本拍身份已被取代(拍初 epoch=%u / 现在=%u)"
+                   " -> 整拍放弃: 不写 current/state, 不提交旧 PWM token\n",
+                   (unsigned)tick_res.epoch, (unsigned)sp_epoch());
+        return;
+    }
+
     /* CP4 K2(§4.3): 这次**重新采身份**已删除。本拍的 PWM 提交、归零关断、状态落位与
      * RUN->READY 全部只用拍初那份 tick_res 快照(见上面第一次 mot_lock 里的复制)。 */
 
@@ -1218,10 +1243,14 @@ rt_err_t motor_arm(void)
     if (ce_sub != RT_EOK && e == RT_EOK) e = ce_sub;
     if (e != RT_EOK)
     {
-        rt_kprintf("[MOT] arm FAILED: DRV_ENABLE HIGH not verified (%d),"
-                   " 走受检回滚(换代/抑制/留 pending 一次做完)\n", (int)e);
+        rt_err_t why = e;                 /* CP5 §3.1: 原因先留在局部, 不被回滚返回值盖掉 */
+
         e = mot_fail_op(&local_res, MOT_STOP_SRC_ARM_ROLLBACK, FAULT_SOFT,
-                        EVT_SOFT_FAULT, e, RT_NULL, &ropf);
+                        EVT_SOFT_FAULT, why, RT_NULL, &ropf);
+        rt_kprintf("[MOT] arm FAILED: DRV_ENABLE HIGH not verified (%d) -"
+                   " 受检回滚(换代/抑制/留 pending 一次)已做完, 本行在保护之后;"
+                   " 对外 rc=%d, 关断 raw=%d\n",
+                   (int)why, (int)e, (int)ropf.pwm.raw_rc);
         goto out;
     }
 
@@ -1239,11 +1268,11 @@ rt_err_t motor_arm(void)
         en = sp_note_enn_confirmed_for(local_res.epoch, 1u, fe);
         if (fe != RT_EOK || en != RT_EOK)
         {
+            e = mot_fail_op(&local_res, MOT_STOP_SRC_ARM_ROLLBACK, FAULT_DRV_FEEDBACK,
+                            EVT_DRV_FEEDBACK, -RT_EPERM, RT_NULL, &ropf);
             rt_kprintf("[MOT] arm FAILED: ENN feedback not on enabled side"
                        " (err=%d verdict=%s) 或确认提交被拒(err=%d) - 受检回滚\n",
                        (int)fe, safety_fb_verdict_name(fv), (int)en);
-            e = mot_fail_op(&local_res, MOT_STOP_SRC_ARM_ROLLBACK, FAULT_DRV_FEEDBACK,
-                            EVT_DRV_FEEDBACK, -RT_EPERM, RT_NULL, &ropf);
             goto out;
         }
     }
@@ -1257,9 +1286,14 @@ rt_err_t motor_arm(void)
         if (sp_enter_token(&local_res, &lvl) != RT_EOK)
         {
             mot_lock_release();
+            /* CP5 §3.1: 许可 HIGH 已经发出 —— 这两处拒绝必须按原 token 处置:
+             * 身份仍有效就走受检回滚(一次关闭 + 抑制 + pending); 已被更新的一代
+             * 取代时 mot_fail_op 内部整笔放弃。不再"只归还预约而遗留本次 HIGH"。 */
+            e = mot_fail_op(&local_res, MOT_STOP_SRC_ARM_ROLLBACK,
+                            FAULT_SOFT, EVT_SOFT_FAULT, -RT_EPERM,
+                            RT_NULL, &ropf);
             rt_kprintf("[MOT] arm REFUSED: 提交 armed 前预约已失效(新故障/新预约)"
                        " - 走统一出口归还 txn(不得从这里直接 return)\n");
-            e = -RT_EPERM;
             goto out;
         }
         /* R5: HIGH 裸写 + 回读 + ENN 确认之后, 由这个提交把 canonical 抬到 SP_ARMED;
@@ -1268,8 +1302,13 @@ rt_err_t motor_arm(void)
         {
             sp_leave_token(lvl);
             mot_lock_release();
+            /* CP5 §3.1: 许可 HIGH 已经发出 —— 这两处拒绝必须按原 token 处置:
+             * 身份仍有效就走受检回滚(一次关闭 + 抑制 + pending); 已被更新的一代
+             * 取代时 mot_fail_op 内部整笔放弃。不再"只归还预约而遗留本次 HIGH"。 */
+            e = mot_fail_op(&local_res, MOT_STOP_SRC_ARM_ROLLBACK,
+                            FAULT_SOFT, EVT_SOFT_FAULT, -RT_EPERM,
+                            RT_NULL, &ropf);
             rt_kprintf("[MOT] arm REFUSED: armed 提交时身份已失效\n");
-            e = -RT_EPERM;
             goto out;
         }
         mot_res      = local_res;

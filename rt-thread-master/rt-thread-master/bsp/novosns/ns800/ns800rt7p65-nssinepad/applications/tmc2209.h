@@ -262,7 +262,8 @@ typedef struct {
 } tmc_op_result_t;
 
 /* 带调用方原身份的复核: expected_epoch 必须是**这条命令在第一次可能等待之前**采到的
- * 代次(arm / start / 运行守卫各用自分快照), expected_epoch=0 才退回"就地采样";
+ * 代次(arm / start / 运行守卫各用自分快照)。CP5 §2: 不再有"0 表示就地采样"的哨兵语义
+ * —— 0 是合法的初始代次, 照 0 判定; 需要就地采样的调用点自己 sp_epoch() 再传进来。
  * 序列里的失败保护也绑在这份身份上。out 可以为 NULL(只要裸返回值)。 */
 rt_err_t tmc2209_config_integrity_check_for(rt_uint32_t expected_epoch,
                                            tmc_op_result_t *out);

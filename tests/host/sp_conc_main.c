@@ -118,16 +118,14 @@ static struct rt_thread c_thread_store[4];
  *   那样"窗口内不许取锁"一旦破功就会死锁, 由 runner 的墙钟 timeout 抓到。 */
 #define S2_MAX_MTX 8
 /* RT-Thread 的 rt_mutex 是**按持有线程递归计数**的(同线程重入合法) —— 主机模型必须
- * 一致, 否则"持 ss_lock 时又触发一次要 ss_lock 的慢整理"会自我死锁
- * (2026-10-24 在 C12/C14 上实测到)。owned/count 只在 s2_mtx_tab 之外由锁所有者改,
- * 与 real 互斥量的持有关系一致。 */
+ * 一致, 否则"持 ss_lock 时又触发一次要 ss_lock 的慢整理"会自我死锁(2026-10-24 在
+ * C12/C14 上实测到)。CP5 §4: 递归与"非持有者不得偷放"现在**全部**由 PTHREAD_MUTEX_
+ * RECURSIVE 本体承担 —— 原来另存一份 owner/owned/count 元数据并在不持任何保护的情况下
+ * 读/写另一线程写的字段, 既是数据竞争, 也可能与真实持有关系脱节。元数据整块删除。 */
 typedef struct {
     struct rt_mutex *key;
     const char      *name;
     pthread_mutex_t  real;
-    pthread_t        owner;
-    int              owned;
-    int              count;
 } s2_slot;
 static s2_slot s2_mtx[S2_MAX_MTX];
 static int s2_mtx_n;
@@ -146,11 +144,14 @@ static pthread_mutex_t *s2_mtx_bind(struct rt_mutex *m, const char *name)
         if (s2_mtx[i].key == m) { out = &s2_mtx[i].real; break; }
     if (out == RT_NULL && s2_mtx_n < S2_MAX_MTX && m != RT_NULL)
     {
+        pthread_mutexattr_t attr;
+
         s2_mtx[s2_mtx_n].key  = m;
         s2_mtx[s2_mtx_n].name = name;
-        s2_mtx[s2_mtx_n].owned = 0;
-        s2_mtx[s2_mtx_n].count = 0;
-        pthread_mutex_init(&s2_mtx[s2_mtx_n].real, RT_NULL);
+        pthread_mutexattr_init(&attr);
+        pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
+        pthread_mutex_init(&s2_mtx[s2_mtx_n].real, &attr);
+        pthread_mutexattr_destroy(&attr);
         out = &s2_mtx[s2_mtx_n].real;
         s2_mtx_n++;
     }
@@ -179,7 +180,6 @@ rt_err_t rt_mutex_init(struct rt_mutex *m, const char *name, rt_uint16_t flags)
 rt_err_t rt_mutex_take(struct rt_mutex *m, rt_int32_t t)
 {
     pthread_mutex_t *real;
-    s2_slot *slot;
     int e;
 
     c_mutex_take++;
@@ -192,20 +192,10 @@ rt_err_t rt_mutex_take(struct rt_mutex *m, rt_int32_t t)
     }
     real = s2_mtx_bind(m, m ? m->name : RT_NULL);
     if (real == RT_NULL) return -RT_EINVAL;
-    slot = s2_mtx_slot_of(m);
-    if (slot != RT_NULL && slot->owned && pthread_equal(slot->owner, pthread_self()))
-    {
-        slot->count++;                       /* 同线程重入: 与 RT-Thread 语义一致 */
-        return RT_EOK;
-    }
     if (t == RT_WAITING_NO)
     {
-        if (pthread_mutex_trylock(real) != 0) return -RT_EBUSY;
-        if (slot != RT_NULL)
-        {
-            slot->owner = pthread_self(); slot->owned = 1; slot->count = 1;
-        }
-        return RT_EOK;
+        /* 递归 mutex: 同线程重入 trylock 直接成功 => 不会被误记成"门外竞争"。 */
+        return (pthread_mutex_trylock(real) == 0) ? RT_EOK : -RT_EBUSY;
     }
     /* 竞争观测点: trylock 拿不到 = **确实有别的线程持有**这把业务锁, 此时才记一次
      * "门外等待"并置序列位, 然后真阻塞。之前把 trylock 探测去掉(一律记)会让
@@ -213,14 +203,12 @@ rt_err_t rt_mutex_take(struct rt_mutex *m, rt_int32_t t)
     e = pthread_mutex_trylock(real);
     if (e != 0)
     {
+        /* 竞争观测点: trylock 失败 = **确实有别的线程持有**这把业务锁(同线程重入在上面
+         * 已经成功了), 这时才记一次"门外等待"并置序列位, 然后真阻塞到拿到为止。 */
         s2_contend_hits++;
         s2_contend_name = (m->name ? m->name : "?");
         s2_seq_set(S2_SEQ_CONTEND);
-        e = pthread_mutex_lock(real);              /* 真阻塞到拿到为止 */
-    }
-    if (e == 0 && slot != RT_NULL)
-    {
-        slot->owner = pthread_self(); slot->owned = 1; slot->count = 1;
+        e = pthread_mutex_lock(real);
     }
     return (e == 0) ? RT_EOK : RT_ERROR;
 }
@@ -228,18 +216,12 @@ rt_err_t rt_mutex_take(struct rt_mutex *m, rt_int32_t t)
 rt_err_t rt_mutex_release(struct rt_mutex *m)
 {
     pthread_mutex_t *real = s2_mtx_bind(m, m ? m->name : RT_NULL);
-    s2_slot *slot = s2_mtx_slot_of(m);
 
     c_mutex_release++;
     if (real == RT_NULL) return -RT_EINVAL;
-    if (slot != RT_NULL && slot->owned)
-    {
-        if (!pthread_equal(slot->owner, pthread_self()))
-            return -RT_EPERM;                    /* 不是自己的锁: 如实失败, 不偷放 */
-        if (--slot->count > 0) return RT_EOK;    /* 递归计数还没放完 */
-        slot->owned = 0;
-    }
-    return pthread_mutex_unlock(real) == 0 ? RT_EOK : RT_ERROR;
+    /* 递归 mutex 自己保证: 同线程多层只放到最后一层; 非持有者 unlock 返回 EPERM
+     * => 与产品语义一致的"不偷放", 不再需要(也不能有)跨线程裸读的元数据。 */
+    return pthread_mutex_unlock(real) == 0 ? RT_EOK : -RT_EPERM;
 }
 
 static s2_slot *s2_mtx_slot_of(struct rt_mutex *m)
@@ -870,10 +852,28 @@ int  s2_seq_wait(int bit, int ms)
 static pthread_t s2_thr[6];
 static int s2_thr_n;
 
+/* 线程入口桥接(任务书附录 A): 夹具的业务入口是 void (*)(void *), 而 pthread 要的是
+ * void *(*)(void *) —— 原写法用强转把两者当同一个, POSIX 下是**类型不符**(审查环境
+ * GCC 13.3 直接报 warning, 原 runner 按"构建不干净"判 INFRA-FAIL)。现在桥接函数调用
+ * 原入口后返回 NULL, 不压警告、也不改任何业务判据。 */
+struct s2_thread_call { void (*fn)(void *); void *arg; };
+static struct s2_thread_call s2_calls[6];
+
+static void *s2_thread_entry(void *p)
+{
+    struct s2_thread_call *c = (struct s2_thread_call *)p;
+
+    c->fn(c->arg);
+    return RT_NULL;
+}
+
 int s2_spawn(void (*fn)(void *), void *arg)
 {
     if (s2_thr_n >= (int)(sizeof(s2_thr) / sizeof(s2_thr[0]))) return -1;
-    if (pthread_create(&s2_thr[s2_thr_n], RT_NULL, (void *(*)(void *))fn, arg) != 0)
+    s2_calls[s2_thr_n].fn  = fn;
+    s2_calls[s2_thr_n].arg = arg;
+    if (pthread_create(&s2_thr[s2_thr_n], RT_NULL,
+                       s2_thread_entry, &s2_calls[s2_thr_n]) != 0)
         return -1;
     s2_thr_n++;
     return 0;
@@ -1736,11 +1736,50 @@ static void c12_new_fault_during_reset(void)
     (void)safety_reconcile_trip(FAULT_SOFT, EVT_SOFT_FAULT);
 }
 
-static void fault_reset_thread(void *a)
+/* ---- CP5 §4: C14 用的确定接缝(条件量 + 已在的钩子点), 不再用睡眠猜交错 ----
+ * 停车点在 fault_reset 里"带票据复核已完成、最终提交之前"的那次
+ * safety_drv_permit_confirm_low(), 它正是夹具已有的 permit_confirm_read 钩子点,
+ * 所以不需要为测试在产品里新插桩。 */
+static pthread_mutex_t c14_m = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t  c14_c = PTHREAD_COND_INITIALIZER;
+static int  c14_stage;        /* 0 初始 / 1 A 停在最终提交前 / 2 放行 / 3 线程已退出 */
+static int  c14_parked;       /* 接缝确实被走到(不是空跑) */
+
+static void c14_park_here(void)
+{
+    pthread_mutex_lock(&c14_m);
+    c14_parked++;
+    c14_stage = 1;
+    pthread_cond_broadcast(&c14_c);
+    while (c14_stage < 2) pthread_cond_wait(&c14_c, &c14_m);
+    pthread_mutex_unlock(&c14_m);
+}
+
+static void c14_wait_stage(int want)
+{
+    pthread_mutex_lock(&c14_m);
+    while (c14_stage < want) pthread_cond_wait(&c14_c, &c14_m);
+    pthread_mutex_unlock(&c14_m);
+}
+
+static void c14_release_a(void)
+{
+    pthread_mutex_lock(&c14_m);
+    c14_stage = 2;
+    pthread_cond_broadcast(&c14_c);
+    pthread_mutex_unlock(&c14_m);
+}
+
+static void c14_reset_thread(void *a)
 {
     int *rc = (int *)a;
+
     fault_reset();
     *rc = 1;
+    pthread_mutex_lock(&c14_m);
+    if (c14_stage < 3) c14_stage = 3;
+    pthread_cond_broadcast(&c14_c);
+    pthread_mutex_unlock(&c14_m);
 }
 
 static void latch_then_prepare(int low_fail)
@@ -1757,7 +1796,10 @@ static void cases_recovery(void)
 {
     sp_snapshot_t s;
     rt_uint32_t e0;
+    rt_uint32_t new_ep = 0u;
+    safety_state_t mid_ss = SAFETY_BOOT;
     int d0, r0 = 0, r1 = 0;
+    int cont0 = 0, b_waited = 0, ok_b = 0, mid_inh = 0, new_pend = 0;
 
     /* C12: 恢复复核之后落下新故障 => 换代 + 保持锁存, 旧票据不清新故障 */
     latch_then_prepare(0);
@@ -1808,22 +1850,75 @@ static void cases_recovery(void)
                  (int)mot.state, (int)mot.armed, (int)pad_level));
     }
 
-    /* C14: 两条真 reset 线程 + 最终窗口前后的新请求 => 整体提交可线性化 */
+    /* ---- C14a: A 停在"复核已完成、最终提交前", 新故障先落地, 再放行 A ----
+     * 原来的 usleep(3000) 只能"看起来"让两条线程进入复核, 并不能证明新请求落在
+     * 最终提交之前还是之后(任务书 §4)。现在用条件量把先后钉死。 */
     latch_then_prepare(0);
-    s2_spawn(fault_reset_thread, &r0);
-    s2_spawn(fault_reset_thread, &r1);
-    usleep(3000);                            /* 让两条线程进到复核/等待里 */
+    pthread_mutex_lock(&c14_m);
+    c14_stage = 0;
+    pthread_mutex_unlock(&c14_m);
+    r0 = r1 = 0;
+    s2_set_hook(c14_park_here, "permit_confirm_read");
+    s2_spawn(c14_reset_thread, &r0);
+    c14_wait_stage(1);                        /* A 真的停在最终提交之前 */
+    /* ⚠ 这里**不能**调 safety_reconcile_trip(): A 停在接缝里仍持 ss_lock, 慢整理会
+     * 排在同一把锁上 => 主线程等 A、A 等主线程放行(本机实测被 60s 墙钟守卫抓到)。
+     * "新故障先落地"只需要短保护(不取任何锁), 它的可观察结果此刻已经成立;
+     * 慢整理放到 A 被拒并 join 之后做, 那时没人持锁。 */
     (void)sp_trip_fast(FAULT_SOFT, EVT_SOFT_FAULT, MOT_STOP_SRC_GUARD_STOP, RT_NULL);
-    (void)safety_reconcile_trip(FAULT_SOFT, EVT_SOFT_FAULT);
+    sp_get(&s);
+    new_ep = s.epoch;
+    new_pend = (s.metadata_pending == RT_TRUE) ? 1 : 0;   /* 放行前就已成立 */
+    c14_release_a();                          /* 才放行 A 的最终窗口 */
+    s2_join_all();
+    /* 这里**不**再 ack: 新故障留下的 pending 必须还是断言要看的那一条事实。 */
+    sp_get(&s);
+    CHECK("C14a-stale-ticket-refused-at-final-commit",
+          r0 == 1 && c14_parked == 1 && new_pend == 1 && s.epoch == new_ep &&
+          s.inhibit == RT_TRUE && ss_state != SAFETY_MANUAL_CLEAR &&
+          s.metadata_pending == RT_TRUE,
+          fm("A 完成=%d 停在接缝=%d epoch=%u(新故障=%u) inhibit=%s ss=%s pending=%s"
+             " - 旧票据不得在新故障那一代上清锁存", r0, c14_parked,
+             (unsigned)s.epoch, (unsigned)new_ep, s.inhibit ? "YES" : "no",
+             safety_state_name(ss_state), s.metadata_pending ? "YES" : "no"));
+
+    /* ---- C14b: A 的最终窗口先成功, B 真的在 ss_lock 门外等, 新故障随后保持 ---- */
+    latch_then_prepare(0);
+    pthread_mutex_lock(&c14_m);
+    c14_stage = 0;
+    pthread_mutex_unlock(&c14_m);
+    r0 = r1 = 0;
+    c14_parked = 0;
+    s2_set_hook(c14_park_here, "permit_confirm_read");
+    s2_spawn(c14_reset_thread, &r0);
+    c14_wait_stage(1);
+    cont0 = s2_contend_hits;
+    s2_spawn(c14_reset_thread, &r1);          /* B: 同一把 ss_lock 的真实竞争者 */
+    {
+        int spins = 0;
+
+        while (s2_contend_hits == cont0 && spins++ < 2500) usleep(200);
+        b_waited = (s2_contend_hits > cont0) ? 1 : 0;
+    }
+    c14_release_a();                            /* 恢复最终窗口先成功 */
+    c14_wait_stage(3);
     s2_join_all();
     sp_get(&s);
-    CHECK("C14-two-reset-threads-new-fault-wins",
-          r0 == 1 && r1 == 1 && s.inhibit == RT_TRUE &&
-          ss_state != SAFETY_MANUAL_CLEAR,
-          fm("两线程完成 r=%d/%d inhibit=%s ss=%s epoch=%u (旧 MANUAL_CLEAR 不覆盖"
-             "新故障: 最终窗口按票据换代整笔放弃)", r0, r1,
-             s.inhibit ? "YES" : "no", safety_state_name(ss_state),
-             (unsigned)s.epoch));
+    mid_ss = ss_state;
+    mid_inh = (s.inhibit == RT_TRUE) ? 1 : 0;
+    ok_b = (r0 == 1 && r1 == 1 && c14_parked == 1 && b_waited == 1 &&
+            mid_ss == SAFETY_MANUAL_CLEAR && mid_inh == 0);
+    (void)sp_trip_fast(FAULT_SOFT, EVT_SOFT_FAULT, MOT_STOP_SRC_GUARD_STOP, RT_NULL);
+    sp_get(&s);                               /* 不 ack: 要看的就是这条保持住的义务 */
+    CHECK("C14b-new-fault-after-commit-kept",
+          ok_b && s.inhibit == RT_TRUE &&
+          safety_state_get() == SAFETY_FAULT_LATCHED &&   /* canonical 视图: 抑制即锁存 */
+          s.metadata_pending == RT_TRUE,
+          fm("A=%d B=%d B 真在门外等=%d 接缝=%d 提交后 ss=%s inhibit=%d ->"
+             " 随后新故障: ss=%s inhibit=%s pending=%s epoch=%u", r0, r1, b_waited,
+             c14_parked, safety_state_name(mid_ss), mid_inh,
+             safety_state_name(ss_state), s.inhibit ? "YES" : "no",
+             s.metadata_pending ? "YES" : "no", (unsigned)s.epoch));
 }
 
 /* ===================================================================== */

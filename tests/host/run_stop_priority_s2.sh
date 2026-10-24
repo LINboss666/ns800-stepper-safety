@@ -85,7 +85,7 @@ G_identity_host_ovr="C07a-no-high-while-inhibited C07b-arm-refuses-post-recovery
 G_diag_target=""
 G_diag_host_ovr="C11a-prepare-fail-releases-no-enable C11b-motor-blocked-while-diag-owns C11c-diag-stop-releases C11d-diag-fail-keeps-owner-single-close"
 
-G_recovery_target="C12-new-fault-during-reset-keeps-latch C12b-low-only-fail-advances C13-latched-cleared-by-real-recheck C14-two-reset-threads-new-fault-wins"
+G_recovery_target="C12-new-fault-during-reset-keeps-latch C12b-low-only-fail-advances C13-latched-cleared-by-real-recheck C14a-stale-ticket-refused-at-final-commit C14b-new-fault-after-commit-kept"
 G_recovery_host_ovr="$G_recovery_target"
 
 G_stale_target="C15a-empty-pending-writes-nothing"
@@ -117,8 +117,9 @@ S_target_reject_target=""
 S_target_reject_host_ovr="C21"
 
 # 变体期望的用例总数(全开时): 少一组/少一个 id 都不算通过。
-S2_EXPECT_target="${S2_EXPECT_target:-22}"
-S2_EXPECT_host_ovr="${S2_EXPECT_host_ovr:-40}"
+# CP5 §4: recovery 组的 C14 拆成 C14a/C14b 两个**确定接缝** => 22->23 / 40->41。
+S2_EXPECT_target="${S2_EXPECT_target:-23}"
+S2_EXPECT_host_ovr="${S2_EXPECT_host_ovr:-41}"
 
 VARIANTS="target host_ovr"
 
