@@ -1,0 +1,144 @@
+phase8-target-measurement-a0 —— 实现前只读审计（CP-A0-1 §1）
+日期：2026-10-25（Asia/Shanghai）。document_base = bbf66ba34d7b31a217c643921aa4192df2f59a56。
+本轮实际动作：只读源码/工程核对 + 生产实现（stop_priority.c 插桩 + 新增 sp_measure_a0.c/.h）+
+新增一条主机链。本文件不含任何目标机动作结果。
+
+路径缩写：APP = rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications，
+BSP = rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad，
+LIB = rt-thread-master/rt-thread-master/bsp/novosns/ns800/libraries，
+KERNEL = rt-thread-master/rt-thread-master，CMSIS = BSP/packages/CMSIS-Core-latest/Include。
+
+================================================================ A. 三个被测入口的现有形状（本轮不改语义）
+A-1 `sp_win()/sp_end()` —— APP/stop_priority.c:97-102 / :105-110。
+    sp_end 的固定顺序是 `SP_BARRIER(); if (sp_win_nest > 0) sp_win_nest--; rt_hw_interrupt_enable(l);`
+    屏障宏在目标分支展开成 `__DSB()`（:37），主机分支展开成 `__atomic_thread_fence(SEQ_CST)`（:39）。
+    `sp_intr_masked()`（:170-186）在目标上直接读真实 PRIMASK（:44 自带 `mrs` 原语），
+    与嵌套计数取并集 —— 这是"命令必须只在普通未屏蔽线程上下文执行"这条门禁的既有同源事实。
+A-2 `sp_trip_fast()` —— APP/stop_priority.c:503-513（窗口 + 一次 sp_protect_held + SPM_END + 原返回）。
+A-3 `sp_trip_for_operation()` —— APP/stop_priority.c:521-556（陈旧身份早退出口 + 真保护出口）。
+A-4 `sp_off_attempt_for()` —— APP/stop_priority.c:642-745，七个出口：非法 owner、陈旧身份、
+    release 的 pe/le/OK 三支、保留预约的 pe 支与成功支。成功支**只**调 disable，
+    不强加一次许可 LOW（:731-740），故该出口的"本次动作"必须是 pwm=1/low=0。
+A-5 `sp_protect_held()` —— APP/stop_priority.c:384-409：换 epoch -> 记 first_fault ->
+    `rt_pwm_disable`（句柄缺失时 -RT_ENOSYS）-> `safety_drv_permit_low_raw_held()`（与 pe 无关）->
+    owner/phase/trips/proof -> 返回 `pe!=EOK?pe:le`。这两条动作彼此独立，且都在同一窗口内。
+
+================================================================ B. 记录器插入的位置与"只在原序列之间插读"
+B-1 测量开关：APP/sp_measure_a0.h:24-28（`NS800_TARGET_MEASUREMENT_A0` 默认 0）；
+    编译期适配宏 APP/sp_measure_a0.h:209-218 —— 开关为 0 时 `SPM_SCOPE` 展开为空、
+    `SPM_WIN` 就是 `sp_win()`、`SPM_END(l,...)` 就是 `sp_end(l)`，一个 spm 符号都不引用。
+B-2 measured-enter/exit 只在 APP/stop_priority.c:119-168 的 `#if` 块内存在（`spm_pin_state` :120、
+    `spm_win_rt` :145、`spm_end_rt` :158）。`spm_end_rt` 的顺序是：
+    钉本次身份/两路 raw（仍在屏蔽内）-> `SP_BARRIER()` -> `sp_win_nest--` -> `spm_body_end()`
+    （body_end 计数 + COUNTFLAG 终点读）-> `rt_hw_interrupt_enable(l)` -> `spm_publish()`
+    （post 读 + 有效性判定 + RESERVED->COMPLETE）。
+    即**只在原序列之间插入寄存器读**：没有新增 MMIO 写、没有删除或后移原 `__DSB`、
+    没有把解屏蔽挪到屏障之前，返回码仍是各出口的原值（由 `SPM_END` 的参数只读带出）。
+B-3 记录器本体 APP/sp_measure_a0.c：槽数组 :84（`static spm_rec_t spm_rec[SPM_SLOTS]`，
+    仅在本变体编译，默认目标里连符号都不存在，见 §F 的 nm 核对）；
+    预约 :122-206；窗口内起点判据 :208-265；body_end/终点判据 :267-298；
+    有效性判定 :300-328；发布 :330-364；只读访问 :366；能力检查 :403-467；
+    dump :469-527；clear :529-577；trip :579-590；命令族 :625-690。
+B-4 预约/发布用的是**原始 PRIMASK 短段**（`SPM_RAW_WIN/SPM_RAW_END`，:112-113），
+    不递归调用 `sp_win()`、不动 `sp_win_nest`、不取任何锁、不分配内存、不打印。
+    槽满只 `spm_dropped_n++` 后照常执行原关闭动作（:158-163）。
+B-5 窗口内的新增读全部列入 observer overhead 清单（§G），没有一项被写成"零开销"。
+
+================================================================ C. 主体区间判据（COUNTFLAG）的可成立性与读取者审计
+C-1 位定义（当前工程实际编入的 CMSIS）：CMSIS/core_cm7.h:1009-1010
+    `SysTick_CTRL_COUNTFLAG_Pos = 16`；`SysTick_Config` 写 CTRL 于 :2307-2312 同段（CLKSOURCE=处理器时钟）；
+    CMSIS/core_cm7.h:1180-1181 `DWT_CTRL_NOCYCCNT_Pos = 25`；:1222-1223 `DWT_CTRL_CYCCNTENA_Pos = 0`；
+    :1713-1714 `CoreDebug_DEMCR_TRCENA_Pos = 24`。SysTick 的 LOAD 是 24 位重装值
+    （`SysTick_LOAD_RELOAD_Msk = 0xFFFFFF`，CMSIS/core_cm7.h:980-981 段），
+    因此"窗口内无重装"给出的区间上界是 `LOAD+1`，远小于 32 位计数器的模。
+C-2 **运行期读 SysTick->CTRL 的读取者审计**：全树（LIB、BSP/applications、KERNEL/src、KERNEL/libcpu/arm，
+    排除 packages/）里对 `SysTick->CTRL` 的引用只有两处来源 ——
+    `drv_common.c:45` 的 `SysTick_Config(...)`（**写**，只在板级初始化一次）与本文件新增的
+    `spm_port_systick_ctrl()`（APP/sp_measure_a0.c:71，测量变体独有）。
+    时钟节拍入口 `SysTick_Handler`（LIB/HAL_Drivers/drv_common.c:58-66）只做
+    `rt_interrupt_enter / rt_tick_increase / g_tick_test=rt_tick_get() / rt_interrupt_leave`，
+    不读 CTRL；既有的 µs 延时 `rt_hw_us_delay`（同文件 :89-113）只读 `SysTick->LOAD` 与 `SysTick->VAL`，
+    **不读 CTRL**，因而不清 COUNTFLAG。=> "读 CTRL 会破坏现工程其它依赖"这一条在当前编译清单内不成立，
+    判据可以采用；调试器/另一核/NMI 等**本构建之外**的读取者保持显式未覆盖（M-1 边界）。
+C-3 前提不成立时的行为：`spm_init_counter()` 只在 `ENABLE && CLKSOURCE==处理器时钟 && LOAD!=0`
+    三条同时成立时置 `guard_ready`（APP/sp_measure_a0.c:444-452）；否则主体样本一律
+    `body_valid=0 + SPM_IV_GUARD_UNAVAILABLE`，并打印 `NOT_ESTABLISHED`，不换成"未证明的差分"凑数。
+C-4 嵌套：内层起点读会清掉外层的"无重装"依据 —— `spm_guard_depth/spm_guard_owner`
+    （:96-97、:236-251）把**外层**也标成 `SPM_IV_NESTED_GUARD`。目标上只有不可屏蔽源能造成这种
+    交错，记录器的同步合同本来不覆盖它们；这里保证的是"被扰动必标无效"，不静默报有效。
+C-5 包围区间（post-pre）：本批没有独立时间基、也没有完整防混叠依据，`spm_eval()` 一律
+    `enclosing_valid=0 + SPM_IV_ENCLOSING_UNPROVEN`（:318-322），**不**用主体有效性给它背书；
+    pre/body_begin/body_end/post 四个原始值始终原样保留。
+C-6 32 位回绕：`body_end < body_begin` 直接判 `SPM_IV_COUNTER_WRAPPED`（:312-315），
+    不解释成"一次回绕内的短区间"。
+
+================================================================ D. 计数资源与"不预设目标可用"
+D-1 启用序列只置 `TRCENA`/`CYCCNTENA` 两位、保留其它位、**不清零 CYCCNT**
+    （APP/sp_measure_a0.c:63-70 目标后端；主机后端由夹具模型实现同一语义）。
+D-2 `DWT_CTRL.NOCYCCNT` 只能运行期读 => 未检查前 `counter_status=COUNTER_UNCHECKED`，
+    且此阶段**不访问任何 PPB 地址**：`spm_ctr_read()`（:118-121）在状态非 OK 时直接返回 0 且不碰端口。
+    读不到递增 => `COUNTER_UNAVAILABLE`；两种状态在记录与 `cap/status` 输出里名字不同，
+    零值一律伴随 `SPM_IV_COUNTER_NOT_OK`，从不被写成"0 耗时"。
+D-3 递增确认是**有限次、固定指令间隔**的两次读（:424-431 的 `volatile` 计数循环），
+    不轮询到成功、不调用 `rt_hw_us_delay`。
+D-4 `clock_basis` 初值 `SOURCE_ASSUMED`，只有能力检查成功才升到 `CONFIG_READBACK`
+    （:434-438）；命令族**没有**把它改成 `EXTERNAL_VERIFIED` 的入口（:625-690 全文无该赋值），
+    因此本批不输出"已校准 µs"。晶振/HXTL 档的未决来源沿用计划 §2.1 F-02/F-03（本轮不改时钟配置）。
+D-5 stop 时**不**清共享的 DWT/DEMCR 位（`spm_stop_accepting()` :461-468 明确只做状态迁移）。
+
+================================================================ E. 默认目标的"完全绕开"证据与工程输入
+E-1 默认目标里三个入口回到原语：`SPM_SCOPE` 空展开 + `SPM_WIN/SPM_END` = `sp_win()/sp_end(l)`
+    （APP/sp_measure_a0.h:216-218），且 `sp_measure_a0.c` 的主体在 `#if` 之外为空翻译单元。
+E-2 主机链的同一事实用符号表核对（§F）。
+E-3 Keil 工程既有构建钩子核对：BSP/project.uvprojx:62-71 `BeforeCompile` 两个
+    `RunUserProg=0`；:72-81 `BeforeMake` 两个 `RunUserProg=0`；:82-91 `AfterMake`
+    `RunUserProg1=1` 且命令是 `fromelf --bin !L --output rtthread.bin`（纯产物转换），
+    `RunUserProg2=0`。=> 工程内不存在下载/调试/设备探测类钩子；本轮只在批处理构建模式下运行，
+    未启动 UV4 的下载或调试会话，也未运行任何设备探测脚本。
+E-4 目标级宏现状（本轮不动）：`project.uvprojx:341` 的 Define 串含
+    `SYSCLK_USE_PLL / SYSCLK_SOURCE_USE_HXTL / PLLCLK_SOURCE_USE_HXTL / DUAL_CORE_ENABLE=0 /
+    __CLK_TCK=RT_TICK_PER_SECOND / USE_HAL_DRIVER / NS800RT7P65X / RT_USING_LIBC / RT_USING_ARMLIBC`；
+    测量开关只加在新目标 `rt-thread-measure-a0` 上（默认目标保持 0）。
+E-5 SConscript 侧 `Glob('*.c')` 已覆盖新文件，无需改动（BSP/board/SConscript）。
+
+================================================================ F. 四宏与"测量开关不是门禁"
+F-1 源码回读（本轮实现后仍成立）：APP/motor.h:69 `MOTOR_HARDWARE_ENABLE_PATH_VALIDATED RT_FALSE`、
+    APP/motor.h:83 `STEP_DIAG_ISOLATED_ENV_CONFIRMED RT_FALSE`、
+    APP/tmc2209.h:100 `TMC_DRIVE_CONFIG_HW_VALIDATED RT_FALSE`、
+    APP/project_board.h:51 `SAFETY_LIMIT_INPUTS_ENABLED RT_FALSE`。
+F-2 测量开关不参与任何安全判定：`sp_measure_a0.h` 不被 motor.c/step_pwm.c/safety_state.c 引用，
+    `NS800_TARGET_MEASUREMENT_A0` 在 APP 内的唯一消费者是 stop_priority.c 与 sp_measure_a0.c；
+    关闭方向的动作文案（`sp_protect_held` / LOW 裸写 / `safety_force_shutdown`）一行未改。
+    `cap` 子命令把四宏的**编译期取值**打印出来，便于在板上核对"这是四宏 FALSE 的变体"。
+F-3 主机链的符号核对（真实进程输出，见 host_results.txt 的 SYMBOL 行）：
+    a0_off 里生产记录器符号数 = 0、记录数组 = 0、三个被测入口 = 3；
+    a0_on 里记录器符号数 = 22、记录数组 = 1。这是"默认目标连符号都不存在"的可判定证据。
+
+================================================================ G. observer overhead 清单（测量变体独有，默认目标为零）
+G-1 预约短段（原始 PRIMASK 一次 disable/enable + 固定字段写）：APP/sp_measure_a0.c:138-196。
+G-2 `pre` 读（窗口外，disable 之前）：:204-206。
+G-3 measured-enter 内的 `epoch_before/trips_before` 两个字段读 + COUNTFLAG 起点读 + `body_begin` 读：
+    APP/stop_priority.c:145-156 与 APP/sp_measure_a0.c:208-265。
+G-4 窗口内逐字段钉快照（最多 18 个固定字段赋值，无结构体整体赋值、无 memcpy）：
+    APP/stop_priority.c:120-143。
+G-5 最终屏障之后的 `body_end` 读 + COUNTFLAG 终点读 + 可能的 LOAD 复核：
+    APP/sp_measure_a0.c:267-298。
+G-6 解屏蔽之后的 `post` 读、有效性判定与发布（含一次屏障 + 一次原始短段）：:300-364。
+G-7 命令族自身的输出（dump/status）全部在窗口外。
+G-8 纪律核对：G-1..G-6 里没有任何日志/UART/锁/事件/延时/轮询/动态分配/浮点/除法/循环复制；
+    主机链用"窗口内禁止项台账"（TMA18 + --wrap=printf 的生产打印计数）把这条变成可判定的观察，
+    而不是口头声明。**这些附加读属于测量变体成本**：不得用"扣掉一次空测量"的差值
+    声称原发布固件的最坏时延，也不得用带插桩的样本给 `B-1` 收尾。
+
+================================================================ H. 本轮**没有**解决、也没有冒充解决的项
+H-1 `B-1` 门内窗口的**实际时长**：仍是目标机待测；主机链只证明"判定与标注正确"，
+    不给出任何 µs/ms 数值，也不给接受阈值（`ACCEPTANCE_LIMIT_TBD` 保持）。
+H-2 `M-1/M-2/M-3`、`RISK-03/03a`、物理 `RISK-04-b`、`BUG-008` 波形：继续开放。
+    本批不插桩 HIGH/RUN、DIR、恢复提交、UART TX/flush、cfg/xfer 与慢整理锁（任务书 §3）。
+H-3 `counter_status/clock_basis` 在**目标机**上的真值：必须由未来的 `spm init` 现场取得；
+    本批只是把检查实现出来并证明其判定逻辑，不声称 NS800RT7P65D 实现了 DWT/CYCCNT。
+H-4 跨时间基关联（"寄存器写→焊盘"）：本批无共同事件/标记 GPIO 授权，继续开放（计划判据 2）。
+H-5 板级动作：零。未连串口/调试器/仪器，未扫描设备，未读 Flash，未烧录/复位，未运行目标命令，
+    未做 GPIO/TMC/STEP/DIR、电机、供电、接线、SW1、真机清故障或 selftest；未运行旧 `sw1_cut.ps1`
+    （其 T-01/T-02 继续 HOLD）。
+H-6 主机真线程 + 寄存器模型**不等于**目标 RT-Thread 调度、真实 PPB 行为或物理停机证明。

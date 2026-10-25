@@ -25,6 +25,7 @@
 #include <rthw.h>
 #include "stop_priority.h"
 #include "safety_gpio.h"
+#include "sp_measure_a0.h"   /* A0 测量: 开关为 0 时本头只给出展开成原语的空宏 */
 
 #define SP_EPOCH_MAX   0xFFFFFFFFu
 
@@ -107,6 +108,64 @@ static void sp_end(rt_base_t l)
     if (sp_win_nest > 0) sp_win_nest--;
     rt_hw_interrupt_enable(l);
 }
+
+/* ---------------- A0 测量的私有 measured-enter/exit（默认目标里整段被排除） ----------------
+ * 顺序纪律（任务书 §4.4）：
+ *   enter: 原 sp_win() -> 钉 epoch_before/trips_before -> COUNTFLAG 起点读 -> body_begin
+ *   exit : 把本次身份/两路 raw 结果钉进本次记录(仍在屏蔽内) -> 原 SP_BARRIER -> 原 nest--
+ *          -> body_end + COUNTFLAG 终点读 -> 原 rt_hw_interrupt_enable -> post + 发布
+ * 只在原序列之间插入**读**：不新增任何 MMIO 写、不移动或删除原屏障、不改返回优先序。
+ * 开关为 0 时三个入口用上面的 sp_win()/sp_end()，本段连符号都不存在。 */
+#if NS800_TARGET_MEASUREMENT_A0
+static void spm_pin_state(spm_ctx_t *c)
+{
+    spm_rec_t *r = c->rec;
+
+    if (r == RT_NULL) return;
+    /* 逐字段赋值：不用结构体整体赋值，避免在这里悄悄引入 memcpy。 */
+    r->epoch_after         = sp.epoch;
+    r->owner_after         = (rt_uint8_t)sp.owner;
+    r->phase_after         = (rt_uint8_t)sp.phase;
+    r->inhibit             = sp.inhibit ? 1u : 0u;
+    r->pending             = sp.metadata_pending ? 1u : 0u;
+    r->pending_epoch       = sp.pending_epoch;
+    r->motor_stop_latched  = sp.motor_stop_latched ? 1u : 0u;
+    r->diag_stop_latched   = sp.diag_stop_latched ? 1u : 0u;
+    r->trips_after         = sp.trips;
+    r->observed_pwm_epoch      = sp.pwm.epoch;
+    r->observed_pwm_attempted  = sp.pwm.attempted ? 1u : 0u;
+    r->observed_pwm_result     = (rt_uint8_t)sp.pwm.result;
+    r->observed_pwm_raw_rc     = (rt_int32_t)sp.pwm.raw_rc;
+    r->observed_permit_epoch   = sp.permit.write_epoch;
+    r->observed_permit_written = sp.permit.written ? 1u : 0u;
+    r->observed_permit_level   = sp.permit.request_level;
+    r->observed_permit_write_rc = (rt_int32_t)sp.permit.write_rc;
+}
+
+static rt_base_t spm_win_rt(spm_ctx_t *c)
+{
+    rt_base_t l = sp_win();
+
+    if (c->rec != RT_NULL)
+    {
+        c->rec->epoch_before = sp.epoch;
+        c->rec->trips_before = sp.trips;
+    }
+    spm_win_note(c, (l != 0) ? 1u : 0u);
+    return l;
+}
+
+static void spm_end_rt(rt_base_t l, spm_ctx_t *c, rt_int32_t api_rc, rt_uint8_t branch_id,
+                       rt_uint8_t pwm_called, rt_uint8_t low_called)
+{
+    spm_pin_state(c);                       /* 仍在本次屏蔽窗口内固定本次证据 */
+    SP_BARRIER();                           /* 原 sp_end 第一条 */
+    if (sp_win_nest > 0) sp_win_nest--;     /* 原 sp_end 第二条 */
+    spm_body_end(c);                        /* body_end 在原最终屏障之后、恢复中断之前 */
+    rt_hw_interrupt_enable(l);              /* 原 sp_end 第三条 */
+    spm_publish(c, api_rc, branch_id, pwm_called, low_called);
+}
+#endif /* NS800_TARGET_MEASUREMENT_A0 */
 
 rt_bool_t sp_intr_masked(void)
 {
@@ -444,10 +503,13 @@ void sp_get_bound(struct rt_device_pwm **out_pwm, int *out_ch, rt_base_t *out_pi
 rt_err_t sp_trip_fast(rt_uint32_t code, rt_uint32_t events, rt_uint8_t src,
                       sp_proof_t *out)
 {
-    rt_base_t l = sp_win();
+    SPM_SCOPE(m, SPM_ENTRY_TRIP_FAST, 0u, 0u, 0u, out);
+    rt_base_t l = SPM_WIN(m);
     rt_err_t  e = sp_protect_held(code, events, src, out);
 
-    sp_end(l);
+    /* A0: 关闭方向不要求先开启输出; 两条动作各自 raw 由 sp_note_*_held 记在同代。 */
+    SPM_END(l, m, (rt_int32_t)e, SPM_BR_TRIP_FAST_DONE,
+            sp.pwm.attempted ? 1u : 0u, 1u);
     return e;
 }
 
@@ -460,7 +522,8 @@ rt_err_t sp_trip_for_operation(rt_uint32_t expected_epoch, rt_uint32_t code,
                                rt_uint32_t events, rt_uint8_t src, sp_proof_t *out,
                                sp_protect_outcome_t *outcome)
 {
-    rt_base_t l = sp_win();
+    SPM_SCOPE(m, SPM_ENTRY_TRIP_FOR_OP, expected_epoch, 0u, 0u, out);
+    rt_base_t l = SPM_WIN(m);
     rt_err_t  e;
 
     if (outcome != RT_NULL) *outcome = SP_PROTECT_NONE;
@@ -476,12 +539,14 @@ rt_err_t sp_trip_for_operation(rt_uint32_t expected_epoch, rt_uint32_t code,
          * 既不称"已保护", 也不得据此写任何状态。 */
         if (outcome != RT_NULL)
             *outcome = sp.inhibit ? SP_PROTECT_ALREADY_PROTECTED : SP_PROTECT_SUPERSEDED;
-        sp_end(l);
+        /* A0: 陈旧身份出口明确记"本次未执行动作"(0/0), 不把 canonical 上一代 raw 说成本次结果。 */
+        SPM_END(l, m, (rt_int32_t)(-RT_EINTR), SPM_BR_TRIP_OP_STALE, 0u, 0u);
         return -RT_EINTR;
     }
     if (outcome != RT_NULL) *outcome = SP_PROTECT_BY_THIS_CALL;
     e = sp_protect_held(code, events, src, out);
-    sp_end(l);
+    SPM_END(l, m, (rt_int32_t)e, SPM_BR_TRIP_OP_PROTECTED,
+            sp.pwm.attempted ? 1u : 0u, 1u);
     return e;
 }
 
@@ -578,14 +643,17 @@ rt_err_t sp_off_attempt_for(rt_uint32_t expected_epoch, sp_owner_t who, rt_uint8
                             rt_uint32_t code, rt_uint32_t events, int release_on_ok,
                             sp_proof_t *out)
 {
-    rt_base_t  l = sp_win();
+    SPM_SCOPE(m, SPM_ENTRY_OFF_ATTEMPT, expected_epoch, (rt_uint8_t)who,
+              release_on_ok ? 1u : 0u, out);
+    rt_base_t  l = SPM_WIN(m);
     sp_owner_t before = sp.owner;
     rt_bool_t  attempted;
     rt_err_t   pe, le, boundary = RT_EOK;
 
     if (!sp_owner_valid(who))
     {
-        sp_end(l);
+        /* A0: 非法 owner 出口 —— 本次一个动作都没做(0/0), 返回码不变。 */
+        SPM_END(l, m, (rt_int32_t)(-RT_EINVAL), SPM_BR_OFF_BAD_OWNER, 0u, 0u);
         return -RT_EINVAL;
     }
     if (sp.epoch != expected_epoch)
@@ -593,7 +661,8 @@ rt_err_t sp_off_attempt_for(rt_uint32_t expected_epoch, sp_owner_t who, rt_uint8
         sp.stale_dropped++;
         sp_copy_proof_held(out);
         if (out != RT_NULL) out->valid = RT_TRUE;   /* 当前事实, 不是本次动作 */
-        sp_end(l);
+        /* A0: 陈旧身份 = 无寄存器写、不动新 owner; 本次动作计数 0/0。 */
+        SPM_END(l, m, (rt_int32_t)(-RT_EINTR), SPM_BR_OFF_STALE, 0u, 0u);
         return -RT_EINTR;                           /* 无硬件写, 不动新 owner */
     }
     if (sp_permit_pin < 0) sp_permit_pin = safety_drv_permit_pin();
@@ -638,7 +707,12 @@ rt_err_t sp_off_attempt_for(rt_uint32_t expected_epoch, sp_owner_t who, rt_uint8
             else                sp.motor_output_active  = RT_TRUE;
         }
         sp_copy_proof_held(out);
-        sp_end(l);
+        SPM_END(l, m,
+                (pe != RT_EOK) ? (rt_int32_t)pe :
+                (le != RT_EOK) ? (rt_int32_t)le : (rt_int32_t)boundary,
+                (pe != RT_EOK) ? SPM_BR_OFF_RELEASE_PE :
+                (le != RT_EOK) ? SPM_BR_OFF_RELEASE_LE : SPM_BR_OFF_RELEASE_OK,
+                attempted ? 1u : 0u, 1u);
         if (pe != RT_EOK) return pe;
         if (le != RT_EOK) return le;
         return boundary;
@@ -659,7 +733,7 @@ rt_err_t sp_off_attempt_for(rt_uint32_t expected_epoch, sp_owner_t who, rt_uint8
         sp.owner = SP_HELD_UNKNOWN;
         sp.trips++;
         sp_copy_proof_held(out);
-        sp_end(l);
+        SPM_END(l, m, (rt_int32_t)pe, SPM_BR_OFF_RESERVE_PE, attempted ? 1u : 0u, 1u);
         (void)boundary;                 /* raw 另存(permit.write_rc / advance_failed), 不外传 */
         return pe;                        /* 对外 PWM 失败优先(§6.2) */
     }
@@ -669,7 +743,8 @@ rt_err_t sp_off_attempt_for(rt_uint32_t expected_epoch, sp_owner_t who, rt_uint8
         sp.phase = SP_ARMED;             /* 受控减速到零: 保留预约与许可 */
     }
     sp_copy_proof_held(out);
-    sp_end(l);
+    /* A0: 保留预约的成功分支原本**只**调 PWM, 不强加一次许可 LOW => low_called=0。 */
+    SPM_END(l, m, (rt_int32_t)RT_EOK, SPM_BR_OFF_RESERVE_ZERO_OK, attempted ? 1u : 0u, 0u);
     return RT_EOK;
 }
 

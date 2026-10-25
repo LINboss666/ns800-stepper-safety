@@ -20,8 +20,12 @@
  *     浮点计算。原因有两条源码事实支撑：
  *       · drv_uart.c:403-427 的 TX 等待按 rt_tick_get() 判超时，而 PRIMASK 屏蔽 SysTick
  *         ⇒ 窗口内 tick 不推进，任何按 tick 超时的等待永不退出；
- *       · HAL/drv_epwm.c:318-321 与 :370-371 的 set 路径会**先抓 TBCTL 旧模式再写回**
- *         ⇒ 跨窗口的"读-算-写"会把已冻结的时间基恢复成 RUN。
+ *       · 旧实现里 drv_epwm.c 的 set 路径会**先抓 TBCTL 旧模式再写回**，跨窗口的"读-算-写"
+ *         会把已冻结的时间基恢复成 RUN。该写回在 S2/CP5 之后已取消：现在
+ *         drv_epwm.c:293-318 走 ns800_epwm_prepare() + ns800_epwm_configure_regs()，
+ *         而 drv_epwm_leaf.inc:232 起明确"**不写 TBCTL 的计数模式**"（见同文件 :18 与
+ *         drv_epwm.c:301 的实现注释）。窗口纪律本身保留（窗口内仍只许固定字段赋值与
+ *         固定寄存器写），但依据不再是"set 会写回计数模式"。
  *     窗口内允许：固定数目的寄存器写与固定数目的字段赋值。
  *   - MMIO 之后先 __DSB() 再恢复中断（CMSIS核心头，见 drv_common.c 的包含链）。
  *
