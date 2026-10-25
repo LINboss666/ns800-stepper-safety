@@ -98,3 +98,127 @@ A0CHAIN-META: OK (正向逐组一致 + 反向按声明执行)
   V1/V2、I/O 四变体、SD 两变体、旧负例矩阵 13 项、元负例 M1-M5: 相关源码与夹具本轮未改且 A0 链
   未新增接口 => 记 NOT_RERUN, 引用 S2/CP6 与 F2d 已接受结果, 不当作本轮新证据。
   目标机: 零执行。T00..T13 全部 NOT_EXECUTED / NOT AUTHORIZED。
+
+##################### r1 层（任务 phase8-target-measurement-a0-r1）#####################
+上面 [1]..[4] 是上一轮原样记录，不改写；以下都是 r1 的新结果。
+转换规则（本轮新增，同样只作用于显示路径）: SRC_APP/OUT_DIR/GCC/NM 的绝对前缀分别替换成
+<REPO_ROOT>/<EVIDENCE_ROOT>/<HOST_GCC_ROOT>，并逐行去行尾空白；数字、用例名、失败行逐字保留。
+
+[R1-1] 定稿字节集上的最终一次运行（正向 8 组 + 两个具名反向家族 + 判定器负控，同一次 runner）
+  runner: tests/host/run_sp_measure_a0.sh，REVERSE=1，A0_OUT_DIR=<EVIDENCE_ROOT>/ns800-a0r1/rev3
+----8<----
+###### 目标机测量 A0 记录器链 (基线 c5028f4c502596d24cb81b80e927e599e0f3d6fd) ######
+run_id=20261025T115357Z-1140
+SRC_APP=<REPO_ROOT>/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications
+OUT_DIR=<EVIDENCE_ROOT>/ns800-a0r1/rev3
+GCC=/c/Program Files (x86)/Dev-Cpp/MinGW64/bin/gcc.exe
+NM=/c/Program Files (x86)/Dev-Cpp/MinGW64/bin/nm.exe
+选择组=off counter contract conc batch cli ledger pack
+BUILD off rc=0 build_log_bytes=0 exe=<EVIDENCE_ROOT>/ns800-a0r1/rev3/a0_off.exe
+BUILD on rc=0 build_log_bytes=0 exe=<EVIDENCE_ROOT>/ns800-a0r1/rev3/a0_on.exe
+--- 符号存在性(编译期绕开的可判定证据) ---
+  符号核对: a0_off 生产记录器符号=0 记录数组=0 命令注册条目=0 (都要求 0) / 三个被测入口存在=3 (要求 3)
+  符号核对: a0_on  生产记录器符号=30 (要求 >=18) 记录数组=1 (要求 1) __fsym_spm=1 (要求 1) __fsym_spm_cmd=0 (要求 0)
+--- 逐组执行 ---
+  off/off: OK (1 例, cases=1 checks=13 fails=0 rc=0)
+  on/counter: OK (8 例, cases=8 checks=111 fails=0 rc=0)
+  on/contract: OK (4 例, cases=4 checks=60 fails=0 rc=0)
+  on/conc: OK (3 例, cases=3 checks=34 fails=0 rc=0)
+  on/batch: OK (3 例, cases=3 checks=36 fails=0 rc=0)
+  on/cli: OK (3 例, cases=3 checks=44 fails=0 rc=0)
+  on/ledger: OK (1 例, cases=1 checks=13 fails=0 rc=0)
+  on/pack: OK (1 例, cases=1 checks=24 fails=0 rc=0)
+--- 具名反向家族(在仓外源码副本上变异) ---
+INJECTED rev_spm_unavailable_is_valid rules=1
+  rev_spm_unavailable_is_valid: META-OK 具名检出 3 例，其余每组台账逐条一致且保持 PASS（含退出码合同）
+INJECTED rev_spm_snapshot_after_unmask rules=2
+  rev_spm_snapshot_after_unmask: META-OK 具名检出 1 例，其余每组台账逐条一致且保持 PASS（含退出码合同）
+--- 台账判定器负控: 故意缺席非锚身份 TMA18 的 RESULT ---
+NEGCTRL-INJECTED fixture_omit_tma18_result.c
+  negctrl/ledger: 按合同判为 INFRA-FAIL —— 声明的 RESULT 身份缺席: TMA18  [期望结果]
+--- 总结果 ---
+A0CHAIN-META: OK (正向逐组一致 + 反向按声明执行)
+----8<----
+
+[R1-2] 判定器负控的身份计数（说明"缺席被报成全绿"这条能力缺口是否还在）
+  两个反向家族的 run.txt 在**只变异反向构建的夹具副本、省略非锚身份 TMA18 的 RESULT 行**时的计数:
+    rev_rev_spm_unavailable_is_valid: CASE_TMA18=1 RESULT_TMA18=1 RESULT_total=23 build_log_bytes=0
+    rev_rev_spm_snapshot_after_unmask: CASE_TMA18=1 RESULT_TMA18=1 RESULT_total=23 build_log_bytes=0
+
+  修前对照（同一变异跑在上一轮 runner 上）：两家族当时都报 "META-OK ... 其余保持 PASS"。
+  修后：正向 on/ledger 与负控都按合同判 INFRA-FAIL；负控那一步的生产源码**没有**任何变异，
+  只改夹具副本的 case_end，所以报出来的 INFRA-FAIL 只能来自判定器本身。负控的 ledger 尾部原文:
+----8<----
+[spm] clear_records: 测量 RAM 已清(未触碰 Safety 故障/抑制/失败锁存)
+  CHECK PASS clear 后无残留槽可被当成样本 =0
+SUMMARY cases=1 checks=13 fails=0
+EXIT OK
+----8<----
+
+[R1-3] S1 正向与 S1 反向**分别**运行（该 runner 的 REVERSE=1 不是正向运行的替代）
+  S1 正向 rc=0 汇总：
+    === S1 关断结果矩阵 ===
+    target | OK 必需用例=50 全部PASS 实际行数=50 自报 fail=0 proc_rc=0
+    host_ovr | OK 必需用例=65 全部PASS 实际行数=65 自报 fail=0 proc_rc=0
+    S1 RUNNER RESULT: PASS (rc=0) —— target 与 host_ovr 两个变体的必需用例全部真执行且判 PASS
+  S1 反向 rc=0 汇总：
+    === S1 反向汇总 ===
+    rev_motor_off_ignores_failure | META-OK 命中 5/5 个业务失败身份 (variant=target proc_rc=1 额外FAIL=12)
+    rev_diag_fail_releases_owner | REV-HANDED-OFF 本链不消费该事实(3 次试投均 NOT-DETECTED); CP5 §6 起由 S2 并发链的 rev_fail_returns_owner_early 在**C11d 真正经过的 release 失败分支**注入, 并把 C11d 扩到对 canonical owner==SP_HELD_UNKNOWN/锁存/输出未交回三者同时断言 => 具名检出(见 run_stop_priority_s2.sh REVERSE=1)
+    S1 REVERSE RESULT: PASS —— 本链注入命中预登记业务失败身份(rc=1, 台账自洽); 第②项按 §10.2 重指向 S2 并发链代跑(见上方 REV-POINTED 行)
+
+[R1-4] S2 全 17 组 + 五家族反向（保留 target 23 / host_ovr 79 的既有合同与 SKIP 声明）
+  A0 没有新增旧链用例，也没有改旧链用例数。
+    target | OK 全部 17 组自洽且必需用例真执行判 PASS (用例=23)
+    实际执行集合: target=17组 host_ovr=17组 (每组一个独立进程)
+    S2 RUNNER RESULT: PASS (rc=0) —— target 与 host_ovr 全部 13 组的必需用例真执行且判 PASS
+    rev_stale_identity_gate | META-OK 命中 2 个业务失败身份 (variant=host_ovr groups=identity stale 台账自洽 proc_rc=1)
+    rev_permit_confirm_identity_gate | META-OK 命中 1 个业务失败身份 (variant=host_ovr groups=identity 台账自洽 proc_rc=1)
+    rev_config_write_token_gate | META-OK 命中 1 个业务失败身份 (variant=host_ovr groups=epwm_leaf 台账自洽 proc_rc=1)
+    rev_tx_flush_budget | META-OK 命中 2 个业务失败身份 (variant=host_ovr groups=uart_leaf tmc_lock 台账自洽 proc_rc=1)
+    rev_fail_returns_owner_early | META-OK 命中 1 个业务失败身份 (variant=host_ovr groups=diag 台账自洽 proc_rc=1)
+    S2 REVERSE RESULT: PASS —— 五项注入均命中预登记业务失败身份(rc=1, 台账自洽)
+
+[R1-5] 缺陷探针：修前基线（跑在 c5028f4 的源码/夹具快照上，全部仓外，被审仓库一个字节没改）
+  做法与复审附录一致：重命名 main 后 include 原夹具，再链接原 REC 与 stop_priority.c；
+  每个前置单独一个进程；rc 不参与判定，defect= 是被打印出来的事实。
+  REVIEW extra_arg rc=0 shutdown_calls=1 defect=1
+  REVIEW SUMMARY observed=1
+  REVIEW counter_disabled ctrl=0 cached_status=1 begin=1014 end=1014 body_valid=1 pwm_disable=1 permit_low=1 defect=1
+  REVIEW SUMMARY observed=1
+  REVIEW counter_stalled ctrl=1 cached_status=1 begin=1014 end=1014 body_valid=1 pwm_disable=1 permit_low=1 defect=1
+  REVIEW SUMMARY observed=1
+  REVIEW historical_countflag begin=1021 end=1028 body_valid=0 invalid=0x104 guard=0x17 defect=1
+  REVIEW SUMMARY observed=1
+  REVIEW pack_sequence second_start_rc=1 records_after_17_calls=1 state=2 trips=17 defect=1
+  REVIEW SUMMARY observed=1
+  REVIEW pack_batches batch1=1 batch2=16 in_flight=0 dropped=0 defect=0
+  REVIEW SUMMARY observed=0
+  REVIEW init_lifecycle active_rc=0 inflight_rc=0 in_flight=1 ctrl_reads=3->4 defect=1
+  REVIEW SUMMARY observed=1
+  REVIEW extra_matrix cap:rc=0,acted=0 init:rc=0,acted=0 stop:rc=0,acted=0 status:rc=0,acted=0 dump:rc=0,acted=0 clear_records:rc=0,acted=0 trip:rc=0,acted=1 defect=1
+  REVIEW SUMMARY observed=1
+
+  与复审给出的原值逐字相同：extra_arg rc=0/shutdown_calls=1；counter_disabled begin=end=1014/
+  body_valid=1；counter_stalled 同为 1014/1014 且 body_valid=1；historical_countflag
+  1021->1028 body_valid=0 invalid=0x104；pack_sequence second_start_rc=1/
+  records_after_17_calls=1/state=2。
+  "真实关闭动作仍执行"由独立总线计数给出（pwm_disable=1 permit_low=1），不是记录字段自称。
+
+[R1-6] 同一组探针在修后字节集上的对照
+  注意 pack_sequence 一项仍 defect=1：它复现的是**被审操作单原文**的批次顺序（缺 clear_records），
+  而修的是文档不是状态机，所以该顺序修后依旧不可执行；pack_batches 用修订后的顺序跑同一业务
+  前置，defect=0 且两批分别得到 1 条与 16 条。该区分写进操作包 §2.1/§2.2 与交接的 r1 映射。
+  REVIEW extra_arg rc=1 shutdown_calls=0 defect=0
+  REVIEW counter_disabled ctrl=0 cached_status=1 begin=1014 end=1014 body_valid=0 pwm_disable=1 permit_low=1 defect=0
+  REVIEW counter_stalled ctrl=1 cached_status=1 begin=1014 end=1014 body_valid=0 pwm_disable=1 permit_low=1 defect=0
+  REVIEW historical_countflag begin=1021 end=1028 body_valid=1 invalid=0x100 guard=0x77 defect=0
+  REVIEW pack_sequence second_start_rc=1 records_after_17_calls=1 state=2 trips=17 defect=1
+  REVIEW pack_batches batch1=1 batch2=16 in_flight=0 dropped=0 defect=0
+  REVIEW init_lifecycle active_rc=1 inflight_rc=1 in_flight=1 ctrl_reads=2->2 defect=0
+  REVIEW extra_matrix cap:rc=1,acted=0 init:rc=1,acted=0 stop:rc=1,acted=0 status:rc=1,acted=0 dump:rc=1,acted=0 clear_records:rc=1,acted=0 trip:rc=1,acted=0 defect=0
+
+[R1-7] 本轮仍然没做（与上一轮同样，且不因新增用例而扩大）：
+  目标机零执行；未连串口/调试器/仪器；未扫描设备或端口；未读/写 Flash；未烧录/复位；
+  未运行任何 spm 或其它目标命令；未操作 GPIO/TMC/STEP/DIR、电机、供电、接线、SW1；
+  未做真机清故障或 selftest；旧 sw1_cut.ps1 继续 HOLD。

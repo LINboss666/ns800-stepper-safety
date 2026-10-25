@@ -472,6 +472,29 @@ r1 轮已消除该尾随空格，首轮的 stdout 不重造。
 镜像即使构建成功，也必须等独立复审与用户对具体板级操作包的另行批准之后才可使用；本批的
 `reports/plans/phase8-target-measurement-a0-operator-pack.md` 只是待审清单，不构成任何授权。
 
+## 12. A0 独立复审结论与 r1 返修的覆盖映射
+
+**2026-10-25 独立复审（审查对象 `c5028f4`，其 `code_commit` `6787687`）结论：
+`A0_REVIEW_REWORK_REQUIRED` —— 当前 A0 测量镜像与操作包不予放行。** 常规链确实通过；复审又发现了
+常规链没覆盖的命令集成、计时判据与批次顺序缺陷，以及新 runner 的反向台账漏检。
+既有 S2 `SOFTWARE_REVIEW_GO`（`bcdec631`）与 `PREP_REVIEW_GO`（`bbf66ba`）**不撤回**：该轮没有发现
+默认关闭配置下的 S1/S2 合同回归。A0 测量代码至今**未**取得 `SOFTWARE_REVIEW_GO`，两份镜像也**没有**
+板级使用许可。
+
+返修轮 `phase8-target-measurement-a0-r1` 的处置（§11 保留为上一轮的原样记录，不重写）：
+
+| 复审项 | 修订位置 | 现在可判定什么 |
+|---|---|---|
+| A0-01 命令名与参数合同 | `APP/sp_measure_a0.c` 的 `spm_validate()`/`spm_cmd()` 与文件末尾 `MSH_CMD_EXPORT_ALIAS(spm_cmd, spm, …)`；新增 `tests/host/sp_measure_a0_finsh.h` | 目标上的命令名逐字是 `spm`（由 AXF 里 `__fsym_spm` 的 name/desc/opt/func 四字段实证，见操作包 §1）；主机链经**名字查表**分发，不再直接调 `spm_cmd()`；缺参/多参/未知子命令/非法 entry 都在任何计数读取、状态变化与关闭动作之前拒绝，合法上下文可打印、非法上下文静默（TMA19/TMA20） |
+| A0-02 计时判据（错误接受） | `spm_ctr_pair()`/`spm_ctr_pair_after()`、`spm_win_note()`/`spm_body_end()` 采逐样本门控、`spm_eval()` 单点裁决 | `counter_status` 降级为**能力缓存**；每条样本自己核起点/终点 `DEMCR.TRCENA` + `DWT_CTRL.CYCCNTENA`（新列 `gates`），缺任一位记 `0x0800`；`body_end==body_begin` 记 `0x0080`，原始值保留，绝不作为 0 耗时入池（TMA21） |
+| A0-02 计时判据（错误拒绝） | `spm_win_note()` 里 `SPM_IV_FLAG_PRE` 退役为观测位 `SPM_GD_FLAG_PRE_SET`；`spm_init_counter()` 增加 `spm_quiescent()` 门 | 起点读已读清的历史 COUNTFLAG 不再单独否定当前主体（TMA23 正向对照），而真重装/回绕/配置漂移/嵌套仍拒绝；`init` 只在静止态（IDLE、无在途、无旧批次、无人持判据）允许，非静止态零 PPB 访问且不换能力缓存（TMA22） |
+| A0-03 操作包 | `reports/plans/phase8-target-measurement-a0-operator-pack.md` 全篇 | 分批闭环"start → N 次 → stop → status(确认无在途) → dump(核对并**先**保存) → clear_records → 下一批"；停止判据不再把 `COUNTER_OK + CONFIG_READBACK + body_valid=1` 的合法组合当故障；判据字段改用**实际存在**的 `body_valid`/`enclosing_valid`（无 `sample_valid` 列）；P-13 只用正式 `motor_disarm`，`spm trip` 不作 `sp_off_attempt_for` 的等价触发，不可达入口记 `NOT_REACHED`；三条命令副作用按源码更正（TMA24 用真实控制函数跑 1 条与 16 条两批） |
+| A0-04 反向台账 | `tests/host/run_sp_measure_a0.sh` 的 `ledger_check()`（正向与反向**共用**）与新增判定器负控 | 缺席/重复/未登记身份/CASE 与 RESULT 不成对/SUMMARY 与 EXIT 不自洽/退出码不符一律 INFRA-FAIL；有预期 FAIL 的组必须恰好 `rc=1`、其它组必须 `rc=0`（不再接受 `rc<=1`）；"故意省略非锚身份 TMA18 的 RESULT 行"的负控现在会被自己判成 INFRA-FAIL，而不是报成"其余保持 PASS" |
+| §7 取证精度 | 同一轮 | `code_commit` 改成**已含完整双目标工程状态**的 `b27e5f14…`（不再有"工程改动在另一个提交"的含混表述）；manifest 分开 Git blob 身份 / LF 内容散列 / 实际工作区原始散列与行尾信息；`keil_builds.txt` 汇总段的 `spm_rec 76800 B` 笔误以勘误层标注（不改原日志数值）；原证据段落全部保留，新结果只追加为 `r1` 层 |
+
+**仍然开放**：A0 测量代码与两份 r1 镜像等待独立复审；`B-1`、`BUG-008`、`RISK-03/03a`、物理
+`RISK-04-b`、`M-1/M-2/M-3` 与 T03–T13、包 B/C 不变。本轮同样**没有任何目标机动作**。
+
 ## 附录 A 引用与散列（LOCAL_ONLY）
 
 SDK/CMSIS 文件仅本地存在，未上传；下列 SHA-256 取前 16 位十六进制用于比对（同一目录树内可复核）：

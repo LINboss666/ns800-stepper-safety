@@ -69,7 +69,7 @@
   "code_commit": {
     "sha": "678768739dd8e964fdcc428ef1168e4353c167f7",
     "contains": "生产实现 + 主机链 + source_audit; Keil 工程改动在其后一次提交",
-    "note": "构建在该定稿源码上执行; 后续文档/二进制提交逐 blob 证明生产与工程字节未变"
+    "note": "构建在该定稿源码上执行; 后续文档/二进制提交逐 blob 证明生产与工程字节未变 [r1 注] 该 code_commit 属于上一轮；r1 的定稿 code_commit 见 build_manifest.r1.code_commit。"
   },
   "builds": {
     "default": {
@@ -89,7 +89,8 @@
       "axf_reason": "ELF/AXF 调试信息可能带本机路径, 未经脱敏不上传",
       "bin_archive": "reports/firmware/phase8-target-measurement-a0/default.bin",
       "bin_sha256": "ef69404d388a7977f170550e324dfa50fd0cf152e41bc2831410c05628a92a20",
-      "bin_bytes": 251148
+      "bin_bytes": 251148,
+      "layer": "a0（上一轮原样记录；r1 的重建见 build_manifest.r1.builds）"
     },
     "measure_a0": {
       "target_name": "rt-thread-measure-a0",
@@ -109,7 +110,8 @@
       "axf_committed": false,
       "bin_archive": "reports/firmware/phase8-target-measurement-a0/measure-a0.bin",
       "bin_sha256": "e9ba8dae1a4b4d59697d5844551bfcd3fbba9061cc8fbcd11784cd7b61a8fc63",
-      "bin_bytes": 259868
+      "bin_bytes": 259868,
+      "layer": "a0（上一轮原样记录；r1 的重建见 build_manifest.r1.builds）"
     }
   },
   "rollback_status": {
@@ -128,5 +130,370 @@
     "镜像构建成功不等于可烧录: 需独立复审 + 用户对具体操作包的另行批准",
     "两目标的 Maximum Stack Usage 行相同, 但离线 call graph 不是目标栈高水位验收",
     "counter_status/clock_basis 的目标真值仍未知 (须未来 spm init 现场取得)"
-  ]
+  ],
+  "historical_images": {
+    "note": "上一轮归档的两份镜像身份保留为 historical；同名文件已被 r1 重建的 BIN 取代，旧散列不称本轮产物",
+    "default.bin": {
+      "sha256": "ef69404d388a7977f170550e324dfa50fd0cf152e41bc2831410c05628a92a20",
+      "bytes": 251148,
+      "built_from_code_commit": "678768739dd8e964fdcc428ef1168e4353c167f7",
+      "program_size": {
+        "Code": 173762,
+        "RO-data": 76806,
+        "RW-data": 2188,
+        "ZI-data": 83784
+      }
+    },
+    "measure-a0.bin": {
+      "sha256": "e9ba8dae1a4b4d59697d5844551bfcd3fbba9061cc8fbcd11784cd7b61a8fc63",
+      "bytes": 259868,
+      "built_from_code_commit": "678768739dd8e964fdcc428ef1168e4353c167f7",
+      "program_size": {
+        "Code": 179858,
+        "RO-data": 79430,
+        "RW-data": 2188,
+        "ZI-data": 91504
+      }
+    }
+  },
+  "errata": [
+    {
+      "where": "keil_builds.txt 上一轮的汇总段落文字",
+      "wrong": "spm_rec 76800 B",
+      "right": "spm_rec 7680 B (= 64 x 120)",
+      "basis": "map 摘录 \"spm_rec                                  0x2000ac58   Data        7680  sp_measure_a0.o(.bss.spm_rec)\" 与 r1 AXF 符号大小 7680 两处一致",
+      "handling": "只在 keil_builds.txt [K] 与本节标注勘误；不回头修改原日志数值与旧段"
+    }
+  ],
+  "r1": {
+    "task_id": "phase8-target-measurement-a0-r1",
+    "generated": "2026-10-25 (Asia/Shanghai)",
+    "reviewed_commit": "c5028f4c502596d24cb81b80e927e599e0f3d6fd",
+    "reviewed_code_commit": "678768739dd8e964fdcc428ef1168e4353c167f7",
+    "code_commit": "b27e5f14bdb62f645b93eace23800b40369717d4",
+    "code_commit_note": "本轮 code_commit 本身已含完整双目标工程状态（project.uvprojx 的 blob 与被审轮相同），构建直接在该提交上做；不再使用 engineering_commit 表述",
+    "build_input_identity_check": {
+      "method": "对每个构建输入取 git cat-file blob <code_commit> 与工作树同路径文件, 按 LF 规范化后逐字节比较",
+      "mismatched_build_inputs": [],
+      "worktree_dirty_paths_at_run_time": [
+        "reports/firmware/phase8-target-measurement-a0/default.bin",
+        "reports/firmware/phase8-target-measurement-a0/measure-a0.bin",
+        "reports/plans/phase8-target-measurement-a0-operator-pack.md",
+        "reports/plans/phase8-target-measurement-plan.md"
+      ],
+      "conclusion": "见本节 mismatched_build_inputs 与 worktree_dirty_paths_at_run_time: Keil 构建时工作树的**构建输入**与 code_commit 逐字节一致, 之后只有文档被改"
+    },
+    "identity_discipline": {
+      "note": "复审 §7：分开 (a) Git blob 身份、(b) blob 内容(LF)散列、(c) 实际工作区原始散列与行尾统计。工作区因 core.autocrlf 多为 CRLF，不能据原始散列断言\"构建内容不同\"，也不能称工作区文件与远端\"逐字相同\"",
+      "uvprojx_note": "project.uvprojx 的工作区原始字节数与\"由 LF 统一转 CRLF\"的结果不一致（混合行尾）；构建输入以 (b) blob 内容散列为准，本轮该文件未改",
+      "files": {
+        "sp_measure_a0.c": {
+          "repo_path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/sp_measure_a0.c",
+          "git_blob_at_code_commit": "858a73daf74f81fe94fd74ba87bf7b4b23626180",
+          "git_blob_bytes": 41518,
+          "sha256_git_blob_content": "98e94f617398fbd4edcb910394847707e43d9347fbaa92c35cea49c84561cb5b",
+          "worktree_raw_sha256": "98e94f617398fbd4edcb910394847707e43d9347fbaa92c35cea49c84561cb5b",
+          "worktree_eol": {
+            "raw_bytes": 41518,
+            "crlf_lines": 0,
+            "lf_only_lines": 843,
+            "cr_only_lines": 0,
+            "normalized_LF_bytes": 41518,
+            "uniform_CRLF_from_LF_bytes": 42361
+          },
+          "changed_vs_reviewed_commit": "yes",
+          "worktree_raw_equals_blob_content": true
+        },
+        "sp_measure_a0.h": {
+          "repo_path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/sp_measure_a0.h",
+          "git_blob_at_code_commit": "8d834b5a9dc73127df1a27f06fa076f8d206b549",
+          "git_blob_bytes": 14722,
+          "sha256_git_blob_content": "b7cee00f86b80bafc09901afe7c107d2abde0ada88894e1711411751ab0476fb",
+          "worktree_raw_sha256": "b7cee00f86b80bafc09901afe7c107d2abde0ada88894e1711411751ab0476fb",
+          "worktree_eol": {
+            "raw_bytes": 14722,
+            "crlf_lines": 0,
+            "lf_only_lines": 257,
+            "cr_only_lines": 0,
+            "normalized_LF_bytes": 14722,
+            "uniform_CRLF_from_LF_bytes": 14979
+          },
+          "changed_vs_reviewed_commit": "yes",
+          "worktree_raw_equals_blob_content": true
+        },
+        "stop_priority.c": {
+          "repo_path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/stop_priority.c",
+          "git_blob_at_code_commit": "9942fc7ac8a5be106d8f4166e23f7e1a354231cb",
+          "git_blob_bytes": 61993,
+          "sha256_git_blob_content": "2ba8a9f49913a8b9a13d99a90e8a011b569261d0890d9cf52145862e8138cdb8",
+          "worktree_raw_sha256": "fc2ba38f446cc7a93c23749194a608e6bbd15a038f027f915e074c0ac07dec2c",
+          "worktree_eol": {
+            "raw_bytes": 63520,
+            "crlf_lines": 1527,
+            "lf_only_lines": 0,
+            "cr_only_lines": 0,
+            "normalized_LF_bytes": 61993,
+            "uniform_CRLF_from_LF_bytes": 63520
+          },
+          "changed_vs_reviewed_commit": "no",
+          "worktree_raw_equals_blob_content": false
+        },
+        "stop_priority.h": {
+          "repo_path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/stop_priority.h",
+          "git_blob_at_code_commit": "560294ad13c6bdb6bb22f5fda6d6b02f52f5fdfb",
+          "git_blob_bytes": 24159,
+          "sha256_git_blob_content": "0c605c471174ceee4140a3ee1465270c8f18d31cfa922f8a01e7404e0c398d7a",
+          "worktree_raw_sha256": "2db39a6c273d8ac4eb0f8b56bdf1426ea5dc8bc9ff9b2945683bfe1dc6976e47",
+          "worktree_eol": {
+            "raw_bytes": 24518,
+            "crlf_lines": 359,
+            "lf_only_lines": 0,
+            "cr_only_lines": 0,
+            "normalized_LF_bytes": 24159,
+            "uniform_CRLF_from_LF_bytes": 24518
+          },
+          "changed_vs_reviewed_commit": "no",
+          "worktree_raw_equals_blob_content": false
+        },
+        "project.uvprojx": {
+          "repo_path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/project.uvprojx",
+          "git_blob_at_code_commit": "c18d31f991f64d08d61cd3b04215e9b48b964067",
+          "git_blob_bytes": 226016,
+          "sha256_git_blob_content": "ec9eed0e9d9998c38b5dd935ddaea7e74829c2a770272dfe0d675cc6fce4cc09",
+          "worktree_raw_sha256": "efb5671345e1f3e747b00f8f02fe2f25fc4d2df30c4b6d88b820f3f391b929b0",
+          "worktree_eol": {
+            "raw_bytes": 231510,
+            "crlf_lines": 5494,
+            "lf_only_lines": 2,
+            "cr_only_lines": 0,
+            "normalized_LF_bytes": 226016,
+            "uniform_CRLF_from_LF_bytes": 231512
+          },
+          "changed_vs_reviewed_commit": "no",
+          "worktree_raw_equals_blob_content": false
+        },
+        "run_sp_measure_a0.sh": {
+          "repo_path": "tests/host/run_sp_measure_a0.sh",
+          "git_blob_at_code_commit": "09513d23910b1db811cbf265d6d56017f9593456",
+          "git_blob_bytes": 26289,
+          "sha256_git_blob_content": "8cbaba943931eb225d87d9ba222a05218986e0ea93597fdcb0e40a623780179e",
+          "worktree_raw_sha256": "8cbaba943931eb225d87d9ba222a05218986e0ea93597fdcb0e40a623780179e",
+          "worktree_eol": {
+            "raw_bytes": 26289,
+            "crlf_lines": 0,
+            "lf_only_lines": 502,
+            "cr_only_lines": 0,
+            "normalized_LF_bytes": 26289,
+            "uniform_CRLF_from_LF_bytes": 26791
+          },
+          "changed_vs_reviewed_commit": "yes",
+          "worktree_raw_equals_blob_content": true
+        },
+        "sp_measure_a0_main.c": {
+          "repo_path": "tests/host/sp_measure_a0_main.c",
+          "git_blob_at_code_commit": "d7ec4da2ceed612113cb195d92669944aeaaf707",
+          "git_blob_bytes": 78963,
+          "sha256_git_blob_content": "7f895aafba03fa8c8db97cca72be15865f6f94691da24f75cb95bff948ce40db",
+          "worktree_raw_sha256": "7f895aafba03fa8c8db97cca72be15865f6f94691da24f75cb95bff948ce40db",
+          "worktree_eol": {
+            "raw_bytes": 78963,
+            "crlf_lines": 0,
+            "lf_only_lines": 1885,
+            "cr_only_lines": 0,
+            "normalized_LF_bytes": 78963,
+            "uniform_CRLF_from_LF_bytes": 80848
+          },
+          "changed_vs_reviewed_commit": "yes",
+          "worktree_raw_equals_blob_content": true
+        },
+        "sp_measure_a0_port.h": {
+          "repo_path": "tests/host/sp_measure_a0_port.h",
+          "git_blob_at_code_commit": "28072535026d85bc79cbcbcc381158230d254a9a",
+          "git_blob_bytes": 3227,
+          "sha256_git_blob_content": "d2fa45be136d406e493b1de19f6f526fa2255b5826e7bbf76de6ebae03490379",
+          "worktree_raw_sha256": "d2fa45be136d406e493b1de19f6f526fa2255b5826e7bbf76de6ebae03490379",
+          "worktree_eol": {
+            "raw_bytes": 3227,
+            "crlf_lines": 0,
+            "lf_only_lines": 65,
+            "cr_only_lines": 0,
+            "normalized_LF_bytes": 3227,
+            "uniform_CRLF_from_LF_bytes": 3292
+          },
+          "changed_vs_reviewed_commit": "no",
+          "worktree_raw_equals_blob_content": true
+        },
+        "sp_measure_a0_finsh.h": {
+          "repo_path": "tests/host/sp_measure_a0_finsh.h",
+          "git_blob_at_code_commit": "22bb47eb1c2b0e571703264cc7ebbad72609ffd3",
+          "git_blob_bytes": 6749,
+          "sha256_git_blob_content": "53e942b50307c4ccc8867d0e85cce75856553688b253864e21b2fe57bacf3ea8",
+          "worktree_raw_sha256": "53e942b50307c4ccc8867d0e85cce75856553688b253864e21b2fe57bacf3ea8",
+          "worktree_eol": {
+            "raw_bytes": 6749,
+            "crlf_lines": 0,
+            "lf_only_lines": 160,
+            "cr_only_lines": 0,
+            "normalized_LF_bytes": 6749,
+            "uniform_CRLF_from_LF_bytes": 6909
+          },
+          "changed_vs_reviewed_commit": "yes",
+          "worktree_raw_equals_blob_content": true
+        }
+      }
+    },
+    "builds": {
+      "default": {
+        "target_name": "rt-thread",
+        "measurement_switch": "NS800_TARGET_MEASUREMENT_A0 未定义 => 0",
+        "four_macros": "RT_FALSE (motor.h:69/:83, tmc2209.h:100, project_board.h:51)",
+        "uv4_rc": 0,
+        "result": "0 Error(s), 0 Warning(s).",
+        "program_size_raw": "Code=173762 RO-data=76806 RW-data=2188 ZI-data=83784",
+        "program_size": {
+          "Code": 173762,
+          "RO-data": 76806,
+          "RW-data": 2188,
+          "ZI-data": 83784
+        },
+        "program_size_equal_to_previous_round": true,
+        "bin_archive": "reports/firmware/phase8-target-measurement-a0/default.bin",
+        "bin_sha256": "41717367e4e1401deb5f59eb27d1f35483108c6241eb30a5b58b28aad5b425de",
+        "bin_bytes": 251148,
+        "bin_diff_vs_previous_archived": {
+          "differing_byte_positions": 6,
+          "span": "0x03bf65..0x03bf6c",
+          "meaning": "RT-Thread 版本横幅里的 __TIME__ 字段（src/kservice.c:162 用 __DATE__/__TIME__）；除此之外逐字节相同",
+          "previous_sha256": "ef69404d388a7977f170550e324dfa50fd0cf152e41bc2831410c05628a92a20"
+        },
+        "elf": {
+          "axf": "build/rt-thread.axf",
+          "axf_sha256_local_only": "76d19ced06ebf5f869d3b2f4ffd9692f9691e0f4d0dbf6d13a5581edc6416758",
+          "axf_bytes": 1645448,
+          "fsym_spm_present": false,
+          "fsym_spm_cmd_present": false,
+          "spm_cmd_present": false,
+          "spm_rec_present": false
+        },
+        "map_removes_recorder_text": "Removing sp_measure_a0.o(.text), (0 bytes).",
+        "spm_name_string_offsets_in_bin": {
+          "bytes": 251148,
+          "sha256": "41717367e4e1401deb5f59eb27d1f35483108c6241eb30a5b58b28aad5b425de",
+          "off_spm": [],
+          "off_spm_cmd": [],
+          "off_desc": []
+        }
+      },
+      "measure_a0": {
+        "target_name": "rt-thread-measure-a0",
+        "measurement_switch": "NS800_TARGET_MEASUREMENT_A0=1",
+        "four_macros": "RT_FALSE (同上; 测量开关不改安全判定)",
+        "uv4_rc": 0,
+        "result": "0 Error(s), 0 Warning(s).",
+        "program_size_raw": "Code=180802 RO-data=79718 RW-data=2188 ZI-data=91504",
+        "program_size": {
+          "Code": 180802,
+          "RO-data": 79718,
+          "RW-data": 2188,
+          "ZI-data": 91504
+        },
+        "delta_vs_previous_measure_image": {
+          "Code": 944,
+          "RO-data": 288,
+          "RW-data": 0,
+          "ZI-data": 0
+        },
+        "record_layout_unchanged": "ZI 未变；spm_rec 仍 7680 B = 64 x 120；schema 升到 2 只改判据与 CSV 列（原 pad2 字节启用为 gates）",
+        "bin_archive": "reports/firmware/phase8-target-measurement-a0/measure-a0.bin",
+        "bin_sha256": "358fd81ae5853ea52df1e1ab367ea41af0f5e86679082a755c17dac3429b0e1b",
+        "bin_bytes": 261100,
+        "previous_sha256": "e9ba8dae1a4b4d59697d5844551bfcd3fbba9061cc8fbcd11784cd7b61a8fc63",
+        "previous_bytes": 259868,
+        "differing_byte_positions_vs_previous": 116601,
+        "elf": {
+          "axf": "build/a0/rt-thread-a0.axf",
+          "axf_bytes": 1674612,
+          "axf_sha256_local_only": "c8176c19188f66654f6bcee5b265ae2487d0c6130d8ae354e8c262cfbd3c01f6",
+          "fsym_spm_addr": "0x0803f858",
+          "fsym_spm_size": 16,
+          "raw16_hex": "84d7020888d7020800000000f9380208",
+          "name_ptr": "0x0802d784",
+          "name_str": "spm",
+          "name_nul_at": 3,
+          "desc_ptr": "0x0802d788",
+          "desc_str": "NS800 target measurement A0 control",
+          "opt_value": "0x00000000",
+          "func_ptr": "0x080238f9",
+          "spm_cmd_symbol_value": "0x080238f9",
+          "spm_cmd_symbol_size": 832,
+          "func_equals_spm_cmd": true,
+          "fsym_spm_cmd_present": false,
+          "spm_rec_size_bytes": 7680
+        },
+        "map_lines": {
+          "fsym_spm": "__fsym_spm                               0x0803f858   Data          16  sp_measure_a0.o(FSymTab)",
+          "spm_cmd": "spm_cmd                                  0x080238f9   Thumb Code   832  sp_measure_a0.o(.text.spm_cmd)",
+          "spm_rec": "spm_rec                                  0x2000ac58   Data        7680  sp_measure_a0.o(.bss.spm_rec)",
+          "fsymtab_refs": [
+            "sp_measure_a0.o(FSymTab) refers to sp_measure_a0.o(.rodata.name) for __fsym_spm_name",
+            "sp_measure_a0.o(FSymTab) refers to sp_measure_a0.o(.text.spm_cmd) for spm_cmd"
+          ]
+        }
+      }
+    },
+    "command_name_binding_proof": {
+      "requirement": "复审 A0-01：必须核对真实 FSymTab/ELF 的名字->函数绑定；不能只把夹具 argv[0] 写成 spm 再直接调 C 函数就称目标命令可达",
+      "source_form": "MSH_CMD_EXPORT_ALIAS(spm_cmd, spm, NS800 target measurement A0 control) @ sp_measure_a0.c:841",
+      "macro_facts": "finsh.h:86-92 MSH_FUNCTION_EXPORT_CMD(name, cmd, desc, opt) 用 #cmd 作命令名; finsh.h:170-181 struct finsh_syscall = {name, desc, opt, func}; msh.c:232-249 按完整名字查表 (rt_strncmp(index->name, cmd, size)==0 && index->name[size]==0)",
+      "elf": {
+        "axf": "build/a0/rt-thread-a0.axf",
+        "axf_bytes": 1674612,
+        "axf_sha256_local_only": "c8176c19188f66654f6bcee5b265ae2487d0c6130d8ae354e8c262cfbd3c01f6",
+        "fsym_spm_addr": "0x0803f858",
+        "fsym_spm_size": 16,
+        "raw16_hex": "84d7020888d7020800000000f9380208",
+        "name_ptr": "0x0802d784",
+        "name_str": "spm",
+        "name_nul_at": 3,
+        "desc_ptr": "0x0802d788",
+        "desc_str": "NS800 target measurement A0 control",
+        "opt_value": "0x00000000",
+        "func_ptr": "0x080238f9",
+        "spm_cmd_symbol_value": "0x080238f9",
+        "spm_cmd_symbol_size": 832,
+        "func_equals_spm_cmd": true,
+        "fsym_spm_cmd_present": false,
+        "spm_rec_size_bytes": 7680
+      },
+      "bin": {
+        "default.bin": {
+          "bytes": 251148,
+          "sha256": "41717367e4e1401deb5f59eb27d1f35483108c6241eb30a5b58b28aad5b425de",
+          "off_spm": [],
+          "off_spm_cmd": [],
+          "off_desc": []
+        },
+        "measure-a0.bin": {
+          "bytes": 261100,
+          "sha256": "358fd81ae5853ea52df1e1ab367ea41af0f5e86679082a755c17dac3429b0e1b",
+          "off_spm": [
+            186244
+          ],
+          "off_spm_cmd": [],
+          "off_desc": [
+            186248
+          ]
+        }
+      },
+      "host_chain": "tests/host/sp_measure_a0_finsh.h 让同一条注册语句在主机变体里也参与编译，夹具经按名查表分发（TMA19）；默认变体整条不注册（runner 符号核对 + 默认 AXF 双向一致）"
+    },
+    "verification": {
+      "host_chain": "TMA01..TMA24 全 PASS（8 组，335 项断言）+ 两个具名反向家族 META-OK（家族一具名检出 TMA02/TMA03/TMA21，家族二 TMA11）+ 判定器负控按合同判 INFRA-FAIL；runner rc=0",
+      "regression": "S1 正向 rc=0（target 50 / host_ovr 65）与 S1 反向 rc=0 分别运行；S2 正向 rc=0（17 组，target 23 / host_ovr 79，每组独立进程）与 S2 五家族反向 rc=0",
+      "not_rerun": "V1/V2、I/O 四变体、SD、旧负例矩阵与元负例：A0 未新增对外接口、未改这些链的输入 => NOT_RERUN，引用已接受结果，不当本轮新证据",
+      "target_execution": "零：T00..T13 全部 NOT_EXECUTED / NOT AUTHORIZED",
+      "hardware_actions": [],
+      "four_macros": "RT_FALSE x4"
+    }
+  }
 }

@@ -142,3 +142,110 @@ H-5 板级动作：零。未连串口/调试器/仪器，未扫描设备，未�
     未做 GPIO/TMC/STEP/DIR、电机、供电、接线、SW1、真机清故障或 selftest；未运行旧 `sw1_cut.ps1`
     （其 T-01/T-02 继续 HOLD）。
 H-6 主机真线程 + 寄存器模型**不等于**目标 RT-Thread 调度、真实 PPB 行为或物理停机证明。
+===============================================================================================
+I. r1 层（任务 phase8-target-measurement-a0-r1）：修后事实与仍然未证明的边界
+   上面 A..H 是上一轮（c5028f4）的原样审计，一律保留不改写。本节行号指 **r1 code_commit
+   b27e5f14bdb62f645b93eace23800b40369717d4** 的文件内容。
+   本节只做源码/ELF/map 的静态审计；目标机零执行，所有目标行为仍是 NOT_EXECUTED。
+
+I.1 命令名与命令接缝（复审 A0-01）
+  REC:841  MSH_CMD_EXPORT_ALIAS(spm_cmd, spm, NS800 target measurement A0 control);
+  内核事实（逐字读过 KERNEL/components/finsh 与 BSP/rtconfig.h）：
+    finsh.h:86-92   MSH_FUNCTION_EXPORT_CMD(name, cmd, desc, opt) 用 **#cmd** 生成
+                    __fsym_##cmd##_name[]，函数取 &name —— 所以别名只能靠第二个参数。
+    finsh.h:101-112 MSH_CMD_EXPORT 的两参数形式展开成 MSH_FUNCTION_EXPORT_CMD(a0, a0, a1, 0)
+                    => 命令名 == 函数名（这正是上一轮产出 "spm_cmd" 的原因）。
+    finsh.h:142-168 MSH_CMD_EXPORT / MSH_CMD_EXPORT_ALIAS 的变参选择宏。
+    finsh.h:170-181 struct finsh_syscall = { name, desc?, opt?, func }；
+    msh.c:232-249   msh_get_cmd(): rt_strncmp(index->name, cmd, size)==0 && index->name[size]=='\0'
+                    —— 按**完整**名字匹配，不会自动去掉 "_cmd" 后缀。
+    msh.c:152-230   msh_split(): 空白分隔并就地写 '\0'，不产生空 argv 项，上限 FINSH_ARG_MAX。
+    msh.c:325-352   _msh_exec_cmd(): 先按第一段查表，查不到就**不**调用任何函数。
+    rtconfig.h:121-133 RT_USING_FINSH / FINSH_USING_MSH / FINSH_USING_SYMTAB /
+                    FINSH_USING_DESCRIPTION / FINSH_USING_OPTION_COMPLETION / FINSH_ARG_MAX 10
+                    => 三参数别名形式把 opt 填 0，结构体四字段都在。
+  真实镜像里的绑定（AXF/map，见 keil_builds.txt [O][P] 与 manifest.r1.command_name_binding_proof）：
+    map : __fsym_spm  0x0803f858  Data 16  sp_measure_a0.o(FSymTab)
+          sp_measure_a0.o(FSymTab) refers to .rodata.name for __fsym_spm_name
+          sp_measure_a0.o(FSymTab) refers to .text.spm_cmd  for spm_cmd
+    AXF : __fsym_spm 前 16 字节 84d70208 88d70208 00000000 f9380208
+          -> name 0x0802d784 == "spm"(3 字节 + NUL) / desc == "NS800 target measurement A0 control"
+          -> opt 0 / func 0x080238f9 == 符号 spm_cmd（Thumb Code, 832 B）
+    BIN : measure-a0.bin 内 "spm\0" @186244、描述串 @186248、"spm_cmd\0" 不存在；
+          default.bin 三个都不存在。
+  主机侧接缝：同一条注册语句现在**也参与主机编译**（REC:37-45 在 NS800_SPM_HOST_BACKEND 下
+  include tests/host/sp_measure_a0_finsh.h）。该文件与真实 finsh.h 的已知差异只有两处，且都被
+  上面的 AXF/map 取证兜底：(1) 用静态表 + 构造函数登记，不靠链接器段 FSymTab；
+  (2) 不加 rt_section(".rodata.name")。字段顺序与 struct finsh_syscall 一致。
+  仍然未证明：目标上 `_syscall_table_begin.._syscall_table_end` 的**运行时枚举顺序**与
+  msh 实际命令行解析从未执行（NOT_EXECUTED）；本审计只证明条目内容与查表语义。
+
+I.2 严格参数合同（REC:702-795）
+  spm_validate()（REC:702）是**纯函数**：只读 argc/argv，不碰任何全局状态、寄存器或关闭入口，
+  返回一个子命令枚举 + 已解析的 entry id。规则：
+    cap/init/stop/status/dump/clear_records/trip => argc 恰为 2
+    start <entry>                                => argc 恰为 3，entry 只在三个合法值内
+    argc<2 => USAGE；argv[1] 空 => UNKNOWN；空子命令/未知子命令/非法 entry => 各自拒绝
+  spm_cmd()（REC:761）四步固定顺序：验证 -> 上下文门（非法上下文**静默** return -1）->
+  合法上下文下的"未执行"分支（**可以**打印用法，但仍零动作）-> dispatch。
+  返回码合同：0 = 该子命令确实执行；非 0 = 拒绝（未执行）。
+  init 的返回值现在如实上报（上一轮 `(void)spm_init_counter(); return 0;` 会把拒绝说成成功）。
+
+I.3 逐样本计时判据（复审 A0-02a）
+  REC:134 spm_ctr_pair() / REC:149 spm_ctr_pair_after()：每条样本自己读 DEMCR.TRCENA 与
+  DWT_CTRL.CYCCNTENA；能力未证（counter_status != OK）时**直接返回 0，一个 PPB 都不碰**；
+  TRCENA 未置位时连 DWT_CTRL 都不读（TRCENA=0 时读 DWT 属实现定义）。
+  REC:245 spm_win_note() 起点采 before 两位，REC:313 spm_body_end() 在取 body_end **之前**先采
+  after 两位（终点读与计数读之间的顺序是刻意的：先证明使能位成立，再取那个值）。
+  窗口内的寄存器读**条数有界**：起点侧最多 5 次（SysTick CTRL、SysTick LOAD、DEMCR、DWT_CTRL、
+  CYCCNT），终点侧最多 5 次；没有等待、没有循环、没有打印、没有锁。
+  REC:350 spm_eval() 是唯一的裁决点（反向家族一注入的就是这一处）：
+    counter_status != OK            => SPM_IV_COUNTER_NOT_OK
+    gates 缺 SPM_GT_ALL_MASK 任一位 => SPM_IV_GATE_LOST   (0x0800)
+    body_end == body_begin          => SPM_IV_NO_PROGRESS (0x0080)   0 差值不是 0 耗时
+    body_end  <  body_begin         => SPM_IV_COUNTER_WRAPPED（独立锚点，家族一不动它）
+  四条判据都保留原始 pre/body_begin/body_end/post 与 invalid_reason，不做单一归因。
+
+I.4 历史 COUNTFLAG 退役（复审 A0-02b）
+  起点读（REC:264 附近）本来就会把历史 COUNTFLAG 读清；上一轮随后又据此置 SPM_IV_FLAG_PRE，
+  等于用"主体开始之前"的事件否定当前主体。r1 起：
+    - SPM_IV_FLAG_PRE 从 invalid_reason 退役（头文件保留 0x0004 的退役说明）；
+    - SPM_GD_FLAG_PRE_SET 仍逐条留档（主机链断言 r1 全批记录里 0x0004 出现次数 = 0）；
+    - 主体内真发生的重装仍由终点读判 RELOAD_IN_BODY，且 TMA23 把"历史旗 + 真重装""历史旗 +
+      回绕""历史旗 + 配置漂移"三种负向一起重新断言，防止正向修法把检测器弄瞎。
+
+I.5 能力检查生命周期（复审 A0-02a 的另一半）
+  REC:467 spm_quiescent()：state==IDLE 且 in_flight==0 且 cursor==0 且 guard_depth==0。
+  REC:476 spm_init_counter() 把该判据放在**任何 PPB 访问与任何缓存改写之前**，不满足就拒绝，
+  因此不会读清在途那次记录的起点旗，也不会让一条记录混用两次能力检查。
+  控制面合同（写进 sp_measure_a0.h 的头注释）：命令侧只由**单个 msh 控制台会话**调用
+  （rtconfig 的 tshell 只有一个控制台），静止态由该控制者维持；与业务线程/ISR 并发的部分只有
+  spm_open/win_note/body_end/publish 四个叶子。
+
+I.6 记录布局与 schema
+  SPM_SCHEMA_VERSION 1 -> 2；记录大小与布局**未变**：原 pad2 字节启用为 counter_gates（AXF 的
+  spm_rec 仍 7680 B = 64 x 120，测量目标 ZI 仍 91504，主机 sizeof=120/48 双向一致）。
+  CSV 从 46 列变 47 列：在 invalid_reason 之后插入 gates 列（dump 头行逐字见操作包 §3）。
+  没有新增/删除结构体字段，因此上一轮的槽数、批次满语义、RESERVED->COMPLETE 协议不变。
+
+I.7 默认目标仍然完全绕开（同一轮复测，不靠措辞）
+  - 默认 AXF：__fsym_spm / __fsym_spm_cmd / spm_cmd / spm_rec 四个符号全部不存在；
+  - 默认 map：`Removing sp_measure_a0.o(.text), (0 bytes).`，且 "spm|sp_measure_a0" 的其余命中
+    全部是 libc 的 __spm（ctime.o，且被移除）；
+  - 默认 BIN：没有 "spm\0"、没有 "spm_cmd\0"、没有描述串；
+  - 默认 Program Size 四项与上一轮逐字相同（Code=173762 RO=76806 RW=2188 ZI=83784）；
+  - 默认 BIN 与上一轮归档逐字节比较只差 **6 个字节**，位置在版本横幅的 __TIME__ 字段
+    （src/kservice.c:162 用 __DATE__/__TIME__）。
+  runner 的符号门也同步加了 __fsym_spm 计数：a0_off 必须 0，a0_on 必须恰好 1，
+  且 __fsym_spm_cmd 在两个变体里都必须是 0。
+
+I.8 本轮仍未解决、也没有冒充解决的项
+  - 目标上的 counter_status / clock_basis / SysTick LOAD 真值：全部未知（零执行）。
+  - clock_basis 仍最多 CONFIG_READBACK；到 EXTERNAL_VERIFIED 需要另行批准的 MCO 路由/分频/测点
+    与独立时基（计划 §2.5 R3a），CLI 里没有升级入口。
+  - "寄存器写 -> 焊盘"的时间关系仍未测：需另行批准的共同事件/对齐方法与误差预算（R3b）。
+  - B-1（门内窗口真实时长与 RX/EXTI 丢失容忍）、BUG-008、RISK-03/03a、物理 RISK-04-b、
+    M-1/M-2/M-3 全部按原口径开放；T03-T13 与包 B/C 未覆盖。
+  - FinSH 条目在 FSymTab 段内的**运行时枚举**与 msh 真实命令行解析未在目标上执行过。
+  - AXF/ELF 仍只留在本地（调试信息可能带本机路径，未脱敏不入库）。
+  - 板上固件身份仍是 USER_REPORTED_E40；回退能力 BLOCKED_ROLLBACK（本轮仍未读 Flash）。
