@@ -1,0 +1,358 @@
+phase8-e40-artifact-search —— e40 旧固件离线查找证据
+任务书: NS800_E40_Artifact_Search_Qoder_Task_20261025.md   日期: 2026-10-25 (Asia/Shanghai)
+执行窗口: 2026-10-25 20:38 ~ 2026-10-25 23:56   执行者: 本地 Qoder Agent
+
+脱敏规则(显式声明, 全文一致): 仓库内证据不出现本机用户名/邮箱/主机名; 本机绝对路径一律写成
+  「代号 + 相对路径」, 完整映射只在**仓外**本地索引留存(位置见交接 §回执指针);
+  Keil 的按用户生成文件 project.uvguix.<USER> 中的 <USER> 即被替换项。日志摘录中与文件身份有关的
+  原文(路径/Program Size/回执文本)按原样保留, 未改写任何身份数据以消除矛盾。
+
+整体结论: NOT_FOUND_IN_SEARCHED_SCOPE —— 有限范围内**没有**任何仍然存留的 e40 时代 BIN/HEX/AXF/ELF。
+  找到的是 (a) e40 的构建/烧录**记录**(R-01..R-05), (b) 可完整复原的**源码**(git 对象),
+  (c) 一个此前未记录路径的**旧工作副本** OLD_PROJECT_01, 内含更早一代(2026-09-10)的真实构建产物
+  与烧录回执(C-12..C-14, R-06/R-07)。三者都不是 e40 的原烧录文件。
+候选计数: E40_LINKED_ARTIFACT=0  POSSIBLE_E40_ARTIFACT=0  OTHER_KNOWN_ARTIFACT=15  NOT_IDENTIFIED=0
+来源等级: GIT=可直接核对的提交/对象; LOG=仓内原始日志(本轮实读); FS=文件系统实测(尺寸/散列/时间);
+          DOC=阶段文档自述; INFER=由上述等级支撑的推断(单列并标注); USER_REPORTED=用户口述(本轮未实测)。
+本任务硬件动作集合为空: 未开 COM5、未枚举/扫描设备、未连接探针、未读 Flash、未备份芯片、
+未烧录/擦除/复位/启动目标、未操作供电/接线/SW1/TMC/电机、未执行任何板上命令、未启动下载或调试会话。
+零测试执行 / 零构建执行 / 零硬件动作。未上传任何 AXF/ELF/压缩包/固件原件。
+
+================================================================================================
+A. 开工只读核对 (§3)
+================================================================================================
+  分支                      : phase8/tmc-drive-config
+  本地 HEAD == document_base: 2ab886ff9a60a2b2283ff3ba200d337235cb2da9
+  A0 实现 code_commit       : b27e5f14bdb62f645b93eace23800b40369717d4
+  工作树                    : git status --porcelain 行数 0 ⇒ 无用户改动需要保留
+  冻结引用本轮未动: main 1b3757eec550802a3973e66790af422d81d3d373 / phase7/full-embedded-software 6d3fbc559d45673d7550eb73dec5a4ade5bb34df
+        标签对象 097935fec5a6f2467261ab1ad449ff0b1d398250 / 解引用固件 e40a9b95ef709e6a80444f9f3949dfdd70ba96ba
+  e40 提交   : e40a9b95ef70  2026-09-25 21:28:05 +0800  "fix: close phase7 on-target validation defects"
+  标签创建   : v0.7-phase7-software-board-validated  2026-09-25 23:25:27 +0800 (GIT)
+  适用规则   : 仓库根**无** AGENTS.md(git ls-files 无匹配); 唯一规则文件为上游
+        rt-thread-master/AGENTS.md, 且它被 .gitignore 第 8 行忽略(未跟踪)。其与本任务一致的条目:
+        不提交生成物/二进制/日志/临时文件、最小可验证改动、禁止改写历史。
+  根 .gitignore(已跟踪)实测: 默认 /* 全忽略 + 白名单放行 rt-thread-master 的部分子树, 另
+        全局忽略 build/ 与 *.log ⇒ "被忽略的构建输出"这一层确实存在于本工程, 必须实地枚举(见 §B)。
+  未做: reset/rebase/force/merge/checkout 老版本覆盖当前工程; 历史内容一律只读
+        git show / cat-file / rev-parse / ls-tree / log --name-only / fsck; 未启动 Keil; 未跑任何测试;
+        未安装软件; 未生成任何新固件; 未用源码重建补造"旧原件"。
+
+================================================================================================
+B. 搜索范围(代号 + 包含/排除) §4.1
+================================================================================================
+  第 1 层 仓库自身(含未跟踪/被忽略内容) —— PROJECT_ROOT 整树, 忽略规则命中的输出目录实地枚举:
+       BSP/build/**(当前默认目标输出) | BSP/build/a0/**(测量目标输出) | BSP/rtthread.bin
+       BSP/*.log(23 个历轮构建/烧录日志) | BSP/project.uvprojx/.uvoptx | _s2work/** | reports/**
+       tests/** | 仓库根 6 个 phase8_*_source_review.zip + ARCHIVE_01
+       实测: _s2work/** 里 .axf/.bin/.hex 类文件 **0 个**(只有历轮夹具/日志/补丁脚本);
+             reports/firmware/ 下只有本轮 A0 归档的两份 BIN(即任务书点名的排除对象)。
+  第 2 层 配置与日志指出的具体路径 —— uvprojx 的 OutputDirectory(原文用反斜杠: .\\build\\ 与
+       .\\build\\a0\\) 与 AfterMake 输出名(rtthread.bin / build\\a0\\measure-a0.bin);
+       两份烧录日志的 Load 路径 = PROJECT_ROOT/BSP/build/rt-thread.axf(第 1 层已覆盖);
+       文档所称"旧仓库"已定位(见下)。
+  第 3 层 工作区内明确属于本项目的旧副本/压缩包 —— 按名 + 内容 + 日期命中:
+       **OLD_PROJECT_01**(旧工作副本根, 下含 OLD_BSP_01 同板卡 BSP, 带完整 build/ 产物)
+       SNAPSHOT_01(同目录) | ARCHIVE_01/ARCHIVE_02 | ARCHIVE_GROUP_03..08 | SCRATCH_GROUP_01..10
+       SCRATCH_LOG_01(D 盘根 6 个 r1/r2 构建日志散件) | EVIDENCE_TEMP 下 **9 个 ns800-* 取证目录
+  「旧仓库」的定位(此前是缺口, 本轮关闭为 INFER 级):
+       文档三处提到它但**均未记录绝对路径**: 开发进度.md:881 "从旧仓库移植
+       ns_flash/ns_storage/flash_demo 测试栈"; 调试记录.md:86 "旧仓库(旧版 RT-Thread)同样的代码
+       工作正常"; 调试记录.md:161 "从旧仓库复制同板卡的 project.uvoptx 过来, 调试器同为 CMSIS-DAP"。
+       ⇒ 命中的 OLD_PROJECT_01 同时满足这三条(其 applications/ 恰是那套测试栈、其 project.uvoptx
+         mtime 2026-09-10 20:32 早于当前仓库 uvoptx 的 2026-09-25 13:46、且其 flash_test.log 走的
+         是同一 CMSIS-DAP 下载链)。**这是推断**: 目录内**没有 .git**, 无任何散列/版本标记可自证身份。
+       排除依据(FS 级, 整树实测): SNAPSHOT_01 **全树**(含 600 MB 上游)按 e40 时间窗口
+       2026-09-20..10-01 find 命中 **0 个文件**, 且整树最新 mtime = 2026-09-10 23:08 ⇒ 该副本
+       整体停在 Phase 2 移植期, 没有承载 e40 时代的构建, 日期即可整体排除。
+  命中项目名后按证据排除的: DOWNLOAD_01/01X(本项目 Flash 移植**源码**包)、
+       DEVKIT_01/01X(厂商资料包, 整树最新 2026-04-21)、UNRELATED_MCU_01(同名规则命中的另一 MCU)
+  明确**不**搜(排除范围): 与本项目无关的个人目录/游戏/音乐/IM/工具安装目录; 聊天与账号凭据文件;
+       网络盘与云端账号(不登录、不调客户端); TOOLCHAIN_01(工程输出路径不指向它, uvprojx 实测输出
+       在 build 子目录内); Windows 卷影副本/文件历史记录(需特权工具, 未调用); 其它机器与移动介质。
+  仅做名字级探测、未读内容的: RECYCLE_D(maxdepth 2 共 13 条目)/RECYCLE_C(119 条目) 按
+       *rt-thread*/rtthread*/*.axf/*.hex 匹配 ⇒ 0 命中; CLOUD_SYNC_01/02 maxdepth 3 按
+       *ns800*/*sinepad*/*novosns*/rtthread*/rt-thread* ⇒ 0 命中。
+  完整性兜底(不依赖文件名): ①按**时间**扫 —— 工作树(mtime 2026-09-25..09-27, 排除 .git)共 26 个
+       文件: 5 .c + 6 .h + 8 .py(一次性助手脚本) + 4 .log + 2 .md + 1 .uvoptx;
+       逐个 file --mime-type 判定 = 11 text/x-c + 14 text/plain + 1 text/xml, **二进制 0 个**;
+       ②按**尺寸**扫 —— 仓库树内(排除 .git)>900 kB 的条目实测列示, 固件类只有 C-01/C-03 两个
+       1.6 MB 级 AXF 与归档的 C-05/C-06, 全部为 2026-10-25 的本轮产物;
+       ③按**Git 对象**扫 —— 见 §E。三种独立兜底在三个层内都未出现 e40 代产物。
+
+================================================================================================
+C. 实际执行的命令摘要与错误 (§5)
+================================================================================================
+  只读列举 : ls -l --time-style=long-iso / find -maxdepth -iname -newermt -size -printf(名/尺寸/mtime)
+  只读判定 : file --mime-type(时间兜底清单逐项), stat(尺寸与亚秒 mtime)
+  只读散列 : python hashlib 对每个候选/记录文件读全字节算 SHA-256(原件只读打开, 未改任何属性)
+  只读 Git : ls-remote / rev-parse / show -s / for-each-ref / log --all --diff-filter=ACDMTR
+             --name-only / diff --numstat --name-only / cat-file -s / hash-object / fsck --dangling(只列不导出)
+  压缩包   : python zipfile.infolist()/namelist() **只列目录**(未解出任何固件条目 —— 列目录已证明
+             没有相关条目, 因此无需解包; 本轮实际**未**执行任何 extract, 未运行包内任何脚本/程序)
+  未新增常驻搜索框架/runner/工具; 一次性辅助脚本与证据生成脚本一律放仓外 EVIDENCE_TEMP。
+  错误与限制(如实):
+    - 一次对 PROJECT_ROOT 全树的 find 因 1.3 GB 上游树超时 ⇒ 改写成"限定 novosns 子树 + 显式根
+      列表"的多次有界查询(这是本轮唯一的基础设施性重跑, 不影响结论)。
+    - 一次对 SNAPSHOT_01 全树(600 MB 上游)的 mtime 扫描超出前台 2 分钟限制 ⇒ **改后台跑完, 退出码 0**,
+      结果为"e40 时间窗口 0 命中 + 整树最新 2026-09-10 23:08"(§B 已引用)。即该层**已完整覆盖**,
+      不是部分覆盖; 超时只是执行方式问题, 没有留下未扫的目录。
+    - 一次 git for-each-ref --date=iso 因该选项不存在而失败 ⇒ 改用 --format=...%(taggerdate:iso) 重跑成功。
+    - 无权限类失败: 本轮所有纳入范围的根均可读, 没有"因权限无法读取"的根。
+
+================================================================================================
+D. e40 身份的构建/烧录记录(原件保持原状, 只读内容与散列)
+================================================================================================
+  R-01  BSP/build_agent2.log                   3538 B  mtime 2026-09-25 21:25:21
+      sha256 = 75290cec900772ae5bc3251204cdb5f8ade476ae10c633cf32e1516da4bad4d4
+      e40 上板前的最后一次 clean Rebuild All: Rebuild target 'rt-thread', 131 个 compiling 行, Code=129306 RO-data=46578 RW-data=2200 ZI-data=83212, 终态 0 Error(s) 0 Warning(s), AfterMake fromelf --bin → rtthread.bin
+  R-02  BSP/build_c.log                        3538 B  mtime 2026-09-26 00:00:44
+      sha256 = 665aa8f6a00fd8aab699f0f4979f34454d21a948979aad163c31ad09e26a0df4
+      同一 Program Size 的第二次 clean Rebuild All(131 单元), 终态 0 Error(s) 0 Warning(s)
+  R-03  BSP/flash_agent.log                     192 B  mtime 2026-09-25 21:26:03
+      sha256 = fbb47f0598345a44162b7dcbe01b40bbaaafbe11f9b4d18af50108284923b293
+      烧录回执: Load PROJECT_ROOT/BSP/build/rt-thread.axf(原文是工程根下的绝对路径, 分隔符为转义双反斜杠) + Erase Done./Programming Done./Verify OK. + Flash Load finished at 21:26:03
+  R-04  BSP/flash_c.log                         192 B  mtime 2026-09-26 00:01:24
+      sha256 = 1a67dda029f474c382546e50e5c896a67a8b5834e40404e6a62e0c4898350fb6
+      第二次烧录回执, 同一 AXF 路径, finished at 00:01:24
+  R-05  BSP/project.uvoptx                    61950 B  mtime 2026-09-25 13:46:08
+      sha256 = 62d2d8f14afbeb1c45f2852cd357b0fee1a6e5ee1110d820d4213c6230387cf1
+      烧录/调试配置落盘载体: TargetName=rt-thread, pMon=BIN\CMSIS_AGDI.dll(CMSIS-DAP); mtime 2026-09-25 13:46:08, 早于两次构建/烧录
+  R-06  OLD_BSP_01/build_test.log              3114 B  mtime 2026-09-10 21:14:20
+      sha256 = 17ed5c960b45e98ed3171ad8bba380a4c8f79de5d1ad74c7beb1fe37f1bed177
+      旧工作副本 2026-09-10 的 Rebuild All 日志: Code=77098 RO-data=20746 RW-data=1712 ZI-data=29052, 0 Error(s) 0 Warning(s), fromelf --bin → rtthread.bin
+  R-07  OLD_BSP_01/flash_test.log               177 B  mtime 2026-09-10 21:22:22
+      sha256 = 35b9f0de14679ddc6f4106f80a0d6ebff7452a40fc2cffdb269845f14e5422d0
+      旧工作副本的烧录回执: Load OLD_BSP_01/build/rt-thread.axf(原文是该副本内的绝对路径), Verify OK, finished at 21:22:22 ⇒ 同一板卡/同一下载链的更早一次实证
+  e40 时间线(全部来自上面的实测 mtime 与 GIT 提交时间, 不是推测):
+    2026-09-25 13:46:08  project.uvoptx 落盘(烧录配置 CMSIS-DAP 就位)
+    2026-09-25 21:25:21  build_agent2.log  clean Rebuild All, 131 单元, Code=129306 RO=46578 RW=2200 ZI=83212
+    2026-09-25 21:26:03  flash_agent.log   Load .../build/rt-thread.axf → Erase/Programming/Verify OK
+    2026-09-25 21:28:05  git 提交 e40a9b95ef70 (标签 23:25:27)
+    2026-09-26 00:00:44  build_c.log       同尺寸 clean Rebuild All(131 单元)
+    2026-09-26 00:01:24  flash_c.log       同一 AXF 路径再次烧录成功
+  交叉一致性(GIT + LOG + DOC 三方对齐):
+    - git diff --numstat e40a9b95ef70..6d3fbc559d45 -- "*.c" "*.h" "*.uvprojx" rtconfig.h  => **0 行**,
+      全量 --name-only 只有 PHASE7_PROGRESS.md / PHASE8_HARDWARE_VALIDATION_20260925.md / README.md
+      ⇒ 21:26 与 00:01 两次烧录之间构建输入**逐字节同内容**, 两次烧的是同一份映像。
+    - BSP/PHASE7_PROGRESS.md 文末"Phase 7 真机上板验证(2026-09-25 20:45–21:30, @03d6438 → 修复 →
+      @e40a9b95ef70)"一节记的最终 Program Size 与 build_agent2.log **逐字相同**(DOC 级, 不携带散列)。
+  将来若出现同代 BIN 的初筛标记(只是线索, 不构成身份):
+    - 单元数判别: e40 时代两次构建都是 **131** 个 compiling 行; 本轮 A0-R1 默认目标是 **133** 行
+      (实测 buildkeil_default_r1.log)⇒ 131 单元时代的 AXF/MAP 必早于当前工程, 反向也可用它排除。
+    - Program Size 判别: e40 = 129306/46578/2200/83212(装载内容 Code+RO+RW = **178084 B**);
+      当前默认 = 173762/76806/2188/83784; A0 测量 = 180802/79718/2188/91504。
+    - 版本横幅实测线索(来自文档, 非本轮板上读取): 板上启动横幅为
+      "[BOOT] 1 safe-gpio … 11 startup-selftest OK -> state=READY", 文档记这些新命令与 [BOOT] n 串
+      "已在 rtthread.bin 内"。
+
+================================================================================================
+E. Git 侧穷尽性(排除"曾经提交过旧原件"这一支)
+================================================================================================
+  git log --all --diff-filter=ACDMTR --name-only -- "*.bin" "*.hex" "*.axf" "*.elf"
+    => 命中提交只有 c5028f4 / 6a4d9d6, 文件只有 reports/firmware/phase8-target-measurement-a0/
+       {default.bin, measure-a0.bin} ⇒ 本仓库历史上**从未提交过**任何 e40 时代固件, 也没有
+       曾被提交后又删除的旧固件。
+  git fsck --dangling => 10 个悬空 blob + 1 个悬空 tree(空树 4b825dc6…); 悬空 blob 尺寸降序前几名
+    53383 / 15277 / 9363 / 7760 / 5729 / 3282 B, **最大 53383 B** 远小于 e40 的 178084 B 装载内容
+    (AXF 量级 1.3–1.6 MB) ⇒ 对象库里不存在被遗弃的旧固件。未 --lost-found 导出任何对象。
+  时间兜底: 工作树 2026-09-25..09-27 窗口的 26 个文件逐项 mime 判定为**全文本**(§B 末), 即
+    不看文件名也没有留下 e40 产物。
+  源码侧(与"原烧录文件"是两件事): e40 的源码树完整可取, 且个别文件至今未再改动 —— 本轮实测
+    git hash-object <工作树文件> 与 git rev-parse e40a9b95ef70:<同路径> 逐字节比较:
+      diagnosis.c SAME / current_adc.c SAME / project_config.c SAME / main.c SAME
+      supervisor.c DIFF / motor.c DIFF (后续轮次改动)
+    ⇒ 只支持"将来按需重建", 不证明存在过原烧录文件; §3.4 明令不得用 rebuild 补造旧原件, 本轮零构建。
+
+================================================================================================
+F. 候选清单与逐项结论(§4.4 四分类)
+================================================================================================
+  C-01  BSP/build/rt-thread.axf
+      类型=ELF32/AXF (armclang)  1645448 B  mtime 2026-10-25 20:00:47
+      sha256 = 76d19ced06ebf5f869d3b2f4ffd9692f9691e0f4d0dbf6d13a5581edc6416758
+      关联: 与烧录日志 R-03/R-04 的 Load 路径逐字相同(路径相同, 字节已换)
+      结论: OTHER_KNOWN_ARTIFACT —— 本轮 A0-R1 默认目标 Rebuild All 的产物; 它占据的正是 2026-09-25 21:26 被烧录的那个**同一路径** AXF —— 旧内容已被后续 Rebuild All 覆盖, 盘上不存在"e40 时代的这个文件"
+  C-02  BSP/rtthread.bin
+      类型=raw BIN  251148 B  mtime 2026-10-25 20:00:47
+      sha256 = 41717367e4e1401deb5f59eb27d1f35483108c6241eb30a5b58b28aad5b425de
+      关联: sha256 与代号 C-05(reports/firmware/phase8-target-measurement-a0/default.bin)逐字节相同
+      结论: OTHER_KNOWN_ARTIFACT —— AfterMake `fromelf --bin` 输出; 与 C-05 同散列 ⇒ 当前默认镜像, 不是 e40
+  C-03  BSP/build/a0/rt-thread-a0.axf
+      类型=ELF32/AXF (armclang)  1674612 B  mtime 2026-10-25 20:01:08
+      sha256 = c8176c19188f66654f6bcee5b265ae2487d0c6130d8ae354e8c262cfbd3c01f6
+      关联: A0-R1 复审报告第 3 节身份
+      结论: OTHER_KNOWN_ARTIFACT —— A0-R1 测量目标产物(schema=2, 含 spm 记录器), 全新实现, e40 里不存在这些代码
+  C-04  BSP/build/a0/measure-a0.bin
+      类型=raw BIN  261100 B  mtime 2026-10-25 20:01:08
+      sha256 = 358fd81ae5853ea52df1e1ab367ea41af0f5e86679082a755c17dac3429b0e1b
+      关联: 同上
+      结论: OTHER_KNOWN_ARTIFACT —— A0-R1 测量目标 BIN; 与 C-06 同散列
+  C-05  PROJECT_ROOT/reports/firmware/phase8-target-measurement-a0/default.bin
+      类型=raw BIN  251148 B  mtime 2026-10-25 20:16:19
+      sha256 = 41717367e4e1401deb5f59eb27d1f35483108c6241eb30a5b58b28aad5b425de
+      关联: A0-R1 已接受镜像身份
+      结论: OTHER_KNOWN_ARTIFACT —— 任务书 §2 点名用于"识别与排除误认"的新默认镜像; 文件名含 default 但不是 e40
+  C-06  PROJECT_ROOT/reports/firmware/phase8-target-measurement-a0/measure-a0.bin
+      类型=raw BIN  261100 B  mtime 2026-10-25 20:16:19
+      sha256 = 358fd81ae5853ea52df1e1ab367ea41af0f5e86679082a755c17dac3429b0e1b
+      关联: A0-R1 已接受镜像身份
+      结论: OTHER_KNOWN_ARTIFACT —— A0 候选测量镜像(未来板级包的批准对象)
+  C-07  ARCHIVE_01 (rt-thread-master.zip)
+      类型=ZIP (45447 条目)  605015358 B  mtime 2026-09-03 20:29:08
+      sha256 = eb8f5b5e6867303b1eb74954becd7d2faae30ac2f44aca316bd14109c33e52a9
+      关联: 与 ARCHIVE_02 同散列(两个来源都保留, 见 C-15)
+      结论: OTHER_KNOWN_ARTIFACT —— 2026-09-03 的上游 RT-Thread 全树快照, 早于本项目第一次提交(git 首个提交 3fb2edf 2026-09-10 23:29); zip 内 ns800rt7p65-nssinepad 共 33 个条目且固件类 **0 个**; 全库 .bin/.hex/.axf/.elf 条目 32 个, 均属其它厂商 BSP 库存件
+  C-08  ARCHIVE_GROUP_08 (phase8_f2d_r2_source_review.zip)
+      类型=ZIP (682 条目)  2282925 B  mtime 2026-10-18 20:36:05
+      sha256 = a9b728e8b249b5b77030e4d39e04e16aa3621b2359ae473e4fe0eba0deee976f
+      关联: 同组另 5 个 zip(f2a/f2b/f2c/f2d/f2d-r1)同样只含源码与文本
+      结论: OTHER_KNOWN_ARTIFACT —— 2026-10-18 的**源码**审查包; 目录列表里 .bin/.hex/.axf/.elf/.map/.o/.dep 类条目数为 0, 且整包 2282925 B 容不下 1.6 MB 级 AXF
+  C-09  UNRELATED_MCU_01 (…/<另一个 MCU 工程>.axf)
+      类型=ELF32/AXF  1017356 B  mtime 2026-09-20 14:00:02
+      sha256 = 41a376ea1ce6c405ab57ffc6a07b28b0a8084723b3167b4e3c57f71003402176
+      关联: 非本项目, 未进一步解析
+      结论: OTHER_KNOWN_ARTIFACT —— 按名匹配命中的另一个 MCU 工程产物; 工程名/尺寸/日期(2026-09-20, 早于 e40 构建)均与 NS800 无关
+  C-10  DOWNLOAD_01 (NS800_FLASH_Full_v1.0.zip)
+      类型=ZIP (16 条目)  26266 B  mtime 2026-09-10 19:45:43
+      sha256 = ea0e63c94c371065c5619025447490087c9a2882ac2b3dd06196d2e788ea13a8
+      关联: 包内 README/SHA256SUMS/TEST_RESULTS 属 Phase 0/2 移植件
+      结论: OTHER_KNOWN_ARTIFACT —— 本项目自己的 ns_flash/ns_storage **源码**交付包(包内最新条目时间 2026-09-10 07:37), 比 e40 构建早 15 天, 固件类条目 0
+  C-11  DEVKIT_01X + DEVKIT_01 (厂商 NS800RT7P65 开发包)
+      类型=厂商资料包(索引 HTML)  9529 B  mtime 2026-04-21 19:38:03
+      sha256 = ec4cf070d2ce0d6d47f16630732b815bf89508c752185fb2e6bb405c49de63e9
+      关联: 散列对象=包内索引 HTML 一份(DEVKIT_01 zip 只列目未取件); 其内 SDK/v0.4.0/third_party/rt-thread 只有源码(src/include/components/libcpu), 无 BSP 构建树
+      结论: OTHER_KNOWN_ARTIFACT —— 整棵解包树里**最新** mtime 为 2026-04-21 19:38(zip 本体 2026-08-29 12:05), 唯一的固件类文件是 2025-12-08 的 PCAN 下载器工具 Application.bin(11192 B) ⇒ 时间上不可能装有 2026-09-25 构建的 e40 映像, 按日期整体排除
+  C-12  OLD_BSP_01/build/rt-thread.axf
+      类型=ELF32/AXF (armclang)  947336 B  mtime 2026-09-10 21:14:19
+      sha256 = 02d7c6aba9783271e46d15b5e92f272b525e16d223920e63b3a93a97815e3318
+      关联: 旧副本 flash_test.log 证明该 AXF 曾于 2026-09-10 21:22 被真实烧录(同一 CMSIS-DAP 链)
+      结论: OTHER_KNOWN_ARTIFACT —— 旧工作副本 Phase 2 Flash 移植期的构建产物(mtime 2026-09-10 21:14, build_test.log 记 Code=77098 RO=20746 RW=1712 ZI=29052), 与 e40 的 129306/46578/2200/83212 不同代; 该副本 applications/ 里只有 main/ns_flash/ns_storage/flash_demo/tmc2209_demo, 完全没有安全链源码(motor/supervisor/stop_priority/blackbox) ⇒ 早于整个 Phase 7 工作
+  C-13  OLD_BSP_01/rtthread.bin
+      类型=raw BIN  98228 B  mtime 2026-09-10 21:14:19
+      sha256 = f8f8a08520b1ed015767fcd501b1587f4fa89baec5479946378a3f76cb3c6134
+      关联: 与 C-12 同批
+      结论: OTHER_KNOWN_ARTIFACT —— 同一次旧构建的 fromelf 输出(98228 B, 2026-09-10 21:14); e40 的装载内容为 178084 B, 尺寸即排除
+  C-14  OLD_BSP_01/rtthread.elf + rtthread.map
+      类型=ELF32 (scons/GCC 路线)  988632 B  mtime 2026-09-03 23:25:05
+      sha256 = 47aca1e94312ab6c2aade944a78c918ad9bba36060d7d2f6d8ed0e9e9f474372
+      关联: 与 rtthread.map(912578 B, 同时间) 同批
+      结论: OTHER_KNOWN_ARTIFACT —— 2026-09-03 23:25 的非 Keil 路线早期件, 早于本项目第一次提交之后的移植工作
+  C-15  ARCHIVE_02 (= ARCHIVE_01 同散列)
+      类型=ZIP (45447 条目)  605015358 B  mtime 2026-09-03 20:29:08
+      sha256 = eb8f5b5e6867303b1eb74954becd7d2faae30ac2f44aca316bd14109c33e52a9
+      关联: 同 C-07
+      结论: OTHER_KNOWN_ARTIFACT —— 与 C-07 逐字节相同, 按任务书要求去重但保留第二来源
+  为什么 POSSIBLE_E40_ARTIFACT = 0(而不是"有一堆可疑候选"):
+    盘上唯一还落在"当年被烧录那个路径"上的 AXF/BIN 是 C-01/C-02, 而它们的 SHA 与已接受的 A0
+    归档镜像逐一相同 ⇒ 身份可以**确定地**判为"本轮新产物", 不是待查疑项。其余命中项都各有
+    独立排除依据(日期早于 e40 / 尺寸量级不符 / 目录内无固件条目 / 非本项目)。
+  相同 SHA 去重(保留全部来源): C-02 == C-05; C-04 == C-06; C-07 == C-15。
+  本轮未对 HEX 做任何"装载字节摘要"(搜索中没有找到 HEX 原件); 也没有把 AXF/ELF 悄悄转成 BIN
+  或声称"存在原 BIN" —— C-01/C-03/C-09/C-12/C-14 一律按 AXF/ELF 原样登记。
+
+================================================================================================
+G. 与当前 A0 两份镜像的相同/不同关系(防误认)
+================================================================================================
+  default.bin    251148 B  sha256=41717367e4e1401deb5f59eb27d1f35483108c6241eb30a5b58b28aad5b425de
+  measure-a0.bin 261100 B  sha256=358fd81ae5853ea52df1e1ab367ea41af0f5e86679082a755c17dac3429b0e1b
+  两份都属**新默认/新测量目标**, 都不是 e40: e40 时代 Program Size(129306/46578/2200/83212)与
+  173762/76806/2188/83784、180802/79718/2188/91504 在 Code/RO/RW 三项上量级不同 ⇒ 尺寸即可排除;
+  绝不因文件名含 default / rt-thread 就认作 e40。
+  A0 事实(schema=2、记录 120 B、64 槽 7680 B、`spm` 命令注册、三入口插桩)只属于新测量实现,
+  e40 源码里没有这些代码 —— 反过来也证明这两份不可能是 e40。
+  default.bin 是"新默认目标"镜像, **不是**板上 e40 的已验证回退镜像。
+
+================================================================================================
+H. 每条证据"直接读到什么 / 证明到哪里 / 仍不能证明什么"(§4.3 三分列)
+================================================================================================
+  H-1  R-01/R-02 两份构建日志
+       直接读到: 目标名 rt-thread、131 个 compiling 行、Program Size 四项、0/0 终态、
+                 AfterMake 的 fromelf 命令行、.\build\rt-thread.axf 输出路径。
+       证明到: e40 上板那次构建的**代次特征与输出路径**; 且两次构建输入零变化 ⇒ 两次烧录同源。
+       不能证明: 日志不含任何散列/文件清单, 也没记源码 SHA ⇒ 单靠日志无法把某个 BIN 字节流绑定到 e40a9b95ef70。
+  H-2  R-03/R-04 两份烧录回执
+       直接读到: 完整 Load 路径 + "Erase Done.Programming Done.Verify OK." + 完成时刻。
+       证明到: 21:26:03 与 00:01:24 **各完成一次真实烧录**, 下载件是那个路径下的 AXF, 且 Keil
+               自身做了 Verify(证明"下载链可用+当时写入成功")。
+       不能证明: 该 AXF 当时的字节内容/散列(回执不打印镜像散列); 也不能证明今天板上仍是它
+               —— 板上身份继续 USER_REPORTED_E40, 本轮未读 Flash。
+  H-3  R-05 uvoptx
+       直接读到: TargetName=rt-thread, pMon=BIN\CMSIS_AGDI.dll。
+       证明到: 当时落盘的下载/调试驱动是 CMSIS-DAP(与文档"板载 DAP/DAPLink"一致)。
+       不能证明: 具体探针序列号、端口、以及本轮任何连接能力(本轮未连接)。
+  H-4  GIT 时间线与提交(§D/§E)
+       证明到: 烧录发生在提交前 2 分 02 秒与提交后 2 小时 33 分; 两次烧录间构建输入零变化;
+               仓库从未提交/从未悬空任何旧固件; e40 源码可完整取出。
+       不能证明: 21:25:21 那次构建所用的**工作树是否恰好等于 e40a9b95ef70 的树** —— 提交在 3 分 44 秒之后
+               才发生, 期间若还有未提交的微调, Git 无法反驳。**这是本链剩余的身份缺口**, 不冒充已证明。
+  H-5  PHASE7_PROGRESS.md / PHASE8_HARDWARE_VALIDATION_20260925.md(DOC 级)
+       证明到: 上板窗口、板型、COM5/115200、DAPLink 记载、未接电机、逐项实测现象、最终 Program Size。
+       不能证明: 任何镜像字节身份(文档不携带散列); 也不覆盖"板上现在仍是该固件"。
+  H-6  OLD_PROJECT_01(C-12..C-14, R-06/R-07)
+       直接读到: 旧副本的 build/rt-thread.axf(947336 B, 2026-09-10 21:14)、rtthread.bin(98228 B)、
+                 rtthread.elf(988632 B, 2026-09-03 23:25)、build_test.log(Code=77098)、
+                 flash_test.log(Load 该路径 AXF, Verify OK, 21:22:22)。
+       证明到: "旧仓库"这一层**已被实地搜索并排除**, 且它属于 Phase 2 移植代次(applications/ 内
+               没有安全链源码), 与 e40 相差 15 天与一整代功能。
+       不能证明: 任何 e40 代映像的存在(它比 e40 早 15 天且差一整代功能); 也不能证明板上现状。
+       补充登记(它反向提供的东西): 该副本证明"同一板卡 + 同一 Keil/CMSIS-DAP 下载链"可反复
+               下载并 Verify 成功(能力证据), 但**不是** e40 的回退依据。
+  H-7  源码可复原 + 四份文件至今与 e40 逐字节相同
+       证明到: e40 的源码内容可精确取出且未被覆盖。
+       不能证明: 用它重建出的映像与当年烧录字节相同 —— 工具链补丁级差异、链接顺序、以及
+       __DATE__/__TIME__ 横幅(本轮实测: 同一默认目标两次 Rebuild All 之间只差 6 字节的 __TIME__)
+       都会造成差异 ⇒ 将来即便重建也只能标 E40_SOURCE_REBUILD, 不得称原烧录件。
+
+================================================================================================
+I. 搜索缺口(如实登记; 未为扩大范围打断用户)
+================================================================================================
+  G-1 (本轮关闭为 INFER, 残留见后) "旧仓库"绝对路径文档未记录 ⇒ 按名+内容+日期定位为 OLD_PROJECT_01;
+       残留: 该等同关系**没有 .git、没有散列**可自证, 若用户另有一个更早的 RT-Thread 工作副本, 需
+       用户提供路径后再查一次 —— 这是本轮之后**最有价值的一条待补**。
+  G-2 (本轮**已关闭**) SNAPSHOT_01 全树 e40 时间窗口扫描: 后台跑完, 0 命中, 整树最新 2026-09-10 23:08。
+  G-3 CLOUD_SYNC_01/02 只做名字级探测(0 命中), 未深入列举内容(网盘常混装无关个人文件)。
+  G-4 RECYCLE_D/RECYCLE_C 只做名字级探测(0 命中), 未解 $I 元数据、未枚举全部条目名。
+  G-5 Windows 卷影副本/文件历史记录未查(需 vssadmin 等特权工具, 且会触碰非本项目快照)。
+  G-6 TOOLCHAIN_01(Keil 安装目录)与 EVIDENCE_TEMP 之外的个人 Temp 未做全量固件名枚举 —— 依据: uvprojx
+       的 OutputDirectory/ListingPath 实测全部指向 PROJECT_ROOT 内。
+  G-7 ARCHIVE_01/02(上游全树 zip)只看目录列表的固件类条目, 未逐个解包比对 —— 依据: 条目时间
+       (2026-09-02/03)整体早于 e40 构建(2026-09-25), 时间上即可排除。
+  G-8 未做任何外部/云端/网络检索; 未联系厂商索取发布包; 未查其它机器、手机或移动介质。
+  G-9 板上现状未验证: 本轮没有读 Flash, 所以"板上仍是 e40"这个前提本身仍是 USER_REPORTED_E40。
+
+================================================================================================
+J. 原件保护与写操作自证
+================================================================================================
+  所有被搜索文件仅以**读**方式打开(读全字节算散列 / stat / find -printf / file / zipfile 列表)
+  未移动、未重命名、未改时间、未 chmod、未删除、未覆盖任何既有文件 —— 候选与记录文件的本轮后
+  mtime 与列举时读到的一致(见 §F/§D 表), C-01..C-15 与 R-01..R-07 原件位置全部保持原状。
+  仓库内新增文件只有任务书 §5 允许的三份: 本 txt、交接 .md、交接 .json。
+  未改生产/HAL/内核、四宏、Keil 工程、tests/host、既有 A0 证据、操作包、阶段文档、.gitignore。
+  未上传未审查的 AXF/ELF、未上传任何压缩包或新发现的镜像(本轮也没有可上传的 e40 固件原件)。
+  未运行任何候选程序; 未调用历史下载脚本(UV4 -f / 烧录批处理一次都没跑); 未解包执行任何包内脚本。
+
+================================================================================================
+K. 下一步: 恢复候选现状(不含任何硬件 GO)
+================================================================================================
+  现状: **没有**可供审查的 e40 恢复镜像 ⇒ BLOCKED_ROLLBACK **不关闭**; 本轮不改动它的状态, 也不把
+  "找到记录/找到旧副本"说成恢复能力已具备。
+  要关闭它还缺的依据(按成本与价值排序):
+  (1) 用户提供 G-1 残留的其它备份位置(更早的工作副本 / 其它机器 / 网盘里的具体目录 / 移动介质);
+  (2) 或另行授权**一次板上 Flash 只读转储 + 散列** —— 这是"板上现在是什么"的唯一直接证据, 需单独批准,
+      本轮未申请也未执行;
+  (3) 或明确决定"以 e40a9b95ef70 源码重建并登记为 E40_SOURCE_REBUILD"作为可接受恢复件, 并同时声明它与
+      当年烧录件不逐字相同、只是功能等价候选、需板上实测确认;
+  (4) 已确定的可用事实(能力证据, 非回退依据): 板载 DAP + pMon=BIN\CMSIS_AGDI.dll、COM5/115200/8N1、
+      以及**四次**成功烧录回执(e40 两次 + 旧副本一次 + 更早一次)证明该下载链对本板可写入并 Verify OK。
+  本报告不构成下载/恢复/Flash 读取/重建的授权, 也不因找到记录放宽任何门禁。
+  继承的既有结论(本轮不重审、不重跑): A0-R1 交付 HEAD 2ab886ff9a60a2b2283ff3ba200d337235cb2da9 已取得限定离线软件/主机合同/归档镜像
+      身份的 SOFTWARE_REVIEW_GO(code_commit b27e5f14bdb62f645b93eace23800b40369717d4); S2 GO 仍是 bcdec631, PREP GO 仍是 bbf66ba;
+      按任务书 §2 在本交接中登记, 未为此重跑主机链或重建 Keil。
+  现场与工具信息按 USER_REPORTED 登记(本轮未实测, 且**不构成**连接/上电/串口/烧录授权):
+      VM 外接 AC/DC 24 V; 逻辑电源来自 USB 经板载 LDO; 最近确认未上电; 断电方式 = 拔 USB 或
+      AC/DC 适配器开关; TMC 模块在位、可拔出; 电机物理未接; SW1 当前使能; 有人在现场;
+      板载 DAP(仓库记录 DAPLink/CMSIS-DAP, 已有 Keil 下载配置); 控制台 COM5 / 115200 / 8N1。
+
+STOP: E40_ARTIFACT_SEARCH_COMPLETE / AWAITING_ARTIFACT_REVIEW
+STOP: NO HARDWARE AUTHORIZATION
+STOP: NO FLASH READ / NO BUILD / NO SERIAL / NO PROGRAM / NO RESET

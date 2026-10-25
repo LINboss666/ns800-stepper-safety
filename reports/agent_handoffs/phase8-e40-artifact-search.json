@@ -1,0 +1,656 @@
+{
+  "task_id": "phase8-e40-artifact-search",
+  "task_title": "NS800 e40 旧固件离线查找(不接触开发板)",
+  "task_book": "NS800_E40_Artifact_Search_Qoder_Task_20261025.md",
+  "date": "2026-10-25",
+  "timezone": "Asia/Shanghai",
+  "executor": "本地 Qoder Agent",
+  "document_base": "2ab886ff9a60a2b2283ff3ba200d337235cb2da9",
+  "a0_code_commit": "b27e5f14bdb62f645b93eace23800b40369717d4",
+  "e40_target": {
+    "firmware_commit": "e40a9b95ef709e6a80444f9f3949dfdd70ba96ba",
+    "tag": "v0.7-phase7-software-board-validated",
+    "tag_object": "097935fec5a6f2467261ab1ad449ff0b1d398250",
+    "tag_dereference": "e40a9b95ef709e6a80444f9f3949dfdd70ba96ba",
+    "commit_time": "2026-09-25 21:28:05 +0800",
+    "tag_time": "2026-09-25 23:25:27 +0800",
+    "board_identity_level": "USER_REPORTED_E40"
+  },
+  "frozen_refs_unchanged": {
+    "main": "1b3757eec550802a3973e66790af422d81d3d373",
+    "phase7/full-embedded-software": "6d3fbc559d45673d7550eb73dec5a4ade5bb34df",
+    "tag_object": "097935fec5a6f2467261ab1ad449ff0b1d398250",
+    "tag_dereference": "e40a9b95ef709e6a80444f9f3949dfdd70ba96ba"
+  },
+  "baseline_check": {
+    "branch": "phase8/tmc-drive-config",
+    "local_head": "2ab886ff9a60a2b2283ff3ba200d337235cb2da9",
+    "remote_head_ls_remote": "2ab886ff9a60a2b2283ff3ba200d337235cb2da9",
+    "worktree_porcelain_line_count": 0,
+    "worktree_user_changes_preserved": "无用户改动需保留(porcelain 为空)",
+    "repo_root_agents_md": "不存在(git ls-files 无匹配)",
+    "only_rule_file_found": "rt-thread-master/AGENTS.md(被 .gitignore 第 8 行忽略, 未跟踪)",
+    "gitignore_behaviour": "默认 /* 全忽略 + 白名单; 全局忽略 build/ 与 *.log ⇒ 构建输出层必须实地枚举",
+    "forbidden_actions_not_done": [
+      "reset",
+      "rebase",
+      "force",
+      "merge",
+      "checkout 老版本覆盖工程",
+      "Keil 构建",
+      "测试重跑",
+      "安装软件",
+      "源码重建补造旧原件"
+    ],
+    "history_read_only": [
+      "git show",
+      "cat-file",
+      "rev-parse",
+      "ls-tree",
+      "log --name-only",
+      "diff --numstat/--name-only",
+      "fsck --dangling(只列不导出)"
+    ]
+  },
+  "source_levels": {
+    "GIT": "可直接核对的提交/对象(本轮实读)",
+    "LOG": "仓内原始构建/烧录日志(本轮实读全文与散列)",
+    "FS": "文件系统实测(尺寸/SHA-256/亚秒 mtime/mime 类型)",
+    "DOC": "阶段文档自述(不携带散列)",
+    "INFER": "由 GIT/LOG/FS/DOC 支撑的推断(单列标注, 不冒充实测)",
+    "USER_REPORTED": "用户口述现场与工具信息(本轮未实测, 不构成任何授权)"
+  },
+  "search_status": "NOT_FOUND_IN_SEARCHED_SCOPE",
+  "classification_counts": {
+    "E40_LINKED_ARTIFACT": 0,
+    "POSSIBLE_E40_ARTIFACT": 0,
+    "OTHER_KNOWN_ARTIFACT": 15,
+    "NOT_IDENTIFIED": 0,
+    "candidate_total": 15,
+    "record_total": 7
+  },
+  "searched_roots": [
+    {
+      "code": "PROJECT_ROOT",
+      "layer": 1,
+      "coverage": "整树(含未跟踪与被忽略的构建输出)",
+      "detail": "BSP/build/**, BSP/build/a0/**, BSP/rtthread.bin, BSP/*.log(23 个), project.uvprojx/uvoptx, _s2work/**(固件类 0 个), reports/**, tests/**, 仓库根 6 个源码审查 zip + ARCHIVE_01"
+    },
+    {
+      "code": "BSP",
+      "layer": 1,
+      "coverage": "工程输出目录逐项枚举并散列",
+      "detail": "当前默认/测量目标产物全部为 2026-10-25 本轮构建, 占据的正是当年被烧录的同一路径"
+    },
+    {
+      "code": "uvprojx OutputDirectory + 烧录日志 Load 路径",
+      "layer": 2,
+      "coverage": "配置与日志指出的具体路径",
+      "detail": "OutputDirectory 指向工程内 build/ 与 build/a0/; 两次 e40 烧录的 Load 路径都在 PROJECT_ROOT 内"
+    },
+    {
+      "code": "OLD_PROJECT_01 / OLD_BSP_01 / SNAPSHOT_01",
+      "layer": 3,
+      "coverage": "旧工作副本全树(含 600 MB 上游)",
+      "detail": "按名 + 内容 + 日期命中; e40 时间窗口(2026-09-20..10-01)全树 0 命中; 整树最新 mtime 2026-09-10 23:08; 内含 Phase 2 代次的真实构建产物与烧录回执"
+    },
+    {
+      "code": "ARCHIVE_01 / ARCHIVE_02",
+      "layer": 3,
+      "coverage": "zip 目录列表(未解包)",
+      "detail": "45447 条目; ns800rt7p65-nssinepad 33 条目且固件类 0; 条目时间 2026-09-02/03 早于 e40"
+    },
+    {
+      "code": "ARCHIVE_GROUP_03..08",
+      "layer": 3,
+      "coverage": "zip 目录列表(未解包)",
+      "detail": "六个源码审查包(最大 2282925 B, 682 条目)固件类条目 0"
+    },
+    {
+      "code": "SCRATCH_GROUP_01..10 + SCRATCH_LOG_01",
+      "layer": 3,
+      "coverage": "历轮仓外工作目录",
+      "detail": "十个目录 .axf/.bin/.hex 全部 0 个(另一处按名探测到的 r1_smoke2 实为盘根的 .log 散件而非目录)"
+    },
+    {
+      "code": "EVIDENCE_TEMP",
+      "layer": 3,
+      "coverage": "9 个 ns800-* 取证目录",
+      "detail": "均为历轮主机夹具/探针/日志, 无固件原件"
+    },
+    {
+      "code": "DOWNLOAD_01 / DOWNLOAD_01X",
+      "layer": "命中后排除",
+      "coverage": "16 条目目录列表",
+      "detail": "本项目 Flash 移植源码包, 最新条目 2026-09-10 07:37, 固件类 0"
+    },
+    {
+      "code": "DEVKIT_01 / DEVKIT_01X",
+      "layer": "命中后排除",
+      "coverage": "整树 mtime + 固件类条目枚举",
+      "detail": "解包树最新 2026-04-21 19:38(zip 本体 2026-08-29); 唯一固件类文件为 2025-12-08 的 PCAN 下载器工具 11192 B ⇒ 日期整体排除"
+    },
+    {
+      "code": "UNRELATED_MCU_01",
+      "layer": "命中后排除",
+      "coverage": "按名命中",
+      "detail": "另一 MCU 工程的 AXF(2026-09-20, 早于 e40), 与 NS800 无关"
+    },
+    {
+      "code": "RECYCLE_D / RECYCLE_C",
+      "layer": "名字级探测",
+      "coverage": "maxdepth 2 共 13 / 119 条目",
+      "detail": "按 *rt-thread*/rtthread*/*.axf/*.hex 匹配 0 命中; 未解 $I 元数据"
+    },
+    {
+      "code": "CLOUD_SYNC_01 / CLOUD_SYNC_02",
+      "layer": "名字级探测",
+      "coverage": "maxdepth 3",
+      "detail": "按 *ns800*/*sinepad*/*novosns*/rtthread*/rt-thread* 匹配 0 命中; 未调客户端、未登录"
+    }
+  ],
+  "excluded_scope": [
+    "与本项目无关的个人目录/游戏/音乐/IM/工具安装目录",
+    "聊天与账号凭据文件",
+    "网络盘与云端账号(不登录、不调客户端)",
+    "TOOLCHAIN_01(Keil 安装目录; uvprojx 的 OutputDirectory/ListingPath 实测全部指向 PROJECT_ROOT 内)",
+    "Windows 卷影副本 / 文件历史记录(需特权工具, 未调用)",
+    "其它机器、手机、移动介质",
+    "外部/云端/网络检索与厂商联系"
+  ],
+  "commands_used": {
+    "listing": [
+      "ls -l --time-style=long-iso",
+      "find -maxdepth/-iname/-newermt/-size -printf"
+    ],
+    "typing": [
+      "file --mime-type(时间兜底清单逐项)",
+      "stat(尺寸与亚秒 mtime)"
+    ],
+    "hashing": [
+      "python hashlib 读全字节 SHA-256(原件只读打开)"
+    ],
+    "git_read_only": [
+      "ls-remote",
+      "rev-parse",
+      "show -s",
+      "for-each-ref",
+      "log --all --diff-filter=ACDMTR --name-only",
+      "diff --numstat/--name-only",
+      "cat-file -s",
+      "hash-object",
+      "fsck --dangling(只列不导出)"
+    ],
+    "archives": [
+      "python zipfile namelist()/infolist() 只列目录",
+      "本轮未执行任何 extract, 未运行包内任何脚本/程序"
+    ],
+    "no_new_framework": "未新增常驻搜索框架/runner/工具; 一次性辅助脚本只在仓外 EVIDENCE_TEMP"
+  },
+  "errors_and_limits": [
+    {
+      "item": "PROJECT_ROOT 全树 find 因 1.3 GB 上游树超时",
+      "handling": "改写成限定 novosns 子树 + 显式根列表的多次有界查询; 不影响结论"
+    },
+    {
+      "item": "SNAPSHOT_01 全树 mtime 扫描超出前台 2 分钟限制",
+      "handling": "改后台跑完, 退出码 0; 结果 e40 窗口 0 命中 + 整树最新 2026-09-10 23:08 ⇒ 该层完整覆盖"
+    },
+    {
+      "item": "git for-each-ref 不支持 --date=iso",
+      "handling": "改用 --format 内 %(taggerdate:iso) 重跑成功"
+    },
+    {
+      "item": "权限类失败",
+      "handling": "无: 纳入范围的根全部可读, 没有因权限无法读取的根"
+    }
+  ],
+  "completeness_backstops": [
+    {
+      "kind": "时间",
+      "detail": "工作树 mtime 2026-09-25..09-27(排除 .git)共 26 个文件: 5 .c + 6 .h + 8 .py + 4 .log + 2 .md + 1 .uvoptx; mime 判定 11 text/x-c + 14 text/plain + 1 text/xml, 二进制 0 个"
+    },
+    {
+      "kind": "尺寸",
+      "detail": "仓库树内(排除 .git)>900 kB 条目实测列示: 固件类只有 C-01/C-03 两个 1.6 MB 级 AXF 与归档的 C-05/C-06, 全部是 2026-10-25 的本轮产物"
+    },
+    {
+      "kind": "Git 对象",
+      "detail": "log --all 的 *.bin/*.hex/*.axf/*.elf 只命中本轮两份归档; 10 个悬空 blob 最大 53383 B(e40 装载内容 178084 B, AXF 1.3–1.6 MB)"
+    }
+  ],
+  "search_gaps": [
+    {
+      "id": "G-1",
+      "status": "CLOSED_TO_INFER_WITH_RESIDUAL",
+      "detail": "文档三处提到\"旧仓库\"但均未记录绝对路径 ⇒ 本轮按名+内容+日期定位为 OLD_PROJECT_01; 残留: 该等同关系没有 .git、没有散列可自证; 若用户另有一个更早的 RT-Thread 工作副本, 需其提供路径后再查一次 —— 本轮之后最有价值的一条待补"
+    },
+    {
+      "id": "G-2",
+      "status": "CLOSED",
+      "detail": "旧副本全树(SNAPSHOT_01, 含 600 MB 上游)e40 时间窗口扫描已完整跑完: 0 命中, 整树最新 mtime 2026-09-10 23:08"
+    },
+    {
+      "id": "G-3",
+      "status": "OPEN_NAME_ONLY_PROBE",
+      "detail": "CLOUD_SYNC_01/02 只做名字级探测(0 命中), 未深入列举内容 —— 网盘常混装无关个人文件"
+    },
+    {
+      "id": "G-4",
+      "status": "OPEN_NAME_ONLY_PROBE",
+      "detail": "RECYCLE_D/RECYCLE_C 只做名字级探测(0 命中), 未解 $I 元数据、未枚举全部条目名"
+    },
+    {
+      "id": "G-5",
+      "status": "OUT_OF_AUTHORIZATION",
+      "detail": "Windows 卷影副本/文件历史记录未查(需 vssadmin 等特权工具, 且会触碰非本项目快照)"
+    },
+    {
+      "id": "G-6",
+      "status": "EXCLUDED_WITH_BASIS",
+      "detail": "TOOLCHAIN_01 与 EVIDENCE_TEMP 之外的个人 Temp 未做全量固件名枚举 —— 依据: uvprojx 的 OutputDirectory/ListingPath 实测全部指向 PROJECT_ROOT 内"
+    },
+    {
+      "id": "G-7",
+      "status": "EXCLUDED_WITH_BASIS",
+      "detail": "ARCHIVE_01/02(上游全树 zip)只看目录列表的固件类条目, 未逐个解包比对 —— 依据: 条目时间 2026-09-02/03 整体早于 e40 构建 2026-09-25"
+    },
+    {
+      "id": "G-8",
+      "status": "NOT_ATTEMPTED",
+      "detail": "未做任何外部/云端/网络检索; 未联系厂商索取发布包; 未查其它机器、手机或移动介质"
+    },
+    {
+      "id": "G-9",
+      "status": "OPEN_BY_AUTHORIZATION_BOUNDARY",
+      "detail": "板上现状未验证: 本轮没有读 Flash, 所以\"板上仍是 e40\"这一前提本身仍是 USER_REPORTED_E40"
+    }
+  ],
+  "candidates": [
+    {
+      "id": "C-01",
+      "code_path": "BSP/build/rt-thread.axf",
+      "type": "ELF32/AXF (armclang)",
+      "bytes": 1645448,
+      "sha256": "76d19ced06ebf5f869d3b2f4ffd9692f9691e0f4d0dbf6d13a5581edc6416758",
+      "mtime": "2026-10-25 20:00:47",
+      "association": "与烧录日志 R-03/R-04 的 Load 路径逐字相同(路径相同, 字节已换)",
+      "classification": "OTHER_KNOWN_ARTIFACT",
+      "why": "本轮 A0-R1 默认目标 Rebuild All 的产物; 它占据的正是 2026-09-25 21:26 被烧录的那个**同一路径** AXF —— 旧内容已被后续 Rebuild All 覆盖, 盘上不存在\"e40 时代的这个文件\""
+    },
+    {
+      "id": "C-02",
+      "code_path": "BSP/rtthread.bin",
+      "type": "raw BIN",
+      "bytes": 251148,
+      "sha256": "41717367e4e1401deb5f59eb27d1f35483108c6241eb30a5b58b28aad5b425de",
+      "mtime": "2026-10-25 20:00:47",
+      "association": "sha256 与代号 C-05(reports/firmware/phase8-target-measurement-a0/default.bin)逐字节相同",
+      "classification": "OTHER_KNOWN_ARTIFACT",
+      "why": "AfterMake `fromelf --bin` 输出; 与 C-05 同散列 ⇒ 当前默认镜像, 不是 e40"
+    },
+    {
+      "id": "C-03",
+      "code_path": "BSP/build/a0/rt-thread-a0.axf",
+      "type": "ELF32/AXF (armclang)",
+      "bytes": 1674612,
+      "sha256": "c8176c19188f66654f6bcee5b265ae2487d0c6130d8ae354e8c262cfbd3c01f6",
+      "mtime": "2026-10-25 20:01:08",
+      "association": "A0-R1 复审报告第 3 节身份",
+      "classification": "OTHER_KNOWN_ARTIFACT",
+      "why": "A0-R1 测量目标产物(schema=2, 含 spm 记录器), 全新实现, e40 里不存在这些代码"
+    },
+    {
+      "id": "C-04",
+      "code_path": "BSP/build/a0/measure-a0.bin",
+      "type": "raw BIN",
+      "bytes": 261100,
+      "sha256": "358fd81ae5853ea52df1e1ab367ea41af0f5e86679082a755c17dac3429b0e1b",
+      "mtime": "2026-10-25 20:01:08",
+      "association": "同上",
+      "classification": "OTHER_KNOWN_ARTIFACT",
+      "why": "A0-R1 测量目标 BIN; 与 C-06 同散列"
+    },
+    {
+      "id": "C-05",
+      "code_path": "PROJECT_ROOT/reports/firmware/phase8-target-measurement-a0/default.bin",
+      "type": "raw BIN",
+      "bytes": 251148,
+      "sha256": "41717367e4e1401deb5f59eb27d1f35483108c6241eb30a5b58b28aad5b425de",
+      "mtime": "2026-10-25 20:16:19",
+      "association": "A0-R1 已接受镜像身份",
+      "classification": "OTHER_KNOWN_ARTIFACT",
+      "why": "任务书 §2 点名用于\"识别与排除误认\"的新默认镜像; 文件名含 default 但不是 e40"
+    },
+    {
+      "id": "C-06",
+      "code_path": "PROJECT_ROOT/reports/firmware/phase8-target-measurement-a0/measure-a0.bin",
+      "type": "raw BIN",
+      "bytes": 261100,
+      "sha256": "358fd81ae5853ea52df1e1ab367ea41af0f5e86679082a755c17dac3429b0e1b",
+      "mtime": "2026-10-25 20:16:19",
+      "association": "A0-R1 已接受镜像身份",
+      "classification": "OTHER_KNOWN_ARTIFACT",
+      "why": "A0 候选测量镜像(未来板级包的批准对象)"
+    },
+    {
+      "id": "C-07",
+      "code_path": "ARCHIVE_01 (rt-thread-master.zip)",
+      "type": "ZIP (45447 条目)",
+      "bytes": 605015358,
+      "sha256": "eb8f5b5e6867303b1eb74954becd7d2faae30ac2f44aca316bd14109c33e52a9",
+      "mtime": "2026-09-03 20:29:08",
+      "association": "与 ARCHIVE_02 同散列(两个来源都保留, 见 C-15)",
+      "classification": "OTHER_KNOWN_ARTIFACT",
+      "why": "2026-09-03 的上游 RT-Thread 全树快照, 早于本项目第一次提交(git 首个提交 3fb2edf 2026-09-10 23:29); zip 内 ns800rt7p65-nssinepad 共 33 个条目且固件类 **0 个**; 全库 .bin/.hex/.axf/.elf 条目 32 个, 均属其它厂商 BSP 库存件"
+    },
+    {
+      "id": "C-08",
+      "code_path": "ARCHIVE_GROUP_08 (phase8_f2d_r2_source_review.zip)",
+      "type": "ZIP (682 条目)",
+      "bytes": 2282925,
+      "sha256": "a9b728e8b249b5b77030e4d39e04e16aa3621b2359ae473e4fe0eba0deee976f",
+      "mtime": "2026-10-18 20:36:05",
+      "association": "同组另 5 个 zip(f2a/f2b/f2c/f2d/f2d-r1)同样只含源码与文本",
+      "classification": "OTHER_KNOWN_ARTIFACT",
+      "why": "2026-10-18 的**源码**审查包; 目录列表里 .bin/.hex/.axf/.elf/.map/.o/.dep 类条目数为 0, 且整包 2282925 B 容不下 1.6 MB 级 AXF"
+    },
+    {
+      "id": "C-09",
+      "code_path": "UNRELATED_MCU_01 (…/<另一个 MCU 工程>.axf)",
+      "type": "ELF32/AXF",
+      "bytes": 1017356,
+      "sha256": "41a376ea1ce6c405ab57ffc6a07b28b0a8084723b3167b4e3c57f71003402176",
+      "mtime": "2026-09-20 14:00:02",
+      "association": "非本项目, 未进一步解析",
+      "classification": "OTHER_KNOWN_ARTIFACT",
+      "why": "按名匹配命中的另一个 MCU 工程产物; 工程名/尺寸/日期(2026-09-20, 早于 e40 构建)均与 NS800 无关"
+    },
+    {
+      "id": "C-10",
+      "code_path": "DOWNLOAD_01 (NS800_FLASH_Full_v1.0.zip)",
+      "type": "ZIP (16 条目)",
+      "bytes": 26266,
+      "sha256": "ea0e63c94c371065c5619025447490087c9a2882ac2b3dd06196d2e788ea13a8",
+      "mtime": "2026-09-10 19:45:43",
+      "association": "包内 README/SHA256SUMS/TEST_RESULTS 属 Phase 0/2 移植件",
+      "classification": "OTHER_KNOWN_ARTIFACT",
+      "why": "本项目自己的 ns_flash/ns_storage **源码**交付包(包内最新条目时间 2026-09-10 07:37), 比 e40 构建早 15 天, 固件类条目 0"
+    },
+    {
+      "id": "C-11",
+      "code_path": "DEVKIT_01X + DEVKIT_01 (厂商 NS800RT7P65 开发包)",
+      "type": "厂商资料包(索引 HTML)",
+      "bytes": 9529,
+      "sha256": "ec4cf070d2ce0d6d47f16630732b815bf89508c752185fb2e6bb405c49de63e9",
+      "mtime": "2026-04-21 19:38:03",
+      "association": "散列对象=包内索引 HTML 一份(DEVKIT_01 zip 只列目未取件); 其内 SDK/v0.4.0/third_party/rt-thread 只有源码(src/include/components/libcpu), 无 BSP 构建树",
+      "classification": "OTHER_KNOWN_ARTIFACT",
+      "why": "整棵解包树里**最新** mtime 为 2026-04-21 19:38(zip 本体 2026-08-29 12:05), 唯一的固件类文件是 2025-12-08 的 PCAN 下载器工具 Application.bin(11192 B) ⇒ 时间上不可能装有 2026-09-25 构建的 e40 映像, 按日期整体排除"
+    },
+    {
+      "id": "C-12",
+      "code_path": "OLD_BSP_01/build/rt-thread.axf",
+      "type": "ELF32/AXF (armclang)",
+      "bytes": 947336,
+      "sha256": "02d7c6aba9783271e46d15b5e92f272b525e16d223920e63b3a93a97815e3318",
+      "mtime": "2026-09-10 21:14:19",
+      "association": "旧副本 flash_test.log 证明该 AXF 曾于 2026-09-10 21:22 被真实烧录(同一 CMSIS-DAP 链)",
+      "classification": "OTHER_KNOWN_ARTIFACT",
+      "why": "旧工作副本 Phase 2 Flash 移植期的构建产物(mtime 2026-09-10 21:14, build_test.log 记 Code=77098 RO=20746 RW=1712 ZI=29052), 与 e40 的 129306/46578/2200/83212 不同代; 该副本 applications/ 里只有 main/ns_flash/ns_storage/flash_demo/tmc2209_demo, 完全没有安全链源码(motor/supervisor/stop_priority/blackbox) ⇒ 早于整个 Phase 7 工作"
+    },
+    {
+      "id": "C-13",
+      "code_path": "OLD_BSP_01/rtthread.bin",
+      "type": "raw BIN",
+      "bytes": 98228,
+      "sha256": "f8f8a08520b1ed015767fcd501b1587f4fa89baec5479946378a3f76cb3c6134",
+      "mtime": "2026-09-10 21:14:19",
+      "association": "与 C-12 同批",
+      "classification": "OTHER_KNOWN_ARTIFACT",
+      "why": "同一次旧构建的 fromelf 输出(98228 B, 2026-09-10 21:14); e40 的装载内容为 178084 B, 尺寸即排除"
+    },
+    {
+      "id": "C-14",
+      "code_path": "OLD_BSP_01/rtthread.elf + rtthread.map",
+      "type": "ELF32 (scons/GCC 路线)",
+      "bytes": 988632,
+      "sha256": "47aca1e94312ab6c2aade944a78c918ad9bba36060d7d2f6d8ed0e9e9f474372",
+      "mtime": "2026-09-03 23:25:05",
+      "association": "与 rtthread.map(912578 B, 同时间) 同批",
+      "classification": "OTHER_KNOWN_ARTIFACT",
+      "why": "2026-09-03 23:25 的非 Keil 路线早期件, 早于本项目第一次提交之后的移植工作"
+    },
+    {
+      "id": "C-15",
+      "code_path": "ARCHIVE_02 (= ARCHIVE_01 同散列)",
+      "type": "ZIP (45447 条目)",
+      "bytes": 605015358,
+      "sha256": "eb8f5b5e6867303b1eb74954becd7d2faae30ac2f44aca316bd14109c33e52a9",
+      "mtime": "2026-09-03 20:29:08",
+      "association": "同 C-07",
+      "classification": "OTHER_KNOWN_ARTIFACT",
+      "why": "与 C-07 逐字节相同, 按任务书要求去重但保留第二来源"
+    }
+  ],
+  "records": [
+    {
+      "id": "R-01",
+      "code_path": "BSP/build_agent2.log",
+      "bytes": 3538,
+      "sha256": "75290cec900772ae5bc3251204cdb5f8ade476ae10c633cf32e1516da4bad4d4",
+      "mtime": "2026-09-25 21:25:21",
+      "content": "e40 上板前的最后一次 clean Rebuild All: Rebuild target 'rt-thread', 131 个 compiling 行, Code=129306 RO-data=46578 RW-data=2200 ZI-data=83212, 终态 0 Error(s) 0 Warning(s), AfterMake fromelf --bin → rtthread.bin"
+    },
+    {
+      "id": "R-02",
+      "code_path": "BSP/build_c.log",
+      "bytes": 3538,
+      "sha256": "665aa8f6a00fd8aab699f0f4979f34454d21a948979aad163c31ad09e26a0df4",
+      "mtime": "2026-09-26 00:00:44",
+      "content": "同一 Program Size 的第二次 clean Rebuild All(131 单元), 终态 0 Error(s) 0 Warning(s)"
+    },
+    {
+      "id": "R-03",
+      "code_path": "BSP/flash_agent.log",
+      "bytes": 192,
+      "sha256": "fbb47f0598345a44162b7dcbe01b40bbaaafbe11f9b4d18af50108284923b293",
+      "mtime": "2026-09-25 21:26:03",
+      "content": "烧录回执: Load PROJECT_ROOT/BSP/build/rt-thread.axf(原文是工程根下的绝对路径, 分隔符为转义双反斜杠) + Erase Done./Programming Done./Verify OK. + Flash Load finished at 21:26:03"
+    },
+    {
+      "id": "R-04",
+      "code_path": "BSP/flash_c.log",
+      "bytes": 192,
+      "sha256": "1a67dda029f474c382546e50e5c896a67a8b5834e40404e6a62e0c4898350fb6",
+      "mtime": "2026-09-26 00:01:24",
+      "content": "第二次烧录回执, 同一 AXF 路径, finished at 00:01:24"
+    },
+    {
+      "id": "R-05",
+      "code_path": "BSP/project.uvoptx",
+      "bytes": 61950,
+      "sha256": "62d2d8f14afbeb1c45f2852cd357b0fee1a6e5ee1110d820d4213c6230387cf1",
+      "mtime": "2026-09-25 13:46:08",
+      "content": "烧录/调试配置落盘载体: TargetName=rt-thread, pMon=BIN\\CMSIS_AGDI.dll(CMSIS-DAP); mtime 2026-09-25 13:46:08, 早于两次构建/烧录"
+    },
+    {
+      "id": "R-06",
+      "code_path": "OLD_BSP_01/build_test.log",
+      "bytes": 3114,
+      "sha256": "17ed5c960b45e98ed3171ad8bba380a4c8f79de5d1ad74c7beb1fe37f1bed177",
+      "mtime": "2026-09-10 21:14:20",
+      "content": "旧工作副本 2026-09-10 的 Rebuild All 日志: Code=77098 RO-data=20746 RW-data=1712 ZI-data=29052, 0 Error(s) 0 Warning(s), fromelf --bin → rtthread.bin"
+    },
+    {
+      "id": "R-07",
+      "code_path": "OLD_BSP_01/flash_test.log",
+      "bytes": 177,
+      "sha256": "35b9f0de14679ddc6f4106f80a0d6ebff7452a40fc2cffdb269845f14e5422d0",
+      "mtime": "2026-09-10 21:22:22",
+      "content": "旧工作副本的烧录回执: Load OLD_BSP_01/build/rt-thread.axf(原文是该副本内的绝对路径), Verify OK, finished at 21:22:22 ⇒ 同一板卡/同一下载链的更早一次实证"
+    }
+  ],
+  "dedupe_same_sha_kept_sources": [
+    "C-02 == C-05",
+    "C-04 == C-06",
+    "C-07 == C-15(ARCHIVE_01/ARCHIVE_02)"
+  ],
+  "hex_and_elf_discipline": [
+    {
+      "hex_found": 0,
+      "loaded_bytes_digest_computed": false,
+      "note": "未找到 HEX 原件, 因此没有做\"装载字节摘要\"; AXF/ELF 一律按原格式登记, 未悄悄转 BIN, 也未声称存在原 BIN"
+    }
+  ],
+  "provenance_links": [
+    {
+      "id": "P-1",
+      "reads": "build_agent2.log / build_c.log 全文(LOG+FS)",
+      "proves": "e40 上板那次构建的目标名、131 个编译单元、Program Size 四项、0/0 终态与输出路径; 两次构建输入零变化 ⇒ 两次烧录同源",
+      "cannot_prove": "日志不含散列/文件清单/源码 SHA ⇒ 无法把某个 BIN 字节流绑定到 e40a9b95ef70"
+    },
+    {
+      "id": "P-2",
+      "reads": "flash_agent.log / flash_c.log 全文(LOG+FS)",
+      "proves": "2026-09-25 21:26:03 与 2026-09-26 00:01:24 各完成一次真实烧录, 下载件为工程内 build/rt-thread.axf, Keil 自身 Verify OK",
+      "cannot_prove": "该 AXF 当时的字节内容/散列; 也不能证明今天板上仍是它(未读 Flash)"
+    },
+    {
+      "id": "P-3",
+      "reads": "project.uvoptx(GIT 跟踪文件 + FS)",
+      "proves": "TargetName=rt-thread, pMon=BIN\\CMSIS_AGDI.dll ⇒ 当时落盘的下载/调试驱动是 CMSIS-DAP",
+      "cannot_prove": "具体探针序列号与端口; 本轮未连接任何设备"
+    },
+    {
+      "id": "P-4",
+      "reads": "git show/for-each-ref/diff --numstat(GIT)",
+      "proves": "烧录在提交前 2 分 02 秒与提交后 2 小时 33 分; 期间 .c/.h/uvprojx/rtconfig.h 零差异, 全量差异只有 3 份 .md",
+      "cannot_prove": "21:25:21 那次构建的工作树是否恰好等于 e40a9b9 的树(提交在 3 分 44 秒之后) —— 这是本链剩余的身份缺口"
+    },
+    {
+      "id": "P-5",
+      "reads": "PHASE7_PROGRESS.md / PHASE8_HARDWARE_VALIDATION_20260925.md(DOC)",
+      "proves": "上板窗口、板型、COM5/115200、DAPLink 记载、未接电机、逐项现象、最终 Program Size",
+      "cannot_prove": "任何镜像字节身份(文档不携带散列), 也不覆盖\"板上现在仍是该固件\""
+    },
+    {
+      "id": "P-6",
+      "reads": "git hash-object 与 git rev-parse e40a9b9:<path> 逐字节比较(GIT+FS)",
+      "proves": "e40 源码树完整可取; diagnosis.c / current_adc.c / project_config.c / main.c 至今与 e40 blob 相同; supervisor.c / motor.c 已不同",
+      "cannot_prove": "用它重建的映像与当年烧录字节相同(工具链补丁级差异、链接顺序、__DATE__/__TIME__) ⇒ 将来也只能标 E40_SOURCE_REBUILD"
+    },
+    {
+      "id": "P-7",
+      "reads": "OLD_BSP_01 的 build/rt-thread.axf、rtthread.bin、rtthread.elf、build_test.log、flash_test.log(FS+LOG)",
+      "proves": "文档所称\"旧仓库\"这一层已被实地搜索并排除(INFER 级等同 + FS 级日期排除); 该副本属 Phase 2 移植代次(Code=77098, applications/ 内无安全链源码)",
+      "cannot_prove": "任何 e40 代映像的存在; 也不能证明板上现状。反向提供的只是\"同一板卡 + 同一 Keil/CMSIS-DAP 链可反复下载并 Verify 成功\"这一能力证据"
+    }
+  ],
+  "a0_images_relation": {
+    "default.bin": {
+      "bytes": 251148,
+      "sha256": "41717367e4e1401deb5f59eb27d1f35483108c6241eb30a5b58b28aad5b425de"
+    },
+    "measure-a0.bin": {
+      "bytes": 261100,
+      "sha256": "358fd81ae5853ea52df1e1ab367ea41af0f5e86679082a755c17dac3429b0e1b"
+    },
+    "relation": "两份都不是 e40: e40 Program Size 129306/46578/2200/83212 与 173762/76806/2188/83784、180802/79718/2188/91504 在 Code/RO/RW 三项量级不同; schema=2、120 B 记录、64 槽 7680 B、spm 命令注册、三入口插桩只属于新测量实现。default.bin 不是板上 e40 的已验证回退镜像。",
+    "identical_to_candidates": {
+      "default.bin": "C-02 == C-05",
+      "measure-a0.bin": "C-04 == C-06"
+    }
+  },
+  "rollback_status": {
+    "state": "BLOCKED_ROLLBACK_OPEN",
+    "closed_by_this_round": false,
+    "e40_restore_image_available": false,
+    "e40_linked_artifact_count": 0,
+    "reason": "未找到任何 e40 时代 BIN/HEX/AXF/ELF; 找到的只是构建/烧录记录、可复原源码与更早一代的旧副本产物",
+    "still_missing": [
+      "用户提供其它备份位置(更早工作副本 / 其它机器 / 网盘具体目录 / 移动介质) —— G-1 残留",
+      "或另行授权一次板上 Flash 只读转储 + 散列(唯一能回答\"板上现在是什么\"的直接证据, 本轮未申请)",
+      "或明确决定以 e40a9b9 源码重建并登记 E40_SOURCE_REBUILD, 同时接受它与当年烧录件不逐字相同"
+    ],
+    "capability_evidence_not_a_fallback": [
+      "板载 DAP + uvoptx pMon=BIN\\CMSIS_AGDI.dll",
+      "COM5 / 115200 / 8N1(文档记载, 本轮未打开)",
+      "四次成功烧录回执(e40 两次 + 旧副本一次 + 更早一次)"
+    ],
+    "no_permission_granted": "本报告不授予下载、恢复、Flash 读取或重建权限"
+  },
+  "originals_preserved": {
+    "all_searched_files_opened_read_only": true,
+    "moved": 0,
+    "renamed": 0,
+    "timestamp_changed": 0,
+    "chmod_changed": 0,
+    "deleted": 0,
+    "overwritten": 0,
+    "statement": "C-01..C-15 与 R-01..R-07 原件位置与属性全部保持原状; 未运行任何候选程序; 未调用任何历史下载脚本(UV4 -f 等一次都没跑)",
+    "repo_writes_only_three_whitelisted_files": true,
+    "uploaded_binaries": 0
+  },
+  "privacy": {
+    "masking_rule": "仓库内证据不出现本机用户名/邮箱/主机名; 绝对路径写成「代号 + 相对路径」; Keil 的 project.uvguix.<USER> 中 <USER> 为替换项; 与文件身份有关的日志原文按原样保留, 未改写任何身份数据以消除矛盾",
+    "local_path_index_location": "EVIDENCE_TEMP/PATH_INDEX.txt(仓外, 不入库; 完整代号→绝对路径映射只在此文件)",
+    "self_check": "生成后对全文 grep 用户名与绝对盘路径命中 0(见交接 §隐私)"
+  },
+  "tests_executed": [],
+  "builds_executed": [],
+  "hardware_actions": [],
+  "production_changed": false,
+  "files_added_or_modified": [
+    "reports/reviews/phase8-e40-artifact-search/search_evidence.txt",
+    "reports/agent_handoffs/phase8-e40-artifact-search.md",
+    "reports/agent_handoffs/phase8-e40-artifact-search.json"
+  ],
+  "inherited_reviewed_conclusions": {
+    "a0_r1_software_review_go": {
+      "accepted_head": "2ab886ff9a60a2b2283ff3ba200d337235cb2da9",
+      "code_commit": "b27e5f14bdb62f645b93eace23800b40369717d4",
+      "verdict": "SOFTWARE_REVIEW_GO(限定离线软件、已声明主机合同与两份归档镜像身份)",
+      "rework_items_closed": [
+        "A0-01",
+        "A0-02",
+        "A0-03",
+        "A0-04"
+      ],
+      "new_required_rework": [],
+      "not_board_go": true,
+      "registration_note": "按复审第 1 节\"不另开纯 GO 登记轮\", 在本轮实际授权任务的交接中登记; 未为此重跑任何主机链或重建 Keil"
+    },
+    "s2_software_review_go_head": "bcdec631266239008734271ba75beab435bf30eb",
+    "prep_review_go_head": "bbf66ba34d7b31a217c643921aa4192df2f59a56",
+    "four_target_safety_macros": {
+      "MOTOR_HARDWARE_ENABLE_PATH_VALIDATED": "RT_FALSE",
+      "STEP_DIAG_ISOLATED_ENV_CONFIRMED": "RT_FALSE",
+      "TMC_DRIVE_CONFIG_HW_VALIDATED": "RT_FALSE",
+      "SAFETY_LIMIT_INPUTS_ENABLED": "RT_FALSE"
+    }
+  },
+  "field_information_user_reported": {
+    "level": "USER_REPORTED",
+    "vm_supply": "外接 AC/DC 24 V",
+    "logic_supply": "USB 经板载 LDO",
+    "power_state": "最近确认未上电",
+    "cut_off_methods": [
+      "拔 USB",
+      "AC/DC 适配器开关"
+    ],
+    "tmc_module": "在位、可拔出",
+    "motor": "物理未接",
+    "sw1": "当前使能",
+    "person_on_site": true,
+    "probe": "板载 DAP(仓库记录 DAPLink/CMSIS-DAP, 已有 Keil 下载配置)",
+    "console": "COM5 / 115200 / 8N1",
+    "authorization_disclaimer": "以上现场与工具信息不构成本任务的连接、上电、串口或烧录授权; 本轮允许的硬件动作集合为空"
+  },
+  "next_step_boundary": {
+    "waiting_for": "云端把恢复条件与已接受的 A0 镜像、板载 DAP、COM5、24 V 现场信息合并进具体板级包, 由用户一次批准",
+    "self_started_next_phase": false,
+    "note": "本轮没有把 BLOCKED_ROLLBACK 改成已关闭, 也没有自授任何板级 GO"
+  },
+  "stop_claim": "E40_ARTIFACT_SEARCH_COMPLETE / AWAITING_ARTIFACT_REVIEW / NO HARDWARE AUTHORIZATION / NO FLASH READ / NO BUILD / NO SERIAL / NO PROGRAM / NO RESET"
+}
