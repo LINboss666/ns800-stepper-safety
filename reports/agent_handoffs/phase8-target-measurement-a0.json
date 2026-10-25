@@ -285,7 +285,7 @@
   ],
   "frozen_refs_verified": {
     "method": "本地 ls-remote 与远端回读",
-    "phase8/tmc-drive-config": "本轮 r1 提交后回读（见 remote_push）",
+    "phase8/tmc-drive-config": "本轮 r1 两个提交（code_commit b27e5f14… 与其后的证据/文档提交）都在该分支上；分支头值不在此自引用，推送后 ls-remote 回读",
     "main": "1b3757eec550802a3973e66790af422d81d3d373",
     "phase7/full-embedded-software": "6d3fbc559d45673d7550eb73dec5a4ade5bb34df",
     "tag_object": "097935fec5a6f2467261ab1ad449ff0b1d398250",
@@ -301,7 +301,7 @@
     "板级身份与静态电气/SW1：USER_REPORTED / USER_CONFIRMED（未重复索取五点电压）"
   ],
   "next_step": "交独立复审：A0-R1 的软件（sp_measure_a0.{c,h} + 主机链 + 新增链专用文件）与两份 r1 镜像。只有复审给出 SOFTWARE_REVIEW_GO 之后，才谈用户对操作包的板级批准。本轮不自行授予任何 GO。",
-  "remote_push": "PENDING（提交推送后回读）",
+  "remote_push": "本轮把 phase8/tmc-drive-config 以普通 push 更新到 origin；分支最终值就是包含本字段的那个提交自身，因此不在本文档内自引用 SHA（由交付回执给出完整 SHA，并在推送后用 ls-remote 回读逐字比对）",
   "stop_claim": "A0_R1_OFFLINE_FIRMWARE_READY / AWAITING_INDEPENDENT_SOFTWARE_AND_IMAGE_REVIEW；NO BOARD/SERIAL/DEBUGGER/GPIO/TMC/STEP/MOTOR AUTHORIZATION；FOUR TARGET SAFETY MACROS RT_FALSE",
   "a0_round_c5028f4": {
     "note": "上一轮 phase8-target-measurement-a0 的交接原样快照；顶层已按 r1 更新，本块不重写",
