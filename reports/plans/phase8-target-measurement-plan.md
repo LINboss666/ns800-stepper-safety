@@ -405,10 +405,13 @@ MCU cycle、仪器时间**不默认同一时间基**（F-11/F-21/F-22：tick 与
    标记 GPIO（判据 2 / §8 的 M-3 行）——两者都是新的板级许可条目，本轮只登记需求，不配置、不占用、
    不假定已存在。未获批准前，本轮与任何后续自动流程都不得执行其中任一条。
 
-登记为未决但不需本轮处理的文档不一致（超出本轮白名单，留给下一次真实生产改动一并整理）：
-`stop_priority.h:23` 仍描述"set 路径会抓旧模式再写回 TBCTL"，与现码
-`drv_epwm.c:293-318`/`drv_epwm_leaf.inc` 的"不写回计数模式"不一致；
-`phase8-safety-chain-acceptance-draft.md:269/433` 引用的 `开发进度.md:33` 行号已过期（实际在 `:104`）。
+登记为未决但不需本轮处理的文档不一致：
+
+1. `stop_priority.h:23` 曾描述"set 路径会抓旧模式再写回 TBCTL"，与现码
+   `drv_epwm.c:293-318`/`drv_epwm_leaf.inc:232` 的"不写回计数模式"不一致 —— **已在 A0 实现轮随
+   允许的生产改动一并更正**（`code_commit` 见 §11），公开接口未变；历史登记保留在此说明去向。
+2. 仍未处理：`phase8-safety-chain-acceptance-draft.md:269/433` 引用的 `开发进度.md:33` 行号已过期
+   （实际在 `:104`）。该文件不在 A0 白名单内，继续留给下一次允许范围覆盖它的改动。
 
 ## 10. 本轮检查与不做项
 
@@ -435,6 +438,39 @@ r1 轮已消除该尾随空格，首轮的 stdout 不重造。
 
 状态：`TARGET_MEASUREMENT_PREP_REVISED / AWAITING_INDEPENDENT_PREP_REVIEW`；
 `NO HARDWARE AUTHORIZATION`；`FOUR MACROS RT_FALSE`；板上 `USER_REPORTED_E40`。
+
+## 11. 准备复审通过（PREP_REVIEW_GO）与 A0 实现轮的覆盖边界
+
+**2026-10-25 独立复审结论：`PREP_REVIEW_GO`，接受 `bbf66ba34d7b31a217c643921aa4192df2f59a56` 的离线
+测量准备计划；R1/R2a/R2b/R3a/R3b/F1 关闭，无新增必须返修项。** 复审端只做了 Git/源码/文档静态核对
+（远端 `ls-remote`、`b27c0c4→bbf66ba` 恰 3 条白名单路径 +494/−72、与 `bcdec631` 相比代码/脚本/工程
+差异为空、三个 blob 逐字节复算一致、JSON 与 `review_resolution` 六项映射、`git diff --check` rc=0、
+四宏与冻结引用回读），**未构建、未执行测试链、未操作硬件**。SDK-LOCAL 的具体内容仍是本地报告，
+未升级为云端逐文件验真。
+
+继承关系不变：S2 `SOFTWARE_REVIEW_GO` 仍只接受 `bcdec631…` 的既有软件与主机合同；
+本 `PREP_REVIEW_GO` **不等于**新的测量代码 GO，也**不等于**目标机执行 GO。
+
+**A0 实现轮（`phase8-target-measurement-a0`，任务书 `NS800_Prep_R1_Review_GO_and_A0_Firmware_Task_bbf66ba_20261025.md`）
+把本计划的哪些格子从"纯计划"推进到哪一步：**
+
+| 计划条目 | A0 之后的实际状态 | 仍然开放的部分 |
+|---|---|---|
+| §4 插桩设计与 `I-1`/`I-2` 形状 | 已在**测量专用编译变体**里实现：`APP/sp_measure_a0.{c,h}` + `APP/stop_priority.c` 三个入口的 measured-enter/exit（原始四时间戳、同窗逐字段钉快照、有效性判定、64 槽单批次只追加、`spm` 命令族） | 目标机上从未运行；`body/包围区间`没有任何真实数值 |
+| T00（时钟/执行者/计数资源核对） | 检查**逻辑**已实现并由主机链验证（`spm init` 读 `NOCYCCNT`、只置 `TRCENA/CYCCNTENA`、有限次确认递增、记录 `LOAD` 与 CTRL 配置） | 目标上的 `counter_status/clock_basis` 真值仍未知；未到 `EXTERNAL_VERIFIED` 前仍不输出"实测 µs" |
+| T02（短窗口路径） | 主机链 TMA01–TMA18 真执行（含 `COUNTER_UNAVAILABLE/UNCHECKED`、回绕、COUNTFLAG 重装、配置漂移、七出口矩阵、`out==NULL`、在途 BUSY、批次满、命令门） | 目标 RT-Thread 调度、真实 PPB 行为、物理停机仍**不是**本链能证明的；窗口时长与 RX/EXTI 丢失容忍保持 `ACCEPTANCE_LIMIT_TBD` |
+| `B-1` 窗口时长 | 记录能力与"什么算有效样本"的判定已可审 | 实际分布仍未测；SysTick 后备路线按 §2.5 保守降级（`BLOCKED_COUNTER`）不变 |
+| `M-1/M-2/M-3` | 未推进：本批不插桩慢整理锁、不新增标记 GPIO、不做跨时间基关联 | 全部按原口径继续开放（`M-3` 的"寄存器写→焊盘"部分尤其如此） |
+| T03–T13 与包 B/C | 未覆盖（本批明确只取关闭路径 A0） | 继续 `NOT_EXECUTED / NOT AUTHORIZED` |
+
+默认发布配置的绕开性是**可判定**的，不靠措辞：同一份夹具源码编译出 `a0_off`（开关 0）与 `a0_on`
+两个可执行体，符号表核对显示 `a0_off` 里生产记录器符号数与 64 槽数组均为 0，而三个被测入口符号仍在；
+`a0_on` 分别为 22 与 1。四个目标安全宏在所有变体里继续 `RT_FALSE`，测量开关不参与任何安全判定。
+
+本轮**没有任何目标机动作**：未连串口/调试器/仪器、未扫描设备、未读 Flash、未烧录/复位、未运行目标
+命令、未做 GPIO/TMC/STEP/DIR、电机、供电、接线、SW1、真机清故障或 selftest，也未运行旧 `sw1_cut.ps1`。
+镜像即使构建成功，也必须等独立复审与用户对具体板级操作包的另行批准之后才可使用；本批的
+`reports/plans/phase8-target-measurement-a0-operator-pack.md` 只是待审清单，不构成任何授权。
 
 ## 附录 A 引用与散列（LOCAL_ONLY）
 

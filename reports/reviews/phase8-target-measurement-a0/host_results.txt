@@ -1,0 +1,100 @@
+phase8-target-measurement-a0 —— 主机链真实执行记录 (脱敏摘要)
+日期: 2026-10-25。被测实现: APP/stop_priority.c(插桩后) + APP/sp_measure_a0.c(记录器/命令)。
+夹具只补: 线程本地 PRIMASK 模型 + 全局窗口独占 + 脚本化 PPB 寄存器模型 + 总线动作计数。
+
+[1] 新链 tests/host/run_sp_measure_a0.sh (REVERSE=1, 两个可执行体)
+###### 目标机测量 A0 记录器链 (基线 bbf66ba34d7b31a217c643921aa4192df2f59a56) ######
+run_id=20261025T101134Z-1065
+SRC_APP=<REPO_ROOT>/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications
+OUT_DIR=/tmp/ns800_a0_ev/final
+GCC=<HOST_GCC_ROOT>/bin/gcc.exe
+NM=<HOST_GCC_ROOT>/bin/nm.exe
+选择组=off counter contract conc batch cli ledger
+BUILD off rc=0 build_log_bytes=0 exe=/tmp/ns800_a0_ev/final/a0_off.exe
+BUILD on rc=0 build_log_bytes=0 exe=/tmp/ns800_a0_ev/final/a0_on.exe
+--- 符号存在性(编译期绕开的可判定证据) ---
+  符号核对: a0_off 生产记录器符号=0 记录数组=0 (都要求 0) / 三个被测入口存在=3 (要求 3)
+  符号核对: a0_on  生产记录器符号=22 (要求 >=18) 记录数组=1 (要求 1)
+--- 逐组执行 ---
+  off/off: OK (1 例, checks=13, rc=0)
+  on/counter: OK (5 例, checks=55, rc=0)
+  on/contract: OK (4 例, checks=60, rc=0)
+  on/conc: OK (3 例, checks=34, rc=0)
+  on/batch: OK (3 例, checks=36, rc=0)
+  on/cli: OK (1 例, checks=15, rc=0)
+  on/ledger: OK (1 例, checks=13, rc=0)
+--- 具名反向家族(在仓外源码副本上变异) ---
+INJECTED rev_spm_unavailable_is_valid rules=2
+  rev_spm_unavailable_is_valid: META-OK 具名检出 2 例 (TMA02 TMA03 ) 其余保持 PASS
+INJECTED rev_spm_snapshot_after_unmask rules=2
+  rev_spm_snapshot_after_unmask: META-OK 具名检出 1 例 (TMA11 ) 其余保持 PASS
+--- 总结果 ---
+A0CHAIN-META: OK (正向逐组一致 + 反向按声明执行)
+
+  每组逐用例结果 (取自 OUT_DIR/run_<variant>_<group>.txt 的 CASE/RESULT 行, 原样摘录):
+    [off/off] CASE TMA01 switch OFF: 三个入口原合同 + 零测量访问
+    [off/off] RESULT TMA01 PASS checks=13 fails=0
+    [on/counter] A0LAYOUT host_sizeof_rec=120 host_sizeof_ctx=48 slots=64 host_bss_delta_max=7680
+    [on/counter] CASE TMA03 UNCHECKED 与 UNAVAILABLE 是两种事实
+    [on/counter] RESULT TMA03 PASS checks=9 fails=0
+    [on/counter] CASE TMA02 计数器不可用 => 无有效时长, 关闭仍执行
+    [on/counter] RESULT TMA02 PASS checks=14 fails=0
+    [on/counter] CASE TMA04 主体有效 + 包围区间独立无效
+    [on/counter] RESULT TMA04 PASS checks=14 fails=0
+    [on/counter] CASE TMA05 窗口内发生重装 => 主体样本无效(混叠不可排除)
+    [on/counter] RESULT TMA05 PASS checks=6 fails=0
+    [on/counter] CASE TMA06 回绕/配置变化/guard 不成立 => 保留无效记录与原因
+    [on/counter] RESULT TMA06 PASS checks=12 fails=0
+    [on/contract] A0LAYOUT host_sizeof_rec=120 host_sizeof_ctx=48 slots=64 host_bss_delta_max=7680
+    [on/contract] CASE TMA07 PWM 失败/LOW 失败组合的合同与未插桩一致
+    [on/contract] RESULT TMA07 PASS checks=13 fails=0
+    [on/contract] CASE TMA08 trip_for_operation 陈旧身份: 一个寄存器写都不发
+    [on/contract] RESULT TMA08 PASS checks=12 fails=0
+    [on/contract] CASE TMA09 off_attempt 七个出口: 次数与返回优先序不变
+    [on/contract] RESULT TMA09 PASS checks=28 fails=0
+    [on/contract] CASE TMA10 out==NULL 也固定本次证据, 不额外触发硬件动作
+    [on/contract] RESULT TMA10 PASS checks=7 fails=0
+    [on/conc] A0LAYOUT host_sizeof_rec=120 host_sizeof_ctx=48 slots=64 host_bss_delta_max=7680
+    [on/conc] CASE TMA11 解屏蔽后交付的新故障不改写本次记录的身份
+    [on/conc] RESULT TMA11 PASS checks=8 fails=0
+    [on/conc] CASE TMA12 预约后被抢占 + 另一记录先完成: 槽与代次不串
+    [on/conc] RESULT TMA12 PASS checks=15 fails=0
+    [on/conc] CASE TMA13 ISR 上下文可记录; 判据被扰动时外层标无效
+    [on/conc] RESULT TMA13 PASS checks=11 fails=0
+    [on/batch] A0LAYOUT host_sizeof_rec=120 host_sizeof_ctx=48 slots=64 host_bss_delta_max=7680
+    [on/batch] CASE TMA14 批次满: 后续笔仍关闭, dropped 可见, 不覆盖既有槽
+    [on/batch] RESULT TMA14 PASS checks=9 fails=0
+    [on/batch] CASE TMA15 在途期间 stop/dump/clear/start 不等待、不误清
+    [on/batch] RESULT TMA15 PASS checks=14 fails=0
+    [on/batch] CASE TMA16 dump/clear 前置与"只清测量数据"的边界
+    [on/batch] RESULT TMA16 PASS checks=13 fails=0
+    [on/cli] A0LAYOUT host_sizeof_rec=120 host_sizeof_ctx=48 slots=64 host_bss_delta_max=7680
+    [on/cli] CASE TMA17 命令门: 非法输入/上下文零副作用; trip 只一次正式关闭
+    [on/cli] RESULT TMA17 PASS checks=15 fails=0
+    [on/ledger] A0LAYOUT host_sizeof_rec=120 host_sizeof_ctx=48 slots=64 host_bss_delta_max=7680
+    [on/ledger] CASE TMA18 台账: 窗口禁止项/发布顺序/每调用一条/无效样本不入统计
+    [on/ledger] RESULT TMA18 PASS checks=13 fails=0
+
+[2] 反向首轮的两次失败尝试(保留, 不删)
+  a) OUT_DIR=.../run3: rev_spm_snapshot_after_unmask 的注入文本没写成注释 => 变异副本编译不过 =
+     INFRA-FAIL(不是检出); b) 同一轮 rev_spm_unavailable_is_valid 报 NOT-DETECTED, 根因是 runner
+     把 `local fam="$1" shift` 写成一条语句, 期望 id 变量取到了家族名。两处都是**注入/判定侧缺陷**,
+     纠正后在 OUT_DIR=.../run4 复跑: 家族1 META-OK(TMA02,TMA03 具名检出), 家族2 仍 NOT-DETECTED ——
+     原因是接缝点选在 post 读(在 pin 之后), 于是 run5 把 TMA11 改为"窗口内挂起、解屏蔽后交付"
+     (与目标 PRIMASK 语义同形), 两个家族同时 META-OK, 记录见 §[1] 的 final 运行。
+
+[3] 集中回归(改动后的同一棵树)
+  --- S1 ---
+  ###### 关断结果可信链 S1 (基线 bbf66ba34d7b31a217c643921aa4192df2f59a56) ######
+  S1 RUNNER RESULT: PASS (rc=0) —— target 与 host_ovr 两个变体的必需用例全部真执行且判 PASS
+  S1 rc=0
+
+  --- S2 ---
+  ###### 停机优先 S2 并发/身份链 (基线 bbf66ba34d7b31a217c643921aa4192df2f59a56) ######
+  S2 RUNNER RESULT: PASS (rc=0) —— target 与 host_ovr 全部 13 组的必需用例真执行且判 PASS
+  S2 rc=0
+
+[4] 本轮明确未跑(按任务书不机械重跑, 引用既有接受结果):
+  V1/V2、I/O 四变体、SD 两变体、旧负例矩阵 13 项、元负例 M1-M5: 相关源码与夹具本轮未改且 A0 链
+  未新增接口 => 记 NOT_RERUN, 引用 S2/CP6 与 F2d 已接受结果, 不当作本轮新证据。
+  目标机: 零执行。T00..T13 全部 NOT_EXECUTED / NOT AUTHORIZED。

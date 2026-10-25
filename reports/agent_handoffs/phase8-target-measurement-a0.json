@@ -1,0 +1,349 @@
+{
+  "task_id": "phase8-target-measurement-a0",
+  "task_book_file": "NS800_Prep_R1_Review_GO_and_A0_Firmware_Task_bbf66ba_20261025.md",
+  "date": "2026-10-25",
+  "timezone": "Asia/Shanghai",
+  "nature": "offline software round: instrumentation implementation + host verification + batch Keil builds of two targets + artifact archival + ordinary commit/push; three checkpoints in one autonomous round",
+  "base": "bbf66ba34d7b31a217c643921aa4192df2f59a56",
+  "accepted_s2_commit": "bcdec631266239008734271ba75beab435bf30eb",
+  "prep_review_commit": "bbf66ba34d7b31a217c643921aa4192df2f59a56",
+  "prep_review_verdict": "PREP_REVIEW_GO (accepted by the independent reviewer, registered here per task book §0; no separate registration round)",
+  "code_commit": "678768739dd8e964fdcc428ef1168e4353c167f7",
+  "engineering_commit": "本次提交(含 project.uvprojx 双目标改动 + 证据 + 两镜像 + 交接); 其 full SHA 只写进最终回执, 不在提交内容里自引用",
+  "status": "A0_OFFLINE_FIRMWARE_READY_AWAITING_INDEPENDENT_SOFTWARE_AND_IMAGE_REVIEW",
+  "production_changed": true,
+  "production_files": [
+    "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/stop_priority.c",
+    "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/stop_priority.h",
+    "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/sp_measure_a0.c",
+    "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/sp_measure_a0.h"
+  ],
+  "production_change_summary": "stop_priority.c: 三个被测入口经编译期宏接入私有 measured-enter/exit, 只在原 sp_end 序列之间插入寄存器读(屏障顺序/动作次数/返回优先序/事件与黑匣子语义/公开签名均不变; 开关为 0 时展开回原语); stop_priority.h: 只更正已登记的旧 TBCTL 注释; 新增 sp_measure_a0.{c,h} 整个文件被功能开关包住",
+  "host_files": [
+    "tests/host/run_sp_measure_a0.sh",
+    "tests/host/sp_measure_a0_main.c",
+    "tests/host/sp_measure_a0_port.h"
+  ],
+  "engineering_files": [
+    "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/project.uvprojx"
+  ],
+  "docs_files": [
+    "reports/plans/phase8-target-measurement-plan.md",
+    "reports/plans/phase8-target-measurement-a0-operator-pack.md",
+    "reports/agent_handoffs/phase8-target-measurement-a0.md",
+    "reports/agent_handoffs/phase8-target-measurement-a0.json"
+  ],
+  "evidence_files": [
+    "reports/reviews/phase8-target-measurement-a0/source_audit.txt",
+    "reports/reviews/phase8-target-measurement-a0/host_results.txt",
+    "reports/reviews/phase8-target-measurement-a0/keil_builds.txt",
+    "reports/reviews/phase8-target-measurement-a0/build_manifest.json"
+  ],
+  "binary_artifacts": [
+    {
+      "path": "reports/firmware/phase8-target-measurement-a0/default.bin",
+      "role": "本轮四宏 FALSE 的默认变体 (测量开关未定义 => 0)",
+      "keil_target": "rt-thread",
+      "sha256": "ef69404d388a7977f170550e324dfa50fd0cf152e41bc2831410c05628a92a20",
+      "bytes": 251148,
+      "is_verified_board_e40_fallback": false,
+      "rollback_capability": "BLOCKED_ROLLBACK (板上 e40 的确切文件与散列未知; 本轮未读 Flash)"
+    },
+    {
+      "path": "reports/firmware/phase8-target-measurement-a0/measure-a0.bin",
+      "role": "A0 测量变体 (NS800_TARGET_MEASUREMENT_A0=1; 四宏仍全 RT_FALSE)",
+      "keil_target": "rt-thread-measure-a0",
+      "sha256": "e9ba8dae1a4b4d59697d5844551bfcd3fbba9061cc8fbcd11784cd7b61a8fc63",
+      "bytes": 259868
+    }
+  ],
+  "builds": {
+    "default": {
+      "target_name": "rt-thread",
+      "command": "UV4.exe -r project.uvprojx -t rt-thread -j0 -o <log>  (批处理 Rebuild All)",
+      "mode": "build only; 未进下载/调试会话, 未做设备探测",
+      "result": "0 Error(s), 0 Warning(s)",
+      "program_size": "Code=173762 RO-data=76806 RW-data=2188 ZI-data=83784",
+      "equals_accepted_cp6_sizes": true,
+      "map_spm_symbol_lines": 0,
+      "axf_local_only_sha256": "see reports/reviews/phase8-target-measurement-a0/build_manifest.json",
+      "axf_committed": false,
+      "bin": "default.bin"
+    },
+    "measure_a0": {
+      "target_name": "rt-thread-measure-a0",
+      "command": "UV4.exe -r project.uvprojx -t rt-thread-measure-a0 -j0 -o <log>",
+      "mode": "build only",
+      "result": "0 Error(s), 0 Warning(s)",
+      "program_size": "Code=179858 RO-data=79430 RW-data=2188 ZI-data=91504",
+      "zi_delta_vs_default_bytes": 7720,
+      "record_array_in_map": "spm_rec @ 0x2000ac58, Data 7680 bytes (= 64 slots x 120 B)",
+      "map_spm_symbol_lines": 361,
+      "maximum_stack_usage_line": "2996 bytes + Unknown(Cycles, Untraceable Function Pointers) (与默认目标逐字相同; 离线 call graph 不是目标栈高水位验收)",
+      "axf_committed": false,
+      "bin": "measure-a0.bin"
+    }
+  },
+  "measure_target_delta": {
+    "method": "整段克隆默认 <Target> 后只做 6 处文本替换; 用 XML 解析逐叶子对比核实",
+    "differs_only_in": [
+      "TargetName",
+      "TargetOption/TargetArmAds/Cads/VariousControls/Define (+NS800_TARGET_MEASUREMENT_A0=1)",
+      "OutputDirectory",
+      "OutputName",
+      "ListingPath",
+      "AfterMake/UserProg1Name"
+    ],
+    "source_lists_identical": true,
+    "source_file_count_each_target": 135,
+    "sconscript_changed": false,
+    "build_hooks": "BeforeCompile/BeforeMake RunUserProg 全 0; AfterMake 只有 fromelf --bin (纯转换)"
+  },
+  "host_tests": {
+    "chain": "tests/host/run_sp_measure_a0.sh",
+    "binaries": [
+      "a0_off (switch 0)",
+      "a0_on (switch 1 + host PPB backend)"
+    ],
+    "groups_declared": [
+      "off",
+      "counter",
+      "contract",
+      "conc",
+      "batch",
+      "cli",
+      "ledger"
+    ],
+    "groups_executed": [
+      "off",
+      "counter",
+      "contract",
+      "conc",
+      "batch",
+      "cli",
+      "ledger"
+    ],
+    "ids_expected": [
+      "TMA01",
+      "TMA02",
+      "TMA03",
+      "TMA04",
+      "TMA05",
+      "TMA06",
+      "TMA07",
+      "TMA08",
+      "TMA09",
+      "TMA10",
+      "TMA11",
+      "TMA12",
+      "TMA13",
+      "TMA14",
+      "TMA15",
+      "TMA16",
+      "TMA17",
+      "TMA18"
+    ],
+    "ids_executed_and_pass": "同上 18 项, 每组一个独立进程, 台账自洽(声明=实际=唯一)",
+    "checks_total": 226,
+    "per_group_checks": {
+      "off": 13,
+      "counter": 55,
+      "contract": 60,
+      "conc": 34,
+      "batch": 36,
+      "cli": 15,
+      "ledger": 13
+    },
+    "runner_rc": 0,
+    "symbol_gate": "a0_off 生产记录器符号=0 / 记录数组=0 / 三个被测入口=3; a0_on 分别 22 / 1",
+    "reverse_families": [
+      {
+        "name": "rev_spm_unavailable_is_valid",
+        "injections": 2,
+        "expected_named_failures": [
+          "TMA02",
+          "TMA03"
+        ],
+        "result": "META-OK"
+      },
+      {
+        "name": "rev_spm_snapshot_after_unmask",
+        "injections": 2,
+        "expected_named_failures": [
+          "TMA11"
+        ],
+        "result": "META-OK"
+      }
+    ],
+    "reverse_first_attempt_defects_kept": [
+      "注入文本没写成注释 => 变异副本编译不过 = INFRA-FAIL(不算检出)",
+      "runner 的 `local fam=\"$1\" shift` 让期望 id 取到家族名 => 假 NOT-DETECTED",
+      "TMA11 的接缝点原本在 post 读(在 pin 之后) => 检不出; 改为\"窗口内挂起、解屏蔽后交付\"后命中"
+    ],
+    "evidence": "reports/reviews/phase8-target-measurement-a0/host_results.txt"
+  },
+  "consolidated_regression": {
+    "S1": "target 50 / host_ovr 65 全 PASS, proc rc=0",
+    "S2": "target 17 组 23 / host_ovr 17 组 79 全 PASS (含叶子 epwm 10 / tmc_lock 15 / uart 7 / budget 6); pre_bad=0; SKIP 与声明一致",
+    "not_rerun": [
+      "V1/V2",
+      "I/O 四变体",
+      "SD 两变体",
+      "旧负例 13 项",
+      "元负例 M1-M5"
+    ],
+    "not_rerun_reason": "相关源码与夹具本轮未改且 A0 链未新增接口 => 引用已接受结果, 不当作本轮新证据",
+    "measurement_switch_during_regression": "default (关闭)"
+  },
+  "target_cases": {
+    "all": "T00..T13 全部 NOT_EXECUTED / NOT AUTHORIZED",
+    "A0_scope": "本批只实现\"关闭路径\"的插桩与命令族; 未插桩 HIGH/RUN、DIR、恢复提交、UART TX/flush、cfg/xfer 叶锁与慢整理锁",
+    "B_C_packages": "继续未授权"
+  },
+  "tests_executed": [
+    "tests/host/run_sp_measure_a0.sh (a0_off + a0_on, 18 例, 226 断言, rc=0)",
+    "tests/host/run_sp_measure_a0.sh REVERSE=1 (两家族 META-OK)",
+    "tests/host/run_stop_result_s1.sh (target 50 / host_ovr 65, rc=0)",
+    "tests/host/run_stop_priority_s2.sh (target 23 / host_ovr 79, rc=0)",
+    "Keil batch Rebuild All x2 (0 Error / 0 Warning)"
+  ],
+  "builds_executed": [
+    "Keil rt-thread Rebuild All (0/0)",
+    "Keil rt-thread-measure-a0 Rebuild All (0/0)",
+    "host gcc a0_off + a0_on + 反向副本构建"
+  ],
+  "hardware_actions": [],
+  "four_target_macros": "RT_FALSE",
+  "macro_readback": {
+    "MOTOR_HARDWARE_ENABLE_PATH_VALIDATED": "motor.h:69 = RT_FALSE",
+    "STEP_DIAG_ISOLATED_ENV_CONFIRMED": "motor.h:83 = RT_FALSE",
+    "TMC_DRIVE_CONFIG_HW_VALIDATED": "tmc2209.h:100 = RT_FALSE",
+    "SAFETY_LIMIT_INPUTS_ENABLED": "project_board.h:51 = RT_FALSE",
+    "NS800_TARGET_MEASUREMENT_A0": "默认 0; 只在测量目标里 =1; 不参与任何安全判定",
+    "host_ovr": "只属于主机编译参数, 不是目标门禁解除方式"
+  },
+  "board_identity": "USER_REPORTED_E40 (未读回 Flash 身份)",
+  "scope_check": {
+    "allowed_paths_hit": "生产 4 + 工程 1 + 新主机链 3 + 计划(append/新文件) + 证据 4 + BIN 2 + 交接 2",
+    "forbidden_paths_touched": [],
+    "unchanged": [
+      "HAL",
+      "内核",
+      "四个安全宏",
+      "时钟/引脚配置",
+      "其它生产模块",
+      "BSP 阶段总文档(待办事项/开发进度/README)",
+      ".gitignore",
+      "SDK/第三方包",
+      "既有 runner/shim/generator",
+      "S2/S1 夹具"
+    ],
+    "no_new_threads_or_generators": true,
+    "gitignore_modified": false,
+    "bin_added_without_force": "两路径未被忽略规则命中, 直接 add; 未放整个 build 目录",
+    "out_of_repo_work": "主机链 OUT_DIR 与反向副本一律在仓库外; 修订/取证脚本留在被忽略的 _s2work/"
+  },
+  "counter_clock_guard_preconditions": {
+    "counter_status_values": "COUNTER_OK / COUNTER_UNAVAILABLE / COUNTER_UNCHECKED",
+    "no_ppb_access_before_check": "未通过能力检查前不触碰任何 PPB 地址; 计数读返回 0 且样本判无效",
+    "zero_is_not_zero_duration": true,
+    "body_interval_basis": "窗口内 SysTick COUNTFLAG 未置位(无重装) => < LOAD+1; 不用 VAL 模差分",
+    "enclosing_interval": "本批恒 invalid (无独立时基/完整防混叠依据), 保留 pre/post 原始值",
+    "wrap_policy": "body_end < body_begin => COUNTER_WRAPPED, 不解释成一次回绕内的短区间",
+    "clock_basis_initial": "SOURCE_ASSUMED; init 成功最多 CONFIG_READBACK; CLI 无 EXTERNAL_VERIFIED 入口",
+    "read_clear_side_effect_audit": "现构建内运行期读 SysTick->CTRL 的只有本记录器; SysTick_Config 只在启动写; SysTick_Handler 与 rt_hw_us_delay 不读 CTRL",
+    "nested_guard": "内层起点读清旗 => 外层标 NESTED_GUARD(目标上只有不可屏蔽源能造成, 同步合同不覆盖)",
+    "unproven_on_target": "芯片是否实现 DWT/CYCCNT 仍未知; 必须上机 spm init 才有真值",
+    "stop_does_not_clear_dwt_bits": true
+  },
+  "operator_pack_ready": {
+    "file": "reports/plans/phase8-target-measurement-a0-operator-pack.md",
+    "bound_to_image_hashes": true,
+    "steps": "P-01..P-14",
+    "ready_now": "仅 P-04..P-12/P-14 在补齐现场与工具信息后可批准; 命令副作用已逐条按源码分类",
+    "not_ready_for_authorization": [
+      "P-01 (现场七项未知)",
+      "P-02 (端口/探针未知, 本轮未扫描设备)",
+      "P-13 (需已知 armed 状态)"
+    ],
+    "excluded_commands": [
+      "pin_status(会重写输出脚默认电平)",
+      "ss_test(会继续 fault_reset)",
+      "各类 *_selftest/flash_test/flash_unlock/config_save",
+      "裸 pin/pwm/tmc_uart_probe",
+      "旧 e40 命令语义"
+    ],
+    "not_read_only_warnings": "spm trip 与 motor_disarm 等关闭动作会经 Safety/黑匣子/存储路径产生 Flash 写; 启动路径本身也不是只读",
+    "still_needed_from_user": [
+      "现场确认(电机未接/模块/VM 与逻辑电源与断电判据/SW1 现位/人在场)",
+      "烧录与串口通道(具体端口/探针)",
+      "是否按整包批准 P-01..P-14"
+    ]
+  },
+  "unresolved": [
+    {
+      "id": "A0-U-1",
+      "item": "counter_status/clock_basis 的目标真值 (DWT 是否实现 / 是否递增 / LOAD 值)",
+      "type": "目标机确认",
+      "blocks": "短保护段窗口时长"
+    },
+    {
+      "id": "A0-U-2",
+      "item": "外部晶振与实际核心频率 (需独立时基; MCO 路由/分频/测点未授权)",
+      "type": "现场/厂商",
+      "blocks": "任何\"实测 µs\"表述"
+    },
+    {
+      "id": "A0-U-3",
+      "item": "窗口时长/丢失容忍/物理响应阈值仍无约定",
+      "type": "规格未约定 => ACCEPTANCE_LIMIT_TBD",
+      "blocks": "T02 的 PASS 判定资格"
+    },
+    {
+      "id": "A0-U-4",
+      "item": "跨时间基共同事件/标记 GPIO 未批准",
+      "type": "待批准板级动作",
+      "blocks": "M-3 的\"寄存器写→焊盘\"部分"
+    },
+    {
+      "id": "A0-U-5",
+      "item": "板上 e40 镜像文件与散列未知",
+      "type": "目标机动作",
+      "blocks": "回退能力 BLOCKED_ROLLBACK"
+    },
+    {
+      "id": "A0-U-6",
+      "item": "现场供电/隔离/串口与探针信息未填",
+      "type": "现场",
+      "blocks": "P-01/P-02 的可批准性"
+    },
+    {
+      "id": "A0-U-7",
+      "item": "A0 代码与两镜像尚未被独立复审接受",
+      "type": "复审门",
+      "blocks": "任何板级执行"
+    }
+  ],
+  "frozen_refs_verified": {
+    "main": "1b3757eec550802a3973e66790af422d81d3d373",
+    "phase7/full-embedded-software": "6d3fbc559d45673d7550eb73dec5a4ade5bb34df",
+    "tag_object": "097935fec5a6f2467261ab1ad449ff0b1d398250",
+    "tag_dereferenced_firmware": "e40a9b95ef709e6a80444f9f3949dfdd70ba96ba",
+    "phase8_at_document_base": "bbf66ba34d7b31a217c643921aa4192df2f59a56"
+  },
+  "inherited_evidence_levels": {
+    "cloud_executed": "S1/S2 正反向、叶子四组、20006 次数值检查、上下文机制探针 (复审端复跑)",
+    "agent_reported": "V1/V2、I/O、负例、元负例、Keil 数字、N7 同负载 A/B、本轮 A0/S1/S2 主机与 Keil 构建",
+    "user_reported": "板上固件身份 USER_REPORTED_E40",
+    "user_confirmed": "现用安全链静态电气 + 现有 SW1 功能 (RISK-04-a); 本轮不重复索取",
+    "explicitly_not_reused": "旧 e40 命令语义; 未修脚本 sw1_cut.ps1 (T-01/T-02 HOLD)"
+  },
+  "next_step": "先交独立复审(软件实现 + 两镜像身份 + 命令包)。复审通过后, 由用户按 operator pack 的 P-01..P-14 整包决定是否批准, 且必须先补齐现场与工具信息; 本轮不自授任何硬件权限, 不启动任何测量, 不把镜像构建成功说成可烧录依据",
+  "remote_push": {
+    "branch": "phase8/tmc-drive-config",
+    "pushed_sha_policy": "本轮 push 后的 full SHA 只写进最终回执, 不在提交内容里自引用",
+    "read_back_planned": "ls-remote 回读分支 full SHA + 逐一复核改动 blob 与两个 BIN 的 SHA-256 + 冻结引用 + 工作树 clean",
+    "self_reference_avoided": true
+  },
+  "stop_claim": "A0_OFFLINE_FIRMWARE_READY; AWAITING_INDEPENDENT_SOFTWARE_AND_IMAGE_REVIEW; NO BOARD/SERIAL/DEBUGGER/GPIO/TMC/STEP/MOTOR AUTHORIZATION; FOUR TARGET SAFETY MACROS RT_FALSE; BOARD USER_REPORTED_E40"
+}

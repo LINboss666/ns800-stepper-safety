@@ -1,0 +1,132 @@
+{
+  "task_id": "phase8-target-measurement-a0",
+  "generated": "2026-10-25 (Asia/Shanghai)",
+  "toolchain": {
+    "compiler": "ARMCLANG V6.24 (pCCUsed 6240000::V6.24::ARMCLANG, uAC6=1)",
+    "ide": "Keil uVision5 batch mode, -r (Rebuild All), -j0",
+    "device": "NS800RT7P65D-DHQFBY2 (PackID NOVOSENSE.NS800RT7XXX.0.5.3)",
+    "host_compiler": "MinGW-w64 gcc (host chain only)"
+  },
+  "inputs": {
+    "project_file": "BSP/project.uvprojx",
+    "production_and_test_blobs": {
+      "stop_priority.c": {
+        "repo_path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/stop_priority.c",
+        "git_blob": "9942fc7ac8a5be106d8f4166e23f7e1a354231cb",
+        "worktree_bytes": 63520,
+        "sha256_worktree": "fc2ba38f446cc7a93c23749194a608e6bbd15a038f027f915e074c0ac07dec2c"
+      },
+      "stop_priority.h": {
+        "repo_path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/stop_priority.h",
+        "git_blob": "560294ad13c6bdb6bb22f5fda6d6b02f52f5fdfb",
+        "worktree_bytes": 24518,
+        "sha256_worktree": "2db39a6c273d8ac4eb0f8b56bdf1426ea5dc8bc9ff9b2945683bfe1dc6976e47"
+      },
+      "sp_measure_a0.c": {
+        "repo_path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/sp_measure_a0.c",
+        "git_blob": "47c9e8d022b7210e38dddd05c56121d3b3d94c99",
+        "worktree_bytes": 31525,
+        "sha256_worktree": "0459531c49db131f2f0043586ce16dce78d3254bdd15e2f23e0f5b5ea6fa6c55"
+      },
+      "sp_measure_a0.h": {
+        "repo_path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/sp_measure_a0.h",
+        "git_blob": "a8d0d4e4f26bbe06852bd20fce8440e1c09f690b",
+        "worktree_bytes": 11746,
+        "sha256_worktree": "d212acf3abfb82e05c2046418b407f6f085ad347a578552166bbefb87f97efaa"
+      },
+      "project.uvprojx": {
+        "repo_path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/project.uvprojx",
+        "git_blob": "c18d31f991f64d08d61cd3b04215e9b48b964067",
+        "worktree_bytes": 231510,
+        "sha256_worktree": "efb5671345e1f3e747b00f8f02fe2f25fc4d2df30c4b6d88b820f3f391b929b0"
+      },
+      "run_sp_measure_a0.sh": {
+        "repo_path": "tests/host/run_sp_measure_a0.sh",
+        "git_blob": "b8c823e35ad4858710948b0c216243bce5020f55",
+        "worktree_bytes": 17071,
+        "sha256_worktree": "8be241f183e66b5cd7c5dfb3efacc4a0e4d7bb26a40550e5408ca0596daaecaa"
+      },
+      "sp_measure_a0_main.c": {
+        "repo_path": "tests/host/sp_measure_a0_main.c",
+        "git_blob": "99283ce1ea27bd1433eecdf27e17d7d2af3ad07b",
+        "worktree_bytes": 58167,
+        "sha256_worktree": "21b43951bd3917818ab5a52df5e8975131d237156e423b309ff6189087d8ed46"
+      },
+      "sp_measure_a0_port.h": {
+        "repo_path": "tests/host/sp_measure_a0_port.h",
+        "git_blob": "28072535026d85bc79cbcbcc381158230d254a9a",
+        "worktree_bytes": 3227,
+        "sha256_worktree": "d2fa45be136d406e493b1de19f6f526fa2255b5826e7bbf76de6ebae03490379"
+      }
+    },
+    "sdk_local_only": {
+      "note": "SDK/CMSIS 只本地存在, 不入库; 用 SHA-256 前缀比对",
+      "core_cm7.h": "5214f848d1f94c1b",
+      "NS800RT7P65x.h": "391a3c7174f8c7a0",
+      "NS800RTxxxx.h": "521d4baa2548e20a"
+    }
+  },
+  "code_commit": {
+    "sha": "678768739dd8e964fdcc428ef1168e4353c167f7",
+    "contains": "生产实现 + 主机链 + source_audit; Keil 工程改动在其后一次提交",
+    "note": "构建在该定稿源码上执行; 后续文档/二进制提交逐 blob 证明生产与工程字节未变"
+  },
+  "builds": {
+    "default": {
+      "target_name": "rt-thread",
+      "measurement_switch": "NS800_TARGET_MEASUREMENT_A0 未定义 => 0",
+      "four_macros": "RT_FALSE (motor.h:69/:83, tmc2209.h:100, project_board.h:51)",
+      "result": "\".\\build\\rt-thread.axf\" - 0 Error(s), 0 Warning(s).",
+      "program_size": {
+        "Code": 173762,
+        "RO-data": 76806,
+        "RW-data": 2188,
+        "ZI-data": 83784
+      },
+      "map_spm_symbol_lines": 0,
+      "axf_sha256_local_only": "8681a24e81c63ff8bf4c7135b8f0aa22ffba5969433084357e8fa8d9dde06fa8",
+      "axf_committed": false,
+      "axf_reason": "ELF/AXF 调试信息可能带本机路径, 未经脱敏不上传",
+      "bin_archive": "reports/firmware/phase8-target-measurement-a0/default.bin",
+      "bin_sha256": "ef69404d388a7977f170550e324dfa50fd0cf152e41bc2831410c05628a92a20",
+      "bin_bytes": 251148
+    },
+    "measure_a0": {
+      "target_name": "rt-thread-measure-a0",
+      "measurement_switch": "NS800_TARGET_MEASUREMENT_A0=1",
+      "four_macros": "RT_FALSE (同上; 测量开关不改变四道安全门)",
+      "result": "\".\\build\\a0\\rt-thread-a0.axf\" - 0 Error(s), 0 Warning(s).",
+      "program_size": {
+        "Code": 179858,
+        "RO-data": 79430,
+        "RW-data": 2188,
+        "ZI-data": 91504
+      },
+      "zi_delta_vs_default_bytes": 7720,
+      "record_array_in_map": "spm_rec                                  0x2000ac58   Data        7680  sp_measure_a0.o(.bss.spm_rec)",
+      "map_spm_symbol_lines": 361,
+      "axf_sha256_local_only": "058ab45684a9cfdacd3aa34a807ba53de75162e5544590541c7d4950e2ab5ae4",
+      "axf_committed": false,
+      "bin_archive": "reports/firmware/phase8-target-measurement-a0/measure-a0.bin",
+      "bin_sha256": "e9ba8dae1a4b4d59697d5844551bfcd3fbba9061cc8fbcd11784cd7b61a8fc63",
+      "bin_bytes": 259868
+    }
+  },
+  "rollback_status": {
+    "default.bin_is": "本轮四宏 FALSE 的默认变体",
+    "is_board_e40_firmware": false,
+    "note": "板上 e40 的确切文件与散列未知 => 回退能力 BLOCKED_ROLLBACK; 本轮未读 Flash"
+  },
+  "verification": {
+    "host_chain": "TMA01..TMA18 全部真执行且 PASS; 两个反向家族 META-OK(具名检出)",
+    "regression": "S1 target 50/host_ovr 65; S2 target 23/host_ovr 79 (叶子 10/15/7/6) 全 PASS",
+    "not_rerun": "V1/V2, I/O 四变体, SD, 旧负例/元负例 (未改且无接口影响, 记 NOT_RERUN)",
+    "target_execution": "零: T00..T13 全 NOT_EXECUTED/NOT AUTHORIZED",
+    "hardware_actions": []
+  },
+  "limits": [
+    "镜像构建成功不等于可烧录: 需独立复审 + 用户对具体操作包的另行批准",
+    "两目标的 Maximum Stack Usage 行相同, 但离线 call graph 不是目标栈高水位验收",
+    "counter_status/clock_basis 的目标真值仍未知 (须未来 spm init 现场取得)"
+  ]
+}
