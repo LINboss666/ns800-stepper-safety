@@ -11,9 +11,10 @@
     "main": "1b3757eec550802a3973e66790af422d81d3d373",
     "phase7/full-embedded-software": "6d3fbc559d45673d7550eb73dec5a4ade5bb34df",
     "tag_object": "097935fec5a6f2467261ab1ad449ff0b1d398250",
-    "tag_dereferenced_firmware": "e40a9b95ef709e6a80444f9f3949dfdd70ba96ba"
+    "tag_dereferenced_firmware": "e40a9b95ef709e6a80444f9f3949dfdd70ba96ba",
+    "phase8/tmc-drive-config_at_prep_r1_review": "b27c0c49118c52219383e36a032069d61fa43cfc"
   },
-  "status": "TARGET_MEASUREMENT_PREPARED_NOT_EXECUTED",
+  "status": "TARGET_MEASUREMENT_PREP_REVISED_NOT_EXECUTED",
   "production_changed": false,
   "tests_executed": [],
   "hardware_actions": [],
@@ -25,7 +26,7 @@
     "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/待办事项.md (S2 段落措辞收敛, 仅此一段)"
   ],
   "s2_wording_correction": {
-    "reason": "上一轮新增的 S2 完成段把\u201c所有锁都限时 / UART 复核已解耦\u201d合写, 超出实际实现",
+    "reason": "上一轮新增的 S2 完成段把“所有锁都限时 / UART 复核已解耦”合写, 超出实际实现",
     "converged_to": "S2 收口的是结构性保护顺序: 短保护排在慢整理锁之前, 开启提交与恢复用原身份门; ss_lock/mot_lock 仍 RT_WAITING_FOREVER; TMC 只有外层 txn 非阻塞, cfg/xfer/UART 用分段与总预算; UART 完整性复核仍在 Motor 斜坡线程内按 200ms 节奏在 mot_lock 外执行, 无独立 UART 守卫线程",
     "source_facts": [
       "motor.c:143 mot_lock_take(RT_WAITING_FOREVER)",
@@ -48,49 +49,118 @@
     "JSON 可被 json.loads 解析",
     "引用路径与行号本地可核对 (F-01..F-24 均带 文件:行)",
     "无本机绝对路径 / 用户名 / 邮箱 / 主机名; SDK 参考以 LOCAL_ONLY + SHA-256 前缀登记",
-    "git diff --check 干净",
+    "首轮检查项 \"git diff --check 干净\" **作废并被 r1 轮更正**: 复审方独立运行 git diff --check f919a5c b27c0c4 实得 rc=2, 命中 reports/plans/phase8-target-measurement-plan.md:82: trailing whitespace. (F-20 行最后一个竖线后一个空格); 原始 stdout 不重造, 本轮实际结果见 revision.offline_checks",
     "未重跑任何主机链, 未重编译 Keil (本轮零执行 => 不声明任何新测试结果)"
   ],
   "resolved_local_facts": [
-    "F-01/03/04/06: 时钟链按代码常量推导为 HXTL 20MHz => SYSCLK 400MHz, HCLK=PCLK1=PCLK2=200MHz, PCLK5=50MHz; SystemCoreClock 运行期刷新点在 drv_common.c:43",
-    "F-02: HXTL 标称自相矛盾 (board.h 选 RCC_HXTL_24M 档 vs NS800RTxxxx.h HXTL_FREQ_VALUE=20000000UL) => 一切 µs/ms 换算依赖未证前提, 须上机核对",
+    "F-01/03/04/06: 时钟链按代码常量推导为 HXTL 20MHz => SYSCLK 400MHz, HCLK=PCLK1=PCLK2=200MHz, PCLK5=50MHz; SystemCoreClock 运行期刷新点在 drv_common.c:43; 该链整体是 clock_basis=SOURCE_ASSUMED, 软件值之间互相读回一致只到 CONFIG_READBACK",
+    "F-02: HXTL 标称自相矛盾 (board.h 选 RCC_HXTL_24M 档 vs NS800RTxxxx.h HXTL_FREQ_VALUE=20000000UL) => 一切 µs/ms 换算依赖未证前提, 只登记\"来源待确认\", 不据此断言晶振实为 24MHz 或配置已错; 升级到 EXTERNAL_VERIFIED 需独立时基",
     "F-05: project.uvprojx:21 的 CLOCK(12000000) 是 IDE 字段, 与计算链无关, 禁止引用",
     "F-07/08: EPWM 时钟 = PCLK1>>EPWMCLKDIV(DIV_1); RCC_getEpwmFrequency 无消费者; 频率->TBPRD 换算只在 ns800_epwm_prepare; 且 hw_init 与驱动配置表两处 prescaler 来源需回读 TBCTL 核对",
-    "F-09/10: UART/SPI 驱动按 PCLK2 计算而外设使能在 APB5(50MHz) => 真实 SCI/SCI 功能时钟未知; ADC 输入时钟身份 SDK 未注明",
-    "F-11: SysTick 用处理器时钟 (CLKSOURCE=1), LOAD=SystemCoreClock/1000, tick=1ms, 优先级 0x0F; I/D cache 使能; PendSV 优先级未显式设置",
-    "F-12/13/14: 单核构建 (DUAL_CORE_ENABLE=0, RT_CPUS_NR=1), 外设全归 CPU1; sema/mu/mcm 编译进镜像但零调用点 => \u201c驱动被编译\u201d不等于另一核在跑",
+    "F-09/10: UART/SPI 的外设时钟**使能域**在 APB5(50MHz) 而驱动按 PCLK2 取**功能时钟** => 两件事分开登记; 真实功能时钟未知, 不推成\"波特率必错 4 倍\"或任何倍数; ADC 输入时钟身份 SDK 未注明",
+    "F-11: SysTick 用处理器时钟 (CLKSOURCE=1), LOAD=SystemCoreClock/1000, tick=1ms; I/D cache 使能; PendSV/SysTick 优先级**确有显式设置** —— 工程编译 KERNEL/libcpu/arm/cortex-m7/context_rvds.S (project.uvprojx:503-505), 其 :22-23 定义 NVIC_SYSPRI2=0xE000ED20 与 NVIC_PENDSV_PRI=0xFFFF0000, rt_hw_context_switch_to (:166) 在首次线程切换的 :189-194 读-OR-写该系统优先级寄存器; drv_common.c:49 的 NVIC_SetPriority(SysTick_IRQn,0x0F) 是更早的 C 侧设置; __NVIC_PRIO_BITS=4 (NS800RT7P65x.h:301) => 最低可实现优先级 = 级别 15",
+    "F-12/13/14: 单核构建 (DUAL_CORE_ENABLE=0, RT_CPUS_NR=1), 外设全归 CPU1; sema/mu/mcm 编译进镜像但零调用点 => “驱动被编译”不等于另一核在跑",
     "F-15: 本工程无 DMA (rtconfig 无项, .config:235 not set, HAL 无 drv_dma.c), 未发现 GPIO 锁存的 DMA 目标",
     "F-16/17: 9 条线程的优先级/栈/节奏已列 (motor 8/768/10ms, safety 4/1024, sensor 7/1024, diag 9/1024, ui 20/512, bblog 18/1024, flog 29/4096, tshell 20/4096, fxcHold 22/768 测试钩子); 未开 RT_USING_STAT/MONITOR/TIMER_SOFT/CPU_USAGE_TRACER",
     "F-18: 可用观测 = ps(栈高水位, usage 列 N/A)/free/list_*/backtrace/memcheck; 无 rt_thread_stat()",
-    "F-19/20/21/22: DWT/CYCCNT/TRCENA 定义在编译清单内的 CMSIS 但零启用, 芯片是否实现须运行时读 NOCYCCNT; 无 PMU 路线; rt_hw_us_delay 用 SysTick->VAL 忙等 => 替代方案量程 1 tick; rt_hw_interrupt_disable 即 CPSID I (屏蔽期 tick 不推进)",
+    "F-19/20/21/22: DWT/CYCCNT/TRCENA 定义在编译清单内的 CMSIS 但零启用, 芯片是否实现须运行时读 NOCYCCNT 并验证递增 => counter_status=COUNTER_UNCHECKED 之前不得报告任何时长 (含 0); 计数器可递增而时钟未证 => 只报原始 cycles; 计数器不可用 => COUNTER_UNAVAILABLE 且无有效差值; rt_hw_us_delay 用 SysTick->VAL 忙等, 单圈模差分不能排除多圈混叠 (N=LOAD+1) => SysTick 路径对本批 B-1 保守降级为不产出有效窗口样本 (BLOCKED_COUNTER); rt_hw_interrupt_disable 即 CPSID I (屏蔽期 tick 不推进)",
     "F-23: console=uart1(PA12/13) 与 TMC=uart2(PB6/7) 是不同外设; GPIO_12/13 排除在测量资源外",
     "F-24: 黑匣子 48B/帧 @100Hz, 300+150 帧 ~35.2KB BSS, 读口 blackbox_status/blackbox_dump; ns_log 落 flash (flash_logstat/flash_dump)",
     "信号写入者穷举: PA.0/PA.1 仅 EPWM; DIR 唯一写点 motor.c:1488; PC.23 唯一 HIGH 生产点 stop_priority.c:810; PC.6 输入 + fail-close 且无 IRQ; pf21_diag/pf21_ab 会驱动已弃用 PF.21 => 列入排除清单",
-    "EPWM1 实例写入者清单 + SYSCON_setTbClkSync 影响所有 TB 计数 => M-2 不能靠\u201c没搜到应用调用\u201d关闭",
+    "EPWM1 实例写入者清单 + SYSCON_setTbClkSync 影响所有 TB 计数 => M-2 不能靠“没搜到应用调用”关闭",
     "预算表原样继承 (125/250/400/1500/10/20/20/2ms+256B; 10ms 节拍; 200ms 节奏; 100ms 应答), 且 motor.c:99/101-106 自否 405ms 为上界",
     "电机/驱动/诊断参数现状: irun20/ihold8/GCONF 0x141/CHOPCONF 0x15030053 均为待验证配置; Rsense=110mΩ 商品页 + VREF=1270mV 历史万用表; 额定 1500mA 仅一处且自否; CHOPCONF 从未写过; 阈值与持续帧数为工程占位; 诊断默认 MONITOR_ONLY, ACTIVE 需 MEASURED",
-    "仪器与现场的历史口径: 唯一仪器型号记录 UT39A+ (仅静态); 2026-09-11 记 \u201c无示波器/逻辑分析仪\u201d; 现场最后记录 2026-10-22 (SW1 阻断位、许可 LOW、armed=0、电机未接、模块在位)"
+    "仪器与现场的历史口径: 唯一仪器型号记录 UT39A+ (仅静态); 2026-09-11 记 “无示波器/逻辑分析仪”; 现场最后记录 2026-10-22 (SW1 阻断位、许可 LOW、armed=0、电机未接、模块在位)",
+    "§2.5 词表 (本轮新增口径): clock_basis=SOURCE_ASSUMED/CONFIG_READBACK/EXTERNAL_VERIFIED; counter_status=COUNTER_OK/COUNTER_UNAVAILABLE/COUNTER_UNCHECKED; 每条时长记录带 sample_valid/invalid_reason, 仅 sample_valid=1 进入统计"
   ],
   "unresolved_facts": [
-    {"id": "U-1", "item": "外部晶振真实标称 (20M vs 24M 冲突) 与目标机实际 SystemCoreClock/PCLK/EPWM 时钟", "type": "现场/工具测量", "blocks": "一切 µs 换算, T02/T04/T06"},
-    {"id": "U-2", "item": "UART(以及 SPI) 的真实功能时钟, 因而位时间与帧时长的物理含义", "type": "厂商/测量", "blocks": "T04"},
-    {"id": "U-3", "item": "芯片是否实现 DWT/CYCCNT (NOCYCCNT 只能运行时读); 无 PMU 定义", "type": "目标机确认", "blocks": "短保护段窗口测量 (有 SysTick->VAL 替代, 量程 1 tick)"},
-    {"id": "U-4", "item": "出厂是否另烧 CPU2 半图 / 是否存在外部 SEMA/MU 使用者", "type": "厂商/现场", "blocks": "M-1 完整关闭"},
-    {"id": "U-5", "item": "同 EPWM1 实例其它通道 (PA.1/EPWM1_B) 与 SYSCON TB 时钟同步的板级用途", "type": "原理图/网表/厂商", "blocks": "M-2"},
-    {"id": "U-6", "item": "所有接受阈值: 窗口时长上限, RX/EXTI 丢失容忍, STEP 频率/占空比公差, 物理停止延迟, 诊断检出/误报率", "type": "规格未约定 => ACCEPTANCE_LIMIT_TBD", "blocks": "T02/T04/T06/T09/T13 的 PASS 判定资格"},
-    {"id": "U-7", "item": "当前可用仪器 (示波器/逻辑分析仪/万用表型号与能力)", "type": "现场", "blocks": "T06/T09 及全部瞬态证据"},
-    {"id": "U-8", "item": "供电来源与断电判据、模块可否拔出、电机铭牌额定电流、ADC 前端实测标定、ENN 线路连续性", "type": "现场", "blocks": "T09/T12/T13"},
-    {"id": "U-9", "item": "板上固件身份未读回 (仍 USER_REPORTED_E40)", "type": "目标机动作", "blocks": "把任何目标结论绑定到具体镜像"}
+    {
+      "id": "U-1",
+      "item": "外部晶振真实标称 (20M vs 24M 冲突) 与目标机实际 SystemCoreClock/PCLK/EPWM 时钟; 软件值互相读回只到 CONFIG_READBACK, 独立时基测量才能到 EXTERNAL_VERIFIED",
+      "type": "现场/工具测量",
+      "blocks": "一切 µs 换算, T02/T04/T06"
+    },
+    {
+      "id": "U-2",
+      "item": "UART/SPI 的外设使能域与真实功能时钟分开确认, 因而位时间与帧时长的物理含义 (不推断倍数)",
+      "type": "厂商/测量",
+      "blocks": "T04"
+    },
+    {
+      "id": "U-3",
+      "item": "芯片是否实现 DWT/CYCCNT (NOCYCCNT 只能运行时读 + 需验证递增); 无 PMU 定义 => 未检查前 counter_status=COUNTER_UNCHECKED; SysTick 单圈差分保守降级为不产出 B-1 有效窗口样本, 登记 BLOCKED_COUNTER",
+      "type": "目标机确认",
+      "blocks": "短保护段窗口测量 (有 SysTick->VAL 替代, 量程 1 tick)"
+    },
+    {
+      "id": "U-4",
+      "item": "出厂是否另烧 CPU2 半图 / 是否存在外部 SEMA/MU 使用者",
+      "type": "厂商/现场",
+      "blocks": "M-1 完整关闭"
+    },
+    {
+      "id": "U-5",
+      "item": "同 EPWM1 实例其它通道 (PA.1/EPWM1_B) 与 SYSCON TB 时钟同步的板级用途",
+      "type": "原理图/网表/厂商",
+      "blocks": "M-2"
+    },
+    {
+      "id": "U-6",
+      "item": "所有接受阈值: 窗口时长上限, RX/EXTI 丢失容忍, STEP 频率/占空比公差, 物理停止延迟, 诊断检出/误报率",
+      "type": "规格未约定 => ACCEPTANCE_LIMIT_TBD",
+      "blocks": "T02/T04/T06/T09/T13 的 PASS 判定资格"
+    },
+    {
+      "id": "U-7",
+      "item": "当前可用仪器 (示波器/逻辑分析仪/万用表型号与能力)",
+      "type": "现场",
+      "blocks": "T06/T09 及全部瞬态证据"
+    },
+    {
+      "id": "U-8",
+      "item": "供电来源与断电判据、模块可否拔出、电机铭牌额定电流、ADC 前端实测标定、ENN 线路连续性",
+      "type": "现场",
+      "blocks": "T09/T12/T13"
+    },
+    {
+      "id": "U-9",
+      "item": "板上固件身份未读回 (仍 USER_REPORTED_E40)",
+      "type": "目标机动作",
+      "blocks": "把任何目标结论绑定到具体镜像"
+    },
+    {
+      "id": "U-10",
+      "item": "跨时间基关联所需条件: 可识别的共同事件/标记 (无任何标记 GPIO 获批准), 对齐方法, 误差来源; 以及 MCO 输出路由/分频/测点与引脚复用接线 (均为单列未来授权动作)",
+      "type": "待批准板级动作",
+      "blocks": "M-3 的\"寄存器写→焊盘\"时间关系部分; T06/T09 的 µs 级换算"
+    }
   ],
   "plan_structure": {
     "fact_table": "F-01..F-24 + 信号表 + 参数表",
-    "segments": ["检测段", "短保护段", "物理响应段", "慢整理段", "恢复段"],
+    "segments": [
+      "检测段",
+      "短保护段",
+      "物理响应段",
+      "慢整理段",
+      "恢复段"
+    ],
     "instrumentation_points": "I-1..I-7 (设计, 不实现)",
     "future_cases": "T00..T13, 全部 NOT AUTHORIZED / NOT EXECUTED",
-    "evidence_template": "case_id/status/software_sha/measurement_variant_sha/image_sha256/source_level/macro_set/clock_basis/instrument_and_setup/trigger_definition/input_identity/epoch_before_after/owner_phase/cycles_pre_body_begin_body_end_post/tick_entry_exit/pwm_raw_rc/permit_write_rc/permit_confirm_rc/enn_feedback/pending_before_after/latch/metadata_commit/notify_count/wire_edges_or_capture_ref/samples_expected_observed_dropped/acceptance_limit_and_source/actual_result/unresolved/stop_reason",
-    "result_classes": ["PLANNED_NOT_EXECUTED", "BLOCKED", "OBSERVED", "PASS", "FAIL"]
+    "evidence_template": "case_id/status/software_sha/measurement_variant_sha/image_sha256/source_level/macro_set/instrument_and_setup/clock_basis/counter_status/sample_valid/invalid_reason/trigger_definition/input_identity/epoch_before_after/owner_phase/cycles_pre_body_begin_body_end_post/tick_entry_exit/pwm_raw_rc/permit_write_rc/permit_confirm_rc/enn_feedback/pending_before_after/latch/metadata_commit/notify_count/wire_edges_or_capture_ref/samples_expected_observed_dropped/timebase_linkage(common_event_or_NONE/alignment_method/error_budget)/acceptance_limit_and_source/actual_result/unresolved/stop_reason",
+    "result_classes": [
+      "PLANNED_NOT_EXECUTED",
+      "BLOCKED",
+      "OBSERVED",
+      "PASS",
+      "FAIL"
+    ],
+    "time_base_and_sample_validity": "§2.5: clock_basis 三层 + counter_status 三值 + sample_valid/invalid_reason 判据 + SysTick 单圈混叠反例 + DWT/SysTick 回绕有效性"
   },
-  "future_authorization_packages": ["A", "B", "C"],
+  "future_authorization_packages": [
+    "A",
+    "B",
+    "C"
+  ],
   "package_summary": {
     "A": "四宏 FALSE、无电机的新固件冒烟与关闭路径观测 (T01/T02/T03/T11 可达部分); 不含许可 HIGH/STEP 开启/TMC apply/改线/供电/SW1/电机",
     "B": "无电机隔离台架的时序/波形/TMC 验证 (T04..T10/T12 中经授权可达项), 逐例列宏组合与解除依据; 仪器不足项保持 BLOCKED_INSTRUMENT",
@@ -102,11 +172,11 @@
     "运行既有采集器 (含 sw1_cut.ps1)、端口/设备扫描",
     "串口/调试器/仪器连接、烧录/读 Flash/复位",
     "真实 GPIO/TMC/STEP/DIR、电机、供电、接线、SW1、真机清故障、selftest",
-    "调用任何会在启动时探测硬件的脚本来\u201c查看环境\u201d",
+    "调用任何会在启动时探测硬件的脚本来“查看环境”",
     "新增脚本、测试平台或测量补丁; 批量翻修其它历史文档段落"
   ],
   "out_of_scope_doc_inconsistencies_registered": [
-    "stop_priority.h:23 仍描述旧的 \u201cset 抓 TBCTL 旧模式再写回\u201d, 与现码 drv_epwm.c:293-318 + drv_epwm_leaf.inc 不一致 (留待下次真实生产改动整理)",
+    "stop_priority.h:23 仍描述旧的 “set 抓 TBCTL 旧模式再写回”, 与现码 drv_epwm.c:293-318 + drv_epwm_leaf.inc 不一致 (留待下次真实生产改动整理)",
     "phase8-safety-chain-acceptance-draft.md:269/433 引用的 开发进度.md:33 行号过期 (实际 :104)"
   ],
   "four_target_macros": "RT_FALSE",
@@ -122,8 +192,171 @@
     "cloud_executed": "S1 50/65, S2 target 23 / host_ovr 79, 五类反向 META-OK, 叶子四组 10/15/7/6, 20006 次 EPWM 数值检查 + UBSan/float-cast-overflow 无诊断, N7 上下文机制探针",
     "agent_reported": "V1 25 / V2 22, I/O 27/29/40/42, 负例 13/13, 元负例 M1..M5, Keil 0/0 (Code=173762 RO=76806 RW=2188 ZI=83784), N7 同负载 A/B",
     "user_reported": "板上固件身份, 静态电气与现有 SW1 现场检查确认, 2026-10-22 现场状态",
-    "explicitly_not_reused": "旧 [C.10] 中无工件支撑的 \u201c另一次全量 OK=13\u201d 引用 (已在 [D.2b] 更正)"
+    "explicitly_not_reused": "旧 [C.10] 中无工件支撑的 “另一次全量 OK=13” 引用 (已在 [D.2b] 更正)"
   },
-  "next_step": "把计划与 A/B/C 三包清单交审议; 只有在某一包获得具体授权后才谈插桩实现与测量镜像制作, 且实现轮需单独走构建 + 主机回归 + Keil。本轮不自授任何硬件权限, 不启动任何测量。",
-  "stop_claim": "AWAITING_PREP_REVIEW_AND_HARDWARE_TASK_AUTHORIZATION; TARGET_MEASUREMENT_PREPARED_NOT_EXECUTED; NO HARDWARE AUTHORIZATION; FOUR MACROS RT_FALSE; BOARD USER_REPORTED_E40"
+  "next_step": "本轮交付的是可复审的计划修订: 零目标机指令执行、零设备连接、零烧录/复位/Flash、零 GPIO/TMC/STEP/DIR、零电机/供电/接线/SW1/真机清故障/selftest、零插桩实现、零镜像构建。下一步顺序: (1) 本轮修订复审; (2) 另行下达的离线测量固件/镜像制作任务 (可审补丁 + 构建输入 + ELF/BIN 散列 + 具体命令包, 该轮自走构建 + 主机回归 + Keil); (3) 拿到真实镜像散列后, 才把烧录/启动/测量作为 A/B/C 具体操作包交用户批准。仪器、现场供电/隔离与电机参数仍是 §7 三组未决, 本轮不升级为离线交付阻塞, 也不重复索取五点电压或现有 SW1 静态确认。本轮不自授任何硬件权限或 GO",
+  "stop_claim": "TARGET_MEASUREMENT_PREP_REVISED; AWAITING_INDEPENDENT_PREP_REVIEW; NO HARDWARE AUTHORIZATION; FOUR MACROS RT_FALSE; BOARD USER_REPORTED_E40",
+  "review_resolution": [
+    {
+      "id": "R1",
+      "finding": "PLAN F-11 与首轮 JSON 把 PendSV 优先级记为\"工程未显式设置\"; 实际汇编写入已存在",
+      "revised_locations": [
+        "reports/plans/phase8-target-measurement-plan.md §2.1 F-11 (结论/出处/已知-未知三列全改)",
+        "本 JSON resolved_local_facts[F-11 条目]",
+        "reports/plans/phase8-target-measurement-plan.md §2 图例补 KERNEL/ 前缀",
+        "reports/plans/phase8-target-measurement-plan.md 附录 A 增加 NS800RT7P65x.h 散列"
+      ],
+      "evidence": [
+        "BSP/project.uvprojx:503-505 (context_rvds.S 进编译清单)",
+        "KERNEL/libcpu/arm/cortex-m7/context_rvds.S:22-23 (NVIC_SYSPRI2=0xE000ED20, NVIC_PENDSV_PRI=0xFFFF0000)",
+        "同文件 :166 rt_hw_context_switch_to 与 :189-194 读-OR-写回",
+        "LIB/HAL_Drivers/drv_common.c:49 NVIC_SetPriority(SysTick_IRQn, 0x0F)",
+        "SDK-Device/Inc/NS800RT7P65x.h:301 __NVIC_PRIO_BITS=4"
+      ],
+      "remaining_premises": [
+        "SHPR3 的运行期实际读回值未取 (T00 级动作)",
+        "0xFFFF0000 落在该字哪些字节未逐位确认, 文档不断言归属",
+        "其它 IRQ 的优先级分配仍未核对",
+        "不猜未读回的数值, 不修改内核"
+      ],
+      "production_rework_required": false
+    },
+    {
+      "id": "R2a",
+      "finding": "F-20 把\"计数器不可用\"与\"时钟未校准\"两种失败混写, 且可能把零值当成有效 cycles",
+      "revised_locations": [
+        "reports/plans/phase8-target-measurement-plan.md §2.1 F-20",
+        "reports/plans/phase8-target-measurement-plan.md §2.5 counter_status 表与样本有效性判据",
+        "reports/plans/phase8-target-measurement-plan.md §4 纪律第 5 条 + 替代方案首条",
+        "reports/plans/phase8-target-measurement-plan.md §8 记录模板 (counter_status/sample_valid/invalid_reason)",
+        "本 JSON resolved_local_facts[F-19/20/21/22 条目] 与 unresolved_facts[U-3]"
+      ],
+      "evidence": [
+        "区分: COUNTER_OK + 时钟未证 => 只报原始计数差; COUNTER_UNAVAILABLE/UNCHECKED => 没有有效计数差, 零值不是零耗时",
+        "仅所选计数源通过可用性检查的样本才参与统计"
+      ],
+      "remaining_premises": [
+        "DWT 是否实现只能在目标机读 DWT_CTRL.NOCYCCNT 并验证递增后判定",
+        "本批未做任何目标机检查 => 该资源仍是 COUNTER_UNCHECKED"
+      ],
+      "production_rework_required": false
+    },
+    {
+      "id": "R2b",
+      "finding": "SysTick 单圈差分不能自证区间小于一圈; 原方案只写\"按 LOAD 处理回绕\"",
+      "revised_locations": [
+        "reports/plans/phase8-target-measurement-plan.md §2.5 混叠反例与 LOAD vs LOAD+1",
+        "reports/plans/phase8-target-measurement-plan.md §4 替代 A (本批选定保守降级)",
+        "reports/plans/phase8-target-measurement-plan.md §3 短保护段行、§6 T02 行、§8 B-1 行",
+        "本 JSON unresolved_facts[U-3]"
+      ],
+      "evidence": [
+        "反例: 重装周期 N=LOAD+1; VAL 300→200 对 100 与 N+100 个计数不可区分 (纯数学推演, 未运行目标或主机测试)",
+        "\"预期 µs 量级\"不是上界证明; post-pre 允许含恢复中断后的 ISR/调度",
+        "保守降级: DWT 不可用时 SysTick 路径不产出 B-1 有效窗口样本, 登记 BLOCKED_COUNTER, 只保留状态与顺序观测",
+        "32 位 DWT 差分同样需允许区间与回绕有效性; 不得把未证明的长区间解释成一次回绕内短区间"
+      ],
+      "remaining_premises": [
+        "若未来仍要用 SysTick 测宽, 须先给出跨重装/多圈/无法判定的完整判据、排除样本的规则与读状态的副作用",
+        "不得重配 SysTick, 不得用忙等验证被测窗口; rt_hw_us_delay 是同类忙等, 不能自测",
+        "本轮不写代码、不加探针"
+      ],
+      "production_rework_required": false
+    },
+    {
+      "id": "R3a",
+      "finding": "配置读回被当作时钟证明的表述需分层; MCO 与 UART/SPI 使能域口径需统一",
+      "revised_locations": [
+        "reports/plans/phase8-target-measurement-plan.md §2.1 F-02/F-03/F-04/F-06, §2.2 F-09/F-10",
+        "reports/plans/phase8-target-measurement-plan.md §2.5 clock_basis 表",
+        "reports/plans/phase8-target-measurement-plan.md §6 T00/T06 行, §8 模板与规则, §9 组 1/组 3",
+        "本 JSON resolved_local_facts[0/1/4] 与 unresolved_facts[U-1/U-2]"
+      ],
+      "evidence": [
+        "SystemCoreClock/RCC_get*/TBCTL/PLL 位读回只核对软件报告链 (同源 => 一致不构成独立证明)",
+        "MCO 需确认路由/分频/测点并用独立时基才算外部依据; 仅配置或读出名字不是测频",
+        "UART/SPI 分开\"外设使能域\"与\"功能时钟来源\", 不推断波特率倍数"
+      ],
+      "remaining_premises": [
+        "独立时基与现场测点未确认 => clock_basis 停在 SOURCE_ASSUMED/CONFIG_READBACK",
+        "MCO 引脚复用与接线是单列的未来授权动作, 本轮不配置、不接线",
+        "未验证时只给带假设的换算或有效原始计数, 不登记\"实测 µs\""
+      ],
+      "production_rework_required": false
+    },
+    {
+      "id": "R3b",
+      "finding": "T06/T09 的波形不自动给出\"寄存器写→焊盘\"的时间差, 缺跨时间基关联事件",
+      "revised_locations": [
+        "reports/plans/phase8-target-measurement-plan.md §6 特殊判据 2 (补共同事件/对齐方法/误差来源与\"无标记 GPIO\"约束)",
+        "reports/plans/phase8-target-measurement-plan.md §6 T06/T09 观测点栏",
+        "reports/plans/phase8-target-measurement-plan.md §8 M-3 关闭行与模板新增 timebase_linkage 字段",
+        "reports/plans/phase8-target-measurement-plan.md §9 组 3 (MCO 路由与标记 GPIO 列为单列授权)",
+        "本 JSON unresolved_facts[U-10]"
+      ],
+      "evidence": [
+        "无共同事件/标记时只报电气信号之间 (SW1/许可/ENN/STEP) 的时序与残余边沿, MCU 的 DSB/cycle 记录单列",
+        "当前没有任何标记 GPIO 获批准, 不得假定其存在"
+      ],
+      "remaining_premises": [
+        "M-3 的\"写入→焊盘\"部分继续开放",
+        "本轮不配置 MCO、不增加 GPIO、不落地插桩、不连接仪器"
+      ],
+      "production_rework_required": false
+    },
+    {
+      "id": "F1",
+      "finding": "首轮交付声称 \"git diff --check 干净\" 与复审实测 rc=2 不一致 (plan:82 尾随空格)",
+      "revised_locations": [
+        "PLAN §2.1 F-20 行尾随空格已消除 (该行本轮整体重写)",
+        "交接 MD §8 保留原声明并标注\"由 r1 轮更正\"",
+        "本 JSON offline_checks 内该条作废, 实测结果改记于 revision.offline_checks"
+      ],
+      "evidence": [
+        "复审实测: git diff --check f919a5c b27c0c4 => rc=2, reports/plans/phase8-target-measurement-plan.md:82: trailing whitespace.",
+        "本轮不重造首轮原始 stdout, 不为此重跑任何测试或 Keil, 只承认不一致并记录新结果"
+      ],
+      "remaining_premises": [
+        "r1 轮自身的 diff --check rc 见 revision.offline_checks, 以最终提交前最后一次运行为准"
+      ],
+      "production_rework_required": false
+    }
+  ],
+  "revision": {
+    "task_id": "phase8-target-measurement-prep-r1",
+    "task_book_file": "NS800_Target_Measurement_Prep_Review_and_Rework_b27c0c4_20261025.md",
+    "review_verdict": "PREP_REVIEW_CHANGES_REQUIRED",
+    "document_base": "b27c0c49118c52219383e36a032069d61fa43cfc",
+    "document_base_parent": "f919a5c05fbee5457c768d5c1a4ba46c41a9dbfc",
+    "first_round_status": "TARGET_MEASUREMENT_PREPARED_NOT_EXECUTED",
+    "files_allowed": [
+      "reports/plans/phase8-target-measurement-plan.md",
+      "reports/agent_handoffs/phase8-target-measurement-prep.md",
+      "reports/agent_handoffs/phase8-target-measurement-prep.json"
+    ],
+    "files_changed": [
+      "reports/plans/phase8-target-measurement-plan.md",
+      "reports/agent_handoffs/phase8-target-measurement-prep.md",
+      "reports/agent_handoffs/phase8-target-measurement-prep.json"
+    ],
+    "explicitly_untouched": [
+      "BSP 待办事项.md (本轮复审已接受其锁与复核措辞, 不再改)",
+      "生产 / HAL / 内核 / 四个目标宏 / tests/host / 夹具 / runner / Keil 工程 / .gitignore",
+      "未新增第四文件、脚本或测试平台"
+    ],
+    "go_unchanged": "S2 SOFTWARE_REVIEW_GO 不撤回、不升级; accepted_software_commit 仍是 bcdec631",
+    "offline_checks": [
+      "git diff --name-only b27c0c4 == 3 paths (plan + handoff md + handoff json), all inside the whitelist; no fourth file",
+      "git diff b27c0c4 -- ':!reports' is EMPTY => production/HAL/kernel/four macros/tests/host/fixtures/runner/Keil project/.gitignore untouched",
+      "git diff --check b27c0c4 => rc=0 (re-run after writing these numbers, still rc=0); this replaces the first-round claim that was falsified by the reviewer (rc=2 at plan:82)",
+      "json.load OK; 32 top-level keys; review_resolution has 6 entries R1/R2a/R2b/R3a/R3b/F1 each mapping finding -> revised_locations -> remaining_premises; tests_executed/builds_executed/hardware_actions all []",
+      "newly cited source lines re-read one by one: project.uvprojx:503/:505, context_rvds.S:22/:23/:166/:189-194, NS800RT7P65x.h:301, drv_common.c:45/:49, board.h:198, core_cm7.h:2307-2312",
+      "four target macros read back RT_FALSE: motor.h:69, motor.h:83, tmc2209.h:100, project_board.h:51",
+      "remote ls-remote at start of round: phase8/tmc-drive-config = b27c0c4... (no third-party advance); main / phase7 / tag object / dereferenced firmware unchanged",
+      "privacy scan of the three files: no local absolute paths, usernames, emails or hostnames; SDK/CMSIS references stay LOCAL_ONLY + SHA-256 prefix",
+      "no host chain re-run, no Keil, no build, no instrumentation patch, no MCO/GPIO config, no image creation"
+    ],
+    "next_step_after_this_revision": "复审通过后, 先由另行下达的**离线测量固件/镜像制作任务**产出可审插桩补丁 + 构建输入 + ELF/BIN SHA-256 + 相对 bcdec631 的差异 + 具体命令包; 只有拿到真实镜像散列后, 才把烧录/启动/测量作为操作包交用户批准。不能让用户先批准一个尚不存在的镜像; 本轮文档修订不推导任何软件实现或硬件权限",
+    "self_reference_policy": "本轮 push 后的 full SHA 只写进最终回执, 不写进被提交的文件, 避免自引用"
+  }
 }

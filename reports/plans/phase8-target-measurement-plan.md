@@ -4,6 +4,11 @@
 性质：**离线准备**。本文所有测试条目状态一律为 `PLANNED / NOT EXECUTED`；本轮零构建、零主机链重跑、
 零硬件动作、零插桩实现。
 
+修订轮 `phase8-target-measurement-prep-r1`（同日，基线 `b27c0c49118c52219383e36a032069d61fa43cfc`）
+按独立复审 `PREP_REVIEW_CHANGES_REQUIRED` 落实 R1（PendSV 优先级已有显式汇编设置）、R2（计数器可用性
+与时钟可校准分开，SysTick 路径保守降级）、R3（`clock_basis` 分层与跨时间基关联条件）与 F1（尾随空格）；
+修订口径见 §2.5、§4、§6 判据 2、§8、§9 与交接 `review_resolution`。**本节不改变任何测试条目状态。**
+
 **本文不是什么**：不是可执行验收单（`reports/plans/phase8-safety-chain-acceptance-draft.md` 自身仍是
 DRAFT，见其 `:3`）；不是停机时延承诺；不是硬件授权。文内任何"入口/触发/宏组合"只是**未来需要
 单独授权的具体动作清单**。
@@ -49,23 +54,24 @@ reset/rebase/force/merge。
 图例：等级 `SRC`=本仓源码/工程可核对；`SDK-LOCAL`=本地 SDK/CMSIS 文件（仅本地存在，见附录 A）；
 `DOC`=仓内既有记录；`USER`=用户断言；`TBD`=本地不能解决。
 路径前缀 `BSP/` = `rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/`，
-`LIB/` = `rt-thread-master/rt-thread-master/bsp/novosns/ns800/libraries/`。
+`LIB/` = `rt-thread-master/rt-thread-master/bsp/novosns/ns800/libraries/`，
+`KERNEL/` = `rt-thread-master/rt-thread-master/`（内核与 `libcpu/`）。
 
 ### 2.1 时钟链（影响所有"计数→时间"换算，必须先解决）
 
 | # | 结论 | 出处 | 等级 | 已知 / 未知 | 影响的测试 |
 |---|---|---|---|---|---|
 | F-01 | 生效时钟配置由编译器宏给出：`SYSCLK_USE_PLL`、`SYSCLK_SOURCE_USE_HXTL`、`PLLCLK_SOURCE_USE_HXTL`、`DUAL_CORE_ENABLE=0`、`__CLK_TCK=RT_TICK_PER_SECOND` | `BSP/project.uvprojx:341`；scons 同值 `BSP/board/SConscript:14-15` | SRC | 已知 | T00/T06 |
-| F-02 | **HXTL 标称值在本地自相矛盾**：寄存器配置选 `RCC_HXTL_24M_AGC_DISABLE`（该枚举注释 24 MHz），而频率常量是 `HXTL_FREQ_VALUE (20000000UL)`，SDK 计算全部用它 | `BSP/board/board.h:88-92`；`SDK-StdDriver/Inc/rcc.h:1525`；`SDK-Device/Inc/NS800RTxxxx.h:53`；`SDK-StdDriver/Src/rcc.c:42` | SDK-LOCAL | 已知=计算按 20 MHz；**未知=晶振真实标称** | 一切 µs/ms 换算、T02/T04/T06 |
-| F-03 | 按 F-02（20 MHz）的推导链：PLL `PLLM_40 / PLLN_DIV1 / PLLP_DIV2` ⇒ SYSCLK=400 MHz；CPUCLK=SYSCLK/1；**HCLK=CPUCLK/2=200 MHz**；PCLK1=PCLK2=HCLK/1=200 MHz；PCLK5=HCLK/4=50 MHz | `board.h:118-121`（PLL）、`:175`（CPU 分频）、`:174`（HCLK=`RCC_HCLKSOURCE_CPUCLK_2`，且 `rcc.c:752` 在 configPll 内再次强制）、`:172-173`（APB1/2=DIV1）、`:171`（APB5=DIV4）；公式 `rcc.c:91`；写入 `rcc.c:403-407`；切源 `board.c:161` | SRC + SDK-LOCAL | 已知=代码链；**未知=目标机实测时钟** | T00/T06/T09 |
-| F-04 | `SystemCoreClock` 由 SDK 在启动后按运行期读数刷新（= CPUCLK），调用点在板级初始化里 | `SDK-Device/Src/system_NS800RT7xxx.c:33-35`（默认 `SYSTEM_CLOCK=HXTL_FREQ_VALUE`）、`:85-92`（`SystemCoreClockUpdate`）；调用 `LIB/HAL_Drivers/drv_common.c:43`（在 `rt_hw_systick_init`，被 `:144 rt_hw_board_init` 调用） | SRC | 已知；**未知=上机读到的实际值**（须读回变量或 MCO） | T00 |
+| F-02 | **HXTL 标称值在本地自相矛盾**：寄存器配置选 `RCC_HXTL_24M_AGC_DISABLE`（该枚举注释 24 MHz），而频率常量是 `HXTL_FREQ_VALUE (20000000UL)`，SDK 计算全部用它 | `BSP/board/board.h:88-92`；`SDK-StdDriver/Inc/rcc.h:1525`；`SDK-Device/Inc/NS800RTxxxx.h:53`；`SDK-StdDriver/Src/rcc.c:42` | SDK-LOCAL | 已知=计算按 20 MHz ⇒ `clock_basis=SOURCE_ASSUMED`；**未知=晶振真实标称**（只能由 `EXTERNAL_VERIFIED` 升级）。两档并列只登记"来源待确认"，**不得**据此断言晶振实为 24 MHz、板子实际超频或配置已错 | 一切 µs/ms 换算、T02/T04/T06 |
+| F-03 | 按 F-02（20 MHz）的推导链：PLL `PLLM_40 / PLLN_DIV1 / PLLP_DIV2` ⇒ SYSCLK=400 MHz；CPUCLK=SYSCLK/1；**HCLK=CPUCLK/2=200 MHz**；PCLK1=PCLK2=HCLK/1=200 MHz；PCLK5=HCLK/4=50 MHz | `board.h:118-121`（PLL）、`:175`（CPU 分频）、`:174`（HCLK=`RCC_HCLKSOURCE_CPUCLK_2`，且 `rcc.c:752` 在 configPll 内再次强制）、`:172-173`（APB1/2=DIV1）、`:171`（APB5=DIV4）；公式 `rcc.c:91`；写入 `rcc.c:403-407`；切源 `board.c:161` | SRC + SDK-LOCAL | 已知=代码链（整条链的输入仍是 F-02 的 `SOURCE_ASSUMED` 常量）；**未知=目标机实际时钟**。运行期读回只到 `CONFIG_READBACK` 级（见 §2.5） | T00/T06/T09 |
+| F-04 | `SystemCoreClock` 由 SDK 在启动后按运行期读数刷新（= CPUCLK），调用点在板级初始化里 | `SDK-Device/Src/system_NS800RT7xxx.c:33-35`（默认 `SYSTEM_CLOCK=HXTL_FREQ_VALUE`）、`:85-92`（`SystemCoreClockUpdate`）；调用 `LIB/HAL_Drivers/drv_common.c:43`（在 `rt_hw_systick_init`，被 `:144 rt_hw_board_init` 调用） | SRC | 已知=刷新机制；**未知=上机读到的值**。注意：`SystemCoreClock`、`RCC_get*`、TBCTL/PLL 位之间的互相读回**同源**（都从 F-02 的 `HXTL_FREQ_VALUE` 算出），一致只证明软件报告链自洽，构成 `CONFIG_READBACK`，**不构成**外部晶振或实际核心频率的独立证明；MCO 只有在确认输出路由/分频/测点并用独立时基测量后才是 `EXTERNAL_VERIFIED`（引脚复用与接线是单列未来授权动作） | T00 |
 | F-05 | 工程内可见的 `CLOCK(12000000)` 是 IDE 调试器/仿真字段，与 F-03 的计算链无关 | `BSP/project.uvprojx:21` | SRC | 已知=不得引用它做换算 | — |
-| F-06 | `RCC_getPclk1Frequency()` 单位是 **Hz**，值 = `HCLK >> APB1DIV`；EPWM 模块时钟 = `PCLK1 >> EPWMCLKDIV(本工程 DIV_1)` ⇒ 按 F-03 为 200 MHz | `rcc.c:163`（`@return … in Hz`）、`:165-167`、`:199-201`；`board.h:179` | SDK-LOCAL | 已知=单位与路径；**未知=上机读数** | T06（波形周期核对） |
+| F-06 | `RCC_getPclk1Frequency()` 单位是 **Hz**，值 = `HCLK >> APB1DIV`；EPWM 模块时钟 = `PCLK1 >> EPWMCLKDIV(本工程 DIV_1)` ⇒ 按 F-03 为 200 MHz | `rcc.c:163`（`@return … in Hz`）、`:165-167`、`:199-201`；`board.h:179` | SDK-LOCAL | 已知=单位与路径（该函数是**按寄存器位算出的软件值** ⇒ `CONFIG_READBACK`，仍受 F-02 前提约束）；**未知=上机 TBCLK 实际频率** | T06（波形周期核对） |
 | F-07 | `RCC_getEpwmFrequency()` / `EPWMClock` 在 HAL 与 applications 中**无任何消费者**；频率→TBPRD 的换算只发生在 `ns800_epwm_prepare()`（CP6 已按 ns/计数/分频实现，分频取驱动配置值） | grep 无命中；`LIB/HAL_Drivers/drivers/drv_epwm_leaf.inc`（prepare）；表 `drv_epwm.c:172-174`（EPWM1=UP_DOWN, `EPWM_CLOCK_DIVIDER_2`, `EPWM_HSCLOCK_DIVIDER_1`） | SRC | 已知；**未知=上机 TBCLK 实测** | T06 |
 | F-08 | 存在**两处** TBCLK 分频写入来源：冷启动 `ns800_epwm_hw_init` 用 `CLKDIV_1/HSDIV_2`，驱动配置表用 `CLKDIV_2/HSDIV_1`；后者在配置提交时覆盖前者 ⇒ 测量换算必须按**当时生效值**，并回读 TBCTL 的 `CLKDIV/HSPCLKDIV` 位核对 | `drv_epwm.c:261-289`（`:263`）、`:172-174`；写位 `SDK epwm.h:1569-1572`（`EPWM_setClockPrescaler`） | SRC + SDK-LOCAL | 已知 | T06/T07 |
-| F-09 | APB5 挂 UART1–4 且 = 50 MHz，但 UART 驱动按 **PCLK2=200 MHz** 计算波特率 ⇒ 真实 SCI 功能时钟本地不可判 | `board.c:252-256`（`RCC_enableApb5PeripheralClock(UART1..4EN)`）；`SDK-StdDriver/Src/uart.c:44-45`（`/* UART clock source = PCLK2 clock */ … RCC_getPclk2Frequency()`） | SRC + SDK-LOCAL | **未知**（须厂商确认或实测波特率/位时间） | T04（帧时长与 2 ms/256 B flush 上限的物理含义） |
-| F-10 | SPI 波特率同样按 PCLK2 计算而外设使能在 APB5；ADC 输入时钟身份 SDK 未注明（工程用 `ADC_CLK_DIV_4`） | `SDK-StdDriver/Src/spi.c:49`、`board.c:254`；`drv_adc.c:150/180`、`adc.h:1099` | SRC + SDK-LOCAL | 已知=配置事实；ADC 时钟源**未知** | T11（电流采样时间基准） |
-| F-11 | SysTick 用**处理器时钟**（不是 AHB/8），`LOAD = SystemCoreClock/1000` ⇒ tick 1 ms；`NVIC_SetPriority(SysTick_IRQn, 0x0F)`；I/D cache 在板级无条件使能 | `CMSIS core_cm7.h:2307-2312`（`SysTick_CTRL_CLKSOURCE_Msk` 置 1）；`drv_common.c:45`、`:49`、`board.h:198`（`SYSTICK_TIME_UNIT 1000UL`）；`rtconfig.h:73`（`RT_TICK_PER_SECOND 1000`）；cache `drv_common.c:119-120/126-133` | SDK-LOCAL + SRC | 已知；**未知**= PendSV/其它 IRQ 优先级（工程未显式设 PendSV 优先级，全仓无 `PendSV_Priority`/`nvic_irq_enable`） | T02/T03（cache 与优先级都会改变观测） |
+| F-09 | APB5 **使能域**挂 UART1–4（=50 MHz 域），但 UART 驱动按 **PCLK2=200 MHz** 取功能时钟算波特率 ⇒ 两者是"外设时钟使能所在域"与"SCI 功能时钟来源"两件事，本地不能判定实际功能时钟 | `board.c:252-256`（`RCC_enableApb5PeripheralClock(UART1..4EN)`）；`SDK-StdDriver/Src/uart.c:44-45`（`/* UART clock source = PCLK2 clock */ … RCC_getPclk2Frequency()`） | SRC + SDK-LOCAL | **未知**（须厂商确认或实测位时间）。此处只登记"来源待确认"，**不得**推成"波特率必错 4 倍"或任何具体倍数 | T04（帧时长与 2 ms/256 B flush 上限的物理含义） |
+| F-10 | SPI 同类：外设使能在 APB5，速率计算取 PCLK2；ADC 输入时钟身份 SDK 未注明（工程用 `ADC_CLK_DIV_4`） | `SDK-StdDriver/Src/spi.c:49`、`board.c:254`；`drv_adc.c:150/180`、`adc.h:1099` | SRC + SDK-LOCAL | 已知=配置事实（使能域与功能来源分开记）；ADC 时钟源**未知** | T11（电流采样时间基准） |
+| F-11 | SysTick 用**处理器时钟**（不是 AHB/8），`LOAD = SystemCoreClock/1000` ⇒ tick 1 ms；I/D cache 在板级无条件使能。**PendSV 优先级是显式设置的**（不是"工程未设置"）：工程把 `KERNEL/libcpu/arm/cortex-m7/context_rvds.S` 列进编译清单（`project.uvprojx:503/:505`），该文件 `:22` 定义 `NVIC_SYSPRI2 EQU 0xE000ED20`、`:23` 定义 `NVIC_PENDSV_PRI EQU 0xFFFF0000`（注释即"PendSV and SysTick priority value (lowest)"），`rt_hw_context_switch_to`（`:166`）在**首次线程切换**中 `:189-194` 读该寄存器、OR、写回。`drv_common.c:49` 的 `NVIC_SetPriority(SysTick_IRQn, 0x0F)` 是更早的 C 侧设置，与汇编写入同指最低档 ⇒ 两条路线都存在，只搜到 C 调用不足以断言"未设置"，反之亦然 | `CMSIS core_cm7.h:2307-2312`（`SysTick_CTRL_CLKSOURCE_Msk` 置 1）；`drv_common.c:45`、`:49`、`board.h:198`（`SYSTICK_TIME_UNIT 1000UL`）；`rtconfig.h:73`（`RT_TICK_PER_SECOND 1000`）；`project.uvprojx:503-505`；`context_rvds.S:22-23/166/189-194`；`__NVIC_PRIO_BITS = 4`（`SDK-Device/Inc/NS800RT7P65x.h:301`）；cache `drv_common.c:119-120/126-133` | SRC + SDK-LOCAL | 已知=tick 基准、cache 策略、首次上下文切换显式把 PendSV（及该寄存器内 SysTick 字段）置为**最低可实现优先级**（4 位实现 ⇒ `0xFF` 对应级别 15）；**未知**=`SHPR3` 运行期实际读回值、`0xFFFF0000` 的逐字节归属、其它 IRQ 的优先级分配（不猜未读回的数值，也不改内核） | T02/T03（抢占与调度观测的前提；cache 也改变观测） |
 
 ### 2.2 执行者、核与其它总线主设备
 
@@ -79,7 +85,7 @@ reset/rebase/force/merge。
 | F-17 | `RT_THREAD_PRIORITY_MAX=32`、`RT_USING_OVERFLOW_CHECK`、`RT_USING_IDLE_HOOK`（列表 4、idle 栈 256）、`RT_USING_HEAP`+SMALL_MEM；**未开** `RT_USING_STAT`/`RT_USING_MONITOR`/`RT_USING_TIMER_SOFT`/`RT_USING_CPU_USAGE_TRACER` | `rtconfig.h:71-79/101-103`；`src/Kconfig:187/192`（选项存在但未开） | SRC |
 | F-18 | 可用的现成观测接口：`ps`（含 `sp`、`max used%` 栈高水位，由扫描 `#` 填充计算；**usage 列输出 `N/A`**，因 CPU-usage tracer 未开）、`free`、`list_*`、`backtrace`、`memcheck`；**没有** `rt_thread_stat()` | `components/finsh/cmd.c:215/243/314-319/325-328`、`cmd.c:1109/1188`、`msh.c:74/93`、`include/rtthread.h:156`、`src/kservice.c:734` | SRC |
 | F-19 | 周期计数器：CMSIS `core_cm7.h` **定义了** `DWT->CYCCNT`、`DWT_CTRL_CYCCNTENA`、`CoreDebug_DEMCR_TRCENA`、`DWT_CTRL_NOCYCCNT`，且 CMSIS 在编译清单内（`NS800RT7P65x.h:314 #include "core_cm7.h"`）；工程内**零启用代码**；`PMCCNT/PMU` 本地未定义 ⇒ 无 PMU 路线 | `packages/CMSIS-Core-latest/Include/core_cm7.h:1143/1168/1180-1181/1204-1205/1222-1223/1665/1714/1791/1803`；grep `DWT\|CYCCNT\|CoreDebug\|TRCENA` 在 HAL/applications/board/StdDriver = 0 | SDK-LOCAL |
-| F-20 | **芯片是否真实现 DWT/CYCCNT 本地无从判断**（`NOCYCCNT` 只能运行时读）⇒ 计划要求：先在目标机上确认可计数，否则只报 cycles 不报 µs，或改用替代源 | 同上 `:1180-1181` | TBD | 
+| F-20 | **芯片是否真实现 DWT/CYCCNT 本地无从判断**（`NOCYCCNT` 只能运行时读）⇒ 先做可用性检查，再决定能报告什么，两种失败必须分开：① **计数器已证可递增、时钟频率未证** ⇒ 可报告原始计数差（cycles），**不得**报告已校准的 µs；② **计数器未实现 / 未启用 / 不递增** ⇒ 没有有效计数差，只能记 `COUNTER_UNAVAILABLE` 或 `COUNTER_UNCHECKED`；**零值不等于零耗时**，0 或不确定值都不得作为有效 cycles 参与统计 | 同上 `:1180-1181`；判定与样本规则见 §2.5 | TBD |
 | F-21 | 已存在的 µs 级延时是用 **SysTick->VAL 忙等**实现的（不是 DWT）：`rt_hw_us_delay()` 按 `reload` 折算 tick 计数并轮询 `VAL`；`rt_thread_delay_until` 存在；无 `udelay` | `drv_common.c:89-113`（`:93` LOAD、`:95` ticks 折算、`:96-113` 轮询）、`src/thread.c:731/783`、`include/rthw.h:195` | SRC |
 | F-22 | `rt_hw_interrupt_disable/enable` 就是硬件 PRIMASK（`MRS r0,PRIMASK / CPSID I`、`MSR PRIMASK,r0`），所以屏蔽期内 tick 不推进 | `libcpu/arm/cortex-m7/context_rvds.S:38-43/51-53`、`include/rthw.h:149` | SRC |
 | F-23 | 控制台与 TMC 是不同外设：console = `uart1`（PA12/PA13，ALT6，GPIO_12/13 不可用作测量），TMC = `uart2`（PB6 TX / PB7 RX，ALT1） | `rtconfig.h:106-108`、`drv_common.c:160`、`drv_uart.c:105/114-121/128/134-141`、`applications/project_board.h:76`、`tmc2209.c:36` | SRC |
@@ -125,12 +131,53 @@ PA.1（EPWM1_B 保留，`project_board.h:9/21` 明示 never reuse）、限位引
 | 采样/帧格式 | 传感器 100 Hz（`SENSOR_PERIOD_MS 10`）、黑匣子 48 B/帧 @100 Hz、pre 2000 ms/post 1000 ms、`BB_SUBMIT_TRIES_MAX 20`；帧内 `11:8`=四路数字电平（bit8=ENN、9/10=LIMIT、11=DIAG）、`active=15:12`、`valid=27:24`、语义版本=1、`SCHEMA_LEGACY=0` 时 bit8 角色**不可追认** | `sensor_service.c:37`、`blackbox.c:74-79/106-109/450`、`safety_io_semantics.h:33/42/67-78/89-90` | 格式规格可继承 |
 | "软件是第二响应"原文 | `motor.c:23/114/619/1588`、`motor.h:30`、`diagnosis.c:32`、`diagnosis.h:28` | 多处 | 必须逐条保留，不得被任何 PASS 覆盖 |
 
+### 2.5 时间基与样本有效性（本文统一口径）
+
+F-01..F-24 的一切换算、T00 的读回、§4 的插桩纪律与 §8 的记录模板都引用下面三张表，不再各自表述。
+
+**`clock_basis` —— 频率依据分三层，只有最高层才允许"已校准 µs"：**
+
+| 层 | 含义 | 允许报告 | 不允许 |
+|---|---|---|---|
+| `SOURCE_ASSUMED` | 沿用代码常量（F-02 的 `HXTL_FREQ_VALUE = 20000000UL`）算出的任何频率 | 带前提的换算，且必须显式写"按 20 MHz 假设" | 写成"实测 µs"或"时钟已确认" |
+| `CONFIG_READBACK` | 读回 `SystemCoreClock`、`RCC_get*`、TBCTL/PLL 分频位 | 核对**软件报告值与配置链**是否自洽、当时生效的分频位 | 当作外部晶振或实际核心频率的独立证明：这些读回若仍由同一个未确认常量算出，彼此一致只说明计算链自洽 |
+| `EXTERNAL_VERIFIED` | 用与 MCU 无关的独立时基，对已核实的测点直接测量 | 校准后的 µs / ms / 频率 | 只有确认输出路由、分频、测点并真的做了独立测量才算；**仅配置或读出 MCO 名字不是测频**；引脚复用与接线是单列的未来授权动作 |
+
+**`counter_status` —— 计数资源状态分开登记（依据 F-19/F-20/F-21）：**
+
+| 值 | 判定条件 | 样本处理 |
+|---|---|---|
+| `COUNTER_OK` | 已启用，且实测两次读数递增、差分与预期量级一致 | 有效计数差可参与统计 |
+| `COUNTER_UNAVAILABLE` | 检查后确认未实现 / 不递增 / 无法启用 | 该场景**没有**窗口时长样本；只保留状态与顺序观测 |
+| `COUNTER_UNCHECKED` | 尚未做可用性检查 | 一律不得报告时长（**包括不得报 0**） |
+
+**样本有效性判据**：每条时长记录同时携带 `counter_status / clock_basis / sample_valid / invalid_reason`。
+只有 `sample_valid=1` 的样本进入分布与最坏值统计；无效样本要保留并写出 `invalid_reason`，不得静默丢弃。
+
+SysTick 单圈差分为什么不足（§4 替代 A 采用保守降级的依据）：
+
+```text
+反例（数学推演，未运行目标或主机测试）：
+重装周期 N = LOAD + 1（LOAD 是最大重装值，模数是 LOAD+1，不是同一个数）。
+起点 VAL=300、终点 VAL=200 时：
+  100 个计数 与 N + 100 个计数（中途跨过一次重装）得到完全相同的起止读数。
+只做单圈模差分 ⇒ 第二种长区间也被记成 100。
+"预期窗口是 µs 量级"不能证明"必小于一圈"；而 post−pre 允许包含恢复中断后的 ISR/调度，
+恰恰不能默认仍在一个 tick 内。
+```
+
+所以本计划对 SysTick 差分采用**保守降级**（见 §4 替代 A）：不产出用于 `B-1` 的有效窗口样本。
+若未来仍要用 SysTick 测宽，必须先给出发现跨重装 / 多圈 / 无法判定的完整判据、排除样本的规则，以及
+读取相关状态对系统原有行为的副作用，并同时区分 `LOAD` 与模数 `LOAD+1`；**不得**重配 SysTick，也**不得**
+用忙等去"验证"被测窗口本身。32 位 DWT 差分同样要写明允许区间与回绕有效性：跨回绕、无法判定或超出
+声明上界的样本判 `sample_valid=0`，不得把未证明的长区间自动解释成一次回绕内的短区间。
+
 ## 3. 测量分段：五段分别取证（不合并成一个"停机耗时"）
 
 | 段 | 起止定义 | 核心观察 | 时间基 | 不能替代的证据 |
 |---|---|---|---|---|
 | 检测段 | 物理故障或已登记注入发生 → 生产守卫作出故障判定 | 10 ms 斜坡节拍（`motor.c:89`）、200 ms 完整性复核节奏（`motor.c:119`，且**只**在 `mot.armed` 时累计，`motor.c:665-671`）、复核被 UART 占用的时长（`motor.c:720-722`） | tick/日志 | 主机发命令的时刻**不是** MCU 故障入口时刻；`motor.c:99/101-106` 明示 405 ms 与 200 ms 都不是停机上界 |
-| 短保护段 | 抑制/请求发布入口 → 两条真实关闭动作与 `__DSB` 完成 | PRIMASK 窗口宽度、PWM 与许可 LOW 的**独立** raw rc、请求身份 epoch | 周期计数器（F-19/F-20）；tick 在屏蔽期不推进（F-22）⇒ **不能用 tick 测窗口** | 只有 tick/日志时刻不等于窗口时长；`rt_pwm_disable()`/API `RT_EOK` 只表示驱动接受请求（`step_pwm.c:30`） |
+| 短保护段 | 抑制/请求发布入口 → 两条真实关闭动作与 `__DSB` 完成 | PRIMASK 窗口宽度、PWM 与许可 LOW 的**独立** raw rc、请求身份 epoch | 周期计数器（F-19/F-20，且须先按 §2.5 判为 `COUNTER_OK` 才产生有效时长样本）；tick 在屏蔽期不推进（F-22）⇒ **不能用 tick 测窗口** | 只有 tick/日志时刻不等于窗口时长；`rt_pwm_disable()`/API `RT_EOK` 只表示驱动接受请求（`step_pwm.c:30`） |
 | 物理响应段 | 指定电气触发 → STEP 后续边沿 / 许可 / ENN 达到相应状态 | 多通道同步波形、阈值、残余脉冲计数 | 仪器时基 | API 返回、寄存器回读、数字单点都**不等于**物理响应完成（M-3）；单台万用表轮流测六点不算同一时刻（草案 V04-03.3） |
 | 慢整理段 | 短保护完成 → 锁取得 / 影子与 Safety 提交 / 通知 / 日志 | pending、epoch、锁等待、黑匣子一次性 | tick + 时间戳 | 日志变晚 ≠ 关闭动作变晚；日志出现也不保证此前已物理停 |
 | 恢复段 | 人工恢复票据 → 专用复核 → 唯一最终提交 | 新故障落在最终提交前/后的接缝、旧票据被拒、不自动 RUN/HIGH | tick + epoch | 手工清故障成功 ≠ 硬件故障消失 |
@@ -172,8 +219,11 @@ post = cycle_now();
    被测窗口、不得撕裂本次 epoch/proof；槽满只累加丢失计数，不等待、不打印；发生丢失即判"该批分布
    不完整"。
 4. 屏蔽窗口内禁浮点/除法/UART/IPC/延时/等待循环（与 S2 合同一致）；周期→时间换算与输出一律窗口外。
-5. 32 位计数器要记录无符号差分与允许的最长区间并处理回绕；核心时钟未证时**只报 cycles 不猜 µs**
-   （F-02/F-20 未解决前，µs 一律标换算假设）。
+5. 每条时长样本必须带 §2.5 的四个字段并逐条判定：`counter_status`（未检查或未递增 ⇒ **没有**有效计数差，
+   零值不是零耗时）、`clock_basis`（`SOURCE_ASSUMED` 只允许带假设的换算；`CONFIG_READBACK` 仍不构成外部
+   频率证明）、`sample_valid`、`invalid_reason`。32 位计数器要记录无符号差分、允许的最长区间与回绕
+   有效性；超出上界或无法判定是否跨回绕的样本判 `sample_valid=0`，不得自动解释成一次回绕内的短区间。
+   核心时钟未证时**只报 cycles 不猜 µs**（F-02/F-20 未解决前，µs 一律标换算假设）。
 6. 测量期间不用断点/单步制造"运行时长"；调试暂停/睡眠对计数的影响须剔除或单列（F-19 的 CYCCNT
    属调试资源，`CoreDebug->DEMCR.TRCENA` 与调试器行为相关，本地无从判断其实现）。
 7. 若要用额外 GPIO 标记或跟踪接口：先确认空闲资源与时钟域，并作为**新的板级许可条目**列出；
@@ -183,11 +233,17 @@ post = cycle_now();
 资源与替代方案（按本地证据）：
 
 - 首选 DWT/CYCCNT：定义在编译清单内的 CMSIS（F-19），但**是否实现未知**（F-20）⇒ 未来第一步是读
-  `DWT_CTRL.NOCYCCNT`/置 `TRCENA`+`CYCCNTENA` 后验证计数递增，失败即降级。
-- 替代 A：`SysTick->VAL` 差分（工程已有同原理的 `rt_hw_us_delay`，F-21）。量程=1 tick（1 ms），
-  分辨率=处理器时钟周期；适合短保护段（预期 µs 量级），**不适合**跨 tick 的慢整理段；重装时刻需
-  按 `LOAD` 处理回绕。
-- 替代 B：tick + `ps` 栈水位/黑匣子帧时刻，只给 ms 量级分布（F-17/F-18/F-24），并如实标精度。
+  `DWT_CTRL.NOCYCCNT`、置 `TRCENA`+`CYCCNTENA` 后**验证计数确实递增**，据此把 `counter_status` 记为
+  `COUNTER_OK` 或 `COUNTER_UNAVAILABLE`；该检查未做之前，一切时长条目都是 `COUNTER_UNCHECKED`。
+  即便 `COUNTER_OK`，仍要单独解决 `clock_basis`：原始计数差可报，µs 换算仍受 F-02 前提约束。
+- 替代 A（**本批选定：保守降级**）：DWT 判为不可用时，`SysTick->VAL` 差分（工程同原理实现是
+  `rt_hw_us_delay`，F-21）**不产出用于 `B-1` 的有效窗口样本**，相应条目登记 `BLOCKED_COUNTER`，
+  只保留状态与顺序观测（inhibit / pending / 各动作 raw rc / epoch），等合适计数源或仪器到位再谈时长。
+  理由见 §2.5 的单圈混叠反例：模差分无法排除多圈，而"预期 µs 量级"不是上界证明。该路线**不得**重配
+  SysTick，也**不得**用忙等去验证被测窗口——`rt_hw_us_delay` 本身就是同类忙等，不能自测。
+  量程/分辨率事实仍记录在案：量程 1 tick（1 ms）、分辨率 = 处理器时钟周期。
+- 替代 B：tick + `ps` 栈水位/黑匣子帧时刻，只给 ms 量级分布（F-17/F-18/F-24），并如实标精度；
+  屏蔽窗口内 tick 不推进（F-22），故替代 B 只适用于窗口外的段。
 - 记录载体：新增静态 RAM 环（不与黑匣子 `bb_ring` 混用，避免污染既有语义），导出口在 A 包命令清单里
   单列并批准；`ns_log`/flash 路径只在窗口外使用（flash 锁是 FOREVER，见 §3 末段）。
 
@@ -239,16 +295,16 @@ post = cycle_now();
 
 | ID | 包 | 未来要验证什么 | 入口 / 固件与宏要求 | 现场前置 | 观测点 / 证据 | 阈值 | 状态 |
 |---|---|---|---|---|---|---|---|
-| T00 | A | 执行核、其它写入者、EPWM1 A/B、时钟链、周期计数资源 | 现固件 + 只读 msh；无需开宏 | 板可上电、串口白名单 | §2.1–2.3 表的实测核对：`SystemCoreClock`/`RCC_get*`/TBCTL 位/`DWT_CTRL` 可读值 | 记录即可（不设阈值） | 仅离线调查（本轮） |
+| T00 | A | 执行核、其它写入者、EPWM1 A/B、时钟链、周期计数资源 | 现固件 + 只读 msh；无需开宏 | 板可上电、串口白名单 | §2.1–2.3 表的实测核对，**分层登记**：`SystemCoreClock`/`RCC_get*`/TBCTL 位/`DWT_CTRL` 可读值只算 `CONFIG_READBACK`（核对软件报告链，不升级成外部频率证明）；周期计数资源按 §2.5 判 `counter_status`；`clock_basis` 未到 `EXTERNAL_VERIFIED` 前不得写"实测 µs"。MCO 需先确认路由/分频/测点并用独立时基测量，引脚复用与接线是单列未来授权动作 | 记录即可（不设阈值），但 §2.5 四字段必填 | 仅离线调查（本轮） |
 | T01 | A | 新四宏 FALSE 固件的首次启动与无电机冒烟 | **测量/发布镜像**（哈希先经用户确认）；四宏 FALSE | 电机未接、模块在位状态如实记、供电来源与断电判据（P-5） | 启动自动硬件初始化清单、线程/健康/使能/输出状态；不要求故障板硬凑 READY | 逐项与源码预期一致 | 未授权 |
-| T02 | A | 正常 / 已抑制重复 / 真实关闭等短窗口路径 | 2 插桩；关闭方向**不要求**先开启输出 | 同上 | `body` 与包围区间（cycles）、各动作 raw rc、epoch/owner、丢失计数 | 时长 ACCEPTANCE_LIMIT_TBD；raw rc 与合同一致为硬判据 | 未授权 |
+| T02 | A | 正常 / 已抑制重复 / 真实关闭等短窗口路径 | 2 插桩；关闭方向**不要求**先开启输出 | 同上 | `body` 与包围区间（cycles）**仅在 `counter_status=COUNTER_OK` 且 `sample_valid=1` 时进入分布**，其余逐条写 `invalid_reason`；各动作 raw rc、epoch/owner、丢失计数。DWT 判不可用 ⇒ 本例时长登记 `BLOCKED_COUNTER`，只交状态与顺序证据 | 时长 ACCEPTANCE_LIMIT_TBD；raw rc 与合同一致为硬判据 | 未授权 |
 | T03 | A | 目标负载下"保护先于慢锁/日志" | 现有任务负载 + 6；`ps` 栈水位 | 同上 | 锁等待/保护时间戳顺序、pending/一次性整理、日志时刻 | 顺序为硬判据；时长 TBD | 未授权 |
 | T04 | B | 真 UART 正常 / 无应答 / 部分帧 / CRC / 洪泛 / 末字节过期 | 5；125/250/400/1500 同一条预算 | uart2 可观测（F-09 时钟未知须记录） | 数据量、`tmc_xfer_reason`、截止位置、字节/时间双上限触发点 | 预算内为硬判据；物理位时间 TBD | 未授权 |
 | T05 | B | cfg/xfer 竞争与最短剩余预算 | I-4；由**另一上下文**持锁（不同线程/优先级） | 同上 | 请求等待值、真实取得/归还次数、先保护后日志 | `min(cap,剩余)` 一致为硬判据 | 未授权 |
-| T06 | B | 新 EPWM 数值的真实波形 | 正式 API + 隔离台架。**任何 STEP 输出**需 `MOTOR_HARDWARE_ENABLE_PATH_VALIDATED` **或** `STEP_DIAG_ISOLATED_ENV_CONFIRMED` 至少一个为 TRUE（`motor.c:2066`、`step_pwm.c:16-17`）；后者只允许在"TMC 模块拔出 / 功率级断开、只为示波器量 STEP 频率"时由操作员人工翻转并留证（`motor.h:77-79`）；关断失败锁存期间连借用申请都被拒 ⇒ **宏不能越过未复核的关断失败**（`motor.h:82-83`） | 示波器/逻辑分析仪可用且通道/触发已记录 | STEP 同步波形：1/20/1000/20000 Hz 周期与脉宽、分频切换、累计边沿计数 | 频率/占空比公差 ACCEPTANCE_LIMIT_TBD | 未授权 + 受宏与仪器限制 |
+| T06 | B | 新 EPWM 数值的真实波形 | 正式 API + 隔离台架。**任何 STEP 输出**需 `MOTOR_HARDWARE_ENABLE_PATH_VALIDATED` **或** `STEP_DIAG_ISOLATED_ENV_CONFIRMED` 至少一个为 TRUE（`motor.c:2066`、`step_pwm.c:16-17`）；后者只允许在"TMC 模块拔出 / 功率级断开、只为示波器量 STEP 频率"时由操作员人工翻转并留证（`motor.h:77-79`）；关断失败锁存期间连借用申请都被拒 ⇒ **宏不能越过未复核的关断失败**（`motor.h:82-83`） | 示波器/逻辑分析仪可用且通道/触发已记录 | STEP 同步波形：1/20/1000/20000 Hz 周期与脉宽、分频切换、累计边沿计数；**只报电气信号之间**的时序，换算所用时钟按 §2.5 分层标注；本例**不**产出"寄存器写→焊盘"的时间关系（见判据 2 与 §8 的 M-3 行） | 频率/占空比公差 ACCEPTANCE_LIMIT_TBD；`clock_basis` 未到 `EXTERNAL_VERIFIED` 前不得写"实测 µs" | 未授权 + 受宏与仪器限制 |
 | T07 | B | 保护后旧配置 / 旧 enable 不得重新开启 | prepare 完成后的**门外**接缝 → 正式保护 → 原 token 真提交；禁止在屏蔽窗中强行执行普通 ISR | 同 T06（需可达预约前置） | CTRMODE 保持冻结、寄存器写增量 0 | 硬判据 | 未授权 |
 | T08 | B | 静止 DIR 门；运行/未知关闭状态拒绝改向 | 正式 `motor_set_direction`；不得 `pin write` DIR | 同上 | 门判定 + 是否有 DIR 写 + 波形/状态 | 硬判据 | 未授权 |
-| T09 | B | SW1 动态电气链与软件后续反应 | 正式许可状态下 SW1→ENN→软件 LOW 的同步先后；不暂停保护来强留 HIGH | 仪器 + 现场授权（改线/拨杆为单列动作） | 多通道同步波形、阈值、残余脉冲；继承既有静态/数字结论 | 物理延迟 TBD；不继承为已测 | 未授权 |
+| T09 | B | SW1 动态电气链与软件后续反应 | 正式许可状态下 SW1→ENN→软件 LOW 的同步先后；不暂停保护来强留 HIGH | 仪器 + 现场授权（改线/拨杆为单列动作） | 多通道同步波形、阈值、残余脉冲；继承既有静态/数字结论。SW1→ENN→软件 LOW 只给出**这些电气信号之间**的先后；MCU 侧 `__DSB`/cycle 记录**单列**，两套时间基未做共同事件对齐前**不得**合并成"写入→边沿"耗时（判据 2） | 物理延迟 TBD；不继承为已测 | 未授权 |
 | T10 | B | 人工恢复接缝与故障保持 | 原票据、新故障落在最终提交前/后、唯一提交、无自动 HIGH/RUN | 清故障动作单列授权 | epoch/pending/latch 序列 | 硬判据 | 未授权 |
 | T11 | A | 无运动传感器 / 状态语义 / 黑匣子记录 | `ps`、`blackbox_status/dump`、`flash_logstat/dump` | 同上 | 有效/活动掩码、ENN 反馈语义、原始帧时间、栈水位；存储写入与读取**分列** | 与 `safety_io_semantics.h` 位域一致 | 未授权（且不是堵转准确率证明） |
 | T12 | B | TMC 受控 apply 与配置回读 | 需 `TMC_DRIVE_CONFIG_HW_VALIDATED` 的**有限台架例外**＋运行态门禁；不按主机 `-D` 搬上板；不写 VACTUAL | VM/限流/模块状态确认 | 四寄存器、IFCNT、读回、原预算、失败保护 | VREF/Rsense 依据必须实测或标注理论值 | 未授权且宏关闭 |
@@ -259,7 +315,10 @@ post = cycle_now();
 1. 冻结 PWM 不保证 STEP 最终为 LOW：观察**后续有效边沿与残余脉冲**；"引脚仍 HIGH"单独不算关断失败，
    一次 LOW 单点也不算"无后续脉冲"。
 2. 区分四个时刻：软件写完成、`__DSB` 完成、外设寄存器状态、焊盘/ENN 实际变化时刻；M-3 不由单次回读
-   或单个计数记录替代。
+   或单个计数记录替代。**MCU cycle 与仪器时间是两套时间基**：只有先设计出可识别的**共同事件/标记**、
+   给出对齐方法与误差来源，才允许报告"寄存器写→焊盘"的时间关系；当前**没有任何标记 GPIO 获批准**，
+   不得假定它存在。若只同步采集 SW1 / 许可 / ENN / STEP，就只报这些**电气信号之间**的时序与残余边沿，
+   MCU 的 DSB/cycle 记录单列，M-3 中"写入到焊盘"的部分**继续开放**。
 3. 无应答/CRC/洪泛的**目标机**注入需具体设计；软件测试缝只证明分支行为，不冒称真实断线/FIFO 故障；
    断电/改线/外部发帧设备是单列授权动作。
 4. 允许"正常时序先开后停"；禁止"停后旧身份重新开启"。不要把正常时序先后误判成故障。
@@ -303,39 +362,48 @@ VM/限流、ADC 前端拓扑/增益/零点、轴与负载约束，未知列 TBD�
 
 ```text
 case_id / status / software_sha / measurement_variant_sha / image_sha256
-source_level / macro_set / clock_basis / instrument_and_setup
+source_level / macro_set / instrument_and_setup
+clock_basis(SOURCE_ASSUMED | CONFIG_READBACK | EXTERNAL_VERIFIED)
+counter_status(COUNTER_OK | COUNTER_UNAVAILABLE | COUNTER_UNCHECKED) / sample_valid / invalid_reason
 trigger_definition / input_identity / epoch_before_after / owner_phase
-cycles_pre_body_begin_body_end_post / tick_entry_exit
+cycles_pre_body_begin_body_end_post（仅 counter_status=COUNTER_OK 且 sample_valid=1 才进入统计）/ tick_entry_exit
 pwm_raw_rc / permit_write_rc / permit_confirm_rc / enn_feedback
 pending_before_after / latch / metadata_commit / notify_count
 wire_edges_or_capture_ref / samples_expected_observed_dropped
+timebase_linkage(common_event_or_NONE / alignment_method / error_budget)
 acceptance_limit_and_source / actual_result / unresolved / stop_reason
 ```
 
 规则：原始数据、导出文本与判据结果必须能定位到**同一镜像 + 同一接线/测量配置**；串口日志时刻、
 MCU cycle、仪器时间**不默认同一时间基**（F-11/F-21/F-22：tick 与周期计数分属两套基准，屏蔽期 tick
-不推进）；命令文本、过程截图、结论数字各自注明来源。实测最大值只是指定条件下的观测值，不自动关闭
-最坏上界或安全等级类风险。
+不推进），跨时间基的任何"写入→边沿"关系必须填 `timebase_linkage`，填不出共同事件就写 `NONE` 并保持
+该关系开放；`clock_basis / counter_status / sample_valid / invalid_reason` 一律按 §2.5 取值，不得留空。
+命令文本、过程截图、结论数字各自注明来源。实测最大值只是指定条件下的观测值，不自动关闭最坏上界或
+安全等级类风险。
 
 | 风险 | 哪些证据能关闭**哪一部分** | 关闭不了的剩余部分 |
 |---|---|---|
-| `B-1` 门内窗口时长 | T02 的 `body`/包围区间分布（且 F-19/F-20 计数资源已确认可用） | RX/EXTI 在该时长内的丢失容忍度（无阈值约定 + FIFO/波特率/时钟参数未逐项记录，含 F-09） |
+| `B-1` 门内窗口时长 | T02 的 `body`/包围区间分布，**且** §2.5 判为 `counter_status=COUNTER_OK`、逐条 `sample_valid=1`；SysTick 单圈模差分**不能**关闭本行（保守降级为 `BLOCKED_COUNTER`，只交状态与顺序证据） | RX/EXTI 在该时长内的丢失容忍度（无阈值约定 + FIFO/波特率/时钟参数未逐项记录，含 F-09）；计数资源未确认 ⇒ 时长部分整体保持开放 |
 | `M-1` 其它执行者 | T00 的执行者与 `ps` 线程实测（核对 §2.2 表） | 出厂是否另烧 CPU2 镜像、SEMA/MU 是否被外部使用（本地无从判断） |
 | `M-2` 同 EPWM 实例其它通道 | 无法由本地关闭（"没搜到应用调用点"已列出但不构成证明） | 需厂商资料 / 原理图 / 网表；含 `SYSCON_setTbClkSync` 与保留的 PA.1 |
-| `M-3` 写完成 ↔ 引脚响应 | T06/T09 的多通道同步波形可给"寄存器写→边沿"的观测关系 | 单点回读、周期计数记录都不构成物理时刻证明 |
+| `M-3` 写完成 ↔ 引脚响应 | **仅当**存在经批准的共同事件/标记 + 对齐方法 + 误差来源（模板字段 `timebase_linkage`）时，T06/T09 才能给出"寄存器写→焊盘"的时间关系；否则本行只关闭**电气信号之间**（SW1 / 许可 / ENN / STEP）的时序与残余边沿 | 单点回读、周期计数记录都不构成物理时刻证明；无标记 GPIO 授权时"写入→焊盘"部分**继续开放**，MCU 侧 `__DSB`/cycle 记录单列 |
 | `RISK-03/03a` | T01/T03/T04/T05/T10 的目标机分布 | 调度覆盖不足的分支、最坏停机时延（阈值未约定 ⇒ 保持开放） |
 | 物理 `RISK-04-b` | T09 的瞬态与连续性证据（仪器可用时） | 断线容错、外接 NC、安全等级 |
 | `BUG-008` | T06 的频率/占空比与残余脉冲观测 | 停机电气表现与真实波形验收 |
 
 ## 9. 未决项（不阻塞本轮离线交付，且**不**要求用户重复既有静态五点/SW1 确认）
 
-1. **当前可用仪器**：示波器/逻辑分析仪是否有、型号、通道数、采样/存储深度、触发与探头方式、
+1. **当前可用仪器与独立时基**：示波器/逻辑分析仪是否有、型号、通道数、采样/存储深度、触发与探头方式、
    差分测点可行性；万用表当前型号与可用性未知（唯一历史型号 UT39A+）。缺 ⇒ T06/T09 与一切瞬态条目
-   `BLOCKED_INSTRUMENT`；万用表只能填静态读数栏，不得填瞬态/脉宽/停机时延。
+   `BLOCKED_INSTRUMENT`；万用表只能填静态读数栏，不得填瞬态/脉宽/停机时延。**同组还缺独立时钟依据**：
+   没有独立时基就没有 `EXTERNAL_VERIFIED`，`clock_basis` 只能停在 `SOURCE_ASSUMED`/`CONFIG_READBACK`（§2.5），
+   周期计数资源的 `counter_status` 也只能在目标机检查后才能脱离 `COUNTER_UNCHECKED`。
 2. **现场供电、隔离与电机参数**：VM/逻辑电源来源与断电判据（草案 P-5）、模块是否可拔出、
    电机铭牌额定电流与绝缘/温度限制、ADC 前端实测标定（零点/增益）、ENN 线路连续性。缺 ⇒ T12/T13 受阻。
 3. **待批准的三个操作包**：A/B/C 的镜像、宏组合例外、命令白名单与次数、仪器与接线前提（§7）。
-   未获批准前，本轮与任何后续自动流程都不得执行其中任一条。
+   本组另含两项**尚未批准**的具体动作：MCO 输出路由/分频/引脚复用与接线，以及为跨时间基关联而新增的
+   标记 GPIO（判据 2 / §8 的 M-3 行）——两者都是新的板级许可条目，本轮只登记需求，不配置、不占用、
+   不假定已存在。未获批准前，本轮与任何后续自动流程都不得执行其中任一条。
 
 登记为未决但不需本轮处理的文档不一致（超出本轮白名单，留给下一次真实生产改动一并整理）：
 `stop_priority.h:23` 仍描述"set 路径会抓旧模式再写回 TBCTL"，与现码
@@ -344,15 +412,28 @@ MCU cycle、仪器时间**不默认同一时间基**（F-11/F-21/F-22：tick 与
 
 ## 10. 本轮检查与不做项
 
-检查：改动仅第 9 节白名单四文件；生产/HAL/内核/所有宏/`tests/host`/工程/`.gitignore` 零改动；
-JSON 可解析；引用路径与版本可核对；无本机绝对路径、用户名、邮箱或主机名；`git diff --check` 干净；
-不重跑任何主机链、不重编译 Keil。
+检查（首轮，四文件）：改动仅 §9 白名单四文件；生产/HAL/内核/所有宏/`tests/host`/工程/`.gitignore`
+零改动；JSON 可解析；引用路径与版本可核对；无本机绝对路径、用户名、邮箱或主机名；不重跑任何主机链、
+不重编译 Keil。**首轮原文里的"`git diff --check` 干净"一句不成立**：复审方独立运行
+`git diff --check f919a5c b27c0c4` 实得 **rc=2**，命中
+`reports/plans/phase8-target-measurement-plan.md:82: trailing whitespace.`（F-20 行末竖线后一个空格）；
+r1 轮已消除该尾随空格，首轮的 stdout 不重造。
+
+检查（r1 修订轮，三文件）：`git diff --name-only b27c0c4` 恰为"本计划 + 交接 MD + 交接 JSON"三条路径，
+全部在白名单内；`git diff b27c0c4 -- ':!reports'` 为空（生产/HAL/内核/四宏/`tests/host`/Keil 工程/
+`.gitignore` 零改动）；`git diff --check b27c0c4` **rc=0**（写入本节数字后复跑仍为 rc=0）；JSON 由
+`json.load` 解析成功，新增 `review_resolution` 六项（R1/R2a/R2b/R3a/R3b/F1）逐项映射"修订位置 →
+剩余前提"，`tests_executed` / `builds_executed` / `hardware_actions` 仍是空数组；本轮新增引用的源码行
+已逐条回读（`project.uvprojx:503/:505`、`context_rvds.S:22-23/166/189-194`、`NS800RT7P65x.h:301`、
+`drv_common.c:45/:49`）；四宏回读 `RT_FALSE`；隐私扫描无本机绝对路径/用户名/邮箱/主机名；
+冻结引用（main / phase7 / 标签对象 / 解引用）远端回读未动。
 
 不做：测量插桩实现、构建、主机链重跑、运行既有采集器（含 `sw1_cut.ps1`）、端口/设备扫描、
 串口/调试器/仪器连接、烧录/读 Flash/复位、真实 GPIO/TMC/STEP/DIR、电机、供电、接线、SW1、
-真机清故障、selftest；也不调用会在启动时探测硬件的脚本来"查看环境"。
+真机清故障、selftest；也不调用会在启动时探测硬件的脚本来"查看环境"。r1 轮同样**不**配置 MCO、
+**不**新增标记 GPIO、**不**落地插桩、**不**制作或构建镜像。
 
-状态：`TARGET_MEASUREMENT_PREPARED / AWAITING_INDEPENDENT_PREP_REVIEW`；
+状态：`TARGET_MEASUREMENT_PREP_REVISED / AWAITING_INDEPENDENT_PREP_REVIEW`；
 `NO HARDWARE AUTHORIZATION`；`FOUR MACROS RT_FALSE`；板上 `USER_REPORTED_E40`。
 
 ## 附录 A 引用与散列（LOCAL_ONLY）
@@ -364,6 +445,7 @@ SDK/CMSIS 文件仅本地存在，未上传；下列 SHA-256 取前 16 位十六
 8485f07a5863e0c9  packages/novosns-series-latest/NS800RT7XXX/StdDriver/Src/rcc.c   (F-02/03/06)
 a1b5a88f8c3db2db  packages/novosns-series-latest/NS800RT7XXX/StdDriver/Inc/rcc.h   (枚举值/HXTL 档)
 521d4baa2548e20a  packages/novosns-series-latest/NS800RT7XXX/Device/Inc/NS800RTxxxx.h (HXTL_FREQ_VALUE)
+391a3c7174f8c7a0  packages/novosns-series-latest/NS800RT7XXX/Device/Inc/NS800RT7P65x.h (F-11 __NVIC_PRIO_BITS / F-19 include)
 dbc14cc70cc74efb  packages/novosns-series-latest/NS800RT7XXX/StdDriver/Src/uart.c  (F-09)
 807f8d5ad5414c69  BSP/board/board.h        93fc3dca86aa173b  BSP/board/board.c
 702e18391bf39cc6  BSP/board/SConscript     d0ffc46154225dd7  BSP/rtconfig.h
@@ -384,6 +466,9 @@ ebaa5b1c9710a2e7  BSP/applications/motor.c 319f21a2e33c1237  BSP/applications/tm
 （`NOT EXECUTED / NOT_TESTED / NOT_VERIFIED / BLOCKED_METHOD / BLOCKED_INSTRUMENT /
 BLOCKED_POWER_STATE / DISABLED_BY_CONFIG / DEFERRED / HOLD / USER_CONFIRMED /
 METER_NOT_MEASURED_THIS_RUN / ANALOG_NOT_VERIFIED`）。
-本文新增的编号是 `T00..T13`（未来执行矩阵）、`F-01..F-24`（本地事实清单）、`I-1..I-7`（插桩点）。
+本文新增的编号是 `T00..T13`（未来执行矩阵）、`F-01..F-24`（本地事实清单）、`I-1..I-7`（插桩点），
+以及 §2.5 的取值词表 `clock_basis = SOURCE_ASSUMED / CONFIG_READBACK / EXTERNAL_VERIFIED`、
+`counter_status = COUNTER_OK / COUNTER_UNAVAILABLE / COUNTER_UNCHECKED`、`sample_valid`、
+`invalid_reason` 与停止条件 `BLOCKED_COUNTER`（计数资源不可用 ⇒ 该场景不产出有效时长样本）。
 既有草案的现场待填仍叫 `P-1..P-7`，与插桩点**不是同一套编号**：引用时必须写全前缀名
 （"插桩点 I-3" / "现场待填 P-5"），避免与草案 `P-5 断电判据` 撞号。

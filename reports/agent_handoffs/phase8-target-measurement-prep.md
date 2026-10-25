@@ -4,6 +4,12 @@
 `NS800_Target_Measurement_Prep_Qoder_Task_f919a5c_20261025.md`。
 性质：**离线准备任务**。本轮测试执行 = 0，硬件动作 = 0，构建 = 0。
 
+**修订轮 `phase8-target-measurement-prep-r1`**（同日）：响应独立复审
+`PREP_REVIEW_CHANGES_REQUIRED`（任务书 `NS800_Target_Measurement_Prep_Review_and_Rework_b27c0c4_20261025.md`），
+以 `b27c0c49118c52219383e36a032069d61fa43cfc` 为 document_base，只改计划 + 本交接 MD/JSON 三份文件，
+落实 R1/R2/R3/F1。逐项映射与新的离线检查结果见 §10；§1–§9 为首轮原文，其中 §8 的一处检查声明
+由本轮更正（原文保留并标注）。
+
 ## 1. 只读核对（开工前）
 
 | 项 | 值 |
@@ -98,12 +104,110 @@ SW1 端子/位置对应仍是待核对（草案 X-5），不判"接反"。
 ## 8. 本轮检查
 
 四路径白名单内改动；`git diff` 对生产/HAL/内核/宏/`tests/host`/工程为**空**；JSON 可解析；
-引用路径与行号可核对；无本机绝对路径/用户名/邮箱/主机名；`git diff --check` 干净；
-主机链与 Keil 均未重跑（本轮零执行，因此不声明任何新测试结果）。
+引用路径与行号可核对；无本机绝对路径/用户名/邮箱/主机名；`git diff --check` 干净
+（**这一条声明由 r1 轮更正**：复审方独立运行 `git diff --check f919a5c b27c0c4` 实得 **rc=2**，命中
+`reports/plans/phase8-target-measurement-plan.md:82: trailing whitespace.`，即 F-20 表格行最后一个竖线后
+多一个空格；本轮已消除该尾随空格，r1 轮自身的实际 rc 记在 §10.4。不重造旧 stdout、不改写历史结论，
+只标注原声明与复审结果不一致）；主机链与 Keil 均未重跑（本轮零执行，因此不声明任何新测试结果）。
 
-## 9. 下一步
+## 9. 下一步（r1 口径，取代首轮"待某一包授权后再谈实现"的表述）
 
-把计划与三包清单交用户/复审方审议；获得某一包的**具体授权**后再谈插桩实现与镜像制作，
-且实现轮须单独走构建与主机回归 + Keil。本轮不自授任何硬件权限、不启动任何测量。
+本轮交付的是**可复审的计划修订**。它不含目标机指令执行、设备连接、烧录/复位/Flash 读写、
+GPIO/TMC/STEP/DIR 操作、电机/供电/接线/SW1/真机清故障/selftest，也不含测量插桩实现或镜像构建。
 
+复审通过后的顺序，**每一步都要另行下达任务书**：
+
+1. **离线测量固件/镜像制作任务**（尚未下达）：产出可审的插桩补丁、完整构建输入、ELF/BIN 的 SHA-256、
+   相对 `bcdec631` 的差异，以及**具体命令包**（烧录/启动/白名单命令/取样次数/停止条件）。该轮自己走
+   构建 + 主机回归 + Keil，并把镜像散列交出去。
+2. **拿到真实镜像散列之后**，才把实际烧录/启动/测量作为操作包 A/B/C 的具体内容交用户批准。
+   **不能让用户先批准一个尚不存在的镜像**；本次文档修订也不推导任何软件实现权限或硬件权限。
+3. 仪器、现场供电/隔离与电机参数仍是 §7 的三组未决，本轮不把它们升级为离线交付阻塞，也不重复索取
+   五点电压或现有 SW1 静态确认。
+
+首轮 STOP 原文保留（已被本轮 §10 末行的 STOP 取代）：
 `STOP: TARGET_MEASUREMENT_PREPARED / AWAITING_INDEPENDENT_PREP_REVIEW；NO HARDWARE AUTHORIZATION；FOUR MACROS RT_FALSE；板上 USER_REPORTED_E40`
+
+## 10. r1 修订轮（R1/R2/R3/F1）
+
+### 10.1 开工只读核对
+
+| 项 | 值 |
+|---|---|
+| 本地 `HEAD` = 远端 `phase8/tmc-drive-config` | `b27c0c49118c52219383e36a032069d61fa43cfc`（即复审对象） |
+| 工作树 | 开工时 clean；未 reset/rebase/force/merge，未覆盖任何未提交内容 |
+| 直接父提交 | `f919a5c05fbee5457c768d5c1a4ba46c41a9dbfc`（首轮 document_base） |
+| `b27c0c4` 相对 `bcdec631` | 全部为文档变化（与复审 §2 一致），生产/HAL/内核/夹具/runner/工程/宏无变化 |
+| main / phase7 / 标签对象 / 解引用 | `1b3757ee…` / `6d3fbc55…` / `097935fe…` / `e40a9b95…`，本轮复核仍未动 |
+| 四宏源码回读 | `motor.h:69`、`motor.h:83`、`tmc2209.h:100`、`project_board.h:51` 全部 `RT_FALSE` |
+
+### 10.2 R1 —— PendSV 优先级不再是"工程未设置"
+
+计划 §2.1 的 F-11 与 JSON 对应事实项已改写。本轮自行回读的证据：
+`BSP/project.uvprojx:503/:505` 把 `KERNEL/libcpu/arm/cortex-m7/context_rvds.S` 列进编译清单；
+该文件 `:22` `NVIC_SYSPRI2 EQU 0xE000ED20`、`:23` `NVIC_PENDSV_PRI EQU 0xFFFF0000`（注释即
+"PendSV and SysTick priority value (lowest)"）；`rt_hw_context_switch_to` 在 `:166`，其 `:189-194`
+对该寄存器做读—OR—写回；`LIB/HAL_Drivers/drv_common.c:49` 的 `NVIC_SetPriority(SysTick_IRQn, 0x0F)`
+是更早的 C 侧设置，两条路线同指最低档；`__NVIC_PRIO_BITS = 4`
+（`SDK-Device/Inc/NS800RT7P65x.h:301`，附录 A 已补该文件散列）。
+**剩余前提**照原样保留：`SHPR3` 的运行期读回值、`0xFFFF0000` 的逐字节归属、其它 IRQ 的优先级分配
+都未核对；不猜数值、不改内核。
+
+### 10.3 R2 —— 计数器可用与时钟可校准分开，SysTick 路径保守降级
+
+新增计划 §2.5（`clock_basis` / `counter_status` / `sample_valid` / `invalid_reason` 的统一词表与判据），
+并把 F-20、§3 短保护段、§4 纪律第 5 条、§4 替代方案、§6 T00/T02、§8 模板与 B-1 行、JSON 的
+F-19/20/21/22 事实项与 U-3 全部改成同一口径：
+
+- 计数器**已证可递增**而频率未证 ⇒ 可报原始计数差，不得报已校准 µs；
+- 计数器**未实现/未启用/不递增** ⇒ `COUNTER_UNAVAILABLE`（未检查则 `COUNTER_UNCHECKED`），**没有**有效
+  计数差，零值不等于零耗时，也不得作为有效 cycles 参与统计；
+- **本批选定保守降级**：DWT 不可用时 SysTick 差分**不产出用于 `B-1` 的有效窗口样本**，登记
+  `BLOCKED_COUNTER`，只保留状态与顺序观测。§2.5 附单圈混叠的数学反例（`N = LOAD+1`，`VAL 300→200`
+  对 `100` 与 `N+100` 个计数不可区分），并写明 `LOAD` 与模数 `LOAD+1` 的区别、读状态的副作用要求、
+  以及"不得重配 SysTick / 不得用忙等验证被测窗口"（`rt_hw_us_delay` 本身就是同类忙等，不能自测）。
+  32 位 DWT 差分同样补允许区间与回绕有效性：无法判定或超上界的样本判 `sample_valid=0`。
+  本轮不写代码、不加探针，反例只是文档中的数学推演。
+
+### 10.4 R3 —— 配置读回不是独立时钟证明；跨时间基关联仍未闭合
+
+`F-02/F-03/F-04/F-06`、`F-09/F-10`、T00、T06、§8 模板与规则、§9 组 1/组 3 与 JSON 的 U-1/U-2 统一改为
+三层 `clock_basis`：软件值互相读回一致只到 `CONFIG_READBACK`（因为都从同一个未确认的
+`HXTL_FREQ_VALUE` 算出，不构成外部晶振或实际核心频率的证明）；`EXTERNAL_VERIFIED` 必须是"确认路由 +
+分频 + 测点 + 独立时基测量"，而 MCO 的引脚复用与接线是单列的未来授权动作。UART/SPI 明确把**外设使能域**
+与**功能时钟来源**分开登记，只写"来源待确认"，**不**推成"波特率必错 4 倍"。
+R3b：§6 特殊判据 2 重写，M-3 关闭行与 T06/T09 观测点同步——只有设计出可识别的**共同事件/标记**、
+给出对齐方法与误差来源（模板新增 `timebase_linkage` 字段）才允许报"寄存器写→焊盘"的时间关系；当前
+**没有任何标记 GPIO 获批准**，因此只报 SW1/许可/ENN/STEP **之间**的电气时序与残余边沿，MCU 的
+`__DSB`/cycle 记录单列，M-3 的该部分继续开放。JSON 新增 `U-10` 登记这一未决。
+
+### 10.5 F1 与本轮离线检查
+
+F-20 表格行末尾竖线后的那个空格已随该行整体重写消失。交接 MD §8 保留首轮原句并就地标注其被本轮更正；
+JSON 的 `offline_checks` 里对应条目改为"已作废 + 复审实测 rc=2 + 指向 `revision.offline_checks`"。
+不重造首轮的 stdout，不改写历史结论，也不为格式项重跑任何测试或 Keil。
+
+本轮实际执行的静态检查（全部离线，零执行）：
+
+| # | 检查 | 结果 |
+|---|---|---|
+| 1 | `git diff --name-only b27c0c4` | 恰 3 条路径：计划 / 交接 MD / 交接 JSON（全在白名单内，无第四文件） |
+| 2 | `git diff b27c0c4 -- ':!reports'` | **空** ⇒ 生产、HAL、内核、四宏、`tests/host`、夹具、runner、Keil 工程、`.gitignore` 零改动 |
+| 3 | `git diff --check b27c0c4` | **rc=0**（写入本表数字后复跑仍 rc=0；与首轮被复审证伪的那句已分列） |
+| 4 | JSON `json.load` | 解析成功；顶层 32 键；`review_resolution` 六项 = R1/R2a/R2b/R3a/R3b/F1；`tests_executed` / `builds_executed` / `hardware_actions` = `[]` |
+| 5 | 新增引用逐条回读 | `project.uvprojx:503`（FileName）/`:505`（FilePath）、`context_rvds.S:22/:23/:166/:189-194`、`NS800RT7P65x.h:301`、`drv_common.c:45/:49`、`board.h:198`、`core_cm7.h:2307-2312` 全部命中 |
+| 6 | 四宏源码回读 | `motor.h:69`、`motor.h:83`、`tmc2209.h:100`、`project_board.h:51` 均 `RT_FALSE` |
+| 7 | 远端 `ls-remote` 回读 | `phase8/tmc-drive-config` = `b27c0c4…`（开工时仍是本轮基线，无他人前进）；main / phase7 / 标签对象与解引用未动 |
+| 8 | 隐私扫描 | 三文件内无本机绝对路径、用户名、邮箱、主机名；SDK 引用仍是 LOCAL_ONLY + 散列 |
+
+未做（延续首轮并加细）：任何目标机动作、任何构建与主机链、插桩实现、MCO 配置、GPIO 标记新增、
+镜像制作；本轮不新增脚本、不新增测试平台（修订用的临时脚本留在仓库外/忽略目录）。
+
+### 10.6 边界
+
+S2 `SOFTWARE_REVIEW_GO` 不撤回、不升级，接受对象仍是 `bcdec631`；本轮无任何生产/夹具/工程/宏改动，
+`tests_executed = []`、`builds_executed = []`、`hardware_actions = []` 保持真实。板上继续
+`USER_REPORTED_E40`；`B-1`、`BUG-008`、`RISK-03/03a`、物理 `RISK-04-b` 与 `M-1/M-2/M-3` 按各自
+**实际未关闭部分**保留（M-3 的"写入→焊盘"部分本轮明确继续开放）。
+
+`STOP: TARGET_MEASUREMENT_PREP_REVISED / AWAITING_INDEPENDENT_PREP_REVIEW；NO HARDWARE AUTHORIZATION；FOUR MACROS RT_FALSE；板上 USER_REPORTED_E40`
