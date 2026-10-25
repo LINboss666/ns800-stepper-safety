@@ -17,9 +17,11 @@
  *   - GPIO/PWM 的返回码与**真实调用次数**独立计数：记录里的 pwm_called/low_called 只是声明，
  *     必须由这些计数交叉核对（记录标志不能替代真实调用证据）。
  *
+ * r1（复审 A0-01..04）新增 TMA19..TMA24：真实命令名查表分发、严格参数矩阵、逐样本门控、
+ *   能力检查生命周期、历史旗正向对照、修订后的分批顺序。
  * 两个可执行体由同一 runner 构建（同一份本文件）：
  *   a0_off : -DNS800_TARGET_MEASUREMENT_A0=0  => 只跑 TMA01
- *   a0_on  : -DNS800_TARGET_MEASUREMENT_A0=1 -DNS800_SPM_HOST_BACKEND => 跑 TMA02..TMA18
+ *   a0_on  : -DNS800_TARGET_MEASUREMENT_A0=1 -DNS800_SPM_HOST_BACKEND => 跑 TMA02..TMA24
  * 生产侧的 rt_kprintf 展开成 printf，本链用 `-Wl,--wrap=printf` 数出**生产打印**（夹具自己的
  * 台账走 emit()/fprintf，不经这条通道），因此"窗口内不许打印"是可判定的而不是口头承诺。
  *
@@ -44,6 +46,10 @@
 #include "safety_state.h"
 #include "sp_measure_a0.h"
 #include "sp_measure_a0_port.h"
+/* r1 / 复审 A0-01：命令必须**按名字查表**分发，夹具不得直接调用 spm_cmd()。
+ * 本 TU 拥有 FSymTab 等价表(实现体)，REC 那份只声明 extern，两边看的是同一张表。 */
+#define SPM_FINSH_HOST_IMPL
+#include "sp_measure_a0_finsh.h"
 
 /* --------------------------------------------------------------- 台账输出 */
 static int g_fail_total, g_checks_total, g_case_fail, g_case_checks, g_cases_done;
@@ -413,20 +419,31 @@ static void boot_once(void)
     sp_bind_permit_pin(87);
 }
 
-static int cmd(const char *a1, const char *a2)
+/* 整行驱动：经**名字查表**分发(msh_get_cmd 语义)，夹具不直接调用 spm_cmd()。
+ * 返回 -998 = 命令名不在表里(等价 msh 的 -RT_ERROR，一个函数都没被调用)；
+ * 其它 = 被分到的那个函数自己的返回码。 */
+static int cmd_line(const char *name, const char *a1, const char *a2)
 {
 #if NS800_TARGET_MEASUREMENT_A0
-    char *av[3];
-    int ac;
+    char line[96];
+    int  ret = -999;
 
-    av[0] = (char *)"spm"; av[1] = (char *)a1; av[2] = (char *)(a2 ? a2 : "");
-    ac = a2 ? 3 : 2;
-    return spm_cmd(ac, av);
+    if (a1 == RT_NULL)                                snprintf(line, sizeof line, "%s", name);
+    else if (a2 == RT_NULL)                           snprintf(line, sizeof line, "%s %s", name, a1);
+    else                                              snprintf(line, sizeof line, "%s %s %s", name, a1, a2);
+    if (spm_msh_exec(line, &ret) != 0) return -998;
+    return ret;
 #else
     /* 开关为 0 的变体里命令入口根本不存在(可执行体符号表可核对), 用例不调到这里。 */
-    (void)a1; (void)a2;
+    (void)name; (void)a1; (void)a2;
     return -999;
 #endif
+}
+
+/* 默认用**目标上的命令名 spm** 驱动，即 cmd("trip","EXTRA") => 整行 "spm trip EXTRA"。 */
+static int cmd(const char *a1, const char *a2)
+{
+    return cmd_line("spm", a1, a2);
 }
 
 #if NS800_TARGET_MEASUREMENT_A0
@@ -440,6 +457,14 @@ static void meas_start(const char *entry)
 }
 
 static void meas_end(void) { (void)cmd("stop", NULL); }
+
+/* init 现在只在**明确静止态**允许(复审 A0-02a 的生命周期一半): 先 stop, 再把测量 RAM 清干净,
+ * 才允许重新做能力检查。夹具用这个助手到达该状态, 不改生产判据。 */
+static void quiesce_for_init(void)
+{
+    (void)cmd("stop", NULL);
+    (void)cmd("clear_records", NULL);
+}
 
 static const spm_rec_t *last_rec(void)
 {
@@ -539,6 +564,7 @@ static void tma02_counter_unavailable(void)
 
     /* (a) 芯片没实现: DWT_CTRL.NOCYCCNT=1 */
     port_ppb_reset(RT_FALSE, 8u, RT_TRUE);
+    quiesce_for_init();
     (void)cmd("init", NULL);
     ck("NOCYCCNT => COUNTER_UNAVAILABLE", SPM_CNT_UNAVAILABLE, spm_counter_status());
     ck("NOCYCCNT 时不写使能位", 0, port_ppb_enable_calls());
@@ -561,6 +587,7 @@ static void tma02_counter_unavailable(void)
 
     /* (b) 实现了但按下去不递增 */
     port_ppb_reset(RT_TRUE, 0u, RT_TRUE);
+    quiesce_for_init();
     (void)cmd("init", NULL);
     ck("不递增 => COUNTER_UNAVAILABLE", SPM_CNT_UNAVAILABLE, spm_counter_status());
     ck("递增检查用有限读取(不轮询到成功)", 1, port_ppb_ctr_reads() >= 2 ? 1 : 0);
@@ -599,6 +626,7 @@ static void tma03_unchecked_vs_unavailable(void)
         ck("未检查前不读 CTRL(无清旗副作用)", 0, port_ppb_ctrl_reads());
     }
 
+    quiesce_for_init();
     (void)cmd("init", NULL);
     ck("init 后 => COUNTER_OK", SPM_CNT_OK, spm_counter_status());
     meas_start("trip_fast");
@@ -621,6 +649,7 @@ static void tma04_valid_body_enclosing_independent(void)
     case_begin("TMA04", "主体有效 + 包围区间独立无效");
     boot_once();
     port_ppb_reset(RT_TRUE, 7u, RT_TRUE);
+    quiesce_for_init();
     (void)cmd("init", NULL);
     ck("init => COUNTER_OK", SPM_CNT_OK, spm_counter_status());
     ck("init => clock_basis 只到 CONFIG_READBACK", SPM_CLK_CONFIG_READBACK, spm_clock_basis());
@@ -659,6 +688,7 @@ static void tma05_reload_in_body(void)
     case_begin("TMA05", "窗口内发生重装 => 主体样本无效(混叠不可排除)");
     boot_once();
     port_ppb_reset(RT_TRUE, 7u, RT_TRUE);
+    quiesce_for_init();
     (void)cmd("init", NULL);
     port_ppb_reload_inside(RT_TRUE);
     meas_start("trip_fast");
@@ -687,6 +717,7 @@ static void tma06_wrap_cfg_guard(void)
 
     /* (a) 32 位回绕 */
     port_ppb_reset(RT_TRUE, 7u, RT_TRUE);
+    quiesce_for_init();
     (void)cmd("init", NULL);
     meas_start("trip_fast");
     port_ppb_make_wrap();
@@ -704,6 +735,7 @@ static void tma06_wrap_cfg_guard(void)
 
     /* (b) 两次读之间 LOAD 漂移 */
     port_ppb_reset(RT_TRUE, 7u, RT_TRUE);
+    quiesce_for_init();
     (void)cmd("init", NULL);
     port_ppb_load_drift_after(0);
     meas_start("trip_fast");
@@ -719,6 +751,7 @@ static void tma06_wrap_cfg_guard(void)
 
     /* (c) SysTick 判据不成立(没启用 => 没有"无重装"依据可用) */
     port_ppb_reset(RT_TRUE, 7u, RT_FALSE);
+    quiesce_for_init();
     (void)cmd("init", NULL);
     ck("(c) 计数器仍可 OK", SPM_CNT_OK, spm_counter_status());
     meas_start("trip_fast");
@@ -746,6 +779,7 @@ static void tma07_two_independent_actions(void)
     case_begin("TMA07", "PWM 失败/LOW 失败组合的合同与未插桩一致");
     boot_once();
     port_ppb_reset(RT_TRUE, 7u, RT_TRUE);
+    quiesce_for_init();
     (void)cmd("init", NULL);
 
     /* (a) PWM 失败, LOW 成功 */
@@ -796,6 +830,7 @@ static void tma08_stale_identity(void)
     case_begin("TMA08", "trip_for_operation 陈旧身份: 一个寄存器写都不发");
     boot_once();
     port_ppb_reset(RT_TRUE, 7u, RT_TRUE);
+    quiesce_for_init();
     (void)cmd("init", NULL);
     meas_start("trip_for_operation");
 
@@ -836,6 +871,7 @@ static void tma09_off_attempt_matrix(void)
     case_begin("TMA09", "off_attempt 七个出口: 次数与返回优先序不变");
     boot_once();
     port_ppb_reset(RT_TRUE, 7u, RT_TRUE);
+    quiesce_for_init();
     (void)cmd("init", NULL);
     meas_start("off_attempt");
     used0 = spm_records_used();
@@ -926,6 +962,7 @@ static void tma10_proof_null(void)
     case_begin("TMA10", "out==NULL 也固定本次证据, 不额外触发硬件动作");
     boot_once();
     port_ppb_reset(RT_TRUE, 7u, RT_TRUE);
+    quiesce_for_init();
     (void)cmd("init", NULL);
     meas_start("trip_fast");
     port_bus_reset();
@@ -986,6 +1023,7 @@ static void tma11_fault_in_publish_seam(void)
     case_begin("TMA11", "解屏蔽后交付的新故障不改写本次记录的身份");
     boot_once();
     port_ppb_reset(RT_TRUE, 7u, RT_TRUE);
+    quiesce_for_init();
     (void)cmd("init", NULL);
     meas_start("trip_fast");
     port_bus_reset();
@@ -1056,6 +1094,7 @@ static void tma12_two_threads_slot_generation(void)
     case_begin("TMA12", "预约后被抢占 + 另一记录先完成: 槽与代次不串");
     boot_once();
     port_ppb_reset(RT_TRUE, 7u, RT_TRUE);
+    quiesce_for_init();
     (void)cmd("init", NULL);
     meas_start("trip_fast");
     port_bus_reset();
@@ -1122,6 +1161,7 @@ static void tma13_isr_and_nested_guard(void)
     case_begin("TMA13", "ISR 上下文可记录; 判据被扰动时外层标无效");
     boot_once();
     port_ppb_reset(RT_TRUE, 7u, RT_TRUE);
+    quiesce_for_init();
     (void)cmd("init", NULL);
 
     /* (a) ISR 上下文里的一次关断 */
@@ -1174,6 +1214,7 @@ static void tma14_batch_full(void)
     case_begin("TMA14", "批次满: 后续笔仍关闭, dropped 可见, 不覆盖既有槽");
     boot_once();
     port_ppb_reset(RT_TRUE, 3u, RT_TRUE);
+    quiesce_for_init();
     (void)cmd("init", NULL);
     meas_start("trip_fast");
     port_bus_reset();
@@ -1229,6 +1270,7 @@ static void tma15_busy_control(void)
     case_begin("TMA15", "在途期间 stop/dump/clear/start 不等待、不误清");
     boot_once();
     port_ppb_reset(RT_TRUE, 7u, RT_TRUE);
+    quiesce_for_init();
     (void)cmd("init", NULL);
     (void)cmd("stop", NULL);
     (void)cmd("clear_records", NULL);
@@ -1268,6 +1310,7 @@ static void tma16_dump_and_clear_bounds(void)
     case_begin("TMA16", "dump/clear 前置与\"只清测量数据\"的边界");
     boot_once();
     port_ppb_reset(RT_TRUE, 7u, RT_TRUE);
+    quiesce_for_init();
     (void)cmd("init", NULL);
     meas_start("trip_fast");
     sp_trip_fast(FAULT_ESTOP, 0u, MOT_STOP_SRC_ESTOP, &p);
@@ -1314,6 +1357,7 @@ static void tma17_cli_gates(void)
     ck("非法输入不触发关闭", 0, port_shutdown_calls() - shut0);
 
     /* 非法上下文(已在屏蔽窗口里) => 拒绝且不在其中打印 */
+    quiesce_for_init();
     (void)cmd("init", NULL);
     reads0 = port_ppb_ctr_reads();
     {
@@ -1352,6 +1396,7 @@ static void tma18_ledger_and_publish_order(void)
     case_begin("TMA18", "台账: 窗口禁止项/发布顺序/每调用一条/无效样本不入统计");
     boot_once();
     port_ppb_reset(RT_TRUE, 7u, RT_TRUE);
+    quiesce_for_init();
     (void)cmd("init", NULL);
     meas_start("trip_fast");
     port_bus_reset();
@@ -1388,6 +1433,397 @@ static void tma18_ledger_and_publish_order(void)
     case_end();
 }
 
+/* TMA19 目标命令名接缝：注册出来的是 spm，函数名 spm_cmd 不是命令；分发只经名字查表。 */
+static void tma19_command_name_binding(void)
+{
+    int shut0, ctr0;
+
+    case_begin("TMA19", "命令名接缝: FSymTab 名 spm -> spm_cmd; 函数名不是命令");
+    boot_once();
+    ck("本链只注册一条命令", 1, spm_fsym_n);
+    ck("注册名逐字是 spm(不是 spm_cmd)", 0,
+       spm_fsym_tab[0] != RT_NULL ? strcmp(spm_fsym_tab[0]->name, "spm") : -1);
+    ck("描述串逐字在位", 0, spm_fsym_tab[0] != RT_NULL ?
+       strcmp(spm_fsym_tab[0]->desc, "NS800 target measurement A0 control") : -1);
+    ck("按完整名查表得到的函数就是 spm_cmd", 1,
+       spm_msh_get_cmd("spm", 3) == (syscall_func)spm_cmd ? 1 : 0);
+    ck("函数名 spm_cmd 不在表里(A0-01 的根因)", 1,
+       spm_msh_get_cmd("spm_cmd", 7) == RT_NULL ? 1 : 0);
+    ck("前缀 sp 不匹配完整名", 1, spm_msh_get_cmd("spm", 2) == RT_NULL ? 1 : 0);
+    ck("前缀 spm_ 不匹配完整名", 1, spm_msh_get_cmd("spm_", 4) == RT_NULL ? 1 : 0);
+
+    port_ppb_reset(RT_TRUE, 7u, RT_TRUE);
+    port_bus_reset();
+    shut0 = port_shutdown_calls();
+    ctr0  = port_ppb_ctr_reads();
+    ck("整行 'spm_cmd trip' => 名字查不到, 未分发", -998, cmd_line("spm_cmd", "trip", RT_NULL));
+    ck("未分发时没有正式关闭", 0, port_shutdown_calls() - shut0);
+    ck("未分发时没有计数读", 0, port_ppb_ctr_reads() - ctr0);
+    ck("整行 'spm trip' => 经表分发返回 0", 0, cmd_line("spm", "trip", RT_NULL));
+    ck("分发到的那条命令真做了一次正式关闭", 1, port_shutdown_calls() - shut0);
+    case_end();
+}
+
+/* TMA20 严格参数矩阵：每个子命令的缺参/多参、未知子命令、非法 entry 都在任何动作之前拒绝。 */
+static void tma20_strict_arg_matrix(void)
+{
+    static const char *plain[] = { "cap", "init", "stop", "status", "dump",
+                                   "clear_records", "trip" };
+    int i, rej_rows = 0, print_rows = 0, silent_rows = 0;
+
+    case_begin("TMA20", "严格参数矩阵: 缺参/多参/未知/非法 entry 先于任何动作拒绝");
+    boot_once();
+    port_ppb_reset(RT_TRUE, 7u, RT_TRUE);
+    port_bus_reset();
+    quiesce_for_init();
+    ck("合法 init 先建立能力", 0, cmd("init", NULL));
+
+    /* (a) 七个单参数子命令各加一个多余参数：rc=1、零动作、零计数读、状态不变、可打印 */
+    for (i = 0; i < (int)(sizeof plain / sizeof plain[0]); i++)
+    {
+        rt_uint32_t st0 = spm_state();
+        int c0 = port_ppb_ctr_reads(), k0 = port_ppb_ctrl_reads(), e0 = port_ppb_enable_calls();
+        int s0 = port_shutdown_calls(), d0 = port_pwm_disable_calls(), l0 = port_permit_low_calls();
+        int p0 = port_print_calls(), rc = cmd(plain[i], "EXTRA");
+
+        if (rc == 1 && port_ppb_ctr_reads() == c0 && port_ppb_ctrl_reads() == k0 &&
+            port_ppb_enable_calls() == e0 && port_shutdown_calls() == s0 &&
+            port_pwm_disable_calls() == d0 && port_permit_low_calls() == l0 &&
+            spm_state() == st0)                      rej_rows++;
+        if (port_print_calls() > p0)                 print_rows++;
+    }
+    ck("7 个子命令的多余参数全部零动作拒绝", 7, rej_rows);
+    ck("合法线程上下文里参数错误有打印(不是静默)", 7, print_rows);
+
+    /* (b) 非法上下文里的参数错误与无参数：静默拒绝，同样零动作 */
+    {
+        rt_base_t lvl = rt_hw_interrupt_disable();
+        rt_uint32_t st0 = spm_state();
+        int s0 = port_shutdown_calls(), d0 = port_pwm_disable_calls(), l0 = port_permit_low_calls();
+        int p0 = port_print_calls(), c0 = port_ppb_ctr_reads();
+
+        if (cmd("trip", "EXTRA") != 0 && port_print_calls() == p0 &&
+            port_shutdown_calls() == s0 && port_pwm_disable_calls() == d0 &&
+            port_permit_low_calls() == l0 && port_ppb_ctr_reads() == c0 &&
+            spm_state() == st0)                      silent_rows++;
+        if (cmd(NULL, NULL) != 0 && port_print_calls() == p0) silent_rows++;
+        rt_hw_interrupt_enable(lvl);
+    }
+    ck("屏蔽上下文里参数错误与无参数都静默零动作", 2, silent_rows);
+
+    /* (c) 参数个数矩阵的其余形状 */
+    quiesce_for_init();
+    ck("无参数 => 打印用法并拒绝", 1, cmd(NULL, NULL));
+    ck("未知子命令 => 拒绝", 1, cmd("nonsense", NULL));
+    ck("start 缺 entry(argc=2) => 拒绝", 1, cmd("start", NULL));
+    ck("start 多一个参数(argc=4) => 拒绝", 1, cmd("start", "trip_fast EXTRA"));
+    ck("start 非法 entry(argc=3 但值不合法) => 拒绝", 1, cmd("start", "bogus_entry"));
+    ck("非法参数之后状态仍是 IDLE", SPM_STATE_IDLE, (long)spm_state());
+    ck("cap(argc=2) 合法 => 0", 0, cmd("cap", NULL));
+    ck("start trip_fast(argc=3) 合法 => 0", 0, cmd("start", "trip_fast"));
+    ck("再 start => 拒在 BUSY, 不是参数", 1, cmd("start", "trip_for_operation"));
+    ck("stop 合法 => 0", 0, cmd("stop", NULL));
+    ck("status 合法 => 0", 0, cmd("status", NULL));
+    ck("dump 合法 => 0", 0, cmd("dump", NULL));
+    ck("clear_records 合法 => 0", 0, cmd("clear_records", NULL));
+    quiesce_for_init();
+    case_end();
+}
+
+/* TMA21 逐样本门控失效：成功 init 之后关使能位/关 TRCENA/计数停转，样本无效但关闭次数不变。 */
+static void tma21_per_sample_gate_failure(void)
+{
+    sp_proof_t p;
+    const spm_rec_t *r;
+    int d0, l0;
+
+    case_begin("TMA21", "逐样本门控: init 后门被关/计数停转 => 该样本无效, 关闭动作不变");
+    boot_once();
+
+    /* (a) 成功 init 后关掉 DWT_CTRL.CYCCNTENA */
+    port_ppb_reset(RT_TRUE, 7u, RT_TRUE);
+    quiesce_for_init();
+    ck("(a) init 成功", 0, cmd("init", NULL));
+    meas_start("trip_fast");
+    P.ctr &= ~M_CTRL_CYCCNTENA;
+    port_ppb_arm();
+    d0 = port_pwm_disable_calls(); l0 = port_permit_low_calls();
+    sp_trip_fast(FAULT_ESTOP, 0u, MOT_STOP_SRC_ESTOP, &p);
+    meas_end();
+    r = last_rec();
+    ck("(a) body_valid=0", 0, r ? (int)r->body_valid : -1);
+    ck("(a) 原因含 GATE_LOST", SPM_IV_GATE_LOST, r ? (int)(r->invalid_reason & SPM_IV_GATE_LOST) : -1);
+    ck("(a) 门控字节缺 CYCCNTENA 两位", 1,
+       r && (r->counter_gates & (SPM_GT_BEFORE_CYCCNTENA | SPM_GT_AFTER_CYCCNTENA)) == 0u ? 1 : 0);
+    ck("(a) 缓存的能力仍是 OK(证明缓存不是充分条件)", SPM_CNT_OK, r ? (int)r->counter_status : -1);
+    ck("(a) 原始值逐字保留(没被清成 0)", 1,
+       r && r->body_begin == 1014u && r->body_end == 1014u ? 1 : 0);
+    ck("(a) 关闭动作仍各恰好一次", 1,
+       (port_pwm_disable_calls() - d0 == 1 && port_permit_low_calls() - l0 == 1) ? 1 : 0);
+
+    /* (b) 成功 init 后关掉 DEMCR.TRCENA */
+    port_ppb_reset(RT_TRUE, 7u, RT_TRUE);
+    quiesce_for_init();
+    ck("(b) init 成功", 0, cmd("init", NULL));
+    meas_start("trip_fast");
+    P.demcr &= ~0x01000000u;                          /* DEMCR.TRCENA = 0 */
+    port_ppb_arm();
+    d0 = port_pwm_disable_calls(); l0 = port_permit_low_calls();
+    sp_trip_fast(FAULT_ESTOP, 0u, MOT_STOP_SRC_ESTOP, &p);
+    meas_end();
+    r = last_rec();
+    ck("(b) body_valid=0", 0, r ? (int)r->body_valid : -1);
+    ck("(b) 门控字节四个位全缺", 1, r && (r->counter_gates & SPM_GT_ALL_MASK) == 0u ? 1 : 0);
+    ck("(b) TRCENA 未证时不读 DWT_CTRL(不碰实现定义地址)", 1,
+       r && (r->guard_metadata & SPM_GD_DWT_CYCCNTENA) == 0u ? 1 : 0);
+    ck("(b) 关闭动作仍各恰好一次", 1,
+       (port_pwm_disable_calls() - d0 == 1 && port_permit_low_calls() - l0 == 1) ? 1 : 0);
+
+    /* (c) 两位使能都在，但计数停转 => 无有效进展（不是 0 耗时） */
+    port_ppb_reset(RT_TRUE, 7u, RT_TRUE);
+    quiesce_for_init();
+    ck("(c) init 成功", 0, cmd("init", NULL));
+    meas_start("trip_fast");
+    port_ppb_stopped();
+    port_ppb_arm();
+    d0 = port_pwm_disable_calls(); l0 = port_permit_low_calls();
+    sp_trip_fast(FAULT_ESTOP, 0u, MOT_STOP_SRC_ESTOP, &p);
+    meas_end();
+    r = last_rec();
+    ck("(c) body_valid=0", 0, r ? (int)r->body_valid : -1);
+    ck("(c) 原因含 NO_PROGRESS", SPM_IV_NO_PROGRESS,
+       r ? (int)(r->invalid_reason & SPM_IV_NO_PROGRESS) : -1);
+    ck("(c) 门控字节仍全成立(区分于 a/b)", SPM_GT_ALL_MASK,
+       r ? (int)(r->counter_gates & SPM_GT_ALL_MASK) : -1);
+    ck("(c) 停转不被当成 0 耗时: invalid_reason 非空", 1,
+       r && r->invalid_reason != SPM_IV_NONE ? 1 : 0);
+    ck("(c) 关闭动作仍各恰好一次", 1,
+       (port_pwm_disable_calls() - d0 == 1 && port_permit_low_calls() - l0 == 1) ? 1 : 0);
+
+    /* (d) 对照: 什么都不动，样本仍有效（收紧判据没有把正常样本一起打掉） */
+    port_ppb_reset(RT_TRUE, 7u, RT_TRUE);
+    quiesce_for_init();
+    ck("(d) init 成功", 0, cmd("init", NULL));
+    meas_start("trip_fast");
+    sp_trip_fast(FAULT_ESTOP, 0u, MOT_STOP_SRC_ESTOP, &p);
+    meas_end();
+    r = last_rec();
+    ck("(d) 对照样本 body_valid=1", 1, r ? (int)r->body_valid : -1);
+    ck("(d) 对照门控全成立", SPM_GT_ALL_MASK, r ? (int)(r->counter_gates & SPM_GT_ALL_MASK) : -1);
+    case_end();
+}
+
+/* TMA22 能力检查生命周期：ACTIVE / 在途 / 有未处理旧批次时 init 被拒且零 PPB 访问。 */
+static void tma22_init_capability_lifecycle(void)
+{
+    spm_ctx_t c;
+    const spm_rec_t *r;
+    rt_uint8_t cs0;
+    int ctrl0, ctr0, en0;
+
+    case_begin("TMA22", "能力检查生命周期: 非静止态 init 被拒, 不读清在途 guard, 不换缓存");
+    boot_once();
+    port_ppb_reset(RT_TRUE, 7u, RT_TRUE);
+    port_bus_reset();
+    quiesce_for_init();
+    ck("静止态 init 允许", 0, cmd("init", NULL));
+    cs0 = spm_counter_status();
+    ck("静止态 init 后 counter=OK", SPM_CNT_OK, cs0);
+
+    /* (a) ACTIVE 时 */
+    ck("start 成功", 0, cmd("start", "trip_fast"));
+    ctrl0 = port_ppb_ctrl_reads(); ctr0 = port_ppb_ctr_reads(); en0 = port_ppb_enable_calls();
+    ck("ACTIVE 时 init 被拒", 1, cmd("init", NULL));
+    ck("ACTIVE 时 init 没读 SysTick CTRL", 0, port_ppb_ctrl_reads() - ctrl0);
+    ck("ACTIVE 时 init 没读 CYCCNT", 0, port_ppb_ctr_reads() - ctr0);
+    ck("ACTIVE 时 init 没写使能位", 0, port_ppb_enable_calls() - en0);
+    ck("ACTIVE 时能力缓存没被换掉", cs0, spm_counter_status());
+
+    /* (b) 在途且已取 COUNTFLAG 判据时 */
+    spm_open(&c, SPM_ENTRY_TRIP_FAST, 0u, 0u, 0u, RT_NULL);
+    spm_win_note(&c, 1u);
+    ck("在途记录确实存在", 1, spm_in_flight() == 1u ? 1 : 0);
+    ctrl0 = port_ppb_ctrl_reads();
+    ck("在途时 init 被拒", 1, cmd("init", NULL));
+    ck("在途时没有读清那条记录的旗", 0, port_ppb_ctrl_reads() - ctrl0);
+    spm_body_end(&c);
+    spm_publish(&c, RT_EOK, SPM_BR_TRIP_FAST_DONE, 1u, 1u);
+    r = last_rec();
+    ck("在途记录照常发布(complete=1)", 1, r && r->complete ? 1 : 0);
+    ck("该记录只用了一次能力检查(与预约时同源)", SPM_CNT_OK, r ? (int)r->counter_status : -1);
+    ck("发布后在途归零", 0, (long)spm_in_flight());
+
+    /* (c) 已停止但旧批次还没导出/清理时 */
+    ck("stop", 0, cmd("stop", NULL));
+    ck("有未处理旧批次时 init 被拒", 1, cmd("init", NULL));
+    ck("dump 导出旧批次", 0, cmd("dump", NULL));
+    ck("clear_records 只清测量 RAM", 0, cmd("clear_records", NULL));
+    ck("清后记录数归零", 0, (long)spm_records_used());
+    ck("清后回到静止态, 合法 init 重新可用", 0, cmd("init", NULL));
+    ck("静止态的合法 init 确实做了能力检查(读了 CTRL)", 1,
+       port_ppb_ctrl_reads() > ctrl0 ? 1 : 0);
+    quiesce_for_init();
+    case_end();
+}
+
+/* TMA23 历史旗只作观测：起点读已把它清掉且主体有进展 => 主体可有效；真负向仍拒绝。 */
+static void tma23_historical_flag_positive(void)
+{
+    sp_proof_t p;
+    const spm_rec_t *r;
+    spm_ctx_t a, b;
+    rt_uint32_t slot_a, slot_b, i, hits = 0u;
+
+    case_begin("TMA23", "历史旗正向对照 + 真重装/回绕/配置/嵌套负向仍拒绝");
+    boot_once();
+
+    /* (a) 正向: 起点前有历史旗, 起点读把它清掉, 主体内无重装, 计数有进展 */
+    port_ppb_reset(RT_TRUE, 7u, RT_TRUE);
+    quiesce_for_init();
+    ck("(a) init", 0, cmd("init", NULL));
+    meas_start("trip_fast");
+    P.systick_ctrl |= M_COUNTFLAG;
+    port_ppb_arm();
+    sp_trip_fast(FAULT_ESTOP, 0u, MOT_STOP_SRC_ESTOP, &p);
+    meas_end();
+    r = last_rec();
+    ck("(a) body_valid=1", 1, r ? (int)r->body_valid : -1);
+    ck("(a) 历史旗仍作为观测位留档", SPM_GD_FLAG_PRE_SET,
+       r ? (int)(r->guard_metadata & SPM_GD_FLAG_PRE_SET) : -1);
+    ck("(a) 原因里除包围区间恒无效外没有别的", SPM_IV_ENCLOSING_UNPROVEN,
+       r ? (int)r->invalid_reason : -1);
+    ck("(a) 退役位 0x0004 不得再出现", 0, r ? (int)(r->invalid_reason & 0x0004u) : -1);
+
+    /* (b) 负向: 历史旗 + 主体内真重装 => 仍然拒绝(正向修法没有把真检测器弄瞎) */
+    meas_start("trip_fast");
+    P.systick_ctrl |= M_COUNTFLAG;
+    port_ppb_reload_inside(RT_TRUE);
+    port_ppb_arm();
+    sp_trip_fast(FAULT_ESTOP, 0u, MOT_STOP_SRC_ESTOP, &p);
+    meas_end();
+    r = last_rec();
+    ck("(b) body_valid=0", 0, r ? (int)r->body_valid : -1);
+    ck("(b) 原因含 RELOAD_IN_BODY", SPM_IV_RELOAD_IN_BODY,
+       r ? (int)(r->invalid_reason & SPM_IV_RELOAD_IN_BODY) : -1);
+    ck("(b) 终点旗也留档", SPM_GD_FLAG_POST_SET,
+       r ? (int)(r->guard_metadata & SPM_GD_FLAG_POST_SET) : -1);
+    port_ppb_reload_inside(RT_FALSE);
+
+    /* (c) 负向: 32 位回绕 */
+    meas_start("trip_fast");
+    P.systick_ctrl |= M_COUNTFLAG;
+    port_ppb_make_wrap();
+    port_ppb_arm();
+    sp_trip_fast(FAULT_ESTOP, 0u, MOT_STOP_SRC_ESTOP, &p);
+    meas_end();
+    r = last_rec();
+    ck("(c) 回绕仍判无效", SPM_IV_COUNTER_WRAPPED,
+       r ? (int)(r->invalid_reason & SPM_IV_COUNTER_WRAPPED) : -1);
+
+    /* (d) 负向: 两次读之间 LOAD 漂移(配置变化) */
+    meas_start("trip_fast");
+    P.systick_ctrl |= M_COUNTFLAG;
+    port_ppb_load_drift_after(0);
+    port_ppb_arm();
+    sp_trip_fast(FAULT_ESTOP, 0u, MOT_STOP_SRC_ESTOP, &p);
+    meas_end();
+    r = last_rec();
+    ck("(d) 配置漂移仍判无效", SPM_IV_CFG_CHANGED,
+       r ? (int)(r->invalid_reason & SPM_IV_CFG_CHANGED) : -1);
+    port_ppb_load_drift_after(-1);
+
+    /* (e) 负向: 嵌套扰动 —— 外层与内层都判无效 */
+    meas_start("trip_fast");
+    slot_a = spm_records_used();
+    spm_open(&a, SPM_ENTRY_TRIP_FAST, 0u, 0u, 0u, RT_NULL);
+    spm_win_note(&a, 1u);
+    slot_b = spm_records_used();
+    spm_open(&b, SPM_ENTRY_TRIP_FAST, 0u, 0u, 0u, RT_NULL);
+    spm_win_note(&b, 1u);
+    spm_body_end(&b);
+    spm_publish(&b, RT_EOK, SPM_BR_TRIP_FAST_DONE, 1u, 1u);
+    spm_body_end(&a);
+    spm_publish(&a, RT_EOK, SPM_BR_TRIP_FAST_DONE, 1u, 1u);
+    meas_end();
+    r = spm_record_at(slot_a);
+    ck("(e) 外层判无效", 0, r ? (int)r->body_valid : -1);
+    ck("(e) 外层原因含 NESTED_GUARD", SPM_IV_NESTED_GUARD,
+       r ? (int)(r->invalid_reason & SPM_IV_NESTED_GUARD) : -1);
+    r = spm_record_at(slot_b);
+    ck("(e) 内层也判无效", 0, r ? (int)r->body_valid : -1);
+
+    for (i = 0u; i < spm_records_used(); i++)
+    {
+        const spm_rec_t *x = spm_record_at(i);
+        if (x && (x->invalid_reason & 0x0004u)) hits++;
+    }
+    ck("本批记录里退役位出现次数 = 0", 0, (long)hits);
+    quiesce_for_init();
+    case_end();
+}
+
+/* TMA24 修订后的分批顺序：用真实控制函数跑 1 条与 16 条两批，逐批数量一致且清 RAM 不清故障。 */
+static void tma24_pack_batch_sequence(void)
+{
+    sp_proof_t p, pk;
+    rt_uint32_t ep_start, ep_b1, code = 0u, events = 0u;
+    rt_uint32_t i, b1, b2, complete = 0u, entry_ok = 0u, action_ok = 0u, valid = 0u;
+    rt_bool_t pend_b1, pend_b2;
+
+    case_begin("TMA24", "操作包分批顺序: 1 条与 16 条两批逐批一致, clear 只清测量 RAM");
+    boot_once();
+    port_ppb_reset(RT_TRUE, 7u, RT_TRUE);
+    port_bus_reset();
+    quiesce_for_init();
+    ck("init", 0, cmd("init", NULL));
+    ep_start = sp_epoch();
+
+    /* ---- 批 1：start -> 1 次关闭 -> stop -> status -> dump -> 核对并保存 -> clear ---- */
+    ck("批1 start", 0, cmd("start", "trip_fast"));
+    sp_trip_fast(FAULT_ESTOP, 0u, MOT_STOP_SRC_ESTOP, &p);
+    ck("批1 stop", 0, cmd("stop", NULL));
+    ck("批1 status(确认无在途)", 0, cmd("status", NULL));
+    ck("批1 无在途", 0, (long)spm_in_flight());
+    ck("批1 dump 未被 BUSY 挡", 0, cmd("dump", NULL));
+    b1 = spm_records_used();
+    ck("批1 恰好 1 条", 1, (long)b1);
+    ep_b1 = sp_epoch();
+    pend_b1 = sp_pending_peek(&pk, &code, &events);
+    ck("批1 clear_records", 0, cmd("clear_records", NULL));
+    ck("clear 不改 Safety epoch", ep_b1, (long)sp_epoch());
+    pend_b2 = sp_pending_peek(&pk, &code, &events);
+    ck("clear 不改 pending 观测", 1, (pend_b1 == pend_b2) ? 1 : 0);
+    ck("clear 后最后一笔 dump 只能是空批次", 0, (long)spm_records_used());
+
+    /* ---- 批 2：start -> 16 次关闭 -> stop -> status -> dump -> 核对并保存 -> clear ---- */
+    ck("批2 start(静止后才允许)", 0, cmd("start", "trip_fast"));
+    for (i = 0u; i < 16u; i++) sp_trip_fast(FAULT_ESTOP, 0u, MOT_STOP_SRC_ESTOP, &p);
+    ck("批2 stop", 0, cmd("stop", NULL));
+    ck("批2 status", 0, cmd("status", NULL));
+    ck("批2 dump 未被 BUSY 挡", 0, cmd("dump", NULL));
+    b2 = spm_records_used();
+    ck("批2 恰好 16 条(两批合计 17 次关闭)", 16, (long)b2);
+    ck("两批合计 disable 动作 17 次", 17, port_pwm_disable_calls());
+    ck("两批合计许可 LOW 17 次", 17, port_permit_low_calls());
+    for (i = 0u; i < b2; i++)
+    {
+        const spm_rec_t *x = spm_record_at(i);
+
+        if (!x) continue;
+        if (x->complete)                            complete++;
+        if (x->entry_id == SPM_ENTRY_TRIP_FAST)     entry_ok++;
+        if (x->pwm_called_by_this_call && x->low_called_by_this_call) action_ok++;
+        if (x->body_valid)                          valid++;
+    }
+    ck("批2 每条都发布", 16, (long)complete);
+    ck("批2 每条 entry 都是 trip_fast", 16, (long)entry_ok);
+    ck("批2 每条都留了本次真实动作位", 16, (long)action_ok);
+    ck("批2 有效时长样本数 = 16(判据成立)", 16, (long)valid);
+    ck("批2 无丢弃", 0, (long)spm_dropped());
+    ck("批2 后 epoch 共前进 17", ep_start + 17u, (long)sp_epoch());
+    quiesce_for_init();
+    case_end();
+}
 #endif /* NS800_TARGET_MEASUREMENT_A0 */
 
 /* ------------------------------------------------------------------ 驱动 */
@@ -1414,6 +1850,9 @@ int main(int argc, char **argv)
         tma04_valid_body_enclosing_independent();
         tma05_reload_in_body();
         tma06_wrap_cfg_guard();
+        tma21_per_sample_gate_failure();
+        tma22_init_capability_lifecycle();
+        tma23_historical_flag_positive();
     }
     if (strcmp(grp, "contract") == 0) {
         tma07_two_independent_actions();
@@ -1431,8 +1870,13 @@ int main(int argc, char **argv)
         tma15_busy_control();
         tma16_dump_and_clear_bounds();
     }
-    if (strcmp(grp, "cli") == 0) tma17_cli_gates();
+    if (strcmp(grp, "cli") == 0) {
+        tma17_cli_gates();
+        tma19_command_name_binding();
+        tma20_strict_arg_matrix();
+    }
     if (strcmp(grp, "ledger") == 0) tma18_ledger_and_publish_order();
+    if (strcmp(grp, "pack") == 0) tma24_pack_batch_sequence();
 #endif
 
     emit("SUMMARY cases=%d checks=%d fails=%d\n", g_cases_done, g_checks_total, g_fail_total);

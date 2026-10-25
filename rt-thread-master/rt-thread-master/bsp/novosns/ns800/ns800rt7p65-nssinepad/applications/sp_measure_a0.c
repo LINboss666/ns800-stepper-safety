@@ -18,6 +18,11 @@
  *   - 未通过能力检查前**不触碰任何 PPB 地址**（TRCENA 未开时读 DWT 属实现定义）；
  *     counter_status=UNCHECKED/UNAVAILABLE 时计数读返回 0，且样本判无效 —— 0 从不被
  *     解释成"0 耗时"，也不作为有效 cycles 参与统计。
+ *   - 能力缓存不代替逐样本证明：每条样本自己核起点/终点的 DEMCR.TRCENA 与
+ *     DWT_CTRL.CYCCNTENA（记在 counter_gates），并拒绝 body_end==body_begin
+ *     (SPM_IV_NO_PROGRESS)。检查只用固定读取，绝不挡住原关闭动作（r1 / 复审 A0-02a）。
+ *   - 命令行先完整验证成子命令枚举再 dispatch；参数错误在任何计数读取、状态变化与
+ *     关闭动作之前拒绝（r1 / 复审 A0-01）。目标上的命令名是 spm，不是 spm_cmd。
  *
  * ⚠ 记录器不是关闭成功的前置：三个入口的原动作、原调用次数、原返回优先序、原事件/黑匣子
  *   语义全部不变；所有早退也照样结束本次记录（或计为丢弃）。
@@ -35,7 +40,9 @@
 #include "project_board.h"
 #include "tmc2209.h"
 #if !defined(NS800_SPM_HOST_BACKEND)
-#include <finsh.h>               /* MSH_CMD_EXPORT: 目标构建走真实 shell 注册 */
+#include <finsh.h>               /* 目标：真实 RT-Thread FinSH 注册宏(FSymTab 段收集) */
+#else
+#include "sp_measure_a0_finsh.h" /* 主机：同形注册宏 + 按名查表分发，让同一条注册语句参与编译 */
 #endif
 
 /* ---------------- 计数/时基后端 ----------------
@@ -118,6 +125,32 @@ static rt_uint32_t spm_ctr_read(void)
     return spm_port_ctr_now();
 }
 
+/* ---------------- 逐样本的计数器门控（复审 A0-02a） ----------------
+ * spm_ctr_status 只是"某一次 init 曾证过递增"的**能力缓存**，它不是每条样本的充分条件：
+ * 调试器/其它读者可以在两次业务调用之间清掉 DEMCR.TRCENA 或 DWT_CTRL.CYCCNTENA，也可以让
+ * 计数停转。所以每条样本自己核两位门控，并且只用**固定次数**的读取（无等待、无循环），
+ * 门控不成立绝不挡住原关闭动作。能力未证之前仍然一个 PPB 地址都不碰。
+ * 返回 bit0=TRCENA 已置位, bit1=CYCCNTENA 已置位（对应 SPM_GT_BEFORE_*）。 */
+static rt_uint8_t spm_ctr_pair(void)
+{
+    rt_uint8_t g = 0u;
+
+    if (spm_ctr_status != SPM_CNT_OK) return 0u;
+    if ((spm_port_demcr() & SPM_DEMCR_TRCENA) != 0u)
+    {
+        g |= SPM_GT_BEFORE_TRCENA;
+        if ((spm_port_ctr_ctrl() & SPM_CTRL_CYCCNTENA) != 0u) g |= SPM_GT_BEFORE_CYCCNTENA;
+    }
+    return g;
+}
+
+/* 终点门控挪到 SPM_GT_AFTER_* 两位上，与起点门控并存于同一个 counter_gates 字节。
+ * SPM_GT_AFTER_* 正好是 SPM_GT_BEFORE_* 整体左移两位，所以一次移位即可。 */
+static rt_uint8_t spm_ctr_pair_after(void)
+{
+    return (rt_uint8_t)(spm_ctr_pair() << 2);
+}
+
 /* ---------------- 预约 ---------------- */
 void spm_open(spm_ctx_t *c, rt_uint8_t entry_id, rt_uint32_t input_expected_epoch,
               rt_uint8_t input_owner, rt_uint8_t release_on_ok, const void *proof_out)
@@ -135,6 +168,7 @@ void spm_open(spm_ctx_t *c, rt_uint8_t entry_id, rt_uint32_t input_expected_epoc
     c->pre = 0u; c->body_begin = 0u; c->body_end = 0u; c->post = 0u;
     c->invalid_reason = SPM_IV_NONE;
     c->saved_primask = 0u;
+    c->gates = 0u;
     c->context_isr = (rt_interrupt_get_nest() != 0) ? 1u : 0u;
     c->open_ok = 0u;
 
@@ -181,6 +215,7 @@ void spm_open(spm_ctx_t *c, rt_uint8_t entry_id, rt_uint32_t input_expected_epoc
         r->pre = 0u; r->body_begin = 0u; r->body_end = 0u; r->post = 0u;
         r->counter_status = spm_ctr_status;
         r->clock_basis = spm_clk_basis;
+        r->counter_gates = 0u;
         r->body_valid = 0u; r->enclosing_valid = 0u;
         r->invalid_reason = SPM_IV_NONE;
         r->guard_metadata = 0u; r->guard_load_seen = spm_guard_load;
@@ -204,7 +239,9 @@ void spm_open(spm_ctx_t *c, rt_uint8_t entry_id, rt_uint32_t input_expected_epoc
  * 只在 counter_status=OK 且 init 已确认 SysTick 前提时才读 CTRL —— 读 CTRL 会清 COUNTFLAG，
  * 这是本记录器对系统原有状态的**唯一**副作用(审计: 现构建里没有任何代码在运行期读
  * SysTick->CTRL; SysTick_Handler 只做 rt_interrupt_enter/rt_tick_increase/rt_interrupt_leave,
- * rt_hw_us_delay 只读 LOAD/VAL)。 */
+ * rt_hw_us_delay 只读 LOAD/VAL)。
+ * 本函数只**登记观测**（门控位、SysTick 现场、嵌套），不在这里裁决"能不能算时长"——
+ * 裁决集中在 spm_eval()，反向家族才能注入到真实经过的那一处语义位置。 */
 void spm_win_note(spm_ctx_t *c, rt_uint8_t saved_primask_set)
 {
     rt_uint32_t ctrl;
@@ -216,48 +253,57 @@ void spm_win_note(spm_ctx_t *c, rt_uint8_t saved_primask_set)
 
     if (c->counter_status != SPM_CNT_OK || !spm_guard_ready)
     {
-        c->invalid_reason |= SPM_IV_COUNTER_NOT_OK;
         if (!spm_guard_ready)
         {
             c->invalid_reason |= SPM_IV_GUARD_UNAVAILABLE;
             c->guard_metadata |= spm_guard_ready ? SPM_GD_SYSTICK_ENABLED : 0u;
         }
-        c->rec->guard_metadata = c->guard_metadata;
-        c->rec->guard_load_seen = spm_guard_load;
-        c->body_begin = spm_ctr_read();
-        c->rec->body_begin = c->body_begin;
-        return;
-    }
-
-    ctrl = spm_port_systick_ctrl();                   /* 起点读: 清掉遗留旗 */
-    c->guard_metadata = 0u;
-    if (ctrl & SPM_SYSTICK_ENABLE)  c->guard_metadata |= SPM_GD_SYSTICK_ENABLED;
-    if (ctrl & SPM_SYSTICK_CLKSRC)  c->guard_metadata |= SPM_GD_CLKSOURCE_PROCESSOR;
-    if (spm_port_systick_load() != 0u) c->guard_metadata |= SPM_GD_LOAD_CAPTURED;
-    if (ctrl & SPM_COUNTFLAG_Msk)   c->guard_metadata |= SPM_GD_FLAG_PRE_SET;
-    c->rec->guard_metadata = c->guard_metadata;
-    c->rec->guard_load_seen = spm_guard_load;
-
-    if (!(c->guard_metadata & SPM_GD_SYSTICK_ENABLED) ||
-        !(c->guard_metadata & SPM_GD_CLKSOURCE_PROCESSOR) ||
-        !(c->guard_metadata & SPM_GD_LOAD_CAPTURED))   c->invalid_reason |= SPM_IV_GUARD_UNAVAILABLE;
-    if (c->guard_metadata & SPM_GD_FLAG_PRE_SET)      c->invalid_reason |= SPM_IV_FLAG_PRE;
-    /* 嵌套: 内层的起点读会清掉外层已建立的"无重装"依据 => **外层**判无效(内层同样判无效)。
-     * 目标上只有不可屏蔽源(NMI/HardFault 类)能造成这种交错, 而那本来就在记录器的同步合同
-     * 之外(计划 M-1 边界); 本链用显式注入验证"被扰动即标无效"这条标注行为, 不靠普通 ISR
-     * 在屏蔽区里"帮忙"跑起来。 */
-    if (spm_guard_depth > 0u)
-    {
-        c->invalid_reason |= SPM_IV_NESTED_GUARD;
-        if (spm_guard_owner != RT_NULL)
-            spm_guard_owner->invalid_reason |= SPM_IV_NESTED_GUARD;
     }
     else
     {
-        c->guard_owner = 1u;
-        spm_guard_owner = c;
+        ctrl = spm_port_systick_ctrl();               /* 起点读: 清掉遗留旗 */
+        c->guard_metadata = 0u;
+        if (ctrl & SPM_SYSTICK_ENABLE)  c->guard_metadata |= SPM_GD_SYSTICK_ENABLED;
+        if (ctrl & SPM_SYSTICK_CLKSRC)  c->guard_metadata |= SPM_GD_CLKSOURCE_PROCESSOR;
+        if (spm_port_systick_load() != 0u) c->guard_metadata |= SPM_GD_LOAD_CAPTURED;
+        if (ctrl & SPM_COUNTFLAG_Msk)   c->guard_metadata |= SPM_GD_FLAG_PRE_SET;
+        if (!(c->guard_metadata & SPM_GD_SYSTICK_ENABLED) ||
+            !(c->guard_metadata & SPM_GD_CLKSOURCE_PROCESSOR) ||
+            !(c->guard_metadata & SPM_GD_LOAD_CAPTURED))   c->invalid_reason |= SPM_IV_GUARD_UNAVAILABLE;
+        /* 起点读之前那次旗属于**本主体开始之前**的历史事件，读清之后不再单独否定当前 body
+         * (复审 A0-02b)，只作为观测位留在 guard_metadata；主体内真发生的重装仍由
+         * spm_body_end() 的终点读判 SPM_IV_RELOAD_IN_BODY。正常 CLI 交互很容易在两条命令之间
+         * 经历一个 tick，把它当缺陷会白丢掉本可有效的主体样本。 */
+        /* 嵌套: 内层的起点读会清掉外层已建立的"无重装"依据 => **外层**判无效(内层同样判无效)。
+         * 目标上只有不可屏蔽源(NMI/HardFault 类)能造成这种交错, 而那本来就在记录器的同步合同
+         * 之外(计划 M-1 边界); 本链用显式注入验证"被扰动即标无效"这条标注行为, 不靠普通 ISR
+         * 在屏蔽区里"帮忙"跑起来。 */
+        if (spm_guard_depth > 0u)
+        {
+            c->invalid_reason |= SPM_IV_NESTED_GUARD;
+            if (spm_guard_owner != RT_NULL)
+                spm_guard_owner->invalid_reason |= SPM_IV_NESTED_GUARD;
+        }
+        else
+        {
+            c->guard_owner = 1u;
+            spm_guard_owner = c;
+        }
+        spm_guard_depth++;
     }
-    spm_guard_depth++;
+
+    /* 本次样本的**起点**门控：固定两次读，无等待、无循环；能力未证之前一个 PPB 都不碰。
+     * 门控不成立只让这条样本的时长不可用，绝不挡住原关闭动作(复审 A0-02a)。 */
+    {
+        rt_uint8_t g = spm_ctr_pair();
+
+        c->gates |= g;
+        if (g & SPM_GT_BEFORE_TRCENA)    c->guard_metadata |= SPM_GD_DWT_TRCENA;
+        if (g & SPM_GT_BEFORE_CYCCNTENA) c->guard_metadata |= SPM_GD_DWT_CYCCNTENA;
+    }
+    c->rec->guard_metadata  = c->guard_metadata;
+    c->rec->guard_load_seen = spm_guard_load;
+    c->rec->counter_gates   = c->gates;
 
     c->body_begin = spm_ctr_read();
     c->rec->body_begin = c->body_begin;
@@ -269,6 +315,10 @@ void spm_body_end(spm_ctx_t *c)
     rt_uint32_t ctrl;
 
     if (c->rec == RT_NULL) return;
+
+    /* 终点门控先取：证明紧跟其后的那次计数读发生时两位使能仍然成立。 */
+    c->gates |= spm_ctr_pair_after();
+    c->rec->counter_gates = c->gates;
 
     c->body_end = spm_ctr_read();
     c->rec->body_end = c->body_end;
@@ -310,9 +360,18 @@ static void spm_eval(spm_ctx_t *c, rt_int32_t api_rc, rt_uint8_t branch_id,
     r->post = c->post;
     r->counter_status = c->counter_status;
     r->clock_basis = c->clock_basis;
+    r->counter_gates = c->gates;
     r->context_isr = c->context_isr;
 
-    if (c->counter_status != SPM_CNT_OK) why |= SPM_IV_COUNTER_NOT_OK;
+    /* --- 逐样本的"这条计数差能不能算时长"判据（复审 A0-02a）---
+     * spm_ctr_status 只是能力缓存，"曾经 init 成功"不是每条样本的充分条件：
+     * 起点或终点的 DEMCR.TRCENA / DWT_CTRL.CYCCNTENA 缺任一位，或本次计数根本没往前走，
+     * 都不得进时长分布。原始值一律保留，invalid_reason 说明到底是哪一条不成立。
+     * 这一段是反向家族 rev_spm_unavailable_is_valid 的唯一注入锚点。 */
+    if (c->counter_status != SPM_CNT_OK)                  why |= SPM_IV_COUNTER_NOT_OK;
+    if ((c->gates & SPM_GT_ALL_MASK) != SPM_GT_ALL_MASK)   why |= SPM_IV_GATE_LOST;
+    if (c->counter_status == SPM_CNT_OK && c->body_end == c->body_begin)
+        why |= SPM_IV_NO_PROGRESS;                         /* 0 差值不是 0 耗时 */
 
     /* 32 位计数差: end < begin 说明跨回绕(或计数器异常) => 本批保守判无效,
      * 不把它解释成"一次回绕内的短区间"。 */
@@ -391,12 +450,26 @@ const char *spm_entry_name(rt_uint8_t v)
     return "-";
 }
 
-/* ---------------- 能力检查（只由显式命令触发；普通未屏蔽线程上下文） ---------------- */
+/* ---------------- 命令上下文门（只允许普通、未屏蔽的线程上下文） ---------------- */
 static rt_bool_t spm_context_ok(void)
 {
     if (rt_interrupt_get_nest() != 0)  return RT_FALSE;
     if (rt_thread_self() == RT_NULL)   return RT_FALSE;
     if (spm_port_primask() != 0u)      return RT_FALSE;   /* 已在屏蔽窗口里 => 拒绝且不打日志 */
+    return RT_TRUE;
+}
+
+/* ---------------- 静止态判据与能力检查 ----------------
+ * 合同（复审 A0-02a 的生命周期一半）：init 只在**明确静止态**允许 —— 未 ACTIVE、无在途记录、
+ * 无未导出的旧批次、且没人持有 COUNTFLAG 判据。否则一次 init 会既读清在途那次记录的起点旗、
+ * 又把能力缓存换掉，让同一条记录混用两次能力检查的结论。
+ * 控制面只支持单个 msh 控制台会话（rtconfig 的 tshell 只有一个），静止态由该控制者维持。 */
+static rt_bool_t spm_quiescent(void)
+{
+    if (spm_state_v != SPM_STATE_IDLE)  return RT_FALSE;
+    if (spm_in_flight_n != 0u)          return RT_FALSE;
+    if (spm_cursor != 0u)               return RT_FALSE;
+    if (spm_guard_depth != 0u)          return RT_FALSE;
     return RT_TRUE;
 }
 
@@ -406,6 +479,16 @@ int spm_init_counter(void)
     rt_uint32_t ctrl_before, demcr, ctrl, a, b;
 
     if (!spm_context_ok()) return -1;
+
+    /* 静止态判据在任何 PPB 访问、任何缓存改写之前完成（读的全是记录器自己的状态）。 */
+    if (!spm_quiescent())
+    {
+        rt_kprintf("[spm] init: 非静止态 => 拒绝, 未读任何 PPB, 未改能力缓存 "
+                   "(state=%u in_flight=%u records=%u guard=%u)\n",
+                   (unsigned)spm_state_v, (unsigned)spm_in_flight_n,
+                   (unsigned)spm_cursor, (unsigned)spm_guard_depth);
+        return -3;
+    }
 
     /* 1) 读能力位与当前 DEMCR/DWT_CTRL(不做任何写)。NOCYCCNT 只能运行期读。 */
     ctrl_before = spm_port_ctr_ctrl();
@@ -483,7 +566,8 @@ int spm_dump_records(void)
                "pwm_attempted,pwm_result,pwm_raw_rc,permit_epoch,permit_written,"
                "permit_level,permit_write_rc,outcome,branch,pwm_called,low_called,"
                "pre,body_begin,body_end,post,counter_status,clock_basis,body_valid,"
-               "enclosing_valid,invalid_reason,guard,guard_load,dropped_at_publish,complete\n");
+               "enclosing_valid,invalid_reason,gates,guard,guard_load,dropped_at_publish,"
+               "complete\n");
     for (i = 0u; i < spm_cursor; i++)
     {
         const spm_rec_t *r = &spm_rec[i];
@@ -497,7 +581,7 @@ int spm_dump_records(void)
         }
         rt_kprintf("%u,%u,%u,%s,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,"
                    "%u,%u,%u,%d,%u,%u,%u,%d,%d,%u,%u,%u,%u,%u,%u,%u,%s,%s,%u,%u,0x%04x,"
-                   "0x%02x,%u,%u,%u\n",
+                   "0x%02x,0x%02x,%u,%u,%u\n",
                    (unsigned)r->schema, (unsigned)r->capture_generation, (unsigned)r->slot,
                    spm_entry_name(r->entry_id), (unsigned)r->context_isr,
                    (unsigned)r->saved_primask, (unsigned)r->input_release_on_ok,
@@ -518,6 +602,7 @@ int spm_dump_records(void)
                    spm_counter_status_name(r->counter_status),
                    spm_clock_basis_name(r->clock_basis), (unsigned)r->body_valid,
                    (unsigned)r->enclosing_valid, (unsigned)r->invalid_reason,
+                   (unsigned)r->counter_gates,
                    (unsigned)r->guard_metadata, (unsigned)r->guard_load_seen,
                    (unsigned)r->dropped_at_publish, (unsigned)r->complete);
     }
@@ -585,28 +670,73 @@ int spm_trip_once(void)
     return 0;
 }
 
-/* ---------------- 命令族（只在测量变体里存在） ---------------- */
-static int spm_start(const char *entry)
-{
-    rt_uint8_t id = 0u;
+/* ---------------- 命令族（只在测量变体里存在） ----------------
+ * 合同（复审 A0-01）：
+ *   1) 命令行**先**被完整验证成一个子命令枚举，验证阶段不读任何计数器、不改任何状态、
+ *      不做任何关闭；验证通过之后才 dispatch。
+ *   2) 每个子命令的参数个数是**恰好**多少，不是"至少"多少：
+ *        cap / init / stop / status / dump / clear_records / trip : argc == 2
+ *        start <entry>                                            : argc == 3
+ *      无参数、缺参数、多余参数、未知子命令、未知 entry 五类全部在任何动作之前拒绝。
+ *   3) 非法上下文（中断里、或已在 PRIMASK 屏蔽窗口里）**静默**拒绝，连参数错误也不打印；
+ *      合法线程上下文里的参数错误可以打印用法。两者都不得有动作。
+ *   4) 返回码：0 = 该子命令确实执行了；非 0 = 拒绝（未执行）。
+ */
+#define SPM_SUB_CAP         1u
+#define SPM_SUB_INIT        2u
+#define SPM_SUB_START       3u
+#define SPM_SUB_STOP        4u
+#define SPM_SUB_STATUS      5u
+#define SPM_SUB_DUMP        6u
+#define SPM_SUB_CLEAR       7u
+#define SPM_SUB_TRIP        8u
+#define SPM_SUB_USAGE       9u    /* 无参数：只打印用法 */
+#define SPM_SUB_BAD_ARITY  10u    /* 参数个数不对（缺参或多参都算） */
+#define SPM_SUB_BAD_ENTRY  11u    /* 个数对但 entry 不合法 */
+#define SPM_SUB_UNKNOWN    12u    /* 未知子命令 */
 
-    if (!spm_context_ok()) return -1;
-    if (entry == RT_NULL || entry[0] == '\0')
+#define SPM_ARGC_PLAIN      2     /* "<命令> <子命令>" */
+#define SPM_ARGC_START      3     /* "<命令> start <entry>" */
+
+/* 纯验证：只碰 argc/argv，不碰任何全局状态、寄存器或关闭入口。 */
+static rt_uint8_t spm_validate(int argc, char **argv, rt_uint8_t *entry_id)
+{
+    const char *sub;
+
+    if (entry_id != RT_NULL) *entry_id = 0u;
+    if (argv == RT_NULL || argc < 1) return SPM_SUB_USAGE;
+    if (argc < SPM_ARGC_PLAIN)                    return SPM_SUB_USAGE;   /* 只打了 "spm" */
+    if (argv[1] == RT_NULL || argv[1][0] == '\0') return SPM_SUB_UNKNOWN; /* 空子命令 */
+
+    sub = argv[1];
+    if (rt_strcmp(sub, "cap") == 0)           return (argc == SPM_ARGC_PLAIN) ? SPM_SUB_CAP    : SPM_SUB_BAD_ARITY;
+    if (rt_strcmp(sub, "init") == 0)          return (argc == SPM_ARGC_PLAIN) ? SPM_SUB_INIT   : SPM_SUB_BAD_ARITY;
+    if (rt_strcmp(sub, "stop") == 0)          return (argc == SPM_ARGC_PLAIN) ? SPM_SUB_STOP   : SPM_SUB_BAD_ARITY;
+    if (rt_strcmp(sub, "status") == 0)        return (argc == SPM_ARGC_PLAIN) ? SPM_SUB_STATUS : SPM_SUB_BAD_ARITY;
+    if (rt_strcmp(sub, "dump") == 0)          return (argc == SPM_ARGC_PLAIN) ? SPM_SUB_DUMP   : SPM_SUB_BAD_ARITY;
+    if (rt_strcmp(sub, "clear_records") == 0) return (argc == SPM_ARGC_PLAIN) ? SPM_SUB_CLEAR  : SPM_SUB_BAD_ARITY;
+    if (rt_strcmp(sub, "trip") == 0)          return (argc == SPM_ARGC_PLAIN) ? SPM_SUB_TRIP   : SPM_SUB_BAD_ARITY;
+    if (rt_strcmp(sub, "start") == 0)
     {
-        rt_kprintf("[spm] start: 缺 entry (仅 trip_fast/trip_for_operation/off_attempt)\n");
-        return -2;
+        if (argc != SPM_ARGC_START)        return SPM_SUB_BAD_ARITY;
+        if (argv[2] == RT_NULL)            return SPM_SUB_BAD_ENTRY;
+        if (rt_strcmp(argv[2], "trip_fast") == 0)
+            { if (entry_id) *entry_id = SPM_ENTRY_TRIP_FAST;   return SPM_SUB_START; }
+        if (rt_strcmp(argv[2], "trip_for_operation") == 0)
+            { if (entry_id) *entry_id = SPM_ENTRY_TRIP_FOR_OP; return SPM_SUB_START; }
+        if (rt_strcmp(argv[2], "off_attempt") == 0)
+            { if (entry_id) *entry_id = SPM_ENTRY_OFF_ATTEMPT; return SPM_SUB_START; }
+        return SPM_SUB_BAD_ENTRY;
     }
-    if (rt_strcmp(entry, "trip_fast") == 0)               id = SPM_ENTRY_TRIP_FAST;
-    else if (rt_strcmp(entry, "trip_for_operation") == 0) id = SPM_ENTRY_TRIP_FOR_OP;
-    else if (rt_strcmp(entry, "off_attempt") == 0)        id = SPM_ENTRY_OFF_ATTEMPT;
-    else
-    {
-        rt_kprintf("[spm] start: 未知 entry='%s'\n", entry);
-        return -2;
-    }
+    return SPM_SUB_UNKNOWN;
+}
+
+/* 只接受已经过 spm_validate() 的调用；entry id 也已解析。 */
+static int spm_start(rt_uint8_t id)
+{
     if (spm_state_v != SPM_STATE_IDLE)
     {
-        rt_kprintf("[spm] start: BUSY (state=%u) => 先 stop/dump/clear_records\n",
+        rt_kprintf("[spm] start: BUSY (state=%u) => 按 stop/dump/clear_records 收尾后再开下一批\n",
                    (unsigned)spm_state_v);
         return -3;
     }
@@ -622,27 +752,54 @@ static int spm_start(const char *entry)
     return 0;
 }
 
+static void spm_cmd_print_usage(void)
+{
+    rt_kprintf("usage: spm cap|init|start <trip_fast|trip_for_operation|off_attempt>"
+               "|stop|status|dump|clear_records|trip\n");
+}
+
 int spm_cmd(int argc, char **argv)
 {
-    const char *sub;
+    rt_uint8_t sub;
+    rt_uint8_t entry_id = 0u;
 
-    /* 整条命令族只接受普通、未屏蔽的线程上下文：非法上下文一律拒绝，且**不在其中打印**
-     * (包括 cap/status 这种"只读"子命令 —— 打印本身就是窗口内禁止项)。 */
+    /* 第 1 步：纯验证。到这里还没有读计数器、没有改状态、没有做任何关闭。 */
+    sub = spm_validate(argc, argv, &entry_id);
+
+    /* 第 2 步：上下文门。非法上下文(中断里 / 已在屏蔽窗口里)静默拒绝 —— 连参数错误也不打印，
+     * 因为打印本身就是窗口内禁止项。 */
     if (!spm_context_ok()) return -1;
 
-    if (argc < 2 || argv[1] == RT_NULL)
+    /* 第 3 步：合法上下文下的"未执行"分支，可以打印，但同样不得有动作。 */
+    switch (sub)
     {
-        rt_kprintf("usage: spm cap|init|start <entry>|stop|status|dump|clear_records|trip\n");
-        return 0;
+    case SPM_SUB_USAGE:      spm_cmd_print_usage(); return 1;
+    case SPM_SUB_BAD_ARITY:
+        rt_kprintf("[spm] 参数个数不对 '%s' (argc=%d) => 拒绝: 未读计数器, 未改状态, 未做关闭\n",
+                   (argv != RT_NULL && argc >= 2 && argv[1] != RT_NULL) ? argv[1] : "?",
+                   (int)argc);
+        spm_cmd_print_usage();
+        return 1;
+    case SPM_SUB_BAD_ENTRY:
+        rt_kprintf("[spm] start: 未知 entry='%s' => 拒绝(未改状态)\n",
+                   (argv != RT_NULL && argc >= 3 && argv[2] != RT_NULL) ? argv[2] : "");
+        return 1;
+    case SPM_SUB_UNKNOWN:
+        rt_kprintf("[spm] 未知子命令 '%s' => 拒绝(未读计数器, 未改状态, 未做关闭)\n",
+                   (argv != RT_NULL && argc >= 2 && argv[1] != RT_NULL) ? argv[1] : "?");
+        return 1;
+    default: break;
     }
-    sub = argv[1];
 
-    /* 未知子命令/参数错误在任何计数读取、控制变化与安全动作**之前**拒绝。 */
-    if (rt_strcmp(sub, "cap") == 0)
+    /* 第 4 步：只有到这里才允许有副作用。 */
+    switch (sub)
     {
-        rt_kprintf("[spm] schema=%u slots=%u record_bytes=%u sizeof_ctx=%u\n",
-                   SPM_SCHEMA_VERSION, SPM_SLOTS, (unsigned)sizeof(spm_rec),
-                   (unsigned)sizeof(spm_ctx_t));
+    case SPM_SUB_CAP:
+        /* record_bytes 必须是**一条**记录的大小；数组大小另列(原来这一行把
+         * sizeof(数组) 当成 record_bytes 打印, 是 r1 顺手纠正的取证口径错误)。 */
+        rt_kprintf("[spm] schema=%u slots=%u record_bytes=%u array_bytes=%u sizeof_ctx=%u\n",
+                   SPM_SCHEMA_VERSION, SPM_SLOTS, (unsigned)sizeof(spm_rec_t),
+                   (unsigned)sizeof(spm_rec), (unsigned)sizeof(spm_ctx_t));
         rt_kprintf("[spm] 编译四宏: MOTOR_HW=%d STEP_DIAG_ISO=%d TMC_CFG_HW=%d LIMIT_EN=%d "
                    "(测量开关不改变这四道门)\n",
                    (int)MOTOR_HARDWARE_ENABLE_PATH_VALIDATED,
@@ -650,37 +807,37 @@ int spm_cmd(int argc, char **argv)
                    (int)TMC_DRIVE_CONFIG_HW_VALIDATED,
                    (int)SAFETY_LIMIT_INPUTS_ENABLED);
         rt_kprintf("[spm] counter=%s clock_basis=%s systick_load=%u guard_ready=%s "
-                   "state=%u records=%u in_flight=%u dropped=%u\n",
+                   "quiescent=%s state=%u records=%u in_flight=%u dropped=%u\n",
                    spm_counter_status_name(spm_ctr_status),
                    spm_clock_basis_name(spm_clk_basis), (unsigned)spm_guard_load,
-                   spm_guard_ready ? "YES" : "NO", (unsigned)spm_state_v,
+                   spm_guard_ready ? "YES" : "NO",
+                   spm_quiescent() ? "YES" : "NO", (unsigned)spm_state_v,
                    (unsigned)spm_cursor, (unsigned)spm_in_flight_n,
                    (unsigned)spm_dropped_n);
         return 0;
-    }
-    if (rt_strcmp(sub, "init") == 0)          { (void)spm_init_counter(); return 0; }
-    if (rt_strcmp(sub, "start") == 0)         { return spm_start(argc > 2 ? argv[2] : "") == 0 ? 0 : 1; }
-    if (rt_strcmp(sub, "stop") == 0)          { spm_stop_accepting(); return 0; }
-    if (rt_strcmp(sub, "status") == 0)
-    {
+    case SPM_SUB_INIT:          return (spm_init_counter() == 0) ? 0 : 1;
+    case SPM_SUB_START:         return (spm_start(entry_id) == 0) ? 0 : 1;
+    case SPM_SUB_STOP:          spm_stop_accepting(); return 0;
+    case SPM_SUB_STATUS:
         rt_kprintf("[spm] status: state=%u entry=%s records=%u in_flight=%u dropped=%u "
-                   "counter=%s clock=%s\n",
+                   "counter=%s clock=%s guard=%u gates_now=0x%x\n",
                    (unsigned)spm_state_v, spm_entry_name(spm_active_entry),
                    (unsigned)spm_cursor, (unsigned)spm_in_flight_n,
                    (unsigned)spm_dropped_n, spm_counter_status_name(spm_ctr_status),
-                   spm_clock_basis_name(spm_clk_basis));
+                   spm_clock_basis_name(spm_clk_basis), (unsigned)spm_guard_depth,
+                   (unsigned)spm_ctr_pair());
         return 0;
+    case SPM_SUB_DUMP:          return (spm_dump_records() == 0) ? 0 : 1;
+    case SPM_SUB_CLEAR:         return (spm_clear_records() == 0) ? 0 : 1;
+    case SPM_SUB_TRIP:          return (spm_trip_once() == 0) ? 0 : 1;
+    default:                    return 1;
     }
-    if (rt_strcmp(sub, "dump") == 0)          { return spm_dump_records() == 0 ? 0 : 1; }
-    if (rt_strcmp(sub, "clear_records") == 0) { return spm_clear_records() == 0 ? 0 : 1; }
-    if (rt_strcmp(sub, "trip") == 0)          { return spm_trip_once() == 0 ? 0 : 1; }
-
-    rt_kprintf("[spm] 未知子命令 '%s' => 拒绝(未读计数器, 未改状态, 未做关闭)\n", sub);
-    return 1;
 }
 
-#if !defined(NS800_SPM_HOST_BACKEND)
-MSH_CMD_EXPORT(spm_cmd, NS800 target measurement A0 control);
-#endif
+/* 目标上的命令名是 **spm**：MSH_CMD_EXPORT 会把函数名本身当成命令名(finsh.h:101-112/
+ * 142-168)，而 msh.c:232-249 按**完整名字**查表、不会去掉 _cmd 后缀，所以别名必须走
+ * MSH_CMD_EXPORT_ALIAS(函数, 命令名, 描述) => 生成 __fsym_spm{name="spm", func=&spm_cmd}。
+ * 主机变体里这一行同样参与编译(见 tests/host/sp_measure_a0_finsh.h)，由名字查表分发。 */
+MSH_CMD_EXPORT_ALIAS(spm_cmd, spm, NS800 target measurement A0 control);
 
 #endif /* NS800_TARGET_MEASUREMENT_A0 */

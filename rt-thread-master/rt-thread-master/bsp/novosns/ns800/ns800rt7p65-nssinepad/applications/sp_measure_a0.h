@@ -13,9 +13,30 @@
  *
  * 有效性口径沿用 reports/plans/phase8-target-measurement-plan.md §2.5：
  *   clock_basis 三层（本批最多到 CONFIG_READBACK，CLI 没有把它改成 EXTERNAL_VERIFIED 的入口）、
- *   counter_status 三值（未检查 / 不可用 / 已证递增）、逐条 sample_valid + invalid_reason。
+ *   counter_status 三值（未检查 / 不可用 / 已证递增）、逐条 body_valid + invalid_reason。
  * "主体区间"用 SysTick COUNTFLAG 证明期间无重装（见 §5.2 的实现前提），**不是**用 VAL 模差分；
  * "包围区间"本批没有独立时基与完整防混叠依据 ⇒ 恒无效，只保留原始四时间戳。
+ *
+ * schema=2（r1）相对 schema=1 的判据收紧，全部由复审 A0-02 提出：
+ *   - counter_status 的"曾检查通过"只是**能力缓存**，不再充当每条样本的充分条件；
+ *     每条样本自己核起点门控与终点门控（DEMCR.TRCENA + DWT_CTRL.CYCCNTENA 四位），
+ *     记在 counter_gates 里，缺任一即 SPM_IV_GATE_LOST。
+ *   - body_end == body_begin 记 SPM_IV_NO_PROGRESS：停转的计数器给出的 0 差值不是"0 耗时"，
+ *     不得进入时长分布（原始值仍逐字保留）。
+ *   - 起点读已经把历史 COUNTFLAG 读清，那次**之前**的旗不再单独否定当前主体
+ *     （SPM_IV_FLAG_PRE 退役，只留 SPM_GD_FLAG_PRE_SET 观测位）；主体内的真实重装
+ *     仍由终点读的 SPM_IV_RELOAD_IN_BODY 判无效。
+ *
+ * 命令接缝（复审 A0-01）：目标上的命令名是 **spm**，由
+ *   MSH_CMD_EXPORT_ALIAS(spm_cmd, spm, ...) 生成 __fsym_spm{name="spm", func=&spm_cmd}。
+ *   MSH_CMD_EXPORT 会把函数名本身当命令名（finsh.h:101-112/142-168），而 msh.c:232-249
+ *   按**完整名字**查表、不会自动去掉 _cmd 后缀，所以别名必须是 ALIAS。
+ *
+ * 控制面并发合同：spm_cmd/spm_init_counter/spm_stop_accepting/spm_clear_records 只由
+ *   **单个 msh 控制台线程**调用（RT-Thread 的 tshell 只有一个控制台会话）；被测入口
+ *   spm_open/win_note/body_end/publish 才是与业务线程/ISR 并发的部分。因此"静止态"
+ *   （state=IDLE 且 in_flight=0 且 records=0 且 guard_depth=0）是控制者负责维持的前提，
+ *   记录器不额外为多控制台会话做仲裁。
  */
 #ifndef SP_MEASURE_A0_H
 #define SP_MEASURE_A0_H
@@ -27,7 +48,7 @@
 #define NS800_TARGET_MEASUREMENT_A0 0
 #endif
 
-#define SPM_SCHEMA_VERSION   1u
+#define SPM_SCHEMA_VERSION   2u
 #define SPM_SLOTS            64u      /* 单批次只追加、不覆盖、不循环复用 */
 
 /* 被测入口身份（与任务书 §3 的三个入口一一对应）。 */
@@ -57,18 +78,22 @@
 #define SPM_CLK_CONFIG_READBACK      1u
 #define SPM_CLK_EXTERNAL_VERIFIED    2u
 
-/* invalid_reason 位（可叠加；记录保留全部命中原因，不做单一归因）。 */
+/* invalid_reason 位（可叠加；记录保留全部命中原因，不做单一归因）。
+ * 0x0004 在 schema=1 里叫 FLAG_PRE（"窗口前旗已置位"）。它否定的是一次**已经被起点读
+ * 读清**的历史事件，而不是当前 body 内发生的事，因此 schema=2 起退役为纯观测位
+ * （guard_metadata 的 SPM_GD_FLAG_PRE_SET 保留），不再单独使当前主体无效（复审 A0-02b）。 */
 #define SPM_IV_NONE                 0x0000u
-#define SPM_IV_COUNTER_NOT_OK       0x0001u   /* UNCHECKED / UNAVAILABLE => 没有有效计数差 */
+#define SPM_IV_COUNTER_NOT_OK       0x0001u   /* 能力缓存 UNCHECKED / UNAVAILABLE => 没有有效计数差 */
 #define SPM_IV_GUARD_UNAVAILABLE    0x0002u   /* SysTick 未启用 / 非处理器时钟 / LOAD 不可读 */
-#define SPM_IV_FLAG_PRE             0x0004u   /* 窗口前 COUNTFLAG 已置位 => 起点不清 */
 #define SPM_IV_RELOAD_IN_BODY       0x0008u   /* 窗口内发生重装 => 主体 >= 一圈, 混叠不可排除 */
 #define SPM_IV_COUNTER_WRAPPED      0x0010u   /* 32 位计数差跨回绕或 end < begin => 保守判无效 */
 #define SPM_IV_NESTED_GUARD         0x0020u   /* 内层记录清掉了外层旗 => 外层不可判 */
 #define SPM_IV_CFG_CHANGED          0x0040u   /* 两次读之间 LOAD/CTRL 配置发生变化 */
+#define SPM_IV_NO_PROGRESS          0x0080u   /* body_end == body_begin => 本次计数没往前走 */
 #define SPM_IV_ENCLOSING_UNPROVEN   0x0100u   /* 包围区间: 无独立时基/完整防混叠依据 */
 #define SPM_IV_GENERATION_STALE     0x0200u   /* 发布时槽代次与预约代次不一致 */
 #define SPM_IV_SLOT_LOST            0x0400u   /* 批次已满被丢弃(记在批计数器上, 不落槽) */
+#define SPM_IV_GATE_LOST            0x0800u   /* 本次样本自己的 DEMCR.TRCENA/DWT.CYCCNTENA 门控不成立 */
 
 /* guard_metadata 位：本次判据用到的现场事实，逐条留档而不是只写"理论可行"。 */
 #define SPM_GD_SYSTICK_ENABLED      0x01u
@@ -78,6 +103,17 @@
 #define SPM_GD_LOAD_CAPTURED        0x10u
 #define SPM_GD_DWT_TRCENA           0x20u
 #define SPM_GD_DWT_CYCCNTENA        0x40u
+
+/* counter_gates 字节：逐样本的计数器门控事实（不是"init 曾经成功过"）。
+ * bit0/bit1 = 本次**起点**读到 DEMCR.TRCENA / DWT_CTRL.CYCCNTENA 已置位；
+ * bit2/bit3 = 本次**终点**同样两位已置位。四个位都成立才允许本次计数差算有效。 */
+#define SPM_GT_BEFORE_TRCENA        0x01u
+#define SPM_GT_BEFORE_CYCCNTENA     0x02u
+#define SPM_GT_AFTER_TRCENA         0x04u
+#define SPM_GT_AFTER_CYCCNTENA      0x08u
+#define SPM_GT_BEFORE_MASK          (SPM_GT_BEFORE_TRCENA | SPM_GT_BEFORE_CYCCNTENA)
+#define SPM_GT_AFTER_MASK           (SPM_GT_AFTER_TRCENA  | SPM_GT_AFTER_CYCCNTENA)
+#define SPM_GT_ALL_MASK             (SPM_GT_BEFORE_MASK | SPM_GT_AFTER_MASK)
 
 /* 控制状态机（命令侧）。 */
 #define SPM_STATE_IDLE        0u
@@ -122,7 +158,7 @@ typedef struct {
     rt_uint8_t  branch_id;
     rt_uint8_t  pwm_called_by_this_call;
     rt_uint8_t  low_called_by_this_call;
-    rt_uint8_t  pad2;
+    rt_uint8_t  counter_gates;           /* SPM_GT_* 逐样本门控事实(schema=2 起) */
     rt_uint32_t pre;                     /* 被测 disable 之前 */
     rt_uint32_t body_begin;              /* 进入原窗口之后 */
     rt_uint32_t body_end;                /* 原关闭/记账 + 原最终 __DSB 之后, 恢复中断之前 */
@@ -158,7 +194,7 @@ typedef struct {
     rt_uint8_t  saved_primask;
     rt_uint8_t  context_isr;
     rt_uint8_t  open_ok;                 /* 1 = 已预约(或已确认丢弃), 供 SPM_END 判断 */
-    rt_uint8_t  pad5[1];
+    rt_uint8_t  gates;                   /* SPM_GT_*: 本次起点/终点的计数器门控 */
 } spm_ctx_t;
 
 /* ---- 生命周期（只由 stop_priority.c 的三个入口使用） ----
