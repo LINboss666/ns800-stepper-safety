@@ -130,7 +130,7 @@ SKIP**——它在本机不在可读位置、且本轮不重连设备，所以�
 |---|---|
 | `accepted_firmware_code_commit` `cd8d9f09…` | 上一轮固件输入（本轮未改） |
 | `gate_code_commit` `d4d337a3580cbe5aea85d98b0317761b5c04c403` | 仅 `tests/host/a0_export_gate.py`（门字节态 A：47960 B，blob `f170e1af…`，sha256 `b08e7bdc…`；GATE-R2-01/02 的实质返修全在这里） |
-| 证据/交接提交 | `gate_r2_verification.txt` + 两个上轮文件的范围内修正 + 本交接 MD/JSON（含门字节态 B：47964 B，blob `6582163…`，sha256 `ba88f37b…`；相对态 A 只改一行用例描述字符串以过尾随空白检查，判定逻辑与用例输入未动，本轮结果都在态 B 上取） |
+| 证据/交接提交 `098fec16350150697ccb6f2eb8f057c216e84cb0` | `gate_r2_verification.txt` + 两个上轮文件的范围内修正 + 本交接 MD/JSON；门字节态 B 也在这里（47964 B，blob `6582163…`，sha256 `ba88f37b…`；相对态 A 只改一行用例描述字符串以过尾随空白检查，判定逻辑与用例输入未动，本轮结果都在态 B 上取）。本交接对提交号的登记写在该提交之后的一次小提交里 |
 
 ## 9. STOP
 

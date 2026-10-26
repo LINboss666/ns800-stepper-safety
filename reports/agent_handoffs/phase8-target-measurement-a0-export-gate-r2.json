@@ -15,10 +15,11 @@
       "sha256": "b08e7bdc3d25fc09c7050f77fa09c8cb838bfdce0106b0f99675dd0e8b30636e"
     },
     "B_final_bytes_to_pin": {
-      "commit": "(本证据提交; 提交后以 ls-remote + 远端 blob 回读确定)",
+      "commit": "098fec16350150697ccb6f2eb8f057c216e84cb0",
       "blob": "658216314b6c6e2a30a2814ba49cec33c8e9c6f4",
       "bytes": 47964,
-      "sha256": "ba88f37bb3fd8b64e6e19bd5984aab5bacf69de108b218f90241431fd3814222"
+      "sha256": "ba88f37bb3fd8b64e6e19bd5984aab5bacf69de108b218f90241431fd3814222",
+      "commit_note": "证据/交接提交; 该提交里的 tests/host/a0_export_gate.py blob 已回读为 658216314b6c6e2a30a2814ba49cec33c8e9c6f4(=sha256 ba88f37b… 的字节)"
     },
     "diff_A_to_B": "1 文件 1 增 1 删; 只改 SELFTEST_CASES 里 GATE-R2-NEG-STATE-UNTERMINATED 的描述字符串(去掉字面反斜杠-n), 未改正则/判定逻辑/用例输入或期望结论",
     "which_state_results_were_taken_on": "B(最终字节)。§1 基线探针在修前冻结门上取, §2 与 §3~§8 全部在 B 上复算; 证据文件里附了逐字重跑的复算复核哈希"
@@ -233,5 +234,6 @@
     "A0_EXPORT_GATE_R2_OFFLINE_READY / AWAITING_INDEPENDENT_GATE_REVIEW",
     "FIRMWARE_AND_IMAGE_BYTES_UNCHANGED",
     "NO BUILD / NO FLASH READ / NO PROGRAM / NO RESET / NO SERIAL / NO MOTOR / NO STEP_ENABLE"
-  ]
+  ],
+  "evidence_commit": "098fec16350150697ccb6f2eb8f057c216e84cb0"
 }
