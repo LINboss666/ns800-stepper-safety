@@ -1,0 +1,402 @@
+{
+  "round": "phase8-target-measurement-a0-export-gate-r3",
+  "date_local": "2026-10-26 (Asia/Shanghai)",
+  "task_book": "NS800_Gate_R2_Review_and_Ready_R3_Patch_8552288_20261026.md",
+  "reviewer_verdict_on_previous_round": "GATE_R2_PREVIOUS_FINDINGS_CLOSED / REMAINING_GATE_REWORK_REQUIRED",
+  "task_start_commit": "85522885ec39fbd96f99847a0508c2d7cb137ae6",
+  "accepted_firmware_code_commit": "cd8d9f095030c08634a082dd2bb9bc622d92fb1d",
+  "gate_code_commit": "b187cdd2ffc3225474006d28c1dca3eca591351d",
+  "branch": "phase8/tmc-drive-config",
+  "repo": "https://github.com/LINboss666/ns800-stepper-safety",
+  "scope_statement": "只返修 Python 采集门(附录 A 补丁) + 本轮离线证据。未改固件/HAL/内核/rtconfig/Keil 工程/镜像/已有 runner/公共 shim/旧证据/归档; 未重编 Keil, 未重跑 A0/S1/S2 主机链, 未连接任何设备。",
+  "de_identification": {
+    "rule": "仓库文件里不写本机用户名/主机名/家目录/原始数据根目录路径; <RAWDATA> 代指本地板级原始数据根目录(本次证据中只在解释路径猜错一事时出现), 所有本地工作副本与冻结件本体留在仓外, 未被提交",
+    "scanned": [
+      "gate_r3_verification.txt",
+      "handoff .md",
+      "handoff .json",
+      "tests/host/a0_export_gate.py",
+      "tests/host/a0_export_gate_r3_probe.py"
+    ],
+    "hits": 0
+  },
+  "firmware_changed": false,
+  "python_gate_changed": true,
+  "documentation_only": false,
+  "builds_executed": [],
+  "hardware_actions": [],
+  "files_changed": [
+    {
+      "path": "tests/host/a0_export_gate.py",
+      "change": "modified",
+      "before": {
+        "bytes": 47964,
+        "sha256": "ba88f37bb3fd8b64e6e19bd5984aab5bacf69de108b218f90241431fd3814222",
+        "git_blob": "658216314b6c6e2a30a2814ba49cec33c8e9c6f4"
+      },
+      "after": {
+        "path": "tests/host/a0_export_gate.py",
+        "bytes": 50246,
+        "sha256": "94e8317577a0fd8f6fd2bccafc0bb16753f3fb900c1adc7d254ee57cf3898c7d",
+        "git_blob_at_gate_code_commit": "0c599487072419a5e3494158d8ca694ff4e6be89",
+        "git_blob_at_task_start": "658216314b6c6e2a30a2814ba49cec33c8e9c6f4"
+      },
+      "net_diff": "1 文件 43 增 9 删"
+    },
+    {
+      "path": "tests/host/a0_export_gate_r3_probe.py",
+      "change": "added",
+      "note": "任务书附录 B 逐字照抄(与工作副本同散列), 供复审一条命令复跑同一份 44 项输入",
+      "identity": {
+        "path": "tests/host/a0_export_gate_r3_probe.py",
+        "bytes": 2482,
+        "sha256": "1c7bf5197ceae79f12fdb47e3fe741ecf9c771d27b92ddca8df685485d267d03",
+        "git_blob_at_gate_code_commit": "12e27151f0683c6c1560dba5d42421eef1d11b7e",
+        "git_blob_at_task_start": "not-in-that-revision"
+      }
+    },
+    {
+      "path": "reports/reviews/phase8-target-measurement-a0-export-gate-r3/gate_r3_verification.txt",
+      "change": "added",
+      "identity": {
+        "path": "reports/reviews/phase8-target-measurement-a0-export-gate-r3/gate_r3_verification.txt",
+        "bytes": 50971,
+        "sha256": "5516ef57c1594d889f6dce99391241165a4e93cad7fe1cbb41427859f079de4d",
+        "git_blob_at_gate_code_commit": "not-in-that-revision",
+        "git_blob_at_task_start": "not-in-that-revision"
+      }
+    },
+    {
+      "path": "reports/agent_handoffs/phase8-target-measurement-a0-export-gate-r3.md",
+      "change": "added"
+    },
+    {
+      "path": "reports/agent_handoffs/phase8-target-measurement-a0-export-gate-r3.json",
+      "change": "added"
+    }
+  ],
+  "patch_not_committed": {
+    "reason": "任务书 §5.2 要求附录 A 只在仓外暂存并应用, 不作为仓库文件交付",
+    "bytes": 7400,
+    "sha256": "806780ac8830cc28f27b75f35e353381303b11e6b9bdfad87f599daff7de1e10",
+    "matches_task_book_section_4": true,
+    "application": "git apply --check rc=0 后 git apply rc=0; 未手抄任何字符串转义",
+    "result_matches_cloud_candidate": true
+  },
+  "gate_final_bytes": {
+    "path": "tests/host/a0_export_gate.py",
+    "bytes": 50246,
+    "sha256": "94e8317577a0fd8f6fd2bccafc0bb16753f3fb900c1adc7d254ee57cf3898c7d",
+    "git_blob_at_gate_code_commit": "0c599487072419a5e3494158d8ca694ff4e6be89",
+    "git_blob_at_task_start": "658216314b6c6e2a30a2814ba49cec33c8e9c6f4"
+  },
+  "gate_matches_cloud_candidate_file": {
+    "candidate_bytes": 50246,
+    "candidate_sha256": "94e8317577a0fd8f6fd2bccafc0bb16753f3fb900c1adc7d254ee57cf3898c7d",
+    "local_applied_same": true
+  },
+  "gate_commit_binds_final_bytes": {
+    "rule": "gate_code_commit 必须是实际包含最终门字节的提交",
+    "verified": true,
+    "no_second_state_this_round": true,
+    "note": "本轮该提交之后门字节未再改动(与上一轮\"最终字节落在证据提交\"的两态情形不同)"
+  },
+  "gate_r3_01_fixed": {
+    "finding": "完整性检查依赖行先被分类为协议行; 前导 NUL 让帧外额外记录被分成 OTHER 而绕过; rstrip(\"\\r\") 还把 CRCRLF 隐式洗成 CRLF",
+    "fix": [
+      "NUL 检查移到分类之前: 文本协议里任何位置的 NUL 都保留原字节并拒绝",
+      "只移除真实 LF 前至多一个 CR(lf and seg.endswith(b\"\\r\")), 不再 rstrip",
+      "协议行残余 CR 具名 BARE_CR_IN_PROTOCOL_LINE",
+      "CSV 帧外的普通合法异步日志仍允许; 未为绕过门而改写采集文件"
+    ],
+    "counterexamples_now_rejected": [
+      "EXTRA_ROW_NUL_PREFIX",
+      "NUL_OTHER",
+      "EXTRA_CR_TAIL"
+    ]
+  },
+  "gate_r3_02_fixed": {
+    "finding": "13 个实际 uint8_t 列按 uint32 收, 256 能进入被接受的完整记录; \"%u 打印提升不改变存储宽度\"这一依据成立",
+    "columns": [
+      "ctx_isr",
+      "saved_primask",
+      "in_owner",
+      "owner_after",
+      "phase_after",
+      "inhibit",
+      "pending",
+      "latch_m",
+      "latch_d",
+      "pwm_attempted",
+      "pwm_result",
+      "permit_level",
+      "branch"
+    ],
+    "domain": "0..255",
+    "over_bound_verdict": "FIELD_ILLEGAL -> REJECT(clear=0 next=0)",
+    "in_bound_positive": "0 与 255 仍 ACCEPT(GATE-R3-POS-U8-MAX)",
+    "no_new_thresholds": "未为 owner/phase/branch 等发明协议之外的枚举阈值; flag/slot/hex2/枚举、int32 与 uint32 边界一律未动"
+  },
+  "tests_executed": [
+    {
+      "id": "r3-baseline-probe",
+      "tool": "附录 B 44 项跑在 8552288 的门字节上: mismatch=16(=3 条字节完整性 + 13 条越界列); rc=1 是\"剩余缺口已复现\", 不是修后失败也不是 INFRA-FAIL",
+      "rc": 1,
+      "output_sha256": "d6299170dd7439902b2797976a6b10e7d204bc32abcc0126939224c248e5b300",
+      "output_bytes": 9086
+    },
+    {
+      "id": "r3-applied-probe",
+      "tool": "同一份附录 B 输入跑在应用补丁后的门字节上: mismatch=0",
+      "rc": 0,
+      "output_sha256": "9c62131ebd3288bdfdbdf89f9b8224093f0b630e0c60c726123a5b0dcc31f9d2",
+      "output_bytes": 10609
+    },
+    {
+      "id": "gate-selftest",
+      "tool": "a0_export_gate.py --selftest (51 例 = 保留 R2 的 46 例 + R3 新增 5 例)",
+      "rc": 0,
+      "output_sha256": "1db7fc6b1e352a15c1bb6a7ed765429f5287c19809042e832e9cfa23c8e1e006",
+      "output_bytes": 8592
+    },
+    {
+      "id": "gate-selftest-meta",
+      "tool": "a0_export_gate.py --selftest-meta (11 道门, 必填 5 道全 META-OK)",
+      "rc": 0,
+      "output_sha256": "1406365c437afd9e4c1f71687ae06061cefd1ad2b9057a0e2cfde1a311ac491d",
+      "output_bytes": 1879
+    },
+    {
+      "id": "gate-header-drift",
+      "tool": "--check-header-against-source 生产 sp_measure_a0.c 头行",
+      "rc": 0,
+      "output_sha256": "18326228a9e9d589e19b6d73dd0c4c9813a1250ee337d034924e81e17f7e14ae",
+      "output_bytes": 65
+    },
+    {
+      "id": "gate-offline-board-batches",
+      "tool": "历史四件按原操作包逐批 expected/entry(1/trip_fast, 16/trip_fast, 1/off_attempt, 0/off_attempt) 离线判定",
+      "rc": "逐批 1",
+      "output_sha256": "075f8fcbbbcd4744a9e6c6420d413f2655f3c655a9490a24142324341657bfd4",
+      "output_bytes": 2644
+    },
+    {
+      "id": "gate-offline-fixed-export",
+      "tool": "现存健康导出切片离线判定(未重跑 A0, 未连 COM5)",
+      "rc": 0,
+      "output_sha256": "b0969694ca0d26311c4deae317ed6329cb0ea74f4e77069ae3e6d1cd7b3979a2",
+      "output_bytes": 207
+    },
+    {
+      "id": "cross-round-regression-r2-probe",
+      "tool": "上一轮任务书 §5 探针跑在本轮门字节上(检查 R2 结论未被重新打开)",
+      "rc": 0,
+      "output_sha256": "b9a634d396fa179843ed548b67f19e3583fbf687261449e66f56a7748484c9ee",
+      "output_bytes": 945
+    },
+    {
+      "id": "in-repo-probe-rerun",
+      "tool": "仓内探针件 tests/host/a0_export_gate_r3_probe.py 复跑同一输入",
+      "rc": 0,
+      "output_sha256": "9c62131ebd3288bdfdbdf89f9b8224093f0b630e0c60c726123a5b0dcc31f9d2",
+      "output_bytes": 10609
+    },
+    {
+      "id": "unchanged-proof-r3",
+      "tool": "13 冻结源文件 + 2 镜像 + 4 宏 + 3 构建输入 + 4 本地不动件",
+      "rc": 0,
+      "output_sha256": "7ec1941bdd5a717bba6952952ef5853507a3ec04b67bdce9f21e3a747b8b821f",
+      "output_bytes": 2989
+    }
+  ],
+  "selftest_summary": "GATE-SELFTEST-SUMMARY pass=65 fail=0 cases=51",
+  "meta_summary": "GATE-META-SUMMARY ok=9 blocked=2 bad=0 guards=11 required=5",
+  "meta_blocked_kept": [
+    {
+      "guard": "STATUS_TOKEN_ANCHOR",
+      "observation": "摘掉后无人误放行, 但 GATE-R2-NEG-STATUS-DROPPED-GLUE 的预期原因被 BATCH_STATE_MISSING 替上"
+    },
+    {
+      "guard": "STOP_TOKEN_ANCHOR",
+      "observation": "摘掉后无人误放行, 但 GATE-R2-NEG-STATE-NUMERIC-SUFFIX 与 GATE-R2-NEG-STATE-RECORDS-GLUE 的预期原因被 BATCH_STATE_MISSING 替上"
+    }
+  ],
+  "meta_new_guards_ok": [
+    "U8_UPPER_BOUND",
+    "BARE_CR_PROTOCOL"
+  ],
+  "cross_round_regression": {
+    "input": "上一轮任务书 §5 的同名同输入探针",
+    "result": "CONTROL_HEALTHY 仍 ACCEPT 且纳入 3; ACTIVE_STATE/NUL_IN_STATE/STATE_NUMERIC_SUFFIX/EXTRA_ROW_AFTER_TAIL/ZERO_PROGRESS_VALID_CLAIM 仍全部 REJECT 且 clear=0 next=0; i32 两边界合法; gen=4294967296 非法",
+    "conclusion": "R2 关闭的缺口未被本轮重新打开"
+  },
+  "offline_comparisons": {
+    "historical_board_batches": [
+      {
+        "file": "cmd_114_b1_dump.txt",
+        "expected_records": 1,
+        "entry": "trip_fast",
+        "verdict": "REJECT",
+        "rc": 1
+      },
+      {
+        "file": "cmd_135_b2_dump.txt",
+        "expected_records": 16,
+        "entry": "trip_fast",
+        "verdict": "REJECT",
+        "rc": 1
+      },
+      {
+        "file": "cmd_141_b3_dump.txt",
+        "expected_records": 1,
+        "entry": "off_attempt",
+        "verdict": "REJECT",
+        "rc": 1
+      },
+      {
+        "file": "cmd_149_cleanup_dump.txt",
+        "expected_records": 0,
+        "entry": "off_attempt",
+        "verdict": "REJECT",
+        "rc": 1
+      }
+    ],
+    "note": "旧时间统计仍不可挽救; REJECT 批仍 clear_records=0/next_batch_trigger=0 且时长统计 untrusted; 未做拼接/清洗/补列。NUL 原因文案随 GATE-R3-01 改为\"含无法分类的行\", 判定本身与上一轮同为 REJECT。",
+    "healthy_export_slice": {
+      "file": "上轮 a0_on 导出切片(stop 行 + 头行 + 3 条数据行)",
+      "verdict": "ACCEPT",
+      "csv_rows_parsed": 3,
+      "failures": [],
+      "timing_included": 3,
+      "timing_trusted": true,
+      "rc": 0
+    }
+  },
+  "frozen_image_identities": [
+    {
+      "path": "reports/firmware/phase8-target-measurement-a0-export-r1/default.bin",
+      "bytes": 251148,
+      "sha256": "02e984583255f3414f43fb5c077dc9ba82eba98553d2cb9d7f7feee9336ebd80",
+      "verified_unchanged_vs": "起点对象 + 任务书 §6 记录值",
+      "flashed": false,
+      "downloaded_this_round": false
+    },
+    {
+      "path": "reports/firmware/phase8-target-measurement-a0-export-r1/measure-a0.bin",
+      "bytes": 261452,
+      "sha256": "5f30d3f058ceff516b2185aa3a1e597bbe63293b94a6fd801fd989a6f7b2b8e6",
+      "verified_unchanged_vs": "起点对象 + 任务书 §6 记录值",
+      "flashed": false,
+      "role": "门复审通过后的未来唯一候选镜像",
+      "downloaded_this_round": false
+    }
+  ],
+  "board_state": "板上仍是旧 358fd81ae5853ea52df1e1ab367ea41af0f5e86679082a755c17dac3429b0e1b; 新 5f30d3f0… 未烧录; 断电为此前 USER_REPORTED 收尾状态(本轮未触碰设备)",
+  "unchanged_proof": {
+    "method": "工作树内容(按 LF 归一) vs accepted_firmware_code_commit 的 git blob vs 任务起点的 git blob 三方一致; 镜像与本地不动件按磁盘字节直算 sha256",
+    "ok": 26,
+    "bad": 0,
+    "skip": 0,
+    "frozen_sources": [
+      "sp_measure_a0.c",
+      "sp_measure_a0.h",
+      "stop_priority.c",
+      "motor.h",
+      "tmc2209.h",
+      "project_board.h",
+      "sp_measure_a0_main.c",
+      "sp_measure_a0_port.h",
+      "sp_measure_a0_console.h",
+      "run_sp_measure_a0.sh",
+      "tests/host/shim_ps/rtthread.h (公共 shim)",
+      "run_stop_result_s1.sh",
+      "run_stop_priority_s2.sh"
+    ],
+    "build_inputs_unchanged": [
+      "project.uvprojx",
+      "template.uvprojx",
+      "rtconfig.h"
+    ],
+    "safety_macros": [
+      {
+        "name": "MOTOR_HARDWARE_ENABLE_PATH_VALIDATED",
+        "site": "motor.h:69",
+        "value": "RT_FALSE"
+      },
+      {
+        "name": "STEP_DIAG_ISOLATED_ENV_CONFIRMED",
+        "site": "motor.h:83",
+        "value": "RT_FALSE"
+      },
+      {
+        "name": "SAFETY_LIMIT_INPUTS_ENABLED",
+        "site": "project_board.h:51",
+        "value": "RT_FALSE"
+      },
+      {
+        "name": "TMC_DRIVE_CONFIG_HW_VALIDATED",
+        "site": "tmc2209.h:100",
+        "value": "RT_FALSE"
+      }
+    ],
+    "local_immovable": {
+      "flash_snapshot_before_a_b": "各 1048576 B, sha256 b89f8a7cde7b944a…(双份一致)",
+      "restore_hex_two_copies": "各 3014958 B, sha256 b3ac97b976bc4765…(flash-snapshot/ 与 restore-project/snap/ 两处本轮均回读一致)",
+      "restore_download": "NOT_EXECUTED"
+    }
+  },
+  "correction_of_previous_round_claim": {
+    "previous": "上一轮交接把\"恢复输入 HEX\"记为 SKIP(本轮不可读), 因此没声称已回读",
+    "actual_cause": "是我方证明脚本把路径猜成 <RAWDATA>/restore/… , 文件一直在 flash-snapshot/ 与 restore-project/snap/ 两处",
+    "this_round": "用真实路径直算磁盘字节, 两处均等于历史身份 b3ac97b9…; 首版(带假 SKIP)输出原样保留在仓外",
+    "not_implied": "恢复下载仍未演练(NOT_EXECUTED 不变), 不据此声称已有可回退依据"
+  },
+  "first_failures_kept": [
+    {
+      "id": "R3-F1",
+      "what": "git apply 在 core.autocrlf=true 下把工作树写成 CRLF: 应用后 51229 B / 983 个 CR, 而索引 blob 仍是 50246 B 的 LF; 照此交付会让本地执行对象与远端字节不是同一份",
+      "handling": "用 git cat-file 把 LF blob 原样写回工作树(50246 B, 0 CR)后才跑全部检查; 未改 git 配置"
+    },
+    {
+      "id": "R3-F2",
+      "what": "unchanged_proof 首版把恢复输入 HEX 路径猜错, 多出一条假 SKIP",
+      "handling": "改用两处真实路径复核(均一致); 首版输出原样保留"
+    },
+    {
+      "id": "R3-F3",
+      "what": "证据生成器首版把捕获件里的空行加成 4 空格缩进, 触发自身的尾随空白硬门(rc 非 0, 未产出文件)",
+      "handling": "声明\"只去行尾空白\"的嵌入口径并在生成器末尾加硬自检后重出"
+    }
+  ],
+  "not_rerun": [
+    "A0/S1/S2/V1/V2/I-O/SD 主机链(任务书 §5.6 禁止)",
+    "Keil Rebuild All",
+    "任何串口/探针/烧录/复位/目标命令"
+  ],
+  "refs_frozen_unchanged": {
+    "main": "1b3757eec550802a3973e66790af422d81d3d373",
+    "phase7/full-embedded-software": "6d3fbc559d45673d7550eb73dec5a4ade5bb34df",
+    "tag_object": "097935fec5a6f2467261ab1ad449ff0b1d398250",
+    "tag_dereference": "e40a9b95ef709e6a80444f9f3949dfdd70ba96ba"
+  },
+  "still_open": [
+    "B-1",
+    "BUG-008",
+    "RISK-03",
+    "RISK-03a",
+    "物理 RISK-04-b",
+    "M-1",
+    "M-2",
+    "M-3",
+    "恢复下载未演练",
+    "板上仍是旧 358fd81a… 镜像",
+    "真实 msh 解析/RT 调度/目标运行状态仍 NOT_EXECUTED",
+    "A0 时长证据仍未取得(NOT_ACHIEVED)"
+  ],
+  "next_step": "本附件只预先验证了候选代码, 不替代远端最终字节复审。门复审通过后, 才把同一份 5f30d3f0… 镜像 + 通过的门 + 字节采集脚本绑定为一次有界板级重测包, 由用户一次批准; 本轮未发出任何硬件授权。",
+  "stop_claim": [
+    "GATE_R3_OFFLINE_READY / AWAITING_INDEPENDENT_GATE_REVIEW",
+    "FIRMWARE_AND_IMAGE_BYTES_UNCHANGED",
+    "NO BUILD / NO FLASH READ / NO PROGRAM / NO RESET / NO SERIAL / NO MOTOR / NO STEP_ENABLE"
+  ]
+}

@@ -1,0 +1,401 @@
+采集门 R3 返修（附录 A 补丁 + 附录 B 同输入探针）：离线验证原文与身份
+轮次 phase8-target-measurement-a0-export-gate-r3    日期 2026-10-26 (Asia/Shanghai)
+任务起点 85522885ec39fbd96f99847a0508c2d7cb137ae6 (= 上一轮被审交付 = 远端分支头)
+accepted_firmware_code_commit cd8d9f095030c08634a082dd2bb9bc622d92fb1d (未改动)
+本轮只改 tests/host/a0_export_gate.py 并新增 tests/host/a0_export_gate_r3_probe.py;
+hardware_actions=[]、builds_executed=[]、firmware_changed=false、python_gate_changed=true。
+全部离线执行：不连串口、不连调试器、不发目标命令、不重编 Keil、不重跑 A0/S1/S2 主机链。
+嵌入口径：下面各节的"原文"逐行照抄捕获文件, 只去掉每行**行尾对齐空格**(非数据); 捕获件本体一字未改, §10 的 output_sha256 按捕获件完整字节计算, 逐字节复算请用 §10 的命令。
+
+====================================================================
+0. 输入身份（补丁与门字节都可复核）
+====================================================================
+  基线门(8552288 里)           47964 B  sha256 ba88f37bb3fd8b64e6e19bd5984aab5bacf69de108b218f90241431fd3814222
+    (与任务书 §2 记录一致: 47964 B / 658216314b6c6e2a30a2814ba49cec33c8e9c6f4 / ba88f37b…)
+  附录 A 补丁(仓外暂存)          7400 B  sha256 806780ac8830cc28f27b75f35e353381303b11e6b9bdfad87f599daff7de1e10
+    (与任务书 §4 记录一致: 7400 B / 806780ac8830cc28f27b75f35e353381303b11e6b9bdfad87f599daff7de1e10)
+  附录 B 探针(仓外与工作树各一份, 逐字照抄)   2482 B  sha256 1c7bf5197ceae79f12fdb47e3fe741ecf9c771d27b92ddca8df685485d267d03
+    仓内件 tests/host/a0_export_gate_r3_probe.py 与工作副本同一散列(未改动一处字节)
+  应用补丁后的门                50246 B  sha256 94e8317577a0fd8f6fd2bccafc0bb16753f3fb900c1adc7d254ee57cf3898c7d
+    git blob 0c599487072419a5e3494158d8ca694ff4e6be89
+    与任务书 §4 的"云端仓外候选文件"逐字节相同(50246 B / 94e8317577a0fd8f…)，即本地应用的不是手抄改写, 而是与候选同一份字节。
+  应用方式: git apply --check 先通过(rc=0), 再 git apply(rc=0); 未手工转写任何字符串转义。
+    净变化 git diff --stat = 1 文件 43 增 9 删。
+  gate_code_commit b187cdd2ffc3225474006d28c1dca3eca591351d —— 该提交里的门 blob 就是 0c599487072419a5e3494158d8ca694ff4e6be89
+    (git cat-file 该提交的对象 = 50246 B / sha256 94e83175…, 与上面"应用补丁后的门"逐字节相同;
+     本轮不存在"最终字节落在后一个提交"的两态问题: 该提交之后门字节未再改动。)
+
+====================================================================
+1. §5.1 基线：附录 B 探针跑在未修改的 8552288 门字节上（原文）
+====================================================================
+  {"id": "CONTROL_HEALTHY", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "CONTROL_LF", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "EXTRA_ROW_NUL_PREFIX", "expected": "REJECT", "actual": "ACCEPT", "ok": false, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "NUL_OTHER", "expected": "REJECT", "actual": "ACCEPT", "ok": false, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "EXTRA_CR_TAIL", "expected": "REJECT", "actual": "ACCEPT", "ok": false, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_ctx_isr_0", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_ctx_isr_255", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_ctx_isr_256", "expected": "REJECT", "actual": "ACCEPT", "ok": false, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_saved_primask_0", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_saved_primask_255", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_saved_primask_256", "expected": "REJECT", "actual": "ACCEPT", "ok": false, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_in_owner_0", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_in_owner_255", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_in_owner_256", "expected": "REJECT", "actual": "ACCEPT", "ok": false, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_owner_after_0", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_owner_after_255", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_owner_after_256", "expected": "REJECT", "actual": "ACCEPT", "ok": false, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_phase_after_0", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_phase_after_255", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_phase_after_256", "expected": "REJECT", "actual": "ACCEPT", "ok": false, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_inhibit_0", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_inhibit_255", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_inhibit_256", "expected": "REJECT", "actual": "ACCEPT", "ok": false, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_pending_0", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_pending_255", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_pending_256", "expected": "REJECT", "actual": "ACCEPT", "ok": false, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_latch_m_0", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_latch_m_255", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_latch_m_256", "expected": "REJECT", "actual": "ACCEPT", "ok": false, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_latch_d_0", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_latch_d_255", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_latch_d_256", "expected": "REJECT", "actual": "ACCEPT", "ok": false, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_pwm_attempted_0", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_pwm_attempted_255", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_pwm_attempted_256", "expected": "REJECT", "actual": "ACCEPT", "ok": false, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_pwm_result_0", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_pwm_result_255", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_pwm_result_256", "expected": "REJECT", "actual": "ACCEPT", "ok": false, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_permit_level_0", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_permit_level_255", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_permit_level_256", "expected": "REJECT", "actual": "ACCEPT", "ok": false, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_branch_0", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_branch_255", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_branch_256", "expected": "REJECT", "actual": "ACCEPT", "ok": false, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  REMAINING-PROBES cases=44 mismatch=16
+
+  判定不符的 16 项(逐项具名, 期望/实际/当时的 action_plan):
+    EXTRA_ROW_NUL_PREFIX  (期望 REJECT, 实际 ACCEPT, plan={"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0})
+    NUL_OTHER  (期望 REJECT, 实际 ACCEPT, plan={"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0})
+    EXTRA_CR_TAIL  (期望 REJECT, 实际 ACCEPT, plan={"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0})
+    U8_ctx_isr_256  (期望 REJECT, 实际 ACCEPT, plan={"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0})
+    U8_saved_primask_256  (期望 REJECT, 实际 ACCEPT, plan={"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0})
+    U8_in_owner_256  (期望 REJECT, 实际 ACCEPT, plan={"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0})
+    U8_owner_after_256  (期望 REJECT, 实际 ACCEPT, plan={"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0})
+    U8_phase_after_256  (期望 REJECT, 实际 ACCEPT, plan={"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0})
+    U8_inhibit_256  (期望 REJECT, 实际 ACCEPT, plan={"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0})
+    U8_pending_256  (期望 REJECT, 实际 ACCEPT, plan={"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0})
+    U8_latch_m_256  (期望 REJECT, 实际 ACCEPT, plan={"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0})
+    U8_latch_d_256  (期望 REJECT, 实际 ACCEPT, plan={"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0})
+    U8_pwm_attempted_256  (期望 REJECT, 实际 ACCEPT, plan={"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0})
+    U8_pwm_result_256  (期望 REJECT, 实际 ACCEPT, plan={"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0})
+    U8_permit_level_256  (期望 REJECT, 实际 ACCEPT, plan={"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0})
+    U8_branch_256  (期望 REJECT, 实际 ACCEPT, plan={"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0})
+  口径: 该脚本 rc=1 表示"已观察到剩余缺口", 不是修后失败, 也不是 INFRA-FAIL;
+        44 项里 28 项本就正确(含两条健康正控与 26 个 0/255 宽度边界), 不是全部失败。
+
+====================================================================
+2. §5.3 同输入复跑：应用附录 A 补丁后（原文）
+====================================================================
+  {"id": "CONTROL_HEALTHY", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "CONTROL_LF", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "EXTRA_ROW_NUL_PREFIX", "expected": "REJECT", "actual": "REJECT", "ok": true, "plan": {"clear_records_send_count": 0, "next_batch_trigger_send_count": 0, "extra_protection_actions": 0}, "failures": ["NUL_IN_PROTOCOL_LINE: 第 7 行(OTHER) 含 1 个 NUL（含无法分类的行）"]}
+  {"id": "NUL_OTHER", "expected": "REJECT", "actual": "REJECT", "ok": true, "plan": {"clear_records_send_count": 0, "next_batch_trigger_send_count": 0, "extra_protection_actions": 0}, "failures": ["NUL_IN_PROTOCOL_LINE: 第 7 行(OTHER) 含 1 个 NUL（含无法分类的行）"]}
+  {"id": "EXTRA_CR_TAIL", "expected": "REJECT", "actual": "REJECT", "ok": true, "plan": {"clear_records_send_count": 0, "next_batch_trigger_send_count": 0, "extra_protection_actions": 0}, "failures": ["BARE_CR_IN_PROTOCOL_LINE: 第 5 行(DUMP_TAIL) 含非 CRLF 终止符的 CR"]}
+  {"id": "U8_ctx_isr_0", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_ctx_isr_255", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_ctx_isr_256", "expected": "REJECT", "actual": "REJECT", "ok": true, "plan": {"clear_records_send_count": 0, "next_batch_trigger_send_count": 0, "extra_protection_actions": 0}, "failures": ["FIELD_ILLEGAL: 第 2 行 ctx_isr='256' 不合法(u8)", "ROW_COUNT: 完整记录条数=0 期望=1"]}
+  {"id": "U8_saved_primask_0", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_saved_primask_255", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_saved_primask_256", "expected": "REJECT", "actual": "REJECT", "ok": true, "plan": {"clear_records_send_count": 0, "next_batch_trigger_send_count": 0, "extra_protection_actions": 0}, "failures": ["FIELD_ILLEGAL: 第 2 行 saved_primask='256' 不合法(u8)", "ROW_COUNT: 完整记录条数=0 期望=1"]}
+  {"id": "U8_in_owner_0", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_in_owner_255", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_in_owner_256", "expected": "REJECT", "actual": "REJECT", "ok": true, "plan": {"clear_records_send_count": 0, "next_batch_trigger_send_count": 0, "extra_protection_actions": 0}, "failures": ["FIELD_ILLEGAL: 第 2 行 in_owner='256' 不合法(u8)", "ROW_COUNT: 完整记录条数=0 期望=1"]}
+  {"id": "U8_owner_after_0", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_owner_after_255", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_owner_after_256", "expected": "REJECT", "actual": "REJECT", "ok": true, "plan": {"clear_records_send_count": 0, "next_batch_trigger_send_count": 0, "extra_protection_actions": 0}, "failures": ["FIELD_ILLEGAL: 第 2 行 owner_after='256' 不合法(u8)", "ROW_COUNT: 完整记录条数=0 期望=1"]}
+  {"id": "U8_phase_after_0", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_phase_after_255", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_phase_after_256", "expected": "REJECT", "actual": "REJECT", "ok": true, "plan": {"clear_records_send_count": 0, "next_batch_trigger_send_count": 0, "extra_protection_actions": 0}, "failures": ["FIELD_ILLEGAL: 第 2 行 phase_after='256' 不合法(u8)", "ROW_COUNT: 完整记录条数=0 期望=1"]}
+  {"id": "U8_inhibit_0", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_inhibit_255", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_inhibit_256", "expected": "REJECT", "actual": "REJECT", "ok": true, "plan": {"clear_records_send_count": 0, "next_batch_trigger_send_count": 0, "extra_protection_actions": 0}, "failures": ["FIELD_ILLEGAL: 第 2 行 inhibit='256' 不合法(u8)", "ROW_COUNT: 完整记录条数=0 期望=1"]}
+  {"id": "U8_pending_0", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_pending_255", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_pending_256", "expected": "REJECT", "actual": "REJECT", "ok": true, "plan": {"clear_records_send_count": 0, "next_batch_trigger_send_count": 0, "extra_protection_actions": 0}, "failures": ["FIELD_ILLEGAL: 第 2 行 pending='256' 不合法(u8)", "ROW_COUNT: 完整记录条数=0 期望=1"]}
+  {"id": "U8_latch_m_0", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_latch_m_255", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_latch_m_256", "expected": "REJECT", "actual": "REJECT", "ok": true, "plan": {"clear_records_send_count": 0, "next_batch_trigger_send_count": 0, "extra_protection_actions": 0}, "failures": ["FIELD_ILLEGAL: 第 2 行 latch_m='256' 不合法(u8)", "ROW_COUNT: 完整记录条数=0 期望=1"]}
+  {"id": "U8_latch_d_0", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_latch_d_255", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_latch_d_256", "expected": "REJECT", "actual": "REJECT", "ok": true, "plan": {"clear_records_send_count": 0, "next_batch_trigger_send_count": 0, "extra_protection_actions": 0}, "failures": ["FIELD_ILLEGAL: 第 2 行 latch_d='256' 不合法(u8)", "ROW_COUNT: 完整记录条数=0 期望=1"]}
+  {"id": "U8_pwm_attempted_0", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_pwm_attempted_255", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_pwm_attempted_256", "expected": "REJECT", "actual": "REJECT", "ok": true, "plan": {"clear_records_send_count": 0, "next_batch_trigger_send_count": 0, "extra_protection_actions": 0}, "failures": ["FIELD_ILLEGAL: 第 2 行 pwm_attempted='256' 不合法(u8)", "ROW_COUNT: 完整记录条数=0 期望=1"]}
+  {"id": "U8_pwm_result_0", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_pwm_result_255", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_pwm_result_256", "expected": "REJECT", "actual": "REJECT", "ok": true, "plan": {"clear_records_send_count": 0, "next_batch_trigger_send_count": 0, "extra_protection_actions": 0}, "failures": ["FIELD_ILLEGAL: 第 2 行 pwm_result='256' 不合法(u8)", "ROW_COUNT: 完整记录条数=0 期望=1"]}
+  {"id": "U8_permit_level_0", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_permit_level_255", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_permit_level_256", "expected": "REJECT", "actual": "REJECT", "ok": true, "plan": {"clear_records_send_count": 0, "next_batch_trigger_send_count": 0, "extra_protection_actions": 0}, "failures": ["FIELD_ILLEGAL: 第 2 行 permit_level='256' 不合法(u8)", "ROW_COUNT: 完整记录条数=0 期望=1"]}
+  {"id": "U8_branch_0", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_branch_255", "expected": "ACCEPT", "actual": "ACCEPT", "ok": true, "plan": {"clear_records_send_count": 1, "next_batch_trigger_send_count": 1, "extra_protection_actions": 0}, "failures": []}
+  {"id": "U8_branch_256", "expected": "REJECT", "actual": "REJECT", "ok": true, "plan": {"clear_records_send_count": 0, "next_batch_trigger_send_count": 0, "extra_protection_actions": 0}, "failures": ["FIELD_ILLEGAL: 第 2 行 branch='256' 不合法(u8)", "ROW_COUNT: 完整记录条数=0 期望=1"]}
+  REMAINING-PROBES cases=44 mismatch=0
+
+  逐项对照(只列 16 项):
+    EXTRA_ROW_NUL_PREFIX / NUL_OTHER        ACCEPT(clear=1 next=1) -> REJECT(clear=0 next=0)
+      现在先核 NUL 再谈分类, 前导 NUL 不能把额外记录伪装成 OTHER 后逃逸;
+      原始字节一律保留, 不删 NUL 重判。
+    EXTRA_CR_TAIL                           ACCEPT -> REJECT
+      decode 只移除真实 LF 前至多一个 CR(不再是 rstrip 吃掉多个 CR), 协议行残余 CR
+      具名 BARE_CR_IN_PROTOCOL_LINE。
+    U8_<列>_256  (13 列)                    ACCEPT -> REJECT(FIELD_ILLEGAL)
+      ctx_isr/saved_primask/in_owner/owner_after/phase_after/inhibit/pending/latch_m/
+      latch_d/pwm_attempted/pwm_result/permit_level/branch 按 spm_rec_t 的 uint8_t 存储
+      宽度核 0..255; 255 仍合法(正控 U8_*_255 与 GATE-R3-POS-U8-MAX), 没有新发明
+      owner/phase/branch 的协议外阈值。
+  两条健康正控(CONTROL_HEALTHY/CONTROL_LF) 在基线与修后都是 ACCEPT, clear=1 next=1。
+
+====================================================================
+3. --selftest 逐例判定原文（51 例 = 保留 R2 的 46 例 + R3 新增 5 例）
+====================================================================
+  GATE-SELFTEST 逐例判定（REJECT 例还必须命中预期的具名失败原因, 且 clear/next 计划数为 0）
+    GATE-POS-COMPLETE                  verdict=ACCEPT clear=1 next=1 OK        正控: 3 条完整且真实进展
+    GATE-POS-BODY-INVALID              verdict=ACCEPT clear=1 next=1 OK        正控: 完整但 body_valid=0(零进展输入原样, 它不声称有效)
+    GATE-POS-STATE-TRANSITION          verdict=ACCEPT clear=1 next=1 OK        正控: stop 仍在途 -> 收尾 status 在途 0(合法过渡, 取最后可靠证据)
+    GATE-POS-LF-ONLY                   verdict=ACCEPT clear=1 next=1 OK        正控: 设备只发 LF(无 CR)同样合法
+    GATE-POS-STATUS-ENTRY-OK           verdict=ACCEPT clear=1 next=1 OK        正控: 收尾 status 的 entry 与本批一致
+    GATE-POS-I32-BOUNDS                verdict=ACCEPT clear=1 next=1 OK        正控: i32 两极端值合法(-2^31 与 2^31-1 同批)
+    GATE-NEG-TRUNC-HEADER              verdict=REJECT clear=0 next=0 OK        负控: 头行剪成 126 可见字节 + NUL 并与数据行粘连
+    GATE-NEG-ROW-NUL-GLUED             verdict=REJECT clear=0 next=0 OK        负控: 数据行漏 NUL 粘连下一行
+    GATE-NEG-MISSING-COLUMN            verdict=REJECT clear=0 next=0 OK        负控: 少一列
+    GATE-NEG-DUP-SLOT                  verdict=REJECT clear=0 next=0 OK        负控: slot 重复
+    GATE-NEG-INCOMPLETE                verdict=REJECT clear=0 next=0 OK        负控: 帧内出现 INCOMPLETE 槽导出
+    GATE-NEG-ROW-ABSENT                verdict=REJECT clear=0 next=0 OK        负控: 条数不足(预期 3 实际 2)
+    GATE-NEG-ASYNC-IN-BLOCK            verdict=REJECT clear=0 next=0 OK        负控: 异步日志插进 CSV 帧内
+    GATE-NEG-DROPPED                   verdict=REJECT clear=0 next=0 OK        负控: dropped 非 0
+    GATE-NEG-SCHEMA1                   verdict=REJECT clear=0 next=0 OK        负控: schema 不是 2
+    GATE-NEG-GEN-GAP                   verdict=REJECT clear=0 next=0 OK        负控: 代次跳号
+    GATE-NEG-INFLIGHT                  verdict=REJECT clear=0 next=0 OK        负控: 收尾状态 in_flight 非 0
+    GATE-NEG-BAD-ENUM                  verdict=REJECT clear=0 next=0 OK        负控: counter_status 取值非法
+    GATE-NEG-EXPORT-ERROR              verdict=REJECT clear=0 next=0 OK        负控: 目标自己报了 EXPORT_ERROR
+    GATE-NEG-HEADER-DRIFT              verdict=REJECT clear=0 next=0 OK        负控: 头行列名被改名(不逐字匹配)
+    GATE-NEG-NO-STATE-LINE             verdict=REJECT clear=0 next=0 OK        负控: 批状态行整条缺失
+    GATE-NEG-BAD-GATE-BITS             verdict=REJECT clear=0 next=0 OK        负控: gates 写成十进制(不是 0x0f 形状)
+    GATE-R2-NEG-ACTIVE-STATE           verdict=REJECT clear=0 next=0 OK        负控: 收尾 state=1(ACTIVE) 不得授权清理
+    GATE-R2-NEG-IDLE-STATE             verdict=REJECT clear=0 next=0 OK        负控: 收尾 state=0(IDLE) 同样不得作为批收尾依据
+    GATE-R2-NEG-NUL-IN-STATE           verdict=REJECT clear=0 next=0 OK        负控: 状态行 dropped=0 之后插入 NUL(整行形状也被破坏)
+    GATE-R2-NEG-NUL-IN-STATE-TAIL      verdict=REJECT clear=0 next=0 OK        负控: NUL 只在状态行括注里(整行仍匹配协议) => NUL 检测必须是唯一原因
+    GATE-R2-NEG-STATE-NUMERIC-SUFFIX   verdict=REJECT clear=0 next=0 OK        负控: dropped=0BAD 前缀伪匹配必须拒
+    GATE-R2-NEG-STATE-RECORDS-GLUE     verdict=REJECT clear=0 next=0 OK        负控: records=3BAD(数字令牌被污染)
+    GATE-R2-NEG-STATUS-DROPPED-GLUE    verdict=REJECT clear=0 next=0 OK        负控: status 行 dropped=0BAD(整行锚定必须拒)
+    GATE-R2-NEG-STATE-UNTERMINATED     verdict=REJECT clear=0 next=0 OK        负控: 协议行没有结尾换行(其换行被剪掉且其后无字节)
+    GATE-R2-NEG-EXTRA-ROW-AFTER-TAIL   verdict=REJECT clear=0 next=0 OK        负控: 汇总行之后又来一条数据行(帧外记录唯一原因)
+    GATE-R2-NEG-INCOMPLETE-AFTER-TAIL  verdict=REJECT clear=0 next=0 OK        负控: 汇总后又出现 INCOMPLETE 导出
+    GATE-R2-NEG-SECOND-HEADER          verdict=REJECT clear=0 next=0 OK        负控: 帧后再来一条头行(重复头/帧污染)
+    GATE-R2-NEG-SECOND-TAIL            verdict=REJECT clear=0 next=0 OK        负控: 帧后再来一条 dump 汇总
+    GATE-R2-NEG-STATE-AFTER-TAIL       verdict=REJECT clear=0 next=0 OK        负控: 汇总后又出现状态行, 不得当本批依据
+    GATE-R2-NEG-STATUS-ENTRY-MISMATCH  verdict=REJECT clear=0 next=0 OK        负控: 收尾 status 的 entry 与本批不同
+    GATE-R2-NEG-STATUS-ENTRY-DASH      verdict=REJECT clear=0 next=0 OK        负控: 收尾 status records>0 却 entry=- (身份不自洽)
+    GATE-R2-NEG-STATE-RECORDS-MISMATCH verdict=REJECT clear=0 next=0 OK        负控: 状态行 records 与预期不符(不拼接凑成功)
+    GATE-R2-NEG-ROW-ENTRY-MISMATCH     verdict=REJECT clear=0 next=0 OK        负控: 某条记录 entry 与本批不同
+    GATE-R3-NEG-NUL-PREFIX-EXTRA-ROW   verdict=REJECT clear=0 next=0 OK        负控: 帧后 NUL+完整额外记录不得当异步输出忽略
+    GATE-R3-NEG-NUL-OTHER              verdict=REJECT clear=0 next=0 OK        负控: 无法分类的 NUL 行同样拒绝，不清洗后放行
+    GATE-R3-NEG-EXTRA-CR-TAIL          verdict=REJECT clear=0 next=0 OK        负控: 汇总行 CRCRLF 不得靠 rstrip 清洗成 CRLF
+    GATE-R3-NEG-U8-OVER                verdict=REJECT clear=0 next=0 OK        负控: uint8_t 字段 branch=256 不可由生产记录表示
+    GATE-R3-POS-U8-MAX                 verdict=ACCEPT clear=1 next=1 OK        正控: 字节宽度边界 branch=255 合法（不额外发明枚举阈值）
+    GATE-R2-NEG-ZERO-PROGRESS-VALID-CLAIM verdict=REJECT clear=0 next=0 OK        负控: body_valid=1 但 body_end==body_begin(上一轮误用为正控的输入, 原样保留)
+    GATE-R2-NEG-VALID-WITH-WRAP        verdict=REJECT clear=0 next=0 OK        负控: body_valid=1 但 body_end<body_begin(回绕不当有效差分)
+    GATE-R2-NEG-GEN-OVER-U32           verdict=REJECT clear=0 next=0 OK        负控: gen=4294967296 超 uint32 上界必须拒(单条批, 唯一原因)
+    GATE-R2-NEG-U32-OVER-MAX           verdict=REJECT clear=0 next=0 OK        负控: pre=2^32 超 uint32 上界必须拒
+    GATE-R2-NEG-I32-OVER-MAX           verdict=REJECT clear=0 next=0 OK        负控: outcome=2^31 越界必须拒
+    GATE-R2-NEG-I32-UNDER-MIN          verdict=REJECT clear=0 next=0 OK        负控: pwm_raw_rc=-(2^31)-1 越界必须拒
+    GATE-R2-NEG-SLOT-OVER              verdict=REJECT clear=0 next=0 OK        负控: slot=64 超槽范围必须拒
+    语义与字段边界补充:
+    GATE-POS-INVALID-ARCHIVED                  完整但无效: 解析并存档 3 条 / 纳入 0 条 / 不追加保护动作                        OK
+    GATE-POS-TIMING-INCLUDE                    COUNTER_OK + body_valid=1 + gates=0x0f + reason<=0x0100 + 有进展 => 纳入 3 条 OK
+    GATE-NEG-TIMING-UNTRUSTED                  REJECT 批: trusted=False, included/excluded 计数清零, 只留 observed 观测 OK
+    GATE-POS-FIELD-BOUNDARY pwm_raw_rc=-2147483648 合法边界必须判合法                                                  OK
+    GATE-POS-FIELD-BOUNDARY outcome=2147483647 合法边界必须判合法                                                  OK
+    GATE-POS-FIELD-BOUNDARY permit_write_rc=0  合法边界必须判合法                                                  OK
+    GATE-POS-FIELD-BOUNDARY gen=4294967295     合法边界必须判合法                                                  OK
+    GATE-POS-FIELD-BOUNDARY slot=63            合法边界必须判合法                                                  OK
+    GATE-NEG-FIELD-BOUNDARY pwm_raw_rc=-2147483649 越界必须判非法                                                    OK
+    GATE-NEG-FIELD-BOUNDARY outcome=2147483648 越界必须判非法                                                    OK
+    GATE-NEG-FIELD-BOUNDARY gen=4294967296     越界必须判非法                                                    OK
+    GATE-NEG-FIELD-BOUNDARY gen=0              越界必须判非法                                                    OK
+    GATE-NEG-FIELD-BOUNDARY slot=64            越界必须判非法                                                    OK
+    GATE-NEG-FIELD-BOUNDARY pre=4294967296     越界必须判非法                                                    OK
+  GATE-SELFTEST-SUMMARY pass=65 fail=0 cases=51
+
+  R2 的 46 例身份与判据一条未删(未靠删用例变绿); R3 新增 5 例:
+    GATE-R3-NEG-NUL-PREFIX-EXTRA-ROW / GATE-R3-NEG-NUL-OTHER / GATE-R3-NEG-EXTRA-CR-TAIL
+    GATE-R3-NEG-U8-OVER / GATE-R3-POS-U8-MAX
+
+====================================================================
+4. --selftest-meta 元负控原文（11 道门：9 必填/附加 META-OK，2 条 META-BLOCKED 如实保留）
+====================================================================
+  GATE-META 元负控：摘掉每道门后, 看具名负控是否翻转(必填门必须翻转)
+    BATCH_NOT_STOPPING         META-OK     摘掉后翻转  2 条: GATE-R2-NEG-ACTIVE-STATE GATE-R2-NEG-IDLE-STATE   [收尾状态必须 STOPPING=2]
+    ROW_OUTSIDE_CSV_FRAME      META-OK     摘掉后翻转  1 条: GATE-R2-NEG-EXTRA-ROW-AFTER-TAIL   [帧外数值记录算帧污染(完整性门)]
+    NUL_IN_PROTOCOL_LINE       META-OK     摘掉后翻转  3 条: GATE-R2-NEG-NUL-IN-STATE-TAIL GATE-R3-NEG-NUL-PREFIX-EXTRA-ROW GATE-R3-NEG-NUL-OTHER   [协议行 NUL 检测(完整性门)]
+    PROTOCOL_LINE_UNTERMINATED META-OK     摘掉后翻转  1 条: GATE-R2-NEG-STATE-UNTERMINATED   [协议行换行终止检测(完整性门)]
+    VALID_WITHOUT_PROGRESS     META-OK     摘掉后翻转  1 条: GATE-R2-NEG-ZERO-PROGRESS-VALID-CLAIM   [有效但零进展的内容矛盾检测]
+    STATUS_TOKEN_ANCHOR        META-BLOCKED 无人翻转, 但 1 条用例的预期原因被替掉: GATE-R2-NEG-STATUS-DROPPED-GLUE->BATCH_STATE_MISSING   [status 行整行锚定(数字令牌边界)]
+    STOP_TOKEN_ANCHOR          META-BLOCKED 无人翻转, 但 2 条用例的预期原因被替掉: GATE-R2-NEG-STATE-NUMERIC-SUFFIX->BATCH_STATE_MISSING GATE-R2-NEG-STATE-RECORDS-GLUE->BATCH_STATE_MISSING   [stop 行整行锚定(数字令牌边界)]
+    U8_UPPER_BOUND             META-OK     摘掉后翻转  1 条: GATE-R3-NEG-U8-OVER   [uint8_t 存储宽度]
+    BARE_CR_PROTOCOL           META-OK     摘掉后翻转  1 条: GATE-R3-NEG-EXTRA-CR-TAIL   [协议行只能 LF 或单个 CRLF 结尾]
+    GEN_U32_UPPER_BOUND        META-OK     摘掉后翻转  1 条: GATE-R2-NEG-GEN-OVER-U32   [gen 的 uint32 上界]
+    I32_RANGE                  META-OK     摘掉后翻转  2 条: GATE-R2-NEG-I32-OVER-MAX GATE-R2-NEG-I32-UNDER-MIN   [i32 取值域]
+  GATE-META-SUMMARY ok=9 blocked=2 bad=0 guards=11 required=5
+
+  两条 META-BLOCKED 的身份与上一轮相同(STATUS/STOP 整行锚定被摘掉后, 预期原因由
+  BATCH_STATE_MISSING 替上 => 无人误放行, 但该门不是唯一拦截者), 未粉饰成 META-OK;
+  新增两道门 U8_UPPER_BOUND 与 BARE_CR_PROTOCOL 各自有具名用例翻转(META-OK);
+  必填 5 道(STOPPING + 4 完整性)全部 META-OK, 其中 NUL 门现在被 3 条用例约束。
+
+====================================================================
+5. 头行合同双向防漂移
+====================================================================
+  CHECK-HEADER gate=490 source=490 literal_pieces=8 identical=YES
+
+====================================================================
+6. §5.4 离线判定对照：历史四件旧接收文件 + 现存健康导出切片（未重跑 A0, 未连 COM5）
+====================================================================
+  历史四件按原操作包逐批 expected/entry(1/trip_fast, 16/trip_fast, 1/off_attempt, 0/off_attempt):
+    GATE board_a_114_b1 verdict=REJECT clear_records=0 next_batch_trigger=0
+        原因: "HEADER_EXACT_MATCH: 期望恰好 1 行逐字等于 47 列合同, 实际=0",
+        原因: "DUMP_TAIL_EXACTLY_ONE: 期望恰好 1 行 dump 汇总, 实际=0",
+        原因: "PROTOCOL_LINE_MALFORMED: 第 1 行有协议名前缀但整行不匹配协议形状: 'schema,gen,slot,entry,ctx_isr,saved_primas
+        原因: "NUL_IN_PROTOCOL_LINE: 第 1 行(PROTOCOL_BROKEN) 含 2 个 NUL（含无法分类的行）",
+        原因: "ROW_COUNT: 完整记录条数=0 期望=1",
+        原因: "BATCH_STATE_MISSING: 头行之前没有可靠 stop/status 行, 本批收尾无依据"
+        rc(cmd_114_b1_dump.txt)=1
+
+    GATE board_a_135_b2 verdict=REJECT clear_records=0 next_batch_trigger=0
+        原因: "HEADER_EXACT_MATCH: 期望恰好 1 行逐字等于 47 列合同, 实际=0",
+        原因: "DUMP_TAIL_EXACTLY_ONE: 期望恰好 1 行 dump 汇总, 实际=0",
+        原因: "PROTOCOL_LINE_MALFORMED: 第 1 行有协议名前缀但整行不匹配协议形状: 'schema,gen,slot,entry,ctx_isr,saved_primas
+        原因: "NUL_IN_PROTOCOL_LINE: 第 1 行(PROTOCOL_BROKEN) 含 17 个 NUL（含无法分类的行）",
+        原因: "ROW_COUNT: 完整记录条数=0 期望=16",
+        原因: "BATCH_STATE_MISSING: 头行之前没有可靠 stop/status 行, 本批收尾无依据"
+        rc(cmd_135_b2_dump.txt)=1
+
+    GATE board_a_141_b3 verdict=REJECT clear_records=0 next_batch_trigger=0
+        原因: "HEADER_EXACT_MATCH: 期望恰好 1 行逐字等于 47 列合同, 实际=0",
+        原因: "DUMP_TAIL_EXACTLY_ONE: 期望恰好 1 行 dump 汇总, 实际=0",
+        原因: "PROTOCOL_LINE_MALFORMED: 第 1 行有协议名前缀但整行不匹配协议形状: 'schema,gen,slot,entry,ctx_isr,saved_primas
+        原因: "NUL_IN_PROTOCOL_LINE: 第 1 行(PROTOCOL_BROKEN) 含 2 个 NUL（含无法分类的行）",
+        原因: "ROW_COUNT: 完整记录条数=0 期望=1",
+        原因: "BATCH_STATE_MISSING: 头行之前没有可靠 stop/status 行, 本批收尾无依据"
+        rc(cmd_141_b3_dump.txt)=1
+
+    GATE board_a_149_cleanup verdict=REJECT clear_records=0 next_batch_trigger=0
+        原因: "HEADER_EXACT_MATCH: 期望恰好 1 行逐字等于 47 列合同, 实际=0",
+        原因: "DUMP_TAIL_EXACTLY_ONE: 期望恰好 1 行 dump 汇总, 实际=0",
+        原因: "PROTOCOL_LINE_MALFORMED: 第 1 行有协议名前缀但整行不匹配协议形状: 'schema,gen,slot,entry,ctx_isr,saved_primas
+        原因: "NUL_IN_PROTOCOL_LINE: 第 1 行(PROTOCOL_BROKEN) 含 1 个 NUL（含无法分类的行）",
+        原因: "BATCH_STATE_MISSING: 头行之前没有可靠 stop/status 行, 本批收尾无依据"
+        rc(cmd_149_cleanup_dump.txt)=1
+  现存健康导出切片(上轮 a0_on 真实导出: stop 行 + 头行 + 3 条数据行):
+      "verdict": "ACCEPT",
+      "csv_rows_parsed": 3,
+      "failures": [],
+        "trusted": true,
+        "included_count": 3,
+    GATE host_export verdict=ACCEPT clear_records=1 next_batch_trigger=1
+      rc(batch_fixed_b1.txt)=0
+  REJECT 批仍 clear=0/next=0 且时长统计标 untrusted; 未做任何拼接/清洗/补列。
+  NUL 原因文案随 GATE-R3-01 改为"含无法分类的行", 判定本身与上轮同为 REJECT。
+
+====================================================================
+7. §5.5 冻结件回读（13 个冻结源文件 + 两份镜像 + 四宏 + 构建输入 + 本地不动件，原文）
+====================================================================
+  == 13 个冻结源文件：工作树(LF) vs cd8d9f09 blob vs 85522885 blob ==
+    OK   sp_measure_a0.c                                            bytes=46074   blob(cd8d9f0)==blob(8552288)=True
+    OK   sp_measure_a0.h                                            bytes=16067   blob(cd8d9f0)==blob(8552288)=True
+    OK   stop_priority.c                                            bytes=61993   blob(cd8d9f0)==blob(8552288)=True
+    OK   motor.h                                                    bytes=20304   blob(cd8d9f0)==blob(8552288)=True
+    OK   tmc2209.h                                                  bytes=18058   blob(cd8d9f0)==blob(8552288)=True
+    OK   project_board.h                                            bytes=5611    blob(cd8d9f0)==blob(8552288)=True
+    OK   sp_measure_a0_main.c                                       bytes=92654   blob(cd8d9f0)==blob(8552288)=True
+    OK   sp_measure_a0_port.h                                       bytes=3743    blob(cd8d9f0)==blob(8552288)=True
+    OK   sp_measure_a0_console.h                                    bytes=4914    blob(cd8d9f0)==blob(8552288)=True
+    OK   run_sp_measure_a0.sh                                       bytes=29199   blob(cd8d9f0)==blob(8552288)=True
+    OK   rtthread.h                                                 bytes=6712    blob(cd8d9f0)==blob(8552288)=True
+    OK   run_stop_result_s1.sh                                      bytes=23422   blob(cd8d9f0)==blob(8552288)=True
+    OK   run_stop_priority_s2.sh                                    bytes=42382   blob(cd8d9f0)==blob(8552288)=True
+  == 两份冻结镜像：磁盘字节直算 ==
+    OK   default.bin              251148 B sha=02e9845832… 与起点对象+登记值一致=True
+    OK   measure-a0.bin           261452 B sha=5f30d3f058… 与起点对象+登记值一致=True
+  == 四道安全宏（必须仍是 RT_FALSE，且未被 -D 覆盖）==
+    OK   MOTOR_HARDWARE_ENABLE_PATH_VALIDATED     motor.h:69 -> RT_FALSE
+    OK   STEP_DIAG_ISOLATED_ENV_CONFIRMED         motor.h:83 -> RT_FALSE
+    OK   SAFETY_LIMIT_INPUTS_ENABLED              project_board.h:51 -> RT_FALSE
+    OK   TMC_DRIVE_CONFIG_HW_VALIDATED            tmc2209.h:100 -> RT_FALSE
+  == 构建输入（Keil 工程与 rtconfig）本轮零改动 ==
+    OK   project.uvprojx                                            bytes=226016  工作树(LF)==cd8d9f0==8552288
+    OK   template.uvprojx                                           bytes=15533   工作树(LF)==cd8d9f0==8552288
+    OK   rtconfig.h                                                 bytes=8689    工作树(LF)==cd8d9f0==8552288
+  == 本地不动件（未连接设备，只核磁盘字节）==
+    OK   旧 1 MiB 片内 Flash 快照 a    1048576 B sha=b89f8a7cde…
+    OK   旧 1 MiB 片内 Flash 快照 b    1048576 B sha=b89f8a7cde…
+    OK   恢复输入 HEX(快照目录)           3014958 B sha=b3ac97b976…
+    OK   恢复输入 HEX(恢复工程内)          3014958 B sha=b3ac97b976…
+  UNCHANGED-PROOF-R3 ok=26 bad=0 skip=0
+
+  注: 上一轮登记为 SKIP 的"恢复输入 HEX"本轮用其真实路径(快照目录与恢复工程内各一份)
+      直算磁盘字节, 两处都等于历史身份 b3ac97b976bc4765…; 这是本轮新获得的回读, 不代表恢复下载已演练(NOT_EXECUTED 不变)。
+
+====================================================================
+8. 跨轮回归：R2 任务书 §5 的同名同输入探针跑在 R3 门字节上（原文）
+====================================================================
+  GATE_UNDER_TEST=tests/host/a0_export_gate.py
+  CONTROL_HEALTHY ACCEPT {'clear_records_send_count': 1, 'next_batch_trigger_send_count': 1, 'extra_protection_actions': 0} 3
+  ACTIVE_STATE REJECT {'clear_records_send_count': 0, 'next_batch_trigger_send_count': 0, 'extra_protection_actions': 0} 0
+  NUL_IN_STATE REJECT {'clear_records_send_count': 0, 'next_batch_trigger_send_count': 0, 'extra_protection_actions': 0} 0
+  STATE_NUMERIC_SUFFIX REJECT {'clear_records_send_count': 0, 'next_batch_trigger_send_count': 0, 'extra_protection_actions': 0} 0
+  EXTRA_ROW_AFTER_TAIL REJECT {'clear_records_send_count': 0, 'next_batch_trigger_send_count': 0, 'extra_protection_actions': 0} 0
+  ZERO_PROGRESS_VALID_CLAIM REJECT {'clear_records_send_count': 0, 'next_batch_trigger_send_count': 0, 'extra_protection_actions': 0} 0
+  I32_BOUNDARY -2147483648 (True, None)
+  I32_BOUNDARY 2147483647 (True, None)
+  GEN_RANGE (False, "gen='4294967296' 不合法(gen_u32)")
+  => R2 关闭的缺口未被本轮重新打开(正控保持, 五条反例仍 REJECT, i32/gen 口径不变)。
+  仓内探针复跑同一输入: REMAINING-PROBES cases=44 mismatch=0
+
+====================================================================
+9. 本轮首次失败与自身缺陷（一律保留，不删日志）
+====================================================================
+  F-1 git apply 在本仓库(autocrlf=true)会把工作树文件写成 CRLF: 应用后工作树 51229 B / 983 个 CR,
+      而索引里的 blob 仍是 50246 B 的 LF —— 若照此交付, 本地执行对象与远端字节就不是同一份。
+      处置: 用 git cat-file 把 LF blob 原样写回工作树(50246 B, 0 CR), 再做全部执行; 未改 git 配置。
+  F-2 unchanged_proof 首版把恢复输入 HEX 的路径猜成 <RAWDATA>/restore/…, 实际在
+      flash-snapshot/ 与 restore-project/snap/ 两处; 首版因此多出一条假 SKIP(已原样保留在
+      仓外 out_unchanged_FIRST_ATTEMPT_badpath.txt), 修路径后两处均回读一致。
+  F-3 证据生成/脚本调用中的失败输出与 rc 一律按实际记录: 基线探针 rc=1 是"缺口已复现",
+      历史四件 rc=1 是"仍不放行", 两者都不是基础设施故障。
+
+====================================================================
+10. 每项检查的输出原文身份（交接 JSON 的 output_sha256 逐条对应）
+====================================================================
+    检查                                                   rc             字节 B  sha256
+    r3-baseline-probe(附录 B 跑在 8552288 的门字节上)             1            9086 B  d6299170dd7439902b2797976a6b10e7d204bc32abcc0126939224c248e5b300
+    r3-applied-probe(附录 B 跑在应用补丁后的门字节上)                  0           10609 B  9c62131ebd3288bdfdbdf89f9b8224093f0b630e0c60c726123a5b0dcc31f9d2
+    gate-selftest                                        0            8592 B  1db7fc6b1e352a15c1bb6a7ed765429f5287c19809042e832e9cfa23c8e1e006
+    gate-selftest-meta                                   0            1879 B  1406365c437afd9e4c1f71687ae06061cefd1ad2b9057a0e2cfde1a311ac491d
+    gate-header-drift                                    0              65 B  18326228a9e9d589e19b6d73dd0c4c9813a1250ee337d034924e81e17f7e14ae
+    gate-offline-board-batches                           逐批 1         2644 B  075f8fcbbbcd4744a9e6c6420d413f2655f3c655a9490a24142324341657bfd4
+    gate-offline-fixed-export                            0             207 B  b0969694ca0d26311c4deae317ed6329cb0ea74f4e77069ae3e6d1cd7b3979a2
+    unchanged-proof-r3                                   0            2989 B  7ec1941bdd5a717bba6952952ef5853507a3ec04b67bdce9f21e3a747b8b821f
+    cross-round-regression(R2 任务书 §5 探针跑在 R3 门上)         0             945 B  b9a634d396fa179843ed548b67f19e3583fbf687261449e66f56a7748484c9ee
+    in-repo-probe-rerun                                  0           10609 B  9c62131ebd3288bdfdbdf89f9b8224093f0b630e0c60c726123a5b0dcc31f9d2
+  复算方式(逐字, 都在仓外工作目录执行):
+    python probe_remaining.py <基线门路径>       # 期望 rc=1, mismatch=16
+    python probe_remaining.py tests/host/a0_export_gate.py            # 期望 rc=0, mismatch=0
+    python tests/host/a0_export_gate.py --selftest / --selftest-meta
+    python tests/host/a0_export_gate.py --check-header-against-source <生产 sp_measure_a0.c>
+    python tests/host/a0_export_gate.py --raw <板级原始接收文件> --batch board_a_<批> --expected-records <该批 N> --entry <该批 entry>   # 逐批 4 次
+    python tests/host/a0_export_gate.py --raw <修后主机导出切片> --batch host_export --expected-records 3 --entry trip_fast
+    python unchanged_proof_r3.py / python probe_r2_baseline.py tests/host/a0_export_gate.py
+  补丁未进仓(按 §5.2 只在仓外暂存应用); 门判定的全部结果都在应用后的 50246 B / 94e83175… 字节上取。
