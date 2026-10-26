@@ -1,0 +1,116 @@
+phase8-target-measurement-a0-board-a —— CP3 一次 A0 下载与独立回读 / CP4 COM5 固定采样 / 目标侧缺陷 BOARD-A-01
+document_base(开工): 81c366238f72dbd9fbcb3f0f91f55e9fade4bf34
+任务书 SHA-256: 3cfdf310ace04277bab176acf465a8a7feb33deba4430542860c3321f492ba00
+窗口: CP3 2026-10-26 16:58:20–16:59:26 ；CP4 17:02:40–17:03:19（Asia/Shanghai）
+状态: **CP4 在"证据身份丢失"判据上停止**（§9）。批次序列已按包跑完且 RAM 已按序清理，记录不可复得。
+脱敏: 只用代号 PROJECT_ROOT / BSP / WORK_OUT / SNAP_DIR / KEIL_ROOT；不出现本机用户名。
+
+================================================================================================
+1. CP3 —— 唯一一次下载（含真实擦写）与独立回读
+================================================================================================
+  调用(1 次): KEIL_ROOT/UV4/UV4.exe -f WORK_OUT/download/download-a0.uvprojx -t "rt-thread" -j0 -o flash_a0.log
+  时刻: 16:58:20 启动，16:58:58 完成；进程退出码 0 **只表示进程结束，不作成败判据**。
+  日志原文(WORK_OUT/logs/cp3_flash_a0.log，130 B):
+      Load "…\download\dl\rt-thread-a0.axf"
+      Erase Done.Programming Done.Verify OK.Flash Load finished at 16:58:58
+    ⇒ 实际下载件路径 = 本轮复制并核过散列的**测量 AXF**（不是默认固件），与 CP0 推导的
+      OutputDirectory+OutputName+.axf 规则一致（该规则由 2026-09-25/26 旧回执同构证实）。
+  载荷身份: dl/rt-thread-a0.axf 1674612 B sha256=c8176c19188f66654f6bcee5b265ae2487d0c6130d8ae354e8c262cfbd3c01f6
+    （下载前后各读一次，均等于任务书 §3；下载前读于 16:58:20）
+  独立回读(1 次 pyOCD 会话): --no-config -t cortex_m -u <板载 DAP 完整 UID> -f 1000000
+      -O auto_unlock=false -O connect_mode=halt -O resume_on_disconnect=false
+      -O cache.enable_memory=false -O cache.read_code_from_elf=false -O scan_all_aps=false
+      status → savemem 0x08000000 0x3FBEC → status → exit
+    回读前/后核心均为 Core 0 (None): Halted；16:59:17→16:59:26。
+  回读结果: SNAP_DIR/BOARD_A0_AFTER_a0.bin  261100 B
+      sha256 = 358fd81ae5853ea52df1e1ab367ea41af0f5e86679082a755c17dac3429b0e1b
+      与任务书 §3 的已接受 measure-a0.bin **散列相同且逐字节相同 = True** ⇒ CP3 成功判据满足。
+  实际擦写覆盖(如实，不称纯读): FLM 按 Bank0/Bank1 的扇区粒度擦写被编程区域，覆盖 0x08000000..0x0803FBEB；
+      未改保护/选项字/OTP/系统区；未做独立整片解锁/全片擦除；未调用其它下载工具。
+  对旧映像的影响: 快照的"有内容"区为 0x08000000..0x0802BFFF（180224 B），**完全落在**新映像的
+      0..0x3FBEB 之内 ⇒ 板上旧应用字节已被整体覆盖，其唯一存留形式是本轮的双读快照(1 MiB)与其 HEX。
+
+================================================================================================
+2. CP4 —— 打开端口、一次新应用启动、51 条白名单命令
+================================================================================================
+  串口实现: PowerShell System.IO.Ports.SerialPort('COM5',115200,'None',8,'One')，
+      打开前显式 DtrEnable=False / RtsEnable=False / Handshake=None；pyserial 未安装且禁止安装。
+      连续原始收发全文: WORK_OUT/serial/99_transcript_all.txt(24 KB) + 逐命令文件 cmd_100..cmd_150。
+  时刻与判据:
+      17:02:40.675 打开端口
+      17:02:43.715 打开后 3 秒窗口=153 B，**boot_like=False** ⇒ 开端口未诱发启动（窗口内是乱码瞬态字节，
+                     已原样存 00_open_initial.txt）⇒ 按计划执行主动复位，未把两次启动并成一次。
+      17:02:45.052 一次 pyOCD attach 会话发出 `reset sysresetreq`（connect_mode=attach，
+                     auto_unlock=false，resume_on_disconnect=false，显式 -u 同一 UID；--no-config，无 --elf）
+                     其输出: "Resetting target" + "Core 0 (None):  Running" ⇒ 核心复位后运行，未 halt。
+      17:03:05.100 启动窗口 3757 B，含构建戳 ⇒ **一次新应用启动（累计供电过程 1 次 + 软件启动 1 次）**。
+  启动横幅(板上实测): ` / | \     5.3.0 build Oct 25 2026 20:01:04`
+      ⇒ 与已接受 measure-a0 的构建时刻(builda0keil_measure_r1.log，AXF mtime 2026-10-25 20:01:08)一致，
+        构成对 CP3 下载身份的**第二条独立证据**（除逐字节回读外的运行期自证）。
+      启动可见: [BOOT] 1 safe-gpio … 6 project-config OK valid=YES；`[SAFETY] thread started (prio 4, IRQ gate CLOSED)`；
+        `MCU_DRV_ENABLE=LOW(readback verified)`；`[MOT] init OK (enable-path-validated=NO, arm gate ACTIVE,
+        DRV_ENABLE LOW verified)`；`[FLASH] CS=22 JEDEC=EF 40 17` + 1 MiB 事件日志扫描（外部 SPI 真实被读）。
+      注: 固件中文在本链路上显示为 `?`（终端编码），未据此判定任何失败。
+  命令台账: 51 条，全部以 prompt 结束，**0 次超时、0 次命令合同拒绝**；未发白名单外命令。
+      顺序与上限完全按 §8 表：free/ps → 6 条初始状态 → spm cap → spm init → 批1(1 trip) →
+      批2(16 trip) → 批3(motor_disarm) → 6 条末态 → 2 条清理核对。
+
+  能力与初始化（目标实测，非主机模型）:
+      `spm cap` : schema=2 slots=64 record_bytes=120 array_bytes=7680 sizeof_ctx=44；
+                  四宏运行期取值 MOTOR_HW=0 STEP_DIAG_ISO=0 TMC_CFG_HW=0 LIMIT_EN=0  ⇒ §8 判据满足；
+                  counter=COUNTER_UNCHECKED clock_basis=SOURCE_ASSUMED guard_ready=NO quiescent=YES records=0。
+      `spm init`: counter=**COUNTER_OK** demcr=0x01000000(TRCENA) ctrl=0x40000001(CYCCNTENA)
+                  a=612446415 b=612447085（Δ=670）load=399999 guard=READY clock_basis=CONFIG_READBACK
+                  ⇒ **本板本构建上 DWT 周期计数器存在且确实递增**（长期开放项在目标侧得到直接实证），
+                    SysTick LOAD 可读=399999；仍**不**构成外部频率证明。
+  批次结果（短行未被截断，可信）:
+      b1 stop: state=2 in_flight=0 **records=1** dropped=0    ；status: entry=trip_fast counter=COUNTER_OK clock=CONFIG_READBACK
+      b2 stop: state=2 in_flight=0 **records=16** dropped=0
+      b3 stop: state=2 in_flight=0 **records=1** dropped=0    ；`motor_disarm` 真实执行:
+                 "[MOT] disarm … (proof epoch=19)" + "DISARM (… STEP api-accepted … / … LOW verified / ENN feedback=OK)"
+                 ⇒ off_attempt 入口产生 1 条真实样本，**不是 NOT_REACHED**。
+      cleanup: `spm dump` records=0 ；`spm status` state=0 entry=- records=0 in_flight=0 dropped=0
+                 counter=COUNTER_OK clock=CONFIG_READBACK guard=0 gates_now=0x3 ⇒ 测量 RAM 已清，epoch 未被 clear 改动。
+  **真实副作用（不得称只读）**: 17 次 `spm trip` = 17 次正式 safety_force_shutdown(FAULT_SELF_TEST=8)，
+      17/17 响应含 "DRV_ENABLE LOW verified" + "ENN feedback OK" + "motor_rc=0 diag_rc=0"，并触发黑匣子
+      （首条可见 `[BB] trigger code=8 session=2 pre_n=200 post_eff=100`、`[SS] ==> FAULT_LATCHED code=8`）
+      ⇒ 片内/外部 Flash 事件写入确有发生。`motor_disarm` 1 次为正式关闭+状态整理。未请求许可 HIGH、
+      未开 DIR/STEP、未读写 TMC 寄存器、未跑 fault_reset/selftest/ss_test/pin/pwm/flash 类命令。
+      全部 HIGH/RUN 字样扫描: 6 处 HIGH 均为**预期语义**（request=DISABLE(LOW) → expected_ENN=HIGH，
+      ENN_feedback=1 → verdict=OK），**未发现意外 HIGH/RUN 请求**；RUN 0 处。
+
+================================================================================================
+3. BOARD-A-01（目标侧缺陷，本轮新发现）：控制台行缓冲把每条长输出剪断
+================================================================================================
+  现象: 每段超过 126 字节的 rt_kprintf 行被剪成**恰好 126 字节**并在断点漏出 0x00，行尾分隔符丢失。
+        `spm dump` 的头行断在 "…owner_after,phase_af" + NUL；**每一条 CSV 记录都在第 126 字节处断**
+        （b2 的 16 条记录段全部 len=126，尾串均为 "…,COUNTER"）。
+  机制(源码/配置实证): BSP/rtconfig.h:107 `#define RT_CONSOLEBUF_SIZE 128`；
+        applications/sp_measure_a0.c 的头行(563 行起)与每条记录(582 行起)各用**一条** rt_kprintf 输出
+        ⇒ 行长受 FinSH 控制台缓冲上限裁剪。b2_dump 实测 2267 B = 17 段×126 + 摘要，与上限严格吻合。
+  波及范围(实测计数): 51 条响应中 **33 条含 NUL**；被剪断的行合计 **35 行**。
+  对判据的直接后果: 被剪掉的正是 CSV 的**第 39–47 列** —— clock_basis / body_valid / enclosing_valid /
+        invalid_reason / gates / guard / guard_load / dropped_at_publish / complete。
+        ⇒ §9 要求的纳入判据（counter_status=COUNTER_OK 且 body_valid=1 且 gates=0x0f 且
+           invalid_reason 仅 0x0100）**在目标数据上无法执行**；前 38 列（含 pre/body_begin/body_end/post
+           四个原始计数）可见，但没有逐样本有效性字段，**不得**据此产出任何"有效时长统计"或 µs 换算。
+        ⇒ 记 **A0 记录有效性与时长统计 = NOT_ACHIEVED（字段被目标控制台裁剪）**，不是 NOT_EXECUTED：
+           命令确实跑了、槽确实写了、导出确实发生了，缺陷在导出通道。
+  为何不可复得: 操作包 §2.1 的六步循环要求"每批 dump→保存/核条数→clear_records"，本轮**按序执行**，
+        三批记录已清（cleanup dump=0 为证）。重跑需要再次发 trip ⇒ 突破 17 次上限并追加真实关断/黑匣子写，
+        **不在本包授权内** ⇒ 不重试、不补跑、不改数、不把段和/短行说成 PASS。
+  主机链为何没抓到: 主机夹具用真实 FinSH 宏的 shim 与 stdout 打印，没有 RT_CONSOLEBUF_SIZE 这道裁剪；
+        故 TMA 台账的"47 列完整"只在主机成立。**教训: 导出通道本身的长度限制必须在目标上验。**
+
+================================================================================================
+4. 停止点、收尾与实况
+================================================================================================
+  停止判据: §9 "证据身份丢失立即停止" ⇒ CP4 之后不进入任何追加硬件动作；不自动回刷快照，不重烧，不重试。
+  已完成的收尾: 串口已关闭（脚本末尾 $p.Close()，17:03:19）；测量 RAM 已清；SW1 仍在阻断位；电机仍物理未接。
+  待现场执行(需操作者手工，本轮不由 Agent 代做): **先关 24 V 适配器，再拔 USB**，并记录结束电源状态。
+  板上现身份: 现存片内 Flash = **measure-a0（已接受镜像，回读逐字节等于 358fd81a…）**；
+        原 2026-09-26 00:00:39 构建的旧应用**仅存在于本轮 1 MiB 双读快照**（含其 HEX 恢复输入）。
+  BLOCKED_ROLLBACK 实况: "未保存现存片内字节"已关闭；"恢复下载已演练"**仍开放**
+        （恢复工程已备、HEX 往返已验，但未执行，且 Keil 对 .hex 输出名的处理未验证）。
+  本文件不授予任何后续硬件许可；BOARD-A-01 的修复（分块写出或短行格式）+ 重编 + 重烧 + 重跑
+  均需**另行下达任务并单独批准**；本轮未自启下一阶段，未改任何生产源码/HAL/内核/四宏/工程/tests。

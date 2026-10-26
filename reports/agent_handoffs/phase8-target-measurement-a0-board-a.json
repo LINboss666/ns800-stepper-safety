@@ -1,0 +1,187 @@
+{
+  "task_id": "phase8-target-measurement-a0-board-a",
+  "task_book": "NS800_E40_Search_Review_and_A0_Board_Package_c06be762_20261026.md",
+  "task_book_sha256": "3cfdf310ace04277bab176acf465a8a7feb33deba4430542860c3321f492ba00",
+  "date": "2026-10-26",
+  "timezone": "Asia/Shanghai",
+  "document_base": "81c366238f72dbd9fbcb3f0f91f55e9fade4bf34",
+  "accepted_a0_software_head": "2ab886ff9a60a2b2283ff3ba200d337235cb2da9",
+  "a0_code_commit": "b27e5f14bdb62f645b93eace23800b40369717d4",
+  "frozen_refs_unchanged": {
+    "main": "1b3757eec550802a3973e66790af422d81d3d373",
+    "phase7/full-embedded-software": "6d3fbc559d45673d7550eb73dec5a4ade5bb34df",
+    "tag_object": "097935fec5a6f2467261ab1ad449ff0b1d398250",
+    "tag_dereference": "e40a9b95ef709e6a80444f9f3949dfdd70ba96ba"
+  },
+  "authorization": {
+    "form": "用户一次批准整包（选项含义等同任务书 §12 文字），含 A0 下载与固定采样",
+    "day_of_field_confirmation": "现场操作者确认 §5 前置当天成立（含 SW1 阻断位可按板上标识指认）",
+    "per_command_reconfirmation_required": false,
+    "search_round_authorization_not_reused": true
+  },
+  "scope_progression": {
+    "CP0_offline_precheck": "COMPLETE",
+    "CP1_field_and_power": "COMPLETE",
+    "CP2_double_read_backup": "COMPLETE (六道门全通过, 门5 修正判定器后)",
+    "CP3_single_download_and_readback": "COMPLETE",
+    "CP4_serial_and_batches": "RUN_THEN_STOPPED_AT_EVIDENCE_IDENTITY_GATE",
+    "CP5_power_down_closeout": "PENDING_OPERATOR_ACTION"
+  },
+  "board_state": {
+    "power": "USB 逻辑电源 + 24 V VM 均仍开启（收尾断电待现场执行：先关 24 V 再拔 USB）",
+    "sw1": "阻断位（全包保持，未恢复使能）",
+    "motor": "物理未接",
+    "tmc_module": "在位，未拔插",
+    "serial": "COM5 已关闭",
+    "onchip_flash_now": "measure-a0 已接受镜像（回读 261100 B 逐字节等于 358fd81a…）",
+    "previous_app_now": "仅存在于本轮 1 MiB 双读快照与其 HEX 恢复输入中"
+  },
+  "hardware_actions": [
+    {"step": "CP2", "action": "探针列表(CMSIS-DAP 枚举)", "count": 2,
+     "note": "第 1 次被主机 GBK 编码打断(rc=1)致判据不可得；第 2 次加 UTF-8 重试。偏差如实登记，未按“一次”美化。"},
+    {"step": "CP2", "action": "调试连接", "count": 1,
+     "params": "--no-config -t cortex_m -u <板载DAP完整UID> -f 1000000 auto_unlock=false connect_mode=halt resume_on_disconnect=false cache.enable_memory=false cache.read_code_from_elf=false scan_all_aps=false"},
+    {"step": "CP2", "action": "CPU 暂停(halt)", "count": 1, "note": "板上运行的旧应用被停；未发 resume；退出仍 Halted"},
+    {"step": "CP2", "action": "片内 Flash 读(savemem 1 MiB)", "count": 2, "bytes_each": 1048576,
+     "duration": "16:51:17→16:52:22", "note": "日志无 Flash 算法痕迹，与 CP0 的 RamRegion 判定一致"},
+    {"step": "CP3", "action": "片内 Flash 擦写(UV4 -f)", "count": 1,
+     "log": "Load …/dl/rt-thread-a0.axf + Erase Done.Programming Done.Verify OK.Flash Load finished at 16:58:58",
+     "coverage": "0x08000000..0x0803FBEB", "prohibited_done": []},
+    {"step": "CP3", "action": "调试连接 + 回读(savemem 0x3FBEC)", "count": 1, "reads": 1},
+    {"step": "CP4", "action": "打开 COM5 串口", "count": 1, "settings": "115200 8N1 hand=None DTR=False(before open) RTS=False"},
+    {"step": "CP4", "action": "调试连接(attach) + reset sysresetreq", "count": 1, "note": "一次新应用启动；未用 reset halt；未另发 continue"},
+    {"step": "CP4", "action": "msh 命令", "count": 51, "timeouts": 0, "contract_refusals": 0},
+    {"step": "CP4", "action": "safety_force_shutdown(FAULT_SELF_TEST=8)", "count": 17,
+     "observed": "17/17 DRV_ENABLE LOW verified + ENN feedback OK + motor_rc=0 diag_rc=0；含黑匣子 trigger code=8 与 FAULT_LATCHED"},
+    {"step": "CP4", "action": "motor_disarm", "count": 1, "observed": "proof epoch=19；DISARM … LOW verified / ENN feedback=OK"},
+    {"step": "CP4", "action": "spm init 对 DWT/DEMCR 的写位", "count": 1},
+    {"step": "CP4", "action": "spm clear_records(仅测量 RAM)", "count": 3}
+  ],
+  "hardware_action_totals": {"probe_listings": 2, "debug_sessions": 3, "cpu_halts": 2,
+                             "system_resets": 1, "flash_program_invocations": 1,
+                             "power_on_processes": 1, "app_starts": 1, "serial_opens": 1,
+                             "msh_commands": 51, "trips": 17, "disarms": 1},
+  "tests_executed": [],
+  "builds_executed": [],
+  "production_changed": false,
+  "macros": {"MOTOR_HARDWARE_ENABLE_PATH_VALIDATED": "RT_FALSE",
+             "STEP_DIAG_ISOLATED_ENV_CONFIRMED": "RT_FALSE",
+             "TMC_DRIVE_CONFIG_HW_VALIDATED": "RT_FALSE",
+             "SAFETY_LIMIT_INPUTS_ENABLED": "RT_FALSE",
+             "target_runtime_observation": "spm cap: MOTOR_HW=0 STEP_DIAG_ISO=0 TMC_CFG_HW=0 LIMIT_EN=0"},
+  "images": {
+    "downloaded_payload_axf": {"bytes": 1674612, "sha256": "c8176c19188f66654f6bcee5b265ae2487d0c6130d8ae354e8c262cfbd3c01f6"},
+    "accepted_measure_a0_bin": {"bytes": 261100, "sha256": "358fd81ae5853ea52df1e1ab367ea41af0f5e86679082a755c17dac3429b0e1b"},
+    "post_download_readback": {"bytes": 261100, "sha256": "358fd81ae5853ea52df1e1ab367ea41af0f5e86679082a755c17dac3429b0e1b",
+                               "byte_equal_to_accepted": true, "address_span": "0x08000000..0x0803FBEB"},
+    "boot_banner_after_start": "5.3.0 build Oct 25 2026 20:01:04",
+    "default_bin_not_downloaded": {"bytes": 251148, "sha256": "41717367e4e1401deb5f59eb27d1f35483108c6241eb30a5b58b28aad5b425de"}
+  },
+  "flash_snapshot": {
+    "name": "BOARD_FLASH_SNAPSHOT_20261026",
+    "bytes": 1048576,
+    "sha256": "b89f8a7cde7b944a5b5425f512a715d27a17c2e6c25822f36b2205bbefd0cac2",
+    "double_read_identical": true,
+    "not_uploaded": true,
+    "saved_dirs": ["SNAP_DIR", "SNAP_DIR2"],
+    "same_physical_disk_claim": false,
+    "vector_table": {"initial_msp": "0x2000CDD8", "msp_in_linker_iram": true, "aligned_4": true,
+                     "reset_vector": "0x0800051D", "thumb": true, "entry_in_flash": true},
+    "content_extent": {"last_non_blank_byte": "0x0802B14E", "used_span_4k_granular": "0x08000000..0x0802BFFF",
+                       "non_0xff_bytes": 170807},
+    "build_stamp_read_from_chip": {"date": "Sep 26 2026", "time": "00:00:39", "occurrences_in_1MiB": 1,
+      "offset": "0x08029CAB",
+      "corroborates": "build_c.log(mtime 2026-09-26 00:00:44) + flash_c.log(完成 00:01:24) 的第二次 e40 时代烧录",
+      "does_not_prove": "与 e40a9b9 源码树重建映像逐字节相同（当年工作树身份缺口仍开放）"},
+    "marker_counts": {"[BOOT]": 15, "safe-gpio": 1, "startup-selftest": 1, "motor_arm": 3,
+                      "tmc_uart_probe": 1, "blackbox": 11, "spm": 0, "schema": 0,
+                      "stop_priority": 0, "step_diag": 0, "io70": 0},
+    "agreement_with_a0_images": {"measure-a0.bin": 0.1027, "default.bin": 0.1070}
+  },
+  "restore_inputs": {
+    "hex_name": "BOARD_FLASH_SNAPSHOT_20261026_restore.hex",
+    "hex_bytes": 3014958,
+    "hex_sha256": "b3ac97b976bc476556818f2bbaa977d15854a5c1d342f4b9c9d3ed825deb2c65",
+    "records": {"type00": 65536, "type04": 16, "type01": 1},
+    "record_checksum_failures": 0, "overlap": 0, "out_of_range": 0, "holes": 0,
+    "roundtrip_equal_to_snapshot": true,
+    "restore_project": {"uvprojx_bytes": 231503,
+                        "uvprojx_sha256": "016d66294951ef934043a4199a96869af79e811e0a1edf8e324a9d65d9e94514",
+                        "uvoptx_sha256": "62d2d8f14afbeb1c45f2852cd357b0fee1a6e5ee1110d820d4213c6230387cf1"},
+    "restore_download_executed": false,
+    "unverified": "Keil 对 OutputName 内含 .hex 的处理须实际执行一次恢复下载才能证实"
+  },
+  "batch_results_trustworthy_short_lines": {
+    "b1": {"entry": "trip_fast", "trips": 1, "records": 1, "in_flight": 0, "dropped": 0},
+    "b2": {"entry": "trip_fast", "trips": 16, "records": 16, "in_flight": 0, "dropped": 0},
+    "b3": {"entry": "off_attempt", "driver": "motor_disarm", "records": 1, "in_flight": 0, "dropped": 0,
+           "not_reached": false},
+    "cleanup": {"records": 0, "in_flight": 0, "state": 0, "counter_status": "COUNTER_OK",
+                 "clock_basis": "CONFIG_READBACK", "gates_now": "0x3"},
+    "spm_cap": {"schema": 2, "slots": 64, "record_bytes": 120, "array_bytes": 7680, "sizeof_ctx": 44},
+    "spm_init": {"counter_status": "COUNTER_OK", "demcr": "0x01000000", "ctrl": "0x40000001",
+                 "a": 612446415, "b": 612447085, "delta": 670, "systick_load": 399999,
+                 "guard": "READY", "clock_basis": "CONFIG_READBACK",
+                 "closes": "DWT 周期计数器在本板本构建上存在且可递增（目标实测）"}
+  },
+  "defects_found_on_target": [
+    {"id": "BOARD-A-01", "severity": "blocking-for-A0-timing-evidence",
+     "title": "FinSH 控制台行缓冲把每条长输出剪成 126 字节并漏出 NUL，CSV 第 39–47 列丢失",
+     "mechanism": "BSP/rtconfig.h:107 RT_CONSOLEBUF_SIZE=128；sp_measure_a0.c 的头行(563)与每条记录(582)各用单条 rt_kprintf",
+     "evidence": "b2_dump 2267 B = 17 段×126 + 摘要；16 条记录段尾串均为 '…,COUNTER'；头行断在 'phase_af'",
+     "affected_responses": "51 条中 33 条含 NUL；被剪断行合计 35",
+     "lost_fields": ["clock_basis", "body_valid", "enclosing_valid", "invalid_reason", "gates",
+                     "guard", "guard_load", "dropped_at_publish", "complete"],
+     "consequence": "§9 的逐样本纳入判据无法在目标数据上执行 ⇒ 记录有效性与时长统计 NOT_ACHIEVED",
+     "why_host_chain_missed_it": "主机夹具无 RT_CONSOLEBUF_SIZE 裁剪，TMA 台账的 47 列完整只在主机成立",
+     "recovery_possible_in_this_round": false,
+     "recovery_note": "三批记录已按操作包 §2.1 顺序 clear_records（cleanup dump=0 为证），重跑需突破 17 次 trip 上限 ⇒ 未执行"
+    }
+  ],
+  "evidence_status": {
+    "a0_record_validity_and_timing": "NOT_ACHIEVED（目标导出通道裁剪，字段缺失）",
+    "a0_state_and_sequence_observations": "ACHIEVED（cap/init/stop/status/cleanup 短行完整）",
+    "physical_waveforms_and_worst_case_shutdown_latency": "NOT_ADDRESSED（无示波器/逻辑分析仪）",
+    "clock_frequency_independent_proof": "NOT_ADDRESSED（CONFIG_READBACK 非外部证明）",
+    "restore_download_drill": "NOT_EXECUTED"
+  },
+  "errata": [
+    {"item": "CP2 门5 首判 '坏校验和记录=65286 ⇒ 不满足'",
+     "status": "判定器缺陷（校验字节被重复计入），原始判定件保留未覆写",
+     "corrected_by": "cp2_gates_result_r1（正确测试 sum(by)&0xFF==0：格式 0 错、校验和 0 错、无重叠越界空洞、往返逐字节相等）"},
+    {"item": "探针列表实际 2 次（任务书允许 1 次）",
+     "status": "偏差已登记；原因=第 1 次被主机 GBK 编码中断致“是否只有一个探针”不可判定"},
+    {"item": "查找轮三条口径校正（同一份映像/压缩包尺寸/段和与时间线索）",
+     "status": "已在本轮 cp0_offline_precheck.txt §7 U-4 登记，未改写查找轮原文件"}
+  ],
+  "files_added_or_modified": [
+    "reports/reviews/phase8-target-measurement-a0-board-a/cp0_offline_precheck.txt",
+    "reports/reviews/phase8-target-measurement-a0-board-a/cp1_cp2_flash_snapshot.txt",
+    "reports/reviews/phase8-target-measurement-a0-board-a/cp3_cp4_board_run.txt",
+    "reports/agent_handoffs/phase8-target-measurement-a0-board-a.md",
+    "reports/agent_handoffs/phase8-target-measurement-a0-board-a.json"
+  ],
+  "not_modified": ["生产源码/HAL/内核/时钟/引脚配置", "四宏", "原 project.uvprojx/uvoptx",
+                   "tests/host 与既有 runner/shim", "既有 A0 与查找轮证据", "操作包与阶段文档", ".gitignore"],
+  "out_of_repo_artifacts": {
+    "work_dir_code": "WORK_OUT",
+    "contents": ["download/（下载专用工程副本）", "restore-project/（恢复专用工程副本，未执行）",
+                 "flash-snapshot/（双读原件 + 快照 HEX + BOARD_A0_AFTER_a0.bin）",
+                 "pyocd-work/（空目录，无隐式脚本）", "logs/", "serial/（逐命令捕获与全文台账）",
+                 "judge/（批判读与 CSV 片段）"],
+    "raw_snapshot_upload_policy": "原始 1 MiB 快照与其 HEX 不上传（可能含设备信息）"
+  },
+  "blocked_rollback": {
+    "closed_subitem": "未保存现存片内 Flash 字节（1 MiB 双读一致 + 已验证 HEX 恢复输入 + 两处目录）",
+    "still_open": ["恢复下载未演练（工程已备，未执行）", "外部 SPI Flash 内容未备份", "全板运行状态未备份",
+                   "快照与 e40a9b9 构建的逐字节关系未证明"],
+    "self_closed": false
+  },
+  "next_step_boundary": {
+    "requires_new_authorization": ["BOARD-A-01 的导出路径修复与重编重烧", "任何重跑批次/追加 trip",
+                                   "恢复下载演练", "板上 Flash 再次读取"],
+    "self_started_next_phase": false,
+    "pending_immediate": "现场收尾断电（先关 24 V，再拔 USB，SW1 保持阻断）"
+  },
+  "stop_claim": "A0_BOARD_A_EXECUTED_OR_STOPPED / AWAITING_INDEPENDENT_BOARD_EVIDENCE_REVIEW / NO MOTOR / NO STEP_ENABLE / NO SAFETY_MACRO_CHANGE / NO AUTOMATIC RESTORE / NO FURTHER HARDWARE WORK"
+}
