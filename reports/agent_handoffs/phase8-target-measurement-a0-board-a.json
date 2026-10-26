@@ -25,14 +25,15 @@
     "CP2_double_read_backup": "COMPLETE (六道门全通过, 门5 修正判定器后)",
     "CP3_single_download_and_readback": "COMPLETE",
     "CP4_serial_and_batches": "RUN_THEN_STOPPED_AT_EVIDENCE_IDENTITY_GATE",
-    "CP5_power_down_closeout": "PENDING_OPERATOR_ACTION"
+    "CP5_power_down_closeout": "COMPLETE_USER_REPORTED"
   },
   "board_state": {
-    "power": "USB 逻辑电源 + 24 V VM 均仍开启（收尾断电待现场执行：先关 24 V 再拔 USB）",
+    "power": "已断电（现场操作者回报；本地记录 2026-10-26 18:35 +08:00；先关 24 V 再拔 USB；USER_REPORTED，Agent 未实测）",
     "sw1": "阻断位（全包保持，未恢复使能）",
     "motor": "物理未接",
     "tmc_module": "在位，未拔插",
-    "serial": "COM5 已关闭",
+    "serial": "COM5 已关闭（17:03:19）",
+    "sw1_final": "阻断位（USER_REPORTED 未回报变更）",
     "onchip_flash_now": "measure-a0 已接受镜像（回读 261100 B 逐字节等于 358fd81a…）",
     "previous_app_now": "仅存在于本轮 1 MiB 双读快照与其 HEX 恢复输入中"
   },
@@ -181,7 +182,7 @@
     "requires_new_authorization": ["BOARD-A-01 的导出路径修复与重编重烧", "任何重跑批次/追加 trip",
                                    "恢复下载演练", "板上 Flash 再次读取"],
     "self_started_next_phase": false,
-    "pending_immediate": "现场收尾断电（先关 24 V，再拔 USB，SW1 保持阻断）"
+    "pending_immediate": "无（收尾断电已完成；SW1 未回报变更，仍阻断位）"
   },
   "stop_claim": "A0_BOARD_A_EXECUTED_OR_STOPPED / AWAITING_INDEPENDENT_BOARD_EVIDENCE_REVIEW / NO MOTOR / NO STEP_ENABLE / NO SAFETY_MACRO_CHANGE / NO AUTOMATIC RESTORE / NO FURTHER HARDWARE WORK"
 }

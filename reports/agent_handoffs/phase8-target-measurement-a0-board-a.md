@@ -12,7 +12,7 @@ SHA-256 `3cfdf310ace04277bab176acf465a8a7feb33deba4430542860c3321f492ba00`
 | CP2 双读备份 | 完成：六道门全通过（门5 修正判定器后）；快照 `BOARD_FLASH_SNAPSHOT_20261026` |
 | CP3 一次下载 | 完成：`Erase Done / Programming Done / Verify OK`；回读 261100 B **逐字节等于已接受 measure-a0.bin** |
 | CP4 串口+启动+采样 | 执行后**止于 §9 证据身份门**：51 条命令 0 超时，但 **CSV 被目标控制台剪断** |
-| CP5 收尾断电 | **待现场手工执行**（先关 24 V，再拔 USB，SW1 保持阻断） |
+| CP5 收尾断电 | 完成：现场回报"关了"（本地记录 2026-10-26 18:35 +08:00），先关 24 V 再拔 USB；SW1 仍阻断位（USER_REPORTED） |
 | 测试／构建 | 0／0（主机链 NOT_RERUN、Keil NOT_BUILT；硬件动作据实登记，不再写 `hardware_actions=[]`） |
 | 生产改动 | 无；四宏继续 `RT_FALSE`；冻结引用未动 |
 
@@ -63,7 +63,9 @@ SHA-256 `3cfdf310ace04277bab176acf465a8a7feb33deba4430542860c3321f492ba00`
 需要新批准才能做的事：BOARD-A-01 的导出路径修复（分块写出或缩短每行格式）+ 重编 + 重烧 + 重跑；任何追加 trip；恢复下载演练；再次读 Flash。
 `B-1 / BUG-008 / RISK-03/03a / 物理 RISK-04-b / M-1/M-2/M-3` 只按本轮实际覆盖部分评价，本包未预授其关闭。
 
-**待现场立即执行**：先关 24 V 适配器，再拔 USB，SW1 保持阻断位，记录结束电源状态（串口与测量 RAM 已收尾）。
+**收尾断电已完成**：现场操作者回报"关了"（本地记录 2026-10-26 18:35 +08:00），顺序为先关 24 V 再拔 USB；
+SW1 未回报变更（仍阻断位，USER_REPORTED）；串口与测量 RAM 此前已收尾。VM 与 USB 逻辑电源现均断开，
+板子不再可达——此为用户口述，Agent 未实测，也不把记录时刻当作断电时刻。
 
 ```text
 A0_BOARD_A_EXECUTED_OR_STOPPED / AWAITING_INDEPENDENT_BOARD_EVIDENCE_REVIEW
