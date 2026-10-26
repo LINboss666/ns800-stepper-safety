@@ -31,6 +31,7 @@
 #include <rtthread.h>
 #include <rtdevice.h>
 #include <rthw.h>
+#include <stdarg.h>
 #include "sp_measure_a0.h"
 
 #if NS800_TARGET_MEASUREMENT_A0
@@ -450,6 +451,60 @@ const char *spm_entry_name(rt_uint8_t v)
     return "-";
 }
 
+/* ---------------- 模块私有：有界整行输出（BOARD-A-01 修复） ----------------
+ * 目标侧 rt_kprintf 走 src/kservice.c:391-411：static char rt_log_buf[RT_CONSOLEBUF_SIZE]
+ * (=128, rtconfig.h:107)，先以 sizeof-1=127 为 size 调 rt_vsnprintf（因此最多 126 个可见字符 +
+ * 第 127 字节是 NUL），再把发送长度钳到 RT_CONSOLEBUF_SIZE-1=127 交 _kputs ——
+ * **超长行被静默剪断，并把 NUL 一起送上控制台**。板级实测：490 字节 CSV 头行上线只剩 127 字节、
+ * 14 列，尾部 body_valid/gates/invalid_reason/complete 等判据列全部丢失（= BOARD-A-01）。
+ * rt_kputs(kservice.c:369-381) 用 rt_strlen 按实际长度一次 _kputs(str, len)，不经过那个
+ * 128 字节格式化缓冲 ⇒ 整行完整上线。
+ *
+ * 缓冲容量依据（按 UTF-8 **字节**计，不按显示字数；逐条测量见本轮证据 line_bounds.json）：
+ *   CSV 头行                490 B（固定字面量，无转换符）              <- 最长
+ *   CSV 数据行最坏          374 B（按 spm_rec_t 实际字段类型：u8=3 u32=10 i32 %d=11，
+ *                              %s 取枚举名实际最长 19/18/17，0x%04x=6，0x%02x=4，
+ *                              46 个逗号 + \n + NUL）
+ *   cap 三行/status/init 行  最坏 215 / 186 / 180 / 147 / 135 / 130 / 126 B
+ *   不按类型核定的宽松上界  534 B
+ *   SPM_TEXT_CAP = 640 ⇒ 覆盖宽松上界 534 并留 106 B(≈20%)；对按类型上界 490 留 150 B。
+ *   line[] 只在 spm_emitfv 的帧内，占 tshell 栈(rtconfig.h:125 FINSH_THREAD_STACK_SIZE 4096)
+ *   的 15.6%；本模块所有调用点都在普通线程上下文，不在任何 PRIMASK 窗口内、不在中断里 ⇒
+ *   不新增窗口内打印、不改窗口形状，也不靠调大线程栈/全局缓冲来掩盖问题。
+ *
+ * 容量不足时：只发一条短 ASCII 错误（必定 <127，因此不会被再剪一次），返回 -1，
+ * **绝不发送已截断的半条记录/半条头行**。
+ * ⚠ rt_kputs 没有长度裁剪，但本工程 rtconfig.h **未定义** RT_USING_THREADSAFE_PRINTF
+ *   （kservice.c:327-332 因此把 CONSOLE_TAKE/CONSOLE_RELEASE 展开成空），所以本模块
+ *   **不承诺**一行绝不会被其它线程的日志插入。"先验完整再清理"由采集侧
+ *   tests/host/a0_export_gate.py 负责；这里不持长 PRIMASK 窗口、不暂停调度、不加锁、
+ *   不关掉其它线程的日志、不新增常驻线程。
+ */
+static int spm_emitfv(const char *fmt, va_list ap)
+{
+    char line[SPM_TEXT_CAP];
+    int n = rt_vsnprintf(line, sizeof(line), fmt, ap);
+
+    if (n < 0 || (rt_size_t)n >= sizeof(line))
+    {
+        rt_kprintf("[spm] EXPORT_ERROR: line_overflow need=%d cap=%d\n", n, SPM_TEXT_CAP);
+        return -1;
+    }
+    rt_kputs(line);
+    return n;
+}
+
+static int spm_emitf(const char *fmt, ...)
+{
+    va_list ap;
+    int n;
+
+    va_start(ap, fmt);
+    n = spm_emitfv(fmt, ap);
+    va_end(ap);
+    return n;
+}
+
 /* ---------------- 命令上下文门（只允许普通、未屏蔽的线程上下文） ---------------- */
 static rt_bool_t spm_context_ok(void)
 {
@@ -483,10 +538,10 @@ int spm_init_counter(void)
     /* 静止态判据在任何 PPB 访问、任何缓存改写之前完成（读的全是记录器自己的状态）。 */
     if (!spm_quiescent())
     {
-        rt_kprintf("[spm] init: 非静止态 => 拒绝, 未读任何 PPB, 未改能力缓存 "
-                   "(state=%u in_flight=%u records=%u guard=%u)\n",
-                   (unsigned)spm_state_v, (unsigned)spm_in_flight_n,
-                   (unsigned)spm_cursor, (unsigned)spm_guard_depth);
+        spm_emitf("[spm] init: 非静止态 => 拒绝, 未读任何 PPB, 未改能力缓存 "
+                  "(state=%u in_flight=%u records=%u guard=%u)\n",
+                  (unsigned)spm_state_v, (unsigned)spm_in_flight_n,
+                  (unsigned)spm_cursor, (unsigned)spm_guard_depth);
         return -3;
     }
 
@@ -524,18 +579,18 @@ int spm_init_counter(void)
                            spm_guard_load != 0u) ? 1u : 0u;
     }
 
-    rt_kprintf("[spm] init: counter=%s demcr=0x%08x ctrl=0x%08x a=%u b=%u load=%u "
-               "guard=%s clock_basis=%s\n",
-               spm_counter_status_name(spm_ctr_status), (unsigned)demcr, (unsigned)ctrl,
-               (unsigned)a, (unsigned)b, (unsigned)spm_guard_load,
-               spm_guard_ready ? "READY" : "NOT_ESTABLISHED",
-               spm_clock_basis_name(spm_clk_basis));
+    spm_emitf("[spm] init: counter=%s demcr=0x%08x ctrl=0x%08x a=%u b=%u load=%u "
+              "guard=%s clock_basis=%s\n",
+              spm_counter_status_name(spm_ctr_status), (unsigned)demcr, (unsigned)ctrl,
+              (unsigned)a, (unsigned)b, (unsigned)spm_guard_load,
+              spm_guard_ready ? "READY" : "NOT_ESTABLISHED",
+              spm_clock_basis_name(spm_clk_basis));
     if (spm_ctr_status != SPM_CNT_OK)
-        rt_kprintf("[spm] init: 无有效计数差 => 时长保持 COUNTER_UNAVAILABLE/UNCHECKED, "
-                   "只交状态与顺序证据(0 不是零耗时)\n");
+        spm_emitf("[spm] init: 无有效计数差 => 时长保持 COUNTER_UNAVAILABLE/UNCHECKED, "
+                  "只交状态与顺序证据(0 不是零耗时)\n");
     else if (!spm_guard_ready)
-        rt_kprintf("[spm] init: 主体区间判据未成立 => BLOCKED_COUNTER/INTERVAL_UNPROVEN, "
-                   "不用未证明的 SysTick 差分凑有效值\n");
+        spm_emitf("[spm] init: 主体区间判据未成立 => BLOCKED_COUNTER/INTERVAL_UNPROVEN, "
+                  "不用未证明的 SysTick 差分凑有效值\n");
     return 0;
 }
 
@@ -543,31 +598,33 @@ void spm_stop_accepting(void)
 {
     if (!spm_context_ok()) return;
     if (spm_state_v == SPM_STATE_ACTIVE) spm_state_v = SPM_STATE_STOPPING;
-    rt_kprintf("[spm] stop: state=%u in_flight=%u records=%u dropped=%u "
-               "(不等待在途, 不清故障, 不关闭共享 DWT/DEMCR 位)\n",
-               (unsigned)spm_state_v, (unsigned)spm_in_flight_n,
-               (unsigned)spm_cursor, (unsigned)spm_dropped_n);
+    spm_emitf("[spm] stop: state=%u in_flight=%u records=%u dropped=%u "
+              "(不等待在途, 不清故障, 不关闭共享 DWT/DEMCR 位)\n",
+              (unsigned)spm_state_v, (unsigned)spm_in_flight_n,
+              (unsigned)spm_cursor, (unsigned)spm_dropped_n);
 }
 
 int spm_dump_records(void)
 {
     rt_uint32_t i;
+    int rc_line;
 
     if (!spm_context_ok()) return -1;
     if (spm_state_v == SPM_STATE_ACTIVE || spm_in_flight_n != 0u)
     {
-        rt_kprintf("[spm] dump: BUSY (state=%u in_flight=%u) => 不循环打印活记录\n",
-                   (unsigned)spm_state_v, (unsigned)spm_in_flight_n);
+        spm_emitf("[spm] dump: BUSY (state=%u in_flight=%u) => 不循环打印活记录\n",
+                  (unsigned)spm_state_v, (unsigned)spm_in_flight_n);
         return -2;
     }
-    rt_kprintf("schema,gen,slot,entry,ctx_isr,saved_primask,rel_ok,proof_null,exp_epoch,"
-               "in_owner,epoch_before,epoch_after,owner_after,phase_after,inhibit,pending,"
-               "pending_epoch,latch_m,latch_d,trips_before,trips_after,pwm_epoch,"
-               "pwm_attempted,pwm_result,pwm_raw_rc,permit_epoch,permit_written,"
-               "permit_level,permit_write_rc,outcome,branch,pwm_called,low_called,"
-               "pre,body_begin,body_end,post,counter_status,clock_basis,body_valid,"
-               "enclosing_valid,invalid_reason,gates,guard,guard_load,dropped_at_publish,"
-               "complete\n");
+    rc_line = spm_emitf("schema,gen,slot,entry,ctx_isr,saved_primask,rel_ok,proof_null,exp_epoch,"
+                        "in_owner,epoch_before,epoch_after,owner_after,phase_after,inhibit,pending,"
+                        "pending_epoch,latch_m,latch_d,trips_before,trips_after,pwm_epoch,"
+                        "pwm_attempted,pwm_result,pwm_raw_rc,permit_epoch,permit_written,"
+                        "permit_level,permit_write_rc,outcome,branch,pwm_called,low_called,"
+                        "pre,body_begin,body_end,post,counter_status,clock_basis,body_valid,"
+                        "enclosing_valid,invalid_reason,gates,guard,guard_load,dropped_at_publish,"
+                        "complete\n");
+    if (rc_line < 0) return -3;              /* 半条头行都不发: 采集门据此拒绝该批 */
     for (i = 0u; i < spm_cursor; i++)
     {
         const spm_rec_t *r = &spm_rec[i];
@@ -575,40 +632,43 @@ int spm_dump_records(void)
         if (r->complete != 1u)
         {
             /* 未完成槽不得导出成完整样本, 也不被新批次复用(见 clear 的前置)。 */
-            rt_kprintf("1,%u,%u,INCOMPLETE,gen=%u\n", (unsigned)i, (unsigned)r->slot,
-                       (unsigned)r->capture_generation);
+            rc_line = spm_emitf("1,%u,%u,INCOMPLETE,gen=%u\n", (unsigned)i, (unsigned)r->slot,
+                                (unsigned)r->capture_generation);
+            if (rc_line < 0) return -3;
             continue;
         }
-        rt_kprintf("%u,%u,%u,%s,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,"
-                   "%u,%u,%u,%d,%u,%u,%u,%d,%d,%u,%u,%u,%u,%u,%u,%u,%s,%s,%u,%u,0x%04x,"
-                   "0x%02x,0x%02x,%u,%u,%u\n",
-                   (unsigned)r->schema, (unsigned)r->capture_generation, (unsigned)r->slot,
-                   spm_entry_name(r->entry_id), (unsigned)r->context_isr,
-                   (unsigned)r->saved_primask, (unsigned)r->input_release_on_ok,
-                   (unsigned)r->proof_out_null, (unsigned)r->input_expected_epoch,
-                   (unsigned)r->input_owner, (unsigned)r->epoch_before,
-                   (unsigned)r->epoch_after, (unsigned)r->owner_after,
-                   (unsigned)r->phase_after, (unsigned)r->inhibit, (unsigned)r->pending,
-                   (unsigned)r->pending_epoch, (unsigned)r->motor_stop_latched,
-                   (unsigned)r->diag_stop_latched, (unsigned)r->trips_before,
-                   (unsigned)r->trips_after, (unsigned)r->observed_pwm_epoch,
-                   (unsigned)r->observed_pwm_attempted, (unsigned)r->observed_pwm_result,
-                   (int)r->observed_pwm_raw_rc, (unsigned)r->observed_permit_epoch,
-                   (unsigned)r->observed_permit_written, (unsigned)r->observed_permit_level,
-                   (int)r->observed_permit_write_rc, (int)r->call_outcome_or_branch,
-                   (unsigned)r->branch_id, (unsigned)r->pwm_called_by_this_call,
-                   (unsigned)r->low_called_by_this_call, (unsigned)r->pre,
-                   (unsigned)r->body_begin, (unsigned)r->body_end, (unsigned)r->post,
-                   spm_counter_status_name(r->counter_status),
-                   spm_clock_basis_name(r->clock_basis), (unsigned)r->body_valid,
-                   (unsigned)r->enclosing_valid, (unsigned)r->invalid_reason,
-                   (unsigned)r->counter_gates,
-                   (unsigned)r->guard_metadata, (unsigned)r->guard_load_seen,
-                   (unsigned)r->dropped_at_publish, (unsigned)r->complete);
+        rc_line = spm_emitf("%u,%u,%u,%s,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,"
+                            "%u,%u,%u,%d,%u,%u,%u,%d,%d,%u,%u,%u,%u,%u,%u,%u,%s,%s,%u,%u,0x%04x,"
+                            "0x%02x,0x%02x,%u,%u,%u\n",
+                            (unsigned)r->schema, (unsigned)r->capture_generation, (unsigned)r->slot,
+                            spm_entry_name(r->entry_id), (unsigned)r->context_isr,
+                            (unsigned)r->saved_primask, (unsigned)r->input_release_on_ok,
+                            (unsigned)r->proof_out_null, (unsigned)r->input_expected_epoch,
+                            (unsigned)r->input_owner, (unsigned)r->epoch_before,
+                            (unsigned)r->epoch_after, (unsigned)r->owner_after,
+                            (unsigned)r->phase_after, (unsigned)r->inhibit, (unsigned)r->pending,
+                            (unsigned)r->pending_epoch, (unsigned)r->motor_stop_latched,
+                            (unsigned)r->diag_stop_latched, (unsigned)r->trips_before,
+                            (unsigned)r->trips_after, (unsigned)r->observed_pwm_epoch,
+                            (unsigned)r->observed_pwm_attempted, (unsigned)r->observed_pwm_result,
+                            (int)r->observed_pwm_raw_rc, (unsigned)r->observed_permit_epoch,
+                            (unsigned)r->observed_permit_written, (unsigned)r->observed_permit_level,
+                            (int)r->observed_permit_write_rc, (int)r->call_outcome_or_branch,
+                            (unsigned)r->branch_id, (unsigned)r->pwm_called_by_this_call,
+                            (unsigned)r->low_called_by_this_call, (unsigned)r->pre,
+                            (unsigned)r->body_begin, (unsigned)r->body_end, (unsigned)r->post,
+                            spm_counter_status_name(r->counter_status),
+                            spm_clock_basis_name(r->clock_basis), (unsigned)r->body_valid,
+                            (unsigned)r->enclosing_valid, (unsigned)r->invalid_reason,
+                            (unsigned)r->counter_gates,
+                            (unsigned)r->guard_metadata, (unsigned)r->guard_load_seen,
+                            (unsigned)r->dropped_at_publish, (unsigned)r->complete);
+        if (rc_line < 0) return -3;          /* 该行未完整上线 => 整批作废, 不发下一批 */
     }
-    rt_kprintf("[spm] dump: records=%u dropped=%u (仅 body_valid=1 的样本进入时长统计)\n",
-               (unsigned)spm_cursor, (unsigned)spm_dropped_n);
-    return 0;
+    rc_line = spm_emitf("[spm] dump: records=%u dropped=%u "
+                        "(仅 body_valid=1 的样本进入时长统计)\n",
+                        (unsigned)spm_cursor, (unsigned)spm_dropped_n);
+    return (rc_line < 0) ? -3 : 0;
 }
 
 int spm_clear_records(void)
@@ -618,13 +678,13 @@ int spm_clear_records(void)
     if (!spm_context_ok()) return -1;
     if (spm_state_v == SPM_STATE_ACTIVE)
     {
-        rt_kprintf("[spm] clear_records: BUSY (state=ACTIVE) => 先 stop\n");
+        spm_emitf("[spm] clear_records: BUSY (state=ACTIVE) => 先 stop\n");
         return -2;
     }
     if (spm_in_flight_n != 0u)
     {
-        rt_kprintf("[spm] clear_records: BUSY (in_flight=%u) => 不等待也不强行清\n",
-                   (unsigned)spm_in_flight_n);
+        spm_emitf("[spm] clear_records: BUSY (in_flight=%u) => 不等待也不强行清\n",
+                  (unsigned)spm_in_flight_n);
         return -3;
     }
     /* 只清测量数据: 绝不调用 fault_reset, 绝不改 sp 的 inhibit/锁存/epoch/pending。
@@ -655,7 +715,7 @@ int spm_clear_records(void)
     spm_cursor = 0u; spm_dropped_n = 0u; spm_in_flight_n = 0u;
     spm_state_v = SPM_STATE_IDLE; spm_active_entry = 0u;
     spm_guard_depth = 0u; spm_guard_owner = RT_NULL;
-    rt_kprintf("[spm] clear_records: 测量 RAM 已清(未触碰 Safety 故障/抑制/失败锁存)\n");
+    spm_emitf("[spm] clear_records: 测量 RAM 已清(未触碰 Safety 故障/抑制/失败锁存)\n");
     return 0;
 }
 
@@ -665,8 +725,8 @@ int spm_trip_once(void)
 {
     if (!spm_context_ok()) return -1;                  /* 非法上下文: 拒绝且不在其中打印 */
     safety_force_shutdown(FAULT_SELF_TEST);            /* 关闭先于任何输出 */
-    rt_kprintf("[spm] trip: 已调用一次 safety_force_shutdown(FAULT_SELF_TEST=%u)\n",
-               (unsigned)FAULT_SELF_TEST);
+    spm_emitf("[spm] trip: 已调用一次 safety_force_shutdown(FAULT_SELF_TEST=%u)\n",
+              (unsigned)FAULT_SELF_TEST);
     return 0;
 }
 
@@ -736,26 +796,26 @@ static int spm_start(rt_uint8_t id)
 {
     if (spm_state_v != SPM_STATE_IDLE)
     {
-        rt_kprintf("[spm] start: BUSY (state=%u) => 按 stop/dump/clear_records 收尾后再开下一批\n",
-                   (unsigned)spm_state_v);
+        spm_emitf("[spm] start: BUSY (state=%u) => 按 stop/dump/clear_records 收尾后再开下一批\n",
+                  (unsigned)spm_state_v);
         return -3;
     }
     if (spm_cursor != 0u || spm_in_flight_n != 0u)
     {
-        rt_kprintf("[spm] start: 仍有旧记录或在途 (records=%u in_flight=%u) => 拒绝\n",
-                   (unsigned)spm_cursor, (unsigned)spm_in_flight_n);
+        spm_emitf("[spm] start: 仍有旧记录或在途 (records=%u in_flight=%u) => 拒绝\n",
+                  (unsigned)spm_cursor, (unsigned)spm_in_flight_n);
         return -4;
     }
     spm_active_entry = id;
     spm_state_v = SPM_STATE_ACTIVE;
-    rt_kprintf("[spm] start: entry=%s (本命令不触发任何关闭动作)\n", spm_entry_name(id));
+    spm_emitf("[spm] start: entry=%s (本命令不触发任何关闭动作)\n", spm_entry_name(id));
     return 0;
 }
 
 static void spm_cmd_print_usage(void)
 {
-    rt_kprintf("usage: spm cap|init|start <trip_fast|trip_for_operation|off_attempt>"
-               "|stop|status|dump|clear_records|trip\n");
+    spm_emitf("usage: spm cap|init|start <trip_fast|trip_for_operation|off_attempt>"
+              "|stop|status|dump|clear_records|trip\n");
 }
 
 int spm_cmd(int argc, char **argv)
@@ -775,18 +835,18 @@ int spm_cmd(int argc, char **argv)
     {
     case SPM_SUB_USAGE:      spm_cmd_print_usage(); return 1;
     case SPM_SUB_BAD_ARITY:
-        rt_kprintf("[spm] 参数个数不对 '%s' (argc=%d) => 拒绝: 未读计数器, 未改状态, 未做关闭\n",
-                   (argv != RT_NULL && argc >= 2 && argv[1] != RT_NULL) ? argv[1] : "?",
-                   (int)argc);
+        spm_emitf("[spm] 参数个数不对 '%s' (argc=%d) => 拒绝: 未读计数器, 未改状态, 未做关闭\n",
+                  (argv != RT_NULL && argc >= 2 && argv[1] != RT_NULL) ? argv[1] : "?",
+                  (int)argc);
         spm_cmd_print_usage();
         return 1;
     case SPM_SUB_BAD_ENTRY:
-        rt_kprintf("[spm] start: 未知 entry='%s' => 拒绝(未改状态)\n",
-                   (argv != RT_NULL && argc >= 3 && argv[2] != RT_NULL) ? argv[2] : "");
+        spm_emitf("[spm] start: 未知 entry='%s' => 拒绝(未改状态)\n",
+                  (argv != RT_NULL && argc >= 3 && argv[2] != RT_NULL) ? argv[2] : "");
         return 1;
     case SPM_SUB_UNKNOWN:
-        rt_kprintf("[spm] 未知子命令 '%s' => 拒绝(未读计数器, 未改状态, 未做关闭)\n",
-                   (argv != RT_NULL && argc >= 2 && argv[1] != RT_NULL) ? argv[1] : "?");
+        spm_emitf("[spm] 未知子命令 '%s' => 拒绝(未读计数器, 未改状态, 未做关闭)\n",
+                  (argv != RT_NULL && argc >= 2 && argv[1] != RT_NULL) ? argv[1] : "?");
         return 1;
     default: break;
     }
@@ -795,38 +855,45 @@ int spm_cmd(int argc, char **argv)
     switch (sub)
     {
     case SPM_SUB_CAP:
+    {
+        int c1, c2, c3;
+
         /* record_bytes 必须是**一条**记录的大小；数组大小另列(原来这一行把
          * sizeof(数组) 当成 record_bytes 打印, 是 r1 顺手纠正的取证口径错误)。 */
-        rt_kprintf("[spm] schema=%u slots=%u record_bytes=%u array_bytes=%u sizeof_ctx=%u\n",
-                   SPM_SCHEMA_VERSION, SPM_SLOTS, (unsigned)sizeof(spm_rec_t),
-                   (unsigned)sizeof(spm_rec), (unsigned)sizeof(spm_ctx_t));
-        rt_kprintf("[spm] 编译四宏: MOTOR_HW=%d STEP_DIAG_ISO=%d TMC_CFG_HW=%d LIMIT_EN=%d "
-                   "(测量开关不改变这四道门)\n",
-                   (int)MOTOR_HARDWARE_ENABLE_PATH_VALIDATED,
-                   (int)STEP_DIAG_ISOLATED_ENV_CONFIRMED,
-                   (int)TMC_DRIVE_CONFIG_HW_VALIDATED,
-                   (int)SAFETY_LIMIT_INPUTS_ENABLED);
-        rt_kprintf("[spm] counter=%s clock_basis=%s systick_load=%u guard_ready=%s "
-                   "quiescent=%s state=%u records=%u in_flight=%u dropped=%u\n",
-                   spm_counter_status_name(spm_ctr_status),
-                   spm_clock_basis_name(spm_clk_basis), (unsigned)spm_guard_load,
-                   spm_guard_ready ? "YES" : "NO",
-                   spm_quiescent() ? "YES" : "NO", (unsigned)spm_state_v,
-                   (unsigned)spm_cursor, (unsigned)spm_in_flight_n,
-                   (unsigned)spm_dropped_n);
+        c1 = spm_emitf("[spm] schema=%u slots=%u record_bytes=%u array_bytes=%u sizeof_ctx=%u\n",
+                       SPM_SCHEMA_VERSION, SPM_SLOTS, (unsigned)sizeof(spm_rec_t),
+                       (unsigned)sizeof(spm_rec), (unsigned)sizeof(spm_ctx_t));
+        c2 = spm_emitf("[spm] 编译四宏: MOTOR_HW=%d STEP_DIAG_ISO=%d TMC_CFG_HW=%d LIMIT_EN=%d "
+                       "(测量开关不改变这四道门)\n",
+                       (int)MOTOR_HARDWARE_ENABLE_PATH_VALIDATED,
+                       (int)STEP_DIAG_ISOLATED_ENV_CONFIRMED,
+                       (int)TMC_DRIVE_CONFIG_HW_VALIDATED,
+                       (int)SAFETY_LIMIT_INPUTS_ENABLED);
+        c3 = spm_emitf("[spm] counter=%s clock_basis=%s systick_load=%u guard_ready=%s "
+                       "quiescent=%s state=%u records=%u in_flight=%u dropped=%u\n",
+                       spm_counter_status_name(spm_ctr_status),
+                       spm_clock_basis_name(spm_clk_basis), (unsigned)spm_guard_load,
+                       spm_guard_ready ? "YES" : "NO",
+                       spm_quiescent() ? "YES" : "NO", (unsigned)spm_state_v,
+                       (unsigned)spm_cursor, (unsigned)spm_in_flight_n,
+                       (unsigned)spm_dropped_n);
+        if (c1 < 0 || c2 < 0 || c3 < 0) return SPM_ERR_EXPORT;
         return 0;
+    }
     case SPM_SUB_INIT:          return (spm_init_counter() == 0) ? 0 : 1;
     case SPM_SUB_START:         return (spm_start(entry_id) == 0) ? 0 : 1;
     case SPM_SUB_STOP:          spm_stop_accepting(); return 0;
     case SPM_SUB_STATUS:
-        rt_kprintf("[spm] status: state=%u entry=%s records=%u in_flight=%u dropped=%u "
-                   "counter=%s clock=%s guard=%u gates_now=0x%x\n",
-                   (unsigned)spm_state_v, spm_entry_name(spm_active_entry),
-                   (unsigned)spm_cursor, (unsigned)spm_in_flight_n,
-                   (unsigned)spm_dropped_n, spm_counter_status_name(spm_ctr_status),
-                   spm_clock_basis_name(spm_clk_basis), (unsigned)spm_guard_depth,
-                   (unsigned)spm_ctr_pair());
-        return 0;
+    {
+        int c1 = spm_emitf("[spm] status: state=%u entry=%s records=%u in_flight=%u dropped=%u "
+                           "counter=%s clock=%s guard=%u gates_now=0x%x\n",
+                           (unsigned)spm_state_v, spm_entry_name(spm_active_entry),
+                           (unsigned)spm_cursor, (unsigned)spm_in_flight_n,
+                           (unsigned)spm_dropped_n, spm_counter_status_name(spm_ctr_status),
+                           spm_clock_basis_name(spm_clk_basis), (unsigned)spm_guard_depth,
+                           (unsigned)spm_ctr_pair());
+        return (c1 < 0) ? SPM_ERR_EXPORT : 0;
+    }
     case SPM_SUB_DUMP:          return (spm_dump_records() == 0) ? 0 : 1;
     case SPM_SUB_CLEAR:         return (spm_clear_records() == 0) ? 0 : 1;
     case SPM_SUB_TRIP:          return (spm_trip_once() == 0) ? 0 : 1;
@@ -839,5 +906,26 @@ int spm_cmd(int argc, char **argv)
  * MSH_CMD_EXPORT_ALIAS(函数, 命令名, 描述) => 生成 __fsym_spm{name="spm", func=&spm_cmd}。
  * 主机变体里这一行同样参与编译(见 tests/host/sp_measure_a0_finsh.h)，由名字查表分发。 */
 MSH_CMD_EXPORT_ALIAS(spm_cmd, spm, NS800 target measurement A0 control);
+
+#if defined(NS800_SPM_HOST_BACKEND)
+/* 主机夹具专用(TMA26)：造一条必然超限的整行，验证"具名 EXPORT_ERROR + 不发半条内容 +
+ * 返回负值"。目标编译里没有这个符号(NS800_SPM_HOST_BACKEND 只在主机链定义)，因此它
+ * 不构成目标侧的新增接口、新增命令或新增 BSS。 */
+int spm_test_emit_long(int pad);
+
+int spm_test_emit_long(int pad)
+{
+    char junk[SPM_TEXT_CAP + 64];
+    int i;
+
+    if (pad < 0) pad = 0;
+    for (i = 0; i < pad && i < (int)sizeof(junk) - 1; i++)
+    {
+        junk[i] = 'A';
+    }
+    junk[i] = 0;
+    return spm_emitf("%s\n", junk);
+}
+#endif /* NS800_SPM_HOST_BACKEND */
 
 #endif /* NS800_TARGET_MEASUREMENT_A0 */

@@ -51,7 +51,183 @@
 #define SPM_FINSH_HOST_IMPL
 #include "sp_measure_a0_finsh.h"
 
-/* --------------------------------------------------------------- 台账输出 */
+/* ================= A0 控制台长度模型（BOARD-A-01 的可判定化） =================
+ * 同形关系与边界逐条写在 tests/host/sp_measure_a0_console.h 的文件头注释里。
+ * 生产侧的 rt_kprintf / rt_vsnprintf / rt_kputs 三个名字被那一份头映射到下面这三个实现，
+ * 于是"128 字节控制台缓冲剪断长行"第一次成为主机可判定事实；断言只看**逐字节捕获缓冲**，
+ * 不看 stdout（stdout 只用来让人看见内容并维持 -Wl,--wrap=printf 的打印计数）。
+ */
+#define A0_CONSOLEBUF 128                 /* == rtconfig.h:107 RT_CONSOLEBUF_SIZE */
+static char a0_log_buf[A0_CONSOLEBUF];    /* == kservice.c:391 static char rt_log_buf[] */
+static char a0_cap_buf[32768];
+static int  a0_cap_on;
+static int  a0_cap_bytes;
+static int  a0_cap_trunc;                 /* 被 127 上限剪断过的行数 */
+static int  a0_cap_nul;                   /* 实际上线字节里的 NUL 个数 */
+
+int a0_rt_vsnprintf(char *buf, rt_size_t size, const char *fmt, va_list ap)
+{
+    char big[4096];
+    va_list ap2;
+    int n, c;
+
+    big[0] = 0;
+    va_copy(ap2, ap);
+    n = vsnprintf(big, sizeof(big), fmt, ap2);
+    va_end(ap2);
+    if (n < 0 || n >= (int) sizeof(big))
+    {
+        n = (int) strlen(big);            /* msvcrt 截断时返回 -1, 这里取真实应写长度 */
+    }
+    c = (size > 0u) ? ((n < (int) size - 1) ? n : (int) size - 1) : 0;
+    memcpy(buf, big, (size_t) c);
+    buf[c] = 0;
+    return n;                             /* 与 rt_vsnprintf_tiny 一致: 应写总字节数, 不含 NUL */
+}
+
+static void a0_console_emit(const char *s, int n)
+{
+    int i;
+
+    if (a0_cap_on)
+    {
+        for (i = 0; i < n; i++)
+        {
+            if (a0_cap_bytes < (int) sizeof(a0_cap_buf) - 1)
+            {
+                a0_cap_buf[a0_cap_bytes++] = s[i];
+            }
+            if (s[i] == 0)
+            {
+                a0_cap_nul++;
+            }
+        }
+    }
+    (void) printf("%.*s", n, s);          /* 经 --wrap=printf: 生产打印计数与窗口内禁止项台账 */
+    fflush(stdout);
+}
+
+int a0_kprintf(const char *fmt, ...)
+{
+    va_list ap;
+    int length;
+
+    va_start(ap, fmt);
+    length = a0_rt_vsnprintf(a0_log_buf, A0_CONSOLEBUF - 1, fmt, ap);
+    va_end(ap);
+    if (length > A0_CONSOLEBUF - 1)
+    {
+        a0_cap_trunc++;                   /* 与 kservice.c:406-409 同一道钳位 */
+        length = A0_CONSOLEBUF - 1;
+    }
+    a0_console_emit(a0_log_buf, length);
+    return length;
+}
+
+void a0_kputs(const char *s)
+{
+    if (s == RT_NULL)
+    {
+        return;                           /* kservice.c:372-375 */
+    }
+    a0_console_emit(s, (int) strlen(s));  /* kservice.c:376-380 _kputs(str, rt_strlen(str)) */
+}
+
+void a0_console_capture(int on) { a0_cap_on = on; }
+
+void a0_console_reset(void)
+{
+    a0_cap_bytes = 0;
+    a0_cap_trunc = 0;
+    a0_cap_nul = 0;
+    a0_cap_buf[0] = 0;
+}
+
+const char *a0_console_bytes(int *len, int *trunc, int *nul)
+{
+    int last = a0_cap_bytes;
+
+    if (last >= (int) sizeof(a0_cap_buf))
+    {
+        last = (int) sizeof(a0_cap_buf) - 1;
+    }
+    a0_cap_buf[last] = 0;
+    if (len)   *len = a0_cap_bytes;
+    if (trunc) *trunc = a0_cap_trunc;
+    if (nul)   *nul = a0_cap_nul;
+    return a0_cap_buf;
+}
+
+int a0_console_has(const char *frag) { return strstr(a0_cap_buf, frag) != 0 ? 1 : 0; }
+
+/* 捕获缓冲里的行工具：断言只看逐字节捕获，不看 stdout。 */
+static const char *a0_cap_find_line(const char *pre, int *linelen)
+{
+    const char *p = a0_cap_buf;
+    size_t n = strlen(pre);
+
+    while (*p)
+    {
+        const char *e = strchr(p, '\n');
+        int L = e ? (int) (e - p) : (int) strlen(p);
+
+        if ((size_t) L >= n && memcmp(p, pre, n) == 0)
+        {
+            *linelen = L;
+            return p;
+        }
+        if (!e) break;
+        p = e + 1;
+    }
+    *linelen = 0;
+    return RT_NULL;
+}
+
+static int a0_cap_line_ends(const char *line, int linelen, const char *suf)
+{
+    size_t n = strlen(suf);
+
+    return (line && linelen >= (int) n && memcmp(line + linelen - n, suf, n) == 0) ? 1 : 0;
+}
+
+/* 一行的列数(逗号数 + 1)与其中 NUL 字节数：被剪断的行既缺列又带 NUL。 */
+static int a0_cap_line_cols(const char *line, int linelen)
+{
+    int i, cols = 1;
+
+    for (i = 0; i < linelen; i++)
+    {
+        if (line[i] == ',') cols++;
+    }
+    return cols;
+}
+
+static int a0_cap_line_nul(const char *line, int linelen)
+{
+    int i, n = 0;
+
+    for (i = 0; i < linelen; i++)
+    {
+        if (line[i] == 0) n++;
+    }
+    return n;
+}
+
+/* frag 在该行内的字节偏移；没出现返回 -1。> 127 即"旧通道一定会剪掉的位置"。 */
+static int a0_cap_line_pos(const char *line, int linelen, const char *frag)
+{
+    size_t n = strlen(frag);
+    int i;
+
+    if (!line) return -1;
+    for (i = 0; i + (int) n <= linelen; i++)
+    {
+        if (memcmp(line + i, frag, n) == 0) return i;
+    }
+    return -1;
+}
+
+/* ------------------------------- 台账输出 */
 static int g_fail_total, g_checks_total, g_case_fail, g_case_checks, g_cases_done;
 static char g_case_id[16] = "-";
 
@@ -1762,6 +1938,197 @@ static void tma23_historical_flag_positive(void)
     case_end();
 }
 
+/* ============ BOARD-A-01 导出通道用例（TMA25..TMA27） ============
+ * 把"控制台 128 字节边界"变成主机可判定事实：修前必须失败，修后必须通过。
+ * 判据一律建立在**逐字节捕获**的行长度/列数/尾字段上，因此一条行是否真的完整上线
+ * 不再由"无限长 stdout"代替（任务书 §5.7）。
+ */
+/* TMA25：cap/init/status/usage/拒绝行等诊断长行同样必须完整（只修 CSV 不合格）。
+ * 判据形状：该行存在 + 该行的**最后一个字段名**确实上线；另外如实数出"整行字节数 > 127"
+ * 的行数(旧通道一定剪断的那些)，两条一起成立才说明长行是被修好的、而不是本来就短。 */
+static void tma25_export_lines_complete(void)
+{
+    static const char *const PRE[] = {
+        "[spm] counter=", "[spm] init: counter=", "[spm] status:", "[spm] stop:",
+        "[spm] schema=", "[spm] clear_records:"
+    };
+    /* 每条格式串里最后出现的字段名(值除外, 值随 ABI 变, 字段名不随 ABI 变)。 */
+    static const char *const LAST[] = {
+        " dropped=", " clock_basis=", " gates_now=", "DWT/DEMCR ",
+        " sizeof_ctx=", "Safety "
+    };
+    const char *line;
+    int len = 0, trunc = 0, nul = 0, L, i, over127 = 0, last_ok = 0;
+
+    case_begin("TMA25", "导出通道: cap/init/status/stop/usage/拒绝行的尾字段完整且无 NUL");
+    boot_once();
+    port_ppb_reset(RT_TRUE, 7u, RT_TRUE);
+    port_bus_reset();
+    quiesce_for_init();
+    a0_console_reset();
+    a0_console_capture(1);
+    (void) cmd("cap", NULL);
+    (void) cmd("init", NULL);
+    (void) cmd("status", NULL);
+    (void) cmd("stop", NULL);
+    (void) cmd("start", NULL);              /* 参数个数不对 => 拒绝行 + usage 行 */
+    (void) cmd("nope", NULL);               /* 未知子命令拒绝行 */
+    (void) cmd("start", "bad_entry");       /* 未知 entry 拒绝行 */
+    (void) cmd("clear_records", NULL);
+    a0_console_capture(0);
+    (void) a0_console_bytes(&len, &trunc, &nul);
+
+    ck("上线字节里没有 127 截断行", 0, trunc);
+    ck("上线字节里没有 NUL", 0, nul);
+    ck("整段没有触发 EXPORT_ERROR", 0, a0_console_has("EXPORT_ERROR"));
+
+    for (i = 0; i < (int) (sizeof PRE / sizeof PRE[0]); i++)
+    {
+        line = a0_cap_find_line(PRE[i], &L);
+        ck("诊断行存在", 1, line ? 1 : 0);
+        if (L > 127) over127++;
+        if (line && a0_cap_line_pos(line, L, LAST[i]) >= 0) last_ok++;
+        if (a0_cap_line_nul(line, L) != 0) ck("该行不带 NUL", 0, a0_cap_line_nul(line, L));
+    }
+    ck("六条被点名的诊断行的最后字段名全部上线", 6, last_ok);
+    /* 本夹具的真实数据里恰好两条诊断行超过 127 字节(cap 第 3 行 142 B、init 行 129 B)：
+     * 这两条就是"旧通道一定丢尾字段"的实例；条数变了说明判据基础变了, 要显式改。 */
+    ck("其中超过 127 字节(旧通道必剪断)的行数 = 2", 2, over127);
+
+    line = a0_cap_find_line("[spm] \xe6\x9c\xaa\xe7\x9f\xa5\xe5\xad\x90\xe5\x91\xbd\xe4\xbb\xa4", &L);
+    ck("未知子命令拒绝行的中文尾完整上线", 1,
+       a0_cap_line_ends(line, L, "\xe6\x9c\xaa\xe5\x81\x9a\xe5\x85\xb3\xe9\x97\xad)"));
+    line = a0_cap_find_line("[spm] \xe5\x8f\x82\xe6\x95\xb0\xe4\xb8\xaa\xe6\x95\xb0\xe4\xb8\x8d\xe5\xaf\xb9", &L);
+    ck("参数个数不对拒绝行的中文尾完整上线", 1,
+       a0_cap_line_ends(line, L, "\xe6\x9c\xaa\xe5\x81\x9a\xe5\x85\xb3\xe9\x97\xad"));
+    line = a0_cap_find_line("usage: spm", &L);
+    ck("usage 行尾子命令 clear_records|trip 到位", 1,
+       a0_cap_line_ends(line, L, "clear_records|trip"));
+
+    quiesce_for_init();
+    case_end();
+}
+
+/* TMA26：容量不足必须是具名短 ASCII 错误 + 负返回 + 绝不发半条内容。 */
+static void tma26_export_overflow_named_error(void)
+{
+    char want[48];
+    int len = 0, trunc = 0, nul = 0, rc;
+
+    case_begin("TMA26", "导出通道: 整行超过 SPM_TEXT_CAP 时具名 EXPORT_ERROR 且不发半条");
+    a0_console_reset();
+    a0_console_capture(1);
+    rc = spm_test_emit_long(SPM_TEXT_CAP + 8);
+    a0_console_capture(0);
+    (void) a0_console_bytes(&len, &trunc, &nul);
+
+    ck("超限整行返回 -1", -1, rc);
+    ck("发出具名 EXPORT_ERROR", 1, a0_console_has("[spm] EXPORT_ERROR: line_overflow need="));
+    snprintf(want, sizeof want, "need=%d cap=%d", SPM_TEXT_CAP + 9, SPM_TEXT_CAP);
+    ck("错误行如实报告应写字节数与容量", 1, a0_console_has(want));
+    ck("未发出超长内容的任何片段", 0,
+       a0_console_has("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                      "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"));
+    ck("错误行自身没有被 127 截断", 0, trunc);
+    ck("错误行不带 NUL", 0, nul);
+    case_end();
+}
+
+#if SPM_TEXT_CAP >= 512
+/* TMA27（正常容量构建）：头行 490 B 与每条数据行必须逐字节完整，dump 返回 0。 */
+static void tma27_export_records_complete(void)
+{
+    const char *line, *b;
+    int len = 0, trunc = 0, nul = 0, rc, L, i;
+    int rows = 0, rows_cols47 = 0, rows_nul0 = 0, rows_complete1 = 0, rows_within_cap = 0;
+    rt_uint32_t got;
+    sp_proof_t p;
+
+    case_begin("TMA27", "导出通道: CSV 头行 490 B 与逐条数据行 47 列完整, dump 返回 0");
+    boot_once();
+    port_ppb_reset(RT_TRUE, 7u, RT_TRUE);
+    port_bus_reset();
+    quiesce_for_init();
+    ck("init 前置", 0, cmd("init", NULL));
+    ck("start 前置", 0, cmd("start", "trip_fast"));
+    for (i = 0; i < 3; i++) sp_trip_fast(FAULT_ESTOP, 0u, MOT_STOP_SRC_ESTOP, &p);
+    ck("stop 前置", 0, cmd("stop", NULL));
+    got = spm_records_used();
+    ck("前置恰好 3 条记录", 3, (long) got);
+
+    a0_console_reset();
+    a0_console_capture(1);
+    rc = spm_dump_records();
+    a0_console_capture(0);
+    b = a0_console_bytes(&len, &trunc, &nul);
+    (void) b;
+
+    ck("dump 返回 0", 0, rc);
+    ck("没有 127 截断行", 0, trunc);
+    ck("上线字节不含 NUL", 0, nul);
+    ck("没有 EXPORT_ERROR", 0, a0_console_has("EXPORT_ERROR"));
+
+    line = a0_cap_find_line("schema,gen,slot,", &L);
+    ck("头行存在", 1, line ? 1 : 0);
+    /* 捕获到的"行"不含结尾 LF：行体 489 B + LF = 上线 490 B(与本轮测量界限一致)。 */
+    ck("头行行体字节数 = 489", 489, L);
+    ck("头行上线字节数(含 LF) = 490", 490, L + 1);
+    ck("头行列数 = 47", 47, a0_cap_line_cols(line, L));
+    ck("头行尾列 dropped_at_publish,complete 在剪断点之后", 1,
+       (a0_cap_line_pos(line, L, "dropped_at_publish,complete") > 127) ? 1 : 0);
+    ck("头行不含 NUL", 0, a0_cap_line_nul(line, L));
+
+    for (line = a0_cap_buf; *line; )
+    {
+        const char *e = strchr(line, '\n');
+        L = e ? (int) (e - line) : (int) strlen(line);
+
+        if (L > 0 && line[0] == '2' && line[1] == ',')
+        {
+            rows++;
+            if (a0_cap_line_cols(line, L) == 47)      rows_cols47++;
+            if (a0_cap_line_nul(line, L) == 0)        rows_nul0++;
+            if (a0_cap_line_ends(line, L, ",1"))      rows_complete1++;
+            if (L < SPM_TEXT_CAP)                     rows_within_cap++;
+        }
+        if (!e) break;
+        line = e + 1;
+    }
+    ck("数据行数 = 3", 3, rows);
+    ck("每条数据行都是 47 列", 3, rows_cols47);
+    ck("每条数据行都不带 NUL", 3, rows_nul0);
+    ck("每条数据行末列 complete=1", 3, rows_complete1);
+    ck("每条数据行都在容量界限内(没有溢出)", 3, rows_within_cap);
+
+    quiesce_for_init();
+    case_end();
+}
+#else
+/* TMA27（精简容量构建，-DSPM_TEXT_CAP<512）：490 B 头行必然超限 =>
+ * 具名 EXPORT_ERROR + dump 返回 -3 + 一条半头行/半记录都不许上线。 */
+static void tma27_export_records_complete(void)
+{
+    const char *b;
+    int len = 0, trunc = 0, nul = 0, rc;
+
+    case_begin("TMA27", "导出通道(精简容量): 头行超限 => 具名错误 + dump=-3 + 无半条记录");
+    a0_console_reset();
+    a0_console_capture(1);
+    rc = spm_dump_records();
+    a0_console_capture(0);
+    b = a0_console_bytes(&len, &trunc, &nul);
+    (void) b;
+
+    ck("容量不足时 dump 返回 -3", -3, rc);
+    ck("发出具名 EXPORT_ERROR", 1, a0_console_has("[spm] EXPORT_ERROR: line_overflow"));
+    ck("没有发出被剪断的半条头行", 0, a0_console_has("schema,gen,slot,entry,"));
+    ck("没有发出任何 CSV 数据行", 0, a0_console_has(",trip_fast,"));
+    ck("导出通道自身不产生 127 截断行", 0, trunc);
+    ck("错误短行不带 NUL", 0, nul);
+    case_end();
+}
+#endif
+
 /* TMA24 修订后的分批顺序：用真实控制函数跑 1 条与 16 条两批，逐批数量一致且清 RAM 不清故障。 */
 static void tma24_pack_batch_sequence(void)
 {
@@ -1877,6 +2244,12 @@ int main(int argc, char **argv)
     }
     if (strcmp(grp, "ledger") == 0) tma18_ledger_and_publish_order();
     if (strcmp(grp, "pack") == 0) tma24_pack_batch_sequence();
+    if (strcmp(grp, "export") == 0)
+    {
+        tma25_export_lines_complete();
+        tma26_export_overflow_named_error();
+        tma27_export_records_complete();
+    }
 #endif
 
     emit("SUMMARY cases=%d checks=%d fails=%d\n", g_cases_done, g_checks_total, g_fail_total);

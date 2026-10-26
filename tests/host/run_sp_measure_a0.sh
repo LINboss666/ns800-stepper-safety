@@ -21,12 +21,24 @@
 #   并额外跑一条"判定器自身"的负控: 在反向构建的夹具副本里省略非锚身份 TMA18 的 RESULT 行,
 #   必须被判定成 INFRA-FAIL(复审 A0-04)。
 #
+# export-r1（复审 BOARD-A-01）新增:
+#   控制台长度模型 tests/host/sp_measure_a0_console.h 以 -include 注入三个编译单元,
+#   把 rt_kprintf/rt_vsnprintf/rt_kputs 换成与 kservice.c 同形的实现, 并**逐字节捕获上线**;
+#   断言只看捕获缓冲(行字节数/列数/尾字段偏移/NUL 计数), 128 字节边界因此第一次可判定。
+#   TMA25 cap/init/status/stop/usage/拒绝行等诊断长行尾字段完整(只修 CSV 不算修好)
+#   TMA26 整行超过 SPM_TEXT_CAP => 具名 EXPORT_ERROR + 返回 -1 + 不发半条内容
+#   TMA27 CSV 头行 490 B/47 列与逐条数据行完整, dump 返回 0
+#   a0_min 第三个可执行体: -DSPM_TEXT_CAP=256, 只跑 export 组; 同一批断言在那里改判
+#         "头行超限 => dump=-3 + 具名错误 + 无半条记录"(生产两个 Keil 目标都不覆盖该宏)
+#   反向家族 rev_export_header_single_limited_kprintf: 把修后的头行导出退回单条受限
+#         rt_kprintf, 必须由 TMA27 具名检出, 其余每组台账逐条一致且保持 PASS。
+#
 # 生产打印经 -Wl,--wrap=printf 计成"窗口内禁止项"台账(夹具自身输出走 fprintf, 不经该通道)。
 #
 # 用法:
 #   A0_OUT_DIR=<仓外目录> bash tests/host/run_sp_measure_a0.sh
 #   ONLY=counter,batch bash tests/host/run_sp_measure_a0.sh     # 选择先验证再执行
-#   REVERSE=1 bash tests/host/run_sp_measure_a0.sh              # 两个具名反向家族 + 台账负控
+#   REVERSE=1 bash tests/host/run_sp_measure_a0.sh              # 三个具名反向家族 + 台账负控
 #   NM=<nm 路径> GCC=<gcc 路径> A0_GROUP_TIMEOUT=90 ...
 # 退出码: 0=通过; 1=检出失败(有用例判 FAIL); 4=基础设施故障; 127=环境缺失
 set -u -o pipefail
@@ -39,6 +51,7 @@ SRC_APP="${SRC_APP:-$REPO_ROOT/$(env_app_rel)}"
 SHIM_DIR="${SHIM_DIR:-$HERE/shim_ps}"
 A0_MAIN="${A0_MAIN:-$HERE/sp_measure_a0_main.c}"
 A0_PORT="${A0_PORT:-$HERE/sp_measure_a0_port.h}"
+A0_CONSOLE_HDR="${A0_CONSOLE_HDR:-$HERE/sp_measure_a0_console.h}"
 HAL_DRV="${HAL_DRV:-$REPO_ROOT/rt-thread-master/rt-thread-master/bsp/novosns/ns800/libraries/HAL_Drivers/drivers}"
 GROUP_TIMEOUT="${A0_GROUP_TIMEOUT:-90}"
 OUT_DIR="${A0_OUT_DIR:-$(env_work_root)/a0}"
@@ -49,7 +62,7 @@ WORST=0
 
 # ------------------------------------------------------------------ 组与逐组必需用例
 # 组名 -> 该组**必须真执行且判 PASS** 的用例 id（与夹具 CASE/RESULT 行逐字一致）。
-A0_GROUPS="off counter contract conc batch cli ledger pack"
+A0_GROUPS="off counter contract conc batch cli ledger pack export"
 G_off_ids="TMA01"
 G_counter_ids="TMA03 TMA02 TMA04 TMA05 TMA06 TMA21 TMA22 TMA23"
 G_contract_ids="TMA07 TMA08 TMA09 TMA10"
@@ -58,10 +71,12 @@ G_batch_ids="TMA14 TMA15 TMA16"
 G_cli_ids="TMA17 TMA19 TMA20"
 G_ledger_ids="TMA18"
 G_pack_ids="TMA24"
+G_export_ids="TMA25 TMA26 TMA27"
 # 每个可执行体跑哪些组
 OFF_GROUPS="off"
-ON_GROUPS="counter contract conc batch cli ledger pack"
-ALL_IDS="$G_off_ids $G_counter_ids $G_contract_ids $G_conc_ids $G_batch_ids $G_cli_ids $G_ledger_ids $G_pack_ids"
+ON_GROUPS="counter contract conc batch cli ledger pack export"
+MIN_GROUPS="export"
+ALL_IDS="$G_off_ids $G_counter_ids $G_contract_ids $G_conc_ids $G_batch_ids $G_cli_ids $G_ledger_ids $G_pack_ids $G_export_ids"
 
 # 反向家族在每个组里**期望**判 FAIL 的身份（其余组必须全 PASS）。
 rev_expect() {                          # $1=家族名 $2=组名
@@ -69,6 +84,7 @@ rev_expect() {                          # $1=家族名 $2=组名
     case "$1|$2" in
       "rev_spm_unavailable_is_valid|counter") echo "TMA02 TMA03 TMA21" ;;
       "rev_spm_snapshot_after_unmask|conc")   echo "TMA11" ;;
+      "rev_export_header_single_limited_kprintf|export") echo "TMA27" ;;
       *)                                      echo "" ;;
     esac
 }
@@ -79,6 +95,7 @@ rev_expect() {                          # $1=家族名 $2=组名
 [ -f "$SRC_APP/sp_measure_a0.h" ]  || { note "FATAL: 记录器接口不存在"; exit 127; }
 [ -f "$A0_MAIN" ] || { note "FATAL: 夹具不存在: $A0_MAIN"; exit 127; }
 [ -f "$A0_PORT" ] || { note "FATAL: 端口头不存在: $A0_PORT"; exit 127; }
+[ -f "$A0_CONSOLE_HDR" ] || { note "FATAL: 控制台模型头不存在: $A0_CONSOLE_HDR"; exit 127; }
 [ -d "$SHIM_DIR" ] || { note "FATAL: 兼容层目录不存在: $SHIM_DIR"; exit 127; }
 
 if ! OUT_DIR="$(require_outside_repo "$OUT_DIR" "A0_OUT_DIR")"; then
@@ -124,6 +141,9 @@ fi
 
 FLAGS="-std=gnu11 -Wall -Wextra -Wno-unused-function -mthreads"
 INCS=(-I "$HERE" -I "$SHIM_DIR" -I "$SRC_APP" -I "$HAL_DRV")
+# 控制台长度模型：对三个编译单元(stop_priority.c / sp_measure_a0.c / 夹具)统一生效。
+# 这是 A0 链专用适配(-include 只在本 runner 里给), 公共 shim_ps 一个字节都没改。
+FORCE_INC=(-include "$A0_CONSOLE_HDR")
 COMPAT="$OUT_DIR/compat"
 mkdir -p "$COMPAT" || { note "FATAL: 无法创建兼容头目录"; exit 4; }
 printf '#ifndef NS800_HOST_RTDEF_COMPAT_H\n#define NS800_HOST_RTDEF_COMPAT_H\n#include <rtthread.h>\n#endif\n' \
@@ -144,7 +164,7 @@ note "GCC=$GCC"
 note "NM=${NM:-NM_MISSING}"
 note "选择组=$SELECTED"
 
-build_variant() {                    # $1=off|on  $2..=额外 -D
+build_variant() {                    # $1=off|on|min  $2..=额外 -D
     local name="$1"; shift
     local log="$OUT_DIR/build_$name.txt"
     local extra=()
@@ -152,7 +172,7 @@ build_variant() {                    # $1=off|on  $2..=额外 -D
     [ "$name" = "off" ] && extra=(-DNS800_SPM_HOST_BACKEND)
     while [ $# -gt 0 ]; do extra+=("$1"); shift; done
     local exe="$OUT_DIR/a0_$name.exe"
-    "$GCC" $FLAGS "${extra[@]}" "${INCS[@]}" -Wl,--wrap=printf \
+    "$GCC" $FLAGS "${extra[@]}" "${INCS[@]}" "${FORCE_INC[@]}" -Wl,--wrap=printf \
         "$A0_MAIN" "$SRC_APP/sp_measure_a0.c" "$SRC_APP/stop_priority.c" \
         -o "$exe" > "$log" 2>&1
     local rc=$?
@@ -304,6 +324,10 @@ symbol_check() {
 BUILD_OK=1
 build_variant off || { note "正向: a0_off 构建失败 => INFRA-FAIL"; remember 4; BUILD_OK=0; }
 build_variant on  || { note "正向: a0_on 构建失败 => INFRA-FAIL"; remember 4; BUILD_OK=0; }
+# 精简容量构建: 唯一目的是让"头行(490 B)超过容量"成为可执行路径 => TMA27 在该构建里判
+# 具名 EXPORT_ERROR + dump=-3 + 无半条记录。生产两个 Keil 目标都不定义 SPM_TEXT_CAP。
+build_variant min -DNS800_TARGET_MEASUREMENT_A0=1 -DNS800_SPM_HOST_BACKEND -DSPM_TEXT_CAP=256 \
+    || { note "正向: a0_min 构建失败 => INFRA-FAIL"; remember 4; BUILD_OK=0; }
 
 if [ "$BUILD_OK" = "1" ]; then
     note "--- 符号存在性(编译期绕开的可判定证据) ---"
@@ -314,6 +338,7 @@ if [ "$BUILD_OK" = "1" ]; then
         case " $ON_GROUPS " in *" $g "*)
             # a0_on 里也允许显式选 off 组(它自己不跑测量用例), 但 off 组只在 a0_off 上跑
             run_group on "$g" ;; esac
+        case " $MIN_GROUPS " in *" $g "*) run_group min "$g" ;; esac
     done
 fi
 
@@ -362,6 +387,15 @@ spec = {
      "    rt_hw_interrupt_enable(l);              /* 原 sp_end 第三条 */\n    spm_publish(c, api_rc, branch_id, pwm_called, low_called);",
      "    rt_hw_interrupt_enable(l);              /* 原 sp_end 第三条 */\n    %s\n    spm_pin_state(c);\n    spm_publish(c, api_rc, branch_id, pwm_called, low_called);" % CM),
   ],
+  # 复审 §5.6 的新增具名反向: 把修后的 CSV 头行导出**退回单条受限 rt_kprintf**
+  # (整行 490 B > 控制台 128 B 缓冲)。控制台模型必须让它剪成 127 字节 + NUL,
+  # 由新增的导出用例 TMA27 具名检出; 其余每组用例与台账合同保持原样(所以只有 export
+  # 组允许出现失败, 且失败身份必须恰好是 TMA27)。
+  "rev_export_header_single_limited_kprintf": [
+    ("sp_measure_a0.c",
+     '    rc_line = spm_emitf("schema,gen,slot,entry,ctx_isr,saved_primask,rel_ok,proof_null,exp_epoch,"',
+     '    rc_line = rt_kprintf("schema,gen,slot,entry,ctx_isr,saved_primask,rel_ok,proof_null,exp_epoch,"'),
+  ],
 }.get(fam, [])
 if not spec:
     raise SystemExit("NOSPEC %s" % fam)
@@ -381,6 +415,7 @@ PY
         local rlog="$work/build.txt"
         "$GCC" $FLAGS -DNS800_TARGET_MEASUREMENT_A0=1 -DNS800_SPM_HOST_BACKEND \
             -I "$HERE" -I "$SHIM_DIR" -I "$work/app" -I "$SRC_APP" -I "$HAL_DRV" -I "$COMPAT" \
+            "${FORCE_INC[@]}" \
             -Wl,--wrap=printf "$A0_MAIN" "$work/app/sp_measure_a0.c" "$work/app/stop_priority.c" \
             -o "$work/a0_rev.exe" > "$rlog" 2>&1
         if [ $? -ne 0 ]; then
@@ -425,6 +460,7 @@ PY
     }
     run_reverse rev_spm_unavailable_is_valid
     run_reverse rev_spm_snapshot_after_unmask
+    run_reverse rev_export_header_single_limited_kprintf
 
     # ---------------- 判定器自身的负控（复审 A0-04）----------------
     # 只在**反向构建的夹具副本**里省略非锚身份 TMA18 的 RESULT 行(保留 CASE/SUMMARY/退出码)，
@@ -455,7 +491,7 @@ PY
             remember 4
         else
             "$GCC" $FLAGS -DNS800_TARGET_MEASUREMENT_A0=1 -DNS800_SPM_HOST_BACKEND \
-                "${INCS[@]}" -Wl,--wrap=printf \
+                "${INCS[@]}" "${FORCE_INC[@]}" -Wl,--wrap=printf \
                 "$NEG_DIR/fixture_omit_tma18_result.c" "$SRC_APP/sp_measure_a0.c" \
                 "$SRC_APP/stop_priority.c" -o "$NEG_DIR/a0_neg.exe" \
                 > "$NEG_DIR/build.txt" 2>&1

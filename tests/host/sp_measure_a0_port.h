@@ -62,4 +62,12 @@ void port_window_close(void);
 int  port_window_violations(void);
 const char *port_window_last_violation(void);
 
+/* ---- 导出通道（TMA25..TMA27，BOARD-A-01） ----
+ * spm_test_emit_long() 定义在生产文件里、仅在 NS800_SPM_HOST_BACKEND 下编译，
+ * 目标上不存在这个符号；它唯一的作用是造出一条必然超过 SPM_TEXT_CAP 的整行，
+ * 用来判定"具名 EXPORT_ERROR + 负返回 + 不发半条内容"。
+ * 控制台模型本体（a0_kprintf/a0_kputs/a0_rt_vsnprintf + 逐字节捕获）见
+ * tests/host/sp_measure_a0_console.h 的文件头注释。 */
+int spm_test_emit_long(int pad);
+
 #endif /* SP_MEASURE_A0_PORT_H */

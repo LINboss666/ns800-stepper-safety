@@ -235,6 +235,25 @@ void spm_stop_accepting(void);
 int  spm_dump_records(void);
 int  spm_clear_records(void);
 int  spm_trip_once(void);            /* 只做一次正式 safety_force_shutdown(FAULT_SELF_TEST) */
+
+/* ---- 导出通道容量与"导出失败"结论码（BOARD-A-01 修复） ----
+ * 目标侧 rt_kprintf 借 128 字节的 static rt_log_buf 格式化（src/kservice.c:391-411,
+ * rtconfig.h:107 RT_CONSOLEBUF_SIZE=128），超长行会被静默剪断并把 NUL 一起送上控制台，
+ * 因此本模块的整行走 spm_emitf()：rt_vsnprintf 到调用方栈上的 SPM_TEXT_CAP 缓冲，
+ * 再经 rt_kputs() 按实际长度一次送出。
+ * 容量不足（整行 UTF-8 字节数 >= SPM_TEXT_CAP）时的合同：
+ *   - 只发一条短 ASCII "[spm] EXPORT_ERROR: line_overflow need=.. cap=.."；
+ *   - **不发送已截断的半条记录/半条头行**；
+ *   - spm_dump_records() 返回 -3；spm_cmd 的 cap/status 报告分支返回 SPM_ERR_EXPORT。
+ * 采集侧据此拒绝发送 clear_records 与下一批触发（见 tests/host/a0_export_gate.py）。
+ * 记录布局(120 B)、47 列顺序/名字/格式、64 槽、有效性判据、门控、时间戳位置与三入口
+ * 保护逻辑均不受影响。
+ * SPM_TEXT_CAP 允许被 -D 覆盖只为主机反向用例（精简容量构建）造出可判定的"容量不足"路径；
+ * 目标两个 Keil 目标都不定义它，因此目标上恒为 640（以本轮构建日志与 map 为证）。 */
+#ifndef SPM_TEXT_CAP
+#define SPM_TEXT_CAP      640
+#endif
+#define SPM_ERR_EXPORT    3
 #endif /* NS800_TARGET_MEASUREMENT_A0 */
 
 /* ---------------- 编译期适配（默认目标只走原语） ----------------
