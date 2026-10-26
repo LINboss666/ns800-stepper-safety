@@ -235,5 +235,207 @@
     "FIRMWARE_AND_IMAGE_BYTES_UNCHANGED",
     "NO BUILD / NO FLASH READ / NO PROGRAM / NO RESET / NO SERIAL / NO MOTOR / NO STEP_ENABLE"
   ],
-  "evidence_commit": "098fec16350150697ccb6f2eb8f057c216e84cb0"
+  "evidence_commit": "098fec16350150697ccb6f2eb8f057c216e84cb0",
+  "remote_readback": {
+    "authority": "GitHub 端对象(git ls-remote + contents API), 不采信本地工作树字节",
+    "branch_head_observed": "0d9d47377ba66a20693171d6ada80123e9eb6af6",
+    "refs": {
+      "refs/heads/main": "1b3757eec550802a3973e66790af422d81d3d373",
+      "refs/heads/phase7/full-embedded-software": "6d3fbc559d45673d7550eb73dec5a4ade5bb34df",
+      "refs/heads/phase8/tmc-drive-config": "0d9d47377ba66a20693171d6ada80123e9eb6af6",
+      "refs/tags/v0.7-phase7-software-board-validated": "097935fec5a6f2467261ab1ad449ff0b1d398250",
+      "refs/tags/v0.7-phase7-software-board-validated^{}": "e40a9b95ef709e6a80444f9f3949dfdd70ba96ba"
+    },
+    "frozen_source_vs_accepted_firmware_code_commit": [
+      {
+        "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/sp_measure_a0.c",
+        "bytes": 46074,
+        "blob": "e13b98fef6799a34cc5045567ad2a4dc003d035e",
+        "downloaded_bytes": 46074,
+        "sha256_of_downloaded_bytes": "cf60d0b4c88d6581ab4694b87a909252f9e6425a88e449596236ff9f154d63f9",
+        "compared_against": "cd8d9f095030c08634a082dd2bb9bc622d92fb1d",
+        "blob_matches": true,
+        "classification": "frozen_source_unchanged"
+      },
+      {
+        "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/sp_measure_a0.h",
+        "bytes": 16067,
+        "blob": "e355aa6d434233424e2e5c12f3e5d9379757fa6d",
+        "downloaded_bytes": 16067,
+        "sha256_of_downloaded_bytes": "937385aaa8fa32a314b889015d20ab454dac94a5285034b2869d3950b5e2c231",
+        "compared_against": "cd8d9f095030c08634a082dd2bb9bc622d92fb1d",
+        "blob_matches": true,
+        "classification": "frozen_source_unchanged"
+      },
+      {
+        "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/stop_priority.c",
+        "bytes": 61993,
+        "blob": "9942fc7ac8a5be106d8f4166e23f7e1a354231cb",
+        "downloaded_bytes": 61993,
+        "sha256_of_downloaded_bytes": "2ba8a9f49913a8b9a13d99a90e8a011b569261d0890d9cf52145862e8138cdb8",
+        "compared_against": "cd8d9f095030c08634a082dd2bb9bc622d92fb1d",
+        "blob_matches": true,
+        "classification": "frozen_source_unchanged"
+      },
+      {
+        "path": "tests/host/sp_measure_a0_main.c",
+        "bytes": 92654,
+        "blob": "bb77caff32d83a5bb0f086b203b94aff94ea3a65",
+        "downloaded_bytes": 92654,
+        "sha256_of_downloaded_bytes": "90739d84da6d2d30719f4268f693bc1da2d0acb24670b152f221a9f57658749a",
+        "compared_against": "cd8d9f095030c08634a082dd2bb9bc622d92fb1d",
+        "blob_matches": true,
+        "classification": "frozen_source_unchanged"
+      },
+      {
+        "path": "tests/host/sp_measure_a0_console.h",
+        "bytes": 4914,
+        "blob": "7488b3de0dd4abd16a703aea7ab27a4330310704",
+        "downloaded_bytes": 4914,
+        "sha256_of_downloaded_bytes": "10526bfb37dcce6bc428bf17223c84b654022e8c60c34cac1196f0fa6414e48c",
+        "compared_against": "cd8d9f095030c08634a082dd2bb9bc622d92fb1d",
+        "blob_matches": true,
+        "classification": "frozen_source_unchanged"
+      },
+      {
+        "path": "tests/host/run_sp_measure_a0.sh",
+        "bytes": 29199,
+        "blob": "9758dbc087c08e030702d6a63989223bf356bf5b",
+        "downloaded_bytes": 29199,
+        "sha256_of_downloaded_bytes": "70c4a185f63e6bcb6c06aac037e75aa01125c85ea657f9e9761915221f90016a",
+        "compared_against": "cd8d9f095030c08634a082dd2bb9bc622d92fb1d",
+        "blob_matches": true,
+        "classification": "frozen_source_unchanged"
+      },
+      {
+        "path": "tests/host/shim_ps/rtthread.h",
+        "bytes": 6712,
+        "blob": "7ed2f491247540d8110333c97539cb6530ad7683",
+        "downloaded_bytes": 6712,
+        "sha256_of_downloaded_bytes": "2db6eecb1686468627f3361162efeca725069aed389b94b9d8334ba29451b32c",
+        "compared_against": "cd8d9f095030c08634a082dd2bb9bc622d92fb1d",
+        "blob_matches": true,
+        "classification": "frozen_source_unchanged"
+      },
+      {
+        "path": "tests/host/run_stop_result_s1.sh",
+        "bytes": 23422,
+        "blob": "b08136754872d5c08a39fa332da4cce93bc1bfd4",
+        "downloaded_bytes": 23422,
+        "sha256_of_downloaded_bytes": "3ff404fa07b28b57aaae56b61139318881874a7d2a0aadbe7d6cb6247c05c64d",
+        "compared_against": "cd8d9f095030c08634a082dd2bb9bc622d92fb1d",
+        "blob_matches": true,
+        "classification": "frozen_source_unchanged"
+      },
+      {
+        "path": "tests/host/run_stop_priority_s2.sh",
+        "bytes": 42382,
+        "blob": "8caf16df489558551e59e330290861ad3b35f775",
+        "downloaded_bytes": 42382,
+        "sha256_of_downloaded_bytes": "28bb656360f3e8dfeb9a3a271166c8e6b2abee4c552defc5557cac56e12e6a17",
+        "compared_against": "cd8d9f095030c08634a082dd2bb9bc622d92fb1d",
+        "blob_matches": true,
+        "classification": "frozen_source_unchanged"
+      }
+    ],
+    "frozen_image_vs_task_book_section_3": [
+      {
+        "path": "reports/firmware/phase8-target-measurement-a0-export-r1/default.bin",
+        "bytes": 251148,
+        "blob": "dbdc050bf9926febcd639a3ab22bf5716a659ef7",
+        "downloaded_bytes": 251148,
+        "sha256_of_downloaded_bytes": "02e984583255f3414f43fb5c077dc9ba82eba98553d2cb9d7f7feee9336ebd80",
+        "compared_against": "fe3b64b40d009fb5f1527bb05e9dddb0dc454f72",
+        "blob_matches": true,
+        "classification": "frozen_image_identity",
+        "task_book_section_3_sha256": "02e984583255f3414f43fb5c077dc9ba82eba98553d2cb9d7f7feee9336ebd80",
+        "sha256_matches_task_book": true
+      },
+      {
+        "path": "reports/firmware/phase8-target-measurement-a0-export-r1/measure-a0.bin",
+        "bytes": 261452,
+        "blob": "287d40d4dafc2be109e45b116492a7d9deb91112",
+        "downloaded_bytes": 261452,
+        "sha256_of_downloaded_bytes": "5f30d3f058ceff516b2185aa3a1e597bbe63293b94a6fd801fd989a6f7b2b8e6",
+        "compared_against": "fe3b64b40d009fb5f1527bb05e9dddb0dc454f72",
+        "blob_matches": true,
+        "classification": "frozen_image_identity",
+        "task_book_section_3_sha256": "5f30d3f058ceff516b2185aa3a1e597bbe63293b94a6fd801fd989a6f7b2b8e6",
+        "sha256_matches_task_book": true
+      }
+    ],
+    "edited_in_scope_vs_task_start": [
+      {
+        "path": "reports/reviews/phase8-target-measurement-a0-export-r1/board_raw_archive.md",
+        "bytes": 113001,
+        "blob": "a38411a549a1f903cc19e78412d35bd6109b5772",
+        "downloaded_bytes": 113001,
+        "sha256_of_downloaded_bytes": "339f0d8da7aa6ec5eb1982fb57d63aeb28fa265eabce61de82c4cf23e8bda7a9",
+        "compared_against": "fe3b64b40d009fb5f1527bb05e9dddb0dc454f72",
+        "blob_matches": false,
+        "classification": "edited_in_scope_this_round",
+        "blob_differs_from_task_start": true
+      },
+      {
+        "path": "reports/reviews/phase8-target-measurement-a0-export-r1/retest_candidate_plan.md",
+        "bytes": 6669,
+        "blob": "469972ddc7e3b057be6cf2a99c6bdd07718d9bfe",
+        "downloaded_bytes": 6669,
+        "sha256_of_downloaded_bytes": "08a6d6f7050a57ed2300c48615ce15db672352169e9b488df7bfdb4edecf7c99",
+        "compared_against": "fe3b64b40d009fb5f1527bb05e9dddb0dc454f72",
+        "blob_matches": false,
+        "classification": "edited_in_scope_this_round",
+        "blob_differs_from_task_start": true
+      }
+    ],
+    "new_this_round": [
+      {
+        "path": "tests/host/a0_export_gate.py",
+        "bytes": 47964,
+        "blob": "658216314b6c6e2a30a2814ba49cec33c8e9c6f4",
+        "downloaded_bytes": 47964,
+        "sha256_of_downloaded_bytes": "ba88f37bb3fd8b64e6e19bd5984aab5bacf69de108b218f90241431fd3814222",
+        "compared_against": "fe3b64b40d009fb5f1527bb05e9dddb0dc454f72",
+        "blob_matches": false,
+        "classification": "new_this_round"
+      },
+      {
+        "path": "reports/agent_handoffs/phase8-target-measurement-a0-export-gate-r2.json",
+        "bytes": 14160,
+        "blob": "cbd73a34e8cc37173793d77517535c5a3a413bf4",
+        "downloaded_bytes": 14160,
+        "sha256_of_downloaded_bytes": "3e6c8859a4308c6b70915e056bf0f8d71eb1e116f2b63998b86bdc9b8eb0b5c4",
+        "compared_against": "fe3b64b40d009fb5f1527bb05e9dddb0dc454f72",
+        "blob_matches": "path 在该提交里不存在",
+        "classification": "new_this_round"
+      },
+      {
+        "path": "reports/agent_handoffs/phase8-target-measurement-a0-export-gate-r2.md",
+        "bytes": 11681,
+        "blob": "994eb72de13a4c39f3bc1affe4f2fba8c1e028e0",
+        "downloaded_bytes": 11681,
+        "sha256_of_downloaded_bytes": "d004f8abb4897735299adfeba203172984f8314e78dae7046e46a104e1b2eb1f",
+        "compared_against": "fe3b64b40d009fb5f1527bb05e9dddb0dc454f72",
+        "blob_matches": "path 在该提交里不存在",
+        "classification": "new_this_round"
+      },
+      {
+        "path": "reports/reviews/phase8-target-measurement-a0-export-gate-r2/gate_r2_verification.txt",
+        "bytes": 26638,
+        "blob": "cb2e768ffb4a52265d0450dc35021052ac55ead0",
+        "downloaded_bytes": 26638,
+        "sha256_of_downloaded_bytes": "4d01ab56534e0241887c825411ad33e0b57afa6b6c1d409a1bd6d16768a3a59b",
+        "compared_against": "fe3b64b40d009fb5f1527bb05e9dddb0dc454f72",
+        "blob_matches": "path 在该提交里不存在",
+        "classification": "new_this_round"
+      }
+    ],
+    "gate_run_on_downloaded_remote_bytes": {
+      "selftest": "GATE-SELFTEST-SUMMARY pass=60 fail=0 cases=46",
+      "selftest_meta": "GATE-META-SUMMARY ok=7 blocked=2 bad=0 guards=9 required=5",
+      "check_header_against_source_rc": 0,
+      "note": "执行对象是远端取回的 47964 B 门字节本身, 不是本地文件"
+    },
+    "caveat": "本条登记写于回读之后, 所以 new_this_round 里 handoff JSON/MD/证据 的 blob 是\"加入本条之前\"的字节; 登记提交自身的提交号无法出现在自己内部, 由回执单独给出。"
+  }
 }

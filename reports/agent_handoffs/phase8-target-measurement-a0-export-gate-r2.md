@@ -132,7 +132,22 @@ SKIP**——它在本机不在可读位置、且本轮不重连设备，所以�
 | `gate_code_commit` `d4d337a3580cbe5aea85d98b0317761b5c04c403` | 仅 `tests/host/a0_export_gate.py`（门字节态 A：47960 B，blob `f170e1af…`，sha256 `b08e7bdc…`；GATE-R2-01/02 的实质返修全在这里） |
 | 证据/交接提交 `098fec16350150697ccb6f2eb8f057c216e84cb0` | `gate_r2_verification.txt` + 两个上轮文件的范围内修正 + 本交接 MD/JSON；门字节态 B 也在这里（47964 B，blob `6582163…`，sha256 `ba88f37b…`；相对态 A 只改一行用例描述字符串以过尾随空白检查，判定逻辑与用例输入未动，本轮结果都在态 B 上取）。本交接对提交号的登记写在该提交之后的一次小提交里 |
 
-## 9. STOP
+## 9. 远端独立回读（身份取自 GitHub 端对象，不取本地工作树）
+
+`ls-remote` 观测：`refs/heads/phase8/tmc-drive-config = 0d9d47377ba66a20693171d6ada80123e9eb6af6`；
+冻结引用未移动 —— `main=1b3757ee…`、`phase7/full-embedded-software=6d3fbc55…`、
+tag 对象 `097935fe…`、dereference `e40a9b95…`。
+
+按该 ref 用 contents API 取回并直算字节：门 `tests/host/a0_export_gate.py` 47964 B，
+blob `6582163…`，sha256 `ba88f37b…`（= 登记的态 B）；把这份**远端取回的字节**直接执行，
+得到 `--selftest pass=60 fail=0 cases=46`、`--selftest-meta ok=7 blocked=2 bad=0 guards=9 required=5`。
+两份冻结 BIN 也按远端原始字节复算：`default.bin` 251148 B `02e98458…`、
+`measure-a0.bin` 261452 B `5f30d3f0…`，与任务书 §3 一致；
+`sp_measure_a0.c` 远端 blob `e13b98fe…` 与 `cd8d9f09` 同值（远端固件源码未被本轮改动）。
+逐条 blob/字节/哈希见交接 JSON 的 `remote_readback`；其中 handoff JSON/MD 自身的 blob 是
+"加入该条之前"的字节（提交号无法出现在自己内部），最终 HEAD 以回执为准。
+
+## 10. STOP
 
 ```
 A0_EXPORT_GATE_R2_OFFLINE_READY / AWAITING_INDEPENDENT_GATE_REVIEW
