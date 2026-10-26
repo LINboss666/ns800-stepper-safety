@@ -1,0 +1,267 @@
+BOARD-A-01 采集门 R2 返修：离线验证原文与身份
+轮次 phase8-target-measurement-a0-export-gate-r2    日期 2026-10-26 (Asia/Shanghai)
+任务起点 fe3b64b40d009fb5f1527bb05e9dddb0dc454f72 (被审对象 = 上一轮 HEAD)
+accepted_firmware_code_commit cd8d9f095030c08634a082dd2bb9bc622d92fb1d (未改动)
+本轮只改 tests/host/a0_export_gate.py + 指定证据口径；hardware_actions=[]、builds_executed=[]、
+firmware_changed=false。全部为**离线**执行：不连串口、不连调试器、不发目标命令。
+
+====================================================================
+0. 被测门自身身份
+====================================================================
+  修后 tests/host/a0_export_gate.py  47964 字节  sha256 ba88f37bb3fd8b64e6e19bd5984aab5bacf69de108b218f90241431fd3814222
+  门字节有两个提交状态, 复审需按最终态判定:
+    态 A = gate_code_commit d4d337a3580cbe5aea85d98b0317761b5c04c403 里的门字节:
+           47960 字节 blob f170e1af09422425c63e05744a08961528a6eb77 sha256 b08e7bdc3d25fc09c7050f77fa09c8cb838bfdce0106b0f99675dd0e8b30636e
+           全部实质返修(批状态/帧边界/数值域/夹具/元负控)都在这一次提交里。
+    态 B = 最终门字节(随本证据提交入库, staged blob 658216314b6c6e2a30a2814ba49cec33c8e9c6f4): 47964 字节 sha256 ba88f37bb3fd8b64e6e19bd5984aab5bacf69de108b218f90241431fd3814222
+      两态差异 git diff = 1 文件 1 增 1 删, 只改 SELFTEST_CASES 里 GATE-R2-NEG-STATE-UNTERMINATED 的**描述字符串**(去掉字面 \n 以过 diff --check 尾随空白检查);
+      未改正则/判定逻辑/用例输入或期望结论。§1~§6 的全部离线结果都在态 B 上复算。
+  修前冻结副本(freeze/a0_export_gate_BASELINE.py) sha256 78a976ed43aac7fdf12619772fbae28fbb001d0bb6bc0f2a8026b2b7001feb07
+  (= cd8d9f09/fe3b64b 里的 blob; 修前件保留在仓外, 未被覆盖)
+  探针脚本(任务书 §5 逐字形状 + 输出落盘) sha256 6a1dfcb045d2f674cfd986fd2a52bf2bb9e656850fc8664d06397db81b664675
+
+====================================================================
+1. §5 基线探针：在未修改的 fe3b64b 门上先复现缺口（原文）
+====================================================================
+  注: CONTROL_HEALTHY 走 fixture(corrupt=progress) 因此基线也是 ACCEPT —— 它是正控;
+      缺口体现在下面 4 条状态/帧反例 + 2 条数值域 + 1 条"零进展却有效"。
+
+  | GATE_UNDER_TEST=freeze/a0_export_gate_BASELINE.py
+  | CONTROL_HEALTHY ACCEPT {'clear_records_send_count': 1, 'next_batch_trigger_send_count': 1, 'extra_protection_actions': 0} 3
+  | ACTIVE_STATE ACCEPT {'clear_records_send_count': 1, 'next_batch_trigger_send_count': 1, 'extra_protection_actions': 0} 3
+  | NUL_IN_STATE ACCEPT {'clear_records_send_count': 1, 'next_batch_trigger_send_count': 1, 'extra_protection_actions': 0} 3
+  | STATE_NUMERIC_SUFFIX ACCEPT {'clear_records_send_count': 1, 'next_batch_trigger_send_count': 1, 'extra_protection_actions': 0} 3
+  | EXTRA_ROW_AFTER_TAIL ACCEPT {'clear_records_send_count': 1, 'next_batch_trigger_send_count': 1, 'extra_protection_actions': 0} 3
+  | ZERO_PROGRESS_VALID_CLAIM ACCEPT {'clear_records_send_count': 1, 'next_batch_trigger_send_count': 1, 'extra_protection_actions': 0} 3
+  | I32_BOUNDARY -2147483648 (False, "pwm_raw_rc='-2147483648' 不合法(i32)")
+  | I32_BOUNDARY 2147483647 (False, "pwm_raw_rc='2147483647' 不合法(i32)")
+  | GEN_RANGE (True, None)
+
+====================================================================
+2. 同名同输入复跑：修后（原文）
+====================================================================
+  | GATE_UNDER_TEST=tests/host/a0_export_gate.py
+  | CONTROL_HEALTHY ACCEPT {'clear_records_send_count': 1, 'next_batch_trigger_send_count': 1, 'extra_protection_actions': 0} 3
+  | ACTIVE_STATE REJECT {'clear_records_send_count': 0, 'next_batch_trigger_send_count': 0, 'extra_protection_actions': 0} 0
+  | NUL_IN_STATE REJECT {'clear_records_send_count': 0, 'next_batch_trigger_send_count': 0, 'extra_protection_actions': 0} 0
+  | STATE_NUMERIC_SUFFIX REJECT {'clear_records_send_count': 0, 'next_batch_trigger_send_count': 0, 'extra_protection_actions': 0} 0
+  | EXTRA_ROW_AFTER_TAIL REJECT {'clear_records_send_count': 0, 'next_batch_trigger_send_count': 0, 'extra_protection_actions': 0} 0
+  | ZERO_PROGRESS_VALID_CLAIM REJECT {'clear_records_send_count': 0, 'next_batch_trigger_send_count': 0, 'extra_protection_actions': 0} 0
+  | I32_BOUNDARY -2147483648 (True, None)
+  | I32_BOUNDARY 2147483647 (True, None)
+  | GEN_RANGE (False, "gen='4294967296' 不合法(gen_u32)")
+
+  逐项对照:
+    CONTROL_HEALTHY          ACCEPT -> ACCEPT   (正控保持, clear/next=1, 纳入 3 条)
+    ACTIVE_STATE             ACCEPT -> REJECT   (state=1 不再授权清理)
+    NUL_IN_STATE             ACCEPT -> REJECT   (状态行 NUL 检出了)
+    STATE_NUMERIC_SUFFIX     ACCEPT -> REJECT   (dropped=0BAD 前缀伪匹配不再放行)
+    EXTRA_ROW_AFTER_TAIL     ACCEPT -> REJECT   (汇总后的额外记录算帧污染)
+    ZERO_PROGRESS_VALID_CLAIM ACCEPT -> REJECT  (上一轮被误用为正控的原始输入, 原样保留)
+    I32 -2147483648 / 2147483647  拒 -> 合法   (改用 -(1<<31)..(1<<31)-1)
+    GEN 4294967296           合法 -> 拒          (补 uint32 上界)
+
+====================================================================
+3. --selftest 逐例判定原文（46 例 + 语义/边界补充 = 60 项断言）
+====================================================================
+  GATE-SELFTEST 逐例判定（REJECT 例还必须命中预期的具名失败原因, 且 clear/next 计划数为 0）
+    GATE-POS-COMPLETE                  verdict=ACCEPT clear=1 next=1 OK        正控: 3 条完整且真实进展
+    GATE-POS-BODY-INVALID              verdict=ACCEPT clear=1 next=1 OK        正控: 完整但 body_valid=0(零进展输入原样, 它不声称有效)
+    GATE-POS-STATE-TRANSITION          verdict=ACCEPT clear=1 next=1 OK        正控: stop 仍在途 -> 收尾 status 在途 0(合法过渡, 取最后可靠证据)
+    GATE-POS-LF-ONLY                   verdict=ACCEPT clear=1 next=1 OK        正控: 设备只发 LF(无 CR)同样合法
+    GATE-POS-STATUS-ENTRY-OK           verdict=ACCEPT clear=1 next=1 OK        正控: 收尾 status 的 entry 与本批一致
+    GATE-POS-I32-BOUNDS                verdict=ACCEPT clear=1 next=1 OK        正控: i32 两极端值合法(-2^31 与 2^31-1 同批)
+    GATE-NEG-TRUNC-HEADER              verdict=REJECT clear=0 next=0 OK        负控: 头行剪成 126 可见字节 + NUL 并与数据行粘连
+    GATE-NEG-ROW-NUL-GLUED             verdict=REJECT clear=0 next=0 OK        负控: 数据行漏 NUL 粘连下一行
+    GATE-NEG-MISSING-COLUMN            verdict=REJECT clear=0 next=0 OK        负控: 少一列
+    GATE-NEG-DUP-SLOT                  verdict=REJECT clear=0 next=0 OK        负控: slot 重复
+    GATE-NEG-INCOMPLETE                verdict=REJECT clear=0 next=0 OK        负控: 帧内出现 INCOMPLETE 槽导出
+    GATE-NEG-ROW-ABSENT                verdict=REJECT clear=0 next=0 OK        负控: 条数不足(预期 3 实际 2)
+    GATE-NEG-ASYNC-IN-BLOCK            verdict=REJECT clear=0 next=0 OK        负控: 异步日志插进 CSV 帧内
+    GATE-NEG-DROPPED                   verdict=REJECT clear=0 next=0 OK        负控: dropped 非 0
+    GATE-NEG-SCHEMA1                   verdict=REJECT clear=0 next=0 OK        负控: schema 不是 2
+    GATE-NEG-GEN-GAP                   verdict=REJECT clear=0 next=0 OK        负控: 代次跳号
+    GATE-NEG-INFLIGHT                  verdict=REJECT clear=0 next=0 OK        负控: 收尾状态 in_flight 非 0
+    GATE-NEG-BAD-ENUM                  verdict=REJECT clear=0 next=0 OK        负控: counter_status 取值非法
+    GATE-NEG-EXPORT-ERROR              verdict=REJECT clear=0 next=0 OK        负控: 目标自己报了 EXPORT_ERROR
+    GATE-NEG-HEADER-DRIFT              verdict=REJECT clear=0 next=0 OK        负控: 头行列名被改名(不逐字匹配)
+    GATE-NEG-NO-STATE-LINE             verdict=REJECT clear=0 next=0 OK        负控: 批状态行整条缺失
+    GATE-NEG-BAD-GATE-BITS             verdict=REJECT clear=0 next=0 OK        负控: gates 写成十进制(不是 0x0f 形状)
+    GATE-R2-NEG-ACTIVE-STATE           verdict=REJECT clear=0 next=0 OK        负控: 收尾 state=1(ACTIVE) 不得授权清理
+    GATE-R2-NEG-IDLE-STATE             verdict=REJECT clear=0 next=0 OK        负控: 收尾 state=0(IDLE) 同样不得作为批收尾依据
+    GATE-R2-NEG-NUL-IN-STATE           verdict=REJECT clear=0 next=0 OK        负控: 状态行 dropped=0 之后插入 NUL(整行形状也被破坏)
+    GATE-R2-NEG-NUL-IN-STATE-TAIL      verdict=REJECT clear=0 next=0 OK        负控: NUL 只在状态行括注里(整行仍匹配协议) => NUL 检测必须是唯一原因
+    GATE-R2-NEG-STATE-NUMERIC-SUFFIX   verdict=REJECT clear=0 next=0 OK        负控: dropped=0BAD 前缀伪匹配必须拒
+    GATE-R2-NEG-STATE-RECORDS-GLUE     verdict=REJECT clear=0 next=0 OK        负控: records=3BAD(数字令牌被污染)
+    GATE-R2-NEG-STATUS-DROPPED-GLUE    verdict=REJECT clear=0 next=0 OK        负控: status 行 dropped=0BAD(整行锚定必须拒)
+    GATE-R2-NEG-STATE-UNTERMINATED     verdict=REJECT clear=0 next=0 OK        负控: 协议行没有结尾换行(其换行被剪掉且其后无字节)
+    GATE-R2-NEG-EXTRA-ROW-AFTER-TAIL   verdict=REJECT clear=0 next=0 OK        负控: 汇总行之后又来一条数据行(帧外记录唯一原因)
+    GATE-R2-NEG-INCOMPLETE-AFTER-TAIL  verdict=REJECT clear=0 next=0 OK        负控: 汇总后又出现 INCOMPLETE 导出
+    GATE-R2-NEG-SECOND-HEADER          verdict=REJECT clear=0 next=0 OK        负控: 帧后再来一条头行(重复头/帧污染)
+    GATE-R2-NEG-SECOND-TAIL            verdict=REJECT clear=0 next=0 OK        负控: 帧后再来一条 dump 汇总
+    GATE-R2-NEG-STATE-AFTER-TAIL       verdict=REJECT clear=0 next=0 OK        负控: 汇总后又出现状态行, 不得当本批依据
+    GATE-R2-NEG-STATUS-ENTRY-MISMATCH  verdict=REJECT clear=0 next=0 OK        负控: 收尾 status 的 entry 与本批不同
+    GATE-R2-NEG-STATUS-ENTRY-DASH      verdict=REJECT clear=0 next=0 OK        负控: 收尾 status records>0 却 entry=- (身份不自洽)
+    GATE-R2-NEG-STATE-RECORDS-MISMATCH verdict=REJECT clear=0 next=0 OK        负控: 状态行 records 与预期不符(不拼接凑成功)
+    GATE-R2-NEG-ROW-ENTRY-MISMATCH     verdict=REJECT clear=0 next=0 OK        负控: 某条记录 entry 与本批不同
+    GATE-R2-NEG-ZERO-PROGRESS-VALID-CLAIM verdict=REJECT clear=0 next=0 OK        负控: body_valid=1 但 body_end==body_begin(上一轮误用为正控的输入, 原样保留)
+    GATE-R2-NEG-VALID-WITH-WRAP        verdict=REJECT clear=0 next=0 OK        负控: body_valid=1 但 body_end<body_begin(回绕不当有效差分)
+    GATE-R2-NEG-GEN-OVER-U32           verdict=REJECT clear=0 next=0 OK        负控: gen=4294967296 超 uint32 上界必须拒(单条批, 唯一原因)
+    GATE-R2-NEG-U32-OVER-MAX           verdict=REJECT clear=0 next=0 OK        负控: pre=2^32 超 uint32 上界必须拒
+    GATE-R2-NEG-I32-OVER-MAX           verdict=REJECT clear=0 next=0 OK        负控: outcome=2^31 越界必须拒
+    GATE-R2-NEG-I32-UNDER-MIN          verdict=REJECT clear=0 next=0 OK        负控: pwm_raw_rc=-(2^31)-1 越界必须拒
+    GATE-R2-NEG-SLOT-OVER              verdict=REJECT clear=0 next=0 OK        负控: slot=64 超槽范围必须拒
+    语义与字段边界补充:
+    GATE-POS-INVALID-ARCHIVED                  完整但无效: 解析并存档 3 条 / 纳入 0 条 / 不追加保护动作                        OK
+    GATE-POS-TIMING-INCLUDE                    COUNTER_OK + body_valid=1 + gates=0x0f + reason<=0x0100 + 有进展 => 纳入 3 条 OK
+    GATE-NEG-TIMING-UNTRUSTED                  REJECT 批: trusted=False, included/excluded 计数清零, 只留 observed 观测 OK
+    GATE-POS-FIELD-BOUNDARY pwm_raw_rc=-2147483648 合法边界必须判合法                                                  OK
+    GATE-POS-FIELD-BOUNDARY outcome=2147483647 合法边界必须判合法                                                  OK
+    GATE-POS-FIELD-BOUNDARY permit_write_rc=0  合法边界必须判合法                                                  OK
+    GATE-POS-FIELD-BOUNDARY gen=4294967295     合法边界必须判合法                                                  OK
+    GATE-POS-FIELD-BOUNDARY slot=63            合法边界必须判合法                                                  OK
+    GATE-NEG-FIELD-BOUNDARY pwm_raw_rc=-2147483649 越界必须判非法                                                    OK
+    GATE-NEG-FIELD-BOUNDARY outcome=2147483648 越界必须判非法                                                    OK
+    GATE-NEG-FIELD-BOUNDARY gen=4294967296     越界必须判非法                                                    OK
+    GATE-NEG-FIELD-BOUNDARY gen=0              越界必须判非法                                                    OK
+    GATE-NEG-FIELD-BOUNDARY slot=64            越界必须判非法                                                    OK
+    GATE-NEG-FIELD-BOUNDARY pre=4294967296     越界必须判非法                                                    OK
+  GATE-SELFTEST-SUMMARY pass=60 fail=0 cases=46
+
+====================================================================
+4. --selftest-meta 元负控原文（摘掉某道门 => 必须有具名负控翻转）
+====================================================================
+  GATE-META 元负控：摘掉每道门后, 看具名负控是否翻转(必填门必须翻转)
+    BATCH_NOT_STOPPING         META-OK     摘掉后翻转  2 条: GATE-R2-NEG-ACTIVE-STATE GATE-R2-NEG-IDLE-STATE   [收尾状态必须 STOPPING=2]
+    ROW_OUTSIDE_CSV_FRAME      META-OK     摘掉后翻转  1 条: GATE-R2-NEG-EXTRA-ROW-AFTER-TAIL   [帧外数值记录算帧污染(完整性门)]
+    NUL_IN_PROTOCOL_LINE       META-OK     摘掉后翻转  1 条: GATE-R2-NEG-NUL-IN-STATE-TAIL   [协议行 NUL 检测(完整性门)]
+    PROTOCOL_LINE_UNTERMINATED META-OK     摘掉后翻转  1 条: GATE-R2-NEG-STATE-UNTERMINATED   [协议行换行终止检测(完整性门)]
+    VALID_WITHOUT_PROGRESS     META-OK     摘掉后翻转  1 条: GATE-R2-NEG-ZERO-PROGRESS-VALID-CLAIM   [有效但零进展的内容矛盾检测]
+    STATUS_TOKEN_ANCHOR        META-BLOCKED 无人翻转, 但 1 条用例的预期原因被替掉: GATE-R2-NEG-STATUS-DROPPED-GLUE->BATCH_STATE_MISSING   [status 行整行锚定(数字令牌边界)]
+    STOP_TOKEN_ANCHOR          META-BLOCKED 无人翻转, 但 2 条用例的预期原因被替掉: GATE-R2-NEG-STATE-NUMERIC-SUFFIX->BATCH_STATE_MISSING GATE-R2-NEG-STATE-RECORDS-GLUE->BATCH_STATE_MISSING   [stop 行整行锚定(数字令牌边界)]
+    GEN_U32_UPPER_BOUND        META-OK     摘掉后翻转  1 条: GATE-R2-NEG-GEN-OVER-U32   [gen 的 uint32 上界]
+    I32_RANGE                  META-OK     摘掉后翻转  2 条: GATE-R2-NEG-I32-OVER-MAX GATE-R2-NEG-I32-UNDER-MIN   [i32 取值域]
+  GATE-META-SUMMARY ok=7 blocked=2 bad=0 guards=9 required=5
+
+  口径: META-OK = 该门是对应具名用例的**唯一**拦截原因(负载性被证明);
+        META-BLOCKED = 摘掉后无人误放行, 但预期原因被另一道门替上(多层防御),
+        本轮两条非必填门即属此列(替代原因是 BATCH_STATE_MISSING, 如实登记);
+        任务书 §7.5 点名的 5 道必填门(STOPPING + 4 道完整性门)全部 META-OK。
+
+====================================================================
+5. §7.6 离线判定对照：历史三批 + cleanup + 修后正常导出
+====================================================================
+  历史批(板级原始接收文件, 本轮离线读取; 未连接设备; 逐批 expected/entry 按原操作包):
+    GATE board_a_114_b1 verdict=REJECT clear_records=0 next_batch_trigger=0
+        原因: "HEADER_EXACT_MATCH: 期望恰好 1 行逐字等于 47 列合同, 实际=0",
+        原因: "DUMP_TAIL_EXACTLY_ONE: 期望恰好 1 行 dump 汇总, 实际=0",
+        原因: "PROTOCOL_LINE_MALFORMED: 第 1 行有协议名前缀但整行不匹配协议形状: 'schema,gen,slot,entry,ctx_isr,saved_primas
+        原因: "NUL_IN_PROTOCOL_LINE: 第 1 行(PROTOCOL_BROKEN) 含 2 个 NUL —— 被 127 窗口剪断的特征",
+        原因: "ROW_COUNT: 完整记录条数=0 期望=1",
+        原因: "BATCH_STATE_MISSING: 头行之前没有可靠 stop/status 行, 本批收尾无依据"
+        rc(cmd_114_b1_dump.txt)=1
+
+    GATE board_a_135_b2 verdict=REJECT clear_records=0 next_batch_trigger=0
+        原因: "HEADER_EXACT_MATCH: 期望恰好 1 行逐字等于 47 列合同, 实际=0",
+        原因: "DUMP_TAIL_EXACTLY_ONE: 期望恰好 1 行 dump 汇总, 实际=0",
+        原因: "PROTOCOL_LINE_MALFORMED: 第 1 行有协议名前缀但整行不匹配协议形状: 'schema,gen,slot,entry,ctx_isr,saved_primas
+        原因: "NUL_IN_PROTOCOL_LINE: 第 1 行(PROTOCOL_BROKEN) 含 17 个 NUL —— 被 127 窗口剪断的特征",
+        原因: "ROW_COUNT: 完整记录条数=0 期望=16",
+        原因: "BATCH_STATE_MISSING: 头行之前没有可靠 stop/status 行, 本批收尾无依据"
+        rc(cmd_135_b2_dump.txt)=1
+
+    GATE board_a_141_b3 verdict=REJECT clear_records=0 next_batch_trigger=0
+        原因: "HEADER_EXACT_MATCH: 期望恰好 1 行逐字等于 47 列合同, 实际=0",
+        原因: "DUMP_TAIL_EXACTLY_ONE: 期望恰好 1 行 dump 汇总, 实际=0",
+        原因: "PROTOCOL_LINE_MALFORMED: 第 1 行有协议名前缀但整行不匹配协议形状: 'schema,gen,slot,entry,ctx_isr,saved_primas
+        原因: "NUL_IN_PROTOCOL_LINE: 第 1 行(PROTOCOL_BROKEN) 含 2 个 NUL —— 被 127 窗口剪断的特征",
+        原因: "ROW_COUNT: 完整记录条数=0 期望=1",
+        原因: "BATCH_STATE_MISSING: 头行之前没有可靠 stop/status 行, 本批收尾无依据"
+        rc(cmd_141_b3_dump.txt)=1
+
+    GATE board_a_149_cleanup verdict=REJECT clear_records=0 next_batch_trigger=0
+        原因: "HEADER_EXACT_MATCH: 期望恰好 1 行逐字等于 47 列合同, 实际=0",
+        原因: "DUMP_TAIL_EXACTLY_ONE: 期望恰好 1 行 dump 汇总, 实际=0",
+        原因: "PROTOCOL_LINE_MALFORMED: 第 1 行有协议名前缀但整行不匹配协议形状: 'schema,gen,slot,entry,ctx_isr,saved_primas
+        原因: "NUL_IN_PROTOCOL_LINE: 第 1 行(PROTOCOL_BROKEN) 含 1 个 NUL —— 被 127 窗口剪断的特征",
+        原因: "BATCH_STATE_MISSING: 头行之前没有可靠 stop/status 行, 本批收尾无依据"
+        rc(cmd_149_cleanup_dump.txt)=1
+  修后正常导出切片(取自上轮 a0_on 的 run_on_export.txt: stop 行 + 头行 + 3 条数据行):
+      "verdict": "ACCEPT",
+      "csv_rows_parsed": 3,
+      "failures": [],
+        "trusted": true,
+        "included_count": 3,
+    GATE host_export verdict=ACCEPT clear_records=1 next_batch_trigger=1
+      rc(batch_fixed_b1.txt)=0
+    失败清单 = [] => 完整批照常放行 clear 与下一批; REJECT 批不做任何拼接/清洗/补列。
+
+====================================================================
+6. §7.7 冻结件回读：本轮未改固件/镜像/runner/公共 shim（原文逐字）
+====================================================================
+  逐项比较"当前工作树字节 vs accepted_firmware_code_commit 的 blob vs HEAD 的 blob";归档件另按磁盘字节直算 sha256:
+  == 冻结件回读（对照 cd8d9f09 的 blob 与上一轮记录的散列）==
+    OK   sp_measure_a0.c                                            work_bytes=47005    blob(HEAD)==blob(cd8d9f0)=True
+    OK   sp_measure_a0.h                                            work_bytes=16343    blob(HEAD)==blob(cd8d9f0)=True
+    OK   stop_priority.c                                            work_bytes=63520    blob(HEAD)==blob(cd8d9f0)=True
+    OK   sp_measure_a0_main.c                                       work_bytes=94912    blob(HEAD)==blob(cd8d9f0)=True
+    OK   sp_measure_a0_port.h                                       work_bytes=3816     blob(HEAD)==blob(cd8d9f0)=True
+    OK   sp_measure_a0_console.h                                    work_bytes=4914     blob(HEAD)==blob(cd8d9f0)=True
+    OK   run_sp_measure_a0.sh                                       work_bytes=29199    blob(HEAD)==blob(cd8d9f0)=True
+    OK   rtthread.h                                                 work_bytes=6856     blob(HEAD)==blob(cd8d9f0)=True
+    OK   run_stop_result_s1.sh                                      work_bytes=23422    blob(HEAD)==blob(cd8d9f0)=True
+    OK   run_stop_priority_s2.sh                                    work_bytes=42382    blob(HEAD)==blob(cd8d9f0)=True
+    OK   default.bin                                                work_bytes=251148   blob(HEAD)==blob(fe3b64b)=True  sha=02e984583255f341
+    OK   measure-a0.bin                                             work_bytes=261452   blob(HEAD)==blob(fe3b64b)=True  sha=5f30d3f058ceff51
+    OK   measure-a0.bin                                             work_bytes=261100   blob(HEAD)==blob(fe3b64b)=True  sha=358fd81ae5853ea5
+  == 上一轮记录的镜像/快照身份（本轮不触碰，只核当前磁盘件）==
+    OK   旧 1 MiB 片内 Flash 快照 a  b89f8a7cde7b944a  BOARD_FLASH_SNAPSHOT_20261026_before-a.bin
+    SKIP  恢复输入 HEX               本地原件路径不在本轮可读位置(未重连设备, 不据此声称已核)
+  UNCHANGED-PROOF bad=0
+  计数: OK=14 SKIP=1 bad=0。SKIP 的那条是恢复输入 HEX 的本地原件路径本轮不可读(未重连设备、也未在本机找到该路径), 因此**不声称已核**; 它的身份沿用上一轮登记的 b3ac97b976bc4765…。板上快照/恢复工程/恢复下载演练状态本轮一律未触碰。
+
+====================================================================
+7. 头行合同双向防漂移
+====================================================================
+  CHECK-HEADER gate=490 source=490 literal_pieces=8 identical=YES
+  (门内 47 列表 = 生产 sp_measure_a0.c 头行字面量按相邻字符串拼接后的 490 字节)
+
+====================================================================
+8. 每项离线检查的输出原文身份（交接 JSON 的 output_sha256 逐条对应）
+====================================================================
+  输出文件都在仓外工作目录, 未被改写; 哈希按文件字节直算(可复算):
+    gate-selftest                rc=0         7875 B  sha256 84294eb6dbb0dd6baedd13a43fab8f7743c2c9df40484e666862275c3c25a3cd
+    gate-selftest-meta           rc=0         1575 B  sha256 3baeb8c849221d92418ce4ef7f41432e57bbe14a716f8b9f62f08ca0baa90f72
+    gate-header-drift            rc=0           65 B  sha256 18326228a9e9d589e19b6d73dd0c4c9813a1250ee337d034924e81e17f7e14ae
+    gate-offline-board-batches   rc=逐批 1      2684 B  sha256 896c89316f599b9779eebbf37539ca7c76f5e03e6a801807fecfee4d90bff37e
+    gate-offline-fixed-export    rc=0          207 B  sha256 b0969694ca0d26311c4deae317ed6329cb0ea74f4e77069ae3e6d1cd7b3979a2
+  复算方式(逐字):
+    python tests/host/a0_export_gate.py --selftest            > final_selftest.txt
+    python tests/host/a0_export_gate.py --selftest-meta       > final_meta.txt
+    python tests/host/a0_export_gate.py --check-header-against-source <生产 sp_measure_a0.c 路径>  > final_header.txt
+    历史批: --raw <板级原始接收文件> --batch board_a_<批> --expected-records <该批 N> --entry <该批 entry> 逐批 4 次(N/entry = 1/trip_fast, 16/trip_fast, 1/off_attempt, 0/off_attempt) > final_offline_board.txt
+    正常批: --raw <修后主机导出切片> --batch host_export --expected-records 3 --entry trip_fast > final_offline_fixed.txt
+  注: --selftest/--selftest-meta/--check-header-against-source/--raw 四条路径都在态 B(最终门字节)上执行; §1 基线探针在态修前冻结门上执行, §2 在态 B 上执行。
+
+  复算复核(去掉首行"运行对象路径"回声后的输出体哈希, 逐字重跑一次):
+    §1 基线探针    重跑=54468eff5dd630a0 存档=54468eff5dd630a0 一致=YES
+    §2 修后探针    重跑=20d1dc8a95c1c99e 存档=20d1dc8a95c1c99e 一致=YES
+
+====================================================================
+9. §6 三项伴随修正的落点与归档守护（原文）
+====================================================================
+  AC-1 采集来源口径: 上轮 56 个归档件由 ReadExisting()+Set-Content -Encoding UTF8 产生,全部带 UTF-8 BOM => "无损"只对已保存文件成立, 不等于原始 UART 线上字节无损;已写进 retest_candidate_plan.md 的采集侧(改用 SerialPort.Read(byte[],…) 先原样落字节再解码)。旧 BOM 文件不删、不覆盖、不补中文字符。本轮未打开任何 COM 口。
+  AC-2 掩码 UID 整字段替换: board_raw_archive.md 的 masked-text 段把探针 UID 的**整个字段**换成 <PROBEUID>(上一版只替换中间长数字段, 留下 token 前后部分), 并同步替换声明;56 个 base64 段与解码原件必须逐字节不变 —— 守护输出见下。
+  AC-3 栈口径撤回: "line[640]+约32 ⇒ 完整调用栈≤约680" 不是完整调用链上界, 已降级为"已知局部数组 640 B; 完整高水位需目标观察"; 旧日志 tshell max used 17%→28% 只作后续比较基线, 不当新镜像栈验收。本轮未为此重编或改线程栈。
+  AC-4 spm init 口径: init 不是只读(会置 DEMCR.TRCENA / DWT_CTRL.CYCCNTENA, 只是不清零 CYCCNT); 已把 cap/init 明确排在"已停止且无在途"的静止前置之后, 并在计划里登记为有副作用动作。
+  AC-5 门调用方式: 计划里改为"退出码 0 + JSON verdict=ACCEPT + action_plan 两个计数=1"三件同时成立才放行; REJECT 或输入故障(退出码 4)一律 clear=0/next=0, 且不得做拼接/清洗/补列。
+  本轮没有设备动作: 以上都是口径/文档与离线守护, 不构成任何重测授权。
+  归档守护(archive_b64_guard.py 逐字原文, 对照 fe3b64b):
+    base64 数据块: 上轮=56 本轮=56
+      逐块原文一致 = True
+      解码后文件字节一致 = True; 256 位摘要序列一致 = True
+      解码后文件数 = 56, 总字节 = 54605 (上轮 56 / 54605)
+    非 base64 段(说明/掩码文本): 上轮=3 本轮=3 变化段数=2
+        段 0: 300 B -> 270 B
+        段 1: 6651 B -> 6621 B
+    B64GUARD PASS

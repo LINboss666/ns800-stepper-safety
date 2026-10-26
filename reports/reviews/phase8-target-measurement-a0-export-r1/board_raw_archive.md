@@ -12,8 +12,16 @@
 | 本机登录名（独立出现） | `<HOSTUSER>` | 用户名泄露 |
 | 板级轮仓外工作目录（盘符 + 该目录名，正反斜杠两种写法） | `<RAWDATA>` | 绝对路径泄露 |
 | 工具链安装目录（盘符 + IDE 目录名，两种写法） | `<KEIL>` | 绝对路径泄露 |
-| 连续 12 位以上纯数字 | `<PROBEUID>` | DAP 探针序列号 |
+| 探针序列号整字段（≥20 位十六进制且内部含 12 位以上连续数字；本机实际值是一串 40 位十六进制） | `<PROBEUID>` | 整字段替换，上一版只换了中间数字段 |
+| 连续 12 位以上纯数字（兜底） | `<PROBEUID>` | 其它上下文里的序列号 |
 | 邮箱形状字符串 | `<EMAIL>` | 邮箱 |
+
+## 来源校准（本轮更正，不删改任何旧记录）
+
+- 板级轮的原始接收文件由本机 PowerShell 采集脚本用 `SerialPort.ReadExisting()` + `Set-Content -Encoding UTF8` 落盘，因此**这 56 个被归档的文件都带一个 UTF-8 BOM**（`EF BB BF`，下文 masked-text 段开头可见的 `﻿` 即它）。
+- 所以下文 base64 的"无损"是相对**已保存的文件字节**成立：解码后逐字节等于本地原件、SHA-256 一致；**它不等于"原始 UART 线上字节无损"**——BOM 是落盘时加的，且 `ReadExisting()` 是"先按文本解码再写盘"的路径。
+- 本轮不删 BOM、不覆盖旧文件、不补任何中文字符；被剪断而丢失的列一律不重建。
+- 未来重测的采集脚本必须改用 `SerialPort.Read(byte[], ...)`（或等价字节接口）**先把字节原样持久保存，再解码**；这条写进重测候选方案，本轮不打开任何串口。
 
 ## 编码约定
 
@@ -104,7 +112,7 @@ QicBP2khPz9pIT9EQicBREInAT9pIT8EBRM/REInP0RCJwE/aSEEBRM/DQo=
 （按上表规则替换后如下；原字节仅存本地，不再无损。）
 
 ```text
-﻿argv: python -m pyocd commander --no-config -t cortex_m -u 0700000105d3ff<PROBEUID>a5a5a5a597969908 -f 1000000 -O auto_unlock=false -O connect_mode=attach -O resume_on_disconnect=false -c "reset sysresetreq" -c status -c exit
+﻿argv: python -m pyocd commander --no-config -t cortex_m -u <PROBEUID> -f 1000000 -O auto_unlock=false -O connect_mode=attach -O resume_on_disconnect=false -c "reset sysresetreq" -c status -c exit
 STDOUT
 Resetting target
 Core 0 (None):  Running
@@ -1496,7 +1504,7 @@ $ErrorActionPreference = 'Stop'
 $W = '<RAWDATA>'
 $OUT = "$W\serial"
 New-Item -ItemType Directory -Force -Path $OUT | Out-Null
-$UID = '0700000105d3ff<PROBEUID>a5a5a5a597969908'
+$UID = '<PROBEUID>'
 if (-not (Test-Path "$OUT\ledger.txt")) { New-Item -ItemType File -Path "$OUT\ledger.txt" | Out-Null }
 
 function Log($m) {

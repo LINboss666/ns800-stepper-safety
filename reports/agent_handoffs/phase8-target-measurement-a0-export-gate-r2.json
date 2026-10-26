@@ -1,0 +1,237 @@
+{
+  "round": "phase8-target-measurement-a0-export-gate-r2",
+  "date_local": "2026-10-26 (Asia/Shanghai)",
+  "task_book": "NS800_A0_Export_R1_Review_and_Gate_R2_Task_fe3b64b4_20261026.md",
+  "reviewer_verdict_on_previous_round": "A0_EXPORT_FIRMWARE_IMAGE_REVIEW_GO / COLLECTION_GATE_REWORK_REQUIRED",
+  "task_start_commit": "fe3b64b40d009fb5f1527bb05e9dddb0dc454f72",
+  "accepted_firmware_code_commit": "cd8d9f095030c08634a082dd2bb9bc622d92fb1d",
+  "gate_code_commit": "d4d337a3580cbe5aea85d98b0317761b5c04c403",
+  "gate_byte_states": {
+    "why_two": "GATE-R2-01/02 的全部实质返修单独提交在 gate_code_commit; 之后为通过 git diff --check 的尾随空白检查, 只改了一行用例描述字符串, 随本证据提交入库。复审应钉最终态字节。",
+    "A_substantive_rework": {
+      "commit": "d4d337a3580cbe5aea85d98b0317761b5c04c403",
+      "blob": "f170e1af09422425c63e05744a08961528a6eb77",
+      "bytes": 47960,
+      "sha256": "b08e7bdc3d25fc09c7050f77fa09c8cb838bfdce0106b0f99675dd0e8b30636e"
+    },
+    "B_final_bytes_to_pin": {
+      "commit": "(本证据提交; 提交后以 ls-remote + 远端 blob 回读确定)",
+      "blob": "658216314b6c6e2a30a2814ba49cec33c8e9c6f4",
+      "bytes": 47964,
+      "sha256": "ba88f37bb3fd8b64e6e19bd5984aab5bacf69de108b218f90241431fd3814222"
+    },
+    "diff_A_to_B": "1 文件 1 增 1 删; 只改 SELFTEST_CASES 里 GATE-R2-NEG-STATE-UNTERMINATED 的描述字符串(去掉字面反斜杠-n), 未改正则/判定逻辑/用例输入或期望结论",
+    "which_state_results_were_taken_on": "B(最终字节)。§1 基线探针在修前冻结门上取, §2 与 §3~§8 全部在 B 上复算; 证据文件里附了逐字重跑的复算复核哈希"
+  },
+  "branch": "phase8/tmc-drive-config",
+  "repo": "https://github.com/LINboss666/ns800-stepper-safety",
+  "scope_statement": "只返修 Python 采集门、其离线测试与指定证据口径。未改固件、未重编 Keil、未重跑 S1/S2/A0 主机链、未换镜像、未动开发板。",
+  "firmware_changed": false,
+  "python_gate_changed": true,
+  "documentation_only": false,
+  "builds_executed": [],
+  "hardware_actions": [],
+  "frozen_image_identities_unchanged": [
+    {
+      "path": "reports/firmware/phase8-target-measurement-a0-export-r1/default.bin",
+      "bytes": 251148,
+      "sha256": "02e984583255f3414f43fb5c077dc9ba82eba98553d2cb9d7f7feee9336ebd80",
+      "verified_unchanged_vs": "fe3b64b4 blob + 任务书 §3 记录值",
+      "flashed": false
+    },
+    {
+      "path": "reports/firmware/phase8-target-measurement-a0-export-r1/measure-a0.bin",
+      "bytes": 261452,
+      "sha256": "5f30d3f058ceff516b2185aa3a1e597bbe63293b94a6fd801fd989a6f7b2b8e6",
+      "verified_unchanged_vs": "fe3b64b4 blob + 任务书 §3 记录值",
+      "flashed": false
+    }
+  ],
+  "unchanged_proof": {
+    "method": "当前工作树字节 vs accepted_firmware_code_commit 的 git blob vs HEAD 的 git blob 三方一致; 归档件另核 sha256/字节数",
+    "items_checked": "13 类冻结件 / 14 条 OK 检查(两份新归档 BIN 与旧 A0 镜像分别计数)+ 1 条 SKIP",
+    "ok": 14,
+    "skip": 1,
+    "bad": 0,
+    "skip_detail": "恢复输入 HEX 的本地原件路径本轮不可读(且未重连设备), 故标 SKIP: 不声称本轮已回读, 身份沿用上一轮登记的 b3ac97b976bc4765…",
+    "explicitly_unchanged": [
+      "sp_measure_a0.c",
+      "sp_measure_a0.h",
+      "stop_priority.c",
+      "sp_measure_a0_main.c",
+      "sp_measure_a0_port.h",
+      "sp_measure_a0_console.h",
+      "run_sp_measure_a0.sh",
+      "tests/host/shim_ps/rtthread.h (公共 shim)",
+      "run_stop_result_s1.sh",
+      "run_stop_priority_s2.sh",
+      "两份新归档 BIN",
+      "旧 A0 镜像 BIN"
+    ],
+    "not_touched_locally_verified": {
+      "flash_snapshot_before_a_b": "b89f8a7cde7b944a5b5425f512a715d27a17c2e6c25822f36b2205bbefd0cac2 (各 1048576 B, 本轮按磁盘字节直算一致)"
+    },
+    "not_touched_identity_carried_over_not_reverified_this_round": {
+      "restore_hex": "b3ac97b976bc476556818f2bbaa977d15854a5c1d342f4b9c9d3ed825deb2c65 (3014958 B, 上一轮登记; 本轮 SKIP)"
+    },
+    "restore_download": "NOT_EXECUTED",
+    "board_flashed_image": "仍是旧 358fd81ae5853ea52df1e1ab367ea41af0f5e86679082a755c17dac3429b0e1b; 新 5f30d3f0… 未烧录(本轮无设备动作)"
+  },
+  "tests_executed": [
+    {
+      "id": "gate-baseline-probe",
+      "tool": "任务书 §5 探针逐字形状, 跑在 fe3b64b 的冻结门上",
+      "result": "缺口全部复现: ACTIVE_STATE/NUL_IN_STATE/STATE_NUMERIC_SUFFIX/EXTRA_ROW_AFTER_TAIL 均误 ACCEPT(clear=1 next=1); 合法 -2147483648/2147483647 被误拒; gen=4294967296 被误受; ZERO_PROGRESS_VALID_CLAIM 被 ACCEPT 且纳入 3 条",
+      "rc": 0,
+      "output_sha256": "889e6abf05eb03f5a79ae371733db3310ca499484754ddc72834ec5d84902e57"
+    },
+    {
+      "id": "gate-postfix-probe",
+      "tool": "同名同输入复跑在修后门上",
+      "result": "CONTROL_HEALTHY 仍 ACCEPT(clear=1 next=1, 纳入 3); 四条反例全部 REJECT 且 clear=0 next=0; i32 两边界判合法; gen 越界判非法; ZERO_PROGRESS_VALID_CLAIM REJECT",
+      "rc": 0,
+      "output_sha256": "b9a634d396fa179843ed548b67f19e3583fbf687261449e66f56a7748484c9ee"
+    },
+    {
+      "id": "gate-selftest",
+      "tool": "a0_export_gate.py --selftest",
+      "result": "pass=60 fail=0 cases=46",
+      "rc": 0,
+      "output_sha256": "84294eb6dbb0dd6baedd13a43fab8f7743c2c9df40484e666862275c3c25a3cd"
+    },
+    {
+      "id": "gate-selftest-meta",
+      "tool": "a0_export_gate.py --selftest-meta",
+      "result": "ok=7 blocked=2 bad=0 guards=9 required=5 (5 道必填门全部 META-OK)",
+      "rc": 0,
+      "output_sha256": "3baeb8c849221d92418ce4ef7f41432e57bbe14a716f8b9f62f08ca0baa90f72"
+    },
+    {
+      "id": "gate-header-drift",
+      "tool": "--check-header-against-source 生产源码头行",
+      "result": "gate=490 source=490 literal_pieces=8 identical=YES",
+      "rc": 0,
+      "output_sha256": "18326228a9e9d589e19b6d73dd0c4c9813a1250ee337d034924e81e17f7e14ae"
+    },
+    {
+      "id": "gate-offline-board-batches",
+      "tool": "对板级轮 4 个原始接收文件离线判定",
+      "result": "b1/b2/b3/cleanup 全部 REJECT, clear_records=0 next_batch_trigger=0; 逐批 expected/entry 按原操作包取 1/trip_fast、16/trip_fast、1/off_attempt、0/off_attempt",
+      "rc": "逐批 1",
+      "output_sha256": "896c89316f599b9779eebbf37539ca7c76f5e03e6a801807fecfee4d90bff37e"
+    },
+    {
+      "id": "gate-offline-fixed-export",
+      "tool": "对上轮 a0_on 真实导出切片离线判定",
+      "result": "ACCEPT, csv_rows_parsed=3, failures=[], timing included=3, trusted=true",
+      "rc": 0,
+      "output_sha256": "b0969694ca0d26311c4deae317ed6329cb0ea74f4e77069ae3e6d1cd7b3979a2"
+    }
+  ],
+  "not_rerun": {
+    "items": [
+      "A0 主机链(off/on/min)",
+      "S1",
+      "S2",
+      "V1/V2",
+      "I/O 行为链",
+      "SD 语义链",
+      "Keil 双目标构建"
+    ],
+    "reason": "任务书 §1/§7.7 明确本轮不改固件不重跑这些链; 被测门的输入(生产 47 列格式与生产导出行)未变, 已由 --check-header-against-source 双向防漂移核对",
+    "status": "NOT_RERUN"
+  },
+  "gate_r2_01_fixed": {
+    "closing_state": "本批收尾依据只取 dump 之前最后一条可靠状态行; 必须 state=STOPPING(2) 且 in_flight=0 且 dropped=0 且 records==预期; ACTIVE(1)/IDLE(0) 一律 BATCH_NOT_STOPPING/BATCH_STATE_RECORDS 拒绝",
+    "protocol_line_integrity": "头行/数据行/状态行/汇总行逐条核: 行内无 NUL(NUL_IN_PROTOCOL_LINE)、以 LF/CRLF 收尾(PROTOCOL_LINE_UNTERMINATED)、整行锚定匹配且数字后必须紧跟真分隔符 => dropped=0BAD / records=3BAD / dropped=0<NUL> 均判 PROTOCOL_LINE_MALFORMED",
+    "frame_boundaries": "块外数值记录/INCOMPLETE => ROW_OUTSIDE_CSV_FRAME; 重复头行 => HEADER_EXACT_MATCH; 重复汇总 => DUMP_TAIL_EXACTLY_ONE; 汇总后的状态行 => STATE_LINE_AFTER_FRAME; 均不得归为普通异步日志",
+    "status_entry_cross_check": "status 行 entry 与本批不符或 records>0 而 entry='-' => BATCH_STATE_ENTRY",
+    "no_stitching": "不拼接不同响应凑成功: 只取最后一条可靠证据, 与之冲突即拒",
+    "reject_plan": "REJECT 与解析异常(退出码 4)一律 clear=0/next=0; 调用方必须同时核对 rc + JSON verdict + action_plan"
+  },
+  "gate_r2_02_fixed": {
+    "i32_range": "I32_MIN=-(1<<31), I32_MAX=(1<<31)-1; 三个 i32 列(pwm_raw_rc/permit_write_rc/outcome)各有两边界正控与外侧一值负控",
+    "uint32_upper_bounds": "gen 改 gen_u32(1..2^32-1); 所有 u32 列含 pre/body_* 一律 <=2^32-1; slot 仍 <64",
+    "healthy_fixture": "正控数据行改为真实进展 body_end=body_begin+1000; 原本 begin==end 却 body_valid=1 的输入**原样保留**为具名负控 GATE-R2-NEG-ZERO-PROGRESS-VALID-CLAIM",
+    "content_contradiction": "body_valid=1 且 end==begin => VALID_WITHOUT_PROGRESS; body_valid=1 且 end<begin => VALID_WITH_WRAP; 均整批 REJECT 且不进有效时间池, 不改写输入字段",
+    "invalid_but_complete": "完整且合法但 body_valid=0 仍 ACCEPT 存档(条数保留), 只从时长统计排除, extra_protection_actions 恒 0",
+    "untrusted_on_reject": "REJECT 批的 timing included/excluded 计数清零并标 trusted=false, 仅留 observed_* 诊断观测"
+  },
+  "selftest_identities_kept": "原 20 例身份与语义全部保留(GATE-POS-COMPLETE/GATE-NEG-* 系列); 修的是正控输入的真实进展, 被弃用的旧形状显式变成具名负控, 未删除任何用例",
+  "accompanying_corrections": [
+    {
+      "id": "AC-1",
+      "item": "归档件来源校准",
+      "done": "board_raw_archive.md 增加'来源校准'一节: 采集脚本走 ReadExisting()+Set-Content -Encoding UTF8, 56 个归档件都带 UTF-8 BOM; base64 的'无损'只对**已保存文件**成立(逐段 SHA 自检仍全等), 不等于原始 UART 线上字节无损; 未删 BOM、未覆盖旧件、未补中文字符。字节接口采集要求写进重测候选方案, 本轮未打开任何串口"
+    },
+    {
+      "id": "AC-2",
+      "item": "探针 UID 整字段替换",
+      "done": "两个含 UID 的 masked-text 段(serial/01_reset_pyocd.txt 的 -u 参数、cp4_run.ps1 的 $UID)由'只换中间 12+ 位数字'改为整字段替换; 新规则=20 位以上十六进制且内含 12 位以上连续数字, 另保留长数字串兜底; 56 个 base64 段逐段 SHA 与旧版完全相同(0 段差异), 原件散列未改"
+    },
+    {
+      "id": "AC-3",
+      "item": "栈开销口径",
+      "done": "撤回'line[640]+约32 => 总调用栈<=约680 B'这一说法: 640 B 只是**已知的单个局部数组**, 完整调用链高水位需目标观察(如 free/ps 现场读数), 不能用约数证明。旧已存日志里 tshell max used 从 17% 到 28% 不等, 只登记为后续比较基线, 不当新镜像的栈验收。本轮不重编、不改线程栈(上轮 keil_build.txt 原文件不回改, 更正只落在此交接)"
+    },
+    {
+      "id": "AC-4",
+      "item": "spm init 不是只读",
+      "done": "retest_candidate_plan.md 更正: init 会置位 DEMCR.TRCENA 与 DWT_CTRL.CYCCNTENA(启用 DWT/DEMCR 位), 只是不清零 CYCCNT; cap/init 必须放在明确的静止前置之后, 不得凭名字列为纯读步骤"
+    },
+    {
+      "id": "AC-5",
+      "item": "门调用方式",
+      "done": "retest_candidate_plan.md 明确调用方必须同时核对进程退出码 + JSON verdict + action_plan 三者; 退出码 4(输入/环境故障)同样不放行; REJECT 后禁止任何拼接/清洗/补列'恢复'"
+    }
+  ],
+  "evidence_files": [
+    "reports/reviews/phase8-target-measurement-a0-export-gate-r2/gate_r2_verification.txt"
+  ],
+  "evidence_files_updated_in_scope": [
+    "reports/reviews/phase8-target-measurement-a0-export-r1/board_raw_archive.md (仅三个 masked-text 段的 UID 整字段 + 变换/来源说明)",
+    "reports/reviews/phase8-target-measurement-a0-export-r1/retest_candidate_plan.md (仅 §6 指出的采集/初始化口径与门调用方式, 仍为待批准方案)"
+  ],
+  "defect_status": {
+    "BOARD-A-01b_validate_before_clear": "GATE-R2 缺口已关闭(离线可判定); 现场执行仍未验证, 且本轮不发出任何硬件重测许可",
+    "BOARD-A-01a_export_channel": "上一轮已获固件/镜像复审接受, 本轮未改"
+  },
+  "evidence_status": {
+    "a0_record_validity_and_timing": "NOT_ACHIEVED",
+    "note": "旧三批在修后的门下仍全部 REJECT, 时长统计不可挽救; 新结论只能来自未来的有界重测包"
+  },
+  "privacy": {
+    "leakcheck_hits": 0,
+    "masked_text_uid_residual_fragments": 0,
+    "originals_with_local_sha_retained": true
+  },
+  "frozen_refs_unchanged": {
+    "main": "1b3757eec550802a3973e66790af422d81d3d373",
+    "phase7_full_embedded_software": "6d3fbc559d45673d7550eb73dec5a4ade5bb34df",
+    "tag_object": "097935fec5a6f2467261ab1ad449ff0b1d398250",
+    "tag_dereference": "e40a9b95ef709e6a80444f9f3949dfdd70ba96ba"
+  },
+  "four_macros": {
+    "MOTOR_HARDWARE_ENABLE_PATH_VALIDATED": "RT_FALSE",
+    "STEP_DIAG_ISOLATED_ENV_CONFIRMED": "RT_FALSE",
+    "TMC_DRIVE_CONFIG_HW_VALIDATED": "RT_FALSE",
+    "SAFETY_LIMIT_INPUTS_ENABLED": "RT_FALSE",
+    "overridden_for_target": false
+  },
+  "open_items_unaffected": [
+    "B-1",
+    "BUG-008",
+    "RISK-03",
+    "RISK-03a",
+    "物理 RISK-04-b",
+    "M-1",
+    "M-2",
+    "M-3"
+  ],
+  "next_step": "门复审通过后, 再把 §3 同一份 5f30d3f0… 镜像 + 通过的采集门 + 字节采集脚本绑定为一次有界板级重测包由用户一次批准; 本轮未发出任何硬件许可, 也未执行任何设备动作",
+  "stop_claim": [
+    "A0_EXPORT_GATE_R2_OFFLINE_READY / AWAITING_INDEPENDENT_GATE_REVIEW",
+    "FIRMWARE_AND_IMAGE_BYTES_UNCHANGED",
+    "NO BUILD / NO FLASH READ / NO PROGRAM / NO RESET / NO SERIAL / NO MOTOR / NO STEP_ENABLE"
+  ]
+}

@@ -651,7 +651,7 @@ SELFTEST_CASES = [
      dict(state='status', corrupt=lambda L: with_progress(
          [L[0].replace('dropped=0 counter', 'dropped=0BAD counter', 1)] + L[1:])),
      'REJECT', 'PROTOCOL_LINE_MALFORMED'),
-    ('GATE-R2-NEG-STATE-UNTERMINATED', '负控: 协议行没有结尾换行(被剪掉的 \n, 其后无字节)',
+    ('GATE-R2-NEG-STATE-UNTERMINATED', '负控: 协议行没有结尾换行(其换行被剪掉且其后无字节)',
      dict(corrupt=with_progress, cut_after='[spm] dump:'), 'REJECT',
      'PROTOCOL_LINE_UNTERMINATED'),
     ('GATE-R2-NEG-EXTRA-ROW-AFTER-TAIL', '负控: 汇总行之后又来一条数据行(帧外记录唯一原因)',

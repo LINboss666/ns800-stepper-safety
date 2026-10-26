@@ -16,24 +16,39 @@
 1. 每个批次的固定动作序（采集门插在 dump 与 clear_records 之间）
 ====================================================================
   a) `spm cap`      —— 确认 schema=2 / record=120 / slots=64 / 四道宏=0 / COUNTER 状态
-  b) `spm init`     —— 静止态能力检查（只读 PPB，不改 CYCCNT）
+                      ⚠ cap 与 init 都**必须放在"已停止且无在途"的静止前置之后**执行；
+                        它们不是"凭名字看起来是纯读"的步骤（见 b 条）。
+  b) `spm init`     —— 静止态能力检查。**不是只读**：它会经 `spm_port_ctr_enable()`
+                      **置位 DEMCR.TRCENA 与 DWT_CTRL.CYCCNTENA**（即启用 DWT/DEMCR 位），
+                      只是**不清零 CYCCNT**、不写其它控制位（sp_measure_a0.c 的 init 分支）。
+                      因此登记为"有副作用的启用动作"，其前置与后置都要留状态证据。
   c) `spm start <entry>`
   d) 触发 N 次（每批 N 固定：批1=1，批2=16，批3=1 次 motor_disarm 走 off_attempt）
   e) `spm stop`
-  f) `spm status`   —— 必须看到 in_flight=0 dropped=0
+  f) `spm status`   —— 收尾依据：必须 state=STOPPING(2)、in_flight=0、dropped=0、records=N
+                      （ACTIVE=1 不授权清理；这条就是采集门 BATCH_NOT_STOPPING 的现场对应）
   g) `spm dump`     —— **原始接收字节逐批落盘（不删 NUL、不改 CRLF、不补列）**
-  h) 运行采集门：
+  h) 运行采集门（r2 版）：
        python tests/host/a0_export_gate.py --raw <本批原始接收文件> \
            --batch <批名> --expected-records <N> --entry <本批 entry> \
            --json-out <本批门结论.json>
-     门返回 verdict / action_plan；串口脚本**只能按 action_plan 行动**：
+     调用方必须**同时**核对三件事才允许继续：进程退出码 0 + JSON verdict=ACCEPT +
+     action_plan 的两个计数为 1；任一项缺失、JSON 解析失败、或读到的是上一批的 JSON
+     => 一律按不放行处理（退出码 4 = 输入/环境故障，同样不放行）。
        verdict=ACCEPT  → 才允许发 `spm clear_records`，才允许开下一批
        verdict=REJECT  → clear_records 发送次数=0，下一批触发次数=0，保存证据并停
-                         （不得重试、不得"再 dump 一次看看"、不得手工拼接缺失列）
+                         （不得重试、不得"再 dump 一次看看"、**不得做任何拼接/清洗/补列的
+                          "恢复"处理**，也不得为凑出有效样本追加保护动作）
+     离线自检（不开串口）：`--selftest`(逐例) 与 `--selftest-meta`(摘掉某道门后必须有具名
+     负控翻转)；`--check-header-against-source` 核对门内 47 列合同与生产头行逐字一致。
   i) 批末再 dump 一次作为空批次核对（预期 records=0）
 
-采集侧仍用本机现有 PowerShell SerialPort（不装 pyserial）；门本身只读文件、不碰串口。
-提示符出现或 rc=0 只说明交互结束，**不作为放行的任何依据**。
+采集侧仍用本机现有 PowerShell（不装 pyserial），但**必须换成字节接口**：用
+`SerialPort.Read(byte[], index, count)`（或等价的 BaseStream.Read）把收到的字节**先原样
+持久落盘，再另行解码**；不得再用 `ReadExisting()` + `Set-Content -Encoding UTF8` 那条
+"先按文本解码、写盘时再加 UTF-8 BOM"的路径 —— 上一轮的 56 个归档件因此都带 BOM，
+其"无损"只对已保存文件成立，不等于原始 UART 线上字节无损（见 board_raw_archive.md 的来源校准）。
+门本身只读文件、不碰串口。提示符出现或串口进程 rc=0 只说明交互结束，**不作为放行的任何依据**。
 
 ====================================================================
 2. 与上一轮的关键差异（为什么这次能拿到时长证据）
