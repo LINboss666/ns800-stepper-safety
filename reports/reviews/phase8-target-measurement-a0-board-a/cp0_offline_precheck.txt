@@ -1,0 +1,159 @@
+phase8-target-measurement-a0-board-a —— CP0 离线前置结果（本文件不含任何硬件动作）
+任务书: NS800_E40_Search_Review_and_A0_Board_Package_c06be762_20261026.md
+       bytes=22764  SHA-256=3cfdf310ace04277bab176acf465a8a7feb33deba4430542860c3321f492ba00
+document_base: c06be762dcb6fb0d33ed8e9605e867d55daa0b75
+已接受 A0 软件 HEAD: 2ab886ff9a60a2b2283ff3ba200d337235cb2da9   code_commit: b27e5f14bdb62f645b93eace23800b40369717d4
+执行窗口: 2026-10-26 16:05 起（Asia/Shanghai）   执行者: 本地 Qoder Agent
+授权形式: 用户经选项批准"批准整包（含 A0 下载与采样）"，含义等同任务书 §12 的一次批准文字；
+          批准范围含 §2 的边界（恢复下载未演练、失败即停、不自动回刷、包内不逐条再确认）。
+状态: CP0 已完成。CP1 及之后**未执行**（等待执行当天现场前置确认）。
+本轮硬件动作累计: 0（未上电、未连探针、未列设备、未开任何串口、未读/写 Flash、未下载、未复位、未发板上命令）。
+本轮测试/构建累计: 0（未跑主机链、未启动 Keil 编译；副本只准备、未调用）。
+
+脱敏规则: 仓库内只出现代号 + 相对路径（PROJECT_ROOT=仓库根, BSP=工程 BSP 根, WORK_OUT=仓外本轮工作目录,
+  KEIL_ROOT=Keil 安装根, PACK_DIR=设备 FLM 所在包目录）；不出现本机用户名/邮箱/主机名。
+  完整映射在 WORK_OUT 下的本地索引，仓外留存。
+
+================================================================================================
+1. CP0.1 基线与规则只读核对 —— 通过
+================================================================================================
+  分支                        : phase8/tmc-drive-config
+  本地 HEAD                   : c06be762dcb6fb0d33ed8e9605e867d55daa0b75 (== document_base)
+  远端 ls-remote 回读         : refs/heads/phase8/tmc-drive-config = c06be762…0b75 (一致)
+  工作树                      : git status --porcelain 行数 0（无用户改动需保留）
+  冻结引用未动                : main 1b3757eec550802a3973e66790af422d81d3d373
+                                phase7/full-embedded-software 6d3fbc559d45673d7550eb73dec5a4ade5bb34df
+                                标签对象 097935fec5a6f2467261ab1ad449ff0b1d398250
+                                解引用源码 e40a9b95ef709e6a80444f9f3949dfdd70ba96ba
+  b27e5f1(已接受 code_commit) → HEAD 的非 reports 差异: **0 个文件** ⇒ 生产/夹具/工程/镜像零改动
+  适用规则                    : 仓库根无 AGENTS.md；唯一规则文件是被忽略的上游规则（不提交生成物/二进制）
+  四宏实读(本轮独立读源码):
+        MOTOR_HARDWARE_ENABLE_PATH_VALIDATED = RT_FALSE   applications/motor.h:69
+        STEP_DIAG_ISOLATED_ENV_CONFIRMED     = RT_FALSE   applications/motor.h:83
+        TMC_DRIVE_CONFIG_HW_VALIDATED        = RT_FALSE   applications/tmc2209.h:100
+        SAFETY_LIMIT_INPUTS_ENABLED          = RT_FALSE   applications/project_board.h:51
+        （注: 上一轮交接把第四宏路径写作 project_board.h，实为 BSP/applications/project_board.h，此处更正）
+  未做: reset/rebase/force/merge、切旧源码覆盖工程、改生产/HAL/内核/时钟/引脚、翻宏、改原工程/runner/shim、
+        重跑主机链、Keil 构建。
+
+================================================================================================
+2. CP0.2 载荷输入身份 —— 通过（逐字节实读，不只核文件名）
+================================================================================================
+  本包唯一正向下载对象:
+    PROJECT_ROOT/reports/firmware/phase8-target-measurement-a0/measure-a0.bin
+      261100 B  SHA-256 358fd81ae5853ea52df1e1ab367ea41af0f5e86679082a755c17dac3429b0e1b  == §3 ✅
+    下载载荷源 AXF  BSP/build/a0/rt-thread-a0.axf
+      1674612 B  SHA-256 c8176c19188f66654f6bcee5b265ae2487d0c6130d8ae354e8c262cfbd3c01f6  == §3 ✅
+    本包不下载(仅登记防误认) default.bin
+      251148 B  SHA-256 41717367e4e1401deb5f59eb27d1f35483108c6241eb30a5b58b28aad5b425de  == §3 ✅
+  装载跨度核对: 0x08000000..0x0803FBEB（末端不含 0x0803FBEC）= 0x3FBEC = **261100 B**，与 BIN 长度一致。
+  上一轮"Code+RO+RW 之和"口径更正的实证: 252756 vs 251148、262708 vs 261100 —— 两份都差 **1608 B**，
+    ⇒ 段和不是文件长度；本包一切身份判定用实读文件长度与散列，不用段和。
+
+================================================================================================
+3. CP0.3 工具版本与参数可用性（离线；禁止安装/升级，未列设备）
+================================================================================================
+  Keil μVision  : KEIL_ROOT/UV4/UV4.exe  FileVersion 5.43.1.0  (12765464 B)
+  pyOCD         : 0.45.1（python -m pyocd 与 site-packages 内安装源码同一份）
+  Python        : 3.12.5
+  串口通路      : **pyserial 未安装**；改用 PowerShell System.IO.Ports.SerialPort（本机实测类型可用）。
+                  任务书 §4.3 禁止安装工具 ⇒ 本包 CP4 的串口采集按 PowerShell 路径执行并如实登记为
+                  "已有串口库"的实际形态；若您不接受这条路径，CP4 不执行。
+  参数可用性逐项核对（从安装源码/帮助读出，不凭 rc=0 猜测）:
+    commander 子命令存在; 选项 --no-config / -O OPTION=VALUE / -u UNIQUE_ID / -t TARGET / -f FREQUENCY /
+      -c CMD(可重复, action='append', nargs='+' ⇒ 多条 -c 全部按顺序执行, 不会只跑最后一条) / --elf(本包不用)
+    会话选项全部已定义: auto_unlock(bool) connect_mode('halt'|'pre-reset'|'under-reset'|'attach')
+      resume_on_disconnect(bool) cache.enable_memory(bool, 默认 True ⇒ 必须显式关闭)
+      cache.read_code_from_elf(bool) scan_all_aps(bool, 默认 False)
+    REPL 命令: status(nargs 任意, 打印各核状态与锁态) savemem(nargs=3, 用法 "ADDR LEN FILENAME")
+               reset(用法 "[halt|-halt|-h] [TYPE]", TYPE 允许 'sysresetreq') exit
+      ⇒ §8.3 的"一次 SYSRESETREQ 且不 halt"写作 `reset sysresetreq`：parse() 中 args[0] 不属于
+         {'-h','--halt','halt'} ⇒ do_halt=False，len(args)==1 ⇒ reset_type=SYSRESETREQ，
+         execute() 走 selected_core.reset(SYSRESETREQ) —— 源码路径已确认，不是猜的。
+  **两条会改变判定方式的实测发现（必须写进纪律）**
+    (a) pyocd commander 的**进程退出码恒为 0**：subcommands/commander_cmd.py invoke() 调
+        PyOCDCommander(...).run() 后直接 `return 0`，而 commander 内部 self.exit_code 会取 1/2/3/4
+        （连接失败/选项错/命令失败）。⇒ CP2/CP3/CP4 的成功与否一律由**日志文本 + 落盘文件的实际字节数
+        与 SHA-256** 判定，绝不使用 rc。
+    (b) `-t cortex_m` 解析到 pyocd.coresight.coresight_target.CoreSightTarget，其默认内存映射
+        （模块内 MemoryMap(...)）把 0x08000000 归入 **RamRegion "RAM2" (0x80000000-0x9FFFFFFF)**，
+        不是 FlashRegion。⇒ savemem 里 `flash_init_required = region.is_flash and …` 为 **False**，
+        即 CP2 的 1 MiB 读取**不会**进入 Flash 算法 init 分支（连 "VERIFY" 与异常回退 "ERASE" 都不会触发），
+        只做 selected_ap.read_memory_block8 的目标读。这是本包"备份阶段不擦写"的关键离线证据。
+
+================================================================================================
+4. CP0.4 仓外 pyOCD 专用目录 —— 通过
+================================================================================================
+  WORK_OUT/pyocd-work/ 内容 = []（空目录）
+  其中不存在 pyocd_user.py / pyocd.yaml / pyocd.yml ⇒ 除显式 --no-config 外无隐式脚本或配置注入
+  所有 pyOCD 命令将在该目录内运行，且不携带 --elf、不携带设备专用用户脚本。
+
+================================================================================================
+5. CP0.5/4.6/4.7 下载专用工程副本 —— 通过（原工程一字未改）
+================================================================================================
+  原工程: BSP/project.uvprojx 231510 B sha256=efb5671345e1f3e747b00f8f02fe2f25fc4d2df30c4b6d88b820f3f391b929b0
+          BSP/project.uvoptx   61950 B sha256=62d2d8f14afbeb1c45f2852cd357b0fee1a6e5ee1110d820d4213c6230387cf1
+  副本:   WORK_OUT/download/download-a0.uvprojx 231472 B sha256=d53c62a32954f34f41e2fa12f1a854051554e14a7d06c309dd0a4abac5fce35f
+          WORK_OUT/download/download-a0.uvoptx   61950 B sha256=62d2d8f14afbeb1c45f2852cd357b0fee1a6e5ee1110d820d4213c6230387cf1
+          （uvoptx 与原文件**逐字节相同** ⇒ 完整沿用已知 CMSIS-DAP 通路与两个 FlashBank FLM 配置）
+          WORK_OUT/download/dl/rt-thread-a0.axf 1674612 B sha256=c8176c19…（与仓内源逐字节相同）
+  副本第一目标(目标名仍为 rt-thread)相对原工程的**全部差异 = 4 行**（逐字节 diff 实测，行数不变）:
+        line 51  <OutputDirectory>.\build\</OutputDirectory>      → <OutputDirectory>.\dl\</OutputDirectory>
+        line 52  <OutputName>rt-thread</OutputName>               → <OutputName>rt-thread-a0</OutputName>
+        line 83  <AfterMake>…<RunUserProg1>1</RunUserProg1>       → <RunUserProg1>0</RunUserProg1>
+        line 85  <UserProg1Name>fromelf --bin !L --output rtthread.bin</UserProg1Name> → 置空
+        ⇒ 输出改指向本轮复制并核过散列的测量 AXF；下载前后自定义程序已禁用；BeforeCompile/BeforeMake 原本即为 0。
+        ⇒ 第二目标(rt-thread-measure-a0)区域保持未改（脚本断言 tail 与原字节相同）。
+  实际选中下载文件路径（按历史规则推导并被旧日志证实）:
+        WORK_OUT/download/dl/rt-thread-a0.axf
+        依据: 旧烧录回执 Load "<工程根>\build\rt-thread.axf" 恰等于当时 OutputDirectory+OutputName+.axf
+              ⇒ 同一机制下副本必然解析为 …\dl\rt-thread-a0.axf（载荷为测量 AXF，不是默认固件）。
+  下载通路与 FlashBank（从副本 uvoptx 实读）:
+        pMon = BIN\CMSIS_AGDI.dll   解析为 KEIL_ROOT/ARM/BIN/CMSIS_AGDI.dll（存在）
+        CMSIS_AGDI: -FN2  Bank0 NS800RT7xxx_FlashBank1.FLM @0x08000000 len 0x80000
+                              Bank1 NS800RT7xxx_FlashBank2.FLM @0x08080000 len 0x80000
+                              RAM 算法工作区 -FD20120000 -FC2000
+        UL2CM3    : 同两 Bank 同地址长度（-FF0/-FF1 名称形式）
+        sIfile/tIfile 均为空 ⇒ 无下载初始化脚本
+  相关文件身份（PACK_DIR 与 KEIL_ROOT/ARM/BIN）:
+        55504 B  1ae62260956fc7c7362d6e162fb80da19af3ca3363a8428fc72952f384fb7523  NS800RT7xxx_FlashBank1.FLM
+        55508 B  aaa500121e431b3248b2536095a4fcb308bd99203ea50e2e2335b31eb3d8e04d  NS800RT7xxx_FlashBank2.FLM
+      2410776 B  05c8cd29093ab6da2bcac8e38cf48b7eac7033547a731c00946dd57747d8884c  CMSIS_AGDI.dll
+      2535192 B  7a5c69da8c3a2f95c78d238c8b1055cb1629d2b835984d5c2b0f9e811dcd3741  UL2CM3.dll
+        （安装目录内另有一份 2017 年的 Backup.001 旧副本；本包不改动任何安装文件，实际加载者以 Keil
+          搜索路径为准，配置文件本身不能单独证明加载的是哪一份 —— 如实登记为限制。）
+
+================================================================================================
+6. CP0.8 备份范围依据 —— 通过
+================================================================================================
+  副本第一目标 IROM Start=0x8000000 Size=0x80000（链接器只声明 512 KB，属 bank0）
+  工程自身 FlashBank 定义: bank0 0x08000000+0x80000, bank1 0x08080000+0x80000 ⇒ 连续 1 MiB 用户 Flash
+  ⇒ 备份范围 **0x08000000..0x080FFFFF（0x100000 = 1048576 B）** 由工程内两 Bank 定义直接支撑。
+  范围外不读: 不读 OTP、选项字、系统 ROM、外部 SPI Flash；不更改任何保护设置。
+
+================================================================================================
+7. 未闭合项与随之而来的停止条件
+================================================================================================
+  U-1  "Reset and Run" 离线不可证：两份工程文件里没有任何含 Reset 的可核对标签（实测 grep 0 命中），
+        该开关在 Keil 私有位域（如 CMSIS_AGDI 的 -O206）里。状态记 **UNPROVEN_OFFLINE**。
+        缓解与判据：CP3 回读用 connect_mode=halt + resume_on_disconnect=false；若下载后核心处于运行/
+        复位态，pyOCD 的 status 行与日志会如实暴露，按 §5.5 计入实际复位/启动次数，不并成"计划内一次"。
+  U-2  探针唯一性：uvoptx 的 -X"" 为空 ⇒ Keil 下载侧未钉住具体 DAP 序列号。CP2 允许的那一次探针列表
+        若发现多于一个无法区分的 CMSIS-DAP，则按 §6 **停止**（不"选第一个"）；恰好一个才可继续，
+        且后续 pyOCD 一律显式 -u <UID>。
+  U-3  串口实现形态：pyserial 缺失，实际走 PowerShell SerialPort（见 §3）。若您不认可该替代，CP4 不执行。
+  U-4  上一轮(查找轮)三条口径校正已在任务书 §1 收到，本轮按 §10.8 在此登记，不改写原文件：
+        (i) "源码无差异 ⇒ 两次烧录同一份映像"撤回（e40 的 src/kservice.c:162 确含 __DATE__/__TIME__）；
+        (ii) 压缩包尺寸不能证明装不下，排除依据只用"目录清单内无固件条目"；
+        (iii) 文件时间/单元数/Program Size/同名路径仅为筛选线索；"未找到"不扩大为"所有位置都不存在"；
+              段和≠BIN 长度（本文件第 2 节已给 1608 B 实测差）。
+  U-5  BLOCKED_ROLLBACK 各子项：本轮 CP2 之后可关闭"未保存现存片内字节"这一子项（若双读一致门通过）；
+        **恢复下载未演练**仍需另行决定，本包不预授。外部 SPI Flash 内容、全板运行状态仍未备份。
+
+================================================================================================
+8. STOP（CP0 收口）
+================================================================================================
+A0_BOARD_A_CP0_OFFLINE_COMPLETE / AWAITING_DAY_OF_FIELD_CONFIRMATION_FOR_CP1
+NO POWER-ON / NO PROBE CONNECTION / NO DEVICE LISTING YET / NO SERIAL / NO FLASH READ / NO PROGRAM / NO RESET
+下一动作: 由现场操作者按 §5 确认当天前置（USB 与 VM 均断电、电机物理未接、TMC 在位不拔插、
+SW1 能从板上标识指认阻断位、24 V 适配器与 USB 通路由本人操作），确认后才进入 CP1。
