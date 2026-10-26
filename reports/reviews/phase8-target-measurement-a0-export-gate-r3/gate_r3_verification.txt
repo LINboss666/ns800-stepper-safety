@@ -399,3 +399,41 @@ hardware_actions=[]、builds_executed=[]、firmware_changed=false、python_gate_
     python tests/host/a0_export_gate.py --raw <修后主机导出切片> --batch host_export --expected-records 3 --entry trip_fast
     python unchanged_proof_r3.py / python probe_r2_baseline.py tests/host/a0_export_gate.py
   补丁未进仓(按 §5.2 只在仓外暂存应用); 门判定的全部结果都在应用后的 50246 B / 94e83175… 字节上取。
+
+====================================================================
+11. 远端独立回读（身份取自 GitHub 端对象，不采信本地工作树；原文）
+====================================================================
+  fatal: path 'reports/agent_handoffs/phase8-target-measurement-a0-export-gate-r3.json' exists on disk, but not in '85522885ec39fbd96f99847a0508c2d7cb137ae6'
+  fatal: path 'reports/agent_handoffs/phase8-target-measurement-a0-export-gate-r3.md' exists on disk, but not in '85522885ec39fbd96f99847a0508c2d7cb137ae6'
+  fatal: path 'reports/reviews/phase8-target-measurement-a0-export-gate-r3/gate_r3_verification.txt' exists on disk, but not in '85522885ec39fbd96f99847a0508c2d7cb137ae6'
+  HEAD=05a766a7f2d49f5ad77750babb3ab58f30a8d9dd
+    SRC  sp_measure_a0.c                      46074 B e13b98fef6 vs cd8d9f09=True
+    SRC  sp_measure_a0.h                      16067 B e355aa6d43 vs cd8d9f09=True
+    SRC  stop_priority.c                      61993 B 9942fc7ac8 vs cd8d9f09=True
+    SRC  motor.h                              20304 B 67e2dcf845 vs cd8d9f09=True
+    SRC  tmc2209.h                            18058 B cefb2ea988 vs cd8d9f09=True
+    SRC  project_board.h                       5611 B 369d443ce2 vs cd8d9f09=True
+    SRC  sp_measure_a0_main.c                 92654 B bb77caff32 vs cd8d9f09=True
+    SRC  sp_measure_a0_port.h                  3743 B f27a8d3e8d vs cd8d9f09=True
+    SRC  sp_measure_a0_console.h               4914 B 7488b3de0d vs cd8d9f09=True
+    SRC  run_sp_measure_a0.sh                 29199 B 9758dbc087 vs cd8d9f09=True
+    SRC  rtthread.h                            6712 B 7ed2f49124 vs cd8d9f09=True
+    SRC  run_stop_result_s1.sh                23422 B b081367548 vs cd8d9f09=True
+    SRC  run_stop_priority_s2.sh              42382 B 8caf16df48 vs cd8d9f09=True
+    SRC  project.uvprojx                     226016 B c18d31f991 vs cd8d9f09=True
+    SRC  rtconfig.h                            8689 B 8ae5e4ce32 vs cd8d9f09=True
+    BIN  default.bin                         251148 B sha=02e9845832 §6 一致=True (起点 blob=True)
+    BIN  measure-a0.bin                      261452 B sha=5f30d3f058 §6 一致=True (起点 blob=True)
+    NEW  a0_export_gate.py                    50246 B 0c59948707 sha=94e8317577
+    NEW  a0_export_gate_r3_probe.py            2482 B 12e27151f0 sha=1c7bf5197c
+    NEW  phase8-target-measurement-a0-export-gate-r3.json   16800 B 0e63e5768a sha=fba540000e
+    NEW  phase8-target-measurement-a0-export-gate-r3.md    9402 B 4c3dc449b4 sha=f30423205e
+    NEW  gate_r3_verification.txt             50971 B 04d2b6a945 sha=5516ef57c1
+    RUN  probe_on_remote_bytes            REMAINING-PROBES cases=44 mismatch=0
+    RUN  selftest_on_remote_bytes         GATE-SELFTEST-SUMMARY pass=65 fail=0 cases=51
+    RUN  selftest_meta_on_remote_bytes    GATE-META-SUMMARY ok=9 blocked=2 bad=0 guards=11 required=5
+    RUN  check_header_on_remote_bytes     CHECK-HEADER gate=490 source=490 literal_pieces=8 identical=YES
+  口径: SRC/BIN 的对照基准是 cd8d9f09(源码) 与任务起点 8552288(镜像对象);
+        NEW 里 gate/probe 的对照基准是 gate_code_commit b187cdd2…(因此 blob_matches=True);
+        RUN 四行是把**远端取回的门与探针字节**直接执行的结果, 与本地同结论;
+        本条回读对应远端头 05a766a…, 登记它的提交号无法出现在自己内部, 由回执给出。

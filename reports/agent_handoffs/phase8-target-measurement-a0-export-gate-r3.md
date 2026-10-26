@@ -118,7 +118,27 @@
 门复审通过后，才把 §5 的**同一份 `5f30d3f0…` 镜像** + 通过的门 + 字节采集脚本绑成一次有界重测包，
 由用户一次批准（包内不逐条索要确认）。没有该包与批准，不上电、不连接、不读取、不烧录、不复位、不加 trip。
 
-## 9. STOP
+## 9. 远端独立回读（身份取自 GitHub 端对象，不采信本地工作树）
+
+`ls-remote` 观测：`refs/heads/phase8/tmc-drive-config = 05a766a7f2d49f5ad77750babb3ab58f30a8d9dd`；
+冻结引用未移动 —— `main=1b3757ee…`、`phase7/full-embedded-software=6d3fbc55…`、
+tag 对象 `097935fe…`、解引用 `e40a9b95…`。
+
+按该 ref 用 contents API 取回并直算字节（逐条见交接 JSON 的 `remote_readback` 与证据 §11）：
+
+- `tests/host/a0_export_gate.py` 50246 B，blob `0c599487…`，sha256 `94e83175…`
+  —— 与 `gate_code_commit b187cdd2…` 里的对象同一 blob，也与任务书 §4 云端候选逐字节相同。
+- `tests/host/a0_export_gate_r3_probe.py` 2482 B，blob `12e27151…`，sha256 `1c7bf519…`。
+- **把远端取回的这两份字节直接执行**：`REMAINING-PROBES cases=44 mismatch=0`、
+  `--selftest pass=65 fail=0 cases=51`、`--selftest-meta ok=9 blocked=2 bad=0 guards=11 required=5`、
+  `CHECK-HEADER gate=490 source=490 literal_pieces=8 identical=YES`。
+- 15 个冻结源/构建输入（13 个源文件 + `project.uvprojx` + `rtconfig.h`）远端 blob 全部等于 `cd8d9f09`；
+  两份冻结镜像远端复算 sha256 = `02e98458…`(251148 B) / `5f30d3f0…`(261452 B)，
+  与任务书 §6 一致且与任务起点的对象逐字节相同。
+- 交接 JSON/MD 自身的远端 blob 是"写入本条回读之前"的字节（`0e63e576…` / `4c3dc449…`）：
+  提交号无法出现在自己内部，登记提交由回执给出。
+
+## 10. STOP
 
 ```
 GATE_R3_OFFLINE_READY / AWAITING_INDEPENDENT_GATE_REVIEW
