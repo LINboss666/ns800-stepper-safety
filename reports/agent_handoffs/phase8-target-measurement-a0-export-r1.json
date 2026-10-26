@@ -1,0 +1,223 @@
+{
+  "round": "phase8-target-measurement-a0-export-r1",
+  "date_local": "2026-10-26 (Asia/Shanghai)",
+  "task_book": "NS800_A0_Board_A_Review_and_Export_Fix_Task_65d35e40_20261026.md",
+  "reviewer_verdict_on_previous_round": "BOARD_A_PARTIAL_RESULTS_ACCEPTED / BOARD_A_01_EXPORT_REWORK_REQUIRED",
+  "document_base": "d03047dbb3aac596a38d1e34f9c6b48c4e513458",
+  "code_commit": "cd8d9f095030c08634a082dd2bb9bc622d92fb1d",
+  "branch": "phase8/tmc-drive-config",
+  "repo": "https://github.com/LINboss666/ns800-stepper-safety",
+  "scope_statement": "本轮只做离线导出修复、离线验证、双目标构建与新镜像交付。未烧录、未读 Flash、未连接探针/串口/仪器、未复位、未发目标命令、未重跑板级批次。",
+  "production_changed": true,
+  "hardware_actions": [],
+  "builds_executed": [
+    {
+      "tool": "UV4.exe -r project.uvprojx -t rt-thread -j0",
+      "target_name": "rt-thread",
+      "measurement_switch": "NS800_TARGET_MEASUREMENT_A0 未定义 => 0",
+      "rebuilds": 1,
+      "result": "0 Error(s), 0 Warning(s).",
+      "log_warning_error_grep_count": 0,
+      "program_size": {"Code": 173762, "RO-data": 76806, "RW-data": 2188, "ZI-data": 83784},
+      "program_size_equal_to_previous_round": true,
+      "map_measurement_symbols": "spm_emitf/spm_emitfv/spm_cmd/__fsym_spm/spm_rec 全部 NOT-PRESENT; 'Removing sp_measure_a0.o(.text), (0 bytes).'",
+      "bin_bytes": 251148,
+      "bin_sha256": "02e984583255f3414f43fb5c077dc9ba82eba98553d2cb9d7f7feee9336ebd80",
+      "bin_archive": "reports/firmware/phase8-target-measurement-a0-export-r1/default.bin",
+      "byte_diff_vs_previous_default": {
+        "previous_sha256": "41717367e4e1401deb5f59eb27d1f35483108c6241eb30a5b58b28aad5b425de",
+        "differing_byte_positions": 5,
+        "span": "0x03bf68..0x03bf73",
+        "content": "old='00:43\\0Oct 25' new='56:52\\0Oct 26'",
+        "meaning": "仅 RT-Thread 版本横幅的 __TIME__/__DATE__ (src/kservice.c:162)；除此之外逐字节相同 => 默认目标无功能字节差异",
+        "functional_byte_difference": false
+      },
+      "axf_bytes": 1645448,
+      "axf_sha256": "016a689b477d8ff6564366a145f2b6bbb5e8105bfe8731a275874c217f70fdb7",
+      "map_sha256": "ab33ac1de309b2ce40402627c3b8a6dff0d81ec0104f590a7723d49f5a5f22f7",
+      "map_bytes": 1946989
+    },
+    {
+      "tool": "UV4.exe -r project.uvprojx -t rt-thread-measure-a0 -j0",
+      "target_name": "rt-thread-measure-a0",
+      "measurement_switch": "NS800_TARGET_MEASUREMENT_A0=1",
+      "rebuilds": 1,
+      "result": "0 Error(s), 0 Warning(s).",
+      "log_warning_error_grep_count": 0,
+      "program_size": {"Code": 181106, "Inits": 658, "RO-data": 79766, "RW-data": 2188, "ZI-data": 91504},
+      "delta_vs_previous_measure_image": {"Code": 304, "RO-data": 48, "RW-data": 0, "ZI-data": 0},
+      "no_new_static_bss": "RW 与 ZI 增量均为 0 => line[640] 只在调用帧内(栈上), 不进 ZI",
+      "map_links_real_kernel_leaves": [
+        "spm_emitfv refers to rt_vsnprintf_tiny.o(.text.rt_vsnprintf)",
+        "spm_emitfv refers to kservice.o(.text.rt_kputs)",
+        "spm_emitfv refers to kservice.o(.text.rt_kprintf)"
+      ],
+      "fsymtab": {"__fsym_spm": "0x0803f9b8 Data 16", "__fsym_spm_name": "0x0802d8b4", "__fsym_spm_desc": "0x0802d8b8"},
+      "bin_bytes": 261452,
+      "bin_sha256": "5f30d3f058ceff516b2185aa3a1e597bbe63293b94a6fd801fd989a6f7b2b8e6",
+      "bin_archive": "reports/firmware/phase8-target-measurement-a0-export-r1/measure-a0.bin",
+      "byte_diff_vs_board_image": {
+        "previous_sha256": "358fd81ae5853ea52df1e1ab367ea41af0f5e86679082a755c17dac3429b0e1b",
+        "previous_bytes": 261100,
+        "differing_byte_positions": 153890,
+        "span": "0x0005a8..0x03fbeb",
+        "meaning": "导出通道改道导致代码尺寸与地址整体位移(首处差异即向量表函数指针); 功能差异就是本轮修复本身",
+        "flashed": false,
+        "board_still_runs": "358fd81ae5853ea52df1e1ab367ea41af0f5e86679082a755c17dac3429b0e1b"
+      },
+      "axf_bytes": 1675944,
+      "axf_sha256": "8b95464e9f687096168f3fd9a182feb559a55452506202ff35a8e73df2b1b959",
+      "map_sha256": "07498bc9370235055dd2b4f8a465853a2577b226a5d0cf382194ea55240fbd0d",
+      "map_bytes": 1999062
+    }
+  ],
+  "stack_budget": {
+    "SPM_TEXT_CAP": 640,
+    "finsh_thread_stack_size": 4096,
+    "declared_frame_share_percent_upper": 16.6,
+    "method": "按源声明缓冲推导(line[640] + 保存寄存器约 32 B)，本工程 map 无 armclang callgraph/Max Depth 段",
+    "evidence_level": "DERIVED_FROM_DECLARATION_NOT_LINKER_MEASURED",
+    "thread_stack_or_global_buffer_enlarged": false
+  },
+  "line_bound_basis": {
+    "csv_header_line_bytes_including_lf": 490,
+    "csv_header_line_body_bytes": 489,
+    "csv_data_row_worst_bytes_by_field_type": 374,
+    "csv_data_row_worst_bytes_loose": 534,
+    "cap_third_line_bytes_host": 142,
+    "init_main_line_bytes_host": 129,
+    "status_line_bytes_host": 124,
+    "enum_name_max_bytes": {"counter_status": 19, "entry": 18, "clock_basis": 17},
+    "sites_total_rt_kprintf_before_fix": 25,
+    "sites_worst_over_127_before_fix": 9,
+    "capacity_margin_vs_loose_bound_bytes": 106,
+    "capacity_margin_vs_header_bytes": 150,
+    "identity_check_vs_production_source": "gate=490 source=490 literal_pieces=8 identical=YES",
+    "line_bounds_json_sha256": "df4399487f294d2de2949247845fdd8330b34a486c00d03a362f019a3161ff1d"
+  },
+  "mechanism_verified_offline": {
+    "rtconfig_RT_CONSOLEBUF_SIZE": 128,
+    "rtconfig_THREADSAFE_PRINTF_defined": false,
+    "vsnprintf_impl_linked": "src/klibc/rt_vsnprintf_tiny.c",
+    "tiny_vsnprintf_return_semantics": "应写出的总字节数(C99 语义, 不含 NUL): 每处转换先判 str<end 再无条件 ++str, 末尾 return str-buf",
+    "probe": {
+      "source_sha256": "d81d164e5756ff030baab01f4169d7b598bbc5c136b674ee39bd6913594e20df",
+      "compile": "gcc -std=c11 -Wall -Wextra -Werror 成功",
+      "rc_meaning": "rc=0 只表示旧缺陷确实复现, 不是生产修复 PASS",
+      "result": {
+        "header_expected_bytes": 490, "header_columns": 47,
+        "kprintf_wire_bytes": 127, "kprintf_visible_prefix": 126,
+        "kprintf_embedded_nul": 1, "kprintf_visible_columns": 14,
+        "kputs_wire_bytes": 490, "kputs_complete": 1, "kputs_nul_sent": 0
+      },
+      "matches_cloud_probe": true
+    }
+  },
+  "board_wire_facts_from_saved_raw_bytes": {
+    "files_scanned": 57,
+    "total_bytes": 54927,
+    "nul_bytes": 146,
+    "crlf_pairs": 776,
+    "lf_count": 781,
+    "lone_lf_locations": "全部 5 处在 01_reset_pyocd.txt, 那是本机工具自己的 stdout 文本, 不是目标上线",
+    "nul_gap_histogram": {"126": 144, "12": 2},
+    "nul_gap_12_explanation": "同一行 [SS] STEP: ...post_eff=100\\nsrc=emergenc<NUL> —— 格式串自带换行, 剪断点落在第二分句中间; 属 Safety 模块历史长行, 不在本轮修复范围",
+    "conclusion_device_path": "NUL 真的上线 => 走 rt_device_write(console_device,0,str,127), 不是 rt_hw_console_output 的 strlen 路径(drv_common.c:175)",
+    "conclusion_line_ending": "设备层把 \\n 展开成 \\r\\n => 采集门必须同时接受 LF 与 CRLF",
+    "conclusion_truncated_line_unterminated": "被剪断的行没有换行, 下一条紧跟其后(实测 ...owner_after,phase_af 直接粘 2,1,0,trip_fast,...)",
+    "analysis_script_sha256": "82d5787c2e3ce11b0c64d5604a1801267c316aac572987a35ed4b462d1638f60"
+  },
+  "tests_executed": [
+    {"chain": "A0 run_sp_measure_a0.sh 正向", "variant": "off/on/min", "groups": "off counter contract conc batch cli ledger pack export", "cases": 26, "build_log_bytes": 0, "meta": "A0CHAIN-META: OK", "rc": 0},
+    {"chain": "A0 具名反向家族", "families": ["rev_spm_unavailable_is_valid (检出 TMA02 TMA03 TMA21)", "rev_spm_snapshot_after_unmask (检出 TMA11)", "rev_export_header_single_limited_kprintf (检出 TMA27, 本轮新增)"], "meta": "三族全部 META-OK, 其余每组台账逐条一致且保持 PASS", "rc": 0},
+    {"chain": "A0 台账判定器负控", "expectation": "省略非锚身份 TMA18 的 RESULT 行必须判 INFRA-FAIL", "observed": "negctrl/ledger: 按合同判为 INFRA-FAIL —— 声明的 RESULT 身份缺席: TMA18", "rc": 0},
+    {"chain": "S1 run_stop_result_s1.sh REVERSE=1", "result": "PASS (正向两变体全 PASS; rev_motor_off_ignores_failure META-OK 命中 5/5; 第②项按 §10.2 重指向 S2 代跑, 如实登记 REV-HANDED-OFF)", "rc": 0},
+    {"chain": "S2 run_stop_priority_s2.sh REVERSE=1", "result": "PASS (target 23/23, host_ovr 79/79, 五家族反向全部 META-OK)", "rc": 0},
+    {"chain": "采集门自检 a0_export_gate.py --selftest", "result": "pass=20 fail=0", "rc": 0},
+    {"chain": "采集门对板级轮真实原始接收字节离线判定", "result": "4 批全部 REJECT, clear_records=0, next_batch_trigger=0", "rc": "逐批 1 (REJECT 即预期)"},
+    {"chain": "采集门对修后真实导出切片", "result": "ACCEPT rows_parsed=3 nul=0 failures=[] timing included=3", "rc": 0}
+  ],
+  "not_rerun": {
+    "items": ["V1/V2 build_and_run.sh", "I/O 行为链 run_io_behavior.sh", "SD 语义链 run_safety_data_semantics.sh", "既有 negatives 矩阵与元负例", "probe_errcodes"],
+    "reason": "这些链的输入未改动；公共 shim tests/host/shim_ps/* 一个字节未改（控制台模型只由 A0 runner 以 -include 注入, 属链专用适配）",
+    "status": "NOT_RERUN"
+  },
+  "new_cases": [
+    {"id": "TMA25", "claim": "cap/init/status/stop/usage/拒绝行的最后字段名全部上线, 无 127 截断行, 无 NUL; 并如实数出'超过 127 字节的诊断行数 = 2'"},
+    {"id": "TMA26", "claim": "整行超过 SPM_TEXT_CAP => rc=-1 + 具名 EXPORT_ERROR(need/cap 如实) + 超长内容零片段上线 + 错误行自身不被截断"},
+    {"id": "TMA27", "claim": "正常容量构建: 头行行体 489 B(+LF=490)/47 列/尾列在第 127 字节之后, 3 条数据行各 47 列且 complete=1, dump=0; 精简容量构建(-DSPM_TEXT_CAP=256, 仅主机): 头行超限 => dump=-3 + 具名错误 + 半条头行与数据行都不许上线"},
+    {"id": "rev_export_header_single_limited_kprintf", "claim": "把修后头行导出退回单条受限 rt_kprintf, 由 TMA27 具名检出 11 条断言失败(126 可见 + NUL + 14 列), 其余身份与台账仍自洽"}
+  ],
+  "collector_gate": {
+    "file": "tests/host/a0_export_gate.py",
+    "inputs": "逐批原始接收字节文件(只读, 无串口副作用, 不删 NUL, 不补列)",
+    "header_contract": "逐字等于 47 列合同; 与生产源码头行双向防漂移检查 identical=YES",
+    "record_contract": "47 列 + 逐列类型/取值域 + schema=2 + complete=1 + slot 从 0 递增 + 代次逐条 +1 + entry 与本批一致 + 条数==预期",
+    "batch_state_contract": "STOPPING/in_flight=0/dropped=0 且状态行 records 与预期一致; 缺状态行即 REJECT",
+    "invalid_but_complete": "body_valid=0 的完整记录仍存档(条数保留), 只从时长统计排除, 且不得为此追加保护动作(extra_protection_actions 恒 0)",
+    "failure_effect": "clear_records_send_count=0 且 next_batch_trigger_send_count=0",
+    "not_proof": "prompt 出现或进程 rc=0 不证明记录完整; 采集门只认证据可继续保存与清理, 不认证时合格"
+  },
+  "defect_status": {
+    "BOARD-A-01": {
+      "id": "BOARD-A-01",
+      "sub_findings": {
+        "BOARD-A-01a_export_channel": "OFFLINE_FIXED_AND_HOST_VERIFIED; 目标侧未验证(未烧录)",
+        "BOARD-A-01b_validate_before_clear": "FIXED_AS_CODE_BEHAVIOR (tests/host/a0_export_gate.py + action_plan); 对板级轮真实原始字节的离线判定 4/4 REJECT, 证明这道门当初会拦下 clear 与后续批次"
+      },
+      "still_open_on_target": true,
+      "closed_by": "尚未独立软件/镜像复审, 且目标导出未经板级验证"
+    }
+  },
+  "evidence_status": {
+    "a0_record_validity_and_timing": "NOT_ACHIEVED",
+    "note": "旧采样维持原判: 有效性列丢失, 时长统计未取得; 本轮没有也不得从截断数据补写有效字段、换算 us 或反算窗口上界。目标导出结论要等新镜像复审通过并取得新散列重测包后才能推进。",
+    "window_worst_case_closed": false,
+    "real_frequency_closed": false,
+    "physical_waveform_risk_closed": false
+  },
+  "caliber_corrections_registered_this_handoff": [
+    {"id": "CAL-1", "item": "旧构建戳与第二次 e40 时代日志高度一致", "status": "关联证据; 不证明唯一对应源码树或当年镜像散列; 快照保持 BOARD_FLASH_SNAPSHOT 身份"},
+    {"id": "CAL-2", "item": "下载/回读范围 0x08000000..0x0803FBEB", "status": "不等于实际擦除扇区范围; 无 FLM 扇区与擦除操作证据 => 实际擦除范围记 未独立核定"},
+    {"id": "CAL-3", "item": "下载后 attach+halt 观察到 Halted", "status": "不能证明此前没有 Reset-and-Run; 只可断言主动 SYSRESETREQ 命令 1 次; 自动运行次数在缺连续观测时不可断言恰好 1"},
+    {"id": "CAL-4", "item": "CP0 曾写 '0x08000000 位于 RAM2(0x80000000..0x9FFFFFFF)'", "status": "该说法不成立。离线重读已安装 pyOCD 0.45.1 的 _create_default_cortex_m_memory_map: 0x08000000 落在 RamRegion 名为 'Code' 的区段(0x00000000 len 0x20000000); RAM2 是 0x80000000 起。区段名/起止已更正, 本轮未为此重连目标"},
+    {"id": "CAL-5", "item": "sizeof_ctx 主机 48 vs 目标 cap 报告 44", "status": "按 ABI/字段布局分别记录: 主机链指针字段为 8 字节 ABI 而目标为 4 字节指针, 属预期差异; 不把主机尺寸要求套到目标, record=120 B 的记录合同仍须保持(本轮 ZI 增量 0 亦佐证布局未变)"},
+    {"id": "CAL-6", "item": "17 次保护日志/故障锁存/黑匣子 trigger 文本", "status": "不能独自证明持久 Flash 写入全部完成; 必须区分 触发 / 排队 / 完成 / 失败 四个阶段"},
+    {"id": "CAL-7", "item": "探针列表实际 2 次的编码重试偏差", "status": "已留痕并接受其说明; 不再为计数重跑任何硬件步骤"}
+  ],
+  "preserved_untouched": {
+    "board_snapshot_1mib_sha256": "b89f8a7cde7b944a5b5425f512a715d27a17c2e6c25822f36b2205bbefd0cac2",
+    "restore_hex_sha256": "b3ac97b976bc476556818f2bbaa977d15854a5c1d342f4b9c9d3ed825deb2c65",
+    "restore_download": "NOT_EXECUTED",
+    "old_a0_bin": "reports/firmware/phase8-target-measurement-a0/measure-a0.bin sha256 358fd81ae5853ea52df1e1ab367ea41af0f5e86679082a755c17dac3429b0e1b (未覆盖)",
+    "old_board_evidence_and_snapshots": "未改动",
+    "path_index_and_restore_project": "本地保留, 未动",
+    "board_raw_deidentified_copy": "reports/reviews/phase8-target-measurement-a0-export-r1/board_raw_archive.md (59 文件, 原始字节 69967, base64 无损; 含机器路径/UID 的 3 个文件改存替换后文本并声明不再无损)"
+  },
+  "frozen_refs_unchanged": {
+    "main": "1b3757eec550802a3973e66790af422d81d3d373",
+    "phase7_full_embedded_software": "6d3fbc559d45673d7550eb73dec5a4ade5bb34df",
+    "tag_object": "097935fec5a6f2467261ab1ad449ff0b1d398250",
+    "tag_dereference": "e40a9b95ef709e6a80444f9f3949dfdd70ba96ba"
+  },
+  "four_macros": {
+    "MOTOR_HARDWARE_ENABLE_PATH_VALIDATED": "RT_FALSE",
+    "STEP_DIAG_ISOLATED_ENV_CONFIRMED": "RT_FALSE",
+    "TMC_DRIVE_CONFIG_HW_VALIDATED": "RT_FALSE",
+    "SAFETY_LIMIT_INPUTS_ENABLED": "RT_FALSE",
+    "overridden_for_target": false
+  },
+  "open_items_unaffected": ["B-1", "BUG-008", "RISK-03", "RISK-03a", "物理 RISK-04-b", "M-1", "M-2", "M-3"],
+  "privacy": {
+    "machine_paths_in_repo_files": "无(已扫描)",
+    "leakcheck_sha256": "df5bf3a0dd370f47f8275ea60df2b27214e4697f9ab6007de434a29743ff5f0f",
+    "leakcheck_result": "files=9 hits=0",
+    "masking_rule_stated_in": "reports/reviews/phase8-target-measurement-a0-export-r1/board_raw_archive.md",
+    "originals_with_local_sha_retained": true
+  },
+  "stop_claim": [
+    "A0_EXPORT_R1_OFFLINE_READY / AWAITING_INDEPENDENT_SOFTWARE_AND_IMAGE_REVIEW",
+    "NO NEW HARDWARE ACTIONS / NO FLASH READ / NO PROGRAM / NO RESET / NO SERIAL",
+    "NO MOTOR / NO STEP_ENABLE / FOUR SAFETY MACROS RT_FALSE"
+  ]
+}

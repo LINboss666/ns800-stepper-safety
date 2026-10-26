@@ -1,0 +1,123 @@
+BOARD-A-01a 导出通道：输出界限依据、目标机制与基线复现
+轮次 phase8-target-measurement-a0-export-r1    document_base d03047dbb3aac596a38d1e34f9c6b48c4e513458
+日期 2026-10-26 (Asia/Shanghai)    全部为离线计算/离线读取，本轮 hardware_actions=[]
+
+====================================================================
+1. 目标机制（逐条实读，行号来自本仓库当前字节）
+====================================================================
+BSP/novosns/ns800/ns800rt7p65-nssinepad/rtconfig.h:107   #define RT_CONSOLEBUF_SIZE 128
+BSP/novosns/ns800/ns800rt7p65-nssinepad/rtconfig.h:125   #define FINSH_THREAD_STACK_SIZE 4096
+rtconfig.h 里没有 RT_USING_THREADSAFE_PRINTF（grep 无命中），也没有 RT_KLIBC_USING_LIBC_VSNPRINTF。
+
+src/kservice.c:391  static char rt_log_buf[RT_CONSOLEBUF_SIZE];        (128 B 静态缓冲)
+src/kservice.c:405  length = rt_vsnprintf(rt_log_buf, sizeof(rt_log_buf) - 1, fmt, args);
+                    ⇒ size 参数是 127：最多写 126 个可见字符，第 127 字节(下标 126)放 NUL
+src/kservice.c:406-409  if (length > RT_CONSOLEBUF_SIZE - 1) length = RT_CONSOLEBUF_SIZE - 1;
+src/kservice.c:411  _kputs(rt_log_buf, length);                        ⇒ 上线 length 个**原始字节**
+src/kservice.c:341-361 _kputs() 在 RT_USING_DEVICE 且有 console 设备时走 rt_device_write(dev,0,str,len)
+src/kservice.c:327-332 RT_USING_THREADSAFE_PRINTF 未定义 ⇒ CONSOLE_TAKE/CONSOLE_RELEASE 展开为空
+src/kservice.c:369-381 rt_kputs(str) = _kputs(str, rt_strlen(str))      ⇒ 不经 128 B 格式化缓冲，不送 NUL
+
+实际链接的 rt_vsnprintf 实现（这是本次核对的一个新增事实）：
+  Keil 工程 bsp/.../project.uvprojx 的文件列表里是 **rt_vsnprintf_tiny.c**（不是 rt_vsnprintf_std.c），
+  而 src/klibc/kstdio.c:81 的 libc 版被 RT_KLIBC_USING_LIBC_VSNPRINTF 编译掉。
+  src/klibc/rt_vsnprintf_tiny.c:325-340 与 447-470 的写法是"先判 str<end 再无条件 ++str"，
+  函数末尾 return str - buf ⇒ **返回值是"应当写出的总字节数"(C99 语义，不含 NUL)**，
+  与实际写入量无关。这一条决定了 spm_emitfv() 的溢出判据
+  `n < 0 || (rt_size_t)n >= sizeof(line)` 在目标上真的会触发（而不是死代码）。
+
+结论：任何 >127 字节的 rt_kprintf 整行都会 (a) 被静默剪成 126 个可见字符，
+(b) 丢掉自己的 \n（于是与下一行粘连），(c) 把一个 NUL 送上控制台。
+
+====================================================================
+2. 每站最长合法行的度量（按 UTF-8 字节，不按显示字数）
+====================================================================
+度量对象：d03047db 的 sp_measure_a0.c（41518 字节，843 行，25 处 rt_kprintf）
+方法：逐条格式串取字面量字节数 + 按**转换符类型**代入各字段的最大合法值
+     （u8→3, u32→10, i32 %d→11, 0x%04x→6, 0x%02x→4, %s 取枚举名实际最长值）
+枚举名实测最长：counter_status "COUNTER_UNAVAILABLE"=19, entry "trip_for_operation"=18,
+                clock_basis "EXTERNAL_VERIFIED"=17
+
+  源行(修前)  前缀                                字面量B  转换符数  按类型最坏B
+  -------  ---------------------------------  ------  -------  ---------
+  582      %u,%u,%u,%s,%u,... (CSV 数据行)      153     47       374(按类型) / 534(宽松)
+  563      schema,gen,slot,entry,... (CSV 头)   490      0       490      ← 最长
+  809      [spm] counter=%s clock_basis=%s ...  215*     9       215
+  822      [spm] status: state=%u entry=%s ...  186*     9       186
+  527      [spm] init: counter=%s demcr=0x%08x  180*     8       180
+  803      [spm] 编译四宏: MOTOR_HW=%d ...       147*     4       147
+  486      [spm] init: 非静止态 => 拒绝 ...      135*     4       135
+  546      [spm] stop: state=%u ...             130*     4       130
+  778      [spm] 参数个数不对 '%s' (argc=%d)...  126*     2       126
+  534/537  [spm] init: ...(纯中文诊断)          125/124  0       125/124
+  800      [spm] schema=%u slots=%u ...         110*     5       110
+  757      usage: spm cap|init|start <...>      105      0       105
+  （* 号行：该列为"字面量 + 最坏代入"的合计，不是字面量本身）
+
+  12 站里 9 站的最坏值超过 127，因此缺陷覆盖面是整个模块，不只是 CSV。
+  §4.1.1 的"只修 CSV 不合格"由此量化：cap/status/init/stop/拒绝行同样会丢尾字段。
+
+容量选择：
+  SPM_TEXT_CAP = 640
+    覆盖   按类型最坏 490（头行）  余量 150 B（30.6%）
+    覆盖   宽松(不按类型)最坏 534   余量 106 B（19.9%）
+  栈预算：line[640] 只在 spm_emitfv 的帧内，占 FINSH_THREAD_STACK_SIZE 4096 的 15.6%；
+          调用点全在普通线程上下文（命令/导出路径），不在 PRIMASK 窗口内、不在中断里。
+  未采用"调大线程栈/全局缓冲"的路径（§4.1.2 禁止），rtconfig.h 与 kservice.c 一个字节未改。
+
+====================================================================
+3. 基线缺陷复现（沿用同名探针，与云端探针同输入同形状）
+====================================================================
+探针源码（仓外，可重放）：ns800-export-r1/make_probe.py → probe/a0_console_probe.c
+探针里 KPRINTF/STR/PUTS 三个函数体是**逐字复制**的 src/kservice.c:369-411 原文；
+rt_vsnp_like() 复刻 rt_vsnprintf_tiny 的"应写长度"返回语义；设备写端仅替换为字节捕获。
+编译 gcc -std=c11 -Wall -Wextra -Werror 通过，运行 rc=0（rc=0 只表示"旧缺陷确实复现"）。
+
+  HDR_bytes=490 ROW_bytes=374 fmtspec_bytes=154
+  KPRINTF_HDR  wire=127 visible=126 embedded_nul=1 visible_columns=14
+  KPRINTF_STR  wire=127 visible=126 embedded_nul=1
+  KPUTS_HDR    wire=490 embedded_nul=0 complete=1
+  KPUTS_ROW    wire=374 embedded_nul=0 complete=1
+
+与云端复审给出的基线数字逐项一致（header_expected_bytes=490 / expected_columns=47 /
+kprintf_return=127 / wire_bytes=127 / visible_prefix=126 / nul_count=1 / observed_columns=14 /
+CONTROL kputs_wire_bytes=490 matches_full_header=1 nul_sent=0）。
+探针源 SHA-256（本轮重放件，供比对）见 host_chain_verification.txt 的身份表。
+
+====================================================================
+4. 板级原始接收字节里的上线事实（离线读取已保存文件，未连接任何设备）
+====================================================================
+对象：`<RAWDATA>/serial/*.txt`（57 个文件，54927 字节；板级轮原样保存的接收字节。
+     `<RAWDATA>` 的展开规则与本包 board_raw_archive.md 的变换表一致）
+
+  NUL 字节总数                    146
+  CRLF 对数 / LF 数               776 / 781  ⇒ 5 个孤 LF 全部在 01_reset_pyocd.txt，
+                                   那是本机工具自己的 stdout 文本("…-c exit\nSTDOUT\nRese")，
+                                   不是目标上线；目标上线的每个 LF 前面都有 CR。
+  每个 NUL 与"上一个分隔符(LF 或前一个 NUL)"的间距直方图
+                                   {126: 144, 12: 2}   ⇒ 恒等于"126 可见 + NUL = 127 上线字节"
+     2 个 12 的特例都是同一行 [SS] STEP: ...post_eff=100\nsrc=emergenc\0
+     —— 该格式串自带一个换行，剪断点落在第二个分句中间；它是 Safety 模块的历史长行，
+     不在本轮修复范围内（§4.1.5 本轮不修所有模块的历史长日志）。
+
+由此判定（不是猜测，是字节证据）：
+  (1) 目标走 rt_device_write(console_device, 0, str, 127) 分支 ⇒ 被剪断时 NUL 真的上线；
+      若走 drv_common.c:175 的 rt_hw_console_output(str) 分支，它按 rt_strlen 发送，NUL 不会上线。
+  (2) 控制台设备层把 \n 展开成 \r\n（故采集门必须同时接受 LF 与 CRLF）。
+  (3) 被剪断的行**没有**换行符，下一条紧跟其后（cmd_114_b1_dump.txt 里可见
+      "...owner_after,phase_af" 直接粘 "2,1,0,trip_fast,..."），
+      这正是"无法可靠分离就拒绝该批"的实测依据。
+
+典型批次（头行 490 B → 上线 127 B）：
+  cmd_114_b1_dump.txt   size=361  nul=2  (头行 + 1 条数据行 各被剪一次)
+  cmd_135_b2_dump.txt   size=2267 nul=17 (头行 + 16 条数据行)
+  cmd_108_spm_cap.txt   size=334  nul=1  (cap 三行里最长那条被剪)
+
+====================================================================
+5. 本轮未做的事（避免把模型通过写成目标导出通过）
+====================================================================
+  - 未烧录、未读 Flash、未连接探针/串口/仪器、未复位、未发目标命令；hardware_actions=[]。
+  - 主机链的控制台模型只覆盖 kservice.c 那一层；设备层 \r\n 展开、UART 时序、
+    其它线程日志的真实插入时机**不在模型内**（逐条边界写在 tests/host/sp_measure_a0_console.h 头部）。
+  - 因此"模型通过"不等于"目标导出已经通过"；目标侧结论要等新镜像复审通过后、
+    由云端用真实新散列制作的有界重测包执行。

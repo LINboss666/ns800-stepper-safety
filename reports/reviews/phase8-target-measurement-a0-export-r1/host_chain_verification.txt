@@ -1,0 +1,163 @@
+BOARD-A-01 导出修复与采集门：离线验证结果原文摘录与身份
+轮次 phase8-target-measurement-a0-export-r1
+document_base d03047dbb3aac596a38d1e34f9c6b48c4e513458
+code_commit   cd8d9f095030c08634a082dd2bb9bc622d92fb1d   (完整软件输入，证据/镜像只在其后追加)
+本轮 hardware_actions=[]；未烧录、未读 Flash、未连探针/串口/仪器、未复位、未发目标命令。
+
+====================================================================
+0. 输入身份
+====================================================================
+仓库内输入（git blob，HEAD=cd8d9f09）：
+  e13b98fef679  BSP/applications/sp_measure_a0.c        (生产, 唯一改动之一)
+  e355aa6d4342  BSP/applications/sp_measure_a0.h        (生产, 容量与错误码说明)
+  bb77caff32d8  tests/host/sp_measure_a0_main.c         (控制台模型 + TMA25..TMA27)
+  7488b3de0dd4  tests/host/sp_measure_a0_console.h      (新增: A0 链专用控制台模型声明/映射)
+  1ba58ce5f562  tests/host/a0_export_gate.py            (新增: 采集门 + 自检)
+  9758dbc087c0  tests/host/run_sp_measure_a0.sh         (runner: export 组 / a0_min / 第三家族)
+未改动：src/kservice.c、BSP rtconfig.h、stop_priority.c、Keil 工程、SConscript、
+        四道宏(motor.h:69/:83, tmc2209.h:100, project_board.h:51 均仍 RT_FALSE)、.gitignore。
+公共 shim tests/host/shim_ps/* 未改（S1/S2 链共用，本轮不受影响；
+模型只由 A0 runner 以 -include 注入，属"链专用适配"）。
+
+仓外工具（本轮实际使用的仪器，SHA-256 全长）：
+  97860501dd7e143101d82efa77e9da102bf61588453294cfcd72f496d1548873  measure_line_bounds2.py
+  8acbdf0ff85aedcec6a3bdc5047467bcf6c7f3fa054c880fb8ade86db1f0b65c  make_probe.py
+  d81d164e5756ff030baab01f4169d7b598bbc5c136b674ee39bd6913594e20df  probe/a0_console_probe.c
+  df4399487f294d2de2949247845fdd8330b34a486c00d03a362f019a3161ff1d  line_bounds.json
+  82d5787c2e3ce11b0c64d5604a1801267c316aac572987a35ed4b462d1638f60  wire_facts.py
+  df32d4be807436e3ff57eba1cde79d9782c8254ff3ea923962cf4322e754db7a  realign_emitf.py
+  7713d687e04e3ad848916a38ac98312352bd4f19eee5def370d820e30cbd4dc5  board_raw_archive.py
+  df5bf3a0dd370f47f8275ea60df2b27214e4697f9ab6007de434a29743ff5f0f  leakcheck.py
+说明：生产编辑是分步审阅的离散修改（逐处 git diff 已随 code_commit 提交），
+不是一个整档脚本产物；中途废弃的草稿脚本不计入仪器。
+
+====================================================================
+1. §5.1 基线：真实控制台边界下的缺陷复现（探针，非生产修复）
+====================================================================
+gcc -std=c11 -Wall -Wextra -Werror 编译通过；探针 rc=0 的含义**只是**"旧缺陷确实复现
+且控制路径成立"，不是生产 PASS。函数体逐字取自 src/kservice.c:369-411。
+
+  HDR_bytes=490 ROW_bytes=374 fmtspec_bytes=154
+  KPRINTF_HDR  wire=127 visible=126 embedded_nul=1 visible_columns=14
+  KPRINTF_STR  wire=127 visible=126 embedded_nul=1
+  KPUTS_HDR    wire=490 embedded_nul=0 complete=1
+  KPUTS_ROW    wire=374 embedded_nul=0 complete=1
+
+与云端复审基线逐项一致(wire_bytes=127 / visible_prefix=126 / nul_count=1 /
+observed_columns=14 / CONTROL kputs_wire_bytes=490 matches_full_header=1 nul_sent=0)。
+
+====================================================================
+2. §5.2..§5.4 修后：A0 主机链导出用例（三个可执行体）
+====================================================================
+runner 原文（build_log_bytes=0 表示这三个构建的编译输出为零字节，即无警告无错误）：
+
+  BUILD off rc=0 build_log_bytes=0 exe=a0_off.exe
+  BUILD on  rc=0 build_log_bytes=0 exe=a0_on.exe     (SPM_TEXT_CAP=640, 与目标同值)
+  BUILD min rc=0 build_log_bytes=0 exe=a0_min.exe    (-DSPM_TEXT_CAP=256, 仅主机反向)
+  符号核对: a0_off 生产记录器符号=0 记录数组=0 命令注册条目=0 / 三个被测入口存在=3
+  符号核对: a0_on  生产记录器符号=30 记录数组=1 __fsym_spm=1 __fsym_spm_cmd=0
+
+逐组执行（正向，全绿）：
+  off/off:     OK (1 例, checks=13  fails=0 rc=0)
+  on/counter:  OK (8 例, checks=111 fails=0 rc=0)
+  on/contract: OK (4 例, checks=60  fails=0 rc=0)
+  on/conc:     OK (3 例, checks=34  fails=0 rc=0)
+  on/batch:    OK (3 例, checks=36  fails=0 rc=0)
+  on/cli:      OK (3 例, checks=44  fails=0 rc=0)
+  on/ledger:   OK (1 例, checks=13  fails=0 rc=0)
+  on/pack:     OK (1 例, checks=24  fails=0 rc=0)
+  on/export:   OK (3 例, checks=39  fails=0 rc=0)   <- TMA25/TMA26/TMA27
+  min/export:  OK (3 例, checks=26  fails=0 rc=0)   <- 精简容量构建的 TMA27 判 -3
+
+修后可判定事实（TMA27 正常容量，断言建立在逐字节捕获上）：
+  头行行体 489 B + LF = 上线 490 B；列数 47；尾列 dropped_at_publish,complete
+  出现在第 127 字节之后；捕获字节里 trunc=0、nul=0；3 条数据行各 47 列、无 NUL、
+  末列 complete=1。
+TMA25 如实数出"超过 127 字节的诊断行数 = 2"（cap 第 3 行 142 B、init 行 129 B），
+即修复覆盖面确实跨过旧剪断点，而不是"本来就短所以没暴露"。
+TMA26（容量不足）：rc=-1、具名 "[spm] EXPORT_ERROR: line_overflow need=649 cap=640"、
+超长内容零片段上线、错误行自身未被截断、不带 NUL。
+a0_min（容量 256，头行 490 必然超限）：dump 返回 -3、具名错误、
+"schema,gen,slot,entry," 半条头行**没有**上线、无任何 CSV 数据行上线。
+
+====================================================================
+3. §5.6 新增具名反向家族（必须被新增的导出用例检出）
+====================================================================
+INJECTED rev_export_header_single_limited_kprintf rules=1
+  注入点：把修后的头行导出退回单条受限 rt_kprintf(整行 490 B > 128 B 控制台缓冲)
+  app/sp_measure_a0.c:619  rc_line = rt_kprintf("schema,gen,slot,entry,...
+结果：rev_export_header_single_limited_kprintf: META-OK 具名检出 1 例，
+      其余每组台账逐条一致且保持 PASS（含退出码合同）
+TMA27 在该构建里的原始失败行（这就是"缺陷形态"本身被链抓住的原文）：
+  CHECK FAIL 没有 127 截断行 expect=0 actual=1
+  CHECK FAIL 上线字节不含 NUL expect=0 actual=1
+  CHECK FAIL 头行行体字节数 = 489 expect=489 actual=126
+  CHECK FAIL 头行上线字节数(含 LF) = 490 expect=490 actual=127
+  CHECK FAIL 头行列数 = 47 expect=47 actual=14
+  CHECK FAIL 头行尾列 dropped_at_publish,complete 在剪断点之后 expect=1 actual=0
+  CHECK FAIL 数据行数 = 3 expect=3 actual=0
+  CHECK FAIL 每条数据行都是 47 列 expect=3 actual=0
+  CHECK FAIL 每条数据行都不带 NUL expect=3 actual=0
+  CHECK FAIL 每条数据行末列 complete=1 expect=3 actual=0
+  CHECK FAIL 每条数据行都在容量界限内(没有溢出) expect=3 actual=0
+  RESULT TMA27 FAIL checks=19 fails=11   ；RESULT TMA25 PASS / RESULT TMA26 PASS
+被剪断的头行与下一行粘连的原文形状（与板级原始字节一致）：
+  ...owner_after,phase_af 紧接着 2,1,0,trip_fast,0,0,0,0,
+
+既有两家族与台账负控继续按原判据通过：
+  rev_spm_unavailable_is_valid:  META-OK 具名检出 3 例 (TMA02 TMA03 TMA21)
+  rev_spm_snapshot_after_unmask: META-OK 具名检出 1 例 (TMA11)
+  negctrl/ledger: 按合同判为 INFRA-FAIL —— 声明的 RESULT 身份缺席: TMA18  [期望结果]
+
+====================================================================
+4. §5.8 集中回归（同一份最终输入）
+====================================================================
+A0：上述全链（正向 26 例 + 三家族反向 + 台账负控）rc=0
+S1 (run_stop_result_s1.sh REVERSE=1)：rc=0
+    正向两变体全 PASS；反向 rev_motor_off_ignores_failure META-OK 命中 5/5 预登记
+    业务失败身份；第②项按既有 §10.2 重指向 S2 并发链代跑(REV-HANDED-OFF 如实登记)。
+S2 (run_stop_priority_s2.sh REVERSE=1)：rc=0
+    target 汇总: 组=17 用例=23 PASS=23 FAIL=0 SKIP行=14 pre_bad=0
+    host_ovr 汇总: 组=17 用例=79 PASS=79 FAIL=0 SKIP行=1 pre_bad=0
+    五家族反向全部 META-OK: rev_stale_identity_gate(2) rev_permit_confirm_identity_gate(1)
+    rev_config_write_token_gate(1) rev_tx_flush_budget(2) rev_fail_returns_owner_early(1)
+未重跑（输入未变，如实登记 NOT_RERUN）：V1/V2(build_and_run.sh)、I/O 行为链、
+SD 语义链、既有 negatives/元负例矩阵、probe_errcodes。
+
+====================================================================
+5. §4.2 采集门（a0_export_gate.py）
+====================================================================
+--check-header-against-source（门内 47 列合同 vs 生产源码头行字面量，双向防漂移）：
+  CHECK-HEADER gate=490 source=490 literal_pieces=8 identical=YES
+
+--selftest（20 例逐判，REJECT 例必须同时把 clear/next 计划数压到 0）：
+  GATE-SELFTEST-SUMMARY pass=20 fail=0
+  ACCEPT 正控 2 例(完整 / 完整但 body_valid=0)；REJECT 负控 16 例：
+  头行剪成 126+NUL 粘连、数据行漏 NUL 粘连、少一列、slot 重复、INCOMPLETE 行、
+  条数不足、异步日志插进 CSV 块内、dropped 非 0、schema!=2、代次跳号、in_flight 非 0、
+  枚举取值非法、目标自报 EXPORT_ERROR、列名漂移、批状态行缺失、gates 非 0x%02x 形状
+  语义补充：完整但无效 => 存档 3 条 / 纳入时长 0 条 / 不追加保护动作；
+            COUNTER_OK+body_valid=1+gates=0x0f+reason<=0x0100 => 纳入 3 条
+
+对**板级轮真实原始接收字节**离线判定（证明这道门当初会怎么拦）：
+  board_a_114_b1_dump  verdict=REJECT clear_records=0 next_batch_trigger=0   (期望 1 条)
+  board_a_135_b2_dump  verdict=REJECT clear_records=0 next_batch_trigger=0   (期望 16 条)
+  board_a_141_b3_dump  verdict=REJECT clear_records=0 next_batch_trigger=0   (期望 1 条)
+  board_a_149_cleanup_dump verdict=REJECT clear_records=0 next_batch_trigger=0
+  => 原执行"首批已损坏却仍发 clear_records 并继续下一批"的行为，在本门下必然被停。
+
+对修后真实导出切片（取自 run_on_export.txt 的 stop 行 + 头行 + 3 条数据行）：
+  fixed_host_b1  verdict=ACCEPT rows_parsed=3 nul=0 failures=[]
+  action_plan: clear_records=1 next_batch_trigger=1 extra_protection_actions=0
+  timing: included=3 excluded_complete=0
+  => 修复后的导出格式与本门互相咬合，下一轮板级才有"可以先清理"的判据。
+
+====================================================================
+6. 边界（不得由以上结果外推）
+====================================================================
+- 主机模型只覆盖内核层(kservice.c/rt_vsnprintf_tiny.c)；控制台设备层的 \n->\r\n 展开、
+  UART 时序、其它线程日志的真实插入时机不在模型内。逐条同形关系与边界写在
+  tests/host/sp_measure_a0_console.h 头部注释。
+- 因此"模型/夹具通过"不等于"目标导出已通过"。目标侧结论要等新镜像经独立软件与镜像复审、
+  并由云端用真实新散列制作有界重测包后执行。
+- 旧板级采样的有效性与时长统计仍为 NOT_ACHIEVED；本轮没有、也不能从截断数据补写有效字段。

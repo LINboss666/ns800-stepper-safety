@@ -1,0 +1,103 @@
+Keil 双目标构建与新镜像身份（phase8-target-measurement-a0-export-r1）
+构建时刻 2026-10-26（Asia/Shanghai）；本轮**只构建，不下载、不读 Flash、不连接任何设备**。
+工作树与 code_commit cd8d9f095030c08634a082dd2bb9bc622d92fb1d 逐字节一致
+（构建前 git status 只多出本轮尚未提交的 reports/ 证据目录）。
+
+====================================================================
+1. 构建命令（两目标各一次 Rebuild All）
+====================================================================
+BSP 目录：rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad
+工具：`<KEIL>/UV4/UV4.exe`（`<KEIL>` = IDE 安装根，展开规则见本包 board_raw_archive.md 的变换表；
+工程内 <pMon>BIN\CMSIS_AGDI.dll，本轮未使用调试器）
+
+  UV4.exe -r project.uvprojx -t rt-thread           -j0 -o <仓外>/build_default.log
+  UV4.exe -r project.uvprojx -t rt-thread-measure-a0 -j0 -o <仓外>/build_measure.log
+
+UV4 进程退出码不判读（历史轮已确认它不承载结论）；判据取日志文本与磁盘字节：
+  build_default.log:  grep -c "warning:|error:" = 0
+                     ".\build\rt-thread.axf" - 0 Error(s), 0 Warning(s).
+                     Build Time Elapsed:  00:00:12
+  build_measure.log:  grep -c "warning:|error:" = 0
+                     ".\build\a0\rt-thread-a0.axf" - 0 Error(s), 0 Warning(s).
+                     Build Time Elapsed:  00:00:09
+两目标各一次，无重跑。工程文件、rtconfig.h、SConscript 未改动。
+
+注意：本轮"零警告"只对 Keil/armclang 成立。Linux/GCC 侧 FinSH 函数指针形状警告
+在历史轮如实保留过，不得把 Keil 0/0 推广为"所有主机编译器零警告"。
+
+====================================================================
+2. Program Size 与内存开销
+====================================================================
+                              Code     Inits  RO-data   RW-data   ZI-data
+  rt-thread          修后   173762       638    76806      2188     83784
+  rt-thread          上轮   173762        —     76806      2188     83784   => 逐项相同
+  measure-a0         修后   181106       658    79766      2188     91504
+  measure-a0         上轮   180802        —     79718      2188     91504
+  measure-a0 增量        +304       +20      +48         0         0
+
+关键判读：
+  RW-data 与 ZI-data 增量均为 **0** ⇒ 修复没有新增任何静态/BSS 占用；
+  SPM_TEXT_CAP=640 的 line[] 只在 spm_emitfv 的调用帧内（栈上），
+  因此它不进 ZI，只体现为 Code/RO 增长（格式化调用点改道 + 错误分支 + 字符串字面量）。
+  默认目标逐项不变 ⇒ 测量代码仍完全被 NS800_TARGET_MEASUREMENT_A0 关在外面。
+
+栈预算（不夸大）：本工程 map 里没有 armclang callgraph/Max Depth 段，
+  所以帧大小按**源声明的缓冲**给出上界：line[640] + 保存寄存器与参数（约 32 B）
+  ⇒ 单次导出调用栈占用 ≤ 约 680 B，占 rtconfig.h:125 FINSH_THREAD_STACK_SIZE 4096 的
+  约 16.6%（本轮没有调大任何栈或全局缓冲）。这是"按声明推导"，不是链接器实测最大值，
+  特此标注证据等级。
+
+====================================================================
+3. map 证据：测量符号归属与真实内核叶子
+====================================================================
+默认目标 build/rt-thread.map：
+  Removing sp_measure_a0.o(.text), (0 bytes).
+  spm_emitf / spm_emitfv / spm_cmd / __fsym_spm / spm_rec  =>  全部 NOT-PRESENT
+  sp_measure_a0.c   0x00000000   Number   0   sp_measure_a0.o ABSOLUTE   (空翻译单元)
+  Total RW Size (RW Data + ZI Data) = 85972
+
+测量目标 build/a0/rt-thread-a0.map（链接器自己写下的引用关系，非人工声明）：
+  sp_measure_a0.o(.text.spm_init_counter)  refers to .text.spm_emitf
+  sp_measure_a0.o(.text.spm_stop_accepting)refers to .text.spm_emitf
+  sp_measure_a0.o(.text.spm_dump_records)  refers to .text.spm_emitf
+  sp_measure_a0.o(.text.spm_clear_records) refers to .text.spm_emitf
+  sp_measure_a0.o(.text.spm_cmd)           refers to .text.spm_emitf
+  sp_measure_a0.o(.text.spm_emitf)         refers to .text.spm_emitfv
+  sp_measure_a0.o(.text.spm_emitfv)        refers to **rt_vsnprintf_tiny.o(.text.rt_vsnprintf)**
+  sp_measure_a0.o(.text.spm_emitfv)        refers to **kservice.o(.text.rt_kputs)**
+  sp_measure_a0.o(.text.spm_emitfv)        refers to  kservice.o(.text.rt_kprintf)   (溢出短错误)
+  FSymTab: __fsym_spm 0x0803f9b8 Data 16  __fsym_spm_name 0x0802d8b4  __fsym_spm_desc 0x0802d8b8
+⇒ 目标上真的走内核 rt_vsnprintf + rt_kputs，桩没有参与；
+⇒ 同时独立证实工程链接的是 rt_vsnprintf_tiny.c（与 §7 里"应写长度"返回语义的核对一致）。
+
+map/dep 身份（供复核）：
+  default  map bytes=1946989 sha=ab33ac1de309b2ce40402627c3b8a6dff0d81ec0104f590a7723d49f5a5f22f7
+  a0       map bytes=1999062 sha=07498bc9370235055dd2b4f8a465853a2577b226a5d0cf382194ea55240fbd0d
+
+====================================================================
+4. 新镜像身份与字节级对照
+====================================================================
+AXF（本地构建产物，未入库；两目标各一）：
+  <BSP>/build/rt-thread.axf      1645448 B  sha256 016a689b477d8ff6564366a145f2b6bbb5e8105bfe8731a275874c217f70fdb7
+  <BSP>/build/a0/rt-thread-a0.axf 1675944 B sha256 8b95464e9f687096168f3fd9a182feb559a55452506202ff35a8e73df2b1b959
+  （构建下载产物路径：After Build 钩子 fromelf --bin，与上轮同一配置，未改工程。）
+
+新默认镜像 reports/firmware/phase8-target-measurement-a0-export-r1/default.bin
+  251148 B  sha256 02e984583255f3414f43fb5c077dc9ba82eba98553d2cb9d7f7feee9336ebd80
+  vs 上轮 reports/firmware/phase8-target-measurement-a0/default.bin
+     251148 B  sha256 41717367e4e1401deb5f59eb27d1f35483108c6241eb30a5b58b28aad5b425de
+  差异字节位置 5 处，跨度 0x03bf68..0x03bf73，内容
+     old = "00:43\0Oct 25"   new = "56:52\0Oct 26"
+  ⇒ 只差 RT-Thread 版本横幅里的 __TIME__/__DATE__（src/kservice.c:162），
+     除此之外逐字节相同：**默认目标无功能字节差异**（§5.10 达成）。
+
+新测量镜像 reports/firmware/phase8-target-measurement-a0-export-r1/measure-a0.bin
+  261452 B  sha256 5f30d3f058ceff516b2185aa3a1e597bbe63293b94a6fd801fd989a6f7b2b8e6
+  vs 当前板上镜像（上轮归档）261100 B sha256 358fd81ae5853ea52df1e1ab367ea41af0f5e86679082a755c17dac3429b0e1b
+  差异 153890 处（跨度 0x0005a8..0x03fbeb），长度 +352 B
+  ⇒ 这是**预期**的：导出通道改道后代码尺寸与地址整体位移，功能差异正是本轮修复本身；
+     首处差异是向量表里的函数指针（old 0x0802c690 → new 0x0802c7c0），符合 Code 段增长。
+  ⇒ 未上板：本镜像尚未烧录，板上仍是 358fd81a… 那一版；两镜像都只在复审通过、
+     并取得云端新散列有界重测包与用户明确批准后才允许下载。
+
+旧 A0 镜像/manifest、板级证据与原 1 MiB 快照保持不动（本轮未覆盖任何"修前"产物）。
