@@ -10,13 +10,14 @@ action_plan 决定要不要发送 `spm clear_records` 和下一批 `spm trip`。
     绝不先删 NUL、绝不补齐缺失字段、绝不把被剪断的行拼回"看起来对"的样子。
   - 头行必须逐字等于 schema=2 合同里的 47 个列名。
   - 参与放行的**协议行**（头行/数据行/stop|status 状态行/dump 汇总行）逐条核：行内无 NUL、
-    以合法 LF/CRLF 收尾、整行完整匹配协议形状、数字令牌后必须是真分隔符 ——
+    以合法 LF/单个 CRLF 收尾、整行完整匹配协议形状、数字令牌后必须是真分隔符 ——
     `dropped=0BAD`/`records=3BAD` 这类**前缀伪匹配必须拒绝**（不做宽松前缀判定）。
   - 帧次序与边界固定：头行 → 数据行 → 汇总行。块外的数值记录/INCOMPLETE/重复头行/重复汇总/
     汇总之后的状态行都属帧污染，**不得**归成普通异步日志忽略。
   - 本批收尾依据只取 **dump 之前最后一条可靠状态行**（合法过渡：stop 时仍在途、稍后 status 在途=0）。
     普通采样批必须 state=STOPPING(2) 且 in_flight=0 且 dropped=0 且 records==预期；
     ACTIVE(1) 不授权清理；不把不同响应拼接成"凑出来的成功"。
+  - 任意位置的 NUL 都拒绝；不得先依赖协议分类，否则前导 NUL 可把额外记录伪装成 OTHER。
   - 一条完整记录要求：47 列、逐列合法类型/取值域（正确的 int32 与 uint32 边界）、schema=2、
     complete=1、slot 与代次身份自洽、entry 与本批一致、条数 == 本批预期。
   - **内容矛盾即拒**：声称 body_valid=1 却 body_end==body_begin（无进展）或 body_end<body_begin
@@ -45,7 +46,7 @@ import json
 import re
 import sys
 
-GATE_REVISION = 'r2'
+GATE_REVISION = 'r3'
 
 SCHEMA = 2
 SLOTS = 64
@@ -68,9 +69,13 @@ COLUMNS = [
 HEADER_LINE = ','.join(COLUMNS)
 
 # 列类型直接来自生产数据行的格式串顺序（%u / %d / 0x%04x / 0x%02x / %s 枚举 / 0-1 标志）。
-# spm_rec_t 的整型字段全部是 32 位（rt_uint8_t 字段以 %u 打印，取值域也按 u32 收）：
-# 因此每个整型列都有明确上界，没有"只查下界"的漏项。
+# 按 spm_rec_t 的存储宽度核域；%u 只决定打印形式，不会把 uint8_t 扩成 uint32_t。
+# 其余字节字段由后面的 flag/slot/枚举/hex2 规则收紧。
 COL_TYPE = dict.fromkeys(COLUMNS, 'u32')
+for _n in ('ctx_isr', 'saved_primask', 'in_owner', 'owner_after', 'phase_after',
+           'inhibit', 'pending', 'latch_m', 'latch_d', 'pwm_attempted', 'pwm_result',
+           'permit_level', 'branch'):
+    COL_TYPE[_n] = 'u8'
 for _n in ('pwm_raw_rc', 'permit_write_rc', 'outcome'):
     COL_TYPE[_n] = 'i32'
 COL_TYPE['invalid_reason'] = 'hex4'
@@ -162,6 +167,8 @@ def field_ok(name, val):
         ok = bool(re.match(r'^\d+$', val)) and 1 <= int(val) <= U32_MAX
     elif t == 'flag':
         ok = val in ('0', '1')
+    elif t == 'u8':
+        ok = bool(re.match(r'^\d+$', val)) and int(val) <= 255
     elif t == 'u32':
         ok = bool(re.match(r'^\d+$', val)) and int(val) <= U32_MAX
     elif t == 'i32':
@@ -202,7 +209,7 @@ def evaluate(raw, expected_records, batch_entry, batch_name='batch'):
     f = []
     dec = []
     for seg, lf, nul in split_lines(raw):
-        t = decode(seg).rstrip('\r')
+        t = decode(seg[:-1] if lf and seg.endswith(b'\r') else seg)
         if t == '':
             continue
         dec.append((t, lf, nul, classify(t)))
@@ -247,10 +254,15 @@ def evaluate(raw, expected_records, batch_entry, batch_name='batch'):
 
     # ---- 协议行的字节完整性（NUL / 换行终止）----
     for i, (t, lf, nul, c) in enumerate(dec):
+        # 先检查 NUL，再依赖分类结果；否则 NUL+记录会变成 OTHER，绕过完整性门。
+        # 本包是文本协议；任何位置的 NUL 都保留原字节并拒绝，绝不清洗后放行。
+        if nul:
+            f.append('NUL_IN_PROTOCOL_LINE: 第 %d 行(%s) 含 %d 个 NUL（含无法分类的行）'
+                     % (i, c, nul))
         if c in ('HEADER', 'ROW', 'INCOMPLETE', 'STATE', 'DUMP_TAIL', 'PROTOCOL_BROKEN'):
-            if nul:
-                f.append('NUL_IN_PROTOCOL_LINE: 第 %d 行(%s) 含 %d 个 NUL —— 被 127 窗口剪断的特征'
-                         % (i, c, nul))
+            if '\r' in t:
+                f.append('BARE_CR_IN_PROTOCOL_LINE: 第 %d 行(%s) 含非 CRLF 终止符的 CR'
+                         % (i, c))
             if not lf:
                 f.append('PROTOCOL_LINE_UNTERMINATED: 第 %d 行(%s) 没有结尾换行, 与下一行粘连'
                          % (i, c))
@@ -679,6 +691,23 @@ SELFTEST_CASES = [
      dict(corrupt=lambda L: edit_row(with_progress(L), row=1, entry='off_attempt')), 'REJECT',
      'ENTRY_MISMATCH'),
 
+    # ---- GATE-R3: NUL 不得借 OTHER 身份逃逸，存储宽度不由 %u 决定 ----
+    ('GATE-R3-NEG-NUL-PREFIX-EXTRA-ROW', '负控: 帧后 NUL+完整额外记录不得当异步输出忽略',
+     dict(corrupt=lambda L: with_progress(L) + ['\x00' + make_row()]),
+     'REJECT', 'NUL_IN_PROTOCOL_LINE'),
+    ('GATE-R3-NEG-NUL-OTHER', '负控: 无法分类的 NUL 行同样拒绝，不清洗后放行',
+     dict(corrupt=lambda L: with_progress(L) + ['\x00unclassified']),
+     'REJECT', 'NUL_IN_PROTOCOL_LINE'),
+    ('GATE-R3-NEG-EXTRA-CR-TAIL', '负控: 汇总行 CRCRLF 不得靠 rstrip 清洗成 CRLF',
+     dict(corrupt=lambda L: with_progress(L[:-2] + [L[-2] + '\r', L[-1]])),
+     'REJECT', 'BARE_CR_IN_PROTOCOL_LINE'),
+    ('GATE-R3-NEG-U8-OVER', '负控: uint8_t 字段 branch=256 不可由生产记录表示',
+     dict(corrupt=lambda L: edit_row(with_progress(L), row=0, branch=256)),
+     'REJECT', 'FIELD_ILLEGAL'),
+    ('GATE-R3-POS-U8-MAX', '正控: 字节宽度边界 branch=255 合法（不额外发明枚举阈值）',
+     dict(corrupt=lambda L: edit_row(with_progress(L), row=0, branch=255)),
+     'ACCEPT', None),
+
     # ---- GATE-R2-02 新增（数值域与"有效时间"夹具）----
     ('GATE-R2-NEG-ZERO-PROGRESS-VALID-CLAIM',
      '负控: body_valid=1 但 body_end==body_begin(上一轮误用为正控的输入, 原样保留)',
@@ -795,7 +824,7 @@ META_GUARDS = [
     ('ROW_OUTSIDE_CSV_FRAME', True, '帧外数值记录算帧污染(完整性门)',
      "        elif c in ('ROW', 'INCOMPLETE'):", "        elif False:"),
     ('NUL_IN_PROTOCOL_LINE', True, '协议行 NUL 检测(完整性门)',
-     '            if nul:', '            if False:'),
+     '        if nul:', '        if False:'),
     ('PROTOCOL_LINE_UNTERMINATED', True, '协议行换行终止检测(完整性门)',
      '            if not lf:', '            if False:'),
     ('VALID_WITHOUT_PROGRESS', True, '有效但零进展的内容矛盾检测',
@@ -806,6 +835,11 @@ META_GUARDS = [
     ('STOP_TOKEN_ANCHOR', False, 'stop 行整行锚定(数字令牌边界)',
      "    if RE_STOP.match(text):\n        return 'STATE'",
      "    if text.startswith('[spm] stop:'):\n        return 'STATE'"),
+    ('U8_UPPER_BOUND', False, 'uint8_t 存储宽度',
+     "        ok = bool(re.match(r'^\\d+$', val)) and int(val) <= 255",
+     "        ok = bool(re.match(r'^\\d+$', val)) and int(val) <= U32_MAX"),
+    ('BARE_CR_PROTOCOL', False, '协议行只能 LF 或单个 CRLF 结尾',
+     "            if '\\r' in t:", "            if False:"),
     ('GEN_U32_UPPER_BOUND', False, 'gen 的 uint32 上界',
      "        ok = bool(re.match(r'^\\d+$', val)) and 1 <= int(val) <= U32_MAX",
      "        ok = bool(re.match(r'^\\d+$', val)) and int(val) >= 1"),
