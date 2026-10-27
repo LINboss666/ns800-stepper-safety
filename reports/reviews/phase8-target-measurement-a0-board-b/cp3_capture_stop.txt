@@ -1,0 +1,173 @@
+NS800 A0 BOARD-B —— CP3 执行停止(真实硬件)与首个失败原文
+轮次 phase8-target-measurement-a0-board-b    日期 2026-10-27 (Asia/Shanghai)
+document_base 358e1ca…; CP0 提交 7c5eada…; CP1/CP2 提交 587c8fa…; 本 checkpoint 前工作树干净。
+结论: A0_BOARD_B_CP3_STOPPED —— 冻结采集器的启动门在本板上不可满足; 一条目标命令都没发出去。
+脱敏: PROJECT_ROOT / BOARD_B_ROOT / WORK_OUT / RAWDATA(本地板级数据根) / PY_ROOT; 散列一律按原始字节直算。
+呈现层: 代号是纯字符串替换, Windows 反斜杠一律写成正斜杠; 判据字节见 §7 的 base64 归档。
+
+==============================================================================
+1. 运行前只读预检(未触碰设备)
+==============================================================================
+  采集器副本 = WORK_OUT/A0BoardB.ps1  19432 B sha256=521d758b2cae3eaca5acfda0c705149f9980fc1ba31873866bad6ebe8bec0fdd
+    (应为 19432 B / 521d758b2cae3eaca5acfda0c705149f9980fc1ba31873866bad6ebe8bec0fdd = 任务书附录字节)
+  冻结门副本 = WORK_OUT/freeze/a0_export_gate_R3.py  50246 B sha256=94e8317577a0fd8f6fd2bccafc0bb16753f3fb900c1adc7d254ee57cf3898c7d
+    (应为 50246 B / 94e8317577a0fd8f6fd2bccafc0bb16753f3fb900c1adc7d254ee57cf3898c7d = 已接受门字节)
+  板上载荷 = CP2 已回读核实的 5f30d3f0…; 启动文本里的构建戳与之相符(见 §4), 属旁证不是推断。
+  DAP UID: 只从 RAWDATA 两处既存日志唯一解析(候选=1, 长度 48), 未列探针、未猜第一个; UID 不入库。
+  独立 pyOCD 目录存在且无 pyocd_user.py/pyocd.yaml/pyocd.yml。
+  OutDir = BOARD_B_ROOT/capture_run1 运行前不存在(cp3_run.py 要求全新/空, 否则 ABORT)。
+  实际调用(只填运行参数, 未改附录源码):
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File WORK_OUT/A0BoardB.ps1 -ExecuteApprovedBoardB -PythonExe <PY_ROOT/python.exe> -GateFile WORK_OUT/freeze/a0_export_gate_R3.py -OutDir BOARD_B_ROOT/capture_run1 -ProbeUID <DAP_UID> -PyocdWorkDir BOARD_B_ROOT/pyocd-work-b
+
+==============================================================================
+2. 台账时间线(ledger.jsonl 原样, 6 行)
+==============================================================================
+  11:49:29.093  SERIAL_OPEN    {"baud": 115200, "dtr": false, "format": "8N1", "port": "COM5", "rts": false}
+  11:49:29.165  RX_BEGIN       {"path": "001_open_passive.rx.bin", "start": 0}
+  11:49:31.186  RX_FILE        {"bytes": 194, "end": 194, "path": "001_open_passive.rx.bin", "sha256": "7b8bb44f4292d705445a7792eba6ba6306e0f9951b97bb337f450eed12c4d851", "start": 0}
+  11:49:31.189  RX_BEGIN       {"path": "002_boot.rx.bin", "start": 194}
+  11:49:31.209  RESET_ATTEMPT  {"attempt": 1, "method": "SYSRESETREQ"}
+  11:49:51.217  STOP_FAILURE   {"counts": {}, "message": "Reply timeout; no retry and no cleanup."}
+  注: SERIAL_OPEN 是整包唯一一次串口打开; RESET_ATTEMPT 是整包唯一一次主动 SYSRESETREQ;
+  台账里没有一条 TX_ATTEMPT => 54 条命令实际发出 0 条, 门/关闭事实/clear 全未涉及。
+
+==============================================================================
+3. 打开后的被动 2 秒(上限内)观察到什么
+==============================================================================
+  001_open_passive.rx.bin  194 B  sha256=7b8bb44f4292d705445a7792eba6ba6306e0f9951b97bb337f450eed12c4d851  NUL=3  CR=0
+  前 64 字节十六进制: 83 23 06 ea 23 ae 18 6d 09 fe 05 b3 24 45 00 d7 4b ce a9 51 cf fb d2 ef c1 63 23 ea 85 b9 97 8f eb 7b 61 18 1c 84 63 ed 13 f6 23 86 3a 06 10 55 ce 23 c1 5d b2 13 a1 44 ee 7b 20 30 eb ef 44 84
+  事实: 这 194 B 是高熵非文本字节(含 3 个 NUL, 无 CR, 97 个 >0x7F 字节), 不是 RT-Thread 文本;
+  采集器的启动文本判据(RT-Thread|\[BOOT\]) 因此未命中, 于是按 §7 走唯一一次主动复位。
+  归因: 不解释成因, 也不写成"已排除"。当时核心处于 CP2 回读后的 halted 态, 这 194 B 可能来自
+  调试侧/UART 线路, 但没有仪器证据, 登记为未观察清楚的事实(原件在 §7 可逐字节复算)。
+
+==============================================================================
+4. 唯一一次主动复位与启动窗口
+==============================================================================
+  reset.tool.stdout.txt (43 B) 逐字: 'Resetting target\r\nCore 0 (None):  Running\r\n'
+  reset.tool.stderr.txt = 0 B (空)
+  采集器要求同时命中 "Resetting target" 与 "Running" —— 两条都在, 该断言通过(不是我把 rc 当判据)。
+  启动窗口 002_boot.rx.bin: 3757 B sha256=97b37f32aa03c86b8708ae088d0ae65a8f92520f1a1ed70beb74663049321749 NUL=3 CR=96 LF=74
+  构建戳旁证(启动文本逐字行, 与新镜像 §3 记录的 Oct 26 2026 / 20:57:05 相符): / | \     5.3.0 build Oct 26 2026 20:57:05
+  启动阶段实际走到: [BOOT] 1..11 全部打印, 末段为
+      [SS] self-test start
+      [SS] self-test done: required=FAIL degraded=0x00
+      [BOOT] 11 startup-selftest FAIL -> state=FAULT_LATCHED
+      [Motor] arm gate fail mask=0x1B (arm REFUSED)
+      [TMC]    DEGRADED drive_cfg=UNCONFIGURED
+      [ADC]    DEGRADED cal=THEORETICAL
+      [MAIN] boot complete but state=FAULT_LATCHED fault=8 (degraded/latched - NOT ready)
+      [MAIN] motor arm gate fail mask=0x1B (MOTOR_HARDWARE_ENABLE_PATH_VALIDATED=NO)
+      [BB] session 1 written (101 frames), last_err=0
+  关键负面事实: 整个 3757 B 启动窗口里 "msh >" 出现次数 = 0;
+  "msh" 在原始字节里只出现 1 次(偏移 489 B), 且其后紧跟的是别的线程的一行, 提示符尾部 ">" 没出现在流里:
+      原文片段: b'start\r\r\nmsh [SAFETY] init OK - MCU_DRV'
+  提示符本身的定义(只读核源): rt-thread shell.c:93  #define _MSH_PROMPT "msh ",
+    shell.c:120-121 在 rt_strlen(finsh_prompt)+2 < RT_CONSOLEBUF_SIZE 时才追加 ">";
+    所以正常提示符字节是 "msh >"。这里只看到 "msh " —— 同一个窗口里有 3 个 NUL 且行长被剪到 128 附近,
+    与已登记的并发 rt_kprintf/RT_CONSOLEBUF 128 截断副作用同型; 本轮不把它写成已证实的单一线程竞争。
+  更决定的一点(不依赖上面那条归因): 提示符落在偏移 489 B, 其后还有约 3268 B 阶段输出, 末行是
+    "[BB] session 1 written (101 frames), last_err=0"。而 Wait-Prompt 的判据是 A0BoardB.ps1:83
+    "行首或换行后的 msh > 且后面只剩空白/换行(即到接收尾部)" + 120 ms 静默 => 启动期提示符既不在流尾,
+    复位后固件也不会再自发打印第二次。
+  => 该判据永远不成立, 到 20 秒合并上限即抛 "Reply timeout; no retry and no cleanup.";
+     采集器 catch 记 STOP_FAILURE 后由 finally 关串口。采集器自己的其它断言都过了:
+     reset 文本两条 Need 命中、构建戳三条 Need 未成为失败点(它们在 Wait-Prompt 成功之后才执行, 故也未执行)。
+  启动文本里仍有 3 个 NUL 与 \r\r\n 混合换行(即已知的 RT_CONSOLEBUF 128 截断副作用), 这次没有
+  任何门区间(门根本没跑), 所以这不代表 NUL 问题已修; 门区间内 NUL 仍是立即拒绝。
+
+==============================================================================
+5. 根因对照: 同一块板的既存已证材料 vs 附录冻结采集器
+==============================================================================
+  对照物 A(上一轮 BOARD-A 真实成功的采集):
+    RAWDATA/serial/02_boot.txt  3762 B  sha256=9654449da1e52d2c4b27fcee28ca3e658b4607bef8bc5bb9df9e43a57e367581
+    其中 "msh >" 出现次数 = 0; 末行同样是 "[BB] session 1 written (101 frames), last_err=0"。
+    => 旧镜像(358fd81a…)也不自发打印 "msh >"。
+    即: 不发输入就没有提示符 —— 这是这块板的 shell 行为, 与新镜像无关。
+  对照物 B(BOARD-A 采集器的提示符用法): RAWDATA/cp4_run.ps1 命中行 ——
+      cp4_run.ps1:101  if ($t -match 'msh\s*/?>\s*$') { $endWhy = 'prompt'; break }
+    该判据作用在 RunCmd 里"已经 $p.WriteLine($cmd) 发出命令之后"累积的响应文本上(同文件 :80 起),
+    并且另有 1200 ms 静默兜底 (:102)。也就是: 上一轮是**先发命令、用提示符当响应结束标记**。
+  对照物 C(附录冻结采集器): A0BoardB.ps1 在主动复位后调用 Wait-Prompt, 此时 TX 计数为 0,
+    它要求先看到自发提示符才允许发第一条命令 => 与 A/B 的既证事实矛盾, 在本板上不可满足。
+  对照物 D(提示符在"发过命令之后"确实出现 —— 上一轮真实回复文件):
+    RAWDATA/serial/cmd_100_boot_free.txt  95 B sha256=b3127b4ad5aa0b10d3fb764c1fbc5f67923c9cae163785f3cfe75948eee0566f
+    末 44 字节逐字: b'm  : 12648\r\navailable: 20024\r\nmsh >\r\nmsh >\r\n'
+    => 每条命令回复的尾部有 "msh >" 两次(回显行 + 新提示符), 所以"提示符只在有输入后才出现"
+    是这块板两套镜像一致的既有行为, 上一轮的成功链就是这么跑的(先发命令, 提示符当响应结束标记)。
+  判定: 这是附录采集器启动门的缺陷, 不是设备失败, 不是门(采集完整性合同)的失败, 也不是镜像问题。
+  处置(照任务书 §4.5/§7): 停在 CP3, 提交实际失败; **不在本地改附录核心逻辑后自行跳过复审**;
+    不重发命令、不再复位、不补跑凑数; 已有原字节全部保留。
+  给复审的最小候选(只是建议, 本轮未实现): 复位后改为"发一条白名单内的查询命令, 用提示符/静默
+    双兜底界定响应", 或把启动门改为"窗口内出现 msh 文本即视为 shell 已起, 允许发第一条命令"。
+    两种都会改变 §7 的命令计数或判据形状, 因此必须回到云端重新出包与复审, 不能在本包内套用。
+
+==============================================================================
+6. 上限消耗与仍然成立的安全边界
+==============================================================================
+  动作                                           已用     上限
+  初始供电                                          1      1   <= 已耗尽
+  新 A0 镜像下载(Keil -f)                            1      1   <= 已耗尽
+  下载后载荷回读                                       1      1   <= 已耗尽
+  pyOCD 会话(回读 + 主动复位)                           2      2   <= 已耗尽
+  主动 SYSRESETREQ                                1      1   <= 已耗尽
+  COM5 打开                                       1      1   <= 已耗尽
+  spm init                                      0      1
+  串口命令(完整成功路径 54 条)                             0     54
+  spm trip                                      0     17
+  motor_disarm                                  0      1
+  spm stop/dump                                 0      3
+  spm clear_records                             0      3
+  下一批开始                                         0      2
+  结论: COM5/主动复位/pyOCD 会话三项已用满, 本包**无法再续跑 CP3**; 继续需要新的批准与新包。
+  未消耗也未做: 任何目标命令、门判定、clear、dump、trip、disarm、STEP 使能、DIR 变更、
+    许可 HIGH、arm/start/ramp、电机接线、四宏启用、构建、第二次下载、恢复下载演练、设备枚举。
+  四宏实测口径未变: 本轮没跑 spm cap, 但启动文本自身打印 arm gate fail mask=0x1B(arm REFUSED)、
+    MOTOR_HARDWARE_ENABLE_PATH_VALIDATED=NO, 方向与 RT_FALSE 一致(软件反馈, 不是示波器证明)。
+  A0 时长证据仍 NOT_ACHIEVED: 没有一条 47 列记录被采到, 也没有任何门 ACCEPT/REJECT 发生。
+  串口终态: 采集器 finally 关闭端口并释放事件源; 本机无残留 powershell; 设备侧电源未动。
+
+==============================================================================
+7. wire 字节归档与首失败原文
+==============================================================================
+  无损上库(隐私扫描无敏感字段): 见同目录 cp3_wire_archive.md 的 base64 逐块 + SHA-256。
+    001_open_passive.rx.bin     194 B sha256=7b8bb44f4292d705445a7792eba6ba6306e0f9951b97bb337f450eed12c4d851 NUL=3 CR=0
+    002_boot.rx.bin            3757 B sha256=97b37f32aa03c86b8708ae088d0ae65a8f92520f1a1ed70beb74663049321749 NUL=3 CR=96
+    ledger.jsonl                824 B sha256=85b2ed1cb26b7012b3ebbc4ac2f7b2e8d7982759f28cd0f06435a2fef958bee4 NUL=0 CR=6
+    reset.tool.stdout.txt        43 B sha256=f336a99c191dc6eade3ed796093da60670587a8f848c3f963c3160e7c4314b26 NUL=0 CR=2
+    session.rx.bin             3951 B sha256=65316ec72de02525bd8772dddbdaed5dd339362f7838941347c823fb16b0250f  = concat(001, 002)(归档声明可由两块复算, 原件仍单独留存)
+  有损上库并声明变换: collector.stderr.txt 原文 433 B sha256=874d2be0e7545b70bde14c825a35baf33355448964f59e12617290f088be7313 含本机绝对路径,
+    下面只给脱敏后的文本(替换规则见文件头), 不称无损; 原件留在本地 capture_run1。
+  首个失败原文(逐字):
+    Reply timeout; no retry and no cleanup.
+    ����λ�� WORK_OUT/A0BoardB.ps1:84 �ַ�: 5
+    +     throw 'Reply timeout; no retry and no cleanup.'
+    +     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OperationStopped: (Reply timeout; no retry and no cleanup.:String) [], RuntimeException
+    + FullyQualifiedErrorId : Reply timeout; no retry and no cleanup.
+  对应台账行: STOP_FAILURE {"counts": {}, "message": "Reply timeout; no retry and no cleanup."}
+  首失败 CP3-F1  启动门不可满足(§4/§5): A0BoardB.ps1 要求复位后先看到行尾 "msh >", 而本板两套镜像
+    都不自发打印行尾提示符; 处置=按 §7 立即停, 不重试、不再复位、不发命令、不 clear、不补 dump。
+    归因: 附录采集器的判据形状与既证设备行为矛盾(云端无 PowerShell 执行环境, 本机 -SelfTest 覆盖不到该路径)。
+  首失败 CP3-F2  我的包装脚本缺陷: cp3_run.py 用 encoding=utf-8 + errors="replace" 收 PowerShell 的
+    stderr, 而 PowerShell 输出的是本机 OEM/GBK 码页 => 上面第二行的本地化文本字节被替换字符吃掉,
+    不可复原(乱码不是采集器造成, 也不是设备输出)。ASCII 抛错文本与行号/字符号完整保留;
+    采集器自己落盘的 wire/台账/门 artifacts 由 PowerShell 直接写字节, 不经过这次解码, 仍逐字节可复算。
+    处置: 只登记不修补历史; 下一个包里的包装脚本改为按原始字节另存 stderr(本轮不再重跑设备)。
+
+==============================================================================
+8. §8 判读项本轮状态(全部按未执行登记, 不补造)
+==============================================================================
+  每入口有效/无效计数与原始 cycles min/median/max: NOT_OBTAINED(无记录)。
+  clock_basis / 外部时基证明: 未涉及, 仍开放。
+  ps 的 tshell 栈高水位: NOT_OBTAINED(ps 未发送)。
+  B-1 / BUG-008 / RISK-03/03a / 物理 RISK-04-b / M-1/M-2/M-3 / 外部时基: 全部继续开放, 未关闭。
+  sw1_cut.ps1: 仍 HOLD, 本轮未运行。
+  采集门 R3 字节(94e83175…)本轮只被采集器按 §4 前置复核过哈希, 未被执行, 也未被放宽。
+
+==============================================================================
+9. CP4 收尾状态
+==============================================================================
+  已向现场操作者发出收尾请求(先关 24 V, 再拔 USB, SW1 保持阻断)。
+  实际断电终态: 等操作者回报后按实登记; 未回报前只登记"请求已发出 + 电源终态 UNKNOWN",
+  不把登记时刻当作断电时刻。本轮之后不再接触设备。

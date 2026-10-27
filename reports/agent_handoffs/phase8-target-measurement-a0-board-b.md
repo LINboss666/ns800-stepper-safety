@@ -89,14 +89,19 @@ R3 两组问题（分类前的原始字节完整性、`%u` 打印提升被当成
 证据：[cp0_offline_precheck.txt](file:///D:/ns800/reports/reviews/phase8-target-measurement-a0-board-b/cp0_offline_precheck.txt)
 （7 节，含脱敏代号表与逐条判据）、[A0BoardB.ps1](file:///D:/ns800/reports/reviews/phase8-target-measurement-a0-board-b/A0BoardB.ps1)
 （与任务书附录逐字节相同的副本）、[cp0_selftest_artifacts.md](file:///D:/ns800/reports/reviews/phase8-target-measurement-a0-board-b/cp0_selftest_artifacts.md)
-（12 块可复算 base64，全部是离线夹具与门输出，**不是 UART 线上采样**）。
+（12 块可复算 base64，全部是离线夹具与门输出，**不是 UART 线上采样**）、
+[cp1_cp2_download_readback.txt](file:///D:/ns800/reports/reviews/phase8-target-measurement-a0-board-b/cp1_cp2_download_readback.txt)、
+[cp3_capture_stop.txt](file:///D:/ns800/reports/reviews/phase8-target-measurement-a0-board-b/cp3_capture_stop.txt)、
+[cp3_wire_archive.md](file:///D:/ns800/reports/reviews/phase8-target-measurement-a0-board-b/cp3_wire_archive.md)
+（4 块可复算 base64：真实 UART 被动窗口、启动窗口、采集器台账、复位工具 stdout；
+`session.rx.bin` 声明为前两块按序拼接，原件另留本地）。
 
 脱敏：仓库里只出现代号（`WORK_OUT/BOARD_B_ROOT/KEIL_ROOT/PY_SITE_ROOT/PYTHON_EXE/GATE_FROZEN_COPY/PROJECT_ROOT/BSP`）
 + 相对路径；完整"代号→本机路径"映射留在仓外 `local_path_index.json`。转换是纯字符串替换，
 所有散列按原始字节直算；探针 UID 与本机用户名未写入仓库。
 
 未覆盖/继续开放：B-1、BUG-008、RISK-03/03a、物理 RISK-04-b、M-1/M-2/M-3、外部时基证明；
-`sw1_cut.ps1` 仍 HOLD；A0 时长证据目前仍 `NOT_ACHIEVED`（要等 CP3 采到记录并由门放行）。
+`sw1_cut.ps1` 仍 HOLD；A0 时长证据仍 `NOT_ACHIEVED` —— CP3 在启动门即停（见 §9），一条目标记录都没采到。
 （§6 这段写于 CP0 时点：当时板上仍是旧 `358fd81a…`、新镜像未下载；CP2 之后已被本次唯一一次
 下载替换为 `5f30d3f0…`，见 §8。）
 
@@ -118,12 +123,37 @@ R3 两组问题（分类前的原始字节完整性、`%u` 打印提升被当成
 | 板上载荷状态变化 | 新测量镜像 `5f30d3f0…` 现在真实在板上；旧 `358fd81a…` 被这一次（也是唯一一次）下载替换 |
 | 本轮首次失败 `CP2-F1` | 我给 `savemem` 传了带反斜杠的绝对路径，pyOCD 的 `-c` 命令串把每个 `\` 当转义吞掉 ⇒ 落盘名变成 `ns800-board-breadbackafter-export-r1.bin`。处置：按日志 `Saved 261452 bytes to …` 找回真实文件再直算 SHA/`cmp`；**未重发 `savemem`**（那要多耗一次会话），未改附录采集器之外的任何越界动作 |
 
-## 9. STOP
+## 9. CP3 执行即停止（附录采集器的启动门在本板上不可满足）
+
+证据原文见 [cp3_capture_stop.txt](file:///D:/ns800/reports/reviews/phase8-target-measurement-a0-board-b/cp3_capture_stop.txt)
+与可逐块复算的字节归档 [cp3_wire_archive.md](file:///D:/ns800/reports/reviews/phase8-target-measurement-a0-board-b/cp3_wire_archive.md)。
+
+| 项 | 实际结果 |
+|---|---|
+| 运行前只读预检 | 采集器 `19432 B / 521d758b…`、冻结门 `50246 B / 94e83175…` 均等于已审字节；DAP UID 从两处既存日志唯一解析（未列探针）；pyOCD 目录无隐式配置；`capture_run1` 全新 |
+| 串口与复位 | `SERIAL_OPEN`（整包唯一一次，115200/8N1，`dtr=false` `rts=false`）→ 被动 2 秒 → `RESET_ATTEMPT SYSRESETREQ attempt=1`（整包唯一一次）；复位工具 stdout 逐字 `Resetting target` + `Core 0 (None):  Running` |
+| 被动 2 秒观察 | `001_open_passive.rx.bin` 194 B 高熵非文本字节（3 个 NUL、无 CR、97 个 >0x7F），不是 RT-Thread 文本 ⇒ 采集器按 §7 走主动复位。**成因未证**，登记为未观察清楚的事实，原件在归档内可逐字节复算 |
+| 启动窗口 | `002_boot.rx.bin` 3757 B / `97b37f32…`；构建戳逐字 `5.3.0 build Oct 26 2026 20:57:05` = 新镜像旁证；阶段 1–11 全打印，终态 `[MAIN] boot complete but state=FAULT_LATCHED fault=8`、`[Motor] arm gate fail mask=0x1B (arm REFUSED)`、`[TMC]/[ADC] DEGRADED` |
+| 停止点 | **`Wait-Prompt` 超时** ⇒ `STOP_FAILURE "Reply timeout; no retry and no cleanup."`，采集器 rc=1，`finally` 已关串口。启动窗口里 `msh >` 出现 **0** 次：`msh` 只在偏移 489 B 出现一次且尾部 `>` 未落到流里，其后还有约 3.3 KB 阶段输出 ⇒ 提示符既不在流尾、复位后也不会自发打印第二次 |
+| 根因（有对照，不靠猜） | ① 既存已证材料同型：BOARD-A 旧镜像 `02_boot.txt`（3762 B）里 `msh >` 同样 0 次、末行同为 `[BB] session 1 written`；② BOARD-A 采集器把 `msh >` 只用作**发出命令之后**的响应结束标记（`cp4_run.ps1:101`，另有 1200 ms 静默兜底），其真实回复 `cmd_100_boot_free.txt` 尾部确有 `msh >`；③ 附录采集器 `A0BoardB.ps1` 在复位后、**TX 计数为 0** 时要求先看到行尾提示符 ⇒ 与本板既证行为矛盾。固件侧提示符定义为 `"msh "` + `>`（shell.c:93、:120-121），形状本身没错，错在"必须自发出现在流尾"这个前提 |
+| 判定 | 附录采集器启动门缺陷；**不是**设备失败、**不是**采集门（完整性合同）失败、**不是**镜像问题。按任务书 §4.5/§7 停在 CP3，不在本地改附录核心逻辑后自行跳过复审 |
+| 本轮实际消耗 | 供电 1/1、下载 1/1、载荷回读 1/1、pyOCD 会话 **2/2**、主动复位 **1/1**、COM5 **1/1**；串口命令 **0/54**、trip 0/17、disarm 0/1、stop/dump 0/3、clear 0/3、下一批 0/2、`spm init` 0/1 ⇒ **COM5/复位/会话三项已用满，本包无法再续跑 CP3** |
+| 未做（全部保持） | 任何目标命令与门判定、clear/dump/trip/disarm、STEP 使能、DIR 变更、许可 HIGH、arm/start/ramp、电机接线、四宏启用、构建、第二次下载、恢复下载演练、设备枚举、`sw1_cut.ps1` |
+| 时长证据 | 仍 **NOT_ACHIEVED**：一条 47 列记录都没采到，也没有 ACCEPT/REJECT 发生；`ps` 栈高水位、cycles 统计全部 `NOT_OBTAINED`，不补造 |
+| 本轮新增首失败 | `CP3-F1` 启动门不可满足（上表）；`CP3-F2` 我的包装脚本 `cp3_run.py` 用 UTF-8 + `errors='replace'` 收 PowerShell 的 OEM/GBK stderr ⇒ 本地化错误文本字节被替换字符吃掉、不可复原（ASCII 抛错文本与行号完整；采集器自己落盘的 wire/台账不经过这次解码，仍逐字节可复算）。只登记不修补历史 |
+
+## 10. STOP
 
 ```
-A0_BOARD_B_CP2_DONE / CP3_PENDING_WITHIN_APPROVED_PACKAGE
-IMAGE_DOWNLOADED_AND_READBACK_VERIFIED 5f30d3f0… (板载新镜像)
-PYOCD_SESSIONS 1/2, COM5_OPENS 0/1, ACTIVE_RESETS 0/1, TRIPS 0/17, DISARM 0/1
-NO STEP_ENABLE / NO MOTOR / NO DIR CHANGE / NO PERMIT-HIGH REQUEST / FOUR SAFETY MACROS RT_FALSE
-NO BUILD / NO AUTOMATIC RESTORE / NO FURTHER FLASH ERASE BEYOND THE ONE APPROVED PROGRAMMING
+A0_BOARD_B_CP3_STOPPED / AWAITING_INDEPENDENT_BOARD_EVIDENCE_REVIEW
+IMAGE_DOWNLOADED_AND_READBACK_VERIFIED 5f30d3f0… (板载新镜像, 启动戳旁证一致)
+LIMITS_EXHAUSTED: POWER_ON 1/1, DOWNLOAD 1/1, READBACK 1/1, PYOCD_SESSIONS 2/2, ACTIVE_RESETS 1/1, COM5_OPENS 1/1
+SERIAL_COMMANDS 0/54, TRIPS 0/17, DISARM 0/1, STOPS 0/3, DUMPS 0/3, CLEARS 0/3, SPM_INIT 0/1 — 采集门从未被调用
+A0_DURATION_EVIDENCE NOT_ACHIEVED / NO_TARGET_RECORDS
+NO MOTOR / NO STEP_ENABLE / NO DIR CHANGE / NO PERMIT-HIGH REQUEST / FOUR SAFETY MACROS RT_FALSE
+NO BUILD / NO SECOND DOWNLOAD / NO AUTOMATIC RESTORE / NO DEVICE ENUMERATION / NO sw1_cut.ps1
+NO_RETRY_NO_BACKFILL: 已停 TX、已关串口、原字节全部保留; 续跑需要新批准与新包
 ```
+
+现场收尾请求（本轮已发出，等操作者实际回报）：**先关 24 V，再拔 USB，SW1 保持阻断位**。
+在收到回报之前，电源终态登记为 `UNKNOWN`，不把登记时刻当作断电时刻。

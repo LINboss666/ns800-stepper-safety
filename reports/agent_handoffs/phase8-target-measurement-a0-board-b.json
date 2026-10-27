@@ -1,6 +1,6 @@
 {
   "round": "phase8-target-measurement-a0-board-b",
-  "phase": "CP0 离线前置 + CP1 现场隔离与一次供电 + CP2 一次下载与一次载荷回读 —— 已完成; CP3 字节采集待执行(在同一已批准整包内)",
+  "phase": "CP0 离线前置 + CP1 供电 + CP2 一次下载与一次回读 = 完成; CP3 在附录采集器的启动门即停(真实硬件, 未发任何目标命令); CP4 收尾请求已发出",
   "date_local": "2026-10-27 (Asia/Shanghai)",
   "task_book": "NS800_Gate_R3_GO_and_A0_Board_B_Package_358e1ca_20261026.md",
   "reviewer_verdict_registered_here": "A0_EXPORT_GATE_REVIEW_GO",
@@ -85,6 +85,31 @@
       "identical_to_accepted_bin_in_repo": true,
       "commander_process_rc": 0,
       "rc_note": "该版本 commander 会吞内部错误码, rc 不作判据"
+    },
+    {
+      "checkpoint": "CP3",
+      "action": "唯一一次 COM5 打开 + 被动 2 秒 + 唯一一次主动 SYSRESETREQ + 采集尝试",
+      "serial_opened": {
+        "port": "COM5",
+        "baud": 115200,
+        "format": "8N1",
+        "dtr": false,
+        "rts": false,
+        "handshake": "None",
+        "opens_used": "1 of 1"
+      },
+      "pyocd_reset_session": {
+        "sessions_used": "2 of 2",
+        "connect_mode": "attach",
+        "stdout_verbatim": "Resetting target\nCore 0 (None):  Running",
+        "stderr_bytes": 0,
+        "rc_note": "commander rc 不作判据"
+      },
+      "commands_sent": 0,
+      "gate_runs": 0,
+      "stopped_at": "Wait-Prompt(启动门) 超时 => STOP_FAILURE; 采集器 finally 已关串口",
+      "collector_exit_code": 1,
+      "motor_step_dir_permit": "未发送任何相关命令; 未启用 STEP/DIR/许可 HIGH/arm/start/ramp"
     }
   ],
   "keil_invoked": true,
@@ -395,73 +420,85 @@
       "action": "初始供电过程(USB 逻辑电源, 再开既有 24 V)",
       "limit": 1,
       "used_this_round": 1,
-      "remaining_within_package": 0
+      "remaining_within_package": 0,
+      "exhausted": true
     },
     {
       "action": "新 A0 镜像下载调用(Keil -f, 不编译)",
       "limit": 1,
       "used_this_round": 1,
-      "remaining_within_package": 0
+      "remaining_within_package": 0,
+      "exhausted": true
     },
     {
       "action": "下载后片内载荷回读 261452 B",
       "limit": 1,
       "used_this_round": 1,
-      "remaining_within_package": 0
+      "remaining_within_package": 0,
+      "exhausted": true
     },
     {
       "action": "已知 DAP 的 pyOCD 会话(回读一次 + 主动复位一次)",
       "limit": 2,
-      "used_this_round": 1,
-      "remaining_within_package": 1
+      "used_this_round": 2,
+      "remaining_within_package": 0,
+      "exhausted": true
     },
     {
       "action": "主动 SYSRESETREQ",
       "limit": 1,
-      "used_this_round": 0,
-      "remaining_within_package": 1
+      "used_this_round": 1,
+      "remaining_within_package": 0,
+      "exhausted": true
     },
     {
       "action": "COM5 打开 115200/8N1 无流控 DTR/RTS 不激活",
       "limit": 1,
-      "used_this_round": 0,
-      "remaining_within_package": 1
+      "used_this_round": 1,
+      "remaining_within_package": 0,
+      "exhausted": true
     },
     {
       "action": "spm trip(批1=1, 批2=16)",
       "limit": 17,
       "used_this_round": 0,
-      "remaining_within_package": 17
+      "remaining_within_package": 17,
+      "exhausted": false
     },
     {
       "action": "motor_disarm(批3, off_attempt 正式入口)",
       "limit": 1,
       "used_this_round": 0,
-      "remaining_within_package": 1
+      "remaining_within_package": 1,
+      "exhausted": false
     },
     {
       "action": "spm init(静止前置后; 会设置 DWT/DEMCR 位)",
       "limit": 1,
       "used_this_round": 0,
-      "remaining_within_package": 1
+      "remaining_within_package": 1,
+      "exhausted": false
     },
     {
       "action": "spm clear_records(每批须门+关闭事实均通过)",
       "limit": 3,
       "used_this_round": 0,
-      "remaining_within_package": 3
+      "remaining_within_package": 3,
+      "exhausted": false
     },
     {
       "action": "下一批开始(最终批后无第4批)",
       "limit": 2,
       "used_this_round": 0,
-      "remaining_within_package": 2
+      "remaining_within_package": 2,
+      "exhausted": false
     },
     {
       "action": "完整成功路径串口命令总数",
       "limit": 54,
       "used_this_round": 0,
-      "remaining_within_package": 54
+      "remaining_within_package": 54,
+      "exhausted": false
     }
   ],
   "tests_executed": [
@@ -510,13 +547,17 @@
       "id": "cp2-download-and-readback-identity",
       "tool": "UV4 -f 一次 + pyOCD commander savemem 一次; 判据取日志文本/落盘字节 SHA/cmp, 不取 rc",
       "result": "PASS —— 日志 Erase Done./Programming Done./Verify OK.; 回读 261452 B = 5f30d3f0…, 与仓内 measure-a0.bin 逐字节无差异; 两次 status 均 Halted"
+    },
+    {
+      "id": "cp3-collector-execution",
+      "tool": "冻结采集器 -ExecuteApprovedBoardB(附录字节 521d758b…, 未改核心逻辑)",
+      "result": "STOPPED —— rc=1; 台账 SERIAL_OPEN/RX_BEGIN×2/RX_FILE×1/RESET_ATTEMPT×1/STOP_FAILURE×1; TX_ATTEMPT 0 条 => 未发出任何目标命令, 采集门未被调用"
     }
   ],
   "not_run_this_round": [
     "A0/S1/S2/V1/V2/I-O/SD 固件主机链",
     "任何串口/调试器/探针/设备操作",
     "全片再备份",
-    "CP3 的一切: COM5 打开、被动 2 秒观察、主动 SYSRESETREQ、54 条串口命令、批门与清理",
     "编译/Rebuild(本包禁止构建, builds_executed 仍为空)",
     "独立 mass erase / unlock / 选项字 / OTP / 系统区操作",
     "探针枚举与设备扫描(UID 取本地既存日志唯一值)",
@@ -555,6 +596,18 @@
       "what": "第一版 CP1/CP2 证据把下载日志里的 Load 路径写成 JSON 列表文本, 经呈现层反斜杠归一后变成带斜杠引号的乱码",
       "handling": "生成脚本改为逐字打印日志原文行, 重新生成同一份证据文件; 未手改输出, 未改动任何判据字节",
       "root_cause_kind": "本地证据生成脚本呈现层缺陷, 与目标/工具无关"
+    },
+    {
+      "id": "CP3-F1",
+      "what": "附录采集器 A0BoardB.ps1 的启动门要求复位后先看到行尾 \"msh >\"; 本板两套镜像都不会自发打印行尾提示符(启动窗口 3757 B 内 msh > 出现 0 次, msh 仅在偏移 489 B 出现且其后仍有约 3.3 KB 输出), 20 秒合并上限即超时",
+      "handling": "立即停: 不重试、不再复位、不发任何命令、不 clear、不补 dump; 原字节与台账全部保留; 未改附录源码",
+      "root_cause_kind": "附录采集器判据形状与既证设备行为矛盾(云端无 PowerShell 执行环境, 本机 -SelfTest 覆盖不到该路径)"
+    },
+    {
+      "id": "CP3-F2",
+      "what": "我的包装脚本 cp3_run.py 用 encoding=utf-8 + errors=\"replace\" 解码 PowerShell 的 OEM/GBK stderr => 本地化错误文本字节被替换字符吃掉, 不可复原",
+      "handling": "只登记不修补历史; ASCII 抛错文本与 行号/字符号 完整保留; 采集器自己落盘的 wire/台账不经过这次解码, 仍逐字节可复算; 下一个包的包装脚本应按原始字节另存 stderr",
+      "root_cause_kind": "本地包装脚本解码缺陷, 不是采集器或设备失败"
     }
   ],
   "de_identification": {
@@ -566,7 +619,9 @@
     "reports/reviews/phase8-target-measurement-a0-board-b/A0BoardB.ps1",
     "reports/reviews/phase8-target-measurement-a0-board-b/cp0_offline_precheck.txt",
     "reports/reviews/phase8-target-measurement-a0-board-b/cp0_selftest_artifacts.md",
-    "reports/reviews/phase8-target-measurement-a0-board-b/cp1_cp2_download_readback.txt"
+    "reports/reviews/phase8-target-measurement-a0-board-b/cp1_cp2_download_readback.txt",
+    "reports/reviews/phase8-target-measurement-a0-board-b/cp3_capture_stop.txt",
+    "reports/reviews/phase8-target-measurement-a0-board-b/cp3_wire_archive.md"
   ],
   "evidence_identities": [
     {
@@ -588,6 +643,16 @@
       "path": "reports/reviews/phase8-target-measurement-a0-board-b/cp1_cp2_download_readback.txt",
       "bytes": 6541,
       "sha256": "42f2ae6073c942827dc81df5ce97fbeae7e9de71f9c8b3554744b60d33d87c7f"
+    },
+    {
+      "path": "reports/reviews/phase8-target-measurement-a0-board-b/cp3_capture_stop.txt",
+      "bytes": 15866,
+      "sha256": "2355fdc3fe0ee5f8e8dde879bd9138936d89dd6c4ab18c54ef6a7c8ae7bf2e83"
+    },
+    {
+      "path": "reports/reviews/phase8-target-measurement-a0-board-b/cp3_wire_archive.md",
+      "bytes": 7925,
+      "sha256": "5f84d459386c52bebc6c13b82debfaced06db74d241a54cd1f264618bf610819"
     }
   ],
   "still_open": [
@@ -606,18 +671,20 @@
     "板上仍是旧 358fd81a… 载荷",
     "sw1_cut.ps1 的 T-01/T-02 仍 HOLD"
   ],
-  "next_step": "CP3: 调用冻结采集器 -ExecuteApprovedBoardB —— 一次 COM5 打开(115200/8N1, 无流控, DTR/RTS 不激活) → 被动 2 秒; 若见启动文本则不主动复位并停; 否则唯一一次 SYSRESETREQ → 固定 54 条命令; 每批以\"已接受门 ACCEPT + 本包关闭事实\"双判据放行 clear, 清理后 status 归零才给下一批 start; 任一失败立即停 TX、保留原字节、关串口、不重试不补触发",
+  "next_step": "停在 CP3 实际失败, 等独立板级证据复审。若要继续 A0 时长测量, 需要云端按 §9 根因重新出包(修附录启动门判据与命令计数口径)并取得新的整包批准; 本轮不再接触设备。现场收尾由操作者执行: 先关 24 V 再拔 USB, SW1 保持阻断。",
   "stop_claim": [
-    "A0_BOARD_B_CP2_DONE / CP3_PENDING_WITHIN_APPROVED_PACKAGE",
-    "IMAGE_DOWNLOADED_AND_READBACK_VERIFIED 5f30d3f058ceff516b2185aa3a1e597bbe63293b94a6fd801fd989a6f7b2b8e6",
-    "PYOCD_SESSIONS 1/2, COM5_OPENS 0/1, ACTIVE_RESETS 0/1, TRIPS 0/17, DISARM 0/1, CLEARS 0/3",
+    "A0_BOARD_B_CP3_STOPPED / AWAITING_INDEPENDENT_BOARD_EVIDENCE_REVIEW",
+    "LIMITS_EXHAUSTED POWER_ON 1/1 DOWNLOAD 1/1 READBACK 1/1 PYOCD_SESSIONS 2/2 ACTIVE_RESETS 1/1 COM5_OPENS 1/1",
+    "SERIAL_COMMANDS 0/54 TRIPS 0/17 DISARM 0/1 STOPS 0/3 DUMPS 0/3 CLEARS 0/3 SPM_INIT 0/1 GATE_INVOCATIONS 0",
+    "A0_DURATION_EVIDENCE NOT_ACHIEVED / NO_TARGET_RECORDS",
     "NO MOTOR / NO STEP_ENABLE / NO DIR CHANGE / NO PERMIT-HIGH REQUEST / FOUR SAFETY MACROS RT_FALSE",
-    "NO BUILD / NO AUTOMATIC RESTORE / NO FURTHER FLASH ERASE BEYOND THE ONE APPROVED PROGRAMMING"
+    "NO BUILD / NO SECOND DOWNLOAD / NO AUTOMATIC RESTORE / NO DEVICE ENUMERATION / NO sw1_cut.ps1",
+    "SERIAL_CLOSED / RAW_BYTES_PRESERVED / NO_RETRY_NO_BACKFILL"
   ],
   "probe_sessions_used": {
-    "pyocd": "1 of 2",
-    "com5_opens": "0 of 1",
-    "active_sysresetreq": "0 of 1"
+    "pyocd": "2 of 2",
+    "com5_opens": "1 of 1",
+    "active_sysresetreq": "1 of 1"
   },
   "board_image_state": {
     "before_this_package": {
@@ -638,5 +705,218 @@
     "readback_bin_as_written_by_pyocd": "pyOCD 隔离工作目录下的原始落盘文件(名字见 CP2-F1), 未改名未重算",
     "readback_archive_copy": "BOARD_B_ROOT/readback/after-export-r1.bin",
     "note": "含本机路径/UID 的工具包装日志留本地; 入库文本一律脱敏并声明替换规则"
+  },
+  "cp3_run": {
+    "collector_exit_code": 1,
+    "elapsed_seconds": 23.2,
+    "started_local": "2026-10-27T11:49:28+08:00",
+    "finished_local": "2026-10-27T11:49:51+08:00",
+    "ledger_kind_counts": {
+      "SERIAL_OPEN": 1,
+      "RX_BEGIN": 2,
+      "RX_FILE": 1,
+      "RESET_ATTEMPT": 1,
+      "STOP_FAILURE": 1
+    },
+    "ledger_rows": [
+      {
+        "at": "2026-10-27T11:49:29.0939372+08:00",
+        "kind": "SERIAL_OPEN",
+        "data": {
+          "port": "COM5",
+          "dtr": false,
+          "baud": 115200,
+          "format": "8N1",
+          "rts": false
+        }
+      },
+      {
+        "at": "2026-10-27T11:49:29.1656264+08:00",
+        "kind": "RX_BEGIN",
+        "data": {
+          "start": 0,
+          "path": "001_open_passive.rx.bin"
+        }
+      },
+      {
+        "at": "2026-10-27T11:49:31.1869374+08:00",
+        "kind": "RX_FILE",
+        "data": {
+          "path": "001_open_passive.rx.bin",
+          "end": 194,
+          "sha256": "7b8bb44f4292d705445a7792eba6ba6306e0f9951b97bb337f450eed12c4d851",
+          "bytes": 194,
+          "start": 0
+        }
+      },
+      {
+        "at": "2026-10-27T11:49:31.1899379+08:00",
+        "kind": "RX_BEGIN",
+        "data": {
+          "start": 194,
+          "path": "002_boot.rx.bin"
+        }
+      },
+      {
+        "at": "2026-10-27T11:49:31.2099199+08:00",
+        "kind": "RESET_ATTEMPT",
+        "data": {
+          "method": "SYSRESETREQ",
+          "attempt": 1
+        }
+      },
+      {
+        "at": "2026-10-27T11:49:51.2171372+08:00",
+        "kind": "STOP_FAILURE",
+        "data": {
+          "counts": {},
+          "message": "Reply timeout; no retry and no cleanup."
+        }
+      }
+    ],
+    "tx_attempts": 0,
+    "serial_commands_sent": 0,
+    "gate_invocations": 0,
+    "artifacts": [
+      {
+        "file": "session.rx.bin",
+        "bytes": 3951,
+        "sha256": "65316ec72de02525bd8772dddbdaed5dd339362f7838941347c823fb16b0250f",
+        "nul": 6,
+        "cr": 96,
+        "lf": 74
+      },
+      {
+        "file": "001_open_passive.rx.bin",
+        "bytes": 194,
+        "sha256": "7b8bb44f4292d705445a7792eba6ba6306e0f9951b97bb337f450eed12c4d851",
+        "nul": 3,
+        "cr": 0,
+        "lf": 0
+      },
+      {
+        "file": "002_boot.rx.bin",
+        "bytes": 3757,
+        "sha256": "97b37f32aa03c86b8708ae088d0ae65a8f92520f1a1ed70beb74663049321749",
+        "nul": 3,
+        "cr": 96,
+        "lf": 74
+      },
+      {
+        "file": "ledger.jsonl",
+        "bytes": 824,
+        "sha256": "85b2ed1cb26b7012b3ebbc4ac2f7b2e8d7982759f28cd0f06435a2fef958bee4",
+        "nul": 0,
+        "cr": 6,
+        "lf": 6
+      },
+      {
+        "file": "reset.tool.stdout.txt",
+        "bytes": 43,
+        "sha256": "f336a99c191dc6eade3ed796093da60670587a8f848c3f963c3160e7c4314b26",
+        "nul": 0,
+        "cr": 2,
+        "lf": 2
+      },
+      {
+        "file": "reset.tool.stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "nul": 0,
+        "cr": 0,
+        "lf": 0
+      },
+      {
+        "file": "collector.stdout.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "nul": 0,
+        "cr": 0,
+        "lf": 0
+      },
+      {
+        "file": "collector.stderr.txt",
+        "bytes": 433,
+        "sha256": "874d2be0e7545b70bde14c825a35baf33355448964f59e12617290f088be7313",
+        "nul": 0,
+        "cr": 0,
+        "lf": 7
+      }
+    ],
+    "stop_message": "Reply timeout; no retry and no cleanup.",
+    "boot_facts": {
+      "build_stamp_line": "/ | \\     5.3.0 build Oct 26 2026 20:57:05",
+      "final_lines": [
+        "[BOOT] 11 startup-selftest FAIL -> state=FAULT_LATCHED",
+        "[Motor] arm gate fail mask=0x1B (arm REFUSED)",
+        "[MAIN] boot complete but state=FAULT_LATCHED fault=8 (degraded/latched - NOT ready)",
+        "[MAIN] motor arm gate fail mask=0x1B (MOTOR_HARDWARE_ENABLE_PATH_VALIDATED=NO)",
+        "[BB] session 1 written (101 frames), last_err=0"
+      ],
+      "msh_prompt_occurrences": 0,
+      "first_msh_offset_bytes": 489,
+      "bytes_after_first_msh": 3268,
+      "nul": 3
+    },
+    "passive_window_facts": {
+      "bytes": 194,
+      "sha256": "7b8bb44f4292d705445a7792eba6ba6306e0f9951b97bb337f450eed12c4d851",
+      "nul": 3,
+      "cr": 0,
+      "high_bytes": 97,
+      "first64_hex": "83 23 06 ea 23 ae 18 6d 09 fe 05 b3 24 45 00 d7 4b ce a9 51 cf fb d2 ef c1 63 23 ea 85 b9 97 8f eb 7b 61 18 1c 84 63 ed 13 f6 23 86 3a 06 10 55 ce 23 c1 5d b2 13 a1 44 ee 7b 20 30 eb ef 44 84",
+      "interpretation_status": "未证 —— 不解释成因也不写成已排除; 当时核心处于 CP2 回读后的 halted 态, 无仪器证据, 原件已无损归档"
+    },
+    "root_cause": {
+      "id": "CP3-F1",
+      "claim": "附录采集器在主动复位后、TX 为 0 时要求先看到\"行尾 msh >\"才允许发第一条命令; 本板两套镜像都不会自发打印行尾提示符, 因此该判据在本包内不可满足",
+      "control_evidence": [
+        {
+          "file": "RAWDATA/serial/02_boot.txt",
+          "bytes": 3762,
+          "sha256": "9654449da1e52d2c4b27fcee28ca3e658b4607bef8bc5bb9df9e43a57e367581",
+          "msh_prompt_occurrences": 0,
+          "shows": "旧镜像(358fd81a…)启动窗口同样 0 次自发 msh >, 末行同为 [BB] session 1 written"
+        },
+        {
+          "file": "RAWDATA/serial/cmd_100_boot_free.txt",
+          "bytes": 95,
+          "sha256": "b3127b4ad5aa0b10d3fb764c1fbc5f67923c9cae163785f3cfe75948eee0566f",
+          "tail": "b'm  : 12648\\r\\navailable: 20024\\r\\nmsh >\\r\\nmsh >\\r\\n'",
+          "shows": "发出命令之后回复尾部确实以 msh > 结束 => 提示符只在有输入后出现"
+        },
+        {
+          "file": "RAWDATA/cp4_run.ps1:101",
+          "shows": "上一轮判据 'msh\\s*/?>\\s*$' 作用在已 WriteLine(\\$cmd) 之后的累积响应上, 另有 1200 ms 静默兜底, 即先发命令、提示符当响应结束标记"
+        },
+        {
+          "file": "rt-thread shell.c:93 + :120-121",
+          "shows": "提示符字节定义为 \"msh \" 追加 > => 形状没错, 错在\"必须自发出现在流尾\"的前提"
+        }
+      ],
+      "not_attributed_to": [
+        "设备失败",
+        "采集门(完整性合同)失败",
+        "镜像身份问题",
+        "下载或回读问题"
+      ],
+      "disposition": "按任务书 §4.5/§7 停在 CP3 并提交实际失败; 未在本地修改附录核心逻辑后自行跳过复审; 不重试、不再复位、不发命令、不 clear、不补 dump",
+      "suggested_fix_for_cloud_review_only": "候选: 复位后发一条白名单查询命令并用提示符/静默双兜底界定响应, 或把启动门改为窗口内出现 msh 文本即允许发第一条命令; 两者都会改变 §7 命令计数或判据形状, 必须重新出包复审"
+    }
+  },
+  "package_state": {
+    "cp3_resumable_within_this_package": false,
+    "reason": "COM5 打开(1/1)、主动 SYSRESETREQ(1/1)、pyOCD 会话(2/2) 三项已用满; 续跑必须换新的批准与新包",
+    "board_after_stop": {
+      "image": "5f30d3f0… (新测量镜像, 启动戳旁证一致)",
+      "core": "运行中(复位后 Running, 启动文本持续到达)",
+      "app_state": "FAULT_LATCHED fault=8, arm gate mask=0x1B 拒绝 arm",
+      "serial": "已关闭"
+    }
+  },
+  "cp4_closeout": {
+    "request_issued_in_this_round": "请现场操作者先关 24 V, 再拔 USB, SW1 保持阻断位",
+    "final_power_state": "UNKNOWN(等操作者实际回报; 未回报前不写成已断电)",
+    "recorded_at_is_not_power_off_time": true
   }
 }
