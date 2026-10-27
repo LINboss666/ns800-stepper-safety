@@ -1,0 +1,139 @@
+NS800 A0 BOARD-B  —— CP0 离线准备与采集器硬门前置（本轮无设备动作）
+轮次 phase8-target-measurement-a0-board-b    日期 2026-10-27 (Asia/Shanghai)
+document_base / 开工 HEAD 358e1cace6e64bbd1d767076f940dd3aaaf9cd46（= 上一轮被审交付 = 远端分支头）
+任务书结论 A0_EXPORT_GATE_REVIEW_GO（登记见交接 §1）；本包 = BOARD-B 有界重测包。
+本轮实际动作全部离线：不供电、不连接、不下载、不复位、不发目标命令、不扫设备、不重编 Keil。
+
+脱敏规则(与 BOARD-A 同口径, 逐条声明): 仓库内只出现代号 + 相对路径。
+  PROJECT_ROOT=仓库根  BSP=工程 BSP 根  WORK_OUT=本轮仓外工作目录
+  BOARD_B_ROOT=仓外下载副本根  KEIL_ROOT=Keil 安装根  PY_SITE_ROOT=pyOCD 安装根
+  PYTHON_EXE=现有 python.exe  GATE_FROZEN_COPY=仓外冻结门副本
+  完整"代号→本机路径"映射留在 WORK_OUT/evidence/local_path_index.json（不上库）。
+  转换是纯字符串替换, 不改动被哈希对象的字节; 所有散列按原始字节直算。
+
+==============================================================================
+1. 基线与 §3 冻结输入实读（逐项，含与任务书记录值的比较）
+==============================================================================
+  git 分支=phase8/tmc-drive-config  HEAD=358e1cace6e64bbd1d767076f940dd3aaaf9cd46
+  工作树=干净(git status --short 无输出)  远端分支头经 ls-remote 等于同一 SHA
+  冻结引用未移动: main=1b3757eec550802a3973e66790af422d81d3d373
+    phase7/full-embedded-software=6d3fbc559d45673d7550eb73dec5a4ade5bb34df
+    tag object=097935fec5a6f2467261ab1ad449ff0b1d398250  dereference=e40a9b95ef709e6a80444f9f3949dfdd70ba96ba
+  唯一下载 BIN               measure-a0.bin                                               261452 B  sha256=5f30d3f058ceff51  与 §3 一致=True
+  默认 BIN(只核不下载)          default.bin                                                  251148 B  sha256=02e984583255f341  与 §3 一致=True
+  采集门                    a0_export_gate.py                                             50246 B  sha256=94e8317577a0fd8f  与 §3 一致=True
+  对应本地 AXF(下载载荷) BSP/build/a0/rt-thread-a0.axf   1675944 B  sha256=8b95464e9f687096  与 §3 一致=True
+    (不重新转换 AXF 凑哈希; 任务书 §4.1 的停止条件因此未触发)
+  载荷跨度核对: BIN 261452 B = 0x3fd4c, 0x08000000..0x0803FD4B, 末端不含 0x803FD4C => §3 的 0x3FD4C 一致=True
+  测量 BIN 内构建戳离线实读: "Oct 26 2026" + "20:57:05"(NUL 分隔) => 与 §3 一致, 只作启动旁证
+  旧板上载荷身份沿用上一轮回读: 261100 B 358fd81ae5853ea5…(本地既存件 reports/firmware/phase8-target-measurement-a0/measure-a0.bin 复算=358fd81ae5853ea5…)
+  四道安全宏仍 RT_FALSE: motor.h:69 MOTOR_HW / motor.h:83 STEP_DIAG_ISO / project_board.h:51 LIMIT_EN / tmc2209.h:100 TMC_CFG_HW
+  既存恢复材料(本地磁盘直算, 未连设备): before-a/b 各 1048576 B b89f8a7cde…; 恢复 HEX 3014958 B b3ac97b976… 两处一致。
+    文件存在且哈希相同**不**证明恢复下载已演练(仍 NOT_EXECUTED), 外部 SPI Flash 与全板状态未备份。
+
+==============================================================================
+2. §4.2 采集器与冻结门副本的字节身份
+==============================================================================
+  提取方式: python 从任务书 MD 的 ```powershell 围栏切正文, encode(ascii)+write_bytes 落盘;
+    未用 > / Set-Content / Out-File 转存任何二进制(§4.2 明确要求)。
+  WORK_OUT/A0BoardB.ps1  19432 B  sha256=521d758b2cae3eac  与任务书 §3/§4 记录一致=True
+    非 ASCII 字节=0  CRLF 字节=0 (=> 源码仍是纯 ASCII/LF)
+    仓库副本 = 本文件同目录 A0BoardB.ps1, 与之逐字节相同=True
+  GATE_FROZEN_COPY  50246 B  sha256=94e8317577a0fd8f  来源=b187cdd2ffc3:tests/host/a0_export_gate.py
+    与工作树门字节逐字节相同=True; 与 §3 记录一致=True
+
+==============================================================================
+3. §4.3 工具版本与参数可用性（离线读取, 未安装/升级任何东西）
+==============================================================================
+  Keil UV4 ProductVersion=5.43.1.0   pyOCD=0.45.1   Python=3.12.5   PowerShell=5.1.26100.5074
+  python.exe = PYTHON_EXE（现有解释器, 未新建虚拟环境）
+  commander --help: --no-config=True -O=True -u/--uid=True -t/--target=True -f/--frequency=True
+    帮助文本 sha256=25f52a3bbe7aec29…（可复算: python -m pyocd commander --help）
+  本包用到的命令/选项在已安装源码里都存在:
+    commands: {"savemem": true, "loadmem": true, "reset": true, "status": true, "exit": true}
+    options : {"auto_unlock": true, "connect_mode": true, "resume_on_disconnect": true, "enable_memory": true, "read_code_from_elf": true, "scan_all_aps": true}
+    -t cortex_m 是 builtin 通用目标(CoreSightTarget)。目标名在册的取证方式:
+      python -m pyocd list --targets   (subcommands/list_cmd.py:97-105 走 list_targets 分支)
+      同一文件 :71-77 显示"不带输出开关时默认 --probes"; :96 的 ConnectHelper.list_connected_probes()
+      只在 --probes 分支里, 且 :86 的 Session(None, ...) 不带设备 => 本次这一条**未做探针/设备枚举**,
+      与 commands/commander.py:58 _CONNECTIONLESS_COMMANDS=(list,help,exit) 相互印证。
+  纯内存读判据(读安装源码, 不再重述旧文档的 RAM2 说法):
+    PY_SITE_ROOT/pyocd/coresight/coresight_target.py:76
+      RamRegion(name="Code", start=0x00000000, length=0x20000000)  => 0x08000000 落在 Code
+      (:80 另有 RAM2 @0x80000000, 与本地址无关 —— 上一轮 CAL-4 更正继续成立)
+    PY_SITE_ROOT/pyocd/commands/commands.py:627-642 (SavememCommand.execute)
+      region=get_region_for_address(addr); :628 flash_init_required = region.is_flash and not region.is_powered_on_boot and region.flash is not None
+      => Code 是 RamRegion, is_flash 为假 => 不进 flash.init(VERIFY/ERASE) 分支,
+         :635 直接 selected_ap.read_memory_block8(addr,count), :641 原样写文件。
+    ⇒ §6 的"一次载荷回读"确实是纯目标内存读, 不调用设备 Flash 算法, 也不引 ELF 代读;
+      且 commander 的进程退出码不作成败判据(该版本吞内部错误码) —— 判据只用日志文本+落盘字节+SHA。
+
+==============================================================================
+4. §4.4 采集器本机硬前置（云端只做过静态检查, 这一段不能以云端 GO 代替）
+==============================================================================
+  (a) Parser.ParseFile 语法检查: TOKENS=3883  PARSE_ERRORS=0  => PARSE-OK, rc=0
+  (b) powershell.exe -NoProfile -File A0BoardB.ps1 -SelfTest -PythonExe PYTHON_EXE \
+        -GateFile GATE_FROZEN_COPY -OutDir WORK_OUT/selftest_1（全新空目录）
+      stdout 原文: BOARD-B-OFFLINE-SELFTEST PASS; device_actions=0      rc=0
+      stderr 字节数: 0（空）
+  (c) ledger.jsonl 实读原文（路径已按代号替换, 内容未改）:
+      {"at":"2026-10-27T11:00:02.2972511+08:00","kind":"RX_BEGIN","data":{"start":0,"path":"001_offline_bytes.rx.bin"}}
+      {"at":"2026-10-27T11:00:02.3856959+08:00","kind":"RX_FILE","data":{"path":"001_offline_bytes.rx.bin","end":8,"sha256":"28338dd70f7706a65735b53b74c93e681a9cf6b99d5f00c11611575aa52be65a","bytes":8,"start":0}}
+      {"at":"2026-10-27T11:00:02.6514913+08:00","kind":"GATE","data":{"rc":0,"batch":"self_positive","allowed":true,"raw_sha256":"3fe53b977b24b2a4ac53055330bf0008dbf58d56e5d35b55773ae9801595b91e"}}
+      {"at":"2026-10-27T11:00:02.7877327+08:00","kind":"GATE","data":{"rc":1,"batch":"self_negative","allowed":false,"raw_sha256":"21c2ab75cb1fac90eac3cf7fb484ac081d14bd0eca80101eac93220b2b509f31"}}
+      {"at":"2026-10-27T11:00:02.7990010+08:00","kind":"OFFLINE_SELFTEST","data":{"result":"PASS","bytes":8,"wire_calls":0}}
+      其中 OFFLINE_SELFTEST.wire_calls=0（按 ledger 字段实读, 不是叙述）;
+      无任何 SERIAL_OPEN/TX_ATTEMPT/RESET_ATTEMPT 条目 => 自检分支未创建串口对象、未起子进程。
+  (d) 自检覆盖到的判据(采集器自身逻辑, 逐条对应 §4.4):
+      原始字节/NUL/高位字节落盘逐字节回核(001_offline_bytes.rx.bin 8 B, sha=28338dd70f7706a6…)
+      假串口下 clear_records/start/pin 三条全被拒且 mock.Write 调用数=0
+      真实门健康正控 self_positive ALLOWED(rc=0); NUL 负控 self_negative 拒绝(rc=1)
+      非零 rc / 旧批 JSON / 缺 JSON / 缺 clear grant 四种情形都不被判为放行
+  (e) 首次失败保留: 见 §6。
+
+==============================================================================
+5. §4.6/4.7 全新仓外下载副本 + FLM/DLL/隔离目录 manifest
+==============================================================================
+  原工程(只读, 一字未改: originals_unmodified=True)
+    uvprojx 231510 B sha=efb5671345e1f3e7… 行尾=CRLF  LF 归一后等于 cd8d9f09 blob=True  等于 BOARD-A 登记原值=True
+    uvoptx  61950 B sha=62d2d8f14afbeb1c… 行尾=LF   原始字节即等于 cd8d9f09 blob=True  等于 BOARD-A 登记原值=True
+  副本 BOARD_B_ROOT/download-b/
+    download-b.uvprojx 231472 B sha=d53c62a32954f34f…  (与 BOARD-A 成功副本 d53c62a3… 同号: True)
+    download-b.uvoptx  61950 B sha=62d2d8f14afbeb1c…  与原 uvoptx 逐字节相同=True
+    dl/rt-thread-a0.axf 1675944 B sha=8b95464e9f687096…  与 §3 AXF 一致=True
+    实际 Load 路径 = BOARD_B_ROOT/download-b/dl/rt-thread-a0.axf
+      依据(上一轮已被日志证实的规则): 旧回执 Load "<工程根>\build\rt-thread.axf" 恰等于 OutputDirectory+OutputName+.axf
+  副本相对原工程的全部差异 = 4 行(逐字节 diff 实测, 全部落在第一目标内):
+      line 51  OutputDirectory -> .\dl\
+      line 52  OutputName -> rt-thread-a0
+      line 83  AfterMake RunUserProg1 1 -> 0
+      line 85  AfterMake UserProg1Name 置空
+    第二目标区域逐字节未改=True; BeforeMake/BeforeCompile 原本即为 0; 下载副本不用于编译。
+  下载通路(从副本 uvoptx 实读): pMon=BIN\CMSIS_AGDI.dll  FLM=NS800RT7xxx_FlashBank1.FLM,NS800RT7xxx_FlashBank2.FLM  sIfile 空=True  tIfile 空=True
+    => 沿用 BOARD-A 成功的 CMSIS_AGDI + 两个 NS800 FlashBank FLM 配置, 无下载初始化脚本。
+    "Reset and Run" 在两份工程文件里**无可核对标签**(grep 命中=False): 它落在 Keil 私有位域(CMSIS_AGDI 的 -O206), 状态 UNPROVEN_OFFLINE。
+    缓解判据沿用上一轮: CP2 回读用 connect_mode=halt + resume_on_disconnect=false; 下载后核心真实状态由 pyOCD status 行与日志暴露, 按实际次数登记, 不并成"计划内一次"。
+  FLM/DLL 实体身份(KEIL_ROOT 下按名检索):
+    NS800RT7xxx_FlashBank1.FLM          55504 B sha=1ae62260956fc7c7… 与任务书 §4.7 一致=True (磁盘副本数=1, 不同内容数=1)
+    NS800RT7xxx_FlashBank2.FLM          55508 B sha=aaa500121e431b32… 与任务书 §4.7 一致=True (磁盘副本数=1, 不同内容数=1)
+    CMSIS_AGDI.dll                     2410776 B sha=05c8cd29093ab6da…
+    UL2CM3.dll                         2535192 B sha=7a5c69da8c3a2f95…
+    限制如实登记: 配置文件本身不能单独证明 Keil 运行时实际加载哪一份 DLL/FLM; 本包不改动安装文件。
+  独立 pyOCD 目录 BOARD_B_ROOT/pyocd-work-b: listing=[]  禁带文件命中=[]
+    => 无 pyocd_user.py/pyocd.yaml/pyocd.yml; CP2/CP3 一律显式 --no-config。
+
+==============================================================================
+6. 本轮首次失败与自身缺陷（一律保留）
+==============================================================================
+  F-1 提取脚本首版把任务书 §4 的 ParseFile 片段当 ASCII 代码写出, 该片段含中文占位符 => UnicodeEncodeError。处置: 该片段是"检查命令"不是附录源码, 改为自写 ASCII 检查脚本并按 §4.5 只填运行参数; 附录采集器本体一字未改。
+  F-2 工具取证脚本首版 import 了该 pyOCD 版本不存在的 pyocd.utility.mask.match_mask => ImportError(原文留在 WORK_OUT/evidence/tooling_probe_FIRST_ATTEMPT_ImportError.txt)。处置: 改为只读安装源码, 不构造 Target、不连设备。
+  F-3 CP0-4 首版把"工作树原始字节 == cd8d9f09 blob"当准入条件, 而 project.uvprojx 在树里是 CRLF、blob 是 LF(autocrlf) => 假 ABORT(原文留在 WORK_OUT/evidence/cp0_download_copy_FIRST_ATTEMPT_false_abort.txt)。处置: 改用 LF 归一比较, 并新增与 BOARD-A 登记原值的连续性核对; 未放宽任何输入判据(AXF/BIN/门仍按原始字节直算)。
+  F-4 cortex_m 默认内存图的正则扫描首版命中 0 条(cortex_m.py 里没有区域定义), 改在 coresight_target.py:74-82 找到 _create_default_cortex_m_memory_map 才是权威来源。
+
+==============================================================================
+7. 硬件授权状态与下一步
+==============================================================================
+  CP0 各前置全部通过, 但 CP0 本身不构成批准。任务书 §2/§9 明确: 只有在用户对**本整包**
+  发出批准后, 才允许 CP1 供电、CP2 一次下载与一次回读、CP3 一次主动复位 + 固定 54 条命令、CP4 收尾。
+  本轮结束时: 板子仍断电(上一轮 USER_REPORTED 收尾), SW1 仍阻断, 电机未接, 板上仍是旧 358fd81a…
+  载荷; 新 5f30d3f0… **尚未下载**。hardware_actions=[]。

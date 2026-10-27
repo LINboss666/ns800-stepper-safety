@@ -1,0 +1,511 @@
+{
+  "round": "phase8-target-measurement-a0-board-b",
+  "phase": "CP0 离线准备与采集器硬门前置（未执行任何硬件动作）",
+  "date_local": "2026-10-27 (Asia/Shanghai)",
+  "task_book": "NS800_Gate_R3_GO_and_A0_Board_B_Package_358e1ca_20261026.md",
+  "reviewer_verdict_registered_here": "A0_EXPORT_GATE_REVIEW_GO",
+  "gate_review_go_scope": "只接受离线采集完整性合同; 真实新镜像尚未上板; A0 新时间证据仍 NOT_ACHIEVED",
+  "document_base": "358e1cace6e64bbd1d767076f940dd3aaaf9cd46",
+  "task_start_commit": "358e1cace6e64bbd1d767076f940dd3aaaf9cd46",
+  "accepted_firmware_code_commit": "cd8d9f095030c08634a082dd2bb9bc622d92fb1d",
+  "gate_code_commit": "b187cdd2ffc3225474006d28c1dca3eca591351d",
+  "branch": "phase8/tmc-drive-config",
+  "repo": "https://github.com/LINboss666/ns800-stepper-safety",
+  "approval_status": {
+    "board_b_package_approved": false,
+    "note": "任务书 §2/§9：本包执行批准尚未取得；CP0 通过不构成批准。批准文字由用户实际发出后才进入 CP1-CP4。",
+    "prior_board_a_approval_does_not_cover_this_package": true
+  },
+  "scope_statement": "本轮全部离线：读文件/核散列/提取并自检采集器/建仓外下载副本与隔离目录。不供电、不连接、不下载、不复位、不发目标命令、不扫设备、不重编 Keil。",
+  "firmware_changed": false,
+  "production_changed": false,
+  "builds_executed": [],
+  "hardware_actions": [],
+  "keil_invoked": false,
+  "serial_or_probe_touched": false,
+  "inputs_verified_against_task_book_section_3": {
+    "method": "磁盘字节直算 SHA-256 与任务书 §3 记录逐条比较；不重新转换、不重编凑哈希",
+    "download_bin": {
+      "path": "reports/firmware/phase8-target-measurement-a0-export-r1/measure-a0.bin",
+      "bytes": 261452,
+      "sha256": "5f30d3f058ceff516b2185aa3a1e597bbe63293b94a6fd801fd989a6f7b2b8e6",
+      "expected_sha256": "5f30d3f058ceff516b2185aa3a1e597bbe63293b94a6fd801fd989a6f7b2b8e6",
+      "match": true,
+      "downloaded": false
+    },
+    "default_bin_identity_only": {
+      "path": "reports/firmware/phase8-target-measurement-a0-export-r1/default.bin",
+      "bytes": 251148,
+      "sha256": "02e984583255f3414f43fb5c077dc9ba82eba98553d2cb9d7f7feee9336ebd80",
+      "expected_sha256": "02e984583255f3414f43fb5c077dc9ba82eba98553d2cb9d7f7feee9336ebd80",
+      "match": true,
+      "downloaded": false
+    },
+    "gate": {
+      "path": "tests/host/a0_export_gate.py",
+      "bytes": 50246,
+      "sha256": "94e8317577a0fd8f6fd2bccafc0bb16753f3fb900c1adc7d254ee57cf3898c7d",
+      "expected_sha256": "94e8317577a0fd8f6fd2bccafc0bb16753f3fb900c1adc7d254ee57cf3898c7d",
+      "match": true,
+      "git_blob_at_gate_code_commit": "0c599487072419a5e3494158d8ca694ff4e6be89"
+    },
+    "axf": {
+      "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/build/a0/rt-thread-a0.axf",
+      "bytes": 1675944,
+      "sha256": "8b95464e9f687096168f3fd9a182feb559a55452506202ff35a8e73df2b1b959",
+      "expected_sha256": "8b95464e9f687096168f3fd9a182feb559a55452506202ff35a8e73df2b1b959",
+      "match": true,
+      "reconverted": false
+    },
+    "payload_extent": {
+      "bin_bytes": 261452,
+      "hex_len": "0x3fd4c",
+      "expect_len": "0x3fd4c",
+      "end_exclusive": "0x803fd4c",
+      "match": true
+    },
+    "build_stamp_read_from_bin_offline": "Oct 26 2026 + 20:57:05 (NUL 分隔), 仅作启动旁证",
+    "board_current_image_identity_carried_forward": "261100 B 358fd81ae5853ea52df1e1ab367ea41af0f5e86679082a755c17dac3429b0e1b (上一轮回读; 本轮未连接设备; 新 5f30d3f0… 尚未下载)"
+  },
+  "four_safety_macros": [
+    {
+      "name": "MOTOR_HARDWARE_ENABLE_PATH_VALIDATED",
+      "site": "motor.h:69",
+      "value": "RT_FALSE"
+    },
+    {
+      "name": "STEP_DIAG_ISOLATED_ENV_CONFIRMED",
+      "site": "motor.h:83",
+      "value": "RT_FALSE"
+    },
+    {
+      "name": "SAFETY_LIMIT_INPUTS_ENABLED",
+      "site": "project_board.h:51",
+      "value": "RT_FALSE"
+    },
+    {
+      "name": "TMC_DRIVE_CONFIG_HW_VALIDATED",
+      "site": "tmc2209.h:100",
+      "value": "RT_FALSE"
+    }
+  ],
+  "existing_recovery_material_local_only": {
+    "flash_snapshot_before_a_b": "各 1048576 B, sha256 b89f8a7cde7b944a…（本轮磁盘直算一致）",
+    "restore_hex_two_copies": "各 3014958 B, sha256 b3ac97b976bc4765…（本轮磁盘直算一致）",
+    "restore_download": "NOT_EXECUTED",
+    "caveat": "文件存在且哈希相同不证明恢复下载已演练；外部 SPI Flash 内容与全板运行状态未备份"
+  },
+  "collector": {
+    "extraction": "python 从任务书 MD 的 ```powershell 围栏里切正文, encode(ascii)+write_bytes; 未用 > / Set-Content / Out-File 转存",
+    "bytes": 19432,
+    "sha256": "521d758b2cae3eaca5acfda0c705149f9980fc1ba31873866bad6ebe8bec0fdd",
+    "matches_task_book": true,
+    "non_ascii_bytes": 0,
+    "crlf_bytes": 0,
+    "repo_copy": "reports/reviews/phase8-target-measurement-a0-board-b/A0BoardB.ps1",
+    "repo_copy_identical_to_work_copy": true,
+    "source_modified_by_agent": false,
+    "filled_parameters_only": [
+      "运行参数路径",
+      "ProbeUID（执行阶段才用, 未写入仓库）"
+    ]
+  },
+  "gate_frozen_copy": {
+    "path": "WORK_OUT\\freeze\\a0_export_gate_R3.py",
+    "bytes": 50246,
+    "sha256": "94e8317577a0fd8f6fd2bccafc0bb16753f3fb900c1adc7d254ee57cf3898c7d",
+    "git_object": "b187cdd2ffc3225474006d28c1dca3eca591351d:tests/host/a0_export_gate.py",
+    "match": true,
+    "identical_to_worktree": true
+  },
+  "tooling": {
+    "keil_uv4_product_version": "5.43.1.0",
+    "pyocd_version": "0.45.1",
+    "python_version": "3.12.5",
+    "powershell_version": "5.1.26100.5074",
+    "dependencies_installed_or_upgraded": false,
+    "commander_help_flags": {
+      "has_no_config": true,
+      "has_dash_O": true,
+      "has_uid": true,
+      "has_target": true,
+      "has_frequency": true,
+      "sha256_of_help_text": "25f52a3bbe7aec29593537f9cee13fad14e50bcbbecc55549978baec3a817e61"
+    },
+    "commands_present": {
+      "savemem": true,
+      "loadmem": true,
+      "reset": true,
+      "status": true,
+      "exit": true
+    },
+    "options_present": {
+      "auto_unlock": true,
+      "connect_mode": true,
+      "resume_on_disconnect": true,
+      "enable_memory": true,
+      "read_code_from_elf": true,
+      "scan_all_aps": true
+    },
+    "dap_uid": "沿用上一轮本地既存日志的板载 DAP 序列号(48 位十六进制); 未重新列探针、未猜选第一个; 值不写入仓库",
+    "target_listing_evidence": {
+      "command": "python -m pyocd list --targets",
+      "why_no_probe_scan": "subcommands/list_cmd.py:97-105 走 list_targets 分支; :96 的 list_connected_probes() 只在 --probes 分支; :86 Session(None) 不带设备; commands/commander.py:58 _CONNECTIONLESS_COMMANDS 含 list"
+    }
+  },
+  "pure_memory_read_basis": {
+    "region_source": "coresight/coresight_target.py:76 RamRegion(name=\"Code\", start=0x00000000, length=0x20000000)",
+    "note_on_ram2": ":80 的 RAM2 @0x80000000 与 0x08000000 无关；上一轮 CAL-4 更正成立",
+    "savemem_decision": "commands/commands.py:628 flash_init_required 需 region.is_flash; RamRegion 为假 => 不进 flash.init(VERIFY/ERASE)，:635 直接 selected_ap.read_memory_block8",
+    "rc_semantics": "commander 进程退出码不作成败判据（该版本吞内部错误码）；判据=日志文本+落盘字节+SHA-256",
+    "elf_based_read_or_device_flash_algorithm_used": false
+  },
+  "collector_hard_prechecks": {
+    "parse_check": {
+      "method": "System.Management.Automation.Language.Parser::ParseFile",
+      "tokens": 3883,
+      "parse_errors": 0,
+      "rc": 0,
+      "output_sha256": "e7b060e9862c9211efbc80e4c5124901d06f76c616cc556cff9f586f3842dbbc"
+    },
+    "selftest": {
+      "command_form": "powershell.exe -NoProfile -File <采集器> -SelfTest -PythonExe <现有python.exe> -GateFile <冻结门副本> -OutDir <全新空目录>",
+      "rc": 0,
+      "stdout_verbatim": "BOARD-B-OFFLINE-SELFTEST PASS; device_actions=0",
+      "stdout_sha256": "fe95e5772b3a3f09b9d6adc04886cd9c2ed6fc7cb383306efbb3ea668c854c3c",
+      "stderr_bytes": 0,
+      "out_dir_was_new": true,
+      "ledger_wire_calls": [
+        0
+      ],
+      "device_kind_entries_in_ledger": [],
+      "covered": [
+        "原始/NUL/高位字节落盘逐字节回核",
+        "假串口下 clear/start/pin 三条全拒且 mock.Write=0",
+        "真实门健康正控 ALLOWED + NUL 负控 REJECT",
+        "非零 rc / 旧批 JSON / 缺 JSON / 缺 clear grant 都不放行"
+      ]
+    },
+    "note": "任务书 §4.4：云端只做过静态检查, 本机这两项是硬前置, 不能用云端 GO 代替"
+  },
+  "download_copy": {
+    "root": "BOARD_B_ROOT/download-b（全新；本轮未运行 Keil）",
+    "original_project": {
+      "uvprojx": {
+        "bytes": 231510,
+        "sha256": "efb5671345e1f3e747b00f8f02fe2f25fc4d2df30c4b6d88b820f3f391b929b0",
+        "line_endings": "CRLF",
+        "git_blob_bytes": 226016,
+        "git_blob_sha256": "ec9eed0e9d9998c38b5dd935ddaea7e74829c2a770272dfe0d675cc6fce4cc09",
+        "worktree_equals_blob_after_lf_normalize": true,
+        "matches_board_a_registered_original": true
+      },
+      "uvoptx": {
+        "bytes": 61950,
+        "sha256": "62d2d8f14afbeb1c45f2852cd357b0fee1a6e5ee1110d820d4213c6230387cf1",
+        "line_endings": "LF",
+        "git_blob_bytes": 61950,
+        "git_blob_sha256": "62d2d8f14afbeb1c45f2852cd357b0fee1a6e5ee1110d820d4213c6230387cf1",
+        "worktree_equals_blob_after_lf_normalize": true,
+        "matches_board_a_registered_original": true
+      }
+    },
+    "copy": {
+      "uvprojx": {
+        "bytes": 231472,
+        "sha256": "d53c62a32954f34f41e2fa12f1a854051554e14a7d06c309dd0a4abac5fce35f"
+      },
+      "uvoptx": {
+        "bytes": 61950,
+        "sha256": "62d2d8f14afbeb1c45f2852cd357b0fee1a6e5ee1110d820d4213c6230387cf1",
+        "byte_identical_to_original": true
+      },
+      "payload_copy": {
+        "bytes": 1675944,
+        "sha256": "8b95464e9f687096168f3fd9a182feb559a55452506202ff35a8e73df2b1b959",
+        "match": true
+      },
+      "changed_lines": [
+        [
+          51,
+          "OutputDirectory -> .\\dl\\"
+        ],
+        [
+          52,
+          "OutputName -> rt-thread-a0"
+        ],
+        [
+          83,
+          "AfterMake RunUserProg1 1 -> 0"
+        ],
+        [
+          85,
+          "AfterMake UserProg1Name 置空"
+        ]
+      ],
+      "second_target_untouched": true,
+      "original_files_unmodified": true
+    },
+    "changed_lines_vs_original": [
+      [
+        51,
+        "OutputDirectory -> .\\dl\\"
+      ],
+      [
+        52,
+        "OutputName -> rt-thread-a0"
+      ],
+      [
+        83,
+        "AfterMake RunUserProg1 1 -> 0"
+      ],
+      [
+        85,
+        "AfterMake UserProg1Name 置空"
+      ]
+    ],
+    "second_target_untouched": true,
+    "original_files_unmodified": true,
+    "used_for_compile": false,
+    "expected_copy_uvprojx_sha256_equals_board_a_copy": true,
+    "flm": {
+      "NS800RT7xxx_FlashBank1.FLM": {
+        "bytes": 55504,
+        "sha256": "1ae62260956fc7c7362d6e162fb80da19af3ca3363a8428fc72952f384fb7523",
+        "match": true,
+        "multiple_copies": null,
+        "copies_on_disk": 1,
+        "identical_copies": 1
+      },
+      "NS800RT7xxx_FlashBank2.FLM": {
+        "bytes": 55508,
+        "sha256": "aaa500121e431b3248b2536095a4fcb308bd99203ea50e2e2335b31eb3d8e04d",
+        "match": true,
+        "multiple_copies": null,
+        "copies_on_disk": 1,
+        "identical_copies": 1
+      }
+    },
+    "flm_all_match": true,
+    "keil_dlls": {
+      "CMSIS_AGDI.dll": {
+        "bytes": 2410776,
+        "sha256": "05c8cd29093ab6da2bcac8e38cf48b7eac7033547a731c00946dd57747d8884c"
+      },
+      "UL2CM3.dll": {
+        "bytes": 2535192,
+        "sha256": "7a5c69da8c3a2f95c78d238c8b1055cb1629d2b835984d5c2b0f9e811dcd3741"
+      }
+    },
+    "download_path": {
+      "pMon": "BIN\\CMSIS_AGDI.dll",
+      "flm_names_in_uvoptx": [
+        "NS800RT7xxx_FlashBank1.FLM",
+        "NS800RT7xxx_FlashBank2.FLM"
+      ],
+      "sIfile_empty": true,
+      "tIfile_empty": true,
+      "reset_and_run_label_found": false
+    },
+    "build_hooks_and_init_scripts_disabled": {
+      "aftermake_user_prog": "RunUserProg1 1->0 且 UserProg1Name 置空",
+      "beforemake_beforecompile": "原本即为 0（未改）",
+      "sIfile_tIfile_empty": true
+    },
+    "reset_and_run": {
+      "status": "UNPROVEN_OFFLINE",
+      "reason": "两份工程文件无可核对标签(grep 命中 0), 落在 Keil 私有位域 (CMSIS_AGDI 的 -O206)",
+      "mitigation": "CP2 用 connect_mode=halt + resume_on_disconnect=false; 真实核状态由 status 行与日志暴露, 按实际次数登记"
+    },
+    "flm_dll_loading_limitation": "配置文件本身不能单独证明 Keil 实际加载哪一份 DLL/FLM；本包不改动任何安装文件",
+    "pyocd_workdir": {
+      "path_created": "BOARD_B_ROOT\\pyocd-work-b",
+      "listing": [],
+      "forbidden_config_present": []
+    }
+  },
+  "package_limits_section_2": [
+    {
+      "action": "初始供电过程(USB 逻辑电源, 再开既有 24 V)",
+      "limit": 1,
+      "used_this_round": 0
+    },
+    {
+      "action": "新 A0 镜像下载调用(Keil -f, 不编译)",
+      "limit": 1,
+      "used_this_round": 0
+    },
+    {
+      "action": "下载后片内载荷回读 261452 B",
+      "limit": 1,
+      "used_this_round": 0
+    },
+    {
+      "action": "已知 DAP 的 pyOCD 会话(回读一次 + 主动复位一次)",
+      "limit": 2,
+      "used_this_round": 0
+    },
+    {
+      "action": "主动 SYSRESETREQ",
+      "limit": 1,
+      "used_this_round": 0
+    },
+    {
+      "action": "COM5 打开 115200/8N1 无流控 DTR/RTS 不激活",
+      "limit": 1,
+      "used_this_round": 0
+    },
+    {
+      "action": "spm trip(批1=1, 批2=16)",
+      "limit": 17,
+      "used_this_round": 0
+    },
+    {
+      "action": "motor_disarm(批3, off_attempt 正式入口)",
+      "limit": 1,
+      "used_this_round": 0
+    },
+    {
+      "action": "spm init(静止前置后; 会设置 DWT/DEMCR 位)",
+      "limit": 1,
+      "used_this_round": 0
+    },
+    {
+      "action": "spm clear_records(每批须门+关闭事实均通过)",
+      "limit": 3,
+      "used_this_round": 0
+    },
+    {
+      "action": "下一批开始(最终批后无第4批)",
+      "limit": 2,
+      "used_this_round": 0
+    },
+    {
+      "action": "完整成功路径串口命令总数",
+      "limit": 54,
+      "used_this_round": 0
+    }
+  ],
+  "tests_executed": [
+    {
+      "id": "cp0-input-identity",
+      "tool": "磁盘/工作树字节直算 SHA-256 vs 任务书 §3",
+      "result": "BIN/AXF/门/默认 BIN 四项全一致; 载荷跨度 0x3FD4C 一致; 构建戳 Oct 26 2026 20:57:05 离线读到",
+      "rc": 0
+    },
+    {
+      "id": "cp0-collector-extract",
+      "tool": "python 提取附录 + write_bytes（非 Set-Content）",
+      "result": "19432 B sha256=521d758b2cae… 与 §3 一致; 非 ASCII=0; CRLF=0",
+      "rc": 0,
+      "output_sha256": "a00be93606c82fcad828942f7ea31bb4dce4f95682f84b6bf1a2ee02d5767a4f"
+    },
+    {
+      "id": "cp0-parse-file-ast",
+      "tool": "Parser::ParseFile 语法检查",
+      "result": "TOKENS=3883 PARSE_ERRORS=0 => PARSE-OK",
+      "rc": 0
+    },
+    {
+      "id": "cp0-collector-selftest",
+      "tool": "A0BoardB.ps1 -SelfTest",
+      "result": "BOARD-B-OFFLINE-SELFTEST PASS; device_actions=0",
+      "rc": 0,
+      "output_sha256": "fe95e5772b3a3f09b9d6adc04886cd9c2ed6fc7cb383306efbb3ea668c854c3c",
+      "ledger_wire_calls": 0
+    },
+    {
+      "id": "cp0-tooling-offline",
+      "tool": "版本读取 + pyocd commander --help + 安装源码检索",
+      "result": "Keil 5.43.1.0 / pyOCD 0.45.1 / Python 3.12.5 / PS 5.1.26100.5074; 命令与 6 个选项都存在",
+      "rc": 0,
+      "output_sha256": "f7ac1999de797a5ef8ad44d2acad9139725ab803f83e4d9065f86c99f095cd50"
+    },
+    {
+      "id": "cp0-download-copy",
+      "tool": "仓外下载副本生成 + XML 差异 + FLM/DLL/隔离目录核对",
+      "result": "副本只 4 行差异; uvoptx 逐字节相同; FLM 与 §4.7 一致; pyocd 目录空; 原工程未改",
+      "rc": 0,
+      "output_sha256": "7a901ff1b9e01ddd17c48a57d0d49873a4b4d1d11f45c285b68fc42779c79883"
+    }
+  ],
+  "not_run_this_round": [
+    "Keil 编译或下载(UV4 未被调用)",
+    "A0/S1/S2/V1/V2/I-O/SD 固件主机链",
+    "任何串口/调试器/探针/设备操作",
+    "恢复下载演练",
+    "全片再备份"
+  ],
+  "first_failures_kept": [
+    {
+      "id": "CP0-F1",
+      "what": "把任务书 §4 的 ParseFile 检查片段当附录源码按 ASCII 写出 => UnicodeEncodeError(片段含中文占位符)",
+      "handling": "自写 ASCII 检查脚本, 按 §4.5 只填运行参数; 附录采集器本体一字未改"
+    },
+    {
+      "id": "CP0-F2",
+      "what": "工具取证脚本 import 了该 pyOCD 版本不存在的 pyocd.utility.mask.match_mask => ImportError",
+      "handling": "改为只读安装源码; 不构造 Target、不连设备"
+    },
+    {
+      "id": "CP0-F3",
+      "what": "准入检查把\"工作树原始字节==cd8d9f09 blob\"当条件, 而 uvprojx 在树里是 CRLF、blob 是 LF(autocrlf) => 假 ABORT",
+      "handling": "改用 LF 归一比较 + 新增与 BOARD-A 登记原值的连续性核对; 未放宽任何输入判据(AXF/BIN/门仍按原始字节直算)"
+    },
+    {
+      "id": "CP0-F4",
+      "what": "工件归档首版把 0 字节文件写成非 base64 文本 => 复算解码失败",
+      "handling": "空块改为显式注释行; 12 个块现逐块复算(长度+SHA-256)一致"
+    }
+  ],
+  "de_identification": {
+    "rule": "仓库内只出现代号 + 相对路径：PROJECT_ROOT/BSP/WORK_OUT/BOARD_B_ROOT/KEIL_ROOT/PY_SITE_ROOT/PYTHON_EXE/GATE_FROZEN_COPY；完整代号→本机路径映射留在仓外 local_path_index.json；探针 UID 与用户名不入库；转换是纯字符串替换, 所有散列按原始字节直算",
+    "residual_scan": "生成器末尾按\"盘符+用户目录\"形状、仓外板级目录名、本机用户名三种模式硬检查 => 0 命中(见函数末尾 RESIDUAL 输出)",
+    "artifacts_are_not_wire_capture": "cp0_selftest_artifacts.md 里 12 块全部是离线夹具与门输出, 不称 wire 原字节, 也不称无损"
+  },
+  "evidence_files": [
+    "reports/reviews/phase8-target-measurement-a0-board-b/cp0_offline_precheck.txt",
+    "reports/reviews/phase8-target-measurement-a0-board-b/A0BoardB.ps1",
+    "reports/reviews/phase8-target-measurement-a0-board-b/cp0_selftest_artifacts.md"
+  ],
+  "evidence_identities": [
+    {
+      "path": "reports/reviews/phase8-target-measurement-a0-board-b/cp0_offline_precheck.txt",
+      "bytes": 13641,
+      "sha256": "5c060599094a3312487ac5619f46caebacc88418036d5aa04cd3a48bca6c143d"
+    },
+    {
+      "path": "reports/reviews/phase8-target-measurement-a0-board-b/A0BoardB.ps1",
+      "bytes": 19432,
+      "sha256": "521d758b2cae3eaca5acfda0c705149f9980fc1ba31873866bad6ebe8bec0fdd"
+    },
+    {
+      "path": "reports/reviews/phase8-target-measurement-a0-board-b/cp0_selftest_artifacts.md",
+      "bytes": 19237,
+      "sha256": "c319274592cfd03a2c709fb66818ac7f03857e7b61b45452907e9451cc9227db"
+    }
+  ],
+  "still_open": [
+    "B-1",
+    "BUG-008",
+    "RISK-03",
+    "RISK-03a",
+    "物理 RISK-04-b",
+    "M-1",
+    "M-2",
+    "M-3",
+    "外部时基/时钟证明",
+    "恢复下载未演练",
+    "外部 SPI Flash 与全板状态未备份",
+    "A0 时长证据 NOT_ACHIEVED（需本包执行）",
+    "板上仍是旧 358fd81a… 载荷",
+    "sw1_cut.ps1 的 T-01/T-02 仍 HOLD"
+  ],
+  "next_step": "等用户对本整包的一次批准（任务书 §9 原话）。批准后按 CP1→CP2→CP3→CP4 顺序执行, 包内不逐条再问；前置失效、真实失败或需越界改动即停并保存证据。",
+  "stop_claim": [
+    "A0_BOARD_B_CP0_READY / AWAITING_BOARD_B_PACKAGE_APPROVAL",
+    "NO HARDWARE EXECUTED / IMAGE_NOT_DOWNLOADED / BOARD_STILL_RUNNING_358fd81a",
+    "NO BUILD / NO FLASH READ / NO PROGRAM / NO RESET / NO SERIAL / NO MOTOR / NO STEP_ENABLE",
+    "FOUR SAFETY MACROS RT_FALSE"
+  ]
+}
