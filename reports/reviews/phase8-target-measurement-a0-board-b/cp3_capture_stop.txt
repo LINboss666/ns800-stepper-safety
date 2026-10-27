@@ -63,11 +63,11 @@ document_base 358e1ca…; CP0 提交 7c5eada…; CP1/CP2 提交 587c8fa…; 本 
   "msh" 在原始字节里只出现 1 次(偏移 489 B), 且其后紧跟的是别的线程的一行, 提示符尾部 ">" 没出现在流里:
       原文片段: b'start\r\r\nmsh [SAFETY] init OK - MCU_DRV'
   提示符本身的定义(只读核源): rt-thread shell.c:93  #define _MSH_PROMPT "msh ",
-    shell.c:120-121 在 rt_strlen(finsh_prompt)+2 < RT_CONSOLEBUF_SIZE 时才追加 ">";
+    shell.c:120 判 rt_strlen(finsh_prompt)+2 < RT_CONSOLEBUF_SIZE, :122 才追加 ">";
     所以正常提示符字节是 "msh >"。这里只看到 "msh " —— 同一个窗口里有 3 个 NUL 且行长被剪到 128 附近,
     与已登记的并发 rt_kprintf/RT_CONSOLEBUF 128 截断副作用同型; 本轮不把它写成已证实的单一线程竞争。
   更决定的一点(不依赖上面那条归因): 提示符落在偏移 489 B, 其后还有约 3268 B 阶段输出, 末行是
-    "[BB] session 1 written (101 frames), last_err=0"。而 Wait-Prompt 的判据是 A0BoardB.ps1:83
+    "[BB] session 1 written (101 frames), last_err=0"。而 Wait-Prompt 的判据是 A0BoardB.ps1:81(抛错在 :84)
     "行首或换行后的 msh > 且后面只剩空白/换行(即到接收尾部)" + 120 ms 静默 => 启动期提示符既不在流尾,
     复位后固件也不会再自发打印第二次。
   => 该判据永远不成立, 到 20 秒合并上限即抛 "Reply timeout; no retry and no cleanup.";

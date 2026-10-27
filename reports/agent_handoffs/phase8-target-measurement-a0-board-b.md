@@ -135,14 +135,27 @@ R3 两组问题（分类前的原始字节完整性、`%u` 打印提升被当成
 | 被动 2 秒观察 | `001_open_passive.rx.bin` 194 B 高熵非文本字节（3 个 NUL、无 CR、97 个 >0x7F），不是 RT-Thread 文本 ⇒ 采集器按 §7 走主动复位。**成因未证**，登记为未观察清楚的事实，原件在归档内可逐字节复算 |
 | 启动窗口 | `002_boot.rx.bin` 3757 B / `97b37f32…`；构建戳逐字 `5.3.0 build Oct 26 2026 20:57:05` = 新镜像旁证；阶段 1–11 全打印，终态 `[MAIN] boot complete but state=FAULT_LATCHED fault=8`、`[Motor] arm gate fail mask=0x1B (arm REFUSED)`、`[TMC]/[ADC] DEGRADED` |
 | 停止点 | **`Wait-Prompt` 超时** ⇒ `STOP_FAILURE "Reply timeout; no retry and no cleanup."`，采集器 rc=1，`finally` 已关串口。启动窗口里 `msh >` 出现 **0** 次：`msh` 只在偏移 489 B 出现一次且尾部 `>` 未落到流里，其后还有约 3.3 KB 阶段输出 ⇒ 提示符既不在流尾、复位后也不会自发打印第二次 |
-| 根因（有对照，不靠猜） | ① 既存已证材料同型：BOARD-A 旧镜像 `02_boot.txt`（3762 B）里 `msh >` 同样 0 次、末行同为 `[BB] session 1 written`；② BOARD-A 采集器把 `msh >` 只用作**发出命令之后**的响应结束标记（`cp4_run.ps1:101`，另有 1200 ms 静默兜底），其真实回复 `cmd_100_boot_free.txt` 尾部确有 `msh >`；③ 附录采集器 `A0BoardB.ps1` 在复位后、**TX 计数为 0** 时要求先看到行尾提示符 ⇒ 与本板既证行为矛盾。固件侧提示符定义为 `"msh "` + `>`（shell.c:93、:120-121），形状本身没错，错在"必须自发出现在流尾"这个前提 |
+| 根因（有对照，不靠猜） | ① 既存已证材料同型：BOARD-A 旧镜像 `02_boot.txt`（3762 B）里 `msh >` 同样 0 次、末行同为 `[BB] session 1 written`；② BOARD-A 采集器把 `msh >` 只用作**发出命令之后**的响应结束标记（本地既存材料 `RAWDATA/cp4_run.ps1:101`，另有 1200 ms 静默兜底），其真实回复 `cmd_100_boot_free.txt` 尾部确有 `msh >`；③ 附录采集器 [A0BoardB.ps1:81](file:///D:/ns800/reports/reviews/phase8-target-measurement-a0-board-b/A0BoardB.ps1#L81) 在复位后、**TX 计数为 0** 时要求先看到行尾提示符（抛错在 :84）⇒ 与本板既证行为矛盾。固件侧提示符形状本身没错：`"msh "`（[shell.c:93](file:///D:/ns800/rt-thread-master/rt-thread-master/components/finsh/shell.c#L93)）在 [shell.c:120](file:///D:/ns800/rt-thread-master/rt-thread-master/components/finsh/shell.c#L120) 判长度后由 :122 追加 `>`，错的是"必须自发出现在流尾"这个前提 |
 | 判定 | 附录采集器启动门缺陷；**不是**设备失败、**不是**采集门（完整性合同）失败、**不是**镜像问题。按任务书 §4.5/§7 停在 CP3，不在本地改附录核心逻辑后自行跳过复审 |
 | 本轮实际消耗 | 供电 1/1、下载 1/1、载荷回读 1/1、pyOCD 会话 **2/2**、主动复位 **1/1**、COM5 **1/1**；串口命令 **0/54**、trip 0/17、disarm 0/1、stop/dump 0/3、clear 0/3、下一批 0/2、`spm init` 0/1 ⇒ **COM5/复位/会话三项已用满，本包无法再续跑 CP3** |
 | 未做（全部保持） | 任何目标命令与门判定、clear/dump/trip/disarm、STEP 使能、DIR 变更、许可 HIGH、arm/start/ramp、电机接线、四宏启用、构建、第二次下载、恢复下载演练、设备枚举、`sw1_cut.ps1` |
 | 时长证据 | 仍 **NOT_ACHIEVED**：一条 47 列记录都没采到，也没有 ACCEPT/REJECT 发生；`ps` 栈高水位、cycles 统计全部 `NOT_OBTAINED`，不补造 |
 | 本轮新增首失败 | `CP3-F1` 启动门不可满足（上表）；`CP3-F2` 我的包装脚本 `cp3_run.py` 用 UTF-8 + `errors='replace'` 收 PowerShell 的 OEM/GBK stderr ⇒ 本地化错误文本字节被替换字符吃掉、不可复原（ASCII 抛错文本与行号完整；采集器自己落盘的 wire/台账不经过这次解码，仍逐字节可复算）。只登记不修补历史 |
 
-## 10. STOP
+## 10. 本轮收口时自查出的两处登记缺陷（勘误，不改写历史）
+
+- **勘误 E1（CP0 遗留的字节登记错误）**：`evidence_identities` 里 `cp0_selftest_artifacts.md` 曾登记为
+  `19237 B / c3192745…`，而该文件自 CP0 提交 `7c5eada` 起的真实字节一直是 `19236 B / 93898d96…`
+  （工作树、`7c5eada` 的 blob、`HEAD` 的 blob 三处一致，且该路径只有这一个提交）。
+  成因是登记发生在提交前的重新生成之前，登记值没跟着更新。影响面：只错在 handoff JSON 的一个字段，
+  全仓 grep `19237` 与 `c3192745` 均 0 命中，没有任何证据文本引用过该错值；采集器/门/镜像的判据字节不受影响。
+  处置：按当前提交字节重算登记 + 本节公开差异；**未删除或重做已发布产物，也未回收旧提交**。
+- **本轮内纠正的两处引用行号（提交前修正，非历史勘误）**：`shell.c` 追加 `>` 的行号原写 `:120-121`，
+  实为 [shell.c:120](file:///D:/ns800/rt-thread-master/rt-thread-master/components/finsh/shell.c#L120) 判长度、
+  :122 追加；`A0BoardB.ps1` 的 Wait-Prompt 判据行原写 `:83`，实为 :81（抛错在 :84）。
+  证据文件因此重生成一次（`cp3_capture_stop.txt` 15866→15880 B），JSON 身份同步更新。
+
+## 11. STOP
 
 ```
 A0_BOARD_B_CP3_STOPPED / AWAITING_INDEPENDENT_BOARD_EVIDENCE_REVIEW

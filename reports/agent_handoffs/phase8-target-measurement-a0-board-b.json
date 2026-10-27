@@ -636,8 +636,8 @@
     },
     {
       "path": "reports/reviews/phase8-target-measurement-a0-board-b/cp0_selftest_artifacts.md",
-      "bytes": 19237,
-      "sha256": "c319274592cfd03a2c709fb66818ac7f03857e7b61b45452907e9451cc9227db"
+      "bytes": 19236,
+      "sha256": "93898d96d83483b90ea123074c9e577b56e629e4533dfe6b207f7d964f40f90c"
     },
     {
       "path": "reports/reviews/phase8-target-measurement-a0-board-b/cp1_cp2_download_readback.txt",
@@ -646,8 +646,8 @@
     },
     {
       "path": "reports/reviews/phase8-target-measurement-a0-board-b/cp3_capture_stop.txt",
-      "bytes": 15866,
-      "sha256": "2355fdc3fe0ee5f8e8dde879bd9138936d89dd6c4ab18c54ef6a7c8ae7bf2e83"
+      "bytes": 15880,
+      "sha256": "b19a6e81a57ae86a9485b6021046bc48bcaca8b536b3c24cde0eb001b135187a"
     },
     {
       "path": "reports/reviews/phase8-target-measurement-a0-board-b/cp3_wire_archive.md",
@@ -890,7 +890,7 @@
           "shows": "上一轮判据 'msh\\s*/?>\\s*$' 作用在已 WriteLine(\\$cmd) 之后的累积响应上, 另有 1200 ms 静默兜底, 即先发命令、提示符当响应结束标记"
         },
         {
-          "file": "rt-thread shell.c:93 + :120-121",
+          "file": "rt-thread shell.c:93 + :120 判长度 / :122 追加 >",
           "shows": "提示符字节定义为 \"msh \" 追加 > => 形状没错, 错在\"必须自发出现在流尾\"的前提"
         }
       ],
@@ -918,5 +918,26 @@
     "request_issued_in_this_round": "请现场操作者先关 24 V, 再拔 USB, SW1 保持阻断位",
     "final_power_state": "UNKNOWN(等操作者实际回报; 未回报前不写成已断电)",
     "recorded_at_is_not_power_off_time": true
-  }
+  },
+  "identity_errata": [
+    {
+      "id": "E1",
+      "found_in_round": "phase8-target-measurement-a0-board-b (CP3 收口时的身份复核)",
+      "path": "reports/reviews/phase8-target-measurement-a0-board-b/cp0_selftest_artifacts.md",
+      "registered_in_cp0_handoff": {
+        "bytes": 19237,
+        "sha256": "c319274592cfd03a2c709fb66818ac7f03857e7b61b45452907e9451cc9227db"
+      },
+      "actually_committed_and_still_committed": {
+        "bytes": 19236,
+        "sha256": "93898d96d83483b90ea123074c9e577b56e629e4533dfe6b207f7d964f40f90c"
+      },
+      "commits_touching_the_file": [
+        "7c5eada832780190348e614b6d960d261af6356c"
+      ],
+      "assessment": "登记值早于最终提交: 该文件在 CP0 提交(7c5eada)之前被重新生成过, 但 JSON 里的身份仍取重生成前的值; 自 7c5eada 起工作树/该提交/HEAD 三处字节完全一致(19236 B / 93898d96d83483b9), 没有已发布产物被删后重做, 也没有第二份同名产物",
+      "blast_radius": "只影响 handoff JSON 的 CP0 登记字段; 没有任何仓内证据文本引用过该错值(全仓 grep 19237 与 c3192745 均 0 命中), 采集器/门/镜像等判据字节不受影响",
+      "handling": "evidence_identities 现按当前提交字节重算并登记本勘误; 不回收旧提交、不改写历史"
+    }
+  ]
 }
