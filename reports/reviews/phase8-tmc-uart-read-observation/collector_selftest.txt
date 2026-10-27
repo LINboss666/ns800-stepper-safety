@@ -1,0 +1,87 @@
+URO collector — UARTReadDiagSerial.ps1 离线自检(Windows PowerShell 5.1 真实执行)
+================================================================================
+文件 : reports/reviews/phase8-tmc-uart-read-observation/UARTReadDiagSerial.ps1
+       bytes=37063  sha256=2ada6b88a0631ceeff1e9f890466e96e55180031c5831a8b5859c114366d349d
+       非 ASCII 字节数 = 0(整份纯 ASCII; 生成器里带"必须纯 ASCII"断言, 因为 PS 5.1 会把
+       无 BOM 的 UTF-8 中文按 GBK 解码并吞掉后续字节 —— 既有已记录的假语法错误来源)
+本轮**只跑离线自检**: -SelfTest; 在线模式 -ExecuteApprovedUroReadDiag 未执行, 设备动作 0。
+
+1. 语法门(与自检分开, 两者都必须真过)
+--------------------------------------------------
+PS 版本 5.1.26100.5074 (Desktop, CLR 4.0.30319.42000)
+[Parser]::ParseFile 错误数 = 0
+[Parser]::ParseInput 错误数 = 0, token 数 = 4469
+声明口径: "Parse 无语法错误" 不等于自检通过, 两者分别记录。
+
+2. 传输层是"复用"而不是"再写一遍"(逐函数比对, 由生成器在写盘后自验)
+--------------------------------------------------
+冻结原件: reports/reviews/phase8-motor-m0-uart-diagnosis/M0Serial.ps1
+          24064 B / sha256 2131af0ef32b0d9acb3a2a0489d47b90e26968e2fedd7c4ee4624fede0687e3f
+          (git blob 6988501a2e19ebe4060ed6602b3dc81c8194463e, 同长度 24064 => 无换行归一差异)
+逐函数哈希比对结果(全部 IDENTICAL, 含结尾 `}`):
+  Note, Save-New, Begin-Reply, Persist-Chunk, Drain-Rx, End-Reply, Wait-Prompt, Send-Tx,
+  Cmd, Need, Idle-Status, Wait-ReadOnlyProbeWindow, One-Line, Make-Response,
+  Fixture-Responses 以及全局设置块与 finally 块 —— 共 16 项全部逐字节相同。
+本轮有意改动的只有: 模式开关与参数名、第 7 条应答的检查器、两条第 7 应答夹具、
+构建横幅改为**必填形状**参数、新增 no-reset 检查、离线自检集合。
+=> 没有第二套串口层被手写, 也没有改动既有传输语义(限流、逐块落盘、缺提示符即停不补发)。
+
+3. 夹具来源(必须是被测固件自己会发的字节)
+--------------------------------------------------
+第 1~6 条应答夹具 = 上一轮 M0 已审的六段 base64 原文, 逐字照抄(未改一个字节)。
+第 7 条(tmc_uart_probe)两条夹具 = **本轮最终生产字节**跑出的主机 probe 输出切片:
+  由仓外脚本对 host_ovr 变体执行 `read_obs` 取原始文本, 再按逐字节切片入库;
+  重新构建并复跑同一命令的输出与夹具源文本 **byte-identical**(diff 为空), 因此夹具没有过期。
+  健康夹具 END 行 = reads=3; 超时夹具 END 行 = reads=1。
+启动流夹具 = 真实板级 001_attach_passive.rx.bin, 3757 B / sha256 97b37f32aa03c86b8708ae088d0ae65a8f92520f1a1ed70beb74663049321749
+  (自检里逐字节回放到 mock 线上, 收尾哈希与源件一致, 且期间一条命令都不发)。
+
+4. 本次真实执行(退出码 0)
+--------------------------------------------------
+命令形状: powershell -NoProfile -ExecutionPolicy Bypass -File <采集器> -SelfTest
+          -OutDir <仓外空目录> -BootFixture <真实启动流 3757 B>
+stdout 原文:
+  URO-OFFLINE-SELFTEST PASS; device_actions=0; mock_commands=7; negative_controls=23; forbidden_blocked=12
+stderr 字节数 = 0
+生成 9 个逐命令 rx 件 + session.rx.bin + ledger.jsonl, 台账 58 条事件:
+  MOCK_TX_ATTEMPT=7, NEGATIVE_CONTROL=23, URO_COMMAND_CHECKED=7, RX_BEGIN=9, RX_FILE=9,
+  READ_ONLY_PROBE_READY=1, URO_SLICE_VERDICTS=1, OFFLINE_SELFTEST=1
+产物身份(名称/字节/sha256, 供独立复算):
+  001_attach_passive.rx.bin        3757  97b37f32aa03c86b8708ae088d0ae65a8f92520f1a1ed70beb74663049321749
+  002_spm_status.rx.bin             146  656db378732c4de39ce081339a6852b9995987253074dcceaacf5a8de3916339
+  003_spm_cap.rx.bin                339  c7c5a79549aeb8852575164d7b183123876ed09eb684b76f78a5c9acdb9a50b4
+  004_safety_state.rx.bin            67  95016978f6ac1e673a7cb0a676002e3c1df55f59f8770c810dd4c073e9cd2025
+  005_safety_status.rx.bin          475  847aba88e20e2a4e220d1ca69cbaf5ef07975619af232caf0cc2b66b45990d7c
+  006_motor_status.rx.bin           891  4d33ed91adb095e1642e91e9f5a926daceaca6f1a5aa0c85719a2ce070b549f5
+  007_step_status.rx.bin            268  7c74b48da1ea7302454aeb9c2944d2384cb3a655841b92a8d516338a0b78ea37
+  008_tmc_uart_probe.rx.bin        2057  ab7d5d834a8ba8a38c99ef5b49fecf81170c38a14185048a4bdf3b855d4cd34a
+  009_negative_missing_prompt.rx.bin 132  d8d15b9c540d100ef3ef52d01034f4ac54c56981e3cec5adc0e382afb026ba2c
+  ledger.jsonl                     8676  1a1967c097de7db3ce64298477b251baf212e714f905026652adf3242fd55771
+  session.rx.bin                   8132  32a65aaecc333775cdd1479e22068a90581dfeb5744e23d48aa97b3990c1db09
+(输出目录必须是新建/空目录, 自检日志写在**目录外**, 以免与之冲突; 这条本身也是采集器的硬前置。)
+
+5. 关键判据: 观测完整 ≠ 通信成功(本轮新增的第 7 条应答按两种结论分别判)
+--------------------------------------------------
+台账 URO_SLICE_VERDICTS 原文:
+  {"healthy": "COMPLETE/SUCCESS", "timeout": "COMPLETE/FAIL", "timeout_reads": 1, "tmro_lines": 36}
+含义: 同一条 probe 应答, 即使业务读全部超时(reads=1、link=UNPROVEN), 只要
+  observation_complete=1 且 writes=0 且 export_err=0 且无 NUL、每条 [TMRO] 行都以 CRLF 收尾,
+  采集面就判 COMPLETE(诊断价值达成), 业务面单独判 FAIL —— 两者不得互相顶替。
+23 条负控覆盖: 缺提示符、缺 END 行、END 计数不一致、出现 WRITE 帧、export_err 非 0、
+  [TMRO] 行含 NUL、行未终结、safe_for_enable 非 0、前置 armed/HIGH 或宏非 0、
+  伪造 result=SUCCESS、把超时切片写成成功、写帧数篡改等; 每条被拒后**仍然保留字节**,
+  不补发、不清理(与 M0 同一口径)。
+被拦的 12 条禁止命令(自检里逐条尝试发送, 全部由 Send-Tx 白名单拒绝, 且 mock 线写入次数保持 0):
+  motor_arm / motor_start / motor_disarm / fault_reset / tmc_config_apply CONFIRM /
+  spm trip / spm clear_records / spm init / pin 87 1 / tmc_config_show / tmc_scan / spm start 100
+
+6. 与任务书 §7 要求的差异登记(如实, 不改口径)
+--------------------------------------------------
+- 复用件 One-Line 抛的前缀仍是 `M0_OBSERVATION_REJECTED:`(逐字节复用, 未改), 因此
+  Expect-Rejected 同时接受 `URO_*` 与 `M0_OBSERVATION_REJECTED:` 两种前缀, 并在文件注释里写明;
+  这不放宽任何判定 —— 未匹配任一前缀仍按"意外异常"直接上抛。
+- 在线模式还要求 -ApprovalSource(批准来源原文)与 -ExpectedBuildBanner(必须匹配
+  `5\.3\.0 build …` 形状, 值取自本轮 manifest 的横幅)以及镜像连续性/现场确认开关;
+  本轮这些参数**没有被使用过**, 因为不执行在线模式。
+- 本自检证明的是"采集器逻辑与夹具一致", 不能推出"板级一定能拿到该形状的输出"; 真机取数
+  仍需操作者授权后执行。

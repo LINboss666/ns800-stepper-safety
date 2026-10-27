@@ -1,0 +1,696 @@
+{
+  "task_id": "phase8-tmc-uart-read-observation",
+  "document_base": "a691eb5c4b5a3e5d639ac9e231ce0920967798de",
+  "source_base": "a691eb5c4b5a3e5d639ac9e231ce0920967798de",
+  "code_commit": "ab76a07b5d48dbd8c7ee9ff6dea0c9bf90fcc5d4",
+  "code_commit_what": "产品(tmc2209.c)与夹具/runner 定稿字节; 两枚镜像的输入即此提交",
+  "verification_chain_commit": "fb1a72e710c07ecf07aa432e0a3c74fa13c116d6",
+  "verification_chain_why": "首轮集中回归暴露: probe 打印文本改 ASCII 短行后, tests/host/inject.py 的 probe_writeback 锚点命中 0 次 => run_negatives N9/N10/N10b 与 run_meta_negatives M1/M1_ctl 记 INFRA-FAIL(rc=4), 不是检出。该文件不在任务书 §10.1 三条白名单内, 属额外改动, 单列披露; 它不是任何镜像的输入, 也未新建 Python/CSV 完整性门。",
+  "accepted_upstream_reviews": [
+    {
+      "id": "M0 板级证据独立复审",
+      "verdict": "ACCEPTED_WITH_READ_TIMEOUT",
+      "source_level": "外部审核方(用户附件转达), 非云端实测",
+      "ref": "a691eb5 登记, 勘误 M0-E1/E2/E3"
+    },
+    {
+      "id": "CP6 独立复审",
+      "verdict": "SOFTWARE_REVIEW_GO",
+      "source_level": "外部审核方(用户附件转达)",
+      "ref": "既往轮次登记"
+    }
+  ],
+  "user_confirmed_field_facts": {
+    "power_wiring_expansion_board": "USER_CONFIRMED(用户口头确认, 非云端实测): 供电正常/接线正常/扩展板线路正常",
+    "not_to_re-request": [
+      "供电说明",
+      "断电顺序回报",
+      "扩展板整体照",
+      "接线两端照"
+    ],
+    "ENN_direction": "本轮不沿 ENN 方向排查 UART 超时, 也不提议改变 ENN 电平作对照",
+    "final_power_state": "UNKNOWN(允许保持, 不为此连接设备)",
+    "motor_nameplate_and_current_limit": "不是本轮或下一次只读观测包的前置"
+  },
+  "production_changed": true,
+  "python_gate_changed": false,
+  "verification_chain_files_changed": [
+    "tests/host/inject.py"
+  ],
+  "hardware_actions": [],
+  "device_actions_this_round": 0,
+  "budget_constants_changed": false,
+  "fixes": [
+    {
+      "id": "URO-F1",
+      "what": "RX 阶段期限锚点",
+      "before": "eff_end = b->start + min(stage_cap, total-used)  (阶段起点被提前到预算打开刻, flush/TX 耗时二次计费)",
+      "after": "eff_end = b->start + used + min(stage_cap, total-used)  (used 在 RX 阶段入口采样一次)",
+      "extra": "总预算耗尽单列前置分支返回; 期限比较全部改回绕安全无符号差; CRC 之后复核期限"
+    },
+    {
+      "id": "URO-F2",
+      "what": "每笔读事务观测(tmc_read_observation_t)接入同一份读 core, 由 probe 逐笔导出",
+      "size": "176 B/笔, 3 笔 528 B(夹具实跑 sizeof, 非估算)"
+    },
+    {
+      "id": "URO-F3",
+      "what": "probe 有界输出改用各条链共有的打印原语(rt_snprintf + rt_kprintf)",
+      "why": "rt_vsnprintf/rt_kputs 只在内核与部分 shim 存在, 公共 shim 缺失 => 首轮集中回归编译失败"
+    }
+  ],
+  "observation_layout": {
+    "type": "tmc_read_observation_t",
+    "sizeof_obs": 176,
+    "sizeof_three": 528,
+    "sizeof_xfer_stat": 48,
+    "cap_lines_bytes": 96,
+    "console_buf": 128,
+    "rx_pre_max": 32,
+    "rx_tail_max": 16,
+    "cand_max": 8,
+    "not_reached_rule": "result=NOT_REACHED 时 rc/reason 导出为 `-`, timing 行写 `timing=- (budget never opened)`, 不得以 rc=0/used=0 伪装成功",
+    "crc_states": [
+      "NOT_REACHED",
+      "FAIL",
+      "OK"
+    ],
+    "echo_states": [
+      "UNKNOWN",
+      "NONE",
+      "ONLY",
+      "WITHIN",
+      "OTHER"
+    ],
+    "stack_note": "观测对象是 probe 栈上局部; 整条调用链栈高水位未实测(FinSH 4096 B 只是配置值)"
+  },
+  "baseline_observation": {
+    "method": "同一份 deadline 探针(tmc_read_reg 真入口)分别编到 a691eb5 字节与最终字节, 仓外构建并运行",
+    "baseline_input": {
+      "bytes": 151478,
+      "sha256": "6a3b7c6d087210a93a8a849b080ce09b9131fa8b6153251e905a538f7cf077ff",
+      "how": "git show a691eb5:<路径> 逐文件取到仓外(含全部 .h, 保证副本自洽)"
+    },
+    "final_input": {
+      "worktree_bytes": 184766,
+      "worktree_sha256": "392d9aad422186c77e4fe2998eae7d3118c6fb8977ecff852406167d1d5df341",
+      "blob_bytes": 180848,
+      "blob": "a480960477f34a1a4cf2b4e206d842297aac445f"
+    },
+    "raw_lines": [
+      "INPUT|baseline|tmc2209.c|bytes=151478|sha256=6a3b7c6d087210a93a8a849b080ce09b9131fa8b6153251e905a538f7cf077ff",
+      "INPUT|baseline|matches-taskbook-a691eb5-blob=yes",
+      "PROBE-TAG|baseline|<仓外工作区>",
+      "BASELINE|URO01-healthy-immediate|rc=0|used=3|tx_written=4|rx_bytes=8|value=0x21000040|published=yes|read_reqs=1|write_frames=0|tx_bytes_on_wire=4|reply_ready_off=0|drain_ms=1|t0=100",
+      "BASELINE|URO02-healthy-prestage-reply-30|rc=0|used=31|tx_written=4|rx_bytes=8|value=0x21000040|published=yes|read_reqs=1|write_frames=0|tx_bytes_on_wire=4|reply_ready_off=30|drain_ms=5|t0=100",
+      "BASELINE|URO03-reply-at-110|rc=-117|used=100|tx_written=4|rx_bytes=0|value=0xA5A5A5A5|published=no|read_reqs=1|write_frames=0|tx_bytes_on_wire=4|reply_ready_off=110|drain_ms=5|t0=100",
+      "BASELINE|URO03b-reply-past-all-limits-126|rc=-117|used=100|tx_written=4|rx_bytes=0|value=0xA5A5A5A5|published=no|read_reqs=1|write_frames=0|tx_bytes_on_wire=4|reply_ready_off=126|drain_ms=5|t0=100",
+      "INPUT|final|tmc2209.c|bytes=184766|sha256=392d9aad422186c77e4fe2998eae7d3118c6fb8977ecff852406167d1d5df341",
+      "PROBE-TAG|final|<仓外工作区>",
+      "BASELINE|URO01-healthy-immediate|rc=0|used=3|tx_written=4|rx_bytes=8|value=0x21000040|published=yes|read_reqs=1|write_frames=0|tx_bytes_on_wire=4|reply_ready_off=0|drain_ms=1|t0=100",
+      "BASELINE|URO02-healthy-prestage-reply-30|rc=0|used=31|tx_written=4|rx_bytes=8|value=0x21000040|published=yes|read_reqs=1|write_frames=0|tx_bytes_on_wire=4|reply_ready_off=30|drain_ms=5|t0=100",
+      "BASELINE|URO03-reply-at-110|rc=0|used=111|tx_written=4|rx_bytes=8|value=0x21000040|published=yes|read_reqs=1|write_frames=0|tx_bytes_on_wire=4|reply_ready_off=110|drain_ms=5|t0=100",
+      "BASELINE|URO03b-reply-past-all-limits-126|rc=-117|used=115|tx_written=4|rx_bytes=0|value=0xA5A5A5A5|published=no|read_reqs=1|write_frames=0|tx_bytes_on_wire=4|reply_ready_off=126|drain_ms=5|t0=100"
+    ],
+    "uro03_pair": {
+      "baseline": "rc=-117 used=100 rx_bytes=0 published=no",
+      "fixed": "rc=0 used=111 rx_bytes=8 published=yes",
+      "meaning": "110 ms 到达的合法应答在基线被拒, 修后被接受并发布真实寄存器值"
+    },
+    "uro03b_pair": {
+      "baseline": "rc=-117 used=100",
+      "fixed": "rc=-117 used=115",
+      "meaning": "126 ms 仍拒绝 => 阶段未越过同一操作总预算, 合同上界未被放宽"
+    }
+  },
+  "tests_executed": {
+    "read_obs_group": {
+      "ids": [
+        "URO01-healthy-read-publishes-real-value",
+        "URO02-healthy-prestage-reply-inside-window",
+        "URO03-reply-at-110-accepted-by-fixed-deadline",
+        "URO04-stage-deadline-boundary-pair",
+        "URO05-total-budget-exhausted-before-rx-entry",
+        "URO06-lock-refusal-sends-nothing-and-releases-nothing",
+        "URO06b-zero-remaining-budget-does-not-even-attempt-lock",
+        "URO07-flush-limits-keep-flush-fact-tx-not-reached",
+        "URO08-tx-no-space-zero-written-rx-not-reached",
+        "URO09-partial-tx-keeps-real-written-count",
+        "URO10-expire-after-last-byte-keeps-written-four",
+        "URO11-rx-zero-bytes-not-claimed-as-echo",
+        "URO12-exact-four-byte-echo-only",
+        "URO13-wrong-header-or-wrong-reg-kept-as-raw-bytes",
+        "URO14-header-matched-short-frame",
+        "URO15-complete-frame-crc-error-keeps-eio",
+        "URO16-complete-legal-frame-rejected-only-by-total-deadline",
+        "URO17-long-stream-slide-counts-prefix-tail-truncation",
+        "URO18-tick-wraparound-uses-unsigned-deltas",
+        "URO19-probe-per-record-facts-and-early-exit",
+        "URO20-probe-stays-read-only-and-prints-after-txn-release",
+        "URO21-output-bounded-and-illegal-context-silent",
+        "URO22-observation-on-off-equivalent-on-same-input",
+        "URO22b-observation-never-invents-a-success"
+      ],
+      "target_ids_equal_host_ovr": true,
+      "host_ovr_summary": "SUMMARY|cases=24|pass=24|fail=0|pre_bad=0|skips=0",
+      "target_summary": "SUMMARY|cases=24|pass=24|fail=0|pre_bad=0|skips=0",
+      "executed_markers": {
+        "host_ovr": true,
+        "target": true
+      },
+      "in_both_variants_required_and_done": true
+    },
+    "s2_ledger": [
+      "target 汇总: 组=18 用例=47 PASS=47 FAIL=0 SKIP行=14 pre_bad=0 期望用例=47",
+      "host_ovr 汇总: 组=18 用例=103 PASS=103 FAIL=0 SKIP行=1 pre_bad=0 期望用例=103",
+      "target/read_obs | OK 必需=24 全部PASS 行数=24 skips=0 pre_bad=0 proc_rc=0",
+      "host_ovr/read_obs | OK 必需=24 全部PASS 行数=24 skips=0 pre_bad=0 proc_rc=0"
+    ],
+    "central_regression": [
+      {
+        "entry": "build_and_run",
+        "command": "bash tests/host/build_and_run.sh",
+        "rc": "rc=0"
+      },
+      {
+        "entry": "io_behavior",
+        "command": "bash tests/host/run_io_behavior.sh",
+        "rc": "rc=0"
+      },
+      {
+        "entry": "safety_data_semantics",
+        "command": "bash tests/host/run_safety_data_semantics.sh",
+        "rc": "rc=0"
+      },
+      {
+        "entry": "stop_result_s1",
+        "command": "bash tests/host/run_stop_result_s1.sh",
+        "rc": "rc=0"
+      },
+      {
+        "entry": "stop_priority_s2",
+        "command": "bash tests/host/run_stop_priority_s2.sh",
+        "rc": "rc=0"
+      },
+      {
+        "entry": "sp_measure_a0",
+        "command": "bash tests/host/run_sp_measure_a0.sh",
+        "rc": "rc=0"
+      },
+      {
+        "entry": "path_guard",
+        "command": "bash tests/host/test_path_guard.sh",
+        "rc": "rc=0"
+      },
+      {
+        "entry": "s2_reverse",
+        "command": "env REVERSE=1 bash tests/host/run_stop_priority_s2.sh",
+        "rc": "rc=0"
+      },
+      {
+        "entry": "negatives",
+        "command": "bash tests/host/run_negatives.sh",
+        "rc": "rc=0"
+      },
+      {
+        "entry": "meta_negatives",
+        "command": "bash tests/host/run_meta_negatives.sh",
+        "rc": "rc=0"
+      }
+    ],
+    "central_regression_runs": {
+      "run1": "build_and_run rc=1(打印原语缺失, 由 ab76a07 修), negatives rc=4, meta rc=1",
+      "run2": "9/10 rc=0; negatives rc=4 与 meta rc=1 = inject.py 锚点命中 0(基础设施失败, 不是检出)",
+      "run3_final": "见 central_regression 字段(BASE_HEAD=fb1a72e710c07ecf07aa432e0a3c74fa13c116d6)"
+    },
+    "targeted_negative_recheck": "ONLY=N9_probe_writeback_V1 N10_probe_writeback_V2 定向重跑: 两条均按 rc=1 检出, 类别 OK=2 INFRA-FAIL=0",
+    "negatives_ok_rows": 26,
+    "negatives_lines": [
+      "执行集合(13) 与请求集合(13) 一致: 是",
+      "类别计数: OK=13 NOT-DETECTED=0 INFRA-FAIL=0",
+      "RUNNER(run_negatives): 所有负例按预期被检出且身份齐备; 干净回归通过 (rc=0)",
+      "RUNNER(meta): 全部元负例按**正确原因**被拒绝, 对照组按预期通过, 集合一致 (rc=0)",
+      "RUNNER(meta) rc=0"
+    ],
+    "meta_negatives_ok": 8,
+    "meta_negatives_bad": 0,
+    "meta_tail": [
+      "############ 元负例汇总表 ############"
+    ]
+  },
+  "reverse_results": [
+    {
+      "name": "rev_rx_deadline_old_origin",
+      "injection": "把 eff_end 退回基线写法(b->start + allowance)",
+      "pre_registered": [
+        "URO03",
+        "URO04",
+        "URO16"
+      ],
+      "verdict_lines": [
+        "rev_rx_deadline_old_origin: 注入替换 2 处(逐条已核对恰好命中一次)",
+        "rev_obs_drop_raw_rx_capture: 注入替换 2 处(逐条已核对恰好命中一次)",
+        "rev_rx_deadline_old_origin | META-OK 命中 3 个业务失败身份 (variant=host_ovr groups=read_obs 台账自洽 proc_rc=1)",
+        "rev_obs_drop_raw_rx_capture | META-OK 命中 2 个业务失败身份 (variant=host_ovr groups=read_obs 台账自洽 proc_rc=1)",
+        "S2 REVERSE RESULT: PASS —— 七项注入均命中预登记业务失败身份(rc=1, 台账自洽)"
+      ],
+      "fail_rows": [
+        "CASE|URO03-reply-at-110-accepted-by-fixed-deadline|FAIL|rc=-117 value=0xA5A5A5A5 前段=15 期限=115 应答可见=110 完成=100 published=0 (旧算式期限=100 会拒绝这一帧)",
+        "CASE|URO04-stage-deadline-boundary-pair|FAIL|期限内: rc=-117 pub=0 done=100 | 期限刻: rc=-117 crc=0 full=0 expired=1 late=0 pub=0",
+        "CASE|URO16-complete-legal-frame-rejected-only-by-total-deadline|FAIL|rc=-117 crc=0(真算过) total_expired=0 late=0 pub=0 cand=00 00 00 00 00 00 00 00 前段=15 期限=20 total=20",
+        "SUMMARY|cases=24|pass=21|fail=3|pre_bad=0|skips=0"
+      ],
+      "healthy_controls_still_pass": true
+    },
+    {
+      "name": "rev_obs_drop_raw_rx_capture",
+      "injection": "保留 rx_total 与业务解析, 只去掉滑动前样本取样",
+      "pre_registered": [
+        "URO12",
+        "URO17"
+      ],
+      "fail_rows": [
+        "CASE|URO01-healthy-read-publishes-real-value|FAIL|rc=0 value=0x21000040 crc=2 hdr=1 full=1 rx_total=12 echo=0 tx=4 cand==应答=1 写帧=0 读请求=1 start=100 total=125",
+        "CASE|URO12-exact-four-byte-echo-only|FAIL|rc=-117 rx_total=4 prefix=00 00 00 00 req=05 00 06 6F echo=0(必须 ONLY=2) match=0 与 URO11 的差别=rx_total 4 vs 0",
+        "CASE|URO13-wrong-header-or-wrong-reg-kept-as-raw-bytes|FAIL|(坏头)rc=-117 hdr=0 echo=0 bytes=00 00 00 | (坏寄存器)rc=-117 hdr=0 bytes=00 00 00",
+        "CASE|URO14-header-matched-short-frame|FAIL|rc=-117 reason=8 hdr=1 full=0 rx_total=5 cand=0 crc=0 echo=0",
+        "CASE|URO17-long-stream-slide-counts-prefix-tail-truncation|FAIL|(滑动)rc=-117 total=48 pre=0 tail=0 退出时 n=16 trunc=0 hdr=0 | (流内应答)rc=0 total=32 hdr=1 pub=1 value=0x21000040",
+        "SUMMARY|cases=24|pass=19|fail=5|pre_bad=0|skips=0"
+      ],
+      "disclosure": "实际 5 条 FAIL: 预登记 2 条命中, 另 3 条(URO01/13/14)是该注入本应暴露的连带检出, 如实登记而不是只报 2 条"
+    }
+  ],
+  "collector_identity": {
+    "path": "reports/reviews/phase8-tmc-uart-read-observation/UARTReadDiagSerial.ps1",
+    "bytes": 37063,
+    "sha256": "2ada6b88a0631ceeff1e9f890466e96e55180031c5831a8b5859c114366d349d",
+    "pure_ascii_non_ascii_bytes": 0,
+    "transport_reuse": "16 个函数/块(Note..Fixture-Responses + finally)与冻结 M0Serial.ps1 逐字节相同, 由生成器写盘后自验",
+    "frozen_source": {
+      "path": "reports/reviews/phase8-motor-m0-uart-diagnosis/M0Serial.ps1",
+      "bytes": 24064,
+      "sha256": "2131af0ef32b0d9acb3a2a0489d47b90e26968e2fedd7c4ee4624fede0687e3f",
+      "blob": "6988501a2e19ebe4060ed6602b3dc81c8194463e"
+    }
+  },
+  "collector_windows_selftest": {
+    "powershell": "5.1.26100.5074 Desktop",
+    "parsefile_errors": 0,
+    "parseinput_errors": 0,
+    "mode": "-SelfTest(离线)",
+    "exit_code": 0,
+    "stderr_bytes": 0,
+    "stdout": "URO-OFFLINE-SELFTEST PASS; device_actions=0; mock_commands=7; negative_controls=23; forbidden_blocked=12",
+    "boot_fixture": {
+      "bytes": 3757,
+      "sha256": "97b37f32aa03c86b8708ae088d0ae65a8f92520f1a1ed70beb74663049321749"
+    },
+    "seventh_reply_fixtures": "取自本轮最终生产字节的 host probe 输出; 重建后复跑同一命令输出与夹具源文本逐字节相同",
+    "ledger_events": 58,
+    "artifacts": {
+      "001_attach_passive.rx.bin": {
+        "bytes": 3757,
+        "sha256": "97b37f32aa03c86b8708ae088d0ae65a8f92520f1a1ed70beb74663049321749"
+      },
+      "002_spm_status.rx.bin": {
+        "bytes": 146,
+        "sha256": "656db378732c4de39ce081339a6852b9995987253074dcceaacf5a8de3916339"
+      },
+      "003_spm_cap.rx.bin": {
+        "bytes": 339,
+        "sha256": "c7c5a79549aeb8852575164d7b183123876ed09eb684b76f78a5c9acdb9a50b4"
+      },
+      "004_safety_state.rx.bin": {
+        "bytes": 67,
+        "sha256": "95016978f6ac1e673a7cb0a676002e3c1df55f59f8770c810dd4c073e9cd2025"
+      },
+      "005_safety_status.rx.bin": {
+        "bytes": 475,
+        "sha256": "847aba88e20e2a4e220d1ca69cbaf5ef07975619af232caf0cc2b66b45990d7c"
+      },
+      "006_motor_status.rx.bin": {
+        "bytes": 891,
+        "sha256": "4d33ed91adb095e1642e91e9f5a926daceaca6f1a5aa0c85719a2ce070b549f5"
+      },
+      "007_step_status.rx.bin": {
+        "bytes": 268,
+        "sha256": "7c74b48da1ea7302454aeb9c2944d2384cb3a655841b92a8d516338a0b78ea37"
+      },
+      "008_tmc_uart_probe.rx.bin": {
+        "bytes": 2057,
+        "sha256": "ab7d5d834a8ba8a38c99ef5b49fecf81170c38a14185048a4bdf3b855d4cd34a"
+      },
+      "009_negative_missing_prompt.rx.bin": {
+        "bytes": 132,
+        "sha256": "d8d15b9c540d100ef3ef52d01034f4ac54c56981e3cec5adc0e382afb026ba2c"
+      },
+      "ledger.jsonl": {
+        "bytes": 8676,
+        "sha256": "1a1967c097de7db3ce64298477b251baf212e714f905026652adf3242fd55771"
+      },
+      "session.rx.bin": {
+        "bytes": 8132,
+        "sha256": "32a65aaecc333775cdd1479e22068a90581dfeb5744e23d48aa97b3990c1db09"
+      }
+    },
+    "slice_verdicts": {
+      "healthy": "capture=COMPLETE business=SUCCESS",
+      "timeout": "capture=COMPLETE business=FAIL reads=1 tmro_lines=36"
+    },
+    "online_mode_not_executed": true,
+    "online_mode_requires": [
+      "-ExecuteApprovedUroReadDiag",
+      "-ApprovalSource",
+      "-ExpectedBuildBanner",
+      "-ImageContinuityConfirmed",
+      "-SiteConfirmed"
+    ]
+  },
+  "builds_executed": [
+    {
+      "target": "rt-thread",
+      "command": "UV4.exe -r project.uvprojx -t \"rt-thread\" -j0 -o <仓外日志>",
+      "errors": 0,
+      "warnings": 0,
+      "program_size": "Code=179082 RO-data=77686 RW-data=2188 ZI-data=83784",
+      "delta_vs_previous": {
+        "code": 5320,
+        "ro_data": 880,
+        "rw_data": 0,
+        "zi_data": 0
+      },
+      "previous": {
+        "code": 173762,
+        "ro": 76806,
+        "rw": 2188,
+        "zi": 83784,
+        "src": "reports/reviews/phase8-motor-bringup-m1-prep/keil_builds.txt:36 与 reports/agent_handoffs/phase8-target-measurement-a0.json 的默认目标记录(两处一致, 为该目标最近一次登记值)"
+      },
+      "attribution": "增量全部来自 tmc2209.c: 只增 .text(观测记账/短行导出代码)与 .rodata(观测标签字符串), RW/ZI 不变 => 观测对象是 probe 的**栈上局部**(每笔 176 B, 三笔 528 B), 不新增任何文件静态/全局可写数据; 本轮没有空翻译单元可声称。",
+      "bin": {
+        "path": "reports/firmware/phase8-tmc-uart-read-observation/default.bin",
+        "bytes": 257348,
+        "sha256": "ad5daaa36974d62ccac911bd1fa46f3c18b139c6ef42444026a75708715cdbd8",
+        "source_build_output": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/rtthread.bin",
+        "source_bytes": 257348,
+        "source_sha256": "ad5daaa36974d62ccac911bd1fa46f3c18b139c6ef42444026a75708715cdbd8",
+        "copied_byte_identical": true,
+        "build_banner_in_image": {
+          "status": "OK",
+          "value": "Oct 27 2026 23:50:13",
+          "date_off": 251808,
+          "time_off": 251799,
+          "layout": "time_then_date"
+        }
+      },
+      "axf_local_only": {
+        "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/build/rt-thread.axf",
+        "bytes": 1661388,
+        "sha256": "ce09d2d6e45694d23ddf1dce45252debaf8385d287455961a0d01163d3f3e449",
+        "upload": "本地独立保存, 不入库(可能含私有绝对路径); 身份以该 SHA/长度为准"
+      },
+      "map": {
+        "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/build/rt-thread.map",
+        "bytes": 1964959,
+        "worktree_sha256": "6ef9d4aa40fb1e31b33ab1322b214cffdd33c2163ba791f287cf875778dfd3b0",
+        "git_blob_note": "map 未纳入版本控制; 若日后入库按 CRLF/LF 双身份登记, 不为换行差异重建固件",
+        "load_regions": [
+          [
+            "LR_IROM1",
+            "0x08000000",
+            "0x0003f390",
+            "0x00080000",
+            ", ABSOLUTE, COMPRESSED[0x0003ed44]"
+          ]
+        ],
+        "first_execution_regions": [
+          [
+            "RW_ITCM",
+            "0x00000000",
+            "0x0803eb00",
+            "0x00000000",
+            "0x00020000"
+          ],
+          [
+            "ER_IROM1",
+            "0x08000000",
+            "0x08000000",
+            "0x0003eb00",
+            "0x00080000"
+          ],
+          [
+            "RW_VT_DTCM",
+            "0x20000000",
+            "0x0803eb00",
+            "0x000003cc",
+            "0x00000400"
+          ],
+          [
+            "RW_DTCM",
+            "0x20000400",
+            "0x0803eb0c",
+            "0x0000cc08",
+            "0x0001fc00"
+          ]
+        ],
+        "entry_point": "Image Entry point: 0x080003cd"
+      },
+      "banner": {
+        "status": "OK",
+        "value": "Oct 27 2026 23:50:13",
+        "date_off": 251808,
+        "time_off": 251799,
+        "layout": "time_then_date"
+      }
+    },
+    {
+      "target": "rt-thread-measure-a0",
+      "command": "UV4.exe -r project.uvprojx -t \"rt-thread-measure-a0\" -j0 -o <仓外日志>",
+      "errors": 0,
+      "warnings": 0,
+      "program_size": "Code=186426 RO-data=80646 RW-data=2188 ZI-data=91504",
+      "delta_vs_previous": {
+        "code": 6568,
+        "ro_data": 1216,
+        "rw_data": 0,
+        "zi_data": 0
+      },
+      "previous": {
+        "code": 179858,
+        "ro": 79430,
+        "rw": 2188,
+        "zi": 91504,
+        "src": "reports/agent_handoffs/phase8-target-measurement-a0.json export-r1 重归档记录 rt-thread-measure-a0 = Code=179858 RO-data=79430 RW-data=2188 ZI-data=91504 (A0 目标最近一次登记值; 首轮 180802/79718 已被 r1 取代)"
+      },
+      "attribution": "增量全部来自 tmc2209.c: 只增 .text(观测记账/短行导出代码)与 .rodata(观测标签字符串), RW/ZI 不变 => 观测对象是 probe 的**栈上局部**(每笔 176 B, 三笔 528 B), 不新增任何文件静态/全局可写数据; 本轮没有空翻译单元可声称。",
+      "bin": {
+        "path": "reports/firmware/phase8-tmc-uart-read-observation/measure-a0.bin",
+        "bytes": 267652,
+        "sha256": "b54387fddbb6ecf77bd0c90d4abc0584212396ddbf884955e44fd76956a4b4d3",
+        "source_build_output": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/build/a0/measure-a0.bin",
+        "source_bytes": 267652,
+        "source_sha256": "b54387fddbb6ecf77bd0c90d4abc0584212396ddbf884955e44fd76956a4b4d3",
+        "copied_byte_identical": true,
+        "build_banner_in_image": {
+          "status": "OK",
+          "value": "Oct 27 2026 23:50:33",
+          "date_off": 262096,
+          "time_off": 262087,
+          "layout": "time_then_date"
+        }
+      },
+      "axf_local_only": {
+        "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/build/a0/rt-thread-a0.axf",
+        "bytes": 1691884,
+        "sha256": "eb1d3fa85b0064193a52ced8bc96ca6f519b7ff8266141258c3a77198c2ec121",
+        "upload": "本地独立保存, 不入库(可能含私有绝对路径); 身份以该 SHA/长度为准"
+      },
+      "map": {
+        "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/build/a0/rt-thread-a0.map",
+        "bytes": 2017042,
+        "worktree_sha256": "8fe79f00d68114e28b5e90fef3b1f620b87c42fa23d16de99e66f760cc7822a6",
+        "git_blob_note": "map 未纳入版本控制; 若日后入库按 CRLF/LF 双身份登记, 不为换行差异重建固件",
+        "load_regions": [
+          [
+            "LR_IROM1",
+            "0x08000000",
+            "0x00041bd0",
+            "0x00080000",
+            ", ABSOLUTE, COMPRESSED[0x00041584]"
+          ]
+        ],
+        "first_execution_regions": [
+          [
+            "RW_ITCM",
+            "0x00000000",
+            "0x08041340",
+            "0x00000000",
+            "0x00020000"
+          ],
+          [
+            "ER_IROM1",
+            "0x08000000",
+            "0x08000000",
+            "0x00041340",
+            "0x00080000"
+          ],
+          [
+            "RW_VT_DTCM",
+            "0x20000000",
+            "0x08041340",
+            "0x000003cc",
+            "0x00000400"
+          ],
+          [
+            "RW_DTCM",
+            "0x20000400",
+            "0x0804134c",
+            "0x0000ea30",
+            "0x0001fc00"
+          ]
+        ],
+        "entry_point": "Image Entry point: 0x080003cd"
+      },
+      "banner": {
+        "status": "OK",
+        "value": "Oct 27 2026 23:50:33",
+        "date_off": 262096,
+        "time_off": 262087,
+        "layout": "time_then_date"
+      }
+    }
+  ],
+  "firmware_images": {
+    "rt-thread": {
+      "bytes": 257348,
+      "sha256": "ad5daaa36974d62ccac911bd1fa46f3c18b139c6ef42444026a75708715cdbd8"
+    },
+    "rt-thread-measure-a0": {
+      "bytes": 267652,
+      "sha256": "b54387fddbb6ecf77bd0c90d4abc0584212396ddbf884955e44fd76956a4b4d3"
+    }
+  },
+  "macros_effective": {
+    "macro_names_checked": [
+      "MOTOR_HARDWARE_ENABLE_PATH_VALIDATED",
+      "STEP_DIAG_ISOLATED_ENV_CONFIRMED",
+      "TMC_DRIVE_CONFIG_HW_VALIDATED",
+      "SAFETY_LIMIT_INPUTS_ENABLED"
+    ],
+    "source_defaults": [
+      "applications/motor.h:69 MOTOR_HARDWARE_ENABLE_PATH_VALIDATED = RT_FALSE",
+      "applications/motor.h:83 STEP_DIAG_ISOLATED_ENV_CONFIRMED = RT_FALSE",
+      "applications/tmc2209.h:100 TMC_DRIVE_CONFIG_HW_VALIDATED = RT_FALSE",
+      "applications/project_board.h:51 SAFETY_LIMIT_INPUTS_ENABLED = RT_FALSE"
+    ],
+    "per_target": [
+      {
+        "target": "rt-thread",
+        "built_this_round": true,
+        "target_level_define": "SYSCLK_USE_PLL, __CLK_TCK=RT_TICK_PER_SECOND, DUAL_CORE_ENABLE=0, USE_HAL_DRIVER, SYSCLK_SOURCE_USE_HXTL, __RTTHREAD__, NS800RT7P65X, __STDC_LIMIT_MACROS, RT_USING_LIBC, RT_USING_ARMLIBC, PLLCLK_SOURCE_USE_HXTL",
+        "of_the_four_overridden_in_target_define": {},
+        "effective_note": "源码 #ifndef 默认 RT_FALSE 未被目标级 -D 覆盖 => 该宏有效值 0(FALSE)"
+      },
+      {
+        "target": "rt-thread-measure-a0",
+        "built_this_round": true,
+        "target_level_define": "SYSCLK_USE_PLL, __CLK_TCK=RT_TICK_PER_SECOND, DUAL_CORE_ENABLE=0, USE_HAL_DRIVER, SYSCLK_SOURCE_USE_HXTL, __RTTHREAD__, NS800RT7P65X, __STDC_LIMIT_MACROS, RT_USING_LIBC, RT_USING_ARMLIBC, PLLCLK_SOURCE_USE_HXTL, NS800_TARGET_MEASUREMENT_A0=1",
+        "of_the_four_overridden_in_target_define": {},
+        "effective_note": "源码 #ifndef 默认 RT_FALSE 未被目标级 -D 覆盖 => 该宏有效值 0(FALSE)"
+      },
+      {
+        "target": "rt-thread-motor-m1-candidate",
+        "built_this_round": false,
+        "target_level_define": "SYSCLK_USE_PLL, __CLK_TCK=RT_TICK_PER_SECOND, DUAL_CORE_ENABLE=0, USE_HAL_DRIVER, SYSCLK_SOURCE_USE_HXTL, __RTTHREAD__, NS800RT7P65X, __STDC_LIMIT_MACROS, RT_USING_LIBC, RT_USING_ARMLIBC, PLLCLK_SOURCE_USE_HXTL, NS800_TARGET_MEASUREMENT_A0=0, MOTOR_HARDWARE_ENABLE_PATH_VALIDATED=1, TMC_DRIVE_CONFIG_HW_VALIDATED=1, STEP_DIAG_ISOLATED_ENV_CONFIRMED=0, SAFETY_LIMIT_INPUTS_ENABLED=0",
+        "of_the_four_overridden_in_target_define": {
+          "MOTOR_HARDWARE_ENABLE_PATH_VALIDATED": "1",
+          "STEP_DIAG_ISOLATED_ENV_CONFIRMED": "0",
+          "TMC_DRIVE_CONFIG_HW_VALIDATED": "1",
+          "SAFETY_LIMIT_INPUTS_ENABLED": "0"
+        },
+        "effective_note": "目标级显式覆盖, 见上"
+      }
+    ],
+    "this_round_built_targets_macro_state": {
+      "rt-thread": {},
+      "rt-thread-measure-a0": {}
+    },
+    "unbuilt_target_note": "第三个目标 rt-thread-motor-m1-candidate 的目标级 Define 里显式写了 MOTOR_HARDWARE_ENABLE_PATH_VALIDATED=1, TMC_DRIVE_CONFIG_HW_VALIDATED=1, STEP_DIAG_ISOLATED_ENV_CONFIRMED=0, SAFETY_LIMIT_INPUTS_ENABLED=0; 本轮未构建、未下载, 故不影响本轮两枚镜像的四宏取值。",
+    "build_log_macro_flip_evidence": {
+      "rt-thread": "未发现该四宏的 -D 覆盖",
+      "rt-thread-measure-a0": "未发现该四宏的 -D 覆盖"
+    },
+    "host_override_is_not_a_target_flip": true,
+    "armclang_preprocessor_probe": {
+      "command": "armclang --target=arm-arm-none-eabi -mcpu=cortex-m7 -E -dM -P <该目标 Define 字段逐项 -D> <该目标 IncludePath 逐项 -I> applications/motor.c",
+      "rc": 0,
+      "stdout": [
+        "TARGET=rt-thread rc=0 defines_passed=11 include_dirs_existing=34/34 stderr_bytes=0",
+        "  MOTOR_HARDWARE_ENABLE_PATH_VALIDATED = RT_FALSE",
+        "  STEP_DIAG_ISOLATED_ENV_CONFIRMED = RT_FALSE",
+        "  TMC_DRIVE_CONFIG_HW_VALIDATED = RT_FALSE",
+        "  SAFETY_LIMIT_INPUTS_ENABLED = RT_FALSE",
+        "  RT_FALSE=0 RT_TRUE=1 | total_macros_dumped=1376",
+        "  macro_names_in_target_define_list=[]",
+        "TARGET=rt-thread-measure-a0 rc=0 defines_passed=12 include_dirs_existing=34/34 stderr_bytes=0",
+        "  MOTOR_HARDWARE_ENABLE_PATH_VALIDATED = RT_FALSE",
+        "  STEP_DIAG_ISOLATED_ENV_CONFIRMED = RT_FALSE",
+        "  TMC_DRIVE_CONFIG_HW_VALIDATED = RT_FALSE",
+        "  SAFETY_LIMIT_INPUTS_ENABLED = RT_FALSE",
+        "  RT_FALSE=0 RT_TRUE=1 | total_macros_dumped=1377",
+        "  macro_names_in_target_define_list=[]"
+      ],
+      "stderr_bytes": 0,
+      "reading": "两目标下四宏全部解析为 RT_FALSE, 且 RT_FALSE=0; 目标 -D 清单里不含这四个名字 => 有效值 0 由编译器实证, 不是仅凭头文件默认值。"
+    }
+  },
+  "errata_this_round": [
+    {
+      "id": "URO-E1",
+      "what": "首次镜像归档取自打印路径修正**之前**的 23:41 构建, code_commit 误指 d2dd743; 三件已移出仓库目录并在仓外完整保留, 现按 23:50 构建重归档"
+    },
+    {
+      "id": "URO-E2",
+      "what": "manifest 首版把 A0 目标的\"上一轮 Program Size\"错取为 M1 候选目标的 173994/83784, 虚报 ZI 增量 7720; 按 A0 自己的 r1 登记 179858/91504 更正 => ZI 增量 0"
+    },
+    {
+      "id": "URO-E3",
+      "what": "manifest 首版 map 摘要解析为空、横幅提取假定 date->time 相邻; 已按本机 armlink 6.24 实样改为逗号格式 + 两种排布都找且要求全镜像唯一时分秒串"
+    },
+    {
+      "id": "M0-X1",
+      "what": "a691eb5 交接 JSON 的 this_round_stage_reality 原写 'CP1/CP2 未进入', 与同文件 m0_status/pending_items 与 CP1 台账矛盾; 已按用户明确要求更正为 CP0 完成 / CP1 已执行并在 IOIN 读超时停止 / CP2 最终状态未回报"
+    }
+  ],
+  "privacy": {
+    "repo_files_scanned": "本轮全部将提交文件(生产源/夹具/runner/脚本/证据/交接 JSON)",
+    "hits": {
+      "tests/host/run_stop_priority_s2.sh": "一处 Windows 数值组 ID(6 位数字, 出现在解释 xargs 组名丢失的注释里), 由 05d0518 引入, 早于本轮; 不是用户名/邮箱/主机名, 本轮不为此改动 runner。扫描器把它列为本机标识符之一, 故在此单列披露。"
+    },
+    "masking": "日志类证据把本机绝对路径(盘符或 /d/ 前缀)替换为 <仓外工作区>(有损); 工具安装根替换为 KEIL_ROOT(有损); 证据文件不复制该数值组 ID",
+    "axf_map": "AXF 与 .map 含构建机路径, 一律不入库, 只登记长度+SHA"
+  },
+  "board_candidate_status": "NOT_AUTHORIZED",
+  "board_candidate_file": "reports/reviews/phase8-tmc-uart-read-observation/board_candidate.md",
+  "frozen_refs_verified": {
+    "main": "1b3757eec550802a3973e66790af422d81d3d373",
+    "phase7/full-embedded-software": "6d3fbc559d45673d7550eb73dec5a4ade5bb34df",
+    "tag_object": "097935fec5a6f2467261ab1ad449ff0b1d398250",
+    "tag_dereference": "e40a9b95ef709e6a80444f9f3949dfdd70ba96ba",
+    "how": "本轮只读核对, 未 reset/rebase/force/merge, 未改写冻结引用"
+  },
+  "not_proven": [
+    "真机 TMC UART 通信结果(本轮设备动作 0)",
+    "整条调用链栈高水位",
+    "真机控制台 128 B 截断表现(主机侧用 <=96 B/无 NUL/不半行断言替代)",
+    "apply/integrity/confirmed-write 路径的观测接入(本轮范围外)"
+  ],
+  "stop_lines": [
+    "OFFLINE_DELIVERY_COMPLETE_THIS_ROUND / HARDWARE_ACTIONS=0",
+    "OBSERVATION_CAPTURE_PROVEN_ON_HOST / TMC_LINK_ON_BOARD_STILL_UNPROVEN",
+    "BOARD_PACKAGE board_candidate.md = DRAFT / NOT_AUTHORIZED / NOT_EXECUTED",
+    "FOUR_DEFAULT_AND_A0_SAFETY_MACROS=0(ARMCLANG 预处理实证)",
+    "SAFE_FOR_ENABLE=false / M2_M3_NOT_AUTHORIZED",
+    "M0 CP2 最终状态仍未回报(允许保持 UNKNOWN, 不为此连接设备)"
+  ]
+}

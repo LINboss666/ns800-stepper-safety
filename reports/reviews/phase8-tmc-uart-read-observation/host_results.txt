@@ -1,0 +1,235 @@
+URO host results — 定稿字节上的主机验证与集中回归
+==============================================================================
+字节集 : 生产/夹具/runner = fb1a72e710c07ecf07aa432e0a3c74fa13c116d6 的工作树内容
+        (产品字节与 ab76a07 相同; leaf_main.c / run_stop_priority_s2.sh 同 ab76a07)
+运行目录: 仓外 <仓外工作区>/central/urofinal3 —— 日志名保留, 绝对路径不入库
+编译器 : 主机 GCC(由 tests/host/env.sh 探测), 每个变体单独构建, 构建日志为空=0 警告
+脱敏   : 本文件对日志原文只做一处有损替换 —— 本机绝对路径(盘符或 /d/ 前缀)统一换成<仓外工作区>; 其余字符逐字保留。替换次数在文末登记。
+
+1. read_obs 组: 同一批用例在 target 与 host_ovr **都真实执行**
+------------------------------------------------------------------------------
+用例数 : host_ovr=24, target=24, 具名清单完全一致(逐条比对): YES
+真执行标记(不是 SKIP): host_ovr marker=True, target marker=True
+  TARGET LEAF|variant=target|group=read_obs|gates=0
+  TARGET LEAF|obs_size=176|obs_x3=528|xfer_stat_size=48
+  TARGET CASE|URO01-healthy-read-publishes-real-value|PASS|rc=0 value=0x21000040 crc=2 hdr=1 full=1 rx_total=12 echo=3 tx=4 cand==应答=1 写帧=0 读请求=1 start=100 total=125
+  TARGET CASE|URO02-healthy-prestage-reply-inside-window|PASS|rc=0 前段=15 期限=115 完成=31 total=125 合同=阶段起点+min(100,总剩余): 115
+  TARGET CASE|URO03-reply-at-110-accepted-by-fixed-deadline|PASS|rc=0 value=0x21000040 前段=15 期限=115 应答可见=110 完成=111 published=1 (旧算式期限=100 会拒绝这一帧)
+  TARGET CASE|URO04-stage-deadline-boundary-pair|PASS|期限内: rc=0 pub=1 done=113 | 期限刻: rc=-117 crc=2 full=1 expired=1 late=1 pub=0
+  TARGET CASE|URO05-total-budget-exhausted-before-rx-entry|PASS|(a)rc=-117 start=100 total=15 done=15 rx_reached=0 tx=3 | (b)rc=-117 reason=6 total_expired=1 stage_expired=0 done=130 应答数增量=1 健康=1->1
+  TARGET CASE|URO06-lock-refusal-sends-nothing-and-releases-nothing|PASS|rc=-23 reason=4 lock=1/0/-23 tx_called=0 落字节增量=0 读请求增量=0 归还增量=0(必须 0)
+  TARGET CASE|URO06b-zero-remaining-budget-does-not-even-attempt-lock|PASS|rc=-117 取锁调用增量=0 归还增量=0 落字节=0 tx_called=0
+  TARGET CASE|URO07-flush-limits-keep-flush-fact-tx-not-reached|PASS|(字节上限)rc=-12 reason=5 flush_bytes=272 rx_total=0 tx_called=0 | (时间上限)rc=-117 flush_ms=2 flush_bytes=2 total_expired=0 落字节增量=0
+  TARGET CASE|URO08-tx-no-space-zero-written-rx-not-reached|PASS|rc=-117 tx_called=1 tx_written=0 reason=6 rx_reached=0 落字节=0 请求数增量=0
+  TARGET CASE|URO09-partial-tx-keeps-real-written-count|PASS|rc=-117 请求构造=4 实际写入=2 线上字节=2 前 2 字节==req=1 reason=6
+  TARGET CASE|URO10-expire-after-last-byte-keeps-written-four|PASS|rc=-117 tx_written=4(线上真实=4) tx_rc=-117 stage_expired=1 total_expired=0 done=28 total=125
+  TARGET CASE|URO11-rx-zero-bytes-not-claimed-as-echo|PASS|rc=-117 reason=rx-timeout-echo rx_total=0 echo=1(必须 NONE=1) hdr=0 crc=0 应答=1
+  TARGET CASE|URO12-exact-four-byte-echo-only|PASS|rc=-117 rx_total=4 prefix=05 00 06 6F req=05 00 06 6F echo=2(必须 ONLY=2) match=1 与 URO11 的差别=rx_total 4 vs 0
+  TARGET CASE|URO13-wrong-header-or-wrong-reg-kept-as-raw-bytes|PASS|(坏头)rc=-117 hdr=0 echo=4 bytes=05 F5 06 | (坏寄存器)rc=-117 hdr=0 bytes=05 FF 26
+  TARGET CASE|URO14-header-matched-short-frame|PASS|rc=-117 reason=8 hdr=1 full=0 rx_total=5 cand=0 crc=0 echo=4
+  TARGET CASE|URO15-complete-frame-crc-error-keeps-eio|PASS|rc=-12(必须 -12=EIO, 不是 -117) reason=9 crc=1 full=1 cand=05 FF 06 21 00 00 40 EA
+  TARGET CASE|URO16-complete-legal-frame-rejected-only-by-total-deadline|PASS|rc=-117 crc=2(真算过) total_expired=1 late=1 pub=0 cand=05 FF 06 21 00 00 40 4F 前段=15 期限=20 total=20
+  TARGET CASE|URO17-long-stream-slide-counts-prefix-tail-truncation|PASS|(滑动)rc=-117 total=48 pre=32 tail=16 退出时 n=16 trunc=1 hdr=0 | (流内应答)rc=0 total=32 hdr=1 pub=1 value=0x21000040
+  TARGET CASE|URO18-tick-wraparound-uses-unsigned-deltas|PASS|(回绕内成功)rc=0 start=FFFFFFF0 期限=103 value=0x21000040 | (回绕后过期)rc=-117 start=FFFFFFE0 过期时应答仍挂起=1 之后入队字节=8
+  TARGET CASE|URO19-probe-per-record-facts-and-early-exit|PASS|早退: FAIL=1 NOT_REACHED=2(rc=0 的=0, rc=- 的=2, reason=- 的=2, timing=- 的=2, reg=01/02=1/1, 冒充 start=0 的行=0) END reads=1=1 EXPORT_ERROR=0 | 全成功: SUCCESS=3 三笔各自 total=8 =1/1/1 END reads=3=1 本份 EXPORT_ERROR=0
+  TARGET CASE|URO20-probe-stays-read-only-and-prints-after-txn-release|PASS|读事务=3 写帧=0 保护(cut=0 low=0) cfg 状态=0->0 view=0->0 健康=1->1 txn 归还=1 归还前已打印行数=0
+  TARGET CASE|URO21-output-bounded-and-illegal-context-silent|PASS|行=40 最长=81 超 96=0 非 ASCII=0 NUL=0 半行=0 丢弃=0 | 三种非法上下文: 打印增量=0 UART 读增量=0 落字节增量=0 取锁增量=0
+  TARGET CASE|URO22-observation-on-off-equivalent-on-same-input|PASS|无观测 rc=0 value=0x21000040 used=31 tx=4 rx=12 | 有观测 rc=0 value=0x21000040 used=31 tx=4 rx=12 | 总线 读1/1 写0/0 字节4/4
+  TARGET CASE|URO22b-observation-never-invents-a-success|PASS|失联: 无观测 rc=-117 used=103 | 有观测 rc=-117 result=1 pub=0 rx_total=0 value 未改=1
+  TARGET SUMMARY|cases=24|pass=24|fail=0|pre_bad=0|skips=0
+
+  host_ovr 侧同一组的逐条明细(观测字段口径, 与 TARGET 的 id 一一对应):
+  HOSTOVR LEAF|variant=host_ovr|group=read_obs|gates=1
+  HOSTOVR LEAF|obs_size=176|obs_x3=528|xfer_stat_size=48
+  HOSTOVR CASE|URO01-healthy-read-publishes-real-value|PASS|rc=0 value=0x21000040 crc=2 hdr=1 full=1 rx_total=12 echo=3 tx=4 cand==应答=1 写帧=0 读请求=1 start=100 total=125
+  HOSTOVR CASE|URO02-healthy-prestage-reply-inside-window|PASS|rc=0 前段=15 期限=115 完成=31 total=125 合同=阶段起点+min(100,总剩余): 115
+  HOSTOVR CASE|URO03-reply-at-110-accepted-by-fixed-deadline|PASS|rc=0 value=0x21000040 前段=15 期限=115 应答可见=110 完成=111 published=1 (旧算式期限=100 会拒绝这一帧)
+  HOSTOVR CASE|URO04-stage-deadline-boundary-pair|PASS|期限内: rc=0 pub=1 done=113 | 期限刻: rc=-117 crc=2 full=1 expired=1 late=1 pub=0
+  HOSTOVR CASE|URO05-total-budget-exhausted-before-rx-entry|PASS|(a)rc=-117 start=100 total=15 done=15 rx_reached=0 tx=3 | (b)rc=-117 reason=6 total_expired=1 stage_expired=0 done=130 应答数增量=1 健康=1->1
+  HOSTOVR CASE|URO06-lock-refusal-sends-nothing-and-releases-nothing|PASS|rc=-23 reason=4 lock=1/0/-23 tx_called=0 落字节增量=0 读请求增量=0 归还增量=0(必须 0)
+  HOSTOVR CASE|URO06b-zero-remaining-budget-does-not-even-attempt-lock|PASS|rc=-117 取锁调用增量=0 归还增量=0 落字节=0 tx_called=0
+  HOSTOVR CASE|URO07-flush-limits-keep-flush-fact-tx-not-reached|PASS|(字节上限)rc=-12 reason=5 flush_bytes=272 rx_total=0 tx_called=0 | (时间上限)rc=-117 flush_ms=2 flush_bytes=2 total_expired=0 落字节增量=0
+  HOSTOVR CASE|URO08-tx-no-space-zero-written-rx-not-reached|PASS|rc=-117 tx_called=1 tx_written=0 reason=6 rx_reached=0 落字节=0 请求数增量=0
+  HOSTOVR CASE|URO09-partial-tx-keeps-real-written-count|PASS|rc=-117 请求构造=4 实际写入=2 线上字节=2 前 2 字节==req=1 reason=6
+  HOSTOVR CASE|URO10-expire-after-last-byte-keeps-written-four|PASS|rc=-117 tx_written=4(线上真实=4) tx_rc=-117 stage_expired=1 total_expired=0 done=28 total=125
+  HOSTOVR CASE|URO11-rx-zero-bytes-not-claimed-as-echo|PASS|rc=-117 reason=rx-timeout-echo rx_total=0 echo=1(必须 NONE=1) hdr=0 crc=0 应答=1
+  HOSTOVR CASE|URO12-exact-four-byte-echo-only|PASS|rc=-117 rx_total=4 prefix=05 00 06 6F req=05 00 06 6F echo=2(必须 ONLY=2) match=1 与 URO11 的差别=rx_total 4 vs 0
+  HOSTOVR CASE|URO13-wrong-header-or-wrong-reg-kept-as-raw-bytes|PASS|(坏头)rc=-117 hdr=0 echo=4 bytes=05 F5 06 | (坏寄存器)rc=-117 hdr=0 bytes=05 FF 26
+  HOSTOVR CASE|URO14-header-matched-short-frame|PASS|rc=-117 reason=8 hdr=1 full=0 rx_total=5 cand=0 crc=0 echo=4
+  HOSTOVR CASE|URO15-complete-frame-crc-error-keeps-eio|PASS|rc=-12(必须 -12=EIO, 不是 -117) reason=9 crc=1 full=1 cand=05 FF 06 21 00 00 40 EA
+  HOSTOVR CASE|URO16-complete-legal-frame-rejected-only-by-total-deadline|PASS|rc=-117 crc=2(真算过) total_expired=1 late=1 pub=0 cand=05 FF 06 21 00 00 40 4F 前段=15 期限=20 total=20
+  HOSTOVR CASE|URO17-long-stream-slide-counts-prefix-tail-truncation|PASS|(滑动)rc=-117 total=48 pre=32 tail=16 退出时 n=16 trunc=1 hdr=0 | (流内应答)rc=0 total=32 hdr=1 pub=1 value=0x21000040
+  HOSTOVR CASE|URO18-tick-wraparound-uses-unsigned-deltas|PASS|(回绕内成功)rc=0 start=FFFFFFF0 期限=103 value=0x21000040 | (回绕后过期)rc=-117 start=FFFFFFE0 过期时应答仍挂起=1 之后入队字节=8
+  HOSTOVR CASE|URO19-probe-per-record-facts-and-early-exit|PASS|早退: FAIL=1 NOT_REACHED=2(rc=0 的=0, rc=- 的=2, reason=- 的=2, timing=- 的=2, reg=01/02=1/1, 冒充 start=0 的行=0) END reads=1=1 EXPORT_ERROR=0 | 全成功: SUCCESS=3 三笔各自 total=8 =1/1/1 END reads=3=1 本份 EXPORT_ERROR=0
+  HOSTOVR CASE|URO20-probe-stays-read-only-and-prints-after-txn-release|PASS|读事务=3 写帧=0 保护(cut=0 low=0) cfg 状态=0->0 view=0->0 健康=1->1 txn 归还=1 归还前已打印行数=0
+  HOSTOVR CASE|URO21-output-bounded-and-illegal-context-silent|PASS|行=40 最长=81 超 96=0 非 ASCII=0 NUL=0 半行=0 丢弃=0 | 三种非法上下文: 打印增量=0 UART 读增量=0 落字节增量=0 取锁增量=0
+  HOSTOVR CASE|URO22-observation-on-off-equivalent-on-same-input|PASS|无观测 rc=0 value=0x21000040 used=31 tx=4 rx=12 | 有观测 rc=0 value=0x21000040 used=31 tx=4 rx=12 | 总线 读1/1 写0/0 字节4/4
+  HOSTOVR CASE|URO22b-observation-never-invents-a-success|PASS|失联: 无观测 rc=-117 used=103 | 有观测 rc=-117 result=1 pub=0 rx_total=0 value 未改=1
+  HOSTOVR SUMMARY|cases=24|pass=24|fail=0|pre_bad=0|skips=0
+
+  说明: target 变体不带 -DPS_GATE_HOST_OVERRIDE, 四个安全宏保持源码默认 RT_FALSE;
+        host_ovr 变体仅在**夹具**里翻三个门宏以跑同一组只读观测用例 —— 这不是目标宏翻转,
+        也不改变板上镜像取值(见 keil_builds.txt §3 的 ARMCLANG 预处理实证)。
+        本组是只读通信观测, 不需要把任何宏变为 1; 旧 23/79 条合同另行保留(见 §3 汇总)。
+
+2. 两项具名局部反向(在同一份定稿字节上, host_ovr 变体)
+------------------------------------------------------------------------------
+    rev_rx_deadline_old_origin: 注入替换 2 处(逐条已核对恰好命中一次)
+    rev_obs_drop_raw_rx_capture: 注入替换 2 处(逐条已核对恰好命中一次)
+  rev_rx_deadline_old_origin | META-OK 命中 3 个业务失败身份 (variant=host_ovr groups=read_obs 台账自洽 proc_rc=1)
+  rev_obs_drop_raw_rx_capture | META-OK 命中 2 个业务失败身份 (variant=host_ovr groups=read_obs 台账自洽 proc_rc=1)
+  S2 REVERSE RESULT: PASS —— 七项注入均命中预登记业务失败身份(rc=1, 台账自洽)
+
+  rev_rx_deadline_old_origin —— 把期限表达式退回基线写法 eff_end = b->start + allowance
+    预期命中: URO03/URO04/URO16。实际失败行(SUMMARY 显示其余 21 条仍 PASS, 即对照未被牵连):
+      CASE|URO03-reply-at-110-accepted-by-fixed-deadline|FAIL|rc=-117 value=0xA5A5A5A5 前段=15 期限=115 应答可见=110 完成=100 published=0 (旧算式期限=100 会拒绝这一帧)
+      CASE|URO04-stage-deadline-boundary-pair|FAIL|期限内: rc=-117 pub=0 done=100 | 期限刻: rc=-117 crc=0 full=0 expired=1 late=0 pub=0
+      CASE|URO16-complete-legal-frame-rejected-only-by-total-deadline|FAIL|rc=-117 crc=0(真算过) total_expired=0 late=0 pub=0 cand=00 00 00 00 00 00 00 00 前段=15 期限=20 total=20
+      SUMMARY|cases=24|pass=21|fail=3|pre_bad=0|skips=0
+
+  rev_obs_drop_raw_rx_capture —— 保留 rx_total 累计与业务解析, 只去掉滑动前的样本取样
+    预期命中: URO12/URO17。实际失败行(共 5 条, 其中预登记 2 条被命中; 其余 3 条是该注入
+    本来就应当暴露的连带检出 —— 回声分类与原始字节导出确实依赖同一份样本, 不假装只见 2 条):
+      CASE|URO01-healthy-read-publishes-real-value|FAIL|rc=0 value=0x21000040 crc=2 hdr=1 full=1 rx_total=12 echo=0 tx=4 cand==应答=1 写帧=0 读请求=1 start=100 total=125
+      CASE|URO12-exact-four-byte-echo-only|FAIL|rc=-117 rx_total=4 prefix=00 00 00 00 req=05 00 06 6F echo=0(必须 ONLY=2) match=0 与 URO11 的差别=rx_total 4 vs 0
+      CASE|URO13-wrong-header-or-wrong-reg-kept-as-raw-bytes|FAIL|(坏头)rc=-117 hdr=0 echo=0 bytes=00 00 00 | (坏寄存器)rc=-117 hdr=0 bytes=00 00 00
+      CASE|URO14-header-matched-short-frame|FAIL|rc=-117 reason=8 hdr=1 full=0 rx_total=5 cand=0 crc=0 echo=0
+      CASE|URO17-long-stream-slide-counts-prefix-tail-truncation|FAIL|(滑动)rc=-117 total=48 pre=0 tail=0 退出时 n=16 trunc=0 hdr=0 | (流内应答)rc=0 total=32 hdr=1 pub=1 value=0x21000040
+      SUMMARY|cases=24|pass=19|fail=5|pre_bad=0|skips=0
+
+3. 任务书 §6.4 集中回归: 在同一份定稿字节上逐条入口执行
+------------------------------------------------------------------------------
+最终采用运行(run #3, BASE_HEAD=fb1a72e = 本轮验证输入提交):
+  build_and_run            rc=0
+  io_behavior              rc=0
+  safety_data_semantics    rc=0
+  stop_result_s1           rc=0
+  stop_priority_s2         rc=0
+  sp_measure_a0            rc=0
+  path_guard               rc=0
+  s2_reverse               rc=0
+  negatives                rc=0
+  meta_negatives           rc=0
+  合计条目 = 10
+
+历史运行(保留, 说明为什么不是'一次就绿'):
+  run #1(BASE_HEAD=ab76a07 之前的定稿尝试): build_and_run=rc=1; io_behavior=rc=0; safety_data_semantics=rc=0; stop_result_s1=rc=0; stop_priority_s2=rc=0; sp_measure_a0=rc=0; path_guard=rc=0; s2_reverse=rc=0; negatives=rc=4; meta_negatives=rc=1
+  run #2(产品字节 ab76a07, 未含注入锚点修正): build_and_run=rc=0; io_behavior=rc=0; safety_data_semantics=rc=0; stop_result_s1=rc=0; stop_priority_s2=rc=0; sp_measure_a0=rc=0; path_guard=rc=0; s2_reverse=rc=0; negatives=rc=4; meta_negatives=rc=1
+  run #2 的 negatives/meta_negatives 失败身份(INJECT-FATAL, 属基础设施失败, 不是检出):
+    (以下两行按原字节入档; INJECT-FATAL 那一行由 bash 侧 GBK 控制台写出, 中文已不可逆乱码 ——
+     这是**有损**保留, 不重排也不翻译; 其后一行的 UTF-8 部分完好。乱码原文实际内容是
+     "INJECT-FATAL: 锚点命中 0 处(应恰好 1 处): <旧 probe 标题行文本>"。
+    INJECT-FATAL: ê������ 0 ��(Ӧǡ 1 ��): rt_kprintf("[TMC] probe: ֻ�����ݼ�� txn-held IOIN+GSTAT+IFCNT (0 �� WRITE ֡
+    FATAL(基础设施): 注入步骤失败(mode=probe_writeback, rc=1): 宁可终止, 不许带病继续
+  run #1 的 build_and_run 编译失败原文(打印原语根因, 已由 ab76a07 修复):
+    <仓外工作区> warning: implicit declaration of function 'rt_vsnprintf' [-Wimplicit-function-declaration]
+         n = rt_vsnprintf(line, sizeof(line), fmt, ap);
+    <仓外工作区> warning: implicit declaration of function 'rt_kputs' [-Wimplicit-function-declaration]
+         rt_kputs(line);
+    <仓外工作区> undefined reference to `rt_vsnprintf'
+    <仓外工作区> undefined reference to `rt_kputs'
+    collect2.exe: error: ld returned 1 exit status
+    <仓外工作区> warning: implicit declaration of function 'rt_vsnprintf' [-Wimplicit-function-declaration]
+         n = rt_vsnprintf(line, sizeof(line), fmt, ap);
+    <仓外工作区> warning: implicit declaration of function 'rt_kputs' [-Wimplicit-function-declaration]
+         rt_kputs(line);
+    <仓外工作区> undefined reference to `rt_vsnprintf'
+    <仓外工作区> undefined reference to `rt_kputs'
+    collect2.exe: error: ld returned 1 exit status
+      V1 build=1 run=127 state=COMPILE_FAILED    V2 build=1 run=127 state=COMPILE_FAILED
+      RUNNER RESULT: FAIL (rc=1; 任一必需步骤非零即失败)
+
+4. 负例与元负例(run #3 原文判定行)
+------------------------------------------------------------------------------
+  OK | N1_only_V1_injected_fail | rc 真实=1 自报=1 期望=1 | V1=RAN/0/1 V2=RAN/0/0 (期望 V1=RAN/0/1 V2=RAN/0/0)
+  OK | N2_only_V2_injected_fail | rc 真实=1 自报=1 期望=1 | V1=RAN/0/0 V2=RAN/0/1 (期望 V1=RAN/0/0 V2=RAN/0/1)
+  OK | N3_V1_stale_exe_not_reused | rc 真实=1 自报=1 期望=1 | V1=COMPILE_FAILED/1/127 V2=RAN/0/0 (期望 V1=COMPILE_FAILED/1/127 V2=RAN/0/0)
+  OK | N4_fw_calc_selftest_FAILED | rc 真实=2 自报=2 期望=2 | V1=RAN/0/2 V2=RAN/0/2 (期望 V1=RAN/0/2 V2=RAN/0/2)
+  OK | N5_fw_cfg_selftest_INCOMPLETE | rc 真实=2 自报=2 期望=2 | V1=RAN/0/2 V2=RAN/0/0 (期望 V1=RAN/0/2 V2=RAN/0/0)
+  OK | N6_helper_thread_create_fail | rc 真实=3 自报=3 期望=3 | V1=RAN/0/3 V2=RAN/0/3 (期望 V1=RAN/0/3 V2=RAN/0/3)
+  OK | N7_helper_thread_startup_fail | rc 真实=3 自报=3 期望=3 | V1=RAN/0/3 V2=RAN/0/3 (期望 V1=RAN/0/3 V2=RAN/0/3)
+  OK | N8_gstat_expect_table_tamper | rc 真实=1 自报=1 期望=1 | V1=RAN/0/1 V2=RAN/0/0 (期望 V1=RAN/0/1 V2=RAN/0/0)
+  OK | N9_probe_writeback_V1 | rc 真实=1 自报=1 期望=1 | V1=RAN/0/1 V2=NOT_RUN/NOT_RUN/NOT_RUN (期望 V1=RAN/0/1 V2=NOT_RUN/NOT_RUN/NOT_RUN)
+  OK | N10_probe_writeback_V2 | rc 真实=1 自报=1 期望=1 | V1=NOT_RUN/NOT_RUN/NOT_RUN V2=RAN/0/1 (期望 V1=NOT_RUN/NOT_RUN/NOT_RUN V2=RAN/0/1)
+  OK | N10b_writeback_both_variants | rc 真实=1 自报=1 期望=1 | V1=RAN/0/1 V2=RAN/0/1 (期望 V1=RAN/0/1 V2=RAN/0/1)
+  OK | N11_clean_snapshot_regression | rc 真实=0 自报=0 期望=0 | V1=RAN/0/0 V2=RAN/0/0 (期望 V1=RAN/0/0 V2=RAN/0/0)
+  OK | N12_workspace_clean_regression | rc 真实=0 自报=0 期望=0 | V1=RAN/0/0 V2=RAN/0/0 (期望 V1=RAN/0/0 V2=RAN/0/0)
+  OK | N1_only_V1_injected_fail
+  OK | N2_only_V2_injected_fail
+  OK | N3_V1_stale_exe_not_reused
+  OK | N4_fw_calc_selftest_FAILED
+  OK | N5_fw_cfg_selftest_INCOMPLETE
+  OK | N6_helper_thread_create_fail
+  OK | N7_helper_thread_startup_fail
+  OK | N8_gstat_expect_table_tamper
+  OK | N9_probe_writeback_V1
+  OK | N10_probe_writeback_V2
+  OK | N10b_writeback_both_variants
+  OK | N11_clean_snapshot_regression
+  OK | N12_workspace_clean_regression
+  执行集合(13) 与请求集合(13) 一致: 是
+  类别计数: OK=13 NOT-DETECTED=0 INFRA-FAIL=0
+  RUNNER(run_negatives): 所有负例按预期被检出且身份齐备; 干净回归通过 (rc=0)
+        [.] 执行集合与请求集合一致(1 例)
+        [.] 执行集合与请求集合一致(1 例)
+        [.] 执行集合与请求集合一致(11 例)
+        [.] 执行集合与请求集合一致(11 例)
+  RUNNER(meta): 全部元负例按**正确原因**被拒绝, 对照组按预期通过, 集合一致 (rc=0)
+  RUNNER(meta) rc=0
+  -- 元负例 --
+      子链 M1: rc=1 矩阵行数=1
+        [.] 子链 rc=1 (=1)
+    => META-OK | M1_blinded_fd7b
+      子链 M1_ctl: rc=0 矩阵行数=1
+        [.] 子链 rc=0 (=0)
+    => CONTROL-OK | M1_control_unblinded
+      子链 M2: rc=4 矩阵行数=11
+        [.] 子链 rc=4 (=4)
+    => META-OK | M2_stubbed_compile
+      子链 M2_ctl: rc=0 矩阵行数=11
+        [.] 子链 rc=0 (=0)
+    => CONTROL-OK | M2_control_real_compiler
+      子链 M3: rc=4 矩阵行数=1
+        [.] 子链 rc=4 非零
+    => META-OK | M3_runner_exit_zero_lost
+      子链 M3_ctl: rc=0 矩阵行数=1
+        [.] 子链 rc=0 (=0)
+    => CONTROL-OK | M3_control_unmodified
+      子链 M4_ambiguous: rc=4 矩阵行数=无文件
+        [.] 子链 rc=4 (=4)
+      子链 M4_unknown: rc=4 矩阵行数=无文件
+        [.] 子链 rc=4 (=4)
+      子链 M4_prefix: rc=0 矩阵行数=1
+        [.] 子链 rc=0 (=0)
+    => META-OK | M4_selection_semantics
+      嵌套(M1 + 编译桩) rc=1
+        [.] 嵌套助手未放行(rc=1)
+        [.] 嵌套子链确实以 rc=4(INFRA) 失败 => 与正确原因 rc=1/NOT-DETECTED 不同
+    => META-OK | M5_wrong_reason_guard
+  RUNNER(meta): 全部元负例按**正确原因**被拒绝, 对照组按预期通过, 集合一致 (rc=0)
+
+5. 覆盖对应关系(§6.1 列的观测语义 -> 用例)
+------------------------------------------------------------------------------
+  期限合同(阶段起点 + min(100, 总剩余))                     URO02/URO03/URO04/URO18
+  总预算耗尽与 RX 未进入分列                                URO05/URO06b
+  锁未取得不得归还 / 不发送                                 URO06/URO06b
+  flush 双上限(字节/时间)且 TX 未到达                       URO07
+  TX 零写入 / 部分写入 / 末字节后过期                         URO08/URO09/URO10
+  RX 零字节 / 仅精确回显 / 其它字节 / 帧不完整 / CRC 错           URO11/URO12/URO13/URO14/URO15
+  完整合法帧仅因期限被拒(crc=OK, late=1, pub=0)             URO04/URO16
+  长流滑动: 总量/前缀/尾部/截断分列                            URO17
+  tick 回绕用无符号差值                                  URO18
+  probe 逐笔导出 + 早退 + 只读副作用为零                      URO19/URO20
+  输出界限(<=96 B、纯 ASCII、无 NUL、不半行)与静默非法上下文         URO21
+  观测开关等价、观测不伪造成功                                 URO22/URO22b
+
+6. 已知缺口 / 未证明项(如实)
+------------------------------------------------------------------------------
+- 全部结论来自主机夹具(scripted tick + 假 UART 叶子), 不是真机; 真机时延与总线字节本轮未采集。
+- 观测对象是 probe 栈上局部(176 B x3); 整条调用链的栈高水位未实测, FinSH 4096 B 是配置值不是余量证明。
+- read_obs 组只覆盖单次读路径; apply/integrity/confirmed-write 的观测未接入(本轮范围外, 也未声称)。
+- target 变体的其余 17 组沿用既有 SKIP/门禁合同, 本组特意在 SKIP 判定之前分派, 因此 target 真执行(见 §1 marker)。
+- run #1/#2 的两次失败都是**验证链自身**的问题(打印原语、注入锚点), 生产结论不受影响, 但按要求保留原文且不重写历史。
+- tests/host/inject.py 属 §10.1 三条白名单之外的额外改动, 原因与范围在交接里单列披露; 未新建任何 Python/CSV 完整性门。
+
+脱敏替换次数(本文件生成时实测) = 8

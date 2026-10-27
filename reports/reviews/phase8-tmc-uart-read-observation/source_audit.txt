@@ -1,0 +1,133 @@
+URO source audit — phase8-tmc-uart-read-observation
+====================================================
+task_id       : phase8-tmc-uart-read-observation
+document_base : a691eb5c4b5a3e5d639ac9e231ce0920967798de (附件任务书声明的基线)
+source_base   : 同上
+本轮回执所用提交链:
+  d2dd743f30bee3cb7b2989b750d7cc7a97f3e536  产品+夹具(两项修改一次落地)
+  ab76a07b5d48dbd8c7ee9ff6dea0c9bf90fcc5d4  产品: 有界输出改用各条链共有的打印原语
+  fb1a72e710c07ecf07aa432e0a3c74fa13c116d6  验证链: 负例注入锚点跟随 probe 标题行口径
+镜像归档的 code_commit = ab76a07(见 build_manifest.json); fb1a72e 只改 tests/host/inject.py,
+该文件不是任何一枚镜像的输入(git diff ab76a07..fb1a72e -- 生产/BSP 路径 = 空)。
+
+1. 输入字节身份(git blob = 提交内字节; worktree = 本机 checkout 字节)
+---------------------------------------------------------------------------
+文件(repo 相对路径)                                          提交       blob 长度  blob SHA                                   工作树长度
+applications/tmc2209.c(= rt-thread-master/.../applications/)  a691eb5    151478    e941b84bf6ade4388efc83df97b7f2bec61f6f56    本轮未单独复算(=blob+每行一个 CR)
+applications/tmc2209.c                                         ab76a07/fb1a72e 180848 a480960477f34a1a4cf2b4e206d842297aac445f  184766(=blob+3918 CR)
+tests/host/leaf_main.c                                         a691eb5    89121     4b418f88d6987f0f7bed70719954f01bf480ef0f    -
+tests/host/leaf_main.c                                         ab76a07/fb1a72e 145525 3c5273b0252646cb693f20b3e3804a014e6d0351  145525(LF)
+tests/host/run_stop_priority_s2.sh                             a691eb5    42382     8caf16df489558551e59e330290861ad3b35f775    -
+tests/host/run_stop_priority_s2.sh                             ab76a07/fb1a72e 47402 917870ac63a97e2da27a2e3d743131a1a02f5d18  47402(LF)
+tests/host/inject.py                                           a691eb5/ab76a07 4603  41d2811dbe4cbf516b75007f8c6290f7d3da3f4a  -
+tests/host/inject.py                                           fb1a72e    4947      845ff4c7f3f8069430ecf42ce41a3e5ffe481815  4947 工作树(LF)/blob 同长度
+冻结引用(本轮只读核对, 未改写): main=1b3757eec550802a3973e66790af422d81d3d373,
+phase7/full-embedded-software=6d3fbc559d45673d7550eb73dec5a4ade5bb34df,
+tag 对象 097935fec5a6f2467261ab1ad449ff0b1d398250 -> 指向提交 e40a9b95ef709e6a80444f9f3949dfdd70ba96ba。
+
+2. 缺陷 1 的字节级定位(修前 / 修后同一处)
+---------------------------------------------------------------------------
+修前(blob a691eb5:tmc2209.c, 原行号):
+  509: stage_cap = rt_tick_from_millisecond(TMC_REPLY_TIMEOUT_MS);
+  513:     rt_tick_t used = rt_tick_get() - b->start;
+  514:     rt_tick_t left = (used >= b->total) ? 0 : (b->total - used);
+  515:     eff_end = b->start + ((stage_cap < left) ? stage_cap : left);
+=> 阶段期限从 **b->start(预算打开刻)** 起算, 而 `used`(flush + TX 已花掉的时间)只是用来
+   削小 left; RX 阶段实际拿到的窗口 = min(100, total-used), 且**起点被提前到 used 之前**,
+   等于把 TX/flush 的耗时二次计费。合同 "RX 阶段 <=100 ms 且不超过同一操作总预算" 里的
+   "100 ms" 因此永远拿不满。
+
+修后(工作树/fb1a72e 字节, 现行号):
+  838: stage_cap = rt_tick_from_millisecond(TMC_REPLY_TIMEOUT_MS);
+  864: eff_end = b->start + used + allowance;
+  868: obs->rx_begin_off = (rt_uint32_t)used;
+  869: obs->rx_deadline_off = (rt_uint32_t)(used + allowance);
+  其中 allowance = min(stage_cap, left), left = total - used, used 在 RX 阶段入口采样一次。
+  总预算耗尽改由显式前置分支返回(-RT_ETIMEOUT / TMC_XFER_BUDGET_EXHAUSTED, RX 未进入),
+  不再和"阶段窗口"混在同一个表达式里。
+期限比较全部改为回绕安全的无符号差值(937/965 行 `rt_tick_get() - eff_end < 0x80000000`),
+CRC 之后仍复核一次期限; 过期后到达的合法完整帧保留 crc_state=OK 与 late_valid_frame=1,
+但 published/value_valid 必须为 0(URO04/URO16 断言)。
+
+3. 预算常量未改(不靠放宽超时"修通")
+---------------------------------------------------------------------------
+`diff <(git show a691eb5:<file> | grep "^#define TMC_BUD\|^#define TMC_REPLY_TIMEOUT_MS\
+^#define TMC_RX_BUF\|^#define TMC_FLUSH") <(grep 同样模式 <当前文件>)` => 逐字节相同, 记为
+BUDGET_AND_BUFFER_DEFINES_UNCHANGED=IDENTICAL。涉及行(当前文件行号):
+  51  TMC_REPLY_TIMEOUT_MS 100      64 TMC_BUD_READ_MS 125      65 TMC_BUD_INTEGRITY_MS 250
+  66  TMC_BUD_CONFIRM_MS 400        67 TMC_BUD_APPLY_MS 1500    68 TMC_BUD_CFG_LOCK_MS 10
+  69  TMC_BUD_XFER_LOCK_MS 20       70 TMC_BUD_TX_FRAME_MS 20   71 TMC_BUD_FLUSH_MS 2
+本轮没有新增任何"观测专用"的等待、重试或额外读; 事务数上限仍 3 读 0 写。
+
+4. 观测对象尺寸(§5.1 要求实际 sizeof 证据)
+---------------------------------------------------------------------------
+主机夹具实跑打印(不是估算): `LEAF|obs_size=176|obs_x3=528|xfer_stat_size=48`
+  单笔 tmc_read_observation_t = 176 B <= 256 B; 三笔 = 528 B <= 768 B; 既有 tmc_xfer_stat_t 仍 48 B。
+  观测对象是 probe 的**栈上局部数组**(三笔), 不新增文件静态/全局可写数据 => Keil 侧 RW/ZI 不变
+  (见 keil_builds.txt 的 Program Size 对照)。
+边界声明: 4096 B 是 FinSH 线程配置值, 不等于"栈够用"; 整条调用链的栈高水位本轮**未实测**,
+不得据 528 B 宣称栈安全。
+
+5. §5.2 逐行要求 -> 实现字段 -> 判定用例(三列都可在字节里核对)
+---------------------------------------------------------------------------
+| §5.2 层面 | 最少事实 | tmc2209.c 字段(fb1a72e 字节) | 实际导出行(当前行号) | 用例 |
+| 身份   | probe 内寄存器序号、addr、reg、原始 rc、legacy reason、SUCCESS/FAIL/NOT_REACHED | idx, addr, reg, valid(本记录是否被填写过), rc, reason, result(枚举 NOT_REACHED=0/FAIL=1/SUCCESS=2) | 1480 `[TMRO] reg=%02X result=%s rc=%s reason=%s` | URO01/05/19 |
+| 入口+锁 | 上下文允许、外层 txn 取得、UART 已打开/本次尝试打开及真实返回、xfer 是否尝试/取得/实际 rc; 未取得不归还, 外层失败逐寄存器 NOT_REACHED | ctx_ok, txn_held/txn_rc, open_state/open_rc, lock_attempted/lock_held/lock_rc | 1482 `[TMRO] reg=%02X ctx=%u txn=%u/%d open=%s/%d lock=%u/%u/%d` | URO06/06b/21 |
+| flush  | 是否进入、实际 rc、清掉字节数与耗时; 未执行不等于"清零成功"; 超限与总预算耗尽分列 | flush_reached, flush_rc, flush_bytes, flush_ms | 1486 `[TMRO] reg=%02X flush=%u/%d bytes=%u ms=%u` | URO07 |
+| TX     | 请求是否构造、4 字节内容、是否真的调用预算写、实际 tx_written/rc/耗时 | req_built, req[4], tx_called, tx_written, tx_rc, tx_off | 1490 `[TMRO] reg=%02X tx=%u/%u/%d off=%u req=<hex>` | URO08/09/10 |
+| RX     | 是否进入、循环累计读到的总字节、退出时解析缓冲当前 n、匹配头、8 字节收齐、CRC 是否真算/通过 | rx_reached, rx_total, rx_buf_n, hdr_seen, frame_complete, crc_state(三态) | 1503 `[TMRO] reg=%02X rx=%u hdr=%u full=%u crc=%s` | URO11..15/17 |
+| 期限   | 同一 budget 的 start/total、RX 开始 offset、RX deadline offset、完成 offset、总/阶段是否过期、完整合法帧是否仅因期限被拒 | b_start, b_total, rx_begin_off, rx_deadline_off, done_off, total_expired, stage_expired, late_valid_frame | 1495 `timing=- (budget never opened)`(未进 RX) / 1498 `start=%u total=%u rx_begin=%u rx_dl=%u done=%u` / 1506 `total=%u buf=%u pub=%u late=%u exp=%u/%u` | URO02/03/04/05/16/18 |
+| 发布   | value 是否真发布; 失败不得把临时帧值当成功读值 | published, value_valid, value | 1506 `pub=%u late=%u` + 1510 `[TMRO] reg=%02X echo=%s match=%u trunc=%u val=%08X` | URO04/15/16/22b |
+| 原始字节 | TX 4 字节; RX 前缀<=32 B; 尾部<=16 B; 实际判候选的应答<=8 B; 长度/总量/截断或中间省略标志 | rx_pre[32]/rx_pre_n, rx_tail[16]/rx_tail_n, cand[8]/cand_n, rx_truncated, echo_state/echo_match_seen | 1490 `req=<hex>` / 1515 `rx1 n=%u <hex>` / 1518 `rxT n=%u <hex>` / 1510 `echo=%s match=%u trunc=%u`(每行最多 16 字节) | URO12/13/14/17 |
+| 事务边界 | 一次明确 BEGIN/END; END 含 attempted_reads、write_frames=0、observation_complete; 记录完整与业务成功分开 | 局部 errs / attempted 计数 | 1616 `[TMRO] BEGIN v=%u addr=%d planned=3 reads=%d` / 1666 `[TMRO] END reads=%d writes=0 export_err=%d observation_complete=%d` | URO19/20/21 |
+
+八种可区分的读失败身份 -> 观测字段组合 -> 用例:
+  未发请求            tx_called=0(锁/flush 先失败)                         URO06/07
+  TX 未完成           tx_called=1, tx_written<4, 线上字节=tx_written        URO08/09/10
+  RX 零字节           rx_total=0, echo_state=NONE                          URO11
+  仅精确回显          rx_total=4 且整段与 req 逐字相等 => ECHO_ONLY          URO12
+  其它字节            echo_state=OTHER, 原始坏头/坏寄存器字节保留            URO13
+  帧不完整            hdr_seen=1, frame_complete=0, crc=NOT_REACHED          URO14
+  CRC 错              rc=-12(EIO), crc_state=FAIL, frame_complete=1          URO15
+  完整合法帧被期限拒  crc_state=OK, late_valid_frame=1, published=0          URO04/16
+
+纪律核对(§5.2 补充 1..8):
+  1 tx_written 只表示交给 DATA 寄存器的计数 —— 导出文本写作 "tx=%d/%d/%d off=%u", 不写"已上线";
+    URO09 断言"线上真实字节 == tx_written == 2"。
+  2 rx_total 在每次 rt_device_read 返回后、滑动/覆盖之前累加并取样(tmc_obs_rx_bytes),
+    URO17 用 48 B 长流证明 rx_total=48 != rx_buf_n(退出时 n=16), 前缀/尾部样本分列。
+  3 flush 阶段只导出计数(本轮未保留 flush 字节样本), 导出文本不宣称知道那些字节内容;
+    flush 丢弃的字节不并入请求后的 rx_total(URO07 断言 flush 之后 rx_total==0)。
+  4 crc_state 三态 NOT_REACHED/FAIL/OK; hdr_seen 与 frame_complete 分列(URO14/16)。
+  5 legacy 枚举名 TMC_XFER_RX_TIMEOUT_ECHO 只原样导出 reason 文本, 回声判定一律用
+    echo_state/echo_match_seen; ECHO_ONLY 只在 rx_total==4 且整段等值时才出现(URO11 vs URO12)。
+  6 NOT_REACHED 的 rc/reason 导出为 `-`, timing 行写 `timing=- (budget never opened)`,
+    不会出现 rc=0/used=0 伪装成功(URO19 断言)。
+  7 观测路径只赋值/有界拷贝; S2 保护窗口、TX 等待环、RX 轮询环、锁内一律没有新增串口输出,
+    URO20 用 leaf_lines_at_txn_release==0 直接证明"归还 txn 之前没有输出行"。
+  8 probe 不改 TMC health/已配置状态/缓存, 不调 apply/清故障/保护写; URO20 同时核对
+    读请求计数增量、写帧增量=0、health 未变。
+
+6. 打印原语可用性(为什么必须有 ab76a07 这一次修正)
+---------------------------------------------------------------------------
+首轮集中回归在 build_and_run 上编译失败(见 host_results.txt 保留的第一次失败原文), 根因是
+probe 的有界输出用了 rt_vsnprintf / rt_kputs:
+  rt-thread-master/include/klibc/kstdio.h:22  int rt_vsnprintf(...)   (仅内核声明)
+  rt-thread-master/include/rtthread.h:783/786  rt_kputs(条件宏 + 声明) (仅内核)
+  tests/host/shim/rtthread.h        有 rt_snprintf、rt_kprintf; 无 rt_vsnprintf、无 rt_kputs
+  tests/host/shim_ps/rtthread.h     同上(shim_leaf/rtthread.h:14 只是 #include "../shim_ps/rtthread.h")
+结论: 公共夹具 shim 是 §10.1 禁改项, 因此产品侧只允许使用**每条链都已有**的 rt_snprintf +
+rt_kprintf。ab76a07 把格式化收进 TMC_PROBE_EMIT(-> rt_snprintf) 与 tmc_probe_put(->
+rt_kprintf("%s", line)), 顺带保留"短行必须容得下"的自检: 需要字节数 >= 上限或 > 96 时报
+`[TMRO] EXPORT_ERROR need=.. cap=..` 并计入 export_err, 不发半条记录。
+
+7. 证据口径与已知缺口
+---------------------------------------------------------------------------
+- CRLF: 本机 checkout 把 tmc2209.c 存成 CRLF(工作树 184766 B vs blob 180848 B), 故凡"原文字节"
+  主张一律以 git blob 长度/SHA 为准; 工作树副本仅用于编译。此为既有已登记口径(M1-E1)。
+- 观测字段名与行号取自 fb1a72e 的工作树/字节内容; 行号会随后续提交漂移, 复核请按字段名 grep。
+- 本轮**未实测**: 板级 TMC UART 通信(设备动作 0)、整条调用链栈高水位、RT-Thread 控制台 128 B
+  截断在真机上的实际表现(主机侧用 <=96 B 行 + 无 NUL 断言替代, 不能等同真机)。
+- 四宏有效值 0 的证据来自编译器本身: 用两目标各自的"目标级 Define 清单 + IncludePath"让
+  ARMCLANG 真预处理 applications/motor.c, -dM 转储显示四个宏都取 RT_FALSE(且 RT_FALSE=0),
+  目标 -D 清单里不含这四个名字(见 build_manifest.json 的 macros_effective 节)。

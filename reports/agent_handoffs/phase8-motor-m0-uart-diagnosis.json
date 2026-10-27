@@ -659,5 +659,5 @@
     "A0_DURATION_EVIDENCE NOT_ACHIEVED / M2_M3 NOT_AUTHORIZED",
     "FINAL_POWER_STATE = UNKNOWN(用户未回报, 不推断)"
   ],
-  "this_round_stage_reality": "CP0 完成(离线), CP1/CP2 未进入; 上面的 stop_lines 是包定义, 本轮实际状态见本字段"
+  "this_round_stage_reality": "CP0 完成(离线自检); CP1 已执行(六条只读查询被接受, 第七条 tmc_uart_probe 在 IOIN 读超时处停止并归档原字节); CP2 收尾的最终状态未回报(断电/结束时刻仍未到手)。上面的 stop_lines 是包定义, 实际阶段以本字段为准。勘误来源: 本字段原写 'CP1/CP2 未进入', 与同文件 m0_status(:560)、pending_items(:645) 与 CP1 台账矛盾, 由 phase8-tmc-uart-read-observation 轮按用户明确要求更正。"
 }

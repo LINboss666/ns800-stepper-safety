@@ -1,0 +1,70 @@
+URO baseline vs fixed — 同一批 deadline 输入, 两份生产字节
+==========================================================
+为什么单独做这张表(任务书 §6.2 末段 / §6.3): 基线 a691eb5 里**还没有** observation 类型,
+整组 read_obs 观测用例无法在它上面编译。因此这里不用观测字段, 而是把"同一份探针 +
+同一个真实入口 tmc_read_reg + 基线本来就具备的事实(rc / used / tx_written / rx_bytes /
+发布值 / 总线计数)"分别编到两份字节上, 让两列结果之间只差被修的那一处期限表达式。
+探针在夹具里由 leaf_main.c 的 `-DURO_BASELINE_BYTES` 开关选出(基线侧只编 deadline 探针);
+两份都由仓外脚本 uro_baseline.sh 现场构建并运行, 不 checkout、不 reset 工作树,
+被测函数体没有复制, 也没有用桩返回预期结果。
+
+1. 输入字节身份(由探针自身在每次运行开头打印, 非事后补记)
+----------------------------------------------------------
+基线副本 : applications/tmc2209.c 由 `git show a691eb5:<路径>` 逐文件取到仓外目录
+           (同目录同时取全部 .h, 保证基线副本自洽)
+           bytes=151478  sha256=6a3b7c6d087210a93a8a849b080ce09b9131fa8b6153251e905a538f7cf077ff
+           脚本用任务书 §4.1 记载的期望散列做了等值断言(b_rc=0)。
+最终副本 : 仓库工作树 applications/tmc2209.c (fb1a72e 内容, CRLF 工作树副本)
+           bytes=184766  sha256=392d9aad422186c77e4fe2998eae7d3118c6fb8977ecff852406167d1d5df341
+           (提交内 blob 为 180848 B / a480960477f34a1a4cf2b4e206d842297aac445f; 差 3918 个 CR,
+            编译用的是工作树副本, 身份主张以 blob 为准。)
+两边构建: PROBE[baseline] BUILD rc=0 / PROBE[final] BUILD rc=0, 均 0 警告(构建日志为空)。
+两边运行: proc rc=0, 进程正常收尾(SUMMARY 行存在)。
+
+2. 对照结果(逐字来自两次运行的 BASELINE 行, 未改写)
+----------------------------------------------------------
+输入(URO01) reply_ready_off=0  drain_ms=1  t0=100
+  基线 rc=0    used=3   tx_written=4 rx_bytes=8 value=0x21000040 published=yes 读请求=1 写帧=0 线上TX=4
+  最终 rc=0    used=3   tx_written=4 rx_bytes=8 value=0x21000040 published=yes 读请求=1 写帧=0 线上TX=4
+  => 健康路径不变(对照正控)。
+
+输入(URO02) reply_ready_off=30 drain_ms=5  t0=100
+  基线 rc=0    used=31  tx_written=4 rx_bytes=8 value=0x21000040 published=yes
+  最终 rc=0    used=31  tx_written=4 rx_bytes=8 value=0x21000040 published=yes
+  => 阶段内应答路径不变。
+
+输入(URO03) reply_ready_off=110 drain_ms=5 t0=100  ← 缺陷复现点
+  基线 rc=-117 used=100 tx_written=4 rx_bytes=0 value=0xA5A5A5A5 published=no
+  最终 rc=0    used=111 tx_written=4 rx_bytes=8 value=0x21000040 published=yes
+  => 基线把 RX 期限锚在预算打开刻(b->start)+min(100,剩余), flush+TX 花掉的 15 ms 被二次计费,
+     RX 实际只拿到 100-15=85 ms 窗口, 110 ms 到达的合法应答被 -117(-RT_ETIMEOUT) 拒掉;
+     修正后期限 = used + min(100, total-used) = 15+100 = 115, 同一输入被接受并真实发布寄存器值。
+     这条差异只来自那一行表达式, 其余字段(rc 类型、tx_written、总线计数)两边同形。
+
+输入(URO03b) reply_ready_off=126 drain_ms=5 t0=100 ← 合同上界仍在
+  基线 rc=-117 used=100 tx_written=4 rx_bytes=0 published=no
+  最终 rc=-117 used=115 tx_written=4 rx_bytes=0 published=no
+  => 修正没有把期限放宽到总预算之外: 126 ms > min(115, total 125) 仍然失败;
+     used 从 100 变 115 正是"阶段拿满 100 ms"的直接读数, 而不是超时被调大(常量见 source_audit.txt §3)。
+
+3. 与 read_obs 组的对应关系
+----------------------------------------------------------
+同一批输入在最终字节上还由 read_obs 组的 URO02/URO03/URO04/URO16 以观测字段复核(逐字原文):
+  URO02 `前段=15 期限=115 完成=31 total=125 合同=阶段起点+min(100,总剩余): 115`
+  URO03 `rc=0 value=0x21000040 前段=15 期限=115 应答可见=110 完成=111 published=1 (旧算式期限=100 会拒绝这一帧)`
+  URO04 `期限内: rc=0 pub=1 done=113 | 期限刻: rc=-117 crc=2 full=1 expired=1 late=1 pub=0`
+        —— 边界成对: 窗口内到达被接受, 恰在期限刻到达的完整合法帧被拒, 但保留 crc=OK 与
+           late_valid_frame=1、published=0(不把临时帧值当成功读值)。
+  URO16 `rc=-117 crc=2(真算过) total_expired=1 late=1 pub=0 cand=05 FF 06 21 00 00 40 4F
+         前段=15 期限=20 total=20`
+        —— 这一条用的是**调用者自带的 20 ms 总预算**(不是 125 ms), 因此 rx 期限被 left 截到 20,
+           完整且 CRC 合法的帧只因总预算到期被拒, 证明"阶段不越过同一操作总预算"这一半合同
+           在修后仍然成立。
+见 host_results.txt。
+
+4. 已知边界
+----------------------------------------------------------
+- 本表只有 4 个输入点, 是"修前/修后同一入口同一输入"的最小对照, 不代替整组 read_obs;
+  整组用例只在最终字节上执行(基线没有观测类型, 这是任务书 §6.2 承认的前提)。
+- 全部为主机夹具(scripted tick)结果, **不是真机时延**; 真机上 flush/TX 实际耗时不同,
+  修后 RX 窗口 = min(100, 总剩余) 的"总剩余"要由板级读数才知道, 本轮未测。
