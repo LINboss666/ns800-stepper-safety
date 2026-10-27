@@ -470,6 +470,20 @@
       ],
       "tmc_uart_reads": 1,
       "tmc_uart_writes": 0
+    },
+    {
+      "action": "out_of_package_serial_retry",
+      "scope": "NOT_PART_OF_M0_PACKAGE",
+      "authorized_by": "用户当轮指令\"你再试试能不能通信\"(自然语言, 真实回合)",
+      "serial_open_COM5": 1,
+      "target_read_only_commands": [
+        "tmc_uart_probe"
+      ],
+      "tmc_uart_writes": 0,
+      "response_bytes": 184,
+      "response_sha256": "df10a658e9320b25b28ff675ea9bf20832165e92e6c77906ae9dbd9642e80b81",
+      "equals_archived_cp1_bytes": true,
+      "note": "这次动作用的是**包外**额度, 不给已用尽的 M0 包续额度; 响应与 CP1 归档 008 块逐字节相同 => 同一具名失败第二次独立复现"
     }
   ],
   "target_commands_executed": [
@@ -493,12 +507,49 @@
     "read_error_decoded": "-RT_ETIMEOUT (ETIMEDOUT = ERROR_BASE_NO 7 + 110; 同一张表算出的 EBUSY=23、EIO=12 与既往实测一致)",
     "observed_line": "[TMC] IOIN read failed (-117) -> 无法确认身份; 这不等于芯片损坏",
     "firmware_reported_write_frames": 0,
-    "stage_within_read": "未收敛: -RT_ETIMEOUT 可由 rx_flush 未排空 / TX 整帧预算耗尽 / RX 等不到合法数据报 三段产出; 区分的内部 reason 未被任何只读命令导出"
+    "stage_within_read": "未收敛(本轮已把出口枚举完整, 见登记件 §3): APP/tmc2209.c 里 return -RT_ETIMEOUT 共 13 处, 分属 请求发出前(:1345 配置事务锁/:1415 hw open/:632 传输锁/:389 TX 预算) 、排空 RX(:309/:336/:347) 、发送(:419/:424) 、接收(:591/:609) 、以及**帧完整且 CRC 已过但被判迟到**(:563/:569) 五类; 区分的内部 reason 与 rx_bytes 未被任何只读命令导出, 且 :586-:588 把\"0 字节\"与\"有字节无匹配头\"合并成同名 reason",
+    "errno_chain_closed_from_repo": {
+      "kerrno_branch_guard": "RT_USING_LIBC && !RT_USING_NANO",
+      "rt_using_nano_defined": false,
+      "armcc_version": "6240002",
+      "error_base_no": 7,
+      "ETIMEDOUT": 117,
+      "EBUSY": 23,
+      "EIO": 12,
+      "ENOSYS": 45,
+      "EINVAL": 5
+    }
   },
   "tmc_global_health_inferred_from_probe": false,
   "safe_for_enable": false,
   "tmc_link_status": "LINK_UNPROVEN",
-  "tmc_link_new_discriminated_fact": "IOIN 读超时 -117; 排除\"uart2 打不开\"与\"取不到事务锁/能力缺失\"(它们给别的码并打印别的行)",
+  "tmc_link_new_discriminated_fact": "IOIN 读**报告**超时 -117 = -RT_ETIMEOUT; 可排除的只有\"uart2 打不开\"(会打印设备失败行)与\"锁能力缺失/取锁失败\"(给 -RT_ENOSYS=-45 / -RT_EBUSY=-23); **不能**排除\"进锁前/发请求前预算已耗尽\"(:1345/:1415/:632/:389 同样返回 -RT_ETIMEOUT), 也**不能**写成\"已证明芯片无应答\"(:563/:569 是帧完整且 CRC 已过、仅因期限被判迟到)",
+  "review_registration": {
+    "verdict": "M0_TARGET_EVIDENCE_REVIEW_ACCEPTED_WITH_READ_TIMEOUT",
+    "accepted_object": "23c74860c19d0552a7096ce10491f54b51f4b9bb",
+    "review_document": "NS800_M0_Target_Evidence_Review_23c7486_20261027.md",
+    "registration_rule_followed": "复审明确不开纯 GO 登记轮 => 随本轮真实工作一并登记",
+    "collector_rework_needed": false,
+    "cp0_rerun_needed": false,
+    "errata": [
+      "M0-E1 motor state=4 = MOTOR_FAULT 非 IDLE, 且 cur/tgt 是软件命令值",
+      "M0-E2 超时只到\"IOIN 读报告超时\", ETIMEOUT 出口共 13 处而非三段",
+      "M0-E3 码表链闭合到仓内文件+默认目标宏转储(补 !RT_USING_NANO 前提); M0-E3b 撤回我口头说的\"连自身回声都没有=>线/供电被钳住\"",
+      "M0-CP1-F1 隐私扫描正则字符类缺陷(已上一轮登记, 本轮不重复计)"
+    ],
+    "cross_check_local": {
+      "rx_sizes_equal_review": true,
+      "session_sha_equal_review": true,
+      "retry_bytes_equal_archived": true,
+      "diff_paths": 8,
+      "non_reports_paths": []
+    },
+    "file": {
+      "bytes": 15199,
+      "sha256": "67cda84d91b818774175ef117e47e4858a2592b27de34b4d7c3d6c08a9e8fd67",
+      "path": "reports/reviews/phase8-motor-m0-uart-diagnosis/review_23c7486_registration.txt"
+    }
+  },
   "board_last_proven_bin_sha256": "5f30d3f058ceff516b2185aa3a1e597bbe63293b94a6fd801fd989a6f7b2b8e6",
   "board_last_proven_bin_bytes": 261452,
   "board_current_power_state": "POWERED_ON_USER_REPORTED / 断电与结束时刻未回报",
@@ -506,7 +557,7 @@
   "operator_closeout": null,
   "power_note": "上电由操作者执行并口头确认; 未给实际时刻, 故只记 USER_REPORTED",
   "a0_duration_evidence": "NOT_ACHIEVED",
-  "m0_status": "CP0_DELIVERED + CP1_EXECUTED_STOPPED_AT_NAMED_FAILURE / CP2 收尾等断电回报",
+  "m0_status": "CP0 accepted + CP1 executed (6 accepted, query 7 = target read reported timeout) + 板级证据独立复审 ACCEPTED_WITH_READ_TIMEOUT / CP2 收尾等断电回报",
   "m2_m3_status": "NOT_AUTHORIZED",
   "m2_m3_additionally_blocked_by": "M0 具名失败(链路身份未成立) + 仍缺同实物电机/限流依据",
   "candidate_bin_still_not_flashed": "a76b845db4ba1d8872f9db395c2e6e796bdb9416c398f010b669538006cf2777",
@@ -545,6 +596,11 @@
       "path": "reports/reviews/phase8-motor-m0-uart-diagnosis/cp1_onboard_capture.md",
       "bytes": 22118,
       "sha256": "36644cc6716495532f525297f1feb868bdf4590ef33ebd0573cf85545fe3cb30"
+    },
+    {
+      "path": "reports/reviews/phase8-motor-m0-uart-diagnosis/review_23c7486_registration.txt",
+      "bytes": 15199,
+      "sha256": "67cda84d91b818774175ef117e47e4858a2592b27de34b4d7c3d6c08a9e8fd67"
     }
   ],
   "first_failures_kept": [
@@ -565,6 +621,24 @@
       "what": "CP1 入库前的隐私自检有两处不实: (a) \"盘符+分隔符\"这一类从未真正执行过——正则字符类里的反斜杠被转义掉, 字符类实际只剩正斜杠, 因此单字母+冒号+反斜杠开头的绝对路径一律漏检; (b) 归档件说明行把\"没执行的检查\"写成\"命中 0\"的事实。用更正后的正则实测: 12 块原字节里 run1.stderr.bin 有 1 处仓根绝对路径(PowerShell 抛 STOP_FAILURE 时回显自身脚本位置), 其余 11 块为 0",
       "handling": "改正字符类为同时匹配两种分隔符并对解码后的原始字节执行; 该块按字节整段替换私有根后重新 base64, 块头同时登记\"归档\"与\"原字节\"的长度+SHA+替换处数(lossless=false, 485 B -> 489 B), 其余 11 块两种身份完全相同; 另写逐块复算校验器 m0_verify_capture.py 现场复算 12/12 通过; 原字节未删改仍在仓外运行目录; 交接的 audit() 也加了同类形状硬停; 顺带用更正后的正则重扫了已入库的 CP0 归档 14 块, 也是 0 命中(那件的\"命中 0\"到本轮才被真正执行过一次)",
       "attribution": "我的检查器缺陷与说明失真, 与被测采集器/板上固件无关, 不改变本轮任何结论"
+    },
+    {
+      "id": "M0-E1",
+      "what": "我把板上 `[MOT] state=4` 解读成\"Motor IDLE\", 并在结论句里写\"通信面 MCU 一侧正常, 链路问题在 UART2↔TMC 之间\"。实读 motor.h:111-115 枚举, 4 = MOTOR_FAULT; 而 COM5 是主机控制台, 它能查询只证明 msh/设备打开, 不证明 UART2 与模块接口",
+      "handling": "登记件 §2 逐字引用原句并给出更正口径(故障锁定/软件命令值/诊断路径各自边界); 已发布件不删不改写",
+      "attribution": "我自己的字段解读与范围外推错误, 由独立复审指出"
+    },
+    {
+      "id": "M0-E2",
+      "what": "我把 -RT_ETIMEOUT 的可能来源写成\"三个阶段\", 并写\"排除了取不到事务锁/能力缺失\"。本轮把 APP/tmc2209.c 全部 13 处 return -RT_ETIMEOUT 定位后发现: :1345/:1415/:632/:389 在**请求发出前**就返回超时(所以\"没发请求\"是一种可能), :563/:569 是**帧完整且 CRC 已过**仅因期限被判迟到(所以\"芯片可能答了\"也是一种可能); 另 :586-:588 把 n==0 与无匹配头合并成同一个 reason 名",
+      "handling": "登记件 §3 给出逐行出口表(行号+函数+reason)与五类阶段归类, 并把结论措辞收紧为\"IOIN 读操作报告超时\"; 禁止\"已证明芯片无应答/无回声\"这类写法",
+      "attribution": "我的枚举不完整与过度排除, 由独立复审 §4 表触发, 本轮回源码核清"
+    },
+    {
+      "id": "M0-E3",
+      "what": "码表推导我只写了 RT_USING_LIBC=1, 漏掉分支条件的一半(!RT_USING_NANO); 另外我在重试当轮口头补了一条无据推论\"RX 零字节连自身回声都没有⇒线/供电被钳住\"",
+      "handling": "本轮把推导闭合到仓内文件(kerrno.h:21/:25/:45 与 extension/sys/errno.h:14/:26) 加默认目标宏转储(__ARMCC_VERSION=6240002→ERROR_BASE_NO=7, RT_USING_NANO 未定义); 零回声推论按 M0-E3b 撤回并保留为未知(UART2 侧 rx_bytes 无只读导出)",
+      "attribution": "前提不完整 + 无据推断"
     }
   ],
   "open_items": [
@@ -575,8 +649,8 @@
     "BUG-008 / B-1 / RISK-03/03a / 物理 RISK-04-b / M-1/M-2/M-3 / 外部时基仍开放",
     "F-A(REQ FAIL 文本合并且不打错误码)按任务书仍只登记不改产品"
   ],
-  "remote_head_before_this_commit": "4cbcd4d23ef24a4af466e967d81c0cc60f3bee87",
-  "stop_claim": "M0_UART_DIAGNOSIS_EXECUTED_AND_STOPPED_AT_NAMED_FAILURE / AWAITING_INDEPENDENT_TARGET_EVIDENCE_REVIEW",
+  "remote_head_before_this_commit": "23c74860c19d0552a7096ce10491f54b51f4b9bb",
+  "stop_claim": "M0_TARGET_EVIDENCE_REVIEW_ACCEPTED_WITH_READ_TIMEOUT / CP2_CLOSEOUT_PENDING / TMC_LINK_UNPROVEN / SAFE_FOR_ENABLE=false / M2_M3_NOT_AUTHORIZED",
   "stop_lines": [
     "M0_UART_DIAGNOSIS_EXECUTED_OR_STOPPED / AWAITING_INDEPENDENT_TARGET_EVIDENCE_REVIEW",
     "NO PROGRAM / NO FLASH READ VIA TOOL / NO DAP / NO ACTIVE RESET / NO DEVICE ENUMERATION",

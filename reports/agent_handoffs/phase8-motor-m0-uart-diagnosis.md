@@ -24,6 +24,7 @@
 | `reports/reviews/phase8-motor-m0-uart-diagnosis/cp0_selftest_artifacts.md` | 29331 | `0e22e95bb6d44b51b67dedc37ee2b6adbeecdc1830c92c1903891b5883e6b864` |
 | `reports/reviews/phase8-motor-m0-uart-diagnosis/cp1_target_fault_analysis.txt` | 13733 | `f732102af0d4a2e6558faddb21f08958d25697d23981f578fd600e9751236b17` |
 | `reports/reviews/phase8-motor-m0-uart-diagnosis/cp1_onboard_capture.md` | 22118 | `36644cc6716495532f525297f1feb868bdf4590ef33ebd0573cf85545fe3cb30` |
+| `reports/reviews/phase8-motor-m0-uart-diagnosis/review_23c7486_registration.txt` | 15199 | `67cda84d91b818774175ef117e47e4858a2592b27de34b4d7c3d6c08a9e8fd67` |
 
 - 采集器 = 任务书附录 A **标记内围栏正文逐字提取**（未手抄、未转义、未改一字节）：24064 B / `2131af0e…`；ASCII=True、BOM=False、CR=0、LF=315、末尾恰一个 LF=True。
 - 启动夹具 = 复用既有原件 3757 B / `97b37f32…`（NUL=3/CR=96/LF=74，未删未重编码），并从 `4bb8e9f5…` 的 `cp3_wire_archive.md` base64 块**独立重取一次交叉核对**，逐字节相同。
@@ -42,6 +43,9 @@
 - `M0-CP0-F1`：我第一遍判定里**假设**本机 Write-Host 输出 CRLF, 据此写的行尾判据 FAIL; 实测本机 stdout 原始字节 82 B / CR=0, 其 SHA 与云端 Core 登记值相同。处置：不重跑 PowerShell, 用 run1 已保存的原始字节与产物重新套更正后的判据; run1 全部产物字节与第一遍判定文件原样保留, 更正判定另存 *_rejudged.json。归因：本地判读脚本缺陷, 与被测采集器无关
 - `M0-CP0-F2`：归档件隐私扫描第一版把 base64 载荷本身当文本扫, 误报四个私有串(base64 字母表巧合); 另有一处是我把被禁词字面写进了说明行。处置：改为**解码后的原始字节**扫描(14 块 20225 B 命中 0), 说明行改用类别描述不写字面 token; 两处都在入库前修正。归因：检查器口径缺陷
 - `M0-CP1-F1`：CP1 入库前的隐私自检有两处不实: (a) "盘符+分隔符"这一类从未真正执行过——正则字符类里的反斜杠被转义掉, 字符类实际只剩正斜杠, 因此单字母+冒号+反斜杠开头的绝对路径一律漏检; (b) 归档件说明行把"没执行的检查"写成"命中 0"的事实。用更正后的正则实测: 12 块原字节里 run1.stderr.bin 有 1 处仓根绝对路径(PowerShell 抛 STOP_FAILURE 时回显自身脚本位置), 其余 11 块为 0。处置：改正字符类为同时匹配两种分隔符并对解码后的原始字节执行; 该块按字节整段替换私有根后重新 base64, 块头同时登记"归档"与"原字节"的长度+SHA+替换处数(lossless=false, 485 B -> 489 B), 其余 11 块两种身份完全相同; 另写逐块复算校验器 m0_verify_capture.py 现场复算 12/12 通过; 原字节未删改仍在仓外运行目录; 交接的 audit() 也加了同类形状硬停; 顺带用更正后的正则重扫了已入库的 CP0 归档 14 块, 也是 0 命中(那件的"命中 0"到本轮才被真正执行过一次)。归因：我的检查器缺陷与说明失真, 与被测采集器/板上固件无关, 不改变本轮任何结论
+- `M0-E1`：我把板上 `[MOT] state=4` 解读成"Motor IDLE", 并在结论句里写"通信面 MCU 一侧正常, 链路问题在 UART2↔TMC 之间"。实读 motor.h:111-115 枚举, 4 = MOTOR_FAULT; 而 COM5 是主机控制台, 它能查询只证明 msh/设备打开, 不证明 UART2 与模块接口。处置：登记件 §2 逐字引用原句并给出更正口径(故障锁定/软件命令值/诊断路径各自边界); 已发布件不删不改写。归因：我自己的字段解读与范围外推错误, 由独立复审指出
+- `M0-E2`：我把 -RT_ETIMEOUT 的可能来源写成"三个阶段", 并写"排除了取不到事务锁/能力缺失"。本轮把 APP/tmc2209.c 全部 13 处 return -RT_ETIMEOUT 定位后发现: :1345/:1415/:632/:389 在**请求发出前**就返回超时(所以"没发请求"是一种可能), :563/:569 是**帧完整且 CRC 已过**仅因期限被判迟到(所以"芯片可能答了"也是一种可能); 另 :586-:588 把 n==0 与无匹配头合并成同一个 reason 名。处置：登记件 §3 给出逐行出口表(行号+函数+reason)与五类阶段归类, 并把结论措辞收紧为"IOIN 读操作报告超时"; 禁止"已证明芯片无应答/无回声"这类写法。归因：我的枚举不完整与过度排除, 由独立复审 §4 表触发, 本轮回源码核清
+- `M0-E3`：码表推导我只写了 RT_USING_LIBC=1, 漏掉分支条件的一半(!RT_USING_NANO); 另外我在重试当轮口头补了一条无据推论"RX 零字节连自身回声都没有⇒线/供电被钳住"。处置：本轮把推导闭合到仓内文件(kerrno.h:21/:25/:45 与 extension/sys/errno.h:14/:26) 加默认目标宏转储(__ARMCC_VERSION=6240002→ERROR_BASE_NO=7, RT_USING_NANO 未定义); 零回声推论按 M0-E3b 撤回并保留为未知(UART2 侧 rx_bytes 无只读导出)。归因：前提不完整 + 无据推断
 
 ## 4.5 CP1 真机会话（已批准的七条只读查询）
 
@@ -56,6 +60,16 @@
 - 原始字节 12 块 base64 归档：`reports/reviews/phase8-motor-m0-uart-diagnosis/cp1_onboard_capture.md`；故障分析：`reports/reviews/phase8-motor-m0-uart-diagnosis/cp1_target_fault_analysis.txt`。
   归档不是逐字无损：唯一改动是把私有根（仓根/仓外工作目录/构建目录）整段换成代号，实测只有 `run1.stderr.bin` 命中 1 处（485 B → 489 B，块头标 `lossless=false` 并登记两种身份），其余 11 块原字节与归档字节完全相同；逐块复算（长度/SHA/替换数/lossless 标志/解码零私有形状）12/12 通过，`session.rx.bin == 八份 RX 按序拼接` 也按解码字节复算为真。原字节未删改，仍在仓外运行目录，可按登记的原字节 SHA 取回比对。见 `M0-CP1-F1`。
 
+## 4.6 板级证据独立复审登记 + 三条口径勘误（不开纯 GO 轮）
+
+- 判定 `M0_TARGET_EVIDENCE_REVIEW_ACCEPTED_WITH_READ_TIMEOUT`，接受对象 `23c74860`；明确不需返修采集器、不重跑 CP0、不单开登记轮 ⇒ 随本轮真实工作一并登记在 `review_23c7486_registration.txt`（15199 B / `67cda84d91b81877`）。
+- **M0-E1**：`[MOT] state=4` 是 **MOTOR_FAULT**（`motor.h:111-115` 枚举 IDLE0/ACCEL1/CRUISE2/DECEL3/**FAULT4**），已发布件 §6 里"Motor IDLE"这句**是错的**；`cur/tgt=0` 是软件命令值不是"物理无脉冲"；`step_status` 未占用只描述诊断路径。同句里"链路问题在 UART2↔TMC 之间"也过强：COM5 是主机控制台，能查询只证明 msh/设备打开这一段。
+- **M0-E2**：已发布件把超时说成"三个阶段能产出"——**数目偏少**。本轮把 `APP/tmc2209.c` 里 13 处 `return -RT_ETIMEOUT` 连同所在函数全部列出并断言，其中 :1345/:1415/:632/:389 是**一个字节都还没上线**就报超时，:563/:569 是**帧完整且 CRC 已过、仅因期限被判迟到** ⇒ "已证明芯片无应答"这种写法禁止；我原句"排除了取不到事务锁"只对一半（被排除的是 -RT_ENOSYS/-RT_EBUSY 两个码）。:586-:588 还把"0 字节"与"有字节无匹配头"合并成同一个 reason 名，所以 `TMC_XFER_RX_TIMEOUT_ECHO` 不能当"收到回声"的证据。
+- **M0-E3**：`-117` 的码表推导本轮闭合到**仓内文件 + 默认目标宏转储**：`kerrno.h:21` 的条件是 `RT_USING_LIBC && !RT_USING_NANO`（我原句漏了后一半），转储实测 __ARMCC_VERSION=6240002 → `ERROR_BASE_NO=7` 分支、RT_USING_NANO 未定义 ⇒ ETIMEDOUT=7+110=117（与观测相等），EBUSY=23、EIO=12、ENOSYS=45、EINVAL=5（armcc 保留值，不机械套 7+22）。
+- **M0-E3b（我的口头推论，已撤回）**：重试当时我说过"RX 拿到 0 字节、连自身回声都没有 ⇒ 指向线/供电被钳住"。这不成立：COM5 被动窗口的字节数与 UART2 侧的 `rx_bytes` 是两回事，后者没有任何只读命令导出，且该 reason 名合并了两种情形。撤回后保留为未知。
+- **包外重试如实登记**：用户当轮指令"再试试能不能通信"发起，用掉 **1 次 COM5 打开 + 1 条只读 `tmc_uart_probe`**（0 个 WRITE 帧）；响应 184 B / `df10a658e9320b25` 与 CP1 归档块 `008_tmc_uart_probe.rx.bin`**逐字节相同** ⇒ 同一具名失败第二次独立复现。这不给已用尽的 M0 包续额度。
+- **ENN 使能实验我方未执行**（用户提议）：本仓 10-22 实录显示芯片在 `IOIN&1=1`（ENN 禁能侧）且 `GCONF` bit6=0 时就正常读到七个寄存器值 ⇒ 拉使能不是通信前提；而由 MCU 拉 ENN 只能绕过安全链裸写 `pin write IO87 HIGH`。已改提合规替代：操作者在硬件侧做成使能态，我方用只读 `safety_status` 验证 PC.6 反馈是否由 HIGH 变 LOW。
+
 ## 5. 边界与下一步
 
 ```text
@@ -65,6 +79,7 @@ NO A0 TRIPS / NO A0 INIT / NO CLEAR_RECORDS / NO AUTO RETRY / NO AUTOMATIC RESTO
 A0_DURATION_EVIDENCE NOT_ACHIEVED / M2_M3 NOT_AUTHORIZED
 FINAL_POWER_STATE = UNKNOWN(用户未回报, 不推断)
 hardware_actions = 操作者常规上电1次 + COM5打开1次 + 只读命令7条(其中 tmc_uart_probe 1次)
+                 + 包外重试: COM5打开1次 + tmc_uart_probe 1条(用户当轮指令, 不给M0包续额度)
 仍为 0: 下载/程序 0  读片内Flash 0  DAP 0  主动复位 0  端口设备枚举 0  配置写入 0
         清故障 0  arm/start/stop/disarm/DIR/STEP/HIGH 0  a0 init/trip/dump/clear 0
         目标上自检 0  地址扫描 0  Keil 构建 0  主机链重跑 0

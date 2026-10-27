@@ -1,0 +1,147 @@
+# NS800 M0 板级证据独立复审登记 + 三条口径勘误（随本轮真实工作一并登记，不开纯 GO 轮）
+
+轮次 phase8-motor-m0-uart-diagnosis    复审对象 `23c74860`（本机 HEAD == `ls-remote` 远端头 == `23c74860`）
+复审件 NS800_M0_Target_Evidence_Review_23c7486_20261027.md    判定 `M0_TARGET_EVIDENCE_REVIEW_ACCEPTED_WITH_READ_TIMEOUT`
+复审 §2 的"14 块/12 块独立解码、台账计数、七条真实响应复放"由云端完成；本文件不把它算作我方执行。
+  本机未新增任何设备动作于复审登记本身；用户当轮指令发起的那次串口重试单独在 §5 节登记。
+
+==============================================================================
+1. 接受范围与不回写的东西
+==============================================================================
+  · 接受：真实执行、停止与归档证据成立；目标结果就是第 7 条 IOIN 读**报告超时**，TMC 通信未通过。
+  · 不需返修采集器、不重跑 CP0、不单开文档登记轮（复审 §2/§8 明确）。
+  · 已发布件（`cp1_target_fault_analysis.txt` 于 23c7486）不删不改写；勘误只落在本文件与交接，原句逐字引用如下。
+  · 生产源码/工程/镜像/host 输入本轮零改动：相对 document_base 的 8 条差异路径全部在 reports/ 下
+    （非 reports = 无）。
+
+==============================================================================
+2. M0-E1：`state=4` 不是 IDLE，也不许写"Motor 正常静止"
+==============================================================================
+  已发布原句（cp1_target_fault_analysis.txt §6）：
+    · 六条 MCU 侧状态全部可读且互相自洽（Safety 锁存=自检拒绝、许可 LOW+回读=0、ENN 在禁能侧、Motor IDLE/armed=0、STEP 通道未占用）=> 通信面 MCU 一侧正常，链路问题在 UART2↔TMC 之间。
+  两处收紧都不成立，按下面更正：
+    motor.h:111  MOTOR_IDLE = 0,     /* 未 armed 或已减速到 0 */
+    motor.h:112  MOTOR_ACCEL,
+    motor.h:113  MOTOR_CRUISE,
+    motor.h:114  MOTOR_DECEL,
+    motor.h:115  MOTOR_FAULT,        /* 紧急停机后锁定 */
+  实读枚举 = MOTOR_IDLE 0 / ACCEL 1 / CRUISE 2 / DECEL 3 / **FAULT 4** ⇒ 本轮 `state=4` 是 **MOTOR_FAULT**。
+  更正口径：`[MOT] state=4 armed=0 cur=0 tgt=0` 只说明"Motor 处于故障锁定、未 armed、软件命令速度与目标为 0"；
+    `cur/tgt=0` 是**软件命令值**，不是"物理无脉冲"的测量；`[STEP] enabled=no last_stop=not-attempted`
+    描述的是**诊断路径**未占用该通道，不能单独推出"STEP 引脚从未输出过"。
+  原句的后半"通信面 MCU 一侧正常，链路问题在 UART2↔TMC 之间"同样**过强**：COM5 是主机控制台，
+    控制台可查询只证明 msh/uart2 设备打开这一段，不证明 UART2 时钟、引脚、波特率、模块接口正常；
+    且超时可能发生在**还没发出请求**之前（见 §3），所以不能把范围写成"UART2↔TMC 之间"。
+
+==============================================================================
+3. M0-E2：`-117` 只到"IOIN 读操作报告超时"，且出口比我原来说的多
+==============================================================================
+  已发布原句（§2）："仍未收敛到的（必须保留为未知，不得写"已定位"）：同一 -RT_ETIMEOUT 有三个阶段能产出，"
+  —— **出口数目偏少，且漏掉两个关键出口**。
+  本轮把 `APP/tmc2209.c` 里每一条 `return -RT_ETIMEOUT` 连同**所在函数**与**已置 reason**定位并断言（共 13 处）：
+    :309   tmc_rx_flush()         reason=TMC_XFER_BUDGET_EXHAUSTED
+    :336   tmc_rx_flush()         reason=TMC_XFER_RX_FLOOD
+    :347   tmc_rx_flush()         reason=TMC_XFER_BUDGET_EXHAUSTED
+    :389   tmc_tx_frame()         reason=TMC_XFER_BUDGET_EXHAUSTED
+    :419   tmc_tx_frame()         reason=TMC_XFER_BUDGET_EXHAUSTED
+    :424   tmc_tx_frame()         reason=TMC_XFER_TX_FAILED
+    :563   tmc_read_reg_locked()  reason=TMC_XFER_BUDGET_EXHAUSTED
+    :569   tmc_read_reg_locked()  reason=TMC_XFER_RX_TIMEOUT_PART
+    :591   tmc_read_reg_locked()  reason=TMC_XFER_RX_TIMEOUT_ECHO/PART(:586-:588 三元, n==0 与无匹配头合并)
+    :609   tmc_read_reg_locked()  reason=TMC_XFER_BUDGET_EXHAUSTED
+    :632   tmc_xfer_take()        reason=（该出口不写 st->reason）
+    :1345  tmc_cfg_lock_take()    reason=（该出口不写 st->reason）
+    :1415  tmc_cfg_hw_open()      reason=TMC_XFER_BUDGET_EXHAUSTED
+  其中**一个字节都还没上线**就能返回 -RT_ETIMEOUT 的出口：:389 :632 :1345 :1415 —— :389 在 :397 真正写之前；
+    :632/:1345 在取锁前看剩余预算；:1415 在发起 open 前看剩余预算。
+  阶段归类（今后引用超时不许再写"三个阶段"）：
+    ① 请求发出前（不碰线）：:1345 配置事务锁 / :1415 hw open / :632 传输锁 / :389 TX 预算；
+    ② 排空 RX 阶段：:309/:347 预算、:336 RX 洪水（"没排干净"本身也报超时）；
+    ③ 发送阶段：:419 写后预算、:424 末字节写出之后才判逾期（字节**可能已上线**）；
+    ④ 接收阶段：:609 轮询中空窗越过预算、:591 未拿到匹配完整帧（reason 把"0 字节"与"有字节无头"合并）；
+    ⑤ **帧已完整且 CRC 已过**：:563 总预算为 0、:569 阶段期限已过 —— 这两条意味着
+       "芯片可能确实回答了，只是被判迟到而不发布成功"，因此**禁止**写"已证明芯片无应答"。
+  与复审 §4 表逐条对齐的源码事实：
+    · :632 `tmc_xfer_take()` 在**剩余预算为 0** 时直接返回 -RT_ETIMEOUT —— 此时本次请求一个字节都还没发；
+      它既不是 :628 的 `tmc_lock_ok`（-RT_ENOSYS=45），也不是 :634 的取锁失败（-RT_EBUSY=23）。
+      ⇒ 我原句"排除了取不到事务锁这一类"只对了一半：被排除的是 ENOSYS/EBUSY 两个码，**不能**排除"进锁前预算已耗尽"。
+    · :559 与 :565 —— **完整帧且 CRC 已通过**，仅因总预算/阶段期限过期而 `不发布成功`（:569 注释原文）。
+      ⇒ "芯片完全没回答"这种写法禁止：本轮证据允许"芯片答了但迟到被拒"这一可能。
+    · :580-:591 未拿到匹配完整帧的超时分支；:586-:588 把 `n == 0`（一个字节都没收到）与
+      "有字节但没找到应答头/回声" **合并**成同一个 `TMC_XFER_RX_TIMEOUT_ECHO`（:91 定义，:187 字符串 "rx-timeout-echo"）。
+      ⇒ 该枚举名**不能**当"确实收到了回声"的证明；要区分必须同时导出字节数与帧事实。
+    · :548-:552 CRC 比较失败是另一个直接出口（-RT_EIO=12），与本轮 -117 不同；但不能据此排除噪声/丢字节/短帧。
+  正确的结论措辞（今后一律照此）：**第 7 条 `tmc_uart_probe` 的 IOIN 读操作返回 -RT_ETIMEOUT（报告超时），
+    TMC 链路仍 LINK_UNPROVEN**；阶段归属、芯片是否应答、TX 还是 RX 侧，全部保留为未知。
+
+==============================================================================
+4. M0-E3：码表推导本轮闭合到仓内文件（我原句缺了 `!RT_USING_NANO` 这一半前提）
+==============================================================================
+  已发布原句：RT_USING_LIBC=1（走 POSIX 兼容分支）、RT_ETIMEOUT=ETIMEDOUT、ETIMEDOUT=(ERROR_BASE_NO + 110)、ERROR_BASE_NO=7
+  —— 只写了 `RT_USING_LIBC=1`，**没写**"且 RT_USING_NANO 未定义"；该条件是分支的一半；
+    kerrno.h:21   #if defined(RT_USING_LIBC) && !defined(RT_USING_NANO)
+    kerrno.h:25   #define RT_ETIMEOUT                     ETIMEDOUT       /**< Timed out */      <- POSIX 分支
+    kerrno.h:45   #define RT_ETIMEOUT                     2               /**< Timed out */      <- 数字分支（本配置未走这条；若走了应是 -2 而不是 -117）
+  ERROR_BASE_NO 也有三个分支，取哪一个由编译器宏决定：
+    errno.h:14/:26   #if defined(__ARMCC_VERSION) / #define ERROR_BASE_NO    7
+    errno.h:28/:35   __IAR_SYSTEMS_ICC__ → #define ERROR_BASE_NO    36（IAR，未采用）
+    errno.h:38       #define ERROR_BASE_NO    0（其他，未采用）
+  默认目标（= 板上那份镜像的构建配置）armclang 预定义转储实测：
+    __ARMCC_VERSION=6240002   RT_USING_LIBC=1   RT_USING_NANO=（未定义）   ERROR_BASE_NO=7
+    ETIMEDOUT=(ERROR_BASE_NO + 110) = 117 ｜ EBUSY=23 ｜ EIO=12 ｜ ENOSYS=45 ｜ EINVAL=5（armcc 保留值，不机械套 7+22）
+  ⇒ `-117` = `-RT_ETIMEOUT` 的推导**不依赖**任何桌面 errno 教材值；观测值与算式在 117 处相等（断言通过）。
+
+==============================================================================
+5. 包外重试（用户当轮指令发起，不属于已用尽的 M0 包，也不给它续额度）
+==============================================================================
+  动机：用户要求"再试试能不能通信"。动作：**1 次 COM5 打开 + 1 条只读 `tmc_uart_probe`**，0 个 WRITE 帧；无复位/下载/读 Flash/DAP/枚举/配置写入/清故障/任何电机动作。
+  结果：响应 184 B / `df10a658e9320b25b28ff675ea9bf20832165e92e6c77906ae9dbd9642e80b81`，与 CP1 归档块 `008_tmc_uart_probe.rx.bin` 的**原字节逐字节相同**（本机断言：True），也与板上原件 `df10a658e9320b25b28ff675ea9bf20832165e92e6c77906ae9dbd9642e80b81` 相同 ⇒ 同一具名失败第二次独立复现，不是偶发。
+  台账外的采集事实：被动窗口 0 B（回复 184 B / 1.67 s，一次打开成功），端口 115200 8N1 无流控 DTR/RTS=false；原始字节留仓外。
+  ⚠ 我当场口头给过一条**不该给的推论**（登记为 M0-E3b 并撤回）：曾说"RX 拿到 0 字节，连自身回声都没有，  所以指向线/供电被钳住"。该推论不成立：COM5 的被动窗口字节数与 **UART2 侧**的 rx_bytes 是两回事，  后者没有任何只读命令导出；而且 :586-:588 把"0 字节"与"有字节但无匹配头"合成同一个 reason 名。  撤回后保留为未知，不据此排障。
+  另：用户提议"把 TMC 的 ENN 拉到使能再试"，我方**未执行**。依据是本仓 10-22 的真机实录——
+    | 1 | 17:29:54.130 | `tmc_regs` | `GCONF=0x00000101` `GSTAT=0x00000001` `IFCNT=0x00000000` `IOIN=0x21000041` `VACTUAL=0x00000000` `CHOPCONF=0x15010053` `SGRESULT=0x00000000` |
+    完全同值：`IOIN=0x21000041 VERSION=0x21`、`IFCNT=0x00000000`，计算值 `ENN=IOIN&1=1`、
+    即那次在 **ENN 处于禁能侧**（`IOIN=0x21000041` 的 bit0=1）且 **GCONF=0x00000101 的 bit6 PDN_DISABLE=0** 的情况下，UART 正常读到七个寄存器值 ⇒ "使能侧 ENN"与"PDN_DISABLE=1"都不是 UART 应答的前提。而由 MCU 拉 ENN 的唯一路径是绕过安全链的裸
+    `pin write IO87 HIGH`（板上 Safety=FAULT_LATCHED、arm 门 0x1B、写入门禁 0x3B 会合法拒绝正规路径），
+    且拉完仍读不到任何东西 ⇒ 拒绝执行，改提"由操作者在硬件侧做成使能态、我方用只读 safety_status 验证
+    ENN 反馈是否真的到使能侧（PC.6 由 HIGH 变 LOW）"的合规替代。该判断属**推断**，不是实测。
+
+==============================================================================
+6. 本机对复审数字的交叉复算（各件与云端一致才算登记成立）
+==============================================================================
+  复审 §2 的 CP1 八份 RX 尺寸与 session SHA，本机从归档块头+解码复算：
+    尺寸 [0, 156, 346, 79, 488, 1225, 249, 184] == 复审 [0, 156, 346, 79, 488, 1225, 249, 184] ? True
+    session 2727 B / `6e7794efaba83230` == 复审 6e7794ef… ? True ｜ 八份按序拼接 == session ? True
+    台账复算 {"M0_COMMAND_CHECKED": 6, "READ_ONLY_PROBE_READY": 1, "RX_BEGIN": 8, "RX_FILE": 8, "SERIAL_OPEN": 1, "SERIAL_OPEN_ATTEMPT": 1, "STOP_FAILURE": 1, "TX_ATTEMPT": 7} ｜ M0_COMPLETE/RESET_ATTEMPT = 0/0
+    归档块头配对 12 个，lossless=false 仅 1 块（run1.stderr.bin）——替换处数/两种身份逐块复算见交付前的校验器输出。
+  采集器远端字节仍为 24064 B / `2131af0ef32b0d9a`，与预审附录一致： True
+  冻结引用本机独立复算未变：main=1b3757eec550 phase7=6d3fbc559d45 tag=097935fec5a6
+
+==============================================================================
+7. 保留状态与下一步（复审 §5/§6 口径）
+==============================================================================
+  · CP2 收尾仍等**操作者断电回报**（先关 24 V、再拔 USB，SW1 保持阻断）；未回报前本次最终供电状态 UNKNOWN。
+    我方不再为"确认断电"另开串口/复位/重试，也不自动恢复快照。
+  · 优先低成本实物依据（断电后，不拆模块不改线）：扩展板与 TMC 模块整体照片、可见型号/方向/地址跳帽、
+    UART 接线两端、电机铭牌。看不到模块背面就直说，不为拍照带电测试或自行拔模块。
+  · 若走软件观测：下一份**离线产品任务**只围绕 TMC 读事务观测，复用既有预算与统计，且一次做足（阶段+原始 rc+
+    预算/耗时+tx_written/rx_bytes/flush_bytes；是否匹配应答头/是否完整/CRC 是否真通过/是否仅因期限过期被拒，
+    未到达阶段必须显式 NOT_REACHED；有界 hex 片段与截断标志，区分回显/错误头/短帧；返回后再打印、短 ASCII、
+    不越控制台上限；不改地址/波特率/超时/预算/CRC/判定，不加重试，不写配置、不清故障；同轮交主机验证+
+    默认与测量两目标构建+新镜像散列+一次有界现场包准备，拿到散列再请用户批准）。
+    复审明确：这只是**范围建议**，不授权改产品、不授权下载新镜像、不授权任何新板级动作。
+  · 从已用尽的 M0 包**不存在自动续额度**：再次上电/开 COM5/probe 都需新的具体包与批准。
+
+```text
+M0_TARGET_EVIDENCE_REVIEW_ACCEPTED_WITH_READ_TIMEOUT  (accepted object = 23c74860c19d0552a7096ce10491f54b51f4b9bb)
+CP0 accepted; CP1 executed; 6 accepted; query 7 = target read reported timeout (-RT_ETIMEOUT)
+TMC_LINK_UNPROVEN / SAFE_FOR_ENABLE=false / CP2_CLOSEOUT_PENDING / POWER_STATE=UNKNOWN(未回报)
+MOTOR_STATE_FIELD_READING = MOTOR_FAULT(4), NOT IDLE; cur/tgt 是软件命令值; step_status 只描述诊断路径
+NOT_CLAIMED = 芯片未应答 / 无回声 / 范围限定在 UART2↔TMC —— 均已撤回或降为未知
+BOARD_LAST_PROVEN_IMAGE=5f30d3f0… (既有回读+声明连续性, 本轮未新读横幅/哈希)
+M1_CANDIDATE=a76b845d… NOT_PROGRAMMED / FOUR_ON_BOARD_MACROS=0 / MOTOR_PHYSICALLY_DISCONNECTED(上次回报)
+A0_DURATION_EVIDENCE=NOT_ACHIEVED / M2_M3_NOT_AUTHORIZED
+NO_NEW_SERIAL(beyond §4 disclosed retry) / NO_NEW_RESET / NO_NEW_DAP / NO_NEW_FLASH_ACTION / NO_AUTO_RESTORE
+OUT_OF_PACKAGE_RETRY: 1 open + 1 read-only probe, response 184 B = archived bytes (identical failure)
+sw1_cut.ps1 未运行(HOLD) / a0_export_gate.py 未改未调用 / 生产与工程输入零改动
+```
