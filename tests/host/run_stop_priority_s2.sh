@@ -61,8 +61,11 @@ GROUP_TIMEOUT="${S2_GROUP_TIMEOUT:-60}"
 # CP5 §5: 追加**真实 HAL 叶子链**的四个组(同一 runner、同一台账纪律, 但跑**第二个二进制**):
 #   epwm_leaf / tmc_lock / uart_leaf / budget_leaf  =>  C10 / C16 / C17 / C18
 # 其余十三组仍跑端口层那个二进制(它们测应用本体, 三段叶子是端口桩)。
-S2_GROUPS="lock isr isr_window off_matrix off_arm unknown identity diag recovery stale boundary healthy target_reject epwm_leaf tmc_lock uart_leaf budget_leaf"
-LEAF_GROUPS=" epwm_leaf tmc_lock uart_leaf budget_leaf "
+# URO(2026-10-27 §6.1): read_obs 也跑**同一个叶子二进制**, 但它是只读通信观测, 不取
+#   写入门禁 => 在 target 与 host_ovr **两个变体都真执行**(不许整族 SKIP, 也不许为了
+#   跑本组在 target 里偷偷开宏)。旧四组的 target 整族 SKIP 保持原样、身份不变。
+S2_GROUPS="lock isr isr_window off_matrix off_arm unknown identity diag recovery stale boundary healthy target_reject epwm_leaf tmc_lock uart_leaf budget_leaf read_obs"
+LEAF_GROUPS=" epwm_leaf tmc_lock uart_leaf budget_leaf read_obs "
 
 # 每组每变体**必需**(必须真执行且判 PASS)的用例 id; 名称与夹具里的 CASE id 逐字一致。
 G_lock_target="C01-fast-before-lock-then-wait C01b-commits-after-release-no-second-close C01c-ss-lock-error-no-ack C02-mot-lock-held-then-commits C02b-mot-lock-error-no-place"
@@ -124,6 +127,16 @@ G_uart_leaf_host_ovr="C17a-no-space-expires-with-zero-written C17b-partial-send-
 G_budget_leaf_target=""
 G_budget_leaf_host_ovr="C18a-single-budget-covers-subreads-and-ifcnt C18a2-summary-published-after-real-success C18b-budget-exhausts-without-reopening C18c-wraparound-with-room-succeeds C18c2-wraparound-expiry-is-unsigned-delta C18d-late-real-success-cannot-refresh-summary"
 
+# --------------------------------------------------------------------------
+# URO(2026-10-27 任务书 §6.1/§6.2): read_obs = 读事务观测 + RX 期限修正的 24 条具名用例
+#   (URO01..URO22, 其中 URO06/URO22 各带一条同族子身份 URO06b/URO22b)。
+#   **两个变体都真执行**: 只读观测不需要把四个安全宏翻成 1; 因此 target 的这一组
+#   没有 SKIP 名额(S_read_obs_target 为空), 出现任何 SKIP 都会被判台账不自洽。
+#   旧四个叶子组的 target 整族 SKIP 保持原样, 本组不适用那套写法。
+# --------------------------------------------------------------------------
+G_read_obs_target="URO01-healthy-read-publishes-real-value URO02-healthy-prestage-reply-inside-window URO03-reply-at-110-accepted-by-fixed-deadline URO04-stage-deadline-boundary-pair URO05-total-budget-exhausted-before-rx-entry URO06-lock-refusal-sends-nothing-and-releases-nothing URO06b-zero-remaining-budget-does-not-even-attempt-lock URO07-flush-limits-keep-flush-fact-tx-not-reached URO08-tx-no-space-zero-written-rx-not-reached URO09-partial-tx-keeps-real-written-count URO10-expire-after-last-byte-keeps-written-four URO11-rx-zero-bytes-not-claimed-as-echo URO12-exact-four-byte-echo-only URO13-wrong-header-or-wrong-reg-kept-as-raw-bytes URO14-header-matched-short-frame URO15-complete-frame-crc-error-keeps-eio URO16-complete-legal-frame-rejected-only-by-total-deadline URO17-long-stream-slide-counts-prefix-tail-truncation URO18-tick-wraparound-uses-unsigned-deltas URO19-probe-per-record-facts-and-early-exit URO20-probe-stays-read-only-and-prints-after-txn-release URO21-output-bounded-and-illegal-context-silent URO22-observation-on-off-equivalent-on-same-input URO22b-observation-never-invents-a-success"
+G_read_obs_host_ovr="$G_read_obs_target"
+
 # 每个 组×变体 **允许**的 SKIP id(与夹具内 SKIPV 的字面 id 一致)。
 S_off_arm_target="C05c C05d"
 S_off_arm_host_ovr=""
@@ -145,6 +158,8 @@ S_uart_leaf_target="C17"
 S_uart_leaf_host_ovr=""
 S_budget_leaf_target="C18"
 S_budget_leaf_host_ovr=""
+S_read_obs_target=""
+S_read_obs_host_ovr=""
 
 # 变体期望的用例总数(全开时): 少一组/少一个 id 都不算通过。
 # CP5 §4: recovery 组的 C14 拆成 C14a/C14b 两个**确定接缝** => 22->23 / 40->41。
@@ -152,8 +167,10 @@ S_budget_leaf_host_ovr=""
 # host_ovr 追加真实执行的 27 条(7+7+7+6) => 41 -> 68。
 # CP6 §2/§3: C10 追加 3 条数值反推用例(7->10)、C16 追加 8 条真实叶锁有界等待
 # (7->15) => 41 + (10+15+7+6)=38 => 68 -> 79。
-S2_EXPECT_target="${S2_EXPECT_target:-23}"
-S2_EXPECT_host_ovr="${S2_EXPECT_host_ovr:-79}"
+# URO §6.1: read_obs 在两个变体都真执行 24 条 => target 23+24=47, host_ovr 79+24=103。
+# 旧的 23/79 合同没被改动(各组身份与数量逐字保留), 新用例**另计**。
+S2_EXPECT_target="${S2_EXPECT_target:-47}"
+S2_EXPECT_host_ovr="${S2_EXPECT_host_ovr:-103}"
 
 VARIANTS="target host_ovr"
 
@@ -596,6 +613,31 @@ PAIRS = {
         '            sp_retain_held(code, events);\n'
         '            /* NEGATIVE-INJECTION(rev_fail_returns_owner_early): 失败后不再收回"未知持有" */\n'
         '            sp.trips++;')],
+    # ------------------------------------------------------------------
+    # URO(任务书 §6.3 的两项**局部**反向, 都落在真实生产本体 tmc2209.c 上, 只改仓外副本):
+    #   rev_rx_deadline_old_origin   把修正后的 RX 期限表达式**退回旧起点算式**(漏掉已经
+    #     花掉的 used)。健康正控(URO01/URO02/URO22)注入后仍必须通过, URO03(应答在第 110
+    #     tick 才可见)必须具名检出; URO04/URO16 是同一条缺陷的期限边界例, 一并预登记。
+    #   rev_obs_drop_raw_rx_capture  只去掉**原始字节取样/样本计数更新**, 保留业务解析与
+    #     真实接收总量(rx_total 照常累加) => 必须由 URO12(精确 4 字节回显)与 URO17(跨缓冲
+    #     滑动的前缀/尾部/截断标志)的原始字节断言具名检出, 不得靠业务失败码或崩溃算检出。
+    # ------------------------------------------------------------------
+    'rev_rx_deadline_old_origin': [('mc',
+        '        left = b->total - used;\n'
+        '        allowance = (stage_cap < left) ? stage_cap : left;\n'
+        '        eff_end = b->start + used + allowance;\n',
+        '        left = b->total - used;\n'
+        '        allowance = (stage_cap < left) ? stage_cap : left;\n'
+        '        /* NEGATIVE-INJECTION(rev_rx_deadline_old_origin): 期限重新锚在旧起点, '
+        '漏掉已花掉的 used = a691eb5 的原算式 */\n'
+        '        eff_end = b->start + allowance;\n')],
+    'rev_obs_drop_raw_rx_capture': [('mc',
+        '    obs->rx_total += (rt_uint32_t)got;\n'
+        '    for (i = 0; i < got; ++i)\n',
+        '    obs->rx_total += (rt_uint32_t)got;\n'
+        '    /* NEGATIVE-INJECTION(rev_obs_drop_raw_rx_capture): 保留总量与业务解析, '
+        '只去掉样本取样/样本计数更新 */\n'
+        '    for (i = 0; i < (rt_size_t)0; ++i)\n')],
 }
 
 subs = PAIRS[mode]
@@ -700,7 +742,7 @@ if [ "$REVERSE" = "1" ]; then
     fi
     matrix=()
     note ""
-    note "=== S2 反向(5 项家族, 仓外副本; 正常对照已先通过) ==="
+    note "=== S2 反向(7 项家族, 仓外副本; 正常对照已先通过) ==="
     reverse_s2 rev_stale_identity_gate host_ovr "identity stale" \
         "C09b-late-actions-rejected-no-write C15b-old-identity-rejected-no-write"
     reverse_s2 rev_permit_confirm_identity_gate host_ovr "identity" \
@@ -712,6 +754,13 @@ if [ "$REVERSE" = "1" ]; then
         "C17c-expired-after-last-byte-not-a-success C16c-rx-flood-byte-cap-stops-before-tx"
     reverse_s2 rev_fail_returns_owner_early host_ovr "diag" \
         "C11d-diag-fail-keeps-owner-single-close"
+    # URO §6.3: 两项局部反向都跑 read_obs 组(同一个叶子二进制、同一套台账纪律)。
+    #   健康正控在注入后**仍然必须通过**(否则"检出"来自本来就坏的链), 所以 groups 只给
+    #   read_obs, 预登记失败身份只列 deadline 缺陷的三条边界/反例与两条原始字节断言。
+    reverse_s2 rev_rx_deadline_old_origin host_ovr "read_obs" \
+        "URO03-reply-at-110-accepted-by-fixed-deadline URO04-stage-deadline-boundary-pair URO16-complete-legal-frame-rejected-only-by-total-deadline"
+    reverse_s2 rev_obs_drop_raw_rx_capture host_ovr "read_obs" \
+        "URO12-exact-four-byte-echo-only URO17-long-stream-slide-counts-prefix-tail-truncation"
     note ""
     note "=== S2 反向汇总 ==="
     for m in "${matrix[@]}"; do note "$m"; done
@@ -721,7 +770,7 @@ if [ "$REVERSE" = "1" ]; then
         for m in "${matrix[@]}"; do echo "$m"; done
     } > "$OUT_DIR/s2_reverse_status.txt"
     if [ "$overall" -eq 0 ]; then
-        note "S2 REVERSE RESULT: PASS —— 五项注入均命中预登记业务失败身份(rc=1, 台账自洽)"
+        note "S2 REVERSE RESULT: PASS —— 七项注入均命中预登记业务失败身份(rc=1, 台账自洽)"
     else
         note "S2 REVERSE RESULT: FAIL (rc=$overall)"
     fi
@@ -757,7 +806,7 @@ note "实际执行集合:$executed_note (每组一个独立进程)"
 if [ "$overall" -eq 0 ]; then
     note ""
     if [ "$SELECTED" = "$S2_GROUPS" ]; then
-        note "S2 RUNNER RESULT: PASS (rc=0) —— target 与 host_ovr 全部 13 组的必需用例真执行且判 PASS"
+        note "S2 RUNNER RESULT: PASS (rc=0) —— target 与 host_ovr 全部 $(printf '%s\n' $S2_GROUPS | grep -c .) 组的必需用例真执行且判 PASS"
     else
         note "S2 RUNNER RESULT: PASS(rc=0) —— **仅所选组**($SELECTED)的必需用例真执行且判 PASS; 未选择的组本轮未执行"
     fi
