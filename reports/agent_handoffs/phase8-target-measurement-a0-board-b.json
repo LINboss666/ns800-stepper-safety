@@ -1,6 +1,6 @@
 {
   "round": "phase8-target-measurement-a0-board-b",
-  "phase": "CP0 离线准备与采集器硬门前置（未执行任何硬件动作）",
+  "phase": "CP0 离线前置 + CP1 现场隔离与一次供电 + CP2 一次下载与一次载荷回读 —— 已完成; CP3 字节采集待执行(在同一已批准整包内)",
   "date_local": "2026-10-27 (Asia/Shanghai)",
   "task_book": "NS800_Gate_R3_GO_and_A0_Board_B_Package_358e1ca_20261026.md",
   "reviewer_verdict_registered_here": "A0_EXPORT_GATE_REVIEW_GO",
@@ -12,17 +12,83 @@
   "branch": "phase8/tmc-drive-config",
   "repo": "https://github.com/LINboss666/ns800-stepper-safety",
   "approval_status": {
-    "board_b_package_approved": false,
-    "note": "任务书 §2/§9：本包执行批准尚未取得；CP0 通过不构成批准。批准文字由用户实际发出后才进入 CP1-CP4。",
+    "board_b_package_approved": true,
+    "approved_by_user_this_turn": "批准 BOARD-B 整包，允许执行 CP1",
+    "scope_as_approved": "任务书 §2/§9 的整包批准：CP0 通过后允许一次新镜像下载、一次指定载荷回读、一次主动复位、固定 17 次 trip 与一次 disarm，以及包内状态查询和有条件 RAM 清理；包内不逐条确认，失败即停，不重试、不自动回刷、不启用 STEP 或电机",
+    "field_preconditions_confirmations": [
+      {
+        "item": "电机物理未接 / SW1 在可对应现板标识的阻断位 / TMC 在位未拆 / 现场有人",
+        "answer_verbatim": "全部成立，可以供电",
+        "level": "USER_CONFIRMED"
+      },
+      {
+        "item": "供电动作由谁做与是否继续",
+        "answer_verbatim": "别墨迹了直接测",
+        "level": "USER_CONFIRMED(要求继续执行，现场动作仍由操作者手工完成)"
+      }
+    ],
+    "execution_still_bounded_by": "§2 硬上限表、§7 固定命令序列与双判据、四宏 RT_FALSE、失败即停不补跑；本字段不扩大任何上限",
     "prior_board_a_approval_does_not_cover_this_package": true
   },
   "scope_statement": "本轮全部离线：读文件/核散列/提取并自检采集器/建仓外下载副本与隔离目录。不供电、不连接、不下载、不复位、不发目标命令、不扫设备、不重编 Keil。",
   "firmware_changed": false,
   "production_changed": false,
   "builds_executed": [],
-  "hardware_actions": [],
-  "keil_invoked": false,
-  "serial_or_probe_touched": false,
+  "hardware_actions": [
+    {
+      "checkpoint": "CP1",
+      "action": "一次初始供电(上限 1)",
+      "operator_performed": true,
+      "sequence_required": "先接 USB(板载 LDO 逻辑电源), 再开既有 24 V 适配器",
+      "wiring_module_sw1_changed": "未变更(操作者未报告任何变更)",
+      "usb_on_time_local": "NOT_REPORTED(操作者未给出时刻, 不补造)",
+      "vm24_on_time_local": "NOT_REPORTED",
+      "anomaly_observation": "NOT_REPORTED —— 不写成\"已确认无异常运动/发热/异常指示\"; 未收到异常回报只表示本轮未记录到该观察",
+      "tool_side_corroboration": "CP2 的 DAP 连接、片内擦写与 Verify OK 均成功, 回读两次 status 均 Halted => 逻辑电源与调试通路确实工作(旁证, 不替代人的观察)",
+      "not_touched_here": [
+        "COM5",
+        "任何目标命令",
+        "电机",
+        "STEP",
+        "DIR",
+        "许可 HIGH",
+        "四宏"
+      ]
+    },
+    {
+      "checkpoint": "CP2",
+      "action": "唯一一次新 A0 镜像下载(Keil UV4 -f, 不编译)",
+      "target": "rt-thread",
+      "payload_loaded": "dl/rt-thread-a0.axf (SHA 8b95464e…)",
+      "log_bytes": 132,
+      "log_sha256": "80fbec7e28380be7fff7172c1ab65bdff9aeef0e5f6d16fe1e2208d9886802ce",
+      "verdict_lines": [
+        "Erase Done.Programming Done.Verify OK.Flash Load finished at 11:35:12"
+      ],
+      "failure_text_hits": [],
+      "forbidden_operation_hits": [],
+      "process_rc": 0,
+      "rc_note": "UV4 的 rc 只表示进程结束, 不作成败判据"
+    },
+    {
+      "checkpoint": "CP2",
+      "action": "唯一一次片内载荷回读(pyOCD 会话 1/2)",
+      "sessions_used": "1 of 2",
+      "status_lines": [
+        "Core 0 (None):  Halted",
+        "Core 0 (None):  Halted"
+      ],
+      "bytes": 261452,
+      "sha256": "5f30d3f058ceff516b2185aa3a1e597bbe63293b94a6fd801fd989a6f7b2b8e6",
+      "byte_length_match": true,
+      "sha256_match": true,
+      "identical_to_accepted_bin_in_repo": true,
+      "commander_process_rc": 0,
+      "rc_note": "该版本 commander 会吞内部错误码, rc 不作判据"
+    }
+  ],
+  "keil_invoked": true,
+  "serial_or_probe_touched": true,
   "inputs_verified_against_task_book_section_3": {
     "method": "磁盘字节直算 SHA-256 与任务书 §3 记录逐条比较；不重新转换、不重编凑哈希",
     "download_bin": {
@@ -328,62 +394,74 @@
     {
       "action": "初始供电过程(USB 逻辑电源, 再开既有 24 V)",
       "limit": 1,
-      "used_this_round": 0
+      "used_this_round": 1,
+      "remaining_within_package": 0
     },
     {
       "action": "新 A0 镜像下载调用(Keil -f, 不编译)",
       "limit": 1,
-      "used_this_round": 0
+      "used_this_round": 1,
+      "remaining_within_package": 0
     },
     {
       "action": "下载后片内载荷回读 261452 B",
       "limit": 1,
-      "used_this_round": 0
+      "used_this_round": 1,
+      "remaining_within_package": 0
     },
     {
       "action": "已知 DAP 的 pyOCD 会话(回读一次 + 主动复位一次)",
       "limit": 2,
-      "used_this_round": 0
+      "used_this_round": 1,
+      "remaining_within_package": 1
     },
     {
       "action": "主动 SYSRESETREQ",
       "limit": 1,
-      "used_this_round": 0
+      "used_this_round": 0,
+      "remaining_within_package": 1
     },
     {
       "action": "COM5 打开 115200/8N1 无流控 DTR/RTS 不激活",
       "limit": 1,
-      "used_this_round": 0
+      "used_this_round": 0,
+      "remaining_within_package": 1
     },
     {
       "action": "spm trip(批1=1, 批2=16)",
       "limit": 17,
-      "used_this_round": 0
+      "used_this_round": 0,
+      "remaining_within_package": 17
     },
     {
       "action": "motor_disarm(批3, off_attempt 正式入口)",
       "limit": 1,
-      "used_this_round": 0
+      "used_this_round": 0,
+      "remaining_within_package": 1
     },
     {
       "action": "spm init(静止前置后; 会设置 DWT/DEMCR 位)",
       "limit": 1,
-      "used_this_round": 0
+      "used_this_round": 0,
+      "remaining_within_package": 1
     },
     {
       "action": "spm clear_records(每批须门+关闭事实均通过)",
       "limit": 3,
-      "used_this_round": 0
+      "used_this_round": 0,
+      "remaining_within_package": 3
     },
     {
       "action": "下一批开始(最终批后无第4批)",
       "limit": 2,
-      "used_this_round": 0
+      "used_this_round": 0,
+      "remaining_within_package": 2
     },
     {
       "action": "完整成功路径串口命令总数",
       "limit": 54,
-      "used_this_round": 0
+      "used_this_round": 0,
+      "remaining_within_package": 54
     }
   ],
   "tests_executed": [
@@ -427,14 +505,23 @@
       "result": "副本只 4 行差异; uvoptx 逐字节相同; FLM 与 §4.7 一致; pyocd 目录空; 原工程未改",
       "rc": 0,
       "output_sha256": "7a901ff1b9e01ddd17c48a57d0d49873a4b4d1d11f45c285b68fc42779c79883"
+    },
+    {
+      "id": "cp2-download-and-readback-identity",
+      "tool": "UV4 -f 一次 + pyOCD commander savemem 一次; 判据取日志文本/落盘字节 SHA/cmp, 不取 rc",
+      "result": "PASS —— 日志 Erase Done./Programming Done./Verify OK.; 回读 261452 B = 5f30d3f0…, 与仓内 measure-a0.bin 逐字节无差异; 两次 status 均 Halted"
     }
   ],
   "not_run_this_round": [
-    "Keil 编译或下载(UV4 未被调用)",
     "A0/S1/S2/V1/V2/I-O/SD 固件主机链",
     "任何串口/调试器/探针/设备操作",
-    "恢复下载演练",
-    "全片再备份"
+    "全片再备份",
+    "CP3 的一切: COM5 打开、被动 2 秒观察、主动 SYSRESETREQ、54 条串口命令、批门与清理",
+    "编译/Rebuild(本包禁止构建, builds_executed 仍为空)",
+    "独立 mass erase / unlock / 选项字 / OTP / 系统区操作",
+    "探针枚举与设备扫描(UID 取本地既存日志唯一值)",
+    "STEP 使能 / DIR 变更 / arm / start / ramp / 许可 HIGH / 电机接线 / 四宏启用",
+    "恢复下载演练(既存材料只做磁盘字节核验)"
   ],
   "first_failures_kept": [
     {
@@ -456,6 +543,18 @@
       "id": "CP0-F4",
       "what": "工件归档首版把 0 字节文件写成非 base64 文本 => 复算解码失败",
       "handling": "空块改为显式注释行; 12 个块现逐块复算(长度+SHA-256)一致"
+    },
+    {
+      "id": "CP2-F1",
+      "what": "我给 savemem 传了含反斜杠的绝对路径; pyOCD 的 -c 命令串解析把每个反斜杠当转义吞掉, 实际落盘名变成 BOARD_B_ROOTreadbackafter-export-r1.bin(相对 D: 的当前目录, 即隔离工作目录)。",
+      "handling": "按日志 \"Saved 261452 bytes to ...\" 找回真实文件, 直算 SHA-256 并用 cmp 与仓内已接受 BIN 逐字节比; 未重发 savemem(那会多耗一次 pyOCD 会话, 整包上限 2 次), 也没把 commander 的 rc=0 当判据。",
+      "root_cause_kind": "本地脚本参数写法缺陷, 不是目标或工具失败"
+    },
+    {
+      "id": "CP12-F2",
+      "what": "第一版 CP1/CP2 证据把下载日志里的 Load 路径写成 JSON 列表文本, 经呈现层反斜杠归一后变成带斜杠引号的乱码",
+      "handling": "生成脚本改为逐字打印日志原文行, 重新生成同一份证据文件; 未手改输出, 未改动任何判据字节",
+      "root_cause_kind": "本地证据生成脚本呈现层缺陷, 与目标/工具无关"
     }
   ],
   "de_identification": {
@@ -464,9 +563,10 @@
     "artifacts_are_not_wire_capture": "cp0_selftest_artifacts.md 里 12 块全部是离线夹具与门输出, 不称 wire 原字节, 也不称无损"
   },
   "evidence_files": [
-    "reports/reviews/phase8-target-measurement-a0-board-b/cp0_offline_precheck.txt",
     "reports/reviews/phase8-target-measurement-a0-board-b/A0BoardB.ps1",
-    "reports/reviews/phase8-target-measurement-a0-board-b/cp0_selftest_artifacts.md"
+    "reports/reviews/phase8-target-measurement-a0-board-b/cp0_offline_precheck.txt",
+    "reports/reviews/phase8-target-measurement-a0-board-b/cp0_selftest_artifacts.md",
+    "reports/reviews/phase8-target-measurement-a0-board-b/cp1_cp2_download_readback.txt"
   ],
   "evidence_identities": [
     {
@@ -483,6 +583,11 @@
       "path": "reports/reviews/phase8-target-measurement-a0-board-b/cp0_selftest_artifacts.md",
       "bytes": 19237,
       "sha256": "c319274592cfd03a2c709fb66818ac7f03857e7b61b45452907e9451cc9227db"
+    },
+    {
+      "path": "reports/reviews/phase8-target-measurement-a0-board-b/cp1_cp2_download_readback.txt",
+      "bytes": 6541,
+      "sha256": "42f2ae6073c942827dc81df5ce97fbeae7e9de71f9c8b3554744b60d33d87c7f"
     }
   ],
   "still_open": [
@@ -501,11 +606,37 @@
     "板上仍是旧 358fd81a… 载荷",
     "sw1_cut.ps1 的 T-01/T-02 仍 HOLD"
   ],
-  "next_step": "等用户对本整包的一次批准（任务书 §9 原话）。批准后按 CP1→CP2→CP3→CP4 顺序执行, 包内不逐条再问；前置失效、真实失败或需越界改动即停并保存证据。",
+  "next_step": "CP3: 调用冻结采集器 -ExecuteApprovedBoardB —— 一次 COM5 打开(115200/8N1, 无流控, DTR/RTS 不激活) → 被动 2 秒; 若见启动文本则不主动复位并停; 否则唯一一次 SYSRESETREQ → 固定 54 条命令; 每批以\"已接受门 ACCEPT + 本包关闭事实\"双判据放行 clear, 清理后 status 归零才给下一批 start; 任一失败立即停 TX、保留原字节、关串口、不重试不补触发",
   "stop_claim": [
-    "A0_BOARD_B_CP0_READY / AWAITING_BOARD_B_PACKAGE_APPROVAL",
-    "NO HARDWARE EXECUTED / IMAGE_NOT_DOWNLOADED / BOARD_STILL_RUNNING_358fd81a",
-    "NO BUILD / NO FLASH READ / NO PROGRAM / NO RESET / NO SERIAL / NO MOTOR / NO STEP_ENABLE",
-    "FOUR SAFETY MACROS RT_FALSE"
-  ]
+    "A0_BOARD_B_CP2_DONE / CP3_PENDING_WITHIN_APPROVED_PACKAGE",
+    "IMAGE_DOWNLOADED_AND_READBACK_VERIFIED 5f30d3f058ceff516b2185aa3a1e597bbe63293b94a6fd801fd989a6f7b2b8e6",
+    "PYOCD_SESSIONS 1/2, COM5_OPENS 0/1, ACTIVE_RESETS 0/1, TRIPS 0/17, DISARM 0/1, CLEARS 0/3",
+    "NO MOTOR / NO STEP_ENABLE / NO DIR CHANGE / NO PERMIT-HIGH REQUEST / FOUR SAFETY MACROS RT_FALSE",
+    "NO BUILD / NO AUTOMATIC RESTORE / NO FURTHER FLASH ERASE BEYOND THE ONE APPROVED PROGRAMMING"
+  ],
+  "probe_sessions_used": {
+    "pyocd": "1 of 2",
+    "com5_opens": "0 of 1",
+    "active_sysresetreq": "0 of 1"
+  },
+  "board_image_state": {
+    "before_this_package": {
+      "bytes": 261100,
+      "sha256": "358fd81ae5853ea52df1e1ab367ea41af0f5e86679082a755c17dac3429b0e1b"
+    },
+    "now_on_board_after_cp2": {
+      "bytes": 261452,
+      "sha256": "5f30d3f058ceff516b2185aa3a1e597bbe63293b94a6fd801fd989a6f7b2b8e6",
+      "proven_by": "一次独立 savemem 回读 + 与仓内已接受 BIN 逐字节 cmp 无差异"
+    },
+    "build_stamp_read_from_payload": "Oct 26 2026 / 20:57:05",
+    "note": "新镜像已真实在板; 但 A0 目标记录一条都还没采到, 时长证据仍 NOT_ACHIEVED"
+  },
+  "cp1_cp2_result_files_local_only": {
+    "cp2_result_json": "BOARD_B_ROOT/cp2_result.json",
+    "uv4_flash_log": "BOARD_B_ROOT/download-b/flash-b.log",
+    "readback_bin_as_written_by_pyocd": "pyOCD 隔离工作目录下的原始落盘文件(名字见 CP2-F1), 未改名未重算",
+    "readback_archive_copy": "BOARD_B_ROOT/readback/after-export-r1.bin",
+    "note": "含本机路径/UID 的工具包装日志留本地; 入库文本一律脱敏并声明替换规则"
+  }
 }

@@ -96,27 +96,34 @@ R3 两组问题（分类前的原始字节完整性、`%u` 打印提升被当成
 所有散列按原始字节直算；探针 UID 与本机用户名未写入仓库。
 
 未覆盖/继续开放：B-1、BUG-008、RISK-03/03a、物理 RISK-04-b、M-1/M-2/M-3、外部时基证明；
-`sw1_cut.ps1` 仍 HOLD；A0 时长证据仍 `NOT_ACHIEVED`（要等本包执行）；板上仍是旧 `358fd81a…` 载荷，
-新 `5f30d3f0…` **尚未下载**；电源终态沿用上一轮 `USER_REPORTED` 断电，本轮未触碰设备。
+`sw1_cut.ps1` 仍 HOLD；A0 时长证据目前仍 `NOT_ACHIEVED`（要等 CP3 采到记录并由门放行）。
+（§6 这段写于 CP0 时点：当时板上仍是旧 `358fd81a…`、新镜像未下载；CP2 之后已被本次唯一一次
+下载替换为 `5f30d3f0…`，见 §8。）
 
-## 7. 下一步（需要用户的一次批准）
+## 7. 批准与执行范围
 
-任务书 §9 的批准文字如下，**在用户实际发出前只是待审批准文本，不构成许可**：
+任务书 §9 的批准文字已由用户实际发出：**「批准 BOARD-B 整包，允许执行 CP1」**（并当场确认四项
+现场前置成立）。据此整包进入执行，包内不再逐条索要确认；前置失效、真实失败或需要越界改动即停。
 
-> 批准本文件 BOARD-B 整包：CP0 通过后，允许一次新镜像下载、一次指定载荷回读、一次主动复位、
-> 固定 17 次 trip 与一次 disarm，以及包内状态查询和有条件 RAM 清理。包内不逐条确认，失败即停，
-> 不重试、不自动回刷、不启用 STEP 或电机；我配合现场隔离和最后断电。
+## 8. CP1 与 CP2 已执行（结果与判据）
 
-取得该批准后，按 CP1（现场隔离与一次供电）→ CP2（一次下载 + 一次载荷回读）→
-CP3（字节采集、一次主动复位、固定 54 条命令，逐批门 + 关闭事实双判据）→ CP4（收尾并登记实际电源终态）
-顺序执行，包内不逐条再问；前置失效、真实失败或需要越界改动就停，保存已有结果，不补跑凑数。
-另需现场操作者配合 §5 的隔离确认与最后断电（先关 24 V 再拔 USB，SW1 保持阻断）。
+证据原文见 [cp1_cp2_download_readback.txt](file:///D:/ns800/reports/reviews/phase8-target-measurement-a0-board-b/cp1_cp2_download_readback.txt)。
 
-## 8. STOP
+| 项 | 实际结果 |
+|---|---|
+| CP1 供电（上限 1 次，已用 1） | USB（板载 LDO 逻辑电源）→ 既有 24 V，由操作者手工做；接线/模块/SW1 未变。**两个时刻与"有无异常运动/发热/指示"未回报 ⇒ 登记 `NOT_REPORTED`**：不补造时刻，也不把"未收到异常回报"写成"已确认无异常"。板上电的旁证只有工具侧（DAP 连接、片内擦写、`Verify OK`、回读时两条 `Halted`） |
+| CP2 唯一一次下载 | `UV4 -f BOARD_B_ROOT/download-b/download-b.uvprojx -t rt-thread -j0`；日志逐字 `Erase Done.Programming Done.Verify OK.Flash Load finished at 11:35:12`；实际 Load 载荷 = 副本 `dl/rt-thread-a0.axf`（`8b95464e…`，与 §3 一致）；`mass erase/unlock/选项字/OTP/系统区` 命中 0；**UV4 退出码只表示进程结束，不作判据** |
+| CP2 唯一一次回读 | pyOCD 会话 #1（整包上限 2 次）：`--no-config -t cortex_m -u <DAP_UID> -f 1000000` + §6 全部 `-O` 选项 + `status` → `savemem 0x08000000 0x3FD4C` → `status`；两次 status 都是 `Core 0 (None):  Halted`；`commander` rc=0 不作判据 |
+| 回读字节身份 | **261452 B / SHA-256 `5f30d3f058ceff51…`**，与任务书 §3/§6 记录一致；与仓内已接受 `measure-a0.bin` 做 `cmp` **无差异**；先落盘后算哈希，输出是全新文件（不是从 BIN 复制） |
+| 板上载荷状态变化 | 新测量镜像 `5f30d3f0…` 现在真实在板上；旧 `358fd81a…` 被这一次（也是唯一一次）下载替换 |
+| 本轮首次失败 `CP2-F1` | 我给 `savemem` 传了带反斜杠的绝对路径，pyOCD 的 `-c` 命令串把每个 `\` 当转义吞掉 ⇒ 落盘名变成 `ns800-board-breadbackafter-export-r1.bin`。处置：按日志 `Saved 261452 bytes to …` 找回真实文件再直算 SHA/`cmp`；**未重发 `savemem`**（那要多耗一次会话），未改附录采集器之外的任何越界动作 |
+
+## 9. STOP
 
 ```
-A0_BOARD_B_CP0_READY / AWAITING_BOARD_B_PACKAGE_APPROVAL
-NO HARDWARE EXECUTED / IMAGE_NOT_DOWNLOADED / BOARD_STILL_RUNNING_358fd81a
-NO BUILD / NO FLASH READ / NO PROGRAM / NO RESET / NO SERIAL / NO MOTOR / NO STEP_ENABLE
-FOUR SAFETY MACROS RT_FALSE
+A0_BOARD_B_CP2_DONE / CP3_PENDING_WITHIN_APPROVED_PACKAGE
+IMAGE_DOWNLOADED_AND_READBACK_VERIFIED 5f30d3f0… (板载新镜像)
+PYOCD_SESSIONS 1/2, COM5_OPENS 0/1, ACTIVE_RESETS 0/1, TRIPS 0/17, DISARM 0/1
+NO STEP_ENABLE / NO MOTOR / NO DIR CHANGE / NO PERMIT-HIGH REQUEST / FOUR SAFETY MACROS RT_FALSE
+NO BUILD / NO AUTOMATIC RESTORE / NO FURTHER FLASH ERASE BEYOND THE ONE APPROVED PROGRAMMING
 ```
