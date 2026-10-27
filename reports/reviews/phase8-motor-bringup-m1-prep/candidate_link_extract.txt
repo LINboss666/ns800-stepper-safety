@@ -1,0 +1,121 @@
+NS800 M1 候选目标链接可审切片 —— 取自 FW/motor-m1-candidate.map(原字节, 无损)
+候选 map = 1948503 B sha256=9f6d37203ca6226ef74323096d48fe5b6719300ab3cfec35f88bfc45833b586f; 默认 map(仅本地) = 1946989 B sha256=ab33ac1de309b2ce40402627c3b8a6dff0d81ec0104f590a7723d49f5a5f22f7
+本文件只摘录 map 的三类原文(区域行 / Total 行 / Image component sizes 表), 不替代原 map; 原 map 已入库, 逐字可回读。
+
+--- Load Region(逐字)
+Load Region LR_IROM1 (Base: 0x08000000, Size: 0x0003dbc0, Max: 0x00080000, ABSOLUTE, COMPRESSED[0x0003d57c])
+--- Totals(逐字)
+Total RO  Size (Code + RO Data)               250676 ( 244.80kB)
+Total RW  Size (RW Data + ZI Data)             85972 (  83.96kB)
+Total ROM Size (Code + RO Data + RW Data)     251260 ( 245.37kB)
+--- Image component sizes: 全部 107 个对象(列: Code inc.data RO RW ZI Debug  Name)
+        86         0         0         0         0         0  __dczerorl2.o
+        28         0         0         0         0        68  _chval.o
+       158         0         0         0         0        92  _strtoul.o
+      1738         0       883         0         4      7399  adc.o
+      1692         4       840         0       109      9893  adxl345.o
+        26         0         0         0         0        80  atoi.o
+      4938         4      2967         8     36056     14349  blackbox.o
+       536         0         0         0         0    121600  board.o
+        48         0         0         0         0        68  cdrcmple.o
+       222         0        67         0         8      2674  clock.o
+      4012        10      2157       120         0     15717  cmd.o
+        42         0         0         0         0      1482  completion_comm.o
+       798         0       293         0         8      4051  completion_up.o
+       276         0        56         0         0      3688  components.o
+       316        28         0         0         0       892  context_rvds.o
+       152         0         0         0         8      3205  cpu_up.o
+      1412         0       573         0        16      4735  cpuport.o
+         8         4       133         0         0        68  ctype_o.o
+      1462        16       561         8        22      7975  current_adc.o
+       334         0         0         0         0       148  dadd.o
+       222         0         0         0         0       100  ddiv.o
+       332         0         0         8         8      3637  defunct.o
+       186         0         0         0         0       176  depilogue.o
+       348         8      1029        16         0     16105  dev_can.o
+      1996         0       768         0        80      8772  dev_pin.o
+      2754        10       342         0         4      9315  dev_serial.o
+       638         0       192         0         0      6691  dev_spi.o
+      2318         0       386         0         0     11429  dev_spi_core.o
+      1284         0       499         0         0      6647  device.o
+        48         0         0         0         0        68  dfixul.o
+      5756        52      2406         0       226     15318  diagnosis.o
+       228         0         0         0         0        96  dmul.o
+      7122        20       502       104        36     80543  drv_adc.o
+       662         0        90         0         4     13441  drv_common.o
+      4228         0       330         0        96    127998  drv_epwm.o
+      3540        18      1832         0       460    104905  drv_gpio.o
+      1246         4       145        72       336     50416  drv_spi.o
+      3346        30       392       128       280     39769  drv_uart.o
+         0         0         0         0         0         0  entry.o
+         0         0         0         0         0         0  entry10a.o
+         0         0         0         0         0         0  entry11a.o
+         8         4         0         0         0         0  entry2.o
+         4         0         0         0         0         0  entry5.o
+         0         0         0         0         0         0  entry7b.o
+         0         0         0         0         0         0  entry8b.o
+         8         4         0         0         0         0  entry9a.o
+         8         4         0         4         0        68  errno.o
+       606         0         0         0         0     58793  gpio.o
+        30         0         0         0         0         0  handlers.o
+       318         0         8         0       448      3854  idle.o
+        48        10         0         0         0        68  init.o
+       506         0        18       972         0      9508  interrupt.o
+      8568         0      1840         0         0     30221  ipc.o
+       258         0         0         0        12      2267  irq.o
+         0         0         0         0         0         0  iusefp.o
+       246         0       128       120         4      3307  kerrno.o
+      1878         4      1397         4       208     15152  kservice.o
+        48         0         0         0         0      1432  kstdio.o
+      1068         0         0         0         0      4120  kstring.o
+        30         0         0         0         0        68  llshl.o
+        36         0         0         0         0        68  llsshr.o
+        32         0         0         0         0        68  llushr.o
+       354         0       555         0         0     17565  main.o
+      1598         0      1029         0         0      5860  mem.o
+        26         0         0         0         0        80  memcmp.o
+        36         0         0         0         0        68  memcpya.o
+        36         0         0         0         0       108  memseta.o
+     12786        22     12545        36        93     32922  motor.o   <== 与默认目标不同: 默认 (12524, 22, 12558, 36, 93, 32649)
+      2332         0       349         0         0      6651  msh.o
+       120         0         0         0         0      1333  msh_parse.o
+      4760         0      1249         0       172     29927  ns_flash.o
+      1800         0      1836         0         0     22788  ns_flash_shell.o
+      3878         0        64         0      5408     11100  ns_storage.o
+      1708         0       336       264        20      8514  object.o
+      2258        90         0         0         0       452  printfa.o
+      2422        12       997         0       173      8656  project_config.o
+      2890         4         0         0         0     42245  rcc.o
+      2212        20      1324        96         4      8933  rt_drv_pwm.o
+      2814       168        34         0         0      4789  rt_vsnprintf_tiny.o
+      2962         0      2529       168         8      9068  safety_gpio.o
+      6016        32      5689         0       134     16425  safety_state.o
+      2612         4      3321         0      1205      9376  safety_thread.o
+       886         0       210         0         4      5707  scheduler_comm.o
+      1522         0        72         0       274      7660  scheduler_up.o
+      3028         4      1841         0       121      9672  sensor_service.o
+      3114         0       251         0       149     10639  shell.o
+       362         0         0         0         0      8559  spi.o
+       632         0         0         0         0     31761  src_adc.o
+        36         8       972         0      4096       952  startup_ns800rt7xxx.o
+         0         0         0         4         0         0  stdout.o
+      1504         0      2296         0        17      8707  step_pwm.o
+      8610         4        96         4       268     22175  stop_priority.o   <== 与默认目标不同: 默认 (8560, 4, 96, 4, 268, 22123)
+        20         0         0         0         0        68  strchr.o
+        28         0         0         0         0        76  strcmp.o
+        14         0         0         0         0        68  strlen.o
+       112         0         0         0         0        88  strtol.o
+       114         0         0         0         0        92  strtoul.o
+      3574        14      3999        16        17     11735  supervisor.o   <== 与默认目标不同: 默认 (3638, 14, 4109, 16, 17, 11804)
+        30         0       218         0         0      5812  syscalls.o
+       296         0         0        36         0     19756  system_ns800rt7xxx.o
+      2548         0       740         0         8     10767  thread.o
+      2090        10       376         0        28      8864  timer.o
+     19988         4     12864         0       325     47812  tmc2209.o   <== 与默认目标不同: 默认 (19996, 4, 12864, 0, 325, 47808)
+        12         0         0         0         0        68  toupper.o
+       302         0         0         0         0      7195  uart.o
+        44         0         0         0         0        80  uidiv.o
+        98         0         0         0         0        92  uldiv.o
+
+--- spm 前缀符号名计数(现算): 默认 0 / 候选 0 / A0 保留件 35
+    A0 里的 spm* 名字(全部, 排序): spm_barrier, spm_body_end, spm_clear_records, spm_clock_basis_name, spm_cmd, spm_cmd_print_usage, spm_context_ok, spm_counter_status_name, spm_ctr_pair, spm_ctr_pair_after, spm_ctr_read, spm_dump_records, spm_emitf, spm_emitfv, spm_end_rt, spm_entry_name, spm_eval, spm_init_counter, spm_open, spm_pin_state, spm_port_ctr_ctrl, spm_port_ctr_enable, spm_port_ctr_now, spm_port_demcr, spm_port_primask, spm_port_systick_ctrl, spm_port_systick_load, spm_publish, spm_quiescent, spm_start, spm_stop_accepting, spm_trip_once, spm_validate, spm_win_note, spm_win_rt

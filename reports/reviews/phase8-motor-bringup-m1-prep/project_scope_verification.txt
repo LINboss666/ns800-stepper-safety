@@ -1,0 +1,63 @@
+NS800 M1 离线准备 —— 工程与写入范围核验(CP2 生成 + CP3 构建之后)
+轮次 phase8-motor-bringup-m1-prep    输入锚 ea519f29…    软件输入提交 70416e7f…    日期 2026-10-27
+身份一律按 **Git blob** 计(本机 core.autocrlf=true, 工作树是 CRLF 检出形态, 与提交身份无关)。
+脱敏代号 = 纯字符串替换(PROJECT_ROOT=仓根、M1_BUILDS/M1_PRESERVED=仓外工作区、KEIL_ROOT=编译器根), 反斜杠写成正斜杠; 仓库内相对路径(含工程路径)不打码, 便于云端直接复算。
+
+1. 唯一允许变更的非 reports 路径 = rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/project.uvprojx
+   锚点 blob: 226016 B sha256=ec9eed0e9d9998c38b5dd935ddaea7e74829c2a770272dfe0d675cc6fce4cc09
+   HEAD  blob: 338976 B sha256=3b882d0a160692c31624108feda9ba285633a19ad02a89f663dec07fb8d51e04
+   与附录 A 生成器的声明输出一致(338976 B / 3b882d0a…) = True
+   该 blob 所在提交 = 70416e7f…(git log -1 -- <工程路径>, 即含候选工程字节的首次提交)
+
+2. 原两个 Target 的原始块逐字节保留
+   Target 块数: 锚点 2 -> HEAD 3
+   第 1 块(rt-thread) 逐字节相同 = True
+   第 2 块(rt-thread-measure-a0) 逐字节相同 = True
+   目标名顺序 = ['rt-thread', 'rt-thread-measure-a0', 'rt-thread-motor-m1-candidate']
+   新增块相对默认块只改六个叶子: TargetName / OutputDirectory / OutputName / ListingPath /
+     TargetArmAds/Cads/VariousControls/Define / AfterMake 的 UserProg1Name; 源清单 Groups 与默认目标逐项相同(135 项)。
+   构建钩子(三目标全列):
+     rt-thread                      BeforeMake run=0/0 name=(空) | AfterMake run=1/0 name=fromelf --bin !L --output rtthread.bin
+     rt-thread-measure-a0           BeforeMake run=0/0 name=(空) | AfterMake run=1/0 name=fromelf --bin !L --output build/a0/measure-a0.bin
+     rt-thread-motor-m1-candidate   BeforeMake run=0/0 name=(空) | AfterMake run=1/0 name=fromelf --bin !L --output ./build/motor_m1/rt-thread-motor-m1.bin
+   文件级编译选项覆盖: 三目标各自 135 个源文件里带 Define 覆盖的文件数 = [0, 0, 0](全为 0),
+     => 没有任何文件级选项意外覆盖目标级 Define(候选的宏只来自目标级)。
+
+3. 生产与历史件零改动(blob 对 blob, 锚点 vs HEAD)
+   template.uvprojx       9a1baf2a14bcf6c007e6965df5fbafad3e19f59d 不变=True
+   project.uvoptx         0af104b102a102b226fcf9b3ad203cf48a976bba 不变=True
+   motor.c                8a0e610406fa12ed0b2ad48c27526d8bf8960630 不变=True
+   motor.h                67e2dcf8459f80f5ca6793163774343f36feca27 不变=True
+   tmc2209.c              e941b84bf6ade4388efc83df97b7f2bec61f6f56 不变=True
+   tmc2209.h              cefb2ea98830b125d7d4a7b4e931dc3491705d44 不变=True
+   project_board.h        369d443ce2676e9adc165496320b4281c367ed34 不变=True
+   supervisor.c           d8161c1a64578853f7032abec5583990343c14f2 不变=True
+   safety_state.c         8eadae1a9f4104ff98a5e21ee3efdb2b8190eaa1 不变=True
+   stop_priority.c        9942fc7ac8a5be106d8f4166e23f7e1a354231cb 不变=True
+   step_pwm.c             5e97da523b6105aa35f4ad704682b544c8a6ee96 不变=True
+   SConscript             c7ef7659ecea92b1dd9b71a97736a8552ee02551 不变=True
+   a0_export_gate.py      0c599487072419a5e3494158d8ca694ff4e6be89 不变=True
+   default.bin            dbdc050bf9926febcd639a3ab22bf5716a659ef7 不变=True
+   measure-a0.bin         287d40d4dafc2be109e45b116492a7d9deb91112 不变=True
+   A0BoardB.ps1           7dc7e071e55c11c06225109a76107a04dd9baef7 不变=True
+   A0BoardBSerialR1.ps1   5812628e439bc7291f8417a4d6a20f51a8cee895 不变=True
+   A0BoardBSerialR1a.ps1  60f8e5d4b7e713f994f0d9fb639d17e4782845ca 不变=True
+
+4. 相对锚点的全部改动路径
+   rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/project.uvprojx
+   非 reports 路径 = ['rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/project.uvprojx'](应且仅等于允许的 project.uvprojx)
+
+5. 工作树换行形态(如实登记两步操作)
+   构建期间: 工作树工程按本机 autocrlf 的 CRLF 形态写出(与既往成功构建一致);
+   现在: 工作树 project.uvprojx 338976 B, CR=0, LF=8231, 与 HEAD blob 逐字节相同=True, 归一化后相同=True。
+   仓库身份按 blob 计, 与工作树换行无关; 提交前 git status 里非 reports 的脏路径 = 无。
+
+6. 冻结引用未动
+   refs/heads/main                                      = 1b3757eec550802a3973e66790af422d81d3d373 相符=True
+   refs/heads/phase7/full-embedded-software             = 6d3fbc559d45673d7550eb73dec5a4ade5bb34df 相符=True
+   refs/tags/v0.7-phase7-software-board-validated       = 097935fec5a6f2467261ab1ad449ff0b1d398250 相符=True
+   tag 解引用 = e40a9b95ef709e6a80444f9f3949dfdd70ba96ba
+
+7. 附录 A 生成器入库件
+   REV/make_motor_m1_target.py = 附录 A 代码块逐字: 3596 B sha256=d5dbce28f3ed65610b7e81ef1339a2dd440b5c831de8a0602bdfa5ccc5ea9f49
+   本轮实际运行的就是这份字节(在仓库根运行, 从 git 对象取工程输入); 它自带的断言全部成立才写出候选工程。

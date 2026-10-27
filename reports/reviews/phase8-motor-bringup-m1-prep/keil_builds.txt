@@ -1,0 +1,156 @@
+NS800 M1 离线准备 —— CP3 真实构建记录(默认 + 候选各一次 Rebuild All, 含一次失败尝试)
+轮次 phase8-motor-bringup-m1-prep    日期 2026-10-27    输入锚 ea519f29…    软件输入提交 70416e7f…
+工具: KEIL_ROOT/UV4/UV4.exe 5.43.1.0 + ARMCLANG V6.24(KEIL_ROOT/ARM/ARMCLANG/Bin); 未安装/升级任何依赖。
+命令形状(与本机既往已证一致, 不使用增量 -b):
+  UV4.exe -r project.uvprojx -t rt-thread                    -j0 -o M1_BUILDS/default.rebuild.log
+  UV4.exe -r project.uvprojx -t rt-thread-motor-m1-candidate -j0 -o M1_BUILDS/candidate.rebuild.log
+工作目录 = 工程目录(PROJECT_ROOT 下的 rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad)。全程没有 -f(下载)、没有 Debug、没有探针、没有复位; -r 只在本地生产产物文件。
+构建钩子核对(§7 要求先查; 节点在 TargetOption/TargetCommonOption/BeforeMake|AfterMake): 三目标 BeforeMake 的 RunUserProg1/2 全为 0 且命令名为空, 即无前置步骤;
+  rt-thread                      BeforeMake run=0/0   AfterMake run=1/0  命令=fromelf --bin !L --output rtthread.bin
+  rt-thread-measure-a0           BeforeMake run=0/0   AfterMake run=1/0  命令=fromelf --bin !L --output build/a0/measure-a0.bin
+  rt-thread-motor-m1-candidate   BeforeMake run=0/0   AfterMake run=1/0  命令=fromelf --bin !L --output ./build/motor_m1/rt-thread-motor-m1.bin
+  => AfterMake 只有 fromelf --bin(离线把已构建 AXF 转 BIN), 不触碰 Download/Debug/探针。
+脱敏代号 = 纯字符串替换(PROJECT_ROOT/M1_BUILDS/M1_PRESERVED/KEIL_ROOT/WORK_OUT*), 反斜杠写成正斜杠; 散列一律按原始字节直算。
+
+==============================================================================
+1. 构建尝试全记录(含失败, 不隐瞒; 与 manifest.build_attempts 同一口径)
+==============================================================================
+  尝试 1  FAIL/STALLED
+        首次以后台方式发起两目标连跑: UV4 进程存活约 10 分钟、CPU 仅 ~3 s、无编译器子进程、无日志无产物; 由看门狗/人工终止。该轮 stdout/stderr 走的是管道。
+  尝试 2  PASS
+        改为(1)stdout/stderr 接文件句柄而非管道 (2)工作树工程按既往成功构建形态写成 CRLF, 并加窗口标题看门狗; 默认目标 rc=0、15.1 s、0 Error 0 Warning。
+  尝试 3  PASS
+        候选目标同形态重跑: rc=0、15.0 s、0 Error 0 Warning。
+  归因纪律: 尝试 1 -> 2 同时改了两项环境形态(stdout/stderr 由管道改接文件句柄; 工作树工程由 LF 改成本机 autocrlf 的 CRLF 检出形态),
+  因此不声称"就是管道导致的"。事实只有: 第一次无日志无产物、后两次产出且判据齐。 两次成功运行都带窗口标题看门狗, 未 killed_by_watchdog。
+  看门狗实测(两次成功运行记录的 UV4 窗口一致): 一个隐藏的主框架窗口(标题含工程路径 + μVision)与一个隐藏 #32770 类对话框,
+  另有 GDI+/IME/输入法挂件窗口; 没有需要人工应答的可见模态框。次数计数见 M1_BUILDS/*.build.json 的 window_titles_seen。
+
+==============================================================================
+2. 两目标结果(取日志文本 + 产物字节为判据, rc 只作旁证)
+==============================================================================
+  目标 rt-thread
+    开始(本地) 2026-10-27T16:54:15+08:00    墙钟 15.1 s    进程 rc=0 (0=无错误无警告)
+    日志 3751 B  sha256=1e5b2966c73b13f2e38db20ce7369dabb115cb45681a77b87b8ba62a805e40c7   解码 utf-8
+    stdout 0 B / stderr 0 B(都按原始字节另存为 .bin, 不再用 UTF8 replace 解码)
+    日志逐字: Program Size: Code=173762 RO-data=76806 RW-data=2188 ZI-data=83784
+    日志逐字: "./build/rt-thread.axf" - 0 Error(s), 0 Warning(s).
+    日志逐字: Build Time Elapsed:  00:00:08
+    含 Error/Warning 字样的行: 1 / 1 条, 逐字如下(实测都只是链接器汇总行本身, 无真实错误/警告):
+      "./build/rt-thread.axf" - 0 Error(s), 0 Warning(s).
+    axf: 1645448 B sha256=92169bef54992fa7f28d2d52280c6130e2cd8e9c8702d3ca92c09b4b1d74a43f
+    bin: 构建目录内未命中(见下一行的实际位置)
+    map: 1946989 B sha256=ab33ac1de309b2ce40402627c3b8a6dff0d81ec0104f590a7723d49f5a5f22f7
+  目标 rt-thread-motor-m1-candidate
+    开始(本地) 2026-10-27T16:55:07+08:00    墙钟 15.0 s    进程 rc=0 (0=无错误无警告)
+    日志 3680 B  sha256=48efa1eae454c8f5992ff8c179382b68328e086dd28d6da3ed321b476fa73bcf   解码 utf-8
+    stdout 0 B / stderr 0 B(都按原始字节另存为 .bin, 不再用 UTF8 replace 解码)
+    日志逐字: Program Size: Code=173994 RO-data=76682 RW-data=2188 ZI-data=83784
+    日志逐字: "./build/motor_m1/rt-thread-motor-m1.axf" - 0 Error(s), 0 Warning(s).
+    日志逐字: Build Time Elapsed:  00:00:08
+    含 Error/Warning 字样的行: 1 / 1 条, 逐字如下(实测都只是链接器汇总行本身, 无真实错误/警告):
+      "./build/motor_m1/rt-thread-motor-m1.axf" - 0 Error(s), 0 Warning(s).
+    axf: 1645936 B sha256=c1e9d4e78c424b3631b2d30cbe6061f32074b30c7518ed2aa681771d6600a86f
+    bin: 251260 B sha256=a76b845db4ba1d8872f9db395c2e6e796bdb9416c398f010b669538006cf2777
+    map: 1948503 B sha256=9f6d37203ca6226ef74323096d48fe5b6719300ab3cfec35f88bfc45833b586f
+  默认目标的 BIN 位置说明(如实): 默认目标的 AfterMake 输出名是 rtthread.bin(相对工程目录), 不在 build/ 下;
+  因此 collector 在 build/ 里记为 missing, 实际按日志 fromelf 行给出的"工程目录/rtthread.bin" 取件并散列:
+    251148 B sha256=7f9baed96ecb23cdf7cb9d1c0ccd4c28f2946bc9f3d720a560f7741cb0f4e45d(与归档 FW/default-control.bin 同字节)
+  候选目标 BIN: build/motor_m1/rt-thread-motor-m1.bin 251260 B sha256=a76b845db4ba1d8872f9db395c2e6e796bdb9416c398f010b669538006cf2777
+  µVision 依赖文件(.dep)身份:
+    default    rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/build/project_rt-thread.dep  992974 B sha256=b63d51e9e9480ec1b1317414196272ea6eb68aab3105c797a2d5a6b3c0b94e2e
+    candidate  rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/build/motor_m1/project_rt-thread-motor-m1-candidate.dep  1018982 B sha256=24d6cc1cb734581be12550c1164fb68b241c50e238d2cf8e9a04be2ee945864b
+
+==============================================================================
+3. 有效宏(§7.3: 用真实编译参数做预处理实证, 只看 XML 的 Define 不算)
+==============================================================================
+  方法: Define/IncludePath 取自**已提交工程 blob** 里该目标的真实字段, 用同一 armclang 以 -E -dM 只预处理(不产物体),
+        对 applications/motor.c、tmc2209.c、supervisor.c 三个单元各跑一次; 六个转储的 stderr 均为 0 B、rc 均为 0。
+  默认目标 rt-thread —— 三个单元逐字一致(已断言): motor.c, tmc2209.c, supervisor.c
+    MOTOR_HARDWARE_ENABLE_PATH_VALIDATED   = RT_FALSE
+    NS800_TARGET_MEASUREMENT_A0            = NOT_DEFINED_IN_TU
+    SAFETY_LIMIT_INPUTS_ENABLED            = RT_FALSE
+    STEP_DIAG_ISOLATED_ENV_CONFIRMED       = RT_FALSE
+    TMC_DRIVE_CONFIG_HW_VALIDATED          = RT_FALSE
+  候选目标 —— 三个单元逐字一致(已断言): motor.c, tmc2209.c, supervisor.c
+    MOTOR_HARDWARE_ENABLE_PATH_VALIDATED   = 1
+    NS800_TARGET_MEASUREMENT_A0            = 0
+    SAFETY_LIMIT_INPUTS_ENABLED            = 0
+    STEP_DIAG_ISOLATED_ENV_CONFIRMED       = 0
+    TMC_DRIVE_CONFIG_HW_VALIDATED          = 1
+  差异恰好是 §3.4 登记的两项例外(MOTOR_HARDWARE_ENABLE_PATH_VALIDATED、TMC_DRIVE_CONFIG_HW_VALIDATED: RT_FALSE -> 1);
+  STEP_DIAG_ISOLATED_ENV_CONFIRMED 与 SAFETY_LIMIT_INPUTS_ENABLED 在候选里是 -D 给的 0(与默认的 RT_FALSE 同值, 只是形态不同);
+  NS800_TARGET_MEASUREMENT_A0 在这三个单元里未定义(默认目标不定义它), 因此候选不会带进 A0 记录器分支。
+  默认值未动: 四个头文件里的 #ifndef 守卫仍写 RT_FALSE(本轮 .h 一个字节都没改, 见 project_scope_verification.txt 第 3 节)。
+
+==============================================================================
+4. 链接内容与"候选没有夹带 A0 记录器"(§7.4)
+==============================================================================
+  源清单: 三目标各 135 项; 候选与默认**逐项相同** = True; A0 与默认逐项相同 = True
+  map 的 Image component sizes 对象表(现算):
+    默认   对象 107 个
+    候选   对象 107 个; 只多 无 / 只少 无
+    A0     对象 108 个; 相对默认多出: ['sp_measure_a0.o']
+  尺寸有差异的对象恰好 4 个(= 两项宏例外真正影响的编译单元):
+    motor.o            默认 Code=12524 RO=12558 RW=36 ZI=93  ->  候选 Code=12786 RO=12545 RW=36 ZI=93
+    stop_priority.o    默认 Code=8560 RO=96 RW=4 ZI=268  ->  候选 Code=8610 RO=96 RW=4 ZI=268
+    supervisor.o       默认 Code=3638 RO=4109 RW=16 ZI=17  ->  候选 Code=3574 RO=3999 RW=16 ZI=17
+    tmc2209.o          默认 Code=19996 RO=12864 RW=0 ZI=325  ->  候选 Code=19988 RO=12864 RW=0 ZI=325
+    (Code 合计 +240 B; 其余 103 个对象逐列相同 => 候选没有偷偷改到别的单元)
+  真实 HAL 叶子在两目标里字节一致(未被候选宏绕过):
+    drv_epwm.o   默认 (4228, 0, 330, 0, 96, 127998)  候选 (4228, 0, 330, 0, 96, 127998)  相同=True
+    drv_gpio.o   默认 (3540, 18, 1832, 0, 460, 104905)  候选 (3540, 18, 1832, 0, 460, 104905)  相同=True
+    drv_uart.o   默认 (3346, 30, 392, 128, 280, 39769)  候选 (3346, 30, 392, 128, 280, 39769)  相同=True
+    drv_spi.o    默认 (1246, 4, 145, 72, 336, 50416)  候选 (1246, 4, 145, 72, 336, 50416)  相同=True
+    drv_adc.o    默认 (7122, 20, 502, 104, 36, 80543)  候选 (7122, 20, 502, 104, 36, 80543)  相同=True
+  运动/安全链符号(两目标都链接): stop_priority.o=True, motor.o=True, tmc2209.o=True, safety_state.o=True, step_pwm.o=True
+  spm 前缀符号名计数(按 map 符号表逐个匹配, 现算): 默认 0, 候选 0, A0 35。
+  正向对照有效: A0 的 map 确实带 35 个 spm* 名字与 sp_measure_a0.o, 所以"默认/候选为 0"不是检测器漏检。
+    A0 里出现的 spm* 名字示例(排序后取前 8 个, 现算): spm_barrier, spm_body_end, spm_clear_records, spm_clock_basis_name, spm_cmd, spm_cmd_print_usage, spm_context_ok, spm_counter_status_name
+  候选的事务锁/票据-epoch 门/ENN 反馈/失败锁存都在 stop_priority.o、motor.o、tmc2209.o、safety_state.o 这些**同一批源文件**里编译;
+  本轮没改任何 .c/.h(见范围核验第 3 节), 所以这些运行态门的源码字节与默认目标逐字节相同, 宏只切换 #if 分支。
+  链接区域(取 map 原文):
+    默认     Load Region LR_IROM1 (Base: 0x08000000, Size: 0x0003db58, Max: 0x00080000, ABSOLUTE, COMPRESSED[0x0003d50c])
+           Total RO  Size (Code + RO Data)               250568 ( 244.70kB) | Total RW  Size (RW Data + ZI Data)             85972 (  83.96kB) | Total ROM Size (Code + RO Data + RW Data)     251144 ( 245.26kB)
+    候选     Load Region LR_IROM1 (Base: 0x08000000, Size: 0x0003dbc0, Max: 0x00080000, ABSOLUTE, COMPRESSED[0x0003d57c])
+           Total RO  Size (Code + RO Data)               250676 ( 244.80kB) | Total RW  Size (RW Data + ZI Data)             85972 (  83.96kB) | Total ROM Size (Code + RO Data + RW Data)     251260 ( 245.37kB)
+    A0 对照  Load Region LR_IROM1 (Base: 0x08000000, Size: 0x00040398, Max: 0x00080000, ABSOLUTE, COMPRESSED[0x0003fd4c])
+           Total RO  Size (Code + RO Data)               260872 ( 254.76kB) | Total RW  Size (RW Data + ZI Data)             93692 (  91.50kB) | Total ROM Size (Code + RO Data + RW Data)     261448 ( 255.32kB)
+
+==============================================================================
+5. 默认镜像与已接受件的字节差(§7.1.2: 不许把任意差异归给时间戳)
+==============================================================================
+  两者长度同为 251148 B; SHA 不同(旧 02e98458… / 新 7f9baed9)。
+  逐字节比对: 差异 = 6 个字节, 偏移 0x3bf65, 0x3bf66, 0x3bf69, 0x3bf6b, 0x3bf6c, 0x3bf73
+  差异窗口(偏移 0x3bf65..0x3bf73)逐字:
+    旧: 'other file.[NUL]20:56:52[NUL]Oct 26 2026[NUL]level ='
+    新: 'other file.[NUL]16:54:05[NUL]Oct 27 2026[NUL]level ='
+  6 个差异字节全部落在同一段 __TIME__/__DATE__ 构建横幅内, 横幅之外零差异 => "允许构建横幅差异"这条限制是定位后满足的。
+  候选相对默认 BIN +112 B; map 的 Total ROM Size 251144 -> 251260 (+116 B)。
+  这两个数是不同口径(镜像实际字节 vs 链接器 ROM 合计), 本文件不把它们写成相等。
+
+==============================================================================
+6. 归档与远端可达性(§7.1.6)
+==============================================================================
+  已入仓(远端可回读, 逐字原字节):
+    FW/default-control.bin      251148 B 7f9baed96ecb23cdf7cb9d1c0ccd4c28f2946bc9f3d720a560f7741cb0f4e45d
+    FW/motor-m1-candidate.bin   251260 B a76b845db4ba1d8872f9db395c2e6e796bdb9416c398f010b669538006cf2777
+    FW/motor-m1-candidate.map   1948503 B 9f6d37203ca6226ef74323096d48fe5b6719300ab3cfec35f88bfc45833b586f  <- 本轮实测该 map 不含任何盘符/用户名串, 故可无损归档
+    REV/build_log_default.txt / REV/build_log_candidate.txt(完整构建日志的脱敏文本, 有损, 规则见文件头)
+    REV/candidate_link_extract.txt(map 的可审切片)、REV/make_motor_m1_target.py(= 附录 A 逐字, 3596 B / d5dbce28)
+  未入版本库的产物(云端不可回读, 不谎称可远端复算)。位置都在**构建区**, 由工程目录 .gitignore 的规则排除:
+    .gitignore:13 的 build 规则排除 build/ 与 build/motor_m1/; .gitignore:5 的 *.bin 规则排除工程根 rtthread.bin(实测 git check-ignore -v 命中)。
+    默认 AXF   rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/build/rt-thread.axf  1645448 B sha256=92169bef54992fa7f28d2d52280c6130e2cd8e9c8702d3ca92c09b4b1d74a43f
+    默认 map   rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/build/rt-thread.map  1946989 B sha256=ab33ac1de309b2ce40402627c3b8a6dff0d81ec0104f590a7723d49f5a5f22f7
+    候选 AXF   rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/build/motor_m1/rt-thread-motor-m1.axf  1645936 B sha256=c1e9d4e78c424b3631b2d30cbe6061f32074b30c7518ed2aa681771d6600a86f
+    A0 map   M1_PRESERVED/a0/rt-thread-a0.map  1999062 B sha256=07498bc9370235055dd2b4f8a465853a2577b226a5d0cf382194ea55240fbd0d(上一轮 A0 目标 map, 正向对照输入)
+  AXF 不入库的原因(实测): 候选 AXF(1645936 B)含 142 处"盘符+分隔符"形式的本机路径串, 默认目标 AXF(1645448 B)含 142 处; 脱敏会破坏 ELF 字节身份 => 两份都只登记长度与 SHA-256。
+  BIN 与 AXF 是两种产物, 散列不可互换; 编程 AXF 后应与其绑定的 Flash 字节对应。
+  如实登记: 候选 map 按**原字节**归档, 因此 `git diff --cached --check` 会在它自身内容里报 2 处风格提示(armlink 生成的表头行尾空格 1 处 + 文件末空行 1 处)。为了保住可复算的字节身份, 没有对它做美化; 本轮自产的全部文本证据行尾空格为 0(逐文件断言)。
+
+==============================================================================
+7. 未重跑的链与工具链边界
+==============================================================================
+  A0/S1/S2/V1V2/I-O/SD/反向/元负例: NOT_RERUN —— 本轮 .c/.h、host 输入、runner、shim 全未改(逐项见范围核验)。
+  0 Error 0 Warning 只适用于 ARMCLANG V6.24; 不推广为 Linux/GCC 零警告。
+  候选镜像状态: NOT_FOR_PROGRAMMING_PENDING_REVIEW_AND_MOTOR_DATA(独立复审 + 电机数据依据 + 现场授权三者都缺)。

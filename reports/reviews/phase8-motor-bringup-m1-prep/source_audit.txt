@@ -1,0 +1,250 @@
+NS800 电机驱动 M1 离线准备 —— CP1 通信查因审计（TMC link FAIL）
+任务 phase8-motor-bringup-m1-prep    输入锚 ea519f29af24c6f9353de67b7bb4d9f60baf5e1a
+方法：只读源码与既有原始材料；所有行号均为**本锚点上的实读行号**（任务书 §5.1 的行号仅作参考，
+      本轮已逐条复核，发现两处偏差见 §7）。本轮 hardware_actions=[]，未连接任何端口或探针。
+符号约定：APP = rt-thread-master/…/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications
+
+================================================================================
+1. 手上到底有哪些原始证据（不是摘要，是字节与逐字行）
+================================================================================
+1.1 BOARD-B 真实启动字节（3757 B，SHA-256 97b37f32aa03c86b…，已入库为可逐块复算的 base64）
+    其中与 TMC 有关的逐字行（按原始流顺序，未挑选）：
+
+      [SS] self-test start
+      [SS] [REQ OK] GPIO
+      [SS] [REQ OK] PWM device
+      [SS] [REQ OK] DRV_ENABLE=LOW (write+readback verified)
+      [SS] [REQ OK] ENN feedback = disabled side (PC.6=H6-5/TMC_ENN)
+      [SS] [REQ FAIL] TMC2209 link
+      [SS] [OK] IMU
+      [SS] [OK] ADC
+      [SS] [OK] Flash (JEDEC EF 40 17)
+      [SS] self-test done: required=FAIL degraded=0x00
+      [BOOT] 11 startup-selftest FAIL -> state=FAULT_LATCHED
+      [TMC]    runtime write gate mask=0x3B (0=运行态条件全通, 编译期门未翻转前仍然一位不写)
+      [TMC]    DEGRADED drive_cfg=UNCONFIGURED
+      [MAIN] boot complete but state=FAULT_LATCHED fault=8 (degraded/latched - NOT ready)
+
+    读法要点：唯一失败的 required 项就是 TMC 链路；GPIO/PWM/DRV_ENABLE 焊盘/ENN 反馈/IMU/ADC/
+    Flash 全部通过；`degraded=0x00` 说明降险位集是空的（TMC 链路在实现里计入 required，
+    不计入 degraded）。
+
+1.2 启动当时的一次主动复位事实（同一份字节内，且是供电之后）
+    BOARD-B 的 CP3 序列是：先 COM5 被动监听 2 秒 → 再做唯一一次 SYSRESETREQ → 上面这段启动流
+    就是复位之后打出来的（复位工具 stdout 逐字 `Resetting target` / `Core 0 (None):  Running`）。
+    => "VM 还没上所以读不到"这一支在**这次观察里不成立**：当时 USB 与既有 24 V 都已接通，
+       且刚复位完仍是 FAIL。这不等于排除时序假设（见 §3 原因 C 的残余不确定）。
+
+1.3 历史上确实拿到过合法应答（同一块板，模块插好之后）
+    bsp/…/PHASE8_HARDWARE_VALIDATION_20260925.md:204 记录 `tmc_status` ×100：
+      "100/100 每次 GSTAT 与 IOIN 均成功、`VERSION=0x21` 100/100；0 超时 / 0 CRC 错 /
+       0 READ FAILED"，并读到 `GCONF=0x101`、`CHOPCONF=0x15010053`、`VACTUAL=0`。
+    reports/agent_handoffs/phase8-enn-readonly-retry-20261022.md:117/120/123 两轮 `tmc_regs`
+      完全同值：`IOIN=0x21000041 VERSION=0x21`、`IFCNT=0x00000000`，计算值 `ENN=IOIN&1=1`、
+      `IOIN bit6=1`（PDN_UART 为高）。
+    同一 README（bsp/…/ns800rt7p65-nssinepad/README.md:294）还留了两条限制，必须一起读：
+      ① 当年那条"写 GCONF 原值 → IFCNT+1"握手被 F2c 复审判为绕过事务锁与写入门禁（F2c-NEW-01），
+         F2d 起 `tmc_uart_probe` **只读**，因此"这两个命令现在只证明芯片应答了读，不再证明写帧到达"；
+      ② 同页写明"模块物理在位跨两轮失联 3 次（插好即恢复）"，稳定性结论仅限"插好之后"。
+
+    => 现状判定：既有材料既不能写成 LINK_DEAD，也不能写成 LINK_OK。本轮按任务书 §5.2 的口径记
+       **LINK_UNPROVEN**，并且这个"未证"是**带方向的未证**：
+       有 100/100 的历史合法应答 + 3 次在位失联 → 假设重心在"接触/在位/单次上电态"，
+       不在"波特率算错"或"软件从未能通信"。这是假设，不是结论。
+
+================================================================================
+2. 失败判定链的实现事实（本轮真实行号）
+================================================================================
+2.1 required 第 ④ 项把两种失败合并成一条消息 —— APP/safety_state.c:629-636
+      629: /* ---- required ④ TMC2209 链路(初始化 + IOIN 读) ---- */
+      630:     if (tmc2209_init() != RT_EOK ||
+      631:         tmc2209_read_register(TMC_ADDR_DEFAULT, TMC_REG_IOIN, &v) != RT_EOK)
+      632:     {
+      633:         rt_kprintf("[SS] [REQ FAIL] TMC2209 link\n");
+      634:         required_fail = -RT_ERROR;
+      635:     }
+      636:     else rt_kprintf("[SS] [REQ OK] TMC2209 (IOIN=0x%08X)\n", v);
+
+    可观测性结论：**这条打印本身不区分是 init 失败还是 IOIN 读失败，也不带错误码。**
+    启动日志里能拿到的只有"链路项失败"这一件事。这是后续包想要"可区分原因"时必须先解决的
+    输出面限制（不是本轮修复项，见 §6）。
+
+2.2 init 到底包含什么 —— APP/tmc2209.c:716-732
+      718:  rt_err_t e = tmc_uart_open();            // uart2 设备 find/open
+      725:  e2 = tmc_cfg_prod_sync();                // 执行器两把锁的建锁/同步
+      727:  if (e != RT_EOK)      tmc_health = SUBSYS_FAILED;
+      728:  else if (e2 != RT_EOK) tmc_health = SUBSYS_FAILED;
+      729:  else                  tmc_health = SUBSYS_OK;
+      731:  return (e != RT_EOK) ? e : e2;
+    串口设备打不开或锁建不起来 ⇒ FAILED；两者都成功 ⇒ OK。
+
+2.3 health 的迁移与语义 —— APP/tmc2209.c:704-714、734-740、824
+      704:  * health 语义: OK=链路通且最近一次传输成功; DEGRADED=链路通但最近失败;
+      705:  * FAILED=uart2 打不开; UNINIT=未初始化。
+      711:  if (tmc_health == SUBSYS_UNINIT) return;   /* 未 init 时不越级判定 */
+      712:  if (tmc_health == SUBSYS_FAILED) return;
+      713:  tmc_health = (e == RT_EOK) ? SUBSYS_OK : SUBSYS_DEGRADED;
+      738:  tmc_health_after_xfer(e);                  // 读 API 的唯一联动点
+      824:  tmc_health_after_xfer(-RT_EIO);            // 传输层失败联动 DEGRADED
+
+    supervisor.c:135 直接把 health 打进启动流：
+      135:  rt_kprintf("[TMC]    %s drive_cfg=%s\n", subsys_health_name(tmc2209_get_health()), …
+
+2.4 由此可以**从既有字节里排除两支**（这是本轮唯一能得到的正向缩小，不是猜测）
+    启动流打的是 `DEGRADED` 而不是 `FAILED`。按 2.2/2.3 的迁移规则，DEGRADED 只有在
+    health 已经离开 UNINIT/FAILED（即 2.2 的 e 与 e2 都成功）之后，被一次失败传输置起来。
+    因此当时成立的是：
+      · uart2 设备打开成功（原因树 A 的"设备找不到/打不开"被排除）；
+      · 配置执行器两把锁创建成功（原因树 A 的"锁没建起来"被排除，
+        并且 write gate 0x3B 里 bit6 NOT_SYNCED 确实为 0，与此一致）；
+      · 失败发生在**其后的一次 IOIN 读**（safety_state.c:631 → tmc2209_read_register → 738 行联动）。
+    同时 gate 位图给出旁证：0x3B = bit0 HW_NOT_VALIDATED(编译期宏)、bit1 MOTOR_NOT_QUIET、
+    bit3 NOT_READY、bit4 FAULT_LATCHED、bit5 LINK_UNHEALTHY；**bit2 DRV_PAD_NOT_LOW=0、
+    bit7 ENN_FB_NOT_DISABLED=0、bit6 NOT_SYNCED=0**。也就是说 MCU 侧请求电平、最终 ENN 反馈、
+    锁同步都是好的，唯独链路不健康。位定义在 tmc2209.h:205-215。
+
+================================================================================
+3. 可区分原因树（每条写"现在能不能分、靠什么分"）
+================================================================================
+原因 A：uart2 设备/配置/互斥初始化失败
+  A1 rt_device_find 失败 / A2 rt_device_open 失败 / A3 执行器锁创建失败
+  → **本轮已由 §2.4 排除**（DEGRADED 而非 FAILED，且 NOT_SYNCED 位为 0）。
+  错误传播：tmc2209_init() 的返回值直接进 safety_state.c:630 的或条件，被压成同一条 FAIL 文本；
+  也就是说 A 类失败在**当前输出面上与 B 类不可区分**，只是这次恰好被 health 名称分开。
+
+原因 B：总线读本身失败（发出读帧但没有合法应答）
+  B1 无应答/读超时  B2 CRC 不符  B3 回显帧被当成应答  B4 短帧/丢字节  B5 地址不匹配
+     B6 寄存器值合法但身份非 0x21  B7 应答来自别的器件
+  → 现有字节**不能区分 B1..B7**（required 检查只回一个错误码，且不打印）。
+  → 单条 `tmc_uart_probe` 能区分的部分（实现见 tmc2209.c:927-1003）：
+     · :934-940 事务锁不可用 ⇒ 直接 REFUSED 且不发总线读（可区分"锁被占"与"总线坏"）；
+     · :942-947 uart2 打不开 ⇒ 明确文本（与 A 类区分）；
+     · :951-960 IOIN 首读失败 ⇒ 打印错误码并**立即结束**（不再锤总线），错误码可分 B1/B2 类；
+     · :961-965 IOIN 读到后按 (IOIN>>24)&0xFF 判 0x21（B5/B6 可分；0x20=TMC2208）；
+     · :967 起 GSTAT/IFCNT 各自还会再走一次超时（:923 注释已说明 IOIN 成功不代表后面不超时）。
+  → probe **不能**区分的：B3/B4（帧形态细节，需要原始字节级取证而不只是 msh 文本）、
+     以及"失败是接触性的还是电气性的"。
+
+原因 C：启动时序（VM 未到位 / 模块上电晚于 MCU）
+  → BOARD-B 那次是**供电之后主动复位**得到的启动流（§1.2），仍 FAIL，所以"USB 先插、VM 后开"
+     这一条不能当作已定位的根因，也不能当唯一解释。
+  → 残余不确定：复位到自检之间模块是否已稳定上电、PDN_UART 复位态、是否曾处于未插稳状态。
+     这些只能由后续**已批准的现场包**在明确断电/上电次序下再观察一次；本轮不猜。
+
+原因 D：PB6/PB7 与模块单线 PDN_UART 的连接、串联/合线电阻、模块地址与在位
+  → 现有仓库里**没有原理图件、没有扩展板或模块照片**（本轮在 reports/ 与 BSP 文档、以及两处
+     本地板级资料目录内检索均无图像/PDF 可依据；原理图 PDF 在
+     reports/reviews/…safety-chain-acceptance-draft.md 里明确记为"未入库"）。
+  → tmc2209.c:20 只登记了"uart2 / PB6=TX / PB7=RX / 115200 8N1 / slave addr 0"这个映射声明，
+     其来源是早期硬件映射，不是本轮实测。IOIN bit6=1（PDN_UART 高）在历史读回里成立，
+     说明"单线功能被启用"这一条在插好时是通的。
+  → MS1/MS2 决定地址：mstep_reg_select=0（计划值是 0，tmc2209.c:1137），地址由硬件绑带决定，
+     因此"默认地址 0 能不能应答"取决于模块上 MS1/MS2 的实际状态 —— **无实物依据，未知**。
+     任务书 §5.1 已禁止拿"常见模块接法"替代该实物，本轮照办。
+
+原因 E：SCI 功能时钟与 APB 使能域（波特率生成）
+  → 既有材料存在"波特率按 PCLK2、使能位在 APB5"的疑点。本轮**只查真实调用链**、不改时钟、
+     不下"波特率错四倍"的结论。
+  → 支持"时钟链基本可用"的既有事实：同一条 uart2 在 20260925 拿到 100/100 合法应答、
+     0 超时 0 CRC 错；同一固件同一时钟配置下 CRC 官方向量真机 PASS。若波特率系统性错，
+     那 100/100 无法解释。=> 疑点保留为**需要测量回答的项**，不是本轮结论。
+
+================================================================================
+4. 最小通信查因命令包（用板上现有镜像，不重烧；本轮一条也不执行）
+================================================================================
+镜像：板上最后已证 measure-a0.bin 261452 B / 5f30d3f058ceff51…（四宏全 0，能力交叉核对靠 spm cap）
+预算：常规上电 ≤1、COM5 打开 ≤1、目标命令 ≤7、probe ≤1；
+      Keil/下载/Flash 读/DAP/主动复位/设备枚举/tmc_scan = 0。
+顺序与判据（完整字面序列、每条响应判据与副作用写在 REV/board_execution_candidate.md 的 M0 节）：
+      1 spm status（复用 R1a 已证的"静默+一次只读查询取响应尾"原则）
+      2 spm cap  3 safety_state  4 safety_status  5 motor_status  6 step_status
+      7 tmc_uart_probe
+停止条件：首条无响应/响应污染/缺提示符即停；不改 baud、不空回车探测、不自动重试；
+          probe 无合法 IOIN 或 GSTAT/IFCNT 不完整 ⇒ 本分支结束，不写配置、不清故障。
+说明：`tmc_config_show` 不在 M0 —— 它会真读 GCONF/CHOPCONF（tmc2209.c:2358/2331 的实时读），
+      属带总线流量的操作，放 M2 更合适；M0 只做身份与状态确认。
+
+================================================================================
+5. 本轮结论（按证据强度，不写"已解决"）
+================================================================================
+  · 排除：uart2 设备打不开、执行器锁未建（§2.4）。
+  · 缩小：失败发生在初始化之后的 IOIN 读；MCU 侧禁能请求与最终 ENN 反馈当时都在禁能侧。
+  · 未证：B1..B7 的具体子因；C（时序）残余；D（接线/地址/在位）全部；E（时钟域）疑点。
+  · 状态登记：tmc_link_status = LINK_UNPROVEN（有方向的未证，见 §1.3）。
+  · 不伪造：没有为了得到健康状态去改 health、改地址、改超时或清故障。
+
+================================================================================
+6. 需要修复项（本轮按 §3.3 不扩大范围，只登记）
+================================================================================
+  F-A（输出面可区分性）safety_state.c:629-636 的 required ④ 把 init 失败与 IOIN 读失败合并成
+      同一条 `[REQ FAIL] TMC2209 link`，且不打印错误码；一旦真是 A 类失败，现场无法区分。
+      最小修法是把两个返回值分开打印（不改判定语义）。属后续产品轮。
+  F-B（在位/接触史）README.md:294 记"跨两轮失联 3 次（插好即恢复）"，但仓库没有可核对的
+      插座/接触实物依据（无照片、原理图未入库）。首转前需要一次由操作员执行的断电检查。
+  F-C（电流档位含义）见 REV/motor_current_basis.md：芯片现读回 CHOPCONF vsense=0，
+      而计划值 vsense=1；在未成功 apply 之前，"IRUN 字段对应多少电流"这件事本身是两套含义。
+
+================================================================================
+7. 任务书 §5.1 参考行号与本轮实读的差异（就地勘误，不改产品）
+================================================================================
+  · `tmc_cfg_gate_prod` 实际在 **APP/tmc2209.c:1456**（任务书写 1457；1457 是左花括号行）。
+  · `tmc_config_show` 函数体起于 **APP/tmc2209.c:2301**，其中会实际读总线的两条在
+    **:2331（写入门禁位图）与 :2358（live GCONF 实时读）**；任务书写 2357/2368。
+  · `fault_reset` 实际起于 **APP/safety_state.c:684**（任务书写 674 起）。
+  · 其余引用（tmc2209.c:20/252、:927-1003、:1137、:1141-1142、:2347、motor.c:1423、
+    motor.c:2340-2372、safety_state.c:630 一带、supervisor.c:427/495）本轮实读**一致**。
+  · 位定义补充：TMC 写入门禁 8 位在 APP/tmc2209.h:205-215；motor arm 门 7 位在
+    APP/motor.h:89-98（0x1B 解码见 §1.1/§2.4 的用法）。
+
+================================================================================
+8. 真实可达的门禁顺序（§5.4；每一行都是"读代码得到的必要条件"，不是愿望清单）
+================================================================================
+位定义：motor arm 门 APP/motor.h:89-98（7 位）；TMC 写入门禁 APP/tmc2209.h:205-215（8 位）。
+本轮启动时的真实读数：arm gate fail mask=0x1B（bit0,1,3,4）、write gate mask=0x3B（bit0,1,3,4,5）。
+
+步 需要的状态                          靠什么进入                     当前(启动字节)挡住它的位
+-1 ------------------------------      ---------------------------      ---------------------------------
+0  上电 + 启动 1..11 完成                supervisor_boot() APP/supervisor.c:427   已完成；:495 打印 11 项结果
+1  TMC 链路合法（IOIN VERSION=0x21）     只读 tmc_uart_probe tmc2209.c:927-1003   safety_state.c:630-636 合并判 FAIL；
+                                                                                   health=DEGRADED（§2.4）
+2  清真实故障的前置成立                  fault_reset() APP/safety_state.c:684 起   需要：故障源已安全 + 人工命令 +
+   （不是"清障=READY"）                                                   票据=当时 epoch 的复核（:59-63 注释口径）
+3  → MANUAL_CLEAR                       同上；成功只到 MANUAL_CLEAR                ⚠ 不自动自检，必须再走步 4
+4  required 自检真通过 → READY           再次执行 required 集（GPIO/PWM/DRV_ENABLE/  目前差 TMC 一项（§1.1）
+                                          ENN/TMC…）并全部 OK
+5  静止下 apply 驱动配置                 tmc_config_apply CONFIRM                 写入门禁 8 位全 0 才发一个 WRITE 帧
+                                          tmc2209.c:2377；门 tmc_cfg_gate_prod:1456-1488   现挡：HW_NOT_VALIDATED(b0)、
+                                          位值 tmc2209_get_write_gate_mask:2058           MOTOR_NOT_QUIET(b1)、NOT_READY(b3)、
+                                                                                   FAULT_LATCHED(b4)、LINK_UNHEALTHY(b5)
+                                                                                   已通：DRV_PAD_NOT_LOW(b2)=0、
+                                                                                   ENN_FB_NOT_DISABLED(b7)=0、NOT_SYNCED(b6)=0
+6  CONFIGURED + 快照可信                 applied snapshot done_valid（:1571-1577）  IHOLD_IRUN 只写：到达凭证只有 IFCNT+1
+                                                                                   （tmc2209.h:131-135）
+7  方向                                motor_dir → motor_set_direction            持 mot_lock + 短窗口复核，停稳/可信关闭
+                                          APP/motor.c:1423                        后才写；不直接写 GPIO
+8  目标频率                             motor_target <hz>  APP/motor.c:2354-2366   API 上限仍是源码里的 20000 Hz；
+                                                                                   候选镜像没有"硬定时/硬封顶"
+9  arm                                  motor_arm  APP/motor.c:2340-2341           六/七门（motor_get_gate_fail_mask
+                                          （cmd_motor_arm → motor_arm()）           APP/motor.c:894）：现挡 ENABLE_PATH(b0)、
+                                                                                   NOT_READY(b1)、NOT_PROTECTED(b3)、
+                                                                                   NO_DRV_CONFIG(b4)
+10 start                                motor_start APP/motor.c:2368-2369          产生真实 STEP 输出 ⇒ 必须已接电机
+11 stop                                 motor_stop APP/motor.c:2371-2372           斜坡降速，可能仍 armed；current 未归零
+                                                                                   不得声称停稳
+12 disarm                               motor_disarm APP/motor.c:2343-2344         撤许可并实测关闭结果；API 接受 ≠
+                                                                                   反馈确认 ≠ 物理无脉冲
+
+读代码得到的三条硬事实（不要绕过）：
+ · 读状态命令不推进门禁：tmc2209_get_write_gate_mask(:2057 注释"不产生总线流量")、
+   motor_get_gate_fail_mask 都是只读观察口。
+ · canonical 抑制/owner/phase：fault_reset 的"慢复核 + 一次最终提交"顺序在
+   safety_state.c:59-63 的口径里写死（canonical 锁存/取消 owner/清码/写 MANUAL_CLEAR/换 epoch/
+   最后清抑制），任何"先清抑制再改状态"的走法都不成立。
+ · SW1 阻断与正式使能互斥：SW1 实测位（出处
+   reports/reviews/phase8-sw1-hardware-cut-20261022/NOTES.txt:50-57，本轮实读）把 1-2 判为阻断侧、
+   2-3 为允许侧（与图纸提取相反），
+   因此 SW1 在阻断位时，许可拉 HIGH 之后的"使能侧 ENN 反馈"这一条件不可能成立 ——
+   未来 arm 之前必须现场明确授权 SW1 动作；不得靠注释假装阻断位下也能正式使能。
+ · 编译期宏只是其中一位：候选目标把 tmc2209.h:205 的 HW_NOT_VALIDATED 与 motor.h:89 的
+   ENABLE_PATH 两项从"永远置位"变成"取决于运行态"，其余各位（QUIET/READY/FAULT/LINK/FB）
+   照旧拦 —— 这就是 §3.4 例外的真实边界，不构成任何硬件验收。

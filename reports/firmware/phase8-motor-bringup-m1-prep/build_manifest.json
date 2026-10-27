@@ -1,0 +1,417 @@
+{
+  "task_id": "phase8-motor-bringup-m1-prep",
+  "software_input_commit": "70416e7ffb9e704a7f6008b310c6223dbda3a669",
+  "software_input_commit_how_derived": "git log -1 -- <工程路径> 反查: 即**真正含有候选工程字节的那次提交**, 非自引用、非事后拼写",
+  "input_anchor": "ea519f29af24c6f9353de67b7bb4d9f60baf5e1a",
+  "generated": "本轮 CP3 实际构建; 值全部现算, 无占位串",
+  "project_input": {
+    "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/project.uvprojx",
+    "blob_bytes_at_anchor": 226016,
+    "blob_sha256_at_anchor": "ec9eed0e9d9998c38b5dd935ddaea7e74829c2a770272dfe0d675cc6fce4cc09",
+    "blob_bytes_now": 338976,
+    "blob_sha256_now": "3b882d0a160692c31624108feda9ba285633a19ad02a89f663dec07fb8d51e04",
+    "equals_appendix_A_output": true,
+    "generator_identity": {
+      "bytes": 3596,
+      "sha256": "d5dbce28f3ed65610b7e81ef1339a2dd440b5c831de8a0602bdfa5ccc5ea9f49",
+      "matches_task_book": true
+    },
+    "worktree_note": "构建期间工作树按既往成功构建形态写成 CRLF, 完成后已还原为与 blob 逐字节相同的 LF; 提交身份始终以 blob 为准"
+  },
+  "tool": {
+    "uv4": "KEIL_ROOT/UV4/UV4.exe",
+    "compiler": "ARMCLANG V6.24 (KEIL_ROOT/ARM/ARMCLANG/Bin)",
+    "keil_version": "5.43.1.0(本机已证安装, 未升级未装新依赖)"
+  },
+  "targets": {
+    "rt-thread": {
+      "kind": "default",
+      "process_rc": 0,
+      "rc_semantics": "0=无错误无警告(本机已证约定); 判据同时取日志文本",
+      "wall_seconds": 15.1,
+      "build_elapsed_text": "00:00:08",
+      "linker_summary_line": "\".\\build\\rt-thread.axf\" - 0 Error(s), 0 Warning(s).",
+      "real_error_lines": [],
+      "real_warning_lines": [],
+      "errors": 0,
+      "warnings": 0,
+      "program_size": [
+        "Program Size: Code=173762 RO-data=76806 RW-data=2188 ZI-data=83784  \r"
+      ],
+      "log": {
+        "bytes": 3751,
+        "sha256": "1e5b2966c73b13f2e38db20ce7369dabb115cb45681a77b87b8ba62a805e40c7"
+      },
+      "output_bin_relative": "BSP/rtthread.bin",
+      "watchdog_killed": null
+    },
+    "rt-thread-motor-m1-candidate": {
+      "kind": "candidate",
+      "process_rc": 0,
+      "rc_semantics": "0=无错误无警告(本机已证约定); 判据同时取日志文本",
+      "wall_seconds": 15.0,
+      "build_elapsed_text": "00:00:08",
+      "linker_summary_line": "\".\\build\\motor_m1\\rt-thread-motor-m1.axf\" - 0 Error(s), 0 Warning(s).",
+      "real_error_lines": [],
+      "real_warning_lines": [],
+      "errors": 0,
+      "warnings": 0,
+      "program_size": [
+        "Program Size: Code=173994 RO-data=76682 RW-data=2188 ZI-data=83784  \r"
+      ],
+      "log": {
+        "bytes": 3680,
+        "sha256": "48efa1eae454c8f5992ff8c179382b68328e086dd28d6da3ed321b476fa73bcf"
+      },
+      "output_bin_relative": "BSP/build/motor_m1/rt-thread-motor-m1.bin",
+      "watchdog_killed": null
+    }
+  },
+  "macro_effective_values": {
+    "default": {
+      "motor.c": {
+        "NS800_TARGET_MEASUREMENT_A0": "NOT_DEFINED_IN_TU",
+        "MOTOR_HARDWARE_ENABLE_PATH_VALIDATED": "RT_FALSE",
+        "TMC_DRIVE_CONFIG_HW_VALIDATED": "RT_FALSE",
+        "STEP_DIAG_ISOLATED_ENV_CONFIRMED": "RT_FALSE",
+        "SAFETY_LIMIT_INPUTS_ENABLED": "RT_FALSE"
+      },
+      "tmc2209.c": {
+        "NS800_TARGET_MEASUREMENT_A0": "NOT_DEFINED_IN_TU",
+        "MOTOR_HARDWARE_ENABLE_PATH_VALIDATED": "RT_FALSE",
+        "TMC_DRIVE_CONFIG_HW_VALIDATED": "RT_FALSE",
+        "STEP_DIAG_ISOLATED_ENV_CONFIRMED": "RT_FALSE",
+        "SAFETY_LIMIT_INPUTS_ENABLED": "RT_FALSE"
+      },
+      "supervisor.c": {
+        "NS800_TARGET_MEASUREMENT_A0": "NOT_DEFINED_IN_TU",
+        "MOTOR_HARDWARE_ENABLE_PATH_VALIDATED": "RT_FALSE",
+        "TMC_DRIVE_CONFIG_HW_VALIDATED": "RT_FALSE",
+        "STEP_DIAG_ISOLATED_ENV_CONFIRMED": "RT_FALSE",
+        "SAFETY_LIMIT_INPUTS_ENABLED": "RT_FALSE"
+      }
+    },
+    "candidate": {
+      "motor.c": {
+        "NS800_TARGET_MEASUREMENT_A0": "0",
+        "MOTOR_HARDWARE_ENABLE_PATH_VALIDATED": "1",
+        "TMC_DRIVE_CONFIG_HW_VALIDATED": "1",
+        "STEP_DIAG_ISOLATED_ENV_CONFIRMED": "0",
+        "SAFETY_LIMIT_INPUTS_ENABLED": "0"
+      },
+      "tmc2209.c": {
+        "NS800_TARGET_MEASUREMENT_A0": "0",
+        "MOTOR_HARDWARE_ENABLE_PATH_VALIDATED": "1",
+        "TMC_DRIVE_CONFIG_HW_VALIDATED": "1",
+        "STEP_DIAG_ISOLATED_ENV_CONFIRMED": "0",
+        "SAFETY_LIMIT_INPUTS_ENABLED": "0"
+      },
+      "supervisor.c": {
+        "NS800_TARGET_MEASUREMENT_A0": "0",
+        "MOTOR_HARDWARE_ENABLE_PATH_VALIDATED": "1",
+        "TMC_DRIVE_CONFIG_HW_VALIDATED": "1",
+        "STEP_DIAG_ISOLATED_ENV_CONFIRMED": "0",
+        "SAFETY_LIMIT_INPUTS_ENABLED": "0"
+      }
+    }
+  },
+  "macro_proof_method": "同一 ARMCLANG 以 -E -dM 只预处理(不产物体), Define/IncludePath 取自**已提交工程 blob** 内该目标的真实字段; 三个编译单元 motor.c / tmc2209.c / supervisor.c 逐个跑",
+  "source_list": {
+    "per_target_items": {
+      "rt-thread": 135,
+      "rt-thread-measure-a0": 135,
+      "rt-thread-motor-m1-candidate": 135
+    },
+    "candidate_identical_to_default": true,
+    "a0_identical_to_default": true
+  },
+  "link_and_symbols": {
+    "rt-thread": {
+      "load_region": [
+        [
+          "LR_IROM1",
+          "0x08000000",
+          "0x0003db58",
+          "0x00080000"
+        ]
+      ],
+      "totals": [
+        [
+          "RO",
+          "Code + RO Data",
+          "250568"
+        ],
+        [
+          "RW",
+          "RW Data + ZI Data",
+          "85972"
+        ],
+        [
+          "ROM",
+          "Code + RO Data + RW Data",
+          "251144"
+        ]
+      ],
+      "object_count_hint": null,
+      "stop_priority_object_linked": true,
+      "spm_symbols_present": [],
+      "motion_symbols_present": [
+        "fault_reset",
+        "motor_arm",
+        "motor_disarm",
+        "motor_get_gate_fail_mask",
+        "motor_set_direction",
+        "motor_start",
+        "motor_stop",
+        "sp_recovery_probe_off",
+        "system_selftest",
+        "tmc2209_apply_config",
+        "tmc2209_get_write_gate_mask",
+        "tmc_uart_probe"
+      ]
+    },
+    "rt-thread-motor-m1-candidate": {
+      "load_region": [
+        [
+          "LR_IROM1",
+          "0x08000000",
+          "0x0003dbc0",
+          "0x00080000"
+        ]
+      ],
+      "totals": [
+        [
+          "RO",
+          "Code + RO Data",
+          "250676"
+        ],
+        [
+          "RW",
+          "RW Data + ZI Data",
+          "85972"
+        ],
+        [
+          "ROM",
+          "Code + RO Data + RW Data",
+          "251260"
+        ]
+      ],
+      "object_count_hint": null,
+      "stop_priority_object_linked": true,
+      "spm_symbols_present": [],
+      "motion_symbols_present": [
+        "fault_reset",
+        "motor_arm",
+        "motor_disarm",
+        "motor_get_gate_fail_mask",
+        "motor_set_direction",
+        "motor_start",
+        "motor_stop",
+        "sp_recovery_probe_off",
+        "system_selftest",
+        "tmc2209_apply_config",
+        "tmc2209_get_write_gate_mask",
+        "tmc_uart_probe"
+      ]
+    },
+    "a0_positive_control_preserved_map": {
+      "file": "rt-thread-a0.map",
+      "bytes": 1999062,
+      "sha256": "07498bc9370235055dd2b4f8a465853a2577b226a5d0cf382194ea55240fbd0d",
+      "purpose": "证明 spm_ 符号确实会出现在 A0 目标的 map 里, 而默认/候选 map 一个都没有"
+    }
+  },
+  "binary_diff_vs_accepted": {
+    "default_bin_vs_accepted_default_bin": {
+      "accepted": {
+        "bytes": 251148,
+        "sha256": "02e984583255f3414f43fb5c077dc9ba82eba98553d2cb9d7f7feee9336ebd80"
+      },
+      "built": {
+        "bytes": 251148,
+        "sha256": "7f9baed96ecb23cdf7cb9d1c0ccd4c28f2946bc9f3d720a560f7741cb0f4e45d"
+      },
+      "differing_bytes": 6,
+      "differing_offsets": [
+        "0x3BF65",
+        "0x3BF66",
+        "0x3BF69",
+        "0x3BF6B",
+        "0x3BF6C",
+        "0x3BF73"
+      ],
+      "attribution": "全部落在构建横幅字符串内: 旧 `20:56:52.Oct 26 2026` → 新 `16:54:05.Oct 27 2026`(即 __TIME__/__DATE__); 区间外零差异"
+    },
+    "candidate_bin_minus_default_bin_bytes": 112
+  },
+  "build_attempts": [
+    {
+      "attempt": 1,
+      "result": "FAIL/STALLED",
+      "detail": "首次以后台方式发起两目标连跑: UV4 进程存活约 10 分钟、CPU 仅 ~3 s、无编译器子进程、无日志无产物; 由看门狗/人工终止。该轮 stdout/stderr 走的是管道。"
+    },
+    {
+      "attempt": 2,
+      "result": "PASS",
+      "detail": "改为(1)stdout/stderr 接文件句柄而非管道 (2)工作树工程按既往成功构建形态写成 CRLF, 并加窗口标题看门狗; 默认目标 rc=0、15.1 s、0 Error 0 Warning。"
+    },
+    {
+      "attempt": 3,
+      "result": "PASS",
+      "detail": "候选目标同形态重跑: rc=0、15.0 s、0 Error 0 Warning。"
+    }
+  ],
+  "attempt_attribution_note": "两处环境差异同时改动, 因此**不能归因到单一因素**; 事实只有\"第一次没产出、后两次产出且判据齐\"。",
+  "programming_ban": "NOT_FOR_PROGRAMMING_PENDING_REVIEW_AND_MOTOR_DATA",
+  "programming_ban_reasons": [
+    "候选镜像含两项编译期宏例外, 需独立软件/镜像复审",
+    "电机铭牌/额定电流定义与模块 Rsense 同实物依据缺失(见 REV/motor_current_basis.md §4)",
+    "TMC 链路本轮仍 LINK_UNPROVEN",
+    "本任务书不授权任何板级动作"
+  ],
+  "host_chains_not_rerun": "NOT_RERUN: 本轮 .c/.h、host 输入、runner、shim 全未改",
+  "hardware_actions": [],
+  "target_commands_executed": [],
+  "board_last_proven_image": {
+    "bytes": 261452,
+    "sha256": "5f30d3f058ceff516b2185aa3a1e597bbe63293b94a6fd801fd989a6f7b2b8e6"
+  },
+  "board_current_power_state": "UNKNOWN",
+  "artifacts": {
+    "default.bin": {
+      "file": "rtthread.bin",
+      "bytes": 251148,
+      "sha256": "7f9baed96ecb23cdf7cb9d1c0ccd4c28f2946bc9f3d720a560f7741cb0f4e45d",
+      "local_only": true,
+      "reachable_by_reviewer": "仅本地(M1_BUILDS/M1_PRESERVED), 云端不可回读"
+    },
+    "default.axf": {
+      "file": "rt-thread.axf",
+      "bytes": 1645448,
+      "sha256": "92169bef54992fa7f28d2d52280c6130e2cd8e9c8702d3ca92c09b4b1d74a43f",
+      "local_only": true,
+      "reachable_by_reviewer": "仅本地(M1_BUILDS/M1_PRESERVED), 云端不可回读"
+    },
+    "default.map": {
+      "file": "rt-thread.map",
+      "bytes": 1946989,
+      "sha256": "ab33ac1de309b2ce40402627c3b8a6dff0d81ec0104f590a7723d49f5a5f22f7",
+      "local_only": true,
+      "reachable_by_reviewer": "仅本地(M1_BUILDS/M1_PRESERVED), 云端不可回读"
+    },
+    "candidate.bin": {
+      "file": "rt-thread-motor-m1.bin",
+      "bytes": 251260,
+      "sha256": "a76b845db4ba1d8872f9db395c2e6e796bdb9416c398f010b669538006cf2777",
+      "local_only": true,
+      "reachable_by_reviewer": "仅本地(M1_BUILDS/M1_PRESERVED), 云端不可回读"
+    },
+    "candidate.axf": {
+      "file": "rt-thread-motor-m1.axf",
+      "bytes": 1645936,
+      "sha256": "c1e9d4e78c424b3631b2d30cbe6061f32074b30c7518ed2aa681771d6600a86f",
+      "local_only": true,
+      "reachable_by_reviewer": "仅本地(M1_BUILDS/M1_PRESERVED), 云端不可回读"
+    },
+    "candidate.map": {
+      "file": "rt-thread-motor-m1.map",
+      "bytes": 1948503,
+      "sha256": "9f6d37203ca6226ef74323096d48fe5b6719300ab3cfec35f88bfc45833b586f",
+      "local_only": true,
+      "reachable_by_reviewer": "仅本地(M1_BUILDS/M1_PRESERVED), 云端不可回读"
+    },
+    "reports/firmware/phase8-motor-bringup-m1-prep/default-control.bin": {
+      "bytes": 251148,
+      "sha256": "7f9baed96ecb23cdf7cb9d1c0ccd4c28f2946bc9f3d720a560f7741cb0f4e45d",
+      "location": "PROJECT_ROOT(reports 归档)",
+      "reachable_by_reviewer": "远端仓库可回读(reports 归档, 原字节)"
+    },
+    "reports/firmware/phase8-motor-bringup-m1-prep/motor-m1-candidate.bin": {
+      "bytes": 251260,
+      "sha256": "a76b845db4ba1d8872f9db395c2e6e796bdb9416c398f010b669538006cf2777",
+      "location": "PROJECT_ROOT(reports 归档)",
+      "reachable_by_reviewer": "远端仓库可回读(reports 归档, 原字节)"
+    },
+    "local_only_note": "AXF 与 .map 按已用仓库惯例不入 Git(既往轮同样只归档 BIN), 在此登记路径/长度/SHA-256, 云端不可远端取得, 不得称其为可远端复算件。",
+    "reports/firmware/phase8-motor-bringup-m1-prep/motor-m1-candidate.map": {
+      "bytes": 1948503,
+      "sha256": "9f6d37203ca6226ef74323096d48fe5b6719300ab3cfec35f88bfc45833b586f",
+      "reachable_by_reviewer": "远端仓库可回读(reports 归档, 原字节)",
+      "note": "本轮实测该 map 不含盘符/用户名串, 故按原字节归档"
+    }
+  },
+  "remote_visibility": {
+    "archived_verbatim": [
+      "reports/firmware/.../default-control.bin",
+      "reports/firmware/.../motor-m1-candidate.bin",
+      "reports/firmware/.../motor-m1-candidate.map",
+      "reports/reviews/.../make_motor_m1_target.py",
+      "reports/reviews/.../candidate_link_extract.txt"
+    ],
+    "masked_lossy": [
+      "reports/reviews/.../build_log_default.txt",
+      "reports/reviews/.../build_log_candidate.txt"
+    ],
+    "local_only": [
+      "rt-thread.axf / rt-thread.bin(工程根) / rt-thread.map",
+      "rt-thread-motor-m1.axf",
+      "两个 .dep 与各 100+ 个 .o/.d(构建区)",
+      "macroproof_*.dM.bin(预处理转储)"
+    ],
+    "axf_reason": "候选 AXF 实测含 142 处、默认 AXF 含 142 处\"盘符+分隔符\"形式的本机路径串, 脱敏会破坏 ELF 字节身份, 故只登记长度与 SHA-256, 不入库",
+    "claim_ban": "不得把任何纯本地件说成云端可回读"
+  },
+  "spm_symbol_counts_measured": {
+    "default": 0,
+    "candidate": 0,
+    "a0_preserved": 35
+  },
+  "link_objects": {
+    "default": 107,
+    "candidate": 107,
+    "a0_preserved": 108,
+    "only_in_default": [],
+    "only_in_candidate": [],
+    "only_in_a0": [
+      "sp_measure_a0.o"
+    ],
+    "size_differing": [
+      "motor.o",
+      "stop_priority.o",
+      "supervisor.o",
+      "tmc2209.o"
+    ],
+    "hal_leaves_identical": true
+  },
+  "dep_identities": {
+    "default": {
+      "file": "project_rt-thread.dep",
+      "bytes": 992974,
+      "sha256": "b63d51e9e9480ec1b1317414196272ea6eb68aab3105c797a2d5a6b3c0b94e2e"
+    },
+    "candidate": {
+      "file": "project_rt-thread-motor-m1-candidate.dep",
+      "bytes": 1018982,
+      "sha256": "24d6cc1cb734581be12550c1164fb68b241c50e238d2cf8e9a04be2ee945864b"
+    }
+  },
+  "build_logs_in_repo": {
+    "rt-thread": {
+      "repo_path": "reports/reviews/phase8-motor-bringup-m1-prep/build_log_default.txt",
+      "raw_bytes": 3751,
+      "raw_sha256": "1e5b2966c73b13f2e38db20ce7369dabb115cb45681a77b87b8ba62a805e40c7",
+      "masked_lossy": true
+    },
+    "rt-thread-motor-m1-candidate": {
+      "repo_path": "reports/reviews/phase8-motor-bringup-m1-prep/build_log_candidate.txt",
+      "raw_bytes": 3680,
+      "raw_sha256": "48efa1eae454c8f5992ff8c179382b68328e086dd28d6da3ed321b476fa73bcf",
+      "masked_lossy": true
+    }
+  },
+  "file_level_define_overrides": {
+    "rt-thread": 0,
+    "rt-thread-measure-a0": 0,
+    "rt-thread-motor-m1-candidate": 0
+  }
+}
