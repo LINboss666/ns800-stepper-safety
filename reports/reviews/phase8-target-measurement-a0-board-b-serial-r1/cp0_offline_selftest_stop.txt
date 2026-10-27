@@ -1,0 +1,185 @@
+NS800 A0 BOARD-B-SERIAL-R1 —— CP0 离线自检即停(附录采集器缺陷, 未触碰任何设备)
+轮次 phase8-target-measurement-a0-board-b-serial-r1   日期 2026-10-27 (Asia/Shanghai)
+任务书 NS800_Board_B_Review_and_Serial_Continuation_R1_4bb8e9f_20261027.md
+document_base = 被审 full SHA 4bb8e9f50c534fe73d51235f5f7746e17a16ae5f(本轮未新增前置提交, 相对它 diff 为空)。
+结论: CP0-5 的硬前置(-SelfTest)未通过 => 按任务书 §6.6 停在 CP0; CP1 未进入, 本包上限消耗全为 0。
+脱敏代号: PROJECT_ROOT / WORK_OUT / WORK_OUT_R1 / BOARD_B_ROOT / RAWDATA / PY_ROOT / DAP_UID。
+呈现层: 代号是纯字符串替换, 反斜杠写成正斜杠; 判据字节见 cp0_selftest_artifacts.md 的 base64 块。
+
+==============================================================================
+1. 基线与规则(任务书 §6 CP0 第 1 条)
+==============================================================================
+  适用 AGENTS.md 实读: rt-thread-master/rt-thread-master/AGENTS.md(仓库根无 AGENTS.md)。
+    与本任务直接相关的约束: 只做最小可验证改动; 禁止提交生成物/临时文件/本地环境文件/密钥;
+    禁止改写历史; 禁止无指令新建文档。本包写入仅限任务书 §6 允许的 reports 白名单目录。
+  分支 = phase8/tmc-drive-config; 本地 HEAD = 远端头 = 锚点 4bb8e9f…(ls-remote 实取);
+  git status --porcelain 输出为空(工作树干净); git diff 锚点..HEAD 为空 => 不需要另证"非 reports 差异"。
+  未做 reset/rebase/force/merge, 未移动任何冻结引用, 未覆盖用户既有改动。
+
+==============================================================================
+2. 不变项实读(任务书 §5)
+==============================================================================
+  motor.h         :69  逐字 = #define MOTOR_HARDWARE_ENABLE_PATH_VALIDATED   RT_FALSE   与任务书指认一致 = True
+  motor.h         :83  逐字 = #define STEP_DIAG_ISOLATED_ENV_CONFIRMED       RT_FALSE   与任务书指认一致 = True
+  tmc2209.h       :100 逐字 = #define TMC_DRIVE_CONFIG_HW_VALIDATED   RT_FALSE   与任务书指认一致 = True
+  project_board.h :51  逐字 = #define SAFETY_LIMIT_INPUTS_ENABLED   RT_FALSE   与任务书指认一致 = True
+  (注: 任务书只给文件名+行号; 这三份头文件实际在 BSP 的 applications/ 目录, 不是 include/。)
+  冻结门来源 = git cat-file blob b187cdd2ffc3225474006d28c1dca3eca591351d(§6.3 指定的 gate_code_commit, 不是 HEAD 工作树文本)
+    collector_old_unchanged  19432 B sha256=521d758b2cae3eaca5acfda0c705149f9980fc1ba31873866bad6ebe8bec0fdd  §指认相符=True
+    gate_frozen_copy        50246 B sha256=94e8317577a0fd8f6fd2bccafc0bb16753f3fb900c1adc7d254ee57cf3898c7d  §指认相符=True
+  板上镜像连续性: reports/firmware/…/measure-a0.bin 261452 B / 5f30d3f0… 相符 = True;
+    default.bin 251148 B / 02e98458… 相符 = True(只核身份, 本包不下载不读 Flash)。
+  旧采集器与上一轮证据未被覆盖: A0BoardB.ps1 19432 B / 521d758b… = True;
+    cp3_capture_stop.txt 16249 B / b53117bb… = True; cp3_wire_archive.md 7925 B 原样。
+  冻结引用: main=1b3757ee… True; phase7/full-embedded-software=6d3fbc55… True;
+    tag v0.7-phase7-software-board-validated object=097935fe… deref=e40a9b95… True。
+  既存恢复材料只在本地磁盘核字节: 恢复 HEX 3014958 B / b3ac97b9… True; 原存件/恢复工程/原始日志
+    目录条目 4/3/57 未动; 恢复下载仍 NOT_EXECUTED(文件存在不等于演练过)。
+
+==============================================================================
+3. 附录提取与工作副本身份(任务书 §6 CP0 第 2-4 条)
+==============================================================================
+  collector_new           21413 B sha256=6faa1afb1b603833e02b4c2afc4f8e34a49f165ada7da476775ab23338f56ad8  相符=True  ascii=True CR=0
+  collector_old_unchanged  19432 B sha256=521d758b2cae3eaca5acfda0c705149f9980fc1ba31873866bad6ebe8bec0fdd  相符=True  ascii=n/a CR=0
+  gate_frozen_copy        50246 B sha256=94e8317577a0fd8f6fd2bccafc0bb16753f3fb900c1adc7d254ee57cf3898c7d  相符=True  ascii=n/a CR=0
+  boot_fixture             3757 B sha256=97b37f32aa03c86b8708ae088d0ae65a8f92520f1a1ed70beb74663049321749  相符=True  ascii=n/a CR=0
+  提取方式 = 任务书唯一标记 <!-- BEGIN_SERIAL_R1_SOURCE --> 之后到第一个 ``` 闭合前,
+    不是从第一个 powershell 围栏猜(那只有 §6.5 的两行示例)。
+  启动夹具与上一轮真实落盘原件逐字节相等 = True(所以"重放的是这次真机字节", 不是再造的样本)。
+  门副本用 Python 直接写原始字节, 未经 PowerShell/Set-Content 转存(避免编码改写)。
+
+==============================================================================
+4. 本机语法检查(硬前置之一)
+==============================================================================
+  System.Management.Automation.Language.Parser::ParseFile -> PARSE_ERRORS=0, PARSE_TOKENS=4083
+  检查脚本本身 ASCII(594 B / sha=a66aa408d7da2276), 主机 Windows PowerShell 版本 5.1.26100.5074。
+  语法这一关是过的: 下面的失败是运行时语义缺陷, 不是解析错误。
+
+==============================================================================
+5. -SelfTest 执行与 §6.5 逐条机器判定
+==============================================================================
+  调用(参数语义照 §6.5, 路径为本地工作副本):
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File WORK_OUT_R1/A0BoardBSerialR1.ps1 -SelfTest -PythonExe <PY_ROOT/python.exe> -GateFile WORK_OUT_R1/freeze/a0_export_gate_R1.py -BootFixture WORK_OUT_R1/fixture/002_boot.rx.bin -OutDir WORK_OUT_R1/selftest_run1
+  rc = 1  (要求 0)   stdout 0 B   stderr 354 B
+  包装器改进(对应上一轮 CP3-F2): stdout/stderr 一律按**原始字节**另存 .bin, 可读视图另生成;
+    本次 stderr 用 GBK **严格**解码成功(strict_decode=True), 本地化错误文本不再被替换字符吃掉。
+  逐条判定:
+    FAIL rc == 0
+         观察 = 1
+    FAIL stdout 有 BOARD-B-SERIAL-R1-OFFLINE-SELFTEST PASS; device_actions=0
+         观察 =
+    FAIL stderr 为空(无抛错)
+         观察 = 354
+    FAIL OFFLINE_SELFTEST 行存在且 device_actions=0 / real_wire_calls=0 / mock_read_probes=3 / mock_forbidden_calls=0 / boot_fixture_bytes=3757
+         观察 = None
+    PASS READ_ONLY_PROBE_READY 存在且 startup_prompt_required=false
+    PASS 3757 B 真实启动重放落盘且 SHA == 97b37f32…
+    FAIL MOCK_TX_ATTEMPT 恰 3 条
+         观察 = 1
+    PASS 无 TX_ATTEMPT(真发命令的账)
+    PASS 无 SERIAL_OPEN
+    PASS 无 RESET_ATTEMPT(脚本已删该路径)
+    FAIL 无 STOP_FAILURE
+         观察 = 1
+    PASS 离线门正控 self_positive allowed=True
+    PASS 离线门负控 self_negative allowed=False 且 rc=1(NUL 仍立即拒绝)
+    PASS 源码里不存在 DAP/pyOCD/复位执行路径
+  台账(全部 11 行, 原样):
+    13:46:49.797  RX_BEGIN               {"path": "001_offline_bytes.rx.bin", "start": 0}
+    13:46:49.895  RX_FILE                {"bytes": 8, "end": 8, "path": "001_offline_bytes.rx.bin", "sha256": "28338dd70f7706a65735b53b74c93e681a9cf6b99d5f00c11611575aa52be65a", "start": 0}
+    13:46:50.287  GATE                   {"allowed": true, "batch": "self_positive", "raw_sha256": "3fe53b977b24b2a4ac53055330bf0008dbf58d56e5d35b55773ae9801595b91e", "rc": 0}
+    13:46:50.443  GATE                   {"allowed": false, "batch": "self_negative", "raw_sha256": "21c2ab75cb1fac90eac3cf7fb484ac081d14bd0eca80101eac93220b2b509f31", "rc": 1}
+    13:46:50.459  RX_BEGIN               {"path": "002_offline_real_boot.rx.bin", "start": 8}
+    13:46:52.474  READ_ONLY_PROBE_READY  {"boot_done": true, "boot_seen": true, "startup_prompt_required": false}
+    13:46:52.483  RX_FILE                {"bytes": 3757, "end": 3765, "path": "002_offline_real_boot.rx.bin", "sha256": "97b37f32aa03c86b8708ae088d0ae65a8f92520f1a1ed70beb74663049321749", "start": 8}
+    13:46:52.490  RX_BEGIN               {"path": "003_spm_status.rx.bin", "start": 3765}
+    13:46:52.492  MOCK_TX_ATTEMPT        {"attempt": 1, "command": "spm status"}
+    13:46:52.664  RX_FILE                {"bytes": 139, "end": 3904, "path": "003_spm_status.rx.bin", "sha256": "971e860794cab264d519ba6278e1099c434d9f4e67ddeb95dddd0dc4aef15772", "start": 3765}
+    13:46:52.673  STOP_FAILURE           {"counts": {"spm status": 1}, "message": "Previous reply still open."}
+  产物清单(selftest_run1, 失败现场不删):
+    001_offline_bytes.rx.bin              8 B
+    002_offline_real_boot.rx.bin       3757 B
+    003_spm_status.rx.bin               139 B
+    fixture.py                          496 B
+    ledger.jsonl                       1778 B
+    negative.rx.bin                     816 B
+    positive.rx.bin                     808 B
+    self_negative.gate.json            1387 B
+    self_negative.gate.stderr.txt         0 B
+    self_negative.gate.stdout.txt      2596 B
+    self_positive.gate.json            1551 B
+    self_positive.gate.stderr.txt         0 B
+    self_positive.gate.stdout.txt      3028 B
+    session.rx.bin                     3904 B
+
+==============================================================================
+6. 失败根因(附录采集器的变量名碰撞, 有独立最小复现)
+==============================================================================
+  抛错链: 台账先写 RX_FILE(003_spm_status, 139 B, 第一支只读查询正常完成), 紧接着
+    STOP_FAILURE "Previous reply still open."; stderr 另有一条 PowerShell 方法错误。
+  PowerShell 变量名**大小写不敏感**: 顶层脚本作用域里 $reply 与内部状态 $script:Reply 是同一个变量。
+  附录自检分支在脚本作用域写了三处赋值:
+      A0BoardBSerialR1.ps1:236  $reply=Cmd 'spm status' 1000; Idle-Status $reply
+      A0BoardBSerialR1.ps1:240  try {$reply=Cmd 'spm status' 250} catch {
+      A0BoardBSerialR1.ps1:246  $reply=Cmd 'spm status' 1000; $badStatusSeen=$false
+    => 第一支 $reply=Cmd … 把返回的 PSCustomObject 写进了 $script:Reply, 内部状态被自身返回值覆盖;
+       第二支 Cmd 的 Begin-Reply 见 $script:Reply 非空即抛 "Previous reply still open.";
+       finally 里对 PSCustomObject 调 .Dispose() 又报"不包含名为 Dispose 的方法"。
+  独立最小复现(本机我自己写的机制样本, 不是附录文件, 也未修改附录):
+    WORK_OUT_R1/r1_reply_var_repro.ps1  1401 B sha256=4d745fefa9f576fcada10eef3fe3b2b5afde06d562e793a98da458ed9259ff89  rc=0 stderr=0 B
+      STEP1_first_open_close=OK
+      STEP2_state_variable_type_after_assign=PSCustomObject
+      STEP3_same_object_as_return_value=True
+      STEP4_second_open_threw=Previous reply still open.
+      STEP5_dispose_threw=方法调用失败，因为 [System.Management.Automation.PSCustomObject] 不包含名为“Dispose”的方法。
+      STEP6_script_scope_reply_variable_exists_and_is_the_returned_object=True
+    STEP2/STEP3/STEP6 说明同一个变量被返回值顶替, STEP4/STEP5 与真实失败的两条错误逐字同形。
+  影响面(只到证据支持的 extent):
+    - 联机分支不含 $…=Cmd 到 reply 的赋值(上表三处都在自检分支), 且 [IO.Ports.SerialPort] 只出现在
+      联机分支与 finally 释放处; 因此该碰撞**阻断的是离线自检**, 不据此断言联机路径也有此错。
+    - 但 §6.5 把 -SelfTest 通过定成硬前置, §4 末段也写明"本机必须先跑附录新增的真实启动夹具自检,
+      成功才能继续"; §6.6 要求自检失败就保留错误停在 CP0 => 本包无法进入 CP1, 本轮即停。
+    - 不把它写成"附录其它逻辑错": 见 §7 的已通过项。
+  本轮未做的事: 未改附录一行源码(提取后 SHA 仍 6faa1afb…, 见 §3); 未放宽判据; 未重跑凑数;
+    未把"我本地改名后能过"当证据 —— 那正是任务书 §6.6 禁止的临场改核心逻辑。
+
+==============================================================================
+7. 失败点之前已经真实执行到的检查 / 未被执行到的检查
+==============================================================================
+  已执行且通过(在同一 -SelfTest 进程内, 早于失败点):
+    - 原始字节分块落盘一致性(8 B 含 NUL/CR/LF/高位字节, base64 相等);
+    - 假串口禁止 spm clear_records / spm start trip_fast / pin 1 1(三条全被拒, wire_calls=0);
+    - 离线门正控 self_positive rc=0 allowed=True; 负控 self_negative rc=1 allowed=False(NUL 仍拒);
+    - Check-Decision 的非零 rc / 旧批 JSON / 缺失 JSON / 缺 clear grant 四项负控;
+    - 3757 B 真机启动重放: 无自发提示符仍判出 READ_ONLY_PROBE_READY(见 §5 台账行)
+      (boot_seen=true, boot_done=true, startup_prompt_required=false), 落盘 SHA 与原件相同;
+    - 第一支只读查询: 假串口收到才回状态, MOCK_TX_ATTEMPT=1, Idle-Status 通过, 139 B 响应含提示符。
+  未被执行到(因此不得声称可用):
+    - "响应缺提示符必须超时"那一例: 因第二支 Cmd 在 Begin-Reply 即抛, 未走到 Wait-Prompt 超时判据;
+    - "状态污染必须拒绝"那一例与最终 OFFLINE_SELFTEST 汇总行(§6.5 要求的 mock_read_probes=3 等)
+      都不存在 => 该三项本轮状态 = NOT_EXERCISED, 不是 PASS 也不是 FAIL。
+
+==============================================================================
+8. 上限消耗与安全边界(全部为 0)
+==============================================================================
+  常规 USB→24 V 供电                             上限  1  本包已用 0
+  COM5 打开                                    上限  1  本包已用 0
+  目标命令总数                                     上限 54  本包已用 0
+  spm trip                                   上限 17  本包已用 0
+  motor_disarm                               上限  1  本包已用 0
+  spm dump                                   上限  3  本包已用 0
+  spm clear_records                          上限  3  本包已用 0
+  Keil/烧录/Flash 读取/DAP/主动复位/设备枚举             上限  0  本包已用 0
+  本轮主机上只运行过: Parser::ParseFile、附录自检(纯假串口)、我自己的提取/复现/判读脚本。
+  未创建串口对象、未启动 pyOCD、未复位、未枚举设备、未接电机、未启用 STEP/DIR/许可 HIGH、未翻四宏。
+  上一轮遗留: 板上仍是 5f30d3f0… 新镜像; 断电终态仍 UNKNOWN(操作者未回报), 本文件不代其声明已断电。
+  sw1_cut.ps1 仍 HOLD; B-1、BUG-008、RISK-03/03a、物理 RISK-04-b、M-1/M-2/M-3、外部时基仍开放。
+
+==============================================================================
+9. 继续所需(不在本包权限内)
+==============================================================================
+  (a) 云端修附录: 把自检分支里三处 $reply 赋值改成不撞内部状态的名字(例如 $probeReply)即可,
+      属变量改名、不触碰 Wait-Prompt/Check-Decision/Run-Gate/Safety-Rows 的判据形状;
+      修后需重新给出新采集器的长度+SHA, 本地再按 §6.5 同一条款自检。
+  (b) 用户发出 §7 的仅串口续测批准文字(本轮未收到); 同时回报上一轮的断电终态。
+  (c) 上述任一项未满足前, 我不接触设备, 也不自行改名跑一次来"证明可用"。
