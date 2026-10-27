@@ -1389,24 +1389,27 @@ static void tmc_probe_hex(char *out, rt_size_t cap, const rt_uint8_t *p, rt_size
     out[o] = '\0';
 }
 
-static int tmc_probe_emit(int *errs, const char *fmt, ...)
+/* 送出**已经格式化好**的一行: 只判长度并整条打印, 不在这里展开可变参数。
+ * 为什么把格式化放到调用点的宏里: rt_vsnprintf/rt_kputs 只有内核侧有, V1V2 那条主机验证
+ * 链的 shim 只给 rt_snprintf(主机上即 snprintf)与 rt_kprintf —— 用宏展开就不必为了打印去
+ * 改公共 shim, 也不给生产新增任何 HAL/内核依赖。长度必须自己量: 控制台缓冲 128 B 会把
+ * 超长行剪断并漏 NUL, 所以越界时只报一条短错误, 不发半条记录。 */
+static int tmc_probe_put(int *errs, const char *line, int n)
 {
-    char line[TMC_PROBE_LINE_CAP];
-    va_list ap;
-    int n;
-
-    va_start(ap, fmt);
-    n = rt_vsnprintf(line, sizeof(line), fmt, ap);
-    va_end(ap);
-    if (n < 0 || (rt_size_t)n >= sizeof(line) || n > TMC_PROBE_LINE_MAX)
+    if (n < 0 || n >= TMC_PROBE_LINE_CAP || n > TMC_PROBE_LINE_MAX)
     {
         (*errs)++;
         rt_kprintf("[TMRO] EXPORT_ERROR need=%d cap=%d\n", n, TMC_PROBE_LINE_CAP);
         return -1;
     }
-    rt_kputs(line);
+    rt_kprintf("%s", line);                       /* 整行一次送出: 96 B < 控制台 128 B */
     return n;
 }
+
+/* 调用点形状: TMC_PROBE_EMIT(&errs, line, "格式\n", ...) —— line 是调用者自己的
+ * char[TMC_PROBE_LINE_CAP] 缓冲; 返回实际行长, 越界则记一次导出错误并返回 -1。 */
+#define TMC_PROBE_EMIT(errs, line, ...) \
+    tmc_probe_put((errs), (line), rt_snprintf((line), sizeof(line), __VA_ARGS__))
 
 static const char *tmc_obs_result_name(rt_uint8_t r)
 {
@@ -1453,6 +1456,8 @@ static const char *tmc_obs_open_name(rt_uint8_t s)
 /* 导出这一笔的**全部**事实。只在 txn/xfer 都已归还之后调用。 */
 static void tmc_probe_dump(int *errs, const tmc_read_observation_t *o)
 {
+    char line[TMC_PROBE_LINE_CAP];
+
     char hx[TMC_PROBE_HEX_MAX * 3 + 2];
     char rcs[8];
     char rns[28];
@@ -1472,48 +1477,48 @@ static void tmc_probe_dump(int *errs, const tmc_read_observation_t *o)
             : tmc_xfer_reason_name((tmc_xfer_reason_t)o->reason);
         rt_snprintf(rns, sizeof(rns), "%s", rsn);
     }
-    tmc_probe_emit(errs, "[TMRO] reg=%02X result=%s rc=%s reason=%s\n",
+    TMC_PROBE_EMIT(errs, line, "[TMRO] reg=%02X result=%s rc=%s reason=%s\n",
                    (unsigned)o->reg, tmc_obs_result_name(o->result), rcs, rns);
-    tmc_probe_emit(errs, "[TMRO] reg=%02X ctx=%u txn=%u/%d open=%s/%d lock=%u/%u/%d\n",
+    TMC_PROBE_EMIT(errs, line, "[TMRO] reg=%02X ctx=%u txn=%u/%d open=%s/%d lock=%u/%u/%d\n",
                    (unsigned)o->reg, (unsigned)o->ctx_ok, (unsigned)o->txn_held,
                    (int)o->txn_rc, tmc_obs_open_name(o->open_state), (int)o->open_rc,
                    (unsigned)o->lock_attempted, (unsigned)o->lock_held, (int)o->lock_rc);
-    tmc_probe_emit(errs, "[TMRO] reg=%02X flush=%u/%d bytes=%u ms=%u\n",
+    TMC_PROBE_EMIT(errs, line, "[TMRO] reg=%02X flush=%u/%d bytes=%u ms=%u\n",
                    (unsigned)o->reg, (unsigned)o->flush_reached, (int)o->flush_rc,
                    (unsigned)o->flush_bytes, (unsigned)o->flush_ms);
     tmc_probe_hex(hx, sizeof(hx), o->req, o->req_built ? TMC_OBS_REQ_MAX : 0u);
-    tmc_probe_emit(errs, "[TMRO] reg=%02X tx=%u/%u/%d off=%u req=%s\n",
+    TMC_PROBE_EMIT(errs, line, "[TMRO] reg=%02X tx=%u/%u/%d off=%u req=%s\n",
                    (unsigned)o->reg, (unsigned)o->req_built, (unsigned)o->tx_called,
                    (int)o->tx_rc, (unsigned)o->tx_off, hx);
     /* §5.2 第 6 条: 未到达的那一笔的时刻/期限一律打 '-'(全 0 会被读成"起点=0/用过 0") */
     if (o->result == TMC_OBS_NOT_REACHED)
-        tmc_probe_emit(errs, "[TMRO] reg=%02X timing=- (budget never opened)\n",
+        TMC_PROBE_EMIT(errs, line, "[TMRO] reg=%02X timing=- (budget never opened)\n",
                        (unsigned)o->reg);
     else
-        tmc_probe_emit(errs, "[TMRO] reg=%02X start=%u total=%u rx_begin=%u rx_dl=%u"
+        TMC_PROBE_EMIT(errs, line, "[TMRO] reg=%02X start=%u total=%u rx_begin=%u rx_dl=%u"
                               " done=%u\n",
                        (unsigned)o->reg, (unsigned)o->b_start, (unsigned)o->b_total,
                        (unsigned)o->rx_begin_off, (unsigned)o->rx_deadline_off,
                        (unsigned)o->done_off);
-    tmc_probe_emit(errs, "[TMRO] reg=%02X rx=%u hdr=%u full=%u crc=%s\n",
+    TMC_PROBE_EMIT(errs, line, "[TMRO] reg=%02X rx=%u hdr=%u full=%u crc=%s\n",
                    (unsigned)o->reg, (unsigned)o->rx_reached, (unsigned)o->hdr_seen,
                    (unsigned)o->frame_complete, tmc_obs_crc_name(o->crc_state));
-    tmc_probe_emit(errs, "[TMRO] reg=%02X total=%u buf=%u pub=%u late=%u exp=%u/%u\n",
+    TMC_PROBE_EMIT(errs, line, "[TMRO] reg=%02X total=%u buf=%u pub=%u late=%u exp=%u/%u\n",
                    (unsigned)o->reg, (unsigned)o->rx_total, (unsigned)o->rx_buf_n,
                    (unsigned)o->published, (unsigned)o->late_valid_frame,
                    (unsigned)o->total_expired, (unsigned)o->stage_expired);
-    tmc_probe_emit(errs, "[TMRO] reg=%02X echo=%s match=%u trunc=%u val=%08X\n",
+    TMC_PROBE_EMIT(errs, line, "[TMRO] reg=%02X echo=%s match=%u trunc=%u val=%08X\n",
                    (unsigned)o->reg, tmc_obs_echo_name(o->echo_state),
                    (unsigned)o->echo_match_seen, (unsigned)o->rx_truncated,
                    o->value_valid ? (unsigned)o->value : 0u);
     tmc_probe_hex(hx, sizeof(hx), o->rx_pre, o->rx_pre_n);
-    tmc_probe_emit(errs, "[TMRO] reg=%02X rx1 n=%u %s\n", (unsigned)o->reg,
+    TMC_PROBE_EMIT(errs, line, "[TMRO] reg=%02X rx1 n=%u %s\n", (unsigned)o->reg,
                    (unsigned)o->rx_pre_n, hx);
     tmc_probe_hex(hx, sizeof(hx), o->rx_tail, o->rx_tail_n);
-    tmc_probe_emit(errs, "[TMRO] reg=%02X rxT n=%u %s\n", (unsigned)o->reg,
+    TMC_PROBE_EMIT(errs, line, "[TMRO] reg=%02X rxT n=%u %s\n", (unsigned)o->reg,
                    (unsigned)o->rx_tail_n, hx);
     tmc_probe_hex(hx, sizeof(hx), o->cand, o->cand_n);
-    tmc_probe_emit(errs, "[TMRO] reg=%02X cand n=%u %s\n", (unsigned)o->reg,
+    TMC_PROBE_EMIT(errs, line, "[TMRO] reg=%02X cand n=%u %s\n", (unsigned)o->reg,
                    (unsigned)o->cand_n, hx);
 }
 
@@ -1540,6 +1545,8 @@ static void tmc_probe_dump(int *errs, const tmc_read_observation_t *o)
  *     不覆盖锁争用或中途失联。要给出上界需要单独改锁结构 + 上板实测, 本轮不做。 */
 static void tmc_uart_probe(void)
 {
+    char line[TMC_PROBE_LINE_CAP];
+
     static const rt_uint8_t ro_regs[3] = { TMC_REG_IOIN, TMC_REG_GSTAT, TMC_REG_IFCNT };
     tmc_read_observation_t obs[3];
     tmc_xfer_stat_t        st;
@@ -1606,26 +1613,26 @@ static void tmc_uart_probe(void)
     for (i = 0; i < 3; ++i)
         if (obs[i].result != TMC_OBS_SUCCESS) all_ok = RT_FALSE;
 
-    tmc_probe_emit(&errs, "[TMRO] BEGIN v=%u addr=%d planned=3 reads=%d\n",
+    TMC_PROBE_EMIT(&errs, line, "[TMRO] BEGIN v=%u addr=%d planned=3 reads=%d\n",
                    TMC_OBS_VERSION, (int)TMC_ADDR_DEFAULT, attempted);
     /* §5.3: probe 的每一行(含被移动过来的原有标题/失败文案)都用短 ASCII, 格式化后
      * 含 LF 不超过 96 B —— 控制台缓冲是 128 B, 超长行会被剪断并漏出 NUL。 */
     if (txn != RT_EOK)
-        tmc_probe_emit(&errs, "[TMC] probe REFUSED (%d): cfg txn unavailable or busy"
+        TMC_PROBE_EMIT(&errs, line, "[TMC] probe REFUSED (%d): cfg txn unavailable or busy"
                               " -> 0 bus reads\n", (int)txn);
-    tmc_probe_emit(&errs, "[TMC] probe: read-only identity check txn-held "
+    TMC_PROBE_EMIT(&errs, line, "[TMC] probe: read-only identity check txn-held "
                           "IOIN+GSTAT+IFCNT (0 WRITE frames)\n");
     for (i = 0; i < 3; ++i) tmc_probe_dump(&errs, &obs[i]);
 
     if (obs[0].result == TMC_OBS_FAIL)
     {
-        tmc_probe_emit(&errs, "[TMC] IOIN read failed (%d) -> identity NOT confirmed"
+        TMC_PROBE_EMIT(&errs, line, "[TMC] IOIN read failed (%d) -> identity NOT confirmed"
                               " (chip damage NOT implied)\n",
                        (int)obs[0].rc);
     }
     else if (obs[0].value_valid)
     {
-        tmc_probe_emit(&errs, "[TMC] IOIN = 0x%08X VERSION = 0x%02X -> %s\n",
+        TMC_PROBE_EMIT(&errs, line, "[TMC] IOIN = 0x%08X VERSION = 0x%02X -> %s\n",
                        (unsigned)obs[0].value, (unsigned)((obs[0].value >> 24) & 0xFFu),
                        (((obs[0].value >> 24) & 0xFFu) == 0x21u)
                            ? "TMC2209 (0x21) identity match"
@@ -1636,27 +1643,27 @@ static void tmc_uart_probe(void)
         tmc_gstat_dec_t gs;
 
         tmc_gstat_decode(obs[1].value, &gs);
-        tmc_probe_emit(&errs, "[TMC] GSTAT = 0x%02X reset=%u drv_err=%u uv_cp=%u\n",
+        TMC_PROBE_EMIT(&errs, line, "[TMC] GSTAT = 0x%02X reset=%u drv_err=%u uv_cp=%u\n",
                        (unsigned)(obs[1].value & 0xFFu), gs.reset, gs.drv_err, gs.uv_cp);
         if (gs.unknown)
-            tmc_probe_emit(&errs, "[TMC] !! GSTAT=0x%08X has bits the manual leaves"
+            TMC_PROBE_EMIT(&errs, line, "[TMC] !! GSTAT=0x%08X has bits the manual leaves"
                                   " undefined (only bit0..bit2)\n",
                            (unsigned)obs[1].value);
         if (gs.uv_cp)
-            tmc_probe_emit(&errs, "[TMC] !! uv_cp=1: charge pump undervoltage, driver"
+            TMC_PROBE_EMIT(&errs, line, "[TMC] !! uv_cp=1: charge pump undervoltage, driver"
                                   " is disabled here (not StallGuard)\n");
     }
     if (obs[2].value_valid)
-        tmc_probe_emit(&errs, "[TMC] IFCNT = %u (read-only: this command wrote no"
+        TMC_PROBE_EMIT(&errs, line, "[TMC] IFCNT = %u (read-only: this command wrote no"
                               " register)\n",
                        (unsigned)(obs[2].value & 0xFFu));
 
     /* 身份读成功的门槛很窄: 三笔全部成功 + IOIN VERSION=0x21; 且**永不**给使能许可。 */
-    tmc_probe_emit(&errs, "[TMRO] identity=%s link=%s safe_for_enable=0\n",
+    TMC_PROBE_EMIT(&errs, line, "[TMRO] identity=%s link=%s safe_for_enable=0\n",
                    (all_ok && obs[0].value_valid &&
                     ((obs[0].value >> 24) & 0xFFu) == 0x21u) ? "READ_OK" : "NOT_PROVEN",
                    all_ok ? "READ_OK" : "UNPROVEN");
-    tmc_probe_emit(&errs, "[TMRO] END reads=%d writes=0 export_err=%d "
+    TMC_PROBE_EMIT(&errs, line, "[TMRO] END reads=%d writes=0 export_err=%d "
                           "observation_complete=%d\n",
                    attempted, errs, errs == 0 ? 1 : 0);
 }

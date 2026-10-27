@@ -483,23 +483,9 @@ static int leaf_kprintf_wrap(const char *fmt, ...)
 #undef rt_kprintf
 #define rt_kprintf leaf_kprintf_wrap
 
-/* 生产 probe 走 rt_vsnprintf + rt_kputs(自己数长度、整条送出, 与已接受的 spm_emitf 同形),
- * 所以这两个也要接进夹具; 语义按 kservice 的 rt_vsnprintf_tiny: **返回应写的总字节数**。 */
-int rt_vsnprintf(char *buf, rt_size_t size, const char *fmt, va_list args)
-{ return vsnprintf(buf, size, fmt, args); }
-
-void rt_kputs(const char *s)
-{
-    if (leaf_capture)
-    {
-        int n = (int)strlen(s);
-
-        leaf_out_kputs++;
-        leaf_out_take(s, n);
-    }
-    fputs(s, stdout);
-}
-
+/* 生产 probe 的行是自格式化后用 rt_kprintf("%s") 整条送出的(见 tmc2209.c 里的
+ * tmc_probe_put/TMC_PROBE_EMIT), 所以捕获只需接住 rt_kprintf —— 本夹具不再实现
+ * rt_vsnprintf/rt_kputs, 免得给主机链添生产侧不需要的第二套打印面。 */
 /* URO §5.3 的"先归还事务再打印"判据用这里记账(不往生产加钩子): 事务锁的**归还**
  * 发生在夹具自己的 rt_mutex_release 里, 那一刻已捕获的行数必须是 0。 */
 
