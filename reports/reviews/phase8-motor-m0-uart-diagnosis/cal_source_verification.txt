@@ -1,0 +1,97 @@
+NS800 M0 离线自检 —— 复审 §2 的说明校正 CAL1..CAL8 逐条实读核验
+轮次 phase8-motor-m0-uart-diagnosis    日期 2026-10-27    document_base d41e644…
+方法: 每条都回到本轮 HEAD 的真实源码行, 抄出判定所需的原文; 不采信叙述, 不照抄复审结论。
+路径缩写 APP = rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications(仓库内真实相对路径, 未打码)
+
+CAL1  system_selftest ≠ runtime_selftest  ==> 校正成立, 我 M1 草案里那句话是错的
+    supervisor.c:386
+    supervisor.c:387      /* ⑥ 收尾: 没有伪造任何硬件门, 真实 motor_arm 必须仍然拒绝 */
+    supervisor.c:388      if (motor_arm() == -RT_EPERM)
+    supervisor.c:389          rt_kprintf("[SELFTEST] 6.arm-still-refused OK (no gate was faked)\n");
+    supervisor.c:390      else
+    supervisor.c:391      { rt_kprintf("[SELFTEST] 6.arm-still-refused FAIL - motor ARMED. disarm now\n");
+    supervisor.c:392        (void)motor_disarm(); pass = 0; }
+    supervisor.c:393
+    supervisor.c:394      motor_get_snapshot(&snap);
+    supervisor.c:395      rt_kprintf("[SELFTEST] %s (final state=%s motor=%d)\n",
+    supervisor.c:396                 pass ? "ALL PASS" : "FAILED",
+    supervisor.c:397                 safety_state_name(safety_state_get()), snap.state);
+    supervisor.c:398  }
+    supervisor.c:399  MSH_CMD_EXPORT(runtime_selftest, software-level runtime self test (no motion));
+    supervisor.c:400
+    supervisor.c:401  static void system_selftest(void)
+    supervisor.c:402  {
+    supervisor.c:403      (void)safety_startup_selftest();
+    supervisor.c:404      system_status();
+    supervisor.c:405  }
+    supervisor.c:406  MSH_CMD_EXPORT(system_selftest, rerun safety selftest and print full status);
+    判定: :401-405 的 system_selftest 只有 safety_startup_selftest() + system_status();
+    :388-392 的 motor_arm()/motor_disarm() 收尾属于 runtime_selftest(:232 起, 导出 :399)。
+    我 M1 现场包草案 §2 写的"system_selftest 会尝试 motor_arm/motor_disarm"**是错的**, 本轮起按 CAL1 更正; M2 若要 required 自检只用字面 `system_selftest`。
+
+CAL2  tmc_uart_probe 不经过 health 包装器  ==> 校正成立
+    tmc2209.c:709  static void tmc_health_after_xfer(rt_err_t e)
+    tmc2209.c:734  rt_err_t tmc2209_read_register(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *value)
+    tmc2209.c:738      tmc_health_after_xfer(e);
+    tmc2209.c:951  e = tmc_read_reg(TMC_ADDR_DEFAULT, TMC_REG_IOIN, &ioin, RT_NULL, RT_NULL);
+    tmc2209.c:967  if (tmc_read_reg(TMC_ADDR_DEFAULT, TMC_REG_GSTAT, &gstat, RT_NULL, RT_NULL) == RT_EOK)
+    tmc2209.c:988  if (tmc_read_reg(TMC_ADDR_DEFAULT, TMC_REG_IFCNT, &ifcnt, RT_NULL, RT_NULL) == RT_EOK)
+    判定: 包装器 rt_err_t tmc2209_read_register()(:734) 内部才调 tmc_health_after_xfer(:738);
+    probe 的三次读直接调文件内 tmc_read_reg(:951/:967/:988), **不经包装器**。
+    我 M1 证据里"probe 之后 health 变好"这类把 probe 也归入改 health 的读命令, 按 CAL2 更正:
+    只有 tmc_config_show 的 live 读(:2357/:2368)会改 tmc_health。
+
+CAL3  tmc_config_show 里 :2331 是纯门禁查询, 不是总线读  ==> 校正成立, 我 §7 的"勘误"反而混淆
+    tmc2209.c:2330                 fail_reg, (int)last_err, (int)from_integrity, (int)snap_valid);
+    tmc2209.c:2331      gates = tmc2209_get_write_gate_mask();
+    tmc2209.c:2332      rt_kprintf("[TMC-CFG] hw_write_gate(compile)=%s runtime_gate_mask=0x%X\n",
+    tmc2209.c:2357  if (tmc2209_read_register(TMC_ADDR_DEFAULT, TMC_REG_GCONF, &v) == RT_EOK)
+    tmc2209.c:2368  if (tmc2209_read_register(TMC_ADDR_DEFAULT, TMC_REG_CHOPCONF, &v) == RT_EOK)
+    判定: 实读总线的只有 :2357(GCONF)与 :2368(CHOPCONF); :2331 是
+    tmc2209_get_write_gate_mask() 的调用(该函数注释声明"不产生总线流量")。
+    我 source_audit.txt §7 用 :2331 替换正确调用链的那句"实读勘误"**不采用**, 以本文件为准。
+
+CAL4  启动 required 只看返回码, 不看 IOIN VERSION  ==> 校正成立
+    safety_state.c:629      /* ---- required ④ TMC2209 链路(初始化 + IOIN 读) ---- */
+    safety_state.c:630      if (tmc2209_init() != RT_EOK ||
+    safety_state.c:631          tmc2209_read_register(TMC_ADDR_DEFAULT, TMC_REG_IOIN, &v) != RT_EOK)
+    safety_state.c:632      {
+    safety_state.c:633          rt_kprintf("[SS] [REQ FAIL] TMC2209 link\n");
+    safety_state.c:634          required_fail = -RT_ERROR;
+    safety_state.c:635      }
+    safety_state.c:636      else rt_kprintf("[SS] [REQ OK] TMC2209 (IOIN=0x%08X)\n", v);
+    safety_state.c:637
+    判定: 条件只有 tmc2209_init() 与 tmc2209_read_register(IOIN) 的返回码;
+    合法帧但 VERSION≠0x21 也会打 [REQ OK]。所以"版本身份"是 M0 要自己拒的事,
+    不能指望现有 [REQ FAIL] TMC2209 link 文本替它作证(与 M1 登记的 F-A 同一处代码)。
+
+CAL5  M0 的具名失败不通往 M2 写入  ==> 采纳为执行约束
+    采集器里与 safe_for_enable 相关的字面行(实测 3 行, 逐字抄自入库脚本):
+      return [pscustomobject]@{ioin=$io.Groups[1].Value; version=33; gstat=$gValue; ifcnt=$ifValue; register_write_frames=0; safe_for_enable=$false}
+      if ($fakePort.Calls -ne 7 -or $mockIdentity.version -ne 33 -or $mockIdentity.safe_for_enable) {throw 'Healthy mock sequence differs'}
+      Note 'M0_COMPLETE' @{commands=7;identity=$identity0;safe_for_enable=$false;hardware_stage='M0_ONLY';a0_timing='NOT_ACHIEVED'}
+    判定: M0_COMPLETE 事件恒带 safe_for_enable=false, 且 Run-M0 之后没有任何写配置或使能路径;
+    M0 具名失败只是取得身份/状态证据, 不构成 M2 的写入许可。
+
+CAL6  对象尺寸相等 ≠ 对象字节相同  ==> 校正成立
+    我 M1 的 keil_builds.txt §4 给的是两目标 map 的 Code/inc.data/RO/RW/ZI/Debug 六列相同,
+    并写了"字节一致"这样的措辞。按 CAL6 更正口径: 这些列只证**尺寸与链接内容**;
+    "本轮未改 HAL 源"是 Git blob 事实(已断言)。没有 .o 原字节, 不升级为逐字相同。
+
+CAL7  提示符只按已证现象使用  ==> 采纳
+    已证: 两份启动流里没有末尾的独立 msh >。不泛化为"shell 启动从不打印提示符"。
+    M0 继续用"≥2 s 被动接收 + 1.2 s 静默 + 一次只读查询取响应尾提示符"。
+
+CAL8  历史寄存器值不是本轮现读  ==> 采纳
+    tmc2209.h:114  #define TMC_GCONF_EN_SPREADCYCLE    (1u << 2)
+    tmc2209.h:115  #define TMC_GCONF_PDN_DISABLE       (1u << 6)   /* 用 UART 时必须置 1(手册原文) */
+    tmc2209.h:116  #define TMC_GCONF_MSTEP_REG_SELECT  (1u << 7)   /* 0 = 微步由 MS1/MS2 引脚决定 */
+    tmc2209.h:117  #define TMC_GCONF_MULTISTEP_FILT    (1u << 8)
+    tmc2209.h:118
+    tmc2209.h:163      rt_uint8_t  vsense;         /* 0/1 */
+    tmc2209.h:164      rt_uint8_t  mstep_reg_select; /* 1 = 用 MRES 设微步; 0 = 由 MS1/MS2 引脚决定 */
+    tmc2209.h:165      rt_uint8_t  mres;           /* 仅 mstep_reg_select=1 时生效 */
+    tmc2209.h:166  } tmc_drv_config_t;
+    判定: mstep_reg_select=1 才用 MRES 设微步, =0 时微步由 MS1/MS2 引脚决定 —— 两回事不混同;
+    IOIN 的 PDN_UART 高电平单独不能证明 UART 配置有效。旧的 vsense=0 等读数一律按历史日期登记,
+    本轮无目标动作, 不写成"现读回"。

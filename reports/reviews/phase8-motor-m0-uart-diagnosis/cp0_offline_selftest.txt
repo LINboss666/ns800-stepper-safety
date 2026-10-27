@@ -1,0 +1,120 @@
+NS800 M0 通信查因包 —— CP0 离线准备与本机 PowerShell 5.1 真实自检(未触碰设备)
+轮次 phase8-motor-m0-uart-diagnosis    document_base d41e644eae7d09f5caaa3338339bf097310307d2
+任务书 NS800_M1_Independent_Review_and_M0_Package_d41e644_20261027.md
+结论: CP0 全绿(33/33 条判据), CP1/CP2 **未进入** —— 缺本包批准与现场前置回报。
+    本文件不构成硬件许可。
+脱敏: 代号 PROJECT_ROOT/M0_WORK 是纯字符串替换; 原始字节一律 base64 无损归档(见 artifacts 件)。
+
+==============================================================================
+1. 基线与写入范围(§4.1)
+==============================================================================
+  分支 phase8/tmc-drive-config; 本地 HEAD == ls-remote 远端头 == document_base;
+  开工时 git status 已跟踪文件零改动(本轮新增仅 reports 白名单)。
+  冻结引用复算: main=1b3757eec550…、phase7/full-embedded-software=6d3fbc559d45…、
+  tag 对象=097935fec5a6…、tag 解引用=e40a9b95ef70… 全部未动。
+  本轮: firmware_changed=false / collector_changed=true(新增 M0 专用入口) /
+  documentation_only=false / builds_executed=[] / 主机链输入未变故 NOT_RERUN。
+  采集门 a0_export_gate.py 未修改也未调用; M0 不产出时长统计。
+
+==============================================================================
+2. 采集器与夹具字节(§4.2)
+==============================================================================
+  附录 A 提取 = 唯一标记内 ```powershell 围栏正文, 未手抄、未转义、未改一个字节:
+    reports/reviews/phase8-motor-m0-uart-diagnosis/M0Serial.ps1  24064 B  sha256=2131af0ef32b0d9acb3a2a0489d47b90e26968e2fedd7c4ee4624fede0687e3f
+    == 任务书给定值(24064 B / 2131af0ef32b0d9a…) = True
+    ASCII=True  CR=0  LF=315  BOM=False  末尾恰一个 LF=True
+  真实启动夹具 = 复用既有原件, 未连目标重取; 并从仓库对象独立重取一次交叉核对:
+    来源 4bb8e9f5…:reports/reviews/phase8-target-measurement-a0-board-b/cp3_wire_archive.md 的 002_boot.rx.bin base64 块
+    解码 3757 B sha256=97b37f32aa03c86b8708ae088d0ae65a8f92520f1a1ed70beb74663049321749  == 登记值: True
+    字节构成 NUL=3 CR=96 LF=74; 未删 NUL/CR、未重编码(与上一轮本地副本逐字节相同)。
+
+==============================================================================
+3. 语法前置与真实 -SelfTest(§4.3)
+==============================================================================
+  主机 PowerShell 版本 = 5.1.26100.5074(Windows PowerShell 5.1, 不是 Core; 云端的 7.4.13 不替代本机)
+  Parser::ParseFile: PARSE_TOKENS=3585 / PARSE_ERRORS=0
+  调用(OutDir 是全新目录 M0_WORK/selftest/run1):
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File PROJECT_ROOT/reports/reviews/phase8-motor-m0-uart-diagnosis/M0Serial.ps1 -SelfTest
+      -BootFixture M0_WORK/fixture/002_boot.rx.bin -OutDir M0_WORK/selftest/run1
+  原始字节: rc=0  stdout 82 B sha256=77b6adad28a9a6939acf04e3ce3601c6a2ae152698da1ec5fe7b4e1cfef54273  stderr 0 B sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  stdout 逐字 = 'M0-OFFLINE-SELFTEST PASS; device_actions=0; mock_commands=7; negative_controls=15\n'
+  平台行尾事实(如实登记): 本机 stdout 是 82 B 且 **CR=0**, 原始 SHA 与云端 Core 7.4.13
+    登记的 77b6adad28a9a6939acf04e3ce3601c6a2ae152698da1ec5fe7b4e1cfef54273 完全相同 => 任务书"后接 LF"在本机逐字成立, 无需归一化。
+  §4.3 判据逐项:
+    PASS M0Serial.ps1 字节 == 任务书附录 A                               24064 B / 2131af0ef32b0d9acb3a2a0489d47b90e26968e2fedd7c4ee4624fede0687e3f
+    PASS 启动夹具字节 == 登记原件(未删 NUL/CR、未重编码)                           3757 B / 97b37f32aa03c86b; NUL=3 CR=96 LF=74
+    PASS 运行的是 Windows PowerShell 5.1(不是 Core)                     5.1.26100.5074
+    PASS Parser::ParseFile errors=0                               rc=0 PARSE_TOKENS=3585 | PARSE_ERRORS=0
+    PASS 进程 rc == 0                                               rc=0(取自 run1 原始登记)
+    PASS stdout 逐字 == 任务书 PASS 行(平台行尾另计)                          'M0-OFFLINE-SELFTEST PASS; device_actions=0; mock_commands=7; negative_control
+    PASS stdout 行尾形态如实登记(本机实测 CR=0/LF=1, 判据"后接 LF"在本机逐字成立)        CR=0 LF=1; 原始 stdout 82 B 的 SHA 与云端登记 77b6adad… 相同=True
+    PASS 归一化后的 stdout 逐字等于云端 Core 7.4.13 的 stdout(同一 SHA)         本机归一后 77b6adad28a9a6939acf vs 云端登记 77b6adad28a9a693
+    PASS stderr == 0 B                                            0 B / e3b0c44298fc
+    PASS 台账 RX_BEGIN == 9                                         实际 9
+    PASS 台账 RX_FILE == 9                                          实际 9
+    PASS 台账 READ_ONLY_PROBE_READY == 1                            实际 1
+    PASS 台账 MOCK_TX_ATTEMPT == 7                                  实际 7
+    PASS 台账 M0_COMMAND_CHECKED == 7                               实际 7
+    PASS 台账 NEGATIVE_CONTROL == 15                                实际 15
+    PASS 台账 OFFLINE_SELFTEST == 1                                 实际 1
+    PASS 无真机事件 SERIAL_OPEN_ATTEMPT                                实际 0
+    PASS 无真机事件 SERIAL_OPEN                                        实际 0
+    PASS 无真机事件 TX_ATTEMPT                                         实际 0
+    PASS 无真机事件 RESET_ATTEMPT                                      实际 0
+    PASS 无真机事件 STOP_FAILURE                                       实际 0
+    PASS 无真机事件 M0_COMPLETE                                        实际 0
+    PASS 汇总行 device_actions/mock/forbidden/repeated/负控/夹具字节 全对    {"repeated_command_blocked": 1, "mock_commands": 7, "result": "PASS", "healthy
+    PASS 15 条具名负控逐字齐且顺序内容与附录 B 一致                                 实际 15 条: missing_response_prompt,macro_enabled,safety_high_pad,safety_no_sampl
+    PASS 关键串口负控真被执行(缺提示符超时, 非静默当成功)                               带 bytes 字段的负控: [{'result': 'REJECTED', 'name': 'missing_response_prompt', 'byt
+    PASS 身份/宏/反馈/数值矛盾类负控真被拒绝
+    PASS RX 文件数 == 9                                              实际 9: ['001_attach_passive.rx.bin', '002_spm_status.rx.bin', '003_spm_cap.rx.b
+    PASS 九份长度依次 == 3757/146/339/67/475/891/268/355/132            [3757, 146, 339, 67, 475, 891, 268, 355, 132]
+    PASS session.rx.bin == 九份按序拼接                                 session 6430 B / 393a822a47b1; 拼接 6430 B
+    PASS 首份(启动重放)哈希 == 夹具 97b37f32…                               001_attach_passive.rx.bin = 97b37f32aa03c86b
+    PASS 台账里每份 RX 的 bytes 与 sha256 都与实盘复算相符                       缺失键: []
+    PASS RX_BEGIN 起点与 session 实际偏移自洽(拼接区间连续无空洞)                   starts=[0, 3757, 3903, 4242, 4309, 4784, 5675, 5943, 6298] ends=[3757, 3903, 4
+    PASS 本轮真机 TX/打开串口事件 = 0                                       实际 0
+  台账事件计数复算(按 ledger.jsonl 逐行统计): {"RX_BEGIN": 9, "READ_ONLY_PROBE_READY": 1, "RX_FILE": 9, "MOCK_TX_ATTEMPT": 7, "M0_COMMAND_CHECKED": 7, "NEGATIVE_CONTROL": 15, "OFFLINE_SELFTEST": 1}
+  真机事件 SERIAL_OPEN_ATTEMPT/SERIAL_OPEN/TX_ATTEMPT/RESET_ATTEMPT/STOP_FAILURE/M0_COMPLETE = 全 0
+  九份 RX 与 session:
+    001_attach_passive.rx.bin      3757 B  sha256=97b37f32aa03c86b8708ae088d0ae65a8f92520f1a1ed70beb74663049321749
+    002_spm_status.rx.bin           146 B  sha256=656db378732c4de39ce081339a6852b9995987253074dcceaacf5a8de3916339
+    003_spm_cap.rx.bin              339 B  sha256=c7c5a79549aeb8852575164d7b183123876ed09eb684b76f78a5c9acdb9a50b4
+    004_safety_state.rx.bin          67 B  sha256=95016978f6ac1e673a7cb0a676002e3c1df55f59f8770c810dd4c073e9cd2025
+    005_safety_status.rx.bin        475 B  sha256=847aba88e20e2a4e220d1ca69cbaf5ef07975619af232caf0cc2b66b45990d7c
+    006_motor_status.rx.bin         891 B  sha256=4d33ed91adb095e1642e91e9f5a926daceaca6f1a5aa0c85719a2ce070b549f5
+    007_step_status.rx.bin          268 B  sha256=7c74b48da1ea7302454aeb9c2944d2384cb3a655841b92a8d516338a0b78ea37
+    008_tmc_uart_probe.rx.bin       355 B  sha256=7eb0367bc04e5dbf8d7a05847483f73c9131fcc5dc2393bbf73cab7619a8785c
+    009_negative_missing_prompt.rx.bin    132 B  sha256=d8d15b9c540d100ef3ef52d01034f4ac54c56981e3cec5adc0e382afb026ba2c
+    session.rx.bin 6430 B sha256=393a822a47b1f04ca47c78ac80401abe9196ee3ac6dc1b6337897b48c7fa9530  == 九份按序拼接: True
+  两条关键串口负控**真被执行**: missing_response_prompt(响应 132 B 落盘, 原因 "Reply timeout; no retry and no cleanup."; 该串是脚本 -cne 精确比较后才允许继续的) 与 14 条身份/宏/反馈/数值矛盾类负控全 REJECTED。
+
+==============================================================================
+4. 首次判定的自己的缺陷(保留, 不掩盖)
+==============================================================================
+  M0-CP0-F1  第一遍判定时我**假设**本机 Windows 控制台会把 Write-Host 输出成 CRLF,
+    并据此写了"行尾形态(本机 CRLF)"这条判据 => 实跑产物本身全绿(rc=0、stderr 0 B、
+    台账/九份 RX 全对), 只有我这条假设判据 FAIL(实测 CR=0)。
+    处置: **不重跑 PowerShell**, 用 run1 已保存的原始字节与产物重新套更正后的判据
+    (--rejudge), run1 的全部产物字节与第一遍判定文件 m0_selftest_verdict.json 原样保留,
+    更正后的判定另存 m0_selftest_verdict_rejudged.json; 改的是我的判据, 不是采集器。
+    归因: 本地判读脚本缺陷, 与被测脚本无关。
+
+==============================================================================
+5. 复审消费的 GO 与校正(§2, 随本轮交接登记一次, 不开纯登记轮)
+==============================================================================
+  M1_OFFLINE_SOFTWARE_IMAGE_REVIEW_GO(对象 d41e644…) 已消费; CAL1..CAL8 已逐条实读核验,
+  结果见 reports/reviews/phase8-motor-m0-uart-diagnosis/cal_source_verification.txt —— 其中 CAL1/CAL2/CAL3/CAL6 四条确实指出我 M1 草案/证据里的错句, 本轮按校正口径执行, 不回写 M1 已发布文件。
+  M1-E1(map 入库形态)由云端独立复算确认: 把入库件的 LF 换回 CRLF 恰得 1948503 B /
+  9f6d3720…, 与原字节登记一致; 该双身份说明继续有效。
+
+==============================================================================
+6. 没有做的事与下一步
+==============================================================================
+  未开串口/未建 SerialPort 对象/未连 DAP/未复位/未读 Flash/未下载/未枚举设备/未发任何目标命令;
+  未动固件、工程、四宏、镜像、历史证据、备份与恢复工程; 未跑 sw1_cut.ps1(T-01/T-02 仍 HOLD)。
+  板上最后已证镜像仍 5f30d3f0…; 供电终态仍 UNKNOWN(不作任何推断)。
+  CP1/CP2 需要: ① 你对本包的批准(自然语言同范围即可) + ② 现场前置回报(已先关 24 V、再拔 USB;
+  SW1 阻断; 电机未接; 现场有人; 模块/接线未改且无人另行烧录)。两者齐备才在同一任务继续,
+  不再为 CP0 通过另开云端登记轮(§4.3 明示)。
+  §3 的口径变化已采纳: 旧 SERIAL-R1a 的 CP1 批准**不再是 M0 前置, 也不再索取**。

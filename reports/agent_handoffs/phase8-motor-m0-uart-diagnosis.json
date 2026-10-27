@@ -1,0 +1,326 @@
+{
+  "task_id": "phase8-motor-m0-uart-diagnosis",
+  "document_base": "d41e644eae7d09f5caaa3338339bf097310307d2",
+  "final_delivery_commit": null,
+  "final_delivery_commit_how_registered": "不写进自身提交; 推送后由 ls-remote 远端头 + 回执登记",
+  "review_consumed": {
+    "verdict": "M1_OFFLINE_SOFTWARE_IMAGE_REVIEW_GO",
+    "object": "d41e644eae7d09f5caaa3338339bf097310307d2",
+    "calibration_corrections_consumed": [
+      "CAL1",
+      "CAL2",
+      "CAL3",
+      "CAL4",
+      "CAL5",
+      "CAL6",
+      "CAL7",
+      "CAL8"
+    ],
+    "calibration_verification": "reports/reviews/phase8-motor-m0-uart-diagnosis/cal_source_verification.txt",
+    "cal_corrections_that_overturn_my_m1_wording": [
+      "CAL1",
+      "CAL2",
+      "CAL3",
+      "CAL6"
+    ],
+    "no_separate_go_registration_round": true,
+    "m1_files_rewritten": false
+  },
+  "collector": {
+    "path": "reports/reviews/phase8-motor-m0-uart-diagnosis/M0Serial.ps1",
+    "bytes": 24064,
+    "sha256": "2131af0ef32b0d9acb3a2a0489d47b90e26968e2fedd7c4ee4624fede0687e3f",
+    "equals_task_book_appendix_A": true,
+    "ascii_no_bom_lf_single_trailing_lf": true,
+    "extracted_from_markers_not_retyped": true
+  },
+  "boot_fixture": {
+    "bytes": 3757,
+    "sha256": "97b37f32aa03c86b8708ae088d0ae65a8f92520f1a1ed70beb74663049321749",
+    "nul": 3,
+    "cr": 96,
+    "lf": 74,
+    "reacquired_independently_from_repo_commit": "4bb8e9f50c534fe73d51235f5f7746e17a16ae5f",
+    "equals_prior_local_copy": true,
+    "device_used_to_refetch": false
+  },
+  "host": {
+    "powershell": "5.1.26100.5074",
+    "platform": "Windows PowerShell 5.1(非 Core; 云端 7.4.13 不替代本机)"
+  },
+  "cp0_selftest": {
+    "parse_errors": 0,
+    "parse_tokens": 3585,
+    "rc": 0,
+    "stdout_bytes": 82,
+    "stdout_sha256": "77b6adad28a9a6939acf04e3ce3601c6a2ae152698da1ec5fe7b4e1cfef54273",
+    "stdout_verbatim": "M0-OFFLINE-SELFTEST PASS; device_actions=0; mock_commands=7; negative_controls=15",
+    "stdout_equals_cloud_registered_sha": true,
+    "stdout_cr_count": 0,
+    "stderr_bytes": 0,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "ledger_event_counts": {
+      "RX_BEGIN": 9,
+      "READ_ONLY_PROBE_READY": 1,
+      "RX_FILE": 9,
+      "MOCK_TX_ATTEMPT": 7,
+      "M0_COMMAND_CHECKED": 7,
+      "NEGATIVE_CONTROL": 15,
+      "OFFLINE_SELFTEST": 1
+    },
+    "expected_ledger": {
+      "RX_BEGIN": 9,
+      "RX_FILE": 9,
+      "READ_ONLY_PROBE_READY": 1,
+      "MOCK_TX_ATTEMPT": 7,
+      "M0_COMMAND_CHECKED": 7,
+      "NEGATIVE_CONTROL": 15,
+      "OFFLINE_SELFTEST": 1
+    },
+    "forbidden_events_observed": {
+      "SERIAL_OPEN_ATTEMPT": 0,
+      "SERIAL_OPEN": 0,
+      "TX_ATTEMPT": 0,
+      "RESET_ATTEMPT": 0,
+      "STOP_FAILURE": 0,
+      "M0_COMPLETE": 0
+    },
+    "rx_file_sizes": [
+      3757,
+      146,
+      339,
+      67,
+      475,
+      891,
+      268,
+      355,
+      132
+    ],
+    "rx_files": {
+      "001_attach_passive.rx.bin": {
+        "bytes": 3757,
+        "sha256": "97b37f32aa03c86b8708ae088d0ae65a8f92520f1a1ed70beb74663049321749"
+      },
+      "002_spm_status.rx.bin": {
+        "bytes": 146,
+        "sha256": "656db378732c4de39ce081339a6852b9995987253074dcceaacf5a8de3916339"
+      },
+      "003_spm_cap.rx.bin": {
+        "bytes": 339,
+        "sha256": "c7c5a79549aeb8852575164d7b183123876ed09eb684b76f78a5c9acdb9a50b4"
+      },
+      "004_safety_state.rx.bin": {
+        "bytes": 67,
+        "sha256": "95016978f6ac1e673a7cb0a676002e3c1df55f59f8770c810dd4c073e9cd2025"
+      },
+      "005_safety_status.rx.bin": {
+        "bytes": 475,
+        "sha256": "847aba88e20e2a4e220d1ca69cbaf5ef07975619af232caf0cc2b66b45990d7c"
+      },
+      "006_motor_status.rx.bin": {
+        "bytes": 891,
+        "sha256": "4d33ed91adb095e1642e91e9f5a926daceaca6f1a5aa0c85719a2ce070b549f5"
+      },
+      "007_step_status.rx.bin": {
+        "bytes": 268,
+        "sha256": "7c74b48da1ea7302454aeb9c2944d2384cb3a655841b92a8d516338a0b78ea37"
+      },
+      "008_tmc_uart_probe.rx.bin": {
+        "bytes": 355,
+        "sha256": "7eb0367bc04e5dbf8d7a05847483f73c9131fcc5dc2393bbf73cab7619a8785c"
+      },
+      "009_negative_missing_prompt.rx.bin": {
+        "bytes": 132,
+        "sha256": "d8d15b9c540d100ef3ef52d01034f4ac54c56981e3cec5adc0e382afb026ba2c"
+      }
+    },
+    "session_rx": {
+      "bytes": 6430,
+      "sha256": "393a822a47b1f04ca47c78ac80401abe9196ee3ac6dc1b6337897b48c7fa9530",
+      "equals_concatenation": true,
+      "ranges": [
+        [
+          0,
+          3757
+        ],
+        [
+          3757,
+          3903
+        ],
+        [
+          3903,
+          4242
+        ],
+        [
+          4242,
+          4309
+        ],
+        [
+          4309,
+          4784
+        ],
+        [
+          4784,
+          5675
+        ],
+        [
+          5675,
+          5943
+        ],
+        [
+          5943,
+          6298
+        ],
+        [
+          6298,
+          6430
+        ]
+      ]
+    },
+    "negative_controls": [
+      "missing_response_prompt",
+      "macro_enabled",
+      "safety_high_pad",
+      "safety_no_sample",
+      "motor_armed",
+      "motor_stop_failed",
+      "step_output",
+      "wrong_version",
+      "inconsistent_ioin",
+      "ifcnt_256",
+      "gstat_inconsistent",
+      "ioin_read_failed",
+      "nul_in_spm",
+      "nul_inside_critical_field",
+      "duplicate_critical_label"
+    ],
+    "criteria_pass": "33/33",
+    "criteria_all_pass": true,
+    "outdir_mode": "全新目录(不复用历史产物目录)"
+  },
+  "collector_changed": true,
+  "firmware_changed": false,
+  "documentation_only": false,
+  "builds_executed": [],
+  "keil_invoked": false,
+  "host_chains_not_rerun": "unchanged inputs",
+  "collection_gate_r3": "NOT_MODIFIED_NOT_INVOKED",
+  "operator_approval": {
+    "source": null,
+    "approval_text_expected": "已先关24 V、再拔USB；SW1阻断，电机未接，现场有人，模块/接线未改且无人另行烧录。批准本文件M0包：一次常规上电、一次COM5打开尝试，按序最多七条查询和一次tmc_uart_probe；失败即停，不增加下载、Flash读取、DAP、主动复位、配置写入或任何电机动作。",
+    "approval_given": false,
+    "site_facts_reported": null,
+    "note": "批准与现场回报都必须来自用户真实回合; 本轮未代填、未把离线自检通过当硬件许可"
+  },
+  "budget_consumed": {
+    "power_on": 0,
+    "com5_open_attempt": 0,
+    "com5_open_success": 0,
+    "target_commands_tx": 0,
+    "tmc_uart_probe": 0,
+    "limits": {
+      "power_on": 1,
+      "com5_open_attempt": 1,
+      "target_commands": 7,
+      "tmc_uart_probe": 1
+    }
+  },
+  "zero_actions": {
+    "active_reset": 0,
+    "dap": 0,
+    "program": 0,
+    "tool_flash_read": 0,
+    "device_enumeration": 0,
+    "motor_actions": 0,
+    "config_writes": 0,
+    "fault_clears": 0,
+    "a0_init_trip_dump_clear": 0,
+    "selftests_on_target": 0,
+    "address_scan": 0,
+    "keil_builds": 0,
+    "host_chain_reruns": 0
+  },
+  "hardware_actions": [],
+  "target_commands_executed": [],
+  "last_completed_command": null,
+  "failure_branch": null,
+  "seven_command_completion": null,
+  "tmc_probe_raw": {
+    "ioin": null,
+    "gstat": null,
+    "ifcnt": null,
+    "read_error": null,
+    "reason": "NOT_EXECUTED —— CP1 未获批准"
+  },
+  "tmc_global_health_inferred_from_probe": false,
+  "safe_for_enable": false,
+  "tmc_link_status": "LINK_UNPROVEN",
+  "board_last_proven_bin_sha256": "5f30d3f058ceff516b2185aa3a1e597bbe63293b94a6fd801fd989a6f7b2b8e6",
+  "board_last_proven_bin_bytes": 261452,
+  "board_current_power_state": "UNKNOWN",
+  "final_power_state": "UNKNOWN",
+  "operator_closeout": null,
+  "a0_duration_evidence": "NOT_ACHIEVED",
+  "m0_status": "CP0_DELIVERED_CP1_CP2_NOT_AUTHORIZED_NOT_EXECUTED",
+  "m2_m3_status": "NOT_AUTHORIZED",
+  "candidate_bin_still_not_flashed": "a76b845db4ba1d8872f9db395c2e6e796bdb9416c398f010b669538006cf2777",
+  "serial_r1a_dependency_removed": {
+    "old_serial_r1a_cp1_approval_is_precondition": false,
+    "still_asking_for_it": false,
+    "note": "§3 明示: 旧 SERIAL-R1a 的 CP1 批准不再作为 M0 前置也不再索取; A0 串口续测本身仍按用户决定暂缓"
+  },
+  "deliverables": [
+    {
+      "path": "reports/reviews/phase8-motor-m0-uart-diagnosis/M0Serial.ps1",
+      "bytes": 24064,
+      "sha256": "2131af0ef32b0d9acb3a2a0489d47b90e26968e2fedd7c4ee4624fede0687e3f"
+    },
+    {
+      "path": "reports/reviews/phase8-motor-m0-uart-diagnosis/cal_source_verification.txt",
+      "bytes": 7405,
+      "sha256": "fa4c8171a416ade1daaa57f8b7992b0f2b208b74f3e04092e6c15f45d5d82e44"
+    },
+    {
+      "path": "reports/reviews/phase8-motor-m0-uart-diagnosis/cp0_offline_selftest.txt",
+      "bytes": 11761,
+      "sha256": "61c0e853cd73b0eda78b3167bea371e517cf868cad6bc1f5c27f76e9448cfd4f"
+    },
+    {
+      "path": "reports/reviews/phase8-motor-m0-uart-diagnosis/cp0_selftest_artifacts.md",
+      "bytes": 29331,
+      "sha256": "0e22e95bb6d44b51b67dedc37ee2b6adbeecdc1830c92c1903891b5883e6b864"
+    }
+  ],
+  "first_failures_kept": [
+    {
+      "id": "M0-CP0-F1",
+      "what": "我第一遍判定里**假设**本机 Write-Host 输出 CRLF, 据此写的行尾判据 FAIL; 实测本机 stdout 原始字节 82 B / CR=0, 其 SHA 与云端 Core 登记值相同。",
+      "handling": "不重跑 PowerShell, 用 run1 已保存的原始字节与产物重新套更正后的判据; run1 全部产物字节与第一遍判定文件原样保留, 更正判定另存 *_rejudged.json",
+      "attribution": "本地判读脚本缺陷, 与被测采集器无关"
+    },
+    {
+      "id": "M0-CP0-F2",
+      "what": "归档件隐私扫描第一版把 base64 载荷本身当文本扫, 误报四个私有串(base64 字母表巧合); 另有一处是我把被禁词字面写进了说明行。",
+      "handling": "改为**解码后的原始字节**扫描(14 块 20225 B 命中 0), 说明行改用类别描述不写字面 token; 两处都在入库前修正",
+      "attribution": "检查器口径缺陷"
+    }
+  ],
+  "open_items": [
+    "M0 CP1/CP2 等用户批准 + 现场前置回报",
+    "M2/M3 仍缺同实物电机/限流依据(铭牌与模块 Rsense/VREF)",
+    "BOARD-B 断电终态仍未回报(M0 不再等它作为前置)",
+    "BUG-008 / B-1 / RISK-03/03a / 物理 RISK-04-b / M-1/M-2/M-3 / 外部时基仍开放",
+    "F-A(REQ FAIL 文本合并且不打错误码)按任务书仍只登记不改产品"
+  ],
+  "remote_head_before_this_commit": "d41e644eae7d09f5caaa3338339bf097310307d2",
+  "stop_claim": "M0_CP0_OFFLINE_DELIVERED_AWAITING_PACKAGE_APPROVAL_AND_SITE_REPORT",
+  "stop_lines": [
+    "M0_UART_DIAGNOSIS_EXECUTED_OR_STOPPED / AWAITING_INDEPENDENT_TARGET_EVIDENCE_REVIEW",
+    "NO PROGRAM / NO FLASH READ VIA TOOL / NO DAP / NO ACTIVE RESET / NO DEVICE ENUMERATION",
+    "NO MOTOR / NO STEP_ENABLE / FOUR ON-BOARD MACROS ZERO / NO FAULT_RESET / NO CONFIG WRITE",
+    "NO A0 TRIPS / NO A0 INIT / NO CLEAR_RECORDS / NO AUTO RETRY / NO AUTOMATIC RESTORE",
+    "A0_DURATION_EVIDENCE NOT_ACHIEVED / M2_M3 NOT_AUTHORIZED",
+    "FINAL_POWER_STATE = UNKNOWN(用户未回报, 不推断)"
+  ],
+  "this_round_stage_reality": "CP0 完成(离线), CP1/CP2 未进入; 上面的 stop_lines 是包定义, 本轮实际状态见本字段"
+}
