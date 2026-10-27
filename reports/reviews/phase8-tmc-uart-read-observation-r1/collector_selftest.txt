@@ -1,0 +1,151 @@
+URO-R1 (task phase8-tmc-uart-read-observation-r1) — 独立复审 6324ac4 的返修证据
+code_commit = a483dcba74abd8c04549459bcee2cbcdb1ddea4c   文档/源码基线 = 6324ac40bd8d0f172fdb89e77917be33dc739460
+分支 = phase8/tmc-drive-config(未新建/未改写冻结引用; 未 force push)
+设备动作 = 0(本轮未创建串口对象、未开 COM5、未发目标命令、未枚举、未读 Flash、
+未下载/复位、未碰供电/接线/ENN/SW1、未输出 STEP/DIR/HIGH、未运行 sw1_cut.ps1;
+Keil 仅批处理构建)
+脱敏规则: 本机绝对路径 -> <仓外工作区>(有损替换, 原件留仓外未删除)
+
+==========================================================================
+1. 采集器件身份与复用核对
+==========================================================================
+UARTReadDiagSerialR1.ps1  bytes=93797 sha256=2e9c8ede8f75e7b513dbd4f2c3091189309454879e98404ba7ec64bbb80f2568 非ASCII字节=0 CR字节=0(纯 ASCII, LF 行尾)
+
+生成器复用核对(逐函数与冻结件比对原文):
+  WROTE bytes=93797 negative_controls=50 finally=IDENTICAL six_checks=IDENTICAL(six_sha12=18cacb675b81)
+  Note=IDENTICAL new_sha12=b26b7fb6ac9f
+  Save-New=IDENTICAL new_sha12=535aa402e5d8
+  Begin-Reply=IDENTICAL new_sha12=ad2b5dc4f142
+  Persist-Chunk=IDENTICAL new_sha12=1c23df10d2e3
+  Drain-Rx=IDENTICAL new_sha12=5f120ff0d491
+  End-Reply=IDENTICAL new_sha12=7634c5af2bd9
+  Wait-Prompt=IDENTICAL new_sha12=1a007b287e74
+  Send-Tx=IDENTICAL new_sha12=6133ff261b0f
+  Cmd=IDENTICAL new_sha12=d60bf55011f6
+  Need=IDENTICAL new_sha12=997a7b4790b6
+  Idle-Status=IDENTICAL new_sha12=b9793d2daa17
+  Wait-ReadOnlyProbeWindow=IDENTICAL new_sha12=01f52fb5b41e
+  One-Line=IDENTICAL new_sha12=194260dc3a73
+  Make-Response=IDENTICAL new_sha12=3f7a7b4bc5a7
+  Fixture-Responses=IDENTICAL new_sha12=9001f94b1b53
+  slice_bytes=healthy=2445, probe_junk=2856, rx_timeout=2116, open_fail=2002, txn_unavailable=2003, wrong_version=2459, gstat_high=2527, ifcnt_high=2445, fresh_open=2439
+
+  M0Serial.ps1 身份: 24064 B / sha256
+  2131af0ef32b0d9acb3a2a0489d47b90e26968e2fedd7c4ee4624fede0687e3f(未改动, 只作为复用来源)
+
+  本轮实际改动只落在: 在线编排(横幅门)、第七条判据(新函数 Check-TmroReply)、
+  自检集合与夹具; 16 件复用对象(15 个 transport/工具函数 + finally 收尾块)逐字节不变,
+  前六个命令的判据也从上一轮交付件逐字搬入(六项核对 = IDENTICAL)。
+
+==========================================================================
+2. Windows PowerShell 5.1 上的真实执行(不是只做 Parser)
+==========================================================================
+  [System.Management.Automation.Language.Parser]::ParseFile -> PARSE_ERRORS=0, PSVersion=5.1.26100.5074(本机 Windows PowerShell, 非 pwsh 7)
+  命令行(真实执行, 独立空输出目录):
+    UARTReadDiagSerialR1.ps1 -SelfTest -OutDir <仓外工作区>/run9 -BootFixture <仓外工作区>/boot/001_attach_passive.rx.bin
+  进程退出码 = 0; stderr = 0 字节; stdout 末行:
+    
+
+  台账计数: {"RX_BEGIN": 9, "READ_ONLY_PROBE_READY": 1, "RX_FILE": 9, "MOCK_TX_ATTEMPT": 7, "UROR1_COMMAND_CHECKED": 7, "SLICE_CONTROL": 9, "NEGATIVE_CONTROL": 51, "BANNER_CONTROL": 2, "OFFLINE_SELFTEST": 1}
+  禁止命令 = 12 条(白名单外一律被 Send-Tx 拒绝且 mock 零调用); 七命令白名单各恰好一次; 复核第二次 spm status 命中"Command cap reached";
+  被动窗口重放 = 3757 B 且 SHA-256 与固定夹具一致; mock 端口对象不是 [IO.Ports.SerialPort]。
+
+--------------------------------------------------------------------------
+  切片判定(正控: 完整采集与业务结论分列):
+--------------------------------------------------------------------------
+  junk_stream_two_chunks     COMPLETE/SUCCESS stage=NONE               reads=3 read_ok=1 identity_ok=1 fields_ok=1 open=ALREADY_OPEN
+  rx_entry_timeout_slice     COMPLETE/FAIL stage=READ               reads=1 read_ok=0 identity_ok=0 fields_ok=1 open=ALREADY_OPEN
+  open_failed_slice          COMPLETE/FAIL stage=OPEN               reads=0 read_ok=0 identity_ok=0 fields_ok=1 open=OPEN_FAILED
+  txn_unavailable_slice      COMPLETE/FAIL stage=TXN                reads=0 read_ok=0 identity_ok=0 fields_ok=1 open=OPEN_NOT_REACHED
+  wrong_version_slice        COMPLETE/FAIL stage=IDENTITY_MISMATCH  reads=3 read_ok=1 identity_ok=0 fields_ok=1 open=ALREADY_OPEN
+  gstat_high_bit_slice       COMPLETE/FAIL stage=FIELDS_OUT_OF_DOMAIN reads=3 read_ok=1 identity_ok=1 fields_ok=0 open=ALREADY_OPEN
+  ifcnt_high_bit_slice       COMPLETE/FAIL stage=FIELDS_OUT_OF_DOMAIN reads=3 read_ok=1 identity_ok=1 fields_ok=0 open=ALREADY_OPEN
+  opened_now_slice           COMPLETE/SUCCESS stage=NONE               reads=3 read_ok=1 identity_ok=1 fields_ok=1 open=OPENED_NOW
+  lf_line_endings            COMPLETE/SUCCESS stage=NONE               reads=3 read_ok=1 identity_ok=1 fields_ok=1 open=ALREADY_OPEN
+
+  横幅门(离线, 未创建任何 SerialPort):
+    banner_observed_exact            -> BANNER_MATCHED
+    silent_window_with_readback      -> BANNER_NOT_OBSERVED
+    banner_wrong_version_observed    -> REJECTED(UROR1_BANNER_MISMATCH)
+    banner_two_contradictory         -> REJECTED(UROR1_BANNER_CONTRADICTION)
+    silent_window_without_readback   -> REJECTED(UROR1_BANNER_UNRESOLVED)
+    banner_observed_without_expected -> REJECTED(UROR1_BANNER_UNRESOLVED)
+
+--------------------------------------------------------------------------
+  负控清单(46 条 Expect-* 拒绝 + 1 条缺提示符 + 上列 4 条横幅):
+    missing_response_prompt                    REJECTED want=-
+    banner_wrong_version_observed              REJECTED want=UROR1_BANNER_MISMATCH
+    banner_two_contradictory                   REJECTED want=UROR1_BANNER_CONTRADICTION
+    silent_window_without_readback             REJECTED want=UROR1_BANNER_UNRESOLVED
+    banner_observed_without_expected           REJECTED want=UROR1_BANNER_UNRESOLVED
+    macro_enabled                              REJECTED want=four macros
+    safety_high_pad                            REJECTED want=
+    safety_no_sample                           REJECTED want=
+    motor_armed                                REJECTED want=
+    motor_stop_failed                          REJECTED want=
+    step_output                                REJECTED want=
+    duplicate_critical_label                   REJECTED want=
+    nul_in_spm                                 REJECTED want=
+    nul_inside_critical_field                  REJECTED want=
+    reset_banner_inside_probe_reply            REJECTED want=reset banner
+    probe_no_per_record_lines                  REJECTED want=result lines
+    probe_drop_tx_written                      REJECTED want=fact line written
+    probe_drop_second_prefix_chunk             REJECTED want=chunks add up to 16
+    probe_chunk_n_overstates_bytes             REJECTED want=claims n=16
+    probe_chunk_offset_gap                     REJECTED want=not contiguous
+    probe_empty_chunk_fabricates_zero          REJECTED want=claims n=0
+    probe_duplicate_record                     REJECTED want=result lines=4
+    probe_end_reads_99                         REJECTED want=outside the 0..3 cap
+    probe_begin_end_mismatch                   REJECTED want=BEGIN reads=2
+    probe_end_before_begin                     REJECTED want=END frame precedes BEGIN
+    probe_wrong_observation_version            REJECTED want=v=1
+    probe_missing_end_frame                    REJECTED want=observation_complete
+    probe_export_error                         REJECTED want=export buffer
+    probe_write_frame_claim                    REJECTED want=WRITE frame
+    probe_grants_enable                        REJECTED want=enable permission
+    probe_end_line_unterminated                REJECTED want=END lines=0
+    probe_nul_byte                             REJECTED want=NUL byte
+    probe_line_over_print_bound                REJECTED want=print bound
+    probe_notreached_fakes_rc                  REJECTED want=numeric rc/reason
+    probe_notreached_fakes_timing              REJECTED want=unopened-budget timing line
+    probe_timeout_faked_success                REJECTED want=says SUCCESS with rc=
+    probe_ioin_fail_continues                  REJECTED want=early exit rule
+    probe_success_without_crc                  REJECTED want=crc=OK
+    probe_fail_line_without_reason             REJECTED want=FAIL with reason=ok
+    probe_identity_claim_contradicts           REJECTED want=not the top byte
+    probe_ioin_summary_masked_value            REJECTED want=not the raw value
+    probe_gstat_mask_contradicts_raw           REJECTED want=masked GSTAT
+    probe_gstat_high_bit_claimed_ok            REJECTED want=fields_ok=1 but the raw values
+    probe_ifcnt_high_bit_claimed_ok            REJECTED want=fields_ok=1 but the raw values
+    probe_read_ok_contradicts_records          REJECTED want=read_ok=1 but the records
+    probe_open_failed_claims_rc0               REJECTED want=carries rc=0
+    probe_open_already_claims_fresh_open       REJECTED want=nothing was attempted
+    probe_notreached_open_with_held_txn        REJECTED want=no transaction was held
+    probe_refused_alongside_held_title         REJECTED want=probe REFUSED appears although
+    probe_ctx_illegal_but_printed              REJECTED want=illegal context
+    probe_injected_third_register              REJECTED want=outside IOIN/GSTAT/IFCNT
+
+==========================================================================
+3. 与上一轮自检的对照(实质约束保留, 只加不减)
+==========================================================================
+  上一轮(UARTReadDiagSerial.ps1)在 Windows 5.1: rc=0, 负控 23 条, 禁止命令 12 条。
+  本轮: 负控 51 条(逐条要求**具名理由**, 理由不符即算自检失败), 禁止命令仍是同 12 条,
+  切片正控 9 条, 横幅门 6 条, 七命令 mock 7 条各一次。
+  旧负控里两条口径随语义变化并已就地更名(不删除、不放宽): 'wrong_version' 从"拒绝任何
+  0x20"改为"摘要与逐笔原值矛盾才拒绝"(复审 §3-C: 合法读到 0x20 必须完整保存); 
+  'inconsistent_ioin' 拆成 io_summary/val 两个方向的交叉核对。
+
+==========================================================================
+4. 本轮自检自身的真实失败历史(保留原文, 不改写)
+==========================================================================
+  run1 rc=1  UROR1_CONTRADICTION: the probe granted enable permission
+            <- 摘要正则的捕获组下标写偏一位(link 在第 4 组, 我按第 5 组读); 已在三处一并更正。
+  run2-3 rc=1 Negative control rejected for the wrong reason: probe_duplicate_record
+            <- 拼接控制时把行尾 CR 一起带上, 先撞上"行未干净终止"; 改为不带终止符取行。
+  run4 rc=1 同上: probe_end_before_begin 先被"END frame precedes BEGIN"具名拒绝(比预期更准,
+            遂把该控制的预期理由改为它)。
+  run5 rc=1 probe_end_line_unterminated -> 实际理由 END lines=0(丢终止符使 END 帧整体不可识别,
+            同样是拒绝, 预期理由改为 END lines=0)。
+  run6 rc=0 起 PASS; run9 为入库那一次。另: 生成器首版把 SIX 切到 default 分支,
+  导致旧的 probe 判据被连带搬入(六项核对报 CHANGED)而拒绝落盘 —— 复用核对在这里起了作用。
+

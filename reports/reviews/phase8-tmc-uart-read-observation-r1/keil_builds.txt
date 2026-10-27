@@ -1,0 +1,93 @@
+URO-R1 (task phase8-tmc-uart-read-observation-r1) — 独立复审 6324ac4 的返修证据
+code_commit = a483dcba74abd8c04549459bcee2cbcdb1ddea4c   文档/源码基线 = 6324ac40bd8d0f172fdb89e77917be33dc739460
+分支 = phase8/tmc-drive-config(未新建/未改写冻结引用; 未 force push)
+设备动作 = 0(本轮未创建串口对象、未开 COM5、未发目标命令、未枚举、未读 Flash、
+未下载/复位、未碰供电/接线/ENN/SW1、未输出 STEP/DIR/HIGH、未运行 sw1_cut.ps1;
+Keil 仅批处理构建)
+脱敏规则: 本机绝对路径 -> <仓外工作区>(有损替换, 原件留仓外未删除)
+
+==========================================================================
+1. 两目标真实 Rebuild All(批处理模式, 零设备动作)
+==========================================================================
+工具链 : UV4.exe 5.43.1.0 + ARMCLANG V6.24(KEIL_ROOT 为安装根脱敏占位)
+调用   : UV4.exe -r project.uvprojx -t <目标> -j0 -o <仓外日志>  (-r = Rebuild All)
+         未使用下载/调试模式, 未连接设备, 未启动任何烧录会话。
+判定口径: 以日志文本 `0 Error(s), 0 Warning(s).` 与产物字节为准; UV4 进程退出码只作参考。
+code_commit(镜像输入字节) = a483dcba74abd8c04549459bcee2cbcdb1ddea4c
+
+目标 rt-thread:
+  Program Size: Code=179674 RO-data=77786 RW-data=2188 ZI-data=83784
+  After Build - User command #1: fromelf --bin .\build\rt-thread.axf --output rtthread.bin
+  ".\build\rt-thread.axf" - 0 Error(s), 0 Warning(s).
+  Build Time Elapsed:  00:00:10
+  真实警告文本行数=0(errors=0 warnings=0)
+  镜像 reports/firmware/phase8-tmc-uart-read-observation-r1/default.bin  bytes=258036 sha256=dccb7b63c9284d320016a42e1fc8b7f62d544b97ca9cb433604e412bbbff55e3
+  与构建产物逐字节相同=True; 镜像内构建横幅="Oct 28 2026 02:23:14"(唯一一处时分秒串, time_then_date 排布)
+  AXF(本地独立保存, 不入库) bytes=1663308 sha256=a985ee184e5a7d37a3c382fb6af145c41a535d68cea0c27d98e5de3be14ffdf9
+  map 摘要: ['LR_IROM1', '0x08000000', '0x0003f640', '0x00080000', ', ABSOLUTE, COMPRESSED[0x0003eff4]']; Image Entry point: 0x080003cd
+  Program Size Code=179674 RO-data=77786 RW-data=2188 ZI-data=83784
+    vs 上一轮 URO(6324ac4): Code+592 RO+100 RW+0 ZI+0
+
+目标 rt-thread-measure-a0:
+  Program Size: Code=187018 RO-data=80746 RW-data=2188 ZI-data=91504
+  After Build - User command #1: fromelf --bin .\build\a0\rt-thread-a0.axf --output build\a0\measure-a0.bin
+  ".\build\a0\rt-thread-a0.axf" - 0 Error(s), 0 Warning(s).
+  Build Time Elapsed:  00:00:08
+  真实警告文本行数=0(errors=0 warnings=0)
+  镜像 reports/firmware/phase8-tmc-uart-read-observation-r1/measure-a0.bin  bytes=268340 sha256=a48400c881c539db539876cfd38f3aceac2a78cc7ed0d0f9655c7edafbb19a1e
+  与构建产物逐字节相同=True; 镜像内构建横幅="Oct 28 2026 02:23:31"(唯一一处时分秒串, time_then_date 排布)
+  AXF(本地独立保存, 不入库) bytes=1693804 sha256=a96889c47c9433b132dc4eeecf46be287c13dc1cff11fc0003e6cca10826846f
+  map 摘要: ['LR_IROM1', '0x08000000', '0x00041e80', '0x00080000', ', ABSOLUTE, COMPRESSED[0x00041834]']; Image Entry point: 0x080003cd
+  Program Size Code=187018 RO-data=80746 RW-data=2188 ZI-data=91504
+    vs 上一轮 URO(6324ac4): Code+592 RO+100 RW+0 ZI+0
+    vs 旧 5f30… 那一阶段(§4.1 更正后的 export-r1 原值): Code+5912 RO+980 RW+0 ZI+0
+
+增量落在 tmc2209.c 的 .text(分块导出、出口记账、quiet 事务核心)与 .rodata(新增导出标签串), RW/ZI 均为 0 增量 => 观测对象仍是 probe 的**栈上局部**: R1 单笔 tmc_read_observation_t = 188 B(URO 轮为 176 B), 三笔 564 B, 合同上限 768 B; 主机链在同批定稿字节上实测 obs_size=188 / obs_x3=564。没有新增文件静态或全局可写数据, 也没有把观测挪进共享全局槽。口径边界: 栈上局部之和**不等于**完整栈高水位, 完整水位需要上板实测, 本轮不声称。
+
+==========================================================================
+2. 复审 §4.1 的更正(A0 增量口径)
+==========================================================================
+上一轮把 A0 测量目标的"上一轮 Program Size"错取了 179858/79430, 于是报成 +6568/+1216;
+旧 5f30… 镜像对应 export-r1 的真实登记值是 Code=181106 RO=79766 RW=2188 ZI=91504
+(来源 fe3b64b4:reports/reviews/phase8-target-measurement-a0-export-r1/keil_build.txt)。
+按该原值算: URO 轮 186426/80646 = +5320/+880/0/0; 本轮 187018/80746 = +5912/+980/0/0。
+两处口径现在分列在 manifest 的 program_size_delta_vs_previous / _vs_earlier_stage 里;
+历史文档不回写成"一开始就正确", 只在证据里新增本条勘误(勘误号 R1-E1)。
+
+本轮增量 +592/+100 与两个目标完全一致, 与"只改 tmc2209.c 的导出/记账代码"相符。
+
+==========================================================================
+3. 工程与四宏
+==========================================================================
+project.uvprojx 未被本轮改动: 工作树 bytes=338976 sha256=3b882d0a160692c31624108feda9ba285633a19ad02a89f663dec07fb8d51e04 git_blob=8f8d7ce31298d2f5af567f18c565b140ce2d687a(338976 B) unchanged=True
+本轮构建目标的四宏在目标级 Define 中均无覆盖: {"rt-thread": {}, "rt-thread-measure-a0": {}}
+  TARGET=rt-thread rc=0 defines_passed=11 include_dirs_existing=34/34 stderr_bytes=0
+    MOTOR_HARDWARE_ENABLE_PATH_VALIDATED = RT_FALSE
+    STEP_DIAG_ISOLATED_ENV_CONFIRMED = RT_FALSE
+    TMC_DRIVE_CONFIG_HW_VALIDATED = RT_FALSE
+    SAFETY_LIMIT_INPUTS_ENABLED = RT_FALSE
+    RT_FALSE=0 RT_TRUE=1 | total_macros_dumped=1376
+    macro_names_in_target_define_list=[]
+  TARGET=rt-thread-measure-a0 rc=0 defines_passed=12 include_dirs_existing=34/34 stderr_bytes=0
+    MOTOR_HARDWARE_ENABLE_PATH_VALIDATED = RT_FALSE
+    STEP_DIAG_ISOLATED_ENV_CONFIRMED = RT_FALSE
+    TMC_DRIVE_CONFIG_HW_VALIDATED = RT_FALSE
+    SAFETY_LIMIT_INPUTS_ENABLED = RT_FALSE
+    RT_FALSE=0 RT_TRUE=1 | total_macros_dumped=1377
+    macro_names_in_target_define_list=[]
+  预处理器实证 rc=0, stderr=0 B => 两目标四宏有效值 0(RT_FALSE), 由编译器实证。
+第三个目标 rt-thread-motor-m1-candidate 的目标级 Define 里显式写了 MOTOR_HARDWARE_ENABLE_PATH_VALIDATED=1, TMC_DRIVE_CONFIG_HW_VALIDATED=1, STEP_DIAG_ISOLATED_ENV_CONFIRMED=0, SAFETY_LIMIT_INPUTS_ENABLED=0; 本轮未构建、未下载, 故不影响本轮两枚镜像的四宏取值。
+
+==========================================================================
+4. 旧镜像一律未覆盖(本轮新镜像只写进本轮新目录)
+==========================================================================
+  uro_default_ad5d: 257348 B / sha256 ad5daaa36974d62ccac911bd1fa46f3c18b139c6ef42444026a75708715cdbd8 = reports/firmware/phase8-tmc-uart-read-observation/default.bin (URO 轮镜像, 复审**未批准下载**; 原样保留, 不覆盖不删除, 也不是本轮候选件)
+  uro_measure_a0_b543: 267652 B / sha256 b54387fddbb6ecf77bd0c90d4abc0584212396ddbf884955e44fd76956a4b4d3 = reports/firmware/phase8-tmc-uart-read-observation/measure-a0.bin (同上)
+  on_board_measure_a0_5f30: 261452 B / sha256 5f30d3f058ceff516b2185aa3a1e597bbe63293b94a6fd801fd989a6f7b2b8e6 = reports/firmware/phase8-target-measurement-a0-export-r1/measure-a0.bin (板上最后已证镜像; 本轮不读 Flash 重证、不覆盖)
+  archived_default_02e9: 该目录同批 default.bin sha256 02e984583255f3414f43fb5c077dc9ba82eba98553d2cb9d7f7feee9336ebd80 (未覆盖)
+  earlier_measure_a0_358f: 261100 B / sha256 358fd81ae5853ea52df1e1ab367ea41af0f5e86679082a755c17dac3429b0e1b = reports/firmware/phase8-target-measurement-a0/measure-a0.bin (A0 首轮, 未覆盖)
+  m1_candidate_bin: 251260 B / sha256 a76b845db4ba1d8872f9db395c2e6e796bdb9416c398f010b669538006cf2777 = reports/firmware/phase8-motor-bringup-m1-prep/motor-m1-candidate.bin (未下载)
+
+  两枚 URO 轮镜像(ad5d…/b543…)复审未批准下载, 本轮候选件是上面这两枚新哈希;
+  第三目标 rt-thread-motor-m1-candidate 本轮未构建、未改动、未下载。
+

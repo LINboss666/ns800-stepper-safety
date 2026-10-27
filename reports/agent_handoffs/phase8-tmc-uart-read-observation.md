@@ -137,3 +137,31 @@ M0 CP2 最终状态仍未回报(允许保持 UNKNOWN, 不为此连接设备)
    `keil_builds.txt` / `collector_selftest.txt` / `board_candidate.md` 做独立复审。
 2. 若复审通过，可直接按 `board_candidate.md` 给一次整包批准（不需要另开离线采集器准备轮）。
 3. 待补事实（不阻塞离线工作）：M0 CP2 的最终状态；真机 `tmc_uart_probe` 的逐笔阶段读数。
+
+## 11. R1 指针与本条勘误（2026-10-28 追加；上文 §1–§10 的原文与 stdout 一律未改写）
+
+独立复审对本 HEAD 的判定是 **`URO_OBSERVATION_AND_CAPTURE_REWORK_REQUIRED`**：
+`RX_DEADLINE_FIX_ACCEPTED` 与 `EXISTING_HOST_REGRESSIONS_REPRODUCED` 成立，但**未给 SOFTWARE/IMAGE GO，
+也未批准下载本文 §1 那两枚镜像**（`ad5daaa3…` / `b54387fd…`）。返修在下一轮一次做完：
+
+- R1 任务 ID `phase8-tmc-uart-read-observation-r1`，锚点即本 HEAD `6324ac40bd8d0f172fdb89e77917be33dc739460`，
+  返修 code_commit `a483dcba74abd8c04549459bcee2cbcdb1ddea4c`。
+- R1 交付：`reports/reviews/phase8-tmc-uart-read-observation-r1/`、
+  `reports/firmware/phase8-tmc-uart-read-observation-r1/`、
+  `reports/agent_handoffs/phase8-tmc-uart-read-observation-r1.md/.json`。
+  本文那两枚 BIN、`UARTReadDiagSerial.ps1` 与原始报告**原样保留不覆盖**，也不是 R1 候选件。
+
+本条同时登记三条口径更正（不改写历史原文，只在此并列说明）：
+
+1. **URO-E4（A0 增量基线）**：本文 §keil_builds.txt 第 2 节把 A0 的"上一轮"取为 179858/79430，
+   于是报出 `+6568/+1216`。复审指出与旧 `5f30…` 阶段对照应取
+   `fe3b64b4:reports/reviews/phase8-target-measurement-a0-export-r1/keil_build.txt` 的真实值
+   **Code=181106 RO=79766 RW=2188 ZI=91504** ⇒ 本轮 URO 的 186426/80646 实为 **+5320/+880/0/0**。
+   R1 的 `keil_builds.txt` §2 与 manifest 已把"vs 上一轮同目标"与"vs 更早阶段"两套对照分列。
+2. **提交数**：URO 轮实际是四个提交 `d2dd743 / ab76a07 / fb1a72e / 6324ac4`；本文头部此前只列后三个，
+   漏了最早的 `d2dd743`（不影响产品字节身份：最终 `tmc2209.c` 等于 `ab76a07` 内的 180848 B）。
+   R1 起按四条引用，不为此另开登记轮。
+3. **主机日志措辞**：`tx_bytes_on_wire` / "线上真实字节" 只表示受控寄存器模型的 DATA 提交计数，
+   不是目标线路波形。本文历史 stdout 原文保留不改写；R1 的新表述统一为
+   "端口真落 DATA 的字节 / 模型字节数"。另 `tmc_obs_echo_eval` 此前只搜前 32 B，
+   "前缀内未见"不等于物理无回声 —— R1 改全流滚动窗口并导出样本内命中偏移。

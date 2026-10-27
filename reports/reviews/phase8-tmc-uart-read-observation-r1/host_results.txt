@@ -1,0 +1,259 @@
+URO-R1 (task phase8-tmc-uart-read-observation-r1) — 独立复审 6324ac4 的返修证据
+code_commit = a483dcba74abd8c04549459bcee2cbcdb1ddea4c   文档/源码基线 = 6324ac40bd8d0f172fdb89e77917be33dc739460
+分支 = phase8/tmc-drive-config(未新建/未改写冻结引用; 未 force push)
+设备动作 = 0(本轮未创建串口对象、未开 COM5、未发目标命令、未枚举、未读 Flash、
+未下载/复位、未碰供电/接线/ENN/SW1、未输出 STEP/DIR/HIGH、未运行 sw1_cut.ps1;
+Keil 仅批处理构建)
+脱敏规则: 本机绝对路径 -> <仓外工作区>(有损替换, 原件留仓外未删除)
+
+==========================================================================
+1. 集中回归: 同一份定稿/夹具字节上的十条既有入口(逐条单独记 rc)
+==========================================================================
+  build_and_run          bash tests/host/build_and_run.sh                     rc=rc=0
+  io_behavior            bash tests/host/run_io_behavior.sh                   rc=rc=0
+  safety_data_semantics  bash tests/host/run_safety_data_semantics.sh         rc=rc=0
+  stop_result_s1         bash tests/host/run_stop_result_s1.sh                rc=rc=0
+  stop_priority_s2       bash tests/host/run_stop_priority_s2.sh              rc=rc=0
+  sp_measure_a0          bash tests/host/run_sp_measure_a0.sh                 rc=rc=0
+  path_guard             bash tests/host/test_path_guard.sh                   rc=rc=0
+  s2_reverse             env REVERSE=1 bash tests/host/run_stop_priority_s2.sh rc=rc=0
+  negatives              bash tests/host/run_negatives.sh                     rc=rc=0
+  meta_negatives         bash tests/host/run_meta_negatives.sh                rc=rc=0
+
+  run 目录 = <仓外工作区>/r1_20261027T175958Z; 每条命令的完整日志留在该目录, 原始失败未删除。
+  BASE_HEAD(本轮完整输入提交) = a483dcba74abd8c04549459bcee2cbcdb1ddea4c; 回归在提交前的同一份工作树字节上跑, 提交后
+  逐 blob 归一比对见 source_audit.txt 第 2 节 => "被测字节 == 提交字节"。
+
+==========================================================================
+2. read_obs 组(两变体都真执行): 本轮 30 例(原 24 条一条未删, 新增 6 条导出侧)
+==========================================================================
+
+[target] marker=target_read_obs.executed.marker 真执行=True
+  LEAF|variant=target|group=read_obs|gates=0
+  LEAF|obs_size=188|obs_x3=564|xfer_stat_size=48
+  CASE|URO01-healthy-read-publishes-real-value|PASS|rc=0 value=0x21000040 crc=2 hdr=1 full=1 rx_total=12 echo=3 tx=4 cand==应答=1 写帧=0 读请求=1 start=100 total=125
+  CASE|URO02-healthy-prestage-reply-inside-window|PASS|rc=0 前段=15 期限=115 完成=31 total=125 合同=阶段起点+min(100,总剩余): 115
+  CASE|URO03-reply-at-110-accepted-by-fixed-deadline|PASS|rc=0 value=0x21000040 前段=15 期限=115 应答可见=110 完成=111 published=1 (旧算式期限=100 会拒绝这一帧)
+  CASE|URO04-stage-deadline-boundary-pair|PASS|期限内: rc=0 pub=1 done=113 | 期限刻: rc=-117 crc=2 full=1 expired=2 late=1 pub=0
+  CASE|URO05-total-budget-exhausted-before-rx-entry|PASS|(a)rc=-117 start=100 total=15 done=15 rx_reached=0 tx=3 | (b)rc=-117 reason=6 total_expired=2 stage_expired=2 done=130 应答数增量=1 健康=1->1
+  CASE|URO06-lock-refusal-sends-nothing-and-releases-nothing|PASS|rc=-23 reason=4 lock=1/0/-23 tx_called=0 落字节增量=0 读请求增量=0 归还增量=0(必须 0)
+  CASE|URO06b-zero-remaining-budget-does-not-even-attempt-lock|PASS|rc=-117 取锁调用增量=0 归还增量=0 落字节=0 tx_called=0
+  CASE|URO07-flush-limits-keep-flush-fact-tx-not-reached|PASS|(字节上限)rc=-12 reason=5 flush_bytes=272 rx_total=0 tx_called=0 | (时间上限)rc=-117 flush_ms=2 flush_bytes=2 total_expired=0 落字节增量=0
+  CASE|URO08-tx-no-space-zero-written-rx-not-reached|PASS|rc=-117 tx_called=1 tx_written=0 reason=6 rx_reached=0 落字节=0 请求数增量=0
+  CASE|URO09-partial-tx-keeps-real-written-count|PASS|rc=-117 请求构造=4 实际写入=2 线上字节=2 前 2 字节==req=1 reason=6
+  CASE|URO10-expire-after-last-byte-keeps-written-four|PASS|rc=-117 tx_written=4(线上真实=4) tx_rc=-117 stage_expired=2 total_expired=1 done=28 total=125
+  CASE|URO11-rx-zero-bytes-not-claimed-as-echo|PASS|rc=-117 reason=rx-timeout-echo rx_total=0 echo=1(必须 NONE=1) hdr=0 crc=0 应答=1
+  CASE|URO12-exact-four-byte-echo-only|PASS|rc=-117 rx_total=4 prefix=05 00 06 6F req=05 00 06 6F echo=2(必须 ONLY=2) match=1 与 URO11 的差别=rx_total 4 vs 0
+  CASE|URO13-wrong-header-or-wrong-reg-kept-as-raw-bytes|PASS|(坏头)rc=-117 hdr=0 echo=4 bytes=05 F5 06 | (坏寄存器)rc=-117 hdr=0 bytes=05 FF 26
+  CASE|URO14-header-matched-short-frame|PASS|rc=-117 reason=8 hdr=1 full=0 rx_total=5 cand=0 crc=0 echo=4
+  CASE|URO15-complete-frame-crc-error-keeps-eio|PASS|rc=-12(必须 -12=EIO, 不是 -117) reason=9 crc=1 full=1 期限=n/n cand=05 FF 06 21 00 00 40 EA
+  CASE|URO16-complete-legal-frame-rejected-only-by-total-deadline|PASS|rc=-117 crc=2(真算过) total_expired=2 stage_now=n late=1 pub=0 cand=05 FF 06 21 00 00 40 4F 前段=15 期限=20 total=20
+  CASE|URO17-long-stream-slide-counts-prefix-tail-truncation|PASS|(滑动)rc=-117 total=48 pre=32 tail=16 退出时 n=16 trunc=1 hdr=0 | (流内应答)rc=0 total=32 hdr=1 pub=1 value=0x21000040
+  CASE|URO18-tick-wraparound-uses-unsigned-deltas|PASS|(回绕内成功)rc=0 start=FFFFFFF0 期限=103 value=0x21000040 | (回绕后过期)rc=-117 start=FFFFFFE0 过期时应答仍挂起=1 之后入队字节=8
+  CASE|URO19-probe-per-record-facts-and-early-exit|PASS|早退: FAIL=1 NOT_REACHED=2(rc=0 的=0, rc=- 的=2, reason=- 的=2, timing=- 的=2, reg=01/02=1/1, 冒充 start=0 的行=0) END reads=1=1 EXPORT_ERROR=0 | 全成功: SUCCESS=3 三笔各自 total=8 =1/1/1 END reads=3=1 本份 EXPORT_ERROR=0
+  CASE|URO20-probe-stays-read-only-and-prints-after-txn-release|PASS|读事务=3 写帧=0 保护(cut=0 low=0) cfg 状态=0->0 view=0->0 健康=1->1 txn 归还=1 归还前已打印行数=0
+  CASE|URO21-output-bounded-and-illegal-context-silent|PASS|行=46 最长=81 超 96=0 非 ASCII=0 NUL=0 半行=0 丢弃=0 | 三种非法上下文: 打印增量=0 UART 读增量=0 落字节增量=0 取锁增量=0
+  CASE|URO22-observation-on-off-equivalent-on-same-input|PASS|无观测 rc=0 value=0x21000040 used=31 tx=4 rx=12 | 有观测 rc=0 value=0x21000040 used=31 tx=4 rx=12 | 总线 读1/1 写0/0 字节4/4
+  CASE|URO22b-observation-never-invents-a-success|PASS|失联: 无观测 rc=-117 used=103 | 有观测 rc=-117 result=1 pub=0 rx_total=0 value 未改=1
+  CASE|URO23-tx-written-count-exported-for-0-2-4|PASS|导出 written=0/2/4 端口真落 DATA 的字节=0/2/4
+  CASE|URO24-prefix32-tail16-rebuilt-from-export|PASS|导出重建 pre=32(0x10..0x2F) tail=16(0x30..0x3F) cand=0 块数=2/1/1 rx_total=48
+  CASE|URO25-rx-entry-expiry-exports-real-rc|PASS|接缝第4次 tick 推进; 业务 rc=-117 观测 rc=-117 reason=3 tx_rc=0 rx_reached=0 导出真 rc 行=1 冒充成功行=0
+  CASE|URO26-open-and-context-identity-in-export|PASS|(a)OPENED_NOW(reg06/三笔)=1/3 ALREADY=0 SUCCESS=3 真打开次数+1 |(b)ctx1=3 ctx0=0 open未到达=3 txn0/-45=3 REFUSED=1 txn-held标题=0 非ASCII字节=0 END完整=1 |(c)OPEN_FAILED=3 END完整=1
+  CASE|URO27-empty-sample-and-truncation-scopes|PASS|空样本 n=0 hex=- 行数=3 虚构00=0 rx_total=0
+  CASE|URO27b-32byte-stream-prefix-fully-exported|PASS|导出重建前缀=32 字节(0x10..0x27 24 垃圾+应答头=05 FF 06) 发布值=0x21000040
+  SUMMARY|cases=30|pass=30|fail=0|pre_bad=0|skips=0
+  [target] 该组 CASE 行数=30(登记必需 id 数=30)
+
+[host_ovr] marker=host_ovr_read_obs.executed.marker 真执行=True
+  LEAF|variant=host_ovr|group=read_obs|gates=1
+  LEAF|obs_size=188|obs_x3=564|xfer_stat_size=48
+  CASE|URO01-healthy-read-publishes-real-value|PASS|rc=0 value=0x21000040 crc=2 hdr=1 full=1 rx_total=12 echo=3 tx=4 cand==应答=1 写帧=0 读请求=1 start=100 total=125
+  CASE|URO02-healthy-prestage-reply-inside-window|PASS|rc=0 前段=15 期限=115 完成=31 total=125 合同=阶段起点+min(100,总剩余): 115
+  CASE|URO03-reply-at-110-accepted-by-fixed-deadline|PASS|rc=0 value=0x21000040 前段=15 期限=115 应答可见=110 完成=111 published=1 (旧算式期限=100 会拒绝这一帧)
+  CASE|URO04-stage-deadline-boundary-pair|PASS|期限内: rc=0 pub=1 done=113 | 期限刻: rc=-117 crc=2 full=1 expired=2 late=1 pub=0
+  CASE|URO05-total-budget-exhausted-before-rx-entry|PASS|(a)rc=-117 start=100 total=15 done=15 rx_reached=0 tx=3 | (b)rc=-117 reason=6 total_expired=2 stage_expired=2 done=130 应答数增量=1 健康=1->1
+  CASE|URO06-lock-refusal-sends-nothing-and-releases-nothing|PASS|rc=-23 reason=4 lock=1/0/-23 tx_called=0 落字节增量=0 读请求增量=0 归还增量=0(必须 0)
+  CASE|URO06b-zero-remaining-budget-does-not-even-attempt-lock|PASS|rc=-117 取锁调用增量=0 归还增量=0 落字节=0 tx_called=0
+  CASE|URO07-flush-limits-keep-flush-fact-tx-not-reached|PASS|(字节上限)rc=-12 reason=5 flush_bytes=272 rx_total=0 tx_called=0 | (时间上限)rc=-117 flush_ms=2 flush_bytes=2 total_expired=0 落字节增量=0
+  CASE|URO08-tx-no-space-zero-written-rx-not-reached|PASS|rc=-117 tx_called=1 tx_written=0 reason=6 rx_reached=0 落字节=0 请求数增量=0
+  CASE|URO09-partial-tx-keeps-real-written-count|PASS|rc=-117 请求构造=4 实际写入=2 线上字节=2 前 2 字节==req=1 reason=6
+  CASE|URO10-expire-after-last-byte-keeps-written-four|PASS|rc=-117 tx_written=4(线上真实=4) tx_rc=-117 stage_expired=2 total_expired=1 done=28 total=125
+  CASE|URO11-rx-zero-bytes-not-claimed-as-echo|PASS|rc=-117 reason=rx-timeout-echo rx_total=0 echo=1(必须 NONE=1) hdr=0 crc=0 应答=1
+  CASE|URO12-exact-four-byte-echo-only|PASS|rc=-117 rx_total=4 prefix=05 00 06 6F req=05 00 06 6F echo=2(必须 ONLY=2) match=1 与 URO11 的差别=rx_total 4 vs 0
+  CASE|URO13-wrong-header-or-wrong-reg-kept-as-raw-bytes|PASS|(坏头)rc=-117 hdr=0 echo=4 bytes=05 F5 06 | (坏寄存器)rc=-117 hdr=0 bytes=05 FF 26
+  CASE|URO14-header-matched-short-frame|PASS|rc=-117 reason=8 hdr=1 full=0 rx_total=5 cand=0 crc=0 echo=4
+  CASE|URO15-complete-frame-crc-error-keeps-eio|PASS|rc=-12(必须 -12=EIO, 不是 -117) reason=9 crc=1 full=1 期限=n/n cand=05 FF 06 21 00 00 40 EA
+  CASE|URO16-complete-legal-frame-rejected-only-by-total-deadline|PASS|rc=-117 crc=2(真算过) total_expired=2 stage_now=n late=1 pub=0 cand=05 FF 06 21 00 00 40 4F 前段=15 期限=20 total=20
+  CASE|URO17-long-stream-slide-counts-prefix-tail-truncation|PASS|(滑动)rc=-117 total=48 pre=32 tail=16 退出时 n=16 trunc=1 hdr=0 | (流内应答)rc=0 total=32 hdr=1 pub=1 value=0x21000040
+  CASE|URO18-tick-wraparound-uses-unsigned-deltas|PASS|(回绕内成功)rc=0 start=FFFFFFF0 期限=103 value=0x21000040 | (回绕后过期)rc=-117 start=FFFFFFE0 过期时应答仍挂起=1 之后入队字节=8
+  CASE|URO19-probe-per-record-facts-and-early-exit|PASS|早退: FAIL=1 NOT_REACHED=2(rc=0 的=0, rc=- 的=2, reason=- 的=2, timing=- 的=2, reg=01/02=1/1, 冒充 start=0 的行=0) END reads=1=1 EXPORT_ERROR=0 | 全成功: SUCCESS=3 三笔各自 total=8 =1/1/1 END reads=3=1 本份 EXPORT_ERROR=0
+  CASE|URO20-probe-stays-read-only-and-prints-after-txn-release|PASS|读事务=3 写帧=0 保护(cut=0 low=0) cfg 状态=0->0 view=0->0 健康=1->1 txn 归还=1 归还前已打印行数=0
+  CASE|URO21-output-bounded-and-illegal-context-silent|PASS|行=46 最长=81 超 96=0 非 ASCII=0 NUL=0 半行=0 丢弃=0 | 三种非法上下文: 打印增量=0 UART 读增量=0 落字节增量=0 取锁增量=0
+  CASE|URO22-observation-on-off-equivalent-on-same-input|PASS|无观测 rc=0 value=0x21000040 used=31 tx=4 rx=12 | 有观测 rc=0 value=0x21000040 used=31 tx=4 rx=12 | 总线 读1/1 写0/0 字节4/4
+  CASE|URO22b-observation-never-invents-a-success|PASS|失联: 无观测 rc=-117 used=103 | 有观测 rc=-117 result=1 pub=0 rx_total=0 value 未改=1
+  CASE|URO23-tx-written-count-exported-for-0-2-4|PASS|导出 written=0/2/4 端口真落 DATA 的字节=0/2/4
+  CASE|URO24-prefix32-tail16-rebuilt-from-export|PASS|导出重建 pre=32(0x10..0x2F) tail=16(0x30..0x3F) cand=0 块数=2/1/1 rx_total=48
+  CASE|URO25-rx-entry-expiry-exports-real-rc|PASS|接缝第4次 tick 推进; 业务 rc=-117 观测 rc=-117 reason=3 tx_rc=0 rx_reached=0 导出真 rc 行=1 冒充成功行=0
+  CASE|URO26-open-and-context-identity-in-export|PASS|(a)OPENED_NOW(reg06/三笔)=1/3 ALREADY=0 SUCCESS=3 真打开次数+1 |(b)ctx1=3 ctx0=0 open未到达=3 txn0/-45=3 REFUSED=1 txn-held标题=0 非ASCII字节=0 END完整=1 |(c)OPEN_FAILED=3 END完整=1
+  CASE|URO27-empty-sample-and-truncation-scopes|PASS|空样本 n=0 hex=- 行数=3 虚构00=0 rx_total=0
+  CASE|URO27b-32byte-stream-prefix-fully-exported|PASS|导出重建前缀=32 字节(0x10..0x27 24 垃圾+应答头=05 FF 06) 发布值=0x21000040
+  SUMMARY|cases=30|pass=30|fail=0|pre_bad=0|skips=0
+  [host_ovr] 该组 CASE 行数=30(登记必需 id 数=30)
+
+两组 id 集合相同 = True
+新增导出侧身份: URO23-tx-written-count-exported-for-0-2-4, URO24-prefix32-tail16-rebuilt-from-export, URO25-rx-entry-expiry-exports-real-rc, URO26-open-and-context-identity-in-export, URO27-empty-sample-and-truncation-scopes, URO27b-32byte-stream-prefix-fully-exported
+
+==========================================================================
+3. S2 链汇总与台账自洽(期望 53/109, 本轮改动只增不减)
+==========================================================================
+    target 汇总: 组=18 用例=53 PASS=53 FAIL=0 SKIP行=14 pre_bad=0 期望用例=53
+    host_ovr 汇总: 组=18 用例=109 PASS=109 FAIL=0 SKIP行=1 pre_bad=0 期望用例=109
+  target | OK 全部 18 组自洽且必需用例真执行判 PASS (用例=53)
+  host_ovr | OK 全部 18 组自洽且必需用例真执行判 PASS (用例=109)
+  实际执行集合: target=18组 host_ovr=18组 (每组一个独立进程)
+  登记合同: S2_EXPECT_target=53(23 原 + 30 read_obs) / S2_EXPECT_host_ovr=109(79 原 + 30 read_obs); 原 23/79 与 URO 的 24 条身份逐字保留。
+
+==========================================================================
+4. 三项反向(仓外副本注入; 原两项保留, 本轮新增导出侧第三项)
+==========================================================================
+  rev_stale_identity_gate | META-OK 命中 2 个业务失败身份 (variant=host_ovr groups=identity stale 台账自洽 proc_rc=1)
+  rev_permit_confirm_identity_gate | META-OK 命中 1 个业务失败身份 (variant=host_ovr groups=identity 台账自洽 proc_rc=1)
+  rev_config_write_token_gate | META-OK 命中 1 个业务失败身份 (variant=host_ovr groups=epwm_leaf 台账自洽 proc_rc=1)
+  rev_tx_flush_budget | META-OK 命中 2 个业务失败身份 (variant=host_ovr groups=uart_leaf tmc_lock 台账自洽 proc_rc=1)
+  rev_fail_returns_owner_early | META-OK 命中 1 个业务失败身份 (variant=host_ovr groups=diag 台账自洽 proc_rc=1)
+  rev_rx_deadline_old_origin | META-OK 命中 3 个业务失败身份 (variant=host_ovr groups=read_obs 台账自洽 proc_rc=1)
+  rev_obs_drop_raw_rx_capture | META-OK 命中 2 个业务失败身份 (variant=host_ovr groups=read_obs 台账自洽 proc_rc=1)
+  rev_export_drop_prefix_second_chunk | META-OK 命中 2 个业务失败身份 (variant=host_ovr groups=read_obs 台账自洽 proc_rc=1)
+  S2 REVERSE RESULT: PASS —— 八项注入均命中预登记业务失败身份(rc=1, 台账自洽)
+
+  [rev_rx_deadline_old_origin] 注入后**具名 FAIL** 与 SUMMARY:
+      CASE|URO03-reply-at-110-accepted-by-fixed-deadline|FAIL|rc=-117 value=0xA5A5A5A5 前段=15 期限=115 应答可见=110 完成=100 published=0 (旧算式期限=100 会拒绝这一帧)
+      CASE|URO04-stage-deadline-boundary-pair|FAIL|期限内: rc=-117 pub=0 done=100 | 期限刻: rc=-117 crc=0 full=0 expired=2 late=0 pub=0
+      CASE|URO16-complete-legal-frame-rejected-only-by-total-deadline|FAIL|rc=-117 crc=0(真算过) total_expired=1 stage_now=y late=0 pub=0 cand=00 00 00 00 00 00 00 00 前段=15 期限=20 total=20
+      SUMMARY|cases=30|pass=27|fail=3|pre_bad=0|skips=0
+
+  [rev_obs_drop_raw_rx_capture] 注入后**具名 FAIL** 与 SUMMARY:
+      CASE|URO01-healthy-read-publishes-real-value|FAIL|rc=0 value=0x21000040 crc=2 hdr=1 full=1 rx_total=12 echo=4 tx=4 cand==应答=1 写帧=0 读请求=1 start=100 total=125
+      CASE|URO12-exact-four-byte-echo-only|FAIL|rc=-117 rx_total=4 prefix=00 00 00 00 req=05 00 06 6F echo=4(必须 ONLY=2) match=0 与 URO11 的差别=rx_total 4 vs 0
+      CASE|URO13-wrong-header-or-wrong-reg-kept-as-raw-bytes|FAIL|(坏头)rc=-117 hdr=0 echo=4 bytes=00 00 00 | (坏寄存器)rc=-117 hdr=0 bytes=00 00 00
+      CASE|URO14-header-matched-short-frame|FAIL|rc=-117 reason=8 hdr=1 full=0 rx_total=5 cand=0 crc=0 echo=4
+      CASE|URO17-long-stream-slide-counts-prefix-tail-truncation|FAIL|(滑动)rc=-117 total=48 pre=0 tail=0 退出时 n=16 trunc=0 hdr=0 | (流内应答)rc=0 total=32 hdr=1 pub=1 value=0x21000040
+      CASE|URO24-prefix32-tail16-rebuilt-from-export|FAIL|导出重建 pre=0(0x01..0x00) tail=0(0x00..0x00) cand=0 块数=1/1/1 rx_total=48
+      CASE|URO27b-32byte-stream-prefix-fully-exported|FAIL|导出重建前缀=0 字节(0xFF..0x00 24 垃圾+应答头=6D B8 D4) 发布值=0x21000040
+      SUMMARY|cases=30|pass=23|fail=7|pre_bad=0|skips=0
+
+  [rev_export_drop_prefix_second_chunk] 注入后**具名 FAIL** 与 SUMMARY:
+      CASE|URO24-prefix32-tail16-rebuilt-from-export|FAIL|导出重建 pre=16(0x10..0x00) tail=16(0x30..0x3F) cand=0 块数=1/1/1 rx_total=48
+      CASE|URO27b-32byte-stream-prefix-fully-exported|FAIL|导出重建前缀=16 字节(0x10..0x00 24 垃圾+应答头=6D B8 D4) 发布值=0x21000040
+      SUMMARY|cases=30|pass=28|fail=2|pre_bad=0|skips=0
+
+  第三项(rev_export_drop_prefix_second_chunk)把 tmc_probe_dump_sample 的分块循环退回
+  "单次 16 B hex"(正是复审 A2 的缺陷形状); **结构体一个字节都没动**, 因此只有从导出
+  字节重建前缀的 URO24/URO27b 能检出 => 检出发生在串口文本层, 不是内存字段层。
+  第二项(rev_obs_drop_raw_rx_capture)在同一批定稿字节上还额外具名打中了 URO24/URO27b
+  (取样被摘掉时前缀根本无法重建), 这一事实如实登记在这里, 预登记身份未改动。
+
+==========================================================================
+5. 其余既有入口的结论行(逐条原文摘录)
+==========================================================================
+
+[build_and_run]
+  HOST TEST SUMMARY: CHECK_PASS=25 CHECK_FAIL=0 BAD_SELFTEST=0 MISSING_CASE=0
+  结论: ALL PASS (判据 + 固件自测终态 + 必需用例齐备性 全部满足)
+  HOST TEST SUMMARY: CHECK_PASS=22 CHECK_FAIL=0 BAD_SELFTEST=0 MISSING_CASE=0
+  结论: ALL PASS (判据 + 固件自测终态 + 必需用例齐备性 全部满足)
+  === RUNNER SUMMARY ===
+    RUNNER RESULT: PASS (rc=0)
+  (入口 rc 见第 1 节 results.tsv; 全 ten 条 rc=0)
+
+[io_behavior]
+    illegal 宏值: 编译如预期被拒绝 (rc=1) —— 配置合法性成立
+  off_target | OK 必需用例=27 全部PASS 自报fail=0 proc_rc=0 (输出 8396 字节)
+  on_target | OK 必需用例=29 全部PASS 自报fail=0 proc_rc=0 (输出 9682 字节)
+  off_ovr | OK 必需用例=40 全部PASS 自报fail=0 proc_rc=0 (输出 23844 字节)
+  on_ovr | OK 必需用例=42 全部PASS 自报fail=0 proc_rc=0 (输出 24212 字节)
+  IO1_CFG-illegal_macro_rejected | OK(拒绝编译 rc=1)
+  IO RUNNER RESULT: PASS (rc=0) —— 4 个变体的必需用例全部真执行且判 PASS, 非法宏值被编译拒绝
+  (入口 rc 见第 1 节 results.tsv; 全 ten 条 rc=0)
+
+[safety_data_semantics]
+  off_target | OK 必需用例=21 全部PASS 自报fail=0 proc_rc=0 (输出 4564 字节)
+  on_target | OK 必需用例=20 全部PASS 自报fail=0 proc_rc=0 (输出 4349 字节)
+  SD RUNNER RESULT: PASS (rc=0) —— 两个变体的必需用例全部真执行且判 PASS
+  (入口 rc 见第 1 节 results.tsv; 全 ten 条 rc=0)
+
+[stop_result_s1]
+    target 真实进程 rc=0 输出 25410 字节
+    host_ovr 真实进程 rc=0 输出 40479 字节
+  target | OK 必需用例=50 全部PASS 实际行数=50 自报 fail=0 proc_rc=0
+  host_ovr | OK 必需用例=65 全部PASS 实际行数=65 自报 fail=0 proc_rc=0
+  S1 RUNNER RESULT: PASS (rc=0) —— target 与 host_ovr 两个变体的必需用例全部真执行且判 PASS
+  (入口 rc 见第 1 节 results.tsv; 全 ten 条 rc=0)
+
+[sp_measure_a0]
+    on/conc: OK (3 例, cases=3 checks=34 fails=0 rc=0)
+    on/batch: OK (3 例, cases=3 checks=36 fails=0 rc=0)
+    on/cli: OK (3 例, cases=3 checks=44 fails=0 rc=0)
+    on/ledger: OK (1 例, cases=1 checks=13 fails=0 rc=0)
+    on/pack: OK (1 例, cases=1 checks=24 fails=0 rc=0)
+    on/export: OK (3 例, cases=3 checks=39 fails=0 rc=0)
+    min/export: OK (3 例, cases=3 checks=26 fails=0 rc=0)
+  A0CHAIN-META: OK (正向逐组一致 + 反向按声明执行)
+  (入口 rc 见第 1 节 results.tsv; 全 ten 条 rc=0)
+
+[path_guard]
+    [PASS] 含空格路径被接受 => /tmp/tmp.FcnZ5NzLnA/valid out dir
+    [PASS] 含空格路径可正常创建与写入
+    [PASS] 规范化结果=/tmp/tmp.FcnZ5NzLnA/outside/y (绝对、无尾斜杠、.. 已消解)
+    [PASS]   该场景沙盒仓库文件完好(未被 rm 波及)
+    [PASS] 无哨兵的已存在目录被拒绝, rc=4
+    [PASS] 拒绝原因明确指向缺少哨兵
+    [PASS] 无哨兵目录里的文件未被删除
+  ############ 结果: PASS=34 FAIL=0 ############
+  (入口 rc 见第 1 节 results.tsv; 全 ten 条 rc=0)
+
+[negatives]
+    => META-OK | M5_wrong_reason_guard
+  META-OK | M1_blinded_fd7b
+  META-OK | M2_stubbed_compile
+  META-OK | M3_runner_exit_zero_lost
+  META-OK | M4_selection_semantics
+  META-OK | M5_wrong_reason_guard
+  RUNNER(meta): 全部元负例按**正确原因**被拒绝, 对照组按预期通过, 集合一致 (rc=0)
+  RUNNER(meta) rc=0
+  (入口 rc 见第 1 节 results.tsv; 全 ten 条 rc=0)
+
+[meta_negatives]
+        [.] 嵌套子链确实以 rc=4(INFRA) 失败 => 与正确原因 rc=1/NOT-DETECTED 不同
+    => META-OK | M5_wrong_reason_guard
+  META-OK | M1_blinded_fd7b
+  META-OK | M2_stubbed_compile
+  META-OK | M3_runner_exit_zero_lost
+  META-OK | M4_selection_semantics
+  META-OK | M5_wrong_reason_guard
+  RUNNER(meta): 全部元负例按**正确原因**被拒绝, 对照组按预期通过, 集合一致 (rc=0)
+  (入口 rc 见第 1 节 results.tsv; 全 ten 条 rc=0)
+
+==========================================================================
+6. 本轮自己引入并被修掉的问题(原始失败保留, 不改写成"一开始就对")
+==========================================================================
+  a) 夹具新增用例首次落地时 6 条 FAIL(URO23/24/25/26/27/27b): 根因是**测试自己**——
+     单笔 tmc_read_reg_obs 按设计不打印任何内容, 断言却在找串口行; 修法是显式调用
+     tmc_probe_dump() 再判定(正是复审 §5.2 第 7 条要求的形状)。原始台账:
+       CASE|URO23-tx-written-count-exported-for-0-2-4|FAIL|导出 written=-1/-1/-1 端口真落 DATA 的字节=1/2/4
+       CASE|URO24-prefix32-tail16-rebuilt-from-export|FAIL|导出重建 pre=0 … 块数=0/0/0 rx_total=48
+       CASE|URO25-rx-entry-expiry-exports-real-rc|FAIL|接缝第4次 tick 推进; 业务 rc=-117 观测 rc=-117 reason=3 … 导出真 rc 行=0
+       CASE|URO26-open-and-context-identity-in-export|FAIL|(a)OPENED_NOW=1 ALREADY=0 真打开次数+1 …
+       CASE|URO27-empty-sample-and-truncation-scopes|FAIL|空样本 n=0 hex=- 行数=0 虚构00=0 rx_total=0
+       CASE|URO27b-32byte-stream-prefix-fully-exported|FAIL|导出重建前缀=0 字节 … 发布值=0x21000040
+     其中 URO23 的 0 字节档还需要端口同时清掉 TDRE(否则叶子仍会交 1 个字节) —— 属夹具
+     输入构造, 不是产品判定放宽。修后两变体各 30/30 PASS(见第 2 节)。
+  b) URO26(a) 的期望先写成"第一笔 OPENED_NOW、后两笔 ALREADY_OPEN", 与复审 §3-B2 要求
+     的口径不符: probe 的打开是**一次**动作, 事实属于本次 probe, 因此三笔都记 OPENED_NOW
+     且不被子读覆盖。期望按产品语义改正(3/0), 未改产品行为。
+  c) 采集器生成/自检过程中出现的真实错误(逐条保留在 collector_selftest.txt 第 4 节):
+     摘要行捕获组下标写偏一位(把 safe_for_enable 读成第 6 组)、
+     Expect-Rejected 的接受前缀正则把 `UROR1_` 与结尾冒号拼错、
+     三条负控拼接文本自带多余 CR 导致被判"行未干净终止"而不是预期理由、
+     两处控制漏传 Command 参数(被 default 分支拒绝)。这些都在本轮内修好, 未留到最后。
+

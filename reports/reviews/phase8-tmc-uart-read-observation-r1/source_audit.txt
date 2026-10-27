@@ -1,0 +1,67 @@
+URO-R1 (task phase8-tmc-uart-read-observation-r1) — 独立复审 6324ac4 的返修证据
+code_commit = a483dcba74abd8c04549459bcee2cbcdb1ddea4c   文档/源码基线 = 6324ac40bd8d0f172fdb89e77917be33dc739460
+分支 = phase8/tmc-drive-config(未新建/未改写冻结引用; 未 force push)
+设备动作 = 0(本轮未创建串口对象、未开 COM5、未发目标命令、未枚举、未读 Flash、
+未下载/复位、未碰供电/接线/ENN/SW1、未输出 STEP/DIR/HIGH、未运行 sw1_cut.ps1;
+Keil 仅批处理构建)
+脱敏规则: 本机绝对路径 -> <仓外工作区>(有损替换, 原件留仓外未删除)
+
+==========================================================================
+1. 缺陷条目 -> 源码位置与改法(行号取本轮提交 blob 的行号)
+==========================================================================
+
+[1] A1 实际写入字节数没有导出
+    改法: tmc2209.c:1599 dump 增加独立的 `[TMRO] reg=%02X tx_written=%u` 行, 与 :1594 的 `tx=请求构造/预算写调用/rc` 分列(两者是不同的事实, 旧导出只看得到后者)。
+    证明: 夹具 URO23(0/2/4 三档真实 TX 叶子输入, 断言**导出文本**里的 tx_written 与端口真落 DATA 的字节数逐一相等)、URO09/URO08/URO10 保留原口径。
+
+[2] A2 前缀 32 B 只导出 16 B 却声称 n=32
+    改法: tmc2209.c:1535 新增 tmc_probe_dump_sample()(附录A 的分块函数, 自持 line 数组, sizeof(line) 不是指针大小); :1630-1632 依次导出 rx1/rxT/cand; 每行 `off=<样本内偏移> n=<本块真实字节数> hex=<至多 16 字节>`, 空样本 `n=0 hex=-`。:1617 另列 `exp=<总期限>/<阶段期限>`、`pre_trunc=<前缀装不下>`、`gap=<全流确有未取样中段>`。
+    证明: URO24(48 B 输入: 从导出字节重建前 32 B + 尾 16 B, 块数 2/1/1, 并核对 `samples pre=32 tail=16 cand=0`/`pre_trunc=1`/`gap=0`)、URO27b(恰好 32 B: 前缀全部可重建, pre_trunc=0/gap=0)、URO27(RX 零字节: 三个样本都是 n=0 hex=-, 不许虚构 00)。
+
+[3] B1 RX 入口前预算耗尽却导出 rc=0/reason=ok
+    改法: tmc2209.c:897-918 该出口现在同时填 st(reason/rc) 与 obs(done_off/total_expired=YES), 并调用与成功路径同一个 tmc_obs_exit(..., -RT_ETIMEOUT, TMC_XFER_BUDGET_EXHAUSTED, 0): 业务返回路径未改, 总预算检查未删, rx_reached/published 仍如实为 0。
+    证明: URO25 用夹具端口的**确定接缝**(末字节后第 4 次取 tick 才推进: 1=TX 叶子末检查、2=观测 tx_off、3=TX 包装后置校验、4=RX 阶段入口)命中这一支, 断言 业务 rc == 观测 rc == -117、reason=budget-exhausted、tx_rc=RT_EOK 且 tx_written=4、rx_reached=0、值未发布, 导出里`result=FAIL rc=0` 的冒充行必须为 0。URO05 保留(那是 TX 层先耗尽的另一条出口)。
+
+[4] B2 子读把 probe 已保存的打开事实覆盖成 ALREADY_OPEN
+    改法: tmc2209.c:1160 tmc_read_reg_obs 只在 `open_state == OPEN_NOT_REACHED` 时才写 ALREADY_OPEN(先写者胜); :1178/:1184 由本次操作自己写 OPENED_NOW / OPEN_FAILED+原始 rc。probe 在 :1695-1702 于打开前取 `was_open`, 打开结果一次记入三笔。
+    证明: URO26(a) 本次真打开: 三笔都记 OPENED_NOW(记的是 **probe 这一层的打开动作**), ALREADY_OPEN=0, 真实 rt_device_open 调用增量=1, 三笔仍全 SUCCESS。
+
+[5] B3 零初始化被读成已打开 / ctx 只在子读里赋值 / BEGIN 之前打印中文
+    改法: tmc2209.c:144 新增显式初值 OPEN_NOT_REACHED(0 不再是"已打开"); :1682 probe 入口给自己的三笔记 ctx_ok=1(入口已过上下文门这一事实), 与"各阶段是否到达"分列; :2908 事务取锁改为私有 quiet/nonquiet 同一核心, :2920 公有 tmc2209_cfg_txn_begin() 保留原语义与其它调用者日志, probe 走 quiet(:1687); :1735-1742 未取到事务时打印 REFUSED 而**不再**无条件声称 txn-held(成功分支标题逐字保留, 以免无谓移动既有负例注入锚点); 导出全部在事务归还之后(:1725 -> :1743)。
+    证明: URO26(b) 事务不可用: ctx=1 三笔、ctx=0 零笔、open=OPEN_NOT_REACHED 三笔、txn=0/-45 三笔、REFUSED 一行、txn-held 标题零行、捕获缓冲非 ASCII 字节=0、END reads=0 且 observation_complete=1 各恰一次; URO26(c) 打开失败: OPEN_FAILED 三笔且顶层原始码可见。
+
+[6] 附带(NULL 判定晚于解引用)
+    改法: tmc2209.c:810 `b == RT_NULL` 判定移到任何 b->start/b->total 读取之前。当前所有公有入口都带预算, 因此**不**据此宣称存在可达的真机崩溃, 只是低成本防御性收口。
+    证明: URO21 的输出界限与非法上下文静默保持原样。
+
+[7] 附带(期限事实的三态)
+    改法: tmc2209.c:150 TMC_OBS_DEAD_UNEVALUATED/NO/YES 三态; 只有**真的做过比较**的出口才写 NO/YES(:926 入口未到、:1018 两条都未到、:1047 循环内阶段未到; :914/:990/:1003/:1064 各处已到)。字段含义是"比较结果", 不再与"哪条拒绝分支被走到"混用。
+    证明: URO15/URO16 的期限断言改按三态字面判定(在最终字节上重跑, 未放宽期望)。
+
+[8] 附带(回声范围)
+    改法: tmc2209.c:214-217/:234-:273 改为全流滚动窗口连续匹配并记录样本内命中偏移, :280 tmc_obs_echo_eval 不再因为"前 32 B 里没找到"就断言整个 RX 流无回声; legacy 枚举名不再被当作物理无回声的证据。
+    证明: URO11/URO12/URO17 保留; 新增 match=<是否>/<样本内偏移> 导出。
+
+[9] 未动项(逐条实证)
+    改法: 预算常量(总 125/阶段 100/TX 20/cfg 10/xfer 20/flush 2ms+256B/apply 1500/integrity 250)、地址 0、115200/8N1、CRC-8、应答头搜索与成功发布门、无重试、probe 仍最多 IOIN->GSTAT->IFCNT 三读且 0 写帧、IOIN 失败即早退、观测本体仍一份/调用者私有/无全局最后结果槽/无分配/无线程、health/配置/恢复票据、四个安全宏(默认与 A0 目标均 0)、.uvprojx 未改 —— 全部未动。RX 期限表达式 `eff_end = b->start + used + allowance` 按复审 RX_DEADLINE_FIX_ACCEPTED 保留。
+    证明: 同一批字节上的原十条入口回归全绿(见 host_results.txt)。
+
+--------------------------------------------------------------------------
+2. 提交身份与构建输入(逐字节)
+--------------------------------------------------------------------------
+rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/tmc2209.c
+    git blob=07c07421c22a1ec27335ae034f722707c9d90263 bytes=191034 sha256(blob)=8a5e030822456fdb334958543588fbf8972bcd96f348668d0cd4769b398de2d1
+    工作树副本 CRLF->LF 归一后与 blob 逐字节相同 = True
+tests/host/leaf_main.c
+    git blob=9ba6654fb4316d28a2df42bd944ea28e3d3630ad bytes=161087 sha256(blob)=6a03b884e7b680fedc65e322fa1500fae6cdc35e56673da43970c1b2b77206a1
+    工作树副本 CRLF->LF 归一后与 blob 逐字节相同 = True
+tests/host/run_stop_priority_s2.sh
+    git blob=461e2937912aee7521dbf0ed6beabd95b5ec729a bytes=49352 sha256(blob)=0d405b01c88697b564106508763f2603a6ecfb4575cc89c0ac26593326f1e545
+    工作树副本 CRLF->LF 归一后与 blob 逐字节相同 = True
+tests/host/inject.py
+    git blob=845ff4c7f3f8069430ecf42ce41a3e5ffe481815 bytes=4947 sha256(blob)=149cb7a3652b4c1919cb987c6793193c9d019d6265124905aeba4549c2dc5cea
+    工作树副本 CRLF->LF 归一后与 blob 逐字节相同 = True
+
+    (autocrlf 口径: 工作树里产品文件以 CRLF 存在, 提交存 LF; 主机链跑的是工作树副本,
+     因此"被测字节 == 提交字节"这句话按上面这行归一比对成立, 不是默认假设。)
+

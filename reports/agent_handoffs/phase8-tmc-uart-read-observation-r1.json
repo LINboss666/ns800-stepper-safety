@@ -1,0 +1,253 @@
+{
+  "task_id": "phase8-tmc-uart-read-observation-r1",
+  "task_book": "NS800_URO_Independent_Review_and_R1_Task_6324ac4_20261028.md",
+  "document_base": "6324ac40bd8d0f172fdb89e77917be33dc739460",
+  "source_base": "6324ac40bd8d0f172fdb89e77917be33dc739460",
+  "code_commit": "a483dcba74abd8c04549459bcee2cbcdb1ddea4c",
+  "code_commit_what": "产品 tmc2209.c + 验证链 leaf_main.c/run_stop_priority_s2.sh + 本轮证据与交接的完整输入提交; 两枚镜像的构建输入字节就是这个提交里的产品 blob",
+  "verification_chain_commit": null,
+  "verification_chain_why": "本轮验证链改动与产品改动同批提交(a483dcb); inject.py 本轮未改动, 仍停在上一轮的 845ff4c7",
+  "inherited_review_verdicts": {
+    "RX_DEADLINE_FIX_ACCEPTED": "保持; eff_end = b->start + used + allowance 未动",
+    "EXISTING_HOST_REGRESSIONS_REPRODUCED": "保持; 本轮十条入口在同一批定稿字节上再次真执行",
+    "URO_OBSERVATION_AND_CAPTURE_REWORK_REQUIRED": "本轮离线关闭 A1/A2、B1/B2/B3、C 三组阻断",
+    "SOFTWARE_GO_ISSUED": false,
+    "PRIOR_URO_IMAGES_APPROVED_FOR_DOWNLOAD": false
+  },
+  "user_confirmed_field_facts": {
+    "power_wiring_expander_board": "USER_CONFIRMED(用户断言, 非云端实测; 本轮不重索取材料, 不做 ENN 对照)",
+    "final_power_state": "UNKNOWN(不为补齐该字段连接设备)",
+    "not_required_this_round": [
+      "供电说明",
+      "断电顺序回报",
+      "扩展板整体照",
+      "接线两端照",
+      "电机铭牌",
+      "模块限流实物依据",
+      "ENN 对照实验"
+    ]
+  },
+  "production_changed": [
+    "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/tmc2209.c"
+  ],
+  "verification_chain_files_changed": [
+    "tests/host/leaf_main.c",
+    "tests/host/run_stop_priority_s2.sh"
+  ],
+  "whitelist_outside_changes": [],
+  "file_identity": {
+    "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/tmc2209.c": {
+      "git_blob": "07c07421c22a1ec27335ae034f722707c9d90263",
+      "blob_bytes": 191034,
+      "changed_this_round": true
+    },
+    "tests/host/leaf_main.c": {
+      "git_blob": "9ba6654fb4316d28a2df42bd944ea28e3d3630ad",
+      "blob_bytes": 161087,
+      "changed_this_round": true
+    },
+    "tests/host/run_stop_priority_s2.sh": {
+      "git_blob": "461e2937912aee7521dbf0ed6beabd95b5ec729a",
+      "blob_bytes": 49352,
+      "changed_this_round": true
+    },
+    "tests/host/inject.py": {
+      "git_blob": "845ff4c7f3f8069430ecf42ce41a3e5ffe481815",
+      "blob_bytes": 4947,
+      "changed_this_round": false
+    }
+  },
+  "blob_vs_worktree_note": "工作树产品文件以 CRLF 存在, 提交存 LF; source_audit.txt §2 逐文件给出 CRLF->LF 归一后与 blob 的 sha256 相同性, 因此'被测字节 == 提交字节'是被证明的, 不是假设。",
+  "hardware_actions": [],
+  "device_actions_this_round": 0,
+  "budget_constants_changed": false,
+  "protocol_constants_changed": false,
+  "fixes": {
+    "A1": "dump 独立行 tx_written=; 与 tx=构造/调用/rc 分列; URO23 以 0/2/4 三档真实叶子输入断言导出文本",
+    "A2": "新增 tmc_probe_dump_sample() 按 16 B 分块导出 rx1/rxT/cand; 每块 n=真实字节数, off=样本内偏移, 空样本 n=0 hex=-; samples 行声明总长度; pre_trunc 与 gap 分列; URO24/URO27b/URO27 从导出字节重建",
+    "B1": "RX 入口总预算耗尽分支同步 obs(rc/reason/total_expired=YES, 走同一 tmc_obs_exit); 业务返回与总预算检查未动; URO25 用末字节后第 4 次取 tick 的确定接缝命中该支",
+    "B2": "tmc_read_reg_obs 的 ALREADY_OPEN 改为'先写者胜'; 本次打开结果由 open core 记 OPENED_NOW/OPEN_FAILED+原始 rc; probe 入口取 was_open 一次记入三笔; URO26(a) 断言三笔 OPENED_NOW 且 ALREADY=0",
+    "B3": "显式 OPEN_NOT_REACHED 初值(0 不再=已打开); probe 入口自记 ctx_ok; 事务取锁收成 quiet/nonquiet 私有核心(公有 wrapper 语义不变); 未取得事务时打 REFUSED 而非 txn-held; 导出全部在事务归还后; URO26(b)/(c) 断言 ctx/txn/open 与全 ASCII",
+    "defensive": "b==NULL 判定移到 b->start/total 解引用之前(当前公有入口都带预算, 不据此宣称可达崩溃)",
+    "deadline_fact": "期限改三态 UNEVALUATED/NO/YES, 只有真比较过才写 NO/YES; 与'走到哪条拒绝分支'分列",
+    "echo_scope": "全流滚动窗口连续匹配 + 样本内命中偏移导出; 前缀内未见不再等于物理无回声(任务书 §4.4)",
+    "C_completeness": "Check-TmroReply: BEGIN/END 各一且顺序/reads 一致且 0..3/planned=3/v=1 addr=0/三笔身份各一/SUCCESS+FAIL=reads/NOT_REACHED=3-reads/必需事实行各一/分块 n-offset-总长可复算/空样本 n=0 hex=-/无 NUL 无 EXPORT_ERROR/行干净终止且 <=96B",
+    "C_business": "capture 与 business 分列; 阶段 OPEN/TXN/READ/IDENTITY_MISMATCH/FIELDS_OUT_OF_DOMAIN; read_ok/identity_ok/fields_ok 与逐笔 val=/摘要 raw= 交叉核对完整 32 位原值; safe_for_enable=1 视为矛盾",
+    "C_banner": "Resolve-BannerGate: 观测到即逐字核对(多横幅矛盾即拒); 未观测到仅在 ImageContinuityConfirmed(本包逐字节回读通过)下继续并记 BANNER_NOT_OBSERVED; 否则拒; 不为横幅复位或重开端口"
+  },
+  "tests_executed": {
+    "read_obs_target": "30/30 PASS (LEAF|obs_size=188|obs_x3=564)",
+    "read_obs_host_ovr": "30/30 PASS",
+    "new_case_ids": [
+      "URO23-tx-written-count-exported-for-0-2-4",
+      "URO24-prefix32-tail16-rebuilt-from-export",
+      "URO25-rx-entry-expiry-exports-real-rc",
+      "URO26-open-and-context-identity-in-export",
+      "URO27-empty-sample-and-truncation-scopes",
+      "URO27b-32byte-stream-prefix-fully-exported"
+    ],
+    "runner_expect": {
+      "target": 53,
+      "host_ovr": 109
+    },
+    "central_regression": "十条入口全部 rc=0(逐条单独记 rc 与日志, 见 host_results.txt §1/§5)",
+    "evidence_files": [
+      "host_results.txt",
+      "baseline_and_fixed_checks.txt",
+      "source_audit.txt"
+    ]
+  },
+  "reverse_results": {
+    "families_total": 8,
+    "preserved_uro_families": [
+      "rev_rx_deadline_old_origin",
+      "rev_obs_drop_raw_rx_capture"
+    ],
+    "new_export_side_family": {
+      "name": "rev_export_drop_prefix_second_chunk",
+      "injection": "tmc_probe_dump_sample 的分块循环退回单次 16 B hex(A2 原缺陷形状), 结构体未改",
+      "named_failures": [
+        "URO24-prefix32-tail16-rebuilt-from-export",
+        "URO27b-32byte-stream-prefix-fully-exported"
+      ],
+      "verdict": "META-OK(命中 2 个预登记业务失败身份, proc rc=1, 台账自洽)"
+    },
+    "note": "rev_obs_drop_raw_rx_capture 在同一批定稿字节上也额外具名打中 URO24/URO27b(取样被摘掉则前缀无法重建), 如实登记; 其预登记身份未改动。",
+    "infra_rules": "编译失败/墙钟超时/异常退出/身份缺席均不算检出"
+  },
+  "collector_identity": {
+    "path": "reports/reviews/phase8-tmc-uart-read-observation-r1/UARTReadDiagSerialR1.ps1",
+    "bytes": 93797,
+    "sha256": "2e9c8ede8f75e7b513dbd4f2c3091189309454879e98404ba7ec64bbb80f2568",
+    "pure_ascii": true,
+    "line_end": "LF",
+    "old_script_kept": "reports/reviews/phase8-tmc-uart-read-observation/UARTReadDiagSerial.ps1 37063 B 2ada6b88…(未覆盖)",
+    "reuse": "15 个 transport/工具函数 + finally 逐字节同于 M0Serial.ps1(24064 B / 2131af0e…); 前六个命令判据逐字同于上一轮脚本; 生成器落盘后逐函数比对全部 IDENTICAL 才交付"
+  },
+  "collector_windows_selftest": {
+    "shell": "Windows PowerShell 5.1.26100.5074(本机, 非 pwsh 7)",
+    "parse_errors": 0,
+    "rc": 0,
+    "stderr_bytes": 0,
+    "negative_controls": 51,
+    "slice_controls": 9,
+    "banner_controls": 6,
+    "forbidden_blocked": 12,
+    "mock_commands": 7,
+    "boot_fixture": "3757 B / 97b37f32aa03c86b8708ae088d0ae65a8f92520f1a1ed70beb74663049321749",
+    "named_reason_required": true,
+    "first_failures_retained": "collector_selftest.txt §4 逐条保留 run1..run5 的真实失败原文"
+  },
+  "builds_executed": 2,
+  "build_result": {
+    "rt-thread": {
+      "errors": 0,
+      "warnings": 0,
+      "program_size": "Code=179674 RO-data=77786 RW-data=2188 ZI-data=83784",
+      "real_warning_text_lines": 0,
+      "elapsed": "00:00:10"
+    },
+    "rt-thread-measure-a0": {
+      "errors": 0,
+      "warnings": 0,
+      "program_size": "Code=187018 RO-data=80746 RW-data=2188 ZI-data=91504",
+      "real_warning_text_lines": 0,
+      "elapsed": "00:00:08"
+    }
+  },
+  "firmware_images": {
+    "rt-thread": {
+      "path": "reports/firmware/phase8-tmc-uart-read-observation-r1/default.bin",
+      "bytes": 258036,
+      "sha256": "dccb7b63c9284d320016a42e1fc8b7f62d544b97ca9cb433604e412bbbff55e3",
+      "banner": "Oct 28 2026 02:23:14",
+      "map_compressed_load_length": "0x0003eff4",
+      "axf_local_only_sha256": "a985ee184e5a7d37a3c382fb6af145c41a535d68cea0c27d98e5de3be14ffdf9",
+      "delta_vs_previous_round_same_target": {
+        "baseline": "上一轮 URO(6324ac4)同目标登记值",
+        "code": 592,
+        "ro_data": 100,
+        "rw_data": 0,
+        "zi_data": 0
+      },
+      "delta_vs_earlier_stage": "该目标本轮无更早阶段对照"
+    },
+    "rt-thread-measure-a0": {
+      "path": "reports/firmware/phase8-tmc-uart-read-observation-r1/measure-a0.bin",
+      "bytes": 268340,
+      "sha256": "a48400c881c539db539876cfd38f3aceac2a78cc7ed0d0f9655c7edafbb19a1e",
+      "banner": "Oct 28 2026 02:23:31",
+      "map_compressed_load_length": "0x00041834",
+      "axf_local_only_sha256": "a96889c47c9433b132dc4eeecf46be287c13dc1cff11fc0003e6cca10826846f",
+      "delta_vs_previous_round_same_target": {
+        "baseline": "上一轮 URO(6324ac4)同目标登记值",
+        "code": 592,
+        "ro_data": 100,
+        "rw_data": 0,
+        "zi_data": 0
+      },
+      "delta_vs_earlier_stage": {
+        "baseline": "fe3b64b40d009fb5f1527bb05e9dddb0dc454f72:reports/reviews/phase8-target-measurement-a0-export-r1/keil_build.txt (旧 5f30… 镜像那一轮 export-r1 的 Code/RO/RW/ZI 原值)",
+        "code": 5912,
+        "ro_data": 980,
+        "rw_data": 0,
+        "zi_data": 0
+      }
+    }
+  },
+  "observation_object": "tmc_read_observation_t 单笔 188 B / probe 三笔 564 B(上一轮 176/528); 合同上限 768 B; 仍是调用者私有栈上局部, 无全局最后结果槽/无分配/无线程",
+  "stack_note": "栈上局部之和不等于完整栈高水位; 完整水位需上板实测, 本轮不声称",
+  "macros_effective": {
+    "per_target_overrides_on_built_targets": {
+      "rt-thread": {},
+      "rt-thread-measure-a0": {}
+    },
+    "armclang_preprocessor_probe_rc": 0,
+    "value": "四宏在默认与 A0 目标均为 RT_FALSE(0), 由编译器 -dM 实证",
+    "third_target_built": false
+  },
+  "errata_this_round": {
+    "R1-E1": "A0 与旧 5f30… 阶段对照的基线改取 fe3b64b4:…/phase8-target-measurement-a0-export-r1/keil_build.txt 的真实 181106/79766/2188/91504; URO 轮 +5320/+880, 本轮 +5912/+980; 上一轮文档里 +6568/+1216 的说法由本条取代(历史原文不回写)",
+    "R1-E2": "URO 轮实际是四个提交(含最早的 d2dd743), 上一轮回执漏计; 本轮起按四条引用, 不另开登记轮",
+    "R1-E3": "主机侧措辞统一为'端口真落 DATA 的字节/模型字节数', 不再使用'线上真实字节'; 历史 stdout 原文不改写",
+    "R1-E4": "tests/host/README.md 仍写'5 项反向家族', 与 runner 现有 8 项不一致; 该文件不在本轮白名单, 未改, 登记为文档滞后",
+    "uncovered_detector_branch": "Check-TmroReply 的 tmroAll/tmroOk 行终止核对在更具体的前置检查之下不可单独触发, 作为纵深防御保留, 如实登记为'未由负控具名命中'"
+  },
+  "privacy": "入库文本无本机绝对路径/用户名/主机名/探针 UID; 脱敏为有损替换(规则在各文件头部声明); AXF/map/原始未脱敏日志留仓外未删除",
+  "board_candidate_status": "DRAFT / NOT_AUTHORIZED / NOT_EXECUTED",
+  "board_candidate_file": "reports/reviews/phase8-tmc-uart-read-observation-r1/board_candidate.md",
+  "board_candidate_quotas": "下载 1 / 新 BIN 长度范围逐字节回读 1 / DAP 会话 2 / 主动复位 1 / COM5 打开尝试 1 / 7 条命令各 1(probe 至多 3 读 0 写); 工具隐含复位计入同一预算; §2 给出 S0..S7 明确顺序与每步停止条件",
+  "frozen_refs_verified": {
+    "main": "1b3757eec550802a3973e66790af422d81d3d373",
+    "phase7/full-embedded-software": "6d3fbc559d45673d7550eb73dec5a4ade5bb34df",
+    "tag_object_v0.7-phase7-software-board-validated": "097935fec5a6f2467261ab1ad449ff0b1d398250",
+    "tag_dereference": "e40a9b95ef709e6a80444f9f3949dfdd70ba96ba",
+    "untouched": true
+  },
+  "prior_artifacts_untouched": [
+    "5f30d3f058ceff516b2185aa3a1e597bbe63293b94a6fd801fd989a6f7b2b8e6 (板上 261452 B)",
+    "02e984583255f3414f43fb5c077dc9ba82eba98553d2cb9d7f7feee9336ebd80",
+    "358fd81ae5853ea52df1e1ab367ea41af0f5e86679082a755c17dac3429b0e1b",
+    "a76b845db4ba1d8872f9db395c2e6e796bdb9416c398f010b669538006cf2777",
+    "b89f8a7cde7b944a5b5425f512a715d27a17c2e6c25822f36b2205bbefd0cac2 (1 MiB 快照)",
+    "b3ac97b976bc476556818f2bbaa977d15854a5c1d342f4b9c9d3ed825deb2c65 (恢复 HEX)",
+    "URO 轮两枚镜像 ad5daaa3…/b54387fd… 与其采集脚本/原始报告(复审未批准下载)"
+  ],
+  "not_proven": [
+    "TMC 链路上板可用(TMC_LINK_ON_BOARD_UNPROVEN)",
+    "板上那次 -117 的根因",
+    "BLOCKED_ROLLBACK(能否回退到板上原镜像)",
+    "完整栈高水位",
+    "B-1 / BUG-008 / RISK-03/03a / 物理 RISK-04-b / M-1/M-2/M-3",
+    "A0 时长证据(NOT_ACHIEVED)",
+    "真实 FinSH 解析与 RT 调度(主机链只是模型)",
+    "R1 采集器的真机运行(本轮 0 设备动作)"
+  ],
+  "stop_lines": [
+    "URO_R1_OFFLINE_READY / AWAITING_INDEPENDENT_SOFTWARE_IMAGE_AND_CAPTURE_REVIEW",
+    "HARDWARE_ACTIONS_THIS_ROUND=0 / FOUR_DEFAULT_AND_A0_SAFETY_MACROS=0",
+    "TMC_LINK_ON_BOARD_UNPROVEN / SAFE_FOR_ENABLE=false",
+    "M2_M3_NOT_AUTHORIZED / A0_DURATION_EVIDENCE_NOT_ACHIEVED"
+  ],
+  "generated_by": "make_r1_handoff.py(仓外): 数值取 manifest 与真实台账, 无手抄"
+}
