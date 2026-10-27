@@ -646,8 +646,8 @@
     },
     {
       "path": "reports/reviews/phase8-target-measurement-a0-board-b/cp3_capture_stop.txt",
-      "bytes": 15880,
-      "sha256": "b19a6e81a57ae86a9485b6021046bc48bcaca8b536b3c24cde0eb001b135187a"
+      "bytes": 16249,
+      "sha256": "b53117bb8a6c709409ed4355ca7c02d014f96d445f676ad78b49030a0df068ed"
     },
     {
       "path": "reports/reviews/phase8-target-measurement-a0-board-b/cp3_wire_archive.md",
@@ -938,6 +938,14 @@
       "assessment": "登记值早于最终提交: 该文件在 CP0 提交(7c5eada)之前被重新生成过, 但 JSON 里的身份仍取重生成前的值; 自 7c5eada 起工作树/该提交/HEAD 三处字节完全一致(19236 B / 93898d96d83483b9), 没有已发布产物被删后重做, 也没有第二份同名产物",
       "blast_radius": "只影响 handoff JSON 的 CP0 登记字段; 没有任何仓内证据文本引用过该错值(全仓 grep 19237 与 c3192745 均 0 命中), 采集器/门/镜像等判据字节不受影响",
       "handling": "evidence_identities 现按当前提交字节重算并登记本勘误; 不回收旧提交、不改写历史"
+    },
+    {
+      "id": "E2",
+      "found_in_round": "phase8-target-measurement-a0-board-b (CP3 收口回执前自查)",
+      "statement": "cp3_capture_stop.txt §6 首稿写\"本机无残留 powershell\"",
+      "defect": "写该句时未实测, 属未验证断言(结论碰巧方向正确不能代替取证)",
+      "verification_performed": "2026-10-27 12:00:38 用 Win32_Process 列举 Name=powershell.exe/python.exe 的进程及其 CreationDate/CommandLine; 只剩本轮自己启动的两个短命进程(11:58:58/12:00:38), 11:49 启动的采集器进程已退出 => 无宿主进程占住 COM5。该列举只读主机进程表, 不枚举设备",
+      "handling": "证据正文补上\"实测时刻+方法+读数\", 并标注该复核晚于首稿; 不删首稿结论, 不假装一开始就取过证"
     }
   ]
 }

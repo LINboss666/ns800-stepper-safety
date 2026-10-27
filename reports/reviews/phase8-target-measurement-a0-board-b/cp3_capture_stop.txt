@@ -125,7 +125,10 @@ document_base 358e1ca…; CP0 提交 7c5eada…; CP1/CP2 提交 587c8fa…; 本 
   四宏实测口径未变: 本轮没跑 spm cap, 但启动文本自身打印 arm gate fail mask=0x1B(arm REFUSED)、
     MOTOR_HARDWARE_ENABLE_PATH_VALIDATED=NO, 方向与 RT_FALSE 一致(软件反馈, 不是示波器证明)。
   A0 时长证据仍 NOT_ACHIEVED: 没有一条 47 列记录被采到, 也没有任何门 ACCEPT/REJECT 发生。
-  串口终态: 采集器 finally 关闭端口并释放事件源; 本机无残留 powershell; 设备侧电源未动。
+  串口终态: 采集器 finally 关闭端口并释放事件源; 设备侧电源未动(等 §9 收尾回报)。
+    残留进程复核(12:00:38 实测, 晚于本证据首稿, 见 JSON identity_errata E2): 列举 Win32_Process 中
+    Name=powershell.exe/python.exe 的进程, 只剩本轮自己启动的两个短命进程(CreationDate 11:58/12:00),
+    采集器(11:49 起)那一个已退出 => 没有宿主进程仍占着 COM5。此列举只看主机进程表, 不枚举任何设备。
 
 ==============================================================================
 7. wire 字节归档与首失败原文
