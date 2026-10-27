@@ -11,16 +11,16 @@
 | `reports/reviews/phase8-motor-bringup-m1-prep/source_audit.txt` | 21087 | `d0263137a18acee1fc9b83e561720046fba6429629473d45537ffecddcf69f0f` |
 | `reports/reviews/phase8-motor-bringup-m1-prep/motor_current_basis.md` | 10071 | `7444f7a90f290e36ed4fa9de570b316e444b87dc5fb5c16c12114c3985a27814` |
 | `reports/reviews/phase8-motor-bringup-m1-prep/board_execution_candidate.md` | 20844 | `60c3635a3e6cb7581fb2b3d2442adfe926c41d53bb0a29604dbcf0c97343e9d1` |
-| `reports/reviews/phase8-motor-bringup-m1-prep/keil_builds.txt` | 15984 | `6d6427e3b46317a871f7be157c939cbb8e79249d54eb6ba189082b0ce810c836` |
-| `reports/reviews/phase8-motor-bringup-m1-prep/project_scope_verification.txt` | 5170 | `edc6de73043ab485d9444c4e1d303a77b964f5968d453010bb865cd9de845908` |
-| `reports/reviews/phase8-motor-bringup-m1-prep/candidate_link_extract.txt` | 9602 | `242eb943d63929e673892548ba05d774de2b6eb1cbc21abc118feae4a3046896` |
+| `reports/reviews/phase8-motor-bringup-m1-prep/keil_builds.txt` | 16646 | `efd43c1cd4eb6abe33d50ac145da1635b41e68ec735c10c0859b8d3cb761731b` |
+| `reports/reviews/phase8-motor-bringup-m1-prep/project_scope_verification.txt` | 6215 | `efeecb6d67b36713f9166e1022c3a13fcbd0cbcd6467098380877d16aa7848ea` |
+| `reports/reviews/phase8-motor-bringup-m1-prep/candidate_link_extract.txt` | 9864 | `ef02a891a9a46a7ab99d3218d7b8abee009a9c8ea4a9acad72ab52583d481137` |
 | `reports/reviews/phase8-motor-bringup-m1-prep/build_log_default.txt` | 4079 | `322ff127dada1459fde2b9d55d2548a5cc67561a100f50dfa29599a8551fb7c8` |
 | `reports/reviews/phase8-motor-bringup-m1-prep/build_log_candidate.txt` | 4012 | `c3031eecb7c6eed6914add7c8dc6fb7abbf8526fbe8044d637f3ac4957ab8948` |
 | `reports/reviews/phase8-motor-bringup-m1-prep/make_motor_m1_target.py` | 3596 | `d5dbce28f3ed65610b7e81ef1339a2dd440b5c831de8a0602bdfa5ccc5ea9f49` |
 | `reports/firmware/phase8-motor-bringup-m1-prep/default-control.bin` | 251148 | `7f9baed96ecb23cdf7cb9d1c0ccd4c28f2946bc9f3d720a560f7741cb0f4e45d` |
 | `reports/firmware/phase8-motor-bringup-m1-prep/motor-m1-candidate.bin` | 251260 | `a76b845db4ba1d8872f9db395c2e6e796bdb9416c398f010b669538006cf2777` |
 | `reports/firmware/phase8-motor-bringup-m1-prep/motor-m1-candidate.map` | 1948503 | `9f6d37203ca6226ef74323096d48fe5b6719300ab3cfec35f88bfc45833b586f` |
-| `reports/firmware/phase8-motor-bringup-m1-prep/build_manifest.json` | 15253 | `0b145d2ae989e7c37300c5be90c5249f0e731468cda475d70da03fff64f6304f` |
+| `reports/firmware/phase8-motor-bringup-m1-prep/build_manifest.json` | 15789 | `a6d93747ebdd38dda1b6b420d70a6ac6314b0a3da1bb9170c305744fc193077d` |
 
 未入库（构建区，被工程目录 `.gitignore` 排除；只登记字节与散列，不称云端可见）：默认 AXF `92169bef54992fa7f28d2d52280c6130e2cd8e9c8702d3ca92c09b4b1d74a43f`、默认 map `ab33ac1de309b2ce40402627c3b8a6dff0d81ec0104f590a7723d49f5a5f22f7`、候选 AXF `c1e9d4e78c424b3631b2d30cbe6061f32074b30c7518ed2aa681771d6600a86f`；完整预处理转储与两份 `.log` 原件在 `M1_BUILDS`。
 
@@ -59,6 +59,12 @@
 - 新登记的现场事实（写进包内防自欺）：**读命令也会改 `tmc_health`**（`tmc2209.c:709-713` 由 `:738` 调用），所以"probe 之后 health 变好"不构成链路健康证据。
 - 引用纪律：本文件 129 项 `file:line` 断言全部命中（mismatch=0），初稿 5 处行号错误已更正（改文档，不改源码）。
 
+## 5.5 勘误（推送后独立回读发现，登记在后续提交里，不改写已发布件）
+
+- `M1-E1`：候选 map 我按原字节写进了归档目录，但独立回读比对 blob 时发现本机 `core.autocrlf=true` 让 Git 把它当**文本**归一：入库件 1928690 B / `d38739048fe7…`，而 armlink 原字节是 1948503 B / `9f6d37203ca6…`，差 19813 个 CR。所以前一次提交里"按原字节无损归档"这句**不成立**，本轮回读把它改成双身份登记：原字节身份（本地，实测不含盘符/用户名串）+ 入库件身份（远端可回读、去 CR 文本形态），并断言 `入库件 == 原字节.replace(CRLF, LF)` = True。
+- 处置纪律：已推送的 map **未删除、未重做**，历史提交 `581b8b3…` 原样保留；两份 BIN 实测 git 判为二进制，工作树字节 == blob 字节，不受影响。
+- `M1-READBACK-F1`：首次 `ls-remote` 未走本机代理返回空，只记为"未取得远端头"，没有推断成"远端不存在"；带 `-c http.proxy` 重跑后取到远端头。
+
 ## 6. 边界（本轮没做的事）
 
 ```text
@@ -96,6 +102,8 @@ flash_read=0  active_reset=0  device_enumeration=0  sw1_cut.ps1=NOT_RUN(HOLD)
 - `M1-DOC-F1`：证据初稿里有两处未经实测的数字(spm 符号计数写成 56、文件级 Define 覆盖写成 32 处); 出稿前改为现算值(35 与 0), 未提交错误版本（登记于 reports/reviews/phase8-motor-bringup-m1-prep/keil_builds.txt 第 4 节、reports/reviews/phase8-motor-bringup-m1-prep/project_scope_verification.txt 第 2 节）
 - `M1-DOC-F2`：现场包初稿 5 处源码行号引用错误, 逐行断言后按实测更正(改的是文档, 不是源码)（登记于 reports/reviews/phase8-motor-bringup-m1-prep/board_execution_candidate.md 文首引用口径）
 - `M1-DOC-F3`：提交前隐私扫描发现 motor_current_basis.md 第 4-5 行漏出两个仓外工作目录的本机绝对路径; 已改为代号并声明该行是有损表述, 在入库前拦截（登记于 本地提交前扫描(断言 15 个文件 x 9 个禁用串, 命中 1 处)）
+- `M1-E1`：远端回读发现: 候选 map 按原字节写入工作树, 但本机 core.autocrlf=true 让 Git 把它当文本归一(CRLF->LF), 入库 blob 1928690 B / d38739048fe7… 不等于 armlink 原字节 1948503 B / 9f6d37203ca6…(差 19813 个 CR)。初稿"无损归档"的说法不成立, 已改为双身份登记; 已推送的 map 未删除未重做, 并已断言 入库件 == 原字节.replace(CRLF, LF) = True（登记于 reports/reviews/phase8-motor-bringup-m1-prep/keil_builds.txt 第 6 节、reports/firmware/phase8-motor-bringup-m1-prep/build_manifest.json 的 artifacts[map] 与 erratum 字段）
+- `M1-READBACK-F1`：首次 ls-remote 未走本机代理, 返回空, 如实记为"未取得远端头"(未当成"远端不存在"); 带 -c http.proxy 重跑后取得远端头（登记于 本字段）
 
 ## 9. 下一步（等你，不自派）
 

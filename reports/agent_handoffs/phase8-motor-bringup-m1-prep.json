@@ -347,18 +347,18 @@
     },
     {
       "path": "reports/reviews/phase8-motor-bringup-m1-prep/keil_builds.txt",
-      "bytes": 15984,
-      "sha256": "6d6427e3b46317a871f7be157c939cbb8e79249d54eb6ba189082b0ce810c836"
+      "bytes": 16646,
+      "sha256": "efd43c1cd4eb6abe33d50ac145da1635b41e68ec735c10c0859b8d3cb761731b"
     },
     {
       "path": "reports/reviews/phase8-motor-bringup-m1-prep/project_scope_verification.txt",
-      "bytes": 5170,
-      "sha256": "edc6de73043ab485d9444c4e1d303a77b964f5968d453010bb865cd9de845908"
+      "bytes": 6215,
+      "sha256": "efeecb6d67b36713f9166e1022c3a13fcbd0cbcd6467098380877d16aa7848ea"
     },
     {
       "path": "reports/reviews/phase8-motor-bringup-m1-prep/candidate_link_extract.txt",
-      "bytes": 9602,
-      "sha256": "242eb943d63929e673892548ba05d774de2b6eb1cbc21abc118feae4a3046896"
+      "bytes": 9864,
+      "sha256": "ef02a891a9a46a7ab99d3218d7b8abee009a9c8ea4a9acad72ab52583d481137"
     },
     {
       "path": "reports/reviews/phase8-motor-bringup-m1-prep/build_log_default.txt",
@@ -392,8 +392,8 @@
     },
     {
       "path": "reports/firmware/phase8-motor-bringup-m1-prep/build_manifest.json",
-      "bytes": 15253,
-      "sha256": "0b145d2ae989e7c37300c5be90c5249f0e731468cda475d70da03fff64f6304f"
+      "bytes": 15789,
+      "sha256": "a6d93747ebdd38dda1b6b420d70a6ac6314b0a3da1bb9170c305744fc193077d"
     },
     {
       "path": "reports/agent_handoffs/phase8-motor-bringup-m1-prep.md",
@@ -459,6 +459,21 @@
       "kept_in": [
         "本地提交前扫描(断言 15 个文件 x 9 个禁用串, 命中 1 处)"
       ]
+    },
+    {
+      "id": "M1-E1",
+      "what": "远端回读发现: 候选 map 按原字节写入工作树, 但本机 core.autocrlf=true 让 Git 把它当文本归一(CRLF->LF), 入库 blob 1928690 B / d38739048fe7… 不等于 armlink 原字节 1948503 B / 9f6d37203ca6…(差 19813 个 CR)。初稿\"无损归档\"的说法不成立, 已改为双身份登记; 已推送的 map 未删除未重做, 并已断言 入库件 == 原字节.replace(CRLF, LF) = True",
+      "kept_in": [
+        "reports/reviews/phase8-motor-bringup-m1-prep/keil_builds.txt 第 6 节",
+        "reports/firmware/phase8-motor-bringup-m1-prep/build_manifest.json 的 artifacts[map] 与 erratum 字段"
+      ]
+    },
+    {
+      "id": "M1-READBACK-F1",
+      "what": "首次 ls-remote 未走本机代理, 返回空, 如实记为\"未取得远端头\"(未当成\"远端不存在\"); 带 -c http.proxy 重跑后取得远端头",
+      "kept_in": [
+        "本字段"
+      ]
     }
   ],
   "open_items": [
@@ -486,8 +501,8 @@
     "safety_boundary": "PASS",
     "history_protection": "PASS"
   },
-  "remote_head_before_this_commit": "70416e7ffb9e704a7f6008b310c6223dbda3a669",
-  "local_head_before_this_commit": "70416e7ffb9e704a7f6008b310c6223dbda3a669",
+  "remote_head_before_this_commit": "581b8b3158b00e8abc561395b26030c7a72038a9",
+  "local_head_before_this_commit": "581b8b3158b00e8abc561395b26030c7a72038a9",
   "stop_claim": "M1_OFFLINE_PREP_DELIVERED_AWAITING_INDEPENDENT_REVIEW",
   "stop_lines": [
     "M1_OFFLINE_PREP_DELIVERED / AWAITING_INDEPENDENT_SOFTWARE_IMAGE_AND_PLAN_REVIEW",

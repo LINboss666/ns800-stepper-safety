@@ -44,6 +44,21 @@ NS800 M1 离线准备 —— 工程与写入范围核验(CP2 生成 + CP3 构建
    A0BoardBSerialR1a.ps1  60f8e5d4b7e713f994f0d9fb639d17e4782845ca 不变=True
 
 4. 相对锚点的全部改动路径
+   reports/agent_handoffs/phase8-motor-bringup-m1-prep.json
+   reports/agent_handoffs/phase8-motor-bringup-m1-prep.md
+   reports/firmware/phase8-motor-bringup-m1-prep/build_manifest.json
+   reports/firmware/phase8-motor-bringup-m1-prep/default-control.bin
+   reports/firmware/phase8-motor-bringup-m1-prep/motor-m1-candidate.bin
+   reports/firmware/phase8-motor-bringup-m1-prep/motor-m1-candidate.map
+   reports/reviews/phase8-motor-bringup-m1-prep/board_execution_candidate.md
+   reports/reviews/phase8-motor-bringup-m1-prep/build_log_candidate.txt
+   reports/reviews/phase8-motor-bringup-m1-prep/build_log_default.txt
+   reports/reviews/phase8-motor-bringup-m1-prep/candidate_link_extract.txt
+   reports/reviews/phase8-motor-bringup-m1-prep/keil_builds.txt
+   reports/reviews/phase8-motor-bringup-m1-prep/make_motor_m1_target.py
+   reports/reviews/phase8-motor-bringup-m1-prep/motor_current_basis.md
+   reports/reviews/phase8-motor-bringup-m1-prep/project_scope_verification.txt
+   reports/reviews/phase8-motor-bringup-m1-prep/source_audit.txt
    rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/project.uvprojx
    非 reports 路径 = ['rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/project.uvprojx'](应且仅等于允许的 project.uvprojx)
 

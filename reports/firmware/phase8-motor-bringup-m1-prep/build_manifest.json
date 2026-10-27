@@ -334,19 +334,26 @@
     },
     "local_only_note": "AXF 与 .map 按已用仓库惯例不入 Git(既往轮同样只归档 BIN), 在此登记路径/长度/SHA-256, 云端不可远端取得, 不得称其为可远端复算件。",
     "reports/firmware/phase8-motor-bringup-m1-prep/motor-m1-candidate.map": {
-      "bytes": 1948503,
-      "sha256": "9f6d37203ca6226ef74323096d48fe5b6719300ab3cfec35f88bfc45833b586f",
-      "reachable_by_reviewer": "远端仓库可回读(reports 归档, 原字节)",
-      "note": "本轮实测该 map 不含盘符/用户名串, 故按原字节归档"
+      "original_bytes": 1948503,
+      "original_sha256": "9f6d37203ca6226ef74323096d48fe5b6719300ab3cfec35f88bfc45833b586f",
+      "repo_blob_bytes": 1928690,
+      "repo_blob_sha256": "d38739048fe77d7706243f6a5279bfe2c9b7ee9874c6aebb2d451c5315a7f897",
+      "lossless": false,
+      "transformation": "CRLF -> LF(本机 core.autocrlf=true 的文本归一; 已断言 repo blob == 原字节.replace(CRLF, LF), 只差 19813 个 CR)",
+      "privacy": "实测原字节与入库件都不含盘符/用户名串(不涉及隐私)",
+      "reachable_by_reviewer": "远端可回读, 但是去 CR 的文本形态而非 armlink 原字节",
+      "erratum": "M1-E1"
     }
   },
   "remote_visibility": {
     "archived_verbatim": [
-      "reports/firmware/.../default-control.bin",
-      "reports/firmware/.../motor-m1-candidate.bin",
-      "reports/firmware/.../motor-m1-candidate.map",
-      "reports/reviews/.../make_motor_m1_target.py",
+      "reports/firmware/.../default-control.bin(git 判为二进制, 工作树字节 == blob 字节)",
+      "reports/firmware/.../motor-m1-candidate.bin(同上)",
+      "reports/reviews/.../make_motor_m1_target.py(附录 A 逐字, 本就是 LF)",
       "reports/reviews/.../candidate_link_extract.txt"
+    ],
+    "archived_text_normalized": [
+      "reports/firmware/.../motor-m1-candidate.map —— 见 erratum M1-E1"
     ],
     "masked_lossy": [
       "reports/reviews/.../build_log_default.txt",

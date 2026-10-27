@@ -132,10 +132,13 @@ NS800 M1 离线准备 —— CP3 真实构建记录(默认 + 候选各一次 Reb
 ==============================================================================
 6. 归档与远端可达性(§7.1.6)
 ==============================================================================
-  已入仓(远端可回读, 逐字原字节):
+  已入仓(远端可回读):
     FW/default-control.bin      251148 B 7f9baed96ecb23cdf7cb9d1c0ccd4c28f2946bc9f3d720a560f7741cb0f4e45d
     FW/motor-m1-candidate.bin   251260 B a76b845db4ba1d8872f9db395c2e6e796bdb9416c398f010b669538006cf2777
-    FW/motor-m1-candidate.map   1948503 B 9f6d37203ca6226ef74323096d48fe5b6719300ab3cfec35f88bfc45833b586f  <- 本轮实测该 map 不含任何盘符/用户名串, 故可无损归档
+    FW/motor-m1-candidate.map   原字节 1948503 B sha256=9f6d37203ca6226ef74323096d48fe5b6719300ab3cfec35f88bfc45833b586f; 仓库 blob 1928690 B sha256=d38739048fe77d7706243f6a5279bfe2c9b7ee9874c6aebb2d451c5315a7f897
+      勘误 M1-E1: 该 map 实测不含任何盘符/用户名串(所以不涉及隐私), 但本机 core.autocrlf=true 让 Git 按文本把 CRLF 归一为 LF => 入库件是**去 CR 的文本形态**, 不是 armlink 原字节(1948503-1928690=19813 个 CR)。
+      规则是确定的(仅删 CR, 已断言 blob == 原字节.replace(CRLF, LF)), 符号名/对象表/区域行等内容完全可读; 但**不称它字节无损**。两个散列都登记, 由复审方按需要取用。
+    两份 BIN 不受影响(实测 git 判为二进制, 工作树字节 == blob 字节): default-control.bin 7f9baed96ecb / motor-m1-candidate.bin a76b845db4ba。
     REV/build_log_default.txt / REV/build_log_candidate.txt(完整构建日志的脱敏文本, 有损, 规则见文件头)
     REV/candidate_link_extract.txt(map 的可审切片)、REV/make_motor_m1_target.py(= 附录 A 逐字, 3596 B / d5dbce28)
   未入版本库的产物(云端不可回读, 不谎称可远端复算)。位置都在**构建区**, 由工程目录 .gitignore 的规则排除:

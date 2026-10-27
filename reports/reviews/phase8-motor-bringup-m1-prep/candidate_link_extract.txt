@@ -1,6 +1,8 @@
-NS800 M1 候选目标链接可审切片 —— 取自 FW/motor-m1-candidate.map(原字节, 无损)
-候选 map = 1948503 B sha256=9f6d37203ca6226ef74323096d48fe5b6719300ab3cfec35f88bfc45833b586f; 默认 map(仅本地) = 1946989 B sha256=ab33ac1de309b2ce40402627c3b8a6dff0d81ec0104f590a7723d49f5a5f22f7
-本文件只摘录 map 的三类原文(区域行 / Total 行 / Image component sizes 表), 不替代原 map; 原 map 已入库, 逐字可回读。
+NS800 M1 候选目标链接可审切片 —— 按本地 armlink **原字节** map 计算(1948503 B / 9f6d37203ca6226ef74323096d48fe5b6719300ab3cfec35f88bfc45833b586f)。
+仓内归档件 FW/motor-m1-candidate.map 是去 CR 的文本形态(1928690 B / d38739048fe77d7706243f6a5279bfe2c9b7ee9874c6aebb2d451c5315a7f897, 见勘误 M1-E1);
+两者已断言为 "原字节.replace(CRLF, LF) == 入库件", 故符号名与对象表逐行相同, 差异只在行尾 CR。
+对照: 默认目标 map(仅本地, 未入库) = 1946989 B sha256=ab33ac1de309b2ce40402627c3b8a6dff0d81ec0104f590a7723d49f5a5f22f7
+本文件只摘录 map 的三类原文(区域行 / Total 行 / Image component sizes 表), 不替代原 map 全文。
 
 --- Load Region(逐字)
 Load Region LR_IROM1 (Base: 0x08000000, Size: 0x0003dbc0, Max: 0x00080000, ABSOLUTE, COMPRESSED[0x0003d57c])
