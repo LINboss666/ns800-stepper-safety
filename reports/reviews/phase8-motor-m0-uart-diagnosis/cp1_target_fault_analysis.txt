@@ -1,0 +1,120 @@
+NS800 M0 CP1 真机采集 —— TMC 链路失败定性（故障分析报告）
+轮次 phase8-motor-m0-uart-diagnosis    document_base d41e644…    批准来源 用户回合（AskUserQuestion 选择"批准，执行 CP1/CP2"）+ 现场前置回报
+板载镜像 261452 B / 5f30d3f0…（其 code_commit = cd8d9f09；本报告引用的 11 个文件已逐个断言在 cd8d9f09 与 HEAD 之间 blob 相同，故行号对板载镜像同样有效）
+采集器 reports/reviews/phase8-motor-m0-uart-diagnosis/M0Serial.ps1 24064 B / 2131af0e…（附录 A 逐字，未改一字节）
+原始字节先落盘再解码；本文件里的每条响应都同时给出"字节可见化"与 UTF-8 文本视图，NUL 用 ⟂NUL⟂ 标出，CR 用 <CR> 标出，未删任何字节。
+
+==============================================================================
+1. 一次会话的预算与时刻（全部实读台账，无推断）
+==============================================================================
+  主机时刻 2026-10-27T20:11:36.0877991+08:00 → 2026-10-27T20:11:39.5650473+08:00（同一会话，跨度约 3.5 s）
+  SERIAL_OPEN_ATTEMPT=1/1  SERIAL_OPEN=1  COM5 115200 8N1 无流控 DTR/RTS=false
+  TX_ATTEMPT=7/7（七条各一次，次序即包内规定）  M0_COMMAND_CHECKED=6 条 ACCEPT
+  STOP_FAILURE=1（第 7 条判定拒绝）  M0_COMPLETE=0  RESET_ATTEMPT=0  SERIAL_ERROR=0
+  下载/读 Flash/DAP/主动复位/端口设备枚举/配置写入/清故障/任何电机动作 = 0
+  事件计数复算: {"SERIAL_OPEN_ATTEMPT": 1, "SERIAL_OPEN": 1, "RX_BEGIN": 8, "READ_ONLY_PROBE_READY": 1, "RX_FILE": 8, "TX_ATTEMPT": 7, "M0_COMMAND_CHECKED": 6, "STOP_FAILURE": 1}
+  脚本退出码 1（PowerShell 抛 STOP_FAILURE 后按 §6 在 finally 关串口）；stdout 0 B，stderr 原字节 485 B / 0d6fb42b262cd3ce…（PowerShell 自己抛错时回显了脚本的仓根绝对路径 1 处，入库归档按字节脱敏为 489 B / 613dbc6f76160843…；原字节未改动，双身份登记，见 M0-CP1-F1）
+  台账与产物: 8 份 RX + session.rx.bin 2727 B（== 按序拼接，已断言）
+     attach_passive=0  spm_status=156  spm_cap=346  safety_state=79  safety_status=488  motor_status=1225  step_status=249  tmc_uart_probe=184
+
+==============================================================================
+2. 失败身份（这是本轮最有价值的一条新事实）
+==============================================================================
+  探针首行已打印（说明 txn 取到、uart2 打开成功、进入了读阶段）：
+     rt_kprintf("[TMC] probe: 只读身份检查 txn-held IOIN+GSTAT+IFCNT (0 个 WRITE 帧)\n");
+  随后立即失败并提前返回（故"probe 结束: 读事务 3 次"那行不出现）：
+     rt_kprintf("[TMC] IOIN read failed (%d) -> 无法确认身份; 这不等于芯片损坏\n",
+  实际观测到的整行（UTF-8 解码）：
+       tmc_uart_probe<CR>
+       [TMC] probe: 只读身份检查 txn-held IOIN+GSTAT+IFCNT (0 个 WRITE 帧)<CR>
+       [TMC] IOIN read failed (-117) -> 无法确认身份; 这不等于芯片损坏<CR>
+       msh ><CR>
+       msh >
+  错误码 = -117。它**不是** RT-Thread 内核数字分支的小码，而是 POSIX 兼容分支的 ETIMEDOUT：
+     RT_USING_LIBC=1（走 POSIX 兼容分支）、RT_ETIMEOUT=ETIMEDOUT、ETIMEDOUT=(ERROR_BASE_NO + 110)、ERROR_BASE_NO=7
+     => RT_ETIMEOUT = 7 + 110 = 117，与观测到的 -117 一致（断言通过）。
+     推导用的宏转储来自 M1 的真实目标构建（同一 armclang V6.24 与同一工程 Define），且 rtconfig.h、kerrno.h 的 blob 在板载 code_commit 与 HEAD 之间未变 —— 不是拿 POSIX 教材值猜。
+  定性: IOIN 读**超时**。可排除的原因（它们会打印别的行、给别的码，本轮都没出现）：
+     · uart2 打不开（会打印 "uart2 打不开"，且 health 会是 FAILED）—— 未出现
+     · 取不到配置事务/能力缺失（会打印 "probe REFUSED (%d)"；对应 -RT_EBUSY=-23、-RT_ENOSYS=-45）—— 未出现
+     · 参数非法 -RT_EINVAL=-5、CRC/帧校验失败 -RT_EIO=-12 —— 与观测 -117 数值均不符
+     同一张表也复现了既往实测的两个值(EBUSY=23、EIO=12)，说明这张码表就是本配置的真表，不是拿 POSIX 教材值猜的。
+  仍未收敛到的（必须保留为未知，不得写"已定位"）：同一 -RT_ETIMEOUT 有三个阶段能产出，
+     本轮的只读命令集**没有**导出区分它们的那条内部 reason：
+     (a) tmc_rx_flush 没排空/时间上限；(b) TX 预算耗尽（drv_uart_txleaf.inc 里等 UART_isSpaceAvailable 的整帧预算）；(c) 帧已发出但 RX 等不到合法数据报。
+     要区分需要把 st->reason 导出到某条只读命令（属产品改动，本任务书 §3.3 不授权修复）。
+  与既有证据的一致性: 本轮之前对链路的认识只有启动流里的健康名 DEGRADED；现在多了一个具体错误码，方向是"超时无应答"而不是"打不开/无锁"。
+  仍**没有**证明的: 是 TX 还是 RX 段超时、模块是否真的在应答、地址/接线/供电哪个环节导致无应答（D 类子因全开放），也不证明芯片损坏 —— 探针自己就印了这句。
+
+==============================================================================
+3. 前六条只读查询的真实观察（通信与状态面，逐条对应源码）
+==============================================================================
+  [spm status]  state/entry/records/in_flight/dropped/counter/clock/guard/gates_now 全在一行，
+     实测: [spm] status: state=0 entry=- records=0 in_flight=0 dropped=0 counter=COUNTER_UNCHECKED clock=SOURCE_ASSUMED guard=0 gates_now=0x0
+     => 记录器 IDLE、无在途、无丢弃；counter=COUNTER_UNCHECKED、clock=SOURCE_ASSUMED：本次启动未跑 spm init，A0 时长证据保持 NOT_ACHIEVED（本包也不授权）。
+  [spm cap]  [spm] schema=2 slots=64 record_bytes=120 array_bytes=7680 sizeof_ctx=44
+     [spm] 编译四宏: MOTOR_HW=0 STEP_DIAG_ISO=0 TMC_CFG_HW=0 LIMIT_EN=0 (测量开关不改变这四道门)
+     [spm] counter=COUNTER_UNCHECKED clock_basis=SOURCE_ASSUMED systick_load=0 guard_ready=NO quiescent=YES state=0 records=0 in_flight=0 dropped=0
+     => 运行期四宏全 0（与生产默认一致）；这是"板上跑的是那份镜像"的能力面交叉核对，配合 BOARD-B 的下载+回读构成连续性证据。
+  [safety_state]  [SS] state=FAULT_LATCHED fault_code=8 degraded=0x00
+     fault_code=8 解 = #define FAULT_SELF_TEST     8u
+     => 锁存的是 **自检拒绝进 READY**（safety_force_shutdown(FAULT_SELF_TEST) 那条路），不是 FAULT_TMC_COMM(6)、也不是 FAULT_BOOT(10) —— 与"required ④ 只看返回码"（M1 已登记的 F-A：合并成一条 [REQ FAIL] TMC2209 link 且不打印错误码）自洽。
+  [safety_status]  [SAFETY] ready=YES first_err=0
+     [SAFETY] MCU_DRV_ENABLE = 0 (禁止(安全))
+     [SAFETY] DRV_ENABLE last write+readback verified = 0 (-1 = never verified)
+     [SAFETY] request=DISABLE(LOW) pad=0 expected_FB=HIGH FB=1 -> verdict=OK
+     [SAFETY] LIMIT inputs = DISABLED_BY_CONFIG (限位实现保留, 不解析/不配置/不读/不注册 IRQ)
+     => 许可焊盘 LOW、回读=0、ENN 反馈在禁能侧（FB=1→verdict OK）。注意 ENN_FEEDBACK 那行在第 126 可见字符处被截断并吐 NUL（RT_CONSOLEBUF_SIZE=128），本行只按前缀取证，不从被截掉的尾巴补值。
+  [motor_status]  (state=4 按本包 §5 第 5 条判据的允许集 {0=IDLE, 4=FAULT} 之内;
+     枚举名未在本轮源码引用中断言, 所以只按数值与判据说话, 不猜名字)
+     [MOT] state=4 cur=0 tgt=0 accel=2000 decel=2000 dir=0
+     [MOT] armed=0 drv_en_verified_pad=0 health=OK
+     [MOT] STEP stop: result=api-accepted(驱动接受关断, 非波形证明) src=emergency-stop rc=0 fail_latched=0 | diag_off_co⟂NUL⟂[MOT] arm gate fail mask=0x1B (arm will be REFUSED)
+     [MOT] arm gate fail mask=0x1B (arm will be REFUSED)
+     [MOT] drive request=LOW pad=0 expected_ENN=HIGH ENN_feedback=1(resolved) verdict=OK
+     [MOT] step-diag permission=DENIED (enable-path / isolated-env 两个宏至少一个为 TRUE 才允许输出 STEP)
+     [MOT] tmc runtime write gate mask=0x3B
+     两处 NUL 截断（STEP stop 行的 diag_off_confirmed 尾值、gate7 detail 的尾值）按"本来不可导出"登记，不补值。
+     澄清一条容易读错的字段：`health=OK` 打的是 **Motor 子系统**快照健康（motor.c:2296-2297 的 snap.health），不是 TMC 链路健康；
+     TMC 侧的可见证据是写入门禁 mask 的第 5 位与本轮 probe 的超时，两者才对应链路。
+     arm 门 fail mask=0x1B、TMC 写入门禁 mask=0x3B —— 与既往启动流读数一致（同一形态复现），含义是"使能路径未验证 / 未 READY / 保护未就绪 / 驱动配置未 apply / 链路不健康"，即所有写入路径当前都被合法挡住。
+  [step_status]  [STEP] dev=epwm1 ch=0 enabled=no(诊断从未占用该通道) last_stop=not-attempted stop_rc=0
+     => dev=epwm1 ch=0、enabled=no、last_stop=not-attempted、stop_rc=0；说明行同样在 126 字符处 NUL 截断（不补值）。STEP 通道未被占用与"无运动事实"一致。
+
+==============================================================================
+4. 一个必须登记的采集事实：被动窗口零字节
+==============================================================================
+  001_attach_passive.rx.bin = 0 B；READ_ONLY_PROBE_READY 记录 boot_seen=false、boot_done=false、startup_prompt_required=false。
+  含义: 串口打开后 2 s 内没有任何自发输出（操作者在此之前已上电，启动流早已过去），
+  因此**本次拿不到版本横幅**；静默判据满足后只发了一次只读查询，未卡死也未重试。
+  脚本的横幅比对（只有看到完整横幅才要求 5.3.0 build Oct 26 2026 20:57:05）自然未触发。
+  镜像连续性据此只能靠 (a) BOARD-B 那次下载+逐字节回读 与 (b) 本轮 spm cap 四宏全 0 两条间接证据支撑，不新读 Flash —— 这一点按实际强度登记，不写成"已回读确认"。
+
+==============================================================================
+5. 停止条件执行与收尾
+==============================================================================
+  §5 规定"任一读失败/REFUSED/字段缺失/不一致即停止并保留证据" —— 已照做：第 7 条判定失败后没有再发任何命令、没有重试、没有补空回车、没有改波特率或地址、
+  没有追加 motor_disarm（M0 预算里它是 0）、没有清记录、没有重 dump、没有复位、没有下载。
+  失败响应已完整落盘（含响应尾 msh >），说明第 7 条命令确实得到了一次完整回复，只是回复内容是失败行 —— 这不属于"缺响应提示符超时"那类采集故障。
+  串口由脚本 finally 关闭。供电终态：操作者已回报上电，**断电与结束时刻尚未回报**，故按 §6 记 POWER_STATE=待回报，不推断、不代填。
+
+==============================================================================
+6. 结论（按证据强度，不写"已解决"）
+==============================================================================
+  · tmc_link_status 仍是 LINK_UNPROVEN，但**失败面收窄了**：本轮第一次拿到具体错误码 -117 = -RT_ETIMEOUT（IOIN 读超时），
+    并据此排除"设备打不开"和"取不到事务锁"两类（它们会打印别的行、给别的码）。
+  · 六条 MCU 侧状态全部可读且互相自洽（Safety 锁存=自检拒绝、许可 LOW+回读=0、ENN 在禁能侧、Motor IDLE/armed=0、STEP 通道未占用）=> 通信面 MCU 一侧正常，链路问题在 UART2↔TMC 之间。
+  · 不因此关闭 BUG-008、RISK-03/03a、物理 RISK-04-b、M-1/M-2/M-3，也不给任何使能/写配置许可：M0 的 safe_for_enable 恒为 false。
+  · 下一步候选（都要新的具体批准，不属本轮）：(i) 现场断电检查模块在位/线序/供电（F-B 类，由操作者做）；(ii) 一次带 reason 导出的只读增项（属产品改动，需单独任务书）；(iii) 示波器看 TX/RX 波形（本机无示波器，仍 BLOCKED_INSTRUMENT）。
+
+==============================================================================
+7. 本轮我自己的缺陷（保留，不掩盖）
+==============================================================================
+  M0-CP1-F1  入库前的隐私自检有两处不实：
+    (a) 扫描器实际只查了五个具名词，"盘符+分隔符"这一类**从来没有被真正执行过**——
+        它的正则把两种分隔符写进了字符类，但反斜杠在字符类里被转义掉，
+        结果字符类只剩正斜杠一个字符，因此"单字母+冒号+反斜杠"开头的绝对路径一律漏检。
+    (b) 归档件说明行写着"扫过五类私有形状…命中 0"，是把**没执行的检查**当成已执行的事实写进交付件。
+    实测命中：run1.stderr.bin 原字节里有 1 处仓根绝对路径（PowerShell 抛 STOP_FAILURE 时回显自身脚本位置）。
+    处置：改正字符类为同时匹配两种分隔符，并把扫描改成**对解码后的原始字节**执行；该块按字节整段替换私有根后重新 base64，块头同时登记"归档"与"原字节"的长度+SHA 与替换处数（lossless=false），其余 11 块替换处数为 0、两种身份完全相同；原字节未删改，仍留在仓外运行目录可按 SHA 取回。
+    归因：我的检查器缺陷与说明失真，与被测采集器、与板上固件都无关；本轮结论不因它改变。
