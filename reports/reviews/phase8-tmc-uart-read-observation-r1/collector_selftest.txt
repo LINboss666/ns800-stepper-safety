@@ -1,5 +1,6 @@
 URO-R1 (task phase8-tmc-uart-read-observation-r1) — 独立复审 6324ac4 的返修证据
-code_commit = a483dcba74abd8c04549459bcee2cbcdb1ddea4c   文档/源码基线 = 6324ac40bd8d0f172fdb89e77917be33dc739460
+构建/被测输入 code_commit = a483dcba74abd8c04549459bcee2cbcdb1ddea4c   文档/源码基线 = 6324ac40bd8d0f172fdb89e77917be33dc739460
+(本证据文件首版随文档提交 a040cdd0913cfe984b85dc205fe2ee49b708dc17 入库, 当前这份由随后的取证更正提交再次入库; 文档提交不改产品字节, 也不作为镜像输入。)
 分支 = phase8/tmc-drive-config(未新建/未改写冻结引用; 未 force push)
 设备动作 = 0(本轮未创建串口对象、未开 COM5、未发目标命令、未枚举、未读 Flash、
 未下载/复位、未碰供电/接线/ENN/SW1、未输出 STEP/DIR/HIGH、未运行 sw1_cut.ps1;
@@ -128,6 +129,10 @@ UARTReadDiagSerialR1.ps1  bytes=93797 sha256=2e9c8ede8f75e7b513dbd4f2c3091189309
 ==========================================================================
 3. 与上一轮自检的对照(实质约束保留, 只加不减)
 ==========================================================================
+  两个计数的口径(都印在脚本自己的 OFFLINE_SELFTEST 结论行里, 不是矛盾):
+    negative_controls=50 指 Expect-* 调用次数(45 条总线/形状负控 + 4 条横幅拒绝
+    + 1 条复位横幅拒绝); 台账里 NEGATIVE_CONTROL 记录 51 条, 多出的那 1 条是
+    missing_response_prompt —— 它由 Wait-Prompt 真实超时路径产生, 不走 Expect-*。
   上一轮(UARTReadDiagSerial.ps1)在 Windows 5.1: rc=0, 负控 23 条, 禁止命令 12 条。
   本轮: 负控 51 条(逐条要求**具名理由**, 理由不符即算自检失败), 禁止命令仍是同 12 条,
   切片正控 9 条, 横幅门 6 条, 七命令 mock 7 条各一次。
