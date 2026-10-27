@@ -20,9 +20,13 @@ SUBS = {
         '{ 0, 1, 0, 0 }, { 0, 0, 1, 0 },',
         '{ 0, 1, 0, 0 }, { 1, 0, 0, 0 },  /* NEGATIVE-INJECTION(gstat) */')],
     # 历史保留组: probe 插回"读旧值再写回"(固件副本)
+    # CP5-R(URO 轮)锚点随打印文本改口径: probe 标题行自 2026-10-27 起是 ASCII 短行,
+    # 且拆成两个字符串字面量, 故锚点一并跟着改 —— 注入落点与判据都没变。
     'probe_writeback': [(
-        'rt_kprintf("[TMC] probe: 只读身份检查 txn-held IOIN+GSTAT+IFCNT (0 个 WRITE 帧)\\n");',
-        'rt_kprintf("[TMC] probe: 只读身份检查 txn-held IOIN+GSTAT+IFCNT (0 个 WRITE 帧)\\n");\n'
+        '    TMC_PROBE_EMIT(&errs, line, "[TMC] probe: read-only identity check txn-held "\n'
+        '                          "IOIN+GSTAT+IFCNT (0 WRITE frames)\\n");',
+        '    TMC_PROBE_EMIT(&errs, line, "[TMC] probe: read-only identity check txn-held "\n'
+        '                          "IOIN+GSTAT+IFCNT (0 WRITE frames)\\n");\n'
         '    /* NEGATIVE-INJECTION: 身份检查顺手把读到的旧值写回(应被 FD3/FD7b 抓到)。\n'
         '     * CP5 修注入本身: S2 §10.3 起 tmc_read_reg / tmc2209_write_register_confirmed\n'
         '     * 都带 (预算, 传输统计) 两个尾参, 旧配方按两参调用 => 副本编译失败\n'
