@@ -1,6 +1,6 @@
 {
   "round": "phase8-target-measurement-a0-board-b-serial-r1",
-  "phase": "CP0 离线修订与自检 —— 自检未通过, 停在 CP0; 未进入 CP1, 无任何设备动作",
+  "phase": "CP0 离线修订与自检 —— 自检未通过, 停在 CP0; 未进入 CP1, 无任何设备动作；随后按 R1a 补正重做采集器并在 Windows 5.1 实测自检通过（CP1 仍未进入）",
   "date_local": "2026-10-27 (Asia/Shanghai)",
   "task_book": "NS800_Board_B_Review_and_Serial_Continuation_R1_4bb8e9f_20261027.md",
   "reviewer_verdict_consumed": "BOARD_B_PARTIAL_EVIDENCE_ACCEPTED / BOOTSTRAP_COLLECTOR_FIX_REQUIRED",
@@ -417,5 +417,328 @@
     "BOARD_STILL_RUNNING_5f30d3f0 / BOARD_B_POWER_STATE=UNKNOWN",
     "NO MOTOR / NO STEP_ENABLE / FOUR SAFETY MACROS RT_FALSE / NO PROGRAM / NO FLASH READ / NO DAP / NO ACTIVE RESET",
     "NO BUILD / NO DEVICE ENUMERATION / NO sw1_cut.ps1 / NO_RETRY_NO_BACKFILL"
-  ]
+  ],
+  "document_base_input_anchor": "004a2653dbcf76bf9495e77356d40e7d3d05d09c",
+  "collector_revision_r1a": {
+    "reason": "任务书 §1/§2 认定 §4 的启动门条件与顶层 $reply/$script:Reply 同名碰撞都出自云端附录代码; 云端另用官方 PowerShell 7.4.13 在隔离环境实跑过原版(失败复现)与修正版(全通过)",
+    "task_book": "NS800_Serial_R1a_Collector_Erratum_and_Executed_Verification_004a265_20261027.md",
+    "identity": {
+      "old_bytes": 21413,
+      "old_sha256": "6faa1afb1b603833e02b4c2afc4f8e34a49f165ada7da476775ab23338f56ad8",
+      "old_preserved_unmodified": true,
+      "new_bytes": 21453,
+      "new_sha256": "de70c7a48280550edb5b5c41d9c5e385e5c79b0b5d4ef5dd901473400b31bd7c",
+      "matches_section_4": true,
+      "ascii_only": true,
+      "cr_count": 0
+    },
+    "generator": {
+      "source": "任务书 §4 的 make_r1a.py 逐字使用",
+      "kept_at": "WORK_OUT_R1/make_r1a.py(仓外; 若放仓库根会多出非 reports 路径, 与写入白名单冲突)",
+      "run_cwd": "PROJECT_ROOT(git show 取对象)",
+      "assertions_that_held": [
+        "旧件 21413 B 且 sha256==6faa1afb…",
+        "$reply token 恰 5 处",
+        "替换后 21453 B 且 sha256==de70c7a4…",
+        "联机分支起点到文件尾新旧逐字相同",
+        "输出用 open(\"xb\") 独占创建"
+      ],
+      "substitution": "re.sub(rb\"\\$reply\\b\", b\"$probeResponse\") 大小写敏感; $script:Reply(11 处)与形参 Idle-Status($Reply)(2 处)未动"
+    },
+    "diff_scope": {
+      "lines_changed": 4,
+      "tokens_changed": 5,
+      "all_inside_selftest_branch": true,
+      "live_branch_first_line": 255,
+      "changed_line_numbers": [
+        236,
+        240,
+        246,
+        247
+      ],
+      "criteria_blocks_byte_identical": [
+        "Wait-Prompt",
+        "Check-Decision",
+        "Run-Gate",
+        "Safety-Rows",
+        "Freeze-Range",
+        "联机分支",
+        "finally"
+      ]
+    },
+    "name_audit": {
+      "top_level_reply_assignments": [],
+      "explicit_script_state_names": [
+        "ClearPermit",
+        "Counts",
+        "EventId",
+        "IsOffline",
+        "LastRx",
+        "Ledger",
+        "Limits",
+        "Port",
+        "Reply",
+        "ReplyFile",
+        "ReplyPath",
+        "ReplyStart",
+        "Rx",
+        "Sequence",
+        "StartPermit"
+      ],
+      "state_name_count": 15,
+      "live_branch_first_line": 255
+    },
+    "parse_check": {
+      "errors": 0,
+      "tokens": 4083
+    },
+    "windows_run": {
+      "runtime": "Windows PowerShell 5.1 (powershell.exe)",
+      "host_powershell_version": "5.1.26100.5074",
+      "rc": 0,
+      "elapsed_seconds": 3.6,
+      "stdout_bytes": 58,
+      "stdout_sha256": "64bc1568c0ab9de5b42c42a8e621f98e4d34f5c540c0ab3c802d331af529f8b8",
+      "stdout_verbatim": "BOARD-B-SERIAL-R1-OFFLINE-SELFTEST PASS; device_actions=0",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_binary_capture_of_both_streams": true,
+      "gate_used": "50246 B / 94e83175…(同一冻结门副本)",
+      "boot_fixture_used": "3757 B / 97b37f32…(同一份, 未重新连目标取)",
+      "outdir": "R1A_ROOT/selftest_run2(全新)",
+      "hard_criteria_total": 21,
+      "hard_criteria_pass": 21,
+      "hard_criteria": [
+        {
+          "item": "R1a 字节 = 21453 B / de70c7a4…",
+          "pass": true,
+          "observed": "de70c7a48280550e"
+        },
+        {
+          "item": "Parser::ParseFile 错误数 = 0",
+          "pass": true,
+          "observed": "0"
+        },
+        {
+          "item": "顶层 $reply 赋值残留 0 处(命名碰撞已消)",
+          "pass": true,
+          "observed": "[]"
+        },
+        {
+          "item": "联机分支与 finally 尾部字节与原脚本相同",
+          "pass": true,
+          "observed": "见 make_r1a 断言与行级 diff"
+        },
+        {
+          "item": "rc == 0",
+          "pass": true,
+          "observed": "0"
+        },
+        {
+          "item": "stdout 逐字 = 原 PASS 行",
+          "pass": true,
+          "observed": "'BOARD-B-SERIAL-R1-OFFLINE-SELFTEST PASS; device_actions=0'"
+        },
+        {
+          "item": "stderr = 0 B",
+          "pass": true,
+          "observed": "0"
+        },
+        {
+          "item": "OFFLINE_SELFTEST: mock_read_probes=3/mock_forbidden_calls=0/real_wire_calls=0/device_actions=0/boot_fixture_bytes=3757",
+          "pass": true,
+          "observed": "{'real_wire_calls': 0, 'boot_fixture_bytes': 3757, 'result': 'PASS', 'mock_forbidden_calls': 0, 'mock_read_probes': 3, 'device_actions': 0}"
+        },
+        {
+          "item": "3757 B 真机启动重放落盘且 SHA == 97b37f32…",
+          "pass": true,
+          "observed": "{'path': '002_offline_real_boot.rx.bin', 'end': 3765, 'sha256': '97b37f32aa03c86b8708ae088d0ae65a8f92520f1a1ed70beb74663049321749', 'bytes': 3757, 'start': 8}"
+        },
+        {
+          "item": "MOCK_TX_ATTEMPT = 3",
+          "pass": true,
+          "observed": "3"
+        },
+        {
+          "item": "三次 MOCK_TX 都是 spm status(第一条只读查询预算)",
+          "pass": true,
+          "observed": "['spm status', 'spm status', 'spm status']"
+        },
+        {
+          "item": "RX_FILE = 5",
+          "pass": true,
+          "observed": "5"
+        },
+        {
+          "item": "负控响应 132 B 已落盘(缺提示符超时例)",
+          "pass": true,
+          "observed": "[8, 3757, 139, 132, 142]"
+        },
+        {
+          "item": "负控响应 142 B 已落盘(状态污染例)",
+          "pass": true,
+          "observed": "[8, 3757, 139, 132, 142]"
+        },
+        {
+          "item": "READ_ONLY_PROBE_READY = 1 且 startup_prompt_required=false",
+          "pass": true,
+          "observed": "[{'boot_seen': True, 'startup_prompt_required': False, 'boot_done': True}]"
+        },
+        {
+          "item": "离线门正控 allowed=True / 负控 allowed=False rc=1",
+          "pass": true,
+          "observed": "{'self_positive': {'rc': 0, 'batch': 'self_positive', 'allowed': True, 'raw_sha256': '3fe53b977b24b2a4ac53055330bf0008dbf58d56e5d35b55773ae9801595b91e'}, 'self_negative': {'rc': 1, 'batch': 'self_nega"
+        },
+        {
+          "item": "无 SERIAL_OPEN",
+          "pass": true,
+          "observed": "None"
+        },
+        {
+          "item": "无 TX_ATTEMPT(真实发命令)",
+          "pass": true,
+          "observed": "None"
+        },
+        {
+          "item": "无 RESET_ATTEMPT",
+          "pass": true,
+          "observed": "None"
+        },
+        {
+          "item": "无 STOP_FAILURE",
+          "pass": true,
+          "observed": "None"
+        },
+        {
+          "item": "事件计数与云端附录 B 对齐(RX_BEGIN=5/RX_FILE=5/GATE=2/PROBE=1/MOCK_TX=3/SUMMARY=1)",
+          "pass": true,
+          "observed": "{'RX_BEGIN': 5, 'RX_FILE': 5, 'GATE': 2, 'READ_ONLY_PROBE_READY': 1, 'MOCK_TX_ATTEMPT': 3, 'OFFLINE_SELFTEST': 1}"
+        }
+      ],
+      "ledger_kind_counts": {
+        "RX_BEGIN": 5,
+        "RX_FILE": 5,
+        "GATE": 2,
+        "READ_ONLY_PROBE_READY": 1,
+        "MOCK_TX_ATTEMPT": 3,
+        "OFFLINE_SELFTEST": 1
+      }
+    },
+    "negative_controls_now_executed": [
+      {
+        "control": "响应缺提示符必须超时",
+        "response_bytes": 132,
+        "response_file": "004_spm_status.rx.bin",
+        "named_rejection": "Reply timeout; no retry and no cleanup."
+      },
+      {
+        "control": "状态污染必须拒绝",
+        "response_bytes": 142,
+        "response_file": "005_spm_status.rx.bin",
+        "named_rejection": "Idle status malformed or not idle."
+      }
+    ],
+    "cloud_vs_local": {
+      "cloud_event_counts": {
+        "RX_BEGIN": 5,
+        "RX_FILE": 5,
+        "GATE": 2,
+        "READ_ONLY_PROBE_READY": 1,
+        "MOCK_TX_ATTEMPT": 3,
+        "OFFLINE_SELFTEST": 1
+      },
+      "local_event_counts": {
+        "RX_BEGIN": 5,
+        "RX_FILE": 5,
+        "GATE": 2,
+        "READ_ONLY_PROBE_READY": 1,
+        "MOCK_TX_ATTEMPT": 3,
+        "OFFLINE_SELFTEST": 1
+      },
+      "per_key_equal": true,
+      "note": "云端是 Core 7.4.13 实跑, 本机是 5.1 实跑, 两条记录独立, 不互相替代"
+    },
+    "first_failures_kept_added": [
+      {
+        "id": "R1A-F1",
+        "what": "第一次实跑(R1A_ROOT/selftest_run1)的 PowerShell 侧已全绿(stdout 与 run2 逐字相同 sha=64bc1568c0ab9de5, stderr 0 B, 事件计数齐), 但我的判读脚本对已是 data 的列表又取一次 ['data'] 抛 KeyError, 没写出判定报告",
+        "handling": "run1 目录与全部字节保留不删; 按 §5.4\"全新目录\"另跑 run2 出正式判定; 两次 stdout SHA 相同 => 可重复性而非挑一次好看的",
+        "root_cause_kind": "本地判读脚本缺陷, 与被测采集器无关"
+      }
+    ],
+    "greenwash_prohibited_checked": "未删负控 / 未加宽松异常兜底 / 未改 finally / 未覆盖旧脚本与旧台账",
+    "cp1_entered": false,
+    "cp1_blockers": [
+      "原仅串口续测批准文字尚未由用户发出(§7)",
+      "上一轮断电终态未回报(当前 UNKNOWN)",
+      "现场四项前置未当场确认"
+    ],
+    "evidence_files": [
+      "reports/reviews/phase8-target-measurement-a0-board-b-serial-r1/A0BoardBSerialR1.ps1",
+      "reports/reviews/phase8-target-measurement-a0-board-b-serial-r1/A0BoardBSerialR1a.ps1",
+      "reports/reviews/phase8-target-measurement-a0-board-b-serial-r1/cp0_offline_selftest_stop.txt",
+      "reports/reviews/phase8-target-measurement-a0-board-b-serial-r1/cp0_selftest_artifacts.md",
+      "reports/reviews/phase8-target-measurement-a0-board-b-serial-r1/r1a_selftest_artifacts.md",
+      "reports/reviews/phase8-target-measurement-a0-board-b-serial-r1/r1a_windows_selftest_verification.txt"
+    ],
+    "evidence_identities": [
+      {
+        "path": "reports/reviews/phase8-target-measurement-a0-board-b-serial-r1/A0BoardBSerialR1.ps1",
+        "bytes": 21413,
+        "sha256": "6faa1afb1b603833e02b4c2afc4f8e34a49f165ada7da476775ab23338f56ad8"
+      },
+      {
+        "path": "reports/reviews/phase8-target-measurement-a0-board-b-serial-r1/cp0_offline_selftest_stop.txt",
+        "bytes": 15537,
+        "sha256": "94ad054197b55a65d175def0dfa17d8797727c8782ddddb31d9badd5ecd796fa"
+      },
+      {
+        "path": "reports/reviews/phase8-target-measurement-a0-board-b-serial-r1/cp0_selftest_artifacts.md",
+        "bytes": 7589,
+        "sha256": "2cf657179dc9bc81669197de2af7b9376d92bda142f3a810e732e7d375ea1e03"
+      },
+      {
+        "path": "reports/reviews/phase8-target-measurement-a0-board-b-serial-r1/A0BoardBSerialR1a.ps1",
+        "bytes": 21453,
+        "sha256": "de70c7a48280550edb5b5c41d9c5e385e5c79b0b5d4ef5dd901473400b31bd7c"
+      },
+      {
+        "path": "reports/reviews/phase8-target-measurement-a0-board-b-serial-r1/r1a_windows_selftest_verification.txt",
+        "bytes": 11098,
+        "sha256": "de14170e0f6ed158a53cc0aa8db07937759df89e5d9af8ad02baf1712e8b2b8e"
+      },
+      {
+        "path": "reports/reviews/phase8-target-measurement-a0-board-b-serial-r1/r1a_selftest_artifacts.md",
+        "bytes": 6324,
+        "sha256": "938f492658bbe9ef143e9282395ae0cc0e905adcde635001dafa817d40db15a7"
+      }
+    ],
+    "hardware_actions": [],
+    "builds_executed": [],
+    "collector_changed": true,
+    "firmware_changed": false,
+    "package_limits_section_3_used": {
+      "常规 USB→24 V 供电": 0,
+      "COM5 打开 115200/8N1 无流控 DTR/RTS 不激活": 0,
+      "目标命令总数(沿用原未使用预算)": 0,
+      "首条命令=前移的 spm status": 0,
+      "spm trip": 0,
+      "motor_disarm": 0,
+      "spm dump": 0,
+      "spm clear_records": 0,
+      "Keil/烧录/Flash 读取/DAP/主动复位/设备枚举": 0,
+      "电机/STEP 使能/许可 HIGH/DIR 改变/arm-start-ramp/真机清故障": 0
+    },
+    "next_step": "等两件事: ①现场回报断电终态(先关 24 V 再拔 USB, SW1 保持阻断) ②用户发出 §7 的批准文字。齐备后按 §5.7 在同一任务继续 CP1: 一次常规供电 + 一次 COM5 打开, 跑 R1a 的 -ExecuteApprovedSerialContinuation -ImageContinuityConfirmed, 54 条预算不变, 失败即停。本轮不接触设备, 也不代填批准或断电回报。",
+    "stop_claim_r1a": [
+      "A0_BOARD_B_SERIAL_R1a_COLLECTOR_VERIFIED_ON_WINDOWS",
+      "CP1_NOT_ENTERED_AWAITING_APPROVAL_AND_POWER_REPORT",
+      "COLLECTOR_R1A 21453 B / de70c7a48280550edb5b5c41d9c5e385e5c79b0b5d4ef5dd901473400b31bd7c",
+      "WINDOWS 5.1 -SelfTest rc=0 / HARD CRITERIA 21/21 PASS / MOCK_TX=3 RX_FILE=5",
+      "NEGATIVE CONTROLS NOW EXECUTED: 132 B Reply timeout + 142 B Idle status malformed",
+      "REAL DEVICE EVENTS THIS ROUND = 0 / hardware_actions=[] / builds_executed=[]",
+      "ORIGINAL CP0 FAILURE AND ARTIFACTS PRESERVED (R1 6faa1afb… 未覆盖)",
+      "NO MOTOR / NO STEP_ENABLE / FOUR SAFETY MACROS RT_FALSE / NO PROGRAM / NO FLASH READ / NO DAP / NO ACTIVE RESET / NO DEVICE ENUMERATION / NO sw1_cut.ps1"
+    ]
+  }
 }

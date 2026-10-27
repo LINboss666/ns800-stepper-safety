@@ -1,0 +1,135 @@
+NS800 A0 BOARD-B-SERIAL-R1a —— Windows PowerShell 5.1 的实际执行验证(CP0 补正, 未触碰设备)
+轮次 phase8-target-measurement-a0-board-b-serial-r1(沿用原任务, 不新开固件/硬件轮)
+日期 2026-10-27 (Asia/Shanghai)
+任务书 NS800_Serial_R1a_Collector_Erratum_and_Executed_Verification_004a265_20261027.md
+输入锚 = 004a2653dbcf76bf9495e77356d40e7d3d05d09c; document_base = 实际开工头(本轮开工时等于该锚, 相对它非 reports 差异为空)。
+结论: R1a 采集器在交付机 PowerShell 5.1 上完整 -SelfTest 实跑通过, §5.4 的 21 条硬判据全 PASS;
+     CP1 仍未进入 —— 原仅串口续测批准与上一轮断电回报都未到位(§5.7/§6), 本文件不构成硬件许可。
+脱敏代号: PROJECT_ROOT / WORK_OUT / WORK_OUT_R1 / R1A_ROOT / BOARD_B_ROOT / RAWDATA / PY_ROOT / DAP_UID;
+呈现层: 代号是纯字符串替换, 反斜杠写成正斜杠; 判据字节见 r1a_selftest_artifacts.md。
+
+==============================================================================
+1. 基线与旧件保护(§5.1/§5.2)
+==============================================================================
+  分支 = phase8/tmc-drive-config; 开工时本地 HEAD = ls-remote 远端头 = 输入锚 004a265。
+  工作树开工前 git status --porcelain 输出为空; 未 reset/rebase/force/merge; 冻结引用未动。
+  旧件一律保留未覆盖:
+    仓内原附录副本 21413 B / 6faa1afb1b603833  与本地工作副本逐字节相同 = True
+    本地工作副本 R1   21413 B / 6faa1afb1b603833… = True
+    上一轮 CP0 失败台账与证据(cp0_offline_selftest_stop.txt / cp0_selftest_artifacts.md / 旧 R1 脚本副本)原样未动; 那份失败末行仍是 STOP_FAILURE "Previous reply still open."。
+    本轮新增的两个自检目录都是全新目录(§5.4"全新 R1a 离线目录"), 不写进历史目录。
+
+==============================================================================
+2. 按 §4 生成器产出 R1a(逐字使用其确定性脚本, 未自创差异)
+==============================================================================
+  生成器 = §4 原文, 存在仓外 WORK_OUT_R1/make_r1a.py; 运行目录 = 仓库根(git show 取对象)。
+    (登记一处与字面指示的偏差: §4 写"在仓库根运行 python make_r1a.py", 若把该脚本本身落进仓库根,
+     本轮就会多出非 reports 路径, 与"允许写入仅 reports 白名单"冲突 => 内容逐字不变, 只放在仓外运行。)
+  它自带的断言全部成立(否则脚本会 ABORT, 不产出文件):
+    旧件 21413 B 且 SHA == 6faa1afb1b603833…; $reply token 恰 5 处;
+    大小写敏感替换成 $probeResponse 后 21453 B 且 SHA == de70c7a48280550e…;
+    联机分支起点起到文件尾, 新旧逐字相同; 输出用 open("xb") 独占创建。
+  本机复算的身份:
+    R1a = R1A_ROOT/A0BoardBSerialR1a.ps1  21453 B  sha256=de70c7a48280550edb5b5c41d9c5e385e5c79b0b5d4ef5dd901473400b31bd7c
+      == §4 登记值: True   ASCII=True  CR=0  LF=316
+  行级差异(按行对齐, 不用字节位移比较):
+    改变的行数 = 4 行, 含 5 个 token; 全部位于自检分支(联机分支首行 = 255)。
+      line 236: $probeResponse=Cmd 'spm status' 1000; Idle-Status $probeResponse
+      line 240: try {$probeResponse=Cmd 'spm status' 250} catch {
+      line 246: $probeResponse=Cmd 'spm status' 1000; $badStatusSeen=$false
+      line 247: try {Idle-Status $probeResponse} catch {
+    双向 diff 摘要行数 = 13; $script:Reply(11 处)与函数形参 Idle-Status($Reply)(2 处)按 §2 保留未动。
+
+==============================================================================
+3. 命名碰撞审计(本机独立复算, 与云端 §3 同一行口径)
+==============================================================================
+  顶层对 $reply 的赋值 = 0 处(原脚本是 236/240/246 三处)
+  显式 $script: 状态名个数 = 15(云端审计=15) => 一致
+  名单 = ClearPermit, Counts, EventId, IsOffline, LastRx, Ledger, Limits, Port, Reply, ReplyFile, ReplyPath, ReplyStart, Rx, Sequence, StartPermit
+  Parser::ParseFile = errors 0 / tokens 4083(原脚本本轮实测也是 errors 0)
+
+==============================================================================
+4. 冻结输入复用(§5.4 要求同一份门与夹具, 未重取未重编)
+==============================================================================
+  门副本 = WORK_OUT_R1/freeze/a0_export_gate_R1.py  50246 B  sha256=94e8317577a0fd8f6fd2bccafc0bb16753f3fb900c1adc7d254ee57cf3898c7d  == 94e83175…: True
+  夹具   = WORK_OUT_R1/fixture/002_boot.rx.bin      3757 B  sha256=97b37f32aa03c86b8708ae088d0ae65a8f92520f1a1ed70beb74663049321749  == 97b37f32…: True
+  夹具仍是上一轮真机落盘字节的解码件(§5.4"夹具沿用本地原件"), 未重新连目标取。
+
+==============================================================================
+5. Windows PowerShell 5.1 实跑与 §5.4 硬判据
+==============================================================================
+  调用(§5.4 原样):
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File R1A_ROOT/A0BoardBSerialR1a.ps1 -SelfTest -PythonExe <PY_ROOT/python.exe> -GateFile <门副本> -BootFixture <夹具> -OutDir R1A_ROOT/selftest_run2
+  rc=0  用时 3.6 s  stdout 58 B(sha=64bc1568c0ab9de5)  stderr 0 B  主机版本 5.1.26100.5074
+  stdout 逐字: 'BOARD-B-SERIAL-R1-OFFLINE-SELFTEST PASS; device_actions=0'
+  stdout/stderr 一律按原始字节另存 .bin, 可读视图另生成(延续上一轮 CP3-F2 的修正)。
+  硬判据 21 条:
+    PASS R1a 字节 = 21453 B / de70c7a4…
+    PASS Parser::ParseFile 错误数 = 0
+    PASS 顶层 $reply 赋值残留 0 处(命名碰撞已消)
+    PASS 联机分支与 finally 尾部字节与原脚本相同
+    PASS rc == 0
+    PASS stdout 逐字 = 原 PASS 行
+    PASS stderr = 0 B
+    PASS OFFLINE_SELFTEST: mock_read_probes=3/mock_forbidden_calls=0/real_wire_calls=0/device_actions=0/boot_fixture_bytes=3757
+    PASS 3757 B 真机启动重放落盘且 SHA == 97b37f32…
+    PASS MOCK_TX_ATTEMPT = 3
+    PASS 三次 MOCK_TX 都是 spm status(第一条只读查询预算)
+    PASS RX_FILE = 5
+    PASS 负控响应 132 B 已落盘(缺提示符超时例)
+    PASS 负控响应 142 B 已落盘(状态污染例)
+    PASS READ_ONLY_PROBE_READY = 1 且 startup_prompt_required=false
+    PASS 离线门正控 allowed=True / 负控 allowed=False rc=1
+    PASS 无 SERIAL_OPEN
+    PASS 无 TX_ATTEMPT(真实发命令)
+    PASS 无 RESET_ATTEMPT
+    PASS 无 STOP_FAILURE
+    PASS 事件计数与云端附录 B 对齐(RX_BEGIN=5/RX_FILE=5/GATE=2/PROBE=1/MOCK_TX=3/SUMMARY=1)
+  两个原本 NOT_EXERCISED 的负控这次真被执行到(§5.4 点名的两条具名拒绝):
+    - 缺提示符超时例: 响应 132 B 落盘(004_spm_status.rx.bin), 拒绝原因 = "Reply timeout; no retry and no cleanup."
+    - 状态污染例:     响应 142 B 落盘(005_spm_status.rx.bin), 拒绝原因 = "Idle status malformed or not idle."
+    判定方式: 这两条字符串是脚本内 -cne 精确比较后才允许继续的; rc=0 且 PASS 行存在 = 两条都被命中,
+    不是"任意异常当成功检出"; 负控响应文件也在台账里留了长度与 SHA。
+  台账事件计数 run2 = {"GATE": 2, "MOCK_TX_ATTEMPT": 3, "OFFLINE_SELFTEST": 1, "READ_ONLY_PROBE_READY": 1, "RX_BEGIN": 5, "RX_FILE": 5}
+  与云端附录 B 的逐项对照(左=本机 Windows 5.1 实测, 右=任务书附录 B 记的 Core 7.4.13 实跑):
+    GATE                   本机 2    云端 2    相同=True
+    MOCK_TX_ATTEMPT        本机 3    云端 3    相同=True
+    OFFLINE_SELFTEST       本机 1    云端 1    相同=True
+    READ_ONLY_PROBE_READY  本机 1    云端 1    相同=True
+    RX_BEGIN               本机 5    云端 5    相同=True
+    RX_FILE                本机 5    云端 5    相同=True
+    两边事件计数完全一致 = True; 这是"同一脚本在两个运行时都跑绿", 不是拿云端结果代替本机取证。
+    汇总行 = {"boot_fixture_bytes": 3757, "device_actions": 0, "mock_forbidden_calls": 0, "mock_read_probes": 3, "real_wire_calls": 0, "result": "PASS"}
+    仍为 0 的真设备事件: SERIAL_OPEN / TX_ATTEMPT / RESET_ATTEMPT / STOP_FAILURE。
+
+==============================================================================
+6. 第一次尝试的如实登记(我自己的判定脚本缺陷, 不掩盖)
+==============================================================================
+  R1A-F1  第一次实跑(run index 1)的 PowerShell 侧其实已经全绿, 但我的判读脚本在整理台账时
+    用错键名(对已是 data 的列表又取一次 ['data'])抛 KeyError, 没写出判定报告 => 该次只留下产物。
+    run1 产物实测: rc 未记(进程已正常结束, stdout 58 B 且与 run2 stdout 逐字相同 sha=64bc1568c0ab9de5,
+    stderr 0 B, 台账事件计数 = {"GATE": 2, "MOCK_TX_ATTEMPT": 3, "OFFLINE_SELFTEST": 1, "READ_ONLY_PROBE_READY": 1, "RX_BEGIN": 5, "RX_FILE": 5}。
+    处置: 不删 run1 目录, 不改它的任何字节; 按 §5.4"全新目录"再跑 run2 并出正式判定;
+    两次 stdout 的 SHA 相同(64bc1568c0ab9de5), 所以这不是"挑一次好看的", 而是同一结果的可重复性。
+    归因: 本地判读脚本缺陷, 与被测采集器无关。
+
+==============================================================================
+7. 没有做的事(边界)
+==============================================================================
+  未做 Keil/A0/S1/S2 固件链(§5.6: 输入未变不重跑); builds_executed=[]; hardware_actions=[];
+  未创建串口对象/未连 DAP/未复位/未读 Flash/未枚举设备/未发任何目标命令/未清 RAM;
+  未删负控、未加宽松异常兜底、未改 finally 来把结果变绿(§5.4 明令);
+  未动固件/门/工程/四宏/镜像/历史证据; 旧 R1 脚本与旧台账原样保留。
+  板上最后已证镜像仍是 5f30d3f0…; 当前供电终态仍 UNKNOWN, 按 §6 不把它写成"仍在运行"。
+  §5.7 允许自检通过后同一任务继续原包, 但前提是"原仅串口续测批准 + 断电 + 现场前置已齐" ——
+  三者本轮都没到位(批准文字未发出、断电未回报), 所以停在 CP0, 不接触设备, 也不替你填批准。
+  sw1_cut.ps1 仍 HOLD; B-1/BUG-008/RISK-03/03a/物理 RISK-04-b/M-1/M-2/M-3/外部时基仍开放;
+  被动窗口 194 B 高熵字节成因仍未知。
+
+==============================================================================
+8. 登记最终 R1a 字节的提交(§5.8)
+==============================================================================
+  含最终 R1a 字节的提交号本轮不预填自引用 SHA: 推送后由远端 blob 回读确认(见交接 MD 的 R1a 段与
+    提交历史), 远端 .ps1 的 SHA 必须等于 de70c7a4… 才算交付完成。
+  待继续项: (a) 上一轮断电终态回报; (b) 你发出 §7 的批准文字("已断电, 批准仅串口续测R1"即可,
+  §5.7 明令不因文件名 R1a 再索要一次同范围许可); (c) 现场四项前置确认。

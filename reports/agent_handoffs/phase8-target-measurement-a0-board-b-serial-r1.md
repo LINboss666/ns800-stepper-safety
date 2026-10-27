@@ -135,3 +135,42 @@ BOARD_STILL_RUNNING_5f30d3f0 / BOARD_B_POWER_STATE UNKNOWN (awaiting operator re
 NO MOTOR / NO STEP_ENABLE / FOUR SAFETY MACROS RT_FALSE / NO PROGRAM / NO FLASH READ / NO DAP / NO ACTIVE RESET
 NO BUILD / NO DEVICE ENUMERATION / NO sw1_cut.ps1 / NO_RETRY_NO_BACKFILL
 ```
+
+## 10. R1a 补正（追加层，§1–§9 的 CP0 失败历史原样保留）
+
+任务书 `NS800_Serial_R1a_Collector_Erratum_and_Executed_Verification_004a265_20261027.md` 认下 §4 的
+根因归它自己写的自检代码，并给出确定性改名生成器与修正版身份。本轮按 §5 只做离线补正验证：
+
+| 项 | 实际结果 |
+|---|---|
+| 生成方式 | 逐字使用 §4 的 `make_r1a.py`（内容未改，脚本文件放仓外，以免本轮多出非 reports 路径；运行目录=仓库根） |
+| 新身份 | `A0BoardBSerialR1a.ps1` **21453 B / `de70c7a4…`** = §4 登记值；ASCII/LF，CR=0 |
+| 差异范围 | 行级对齐只改 **4 行、5 个 token**（`$reply`→`$probeResponse`），全部在自检分支（联机分支首行 255 之后逐字相同）；`$script:Reply` 11 处与形参 `Idle-Status($Reply)` 2 处按 §2 保留 |
+| 命名碰撞审计 | 顶层 `$reply` 赋值 0 处；显式 `$script:` 状态名 **15 个**（与云端 §3 同行口径一致）；`ParseFile` errors=0 / tokens=4083 |
+| Windows 5.1 实跑 | `powershell.exe -SelfTest`（同一冻结门 `94e83175…` 与同一 3757 B 夹具 `97b37f32…`）：**rc=0**，stdout 逐字 = 原 PASS 行，**stderr 0 B**，3.6 s |
+| 硬判据 | §5.4 全部 **21/21 PASS**（含 `OFFLINE_SELFTEST` = mock_read_probes 3 / mock_forbidden_calls 0 / real_wire_calls 0 / device_actions 0 / boot_fixture_bytes 3757；MOCK_TX_ATTEMPT=3；RX_FILE=5；3757 B 重放 SHA 与原件相同） |
+| 原 NOT_EXERCISED 的两条负控 | **这次真被执行到**：缺提示符超时例响应 132 B 落盘并命中 `Reply timeout; no retry and no cleanup.`；状态污染例 142 B 落盘并命中 `Idle status malformed or not idle.`（脚本内 `-cne` 精确比较，rc=0 才算两条都命中） |
+| 与云端对照 | 事件计数逐项相同（RX_BEGIN 5 / RX_FILE 5 / GATE 2 / READ_ONLY_PROBE_READY 1 / MOCK_TX_ATTEMPT 3 / OFFLINE_SELFTEST 1）；本机是 5.1、云端是 Core 7.4.13，两条独立记录不互替 |
+| 真设备事件 | `SERIAL_OPEN`/`TX_ATTEMPT`/`RESET_ATTEMPT`/`STOP_FAILURE` 全为 0；`hardware_actions=[]`，`builds_executed=[]` |
+| 本轮首失败 `R1A-F1` | 我第一次实跑（run index 1）PowerShell 侧其实已全绿，但我的判读脚本取键名出错抛 KeyError 没出报告 ⇒ 产物保留不删，按 §5.4 另起全新目录跑 run2 出正式判定；两次 stdout 的 SHA 相同（`64bc1568…`），属可重复性而非挑一次好看的 |
+| 变绿手段检查 | 未删负控、未加宽松异常兜底、未改 `finally`；旧 R1 脚本/台账/base64/stdout/stderr 一律未动 |
+| 是否继续 CP1 | **没有**。§5.7 要求"Windows 自检通过 + 原仅串口续测批准 + 断电 + 现场前置"三者齐备；本轮只有第一项成立 ⇒ 停在 CP0，不接触设备，也不代填批准或断电回报 |
+
+证据：[r1a_windows_selftest_verification.txt](file:///D:/ns800/reports/reviews/phase8-target-measurement-a0-board-b-serial-r1/r1a_windows_selftest_verification.txt)（11098 B / `de14170e0f6ed158a53cc0aa8db07937759df89e5d9af8ad02baf1712e8b2b8e`）、[r1a_selftest_artifacts.md](file:///D:/ns800/reports/reviews/phase8-target-measurement-a0-board-b-serial-r1/r1a_selftest_artifacts.md)（6324 B / `938f492658bbe9ef143e9282395ae0cc0e905adcde635001dafa817d40db15a7`）、[A0BoardBSerialR1a.ps1](file:///D:/ns800/reports/reviews/phase8-target-measurement-a0-board-b-serial-r1/A0BoardBSerialR1a.ps1)（21453 B / `de70c7a48280550edb5b5c41d9c5e385e5c79b0b5d4ef5dd901473400b31bd7c`）。
+
+## 11. STOP（R1a 之后）
+
+```text
+A0_BOARD_B_SERIAL_R1a_COLLECTOR_VERIFIED_ON_WINDOWS / CP1_NOT_ENTERED_AWAITING_APPROVAL_AND_POWER_REPORT
+COLLECTOR_R1A 21453 B de70c7a48280550edb5b5c41d9c5e385e5c79b0b5d4ef5dd901473400b31bd7c (差异=4行/5token, 只在自检分支)
+WINDOWS PowerShell 5.1 -SelfTest rc=0 / PASS LINE / stderr=0 B / HARD CRITERIA 21/21 PASS / MOCK_TX=3 RX_FILE=5
+TWO PREVIOUSLY NOT_EXERCISED NEGATIVE CONTROLS NOW EXECUTED (132 B Reply timeout / 142 B Idle status malformed)
+REAL DEVICE EVENTS THIS ROUND = 0 (NO SERIAL_OPEN / NO TX_ATTEMPT / NO RESET_ATTEMPT / NO STOP_FAILURE)
+HARDWARE_ACTIONS=[] BUILDS=[] / FOUR SAFETY MACROS RT_FALSE / FIRMWARE AND GATE AND IMAGE UNCHANGED
+BOARD_B_LAST_PROVEN_IMAGE 5f30d3f0… / BOARD_B_POWER_STATE=UNKNOWN (awaiting operator report; 不写成"仍在运行")
+ORIGINAL CP0 FAILURE AND ALL ITS ARTIFACTS PRESERVED (旧 R1 脚本 6faa1afb… 未覆盖, 台账未改写)
+NO MOTOR / NO STEP_ENABLE / NO PROGRAM / NO FLASH READ / NO DAP / NO ACTIVE RESET / NO DEVICE ENUMERATION / NO sw1_cut.ps1
+```
+
+需要你做两件事才能继续（我不会替你填）：① 让现场回报上一轮断电终态（先关 24 V 再拔 USB，SW1 保持阻断）；
+② 发出 §7 那句批准（"已断电，批准仅串口续测R1…"，按 §5.7 不因文件名 R1a 再索要同范围许可）。
