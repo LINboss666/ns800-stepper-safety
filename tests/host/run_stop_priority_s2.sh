@@ -128,13 +128,15 @@ G_budget_leaf_target=""
 G_budget_leaf_host_ovr="C18a-single-budget-covers-subreads-and-ifcnt C18a2-summary-published-after-real-success C18b-budget-exhausts-without-reopening C18c-wraparound-with-room-succeeds C18c2-wraparound-expiry-is-unsigned-delta C18d-late-real-success-cannot-refresh-summary"
 
 # --------------------------------------------------------------------------
-# URO(2026-10-27 任务书 §6.1/§6.2): read_obs = 读事务观测 + RX 期限修正的 24 条具名用例
-#   (URO01..URO22, 其中 URO06/URO22 各带一条同族子身份 URO06b/URO22b)。
+# URO(2026-10-27 任务书 §6.1/§6.2): read_obs = 读事务观测 + RX 期限修正的具名用例
+#   URO-R1(2026-10-28 §7)在同一组追加 6 条**导出侧**用例 URO23..URO27b(URO27 带子身份
+#   URO27b): 断言的是"完整导出后的数值与字节序列", 不再只看内存中的结构体字段。
+#   (原 URO01..URO22, 其中 URO06/URO22 各带一条同族子身份 URO06b/URO22b, **一条未删**。)
 #   **两个变体都真执行**: 只读观测不需要把四个安全宏翻成 1; 因此 target 的这一组
 #   没有 SKIP 名额(S_read_obs_target 为空), 出现任何 SKIP 都会被判台账不自洽。
 #   旧四个叶子组的 target 整族 SKIP 保持原样, 本组不适用那套写法。
 # --------------------------------------------------------------------------
-G_read_obs_target="URO01-healthy-read-publishes-real-value URO02-healthy-prestage-reply-inside-window URO03-reply-at-110-accepted-by-fixed-deadline URO04-stage-deadline-boundary-pair URO05-total-budget-exhausted-before-rx-entry URO06-lock-refusal-sends-nothing-and-releases-nothing URO06b-zero-remaining-budget-does-not-even-attempt-lock URO07-flush-limits-keep-flush-fact-tx-not-reached URO08-tx-no-space-zero-written-rx-not-reached URO09-partial-tx-keeps-real-written-count URO10-expire-after-last-byte-keeps-written-four URO11-rx-zero-bytes-not-claimed-as-echo URO12-exact-four-byte-echo-only URO13-wrong-header-or-wrong-reg-kept-as-raw-bytes URO14-header-matched-short-frame URO15-complete-frame-crc-error-keeps-eio URO16-complete-legal-frame-rejected-only-by-total-deadline URO17-long-stream-slide-counts-prefix-tail-truncation URO18-tick-wraparound-uses-unsigned-deltas URO19-probe-per-record-facts-and-early-exit URO20-probe-stays-read-only-and-prints-after-txn-release URO21-output-bounded-and-illegal-context-silent URO22-observation-on-off-equivalent-on-same-input URO22b-observation-never-invents-a-success"
+G_read_obs_target="URO01-healthy-read-publishes-real-value URO02-healthy-prestage-reply-inside-window URO03-reply-at-110-accepted-by-fixed-deadline URO04-stage-deadline-boundary-pair URO05-total-budget-exhausted-before-rx-entry URO06-lock-refusal-sends-nothing-and-releases-nothing URO06b-zero-remaining-budget-does-not-even-attempt-lock URO07-flush-limits-keep-flush-fact-tx-not-reached URO08-tx-no-space-zero-written-rx-not-reached URO09-partial-tx-keeps-real-written-count URO10-expire-after-last-byte-keeps-written-four URO11-rx-zero-bytes-not-claimed-as-echo URO12-exact-four-byte-echo-only URO13-wrong-header-or-wrong-reg-kept-as-raw-bytes URO14-header-matched-short-frame URO15-complete-frame-crc-error-keeps-eio URO16-complete-legal-frame-rejected-only-by-total-deadline URO17-long-stream-slide-counts-prefix-tail-truncation URO18-tick-wraparound-uses-unsigned-deltas URO19-probe-per-record-facts-and-early-exit URO20-probe-stays-read-only-and-prints-after-txn-release URO21-output-bounded-and-illegal-context-silent URO22-observation-on-off-equivalent-on-same-input URO22b-observation-never-invents-a-success URO23-tx-written-count-exported-for-0-2-4 URO24-prefix32-tail16-rebuilt-from-export URO25-rx-entry-expiry-exports-real-rc URO26-open-and-context-identity-in-export URO27-empty-sample-and-truncation-scopes URO27b-32byte-stream-prefix-fully-exported"
 G_read_obs_host_ovr="$G_read_obs_target"
 
 # 每个 组×变体 **允许**的 SKIP id(与夹具内 SKIPV 的字面 id 一致)。
@@ -168,9 +170,10 @@ S_read_obs_host_ovr=""
 # CP6 §2/§3: C10 追加 3 条数值反推用例(7->10)、C16 追加 8 条真实叶锁有界等待
 # (7->15) => 41 + (10+15+7+6)=38 => 68 -> 79。
 # URO §6.1: read_obs 在两个变体都真执行 24 条 => target 23+24=47, host_ovr 79+24=103。
-# 旧的 23/79 合同没被改动(各组身份与数量逐字保留), 新用例**另计**。
-S2_EXPECT_target="${S2_EXPECT_target:-47}"
-S2_EXPECT_host_ovr="${S2_EXPECT_host_ovr:-103}"
+# URO-R1 §7: 同组再加 6 条导出侧用例 => target 47+6=53, host_ovr 103+6=109。
+# 旧的 23/79 与 URO 的 24 条合同没被改动(各组身份与数量逐字保留), 新用例**另计**。
+S2_EXPECT_target="${S2_EXPECT_target:-53}"
+S2_EXPECT_host_ovr="${S2_EXPECT_host_ovr:-109}"
 
 VARIANTS="target host_ovr"
 
@@ -638,6 +641,19 @@ PAIRS = {
         '    /* NEGATIVE-INJECTION(rev_obs_drop_raw_rx_capture): 保留总量与业务解析, '
         '只去掉样本取样/样本计数更新 */\n'
         '    for (i = 0; i < (rt_size_t)0; ++i)\n')],
+    # ------------------------------------------------------------------
+    # URO-R1(任务书 §7)第三项: **导出侧**反向。把分块导出退回"单次 16 字节 hex"
+    #   (等价于复审抓到的 A2 原缺陷: 行头声称 n=32, 串口实际只有 16 B)。
+    #   结构体里的 rx_pre[0..31] 完全没被动过 —— 所以只查内存字段的断言仍会绿,
+    #   必须由**从最终输出字节重建前缀**的 URO24/URO27b 具名检出。
+    # ------------------------------------------------------------------
+    'rev_export_drop_prefix_second_chunk': [('mc',
+        '        off += part;\n'
+        '    } while (off < len);\n',
+        '        /* NEGATIVE-INJECTION(rev_export_drop_prefix_second_chunk): 单次 hex '
+        '即返回, 第二块及以后的字节不再出现在串口(A2 原缺陷形状) */\n'
+        '        off = len;\n'
+        '    } while (off < len);\n')],
 }
 
 subs = PAIRS[mode]
@@ -742,7 +758,7 @@ if [ "$REVERSE" = "1" ]; then
     fi
     matrix=()
     note ""
-    note "=== S2 反向(7 项家族, 仓外副本; 正常对照已先通过) ==="
+    note "=== S2 反向(8 项家族, 仓外副本; 正常对照已先通过) ==="
     reverse_s2 rev_stale_identity_gate host_ovr "identity stale" \
         "C09b-late-actions-rejected-no-write C15b-old-identity-rejected-no-write"
     reverse_s2 rev_permit_confirm_identity_gate host_ovr "identity" \
@@ -761,6 +777,11 @@ if [ "$REVERSE" = "1" ]; then
         "URO03-reply-at-110-accepted-by-fixed-deadline URO04-stage-deadline-boundary-pair URO16-complete-legal-frame-rejected-only-by-total-deadline"
     reverse_s2 rev_obs_drop_raw_rx_capture host_ovr "read_obs" \
         "URO12-exact-four-byte-echo-only URO17-long-stream-slide-counts-prefix-tail-truncation"
+    # URO-R1 §7: **导出侧**反向(分块导出退回单次 16 B hex)。结构体完全没被改动, 因此
+    #   检出必须来自"从最终串口字节重建前缀"的 URO24/URO27b —— 复审抓到的正是这一类
+    #   "内存里有、串口没有"的不等价。
+    reverse_s2 rev_export_drop_prefix_second_chunk host_ovr "read_obs" \
+        "URO24-prefix32-tail16-rebuilt-from-export URO27b-32byte-stream-prefix-fully-exported"
     note ""
     note "=== S2 反向汇总 ==="
     for m in "${matrix[@]}"; do note "$m"; done
@@ -770,7 +791,7 @@ if [ "$REVERSE" = "1" ]; then
         for m in "${matrix[@]}"; do echo "$m"; done
     } > "$OUT_DIR/s2_reverse_status.txt"
     if [ "$overall" -eq 0 ]; then
-        note "S2 REVERSE RESULT: PASS —— 七项注入均命中预登记业务失败身份(rc=1, 台账自洽)"
+        note "S2 REVERSE RESULT: PASS —— 八项注入均命中预登记业务失败身份(rc=1, 台账自洽)"
     else
         note "S2 REVERSE RESULT: FAIL (rc=$overall)"
     fi

@@ -107,6 +107,13 @@ static rt_tick_t   leaf_tx_busy_until;         /* 移位器变空的时刻 */
  * C17b 的部分发送, 不是同一条判据。 */
 static int         leaf_tick_jump_after;       /* 0 = 关闭 */
 static rt_uint32_t leaf_tick_jump_ms;
+/* R1-B1 接缝(附录B 同一思路的端口版): 末字节落地之后再走 N 次 rt_tick_get() 才推进时钟。
+ * 为什么不能用上面的 jump_after: 那是在**字节钩子内**推进, TX 自己的后置校验就会先看到过期,
+ * 于是测到的是 TX 层出口, 不是"TX 全成功返回之后、RX 阶段取 tick 之前被抢占"这条出口。
+ * 默认 0 = 关闭, 旧组行为逐字不变。 */
+static int         leaf_tick_gets_to_jump;     /* 末字节后第 N 次 rt_tick_get 时推进 */
+static rt_uint32_t leaf_tick_get_jump_ms;
+static int         leaf_tick_gets_after_tx;    /* 计数, 用例据此核对真的停在第 4 次 */
 static int         leaf_tx_busy;             /* 1 = 正在移位(与 0 时刻可区分, 回绕不失效) */
 static rt_uint8_t  leaf_tx_bytes_log[64];
 static int         leaf_tx_log_n;
@@ -126,6 +133,7 @@ static void leaf_tx_reset(void)
     leaf_tx_written = 0; leaf_tx_allowed = 1 << 20; leaf_tx_busy_until = 0; leaf_tx_busy = 0;
     leaf_drain_ms = 1; leaf_tx_log_n = 0;
     leaf_tick_jump_after = 0; leaf_tick_jump_ms = 0;
+    leaf_tick_gets_to_jump = 0; leaf_tick_get_jump_ms = 0; leaf_tick_gets_after_tx = 0;
     leaf_uart_regs.STAT.WORDVAL |= LEAF_TDRE;      /* 上电: 发送数据寄存器空 */
 }
 
@@ -413,7 +421,20 @@ uint32_t ns800_leaf_primask(void) { return leaf_masked ? 1u : 0u; }
 rt_bool_t rt_interrupt_get_nest(void) { return leaf_nest ? RT_TRUE : RT_FALSE; }
 rt_thread_t rt_thread_self(void)
 { return (leaf_masked || leaf_no_thread) ? RT_NULL : (rt_thread_t)(void *)0x1; }
-rt_tick_t rt_tick_get(void) { return leaf_tick; }
+rt_tick_t rt_tick_get(void)
+{
+    /* R1-B1 确定接缝: 末字节之后第 N 次取 tick 时把时间推走(模拟被抢占), 于是生产代码
+     * 走到的是 **RX 阶段入口**那条"总预算已耗尽"出口, 而不是 TX 层的同名返回。 */
+    if (leaf_tick_gets_to_jump != 0 && leaf_tx_written == 4)
+    {
+        if (++leaf_tick_gets_after_tx == leaf_tick_gets_to_jump)
+        {
+            leaf_advance((rt_tick_t)leaf_tick_get_jump_ms);
+            leaf_tick_gets_to_jump = 0;
+        }
+    }
+    return leaf_tick;
+}
 rt_tick_t rt_tick_from_millisecond(rt_int32_t ms) { return (rt_tick_t)ms; }
 void rt_thread_mdelay(rt_int32_t ms) { ps_win_note("rt_thread_mdelay"); leaf_advance((rt_tick_t)ms); }
 
@@ -2094,6 +2115,51 @@ static void uro_expect_reply(rt_uint8_t reg, rt_uint8_t *rep)
     rep[7] = leaf_crc8(rep, 7);
 }
 
+/* R1(§6.1): 把某个**命名样本**的全部分块按 off 顺序拼回来 —— 这是"导出侧"的复算,
+ * 不是读结构体字段。返回拼到的字节数; *bad 置 1 表示分块起点不连续、或某块自报 n
+ * 超过产品约定的每块上限(16)。 */
+static int uro_sample_gather(const char *reg_tag, const char *tag, rt_uint8_t *out,
+                             int cap, int *bad)
+{
+    char  tmp[200];
+    int   i = 0, j, got = 0;
+
+    if (bad != NULL) *bad = 0;
+    while (i < leaf_out_n)
+    {
+        char *p, *q;
+        long  off, n, k;
+
+        j = 0;
+        while (i < leaf_out_n && leaf_out[i] != '\n' && j < (int)sizeof(tmp) - 1)
+            tmp[j++] = leaf_out[i++];
+        tmp[j] = '\0';
+        if (i < leaf_out_n && leaf_out[i] == '\n') i++;
+        if (strstr(tmp, reg_tag) == NULL) continue;
+        p = strstr(tmp, tag);
+        if (p == NULL) continue;
+        q = strstr(p, " off=");
+        if (q == NULL) continue;                      /* 声明行(samples / cand=)不是分块 */
+        off = strtol(q + 5, NULL, 10);
+        q = strstr(q, " n=");
+        if (q == NULL) continue;
+        n = strtol(q + 3, NULL, 10);
+        q = strstr(q, "hex=");
+        if (q == NULL) continue;
+        q += 4;
+        if (off != (long)got && bad != NULL) *bad = 1;
+        if (n > 16 && bad != NULL) *bad = 1;
+        for (k = 0; k < n; ++k)
+        {
+            while (*q == ' ') q++;
+            if (got < cap) out[got] = (rt_uint8_t)strtol(q, NULL, 16);
+            got++;
+            q += 2;
+        }
+    }
+    return got;
+}
+
 static void uro_group(void)
 {
     tmc_read_observation_t o, o2;
@@ -2133,7 +2199,8 @@ static void uro_group(void)
           memcmp(o.rx_pre, o.req, 4) == 0 && o.cand_n == 8u &&
           memcmp(o.cand, exp_rep, 8) == 0 &&
           o.echo_state == TMC_OBS_ECHO_WITHIN && o.echo_match_seen == 1u &&
-          o.late_valid_frame == 0u && o.stage_expired == 0u && o.total_expired == 0u &&
+          o.late_valid_frame == 0u && o.stage_expired == TMC_OBS_DEAD_NO &&
+          o.total_expired == TMC_OBS_DEAD_NO &&
           o.b_start == (rt_uint32_t)t0 && o.b_total == 125u &&
           o.flush_reached == 1u && o.flush_rc == RT_EOK && o.flush_bytes == 0u &&
           leaf_write_frames == wf0 && leaf_read_reqs == rr0 + 1 &&
@@ -2160,7 +2227,8 @@ static void uro_group(void)
           o.tx_off == o.rx_begin_off && o.rx_begin_off == 15u && o.rx_reached == 1u &&
           o.rx_deadline_off == o.rx_begin_off + 100u && o.rx_deadline_off <= o.b_total &&
           o.done_off >= 30u && o.done_off < o.rx_deadline_off &&
-          o.stage_expired == 0u && o.total_expired == 0u && o.late_valid_frame == 0u,
+          o.stage_expired == TMC_OBS_DEAD_NO && o.total_expired == TMC_OBS_DEAD_NO &&
+          o.late_valid_frame == 0u,
           fm("rc=%d 前段=%u 期限=%u 完成=%u total=%u 合同=阶段起点+min(100,总剩余): %s",
              (int)e, (unsigned)o.rx_begin_off, (unsigned)o.rx_deadline_off,
              (unsigned)o.done_off, (unsigned)o.b_total,
@@ -2184,7 +2252,7 @@ static void uro_group(void)
           o.rx_begin_off == 15u && o.rx_deadline_off == 115u &&
           o.rx_deadline_off > 100u &&            /* 旧算式恰好给 100 => 本项直接反对它 */
           o.done_off >= 110u && o.done_off < o.rx_deadline_off &&
-          o.total_expired == 0u && o.stage_expired == 0u,
+          o.total_expired == TMC_OBS_DEAD_NO && o.stage_expired == TMC_OBS_DEAD_NO,
           fm("rc=%d value=0x%08X 前段=%u 期限=%u 应答可见=110 完成=%u published=%u "
              "(旧算式期限=100 会拒绝这一帧)",
              (int)e, (unsigned)v, (unsigned)o.rx_begin_off,
@@ -2203,14 +2271,15 @@ static void uro_group(void)
     e2 = tmc_read_reg_obs(TMC_ADDR_DEFAULT, TMC_REG_IOIN, &v2, RT_NULL, &st2, &o2);
     CHECK("URO04-stage-deadline-boundary-pair",
           e == RT_EOK && o.published == 1u && o.crc_state == TMC_OBS_CRC_OK &&
-          o.stage_expired == 0u && o.late_valid_frame == 0u &&
+          o.stage_expired == TMC_OBS_DEAD_NO && o.late_valid_frame == 0u &&
           o.done_off < o.rx_deadline_off &&
           e2 == -RT_ETIMEOUT && o2.result == TMC_OBS_FAIL &&
           o2.crc_state == TMC_OBS_CRC_OK &&     /* CRC 真的算过并通过 => 复核接缝确实命中 */
           o2.hdr_seen == 1u && o2.frame_complete == 1u && o2.rx_total == 8u &&
-          o2.stage_expired == 1u && o2.late_valid_frame == 1u &&
+          o2.stage_expired == TMC_OBS_DEAD_YES && o2.late_valid_frame == 1u &&
           o2.published == 0u && o2.value_valid == 0u && v2 == 0u &&
-          o2.rx_deadline_off == o.rx_deadline_off && o2.total_expired == 0u,
+          o2.rx_deadline_off == o.rx_deadline_off &&
+          o2.total_expired == TMC_OBS_DEAD_NO,
           fm("期限内: rc=%d pub=%u done=%u | 期限刻: rc=%d crc=%u full=%u expired=%u "
              "late=%u pub=%u",
              (int)e, (unsigned)o.published, (unsigned)o.done_off, (int)e2,
@@ -2247,7 +2316,8 @@ static void uro_group(void)
           o.frame_complete == 0u && o.crc_state == TMC_OBS_CRC_NOT_REACHED &&
           o.published == 0u && o.value_valid == 0u && v == 0xA5A5A5A5u &&
           e2 == -RT_ETIMEOUT && o2.reason == TMC_XFER_TX_FAILED &&
-          o2.total_expired == 1u && o2.stage_expired == 0u &&
+          o2.total_expired == TMC_OBS_DEAD_YES &&
+          o2.stage_expired == TMC_OBS_DEAD_YES &&
           o2.rx_reached == 0u && o2.tx_written == 4u &&
           o2.done_off >= 125u && o2.done_off < 0x80000000u &&
           o2.b_start < 200u && v2 == 0xA5A5A5A5u && o2.value_valid == 0u &&
@@ -2335,7 +2405,7 @@ static void uro_group(void)
           leaf_tx_written == tx0 &&
           e2 == -RT_ETIMEOUT && o2.flush_rc == -RT_ETIMEOUT &&
           o2.reason == TMC_XFER_RX_FLOOD && o2.flush_ms >= 2u &&
-          o2.flush_bytes < 256u && o2.total_expired == 0u &&
+          o2.flush_bytes < 256u && o2.total_expired == TMC_OBS_DEAD_UNEVALUATED &&
           o2.tx_called == 0u && o2.rx_total == 0u &&
           v == 0xA5A5A5A5u && v2 == 0xA5A5A5A5u,
           fm("(字节上限)rc=%d reason=%u flush_bytes=%u rx_total=%u tx_called=%u | "
@@ -2403,7 +2473,8 @@ static void uro_group(void)
     CHECK("URO10-expire-after-last-byte-keeps-written-four",
           e == -RT_ETIMEOUT && (int)o.rc == (int)e && o.result == TMC_OBS_FAIL &&
           o.tx_written == 4u && leaf_tx_written == 4 && o.tx_rc == -RT_ETIMEOUT &&
-          o.stage_expired == 1u && o.total_expired == 0u && o.rx_reached == 0u &&
+          o.stage_expired == TMC_OBS_DEAD_YES && o.total_expired == TMC_OBS_DEAD_NO &&
+          o.rx_reached == 0u &&
           o.rx_total == 0u && o.published == 0u && v == 0xA5A5A5A5u &&
           o.done_off > 20u && o.done_off < o.b_total && o.reason == TMC_XFER_TX_FAILED,
           fm("rc=%d tx_written=%u(线上真实=%d) tx_rc=%d stage_expired=%u total_expired=%u "
@@ -2426,7 +2497,7 @@ static void uro_group(void)
           o.rx_total == 0u && o.rx_buf_n == 0u && o.echo_state == TMC_OBS_ECHO_NONE &&
           o.echo_match_seen == 0u && o.hdr_seen == 0u && o.frame_complete == 0u &&
           o.crc_state == TMC_OBS_CRC_NOT_REACHED && o.published == 0u &&
-          o.stage_expired == 1u && o.rx_pre_n == 0u && o.cand_n == 0u &&
+          o.stage_expired == TMC_OBS_DEAD_YES && o.rx_pre_n == 0u && o.cand_n == 0u &&
           o.reason == TMC_XFER_RX_TIMEOUT_ECHO &&   /* 旧枚举名保留, 但不据它判回声 */
           leaf_read_reqs == rr0 + 1 && v == 0xA5A5A5A5u &&
           o.echo_state != TMC_OBS_ECHO_ONLY,
@@ -2524,12 +2595,15 @@ static void uro_group(void)
           o.hdr_seen == 1u && o.frame_complete == 1u &&
           o.crc_state == TMC_OBS_CRC_FAIL && o.published == 0u && o.value_valid == 0u &&
           o.rx_total == 8u && o.cand_n == 8u && memcmp(o.cand, exp_rep, 8) == 0 &&
-          o.stage_expired == 0u && o.late_valid_frame == 0u && o.total_expired == 0u &&
+          o.stage_expired == TMC_OBS_DEAD_NO &&
+          o.late_valid_frame == 0u && o.total_expired == TMC_OBS_DEAD_NO &&
           v == 0xA5A5A5A5u,
-          fm("rc=%d(必须 -12=EIO, 不是 -117) reason=%u crc=%u full=%u cand=%02X %02X "
+          fm("rc=%d(必须 -12=EIO, 不是 -117) reason=%u crc=%u full=%u 期限=%c/%c cand=%02X %02X "
              "%02X %02X %02X %02X %02X %02X",
              (int)o.rc, (unsigned)o.reason, (unsigned)o.crc_state,
-             (unsigned)o.frame_complete, o.cand[0], o.cand[1], o.cand[2], o.cand[3],
+             (unsigned)o.frame_complete, tmc_obs_dead_name(o.stage_expired),
+             tmc_obs_dead_name(o.total_expired),
+             o.cand[0], o.cand[1], o.cand[2], o.cand[3],
              o.cand[4], o.cand[5], o.cand[6], o.cand[7]));
 
     /* ================= URO16 完整合法帧仅因**总期限**被拒: CRC=OK published=0 ===== */
@@ -2547,17 +2621,19 @@ static void uro_group(void)
     uro_expect_reply(TMC_REG_IOIN, exp_rep);
     CHECK("URO16-complete-legal-frame-rejected-only-by-total-deadline",
           e == -RT_ETIMEOUT && (int)o.rc == (int)e &&
-          o.crc_state == TMC_OBS_CRC_OK && o.total_expired == 1u &&
+          o.crc_state == TMC_OBS_CRC_OK && o.total_expired == TMC_OBS_DEAD_YES &&
           o.late_valid_frame == 1u && o.published == 0u && o.value_valid == 0u &&
           v == 0xA5A5A5A5u && o.hdr_seen == 1u && o.frame_complete == 1u &&
           o.rx_total == 8u && o.cand_n == 8u && memcmp(o.cand, exp_rep, 8) == 0 &&
           o.b_start == (rt_uint32_t)bb.start && o.b_total == 20u &&
           o.rx_begin_off == 15u && o.rx_deadline_off == 20u &&
-          o.reason == TMC_XFER_BUDGET_EXHAUSTED && o.stage_expired == 0u &&
+          o.reason == TMC_XFER_BUDGET_EXHAUSTED &&
+          o.stage_expired == TMC_OBS_DEAD_NO &&
           o.done_off >= 20u,
-          fm("rc=%d crc=%u(真算过) total_expired=%u late=%u pub=%u cand=%02X %02X %02X "
+          fm("rc=%d crc=%u(真算过) total_expired=%u stage_now=%c late=%u pub=%u cand=%02X %02X %02X "
              "%02X %02X %02X %02X %02X 前段=%u 期限=%u total=%u",
              (int)e, (unsigned)o.crc_state, (unsigned)o.total_expired,
+             tmc_obs_dead_name(o.stage_expired),
              (unsigned)o.late_valid_frame, (unsigned)o.published,
              o.cand[0], o.cand[1], o.cand[2], o.cand[3], o.cand[4], o.cand[5],
              o.cand[6], o.cand[7], (unsigned)o.rx_begin_off,
@@ -2620,9 +2696,10 @@ static void uro_group(void)
           e == RT_EOK && o.result == TMC_OBS_SUCCESS && v == 0x21000040u &&
           o.published == 1u && o.b_start == 0xFFFFFFF0u &&
           o.rx_begin_off == 3u && o.rx_deadline_off == 103u &&
-          o.total_expired == 0u && o.stage_expired == 0u &&
+          o.total_expired == TMC_OBS_DEAD_NO && o.stage_expired == TMC_OBS_DEAD_NO &&
           e2 == -RT_ETIMEOUT && o2.b_start == 0xFFFFFFE0u &&
-          o2.stage_expired == 1u && o2.published == 0u && o2.rx_total == 0u &&
+          o2.stage_expired == TMC_OBS_DEAD_YES && o2.published == 0u &&
+          o2.rx_total == 0u &&
           o2.late_valid_frame == 0u && k == 1 && leaf_rep_pending == 0 && leaf_rxn == 8,
           fm("(回绕内成功)rc=%d start=%08X 期限=%u value=0x%08X | (回绕后过期)rc=%d "
              "start=%08X 过期时应答仍挂起=%d 之后入队字节=%d",
@@ -2785,7 +2862,8 @@ static void uro_group(void)
               st.used == st2.used && rr_a == rr_b && rr_a == 1 &&
               wf_a == wf_b && wf_a == 0 && tx_a == tx_b && tx_a == 4 &&
               o2.published == 1u && o2.crc_state == TMC_OBS_CRC_OK &&
-              o2.late_valid_frame == 0u && o2.stage_expired == 0u,
+              o2.late_valid_frame == 0u &&
+              o2.stage_expired == TMC_OBS_DEAD_NO,
               fm("无观测 rc=%d value=0x%08X used=%u tx=%u rx=%u | 有观测 rc=%d "
                  "value=0x%08X used=%u tx=%u rx=%u | 总线 读%d/%d 写%d/%d 字节%d/%d",
                  (int)e, (unsigned)a, (unsigned)st.used, (unsigned)st.tx_written,
@@ -2815,6 +2893,244 @@ static void uro_group(void)
                  (int)e, (unsigned)st.used, (int)e2, (unsigned)o2.result,
                  (unsigned)o2.published, (unsigned)o2.rx_total,
                  (int)(a == 0xA5A5A5A5u)));
+    }
+
+    /* ============ URO23 tx_written 必须真的出现在串口输出里(不只存在于结构体) ===== */
+    {
+        static const int allow[3] = { 0, 2, 4 };
+        int k, ok = 1, exp_w[3], real_w[3], blocks, derr = 0;
+
+        for (k = 0; k < 3; ++k)
+        {
+            leaf_state_clear();
+            if (!leaf_pre(leaf_bus_ready(), "URO23 bus ready")) return;
+            uro_zero(&o, &st);
+            (void)uro_input(0, 0u, 1u);
+            leaf_tx_allowed = allow[k];
+            if (allow[k] == 0)
+                leaf_uart_regs.STAT.WORDVAL &= ~LEAF_TDRE;   /* 一个字节都发不出去 */
+            leaf_capture = 1;
+            leaf_out_reset();
+            v = 0xA5A5A5A5u;
+            (void)tmc_read_reg_obs(TMC_ADDR_DEFAULT, TMC_REG_IOIN, &v, RT_NULL, &st, &o);
+            tmc_probe_dump(&derr, &o);                      /* 导出到"串口" */
+            exp_w[k] = (int)uro_field("reg=06", "tx_written=");
+            real_w[k] = leaf_tx_written;
+            blocks = uro_line_scan("reg=06", "tx_written=");
+            leaf_capture = 0;
+            if (exp_w[k] != allow[k] || real_w[k] != allow[k] || blocks != 1 ||
+                derr != 0) ok = 0;
+        }
+        CHECK("URO23-tx-written-count-exported-for-0-2-4",
+              ok == 1 && exp_w[0] == 0 && exp_w[1] == 2 && exp_w[2] == 4 &&
+              real_w[0] == 0 && real_w[1] == 2 && real_w[2] == 4,
+              fm("导出 written=%d/%d/%d 端口真落 DATA 的字节=%d/%d/%d",
+                 exp_w[0], exp_w[1], exp_w[2], real_w[0], real_w[1], real_w[2]));
+    }
+
+    /* ============ URO24 48 B 长流: 前缀 32 B 必须能**从导出**重建 ================= */
+    {
+        rt_uint8_t pre[64], tail[64], cand[64];
+        int bad_pre = 0, bad_tail = 0, bad_cand = 0, derr = 0;
+        int got_pre, got_tail, got_cand, chunks_pre, chunks_tail, chunks_cand;
+
+        leaf_state_clear();
+        if (!leaf_pre(leaf_bus_ready(), "URO24 bus ready")) return;
+        uro_zero(&o, &st);
+        (void)uro_input(0, 0u, 1u);
+        leaf_reply_junk = 48;                         /* 48 个递增垃圾字节, 无应答 */
+        leaf_capture = 1;
+        leaf_out_reset();
+        v = 0xA5A5A5A5u;
+        e = tmc_read_reg_obs(TMC_ADDR_DEFAULT, TMC_REG_IOIN, &v, RT_NULL, &st, &o);
+        leaf_reply_junk = 0;
+        tmc_probe_dump(&derr, &o);
+        got_pre   = uro_sample_gather("reg=06", "rx1",   pre,   (int)sizeof(pre),   &bad_pre);
+        got_tail  = uro_sample_gather("reg=06", "rxT",   tail,  (int)sizeof(tail),  &bad_tail);
+        got_cand  = uro_sample_gather("reg=06", "cand",  cand,  (int)sizeof(cand),  &bad_cand);
+        chunks_pre  = uro_line_scan("reg=06", "rx1 off=");
+        chunks_tail = uro_line_scan("reg=06", "rxT off=");
+        chunks_cand = uro_line_scan("reg=06", "cand off=");
+        leaf_capture = 0;
+        CHECK("URO24-prefix32-tail16-rebuilt-from-export",
+              e == -RT_ETIMEOUT && o.rx_total == 48u &&
+              got_pre == 32 && got_tail == 16 && got_cand == 0 &&
+              bad_pre == 0 && bad_tail == 0 && bad_cand == 0 &&
+              chunks_pre == 2 && chunks_tail == 1 && chunks_cand == 1 &&
+              pre[0] == 0x10u && pre[31] == (rt_uint8_t)(0x10u + 31u) &&
+              tail[0] == (rt_uint8_t)(0x10u + 32u) && tail[15] == (rt_uint8_t)(0x10u + 47u) &&
+              uro_line_scan("reg=06", "samples pre=32 tail=16 cand=0") == 1 &&
+              uro_line_scan("reg=06", "pre_trunc=1") == 1 &&
+              uro_line_scan("reg=06", "gap=0") == 1,
+              fm("导出重建 pre=%d(0x%02X..0x%02X) tail=%d(0x%02X..0x%02X) cand=%d "
+                 "块数=%d/%d/%d rx_total=%u",
+                 got_pre, pre[0], pre[31], got_tail, tail[0], tail[15], got_cand,
+                 chunks_pre, chunks_tail, chunks_cand, (unsigned)o.rx_total));
+    }
+
+    /* ============ URO25 RX 入口到期: 导出的 rc/reason 必须与业务返回一致 =========== */
+    {
+        int real_line, fake_line, derr = 0;
+
+        leaf_state_clear();
+        if (!leaf_pre(leaf_bus_ready(), "URO25 bus ready")) return;
+        uro_zero(&o, &st);
+        (void)uro_input(0, 0u, 1u);
+        /* 端口接缝: 末字节之后第 4 次取 tick 才推进 => 第 1/2/3 次分别是 TX 叶子末检查、
+         * 观测 tx_off、TX 包装后置校验, 第 4 次正是 RX 阶段入口(与附录B 同一计数)。 */
+        leaf_tick_gets_to_jump = 4;
+        leaf_tick_get_jump_ms = 200u;
+        leaf_capture = 1;
+        leaf_out_reset();
+        v = 0xA5A5A5A5u;
+        e = tmc_read_reg_obs(TMC_ADDR_DEFAULT, TMC_REG_IOIN, &v, RT_NULL, &st, &o);
+        tmc_probe_dump(&derr, &o);                      /* 导出到"串口"再判定 */
+        real_line = uro_line_scan("reg=06", "result=FAIL rc=-117 reason=budget-exhausted");
+        fake_line = uro_line_scan("reg=06", "rc=0 reason=ok");
+        leaf_capture = 0;
+        CHECK("URO25-rx-entry-expiry-exports-real-rc",
+              e == -RT_ETIMEOUT && leaf_tick_gets_after_tx == 4 &&
+              o.tx_rc == RT_EOK && o.tx_written == 4u &&      /* TX 整帧真的成功 */
+              o.rx_reached == 0u && o.rc == (rt_int32_t)e &&
+              o.reason == TMC_XFER_BUDGET_EXHAUSTED &&
+              o.total_expired == TMC_OBS_DEAD_YES &&
+              o.published == 0u && o.value_valid == 0u && v == 0xA5A5A5A5u &&
+              real_line == 1 && fake_line == 0 && derr == 0 &&
+              uro_line_scan("reg=06", "exp=y/") == 1,
+              fm("接缝第%d次 tick 推进; 业务 rc=%d 观测 rc=%d reason=%u tx_rc=%d "
+                 "rx_reached=%u 导出真 rc 行=%d 冒充成功行=%d",
+                 leaf_tick_gets_after_tx, (int)e, (int)o.rc, (unsigned)o.reason,
+                 (int)o.tx_rc, (unsigned)o.rx_reached, real_line, fake_line));
+    }
+
+    /* ============ URO26 打开身份/上下文与拒绝路径的导出 ============================ */
+    {
+        int opened_now_06, opened_now_all, already_all, success_a;
+        int opened_calls_delta, opens0;
+        int ctx1, ctx0, not_reached, txn_0, refused, held_title, non_ascii, dev_opens;
+        int end_b, end_c;
+
+        /* (a) 本次真的打开: 三笔都记 probe 这一层的 OPENED_NOW, 不被子读覆盖成 ALREADY */
+        leaf_state_clear();
+        if (!leaf_pre(leaf_bus_ready(), "URO26a bus ready")) return;
+        leaf_capture = 1; leaf_txn_mtx = &tmc_cfg_prod.txn;
+        tmc_opened = RT_FALSE; tmc_serial = RT_NULL;
+        opens0 = leaf_dev_open_calls;
+        leaf_out_reset();
+        (*leaf_cmd_tmc_uart_probe)();
+        opened_now_06 = uro_line_scan("reg=06", "open=OPENED_NOW/0");
+        opened_now_all = uro_line_count("open=OPENED_NOW/0");
+        already_all = uro_line_count("open=ALREADY_OPEN/0");
+        success_a = uro_line_count("result=SUCCESS");
+        opened_calls_delta = leaf_dev_open_calls - opens0;
+        leaf_capture = 0;
+
+        /* (b) 事务不可用: ctx 是 probe 入口的事实(允许), 打开这一步根本没走到 */
+        leaf_state_clear();
+        if (!leaf_pre(leaf_bus_ready(), "URO26b bus ready")) return;
+        leaf_capture = 1;
+        tmc_cfg_prod.txn_ok = RT_FALSE;
+        leaf_out_reset();
+        (*leaf_cmd_tmc_uart_probe)();
+        tmc_cfg_prod.txn_ok = RT_TRUE;
+        ctx1 = uro_line_count("ctx=1");
+        ctx0 = uro_line_count("ctx=0");
+        not_reached = uro_line_count("open=OPEN_NOT_REACHED/0");
+        txn_0 = uro_line_count("txn=0/-45");
+        refused = uro_line_scan("probe REFUSED", "-45");
+        held_title = uro_line_count("identity check txn-held");
+        end_b = uro_line_scan("[TMRO] END reads=0", "observation_complete=1");
+        non_ascii = 0;
+        {
+            int z;
+
+            for (z = 0; z < leaf_out_n; ++z)
+                if ((unsigned char)leaf_out[z] > 127u) non_ascii++;
+        }
+        leaf_capture = 0;
+
+        /* (c) 打开失败: 顶层失败就在 OPEN 这一层, 原始 rc 可见, 三笔都没试过 */
+        leaf_state_clear();
+        if (!leaf_pre(leaf_bus_ready(), "URO26c bus ready")) return;
+        leaf_capture = 1; leaf_txn_mtx = &tmc_cfg_prod.txn;
+        tmc_opened = RT_FALSE; tmc_serial = RT_NULL;
+        leaf_dev_present = 0;
+        leaf_out_reset();
+        (*leaf_cmd_tmc_uart_probe)();
+        dev_opens = uro_line_count("open=OPEN_FAILED/");
+        end_c = uro_line_scan("[TMRO] END reads=0", "observation_complete=1");
+        leaf_capture = 0;
+        leaf_dev_present = 1;
+        CHECK("URO26-open-and-context-identity-in-export",
+              opened_now_06 == 1 && opened_now_all == 3 && already_all == 0 &&
+              opened_calls_delta == 1 && success_a == 3 &&
+              ctx1 == 3 && ctx0 == 0 && not_reached == 3 && txn_0 == 3 &&
+              refused == 1 && held_title == 0 && non_ascii == 0 && end_b == 1 &&
+              dev_opens == 3 && end_c == 1,
+              fm("(a)OPENED_NOW(reg06/三笔)=%d/%d ALREADY=%d SUCCESS=%d 真打开次数+%d "
+                 "|(b)ctx1=%d ctx0=%d open未到达=%d txn0/-45=%d REFUSED=%d txn-held标题=%d "
+                 "非ASCII字节=%d END完整=%d |(c)OPEN_FAILED=%d END完整=%d",
+                 opened_now_06, opened_now_all, already_all, success_a, opened_calls_delta,
+                 ctx1, ctx0, not_reached, txn_0, refused, held_title, non_ascii, end_b,
+                 dev_opens, end_c));
+    }
+
+    /* ============ URO27 空样本与"截断/缺口"分列 ==================================== */
+    {
+        rt_uint8_t pre[64];
+        int bad = 0, got, derr = 0;
+
+        /* (a) RX 零字节: 三个样本都是 `n=0 hex=-`, 不许出现虚构的 00 */
+        leaf_state_clear();
+        if (!leaf_pre(leaf_bus_ready(), "URO27a bus ready")) return;
+        uro_zero(&o, &st);
+        (void)uro_input(0, 0u, 1u);
+        leaf_chip_enabled = 0;
+        leaf_capture = 1;
+        leaf_out_reset();
+        v = 0xA5A5A5A5u;
+        (void)tmc_read_reg_obs(TMC_ADDR_DEFAULT, TMC_REG_IOIN, &v, RT_NULL, &st, &o);
+        leaf_chip_enabled = 1;
+        tmc_probe_dump(&derr, &o);                      /* 显式导出: 单笔读自己不打日志 */
+        {
+            int empties = uro_line_count("n=0 hex=-");
+            int fake0   = uro_line_scan("reg=06", "n=0 hex=00");
+
+            leaf_capture = 0;
+            CHECK("URO27-empty-sample-and-truncation-scopes",
+                  empties == 3 && fake0 == 0 && derr == 0 &&
+                  uro_line_scan("reg=06", "pre_trunc=0") == 1 &&
+                  uro_line_scan("reg=06", "gap=0") == 1 &&
+                  o.rx_total == 0u && o.rx_pre_n == 0u,
+                  fm("空样本 n=0 hex=- 行数=%d 虚构00=%d rx_total=%u",
+                     empties, fake0, (unsigned)o.rx_total));
+        }
+
+        /* (b) 恰好 32 B(24 垃圾 + 8 合法应答): 前缀**全部**可重建, 没有前缀溢出也没有缺口
+         *     —— 与 URO24 的 48 B(pre_trunc=1 / gap=0)一起把三种范围分列清楚。 */
+        leaf_state_clear();
+        if (!leaf_pre(leaf_bus_ready(), "URO27b bus ready")) return;
+        uro_zero(&o, &st);
+        (void)uro_input(0, 0u, 1u);
+        leaf_reply_junk = -24;
+        leaf_capture = 1;
+        leaf_out_reset();
+        v = 0u;
+        (void)tmc_read_reg_obs(TMC_ADDR_DEFAULT, TMC_REG_IOIN, &v, RT_NULL, &st, &o);
+        leaf_reply_junk = 0;
+        tmc_probe_dump(&derr, &o);                      /* 显式导出到"串口" */
+        got = uro_sample_gather("reg=06", "rx1", pre, (int)sizeof(pre), &bad);
+        leaf_capture = 0;
+        CHECK("URO27b-32byte-stream-prefix-fully-exported",
+              got == 32 && bad == 0 && derr == 0 && pre[0] == 0x10u && pre[23] == (rt_uint8_t)(0x10u + 23u) &&
+              pre[24] == 0x05u && pre[25] == 0xFFu && pre[26] == TMC_REG_IOIN &&
+              v == 0x21000040u &&
+              uro_line_scan("reg=06", "samples pre=32 tail=16 cand=8") == 1 &&
+              uro_line_scan("reg=06", "pre_trunc=0") == 1 &&
+              uro_line_scan("reg=06", "gap=0") == 1,
+              fm("导出重建前缀=%d 字节(0x%02X..0x%02X 24 垃圾+应答头=%02X %02X %02X) "
+                 "发布值=0x%08X",
+                 got, pre[0], pre[23], pre[24], pre[25], pre[26], (unsigned)v));
     }
 
     leaf_capture = 0;

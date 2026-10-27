@@ -139,6 +139,18 @@ typedef struct
 #define TMC_OBS_ECHO_WITHIN      3u   /* 捕获到与请求逐字相等的连续片段, 但还有其它字节 */
 #define TMC_OBS_ECHO_OTHER       4u   /* 有非零字节, 但没有逐字相等的请求片段 */
 
+/* R1(任务书 §6.2 B3): 打开身份是**四态**, 0 不再被默认解释成"已打开"。
+ * 私有枚举重排, 公开 API/头文件不受影响。 */
+#define TMC_OBS_OPEN_NOT_REACHED 0u   /* 本次没有走到打开这一步(未知, 不是已打开) */
+#define TMC_OBS_OPEN_ALREADY     1u   /* 进入本笔之前就已打开: 不冒充本次重配置成功 */
+#define TMC_OBS_OPENED_NOW       2u   /* 本次操作里真的执行了打开并成功 */
+#define TMC_OBS_OPEN_FAILED      3u   /* 本次操作里尝试打开并失败(open_rc 为原始码) */
+
+/* R1(任务书 §6.2 末条): 期限字段表示"期限事实快照", 未做过比较不许写成"没过期"。 */
+#define TMC_OBS_DEAD_UNEVALUATED 0u   /* 该期限还没被比较过 */
+#define TMC_OBS_DEAD_NO          1u   /* 比较过: 当时未到期 */
+#define TMC_OBS_DEAD_YES         2u   /* 比较过: 已到期 */
+
 typedef struct
 {
     /* 身份 */
@@ -153,7 +165,7 @@ typedef struct
     rt_uint8_t  ctx_ok;              /* 上下文是否允许等待 */
     rt_uint8_t  txn_held;            /* 外层配置事务是否取得 */
     rt_int16_t  txn_rc;
-    rt_uint8_t  open_state;          /* 0=本次未打开(已打开) 1=本次尝试打开 2=打开失败 */
+    rt_uint8_t  open_state;          /* TMC_OBS_OPEN_*: 0=NOT_REACHED(不是"已打开") */
     rt_int16_t  open_rc;
     /* 锁 */
     rt_uint8_t  lock_attempted;
@@ -184,8 +196,8 @@ typedef struct
     rt_uint32_t rx_begin_off;
     rt_uint32_t rx_deadline_off;
     rt_uint32_t done_off;
-    rt_uint8_t  total_expired;
-    rt_uint8_t  stage_expired;
+    rt_uint8_t  total_expired;       /* TMC_OBS_DEAD_*: 总预算期限的比较结果(未比较=0) */
+    rt_uint8_t  stage_expired;       /* TMC_OBS_DEAD_*: RX 阶段期限的比较结果(未比较=0) */
     rt_uint8_t  late_valid_frame;    /* CRC 已 OK 却仅因期限被拒 */
     /* 发布 */
     rt_uint8_t  published;           /* value 是否真的写给了调用者 */
@@ -198,12 +210,27 @@ typedef struct
     rt_uint32_t rx_tail_n;
     rt_uint8_t  cand[TMC_OBS_CAND_MAX];
     rt_uint32_t cand_n;
-    rt_uint8_t  rx_truncated;        /* 1 = 总字节数超过样本容量, 中间有省略 */
+    rt_uint8_t  rx_truncated;        /* 1 = 前缀样本装不下(rx_pre 被截), 与"全流有遗漏"分列 */
+    rt_uint8_t  echo_win[TMC_OBS_REQ_MAX];  /* R1 §4.4: 全流滚动窗口, 回声检测不再只看前缀 */
+    rt_uint8_t  echo_win_n;
+    rt_uint32_t echo_match_off;      /* 首个逐字相等片段在**全流**里的起点(echo_match_seen=1 才有意义) */
+    rt_uint8_t  stream_gap;          /* 1 = 全流超出"前缀 32 + 尾部 16"的覆盖, 中间确有未取样字节 */
     rt_uint8_t  echo_state;
     rt_uint8_t  echo_match_seen;     /* 捕获到与本次请求逐字相等的连续片段 */
 } tmc_read_observation_t;
 
-/* 纯记账: 把刚读到的一批字节并入观测(在滑动/覆盖之前调用)。不打印、不加锁。 */
+static rt_bool_t tmc_obs_same(const rt_uint8_t *a, const rt_uint8_t *b, rt_size_t n)
+{
+    rt_size_t i;
+
+    for (i = 0; i < n; ++i) if (a[i] != b[i]) return RT_FALSE;
+    return RT_TRUE;
+}
+
+/* 纯记账: 把刚读到的一批字节并入观测(在滑动/覆盖之前调用)。不打印、不加锁。
+ * R1(任务书 §4.4): 逐字相等的请求片段检测改成**边取样边扫全流**(4 字节滚动窗口),
+ * 因此"前缀样本之外有没有回声"不再取决于 32 B 样本容量; 命中时另记全流起点。
+ * 覆盖缺口也在这里分列: 前缀 32 + 尾部 16 只能覆盖 48 B, 超过才叫"中间真没取到样"。 */
 static void tmc_obs_rx_bytes(tmc_read_observation_t *obs, const rt_uint8_t *p,
                              rt_size_t got)
 {
@@ -225,35 +252,36 @@ static void tmc_obs_rx_bytes(tmc_read_observation_t *obs, const rt_uint8_t *p,
             rt_memmove(obs->rx_tail, obs->rx_tail + 1, TMC_OBS_RX_TAIL_MAX - 1);
             obs->rx_tail[TMC_OBS_RX_TAIL_MAX - 1] = p[i];
         }
+        /* 全流滚动窗口(请求已构造后才有意义): 命中即记 match_seen 与全流起点。 */
+        if (obs->req_built != 0u)
+        {
+            if (obs->echo_win_n < TMC_OBS_REQ_MAX)
+                obs->echo_win[obs->echo_win_n++] = p[i];
+            else
+            {
+                rt_memmove(obs->echo_win, obs->echo_win + 1, TMC_OBS_REQ_MAX - 1);
+                obs->echo_win[TMC_OBS_REQ_MAX - 1] = p[i];
+            }
+            if (obs->echo_win_n == TMC_OBS_REQ_MAX && obs->echo_match_seen == 0u &&
+                tmc_obs_same(obs->echo_win, obs->req, TMC_OBS_REQ_MAX))
+            {
+                obs->echo_match_seen = 1u;
+                obs->echo_match_off = obs->rx_total - TMC_OBS_REQ_MAX;
+            }
+        }
+        if (obs->rx_total > (TMC_OBS_RX_PRE_MAX + TMC_OBS_RX_TAIL_MAX))
+            obs->stream_gap = 1u;
     }
 }
 
-static rt_bool_t tmc_obs_same(const rt_uint8_t *a, const rt_uint8_t *b, rt_size_t n)
-{
-    rt_size_t i;
-
-    for (i = 0; i < n; ++i) if (a[i] != b[i]) return RT_FALSE;
-    return RT_TRUE;
-}
-
-/* 纯记账: 回声判定。只有与本次 4 字节请求逐字相等的**连续**片段才算 match_seen;
- * RX 总量恰等于请求长度且整段相等才升为 ECHO_ONLY。样本只取前 32 B, 超出记 rx_truncated。 */
+/* 纯记账: 回声分类。match_seen 由上面的**全流**滚动窗口给出(不再受 32 B 样本容量限制);
+ * ECHO_ONLY 仍要求 RX 总量恰等于请求长度且整段逐字相等 —— 那是更强的事实, 不能靠"某处见过"升级。
+ * 事实不足(rx_total < 请求长度)时保持 UNKNOWN, 不猜。 */
 static void tmc_obs_echo_eval(tmc_read_observation_t *obs, const rt_uint8_t *req,
                               rt_size_t reqlen)
 {
-    rt_uint32_t i;
-
-    if (obs == RT_NULL || req == RT_NULL ||
-        obs->rx_total < reqlen || obs->rx_pre_n < reqlen)
-        return;                        /* 事实不足: 保持 UNKNOWN, 不猜 */
-    for (i = 0; i + reqlen <= obs->rx_pre_n; ++i)
-    {
-        if (tmc_obs_same(obs->rx_pre + i, req, reqlen))
-        {
-            obs->echo_match_seen = 1u;
-            break;
-        }
-    }
+    if (obs == RT_NULL || req == RT_NULL || obs->rx_total < (rt_uint32_t)reqlen)
+        return;
     if (obs->rx_total == (rt_uint32_t)reqlen && obs->rx_pre_n == (rt_uint32_t)reqlen &&
         tmc_obs_same(obs->rx_pre, req, reqlen))
         obs->echo_state = TMC_OBS_ECHO_ONLY;
@@ -401,6 +429,8 @@ static rt_err_t tmc_read_reg_core(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *
                                   tmc_read_observation_t *obs);
 static rt_err_t tmc_write_reg_locked(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t value,
                                      const tmc_budget_t *b, tmc_xfer_stat_t *st);
+/* R1-B3: probe 用 quiet 变体取同一次事务(定义在文件后段, 这里先声明)。 */
+static rt_err_t tmc_cfg_txn_begin_core(rt_bool_t quiet);
 /* F2d(F2c-NEW-01): 写帧的唯一发起点收进文件内 —— 语义(写 + IFCNT 到达确认)一字
  * 未改, 只是不再对外暴露。头文件里"在位验证用 write_register_confirmed()"那句
  * 作废: 任何不持有配置事务的写入口, 本身就是绕过写入门禁的入口。 */
@@ -521,7 +551,7 @@ static rt_err_t tmc_rx_flush(const tmc_budget_t *b, tmc_xfer_stat_t *st,
         if (obs)
         {
             obs->flush_rc = -RT_ETIMEOUT;
-            obs->total_expired = 1u;
+            obs->total_expired = TMC_OBS_DEAD_YES;
             obs->done_off = (rt_uint32_t)(rt_tick_get() - b->start);
             obs->result = TMC_OBS_FAIL;
         }
@@ -581,7 +611,7 @@ static rt_err_t tmc_rx_flush(const tmc_budget_t *b, tmc_xfer_stat_t *st,
                 obs->flush_bytes = got_total;
                 obs->flush_rc = -RT_ETIMEOUT;
                 obs->flush_ms = (rt_uint32_t)(rt_tick_get() - start);
-                obs->total_expired = 1u;
+                obs->total_expired = TMC_OBS_DEAD_YES;
                 obs->result = TMC_OBS_FAIL;
             }
             return -RT_ETIMEOUT;
@@ -637,7 +667,7 @@ static rt_err_t tmc_tx_frame(const rt_uint8_t *frame, rt_size_t len,
         if (obs)
         {
             obs->tx_rc = -RT_ETIMEOUT;
-            obs->total_expired = 1u;
+            obs->total_expired = TMC_OBS_DEAD_YES;
             obs->done_off = (rt_uint32_t)used;
             obs->result = TMC_OBS_FAIL;
         }
@@ -666,11 +696,14 @@ static rt_err_t tmc_tx_frame(const rt_uint8_t *frame, rt_size_t len,
         if (obs)
         {
             obs->result = TMC_OBS_FAIL;
-            /* §5.2"总预算与RX阶段是否过期": 底层叶子在**本帧阶段上限 eff** 处返回超时时,
-             * 下面两条后置检查不会被走到。按同一个 tx_off 快照如实分列越过了哪一层,
+            /* §5.2"总预算与RX阶段是否过期": 底层叶子在**本帧阶段上限 eff** 处返回超时。
+             * R1(§6.2): 这里两条期限都被**实际比较过**(拿同一个 tx_off 快照比 total/eff),
+             * 所以未越限的一格记 n 而不是留 0 —— "没比较"与"比较过且未到"必须可区分。
              * 不把"阶段越限"冒充成"总预算越限", 也不反过来。 */
-            if (obs->tx_off >= (rt_uint32_t)b->total) obs->total_expired = 1u;
-            else if (obs->tx_off >= (rt_uint32_t)eff)  obs->stage_expired = 1u;
+            obs->total_expired = (obs->tx_off >= (rt_uint32_t)b->total)
+                                     ? TMC_OBS_DEAD_YES : TMC_OBS_DEAD_NO;
+            obs->stage_expired = (obs->tx_off >= (rt_uint32_t)eff)
+                                     ? TMC_OBS_DEAD_YES : TMC_OBS_DEAD_NO;
         }
         return e;
     }
@@ -690,7 +723,7 @@ static rt_err_t tmc_tx_frame(const rt_uint8_t *frame, rt_size_t len,
         if (st) { st->reason = TMC_XFER_BUDGET_EXHAUSTED; st->rc = -RT_ETIMEOUT; }
         if (obs)
         {
-            obs->total_expired = 1u;
+            obs->total_expired = TMC_OBS_DEAD_YES;
             obs->done_off = (rt_uint32_t)used;
             obs->result = TMC_OBS_FAIL;
         }
@@ -701,10 +734,16 @@ static rt_err_t tmc_tx_frame(const rt_uint8_t *frame, rt_size_t len,
         if (st) { st->reason = TMC_XFER_TX_FAILED; st->rc = -RT_ETIMEOUT; }
         if (obs)
         {
-            obs->stage_expired = 1u;
+            obs->stage_expired = TMC_OBS_DEAD_YES;
             obs->result = TMC_OBS_FAIL;
         }
         return -RT_ETIMEOUT;                    /* 阶段期限已过: 不发布成功 */
+    }
+    /* R1(§6.2): 走到这里说明两条期限**都刚比较过且未到**, 记 NO 是实证快照。 */
+    if (obs)
+    {
+        obs->total_expired = TMC_OBS_DEAD_NO;
+        obs->stage_expired = TMC_OBS_DEAD_NO;
     }
     if (st) st->reason = TMC_XFER_OK;
     return RT_EOK;
@@ -765,6 +804,31 @@ static rt_err_t tmc_read_reg_core(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *
     rt_tick_t  eff_end;            /* 绝对 tick: RX 阶段不得越过它 */
     rt_err_t   e;
 
+    /* R1(任务书 §6.2 末条): 先判 b 是否为空, 再碰 b 的字段 —— 原来这里在
+     * `b == RT_NULL` 判定**之前**就读 b->start/b->total。当前所有公有入口都会带预算,
+     * 因此不据此宣称存在可达的真机崩溃; 这只是一处低成本防御性收口。 */
+    if (b == RT_NULL)
+    {
+        if (st) { st->reason = TMC_XFER_BUDGET_EXHAUSTED; st->rc = -RT_EINVAL; }
+        if (obs)
+        {
+            obs->rc = -RT_EINVAL;
+            obs->reason = TMC_XFER_BUDGET_EXHAUSTED;
+            obs->result = TMC_OBS_FAIL;
+        }
+        return -RT_EINVAL;
+    }
+    if (value == RT_NULL)
+    {
+        if (st) { st->reason = TMC_XFER_NO_DEVICE; st->rc = -RT_EINVAL; }
+        if (obs)
+        {
+            obs->rc = -RT_EINVAL;
+            obs->reason = TMC_XFER_NO_DEVICE;
+            obs->result = TMC_OBS_FAIL;
+        }
+        return -RT_EINVAL;
+    }
     if (obs)
     {
         obs->valid = 1u;
@@ -772,18 +836,6 @@ static rt_err_t tmc_read_reg_core(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *
         obs->reg = reg;
         obs->b_start = (rt_uint32_t)b->start;
         obs->b_total = (rt_uint32_t)b->total;
-    }
-    if (b == RT_NULL)
-    {
-        if (st) { st->reason = TMC_XFER_BUDGET_EXHAUSTED; st->rc = -RT_EINVAL; }
-        if (obs) { obs->rc = -RT_EINVAL; obs->result = TMC_OBS_FAIL; }
-        return -RT_EINVAL;
-    }
-    if (value == RT_NULL)
-    {
-        if (st) { st->reason = TMC_XFER_NO_DEVICE; st->rc = -RT_EINVAL; }
-        if (obs) { obs->rc = -RT_EINVAL; obs->result = TMC_OBS_FAIL; }
-        return -RT_EINVAL;
     }
 
     req[0] = TMC_SYNC_BYTE;
@@ -845,7 +897,12 @@ static rt_err_t tmc_read_reg_core(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *
         if (used >= b->total)
         {
             /* 沿用 -RT_ETIMEOUT / TMC_XFER_BUDGET_EXHAUSTED。
-             * 观测明确 RX 尚未进入, 不再尝试读或等待。 */
+             * 观测明确 RX 尚未进入, 不再尝试读或等待。
+             * R1-B1(任务书 §3/§6.2): 这一支原先只给 st 填了原始码, obs 留着 rc=0/
+             * reason=0 出门, 导出就成了 `result=FAIL rc=0 reason=ok` —— 与业务返回的
+             * -117 直接矛盾。这里用同一份 tmc_obs_exit 把**原始码与遗留 reason**一起
+             * 落下, 并保留"RX 未进入、值未发布"的事实(rx_reached/published 不动)。
+             * 不改业务返回路径, 也不删总预算检查。 */
             if (st)
             {
                 st->reason = TMC_XFER_BUDGET_EXHAUSTED;
@@ -854,8 +911,9 @@ static rt_err_t tmc_read_reg_core(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *
             if (obs)
             {
                 obs->done_off = (rt_uint32_t)used;
-                obs->total_expired = 1u;
-                obs->result = TMC_OBS_FAIL;
+                obs->total_expired = TMC_OBS_DEAD_YES;
+                tmc_obs_exit(obs, req, n, b, -RT_ETIMEOUT,
+                             TMC_XFER_BUDGET_EXHAUSTED, 0u);
             }
             return -RT_ETIMEOUT;
         }
@@ -864,6 +922,8 @@ static rt_err_t tmc_read_reg_core(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *
         eff_end = b->start + used + allowance;
         if (obs)
         {
+            /* 走到这里就是"总预算期限刚比较过且未到"的实证, 不是"没比较"。 */
+            obs->total_expired = TMC_OBS_DEAD_NO;
             obs->rx_reached = 1u;
             obs->rx_begin_off = (rt_uint32_t)used;
             obs->rx_deadline_off = (rt_uint32_t)(used + allowance);
@@ -927,7 +987,7 @@ static rt_err_t tmc_read_reg_core(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *
                           st->rx_bytes = n; }
                 if (obs)
                 {
-                    obs->total_expired = 1u;
+                    obs->total_expired = TMC_OBS_DEAD_YES;
                     obs->late_valid_frame = 1u;   /* CRC 已 OK, 仅因总期限被拒 */
                 }
                 tmc_obs_exit(obs, req, n, b, -RT_ETIMEOUT,
@@ -940,7 +1000,7 @@ static rt_err_t tmc_read_reg_core(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *
                           st->rx_bytes = n; }
                 if (obs)
                 {
-                    obs->stage_expired = 1u;
+                    obs->stage_expired = TMC_OBS_DEAD_YES;
                     obs->late_valid_frame = 1u;   /* CRC 已 OK, 仅因阶段期限被拒 */
                 }
                 tmc_obs_exit(obs, req, n, b, -RT_ETIMEOUT, TMC_XFER_RX_TIMEOUT_PART, 0u);
@@ -953,6 +1013,10 @@ static rt_err_t tmc_read_reg_core(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *
             if (st) { st->reason = TMC_XFER_OK; st->rc = RT_EOK; st->rx_bytes = n; }
             if (obs)
             {
+                /* R1(§6.2): 两条期限在这里都**真的比较过且未到** —— 记 NO 是实证,
+                 * 而不是"没比较所以留 0"。 */
+                obs->total_expired = TMC_OBS_DEAD_NO;
+                obs->stage_expired = TMC_OBS_DEAD_NO;
                 obs->published = 1u;
                 obs->value_valid = 1u;
                 obs->value = *value;
@@ -973,12 +1037,14 @@ static rt_err_t tmc_read_reg_core(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *
                                         : TMC_XFER_RX_TIMEOUT_ECHO);
                 st->rc = -RT_ETIMEOUT;
             }
-            if (obs) obs->stage_expired = 1u;
+            if (obs) obs->stage_expired = TMC_OBS_DEAD_YES;
             tmc_obs_exit(obs, req, n, b, -RT_ETIMEOUT,
                          (n == 0 || !hdr_found) ? TMC_XFER_RX_TIMEOUT_ECHO
                                                 : TMC_XFER_RX_TIMEOUT_PART, 0u);
             return -RT_ETIMEOUT;
         }
+        /* R1(§6.2): 这一轮比较确实做过且未到 => 阶段期限事实是"未到期", 不是"没评估"。 */
+        if (obs) obs->stage_expired = TMC_OBS_DEAD_NO;
 
         if (n >= sizeof(buf))
         {
@@ -995,7 +1061,7 @@ static rt_err_t tmc_read_reg_core(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *
             {
                 if (st) { st->reason = TMC_XFER_BUDGET_EXHAUSTED; st->rc = -RT_ETIMEOUT;
                           st->rx_bytes = n; }
-                if (obs) obs->total_expired = 1u;
+                if (obs) obs->total_expired = TMC_OBS_DEAD_YES;
                 tmc_obs_exit(obs, req, n, b, -RT_ETIMEOUT,
                              TMC_XFER_BUDGET_EXHAUSTED, 0u);
                 return -RT_ETIMEOUT;
@@ -1086,6 +1152,16 @@ static rt_err_t tmc_read_reg_obs(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *v
                               TMC_XFER_BAD_CONTEXT, 0u);
         return -RT_EBUSY;
     }
+    /* R1-B2/B3(任务书 §6.2): 打开身份**先记先赢**。probe 在外层 txn 里已经按"本次调用
+     * 之前是否已打开"如实保存过 OPENED_NOW / ALREADY_OPEN; 子读入口若再按"此刻 tmc_opened
+     * 已为真"覆盖, 就把"本次真的打开了 UART"这笔事实抹平成"进来时就开着" —— 实测三次都
+     * 显示 ALREADY_OPEN 而 actual_new_opens=1。因此这里只在还没人记过时才记。
+     * 另外 0 现在是 NOT_REACHED(未知), 不再被默认解释成"已打开"。 */
+    if (obs && obs->open_state == TMC_OBS_OPEN_NOT_REACHED && tmc_opened)
+    {
+        obs->open_state = TMC_OBS_OPEN_ALREADY;
+        obs->open_rc = RT_EOK;
+    }
     if (!tmc_opened)
     {
         motor_snapshot_t snap;
@@ -1095,32 +1171,23 @@ static rt_err_t tmc_read_reg_obs(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *v
             snap.state != MOTOR_IDLE)
         {
             if (st) { st->reason = TMC_XFER_NO_DEVICE; st->rc = -RT_EIO; }
-            if (obs)
-            {
-                obs->open_state = 0u;
-                tmc_obs_exit(obs, (const rt_uint8_t *)RT_NULL, 0, b, -RT_EIO,
-                             TMC_XFER_NO_DEVICE, 0u);
-            }
+            if (obs) tmc_obs_exit(obs, (const rt_uint8_t *)RT_NULL, 0, b, -RT_EIO,
+                                  TMC_XFER_NO_DEVICE, 0u);
             return -RT_EIO;
         }
-        if (obs) obs->open_state = 1u;             /* 本次尝试打开 */
+        if (obs) obs->open_state = TMC_OBS_OPENED_NOW;  /* 本次操作真的尝试打开 */
         if (tmc_uart_open() != RT_EOK)
         {
             if (st) { st->reason = TMC_XFER_NO_DEVICE; st->rc = -RT_ERROR; }
             if (obs)
             {
-                obs->open_state = 2u;
+                obs->open_state = TMC_OBS_OPEN_FAILED;
                 obs->open_rc = -RT_ERROR;
                 tmc_obs_exit(obs, (const rt_uint8_t *)RT_NULL, 0, b, -RT_ERROR,
                              TMC_XFER_NO_DEVICE, 0u);
             }
             return -RT_ERROR;
         }
-    }
-    else if (obs)
-    {
-        obs->open_state = 0u;                      /* 已打开: 不冒充"本次重新配置成功" */
-        obs->open_rc = RT_EOK;
     }
     if (obs) obs->lock_attempted = 1u;
     e = tmc_xfer_take(b, &taken);
@@ -1140,7 +1207,7 @@ static rt_err_t tmc_read_reg_obs(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *v
         }
         if (obs)
         {
-            if (e == -RT_ETIMEOUT) obs->total_expired = 1u;
+            if (e == -RT_ETIMEOUT) obs->total_expired = TMC_OBS_DEAD_YES;
             tmc_obs_exit(obs, (const rt_uint8_t *)RT_NULL, 0, b, e,
                          (e == -RT_EBUSY) ? TMC_XFER_LOCK_BUSY
                         : (e == -RT_ETIMEOUT) ? TMC_XFER_BUDGET_EXHAUSTED
@@ -1447,10 +1514,47 @@ static const char *tmc_obs_open_name(rt_uint8_t s)
 {
     switch (s)
     {
-    case 1u:   return "OPENED_NOW";
-    case 2u:   return "OPEN_FAILED";
-    default:   return "ALREADY_OPEN";   /* 已打开: 不冒充"本次重新配置成功" */
+    case TMC_OBS_OPEN_ALREADY:     return "ALREADY_OPEN";  /* 进来前就开着: 不冒充本次重配置成功 */
+    case TMC_OBS_OPENED_NOW:       return "OPENED_NOW";    /* 本次操作真的打开并成功 */
+    case TMC_OBS_OPEN_FAILED:      return "OPEN_FAILED";   /* 本次尝试打开并失败(open_rc 是原码) */
+    default:                       return "OPEN_NOT_REACHED"; /* R1-B3: 0 = 未知, 不是"已打开" */
     }
+}
+
+/* R1(§6.2): 期限事实三态导出字符(未做过比较 = '-')。 */
+static char tmc_obs_dead_name(rt_uint8_t d)
+{
+    return (d == TMC_OBS_DEAD_YES) ? 'y' : ((d == TMC_OBS_DEAD_NO) ? 'n' : '-');
+}
+
+/* R1-A2(任务书 §6.1 / 附录A 逐字采纳): 一个**命名样本**按每行 ≤16 字节分块全量导出。
+ * 旧写法把 32 字节前缀交给只转 16 字节的 tmc_probe_hex, 行头却照抄 n=32 —— 串口上
+ * 永远拿不到后 16 字节, 而"行长没超限"的自检发现不了这种主动截断。
+ * off 只表示**该命名样本内**的偏移(候选帧的样本内起点是 0, 不许冒充全流偏移);
+ * 空样本打 `n=0 hex=-`, 不打印虚构的 00。每次调用含 LF 仍 ≤96 B。 */
+static void tmc_probe_dump_sample(int *errs, rt_uint8_t reg, const char *tag,
+                                  const rt_uint8_t *bytes, rt_size_t len)
+{
+    char line[TMC_PROBE_LINE_CAP];
+    char hx[TMC_PROBE_HEX_MAX * 3 + 2];
+    rt_size_t off = 0;
+
+    do
+    {
+        rt_size_t part = len - off;
+
+        if (part > TMC_PROBE_HEX_MAX) part = TMC_PROBE_HEX_MAX;
+        if (part != 0)
+            tmc_probe_hex(hx, sizeof(hx), bytes + off, part);
+        else
+        {
+            hx[0] = '-';
+            hx[1] = '\0';
+        }
+        TMC_PROBE_EMIT(errs, line, "[TMRO] reg=%02X %s off=%u n=%u hex=%s\n",
+                       (unsigned)reg, tag, (unsigned)off, (unsigned)part, hx);
+        off += part;
+    } while (off < len);
 }
 
 /* 导出这一笔的**全部**事实。只在 txn/xfer 都已归还之后调用。 */
@@ -1490,6 +1594,10 @@ static void tmc_probe_dump(int *errs, const tmc_read_observation_t *o)
     TMC_PROBE_EMIT(errs, line, "[TMRO] reg=%02X tx=%u/%u/%d off=%u req=%s\n",
                    (unsigned)o->reg, (unsigned)o->req_built, (unsigned)o->tx_called,
                    (int)o->tx_rc, (unsigned)o->tx_off, hx);
+    /* R1-A1: tx= 三个数字是"请求构造/预算写调用/rc", 与实际交给 DATA 的字节数是**不同**
+     * 的事实。旧导出里 written=2 与 written=4 从串口上看不出来(只能看到 tx=1/1/…)。 */
+    TMC_PROBE_EMIT(errs, line, "[TMRO] reg=%02X tx_written=%u\n",
+                   (unsigned)o->reg, (unsigned)o->tx_written);
     /* §5.2 第 6 条: 未到达的那一笔的时刻/期限一律打 '-'(全 0 会被读成"起点=0/用过 0") */
     if (o->result == TMC_OBS_NOT_REACHED)
         TMC_PROBE_EMIT(errs, line, "[TMRO] reg=%02X timing=- (budget never opened)\n",
@@ -1503,23 +1611,25 @@ static void tmc_probe_dump(int *errs, const tmc_read_observation_t *o)
     TMC_PROBE_EMIT(errs, line, "[TMRO] reg=%02X rx=%u hdr=%u full=%u crc=%s\n",
                    (unsigned)o->reg, (unsigned)o->rx_reached, (unsigned)o->hdr_seen,
                    (unsigned)o->frame_complete, tmc_obs_crc_name(o->crc_state));
-    TMC_PROBE_EMIT(errs, line, "[TMRO] reg=%02X total=%u buf=%u pub=%u late=%u exp=%u/%u\n",
+    /* R1(§6.2): exp=总期限/阶段期限的**比较结果**三态(y=已到 n=未到 -=没比较过);
+     * gap=1 表示全流超出"前缀 32 + 尾部 16"的覆盖, 中间确有未取样字节 —— 与
+     * pre_trunc(前缀样本装不下)分列, 不再用 48 B 总量去宣称"必然丢了中间一段"。 */
+    TMC_PROBE_EMIT(errs, line, "[TMRO] reg=%02X total=%u buf=%u pub=%u late=%u exp=%c/%c "
+                         "pre_trunc=%u gap=%u\n",
                    (unsigned)o->reg, (unsigned)o->rx_total, (unsigned)o->rx_buf_n,
                    (unsigned)o->published, (unsigned)o->late_valid_frame,
-                   (unsigned)o->total_expired, (unsigned)o->stage_expired);
-    TMC_PROBE_EMIT(errs, line, "[TMRO] reg=%02X echo=%s match=%u trunc=%u val=%08X\n",
+                   tmc_obs_dead_name(o->total_expired), tmc_obs_dead_name(o->stage_expired),
+                   (unsigned)o->rx_truncated, (unsigned)o->stream_gap);
+    TMC_PROBE_EMIT(errs, line, "[TMRO] reg=%02X echo=%s match=%u/%u val=%08X\n",
                    (unsigned)o->reg, tmc_obs_echo_name(o->echo_state),
-                   (unsigned)o->echo_match_seen, (unsigned)o->rx_truncated,
+                   (unsigned)o->echo_match_seen, (unsigned)o->echo_match_off,
                    o->value_valid ? (unsigned)o->value : 0u);
-    tmc_probe_hex(hx, sizeof(hx), o->rx_pre, o->rx_pre_n);
-    TMC_PROBE_EMIT(errs, line, "[TMRO] reg=%02X rx1 n=%u %s\n", (unsigned)o->reg,
-                   (unsigned)o->rx_pre_n, hx);
-    tmc_probe_hex(hx, sizeof(hx), o->rx_tail, o->rx_tail_n);
-    TMC_PROBE_EMIT(errs, line, "[TMRO] reg=%02X rxT n=%u %s\n", (unsigned)o->reg,
-                   (unsigned)o->rx_tail_n, hx);
-    tmc_probe_hex(hx, sizeof(hx), o->cand, o->cand_n);
-    TMC_PROBE_EMIT(errs, line, "[TMRO] reg=%02X cand n=%u %s\n", (unsigned)o->reg,
-                   (unsigned)o->cand_n, hx);
+    TMC_PROBE_EMIT(errs, line, "[TMRO] reg=%02X samples pre=%u tail=%u cand=%u\n",
+                   (unsigned)o->reg, (unsigned)o->rx_pre_n,
+                   (unsigned)o->rx_tail_n, (unsigned)o->cand_n);
+    tmc_probe_dump_sample(errs, o->reg, "rx1", o->rx_pre, o->rx_pre_n);
+    tmc_probe_dump_sample(errs, o->reg, "rxT", o->rx_tail, o->rx_tail_n);
+    tmc_probe_dump_sample(errs, o->reg, "cand", o->cand, o->cand_n);
 }
 
 /* ---------- F2d(F2c-NEW-01): probe 改为**严格只读**的身份/状态检查 ----------
@@ -1566,10 +1676,15 @@ static void tmc_uart_probe(void)
         obs[i].addr = TMC_ADDR_DEFAULT;
         obs[i].reg = ro_regs[i];
         obs[i].result = TMC_OBS_NOT_REACHED;
+        /* R1-B3: "上下文允许"是 **probe 入口**的事实(上面那道门已过), 与"各阶段是否到达"
+         * 分列。原先 ctx_ok 只在子读里赋值, 于是 txn 失败时三笔都印 ctx=0 —— 把合法的
+         * probe 入口写成了非法上下文。open_state 保持 0 = NOT_REACHED(不再默认"已打开")。 */
+        obs[i].ctx_ok = 1u;
     }
 
-    /* 与 apply / motor_arm 用同一把事务锁: 诊断的读集不能跨在配置序列中间 */
-    txn = tmc2209_cfg_txn_begin();
+    /* 与 apply / motor_arm 用同一把事务锁: 诊断的读集不能跨在配置序列中间。
+     * quiet 变体: 取不到事务时**不**在 [TMRO] BEGIN 之前打印任何非 ASCII 文案(R1-B3)。 */
+    txn = tmc_cfg_txn_begin_core(RT_TRUE);
     for (i = 0; i < 3; ++i)
     {
         obs[i].txn_held = (txn == RT_EOK) ? 1u : 0u;
@@ -1584,7 +1699,7 @@ static void tmc_uart_probe(void)
         {
             for (i = 0; i < 3; ++i)
             {
-                obs[i].open_state = was_open ? 0u : 1u;
+                obs[i].open_state = was_open ? TMC_OBS_OPEN_ALREADY : TMC_OBS_OPENED_NOW;
                 obs[i].open_rc = RT_EOK;
             }
             for (i = 0; i < 3; ++i)
@@ -1603,7 +1718,7 @@ static void tmc_uart_probe(void)
         {
             for (i = 0; i < 3; ++i)
             {
-                obs[i].open_state = 2u;             /* 本次尝试打开且失败 */
+                obs[i].open_state = TMC_OBS_OPEN_FAILED;   /* 本次尝试打开且失败 */
                 obs[i].open_rc = (rt_int16_t)e;
             }
         }
@@ -1620,6 +1735,9 @@ static void tmc_uart_probe(void)
     if (txn != RT_EOK)
         TMC_PROBE_EMIT(&errs, line, "[TMC] probe REFUSED (%d): cfg txn unavailable or busy"
                               " -> 0 bus reads\n", (int)txn);
+    /* R1-B3: 没取得事务时不再无条件宣称 "txn-held"(那句是事实陈述, 不是修辞)。
+     * 成功分支的标题**逐字保持原样**(含缩进), 以免无谓移动既有负例注入锚点。 */
+    else
     TMC_PROBE_EMIT(&errs, line, "[TMC] probe: read-only identity check txn-held "
                           "IOIN+GSTAT+IFCNT (0 WRITE frames)\n");
     for (i = 0; i < 3; ++i) tmc_probe_dump(&errs, &obs[i]);
@@ -1643,8 +1761,10 @@ static void tmc_uart_probe(void)
         tmc_gstat_dec_t gs;
 
         tmc_gstat_decode(obs[1].value, &gs);
-        TMC_PROBE_EMIT(&errs, line, "[TMC] GSTAT = 0x%02X reset=%u drv_err=%u uv_cp=%u\n",
-                       (unsigned)(obs[1].value & 0xFFu), gs.reset, gs.drv_err, gs.uv_cp);
+        TMC_PROBE_EMIT(&errs, line, "[TMC] GSTAT = 0x%02X raw=0x%08X reset=%u drv_err=%u"
+                              " uv_cp=%u\n",
+                       (unsigned)(obs[1].value & 0xFFu), (unsigned)obs[1].value,
+                       gs.reset, gs.drv_err, gs.uv_cp);
         if (gs.unknown)
             TMC_PROBE_EMIT(&errs, line, "[TMC] !! GSTAT=0x%08X has bits the manual leaves"
                                   " undefined (only bit0..bit2)\n",
@@ -1654,15 +1774,31 @@ static void tmc_uart_probe(void)
                                   " is disabled here (not StallGuard)\n");
     }
     if (obs[2].value_valid)
-        TMC_PROBE_EMIT(&errs, line, "[TMC] IFCNT = %u (read-only: this command wrote no"
-                              " register)\n",
-                       (unsigned)(obs[2].value & 0xFFu));
+        TMC_PROBE_EMIT(&errs, line, "[TMC] IFCNT = %u raw=0x%08X (read-only: this command"
+                              " wrote no register)\n",
+                       (unsigned)(obs[2].value & 0xFFu), (unsigned)obs[2].value);
 
-    /* 身份读成功的门槛很窄: 三笔全部成功 + IOIN VERSION=0x21; 且**永不**给使能许可。 */
-    TMC_PROBE_EMIT(&errs, line, "[TMRO] identity=%s link=%s safe_for_enable=0\n",
-                   (all_ok && obs[0].value_valid &&
-                    ((obs[0].value >> 24) & 0xFFu) == 0x21u) ? "READ_OK" : "NOT_PROVEN",
-                   all_ok ? "READ_OK" : "UNPROVEN");
+    /* R1-C(任务书 §6.3): 人类摘要把 GSTAT 掩成低 8 位、IFCNT 掩成低 8 位, 单看摘要会
+     * 把"高位有未定义置位"误读成全成功。fields_ok 只回答一件事: 读到的**完整 32 位原值**
+     * 是否全部落在手册已定义的字段范围内(GSTAT 只 bit0..2, IFCNT 只低 8 位)。
+     * 这是报告归类, 不改变底层 value 发布、CRC、health 或任何电机门禁。 */
+    {
+        rt_bool_t fields_ok = RT_TRUE;
+
+        if (obs[1].value_valid != 0u && (obs[1].value & (rt_uint32_t)~0x7u) != 0u)
+            fields_ok = RT_FALSE;
+        if (obs[2].value_valid != 0u && (obs[2].value & (rt_uint32_t)~0xFFu) != 0u)
+            fields_ok = RT_FALSE;
+        /* 身份读成功(READ_OK)的门槛很窄: 三笔全部成功 + IOIN VERSION=0x21;
+         * read_ok(总线读到)/identity_ok(版本匹配)/fields_ok(原值域内)分列, 且**永不**给
+         * 使能许可 —— 通信成功不解锁电机。 */
+        TMC_PROBE_EMIT(&errs, line, "[TMRO] read_ok=%u identity_ok=%u fields_ok=%u "
+                              "link=%s safe_for_enable=0\n",
+                       all_ok ? 1u : 0u,
+                       (all_ok && obs[0].value_valid != 0u &&
+                        ((obs[0].value >> 24) & 0xFFu) == 0x21u) ? 1u : 0u,
+                       fields_ok ? 1u : 0u, all_ok ? "READ_OK" : "UNPROVEN");
+    }
     TMC_PROBE_EMIT(&errs, line, "[TMRO] END reads=%d writes=0 export_err=%d "
                           "observation_complete=%d\n",
                    attempted, errs, errs == 0 ? 1 : 0);
@@ -2765,15 +2901,25 @@ rt_bool_t tmc2209_drive_config_ok_for_arm(void)
  * F2c R02: 互斥量不可用返回 -RT_ENOSYS(能力缺失), 不再是"无锁也放行"的 RT_EOK。
  * ⚠ 停机路径(motor_emergency_stop / safety_force_shutdown)不得调用本函数 ——
  *   紧急停机永远不能被配置事务挡住。 */
-rt_err_t tmc2209_cfg_txn_begin(void)
+/* R1-B3(任务书 §5.3/§6.2): 取事务本体收成一份私有 core, quiet 变体**一条都不打印**。
+ * probe 持 txn 时若在公有 tmc2209_cfg_txn_begin() 里吐中文, 那行就排在 [TMRO] BEGIN
+ * 之前且非 ASCII —— 新观测要求 probe 全短 ASCII、输出在锁归还之后。公有 wrapper 保留
+ * 原语义与原日志(其它调用者的打印不变), 不复制锁算法、不放宽门禁、不改返回码。 */
+static rt_err_t tmc_cfg_txn_begin_core(rt_bool_t quiet)
 {
     if (!tmc_cfg_prod.txn_ok)
     {
-        rt_kprintf("[MOT] cfg txn BEGIN refused: 执行器互斥量不可用(-RT_ENOSYS)\n");
+        if (!quiet)
+            rt_kprintf("[MOT] cfg txn BEGIN refused: 执行器互斥量不可用(-RT_ENOSYS)\n");
         return -RT_ENOSYS;
     }
     return (rt_mutex_take(&tmc_cfg_prod.txn, RT_WAITING_NO) == RT_EOK)
            ? RT_EOK : -RT_EBUSY;
+}
+
+rt_err_t tmc2209_cfg_txn_begin(void)
+{
+    return tmc_cfg_txn_begin_core(RT_FALSE);
 }
 
 void tmc2209_cfg_txn_end(void)
