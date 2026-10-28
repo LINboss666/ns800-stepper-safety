@@ -342,6 +342,14 @@ class Runner:
             "safety_state": self.q(rec, "safety_state"),
             "safety_status": self.q(rec, "safety_status"),
         }
+        # Safety 线程整理事件可能晚于命令返回; 给一个有界观察窗, 不延长运动
+        for _ in range(3):
+            ss_now = self.parse_safety_state(after_trip["safety_state"])
+            if ss_now["state"] == "FAULT_LATCHED" and ss_now["fault"] == 9:
+                break
+            self.sleep(0.2)
+            after_trip["safety_state"] = self.q(rec, "safety_state")
+            after_trip["safety_status"] = self.q(rec, "safety_status")
         self.wait_until(t_start + 5.0)
         raw, t_disarm, _ = self.link.send("motor_disarm", 10.0, 1.0)
         rec.save("motor_disarm", raw, t_disarm, self.clock())
