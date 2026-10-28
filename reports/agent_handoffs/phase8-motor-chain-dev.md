@@ -73,3 +73,24 @@ M2/M3 字面步骤、判据、失败退出与一次批准范围见
 未清故障、未写 TMC 配置。板上最终态：**运行中，state=READY，motion gate-locked**；
 TMC `drive_cfg=UNCONFIGURED`，`safe_for_enable=false`；A0 时长 NOT_ACHIEVED 且暂缓。
 main/phase7/tag 未动；未改全局 Git 配置。
+
+## 8. M2 配置测试结果（2026-10-28，用户「批准M2」）
+
+候选已下载并逐字节回读（258428 B / `397aa844…`），启动 READY、IOIN=0x21000041 VERSION=0x21。
+单次 COM5 会话按包内 15 步执行，`tmc_config_apply CONFIRM` 仅一次：
+
+| 项 | 实测 |
+|---|---|
+| IFCNT | before=6，after=10，`(10-6)&0xFF=4` |
+| GCONF | before=0x00000040 → RMW 期望 0x00000041；live/applied 均 **0x41** |
+| CHOPCONF | before=0x15010053 → RMW 期望 0x15030053；live/applied 均 **0x15030053** |
+| IHOLD_IRUN / TPOWERDOWN | 写 0x00041408 / 0x08（只写；由逐笔 IFCNT 与首尾 +4 证明到达） |
+| 配置状态 | `state=CONFIGURED snapshot_valid=1 last_err=0` |
+| 运动态 | armed=0、cur/tgt=0、stop api-accepted rc=0 latch=0、step enabled=0 |
+| 安全态 | READY fault=0；request/pad LOW、ENN 反馈禁能侧 resolved；IRQ CLOSED / polarity NOT confirmed / protection_ready=NO |
+| arm gate | 0x18 → 配置后 **0x08**（仅 protection-not-ready，符合包预期） |
+
+**M2 = PASS（M2_CONFIGURED_AND_VERIFIED）**。`safe_for_enable` 仍 false；不证明电流适合电机；
+M3 未执行。原始串口/启动/下载日志以 base64 存于
+`reports/reviews/phase8-motor-chain-dev/m2/`，`m2_result.txt` 为逐项结果。
+板当前运行候选镜像（禁能、无电机、未 arm）。

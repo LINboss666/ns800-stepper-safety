@@ -1,0 +1,66 @@
+M2 配置测试执行结果（2026-10-28）
+任务包：NS800_M2_Configuration_Package_a9b1160_20261028.md（11669 B / d1cc812f…）
+批准：用户「批准M2」
+软件输入：916c34ba4032bc7f41e2944c13b449271030191b；交付头：a9b116042b681c88d2b7d51012dfdf0dbe07e213
+
+[输入与载荷]
+  候选 Target：rt-thread-motor-m1-candidate
+  宏：MOTOR_HARDWARE_ENABLE_PATH_VALIDATED=1 / TMC_DRIVE_CONFIG_HW_VALIDATED=1
+      STEP_DIAG_ISOLATED_ENV_CONFIRMED=0 / SAFETY_LIMIT_INPUTS_ENABLED=0
+  BIN：258428 B / 397aa844afdeb2f2b768670546f28067d6398851cae3416cbe6d910f2078e675
+  AXF：1665388 B / 0cfa048fd645bf2c1a9e9ae4269bfa1a8f3b19096972faa07bdeb7e899134baf
+  条件：电机物理未接、SW1 阻断（沿用用户确认；本包未改变）
+
+[下载与回读]
+  pyOCD 0.45.1 + NOVOSENSE.NS800RT7XXX.0.5.3.pack，sector erase；Erased/Programmed 259072 B
+  0x08000000 起 258428 B 回读与候选 BIN **逐字节相等**
+  启动：SELF_TEST -> READY；[SS] [REQ OK] TMC2209 IOIN=0x21000041 VERSION=0x21；无 abort/新 fault/overflow
+
+[15 步命令结果]（单次 COM5 会话，原始 RX 先保存；命令各执行 1 次，apply 仅 1 次）
+ 1 system_status      : bootstrap-complete=YES abort-stage=0；Safety state=READY
+ 2 safety_state       : READY fault_code=0 degraded=0x00
+ 3 safety_status      : ready=YES first_err=0；MCU_DRV_ENABLE=0；ENN raw=1 resolved=YES；
+                        request=DISABLE(LOW) pad=0 expected_FB=HIGH FB=1 verdict=OK
+ 4 motor_status       : state=0 IDLE、cur_hz=0 tgt_hz=0、armed=0；
+                        stop result=api-accepted src=init rc=0 latched=0；diag_off=YES；
+                        arm_gate_mask=0x18（protection + drive-config）
+ 5 step_status        : enabled=0；last_stop=not-attempted stop_rc=0 latched=0
+ 6 tmc_uart_probe     : 3/3 SUCCESS、CRC OK、identity OK；**IFCNT_before=6**
+ 7 tmc_config_show    : state=UNCONFIGURED snapshot_valid=0 last_err=0；
+                        compile gate OPEN、runtime_gate_mask=0x0；
+                        **GCONF_before=0x00000040、CHOPCONF_before=0x15010053**；
+                        planned irun=20 ihold=8 dly=4 tpd=8 vsense=1 mstep_sel=0
+ 8 tmc_config_apply CONFIRM : **CONFIGURED（本次写入均已 IFCNT 确认; GCONF/CHOPCONF 读回一致）**；
+                        无 REFUSED/FAILED；仅一次 apply
+ 9 tmc_config_show    : state=CONFIGURED、snapshot_valid=1、last_err=0；
+                        applied GCONF=0x00000041 CHOPCONF=0x15030053；
+                        live    GCONF=0x00000041 CHOPCONF=0x15030053
+10 tmc_uart_probe     : 3/3 SUCCESS、CRC OK；**IFCNT_after=10**；(10-6)&0xFF=**4**
+11 motor_status       : armed=0 cur/tgt=0、request LOW、stop accepted rc=0 latch=0；
+                        arm_gate_mask=0x8（仅 protection-not-ready）；gate5 tmc_drive_cfg=CONFIGURED
+12 step_status        : enabled=0，无关断异常
+13 safety_state       : READY fault_code=0
+14 safety_status      : request/pad LOW、ENN 反馈在禁能侧且 resolved=YES
+15 safety_irq_status  : irq_gate=CLOSED、polarity=NOT confirmed、protection_ready=NO；
+                        TMC_DIAG raw=0、ENN_FB raw=HIGH（只记录，未更改）
+
+[写入值核对（按真实基线 RMW）]
+  GCONF_expected    = (0x40 & ~0x000000C1) | 0x41 = 0x00000041；live/applied 均 0x41  **MATCH**
+  CHOPCONF_expected = (0x15010053 & ~0x00020000) | 0x00020000 = 0x15030053；live/applied 均 0x15030053  **MATCH**
+  IHOLD_IRUN 写入 0x00041408、TPOWERDOWN 写入 0x00000008（只写寄存器，不读回）；
+  4 次配置写由生产逐笔 IFCNT 确认，外部首尾 IFCNT 差 = 4 与之一致。未新增逐笔原始计数日志。
+
+[判据]
+  四项配置在本事务到达、两件可读寄存器与 RMW 期望一致、配置摘要可信、仍保持禁能、未 arm/STEP。
+  M2 = **PASS（M2_CONFIGURED_AND_VERIFIED）**
+  含义边界：不证明相电流正确、不适合当前电机；safe_for_enable 仍为 false；M3 未执行。
+
+[已知显示限制]
+  apply 成功行与 safety_status 的个别旧长解释行存在 NUL/截断；关键结果与数值由独立状态查询/完整原始行
+  取得，未从截断处补字段，也未把整段原始流清洗后冒充原字节。
+
+[原始件]
+  seq.bin.b64     17082 B（base64）-> 12643 B 原始串口 RX
+  boot.bin.b64     4592 B（base64）->  3399 B 启动原始 RX
+  flash.log.b64     649 B（base64）->   478 B 下载日志
+  解码：base64 -d <file> > out.bin；原始件未做行尾/字符替换。
