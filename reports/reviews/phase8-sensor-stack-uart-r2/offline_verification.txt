@@ -1,0 +1,167 @@
+URO-R2 sensor 栈与 UART 就绪门合并修复 —— 离线证据(task phase8-sensor-stack-uart-r2)
+本轮锚点/文档基线 = afa922b934f600e4b3301d87df16a99948610a10   产品软件输入 code_commit = 139e9377ccbc36b878cd577a6b848d974e1e07fa
+已复审交付(上一轮 GO 所属头) = 66f853309fe22376ffa6b45080e5f79c5891d4d1
+任务书 = NS800_Sensor_Stack_UART_R2_Fix_Task.md  bytes=20321 sha256=2bbf84ca77d8c718df4e12d851080b0c28765b3a51ee8d0a291bb90855f4cfd7
+设备动作 = 0(本轮未创建串口对象、未开 COM5、未发目标命令、未枚举、未读 Flash、未下载/复位、
+未碰供电/接线/ENN/SW1、未输出 STEP/DIR/HIGH、未运行 sw1_cut.ps1; Keil 仅批处理构建)
+脱敏规则: 本机绝对路径 -> <仓外工作区>/<仓库根>(有损替换 lossless=false, 原件仓外未删除);
+UID 不落本文。逐行右端空白已剥离, 完整性以各段登记的 bytes/sha256 为准。
+
+== 0. 输入与产物身份(全部现算) ==
+  冻结 R1 采集器(仓内)                      bytes=93797    sha256=2e9c8ede8f75e7b513dbd4f2c3091189309454879e98404ba7ec64bbb80f2568
+  R1 采集器 LF 副本(git blob 直取)          bytes=93797    sha256=2e9c8ede8f75e7b513dbd4f2c3091189309454879e98404ba7ec64bbb80f2568
+  附录 A make_r2.py                    bytes=3327     sha256=11e8aa34460ef1a748d38991ea82806b656702e2fe58023b2b66e274d80b9fdb
+  附录 B test_r2.ps1                   bytes=4125     sha256=a9090ad8606522c9b44fe0fb0f21825b989d8271e88b517ef987c36d3e270abe
+  新 R2 采集器                           bytes=92860    sha256=9ed8a3e342f7cad8430c42140ffb508d6cc0694e251636c1b93ab2a2a7390a37
+  本次真实被动流 23845 B                    bytes=23845    sha256=ce98adab56a6d2f164b4b301a6870cb482c9b0a91c780b9bd5f0275e0b59091b
+  旧启动夹具(-SelfTest 用)                 bytes=3757     sha256=97b37f32aa03c86b8708ae088d0ae65a8f92520f1a1ed70beb74663049321749
+  新镜像 measure-a0.bin                 bytes=268340   sha256=b1e852949f003965de52d539ca324a11b8b89e17a51a8f34fe3efd01525ae2d1
+  新镜像 default.bin                    bytes=258036   sha256=db5db20bb8d6eae1e8e5bed9dd0b70f5ad5c818a6cb3db9333496e0280aebe2d
+  本地 AXF(A0, 不入库)                    bytes=1693804  sha256=15be5f3efc45bf296bc0ef24e3947081372616d819e4bb3b189e9614cf9a5b9a
+  校验: 任务书 §3/§4/附录声明的身份逐项命中 ——
+    R1 = 93797/2e9c8ede…: True ; make_r2.py = 3327/11e8aa34…: True ; test_r2.ps1 = 4125/a9090ad8…: True
+    R2 = 92860/9ed8a3e3…: True ; 被动流 = 23845/ce98adab…: True
+  LF 副本取法: python 直接写 `git show afa922b:<R1 路径>` 的 stdout 字节, 未经 PowerShell 文本重定向,
+  未改 Git 配置; 副本 CR 数=0(0 才是可用输入)。
+
+== 1. 产品补丁(唯一产品改动) ==
+  applications/sensor_service.c  SENSOR_THREAD_STACK 1024 -> 4096
+  修前 LF blob sha256 = 5b48e0e63e3d0e4b8f6abedb0d15621e70f0cacf0530aaaf84ebca18c71d0516
+  修后 LF blob sha256 = 198ac05e2ab8a2df23189c2476acc5a139d2c6c3c805dcd5e7d3b2fa392c2d0e  与任务书 §3 声明一致 = True
+  git blob(SHA-1 对象号) = 5975b34e15c8b7f060ff12ba97410f89a66eec43
+  提交 = 139e9377ccbc36b878cd577a6b848d974e1e07fa(先提交软件输入, 再用该字节构建; 文档提交不作为镜像输入)
+  工作树副本因 core.autocrlf 是 CRLF, 其文件散列与 blob 散列是两个口径, 本文只用 blob 口径。
+  动态堆增量 = 3072 B(rt_thread_create 堆分配, 不是静态数组; ZI 增量为 0 不代表没生效)。
+  未做的事: 未关 RT_USING_OVERFLOW_CHECK、未改 LOG 级别/隐藏 LOG_W、未停 sensor、未降采样、
+  未加延时、未改线程优先级 7/周期 10 ms/锁策略/超时预算/TMC 逻辑/四宏。
+
+== 2. 构建(两目标各一次最终 Rebuild All) ==
+  工具: UV4 5.43.1.0 + ARMCLANG V6.24 (KEIL_ROOT/ARM/ARMCLANG/Bin)
+  离线流程修正: 本轮用 Start-Process -Wait 等 UV4 进程退出后才读日志 ——
+    上一板级轮登记的'UV4 -f 异步落日志导致判定过早'缺陷在本轮流程里已修, 未因此重跑任何设备动作。
+  目标 rt-thread:
+    Program Size: Code=179674 RO-data=77786 RW-data=2188 ZI-data=83784
+    链接器汇总: 0 Error(s), 0 Warning(s); 真实 warning 文本行数=0; 耗时=00:00:09
+    BIN 258036 B sha256=db5db20bb8d6eae1e8e5bed9dd0b70f5ad5c818a6cb3db9333496e0280aebe2d
+    镜像内构建横幅 = 'Oct 28 2026 10:23:37' (layout=date_then_time, 全镜像唯一时分秒串)
+    map COMPRESSED 加载长度 = 0x0003EFF4 ; 定长回读口径 = BIN 实际长度 258036 B 与之相符
+    vs R1 同目标差异字节 = 23  分类={'date': 11, 'other': 3, 'time': 9}
+    Program Size 增量(vs R1) = {'Code': 0, 'RO_data': 0, 'RW_data': 0, 'ZI_data': 0}
+    AXF(本地留存, 不入库) = 1663308 B sha256=1db8e22289b318752c305d1774a0d8f0fcd49d4da96b175dcea6d457c407bc20
+  目标 rt-thread-measure-a0:
+    Program Size: Code=187018 RO-data=80746 RW-data=2188 ZI-data=91504
+    链接器汇总: 0 Error(s), 0 Warning(s); 真实 warning 文本行数=0; 耗时=00:00:08
+    BIN 268340 B sha256=b1e852949f003965de52d539ca324a11b8b89e17a51a8f34fe3efd01525ae2d1
+    镜像内构建横幅 = 'Oct 28 2026 10:23:50' (layout=time_then_date, 全镜像唯一时分秒串)
+    map COMPRESSED 加载长度 = 0x00041834 ; 定长回读口径 = BIN 实际长度 268340 B 与之相符
+    vs R1 同目标差异字节 = 5  分类={'other': 1, 'time': 4}
+    Program Size 增量(vs R1) = {'Code': 0, 'RO_data': 0, 'RW_data': 0, 'ZI_data': 0}
+    AXF(本地留存, 不入库) = 1693804 B sha256=15be5f3efc45bf296bc0ef24e3947081372616d819e4bb3b189e9614cf9a5b9a
+  默认目标的历史 AXF 已被本轮 Rebuild All 覆盖(它一直只留本地、未入库), 所以'前后只变一处'的
+  全镜像语义对照做在 A0 目标上(见第 3 节); 两目标的源码输入与 Program Size 完全相同。
+
+== 3. 4096 的依据(栈报告, 不编造最坏界) ==
+  告警判据实读: src/scheduler_comm.c:519-525 —— 向下增长栈的已保存 SP <= stack_addr+32 时打印,
+  所以它是真实边界压力告警, 不能仅为静默而隐藏。
+  armlink Static Call Graph(两目标同值):
+    镜像级 = Maximum Stack Usage = 2996 bytes + Unknown(Cycles, Untraceable Function Pointers)
+    sensor_thread_entry          本帧=72 B  累计 Max Depth=1228 B
+    s_collect                    本帧=104 B  累计 Max Depth=1156 B
+    tmc2209_read_sg_result       本帧=24 B  累计 Max Depth=1052 B
+    tmc2209_read_register        本帧=24 B  累计 Max Depth=1028 B
+    tmc_read_reg                 本帧=32 B  累计 Max Depth=1004 B
+    tmc_read_reg_obs             本帧=112 B  累计 Max Depth=972 B
+    motor_get_snapshot           本帧=288 B  累计 Max Depth=860 B
+    adxl345_read_mg              本帧=40 B  累计 Max Depth=780 B
+    current_adc_read_measurement 本帧=32 B  累计 Max Depth=136 B
+    s_read_sai_input             本帧=32 B  累计 Max Depth=120 B
+    s_isqrt                      本帧=16 B  累计 Max Depth=16 B
+    sensor_service_init          本帧=32 B  累计 Max Depth=748 B
+  结论(据证, 不外推): sensor 线程入口的**静态已知**最深链 = 1228 B, 已超过旧配置 1024 B, 这正是
+  20 s 内 243 次告警的量化解释; 新配置 4096 B 对该已知链留 2868 B 余量。
+  报告未给出闭合上界的部分(如实记未知): 镜像级度量显式带 '+ Unknown(Cycles, Untraceable Function Pointers)', 且调用图里存在 'Mutually Recursive functions' 段(rt_assert_handler/rt_backtrace_frame/fputc 等与 rt_kprintf 互递归), 函数指针入口(msh 命令分发、线程 entry、device ops)不参与静态上界
+  因此: 4096 **不是**已证明的完整最坏栈界; 本轮也没为它另造 WCET 平台。报告没有显示 4096 不足,
+  故未据证上调到 8192(任务书 §3 的许可条件不成立)。
+  中断/异常进入该线程栈时的硬件压栈(M7 异常帧)不在 armlink 静态度量内 —— 记未知, 不折算。
+  反汇编前后对照(fromelf --disassemble, 同目标 A0 全文逐行):
+    R1 AXF=a96889c47c9433b132dc4eeecf46be287c13dc1cff11fc0003e6cca10826846f
+    R2 AXF=15be5f3efc45bf296bc0ef24e3947081372616d819e4bb3b189e9614cf9a5b9a
+    行数 R1=117145 R2=117145  非相等块=2  差异行=4
+      R1| MOV      r3,#0x400   ==>   R2| MOV      r3,#0x1000
+      R1| DCB      0x30   ==>   R2| DCB      0x31
+      R1| DCD      0x33323a32   ==>   R2| DCD      0x33323a30
+      R1| DCD      0x0031333a   ==>   R2| DCD      0x0030353a
+    => 整镜像只有栈大小立即数 0x400->0x1000 与 __TIME__ 数据串不同, 没有其它代码/数据变化。
+
+== 4. R2 采集器(附录 A 原样生成, 无本地改写) ==
+  生成命令: python make_r2.py <R1 LF 副本> <新目录>/UARTReadDiagSerialR2.ps1
+  输出身份: 92860 B / 9ed8a3e342f7cad8430c42140ffb508d6cc0694e251636c1b93ab2a2a7390a37  与任务书 §4 期望一致 = True
+  结构核对: 纯 ASCII=True(高位字节=0) CR=0 ; Assert-StackSafe/Drain-Rx/Wait-ReadOnlyProbeWindow 各 1 处
+  行为差异(逐条对任务书 §4):
+    首查询不再要求 1200 ms 全流静默: 旧条件串 '-ge 1200' 出现次数 R1=1 R2=0
+    新失败身份文本 BOOT_WINDOW_INCOMPLETE 出现=1 ; 旧文本 'No bounded quiet probe window' 残留=0
+    Drain-Rx 单次上限 16384 B: drainLeft=16384 出现=1 ; Assert-StackSafe 在 Persist-Chunk 之后调用=2
+    STACK_DANGER_OBSERVED 出现=1(先落盘再判, 不丢诊断)
+  未删除的旧门(逐项与 R1 比较; 一律用**精确串**, 不用会被 -ge 1200 吃进去的子串):
+    Wait-Prompt 的 120 ms 尾部判据 'TotalMilliseconds -ge 120)' : R1=1 R2=1 相等=True
+    提示符判据 'msh >' : R1=2 R2=2 相等=True
+    TMRO 完整性 function Check-TmroReply 定义 R1=1 R2=1 ; 出现总数(含注释) R1=3 R2=2
+    横幅门 Resolve-BannerGate=True ; 业务/完整性分层 UROR1_CAPTURE R1=51 R2=51 ; finally=True ; 白名单拒绝=True
+    代码体相同性(实算, 非声明): 从 [CmdletBinding()] 起的文本里, 把附录 A 有意替换的那几段整段摘除后,
+    R1 剩余文本 90601 B 与 R2 剩余文本 90601 B 逐字节相等 = True
+    (相等即说明: 除 Drain-Rx / Wait-ReadOnlyProbeWindow 两段替换与新增的 Assert-StackSafe 外,
+     采集器没有第三处代码改动。)
+    **有意的头部差异(如实登记)**: 附录 A 从 '[CmdletBinding()]' 起重建文本, 所以 R1 的 1784 B 前置说明注释
+    (复用谱系/判据说明)被换成生成器写的 228 B 三行头; 这是**任务书指定的生成器行为**, 不是本地改动。
+    R1 头部注释里的谱系声明在本文与 R1 原文件里仍可查, 未丢失。
+    串口参数(115200/8N1/DTR=RTS=false)与 -ExpectedBuildBanner/-ImageContinuityConfirmed/-SiteConfirmed 开关保持; CLI 名 ExecuteApprovedR1ReadDiag 仅作参数名保留(出现 6 次), 不代表继承旧批准。
+  两份附录脚本按原字节入库: make_r2.py / test_r2.ps1(与本目录同放), 未做任何'顺手改进'。
+
+== 5. Windows PowerShell 5.1 实跑 ==
+  ParseFile: PARSE_ERRORS=0(见 s2_parse 记录), PSVersion=5.1.26100.5074
+  命令行: UARTReadDiagSerialR2.ps1 -SelfTest -OutDir <仓外工作区>/r2/selftest/run1 -BootFixture <仓外工作区>/boot/001_attach_passive.rx.bin
+  进程 rc=0 ; stderr=0 字节 ; 末行: URO-R1-OFFLINE-SELFTEST PASS; device_actions=0; mock_commands=7; negative_controls=50; banner_controls=6; slice_controls=9
+  台账事件直方图(逐事件计数, 以台账为准):
+    {"BANNER_CONTROL": 2, "MOCK_TX_ATTEMPT": 7, "NEGATIVE_CONTROL": 51, "OFFLINE_SELFTEST": 1, "READ_ONLY_PROBE_READY": 1, "RX_BEGIN": 9, "RX_FILE": 9, "SLICE_CONTROL": 9, "UROR1_COMMAND_CHECKED": 7}
+    唯一具名负控=51 个(NEGATIVE_CONTROL 行=51, 无名=0) —— 与 R1 的 51 完全同集, 说明附录 A 没删旧负控;
+    旧汇总字符串仍写 negative_controls=50: 两个口径**并列保留**, 不为改一个字符串另开一轮。
+  被动窗口重放: 3757 B / sha256=97b37f32aa03c86b… 与固定夹具一致=True ; 真实 SerialPort 对象=0(全程 mock)。
+  切片(正控)分列结果沿用 R1 判据, 未放宽: 见 run1 目录 9 个 RX_FILE + 7 条命令检查事件。
+
+== 6. 附录 B 六项检查(输入=本次真实 23845 B 流) ==
+  解码输入: 从仓库交付件 passive_capture_b64.txt 复算 -> 3 块逐块 bytes+SHA 吻合, 拼回 23845 B,
+            sha256=ce98adab56a6d2f164b4b301a6870cb482c9b0a91c780b9bd5f0275e0b59091b, 与仓外原字节逐字节相等=True
+  命令行: test_r2.ps1 -Collector <R2> -Wire <23845 B 流> -OutRoot <仓外工作区>/r2/apb_run2
+  进程 rc=0 ; stderr=0 字节 ; 只用 fake port, 未创建 SerialPort。
+    PASS BUSY_HEALTHY_NO_QUIET_READY
+    PASS CONTINUOUS_DRAIN_RETURNS_AT_16K
+    PASS REAL_23845B_WIRE_STACK_DANGER_SAVED
+    PASS STACK_WARNING_SPLIT_BYTEWISE
+    PASS STACK_OVERFLOW_STOPS_AFTER_SAVE
+    PASS BOOT_NOT_DONE_TIMES_OUT_WITHOUT_TX
+    SUMMARY pass=6 fail=0 serial_objects=0
+  首失败保留(不删不改): 第一次调用用 OutRoot=r2/apb_run1, 因本生成器之前的解码脚本把'拼接校验'段落也当成 base64 读入而没写出 -Wire 文件, 前两例 PASS 后第三例 FileNotFoundException 退出(rc=1):
+    已判出的两例: PASS BUSY_HEALTHY_NO_QUIET_READY; PASS CONTINUOUS_DRAIN_RETURNS_AT_16K
+    归因: 是我这次编排/解码脚本的缺陷(任务书 §2 允许范围内修正), 不是采集器缺陷, 也不是判据放宽;
+    处置: 修解码(只认 base64 字符行)后在新 OutRoot 重跑, 得到上面 6/6; 旧 run1 目录与两份输出原样保留。
+
+== 7. 既有主机链(各跑一次, 不重跑输入未变的其它链) ==
+  S1: target | OK 必需用例=50 全部PASS 实际行数=50 自报 fail=0 proc_rc=0 | host_ovr | OK 必需用例=65 全部PASS 实际行数=65 自报 fail=0 proc_rc=0 | S1 RUNNER RESULT: PASS (rc=0) —— target 与 host_ovr 两个变体的必需用例全部真执行且判 PASS
+      (S1 链没有 read_obs 组, 该组属 S2; 不在此冒充)
+  S2: target | OK 全部 18 组自洽且必需用例真执行判 PASS (用例=53) | host_ovr | OK 全部 18 组自洽且必需用例真执行判 PASS (用例=109) | S2 RUNNER RESULT: PASS (rc=0) —— target 与 host_ovr 全部 18 组的必需用例真执行且判 PASS
+      read_obs 组(逐变体):
+      逐变体汇总:
+  说明: 本轮只改了一个栈常量, 未新增/修改断言; 期望值 S1 50/65、S2 53/109、read_obs 30/30 全部实跑到。
+  未机械重跑: V1/V2、I/O 行为链、SD 链、旧元负例、A0 链(本轮输入未变, 且既有已审 runner 冻结)。
+
+== 8. 四宏与边界 ==
+  目标级 Define 覆盖情况: {"rt-thread": {}, "rt-thread-measure-a0": {}}
+  ARMCLANG 预处理实证: rc=0, stderr=0 B, 摘要=两目标下四宏全部解析为 RT_FALSE 且 RT_FALSE=0 => 有效值 0 由编译器实证, 不是仅凭头文件默认值。
+  未构建第三目标 rt-thread-motor-m1-candidate(其目标级 Define 显式写了 1, 与本轮两枚镜像无关)。
+  旧镜像/旧证据/快照/HEX/恢复工程未覆盖未删除; 冻结分支与 tag 未动; 无 reset/rebase/merge/force。
+
+== 9. 本轮没拿到的东西(直说) ==
+  板上 sensor 栈告警是否消失 = 未取得(本轮零设备动作, 栈修复只是离线配置+静态报告)。
+  tmc_uart_probe 的逐笔读观测 = 未取得; 板上 TMC 链路仍 UNPROVEN, -117 根因仍未知。
+  完整最坏栈界 = 未证明(静态调用图显式带 Unknown; 互递归与函数指针不参与上界; 异常帧未计)。
+  echo_match_off 仍 KNOWN_INVALID_FOR_DIAG(本轮不扩改 TMC)。

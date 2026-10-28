@@ -272,3 +272,24 @@ tag deref                                  e40a9b95ef709e6a80444f9f3949dfdd70ba9
 使交付的 `.md` 里真存了一个 ESC 字节（GitHub contents API 因此拒绝直接回显该件）。
 `0b9dd5d` 只把该一个字符改为字面 `\x1b` 文本，不动任何事实与计数；因上一提交已推送，故不 amend，
 另立勘误提交。三件证据文件经复检均无裸控制字节。
+
+
+---
+
+## 8. 后续轮指针（2026-10-28，URO-R2）
+
+本轮交付之后, 任务书 `NS800_Sensor_Stack_UART_R2_Fix_Task.md` 要求把"栈告警刷屏"与"就绪门要求全流静默"
+合并修复。该离线轮已交付, 结果与本文的关系如下(**本文 §1–§7 的历史文字与停点标签原样保留, 不回写**):
+
+- 产品侧: `applications/sensor_service.c` 的 `SENSOR_THREAD_STACK` 1024 → 4096(软件输入提交
+  `139e9377ccbc36b878cd577a6b848d974e1e07fa`); 静态已知最深链 `sensor_thread_entry` = 1228 B, 旧配置装不下它, 这就是本文 243 次告警的量化解释。
+- 采集器侧: 新 `UARTReadDiagSerialR2.ps1`(92860 B / `9ed8a3e342f7…`)按任务书附录 A 原样生成, 首查询不再要求 1200 ms
+  全流静默, 改为"先落盘再判栈危险, 命中即 `STACK_DANGER_OBSERVED` 停"; 附录 B 六项以**本文这条真实
+  23845 B 流**为输入全 PASS。
+- 镜像侧: 两枚新 BIN(`measure-a0.bin` 268340 B / `b1e852949f00…`, 期望横幅 `5.3.0 build Oct 28 2026 10:23:50`)已归档; 本文已证的板上旧镜像
+  `a48400c8…` 与其归档件未覆盖、未删除。
+- 状态侧: 本文的 `CAPTURE=INCOMPLETE / BUSINESS=NOT_REACHED / msh 0/7 / 额度全部用尽`**继续成立**,
+  未被后续轮改写; 板上 TMC 链路仍 `UNPROVEN`, `-117` 根因仍未知。
+- 下一轮: 见 `reports/reviews/phase8-sensor-stack-uart-r2/board_package_r2.md`(填实的续测包)与
+  `reports/agent_handoffs/phase8-sensor-stack-uart-r2.md/.json`; 需要用户对那份新包的一次批准,
+  本文的批准不续用。

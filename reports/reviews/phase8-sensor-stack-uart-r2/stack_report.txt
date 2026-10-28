@@ -1,0 +1,57 @@
+URO-R2 sensor 线程栈占用报告(离线只读, 零设备动作)
+来源 = 本轮真实构建产物: armlink Static Call Graph HTML + fromelf --disassemble 全文对照
+软件输入提交 = 139e9377ccbc36b878cd577a6b848d974e1e07fa   构建 = UV4 5.43.1.0 + ARMCLANG V6.24, -r Rebuild All, 两目标各一次
+告警判据(实读源码): src/scheduler_comm.c:519-525 —— 向下增长栈的已保存 SP <= stack_addr+32 即打印
+  => 这是真实栈边界压力告警, 不是可以只为静默隐藏的噪声。
+
+== 1. armlink 调用图度量(两个目标各读一遍) ==
+  镜像级(default) : Maximum Stack Usage = 2996 bytes + Unknown(Cycles, Untraceable Function Pointers)
+  镜像级(A0)      : Maximum Stack Usage = 2996 bytes + Unknown(Cycles, Untraceable Function Pointers)
+  互递归段存在: default=True A0=True
+  符号                                 default 本帧     default 累计            A0 本帧          A0 累计
+  sensor_thread_entry                        72           1228               72           1228
+  s_collect                                 104           1156              104           1156
+  tmc2209_read_sg_result                     24           1052               24           1052
+  tmc2209_read_register                      24           1028               24           1028
+  tmc_read_reg                               32           1004               32           1004
+  tmc_read_reg_obs                          112            972              112            972
+  motor_get_snapshot                        288            860              288            860
+  adxl345_read_mg                            40            780               40            780
+  current_adc_read_measurement               32            136               32            136
+  s_read_sai_input                           32            120               32            120
+  s_isqrt                                    16             16               16             16
+  sensor_service_init                        32            748               32            748
+  sensor_status                              32            284               32            284
+  sensor_snapshot                           136            500              136            500
+
+  sensor 线程自己那条链的静态已知最深值 = 1228 B(A0) / 1228 B(default), 两者相同。
+  旧配置 1024 B < 1228 B => 上一轮 20.017 s 内 243 次告警与此一致; 新配置 4096 B 留 2868 B 余量。
+  配置口径: SENSOR_THREAD_STACK 经 rt_thread_create 走**堆**分配 => 动态堆增量 3072 B;
+  因此两目标 Program Size 四项增量为 0 是预期的, 不代表改动没生效(生效证明见第 2 节)。
+
+== 2. 镜像前后对照(fromelf --disassemble 全文逐行, 同目标 A0) ==
+  R1 AXF sha256 = a96889c47c9433b132dc4eeecf46be287c13dc1cff11fc0003e6cca10826846f
+  R2 AXF sha256 = 15be5f3efc45bf296bc0ef24e3947081372616d819e4bb3b189e9614cf9a5b9a
+  行数 R1=117145 R2=117145   非相等块=2   差异行=4
+    R1| MOV      r3,#0x400   ==>   R2| MOV      r3,#0x1000
+    R1| DCB      0x30   ==>   R2| DCB      0x31
+    R1| DCD      0x33323a32   ==>   R2| DCD      0x33323a30
+    R1| DCD      0x0031333a   ==>   R2| DCD      0x0030353a
+  => 整镜像只有栈大小立即数(#0x400 -> #0x1000, r3 = rt_thread_create 第 4 个整型实参)
+     与 __TIME__ 数据串不同, 没有任何其它代码/数据变化。
+  默认目标的 R1 AXF 按既有纪律只留本地未入库, 已被本轮 Rebuild All 覆盖, 所以该对照做在 A0 上;
+  两目标的产品输入与 Program Size 完全相同, 默认目标只补 BIN 逐字节差异(见 manifest)。
+
+== 3. 这份报告没有给出的东西(不编造) ==
+  1) 完整最坏栈界: armlink 自己把镜像级度量写成 'Maximum Stack Usage = 2996 bytes + Unknown(Cycles, Untraceable Function Pointers)',
+     即存在 Cycles(互递归)与不可追踪函数指针(msh 命令分发、线程 entry、device ops 等),
+     静态调用图**不给闭合上界**。
+  2) 异常/中断进入线程栈的硬件压栈不计入静态度量(M7 异常帧视 FP 上下文而异) => 记未知。
+  3) 真实高水位需要上板实测(如栈填充模式 + 边界回读), 本轮零设备动作, 未测, 不声称。
+  4) 未为本次通信诊断另造 WCET 平台(任务书 §3 明确不要求)。
+
+== 4. 因此本轮对 4096 的表述边界 ==
+  可以说: 4096 大于静态已知最深链 1228 B, 且旧配置 1024 连静态已知值都装不下; 报告没有显示 4096 不足,
+          所以未动用'据证上调到 <=8192'的许可。
+  不可以说: 4096 是已证明的最坏栈界; 板上告警已消失; sensor 路径已做过栈溢出实测。
+  主机侧改一个常量的断言不等于目标栈验证 —— 本轮没有写这种假证明。

@@ -423,5 +423,36 @@
   "errata_this_round": [
     "5360a5e 的交接 §7.3 把 ANSI 前缀名写成裸 0x1B 控制字节 -> 0b9dd5d 改为字面 \\x1b 文本; 只改一个字符的呈现, 不动事实与计数; 上一提交已推送故不 amend, 另立勘误提交",
     "私有 runner 的 UV4 异步日志判定过早缺陷已在 §7.1/§2 登记, 未通过重跑下载来掩盖"
-  ]
+  ],
+  "followup_round_pointer": {
+    "task_id": "phase8-sensor-stack-uart-r2",
+    "software_input_commit": "139e9377ccbc36b878cd577a6b848d974e1e07fa",
+    "sensor_stack": {
+      "old": 1024,
+      "new": 4096,
+      "static_known_max_depth_bytes": 1228
+    },
+    "r2_collector": {
+      "bytes": 92860,
+      "sha256": "9ed8a3e342f7cad8430c42140ffb508d6cc0694e251636c1b93ab2a2a7390a37"
+    },
+    "new_images": {
+      "measure-a0": {
+        "bytes": 268340,
+        "sha256": "b1e852949f003965de52d539ca324a11b8b89e17a51a8f34fe3efd01525ae2d1"
+      },
+      "default": {
+        "bytes": 258036,
+        "sha256": "db5db20bb8d6eae1e8e5bed9dd0b70f5ad5c818a6cb3db9333496e0280aebe2d"
+      }
+    },
+    "expected_banner": "5.3.0 build Oct 28 2026 10:23:50",
+    "this_round_status_preserved_unchanged": [
+      "CAPTURE=INCOMPLETE",
+      "BUSINESS=NOT_REACHED",
+      "msh_commands=0/7",
+      "QUOTAS_EXHAUSTED"
+    ],
+    "note": "只追加指针, 本文 §1–§7 的历史文字与停点标签不回写"
+  }
 }

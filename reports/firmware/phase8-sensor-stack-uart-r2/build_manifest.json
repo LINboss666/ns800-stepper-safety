@@ -1,0 +1,588 @@
+{
+  "task_id": "phase8-sensor-stack-uart-r2",
+  "code_commit": "139e9377ccbc36b878cd577a6b848d974e1e07fa",
+  "document_base": "afa922b934f600e4b3301d87df16a99948610a10",
+  "reviewed_delivery_commit": "66f853309fe22376ffa6b45080e5f79c5891d4d1",
+  "software_input_note": "本轮唯一产品改动 = applications/sensor_service.c 的 SENSOR_THREAD_STACK 1024→4096(提交 139e9377ccbc)。构建使用该提交的字节; 后续文档提交不改变产品输入, 也不作为镜像 code_commit。",
+  "tool": {
+    "uv4": "KEIL_ROOT/UV4/UV4.exe",
+    "keil_version": "5.43.1.0",
+    "compiler": "ARMCLANG V6.24 (KEIL_ROOT/ARM/ARMCLANG/Bin)",
+    "mode": "UV4 -r (Rebuild All) -j0 批处理构建; 用 Start-Process -Wait 等进程退出后才读日志(上一板级轮登记的 UV4 异步落日志缺陷已在本轮离线流程修掉); 未使用下载/调试模式, 未连接设备",
+    "builds_executed": 2,
+    "device_actions_this_round": 0,
+    "path_note": "KEIL_ROOT 为安装根目录的脱敏占位符(替换掉盘符与安装目录); 版本号与可执行文件名保持原值。"
+  },
+  "project_file_identity": {
+    "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/project.uvprojx",
+    "worktree_bytes": 338976,
+    "worktree_sha256": "3b882d0a160692c31624108feda9ba285633a19ad02a89f663dec07fb8d51e04",
+    "git_blob": "8f8d7ce31298d2f5af567f18c565b140ce2d687a",
+    "git_blob_bytes": 338976,
+    "unchanged_this_round": true,
+    "note": "工程原块/Define/AfterMake/源清单保持原字节; 构建未改动任何受版本控制的文件。"
+  },
+  "sensor_stack_config": {
+    "file": "applications/sensor_service.c",
+    "macro": "SENSOR_THREAD_STACK",
+    "old_value": 1024,
+    "new_value": 4096,
+    "source_blob_before": "5b48e0e63e3d0e4b8f6abedb0d15621e70f0cacf0530aaaf84ebca18c71d0516",
+    "source_blob_after": "198ac05e2ab8a2df23189c2476acc5a139d2c6c3c805dcd5e7d3b2fa392c2d0e",
+    "blob_after_verified_locally": null,
+    "allocation": "rt_thread_create 动态分配(堆), 不是静态数组 => 新增堆需求 = 4096-1024 = 3072 B; ZI 不变不代表没生效(见 program_size 与反汇编双重证据)",
+    "dynamic_heap_delta_bytes": 3072,
+    "axf_before_after_scope": "全镜像反汇编对照只做在 **A0 目标**上: 默认目标的 R1 AXF 按既有纪律只留本地、未入库, 已被本轮 Rebuild All 覆盖, 事后无法取回原字节。因此默认目标提供的是 BIN 逐字节差异 + 压缩容器口径说明, 语义级'前后只变一处'的证明由 A0 目标承担; 两目标的 Program Size 与 sensor_service.c 输入完全相同。",
+    "why_not_hidden": "scheduler 的该告警判据是向下增长栈的已保存 SP <= stack_addr+32 (src/scheduler_comm.c:519-525), 是真实栈边界压力; 本轮不关 RT_USING_OVERFLOW_CHECK、不改 LOG 级别、不停线程、不降采样、不加延时。",
+    "static_call_graph_evidence": null,
+    "disassembly_evidence": "见同节 whole_image_disassembly_diff: 同目标(A0) R1 与 R2 的 AXF 全文反汇编只有 4 行不同(1 行栈大小立即数 + 3 行 __TIME__ 数据), r3 即 rt_thread_create 的第 4 个整型实参(stack_size)。故常量确实进入镜像, 且没有其它代码变化。",
+    "source_blob_sha256_after_verified": "198ac05e2ab8a2df23189c2476acc5a139d2c6c3c805dcd5e7d3b2fa392c2d0e",
+    "source_git_blob_id_sha1": "5975b34e15c8b7f060ff12ba97410f89a66eec43",
+    "blob_after_matches_declared": true,
+    "note_on_hash_kind": "本节两个 64 位串是**内容的 SHA-256**(取自 git blob 字节, LF 归一), 另单列 git blob 的 SHA-1 对象号; 工作树副本因 core.autocrlf 是 CRLF, 其文件 SHA-256 与 blob SHA-256 不同口径, 不混用。",
+    "whole_image_disassembly_diff": {
+      "target": "rt-thread-measure-a0",
+      "r1_axf_sha256": "a96889c47c9433b132dc4eeecf46be287c13dc1cff11fc0003e6cca10826846f",
+      "r2_axf_sha256": "15be5f3efc45bf296bc0ef24e3947081372616d819e4bb3b189e9614cf9a5b9a",
+      "tool": "fromelf --disassemble <AXF> 全文逐行对照(difflib)",
+      "lines_r1": 117145,
+      "lines_r2": 117145,
+      "diff_block_count": 2,
+      "diff_line_count": 4,
+      "diff_lines": [
+        "R1| MOV      r3,#0x400   ==>   R2| MOV      r3,#0x1000",
+        "R1| DCB      0x30   ==>   R2| DCB      0x31",
+        "R1| DCD      0x33323a32   ==>   R2| DCD      0x33323a30",
+        "R1| DCD      0x0031333a   ==>   R2| DCD      0x0030353a"
+      ],
+      "reading": "整镜像 117145 行里只有 4 行不同: 1 行是 sensor_service_init 里传给 rt_thread_create 的栈大小立即数 0x400→0x1000; 其余 3 行是 __TIME__ 字符串的 DCB/DCD 数据(构建时刻)。除这两处外没有任何代码/数据变化。"
+    }
+  },
+  "targets": {
+    "rt-thread": {
+      "kind": "default",
+      "command": "UV4.exe -r project.uvprojx -t \"rt-thread\" -j0 -o <仓外日志>",
+      "process_rc_note": "UV4 退出码只作参考, 判定取日志文本与产物字节(既有已审口径)",
+      "log_linker_summary": [
+        "0",
+        "0"
+      ],
+      "errors": 0,
+      "warnings": 0,
+      "real_warning_text_lines": 0,
+      "build_elapsed": "00:00:09",
+      "program_size_this_build": "Code=179674 RO-data=77786 RW-data=2188 ZI-data=83784",
+      "program_size_this_build_parsed": {
+        "Code": 179674,
+        "RO_data": 77786,
+        "RW_data": 2188,
+        "ZI_data": 83784
+      },
+      "program_size_previous_r1": "Code=179674 RO-data=77786 RW-data=2188 ZI-data=83784",
+      "program_size_delta_vs_r1": {
+        "Code": 0,
+        "RO_data": 0,
+        "RW_data": 0,
+        "ZI_data": 0
+      },
+      "delta_explanation": "Code/RO/RW/ZI 四项增量为 0: SENSOR_THREAD_STACK 走 rt_thread_create 的**堆**分配, 不占静态段; 生效证据是镜像里的 `MOV r3,#0x1000` 与调用图度量, 不是段大小。",
+      "bin": {
+        "path": "reports/firmware/phase8-sensor-stack-uart-r2/default.bin",
+        "bytes": 258036,
+        "sha256": "db5db20bb8d6eae1e8e5bed9dd0b70f5ad5c818a6cb3db9333496e0280aebe2d",
+        "source_build_output": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/rtthread.bin",
+        "source_bytes": 258036,
+        "source_sha256": "db5db20bb8d6eae1e8e5bed9dd0b70f5ad5c818a6cb3db9333496e0280aebe2d",
+        "copied_byte_identical": true,
+        "build_banner_in_image": {
+          "status": "OK",
+          "value": "Oct 28 2026 10:23:37",
+          "date_off": 252491,
+          "time_off": 252503,
+          "layout": "date_then_time"
+        },
+        "compressed_load_length_from_map": "0x0003EFF4",
+        "readback_length_basis": "定长回读取 BIN 实际长度与 map 的 COMPRESSED[...] 两个相符口径; 不用 Code+RO 相加代替压缩镜像长度",
+        "diff_vs_r1_bin": {
+          "r1_bytes": 258036,
+          "r2_bytes": 258036,
+          "diff_byte_count": 23,
+          "by_category": {
+            "date": {
+              "count": 11,
+              "offsets": [
+                252500,
+                252501,
+                252502,
+                252503,
+                252504,
+                252505,
+                252506,
+                252507,
+                252508,
+                252509,
+                252510
+              ]
+            },
+            "other": {
+              "count": 3,
+              "offsets": [
+                112582,
+                112594,
+                133869
+              ]
+            },
+            "time": {
+              "count": 9,
+              "offsets": [
+                252491,
+                252492,
+                252493,
+                252494,
+                252495,
+                252496,
+                252497,
+                252498,
+                252499
+              ]
+            }
+          },
+          "stamp_strings_r1": [
+            [
+              "time",
+              252491,
+              "02:23:14"
+            ],
+            [
+              "date",
+              252500,
+              "Oct 28 2026"
+            ]
+          ],
+          "stamp_strings_r2": [
+            [
+              "time",
+              252503,
+              "10:23:37"
+            ],
+            [
+              "date",
+              252491,
+              "Oct 28 2026"
+            ]
+          ],
+          "container_note": "该 .bin 是 fromelf --bin 产出的**压缩加载镜像**(map 里有 COMPRESSED[...]), 所以镜像内字节位置不等于链接后的代码地址; 语义层的前后对照以全镜像反汇编为准 (见 sensor_stack_config.whole_image_disassembly_diff), 不在这里把偏移解释成指令地址。"
+        }
+      },
+      "axf_local_only": {
+        "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/build/rt-thread.axf",
+        "bytes": 1663308,
+        "sha256": "1db8e22289b318752c305d1774a0d8f0fcd49d4da96b175dcea6d457c407bc20",
+        "upload": "本地独立保存, 不入库(可能含私有绝对路径); 身份以该 SHA/长度为准"
+      },
+      "map": {
+        "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/build/rt-thread.map",
+        "bytes": 1967908,
+        "worktree_sha256": "0e1339a3e430fed1d735992bb22a1da94724e41269c87bae1754aa24ab47f247",
+        "load_regions": [
+          [
+            "LR_IROM1",
+            "0x08000000",
+            "0x0003f640",
+            "0x00080000",
+            ", ABSOLUTE, COMPRESSED[0x0003eff4]"
+          ]
+        ],
+        "first_execution_regions": [
+          [
+            "RW_ITCM",
+            "0x00000000",
+            "0x0803edb4",
+            "0x00000000",
+            "0x00020000"
+          ],
+          [
+            "ER_IROM1",
+            "0x08000000",
+            "0x08000000",
+            "0x0003edb4",
+            "0x00080000"
+          ],
+          [
+            "RW_VT_DTCM",
+            "0x20000000",
+            "0x0803edb4",
+            "0x000003cc",
+            "0x00000400"
+          ],
+          [
+            "RW_DTCM",
+            "0x20000400",
+            "0x0803edbc",
+            "0x0000cc08",
+            "0x0001fc00"
+          ]
+        ],
+        "entry_point": "Image Entry point: 0x080003cd",
+        "compressed_marker": "0x0003EFF4",
+        "git_blob_note": "map 未纳入版本控制; 若日后入库按 CRLF/LF 双身份登记, 不为换行差异重建固件"
+      },
+      "callgraph": {
+        "html_path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/build/rt-thread.htm",
+        "html_bytes": 990040,
+        "html_sha256": "864d2d339ee76033aa4ab9f6df4146cd6dcc922e548bd6b60d6137aa6cc4111a",
+        "metrics": {
+          "image_maximum_stack_usage": "Maximum Stack Usage = 2996 bytes + Unknown(Cycles, Untraceable Function Pointers)",
+          "sensor_thread_entry": {
+            "own_frame_bytes": 72,
+            "max_depth_bytes": 1228
+          },
+          "s_collect": {
+            "own_frame_bytes": 104,
+            "max_depth_bytes": 1156
+          },
+          "tmc2209_read_sg_result": {
+            "own_frame_bytes": 24,
+            "max_depth_bytes": 1052
+          },
+          "tmc2209_read_register": {
+            "own_frame_bytes": 24,
+            "max_depth_bytes": 1028
+          },
+          "tmc_read_reg": {
+            "own_frame_bytes": 32,
+            "max_depth_bytes": 1004
+          },
+          "tmc_read_reg_obs": {
+            "own_frame_bytes": 112,
+            "max_depth_bytes": 972
+          },
+          "motor_get_snapshot": {
+            "own_frame_bytes": 288,
+            "max_depth_bytes": 860
+          },
+          "adxl345_read_mg": {
+            "own_frame_bytes": 40,
+            "max_depth_bytes": 780
+          },
+          "current_adc_read_measurement": {
+            "own_frame_bytes": 32,
+            "max_depth_bytes": 136
+          },
+          "s_read_sai_input": {
+            "own_frame_bytes": 32,
+            "max_depth_bytes": 120
+          },
+          "s_isqrt": {
+            "own_frame_bytes": 16,
+            "max_depth_bytes": 16
+          },
+          "sensor_service_init": {
+            "own_frame_bytes": 32,
+            "max_depth_bytes": 748
+          },
+          "sensor_status": {
+            "own_frame_bytes": 32,
+            "max_depth_bytes": 284
+          },
+          "sensor_snapshot": {
+            "own_frame_bytes": 136,
+            "max_depth_bytes": 500
+          },
+          "mutually_recursive_section_present": true
+        }
+      }
+    },
+    "rt-thread-measure-a0": {
+      "kind": "measure-a0",
+      "command": "UV4.exe -r project.uvprojx -t \"rt-thread-measure-a0\" -j0 -o <仓外日志>",
+      "process_rc_note": "UV4 退出码只作参考, 判定取日志文本与产物字节(既有已审口径)",
+      "log_linker_summary": [
+        "0",
+        "0"
+      ],
+      "errors": 0,
+      "warnings": 0,
+      "real_warning_text_lines": 0,
+      "build_elapsed": "00:00:08",
+      "program_size_this_build": "Code=187018 RO-data=80746 RW-data=2188 ZI-data=91504",
+      "program_size_this_build_parsed": {
+        "Code": 187018,
+        "RO_data": 80746,
+        "RW_data": 2188,
+        "ZI_data": 91504
+      },
+      "program_size_previous_r1": "Code=187018 RO-data=80746 RW-data=2188 ZI-data=91504",
+      "program_size_delta_vs_r1": {
+        "Code": 0,
+        "RO_data": 0,
+        "RW_data": 0,
+        "ZI_data": 0
+      },
+      "delta_explanation": "Code/RO/RW/ZI 四项增量为 0: SENSOR_THREAD_STACK 走 rt_thread_create 的**堆**分配, 不占静态段; 生效证据是镜像里的 `MOV r3,#0x1000` 与调用图度量, 不是段大小。",
+      "bin": {
+        "path": "reports/firmware/phase8-sensor-stack-uart-r2/measure-a0.bin",
+        "bytes": 268340,
+        "sha256": "b1e852949f003965de52d539ca324a11b8b89e17a51a8f34fe3efd01525ae2d1",
+        "source_build_output": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/build/a0/measure-a0.bin",
+        "source_bytes": 268340,
+        "source_sha256": "b1e852949f003965de52d539ca324a11b8b89e17a51a8f34fe3efd01525ae2d1",
+        "copied_byte_identical": true,
+        "build_banner_in_image": {
+          "status": "OK",
+          "value": "Oct 28 2026 10:23:50",
+          "date_off": 262788,
+          "time_off": 262779,
+          "layout": "time_then_date"
+        },
+        "compressed_load_length_from_map": "0x00041834",
+        "readback_length_basis": "定长回读取 BIN 实际长度与 map 的 COMPRESSED[...] 两个相符口径; 不用 Code+RO 相加代替压缩镜像长度",
+        "diff_vs_r1_bin": {
+          "r1_bytes": 268340,
+          "r2_bytes": 268340,
+          "diff_byte_count": 5,
+          "by_category": {
+            "other": {
+              "count": 1,
+              "offsets": [
+                133917
+              ]
+            },
+            "time": {
+              "count": 4,
+              "offsets": [
+                262779,
+                262780,
+                262785,
+                262786
+              ]
+            }
+          },
+          "stamp_strings_r1": [
+            [
+              "time",
+              262779,
+              "02:23:31"
+            ],
+            [
+              "date",
+              262788,
+              "Oct 28 2026"
+            ]
+          ],
+          "stamp_strings_r2": [
+            [
+              "time",
+              262779,
+              "10:23:50"
+            ],
+            [
+              "date",
+              262788,
+              "Oct 28 2026"
+            ]
+          ],
+          "container_note": "该 .bin 是 fromelf --bin 产出的**压缩加载镜像**(map 里有 COMPRESSED[...]), 所以镜像内字节位置不等于链接后的代码地址; 语义层的前后对照以全镜像反汇编为准 (见 sensor_stack_config.whole_image_disassembly_diff), 不在这里把偏移解释成指令地址。"
+        }
+      },
+      "axf_local_only": {
+        "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/build/a0/rt-thread-a0.axf",
+        "bytes": 1693804,
+        "sha256": "15be5f3efc45bf296bc0ef24e3947081372616d819e4bb3b189e9614cf9a5b9a",
+        "upload": "本地独立保存, 不入库(可能含私有绝对路径); 身份以该 SHA/长度为准"
+      },
+      "map": {
+        "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/build/a0/rt-thread-a0.map",
+        "bytes": 2019991,
+        "worktree_sha256": "e9e808d2d103c337b915ab20e425a800b10e148ce139c2142a9cda9040de4417",
+        "load_regions": [
+          [
+            "LR_IROM1",
+            "0x08000000",
+            "0x00041e80",
+            "0x00080000",
+            ", ABSOLUTE, COMPRESSED[0x00041834]"
+          ]
+        ],
+        "first_execution_regions": [
+          [
+            "RW_ITCM",
+            "0x00000000",
+            "0x080415f4",
+            "0x00000000",
+            "0x00020000"
+          ],
+          [
+            "ER_IROM1",
+            "0x08000000",
+            "0x08000000",
+            "0x000415f4",
+            "0x00080000"
+          ],
+          [
+            "RW_VT_DTCM",
+            "0x20000000",
+            "0x080415f4",
+            "0x000003cc",
+            "0x00000400"
+          ],
+          [
+            "RW_DTCM",
+            "0x20000400",
+            "0x080415fc",
+            "0x0000ea30",
+            "0x0001fc00"
+          ]
+        ],
+        "entry_point": "Image Entry point: 0x080003cd",
+        "compressed_marker": "0x00041834",
+        "git_blob_note": "map 未纳入版本控制; 若日后入库按 CRLF/LF 双身份登记, 不为换行差异重建固件"
+      },
+      "callgraph": {
+        "html_path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/build/a0/rt-thread-a0.htm",
+        "html_bytes": 1011678,
+        "html_sha256": "1153b7a4b53c3b8953c63f467c6b97dc39be89d559008a7c16431bf6c16137ce",
+        "metrics": {
+          "image_maximum_stack_usage": "Maximum Stack Usage = 2996 bytes + Unknown(Cycles, Untraceable Function Pointers)",
+          "sensor_thread_entry": {
+            "own_frame_bytes": 72,
+            "max_depth_bytes": 1228
+          },
+          "s_collect": {
+            "own_frame_bytes": 104,
+            "max_depth_bytes": 1156
+          },
+          "tmc2209_read_sg_result": {
+            "own_frame_bytes": 24,
+            "max_depth_bytes": 1052
+          },
+          "tmc2209_read_register": {
+            "own_frame_bytes": 24,
+            "max_depth_bytes": 1028
+          },
+          "tmc_read_reg": {
+            "own_frame_bytes": 32,
+            "max_depth_bytes": 1004
+          },
+          "tmc_read_reg_obs": {
+            "own_frame_bytes": 112,
+            "max_depth_bytes": 972
+          },
+          "motor_get_snapshot": {
+            "own_frame_bytes": 288,
+            "max_depth_bytes": 860
+          },
+          "adxl345_read_mg": {
+            "own_frame_bytes": 40,
+            "max_depth_bytes": 780
+          },
+          "current_adc_read_measurement": {
+            "own_frame_bytes": 32,
+            "max_depth_bytes": 136
+          },
+          "s_read_sai_input": {
+            "own_frame_bytes": 32,
+            "max_depth_bytes": 120
+          },
+          "s_isqrt": {
+            "own_frame_bytes": 16,
+            "max_depth_bytes": 16
+          },
+          "sensor_service_init": {
+            "own_frame_bytes": 32,
+            "max_depth_bytes": 748
+          },
+          "sensor_status": {
+            "own_frame_bytes": 32,
+            "max_depth_bytes": 284
+          },
+          "sensor_snapshot": {
+            "own_frame_bytes": 136,
+            "max_depth_bytes": 500
+          },
+          "mutually_recursive_section_present": true
+        }
+      }
+    }
+  },
+  "macros_effective": {
+    "macro_names_checked": [
+      "MOTOR_HARDWARE_ENABLE_PATH_VALIDATED",
+      "STEP_DIAG_ISOLATED_ENV_CONFIRMED",
+      "TMC_DRIVE_CONFIG_HW_VALIDATED",
+      "SAFETY_LIMIT_INPUTS_ENABLED"
+    ],
+    "source_defaults": [
+      "applications/motor.h:69 MOTOR_HARDWARE_ENABLE_PATH_VALIDATED = RT_FALSE",
+      "applications/motor.h:83 STEP_DIAG_ISOLATED_ENV_CONFIRMED = RT_FALSE",
+      "applications/tmc2209.h:100 TMC_DRIVE_CONFIG_HW_VALIDATED = RT_FALSE",
+      "applications/project_board.h:51 SAFETY_LIMIT_INPUTS_ENABLED = RT_FALSE"
+    ],
+    "per_target": [
+      {
+        "target": "rt-thread",
+        "built_this_round": true,
+        "target_level_define": "SYSCLK_USE_PLL, __CLK_TCK=RT_TICK_PER_SECOND, DUAL_CORE_ENABLE=0, USE_HAL_DRIVER, SYSCLK_SOURCE_USE_HXTL, __RTTHREAD__, NS800RT7P65X, __STDC_LIMIT_MACROS, RT_USING_LIBC, RT_USING_ARMLIBC, PLLCLK_SOURCE_USE_HXTL",
+        "of_the_four_overridden_in_target_define": {},
+        "effective_note": "源码 #ifndef 默认 RT_FALSE 未被目标级 -D 覆盖 => 该宏有效值 0(FALSE)"
+      },
+      {
+        "target": "rt-thread-measure-a0",
+        "built_this_round": true,
+        "target_level_define": "SYSCLK_USE_PLL, __CLK_TCK=RT_TICK_PER_SECOND, DUAL_CORE_ENABLE=0, USE_HAL_DRIVER, SYSCLK_SOURCE_USE_HXTL, __RTTHREAD__, NS800RT7P65X, __STDC_LIMIT_MACROS, RT_USING_LIBC, RT_USING_ARMLIBC, PLLCLK_SOURCE_USE_HXTL, NS800_TARGET_MEASUREMENT_A0=1",
+        "of_the_four_overridden_in_target_define": {},
+        "effective_note": "源码 #ifndef 默认 RT_FALSE 未被目标级 -D 覆盖 => 该宏有效值 0(FALSE)"
+      },
+      {
+        "target": "rt-thread-motor-m1-candidate",
+        "built_this_round": false,
+        "target_level_define": "SYSCLK_USE_PLL, __CLK_TCK=RT_TICK_PER_SECOND, DUAL_CORE_ENABLE=0, USE_HAL_DRIVER, SYSCLK_SOURCE_USE_HXTL, __RTTHREAD__, NS800RT7P65X, __STDC_LIMIT_MACROS, RT_USING_LIBC, RT_USING_ARMLIBC, PLLCLK_SOURCE_USE_HXTL, NS800_TARGET_MEASUREMENT_A0=0, MOTOR_HARDWARE_ENABLE_PATH_VALIDATED=1, TMC_DRIVE_CONFIG_HW_VALIDATED=1, STEP_DIAG_ISOLATED_ENV_CONFIRMED=0, SAFETY_LIMIT_INPUTS_ENABLED=0",
+        "of_the_four_overridden_in_target_define": {
+          "MOTOR_HARDWARE_ENABLE_PATH_VALIDATED": "1",
+          "STEP_DIAG_ISOLATED_ENV_CONFIRMED": "0",
+          "TMC_DRIVE_CONFIG_HW_VALIDATED": "1",
+          "SAFETY_LIMIT_INPUTS_ENABLED": "0"
+        },
+        "effective_note": "目标级显式覆盖, 见上"
+      }
+    ],
+    "this_round_built_targets_macro_state": {
+      "rt-thread": {},
+      "rt-thread-measure-a0": {}
+    },
+    "unbuilt_target_note": "第三个目标 rt-thread-motor-m1-candidate 的目标级 Define 里显式写了三个 1; 本轮未构建、未下载, 不影响本轮两枚镜像的四宏取值。",
+    "build_log_macro_flip_evidence": {
+      "rt-thread": "未发现该四宏的 -D 覆盖",
+      "rt-thread-measure-a0": "未发现该四宏的 -D 覆盖"
+    },
+    "armclang_preprocessor_probe": {
+      "command": "armclang --target=arm-arm-none-eabi -mcpu=cortex-m7 -E -dM -P <该目标 Define 逐项 -D> <该目标 IncludePath 逐项 -I> applications/motor.c",
+      "rc": 0,
+      "stdout": [
+        "TARGET=rt-thread rc=0 defines_passed=11 include_dirs_existing=34/34 stderr_bytes=0",
+        "  MOTOR_HARDWARE_ENABLE_PATH_VALIDATED = RT_FALSE",
+        "  STEP_DIAG_ISOLATED_ENV_CONFIRMED = RT_FALSE",
+        "  TMC_DRIVE_CONFIG_HW_VALIDATED = RT_FALSE",
+        "  SAFETY_LIMIT_INPUTS_ENABLED = RT_FALSE",
+        "  RT_FALSE=0 RT_TRUE=1 | total_macros_dumped=1376",
+        "  macro_names_in_target_define_list=[]",
+        "TARGET=rt-thread-measure-a0 rc=0 defines_passed=12 include_dirs_existing=34/34 stderr_bytes=0",
+        "  MOTOR_HARDWARE_ENABLE_PATH_VALIDATED = RT_FALSE",
+        "  STEP_DIAG_ISOLATED_ENV_CONFIRMED = RT_FALSE",
+        "  TMC_DRIVE_CONFIG_HW_VALIDATED = RT_FALSE",
+        "  SAFETY_LIMIT_INPUTS_ENABLED = RT_FALSE",
+        "  RT_FALSE=0 RT_TRUE=1 | total_macros_dumped=1377",
+        "  macro_names_in_target_define_list=[]"
+      ],
+      "stderr_bytes": 0,
+      "reading": "两目标下四宏全部解析为 RT_FALSE 且 RT_FALSE=0 => 有效值 0 由编译器实证, 不是仅凭头文件默认值。"
+    },
+    "host_override_is_not_a_target_flip": true
+  },
+  "previous_images_untouched": {
+    "uro_r1_measure_a0": "268340 B / a48400c8… = reports/firmware/phase8-tmc-uart-read-observation-r1/measure-a0.bin (上一板级轮已证在板的镜像; 本轮不覆盖不删除, 也不是本轮候选件)",
+    "uro_r1_default": "258036 B / dccb7b63… = 同目录 default.bin (同上)",
+    "on_board_before_this_round": "板上最后已证镜像即 a48400c8…(上一轮逐字节回读证明); 本轮无新设备动作, 板上仍是它",
+    "note": "本轮新镜像只写入 reports/firmware/phase8-sensor-stack-uart-r2/; 1 MiB 快照与恢复 HEX 未动。"
+  }
+}

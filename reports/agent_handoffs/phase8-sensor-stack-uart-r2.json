@@ -1,0 +1,213 @@
+{
+  "task_id": "phase8-sensor-stack-uart-r2",
+  "task_book": "NS800_Sensor_Stack_UART_R2_Fix_Task.md",
+  "task_book_identity": {
+    "bytes": 20321,
+    "sha256": "2bbf84ca77d8c718df4e12d851080b0c28765b3a51ee8d0a291bb90855f4cfd7"
+  },
+  "anchor_commit": "afa922b934f600e4b3301d87df16a99948610a10",
+  "software_input_commit": "139e9377ccbc36b878cd577a6b848d974e1e07fa",
+  "reviewed_delivery_from_previous_round": "66f853309fe22376ffa6b45080e5f79c5891d4d1",
+  "stage": "offline fix + collector + verification + images + filled continuation package; zero device actions; stopped at user-approval gate",
+  "product_change": {
+    "file": "applications/sensor_service.c",
+    "macro": "SENSOR_THREAD_STACK",
+    "old": 1024,
+    "new": 4096,
+    "blob_sha256_before": "5b48e0e63e3d0e4b8f6abedb0d15621e70f0cacf0530aaaf84ebca18c71d0516",
+    "blob_sha256_after": "198ac05e2ab8a2df23189c2476acc5a139d2c6c3c805dcd5e7d3b2fa392c2d0e",
+    "matches_task_book_declared": true,
+    "dynamic_heap_delta_bytes": 3072,
+    "static_known_max_depth_bytes": 1228,
+    "image_maximum_stack_usage": "Maximum Stack Usage = 2996 bytes + Unknown(Cycles, Untraceable Function Pointers)",
+    "whole_image_disassembly_diff_lines": 4,
+    "not_proved": "完整最坏栈界(报告显式带 Unknown: Cycles + Untraceable Function Pointers; 互递归段存在; 异常硬件压栈不在静态度量内)",
+    "forbidden_silence_tricks_not_used": [
+      "RT_USING_OVERFLOW_CHECK 关闭",
+      "LOG_W 隐藏",
+      "停 sensor 线程",
+      "降采样",
+      "加延时造静默"
+    ]
+  },
+  "collector": {
+    "path": "reports/reviews/phase8-sensor-stack-uart-r2/UARTReadDiagSerialR2.ps1",
+    "bytes": 92860,
+    "sha256": "9ed8a3e342f7cad8430c42140ffb508d6cc0694e251636c1b93ab2a2a7390a37",
+    "matches_task_book_expected": true,
+    "generated_from": {
+      "r1_bytes": 93797,
+      "r1_sha256": "2e9c8ede8f75e7b513dbd4f2c3091189309454879e98404ba7ec64bbb80f2568",
+      "input_taken_as": "git show <anchor>:<path> 的 LF blob(未用 PowerShell 文本重定向, 未改 Git 配置)"
+    },
+    "appendix_a_bytes": 3327,
+    "appendix_a_sha256": "11e8aa34460ef1a748d38991ea82806b656702e2fe58023b2b66e274d80b9fdb",
+    "changed": [
+      "首查询不再要求 1200 ms 全流静默(保留 >=2 s / BOOT 未完成最多 20 s / 单次首查询)",
+      "Drain-Rx 单次上限 16384 B 后交回外层计时循环",
+      "新增 Assert-StackSafe: 原字节先落盘再判, 命中告警/overflow 抛 STACK_DANGER_OBSERVED"
+    ],
+    "retained_gates_proof": "把有意替换的两段与新增函数整段摘除后, R1 与 R2 剩余文本 90601 B 逐字节相等",
+    "intentional_header_difference": "附录 A 从 [CmdletBinding()] 重建文本: R1 的 1784 B 前置注释被换成 228 B 三行头(生成器规定行为)",
+    "cli_name_kept_not_an_authorization": "ExecuteApprovedR1ReadDiag"
+  },
+  "offline_verification": {
+    "ps51_parse_errors": 0,
+    "selftest": {
+      "rc": 0,
+      "stderr_bytes": 0,
+      "boot_fixture": "3757 B / 97b37f32aa03c86b8708ae088d0ae65a8f92520f1a1ed70beb74663049321749",
+      "ledger_histogram": {
+        "NEGATIVE_CONTROL": 51,
+        "SLICE_CONTROL": 9,
+        "RX_BEGIN": 9,
+        "RX_FILE": 9,
+        "MOCK_TX_ATTEMPT": 7,
+        "UROR1_COMMAND_CHECKED": 7,
+        "BANNER_CONTROL": 2,
+        "READ_ONLY_PROBE_READY": 1,
+        "OFFLINE_SELFTEST": 1
+      },
+      "unique_named_negative_controls": 51,
+      "legacy_summary_string_negative_controls": 50,
+      "both_counts_kept_in_parallel": true,
+      "serial_port_objects": 0
+    },
+    "appendix_b": {
+      "rc": 0,
+      "stderr_bytes": 0,
+      "pass": 6,
+      "fail": 0,
+      "serial_objects": 0,
+      "wire_input": "本次真实 23845 B 流(从仓库 passive_capture_b64.txt 复算, 逐块 bytes+SHA 吻合, 与仓外原件逐字节相等)",
+      "cases": [
+        "BUSY_HEALTHY_NO_QUIET_READY",
+        "CONTINUOUS_DRAIN_RETURNS_AT_16K",
+        "REAL_23845B_WIRE_STACK_DANGER_SAVED",
+        "STACK_WARNING_SPLIT_BYTEWISE",
+        "STACK_OVERFLOW_STOPS_AFTER_SAVE",
+        "BOOT_NOT_DONE_TIMES_OUT_WITHOUT_TX"
+      ],
+      "first_failure_retained": "OutRoot=r2/apb_run1 那次因本 Agent 解码脚本把'拼接校验'段落当 base64 读入而缺 -Wire 文件, 前两例 PASS 后第三例 FileNotFoundException rc=1; 修解码后新 OutRoot 得 6/6; 旧目录原样保留"
+    },
+    "host_chains": {
+      "S1": "target 50/50 + host_ovr 65/65 PASS, runner rc=0",
+      "S2": "target 53/53 + host_ovr 109/109 PASS, read_obs 30/30 两个变体, 18 组台账自洽, runner rc=0",
+      "not_re_run_reason": "本轮输入未变: V1/V2、I/O 行为链、SD 链、旧元负例、A0 链"
+    },
+    "keil": {
+      "tool": "UV4 5.43.1.0 + ARMCLANG V6.24",
+      "mode": "-r Rebuild All -j0, Start-Process -Wait 后再读日志",
+      "rt-thread": {
+        "errors": 0,
+        "warnings": 0,
+        "program_size": "Code=179674 RO-data=77786 RW-data=2188 ZI-data=83784",
+        "bin_bytes": 258036,
+        "bin_sha256": "db5db20bb8d6eae1e8e5bed9dd0b70f5ad5c818a6cb3db9333496e0280aebe2d",
+        "banner": "Oct 28 2026 10:23:37"
+      },
+      "rt-thread-measure-a0": {
+        "errors": 0,
+        "warnings": 0,
+        "program_size": "Code=187018 RO-data=80746 RW-data=2188 ZI-data=91504",
+        "bin_bytes": 268340,
+        "bin_sha256": "b1e852949f003965de52d539ca324a11b8b89e17a51a8f34fe3efd01525ae2d1",
+        "banner": "Oct 28 2026 10:23:50"
+      },
+      "program_size_delta_vs_r1": {
+        "Code": 0,
+        "RO_data": 0,
+        "RW_data": 0,
+        "ZI_data": 0
+      },
+      "third_target_built": false
+    },
+    "macros": {
+      "rt-thread": {},
+      "rt-thread-measure-a0": {}
+    },
+    "macro_preprocessor_probe_rc": 0
+  },
+  "previous_round_facts_kept": {
+    "image_on_board": "CONFIRMED(a48400c8… 逐字节回读相等 + 横幅匹配)",
+    "capture": "INCOMPLETE",
+    "business": "NOT_REACHED",
+    "msh_commands_sent": "0/7",
+    "quotas": "上一包额度已用尽, 本轮未续用、未重跑任何设备动作"
+  },
+  "hardware_actions": [],
+  "device_actions_this_round": 0,
+  "not_authorized_this_round": [
+    "电机连接/运动",
+    "STEP",
+    "DIR/许可 HIGH",
+    "翻宏",
+    "arm/start/ramp",
+    "清故障",
+    "配置写",
+    "手动 selftest",
+    "pin_status",
+    "额外 A0 采样/清理",
+    "自动恢复",
+    "外部 SPI Flash 转储",
+    "全片备份",
+    "设备/端口/探针枚举",
+    "sw1_cut.ps1",
+    "新烧录",
+    "COM5",
+    "DAP",
+    "复位"
+  ],
+  "not_proven": [
+    "板上 sensor 栈告警是否消失(需板级轮)",
+    "板上 TMC 链路与状态(UNPROVEN)",
+    "板上原 -117 根因",
+    "完整最坏栈界/栈高水位",
+    "OPEN/TXN/锁/flush/TX/RX/期限/身份各阶段的板上实测值",
+    "BLOCKED_ROLLBACK 剩余项(恢复下载未演练)",
+    "B-1",
+    "BUG-008",
+    "RISK-03/03a",
+    "物理 RISK-04-b",
+    "M-1",
+    "M-2",
+    "M-3",
+    "A0 时长证据(NOT_ACHIEVED)"
+  ],
+  "safety_macros": "四宏默认与 A0 目标均为 0(RT_FALSE), 由 ARMCLANG -E -dM 实证; 本轮未翻宏、未构建第三目标",
+  "privacy": {
+    "deid": "本机绝对路径 -> <仓外工作区>/<仓库根>; DAP UID 值不落盘, 只登记长度 48 与 sha256(uid)[:12]",
+    "lossless": false,
+    "originals_kept_out_of_repo": true,
+    "trailing_whitespace_stripped": "各证据文件每行右端空白已剥离, 完整性以登记的 bytes/sha256 为准"
+  },
+  "files_changed_in_repo": [
+    "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/sensor_service.c",
+    "reports/reviews/phase8-sensor-stack-uart-r2/UARTReadDiagSerialR2.ps1",
+    "reports/reviews/phase8-sensor-stack-uart-r2/make_r2.py",
+    "reports/reviews/phase8-sensor-stack-uart-r2/test_r2.ps1",
+    "reports/reviews/phase8-sensor-stack-uart-r2/offline_verification.txt",
+    "reports/reviews/phase8-sensor-stack-uart-r2/stack_report.txt",
+    "reports/reviews/phase8-sensor-stack-uart-r2/board_package_r2.md",
+    "reports/firmware/phase8-sensor-stack-uart-r2/default.bin",
+    "reports/firmware/phase8-sensor-stack-uart-r2/measure-a0.bin",
+    "reports/firmware/phase8-sensor-stack-uart-r2/build_manifest.json",
+    "reports/agent_handoffs/phase8-sensor-stack-uart-r2.md",
+    "reports/agent_handoffs/phase8-sensor-stack-uart-r2.json",
+    "reports/agent_handoffs/phase8-tmc-uart-read-observation-r1-board.md(只追加指针)",
+    "reports/agent_handoffs/phase8-tmc-uart-read-observation-r1-board.json(只追加指针)"
+  ],
+  "next_step_requires": "用户对 board_package_r2.md 整包的一次批准(简写: 批准执行 URO-R2 板级包); 上一包额度与批准不续用",
+  "stop_lines": [
+    "URO_R2_OFFLINE_FIX_AND_PACKAGE_DELIVERED / HARDWARE_ACTIONS_THIS_ROUND=0",
+    "SENSOR_THREAD_STACK=1024->4096 / STATIC_KNOWN_DEPTH=1228B / IMAGE_METRIC=2996B+Unknown",
+    "WORST_CASE_STACK_BOUND_NOT_PROVEN",
+    "R2_COLLECTOR=92860B/9ed8a3e3… / APPENDIX_B=6/6 / SELFTEST=rc0,NEG51,SLICE9",
+    "HOST=S1 50/65 PASS, S2 53/109 PASS(read_obs 30/30) / KEIL=0E-0W 两目标",
+    "NEW_IMAGES measure-a0=b1e85294… default=db5db20b… / EXPECTED_BANNER='5.3.0 build Oct 28 2026 10:23:50'",
+    "FOUR_SAFETY_MACROS=0 / SAFE_FOR_ENABLE=false / ECHO_MATCH_OFFSET=KNOWN_INVALID_FOR_DIAG",
+    "TMC_LINK_ON_BOARD=UNPROVEN / A0_DURATION_EVIDENCE_NOT_ACHIEVED / BLOCKED_ROLLBACK_OPEN",
+    "AWAITING_USER_APPROVAL / NO_NEW_HARDWARE_ACTIONS"
+  ],
+  "generated_by": "make_r2_handoff.py"
+}
