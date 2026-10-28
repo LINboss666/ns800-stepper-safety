@@ -104,3 +104,60 @@ FOUR_SAFETY_MACROS=0 / SAFE_FOR_ENABLE=false / TMC_LINK_ON_BOARD=UNPROVEN
 AWAITING_USER_APPROVAL / NO_NEW_HARDWARE_ACTIONS / ECHO_MATCH_OFFSET=KNOWN_INVALID_FOR_DIAG
 A0_DURATION_EVIDENCE_NOT_ACHIEVED / BLOCKED_ROLLBACK_OPEN / M2_M3_NOT_AUTHORIZED
 ```
+
+## 8. 推送后逐 blob 远端独立回读（只读，零设备动作）
+
+远端分支头 = `2554025146f65396266f669206d7ce7812c75d7a`；本轮两个提交：`139e937`（产品软件输入，镜像按它构建）+ `2554025`（证据/镜像/交接/包）。
+方法：`gh api .../contents/<path>?ref=HEAD -H Accept: application/vnd.github.raw` 取远端实际字节，
+与 `git show HEAD:<path>` 的 blob 字节同时比 **长度与 SHA-256**。
+
+| 件 | bytes | sha256 | 判定 |
+|---|---:|---|---|
+| `sensor_service.c` | 17734 | `198ac05e2ab8…` | MATCH |
+| `UARTReadDiagSerialR2.ps1` | 92860 | `9ed8a3e342f7…` | MATCH |
+| `make_r2.py` | 3327 | `11e8aa34460e…` | MATCH |
+| `test_r2.ps1` | 4125 | `a9090ad86065…` | MATCH |
+| `offline_verification.txt` | 15541 | `93c509a8c059…` | MATCH |
+| `stack_report.txt` | 4807 | `2c32f4404932…` | MATCH |
+| `board_package_r2.md` | 10082 | `e09078901265…` | MATCH |
+| `measure-a0.bin` | 268340 | `b1e852949f00…` | MATCH |
+| `default.bin` | 258036 | `db5db20bb8d6…` | MATCH |
+| `build_manifest.json` | 24583 | `9c3b492a4f74…` | MATCH |
+| `phase8-sensor-stack-uart-r2.md` | 8244 | `c383491b44ea…` | MATCH |
+| `phase8-sensor-stack-uart-r2.json` | 9492 | `5ce93470bf37…` | MATCH |
+| `phase8-tmc-uart-read-observation-r1-board.md` | 21929 | `b14fd6e63bbd…` | MATCH |
+| `phase8-tmc-uart-read-observation-r1-board.json` | 22608 | `e6d74440e2cc…` | MATCH |
+
+A 组 **14/14 MATCH**。
+
+应不变对象（跨头核对）：
+
+- `tmc2209.c` 与 `66f8533` 上的 blob **SAME**（`8a5e03082245…`）
+- `leaf_main.c` 与 `66f8533` 上的 blob **SAME**（`6a03b884e7b6…`）
+- `run_stop_priority_s2.sh` 与 `66f8533` 上的 blob **SAME**（`0d405b01c886…`）
+- `measure-a0.bin` 与 `66f8533` 上的 blob **SAME**（`a48400c881c5…`）
+- `default.bin` 与 `66f8533` 上的 blob **SAME**（`dccb7b63c928…`）
+- `build_manifest.json` 与 `66f8533` 上的 blob **SAME**（`075bd3ff6eac…`）
+- `UARTReadDiagSerialR1.ps1` 与 `66f8533` 上的 blob **SAME**（`2e9c8ede8f75…`）
+- `board_run_evidence.txt` 与 `afa922b` 上的 blob **SAME**（`b271a5e5892f…`）
+- `passive_window_analysis.txt` 与 `afa922b` 上的 blob **SAME**（`10a248b5fa98…`）
+- `passive_capture_b64.txt` 与 `afa922b` 上的 blob **SAME**（`8bd705b585e1…`）
+- `s0_offline_binding.txt` 与 `afa922b` 上的 blob **SAME**（`7c36aca3ad8a…`）
+- `execution_package.md` 与 `afa922b` 上的 blob **SAME**（`8c399e50e5a8…`）
+- `commands.expanded.masked.ps1` 与 `afa922b` 上的 blob **SAME**（`699b759a3c41…`）
+
+B 组 **13/13 SAME**：产品 `tmc2209.c`、夹具、runner、R1 两镜像与 manifest、冻结 R1 采集器，
+以及上一板级轮的全部证据与 S0 三件都未动。
+
+冻结引用（与 `-board` 交接 §7.7 逐项相同）：
+
+```text
+remote main                        1b3757eec550802a3973e66790af422d81d3d373
+remote phase7/full-embedded-software 6d3fbc559d45673d7550eb73dec5a4ade5bb34df
+tag v0.7-phase7-software-board-validated   097935fec5a6f2467261ab1ad449ff0b1d398250
+tag deref                              e40a9b95ef709e6a80444f9f3949dfdd70ba96ba
+本轮改动面                       仅 14 个文件（1 产品 + 6 证据/包 + 3 镜像 + 2 新交接 + 2 指针追加）
+```
+
+自指口径：表内两份交接文件与本节自身同源，登记本节会改变这两个 blob，所以最终头上这两件
+在推送后另行复验（见回执），不在文件内递归登记。

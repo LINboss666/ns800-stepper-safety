@@ -207,7 +207,192 @@
     "NEW_IMAGES measure-a0=b1e85294… default=db5db20b… / EXPECTED_BANNER='5.3.0 build Oct 28 2026 10:23:50'",
     "FOUR_SAFETY_MACROS=0 / SAFE_FOR_ENABLE=false / ECHO_MATCH_OFFSET=KNOWN_INVALID_FOR_DIAG",
     "TMC_LINK_ON_BOARD=UNPROVEN / A0_DURATION_EVIDENCE_NOT_ACHIEVED / BLOCKED_ROLLBACK_OPEN",
-    "AWAITING_USER_APPROVAL / NO_NEW_HARDWARE_ACTIONS"
+    "AWAITING_USER_APPROVAL / NO_NEW_HARDWARE_ACTIONS",
+    "REMOTE_READBACK=14/14 MATCH + 13/13 SAME (frozen refs unchanged)",
+    "DELIVERY_HEAD=2554025146f65396266f669206d7ce7812c75d7a"
   ],
-  "generated_by": "make_r2_handoff.py"
+  "generated_by": "make_r2_handoff.py",
+  "remote_readback": {
+    "head": "2554025146f65396266f669206d7ce7812c75d7a",
+    "commits": [
+      "139e9377ccbc36b878cd577a6b848d974e1e07fa",
+      "2554025146f65396266f669206d7ce7812c75d7a"
+    ],
+    "method": "gh api contents raw @HEAD vs git show HEAD:path (bytes + sha256)",
+    "this_round_files": [
+      {
+        "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/sensor_service.c",
+        "bytes": 17734,
+        "sha256": "198ac05e2ab8a2df23189c2476acc5a139d2c6c3c805dcd5e7d3b2fa392c2d0e",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-sensor-stack-uart-r2/UARTReadDiagSerialR2.ps1",
+        "bytes": 92860,
+        "sha256": "9ed8a3e342f7cad8430c42140ffb508d6cc0694e251636c1b93ab2a2a7390a37",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-sensor-stack-uart-r2/make_r2.py",
+        "bytes": 3327,
+        "sha256": "11e8aa34460ef1a748d38991ea82806b656702e2fe58023b2b66e274d80b9fdb",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-sensor-stack-uart-r2/test_r2.ps1",
+        "bytes": 4125,
+        "sha256": "a9090ad8606522c9b44fe0fb0f21825b989d8271e88b517ef987c36d3e270abe",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-sensor-stack-uart-r2/offline_verification.txt",
+        "bytes": 15541,
+        "sha256": "93c509a8c059669c980f8c8763e0317c975eb70b70dd5b5b671030dfca1242f0",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-sensor-stack-uart-r2/stack_report.txt",
+        "bytes": 4807,
+        "sha256": "2c32f44049329785d1b664cf2399e62b6bfdd92eafd72ad56ce9e46b9378f299",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-sensor-stack-uart-r2/board_package_r2.md",
+        "bytes": 10082,
+        "sha256": "e09078901265d957fdef223545e165544f83f530d9ba83e353362090b4a4c934",
+        "match": true
+      },
+      {
+        "path": "reports/firmware/phase8-sensor-stack-uart-r2/measure-a0.bin",
+        "bytes": 268340,
+        "sha256": "b1e852949f003965de52d539ca324a11b8b89e17a51a8f34fe3efd01525ae2d1",
+        "match": true
+      },
+      {
+        "path": "reports/firmware/phase8-sensor-stack-uart-r2/default.bin",
+        "bytes": 258036,
+        "sha256": "db5db20bb8d6eae1e8e5bed9dd0b70f5ad5c818a6cb3db9333496e0280aebe2d",
+        "match": true
+      },
+      {
+        "path": "reports/firmware/phase8-sensor-stack-uart-r2/build_manifest.json",
+        "bytes": 24583,
+        "sha256": "9c3b492a4f7487b850becaa182cea7214ff84f495af621c56d34a9f1f645194e",
+        "match": true
+      },
+      {
+        "path": "reports/agent_handoffs/phase8-sensor-stack-uart-r2.md",
+        "bytes": 8244,
+        "sha256": "c383491b44ea47b797261d5440b2c1795d2c1696bf5f55d75c8c65f56a2198a5",
+        "match": true
+      },
+      {
+        "path": "reports/agent_handoffs/phase8-sensor-stack-uart-r2.json",
+        "bytes": 9492,
+        "sha256": "5ce93470bf370f0c27d1d52e0e3c1c8d27e9e16be01622062e8d6f5922e686e7",
+        "match": true
+      },
+      {
+        "path": "reports/agent_handoffs/phase8-tmc-uart-read-observation-r1-board.md",
+        "bytes": 21929,
+        "sha256": "b14fd6e63bbd2338245e3d7672c0766b88f43bfd5e14c88266a81b89fad83cfc",
+        "match": true
+      },
+      {
+        "path": "reports/agent_handoffs/phase8-tmc-uart-read-observation-r1-board.json",
+        "bytes": 22608,
+        "sha256": "e6d74440e2cc0ce7066cef215903de09fc2eaa7c81939645d38626d06f2adc93",
+        "match": true
+      }
+    ],
+    "this_round_match": "14/14",
+    "immutable_objects": [
+      {
+        "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/tmc2209.c",
+        "base": "66f8533",
+        "sha256": "8a5e030822456fdb334958543588fbf8972bcd96f348668d0cd4769b398de2d1",
+        "same": true
+      },
+      {
+        "path": "tests/host/leaf_main.c",
+        "base": "66f8533",
+        "sha256": "6a03b884e7b680fedc65e322fa1500fae6cdc35e56673da43970c1b2b77206a1",
+        "same": true
+      },
+      {
+        "path": "tests/host/run_stop_priority_s2.sh",
+        "base": "66f8533",
+        "sha256": "0d405b01c88697b564106508763f2603a6ecfb4575cc89c0ac26593326f1e545",
+        "same": true
+      },
+      {
+        "path": "reports/firmware/phase8-tmc-uart-read-observation-r1/measure-a0.bin",
+        "base": "66f8533",
+        "sha256": "a48400c881c539db539876cfd38f3aceac2a78cc7ed0d0f9655c7edafbb19a1e",
+        "same": true
+      },
+      {
+        "path": "reports/firmware/phase8-tmc-uart-read-observation-r1/default.bin",
+        "base": "66f8533",
+        "sha256": "dccb7b63c9284d320016a42e1fc8b7f62d544b97ca9cb433604e412bbbff55e3",
+        "same": true
+      },
+      {
+        "path": "reports/firmware/phase8-tmc-uart-read-observation-r1/build_manifest.json",
+        "base": "66f8533",
+        "sha256": "075bd3ff6eace662a8f4809a4b5810eeddd04997a77f590b2bbef0519db5d2e3",
+        "same": true
+      },
+      {
+        "path": "reports/reviews/phase8-tmc-uart-read-observation-r1/UARTReadDiagSerialR1.ps1",
+        "base": "66f8533",
+        "sha256": "2e9c8ede8f75e7b513dbd4f2c3091189309454879e98404ba7ec64bbb80f2568",
+        "same": true
+      },
+      {
+        "path": "reports/reviews/phase8-tmc-uart-read-observation-r1-board/board_run_evidence.txt",
+        "base": "afa922b",
+        "sha256": "b271a5e5892f1de543aecda50e5ff6805759992bccec22dcb372f1cdde7245de",
+        "same": true
+      },
+      {
+        "path": "reports/reviews/phase8-tmc-uart-read-observation-r1-board/passive_window_analysis.txt",
+        "base": "afa922b",
+        "sha256": "10a248b5fa98156729b5e43bf00921daceb435087bf287b055ee9386c1df22e0",
+        "same": true
+      },
+      {
+        "path": "reports/reviews/phase8-tmc-uart-read-observation-r1-board/passive_capture_b64.txt",
+        "base": "afa922b",
+        "sha256": "8bd705b585e138288e917c8330cc5d9a1c6177ce9bcf028b37b0de291bb72729",
+        "same": true
+      },
+      {
+        "path": "reports/reviews/phase8-tmc-uart-read-observation-r1-board/s0_offline_binding.txt",
+        "base": "afa922b",
+        "sha256": "7c36aca3ad8a671e0013c2c0566f6173c4c207ca6884f3b172131d3922a9f4ec",
+        "same": true
+      },
+      {
+        "path": "reports/reviews/phase8-tmc-uart-read-observation-r1-board/execution_package.md",
+        "base": "afa922b",
+        "sha256": "8c399e50e5a889692a39653534f4172c1cf86518bb6727d3a65da8061e27abf9",
+        "same": true
+      },
+      {
+        "path": "reports/reviews/phase8-tmc-uart-read-observation-r1-board/commands.expanded.masked.ps1",
+        "base": "afa922b",
+        "sha256": "699b759a3c4183a2b96dbaa747ca5d46390c6f30f6449ded863ff991f0c3656e",
+        "same": true
+      }
+    ],
+    "immutable_same": "13/13",
+    "frozen_refs_unchanged": {
+      "remote main": "1b3757eec550802a3973e66790af422d81d3d373",
+      "remote phase7/full-embedded-software": "6d3fbc559d45673d7550eb73dec5a4ade5bb34df",
+      "tag v0.7-phase7-software-board-validated": "097935fec5a6f2467261ab1ad449ff0b1d398250",
+      "tag deref": "e40a9b95ef709e6a80444f9f3949dfdd70ba96ba"
+    },
+    "device_actions_during_readback": 0
+  }
 }
