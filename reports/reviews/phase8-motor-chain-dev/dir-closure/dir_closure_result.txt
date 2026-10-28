@@ -1,0 +1,66 @@
+M3 方向闭环结果（2026-10-28）
+任务包：NS800_M3_DIR_Closure_Task_b5caa4e_20261028.md（14408 B / 0a0d18158f27336f7b99ac769b4c7c950f6d9cc858b4241b0e8c7f50810432aa）
+批准：用户「批准方向闭环包+-」；随后明确「批准烧回 IRUN20 并继续阶段 C」
+基线：b5caa4ebc1a10e8f62ba62b40905b7754f12f357；software_input=916c34ba4032bc7f41e2944c13b449271030191b
+
+[在板镜像与恢复]
+- 阶段 A 开始时板上仍是上轮未提交的 IRUN26 实验件（BIN 4c5a127c…、IFCNT=8、planned irun=26），
+  与包内 IRUN20 基线不同；阶段 A 只读 DIR/IOIN，结果仍有效，但已记录基线偏差。
+- 阶段 C 前烧回既有 IRUN20 候选：AXF 0cfa048f…、BIN 397aa844…（258428 B）；
+  pyOCD 擦/写 259072 B；0x08000000 起 258428 B 回读 SHA-256 与 BIN 相等（BYTE_EQUAL=True）。
+- 恢复后一次原参数 apply：IFCNT 8→12；planned irun=20；target IHOLD_IRUN=0x00041408；
+  applied/live GCONF=0x00000141、CHOPCONF=0x15030053；state=CONFIGURED snapshot_valid=1。
+- 保护：同一 H6-7 对地 0 V 依据；safety_polarity_confirm CONFIRM + safety_irq_enable；
+  IRQ OPEN、protection_ready=YES（连读两次）、arm_gate_mask=0x0；无 storm/fault。
+
+[阶段 A：DIR 0→1→0 芯片读回]
+| 命令 | 软件 dir | IOIN(0x06) | IOIN.DIR bit9 | MS1/MS2 | VERSION | probe |
+|---|---:|---|---:|---|---|---|
+| motor_dir 0 | 0 | 0x210000C1 | 0 | 0/0 | 0x21 | 3/3 SUCCESS, CRC OK |
+| motor_dir 1 | 1 | 0x210002C1 | 1 | 0/0 | 0x21 | 3/3 SUCCESS, CRC OK |
+| motor_dir 0 | 0 | 0x210000C1 | 0 | 0/0 | 0x21 | 3/3 SUCCESS, CRC OK |
+共 9/9 SUCCESS、9/9 CRC OK，无 REFUSED/超时。静态 DIR 通路成立。
+
+[关键口径更正]
+- IOIN MS1/MS2=0 → 实际外部细分是 8（mstep_reg_select=0，MRES 字段不是有效来源）。
+  CHOPCONF.MRES=5 不能再解释成 1/32。
+- 若电机为 1.8°/步：100 Hz、5 s 约 112.5°；1 kHz 约 37.5 rpm。此前按 1/32 算的 9.4 rpm 是错误解释。
+
+[阶段 C：100 Hz、IRUN20、原约 0.35 A、每组 ≤5 s]
+| 命令DIR | 软件dir | 未armed IOIN.DIR | arm后 IOIN.DIR | 运行中DIR | 轴实际方向/视角 | stop/disarm |
+|---|---:|---:|---:|---|---|---|
+| 0 | 0 | 0 | 0 | 未采 | 顺时针持续转为主；末尾左右抖动 1~2 s | api-accepted rc=0 / disarm OK |
+| 1 | 1 | 1 | 1 | 未采 | 不转；持续左右抖动 | api-accepted rc=0 / disarm OK |
+
+- DIR0 共 3 次 start：第 1 次操作者未观察；第 2 次操作者要求重来；第 3 次观察到
+  “顺时针转了一会，最后左右抖动 1~2 秒”。三次软件链路均通过。
+- DIR1 1 次 start：操作者观察到“一直左右抖动”，没有连续旋转。
+- 另有一次阶段 C setup arm 后 probe 返回 `-23 EBUSY`（运行期守卫占用），未 target/start，
+  按失败路径立即 stop+disarm；按包内允许做了最多 2 次只读复查，复查成功后才起转。
+- start 计数：DIR0b、DIR0c、DIR0d、DIR1 = 4/4（包内上限）；无第 5 次运动。
+- 所有 stop：`api-accepted src=ramp-zero rc=0 latched=0`；所有 disarm 成功；无新 fault/栈/通信异常。
+
+[结论]
+- `M3_DIR_STATIC_PATH_VERIFIED`：芯片侧 DIR 0→1→0 稳定跟随，arm 后 DIR 未被覆盖。
+- `DIRECTION_CONSISTENCY_NOT_CLOSED`：DIR0 顺时针转（末尾抖动），DIR1 不转仅持续左右抖动；
+  同一固定视角下两方向运动没有形成相反且可重复的结果。
+- 问题被缩小到 DIR 电平正确之后的下游：相线配对/一相反接或弱、功率级/电机/机械；
+  不预先把原因归为“惯性”“模块坏了”或“必须升流”。
+- 未发现需要改代码的缺陷；产品代码/工程/镜像未新增变更（仅按批准恢复 IRUN20 既有镜像）。
+- 上轮未提交的 IRUN26 1 kHz 实验：在 8 细分下约 37.5 rpm，失败（不转/抖动）；
+  与本次 DIR1 现象一致，仍在仓外 `m3exp/`，不随本轮提交。
+
+[下一步具体调整方案（本轮未执行，需新批准）]
+1. 断电后用万用表电阻档核对线圈配对：同一绕组约 2 Ω、不同绕组开路；
+   确认 1A/1B 为一组、2A/2B 为另一组，没有跨接或一相反接。
+2. 若确认某组反接/配对错误：纠正接线后，再做一次固定视角的 100 Hz、5 s、IRUN20 正反向复测；
+   不升流/升频。
+3. 若接线正确：需要实测相电流/波形（或斩波状态）后再决定电流/细分调整；本轮不授权。
+4. 不以“再跑一次”代替上述接线/相位证据。
+
+[终态]
+- 在板 IRUN20 候选；CONFIGURED、IFCNT=12、planned irun=20。
+- armed=0、cur/tgt=0、dir=1（最后一条 DIR 命令）、stop=`api-accepted src=disarm rc=0 latched=0`、
+  arm_gate_mask=0x0、drv_request=LOW pad=0、ENN_fb=HIGH、STEP enabled=0、READY/fault=0。
+- IRQ OPEN/protection_ready=YES；SW1 保持允许位（用户要求不再反复拨动）。
+- 未清故障、未升流/升频、未改细分/线序、未改宏、未做全片擦除；4/4 start 已用尽。

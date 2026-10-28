@@ -1,0 +1,8 @@
+0001961 I Loading D:\ns800\reports\firmware\phase8-motor-chain-dev\rt-thread-motor-m1.axf [load_cmd]
+0001962 I Erasing... [loader]
+[---|---|---|---|---|---|---|---|---|----]
+[========================================]
+0007636 I Programming... [loader]
+[---|---|---|---|---|---|---|---|---|----]
+[========================================]
+0021173 I Erased 259072 bytes (253 sectors), programmed 259072 bytes (253 pages), identical 0 bytes (0 pages) at 13.17 kB/s [loader]

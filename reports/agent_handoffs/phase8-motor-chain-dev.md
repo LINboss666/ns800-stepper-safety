@@ -122,3 +122,31 @@ M3 未执行。原始串口/启动/下载日志以 base64 存于
   波形/频率/停机时延。`safe_for_enable=false`。5 s 两次为授权变更，超出原包 ≤2 s。
 - **证据**：`reports/reviews/phase8-motor-chain-dev/m3/`（`*.bin.b64` + `m3_result.txt` +
   `run_timings.txt`）。未清故障、未升流/升频、未改宏、未重烧、未读 DAP/Flash。
+
+## 10. M3 方向闭环（2026-10-28，用户「批准方向闭环包+-」/「批准烧回 IRUN20 并继续阶段 C」）
+
+- **阶段 A（只读）**：在 IRUN26 实验件上执行 `motor_dir 0/1/0`，软件 dir 0/1/0，
+  IOIN.DIR bit9 同步 0/1/0（0x210000C1/0x210002C1/0x210000C1）；3×3 reads 全 SUCCESS/CRC；
+  无 REFUSED/超时。**静态 DIR 通路成立**。阶段 A 时在板不是包内 IRUN20，已记录基线偏差。
+- **口径更正**：IOIN MS1/MS2=0 → 实际外部细分是 **8**；`CHOPCONF.MRES=5` 不是有效细分来源。
+  按 1.8°/步：100 Hz、5 s 约 **112.5°**；1 kHz 约 **37.5 rpm**。此前按 1/32 算的 9.4 rpm 作废。
+- **恢复 IRUN20**：按批准烧回既有候选（AXF 0cfa048f… / BIN 397aa844…，258428 B），
+  0x08000000 起回读逐字节相等；一次原参数 apply：IFCNT 8→12、planned irun=20、
+  target IHOLD_IRUN=0x00041408、live/applied GCONF=0x141/CHOPCONF=0x15030053、CONFIGURED；
+  保护重开：IRQ OPEN、protection_ready=YES、arm_gate_mask=0x0。
+- **阶段 C（100 Hz、IRUN20、≤5 s，4/4 start）**：
+  - DIR0 三次 start（前两次操作者未观察/要求重来；第 3 次观察到）：**顺时针持续转为主，
+    末尾左右抖动 1~2 s**；stop=api-accepted rc=0、disarm 成功。
+  - DIR1 一次 start：**不转，持续左右抖动**；stop=api-accepted rc=0、disarm 成功。
+  - 一次 setup 在 arm 后 probe `-23 EBUSY`（运行期守卫占用），未 target/start，已 stop+disarm；
+    按包内允许做了最多 2 次只读复查，复查成功后才起转。第一失败原件保留。
+  - 无新 fault/栈/通信异常；所有 stop/disarm 均成立。
+- **结论**：`M3_DIR_STATIC_PATH_VERIFIED / DIRECTION_CONSISTENCY_NOT_CLOSED`。
+  芯片 DIR 0/1 跟随正确，但 DIR0/DIR1 没有形成相反且可重复的轴运动；
+  问题缩小到 DIR 电平之后的下游：相线配对/一相反接或弱、功率级/电机/机械。
+  未发现需要改代码的缺陷；本轮未改产品代码/工程/镜像（仅按批准恢复既有 IRUN20）。
+- **下一步（未执行，需新批准）**：断电核对线圈配对与 1A/1B、2A/2B；若反接/配对错误则纠正后
+  再做一次 100 Hz/5 s/IRUN20 正反向复测；若接线正确则先实测相电流/波形；不升流/升频。
+- **终态**：IRUN20/CONFIGURED、IFCNT=12、armed=0、请求 LOW、ENN HIGH、gate 0、READY/fault=0；
+  IRQ OPEN/protection_ready=YES；SW1 保持允许位。证据
+  `reports/reviews/phase8-motor-chain-dev/dir-closure/`。
