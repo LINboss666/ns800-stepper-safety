@@ -33,6 +33,9 @@ COL_UINT = [True] * 6 + [False] * 7 + [True]
 
 RE_SLOT_LINE = re.compile(r"^slot ([0-9]+) (empty|error -?[0-9]+)$")
 RE_ECHO = re.compile(r"^(?:msh >)?flash_dump ([0-9]+) ([0-9]+)$")
+# 采集期间其他线程的正常短行(原始件保留); 它们不是 CSV 数据, 跳过而不清洗。
+BACKGROUND_PREFIXES = ("[SENSOR]", "[DIAG]", "[MOT]", "[SS]", "[BB]",
+                       "[TMC]", "[CUR]", "[CFG]", "[STEP]", "[SUP]", "[SAFETY]")
 
 
 class Reject(Exception):
@@ -99,6 +102,10 @@ def parse_batch(data, first, count):
         if m:
             raise Reject("READ_ERROR" if m.group(2) != "empty" else "EMPTY_SLOT",
                          "slot %s marker %r" % (m.group(1), m.group(2)))
+        if line.startswith("[FLASH] flash_dump ERROR"):
+            raise Reject("EXPORT_ERROR", line)
+        if any(line.startswith(p) for p in BACKGROUND_PREFIXES):
+            continue
         if not seen_header:
             raise Reject("HEADER", "non-framing line before header: %r" % line[:80])
         parts = line.split(",")
@@ -274,6 +281,13 @@ def _selftest_cases():
         (0, 4, b1.replace(b"\n", b"\r\n")),
         (4, 4, b2.replace(b"\n", b"\r\n"))], 8))
     cases.append(("AR16-expected_short_rejected", "reject", "EXPECTED_RANGE", good, 7))
+    cases.append(("AR17-background_line_tolerated", "accept", None, [
+        (0, 4, _raw([_row(0), "[SENSOR] seq=1 tick=2 ax=1",
+                     _row(1), _row(2), _row(3)])), (4, 4, b2)], 8))
+    cases.append(("AR18-export_error_rejected", "reject", "EXPORT_ERROR", [
+        (0, 4, _raw([_row(0),
+                     "[FLASH] flash_dump ERROR: line overflow at slot 1",
+                     _row(2), _row(3)])), (4, 4, b2)], 8))
     return cases
 
 

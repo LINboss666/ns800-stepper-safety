@@ -6,12 +6,15 @@ CASE|AR05-int32_overflow_rejected|PASS|want=reject(VALUE_RANGE) got=reject VALUE
 CASE|AR06-nul_rejected|PASS|want=reject(NUL_BYTE) got=reject NUL_BYTE:raw batch contains NUL (truncated console line)
 CASE|AR07-missing_column_rejected|PASS|want=reject(FIELD_COUNT) got=reject FIELD_COUNT:line 3 has 13 fields
 CASE|AR08-read_error_rejected|PASS|want=reject(READ_ERROR) got=reject READ_ERROR:slot 1 marker 'error -12'
-CASE|AR09-batch_out_of_range_rejected|PASS|want=reject(EXPECTED_RANGE) got=reject EXPECTED_RANGE:batch 2 ends 9 > expected 8
+CASE|AR09-batch_out_of_range_rejected|PASS|want=reject(EXPECTED_RANGE) got=reject EXPECTED_RANGE:batch 2 ends 9 > expected end 8
 CASE|AR10-gap_rejected|PASS|want=reject(GAP) got=reject GAP:batch 1 starts 5, expected 4
 CASE|AR11-truncated_tail_rejected|PASS|want=reject(TRUNCATED_TAIL) got=reject TRUNCATED_TAIL:last line has no LF
 CASE|AR12-header_missing_rejected|PASS|want=reject(HEADER) got=reject HEADER:non-framing line before header: '0,1,2,3,4,5,-6,-7,-8,-9,-10,-11,-12,13'
 CASE|AR13-header_renamed_rejected|PASS|want=reject(HEADER) got=reject HEADER:non-framing line before header: 'slot,seq,session,time_ms,event,valid,sg,current_ma,ax_mg,ay_mg,az_mg,step_hz,vib'
 CASE|AR14-malformed_extra_line_rejected|PASS|want=reject(FIELD_COUNT) got=reject FIELD_COUNT:line 2 has 1 fields
 CASE|AR15-crlf_framing_accepted|PASS|want=accept got=accept rows=8
-CASE|AR16-expected_short_rejected|PASS|want=reject(EXPECTED_RANGE) got=reject EXPECTED_RANGE:batch 1 ends 8 > expected 7
-SUMMARY|cases=16 pass=16 fail=0
+CASE|AR16-expected_short_rejected|PASS|want=reject(EXPECTED_RANGE) got=reject EXPECTED_RANGE:batch 1 ends 8 > expected end 7
+CASE|AR17-background_line_tolerated|PASS|want=accept got=accept rows=8
+CASE|AR18-export_error_rejected|PASS|want=reject(EXPORT_ERROR) got=reject EXPORT_ERROR:[FLASH] flash_dump ERROR: line overflow at slot 1
+CASE|AR17-start_offset_accepted|PASS|want=accept got=accept rows=[4090, 4091] start=4090
+SUMMARY|cases=19 pass=19 fail=0

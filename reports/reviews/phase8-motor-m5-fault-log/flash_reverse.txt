@@ -1,6 +1,6 @@
-###### M5 flash_dump 导出边界链 (基线 6218efa251cd6b8a16ad2df8f0fef1efd2ba5eeb) ######
-run_id=20261028T162620Z-423
-OUT_DIR=/tmp/ns800-host-chain/m5-flash/20261028T162620Z-423
+###### M5 flash_dump 导出边界链 (基线 d7e867b9967a4494326abe9da21f141fa4349d72) ######
+run_id=20261028T164446Z-2616
+OUT_DIR=/tmp/ns800-host-chain/m5-flash/20261028T164446Z-2616
 compiler=gcc.exe (tdm64-1) 4.9.2
 === normal: 真编译 ns_flash_shell.c ===
   normal 构建 OK
@@ -13,7 +13,7 @@ compiler=gcc.exe (tdm64-1) 4.9.2
   台账自洽: 1 个必需 id 各 PASS 一次, 共 1 行
   cap: 具名溢出错误、无半条数据
 === archive: 判读器自测 + 真实导出字节接受/拒绝 ===
-  判读器自测 16/16 PASS
+  判读器自测 19/19 PASS
   完整批次 ACCEPT, 重建 CSV 与导出字节逐字节一致
   缺槽批次 REJECT (MISSING_SLOT), CLEAR_ALLOWED=NO
 === reverse: rt_kputs(line) -> rt_kprintf("%s", line) ===

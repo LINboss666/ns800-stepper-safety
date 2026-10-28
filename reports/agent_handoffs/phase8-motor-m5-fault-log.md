@@ -22,7 +22,7 @@ software_input / code_commit：`8cf23aa6dda20baf7843798bdef9a02cfd71326f`
   构建门”继续有意义，无行为变化。
 - 验证链：S1 增加 PS17a–e 与 `rev_safety_trip_skip_post` 反向；新增
   `shim_flash/`+`flash_main.c`+`run_flash_export_m5.sh`（FE01–FE06、容量探针、反向）；
-  新增 `m5_log_archive_check.py`（17 例自测）；S1 runner 修 EPIPE 并加未登记 ID 负控；
+  新增 `m5_log_archive_check.py`（19 例自测）；S1 runner 修 EPIPE 并加未登记 ID 负控；
   S2 夹具假 TMC IOIN 改为合法 0x21 以适配 916c34b 起已接受的启动身份检查。
 - 现场脚本：`reports/reviews/phase8-motor-m5-fault-log/m5_field_serial.py`（archive/fault
   两阶段、清区门、3 s/5 s 截止、16 轮有界轮询、失败不自动恢复），自带 4 例离线自测。
@@ -33,7 +33,7 @@ software_input / code_commit：`8cf23aa6dda20baf7843798bdef9a02cfd71326f`
 |---|---|
 | S1 target/host_ovr | 55/55、70/70 全部 PASS，runner rc=0（正常） |
 | S1 反向 | rev_motor_off 5/5、rev_safety_trip_skip_post 1/1 META-OK，rc=0 |
-| flash 正常 | FE01–FE05 PASS；容量探针 FE06 PASS；判读器 17/17；完整批次 ACCEPT/CLEAR_ALLOWED=YES；缺槽 REJECT |
+| flash 正常 | FE01–FE05 PASS；容量探针 FE06 PASS；判读器 19/19；完整批次 ACCEPT/CLEAR_ALLOWED=YES；缺槽 REJECT |
 | flash 反向 | 仅 FE02 判 FAIL（126 B 截断+NUL）；截断批次 REJECT NUL_BYTE / CLEAR_ALLOWED=NO；rc=0 |
 | S2 选择组 | ONLY=recovery,identity,stale,diag：target 4 组/6 例、host_ovr 4 组/19 例，全部 PASS，rc=0 |
 | V1/V2 | CHECK_PASS=22 / FAIL=0，rc=0 |
@@ -66,7 +66,7 @@ UV4 5.43.1.0 / ARMCLANG V6.24，三目标均 Rebuild All 0 Error / 0 Warning。
 
 - 包：`reports/reviews/phase8-motor-m5-fault-log/m5_field_package.md`
 - 现场脚本：同目录 `m5_field_serial.py`（archive/fault；离线自测 4/4）
-- 判读器：`tests/host/m5_log_archive_check.py`（真实输入和 17 例自测同函数）
+- 判读器：`tests/host/m5_log_archive_check.py`（真实输入和 19 例自测同函数）
 - 允许：1 次下载、1 次定长回读、1 次显式启动；COM5 ≤2 次；必要时 1 次原 IRUN20 apply；
   归档通过且空间不足时 1 次清 1 MiB 日志区；DIR0/300 Hz 一次空载起转，t≈3 s 一次
   `safety_trip CONFIRM`、t=5 s 一次兜底 disarm；故障态 arm 拒绝 ≤1 次；16 轮写盘轮询；

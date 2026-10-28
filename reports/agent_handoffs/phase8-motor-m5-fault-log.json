@@ -58,7 +58,7 @@
   "host_verified": {
     "S1_normal": "target 55/55, host_ovr 70/70, rc=0",
     "S1_reverse": "rev_motor_off 5/5, rev_safety_trip_skip_post 1/1, rc=0",
-    "flash_normal": "FE01-05 + FE06 cap + checker 17/17 + ACCEPT/REJECT gate, rc=0",
+    "flash_normal": "FE01-05 + FE06 cap + checker 19/19 + ACCEPT/REJECT gate, rc=0",
     "flash_reverse": "FE02 only FAIL, truncated archive REJECT(CLEAR_ALLOWED=NO), rc=0",
     "S2_selected": "recovery/identity/stale/diag: target 6 cases, host_ovr 19 cases, rc=0",
     "V1V2": "22 checks PASS, rc=0",
