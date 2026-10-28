@@ -1,0 +1,329 @@
+{
+ "mode": "live",
+ "binding": {
+  "axf": {
+   "bytes": 1693804,
+   "sha256": "15be5f3efc45bf296bc0ef24e3947081372616d819e4bb3b189e9614cf9a5b9a",
+   "path_kind": "本地 build/a0 现存件"
+  },
+  "s_tid_addr": "0x2000a480",
+  "s_tid_addr_int": 536913024,
+  "s_tid_cu": "sensor_service.c",
+  "cpu_addr": "0x200008d0",
+  "cpu_addr_int": 536873168,
+  "cpu_cu": "cpu_up.c",
+  "sensor_thread_entry": "0x08020e18",
+  "sensor_thread_entry_int": 134352408,
+  "sensor_thread_entry_expected_in_tcb": "0x08020e19",
+  "entry_symtab": {
+   "value": "0x08020e19",
+   "size": 128,
+   "bind": "STB_LOCAL"
+  },
+  "stack_check_symtab": {
+   "value": "0x0801ad81",
+   "size": 246,
+   "bind": "STB_GLOBAL"
+  },
+  "rt_thread_size": 168,
+  "rt_thread_offsets": {
+   "parent": 0,
+   "sp": 28,
+   "entry": 32,
+   "parameter": 36,
+   "stack_addr": 40,
+   "stack_size": 44,
+   "error": 48
+  },
+  "rt_object_name_off": 0,
+  "rt_object_name_len": 16,
+  "rt_object_type_off": 16,
+  "rt_cpu_size": 8,
+  "rt_cpu_current_thread_off": 0,
+  "layout_evidence": {
+   "rt_thread": {
+    "definitions": 30,
+    "byte_size": 168,
+    "member_offset_variants": {
+     "parent": 1,
+     "sp": 1,
+     "entry": 1,
+     "parameter": 1,
+     "stack_addr": 1,
+     "stack_size": 1,
+     "error": 1,
+     "sched_thread_ctx": 1,
+     "thread_timer": 1,
+     "cleanup": 1,
+     "taken_object_list": 1,
+     "pending_object": 1,
+     "event_set": 1,
+     "event_info": 1,
+     "spinlock": 1,
+     "user_data": 1
+    }
+   },
+   "rt_object": {
+    "definitions": 45,
+    "byte_size": 28,
+    "member_offset_variants": {
+     "name": 1,
+     "name_array_len": 1,
+     "type": 1,
+     "flag": 1,
+     "list": 1
+    }
+   },
+   "rt_cpu": {
+    "definitions": 1,
+    "byte_size": 8,
+    "member_offset_variants": {
+     "current_thread": 1,
+     "idle_thread": 1
+    }
+   }
+  },
+  "ram_window": [
+   "0x20000000",
+   "0x20020000"
+  ],
+  "sysreg": {
+   "ccr": [
+    3758157076,
+    4
+   ],
+   "dtcmcr": [
+    3758157716,
+    4
+   ]
+  },
+  "sysreg_evidence": {
+   "ccr": {
+    "cmsis_header": "core_cm7.h SCS_BASE=0xe000e000 SCB_BASE=SCS_BASE+0xd00",
+    "dwarf_anon_scb_defs": 6,
+    "dwarf_scb_size": 684,
+    "offset_dwarf": 20,
+    "offset_cmsis_annotation": 20,
+    "addr": "0xe000ed14"
+   },
+   "dtcmcr": {
+    "dwarf_anon_scb_defs": 6,
+    "offset_dwarf": 660,
+    "offset_cmsis_annotation": 660,
+    "target_visible_basis": "DTCM 地址空间属调试 AP 可见的 data TCM 窗口",
+    "addr": "0xe000ef94"
+   }
+  },
+  "budget": 16384
+ },
+ "uid_source": "私有 UID 文件(未写入产物)",
+ "session_options": {
+  "no_config": true,
+  "connect_mode": "attach",
+  "auto_unlock": false,
+  "target_override": "cortex_m",
+  "halt_on_connect": false,
+  "resume_on_disconnect": false,
+  "scan_all_aps": false,
+  "cache.enable_memory": false,
+  "cache.read_code_from_elf": false
+ },
+ "core_count": 1,
+ "core_numbers": [
+  0
+ ],
+ "session_opened": true,
+ "initial_state": {
+  "halted": false,
+  "running": true
+ },
+ "halt": {
+  "performed": true,
+  "after_halted": true
+ },
+ "registers": {
+  "pc": "0x080003e8",
+  "sp": "0x20009ac0",
+  "lr": "0x0801c831",
+  "msp": "0x2000ee10",
+  "psp": "0x20009ac0",
+  "control": "0x00000002",
+  "xpsr": "0x81000000",
+  "primask": "0x00000001",
+  "basepri": "0x00000000",
+  "faultmask": "0x00000000",
+  "fpscr": "0x20000010",
+  "mvac": "unavailable(KeyError)",
+  "r0": "0x00000000",
+  "r1": "0x2000a2d8",
+  "r2": "0x00000001",
+  "r3": "0x00000000",
+  "r4": "0xdeadbeef",
+  "r5": "0xdeadbeef",
+  "r6": "0xdeadbeef",
+  "r7": "0xdeadbeef",
+  "r8": "0xdeadbeef",
+  "r9": "0xdeadbeef",
+  "r10": "0xdeadbeef",
+  "r11": "0xdeadbeef",
+  "r12": "0x00000000"
+ },
+ "gate_reads": [
+  {
+   "what": "s_tid",
+   "addr": "0x2000a480",
+   "len": 4,
+   "sha256": "7d3d50d9d7ddcaf12deac810e40b316464187b55b98bd2741d95ddd62fb456a2",
+   "cum_bytes": 4
+  },
+  {
+   "what": "tcb",
+   "addr": "0x20014098",
+   "len": 168,
+   "sha256": "ab7b42fd3017501fb5e957d49fc868624855702d89d1796b3e77dad0c85706ff",
+   "cum_bytes": 172
+  },
+  {
+   "what": "cpu",
+   "addr": "0x200008d0",
+   "len": 8,
+   "sha256": "d5adf271f5bccef21c8efc0d5f623c0687c4e825f3f0f0a83be7f83229533d76",
+   "cum_bytes": 180
+  },
+  {
+   "what": "stack",
+   "addr": "0x20014150",
+   "len": 4096,
+   "sha256": "b54784bf6861b76b943342fc95b7a1c80d0f4cb353b8a894f2a23106d8454739",
+   "cum_bytes": 4276
+  },
+  {
+   "what": "s_tid_reread",
+   "addr": "0x2000a480",
+   "len": 4,
+   "sha256": "7d3d50d9d7ddcaf12deac810e40b316464187b55b98bd2741d95ddd62fb456a2",
+   "cum_bytes": 4280
+  },
+  {
+   "what": "tcb_reread",
+   "addr": "0x20014098",
+   "len": 168,
+   "sha256": "ab7b42fd3017501fb5e957d49fc868624855702d89d1796b3e77dad0c85706ff",
+   "cum_bytes": 4448
+  },
+  {
+   "what": "ccr",
+   "addr": "0xe000ed14",
+   "len": 4,
+   "sha256": "e504021cdb5f1f15bd02bbc09cb5031613812c3f7e2174e5e8485fcda3518caf",
+   "cum_bytes": 4452
+  },
+  {
+   "what": "dtcmcr",
+   "addr": "0xe000ef94",
+   "len": 4,
+   "sha256": "daaf62de76f04e09a55d751f98b97c440bd2dba3f4d9d55a6e93ce8446266f92",
+   "cum_bytes": 4456
+  }
+ ],
+ "ram_bytes_read_so_far": 0,
+ "steps": [
+  {
+   "s_tid_value": "0x20014098"
+  },
+  {
+   "tcb_fields": {
+    "name": "sensor",
+    "type_byte": 1,
+    "sp": "0x20014fb4",
+    "entry": "0x08020e19",
+    "stack_addr": "0x20014150",
+    "stack_size": 4096,
+    "error_field": 4294967285,
+    "sha256": "ab7b42fd3017501fb5e957d49fc868624855702d89d1796b3e77dad0c85706ff"
+   }
+  },
+  {
+   "cpu_current_thread": {
+    "value": "0x20009978",
+    "equals_tcb": false
+   }
+  },
+  {
+   "stack_fill": {
+    "stack0": "0x23",
+    "stack0_is_hash": true,
+    "leading_hash_run_from_low": 3100,
+    "first_non_hash_offset": 3100,
+    "high_water_estimate_bytes": 996,
+    "saved_free_sp_minus_base": 3684,
+    "saved_used_high_minus_sp": 412
+   }
+  },
+  {
+   "snapshot_recheck": {
+    "s_tid_equal": true,
+    "tcb_equal": true,
+    "consistent": true
+   }
+  },
+  {
+   "ccr": {
+    "addr": "0xe000ed14",
+    "value": "0x00070200",
+    "decode": {
+     "dcache_en": true,
+     "icache_en": true
+    }
+   }
+  },
+  {
+   "dtcmcr": {
+    "addr": "0xe000ef94",
+    "value": "0x00000041",
+    "decode": {
+     "dcache_en": null,
+     "icache_en": null
+    }
+   }
+  }
+ ],
+ "s_tid_raw": "98400120",
+ "tcb_raw": {
+  "name": "sensor",
+  "type_byte": 1,
+  "sp": "0x20014fb4",
+  "entry": "0x08020e19",
+  "stack_addr": "0x20014150",
+  "stack_size": 4096,
+  "error_field": 4294967285,
+  "sha256": "ab7b42fd3017501fb5e957d49fc868624855702d89d1796b3e77dad0c85706ff"
+ },
+ "computation": {
+  "stack_low": "0x20014150",
+  "stack_high": "0x20015150",
+  "saved_sp": "0x20014fb4",
+  "saved_free": 3684,
+  "saved_used": 412,
+  "leading_hash_run": 3100,
+  "hash_tail_after_run": "01",
+  "sp_at_base_plus": 3684,
+  "in_warning_band": false,
+  "in_overflow_band": false,
+  "fill_vs_sp_consistent": true,
+  "sp_window_hex": "01000000000000000000000000000000000000000000000000000000000000000100000000000909efbeaddeefbeaddeefbeaddeefbeaddeefbeaddeefbeadde",
+  "first64": "23232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323",
+  "last64": "9c001f00ea03f60301010000080800000a080000aaa936410101010000000000000000000400010000000909010000000e99090000000000efbeadde195d0008"
+ },
+ "artifacts_expected": {
+  "stack_sha256": "b54784bf6861b76b943342fc95b7a1c80d0f4cb353b8a894f2a23106d8454739",
+  "stack_len": 4096
+ },
+ "total_ram_bytes_read": 4456,
+ "mem_read_attempts": 8,
+ "final_state": {
+  "halted": true,
+  "running": false
+ },
+ "outcome": "PASS_ALL_GATES"
+}

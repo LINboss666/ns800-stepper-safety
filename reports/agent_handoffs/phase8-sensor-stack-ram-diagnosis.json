@@ -6,7 +6,7 @@
     "date": "2026-10-28",
     "git_anchor": "7380856149752506286714e9e82eda6e205abb40",
     "branch": "phase8/tmc-drive-config",
-    "branch_head_at_start": "7a6e31efb3b5b4391299d2ac3db86742e8e65113",
+    "branch_head_before_execution": "7a6e31efb3b5b4391299d2ac3db86742e8e65113",
     "software_input_commit": "139e9377ccbc36b878cd577a6b848d974e1e07fa"
   },
   "rounds_inherited": [
@@ -34,31 +34,60 @@
     "round1_warning_interpreted_as_4096_insufficient": false,
     "round2_silence_interpreted_as_fix": false
   },
+  "approval": {
+    "required": true,
+    "consumed": true,
+    "consumed_on": "2026-10-28",
+    "text_received": "批准执行本文栈 RAM 诊断包：允许一次已知 DAP 连接、最多一次暂停，按可信 R2 AXF 绑定线程，仅限≤16 KiB RAM及本文所列核心/只读系统状态；不烧录、不读目标Flash、不复位、不串口、不写业务内存、不注入代码，结束保持暂停。离线绑定和检查在同一任务完成，不逐条重复确认。",
+    "scope": {
+      "dap_sessions": 1,
+      "halts_max": 1,
+      "ram_bytes_max": 16384,
+      "core_register_groups": 1,
+      "core_registers_max": 32,
+      "sysreg_ccr_bytes": 4,
+      "sysreg_dtcmcr_bytes": 4,
+      "compile_download_flashread_reset_serial_msh_tmc": 0,
+      "end_state": "HALTED",
+      "auto_resume_or_reset": false
+    }
+  },
   "this_round": {
-    "mode": "offline binding + bounded diagnostic tool + dry-run matrix; no device action",
+    "mode": "approved single live session after offline binding and dry-runs",
     "decision": "读取现有线程与栈状态; 不加栈、不改内核告警、不重烧、不经串口采集器",
-    "hardware_actions": [],
+    "hardware_actions": [
+      "1 个打开的目标会话 (另有 2 次构造未 open 的失败尝试, 0 halt/0 读/0 写)",
+      "1 次显式 halt (初始 Running)",
+      "8 次 RAM 读, 共 4456 B",
+      "1 组核心寄存器 25 个",
+      "CCR 4 B + DTCMCR 4 B"
+    ],
     "hardware_action_counts": {
-      "dap_sessions": 0,
-      "halts": 0,
-      "ram_reads": 0,
-      "ram_bytes_read": 0,
-      "core_register_reads": 0,
-      "sysreg_reads": 0,
+      "sessions_opened": 1,
+      "session_construction_failures_not_opened": 2,
+      "halts": 1,
+      "ram_reads": 8,
+      "ram_bytes_read": 4456,
+      "core_register_groups": 1,
+      "core_registers": 25,
+      "sysreg_reads": 2,
+      "writes": 0,
       "compile": 0,
       "download_flash": 0,
       "target_flash_read": 0,
       "reset": 0,
       "serial": 0,
       "msh": 0,
-      "tmc_transactions": 0,
-      "writes": 0
+      "tmc_transactions": 0
     },
     "stop_labels": {
-      "STACK_RAM_SNAPSHOT": "NOT_ATTEMPTED",
-      "EXPLANATION_LEVEL": "NOT_ASSESSED",
-      "FINAL_CORE_STATE": "UNCHANGED",
-      "device_pass_generated": false
+      "STACK_RAM_SNAPSHOT": "OBTAINED",
+      "SNAPSHOT_WARNING_STATE_CAPTURED": false,
+      "EXPLANATION_LEVEL": "INCONCLUSIVE",
+      "FINAL_CORE_STATE": "HALTED",
+      "FINAL_CORE_STATE_NOTE": "断开时 resume_on_disconnect=False; 未再连接复核",
+      "device_read_gates_pass": true,
+      "device_read_gates_pass_is_not_stack_safety_pass": true
     }
   },
   "binding": {
@@ -74,38 +103,19 @@
       "measure-a0.bin": {
         "bytes": 268340,
         "sha256": "b1e852949f003965de52d539ca324a11b8b89e17a51a8f34fe3efd01525ae2d1",
-        "role": "A0 目标; 板上两轮逐字节回读证实; 本轮未再读目标 Flash"
+        "role": "A0 目标; 板上两轮逐字节回读证实; 本包未再读目标 Flash"
       },
       "default.bin": {
         "bytes": 258036,
         "sha256": "db5db20bb8d6eae1e8e5bed9dd0b70f5ad5c818a6cb3db9333496e0280aebe2d",
-        "role": "同目录归档; 本轮不涉及"
+        "role": "同目录归档; 本包不涉及"
       }
     },
     "objects": {
-      "s_tid": {
-        "addr": "0x2000a480",
-        "cu": "sensor_service.c",
-        "dwarf_defs": 1,
-        "symtab": {"size": 4, "type": "STT_OBJECT"}
-      },
-      "_cpu": {
-        "addr": "0x200008d0",
-        "cu": "cpu_up.c",
-        "dwarf_defs": 1
-      },
-      "sensor_thread_entry": {
-        "dwarf_low_pc": "0x08020e18",
-        "symtab": "0x08020e19",
-        "expected_in_tcb": "0x08020e19",
-        "size": 128,
-        "bind": "STB_LOCAL"
-      },
-      "rt_scheduler_stack_check": {
-        "symtab": "0x0801ad81",
-        "size": 246,
-        "bind": "STB_GLOBAL"
-      }
+      "s_tid": {"addr": "0x2000a480", "cu": "sensor_service.c", "dwarf_defs": 1, "symtab_size": 4, "symtab_type": "STT_OBJECT"},
+      "_cpu": {"addr": "0x200008d0", "cu": "cpu_up.c", "dwarf_defs": 1},
+      "sensor_thread_entry": {"dwarf_low_pc": "0x08020e18", "symtab": "0x08020e19", "expected_in_tcb": "0x08020e19", "size": 128, "bind": "STB_LOCAL"},
+      "rt_scheduler_stack_check": {"symtab": "0x0801ad81", "size": 246, "bind": "STB_GLOBAL"}
     },
     "types": {
       "rt_thread": {"byte_size": 168, "definitions": 30, "offset_variant_count": 1,
@@ -116,8 +126,7 @@
     },
     "sysreg": {
       "ccr": {"addr": "0xE000ED14", "len": 4, "offset_dwarf": 20, "offset_cmsis_annotation": 20},
-      "dtcmcr": {"addr": "0xE000EF94", "len": 4, "offset_dwarf": 660, "offset_cmsis_annotation": 660, "anon_scb_defs": 6, "anon_scb_size": 684},
-      "note": "两个偏移由 DWARF 布局与 core_cm7.h 成员 Offset 注释双源一致才采用; 早前误用的 0xE000EF1C 为 Cortex-M55 MEMSYSCTL, 已弃用"
+      "dtcmcr": {"addr": "0xE000EF94", "len": 4, "offset_dwarf": 660, "offset_cmsis_annotation": 660, "anon_scb_defs": 6, "anon_scb_size": 684}
     },
     "ram_window": ["0x20000000", "0x20020000"],
     "heap": {"begin": "0x20012000", "end": "0x2001A000", "bytes": 32768, "margin_to_window_upper": 24576},
@@ -136,11 +145,91 @@
     "overflow_hook": {"pointer_ram_addr": "0x2000a2e0", "registered": false, "consequence": "打印后 dummy=1 原地死循环(静态读出, 非设备实测)"},
     "call_site": {"insn_addr": "0x0801acc6", "target": "0x0801ad81", "caller": "rt_schedule", "single": true, "linear_insns_scanned": 112670}
   },
+  "live_result": {
+    "session_options": {
+      "no_config": true,
+      "connect_mode": "attach",
+      "auto_unlock": false,
+      "target_override": "cortex_m",
+      "halt_on_connect": false,
+      "resume_on_disconnect": false,
+      "scan_all_aps": false,
+      "cache.enable_memory": false,
+      "cache.read_code_from_elf": false
+    },
+    "core_count": 1,
+    "core_numbers": [0],
+    "initial_state": {"halted": false, "running": true},
+    "final_state": {"halted": true, "running": false},
+    "thread": {
+      "s_tid_value": "0x20014098",
+      "tcb_addr": "0x20014098",
+      "name": "sensor",
+      "type_byte": 1,
+      "entry": "0x08020e19",
+      "stack_addr": "0x20014150",
+      "stack_size": 4096,
+      "saved_sp": "0x20014fb4",
+      "error_field": "0xfffffff5"
+    },
+    "stack": {
+      "low": "0x20014150",
+      "high": "0x20015150",
+      "stack0": "0x23",
+      "canary_is_hash": true,
+      "leading_hash_run": 3100,
+      "first_non_hash_offset": 3100,
+      "high_water_estimate_bytes": 996,
+      "saved_free": 3684,
+      "saved_used": 412,
+      "in_warning_band": false,
+      "in_overflow_band": false,
+      "fill_vs_sp_consistent": true
+    },
+    "current_thread": {"value": "0x20009978", "equals_sensor_tcb": false},
+    "context": {
+      "control": "0x00000002",
+      "control_note": "线程模式使用 PSP",
+      "primask": "0x00000001",
+      "pc": "0x080003e8",
+      "pc_symbol": "rt_hw_interrupt_enable+0x0 (size=6)",
+      "lr": "0x0801c831",
+      "lr_symbol": "rt_spin_unlock_irqrestore+0x21 (size=36)",
+      "r4_r11": "0xdeadbeef (原样记录, 不解释)",
+      "sp": "0x20009ac0",
+      "psp": "0x20009ac0"
+    },
+    "sysreg_values": {
+      "ccr": "0x00070200",
+      "ccr_decode": {"dcache_en": true, "icache_en": true},
+      "dtcmcr": "0x00000041",
+      "dtcmcr_bit0_enable": 1,
+      "dtcmcr_other_bits": "原样记录, 不解释"
+    },
+    "cache_caveat": "栈与 TCB 位于 RW_RT_HEAD [0x20012000,0x2001A000) 可缓存 SRAM, 非 DTCM; D/I Cache 启用且未执行 clean/invalidate, 故 '#' 填充只能作指示, 不能判假阳性或从未写过",
+    "interpretation": {
+      "task_table_row": "暂停时 SP 正常且填充未见接近底部 -> 本快照没有捕获告警状态",
+      "does_not_negate_prior_warnings": true,
+      "does_not_establish_H2": true,
+      "level": "INCONCLUSIVE",
+      "next_step_evidence_backed": "在告警发生的上下文取样(切换点重复抓 sensor 保存 SP/PC), 而不是继续加栈; 本包不自动执行"
+    },
+    "reads": [
+      {"what": "s_tid", "addr": "0x2000a480", "len": 4, "cum_bytes": 4},
+      {"what": "tcb", "addr": "0x20014098", "len": 168, "cum_bytes": 172},
+      {"what": "cpu", "addr": "0x200008d0", "len": 8, "cum_bytes": 180},
+      {"what": "stack", "addr": "0x20014150", "len": 4096, "cum_bytes": 4276},
+      {"what": "s_tid_reread", "addr": "0x2000a480", "len": 4, "cum_bytes": 4280},
+      {"what": "tcb_reread", "addr": "0x20014098", "len": 168, "cum_bytes": 4448},
+      {"what": "ccr", "addr": "0xe000ed14", "len": 4, "cum_bytes": 4452},
+      {"what": "dtcmcr", "addr": "0xe000ef94", "len": 4, "cum_bytes": 4456}
+    ]
+  },
   "dryruns": {
     "tool": {
       "path": "reports/reviews/phase8-sensor-stack-ram-diagnosis/stack_ram_diag.py",
-      "bytes": 29335,
-      "sha256": "32f4eb7fed3581534fe082cc1a3c056dc2d0cda940179b69cd49350c99badf69"
+      "bytes": 29997,
+      "sha256": "1a62fc4dc3381777b21fb700c15fe31536ee2fb9527325cc91bd74407c51ee17"
     },
     "count": 8,
     "required_coverage": ["ok", "oor", "badname/badentry"],
@@ -152,11 +241,22 @@
     "serial_objects_created": false
   },
   "deliverables": [
-    {"path": "reports/reviews/phase8-sensor-stack-ram-diagnosis/stack_ram_diag.py", "bytes": 29335, "sha256": "32f4eb7fed3581534fe082cc1a3c056dc2d0cda940179b69cd49350c99badf69"},
+    {"path": "reports/reviews/phase8-sensor-stack-ram-diagnosis/stack_ram_diag.py", "bytes": 29997, "sha256": "1a62fc4dc3381777b21fb700c15fe31536ee2fb9527325cc91bd74407c51ee17"},
     {"path": "reports/reviews/phase8-sensor-stack-ram-diagnosis/binding_report.txt", "bytes": 16693, "sha256": "91fb6516eb4059440bbe43e657b5536e6679b108eca166da82a7befb51735dc0"},
-    {"path": "reports/reviews/phase8-sensor-stack-ram-diagnosis/dryrun_matrix.txt", "bytes": 4196, "sha256": "b29fd4fb759fa88d5bba009db75a77685fe6e5b3a843b02ef8d11abed9aa88be"},
-    {"path": "reports/reviews/phase8-sensor-stack-ram-diagnosis/live_package.txt", "bytes": 3740, "sha256": "ba0030c46cae4fa93a211aca4e07e1122caa60707b2e0c3618564d050522903c"},
-    {"path": "reports/reviews/phase8-sensor-stack-ram-diagnosis/items_manifest.txt", "bytes": 756, "sha256": "self-reference excluded; see git blob and remote readback"},
+    {"path": "reports/reviews/phase8-sensor-stack-ram-diagnosis/dryrun_matrix.txt", "bytes": 4593, "sha256": "d269599825760e6530b2016ee545f333f863356bc344b8bb26a65120ba2398c4"},
+    {"path": "reports/reviews/phase8-sensor-stack-ram-diagnosis/live_package.txt", "bytes": 3969, "sha256": "a9d94a41052e08ab74fa1ff65d8d16c01cf2b64d731b5d7ef8e5ed7484d43bd7"},
+    {"path": "reports/reviews/phase8-sensor-stack-ram-diagnosis/live/live_report.txt", "bytes": 4107, "sha256": "294142dcb9987b7676847de9e1ded2e4befae6d435474f08727f454b23224d6b"},
+    {"path": "reports/reviews/phase8-sensor-stack-ram-diagnosis/live/result.json", "bytes": 7500, "sha256": "ce34bc3b10c0c6589b234539a2bf32020569629521e18d8bef34309bd8dbaeb0"},
+    {"path": "reports/reviews/phase8-sensor-stack-ram-diagnosis/live/session.log", "bytes": 3005, "sha256": "64a500adcb1e0e36c864f942ecf64ffadd9155b738d1bfb257aa86ccda674a1c"},
+    {"path": "reports/reviews/phase8-sensor-stack-ram-diagnosis/live/stack.bin", "bytes": 4096, "sha256": "b54784bf6861b76b943342fc95b7a1c80d0f4cb353b8a894f2a23106d8454739"},
+    {"path": "reports/reviews/phase8-sensor-stack-ram-diagnosis/live/tcb.bin", "bytes": 168, "sha256": "ab7b42fd3017501fb5e957d49fc868624855702d89d1796b3e77dad0c85706ff"},
+    {"path": "reports/reviews/phase8-sensor-stack-ram-diagnosis/live/tcb_reread.bin", "bytes": 168, "sha256": "ab7b42fd3017501fb5e957d49fc868624855702d89d1796b3e77dad0c85706ff"},
+    {"path": "reports/reviews/phase8-sensor-stack-ram-diagnosis/live/cpu.bin", "bytes": 8, "sha256": "d5adf271f5bccef21c8efc0d5f623c0687c4e825f3f0f0a83be7f83229533d76"},
+    {"path": "reports/reviews/phase8-sensor-stack-ram-diagnosis/live/s_tid.bin", "bytes": 4, "sha256": "7d3d50d9d7ddcaf12deac810e40b316464187b55b98bd2741d95ddd62fb456a2"},
+    {"path": "reports/reviews/phase8-sensor-stack-ram-diagnosis/live/s_tid_reread.bin", "bytes": 4, "sha256": "7d3d50d9d7ddcaf12deac810e40b316464187b55b98bd2741d95ddd62fb456a2"},
+    {"path": "reports/reviews/phase8-sensor-stack-ram-diagnosis/live/ccr.bin", "bytes": 4, "sha256": "e504021cdb5f1f15bd02bbc09cb5031613812c3f7e2174e5e8485fcda3518caf"},
+    {"path": "reports/reviews/phase8-sensor-stack-ram-diagnosis/live/dtcmcr.bin", "bytes": 4, "sha256": "daaf62de76f04e09a55d751f98b97c440bd2dba3f4d9d55a6e93ce8446266f92"},
+    {"path": "reports/reviews/phase8-sensor-stack-ram-diagnosis/items_manifest.txt", "bytes": 2080, "sha256": "self-reference excluded; see git blob and remote readback"},
     {"path": "reports/agent_handoffs/phase8-sensor-stack-ram-diagnosis.md", "sha256": "see git blob and remote readback"},
     {"path": "reports/agent_handoffs/phase8-sensor-stack-ram-diagnosis.json", "sha256": "self-reference excluded; see git blob and remote readback"}
   ],
@@ -166,7 +266,7 @@
       "wrong_reading": "0x2001A000 (区域末地址)",
       "actual": "0x20012000 (ZI-only 区域基址)",
       "consequence_before_fix": "曾设想 TM 栈可能落在批准窗口之外",
-      "resolution": "HEAP=[0x20012000,0x2001A000) 全在窗口内, 余 24576 B; 勘误写入 binding_report.txt §6, 未静默删除"
+      "resolution": "HEAP=[0x20012000,0x2001A000) 全在窗口内, 余 24576 B; 勘误写入 binding_report.txt §6"
     },
     {
       "item": "DTCMCR address",
@@ -175,13 +275,31 @@
       "resolution": "改由 DWARF 偏移 660 与 CMSIS Offset 注释 660 双源一致推导"
     }
   ],
-  "first_failures_offline": [
-    "SYSREG_CCR_BINDING_UNAVAILABLE: 初版找命名类型 SCB(实际为匿名结构), 改为结构特征扫描+双源核对",
-    "ok 夹具自相矛盾(1024 B '#' 配 16 B saved_free), 拆分为 ok/okshallow/contradict 并增 fill_vs_sp_consistent",
-    "语义注释按 (mnem, ops) 归类造成同助记符误标, 改为按地址逐条绑定并断言 94 条全覆盖",
-    "dryrun_matrix 对 contradict 只在 refusal 找标记而误判, 改为同时检索 computation",
-    "items_manifest 曾把自身写入前散列写进自身, 改为不列自散列",
-    "live_package 合计式曾写错为 6184 B, 改为由绑定值现算 6168 B 上限并附实测 4456 B"
+  "first_failures": [
+    {
+      "stage": "live attempt 1",
+      "error": "TargetSupportError: Target type stm32f103rb not recognized",
+      "cause": "未显式指定 target, 使用 DAP 默认 target 名; 本机无该 target 支持包",
+      "device_effect": "会话构造失败, 未 open; 0 halt / 0 读 / 0 写"
+    },
+    {
+      "stage": "live attempt 2",
+      "error": "KeyError: 0",
+      "cause": "session_with_chosen_probe 返回惰性会话, 未调用 open() 即取 primary_core; 核列表为空",
+      "device_effect": "未 open; 0 halt / 0 读 / 0 写"
+    },
+    {
+      "stage": "live attempt 3",
+      "error": null,
+      "cause": "修正后单会话完成",
+      "device_effect": "1 会话 / 1 halt / 8 读 4456 B / 结束 Halted"
+    },
+    {
+      "stage": "offline evidence defects",
+      "error": "匿名 SCB 绑定失败; ok 夹具自相矛盾; 语义注释按助记符误标; manifest 自散列; 合计式算错; contradict 标记位置错",
+      "cause": "工具/证据生成缺陷",
+      "device_effect": "均在离线修正并重跑, 未放宽判据"
+    }
   ],
   "safety_boundary": {
     "motor_connected": false,
@@ -195,25 +313,7 @@
     "safe_for_enable": false,
     "a0_duration": "仍暂缓"
   },
-  "approval": {
-    "required": true,
-    "consumed": false,
-    "short_form": "批准栈 RAM 诊断包",
-    "full_text": "批准执行本文栈 RAM 诊断包：允许一次已知 DAP 连接、最多一次暂停，按可信 R2 AXF 绑定线程，仅限≤16 KiB RAM 及本文所列核心/只读系统状态；不烧录、不读目标Flash、不复位、不串口、不写业务内存、不注入代码，结束保持暂停。离线绑定和检查在同一任务完成，不逐条重复确认。",
-    "scope": {
-      "dap_sessions": 1,
-      "halts_max": 1,
-      "ram_bytes_max": 16384,
-      "core_register_groups": 1,
-      "core_registers_max": 32,
-      "sysreg_ccr_bytes": 4,
-      "sysreg_dtcmcr_bytes": 4,
-      "compile_download_flashread_reset_serial_msh_tmc": 0,
-      "end_state": "HALTED",
-      "auto_resume_or_reset": false
-    }
-  },
-  "next_step": "等待用户回复「批准栈 RAM 诊断包」(或全文); 未获批准不连接设备。",
+  "next_step": "本包不自动扩权。若要继续, 需新的有界方案: 在告警发生上下文取样(切换点重复抓 sensor 保存 SP/PC), 而不是继续加栈。",
   "frozen_refs_at_round_start": {
     "refs/heads/main": "1b3757eec550802a3973e66790af422d81d3d373",
     "refs/heads/phase7/full-embedded-software": "6d3fbc559d45673d7550eb73dec5a4ade5bb34df",

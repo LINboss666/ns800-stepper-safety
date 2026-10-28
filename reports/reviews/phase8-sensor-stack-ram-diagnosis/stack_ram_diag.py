@@ -511,13 +511,23 @@ def main():
                 raise Refuse("UID_FILE_EMPTY")
             R["uid_source"] = "私有 UID 文件(未写入产物)"
             opts = {"no_config": True, "connect_mode": "attach", "auto_unlock": False,
+                    "target_override": "cortex_m", "halt_on_connect": False,
                     "resume_on_disconnect": False, "scan_all_aps": False,
                     "cache.enable_memory": False, "cache.read_code_from_elf": False}
+            R["session_options"] = opts
             sess = ConnectHelper.session_with_chosen_probe(unique_id=uid, options=opts)
             if sess is None:
                 raise Refuse("NO_SESSION_FOR_BOUND_UID —— 不枚举其它探针")
-            core = sess.target.primary_core
+            R["core_count"] = len(sess.target.cores)
+            R["core_numbers"] = sorted(sess.target.cores.keys())
             try:
+                sess.open()
+                R["session_opened"] = True
+                R["core_count"] = len(sess.target.cores)
+                R["core_numbers"] = sorted(sess.target.cores.keys())
+                core = sess.target.selected_core
+                if core is None:
+                    raise Refuse("NO_CORE_DISCOVERED —— cores=%d" % len(sess.target.cores))
                 R["initial_state"] = {"halted": bool(core.is_halted()), "running": bool(core.is_running())}
                 log("INITIAL %s" % R["initial_state"])
                 if not R["initial_state"]["halted"]:
@@ -550,8 +560,10 @@ def main():
         R["refusal"] = str(e)
         log("REFUSED_EARLY: %s" % e)
     except Exception as e:
+        import traceback
         R["outcome"] = "ERROR"
         R["error"] = "%s: %s" % (type(e).__name__, e)
+        R["traceback_tail"] = traceback.format_exc().splitlines()[-6:]
         log("ERROR %s: %s" % (type(e).__name__, e))
     for k, v in artifacts.items():
         io.open(os.path.join(a.out, k + ".bin"), "wb").write(v)

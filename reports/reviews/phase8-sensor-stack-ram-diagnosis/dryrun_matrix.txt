@@ -1,5 +1,7 @@
 SR-DRYRUN  八组夹具的真实执行结果(工具: reports/reviews/phase8-sensor-stack-ram-diagnosis/stack_ram_diag.py)
 执行环境: 从仓库内的工具副本运行, --dryrun 使用内存夹具, 不创建 pyOCD 会话/探针(产物 pyocd_session_created=false)。
+工具 sha256 = 1a62fc4dc3381777b21fb700c15fe31536ee2fb9527325cc91bd74407c51ee17 (本表即在该字节上执行)。
+live 前两次尝试均未打开目标会话(第 1 次: 未指定 target, 被 DAP 默认 target 名阻断; 第 2 次: session 未 open, 核列表为空), 均 0 halt/0 读; 定稿版加 target_override=cortex_m、显式 open 并取 selected_core, 本表与 live 用同一字节。
 每组输出目录互不相同; 原始 stdout 与 result.json 的散列在本表末尾, 可按散列复核。
 
 | # | 模式 | 夹具语义 | 期望 | 实测 outcome | 退出码 | RAM 读次数 | 累计字节 | 首次失败标识 |

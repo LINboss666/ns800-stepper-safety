@@ -1,8 +1,19 @@
 SR-ITEMS  本包目录内文件的字节数与 sha256(生成后直接对本地文件复算)
 说明: 本文件(items_manifest.txt)的自散列无法写入自身; 其字节数与 sha256 以提交后的 git blob 与远端回读为准。
-binding_report.txt                    16693 B  91fb6516eb4059440bbe43e657b5536e6679b108eca166da82a7befb51735dc0
-dryrun_matrix.txt                      4196 B  b29fd4fb759fa88d5bba009db75a77685fe6e5b3a843b02ef8d11abed9aa88be
-live_package.txt                       3740 B  ba0030c46cae4fa93a211aca4e07e1122caa60707b2e0c3618564d050522903c
-stack_ram_diag.py                     29335 B  32f4eb7fed3581534fe082cc1a3c056dc2d0cda940179b69cd49350c99badf69
+binding_report.txt                          16693 B  91fb6516eb4059440bbe43e657b5536e6679b108eca166da82a7befb51735dc0
+dryrun_matrix.txt                            4593 B  d269599825760e6530b2016ee545f333f863356bc344b8bb26a65120ba2398c4
+live_package.txt                             3969 B  a9d94a41052e08ab74fa1ff65d8d16c01cf2b64d731b5d7ef8e5ed7484d43bd7
+stack_ram_diag.py                           29997 B  1a62fc4dc3381777b21fb700c15fe31536ee2fb9527325cc91bd74407c51ee17
+live/ccr.bin                                    4 B  e504021cdb5f1f15bd02bbc09cb5031613812c3f7e2174e5e8485fcda3518caf
+live/cpu.bin                                    8 B  d5adf271f5bccef21c8efc0d5f623c0687c4e825f3f0f0a83be7f83229533d76
+live/dtcmcr.bin                                 4 B  daaf62de76f04e09a55d751f98b97c440bd2dba3f4d9d55a6e93ce8446266f92
+live/live_report.txt                         4107 B  294142dcb9987b7676847de9e1ded2e4befae6d435474f08727f454b23224d6b
+live/result.json                             7500 B  ce34bc3b10c0c6589b234539a2bf32020569629521e18d8bef34309bd8dbaeb0
+live/s_tid.bin                                  4 B  7d3d50d9d7ddcaf12deac810e40b316464187b55b98bd2741d95ddd62fb456a2
+live/s_tid_reread.bin                           4 B  7d3d50d9d7ddcaf12deac810e40b316464187b55b98bd2741d95ddd62fb456a2
+live/session.log                             3005 B  64a500adcb1e0e36c864f942ecf64ffadd9155b738d1bfb257aa86ccda674a1c
+live/stack.bin                               4096 B  b54784bf6861b76b943342fc95b7a1c80d0f4cb353b8a894f2a23106d8454739
+live/tcb.bin                                  168 B  ab7b42fd3017501fb5e957d49fc868624855702d89d1796b3e77dad0c85706ff
+live/tcb_reread.bin                           168 B  ab7b42fd3017501fb5e957d49fc868624855702d89d1796b3e77dad0c85706ff
 
-合计 5 个文件(含本文件), 其中 4 件可自散列共 53964 B。
+合计 16 个文件(含本文件), 其中 15 件可自散列共 74320 B。

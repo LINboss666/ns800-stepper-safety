@@ -1,0 +1,54 @@
+SR-LIVE-RESULT  一次会话的板级栈 RAM 快照(公开脱敏副本)
+来源: 由 result.json 与原始件直接生成; 本轮设备动作与读取范围见下。UID 未写入任何产物。
+
+[身份] AXF 1693804 B sha256=15be5f3efc45bf296bc0ef24e3947081372616d819e4bb3b189e9614cf9a5b9a
+       core_count=1 core_numbers=[0]  session_opened=True
+
+[动作台账]
+  打开的目标会话: 1 次(前两次构造未 open: 第 1 次 target 名不可用, 第 2 次核列表未初始化; 均 0 halt/0 读/0 写)
+  halt: 初始 {'halted': False, 'running': True} -> 显式 halt 1 次 -> 结束 Halted
+  RAM 读: 8 次 / 4456 B (上限 16384 B); 核心寄存器 1 组 25 个(mvac 不可用记为 unavailable)
+  只读系统状态: CCR 4 B + DTCMCR 4 B; 写/下载/复位/串口/msh/TMC: 0
+  断开: resume_on_disconnect=False; 未自动恢复, 未 reset, 未再连接验证
+
+[线程身份] s_tid=0x20014098 -> TCB=0x20014098
+  name=sensor type_byte=1 entry=0x08020e19 (期望 0x08020e19)
+  stack_addr=0x20014150 stack_size=4096 sp(保存)=0x20014fb4 error_field=0xfffffff5
+  同会话复读: {'s_tid_equal': True, 'tcb_equal': True, 'consistent': True}
+
+[栈计算] stack_low=0x20014150 stack_high=0x20015150 saved_sp=0x20014fb4
+  saved_free=SP-base=3684 B; saved_used=high-SP=412 B
+  stack[0]=0x23; 从低端连续 '#' 长度=3100 B; 首个非 '#' 偏移=3100; 历史最深估计=996 B
+  in_warning_band=False (告警带为 base..base+32); in_overflow_band=False; fill_vs_sp_consistent=True
+
+[暂停时上下文] 本轮 halt 落在另一个线程上: _cpu.current_thread=0x20009978 != sensor TCB
+  CONTROL=0x00000002 -> 线程模式使用 PSP; PRIMASK=0x00000001; PC=0x080003e8 (rt_hw_interrupt_enable+0x0 (size=6)); LR=0x0801c831 (rt_spin_unlock_irqrestore+0x21 (size=36))
+  r4-r11 原值为 0xdeadbeef(原样记录, 不作解释); SP/PSP=0x20009ac0/0x20009ac0
+  因 current_thread 不是 sensor, 该 SP 是 sensor 上次被切换出去时的保存上下文, 不是即时 PSP。
+
+[系统寄存器]
+  CCR   @0xe000ed14 = 0x00070200 -> DCache=True ICache=True
+  DTCMCR@0xe000ef94 = 0x00000041 -> bit0(ENABLE)=1; 其余位原样记录, 不解释
+  栈与 TCB 位于 RW_RT_HEAD 区 [0x20012000,0x2001A000), 不在 DTCM 地址段; 该区可缓存。
+  CCR 显示 D/I Cache 均启用; 本轮未执行任何 cache clean/invalidate(也不被允许),
+  故调试 AP 读到的 '#' 填充只能作为指示, 不能据此判定“从未写过”或“告警是假阳性”。
+
+[解释] 按任务书 §5 的表:
+  保存 SP 正常(距 base 3684 B, 当前使用 412 B), 且填充未接近底部(历史最深约 996 B)
+  => 本快照没有捕获告警状态; 不否定先前真实告警, 也不据此把 H2 定案。
+  快照本身有效(身份/窗口/预算/复读一致), 但对“4096 是否足够”的解释等级为 INCONCLUSIVE。
+  最有证据的下一步(本包不执行): 在告警发生的上下文里取样(例如在切换点上重复抓取 sensor
+  保存 SP/PC), 而不是继续加栈; 若再次抓到 SP 贴近 base, 再对照本表定位链。
+
+[原始件 sha256 与字节数(公开副本 live/ 目录)]
+  s_tid.bin                  4 B  7d3d50d9d7ddcaf12deac810e40b316464187b55b98bd2741d95ddd62fb456a2
+  tcb.bin                  168 B  ab7b42fd3017501fb5e957d49fc868624855702d89d1796b3e77dad0c85706ff
+  cpu.bin                    8 B  d5adf271f5bccef21c8efc0d5f623c0687c4e825f3f0f0a83be7f83229533d76
+  stack.bin               4096 B  b54784bf6861b76b943342fc95b7a1c80d0f4cb353b8a894f2a23106d8454739
+  s_tid_reread.bin           4 B  7d3d50d9d7ddcaf12deac810e40b316464187b55b98bd2741d95ddd62fb456a2
+  tcb_reread.bin           168 B  ab7b42fd3017501fb5e957d49fc868624855702d89d1796b3e77dad0c85706ff
+  ccr.bin                    4 B  e504021cdb5f1f15bd02bbc09cb5031613812c3f7e2174e5e8485fcda3518caf
+  dtcmcr.bin                 4 B  daaf62de76f04e09a55d751f98b97c440bd2dba3f4d9d55a6e93ce8446266f92
+  result.json             7500 B  ce34bc3b10c0c6589b234539a2bf32020569629521e18d8bef34309bd8dbaeb0
+  session.log             3005 B  64a500adcb1e0e36c864f942ecf64ffadd9155b738d1bfb257aa86ccda674a1c
+  合计 14961 B

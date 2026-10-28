@@ -1,4 +1,4 @@
-SR-LIVE  一次会话的板级执行包(未执行; 需一次批准)
+SR-LIVE  一次会话的板级执行包(存档; 已于 2026-10-28 按一次批准执行 1 次, 结果见 live/live_report.txt)
 
 [动作额度] 本包上限, 超出即停:
   - 已知 UID 的 DAP 定向连接: 1 个会话(不枚举设备/探针列表)
@@ -27,6 +27,7 @@ SR-LIVE  一次会话的板级执行包(未执行; 需一次批准)
   set PYTHONIOENCODING=utf-8
   python stack_ram_diag.py --live --uid-file <私有 UID 文件> --out <全新输出目录>
   说明: UID 只从私有文件读入, 不写入任何产物(产物只记 uid_source); 输出目录必须不存在, 已存在即拒绝覆盖。
+  目标核: 显式 target_override=cortex_m(该 DAP 的默认 target 名在本机不可用, 首轮尝试已因此失败并登记; 与上一包 -t cortex_m 同口径)。
 
 [会话内顺序]
   1. 只定向连接已知 UID; 记录初始 Halted/Running。不 reset。
