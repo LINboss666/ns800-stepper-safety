@@ -1,0 +1,13 @@
+
+msh >
+msh >tmc_scan
+[TMC] scan: READ IOIN(0x06) on addr 0..3, read-only
+ADDR 0: no valid reply
+ADDR 1: no valid reply
+ADDR 2: no valid reply
+ADDR 3: no valid reply
+[TMC] UART MCU TX/RX echo path OK
+[TMC] No TMC2209 response on addresses 0..3
+[TMC] Check VIO / VM / common GND / PDN_UART physical connection / MS1-MS2 hardware
+msh >
+msh >

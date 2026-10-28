@@ -1,0 +1,23 @@
+TMC-RC 诊断镜像身份与烧录回读（2026-10-28）
+
+临时诊断：sensor_service.c 加 TMC_RC_DIAG_NO_SG=1（只停周期 SG 读，其余后台不变；最终修复前必删）
+
+源码输入：debug/tmc-uart-rootcause-20261028 @ 1696c59 + 上述临时宏
+构建目标：rt-thread-measure-a0（UV4 5.43.1.0 / ARMCLANG V6.24）
+构建结果：0 Error / 0 Warning
+Program Size：Code=186874 RO-data=80746 RW-data=2188 ZI-data=91504
+
+AXF：1693528 B / sha256=380b2148dffc42513dcced24e2f8ca7fc6facb8eb344f4f3f6eecd67faa2e87c
+BIN：268196 B / sha256=27c0f14ac87f1e03c1d94e26a6edea5b20ab8b33d588367eea6b9a8a58409bac
+
+烧录方式：pyOCD 0.45.1 + NOVOSENSE.NS800RT7XXX.0.5.3.pack
+  -t ns800rt7p65d_dhqfby2，-e sector（非 chip/mass erase），auto_unlock=false
+  日志：Erased 268288 bytes (262 sectors), programmed 268288 bytes (262 pages)
+  （UV4 -f 在本机报 Internal DLL Error；同探针 pyOCD 连接正常，故改用 pack 路径）
+
+回读校验：0x08000000 起 268288 B
+  前 268196 B 与新 BIN 逐字节相等 = True
+  尾部 92 B 全为 0xFF（擦除态）
+  启动横幅实测：5.3.0 build Oct 28 2026 17:06:47
+
+板上旧 R2 身份（已归档）：AXF 15be5f3e… / measure-a0.bin b1e85294… / 横幅 10:23:50

@@ -1,0 +1,49 @@
+
+msh >
+msh >tmc_uart_probe
+[TMRO] BEGIN v=1 addr=0 planned=3 reads=1
+[TMC] probe: read-only identity check txn-held IOIN+GSTAT+IFCNT (0 WRITE frames)
+[TMRO] reg=06 result=FAIL rc=-117 reason=rx-timeout-echo
+[TMRO] reg=06 ctx=1 txn=1/0 open=ALREADY_OPEN/0 lock=1/1/0
+[TMRO] reg=06 flush=1/0 bytes=0 ms=0
+[TMRO] reg=06 tx=1/1/0 off=3 req=05 00 06 6F
+[TMRO] reg=06 tx_written=4
+[TMRO] reg=06 start=23385 total=125 rx_begin=3 rx_dl=103 done=103
+[TMRO] reg=06 rx=1 hdr=0 full=0 crc=NOT_REACHED
+[TMRO] reg=06 total=4 buf=4 pub=0 late=0 exp=n/y pre_trunc=0 gap=0
+[TMRO] reg=06 echo=ECHO_ONLY match=1/0 val=00000000
+[TMRO] reg=06 samples pre=4 tail=4 cand=0
+[TMRO] reg=06 rx1 off=0 n=4 hex=05 00 06 6F
+[TMRO] reg=06 rxT off=0 n=4 hex=05 00 06 6F
+[TMRO] reg=06 cand off=0 n=0 hex=-
+[TMRO] reg=01 result=NOT_REACHED rc=- reason=-
+[TMRO] reg=01 ctx=1 txn=1/0 open=ALREADY_OPEN/0 lock=0/0/0
+[TMRO] reg=01 flush=0/0 bytes=0 ms=0
+[TMRO] reg=01 tx=0/0/0 off=0 req=
+[TMRO] reg=01 tx_written=0
+[TMRO] reg=01 timing=- (budget never opened)
+[TMRO] reg=01 rx=0 hdr=0 full=0 crc=NOT_REACHED
+[TMRO] reg=01 total=0 buf=0 pub=0 late=0 exp=-/- pre_trunc=0 gap=0
+[TMRO] reg=01 echo=UNKNOWN match=0/0 val=00000000
+[TMRO] reg=01 samples pre=0 tail=0 cand=0
+[TMRO] reg=01 rx1 off=0 n=0 hex=-
+[TMRO] reg=01 rxT off=0 n=0 hex=-
+[TMRO] reg=01 cand off=0 n=0 hex=-
+[TMRO] reg=02 result=NOT_REACHED rc=- reason=-
+[TMRO] reg=02 ctx=1 txn=1/0 open=ALREADY_OPEN/0 lock=0/0/0
+[TMRO] reg=02 flush=0/0 bytes=0 ms=0
+[TMRO] reg=02 tx=0/0/0 off=0 req=
+[TMRO] reg=02 tx_written=0
+[TMRO] reg=02 timing=- (budget never opened)
+[TMRO] reg=02 rx=0 hdr=0 full=0 crc=NOT_REACHED
+[TMRO] reg=02 total=0 buf=0 pub=0 late=0 exp=-/- pre_trunc=0 gap=0
+[TMRO] reg=02 echo=UNKNOWN match=0/0 val=00000000
+[TMRO] reg=02 samples pre=0 tail=0 cand=0
+[TMRO] reg=02 rx1 off=0 n=0 hex=-
+[TMRO] reg=02 rxT off=0 n=0 hex=-
+[TMRO] reg=02 cand off=0 n=0 hex=-
+[TMC] IOIN read failed (-117) -> identity NOT confirmed (chip damage NOT implied)
+[TMRO] read_ok=0 identity_ok=0 fields_ok=1 link=UNPROVEN safe_for_enable=0
+[TMRO] END reads=1 writes=0 export_err=0 observation_complete=1
+msh >
+msh >

@@ -36,6 +36,9 @@
 #define SENSOR_THREAD_PRIO    7
 #define SENSOR_PERIOD_MS      10          /* 100Hz */
 #define SENSOR_SG_DIV         10          /* SG_RESULT 10Hz 分频 */
+/* TEMP DIAGNOSTIC (debug/tmc-uart-rootcause-20261028): 停掉周期 SG 读以隔离 UART 读路径。
+ * 只用于 A/B，不得进入最终构建；根因定位后必须删除。 */
+#define TMC_RC_DIAG_NO_SG     1
 
 static sensor_frame_t s_frame;              /* 最新帧(临界区保护) */
 static sensor_frame_t s_prev;               /* 生产基帧(零初始化=全 valid 0) */
@@ -112,6 +115,9 @@ static void s_collect(sensor_frame_t *f, sensor_frame_t *base_prev,
     else { f->valid_current = 0; f->fresh_current = 0; }
 
     /* TMC SG_RESULT: 10Hz 分频 */
+#if TMC_RC_DIAG_NO_SG
+    f->fresh_sg = 0;                    /* TEMP DIAG: 不发起 TMC 读, 留给 msh probe 独占 */
+#else
     if ((*seq % SENSOR_SG_DIV) == 0)
     {
         rt_uint16_t sg = 0;
@@ -120,6 +126,7 @@ static void s_collect(sensor_frame_t *f, sensor_frame_t *base_prev,
         else { f->valid_sg = 0; f->fresh_sg = 0; }
     }
     else f->fresh_sg = 0;               /* 非采样帧: 值与 valid 沿用, fresh=0 */
+#endif
 
     /* 运动快照 */
     if (motor_get_snapshot(&snap) == RT_EOK)
