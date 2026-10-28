@@ -1,0 +1,76 @@
+{
+  "task": "NS800_TMC_Autonomous_Debug_Fix_and_Flash_Task",
+  "date": "2026-10-28",
+  "branch": "debug/tmc-uart-rootcause-20261028",
+  "branch_base": "1696c59f4b56bae5d503fb18888e379dfad6f76f",
+  "code_commit": "c2d29d99e81d23ac3451480eb6f5bade5f8b5981",
+  "target": "rt-thread-measure-a0",
+  "toolchain": {
+    "keil": "UV4 5.43.1.0",
+    "compiler": "ARMCLANG V6.24"
+  },
+  "build": {
+    "errors": 0,
+    "warnings": 0,
+    "program_size": "Code=187050 RO-data=80746 RW-data=2188 ZI-data=91504",
+    "banner": "5.3.0 build Oct 28 2026 17:36:54"
+  },
+  "images": {
+    "axf": {
+      "path": "reports/firmware/phase8-tmc-uart-rootcause/rt-thread-a0.axf",
+      "bytes": 1693876,
+      "sha256": "a66673f0119447fec7907574c7a5096af9cc6a9848bae737f1173ab0c56f840c"
+    },
+    "measure-a0.bin": {
+      "path": "reports/firmware/phase8-tmc-uart-rootcause/measure-a0.bin",
+      "bytes": 268372,
+      "sha256": "c635d1d156f22a4688cfde664af6b43df89c48cb913e82fea5b591ba389e7ca0"
+    }
+  },
+  "flash": {
+    "method": "pyOCD 0.45.1 + NOVOSENSE.NS800RT7XXX.0.5.3.pack",
+    "target": "ns800rt7p65d_dhqfby2",
+    "erase": "sector (not chip/mass erase)",
+    "erased_programmed_bytes": 269312,
+    "readback": "0x08000000 起 268372 B 与 measure-a0.bin 逐字节相等 = true"
+  },
+  "ab_reference_e40": {
+    "commit": "e40a9b95ef709e6a80444f9f3949dfdd70ba96ba",
+    "axf_sha256": "85c0711494429f6adce7059b3e753eeb594d38a072db40a0a632566505dd1e8b",
+    "bin_sha256": "50ce5c7a4710e6275280bb24a661344413ba7e42e1345109a244a151b80e0f45",
+    "result": "tmc_regs 7/7 读出，IOIN=0x21000041 ⇒ 模块与线路正常"
+  },
+  "fixes": [
+    "drv_uart_txleaf.inc: 去掉字节间 rt_thread_mdelay(1)，改为只按 tick 检查预算的短自旋，帧内保持连续",
+    "motor.c: MOTOR_THREAD_STACK 768 → 2048（TMC 读通后暴露的真实溢出；实测高水位 728 B）",
+    "tests/host 叶子夹具：轮询无空位时由 ns800_leaf_uart_poll() 推进 1 ms 模型时间"
+  ],
+  "verification": {
+    "boot_self_test": "TMC2209 (IOIN=0x21000041)，state=READY",
+    "background": "sensor 100 Hz，valid_sg=1，tmc_health=OK",
+    "reads": {"groups": 100, "reads_per_group": 3, "total": 300, "success": 300, "fail": 0},
+    "reboots": 3,
+    "groups_per_boot": [34, 33, 33],
+    "crc": "全部 OK",
+    "ioin_each_group": "0x21000041",
+    "unexpected_117_23_crc": 0,
+    "retries": 0,
+    "stack": {
+      "motor": {"size": 2048, "high_water": 728, "canary": "0x23"},
+      "sensor": {"size": 4096, "high_water": 900, "canary": "0x23"}
+    },
+    "host_leaf_tests": {"C17": "7/7 PASS", "C18": "6/6 PASS", "runner_rc": 0}
+  },
+  "safety": {
+    "motor_connected": false,
+    "sw1_blocking": true,
+    "target_level_define_overrides_of_four_macros": "none",
+    "tmc_writes_in_final": 0,
+    "step_dir_license_high": 0,
+    "fault_cleared": false,
+    "board_state": "running READY, motion gate-locked",
+    "tmc_drive_config": "UNCONFIGURED",
+    "safe_for_enable": false,
+    "a0_duration": "still deferred"
+  }
+}

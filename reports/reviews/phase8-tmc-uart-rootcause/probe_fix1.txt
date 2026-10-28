@@ -1,0 +1,51 @@
+
+msh >
+msh >tmc_uart_probe
+[TMRO] BEGIN v=1 addr=0 planned=3 reads=3
+[TMC] probe: read-only identity check txn-held IOIN+GSTAT+IFCNT (0 WRITE frames)
+[TMRO] reg=06 result=SUCCESS rc=0 reason=ok
+[TMRO] reg=06 ctx=1 txn=1/0 open=ALREADY_OPEN/0 lock=1/1/0
+[TMRO] reg=06 flush=1/0 bytes=0 ms=0
+[TMRO] reg=06 tx=1/1/0 off=0 req=05 00 06 6F
+[TMRO] reg=06 tx_written=4
+[TMRO] reg=06 start=13873 total=125 rx_begin=0 rx_dl=100 done=2
+[TMRO] reg=06 rx=1 hdr=1 full=1 crc=OK
+[TMRO] reg=06 total=12 buf=12 pub=1 late=0 exp=n/n pre_trunc=0 gap=0
+[TMRO] reg=06 echo=ECHO_WITHIN match=1/8 val=21000041
+[TMRO] reg=06 samples pre=12 tail=12 cand=8
+[TMRO] reg=06 rx1 off=0 n=12 hex=05 00 06 6F 05 FF 06 21 00 00 41 C6
+[TMRO] reg=06 rxT off=0 n=12 hex=05 00 06 6F 05 FF 06 21 00 00 41 C6
+[TMRO] reg=06 cand off=0 n=8 hex=05 FF 06 21 00 00 41 C6
+[TMRO] reg=01 result=SUCCESS rc=0 reason=ok
+[TMRO] reg=01 ctx=1 txn=1/0 open=ALREADY_OPEN/0 lock=1/1/0
+[TMRO] reg=01 flush=1/0 bytes=0 ms=0
+[TMRO] reg=01 tx=1/1/0 off=0 req=05 00 01 C1
+[TMRO] reg=01 tx_written=4
+[TMRO] reg=01 start=13875 total=125 rx_begin=0 rx_dl=100 done=2
+[TMRO] reg=01 rx=1 hdr=1 full=1 crc=OK
+[TMRO] reg=01 total=12 buf=12 pub=1 late=0 exp=n/n pre_trunc=0 gap=0
+[TMRO] reg=01 echo=ECHO_WITHIN match=1/8 val=00000001
+[TMRO] reg=01 samples pre=12 tail=12 cand=8
+[TMRO] reg=01 rx1 off=0 n=12 hex=05 00 01 C1 05 FF 01 00 00 00 01 9A
+[TMRO] reg=01 rxT off=0 n=12 hex=05 00 01 C1 05 FF 01 00 00 00 01 9A
+[TMRO] reg=01 cand off=0 n=8 hex=05 FF 01 00 00 00 01 9A
+[TMRO] reg=02 result=SUCCESS rc=0 reason=ok
+[TMRO] reg=02 ctx=1 txn=1/0 open=ALREADY_OPEN/0 lock=1/1/0
+[TMRO] reg=02 flush=1/0 bytes=0 ms=0
+[TMRO] reg=02 tx=1/1/0 off=0 req=05 00 02 8F
+[TMRO] reg=02 tx_written=4
+[TMRO] reg=02 start=13877 total=125 rx_begin=0 rx_dl=100 done=2
+[TMRO] reg=02 rx=1 hdr=1 full=1 crc=OK
+[TMRO] reg=02 total=12 buf=12 pub=1 late=0 exp=n/n pre_trunc=0 gap=0
+[TMRO] reg=02 echo=ECHO_WITHIN match=1/8 val=00000006
+[TMRO] reg=02 samples pre=12 tail=12 cand=8
+[TMRO] reg=02 rx1 off=0 n=12 hex=05 00 02 8F 05 FF 02 00 00 00 06 6B
+[TMRO] reg=02 rxT off=0 n=12 hex=05 00 02 8F 05 FF 02 00 00 00 06 6B
+[TMRO] reg=02 cand off=0 n=8 hex=05 FF 02 00 00 00 06 6B
+[TMC] IOIN = 0x21000041 VERSION = 0x21 -> TMC2209 (0x21) identity match
+[TMC] GSTAT = 0x01 raw=0x00000001 reset=1 drv_err=0 uv_cp=0
+[TMC] IFCNT = 6 raw=0x00000006 (read-only: this command wrote no register)
+[TMRO] read_ok=1 identity_ok=1 fields_ok=1 link=READ_OK safe_for_enable=0
+[TMRO] END reads=3 writes=0 export_err=0 observation_complete=1
+msh >
+msh >

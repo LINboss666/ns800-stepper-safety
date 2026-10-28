@@ -1,0 +1,74 @@
+{
+  "task": "NS800_TMC_Autonomous_Debug_Fix_and_Flash_Task",
+  "date": "2026-10-28",
+  "branch": "debug/tmc-uart-rootcause-20261028",
+  "branch_base": "1696c59f4b56bae5d503fb18888e379dfad6f76f",
+  "code_commit": "c2d29d99e81d23ac3451480eb6f5bade5f8b5981",
+  "result": "ROOT_CAUSE_FOUND_AND_FIXED_ON_TARGET",
+  "root_cause": {
+    "summary": "预算 TX 叶子在 TDRE 未就绪时 rt_thread_mdelay(1)，4 字节请求出现 ~1ms 字节间隔（tx_off=3ms），TMC2209 丢弃整帧；MCU 只收到自身回声，读恒为 -117",
+    "evidence": [
+      "当前固件：req=05 00 06 6F，CRC 正确，tx_written=4，echo=ECHO_ONLY，无 8 字节应答",
+      "e40a9b9 同板对照：tmc_regs 7/7 读出，IOIN=0x21000041（模块与线路正常）",
+      "A/B 换回 rt_device_write：启动自检即读通 TMC2209 IOIN=0x21000041",
+      "修复叶子后：三读 SUCCESS、crc=OK、tx_off=0、IOIN=0x21000041"
+    ],
+    "disproven_hypothesis": "GCONF.pdn_disable=0（授权补写后仍 echo-only；e40 GCONF=0x101 且 pdn_disable=0 也能读）"
+  },
+  "fixes": [
+    "drv_uart_txleaf.inc：删除字节间 mdelay，改为按 tick 检查预算的短自旋（帧内连续）",
+    "motor.c：MOTOR_THREAD_STACK 768→2048（读通后暴露的真实溢出；高水位 728B）",
+    "tests/host 叶子夹具：轮询无空位时推进 1ms 模型时间（C17/C18 13/13 PASS）"
+  ],
+  "final_image": {
+    "axf": {"bytes": 1693876, "sha256": "a66673f0119447fec7907574c7a5096af9cc6a9848bae737f1173ab0c56f840c"},
+    "bin": {"bytes": 268372, "sha256": "c635d1d156f22a4688cfde664af6b43df89c48cb913e82fea5b591ba389e7ca0"},
+    "banner": "5.3.0 build Oct 28 2026 17:36:54",
+    "program_size": "Code=187050 RO-data=80746 RW-data=2188 ZI-data=91504",
+    "flashed": "pyOCD 0.45.1 + NOVOSENSE.NS800RT7XXX.0.5.3.pack, sector erase",
+    "readback_equal": true
+  },
+  "verification": {
+    "boot_self_test_ioin": "0x21000041",
+    "sensor_valid_sg": 1,
+    "tmc_health": "OK",
+    "read_groups": 100,
+    "reads_total": 300,
+    "reads_success": 300,
+    "reads_failed": 0,
+    "crc_ok": "all",
+    "errors_117_23_crc_identity": 0,
+    "retries": 0,
+    "reboots": 3,
+    "groups_per_boot": [34, 33, 33],
+    "stack": {
+      "motor": {"size": 2048, "high_water": 728, "canary": "0x23"},
+      "sensor": {"size": 4096, "high_water": 900, "canary": "0x23"}
+    },
+    "overflow_or_near_end_text": 0,
+    "host_leaf": {"C17": "7/7 PASS", "C18": "6/6 PASS", "runner_rc": 0}
+  },
+  "first_failures": [
+    "GCONF.pdn_disable 假设错误：授权写后仍 echo-only，已撤回",
+    "motor 线程 768B 栈溢出：TMC 修通后出现，已提升到 2048B",
+    "UV4 -f Internal DLL Error：改用 pyOCD + 厂商 pack，并整段回读验证",
+    "主机叶子链因模型时间不推进而超时：更新夹具轮询时间模型后 13/13 PASS"
+  ],
+  "safety": {
+    "motor_connected": false,
+    "sw1_blocking": true,
+    "four_macros_target_overrides": "none",
+    "tmc_writes_in_final": 0,
+    "step_dir_license_high": 0,
+    "fault_cleared": false,
+    "board_state": "running READY, motion gate-locked",
+    "tmc_drive_config": "UNCONFIGURED",
+    "safe_for_enable": false,
+    "a0_duration": "still deferred"
+  },
+  "frozen_refs": {
+    "refs/heads/main": "1b3757eec550802a3973e66790af422d81d3d373",
+    "refs/heads/phase7/full-embedded-software": "6d3fbc559d45673d7550eb73dec5a4ade5bb34df",
+    "refs/tags/v0.7-phase7-software-board-validated": "097935fec5a6f2467261ab1ad449ff0b1d398250"
+  }
+}

@@ -1,0 +1,13 @@
+
+msh >
+msh >tmc_regs
+[TMC] register snapshot (read-only, addr 0):
+[TMC] GCONF    (0x00) = 0x00000101
+[TMC] GSTAT    (0x01) = 0x00000001
+[TMC] IFCNT    (0x02) = 0x00000000
+[TMC] IOIN     (0x06) = 0x21000041
+[TMC] VACTUAL  (0x22) = 0x00000000
+[TMC] CHOPCONF (0x6C) = 0x15010053
+[TMC] SGRESULT (0x41) = 0x00000000
+msh >
+msh >
