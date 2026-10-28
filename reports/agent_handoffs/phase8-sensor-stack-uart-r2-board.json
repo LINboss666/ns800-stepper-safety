@@ -1,0 +1,155 @@
+{
+  "task_id": "phase8-sensor-stack-uart-r2-board",
+  "approved_package": {
+    "path": "reports/reviews/phase8-sensor-stack-uart-r2/board_package_r2.md",
+    "bytes": 10082,
+    "sha256": "e09078901265d957fdef223545e165544f83f530d9ba83e353362090b4a4c934"
+  },
+  "approval": {
+    "granted": "2026-10-28 12:0x +0800",
+    "form": "用户真实回合简写「批准执行 URO-R2 板级包」",
+    "bound_to": "包 §6 一次批准文字"
+  },
+  "delivery_base": "2053e6adc7d71d892d138754a3955fe91ac31343",
+  "software_input_commit": "139e9377ccbc36b878cd577a6b848d974e1e07fa",
+  "execution_window": "2026-10-28T11:58:54+08:00 .. 2026-10-28T12:01:24+08:00",
+  "steps": {
+    "S0_offline_binding": "PASS(zero device action; 4 件产物身份 OK; 副本 uvprojx/uvoptx 与已证源逐字节相同; Load=副本 dl/rt-thread-a0.axf; pyOCD 无隐式配置; UID 取既存私有件)",
+    "S1_power": "NO_ACTION(USER_CONFIRMED 沿用)",
+    "S2_keil_download": "PASS(Load 本轮载荷 + Erase Done. + Programming Done. + Verify OK. @12:00:12; Start-Process -Wait 修好判定过早缺陷, 该步 rc=0)",
+    "S3_readback": "PASS(0x08000000 起 0x41834=268340 B; 两次 Halted; sha256 与接受 BIN 相同且逐字节相等)",
+    "S4_explicit_reset": "PASS(Resetting target + Core 0 (None):  Running)",
+    "S5_collector": "FAIL_AT_STACK_DANGER_GATE(STACK_DANGER_OBSERVED @UARTReadDiagSerialR2.ps1:54; 开口 0.022 s 即判; 原字节先落盘)",
+    "S6_msh_commands": "NOT_REACHED(0/7)",
+    "S7_stop_and_archive": "DONE(保存原字节+台账; 句柄由 finally 关闭; 停机后 0 新动作)"
+  },
+  "quotas_consumed": {
+    "keil_download": "1/1",
+    "dap_sessions": "2/2",
+    "flash_readback": "1/1",
+    "explicit_sysresetreq": "1/1",
+    "com5_open_attempts": "1/1",
+    "msh_commands": "0/7",
+    "probe": "0/1",
+    "tmc_register_reads": 0,
+    "write_frames": 0,
+    "power_on": 0,
+    "enumeration": 0,
+    "device_actions_after_stop": 0,
+    "keil_internal_reset": "NOT_SEPARATELY_OBSERVABLE"
+  },
+  "image_identity": {
+    "accepted_bin": {
+      "bytes": 268340,
+      "sha256": "b1e852949f003965de52d539ca324a11b8b89e17a51a8f34fe3efd01525ae2d1"
+    },
+    "readback": {
+      "bytes": 268340,
+      "sha256": "b1e852949f003965de52d539ca324a11b8b89e17a51a8f34fe3efd01525ae2d1",
+      "byte_equal_to_accepted": true
+    },
+    "payload_axf": "15be5f3efc45bf296bc0ef24e3947081372616d819e4bb3b189e9614cf9a5b9a",
+    "expected_banner_never_evaluated": "5.3.0 build Oct 28 2026 10:23:50"
+  },
+  "key_board_fact": {
+    "statement": "4096 字节栈的镜像已证在板运行, 但同一条 sensor 栈告警在复位后开口的第一批字节里仍然出现",
+    "capture_bytes": 166,
+    "capture_sha256": "075b02ddf70654ba3ac2aaf55de08b1b9272158c8f48614cb7c6140aec829afc",
+    "warning_text": "[W/kernel.sched] warning: sensor stack is close to end of stack address.",
+    "observed_within_seconds": 0.022,
+    "complete_warning_lines": 2,
+    "overflow_text_present": false,
+    "kernel_semantics_read_from_source": [
+      "src/thread.c:204-219 stack_addr=块低端+整块 memset '#'; 向下增长 CPU 初始 sp 在块高端",
+      "src/scheduler_up.c:355 -> src/scheduler_comm.c:460 切入线程时用其保存 sp 检查",
+      "src/scheduler_comm.c:507-512 sp <= stack_addr+32 => 本轮告警",
+      "src/scheduler_comm.c:477-486 栈首字节非 '#' 等 => 另一句 stack overflow(本轮未出现)"
+    ],
+    "implied_usage_bytes_at_least": 4064,
+    "disproved": "上一轮'静态已知最深链 1228 B > 1024 即此告警的解释'的充分性(该不等式本身仍成立)",
+    "open_hypotheses_not_distinguished": [
+      "H1 真实用量远超 armlink 静态度量(Unknown: Cycles + Untraceable Function Pointers; 异常压栈不计)",
+      "H2 该检查对这条线程给假阳性(若是, 继续加栈永远不会消除告警)"
+    ],
+    "needed_to_distinguish": "一次新的只读诊断(读该线程 sp/stack_addr/stack_size 与 '#' 高水位) —— 需新批准, 本轮未做"
+  },
+  "collector_change_effect": {
+    "no_quiet_prerequisite": "delivered(0.022 s 判定 vs 上一轮 20 s 超时)",
+    "save_before_decide": "delivered(166 B 先落盘, session.rx.bin 同散列)",
+    "danger_not_bypassed_for_commands": "delivered(counts={}, 0 命令)",
+    "distinct_failure_identity": "delivered(STACK_DANGER_OBSERVED :54 vs 上一轮 :139)"
+  },
+  "capture": "INCOMPLETE",
+  "business": "NOT_REACHED",
+  "failure_stage": "STACK_DANGER_OBSERVED",
+  "banner_gate": "NOT_EVALUATED(danger check precedes it)",
+  "tmc_link_on_board": "UNPROVEN",
+  "safe_for_enable": false,
+  "safety_macros": "四个安全宏默认与 A0 均为 0; 未翻宏、未 arm/start/ramp、无 STEP/DIR/许可 HIGH、无 WRITE 帧",
+  "not_authorized_and_not_done": [
+    "电机连接/运动",
+    "STEP",
+    "DIR/许可 HIGH",
+    "翻宏",
+    "arm/start/ramp",
+    "清故障",
+    "配置写",
+    "手动 selftest",
+    "pin_status",
+    "额外 A0 采样/清理",
+    "自动恢复",
+    "外部 SPI Flash 转储",
+    "全片备份",
+    "设备/端口/探针枚举",
+    "sw1_cut.ps1",
+    "重试下载/回读/复位/开口"
+  ],
+  "previous_round_status_preserved": {
+    "uro_r1_board": "CAPTURE=INCOMPLETE / BUSINESS=NOT_REACHED / msh 0/7 / 额度用尽 原样保留",
+    "uro_r2_offline": "R2 离线交付(镜像/采集器/包)按其原登记保留; 本轮是其首次板级执行",
+    "image_a48400c8": "上一轮已证在板的旧镜像事实保留; 本轮已被 b1e85294… 取代为板上最新已证镜像"
+  },
+  "files_changed_in_repo": [
+    "reports/reviews/phase8-sensor-stack-uart-r2-board/board_run_evidence.txt",
+    "reports/reviews/phase8-sensor-stack-uart-r2-board/stack_warning_analysis.txt",
+    "reports/agent_handoffs/phase8-sensor-stack-uart-r2-board.md",
+    "reports/agent_handoffs/phase8-sensor-stack-uart-r2-board.json",
+    "reports/agent_handoffs/phase8-sensor-stack-uart-r2.md(只追加指针)",
+    "reports/agent_handoffs/phase8-sensor-stack-uart-r2.json(只追加指针)"
+  ],
+  "production_firmware_engineering_collector_untouched": true,
+  "privacy": {
+    "deid": "绝对路径 -> <本地执行根>/<仓库根>; UID 只登记长度与 sha256[:12]; 控制字节写成 <ESC>/<NUL>",
+    "lossless": false,
+    "originals_kept_out_of_repo": true,
+    "passive_bytes_archived_as": "evidence 文件内联 base64(无损转码, 非原始串口字节)"
+  },
+  "source_tier": "LOCAL-RUN(本机 Windows 实跑); 云端未执行任何设备步骤",
+  "not_proven": [
+    "板上 TMC 链路与状态(UNPROVEN)",
+    "板上原 -117 根因",
+    "告警持久化的原因(H1 真实深用 vs H2 检查假阳性, 未区分)",
+    "完整最坏栈界",
+    "4096 是否足够(其充分性已被否定)",
+    "BLOCKED_ROLLBACK 剩余项",
+    "B-1",
+    "BUG-008",
+    "RISK-03/03a",
+    "物理 RISK-04-b",
+    "M-1/M-2/M-3",
+    "A0 时长(NOT_ACHIEVED)"
+  ],
+  "next_step_requires": "一次新的用户批准: 二选一(只读诊断 sp/栈高水位以定案; 或继续加栈复测; 或改内核/采集器观测口径并重走复审)。本轮未预选、未执行。",
+  "stop_lines": [
+    "URO_R2_BOARD_READ_DIAG_EXECUTED_OR_STOPPED=EXECUTED_THEN_STOPPED",
+    "IMAGE_ON_BOARD=CONFIRMED(b1e85294… 逐字节回读相等 + 复位 Running)",
+    "SENSOR_STACK_WARNING_OBSERVED=TRUE(at 4096) / STACK_4096_SUFFICIENCY=DISPROVED",
+    "CAPTURE=INCOMPLETE / BUSINESS=NOT_REACHED / FAILURE_STAGE=STACK_DANGER_OBSERVED",
+    "BANNER_GATE=NOT_EVALUATED / TMC_LINK_ON_BOARD=UNPROVEN",
+    "QUOTAS_EXHAUSTED=download 1/1 + DAP 2/2 + readback 1/1 + reset 1/1 + COM5 1/1 + msh 0/7",
+    "DEVICE_ACTIONS_AFTER_STOP=0 / NO_RETRY / NO_AUTO_CARRYOVER",
+    "SAFE_FOR_ENABLE=false / FOUR_SAFETY_MACROS=0 / ECHO_MATCH_OFFSET=KNOWN_INVALID_FOR_DIAG",
+    "NEXT_ROUND_REQUIRES_NEW_USER_APPROVAL"
+  ],
+  "generated_by": "make_r2b_handoff.py"
+}

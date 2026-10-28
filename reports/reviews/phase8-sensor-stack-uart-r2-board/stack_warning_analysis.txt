@@ -1,0 +1,63 @@
+URO-R2 板级执行轮的栈告警分析(task phase8-sensor-stack-uart-r2-board)
+输入 = 本轮采集到的 166 B 被动流(sha256=075b02ddf70654ba3ac2aaf55de08b1b9272158c8f48614cb7c6140aec829afc) + 本轮已证在板的镜像 + 仓内源码实读
+方法 = 全部离线只读; 停机后未再触碰设备, 未读内存, 未发命令。
+
+== 1. 观察到的事实(按证据强度排) ==
+  F1 新镜像确在板且被执行: S2 日志 Load 本轮载荷 + Erase/Programming/Verify OK;
+     S3 从 0x08000000 定长回读 268340 B 与接受 BIN **逐字节相等**(sha256=b1e852949f003965de52d539ca324a11b8b89e17a51a8f34fe3efd01525ae2d1);
+     S4 唯一显式 SYSRESETREQ 得 `Resetting target` + `Core 0 (None):  Running`。
+  F2 该镜像的产品输入含 SENSOR_THREAD_STACK=4096(镜像反汇编 `MOV r3,#0x1000`, 见 R2 离线证据);
+     manifest 的期望横幅 = `5.3.0 build Oct 28 2026 10:23:50`。
+  F3 复位后开口的第一批字节里就有同一条告警(共 2 条完整 + 第 3 条残段),
+     采集器 RX_BEGIN(12:01:23.858) -> STOP_FAILURE(12:01:23.880) = 0.022 s。
+     告警文本逐字 = `[W/kernel.sched] warning: sensor stack is close to end of stack address.`
+     线程名 = sensor, 即 applications/sensor_service.c 里 rt_thread_create("sensor", …) 那条线程。
+  F4 0 条 msh 命令发出(台账 counts={} 且无分响应件); 未看到启动横幅, 但横幅门本轮**未执行**
+     (危险判据在 Resolve-BannerGate 之前抛出), 所以 banner 状态记 NOT_EVALUATED, 不是 BANNER_NOT_OBSERVED。
+  F5 未出现 `stack overflow` 文本(内核该分支打的是另一句), 因此本轮没有 overflow 的直接证词。
+
+== 2. 告警判据的源码语义(实读, 不是猜测) ==
+  src/thread.c:204-206      thread->stack_addr = stack_start(块低端), thread->stack_size = 传入值;
+                            整块 rt_memset '#'(高水位染色) 。
+  src/thread.c:217-219      向下增长 CPU 的初始 sp = stack_addr + stack_size - sizeof(rt_ubase_t)(块高端)。
+  src/scheduler_comm.c:460  rt_scheduler_stack_check(thread); 调用点 src/scheduler_up.c:355
+                            发生在**切入该线程时**, 用的是该线程上次切出时保存的 sp。
+  src/scheduler_comm.c:477-486  overflow 分支: 栈首字节(stack_addr[0])不是 '#'、或 sp<=stack_addr、
+                            或 sp>stack_addr+stack_size => 打 `thread:%s stack overflow`。
+  src/scheduler_comm.c:507-512  else-if: sp <= stack_addr + 32 => 打本轮观察到的那句告警。
+  因此这句话的字面含义是: **保存的 SP 已进入分配块末端最后 32 B, 而最底部第 1 个 '#' 尚未被写过**。
+  按分配值 4096 B 换算, 即该线程在切出瞬间用掉约 4064 B 以上。
+
+== 3. 被本轮否定的说法 ==
+  上一轮 R2 离线轮的核心推断是: '静态已知最深链 1228 B 已超过旧配置 1024 B, 这就是告警的量化解释'
+  (见 reports/reviews/phase8-sensor-stack-uart-r2/stack_report.txt 与交接 §2)。
+  本轮直接观测否定了它的**充分性**: 栈给到 4096 之后, 同一条告警仍然立即出现。
+  仍然成立的部分: 1024 确实小于 1228 B 的静态度量(那只是'不够'的证据, 不是'够了'的证据)。
+  结论登记: 4096 不足以消除该告警 => '再加大栈'这条路线本身尚未被证明能收敛。
+
+== 4. 两个候选解释(本轮都没能区分, 不选一个写死) ==
+  H1 真实用量远超 armlink 静态度量: 调用图对镜像级值自己写了 `+ Unknown(Cycles, Untraceable
+     Function Pointers)`; printf/设备写路径经函数指针、互递归(rt_assert_handler/fputc <-> rt_kprintf)
+     不参与上界; 异常/中断硬件压栈也不计。这些未追踪部分足以把 1228 B 撑到接近 4096 B。
+  H2 检查本身对该线程给出假阳性: 例如被检查的 sp/stack_addr/stack_size 组合与实际创建的块不一致,
+     或在切入点上保存的 sp 不代表该线程自身栈的使用深度。若是这一类, 加栈永远不会让告警消失。
+  区分二者需要一次**新的读取动作**(读该线程 sp/stack_addr 或 '#' 高水位位置, 即需要命令或内存读),
+  本包额度已用尽且明令不追加动作, 因此本轮不区分, 只登记为未知。
+  注意: H1/H2 都与 TMC UART 无关 —— 不能把这条告警当成 -117 的原因, 也不能因为它存在就排除通信问题。
+
+== 5. 采集器行为判定(R2 改动的实际效果) ==
+  按任务书 §4/§7 的设计意图逐条对:
+    不再等 1200 ms 静默: 生效 —— 本轮 0.022 s 就得到判定, 上一轮是 20 s 超时。
+    先落盘再判危险: 生效 —— 166 B 原字节已在 throw 之前写入 001_attach_passive.rx.bin,
+                       且 session.rx.bin 与之同散列; 没有任何诊断字节被丢弃来换取放行。
+    危险不为发命令让路: 生效 —— 抛 STACK_DANGER_OBSERVED, counts={}, 一条命令未发, 未重开口, 未续动作。
+    失败身份可区分: 生效 —— 新身份文本出现 1 次(UARTReadDiagSerialR2.ps1:54),
+                    与上一轮的 'No bounded quiet probe window'(:139) 是两个不同停点, 可分别登记。
+  也就是说: R2 把'等不到静默所以什么都不知道'换成了'精确停在栈危险上并留下原字节'。
+  未达成的目标仍然是本轮主任务: tmc_uart_probe 的逐笔读观测**没有取得**, TMC 链路仍 UNPROVEN。
+
+== 6. 本轮不能说的话(把边界钉死) ==
+  不能声称: 栈已够用/已不够用(两种都可能); 溢出已发生(无 overflow 证词, 栈尾 '#' 仍在);
+  不能声称: 告警由 TMC 通信引起或与 -117 有关; 镜像没在跑(S3 已证在跑);
+  不能声称: 横幅匹配或不匹配(横幅门未执行); 七条查询有任何一条成功(0 条发出);
+  不能把 safe_for_enable 写成 true, 也不能把四个 0 宏说成已翻。

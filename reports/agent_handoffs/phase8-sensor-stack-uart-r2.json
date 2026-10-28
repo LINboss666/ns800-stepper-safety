@@ -394,5 +394,20 @@
       "tag deref": "e40a9b95ef709e6a80444f9f3949dfdd70ba96ba"
     },
     "device_actions_during_readback": 0
+  },
+  "board_execution_round_pointer": {
+    "task_id": "phase8-sensor-stack-uart-r2-board",
+    "executed": true,
+    "stopped_at": "STACK_DANGER_OBSERVED(collector danger gate)",
+    "image_on_board": {
+      "sha256": "b1e852949f003965de52d539ca324a11b8b89e17a51a8f34fe3efd01525ae2d1",
+      "bytes": 268340,
+      "byte_identical_readback": true
+    },
+    "sensor_stack_warning_at_4096": "STILL_OBSERVED",
+    "sufficiency_of_4096": "DISPROVED (static-known-depth argument was not sufficient)",
+    "msh_commands_sent": "0/7",
+    "device_actions_after_stop": 0,
+    "this_document_preserved": "§1–§8 的离线交付内容与数字原样保留, 不回写"
   }
 }

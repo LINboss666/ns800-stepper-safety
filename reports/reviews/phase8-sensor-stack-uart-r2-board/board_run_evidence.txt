@@ -1,0 +1,135 @@
+URO-R2 板级包 S0–S6 真实执行证据(task phase8-sensor-stack-uart-r2-board)
+交付/复审基线 = 2053e6adc7d71d892d138754a3955fe91ac31343   产品软件输入 code_commit = 139e9377ccbc36b878cd577a6b848d974e1e07fa
+续测包 = reports/reviews/phase8-sensor-stack-uart-r2/board_package_r2.md (bytes=10082 sha256=e09078901265d957fdef223545e165544f83f530d9ba83e353362090b4a4c934)
+批准 = 用户真实回合简写「批准执行 URO-R2 板级包」(2026-10-28 12:01 +0800 前一回合; 绑定包 §6)
+执行时刻 = 2026-10-28 11:58:54 → 12:01:24 +0800
+
+本轮设备动作(实际, 全部计入已批额度):
+  Keil 下载 1/1 | pyOCD DAP 会话 2/2 | Flash 定长回读 1/1 | 显式 SYSRESETREQ 1/1 |
+  COM5 打开尝试 1/1 | msh 命令 0/7(R2 危险门拦停, 一条未发) | TMC 读事务 0 | WRITE 帧 0
+停机点 = 冻结 R2 采集器的栈危险门 UARTReadDiagSerialR2.ps1:54 抛 STACK_DANGER_OBSERVED
+  (原字节先落盘, 之后才判定; 与设计一致: 真实危险流不为发命令而放行)。
+停机后未追加动作: 未重跑 S2/S3/S4, 未重开 COM5, 未发命令, 未复位, 未清故障, 未恢复, 未枚举。
+
+来源分层: 本文全部条目标 LOCAL-RUN(本机 Windows 实跑, 云端未执行)。
+脱敏(lossless=false): 绝对路径 -> <本地执行根>/<仓库根>; DAP UID 不落值, 只登记长度=48 与
+  sha256(uid)[:12]=d2f530dbd062(与既有登记同值)。原件留仓外 logs/ readback/ capture/ 未删除。
+排印: 每行右端空白已剥离; 各段标题行登记原始件真实 bytes+sha256, 完整性以那里为准。
+
+=== 0. S0 离线绑定(零设备动作) ===
+---- logs/s0_precheck.out.txt  (bytes=712  sha256=d45719f659983175c1ac032ce4ef32cfbe011999cea97902da0ea42d59811aaf  mtime=2026-10-28T11:58:54+0800  解码=cp936 -> UTF-8) ----
+accepted BIN identity OK bytes=268340 sha256=b1e852949f003965de52d539ca324a11b8b89e17a51a8f34fe3efd01525ae2d1
+build manifest identity OK bytes=24583 sha256=9c3b492a4f7487b850becaa182cea7214ff84f495af621c56d34a9f1f645194e
+R2 collector identity OK bytes=92860 sha256=9ed8a3e342f7cad8430c42140ffb508d6cc0694e251636c1b93ab2a2a7390a37
+download payload identity OK bytes=1693804 sha256=15be5f3efc45bf296bc0ef24e3947081372616d819e4bb3b189e9614cf9a5b9a
+pyOCD work dir clean: <本地执行根>\pyocd-work-r2
+Precheck: read-only identity and directory checks done, zero device action.
+download project present=True collector OutDir not created=True readback file not created=True flash log present(before S2)=False
+新执行根 = <本地执行根>(不复用上一轮 ns800-r1-board 的日志/回读/采集件)。
+  副本工程 download-b.uvprojx 与已证 BOARD-B 源件逐字节相同 = True
+  副本工程 download-b.uvoptx 与已证 BOARD-B 源件逐字节相同 = True
+  Load 绑定: 副本工程目标 rt-thread 的 OutputDirectory=.\dl\ + OutputName=rt-thread-a0
+    => UV4 -f 的加载对象 = <本地执行根>/download-r2/dl/rt-thread-a0.axf
+    该载荷身份 = bytes=1693804 sha256=15be5f3efc45bf296bc0ef24e3947081372616d819e4bb3b189e9614cf9a5b9a(与本轮 manifest 登记的 A0 AXF 同值)
+  私有 runner = <本地执行根>/logs/r2_s1_s6_commands.ps1 bytes=8988 sha256=f46fb36fd3bfe6335b48deaf740fad983857deb69dfdffc56b3b2606cfcc1827(ASCII, 无中文, 免 BOM 陷阱)
+  PS 5.1 ParseFile PARSE_ERRORS=0; pyOCD 工作目录无 pyocd.yaml/.yml/_user.py; 工具沿用已证:
+    UV4 5.43.1.0 / Python 3.12.5 / pyocd 0.45.1 / Windows PowerShell 5.1.26100.5074; 未枚举设备或端口。
+
+=== 1. S1 供电(无 Agent 动作) ===
+沿用用户既有确认(USER_CONFIRMED): 供电正常、接线正常、扩展板线路正常、现场有人、电机物理未接、
+SW1 阻断、模块线路不变。本轮未新增上电、未做关电循环、未碰 ENN/SW1; 历史最终供电状态仍记 UNKNOWN。
+
+=== 2. S2 一次 Keil 下载 ===
+---- logs/s2_run.out.txt  (bytes=628  sha256=7dc6e2444a5f38ec0568e4f1515b55d749cff7171eaac2e81028afdebe41ea2c  mtime=2026-10-28T12:00:13+0800  解码=cp936 -> UTF-8) ----
+accepted BIN identity OK bytes=268340 sha256=b1e852949f003965de52d539ca324a11b8b89e17a51a8f34fe3efd01525ae2d1
+build manifest identity OK bytes=24583 sha256=9c3b492a4f7487b850becaa182cea7214ff84f495af621c56d34a9f1f645194e
+R2 collector identity OK bytes=92860 sha256=9ed8a3e342f7cad8430c42140ffb508d6cc0694e251636c1b93ab2a2a7390a37
+download payload identity OK bytes=1693804 sha256=15be5f3efc45bf296bc0ef24e3947081372616d819e4bb3b189e9614cf9a5b9a
+pyOCD work dir clean: <本地执行根>\pyocd-work-r2
+UV4 process exit code=0 (reference only, not the gate)
+S2 PASS: Load of this round payload + Erase/Programming/Verify OK.
+---- logs/s2_flash.log  (bytes=134  sha256=e78819436dddafdc454aa49338efc6775adf42de0693f5b559db5f74080d86a8  mtime=2026-10-28T12:00:12+0800  解码=cp936 -> UTF-8) ----
+Load "<本地执行根>\\download-r2\\dl\\rt-thread-a0.axf"
+Erase Done.Programming Done.Verify OK.Flash Load finished at 12:00:12
+判据: Load 指向本轮新副本载荷 + Erase Done. + Programming Done. + Verify OK.; 无 mass erase/unlock/
+option bytes/OTP 字样; UV4 退出码只作参考(本轮=0)。未下载第二次。
+上一轮登记的工具缺陷已在本轮流程中修好: S2 分支用 Start-Process -Wait 等 UV4 进程退出后才读日志,
+  因此本轮该步 rc=0 且日志完整(时间戳可证: s2_flash.log=12:00:12 早于 s2_run.out=12:00:13)。
+
+=== 3. S3 pyOCD 会话 #1: 唯一定长回读 ===
+---- logs/s3_run.out.txt  (bytes=839  sha256=0db99df1cdbfb9ea5b99164f9cfb7b686ee51abf4cd853c5aac3778ce015c114  mtime=2026-10-28T12:00:32+0800  解码=cp936 -> UTF-8) ----
+accepted BIN identity OK bytes=268340 sha256=b1e852949f003965de52d539ca324a11b8b89e17a51a8f34fe3efd01525ae2d1
+build manifest identity OK bytes=24583 sha256=9c3b492a4f7487b850becaa182cea7214ff84f495af621c56d34a9f1f645194e
+R2 collector identity OK bytes=92860 sha256=9ed8a3e342f7cad8430c42140ffb508d6cc0694e251636c1b93ab2a2a7390a37
+download payload identity OK bytes=1693804 sha256=15be5f3efc45bf296bc0ef24e3947081372616d819e4bb3b189e9614cf9a5b9a
+pyOCD work dir clean: <本地执行根>\pyocd-work-r2
+Core 0 (None):  Halted
+Saved 268340 bytes to <本地执行根>/readback/r2-measure-a0-268340.bin
+Core 0 (None):  Halted
+readback identity OK bytes=268340 sha256=b1e852949f003965de52d539ca324a11b8b89e17a51a8f34fe3efd01525ae2d1 byte-identical=True
+S3 PASS: length / SHA / byte comparison OK => ImageContinuityConfirmed basis holds.
+---- logs/s3_readback_pyocd.log  (bytes=248  sha256=6ba5ea008e46c49a0f29d813b7665db85845f38cf2e094a2843eba0514e65e2b  mtime=2026-10-28T12:00:31+0800  解码=UTF-16LE(BOM) -> UTF-8) ----
+﻿Core 0 (None):  Halted
+Saved 268340 bytes to <本地执行根>/readback/r2-measure-a0-268340.bin
+Core 0 (None):  Halted
+回读范围 0x08000000 起 0x41834 = 268340 B(与接受 BIN 长度两个口径相符)。
+回读件 bytes=268340 sha256=b1e852949f003965de52d539ca324a11b8b89e17a51a8f34fe3efd01525ae2d1
+接受 BIN bytes=268340 sha256=b1e852949f003965de52d539ca324a11b8b89e17a51a8f34fe3efd01525ae2d1
+逐字节比较: length_equal=True bytes_equal=True SequenceEqual=True
+两个 status 均 Halted; savemem 无 error/traceback; 未恢复运行; 未读第二遍或扩大范围。
+=> 本轮 -ImageContinuityConfirmed 的依据成立(先于采集器判定)。
+
+=== 4. S4 pyOCD 会话 #2: 开串口前唯一显式复位 ===
+---- logs/s4_run.out.txt  (bytes=614  sha256=4c0ecc54d6b3ba0c18c91443ba1ba55cf5e29b27adb7e3a46148c60d75a113a0  mtime=2026-10-28T12:00:40+0800  解码=cp936 -> UTF-8) ----
+accepted BIN identity OK bytes=268340 sha256=b1e852949f003965de52d539ca324a11b8b89e17a51a8f34fe3efd01525ae2d1
+build manifest identity OK bytes=24583 sha256=9c3b492a4f7487b850becaa182cea7214ff84f495af621c56d34a9f1f645194e
+R2 collector identity OK bytes=92860 sha256=9ed8a3e342f7cad8430c42140ffb508d6cc0694e251636c1b93ab2a2a7390a37
+download payload identity OK bytes=1693804 sha256=15be5f3efc45bf296bc0ef24e3947081372616d819e4bb3b189e9614cf9a5b9a
+pyOCD work dir clean: <本地执行根>\pyocd-work-r2
+Resetting target
+Core 0 (None):  Running
+S4 PASS: reset + Running evidenced. Collector may start only now.
+---- logs/s4_reset_pyocd.log  (bytes=88  sha256=e4f1258235ff8a7fccf1b4135f118985ae444653f7084496fb775c182fe7c0d9  mtime=2026-10-28T12:00:40+0800  解码=UTF-16LE(BOM) -> UTF-8) ----
+﻿Resetting target
+Core 0 (None):  Running
+实证 Resetting target + Core 0 (None):  Running; 未追加 resume/reset, 未建第三次 DAP 会话。
+
+=== 5. S5 冻结 R2 采集器: 一次 COM5 打开, 危险门拦停 ===
+---- logs/s5_run.out.txt  (bytes=1093  sha256=d2dd871858c9e3124c5ad315f8a02c81bffbbe8d1dfe71703f518753e4711b4a  mtime=2026-10-28T12:01:24+0800  解码=cp936 -> UTF-8) ----
+accepted BIN identity OK bytes=268340 sha256=b1e852949f003965de52d539ca324a11b8b89e17a51a8f34fe3efd01525ae2d1
+build manifest identity OK bytes=24583 sha256=9c3b492a4f7487b850becaa182cea7214ff84f495af621c56d34a9f1f645194e
+R2 collector identity OK bytes=92860 sha256=9ed8a3e342f7cad8430c42140ffb508d6cc0694e251636c1b93ab2a2a7390a37
+download payload identity OK bytes=1693804 sha256=15be5f3efc45bf296bc0ef24e3947081372616d819e4bb3b189e9614cf9a5b9a
+pyOCD work dir clean: <本地执行根>\pyocd-work-r2
+STACK_DANGER_OBSERVED; saved raw bytes, no further command.
+所在位置 <仓库根>\reports\reviews\phase8-sensor-stack-uart-r2\UARTReadDiagSerialR2.ps1:54 字符: 9
++         throw 'STACK_DANGER_OBSERVED; saved raw bytes, no further com ...
++         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OperationStopped: (STACK_DANGER_OB...urther command.:String) [], RuntimeException
+    + FullyQualifiedErrorId : STACK_DANGER_OBSERVED; saved raw bytes, no further command.
+
+collector rc=1 (ledger/raw bytes in <本地执行根>\capture\r2_run1)
+采集器身份再算一次: bytes=92860 sha256=9ed8a3e342f7cad8430c42140ffb508d6cc0694e251636c1b93ab2a2a7390a37(包 §1 期望 92860/9ed8a3e3… 相符=True)
+采集目录清单:
+  001_attach_passive.rx.bin    bytes=166    sha256=075b02ddf70654ba3ac2aaf55de08b1b9272158c8f48614cb7c6140aec829afc
+  ledger.jsonl                 bytes=805    sha256=0df42d50cfd8155e6658680cfdde8d56e615aa88ccef90daeea69b1f3a106e01
+  session.rx.bin               bytes=166    sha256=075b02ddf70654ba3ac2aaf55de08b1b9272158c8f48614cb7c6140aec829afc
+台账原文(逐行):
+  {"at":"2026-10-28T12:01:23.8097187+08:00","kind":"SERIAL_OPEN_ATTEMPT","data":{"port":"COM5","approval_source":"URO-R2 板级包已获用户真实回合简写批准: 批准执行 URO-R2 板级包 (2026-10-28 12:01 +0800, 绑定 reports/reviews/phase8-sensor-stack-uart-r2/board_package_r2.md 6 一次批准文字)","attempt":1}}
+  {"at":"2026-10-28T12:01:23.8519726+08:00","kind":"SERIAL_OPEN","data":{"port":"COM5","baud":115200,"expected_build_banner":"5.3.0 build Oct 28 2026 10:23:50","dtr":false,"rts":false,"format":"8N1"}}
+  {"at":"2026-10-28T12:01:23.8585574+08:00","kind":"RX_BEGIN","data":{"start":0,"path":"001_attach_passive.rx.bin"}}
+  {"at":"2026-10-28T12:01:23.8806084+08:00","kind":"STOP_FAILURE","data":{"counts":{},"message":"STACK_DANGER_OBSERVED; saved raw bytes, no further command."}}
+事件序列 = SERIAL_OPEN_ATTEMPT -> SERIAL_OPEN -> RX_BEGIN -> STOP_FAILURE
+RX_BEGIN→STOP_FAILURE = 0.022 s(即开口的第一批字节里就命中危险判据, 不等 20 s 上限)
+SERIAL_OPEN_ATTEMPT 恰 1 次(attempt=1; COM5/115200/8N1/DTR=RTS=false, 未改传输参数);
+  STOP_FAILURE 的 counts={} => 采集器自身逐命令发送计数为空, 这是 0 条命令发出的直接证据;
+  采集目录无 NNN_<command>.rx.bin 分响应件; 句柄由脚本 finally 关闭; 未重开口、未追加动作。
+被动流原字节(全部 166 B, 本轮只有这一段; session.rx.bin 与之逐字节相等=True, 同散列):
+  base64(无损转码, 不是原始串口字节; 原件留仓外): G1szM21bVy9rZXJuZWwuc2NoZWRdIHdhcm5pbmc6IHNlbnNvciBzdGFjayBpcyBjbG9zZSB0byBlbmQgb2Ygc3RhY2sgYWRkcmVzcy4NChtbMG0NChtbMzNtW1cva2VybmVsLnNjaGVkXSB3YXJuaW5nOiBzZW5zb3Igc3RhY2sgaXMgY2xvc2UgdG8gZW5kIG9mIHN0YWNrIGFkZHJlc3MuDQobWw==
+  可读还原(ANSI 改名, 控制字节用 <NUL>/<CR>/<LF> 表示):
+    |<ESC[33m>[W/kernel.sched] warning: sensor stack is close to end of stack address.
+    |<ESC[0m>
+    |<ESC[33m>[W/kernel.sched] warning: sensor stack is close to end of stack address.
+    |<ESC>[
+  内容判定: 两条完整的 `[W/kernel.sched] warning: sensor stack is close to end of stack address.`
+  加第三条的残段(在 \x1b[ 处被停机截断); 无启动横幅, 无 msh 提示符, 无 NUL, 无 overflow 文本。
