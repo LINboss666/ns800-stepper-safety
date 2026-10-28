@@ -13,22 +13,22 @@
     "rt-thread": {
       "macros": "four macros = RT_FALSE (no target-level override)",
       "program_size": "Code=180034 RO-data=77710 RW-data=2188 ZI-data=83784",
-      "axf": {"bytes": 1665000, "sha256": "925e73701230a497dd2534c5b4d735666044dbda3caa367e3db3080fd29e6dd6"},
+      "axf": {"bytes": 1664908, "sha256": "925e73701230a497dd2534c5b4d735666044dbda3caa367e3db3080fd29e6dd6"},
       "bin": {"bytes": 258324, "sha256": "ef02100c694f9bbaa23ade48b523f7e66ed6e9a2acc24ca7bc2f7c401087b4c2"},
       "on_board": true
     },
     "rt-thread-measure-a0": {
       "macros": "four macros = RT_FALSE; NS800_TARGET_MEASUREMENT_A0=1",
       "program_size": "Code=187378 RO-data=80670 RW-data=2188 ZI-data=91504",
-      "axf": {"bytes": 1695496, "sha256": "d79479812ef1964ef577c146077cc7f1968032f6b903292dc1d7530e781426e5"},
-      "bin": {"bytes": 268716, "sha256": "5ac237109ecda8428134efe5caf1ad7d53369935f25da231d90f6913935f4831"},
+      "axf": {"bytes": 1695404, "sha256": "d79479812ef1964ef577c146077cc7f1968032f6b903292dc1d7530e781426e5"},
+      "bin": {"bytes": 268628, "sha256": "5ac237109ecda8428134efe5caf1ad7d53369935f25da231d90f6913935f4831"},
       "on_board": false
     },
     "rt-thread-motor-m1-candidate": {
       "macros": "MOTOR_HARDWARE_ENABLE_PATH_VALIDATED=1 TMC_DRIVE_CONFIG_HW_VALIDATED=1 STEP_DIAG_ISOLATED_ENV_CONFIRMED=0 SAFETY_LIMIT_INPUTS_ENABLED=0",
       "program_size": "Code=180266 RO-data=77586 RW-data=2188 ZI-data=83784",
-      "axf": {"bytes": 1665352, "sha256": "0cfa048fd645bf2c1a9e9ae4269bfa1a8f3b19096972faa07bdeb7e899134baf"},
-      "bin": {"bytes": 258568, "sha256": "397aa844afdeb2f2b768670546f28067d6398851cae3416cbe6d910f2078e675"},
+      "axf": {"bytes": 1665388, "sha256": "0cfa048fd645bf2c1a9e9ae4269bfa1a8f3b19096972faa07bdeb7e899134baf"},
+      "bin": {"bytes": 258428, "sha256": "397aa844afdeb2f2b768670546f28067d6398851cae3416cbe6d910f2078e675"},
       "on_board": false,
       "downloaded": false
     }

@@ -62,7 +62,7 @@ UV4 5.43.1.0 / ARMCLANG V6.24，三目标均 0 Error / 0 Warning。镜像与 man
 
 ## 6. 电机候选与下一次一次批准（§7）
 
-候选已构建、未下载：AXF `0cfa048f…` / BIN `397aa844…`（258568 B），Target 宏见 §3。
+候选已构建、未下载：AXF `0cfa048f…` / BIN `397aa844…`（258428 B），Target 宏见 §3。
 M2/M3 字面步骤、判据、失败退出与一次批准范围见
 `reports/reviews/phase8-motor-chain-dev/motor_package_m2_m3.md`。
 状态：**MOTOR_CANDIDATE_BUILT / MOTOR_PARAMETERS_UNRESOLVED**（相电流定义、同实物 Rsense/VREF 仍缺）。

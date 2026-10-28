@@ -1,7 +1,7 @@
 # M2 / M3 电机下一步包（供一次批准）
 
 候选镜像（已构建，未下载、未运行）：
-- AXF `0cfa048f…`（1665352 B）/ BIN `397aa844…`（258568 B）
+- AXF `0cfa048f…`（1665388 B）/ BIN `397aa844…`（258428 B）
 - Target `rt-thread-motor-m1-candidate`：`MOTOR_HARDWARE_ENABLE_PATH_VALIDATED=1`、
   `TMC_DRIVE_CONFIG_HW_VALIDATED=1`、STEP 诊断=0、限位=0
 - 输入：`916c34ba4032bc7f41e2944c13b449271030191b`
@@ -11,7 +11,7 @@
 
 ## M2：电机不接、SW1 阻断下的配置写
 
-1. 烧录候选镜像（BIN 长度 258568 B，回读逐字节比较；不 mass erase/OTP/unlock）。
+1. 烧录候选镜像（BIN 长度 258428 B，回读逐字节比较；不 mass erase/OTP/unlock）。
 2. 复位后确认 `state=READY`、`TMC2209 IOIN=0x21000041 VERSION=0x21`、`step_status` 无输出。
 3. 执行 `tmc_config_apply`（正式受控 apply，进入写门禁）：
    - 写 GCONF / CHOPCONF / IHOLD_IRUN / TPOWERDOWN 四个寄存器（值见 `motor_target` 相邻的

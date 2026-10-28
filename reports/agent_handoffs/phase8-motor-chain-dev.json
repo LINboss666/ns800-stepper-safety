@@ -15,10 +15,10 @@
                 "bin_bytes": 258324, "on_board": true},
     "a0": {"axf_sha256": "d79479812ef1964ef577c146077cc7f1968032f6b903292dc1d7530e781426e5",
            "bin_sha256": "5ac237109ecda8428134efe5caf1ad7d53369935f25da231d90f6913935f4831",
-           "bin_bytes": 268716, "on_board": false},
+           "bin_bytes": 268628, "on_board": false},
     "motor_m1_candidate": {"axf_sha256": "0cfa048fd645bf2c1a9e9ae4269bfa1a8f3b19096972faa07bdeb7e899134baf",
                            "bin_sha256": "397aa844afdeb2f2b768670546f28067d6398851cae3416cbe6d910f2078e675",
-                           "bin_bytes": 258568, "on_board": false, "downloaded": false}
+                           "bin_bytes": 258428, "on_board": false, "downloaded": false}
   },
   "build": {"tool": "UV4 5.43.1.0 / ARMCLANG V6.24", "result": "3 targets 0 Error / 0 Warning",
             "default_size": "Code=180034 RO=77710 RW=2188 ZI=83784",
