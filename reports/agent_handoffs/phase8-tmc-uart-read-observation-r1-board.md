@@ -219,3 +219,56 @@ UID 只登记长度 48 与 `sha256(uid)[:12]=d2f530dbd062`）；原件留在仓�
 `<本地执行根>\logs`、`\readback`、`\capture\r1_run1` 未删除。base64 段是原字节的无损转码文本，
 已从写好的文本件本身复验：3 块逐块 SHA 吻合、拼回 23845 B 与原串口件逐字节相等。
 来源等级全部为 LOCAL-RUN（本机 Windows 实跑），云端未执行任何一步。
+
+
+### 7.7 推送后逐 blob 远端独立回读（只读，零设备动作）
+
+远端分支头 = `0b9dd5dd41d317503c1814c283532273d9a56064`（本轮两个提交：`5360a5e` 执行证据 + `0b9dd5d` 下面第 4 条勘误）。
+方法：`gh api repos/LINboss666/ns800-stepper-safety/contents/<path>?ref=HEAD -H Accept: application/vnd.github.raw` 取实际字节，
+与 `git show HEAD:<path>` 的 blob 字节散列逐件比对（大小与 SHA-256 同时相等才算 MATCH）。
+
+| 件 | bytes | sha256(本地=远端) | 判定 |
+|---|---:|---|---|
+| `board_run_evidence.txt` | 16656 | `b271a5e5892f…` | MATCH |
+| `passive_window_analysis.txt` | 9665 | `10a248b5fa98…` | MATCH |
+| `passive_capture_b64.txt` | 34008 | `8bd705b585e1…` | MATCH |
+| `phase8-tmc-uart-read-observation-r1-board.md` | 16786 | `7fbd9392b23a…` | MATCH |
+| `phase8-tmc-uart-read-observation-r1-board.json` | 14988 | `dbb3c80e3061…` | MATCH |
+
+A 组 **5/5 MATCH**（本轮新增/修改五件，远端字节与本地提交一致）。
+
+自指口径：上表的 `.md`/`.json` 两行取的是**本 §7.7 写入之前**那个头（`0b9dd5d`）的字节；
+把本节写进交接本身就会改变这两个 blob，所以最终提交头上这两件在推送后另行复验（见回执），
+不在文件里递归登记。三件证据文件不受本节影响，其散列对最终头同样成立。
+
+应不变对象（跨头三点核对）：
+
+- `tmc2209.c` — 与 `66f8533` 上的 blob **SAME**（`8a5e03082245…`）
+- `leaf_main.c` — 与 `66f8533` 上的 blob **SAME**（`6a03b884e7b6…`）
+- `run_stop_priority_s2.sh` — 与 `66f8533` 上的 blob **SAME**（`0d405b01c886…`）
+- `measure-a0.bin` — 与 `66f8533` 上的 blob **SAME**（`a48400c881c5…`）
+- `default.bin` — 与 `66f8533` 上的 blob **SAME**（`dccb7b63c928…`）
+- `build_manifest.json` — 与 `66f8533` 上的 blob **SAME**（`075bd3ff6eac…`）
+- `UARTReadDiagSerialR1.ps1` — 与 `66f8533` 上的 blob **SAME**（`2e9c8ede8f75…`）
+- `s0_offline_binding.txt` — 与 `35fc9ac` 上的 blob **SAME**（`7c36aca3ad8a…`）
+- `execution_package.md` — 与 `35fc9ac` 上的 blob **SAME**（`8c399e50e5a8…`）
+- `commands.expanded.masked.ps1` — 与 `35fc9ac` 上的 blob **SAME**（`699b759a3c41…`）
+
+B 组 **10/10 SAME**：产品 `tmc2209.c`、夹具 `leaf_main.c`、runner `run_stop_priority_s2.sh`、
+两个镜像 BIN、`build_manifest.json`、冻结采集器 `UARTReadDiagSerialR1.ps1` 以及 S0 三件全部未动。
+
+冻结引用（与 `s0_offline_binding.txt` 第 18–22 行所记逐项相同）：
+
+```text
+remote main                          1b3757eec550802a3973e66790af422d81d3d373
+remote phase7/full-embedded-software   6d3fbc559d45673d7550eb73dec5a4ade5bb34df
+tag v0.7-phase7-software-board-validated        097935fec5a6f2467261ab1ad449ff0b1d398250
+tag deref                                  e40a9b95ef709e6a80444f9f3949dfdd70ba96ba
+本轮改动面                           仅 reports/{reviews,agent_handoffs} 下 5 个文件
+旧固件目录/1 MiB 快照/恢复 HEX/下载工程  未写（git diff 35fc9ac..HEAD 对 reports/firmware 为空）
+```
+
+**本轮勘误（不掩盖，随轮登记）**：`5360a5e` 的交接 §7.3 把 ANSI 前缀名写成裸 `0x1B` 控制字节，
+使交付的 `.md` 里真存了一个 ESC 字节（GitHub contents API 因此拒绝直接回显该件）。
+`0b9dd5d` 只把该一个字符改为字面 `\x1b` 文本，不动任何事实与计数；因上一提交已推送，故不 amend，
+另立勘误提交。三件证据文件经复检均无裸控制字节。

@@ -4,7 +4,7 @@
   "review_object_and_baseline": "66f853309fe22376ffa6b45080e5f79c5891d4d1",
   "software_build_and_image_input_code_commit": "a483dcba74abd8c04549459bcee2cbcdb1ddea4c",
   "document_source_base": "6324ac40bd8d0f172fdb89e77917be33dc739460",
-  "stage": "S1-S6 executed on real board 2026-10-28 09:18-09:20 +0800; flash/readback/reset PASS; collector readiness gate FAIL (console never quiet); stopped per package rules, no action after the stop",
+  "stage": "S1-S6 executed and stopped at the collector readiness gate; evidence + handoff committed (5360a5e) and errata committed (0b9dd5d); pushed; per-blob remote readback 5/5 MATCH and 10/10 immutable SAME; no device action after the stop",
   "go_registered": {
     "verdict": "SOFTWARE_IMAGE_CAPTURE_REVIEW_GO_FOR_BOUNDED_READ_DIAG",
     "object": "66f853309fe22376ffa6b45080e5f79c5891d4d1",
@@ -231,7 +231,9 @@
     "DEVICE_ACTIONS_AFTER_STOP=0 / NO_RETRY / NO_AUTO_CARRYOVER",
     "ECHO_MATCH_OFFSET=KNOWN_INVALID_FOR_DIAG / SAFE_FOR_ENABLE=false",
     "FOUR_SAFETY_MACROS=0 / NO MOTOR / NO STEP_ENABLE / NO WRITE FRAME",
-    "NEXT_ROUND_REQUIRES_NEW_USER_APPROVAL"
+    "NEXT_ROUND_REQUIRES_NEW_USER_APPROVAL",
+    "REMOTE_READBACK=5/5 MATCH + 10/10 SAME(frozen refs unchanged)",
+    "ERRATA_COMMIT=0b9dd5d(单字符呈现勘误, 事实未变)"
   ],
   "generated_by": "make_r1b_board_exec_handoff.py (execution round; S0 fields preserved as history)",
   "approval_record": {
@@ -286,5 +288,140 @@
     "echo_match_offset": "KNOWN_INVALID_FOR_DIAG",
     "safe_for_enable": false
   },
-  "source_tier": "LOCAL-RUN(本机 Windows 实跑): 下载/回读/复位/采集器四步全部本地执行; 云端未执行任何一步"
+  "source_tier": "LOCAL-RUN(本机 Windows 实跑): 下载/回读/复位/采集器四步全部本地执行; 云端未执行任何一步",
+  "remote_readback": {
+    "head": "0b9dd5dd41d317503c1814c283532273d9a56064",
+    "method": "gh api contents raw @HEAD vs git show HEAD:path (bytes + sha256)",
+    "this_round_files": [
+      {
+        "path": "reports/reviews/phase8-tmc-uart-read-observation-r1-board/board_run_evidence.txt",
+        "bytes_local": 16656,
+        "bytes_remote": 16656,
+        "sha256_local": "b271a5e5892f1de543aecda50e5ff6805759992bccec22dcb372f1cdde7245de",
+        "sha256_remote": "b271a5e5892f1de543aecda50e5ff6805759992bccec22dcb372f1cdde7245de",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-tmc-uart-read-observation-r1-board/passive_window_analysis.txt",
+        "bytes_local": 9665,
+        "bytes_remote": 9665,
+        "sha256_local": "10a248b5fa98156729b5e43bf00921daceb435087bf287b055ee9386c1df22e0",
+        "sha256_remote": "10a248b5fa98156729b5e43bf00921daceb435087bf287b055ee9386c1df22e0",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-tmc-uart-read-observation-r1-board/passive_capture_b64.txt",
+        "bytes_local": 34008,
+        "bytes_remote": 34008,
+        "sha256_local": "8bd705b585e138288e917c8330cc5d9a1c6177ce9bcf028b37b0de291bb72729",
+        "sha256_remote": "8bd705b585e138288e917c8330cc5d9a1c6177ce9bcf028b37b0de291bb72729",
+        "match": true
+      },
+      {
+        "path": "reports/agent_handoffs/phase8-tmc-uart-read-observation-r1-board.md",
+        "bytes_local": 16786,
+        "bytes_remote": 16786,
+        "sha256_local": "7fbd9392b23a66c49a695f9b172144ad0db13706d0dc59fa982c3501dce356ad",
+        "sha256_remote": "7fbd9392b23a66c49a695f9b172144ad0db13706d0dc59fa982c3501dce356ad",
+        "match": true
+      },
+      {
+        "path": "reports/agent_handoffs/phase8-tmc-uart-read-observation-r1-board.json",
+        "bytes_local": 14988,
+        "bytes_remote": 14988,
+        "sha256_local": "dbb3c80e306174055ee409237fafcec86f058e57175f37bf7ab291d33b06856b",
+        "sha256_remote": "dbb3c80e306174055ee409237fafcec86f058e57175f37bf7ab291d33b06856b",
+        "match": true
+      }
+    ],
+    "this_round_match": "5/5",
+    "immutable_objects": [
+      {
+        "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/tmc2209.c",
+        "sha256_head": "8a5e030822456fdb334958543588fbf8972bcd96f348668d0cd4769b398de2d1",
+        "sha256_base": "8a5e030822456fdb334958543588fbf8972bcd96f348668d0cd4769b398de2d1",
+        "base": "66f8533",
+        "same": true
+      },
+      {
+        "path": "tests/host/leaf_main.c",
+        "sha256_head": "6a03b884e7b680fedc65e322fa1500fae6cdc35e56673da43970c1b2b77206a1",
+        "sha256_base": "6a03b884e7b680fedc65e322fa1500fae6cdc35e56673da43970c1b2b77206a1",
+        "base": "66f8533",
+        "same": true
+      },
+      {
+        "path": "tests/host/run_stop_priority_s2.sh",
+        "sha256_head": "0d405b01c88697b564106508763f2603a6ecfb4575cc89c0ac26593326f1e545",
+        "sha256_base": "0d405b01c88697b564106508763f2603a6ecfb4575cc89c0ac26593326f1e545",
+        "base": "66f8533",
+        "same": true
+      },
+      {
+        "path": "reports/firmware/phase8-tmc-uart-read-observation-r1/measure-a0.bin",
+        "sha256_head": "a48400c881c539db539876cfd38f3aceac2a78cc7ed0d0f9655c7edafbb19a1e",
+        "sha256_base": "a48400c881c539db539876cfd38f3aceac2a78cc7ed0d0f9655c7edafbb19a1e",
+        "base": "66f8533",
+        "same": true
+      },
+      {
+        "path": "reports/firmware/phase8-tmc-uart-read-observation-r1/default.bin",
+        "sha256_head": "dccb7b63c9284d320016a42e1fc8b7f62d544b97ca9cb433604e412bbbff55e3",
+        "sha256_base": "dccb7b63c9284d320016a42e1fc8b7f62d544b97ca9cb433604e412bbbff55e3",
+        "base": "66f8533",
+        "same": true
+      },
+      {
+        "path": "reports/firmware/phase8-tmc-uart-read-observation-r1/build_manifest.json",
+        "sha256_head": "075bd3ff6eace662a8f4809a4b5810eeddd04997a77f590b2bbef0519db5d2e3",
+        "sha256_base": "075bd3ff6eace662a8f4809a4b5810eeddd04997a77f590b2bbef0519db5d2e3",
+        "base": "66f8533",
+        "same": true
+      },
+      {
+        "path": "reports/reviews/phase8-tmc-uart-read-observation-r1/UARTReadDiagSerialR1.ps1",
+        "sha256_head": "2e9c8ede8f75e7b513dbd4f2c3091189309454879e98404ba7ec64bbb80f2568",
+        "sha256_base": "2e9c8ede8f75e7b513dbd4f2c3091189309454879e98404ba7ec64bbb80f2568",
+        "base": "66f8533",
+        "same": true
+      },
+      {
+        "path": "reports/reviews/phase8-tmc-uart-read-observation-r1-board/s0_offline_binding.txt",
+        "sha256_head": "7c36aca3ad8a671e0013c2c0566f6173c4c207ca6884f3b172131d3922a9f4ec",
+        "sha256_base": "7c36aca3ad8a671e0013c2c0566f6173c4c207ca6884f3b172131d3922a9f4ec",
+        "base": "35fc9ac",
+        "same": true
+      },
+      {
+        "path": "reports/reviews/phase8-tmc-uart-read-observation-r1-board/execution_package.md",
+        "sha256_head": "8c399e50e5a889692a39653534f4172c1cf86518bb6727d3a65da8061e27abf9",
+        "sha256_base": "8c399e50e5a889692a39653534f4172c1cf86518bb6727d3a65da8061e27abf9",
+        "base": "35fc9ac",
+        "same": true
+      },
+      {
+        "path": "reports/reviews/phase8-tmc-uart-read-observation-r1-board/commands.expanded.masked.ps1",
+        "sha256_head": "699b759a3c4183a2b96dbaa747ca5d46390c6f30f6449ded863ff991f0c3656e",
+        "sha256_base": "699b759a3c4183a2b96dbaa747ca5d46390c6f30f6449ded863ff991f0c3656e",
+        "base": "35fc9ac",
+        "same": true
+      }
+    ],
+    "immutable_same": "10/10",
+    "frozen_refs_unchanged": {
+      "remote main": "1b3757eec550802a3973e66790af422d81d3d373",
+      "remote phase7/full-embedded-software": "6d3fbc559d45673d7550eb73dec5a4ade5bb34df",
+      "tag v0.7-phase7-software-board-validated": "097935fec5a6f2467261ab1ad449ff0b1d398250",
+      "tag deref": "e40a9b95ef709e6a80444f9f3949dfdd70ba96ba"
+    },
+    "device_actions_during_readback": 0,
+    "commits_this_round": [
+      "5360a5e43be8c210690d48530fa0eb0f5f028418",
+      "0b9dd5dd41d317503c1814c283532273d9a56064"
+    ]
+  },
+  "errata_this_round": [
+    "5360a5e 的交接 §7.3 把 ANSI 前缀名写成裸 0x1B 控制字节 -> 0b9dd5d 改为字面 \\x1b 文本; 只改一个字符的呈现, 不动事实与计数; 上一提交已推送故不 amend, 另立勘误提交",
+    "私有 runner 的 UV4 异步日志判定过早缺陷已在 §7.1/§2 登记, 未通过重跑下载来掩盖"
+  ]
 }
