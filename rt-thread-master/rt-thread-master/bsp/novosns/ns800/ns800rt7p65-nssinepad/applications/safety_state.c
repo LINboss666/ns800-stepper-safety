@@ -575,7 +575,6 @@ rt_uint32_t    safety_fault_get(void) { return ss_fault_code; }
 rt_err_t safety_run_selftest(void)
 {
     rt_err_t required_fail = RT_EOK;
-    rt_uint32_t v = 0;
 
     ss_degraded_mask = 0;
     rt_kprintf("[SS] self-test start\n");
@@ -626,14 +625,38 @@ rt_err_t safety_run_selftest(void)
         else rt_kprintf("[SS] [REQ OK] ENN feedback = disabled side (PC.6=H6-5/TMC_ENN)\n");
     }
 
-    /* ---- required ④ TMC2209 链路(初始化 + IOIN 读) ---- */
-    if (tmc2209_init() != RT_EOK ||
-        tmc2209_read_register(TMC_ADDR_DEFAULT, TMC_REG_IOIN, &v) != RT_EOK)
+    /* ---- required ④ TMC2209 链路(初始化 + IOIN 读 + VERSION 身份) ----
+     * 三条失败分开打印; 只有 init 成功 + 读成功 + IOIN[31:24]==0x21 才算通过。
+     * 不匹配时只报实际 IOIN/rc, 不写寄存器“修身份”, 也不宣称芯片损坏。 */
     {
-        rt_kprintf("[SS] [REQ FAIL] TMC2209 link\n");
-        required_fail = -RT_ERROR;
+        rt_err_t e_init = tmc2209_init();
+        rt_err_t e_read = RT_EOK;
+        rt_uint32_t ioin = 0;
+
+        if (e_init != RT_EOK)
+        {
+            rt_kprintf("[SS] [REQ FAIL] TMC2209 init rc=%d\n", (int)e_init);
+            required_fail = -RT_ERROR;
+        }
+        else
+        {
+            e_read = tmc2209_read_register(TMC_ADDR_DEFAULT, TMC_REG_IOIN, &ioin);
+            if (e_read != RT_EOK)
+            {
+                rt_kprintf("[SS] [REQ FAIL] TMC2209 IOIN read rc=%d\n", (int)e_read);
+                required_fail = -RT_ERROR;
+            }
+            else if (!tmc2209_ioin_is_identity(ioin))
+            {
+                rt_kprintf("[SS] [REQ FAIL] TMC2209 VERSION mismatch IOIN=0x%08X rc=0\n", ioin);
+                required_fail = -RT_ERROR;
+            }
+            else
+            {
+                rt_kprintf("[SS] [REQ OK] TMC2209 IOIN=0x%08X VERSION=0x21\n", ioin);
+            }
+        }
     }
-    else rt_kprintf("[SS] [REQ OK] TMC2209 (IOIN=0x%08X)\n", v);
 
     /* ---- degraded: IMU ---- */
     if (adxl345_init() != RT_EOK)

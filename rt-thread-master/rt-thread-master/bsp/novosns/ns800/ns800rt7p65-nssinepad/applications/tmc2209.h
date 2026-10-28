@@ -39,6 +39,13 @@
  * 配置事务内部(见下方写入口审计), 未过编译期门与运行态门禁时不得为诊断而触发。 */
 rt_err_t tmc2209_init(void);
 
+/* IOIN[31:24]=VERSION; TMC2209=0x21。生产 probe 与启动自检共用这一个判据。
+ * 放在头内联: 主机链可只包含 safety_state.c 而不链接整个 tmc2209.c。 */
+static inline rt_bool_t tmc2209_ioin_is_identity(rt_uint32_t ioin)
+{
+    return (((ioin >> 24) & 0xFFu) == 0x21u) ? RT_TRUE : RT_FALSE;
+}
+
 /* 读寄存器。addr 一般为 TMC_ADDR_DEFAULT。RT_EOK 时 *value 有效。 */
 rt_err_t tmc2209_read_register(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *value);
 

@@ -1752,7 +1752,7 @@ static void tmc_uart_probe(void)
     {
         TMC_PROBE_EMIT(&errs, line, "[TMC] IOIN = 0x%08X VERSION = 0x%02X -> %s\n",
                        (unsigned)obs[0].value, (unsigned)((obs[0].value >> 24) & 0xFFu),
-                       (((obs[0].value >> 24) & 0xFFu) == 0x21u)
+                       tmc2209_ioin_is_identity(obs[0].value)
                            ? "TMC2209 (0x21) identity match"
                            : "VERSION != 0x21: not TMC2209 (0x20=TMC2208)");
     }
@@ -1796,7 +1796,7 @@ static void tmc_uart_probe(void)
                               "link=%s safe_for_enable=0\n",
                        all_ok ? 1u : 0u,
                        (all_ok && obs[0].value_valid != 0u &&
-                        ((obs[0].value >> 24) & 0xFFu) == 0x21u) ? 1u : 0u,
+                        tmc2209_ioin_is_identity(obs[0].value)) ? 1u : 0u,
                        fields_ok ? 1u : 0u, all_ok ? "READ_OK" : "UNPROVEN");
     }
     TMC_PROBE_EMIT(&errs, line, "[TMRO] END reads=%d writes=0 export_err=%d "
@@ -3146,20 +3146,23 @@ static void tmc_config_show(void)
                TMC_DRIVE_CONFIG_HW_VALIDATED ? "OPEN" : "CLOSED", (unsigned)gates);
     if (gates) tmc_cfg_print_gate(gates);
     else rt_kprintf("[TMC-CFG] !! 运行态门禁全通, 但编译期门未翻转前仍然一位不写\n");
-    rt_kprintf("[TMC-CFG] planned irun=%u ihold=%u dly=%u tpd=%u vsense=%u mstep_sel=%u mres=%u\n",
-               c.irun, c.ihold, c.ihold_delay, c.tpowerdown,
-               c.vsense, c.mstep_reg_select, c.mres);
-    rt_kprintf("[TMC-CFG] targets GCONF=%08X CHOPCONF=%08X IHOLD_IRUN=%08X TPOWERDOWN(0x%02X)=%02X\n",
-               (unsigned)TMC_CFG_TGT_GCONF, (unsigned)TMC_CFG_TGT_CHOPCONF,
+    rt_kprintf("[TMC-CFG] planned irun=%u ihold=%u dly=%u\n",
+               c.irun, c.ihold, c.ihold_delay);
+    rt_kprintf("[TMC-CFG] planned tpd=%u vsense=%u mstep_sel=%u mres=%u\n",
+               c.tpowerdown, c.vsense, c.mstep_reg_select, c.mres);
+    rt_kprintf("[TMC-CFG] target GCONF=%08X CHOPCONF=%08X\n",
+               (unsigned)TMC_CFG_TGT_GCONF, (unsigned)TMC_CFG_TGT_CHOPCONF);
+    rt_kprintf("[TMC-CFG] target IHOLD_IRUN=%08X TPOWERDOWN(0x%02X)=%02X\n",
                (unsigned)TMC_CFG_TGT_IHOLD_IRUN, TMC_REG_TPOWERDOWN,
                (unsigned)TMC_CFG_TGT_TPOWERDOWN);
-    rt_kprintf("[TMC-CFG] 理论: V_FS=%umV Rsense=%umO(+%umO Rds) VREF=%umV\n",
+    rt_kprintf("[TMC-CFG] theory V_FS=%umV Rsense=%umO Rds=%umO\n",
                (unsigned)vfs, (unsigned)TMC_CFG_RSENSE_MOHM,
-               (unsigned)TMC_SENSE_RDS_MOHM, (unsigned)TMC_CFG_VREF_MV);
-    rt_kprintf("[TMC-CFG] 理论电流 run=%u mA RMS / hold=%u mA RMS"
-               " (电机额定 1500 mA RMS)\n", (unsigned)run, (unsigned)hold);
-    rt_kprintf("[TMC-CFG] !! 理论值, 未实测: VREF 为万用表读数(未在本固件核实),"
-               " RSENSE 为商品页暂定值。不得当作实测电流使用。\n");
+               (unsigned)TMC_SENSE_RDS_MOHM);
+    rt_kprintf("[TMC-CFG] theory VREF=%umV\n", (unsigned)TMC_CFG_VREF_MV);
+    rt_kprintf("[TMC-CFG] theory_current run=%u mA RMS hold=%u mA RMS\n",
+               (unsigned)run, (unsigned)hold);
+    rt_kprintf("[TMC-CFG] note: theoretical, NOT measured; motor rating not confirmed\n");
+    rt_kprintf("[TMC-CFG] note: VREF unverified in firmware; RSENSE from listing only\n");
 
     if (snap_valid)
         rt_kprintf("[TMC-CFG] applied snapshot: GCONF=%08X CHOPCONF=%08X\n",

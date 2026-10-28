@@ -341,24 +341,12 @@ rt_bool_t step_pwm_off_confirmed(void)
 
 static void step_status(void)
 {
-    const char *state;
-
-    if (step_enabled)                       state = "YES(输出中!)";
-    else if (step_stop_latched)
-        /* 关断失败过且未经人工恢复: 即便最近一次成功也不能写成"no(安全)" */
-                                            state = "UNKNOWN(曾有失败, 待 fault_reset)";
-    else if (step_stop_result == MOT_STOP_API_ACCEPTED)
-                                            state = "no(驱动 API 接受关断; 未做波形验证)";
-    else if (step_stop_result == MOT_STOP_API_FAILED)
-                                            state = "UNKNOWN(关断失败, 所有权未释放!)";
-    else if (step_stop_result == MOT_STOP_DEV_UNAVAILABLE)
-                                            state = "UNKNOWN(未取得设备句柄, 未确认关断)";
-    else                                    state = "no(诊断从未占用该通道)";
-
-    rt_kprintf("[STEP] dev=%s ch=%d enabled=%s last_stop=%s stop_rc=%d\n",
-               STEP_PWM_DEV, STEP_PWM_CH, state,
-               mot_stop_result_name(step_stop_result), (int)step_stop_rc);
-    rt_kprintf("[STEP] 说明: '驱动 API 接受关断' != 示波器证明无脉冲(BUG-008 未验收);"
-               " 未持有诊断所有权也不代表整个通道物理无 STEP\n");
+    rt_kprintf("[STEP] dev=%s ch=%d enabled=%d\n",
+               STEP_PWM_DEV, STEP_PWM_CH, step_enabled ? 1 : 0);
+    rt_kprintf("[STEP] last_stop=%s stop_rc=%d latched=%d\n",
+               mot_stop_result_name(step_stop_result), (int)step_stop_rc,
+               step_stop_latched ? 1 : 0);
+    rt_kprintf("[STEP] note: api-accepted != physical no-pulse (BUG-008 unverified)\n");
+    rt_kprintf("[STEP] note: no diag ownership != physically no STEP\n");
 }
 MSH_CMD_EXPORT(step_status, show STEP output state);

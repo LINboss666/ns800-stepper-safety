@@ -934,29 +934,31 @@ void motor_get_stop_state(mot_stop_result_t *out_result, rt_uint8_t *out_src,
 
 static void mot_print_gate_fail(rt_uint32_t bad)
 {
-    rt_kprintf("[MOT] arm gate mask=0x%X:", bad);
-    if (bad & MOT_GATE_ENABLE_PATH)   rt_kprintf(" enable-path-not-validated");
-    if (bad & MOT_GATE_NOT_READY)     rt_kprintf(" safety-not-READY");
-    if (bad & MOT_GATE_UNHEALTHY)     rt_kprintf(" subsystem-unhealthy");
-    if (bad & MOT_GATE_NOT_PROTECTED) rt_kprintf(" protection-not-ready");
-    if (bad & MOT_GATE_NO_DRV_CONFIG) rt_kprintf(" drive-config-not-applied");
-    if (bad & MOT_GATE_FB_MISMATCH)   rt_kprintf(" enn-feedback-mismatch");
-    if (bad & MOT_GATE_STOP_UNCONFIRMED) rt_kprintf(" step-stop-unconfirmed");
-    rt_kprintf("\n");
-    rt_kprintf("[MOT] gate4 detail: irq_gate=%s polarity=%s gpio_ready=%s\n",
+    rt_kprintf("[MOT] arm_gate_mask=0x%X\n", bad);
+    if (bad & MOT_GATE_ENABLE_PATH)      rt_kprintf("[MOT] gate_reason=enable-path-not-validated\n");
+    if (bad & MOT_GATE_NOT_READY)        rt_kprintf("[MOT] gate_reason=safety-not-READY\n");
+    if (bad & MOT_GATE_UNHEALTHY)        rt_kprintf("[MOT] gate_reason=subsystem-unhealthy\n");
+    if (bad & MOT_GATE_NOT_PROTECTED)    rt_kprintf("[MOT] gate_reason=protection-not-ready\n");
+    if (bad & MOT_GATE_NO_DRV_CONFIG)    rt_kprintf("[MOT] gate_reason=drive-config-not-applied\n");
+    if (bad & MOT_GATE_FB_MISMATCH)      rt_kprintf("[MOT] gate_reason=enn-feedback-mismatch\n");
+    if (bad & MOT_GATE_STOP_UNCONFIRMED) rt_kprintf("[MOT] gate_reason=step-stop-unconfirmed\n");
+    rt_kprintf("[MOT] gate4 irq_gate=%s polarity=%s\n",
                safety_irq_attached() ? "OPEN" : "CLOSED",
-               safety_polarity_validated() ? "CONFIRMED" : "not-confirmed",
-               safety_gpio_ready() ? "YES" : "NO");
-    rt_kprintf("[MOT] gate5 detail: tmc_drive_cfg=%s\n",
+               safety_polarity_validated() ? "CONFIRMED" : "not-confirmed");
+    rt_kprintf("[MOT] gate4 gpio_ready=%s\n", safety_gpio_ready() ? "YES" : "NO");
+    rt_kprintf("[MOT] gate5 tmc_drive_cfg=%s\n",
                tmc_drv_cfg_state_name(tmc2209_get_config_state()));
-    rt_kprintf("[MOT] gate6 detail: request_basis=%s enn_feedback_verdict=%s (PC.6=TMC_ENN)\n",
-               mot_fb_request_basis() ? "ENABLED" : "DISABLED",
+    rt_kprintf("[MOT] gate6 request_basis=%s\n",
+               mot_fb_request_basis() ? "ENABLED" : "DISABLED");
+    rt_kprintf("[MOT] gate6 enn_verdict=%s\n",
                safety_fb_verdict_name(safety_fb_now(mot_fb_request_basis())));
-    rt_kprintf("[MOT] gate7 detail: motor_stop=%s src=%s rc=%d latched=%s |"
-               " diag_off_confirmed=%s (current_hz=0 是命令值, 不构成关断证明)\n",
+    rt_kprintf("[MOT] gate7 motor_stop=%s src=%s rc=%d\n",
                mot_stop_result_name(mot.stop_result), mot_stop_src_name(mot.stop_src),
-               (int)mot.stop_rc, mot.stop_fail_latched ? "YES" : "no",
+               (int)mot.stop_rc);
+    rt_kprintf("[MOT] gate7 latched=%s diag_off=%s\n",
+               mot.stop_fail_latched ? "YES" : "no",
                step_pwm_off_confirmed() ? "YES" : "NO");
+    rt_kprintf("[MOT] note: current_hz=0 is a command value, not stop proof\n");
 }
 
 /* ---------- 正式 API (motor.h) ---------- */
@@ -2290,54 +2292,55 @@ static void cmd_motor_status(void)
     if (motor_get_snapshot(&snap) != RT_EOK)
     { rt_kprintf("[MOT] snapshot failed\n"); return; }
 
-    rt_kprintf("[MOT] state=%d cur=%u tgt=%u accel=%u decel=%u dir=%u\n",
-               snap.state, snap.current_hz, snap.target_hz,
-               snap.accel_hz_s, snap.decel_hz_s, snap.dir);
-    rt_kprintf("[MOT] armed=%d drv_en_verified_pad=%d health=%s\n",
+    rt_kprintf("[MOT] state=%d name=%s\n", snap.state,
+               snap.state == MOTOR_FAULT ? "FAULT" : "OTHER");
+    rt_kprintf("[MOT] cur_hz=%u tgt_hz=%u accel=%u decel=%u dir=%u\n",
+               snap.current_hz, snap.target_hz, snap.accel_hz_s, snap.decel_hz_s, snap.dir);
+    rt_kprintf("[MOT] armed=%d drv_en_request=%d health=%s\n",
                snap.armed, snap.drv_en_request, subsys_health_name(snap.health));
-    rt_kprintf("[MOT] drv-guard: stops=%u last_reason=%u "
-               "(0=none 1=cfg-lost 2=integrity 3=txn-busy-limit 4=enn-feedback)\n",
+    rt_kprintf("[MOT] guard stops=%u reason=%u\n",
                (unsigned)snap.guard_stops, (unsigned)snap.guard_reason);
-    /* 追加(2026-10-23 S1): 关断结果单独一列。state=IDLE / current_hz=0 **不能**
-     * 推出"STEP 已关断" —— 只有 result=api-accepted 才叫驱动接受了关断请求。 */
-    rt_kprintf("[MOT] STEP stop: result=%s src=%s rc=%d fail_latched=%u"
-               " | diag_off_confirmed=%s\n",
+    rt_kprintf("[MOT] guard reason map: 0=none 1=cfg-lost 2=integrity 3=txn-busy 4=enn-fb\n");
+    rt_kprintf("[MOT] stop result=%s src=%s rc=%d latched=%u\n",
                mot_stop_result_name((mot_stop_result_t)snap.stop_result),
                mot_stop_src_name(snap.stop_src), (int)snap.stop_rc,
-               (unsigned)snap.stop_fail_latched,
+               (unsigned)snap.stop_fail_latched);
+    rt_kprintf("[MOT] diag_off_confirmed=%s\n",
                step_pwm_off_confirmed() ? "YES" : "NO");
     bad = motor_get_gate_fail_mask();
-    rt_kprintf("[MOT] arm gate fail mask=0x%X (%s)\n", bad,
-               bad ? "arm will be REFUSED" : "all gate conditions pass");
+    rt_kprintf("[MOT] arm_gate_mask=0x%X %s\n", bad,
+               bad ? "REFUSED" : "ALL-PASS");
     if (bad) mot_print_gate_fail(bad);
-    /* 追加(2026-10-21): 请求 / 焊盘 / 最终反馈三者分列, 不混为一谈 */
     {
         rt_int32_t req = -1, pad = -1, fb = -1;
         rt_bool_t  fb_ok = RT_FALSE;
         rt_uint8_t want  = mot_fb_request_basis();
 
         safety_fb_snapshot(&req, &pad, &fb, &fb_ok);
-        rt_kprintf("[MOT] drive request=%s pad=%d expected_ENN=%s ENN_feedback=%d(%s)"
-                   " verdict=%s\n",
+        rt_kprintf("[MOT] drv_request=%s pad=%d\n",
                    req < 0 ? "NEVER-VERIFIED" : (req == PIN_HIGH ? "HIGH" : "LOW"),
-                   (int)pad, want ? "LOW" : "HIGH", (int)fb,
-                   fb_ok ? "resolved" : "UNRESOLVED/no-sample",
+                   (int)pad);
+        rt_kprintf("[MOT] expected_ENN=%s ENN_fb=%d %s verdict=%s\n",
+                   want ? "LOW" : "HIGH", (int)fb,
+                   fb_ok ? "resolved" : "UNRESOLVED",
                    safety_fb_verdict_name(safety_fb_now(want)));
-        rt_kprintf("[MOT] limit inputs=%s (SAFETY_LIMIT_INPUTS_ENABLED;"
-                   " OFF => DISABLED_BY_CONFIG, 不解析/不读/不注册)\n",
-                   safety_limit_inputs_enabled() ? "ENABLED (HIGH=safe, LOW=trigger)"
-                                                 : "DISABLED_BY_CONFIG");
+        rt_kprintf("[MOT] limit_inputs=%s\n",
+                   safety_limit_inputs_enabled() ? "ENABLED(HIGH=safe)" : "DISABLED_BY_CONFIG");
     }
-    rt_kprintf("[MOT] step-diag permission=%s (enable-path / isolated-env 两个宏"
-               "至少一个为 TRUE 才允许输出 STEP)\n",
+    rt_kprintf("[MOT] step_diag=%s\n",
                (MOTOR_HARDWARE_ENABLE_PATH_VALIDATED ||
                 STEP_DIAG_ISOLATED_ENV_CONFIRMED) ? "GRANTED" : "DENIED");
-    rt_kprintf("[MOT] tmc runtime write gate mask=0x%X\n",
+    rt_kprintf("[MOT] tmc_write_gate=0x%X\n",
                (unsigned)tmc2209_get_write_gate_mask());
+    rt_kprintf("[MOT] note: state/cur/tgt=0 does not prove physical STEP stopped\n");
 }
 MSH_CMD_EXPORT_ALIAS(cmd_motor_status, motor_status, show motor state and arm gate mask);
 
-static void cmd_motor_arm(void)      { (void)motor_arm(); }
+static void cmd_motor_arm(int argc, char **argv)
+{
+    if (argc != 1) { rt_kprintf("usage: motor_arm\n"); return; }
+    (void)motor_arm();
+}
 MSH_CMD_EXPORT_ALIAS(cmd_motor_arm, motor_arm, request arm through the five gates);
 
 static void cmd_motor_disarm(void)   { (void)motor_disarm(); }
@@ -2345,27 +2348,48 @@ MSH_CMD_EXPORT_ALIAS(cmd_motor_disarm, motor_disarm, disarm and verify DRV_ENABL
 
 static void cmd_motor_dir(int argc, char **argv)
 {
-    if (argc != 2 || (argv[1][0] != '0' && argv[1][0] != '1'))
-    { rt_kprintf("usage: motor_dir 0 or 1\n"); return; }
-    (void)motor_set_direction((rt_uint8_t)(argv[1][0] - '0'));
+    rt_uint8_t dir;
+
+    if (argc != 2) { rt_kprintf("usage: motor_dir 0 or 1\n"); return; }
+    if (rt_strcmp(argv[1], "0") == 0)      dir = 0u;
+    else if (rt_strcmp(argv[1], "1") == 0) dir = 1u;
+    else { rt_kprintf("usage: motor_dir 0 or 1\n"); return; }
+    (void)motor_set_direction(dir);
 }
 MSH_CMD_EXPORT_ALIAS(cmd_motor_dir, motor_dir, set DIR only when fully at rest);
 
 static void cmd_motor_target(int argc, char **argv)
 {
+    const char *p;
+    rt_uint32_t v = 0;
     rt_err_t e;
-    long v;
 
     if (argc != 2) { rt_kprintf("usage: motor_target <hz>\n"); return; }
-    v = strtol(argv[1], RT_NULL, 10);
-    if (v < 0) { rt_kprintf("[MOT] bad hz (negative or not a number)\n"); return; }
-    e = motor_set_target_hz((rt_uint32_t)v);
-    rt_kprintf("[MOT] set target %d Hz: %s\n", (int)v,
+    p = argv[1];
+    if (*p == '\0') { rt_kprintf("[MOT] bad hz (empty)\n"); return; }
+    while (*p != '\0')
+    {
+        rt_uint32_t d;
+
+        if (*p < '0' || *p > '9')
+        { rt_kprintf("[MOT] bad hz (not a decimal integer)\n"); return; }
+        d = (rt_uint32_t)(*p - '0');
+        if (v > (MOTOR_MAX_HZ - d) / 10u)
+        { rt_kprintf("[MOT] bad hz (over MOTOR_MAX_HZ=%u)\n", (unsigned)MOTOR_MAX_HZ); return; }
+        v = v * 10u + d;
+        ++p;
+    }
+    e = motor_set_target_hz(v);
+    rt_kprintf("[MOT] set target %u Hz: %s\n", (unsigned)v,
                e == RT_EOK ? "OK" : "REJECTED(over MOTOR_MAX_HZ)");
 }
 MSH_CMD_EXPORT_ALIAS(cmd_motor_target, motor_target, set ramp target frequency in Hz);
 
-static void cmd_motor_start(void)    { (void)motor_start(); }
+static void cmd_motor_start(int argc, char **argv)
+{
+    if (argc != 1) { rt_kprintf("usage: motor_start\n"); return; }
+    (void)motor_start();
+}
 MSH_CMD_EXPORT_ALIAS(cmd_motor_start, motor_start, start motion through the formal API);
 
 static void cmd_motor_stop(void)     { (void)motor_stop(); }
