@@ -46,7 +46,7 @@ canary `0x23`、当前 SP 距底 1828 B。sensor 栈 4096、高水位 900 B、ca
 | 失败/重试 | 0 个 -117、0 个 -23、0 个 CRC/身份错误；无自动重试 |
 | 栈 | motor 2048 / 高水位 728；sensor 4096 / 高水位 900；两次采样无 overflow 文本 |
 
-原始件：`stress_ms_boot1/2/3.txt`（含每组完整 TMRO 行）、`boot_ms2048.txt`、
+原始件（二进制原样保存，含 CR）：`stress_ms_boot1/2/3.bin`（含每组完整 TMRO 行）、`boot_ms2048.txt`、
 `probe_fix1.txt`、`probe_ab_rtdev.txt`、`e40_tmc_regs.txt`。
 
 ## 4. 临时实验与已撤回内容

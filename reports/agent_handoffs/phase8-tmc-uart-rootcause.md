@@ -47,7 +47,7 @@ TMC 读通后暴露的 motor 线程 768 B 栈溢出也一并修复（2048 B，�
 - 镜像：pyOCD + 厂商 pack 烧录（sector erase）；`0x08000000` 起 268372 B 回读与 BIN 逐字节相等。
 
 原始件：`reports/reviews/phase8-tmc-uart-rootcause/`
-（`stress_ms_boot1/2/3.txt`、`boot_ms2048.txt`、`probe_fix1.txt`、`probe_ab_rtdev.txt`、`e40_tmc_regs.txt`）。
+（二进制原样保存，含 CR：`stress_ms_boot1/2/3.bin`、`boot_ms2048.txt`、`probe_fix1.txt`、`probe_ab_rtdev.txt`、`e40_tmc_regs.txt`）。
 
 ## 4. 首失败与保留
 
