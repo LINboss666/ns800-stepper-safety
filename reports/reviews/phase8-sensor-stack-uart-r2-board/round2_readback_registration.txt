@@ -1,0 +1,112 @@
+URO-R2 第 2 轮（用户指令重烧）推送后的独立远端回读登记
+回读头 = fda5a790b76f5b21ab22dca98f10c2a3ca7d263d   回读方式 = gh api repos/LINboss666/ns800-stepper-safety/contents/<path>?ref=<该头>
+          -H Accept: application/vnd.github.raw（取原始字节，不解 JSON、不按首字符猜格式）
+比较口径 = 远端 raw 字节的 bytes+SHA-256 对 HEAD blob 的 bytes+SHA-256（git show <head>:<path>），
+          与工作树 CRLF 副本无关；本轮三件均为 LF blob。
+
+=== 1. 本轮新增/修改 3 件：逐 blob 远端回读 ===
+  round2_run_evidence.txt                    bytes=14625   local=5d406862d3f9 remote=5d406862d3f9 MATCH
+  phase8-sensor-stack-uart-r2-board.md       bytes=9706    local=c8f0f22eaf7c remote=c8f0f22eaf7c MATCH
+  phase8-sensor-stack-uart-r2-board.json     bytes=11030   local=c92c5d36b8ec remote=c92c5d36b8ec MATCH
+  A 组 3/3 MATCH（与上面原始行同源：见 §4 内联原文）
+
+=== 2. 应不变对象：HEAD blob 与其交付头 blob 同散列 ===
+  基准 7380856:
+    board_run_evidence.txt                     SAME sha=44d81e16a1bb
+    stack_warning_analysis.txt                 SAME sha=4f62b4735080
+    phase8-sensor-stack-uart-r2.md             SAME sha=619bdef21c20
+    phase8-sensor-stack-uart-r2.json           SAME sha=067c6953c086
+  基准 2053e6a:
+    UARTReadDiagSerialR2.ps1                   SAME sha=9ed8a3e342f7
+    board_package_r2.md                        SAME sha=e09078901265
+    offline_verification.txt                   SAME sha=93c509a8c059
+    stack_report.txt                           SAME sha=2c32f4404932
+    make_r2.py                                 SAME sha=11e8aa34460e
+    test_r2.ps1                                SAME sha=a9090ad86065
+    measure-a0.bin                             SAME sha=b1e852949f00
+    default.bin                                SAME sha=db5db20bb8d6
+    build_manifest.json                        SAME sha=9c3b492a4f74
+  基准 139e937:
+    sensor_service.c                           SAME sha=198ac05e2ab8
+  基准 66f8533:
+    tmc2209.c                                  SAME sha=8a5e03082245
+    leaf_main.c                                SAME sha=6a03b884e7b6
+    run_stop_priority_s2.sh                    SAME sha=0d405b01c886
+    measure-a0.bin                             SAME sha=a48400c881c5
+    UARTReadDiagSerialR1.ps1                   SAME sha=2e9c8ede8f75
+  B 组 19/19 SAME。两处曾报 CHANGED 的是 phase8-sensor-stack-uart-r2.md/.json，
+  原因是**回读脚本把基准选错**（选成离线轮头 2053e6a），而这两件是在第 1 轮板级头 7380856
+  里被追加过 §9 指针的；按 7380856 复核后 SAME —— 是登记口径缺陷，不是仓库内容被改，见 §3。
+
+=== 3. 本轮保留的两处首失败（都在提交/推送之前发现并修掉，不影响板上事实） ===
+(a) 交接 JSON 的 stop_lines 被第 2 轮块追加了两次（生成器 d["stop_lines"] += [...] 不幂等）。
+    发现方式 = 提交前对列表做重复项自检；处置 = 生成器改为合并后保序去重，
+    并把两件 handoff 文件先还原成 7380856 的 blob 字节再整体重生成（不是手改成品文件）。
+    修后 = stop_lines 13 条、0 重复、29 键；round-1 的 9 条标签原样在前。
+(b) 回读脚本首版把 phase8-sensor-stack-uart-r2.md/.json 的"不变基准"选成 2053e6a，
+    首跑报 17/19 SAME（2 件假 CHANGED）。处置 = 基准改为实际交付头 7380856 后重跑，19/19 SAME；
+    两次原始输出都在 §4 内联保留，首失败不删。
+  另：本轮没有为了让证据通过而放宽任何判据；采集器、镜像、工程、夹具字节全部未动（§2 的 SAME 即是证明）。
+
+=== 4. 回读原始输出（未改写，逐字内联） ===
+--- begin D:/uro/r2b_run2_readback.txt ---
+  | URO-R2 第 2 轮(用户指令重烧)交付的逐 blob 远端回读(只读, 零设备动作)
+  | 本地 HEAD=fda5a79  第 1 轮板级头=7380856  离线轮头=2053e6a  产品软件输入=139e937
+  |
+  | == A. 本轮新增/修改 3 件(远端 raw 字节 vs HEAD blob 字节) ==
+  |   round2_run_evidence.txt                    bytes=14625    local=5d406862d3f9 remote=5d406862d3f9 MATCH
+  |   phase8-sensor-stack-uart-r2-board.md       bytes=9706     local=c8f0f22eaf7c remote=c8f0f22eaf7c MATCH
+  |   phase8-sensor-stack-uart-r2-board.json     bytes=11030    local=c92c5d36b8ec remote=c92c5d36b8ec MATCH
+  |   A 组 3/3 MATCH
+  |
+  | == B. 应不变对象(HEAD blob vs 其交付头 blob) ==
+  |   基准 7380856:
+  |     board_run_evidence.txt                     SAME sha=44d81e16a1bb
+  |     stack_warning_analysis.txt                 SAME sha=4f62b4735080
+  |     phase8-sensor-stack-uart-r2.md             SAME sha=619bdef21c20
+  |     phase8-sensor-stack-uart-r2.json           SAME sha=067c6953c086
+  |   基准 2053e6a:
+  |     UARTReadDiagSerialR2.ps1                   SAME sha=9ed8a3e342f7
+  |     board_package_r2.md                        SAME sha=e09078901265
+  |     offline_verification.txt                   SAME sha=93c509a8c059
+  |     stack_report.txt                           SAME sha=2c32f4404932
+  |     make_r2.py                                 SAME sha=11e8aa34460e
+  |     test_r2.ps1                                SAME sha=a9090ad86065
+  |     measure-a0.bin                             SAME sha=b1e852949f00
+  |     default.bin                                SAME sha=db5db20bb8d6
+  |     build_manifest.json                        SAME sha=9c3b492a4f74
+  |   基准 139e937:
+  |     sensor_service.c                           SAME sha=198ac05e2ab8
+  |   基准 66f8533:
+  |     tmc2209.c                                  SAME sha=8a5e03082245
+  |     leaf_main.c                                SAME sha=6a03b884e7b6
+  |     run_stop_priority_s2.sh                    SAME sha=0d405b01c886
+  |     measure-a0.bin                             SAME sha=a48400c881c5
+  |     UARTReadDiagSerialR1.ps1                   SAME sha=2e9c8ede8f75
+  |   B 组 19/19 SAME
+  |
+  | == C. 远端分支头 / 冻结引用 / 本轮改动面 / 工作树 ==
+  |   remote phase8  fda5a790b76f5b21ab22dca98f10c2a3ca7d263d	refs/heads/phase8/tmc-drive-config
+  |   remote main    1b3757eec550802a3973e66790af422d81d3d373	refs/heads/main
+  |   remote phase7  6d3fbc559d45673d7550eb73dec5a4ade5bb34df	refs/heads/phase7/full-embedded-software
+  |   tag            097935fec5a6f2467261ab1ad449ff0b1d398250
+  |   tag^{}         e40a9b95ef709e6a80444f9f3949dfdd70ba96ba
+  |   本轮改动面          M	reports/agent_handoffs/phase8-sensor-stack-uart-r2-board.json
+  | M	reports/agent_handoffs/phase8-sensor-stack-uart-r2-board.md
+  | A	reports/reviews/phase8-sensor-stack-uart-r2-board/round2_run_evidence.txt
+  |   工作树            (干净)
+--- end   (bytes=2772 sha256=cc990ec051f654531eb30885c3a024befc52f1ec92e21003d407b39a4c539444) ---
+
+=== 5. 冻结引用与改动面（回读时实测值） ===
+  remote phase8/tmc-drive-config = fda5a790b76f5b21ab22dca98f10c2a3ca7d263d（本轮头，快进于 7380856）
+  remote main                    = 1b3757eec550802a3973e66790af422d81d3d373（未动）
+  remote phase7/...              = 6d3fbc559d45673d7550eb73dec5a4ade5bb34df（未动）
+  tag v0.7-phase7-software-board-validated = 097935fec5a6f2467261ab1ad449ff0b1d398250 -> e40a9b95ef709e6a80444f9f3949dfdd70ba96ba（未动）
+  第 2 轮执行头改动面 = 3 件（1 新增 + 2 修改，见 §4 内联原文），全部在板级证据/交接目录内；
+  本登记件自身所在头 = 只新增本文件 1 件。产品代码、HAL、内核、rtconfig、四宏、采集器、镜像、
+  manifest 一项未改 => 未新增任何设备动作，本轮额度已用尽且不自动续用。
+
+=== 6. 回读后判据 ===
+READBACK_A = 3/3 MATCH / READBACK_B_IMMUTABLE = 19/19 SAME / FROZEN_REFS = UNCHANGED
+WORKTREE_AFTER_READBACK = 干净（本登记件写入后为唯一未跟踪文件，随即提交）
+DEVICE_ACTIONS_THIS_STEP = 0（回读只走 HTTPS，不碰 DAP/COM5/Keil）
