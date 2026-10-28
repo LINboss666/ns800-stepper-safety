@@ -1,0 +1,6 @@
+
+msh >
+msh >safety_state
+[SS] state=READY fault_code=0 degraded=0x00
+msh >
+msh >

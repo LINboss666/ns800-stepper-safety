@@ -64,3 +64,8 @@ TMC 读通后暴露的 motor 线程 768 B 栈溢出也一并修复（2048 B，�
 未做 TMC 配置写。板上最终态：**运行中，state=READY，motion gate-locked**；
 TMC `drive_cfg=UNCONFIGURED`，`safe_for_enable=false`；A0 时长仍暂缓。
 未合并 main/phase7/tag，未改全局 Git 配置。
+
+## 后续指针（2026-10-28）
+
+本轮的电机链开发与源码/镜像收口见 `reports/agent_handoffs/phase8-motor-chain-dev.md`；
+本文件的历史镜像、300 读日志与旧 manifest 保留不改，旧 manifest 的 code_commit 声明已在新交接中失效说明。

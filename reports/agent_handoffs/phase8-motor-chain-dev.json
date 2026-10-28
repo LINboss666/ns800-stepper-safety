@@ -1,0 +1,52 @@
+{
+  "task": "phase8-motor-chain-dev",
+  "attached_task_book": {"bytes": 21586, "sha256": "7c4c3c15b395d9bd1703a37085dc4e20ae760092512e4d3c0273ac5edd6042f4"},
+  "branch": "debug/tmc-uart-rootcause-20261028",
+  "branch_base": "9761e2353641785fed6657870fca12246867a1db",
+  "code_commit": "916c34ba4032bc7f41e2944c13b449271030191b",
+  "source_reconciliation": {
+    "invalid_old_claim": "旧 manifest 的 code_commit c2d29d9 不是实际构建输入（该提交仍含 NO_SG 与 init GCONF 实验写）",
+    "cleanup_commit": "01025ce44c41e47298ef34de84d3c2d557c86ab8",
+    "final_input_commit": "916c34ba4032bc7f41e2944c13b449271030191b"
+  },
+  "images": {
+    "default": {"axf_sha256": "925e73701230a497dd2534c5b4d735666044dbda3caa367e3db3080fd29e6dd6",
+                "bin_sha256": "ef02100c694f9bbaa23ade48b523f7e66ed6e9a2acc24ca7bc2f7c401087b4c2",
+                "bin_bytes": 258324, "on_board": true},
+    "a0": {"axf_sha256": "d79479812ef1964ef577c146077cc7f1968032f6b903292dc1d7530e781426e5",
+           "bin_sha256": "5ac237109ecda8428134efe5caf1ad7d53369935f25da231d90f6913935f4831",
+           "bin_bytes": 268716, "on_board": false},
+    "motor_m1_candidate": {"axf_sha256": "0cfa048fd645bf2c1a9e9ae4269bfa1a8f3b19096972faa07bdeb7e899134baf",
+                           "bin_sha256": "397aa844afdeb2f2b768670546f28067d6398851cae3416cbe6d910f2078e675",
+                           "bin_bytes": 258568, "on_board": false, "downloaded": false}
+  },
+  "build": {"tool": "UV4 5.43.1.0 / ARMCLANG V6.24", "result": "3 targets 0 Error / 0 Warning",
+            "default_size": "Code=180034 RO=77710 RW=2188 ZI=83784",
+            "a0_size": "Code=187378 RO=80670 RW=2188 ZI=91504",
+            "candidate_size": "Code=180266 RO=77586 RW=2188 ZI=83784"},
+  "board_verification": {
+    "flash": "pyOCD + vendor pack, sector erase, 259072 B; readback 258324 B byte-identical",
+    "boot_selftest": "IOIN=0x21000041 VERSION=0x21; SELF_TEST->READY",
+    "reads": {"groups": 30, "reads": 90, "success": 90, "crc_ok": 90, "boots": 3, "errors": 0},
+    "status_lines": {"motor_status_max": 91, "step_status_max": 67, "safety_state_max": 43, "nul": 0},
+    "stacks": {"motor": {"size": 2048, "high_water": 704}, "sensor": {"size": 4096, "high_water": 900}},
+    "overflow_text": 0
+  },
+  "host_verification": {
+    "S1_target": "50/50 PASS rc=0",
+    "S1_host_ovr": "65/65 CASE PASS rc=0; runner ledger reports 未登记=1 (all 65 IDs registered; parser false positive, logged)",
+    "new_cases_for_cli_identity_log": "NOT_ADDED"
+  },
+  "open_items": [
+    "§5 专用 host 用例（CLI 验参 / 启动身份 / 短行宽度）未新增",
+    "相电流定义与同实物 Rsense/VREF 未确认",
+    "ADC 理论标定、诊断阈值工程占位、物理 STEP/停机时延未验",
+    "恢复下载路径未演练；A0 时长 NOT_ACHIEVED"
+  ],
+  "safety": {"motor_connected": false, "sw1_blocking": true, "four_macros_default_false": true,
+             "target_overrides_only_on_candidate": true, "tmc_writes_on_default": 0,
+             "fault_cleared": false, "board_state": "READY, motion gate-locked",
+             "safe_for_enable": false},
+  "status": "MOTOR_CANDIDATE_BUILT / MOTOR_PARAMETERS_UNRESOLVED",
+  "package": "reports/reviews/phase8-motor-chain-dev/motor_package_m2_m3.md"
+}

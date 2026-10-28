@@ -1,0 +1,77 @@
+{
+  "task": "phase8-motor-chain-dev",
+  "date": "2026-10-28",
+  "branch": "debug/tmc-uart-rootcause-20261028",
+  "branch_base": "9761e2353641785fed6657870fca12246867a1db",
+  "code_commit": "916c34ba4032bc7f41e2944c13b449271030191b",
+  "source_image_reconciliation": {
+    "problem": "上一轮 manifest 声称输入 c2d29d9，但该提交仍含 NO_SG 诊断与 init GCONF 实验写；实际镜像由清理后的工作树构建",
+    "resolution": "提交 01025ce 恢复 sensor 正常 SG 读并删除 init GCONF 写；本轮所有镜像由 916c34b 构建",
+    "old_manifest_status": "历史保留；其 code_commit 不能代表实际构建输入，已在交接中声明失效"
+  },
+  "targets": {
+    "rt-thread": {
+      "macros": "four macros = RT_FALSE (no target-level override)",
+      "program_size": "Code=180034 RO-data=77710 RW-data=2188 ZI-data=83784",
+      "axf": {"bytes": 1665000, "sha256": "925e73701230a497dd2534c5b4d735666044dbda3caa367e3db3080fd29e6dd6"},
+      "bin": {"bytes": 258324, "sha256": "ef02100c694f9bbaa23ade48b523f7e66ed6e9a2acc24ca7bc2f7c401087b4c2"},
+      "on_board": true
+    },
+    "rt-thread-measure-a0": {
+      "macros": "four macros = RT_FALSE; NS800_TARGET_MEASUREMENT_A0=1",
+      "program_size": "Code=187378 RO-data=80670 RW-data=2188 ZI-data=91504",
+      "axf": {"bytes": 1695496, "sha256": "d79479812ef1964ef577c146077cc7f1968032f6b903292dc1d7530e781426e5"},
+      "bin": {"bytes": 268716, "sha256": "5ac237109ecda8428134efe5caf1ad7d53369935f25da231d90f6913935f4831"},
+      "on_board": false
+    },
+    "rt-thread-motor-m1-candidate": {
+      "macros": "MOTOR_HARDWARE_ENABLE_PATH_VALIDATED=1 TMC_DRIVE_CONFIG_HW_VALIDATED=1 STEP_DIAG_ISOLATED_ENV_CONFIRMED=0 SAFETY_LIMIT_INPUTS_ENABLED=0",
+      "program_size": "Code=180266 RO-data=77586 RW-data=2188 ZI-data=83784",
+      "axf": {"bytes": 1665352, "sha256": "0cfa048fd645bf2c1a9e9ae4269bfa1a8f3b19096972faa07bdeb7e899134baf"},
+      "bin": {"bytes": 258568, "sha256": "397aa844afdeb2f2b768670546f28067d6398851cae3416cbe6d910f2078e675"},
+      "on_board": false,
+      "downloaded": false
+    }
+  },
+  "build": {
+    "tool": "UV4 5.43.1.0 / ARMCLANG V6.24",
+    "command": "UV4.exe -r project.uvprojx -t <target> -j0 -o <log>",
+    "all_targets": "0 Error / 0 Warning"
+  },
+  "product_changes": [
+    "safety_run_selftest required④：init 失败 / IOIN 读失败 / VERSION!=0x21 分开；仅 0x21 通过；保留完整 IOIN 与原始 rc",
+    "tmc2209_ioin_is_identity 头内联共享；生产 probe 与自检同一判据",
+    "motor_dir 仅接受完整 \"0\"/\"1\"；motor_target 严格十进制、防溢出、上界 MOTOR_MAX_HZ；arm/start argc==1",
+    "motor_status/step_status/gate 详情/配置 show 拆为 <=110B 短 ASCII 行；删除未确认的 1500mA 额定断言",
+    "恢复 sensor 正常 SG 读；删除 init 实验 GCONF 写（01025ce）"
+  ],
+  "board_verification": {
+    "image": "rt-thread default (four macros 0)",
+    "flash": "pyOCD 0.45.1 + NOVOSENSE.NS800RT7XXX.0.5.3.pack, sector erase, 259072 B",
+    "readback": "0x08000000 起 258324 B 与 rtthread.bin 逐字节相等",
+    "boot": "SELF_TEST -> READY; [SS] [REQ OK] TMC2209 IOIN=0x21000041 VERSION=0x21",
+    "reads": {"groups": 30, "reads": 90, "success": 90, "crc_ok": 90, "boots": 3},
+    "errors_117_23_crc": 0,
+    "stack": {"motor": {"size": 2048, "high_water": 704}, "sensor": {"size": 4096, "high_water": 900}},
+    "overflow_text": 0,
+    "status_lines": {"motor_status_max_bytes": 91, "step_status_max_bytes": 67, "safety_state_max_bytes": 43, "nul_bytes": 0}
+  },
+  "host_verification": {
+    "S1_target": "50/50 PASS, rc=0",
+    "S1_host_ovr": "65/65 CASE PASS, rc=0; runner ledger 仍报 未登记=1（同一份 65 个 ID 均在登记表内，判为台账解析假阳性，登记为待修基础设施项）",
+    "new_cli_identity_log_cases": "NOT_ADDED — 本轮未新增针对 CLI 验参/身份/短行的专用 host 用例；这是 §5 的未完成项"
+  },
+  "safety": {
+    "motor_connected": false,
+    "sw1_blocking": true,
+    "step_dir_license_high": 0,
+    "tmc_writes_on_default": 0,
+    "fault_cleared": false,
+    "board_state": "running READY, motion gate-locked",
+    "tmc_drive_config": "UNCONFIGURED",
+    "safe_for_enable": false,
+    "a0_duration": "NOT_ACHIEVED / deferred"
+  },
+  "candidate_package": "reports/reviews/phase8-motor-chain-dev/motor_package_m2_m3.md",
+  "status": "MOTOR_CANDIDATE_BUILT / MOTOR_PARAMETERS_UNRESOLVED"
+}

@@ -1,0 +1,5 @@
+MOTOR-CHAIN default image reads (3 resets x 10 groups x 3 reads)
+boot1 reads=30 success=30
+boot2 reads=30 success=30
+boot3 reads=30 success=30
+TOTAL reads=90 success=90

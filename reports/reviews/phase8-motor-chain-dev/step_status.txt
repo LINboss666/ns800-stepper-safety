@@ -1,0 +1,9 @@
+
+msh >
+msh >step_status
+[STEP] dev=epwm1 ch=0 enabled=0
+[STEP] last_stop=not-attempted stop_rc=0 latched=0
+[STEP] note: api-accepted != physical no-pulse (BUG-008 unverified)
+[STEP] note: no diag ownership != physically no STEP
+msh >
+msh >
