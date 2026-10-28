@@ -128,3 +128,94 @@ ECHO_MATCH_OFFSET=KNOWN_INVALID_FOR_DIAG / FOUR_DEFAULT_AND_A0_SAFETY_MACROS=0
 TMC_LINK_ON_BOARD_UNPROVEN / SAFE_FOR_ENABLE=false
 BLOCKED_ROLLBACK_OPEN / M2_M3_NOT_AUTHORIZED / A0_DURATION_EVIDENCE_NOT_ACHIEVED
 ```
+
+
+---
+
+## 7. 真实执行结果（2026-10-28 09:18:20 → 09:20:13 +0800，本机实跑）
+
+批准 = 用户真实回合简写「批准执行 URO-R1 板级包」（2026-10-28 09:18 +0800）。
+本节覆盖 §6「当前停止位置」里的 `AWAITING_USER_APPROVAL` 一项：批准已到达并已按 S1→S6 执行；
+§6 其余历史文字与 S0 证据按原文保留，不回写。
+
+### 7.1 逐步结果
+
+| 步 | 内容 | 结果 | 关键原文位置 |
+|---|---|---|---|
+| 前置 | 执行前只读身份复核 | PASS（BIN/manifest/采集器/AXF 四件一致） | `board_run_evidence.txt` §0 |
+| S1 | 供电 | 无动作（USER_CONFIRMED 沿用） | 同上 §1 |
+| S2 | 一次 Keil 下载 | **PASS**：`Load <新副本>\download-r1\dl\rt-thread-a0.axf` + Erase Done. + Programming Done. + Verify OK. | 同上 §2 |
+| S2′ | 私有 runner 工具缺陷 | 判定过早（UV4 `-f` 异步落日志）→ 该步 rc=1；未重跑下载，只读 09:19:07 生成的日志判据 | 同上 §2 |
+| S3 | pyOCD 会话 #1 定长回读 | **PASS**：268340 B，sha256 `a48400c8…` 与接受 BIN **逐字节相等**；两次 status 均 Halted | 同上 §3 |
+| S4 | pyOCD 会话 #2 唯一显式复位 | **PASS**：`Resetting target` + `Core 0 (None):  Running` | 同上 §4 |
+| S5 | 冻结采集器一次 COM5 + 七条查询 | **FAIL（就绪门）**：`No bounded quiet probe window; no command sent and no retry.`（脚本 :139）；0 条命令发出 | 同上 §5 |
+| S6 | 命令序列 | **NOT_REACHED**（0/7） | 同上 §6 |
+| S7 | 停机与归档 | 已按包执行：保存原字节、台账、句柄由脚本 finally 关闭；停机后 0 新动作 | 同上 §6/§8 |
+
+### 7.2 额度实际消耗
+
+下载 1/1（用尽）· DAP 会话 2/2（用尽）· 回读 1/1（用尽）· 显式 SYSRESETREQ 1/1（用尽）·
+COM5 打开 1/1（用尽）· msh 命令 **0/7** · probe **0/1** · TMC 读事务 **0** · WRITE 帧 0 ·
+新增上电 0 · 枚举 0 · 清故障/配置写/arm/start/ramp/STEP/DIR/翻宏/备份/恢复/`sw1_cut.ps1` 全部 0。
+
+Keil 内部隐含初始化/复位包含在一次下载内，记 `NOT_SEPARATELY_OBSERVABLE`，因此不宣称芯片物理复位总量为 1。
+
+### 7.3 新板上事实（被动窗口 23845 B，`passive_window_analysis.txt`）
+
+1. **新镜像确在板上运行**：启动横幅 `5.3.0 build Oct 28 2026 02:23:31` 命中 1 次，与复审 §3 期望逐字一致——
+   这是回读逐字节相等之外的第二重身份证据。
+2. **阻塞根因（通信之外的新缺陷）**：内核持续输出
+   `[W/kernel.sched] warning: sensor stack is close to end of stack address.` —— 20.017 s 窗口内
+   243 次（子串/前缀/`[33m` 三口径同为 243；去 ANSI 后整行精确匹配 237，差 6 行是被并发输出切断的碎片）。
+   采集器要求距上一字节 ≥1200 ms 才允许首条查询，因此就绪门在 20 s 上限内不可能满足。
+3. **多线程控制台交错 + NUL**：内核告警从中间插进主线程的 `[MAIN] boot complete but state=FAULT_L…` 行；
+   流内有 5 个 NUL、243 对 ANSI 转义、17 个裸 CR。这是响应切分侧的真实约束。
+4. **固件自检自身的 TMC 判定**：`[SS] [REQ FAIL] TMC2209 link`、`[SS] self-test done: required=FAIL`、
+   `[BOOT] 11 startup-selftest FAIL -> state=FAULT_LATCHED`、`[TMC] DEGRADED drive_cfg=UNCONFIGURED`、
+   `[Motor] state=4 … health=OK`、`arm gate fail mask=0x1B (arm REFUSED)`、`runtime write gate mask=0x3B`。
+   这些是被动观察，**不是** `tmc_uart_probe` 的逐笔读观测，不能给出 OPEN/TXN/锁/flush/TX/RX 阶段或原始 rc。
+5. `msh` 提示符在整个窗口内 0 次（本包已明令不把它当首条查询前置，故不影响批准有效性）。
+
+### 7.4 分层与结论
+
+- 镜像/执行层：**已证**（AXF 实际 Load + 268340 B 逐字节相等回读 + 复位 Running + 横幅匹配）。
+- capture 层：**INCOMPLETE**（有被动 RX，无分响应、无 TX、无七条查询）。
+- business 层：**NOT_REACHED**（probe 未发出）。
+- 根因层：板上原 `-117` 仍 **UNPROVEN**；本轮既不支持也未排除任何假设。
+- 本轮的诊断目标（区分 OPEN/TXN/锁/flush/TX/RX/期限/身份）**未取得**，推进点改为上面第 2、3 条新缺陷。
+- `echo_match_off` 仍 `KNOWN_INVALID_FOR_DIAG`；无 probe 证据更无从使用。
+
+### 7.5 下一轮需要的新授权（本包额度已用尽，不自动续）
+
+本轮停机后未追加任何设备动作。要继续查因必须先解决"控制台不静默"这一层，
+可选方向（都需要新的批准，本轮一律未执行）：
+
+1. 让 `sensor` 线程栈告警不再刷屏（提高该线程栈、或抑制该告警）——属于产品改动，需新任务书。
+2. 或把就绪门改成"容忍持续告警、只按 `[MAIN] boot complete` 之后的行界判定"——属于采集器改动，
+   会破坏 R1 冻结件的已复审身份，需重新走复审。
+3. 或在不改固件、不改采集器前提下，用一次新的、明确扩权的现场包。
+
+本节不预设选哪条，也不代为执行任何一条。
+
+### 7.6 停点标签（复审 §10 口径，按实际填写）
+
+```text
+URO_R1_BOARD_READ_DIAG_EXECUTED_OR_STOPPED = EXECUTED_THEN_STOPPED
+CAPTURE = INCOMPLETE (NOT_REACHED for the 7-command sequence)
+BUSINESS = NOT_REACHED
+FAILURE_STAGE = READ_ONLY_PROBE_WINDOW(no 1.2 s quiet; no command sent)
+ECHO_MATCH_OFFSET = KNOWN_INVALID_FOR_DIAG
+SAFE_FOR_ENABLE = false
+NO MOTOR / NO STEP_ENABLE / FOUR SAFETY MACROS=0
+IMAGE_ON_BOARD = CONFIRMED(byte-identical readback + matching boot banner)
+TMC_LINK_ON_BOARD = UNPROVEN(no probe evidence this round)
+NEW_BLOCKER = kernel sensor-stack warning storm blocks the quiet-readiness gate
+DEVICE_ACTIONS_AFTER_STOP = 0
+```
+
+原始/脱敏口径：本轮三件证据（`board_run_evidence.txt`、`passive_window_analysis.txt`、
+`passive_capture_b64.txt`）为本地实跑产物的有损脱敏副本（绝对路径→`<本地执行根>`/`<仓库根>`，
+UID 只登记长度 48 与 `sha256(uid)[:12]=d2f530dbd062`）；原件留在仓外
+`<本地执行根>\logs`、`\readback`、`\capture\r1_run1` 未删除。base64 段是原字节的无损转码文本，
+已从写好的文本件本身复验：3 块逐块 SHA 吻合、拼回 23845 B 与原串口件逐字节相等。
+来源等级全部为 LOCAL-RUN（本机 Windows 实跑），云端未执行任何一步。

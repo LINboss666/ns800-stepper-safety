@@ -1,0 +1,157 @@
+URO-R1 板级包 S5 被动窗口分析(task phase8-tmc-uart-read-observation-r1-board)
+输入 = <本地执行根>/capture/r1_run1/001_attach_passive.rx.bin bytes=23845 sha256=ce98adab56a6d2f164b4b301a6870cb482c9b0a91c780b9bd5f0275e0b59091b
+方法 = 对已落盘原字节做离线只读统计; 未重开 COM5, 未再采集, 未发任何命令。
+文本视图为 UTF-8 解码产物(原文含合法 UTF-8 中文); 所有计数以字节/子串为准。
+排印: 每行右端空白已剥离; 输入件的 bytes/sha256 见上一行, 完整性以那里为准。
+
+=== 1. 字节层统计 ===
+bytes=23845  CR=565  LF=548  CRLF=548  裸 CR(后无 LF)=17  LF-only=0
+NUL(0x00)=5  高位字节(>0x7F)=251  ANSI 转义序列=486(\x1b[33m 243 次 + \x1b[0m 243 次)
+高位字节全部落在 0xC2–0xE9 的 UTF-8 引导/续接区间(共 59 种取值), 即固件自身的中文输出,
+  不是噪声或编码故障; 原样样例(已核实命中 1 次): 'STEP=api-accepted(驱动接受关断, 非' —— 该行在此处被截断并漏出 NUL。
+行数=548  非空行=545  去重后=66
+
+=== 2. 就绪门为何过不了: 启动横幅之后内核持续刷屏 ===
+内核告警 `[W/kernel.sched] warning: sensor stack is close to end of stack address.` 出现 243 次, 首见偏移=845, 末见偏移=23624, 全文长度=23678
+窗口时长=20.017 s(台账 RX_BEGIN→STOP_FAILURE)。243 次告警 => 平均约 82 ms 一条,
+  而采集器要求距上一字节 >=1200 ms 才允许首条查询(:133)。
+窗口最后 300 B 原样如下(截到结尾仍在刷告警, 结尾就是告警行+CRLF):
+  |ack is close to end of stack address.
+  |<ESC[0m>
+  |<ESC[33m>[W/kernel.sched] warning: sensor stack is close to end of stack address.
+  |<ESC[0m>
+  |<ESC[33m>[W/kernel.sched] warning: sensor stack is close to end of stack address.
+  |<ESC[0m>
+  |<ESC[33m>[W/kernel.sched] warning: sensor stack is close to end of stack address.
+  |<ESC[0m>
+
+计数口径(并列保留, 防止后续引用混用):
+  子串 'sensor stack is close' 命中            = 243
+  前缀 '[W/kernel.sched] warning' 命中          = 243
+  ANSI \x1b[33m 出现                            = 243
+  去 ANSI 后整行精确等于该告警的行数           = 237
+  差异 6 行是被其它线程的输出从中间切断后残留的碎片(见第 3 节), 不是额外告警。
+
+口径区分(重要): 逐字节时间戳未由采集器记录, 因此'相邻两字节之间的最大静默间隔'本机无法测得,
+记 NOT_SEPARATELY_OBSERVABLE。就绪门失败本身是采集器台账的直接事实(STOP_FAILURE);
+上面的平均速率只是解释性推论, 不冒充实测间隔。
+
+=== 3. 多线程控制台交错(同一窗口内的第二类缺陷) ===
+示例(原文, ANSI 已改名) —— 内核告警从中间插进了主线程的 [MAIN] 行:
+  [MAIN] boot complete but state=FAULT_L<ESC[33m>[W/kernel.sched] warning: sensor stack is close to end of stack address.
+对应碎行(去重清单里可见): 'Af stack' / ' addres' / 's.' / '<NUL>raded/latched - NOT ready)' ——
+即一次 rt_kprintf 的输出被并发改写方切断, 且行内出现字面 NUL(控制台 128 B 缓冲截断老形态)。
+影响登记: 本轮没有查询发出, 故未触及响应切分; 但这条流证明确有交错, 下一轮若靠'行界完整'
+判定响应, 必须按已有 One-Line 注释的口径处理(保留每字节, 只认下一个精确标签)。
+
+=== 4. 本窗口里可复用的板上事实(被动观察, 非主动诊断) ===
+  [启动横幅] 命中=1 | 5.3.0 build Oct 28 2026 02:23:31
+      -> 与复审 §3 期望逐字一致 => 新镜像确在板上按该构建戳运行
+  [启动自检 TMC] 命中=1 | [SS] [REQ FAIL] TMC2209 link
+      -> 固件自身判 TMC2209 链路必需项失败(不是本轮 probe 结论)
+  [自检总判] 命中=1 | [SS] self-test done: required=FAIL degraded=0x00
+      -> required=FAIL
+  [BOOT 终态] 命中=1 | [BOOT] 11 startup-selftest FAIL -> state=FAULT_LATCHED
+      -> 启动自检失败 -> 故障锁定
+  [主线程] 命中=1 | boot complete but state=FAULT_L
+      -> 该行随后被内核告警从中间切断, 见第 3 节
+  [安全态] 命中=1 | [Safety] state=FAULT_LATCHED fault=8 irq_gate=CLOSED polarity=not-confirmed protect_ready=NO
+      -> 极性仍未确认, 保护未就绪
+  [使能链] 命中=1 | [Safety] request=LOW pad=0 expected_ENN=HIGH ENN_fb=1(resolved) verdict=OK
+      -> DRV_ENABLE 请求 LOW 且焊盘=0
+  [ENN 反馈] 命中=1 | [SS] [REQ OK] ENN feedback = disabled side (PC.6=H6-5/TMC_ENN)
+      -> 反馈读为关断侧(本轮不作 ENN 对照实验)
+  [电机] 命中=1 | [Motor] state=4 cur=0 tgt=0 armed=0 drv_en_verified=0 health=OK
+      -> state=4 是 FAULT; health=OK 不等于链路健康
+  [起转门] 命中=1 | [Motor] arm gate fail mask=0x1B (arm REFUSED)
+      -> arm 被拒
+  [运行期写门] 命中=1 | [TMC]    runtime write gate mask=0x3B
+      -> 编译期门未翻转前一位不写
+  [TMC 配置] 命中=1 | [TMC]    DEGRADED drive_cfg=UNCONFIGURED
+      -> 驱动配置未落地
+  [ADC] 命中=1 | [ADC]    DEGRADED cal=THEORETICAL
+      -> 标定仍为理论值
+  [IMU 自检] 命中=1 | [SS] [OK] IMU
+      -> 通过
+  [ADC 自检] 命中=1 | [SS] [OK] ADC
+      -> 通过(与上面 cal=THEORETICAL 并存: 自检项 OK 不代表标定已实测)
+  [Flash 自检] 命中=1 | [SS] [OK] Flash (JEDEC EF 40 17)
+      -> 通过
+  [黑盒触发] 命中=1 | [BB] trigger code=8 session=1 pre_n=1 post_eff=100
+      -> 故障 8 触发一次会话
+  [黑盒写入] 命中=1 | [BB] session 1 written (101 frames), last_err=0
+      -> 101 帧落盘, 无错误
+  [提示符 msh>] 命中=0
+  [提示符 msh >] 命中=0
+  [提示符 MSH] 命中=0
+  [提示符 msh] 命中=0
+  => 20 s 窗口内 msh 提示符一次都没出现(本包已明令不把它当首条查询的前置, 故这不影响批准)。
+
+=== 5. 本窗口不能证明什么 ===
+不能: 不能把 [SS] [REQ FAIL] TMC2209 link 当成 tmc_uart_probe 的逐笔读观测, 它不给出
+      OPEN/TXN/锁/flush/TX/RX 阶段、原始 rc、期限或寄存器值; 也不能区分 -117 的根因。
+不能: 不能由被动字节推断 TMC 是否应答过(本轮没有 TX 帧, 芯片没有理由回东西)。
+不能: 不能把 banner 匹配当成'全负载长期稳定'的证据。
+能  : 能证新镜像在板上按预期构建戳运行; 能登记两条新缺陷形状(sensor 栈告警刷屏 +
+      多线程控制台交错/NUL 截断), 二者都是下一轮查因的真实约束。
+
+=== 6. 去重后的非告警行清单(ANSI 已改名, 逐条原样, 共 302 条) ===
+  0 | \ | /
+  1 | - RT -     Thread Operating System
+  2 | / | \     5.3.0 build Oct 28 2026 02:23:31
+  3 | 2006 - 2024 Copyright by RT-Thread team
+  4 | ========================================
+  5 | NS800 stepper safety system startup
+  6 | stages: 1 safe-hw / 2 safety-state / 3 safety-thread /
+  7 | 4 hw-svc / 5 storage / 6 config / 7 motor+sensor /
+  8 | 8 diag / 9 blackbox / 10 ui / 11 selftest->READY
+  9 | [BOOT] Phas[BOOT] 5 storage ......... OK
+ 10 | [CFG] loaded OK (version 0x00010002 cal_source=1)
+ 11 | [BOOT] 6 project-config .. OK valid=YES
+ 12 | [MOT] init OK (enable-path-validated=NO, arm gate ACTIVE, DRV_ENABLE LOW verified, STEP=api-accepted(驱动接受关断, 非�<NUL>[MOT]   注: STE
+ 13 | [BOOT] 7 motor-service ... OK health=OK
+ 14 | S
+ 15 | stack is close to end of sta[BOOT] 7 sensor-service .. OK
+ 16 | [DIAG] thread started (prio 9, mode=MONITOR_ONLY)
+ 17 | [BOOT] 8 diagnosis ....... OK
+ 18 | [BB] blackbox ready (ring=300 cap=450 frames @100Hz, prio 18)
+ 19 | [BOOT] 9 blackbox ........ OK
+ 20 | [BOOT] 10 ui-manager ..... started (output=SAFE-OFF)
+ 21 | [SS] self-test start
+ 22 | [SS] [REQ OK] GPIO
+ 23 | [SS] [REQ OK] PWM device
+ 24 | [SS] [REQ OK] DRV_ENABLE=LOW (write+readback verified)
+ 25 | [SS] [REQ OK] ENN feedback = disabled side (PC.6=H6-5/TMC_ENN)
+ 26 | [SS] [REQ FAIL] TMC2209 link
+ 27 | [SS] [OK] IMU
+ 28 | [SS] [OK] ADC
+ 29 | [SS] [OK] Flash (JEDEC EF 40 17)
+ 30 | [SS] self-test done: required=FAIL degraded=0x00
+ 31 | [SS] STEP: 两条输出路径都没有未确认的关断 (motor=api-accepted(驱动接受关断, 非波形证明) src=emergenc<NUL>[SS] ==> FAULT_LATCHED code=8 (DRV_ENABLE LOW verif
+ 32 | [BOOT] 11 startup-selftest FAIL -> state=FAULT_LATCHED
+ 33 | [BOOT] Phase-7 runtime bootstrap complete (state=FAULT_LATCHED)
+ 34 | === SYSTEM STATUS ===
+ 35 | [Boot]   bootstrap-complete=YES abort-stage=0
+ 36 | [Safety] state=FAULT_LATCHED fault=8 irq_gate=CLOSED polarity=not-confirmed protect_ready=NO
+ 37 | [Safety] gpio_ready=YES thread=OK drv_en_pad_low=YES
+ 38 | [Safety] request=LOW pad=0 expected_ENN=HIGH ENN_fb=1(resolved) verdict=OK
+ 39 | [Safety] limit_inputs=DISABLED_BY_CONFIG (HIGH=safe/LOW=trigger when ENABLED); e-stop=hardware-only, no MCU e-stop input
+ 40 | [Motor] state=4 cur=0 tgt=0 armed=0 drv_en_verified=0 health=OK
+ 41 | [Motor] arm gate fail mask=0x1B (arm REFUSED)
+ 42 | [TMC]    runtime write gate mask=0x3B (0=运行态条件全通, 编译期门未翻转前仍然一位不写)
+ 43 | [Sensor] thread=OK
+ 44 | [TMC]    DEGRADED drive_cfg=UNCONFIGURED
+ 45 | [IMU]    OK
+ 46 | [ADC]    DEGRADED cal=THEORETICAL
+ 47 | [Flash]  storage bring-up=OK (spi1)
+ 48 | [Storage] OK (ns_params/log)
+ 49 | [Config] OK valid=YES cal_source=1
+ 50 | [Diag]   OK verdict=0 mode=MONITOR_ONLY
+ 51 | [Blackbox] OK
+ 52 | [UI]     led/buzzer output=SAFE-OFF (polarity hardware-pending)
+ 53 | s.
+ 54 | <NUL>raded/latched - NOT ready)
+ 55 | [MAIN] motor arm gate fail mask=0x1B (MOTOR_HARDWARE_ENABLE_PATH_VALIDATED=NO)
+ 56 | [BB] trigger code=8 session=1 pre_n=1 post_eff=100
+ 57 | [BB] session 1 written (101 frames), last_err=0
+unique 非告警行数=58

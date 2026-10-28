@@ -1,0 +1,194 @@
+URO-R1 板级包 S1–S6 真实执行证据(task phase8-tmc-uart-read-observation-r1-board)
+复审对象/基线 = 66f853309fe22376ffa6b45080e5f79c5891d4d1   产品 code_commit = a483dcba74abd8c04549459bcee2cbcdb1ddea4c   文档/源码基线 = 6324ac40bd8d0f172fdb89e77917be33dc739460
+GO = SOFTWARE_IMAGE_CAPTURE_REVIEW_GO_FOR_BOUNDED_READ_DIAG(复审 §4 限制随包携带)
+批准 = 用户真实回合简写「批准执行 URO-R1 板级包」(2026-10-28 09:18 +0800, 绑定 execution_package.md §6)
+执行时刻 = 2026-10-28 09:18:20 → 09:20:13 +0800
+
+本轮设备动作(实际, 全部计入已批额度):
+  Keil 下载 1/1 | pyOCD DAP 会话 2/2 | Flash 定长回读 1/1 | 显式 SYSRESETREQ 1/1 |
+  COM5 打开尝试 1/1 | msh 命令 0/7(采集器就绪门未过, 一条也未发出) | TMC 读事务 0
+停机点 = 冻结采集器 Wait-ReadOnlyProbeWindow 的 1.2 s 静默就绪门(UARTReadDiagSerialR1.ps1:139)。
+停机后未追加任何动作: 未重跑 S2/S3/S4, 未重开 COM5, 未发命令, 未清故障, 未恢复, 未枚举。
+
+来源分层: 本文全部条目标 LOCAL-RUN(本机 Windows 实跑, 云端未执行)。
+脱敏规则(lossless=false): 本机绝对路径 -> <本地执行根>/<仓库根>; DAP UID 不落本文
+(只登记长度=48 与 sha256(uid) 前 12 位=d2f530dbd062)。原始未脱敏件留在仓外 logs/ readback/ capture/ 未删除。
+被动窗口原字节另以 base64 无损转码归档(passive_capture_b64.txt), 那是转码文本, 不叫原始串口字节。
+排印: 本文各段每行右端空白已剥离(只为 git diff --check 干净); 每段标题行仍登记原始件的
+  真实 bytes 与 sha256, 完整性以那里为准。
+排印: 本文各段每行右端空白已剥离(只为 git diff --check 干净); 各段标题行仍登记
+  原始件的真实 bytes 与 sha256, 完整性以那里为准。
+
+=== 0. 执行前只读身份复核(零设备动作, 于 S2 之前) ===
+---- logs/s0_precheck_before_exec.out  (bytes=605  sha256=35dda7e7dc269fece8ecb188f5ae46e2fade112cc16e58c8e770f37f7a56c961  mtime=2026-10-28T09:18:20+0800  解码=cp936 -> UTF-8) ----
+待下载 BIN 身份一致 bytes=268340 sha256=a48400c881c539db539876cfd38f3aceac2a78cc7ed0d0f9655c7edafbb19a1e
+构建 manifest 身份一致 bytes=16057 sha256=075bd3ff6eace662a8f4809a4b5810eeddd04997a77f590b2bbef0519db5d2e3
+冻结采集器 身份一致 bytes=93797 sha256=2e9c8ede8f75e7b513dbd4f2c3091189309454879e98404ba7ec64bbb80f2568
+下载副本载荷 AXF 身份一致 bytes=1693804 sha256=a96889c47c9433b132dc4eeecf46be287c13dc1cff11fc0003e6cca10826846f
+pyOCD 工作目录无隐式配置: <本地执行根>\pyocd-work-r1
+Precheck: 只读身份/目录核对完成, 零设备动作。
+下载工程存在=True 采集 OutDir 尚未创建=True 回读文件尚未创建=True
+判据: 四件产物(BIN/manifest/冻结采集器/下载副本载荷 AXF)与复审 §3 逐字节一致后才允许进入 S1。
+AXF 不在远端, 身份由本地直算得到(同名不认定)。
+
+=== 1. S1 供电(无 Agent 动作) ===
+现场事实沿用用户既有确认(USER_CONFIRMED, 非云端实测): 供电正常、接线正常、扩展板线路正常、
+现场有人、电机物理未接、SW1 阻断、模块线路不变。本轮未新增上电、未做关电循环、未碰 ENN/SW1。
+历史最终供电状态继续记 UNKNOWN(本包明令不为补该字段连接设备)。
+
+=== 2. S2 一次 Keil 下载 ===
+---- logs/s2_run.out  (bytes=960  sha256=69898a8253185c4c99474d830d65406719d2d0152443366c6b43565b63606308  mtime=2026-10-28T09:18:31+0800  解码=cp936 -> UTF-8) ----
+待下载 BIN 身份一致 bytes=268340 sha256=a48400c881c539db539876cfd38f3aceac2a78cc7ed0d0f9655c7edafbb19a1e
+构建 manifest 身份一致 bytes=16057 sha256=075bd3ff6eace662a8f4809a4b5810eeddd04997a77f590b2bbef0519db5d2e3
+冻结采集器 身份一致 bytes=93797 sha256=2e9c8ede8f75e7b513dbd4f2c3091189309454879e98404ba7ec64bbb80f2568
+下载副本载荷 AXF 身份一致 bytes=1693804 sha256=a96889c47c9433b132dc4eeecf46be287c13dc1cff11fc0003e6cca10826846f
+pyOCD 工作目录无隐式配置: <本地执行根>\pyocd-work-r1
+Get-Content : 找不到路径“<本地执行根>\logs\s2_flash.log”，因为该路径不存在。
+所在位置 <本地执行根>\logs\s1_s6_commands.ps1:79 字符: 16
++         $log = Get-Content -Raw $FlashLog
++                ~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (<本地执行根>\logs\s2_flash.log:String) [Get-Content], ItemNotFound
+   Exception
+    + FullyQualifiedErrorId : PathNotFound,Microsoft.PowerShell.Commands.GetContentCommand
+下载工具日志原文(本轮唯一接受件, 由 UV4 于 09:19:07 写出):
+---- logs/s2_flash.log  (bytes=134  sha256=f0345f017c14955aeb4fa2459418ca14412866f8e50447dbb86a2b46c2506842  mtime=2026-10-28T09:19:07+0800  解码=cp936 -> UTF-8) ----
+Load "<本地执行根>\\download-r1\\dl\\rt-thread-a0.axf"
+Erase Done.Programming Done.Verify OK.Flash Load finished at 09:19:07
+判据核对: Load 载荷 = 本轮新副本 <本地执行根>/download-r1/dl/rt-thread-a0.axf(sha256=a96889c47c9433b132dc4eeecf46be287c13dc1cff11fc0003e6cca10826846f);
+  Erase Done. / Programming Done. / Verify OK. 三项齐备, 无 mass erase/unlock/option bytes/OTP 字样。
+  未下载第二次; UV4 rc 未单独作判据。
+
+私有 runner 工具缺陷(如实登记, 非设备失败, 不影响 S2 结论):
+  s1_s6_commands.ps1 的 S2 分支在 `& $Uv4Exe -f ... -o $FlashLog` 之后立即 Get-Content $FlashLog,
+  而 UV4 -f 是异步落日志: 时间戳可证 s2_run.out=09:18:31 早于 s2_flash.log=09:19:07,
+  因此那次调用报 Get-Content PathNotFound 并使该步 rc=1(见上面 s2_run.out 原文)。
+  处置: 未重跑 S2(重跑就等于第二次下载)。改为等 UV4 进程退出后只读已生成的 s2_flash.log,
+  按复审 §7 的四项判据判定, 结果通过。修法是给下一轮加 `Start-Process -Wait` 或轮询进程退出,
+  本轮不改私有 runner 之外任何东西, 也不为此重下。
+  该步 rc=1 是判定过晚造成的工具错误, 不是板上失败; 设备动作计数不变(下载 1 次)。
+另注: 副本目录继承件 <本地执行根>/download-r1/flash-b.log 是拷贝时的旧 BOARD-B 日志
+(mtime 08:38:02, Load 指向旧路径), 本轮未写它, 也不作任何判据。
+
+=== 3. S3 pyOCD 会话 #1: 唯一定长回读 ===
+---- logs/s3_run.out  (bytes=848  sha256=3799b8ef32375b7285416e6d5fcf592f2f0fbafb209ed6520174bb488c48c4c8  mtime=2026-10-28T09:19:31+0800  解码=cp936 -> UTF-8) ----
+待下载 BIN 身份一致 bytes=268340 sha256=a48400c881c539db539876cfd38f3aceac2a78cc7ed0d0f9655c7edafbb19a1e
+构建 manifest 身份一致 bytes=16057 sha256=075bd3ff6eace662a8f4809a4b5810eeddd04997a77f590b2bbef0519db5d2e3
+冻结采集器 身份一致 bytes=93797 sha256=2e9c8ede8f75e7b513dbd4f2c3091189309454879e98404ba7ec64bbb80f2568
+下载副本载荷 AXF 身份一致 bytes=1693804 sha256=a96889c47c9433b132dc4eeecf46be287c13dc1cff11fc0003e6cca10826846f
+pyOCD 工作目录无隐式配置: <本地执行根>\pyocd-work-r1
+Core 0 (None):  Halted
+Saved 268340 bytes to <本地执行根>/readback/r1-measure-a0-268340.bin
+Core 0 (None):  Halted
+板上回读 身份一致 bytes=268340 sha256=a48400c881c539db539876cfd38f3aceac2a78cc7ed0d0f9655c7edafbb19a1e
+回读与接受 BIN 逐字节相等(定长 SequenceEqual)。
+S3 通过: 长度/SHA/逐字节 cmp 一致 => 本次 ImageContinuityConfirmed 的依据成立。
+pyOCD 原始 stdout(未加工):
+---- logs/s3_readback_pyocd.log  (bytes=248  sha256=7572b4e423d485b9c3e420592971076e806eef8f80876ddd020bb8c470572f87  mtime=2026-10-28T09:19:31+0800  解码=UTF-16LE(BOM) -> UTF-8) ----
+﻿Core 0 (None):  Halted
+Saved 268340 bytes to <本地执行根>/readback/r1-measure-a0-268340.bin
+Core 0 (None):  Halted
+回读件身份: bytes=268340 sha256=a48400c881c539db539876cfd38f3aceac2a78cc7ed0d0f9655c7edafbb19a1e
+接受 BIN 身份: bytes=268340 sha256=a48400c881c539db539876cfd38f3aceac2a78cc7ed0d0f9655c7edafbb19a1e
+逐字节比较: length_equal=True  bytes_equal=True  (SequenceEqual, 非仅散列)
+两个 status 均为 Halted, savemem 无 error/traceback, 未恢复运行, 未读第二遍或扩大范围。
+=> 本次 -ImageContinuityConfirmed 的依据成立(先于采集器启动判定)。
+
+=== 4. S4 pyOCD 会话 #2: 开串口前唯一显式复位 ===
+---- logs/s4_run.out  (bytes=596  sha256=d06672d42defdc53109726b3c5fae7356be324fdc89c3d56e5d34eb3699cd3ee  mtime=2026-10-28T09:19:43+0800  解码=cp936 -> UTF-8) ----
+待下载 BIN 身份一致 bytes=268340 sha256=a48400c881c539db539876cfd38f3aceac2a78cc7ed0d0f9655c7edafbb19a1e
+构建 manifest 身份一致 bytes=16057 sha256=075bd3ff6eace662a8f4809a4b5810eeddd04997a77f590b2bbef0519db5d2e3
+冻结采集器 身份一致 bytes=93797 sha256=2e9c8ede8f75e7b513dbd4f2c3091189309454879e98404ba7ec64bbb80f2568
+下载副本载荷 AXF 身份一致 bytes=1693804 sha256=a96889c47c9433b132dc4eeecf46be287c13dc1cff11fc0003e6cca10826846f
+pyOCD 工作目录无隐式配置: <本地执行根>\pyocd-work-r1
+Resetting target
+Core 0 (None):  Running
+S4 通过: 复位 + Running 已由原文实证。此后才允许启动采集器。
+pyOCD 原始 stdout(未加工):
+---- logs/s4_reset_pyocd.log  (bytes=88  sha256=e4f1258235ff8a7fccf1b4135f118985ae444653f7084496fb775c182fe7c0d9  mtime=2026-10-28T09:19:43+0800  解码=UTF-16LE(BOM) -> UTF-8) ----
+﻿Resetting target
+Core 0 (None):  Running
+实证 `Resetting target` 与 `Core 0 (None):  Running`。未追加 resume/reset, 未建第三次 DAP 会话。
+
+=== 5. S5 冻结采集器一次 COM5 打开与被动窗口(七条命令 0 发出) ===
+---- logs/s5_run.out  (bytes=1082  sha256=68ed2309ee0e2e8e62c17acddbed2c9579088fcb52fc063582a7e64a75298bd6  mtime=2026-10-28T09:20:13+0800  解码=cp936 -> UTF-8) ----
+待下载 BIN 身份一致 bytes=268340 sha256=a48400c881c539db539876cfd38f3aceac2a78cc7ed0d0f9655c7edafbb19a1e
+构建 manifest 身份一致 bytes=16057 sha256=075bd3ff6eace662a8f4809a4b5810eeddd04997a77f590b2bbef0519db5d2e3
+冻结采集器 身份一致 bytes=93797 sha256=2e9c8ede8f75e7b513dbd4f2c3091189309454879e98404ba7ec64bbb80f2568
+下载副本载荷 AXF 身份一致 bytes=1693804 sha256=a96889c47c9433b132dc4eeecf46be287c13dc1cff11fc0003e6cca10826846f
+pyOCD 工作目录无隐式配置: <本地执行根>\pyocd-work-r1
+No bounded quiet probe window; no command sent and no retry.
+所在位置 <仓库根>\reports\reviews\phase8-tmc-uart-read-observation-r1\UARTReadDiagSerialR1.ps1:139 字符: 5
++     throw 'No bounded quiet probe window; no command sent and no retr ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OperationStopped: (No bounded quie...t and no retry.:String) [], RuntimeException
+    + FullyQualifiedErrorId : No bounded quiet probe window; no command sent and no retry.
+
+采集器 rc=1 (台账/原字节在 <本地执行根>\capture\r1_run1)
+采集器脚本身份复核(执行前已核, 此处再算一次): bytes=93797 sha256=2e9c8ede8f75e7b513dbd4f2c3091189309454879e98404ba7ec64bbb80f2568 期望散列 2e9c8ede8f75e7b513dbd4f2c3091189309454879e98404ba7ec64bbb80f2568
+采集目录清单(仅三件; 无分响应文件, 因 0 条命令发出):
+  001_attach_passive.rx.bin    bytes=23845   sha256=ce98adab56a6d2f164b4b301a6870cb482c9b0a91c780b9bd5f0275e0b59091b
+  ledger.jsonl                 bytes=724     sha256=c9ea8dbbcc675bc75e31194dccb4ffd9057844f5a60b1ef7cfd2ae8c60499447
+  session.rx.bin               bytes=23845   sha256=ce98adab56a6d2f164b4b301a6870cb482c9b0a91c780b9bd5f0275e0b59091b
+台账原文(逐行, 未加工):
+  {"at":"2026-10-28T09:19:53.5624013+08:00","kind":"SERIAL_OPEN_ATTEMPT","data":{"port":"COM5","approval_source":"用户真实回合简写批准: 批准执行 URO-R1 板级包 (2026-10-28 09:18 +0800, 绑定 execution_package.md §6)","attempt":1}}
+  {"at":"2026-10-28T09:19:53.6055792+08:00","kind":"SERIAL_OPEN","data":{"port":"COM5","baud":115200,"expected_build_banner":"5.3.0 build Oct 28 2026 02:23:31","dtr":false,"rts":false,"format":"8N1"}}
+  {"at":"2026-10-28T09:19:53.6115572+08:00","kind":"RX_BEGIN","data":{"start":0,"path":"001_attach_passive.rx.bin"}}
+  {"at":"2026-10-28T09:20:13.6290469+08:00","kind":"STOP_FAILURE","data":{"counts":{},"message":"No bounded quiet probe window; no command sent and no retry."}}
+台账事件序列 = SERIAL_OPEN_ATTEMPT -> SERIAL_OPEN -> RX_BEGIN -> STOP_FAILURE
+被动窗口时长 = RX_BEGIN(09:19:53) → STOP_FAILURE(09:20:13) = 20.017 s(采集器自身 20 s 上限用满)
+判据核对: SERIAL_OPEN_ATTEMPT 恰 1 次(attempt=1, COM5/115200/8N1/DTR=RTS=false 未改传输参数);
+  STOP_FAILURE 的 counts={} —— 采集器自身逐命令发送计数表为空, 这是 0 条命令发出的直接证据;
+  采集目录只有 001_attach_passive.rx.bin(被动窗口), 无任何 NNN_<command>.rx.bin 分响应件;
+  未重开端口, 未追加复位, 未重跑 S2/S3。
+  句柄释放: 脚本 catch 记 STOP_FAILURE 后 throw, finally(UARTReadDiagSerialR1.ps1:712-717)
+  Dispose ReplyFile/Reply、Close+Dispose SerialPort、Unregister-Event、Dispose Rx 与 Ledger ——
+  即冻结设计自带的关闭路径, 本包明令不附加清理命令。
+失败语义: 这是冻结采集器按设计的 fail-closed(UARTReadDiagSerialR1.ps1:139), 不是采集器缺陷, 也不是重试入口。
+就绪门(UARTReadDiagSerialR1.ps1:125-140, 条件在 :133)需同时满足: 已等 >=2000 ms、距 LastRx >=1200 ms、
+且(未见到启动字样 或 已见 [MAIN] boot complete)。第三项已满足, 第二项始终未满足 => 20 s 上限耗尽后 throw。
+
+=== 6. 额度实际消耗与未执行项 ===
+  Keil 下载尝试 = 1 / 1(用尽)
+  DAP/pyOCD 会话 = 2 / 2(#1 回读 Halted, #2 显式复位 Running; 用尽)
+  Flash 回读 = 1 / 1(0x08000000 起 0x41834 = 268340 B; 用尽)
+  Agent 显式 SYSRESETREQ = 1 / 1(用尽)
+  COM5 打开尝试 = 1 / 1(用尽)
+  msh 命令 = 0 / 7(就绪门未过, 一条未发)
+  tmc_uart_probe = 0 / 1(未发)
+  TMC 寄存器读事务 = 0(三笔读未发生)
+  WRITE 帧 = 0(未授权项, 本轮也未发生)
+  新增上电 = 0(USER_CONFIRMED 已供电, 未循环)
+  清故障 / 配置写 / selftest / pin_status / arm / start / ramp = 0 / 未授权
+  STEP / DIR / 许可 HIGH / 翻宏 = 0 / 未授权
+  外部 SPI Flash 转储 / 全片备份 / 自动恢复 / sw1_cut.ps1 = 0 / 未授权
+  设备·端口·探针枚举 = 0(未枚举; UID 只取自既存私有件)
+  额外 A0 采样 = 0
+工具隐含动作: Keil 既有内部初始化/复位沿用已证配置, 包含在一次下载内, 记 NOT_SEPARATELY_OBSERVABLE;
+因此不宣称芯片物理复位总数=1(Agent 显式 SYSRESETREQ 是 1 次, 不是全片复位总量)。
+
+=== 7. 分层结论(身份/完整性/业务/根因分列) ===
+镜像/执行层  = 已证: 新 AXF 实际 Load; 回读 268340 B 与接受 BIN 逐字节相等; 复位后 Running;
+               且被动窗口里出现完全一致的启动横幅 `5.3.0 build Oct 28 2026 02:23:31`(独立第二重身份证据)。
+capture 层    = INCOMPLETE / 未达命令阶段: 有 23845 B 被动 RX 原字节, 但无分响应、无 TX、无七条查询证据。
+business 层   = NOT_REACHED: tmc_uart_probe 未发出, OPEN/TXN/锁/flush/TX/RX/期限各阶段无板上实测值。
+根因层        = 本轮未取得 probe 逐笔读观测, 故 UART -117 根因仍 UNPROVEN;
+               但被动窗口给出两条可复用的新实证(见 passive_window_analysis.txt):
+               (a) 固件启动自检自身报 [SS] [REQ FAIL] TMC2209 link;
+               (b) 内核持续输出 `sensor stack is close to end of stack address`,
+                   20 s 窗口内 243 次, 使 1.2 s 静默就绪门无法满足。
+历史板上 -117 的解释: 本轮没有新增证据支持也没有排除任何一种假设; 不把它当成芯片无应答。
+echo_match_off = KNOWN_INVALID_FOR_DIAG(复审 GO-OBS-01; 本轮无 probe 证据, 更无从使用)。
+Motor health=OK 不等于 TMC 链路健康; [Motor] state=4 是 FAULT; safe_for_enable 仍为 false。
+
+=== 8. 复审 §10 停点标签(按实际填写) ===
+URO_R1_BOARD_READ_DIAG_EXECUTED_OR_STOPPED = EXECUTED_THEN_STOPPED(S1–S5 已跑, S5 就绪门失败后停)
+CAPTURE = INCOMPLETE(NOT_REACHED for the 7-command sequence)
+BUSINESS = NOT_REACHED
+FAILURE_STAGE = READ_ONLY_PROBE_WINDOW(no 1.2 s quiet; no command sent)
+ECHO_MATCH_OFFSET = KNOWN_INVALID_FOR_DIAG
+SAFE_FOR_ENABLE = false
+NO MOTOR / NO STEP_ENABLE / FOUR SAFETY MACROS=0
+TMC_LINK_ON_BOARD = UNPROVEN(no probe evidence this round)
+IMAGE_ON_BOARD = CONFIRMED(byte-identical readback + matching boot banner)
+NEW_BLOCKER = kernel sensor-stack warning storm blocks the quiet-readiness gate
+DEVICE_ACTIONS_AFTER_STOP = 0

@@ -4,7 +4,7 @@
   "review_object_and_baseline": "66f853309fe22376ffa6b45080e5f79c5891d4d1",
   "software_build_and_image_input_code_commit": "a483dcba74abd8c04549459bcee2cbcdb1ddea4c",
   "document_source_base": "6324ac40bd8d0f172fdb89e77917be33dc739460",
-  "stage": "S0 offline binding complete; execution package instantiated; device actions 0; stopped at the user-approval gate",
+  "stage": "S1-S6 executed on real board 2026-10-28 09:18-09:20 +0800; flash/readback/reset PASS; collector readiness gate FAIL (console never quiet); stopped per package rules, no action after the stop",
   "go_registered": {
     "verdict": "SOFTWARE_IMAGE_CAPTURE_REVIEW_GO_FOR_BOUNDED_READ_DIAG",
     "object": "66f853309fe22376ffa6b45080e5f79c5891d4d1",
@@ -134,7 +134,21 @@
     "probe_reads_max": 3,
     "probe_write_frames": 0
   },
-  "quotas_consumed_this_round": "全部 0(未执行任何设备动作)",
+  "quotas_consumed_this_round": {
+    "keil_download": "1/1 用尽",
+    "dap_sessions": "2/2 用尽",
+    "flash_readback": "1/1 用尽",
+    "explicit_sysresetreq": "1/1 用尽",
+    "com5_open_attempts": "1/1 用尽",
+    "msh_commands": "0/7(就绪门未过, 一条未发)",
+    "probe": "0/1",
+    "tmc_register_reads": 0,
+    "write_frames": 0,
+    "power_on": "0(USER_CONFIRMED 已供电)",
+    "enumeration": 0,
+    "device_actions_after_stop": 0,
+    "keil_internal_reset": "NOT_SEPARATELY_OBSERVABLE(包含在一次下载内; 不宣称物理复位总量=1)"
+  },
   "field_prerequisites_confirmed_by_approval": [
     "现场有人可操作",
     "设备可连接",
@@ -170,20 +184,30 @@
     "reports/reviews/phase8-tmc-uart-read-observation-r1-board/execution_package.md",
     "reports/reviews/phase8-tmc-uart-read-observation-r1-board/commands.expanded.masked.ps1",
     "reports/agent_handoffs/phase8-tmc-uart-read-observation-r1-board.md",
-    "reports/agent_handoffs/phase8-tmc-uart-read-observation-r1-board.json"
+    "reports/agent_handoffs/phase8-tmc-uart-read-observation-r1-board.json",
+    "reports/reviews/phase8-tmc-uart-read-observation-r1-board/board_run_evidence.txt",
+    "reports/reviews/phase8-tmc-uart-read-observation-r1-board/passive_window_analysis.txt",
+    "reports/reviews/phase8-tmc-uart-read-observation-r1-board/passive_capture_b64.txt"
   ],
   "production_firmware_engineering_collector_untouched": true,
-  "hardware_actions": [],
-  "device_actions_this_round": 0,
+  "hardware_actions": [
+    "keil_download_1",
+    "pyocd_readback_1",
+    "pyocd_explicit_sysresetreq_1",
+    "com5_open_1"
+  ],
+  "device_actions_this_round": 6,
   "privacy": {
     "deid": "本机绝对路径 -> 代号(<LOCAL-ROOT>/<REPO-ROOT>/<TOOL-ROOT>); DAP UID 值不入仓库, 只登记长度与 sha256(uid)[:12]",
     "lossless": false,
     "replacement_scope_declared_in": "commands.expanded.masked.ps1 文件头 + s0_offline_binding.txt 头部",
-    "originals_kept_out_of_repo": true
+    "originals_kept_out_of_repo": true,
+    "execution_round_files": "board_run_evidence.txt / passive_window_analysis.txt / passive_capture_b64.txt 同为有损脱敏(lossless=false): 绝对路径-><本地执行根>/<仓库根>, UID 只登记长度与 sha256[:12]; 原字节经 base64 无损转码且已从写好的文本件复验逐块 SHA 与拼回相等"
   },
   "not_proven": [
-    "板上 TMC 链路与状态(TMC_LINK_ON_BOARD_UNPROVEN)",
-    "板上原 -117 根因",
+    "板上 TMC 链路与状态(TMC_LINK_ON_BOARD_UNPROVEN; 本轮 probe 未发出)",
+    "板上原 -117 根因(本轮既未支持也未排除任何假设)",
+    "OPEN/TXN/锁/flush/TX/RX/期限/身份 各阶段的板上实测值(0 条命令)",
     "BLOCKED_ROLLBACK 剩余项(恢复下载未演练)",
     "完整栈高水位",
     "目标 RT 调度与物理波形/时延",
@@ -194,18 +218,73 @@
     "M-1",
     "M-2",
     "M-3",
-    "A0 时长证据(NOT_ACHIEVED)",
-    "R1 采集器的真机运行(本包才首次接入)"
+    "A0 时长证据(NOT_ACHIEVED)"
   ],
   "safety_macros": "四个安全宏在默认与 A0 目标仍为 0; 本包不改宏/工程; safe_for_enable 恒 0",
-  "next_step_requires": "用户对 execution_package.md §6 整包的一次批准(简写: 批准执行 URO-R1 板级包); 旧 M0/BOARD-B 批准不续额度",
+  "next_step_requires": "新的批准: 本轮额度已用尽且已停机, 未追加动作。继续查因需先解决'控制台不静默'一层(改固件栈/告警, 或改冻结采集器的就绪门并重新复审, 或另发一次明确扩权的现场包)。本轮不预设选哪条, 也未代为执行。",
   "stop_lines": [
-    "URO_R1_BOARD_PACKAGE_BOUND_AND_READY / S0_OFFLINE_BINDING_COMPLETE",
-    "HARDWARE_ACTIONS_THIS_ROUND=0 / AWAITING_USER_APPROVAL / NO_NEW_HARDWARE_ACTIONS",
-    "GO_REGISTERED=SOFTWARE_IMAGE_CAPTURE_REVIEW_GO_FOR_BOUNDED_READ_DIAG(66f8533)",
-    "ECHO_MATCH_OFFSET=KNOWN_INVALID_FOR_DIAG / FOUR_DEFAULT_AND_A0_SAFETY_MACROS=0",
-    "TMC_LINK_ON_BOARD_UNPROVEN / SAFE_FOR_ENABLE=false",
-    "BLOCKED_ROLLBACK_OPEN / M2_M3_NOT_AUTHORIZED / A0_DURATION_EVIDENCE_NOT_ACHIEVED"
+    "URO_R1_BOARD_READ_DIAG_EXECUTED_OR_STOPPED=EXECUTED_THEN_STOPPED",
+    "CAPTURE=INCOMPLETE / BUSINESS=NOT_REACHED / FAILURE_STAGE=READ_ONLY_PROBE_WINDOW",
+    "IMAGE_ON_BOARD=CONFIRMED / TMC_LINK_ON_BOARD=UNPROVEN",
+    "NEW_BLOCKER=kernel sensor-stack warning storm blocks the quiet-readiness gate",
+    "QUOTAS_EXHAUSTED=download 1/1 + DAP 2/2 + readback 1/1 + reset 1/1 + COM5 1/1 + msh 0/7",
+    "DEVICE_ACTIONS_AFTER_STOP=0 / NO_RETRY / NO_AUTO_CARRYOVER",
+    "ECHO_MATCH_OFFSET=KNOWN_INVALID_FOR_DIAG / SAFE_FOR_ENABLE=false",
+    "FOUR_SAFETY_MACROS=0 / NO MOTOR / NO STEP_ENABLE / NO WRITE FRAME",
+    "NEXT_ROUND_REQUIRES_NEW_USER_APPROVAL"
   ],
-  "generated_by": "make_r1b_handoff.py(仓外): 长度/散列/一致性现场直算"
+  "generated_by": "make_r1b_board_exec_handoff.py (execution round; S0 fields preserved as history)",
+  "approval_record": {
+    "granted": "2026-10-28 09:18 +0800",
+    "form": "用户真实回合简写「批准执行 URO-R1 板级包」",
+    "bound_to": "execution_package.md §6 一次批准文字"
+  },
+  "execution_results": {
+    "precheck_identity": "PASS",
+    "S1_power": "NO_ACTION(USER_CONFIRMED 沿用)",
+    "S2_keil_download": "PASS(Erase Done./Programming Done./Verify OK./Load 新副本 AXF)",
+    "S2_private_runner_defect": "判定过早: UV4 -f 异步落日志, runner 在日志生成前 Get-Content 而 rc=1; 未重跑下载(重跑即第二次下载), 改为只读 09:19:07 已生成的日志按四项判据判定; 非设备失败, 设备动作计数不变",
+    "S3_readback": "PASS(268340 B, sha256=a48400c8…, 与接受 BIN 逐字节相等, 两次 status Halted)",
+    "S4_explicit_reset": "PASS(Resetting target + Core 0 (None):  Running)",
+    "S5_collector": "FAIL_AT_READINESS_GATE(No bounded quiet probe window; no command sent and no retry. @UARTReadDiagSerialR1.ps1:139)",
+    "S6_msh_commands": "NOT_REACHED(0/7)",
+    "S7_stop_and_archive": "DONE(保存原字节+台账; 句柄由脚本 finally 关闭; 停机后 0 新动作)",
+    "image_on_board": "CONFIRMED(byte-identical readback + boot banner 5.3.0 build Oct 28 2026 02:23:31 逐字匹配)"
+  },
+  "device_action_accounting": "按复审 §5 额度表逐条计: 下载 1 + DAP 会话 2 + Flash 回读 1 + 显式 SYSRESETREQ 1 + COM5 打开 1 = 6 条已消耗(回读/复位分别是两个 DAP 会话的载荷, 表内分列故按表计); msh 命令 0; TMC 读事务 0; WRITE 帧 0; 停机后新增设备动作 0",
+  "new_board_findings": [
+    "kernel.sched 持续告警 'sensor stack is close to end of stack address' 243 次/20.017 s => 采集器 1.2 s 静默就绪门不可能满足",
+    "多线程控制台输出交错: 告警从中间切断主线程 [MAIN] boot complete 行; 窗口内 NUL=5, ANSI 转义=486, 裸 CR=17",
+    "被动观察: [SS] [REQ FAIL] TMC2209 link + self-test required=FAIL -> state=FAULT_LATCHED",
+    "被动观察: [Motor] state=4(FAULT) health=OK / arm gate fail mask=0x1B / runtime write gate mask=0x3B / drive_cfg=UNCONFIGURED",
+    "被动观察: msh 提示符在整个 20 s 窗口内 0 次(本包不将其作为前置)"
+  ],
+  "passive_capture_identity": {
+    "file": "001_attach_passive.rx.bin",
+    "bytes": 23845,
+    "sha256": "ce98adab56a6d2f164b4b301a6870cb482c9b0a91c780b9bd5f0275e0b59091b",
+    "session_rx_equals_passive_block": true,
+    "per_response_files": 0,
+    "ledger_events": [
+      "SERIAL_OPEN_ATTEMPT",
+      "SERIAL_OPEN",
+      "RX_BEGIN",
+      "STOP_FAILURE"
+    ],
+    "window_seconds": 20.017
+  },
+  "readback_identity": {
+    "bytes": 268340,
+    "sha256": "a48400c881c539db539876cfd38f3aceac2a78cc7ed0d0f9655c7edafbb19a1e",
+    "byte_equal_to_accepted_bin": true,
+    "status_both": "Halted"
+  },
+  "business_and_capture": {
+    "capture": "INCOMPLETE",
+    "business": "NOT_REACHED",
+    "failure_stage": "READ_ONLY_PROBE_WINDOW(no 1.2 s quiet; no command sent)",
+    "echo_match_offset": "KNOWN_INVALID_FOR_DIAG",
+    "safe_for_enable": false
+  },
+  "source_tier": "LOCAL-RUN(本机 Windows 实跑): 下载/回读/复位/采集器四步全部本地执行; 云端未执行任何一步"
 }
