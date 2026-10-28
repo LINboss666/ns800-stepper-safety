@@ -32,7 +32,7 @@
 #include "sensor_service.h"
 #include "safety_state.h"
 
-#define SENSOR_THREAD_STACK   1024
+#define SENSOR_THREAD_STACK   4096
 #define SENSOR_THREAD_PRIO    7
 #define SENSOR_PERIOD_MS      10          /* 100Hz */
 #define SENSOR_SG_DIV         10          /* SG_RESULT 10Hz 分频 */
