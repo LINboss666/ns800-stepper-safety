@@ -1,0 +1,189 @@
+SR-BINDING  现有 R2 镜像的单次栈 RAM 诊断: 离线绑定证据
+生成方式: 由脚本从 AXF/DWARF、symtab、map、fromelf 反汇编与 dry-run 原始 result.json 直接取值; 本文件数值非手抄。
+本轮无设备动作: 未连接 DAP、未 halt、未读 RAM、未下载、未复位、未开串口。
+
+[1] 输入身份
+  AXF   : <仓库根>/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/build/a0/rt-thread-a0.axf
+          bytes=1693804 sha256=15be5f3efc45bf296bc0ef24e3947081372616d819e4bb3b189e9614cf9a5b9a
+  MAP   : <仓库根>/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/build/a0/rt-thread-a0.map
+  CMSIS : <仓库根>/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/packages/CMSIS-Core-latest/Include/core_cm7.h
+  板上 BIN(本轮未再读目标 Flash; 身份由本地归档件现算, 并与 manifest 交叉核对):
+          measure-a0.bin 268340 B sha256=b1e852949f003965de52d539ca324a11b8b89e17a51a8f34fe3efd01525ae2d1  <- A0 目标, 板上两轮逐字节回读证实
+          default.bin    258036 B sha256=db5db20bb8d6eae1e8e5bed9dd0b70f5ad5c818a6cb3db9333496e0280aebe2d  <- 本轮不涉及的归档镜像(一并现算登记)
+          两份归档字节与 build_manifest targets[*].bin 逐项相等(脚本断言)。
+  说明: AXF 身份与本轮 build_manifest 的软件输入一致; AXF 若字节不符, 工具在连接设备之前即 Refuse(AXF_IDENTITY_MISMATCH)。
+
+[2] 变量/函数绑定 (DWARF; 同名静态变量要求唯一, 否则拒绝)
+  s_tid  : 0x2000a480   编译单元=sensor_service.c   (全 DWARF 定义数=1; 具地址定义数=1)
+           symtab 交叉核对: s_tid=0x2000a480 size=4 type=STT_OBJECT
+  _cpu   : 0x200008d0   编译单元=cpu_up.c   (全 DWARF 定义数=1; 具地址定义数=1)
+  窗口检查: s_tid 0x2000a480 与 _cpu 0x200008d0 均落在批准读取窗口 [0x20000000, 0x20020000) 内(脚本断言)。
+  sensor_thread_entry: DWARF low_pc=0x08020e18 (无 Thumb 位); symtab=0x08020e19 size=128 bind=STB_LOCAL
+           => Cortex-M 的 TCB.entry 应为 0x08020e19 (low_pc|1); 二者不一致工具直接拒绝。
+  rt_scheduler_stack_check: symtab=0x0801ad81 size=246 bind=STB_GLOBAL
+
+[3] 类型布局 (DWARF; 要求同一类型在全部编译单元里 byte_size 与成员偏移一致)
+  rt_cpu     definitions=1   byte_size=8  成员偏移变体数(1=一致)=[1]
+  rt_object  definitions=45  byte_size=28  成员偏移变体数(1=一致)=[1]
+  rt_thread  definitions=30  byte_size=168  成员偏移变体数(1=一致)=[1]
+  rt_thread 关键偏移: parent=0 sp=28 entry=32 parameter=36 stack_addr=40 stack_size=44 error=48
+  rt_object: name=0 (数组长度=16) type=16
+  rt_cpu   : byte_size=8 current_thread=0
+  用途: 读取时用这些偏移解析 name/entry/stack_addr/stack_size/sp; 不按网上 RT-Thread 版本猜偏移。
+
+[4] 只读系统寄存器地址的推导 (不硬编码)
+  core_cm7.h SCS_BASE=0xe000e000 SCB_BASE=SCS_BASE+0xd00
+  该 AXF 中「含 CCR+DTCMCR+SCR 的匿名结构」定义数=6, byte_size=684
+  CCR   : DWARF 偏移=20 / core_cm7.h 成员 Offset 注释=20 => 0xe000ed14
+  DTCMCR: DWARF 偏移=660 / core_cm7.h 成员 Offset 注释=660 => 0xe000ef94 (本轮可读)
+  两个偏移由两个独立来源(DWARF 布局 / 头文件注释)一致才采用; 不一致则拒绝运行。
+  注: 早前一轮准备中曾把 0xE000EF1C 当作 DTCMCR —— 那是 Cortex-M55 MEMSYSCTL 的地址, 已弃用; 本表地址为上法实测。
+
+[5] 链接后真实指令 (fromelf 反汇编, 非源码抄写)
+  函数区间: 0x0801ad80 起, size=246, 所在段=ER_IROM1
+  语义注释逐条按指令地址人工写入; 地址/字节/助记符一律取自反汇编原始输出。
+  addr         bytes      mnem         operands                           语义
+  0x0801ad80   80b5       push         {r7, lr}                           序言: 保存 r7/lr
+  0x0801ad82   84b0       sub          sp, #0x10                          栈帧 16 B
+  0x0801ad84   0390       str          r0, [sp, #0xc]                     保存入参 thread
+  0x0801ad86   0398       ldr          r0, [sp, #0xc]                     取 thread
+  0x0801ad88   68b9       cbnz         r0, #0x801ada6                     thread != NULL 则跳到 0x0801ada6
+  0x0801ad8a   ffe7       b            #0x801ad8c                         (跳板)
+  0x0801ad8c   4ff6de20   movw         r0, #0xfade                        断言失败路径: 取 "thread != RT_NULL" 串
+  0x0801ad90   c0f60300   movt         r0, #0x803                         串地址高 16 位
+  0x0801ad94   40f69611   movw         r1, #0x996                         取 "rt_scheduler_stack_check" 串
+  0x0801ad98   c0f60401   movt         r1, #0x804                         串地址高 16 位
+  0x0801ad9c   4ff4e772   mov.w        r2, #0x1ce                         断言行号 0x1ce=462
+  0x0801ada0   fcf7b2fb   bl           #0x8017508                         调用断言输出
+  0x0801ada4   ffe7       b            #0x801ada6                         (跳板)
+  0x0801ada6   0398       ldr          r0, [sp, #0xc]                     重取 thread
+  0x0801ada8   806a       ldr          r0, [r0, #0x28]                    取 thread->stack_addr (偏移 0x28)
+  0x0801adaa   0078       ldrb         r0, [r0]                           读栈块最低地址首字节
+  0x0801adac   2328       cmp          r0, #0x23                          与 '#'(0x23) 比较 —— 底部保护字节
+  0x0801adae   0ed1       bne          #0x801adce                         ≠'#' → 溢出分支
+  0x0801adb0   ffe7       b            #0x801adb2                         (跳板)
+  0x0801adb2   0399       ldr          r1, [sp, #0xc]                     重取 thread
+  0x0801adb4   c869       ldr          r0, [r1, #0x1c]                    取 thread->sp (偏移 0x1c, 调度时保存的 SP)
+  0x0801adb6   896a       ldr          r1, [r1, #0x28]                    取 stack_addr
+  0x0801adb8   8842       cmp          r0, r1                             sp 与 stack_addr 比较
+  0x0801adba   08d9       bls          #0x801adce                         sp <= base → 溢出分支
+  0x0801adbc   ffe7       b            #0x801adbe                         (跳板)
+  0x0801adbe   039a       ldr          r2, [sp, #0xc]                     重取 thread
+  0x0801adc0   d069       ldr          r0, [r2, #0x1c]                    取 thread->sp
+  0x0801adc2   916a       ldr          r1, [r2, #0x28]                    取 stack_addr
+  0x0801adc4   d26a       ldr          r2, [r2, #0x2c]                    取 thread->stack_size (偏移 0x2c)
+  0x0801adc6   1144       add          r1, r2                             base + size = 栈高端
+  0x0801adc8   8842       cmp          r0, r1                             sp 与 base+size 比较
+  0x0801adca   34d9       bls          #0x801ae36                         sp <= base+size → 进入告警判定
+  0x0801adcc   ffe7       b            #0x801adce                         (跳板)
+  0x0801adce   0120       movs         r0, #1                             溢出分支: dummy = 1
+  0x0801add0   0290       str          r0, [sp, #8]                       存 dummy
+  0x0801add2   6ff0fe00   mvn          r0, #0xfe                          result = -RT_ERROR (0xffffff01)
+  0x0801add6   0190       str          r0, [sp, #4]                       存 result
+  0x0801add8   ffe7       b            #0x801adda                         (跳板)
+  0x0801adda   40f64610   movw         r0, #0x946                         取 LOG_E 前缀 0x08040946 "\x1b[31m[E/kernel.sched] "
+  0x0801adde   c0f60400   movt         r0, #0x804                         串地址高 16 位
+  0x0801ade2   fef799f8   bl           #0x8018f18                         输出前缀
+  0x0801ade6   0399       ldr          r1, [sp, #0xc]                     第二参数 = thread
+  0x0801ade8   40f62c10   movw         r0, #0x92c                         取 0x0804092c "thread:%s stack overflow\n"
+  0x0801adec   c0f60400   movt         r0, #0x804                         串地址高 16 位
+  0x0801adf0   fef792f8   bl           #0x8018f18                         打印溢出文案
+  0x0801adf4   4df62d40   movw         r0, #0xdc2d                        取 0x0803dc2d 复位串 "\x1b[0m\n"
+  0x0801adf8   c0f60300   movt         r0, #0x803                         串地址高 16 位
+  0x0801adfc   fef78cf8   bl           #0x8018f18                         输出复位串
+  0x0801ae00   ffe7       b            #0x801ae02                         (跳板)
+  0x0801ae02   4af2e020   movw         r0, #0xa2e0                        取 rt_stack_overflow_hook 地址 0x2000a2e0
+  0x0801ae06   c2f20000   movt         r0, #0x2000                        地址高 16 位
+  0x0801ae0a   0068       ldr          r0, [r0]                           读钩子指针
+  0x0801ae0c   48b1       cbz          r0, #0x801ae22                     钩子为 NULL → 跳过
+  0x0801ae0e   ffe7       b            #0x801ae10                         (跳板)
+  0x0801ae10   4af2e020   movw         r0, #0xa2e0                        重取钩子地址
+  0x0801ae14   c2f20000   movt         r0, #0x2000                        地址高 16 位
+  0x0801ae18   0168       ldr          r1, [r0]                           读钩子指针
+  0x0801ae1a   0398       ldr          r0, [sp, #0xc]                     第一参数 = thread
+  0x0801ae1c   8847       blx          r1                                 调用钩子; 返回值写回 result
+  0x0801ae1e   0190       str          r0, [sp, #4]                       存钩子返回值
+  0x0801ae20   ffe7       b            #0x801ae22                         (跳板)
+  0x0801ae22   0198       ldr          r0, [sp, #4]                       读 result
+  0x0801ae24   30b1       cbz          r0, #0x801ae34                     result == 0 → 退出
+  0x0801ae26   ffe7       b            #0x801ae28                         (跳板)
+  0x0801ae28   ffe7       b            #0x801ae2a                         (跳板)
+  0x0801ae2a   0298       ldr          r0, [sp, #8]                       读 dummy
+  0x0801ae2c   08b1       cbz          r0, #0x801ae32                     dummy == 0 → 退出
+  0x0801ae2e   ffe7       b            #0x801ae30                         (跳板)
+  0x0801ae30   fbe7       b            #0x801ae2a                         dummy != 0 → 原地死循环
+  0x0801ae32   ffe7       b            #0x801ae34                         (跳板)
+  0x0801ae34   1de0       b            #0x801ae72                         跳到尾声 0x0801ae72
+  0x0801ae36   0399       ldr          r1, [sp, #0xc]                     告警路径: 重取 thread
+  0x0801ae38   c869       ldr          r0, [r1, #0x1c]                    取 thread->sp
+  0x0801ae3a   896a       ldr          r1, [r1, #0x28]                    取 stack_addr
+  0x0801ae3c   2031       adds         r1, #0x20                          base + 32 = 告警带边界
+  0x0801ae3e   8842       cmp          r0, r1                             sp 与 base+32 比较
+  0x0801ae40   16d8       bhi          #0x801ae70                         sp > base+32 → 跳过告警
+  0x0801ae42   ffe7       b            #0x801ae44                         (跳板)
+  0x0801ae44   ffe7       b            #0x801ae46                         (跳板)
+  0x0801ae46   40f65d10   movw         r0, #0x95d                         取 LOG_W 前缀 0x0804095d "\x1b[33m[W/kernel.sched] "
+  0x0801ae4a   c0f60400   movt         r0, #0x804                         串地址高 16 位
+  0x0801ae4e   fef763f8   bl           #0x8018f18                         输出前缀
+  0x0801ae52   0399       ldr          r1, [sp, #0xc]                     第二参数 = thread
+  0x0801ae54   40f6f700   movw         r0, #0x8f7                         取 0x080408f7 "warning: %s stack is close to end of stack address.\n"
+  0x0801ae58   c0f60400   movt         r0, #0x804                         串地址高 16 位
+  0x0801ae5c   fef75cf8   bl           #0x8018f18                         打印告警文案
+  0x0801ae60   4df62d40   movw         r0, #0xdc2d                        取 0x0803dc2d 复位串
+  0x0801ae64   c0f60300   movt         r0, #0x803                         串地址高 16 位
+  0x0801ae68   fef756f8   bl           #0x8018f18                         输出复位串
+  0x0801ae6c   ffe7       b            #0x801ae6e                         (跳板)
+  0x0801ae6e   ffe7       b            #0x801ae70                         (跳板)
+  0x0801ae70   ffe7       b            #0x801ae72                         (跳板)
+  0x0801ae72   04b0       add          sp, #0x10                          撤栈帧
+  0x0801ae74   80bd       pop          {r7, pc}                           返回
+
+  分支结构(由上表直接读出):
+    (a) 底部首字节 != '#'                       -> 溢出分支
+    (b) thread->sp <= stack_addr                -> 溢出分支 (BLS)
+    (c) thread->sp >  stack_addr+stack_size     -> 溢出分支
+    (d) 否则若 thread->sp <= stack_addr+32      -> 打印告警 (BHI 反向: >base+32 才跳过)
+    关键点: 判据用的是 TCB 里保存的 thread->sp(偏移 0x1c), 不是当前即时 PSP/MSP;
+            告警带是栈块最低 32 B, 与栈大小无关。
+  唯一调用点:
+    手工 BL 解码 : 指令 @0x0801acc6, BL 之后 PC=0x0801acca, 目标 thumb=0x0801ad81, 调用者=rt_schedule[GLOBAL]
+    capstone 线性: 指令 @0x0801acc6, mnem=bl, 目标=#0x801ad80 (二者指向同一函数, 地址差仅 Thumb 位)
+    线性扫描覆盖 112670 条指令, 只此一处 BL 到本函数。
+  相关字符串(段内实测):
+    0x0804095d [ER_IROM1] len=22 '\x1b[33m[W/kernel.sched] '
+    0x080408f7 [ER_IROM1] len=52 'warning: %s stack is close to end of stack address.\n'
+    0x0803dc2d [ER_IROM1] len=5 '\x1b[0m\n'
+    0x0803fade [ER_IROM1] len=17 'thread != RT_NULL'
+    0x08040996 [ER_IROM1] len=24 'rt_scheduler_stack_check'
+    0x08040946 [ER_IROM1] len=22 '\x1b[31m[E/kernel.sched] '
+    0x0804092c [ER_IROM1] len=25 'thread:%s stack overflow\n'
+
+[6] RAM 读取窗口的依据
+  map 中的数据区域(逐行取自 rt-thread-a0.map):
+    Execution Region ER_IROM1 (Exec base: 0x08000000, Load base: 0x08000000, Size: 0x000415f4, Max: 0x00080000, ABSOLUTE)
+    Execution Region RW_VT_DTCM (Exec base: 0x20000000, Load base: 0x080415f4, Size: 0x000003cc, Max: 0x00000400, ABSOLUTE, COMPRESSED[0x00000008])
+    Execution Region RW_DTCM (Exec base: 0x20000400, Load base: 0x080415fc, Size: 0x0000ea30, Max: 0x0001fc00, ABSOLUTE, COMPRESSED[0x00000238])
+    Execution Region RW_RT_HEAD (Exec base: 0x20012000, Load base: 0x08041834, Size: 0x00008000, Max: 0x00008000, ABSOLUTE)
+  允许区合并: 下限 = RW_VT_DTCM 基址 0x20000000;
+              上限 = RW_DTCM 基址 0x20000400 + Max 0x1FC00 = 0x20020000 (开区间)。
+  该上界来自 scatter 区域 Max, 是本包**读取范围**的上限, 不是整颗芯片 RAM 规格。
+  堆范围(board/board.h: HEAP_BEGIN=&Image$$RW_RT_HEAD$$Limit, HEAP_END=+0x8000):
+    Image$$RW_RT_HEAD$$Limit = 0x20012000 (SHN_ABS, size=0)
+    => HEAP = [0x20012000, 0x2001a000), 32768 B
+    sensor 的 TCB 与 4096 B 栈都由 rt_thread_create 从该堆分配, 故必然落在上式区间内;
+    距批准窗口上界 0x20020000 还有 24576 B。
+  勘误(本轮自查): 进入本轮时曾把该 Limit 符号按「区域末地址」理解, 得到 HEAP_END=0x20022000,
+    据此设想「TM 栈可能落在批准窗口之外」。实测 symtab 值为 0x20012000(区域基址; ZI-only 区域的
+    Limit 符号等于基址), 该设想不成立; 上述算术即为更正后的口径。
+  物理 RAM 与窗口的关系: 设备头给出 SRAM 256 KB(上至 0x20040000), 批准窗口比物理 RAM 窄;
+    落在窗口外的对象一律在读之前拒绝(fail-closed), 不擅自放宽窗口。
+
+[7] 预登记的拒绝分支(与 dry-run 一一对应, 见 dryrun_matrix.txt)
+  AXF 字节不符 / s_tid 或 _cpu 绑定不唯一 / 类型布局跨 CU 不一致 / 入口 DWARF 与 symtab 不符
+      -> bind() 直接 Refuse, 不创建会话(设备侧零动作)。
+  s_tid == 0 (线程尚未创建) -> 记录原值后停止, 不扫描内存。
+  TCB 未 4 字节对齐 / 越出窗口 / sizeof 超过 1024 -> 读 TCB 之前拒绝。
+  name != 'sensor' / entry != low_pc|1 / stack_size != 4096 -> 记录 TCB 原值后停止, 不读栈。
+  栈 base+4096 越出窗口, 或长度不是 4096 -> 读栈之前拒绝(不因动态值重新请示, 但也不放宽)。
+  累计读数超过 16384 B -> 下一次读取前拒绝。
+  系统寄存器只有在地址等于推导值时才允许读; 否则 SYSREG_NOT_BOUND。

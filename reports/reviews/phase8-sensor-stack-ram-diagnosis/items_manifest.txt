@@ -1,0 +1,8 @@
+SR-ITEMS  本包目录内文件的字节数与 sha256(生成后直接对本地文件复算)
+说明: 本文件(items_manifest.txt)的自散列无法写入自身; 其字节数与 sha256 以提交后的 git blob 与远端回读为准。
+binding_report.txt                    16693 B  91fb6516eb4059440bbe43e657b5536e6679b108eca166da82a7befb51735dc0
+dryrun_matrix.txt                      4196 B  b29fd4fb759fa88d5bba009db75a77685fe6e5b3a843b02ef8d11abed9aa88be
+live_package.txt                       3740 B  ba0030c46cae4fa93a211aca4e07e1122caa60707b2e0c3618564d050522903c
+stack_ram_diag.py                     29335 B  32f4eb7fed3581534fe082cc1a3c056dc2d0cda940179b69cd49350c99badf69
+
+合计 5 个文件(含本文件), 其中 4 件可自散列共 53964 B。

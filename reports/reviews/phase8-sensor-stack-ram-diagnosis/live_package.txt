@@ -1,0 +1,57 @@
+SR-LIVE  一次会话的板级执行包(未执行; 需一次批准)
+
+[动作额度] 本包上限, 超出即停:
+  - 已知 UID 的 DAP 定向连接: 1 个会话(不枚举设备/探针列表)
+  - 显式 halt: 至多 1 次(连接时已 Halted 则不重复)
+  - RAM 读取: <=16384 B, 且只读下列绑定对象
+  - 核心寄存器: 1 组(<=32 个; 不支持的字段记 unavailable, 不补零)
+  - 只读系统状态: CCR 4 B; DTCMCR 4 B(地址由 DWARF+CMSIS 推导)
+  - 编译/下载/目标 Flash 读取/复位/串口/msh/TMC 主动事务: 0
+  - 继续运行/单步/断点/注入代码/业务内存写/缓存维护: 0
+  - 结束状态: Halted; 不断开自动恢复, 不 reset
+
+[读取对象与字节数(由绑定值算出)]
+  s_tid           4 B   @ 0x2000a480
+  sensor TCB     168 B   @ 动态(取自 s_tid), 上限 1024
+  _cpu             8 B   @ 0x200008d0
+  sensor 栈     4096 B   @ 动态(取自 TCB.stack_addr), 长度必须恰好 4096
+  s_tid 复读       4 B   @ 同上
+  TCB 复读       168 B   @ 同上
+  CCR              4 B   @ 0xe000ed14
+  DTCMCR           4 B   @ 0xe000ef94
+  合计上限 = 4+1024(TCB)+8(_cpu)+4096(栈)+4+1024(TCB 复读)+4+4 = 6168 B, 低于 16384 B 上限;
+  dry-run 同类路径实测累计 4456 B(真实 TCB 为 168 B, 非上限)。
+
+[执行命令(单进程单会话)]
+  cd <仓库根>/reports/reviews/phase8-sensor-stack-ram-diagnosis
+  set PYTHONIOENCODING=utf-8
+  python stack_ram_diag.py --live --uid-file <私有 UID 文件> --out <全新输出目录>
+  说明: UID 只从私有文件读入, 不写入任何产物(产物只记 uid_source); 输出目录必须不存在, 已存在即拒绝覆盖。
+
+[会话内顺序]
+  1. 只定向连接已知 UID; 记录初始 Halted/Running。不 reset。
+  2. 若 Running -> 唯一一次 halt; 若已 Halted -> 不重复。
+  3. 读核心寄存器一组(PC/LR/SP/MSP/PSP/CONTROL/xPSR/PRIMASK/BASEPRI/FAULTMASK/FPSCR/MVAC/r0-r12)。
+  4. 读 s_tid -> 校验非零/对齐/TCB 整段在窗口内 -> 读 TCB -> 校验 name=='sensor'、entry==0x08020e19、stack_size==4096、base 合法。
+  5. 读 _cpu.current_thread 并与 TCB 地址比对(仅登记, 不作身份依据 —— 调度切换前后该值已改为 to_thread)。
+  6. 读 4096 B 栈 -> 从低端数连续 '#' -> 记 saved_free/saved_used/首非 '#' 偏移/两端 64 B/SP 邻域。
+  7. 同会话复读 s_tid 与 TCB 一次 -> 记 snapshot_recheck; 不一致只登记, 不追加第三次。
+  8. 读 CCR; 读 DTCMCR(若绑定存在)。读失败记 NOT_READ, 不猜。
+  9. 确认仍 Halted -> 断开; 禁止自动恢复。
+
+[输出产物(全部落在全新输出目录)]
+  s_tid.bin / tcb.bin / cpu.bin / stack.bin / s_tid_reread.bin / tcb_reread.bin / ccr.bin / dtcmcr.bin
+  result.json (含 binding / registers / steps / computation / gate_reads / total_ram_bytes_read / final_state)
+  session.log  (逐条 READ/STEP/REFUSE 行, 与 stdout 同内容)
+  公开副本须脱敏: 绝对路径 -> <本地执行根>/<仓库根>; UID 不落值; 控制字节写 <ESC>/<NUL>; 行尾空白剥离。
+
+[停点标签(执行后按实测填)]
+  STACK_RAM_SNAPSHOT_OBTAINED / INCOMPLETE; 解释等级 SUPPORTED / CONTRADICTORY / INCONCLUSIVE; FINAL_CORE_STATE=HALTED
+  若命中任一拒绝分支: 按分支名停, 保留原值, 不追加读取。
+
+[一次批准(原文)]
+  批准执行本文栈 RAM 诊断包: 允许一次已知 DAP 连接、最多一次暂停, 按可信 R2 AXF 绑定线程,
+  仅限<=16 KiB RAM 及本文所列核心/只读系统状态; 不烧录、不读目标Flash、不复位、不串口、不写业务内存、
+  不注入代码, 结束保持暂停。离线绑定和检查在同一任务完成, 不逐条重复确认。
+
+  简写「批准栈 RAM 诊断包」即绑定上述完整范围。

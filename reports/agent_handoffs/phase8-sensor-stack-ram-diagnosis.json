@@ -1,0 +1,222 @@
+{
+  "task": {
+    "name": "NS800_Stack_RAM_Diagnosis_Task_7380856",
+    "bytes": 11829,
+    "sha256": "cd8e72d8b6df0a272755ef9b67830d95274c7bb1784404306da6c6edb4905d87",
+    "date": "2026-10-28",
+    "git_anchor": "7380856149752506286714e9e82eda6e205abb40",
+    "branch": "phase8/tmc-drive-config",
+    "branch_head_at_start": "7a6e31efb3b5b4391299d2ac3db86742e8e65113",
+    "software_input_commit": "139e9377ccbc36b878cd577a6b848d974e1e07fa"
+  },
+  "rounds_inherited": [
+    {
+      "round": "URO-R1 board",
+      "stop_label": "STACK_DANGER_OBSERVED",
+      "facts": "真实危险流 166 B / 075b02ddf70654ba3ac2aaf55de08b1b9272158c8f48614cb7c6140aec829afc; 七条命令 0 发出",
+      "story_unchanged": true
+    },
+    {
+      "round": "URO-R2 board run 1",
+      "stop_label": "STACK_DANGER_OBSERVED",
+      "facts": "新镜像(4096)逐字节在板; 20 s 内 243 次栈告警; 0 条命令",
+      "story_unchanged": true
+    },
+    {
+      "round": "URO-R2 board run 2 (reflash by user instruction)",
+      "stop_label": "BOOT_WINDOW_INCOMPLETE",
+      "facts": "横幅逐字命中; 启动头后 20 s 无字节; 窗口未完成; 0 条命令",
+      "story_unchanged": true
+    }
+  ],
+  "inherited_state_flags": {
+    "STACK_4096_CHANGE_DID_NOT_CLEAR_WARNING": true,
+    "round1_warning_interpreted_as_4096_insufficient": false,
+    "round2_silence_interpreted_as_fix": false
+  },
+  "this_round": {
+    "mode": "offline binding + bounded diagnostic tool + dry-run matrix; no device action",
+    "decision": "读取现有线程与栈状态; 不加栈、不改内核告警、不重烧、不经串口采集器",
+    "hardware_actions": [],
+    "hardware_action_counts": {
+      "dap_sessions": 0,
+      "halts": 0,
+      "ram_reads": 0,
+      "ram_bytes_read": 0,
+      "core_register_reads": 0,
+      "sysreg_reads": 0,
+      "compile": 0,
+      "download_flash": 0,
+      "target_flash_read": 0,
+      "reset": 0,
+      "serial": 0,
+      "msh": 0,
+      "tmc_transactions": 0,
+      "writes": 0
+    },
+    "stop_labels": {
+      "STACK_RAM_SNAPSHOT": "NOT_ATTEMPTED",
+      "EXPLANATION_LEVEL": "NOT_ASSESSED",
+      "FINAL_CORE_STATE": "UNCHANGED",
+      "device_pass_generated": false
+    }
+  },
+  "binding": {
+    "axf": {
+      "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/build/a0/rt-thread-a0.axf",
+      "bytes": 1693804,
+      "sha256": "15be5f3efc45bf296bc0ef24e3947081372616d819e4bb3b189e9614cf9a5b9a"
+    },
+    "map": {
+      "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/build/a0/rt-thread-a0.map"
+    },
+    "images": {
+      "measure-a0.bin": {
+        "bytes": 268340,
+        "sha256": "b1e852949f003965de52d539ca324a11b8b89e17a51a8f34fe3efd01525ae2d1",
+        "role": "A0 目标; 板上两轮逐字节回读证实; 本轮未再读目标 Flash"
+      },
+      "default.bin": {
+        "bytes": 258036,
+        "sha256": "db5db20bb8d6eae1e8e5bed9dd0b70f5ad5c818a6cb3db9333496e0280aebe2d",
+        "role": "同目录归档; 本轮不涉及"
+      }
+    },
+    "objects": {
+      "s_tid": {
+        "addr": "0x2000a480",
+        "cu": "sensor_service.c",
+        "dwarf_defs": 1,
+        "symtab": {"size": 4, "type": "STT_OBJECT"}
+      },
+      "_cpu": {
+        "addr": "0x200008d0",
+        "cu": "cpu_up.c",
+        "dwarf_defs": 1
+      },
+      "sensor_thread_entry": {
+        "dwarf_low_pc": "0x08020e18",
+        "symtab": "0x08020e19",
+        "expected_in_tcb": "0x08020e19",
+        "size": 128,
+        "bind": "STB_LOCAL"
+      },
+      "rt_scheduler_stack_check": {
+        "symtab": "0x0801ad81",
+        "size": 246,
+        "bind": "STB_GLOBAL"
+      }
+    },
+    "types": {
+      "rt_thread": {"byte_size": 168, "definitions": 30, "offset_variant_count": 1,
+                    "offsets": {"parent": 0, "sp": 28, "entry": 32, "parameter": 36, "stack_addr": 40, "stack_size": 44, "error": 48}},
+      "rt_object": {"byte_size": 28, "definitions": 45, "offset_variant_count": 1,
+                    "name_offset": 0, "name_len": 16, "type_offset": 16},
+      "rt_cpu": {"byte_size": 8, "definitions": 1, "current_thread_offset": 0}
+    },
+    "sysreg": {
+      "ccr": {"addr": "0xE000ED14", "len": 4, "offset_dwarf": 20, "offset_cmsis_annotation": 20},
+      "dtcmcr": {"addr": "0xE000EF94", "len": 4, "offset_dwarf": 660, "offset_cmsis_annotation": 660, "anon_scb_defs": 6, "anon_scb_size": 684},
+      "note": "两个偏移由 DWARF 布局与 core_cm7.h 成员 Offset 注释双源一致才采用; 早前误用的 0xE000EF1C 为 Cortex-M55 MEMSYSCTL, 已弃用"
+    },
+    "ram_window": ["0x20000000", "0x20020000"],
+    "heap": {"begin": "0x20012000", "end": "0x2001A000", "bytes": 32768, "margin_to_window_upper": 24576},
+    "budget_bytes": 16384
+  },
+  "disassembly_facts": {
+    "function_addr": "0x0801ad80",
+    "function_size": 246,
+    "instructions_documented": 94,
+    "canary": {"offset": 40, "value": "0x23 ('#')"},
+    "saved_sp": {"offset": 28, "semantics": "判据使用 TCB 保存的 thread->sp, 非当前即时 PSP/MSP"},
+    "stack_size": {"offset": 44},
+    "overflow_conditions": ["canary != '#'", "sp <= base (BLS)", "sp > base+size"],
+    "warning_condition": "sp <= base+0x20 (BHI 反向: > base+32 才跳过)",
+    "warning_band_bytes": 32,
+    "overflow_hook": {"pointer_ram_addr": "0x2000a2e0", "registered": false, "consequence": "打印后 dummy=1 原地死循环(静态读出, 非设备实测)"},
+    "call_site": {"insn_addr": "0x0801acc6", "target": "0x0801ad81", "caller": "rt_schedule", "single": true, "linear_insns_scanned": 112670}
+  },
+  "dryruns": {
+    "tool": {
+      "path": "reports/reviews/phase8-sensor-stack-ram-diagnosis/stack_ram_diag.py",
+      "bytes": 29335,
+      "sha256": "32f4eb7fed3581534fe082cc1a3c056dc2d0cda940179b69cd49350c99badf69"
+    },
+    "count": 8,
+    "required_coverage": ["ok", "oor", "badname/badentry"],
+    "extra": ["okshallow", "contradict", "oor2", "biggerstack"],
+    "all_as_expected": true,
+    "max_ram_bytes": 4456,
+    "refusals_before_read": ["oor", "oor2", "badname", "badentry", "biggerstack"],
+    "pyocd_session_created": false,
+    "serial_objects_created": false
+  },
+  "deliverables": [
+    {"path": "reports/reviews/phase8-sensor-stack-ram-diagnosis/stack_ram_diag.py", "bytes": 29335, "sha256": "32f4eb7fed3581534fe082cc1a3c056dc2d0cda940179b69cd49350c99badf69"},
+    {"path": "reports/reviews/phase8-sensor-stack-ram-diagnosis/binding_report.txt", "bytes": 16693, "sha256": "91fb6516eb4059440bbe43e657b5536e6679b108eca166da82a7befb51735dc0"},
+    {"path": "reports/reviews/phase8-sensor-stack-ram-diagnosis/dryrun_matrix.txt", "bytes": 4196, "sha256": "b29fd4fb759fa88d5bba009db75a77685fe6e5b3a843b02ef8d11abed9aa88be"},
+    {"path": "reports/reviews/phase8-sensor-stack-ram-diagnosis/live_package.txt", "bytes": 3740, "sha256": "ba0030c46cae4fa93a211aca4e07e1122caa60707b2e0c3618564d050522903c"},
+    {"path": "reports/reviews/phase8-sensor-stack-ram-diagnosis/items_manifest.txt", "bytes": 756, "sha256": "self-reference excluded; see git blob and remote readback"},
+    {"path": "reports/agent_handoffs/phase8-sensor-stack-ram-diagnosis.md", "sha256": "see git blob and remote readback"},
+    {"path": "reports/agent_handoffs/phase8-sensor-stack-ram-diagnosis.json", "sha256": "self-reference excluded; see git blob and remote readback"}
+  ],
+  "errata": [
+    {
+      "item": "Image$$RW_RT_HEAD$$Limit",
+      "wrong_reading": "0x2001A000 (区域末地址)",
+      "actual": "0x20012000 (ZI-only 区域基址)",
+      "consequence_before_fix": "曾设想 TM 栈可能落在批准窗口之外",
+      "resolution": "HEAP=[0x20012000,0x2001A000) 全在窗口内, 余 24576 B; 勘误写入 binding_report.txt §6, 未静默删除"
+    },
+    {
+      "item": "DTCMCR address",
+      "wrong_reading": "0xE000EF1C (Cortex-M55 MEMSYSCTL)",
+      "actual": "0xE000EF94",
+      "resolution": "改由 DWARF 偏移 660 与 CMSIS Offset 注释 660 双源一致推导"
+    }
+  ],
+  "first_failures_offline": [
+    "SYSREG_CCR_BINDING_UNAVAILABLE: 初版找命名类型 SCB(实际为匿名结构), 改为结构特征扫描+双源核对",
+    "ok 夹具自相矛盾(1024 B '#' 配 16 B saved_free), 拆分为 ok/okshallow/contradict 并增 fill_vs_sp_consistent",
+    "语义注释按 (mnem, ops) 归类造成同助记符误标, 改为按地址逐条绑定并断言 94 条全覆盖",
+    "dryrun_matrix 对 contradict 只在 refusal 找标记而误判, 改为同时检索 computation",
+    "items_manifest 曾把自身写入前散列写进自身, 改为不列自散列",
+    "live_package 合计式曾写错为 6184 B, 改为由绑定值现算 6168 B 上限并附实测 4456 B"
+  ],
+  "safety_boundary": {
+    "motor_connected": false,
+    "sw1_blocking": true,
+    "safety_macros_effective_zero": 4,
+    "enn_step_dir_license_touched": false,
+    "fault_cleared": false,
+    "selftest_run": false,
+    "device_scan": false,
+    "tmc_link_tested_by_this_round": false,
+    "safe_for_enable": false,
+    "a0_duration": "仍暂缓"
+  },
+  "approval": {
+    "required": true,
+    "consumed": false,
+    "short_form": "批准栈 RAM 诊断包",
+    "full_text": "批准执行本文栈 RAM 诊断包：允许一次已知 DAP 连接、最多一次暂停，按可信 R2 AXF 绑定线程，仅限≤16 KiB RAM 及本文所列核心/只读系统状态；不烧录、不读目标Flash、不复位、不串口、不写业务内存、不注入代码，结束保持暂停。离线绑定和检查在同一任务完成，不逐条重复确认。",
+    "scope": {
+      "dap_sessions": 1,
+      "halts_max": 1,
+      "ram_bytes_max": 16384,
+      "core_register_groups": 1,
+      "core_registers_max": 32,
+      "sysreg_ccr_bytes": 4,
+      "sysreg_dtcmcr_bytes": 4,
+      "compile_download_flashread_reset_serial_msh_tmc": 0,
+      "end_state": "HALTED",
+      "auto_resume_or_reset": false
+    }
+  },
+  "next_step": "等待用户回复「批准栈 RAM 诊断包」(或全文); 未获批准不连接设备。",
+  "frozen_refs_at_round_start": {
+    "refs/heads/main": "1b3757eec550802a3973e66790af422d81d3d373",
+    "refs/heads/phase7/full-embedded-software": "6d3fbc559d45673d7550eb73dec5a4ade5bb34df",
+    "refs/tags/v0.7-phase7-software-board-validated": "097935fec5a6f2467261ab1ad449ff0b1d398250"
+  }
+}

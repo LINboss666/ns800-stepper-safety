@@ -1,0 +1,41 @@
+SR-DRYRUN  八组夹具的真实执行结果(工具: reports/reviews/phase8-sensor-stack-ram-diagnosis/stack_ram_diag.py)
+执行环境: 从仓库内的工具副本运行, --dryrun 使用内存夹具, 不创建 pyOCD 会话/探针(产物 pyocd_session_created=false)。
+每组输出目录互不相同; 原始 stdout 与 result.json 的散列在本表末尾, 可按散列复核。
+
+| # | 模式 | 夹具语义 | 期望 | 实测 outcome | 退出码 | RAM 读次数 | 累计字节 | 首次失败标识 |
+|---|------|----------|------|--------------|--------|-----------|----------|--------------|
+| 1 | ok | 正确指针 + 低端 sp 且填充一致(告警带内) | PASS_ALL_GATES | PASS_ALL_GATES | 0 | 8 | 4456 |  |
+| 2 | okshallow | 正确指针 + 高位 sp(未捕获告警态) | PASS_ALL_GATES | PASS_ALL_GATES | 0 | 8 | 4456 |  |
+| 3 | contradict | sp 贴近低端但填充显示未深用 | PASS_ALL_GATES | PASS_ALL_GATES | 0 | 8 | 4456 | computation 含 "fill_vs_sp_consistent": false |
+| 4 | oor | s_tid 指向窗口外 0x20021000 | REFUSED | REFUSED | 3 | 1 | 4 | GATE_REFUSED(tcb): OUT_OF_RANGE 0x20021000+168 window=[0x2000000... |
+| 5 | oor2 | 栈 base=0x2001f800 时 base+4096 越界 | REFUSED | REFUSED | 3 | 2 | 172 | GATE_REFUSED(stack): OUT_OF_RANGE 0x2001f800+4096 window=[0x2000... |
+| 6 | badname | TCB.name='motor' | REFUSED | REFUSED | 3 | 2 | 172 | TCB_IDENTITY_CONTRADICTION: NAME_NOT_SENSOR('motor') —— 原值已记录, 停... |
+| 7 | badentry | TCB.entry=0x0800abcd | REFUSED | REFUSED | 3 | 2 | 172 | TCB_IDENTITY_CONTRADICTION: ENTRY_MISMATCH got=0x0800abcd want_b... |
+| 8 | biggerstack | TCB.stack_size=8192 | REFUSED | REFUSED | 3 | 2 | 172 | TCB_IDENTITY_CONTRADICTION: STACK_SIZE_NOT_4096(8192) —— 原值已记录, ... |
+
+判定: 八组全部符合期望
+
+关键观察:
+  - oor / oor2: 越界地址在**读之前**被拒(GATE-REFUSE(before-read)), 被拒的那次读没有发出。
+  - badname / badentry / biggerstack: 先记录 s_tid 与 TCB 原值, 再停; 栈**一次都没读**(读次数=2, 字节=172)。
+  - contradict: 工具不把自相矛盾的快照当结论, 只把 fill_vs_sp_consistent=false 记入 computation; 解释留给报告。
+  - 每组都生成 BINDING 行(绑定值一致), 说明绑定路径在八种输入下都跑到。
+  - 预算: 最大一组 4456 B, 低于 16384 B 上限; 真实运行还会多读一次 _cpu 与两次复读(已计入 4456)。
+
+原始件散列(sha256 全值; 原始件位于仓库外的执行目录, 本表自带全值以便复核):
+  ok/stdout.txt                 3056 B  9faa67871d68d891d77ff76096667668a96ce32054a06f1613770463a386e486
+  ok/result.json                6837 B  341d32061bcb5ffbc7393ce8c66650cc326b113eded698cc1e3ad71f53df71c2
+  okshallow/stdout.txt          3062 B  7abfc096d7e97cfe6023b7df5b3398be89db371af6af6f7664956b6dad41d2de
+  okshallow/result.json         6889 B  0edd0564a55b5f69a2b8e1421241993c085d6794127a2792bcf0ec279a9a6d31
+  contradict/stdout.txt         3060 B  957a455337f71f3ae7d6c216ad44a559dc58fd6f25739ac920cf7a047df03fd4
+  contradict/result.json        6852 B  04478f0a958996a397bfbbcd6fce73f0cb4da31102e636a2b90f12252c866474
+  oor/stdout.txt                1796 B  734e5e22c22417a027ac442cc11e4c610d03618ad4885691ee235685a521da55
+  oor/result.json               3301 B  8aee22b7b02ba2e7cbf9ffcf93ecf56ec603c94defe501c40be621a56881d4dd
+  oor2/stdout.txt               2128 B  2de7e504811c0805403d2a9747a48d4ced008304d1b27a650ca58d8b4b695e64
+  oor2/result.json              4047 B  e31b574f4fa0022aa7f3b14baa3eed8a79935901cf7c164f830c77fbe701f5fd
+  badname/stdout.txt            2056 B  5ccbeaa6b4fef9691ce0048edff86a6a1d0ced9c38401dbccab6ae5486e1d255
+  badname/result.json           4070 B  75b9b776177d6f1ab7c7f67ddc81e9fe4972251ca2b137ec6ff4925c99445972
+  badentry/stdout.txt           2179 B  5051dbb880a473b95ed24a435d093094db53bb651aac58e2aead649f813013be
+  badentry/result.json          4195 B  86587eb96652213112a05d052dd778ddf35d46f956c03a2286f7126a9d2a98c4
+  biggerstack/stdout.txt        2058 B  3a57a98a3a8d3a7fd24a77ebf6e81bb96da3f7b5302c748c5e32c0c04d7b443f
+  biggerstack/result.json       4077 B  a9fdef98010865c9171780f525b2e7656f2d2f5211f9fb820bb5c58a8e598307
