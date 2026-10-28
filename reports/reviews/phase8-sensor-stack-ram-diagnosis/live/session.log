@@ -1,0 +1,18 @@
+BINDING {"axf": {"bytes": 1693804, "sha256": "15be5f3efc45bf296bc0ef24e3947081372616d819e4bb3b189e9614cf9a5b9a", "path_kind": "本地 build/a0 现存件"}, "s_tid_addr": "0x2000a480", "s_tid_addr_int": 536913024, "s_tid_cu": "sensor_service.c", "cpu_addr": "0x200008d0", "cpu_addr_int": 536873168, "cpu_cu": "cpu_up.c", "sensor_thread_entry": "0x08020e18", "sensor_thread_entry_int": 134352408, "sensor_thread_entry_expected_in_tcb": "0x08020e19", "entry_symtab": {"value": "0x08020e19", "size": 128, "bind": "STB_LOCAL"}, "stack_check_symtab": {"value": "0x0801ad81", "size": 246, "bind": "STB_GLOBAL"}, "rt_thread_size": 168, "rt_thread_offsets": {"parent": 0, "sp": 28, "entry": 32, "parameter": 36, "stack_addr": 40, "stack_size": 44, "error": 48}, "rt_object_name_off": 0, "rt_object_name_len": 16, "rt_object_type_off": 16, "rt_cpu_size": 8, "rt_cpu_current_thread_off": 0, "ram_window": ["0x20000000", "0x20020000"], "sysreg": {"ccr": [3758157076, 4], "dtcmcr": [3758157716, 4]}, "sysreg_evidence": {"ccr": {"cmsis_header": "core_cm7.h SCS_BASE=0xe000e000 SCB_BASE=SCS_BASE+0xd00", "dwarf_anon_scb_defs": 6, "dwarf_scb_size": 684, "offset_dwarf": 20, "offset_cmsis_annotation": 20, "addr": "0xe000ed14"}, "dtcmcr": {"dwarf_anon_scb_defs": 6, "offset_dwarf": 660, "offset_cmsis_annotation": 660, "target_visible_basis": "DTCM 地址空间属调试 AP 可见的 data TCM 窗口", "addr": "0xe000ef94"}}, "budget": 16384}
+INITIAL {'halted': False, 'running': True}
+HALT once -> {'performed': True, 'after_halted': True}
+READ s_tid        addr=0x2000a480 len=4     cum=4      sha=7d3d50d9d7ddcaf1
+STEP s_tid_value: 0x20014098
+READ tcb          addr=0x20014098 len=168   cum=172    sha=ab7b42fd3017501f
+STEP tcb_fields: {"name": "sensor", "type_byte": 1, "sp": "0x20014fb4", "entry": "0x08020e19", "stack_addr": "0x20014150", "stack_size": 4096, "error_field": 4294967285, "sha256": "ab7b42fd3017501fb5e957d49fc868624855702d89d1796b3e77dad0c85706ff"}
+READ cpu          addr=0x200008d0 len=8     cum=180    sha=d5adf271f5bccef2
+STEP cpu_current_thread: {"value": "0x20009978", "equals_tcb": false}
+READ stack        addr=0x20014150 len=4096  cum=4276   sha=b54784bf6861b76b
+STEP stack_fill: {"stack0": "0x23", "stack0_is_hash": true, "leading_hash_run_from_low": 3100, "first_non_hash_offset": 3100, "high_water_estimate_bytes": 996, "saved_free_sp_minus_base": 3684, "saved_used_high_minus_sp": 412}
+READ s_tid_reread addr=0x2000a480 len=4     cum=4280   sha=7d3d50d9d7ddcaf1
+READ tcb_reread   addr=0x20014098 len=168   cum=4448   sha=ab7b42fd3017501f
+STEP snapshot_recheck: {"s_tid_equal": true, "tcb_equal": true, "consistent": true}
+READ ccr          addr=0xe000ed14 len=4     cum=4452   sha=e504021cdb5f1f15
+STEP ccr: {"addr": "0xe000ed14", "value": "0x00070200", "decode": {"dcache_en": true, "icache_en": true}}
+READ dtcmcr       addr=0xe000ef94 len=4     cum=4456   sha=daaf62de76f04e09
+STEP dtcmcr: {"addr": "0xe000ef94", "value": "0x00000041", "decode": {"dcache_en": null, "icache_en": null}}
