@@ -30,6 +30,18 @@
 - 回读 `0x08000000` 起 268288 B：前 268196 B 与新 BIN **逐字节相等**，尾部 92 B 为 `0xFF`（擦除态）。
 - 启动横幅 `5.3.0 build Oct 28 2026 17:06:47`，boot 全流程到 msh。
 
+## 追加实验（模块单独断电重上电 + 授权 GCONF 写）
+
+1. 用户确认 VIO/VM 在，并单独给 TMC 模块断电重上电。重上电后 `tmc_uart_probe` 仍是
+   `rx-timeout-echo`、`echo=ECHO_ONLY`、无应答（`probe_after_module_powercycle.txt`）。
+2. 依据手册“使用 UART 时应置 GCONF.pdn_disable=1”，经用户单独授权，在 `tmc2209_init()`
+   的 UART 打开后补**一帧** GCONF 写（值仅 `pdn_disable=1`，其余位为复位态；不写电流/斩波/OTP，
+   不 arm/STEP）。构建 → 烧录 → 复位后 `tmc_uart_probe` **仍为 echo-only、无应答**
+   （`probe_after_gconf_write.txt`）。该写本身无法被读回确认（芯片不回复）。
+3. 结论修正：pdn_disable 不是本次“完全无应答”的充分解释；在“帧正确 + 回声正常 + 0..3 地址
+   + 上电复位后仍无应答”的组合下，剩余可能落在 PDN_UART 到模块的连通性 / 共地 / 模块芯片本身，
+   已超出软件与当前授权能判定的范围。
+
 ## 当前判断
 
 MCU 侧读链（帧、TX、回声、RX、解析、锁）已逐段证明；唯一缺口是 **TMC 芯片完全不应答**。

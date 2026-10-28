@@ -782,6 +782,21 @@ static rt_err_t tmc_write_reg_locked(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_
     return tmc_rx_flush(b, st, RT_NULL);
 }
 
+/* 2026-10-28 TMC-RC(用户单独授权的最小写): TMC 每次上电后 GCONF.pdn_disable=0,
+ * PDN_UART 的低电平功能会干扰 UART 事务, 读请求得不到应答。这里在 UART 打开后
+ * 只发**一帧** GCONF 写, 只置 pdn_disable=1, 其余位为 0(=上电复位态);
+ * 不写电流/斩波/OTP, 不 arm、不输出 STEP, 不改电机使能。 */
+static rt_err_t tmc_uart_pdn_disable_once(void)
+{
+    tmc_budget_t    b;
+    tmc_xfer_stat_t st;
+
+    if (!tmc_budget_open(&b, TMC_BUD_CONFIRM_MS)) return -RT_EINVAL;
+    rt_memset(&st, 0, sizeof(st));
+    return tmc_write_reg_locked(TMC_ADDR_DEFAULT, TMC_REG_GCONF,
+                                TMC_GCONF_PDN_DISABLE, &b, &st);
+}
+
 /* F2d(F2c-NEW-01): 这里原先还有一个 tmc_write_reg() —— 只持单次传输锁、不做任何
  * 到达确认与门禁检查的裸写包装, 唯一调用点是旧 probe。它已被删除, 写帧只能由
  * tmc2209_write_register_confirmed() 发出(见下方写入口审计)。 */
@@ -1248,6 +1263,7 @@ rt_err_t tmc2209_init(void)
 {
     rt_err_t e = tmc_uart_open();
     rt_err_t e2;
+    rt_err_t ep = RT_EOK;
 
     /* F2b/F2c: 配置执行器的两把锁随子系统一起就绪(本函数在 bootstrap 单线程阶段
      * 调用, 之后才有 motor/diagnosis 线程)。
@@ -1255,11 +1271,16 @@ rt_err_t tmc2209_init(void)
      * 不再出现"链路 OK 但关键区没有互斥"的中间态。 */
     e2 = tmc_cfg_prod_sync();
 
+    /* 2026-10-28 TMC-RC: UART 打开后补一帧最小 GCONF 写(pdn_disable=1),
+     * 否则 TMC 上电复位后的读事务会被 PDN 功能干扰而永远无应答。 */
+    if (e == RT_EOK && e2 == RT_EOK) ep = tmc_uart_pdn_disable_once();
+
     if (e != RT_EOK)      tmc_health = SUBSYS_FAILED;
     else if (e2 != RT_EOK) tmc_health = SUBSYS_FAILED;
+    else if (ep != RT_EOK) tmc_health = SUBSYS_FAILED;
     else                  tmc_health = SUBSYS_OK;
 
-    return (e != RT_EOK) ? e : e2;
+    return (e != RT_EOK) ? e : ((e2 != RT_EOK) ? e2 : ep);
 }
 
 rt_err_t tmc2209_read_register(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *value)

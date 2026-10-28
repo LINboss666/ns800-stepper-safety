@@ -21,3 +21,12 @@ BIN：268196 B / sha256=27c0f14ac87f1e03c1d94e26a6edea5b20ab8b33d588367eea6b9a8a
   启动横幅实测：5.3.0 build Oct 28 2026 17:06:47
 
 板上旧 R2 身份（已归档）：AXF 15be5f3e… / measure-a0.bin b1e85294… / 横幅 10:23:50
+
+## 第二枚诊断镜像（授权 GCONF 写 pdn_disable=1）
+
+源码：在上一枚基础上，tmc2209_init() 增加一帧 GCONF 写（仅 pdn_disable=1）。
+构建：0 Error / 0 Warning；Program Size Code=187010 RO=80746 RW=2188 ZI=91504
+AXF：sha256=815ddccf1548fef75bef21a47e9a87478231efa522ae07281a35696e9b02ee56
+BIN：268332 B / sha256=3291da43cda5b1b1db73b5fb18aaa4ae037d13fd8219bd00c07bede9e36b0d76
+烧录：pyOCD + 同一厂商 pack，-e sector；Erased/Programmed 269312 B
+结果：复位后 tmc_uart_probe 仍 echo-only、0..3 无应答（见 probe_after_gconf_write.txt）
