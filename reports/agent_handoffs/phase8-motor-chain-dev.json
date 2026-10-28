@@ -845,5 +845,12 @@
    "l1_monitor_console.txt",
    "final_console.txt"
   ]
+ },
+ "m5_pointer": {
+  "handoff": "reports/agent_handoffs/phase8-motor-m5-fault-log.md",
+  "json": "reports/agent_handoffs/phase8-motor-m5-fault-log.json",
+  "field_package": "reports/reviews/phase8-motor-m5-fault-log/m5_field_package.md",
+  "m5_field_results": "NOT_REACHED (awaiting field approval)",
+  "note": "M4 accepted motor function is not withdrawn."
  }
 }

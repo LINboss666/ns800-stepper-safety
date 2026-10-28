@@ -1,0 +1,4 @@
+CASE|FE06-capacity_overflow_named_no_partial|PASS|reads=1 rows=0 kputs=1 kprintf=1 cap=slot,seq,session,time_ms,event,valid,sg,current_ma,ax_mg,ay_mg,az_mg,step_hz,vibration_mg,flags
+[FLASH] flash_dump ERROR: line overflow at slot 0
+
+SUMMARY|cases=1 pass=1 fail=0

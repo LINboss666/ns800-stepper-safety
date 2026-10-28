@@ -1,0 +1,2 @@
+ARCHIVE=ACCEPT rows=4 batches=1
+CLEAR_ALLOWED=YES

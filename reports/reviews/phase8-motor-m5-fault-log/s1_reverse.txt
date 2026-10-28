@@ -1,0 +1,37 @@
+drv_epwm.h=D:/ns800/rt-thread-master/rt-thread-master/bsp/novosns/ns800/libraries/HAL_Drivers/drivers/drv_epwm.h (真实公开头) compat=/tmp/ns800-host-chain/s1/20261028T161953Z-2541/compat/{rtdef.h,rthw.h}
+###### 关断结果可信链 S1 (基线 6218efa251cd6b8a16ad2df8f0fef1efd2ba5eeb) ######
+run_id=20261028T161953Z-2541
+SRC_APP=D:/ns800/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications
+OUT_DIR=/tmp/ns800-host-chain/s1/20261028T161953Z-2541
+compiler=gcc.exe (tdm64-1) 4.9.2
+negative control: PS99-unregistered rejected by validate_ledger (rc=2, unreg=1, miss=0)
+
+=== 反向验证(2 项, 仓外副本; 正常对照必须先通过) ===
+  判 FAIL: CASE|PS01d-init_records_unknown_and_latches|FAIL|stop=api-accepted(驱动接受关断, 非波形证明) src=init rc=-12 latched=1
+  判 FAIL: CASE|PS02d-estop_pwmfail_records_unknown|FAIL|stop=api-accepted(驱动接受关断, 非波形证明) src=emergency-stop latched=0
+  判 FAIL: CASE|PS04a-disarm_fail_rc_is_pwm|FAIL|disarm rc=-12 stop_rc=-12 stop=api-accepted(驱动接受关断, 非波形证明) (不得解释成只是 GPIO 失败)
+  判 FAIL: CASE|PS04b-disarm_fail_not_clean_idle|FAIL|state=4(FAULT=4) armed=0 latched=0 src=disarm - 不回正常可启动 IDLE
+  判 FAIL: CASE|PS04c-arm_refused_with_bit7|FAIL|arm rc=-8 mask=0x3 bit7=0
+  判 FAIL: CASE|PS06c-no_false_step_stopped|FAIL|捕获含 'STEP stopped'=0 含 'NOT-confirmed'=0
+  判 FAIL: CASE|PS08c-successful_stop_no_auto_recover|FAIL|stop=api-accepted(驱动接受关断, 非波形证明) latched=0 state=FAULT_LATCHED bit7=0 HIGH 写 0->0
+  判 FAIL: CASE|PS10b-enn_unknown_and_pwm_fail_recorded_separately|FAIL|stop=api-accepted(驱动接受关断, 非波形证明) pad_low=1 (ENN 无样本没有抹掉 PWM 失败, 反之亦然)
+  判 FAIL: CASE|PS12a-dir_refused_while_stop_uncertain|FAIL|dir rc=-8 DIR 写 0->0 latch=0 state=4 cur=0(命令值) - 已知关断失败不得据 0Hz 改方向
+  判 FAIL: CASE|PS13d-device_back_re-attempts_real_close_no_stale_flag|FAIL|init rc=-12 stop=api-accepted(驱动接受关断, 非波形证明) rc=-12 disable 0->1 null=0 threads=0 - 陈旧 mot_dev_ok 会在这里现形
+  判 FAIL: CASE|PS14a-disarm_pwmfail_posts_software_fault_once|FAIL|disarm rc=-12 event 1->2 last=0x40 bits0=0x0 safety=FAULT_LATCHED latch=0 inhibited=1 trip_pending=1
+  判 FAIL: CASE|PS14c-plain_success_after_handoff_does_not_self_recover|FAIL|stop=api-accepted(驱动接受关断, 非波形证明) latch=0 safety=FAULT_LATCHED
+  台账: 必需=55 唯一出现=55 实际行数=55 SUMMARY(cases=55 pass=43 fail=12) 自洽=1
+  命中期望失败身份: PS01d-init_records_unknown_and_latches
+  命中期望失败身份: PS02d-estop_pwmfail_records_unknown
+  命中期望失败身份: PS04a-disarm_fail_rc_is_pwm
+  命中期望失败身份: PS10b-enn_unknown_and_pwm_fail_recorded_separately
+  命中期望失败身份: PS13d-device_back_re-attempts_real_close_no_stale_flag
+  判 FAIL: CASE|PS17a-safety_trip_valid_single_event|FAIL|event 2->2 cap=[SS] safety_trip: EVT_SOFT_FAULT posted rc=0 (software event; protection ran in this call; persistence NOT implied)
+  判 FAIL: CASE|PS17e-safety_trip_post_fail_not_persisted|FAIL|event +0 cap=[SS] safety_trip: EVT_SOFT_FAULT posted rc=0 (software event; protection ran in this call; persistence NOT implied)
+  台账: 必需=55 唯一出现=55 实际行数=55 SUMMARY(cases=55 pass=53 fail=2) 自洽=1
+  命中期望失败身份: PS17a-safety_trip_valid_single_event
+
+=== S1 反向汇总 ===
+rev_motor_off_ignores_failure | META-OK 命中 5/5 个业务失败身份 (variant=target proc_rc=1 额外FAIL=12)
+rev_safety_trip_skip_post | META-OK 命中 1/1 个业务失败身份 (variant=target proc_rc=1 额外FAIL=2)
+rev_diag_fail_releases_owner | REV-HANDED-OFF 本链不消费该事实(3 次试投均 NOT-DETECTED); CP5 §6 起由 S2 并发链的 rev_fail_returns_owner_early 在**C11d 真正经过的 release 失败分支**注入, 并把 C11d 扩到对 canonical owner==SP_HELD_UNKNOWN/锁存/输出未交回三者同时断言 => 具名检出(见 run_stop_priority_s2.sh REVERSE=1)
+S1 REVERSE RESULT: PASS —— 本链注入命中预登记业务失败身份(rc=1, 台账自洽); 第②项按 §10.2 重指向 S2 并发链代跑(见上方 REV-POINTED 行)

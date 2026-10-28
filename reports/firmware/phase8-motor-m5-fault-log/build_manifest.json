@@ -1,0 +1,97 @@
+{
+  "task": "phase8-motor-m5-fault-log",
+  "date": "2026-10-29",
+  "branch": "debug/tmc-uart-rootcause-20261028",
+  "code_commit": "8cf23aa6dda20baf7843798bdef9a02cfd71326f",
+  "document_base": "6218efa251cd6b8a16ad2df8f0fef1efd2ba5eeb",
+  "targets": {
+    "rt-thread": {
+      "macros": "four macros = RT_FALSE (source defaults; no target override)",
+      "program_size": "Code=180586 RO-data=78306 RW-data=2188 ZI-data=83784",
+      "axf": {
+        "bytes": 1667756,
+        "sha256": "cb3d4e7507459a98fb6b268b3dcff7714c3da5bb58bc0975844e5cd790cdbbab"
+      },
+      "bin": {
+        "bytes": 259468,
+        "sha256": "fdab581e63ccb19b7617a8430a0847eb1b7c1d53b3c97aae6ed21da5162f94b2"
+      },
+      "load": {
+        "base": "0x08000000",
+        "file_bytes": 259468,
+        "mem_bytes": 344864
+      }
+    },
+    "rt-thread-measure-a0": {
+      "macros": "four macros = RT_FALSE; NS800_TARGET_MEASUREMENT_A0 is not defined in this target's Define (same as prior builds)",
+      "program_size": "Code=187882 RO-data=81266 RW-data=2188 ZI-data=91504",
+      "axf": {
+        "bytes": 1698176,
+        "sha256": "3adf06f1061c78e212f052d219289433106afa9896889938e5071d6598777786"
+      },
+      "bin": {
+        "bytes": 269724,
+        "sha256": "17c6f191dbf80635b903d88919b25ef7ba7ae5cffa784be093f59fd0062a1771"
+      },
+      "load": {
+        "base": "0x08000000",
+        "file_bytes": 269724,
+        "mem_bytes": 362840
+      }
+    },
+    "rt-thread-motor-m1-candidate": {
+      "macros": "MOTOR_HARDWARE_ENABLE_PATH_VALIDATED=1 TMC_DRIVE_CONFIG_HW_VALIDATED=1 STEP_DIAG_ISOLATED_ENV_CONFIRMED=0 SAFETY_LIMIT_INPUTS_ENABLED=0",
+      "program_size": "Code=180818 RO-data=78186 RW-data=2188 ZI-data=83784",
+      "axf": {
+        "bytes": 1668244,
+        "sha256": "8c5bc7bf1efa786013c767ae1e09415ad0d5d5db3e38069c8aeebabf7cebae40"
+      },
+      "bin": {
+        "bytes": 259580,
+        "sha256": "01d3e5ab1ad245949385d50c9f1d5fd2bbaac0806c3920e897321bc46db764bc"
+      },
+      "load": {
+        "base": "0x08000000",
+        "file_bytes": 259580,
+        "mem_bytes": 344976
+      },
+      "banner": "build Oct 29 2026 00:38:59"
+    }
+  },
+  "build": {
+    "tool": "UV4 5.43.1.0 / ARMCLANG V6.24",
+    "command": "UV4.exe -r project.uvprojx -t <target> -j0 -o <log>",
+    "rebuild_all": true,
+    "logs": [
+      "reports/reviews/phase8-motor-m5-fault-log/build_default.txt",
+      "reports/reviews/phase8-motor-m5-fault-log/build_a0.txt",
+      "reports/reviews/phase8-motor-m5-fault-log/build_motor.txt"
+    ],
+    "result": "default 0E/0W; A0 0E/0W; motor candidate 0E/0W",
+    "macro_probe": {
+      "tool": "armclang 6.24 --target=arm-arm-none-eabi -mcpu=cortex-m7 -mfpu=fpv5-d16 -mfloat-abi=hard",
+      "candidate": "MOTOR=1 TMC=1 STEP=0 LIMIT=0 (compile-time #error guards passed)",
+      "default_a0": "MOTOR=0 TMC=0 STEP=0 LIMIT=0 (no target overrides)"
+    }
+  },
+  "host_verification": {
+    "S1_normal": "target 55/55 PASS, host_ovr 70/70 PASS, runner rc=0",
+    "S1_reverse": "rev_motor_off 5/5, rev_safety_trip_skip_post 1/1 META-OK, runner rc=0",
+    "flash_normal": "FE01-FE05 PASS, cap FE06 PASS, archive checker 17/17 selftest, ACCEPT + CLEAR_ALLOWED=YES, missing-slot REJECT",
+    "flash_reverse": "FE02 only FAIL (truncated 126B+NUL), archive batch REJECT NUL_BYTE/CLEAR_ALLOWED=NO, runner rc=0",
+    "S2_selected": "ONLY=recovery,identity,stale,diag: target 4 groups/6 cases, host_ovr 4 groups/19 cases, all required PASS, rc=0",
+    "V1V2": "CHECK_PASS=22 CHECK_FAIL=0, runner rc=0",
+    "IO_behavior": "off_target/on_target/off_ovr/on_ovr 27/29/40/42 required PASS, rc=0",
+    "SD_chain": "NOT_RERUN (sensor_service.c/blackbox.c inputs unchanged this round)",
+    "field_script_selftest": "FS01-FS04 PASS (archive reject blocks clear, 3s/5s order, no-clear stop, no-new-log blocks recovery)"
+  },
+  "product_changes": [
+    "safety_state.c: safety_trip CONFIRM software event entry through safety_post_event(EVT_SOFT_FAULT); strict argc/arg, silent context rejection, no persistence claim",
+    "ns_flash_shell.c: flash_dump strict decimal args/range before reads, checked rt_snprintf+rt_kputs with 256B line, named overflow error, explicit empty/error markers, 14 columns unchanged",
+    "diagnosis.c: disclose ADC cal source (THEORETICAL=not measured), threshold_validation=NOT_ESTABLISHED, MONITOR_ONLY and vibration gravity baseline; criteria unchanged",
+    "motor.c: add (void)argv to cmd_motor_arm/cmd_motor_start to keep the S2 strict 0-warning build gate meaningful; no behavior change",
+    "tests/host: PS17a-e + skip-post reverse; shim_flash/flash_main FE01-FE06; m5_log_archive_check.py 17-case selftest; S1 EPIPE fix + unregistered negative control; S2 fake IOIN identity 0x21 for the accepted production VERSION check",
+    "reports/reviews/phase8-motor-m5-fault-log/m5_field_serial.py: archive/fault phases with clear gate, 3s trip/5s disarm deadlines and bounded BB polling"
+  ],
+  "status": "M5_CP0_OFFLINE_COMPLETE / IMAGES_BUILT / NOT_FLASHED / FIELD_PACKAGE_PENDING_APPROVAL"
+}

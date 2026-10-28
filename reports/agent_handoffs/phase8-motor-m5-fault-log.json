@@ -1,0 +1,85 @@
+{
+  "task": "phase8-motor-m5-fault-log",
+  "date": "2026-10-29",
+  "branch": "debug/tmc-uart-rootcause-20261028",
+  "base_commit": "6218efa251cd6b8a16ad2df8f0fef1efd2ba5eeb",
+  "code_commit": "8cf23aa6dda20baf7843798bdef9a02cfd71326f",
+  "status": "CP0_OFFLINE_COMPLETE / NOT_FLASHED / AWAITING_FIELD_APPROVAL",
+  "candidate": {
+    "target": "rt-thread-motor-m1-candidate",
+    "bin": {
+      "bytes": 259580,
+      "sha256": "01d3e5ab1ad245949385d50c9f1d5fd2bbaac0806c3920e897321bc46db764bc"
+    },
+    "axf": {
+      "bytes": 1668244,
+      "sha256": "8c5bc7bf1efa786013c767ae1e09415ad0d5d5db3e38069c8aeebabf7cebae40"
+    },
+    "banner": "build Oct 29 2026 00:38:59",
+    "load": {
+      "base": "0x08000000",
+      "file_bytes": 259580,
+      "mem_bytes": 344976
+    },
+    "macros": {
+      "MOTOR_HARDWARE_ENABLE_PATH_VALIDATED": 1,
+      "TMC_DRIVE_CONFIG_HW_VALIDATED": 1,
+      "STEP_DIAG_ISOLATED_ENV_CONFIRMED": 0,
+      "SAFETY_LIMIT_INPUTS_ENABLED": 0
+    }
+  },
+  "other_targets": {
+    "rt-thread": {
+      "bin": {
+        "bytes": 259468,
+        "sha256": "fdab581e63ccb19b7617a8430a0847eb1b7c1d53b3c97aae6ed21da5162f94b2"
+      },
+      "axf": {
+        "bytes": 1667756,
+        "sha256": "cb3d4e7507459a98fb6b268b3dcff7714c3da5bb58bc0975844e5cd790cdbbab"
+      }
+    },
+    "rt-thread-measure-a0": {
+      "bin": {
+        "bytes": 269724,
+        "sha256": "17c6f191dbf80635b903d88919b25ef7ba7ae5cffa784be093f59fd0062a1771"
+      },
+      "axf": {
+        "bytes": 1698176,
+        "sha256": "3adf06f1061c78e212f052d219289433106afa9896889938e5071d6598777786"
+      }
+    }
+  },
+  "build": {
+    "tool": "UV4 5.43.1.0 / ARMCLANG V6.24",
+    "rebuild_all": true,
+    "result": "three targets 0 Error / 0 Warning"
+  },
+  "host_verified": {
+    "S1_normal": "target 55/55, host_ovr 70/70, rc=0",
+    "S1_reverse": "rev_motor_off 5/5, rev_safety_trip_skip_post 1/1, rc=0",
+    "flash_normal": "FE01-05 + FE06 cap + checker 17/17 + ACCEPT/REJECT gate, rc=0",
+    "flash_reverse": "FE02 only FAIL, truncated archive REJECT(CLEAR_ALLOWED=NO), rc=0",
+    "S2_selected": "recovery/identity/stale/diag: target 6 cases, host_ovr 19 cases, rc=0",
+    "V1V2": "22 checks PASS, rc=0",
+    "IO": "27/29/40/42 required PASS, rc=0",
+    "SD": "NOT_RERUN (unchanged inputs)",
+    "field_selftest": "FS01-FS04 4/4 PASS"
+  },
+  "field_package": "reports/reviews/phase8-motor-m5-fault-log/m5_field_package.md",
+  "field_script": "reports/reviews/phase8-motor-m5-fault-log/m5_field_serial.py",
+  "archive_checker": "tests/host/m5_log_archive_check.py",
+  "field_results": {
+    "M5_SOFTWARE_EVENT_STOP_PASS": "NOT_REACHED",
+    "M5_NEW_FAULT_LOG_PASS": "NOT_REACHED",
+    "M5_MANUAL_RECOVERY_PASS": "NOT_REACHED"
+  },
+  "open_items": [
+    "DIAG physical trigger",
+    "real stall/load SG calibration",
+    "measured phase current",
+    "physical PWM timing / stop latency",
+    "M5 field execution"
+  ],
+  "no_device_actions": "No COM5, DAP, flash, readback, log clear, motor start or reset was performed."
+}

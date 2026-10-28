@@ -1,0 +1,2 @@
+ARCHIVE=REJECT reason=NUL_BYTE detail=raw batch contains NUL (truncated console line)
+CLEAR_ALLOWED=NO

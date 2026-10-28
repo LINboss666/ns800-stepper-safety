@@ -194,3 +194,10 @@ M3 未执行。原始串口/启动/下载日志以 base64 存于
   M4 不测 IRUN26。旧 M3 target→arm 顺序错误已在方向闭环轮更正并记录。
 - **证据**：`reports/reviews/phase8-motor-chain-dev/m4/`（`m4_result.txt` + 8 个原始 RX b64 +
   host console）。未构建/烧录/apply/fault_reset/blackbox_clear；6 次 start/stop 在批准内。
+
+## M5 指针（2026-10-29，仅追加）
+
+M5 软件故障停机/新日志/人工恢复的 CP0 交付与现场包见
+`reports/agent_handoffs/phase8-motor-m5-fault-log.md` / `.json` 与
+`reports/reviews/phase8-motor-m5-fault-log/m5_field_package.md`。
+M4 已接受的电机功能结论不撤回；软件故障停机、新故障日志与人工恢复为 **NOT_REACHED**（等待现场批准）。

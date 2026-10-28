@@ -1,0 +1,14 @@
+CASE|FE01-header_and_normal_row|PASS|reads=1 kputs=1 kprintf=1 len=142 cap=slot,seq,session,time_ms,event,valid,sg,current_ma,ax_mg,ay_mg,az_mg,step_hz,vibration_mg,flags
+0,17,3,123456,9,31,-6,-7,-8,-9,-10,-11,-12,13
+
+CASE|FE02-extreme_values_full_roundtrip|FAIL|reads=4 rows=2 n0=139 n3=45 kputs=1 kprintf=4 nul=1 cap=slot,seq,session,time_ms,event,valid,sg,current_ma,ax_mg,ay_mg,az_mg,step_hz,vibration_mg,flags
+0,4294967295,4294967295,4294967295,4294967295,4294967295,-2147483648,2147483647,-2147483648,2147483647,-2147483648,2147483647,
+CASE|FE03-invalid_args_zero_reads|PASS|16 malformed arg sets rejected before any ns_log_read_slot
+CASE|FE04-last_slot_boundary_accepted|PASS|reads=1 rows=1 p=96 cap=slot,seq,session,time_ms,event,valid,sg,current_ma,ax_mg,ay_mg,az_mg,step_hz,vibration_mg,flags
+4095,4095,3,123456,9,31,-6,-7,-8,-9,-10,-11,-12,13
+
+CASE|FE05-read_error_no_partial_row|PASS|reads=2 rows=1 cap=slot,seq,session,time_ms,event,valid,sg,current_ma,ax_mg,ay_mg,az_mg,step_hz,vibration_mg,flags
+slot 5 error -12
+6,21,3,123456,9,31,-6,-7,-8,-9,-10,-11,-12,13
+
+SUMMARY|cases=5 pass=4 fail=1

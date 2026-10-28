@@ -1,0 +1,2 @@
+ARCHIVE=REJECT reason=MISSING_SLOT detail=batch [0,4): 3/4 rows, missing [2]
+CLEAR_ALLOWED=NO

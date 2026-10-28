@@ -34,7 +34,8 @@ import sys
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-CHECKER = os.path.join(HERE, "m5_log_archive_check.py")
+REPO_ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
+CHECKER = os.path.join(REPO_ROOT, "tests", "host", "m5_log_archive_check.py")
 NEED_SLOTS = 400          # pre200+post100 + 余量
 NS_LOG_SLOTS = 4096
 POLL_ROUNDS = 16
