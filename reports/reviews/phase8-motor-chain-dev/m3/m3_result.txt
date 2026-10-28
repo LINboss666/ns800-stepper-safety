@@ -1,0 +1,75 @@
+M3 首次电机短转执行结果（2026-10-28）
+任务包：NS800_M3_First_Motor_Run_20261028.md（15161 B / 68838d49faa0a93dd056e3e9f428cec8c67f1b77f977c26b73a73ff55119ced5）
+批准：用户「批准本文件 M3 包…」；后续两次 5 s 重跑为用户明确授权变更
+document_base：5a613584b8d84f9ca91f6f6348c6b3ac5ab4b08c
+software_input：916c34ba4032bc7f41e2944c13b449271030191b
+在板：rt-thread-motor-m1-candidate；BIN 258428 B / 397aa844afdeb2f2b768670546f28067d6398851cae3416cbe6d910f2078e675；
+      AXF 1665388 B / 0cfa048fd645bf2c1a9e9ae4269bfa1a8f3b19096972faa07bdeb7e899134baf
+（build_manifest.json 的 on_board/downloaded 是 M2 前历史字段，未据此重烧）
+
+[启动与配置]
+- MCU 未重启：system_status 仍 READY、drive_cfg=CONFIGURED；但 TMC IFCNT=0、
+  live GCONF=0x00000101、CHOPCONF=0x15010053，表明接线时 TMC 掉过电，M2 的 CONFIGURED 快照不可继承。
+- 未取得新启动原流；按包内“允许以只读状态查询建立同步”，用当前状态查询 + 一次 apply 建立本次可信配置。
+- 一次 tmc_config_apply CONFIRM：
+  IFCNT 0→4（Δ4）；
+  GCONF  RMW (0x00000101 & ~0x000000C1)|0x00000041 = 0x00000141；
+  CHOPCONF RMW (0x15010053 & ~0x00020000)|0x00020000 = 0x15030053；
+  applied 与 live 均 GCONF=0x00000141、CHOPCONF=0x15030053；
+  IHOLD_IRUN=0x00041408、TPOWERDOWN=0x08 只写（逐笔 IFCNT 与首尾 +4 证明到达）；
+  state=CONFIGURED、snapshot_valid=1、last_err=0。
+- 电流为设定值，非实测：VREF=1.37 V、Rsense=110 mΩ、Rds=20 mΩ、VSENSE=1、IRUN=20/IHOLD=8
+  → run 0.352 A RMS（正弦峰值 0.498 A）、hold 0.151 A RMS。
+  固件仍按编译常量 VREF=1.27 V 打印 run 326 mA / hold 139 mA RMS，不代表本次读数。
+
+[保护就绪]
+- 现场万用表：H6-7 对地 0 V（操作者读数）；软件 PA.3/TMC_DIAG raw=0 safe=0。
+- 文档依据：TMC2209 DIAG 高有效（Datasheet pin 11 / §15.4）；MCU PA.3 输入、safe LOW、RISING。
+- 限制：H6-7→PA.3 的独立连通/无反相仍无网表或导通实测；H6 pin7 仅为图纸推断。
+- 一次 safety_polarity_confirm CONFIRM；一次 safety_irq_enable；
+  safety_irq_status 连读两次：IRQ OPEN、polarity CONFIRMED、protection_ready=YES、
+  TMC_DIAG raw=0、无中断风暴/新 fault；motor_status arm_gate_mask=0x0。
+
+[短转执行]
+- 任务书顺序 target→arm 与固件合同冲突：motor_arm 要求 state=IDLE/armed=0/cur=0/tgt=0。
+  第一次 DIR0 先 motor_target 100 再 arm 被 REFUSED（未通电、未转动），随即 motor_disarm。
+  修正为 arm→target→start；ramp 线程在 IDLE 直接 return，arm 后设 target 不会提前起转。
+- SW1：接线/前置期间阻断；前置通过后切允许位并保持（操作者明确不再拨动）。
+- DIR0 1.5 s：motor_dir 0；ARMED（许可 HIGH、ENN 反馈 LOW 一致）；target 100；
+  start→stop 1501 ms；stop=api-accepted src=ramp-zero rc=0 latched=0；disarm 完成。
+  现场：顺时针、幅度小、非平顺、无异常。
+- DIR1 1.5 s：motor_dir 1；ARMED；target 100；start→stop 1501 ms；
+  stop=api-accepted src=ramp-zero rc=0；disarm 完成。现场：逆时针（平滑性未报告）。
+- 授权变更 1（5 s，超出原包 ≤2 s）：DIR1 5 s；ARMED；target 100；start→stop 5000 ms；
+  stop=api-accepted src=ramp-zero rc=0；disarm 完成。现场：顺时针、幅度更大、有抖动。
+- 授权变更 2（5 s）：DIR0 5 s；ARMED；target 100；start→stop 5001 ms；
+  stop=api-accepted src=ramp-zero rc=0；disarm 完成。现场：顺时针、幅度更大、抖动（操作者判断为自身惯性）。
+- 计数：实际运动 4 次；arm 命令 5 次（含 1 次 REFUSED）；start 4 次；stop 4 次正常 + 1 次失败清理；
+  disarm 5 次。两次 5 s 为用户授权变更，不计入原包 PASS。
+
+[终态]
+- armed=0、cur_hz=0、tgt_hz=0、stop=api-accepted src=disarm rc=0 latched=0、
+  arm_gate_mask=0x0、drv_request=LOW pad=0、ENN_fb=HIGH verdict=OK、STEP enabled=0、
+  Safety READY fault=0、IFCNT=4、drive_cfg=CONFIGURED。
+- IRQ 仍 OPEN、polarity CONFIRMED、protection_ready=YES；SW1 保持允许位（操作者拒绝再拨动）；
+  软件已 disarm、ENN HIGH。
+- 显示 caveat：motor_status 的 drv_en_request 在 disarm 后仍显示 1
+  （该字段语义为“最近一次经回读确认的焊盘电平”，disarm 不更新它）；
+  实际 safety request=LOW/pad=0、safety_status 的 last write+readback=0。不得据此称使能。
+
+[判据与结论]
+- PASS（有限）：一次 apply 到达/一致；保护就绪；DIR0/DIR1 各一次 1.5 s 的 arm/start/stop/disarm
+  软件链路；原始 1.5 s 两方向各观察到转动（DIR0 CW、DIR1 CCW 一次）。
+- UNRESOLVED：方向一致性（DIR1 5 s 报 CW，与 1.5 s 的 CCW 矛盾）；
+  平顺性/抖动（操作者判断惯性，未测）；无频率/占空比/停机时延波形证据；无实测相电流。
+- 结论：M3_FIRST_FUNCTIONAL_ROTATION_PARTIAL_DIRECTION_UNRESOLVED；
+  不登记 M3_FIRST_FUNCTIONAL_ROTATION_VERIFIED；safe_for_enable=false；
+  不宣称系统全部安全验收、量产 GO、真实电流测量或最坏停机时延通过。
+- 未执行：fault_reset、清故障、升流、升频、改宏、重新烧录、DAP/Flash 读取、OTP/选项字/全片擦除。
+
+[原始件]
+- 原始 RX 逐文件存为 *.bin.b64（base64，解码 base64 -d）；device 输出不含主机计时，
+  1501/1501/5000/5001 ms 来自主机 console，见 run_timings.txt。
+- 文件：pre / apply / irq / sw1_allow / dir0(首次 arm 被拒) / after_fail /
+  dir0b / dir1 / dir1_5s / dir0_5s / final。
+- 个别旧长行仍有 NUL/截尾；关键数值由独立短行与原始流取得，未从截断处补字段。

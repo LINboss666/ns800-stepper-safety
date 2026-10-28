@@ -94,3 +94,31 @@ main/phase7/tag 未动；未改全局 Git 配置。
 M3 未执行。原始串口/启动/下载日志以 base64 存于
 `reports/reviews/phase8-motor-chain-dev/m2/`，`m2_result.txt` 为逐项结果。
 板当前运行候选镜像（禁能、无电机、未 arm）。
+
+## 9. M3 首次电机短转结果（2026-10-28，用户「批准本文件 M3 包…」）
+
+§8 为 M2 结束时状态；本节为 M3 后当前状态。
+
+- **启动/配置**：MCU 未重启（system_status 仍 READY/CONFIGURED），但 TMC IFCNT=0、
+  live GCONF=0x00000101 / CHOPCONF=0x15010053，说明接线时 TMC 掉电，M2 的 CONFIGURED
+  不可继承。未取得新启动原流；以当前状态查询 + **一次** `tmc_config_apply CONFIRM` 重建：
+  IFCNT 0→4；applied/live GCONF=0x00000141、CHOPCONF=0x15030053；snapshot_valid=1。
+- **保护**：操作者万用表 **H6-7 对地 0 V**；PA.3 raw=0/safe=0。一次
+  `safety_polarity_confirm CONFIRM`、一次 `safety_irq_enable`；IRQ OPEN、polarity CONFIRMED、
+  protection_ready=YES（连读两次）、arm_gate_mask=0x0；无风暴/新 fault。
+  限制：H6-7→PA.3 的独立连通/无反相仍缺网表或导通证据（H6 pin7 为图纸推断）。
+- **短转**：任务书 target→arm 与固件“arm 时 target=0”冲突；首次 DIR0 arm 被拒（未通电），
+  随即 disarm；改为 arm→target→start。DIR0 1.5 s：CW、幅度小、非平顺、无异常；
+  DIR1 1.5 s：CCW（平滑性未报告）；stop/disarm 均 api-accepted rc=0。
+- **用户授权 5 s 变更**：DIR1 5 s：CW、幅度更大、有抖动；DIR0 5 s：CW、幅度更大、
+  抖动（操作者判断为自身惯性）。两次均 5000/5001 ms、stop/disarm 通过。
+- **终态**：armed=0、cur/tgt=0、drv_request=LOW pad=0、ENN_fb=HIGH、STEP enabled=0、
+  READY/fault=0、IFCNT=4、drive_cfg=CONFIGURED；IRQ OPEN/protection_ready=YES；
+  SW1 保持允许位（操作者明确不再拨动）。`motor_status` 的 `drv_en_request` 仍显示 1，
+  是“最近一次回读确认值”的显示语义，实际 safety request=LOW / last readback=0。
+- **结论**：`M3_FIRST_FUNCTIONAL_ROTATION_PARTIAL_DIRECTION_UNRESOLVED`（不登记 VERIFIED）。
+  有限 PASS：apply、保护就绪、两方向原始 1.5 s 各一次 arm/start/stop/disarm 与转动观察；
+  UNRESOLVED：方向一致性（DIR1 5 s CW 与 1.5 s CCW 矛盾）、平顺性/抖动、实测电流、
+  波形/频率/停机时延。`safe_for_enable=false`。5 s 两次为授权变更，超出原包 ≤2 s。
+- **证据**：`reports/reviews/phase8-motor-chain-dev/m3/`（`*.bin.b64` + `m3_result.txt` +
+  `run_timings.txt`）。未清故障、未升流/升频、未改宏、未重烧、未读 DAP/Flash。

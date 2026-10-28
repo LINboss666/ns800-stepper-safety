@@ -1,0 +1,7 @@
+M3 host-side timing evidence (2026-10-28)
+DIR0 first attempt: no motion; motor_arm REFUSED (target_hz=100 before arm); no energization; source dir0_console.txt
+DIR0 1.5 s: motor_start -> motor_stop in 1501 ms; source dir0b_console.txt
+DIR1 1.5 s: motor_start -> motor_stop in 1501 ms; source dir1_console.txt
+DIR1 5 s (user-authorized extension): motor_start -> motor_stop in 5000 ms; source dir1_5s_console.txt
+DIR0 5 s (user-requested extension): motor_start -> motor_stop in 5001 ms; source dir0_5s_console.txt
+Note: device raw output for the 1.5 s and 5 s runs of the same direction is byte-identical; duration is host-side only.

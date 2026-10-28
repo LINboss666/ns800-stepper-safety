@@ -29,8 +29,8 @@
    "axf_sha256": "0cfa048fd645bf2c1a9e9ae4269bfa1a8f3b19096972faa07bdeb7e899134baf",
    "bin_sha256": "397aa844afdeb2f2b768670546f28067d6398851cae3416cbe6d910f2078e675",
    "bin_bytes": 258428,
-   "on_board": false,
-   "downloaded": false
+   "on_board": true,
+   "downloaded": true
   }
  },
  "build": {
@@ -78,19 +78,24 @@
   "§5 专用 host 用例（CLI 验参 / 启动身份 / 短行宽度）未新增",
   "相电流定义与同实物 Rsense/VREF 未确认",
   "ADC 理论标定、诊断阈值工程占位、物理 STEP/停机时延未验",
-  "恢复下载路径未演练；A0 时长 NOT_ACHIEVED"
+  "恢复下载路径未演练；A0 时长 NOT_ACHIEVED",
+  "M3 方向一致性未闭环：DIR1 1.5 s 报告 CCW，5 s 报告 CW；未用波形/相电流解释",
+  "M3 平顺性/抖动未测；操作者判断 5 s 抖动为自身惯性",
+  "H6-7→PA.3 连通/无反相仍缺独立网表或导通证据（H6 pin7 为图纸推断）",
+  "motor_status 的 drv_en_request 在 disarm 后仍显示 1（字段语义为最近一次回读确认值；非门禁，但显示易误读）"
  ],
  "safety": {
-  "motor_connected": false,
-  "sw1_blocking": true,
+  "motor_connected": true,
+  "sw1_blocking": false,
   "four_macros_default_false": true,
   "target_overrides_only_on_candidate": true,
   "tmc_writes_on_default": 0,
   "fault_cleared": false,
-  "board_state": "READY, motion gate-locked",
-  "safe_for_enable": false
+  "board_state": "READY, disarmed, ENN HIGH; IRQ OPEN/protection_ready=YES; SW1 allow",
+  "safe_for_enable": false,
+  "sw1_position": "allow (operator left it after M3; not moved back)"
  },
- "status": "M2_CONFIGURED_AND_VERIFIED / M3_PENDING",
+ "status": "M3_FIRST_FUNCTIONAL_ROTATION_PARTIAL_DIRECTION_UNRESOLVED / SAFE_FOR_ENABLE_FALSE",
  "package": "reports/reviews/phase8-motor-chain-dev/motor_package_m2_m3.md",
  "m2": {
   "approved": "用户「批准M2」",
@@ -135,9 +140,221 @@
  },
  "board": {
   "image": "candidate rt-thread-motor-m1",
-  "state": "READY, motion gate-locked",
+  "state": "READY, disarmed, ENN HIGH; IRQ OPEN/protection_ready=YES",
   "armed": false,
   "drive_cfg": "CONFIGURED",
-  "safe_for_enable": false
+  "safe_for_enable": false,
+  "sw1": "allow (operator left it)"
+ },
+ "m3": {
+  "approved": "用户「批准本文件 M3 包…」",
+  "document_bytes": 15161,
+  "document_sha256": "68838d49faa0a93dd056e3e9f428cec8c67f1b77f977c26b73a73ff55119ced5",
+  "executed": true,
+  "mcu_reboot": false,
+  "tmc_power_cycle_detected": true,
+  "new_boot_stream_captured": false,
+  "startup_note": "system_status 仍 READY/CONFIGURED，但 TMC IFCNT=0/live 默认值表明接线时 TMC 掉电；按包内允许以只读状态查询建立同步，并以一次 apply 重建可信配置",
+  "config": {
+   "ifcnt_before": 0,
+   "ifcnt_after": 4,
+   "ifcnt_delta_mod256": 4,
+   "gconf_before": "0x00000101",
+   "gconf_expected_rmw": "0x00000141",
+   "gconf_live": "0x00000141",
+   "gconf_applied": "0x00000141",
+   "chopconf_before": "0x15010053",
+   "chopconf_expected_rmw": "0x15030053",
+   "chopconf_live": "0x15030053",
+   "chopconf_applied": "0x15030053",
+   "ihold_irun_write": "0x00041408",
+   "tpowerdown_write": "0x00000008",
+   "state": "CONFIGURED snapshot_valid=1 last_err=0"
+  },
+  "current_setpoint": {
+   "vref_mv": 1370,
+   "rsense_mohm": 110,
+   "rds_mohm": 20,
+   "vsense": 1,
+   "irun": 20,
+   "ihold": 8,
+   "run_ma_rms": 352,
+   "peak_ma": 498,
+   "hold_ma_rms": 151,
+   "measured": false,
+   "firmware_print_vref_mv": 1270,
+   "firmware_print_run_ma_rms": 326,
+   "firmware_print_hold_ma_rms": 139
+  },
+  "protection": {
+   "dmm_point": "H6-7",
+   "dmm_volts": 0,
+   "pa3_raw": 0,
+   "pa3_safe": 0,
+   "irq_gate": "OPEN",
+   "polarity": "CONFIRMED",
+   "protection_ready": "YES",
+   "arm_gate_mask": "0x0",
+   "interrupt_storm": false,
+   "routing_caveat": "H6-7→PA.3 连通/无反相仍缺独立网表或导通证据"
+  },
+  "first_failure": "motor_arm REFUSED: not at rest (target_hz=100 before arm); firmware requires target_hz=0; no energization; motor_disarm executed",
+  "runs": [
+   {
+    "dir": 0,
+    "window_ms": 1501,
+    "package_scope": true,
+    "armed": true,
+    "target_hz": 100,
+    "observed": "CW, small amplitude, not smooth, no abnormal reported",
+    "stop": "api-accepted src=ramp-zero rc=0 latched=0",
+    "disarm": true
+   },
+   {
+    "dir": 1,
+    "window_ms": 1501,
+    "package_scope": true,
+    "armed": true,
+    "target_hz": 100,
+    "observed": "CCW; smoothness not reported",
+    "stop": "api-accepted src=ramp-zero rc=0 latched=0",
+    "disarm": true
+   },
+   {
+    "dir": 1,
+    "window_ms": 5000,
+    "package_scope": false,
+    "authorized_extension": true,
+    "armed": true,
+    "target_hz": 100,
+    "observed": "CW, larger amplitude, vibration",
+    "stop": "api-accepted src=ramp-zero rc=0 latched=0",
+    "disarm": true
+   },
+   {
+    "dir": 0,
+    "window_ms": 5001,
+    "package_scope": false,
+    "user_requested_extension": true,
+    "armed": true,
+    "target_hz": 100,
+    "observed": "CW, larger amplitude, vibration (operator: inertia)",
+    "stop": "api-accepted src=ramp-zero rc=0 latched=0",
+    "disarm": true
+   }
+  ],
+  "counts": {
+   "motion_runs": 4,
+   "arm_commands": 5,
+   "arm_refused": 1,
+   "start_commands": 4,
+   "normal_stops": 4,
+   "cleanup_stop_commands": 1,
+   "disarm_commands": 5
+  },
+  "final": {
+   "armed": 0,
+   "cur_hz": 0,
+   "target_hz": 0,
+   "stop": "api-accepted src=disarm rc=0 latched=0",
+   "arm_gate_mask": "0x0",
+   "drv_request": "LOW",
+   "pad": 0,
+   "enn_fb": "HIGH",
+   "step_enabled": 0,
+   "safety": "READY fault=0",
+   "ifcnt": 4,
+   "drive_cfg": "CONFIGURED",
+   "sw1": "allow (operator left it)",
+   "irq_gate": "OPEN",
+   "protection_ready": "YES"
+  },
+  "display_caveat": "motor_status drv_en_request remains 1 after disarm (semantics: last readback-verified pad level); actual safety request=LOW/pad=0 and last write+readback=0",
+  "deviations": [
+   "两次 5 s 运行由用户明确授权，超出原 M3 包每方向 <=2 s 的计划窗口",
+   "用户明确拒绝把 SW1 拨回阻断；最终 SW1 保持允许位，软件已 disarm/ENN HIGH",
+   "首次 DIR0 先设 target 再 arm，被固件静止条件拒绝；修正为 arm→target→start，未改固件/宏/门禁"
+  ],
+  "verdict": "M3_FIRST_FUNCTIONAL_ROTATION_PARTIAL_DIRECTION_UNRESOLVED",
+  "package_success_label_registered": false,
+  "safe_for_enable": false,
+  "waveform_frequency_duty_stop_latency_verified": false,
+  "actual_phase_current_measured": false,
+  "evidence": {
+   "pre.bin.b64": {
+    "b64_bytes": 9443,
+    "b64_sha256": "957839374938f22cdea0016996b4f2764c115ab9c859a132ac79cff0950b3191",
+    "raw_bytes": 6990,
+    "raw_sha256": "70000da857546f9ac8670eed2acef0b1b09c54392eab918c909991763cdd4eab"
+   },
+   "apply.bin.b64": {
+    "b64_bytes": 7271,
+    "b64_sha256": "d5f5b13662a2b86e4a7cfe539c839afb43f168e3b157c74d73a0135bde39271c",
+    "raw_bytes": 5382,
+    "raw_sha256": "bd1376657b374d0ce674ea4c241a418216fd9b9014d051b87d8d0114703969af"
+   },
+   "irq.bin.b64": {
+    "b64_bytes": 4774,
+    "b64_sha256": "ab1567a6c23eb6fee93266ddf59040bdbfd931045b799d9c67103115829eac5b",
+    "raw_bytes": 3532,
+    "raw_sha256": "3fe5342954690a7f059a3c0a48c7f2f75cce858c92b0fa18eb50c772d4ef8daf"
+   },
+   "sw1_allow.bin.b64": {
+    "b64_bytes": 2420,
+    "b64_sha256": "b97d6ce0fa7adeb05a90db8139274b01a5a664e0ae5edb8d025c1c5be0507200",
+    "raw_bytes": 1789,
+    "raw_sha256": "e4c45545548646f6d471aefe8ee19e94945148b2b372dbd6ad71480cd5f990be"
+   },
+   "dir0.bin.b64": {
+    "b64_bytes": 815,
+    "b64_sha256": "823ff248fd5450e967cf5a5d39d54e7827f0c5f3200920d40138c9f14dd8d6c8",
+    "raw_bytes": 603,
+    "raw_sha256": "c9e6220bafc2921047f3ecb65b293e81448a2b021b047e6e8f79caf82e047f0f"
+   },
+   "after_fail.bin.b64": {
+    "b64_bytes": 1654,
+    "b64_sha256": "50b052a02b1490560e7737dbc7db494a87b5d57d1ace688aa616b9917d74e786",
+    "raw_bytes": 1223,
+    "raw_sha256": "a840b87d72f4352d0cf85fbd3629a161776086950c2fad4c121b4d6e649b72fb"
+   },
+   "dir0b.bin.b64": {
+    "b64_bytes": 3279,
+    "b64_sha256": "8ecef990b42708c24f3d040c6c37f103ed50421680ec3d2aa67c68cb70724668",
+    "raw_bytes": 2426,
+    "raw_sha256": "ca16900158f9507336ebacd076673c56087fc3c5322cd2f9708826125d9d1aea"
+   },
+   "dir1.bin.b64": {
+    "b64_bytes": 3279,
+    "b64_sha256": "847c0aef8b833846c656bbd67a478d7b33aa0c23fbd9de7d2fe1e4af260ff8fe",
+    "raw_bytes": 2426,
+    "raw_sha256": "b4b0e4a9ca438c1da17496bfb7ff86bca84a31194e9c235144228c6f8cadad3f"
+   },
+   "dir1_5s.bin.b64": {
+    "b64_bytes": 3279,
+    "b64_sha256": "847c0aef8b833846c656bbd67a478d7b33aa0c23fbd9de7d2fe1e4af260ff8fe",
+    "raw_bytes": 2426,
+    "raw_sha256": "b4b0e4a9ca438c1da17496bfb7ff86bca84a31194e9c235144228c6f8cadad3f"
+   },
+   "dir0_5s.bin.b64": {
+    "b64_bytes": 3279,
+    "b64_sha256": "8ecef990b42708c24f3d040c6c37f103ed50421680ec3d2aa67c68cb70724668",
+    "raw_bytes": 2426,
+    "raw_sha256": "ca16900158f9507336ebacd076673c56087fc3c5322cd2f9708826125d9d1aea"
+   },
+   "final.bin.b64": {
+    "b64_bytes": 7551,
+    "b64_sha256": "a929320c6088cbc265a5e999a65dd8baccf74cc9d8799d8174ddd4fa000b9da8",
+    "raw_bytes": 5588,
+    "raw_sha256": "a0df3b032934a62f416f94f25bf73226e7b7532b74bfe9e2986a02f16050f583"
+   },
+   "m3_result.txt": {
+    "bytes": 5760,
+    "sha256": "fe634121ae9be651060e6c665e4c55cb29068da4ad063e3618b2a41ed9588f15"
+   },
+   "run_timings.txt": {
+    "bytes": 634,
+    "sha256": "709e39a9066aadd5745cd024d73f34b8d6cbeab9e8bb75ff9330961e150ae594"
+   }
+  }
  }
 }
