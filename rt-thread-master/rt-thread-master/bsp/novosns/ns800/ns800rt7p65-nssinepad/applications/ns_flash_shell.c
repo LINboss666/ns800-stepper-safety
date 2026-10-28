@@ -111,26 +111,59 @@ static void flash_event(void)
     result("queue + persistent event (valid=0)",e);
 }
 MSH_CMD_EXPORT(flash_event, submit one test event then wait for persistence);
+static int flash_dump_u32(const char *s, unsigned long *out)
+{
+    unsigned long v = 0;
+    if (s == RT_NULL || *s == '\0') return 0;
+    for (; *s; ++s)
+    {
+        unsigned d;
+        if (*s < '0' || *s > '9') return 0;
+        d = (unsigned)(*s - '0');
+        if (v > (0xFFFFFFFFul - (unsigned long)d) / 10ul) return 0;
+        v = v * 10ul + (unsigned long)d;
+    }
+    *out = v;
+    return 1;
+}
+
 static void flash_dump(int argc,char **argv)
 {
-    uint32_t first=0,count=10,i,seq;
+    unsigned long first_u = 0, count_u = 10;
+    uint32_t first, count, i, seq;
     ns_fault_sample_t s;
     rt_err_t e;
-    char *end;
-    unsigned long value;
-    if(argc>3) {rt_kprintf("flash_dump [first_slot] [count<=100]\n");return;}
-    if(argc>1) {value=strtoul(argv[1],&end,0);if(*end || value>=NS_LOG_SLOTS)return;first=(uint32_t)value;}
-    if(argc>2) {value=strtoul(argv[2],&end,0);if(*end || value>100 || !value)return;count=(uint32_t)value;}
-    rt_kprintf("slot,seq,session,time_ms,event,valid,sg,current_ma,ax_mg,ay_mg,az_mg,step_hz,vibration_mg,flags\n");
-    for(i=first;i<NS_LOG_SLOTS && i<first+count;++i)
+    char line[256];
+    int n;
+
+    if (argc > 3) { rt_kprintf("flash_dump [first 0..4095] [count 1..100]\n"); return; }
+    if (argc > 1 && !flash_dump_u32(argv[1], &first_u))
+    { rt_kprintf("flash_dump: bad first (decimal 0..4095)\n"); return; }
+    if (argc > 2 && !flash_dump_u32(argv[2], &count_u))
+    { rt_kprintf("flash_dump: bad count (decimal 1..100)\n"); return; }
+    if (first_u >= NS_LOG_SLOTS)
+    { rt_kprintf("flash_dump: bad first (decimal 0..4095)\n"); return; }
+    if (argc > 2 && (count_u == 0 || count_u > 100))
+    { rt_kprintf("flash_dump: bad count (decimal 1..100)\n"); return; }
+    first = (uint32_t)first_u;
+    count = (uint32_t)count_u;
+    if (count == 0 || count > NS_LOG_SLOTS - first)
+    { rt_kprintf("flash_dump: range exceeds %u slots\n", (unsigned)NS_LOG_SLOTS); return; }
+
+    rt_kputs("slot,seq,session,time_ms,event,valid,sg,current_ma,ax_mg,ay_mg,az_mg,step_hz,vibration_mg,flags\n");
+    for(i=first;i<first+count;++i)
     {
         e=ns_log_read_slot(i,&s,&seq);
-        if(e==-RT_EEMPTY) continue;
-        if(e!=RT_EOK) {rt_kprintf("slot %u invalid/read error %d\n",(unsigned)i,e);continue;}
-        rt_kprintf("%u,%u,%u,%u,%u,%u,%d,%d,%d,%d,%d,%d,%d,%u\n",(unsigned)i,
+        if(e==-RT_EEMPTY) { rt_kprintf("slot %u empty\n",(unsigned)i); continue; }
+        if(e!=RT_EOK) { rt_kprintf("slot %u error %d\n",(unsigned)i,(int)e); continue; }
+        n=rt_snprintf(line,sizeof(line),
+            "%u,%u,%u,%u,%u,%u,%d,%d,%d,%d,%d,%d,%d,%u\n",(unsigned)i,
             (unsigned)seq,(unsigned)s.session_id,(unsigned)s.time_ms,(unsigned)s.event,
             (unsigned)s.valid,(int)s.sg,(int)s.current_ma,(int)s.ax_mg,(int)s.ay_mg,
             (int)s.az_mg,(int)s.step_hz,(int)s.vibration_mg,(unsigned)s.flags);
+        if(n<0 || (rt_size_t)n>=sizeof(line))
+        { rt_kprintf("[FLASH] flash_dump ERROR: line overflow at slot %u\n",(unsigned)i); return; }
+        rt_kputs(line);
     }
 }
 MSH_CMD_EXPORT(flash_dump, export event slots as CSV);

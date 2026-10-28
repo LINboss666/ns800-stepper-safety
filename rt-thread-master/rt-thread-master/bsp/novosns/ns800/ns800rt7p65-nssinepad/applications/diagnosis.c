@@ -427,6 +427,19 @@ static void diag_status(void)
                verdict_name(d_prod.st.verdict),
                d_mode == DIAG_MODE_ACTIVE_PROTECTION ? "ACTIVE" : "MONITOR_ONLY",
                subsys_health_name(d_health));
+    {
+        current_adc_cal_source_t src = current_adc_cal_source();
+
+        rt_kprintf("[DIAG] adc_cal_source=%s%s\n",
+                   src == CURRENT_ADC_CAL_MEASURED ? "MEASURED" :
+                   src == CURRENT_ADC_CAL_THEORETICAL ? "THEORETICAL" : "NONE",
+                   src == CURRENT_ADC_CAL_MEASURED ? "" :
+                   " (NOT a measured current)");
+    }
+    rt_kprintf("[DIAG] threshold_validation=NOT_ESTABLISHED"
+               " (SG load/speed applicability unverified)\n");
+    rt_kprintf("[DIAG] mode=%s; vibration includes ~1g gravity baseline\n",
+               d_mode == DIAG_MODE_ACTIVE_PROTECTION ? "ACTIVE" : "MONITOR_ONLY");
     rt_kprintf("[DIAG] sg_filt=%d delta=%d cur_filt=%d mA delta=%d mA\n",
                (int)d_prod.st.sg_filt, (int)d_prod.st.sg_delta,
                (int)d_prod.st.cur_filt, (int)d_prod.st.cur_delta);

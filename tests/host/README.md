@@ -40,6 +40,8 @@ bash tests/host/run_stop_result_s1.sh            # 关断结果可信链(ps_main
 REVERSE=1 bash tests/host/run_stop_result_s1.sh  # 该链的 2 项反向注入(只改仓外单文件副本)
 bash tests/host/run_stop_priority_s2.sh          # 停机优先 S2 链: 端口层二进制(13 组)+ 真实 HAL 叶子二进制(4 组)
 REVERSE=1 bash tests/host/run_stop_priority_s2.sh # 该链的 5 项反向家族(仓外多文件副本)
+bash tests/host/run_flash_export_m5.sh           # M5 flash_dump 导出边界链: 正常 + 容量探针 + 归档判读门
+REVERSE=1 bash tests/host/run_flash_export_m5.sh # 追加"退回受限长 rt_kprintf"反向与截断批次拒绝
 ```
 
 四条链**并列且互不复用夹具**, 因为"真编译哪几个生产模块"不同:
@@ -52,6 +54,13 @@ REVERSE=1 bash tests/host/run_stop_priority_s2.sh # 该链的 5 项反向家族(
 | `run_stop_result_s1.sh` (`ps_main.c` + `shim_ps/`) | `step_pwm.c` + `motor.c` + `safety_state.c` | RT 原语(单线程确定性)、安全 GPIO/线程、TMC、传感器、存储、黑匣子 |
 | `run_stop_priority_s2.sh` 第 1 个二进制 (`sp_conc_main.c` + `shim_ps/`) | `stop_priority.c` `step_pwm.c` `motor.c` `safety_state.c` | TMC/EPWM/UART 三段是**端口桩**(C01–C21 测应用与协调层) |
 | `run_stop_priority_s2.sh` 第 2 个二进制 (`leaf_main.c` + `shim_leaf/`) | `stop_priority.c` `tmc2209.c` + 真实叶子 `drv_uart_txleaf.inc` `drv_epwm_leaf.inc` | 应用层状态(motor 快照/安全状态/许可脚)是受控输入; 寄存器与时间用模型 |
+| `run_flash_export_m5.sh` (`flash_main.c` + `shim_flash/`) | `ns_flash_shell.c` 的 `flash_dump` | `ns_flash_*`/`ns_storage_*`/`ns_log_*` 为可注入槽模拟; RT 控制台按 128 B 截断语义建模 |
+
+M5 导出链只证明 **CSV 格式、参数/错误边界与归档判读门**, 不证明真实 Flash 页布局、CRC、
+刷新时延或串口传输完整性; 归档判读器 (`m5_log_archive_check.py`) 只承认 14 列全部由生产
+`ns_log_read_slot` 读出且逐槽恰好一次的记录, 任何 NUL/截断/缺槽/重复/越界/读错都会输出
+`CLEAR_ALLOWED=NO`。正常构建 5 例、容量探针 1 例、判读器自测 16 例; 反向要求仅 `FE02`
+具名失败并让截断批次被归档门拒绝。
 
 CP5 §5 的分工写在这里是因为两者**判据不同**: 端口链观察"生产应用有没有按协议调用", 叶子链观察
 "生产实现自己写进去的寄存器字节/次数、真 TDRE 等待环、真 cfg/xfer 锁与真 IFCNT"。叶子链的

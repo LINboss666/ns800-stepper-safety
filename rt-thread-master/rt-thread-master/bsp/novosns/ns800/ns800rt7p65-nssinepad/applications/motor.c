@@ -2339,6 +2339,7 @@ MSH_CMD_EXPORT_ALIAS(cmd_motor_status, motor_status, show motor state and arm ga
 static void cmd_motor_arm(int argc, char **argv)
 {
     if (argc != 1) { rt_kprintf("usage: motor_arm\n"); return; }
+    (void)argv;
     (void)motor_arm();
 }
 MSH_CMD_EXPORT_ALIAS(cmd_motor_arm, motor_arm, request arm through the five gates);
@@ -2388,6 +2389,7 @@ MSH_CMD_EXPORT_ALIAS(cmd_motor_target, motor_target, set ramp target frequency i
 static void cmd_motor_start(int argc, char **argv)
 {
     if (argc != 1) { rt_kprintf("usage: motor_start\n"); return; }
+    (void)argv;
     (void)motor_start();
 }
 MSH_CMD_EXPORT_ALIAS(cmd_motor_start, motor_start, start motion through the formal API);

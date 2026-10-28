@@ -93,7 +93,10 @@ PS14c-plain_success_after_handoff_does_not_self_recover \
 PS14d-active_input_still_refuses_recovery \
 PS14e-manual_recovery_clears_after_plain_failure \
 PS14f-unified_shutdown_never_posts_events \
-PS16a-window_forbidden_calls_zero"
+PS16a-window_forbidden_calls_zero \
+PS17a-safety_trip_valid_single_event PS17b-safety_trip_bad_args_zero_event \
+PS17c-safety_trip_isr_silent_zero_event PS17d-safety_trip_masked_silent_zero_event \
+PS17e-safety_trip_post_fail_not_persisted"
 TARGET_ONLY_CASES="PS11a-arm_refused_by_enable_path_macro PS11b-diag_step_denied \
 PS11b2-gate_check_is_read_only \
 PS11c-tmc_write_gate_has_macro_bit PS11d-status_queries_have_no_side_effects \
@@ -225,7 +228,7 @@ validate_ledger() {
         # 出现的 id 必须是登记集合的子集(不允许偷偷加没登记的用例)
         g_unreg="$(grep -E '^CASE\|' "$out" | sed 's/^CASE|\([^|]*\)|.*/\1/' | sort -u | while
                        read -r id; do
-                           printf '%s\n' $(required_of "$name") | grep -qx -- "$id" || echo "$id"
+                           printf '%s\n' $(required_of "$name") | grep -xF -- "$id" >/dev/null || echo "$id"
                        done | grep -c . )"
         if [ "$g_sum_cases" = "$g_lines" ] && \
            [ "$((g_sum_pass + g_sum_fail))" = "$g_lines" ]; then
@@ -243,6 +246,33 @@ validate_ledger() {
     [ "$g_bad" -ne 0 ] && return 3
     return 0
 }
+
+# M5 §5.4 negative control: one real unregistered ID must be rejected by the
+# same validate_ledger() used for normal runs.  It builds a complete synthetic
+# ledger for the target variant (all registered IDs PASS) plus PS99-unregistered.
+self_test_unregistered() {
+    local f="$OUT_DIR/unreg_ledger.txt" n=0 r
+    {
+        for r in $(required_of target); do
+            printf 'CASE|%s|PASS|synthetic\n' "$r"
+            n=$((n+1))
+        done
+        printf 'CASE|PS99-unregistered|PASS|synthetic\n'
+        n=$((n+1))
+        printf 'SUMMARY|cases=%d pass=%d fail=0\n' "$n" "$n"
+    } > "$f" || { note "FATAL: 无法写未登记负控台账"; return 4; }
+    validate_ledger "$f" target > "$OUT_DIR/unreg_selftest.txt" 2>&1
+    local rc=$?
+    if [ "$rc" -ne 2 ] || [ "${g_unreg:-0}" -ne 1 ] || [ "${g_miss:-0}" -ne 0 ]; then
+        note "FATAL: 未登记ID负控失败 (rc=$rc unreg=${g_unreg:-?} miss=${g_miss:-?})"
+        return 4
+    fi
+    note "negative control: PS99-unregistered rejected by validate_ledger (rc=2, unreg=1, miss=0)"
+    return 0
+}
+
+# M5 §5.4: prove the unregistered-ID rejection still works after the EPIPE fix.
+self_test_unregistered || exit 4
 
 # --------------------------------------------------------------------------
 # 正向: 每个变体 编译 -> 真执行 -> 台账核对
@@ -309,6 +339,10 @@ PAIRS = {
         '        sp.pwm.result = (pe == RT_EOK) ? MOT_STOP_API_ACCEPTED : MOT_STOP_API_FAILED;',
         '        sp.pwm.result = MOT_STOP_API_ACCEPTED;'
         '   /* NEGATIVE-INJECTION(rev_motor_off_ignores_failure): 失败一律记成已接受 */')],
+    # M5: legal safety_trip must post one event; remove the formal post call.
+    'rev_safety_trip_skip_post': [(
+        '    e = safety_post_event(EVT_SOFT_FAULT);',
+        '    e = RT_EOK;   /* NEGATIVE-INJECTION(rev_safety_trip_skip_post): no event */')],
 }
 subs = PAIRS[mode]
 s = io.open(path, encoding='utf-8').read()
@@ -387,6 +421,8 @@ if [ "$REVERSE" = "1" ]; then
     #  里只会得到"没命中", 那是对注入的误判, 不是产品问题。S1 的断言本身没有放宽。)
     reverse_case rev_motor_off_ignores_failure target stop_priority.c \
         "PS01d-init_records_unknown_and_latches PS02d-estop_pwmfail_records_unknown PS04a-disarm_fail_rc_is_pwm PS10b-enn_unknown_and_pwm_fail_recorded_separately PS13d-device_back_re-attempts_real_close_no_stale_flag"
+    reverse_case rev_safety_trip_skip_post target safety_state.c \
+        "PS17a-safety_trip_valid_single_event"
     # §10.2 第②项"失败提前交回 owner"的重指向结论(不是删反向):
     # CP4 之后这条事实由协调层的身份/归还门承担, 本链不再消费它 —— 三次试投都是
     # "注入落地 + 台账自洽 + proc rc=0"(即本链抓不到):

@@ -110,8 +110,15 @@ rt_err_t rt_mutex_detach(struct rt_mutex *m) { (void)m; return RT_EOK; }
 
 rt_err_t rt_event_init(struct rt_event *e, const char *name, rt_uint8_t flag)
 { (void)flag; if (e) { e->name = name; e->inited = RT_TRUE; } return RT_EOK; }
+static rt_err_t s_event_send_rc = RT_EOK;
+void ps_set_event_send_rc(rt_err_t rc) { s_event_send_rc = rc; }
 rt_err_t rt_event_send(struct rt_event *e, rt_uint32_t event)
-{ (void)e; c_event_send++; c_event_bits |= event; c_event_last = event; return RT_EOK; }
+{
+    rt_err_t r = s_event_send_rc;
+    (void)e; c_event_send++; c_event_bits |= event; c_event_last = event;
+    s_event_send_rc = RT_EOK;
+    return r;
+}
 rt_err_t rt_event_recv(struct rt_event *e, rt_uint32_t ev, rt_uint32_t fl,
                        rt_int32_t to, rt_uint32_t *out)
 { (void)e; (void)ev; (void)fl; (void)to; if (out) *out = 0; return -RT_ETIMEOUT; }
@@ -320,6 +327,7 @@ void ps_sim_reset(void)
     fb_confirm_calls = fb_now_calls = 0; confirm_fail_after = -1;
     bb_triggers = 0;
     c_mutex_take = c_mutex_release = c_event_send = 0; c_event_bits = 0; c_event_last = 0;
+    s_event_send_rc = RT_EOK;
     c_thread_create = c_thread_startup = 0;
     protect_ready = irq_attached = polarity_ok = gpio_ready = 1;
     f_cfg_ok = RT_TRUE; f_cfg_state = TMC_DRV_CONFIGURED; f_tmc_health = SUBSYS_OK;
@@ -1914,6 +1922,80 @@ static void cases_apply_sequence(void)
 #endif /* PS_GATE_HOST_OVERRIDE */
 
 /* ===================================================================== */
+/* M5: safety_trip CONFIRM host contract                                    */
+/* ===================================================================== */
+static void cases_safety_trip(void)
+{
+    char *ok[]   = { "safety_trip", "CONFIRM" };
+    char *bad1[] = { "safety_trip" };
+    char *bad2[] = { "safety_trip", "CONFIRM", "extra" };
+    char *bad3[] = { "safety_trip", "confirm" };
+    char *bad4[] = { "safety_trip", "CONFIRMx" };
+    int ev0;
+
+    ps_cap_clear();
+    ev0 = ps_event_sends();
+    safety_trip_cmd(2, ok);
+    CHECK("PS17a-safety_trip_valid_single_event",
+          ps_event_sends() == ev0 + 1 &&
+          ps_cap_has("EVT_SOFT_FAULT posted rc=0") &&
+          !ps_cap_has("persisted") && !ps_cap_has("written") &&
+          !ps_cap_has("stall detected"),
+          fm("event %d->%d cap=%s", ev0, ps_event_sends(), ps_cap));
+
+    ps_cap_clear();
+    ev0 = ps_event_sends();
+    safety_trip_cmd(1, bad1);
+    safety_trip_cmd(3, bad2);
+    safety_trip_cmd(2, bad3);
+    safety_trip_cmd(2, bad4);
+    CHECK("PS17b-safety_trip_bad_args_zero_event",
+          ps_event_sends() == ev0 &&
+          ps_cap_has("usage: safety_trip CONFIRM"),
+          fm("event unchanged=%d", ps_event_sends() - ev0));
+
+    ps_isr_set(1);
+    ps_cap_clear();
+    ev0 = ps_event_sends();
+    safety_trip_cmd(2, ok);
+    CHECK("PS17c-safety_trip_isr_silent_zero_event",
+          ps_event_sends() == ev0 && ps_cap_len == 0,
+          fm("event +%d cap_len=%d", ps_event_sends() - ev0, ps_cap_len));
+    ps_isr_set(0);
+
+    {
+        rt_base_t lvl;
+        ps_cap_clear();
+        ev0 = ps_event_sends();
+        lvl = sp_win_begin();
+        safety_trip_cmd(2, ok);
+        sp_win_end(lvl);
+        CHECK("PS17d-safety_trip_masked_silent_zero_event",
+              ps_event_sends() == ev0 && ps_cap_len == 0,
+              fm("event +%d cap_len=%d", ps_event_sends() - ev0, ps_cap_len));
+    }
+
+    /* Post failure: protection still runs, but the summary must not claim
+     * persistence.  The short-protection pending fact is independent of the
+     * failed event send. */
+    ps_set_event_send_rc(-RT_EIO);
+    ps_cap_clear();
+    ev0 = ps_event_sends();
+    safety_trip_cmd(2, ok);
+    {
+        char expect_rc[32];
+        snprintf(expect_rc, sizeof(expect_rc), "posted rc=%d", (int)-RT_EIO);
+        CHECK("PS17e-safety_trip_post_fail_not_persisted",
+              ps_event_sends() == ev0 + 1 &&
+              ps_cap_has("posted rc=") && ps_cap_has(expect_rc) &&
+              !ps_cap_has("persisted") && !ps_cap_has("written"),
+              fm("event +%d cap=%s pending=%d", ps_event_sends() - ev0,
+                 ps_cap, (int)safety_trip_pending()));
+    }
+    ps_set_event_send_rc(RT_EOK);
+}
+
+/* ===================================================================== */
 int main(void)
 {
     ps_sim_reset();
@@ -1958,6 +2040,7 @@ int main(void)
 
     /* CP3 §9 第 2/5 项的总账: 整条链跑完之后, "在 PRIMASK 窗口内取锁/睡眠/打印"
      * 必须一次都没有发生过。计数由端口在每个可疑入口按当前掩码状态累加。 */
+    cases_safety_trip();
     CHECK("PS16a-window_forbidden_calls_zero",
           ps_win_violations() == 0,
           fm("窗口内禁止项命中=%d 最后一次=%s 结束时掩码=%d 深度=%d",

@@ -633,7 +633,13 @@ tmc_drv_cfg_state_t tmc2209_get_config_state(void) { return f_cfg_state; }
 subsys_health_t     tmc2209_get_health(void)       { return f_tmc_health; }
 rt_err_t  tmc2209_init(void) { return RT_EOK; }
 rt_err_t  tmc2209_read_register(rt_uint8_t a, rt_uint8_t r, rt_uint32_t *v)
-{ (void)a; fake_bus_reads++; if (v) *v = 0x12340000u | r; return RT_EOK; }
+{
+    (void)a; fake_bus_reads++;
+    /* 916c34b 起生产启动自检要求 IOIN[31:24]==0x21; 假总线给出合法身份,
+     * 其余寄存器仍是通用假值。身份不匹配由生产检查自身负责, 不在本夹具改写。 */
+    if (v) *v = (r == 0x06u) ? 0x21000006u : (0x12340000u | r);
+    return RT_EOK;
+}
 rt_err_t  tmc2209_cfg_txn_begin(void) { cfg_txn_begins++; return RT_EOK; }
 void      tmc2209_cfg_txn_end(void)   { cfg_txn_ends++; }
 /* CP4 K3(§5.3): 生产侧现在有"带调用方原身份 + 本次结果摘要"的复核版本。

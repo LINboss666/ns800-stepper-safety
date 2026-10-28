@@ -992,6 +992,32 @@ static void safety_state(void)
 }
 MSH_CMD_EXPORT(safety_state, dump safety state machine state);
 
+/* M5: explicit software-fault entry.  Strict argument + thread-only context;
+ * the formal safety_post_event() path performs the short protection first and
+ * posts EVT_SOFT_FAULT for the Safety thread to reconcile.  This command does
+ * not write ss_state, does not call blackbox_trigger itself, and never claims
+ * that the event was persisted or that a physical stall was detected. */
+void safety_trip_cmd(int argc, char **argv)
+{
+    rt_err_t e;
+
+    if (argc != 2 || rt_strcmp(argv[1], "CONFIRM") != 0)
+    {
+        rt_kprintf("usage: safety_trip CONFIRM\n");
+        return;
+    }
+    /* ISR / PRIMASK window / no thread object: refuse silently (no event,
+     * no print, no business-state write). */
+    if (!ss_log_ctx_ok()) return;
+
+    e = safety_post_event(EVT_SOFT_FAULT);
+    rt_kprintf("[SS] safety_trip: EVT_SOFT_FAULT posted rc=%d"
+               " (software event; protection ran in this call; persistence NOT implied)\n",
+               (int)e);
+}
+MSH_CMD_EXPORT_ALIAS(safety_trip_cmd, safety_trip,
+                     post one software fault event through the formal path);
+
 /* 软件级联调: 强制停机 → 锁死 → 实测源 → 清除(历史命令, 保留) */
 static void ss_test(void)
 {
