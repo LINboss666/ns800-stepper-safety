@@ -87,7 +87,7 @@
 #define MOTOR_PWM_DEV       EPWM_STEP_DEV_NAME   /* "epwm1" */
 #define MOTOR_PWM_CH        0                    /* EPWMX_A = PA0 */
 #define MOTOR_RAMP_PERIOD_MS 10
-#define MOTOR_THREAD_STACK   768
+#define MOTOR_THREAD_STACK   2048
 #define MOTOR_THREAD_PRIO    8                    /* Safety(4) > Sensor(7) > Motor(8) */
 
 #define MOTOR_DEFAULT_ACCEL 2000u    /* Hz/s */
@@ -104,7 +104,7 @@
  *        ss_lock / mot_lock / TMC 配置事务 / UART xfer 的等待(RT_WAITING_FOREVER 路径
  *        本轮一律未改, 见任务书 §3 与 §4.5), 因此不能称"可靠上界", 只是软件复核周期本身
  *        的量级估计(未上板实测)。停机时延上界仍属 RISK-03/03a, 待 S2 与上板验证。
- *   2) 复核跑在斜坡线程(prio 8, 栈 MOTOR_THREAD_STACK=768B)内, 期间 10ms 节拍被
+ *   2) 复核跑在斜坡线程(prio 8, 栈 MOTOR_THREAD_STACK=2048B)内, 期间 10ms 节拍被
  *      阻塞, STEP 仍以最后设置的频率继续输出(PWM 硬件自由运行) —— 复核失败之前
  *      脉冲不会停。栈余量与真实阻塞时长均未上板实测(NOT TESTED)。
  *   3) 判定为停机后的动作是**立即**的: rt_pwm_disable + DRV_ENABLE 写 LOW 并回读,

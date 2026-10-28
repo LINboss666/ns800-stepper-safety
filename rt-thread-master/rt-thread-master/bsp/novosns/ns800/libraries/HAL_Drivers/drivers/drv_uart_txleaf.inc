@@ -56,8 +56,15 @@ rt_err_t ns800_uart_write_budgeted(rt_device_t dev, const rt_uint8_t *data,
         if ((rt_tick_t)(rt_tick_get() - start) >= total) return -RT_ETIMEOUT;
         if (!UART_isSpaceAvailable(uart->handle.Instance))
         {
-            rt_thread_mdelay(1);        /* 线程、窗口外; 总预算继续流逝 */
-            continue;
+            /* 2026-10-28 TMC-RC 根因: 原实现在这里 rt_thread_mdelay(1)。
+             * 4 字节帧因此出现 ~1ms 的字节间隔(整帧 tx_off=3ms), TMC2209 会丢弃
+             * 这种带长空闲的帧 —— 线上有回声但永远没有应答。帧内必须保持连续:
+             * 这里改为只按 tick 检查预算的短自旋(单字节等待 <= 一个字符时间),
+             * 与旧 ns800_putc 的等待方式一致; 预算仍在这里强制执行。 */
+            while (!UART_isSpaceAvailable(uart->handle.Instance))
+            {
+                if ((rt_tick_t)(rt_tick_get() - start) >= total) return -RT_ETIMEOUT;
+            }
         }
         UART_writeChar(uart->handle.Instance, data[i]);
         ++i;

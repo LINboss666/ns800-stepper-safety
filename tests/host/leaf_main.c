@@ -139,6 +139,11 @@ static void leaf_tx_reset(void)
 
 /* shim_leaf/drv_common.h 里 UART_writeChar 的 tap: 一次 DATA 写 = 一个字节离开本 MCU。
  * 寄存器写本身仍按 SDK 原文执行(TYPE8(&DATA.WORDVAL)=data), 这里只是把它接进行模型。 */
+void ns800_leaf_uart_poll(void)
+{
+    leaf_advance(1);      /* 轮询无空位: 模型时间推进 1ms, 与硬件移位时间同义 */
+}
+
 void ns800_leaf_uart_tx_byte(rt_uint8_t b)
 {
     if (leaf_tx_log_n < (int)sizeof(leaf_tx_bytes_log))

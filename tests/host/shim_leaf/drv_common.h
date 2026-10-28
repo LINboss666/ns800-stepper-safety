@@ -144,10 +144,16 @@ _Static_assert(offsetof(UART_TypeDef, DATA.WORDVAL) == 0x1Cu, "UART DATA offset"
  *   把它接进行模型(帧装配 + 移位时间)。寄存器写本身仍按原文执行, 判断"有没有空"的
  *   UART_isSpaceAvailable 一字未改, 所以生产等待环看到的是**模型给的 TDRE**。 */
 void ns800_leaf_uart_tx_byte(rt_uint8_t data);
+/* 2026-10-28 TMC-RC: 生产等待环由 rt_thread_mdelay(1) 改为按 tick 预算的短自旋
+ * (帧内字节间隔必须连续)。主机模型的时间只在 mdelay/read 里推进, 因此这里的轮询
+ * 必须代表"硬件在这段时间里移位": 无空位时推进 1ms 模型时间。 */
+void ns800_leaf_uart_poll(void);
 
 static inline uint8_t UART_isSpaceAvailable(UART_TypeDef *uart)
 {
-    return (uint8_t)((READ_BIT(uart->STAT.WORDVAL, UART_STAT_TDRE_M)) >> UART_STAT_TDRE_S);
+    uint8_t r = (uint8_t)((READ_BIT(uart->STAT.WORDVAL, UART_STAT_TDRE_M)) >> UART_STAT_TDRE_S);
+    if (!r) ns800_leaf_uart_poll();
+    return r;
 }
 static inline void UART_writeChar(UART_TypeDef *uart, uint8_t data)
 {
