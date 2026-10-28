@@ -1,0 +1,116 @@
+URO-R1 板级包 S0 —— 离线绑定证据(task phase8-tmc-uart-read-observation-r1-board)
+复审对象/基线 = 66f853309fe22376ffa6b45080e5f79c5891d4d1   软件与镜像输入 code_commit = a483dcba74abd8c04549459bcee2cbcdb1ddea4c
+文档/源码基线(上一轮返修锚点) = 6324ac40bd8d0f172fdb89e77917be33dc739460
+GO = SOFTWARE_IMAGE_CAPTURE_REVIEW_GO_FOR_BOUNDED_READ_DIAG(§4 限制见末尾登记)
+本轮设备动作 = 0:未创建 SerialPort、未开 COM5、未发目标命令、未枚举设备/端口/探针、
+未调用 pyOCD 连接任何目标、未读 Flash、未下载、未复位、未碰供电/接线/ENN/SW1。
+上面'pyOCD 连接'一项的含义: 本轮只查本机 pyocd 包版本(import 级), 未建任何会话。
+脱敏: 本机绝对路径以 <本地执行根>/<仓库根>/<工具根> 代号替代; UID 只登记长度与
+sha256(uid) 前 12 位; 原始未脱敏件留在 <本地执行根>\logs\ 仓外, 未删除。
+
+==========================================================================
+1. 基线、工作树与冻结引用(只读)
+==========================================================================
+本地 HEAD            = 66f853309fe22376ffa6b45080e5f79c5891d4d1
+分支                 = phase8/tmc-drive-config
+工作树(tracked+untracked)= ?? reports/reviews/phase8-tmc-uart-read-observation-r1-board/s0_offline_binding.txt
+远端实时 ls-remote(经命令级代理, 未改全局配置):
+   refs/heads/main                                            1b3757eec550802a3973e66790af422d81d3d373
+   refs/heads/phase7/full-embedded-software                   6d3fbc559d45673d7550eb73dec5a4ade5bb34df
+   refs/heads/phase8/tmc-drive-config                         66f853309fe22376ffa6b45080e5f79c5891d4d1
+   refs/tags/v0.7-phase7-software-board-validated             097935fec5a6f2467261ab1ad449ff0b1d398250
+   refs/tags/v0.7-phase7-software-board-validated^{}          e40a9b95ef709e6a80444f9f3949dfdd70ba96ba
+判定: 本地 == 远端分支头 == 66f8533 = True;main/phase7/tag 对象与解引用与复审登记逐字一致 = True
+未 reset / rebase / merge / force-push;未发现他人推进(远端头即本轮交付)。
+
+==========================================================================
+2. 第 3 节四件 + 本地 AXF 与副本载荷(逐项现场直算)
+==========================================================================
+measure-a0.bin  (待下载唯一件)                       MATCH bytes=268340(期望 268340) sha256=a48400c881c539db539876cfd38f3aceac2a78cc7ed0d0f9655c7edafbb19a1e
+build_manifest.json                            MATCH bytes=16057(期望 16057) sha256=075bd3ff6eace662a8f4809a4b5810eeddd04997a77f590b2bbef0519db5d2e3
+UARTReadDiagSerialR1.ps1 (冻结采集器)               MATCH bytes=93797(期望 93797) sha256=2e9c8ede8f75e7b513dbd4f2c3091189309454879e98404ba7ec64bbb80f2568
+default.bin (对照, 不下载)                          MATCH bytes=258036(期望 258036) sha256=dccb7b63c9284d320016a42e1fc8b7f62d544b97ca9cb433604e412bbbff55e3
+build/a0/rt-thread-a0.axf (本地 AXF, 不在远端)       MATCH bytes=1693804(期望 1693804) sha256=a96889c47c9433b132dc4eeecf46be287c13dc1cff11fc0003e6cca10826846f
+新副本载荷 download-r1\dl\rt-thread-a0.axf          MATCH bytes=1693804(期望 1693804) sha256=a96889c47c9433b132dc4eeecf46be287c13dc1cff11fc0003e6cca10826846f
+manifest 内部登记与本地直算一致性:
+   bin bytes=268340 sha=a48400c881c539db / axf bytes=1693804 sha=a96889c47c9433b1 / 横幅=Oct 28 2026 02:23:31 / map COMPRESSED=0x00041834
+   两个长度口径互证: BIN=268340 B == map 压缩载荷 268340 B(=0x41834) => 回读长度取 0x41834。
+
+==========================================================================
+3. 下载工程副本与新执行根(未构建、未触发任何钩子)
+==========================================================================
+   download-b.uvprojx 源=d53c62a32954 副本=d53c62a32954 逐字节相同=True => 工程/FLM/探针驱动配置未改
+   download-b.uvoptx 源=62d2d8f14afb 副本=62d2d8f14afb 逐字节相同=True => 工程/FLM/探针驱动配置未改
+   旧 BOARD-B 根原件未改动: bytes=1675944 sha=8b95464e9f687096(=上一轮已证 8b95464e…)
+   旧根目录未被写入(本轮只在**新副本**的既有 dl/rt-thread-a0.axf 位置放入固定 AXF)。
+   副本目标 rt-thread: OutputDirectory=.\dl\ OutputName=rt-thread-a0 CreateExecutable=1
+   => UV4 -f 的 Load 载荷路径解析为新副本 download-r1\dl\rt-thread-a0.axf(本轮固定 AXF, SHA 见 §2)
+   BeforeMake/AfterMake 用户程序开关 RunUserProg1/2 = 0 / 0(本轮不构建, 不会触发)
+   FlashDriverDll 含已证 NS800RT7xxx_FlashBank1 与 -FS08000000 = True
+   .uvoptx 里 CMSIS_AGDI 出现次数 = 2(沿用既有板载 DAP 驱动, 未换探针)
+   新执行根子目录: download-r1 / pyocd-work-r1 / readback / logs(capture 未预先创建, 见 §5)
+
+==========================================================================
+4. 工具版本与 DAP UID 依据(未枚举任何设备/端口/探针)
+==========================================================================
+   UV4 ProductVersion            = 5.43.1.0(复审要求 5.43.1.0)
+   python --version              = Python 3.12.5
+   python 解释器                 = <工具根>/Python312/python(本地既存, 未新装)
+   pyocd 包 __version__(import)  = 0.45.1
+   Windows PowerShell            = 5.1.26100.5074(与上一轮采集器自检同一宿主)
+   未运行 pyocd list / 未枚举 USB 设备 / 未打开任何 COM 端口。
+   DAP UID 解析自两处既存本地原始件(<仓外>/ns800-board-a/serial/01_reset_pyocd.txt 与其 cp4_run.ps1),
+   两处唯一交集一致: 长度=48, 形状匹配 ^[0-9A-Fa-f]{20,64}$=True, sha256(uid)[:12]=d2f530dbd062
+   值只存仓外私有件(权限 600)供 S3/S4 的 -u 参数使用; 仓库与本证据不登记 UID 任何片段。
+   pyOCD 工作目录 <本地执行根>/pyocd-work-r1 内容 = 空(无 pyocd.yaml / pyocd.yml / pyocd_user.py, 每次调用显式 --no-config)
+   未复用旧 BOARD-B 的自动采集/条件复位脚本(A0BoardBSerialR1a.ps1 只作为 UID 既存依据的来源之一被读取)。
+
+==========================================================================
+5. 采集器冻结、OutDir 新鲜性与本地语法门
+==========================================================================
+   冻结采集器散列已在 §2 现场直算为 MATCH;本轮不修改它(散列不符即停, 不临时补丁)。
+   CaptureOutDir = <本地执行根>\capture\r1_run1  存在=False(必须由采集器自己新建)
+   ReadbackPath  = <本地执行根>\readback\r1-measure-a0-268340.bin 存在=False(本轮新文件, 不是旧快照/BIN)
+   s1_s6_commands.ps1 的 [Parser]::ParseFile -> PARSE_ERRORS=0
+   -Step Precheck(只算散列与列目录, 零设备动作) rc=0, 原文:
+      待下载 BIN 身份一致 bytes=268340 sha256=a48400c881c539db539876cfd38f3aceac2a78cc7ed0d0f9655c7edafbb19a1e
+      构建 manifest 身份一致 bytes=16057 sha256=075bd3ff6eace662a8f4809a4b5810eeddd04997a77f590b2bbef0519db5d2e3
+      冻结采集器 身份一致 bytes=93797 sha256=2e9c8ede8f75e7b513dbd4f2c3091189309454879e98404ba7ec64bbb80f2568
+      下载副本载荷 AXF 身份一致 bytes=1693804 sha256=a96889c47c9433b132dc4eeecf46be287c13dc1cff11fc0003e6cca10826846f
+      pyOCD 工作目录无隐式配置: <本地路径已脱敏>
+      Precheck: 只读身份/目录核对完成, 零设备动作。
+      下载工程存在=True 采集 OutDir 尚未创建=True 回读文件尚未创建=True
+   (本机 PowerShell 5.1 对无 BOM 的含中文 .ps1 按 GBK 解码会报假语法错误;
+    本次实跑先复现该现象, 再补 UTF-8 BOM 后 PARSE_ERRORS=0 —— 原始报错保留在此说明, 不追改)
+
+==========================================================================
+6. GO 携带的非阻断限制与勘误(按复审第 4 节登记)
+==========================================================================
+   GO-OBS-01  echo_match_off: 已复现误差 —— 单读 12 B(4 B 回声 + 8 B 应答)时真实回声在偏移 0,
+              文本给 match=1/8。本包保留原文, 该字段标 KNOWN_INVALID_FOR_DIAG, 禁用其定位、
+              应答起点与时序结论;即便某次导出为 0 也不因此恢复可信等级。真实 rx_total、收发
+              计数、业务返回、原始样本与命中存在性不受影响, 采集器也未用该偏移作判据。
+              修复留到下一次真实产品工作(需用同一字节流的 [12] 与 [4,8] 分块一致性验证),
+              本包不为该可选字段返修或重烧。
+   计数口径   : 自检实际 51 个唯一具名负控, 旧汇总串声明 50(= Expect-* 调用数)。并列保留,
+              以逐事件台账为准;不改脚本散列。
+   格式例外   : git diff --check 6324ac4..HEAD 非 rc=0 —— baseline_and_fixed_checks.txt:446、
+              collector_selftest.txt:48/140/156、host_results.txt:260、keil_builds.txt:94、
+              source_audit.txt:68 存在尾空白/EOF 空行。已作为已知文档例外接受, 本轮不改写
+              那些历史证据原文来'做绿';本文件与新增证据不保留行尾空白(声明的转换规则),
+              未规范化的原始字节留在仓外并可由 §2 散列复核。
+   未单独具名 : tmroAll != tmroOk 的分支被更具体的前置检查覆盖, 保持'未单独具名命中',
+              不声称所有内部条件各自验证过。
+   顺序修正   : S4(开串口前唯一显式 SYSRESETREQ, pyOCD 会话 #2)**取代**已推送的
+              R1 board_candidate.md §2 里旧 S6 的条件复位 —— 因 S3 留下 Halted, 冻结采集器
+              会自行从被动等待进入首条查询, 无法在其内部插入复位。历史文档不回写, 以本包为准。
+   复位口径   : 显式 SYSRESETREQ 1 次 != 芯片物理总共只复位一次;Keil 既有内部初始化/复位
+              沿用已证配置, 含在一次下载之内;能观测就实记, 不能逐次观测记
+              NOT_SEPARATELY_OBSERVABLE, 不虚报物理复位总数。
+
+==========================================================================
+7. 停点
+==========================================================================
+S0 全部通过 => 包可直接批准;但设备动作仍为 0, 等待用户对本文所属整包的一次批准。
+批准前不下载、不回读、不复位、不开 COM5、不发目标命令。
+旧 M0/BOARD-B 批准不续额度;包外不追加动作。

@@ -1,0 +1,211 @@
+{
+  "task_id": "phase8-tmc-uart-read-observation-r1-board",
+  "task_book": "NS800_URO_R1_Review_GO_and_Board_Package_66f8533_20261028.md",
+  "review_object_and_baseline": "66f853309fe22376ffa6b45080e5f79c5891d4d1",
+  "software_build_and_image_input_code_commit": "a483dcba74abd8c04549459bcee2cbcdb1ddea4c",
+  "document_source_base": "6324ac40bd8d0f172fdb89e77917be33dc739460",
+  "stage": "S0 offline binding complete; execution package instantiated; device actions 0; stopped at the user-approval gate",
+  "go_registered": {
+    "verdict": "SOFTWARE_IMAGE_CAPTURE_REVIEW_GO_FOR_BOUNDED_READ_DIAG",
+    "object": "66f853309fe22376ffa6b45080e5f79c5891d4d1",
+    "scope": "一次有界板级只读通信诊断(下载该测量镜像 + 定长回读 + 一次复位启动 + 一次 COM5 + 七条只读命令)",
+    "not_granted": [
+      "电机使能",
+      "STEP/DIR/HIGH",
+      "物理时序验收",
+      "产品无缺陷结论",
+      "上一轮 URO 两枚镜像的下载许可"
+    ],
+    "registration_way": "按复审 §10 随本次真实板级工作交接一并登记, 未开纯 GO 登记轮"
+  },
+  "s0_results": {
+    "identity_and_frozen_refs": {
+      "local_head": "66f853309fe22376ffa6b45080e5f79c5891d4d1",
+      "remote_branch_head": "66f853309fe22376ffa6b45080e5f79c5891d4d1",
+      "worktree_tracked_clean": true,
+      "untracked_at_generation_time": [
+        "reports/agent_handoffs/phase8-tmc-uart-read-observation-r1-board.json",
+        "reports/agent_handoffs/phase8-tmc-uart-read-observation-r1-board.md",
+        "reports/reviews/phase8-tmc-uart-read-observation-r1-board/commands.expanded.masked.ps1",
+        "reports/reviews/phase8-tmc-uart-read-observation-r1-board/execution_package.md",
+        "reports/reviews/phase8-tmc-uart-read-observation-r1-board/s0_offline_binding.txt"
+      ],
+      "untracked_note": "生成时刻的未跟踪项只有本阶段自己的新交付物(-board 证据与交接), 随本提交入库; 基线核对时(tracked+untracked)工作树是干净的",
+      "main": "1b3757eec550802a3973e66790af422d81d3d373",
+      "phase7_full_embedded_software": "6d3fbc559d45673d7550eb73dec5a4ade5bb34df",
+      "tag_object": "097935fec5a6f2467261ab1ad449ff0b1d398250",
+      "tag_dereference": "e40a9b95ef709e6a80444f9f3949dfdd70ba96ba",
+      "no_reset_rebase_merge_force": true
+    },
+    "identities_verified_locally": {
+      "measure-a0.bin": [
+        268340,
+        "a48400c881c539db539876cfd38f3aceac2a78cc7ed0d0f9655c7edafbb19a1e"
+      ],
+      "build_manifest.json": [
+        16057,
+        "075bd3ff6eace662a8f4809a4b5810eeddd04997a77f590b2bbef0519db5d2e3"
+      ],
+      "UARTReadDiagSerialR1.ps1": [
+        93797,
+        "2e9c8ede8f75e7b513dbd4f2c3091189309454879e98404ba7ec64bbb80f2568"
+      ],
+      "default.bin(对照不下载)": [
+        258036,
+        "dccb7b63c9284d320016a42e1fc8b7f62d544b97ca9cb433604e412bbbff55e3"
+      ],
+      "local_axf(不在远端, 本地直算)": [
+        1693804,
+        "a96889c47c9433b132dc4eeecf46be287c13dc1cff11fc0003e6cca10826846f"
+      ],
+      "copy_payload_axf": [
+        1693804,
+        "a96889c47c9433b132dc4eeecf46be287c13dc1cff11fc0003e6cca10826846f"
+      ]
+    },
+    "readback_length_basis": "BIN 268340 B == map COMPRESSED[0x00041834] => 回读取 0x08000000 + 0x41834",
+    "download_project_copy": {
+      "uvprojx_byte_identical_to_source": true,
+      "uvoptx_byte_identical_to_source": true,
+      "target": "rt-thread",
+      "output_directory": ".\\dl\\",
+      "output_name": "rt-thread-a0",
+      "before_after_make_user_programs": "RunUserProg1/2 = 0/0(未构建, 未触发)",
+      "proven_flm_and_flash_base_present": true,
+      "old_board_b_root_payload_untouched": "8b95464e…1675944",
+      "note": "只在**新副本**既有 dl/rt-thread-a0.axf 位置放固定 AXF; 未新建工程, 未构建, 旧根未写"
+    },
+    "tool_versions": {
+      "uv4_product_version": "5.43.1.0",
+      "python": "3.12.5",
+      "pyocd_import_version": "0.45.1",
+      "powershell": "5.1.26100.5074",
+      "probe_enumeration_run": false,
+      "pyocd_session_opened": false
+    },
+    "dap_uid": {
+      "length": 48,
+      "shape_matches_collector_gate": true,
+      "sha256_of_uid_prefix12": "d2f530dbd062",
+      "sources": [
+        "<仓外>/ns800-board-a/serial/01_reset_pyocd.txt",
+        "<仓外>/ns800-board-a/cp4_run.ps1"
+      ],
+      "resolved_uniquely_from_two_existing_artifacts": true,
+      "value_in_repo": false,
+      "stored_only_in": "<本地执行根>/logs/dap_uid_private.txt (mode 600)"
+    },
+    "pyocd_workdir_no_implicit_config": true,
+    "collector_frozen_and_unmodified": true,
+    "fresh_paths": {
+      "capture_outdir_exists": false,
+      "readback_file_exists": false
+    },
+    "local_syntax_gate": {
+      "parse_errors_private_runner": 0,
+      "precheck_step_rc": 0,
+      "precheck_scope": "只算散列与列目录, 零设备动作",
+      "repro_then_fix_note": "无 BOM 的含中文 .ps1 在 PS5.1 下按 GBK 解码报假语法错误; 补 UTF-8 BOM 后 PARSE_ERRORS=0(原始报错保留在证据里)"
+    }
+  },
+  "package_order_correction": {
+    "supersedes": "R1 board_candidate.md §2 的旧 S6 条件复位",
+    "new": "S4 = 回读之后、开串口之前的唯一一次显式 reset sysresetreq(pyOCD 会话 #2)",
+    "reason": "S3 留下 Halted, 冻结采集器自行从被动等待进入首条查询, 无法在其内部插入复位",
+    "after_that": "可能漏掉启动横幅 => 走已验证镜像 + BANNER_NOT_OBSERVED 继续, 不为补横幅再复位",
+    "history_not_rewritten": true
+  },
+  "go_carrying_limits": {
+    "GO-OBS-01": "echo_match_off = KNOWN_INVALID_FOR_DIAG(单读 12 B 时真实偏移 0, 文本给 8); 本包保留原文并禁用其定位/起点/时序结论; 修复留到下一次真实产品工作并用 [12] 与 [4,8] 分块一致性验证; 本包不为此返修或重烧",
+    "ledger_counts": "51 个唯一具名负控 vs 旧汇总串 50(=Expect-* 调用数); 以逐事件台账为准, 不改脚本散列",
+    "whitespace_exception": "6324ac4..66f8533 的 git diff --check 非 rc=0(复审逐行指认); 历史证据不改写做绿, 本轮新文件按声明规则不留行尾空白",
+    "uncovered_detector_branch": "tmroAll != tmroOk 分支被更具体前置覆盖, 保持未单独具名命中",
+    "reset_accounting": "显式 SYSRESETREQ 1 次 != 物理总复位 1 次; Keil 内部初始化/复位计入那一次下载; 不可逐次观测记 NOT_SEPARATELY_OBSERVABLE",
+    "read_only_scope": "指本包主动 TMC 诊断不写寄存器; 不声称固件启动完全不写 GPIO/存储; 三笔读上限指 msh probe"
+  },
+  "quotas": {
+    "power_on_if_dead": 1,
+    "keil_download": 1,
+    "dap_sessions": 2,
+    "flash_readback": 1,
+    "explicit_sysresetreq": 1,
+    "com5_open_attempts": 1,
+    "msh_commands": 7,
+    "probe_reads_max": 3,
+    "probe_write_frames": 0
+  },
+  "quotas_consumed_this_round": "全部 0(未执行任何设备动作)",
+  "field_prerequisites_confirmed_by_approval": [
+    "现场有人可操作",
+    "设备可连接",
+    "本包之外无其它动作",
+    "电机物理未接",
+    "SW1 阻断",
+    "模块与线路不变"
+  ],
+  "user_confirmed_field_facts": {
+    "power_wiring_expander": "USER_CONFIRMED(非云端实测); 不重索取材料, 不作 ENN 对照",
+    "final_power_state": "UNKNOWN(如实记未知, 不为填字段连接设备)",
+    "a0_sampling": "继续暂缓; A0_DURATION_EVIDENCE_NOT_ACHIEVED 不改"
+  },
+  "not_authorized": [
+    "电机连接/运动",
+    "STEP",
+    "DIR/许可 HIGH",
+    "翻宏",
+    "arm/start/ramp",
+    "清故障",
+    "配置写",
+    "手动 selftest",
+    "pin_status",
+    "额外 A0 采样/清理",
+    "自动恢复",
+    "外部 SPI Flash 转储",
+    "全片备份",
+    "设备/端口/探针枚举",
+    "sw1_cut.ps1"
+  ],
+  "files_changed_in_repo": [
+    "reports/reviews/phase8-tmc-uart-read-observation-r1-board/s0_offline_binding.txt",
+    "reports/reviews/phase8-tmc-uart-read-observation-r1-board/execution_package.md",
+    "reports/reviews/phase8-tmc-uart-read-observation-r1-board/commands.expanded.masked.ps1",
+    "reports/agent_handoffs/phase8-tmc-uart-read-observation-r1-board.md",
+    "reports/agent_handoffs/phase8-tmc-uart-read-observation-r1-board.json"
+  ],
+  "production_firmware_engineering_collector_untouched": true,
+  "hardware_actions": [],
+  "device_actions_this_round": 0,
+  "privacy": {
+    "deid": "本机绝对路径 -> 代号(<LOCAL-ROOT>/<REPO-ROOT>/<TOOL-ROOT>); DAP UID 值不入仓库, 只登记长度与 sha256(uid)[:12]",
+    "lossless": false,
+    "replacement_scope_declared_in": "commands.expanded.masked.ps1 文件头 + s0_offline_binding.txt 头部",
+    "originals_kept_out_of_repo": true
+  },
+  "not_proven": [
+    "板上 TMC 链路与状态(TMC_LINK_ON_BOARD_UNPROVEN)",
+    "板上原 -117 根因",
+    "BLOCKED_ROLLBACK 剩余项(恢复下载未演练)",
+    "完整栈高水位",
+    "目标 RT 调度与物理波形/时延",
+    "B-1",
+    "BUG-008",
+    "RISK-03/03a",
+    "物理 RISK-04-b",
+    "M-1",
+    "M-2",
+    "M-3",
+    "A0 时长证据(NOT_ACHIEVED)",
+    "R1 采集器的真机运行(本包才首次接入)"
+  ],
+  "safety_macros": "四个安全宏在默认与 A0 目标仍为 0; 本包不改宏/工程; safe_for_enable 恒 0",
+  "next_step_requires": "用户对 execution_package.md §6 整包的一次批准(简写: 批准执行 URO-R1 板级包); 旧 M0/BOARD-B 批准不续额度",
+  "stop_lines": [
+    "URO_R1_BOARD_PACKAGE_BOUND_AND_READY / S0_OFFLINE_BINDING_COMPLETE",
+    "HARDWARE_ACTIONS_THIS_ROUND=0 / AWAITING_USER_APPROVAL / NO_NEW_HARDWARE_ACTIONS",
+    "GO_REGISTERED=SOFTWARE_IMAGE_CAPTURE_REVIEW_GO_FOR_BOUNDED_READ_DIAG(66f8533)",
+    "ECHO_MATCH_OFFSET=KNOWN_INVALID_FOR_DIAG / FOUR_DEFAULT_AND_A0_SAFETY_MACROS=0",
+    "TMC_LINK_ON_BOARD_UNPROVEN / SAFE_FOR_ENABLE=false",
+    "BLOCKED_ROLLBACK_OPEN / M2_M3_NOT_AUTHORIZED / A0_DURATION_EVIDENCE_NOT_ACHIEVED"
+  ],
+  "generated_by": "make_r1b_handoff.py(仓外): 长度/散列/一致性现场直算"
+}
