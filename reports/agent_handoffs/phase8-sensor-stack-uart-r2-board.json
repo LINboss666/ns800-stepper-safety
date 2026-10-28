@@ -149,7 +149,75 @@
     "QUOTAS_EXHAUSTED=download 1/1 + DAP 2/2 + readback 1/1 + reset 1/1 + COM5 1/1 + msh 0/7",
     "DEVICE_ACTIONS_AFTER_STOP=0 / NO_RETRY / NO_AUTO_CARRYOVER",
     "SAFE_FOR_ENABLE=false / FOUR_SAFETY_MACROS=0 / ECHO_MATCH_OFFSET=KNOWN_INVALID_FOR_DIAG",
-    "NEXT_ROUND_REQUIRES_NEW_USER_APPROVAL"
+    "NEXT_ROUND_REQUIRES_NEW_USER_APPROVAL",
+    "ROUND2 = EXECUTED_THEN_STOPPED(user-directed re-flash; new grant, round1 quotas not reused)",
+    "ROUND2_FAILURE_STAGE=BOOT_WINDOW_INCOMPLETE / SENSOR_STACK_WARNING_OBSERVED_ROUND2=FALSE(not a fix)",
+    "IMAGE_ON_BOARD=CONFIRMED twice (byte-identical readback run1 + run2) + on-console banner match run2",
+    "MOTOR/STEP/WRITE-FRAME=0 / DEVICE_ACTIONS_AFTER_STOP=0 / NEXT_STEP_NEEDS_NEW_READ_ONLY_DIAG_APPROVAL"
   ],
-  "generated_by": "make_r2b_handoff.py"
+  "generated_by": "make_r2b_handoff.py",
+  "round2": {
+    "authorization": "用户真实回合指令『重新烧录一次』+ 选项确认『重烧 4096 再跑采集』= 新的第 2 轮擦写/串口授权(第 1 轮额度未续用)",
+    "advice_given_before": "已明确告知重烧同一镜像不会改变预期结果(S3 已逐字节证实在板, 告警来自运行中的固件), 用户仍选择该动作",
+    "window": "2026-10-28T12:24..12:27:27+08:00",
+    "runner_change": {
+      "file": "<本地执行根>/logs/r2_s1_s6_commands.ps1",
+      "bytes": 9375,
+      "sha256": "8fccedf1fa8679c38e0d3a29ade98c21578345c4bb6c76fb186ac81f8d99c326",
+      "change": "参数化 -Round, 使每轮日志/回读/采集互不覆盖; PS5.1 ParseFile 0 错",
+      "collector_image_project_fixture_touched": false
+    },
+    "steps": {
+      "S2_download": "PASS(Erase/Programming/Verify OK @12:26:01)",
+      "S3_readback": "PASS(第二次独立回读, 与 b1e85294… 逐字节相等)",
+      "S4_reset": "PASS(Running)",
+      "S5_collector": "FAIL_AT_BOOT_WINDOW_GATE(BOOT_WINDOW_INCOMPLETE @UARTReadDiagSerialR2.ps1:135)",
+      "S6_msh": "NOT_REACHED(0/7, counts={})",
+      "S7_stop": "DONE(停机后 0 新动作)"
+    },
+    "capture": {
+      "bytes": 240,
+      "sha256": "a402e24f5e04da184f1d0343be42ba27901ab0e8335cbd5e503c24aedd92b8ca",
+      "duration_s": 20.019278,
+      "banner_verbatim_match": 1,
+      "boot_stage_lines": 0,
+      "main_boot_complete": 0,
+      "sensor_stack_warnings": 0,
+      "msh_prompt": 0,
+      "self_test_tmc_fail_line": 0
+    },
+    "cross_round": {
+      "round1": {
+        "stage": "STACK_DANGER_OBSERVED",
+        "bytes": 166,
+        "duration_s": 0.022,
+        "sensor_warnings": 2,
+        "banner": 0
+      },
+      "round2": {
+        "stage": "BOOT_WINDOW_INCOMPLETE",
+        "bytes": 240,
+        "duration_s": 20.019,
+        "sensor_warnings": 0,
+        "banner": 1
+      },
+      "reading": "同一镜像两次复位走到不同位置: 一轮启动完成并持续刷栈告警, 一轮在启动头部后停住 20 s 无字节",
+      "must_not_conclude": [
+        "第 2 轮无告警 != 栈问题已解决(该轮未到 sensor 阶段)",
+        "不能断言早期停住的机制(固件卡在该阶段 vs 继续跑但控制台静默); '读得太晚/缓冲丢后段'已被 §3b 时序核对排除"
+      ]
+    },
+    "quotas_used_round2": {
+      "download": "1/1",
+      "flash_readback": "1/1",
+      "dap_sessions": "2/2",
+      "explicit_sysresetreq": "1/1",
+      "com5_open": "1/1",
+      "msh_commands": "0/7",
+      "probe_reads": 0,
+      "write_frames": 0,
+      "device_actions_after_stop": 0
+    },
+    "status_after_round2": "CAPTURE=INCOMPLETE / BUSINESS=NOT_REACHED / TMC_LINK_ON_BOARD=UNPROVEN / SAFE_FOR_ENABLE=false"
+  }
 }

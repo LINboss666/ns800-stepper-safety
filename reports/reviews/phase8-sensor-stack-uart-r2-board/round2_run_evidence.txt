@@ -1,0 +1,166 @@
+URO-R2 板级包第 2 轮执行证据(用户指令重烧; task phase8-sensor-stack-uart-r2-board / round run2)
+交付/复审基线 = 7380856149752506286714e9e82eda6e205abb40   产品软件输入 code_commit = 139e9377ccbc36b878cd577a6b848d974e1e07fa
+授权 = 用户真实回合指令『重新烧录一次』, 经选项确认为『重烧 4096 再跑采集』(2026-10-28 12:2x +0800)。
+  登记为**新的第 2 轮擦写/串口授权**(第 1 轮额度已用尽且未续用): 下载 1 + 定长回读 1 + DAP 2 +
+  显式复位 1 + COM5 1 + 七条查询各 1 + probe(三读零 WRITE)。
+执行时刻 = 2026-10-28 12:24:xx → 12:27:27 +0800; 全部产物写在 run2-* 新路径, 第 1 轮证据未覆盖。
+来源分层 = LOCAL-RUN(本机 Windows 实跑)。脱敏(lossless=false): 绝对路径 -> <本地执行根>/<仓库根>;
+UID 不落值(长度 48, sha256[:12]=d2f530dbd062); 控制字节写成 <ESC>; 行尾空白已剥离。
+私有 runner 已参数化为 -Round(散列变化: 8fccedf1fa86, 9375 B; PS 5.1 ParseFile PARSE_ERRORS=0), 目的是
+让每一轮的日志/回读/采集互不覆盖; 采集器/镜像/工程/夹具字节全部未动(散列见下与第 1 轮证据)。
+
+=== 1. 第二轮原始输出 ===
+---- logs/run2_s0_precheck.out.txt  (bytes=775  sha256=b4cb2c7a479553e4890d0fcf7ad2a17209e5174d3f566f3a31bcee0311482591  mtime=2026-10-28T12:25:18+0800  解码=cp936 -> UTF-8) ----
+ROUND = run2  (flash log / readback / capture all under this round name)
+accepted BIN identity OK bytes=268340 sha256=b1e852949f003965de52d539ca324a11b8b89e17a51a8f34fe3efd01525ae2d1
+build manifest identity OK bytes=24583 sha256=9c3b492a4f7487b850becaa182cea7214ff84f495af621c56d34a9f1f645194e
+R2 collector identity OK bytes=92860 sha256=9ed8a3e342f7cad8430c42140ffb508d6cc0694e251636c1b93ab2a2a7390a37
+download payload identity OK bytes=1693804 sha256=15be5f3efc45bf296bc0ef24e3947081372616d819e4bb3b189e9614cf9a5b9a
+pyOCD work dir clean: <本地执行根>\pyocd-work-r2
+Precheck: read-only identity and directory checks done, zero device action.
+download project present=True this round OutDir free=True this round readback free=True this round flash log free=True
+---- logs/run2_s2_run.out.txt  (bytes=702  sha256=481336693f5b760528862c8e4e0782059d47fe0dd8b5aea4603604b89be52897  mtime=2026-10-28T12:26:02+0800  解码=cp936 -> UTF-8) ----
+ROUND = run2  (flash log / readback / capture all under this round name)
+accepted BIN identity OK bytes=268340 sha256=b1e852949f003965de52d539ca324a11b8b89e17a51a8f34fe3efd01525ae2d1
+build manifest identity OK bytes=24583 sha256=9c3b492a4f7487b850becaa182cea7214ff84f495af621c56d34a9f1f645194e
+R2 collector identity OK bytes=92860 sha256=9ed8a3e342f7cad8430c42140ffb508d6cc0694e251636c1b93ab2a2a7390a37
+download payload identity OK bytes=1693804 sha256=15be5f3efc45bf296bc0ef24e3947081372616d819e4bb3b189e9614cf9a5b9a
+pyOCD work dir clean: <本地执行根>\pyocd-work-r2
+UV4 process exit code=0 (reference only, not the gate)
+S2 PASS: Load of this round payload + Erase/Programming/Verify OK.
+---- logs/run2_s2_flash.log  (bytes=134  sha256=95fe7179cb487650126dcd9aa24d8d59b4783f0f9dd8a5dededda361f9773194  mtime=2026-10-28T12:26:01+0800  解码=cp936 -> UTF-8) ----
+Load "<本地执行根>\\download-r2\\dl\\rt-thread-a0.axf"
+Erase Done.Programming Done.Verify OK.Flash Load finished at 12:26:01
+---- logs/run2_s3_run.out.txt  (bytes=915  sha256=a15076f213094e57b0d83f24429ae8443e7ef182cd156ad3ef51ff7ce42dee33  mtime=2026-10-28T12:26:19+0800  解码=cp936 -> UTF-8) ----
+ROUND = run2  (flash log / readback / capture all under this round name)
+accepted BIN identity OK bytes=268340 sha256=b1e852949f003965de52d539ca324a11b8b89e17a51a8f34fe3efd01525ae2d1
+build manifest identity OK bytes=24583 sha256=9c3b492a4f7487b850becaa182cea7214ff84f495af621c56d34a9f1f645194e
+R2 collector identity OK bytes=92860 sha256=9ed8a3e342f7cad8430c42140ffb508d6cc0694e251636c1b93ab2a2a7390a37
+download payload identity OK bytes=1693804 sha256=15be5f3efc45bf296bc0ef24e3947081372616d819e4bb3b189e9614cf9a5b9a
+pyOCD work dir clean: <本地执行根>\pyocd-work-r2
+Core 0 (None):  Halted
+Saved 268340 bytes to <本地执行根>/readback/run2-measure-a0-268340.bin
+Core 0 (None):  Halted
+readback identity OK bytes=268340 sha256=b1e852949f003965de52d539ca324a11b8b89e17a51a8f34fe3efd01525ae2d1 byte-identical=True
+S3 PASS: length / SHA / byte comparison OK => ImageContinuityConfirmed basis holds.
+---- logs/run2_s3_readback_pyocd.log  (bytes=252  sha256=6c03c4dfe6978f1e5abef26a638d8bc9a93664972286f6417e3635b1234cd48c  mtime=2026-10-28T12:26:18+0800  解码=UTF-16LE(BOM) -> UTF-8) ----
+﻿Core 0 (None):  Halted
+Saved 268340 bytes to <本地执行根>/readback/run2-measure-a0-268340.bin
+Core 0 (None):  Halted
+---- logs/run2_s4_run.out.txt  (bytes=688  sha256=fbb9072036a226f6bdde206065df5936ffc2e39ff7cb766210871021da135a7f  mtime=2026-10-28T12:26:29+0800  解码=cp936 -> UTF-8) ----
+ROUND = run2  (flash log / readback / capture all under this round name)
+accepted BIN identity OK bytes=268340 sha256=b1e852949f003965de52d539ca324a11b8b89e17a51a8f34fe3efd01525ae2d1
+build manifest identity OK bytes=24583 sha256=9c3b492a4f7487b850becaa182cea7214ff84f495af621c56d34a9f1f645194e
+R2 collector identity OK bytes=92860 sha256=9ed8a3e342f7cad8430c42140ffb508d6cc0694e251636c1b93ab2a2a7390a37
+download payload identity OK bytes=1693804 sha256=15be5f3efc45bf296bc0ef24e3947081372616d819e4bb3b189e9614cf9a5b9a
+pyOCD work dir clean: <本地执行根>\pyocd-work-r2
+Resetting target
+Core 0 (None):  Running
+S4 PASS: reset + Running evidenced. Collector may start only now.
+---- logs/run2_s4_reset_pyocd.log  (bytes=88  sha256=e4f1258235ff8a7fccf1b4135f118985ae444653f7084496fb775c182fe7c0d9  mtime=2026-10-28T12:26:28+0800  解码=UTF-16LE(BOM) -> UTF-8) ----
+﻿Resetting target
+Core 0 (None):  Running
+---- logs/run2_s5_run.out.txt  (bytes=1141  sha256=ee6b987ba0ad10890a1b88f04d11b2126c2c586e12eee1ed6f02ec526f5edc46  mtime=2026-10-28T12:27:27+0800  解码=cp936 -> UTF-8) ----
+ROUND = run2  (flash log / readback / capture all under this round name)
+accepted BIN identity OK bytes=268340 sha256=b1e852949f003965de52d539ca324a11b8b89e17a51a8f34fe3efd01525ae2d1
+build manifest identity OK bytes=24583 sha256=9c3b492a4f7487b850becaa182cea7214ff84f495af621c56d34a9f1f645194e
+R2 collector identity OK bytes=92860 sha256=9ed8a3e342f7cad8430c42140ffb508d6cc0694e251636c1b93ab2a2a7390a37
+download payload identity OK bytes=1693804 sha256=15be5f3efc45bf296bc0ef24e3947081372616d819e4bb3b189e9614cf9a5b9a
+pyOCD work dir clean: <本地执行根>\pyocd-work-r2
+BOOT_WINDOW_INCOMPLETE; no command sent and no retry.
+所在位置 <仓库根>\reports\reviews\phase8-sensor-stack-uart-r2\UARTReadDiagSerialR2.ps1:135 字符: 5
++     throw 'BOOT_WINDOW_INCOMPLETE; no command sent and no retry.'
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OperationStopped: (BOOT_WINDOW_INC...t and no retry.:String) [], RuntimeException
+    + FullyQualifiedErrorId : BOOT_WINDOW_INCOMPLETE; no command sent and no retry.
+
+collector rc=1 (ledger/raw bytes in <本地执行根>\capture\run2)
+
+=== 2. 本轮身份链 ===
+S2 判据: Load 本轮载荷 + Erase Done. + Programming Done. + Verify OK.(12:26:01); 无越界操作字样; UV4 rc 只作参考。
+S3 回读: run2 新文件 bytes=268340 sha256=b1e852949f003965de52d539ca324a11b8b89e17a51a8f34fe3efd01525ae2d1
+   与接受 BIN bytes=268340 sha256=b1e852949f003965de52d539ca324a11b8b89e17a51a8f34fe3efd01525ae2d1 两个口径相符: length_equal=True bytes_equal=True(第二次独立回读, 逐字节再次相等)
+S4: Resetting target + Core 0 (None):  Running(第 2 次显式复位, 仍在同一轮 DAP 2 次额度内)。
+S5: 采集器 92860 B / 9ed8a3e342f7; 台账四事件 SERIAL_OPEN_ATTEMPT -> SERIAL_OPEN -> RX_BEGIN -> STOP_FAILURE; counts={} => 0 条命令发出; 无分响应件。
+句柄: 脚本 finally 关闭 SerialPort/Rx/Ledger/ReplyFile; 停机后未重开口、未再复位、未追加动作。
+
+=== 3. 两轮被动窗口对照(同一镜像、同一采集器、同一台板子) ===
+  项                                      第 1 轮 run1     第 2 轮 run2
+  被动窗口字节                                        166            240
+  原字节 sha256[:12]                      075b02ddf706   a402e24f5e04
+  RX_BEGIN→停机 秒                               0.022         20.019
+  停机身份                               STACK_DANGER_OBSERVED BOOT_WINDOW_INCOMPLETE
+  命中: 5.3.0 build Oct 28 2026 10                  0              1
+  命中: RT-Thread                                   0              1
+  命中: [BOOT]                                      0              0
+  命中: [MAIN] boot complete                        0              0
+  命中: sensor stack is close                       2              0
+  命中: stack overflow                              0              0
+  命中: msh >                                       0              0
+  命中: [SS] [REQ FAIL] TMC2209 li                  0              0
+  命中: [Motor] state=4                             0              0
+  命中: [BB]                                        0              0
+  命中: FAULT                                       0              0
+
+  第 1 轮: 复位后 0.022 s 内即两条完整 sensor 栈告警(+1 残段), 危险门先落盘再拒, 一条命令未发。
+  第 2 轮: 拿到**启动横幅逐字匹配** `5.3.0 build Oct 28 2026 10:23:50`(这是该新镜像第一次在串口上
+           直接自证身份), 随后是 `NS800 stepper safety system startup` 与残行
+           `stages: 1 safe-hw /`, **此后 20 s 上限内再无任何字节**: 没有 [BOOT] 阶段完成行,
+           没有 [MAIN] boot complete, 没有任何 sensor 栈告警, 没有提示符。
+  => 同固件两次复位后走到完全不同的地方: 一次启动跑完(并持续刷栈告警), 一次在启动头部之后停住。
+
+=== 3b. 时序核对(为什么第 2 轮不是'桥接缓冲把后段丢了') ===
+  第 1 轮: 复位 12:00:40 → 开口 RX_BEGIN 12:01:23.9(间隔 43.9 s); 读到 166 B 且只有告警, 无横幅。
+  第 2 轮: 复位 12:26:28 → 开口 RX_BEGIN 12:27:07.8(间隔 39.5 s); 读到 240 B 且正是**最早的横幅+启动头**,
+           随后采集器连续排读 20.019 s, 期间新增 0 字节。
+  两次开口间隔几乎相同, 缓冲内容却分别是'只剩最新'与'完整保住最前'。唯一自洽的读法是:
+    第 1 轮自复位起产出了几十 KB(横幅+启动日志+每 ~80 ms 一条告警), 小缓冲被反复覆盖, 只剩最新 166 B;
+    第 2 轮自复位起总共只产出了 240 B, 没有溢出, 所以头部即全部, 之后没有新内容。
+  => 因此第 2 轮的'静默'不是我们读得太晚造成的观测缺失, 而是**板子在启动头部之后确实没有再输出**。
+     仍不能确定的只是机制: 固件卡在该阶段, 还是固件继续跑但控制台输出停了。两种都与观测一致。
+
+=== 4. 本轮能说什么 / 不能说什么 ===
+  能: 新镜像在板且可被逐字节回读第二次证实; 其串口横幅与 manifest 期望逐字一致;
+     R2 采集器两个新判据在两轮里各自生效且都是 fail-closed(先落盘再拒, 0 命令, 无重试无续动作)。
+  不能: 不能把第 2 轮的'告警没出现'当成栈问题已解决 —— 该轮连 sensor 线程所在的启动阶段都没到,
+        没有可比性; 也不能反过来说第 1 轮的告警是偶发。
+  不能: 不能断言第 2 轮停住的机制是'固件卡在该阶段'还是'固件继续跑但控制台输出停了'——两种都与观测
+        一致(§3b 已排除'我们读得太晚/缓冲丢了后段'这一种, 因为两次开口间隔几乎相同而内容形态相反)。
+  不能: TMC 链路、-117 根因、栈告警持久化原因(H1 真实用量 vs H2 检查假阳性)全部仍未定;
+        probe 逐笔读观测两轮都没取得(capture=INCOMPLETE, business=NOT_REACHED, 0/7 命令)。
+
+=== 5. 第 2 轮原字节归档(小件, 直接内联) ===
+run2 001_attach_passive.rx.bin bytes=240 sha256=a402e24f5e04da184f1d0343be42ba27901ab0e8335cbd5e503c24aedd92b8ca ; session.rx.bin 逐字节相等=True
+base64(无损转码文本, 不叫原始串口字节): DQogXCB8IC8NCi0gUlQgLSAgICAgVGhyZWFkIE9wZXJhdGluZyBTeXN0ZW0NCiAvIHwgXCAgICAgNS4zLjAgYnVpbGQgT2N0IDI4IDIwMjYgMTA6MjM6NTANCiAyMDA2IC0gMjAyNCBDb3B5cmlnaHQgYnkgUlQtVGhyZWFkIHRlYW0NCg0NCj09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0NDQogIE5TODAwIHN0ZXBwZXIgc2FmZXR5IHN5c3RlbSBzdGFydHVwDQ0KICBzdGFnZXM6IDEgc2FmZS1odyAv
+十六进制全文:
+  0000  0d 0a 20 5c 20 7c 20 2f 0d 0a 2d 20 52 54 20 2d 20 20 20 20 20 54 68 72 65 61 64 20 4f 70 65 72
+  0020  61 74 69 6e 67 20 53 79 73 74 65 6d 0d 0a 20 2f 20 7c 20 5c 20 20 20 20 20 35 2e 33 2e 30 20 62
+  0040  75 69 6c 64 20 4f 63 74 20 32 38 20 32 30 32 36 20 31 30 3a 32 33 3a 35 30 0d 0a 20 32 30 30 36
+  0060  20 2d 20 32 30 32 34 20 43 6f 70 79 72 69 67 68 74 20 62 79 20 52 54 2d 54 68 72 65 61 64 20 74
+  0080  65 61 6d 0d 0a 0d 0d 0a 3d 3d 3d 3d 3d 3d 3d 3d 3d 3d 3d 3d 3d 3d 3d 3d 3d 3d 3d 3d 3d 3d 3d 3d
+  00a0  3d 3d 3d 3d 3d 3d 3d 3d 3d 3d 3d 3d 3d 3d 3d 3d 0d 0d 0a 20 20 4e 53 38 30 30 20 73 74 65 70 70
+  00c0  65 72 20 73 61 66 65 74 79 20 73 79 73 74 65 6d 20 73 74 61 72 74 75 70 0d 0d 0a 20 20 73 74 61
+  00e0  67 65 73 3a 20 31 20 73 61 66 65 2d 68 77 20 2f
+可读还原(控制字节改名):
+  |
+  | \ | /
+  |- RT -     Thread Operating System
+  | / | \     5.3.0 build Oct 28 2026 10:23:50
+  | 2006 - 2024 Copyright by RT-Thread team
+  |<CR>
+  |========================================<CR>
+  |  NS800 stepper safety system startup<CR>
+  |  stages: 1 safe-hw /
+
+=== 6. 停点标签(第 2 轮) ===
+URO_R2_BOARD_ROUND2 = EXECUTED_THEN_STOPPED(user-directed re-flash)
+IMAGE_ON_BOARD = CONFIRMED(round-2 byte-identical readback + on-console banner match)
+ROUND2_CAPTURE = INCOMPLETE / ROUND2_BUSINESS = NOT_REACHED / ROUND2_MSH = 0/7
+ROUND2_FAILURE_STAGE = BOOT_WINDOW_INCOMPLETE(boot seen, [MAIN] boot complete never seen, 20 s cap)
+SENSOR_STACK_WARNING_OBSERVED_ROUND2 = FALSE(boot did not reach sensor stage; NOT a fix)
+ROUND1_FAILURE_STAGE = STACK_DANGER_OBSERVED(preserved, not rewritten)
+TMC_LINK_ON_BOARD = UNPROVEN / ECHO_MATCH_OFFSET = KNOWN_INVALID_FOR_DIAG
+SAFE_FOR_ENABLE = false / FOUR_SAFETY_MACROS=0 / NO MOTOR / NO STEP_ENABLE / NO WRITE FRAME
+ROUND2_QUOTAS_USED = download 1/1 + readback 1/1 + DAP 2/2 + reset 1/1 + COM5 1/1
+DEVICE_ACTIONS_AFTER_STOP = 0 / NO_RETRY / NO_AUTO_CARRYOVER
+NEXT_STEP_NEEDS: 一次能区分'早期停住'三种解释的只读诊断授权(未预选)
