@@ -438,7 +438,8 @@
    ],
    "dir0_extra_unobserved_starts": 2,
    "setup_failure": "post-arm probe -23 EBUSY; no target/start; disarmed; retried per package allowance",
-   "new_faults": 0
+   "new_faults": 0,
+   "note": "DIR0 三次 start 中两次为澄清固定视角观察的重跑；不是严格两组正反向成对，而是 4 次 start 上限内的观察澄清；未对完全相同失败无条件重复"
   },
   "verdict": "M3_DIR_STATIC_PATH_VERIFIED / DIRECTION_CONSISTENCY_NOT_CLOSED",
   "safe_for_enable": false,
@@ -516,20 +517,20 @@
     "raw_sha256": "e57f3afa6b73d7501192e73ed969d9ff471e8d87f63050800e4426a3d255c528"
    },
    "dir_closure_result.txt": {
-    "bytes": 4985,
-    "sha256": "167d8fcfb05f17676a4e02be0ae9fbb84335836b743f90543bab7917f856820a"
+    "bytes": 5218,
+    "sha256": "af6b2b6eb7be9b28a93d40a4c5fad678ea2f42f0dae9220c3aa78dd9387224f6"
    },
    "readback_irun20.txt": {
     "bytes": 236,
     "sha256": "ab964753b48059e65a98b264e5990e726e30ec9e465712187c345c27ca94ccf1"
    },
    "flash_irun20.txt": {
-    "bytes": 478,
-    "sha256": "c39e24aa928a910e9899e093d57b2683aaa146b15da54e6dd01dc64953b62d1f"
+    "bytes": 470,
+    "sha256": "479dd92838171699af5a4ceec6336dc16be40c7f906adca69d282c82b00a12ee"
    },
    "dir0_console.txt": {
-    "bytes": 1726,
-    "sha256": "692aa912b7f06d6f9620ebb6429905be6725f4f088914eebf304cfe359ce87ce"
+    "bytes": 1680,
+    "sha256": "843b61ad2d18fa9293f486ca25b582397e75dfdbcff1c782e6aba02ec2e68eb3"
    },
    "dir0b_console.txt": {
     "bytes": 3943,

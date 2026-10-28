@@ -38,6 +38,10 @@ M3 方向闭环结果（2026-10-28）
 - 另有一次阶段 C setup arm 后 probe 返回 `-23 EBUSY`（运行期守卫占用），未 target/start，
   按失败路径立即 stop+disarm；按包内允许做了最多 2 次只读复查，复查成功后才起转。
 - start 计数：DIR0b、DIR0c、DIR0d、DIR1 = 4/4（包内上限）；无第 5 次运动。
+
+注：DIR0 的 3 次 start 中有 2 次是为澄清固定视角观察的重跑；因此本轮不是严格两组
+“正反向成对”，而是 4 次 start 上限内的观察澄清；未对完全相同的失败做无条件重复。
+
 - 所有 stop：`api-accepted src=ramp-zero rc=0 latched=0`；所有 disarm 成功；无新 fault/栈/通信异常。
 
 [结论]
