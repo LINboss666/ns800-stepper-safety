@@ -150,3 +150,21 @@ M3 未执行。原始串口/启动/下载日志以 base64 存于
 - **终态**：IRUN20/CONFIGURED、IFCNT=12、armed=0、请求 LOW、ENN HIGH、gate 0、READY/fault=0；
   IRQ OPEN/protection_ready=YES；SW1 保持允许位。证据
   `reports/reviews/phase8-motor-chain-dev/dir-closure/`。
+
+## 11. 纠线后方向复测（2026-10-28，用户「批准纠线后复测」）
+
+- **纠线**：`1A/1B → 电机 A+/A−`、`2A/2B → B+/B−`（操作者完成；软件不测线）。
+- **未重烧、未 apply、未重启**：沿用 IRUN20 候选；CONFIGURED、IFCNT=12、planned irun=20、
+  target IHOLD_IRUN=0x00041408；IRQ OPEN、protection_ready=YES、gate 0。
+- **DIR0**：预 probe `0x210000C1` DIR=0；arm 后 `0x210000C0` DIR=0；100 Hz、5000 ms；
+  现场 **顺时针、连续、无明显抖动**；stop=api-accepted rc=0、disarm 完成。
+- **DIR1**：预 probe `0x210002C1` DIR=1；arm 后 `0x210002C0` DIR=1；100 Hz、5000 ms；
+  现场 **逆时针、连续、无明显抖动**；stop=api-accepted rc=0、disarm 完成。
+- **结论**：纠线后 **DIR0 CW / DIR1 CCW 单对各一次通过**；方向一致性按本轮“每方向一次”的
+  单对复测范围收口。限制：只做一对复测；未做多次重复、波形/频率/占空比/停机时延、实测相电流；
+  `safe_for_enable=false`；不宣称整机安全验收或量产 GO。
+- 前一轮 DIR1 不转/抖动与本轮纠线后通过，支持相线配对/一相反接是原因；不把一次通过扩写成
+  “接线完全验收”。
+- **终态**：IRUN20/CONFIGURED、IFCNT=12、armed=0、请求 LOW、ENN HIGH、gate 0、READY/fault=0；
+  IRQ OPEN/protection_ready=YES；SW1 保持允许位；dir=1（最后命令）。
+- **证据**：`reports/reviews/phase8-motor-chain-dev/dir-closure/postwire/`。

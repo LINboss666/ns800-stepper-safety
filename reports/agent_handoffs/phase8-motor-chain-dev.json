@@ -83,9 +83,10 @@
   "M3 平顺性/抖动未测；操作者判断 5 s 抖动为自身惯性",
   "H6-7→PA.3 连通/无反相仍缺独立网表或导通证据（H6 pin7 为图纸推断）",
   "motor_status 的 drv_en_request 在 disarm 后仍显示 1（字段语义为最近一次回读确认值；非门禁，但显示易误读）",
-  "方向一致性未关闭：芯片 IOIN.DIR 0/1 正确，但 DIR0 顺时针+末尾抖动、DIR1 不转仅持续左右抖动",
   "下一步需断电核对线圈配对/一相反接与 1A/1B、2A/2B；任何接线改动后需新批准复测，不升流/升频",
-  "IRUN26 1 kHz 实验未提交；板上已恢复 IRUN20；两者不可混写"
+  "IRUN26 1 kHz 实验未提交；板上已恢复 IRUN20；两者不可混写",
+  "方向一致性：纠线后 DIR0 CW / DIR1 CCW 单对各一次通过；多次重复、波形/电流未测",
+  "1 kHz/IRUN26 实验未提交；板上 IRUN20；两者不可混写"
  ],
  "safety": {
   "motor_connected": true,
@@ -98,7 +99,7 @@
   "safe_for_enable": false,
   "sw1_position": "allow (operator left it; not moved for Stage C)"
  },
- "status": "M3_DIR_STATIC_PATH_VERIFIED / DIRECTION_CONSISTENCY_NOT_CLOSED / IRUN20_RESTORED / SAFE_FOR_ENABLE_FALSE",
+ "status": "M3_DIR_CLOSURE_POSTWIRE_PAIR_PASS / REPEATABILITY_NOT_MEASURED / SAFE_FOR_ENABLE_FALSE",
  "package": "reports/reviews/phase8-motor-chain-dev/motor_package_m2_m3.md",
  "m2": {
   "approved": "用户「批准M2」",
@@ -547,7 +548,97 @@
    "dir1_console.txt": {
     "bytes": 3978,
     "sha256": "8d557ca12c54072652491d674f262b7df84bb1fb8c05deed5e8ba9568f19ac48"
+   },
+   "postwire/postwire_pre.bin.b64": {
+    "b64_bytes": 8600,
+    "b64_sha256": "527e094b305ae289d6d41a73e2559c6f0c76019e48f45ea995f3979a6d18c190",
+    "raw_bytes": 6365,
+    "raw_sha256": "8498c9eb783134c371a0192b6da6e34c663ef9a22d597f7a3615b9dde1e46c36"
+   },
+   "postwire/dir0_postwire.bin.b64": {
+    "b64_bytes": 12774,
+    "b64_sha256": "1a0ef16e50c04999a20df7c27f99cd2779157ba39dc73f766f3935d92f10e59f",
+    "raw_bytes": 9455,
+    "raw_sha256": "47cf9b9b52a07c7adb3f1aa32599b66e5b9ed41f634295e51eb0a7ae69772050"
+   },
+   "postwire/dir1_postwire.bin.b64": {
+    "b64_bytes": 12774,
+    "b64_sha256": "ca3f6f848b0f4e863fa5e10fcb9e377b347e3991015612a3b18b0b926a5c702f",
+    "raw_bytes": 9455,
+    "raw_sha256": "476f533e21d755aa00e77fa0c10eeb7007844269d6949654b3c51bd8b6f765ce"
+   },
+   "postwire/final_postwire.bin.b64": {
+    "b64_bytes": 7238,
+    "b64_sha256": "ded5f4b0fe8eb701971c9dd1cccff5df4ec0c11c859beef7ef89d0ee125c1298",
+    "raw_bytes": 5356,
+    "raw_sha256": "3070ec847199e42908c88c98777f407b0726b62fbee7350c125fb3a8695d469d"
+   },
+   "postwire/dir0_postwire_console.txt": {
+    "bytes": 3978,
+    "sha256": "69be071360e2592ac1c6f58e018134cf45dc37493ead629f41715e310a854b26"
+   },
+   "postwire/dir1_postwire_console.txt": {
+    "bytes": 3978,
+    "sha256": "735ba5fb38b1428fed4dfc9a611a26fe86d6524d725699c0ff73e31cdc66e7b7"
+   },
+   "postwire/postwire_result.txt": {
+    "bytes": 2141,
+    "sha256": "1b72eb9f8c521f42cc2b455277592b66f56c6b1556bc8c308bc53bcfef6e5369"
    }
+  },
+  "postwire": {
+   "wiring": "1A/1B -> motor A+/A-; 2A/2B -> B+/B- (operator)",
+   "no_reflash": true,
+   "no_apply": true,
+   "no_reboot": true,
+   "config": "IRUN20 CONFIGURED IFCNT=12 planned irun=20 target IHOLD_IRUN=0x00041408",
+   "runs": [
+    {
+     "dir": 0,
+     "pre_ioin": "0x210000C1",
+     "pre_dir": 0,
+     "post_ioin": "0x210000C0",
+     "post_dir": 0,
+     "hz": 100,
+     "window_ms": 5000,
+     "observed": "CW, continuous, no obvious jitter",
+     "stop": "api-accepted rc=0 latched=0",
+     "disarm": true
+    },
+    {
+     "dir": 1,
+     "pre_ioin": "0x210002C1",
+     "pre_dir": 1,
+     "post_ioin": "0x210002C0",
+     "post_dir": 1,
+     "hz": 100,
+     "window_ms": 5000,
+     "observed": "CCW, continuous, no obvious jitter",
+     "stop": "api-accepted rc=0 latched=0",
+     "disarm": true
+    }
+   ],
+   "final": {
+    "armed": 0,
+    "cur_hz": 0,
+    "target_hz": 0,
+    "dir": 1,
+    "stop": "api-accepted src=disarm rc=0 latched=0",
+    "arm_gate_mask": "0x0",
+    "drv_request": "LOW",
+    "pad": 0,
+    "enn_fb": "HIGH",
+    "step_enabled": 0,
+    "safety": "READY fault=0",
+    "ifcnt": 12,
+    "drive_cfg": "CONFIGURED",
+    "irq": "OPEN",
+    "protection_ready": "YES",
+    "sw1": "allow"
+   },
+   "verdict": "POSTWIRE_PAIR_PASS",
+   "limits": "single pair only; repeatability beyond one pair, waveform/frequency/duty/stop latency, actual phase current not measured",
+   "safe_for_enable": false
   }
  }
 }

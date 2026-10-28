@@ -1,0 +1,34 @@
+纠线后方向一致性复测（2026-10-28）
+用户纠线：1A/1B → 电机 A+/A−；2A/2B → B+/B−（操作者完成，软件不测线）。
+镜像/配置：沿用现有 IRUN20 候选，未重烧；本次未重启、未 apply。
+  CONFIGURED、IFCNT=12、planned irun=20、target IHOLD_IRUN=0x00041408；
+  live/applied GCONF=0x00000141、CHOPCONF=0x15030053；
+  IRQ OPEN、protection_ready=YES、arm_gate_mask=0x0；armed=0、请求 LOW、ENN HIGH。
+
+[DIR0]
+- 预 probe：IOIN=0x210000C1，DIR=0；arm 后 probe：0x210000C0，DIR=0。
+- 100 Hz、start→stop 5000 ms；现场：顺时针、连续、无明显抖动。
+- stop=api-accepted src=ramp-zero rc=0 latched=0；disarm 完成。
+
+[DIR1]
+- 预 probe：IOIN=0x210002C1，DIR=1；arm 后 probe：0x210002C0，DIR=1。
+- 100 Hz、start→stop 5000 ms；现场：逆时针、连续、无明显抖动。
+- stop=api-accepted src=ramp-zero rc=0 latched=0；disarm 完成。
+
+[终态]
+- armed=0、cur/tgt=0、dir=1（最后 DIR 命令）、stop=api-accepted src=disarm rc=0 latched=0、
+  arm_gate_mask=0x0、drv_request=LOW pad=0、ENN_fb=HIGH、STEP enabled=0、READY/fault=0。
+- IRQ OPEN/protection_ready=YES；SW1 保持允许位；CONFIGURED、IFCNT=12、planned irun=20。
+
+[结论]
+- 纠线后 DIR0（CW）与 DIR1（CCW）各一次 5 s 均连续、无明显抖动，芯片 DIR 0/1 跟随；
+  方向一致性按本轮“每方向一次”的单对复测范围收口。
+- 限制：只做了一对复测；没有多次重复、没有波形/频率/占空比/停机时延测量、没有实测相电流；
+  不宣称整机安全验收、量产 GO 或最坏停机时延。`safe_for_enable=false`。
+- 前一轮 DIR1 不转/抖动与本轮纠线后通过，支持相线配对/一相反接是原因；但不把一次通过
+  扩写成“接线完全验收”或“模块/电机全部正常”。
+- 上轮 IRUN26 1 kHz 实验仍是独立物理 FAIL（8 细分约 37.5 rpm），未提交；板上已恢复 IRUN20。
+
+[原始件]
+- postwire_pre.bin.b64 / dir0_postwire.bin.b64 / dir1_postwire.bin.b64 / final_postwire.bin.b64
+- dir0_postwire_console.txt / dir1_postwire_console.txt
