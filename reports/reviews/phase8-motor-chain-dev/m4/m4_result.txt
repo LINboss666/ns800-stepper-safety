@@ -1,0 +1,95 @@
+M4 基本运行与监测结果（2026-10-28）
+任务包：NS800_M4_Motor_Function_and_Monitoring_20261028.md（13094 B / 10b19e33…f244bef5）
+批准：用户「批准M4基本运行与监测包…」原文
+基线：b9a2517913c693f088368a14f62e04e9a89d820e；software_input=916c34ba4032bc7f41e2944c13b449271030191b
+在板：IRUN20 候选 BIN 397aa844…（258428 B）/ AXF 0cfa048f…（1665388 B）；
+      本轮 **无构建、无烧录、无 apply、无 DAP/Flash**；未重启，配置沿用。
+
+[前置]
+READY/fault0；armed=0、cur/tgt=0；请求 LOW/pad0、ENN HIGH、stop 无锁存；
+CONFIGURED、IFCNT=12、planned irun=20、target IHOLD_IRUN=0x00041408；
+GCONF=0x141、CHOPCONF=0x15030053；IOIN=0x210002C1 DIR=1、MS1/MS2=0、
+VERSION=0x21；IRQ OPEN、protection_ready=YES、arm_gate_mask=0；
+diag MONITOR_ONLY、ADC cal=THEORETICAL；DIAG raw=0；SW1 允许侧。
+
+[R1–R4：两对 100 Hz 正反向，每段 5 s]
+| 段 | 命令DIR | cur/tgt | 现场观察 | stop | disarm |
+|---|---:|---|---|---|---|
+| R1 | 0 | 100/100 Hz | 顺时针、连续、无明显抖动 | ramp-zero api-accepted rc=0 latched=0 | OK |
+| R2 | 1 | 100/100 Hz | 逆时针、连续、无明显抖动 | ramp-zero api-accepted rc=0 latched=0 | OK |
+| R3 | 0 | 100/100 Hz | 顺时针、连续、无明显抖动 | ramp-zero api-accepted rc=0 latched=0 | OK |
+| R4 | 1 | 100/100 Hz | 逆时针、连续、无明显抖动 | ramp-zero api-accepted rc=0 latched=0 | OK |
+- 运行中 motor_status 出现 gate 0x2/safety-not-READY 是 SAFETY RUN 的正常中间态；每段结束回到 armed=0/请求 LOW/ENN HIGH/gate 0/READY。
+- A = PASS（两对方向相反、连续、stop/disarm 成立；来自操作者同一固定视角观察，非波形/编码器）。
+
+[S1：单方向变速，35 s]
+| 计划 | 实际主机时刻 | target | motor_status cur/tgt |
+|---|---:|---:|---|
+| 0 s | ~0 | 100 | 100/100 |
+| 5 s | ~5.6 | 300 | 300/300 |
+| 10 s | ~10.6 | 600 | 600/600 |
+| 15 s | ~15.6 | 1000 | 1000/1000 |
+| 20 s | ~20.6 | 600 | 600/600 |
+| 25 s | ~25.6 | 300 | 300/300 |
+| 30 s | ~30.6 | 100 | 100/100 |
+| 35 s | 定时 stop | — | ramp-zero api-accepted rc=0 latched=0 |
+- 现场：档位变化可见/可闻，连续，无异常；未测物理 STEP 频率精度、占空比或波形。
+- B = PASS（有限：七档命令与 cur/target 有记录，轴运动变化相符，无 fault/guard）。
+
+[L1：300 Hz、60 s 监测]
+- DIR1、target 300；三次轻量快照 t≈10.7/30.7/50.6：
+  - motor_status：cur/tgt=300、armed=1、gate 0x2（RUN 正常中间态）；
+  - sensor_snapshot：frame seq=448677→450637→452593，tick=4588411→4608403→4628355；
+    curr [VALID] raw≈2065–2067、ma 16/24/26 **cal_source=THEORETICAL，NOT measured**；
+    sg [VALID] SG_RESULT=72/64/68；IMU VALID；safe active=09 valid=09。
+  - diag_status：`STALL_SUSPECT / MONITOR_ONLY`，sg_filt 66/73/64，
+    cnt sg<warn=1095/3054/5011、**sg<stall=0**、cur>warn=0、impact=0、bad=0；
+    仅是监测判据，未触发 fault/guard，不据此判堵转，未改模式/阈值。
+- t=60 定时 stop：ramp-zero api-accepted rc=0 latched=0；disarm；终态 READY/fault0。
+- 现场：60 秒连续、无明显异常、速度稳定（操作者观察）。
+- C = PASS（有限：短时功能运行，不是长期寿命/温升试验）。
+- D = MONITORING_OBSERVATION_COMPLETE（有上述帧/有效位/校准来源；相电流未实测；
+      STALL_SUSPECT 是 MONITOR_ONLY 观察，不是故障或物理堵转确认）。
+
+[终态与健康]
+armed=0、cur/tgt=0、dir=1、stop=api-accepted src=disarm rc=0 latched=0、gate 0；
+请求 LOW/pad0、ENN HIGH；STEP enabled=0；READY/fault=0；CONFIGURED、IFCNT=12；
+IRQ OPEN/protection_ready=YES；SW1 允许位。
+ps：motor 2048B/max used 68%（约1393B，余量约655B）、sensor 4096B/21%、
+safety 1024B/34%、diag 1024B/50%、bblog 1024B/50%、main 2048B/69%、
+tshell 4096B/53%；无 overflow 文本；未做最坏栈深证明。
+blackbox_status：flash used=4096 valid=4096 bad=0；session=0、written=0（本轮未新增记录）；
+blackbox_dump 3：读到 3 条既有记录（ses=1，t≈12701–12721，ev=8，valid=1E，hz=0）；
+未 clear，不把旧记录当本轮故障，也不宣称新故障记录链已验证。
+
+[结论]
+M4_MOTOR_FUNCTION_PASS（仅 A/B/C 的实际完成部分；操作者观察+主机记录，不是物理精度验收）
+MONITORING_OBSERVATION_COMPLETE（D/E 的读性与快照完整；含未标定/未实测项）
+PROJECT_SAFETY_ACCEPTANCE_PENDING
+safe_for_enable=false。
+
+[口径更正（同轮登记）]
+- 旧异常原因为**跨相配对错误**：原 1A/2A 接 A 绕组、1B/2B 接 B 绕组；
+  已改为 1A/1B→A+/A−、2A/2B→B+/B−。一相内部两线对调通常只改变方向约定。
+- 纠线前 1 kHz/IRUN26 保留历史 FAIL，但当时接线错误、实验件未提交；
+  **纠线后 IRUN26 为 NOT_EXECUTED**，本包不测 IRUN26。
+- 旧 M3 任务书 target→arm 顺序错误已在方向闭环轮更正并记录；不再重做。
+
+[最终验收差距表（一页）]
+| 既定必验功能 | 已接受的实际证据 | 仍缺的实际测量/标定/故障验证 | 对两天期限的真实影响 |
+|---|---|---|---|
+| A 重复启停/方向 | R1–R4 两对 100 Hz/5 s，方向相反、连续、stop/disarm；操作者固定视角 | 更多循环重复性、负载、温度、波形/STEP 精度 | 功能演示可交；正式重复性/负载仍待 |
+| B 调速/加减速 | 七档 target 与 cur/tgt 记录，运动变化相符，无 fault | 物理频率/占空比、加速度/停机时延、负载转矩 | 功能已演示；测量未做 |
+| C 60 s 短时运行 | 300 Hz、60 s 连续、起止状态、无异常 | 温升/寿命/长时运行、热测量 | 仅短时功能，不是寿命结论 |
+| D 监测 | 三次快照 seq/tick、valid、cal_source、SG/diag；STALL_SUSPECT(MONITOR_ONLY) | 实测相电流（ADC=THEORETICAL）、DIAG 连通/注入、StallGuard 有效范围 | 监测观察完整；保护判据未验收 |
+| E 日志/存储 | blackbox_status + dump 3 可读；本轮未触发新故障 | 新故障记录链（需故障注入/clear 批准） | 旧记录可读；新链未验 |
+| 其他 | IRUN20/配置/保护门/终态 | 限位禁用、DIAG H6-7→PA.3 独立连通、A0、最坏停机时延、实测 VREF/Rsense | 项目安全验收仍 PENDING |
+
+[安全边界]
+6 次 start/6 次正常 stop 全部在批准内；无升流/调 VREF/改细分/改宏/改线/带载/堵转/故障注入/
+diag 模式切换；无 config_save/default/load、blackbox_clear/selftest、pin_status、pwm_test、
+手工 selftest、A0；无 fault_reset；未重烧；未自动回刷。SW1 保持允许位。
+
+[原始件]
+m4/pre.bin.b64、r1_d0、r2_d1、r3_d0、r4_d1、s1_speed、l1_monitor、final；
+对应 host console 原文件同目录。

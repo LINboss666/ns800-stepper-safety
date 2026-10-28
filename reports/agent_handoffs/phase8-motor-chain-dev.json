@@ -86,7 +86,10 @@
   "下一步需断电核对线圈配对/一相反接与 1A/1B、2A/2B；任何接线改动后需新批准复测，不升流/升频",
   "IRUN26 1 kHz 实验未提交；板上已恢复 IRUN20；两者不可混写",
   "方向一致性：纠线后 DIR0 CW / DIR1 CCW 单对各一次通过；多次重复、波形/电流未测",
-  "1 kHz/IRUN26 实验未提交；板上 IRUN20；两者不可混写"
+  "1 kHz/IRUN26 实验未提交；板上 IRUN20；两者不可混写",
+  "M4 A/B/C 为受限功能测试：未做更多循环重复性、负载、温度/寿命、物理频率/STEP精度",
+  "M4 D：相电流未实测（ADC=THEORETICAL）；DIAG 连通/注入、StallGuard 有效范围、新故障记录链未验",
+  "限位禁用、A0、H6-7→PA.3 独立连通、最坏停机时延仍保留"
  ],
  "safety": {
   "motor_connected": true,
@@ -99,7 +102,7 @@
   "safe_for_enable": false,
   "sw1_position": "allow (operator left it; not moved for Stage C)"
  },
- "status": "M3_DIR_CLOSURE_POSTWIRE_PAIR_PASS / REPEATABILITY_NOT_MEASURED / SAFE_FOR_ENABLE_FALSE",
+ "status": "M4_MOTOR_FUNCTION_PASS / MONITORING_OBSERVATION_COMPLETE / PROJECT_SAFETY_ACCEPTANCE_PENDING",
  "package": "reports/reviews/phase8-motor-chain-dev/motor_package_m2_m3.md",
  "m2": {
   "approved": "用户「批准M2」",
@@ -640,5 +643,207 @@
    "limits": "single pair only; repeatability beyond one pair, waveform/frequency/duty/stop latency, actual phase current not measured",
    "safe_for_enable": false
   }
+ },
+ "m4": {
+  "approved": "用户「批准M4基本运行与监测包…」原文",
+  "document_bytes": 13094,
+  "document_sha256": "10b19e3358673d4d3357af5f68ebb894e234135bd73bd122273569a7f244bef5",
+  "no_build": true,
+  "no_flash": true,
+  "no_apply": true,
+  "no_reboot": true,
+  "image": "IRUN20 candidate 397aa844… (258428 B)",
+  "pre": {
+   "ready": true,
+   "fault": 0,
+   "armed": 0,
+   "cur_hz": 0,
+   "target_hz": 0,
+   "request": "LOW",
+   "pad": 0,
+   "enn_fb": "HIGH",
+   "arm_gate_mask": "0x0",
+   "config": "CONFIGURED IFCNT=12 planned irun=20",
+   "ioin": "0x210002C1",
+   "version": "0x21",
+   "diag_mode": "MONITOR_ONLY",
+   "adc_cal": "THEORETICAL",
+   "sw1": "allow"
+  },
+  "pairs": [
+   {
+    "run": "R1",
+    "dir": 0,
+    "hz": 100,
+    "window_ms": 5000,
+    "observed": "CW continuous, no obvious jitter",
+    "stop": "ramp-zero api-accepted rc=0 latched=0",
+    "disarm": true
+   },
+   {
+    "run": "R2",
+    "dir": 1,
+    "hz": 100,
+    "window_ms": 5000,
+    "observed": "CCW continuous, no obvious jitter",
+    "stop": "ramp-zero api-accepted rc=0 latched=0",
+    "disarm": true
+   },
+   {
+    "run": "R3",
+    "dir": 0,
+    "hz": 100,
+    "window_ms": 5000,
+    "observed": "CW continuous, no obvious jitter",
+    "stop": "ramp-zero api-accepted rc=0 latched=0",
+    "disarm": true
+   },
+   {
+    "run": "R4",
+    "dir": 1,
+    "hz": 100,
+    "window_ms": 5000,
+    "observed": "CCW continuous, no obvious jitter",
+    "stop": "ramp-zero api-accepted rc=0 latched=0",
+    "disarm": true
+   }
+  ],
+  "speed": {
+   "hz_seq": [
+    100,
+    300,
+    600,
+    1000,
+    600,
+    300,
+    100
+   ],
+   "actual_switch_s": [
+    5.6,
+    10.6,
+    15.6,
+    20.6,
+    25.6,
+    30.6
+   ],
+   "observed": "speed changes visible/audible; continuous; no obvious anomaly",
+   "stop": "ramp-zero api-accepted rc=0 latched=0",
+   "disarm": true,
+   "physical_frequency_accuracy_measured": false
+  },
+  "monitor": {
+   "dir": 1,
+   "hz": 300,
+   "window_ms": 60000,
+   "snapshots": [
+    {
+     "t_s": 10.7,
+     "seq": 448677,
+     "tick": 4588411,
+     "current_raw": 2066,
+     "cal_source": "THEORETICAL",
+     "current_measured": false,
+     "sg": 72,
+     "diag": "STALL_SUSPECT/MONITOR_ONLY"
+    },
+    {
+     "t_s": 30.7,
+     "seq": 450637,
+     "tick": 4608403,
+     "current_raw": 2067,
+     "cal_source": "THEORETICAL",
+     "current_measured": false,
+     "sg": 64,
+     "diag": "STALL_SUSPECT/MONITOR_ONLY"
+    },
+    {
+     "t_s": 50.6,
+     "seq": 452593,
+     "tick": 4628355,
+     "current_raw": 2065,
+     "cal_source": "THEORETICAL",
+     "current_measured": false,
+     "sg": 68,
+     "diag": "STALL_SUSPECT/MONITOR_ONLY"
+    }
+   ],
+   "sg_below_stall": 0,
+   "cur_above_stall": 0,
+   "impact": 0,
+   "fault": 0,
+   "guard_stops": 0,
+   "observed": "60 s continuous, no obvious anomaly, speed stable",
+   "stop": "ramp-zero api-accepted rc=0 latched=0",
+   "disarm": true
+  },
+  "final": {
+   "armed": 0,
+   "cur_hz": 0,
+   "target_hz": 0,
+   "dir": 1,
+   "stop": "api-accepted src=disarm rc=0 latched=0",
+   "arm_gate_mask": "0x0",
+   "drv_request": "LOW",
+   "pad": 0,
+   "enn_fb": "HIGH",
+   "step_enabled": 0,
+   "safety": "READY fault=0",
+   "ifcnt": 12,
+   "drive_cfg": "CONFIGURED",
+   "ioin": "0x21000241",
+   "irq": "OPEN",
+   "protection_ready": "YES",
+   "sw1": "allow",
+   "ps": {
+    "motor": "2048B/68% (~1393B, ~655B headroom)",
+    "sensor": "4096B/21%",
+    "safety": "1024B/34%",
+    "diag": "1024B/50%",
+    "bblog": "1024B/50%",
+    "main": "2048B/69%",
+    "tshell": "4096B/53%",
+    "overflow": false
+   },
+   "blackbox": {
+    "used": 4096,
+    "valid": 4096,
+    "bad": 0,
+    "session": 0,
+    "written": 0,
+    "dump3": "existing ses=1 records; not new; not cleared"
+   }
+  },
+  "assessments": {
+   "A": "PASS (two pairs, opposite, continuous, stop/disarm)",
+   "B": "PASS_LIMITED (seven target steps + cur/target records; physical frequency accuracy not measured)",
+   "C": "PASS_LIMITED (60 s continuous short run; not lifetime/temperature)",
+   "D": "MONITORING_OBSERVATION_COMPLETE (frames/valid/cal_source; current not measured; STALL_SUSPECT monitor-only)",
+   "E": "LOG_READABLE_NO_NEW_FAULT (blackbox status/dump3; no new fault chain validation)"
+  },
+  "verdict": "M4_MOTOR_FUNCTION_PASS / MONITORING_OBSERVATION_COMPLETE / PROJECT_SAFETY_ACCEPTANCE_PENDING",
+  "safe_for_enable": false,
+  "corrections": [
+   "旧异常原因=跨相配对错误（原1A/2A→A、1B/2B→B），已纠正；一相内部两线对调只改变方向约定",
+   "纠线前1kHz/IRUN26历史FAIL属错接条件、实验件未提交；纠线后IRUN26 NOT_EXECUTED，M4不测IRUN26",
+   "旧M3 target→arm顺序错误已在方向闭环轮更正并记录"
+  ],
+  "evidence": [
+   "pre.bin.b64",
+   "r1_d0.bin.b64",
+   "r2_d1.bin.b64",
+   "r3_d0.bin.b64",
+   "r4_d1.bin.b64",
+   "s1_speed.bin.b64",
+   "l1_monitor.bin.b64",
+   "final.bin.b64",
+   "m4_result.txt",
+   "r1_d0_console.txt",
+   "r2_d1_console.txt",
+   "r3_d0_console.txt",
+   "r4_d1_console.txt",
+   "s1_speed_console.txt",
+   "l1_monitor_console.txt",
+   "final_console.txt"
+  ]
  }
 }

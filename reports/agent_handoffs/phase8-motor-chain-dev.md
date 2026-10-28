@@ -168,3 +168,29 @@ M3 未执行。原始串口/启动/下载日志以 base64 存于
 - **终态**：IRUN20/CONFIGURED、IFCNT=12、armed=0、请求 LOW、ENN HIGH、gate 0、READY/fault=0；
   IRQ OPEN/protection_ready=YES；SW1 保持允许位；dir=1（最后命令）。
 - **证据**：`reports/reviews/phase8-motor-chain-dev/dir-closure/postwire/`。
+
+## 12. M4 基本运行与监测（2026-10-28，用户批准 M4 包）
+
+- **前置**：IRUN20、未重启/未 apply；READY/fault0、armed=0、请求 LOW/pad0、ENN HIGH、
+  CONFIGURED/IFCNT12、IOIN=0x210002C1 VERSION=0x21、IRQ OPEN/protection_ready=YES/gate 0、
+  diag MONITOR_ONLY、ADC cal=THEORETICAL。
+- **R1–R4（两对 100 Hz/5 s）**：D0 CW、D1 CCW、D0 CW、D1 CCW，均连续、无明显抖动
+  （操作者固定视角）；每段 ramp-zero stop=api-accepted rc=0、disarm。
+- **S1（35 s）**：DIR0，target 与 cur/tgt 记录
+  100→300→600→1000→600→300→100（实际切换约 5.6/10.6/15.6/20.6/25.6/30.6 s）；
+  t=35 定时 stop=api-accepted、disarm；无 fault/guard；现场档位变化可见、连续。
+- **L1（300 Hz、60 s）**：DIR1；三次快照 frame seq 448677→450637→452593、
+  tick 4588411→4608403→4628355；curr VALID raw≈2065–2067、cal_source=THEORETICAL（ma 非实测）；
+  SG=72/64/68；diag `STALL_SUSPECT / MONITOR_ONLY`（sg<warn 计数↑，sg<stall=0，无 fault/guard，
+  不据此判堵转）；t=60 stop/disarm；现场连续、无明显异常。
+- **终态**：armed=0、cur/tgt=0、请求 LOW/ENN HIGH、gate 0、READY/fault=0、CONFIGURED/IFCNT12；
+  `ps` motor 2048B/68%（余量约655B）、sensor 4096B/21%，无 overflow；
+  blackbox_status used/valid=4096，session=0/written=0；dump 3 只读到既有 ses=1 记录，未 clear。
+- **结论**：`M4_MOTOR_FUNCTION_PASS`（A/B/C 实际完成，操作者观察+主机记录，不是物理精度验收）；
+  `MONITORING_OBSERVATION_COMPLETE`（D/E；相电流未实测、STALL_SUSPECT 仅 MONITOR_ONLY）；
+  `PROJECT_SAFETY_ACCEPTANCE_PENDING`；`safe_for_enable=false`。
+- **口径更正**：旧异常为跨相配对错误（原 1A/2A→A、1B/2B→B），已纠正；
+  纠线前 1 kHz/IRUN26 的历史 FAIL 属错接条件、实验件未提交；纠线后 IRUN26 NOT_EXECUTED，
+  M4 不测 IRUN26。旧 M3 target→arm 顺序错误已在方向闭环轮更正并记录。
+- **证据**：`reports/reviews/phase8-motor-chain-dev/m4/`（`m4_result.txt` + 8 个原始 RX b64 +
+  host console）。未构建/烧录/apply/fault_reset/blackbox_clear；6 次 start/stop 在批准内。
