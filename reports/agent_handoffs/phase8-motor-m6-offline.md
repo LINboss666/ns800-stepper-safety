@@ -92,8 +92,8 @@ I/O 四变体（off/on × target/ovr）全部 PASS；证据 `io_behavior.txt`。
 
 新增 `reports/reviews/phase8-motor-m6-offline/m6_field_candidate.py`，保留 M5 原脚本。
 状态 **FIELD_CANDIDATE_OFFLINE_FIXED / NOT_BOARD_EXECUTED**；独立复审的三项阻断已修，
-本轮仍无现场批准。候选 **Git blob SHA-256（远端回读）：`34480647613a80649761f597648e87287abf32dac197f7261a1feaab1af4853d`**；
-工作树 CRLF 副本 SHA-256 `9d424e2f07e1027a05c74e80989eb851cae651fb9f660af81ba5cf929fd63cc2`
+本轮仍无现场批准。候选 **Git blob SHA-256（远端回读）：`9faaca5904ccd3c2618c4a152cc200f4f756ff45aef3e671cf2815356b706649`**；
+工作树 CRLF 副本 SHA-256 `6d0385064c09383f5e8dd30392ce63c56b3242f24dba37cbe9c10f36dc3d2233`
 （仅换行差异；两种字节均执行了 32/32 自测，结果分别归档）。
 
 复审补正（D-1/D-2/D-3）：

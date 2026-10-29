@@ -5,8 +5,8 @@
   "document_base": "a052e8e3dc11a4a983fcaecf5fd36ba9e4139af4",
   "source_base": "a052e8e3dc11a4a983fcaecf5fd36ba9e4139af4",
   "code_commit": "cf133d6a5d539bb5a7c3b9da4d50d53dc3b47055",
-  "delivery_head": "e4f89d30effa3e49a4e0f0335dc6af154dc42940",
-  "delivery_head_note": "final field-candidate evidence commit (32/32 worktree + Git-blob, D-2e first-failure raw log); images are in 80fc7db, build manifest/project binding in 9241828; the handoff documentation commit follows and is reported in the STOP/readback, not self-recorded",
+  "delivery_head": "6db52c1f3f534b42e4b326846508aa6fa2941a8a",
+  "delivery_head_note": "final field-candidate evidence commit after the allow_recovery seam update; images are in 80fc7db, build manifest/project binding in 9241828; the handoff documentation commit follows and is reported in the STOP/readback, not self-recorded",
   "status": "M6_OFFLINE_CLOSEOUT_COMPLETE / NEW_IMAGES_BUILT_NOT_FLASHED / FIELD_CANDIDATE_OFFLINE_FIXED_NOT_EXECUTED",
   "product_changed": {
     "applications/safety_state.c": "safety_trip_cmd checks ss_log_ctx_ok before ANY argument parsing or output; legal thread retains usage and one safety_post_event; no protection/recovery logic change",
@@ -124,8 +124,8 @@
       "new_ids": 12,
       "status": "FIELD_CANDIDATE_OFFLINE_FIXED / NOT_BOARD_EXECUTED",
       "first_failure": "reports/reviews/phase8-motor-m6-offline/field_candidate_selftest_first_failure.txt",
-      "sha256": "34480647613a80649761f597648e87287abf32dac197f7261a1feaab1af4853d",
-      "sha256_worktree_crlf": "9d424e2f07e1027a05c74e80989eb851cae651fb9f660af81ba5cf929fd63cc2",
+      "sha256": "9faaca5904ccd3c2618c4a152cc200f4f756ff45aef3e671cf2815356b706649",
+      "sha256_worktree_crlf": "6d0385064c09383f5e8dd30392ce63c56b3242f24dba37cbe9c10f36dc3d2233",
       "sha256_note": "Git blob bytes are LF; worktree checkout is CRLF. Both byte sets ran 25/25; line endings only.",
       "evidence_git_blob": "reports/reviews/phase8-motor-m6-offline/field_candidate_selftest_git_blob.txt",
       "first_failure_provenance": "transcribed console output of the first post-rewrite run; the raw temporary file was later overwritten; not device evidence",
@@ -590,7 +590,7 @@
     "round2": {
       "date": "2026-10-29",
       "result": "A/B/C accepted; D-1 and D-3 closed; D-2 transport fixed; D-2e evidence control flow now fixed; candidate remains NOT_BOARD_EXECUTED",
-      "candidate_sha256": "34480647613a80649761f597648e87287abf32dac197f7261a1feaab1af4853d",
+      "candidate_sha256": "9faaca5904ccd3c2618c4a152cc200f4f756ff45aef3e671cf2815356b706649",
       "remaining_before_this_fix": "evidence save failure only set a flag; fault_reset/system_selftest could still run",
       "fix": "immediate EvidenceError on business q; cleanup exemption; no recovery after evidence failure"
     }
