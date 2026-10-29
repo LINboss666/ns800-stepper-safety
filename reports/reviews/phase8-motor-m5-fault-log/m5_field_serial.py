@@ -215,13 +215,14 @@ class Runner:
     # ---------- P0 ----------
     def preflight(self, rec, expect_banner=None, allow_apply=False):
         text = {}
-        for cmd in ("system_status", "safety_state", "safety_status",
+        for cmd in ("system_status", "version", "safety_state", "safety_status",
                     "motor_status", "step_status", "tmc_config_show",
                     "diag_status", "config_show", "sensor_snapshot",
                     "blackbox_status", "flash_logstat"):
             text[cmd] = self.q(rec, cmd)
-        if expect_banner and expect_banner not in text["system_status"]:
-            raise Abort("banner mismatch: %r not in system_status" % expect_banner)
+        banner_seen = text["version"] + text["system_status"]
+        if expect_banner and expect_banner not in banner_seen:
+            raise Abort("banner mismatch: %r not in version/system_status" % expect_banner)
         ss = self.parse_safety_state(text["safety_state"])
         st = self.parse_safety_status(text["safety_status"])
         mo = self.parse_motor(text["motor_status"])
@@ -555,6 +556,7 @@ class FakeDevice:
 
     def text(self, cmd):
         if cmd == "system_status": return "FAKEBANNER build M5\r\n"
+        if cmd == "version": return " / | \\     5.3.0 build FAKEBANNER Oct 29 2026 00:00:00\r\n"
         if cmd == "safety_state":
             return "[SS] state=%s fault_code=%d degraded=0x00\n" % (self.safety, self.fault)
         if cmd == "safety_status":
