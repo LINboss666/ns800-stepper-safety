@@ -81,6 +81,27 @@ def parse_blackbox(text):
             "drop": int(f.group(7))}
 
 
+def load_archive_gate(path):
+    """The M5 archive phase must have accepted the old log, and a clear (if
+    any) must have a verified second copy, before a new fault may start."""
+    try:
+        with open(path, encoding="utf-8") as fh:
+            st = json.load(fh)
+    except (OSError, ValueError) as exc:
+        raise Abort("archive state unreadable: %s" % exc)
+    if not st.get("archive_accept"):
+        raise Abort("archive not accepted")
+    if st.get("clear_done"):
+        second = st.get("second_copy")
+        if not second:
+            raise Abort("second copy missing after clear")
+        if not os.path.isfile(os.path.join(second, "COPY_VERIFIED.json")):
+            raise Abort("second copy verification missing")
+    elif int(st.get("free", 0)) < EXPECTED_FRAMES:
+        raise Abort("archive reports insufficient free slots")
+    return st
+
+
 class Session:
     def __init__(self, link, clock=time.monotonic, sleep=time.sleep,
                  verify_log=None, out_dir=None):
@@ -189,11 +210,14 @@ class Session:
         self.bb0 = bb
         return fl["used"]
 
-    def run_fault(self, deadline_s=20.0, allow_recovery=False):
+    def run_fault(self, deadline_s=20.0, allow_recovery=False,
+                  archive_state=None):
         t0 = self.clock()
         deadline = t0 + deadline_s
         recovered = False
         try:
+            if archive_state:
+                load_archive_gate(archive_state)
             self._static_preflight(deadline)
             self.q("motor_dir 0", deadline)
             # Arm may make the output eligible: responsibility starts here.
@@ -611,6 +635,68 @@ def selftest():
         if "serial" in sys.modules:
             raise AssertionError("pyserial imported on argument error")
 
+    def c11():
+        import shutil
+        import tempfile
+        d = tempfile.mkdtemp(prefix="m6_gate_")
+        try:
+            good = os.path.join(d, "good.json")
+            with open(good, "w", encoding="utf-8") as fh:
+                json.dump({"archive_accept": True, "clear_done": False,
+                           "free": 4096}, fh)
+            load_archive_gate(good)
+            bads = []
+            p = os.path.join(d, "reject.json")
+            with open(p, "w", encoding="utf-8") as fh:
+                json.dump({"archive_accept": False, "clear_done": False,
+                           "free": 4096}, fh)
+            bads.append(p)
+            p = os.path.join(d, "nocopy.json")
+            with open(p, "w", encoding="utf-8") as fh:
+                json.dump({"archive_accept": True, "clear_done": True,
+                           "second_copy": None}, fh)
+            bads.append(p)
+            p = os.path.join(d, "unverified.json")
+            empty = os.path.join(d, "second")
+            os.makedirs(empty)
+            with open(p, "w", encoding="utf-8") as fh:
+                json.dump({"archive_accept": True, "clear_done": True,
+                           "second_copy": empty}, fh)
+            bads.append(p)
+            for bad in bads:
+                try:
+                    load_archive_gate(bad)
+                except Abort:
+                    continue
+                raise AssertionError("bad archive gate accepted: %s" % bad)
+            dev = FDevice(); clock = FClock()
+            s = Session(dev, clock=clock, sleep=clock.sleep, verify_log=_verify_ok)
+            try:
+                s.run_fault(archive_state=bads[0])
+            except Abort:
+                pass
+            if any(c in ("motor_arm", "motor_start") for _, c in dev.sent):
+                raise AssertionError("motor command after archive rejection")
+        finally:
+            shutil.rmtree(d, ignore_errors=True)
+
+    def c12():
+        import shutil
+        import tempfile
+        d = tempfile.mkdtemp(prefix="m6_gate_main_")
+        try:
+            p = os.path.join(d, "reject.json")
+            with open(p, "w", encoding="utf-8") as fh:
+                json.dump({"archive_accept": False, "clear_done": False,
+                           "free": 4096}, fh)
+            rc = main(["--port", "COM1", "--archive-state", p])
+            if rc != 1:
+                raise AssertionError("archive rejection rc=%s" % rc)
+            if "serial" in sys.modules:
+                raise AssertionError("pyserial imported before archive gate")
+        finally:
+            shutil.rmtree(d, ignore_errors=True)
+
     case("M6D01-interleaved_trip_still_disarms", c1)
     case("M6D02-read_timeout_cleanup_within_5s", c2)
     case("M6D02b-lost_disarm_reply_marks_unknown", c2b)
@@ -622,6 +708,8 @@ def selftest():
     case("M6D08-no_space_blocks_motor_commands", c8)
     case("M6D09-raw_txrx_preserved", c9)
     case("M6D10-argument_error_no_serial", c10)
+    case("M6D11-archive_gate_blocks_bad_state", c11)
+    case("M6D12-bad_archive_before_serial", c12)
     print("SUMMARY|cases=%d pass=%d fail=%d" % (passed + failed, passed, failed))
     return 0 if failed == 0 else 1
 
@@ -631,15 +719,24 @@ def main(argv):
     ap.add_argument("--selftest", action="store_true")
     ap.add_argument("--port")
     ap.add_argument("--out-dir")
+    ap.add_argument("--archive-state",
+                    help="M5 archive_state.json; required for a real run")
     ap.add_argument("--allow-recovery", action="store_true")
     args = ap.parse_args(argv)
     if args.selftest:
         return selftest()
     if not args.port:
         ap.error("--port or --selftest required")
+    if not args.archive_state:
+        ap.error("--archive-state is required for a real run")
+    try:
+        load_archive_gate(args.archive_state)
+    except Abort as exc:
+        print("PRECHECK=FAIL archive=%s" % exc)
+        return 1
     if not args.out_dir:
         args.out_dir = "m6_field_%s" % time.strftime("%Y%m%d_%H%M%S")
-    import serial  # lazy: never imported by selftest
+    import serial  # lazy: never imported by selftest or a failed pre-check
     ser = serial.Serial(args.port, 115200, timeout=0.05)
     try:
         class RealLink:
@@ -660,7 +757,8 @@ def main(argv):
                 return buf, t0, time.monotonic()
         s = Session(RealLink(), out_dir=args.out_dir)
         try:
-            res = s.run_fault(allow_recovery=args.allow_recovery)
+            res = s.run_fault(allow_recovery=args.allow_recovery,
+                              archive_state=args.archive_state)
             print("FAULT_RESULT=PASS %s" % json.dumps(res, sort_keys=True))
             return 0
         except Abort as exc:

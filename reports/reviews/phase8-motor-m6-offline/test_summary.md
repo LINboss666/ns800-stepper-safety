@@ -10,7 +10,7 @@ Final-source runs (product source unchanged since `cf133d6`):
 | I/O off_target/on_target/off_ovr/on_ovr | 33/35/46/48 required PASS, rc=0 |
 | CLI strict target/host_ovr | 10/10 each PASS, rc=0 |
 | TMC selftest identity | IO11a-f PASS in all four I/O variants |
-| Field candidate selftest | M6D01-M6D10 11/11 PASS; pyserial not imported |
+| Field candidate selftest | M6D01-M6D12 13/13 PASS; pyserial not imported |
 | M5 raw recovery | 19/19 b64 decode length/SHA equal; 3 flash batches rebuild CSV byte-equal (SHA c26cb75…) |
 
 Notes:
@@ -19,8 +19,9 @@ Notes:
 - PS18h injects `-RT_EIO`; the host shim defines `RT_EIO=12`, so the captured line shows
   `rc=-12`. The assertion is symbolic; the target's errno value is not asserted here.
 - The field candidate now performs a full `flash_dump` readback (slot coverage + session +
-  event + time), preserves every raw RX/TX in `--out-dir`, and forbids recovery unless a
-  confirmed LOW/pad=0 disarm and a complete 300-row readback both pass. It remains
-  OFFLINE_VERIFIED / NOT_BOARD_EXECUTED.
+  event + time), preserves every raw RX/TX in `--out-dir`, requires an accepted M5
+  `archive_state.json` (and a verified second copy after a clear) before importing pyserial,
+  and forbids recovery unless a confirmed LOW/pad=0 disarm and a complete 300-row readback
+  both pass. It remains OFFLINE_VERIFIED / NOT_BOARD_EXECUTED.
 - Host GCC diagnostics are listed separately from Keil 0/0; FinSH generic function-pointer
   warnings are not claimed as host zero-warning.

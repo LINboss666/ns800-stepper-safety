@@ -1,5 +1,7 @@
 usage: m6_field_candidate.py [-h] [--selftest] [--port PORT]
-                             [--out-dir OUT_DIR] [--allow-recovery]
+                             [--out-dir OUT_DIR]
+                             [--archive-state ARCHIVE_STATE]
+                             [--allow-recovery]
 m6_field_candidate.py: error: --port or --selftest required
 CASE|M6D01-interleaved_trip_still_disarms|PASS|ok
 CASE|M6D02-read_timeout_cleanup_within_5s|PASS|ok
@@ -12,4 +14,7 @@ CASE|M6D07-incomplete_readback_forbids_recovery|PASS|ok
 CASE|M6D08-no_space_blocks_motor_commands|PASS|ok
 CASE|M6D09-raw_txrx_preserved|PASS|ok
 CASE|M6D10-argument_error_no_serial|PASS|ok
-SUMMARY|cases=11 pass=11 fail=0
+CASE|M6D11-archive_gate_blocks_bad_state|PASS|ok
+PRECHECK=FAIL archive=archive not accepted
+CASE|M6D12-bad_archive_before_serial|PASS|ok
+SUMMARY|cases=13 pass=13 fail=0

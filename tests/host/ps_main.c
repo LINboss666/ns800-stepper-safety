@@ -2028,9 +2028,10 @@ static void cases_safety_trip(void)
         CHECK("PS17e-safety_trip_post_fail_not_persisted",
               ps_event_sends() == ev0 + 1 &&
               ps_cap_has("posted rc=") && ps_cap_has(expect_rc) &&
-              !ps_cap_has("persisted") && !ps_cap_has("written"),
-              fm("event +%d cap=%s pending=%d", ps_event_sends() - ev0,
-                 ps_cap, (int)safety_trip_pending()));
+              !ps_cap_has("persisted") && !ps_cap_has("written") &&
+              safety_trip_pending() == RT_TRUE,
+              fm("event +%d pending=%d cap=%s", ps_event_sends() - ev0,
+                 (int)safety_trip_pending(), ps_cap));
     }
     ps_set_event_send_rc(RT_EOK);
 }
