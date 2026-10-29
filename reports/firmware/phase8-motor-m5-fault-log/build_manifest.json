@@ -83,7 +83,7 @@
     "V1V2": "CHECK_PASS=22 CHECK_FAIL=0, runner rc=0",
     "IO_behavior": "off_target/on_target/off_ovr/on_ovr 27/29/40/42 required PASS, rc=0",
     "SD_chain": "NOT_RERUN (sensor_service.c/blackbox.c inputs unchanged this round)",
-    "field_script_selftest": "FS01-FS04 PASS (archive reject blocks clear, 3s/5s order, no-clear stop, no-new-log blocks recovery)"
+    "field_script_selftest": "FS01-FS05 PASS (archive reject blocks clear, 3s/5s order, no-clear stop, no-new-log blocks recovery)"
   },
   "product_changes": [
     "safety_state.c: safety_trip CONFIRM software event entry through safety_post_event(EVT_SOFT_FAULT); strict argc/arg, silent context rejection, no persistence claim",

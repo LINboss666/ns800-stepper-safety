@@ -68,7 +68,7 @@ pyocd reset -t cortex_m
 python reports/reviews/phase8-motor-m5-fault-log/m5_field_serial.py archive \
   --port COM5 --out <run-outside-repo> \
   --expect-banner "build Oct 29 2026 00:38:59" \
-  --allow-apply --allow-clear
+  --allow-apply --allow-clear --second-copy <second-outside-repo-dir>
 ```
 
 脚本强制顺序：
@@ -80,7 +80,8 @@ python reports/reviews/phase8-motor-m5-fault-log/m5_field_serial.py archive \
 3. 按 `flash_dump first count`（count≤100）逐槽导出全部 `used` 槽；每批原始件落盘后才判读。
 4. 只有 `ARCHIVE=ACCEPT` 且 `CLEAR_ALLOWED=YES` 才继续；导出后 used/valid/bad 与
    BB session/acc/done/fail/drop 必须不变。
-5. `free = 4096 - used`：`free >= 400` 不清区；否则在 `--allow-clear` 下只执行一次
+5. 生成 `old_archive_manifest.json`；清区前必须把原始件/重建 CSV/清单复制到第二处并逐文件 SHA 复核（`--second-copy`），两份 `COPY_VERIFIED.json` 均成立才继续。
+   `free = 4096 - used`：`free >= 400` 不清区；否则在 `--allow-clear` 下只执行一次
    `flash_logclear ERASE`（600 s 上限），随后要求 used=valid=bad=0、queued=0、failed=0、dropped=0。
 6. 写 `archive_state.json`；任何缺槽/重复/NUL/截断/越界/读错 → 停止，不清区、不起转。
 

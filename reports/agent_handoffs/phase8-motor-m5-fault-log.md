@@ -39,7 +39,7 @@ software_input / code_commit：`8cf23aa6dda20baf7843798bdef9a02cfd71326f`
 | V1/V2 | CHECK_PASS=22 / FAIL=0，rc=0 |
 | I/O 行为 | 四变体 27/29/40/42 必需用例 PASS，rc=0 |
 | SD 链 | NOT_RERUN（`sensor_service.c`/`blackbox.c` 本轮未变） |
-| 现场脚本自测 | FS01 归档拒绝禁止 clear；FS02 3 s/5 s 顺序；FS03 满日志未批准不清；FS04 无新日志禁止恢复；4/4 PASS |
+| 现场脚本自测 | FS01 归档拒绝禁止 clear；FS02 3 s/5 s 顺序；FS03 满日志未批准不清；FS04 无新日志禁止恢复；5/5 PASS |
 
 说明：S1 的 `safety_trip` 用例验证的是**正式路径的事件投递/上下文/失败摘要**；Safety 线程
 消费者在该链中是桩，端到端锁存与黑匣子由现场 P2–P4 验证。flash 链只证明导出格式与边界，

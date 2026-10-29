@@ -64,7 +64,7 @@
     "V1V2": "22 checks PASS, rc=0",
     "IO": "27/29/40/42 required PASS, rc=0",
     "SD": "NOT_RERUN (unchanged inputs)",
-    "field_selftest": "FS01-FS04 4/4 PASS"
+    "field_selftest": "FS01-FS05 5/5 PASS"
   },
   "field_package": "reports/reviews/phase8-motor-m5-fault-log/m5_field_package.md",
   "field_script": "reports/reviews/phase8-motor-m5-fault-log/m5_field_serial.py",

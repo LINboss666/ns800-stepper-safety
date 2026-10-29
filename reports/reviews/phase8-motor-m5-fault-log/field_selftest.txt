@@ -5,4 +5,5 @@ CASE|FS02-order_3s_5s_and_clear|PASS|ok
 CASE|FS03-full_log_without_clear_approval_stops|PASS|ok
 ARCHIVE=PASS used=0 clear=NO free_after=4096
 CASE|FS04-no_new_log_blocks_recovery|PASS|ok
-SUMMARY|cases=4 pass=4 fail=0
+CASE|FS05-clear_requires_two_copies|PASS|ok
+SUMMARY|cases=5 pass=5 fail=0

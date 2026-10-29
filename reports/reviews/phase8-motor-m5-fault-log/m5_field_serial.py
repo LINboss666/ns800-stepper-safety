@@ -29,6 +29,7 @@ import io
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -250,7 +251,67 @@ class Runner:
         return text, bb, f
 
     # ---------- P1 ----------
-    def archive(self, expect_banner=None, allow_clear=False, allow_apply=False):
+    def _archive_manifest(self, used, valid, bad, batches, checker):
+        files = []
+        for first, count, path in batches:
+            b = open(path, "rb").read()
+            files.append({"first": first, "count": count,
+                          "path": os.path.relpath(path, self.out),
+                          "bytes": len(b),
+                          "sha256": hashlib.sha256(b).hexdigest()})
+        extra = []
+        for name in ("old_archive.csv", "old_archive_checker.txt", "raw/archive/index.json"):
+            p = os.path.join(self.out, name)
+            if os.path.exists(p):
+                b = open(p, "rb").read()
+                extra.append({"path": name, "bytes": len(b),
+                              "sha256": hashlib.sha256(b).hexdigest()})
+        manifest = {"used": used, "valid": valid, "bad": bad,
+                    "batches": files, "files": extra,
+                    "checker": checker.strip()}
+        p = os.path.join(self.out, "old_archive_manifest.json")
+        with open(p, "w", encoding="utf-8") as fh:
+            json.dump(manifest, fh, indent=2)
+            fh.write("\n")
+        return manifest
+
+    def _second_copy(self, second, manifest):
+        if not second:
+            raise Abort("two-copy archive required before clear: --second-copy missing")
+        src = os.path.abspath(self.out)
+        dst = os.path.abspath(second)
+        try:
+            common = os.path.commonpath([src, dst])
+        except ValueError:
+            common = None              # 不同盘符: 必然分离
+        if common in (src, dst):
+            raise Abort("second copy must be a separate directory")
+        if os.path.exists(dst) and (not os.path.isdir(dst) or os.listdir(dst)):
+            raise Abort("second copy directory must be absent or empty: %s" % dst)
+        os.makedirs(dst, exist_ok=True)
+        rels = [f["path"] for f in manifest["batches"]]
+        rels += [f["path"] for f in manifest["files"]]
+        rels += ["old_archive_manifest.json"]
+        for rel in rels:
+            s = os.path.join(src, rel)
+            d = os.path.join(dst, rel)
+            os.makedirs(os.path.dirname(d), exist_ok=True)
+            shutil.copy2(s, d)
+            sb = open(s, "rb").read()
+            db = open(d, "rb").read()
+            if hashlib.sha256(sb).hexdigest() != hashlib.sha256(db).hexdigest():
+                raise Abort("second copy mismatch: %s" % rel)
+        marker = {"copies": 2, "files": len(rels), "used": manifest["used"],
+                  "checker": manifest["checker"]}
+        for root in (src, dst):
+            with open(os.path.join(root, "COPY_VERIFIED.json"), "w",
+                      encoding="utf-8") as fh:
+                json.dump(marker, fh, indent=2)
+                fh.write("\n")
+        return dst
+
+    def archive(self, expect_banner=None, allow_clear=False, allow_apply=False,
+                second_copy=None):
         os.makedirs(self.out, exist_ok=True)
         rec = Recorder(self.out, "archive")
         text, bb0, f0 = self.preflight(rec, expect_banner, allow_apply)
@@ -283,10 +344,14 @@ class Runner:
             if bb1[k] != bb0[k]:
                 raise Abort("blackbox %s changed during archive" % k)
         free = NS_LOG_SLOTS - used
+        rec.write_index()
+        manifest = self._archive_manifest(used, f1["valid"], f1["bad"], batches, out)
         clear_done = False
+        second_dst = None
         if free < NEED_SLOTS:
             if not allow_clear:
                 raise Abort("log nearly full (free=%d) and --allow-clear not given" % free)
+            second_dst = self._second_copy(second_copy, manifest)
             self.q(rec, "flash_logclear ERASE", 600.0, 3.0)
             f2 = self.parse_logstat(self.q(rec, "flash_logstat"))
             if f2["used"] != 0 or f2["valid"] != 0 or f2["bad"] != 0 or \
@@ -297,6 +362,8 @@ class Runner:
         state = {"archive_accept": True, "used_before": used, "used_after": used,
                  "free": NS_LOG_SLOTS - used, "clear_done": clear_done,
                  "batches": len(batches), "csv": os.path.join(self.out, "old_archive.csv"),
+                 "manifest": os.path.join(self.out, "old_archive_manifest.json"),
+                 "second_copy": second_dst,
                  "checker": out.strip()}
         with open(os.path.join(self.out, "archive_state.json"), "w", encoding="utf-8") as fh:
             json.dump(state, fh, indent=2)
@@ -658,9 +725,12 @@ def selftest():
         dev.used = 4096
         for i in range(4096):
             dev.frames[i] = (0, 0, 0)
-        state = runner.archive(expect_banner="FAKEBANNER", allow_clear=True)
+        state = runner.archive(expect_banner="FAKEBANNER", allow_clear=True,
+                               second_copy=tmp + "_second_fs02")
         if not state["clear_done"]:
             raise AssertionError("clear not executed with full log")
+        if not os.path.exists(os.path.join(tmp + "_second_fs02", "COPY_VERIFIED.json")):
+            raise AssertionError("second copy not verified")
         runner.fault()
         times = {c: t for t, c in link.commands}
         t_start = times["motor_start"]
@@ -717,10 +787,26 @@ def selftest():
         if any(c.startswith("fault_reset") for _, c in link.commands):
             raise AssertionError("recovery sent without new log")
 
+    # 5. 批准清区但未给第二份归档 -> 禁止 clear
+    def t5():
+        runner, dev, link, _ = _runner_for_selftest(tmp, _fake_checker_accept)
+        dev.used = 4096
+        for i in range(4096):
+            dev.frames[i] = (0, 0, 0)
+        try:
+            runner.archive(expect_banner="FAKEBANNER", allow_clear=True)
+            raise AssertionError("clear ran without second archive copy")
+        except Abort as exc:
+            if "two-copy" not in str(exc):
+                raise
+        if any("flash_logclear" in c for _, c in link.commands):
+            raise AssertionError("clear sent without second copy")
+
     case("FS01-archive_reject_blocks_clear", t1)
     case("FS02-order_3s_5s_and_clear", t2)
     case("FS03-full_log_without_clear_approval_stops", t3)
     case("FS04-no_new_log_blocks_recovery", t4)
+    case("FS05-clear_requires_two_copies", t5)
     print("SUMMARY|cases=%d pass=%d fail=%d" % (passed + failed, passed, failed))
     return 0 if failed == 0 else 1
 
@@ -733,6 +819,7 @@ def main(argv):
     ap.add_argument("--checker", default=CHECKER)
     ap.add_argument("--expect-banner")
     ap.add_argument("--allow-clear", action="store_true")
+    ap.add_argument("--second-copy", help="second archive directory, verified before clear")
     ap.add_argument("--allow-apply", action="store_true")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args(argv)
@@ -745,7 +832,8 @@ def main(argv):
     try:
         runner = Runner(link, args.out, [sys.executable, args.checker])
         if args.phase == "archive":
-            runner.archive(args.expect_banner, args.allow_clear, args.allow_apply)
+            runner.archive(args.expect_banner, args.allow_clear, args.allow_apply,
+                           args.second_copy)
         else:
             runner.fault()
     except Abort as exc:
