@@ -34,9 +34,10 @@ Notes:
     (`state=0 armed=1 cur=0 tgt=0`); refusal text, armed=0, missing/duplicate fields and
     conflicting state cannot send target/start. M6D19-M6D22.
 - The original 13 case identities (M6D01, M6D02, M6D02b, M6D03-M6D12) are retained.
-  The first failing run after the rewrite is preserved as
+  The first failing run after the rewrite is transcribed as
   `field_candidate_selftest_first_failure.txt` (c2/c2b/c7/c17 failed before the fixture
-  fixes).
+  fixes). Its raw temporary file was overwritten by a later run; the transcription is
+  explicitly not device evidence.
 - PS18h injects `-RT_EIO`; the host shim defines `RT_EIO=12`, so the captured line shows
   `rc=-12`. The assertion is symbolic; the target's errno value is not asserted here.
 - The field candidate now requires an accepted M5 `archive_state.json` (and a verified
