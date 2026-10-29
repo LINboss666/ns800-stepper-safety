@@ -4,7 +4,8 @@
 分支：`debug/tmc-uart-rootcause-20261028`
 基线：`6218efa251cd6b8a16ad2df8f0fef1efd2ba5eeb`（M4 收口）
 software_input / code_commit：`8cf23aa6dda20baf7843798bdef9a02cfd71326f`
-状态：**CP0 离线完成；候选镜像已构建归档；未上板、未烧录、未清日志、未起转；现场包等待用户一次批准。**
+状态：**CP0 完成；CP1 部分执行：P0 通过、P1 归档通过、清区命令已发送但完成未验证、P2–P4 NOT_REACHED。**
+CP1 原始证据与停点：`reports/reviews/phase8-motor-m5-fault-log/cp1/m5_result_partial.md`。
 
 ## 1. 产品改动（最小面）
 
@@ -22,7 +23,7 @@ software_input / code_commit：`8cf23aa6dda20baf7843798bdef9a02cfd71326f`
   构建门”继续有意义，无行为变化。
 - 验证链：S1 增加 PS17a–e 与 `rev_safety_trip_skip_post` 反向；新增
   `shim_flash/`+`flash_main.c`+`run_flash_export_m5.sh`（FE01–FE06、容量探针、反向）；
-  新增 `m5_log_archive_check.py`（19 例自测）；S1 runner 修 EPIPE 并加未登记 ID 负控；
+  新增 `m5_log_archive_check.py`（20 例自测）；S1 runner 修 EPIPE 并加未登记 ID 负控；
   S2 夹具假 TMC IOIN 改为合法 0x21 以适配 916c34b 起已接受的启动身份检查。
 - 现场脚本：`reports/reviews/phase8-motor-m5-fault-log/m5_field_serial.py`（archive/fault
   两阶段、清区门、3 s/5 s 截止、16 轮有界轮询、失败不自动恢复），自带 4 例离线自测。
@@ -33,7 +34,7 @@ software_input / code_commit：`8cf23aa6dda20baf7843798bdef9a02cfd71326f`
 |---|---|
 | S1 target/host_ovr | 55/55、70/70 全部 PASS，runner rc=0（正常） |
 | S1 反向 | rev_motor_off 5/5、rev_safety_trip_skip_post 1/1 META-OK，rc=0 |
-| flash 正常 | FE01–FE05 PASS；容量探针 FE06 PASS；判读器 19/19；完整批次 ACCEPT/CLEAR_ALLOWED=YES；缺槽 REJECT |
+| flash 正常 | FE01–FE05 PASS；容量探针 FE06 PASS；判读器 20/20；完整批次 ACCEPT/CLEAR_ALLOWED=YES；缺槽 REJECT |
 | flash 反向 | 仅 FE02 判 FAIL（126 B 截断+NUL）；截断批次 REJECT NUL_BYTE / CLEAR_ALLOWED=NO；rc=0 |
 | S2 选择组 | ONLY=recovery,identity,stale,diag：target 4 组/6 例、host_ovr 4 组/19 例，全部 PASS，rc=0 |
 | V1/V2 | CHECK_PASS=22 / FAIL=0，rc=0 |
@@ -66,7 +67,7 @@ UV4 5.43.1.0 / ARMCLANG V6.24，三目标均 Rebuild All 0 Error / 0 Warning。
 
 - 包：`reports/reviews/phase8-motor-m5-fault-log/m5_field_package.md`
 - 现场脚本：同目录 `m5_field_serial.py`（archive/fault；离线自测 4/4）
-- 判读器：`tests/host/m5_log_archive_check.py`（真实输入和 19 例自测同函数）
+- 判读器：`tests/host/m5_log_archive_check.py`（真实输入和 20 例自测同函数）
 - 允许：1 次下载、1 次定长回读、1 次显式启动；COM5 ≤2 次；必要时 1 次原 IRUN20 apply；
   归档通过且空间不足时 1 次清 1 MiB 日志区；DIR0/300 Hz 一次空载起转，t≈3 s 一次
   `safety_trip CONFIRM`、t=5 s 一次兜底 disarm；故障态 arm 拒绝 ≤1 次；16 轮写盘轮询；
@@ -84,3 +85,19 @@ UV4 5.43.1.0 / ARMCLANG V6.24，三目标均 Rebuild All 0 Error / 0 Warning。
 - `PROJECT_SAFETY_ACCEPTANCE_PENDING`：DIAG 物理触发、真实堵转/负载诊断标定、实测电流、
   物理 PWM 精度/停机时延等仍开放。
 - M4 已接受的两项目标级例外（使能链、TMC 配置）沿用；`safe_for_enable` 仍为 false。
+
+
+## 6. CP1 现场执行（2026-10-29，部分完成）
+
+- P0 PASS：候选下载 1 次（260096 B 擦写）、`0x08000000` 起 259580 B 回读与 BIN
+  逐字节相等、显式复位 1 次；运行横幅 `5.3.0 build Oct 29 2026 00:38:59`。
+- P1 归档 PASS：4096/4096 valid、bad=0；41 批导出；首次判读因末尾裸 `msh >`
+  被误判 TRUNCATED_TAIL（数据行完整），修正框架行后离线复判 ACCEPT；两份归档
+  逐文件 SHA 复核（45 文件、copies=2）。
+- 清区：唯一一次 `flash_logclear ERASE` 已发送（10:01:11），但原始件只有命令回显；
+  脚本把回显后 3 s 静默当作完成，随后即时 `flash_logstat` 无响应而中止。
+  **清区完成状态未验证**；未重试、未第二次清区。
+- P2–P4 NOT_REACHED：电机未起转、未 `safety_trip`、无新日志、无恢复。
+- 额度：DAP 3/3、COM5 2/2 已用尽；无主机进程占用 COM5。
+- 结果：`M5_CP1_PARTIAL`；三项现场 PASS 均 NOT_REACHED；需一次额外 COM5 会话批准
+  （先验证日志 0/0/0，若成立再做 P2–P4；不成立则停止，不清第二次）。

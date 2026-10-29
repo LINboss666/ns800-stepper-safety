@@ -77,7 +77,7 @@
   "host_verification": {
     "S1_normal": "target 55/55 PASS, host_ovr 70/70 PASS, runner rc=0",
     "S1_reverse": "rev_motor_off 5/5, rev_safety_trip_skip_post 1/1 META-OK, runner rc=0",
-    "flash_normal": "FE01-FE05 PASS, cap FE06 PASS, archive checker 19/19 selftest, ACCEPT + CLEAR_ALLOWED=YES, missing-slot REJECT",
+    "flash_normal": "FE01-FE05 PASS, cap FE06 PASS, archive checker 20/20 selftest, ACCEPT + CLEAR_ALLOWED=YES, missing-slot REJECT",
     "flash_reverse": "FE02 only FAIL (truncated 126B+NUL), archive batch REJECT NUL_BYTE/CLEAR_ALLOWED=NO, runner rc=0",
     "S2_selected": "ONLY=recovery,identity,stale,diag: target 4 groups/6 cases, host_ovr 4 groups/19 cases, all required PASS, rc=0",
     "V1V2": "CHECK_PASS=22 CHECK_FAIL=0, runner rc=0",
@@ -90,7 +90,7 @@
     "ns_flash_shell.c: flash_dump strict decimal args/range before reads, checked rt_snprintf+rt_kputs with 256B line, named overflow error, explicit empty/error markers, 14 columns unchanged",
     "diagnosis.c: disclose ADC cal source (THEORETICAL=not measured), threshold_validation=NOT_ESTABLISHED, MONITOR_ONLY and vibration gravity baseline; criteria unchanged",
     "motor.c: add (void)argv to cmd_motor_arm/cmd_motor_start to keep the S2 strict 0-warning build gate meaningful; no behavior change",
-    "tests/host: PS17a-e + skip-post reverse; shim_flash/flash_main FE01-FE06; m5_log_archive_check.py 19-case selftest; S1 EPIPE fix + unregistered negative control; S2 fake IOIN identity 0x21 for the accepted production VERSION check",
+    "tests/host: PS17a-e + skip-post reverse; shim_flash/flash_main FE01-FE06; m5_log_archive_check.py 20-case selftest; S1 EPIPE fix + unregistered negative control; S2 fake IOIN identity 0x21 for the accepted production VERSION check",
     "reports/reviews/phase8-motor-m5-fault-log/m5_field_serial.py: archive/fault phases with clear gate, 3s trip/5s disarm deadlines and bounded BB polling"
   ],
   "status": "M5_CP0_OFFLINE_COMPLETE / IMAGES_BUILT / NOT_FLASHED / FIELD_PACKAGE_PENDING_APPROVAL"

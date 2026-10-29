@@ -1,0 +1,13 @@
+{
+  "archive_accept": true,
+  "used_before": 4096,
+  "used_after": 4096,
+  "free": 0,
+  "clear_done": false,
+  "batches": 41,
+  "csv": "D:/ns800-tmc-rc/m5-field-20261029/run\\old_archive.csv",
+  "manifest": "D:/ns800-tmc-rc/m5-field-20261029/run\\old_archive_manifest.json",
+  "second_copy": "D:\\ns800-m5-field-archive-2-20261029",
+  "checker": "ARCHIVE=ACCEPT rows=4096 batches=41\nCLEAR_ALLOWED=YES",
+  "checker_first_failure": "D:/ns800-tmc-rc/m5-field-20261029/run\\old_archive_checker_first_failure.txt"
+}

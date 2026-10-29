@@ -4,7 +4,7 @@
   "branch": "debug/tmc-uart-rootcause-20261028",
   "base_commit": "6218efa251cd6b8a16ad2df8f0fef1efd2ba5eeb",
   "code_commit": "8cf23aa6dda20baf7843798bdef9a02cfd71326f",
-  "status": "CP0_OFFLINE_COMPLETE / NOT_FLASHED / AWAITING_FIELD_APPROVAL",
+  "status": "M5_CP1_PARTIAL",
   "candidate": {
     "target": "rt-thread-motor-m1-candidate",
     "bin": {
@@ -58,7 +58,7 @@
   "host_verified": {
     "S1_normal": "target 55/55, host_ovr 70/70, rc=0",
     "S1_reverse": "rev_motor_off 5/5, rev_safety_trip_skip_post 1/1, rc=0",
-    "flash_normal": "FE01-05 + FE06 cap + checker 19/19 + ACCEPT/REJECT gate, rc=0",
+    "flash_normal": "FE01-05 + FE06 cap + checker 20/20 + ACCEPT/REJECT gate, rc=0",
     "flash_reverse": "FE02 only FAIL, truncated archive REJECT(CLEAR_ALLOWED=NO), rc=0",
     "S2_selected": "recovery/identity/stale/diag: target 6 cases, host_ovr 19 cases, rc=0",
     "V1V2": "22 checks PASS, rc=0",
@@ -81,5 +81,24 @@
     "physical PWM timing / stop latency",
     "M5 field execution"
   ],
-  "no_device_actions": "No COM5, DAP, flash, readback, log clear, motor start or reset was performed."
+  "no_device_actions": "No COM5, DAP, flash, readback, log clear, motor start or reset was performed.",
+  "cp1": {
+    "result_md": "reports/reviews/phase8-motor-m5-fault-log/cp1/m5_result_partial.md",
+    "result_json": "reports/reviews/phase8-motor-m5-fault-log/cp1/m5_result_partial.json",
+    "p0": "PASS: flash/readback byte-equal/reset; banner 5.3.0 build Oct 29 2026 00:38:59",
+    "p1_archive": "PASS: 4096 rows/41 batches, two copies verified",
+    "clear": "one ERASE sent; completion NOT VERIFIED; no retry",
+    "p2_p4": "NOT_REACHED",
+    "quotas_used": {
+      "dap_sessions": 3,
+      "com5_sessions": 2,
+      "downloads": 1,
+      "readbacks": 1,
+      "resets": 1,
+      "clears_sent": 1,
+      "starts": 0,
+      "trips": 0
+    }
+  },
+  "next": "one additional COM5 session approval: verify 0/0/0 then P2-P4; else stop without a second clear"
 }

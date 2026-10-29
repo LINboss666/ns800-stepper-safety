@@ -1,0 +1,5 @@
+flash_logstat
+slots=4096/4096 valid=4096 bad=0
+queued=0 completed=0 failed=0 queue_dropped=0 last_error=0
+msh >
+msh >

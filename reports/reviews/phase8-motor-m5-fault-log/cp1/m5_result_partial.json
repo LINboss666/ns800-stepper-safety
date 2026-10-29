@@ -1,0 +1,55 @@
+{
+  "task": "phase8-motor-m5-fault-log",
+  "date": "2026-10-29",
+  "approved_payload": {
+    "code_commit": "8cf23aa6dda20baf7843798bdef9a02cfd71326f",
+    "bin_bytes": 259580,
+    "bin_sha256": "01d3e5ab1ad245949385d50c9f1d5fd2bbaac0806c3920e897321bc46db764bc",
+    "axf_bytes": 1668244,
+    "axf_sha256": "8c5bc7bf1efa786013c767ae1e09415ad0d5d5db3e38069c8aeebabf7cebae40"
+  },
+  "status": "M5_CP1_PARTIAL",
+  "p0_identity": {
+    "flash": "PASS rc=0; erased/programmed 260096 B with pyOCD sector erase",
+    "readback": "PASS 259580 B at 0x08000000; SHA matches BIN; byte-equal true",
+    "reset": "PASS rc=0",
+    "banner": "5.3.0 build Oct 29 2026 00:38:59",
+    "preconditions": "READY/fault0, armed0, LOW/pad0, ENN disabled, CONFIGURED, MONITOR_ONLY/THEORETICAL",
+    "apply": "one tmc_config_apply CONFIRM after reflash (approved quota)"
+  },
+  "p1_archive": {
+    "source": "slots=4096/4096 valid=4096 bad=0; BB session=0 acc=done=0 fail/drop=0",
+    "export": "41 batches, 4096 rows, slots 0..4095 exactly once",
+    "first_check": "REJECT TRUNCATED_TAIL due to trailing 'msh >' prompt without LF; first failure preserved",
+    "recheck": "ACCEPT rows=4096 batches=41; checker fixed to accept trailing prompt as framing",
+    "two_copies": "PASS; 45 files SHA-verified in both copies; COPY_VERIFIED.json copies=2",
+    "clear": "one flash_logclear ERASE sent 2026-10-29 10:01:11; response only echo; completion NOT VERIFIED",
+    "clear_incident": "script treated 3s silence after echo as completion; next flash_logstat got no response; aborted before verification; no retry"
+  },
+  "p2_p4": {
+    "motor_start": "NOT_REACHED",
+    "safety_trip": "NOT_REACHED",
+    "fault_latch": "NOT_REACHED",
+    "new_log": "NOT_REACHED",
+    "recovery": "NOT_REACHED"
+  },
+  "quotas_used": {
+    "dap_sessions": 3,
+    "com5_sessions": 2,
+    "downloads": 1,
+    "readbacks": 1,
+    "resets": 1,
+    "log_clears_sent": 1,
+    "motor_starts": 0,
+    "safety_trips": 0
+  },
+  "results": {
+    "M5_SOFTWARE_EVENT_STOP_PASS": "NOT_REACHED",
+    "M5_NEW_FAULT_LOG_PASS": "NOT_REACHED",
+    "M5_MANUAL_RECOVERY_PASS": "NOT_REACHED",
+    "MONITORING_VALIDITY_DISCLOSED": "PRESENT in diag output",
+    "PROJECT_SAFETY_ACCEPTANCE_PENDING": true
+  },
+  "next": "requires one additional COM5 session approval: verify log is 0/0/0 and READY; if yes run approved P2-P4; if not, stop without a second clear",
+  "evidence": "reports/reviews/phase8-motor-m5-fault-log/cp1/"
+}

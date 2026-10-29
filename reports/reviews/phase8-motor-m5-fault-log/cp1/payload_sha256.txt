@@ -1,0 +1,2 @@
+01d3e5ab1ad245949385d50c9f1d5fd2bbaac0806c3920e897321bc46db764bc *reports/firmware/phase8-motor-m5-fault-log/rt-thread-motor-m1.bin
+8c5bc7bf1efa786013c767ae1e09415ad0d5d5db3e38069c8aeebabf7cebae40 *reports/firmware/phase8-motor-m5-fault-log/rt-thread-motor-m1.axf

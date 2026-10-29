@@ -1,0 +1,6 @@
+{
+  "copies": 2,
+  "files": 45,
+  "used": 4096,
+  "checker": "ARCHIVE=ACCEPT rows=4096 batches=41\nCLEAR_ALLOWED=YES"
+}

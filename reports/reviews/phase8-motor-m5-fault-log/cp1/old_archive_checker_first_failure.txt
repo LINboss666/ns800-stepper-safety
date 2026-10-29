@@ -1,0 +1,2 @@
+ARCHIVE=REJECT reason=TRUNCATED_TAIL detail=last line has no LF
+CLEAR_ALLOWED=NO

@@ -1,0 +1,312 @@
+{
+  "used": 4096,
+  "valid": 4096,
+  "bad": 0,
+  "batches": [
+    {
+      "first": 0,
+      "count": 100,
+      "path": "raw\\archive\\014_flash_dump_0_100.bin",
+      "bytes": 5635,
+      "sha256": "a3fb183e252d9f23e014fae7f52f206470f4c4de463089f119e40d86b656294e"
+    },
+    {
+      "first": 100,
+      "count": 100,
+      "path": "raw\\archive\\015_flash_dump_100_100.bin",
+      "bytes": 5855,
+      "sha256": "d64ef5cb99f6ccbd3ac1884ec5a11f14776975684ad677d7567a720273715758"
+    },
+    {
+      "first": 200,
+      "count": 100,
+      "path": "raw\\archive\\016_flash_dump_200_100.bin",
+      "bytes": 5852,
+      "sha256": "08a7ca0d72af8c652eadfcf6dd1a36140cf9bd91704ea72ec06ec4473b3baedc"
+    },
+    {
+      "first": 300,
+      "count": 100,
+      "path": "raw\\archive\\017_flash_dump_300_100.bin",
+      "bytes": 5756,
+      "sha256": "c0dc0ed23470e732f35f29a737079d60bad92e48cb0f68a173747c8229943ad3"
+    },
+    {
+      "first": 400,
+      "count": 100,
+      "path": "raw\\archive\\018_flash_dump_400_100.bin",
+      "bytes": 5748,
+      "sha256": "279b56061dcd43caa94b75e22489cd31ec1f6030ec8442084574081886e1946a"
+    },
+    {
+      "first": 500,
+      "count": 100,
+      "path": "raw\\archive\\019_flash_dump_500_100.bin",
+      "bytes": 5754,
+      "sha256": "2ea89557701425e734039ba963d555ed759822c4ec3984ed2933384ecd74fc32"
+    },
+    {
+      "first": 600,
+      "count": 100,
+      "path": "raw\\archive\\020_flash_dump_600_100.bin",
+      "bytes": 5464,
+      "sha256": "bd777c4af0bd21297eb91ca17d7c90f98009824812d67cb7d71083319abec916"
+    },
+    {
+      "first": 700,
+      "count": 100,
+      "path": "raw\\archive\\021_flash_dump_700_100.bin",
+      "bytes": 5473,
+      "sha256": "b919645d8bd374b9a3472ac45034b36df16a417b4ebcda48a0fa8cb1a9ae0781"
+    },
+    {
+      "first": 800,
+      "count": 100,
+      "path": "raw\\archive\\022_flash_dump_800_100.bin",
+      "bytes": 5479,
+      "sha256": "6689f2271e5bbb0ac3223554fdb6d342387eef5a478d22fb33154e06c4e32424"
+    },
+    {
+      "first": 900,
+      "count": 100,
+      "path": "raw\\archive\\023_flash_dump_900_100.bin",
+      "bytes": 5479,
+      "sha256": "86b4b343634e8bae76f25ce5791c609e3248ba33e5df8e78ac5a9e3ffe1793a1"
+    },
+    {
+      "first": 1000,
+      "count": 100,
+      "path": "raw\\archive\\024_flash_dump_1000_100.bin",
+      "bytes": 5672,
+      "sha256": "ce837f87c332e519507765a2f1e783c7a3502a974e225efe7cb2566d541f825c"
+    },
+    {
+      "first": 1100,
+      "count": 100,
+      "path": "raw\\archive\\025_flash_dump_1100_100.bin",
+      "bytes": 5675,
+      "sha256": "5431eac42778cd3e60c6fa904e1b2417ad8714b20770bdeb6c9898fdad873877"
+    },
+    {
+      "first": 1200,
+      "count": 100,
+      "path": "raw\\archive\\026_flash_dump_1200_100.bin",
+      "bytes": 5637,
+      "sha256": "2e0940025bc577b0fe2c7b097474c4fb32c4cffa6a0c8fd7e098a036f56833ca"
+    },
+    {
+      "first": 1300,
+      "count": 100,
+      "path": "raw\\archive\\027_flash_dump_1300_100.bin",
+      "bytes": 5575,
+      "sha256": "7befd802fb741f7c0aaeb41bfd5b6b1ada301fae605a77b91dde2f3b2ea9724f"
+    },
+    {
+      "first": 1400,
+      "count": 100,
+      "path": "raw\\archive\\028_flash_dump_1400_100.bin",
+      "bytes": 5689,
+      "sha256": "7ed301fe7870e6c7ac00c333823a9157fd8d774a11248c137dc6822547fc9a42"
+    },
+    {
+      "first": 1500,
+      "count": 100,
+      "path": "raw\\archive\\029_flash_dump_1500_100.bin",
+      "bytes": 5638,
+      "sha256": "4f87743e4225b58fc0afa2cbe021a30924cd7b89a6cf037174bdc2e389e0fcda"
+    },
+    {
+      "first": 1600,
+      "count": 100,
+      "path": "raw\\archive\\030_flash_dump_1600_100.bin",
+      "bytes": 5511,
+      "sha256": "80bf231ffd22c88f395bcc07bb25e4b683474d4c8c2414248564c5a446abc233"
+    },
+    {
+      "first": 1700,
+      "count": 100,
+      "path": "raw\\archive\\031_flash_dump_1700_100.bin",
+      "bytes": 5177,
+      "sha256": "4e7d3b2196fa2157abcb20586dd38d0255109c963d2062b138ba8bf795123fcd"
+    },
+    {
+      "first": 1800,
+      "count": 100,
+      "path": "raw\\archive\\032_flash_dump_1800_100.bin",
+      "bytes": 5099,
+      "sha256": "8c6c85d7e715ae9c251f6f00ffa26af887c321ec094740beb288434150b25b90"
+    },
+    {
+      "first": 1900,
+      "count": 100,
+      "path": "raw\\archive\\033_flash_dump_1900_100.bin",
+      "bytes": 5587,
+      "sha256": "346959484aead8129946e13f1f77d32b3dfeb54d5bbf716e1ca81b2c749c3fca"
+    },
+    {
+      "first": 2000,
+      "count": 100,
+      "path": "raw\\archive\\034_flash_dump_2000_100.bin",
+      "bytes": 5522,
+      "sha256": "a78465a6ea235b577ae404d7eb2cf13c77df596114b812def540522cda03fa7c"
+    },
+    {
+      "first": 2100,
+      "count": 100,
+      "path": "raw\\archive\\035_flash_dump_2100_100.bin",
+      "bytes": 5555,
+      "sha256": "fb2eb073f7735b388d36217188a79b9dd38838fd44fabcedb74b3ebcab78e657"
+    },
+    {
+      "first": 2200,
+      "count": 100,
+      "path": "raw\\archive\\036_flash_dump_2200_100.bin",
+      "bytes": 4830,
+      "sha256": "b367339402f83fa78332ab31089e471bf6d8f0b4e8c84b010365d625a980aef6"
+    },
+    {
+      "first": 2300,
+      "count": 100,
+      "path": "raw\\archive\\037_flash_dump_2300_100.bin",
+      "bytes": 4830,
+      "sha256": "885dff85dffafd0893b7bd7651a799ddaa3cf0b3fad28f5c5e4ee369cefcf287"
+    },
+    {
+      "first": 2400,
+      "count": 100,
+      "path": "raw\\archive\\038_flash_dump_2400_100.bin",
+      "bytes": 4830,
+      "sha256": "bf2b4ee25cbdb0d726e0e48729c4268fd2e0a880696d45c7054e497d32f5143f"
+    },
+    {
+      "first": 2500,
+      "count": 100,
+      "path": "raw\\archive\\039_flash_dump_2500_100.bin",
+      "bytes": 5370,
+      "sha256": "57686e39f72a830bd58b5f5c1cd6d2773c83a010d64b2eb25ecc9e21a3ed6629"
+    },
+    {
+      "first": 2600,
+      "count": 100,
+      "path": "raw\\archive\\040_flash_dump_2600_100.bin",
+      "bytes": 5803,
+      "sha256": "65d9e55d434d47fa6b2c7dac1294a695f47e1773fbf97a47232ec91d1ee5f304"
+    },
+    {
+      "first": 2700,
+      "count": 100,
+      "path": "raw\\archive\\041_flash_dump_2700_100.bin",
+      "bytes": 5933,
+      "sha256": "fbb6412ed816da157c260e2125ed270da47be08cd662fde1097118d6e103ee07"
+    },
+    {
+      "first": 2800,
+      "count": 100,
+      "path": "raw\\archive\\042_flash_dump_2800_100.bin",
+      "bytes": 5918,
+      "sha256": "0a51cc5c30b9144d791ce1f72aaae72ab64b1cbb5a0182b71bc96803fa9ef37f"
+    },
+    {
+      "first": 2900,
+      "count": 100,
+      "path": "raw\\archive\\043_flash_dump_2900_100.bin",
+      "bytes": 5925,
+      "sha256": "5771148f963f59ddaec42e1ee0f9824468daef9a5a54eb5d5b574b33cab84a84"
+    },
+    {
+      "first": 3000,
+      "count": 100,
+      "path": "raw\\archive\\044_flash_dump_3000_100.bin",
+      "bytes": 5925,
+      "sha256": "06da50fba0116fc77dcbf78f82627fbfccc5b347d4f6182ef484652b8c691c2b"
+    },
+    {
+      "first": 3100,
+      "count": 100,
+      "path": "raw\\archive\\045_flash_dump_3100_100.bin",
+      "bytes": 5985,
+      "sha256": "e2914615959c8edc8783f64a67d4459bce87273899d6abdb6a709de190357c57"
+    },
+    {
+      "first": 3200,
+      "count": 100,
+      "path": "raw\\archive\\046_flash_dump_3200_100.bin",
+      "bytes": 6012,
+      "sha256": "7e86c6044e1eaf52001f874f749f94ba2cc736bdb4ce625db90226b790ff9c5c"
+    },
+    {
+      "first": 3300,
+      "count": 100,
+      "path": "raw\\archive\\047_flash_dump_3300_100.bin",
+      "bytes": 5836,
+      "sha256": "50da5d241ffb639a29f2f446a71ca5649c4aa73bc32b69fa2f41e5cb11438e61"
+    },
+    {
+      "first": 3400,
+      "count": 100,
+      "path": "raw\\archive\\048_flash_dump_3400_100.bin",
+      "bytes": 5706,
+      "sha256": "af908d659f3edba2362325592713892d89f6fa9b336e47d7d2727e3645703c32"
+    },
+    {
+      "first": 3500,
+      "count": 100,
+      "path": "raw\\archive\\049_flash_dump_3500_100.bin",
+      "bytes": 5774,
+      "sha256": "d3ab0b02b737f1c209a7c6034888195ee66d7957ffb40f1b5fc20e8e8022b2d1"
+    },
+    {
+      "first": 3600,
+      "count": 100,
+      "path": "raw\\archive\\050_flash_dump_3600_100.bin",
+      "bytes": 5889,
+      "sha256": "8e7169880348c123b920a5b83a996ccf28d8483dc0e2394e3930afd5ad0bc159"
+    },
+    {
+      "first": 3700,
+      "count": 100,
+      "path": "raw\\archive\\051_flash_dump_3700_100.bin",
+      "bytes": 5869,
+      "sha256": "21f47b9a262ccaffdd222efc9c9890cd575d53b815fc90881429d85dc657542a"
+    },
+    {
+      "first": 3800,
+      "count": 100,
+      "path": "raw\\archive\\052_flash_dump_3800_100.bin",
+      "bytes": 5866,
+      "sha256": "d1284e7d994be0dac189d0a392adab5e6066ff2bc7a5f083ea67e60522f1d33c"
+    },
+    {
+      "first": 3900,
+      "count": 100,
+      "path": "raw\\archive\\053_flash_dump_3900_100.bin",
+      "bytes": 5921,
+      "sha256": "86fc9efe41cb41746d2f430f4738bb39ee25f1817795a1aa12ef516d6ba344ae"
+    },
+    {
+      "first": 4000,
+      "count": 96,
+      "path": "raw\\archive\\054_flash_dump_4000_96.bin",
+      "bytes": 5683,
+      "sha256": "9e23061c026928ed0e849737b904d63ba2bdac1197f253ae57eef62fceff9a0a"
+    }
+  ],
+  "files": [
+    {
+      "path": "old_archive.csv",
+      "bytes": 221420,
+      "sha256": "4a73a3743cc650b3b46671e69045dccafc2ff78c8d2af0e9453415841d070e43"
+    },
+    {
+      "path": "old_archive_checker.txt",
+      "bytes": 54,
+      "sha256": "982944d726e7ef8a3bf595ec42d60b1c1bf8973401cc63c233b6f9b5e4a04ef8"
+    },
+    {
+      "path": "old_archive_checker_first_failure.txt",
+      "bytes": 83,
+      "sha256": "9e1b65dc092e3d59023476e9ccca967d0842bf5d7906aaaa68afbabe9e0f4cb2"
+    }
+  ],
+  "checker": "ARCHIVE=ACCEPT rows=4096 batches=41\nCLEAR_ALLOWED=YES"
+}
