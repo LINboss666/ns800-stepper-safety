@@ -1,11 +1,15 @@
-# Phase 8 M5：软件故障停机与新日志闭环（CP0 交付）
+# Phase 8 M5：软件故障停机与新日志闭环（现场闭环完成）
 
 日期：2026-10-29（北京时间）
 分支：`debug/tmc-uart-rootcause-20261028`
 基线：`6218efa251cd6b8a16ad2df8f0fef1efd2ba5eeb`（M4 收口）
 software_input / code_commit：`8cf23aa6dda20baf7843798bdef9a02cfd71326f`
-状态：**CP0 完成；CP1 部分执行：P0 通过、P1 归档通过、清区命令已发送但完成未验证、P2–P4 NOT_REACHED。**
-CP1 原始证据与停点：`reports/reviews/phase8-motor-m5-fault-log/cp1/m5_result_partial.md`。
+状态：**M5 现场闭环完成：软件事件停机 PASS（无物理时延测量）、300 帧新日志 PASS、
+人工恢复 PARTIAL（故障态 arm 拒绝未单独实机执行）；项目安全验收 OPEN。**
+最终执行记录：见本文 §12（CP1h，2026-10-29）。
+CP1 中途停点原件：`reports/reviews/phase8-motor-m5-fault-log/cp1/m5_result_partial.md`
+（保留首次失败与“清区完成未验证”的历史状态，不代表最终结果）。
+M6 离线收口（无硬件动作）：`reports/agent_handoffs/phase8-motor-m6-offline.md`。
 
 ## 1. 产品改动（最小面）
 

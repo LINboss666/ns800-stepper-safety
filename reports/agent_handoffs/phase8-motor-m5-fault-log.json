@@ -109,5 +109,7 @@
     },
     "p3_log": "300/300/0, accepted=completed=300, bb_write_drops=0, queue_dropped=51 retries; readback pending"
   },
-  "next": "no further action; open physical/timing items and unexercised fault-state arm refusal"
+  "m6_offline_handoff": "reports/agent_handoffs/phase8-motor-m6-offline.md",
+  "final_execution": "section 12 (CP1h): software stop PASS, 300-frame log PASS, recovery PARTIAL; board image unchanged",
+  "next": "no board action; M6 offline closeout done; next field work requires a new approval"
 }

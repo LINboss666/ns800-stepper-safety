@@ -1,0 +1,523 @@
+{
+  "task": "phase8-motor-m6-offline",
+  "date": "2026-10-29",
+  "branch": "debug/tmc-uart-rootcause-20261028",
+  "document_base": "a052e8e3dc11a4a983fcaecf5fd36ba9e4139af4",
+  "source_base": "a052e8e3dc11a4a983fcaecf5fd36ba9e4139af4",
+  "code_commit": "cf133d6a5d539bb5a7c3b9da4d50d53dc3b47055",
+  "delivery_head": "80fc7db4a2cde89375eced0d1da32369b765cda0",
+  "delivery_head_note": "test evidence + build artifacts commit; the handoff documentation commit follows and is reported in the STOP/readback, not self-recorded",
+  "status": "M6_OFFLINE_CLOSEOUT_COMPLETE / NEW_IMAGES_BUILT_NOT_FLASHED / FIELD_CANDIDATE_OFFLINE_VERIFIED_NOT_EXECUTED",
+  "product_changed": {
+    "applications/safety_state.c": "safety_trip_cmd checks ss_log_ctx_ok before ANY argument parsing or output; legal thread retains usage and one safety_post_event; no protection/recovery logic change",
+    "other_product_sources": "none"
+  },
+  "tests_executed": {
+    "S1": {
+      "result": "PASS",
+      "target_required": 58,
+      "host_ovr_required": 73,
+      "rc": 0,
+      "new_ids": [
+        "PS17f",
+        "PS17g",
+        "PS17h"
+      ],
+      "evidence": [
+        "reports/reviews/phase8-motor-m6-offline/s1_normal.txt"
+      ]
+    },
+    "S1_reverse": {
+      "result": "PASS",
+      "rev_motor_off": "5/5",
+      "rev_safety_trip_skip_post": "1/1",
+      "rc": 0,
+      "evidence": [
+        "reports/reviews/phase8-motor-m6-offline/s1_reverse.txt"
+      ]
+    },
+    "IO_behavior": {
+      "result": "PASS",
+      "off_target": 33,
+      "on_target": 35,
+      "off_ovr": 46,
+      "on_ovr": 48,
+      "illegal_macro": "compile rejected",
+      "tmc_identity_ids": [
+        "IO11a",
+        "IO11b",
+        "IO11c",
+        "IO11d",
+        "IO11e",
+        "IO11f"
+      ],
+      "evidence": [
+        "reports/reviews/phase8-motor-m6-offline/io_behavior.txt"
+      ]
+    },
+    "CLI_strict": {
+      "result": "PASS",
+      "target": "10/10",
+      "host_ovr": "10/10",
+      "rc": 0,
+      "ids": [
+        "PS18a",
+        "PS18a2",
+        "PS18b",
+        "PS18b2",
+        "PS18c",
+        "PS18d",
+        "PS18e",
+        "PS18f",
+        "PS18g",
+        "PS18h"
+      ],
+      "evidence": [
+        "reports/reviews/phase8-motor-m6-offline/cli_strict.txt"
+      ]
+    },
+    "field_candidate_selftest": {
+      "result": "PASS",
+      "cases": "11/11",
+      "rc": 0,
+      "ids": [
+        "M6D01",
+        "M6D02",
+        "M6D02b",
+        "M6D03",
+        "M6D04",
+        "M6D05",
+        "M6D06",
+        "M6D07",
+        "M6D08",
+        "M6D09",
+        "M6D10"
+      ],
+      "evidence": [
+        "reports/reviews/phase8-motor-m6-offline/field_candidate_selftest.txt"
+      ]
+    },
+    "raw_recovery": {
+      "result": "PASS",
+      "b64_decoded_equal": "19/19",
+      "csv_rebuild": "ARCHIVE=ACCEPT rows=300 batches=3; BYTE_EQUAL=True",
+      "csv_bytes": 17314,
+      "csv_sha256": "c26cb752d79051f5914350424af9a28adc4a8ceb22e3bd18c2af77c9abb7567a",
+      "evidence": [
+        "reports/reviews/phase8-motor-m6-offline/m5_raw_recovery/verification.txt"
+      ]
+    }
+  },
+  "tests_not_rerun": [
+    {
+      "chain": "S2 concurrency",
+      "reason": "stop_priority/HAL/persistence unchanged; safety_trip ordering covered by S1"
+    },
+    {
+      "chain": "V1/V2",
+      "reason": "safety_state.c is stubbed there; no tmc2209/motor semantic change"
+    },
+    {
+      "chain": "SD sensor stack",
+      "reason": "sensor_service/blackbox unchanged"
+    },
+    {
+      "chain": "A0 export gate",
+      "reason": "export/collection logic unchanged"
+    }
+  ],
+  "builds_executed": {
+    "tool": "UV4 5.43.1.0 / ARMCLANG V6.24",
+    "rebuild_all": true,
+    "result": "3 targets 0 Error / 0 Warning",
+    "macro_probe": "default/A0 0/0/0/0; motor MOTOR=1 TMC=1 STEP=0 LIMIT=0",
+    "targets": {
+      "rt-thread": {
+        "program_size": "Code=180586 RO=78306 RW=2188 ZI=83784",
+        "banner": "build Oct 29 2026 11:20:17",
+        "bin": {
+          "bytes": 259468,
+          "sha256": "ccfae5e37cd010e873f3bf1a52c04e5925840d3e9f869a47d3514946bfbc1eec"
+        },
+        "axf": {
+          "bytes": 1667756,
+          "sha256": "377b4e059ebc42aeea999d1d7a9a749e65a57339e86105868ce65b0076d84f96"
+        }
+      },
+      "rt-thread-measure-a0": {
+        "program_size": "Code=187882 RO=81266 RW=2188 ZI=91504",
+        "banner": "build Oct 29 2026 11:20:33",
+        "bin": {
+          "bytes": 269724,
+          "sha256": "6458c8417471bed1ea760a9f4a20949efd45056f13e6177f2913afade42b70c1"
+        },
+        "axf": {
+          "bytes": 1698176,
+          "sha256": "9110c5e38d98cab521987d83057f7ae9438e634c74db67011b419622d645de0f"
+        }
+      },
+      "rt-thread-motor-m1-candidate": {
+        "program_size": "Code=180818 RO=78186 RW=2188 ZI=83784",
+        "banner": "build Oct 29 2026 11:20:45",
+        "macros": {
+          "MOTOR_HARDWARE_ENABLE_PATH_VALIDATED": 1,
+          "TMC_DRIVE_CONFIG_HW_VALIDATED": 1,
+          "STEP_DIAG_ISOLATED_ENV_CONFIRMED": 0,
+          "SAFETY_LIMIT_INPUTS_ENABLED": 0
+        },
+        "bin": {
+          "bytes": 259580,
+          "sha256": "a1ba8226c5d09578c111b61a0b12a7ac182d572db01cc945081c51185b837f7b"
+        },
+        "axf": {
+          "bytes": 1668244,
+          "sha256": "b9bb80ffaa5b7f9a153296a995d21b2e6059e1e6504d3f6c1452315f287af16a"
+        }
+      }
+    },
+    "build_manifest": "reports/firmware/phase8-motor-m6-offline/build_manifest.json",
+    "evidence_logs": [
+      "reports/reviews/phase8-motor-m6-offline/build_default.log",
+      "reports/reviews/phase8-motor-m6-offline/build_a0.log",
+      "reports/reviews/phase8-motor-m6-offline/build_motor.log"
+    ]
+  },
+  "artifacts": {
+    "firmware_dir": "reports/firmware/phase8-motor-m6-offline/",
+    "review_dir": "reports/reviews/phase8-motor-m6-offline/",
+    "handoff_md": "reports/agent_handoffs/phase8-motor-m6-offline.md",
+    "handoff_json": "reports/agent_handoffs/phase8-motor-m6-offline.json",
+    "field_candidate": "reports/reviews/phase8-motor-m6-offline/m6_field_candidate.py"
+  },
+  "raw_recovery": {
+    "scope": "19 final responses listed by reports/reviews/phase8-motor-m5-fault-log/cp1/final_pass/index.json",
+    "methods": {
+      "ORIGINAL_LOCAL_FILE": 19,
+      "EXACT_GIT_BYTES": 0,
+      "RECOVERED_FROM_LF_NORMALIZED_GIT_BLOB": 0
+    },
+    "note": "all 19 originals still readable and matched index length/SHA; 16 Git blobs are LF-normalized and recorded as restorable, but were not used as recovery source",
+    "index_bytes_total": 25972,
+    "items": [
+      {
+        "seq": 1,
+        "cmd": "system_status",
+        "repo_bin": "reports/reviews/phase8-motor-m5-fault-log/cp1/final_pass/001_system_status.bin",
+        "b64": "reports/reviews/phase8-motor-m6-offline/m5_raw_recovery/001_system_status.bin.b64",
+        "index_bytes": 984,
+        "index_sha256": "bf8fa27e010e7ab0de47d43cbf393bccf704c2c39d5dfd2dc695362a500fa116",
+        "git_blob_sha1": "fc72174721347d059c2fc2af41b2b9a8a60317f2",
+        "git_bytes_exact": false,
+        "git_lf_normalized_restorable": true,
+        "recovery_method": "ORIGINAL_LOCAL_FILE",
+        "b64_decoded_bytes": 984,
+        "b64_decoded_sha256": "bf8fa27e010e7ab0de47d43cbf393bccf704c2c39d5dfd2dc695362a500fa116",
+        "equal": true
+      },
+      {
+        "seq": 2,
+        "cmd": "version",
+        "repo_bin": "reports/reviews/phase8-motor-m5-fault-log/cp1/final_pass/002_version.bin",
+        "b64": "reports/reviews/phase8-motor-m6-offline/m5_raw_recovery/002_version.bin.b64",
+        "index_bytes": 154,
+        "index_sha256": "ce6b0f6de77340bc16bf45a458bd25cdb0c1ed4c05d5a190e83fab6a5c28e5b9",
+        "git_blob_sha1": "db7dbfb63f678d256c1affff3c6f17ee688c9453",
+        "git_bytes_exact": false,
+        "git_lf_normalized_restorable": true,
+        "recovery_method": "ORIGINAL_LOCAL_FILE",
+        "b64_decoded_bytes": 154,
+        "b64_decoded_sha256": "ce6b0f6de77340bc16bf45a458bd25cdb0c1ed4c05d5a190e83fab6a5c28e5b9",
+        "equal": true
+      },
+      {
+        "seq": 3,
+        "cmd": "safety_state",
+        "repo_bin": "reports/reviews/phase8-motor-m5-fault-log/cp1/final_pass/003_safety_state.bin",
+        "b64": "reports/reviews/phase8-motor-m6-offline/m5_raw_recovery/003_safety_state.bin.b64",
+        "index_bytes": 79,
+        "index_sha256": "9eb2fefbe4cd4fba185d8f9f619fcb08dc876e40d739d814932b5b04a681f6a1",
+        "git_blob_sha1": "b78eb2af9d2a5c9f2d8f1e8bc5650df4e08973c2",
+        "git_bytes_exact": false,
+        "git_lf_normalized_restorable": true,
+        "recovery_method": "ORIGINAL_LOCAL_FILE",
+        "b64_decoded_bytes": 79,
+        "b64_decoded_sha256": "9eb2fefbe4cd4fba185d8f9f619fcb08dc876e40d739d814932b5b04a681f6a1",
+        "equal": true
+      },
+      {
+        "seq": 4,
+        "cmd": "safety_status",
+        "repo_bin": "reports/reviews/phase8-motor-m5-fault-log/cp1/final_pass/004_safety_status.bin",
+        "b64": "reports/reviews/phase8-motor-m6-offline/m5_raw_recovery/004_safety_status.bin.b64",
+        "index_bytes": 488,
+        "index_sha256": "acd8b6995ff69c499de1a984712f44cf4b22262b07f80c23335d766cafb6ffdf",
+        "git_blob_sha1": "bf9ef6a97e78d3862eb05cd2aacc811adfcd97b8",
+        "git_bytes_exact": true,
+        "git_lf_normalized_restorable": false,
+        "recovery_method": "ORIGINAL_LOCAL_FILE",
+        "b64_decoded_bytes": 488,
+        "b64_decoded_sha256": "acd8b6995ff69c499de1a984712f44cf4b22262b07f80c23335d766cafb6ffdf",
+        "equal": true
+      },
+      {
+        "seq": 5,
+        "cmd": "motor_status",
+        "repo_bin": "reports/reviews/phase8-motor-m5-fault-log/cp1/final_pass/005_motor_status.bin",
+        "b64": "reports/reviews/phase8-motor-m6-offline/m5_raw_recovery/005_motor_status.bin.b64",
+        "index_bytes": 1091,
+        "index_sha256": "59985c74abf0ba8cefde31194631c8ce14f5d4acff95da58cbe2fdbbf4a536ae",
+        "git_blob_sha1": "de20e6756fcb5d48f0ac182cc1178d86ff9cf787",
+        "git_bytes_exact": false,
+        "git_lf_normalized_restorable": true,
+        "recovery_method": "ORIGINAL_LOCAL_FILE",
+        "b64_decoded_bytes": 1091,
+        "b64_decoded_sha256": "59985c74abf0ba8cefde31194631c8ce14f5d4acff95da58cbe2fdbbf4a536ae",
+        "equal": true
+      },
+      {
+        "seq": 6,
+        "cmd": "step_status",
+        "repo_bin": "reports/reviews/phase8-motor-m5-fault-log/cp1/final_pass/006_step_status.bin",
+        "b64": "reports/reviews/phase8-motor-m6-offline/m5_raw_recovery/006_step_status.bin.b64",
+        "index_bytes": 233,
+        "index_sha256": "144a3bdd92cd449a62f0d9adb0c81618c8a3365695e9331e72bcebba67d2f41f",
+        "git_blob_sha1": "a81a7b68b72b17f546e119e4febb84eca44bc9ac",
+        "git_bytes_exact": false,
+        "git_lf_normalized_restorable": true,
+        "recovery_method": "ORIGINAL_LOCAL_FILE",
+        "b64_decoded_bytes": 233,
+        "b64_decoded_sha256": "144a3bdd92cd449a62f0d9adb0c81618c8a3365695e9331e72bcebba67d2f41f",
+        "equal": true
+      },
+      {
+        "seq": 7,
+        "cmd": "blackbox_status",
+        "repo_bin": "reports/reviews/phase8-motor-m5-fault-log/cp1/final_pass/007_blackbox_status.bin",
+        "b64": "reports/reviews/phase8-motor-m6-offline/m5_raw_recovery/007_blackbox_status.bin.b64",
+        "index_bytes": 338,
+        "index_sha256": "4107e76c384259ff2a0569b3aa175482e09a49709abdd677958c28de59105742",
+        "git_blob_sha1": "052f554c8a6418cb33ca0648b1513ae169f66bac",
+        "git_bytes_exact": false,
+        "git_lf_normalized_restorable": true,
+        "recovery_method": "ORIGINAL_LOCAL_FILE",
+        "b64_decoded_bytes": 338,
+        "b64_decoded_sha256": "4107e76c384259ff2a0569b3aa175482e09a49709abdd677958c28de59105742",
+        "equal": true
+      },
+      {
+        "seq": 8,
+        "cmd": "flash_logstat",
+        "repo_bin": "reports/reviews/phase8-motor-m5-fault-log/cp1/final_pass/008_flash_logstat.bin",
+        "b64": "reports/reviews/phase8-motor-m6-offline/m5_raw_recovery/008_flash_logstat.bin.b64",
+        "index_bytes": 124,
+        "index_sha256": "19c566f45293491c4bb789f301483f7fc628d99094dd54cc84155c44a0fad78c",
+        "git_blob_sha1": "8bc9c6249b634abd4158af623a5e2d670009d327",
+        "git_bytes_exact": false,
+        "git_lf_normalized_restorable": true,
+        "recovery_method": "ORIGINAL_LOCAL_FILE",
+        "b64_decoded_bytes": 124,
+        "b64_decoded_sha256": "19c566f45293491c4bb789f301483f7fc628d99094dd54cc84155c44a0fad78c",
+        "equal": true
+      },
+      {
+        "seq": 9,
+        "cmd": "flash_dump 0 100",
+        "repo_bin": "reports/reviews/phase8-motor-m5-fault-log/cp1/final_pass/009_flash_dump_0_100.bin",
+        "b64": "reports/reviews/phase8-motor-m6-offline/m5_raw_recovery/009_flash_dump_0_100.bin.b64",
+        "index_bytes": 5891,
+        "index_sha256": "a7fb278179a33ba7641c84a66c37e7c01d7067bbcadbc11051ac08a2760a7d9f",
+        "git_blob_sha1": "c8f3a030c6c21b35a47743a33ca235e31ee14dde",
+        "git_bytes_exact": false,
+        "git_lf_normalized_restorable": true,
+        "recovery_method": "ORIGINAL_LOCAL_FILE",
+        "b64_decoded_bytes": 5891,
+        "b64_decoded_sha256": "a7fb278179a33ba7641c84a66c37e7c01d7067bbcadbc11051ac08a2760a7d9f",
+        "equal": true
+      },
+      {
+        "seq": 10,
+        "cmd": "flash_dump 100 100",
+        "repo_bin": "reports/reviews/phase8-motor-m5-fault-log/cp1/final_pass/010_flash_dump_100_100.bin",
+        "b64": "reports/reviews/phase8-motor-m6-offline/m5_raw_recovery/010_flash_dump_100_100.bin.b64",
+        "index_bytes": 6107,
+        "index_sha256": "e5bd903bff546919b8c3ddd2c50e161b2aa75f8eefa08bff9dd25dc9911209fe",
+        "git_blob_sha1": "27933a6b3015f6034667256cf368c0ab246d624e",
+        "git_bytes_exact": false,
+        "git_lf_normalized_restorable": true,
+        "recovery_method": "ORIGINAL_LOCAL_FILE",
+        "b64_decoded_bytes": 6107,
+        "b64_decoded_sha256": "e5bd903bff546919b8c3ddd2c50e161b2aa75f8eefa08bff9dd25dc9911209fe",
+        "equal": true
+      },
+      {
+        "seq": 11,
+        "cmd": "flash_dump 200 100",
+        "repo_bin": "reports/reviews/phase8-motor-m5-fault-log/cp1/final_pass/011_flash_dump_200_100.bin",
+        "b64": "reports/reviews/phase8-motor-m6-offline/m5_raw_recovery/011_flash_dump_200_100.bin.b64",
+        "index_bytes": 5905,
+        "index_sha256": "2b664759f876526c77f126c17b19e0261ceffac7bb045544be73f7d1cde733a6",
+        "git_blob_sha1": "e56ea81f5425345466883fc2f850e4e83a79c4c4",
+        "git_bytes_exact": false,
+        "git_lf_normalized_restorable": true,
+        "recovery_method": "ORIGINAL_LOCAL_FILE",
+        "b64_decoded_bytes": 5905,
+        "b64_decoded_sha256": "2b664759f876526c77f126c17b19e0261ceffac7bb045544be73f7d1cde733a6",
+        "equal": true
+      },
+      {
+        "seq": 12,
+        "cmd": "fault_reset",
+        "repo_bin": "reports/reviews/phase8-motor-m5-fault-log/cp1/final_pass/012_fault_reset.bin",
+        "b64": "reports/reviews/phase8-motor-m6-offline/m5_raw_recovery/012_fault_reset.bin.b64",
+        "index_bytes": 562,
+        "index_sha256": "10f94203eb4e779fde0a61d18ca505812dacbfb5af372e50a9806130d1f68d80",
+        "git_blob_sha1": "ed728b0c77b5d9d2517de142ef113e00110e8fd2",
+        "git_bytes_exact": true,
+        "git_lf_normalized_restorable": false,
+        "recovery_method": "ORIGINAL_LOCAL_FILE",
+        "b64_decoded_bytes": 562,
+        "b64_decoded_sha256": "10f94203eb4e779fde0a61d18ca505812dacbfb5af372e50a9806130d1f68d80",
+        "equal": true
+      },
+      {
+        "seq": 13,
+        "cmd": "motor_status",
+        "repo_bin": "reports/reviews/phase8-motor-m5-fault-log/cp1/final_pass/013_motor_status.bin",
+        "b64": "reports/reviews/phase8-motor-m6-offline/m5_raw_recovery/013_motor_status.bin.b64",
+        "index_bytes": 1046,
+        "index_sha256": "1b0edc21e54b8ee4d627bcc00f1de208a9cfb78521e1052ff8d7969cfdfa7d02",
+        "git_blob_sha1": "b86d01639ec506e5cae403370fea7a0c402758bb",
+        "git_bytes_exact": false,
+        "git_lf_normalized_restorable": true,
+        "recovery_method": "ORIGINAL_LOCAL_FILE",
+        "b64_decoded_bytes": 1046,
+        "b64_decoded_sha256": "1b0edc21e54b8ee4d627bcc00f1de208a9cfb78521e1052ff8d7969cfdfa7d02",
+        "equal": true
+      },
+      {
+        "seq": 14,
+        "cmd": "system_selftest",
+        "repo_bin": "reports/reviews/phase8-motor-m5-fault-log/cp1/final_pass/014_system_selftest.bin",
+        "b64": "reports/reviews/phase8-motor-m6-offline/m5_raw_recovery/014_system_selftest.bin.b64",
+        "index_bytes": 1457,
+        "index_sha256": "4636a643d597f1c26c0dccdc5980ebdd143e4ac00b05946b9d7c9046b194f4e5",
+        "git_blob_sha1": "e7d791791f473d9994541016d0c65126da885cc6",
+        "git_bytes_exact": false,
+        "git_lf_normalized_restorable": true,
+        "recovery_method": "ORIGINAL_LOCAL_FILE",
+        "b64_decoded_bytes": 1457,
+        "b64_decoded_sha256": "4636a643d597f1c26c0dccdc5980ebdd143e4ac00b05946b9d7c9046b194f4e5",
+        "equal": true
+      },
+      {
+        "seq": 15,
+        "cmd": "safety_state",
+        "repo_bin": "reports/reviews/phase8-motor-m5-fault-log/cp1/final_pass/015_safety_state.bin",
+        "b64": "reports/reviews/phase8-motor-m6-offline/m5_raw_recovery/015_safety_state.bin.b64",
+        "index_bytes": 71,
+        "index_sha256": "6a59468afb1f1684e77ecaf4ff723a69013c620215dc793b9667f8048361dacd",
+        "git_blob_sha1": "05d0933b81b53a897ca8386e5df74cee4774c39b",
+        "git_bytes_exact": false,
+        "git_lf_normalized_restorable": true,
+        "recovery_method": "ORIGINAL_LOCAL_FILE",
+        "b64_decoded_bytes": 71,
+        "b64_decoded_sha256": "6a59468afb1f1684e77ecaf4ff723a69013c620215dc793b9667f8048361dacd",
+        "equal": true
+      },
+      {
+        "seq": 16,
+        "cmd": "safety_state",
+        "repo_bin": "reports/reviews/phase8-motor-m5-fault-log/cp1/final_pass/016_safety_state.bin",
+        "b64": "reports/reviews/phase8-motor-m6-offline/m5_raw_recovery/016_safety_state.bin.b64",
+        "index_bytes": 71,
+        "index_sha256": "6a59468afb1f1684e77ecaf4ff723a69013c620215dc793b9667f8048361dacd",
+        "git_blob_sha1": "05d0933b81b53a897ca8386e5df74cee4774c39b",
+        "git_bytes_exact": false,
+        "git_lf_normalized_restorable": true,
+        "recovery_method": "ORIGINAL_LOCAL_FILE",
+        "b64_decoded_bytes": 71,
+        "b64_decoded_sha256": "6a59468afb1f1684e77ecaf4ff723a69013c620215dc793b9667f8048361dacd",
+        "equal": true
+      },
+      {
+        "seq": 17,
+        "cmd": "safety_status",
+        "repo_bin": "reports/reviews/phase8-motor-m5-fault-log/cp1/final_pass/017_safety_status.bin",
+        "b64": "reports/reviews/phase8-motor-m6-offline/m5_raw_recovery/017_safety_status.bin.b64",
+        "index_bytes": 488,
+        "index_sha256": "acd8b6995ff69c499de1a984712f44cf4b22262b07f80c23335d766cafb6ffdf",
+        "git_blob_sha1": "bf9ef6a97e78d3862eb05cd2aacc811adfcd97b8",
+        "git_bytes_exact": true,
+        "git_lf_normalized_restorable": false,
+        "recovery_method": "ORIGINAL_LOCAL_FILE",
+        "b64_decoded_bytes": 488,
+        "b64_decoded_sha256": "acd8b6995ff69c499de1a984712f44cf4b22262b07f80c23335d766cafb6ffdf",
+        "equal": true
+      },
+      {
+        "seq": 18,
+        "cmd": "motor_status",
+        "repo_bin": "reports/reviews/phase8-motor-m5-fault-log/cp1/final_pass/018_motor_status.bin",
+        "b64": "reports/reviews/phase8-motor-m6-offline/m5_raw_recovery/018_motor_status.bin.b64",
+        "index_bytes": 650,
+        "index_sha256": "9cac7640a841c1e6c17e1d0363ff1d3946310a2d961559114028af9bea2aeb37",
+        "git_blob_sha1": "73955e23b91874e035d6ca3d9c43040e91071ddb",
+        "git_bytes_exact": false,
+        "git_lf_normalized_restorable": true,
+        "recovery_method": "ORIGINAL_LOCAL_FILE",
+        "b64_decoded_bytes": 650,
+        "b64_decoded_sha256": "9cac7640a841c1e6c17e1d0363ff1d3946310a2d961559114028af9bea2aeb37",
+        "equal": true
+      },
+      {
+        "seq": 19,
+        "cmd": "step_status",
+        "repo_bin": "reports/reviews/phase8-motor-m5-fault-log/cp1/final_pass/019_step_status.bin",
+        "b64": "reports/reviews/phase8-motor-m6-offline/m5_raw_recovery/019_step_status.bin.b64",
+        "index_bytes": 233,
+        "index_sha256": "144a3bdd92cd449a62f0d9adb0c81618c8a3365695e9331e72bcebba67d2f41f",
+        "git_blob_sha1": "a81a7b68b72b17f546e119e4febb84eca44bc9ac",
+        "git_bytes_exact": false,
+        "git_lf_normalized_restorable": true,
+        "recovery_method": "ORIGINAL_LOCAL_FILE",
+        "b64_decoded_bytes": 233,
+        "b64_decoded_sha256": "144a3bdd92cd449a62f0d9adb0c81618c8a3365695e9331e72bcebba67d2f41f",
+        "equal": true
+      }
+    ]
+  },
+  "on_board_last_proven_identity": {
+    "image": "M5 candidate (unchanged)",
+    "bin_bytes": 259580,
+    "bin_sha256": "01d3e5ab1ad245949385d50c9f1d5fd2bbaac0806c3920e897321bc46db764bc",
+    "axf_bytes": 1668244,
+    "axf_sha256": "8c5bc7bf1efa786013c767ae1e09415ad0d5d5db3e38069c8aeebabf7cebae40",
+    "banner": "build Oct 29 2026 00:38:59",
+    "status": "UNCHANGED / NOT_FLASHED"
+  },
+  "hardware_actions": [],
+  "serial_objects_created": 0,
+  "dap": 0,
+  "reset": 0,
+  "flash_read_write": 0,
+  "motor_actions": 0,
+  "target_cases": "NOT_EXECUTED",
+  "open_items": [
+    "M5_MANUAL_RECOVERY_PASS remains PARTIAL: fault-state motor_arm refusal not separately executed on hardware",
+    "PROJECT_SAFETY_ACCEPTANCE_PENDING: ADC current calibration, SG/fusion calibration, DIAG physical trigger, scope/A0 deferred",
+    "M6 images are NOT_FLASHED; board image remains the M5 candidate"
+  ],
+  "next_steps": [
+    "future approved static fault session may exercise fault-state motor_arm refusal without re-spinning the motor",
+    "bus-current ADC needs an independent current reference/front-end calibration, distinguished from phase-current measurement",
+    "SG/fusion thresholds must be calibrated at final speed/current/load and kept MONITOR_ONLY until evidence exists",
+    "DIAG physical trigger method remains to be defined; IRQ OPEN is not a measurement",
+    "scope/A0 remain deferred per user decision, not hard prerequisites for the next software prep"
+  ],
+  "privacy": {
+    "absolute_user_paths": 0,
+    "port_names": 0,
+    "instrument_serials": 0,
+    "credentials": 0
+  }
+}
