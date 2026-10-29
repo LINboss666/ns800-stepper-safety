@@ -89,6 +89,23 @@ REV3 子 runner：云端 `rc=4`（总入口 rc=1，C22f 确实 FAIL，focused `c
 - REV3 云端 rc=4 的原因未定；完整栈高水位仍 `NOT_MEASURED`。
 - 完整项目安全验收、独立母线参考、真实 DIAG/SG 端到端、物理电流与波形/时延均保持开放。
 
+## 6A. 远端字节回读（工具提交 `01da9d6` 之后）
+
+详见 `reports/reviews/phase8-motor-m7-current-calibration-r2/remote_readback_r2.md`。要点：
+
+- 远端分支 tip 实测 `01da9d62c65bb482db7eaec2d5e6a62ae492cf86`；`main` / `phase7` / `phase8` /
+  tag `v0.7-phase7-software-board-validated`（对象与解引用）四项冻结引用逐字相等。
+- 21 个交付路径逐条读远端 blob 字节：计算器 = `5c7a2340…63ad` / 54267 B（CR 字节 0），
+  与任务书候选逐字节相等；`run_m7_reverse.sh` = `a32be1db…96d4` / 10083 B；
+  P0 采集器 = `1e34589f…c44f` / 15503 B。
+- 六件 M7-R1 镜像的远端 blob 与 `build_manifest.json` 登记值全部相等；
+  `c78f786 → 远端 tip` 在 `reports/firmware/` 下变更路径数 = 0，M5 归档 BIN 仍 259580 B / `01d3e5ab…`。
+- **用远端字节重跑**（不是复述本地结果）：`--selftest` 54/54、`verify_calc_candidate.py` 21/21、
+  同一输入探针五个缺陷源全 `rc=1` 且无命令、非线性角点界 `10.317726165210626` → `REJECT`。
+- 本文件 §7 第一行的 `AWAITING_REMOTE_BYTE_REVIEW` 描述的是工具提交 `01da9d6` 当时的状态；
+  回读本身随本证据提交入库，因此该行的后继状态是 `REMOTE_BYTE_READBACK_DONE / AWAITING_INDEPENDENT_REVIEW`。
+  这不是对本轮五行测点契约的改写，只是登记顺序。
+
 ## 7. 回执
 
 ```text

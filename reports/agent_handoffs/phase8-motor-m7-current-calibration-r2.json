@@ -5,8 +5,9 @@
   "roles": {
     "firmware_code_commit": "5b564eb962e8518920f581111d7a460a2b1fce64",
     "reviewed_delivery": "c78f7865292d387a0533c2f22c39e8c848bcd689",
-    "calculator_code_commit": "THIS_ROUND_TOOL_COMMIT (filled by the R2 calculator commit; never self-referenced)",
-    "delivery_head": "THIS_ROUND_EVIDENCE_COMMIT (filled after push, see remote_readback_r2.md)"
+    "calculator_code_commit": "01da9d62c65bb482db7eaec2d5e6a62ae492cf86",
+    "delivery_head": "not self-referenced; resolve with git log -1 --format=%H -- reports/reviews/phase8-motor-m7-current-calibration-r2/remote_readback_r2.md",
+    "calculator_code_commit_note": "remote branch tip read back as this commit before this evidence commit existed; see remote_readback_r2.md section 6"
   },
   "scope": {
     "authorized": [
@@ -140,6 +141,28 @@
     "REV3 cloud rc=4 cause undetermined; tshell stack high-water NOT_MEASURED"
   ],
   "synthetic_data_warning": "every calculator example including reports/reviews/phase8-motor-m7-current-calibration-r2/example_result_HOST_SYNTHETIC.json (current_cal apply 1598291 671551 CONFIRM_MEASURED) is HOST_SYNTHETIC and must never be sent to hardware",
+  "remote_readback": {
+    "method": "ls-remote before and after push, then git cat-file -p origin/debug/tmc-uart-rootcause-20261028:<path> on the remote blob bytes; the autocrlf working tree is never used as a judge",
+    "branch_tip": "01da9d62c65bb482db7eaec2d5e6a62ae492cf86",
+    "frozen_refs_match": true,
+    "changed_paths_c78f786_to_tip": 21,
+    "product_code_changed_paths": 0,
+    "firmware_dir_changed_paths": 0,
+    "tool_remote_blob": {
+      "bytes": 54267,
+      "sha256": "5c7a2340b4d350b1e8932798a57b85e8a6f4818501e469ad6dfd5c1bd29163ad",
+      "cr_bytes": 0,
+      "equals_reviewed_candidate": true
+    },
+    "six_images_match_manifest": true,
+    "reruns_from_remote_bytes": {
+      "selftest": "SUMMARY cases=54 pass=54 fail=0",
+      "candidate_focused": "SUMMARY 21 pass 21 fail 0 []",
+      "same_input_probe": "HEADER_ONLY/MISSING_DECISION_TAIL/NUL_IN_NEGATIVE_DECISION/CHANGED_VERSION/REUSED_FIT_AS_HOLDOUT_RENAMED all rc=1 with no command; CONTROL_FULL_REAL_FORMAT rc=0 DRAFT_NOT_APPROVED; NONLINEAR_INTERVAL_CORNER bound=10.317726165210626 REJECT usable=false"
+    },
+    "receipt_note": "the first receipt line's AWAITING_REMOTE_BYTE_REVIEW describes the state at the calculator commit 01da9d6; the readback itself is recorded in remote_readback_r2.md by the evidence commit that resolves delivery_head",
+    "detail": "reports/reviews/phase8-motor-m7-current-calibration-r2/remote_readback_r2.md"
+  },
   "receipt": [
     "M7_R2_CALCULATOR_PATCH_APPLIED / OFFLINE_VERIFIED / AWAITING_REMOTE_BYTE_REVIEW",
     "M7_R1_FIRMWARE_ACCEPTED_FOR_P0 / SIX_IMAGE_BYTES_UNCHANGED",
