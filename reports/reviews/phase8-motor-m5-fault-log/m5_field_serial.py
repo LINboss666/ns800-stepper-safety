@@ -211,10 +211,12 @@ class Runner:
         m = re.search(r"\[MOT\] state=(\d+)", text)
         hz = re.search(r"cur_hz=(\d+) tgt_hz=(\d+)", text)
         a = re.search(r"armed=(\d+)", text)
+        g = re.search(r"arm_gate_mask=0x([0-9A-Fa-f]+)", text)
         if not m or not hz:
             raise Abort("motor_status parse failed")
         return {"state": int(m.group(1)), "cur": int(hz.group(1)),
-                "tgt": int(hz.group(2)), "armed": int(a.group(1)) if a else -1}
+                "tgt": int(hz.group(2)), "armed": int(a.group(1)) if a else -1,
+                "gate": int(g.group(1), 16) if g else -1}
 
     # ---------- P0 ----------
     def preflight(self, rec, expect_banner=None, allow_apply=False):
@@ -391,10 +393,17 @@ class Runner:
             raise Abort("log space insufficient and clear not done")
         rec = Recorder(self.out, "fault")
         text, bb0, f0 = self.preflight(rec)
+        mo = self.parse_motor(text["motor_status"])
+        if mo["gate"] != 0:
+            raise Abort("arm gate not clear before P2 (mask=0x%X); no motor command sent"
+                        % (mo["gate"] & 0xFFFFFFFF))
         pre_used = f0["used"]
-        # P2
+        # P2: arm must be confirmed before target/start (a refused arm must not set target)
         self.q(rec, "motor_dir 0")
         self.q(rec, "motor_arm", 10.0, 1.0)
+        armed = self.parse_motor(self.q(rec, "motor_status"))
+        if armed["armed"] != 1:
+            raise Abort("arm refused before target/start: %s" % armed)
         self.q(rec, "motor_target 300")
         raw, t_start, _ = self.link.send("motor_start", 10.0, 1.0)
         rec.save("motor_start", raw, t_start, self.clock())
@@ -552,6 +561,7 @@ class FakeDevice:
         self.bb_state = 0
         self.frames = {}
         self.motor = {"state": 0, "cur": 0, "tgt": 0, "armed": 0}
+        self.gate = 0
         self.safety = "READY"
         self.fault = 0
         self.pad = 0
@@ -572,8 +582,9 @@ class FakeDevice:
             return ("[MOT] state=%d name=OTHER\n"
                     "[MOT] cur_hz=%d tgt_hz=%d accel=2000 decel=2000 dir=0\n"
                     "[MOT] armed=%d drv_en_request=1 health=OK\n"
+                    "[MOT] arm_gate_mask=0x%X\n"
                     % (self.motor["state"], self.motor["cur"], self.motor["tgt"],
-                       self.motor["armed"]))
+                       self.motor["armed"], self.gate))
         if cmd == "step_status": return "[STEP] enabled=0 last_stop=not-attempted\n"
         if cmd == "tmc_config_show": return "[TMC] state=CONFIGURED snapshot_valid=1 last_err=0\n"
         if cmd == "diag_status":
@@ -809,11 +820,29 @@ def selftest():
         if any("flash_logclear" in c for _, c in link.commands):
             raise AssertionError("clear sent without second copy")
 
+    # 6. arm gate 未清零 -> 在发送任何电机命令前停止
+    def t6():
+        runner, dev, link, _ = _runner_for_selftest(tmp, _fake_checker_accept)
+        runner.archive(expect_banner="FAKEBANNER", allow_clear=False)
+        dev.gate = 8
+        before = len(link.commands)
+        try:
+            runner.fault()
+            raise AssertionError("fault ran with arm gate 0x8")
+        except Abort as exc:
+            if "arm gate not clear" not in str(exc):
+                raise
+        sent = [c for _, c in link.commands[before:]]
+        for bad in ("motor_dir", "motor_arm", "motor_target", "motor_start"):
+            if any(c.startswith(bad) for c in sent):
+                raise AssertionError("motor command sent before gate check: %s" % sent)
+
     case("FS01-archive_reject_blocks_clear", t1)
     case("FS02-order_3s_5s_and_clear", t2)
     case("FS03-full_log_without_clear_approval_stops", t3)
     case("FS04-no_new_log_blocks_recovery", t4)
     case("FS05-clear_requires_two_copies", t5)
+    case("FS06-arm_gate_blocks_before_any_motor_command", t6)
     print("SUMMARY|cases=%d pass=%d fail=%d" % (passed + failed, passed, failed))
     return 0 if failed == 0 else 1
 

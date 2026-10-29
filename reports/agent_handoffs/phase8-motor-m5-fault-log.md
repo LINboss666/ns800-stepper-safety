@@ -101,3 +101,18 @@ UV4 5.43.1.0 / ARMCLANG V6.24，三目标均 Rebuild All 0 Error / 0 Warning。
 - 额度：DAP 3/3、COM5 2/2 已用尽；无主机进程占用 COM5。
 - 结果：`M5_CP1_PARTIAL`；三项现场 PASS 均 NOT_REACHED；需一次额外 COM5 会话批准
   （先验证日志 0/0/0，若成立再做 P2–P4；不成立则停止，不清第二次）。
+
+## 7. CP1b 追加会话（2026-10-29，停在起转前门禁）
+
+- 只读确认清区完成：`slots=0/4096 valid=0 bad=0`、队列 0/0/0；READY/fault0、LOW/pad0、
+  TMC CONFIGURED、BB 空闲。
+- P2 尝试：`motor_dir 0` OK；`motor_arm` **REFUSED**（`arm_gate_mask=0x8`、
+  `gate4 irq_gate=CLOSED polarity=not-confirmed`、`protection-not-ready`）；
+  `motor_target 300` 被脚本在拒绝后仍发送（已修正）；`motor_start` REFUSED not armed；
+  t≈1 s 状态仍 `armed=0 cur=0`，脚本停止。**电机从未起转。**
+- 未发送 `safety_trip`、未产生新日志、未做恢复。日志仍 `0/0/0`；软件 target 留在 300 Hz。
+- 工具修正：fault 前置要求 `arm_gate_mask==0`，arm 后必须 `armed=1` 才发 target/start；
+  自测 FS01–FS06 6/6。
+- 结果：`M5_CP1_STOPPED_AT_ARM`；需新批准一次 COM5 会话：target 0 清理 + 现场确认
+  DIAG/H6-7 0 V 后一次 `safety_polarity_confirm CONFIRM` + 一次 `safety_irq_enable`，
+  复核 mask=0 再执行 P2–P4；不清区/不重烧/不自动重跑。

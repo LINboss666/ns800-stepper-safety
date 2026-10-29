@@ -1,0 +1,15 @@
+motor_arm
+[MOT] arm REFUSED (gates failing)
+[MOT] arm_gate_mask=0x8
+[MOT] gate_reason=protection-not-ready
+[MOT] gate4 irq_gate=CLOSED polarity=not-confirmed
+[MOT] gate4 gpio_ready=YES
+[MOT] gate5 tmc_drive_cfg=CONFIGURED
+[MOT] gate6 request_basis=DISABLED
+[MOT] gate6 enn_verdict=OK
+[MOT] gate7 motor_stop=api-accepted(驱动接受关断, 非波形证明) src=init rc=0
+[MOT] gate7 latched=no diag_off=YES
+[MOT] note: current_hz=0 is a command value, not stop proof
+motor_arm: command failed -8.
+msh >
+msh >

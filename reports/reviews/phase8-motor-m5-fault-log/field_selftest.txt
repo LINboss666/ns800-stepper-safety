@@ -6,4 +6,6 @@ CASE|FS03-full_log_without_clear_approval_stops|PASS|ok
 ARCHIVE=PASS used=0 clear=NO free_after=4096
 CASE|FS04-no_new_log_blocks_recovery|PASS|ok
 CASE|FS05-clear_requires_two_copies|PASS|ok
-SUMMARY|cases=5 pass=5 fail=0
+ARCHIVE=PASS used=0 clear=NO free_after=4096
+CASE|FS06-arm_gate_blocks_before_any_motor_command|PASS|ok
+SUMMARY|cases=6 pass=6 fail=0
