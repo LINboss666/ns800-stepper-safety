@@ -1,8 +1,8 @@
-usage: m6_candidate_git_blob_d2e.py [-h] [--selftest] [--port PORT]
-                                    [--out-dir OUT_DIR]
-                                    [--archive-state ARCHIVE_STATE]
-                                    [--allow-recovery]
-m6_candidate_git_blob_d2e.py: error: --port or --selftest required
+usage: m6_candidate_git_blob_final.py [-h] [--selftest] [--port PORT]
+                                      [--out-dir OUT_DIR]
+                                      [--archive-state ARCHIVE_STATE]
+                                      [--allow-recovery]
+m6_candidate_git_blob_final.py: error: --port or --selftest required
 CASE|M6D01-interleaved_trip_still_disarms|PASS|ok
 CASE|M6D02-read_timeout_cleanup_within_5s|PASS|ok
 CASE|M6D02b-lost_disarm_reply_marks_unknown|PASS|ok
