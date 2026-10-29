@@ -1,0 +1,76 @@
+[
+  {
+    "case": "VERBATIM_016_safety_state.bin",
+    "command": "safety_state",
+    "bytes": 71,
+    "cr_bytes": 3,
+    "nul_bytes": 0,
+    "sha256": "6a59468afb1f1684e77ecaf4ff723a69013c620215dc793b9667f8048361dacd",
+    "body_tag_present": true,
+    "prompt_at_frame_end": true,
+    "verdict": "ACCEPT"
+  },
+  {
+    "case": "CLOUD_REPLAY_INPUT_016_safety_state.bin",
+    "bytes": 68,
+    "cr_bytes": 0,
+    "identical_to_repo_archive": false,
+    "verdict": "ACCEPT"
+  },
+  {
+    "case": "VERBATIM_017_safety_status.bin",
+    "command": "safety_status",
+    "bytes": 488,
+    "cr_bytes": 7,
+    "nul_bytes": 1,
+    "sha256": "acd8b6995ff69c499de1a984712f44cf4b22262b07f80c23335d766cafb6ffdf",
+    "body_tag_present": true,
+    "prompt_at_frame_end": true,
+    "verdict": "ACCEPT"
+  },
+  {
+    "case": "CLOUD_REPLAY_INPUT_017_safety_status.bin",
+    "bytes": 488,
+    "cr_bytes": 7,
+    "identical_to_repo_archive": true,
+    "verdict": "ACCEPT"
+  },
+  {
+    "case": "VERBATIM_018_motor_status.bin",
+    "command": "motor_status",
+    "bytes": 650,
+    "cr_bytes": 16,
+    "nul_bytes": 0,
+    "sha256": "9cac7640a841c1e6c17e1d0363ff1d3946310a2d961559114028af9bea2aeb37",
+    "body_tag_present": true,
+    "prompt_at_frame_end": true,
+    "verdict": "ACCEPT"
+  },
+  {
+    "case": "CLOUD_REPLAY_INPUT_018_motor_status.bin",
+    "bytes": 634,
+    "cr_bytes": 0,
+    "identical_to_repo_archive": false,
+    "verdict": "ACCEPT"
+  },
+  {
+    "case": "VERBATIM_019_step_status.bin",
+    "command": "step_status",
+    "bytes": 233,
+    "cr_bytes": 6,
+    "nul_bytes": 0,
+    "sha256": "144a3bdd92cd449a62f0d9adb0c81618c8a3365695e9331e72bcebba67d2f41f",
+    "body_tag_present": true,
+    "prompt_at_frame_end": true,
+    "verdict": "ACCEPT"
+  },
+  {
+    "case": "CLOUD_REPLAY_INPUT_019_step_status.bin",
+    "bytes": 227,
+    "cr_bytes": 0,
+    "identical_to_repo_archive": false,
+    "verdict": "ACCEPT"
+  }
+]
+VERBATIM_M5_REPLAY=4/4 accept
+candidate sha256 verified / DEVICE_ACTIONS=0 / inputs are historical archives, not new measurements

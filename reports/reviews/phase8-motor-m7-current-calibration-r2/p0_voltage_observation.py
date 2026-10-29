@@ -1,385 +1,401 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""NS800 M7-R1 P0 voltage-observation collector (read-only whitelist).
+"""M7 P0: bounded read-only voltage observation; offline by default.
 
-Offline by default. The only real transport constructor lives behind
---execute-approved-p0; the selftest never opens a port and asserts that.
-
-Disciplines kept from the previously executed field rounds:
-  * raw bytes are written to disk BEFORE anything is interpreted;
-  * every read and write is bounded, and the first failure stops the run
-    (no retry, no auto-recovery, no extra command);
-  * the command set is a fixed literal whitelist - anything else is refused
-    before it can reach the wire;
-  * danger markers (stack/overflow) stop the run after the bytes are saved,
-    never by suppressing the alarm or disabling the producer.
+No flashing is performed by this script. The operator first completes the one
+approved download/readback. This script binds those exact bytes before opening
+COM5, then performs one explicit reset with the already known DAP UID.
 """
 import argparse
 import hashlib
+import importlib.util
 import json
+import math
 import os
+from pathlib import Path
 import re
+import subprocess
 import sys
+import time
 
-BAUD = 115200
-# Fixed, verbatim whitelist. No pin_status, no run_fault, no probe, no clear,
-# no apply, no save, no selftest, no blank line.
-WHITELIST = (
-    "safety_state",
-    "safety_status",
-    "motor_status",
-    "step_status",
-    "current_cal show",
-    "current_cal sample 128",
-)
-MAX_BANNER_BYTES = 262144
-PROMPT_RE = re.compile(rb"msh[^\r\n]*>")   # the msh prompt ends one frame
-MAX_RESPONSE_BYTES = 32768
-READ_CHUNK = 512
-POLL_TICK = 0.05
-BANNER_DEADLINE_S = 25.0
-RESPONSE_DEADLINE_S = 12.0
-DANGER_PATTERNS = (
-    rb"stack is close", rb"stack overflow", rb"SYSTEM_HALT", rb"HardFault",
-)
+BIN_SHA = 'e614a075ab63eb5b1c4b08e1ab51fb4043f474037ce734b4bcaf666899c8f7da'
+AXF_SHA = '2205c7e7ad6bad93e848fd24d1e5f38c76796865a2b21ebcd2d4e22bb4b6d584'
+CALC_SHA = '5c7a2340b4d350b1e8932798a57b85e8a6f4818501e469ad6dfd5c1bd29163ad'
+BIN_SIZE, AXF_SIZE = 266244, 1688696
+BANNER = b'5.3.0 build Oct 29 2026 23:11:52'
+BOOT_DONE = b'[MAIN] boot complete: READY (motion still gate-locked)'
+WHITELIST = ('safety_state', 'safety_status', 'motor_status', 'step_status',
+             'current_cal show', 'current_cal sample 128')
+SEQUENCE = WHITELIST + ('current_cal show',)
+BODY_TAG = dict(zip(WHITELIST, (b'[SS] state=', b'[SAFETY] ready=', b'[MOT] state=',
+                             b'[STEP] dev=', b'[CAL] adc health=', b'[CAL] sample n_req=')))
+PROMPT = re.compile(rb'(?:^|[\r\n])msh\s*(?:>|/>)\s*\Z')
+ANSI = re.compile(rb'\x1b\[[0-?]*[ -/]*[@-~]')
+DANGER = re.compile(rb'stack is close|stack overflow|SYSTEM_HALT|HardFault|BusFault|UsageFault', re.I)
+API_ACCEPTED = 'api-accepted(驱动接受关断, 非波形证明)'.encode('utf-8')
+RESPONSE_CAP, BOOT_CAP = 32768, 262144
+WRITE_SECONDS, RESPONSE_SECONDS, BOOT_SECONDS, HUMAN_SECONDS = 2., 12., 30., 900.
 
 
-def sha256_file(path):
-    h = hashlib.sha256()
-    with open(path, "rb") as fh:
-        for chunk in iter(lambda: fh.read(65536), b""):
-            h.update(chunk)
-    return h.hexdigest()
+class Stop(Exception):
+    pass
 
 
-class Ledger:
-    """Append-only run record; written after each step so a stop keeps evidence."""
-
-    def __init__(self, path):
-        self.path = path
-        self.rows = []
-
-    def add(self, kind, **kw):
-        row = {"kind": kind}
-        row.update(kw)
-        self.rows.append(row)
-        with open(self.path, "w", encoding="utf-8", newline="\n") as fh:
-            json.dump(self.rows, fh, indent=2, ensure_ascii=False)
-            fh.write("\n")
-        return row
-
-    def count_tx(self):
-        return sum(1 for r in self.rows if r["kind"] == "TX_ATTEMPT")
+def sha(data):
+    return hashlib.sha256(data).hexdigest()
 
 
-def save_raw(out_dir, name, payload):
-    """Write bytes first; the caller may only look at the file afterwards."""
-    path = os.path.join(out_dir, name)
-    with open(path, "wb") as fh:
-        fh.write(payload)
-        fh.flush()
-        os.fsync(fh.fileno())
-    return path, len(payload), sha256_file(path)
+def save_json(path, value):
+    # No success is reported when evidence cannot be saved.
+    with open(path, 'x', encoding='utf-8', newline='\n') as f:
+        json.dump(value, f, indent=2, ensure_ascii=False)
+        f.write('\n'); f.flush(); os.fsync(f.fileno())
 
 
-def drain_until(port, out_dir, name, deadline_s, stop_re=None, ledger=None,
-                label=""):
-    """Bounded passive read. Returns (path, bytes, matched) or ('', n, False) on error."""
-    buf = bytearray()
-    import time
-    end = time.monotonic() + deadline_s
-    err = None
-    while time.monotonic() < end and len(buf) < MAX_BANNER_BYTES:
+class Session:
+    def __init__(self, port, out, clock=time):
+        self.port, self.out, self.clock = port, Path(out), clock
+        self.serial_number = 0
+        self.tx = []
+        self.ledger = open(self.out / 'ledger.jsonl', 'x', encoding='utf-8', newline='\n')
+
+    def event(self, kind, **kw):
+        row = dict(kind=kind, monotonic=self.clock.monotonic(), **kw)
+        self.ledger.write(json.dumps(row, ensure_ascii=False) + '\n')
+        self.ledger.flush(); os.fsync(self.ledger.fileno())
+
+    def check_danger(self, data):
+        if DANGER.search(ANSI.sub(b'', data)):
+            raise Stop('STACK_DANGER_OBSERVED (raw bytes already saved)')
+
+    def capture(self, name, seconds, cap, complete):
+        """Persist each chunk before checking danger/completion, including errors."""
+        deadline = self.clock.monotonic() + seconds
+        buf = bytearray()
+        with open(self.out / name, 'xb') as raw:
+            while self.clock.monotonic() < deadline:
+                left = cap - len(buf)
+                if left <= 0:
+                    raise Stop('RX_BYTE_CAP:' + name)
+                self.port.timeout = min(.1, max(0., deadline - self.clock.monotonic()))
+                chunk = self.port.read(min(512, left))
+                if chunk:
+                    raw.write(chunk); raw.flush(); os.fsync(raw.fileno())
+                    buf.extend(chunk)
+                    self.check_danger(bytes(buf))
+                    if self.clock.monotonic() > deadline:
+                        raise Stop('RX_LATE_SUCCESS:' + name)
+                    if complete(bytes(buf)):
+                        self.event('RX_COMPLETE', file=name, bytes=len(buf), sha256=sha(buf))
+                        return bytes(buf)
+                else:
+                    self.clock.sleep(min(.01, max(0., deadline - self.clock.monotonic())))
+        raise Stop('REPLY_TIMEOUT:' + name)
+
+    def query(self, command, validator):
+        if command not in WHITELIST:
+            raise Stop('COMMAND_NOT_WHITELISTED')
+        if len(self.tx) >= len(SEQUENCE) or command != SEQUENCE[len(self.tx)]:
+            raise Stop('COMMAND_ORDER_OR_QUOTA')
+        # Preserve already buffered asynchronous output separately. No quiet window
+        # is required; only this finite snapshot is drained before the new request.
+        self.pending('before_%02d.bin' % (len(self.tx) + 1))
+        self.serial_number += 1
+        name = '%02d_%s.rx.bin' % (self.serial_number, command.replace(' ', '_'))
+        wire = (command + '\r').encode('ascii')   # One terminator, no second blank command.
+        self.event('TX_ATTEMPT', command=command, file=name)
+        self.tx.append(command)                  # Failed attempts consume the quota.
+        self.port.write_timeout = WRITE_SECONDS
+        before = self.clock.monotonic()
+        count = self.port.write(wire)           # Exactly one bounded write; never flush()/retry.
+        if count != len(wire) or self.clock.monotonic() - before > WRITE_SECONDS:
+            raise Stop('SHORT_OR_LATE_WRITE:' + command)
+        payload = self.capture(name, RESPONSE_SECONDS, RESPONSE_CAP,
+                               lambda b: BODY_TAG[command] in b and
+                               bool(PROMPT.search(ANSI.sub(b'', b))))
+        value = validator(payload)
+        self.event('COMMAND_ACCEPTED', command=command)
+        return value
+
+    def pending(self, name):
+        count = self.port.in_waiting
+        if not count: return
+        if count > BOOT_CAP: raise Stop('PENDING_BYTE_CAP')
+        self.capture(name, 2., BOOT_CAP, lambda b: len(b) >= count)
+
+    def wait_dmm(self, phase, seconds=HUMAN_SECONDS):
+        target = self.out / ('dmm_' + phase + '.json')
+        if target.exists(): raise Stop('DMM_PREEXISTING:' + phase)
+        self.event('WAIT_DMM', phase=phase, required_file=target.name)
+        print('WAIT_DMM_' + phase.upper() + ': H10-1 and H10-3 DC voltage; keep H10-2 GND', flush=True)
+        deadline = self.clock.monotonic() + seconds
+        buf = bytearray()
+        with open(self.out / ('passive_dmm_' + phase + '.bin'), 'xb') as raw:
+            while self.clock.monotonic() < deadline:
+                if target.exists():
+                    data = target.read_bytes()
+                    try: v = json.loads(data)
+                    except (ValueError, UnicodeError) as e: raise Stop('DMM_JSON_INVALID') from e
+                    if not isinstance(v, dict) or v.get('meter') != 'UT39A+' or v.get('range_V') != 4 or v.get('mode') != 'DCV':
+                        raise Stop('DMM_METHOD_MISMATCH')
+                    for key in ('Vadc', 'V3v3'):
+                        r = v.get(key)
+                        if not isinstance(r, dict) or not isinstance(r.get('observed_at'), str) or not r['observed_at']:
+                            raise Stop('DMM_READING_MISSING')
+                        n = r.get('V')
+                        if isinstance(n, bool) or not isinstance(n, (int, float)) or not math.isfinite(n) or not 0 <= n < 4:
+                            raise Stop('DMM_VALUE_OUT_OF_RANGE')
+                    self.event('DMM_RECEIVED', phase=phase, file=target.name, sha256=sha(data))
+                    return v
+                self.port.timeout = min(.1, max(0., deadline - self.clock.monotonic()))
+                chunk = self.port.read(min(512, BOOT_CAP - len(buf)))
+                if chunk:
+                    raw.write(chunk); raw.flush(); os.fsync(raw.fileno()); buf.extend(chunk)
+                    self.check_danger(bytes(buf))
+                    if len(buf) >= BOOT_CAP: raise Stop('DMM_PASSIVE_BYTE_CAP')
+                else:
+                    self.clock.sleep(min(.05, max(0., deadline - self.clock.monotonic())))
+        raise Stop('DMM_WAIT_EXPIRED:' + phase)
+
+
+def lines(data, command):
+    # Normalization is only for interpretation. Saved wire bytes stay untouched.
+    data = ANSI.sub(b'', data)
+    if not PROMPT.search(data): raise Stop('MISSING_RESPONSE_PROMPT')
+    data = PROMPT.sub(b'', data)
+    echo = re.compile(rb'(?:msh\s*(?:>|/>)\s*)?' + re.escape(command.encode()) + rb'\r(?:\n)?')
+    data = echo.sub(b'', data, count=1)
+    rows = data.replace(b'\r\n', b'\n').split(b'\n')
+    if command == 'safety_status':
+        expanded = []
+        for row in rows:
+            # kservice's known 126-byte truncation drops this explanatory line's
+            # newline, immediately followed by an intact authoritative record.
+            # Only this exact noncanonical prefix/length permits a boundary. Never
+            # repair a clipped gate field, sample, or any other NUL-bearing row.
+            a, sep, b = row.partition(b'\x00')
+            if sep and len(a) == 126 and a.startswith(b'[SAFETY] ENN_FEEDBACK(') and b.startswith(b'[SAFETY] request='):
+                expanded.extend((a + sep, b))
+            else: expanded.append(row)
+        rows = expanded
+    return rows
+
+
+def one(rows, pattern):
+    hits = [re.fullmatch(pattern, row) for row in rows]
+    hits = [v for v in hits if v]
+    if len(hits) != 1: raise Stop('MISSING_DUPLICATE_OR_MALFORMED_FIELD:' + pattern.decode('utf-8', 'backslashreplace'))
+    return hits[0]
+
+
+def state(data):
+    r = lines(data, 'safety_state')
+    one(r, rb'\[SS\] state=READY fault_code=0 degraded=0x[0-9A-Fa-f]+')
+    if sum(x.startswith(b'[SS] state=') for x in r) != 1: raise Stop('SAFETY_STATE_CONFLICT')
+
+
+def safety(data):
+    r = lines(data, 'safety_status')
+    one(r, rb'\[SAFETY\] ready=YES first_err=0')
+    one(r, rb'\[SAFETY\] MCU_DRV_ENABLE = 0 \([^\r\n\x00]+\)')
+    one(r, rb'\[SAFETY\] DRV_ENABLE last write\+readback verified = 0 \(-1 = never verified\)')
+    one(r, rb'\[SAFETY\] request=DISABLE\(LOW\) pad=0 expected_FB=HIGH FB=1 -> verdict=OK')
+    # The old long ENN explanation can be truncated by the 128 B console.
+    # It is never used as a gate: the short complete request/FB/verdict line above is mandatory.
+    prefixes = (b'[SAFETY] ready=', b'[SAFETY] MCU_DRV_ENABLE =',
+                b'[SAFETY] DRV_ENABLE last', b'[SAFETY] request=')
+    if any(sum(x.startswith(p) for x in r) != 1 for p in prefixes): raise Stop('SAFETY_FIELD_CONFLICT')
+
+
+def motor(data):
+    r = lines(data, 'motor_status')
+    patterns = (
+        rb'\[MOT\] state=0 name=OTHER',
+        rb'\[MOT\] cur_hz=0 tgt_hz=0 accel=[0-9]+ decel=[0-9]+ dir=[01]',
+        rb'\[MOT\] armed=0 drv_en_request=-?[0-9]+ health=[A-Z_]+',
+        rb'\[MOT\] stop result=' + re.escape(API_ACCEPTED) + rb' src=[a-z_-]+ rc=0 latched=0',
+        rb'\[MOT\] diag_off_confirmed=YES',
+        rb'\[MOT\] drv_request=LOW pad=0',
+        rb'\[MOT\] expected_ENN=HIGH ENN_fb=1 resolved verdict=OK',
+    )
+    for p in patterns: one(r, p)
+    for prefix in (b'[MOT] state=', b'[MOT] cur_hz=', b'[MOT] armed=', b'[MOT] stop result=',
+                   b'[MOT] diag_off_confirmed=', b'[MOT] drv_request=', b'[MOT] expected_ENN='):
+        if sum(x.startswith(prefix) for x in r) != 1: raise Stop('MOTOR_FIELD_CONFLICT')
+
+
+def step(data):
+    r = lines(data, 'step_status')
+    one(r, rb'\[STEP\] dev=epwm1 ch=0 enabled=0')
+    one(r, rb'\[STEP\] last_stop=(?:not-attempted|' + re.escape(API_ACCEPTED) + rb') stop_rc=0 latched=0')
+    if sum(x.startswith(b'[STEP] dev=') for x in r) != 1 or sum(x.startswith(b'[STEP] last_stop=') for x in r) != 1:
+        raise Stop('STEP_FIELD_CONFLICT')
+
+
+def show(data):
+    r = lines(data, 'current_cal show')
+    if b'\x00' in data: raise Stop('CAL_SHOW_NUL')
+    a = one(r, rb'\[CAL\] adc health=[A-Z_]+ src=(NONE|THEORETICAL|MEASURED) ver=([0-9]+)')
+    b = one(r, rb'\[CAL\] adc offset_uV=(-?[0-9]+) gain_uV_per_A=([0-9]+) measured=(YES|NO)')
+    one(r, rb'\[CAL\] cfg valid=(YES|NO) src=[0-9]+ offset_uV=-?[0-9]+ gain_uV_per_A=[0-9]+')
+    one(r, rb'\[CAL\] sample seq=[0-9]+ tick=[0-9]+ raw=[0-9]+ valid=1 fresh=1')
+    one(r, rb'\[CAL\] sample ma_uA=-?[0-9]+ src=(NONE|THEORETICAL|MEASURED)')
+    one(r, rb'\[CAL\] note: show/sample do not change cal/motion/flash')
+    if len([x for x in r if x.startswith(b'[CAL]')]) != 6: raise Stop('CAL_SHOW_RECORD_COUNT')
+    if int(a[2]) > 0xffffffff: raise Stop('CAL_VERSION_RANGE')
+    return (a[1].decode(), int(a[2]), int(b[1]), int(b[2]), b[3].decode())
+
+
+def sample_validator(calc, out):
+    def parse(data):
+        # This is the exact reviewed complete six-line parser, not another format.
+        try: v = calc._parse_capture(str(Path(out) / '06_current_cal_sample_128.rx.bin'))
+        except calc.Reject as e: raise Stop('SAMPLE_NOT_ACCEPTED:' + str(e)) from e
+        if v['n_requested'] != 128 or v['n_valid'] != 128: raise Stop('SAMPLE_COUNT')
+        n, sm, sq = 128, v['raw_sum'], v['raw_sum_sq']
+        lo, hi = v['raw_min'], v['raw_max']
+        if not 0 < lo <= hi < 4095 or not n * lo <= sm <= n * hi or not sm * sm <= n * sq:
+            raise Stop('SAMPLE_MOMENT_CONTRADICTION')
+        return v
+    return parse
+
+
+def observe(s, calc):
+    # Every validator completes before the next command; no static gate is inferred from a prompt.
+    for cmd, validator in zip(WHITELIST[:4], (state, safety, motor, step)):
+        s.query(cmd, validator)
+    before = s.wait_dmm('before')
+    c0 = s.query('current_cal show', show)
+    sampled = s.query('current_cal sample 128', sample_validator(calc, s.out))
+    c1 = s.query('current_cal show', show)
+    if c0 != c1 or sampled['cal_source'] != c0[0] or sampled['cal_version'] != c0[1]:
+        raise Stop('CAL_CHANGED_ACROSS_P0')
+    after = s.wait_dmm('after')
+    s.pending('after_dmm.bin')
+    mean_mv = sampled['raw_sum'] * 3300 / (128 * 4095)
+    readings = []
+    for phase, d in (('before', before), ('after', after)):
+        for key in ('Vadc', 'V3v3'):
+            measured = d[key]['V'] * 1000
+            error = .005 * abs(measured) + 5
+            readings.append(dict(phase=phase, node=key, measured_mV=measured,
+                                 observed_at=d[key]['observed_at'], dmm_limit_mV=error,
+                                 dmm_interval_mV=[measured-error, measured+error],
+                                 nominal_adc_minus_dmm_mV=mean_mv-measured if key == 'Vadc' else None))
+    result = dict(status='VOLTAGE_OBSERVATION_ONLY', commands=s.tx, sample=sampled,
+                  nominal_mean_mV=mean_mv, nominal_min_mV=sampled['raw_min'] * 3300 / 4095,
+                  nominal_max_mV=sampled['raw_max'] * 3300 / 4095,
+                  readings=readings, calibrated=False, physical_accuracy_accepted=False)
+    save_json(s.out / 'result.json', result)
+    s.event('COMPLETE', status=result['status'], tx=len(s.tx))
+    return result
+
+
+def load_calc(path):
+    p = Path(path)
+    if sha(p.read_bytes()) != CALC_SHA: raise Stop('CALCULATOR_IDENTITY_MISMATCH')
+    spec = importlib.util.spec_from_file_location('p0_calcalc', p)
+    mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+    return mod
+
+
+def bind(args):
+    if not (args.approval_source and args.site_confirmed and args.execute_approved_p0):
+        raise Stop('APPROVAL_AND_SITE_REQUIRED')
+    for path, size, digest in ((args.payload_bin, BIN_SIZE, BIN_SHA),
+                               (args.payload_axf, AXF_SIZE, AXF_SHA),
+                               (args.readback_bin, BIN_SIZE, BIN_SHA)):
+        b = Path(path).read_bytes()
+        if len(b) != size or sha(b) != digest: raise Stop('PAYLOAD_OR_READBACK_MISMATCH')
+    if Path(args.payload_bin).read_bytes() != Path(args.readback_bin).read_bytes():
+        raise Stop('READBACK_BYTES_DIFFER')
+    calc = load_calc(args.calculator)
+    uid = Path(args.uid_file).read_text(encoding='ascii').strip()
+    if len(uid) != 48 or sha(uid.encode())[:12] != 'd2f530dbd062': raise Stop('KNOWN_DAP_UID_MISMATCH')
+    if Path(args.out).exists(): raise Stop('OUTPUT_DIRECTORY_MUST_BE_NEW')
+    return calc, uid
+
+
+def reset_once(s, uid):
+    argv = [sys.executable, '-m', 'pyocd', 'reset', '--method', 'sysresetreq',
+            '--no-config', '--no-wait', '--connect', 'attach', '--core', '0', '-t', 'cortex_m',
+            '-u', uid, '-f', '1000000', '-Oauto_unlock=false',
+            '-Ocache.enable_memory=false', '-Ocache.read_code_from_elf=false', '-Oscan_all_aps=false']
+    # UID stays in the private process arguments, never in a published ledger.
+    s.event('RESET_ATTEMPT', known_uid_digest_prefix='d2f530dbd062')
+    with open(s.out / 'reset.stdout.bin', 'xb') as so, open(s.out / 'reset.stderr.bin', 'xb') as se:
+        p = subprocess.Popen(argv, stdout=so, stderr=se)
         try:
-            n = port.in_waiting if hasattr(port, "in_waiting") else port.inWaiting()
-        except Exception as e:                                  # transport died
-            err = repr(e)
-            break
-        if n:
-            try:
-                chunk = port.read(min(int(n), READ_CHUNK))
-            except Exception as e:
-                err = repr(e)
-                break
-            if chunk:
-                buf += chunk
-                if stop_re is not None and stop_re.search(bytes(buf)):
-                    break
-            continue
-        time.sleep(POLL_TICK)
-    if err is not None:
-        return None, bytes(buf), False, err
-    if not buf:
-        return None, b"", False, "NO_BYTES_BEFORE_DEADLINE"
-    path, size, digest = save_raw(out_dir, name, bytes(buf))
-    matched = bool(stop_re.search(bytes(buf))) if stop_re is not None else True
-    if ledger is not None:
-        ledger.add("RX", label=label, file=os.path.basename(path), bytes=size,
-                   sha256=digest, matched=matched, error=None)
-    return path, bytes(buf), matched, None
+            boot = s.capture('raw_boot.bin', BOOT_SECONDS, BOOT_CAP,
+                             lambda b: BANNER in b and BOOT_DONE + b'\n' in b.replace(b'\r\n', b'\n'))
+            # No quiet/prompt requirement at startup. Identity plus the complete main-ready line suffice.
+            p.wait(timeout=2)
+            if p.returncode != 0: raise Stop('RESET_TOOL_FAILED')
+            s.event('BOOT_IDENTITY_AND_MAIN_READY', bytes=len(boot), sha256=sha(boot))
+        finally:
+            if p.poll() is None:
+                p.terminate()
+                try: p.wait(timeout=2)
+                except subprocess.TimeoutExpired: p.kill(); p.wait(timeout=2)
 
 
-def danger_hit(payload):
-    for pat in DANGER_PATTERNS:
-        if re.search(pat, payload, re.IGNORECASE):
-            return pat.decode("ascii", "replace")
-    return None
-
-
-def send_command(port, cmd, out_dir, name, ledger, step):
-    """One write, one bounded read, bytes first, no retry."""
-    if cmd not in WHITELIST:
-        ledger.add("REFUSED_NOT_WHITELISTED", command=cmd, step=step)
-        raise SystemExit("REFUSED: command not on the P0 read-only whitelist: %r" % cmd)
-    ledger.add("TX_ATTEMPT", command=cmd, step=step, tx_bytes=len(cmd) + 2)
+def execute(args):
+    calc, uid = bind(args)                  # Before importing/constructing any serial object.
+    Path(args.out).mkdir()
+    import serial                         # Offline/selftest paths never import pyserial.
+    port = None
+    s = Session(None, args.out)
+    primary = None
+    cleanup = []
     try:
-        port.write((cmd + "\r\n").encode("ascii"))
-        port.flush()
-    except Exception as e:
-        ledger.add("TX_FAILED", command=cmd, step=step, error=repr(e))
-        raise SystemExit("STOP: TX failed at step %d (%s); no retry" % (step, e))
-    path, payload, matched, err = drain_until(
-        port, out_dir, name, RESPONSE_DEADLINE_S,
-        stop_re=PROMPT_RE, ledger=ledger, label=cmd)
-    if err is not None:
-        ledger.add("RX_FAILED", command=cmd, step=step, error=err,
-                   bytes_before_error=len(payload))
-        raise SystemExit("STOP: RX failed at step %d (%s); bytes kept if any"
-                         % (step, err))
-    if not matched:
-        ledger.add("FRAME_END_NOT_SEEN", command=cmd, step=step,
-                   bytes=len(payload))
-        raise SystemExit("STOP: no prompt frame end for %r; not re-sending" % cmd)
-    return payload
-
-
-def run_execute(args):
-    if not (args.execute_approved_p0 and args.approval_source and
-            args.site_confirmed and args.image_continuity_confirmed):
-        raise SystemExit("REFUSED: execution needs the explicit approval flags "
-                         "(--execute-approved-p0 --approval-source --site-confirmed "
-                         "--image_continuity_confirmed_equivalent)")
-    import serial                                                # only here
-    out = args.out
-    os.makedirs(out, exist_ok=True)
-    led = Ledger(os.path.join(out, "p0_ledger.json"))
-    led.add("BIND", payload_bin=args.payload_bin, payload_sha256=expected_sha(args),
-            readback_file=args.readback_bin, port=args.port, baud=BAUD,
-            whitelist=list(WHITELIST), expected_banner=args.expect_banner)
-    port = serial.Serial(args.port, BAUD, timeout=0.2)           # 1 open attempt
-    led.add("PORT_OPEN", port=args.port, baud=BAUD)
-    try:
-        _, banner, got, err = drain_until(port, out, "raw_boot.bin",
-                                         BANNER_DEADLINE_S,
-                                         stop_re=re.compile(re.escape(
-                                             args.expect_banner.encode("ascii"))),
-                                         ledger=led, label="boot_banner")
-        if not got:
-            led.add("STOP", reason="BOOT_BANNER_NOT_OBSERVED", error=err)
-            raise SystemExit("STOP: expected boot banner not in the captured bytes; "
-                             "identity stays unproven, no commands sent")
-        payloads = {}
-        for step, cmd in enumerate(WHITELIST, start=1):
-            payloads[cmd] = send_command(port, cmd, out, "raw_cmd%02d.bin" % step,
-                                         led, step)
-        for cmd, payload in payloads.items():
-            hit = danger_hit(payload)
-            if hit:
-                led.add("STACK_DANGER_OBSERVED", pattern=hit, command=cmd)
-                raise SystemExit("STOP: danger marker %r present after %s "
-                                 "(bytes already saved)" % (hit, cmd))
-        led.add("RUN_RESULT", status="COMPLETE", tx=led.count_tx(),
-                commands=len(WHITELIST))
+        s.event('BIND', payload_sha256=BIN_SHA, readback_sha256=BIN_SHA,
+                axf_sha256=AXF_SHA, calculator_sha256=CALC_SHA)
+        s.event('PORT_OPEN_ATTEMPT', port='COM5')
+        # timeout/write_timeout are bounded; no flush(), probing, scanning, retries or extra commands.
+        port = serial.Serial('COM5', 115200, bytesize=8, parity='N', stopbits=1,
+                             timeout=.1, write_timeout=WRITE_SECONDS,
+                             xonxoff=False, rtscts=False, dsrdtr=False)
+        s.port = port
+        s.event('PORT_OPEN', port='COM5')
+        reset_once(s, uid)
+        observe(s, calc)
+    except BaseException as e:
+        primary = e
     finally:
-        try:
-            port.close()
-            led.add("PORT_CLOSED")
-        except Exception as e:
-            led.add("PORT_CLOSE_FAILED", error=repr(e))
+        if port is not None:
+            try:
+                port.close()
+                s.event('PORT_CLOSED')
+            except Exception as e: cleanup.append('PORT_CLOSE_OR_EVIDENCE:' + repr(e))
+        try: s.ledger.close()
+        except Exception as e: cleanup.append('LEDGER_CLOSE:' + repr(e))
+    if cleanup: print('CLEANUP_ERRORS:' + repr(cleanup), file=sys.stderr)
+    if primary is not None: raise primary
+    if cleanup: raise Stop('CLEANUP_FAILED')
     return 0
-
-
-def expected_sha(args):
-    if not args.payload_sha256:
-        return None
-    return args.payload_sha256
-
-
-# ------------------------------------------------------------------ offline selftest
-class FakePort:
-    """Selftest transport only. Answers from a canned byte script, counts writes."""
-
-    def __init__(self, script):
-        self.script = list(script)
-        self.writes = []
-
-    @property
-    def in_waiting(self):
-        return len(self.script[0]) if self.script else 0
-
-    def read(self, n):
-        if not self.script:
-            return b""
-        head = self.script[0][:n]
-        self.script[0] = self.script[0][n:]
-        if not self.script[0]:
-            self.script.pop(0)
-        return head
-
-    def write(self, b):
-        self.writes.append(bytes(b))
-        return len(b)
-
-    def flush(self):
-        pass
-
-
-BANNER = b"\r\n / | \\     5.3.0 build Oct 29 2026 23:11:52\r\n"
-PROMPT = b"msh >"
-OK_TAIL = b"\r\n" + PROMPT
-
-
-def _script():
-    out = [BANNER + PROMPT]
-    for cmd in WHITELIST:
-        body = b"[P0] " + cmd.encode("ascii") + b" ok\r\n" + OK_TAIL
-        if cmd == "current_cal sample 128":
-            body = (b"[CAL] sample n_req=128 n_seen=128 n_valid=128 dup=0 invalid=0"
-                    b" skip=0\r\n[CAL] sample seq=10..137 tick=1000..3560 ver=2..2"
-                    b" reset=0\r\n" + OK_TAIL)
-        out.append(body)
-    return out
-
-
-def run_selftest():
-    checks = []
-
-    def ck(name, ok, detail=""):
-        checks.append((name, bool(ok), detail))
-        return bool(ok)
-
-    # 1. whitelist is exactly the six literal commands, nothing else can pass
-    ck("P0T01-whitelist-is-exactly-six", WHITELIST == (
-        "safety_state", "safety_status", "motor_status", "step_status",
-        "current_cal show", "current_cal sample 128"), "|".join(WHITELIST))
-    joined = " ".join(WHITELIST).lower()
-    for banned in ("pin_status", "run_fault", "probe", "config_save", "apply",
-                   "selftest", "fault_reset", "motor_start", "motor_arm"):
-        if banned in joined:
-            ck("P0T02-no-privileged-command-in-whitelist", False, banned)
-            break
-    else:
-        ck("P0T02-no-privileged-command-in-whitelist", True, "0 hits")
-
-    # 2. module import and the offline path must not create a device object
-    src = open(os.path.abspath(__file__), encoding="utf-8").read()
-    head = src.split("def run_execute", 1)[0]
-    ck("P0T03-no-transport-import-at-module-scope",
-       "import serial" not in head and "pyocd" not in head,
-       "import serial appears only after run_execute starts")
-    ck("P0T04-real-port-only-behind-approval-flag",
-       "serial.Serial" in src.split("def run_execute", 1)[1], "constructor in execute path")
-
-    # 3. raw bytes reach disk before any interpretation, and once per step
-    out = os.path.join(os.environ.get("TEMP", "/tmp"), "p0_selftest_run")
-    if os.path.isdir(out):
-        for f in os.listdir(out):
-            os.remove(os.path.join(out, f))
-    os.makedirs(out, exist_ok=True)
-    led = Ledger(os.path.join(out, "ledger.json"))
-    fake = FakePort(_script())
-    path, payload, matched, err = drain_until(fake, out, "raw_boot.bin", 2.0,
-                                             stop_re=re.compile(re.escape(BANNER)),
-                                             ledger=led, label="banner")
-    ck("P0T05-banner-saved-before-decision",
-       matched and err is None and path and os.path.isfile(path)
-       and sha256_file(path) == hashlib.sha256(BANNER + PROMPT).hexdigest(),
-       os.path.basename(path or ""))
-
-    # 4. a non-whitelisted command is refused before it can be written
-    fake2 = FakePort([])
-    try:
-        send_command(fake2, "config_save", out, "raw_x.bin", led, 99)
-        ck("P0T06-non-whitelist-refused-before-wire", False, "it returned")
-    except SystemExit as e:
-        ck("P0T06-non-whitelist-refused-before-wire",
-           "not on the P0 read-only whitelist" in str(e) and fake2.writes == [],
-           "%d bytes written" % len(b"".join(fake2.writes)))
-
-    # 5. bounded read: a producer that never stops cannot hang the run
-    endless = FakePort([b"x" * 4096] * 200)
-    p2, pay2, m2, e2 = drain_until(endless, out, "raw_endless.bin", 3.0,
-                                   stop_re=re.compile(rb"never-seen"),
-                                   ledger=led, label="endless")
-    ck("P0T07-read-is-bounded", len(pay2) <= MAX_BANNER_BYTES and m2 is False
-   and os.path.isfile(p2),
-       "captured=%d cap=%d" % (len(pay2), MAX_BANNER_BYTES))
-
-    # 6. one failure stops: no prompt frame end => SystemExit, no re-send
-    fake3 = FakePort([b"[P0] stuck, no prompt here\r\n"])
-    try:
-        send_command(fake3, "safety_state", out, "raw_noprompt.bin", led, 1)
-        ck("P0T08-first-failure-stops", False, "returned normally")
-    except SystemExit as e:
-        ck("P0T08-first-failure-stops", "no prompt frame end" in str(e)
-           and len(fake3.writes) == 1, "writes=%d" % len(fake3.writes))
-
-    # 7. danger marker is detected only after the bytes are on disk
-    body = b"[MOT] sensor stack is close 12%\r\n" + OK_TAIL
-    fake4 = FakePort([body])
-    payload4 = send_command(fake4, "safety_state", out, "raw_danger.bin", led, 1)
-    dpath = os.path.join(out, "raw_danger.bin")
-    ck("P0T09-danger-stops-after-saving",
-       os.path.isfile(dpath) and danger_hit(payload4) == "stack is close"
-       and open(dpath, "rb").read() == body, os.path.basename(dpath))
-
-    # 8. the six-command sequence executes in the fixed order, one write each
-    fake5 = FakePort(_script()[1:])
-    seq = []
-    for step, cmd in enumerate(WHITELIST, start=1):
-        send_command(fake5, cmd, out, "raw_seq%02d.bin" % step, led, step)
-        seq.append(cmd)
-    ck("P0T10-fixed-order-one-write-each",
-       fake5.writes == [(c + "\r\n").encode("ascii") for c in WHITELIST]
-       and seq == list(WHITELIST), "%d writes" % len(fake5.writes))
-
-    # 11. ledger keeps TX attempts distinct from successes
-    rows = json.load(open(os.path.join(out, "ledger.json"), encoding="utf-8"))
-    tx = [r for r in rows if r["kind"] == "TX_ATTEMPT"]
-    ck("P0T11-ledger-separates-tx-from-result",
-       all("command" in r and "step" in r for r in tx) and len(tx) >= 7,
-       "TX_ATTEMPT rows=%d" % len(tx))
-
-    fails = [c for c in checks if not c[1]]
-    for name, ok, detail in checks:
-        print("%s %s %s" % ("PASS" if ok else "FAIL", name, detail))
-    print("SUMMARY cases=%d pass=%d fail=%d" % (len(checks), len(checks) - len(fails),
-                                                len(fails)))
-    print("M7-R2 P0 COLLECTOR SELFTEST:", "PASS" if not fails else "FAIL")
-    return 0 if not fails else 1
 
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--selftest", action="store_true")
-    ap.add_argument("--execute-approved-p0", action="store_true")
-    ap.add_argument("--out", default=os.path.join(os.getcwd(), "p0_run"))
-    ap.add_argument("--port", default="COM5")
-    ap.add_argument("--expect-banner", default="5.3.0 build Oct 29 2026 23:11:52")
-    ap.add_argument("--payload-bin", default="")
-    ap.add_argument("--payload-sha256", default="")
-    ap.add_argument("--readback-bin", default="")
-    ap.add_argument("--approval-source", default="")
-    ap.add_argument("--site-confirmed", action="store_true")
-    ap.add_argument("--image-continuity-confirmed", action="store_true")
+    ap.add_argument('--selftest', action='store_true')
+    ap.add_argument('--execute-approved-p0', action='store_true')
+    ap.add_argument('--approval-source')
+    ap.add_argument('--site-confirmed', action='store_true')
+    for key in ('out', 'payload-bin', 'payload-axf', 'readback-bin', 'uid-file'):
+        ap.add_argument('--' + key)
+    ap.add_argument('--calculator', default=str(Path(__file__).resolve().parents[1] /
+                    'phase8-motor-m7-current-calibration' / 'm7_calcalc.py'))
     args = ap.parse_args(argv)
     if args.selftest:
-        return run_selftest()
-    if args.execute_approved_p0:
-        return run_execute(args)
-    ap.print_help()
-    return 2
+        import verify_p0_candidate
+        return verify_p0_candidate.run(sys.modules[__name__], args.calculator)
+    if not args.execute_approved_p0:
+        ap.print_help(); return 2
+    try:
+        return execute(args)
+    except Exception as e:
+        print('P0_FAILED:' + type(e).__name__ + ':' + str(e), file=sys.stderr)
+        return 1
 
 
-if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+if __name__ == '__main__':
+    sys.exit(main())

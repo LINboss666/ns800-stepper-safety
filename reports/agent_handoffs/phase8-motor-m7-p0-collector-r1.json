@@ -1,0 +1,224 @@
+{
+  "task": "phase8-motor-m7-p0-collector-r1",
+  "date": "2026-10-30",
+  "reviewed_delivery": "208bf102e6b3bce7159eec672b83a0d6b77f8811",
+  "roles": {
+    "firmware_code_commit": "5b564eb962e8518920f581111d7a460a2b1fce64",
+    "reviewed_delivery": "208bf102e6b3bce7159eec672b83a0d6b77f8811",
+    "script_code_commit": "THIS_ROUND_SCRIPT_COMMIT (filled by the follow-up evidence commit; never self-referenced)",
+    "delivery_head": "not self-referenced; resolve with git log -1 --format=%H -- reports/reviews/phase8-motor-m7-p0-collector-r1/remote_readback_r1.md",
+    "note": "the calculator is accepted at 208bf10 and is not rebuilt or re-reviewed here; the P0 collector/verifier/plan belong to their own script commit, and the firmware input stays 5b564eb because no image was rebuilt"
+  },
+  "verdicts_consumed": {
+    "M7_R2_calculator": "M7_R2_CALCULATOR_REVIEW_GO (accepted=208bf10); R3 source completeness and interval bound closed",
+    "R1a_R1b_R2_and_six_images": "unchanged, not re-opened, no rebuild",
+    "original_p0_collector": "P0_COLLECTOR_REWORK_REQUIRED -> handled by this exact candidate",
+    "P1": "METHOD_NOT_READY",
+    "P2": "NOT_AUTHORIZED",
+    "hardware": "no device action approved by this task"
+  },
+  "inputs": {
+    "task_zip": {
+      "bytes": 166113,
+      "cr_bytes": 540,
+      "sha256": "3ee2c9005e99b5485ed15d66d82db527eef50e265ca0ca3c193b905d9a5ba686",
+      "path": "NS800_M7_R2_Calculator_GO_P0_Collector_Fix_20261030.zip"
+    },
+    "combined_patch": {
+      "bytes": 74411,
+      "cr_bytes": 0,
+      "sha256": "ff7a03e9667f9532b1f02603578de06fa8d114a11ed65a7090a6d406159cc4d9",
+      "path": "candidate/p0_collector_r1_combined.patch"
+    },
+    "baseline_probe_script": {
+      "bytes": 2558,
+      "cr_bytes": 0,
+      "sha256": "00ef4e91c336a37569959b637e52a2c28a8d96b0755a6e5e6e4d8887605c30d4",
+      "path": "checks/probe_original_collector.py"
+    },
+    "start_head": "208bf102e6b3bce7159eec672b83a0d6b77f8811",
+    "core_autocrlf_untouched": "true"
+  },
+  "scope": {
+    "authorized": [
+      "apply the exact P0 collector candidate once",
+      "verify offline on Windows",
+      "finalise the P0 package bytes",
+      "git delivery"
+    ],
+    "forbidden_and_not_done": [
+      "C/.h edits",
+      "HAL/kernel/stop_priority edits",
+      "macro/clock/pin changes",
+      "TMC/current-limit/SG changes",
+      "flash schema",
+      "Keil project edits",
+      "any rebuild",
+      "flashing",
+      "any device object",
+      "re-running unchanged calculator/S1/S2/I-O/SD chains"
+    ],
+    "hardware_actions": [],
+    "keil_builds_executed": [],
+    "new_flash_actions": 0,
+    "motor_actions": []
+  },
+  "baseline_before_patch": {
+    "collector_bytes_at_start": 15503,
+    "collector_sha256_at_start": "1e34589fd3f0250abc5db6a63df2800cf8883c6f65de6219ff350540d138c44f",
+    "probe_rc": 0,
+    "observations": "BASELINE_OBSERVATIONS=6/6",
+    "cases": [
+      "ECHO_ONLY_ACCEPTED_AS_RESPONSE",
+      "ALL_GARBAGE_RESPONSES_ACCEPTED",
+      "FIRST_RESPONSE_DANGER_STILL_SENDS_ALL_SIX",
+      "BOOT_DANGER_IGNORED",
+      "READ_ERROR_DISCARDS_RECEIVED_BYTES",
+      "ZERO_BYTE_WRITE_RETURN_IGNORED"
+    ],
+    "local_stdout": {
+      "bytes": 1276,
+      "cr_bytes": 56,
+      "sha256": "8a98f527725d5ee401d3d7399a7f2df0997e192696fcb2ef8e351c706ad43bec",
+      "cr_normalized_sha256": "6a693f7f906b17699d936d734f02952c06e6aac611847e0bd8d1fa255f1ff14e",
+      "equals_cloud_record": true
+    },
+    "cloud_record": {
+      "bytes": 1220,
+      "cr_bytes": 0,
+      "sha256": "6a693f7f906b17699d936d734f02952c06e6aac611847e0bd8d1fa255f1ff14e"
+    }
+  },
+  "patch_application": {
+    "method": "exported HEAD blobs to a repo-external directory, git -c core.autocrlf=false apply --check then apply, copied the LF results back and staged; no git configuration was modified and the packaged complete files were not applied a second time",
+    "staged_after_patch": {
+      "p0_voltage_observation.py": {
+        "bytes": 19642,
+        "cr_bytes": 0,
+        "sha256": "a2c75ea83cd3842246397a6eff33eea52745c69f8926fb6800a2561fe36cb95a",
+        "matches_declared_candidate": true
+      },
+      "verify_p0_candidate.py": {
+        "bytes": 16343,
+        "cr_bytes": 0,
+        "sha256": "bc438094d4193d31fba710622c13d41d3fa19208658dec4b4015f11b444769a2",
+        "matches_declared_candidate": true
+      },
+      "p0_package.md": {
+        "bytes": 9345,
+        "cr_bytes": 0,
+        "sha256": "dd4924b75e1bd70c13fca8198f1628a390a15534605e6079ef41a647a866e26b",
+        "matches_declared_candidate": true
+      }
+    },
+    "all_three_match_declared_candidate": true,
+    "log": "reports/reviews/phase8-motor-m7-p0-collector-r1/patch_application_log.txt"
+  },
+  "executed_here": {
+    "p0_selftest_from_index_blob": "RC=0 stderr=0B SUMMARY cases=37 pass=37 fail=0 / DEVICE_ACTIONS=0 / NO_REAL_TRANSPORT",
+    "pyocd_version": "0.45.1",
+    "pyocd_reset_help_offline": "rc=0; --method(sysresetreq) --connect(attach) --core --no-config --no-wait -u/-t/-f/-O all present",
+    "real_pyserial_installed": "3.5, but never imported by the selftest path (P0T03/P0T04)",
+    "keil": "not executed (no firmware change)"
+  },
+  "independent_checks_by_agent": {
+    "verbatim_m5_replay": {
+      "finding": "three of the four cloud replay inputs are CR-stripped LF transcripts (68/634/227 B) while only 017 (488 B) equals the repo archive; the board wire is CRLF",
+      "repo_inputs": "reports/reviews/phase8-motor-m5-fault-log/cp1/final_pass/{016,017,018,019}_*.bin as 71/488/650/233 B with CR=3/7/16/6 and one NUL in 017",
+      "result": "VERBATIM_M5_REPLAY=4/4 accept (body tag present and prompt at frame end for all four)",
+      "transcript": "reports/reviews/phase8-motor-m7-p0-collector-r1/m5_verbatim_replay.txt",
+      "runner": "reports/reviews/phase8-motor-m7-p0-collector-r1/replay_verbatim_m5.py",
+      "limitation": "a re-check of the validators against historical archives; not a new board measurement"
+    },
+    "bin_timestamp_offsets": {
+      "claim_under_test": "date @260674 and time @260665 in the corrected plan",
+      "measured": "single occurrence each in the 266244 B delivered BIN; the superseded 259925/259916 offsets read b\" \\n\\x00[INFO] N\" and b\"number:%\"",
+      "transcript": "reports/reviews/phase8-motor-m7-p0-collector-r1/bin_timestamp_offset_check.txt",
+      "limitation": "archived-BIN byte recovery, not a board read"
+    },
+    "plan_clause_parity": {
+      "result": "no clause weakened; the new plan adds the boot-complete literal, the three script hashes, the explicit sysresetreq method and the 4 V range wording",
+      "note": "P0 stops fail-closed if current_cal show prints the ma_uA=N/A branch (current_cal.c:179-189 only prints the numeric form when valid_current and fresh_current are 1, set at sensor_service.c:104-113); the raw response is saved first and the quota is consumed",
+      "detail": "reports/reviews/phase8-motor-m7-p0-collector-r1/plan_diff_notes.md"
+    }
+  },
+  "p0_package": {
+    "path": "reports/reviews/phase8-motor-m7-current-calibration-r2/p0_package.md",
+    "collector": {
+      "path": "reports/reviews/phase8-motor-m7-current-calibration-r2/p0_voltage_observation.py",
+      "bytes": 19642,
+      "cr_bytes": 0,
+      "sha256": "a2c75ea83cd3842246397a6eff33eea52745c69f8926fb6800a2561fe36cb95a",
+      "matches_declared_candidate": true
+    },
+    "verifier": {
+      "path": "reports/reviews/phase8-motor-m7-current-calibration-r2/verify_p0_candidate.py",
+      "bytes": 16343,
+      "cr_bytes": 0,
+      "sha256": "bc438094d4193d31fba710622c13d41d3fa19208658dec4b4015f11b444769a2",
+      "matches_declared_candidate": true
+    },
+    "payload_bin": {
+      "bytes": 266244,
+      "sha256": "e614a075ab63eb5b1c4b08e1ab51fb4043f474037ce734b4bcaf666899c8f7da"
+    },
+    "payload_axf": {
+      "bytes": 1688696,
+      "sha256": "2205c7e7ad6bad93e848fd24d1e5f38c76796865a2b21ebcd2d4e22bb4b6d584"
+    },
+    "readback_range": {
+      "address": "0x08000000",
+      "length_bytes": 266244,
+      "length_hex": "0x00041004"
+    },
+    "expected_boot_banner": "5.3.0 build Oct 29 2026 23:11:52",
+    "expected_main_ready_line": "[MAIN] boot complete: READY (motion still gate-locked)",
+    "send_sequence": [
+      "safety_state",
+      "safety_status",
+      "motor_status",
+      "step_status",
+      "current_cal show",
+      "current_cal sample 128",
+      "current_cal show"
+    ],
+    "quota": {
+      "download": 1,
+      "fixed_length_readback": 1,
+      "com5_open": 1,
+      "explicit_sysresetreq": 1,
+      "dap_sessions": 3,
+      "status_queries_each": 1,
+      "current_cal_show": 2,
+      "current_cal_sample_128": 1,
+      "dmm_readings": 4,
+      "dmm_wait_points": 2
+    },
+    "conclusion_ceiling": "VOLTAGE_OBSERVATION_ONLY",
+    "forbidden_preconditions_kept_out": [
+      "1200 ms quiet window",
+      "waiting for a spontaneously seen prompt"
+    ],
+    "status": "READY_FOR_SINGLE_USER_APPROVAL / NOT_BOARD_EXECUTED"
+  },
+  "not_executed_here": [
+    "any device action: no serial/DAP/instrument object, no enumeration, no target memory read, no download, no reset, no target command, no power/wiring/SW1 change, no arm/start, no STEP/DIR/HIGH",
+    "Keil rebuild; the six accepted images are unchanged",
+    "unchanged regression chains (calculator 54+21, S1/S2, I/O, SD, V1/V2)"
+  ],
+  "open": [
+    "P0 needs one explicit user approval of the whole package",
+    "board still runs the M5 image 01d3e5ab1ad245949385d50c9f1d5fd2bbaac0806c3920e897321bc46db764bc (last proven)",
+    "banner is an archived-BIN recovery, not a board read",
+    "P1 METHOD_NOT_READY; more than two fit points stays UNSUPPORTED_BOUND_MODEL",
+    "REV3 cloud rc=4 cause undetermined; independent bus current reference still lacks method and fixtures"
+  ],
+  "synthetic_data_warning": "all selftest fixtures and every value in replay_verbatim_m5.py inputs are HOST_SYNTHETIC or historical archives; none may be sent to the board or treated as a new measurement",
+  "receipt": [
+    "M7_R2_CALCULATOR_REVIEW_GO(accepted=208bf10)",
+    "P0_COLLECTOR_EXACT_CANDIDATE_APPLIED / WINDOWS_SELFTEST_37_PASS / REMOTE_BYTES_MATCH",
+    "P0_PACKAGE_READY_FOR_SINGLE_USER_APPROVAL / NOT_BOARD_EXECUTED",
+    "FIRMWARE_IMAGES_UNCHANGED / NO_KEIL_REBUILD / HARDWARE_ACTIONS=[]",
+    "P1_METHOD_NOT_READY / P2_NOT_AUTHORIZED / M5_BOARD_IMAGE_UNCHANGED"
+  ]
+}

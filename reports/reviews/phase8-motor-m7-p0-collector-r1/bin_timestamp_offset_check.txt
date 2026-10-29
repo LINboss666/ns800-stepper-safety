@@ -1,0 +1,21 @@
+M7 P0-R1: build-timestamp offsets in the corrected plan, measured on the delivered BIN
+file reports/firmware/phase8-motor-m7-current-calibration-r1/rt-thread-motor-m1.bin
+bytes=266244 sha256=e614a075ab63eb5b1c4b08e1ab51fb4043f474037ce734b4bcaf666899c8f7da
+
+all occurrences (zero-based byte offsets, whole file scanned):
+  b'Oct 29 2026' -> [260674]  (count=1)
+  b'23:11:52'    -> [260665]  (count=1)
+
+plan candidate claims: date @260674, time @260665
+  bytes[260674:260685] = b'Oct 29 2026'
+  bytes[260665:260673] = b'23:11:52'
+  claim CONFIRMED: True
+
+superseded 208bf10 plan offsets 259925/259916 (from the R2 p0_package.md):
+  bytes[259925:259936] = b' \n\x00[INFO] N'
+  bytes[259916:259924] = b'number:%'
+  those offsets do NOT hold the stamp: the correction in the new plan is real.
+
+banner string used by the collector stays 5.3.0 build Oct 29 2026 23:11:52
+(RT version 5/3/0 from include/rtdef.h + kservice.c format; this is an archived-BIN
+ byte recovery, NOT a board read this round.)

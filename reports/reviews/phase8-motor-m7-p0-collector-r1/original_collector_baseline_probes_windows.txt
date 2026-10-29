@@ -1,0 +1,56 @@
+[
+  {
+    "case": "ECHO_ONLY_ACCEPTED_AS_RESPONSE",
+    "accepted": true,
+    "payload": "msh >safety_state\r\n"
+  },
+  {
+    "case": "ALL_GARBAGE_RESPONSES_ACCEPTED",
+    "rc": 0,
+    "writes": [
+      "safety_state",
+      "safety_status",
+      "motor_status",
+      "step_status",
+      "current_cal show",
+      "current_cal sample 128"
+    ],
+    "error": null
+  },
+  {
+    "case": "FIRST_RESPONSE_DANGER_STILL_SENDS_ALL_SIX",
+    "rc": 1,
+    "writes": [
+      "safety_state",
+      "safety_status",
+      "motor_status",
+      "step_status",
+      "current_cal show",
+      "current_cal sample 128"
+    ],
+    "error": "STOP: danger marker 'stack is close' present after safety_state (bytes already saved)"
+  },
+  {
+    "case": "BOOT_DANGER_IGNORED",
+    "rc": 0,
+    "writes": [
+      "safety_state",
+      "safety_status",
+      "motor_status",
+      "step_status",
+      "current_cal show",
+      "current_cal sample 128"
+    ],
+    "error": null
+  },
+  {
+    "case": "READ_ERROR_DISCARDS_RECEIVED_BYTES",
+    "bytes_returned": 20,
+    "raw_file_exists": false
+  },
+  {
+    "case": "ZERO_BYTE_WRITE_RETURN_IGNORED",
+    "accepted": true
+  }
+]
+BASELINE_OBSERVATIONS=6/6 (defect reproduction; not product PASS)

@@ -118,3 +118,18 @@ M5_BOARD_IMAGE_UNCHANGED / NO_MOTOR_ACTIONS / NO_HARDWARE_GO_SELF_CLAIMED
 
 下一轮：等复审对候选工具字节与 P0 整包的意见；P0 需要用户对该整包**一次**批准才执行。
 本任务不含现场批准。
+
+## 8. P0-R1 复审指针（只追加，上文不改）
+
+独立复审对象 `208bf102e6b3bce7159eec672b83a0d6b77f8811` 的结论（2026-10-30）：
+
+- 计算器：**`M7_R2_CALCULATOR_REVIEW_GO`**，R3 两项（截断来源冒充完整证据、局部导数冒充全区间最坏界）
+  在该版字节上关闭；本文件 §2/§3 的登记照原文有效，不再返修 `m7_calcalc.py`。
+- 本文件 §5 的 P0 采集器 `1e34589f…c44f`：**`P0_COLLECTOR_REWORK_REQUIRED`**，不能照该版直接上板。
+  六项缺陷（回显当响应、无业务门、告警停得太晚、启动告警漏判、读异常丢原始件、忽略 write 返回值）
+  已在 Windows 交付机用包内探针原样复现，与修前基线记录逐字节相符。
+- 本文件 §5 的 P0 计划（含旧 BIN 时间戳偏移 259925/259916、单次 show、裸 `pyocd reset`）已被
+  `reports/reviews/phase8-motor-m7-p0-collector-r1/plan_diff_notes.md` 记录的修正版取代；
+  本文的历史状态与首错仍有效，未被改写。
+- 后续：`reports/agent_handoffs/phase8-motor-m7-p0-collector-r1.md` / `.json`。
+  P0 仍**未执行**，等用户对该整包一次批准；本文件不承担任何现场批准。

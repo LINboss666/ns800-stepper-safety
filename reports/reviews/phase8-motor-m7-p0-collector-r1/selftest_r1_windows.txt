@@ -1,0 +1,56 @@
+WAIT_DMM_BEFORE: H10-1 and H10-3 DC voltage; keep H10-2 GND
+WAIT_DMM_AFTER: H10-1 and H10-3 DC voltage; keep H10-2 GND
+WAIT_DMM_BEFORE: H10-1 and H10-3 DC voltage; keep H10-2 GND
+WAIT_DMM_AFTER: H10-1 and H10-3 DC voltage; keep H10-2 GND
+WAIT_DMM_BEFORE: H10-1 and H10-3 DC voltage; keep H10-2 GND
+WAIT_DMM_BEFORE: H10-1 and H10-3 DC voltage; keep H10-2 GND
+WAIT_DMM_BEFORE: H10-1 and H10-3 DC voltage; keep H10-2 GND
+WAIT_DMM_BEFORE: H10-1 and H10-3 DC voltage; keep H10-2 GND
+WAIT_DMM_BEFORE: H10-1 and H10-3 DC voltage; keep H10-2 GND
+WAIT_DMM_AFTER: H10-1 and H10-3 DC voltage; keep H10-2 GND
+WAIT_DMM_BEFORE: H10-1 and H10-3 DC voltage; keep H10-2 GND
+WAIT_DMM_AFTER: H10-1 and H10-3 DC voltage; keep H10-2 GND
+WAIT_DMM_BEFORE: H10-1 and H10-3 DC voltage; keep H10-2 GND
+WAIT_DMM_AFTER: H10-1 and H10-3 DC voltage; keep H10-2 GND
+WAIT_DMM_BEFORE: H10-1 and H10-3 DC voltage; keep H10-2 GND
+WAIT_DMM_BEFORE: H10-1 and H10-3 DC voltage; keep H10-2 GND
+WAIT_DMM_AFTER: H10-1 and H10-3 DC voltage; keep H10-2 GND
+PASS P0T01-whitelist-six-sequence-seven None
+PASS P0T02-no-privileged-command None
+PASS P0T03-offline-no-pyserial-import None
+PASS P0T04-bind-before-transport None
+PASS P0T05-boot-bytes-before-decision None
+PASS P0T06-whitelist-reject-before-write None
+PASS P0T07-read-cap None
+PASS P0T08-echo-is-not-response-end-no-retry None
+PASS P0T09-immediate-danger-save-stop None
+PASS P0T10-complete-production-shaped-sequence 7 TX, two show, one sample, 4 DMM values
+PASS P0T11-ledger-attempt-vs-accepted None
+PASS P0T12-boot-danger-no-TX None
+PASS P0T13-garbage-not-complete None
+PASS P0T14-armed-state-blocks-sample None
+PASS P0T15-latched-stop-blocks-sample None
+PASS P0T16-short-FB-proof-required None
+PASS P0T17-conflicting-state None
+PASS P0T18-error-preserves-partial-RX None
+PASS P0T19-short-write-no-read-no-next None
+PASS P0T20-deadline-rechecked-after-read None
+PASS P0T21-deadline-rechecked-after-write None
+PASS P0T22-evidence-failure-no-next None
+PASS P0T23-sample-NUL None
+PASS P0T24-sample-not-ready None
+PASS P0T25-second-show-actually-compared None
+PASS P0T26-waits-before-sampling None
+PASS P0T27-preexisting-DMM-not-reused None
+PASS P0T28-wrong-banner-no-TX None
+PASS P0T29-incomplete-main-line-no-TX None
+PASS P0T30-pending-async-not-used-as-response None
+PASS P0T31-known-noncanonical-NUL-not-gate-proof None
+PASS P0T32-split-echo-and-response None
+PASS P0T33-port-before-one-known-reset None
+PASS P0T34-bad-reset-banner-no-retry None
+PASS P0T35-invalid-meter-no-sample None
+PASS P0T36-exact-noncanonical-truncation-boundary None
+PASS P0T37-NUL-in-authoritative-line-rejected None
+SUMMARY cases=37 pass=37 fail=0
+HOST_SYNTHETIC_ONLY / DEVICE_ACTIONS=0 / NO_REAL_TRANSPORT

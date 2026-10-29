@@ -163,6 +163,15 @@
     "receipt_note": "the first receipt line's AWAITING_REMOTE_BYTE_REVIEW describes the state at the calculator commit 01da9d6; the readback itself is recorded in remote_readback_r2.md by the evidence commit that resolves delivery_head",
     "detail": "reports/reviews/phase8-motor-m7-current-calibration-r2/remote_readback_r2.md"
   },
+  "p0_collector_r1_review_pointer": {
+    "reviewed_delivery": "208bf102e6b3bce7159eec672b83a0d6b77f8811",
+    "date": "2026-10-30",
+    "calculator": "M7_R2_CALCULATOR_REVIEW_GO - R3 source completeness and interval bound closed on these bytes; no further rework",
+    "p0_collector": "P0_COLLECTOR_REWORK_REQUIRED for 1e34589f...c44f; six defects reproduced on the Windows delivery machine with the package probe",
+    "p0_package_plan": "superseded by the corrected plan; the BIN timestamp offsets 259925/259916 in this round were wrong (measured: Oct 29 2026 @260674, 23:11:52 @260665)",
+    "follow_up": "reports/agent_handoffs/phase8-motor-m7-p0-collector-r1.md",
+    "history_rule": "this block is appended only; nothing above is rewritten and the first-failure originals stay as delivered"
+  },
   "receipt": [
     "M7_R2_CALCULATOR_PATCH_APPLIED / OFFLINE_VERIFIED / AWAITING_REMOTE_BYTE_REVIEW",
     "M7_R1_FIRMWARE_ACCEPTED_FOR_P0 / SIX_IMAGE_BYTES_UNCHANGED",

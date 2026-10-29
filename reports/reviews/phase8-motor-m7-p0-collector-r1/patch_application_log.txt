@@ -1,0 +1,89 @@
+# M7 P0-R1 补丁应用日志（本机逐字命令与输出）
+
+日期 2026-10-30。起点 HEAD = 远端 tip = `208bf102e6b3bce7159eec672b83a0d6b77f8811`，工作树 clean。
+输入补丁 `candidate/p0_collector_r1_combined.patch` = 74411 B / CR=0 /
+`ff7a03e9667f9532b1f02603578de06fa8d114a11ed65a7090a6d406159cc4d9`（LF-only，3 个文件的整文件替换）。
+本轮 `core.autocrlf` 仍为 `true`（仓库级，未修改任何 git 配置）。
+
+## 1. 起点身份（规范 Git blob，非工作树）
+
+```text
+p0_voltage_observation.py | 15503 B | CR=0 | 1e34589fd3f0250abc5db6a63df2800cf8883c6f65de6219ff350540d138c44f
+p0_package.md             | 12085 B | CR=0 | dbb1c5f886b42cbf5701190037173043d4373aa70fb1123c66e9f68ba67e4542
+```
+
+两个都等于 208bf10 的远端 blob 实测值（见 R2 的 remote_readback_r2.md）。
+
+## 2. 在仓外对规范 LF 字节应用（先 --check）
+
+```bash
+SC=$TEMP/m7p0r1_apply
+mkdir -p "$SC/reports/reviews/phase8-motor-m7-current-calibration-r2"
+git cat-file -p 208bf10:.../p0_voltage_observation.py > "$SC/.../p0_voltage_observation.py"
+git cat-file -p 208bf10:.../p0_package.md             > "$SC/.../p0_package.md"
+cd "$SC"
+git -c core.autocrlf=false apply --check -p1 .../p0_collector_r1_combined.patch   # -> APPLY-CHECK OK
+git -c core.autocrlf=false apply        -p1 .../p0_collector_r1_combined.patch   # -> APPLIED
+```
+
+`git apply --check` 一次通过，没有 fuzz、没有手工拼接。结果：
+
+```text
+p0_voltage_observation.py | 19642 B | CR=0 | a2c75ea83cd3842246397a6eff33eea52745c69f8926fb6800a2561fe36cb95a
+verify_p0_candidate.py    | 16343 B | CR=0 | bc438094d4193d31fba710622c13d41d3fa19208658dec4b4015f11b444769a2
+p0_package.md             |  9345 B | CR=0 | dd4924b75e1bd70c13fca8198f1628a390a15534605e6079ef41a647a866e26b
+```
+
+三个值分别等于任务书 §4.2 声明的采集器/验证器散列，以及包内完整文件
+`candidate/p0_voltage_observation.py`、`candidate/verify_p0_candidate.py`、
+`candidate/p0_package.md` 的逐字节散列。**没有再叠加"完整文件覆盖"第二步**（任务书 §4.1 明确要求只应用一次合并补丁）。
+
+## 3. 回到仓库并暂存后的索引 blob
+
+```bash
+cp "$SC"/...{p0_voltage_observation.py,verify_p0_candidate.py,p0_package.md} reports/reviews/phase8-motor-m7-current-calibration-r2/
+git add reports/reviews/phase8-motor-m7-current-calibration-r2/{p0_voltage_observation.py,verify_p0_candidate.py,p0_package.md}
+```
+
+```text
+p0_voltage_observation.py | blob cefbb686449278e088f0b99fb288413b557b8ccb | 19642 B | CR=0 | a2c75ea8…b95a
+verify_p0_candidate.py    | blob de467fdeccd52d355ee0099bc53f72136e01d644 | 16343 B | CR=0 | bc438094…69a2
+p0_package.md             | blob 35641850b9bb6fd6fdbb2e7cc601341be6cf4d6e |  9345 B | CR=0 | dd4924b7…e26b
+```
+
+`git status --porcelain` 只有这三条（加本轮证据/交接文件），产品码、Keil 工程、
+`reports/firmware/` 与 `tests/host/` 未出现在改动集里。
+
+## 4. 用索引 blob 重跑（Windows 交付机）
+
+把三个 `.py`/`m7_calcalc.py` 的**索引 blob** 导出到
+`%TEMP%/m7p0r1_winselftest/reports/reviews/…` 的镜像目录（保持采集器默认
+`--calculator` 的相对解析），全部 CR=0：
+
+```text
+p0_voltage_observation.py 19642 a2c75ea8…   verify_p0_candidate.py 16343 bc438094…   m7_calcalc.py 54267 5c7a2340…
+```
+
+```text
+python reports/reviews/phase8-motor-m7-current-calibration-r2/p0_voltage_observation.py --selftest
+-> RC=0，stderr 0 字节，SUMMARY cases=37 pass=37 fail=0
+-> HOST_SYNTHETIC_ONLY / DEVICE_ACTIONS=0 / NO_REAL_TRANSPORT
+```
+
+原文见 `selftest_r1_windows.txt`（P0T01–P0T37 全 PASS）。
+
+## 5. 修前基线（先于补丁执行，原件字节）
+
+`probe_original_collector.py`（2558 B / `00ef4e91c336a37569959b637e52a2c28a8d96b0755a6e5e6e4d8887605c30d4`，
+包内原样，只在仓外 `current/` 镜像目录里跑 208bf10 的 `1e34589f…` 采集器）在本机 rc=0，
+`BASELINE_OBSERVATIONS=6/6`。原始输出 `original_collector_baseline_probes_windows.txt`
+是 Windows 侧重定向产物（56 CR / 56 LF / 1276 B）；去掉 CR 后与云端
+`results/collector_baseline_probes.txt`（`6a693f7f906b17699d936d734f02952c06e6aac611847e0bd8d1fa255f1ff14e`）
+**逐字节相等**。也就是说六个缺陷在两平台都能复现，且云端记录没有夸大。
+
+## 6. 本轮没有做的事
+
+- 没改候选脚本的任何一字节（散列即证）。
+- 没跑 Keil、没碰设备、没创建串口/DAP 对象；自检路径不导入 pyserial（P0T03/P0T04 断言）。
+- 没重跑未变化的 54+21 计算器链、S1/S2、I/O、SD、V1/V2。
+- 没动 `p0_collector_selftest.txt`（11 项旧自检的原文件）与任何历史证据。
