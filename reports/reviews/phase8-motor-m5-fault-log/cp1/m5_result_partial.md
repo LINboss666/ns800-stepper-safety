@@ -4,7 +4,7 @@
 批准载荷：code_commit `8cf23aa6dda20baf7843798bdef9a02cfd71326f`，
 BIN 259580 B / `01d3e5ab1ad245949385d50c9f1d5fd2bbaac0806c3920e897321bc46db764bc`，
 AXF 1668244 B / `8c5bc7bf1efa786013c767ae1e09415ad0d5d5db3e38069c8aeebabf7cebae40`。
-状态：**P0 通过；P1 旧日志归档与唯一一次清区均通过；P2 未起转：两次尝试均停在起转前（arm gate 0x8；第二次在 target 清理前被前置检查拦住）。P3/P4 NOT_REACHED。**
+状态：**P0/P1 通过；P2 已真实起转并在运行中投递软件故障：t≈1 s 300 Hz 运行，t≈3 s 原始流出现 FAULT_LATCHED code=9 与 BB trigger session=1；脚本因并发输出匹配失败而中止，未做兜底 disarm、新日志读回与恢复。P3/P4 NOT_REACHED。**
 没有第二次下载、没有第二次清区、没有 safety_trip、没有 fault_reset/system_selftest。
 
 ## 1. P0 身份与静止前置（PASS）
@@ -95,3 +95,36 @@ AXF 1668244 B / `8c5bc7bf1efa786013c767ae1e09415ad0d5d5db3e38069c8aeebabf7cebae4
 - 修正：`fault()` 默认先 `motor_target 0` 再 preflight；调用方可传 `clear_target=False`
   避免重复；已加 FS07/FS08 自测，当前 8/8。
 - 第三次尝试仍需要一次新的 COM5 会话；板上 target 仍为 300、armed=0、无运动。
+
+
+## 9. CP1e 最终会话（软件故障已触发，读回/恢复未做）
+
+- 修正编排后同一会话完成：`motor_target 0` → 前置 READY/LOW/无 STEP → 一次
+  `safety_polarity_confirm CONFIRM` → 一次 `safety_irq_enable` → `irq_gate=OPEN`、
+  `protection_ready=YES`、`arm_gate_mask=0x0`。
+- 起转：`motor_dir 0`、`motor_arm`（ARMED，DRV_ENABLE HIGH 回读、ENN LOW confirmed）、
+  `motor_target 300`、`motor_start`。
+- t≈1 s（`018_motor_status.bin`）：`state=2`、`cur_hz=300 tgt_hz=300`、`armed=1`；
+  `019_sensor_snapshot.bin`：`step_hz=300`。**电机确实在 300 Hz 运行。**
+- t≈3 s 仅一次 `safety_trip CONFIRM`。原始件 `020_safety_trip_CONFIRM.bin`（496 B，含 NUL/交错）
+  可读出：`[SS] ==> FAULT_LATCHED code=9 (DRV_ENABLE LOW verified, ENN feedback OK,
+  STEP off-confirmed(api), motor_rc=0 diag_rc=0)`、`[SAFETY] EVT_SOFT_FAULT -> 已整理`、
+  `[BB] trigger code=9 session=1 pre_n=200 post_eff=100`。
+- 脚本的字符串判据 `EVT_SOFT_FAULT posted rc=0` 被 Safety/BB 并发输出打断而未匹配，
+  脚本在 trip 后立即中止：**未发送 t=5 s 兜底 `motor_disarm`、未单独保存 trip 后
+  motor/safety 状态、未读回新日志、未恢复**。这是判据实现缺陷，不是事件失败。
+- 板上预期：FAULT_LATCHED code 9、DRV_ENABLE 已由 trip 保护拉低、BB session 1 可能已写约
+  300 帧；未 `fault_reset`。物理转轴是否停止尚无仪器测量/操作者书面确认。
+- 工具修正：trip 接受改为以有界窗口内 canonical `FAULT_LATCHED code=9` 为准，不再依赖
+  单行短句；自测 FS01–FS08 8/8。
+
+### 需要的新批准（无起转）
+
+一次 COM5 会话：
+1. 只读确认 `safety_state/safety_status/motor_status/step_status/blackbox_status/flash_logstat`：
+   FAULT_LATCHED code9、输出 LOW/ENN 禁能、STEP 无输出、BB 空闲、日志 used/valid 与 session1 一致；
+2. 用 `flash_dump` 导出新槽（预计 0..used-1，count≤100），以 `--start 0` 通过归档判据，
+   核对 session=1、pre 段 event=0 且含 step_hz>0、post 段 event=9；
+3. 必要时一次普通 `motor_disarm` 清理（若输出/许可未确认禁用）；
+4. 一次 `fault_reset`、一次 `system_selftest`，恢复后不 arm/start；
+5. 不第二次清区、不重烧、不再次触发故障、不升流/堵转/注入；失败不自动重跑。

@@ -1,0 +1,10 @@
+diag_status
+[DIAG] verdict=NORMAL mode=MONITOR_ONLY health=OK
+[DIAG] adc_cal_source=THEORETICAL (NOT a measured current)
+[DIAG] threshold_validation=NOT_ESTABLISHED (SG load/speed applicability unverified)
+[DIAG] mode=MONITOR_ONLY; vibration includes ~1g gravity baseline
+[DIAG] sg_filt=17 delta=0 cur_filt=16 mA delta=0 mA
+[DIAG] vib rms=1006 peak=1010 mg band=-1
+[DIAG] cnt sg<warn=0 sg<stall=0 cur>warn=0 cur>stall=0 impact=0 bad=0 clean=0
+msh >
+msh >

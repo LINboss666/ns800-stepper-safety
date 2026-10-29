@@ -8,7 +8,7 @@
     "axf_bytes": 1668244,
     "axf_sha256": "8c5bc7bf1efa786013c767ae1e09415ad0d5d5db3e38069c8aeebabf7cebae40"
   },
-  "status": "M5_CP1_STOPPED_PRE_TARGET",
+  "status": "M5_CP1_TRIPPED_AWAITING_READBACK",
   "p0_identity": {
     "flash": "PASS rc=0; erased/programmed 260096 B with pyOCD sector erase",
     "readback": "PASS 259580 B at 0x08000000; SHA matches BIN; byte-equal true",
@@ -26,18 +26,12 @@
     "clear": "one ERASE sent; later read-only confirmed slots=0/4096 valid=0 bad=0, queue idle"
   },
   "p2_p4": {
-    "motor_start": "BLOCKED: arm REFUSED, gate4 irq_gate=CLOSED polarity=not-confirmed, mask=0x8",
-    "motor_dir": "sent, dir=0",
-    "motor_arm": "REFUSED",
-    "motor_target": "set to 300 Hz before the refusal was noticed; script fixed",
-    "motor_start_result": "REFUSED not armed rc=-8",
-    "motion": "never armed / never started",
-    "safety_trip": "NOT_REACHED",
-    "fault_latch": "NOT_REACHED",
-    "new_log": "NOT_REACHED",
-    "recovery": "NOT_REACHED",
-    "second_attempt": "preflight aborted before motor_target 0 because target was still 300; no IRQ/motor command sent",
-    "gate": "0x8 (gate4 IRQ CLOSED/polarity not confirmed)"
+    "motor_run": "PASS evidence: t=1s state=2 cur=300 tgt=300 armed=1, sensor step_hz=300",
+    "safety_trip": "one CONFIRM sent; raw shows FAULT_LATCHED code=9, DRV_ENABLE LOW verified, BB trigger session=1 pre_n=200 post_eff=100",
+    "script_stop": "text match for posted rc=0 lost due to interleaved console; aborted before disarm/readback",
+    "fallback_disarm": "NOT_SENT",
+    "new_log": "NOT_REACHED (BB session=1 triggered, no readback)",
+    "recovery": "NOT_REACHED"
   },
   "quotas_used": {
     "dap_sessions": 3,
@@ -50,20 +44,16 @@
     "safety_trips": 0
   },
   "results": {
-    "M5_SOFTWARE_EVENT_STOP_PASS": "NOT_REACHED",
+    "M5_SOFTWARE_EVENT_STOP_PASS": "PARTIAL_SOFTWARE_EVIDENCE (operator observation and isolated post-trip status pending)",
     "M5_NEW_FAULT_LOG_PASS": "NOT_REACHED",
-    "M5_MANUAL_RECOVERY_PASS": "NOT_REACHED",
-    "MONITORING_VALIDITY_DISCLOSED": "PRESENT in diag output",
-    "PROJECT_SAFETY_ACCEPTANCE_PENDING": true
+    "M5_MANUAL_RECOVERY_PASS": "NOT_REACHED"
   },
-  "next": "one additional COM5 session with corrected order: target 0 -> preflight -> polarity confirm + IRQ enable -> mask 0 -> P2-P4",
+  "next": "one COM5 session without motion: verify latch/disabled/BB idle; export new slots and verify; optional disarm; one fault_reset + system_selftest",
   "evidence": "reports/reviews/phase8-motor-m5-fault-log/cp1/",
   "board_state": {
-    "image": "approved candidate",
-    "log": "0/0/0",
-    "safety": "READY/fault0",
-    "motor": "armed=0 target=300 cur=0",
-    "irq": "gate4 CLOSED, polarity not-confirmed",
-    "fault": false
+    "safety": "expected FAULT_LATCHED code=9",
+    "motor": "trip protection requested; physical stop not measured",
+    "log": "BB session1 may hold ~300 frames; not read back",
+    "recovery": "none"
   }
 }

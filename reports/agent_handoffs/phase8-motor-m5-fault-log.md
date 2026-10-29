@@ -126,3 +126,18 @@ UV4 5.43.1.0 / ARMCLANG V6.24，三目标均 Rebuild All 0 Error / 0 Warning。
   `clear_target=False` 供编排方避免重复；自测 FS01–FS08 8/8。
 - 需要再一次 COM5 会话：target 0 → preflight → `safety_polarity_confirm CONFIRM` +
   `safety_irq_enable` → 复核 mask=0 → P2–P4；不清区/不重烧。
+
+
+## 9. CP1e 最终会话（2026-10-29，软件故障已触发）
+
+- 修正编排后：target 0 → 前置 READY/LOW/无 STEP → 一次 polarity confirm + 一次 IRQ enable
+  → 复核 `irq_gate=OPEN`、`protection_ready=YES`、`arm_gate_mask=0x0` → DIR0/300 Hz 起转。
+- t≈1 s：`state=2 cur=tgt=300 armed=1`，sensor `step_hz=300`（确实运行）。
+- t≈3 s 一次 `safety_trip CONFIRM`；原始流含 `FAULT_LATCHED code=9`（DRV_ENABLE LOW verified、
+  ENN OK、STEP off-confirmed(api)）、`[SAFETY] EVT_SOFT_FAULT -> 已整理`、
+  `[BB] trigger code=9 session=1 pre_n=200 post_eff=100`。
+- 脚本的固定短句匹配被并发输出打断，trip 后立即中止：未兜底 disarm、未读回新日志、未恢复。
+  判据已改为以 canonical `FAULT_LATCHED code=9` 为准；自测 FS01–FS08 8/8。
+- 板上预期 FAULT_LATCHED code9；物理停止未测量/未取得操作者书面确认。
+- 需一次**无起转**COM5 会话：只读确认锁存/禁能/BB 空闲 → 导出新日志并判读 →
+  必要时一次 disarm → 一次 fault_reset + system_selftest；不清区/不重烧/不再触发。

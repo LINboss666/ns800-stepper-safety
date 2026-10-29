@@ -1,0 +1,27 @@
+motor_status
+[MOT] state=2 name=OTHER
+[MOT] cur_hz=300 tgt_hz=300 accel=2000 decel=2000 dir=0
+[MOT] armed=1 drv_en_request=1 health=OK
+[MOT] guard stops=0 reason=0
+[MOT] guard reason map: 0=none 1=cfg-lost 2=integrity 3=txn-busy 4=enn-fb
+[MOT] stop result=output-requested(running) src=none rc=0 latched=0
+[MOT] diag_off_confirmed=YES
+[MOT] arm_gate_mask=0x2 REFUSED
+[MOT] arm_gate_mask=0x2
+[MOT] gate_reason=safety-not-READY
+[MOT] gate4 irq_gate=OPEN polarity=CONFIRMED
+[MOT] gate4 gpio_ready=YES
+[MOT] gate5 tmc_drive_cfg=CONFIGURED
+[MOT] gate6 request_basis=ENABLED
+[MOT] gate6 enn_verdict=OK
+[MOT] gate7 motor_stop=output-requested(running) src=none rc=0
+[MOT] gate7 latched=no diag_off=YES
+[MOT] note: current_hz=0 is a command value, not stop proof
+[MOT] drv_request=HIGH pad=1
+[MOT] expected_ENN=LOW ENN_fb=0 resolved verdict=OK
+[MOT] limit_inputs=DISABLED_BY_CONFIG
+[MOT] step_diag=GRANTED
+[MOT] tmc_write_gate=0x8E
+[MOT] note: state/cur/tgt=0 does not prove physical STEP stopped
+msh >
+msh >

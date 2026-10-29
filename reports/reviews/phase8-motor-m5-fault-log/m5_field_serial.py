@@ -382,7 +382,7 @@ class Runner:
         return state
 
     # ---------- P2/P3/P4 ----------
-    def fault(self, clear_target=True):
+    def fault(self, clear_target=True, phase_tag="fault"):
         st_path = os.path.join(self.out, "archive_state.json")
         if not os.path.exists(st_path):
             raise Abort("archive_state.json missing; run archive phase first")
@@ -391,7 +391,7 @@ class Runner:
             raise Abort("archive not accepted")
         if not state.get("clear_done") and state.get("free", 0) < NEED_SLOTS:
             raise Abort("log space insufficient and clear not done")
-        rec = Recorder(self.out, "fault")
+        rec = Recorder(self.out, phase_tag)
         # Approved P2 starts from target 0; clear any stale command value first.
         if clear_target:
             self.q(rec, "motor_target 0")
@@ -420,21 +420,23 @@ class Runner:
         raw, t_trip, _ = self.link.send("safety_trip CONFIRM", 10.0, 1.0)
         rec.save("safety_trip CONFIRM", raw, t_trip, self.clock())
         trip_text = _text(raw)
-        if "EVT_SOFT_FAULT posted rc=0" not in trip_text:
-            raise Abort("safety_trip not accepted: %r" % trip_text)
         after_trip = {
             "motor_status": self.q(rec, "motor_status"),
             "safety_state": self.q(rec, "safety_state"),
             "safety_status": self.q(rec, "safety_status"),
         }
-        # Safety 线程整理事件可能晚于命令返回; 给一个有界观察窗, 不延长运动
-        for _ in range(3):
+        # 命令回显可能与 Safety/BB 线程输出交错, 不以固定短句判定;
+        # 以有界窗口内的 canonical 锁存(code 9)为准。
+        for _ in range(5):
             ss_now = self.parse_safety_state(after_trip["safety_state"])
             if ss_now["state"] == "FAULT_LATCHED" and ss_now["fault"] == 9:
                 break
             self.sleep(0.2)
             after_trip["safety_state"] = self.q(rec, "safety_state")
             after_trip["safety_status"] = self.q(rec, "safety_status")
+        if self.parse_safety_state(after_trip["safety_state"])["state"] != "FAULT_LATCHED" or            self.parse_safety_state(after_trip["safety_state"])["fault"] != 9:
+            raise Abort("safety_trip not evidenced as FAULT_LATCHED code 9: %r / %s"
+                        % (trip_text, after_trip["safety_state"]))
         self.wait_until(t_start + 5.0)
         raw, t_disarm, _ = self.link.send("motor_disarm", 10.0, 1.0)
         rec.save("motor_disarm", raw, t_disarm, self.clock())
