@@ -5,8 +5,8 @@
   "document_base": "a052e8e3dc11a4a983fcaecf5fd36ba9e4139af4",
   "source_base": "a052e8e3dc11a4a983fcaecf5fd36ba9e4139af4",
   "code_commit": "cf133d6a5d539bb5a7c3b9da4d50d53dc3b47055",
-  "delivery_head": "d8ee03c9bb547b26c9362b98c69e8a14f6ed53b7",
-  "delivery_head_note": "final field-candidate review-fix/evidence commit; image bytes are in 80fc7db, build manifest/project binding in 9241828; the handoff documentation commit follows and is reported in the STOP/readback, not self-recorded",
+  "delivery_head": "1b65f2837721064590ad1d655068aaac4bcd6e6c",
+  "delivery_head_note": "final field-candidate evidence commit (worktree + Git-blob selftests); image bytes are in 80fc7db, build manifest/project binding in 9241828; the handoff documentation commit follows and is reported in the STOP/readback, not self-recorded",
   "status": "M6_OFFLINE_CLOSEOUT_COMPLETE / NEW_IMAGES_BUILT_NOT_FLASHED / FIELD_CANDIDATE_OFFLINE_FIXED_NOT_EXECUTED",
   "product_changed": {
     "applications/safety_state.c": "safety_trip_cmd checks ss_log_ctx_ok before ANY argument parsing or output; legal thread retains usage and one safety_post_event; no protection/recovery logic change",
@@ -109,14 +109,18 @@
         "M6D24"
       ],
       "evidence": [
-        "reports/reviews/phase8-motor-m6-offline/field_candidate_selftest.txt"
+        "reports/reviews/phase8-motor-m6-offline/field_candidate_selftest.txt",
+        "reports/reviews/phase8-motor-m6-offline/field_candidate_selftest_git_blob.txt"
       ],
       "archive_gate": "real run requires accepted archive_state.json; missing second copy or COPY_VERIFIED.json rejected before pyserial",
       "original_ids_retained": 13,
       "new_ids": 12,
       "status": "FIELD_CANDIDATE_OFFLINE_FIXED / NOT_BOARD_EXECUTED",
       "first_failure": "reports/reviews/phase8-motor-m6-offline/field_candidate_selftest_first_failure.txt",
-      "sha256": "b1c5390b2a1f8887393b236e8d5c28888be5060ca8f5f8addc10ffb9a3ff772f"
+      "sha256": "30623f0291e734c636551e5d36c208aa0d37f5f8c31fa2eea08ecf2d7d7e4890",
+      "sha256_worktree_crlf": "b1c5390b2a1f8887393b236e8d5c28888be5060ca8f5f8addc10ffb9a3ff772f",
+      "sha256_note": "Git blob bytes are LF; worktree checkout is CRLF. Both byte sets ran 25/25; line endings only.",
+      "evidence_git_blob": "reports/reviews/phase8-motor-m6-offline/field_candidate_selftest_git_blob.txt"
     },
     "raw_recovery": {
       "result": "PASS",
@@ -225,7 +229,8 @@
       "reports/reviews/phase8-motor-m6-offline/build_a0.log",
       "reports/reviews/phase8-motor-m6-offline/build_motor.log"
     ],
-    "first_failure": "reports/reviews/phase8-motor-m6-offline/field_candidate_selftest_first_failure.txt"
+    "first_failure": "reports/reviews/phase8-motor-m6-offline/field_candidate_selftest_first_failure.txt",
+    "blob_selftest": "reports/reviews/phase8-motor-m6-offline/field_candidate_selftest_git_blob.txt"
   },
   "raw_recovery": {
     "scope": "19 final responses listed by reports/reviews/phase8-motor-m5-fault-log/cp1/final_pass/index.json",
@@ -569,6 +574,6 @@
       "D-2": "transport/OSError and evidence failures are recorded separately; primary exception/traceback preserved; unconfirmed disable is UNKNOWN; M6D16/M6D18/M6D23/M6D24",
       "D-3": "arm success requires one complete motor_status snapshot state=0 armed=1 cur=0 tgt=0; refusal/armed=0/missing/duplicate/conflict cannot start; M6D19-M6D22"
     },
-    "candidate_sha256": "b1c5390b2a1f8887393b236e8d5c28888be5060ca8f5f8addc10ffb9a3ff772f"
+    "candidate_sha256": "30623f0291e734c636551e5d36c208aa0d37f5f8c31fa2eea08ecf2d7d7e4890"
   }
 }

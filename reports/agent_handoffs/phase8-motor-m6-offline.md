@@ -92,7 +92,9 @@ I/O 四变体（off/on × target/ovr）全部 PASS；证据 `io_behavior.txt`。
 
 新增 `reports/reviews/phase8-motor-m6-offline/m6_field_candidate.py`，保留 M5 原脚本。
 状态 **FIELD_CANDIDATE_OFFLINE_FIXED / NOT_BOARD_EXECUTED**；独立复审的三项阻断已修，
-本轮仍无现场批准。候选文件 SHA-256：`b1c5390b2a1f8887393b236e8d5c28888be5060ca8f5f8addc10ffb9a3ff772f`。
+本轮仍无现场批准。候选 **Git blob SHA-256（远端回读）：`30623f0291e734c636551e5d36c208aa0d37f5f8c31fa2eea08ecf2d7d7e4890`**；
+工作树 CRLF 副本 SHA-256 `b1c5390b2a1f8887393b236e8d5c28888be5060ca8f5f8addc10ffb9a3ff772f`
+（仅换行差异；两种字节均执行了 25/25 自测，结果分别归档）。
 
 复审补正（D-1/D-2/D-3）：
 
@@ -120,11 +122,12 @@ I/O 四变体（off/on × target/ovr）全部 PASS；证据 `io_behavior.txt`。
   任何异常不得自动清锁存；参数错误/`--selftest` 不导入 pyserial、不构造 SerialPort；
 - 每个收发先落 `--out-dir/NNN_*.bin` 与 `raw_index.jsonl`。
 
-离线自测 **25/25 PASS**（`field_candidate_selftest.txt`）：原 13 个用例（M6D01、M6D02、
-M6D02b、M6D03–M6D12）身份保留，新增 M6D13–M6D24 覆盖上述三项复审阻断、拒绝文本、
-状态字段缺失/重复/冲突、回执丢失、证据失败和实际发送记录。首个补正失败运行保留为
-`field_candidate_selftest_first_failure.txt`（4 例先失败后修复）。候选未上板，不声称
-Windows/USB 硬实时或物理停机上界。
+离线自测 **25/25 PASS**（`field_candidate_selftest.txt`）；同一脚本的 Git blob 字节
+（LF）另跑一次 **25/25 PASS**（`field_candidate_selftest_git_blob.txt`）。原 13 个用例
+（M6D01、M6D02、M6D02b、M6D03–M6D12）身份保留，新增 M6D13–M6D24 覆盖上述三项复审阻断、
+拒绝文本、状态字段缺失/重复/冲突、回执丢失、证据失败和实际发送记录。首个补正失败运行
+保留为 `field_candidate_selftest_first_failure.txt`（4 例先失败后修复）。候选未上板，
+不声称 Windows/USB 硬实时或物理停机上界。
 
 未覆盖/明确不属候选：旧日志归档、清区、两份备份门由 M5 脚本负责并已有 FS01–FS08
 自测；候选不执行 fault_reset（除非未来显式批准并传 `--allow-recovery`），不重开串口、
@@ -208,7 +211,7 @@ NOT_RERUN（说明）：S2 并发链（stop_priority/HAL/persistence 未改）�
 
 - 原始/汇总证据：`reports/reviews/phase8-motor-m6-offline/`（`s1_normal.txt`、
   `s1_reverse.txt`、`io_behavior.txt`、`cli_strict.txt`、`field_candidate_selftest.txt`、
-  `field_candidate_selftest_first_failure.txt`、`test_summary.md`、三份 build_*.log、
-  `macro_probe.c`、`m5_raw_recovery/`）。
+  `field_candidate_selftest_git_blob.txt`、`field_candidate_selftest_first_failure.txt`、
+  `test_summary.md`、三份 build_*.log、`macro_probe.c`、`m5_raw_recovery/`）。
 - 新文件仅含仓库相对路径；未复制本机私有绝对路径、端口、仪器序列号或凭据。
 - 本轮云端 52 MiB 交接 ZIP 未更新；仅交仓库级交接与下次打包摘要。
