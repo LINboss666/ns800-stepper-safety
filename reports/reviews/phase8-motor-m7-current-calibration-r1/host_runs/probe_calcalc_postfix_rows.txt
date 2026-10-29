@@ -1,0 +1,10 @@
+{"bound": 3.1000000181933864, "command": "current_cal apply 1598291 671551 CONFIRM_MEASURED", "holdout": true, "name": "CONTROL_HEALTHY", "qualified": true, "rc": 0, "status": "DRAFT_NOT_APPROVED", "target": 8.0}
+{"command": null, "holdout": null, "name": "HOLDOUT_FAIL", "qualified": null, "rc": 1, "status": null}
+{"command": null, "holdout": null, "name": "NEGATIVE_REFERENCE_ERROR", "qualified": null, "rc": 1, "status": null}
+{"command": null, "holdout": null, "name": "IMPOSSIBLE_SECOND_MOMENT", "qualified": null, "rc": 1, "status": null}
+{"command": null, "holdout": null, "name": "FRACTIONAL_SAMPLE_COUNT", "qualified": null, "rc": 1, "status": null}
+{"command": null, "holdout": null, "name": "FIELD_NONEXISTENT_SOURCE", "qualified": null, "rc": 1, "status": null}
+{"bound": 3.1000000181933864, "command": "current_cal apply 1598291 671551 CONFIRM_MEASURED", "holdout": true, "name": "REUSED_HOLDOUT_ARTIFACT", "qualified": true, "rc": 0, "status": "DRAFT_NOT_APPROVED", "target": 8.0}
+{"command": null, "holdout": null, "name": "BOUNDED_ERRORS_RSS", "qualified": null, "rc": 1, "status": null}
+BOUNDED_ERRORS_COUNTEREXAMPLE meter-only hard limit = 0.5*5.9 + 0.5*5.9 + 5.9 = 11.8 mA; target = 8 mA
+All probes are HOST_SYNTHETIC review experiments, including deliberately false FIELD_MEASURED declarations.

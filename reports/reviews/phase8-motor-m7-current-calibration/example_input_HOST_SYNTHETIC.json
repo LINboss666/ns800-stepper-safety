@@ -21,8 +21,8 @@
       "id": "F1",
       "n_requested": 128,
       "n_valid": 128,
-      "raw_max": 2020.0,
-      "raw_min": 1980.0,
+      "raw_max": 2002.0,
+      "raw_min": 1998.0,
       "raw_source_file": "synth_f1.txt",
       "raw_source_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
       "raw_sum": 256000.0,
@@ -45,8 +45,8 @@
       "id": "F2",
       "n_requested": 128,
       "n_valid": 128,
-      "raw_max": 2120.0,
-      "raw_min": 2080.0,
+      "raw_max": 2102.0,
+      "raw_min": 2098.0,
       "raw_source_file": "synth_f2.txt",
       "raw_source_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
       "raw_sum": 268800.0,
@@ -69,8 +69,8 @@
       "id": "H1",
       "n_requested": 128,
       "n_valid": 128,
-      "raw_max": 2070.0,
-      "raw_min": 2030.0,
+      "raw_max": 2052.0,
+      "raw_min": 2048.0,
       "raw_source_file": "synth_h1.txt",
       "raw_source_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
       "raw_sum": 262400.0,
@@ -90,5 +90,5 @@
     }
   ],
   "provenance": "HOST_SYNTHETIC",
-  "schema": "ns800.m7.calinputs/1"
+  "schema": "ns800.m7.calinputs/2"
 }

@@ -410,9 +410,24 @@
   ],
   "prior_evidence_discrepancy": {
     "topic": "build banner",
+    "status": "RETRACTED 2026-10-29 by the independent M7-R1 review section 5.2",
     "observation": "no compile-time date string exists in any of the three M7 BIN or AXF, and __DATE__ appears in no source under bsp/novosns/ns800",
     "conflict": "the M5 and M6 build manifests each carry a banner value that cannot be reproduced from their archived image bytes (same pattern scan returns 0 hits on the M5 BIN/AXF)",
-    "handling": "both records kept side by side; the M7 manifest records NOT_EMBEDDED_IN_IMAGE_BYTES; neither was rewritten and no conclusion was drawn about how the earlier values were obtained"
+    "handling": "both records kept side by side; the M7 manifest records NOT_EMBEDDED_IN_IMAGE_BYTES; neither was rewritten and no conclusion was drawn about how the earlier values were obtained",
+    "erratum": {
+      "what_was_wrong": [
+        "search scope: __DATE__/__TIME__ are used at src/kservice.c:161-162, outside bsp/novosns/ns800/ where the grep ran",
+        "search shape: that rt_kprintf emits date and time as two separate string-pool objects, so a date-immediately-followed-by-time pattern cannot hit; the measured pools often hold the time at the lower offset"
+      ],
+      "recheck_method": "read each archived BIN as bytes and run two independent patterns, month-day-year and HH:MM:SS, reporting zero-based byte offsets",
+      "recheck_result": "nine of nine archived BINs (3 M7 + 3 M5 + 3 M6) contain exactly one date string and one time string; the three M7 offsets equal the review results/banner_probe.json entries line by line",
+      "still_true": "no boot banner text was read from the board this round (hardware actions = 0); the six M7 BIN/AXF SHAs still match the manifest",
+      "source_grades": {
+        "build_stamp_recovered_from_archived_bytes": "AVAILABLE",
+        "boot_text_actually_read_on_board": "NOT_AVAILABLE_THIS_ROUND"
+      },
+      "evidence": "reports/reviews/phase8-motor-m7-current-calibration-r1/banner_erratum.md"
+    }
   },
   "review_go_registration": {
     "m6": {

@@ -1,0 +1,28 @@
+runner   : /d/ns800/tests/host/host_main.c
+SRC_APP  : D:/ns800/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications
+OUT_DIR  : /tmp/ns800-m7r1-hostchain/out
+compiler : gcc.exe (tdm64-1) 4.9.2
+
+=== V1 (发布配置: 三个安全宏 = FALSE) ===
+V1 build rc = 0  (log: v1_build.txt)
+V1 run   rc = 0  (执行证据: v1_executed.marker)
+
+=========================================================
+HOST TEST SUMMARY: CHECK_PASS=25 CHECK_FAIL=0 BAD_SELFTEST=0 MISSING_CASE=0
+结论: ALL PASS (判据 + 固件自测终态 + 必需用例齐备性 全部满足)
+PROCESS RC=0 (0=通过)
+=========================================================
+
+=== V2 (HOST_GATE_OVERRIDE + 三宏按 TRUE; 仅主机覆盖路径, 不进 Keil/正式固件) ===
+V2 build rc = 0  (log: v2_build.txt)
+V2 run   rc = 0  (执行证据: v2_executed.marker)
+
+=========================================================
+HOST TEST SUMMARY: CHECK_PASS=22 CHECK_FAIL=0 BAD_SELFTEST=0 MISSING_CASE=0
+结论: ALL PASS (判据 + 固件自测终态 + 必需用例齐备性 全部满足)
+PROCESS RC=0 (0=通过)
+=========================================================
+
+=== RUNNER SUMMARY ===
+  V1 build=0 run=0 state=RAN    V2 build=0 run=0 state=RAN
+  RUNNER RESULT: PASS (rc=0)

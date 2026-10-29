@@ -209,9 +209,27 @@ rt_err_t rt_mutex_init(struct rt_mutex *m, const char *name, rt_uint16_t flags)
     return RT_EOK;
 }
 
+/* mot_lock 在**本线程**的递归持有层数。POSIX 不暴露递归 mutex 的深度, 所以在夹具
+ * 自己的取/放里按锁名记一层, 且只在成功时变动。C22f 用它回答"这次 SP_DIAG 预约到底
+ * 发生在业务锁的持有期内还是持有期外" —— 修前的形状里, 诊断线程只是**碰巧**阻塞在
+ * gate 内部的取锁上, 一旦没有人持锁, gate 一还锁预约就落在锁外; 光看"有没有别的线程
+ * 抢进来"分不出这两种(2026-10-29 REV3 实测: 拆掉外层持锁后 C22b/C22c 仍全绿)。 */
+#define S2_MOT_LOCK_NAME "mot"
+static __thread int s2_mot_depth;
+
+static void s2_mot_note(struct rt_mutex *m, rt_err_t rc, int is_release)
+{
+    if (rc != RT_EOK) return;
+    if (m == RT_NULL || m->name == RT_NULL) return;
+    if (strcmp(m->name, S2_MOT_LOCK_NAME) != 0) return;
+    if (is_release) { if (s2_mot_depth > 0) s2_mot_depth--; }
+    else            { s2_mot_depth++; }
+}
+
 rt_err_t rt_mutex_take(struct rt_mutex *m, rt_int32_t t)
 {
     pthread_mutex_t *real;
+    rt_err_t r;
     int e;
 
     c_mutex_take++;
@@ -227,7 +245,9 @@ rt_err_t rt_mutex_take(struct rt_mutex *m, rt_int32_t t)
     if (t == RT_WAITING_NO)
     {
         /* 递归 mutex: 同线程重入 trylock 直接成功 => 不会被误记成"门外竞争"。 */
-        return (pthread_mutex_trylock(real) == 0) ? RT_EOK : -RT_EBUSY;
+        r = (pthread_mutex_trylock(real) == 0) ? RT_EOK : -RT_EBUSY;
+        s2_mot_note(m, r, 0);
+        return r;
     }
     /* 竞争观测点: trylock 拿不到 = **确实有别的线程持有**这把业务锁, 此时才记一次
      * "门外等待"并置序列位, 然后真阻塞。之前把 trylock 探测去掉(一律记)会让
@@ -249,18 +269,23 @@ rt_err_t rt_mutex_take(struct rt_mutex *m, rt_int32_t t)
         }
         e = pthread_mutex_lock(real);
     }
-    return (e == 0) ? RT_EOK : RT_ERROR;
+    r = (e == 0) ? RT_EOK : RT_ERROR;
+    s2_mot_note(m, r, 0);
+    return r;
 }
 
 rt_err_t rt_mutex_release(struct rt_mutex *m)
 {
     pthread_mutex_t *real = s2_mtx_bind(m, m ? m->name : RT_NULL);
+    rt_err_t r;
 
     c_mutex_release++;
     if (real == RT_NULL) return -RT_EINVAL;
     /* 递归 mutex 自己保证: 同线程多层只放到最后一层; 非持有者 unlock 返回 EPERM
      * => 与产品语义一致的"不偷放", 不再需要(也不能有)跨线程裸读的元数据。 */
-    return pthread_mutex_unlock(real) == 0 ? RT_EOK : -RT_EPERM;
+    r = pthread_mutex_unlock(real) == 0 ? RT_EOK : -RT_EPERM;
+    s2_mot_note(m, r, 1);
+    return r;
 }
 
 static s2_slot *s2_mtx_slot_of(struct rt_mutex *m)
@@ -735,6 +760,20 @@ static int          s_win_violations;   /* 窗口内禁止项命中次数 */
 static pthread_mutex_t s2_atomic = PTHREAD_MUTEX_INITIALIZER;
 static int s2_win_live;                        /* 有线程正在窗口内(受 s2_atomic 保护) */
 
+/* ---------- M7R1-A(C22f): 预约时刻的"业务锁覆盖"探针 ----------
+ * 生产里每一次预约都在**一个最外层窗口内**把 sp.owner 从 SP_NONE 改成自己的 owner
+ * (sp_reserve -> sp_win -> sp_reserve_impl_held), 所以窗口的进出就是"预约当场"这个
+ * 确定时刻, 不需要在产品里加任何会合点。最外层窗口进入时记下本线程 mot_lock 的持有
+ * 层数与 owner; 最外层退出时若 owner 由 SP_NONE 变成别的值, 这一次就是预约, 把当时
+ * 的层数登记下来。合同: 诊断借用路径的预约层数必须 >=1(在 mot_lock 持有期内)。 */
+static __thread int s2_win_mot_before;
+static __thread int s2_win_owner_before;
+int s2_reserve_probe_seen;              /* 1 = 复位后确实发生过一次 owner 认领 */
+int s2_reserve_probe_mot_depth;         /* 那次认领所在最外层窗口进入时的 mot_lock 层数 */
+int s2_reserve_probe_owner;             /* 认领到的 owner */
+static int  sp_owner_peek(void);        /* 定义在 stop_priority.c 纳入之后 */
+static void s2_win_probe_exit(void);
+
 /* ---------- S2: 被屏蔽期间排队、窗口结束后交付的 ISR 模型 ----------
  * 目标事实: PRIMASK=1 时可屏蔽中断只能挂在中断线上, 退出临界区后立即响应。
  * 这里把 s2_isr_raise() 做成同一形状: 窗口开着 => 只入队(记一次"已请求未交付");
@@ -771,6 +810,8 @@ rt_base_t rt_hw_interrupt_disable(void)
     {
         pthread_mutex_lock(&s2_atomic);
         s2_win_live = 1;
+        s2_win_mot_before   = s2_mot_depth;
+        s2_win_owner_before = sp_owner_peek();
     }
     s_intr_depth++;
     s_intr_masked = 1;
@@ -785,6 +826,7 @@ void rt_hw_interrupt_enable(rt_base_t level)
         s_intr_masked = 0;
         s2_win_live = 0;
         pthread_mutex_unlock(&s2_atomic);
+        s2_win_probe_exit();
         /* 窗口一结束就响应挂着的中断(与目标上"退出临界区后立即进 ISR"同序)。
          * ⚠ 必须在解锁**之后**交付: 被交付的 ISR 自己会再开一个短临界区。 */
         s2_dispatch_pending();
@@ -1037,6 +1079,32 @@ int ns800_epwm_commit_prepared_held(struct rt_device_pwm *device,
 #include "step_pwm.c"
 #include "motor.c"
 #include "safety_state.c"
+
+/* M7R1-A(C22f) 探针的后半: 要直接读 canonical 的 sp.owner, 只能放在 stop_priority.c
+ * 纳入之后(前面只有前向声明)。读的是普通字段, 不开窗口、不打印、不调度任何动作。 */
+static int sp_owner_peek(void) { return (int)sp.owner; }
+
+static void s2_win_probe_exit(void)
+{
+    int after = (int)sp.owner;
+
+    if (s2_win_owner_before == (int)SP_NONE && after != (int)SP_NONE)
+    {
+        /* 这个最外层窗口把 owner 从"无人"认领成了某个 owner => 它就是那次预约的窗口。
+         * 登记认领时刻本线程 mot_lock 的持有层数, 由 C22f 判"预约是否落在业务锁的
+         * 持有期内"。层数 0 = 检查与预约之间锁被还掉过 = 修前的形状。 */
+        s2_reserve_probe_seen = 1;
+        s2_reserve_probe_mot_depth = s2_win_mot_before;
+        s2_reserve_probe_owner = after;
+    }
+}
+
+void s2_reserve_probe_reset(void)
+{
+    s2_reserve_probe_seen = 0;
+    s2_reserve_probe_mot_depth = -1;
+    s2_reserve_probe_owner = -1;
+}
 
 /* ---------------- 台账 ---------------- */
 static int g_run, g_pass, g_fail, g_pre, g_skip;
@@ -2260,6 +2328,237 @@ static void cases_target_reject(void)
 }
 
 /* ===================================================================== */
+/* C22 = M7R1-A: 标定静止事务与诊断预约必须共用 mot_lock 的串行化关系
+ * 两条确定次序都用真线程, 先后顺序靠夹具既有的"门外等待"会合点判定:
+ * s2_contend_hits/S2_SEQ_CONTEND 只在**另一个线程确实持有**该业务锁时才置位,
+ * 因此"对方已经卡在锁上"是一个事件, 不是 usleep 猜出来的(任务书 §9 同一纪律)。
+ * 修后的合同两条:
+ *   (1) 标定事务没结束期间, 不得出现新的 SP_DIAG 预约;
+ *   (2) 事务结束之后同一条借用路径必须重新可用 —— 否则是永久封锁而不是串行化。
+ * 但 (1) 单独还不足以锁住这条并发合同: 两条"别人持锁"的次序在修前的实现里也会通过
+ * (诊断线程只是卡在 gate 内部的取锁上, 不是"检查+预约"整段被覆盖)。因此补 C22f,
+ * 直接观察**预约那一刻**本线程是否仍在 mot_lock 持有期内 —— 这是"诊断先取得资格但
+ * 还未预约时标定不得竞争进来"这第二种次序的可判定形式。 */
+#define BIT_CAL_START     6
+#define BIT_DIAG_DONE     7
+
+static int c22_grant_rc = 99, c22_owner_after = 0xFF, c22_taken;
+
+
+static void c22_diag_worker(void *a)
+{
+    sp_token_t tok;
+    sp_snapshot_t s;
+
+    (void)a;
+    s2_seq_set(BIT_CAL_START);            /* 在可能阻塞之前先声明"我要请求了" */
+    c22_grant_rc = (int)motor_pwm_grant_to_diag(&tok);
+    sp_get(&s);
+    c22_owner_after = (int)s.owner;
+    c22_taken = (c22_grant_rc == RT_EOK) ? 1 : 0;
+    if (c22_taken) (void)sp_release(&tok);   /* 真拿到就归还, 不给后面的用例留残态 */
+    s2_seq_set(BIT_DIAG_DONE);
+}
+
+static void cases_cal_static(void)
+{
+    sp_snapshot_t s;
+    sp_token_t tok;
+    rt_err_t e;
+    int hits0;
+
+    /* 这一族全部以"诊断借用真可发生"为前提 => target 变体(四宏 RT_FALSE)整族按声明
+     * SKIP, 不拿"门永远拒绝"冒充标定串行化已经被验证。 */
+    if (!diag_gates_open())
+    {
+        SKIPV("C22", "target 变体无 STEP 输出许可, 预约路径不可达(整族)");
+        return;
+    }
+
+    /* ---- C22a 控制: 静止且无事务时, 预约必须能正常取得并归还 ----
+     * 没有这一条, 后面的"被拒绝/被串行"可能只是因为夹具根本拿不到预约。 */
+    wire_and_boot();
+    if (!pre_ok("C22a READY", safety_state_get() == SAFETY_READY)) return;
+    e = motor_pwm_grant_to_diag(&tok);
+    sp_get(&s);
+    CHECK("C22a-idle-grant-works",
+          e == RT_EOK && s.owner == SP_DIAG,
+          fm("grant rc=%d owner=%u(期望 SP_DIAG=%u) - 无人竞争时借用路径必须可用",
+             (int)e, (unsigned)s.owner, (unsigned)SP_DIAG));
+    (void)sp_release(&tok);
+    sp_get(&s);
+    if (!pre_ok("C22a release balances", s.owner == SP_NONE)) return;
+
+    /* ---- C22b 标定先持事务 -> 另一线程请求预约: 事务期间不得出现预约 ---- */
+    wire_and_boot();
+    s2_seq_reset();
+    s2_contend_clear();
+    hits0 = s2_contend_hits;
+    if (!pre_ok("C22b cal begin",
+                motor_calibration_static_begin() == RT_EOK)) return;
+    c22_grant_rc = 99; c22_taken = 0; c22_owner_after = 0xFF;
+    s2_spawn(c22_diag_worker, RT_NULL);
+    if (!seq_or_fail("C22b worker started", BIT_CAL_START))
+    {
+        motor_calibration_static_end(); s2_join_all(); return;
+    }
+    if (!seq_or_fail("C22b worker parked on mot_lock", S2_SEQ_CONTEND))
+    {
+        motor_calibration_static_end(); s2_join_all(); return;
+    }
+    sp_get(&s);
+    /* 此刻工作线程还停在锁外, 它自己的观察值尚未写下(初值 0xFF) —— 那是正常的,
+     * 判据只看**全局**有没有产生新的 SP_DIAG 预约, 不看它还没机会写的那个字段。 */
+    CHECK("C22b-cal-tx-blocks-diag-reservation",
+          s2_contend_hits > hits0 && strcmp(s2_contend_name, "mot") == 0 &&
+          s.owner == SP_NONE && !c22_taken,
+          fm("事务持锁中: 竞争计数 %d->%d(锁=%s) 全局 owner=%u(SP_NONE=%u)"
+             " 工作线程已完成=%d - 预约没有在事务期间产生",
+             hits0, s2_contend_hits, s2_contend_name,
+             (unsigned)s.owner, (unsigned)SP_NONE,
+             (s2_seq_get_bit(BIT_DIAG_DONE) ? 1 : 0)));
+    /* 放锁 => 同一线程的等待必须被放行, 并且这次合法地拿到预约(串行完成)。 */
+    motor_calibration_static_end();
+    if (!seq_or_fail("C22b2 worker finished", BIT_DIAG_DONE))
+    {
+        s2_join_all(); return;
+    }
+    s2_join_all();
+    sp_get(&s);
+    CHECK("C22b2-grant-legal-after-tx-ends",
+          c22_grant_rc == RT_EOK && c22_taken == 1,
+          fm("事务结束后诊断 rc=%d taken=%d - 是串行化, 不是永久封锁",
+             c22_grant_rc, c22_taken));
+    if (!pre_ok("C22b2 owner released", s.owner == SP_NONE)) return;
+
+    /* ---- C22c 反向次序(不带标定参与): 任意线程持 mot_lock 时, 诊断借用同样必须
+     * 被挡在锁外且不产生预约。修前 grant 的"资格判定 + 预约"跨了两次取放, 这一段
+     * 窗口对任何持锁方都存在; 现在两段在同一个持锁段里, 所以挡住它的只有锁本身。
+     * 用夹具的真递归互斥量按名字取"mot"(与 C02 同一手法), 不依赖标定标志位。 */
+    wire_and_boot();
+    s2_seq_reset();
+    s2_contend_clear();
+    hits0 = s2_contend_hits;
+    {
+        struct rt_mutex *m = s2_mtx_by_name("mot");
+
+        if (!pre_ok("C22c mot mutex exists", m != RT_NULL)) return;
+        if (!pre_ok("C22c main takes mot_lock",
+                    rt_mutex_take(m, RT_WAITING_FOREVER) == RT_EOK)) return;
+        c22_grant_rc = 99; c22_taken = 0; c22_owner_after = 0xFF;
+        s2_spawn(c22_diag_worker, RT_NULL);
+        if (!seq_or_fail("C22c worker started", BIT_CAL_START) ||
+            !seq_or_fail("C22c worker parked on mot_lock", S2_SEQ_CONTEND))
+        {
+            (void)rt_mutex_release(m); s2_join_all(); return;
+        }
+        sp_get(&s);
+        CHECK("C22c-lock-holder-blocks-diag-reservation",
+              s2_contend_hits > hits0 && strcmp(s2_contend_name, "mot") == 0 &&
+              s.owner == SP_NONE && !c22_taken,
+              fm("外部持锁中: 竞争 %d->%d(锁=%s) owner=%u(SP_NONE=%u) done=%d"
+                 " - 串行化来自锁, 不是来自标定标志",
+                 hits0, s2_contend_hits, s2_contend_name, (unsigned)s.owner,
+                 (unsigned)SP_NONE, (s2_seq_get_bit(BIT_DIAG_DONE) ? 1 : 0)));
+        (void)rt_mutex_release(m);
+        if (!seq_or_fail("C22c worker finished", BIT_DIAG_DONE))
+        {
+            s2_join_all(); return;
+        }
+        s2_join_all();
+        sp_get(&s);
+        CHECK("C22c2-grant-legal-after-holder-releases",
+              c22_grant_rc == RT_EOK && c22_taken,
+              fm("放锁后诊断 rc=%d taken=%d - 是串行化, 不是永久封锁",
+                 c22_grant_rc, c22_taken));
+        if (!pre_ok("C22c2 owner released", s.owner == SP_NONE)) return;
+    }
+
+    /* ---- C22d 原有语义未退化: 诊断已持预约时, 标定事务必须拒绝 ---- */
+    wire_and_boot();
+    if (!pre_ok("C22d grant", motor_pwm_grant_to_diag(&tok) == RT_EOK)) return;
+    e = motor_calibration_static_begin();
+    sp_get(&s);
+    CHECK("C22d-diag-owner-blocks-cal-tx",
+          e != RT_EOK && s.owner == SP_DIAG,
+          fm("begin rc=%d owner=%u - 已持诊断预约时标定事务必须拒绝且不残留",
+             (int)e, (unsigned)s.owner));
+    (void)sp_release(&tok);
+
+    /* ---- C22e 失败出口不泄锁: 被串行化过的诊断路径之后, 锁仍可正常取放 ---- */
+    wire_and_boot();
+    if (!pre_ok("C22e cal begin",
+                motor_calibration_static_begin() == RT_EOK)) return;
+    s2_seq_reset();
+    s2_contend_clear();
+    c22_grant_rc = 99; c22_taken = 0;
+    s2_spawn(c22_diag_worker, RT_NULL);
+    if (!seq_or_fail("C22e worker parked", S2_SEQ_CONTEND))
+    {
+        motor_calibration_static_end(); s2_join_all(); return;
+    }
+    motor_calibration_static_end();
+    if (!seq_or_fail("C22e worker finished", BIT_DIAG_DONE))
+    {
+        s2_join_all(); return;
+    }
+    s2_join_all();
+    {
+        motor_snapshot_t ms;
+        int r1, r2;
+
+        memset(&ms, 0, sizeof(ms));
+        r1 = (int)motor_get_snapshot(&ms);          /* 内部要取放 mot_lock */
+        r2 = (int)motor_pwm_grant_to_diag(&tok);
+        sp_get(&s);
+        CHECK("C22e-contended-path-leaks-no-lock",
+              r1 == RT_EOK && r2 == RT_EOK && s.owner == SP_DIAG && c22_taken,
+              fm("排队之后 snapshot=%d grant=%d owner=%u - 没有把锁留在被拒的一刻",
+                 r1, r2, (unsigned)s.owner));
+        (void)sp_release(&tok);
+    }
+
+    /* ---- C22f "已取得资格但尚未预约"这段时间必须真的在锁里 ----
+     * C22b/C22c 只证明"别人持锁时预约出不来", 而修前的形状同样满足它: 诊断线程会
+     * 碰巧卡在 gate 内部 motor_get_snapshot() 的那次取锁上, 而不是"检查+预约"这一整段
+     * 被同一把锁覆盖(2026-10-29 REV3 实测: 把外层持锁拆掉, C22b/C22c 仍然全绿)。
+     * 这一条不靠抢时间: 生产里每次预约都在一个最外层屏蔽窗口内把 owner 从 SP_NONE
+     * 认领成自己, 夹具在该窗口进入时记下本线程 mot_lock 的持有层数 => 预约时刻的覆盖
+     * 是一个当场可读的事实。合同: 借用路径的这次认领层数必须 >=1。 */
+    wire_and_boot();
+    if (!pre_ok("C22f READY", safety_state_get() == SAFETY_READY)) return;
+    sp_get(&s);
+    if (!pre_ok("C22f no owner before", s.owner == SP_NONE)) return;
+    s2_reserve_probe_reset();
+    e = motor_pwm_grant_to_diag(&tok);
+    sp_get(&s);
+    CHECK("C22f-qualification-and-reservation-are-one-hold",
+          e == RT_EOK && s2_reserve_probe_seen == 1 &&
+          s2_reserve_probe_owner == (int)SP_DIAG &&
+          s2_reserve_probe_mot_depth >= 1 && s.owner == SP_DIAG,
+          fm("grant=%d 认领=%d owner=%d 预约时 mot_lock 层数=%d - 检查还锁之后才预约"
+             "就是修前那个窗口(期望层数>=1, 即仍在 mot_lock 持有期内)",
+             (int)e, s2_reserve_probe_seen, s2_reserve_probe_owner,
+             s2_reserve_probe_mot_depth));
+    if (s.owner != SP_NONE) (void)sp_release(&tok);
+    sp_get(&s);
+    if (!pre_ok("C22f release balances", s.owner == SP_NONE)) return;
+    /* 对照: 预约时刻的观测本身不是恒真 —— 同一探针在没有发生认领时必须报"没认领",
+     * 否则 C22f 的"看到一次层数>=1 的认领"不构成证据。 */
+    {
+        motor_snapshot_t fms;
+
+        s2_reserve_probe_reset();
+        memset(&fms, 0, sizeof(fms));
+        if (!pre_ok("C22f2 snapshot ok", motor_get_snapshot(&fms) == RT_EOK)) return;
+        CHECK("C22f2-probe-not-vacuous",
+              s2_reserve_probe_seen == 0 && s2_reserve_probe_mot_depth == -1,
+              fm("只读快照之后 认领=%d 层数=%d - 探针不会把无关窗口当预约",
+                 s2_reserve_probe_seen, s2_reserve_probe_mot_depth));
+    }
+}
+
+/* ===================================================================== */
 /* main: 一个进程跑完全部适用 ID(与既有四链同一台账纪律)                    */
 /* ===================================================================== */
 struct s2_grp { const char *name; void (*fn)(void); };
@@ -2271,6 +2570,7 @@ static const struct s2_grp grps[] = {
     { "diag", cases_diag },            { "recovery", cases_recovery },
     { "stale", cases_stale },          { "boundary", cases_boundary },
     { "healthy", cases_healthy },      { "target_reject", cases_target_reject },
+    { "cal_static", cases_cal_static },
 };
 
 /* 每组**一个独立进程**: 生产静态量(sp 的 exhausted/inhibit、SS 状态、历史锁存)在同一

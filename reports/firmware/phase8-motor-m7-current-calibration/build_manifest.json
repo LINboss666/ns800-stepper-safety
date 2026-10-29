@@ -15,6 +15,8 @@
     "result": "three targets 0 Error(s), 0 Warning(s)"
   },
   "banner_note": "No __DATE__/__TIME__ banner is compiled into these images: grep for the date-time pattern over all three BIN and all three AXF returns 0 hits, and __DATE__ appears nowhere under bsp/novosns/ns800 except a markdown file. This round has no device access, so no boot banner was read from the board. The 'banner' values in the M5/M6 build manifests are therefore not reproducible from the archived image bytes; recorded as a prior-evidence discrepancy, not silently copied forward.",
+  "banner_erratum": "RETRACTED, 2026-10-29 independent review M7-R1 section 5.2. The banner_note above is a search-method error, not an image property: __DATE__/__TIME__ are used at src/kservice.c:161-162, outside bsp/novosns/ns800/ where I grepped, and that format string emits date and time as TWO separate string-pool objects, so my date-immediately-followed-by-time pattern can never hit. Re-measured this round by zero-based byte offsets over the archived BINs with two independent patterns: all three M7 BINs and all three M5 and all three M6 BINs each contain exactly one date string and one time string. The M5/M6 manifest banner values ARE reproducible from archived bytes, so the prior-evidence-discrepancy claim is void too. Unchanged facts: no boot banner was read from the board this round (no device access), and the six M7 BIN/AXF SHAs still match their manifest values. Evidence: reports/reviews/phase8-motor-m7-current-calibration-r1/banner_erratum.md",
+  "banner_source_grades": {"build_stamp_recovered_from_archived_bytes": "AVAILABLE, offsets recorded per target", "boot_text_actually_read_on_board": "NOT_AVAILABLE_THIS_ROUND (hardware actions = 0)"},
   "targets": {
     "rt-thread": {
       "macros": "no target -D for the four hardware macros -> motor.h defaults RT_FALSE (probe rc=0)",
@@ -37,7 +39,8 @@
         "entry_point": "0x080003cd",
         "note": "armlink Load Region LR_IROM1: base/size/max/compressed from the .map. compressed equals the archived BIN byte count for every target; total_rom_size is 4 B smaller (armlink counts Code+RO+RW without the trailing padding fromelf appends)."
       },
-      "banner": "NOT_EMBEDDED_IN_IMAGE_BYTES (see banner_note)",
+      "banner": "build stamp recovered from archived BIN bytes: date \"Oct 29 2026\" at zero-based offset 259816, time \"18:46:15\" at offset 259807 (see banner_erratum)",
+      "banner_superseded_value_kept_for_audit": "NOT_EMBEDDED_IN_IMAGE_BYTES (retracted 2026-10-29)",
       "build_log": "reports/reviews/phase8-motor-m7-current-calibration/builds/build_rt-thread.log"
     },
     "rt-thread-measure-a0": {
@@ -61,7 +64,8 @@
         "entry_point": "0x080003cd",
         "note": "armlink Load Region LR_IROM1: base/size/max/compressed from the .map. compressed equals the archived BIN byte count for every target; total_rom_size is 4 B smaller (armlink counts Code+RO+RW without the trailing padding fromelf appends)."
       },
-      "banner": "NOT_EMBEDDED_IN_IMAGE_BYTES (see banner_note)",
+      "banner": "build stamp recovered from archived BIN bytes: date \"Oct 29 2026\" at zero-based offset 270047, time \"18:46:28\" at offset 270059 (see banner_erratum)",
+      "banner_superseded_value_kept_for_audit": "NOT_EMBEDDED_IN_IMAGE_BYTES (retracted 2026-10-29)",
       "build_log": "reports/reviews/phase8-motor-m7-current-calibration/builds/build_rt-thread-measure-a0.log"
     },
     "rt-thread-motor-m1-candidate": {
@@ -85,7 +89,8 @@
         "entry_point": "0x080003cd",
         "note": "armlink Load Region LR_IROM1: base/size/max/compressed from the .map. compressed equals the archived BIN byte count for every target; total_rom_size is 4 B smaller (armlink counts Code+RO+RW without the trailing padding fromelf appends)."
       },
-      "banner": "NOT_EMBEDDED_IN_IMAGE_BYTES (see banner_note)",
+      "banner": "build stamp recovered from archived BIN bytes: date \"Oct 29 2026\" at zero-based offset 259925, time \"18:46:41\" at offset 259916 (see banner_erratum)",
+      "banner_superseded_value_kept_for_audit": "NOT_EMBEDDED_IN_IMAGE_BYTES (retracted 2026-10-29)",
       "build_log": "reports/reviews/phase8-motor-m7-current-calibration/builds/build_rt-thread-motor-m1-candidate.log"
     }
   },

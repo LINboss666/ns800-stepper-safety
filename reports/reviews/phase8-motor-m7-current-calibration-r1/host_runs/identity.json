@@ -1,0 +1,206 @@
+{
+  "round": "phase8-motor-m7-current-calibration-r1",
+  "executed_on": "local Windows / Git Bash / MinGW-w64 GCC 4.9.2 (tdm64), offline",
+  "identity_rule": "core.autocrlf=true (measured); these paths report `text: unspecified` from git check-attr, so a commit drops every CR. expected_blob_* = worktree bytes with \r\n -> \n, which is the transform git performs and is re-checked against the pushed remote blob in remote_readback_r1.md",
+  "self_hash_excluded": "identity.json does not hash its own bytes",
+  "files": [
+    {
+      "file": "calcalc_selftest.log",
+      "worktree_bytes": 2531,
+      "worktree_sha256": "065e1e6cdf6a1f25527dd47d08b68c4c729c33dd5a266f071f7740a31a4c4f7e",
+      "cr": 56,
+      "lf": 56,
+      "expected_blob_bytes": 2475,
+      "expected_blob_sha256": "b8ea8c13224713ec5e12c15f72a2329b658fdda056fc509feb16f5102745b021",
+      "normalized_by_autocrlf": true,
+      "lossless": false
+    },
+    {
+      "file": "current_cal.log",
+      "worktree_bytes": 9691,
+      "worktree_sha256": "7f2b9e85c26001cd483de5204585a06e31b5d8115e28c91589bab83aaeee7263",
+      "cr": 157,
+      "lf": 160,
+      "expected_blob_bytes": 9534,
+      "expected_blob_sha256": "810f45d8e4ad6717e9efd01c7f1edfcca7bad3beb420805684c04b2674d4655a",
+      "normalized_by_autocrlf": true,
+      "lossless": false
+    },
+    {
+      "file": "io.log",
+      "worktree_bytes": 1019,
+      "worktree_sha256": "d10a387994da75ffd7344bb1457fb242f59e910ce88b9e81ea995cd53771ae74",
+      "cr": 0,
+      "lf": 24,
+      "expected_blob_bytes": 1019,
+      "expected_blob_sha256": "d10a387994da75ffd7344bb1457fb242f59e910ce88b9e81ea995cd53771ae74",
+      "normalized_by_autocrlf": false,
+      "lossless": true
+    },
+    {
+      "file": "m6_cli.log",
+      "worktree_bytes": 188,
+      "worktree_sha256": "e3c36f03d24868094c25e81c4449424972699e99610a5ed0242721230ed2b231",
+      "cr": 0,
+      "lf": 5,
+      "expected_blob_bytes": 188,
+      "expected_blob_sha256": "e3c36f03d24868094c25e81c4449424972699e99610a5ed0242721230ed2b231",
+      "normalized_by_autocrlf": false,
+      "lossless": true
+    },
+    {
+      "file": "m7_reverse_final.log",
+      "worktree_bytes": 302,
+      "worktree_sha256": "fd53f797845a48f66e46b3c0908e237510efb0fed8aaf13967ffd2d7b9e0306f",
+      "cr": 0,
+      "lf": 8,
+      "expected_blob_bytes": 302,
+      "expected_blob_sha256": "fd53f797845a48f66e46b3c0908e237510efb0fed8aaf13967ffd2d7b9e0306f",
+      "normalized_by_autocrlf": false,
+      "lossless": true
+    },
+    {
+      "file": "m7_reverse_run1_first_attempt_NOT_DETECTED.log",
+      "worktree_bytes": 227,
+      "worktree_sha256": "fe35631c0c990e65da6255bdde52c3dafcfef26294d3a3419b2347d028ef04a5",
+      "cr": 0,
+      "lf": 8,
+      "expected_blob_bytes": 227,
+      "expected_blob_sha256": "fe35631c0c990e65da6255bdde52c3dafcfef26294d3a3419b2347d028ef04a5",
+      "normalized_by_autocrlf": false,
+      "lossless": true
+    },
+    {
+      "file": "m7_reverse_run2.log",
+      "worktree_bytes": 295,
+      "worktree_sha256": "d495372f3d4bdaa2262fc6b13367ccfc311790269162e29b4ca07c83541d4ebd",
+      "cr": 0,
+      "lf": 8,
+      "expected_blob_bytes": 295,
+      "expected_blob_sha256": "d495372f3d4bdaa2262fc6b13367ccfc311790269162e29b4ca07c83541d4ebd",
+      "normalized_by_autocrlf": false,
+      "lossless": true
+    },
+    {
+      "file": "probe_calcalc_postfix_rows.txt",
+      "worktree_bytes": 1326,
+      "worktree_sha256": "01fa7ca613e8188b5c631f123457e2f379e90c47496b83740f834f1a70b465a3",
+      "cr": 10,
+      "lf": 10,
+      "expected_blob_bytes": 1316,
+      "expected_blob_sha256": "5a3772dfb12b98cffa465e4700b916c8d7087ddac6c6fb02494dd1ac96286abf",
+      "normalized_by_autocrlf": true,
+      "lossless": false
+    },
+    {
+      "file": "probe_cfg_mutex_postfix.txt",
+      "worktree_bytes": 194,
+      "worktree_sha256": "1d202b698a1489d09bd0682b517ca7793f81655b9f2245178ec97cfc7b76cbe2",
+      "cr": 3,
+      "lf": 3,
+      "expected_blob_bytes": 191,
+      "expected_blob_sha256": "1fefb61b346dc5b027e8b3cc014c4e21477c56aee16ca7d51f5679d08918bf7b",
+      "normalized_by_autocrlf": true,
+      "lossless": false
+    },
+    {
+      "file": "probe_diag_threads_postfix.txt",
+      "worktree_bytes": 1859,
+      "worktree_sha256": "bc08d6da7b5c8226aeaf0a85cda4d736c75d79c78db72718ff28e9eb3793aafa",
+      "cr": 26,
+      "lf": 26,
+      "expected_blob_bytes": 1833,
+      "expected_blob_sha256": "bcd4792e7cc7364c174f2d21ed5c5897b8c7f74888c6f6e1d7c10976af8918c6",
+      "normalized_by_autocrlf": true,
+      "lossless": false
+    },
+    {
+      "file": "probe_show_overflow_postfix.txt",
+      "worktree_bytes": 477,
+      "worktree_sha256": "0570fe2fa6a418d8578e26a3e6c24e300d685e155c5259f445ce68cad569c120",
+      "cr": 9,
+      "lf": 9,
+      "expected_blob_bytes": 468,
+      "expected_blob_sha256": "03215d4d0414a28be3bcbd2649c969e83b13694a7ae0d7a6da926f2a6c6ab448",
+      "normalized_by_autocrlf": true,
+      "lossless": false
+    },
+    {
+      "file": "reverse_cc6_detail.txt",
+      "worktree_bytes": 9880,
+      "worktree_sha256": "ac7df9e0e661202122f874e05e614235a7cc6ee28f7407a43299aabc6b1ef97a",
+      "cr": 157,
+      "lf": 163,
+      "expected_blob_bytes": 9723,
+      "expected_blob_sha256": "ec310e1dbee5171d4ebdcb96dfc1b6e5ab2b5d4895b840ca6599c7a1790c13df",
+      "normalized_by_autocrlf": true,
+      "lossless": false
+    },
+    {
+      "file": "reverse_s2_C22f_failure_detail.txt",
+      "worktree_bytes": 8765,
+      "worktree_sha256": "342d7a805740bb181a908fd01f1954b30724812322bb72ee1f2f48859004f652",
+      "cr": 0,
+      "lf": 100,
+      "expected_blob_bytes": 8765,
+      "expected_blob_sha256": "342d7a805740bb181a908fd01f1954b30724812322bb72ee1f2f48859004f652",
+      "normalized_by_autocrlf": false,
+      "lossless": true
+    },
+    {
+      "file": "run_probes_local.py",
+      "worktree_bytes": 6732,
+      "worktree_sha256": "57a47b22d0dc67d91a0f8fa2e01be1f615f2e8690cdb918ccc67c61e965312ee",
+      "cr": 0,
+      "lf": 128,
+      "expected_blob_bytes": 6732,
+      "expected_blob_sha256": "57a47b22d0dc67d91a0f8fa2e01be1f615f2e8690cdb918ccc67c61e965312ee",
+      "normalized_by_autocrlf": false,
+      "lossless": true
+    },
+    {
+      "file": "s1.log",
+      "worktree_bytes": 1250,
+      "worktree_sha256": "84077360b55e4e07b4b8c0769b038044fd87f79d166844eb51120572a4049cc6",
+      "cr": 0,
+      "lf": 21,
+      "expected_blob_bytes": 1250,
+      "expected_blob_sha256": "84077360b55e4e07b4b8c0769b038044fd87f79d166844eb51120572a4049cc6",
+      "normalized_by_autocrlf": false,
+      "lossless": true
+    },
+    {
+      "file": "s2.log",
+      "worktree_bytes": 8569,
+      "worktree_sha256": "8be1e4eb7e8dfd54ac3aa181f41360cee28d919164e5e048f1111ad4a71eef9a",
+      "cr": 0,
+      "lf": 98,
+      "expected_blob_bytes": 8569,
+      "expected_blob_sha256": "8be1e4eb7e8dfd54ac3aa181f41360cee28d919164e5e048f1111ad4a71eef9a",
+      "normalized_by_autocrlf": false,
+      "lossless": true
+    },
+    {
+      "file": "sd.log",
+      "worktree_bytes": 806,
+      "worktree_sha256": "797f634d56d89e9a0d0a3732f657fbabc1be3f6bd34929e17c84ff2e32ad64b0",
+      "cr": 0,
+      "lf": 19,
+      "expected_blob_bytes": 806,
+      "expected_blob_sha256": "797f634d56d89e9a0d0a3732f657fbabc1be3f6bd34929e17c84ff2e32ad64b0",
+      "normalized_by_autocrlf": false,
+      "lossless": true
+    },
+    {
+      "file": "v1v2.log",
+      "worktree_bytes": 1281,
+      "worktree_sha256": "b1fd3317add72a15022336d1af6f28637f92846bfe06824b12dc5617dd4883e9",
+      "cr": 12,
+      "lf": 28,
+      "expected_blob_bytes": 1269,
+      "expected_blob_sha256": "3c369d825d9087d9d28df76649ab7b36878e78077f6ebc040e60187c8231d581",
+      "normalized_by_autocrlf": true,
+      "lossless": false
+    }
+  ]
+}

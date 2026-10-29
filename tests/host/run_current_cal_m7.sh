@@ -25,7 +25,7 @@ fi
 prc=$?
 echo "build_rc=$brc proc_rc=$prc"
 cat "$OUT_DIR/out.txt"
-ids="CC01-show_no_side_effects CC02-sample_128_normal CC03-sample_dup_invalid_skip CC04-sample_endpoint_rejected CC05-sample_no_frames_bounded CC06-isr_silent CC07-masked_silent CC08-no_thread_silent CC09-bad_n_usage CC10-missing_confirm_usage CC11-bad_nominal_confirm CC12-apply_numeric_reject CC13-apply_static_refused CC14-apply_success_measured CC15-apply_other_cfg_kept CC16-nominal_theoretical CC17-config_publish_order CC18-save_load_preserves_measured CC19-load_failure_theoretical CC20-cal_snapshot_same_read CC21-key_lines_ascii_110 CC22-msh_export_name CC23-sample_cal_changed CC24-sample_256_boundary CC25-nan_inf_range_reject CC26-api_none_legal_config_rejects"
+ids="CC01-show_no_side_effects CC02-sample_128_normal CC03-sample_dup_invalid_skip CC04-sample_endpoint_rejected CC05-sample_no_frames_bounded CC06-isr_silent CC07-masked_silent CC08-no_thread_silent CC09-bad_n_usage CC10-missing_confirm_usage CC11-bad_nominal_confirm CC12-apply_numeric_reject CC13-apply_static_refused CC14-apply_success_measured CC15-apply_other_cfg_kept CC16-nominal_theoretical CC17-config_publish_order CC18-save_load_preserves_measured CC19-load_failure_theoretical CC20-cal_snapshot_same_read CC21-key_lines_ascii_110 CC22-msh_export_name CC23-sample_cal_changed CC24-sample_256_boundary CC25-nan_inf_range_reject CC26-api_none_legal_config_rejects CC27-cfg_lock_unavailable_rejects CC27b-cfg_lock_unavailable_no_mutation CC27c-cfg_lock_unavailable_no_release CC27d-cfg_lock_available_publishes CC28-microamp_export_no_int32_wrap CC28b-microamp_line_still_short CC28c-microamp_negative_signed CC29-scaled_dec_range_marker"
 n=0; bad=0
 for id in $ids; do
     n=$((n+1))

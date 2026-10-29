@@ -1,0 +1,8 @@
+REV1 s1_rc=1 hits=3/3
+REV2 cc_rc=1 hits=1/1
+REV3 s2_rc=1 hits=1/1
+REV4 cc4_rc=1 hits=2/2
+REV5 calcalc_rc=1 hits=3/3
+REV6 cc6_rc=1 hits=2/2 collateral_cc27d_fail=1
+OUT_DIR=/tmp/ns800-m7r1-hostchain/m7-reverse/20261029T144534Z-403
+M7 REVERSE RESULT: PASS (all six named failure families detected)

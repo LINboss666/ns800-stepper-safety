@@ -1,0 +1,98 @@
+###### 停机优先 S2 并发/身份链 (基线 68d0774e6b32fec28ebca8dd306a23a29a4a2fc9) ######
+run_id=20261029T145940Z-2166
+SRC_APP=D:/ns800/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications
+夹具=/d/ns800/tests/host/sp_conc_main.c (真 pthread 互斥量/线程/窗口内排队 ISR)
+OUT_DIR=/tmp/ns800-m7r1-hostchain/s2/20261029T145940Z-2166
+compiler=gcc.exe (tdm64-1) 4.9.2
+单组墙钟=60s(死锁守卫)  选择集合=lock,isr,isr_window,off_matrix,off_arm,unknown,identity,diag,recovery,stale,boundary,healthy,target_reject,epwm_leaf,tmc_lock,uart_leaf,budget_leaf,read_obs,cal_static
+
+=== 变体 target ===
+    台账: 必需=5 唯一出现=5 实际行数=5 SUMMARY(cases=5 pass=5 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=3 唯一出现=3 实际行数=3 SUMMARY(cases=3 pass=3 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=2 唯一出现=2 实际行数=2 SUMMARY(cases=2 pass=2 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=2 唯一出现=2 实际行数=2 SUMMARY(cases=2 pass=2 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=0 唯一出现=0 实际行数=0 SUMMARY(cases=0 pass=0 fail=0 pre_bad=0 skips=2) 自洽=1
+    台账: 必需=1 唯一出现=1 实际行数=1 SUMMARY(cases=1 pass=1 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=0 唯一出现=0 实际行数=0 SUMMARY(cases=0 pass=0 fail=0 pre_bad=0 skips=3) 自洽=1
+    台账: 必需=0 唯一出现=0 实际行数=0 SUMMARY(cases=0 pass=0 fail=0 pre_bad=0 skips=1) 自洽=1
+    台账: 必需=5 唯一出现=5 实际行数=5 SUMMARY(cases=5 pass=5 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=1 唯一出现=1 实际行数=1 SUMMARY(cases=1 pass=1 fail=0 pre_bad=0 skips=2) 自洽=1
+    台账: 必需=2 唯一出现=2 实际行数=2 SUMMARY(cases=2 pass=2 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=0 唯一出现=0 实际行数=0 SUMMARY(cases=0 pass=0 fail=0 pre_bad=0 skips=2) 自洽=1
+    台账: 必需=2 唯一出现=2 实际行数=2 SUMMARY(cases=2 pass=2 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=0 唯一出现=0 实际行数=0 SUMMARY(cases=0 pass=0 fail=0 pre_bad=0 skips=1) 自洽=1
+    台账: 必需=0 唯一出现=0 实际行数=0 SUMMARY(cases=0 pass=0 fail=0 pre_bad=0 skips=1) 自洽=1
+    台账: 必需=0 唯一出现=0 实际行数=0 SUMMARY(cases=0 pass=0 fail=0 pre_bad=0 skips=1) 自洽=1
+    台账: 必需=0 唯一出现=0 实际行数=0 SUMMARY(cases=0 pass=0 fail=0 pre_bad=0 skips=1) 自洽=1
+    台账: 必需=30 唯一出现=30 实际行数=30 SUMMARY(cases=30 pass=30 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=0 唯一出现=0 实际行数=0 SUMMARY(cases=0 pass=0 fail=0 pre_bad=0 skips=1) 自洽=1
+  target 汇总: 组=19 用例=53 PASS=53 FAIL=0 SKIP行=15 pre_bad=0 期望用例=53
+
+=== 变体 host_ovr ===
+    台账: 必需=5 唯一出现=5 实际行数=5 SUMMARY(cases=5 pass=5 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=3 唯一出现=3 实际行数=3 SUMMARY(cases=3 pass=3 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=2 唯一出现=2 实际行数=2 SUMMARY(cases=2 pass=2 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=2 唯一出现=2 实际行数=2 SUMMARY(cases=2 pass=2 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=2 唯一出现=2 实际行数=2 SUMMARY(cases=2 pass=2 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=1 唯一出现=1 实际行数=1 SUMMARY(cases=1 pass=1 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=7 唯一出现=7 实际行数=7 SUMMARY(cases=7 pass=7 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=4 唯一出现=4 实际行数=4 SUMMARY(cases=4 pass=4 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=5 唯一出现=5 实际行数=5 SUMMARY(cases=5 pass=5 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=3 唯一出现=3 实际行数=3 SUMMARY(cases=3 pass=3 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=2 唯一出现=2 实际行数=2 SUMMARY(cases=2 pass=2 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=5 唯一出现=5 实际行数=5 SUMMARY(cases=5 pass=5 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=0 唯一出现=0 实际行数=0 SUMMARY(cases=0 pass=0 fail=0 pre_bad=0 skips=1) 自洽=1
+    台账: 必需=10 唯一出现=10 实际行数=10 SUMMARY(cases=10 pass=10 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=15 唯一出现=15 实际行数=15 SUMMARY(cases=15 pass=15 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=7 唯一出现=7 实际行数=7 SUMMARY(cases=7 pass=7 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=6 唯一出现=6 实际行数=6 SUMMARY(cases=6 pass=6 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=30 唯一出现=30 实际行数=30 SUMMARY(cases=30 pass=30 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=9 唯一出现=9 实际行数=9 SUMMARY(cases=9 pass=9 fail=0 pre_bad=0 skips=0) 自洽=1
+  host_ovr 汇总: 组=19 用例=118 PASS=118 FAIL=0 SKIP行=1 pre_bad=0 期望用例=118
+
+=== S2 并发/身份矩阵 ===
+target/lock | OK 必需=5 全部PASS 行数=5 skips=0 pre_bad=0 proc_rc=0
+target/isr | OK 必需=3 全部PASS 行数=3 skips=0 pre_bad=0 proc_rc=0
+target/isr_window | OK 必需=2 全部PASS 行数=2 skips=0 pre_bad=0 proc_rc=0
+target/off_matrix | OK 必需=2 全部PASS 行数=2 skips=0 pre_bad=0 proc_rc=0
+target/off_arm | OK 必需=0 全部PASS 行数=0 skips=2 pre_bad=0 proc_rc=0
+target/unknown | OK 必需=1 全部PASS 行数=1 skips=0 pre_bad=0 proc_rc=0
+target/identity | OK 必需=0 全部PASS 行数=0 skips=3 pre_bad=0 proc_rc=0
+target/diag | OK 必需=0 全部PASS 行数=0 skips=1 pre_bad=0 proc_rc=0
+target/recovery | OK 必需=5 全部PASS 行数=5 skips=0 pre_bad=0 proc_rc=0
+target/stale | OK 必需=1 全部PASS 行数=1 skips=2 pre_bad=0 proc_rc=0
+target/boundary | OK 必需=2 全部PASS 行数=2 skips=0 pre_bad=0 proc_rc=0
+target/healthy | OK 必需=0 全部PASS 行数=0 skips=2 pre_bad=0 proc_rc=0
+target/target_reject | OK 必需=2 全部PASS 行数=2 skips=0 pre_bad=0 proc_rc=0
+target/epwm_leaf | OK 必需=0 全部PASS 行数=0 skips=1 pre_bad=0 proc_rc=0
+target/tmc_lock | OK 必需=0 全部PASS 行数=0 skips=1 pre_bad=0 proc_rc=0
+target/uart_leaf | OK 必需=0 全部PASS 行数=0 skips=1 pre_bad=0 proc_rc=0
+target/budget_leaf | OK 必需=0 全部PASS 行数=0 skips=1 pre_bad=0 proc_rc=0
+target/read_obs | OK 必需=30 全部PASS 行数=30 skips=0 pre_bad=0 proc_rc=0
+target/cal_static | OK 必需=0 全部PASS 行数=0 skips=1 pre_bad=0 proc_rc=0
+target | OK 全部 19 组自洽且必需用例真执行判 PASS (用例=53)
+host_ovr/lock | OK 必需=5 全部PASS 行数=5 skips=0 pre_bad=0 proc_rc=0
+host_ovr/isr | OK 必需=3 全部PASS 行数=3 skips=0 pre_bad=0 proc_rc=0
+host_ovr/isr_window | OK 必需=2 全部PASS 行数=2 skips=0 pre_bad=0 proc_rc=0
+host_ovr/off_matrix | OK 必需=2 全部PASS 行数=2 skips=0 pre_bad=0 proc_rc=0
+host_ovr/off_arm | OK 必需=2 全部PASS 行数=2 skips=0 pre_bad=0 proc_rc=0
+host_ovr/unknown | OK 必需=1 全部PASS 行数=1 skips=0 pre_bad=0 proc_rc=0
+host_ovr/identity | OK 必需=7 全部PASS 行数=7 skips=0 pre_bad=0 proc_rc=0
+host_ovr/diag | OK 必需=4 全部PASS 行数=4 skips=0 pre_bad=0 proc_rc=0
+host_ovr/recovery | OK 必需=5 全部PASS 行数=5 skips=0 pre_bad=0 proc_rc=0
+host_ovr/stale | OK 必需=3 全部PASS 行数=3 skips=0 pre_bad=0 proc_rc=0
+host_ovr/boundary | OK 必需=2 全部PASS 行数=2 skips=0 pre_bad=0 proc_rc=0
+host_ovr/healthy | OK 必需=5 全部PASS 行数=5 skips=0 pre_bad=0 proc_rc=0
+host_ovr/target_reject | OK 必需=0 全部PASS 行数=0 skips=1 pre_bad=0 proc_rc=0
+host_ovr/epwm_leaf | OK 必需=10 全部PASS 行数=10 skips=0 pre_bad=0 proc_rc=0
+host_ovr/tmc_lock | OK 必需=15 全部PASS 行数=15 skips=0 pre_bad=0 proc_rc=0
+host_ovr/uart_leaf | OK 必需=7 全部PASS 行数=7 skips=0 pre_bad=0 proc_rc=0
+host_ovr/budget_leaf | OK 必需=6 全部PASS 行数=6 skips=0 pre_bad=0 proc_rc=0
+host_ovr/read_obs | OK 必需=30 全部PASS 行数=30 skips=0 pre_bad=0 proc_rc=0
+host_ovr/cal_static | OK 必需=9 全部PASS 行数=9 skips=0 pre_bad=0 proc_rc=0
+host_ovr | OK 全部 19 组自洽且必需用例真执行判 PASS (用例=118)
+
+选择集合=lock,isr,isr_window,off_matrix,off_arm,unknown,identity,diag,recovery,stale,boundary,healthy,target_reject,epwm_leaf,tmc_lock,uart_leaf,budget_leaf,read_obs,cal_static
+实际执行集合: target=19组 host_ovr=19组 (每组一个独立进程)
+
+S2 RUNNER RESULT: PASS (rc=0) —— target 与 host_ovr 全部 19 组的必需用例真执行且判 PASS

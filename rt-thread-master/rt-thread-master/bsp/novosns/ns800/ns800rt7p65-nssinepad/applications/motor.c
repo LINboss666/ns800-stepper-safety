@@ -2202,13 +2202,55 @@ rt_err_t motor_diag_gate_check(void)
 /* 诊断借用的**预约**: 只读门全通之后再去 stop_priority 取一个真正的 SP_DIAG 身份。
  * 2026-10-23 S2(任务书 §9): 旧版只返回 EOK 的判定不能当预约 —— 没有身份的借用
  * 挡不住"停机之后再 enable"这一类交错。sp_reserve 自己在同一个短临界区里核对
- * inhibit/exhausted/owner/锁存, 因此这里不重复判一遍, 也不在门外补第二次检查。 */
+ * inhibit/exhausted/owner/锁存, 因此这里不重复判一遍, 也不在门外补第二次检查。
+ *
+ * M7R1-A(2026-10-29 独立复审 R1a): 上面那句只覆盖协调层自己的检查, **不覆盖标定**。
+ * motor_diag_gate_check() 内部的 motor_get_snapshot() 取放 mot_lock 之后就把锁还了,
+ * 于是"标定静止事务正持着 mot_lock"与"诊断在这里取到 SP_DIAG"可以并存 —— 复审的
+ * 真双线程探针在修前实测到 cal_guard_held=1 同时 grant_rc=0/owner=SP_DIAG。
+ *
+ * 修法是把"资格判定 + 预约"整个放进同一次 mot_lock 持有里, 而不是只在预约外面加一把
+ * 无等待锁: 后者看着像不阻塞更安全, 实际上 gate 检查内部本来就会阻塞等这把锁,
+ * 拒绝分支根本到不了(本机首版实现把诊断线程钉在 gate 里, S2 用例直接挂住, 已改)。
+ * 现在两条路都只剩合法结果:
+ *   - 诊断先取得锁 => 标定 begin 等锁, 等到的那一时刻 owner 已是 SP_DIAG => begin 拒绝;
+ *   - 标定正持事务 => 诊断在锁外等, 醒来时事务已结束, 它判到的是事务之后的静止态。
+ * 递归语义核对过: mot_lock 是**按持有线程递归计数**的互斥量(RT-Thread 语义, 主机夹具
+ * 用 PTHREAD_MUTEX_RECURSIVE 同模型, 见 tests/host/sp_conc_main.c 的注释), 所以门内
+ * 的 motor_get_snapshot() 再取一次是同一线程重入, 不是自我死锁; 取放仍然成对。
+ * 锁里没有 UART 之外的等待、没有浮点、没有 Flash, 也**不进** PRIMASK 窗口 ——
+ * sp_reserve 自己的短临界区只做固定字段核对与写入。拒绝分支会打印原因, 这是持锁期间
+ * 唯一的输出, 且只在"本来就要拒绝"的慢路径上。 */
 rt_err_t motor_pwm_grant_to_diag(sp_token_t *out)
 {
-    if (out == RT_NULL) return -RT_EINVAL;
-    if (motor_diag_gate_check() != RT_EOK) return -RT_EPERM;
+    rt_err_t e, gate;
 
-    if (sp_reserve(SP_DIAG, out) != RT_EOK)
+    if (out == RT_NULL) return -RT_EINVAL;
+
+    e = motor_lock_take_checked();
+    if (e != RT_EOK)
+    {
+        rt_kprintf("[MOT] grant REFUSED: mot_lock 未取得 rc=%d"
+                   " (互斥量不可用) - 不判定也不取预约\n", (int)e);
+        return -RT_EPERM;
+    }
+    gate = motor_diag_gate_check();          /* 同一线程递归取放, 不改变其判据 */
+    if (gate != RT_EOK)
+    {
+        motor_lock_give_checked();
+        return -RT_EPERM;
+    }
+    /* 冗余但可判: guard 置位意味着标定事务正持着这把锁(同一线程重入才会走到这里),
+     * 走到这里说明不变量已经破了 —— 宁拒绝也不并发提交。 */
+    if (mot_cal_guard_held)
+    {
+        motor_lock_give_checked();
+        rt_kprintf("[MOT] grant REFUSED: 标定静止事务正在进行, 不取诊断预约\n");
+        return -RT_EBUSY;
+    }
+    e = sp_reserve(SP_DIAG, out);
+    motor_lock_give_checked();
+    if (e != RT_EOK)
     {
         rt_kprintf("[MOT] grant REFUSED: 取不到诊断预约(已抑制/饱和/他人持有"
                    "/未复核的关断失败)\n");

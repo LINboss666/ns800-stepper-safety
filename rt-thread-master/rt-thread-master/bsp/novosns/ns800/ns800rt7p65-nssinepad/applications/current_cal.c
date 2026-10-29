@@ -68,10 +68,60 @@ static void cc_u64_dec(rt_uint64_t v, char *out, rt_size_t n)
     out[i] = '\0';
 }
 
-static rt_int32_t cc_round_scaled(float v, rt_int32_t mult)
+/* M7R2(2026-10-29 独立复审): 原来这里直接 (rt_int32_t)(v*mult ± 0.5)。
+ * cal 参数本身是有界的(offset 0..3300 mV、gain 0.001..100 V/A), 但**由它们导出的
+ * current_ma 没有**: ma=(mv-offset)/gain, 在合法最小 gain=0.001 V/A、mv-offset=3300 mV
+ * 时 ma≈3.3e6 mA, 再乘 1000 变 µA 就是 3.3e9 —— 超出 int32, 那次浮点转整数本身就是
+ * 未定义行为(复审在真实产品文件上以 UBSan float-cast-overflow 具名复现:
+ * "3.29919e+09 is outside the range of representable values of type 'int'")。
+ * 修法是**先判范围再转换**, 并把结果按十进制字符串发出去: 不预设 tiny printf 支持
+ * %lld/%llu, 也不把最小 gain 抬高来掩盖输出侧的问题。
+ *
+ * 界: |v*mult| 必须严格小于 CC_DEC_LIMIT_D(1e18), 该值同时落在
+ * [-(2^63), 2^63) 与 [0, 2^64) 之内, 所以之后的 double->整数转换一定是定义好的。
+ * 超界就写明确的 OUT_OF_RANGE, 而不是印一个被截断/环绕出来的假数。 */
+#define CC_DEC_LIMIT_D 1.0e18
+
+static void cc_copy_out(char *out, rt_size_t n, const char *s)
 {
-    float a = v * (float)mult;
-    return (a >= 0.0f) ? (rt_int32_t)(a + 0.5f) : (rt_int32_t)(a - 0.5f);
+    rt_size_t i = 0;
+
+    if (out == RT_NULL || n == 0) return;
+    while (s[i] != '\0' && i + 1 < n) { out[i] = s[i]; i++; }
+    out[i] = '\0';
+}
+
+/* 返回 RT_EOK 表示 out 里是一个可表示的十进制整数; -RT_EINVAL 表示发了超范围标记。 */
+static rt_err_t cc_scaled_dec(float v, rt_int32_t mult, char *out, rt_size_t n)
+{
+    double d;
+    rt_bool_t neg;
+
+    if (out == RT_NULL || n < 4) return -RT_EINVAL;
+    d = (double)v * (double)mult;
+    if (!(d == d) || d >= CC_DEC_LIMIT_D || d <= -CC_DEC_LIMIT_D)
+    {
+        cc_copy_out(out, n, "OUT_OF_RANGE");
+        return -RT_EINVAL;
+    }
+    d = (d >= 0.0) ? (d + 0.5) : (d - 0.5);      /* 四舍五入, 远离零 */
+    if (d >= CC_DEC_LIMIT_D || d <= -CC_DEC_LIMIT_D)
+    {
+        cc_copy_out(out, n, "OUT_OF_RANGE");
+        return -RT_EINVAL;
+    }
+    neg = (d < 0.0);
+    if (neg) d = -d;
+    if (neg)
+    {
+        out[0] = '-';
+        cc_u64_dec((rt_uint64_t)d, out + 1, n - 1);
+    }
+    else
+    {
+        cc_u64_dec((rt_uint64_t)d, out, n);
+    }
+    return RT_EOK;
 }
 
 static const char *cc_src_name(rt_uint8_t src)
@@ -97,7 +147,7 @@ static void cc_show(void)
     current_adc_cal_t cal;
     project_config_t cfg;
     sensor_frame_t f;
-    rt_int32_t off_uv, gain_uv;
+    char off_buf[24], gain_buf[24], ma_buf[24];
     rt_bool_t cfg_valid;
 
     if (current_adc_get_calibration(&cal) != RT_EOK ||
@@ -108,27 +158,32 @@ static void cc_show(void)
         return;
     }
     cfg_valid = project_config_is_valid();
-    off_uv = cc_round_scaled(cal.offset_mv, 1000);
-    gain_uv = cc_round_scaled(cal.gain_v_per_a, 1000000);
+    (void)cc_scaled_dec(cal.offset_mv, 1000, off_buf, sizeof(off_buf));
+    (void)cc_scaled_dec(cal.gain_v_per_a, 1000000, gain_buf, sizeof(gain_buf));
 
     rt_kprintf("[CAL] adc health=%s src=%s ver=%u\n",
                subsys_health_name(current_adc_get_health()),
                cc_src_name(cal.source), (unsigned)cal.version);
-    rt_kprintf("[CAL] adc offset_uV=%d gain_uV_per_A=%d measured=%s\n",
-               (int)off_uv, (int)gain_uv,
+    rt_kprintf("[CAL] adc offset_uV=%s gain_uV_per_A=%s measured=%s\n",
+               off_buf, gain_buf,
                cal.source == CURRENT_ADC_CAL_MEASURED ? "YES" : "NO");
-    rt_kprintf("[CAL] cfg valid=%s src=%u offset_uV=%d gain_uV_per_A=%d\n",
+    (void)cc_scaled_dec(cfg.cur_offset_mv, 1000, off_buf, sizeof(off_buf));
+    (void)cc_scaled_dec(cfg.cur_gain_v_per_a, 1000000, gain_buf, sizeof(gain_buf));
+    rt_kprintf("[CAL] cfg valid=%s src=%u offset_uV=%s gain_uV_per_A=%s\n",
                cfg_valid ? "YES" : "NO", (unsigned)cfg.cur_cal_source,
-               (int)cc_round_scaled(cfg.cur_offset_mv, 1000),
-               (int)cc_round_scaled(cfg.cur_gain_v_per_a, 1000000));
+               off_buf, gain_buf);
     rt_kprintf("[CAL] sample seq=%u tick=%u raw=%u valid=%u fresh=%u\n",
                (unsigned)f.seq, (unsigned)f.timestamp,
                (unsigned)f.current_raw, (unsigned)f.valid_current,
                (unsigned)f.fresh_current);
     if (f.valid_current && f.fresh_current)
-        rt_kprintf("[CAL] sample ma_uA=%d src=%s\n",
-                   (int)cc_round_scaled(f.current_ma, 1000),
-                   cc_src_name(f.current_cal_source));
+    {
+        /* current_ma 是**导出量**, 合法最小 gain 下可以远超 int32 的 µA 表示范围;
+         * 越界时这里印 OUT_OF_RANGE, 不印一个环绕出来的假数。 */
+        (void)cc_scaled_dec(f.current_ma, 1000, ma_buf, sizeof(ma_buf));
+        rt_kprintf("[CAL] sample ma_uA=%s src=%s\n",
+                   ma_buf, cc_src_name(f.current_cal_source));
+    }
     else
         rt_kprintf("[CAL] sample ma_uA=N/A (no valid fresh frame)\n");
     rt_kprintf("[CAL] note: show/sample do not change cal/motion/flash\n");

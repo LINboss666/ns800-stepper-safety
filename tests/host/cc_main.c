@@ -630,6 +630,150 @@ static void test_export_and_lines(void)
           "current_cal alias is exported");
 }
 
+/* ---- M7R1 复审新增接缝 ----------------------------------------------------
+ * CC27 = R1b(取锁失败不得发布), CC28/CC29 = R2(µA 导出的范围与标记)。
+ * 三条都判**真实产品函数的实际输出/副作用**, 不判自写的期望常量。 */
+
+/* 从捕获缓冲里取 "prefix=<token>" 的第一段非空白/非换行 token。 */
+static int cap_field(const char *prefix, char *out, size_t n)
+{
+    const char *p = strstr(g_cap, prefix);
+    size_t i = 0;
+
+    if (p == NULL) return 0;
+    p += strlen(prefix);
+    if (*p != '=') return 0;
+    p++;
+    while (*p != '\0' && *p != ' ' && *p != '\n' && i + 1 < n) out[i++] = *p++;
+    out[i] = '\0';
+    return i > 0;
+}
+
+static void test_cfg_lock_unavailable(void)
+{
+    current_adc_cal_t c0, c1;
+    project_config_t p0, p1;
+    rt_err_t e;
+    int rel0, rel1, takes0;
+
+    setup();
+    current_adc_get_calibration(&c0);
+    project_config_get_snapshot(&p0);
+    takes0 = g_mutex_takes;
+    rel0 = g_mutex_releases;
+
+    /* 让 cfg 互斥量的 take 明确失败(夹具里 inited=FALSE => -RT_EIO)。
+     * cfg_lock 来自本 TU 内的真实 project_config.c。 */
+    cfg_lock.inited = RT_FALSE;
+    e = project_config_set_calibration(1600.0f, 0.7f, CURRENT_ADC_CAL_MEASURED);
+    cfg_lock.inited = RT_TRUE;
+    rel1 = g_mutex_releases;          /* 必须在后面的读操作之前取, 否则 snapshot 自己的
+                                        * 正常取放会被算成"未持有就 release"。 */
+
+    current_adc_get_calibration(&c1);
+    project_config_get_snapshot(&p1);
+    /* 拆成三条可判身份, 而不是一个"与"起来的大条件: 复审要的是"拒绝且不写"这一整条
+     * 合同, 但台账必须能说清到底是哪一半没守住。 */
+    check("CC27-cfg_lock_unavailable_rejects", e != RT_EOK,
+          "take failure must be reported to the caller as an error");
+    check("CC27b-cfg_lock_unavailable_no_mutation",
+          cal_eq(&c0, &c1) && cfg_eq(&p0, &p1) && c0.version == c1.version,
+          "no ADC tuple, cfg working set or version changed on the rejected call");
+    check("CC27c-cfg_lock_unavailable_no_release", rel1 == rel0,
+          "release is never attempted for a lock that was not acquired");
+    (void)takes0;
+    /* 对照: 锁恢复正常后同一组参数必须真的发布 —— 否则上面三条可能只是恒拒绝。 */
+    e = project_config_set_calibration(1600.0f, 0.7f, CURRENT_ADC_CAL_MEASURED);
+    current_adc_get_calibration(&c1);
+    check("CC27d-cfg_lock_available_publishes",
+          e == RT_EOK && c1.version == c0.version + 1 &&
+          fabs((double)c1.offset_mv - 1600.0) < 1e-3 &&
+          fabs((double)c1.gain_v_per_a - 0.7) < 1e-6 &&
+          c1.source == CURRENT_ADC_CAL_MEASURED,
+          "control: once the lock is available the same call publishes and bumps version");
+}
+
+static void test_microamp_export_bounds(void)
+{
+    current_adc_cal_t cal;
+    float ma = 0.0f, mv = 0.0f;
+    rt_uint32_t raw = 0;
+    char tok[32];
+    double expect, got;
+    int ok;
+
+    setup();
+    /* 合法参数: offset=0 mV, gain=0.001 V/A(下界)。raw 取接近满量程的最大值。 */
+    if (project_config_set_calibration(0.0f, 0.001f, CURRENT_ADC_CAL_MEASURED) != RT_EOK)
+        g_pre_bad++;
+    g_adc_raw = 4094;
+    if (current_adc_read_measurement_cal(&raw, &mv, &ma, &cal) != RT_EOK) g_pre_bad++;
+    frame_add(1, 1, raw, 1, 1, cal.source, ma);
+    cap_reset();
+    run_cmd(2, (const char *[]){ "current_cal", "show" });
+
+    ok = cap_field("sample ma_uA", tok, sizeof(tok)) != 0;
+    got = atof(tok);
+    expect = (double)ma * 1000.0;
+    /* 关键判据: 打印值必须等于真实 mA 的 1000 倍(相对误差 1e-6 内), 且**大于** int32
+     * 上界 —— 说明它没有被截断/环绕成 int32 里的假数。 */
+    check("CC28-microamp_export_no_int32_wrap",
+          ok && expect > 2147483647.0 && fabs(got - expect) <= expect * 1e-6,
+          "legal minimum gain + near-full-scale raw exports the full >int32 microamp "
+          "value instead of a wrapped/truncated number");
+    cap_check_nul();
+    check("CC28b-microamp_line_still_short",
+          cap_line_max("[CAL]") > 0 && cap_line_max("[CAL]") <= 110 && !g_nul_seen,
+          "the wide value keeps every [CAL] line <=110B with no NUL");
+    /* 负方向(实测 mv < offset)必须带符号, 不能被当成无符号量。
+     * 夹具的 get_latest 取 g_frames[g_frame_idx], 不清表就会读到上一段那条正数帧。 */
+    frame_reset();
+    if (project_config_set_calibration(1650.0f, 0.6f, CURRENT_ADC_CAL_MEASURED) != RT_EOK)
+        g_pre_bad++;
+    g_adc_raw = 100;
+    if (current_adc_read_measurement_cal(&raw, &mv, &ma, &cal) != RT_EOK) g_pre_bad++;
+    frame_add(2, 2, raw, 1, 1, cal.source, ma);
+    cap_reset();
+    run_cmd(2, (const char *[]){ "current_cal", "show" });
+    ok = cap_field("sample ma_uA", tok, sizeof(tok)) != 0;
+    check("CC28c-microamp_negative_signed",
+          ok && ma < 0.0f && tok[0] == '-' &&
+          fabs(atof(tok) - (double)ma * 1000.0) <= fabs((double)ma * 1000.0) * 1e-6,
+          "negative derived current prints with its sign and correct magnitude");
+}
+
+static void test_scaled_dec_marker(void)
+{
+    char buf[24];
+    int bad = 0;
+
+    setup();
+    /* 越界/NaN/Inf 必须在**转换之前**就被判掉, 并给出明确标记, 而不是一个数字。 */
+    if (cc_scaled_dec(1.0e30f, 1000, buf, sizeof(buf)) != -RT_EINVAL ||
+        strcmp(buf, "OUT_OF_RANGE") != 0) bad = 1;
+    if (cc_scaled_dec(-1.0e30f, 1000, buf, sizeof(buf)) != -RT_EINVAL ||
+        strcmp(buf, "OUT_OF_RANGE") != 0) bad = 1;
+    if (cc_scaled_dec(NAN, 1000, buf, sizeof(buf)) != -RT_EINVAL ||
+        strcmp(buf, "OUT_OF_RANGE") != 0) bad = 1;
+    if (cc_scaled_dec(INFINITY, 1000, buf, sizeof(buf)) != -RT_EINVAL ||
+        strcmp(buf, "OUT_OF_RANGE") != 0) bad = 1;
+    /* 恰好越过 int32 边界的值必须原样发出去(这正是原缺陷会环绕的地方)。 */
+    if (cc_scaled_dec(2147484.0f, 1000, buf, sizeof(buf)) != RT_EOK ||
+        strcmp(buf, "2147484000") != 0) bad = 1;
+    if (cc_scaled_dec(-2147484.0f, 1000, buf, sizeof(buf)) != RT_EOK ||
+        strcmp(buf, "-2147484000") != 0) bad = 1;
+    if (cc_scaled_dec(0.0f, 1000, buf, sizeof(buf)) != RT_EOK ||
+        strcmp(buf, "0") != 0) bad = 1;
+    /* 四舍五入远离零: .5 边界。 */
+    if (cc_scaled_dec(0.0005f, 1000, buf, sizeof(buf)) != RT_EOK ||
+        strcmp(buf, "1") != 0) bad = 1;
+    if (cc_scaled_dec(-0.0005f, 1000, buf, sizeof(buf)) != RT_EOK ||
+        strcmp(buf, "-1") != 0) bad = 1;
+    check("CC29-scaled_dec_range_marker",
+          !bad, "out-of-range/NaN/Inf emit the explicit marker; >int32 and negative "
+                "values and zero round-trip exactly");
+}
+
 int main(void)
 {
     printf("VARIANT|cc_host\n");
@@ -645,6 +789,9 @@ int main(void)
     test_sample_256();
     test_numeric_nan_inf();
     test_api_none();
+    test_cfg_lock_unavailable();
+    test_microamp_export_bounds();
+    test_scaled_dec_marker();
     test_export_and_lines();
     printf("SUMMARY|cases=%d pass=%d fail=%d pre_bad=%d\n",
            g_run, g_pass, g_fail, g_pre_bad);

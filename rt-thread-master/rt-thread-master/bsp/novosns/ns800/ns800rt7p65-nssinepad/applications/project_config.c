@@ -33,6 +33,20 @@ static rt_bool_t cfg_lock_ok = RT_FALSE;
 static void cfg_take(void)    { if (cfg_lock_ok) rt_mutex_take(&cfg_lock, RT_WAITING_FOREVER); }
 static void cfg_release(void) { if (cfg_lock_ok) rt_mutex_release(&cfg_lock); }
 
+/* M7R1-B(2026-10-29 独立复审): cfg_take() 把 rt_mutex_take 的返回码丢掉了, 于是
+ * "锁根本没拿到"在调用方看来越跟"拿到了"一样。标定发布路径不能这样: 它一次要写
+ * ADC 运行时的 offset/gain/source/version 四个字段外加 cfg 工作集, 无锁并发写会留下
+ * 半套系数, 而 Sensor 那一侧读到的就是半套。
+ * 这里只给**本次新增的标定发布**用一条有返回码的窄路径: 锁不可用或 take 失败一律
+ * 返回错误, 调用方一个字段都不改, 更不调用 release(未持有就 release 是 UB)。
+ * 旧的 set/load/default 维持既有 cfg_take() 语义不动 —— 复审 §6.1 要求不借此重构
+ * 全部旧业务锁; 这一条已作为范围外观察记进交接。 */
+static rt_err_t cfg_take_checked(void)
+{
+    if (!cfg_lock_ok) return -RT_EIO;         /* 互斥量没建起来 = 不敢发布 */
+    return rt_mutex_take(&cfg_lock, RT_WAITING_FOREVER);
+}
+
 /* ---------- 默认值 ---------- */
 
 /* 无锁内部实现: 只允许已持有 cfg_lock 的调用者使用 */
@@ -215,7 +229,8 @@ rt_err_t project_config_set_calibration(float offset_mv, float gain_v_per_a,
         gain_v_per_a > CURRENT_ADC_GAIN_MAX_V_PER_A)
         return -RT_EINVAL;
 
-    cfg_take();
+    e = cfg_take_checked();
+    if (e != RT_EOK) return e;    /* 没取得锁: 一个字段都不改, 也不 release */
     tmp = cfg;
     tmp.cur_offset_mv = offset_mv;
     tmp.cur_gain_v_per_a = gain_v_per_a;

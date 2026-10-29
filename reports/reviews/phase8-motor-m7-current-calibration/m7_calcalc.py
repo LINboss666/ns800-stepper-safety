@@ -1,15 +1,25 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""NS800 M7 bus-current calibration fit / qualification tool.
+"""NS800 M7-R1 bus-current calibration fit / qualification tool (v2).
 
-Offline only. It reads a declared record file, fits raw-code -> independent
-reference current, and emits a DRAFT_NOT_APPROVED candidate. It never talks to
-a board and never marks anything as board-accepted.
+Offline only: no serial, DAP, instrument or device code, and nothing here can
+touch a board. Inputs are declared records; the tool fits raw code -> reference
+current, checks the qualification gates that were fixed before any field result
+existed, and prints a conclusion that matches its own failures.
 
-Provenance levels accepted in the input:
-  HOST_SYNTHETIC  numbers invented for this tool's own tests; output stays DRAFT
-  FIELD_MEASURED  real meter readings; the method/meter fields must be filled
-Anything else is rejected. Missing numbers are never defaulted to 0.
+Two things v1 got wrong and this revision is explicitly about:
+
+* Conclusion consistency - a failed qualification or a failed held-out point now
+  makes the whole run REJECT with a non-zero exit and no applicable command. The
+  diagnostics are still printed, but labelled not-applicable.
+* Error arithmetic - a meter's +/- limit is a **bound**, not a standard
+  deviation. v1 root-sum-squared those limits and called the result a
+  conservative bound. Here every bounded term is propagated by absolute value
+  (worst case, valid without any distribution or independence claim), and the
+  repeatability estimate is carried linearly on top, labelled as a 1-sigma
+  estimate rather than folded into a coverage factor.
+
+v1's bytes remain recoverable from git (f188339 / 68d0774); this file replaces it.
 """
 
 import argparse
@@ -18,17 +28,21 @@ import hashlib
 import json
 import math
 import os
+import re
 import sys
 
-TOOL_ID = "ns800-m7-calcalc-v1"
-SCHEMA = "ns800.m7.calinputs/1"
+TOOL_ID = "ns800-m7-calcalc-v2"
+SCHEMA = "ns800.m7.calinputs/2"
+V1_SCHEMA = "ns800.m7.calinputs/1"
 
 # current_adc.c nominal conversion assumes raw*3300/4095 mV per count.
-# That 3300 is a configuration assumption, not a measured VDDA.
+# 3300 is a configuration assumption, not a measured VDDA.
 NOMINAL_K_MV_PER_COUNT = 3300.0 / 4095.0
 RAW_BITS_MAX = 4095
+RAW_COUNT_BOUND = 0.5           # single-sample quantisation is bounded by half a count
+MIN_SAMPLES_PER_POINT = 2       # one sample cannot support any dispersion statement
 
-# Gates are fixed here, before any field result exists (task section 7).
+# Gates fixed before any field result exists (task section 7 / review section 4).
 REF_SPAN_ERROR_RATIO_MIN = 10.0
 RAW_SPAN_NOISE_RATIO_MIN = 10.0
 HOLDOUT_TARGET_ABS_MA = 5.0
@@ -36,23 +50,16 @@ HOLDOUT_TARGET_REL = 0.10
 
 PROVENANCE_ALLOWED = ("HOST_SYNTHETIC", "FIELD_MEASURED")
 INDEPENDENT_REFERENCE_SOURCES = ("METER_IN_SERIES",
-                                "METER_ACROSS_KNOWN_RESISTOR",
-                                "METER_ACROSS_STABLE_LOAD")
-
+                                 "METER_ACROSS_KNOWN_RESISTOR",
+                                 "METER_ACROSS_STABLE_LOAD")
 FAIL = "REJECT"
 NOT_READY = "METHOD_NOT_READY"
 
-REJECT_CODES = (
-    "SCHEMA_MISMATCH", "UNKNOWN_PROVENANCE", "NO_POINTS", "MISSING_FIELD",
-    "NON_NUMERIC_FIELD", "NON_FINITE_VALUE", "BAD_ROLE", "DUPLICATE_POINT_ID",
-    "NO_INDEPENDENT_REFERENCE", "INVALID_SAMPLE", "INCOMPLETE_SAMPLE",
-    "RAW_OUT_OF_RANGE", "SATURATED_ENDPOINT", "RAW_MEAN_INCONSISTENT",
-    "INSUFFICIENT_FIT_POINTS", "INSUFFICIENT_HOLDOUT_POINTS",
-    "HOLDOUT_NOT_INDEPENDENT", "EXTRAPOLATION_HOLDOUT",
-    NOT_READY, "DUPLICATE_X", "NON_POSITIVE_SLOPE", "NON_FINITE_FIT",
-    "QUALIFICATION_FAILED", "OFFSET_OUTSIDE_ADC_RANGE",
-    "GAIN_OUTSIDE_SAFE_RANGE",
-)
+SAMPLE_HEADER_RE = re.compile(r"\[CAL\] sample n_req=(\d+) n_seen=(\d+) n_valid=(\d+)")
+SAMPLE_RAW_RE = re.compile(r"\[CAL\] raw sum=(\d+) min=(\d+) max=(\d+) mean_x1000=(\d+)")
+SAMPLE_SQ_RE = re.compile(r"\[CAL\] raw sum_sq=(\d+)")
+SAMPLE_SEQ_RE = re.compile(r"\[CAL\] sample seq=(\d+)\.\.(\d+) tick=(\d+)\.\.(\d+)")
+SAMPLE_FIT_RE = re.compile(r"fit=(YES|NO)")
 
 
 class Reject(Exception):
@@ -62,7 +69,9 @@ class Reject(Exception):
         self.detail = detail
 
 
-def _num(value, field):
+# ---------------------------------------------------------------- primitives
+
+def _num(value, field, allow_zero=True):
     if value is None:
         raise Reject("MISSING_FIELD", field + " is null/absent; not defaulted to 0")
     if isinstance(value, bool) or not isinstance(value, (int, float)):
@@ -70,7 +79,26 @@ def _num(value, field):
     f = float(value)
     if math.isnan(f) or math.isinf(f):
         raise Reject("NON_FINITE_VALUE", "%s=%r" % (field, value))
+    if not allow_zero and f <= 0.0:
+        raise Reject("NON_POSITIVE_VALUE", "%s=%r must be > 0" % (field, value))
     return f
+
+
+def _int_count(value, field):
+    """Sample counts must be whole numbers: 128.5 samples is not a measurement."""
+    f = _num(value, field)
+    if f != math.floor(f):
+        raise Reject("FRACTIONAL_COUNT",
+                     "%s=%r is not a whole number of samples" % (field, value))
+    return int(f)
+
+
+def _bool(value, field):
+    if not isinstance(value, bool):
+        raise Reject("NOT_A_BOOLEAN",
+                     "%s=%r must be a real true/false, not a string or a number"
+                     % (field, value))
+    return value
 
 
 def _req(obj, field, path):
@@ -78,6 +106,16 @@ def _req(obj, field, path):
         raise Reject("MISSING_FIELD", "%s.%s absent" % (path, field))
     return obj[field]
 
+
+def sha256_file(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+# ---------------------------------------------------------------- validation
 
 POINT_REQUIRED_FIELDS = ("id", "role", "used_for_fit", "reference_source",
                          "reference_mA", "reference_error_mA", "raw_sum",
@@ -87,7 +125,11 @@ POINT_REQUIRED_FIELDS = ("id", "role", "used_for_fit", "reference_source",
                          "temp_c", "raw_source_file", "raw_source_sha256")
 
 
-def validate(doc):
+def validate(doc, base_dir=None):
+    if doc.get("schema") == V1_SCHEMA:
+        raise Reject("SCHEMA_MISMATCH",
+                     "input declares the v1 schema; v2 needs %s because the error "
+                     "model and the conclusion rule changed" % SCHEMA)
     if doc.get("schema") != SCHEMA:
         raise Reject("SCHEMA_MISMATCH", "expected %s got %r" % (SCHEMA, doc.get("schema")))
     prov = doc.get("provenance")
@@ -97,6 +139,7 @@ def validate(doc):
     points = _req(doc, "points", "root")
     if not isinstance(points, list) or not points:
         raise Reject("NO_POINTS", "points must be a non-empty list")
+
     ids = []
     for p in points:
         pid = str(_req(p, "id", "point"))
@@ -106,14 +149,12 @@ def validate(doc):
         role = p["role"]
         if role not in ("fit", "holdout"):
             raise Reject("BAD_ROLE", "%s role=%r" % (pid, role))
-        uff = p["used_for_fit"]
-        if uff is None:
-            raise Reject("MISSING_FIELD", "%s.used_for_fit undecided" % pid)
-        if role == "holdout" and uff is True:
+        uff = _bool(p["used_for_fit"], "%s.used_for_fit" % pid)
+        if role == "holdout" and uff:
             raise Reject("HOLDOUT_NOT_INDEPENDENT",
-                         "%s is declared as fitted and then used as its own "
+                         "%s declares used_for_fit=true and cannot also be an "
                          "independent verification" % pid)
-        if role == "fit" and uff is False:
+        if role == "fit" and not uff:
             raise Reject("BAD_ROLE", "%s is role=fit but used_for_fit=false" % pid)
         src = p["reference_source"]
         if src not in INDEPENDENT_REFERENCE_SOURCES:
@@ -122,21 +163,35 @@ def validate(doc):
                          "reference. IRUN/VREF math, the same ADC back-solved, "
                          "driver-disabled baselines and adapter total current "
                          "are all forbidden here." % (pid, src))
-        for nfld in ("reference_mA", "reference_error_mA", "raw_sum", "raw_sum_sq",
-                     "raw_min", "raw_max", "n_valid", "n_requested", "seq_first",
-                     "seq_last", "tick_first", "tick_last", "read_window_s",
-                     "h10_mv", "vdd33_mv", "temp_c"):
-            _num(p[nfld], "%s.%s" % (pid, nfld))
-        nv = float(p["n_valid"])
-        nq = float(p["n_requested"])
+        _num(p["reference_mA"], "%s.reference_mA" % pid)
+        err = _num(p["reference_error_mA"], "%s.reference_error_mA" % pid)
+        if err < 0.0:
+            raise Reject("NEGATIVE_ERROR_LIMIT",
+                         "%s.reference_error_mA=%r is a bound and cannot be "
+                         "negative; a negative value also shrinks the span gate "
+                         "denominator" % (pid, err))
+        if _num(p["read_window_s"], "%s.read_window_s" % pid, allow_zero=False) <= 0.0:
+            raise Reject("NON_POSITIVE_VALUE", "%s.read_window_s" % pid)
+        for fld in ("raw_sum", "raw_sum_sq", "raw_min", "raw_max", "seq_first",
+                    "seq_last", "tick_first", "tick_last", "h10_mv", "vdd33_mv",
+                    "temp_c"):
+            _num(p[fld], "%s.%s" % (pid, fld))
+        nv = _int_count(p["n_valid"], "%s.n_valid" % pid)
+        nq = _int_count(p["n_requested"], "%s.n_requested" % pid)
         if nv < 1 or nq < 1:
             raise Reject("INVALID_SAMPLE", "%s n_valid=%r n_requested=%r" % (pid, nv, nq))
-        if nv < nq:
+        if nv != nq:
             raise Reject("INCOMPLETE_SAMPLE",
-                         "%s n_valid=%g < n_requested=%g; do not top up with the "
-                         "previous run's values" % (pid, nv, nq))
+                         "%s n_valid=%d != n_requested=%d; a completed sample is "
+                         "required, and the previous run's values may not top it up"
+                         % (pid, nv, nq))
     if len(set(ids)) != len(ids):
         raise Reject("DUPLICATE_POINT_ID", "point ids must be unique")
+
+    # Independence is settled from the declaration alone, for every provenance: the
+    # HOST_SYNTHETIC exemption is about not opening invented files, not about letting a
+    # re-used capture stand in as an independent held-out sample.
+    _verify_capture_independence(points)
 
     method = _req(doc, "method", "root")
     meter = _req(doc, "meter", "root")
@@ -145,29 +200,123 @@ def validate(doc):
                     "surcharge_handling", "environment"):
             if method.get(fld) in (None, ""):
                 raise Reject(NOT_READY,
-                             "FIELD_MEASURED needs method.%s filled; an unfilled "
-                             "gap is not evidence that the gap was excluded" % fld)
+                             "FIELD_MEASURED needs method.%s filled; an unfilled gap "
+                             "is not evidence that the gap was excluded" % fld)
         for fld in ("model", "dc_range", "resolution", "error_expression"):
             if meter.get(fld) in (None, ""):
                 raise Reject(NOT_READY, "FIELD_MEASURED needs meter.%s filled" % fld)
         cov = method.get("covers_all_measured_current")
         if cov is None:
             raise Reject(NOT_READY, "method.covers_all_measured_current undecided")
+        _bool(cov, "method.covers_all_measured_current")
         if cov is False:
-            # A declared uncovered sibling branch is allowed only with its own
-            # error carried into the budget below.
             if method.get("uncovered_branch_error_mA") is None:
                 raise Reject(NOT_READY,
-                             "method.uncovered_branch_error_mA must be declared "
-                             "when the reference does not cover every ampere that "
-                             "flows through the图纸 shunt branch")
-            _num(method["uncovered_branch_error_mA"], "method.uncovered_branch_error_mA")
+                             "method.uncovered_branch_error_mA must be declared when "
+                             "the reference does not cover every ampere flowing "
+                             "through the图纸 shunt branch")
+            if _num(method["uncovered_branch_error_mA"],
+                    "method.uncovered_branch_error_mA") < 0.0:
+                raise Reject("NEGATIVE_ERROR_LIMIT",
+                             "method.uncovered_branch_error_mA must be >= 0")
+        _verify_field_evidence(points, base_dir)
     return doc
+
+
+def _parse_capture(path):
+    """Read a saved `current_cal sample` transcript into its declared statistics."""
+    with open(path, "r", encoding="utf-8", errors="replace") as fh:
+        text = fh.read()
+    out = {}
+    m = SAMPLE_HEADER_RE.search(text)
+    if m:
+        out["n_valid"] = int(m.group(3))
+    m = SAMPLE_RAW_RE.search(text)
+    if m:
+        out["raw_sum"] = int(m.group(1))
+        out["raw_min"] = int(m.group(2))
+        out["raw_max"] = int(m.group(3))
+    m = SAMPLE_SQ_RE.search(text)
+    if m:
+        out["raw_sum_sq"] = int(m.group(1))
+    m = SAMPLE_SEQ_RE.search(text)
+    if m:
+        out["seq_first"] = int(m.group(1))
+        out["seq_last"] = int(m.group(2))
+    m = SAMPLE_FIT_RE.search(text)
+    if m:
+        out["fit"] = m.group(1)
+    return out
+
+
+def _verify_capture_independence(points):
+    """Declaration-only independence, run for EVERY provenance.
+
+    The HOST_SYNTHETIC exemption in the task book covers *artifact existence* only: an
+    invented file name may not be opened.  It does not license a re-used capture to be
+    presented as an independent held-out sample, and that question is answerable from
+    the declared fields alone, so it must not be gated on provenance.  Sharing one
+    session transcript stays legal exactly when the declared response ranges are disjoint.
+    """
+    fit_spans = [(q.get("raw_source_file"), int(q["seq_first"]), int(q["seq_last"]), q["id"])
+                 for q in points if q["role"] == "fit"]
+    for p in points:
+        if p["role"] != "holdout":
+            continue
+        lo, hi = int(p["seq_first"]), int(p["seq_last"])
+        for fname, flo, fhi, fid in fit_spans:
+            if not fname or fname != p.get("raw_source_file"):
+                continue
+            if (flo <= lo <= fhi) or (flo <= hi <= fhi) or (lo <= flo <= hi):
+                raise Reject("HOLDOUT_NOT_INDEPENDENT",
+                             "%s reuses the same capture range as fit point %s in %r; "
+                             "changing an id or a bool does not make a sample "
+                             "independent, and this check does not depend on provenance"
+                             % (p["id"], fid, fname))
+
+
+def _verify_field_evidence(points, base_dir):
+    """FIELD inputs must bind to a real capture, and the declared numbers must match it.
+
+    A reference declaration alone is not evidence: copying a file name and a fake
+    digest used to be enough for the tool to call a run FIELD_MEASURED.  Independence
+    is settled before this by _verify_capture_independence, so a fabricated FIELD
+    declaration cannot dodge it by naming a file that does not exist.
+    """
+    for p in points:
+        pid = p["id"]
+        name = p["raw_source_file"]
+        path = name if os.path.isabs(name) else os.path.join(base_dir or ".", name)
+        if not os.path.isfile(path):
+            raise Reject("FIELD_SOURCE_MISSING",
+                         "%s declares FIELD evidence %r that does not exist; a "
+                         "declared provenance is not a captured response"
+                         % (pid, name))
+        want = str(p["raw_source_sha256"])
+        got = sha256_file(path)
+        if got != want:
+            raise Reject("FIELD_SOURCE_SHA_MISMATCH",
+                         "%s declared sha256=%s but the artifact hashes to %s"
+                         % (pid, want, got))
+        cap = _parse_capture(path)
+        if not cap:
+            raise Reject("FIELD_SOURCE_UNPARSEABLE",
+                         "%s: %r holds no `current_cal sample` statistics" % (pid, name))
+        if cap.get("fit") == "NO":
+            raise Reject("FIELD_SOURCE_NOT_FITTABLE",
+                         "%s: the capture itself reported fit=NO" % pid)
+        for fld in ("n_valid", "raw_sum", "raw_min", "raw_max", "raw_sum_sq",
+                    "seq_first", "seq_last"):
+            if fld in cap and float(cap[fld]) != float(p[fld]):
+                raise Reject("FIELD_SOURCE_STATS_MISMATCH",
+                             "%s declares %s=%r but %r says %r"
+                             % (pid, fld, p[fld], name, cap[fld]))
+        p["_capture"] = cap
 
 
 def point_stats(p):
     pid = p["id"]
-    n = _num(p["n_valid"], pid + ".n_valid")
+    n = _int_count(p["n_valid"], pid + ".n_valid")
     s = _num(p["raw_sum"], pid + ".raw_sum")
     sq = _num(p["raw_sum_sq"], pid + ".raw_sum_sq")
     rmin = _num(p["raw_min"], pid + ".raw_min")
@@ -180,19 +329,38 @@ def point_stats(p):
     if mean < rmin or mean > rmax:
         raise Reject("RAW_MEAN_INCONSISTENT",
                      "%s mean=%.4f outside its own [%g,%g] window" % (pid, mean, rmin, rmax))
+    if n < MIN_SAMPLES_PER_POINT:
+        raise Reject("TOO_FEW_SAMPLES",
+                     "%s n_valid=%d; one sample cannot support a dispersion claim"
+                     % (pid, n))
     if rmin == 0 or rmax == RAW_BITS_MAX:
         raise Reject("SATURATED_ENDPOINT",
                      "%s touches a rail (min=%g max=%g); saturated raw codes are "
                      "recordable but cannot carry a linear gain fit" % (pid, rmin, rmax))
-    var = (sq - s * s / n) / (n - 1.0) if n > 1 else 0.0
+    # Cauchy-Schwarz: sum_sq >= sum^2/n, equality only when every sample is equal.
+    floor = s * s / n
+    if sq + 1e-6 < floor:
+        raise Reject("IMPOSSIBLE_SECOND_MOMENT",
+                     "%s raw_sum_sq=%g < raw_sum^2/n=%g; that variance does not "
+                     "exist. It is not clamped to zero." % (pid, sq, floor))
+    ceil = n * max(rmin * rmin, rmax * rmax)
+    if sq - 1e-6 > ceil:
+        raise Reject("IMPOSSIBLE_SECOND_MOMENT",
+                     "%s raw_sum_sq=%g cannot come from values inside [%g,%g]"
+                     % (pid, sq, rmin, rmax))
+    var = (sq - floor) / (n - 1.0)
     if var < 0.0:
         var = 0.0
-    u_noise = math.sqrt(var / n)
-    u_quant = 1.0 / math.sqrt(12.0)
-    return {"id": pid, "n": n, "mean": mean, "sd": math.sqrt(var),
-            "u_x": math.hypot(u_noise, u_quant),
-            "seq_first": p["seq_first"], "seq_last": p["seq_last"],
-            "tick_first": p["tick_first"], "tick_last": p["tick_last"],
+    sd = math.sqrt(var)
+    # Bounded quantisation plus the repeatability estimate, summed by absolute
+    # value. No distribution is assumed for the bounded part.
+    u_bound = RAW_COUNT_BOUND
+    u_repeat = sd / math.sqrt(n)
+    return {"id": pid, "n": n, "mean": mean, "sd": sd, "var": var,
+            "u_bound_counts": u_bound, "u_repeat_counts": u_repeat,
+            "u_counts": u_bound + u_repeat,
+            "seq_first": int(p["seq_first"]), "seq_last": int(p["seq_last"]),
+            "tick_first": int(p["tick_first"]), "tick_last": int(p["tick_last"]),
             "read_window_s": float(p["read_window_s"]),
             "h10_mv": float(p["h10_mv"]), "vdd33_mv": float(p["vdd33_mv"]),
             "temp_c": float(p["temp_c"])}
@@ -226,6 +394,11 @@ def _lstsq(xs, ys):
     return a, my - a * mx
 
 
+def predict_from(xs, ys, x_h):
+    a, b = _lstsq(list(xs), list(ys))
+    return a * x_h + b
+
+
 def fit_line(fit):
     xs = [p["_stats"]["mean"] for p in fit]
     ys = [float(p["reference_mA"]) for p in fit]
@@ -238,138 +411,141 @@ def fit_line(fit):
     return a, b
 
 
-def predict(fit, x_h):
-    a, b = _lstsq([p["_stats"]["mean"] for p in fit],
-                  [float(p["reference_mA"]) for p in fit])
-    return a * x_h + b
+def jac(fit, x_h, h=1e-5):
+    """d(prediction)/d(each input), by re-running the fit on a perturbed input.
 
-
-def predict_from(xs, ys, x_h):
-    a, b = _lstsq(list(xs), list(ys))
-    return a * x_h + b
-
-
-def jac(fit, x_h, ux, ui, h=1e-5):
-    """First-order sensitivity of the prediction, by central differences.
-
-    Perturbing a fit raw mean or reference current re-runs the whole fit, so
-    the strong slope/intercept correlation cancels the way it does in reality
-    instead of inflating a lever-arm term.
+    Re-fitting keeps the slope/intercept correlation inside the derivative, so
+    the lever-arm term that a naive a/b propagation invents does not appear.
     """
     xs = [p["_stats"]["mean"] for p in fit]
     ys = [float(p["reference_mA"]) for p in fit]
     gx = []
     for i in range(len(xs)):
-        xp = list(xs)
-        xm = list(xs)
+        xp, xm = list(xs), list(xs)
         xp[i] += h
         xm[i] -= h
         gx.append((predict_from(xp, ys, x_h) - predict_from(xm, ys, x_h)) / (2.0 * h))
     gy = []
     for i in range(len(ys)):
-        yp = list(ys)
-        ym = list(ys)
+        yp, ym = list(ys), list(ys)
         yp[i] += h
         ym[i] -= h
         gy.append((predict_from(xs, yp, x_h) - predict_from(xs, ym, x_h)) / (2.0 * h))
     gh = (predict_from(xs, ys, x_h + h) - predict_from(xs, ys, x_h - h)) / (2.0 * h)
-    var = sum((g * u) ** 2 for g, u in zip(gx, ux[:len(xs)]))
-    var += sum((g * u) ** 2 for g, u in zip(gy, ui))
-    var += (gh * ux[len(xs)]) ** 2
-    return math.sqrt(var), {"d_per_raw_mean": gx, "d_per_reference_mA": gy,
-                            "d_per_holdout_raw_mean": gh}
+    return gx, gy, gh
 
 
-def qualify(fit, spans):
-    lo_x, hi_x = spans["lo_x"], spans["hi_x"]
-    xs = [p["_stats"]["mean"] for p in fit]
-    ys = [float(p["reference_mA"]) for p in fit]
-    ey = [float(p["reference_error_mA"]) for p in fit]
-    span_x = hi_x - lo_x
-    span_y = max(ys) - min(ys)
-    e_sum = ey[xs.index(lo_x)] + ey[xs.index(hi_x)]
-    ref_ratio = span_y / e_sum if e_sum > 0 else float("inf")
-    ref_ok = ref_ratio > REF_SPAN_ERROR_RATIO_MIN
-    u_diff = math.hypot(*[p["_stats"]["u_x"] for p in fit
-                          if p["_stats"]["mean"] in (lo_x, hi_x)])
-    noise_ratio = span_x / u_diff if u_diff > 0 else float("inf")
-    noise_ok = noise_ratio > RAW_SPAN_NOISE_RATIO_MIN
-    checks = [
-        {"gate": "REF_SPAN_GT_10x_SUM_REF_ERROR_BOUNDS",
-         "expr": "span_I > %.0f * (E_lo + E_hi)" % REF_SPAN_ERROR_RATIO_MIN,
-         "substituted": {"span_I_mA": span_y, "E_lo_mA": e_sum, "ratio": ref_ratio,
-                         "limit": REF_SPAN_ERROR_RATIO_MIN},
-         "pass": bool(ref_ok),
-         "reason": "the reference span must dominate the meter error limits at "
-                   "both ends, otherwise the slope is inside the instrument"},
-        {"gate": "RAW_SPAN_GT_10x_CODE_UNCERTAINTY",
-         "expr": "span_raw > %.0f * u(raw_mean_lo - raw_mean_hi)" % RAW_SPAN_NOISE_RATIO_MIN,
-         "substituted": {"span_raw_counts": span_x, "u_diff_counts": u_diff,
-                         "ratio": noise_ratio, "limit": RAW_SPAN_NOISE_RATIO_MIN},
-         "pass": bool(noise_ok),
-         "reason": "raw-code span must dominate per-point dispersion plus the "
-                   "1/sqrt(12) quantisation of a single count"},
-    ]
-    return ref_ok and noise_ok, checks
-
-
-def holdout_rows(doc, fit, hold, a, b):
+def bounds(doc, fit, hold, a, b):
+    """Worst-case (absolute-sum) interval on the prediction at each held-out point."""
     unc = 0.0
     meth = doc.get("method") or {}
     if meth.get("covers_all_measured_current") is False:
         unc = float(meth.get("uncovered_branch_error_mA") or 0.0)
-    ux_fit = [p["_stats"]["u_x"] for p in fit]
-    ui_fit = [float(p["reference_error_mA"]) for p in fit]
     rows = []
     all_pass = True
+    lo_x = min(q["_stats"]["mean"] for q in fit)
+    hi_x = max(q["_stats"]["mean"] for q in fit)
     for p in hold:
         x_h = p["_stats"]["mean"]
-        if not (min(q["_stats"]["mean"] for q in fit) <= x_h <=
-                max(q["_stats"]["mean"] for q in fit)):
+        if not (lo_x <= x_h <= hi_x):
             raise Reject("EXTRAPOLATION_HOLDOUT",
-                         "%s raw mean %.4f is outside the fitted raw-code range; "
-                         "a held-out point verifies interpolation, not extrapolation"
-                         % (p["id"], x_h))
+                         "%s raw mean %.4f is outside the fitted raw-code range "
+                         "[%.4f,%.4f]; a held-out point verifies interpolation, "
+                         "not extrapolation" % (p["id"], x_h, lo_x, hi_x))
         i_ref = float(p["reference_mA"])
         i_pred = a * x_h + b
-        err = abs(i_pred - i_ref)
+        gx, gy, gh = jac(fit, x_h)
+        terms = []
+        for g, q in zip(gx, fit):
+            st = q["_stats"]
+            terms.append({"term": "fit_raw_code:%s" % q["id"],
+                          "kind": "bounded+repeatability",
+                          "half_width_mA": abs(g) * st["u_counts"],
+                          "bounded_mA": abs(g) * st["u_bound_counts"],
+                          "repeatability_mA": abs(g) * st["u_repeat_counts"]})
+        for g, q in zip(gy, fit):
+            terms.append({"term": "fit_reference:%s" % q["id"],
+                          "kind": "bounded(meter limit, not a standard deviation)",
+                          "half_width_mA": abs(g) * float(q["reference_error_mA"])})
+        st = p["_stats"]
+        terms.append({"term": "holdout_raw_code:%s" % p["id"],
+                      "kind": "bounded+repeatability",
+                      "half_width_mA": abs(gh) * st["u_counts"],
+                      "bounded_mA": abs(gh) * st["u_bound_counts"],
+                      "repeatability_mA": abs(gh) * st["u_repeat_counts"]})
+        total = sum(t["half_width_mA"] for t in terms)
+        # Absolute sum, then the held-out point's own meter limit and any declared
+        # uncovered-branch term. Nothing is root-sum-squared here: a +/- limit is a
+        # bound, and v1's RSS made the "bound" smaller than the meter alone allows.
+        bound = total + float(p["reference_error_mA"]) + unc
         target = max(HOLDOUT_TARGET_ABS_MA, HOLDOUT_TARGET_REL * abs(i_ref))
-        u_pred, sens = jac(fit, x_h, ux_fit + [p["_stats"]["u_x"]], ui_fit)
-        bound = math.sqrt(u_pred * u_pred +
-                          float(p["reference_error_mA"]) ** 2 + unc * unc)
+        err = abs(i_pred - i_ref)
         bound_ok = bound <= target
         ok = (err <= target) and bound_ok
         all_pass = all_pass and ok
         rows.append({
-            "id": p["id"], "raw_mean": x_h, "n_valid": p["_stats"]["n"],
+            "id": p["id"], "raw_mean": x_h, "n_valid": st["n"],
             "reference_mA": i_ref, "predicted_mA": i_pred,
             "abs_error_mA": err, "target_mA": target,
-            "target_rule": "PROPOSED_FOR_APPROVAL max(5 mA, 10%% of reference); "
-                           "not an inherited project safety limit",
-            "fit_propagated_mA": u_pred,
-            "reference_error_mA": float(p["reference_error_mA"]),
+            "target_rule": "PROPOSED_FOR_APPROVAL max(5 mA, 10%% of reference); not "
+                           "an inherited project safety limit",
+            "error_model": "interval / absolute-sum; no distribution, coverage "
+                           "factor or independence claim is made for the bounded "
+                           "meter and quantisation terms; the repeatability term "
+                           "is a 1-sigma estimate carried linearly",
+            "terms": terms,
+            "worst_case_bound_mA": bound,
+            "holdout_reference_limit_mA": float(p["reference_error_mA"]),
             "uncovered_branch_mA": unc,
-            "combined_error_bound_mA": bound,
             "bound_exceeds_target": (not bound_ok),
             "pass": bool(ok),
-            "sensitivity": sens,
         })
     return rows, all_pass
 
 
-def compute(doc):
-    validate(doc)
+def qualify(fit):
+    xs = [p["_stats"]["mean"] for p in fit]
+    ys = [float(p["reference_mA"]) for p in fit]
+    ey = [float(p["reference_error_mA"]) for p in fit]
+    lo_x, hi_x = min(xs), max(xs)
+    span_x = hi_x - lo_x
+    span_y = max(ys) - min(ys)
+    e_sum = ey[xs.index(lo_x)] + ey[xs.index(hi_x)]
+    ref_ratio = span_y / e_sum if e_sum > 0 else float("inf")
+    ref_ok = e_sum > 0 and ref_ratio > REF_SPAN_ERROR_RATIO_MIN
+    u_sum = 0.0
+    for q in fit:
+        if q["_stats"]["mean"] in (lo_x, hi_x):
+            u_sum += q["_stats"]["u_counts"]
+    noise_ratio = span_x / u_sum if u_sum > 0 else float("inf")
+    noise_ok = u_sum > 0 and noise_ratio > RAW_SPAN_NOISE_RATIO_MIN
+    checks = [
+        {"gate": "REF_SPAN_GT_10x_SUM_REF_ERROR_BOUNDS",
+         "expr": "span_I > %.0f * (E_lo + E_hi)" % REF_SPAN_ERROR_RATIO_MIN,
+         "substituted": {"span_I_mA": span_y, "E_lo_plus_E_hi_mA": e_sum,
+                         "ratio": ref_ratio, "limit": REF_SPAN_ERROR_RATIO_MIN},
+         "pass": bool(ref_ok),
+         "reason": "the reference span must dominate the meter error limits at both "
+                   "ends, otherwise the fitted slope sits inside the instrument"},
+        {"gate": "RAW_SPAN_GT_10x_SUM_CODE_UNCERTAINTY",
+         "expr": "span_raw > %.0f * (u(lo) + u(hi))" % RAW_SPAN_NOISE_RATIO_MIN,
+         "substituted": {"span_raw_counts": span_x, "sum_u_counts": u_sum,
+                         "ratio": noise_ratio, "limit": RAW_SPAN_NOISE_RATIO_MIN},
+         "pass": bool(noise_ok),
+         "reason": "raw-code span must dominate the half-count bound plus the "
+                   "dispersion of the two end points"},
+    ]
+    return ref_ok and noise_ok, checks
+
+
+def compute(doc, base_dir=None):
+    validate(doc, base_dir)
     for p in doc["points"]:
         p["_stats"] = point_stats(p)
     fit, hold = split_points(doc["points"])
     a, b = fit_line(fit)
-    xs = [p["_stats"]["mean"] for p in fit]
-    spans = {"lo_x": min(xs), "hi_x": max(xs),
-             "span_x": max(xs) - min(xs),
-             "lo_mA": min(float(p["reference_mA"]) for p in fit),
-             "hi_mA": max(float(p["reference_mA"]) for p in fit)}
-    qualified, checks = qualify(fit, spans)
-    hrows, hold_pass = holdout_rows(doc, fit, hold, a, b)
+    qualified, checks = qualify(fit)
+    hrows, hold_pass = bounds(doc, fit, hold, a, b)
 
     k = NOMINAL_K_MV_PER_COUNT
     gain_v_per_a = k / a
@@ -383,11 +559,13 @@ def compute(doc):
     offset_uv = int(round(offset_mv * 1000.0))
     gain_uv_per_a = int(round(gain_v_per_a * 1e6))
 
+    usable = bool(qualified and hold_pass)
     refs = sorted([float(p["reference_mA"]) for p in doc["points"]])
     out = {
         "tool": TOOL_ID,
         "provenance": doc["provenance"],
-        "status": "DRAFT_NOT_APPROVED",
+        "status": ("DRAFT_NOT_APPROVED" if usable else FAIL),
+        "usable": usable,
         "candidate": {
             "offset_uV": offset_uv,
             "gain_uV_per_A": gain_uv_per_a,
@@ -396,43 +574,47 @@ def compute(doc):
             "slope_mA_per_count": a,
             "intercept_mA": b,
             "nominal_mv_per_count_assumed": k,
+            "applicable": usable,
         },
-        "candidate_command_DRAFT_NOT_APPROVED":
-            "current_cal apply %d %d CONFIRM_MEASURED" % (offset_uv, gain_uv_per_a),
+        "candidate_command_DRAFT_NOT_APPROVED": (
+            "current_cal apply %d %d CONFIRM_MEASURED" % (offset_uv, gain_uv_per_a)
+            if usable else None),
+        "not_applicable_reason": None if usable else [
+            c["gate"] for c in checks if not c["pass"]
+        ] + ([] if hold_pass else ["HOLDOUT_FAILED"]),
         "valid_range": {
             "reference_mA": [refs[0], refs[-1]],
-            "raw_counts": [spans["lo_x"], spans["hi_x"]],
-            "note": "Only inside the measured current, supply, temperature and "
-                    "load window of these points. No extrapolation to "
-                    "over-current or stall thresholds.",
+            "raw_counts": [min(p["_stats"]["mean"] for p in doc["points"]),
+                           max(p["_stats"]["mean"] for p in doc["points"])],
+            "note": "Only inside the measured current, supply, temperature and load "
+                    "window of these points. No extrapolation to over-current or "
+                    "stall thresholds.",
         },
-        "qualification": {"qualified": bool(qualified), "checks": checks,
-                          "spans": spans},
+        "qualification": {"qualified": bool(qualified), "checks": checks},
         "fit_points": [public_point(p) for p in fit],
         "holdout_points": hrows,
         "holdout_all_pass": bool(hold_pass),
         "method": doc.get("method"),
         "meter": doc.get("meter"),
         "notes": [
-            "the mV display uses the nominal 3300/4095 assumption; it is not "
-            "proof that VDDA was measured",
-            "a pass here qualifies the fitted link only, not the whole "
-            "protection chain",
-            "status stays DRAFT_NOT_APPROVED until an independent review and "
-            "one approval of the concrete field package",
+            "the mV display uses the nominal 3300/4095 assumption; it is not proof "
+            "that VDDA was measured",
+            "a pass here qualifies the fitted link only, not the whole protection "
+            "chain",
+            "status stays DRAFT_NOT_APPROVED until an independent review and one "
+            "approval of the concrete field package",
+            "the fit numbers above are still reported when the run REJECTs, so a "
+            "reviewer can see how close it was; they are not an applicable candidate",
         ],
     }
-    if not qualified:
-        out["status"] = FAIL
-        out["reject_code"] = "QUALIFICATION_FAILED"
-        out["reject_detail"] = [c["gate"] for c in checks if not c["pass"]]
     return out
 
 
 def public_point(p):
     s = p["_stats"]
     return {"id": p["id"], "raw_mean": s["mean"], "n_valid": s["n"],
-            "sd_counts": s["sd"], "u_raw_mean_counts": s["u_x"],
+            "sd_counts": s["sd"], "u_bound_counts": s["u_bound_counts"],
+            "u_repeat_counts": s["u_repeat_counts"], "u_counts": s["u_counts"],
             "reference_mA": float(p["reference_mA"]),
             "reference_error_mA": float(p["reference_error_mA"]),
             "reference_source": p["reference_source"],
@@ -444,30 +626,31 @@ def public_point(p):
             "vdd33_mv": s["vdd33_mv"], "temp_c": s["temp_c"]}
 
 
-def sha256_file(path):
-    h = hashlib.sha256()
-    with open(path, "rb") as fh:
-        for chunk in iter(lambda: fh.read(65536), b""):
-            h.update(chunk)
-    return h.hexdigest()
-
-
 def load_input(path):
     with open(path, "r", encoding="utf-8") as fh:
-        doc = json.load(fh)
-    return doc
+        return json.load(fh)
 
 
 # ---------------------------------------------------------------- selftest
+#
+# Every number below is invented for tool testing. Nothing here is a field
+# current reference, and the emitted command text must never be sent to hardware.
 
-def _pt(pid, role, mean, iref, ierr, n=128, sd2=4.0):
-    s = mean * n
-    sq = (mean * mean + sd2) * n
+def _pt(pid, role, mean, iref, ierr, n=128, half=2.0):
+    """A real two-level code sequence: n/2 samples at mean-half, n/2 at mean+half.
+
+    v1 declared mean+-20 as min/max while its total squared deviation only
+    supported +-2, so the "healthy" control could not correspond to 128 samples.
+    These moments are computed from the sequence itself.
+    """
+    assert n % 2 == 0
+    lo, hi = mean - half, mean + half
+    s = (n // 2) * (lo + hi)
+    sq = (n // 2) * (lo * lo + hi * hi)
     return {"id": pid, "role": role, "used_for_fit": role == "fit",
             "reference_source": "METER_IN_SERIES",
             "reference_mA": iref, "reference_error_mA": ierr,
-            "raw_sum": s, "raw_sum_sq": sq,
-            "raw_min": mean - 20, "raw_max": mean + 20,
+            "raw_sum": s, "raw_sum_sq": sq, "raw_min": lo, "raw_max": hi,
             "n_valid": n, "n_requested": n,
             "seq_first": 10, "seq_last": 10 + n - 1,
             "tick_first": 1000, "tick_last": 1000 + 20 * n,
@@ -484,8 +667,9 @@ def synthetic_doc(mut=None):
                    "covers_all_measured_current": True, "fuse_rating": None,
                    "series_voltage_drop_mV": None, "surcharge_handling": None,
                    "environment": None, "uncovered_branch_error_mA": None},
-        "meter": {"model": "UT39A+", "dc_range": "400mA",
-                  "resolution": "0.1mA", "error_expression": "0.8%+3"},
+        "meter": {"model": "UT39A+", "dc_range": "400mA", "resolution": "0.1mA",
+                  "error_expression": "0.8%+3"},
+        # x=2000 -> 20 mA, x=2100 -> 140 mA, held out x=2050 -> 80 mA.
         "points": [_pt("F1", "fit", 2000.0, 20.0, 0.5),
                    _pt("F2", "fit", 2100.0, 140.0, 1.42),
                    _pt("H1", "holdout", 2050.0, 80.0, 0.94)],
@@ -503,7 +687,7 @@ def _check_ok(lines, name, cond, val):
     return bool(cond)
 
 
-def _expect_reject(lines, name, fn, want):
+def _expect(lines, name, fn, want):
     try:
         fn()
     except Reject as exc:
@@ -525,135 +709,319 @@ def selftest():
 
     res = compute(synthetic_doc())
     c = res["candidate"]
-    ok &= _check_ok(lines, "M7C01-slope", abs(c["slope_mA_per_count"] - 1.2) < 1e-12,
-                    c["slope_mA_per_count"])
-    ok &= _check_ok(lines, "M7C02-gain",
-                    abs(c["gain_V_per_A"] - (3300.0 / 4095.0) / 1.2) < 1e-12,
-                    c["gain_V_per_A"])
-    ok &= _check_ok(lines, "M7C03-offset",
-                    abs(c["offset_mV"] - 1598.2905982905984) < 1e-6, c["offset_mV"])
-    ok &= _check_ok(lines, "M7C04-gain-uV", c["gain_uV_per_A"] == 671551,
-                    c["gain_uV_per_A"])
-    ok &= _check_ok(lines, "M7C05-offset-uV", c["offset_uV"] == 1598291, c["offset_uV"])
-    ok &= _check_ok(lines, "M7C06-command-draft",
-                    res["candidate_command_DRAFT_NOT_APPROVED"] ==
-                    "current_cal apply 1598291 671551 CONFIRM_MEASURED",
-                    res["candidate_command_DRAFT_NOT_APPROVED"])
-    ok &= _check_ok(lines, "M7C07-status-draft", res["status"] == "DRAFT_NOT_APPROVED",
-                    res["status"])
-    ok &= _check_ok(lines, "M7C08-qualified", res["qualification"]["qualified"] is True,
-                    res["qualification"]["checks"])
-    ok &= _check_ok(lines, "M7C09-holdout-pass",
-                    res["holdout_all_pass"] is True and
-                    res["holdout_points"][0]["abs_error_mA"] < 1e-9,
-                    res["holdout_points"])
-    ok &= _check_ok(lines, "M7C10-provenance-synthetic",
-                    res["provenance"] == "HOST_SYNTHETIC", res["provenance"])
+    k = NOMINAL_K_MV_PER_COUNT
+    checks = [
+        ("M7C01-slope", abs(c["slope_mA_per_count"] - 1.2) < 1e-12, c["slope_mA_per_count"]),
+        ("M7C02-gain", abs(c["gain_V_per_A"] - k / 1.2) < 1e-12, c["gain_V_per_A"]),
+        ("M7C03-offset", abs(c["offset_mV"] - 1598.2905982905984) < 1e-6, c["offset_mV"]),
+        ("M7C04-gain-uV", c["gain_uV_per_A"] == 671551, c["gain_uV_per_A"]),
+        ("M7C05-offset-uV", c["offset_uV"] == 1598291, c["offset_uV"]),
+        ("M7C06-command-draft",
+         res["candidate_command_DRAFT_NOT_APPROVED"] ==
+         "current_cal apply 1598291 671551 CONFIRM_MEASURED",
+         res["candidate_command_DRAFT_NOT_APPROVED"]),
+        ("M7C07-status-draft", res["status"] == "DRAFT_NOT_APPROVED", res["status"]),
+        ("M7C08-qualified", res["qualification"]["qualified"] is True,
+         res["qualification"]["checks"]),
+        ("M7C09-holdout-pass", res["holdout_all_pass"] is True and
+         res["holdout_points"][0]["abs_error_mA"] < 1e-9, res["holdout_points"]),
+        ("M7C10-provenance-synthetic", res["provenance"] == "HOST_SYNTHETIC",
+         res["provenance"]),
+    ]
+    for name, cond, val in checks:
+        ok &= _check_ok(lines, name, cond, val)
 
-    mut_drop_fit = lambda d: d.__setitem__("points", [d["points"][0], d["points"][2]])
-    mut_dup_x = lambda d: d["points"][1].update(_pt("F2", "fit", 2000.0, 140.0, 1.42))
-    def mut_zero_slope(d):
+    # v1's control data was impossible; recompute the moments the sequence gives.
+    p0 = res["fit_points"][0]
+    ok &= _check_ok(lines, "M7C01b-control-moments-consistent",
+                    abs(p0["sd_counts"] - math.sqrt(128 * 4.0 / 127.0)) < 1e-12 and
+                    abs(p0["raw_mean"] - 2000.0) < 1e-12 and
+                    p0["u_bound_counts"] == 0.5,
+                    (p0["sd_counts"], p0["u_bound_counts"]))
+
+    def m_drop_fit(d):
+        d["points"] = [d["points"][0], d["points"][2]]
+    def m_dup_x(d):
+        d["points"][1].update(_pt("F2", "fit", 2000.0, 140.0, 1.42))
+    def m_zero_slope(d):
         d["points"][1]["reference_mA"] = 20.0
-    def mut_neg_slope(d):
+    def m_neg_slope(d):
         d["points"][1]["reference_mA"] = -140.0
-    def mut_nan(d):
+    def m_nan(d):
         d["points"][0]["reference_mA"] = float("nan")
-    def mut_raw_oob(d):
+    def m_raw_oob(d):
         d["points"][0].update(_pt("F1", "fit", 5000.0, 20.0, 0.5))
-    def mut_sat(d):
+    def m_sat(d):
         d["points"][0]["raw_min"] = 0
-    def mut_mean_incon(d):
+    def m_mean_incon(d):
         d["points"][0]["raw_sum"] = 3000.0 * 128
-    def mut_theory_ref(d):
+    def m_theory(d):
         d["points"][0]["reference_source"] = "IRUN_VREF_THEORY"
-    def mut_adapter(d):
+    def m_adapter(d):
         d["points"][0]["reference_source"] = "ADAPTER_TOTAL_CURRENT"
-    def mut_disabled_baseline(d):
+    def m_disabled(d):
         d["points"][0]["reference_source"] = "DRIVER_DISABLED_ZERO"
-    def mut_no_holdout(d):
+    def m_no_holdout(d):
         d["points"][2]["role"] = "fit"
         d["points"][2]["used_for_fit"] = True
-    def mut_holdout_shared(d):
+    def m_holdout_shared(d):
         d["points"][2]["used_for_fit"] = True
-    def mut_extrap(d):
+    def m_extrap(d):
         d["points"][2].update(_pt("H1", "holdout", 2400.0, 80.0, 0.94))
-    def mut_low_span(d):
+    def m_low_span(d):
         d["points"][1]["reference_mA"] = 23.0
-    def mut_missing(d):
+    def m_missing(d):
         del d["points"][0]["raw_source_sha256"]
-    def mut_incomplete(d):
+    def m_incomplete(d):
         d["points"][0]["n_valid"] = 100
-    def mut_null(d):
+    def m_null(d):
         d["points"][0]["raw_sum"] = None
-    def mut_schema(d):
-        d["schema"] = "other/1"
-    def mut_prov(d):
+    def m_schema(d):
+        d["schema"] = V1_SCHEMA
+    def m_prov(d):
         d["provenance"] = "BOARD_ACCEPTED"
-    def mut_bad_role(d):
+    def m_role(d):
         d["points"][0]["role"] = "close_enough"
-    def mut_dup_id(d):
+    def m_dup_id(d):
         d["points"][1]["id"] = "F1"
-    def mut_bound(d):
-        d["points"][2]["reference_error_mA"] = 51.2
-    def mut_field_no_method(d):
+    def m_uff_str(d):
+        d["points"][2]["used_for_fit"] = "false"
+    def m_cov_str(d):
+        d["provenance"] = "FIELD_MEASURED"
+        d["method"].update({"branch": "VM leg", "connection": "series",
+                           "fuse_rating": "declared", "series_voltage_drop_mV": 12.0,
+                           "surcharge_handling": "declared", "environment": "25C",
+                           "covers_all_measured_current": "yes",
+                           "uncovered_branch_error_mA": 0.0})
+    def m_neg_err(d):
+        for q in d["points"]:
+            q["reference_error_mA"] = -0.01
+    def m_zero_window(d):
+        d["points"][0]["read_window_s"] = 0.0
+    def m_sq_zero(d):
+        for q in d["points"]:
+            q["raw_sum_sq"] = 0
+    def m_frac(d):
+        for q in d["points"]:
+            mean = q["raw_sum"] / q["n_valid"]
+            q["n_valid"] = 128.5
+            q["n_requested"] = 128.5
+            q["raw_sum"] = mean * 128.5
+            q["raw_sum_sq"] = (mean * mean + 4.0) * 128.5
+    def m_one_sample(d):
+        q = d["points"][0]
+        q["n_valid"] = q["n_requested"] = 1
+        q["raw_sum"] = 2000.0
+        q["raw_sum_sq"] = 2000.0 * 2000.0
+        q["raw_min"] = q["raw_max"] = 2000.0
+    def m_field_missing(d):
+        d["provenance"] = "FIELD_MEASURED"
+        d["method"].update({"branch": "VM leg", "connection": "series",
+                            "fuse_rating": "declared", "series_voltage_drop_mV": 12.0,
+                            "surcharge_handling": "declared", "environment": "25C",
+                            "covers_all_measured_current": True,
+                            "uncovered_branch_error_mA": 0.0})
+        for q in d["points"]:
+            q["raw_source_file"] = "/definitely/nonexistent/m7-%s.bin" % q["id"]
+            q["raw_source_sha256"] = "0" * 64
+    def m_field_no_method(d):
         d["provenance"] = "FIELD_MEASURED"
         d["method"].update({"branch": None, "connection": "",
                             "covers_all_measured_current": True})
-    def mut_field_partial(d):
+    def m_field_partial(d):
         d["provenance"] = "FIELD_MEASURED"
         d["method"].update({"branch": "VM leg", "connection": "series",
-                            "fuse_rating": "declared",
-                            "series_voltage_drop_mV": 12.0,
+                            "fuse_rating": "declared", "series_voltage_drop_mV": 12.0,
                             "surcharge_handling": "declared", "environment": "25C",
                             "covers_all_measured_current": False,
                             "uncovered_branch_error_mA": None})
 
     negatives = [
-        ("M7C11-insufficient-fit", mut_drop_fit, "INSUFFICIENT_FIT_POINTS"),
-        ("M7C12-duplicate-x", mut_dup_x, "DUPLICATE_X"),
-        ("M7C13-zero-slope", mut_zero_slope, "NON_POSITIVE_SLOPE"),
-        ("M7C14-negative-slope", mut_neg_slope, "NON_POSITIVE_SLOPE"),
-        ("M7C15-nan-reference", mut_nan, "NON_FINITE_VALUE"),
-        ("M7C16-raw-out-of-range", mut_raw_oob, "RAW_OUT_OF_RANGE"),
-        ("M7C17-saturated-endpoint", mut_sat, "SATURATED_ENDPOINT"),
-        ("M7C18-raw-mean-inconsistent", mut_mean_incon, "RAW_MEAN_INCONSISTENT"),
-        ("M7C19-theory-reference", mut_theory_ref, "NO_INDEPENDENT_REFERENCE"),
-        ("M7C20-adapter-total", mut_adapter, "NO_INDEPENDENT_REFERENCE"),
-        ("M7C21-disabled-baseline", mut_disabled_baseline, "NO_INDEPENDENT_REFERENCE"),
-        ("M7C22-missing-heldout", mut_no_holdout, "INSUFFICIENT_HOLDOUT_POINTS"),
-        ("M7C23-heldout-not-independent", mut_holdout_shared, "HOLDOUT_NOT_INDEPENDENT"),
-        ("M7C24-extrapolating-heldout", mut_extrap, "EXTRAPOLATION_HOLDOUT"),
-        ("M7C25-missing-field", mut_missing, "MISSING_FIELD"),
-        ("M7C26-incomplete-sample", mut_incomplete, "INCOMPLETE_SAMPLE"),
-        ("M7C27-null-not-zeroed", mut_null, "MISSING_FIELD"),
-        ("M7C28-schema", mut_schema, "SCHEMA_MISMATCH"),
-        ("M7C29-provenance", mut_prov, "UNKNOWN_PROVENANCE"),
-        ("M7C30-bad-role", mut_bad_role, "BAD_ROLE"),
-        ("M7C31-duplicate-id", mut_dup_id, "DUPLICATE_POINT_ID"),
-        ("M7C32-field-method-missing", mut_field_no_method, "METHOD_NOT_READY"),
-        ("M7C33-field-partial-branch", mut_field_partial, "METHOD_NOT_READY"),
+        ("M7C11-insufficient-fit", m_drop_fit, "INSUFFICIENT_FIT_POINTS"),
+        ("M7C12-duplicate-x", m_dup_x, "DUPLICATE_X"),
+        ("M7C13-zero-slope", m_zero_slope, "NON_POSITIVE_SLOPE"),
+        ("M7C14-negative-slope", m_neg_slope, "NON_POSITIVE_SLOPE"),
+        ("M7C15-nan-reference", m_nan, "NON_FINITE_VALUE"),
+        ("M7C16-raw-out-of-range", m_raw_oob, "RAW_OUT_OF_RANGE"),
+        ("M7C17-saturated-endpoint", m_sat, "SATURATED_ENDPOINT"),
+        ("M7C18-raw-mean-inconsistent", m_mean_incon, "RAW_MEAN_INCONSISTENT"),
+        ("M7C19-theory-reference", m_theory, "NO_INDEPENDENT_REFERENCE"),
+        ("M7C20-adapter-total", m_adapter, "NO_INDEPENDENT_REFERENCE"),
+        ("M7C21-disabled-baseline", m_disabled, "NO_INDEPENDENT_REFERENCE"),
+        ("M7C22-missing-heldout", m_no_holdout, "INSUFFICIENT_HOLDOUT_POINTS"),
+        ("M7C23-heldout-not-independent", m_holdout_shared, "HOLDOUT_NOT_INDEPENDENT"),
+        ("M7C24-extrapolating-heldout", m_extrap, "EXTRAPOLATION_HOLDOUT"),
+        ("M7C25-missing-field", m_missing, "MISSING_FIELD"),
+        ("M7C26-incomplete-sample", m_incomplete, "INCOMPLETE_SAMPLE"),
+        ("M7C27-null-not-zeroed", m_null, "MISSING_FIELD"),
+        ("M7C28-schema", m_schema, "SCHEMA_MISMATCH"),
+        ("M7C29-provenance", m_prov, "UNKNOWN_PROVENANCE"),
+        ("M7C30-bad-role", m_role, "BAD_ROLE"),
+        ("M7C31-duplicate-id", m_dup_id, "DUPLICATE_POINT_ID"),
+        ("M7C32-field-method-missing", m_field_no_method, "METHOD_NOT_READY"),
+        ("M7C33-field-partial-branch", m_field_partial, "METHOD_NOT_READY"),
+        ("M7C38-used-for-fit-not-bool", m_uff_str, "NOT_A_BOOLEAN"),
+        ("M7C39-cover-not-bool", m_cov_str, "NOT_A_BOOLEAN"),
+        ("M7C40-negative-error-limit", m_neg_err, "NEGATIVE_ERROR_LIMIT"),
+        ("M7C41-zero-read-window", m_zero_window, "NON_POSITIVE_VALUE"),
+        ("M7C42-impossible-second-moment", m_sq_zero, "IMPOSSIBLE_SECOND_MOMENT"),
+        ("M7C43-fractional-sample-count", m_frac, "FRACTIONAL_COUNT"),
+        ("M7C44-single-sample-point", m_one_sample, "TOO_FEW_SAMPLES"),
+        ("M7C45-field-source-missing", m_field_missing, "FIELD_SOURCE_MISSING"),
     ]
-    for name, m, want in negatives:
-        ok &= _expect_reject(lines, name, lambda m=m: compute(synthetic_doc(m)), want)
+    for name, mut, want in negatives:
+        ok &= _expect(lines, name, lambda m=mut: compute(synthetic_doc(m)), want)
 
-    # Low reference span must fail the fixed qualification gate, not be
-    # rescued by widening the reference range afterwards.
-    low = compute(synthetic_doc(mut_low_span))
+    # Low reference span must fail the pre-fixed gate rather than be rescued by
+    # widening the reference range afterwards.
+    low = compute(synthetic_doc(m_low_span))
     ok &= _check_ok(lines, "M7C34-low-reference-span-rejected",
-                    low["status"] == FAIL and
-                    low["reject_detail"] == ["REF_SPAN_GT_10x_SUM_REF_ERROR_BOUNDS"],
-                    (low["status"], low.get("reject_detail")))
+                    low["status"] == FAIL and low["usable"] is False and
+                    low["candidate_command_DRAFT_NOT_APPROVED"] is None and
+                    "REF_SPAN_GT_10x_SUM_REF_ERROR_BOUNDS" in
+                    low["not_applicable_reason"],
+                    (low["status"], low["not_applicable_reason"]))
 
-    # Error bound bigger than the target is not a pass.
-    be = compute(synthetic_doc(mut_bound))
+    # Bounded meter limits summed by absolute value, not root-sum-squared: the
+    # review's counterexample. Three 5.9 mA limits, span 120 mA still qualifies.
+    def m_bound(d):
+        for q in d["points"]:
+            q["reference_error_mA"] = 5.9
+    be = compute(synthetic_doc(m_bound))
     row = be["holdout_points"][0]
+    meter_only_worst = 0.5 * 5.9 + 0.5 * 5.9 + 5.9
     ok &= _check_ok(lines, "M7C35-bound-exceeds-target-not-pass",
                     be["qualification"]["qualified"] is True and
                     row["bound_exceeds_target"] is True and
-                    be["holdout_all_pass"] is False,
-                    (row["combined_error_bound_mA"], row["target_mA"]))
+                    be["holdout_all_pass"] is False and
+                    be["usable"] is False and
+                    be["candidate_command_DRAFT_NOT_APPROVED"] is None and
+                    row["worst_case_bound_mA"] >= meter_only_worst,
+                    (row["worst_case_bound_mA"], row["target_mA"], meter_only_worst))
+    ok &= _check_ok(lines, "M7C35b-no-rss-of-bounded-terms",
+                    all(t["kind"].startswith("bounded") or
+                        t["half_width_mA"] >= 0.0 for t in row["terms"]) and
+                    "absolute-sum" in row["error_model"],
+                    row["error_model"])
 
-    # No device or transport module may be reachable from this tool.
+    # Reused capture cannot become an independent held-out point (real files).
+    import tempfile
+
+    def field_shell(d):
+        d["provenance"] = "FIELD_MEASURED"
+        d["method"].update({"branch": "VM leg", "connection": "series",
+                           "fuse_rating": "declared", "series_voltage_drop_mV": 12.0,
+                           "surcharge_handling": "declared", "environment": "25C",
+                           "covers_all_measured_current": True,
+                           "uncovered_branch_error_mA": 0.0})
+
+    def write_capture(td, p, name):
+        path = os.path.join(td, name)
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write("[CAL] sample n_req=%d n_seen=%d n_valid=%d dup=0 invalid=0 skip=0\n"
+                     % (p["n_requested"], p["n_valid"], p["n_valid"]))
+            fh.write("[CAL] sample seq=%d..%d tick=%d..%d ver=3..3 reset=0\n"
+                     % (p["seq_first"], p["seq_last"], p["tick_first"], p["tick_last"]))
+            fh.write("[CAL] raw sum=%d min=%d max=%d mean_x1000=%d\n"
+                     % (p["raw_sum"], p["raw_min"], p["raw_max"],
+                        int(round(p["raw_sum"] * 1000.0 / p["n_valid"]))))
+            fh.write("[CAL] raw sum_sq=%d\n" % p["raw_sum_sq"])
+            fh.write("[CAL] sample cal src=THEORETICAL changed=0 fit=YES reason=-\n")
+        return path
+
+    with tempfile.TemporaryDirectory() as td:
+        # M7C46: every point claims the *same* capture and the *same* response
+        # range, so no held-out point has any evidence of its own.
+        def m_reuse(d, td=td):
+            field_shell(d)
+            shared = None
+            for q in d["points"]:
+                shared = shared or write_capture(td, q, "shared_capture.txt")
+                q["raw_source_file"] = shared
+                q["raw_source_sha256"] = sha256_file(shared)
+        ok &= _expect(lines, "M7C46-reused-capture-not-independent",
+                      lambda: compute(synthetic_doc(m_reuse), base_dir=td),
+                      "HOLDOUT_NOT_INDEPENDENT")
+
+        # M7C53: the same reuse under HOST_SYNTHETIC, where the task book exempts the
+        # artifact from *existence* checks.  Independence is a declaration question, so
+        # the exemption must not silence it (this is the review's REUSED_HOLDOUT_ARTIFACT
+        # input, which used to come back qualified=true).
+        def m_reuse_synth(d):
+            for q in d["points"]:
+                q["raw_source_file"] = "same_capture.bin"
+                q["raw_source_sha256"] = "a" * 64
+        ok &= _expect(lines, "M7C53-synthetic-reused-capture-not-independent",
+                      lambda: compute(synthetic_doc(m_reuse_synth), base_dir=None),
+                      "HOLDOUT_NOT_INDEPENDENT")
+
+        # Separate real captures per point: the independence question is settled,
+        # so what is left to catch is a lying declaration.
+        def m_stats_lie(d, td=td):
+            field_shell(d)
+            for q in d["points"]:
+                path = write_capture(td, q, "cap_%s.txt" % q["id"])
+                q["raw_source_file"] = path
+                q["raw_source_sha256"] = sha256_file(path)
+            d["points"][0]["raw_sum_sq"] += 1000.0
+        ok &= _expect(lines, "M7C47-declared-stats-not-in-artifact",
+                      lambda: compute(synthetic_doc(m_stats_lie), base_dir=td),
+                      "FIELD_SOURCE_STATS_MISMATCH")
+
+        def m_sha_lie(d, td=td):
+            field_shell(d)
+            for q in d["points"]:
+                path = write_capture(td, q, "sha_%s.txt" % q["id"])
+                q["raw_source_file"] = path
+                q["raw_source_sha256"] = sha256_file(path)
+            d["points"][0]["raw_source_sha256"] = "a" * 64
+        ok &= _expect(lines, "M7C48-declared-sha-not-artifact",
+                      lambda: compute(synthetic_doc(m_sha_lie), base_dir=td),
+                      "FIELD_SOURCE_SHA_MISMATCH")
+
+        def m_good_field(d, td=td):
+            field_shell(d)
+            for q in d["points"]:
+                path = write_capture(td, q, "good_%s.txt" % q["id"])
+                q["raw_source_file"] = path
+                q["raw_source_sha256"] = sha256_file(path)
+        good = compute(synthetic_doc(m_good_field), base_dir=td)
+        ok &= _check_ok(lines, "M7C49-field-evidence-accepted",
+                        good["usable"] is True and
+                        good["status"] == "DRAFT_NOT_APPROVED" and
+                        good["provenance"] == "FIELD_MEASURED",
+                        (good["status"], good["not_applicable_reason"]))
+
+    # CLI exit codes: the review asked that the *process* conclusion match the
+    # internal one, for the bound failure and for the low-span failure too.
+    import tempfile as _tf
+    import io as _io
+
+    def _cli(name, mut):
+        with _tf.TemporaryDirectory() as run_dir:
+            path = os.path.join(run_dir, name)
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(json.dumps(synthetic_doc(mut), indent=2, sort_keys=True))
+            buf = _io.StringIO()
+            real, sys.stdout = sys.stdout, buf
+            try:
+                rc = main(["--input", path])
+            finally:
+                sys.stdout = real
+            return rc, buf.getvalue()
+
+    rc, text = _cli("cli_lowspan.json", m_low_span)
+    ok &= _check_ok(lines, "M7C50-cli-low-span-exits-nonzero",
+                    rc == 1 and "current_cal apply" not in text and
+                    '"usable": false' in text, (rc, text[-120:]))
+    rc, text = _cli("cli_bound.json", m_bound)
+    ok &= _check_ok(lines, "M7C51-cli-bound-failure-exits-nonzero",
+                    rc == 1 and "current_cal apply" not in text, (rc, text[-120:]))
+    rc, text = _cli("cli_healthy.json", None)
+    ok &= _check_ok(lines, "M7C52-cli-healthy-exits-zero-draft-only",
+                    rc == 0 and "DRAFT_NOT_APPROVED" in text and
+                    "current_cal apply" in text, (rc, text[-120:]))
+
     src = open(os.path.abspath(__file__), "r", encoding="utf-8").read()
     mods = set()
     for node in ast.walk(ast.parse(src)):
@@ -661,13 +1029,9 @@ def selftest():
             mods.update(a.name.split(".")[0] for a in node.names)
         elif isinstance(node, ast.ImportFrom) and node.module:
             mods.add(node.module.split(".")[0])
-    banned = {"serial", "usb", "usb1", "pyocd", "ctypes", "socket", "subprocess"}
+    banned = {"serial", "usb", "pyocd", "ctypes", "socket", "subprocess"}
     ok &= _check_ok(lines, "M7C36-no-transport-or-device-imports",
                     not (mods & banned), sorted(mods))
-
-    ok &= _check_ok(lines, "M7C37-reject-codes-enumerated",
-                    all(code in REJECT_CODES for _, _, code in negatives) and
-                    "QUALIFICATION_FAILED" in REJECT_CODES, None)
 
     npass = sum(1 for ln in lines if ln.startswith("PASS"))
     for ln in lines:
@@ -677,14 +1041,22 @@ def selftest():
     return ok, lines
 
 
+def cli_result(res):
+    """A REJECT must leave the process non-zero and must not print an apply line."""
+    print(json.dumps(res, indent=2, sort_keys=True))
+    if not res["usable"]:
+        print("REJECT %s: %s" % (res["status"], ", ".join(res["not_applicable_reason"])))
+        return 1
+    return 0
+
+
 def main(argv):
     ap = argparse.ArgumentParser(prog="m7_calcalc.py")
     ap.add_argument("--input")
     ap.add_argument("--out")
     ap.add_argument("--selftest", action="store_true")
     ap.add_argument("--hash")
-    ap.add_argument("--emit-example", metavar="PATH",
-                    help="write a HOST_SYNTHETIC example input; not field data")
+    ap.add_argument("--emit-example", metavar="PATH")
     args = ap.parse_args(argv)
 
     if args.hash:
@@ -702,16 +1074,15 @@ def main(argv):
         print("usage: --selftest | --input FILE [--out FILE]", file=sys.stderr)
         return 2
     try:
-        result = compute(load_input(args.input))
+        result = compute(load_input(args.input),
+                         base_dir=os.path.dirname(os.path.abspath(args.input)))
     except Reject as exc:
         print("REJECT %s" % exc)
         return 1
-    text = json.dumps(result, indent=2, sort_keys=True)
     if args.out:
         with open(args.out, "w", encoding="utf-8") as fh:
-            fh.write(text + "\n")
-    print(text)
-    return 0
+            fh.write(json.dumps(result, indent=2, sort_keys=True) + "\n")
+    return cli_result(result)
 
 
 if __name__ == "__main__":

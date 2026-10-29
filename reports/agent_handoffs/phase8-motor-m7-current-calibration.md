@@ -147,6 +147,26 @@ Git blob 3636 B/0 CR。因此仓库内的构建日志**不是工具原始 stdout
 处理方式：M7 manifest 的 banner 记 `NOT_EMBEDDED_IN_IMAGE_BYTES` 并附本段说明；
 M5/M6 原件不改写，也不据此断言当时如何取得。
 
+### 9.1 本节结论**已撤回**（2026-10-29 独立复审 §5.2）
+
+上面那段的两条搜索方法都错了，所以"镜像里没有横幅"和"M5/M6 的 banner 值不可复现"**都不成立**：
+
+- `__DATE__` / `__TIME__` 的实际使用点在 BSP 目录**之外**的 `src/kservice.c:161-162`，
+  我只在 `bsp/novosns/ns800/` 下 grep；
+- 那一行把日期和时间作为**两个独立的字符串池对象**发出，我用"日期紧跟时间"的联合 pattern，
+  在池里必然 0 命中（实测常见顺序还是时间在低地址、日期在高地址）。
+
+本轮按零基字节偏移用两条独立 pattern 复核九枚归档 BIN：M7 三枚、M5 三枚、M6 三枚
+**每枚各有 1 次日期命中 + 1 次时间命中**，与复审 `results/banner_probe.json` 逐条相等。
+偏移表与复算入口见 `reports/reviews/phase8-motor-m7-current-calibration-r1/banner_erratum.md`；
+`build_manifest.json` 已追加 `banner_erratum` 字段并把每目标的实测偏移写进 `banner`，
+原 `banner_note` 与 `NOT_EMBEDDED_IN_IMAGE_BYTES` 字样按要求留在原地备审
+（`banner_superseded_value_kept_for_audit`）。
+
+本节仍然成立的只剩一条：**本轮没有板上实读的启动文本**（无设备接入）。
+来源要分开——"归档字节恢复的构建戳"有，"板上实读的启动文本"没有，后者不得用前者替代。
+六件 M7 BIN/AXF 的 SHA 与 manifest 全等这一事实不受本勘误影响；M5/M6 历史件与旧镜像不重做。
+
 ## 10. 未闭合与不外推
 
 - `target_calibration_cases = NOT_EXECUTED`；板上 ADC 电流实测仍未完成。
@@ -156,3 +176,5 @@ M5/M6 原件不改写，也不据此断言当时如何取得。
   合成点全部标 `HOST_SYNTHETIC`，`example_*_HOST_SYNTHETIC.json` 里的系数禁止下发实物。
 - 新发现的既往证据限制：M5/M6 manifest 的 `banner` 值不能从已归档镜像字节复现，
   本轮镜像内也确实不含编译期日期串；已作为并列事实记录，未择一采信。
+  **← 本条按 §9.1 撤回**：九枚归档 BIN 实测各含 1 次日期与 1 次时间串，历史值可复现；
+  本轮真正缺的只有"板上实读的启动文本"。原文保留以便核对误判过程。

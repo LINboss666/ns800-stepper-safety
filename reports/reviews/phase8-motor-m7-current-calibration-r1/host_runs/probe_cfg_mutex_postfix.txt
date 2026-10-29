@@ -1,0 +1,3 @@
+[CFG] load failed (-45) -> safe defaults (THEORETICAL)
+[CFG] defaults restored (RAM; use config_save to persist)
+PROBE cfg_mutex_unavailable rc=-12 version_before=2 version_after=2 changed=0

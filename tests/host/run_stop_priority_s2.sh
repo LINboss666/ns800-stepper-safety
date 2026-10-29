@@ -64,7 +64,7 @@ GROUP_TIMEOUT="${S2_GROUP_TIMEOUT:-60}"
 # URO(2026-10-27 §6.1): read_obs 也跑**同一个叶子二进制**, 但它是只读通信观测, 不取
 #   写入门禁 => 在 target 与 host_ovr **两个变体都真执行**(不许整族 SKIP, 也不许为了
 #   跑本组在 target 里偷偷开宏)。旧四组的 target 整族 SKIP 保持原样、身份不变。
-S2_GROUPS="lock isr isr_window off_matrix off_arm unknown identity diag recovery stale boundary healthy target_reject epwm_leaf tmc_lock uart_leaf budget_leaf read_obs"
+S2_GROUPS="lock isr isr_window off_matrix off_arm unknown identity diag recovery stale boundary healthy target_reject epwm_leaf tmc_lock uart_leaf budget_leaf read_obs cal_static"
 LEAF_GROUPS=" epwm_leaf tmc_lock uart_leaf budget_leaf read_obs "
 
 # 每组每变体**必需**(必须真执行且判 PASS)的用例 id; 名称与夹具里的 CASE id 逐字一致。
@@ -163,6 +163,13 @@ S_budget_leaf_host_ovr=""
 S_read_obs_target=""
 S_read_obs_host_ovr=""
 
+# C22* = M7R1-A 标定静止事务与诊断预约的串行化。全部以"诊断借用真可发生"为前提
+#   => target 变体整族按声明 SKIP(不拿"门永远拒绝"冒充验证), host_ovr 真执行 6 条。
+G_cal_static_target=""
+G_cal_static_host_ovr="C22a-idle-grant-works C22b-cal-tx-blocks-diag-reservation C22b2-grant-legal-after-tx-ends C22c-lock-holder-blocks-diag-reservation C22c2-grant-legal-after-holder-releases C22d-diag-owner-blocks-cal-tx C22e-contended-path-leaks-no-lock C22f-qualification-and-reservation-are-one-hold C22f2-probe-not-vacuous"
+S_cal_static_target="C22"
+S_cal_static_host_ovr=""
+
 # 变体期望的用例总数(全开时): 少一组/少一个 id 都不算通过。
 # CP5 §4: recovery 组的 C14 拆成 C14a/C14b 两个**确定接缝** => 22->23 / 40->41。
 # CP5 §5: target 的叶子四组贡献 0 个 CASE(整族 SKIP) => 23 不变;
@@ -173,7 +180,7 @@ S_read_obs_host_ovr=""
 # URO-R1 §7: 同组再加 6 条导出侧用例 => target 47+6=53, host_ovr 103+6=109。
 # 旧的 23/79 与 URO 的 24 条合同没被改动(各组身份与数量逐字保留), 新用例**另计**。
 S2_EXPECT_target="${S2_EXPECT_target:-53}"
-S2_EXPECT_host_ovr="${S2_EXPECT_host_ovr:-109}"
+S2_EXPECT_host_ovr="${S2_EXPECT_host_ovr:-118}"
 
 VARIANTS="target host_ovr"
 

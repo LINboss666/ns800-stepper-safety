@@ -1,0 +1,9 @@
+[CFG] load failed (-45) -> safe defaults (THEORETICAL)
+[CFG] defaults restored (RAM; use config_save to persist)
+PROBE legal_gain_rc=0 actual_ma=3299194.000000 raw=4094
+[CAL] adc health=OK src=MEASURED ver=3
+[CAL] adc offset_uV=0 gain_uV_per_A=1000 measured=YES
+[CAL] cfg valid=YES src=2 offset_uV=0 gain_uV_per_A=1000
+[CAL] sample seq=1 tick=1 raw=4094 valid=1 fresh=1
+[CAL] sample ma_uA=3299194000 src=MEASURED
+[CAL] note: show/sample do not change cal/motion/flash

@@ -1,0 +1,26 @@
+[SS] state machine inited (event+lock), BOOT->INIT->SELF_TEST
+[SS] BOOT -> INIT
+[SS] INIT -> SELF_TEST
+[MOT] init OK (enable-path-validated=YES, arm gate ACTIVE, DRV_ENABLE LOW verified, STEP=api-accepted(驱动接受关断, 非波形证明))
+[MOT]   注: STEP=api-accepted 只说明驱动**接受了关断请求**, 不是示波器证明无脉冲(BUG-008 仍未验收)
+[SS] STEP: 两条输出路径都没有未确认的关断 (motor=api-accepted(驱动接受关断, 非波形证明) src=emergency-stop / diag=诊断从未占用该通道) - 仍不等于示波器证明无脉冲
+[SS] ==> FAULT_LATCHED code=9 (DRV_ENABLE LOW verified, ENN feedback OK, STEP off-confirmed(api), motor_rc=0 diag_rc=0, 整理身份 epoch=1, events=0x40)
+[SS] fault_reset: active protection inputs = 1 (SAFETY_LIMIT_INPUTS_ENABLED=RT_FALSE)
+[SS] TMC_DIAG level=0 (safe=0) safe
+[SS] ENN feedback confirmed DISABLED side (verdict=OK)
+[SS] motor recovered: DRV_ENABLE LOW verified, ENN feedback on disabled side confirmed (post-recheck)
+[SS] STEP 关断结果有效(Motor 侧=驱动接受关断; 诊断侧=从未占用该通道) - 仍非波形证明, motor src=disarm, diag latched=no
+[SS] ==> MANUAL_CLEAR (重跑自检进 READY 后仍需重新 arm) [本次覆盖的历史关断锁存: motor=无 diag=无, 票据 epoch=1]
+[SS] self-test start
+[SS] [REQ OK] GPIO
+[SS] [REQ OK] PWM device
+[SS] [REQ OK] DRV_ENABLE=LOW (write+readback verified)
+[SS] [REQ OK] ENN feedback = disabled side (PC.6=H6-5/TMC_ENN)
+[SS] [REQ OK] TMC2209 IOIN=0x21000006 VERSION=0x21
+[SS] [OK] IMU
+[SS] [OK] ADC
+[SS] [OK] Flash (JEDEC EF 40 17)
+[SS] self-test done: required=PASS degraded=0x00
+[SS] MANUAL_CLEAR -> READY (identity epoch=2)
+[SS] state=READY fault_code=0 degraded=0x00
+PROBE pthread cal_begin_rc=99 cal_guard_held=0 grant_rc=0 owner=2 expected_none=0 diag=2 rendezvous=2
