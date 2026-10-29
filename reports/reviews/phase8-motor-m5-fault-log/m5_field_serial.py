@@ -93,7 +93,7 @@ class SerialLink:
         time.sleep(0.2)
         self.ser.reset_input_buffer()
 
-    def send(self, cmd, timeout, quiet=0.5):
+    def send(self, cmd, timeout, quiet=0.5, done_marker=None):
         self.ser.reset_input_buffer()
         t_tx = time.monotonic()
         self.ser.write((cmd + "\r\n").encode("ascii"))
@@ -105,7 +105,8 @@ class SerialLink:
             if chunk:
                 buf.extend(chunk)
                 last = time.monotonic()
-            elif time.monotonic() - last >= quiet and buf:
+            elif (time.monotonic() - last >= quiet and buf and
+                  (done_marker is None or done_marker in bytes(buf))):
                 break
             else:
                 time.sleep(0.02)
@@ -125,10 +126,13 @@ class Runner:
         self.sleep = sleep
 
     # ---------- 基础 ----------
-    def q(self, rec, cmd, timeout=4.0, quiet=0.5):
-        raw, t0, t1 = self.link.send(cmd, timeout, quiet)
+    def q(self, rec, cmd, timeout=4.0, quiet=0.5, done_marker=None):
+        raw, t0, t1 = self.link.send(cmd, timeout, quiet, done_marker)
         rec.save(cmd, raw, t0, t1)
-        return _text(raw)
+        text = _text(raw)
+        if done_marker is not None and done_marker not in text:
+            raise Abort("command did not report completion: %s" % cmd)
+        return text
 
     def wait_until(self, t_target):
         while self.clock() < t_target:
@@ -353,7 +357,8 @@ class Runner:
             if not allow_clear:
                 raise Abort("log nearly full (free=%d) and --allow-clear not given" % free)
             second_dst = self._second_copy(second_copy, manifest)
-            self.q(rec, "flash_logclear ERASE", 600.0, 3.0)
+            self.q(rec, "flash_logclear ERASE", 600.0, 3.0,
+                   done_marker="[FLASH] clear event partition")
             f2 = self.parse_logstat(self.q(rec, "flash_logstat"))
             if f2["used"] != 0 or f2["valid"] != 0 or f2["bad"] != 0 or \
                f2["queued"] != 0 or f2["failed"] != 0 or f2["dropped"] != 0:
@@ -654,7 +659,7 @@ class FakeLink:
     def __init__(self, dev, clock):
         self.dev, self.clock = dev, clock
         self.commands = []
-    def send(self, cmd, timeout, quiet=0.5):
+    def send(self, cmd, timeout, quiet=0.5, done_marker=None):
         self.commands.append((self.clock(), cmd))
         self.clock.sleep(0.05)
         return self.dev.text(cmd).encode(), self.clock() - 0.05, self.clock()

@@ -151,10 +151,10 @@ note "=== archive: 判读器自测 + 真实导出字节接受/拒绝 ==="
 if ! "$PY" "$CHECKER" --selftest > "$OUT_DIR/archive_selftest.txt" 2>&1; then
     note "FATAL: 归档判读器自测失败, 见 $OUT_DIR/archive_selftest.txt"; exit 4
 fi
-if ! grep -q '^SUMMARY|cases=19 pass=19 fail=0$' "$OUT_DIR/archive_selftest.txt"; then
+if ! grep -q '^SUMMARY|cases=20 pass=20 fail=0$' "$OUT_DIR/archive_selftest.txt"; then
     note "FATAL: 判读器自测台账不是 16/16"; exit 4
 fi
-note "  判读器自测 19/19 PASS"
+note "  判读器自测 20/20 PASS"
 
 "$OUT_DIR/normal.exe" emit > "$OUT_DIR/batch_0_4.raw" 2> "$OUT_DIR/emit_err.txt"
 if [ $? -ne 0 ] || [ ! -s "$OUT_DIR/batch_0_4.raw" ]; then

@@ -16,5 +16,6 @@ CASE|AR15-crlf_framing_accepted|PASS|want=accept got=accept rows=8
 CASE|AR16-expected_short_rejected|PASS|want=reject(EXPECTED_RANGE) got=reject EXPECTED_RANGE:batch 1 ends 8 > expected end 7
 CASE|AR17-background_line_tolerated|PASS|want=accept got=accept rows=8
 CASE|AR18-export_error_rejected|PASS|want=reject(EXPORT_ERROR) got=reject EXPORT_ERROR:[FLASH] flash_dump ERROR: line overflow at slot 1
+CASE|AR19-trailing_prompt_without_lf_accepted|PASS|want=accept got=accept rows=8
 CASE|AR17-start_offset_accepted|PASS|want=accept got=accept rows=[4090, 4091] start=4090
-SUMMARY|cases=19 pass=19 fail=0
+SUMMARY|cases=20 pass=20 fail=0

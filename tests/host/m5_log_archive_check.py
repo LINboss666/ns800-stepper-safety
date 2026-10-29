@@ -81,9 +81,13 @@ def parse_batch(data, first, count):
         text = body.decode("ascii")
     except UnicodeDecodeError:
         raise Reject("NON_ASCII", "raw batch is not ASCII")
-    if not text.endswith("\n"):
-        raise Reject("TRUNCATED_TAIL", "last line has no LF")
-    lines = text.split("\n")[:-1]
+    if text.endswith("\n"):
+        lines = text.split("\n")[:-1]
+    else:
+        lines = text.split("\n")
+        # 串口控制台的最后一个提示符通常没有 LF; 它是框行, 不是数据行。
+        if not lines or lines[-1] != "msh >":
+            raise Reject("TRUNCATED_TAIL", "last line has no LF")
 
     rows = []
     seen_header = False
@@ -288,6 +292,8 @@ def _selftest_cases():
         (0, 4, _raw([_row(0),
                      "[FLASH] flash_dump ERROR: line overflow at slot 1",
                      _row(2), _row(3)])), (4, 4, b2)], 8))
+    cases.append(("AR19-trailing_prompt_without_lf_accepted", "accept", None, [
+        (0, 4, b1 + b"msh >"), (4, 4, b2 + b"msh >")], 8))
     return cases
 
 
