@@ -47,6 +47,13 @@ def _text(raw):
     return raw.replace(b"\x00", b"<NUL>").decode("utf-8", "replace")
 
 
+def _safe_exc(exc):
+    """Keep the exception type/reason without copying local absolute paths."""
+    if isinstance(exc, OSError) and exc.strerror:
+        return "%s: %s" % (type(exc).__name__, exc.strerror)
+    return "%s: %s" % (type(exc).__name__, exc)
+
+
 def parse_u(text, pattern, what):
     m = re.search(pattern, text)
     if not m:
@@ -173,7 +180,7 @@ class SerialLink:
             raise
         except OSError as exc:
             # SerialException/SerialTimeoutException derive from OSError.
-            raise TransportError("write/read failed: %s" % exc) from exc
+            raise TransportError("write/read failed: %s" % _safe_exc(exc)) from exc
 
 
 class Session:
@@ -238,7 +245,7 @@ class Session:
         except (OSError, ValueError) as exc:
             # Evidence failure is recorded, never allowed to hide the primary
             # command/safety result.
-            self.evidence_error = "%s: %s" % (type(exc).__name__, exc)
+            self.evidence_error = _safe_exc(exc)
 
     def write_failure(self):
         if not self.out_dir:
@@ -261,7 +268,7 @@ class Session:
                 json.dump(doc, fh, ensure_ascii=False, indent=2)
                 fh.write("\n")
         except (OSError, ValueError) as exc:
-            self.evidence_error = "%s: %s" % (type(exc).__name__, exc)
+            self.evidence_error = _safe_exc(exc)
 
     def wait_until(self, t):
         while self.clock() < t:
@@ -288,7 +295,7 @@ class Session:
             # Cleanup must never replace the primary failure. A transport
             # exception or query failure leaves the output state UNKNOWN.
             self.cleanup_unknown = True
-            self.cleanup_error = "%s: %s" % (type(exc).__name__, exc)
+            self.cleanup_error = _safe_exc(exc)
             self.cleanup_traceback = traceback.format_exc()
 
     def _static_preflight(self, deadline):
@@ -423,7 +430,7 @@ class Session:
                     "cleanup_late": self.cleanup_late}
         except Exception as exc:
             if self.primary_error is None:
-                self.primary_error = "%s: %s" % (type(exc).__name__, exc)
+                self.primary_error = _safe_exc(exc)
                 self.primary_exc = exc
                 self.primary_traceback = traceback.format_exc()
             raise
@@ -730,8 +737,8 @@ def selftest():
     def case(cid, fn):
         nonlocal passed, failed
         try:
-            fn()
-            ok, detail = True, "ok"
+            detail = fn() or "ok"
+            ok = True
         except Exception as exc:
             ok, detail = False, "%s: %s" % (type(exc).__name__, exc)
         passed += 1 if ok else 0
@@ -975,6 +982,8 @@ def selftest():
         if s.primary_error is None or "WRITE_TIMEOUT" not in s.primary_error:
             raise AssertionError("primary write error lost: %s"
                                  % s.primary_error)
+        return ("arm_block=10.1 disarm=%.2f clock=%.2f late=%s"
+                % (s.disarm_time, clk(), s.cleanup_late))
 
     def c14():
         # D-1: a start write timeout preserves the primary and still leaves
@@ -995,6 +1004,8 @@ def selftest():
             raise AssertionError("actual disarm not sent")
         if s.primary_error is None or "WRITE_TIMEOUT" not in s.primary_error:
             raise AssertionError("primary write error lost")
+        return ("start_write_block=1.0 disarm_dt=%.2f primary=%s"
+                % (s.disarm_time - s.start_time, s.primary_error))
 
     def c15():
         # D-1: start read blocking consumes the same clock; the command is
@@ -1015,6 +1026,8 @@ def selftest():
         if s.primary_error is None or "start not confirmed" not in s.primary_error:
             raise AssertionError("primary start error lost: %s"
                                  % s.primary_error)
+        return ("start_read_block=1.5 grace=0.5 disarm_dt=%.2f primary=%s"
+                % (s.disarm_time - s.start_time, s.primary_error))
 
     def c16():
         # D-2 review repro: primary start write failure + cleanup write
@@ -1039,6 +1052,7 @@ def selftest():
             raise AssertionError("cleanup failure not UNKNOWN")
         if sent(ser, "motor_disarm") != 1:
             raise AssertionError("actual cleanup command not sent")
+        return ("primary=%s cleanup=%s" % (s.primary_error, s.cleanup_error))
 
     def c17():
         # D-2: command reached the device but the reply is lost; the real
@@ -1052,6 +1066,7 @@ def selftest():
             raise AssertionError("disarm did not reach the device")
         if not s.disarm_confirmed or s.cleanup_unknown:
             raise AssertionError("disarm not confirmed despite LOW/pad0")
+        return "applied_disarm=1 confirmed=True"
 
     def c18():
         # D-2: evidence write failure must not replace the primary error.
@@ -1070,6 +1085,8 @@ def selftest():
                 raise AssertionError("evidence failure not recorded")
             if s.primary_error is None or "WRITE_TIMEOUT" not in s.primary_error:
                 raise AssertionError("primary lost after evidence failure")
+            return ("evidence=%s primary=%s"
+                    % (s.evidence_error, s.primary_error))
         finally:
             os.unlink(path)
 
@@ -1087,6 +1104,7 @@ def selftest():
                 raise AssertionError("start after refusal mode %s" % mode)
             if sent(ser, "motor_disarm") != 1:
                 raise AssertionError("cleanup not sent after refusal %s" % mode)
+        return "modes=refused_text,not_armed no_start=1"
 
     def c20():
         # D-3: armed=0, missing field, duplicated field, conflicting state
@@ -1124,6 +1142,7 @@ def selftest():
             if sent(ser, "motor_disarm") != 1:
                 raise AssertionError("cleanup not sent after arm status %s"
                                      % mode)
+        return "modes=armed_zero,missing,duplicate,conflict no_start=1"
 
     def c21():
         # D-3 healthy control + lost arm reply confirmed by status.
@@ -1136,6 +1155,7 @@ def selftest():
             raise AssertionError("arm write did not reach the device")
         if sent(ser, "motor_disarm") != 1:
             raise AssertionError("disarm not sent")
+        return "applied_arm=1 start=1 disarm=1"
 
     def c22():
         # D-3: lost arm reply and unqueryable status -> no start.
@@ -1150,6 +1170,7 @@ def selftest():
             raise AssertionError("start sent without arm confirmation")
         if sent(ser, "motor_disarm") != 1:
             raise AssertionError("cleanup not sent")
+        return "arm_lost_status_unavailable no_start=1"
 
     def c23():
         # D-2: a single preflight transport error must not add arm/start.
@@ -1164,6 +1185,7 @@ def selftest():
             raise AssertionError("motor command after preflight error")
         if s.primary_error is None or "WRITE_TIMEOUT" not in s.primary_error:
             raise AssertionError("primary lost")
+        return "preflight_write_error no_motor=1"
 
     def c24():
         # D-2: evidence failure alone must fail the run, not claim success.
@@ -1184,6 +1206,7 @@ def selftest():
                 raise AssertionError("evidence failure disturbed cleanup")
             if s.primary_error is None or "evidence error" not in s.primary_error:
                 raise AssertionError("evidence error not primary")
+            return "evidence_only_failed cleanup_confirmed=1"
         finally:
             os.unlink(path)
 

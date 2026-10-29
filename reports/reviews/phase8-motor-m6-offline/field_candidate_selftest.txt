@@ -17,16 +17,16 @@ CASE|M6D10-argument_error_no_serial|PASS|ok
 CASE|M6D11-archive_gate_blocks_bad_state|PASS|ok
 PRECHECK=FAIL archive=archive not accepted
 CASE|M6D12-bad_archive_before_serial|PASS|ok
-CASE|M6D13-shared_clock_charges_arm_block|PASS|ok
-CASE|M6D14-write_timeout_preserves_primary|PASS|ok
-CASE|M6D15-start_read_block_within_cleanup|PASS|ok
-CASE|M6D16-primary_and_cleanup_errors_separate|PASS|ok
-CASE|M6D17-write_reached_reply_lost|PASS|ok
-CASE|M6D18-evidence_failure_keeps_primary|PASS|ok
-CASE|M6D19-arm_refusal_text_no_start|PASS|ok
-CASE|M6D20-arm_status_missing_duplicate_conflict|PASS|ok
-CASE|M6D21-arm_reply_lost_status_confirmed|PASS|ok
-CASE|M6D22-arm_reply_lost_status_unavailable|PASS|ok
-CASE|M6D23-static_preflight_error_no_motor|PASS|ok
-CASE|M6D24-evidence_failure_alone_fails|PASS|ok
+CASE|M6D13-shared_clock_charges_arm_block|PASS|arm_block=10.1 disarm=11.00 clock=11.35 late=True
+CASE|M6D14-write_timeout_preserves_primary|PASS|start_write_block=1.0 disarm_dt=1.00 primary=TransportError: write/read failed: OSError: WRITE_TIMEOUT:motor_start
+CASE|M6D15-start_read_block_within_cleanup|PASS|start_read_block=1.5 grace=0.5 disarm_dt=1.20 primary=Abort: start not confirmed running: {'state': 0, 'armed': 1, 'cur': 0, 'tgt': 0}
+CASE|M6D16-primary_and_cleanup_errors_separate|PASS|primary=TransportError: write/read failed: OSError: WRITE_TIMEOUT:motor_start cleanup=TransportError: write/read failed: OSError: WRITE_TIMEOUT:motor_disarm
+CASE|M6D17-write_reached_reply_lost|PASS|applied_disarm=1 confirmed=True
+CASE|M6D18-evidence_failure_keeps_primary|PASS|evidence=FileNotFoundError: No such file or directory primary=TransportError: write/read failed: OSError: WRITE_TIMEOUT:motor_start
+CASE|M6D19-arm_refusal_text_no_start|PASS|modes=refused_text,not_armed no_start=1
+CASE|M6D20-arm_status_missing_duplicate_conflict|PASS|modes=armed_zero,missing,duplicate,conflict no_start=1
+CASE|M6D21-arm_reply_lost_status_confirmed|PASS|applied_arm=1 start=1 disarm=1
+CASE|M6D22-arm_reply_lost_status_unavailable|PASS|arm_lost_status_unavailable no_start=1
+CASE|M6D23-static_preflight_error_no_motor|PASS|preflight_write_error no_motor=1
+CASE|M6D24-evidence_failure_alone_fails|PASS|evidence_only_failed cleanup_confirmed=1
 SUMMARY|cases=25 pass=25 fail=0
