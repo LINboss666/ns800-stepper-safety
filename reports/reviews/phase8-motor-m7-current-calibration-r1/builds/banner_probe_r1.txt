@@ -1,0 +1,20 @@
+# banner probe: zero-based byte offsets inside the archived BIN (NOT Flash addresses)
+# two independent patterns; __DATE__ and __TIME__ are separate string-pool objects (src/kservice.c:161-162), no adjacency assumed
+rt-thread
+  bin  bytes=266140 sha256=5f080fbc652599c691e31df9825f1149a89248af786fdeacc7ab889bfbf3f8d7
+  axf  bytes=1688212 sha256=54479417bff6e9d0be5f2185497621d211dd821e290108a9301a3b918fc6e724
+  bin date_hits(1): Oct 29 2026@260556
+  bin time_hits(1): 23:11:27@260568
+  axf date_strings=Oct 29 2026 time_strings=23:11:27
+rt-thread-measure-a0
+  bin  bytes=276388 sha256=f99f3be502341508471ce1c36902126bee9271ed7f8bc92ef565273affbafa7e
+  axf  bytes=1718624 sha256=9a9a5d92e488a316ebb59d41f0ed4da3c7365f4d7aeeac23915a4e2389a15b6f
+  bin date_hits(1): Oct 29 2026@270805
+  bin time_hits(1): 23:11:40@270796
+  axf date_strings=Oct 29 2026 time_strings=23:11:40
+rt-thread-motor-m1-candidate
+  bin  bytes=266244 sha256=e614a075ab63eb5b1c4b08e1ab51fb4043f474037ce734b4bcaf666899c8f7da
+  axf  bytes=1688696 sha256=2205c7e7ad6bad93e848fd24d1e5f38c76796865a2b21ebcd2d4e22bb4b6d584
+  bin date_hits(1): Oct 29 2026@260674
+  bin time_hits(1): 23:11:52@260665
+  axf date_strings=Oct 29 2026 time_strings=23:11:52

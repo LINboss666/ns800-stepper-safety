@@ -1,0 +1,372 @@
+{
+  "task": "phase8-motor-m7-current-calibration-r1",
+  "date": "2026-10-29",
+  "reviewed_object": "68d0774e6b32fec28ebca8dd306a23a29a4a2fc9",
+  "review_verdict_consumed": "M7 round withheld SOFTWARE_REVIEW_GO; no GO is self-issued here",
+  "code_commit": "5b564eb962e8518920f581111d7a460a2b1fce64",
+  "branch": "debug/tmc-uart-rootcause-20261028",
+  "frozen_refs_untouched": [
+    "main",
+    "phase7",
+    "phase8",
+    "tags"
+  ],
+  "scope": {
+    "authorized": [
+      "offline rework",
+      "host verification",
+      "Keil build",
+      "git delivery"
+    ],
+    "hardware_actions": [],
+    "not_a_field_approval": [
+      "P0",
+      "P1",
+      "P2"
+    ],
+    "m6_field_candidate_executed": false,
+    "m5_quota_inherited": false
+  },
+  "items": {
+    "R1a": {
+      "product": "applications/motor.c motor_pwm_grant_to_diag: final qualification and SP_DIAG reservation now share one mot_lock hold, taken through motor_lock_take_checked()",
+      "not_used": [
+        "forced owner change",
+        "recovery ticket as bypass",
+        "stop_priority core change",
+        "generic callback"
+      ],
+      "verification": "S2 group 19 cal_static, host_ovr C22a..C22f2 (9 cases); event rendezvous only, no sleep guessing",
+      "first_attempt_negative_result": "REV3 mutation (gate+reserve back outside the lock) was NOT detected by C22b/C22c: the pre-fix thread merely blocked on the gate's internal mot_lock take. C22f was added to observe the reservation instant itself; the first-attempt log is archived unmodified.",
+      "post_fix_probe": "PROBE pthread cal_begin_rc=99 cal_guard_held=0 grant_rc=0 owner=2 expected_none=0 diag=2 rendezvous=2",
+      "pre_fix_probe_cloud": "PROBE pthread cal_begin_rc=0 cal_guard_held=1 grant_rc=0 owner=2 expected_none=0 diag=2 rendezvous=1"
+    },
+    "R1b": {
+      "product": "applications/project_config.c cfg_take_checked() + project_config_set_calibration() refuses on take failure; no field changed, no release attempted",
+      "out_of_scope_observation": "old project_config_set/load/config_default/boot still use the unchecked cfg_take(); the review forbade refactoring all old lock users in this round, so they are left as recorded debt",
+      "verification": "CC27/CC27b/CC27c/CC27d in tests/host/cc_main.c; chain 34/34",
+      "reverse": "REV6 cc6_rc=1 hits=2/2 (CC27, CC27b). CC27c stays green under this mutation because v1 cfg_take() was a no-op when cfg_lock_ok=FALSE, so it is recorded as non-discriminating, not as a detection",
+      "post_fix_probe": "PROBE cfg_mutex_unavailable rc=-12 version_before=2 version_after=2 changed=0",
+      "pre_fix_probe_cloud": "PROBE cfg_mutex_unavailable rc=0 version_before=2 version_after=3 changed=1"
+    },
+    "R2": {
+      "product": "applications/current_cal.c: cc_round_scaled removed; cc_scaled_dec range-checks |v*mult| < 1e18 before any float->integer conversion and emits decimal text, OUT_OF_RANGE marker beyond that; cc_show prints %s",
+      "not_used": [
+        "%lld",
+        "raising the minimum gain to make a test pass"
+      ],
+      "verification": "CC28/CC28b/CC28c real output assertions + CC29 marker; reverse REV4 cc4_rc=1 hits=2/2",
+      "post_fix_probe": "PROBE legal_gain_rc=0 actual_ma=3299194.000000 raw=4094 -> [CAL] sample ma_uA=3299194000 src=MEASURED (3299194000 > INT32_MAX)",
+      "ubsan_status": "NOT executed on this machine: MinGW GCC 4.9.2 has no libubsan and no -fsanitize=float-cast-overflow. The sanitizer line stays attributed to the cloud review."
+    },
+    "R3": {
+      "tool_id": "ns800-m7-calcalc-v2",
+      "schema": "ns800.m7.calinputs/2",
+      "R3a": "qualification failure or any required holdout failure => whole run REJECT, non-zero CLI exit, no applicable command draft; diagnostics kept but usable=false; a passing run still only reaches DRAFT_NOT_APPROVED",
+      "R3b": "bounded meter limits are no longer RSS'd into a 'combined bound'; each bounded term is propagated by absolute value, the repeatability term is carried linearly and labelled a 1-sigma estimate; worst_case_bound_mA with error_model=absolute-sum",
+      "R3b_counterexample": "review numbers (fit 2000/2100 vs 20/140 mA, holdout 2050 vs 80 mA, three 5.9 mA limits, target 8 mA) now give bound 13.000 mA >= meter-only worst 11.8 mA > 8 => REJECT (v1 gave 7.238439 mA and passed)",
+      "R3c": "integer counts with n_valid==n_requested, two-sided Cauchy-Schwarz on the second moment (no clamping), non-negative limits, positive time windows, real booleans for used_for_fit/covers_all_measured_current, FIELD binds to an existing complete transcript with matching SHA and statistics",
+      "R3c_gap_closed_this_round": "capture independence was gated on the FIELD branch, so the review's REUSED_HOLDOUT_ARTIFACT input still returned qualified=true. _verify_capture_independence() now runs for every provenance (declaration only, so it does not conflict with the HOST_SYNTHETIC exemption on file existence); sharing one session file is legal only with disjoint declared response ranges. New selftest M7C53; suite 53 -> 54.",
+      "synthetic_point_data_correction": "the old 'healthy' _pt() template claimed n=128 with min/max=mean+-20 but only 512 total squared deviation, which two endpoints alone exceed; it is now a real 64x(mean-2)+64x(mean+2) code set. The original 37 case identities and business intent are kept.",
+      "review_probe_rows": "all seven counterexample inputs now exit rc=1 with no command; only CONTROL_HEALTHY stays DRAFT_NOT_APPROVED"
+    },
+    "S5_1": "board_candidate.md rewritten: M5-inherited CONFIGURED/IRQ-OPEN P0 preconditions dropped (tmc2209.c:2180 sets TMC_DRV_UNCONFIGURED at boot); identity sequence download/byte-readback/reset/boot-text/version added; raw*3300/4095 vs DMM relabelled VOLTAGE_OBSERVATION_ONLY with paired deviation and known error terms; one executable pairing table (4 samples, 8 readings per node); P1 lists only the chosen method's three real gaps; P2 uses FAILED/PARTIAL/NOT_ACHIEVED for executed steps",
+    "S5_2": "banner conclusion retracted and pointer added in the old manifest (banner_erratum + per-target offsets), old build_notes section 6.1 and old handoff MD/JSON; nine archived BINs each contain one date and one time string at measured zero-based offsets; M5/M6 artefacts and images not rewritten; FINSH_THREAD_STACK_SIZE=4096 recorded as a source fact with high-water still NOT_MEASURED"
+  },
+  "chains_executed_on_this_machine": {
+    "current_cal": "34/34 PASS rc=0",
+    "S1": "target 61/61, host_ovr 78/78 rc=0",
+    "S2": "19 groups, target 53 (+1 skip line), host_ovr 118 rc=0",
+    "M6_CLI": "two variants 10/10 rc=0",
+    "IO_behavior": "four variants rc=0",
+    "SD_semantics": "two variants rc=0",
+    "V1_V2": "CHECK_PASS=25 and CHECK_PASS=22, fail=0, rc=0",
+    "calcalc_selftest": "54/54 PASS rc=0",
+    "reverse_battery": "REV1 3/3, REV2 1/1, REV3 1/1, REV4 2/2, REV5 3/3, REV6 2/2; M7 REVERSE RESULT: PASS",
+    "keil_three_targets": "Rebuild All once each, uv4_rc=0/0/0, each 0 Error 0 Warning",
+    "macro_probe": "3 positives rc=0 + 3 negatives rc=1; 136 sources per target, current_cal.c once per target"
+  },
+  "not_executed_here": [
+    "UBSan float-cast-overflow (toolchain lacks libubsan and the option)",
+    "any device action: no serial/DAP/instrument object, no enumeration, no target memory read, no download, no reset, no target command, no power/wiring/SW1 change, no arm/start, no STEP/DIR/HIGH",
+    "boot banner text read from the board",
+    "tshell stack high-water measurement"
+  ],
+  "images": {
+    "rt-thread": {
+      "bin": {
+        "path": "reports/firmware/phase8-motor-m7-current-calibration-r1/rt-thread.bin",
+        "bytes": 266140,
+        "sha256": "5f080fbc652599c691e31df9825f1149a89248af786fdeacc7ab889bfbf3f8d7"
+      },
+      "axf": {
+        "path": "reports/firmware/phase8-motor-m7-current-calibration-r1/rt-thread.axf",
+        "bytes": 1688212,
+        "sha256": "54479417bff6e9d0be5f2185497621d211dd821e290108a9301a3b918fc6e724"
+      },
+      "program_size": "Code=185786 RO-data=79770 RW-data=2188 ZI-data=83792",
+      "result": "0 Error(s), 0 Warning(s)",
+      "banner_date_offset_bin": "Oct 29 2026@260556",
+      "banner_time_offset_bin": "23:11:27@260568"
+    },
+    "rt-thread-measure-a0": {
+      "bin": {
+        "path": "reports/firmware/phase8-motor-m7-current-calibration-r1/rt-thread-measure-a0.bin",
+        "bytes": 276388,
+        "sha256": "f99f3be502341508471ce1c36902126bee9271ed7f8bc92ef565273affbafa7e"
+      },
+      "axf": {
+        "path": "reports/firmware/phase8-motor-m7-current-calibration-r1/rt-thread-measure-a0.axf",
+        "bytes": 1718624,
+        "sha256": "9a9a5d92e488a316ebb59d41f0ed4da3c7365f4d7aeeac23915a4e2389a15b6f"
+      },
+      "program_size": "Code=193082 RO-data=82730 RW-data=2188 ZI-data=91512",
+      "result": "0 Error(s), 0 Warning(s)",
+      "banner_date_offset_bin": "Oct 29 2026@270805",
+      "banner_time_offset_bin": "23:11:40@270796"
+    },
+    "rt-thread-motor-m1-candidate": {
+      "bin": {
+        "path": "reports/firmware/phase8-motor-m7-current-calibration-r1/rt-thread-motor-m1.bin",
+        "bytes": 266244,
+        "sha256": "e614a075ab63eb5b1c4b08e1ab51fb4043f474037ce734b4bcaf666899c8f7da"
+      },
+      "axf": {
+        "path": "reports/firmware/phase8-motor-m7-current-calibration-r1/rt-thread-motor-m1.axf",
+        "bytes": 1688696,
+        "sha256": "2205c7e7ad6bad93e848fd24d1e5f38c76796865a2b21ebcd2d4e22bb4b6d584"
+      },
+      "program_size": "Code=186018 RO-data=79646 RW-data=2188 ZI-data=83792",
+      "result": "0 Error(s), 0 Warning(s)",
+      "banner_date_offset_bin": "Oct 29 2026@260674",
+      "banner_time_offset_bin": "23:11:52@260665"
+    }
+  },
+  "images_flashed": false,
+  "board_last_proven_image": {
+    "target": "M5 motor candidate",
+    "bytes": 259580,
+    "sha256": "01d3e5ab1ad245949385d50c9f1d5fd2bbaac0806c3920e897321bc46db764bc"
+  },
+  "previous_m7_round_kept": "reports/firmware/phase8-motor-m7-current-calibration and its evidence stay as delivered; superseded banner claim kept on record with an erratum pointer",
+  "host_run_identity": {
+    "rule": "core.autocrlf=true (measured); these paths report `text: unspecified` from git check-attr, so a commit drops every CR. expected_blob_* = worktree bytes with \r\n -> \n, which is the transform git performs and is re-checked against the pushed remote blob in remote_readback_r1.md",
+    "normalized_by_autocrlf": [
+      "calcalc_selftest.log",
+      "current_cal.log",
+      "probe_calcalc_postfix_rows.txt",
+      "probe_cfg_mutex_postfix.txt",
+      "probe_diag_threads_postfix.txt",
+      "probe_show_overflow_postfix.txt",
+      "reverse_cc6_detail.txt",
+      "v1v2.log"
+    ],
+    "files": [
+      {
+        "file": "calcalc_selftest.log",
+        "worktree_bytes": 2531,
+        "worktree_sha256": "065e1e6cdf6a1f25527dd47d08b68c4c729c33dd5a266f071f7740a31a4c4f7e",
+        "cr": 56,
+        "lf": 56,
+        "expected_blob_bytes": 2475,
+        "expected_blob_sha256": "b8ea8c13224713ec5e12c15f72a2329b658fdda056fc509feb16f5102745b021",
+        "normalized_by_autocrlf": true,
+        "lossless": false
+      },
+      {
+        "file": "current_cal.log",
+        "worktree_bytes": 9691,
+        "worktree_sha256": "7f2b9e85c26001cd483de5204585a06e31b5d8115e28c91589bab83aaeee7263",
+        "cr": 157,
+        "lf": 160,
+        "expected_blob_bytes": 9534,
+        "expected_blob_sha256": "810f45d8e4ad6717e9efd01c7f1edfcca7bad3beb420805684c04b2674d4655a",
+        "normalized_by_autocrlf": true,
+        "lossless": false
+      },
+      {
+        "file": "io.log",
+        "worktree_bytes": 1019,
+        "worktree_sha256": "d10a387994da75ffd7344bb1457fb242f59e910ce88b9e81ea995cd53771ae74",
+        "cr": 0,
+        "lf": 24,
+        "expected_blob_bytes": 1019,
+        "expected_blob_sha256": "d10a387994da75ffd7344bb1457fb242f59e910ce88b9e81ea995cd53771ae74",
+        "normalized_by_autocrlf": false,
+        "lossless": true
+      },
+      {
+        "file": "m6_cli.log",
+        "worktree_bytes": 188,
+        "worktree_sha256": "e3c36f03d24868094c25e81c4449424972699e99610a5ed0242721230ed2b231",
+        "cr": 0,
+        "lf": 5,
+        "expected_blob_bytes": 188,
+        "expected_blob_sha256": "e3c36f03d24868094c25e81c4449424972699e99610a5ed0242721230ed2b231",
+        "normalized_by_autocrlf": false,
+        "lossless": true
+      },
+      {
+        "file": "m7_reverse_final.log",
+        "worktree_bytes": 302,
+        "worktree_sha256": "fd53f797845a48f66e46b3c0908e237510efb0fed8aaf13967ffd2d7b9e0306f",
+        "cr": 0,
+        "lf": 8,
+        "expected_blob_bytes": 302,
+        "expected_blob_sha256": "fd53f797845a48f66e46b3c0908e237510efb0fed8aaf13967ffd2d7b9e0306f",
+        "normalized_by_autocrlf": false,
+        "lossless": true
+      },
+      {
+        "file": "m7_reverse_run1_first_attempt_NOT_DETECTED.log",
+        "worktree_bytes": 227,
+        "worktree_sha256": "fe35631c0c990e65da6255bdde52c3dafcfef26294d3a3419b2347d028ef04a5",
+        "cr": 0,
+        "lf": 8,
+        "expected_blob_bytes": 227,
+        "expected_blob_sha256": "fe35631c0c990e65da6255bdde52c3dafcfef26294d3a3419b2347d028ef04a5",
+        "normalized_by_autocrlf": false,
+        "lossless": true
+      },
+      {
+        "file": "m7_reverse_run2.log",
+        "worktree_bytes": 295,
+        "worktree_sha256": "d495372f3d4bdaa2262fc6b13367ccfc311790269162e29b4ca07c83541d4ebd",
+        "cr": 0,
+        "lf": 8,
+        "expected_blob_bytes": 295,
+        "expected_blob_sha256": "d495372f3d4bdaa2262fc6b13367ccfc311790269162e29b4ca07c83541d4ebd",
+        "normalized_by_autocrlf": false,
+        "lossless": true
+      },
+      {
+        "file": "probe_calcalc_postfix_rows.txt",
+        "worktree_bytes": 1326,
+        "worktree_sha256": "01fa7ca613e8188b5c631f123457e2f379e90c47496b83740f834f1a70b465a3",
+        "cr": 10,
+        "lf": 10,
+        "expected_blob_bytes": 1316,
+        "expected_blob_sha256": "5a3772dfb12b98cffa465e4700b916c8d7087ddac6c6fb02494dd1ac96286abf",
+        "normalized_by_autocrlf": true,
+        "lossless": false
+      },
+      {
+        "file": "probe_cfg_mutex_postfix.txt",
+        "worktree_bytes": 194,
+        "worktree_sha256": "1d202b698a1489d09bd0682b517ca7793f81655b9f2245178ec97cfc7b76cbe2",
+        "cr": 3,
+        "lf": 3,
+        "expected_blob_bytes": 191,
+        "expected_blob_sha256": "1fefb61b346dc5b027e8b3cc014c4e21477c56aee16ca7d51f5679d08918bf7b",
+        "normalized_by_autocrlf": true,
+        "lossless": false
+      },
+      {
+        "file": "probe_diag_threads_postfix.txt",
+        "worktree_bytes": 1859,
+        "worktree_sha256": "bc08d6da7b5c8226aeaf0a85cda4d736c75d79c78db72718ff28e9eb3793aafa",
+        "cr": 26,
+        "lf": 26,
+        "expected_blob_bytes": 1833,
+        "expected_blob_sha256": "bcd4792e7cc7364c174f2d21ed5c5897b8c7f74888c6f6e1d7c10976af8918c6",
+        "normalized_by_autocrlf": true,
+        "lossless": false
+      },
+      {
+        "file": "probe_show_overflow_postfix.txt",
+        "worktree_bytes": 477,
+        "worktree_sha256": "0570fe2fa6a418d8578e26a3e6c24e300d685e155c5259f445ce68cad569c120",
+        "cr": 9,
+        "lf": 9,
+        "expected_blob_bytes": 468,
+        "expected_blob_sha256": "03215d4d0414a28be3bcbd2649c969e83b13694a7ae0d7a6da926f2a6c6ab448",
+        "normalized_by_autocrlf": true,
+        "lossless": false
+      },
+      {
+        "file": "reverse_cc6_detail.txt",
+        "worktree_bytes": 9880,
+        "worktree_sha256": "ac7df9e0e661202122f874e05e614235a7cc6ee28f7407a43299aabc6b1ef97a",
+        "cr": 157,
+        "lf": 163,
+        "expected_blob_bytes": 9723,
+        "expected_blob_sha256": "ec310e1dbee5171d4ebdcb96dfc1b6e5ab2b5d4895b840ca6599c7a1790c13df",
+        "normalized_by_autocrlf": true,
+        "lossless": false
+      },
+      {
+        "file": "reverse_s2_C22f_failure_detail.txt",
+        "worktree_bytes": 8765,
+        "worktree_sha256": "342d7a805740bb181a908fd01f1954b30724812322bb72ee1f2f48859004f652",
+        "cr": 0,
+        "lf": 100,
+        "expected_blob_bytes": 8765,
+        "expected_blob_sha256": "342d7a805740bb181a908fd01f1954b30724812322bb72ee1f2f48859004f652",
+        "normalized_by_autocrlf": false,
+        "lossless": true
+      },
+      {
+        "file": "run_probes_local.py",
+        "worktree_bytes": 6732,
+        "worktree_sha256": "57a47b22d0dc67d91a0f8fa2e01be1f615f2e8690cdb918ccc67c61e965312ee",
+        "cr": 0,
+        "lf": 128,
+        "expected_blob_bytes": 6732,
+        "expected_blob_sha256": "57a47b22d0dc67d91a0f8fa2e01be1f615f2e8690cdb918ccc67c61e965312ee",
+        "normalized_by_autocrlf": false,
+        "lossless": true
+      },
+      {
+        "file": "s1.log",
+        "worktree_bytes": 1250,
+        "worktree_sha256": "84077360b55e4e07b4b8c0769b038044fd87f79d166844eb51120572a4049cc6",
+        "cr": 0,
+        "lf": 21,
+        "expected_blob_bytes": 1250,
+        "expected_blob_sha256": "84077360b55e4e07b4b8c0769b038044fd87f79d166844eb51120572a4049cc6",
+        "normalized_by_autocrlf": false,
+        "lossless": true
+      },
+      {
+        "file": "s2.log",
+        "worktree_bytes": 8569,
+        "worktree_sha256": "8be1e4eb7e8dfd54ac3aa181f41360cee28d919164e5e048f1111ad4a71eef9a",
+        "cr": 0,
+        "lf": 98,
+        "expected_blob_bytes": 8569,
+        "expected_blob_sha256": "8be1e4eb7e8dfd54ac3aa181f41360cee28d919164e5e048f1111ad4a71eef9a",
+        "normalized_by_autocrlf": false,
+        "lossless": true
+      },
+      {
+        "file": "sd.log",
+        "worktree_bytes": 806,
+        "worktree_sha256": "797f634d56d89e9a0d0a3732f657fbabc1be3f6bd34929e17c84ff2e32ad64b0",
+        "cr": 0,
+        "lf": 19,
+        "expected_blob_bytes": 806,
+        "expected_blob_sha256": "797f634d56d89e9a0d0a3732f657fbabc1be3f6bd34929e17c84ff2e32ad64b0",
+        "normalized_by_autocrlf": false,
+        "lossless": true
+      },
+      {
+        "file": "v1v2.log",
+        "worktree_bytes": 1281,
+        "worktree_sha256": "b1fd3317add72a15022336d1af6f28637f92846bfe06824b12dc5617dd4883e9",
+        "cr": 12,
+        "lf": 28,
+        "expected_blob_bytes": 1269,
+        "expected_blob_sha256": "3c369d825d9087d9d28df76649ab7b36878e78077f6ebc040e60187c8231d581",
+        "normalized_by_autocrlf": true,
+        "lossless": false
+      }
+    ]
+  },
+  "receipt": [
+    "M7_R1_OFFLINE_READY / AWAITING_INDEPENDENT_REVIEW",
+    "NEW_IMAGES_NOT_FLASHED / HARDWARE_ACTIONS=[]",
+    "P1_METHOD_NOT_READY",
+    "M5_BOARD_IMAGE_UNCHANGED / NO_HARDWARE_GO_SELF_CLAIMED"
+  ],
+  "next_step_awaiting_review": "one concrete P0 voltage-observation package for a single user approval; P1 reference conditions keep being closed offline; communication, basic start/stop and the 300-frame software-fault demo are not reopened"
+}

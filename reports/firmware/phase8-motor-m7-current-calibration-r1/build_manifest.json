@@ -1,0 +1,116 @@
+{
+  "task": "phase8-motor-m7-current-calibration-r1",
+  "round": "M7-R1 concentrated rework after the independent M7 review",
+  "review_object_under_rework": "68d0774e6b32fec28ebca8dd306a23a29a4a2fc9",
+  "code_commit": "5b564eb962e8518920f581111d7a460a2b1fce64",
+  "built_at_utc": "2026-10-29T15:11Z (see each build log Build Time Elapsed)",
+  "toolchain": {
+    "uv4": "UV4 5.43.1.0",
+    "compiler": "Arm Compiler for Embedded 6.24 (armclang V6.24)",
+    "command": "UV4.exe -r project.uvprojx -t <target> -j0 -o <absolute log path>",
+    "rebuild_all": true,
+    "download_used": false,
+    "hooks_verified_before_build": "BeforeMake RunUserProg1=0 for all three targets; AfterMake RunUserProg1=1 with 'fromelf --bin' only (image conversion, no flasher)",
+    "result": "three targets 0 Error(s), 0 Warning(s), uv4 exit code 0 each",
+    "executed_on": "this machine (local Keil), logs archived under builds/"
+  },
+  "banner_note": "CORRECTED against the M7 round. __DATE__/__TIME__ are emitted at src/kservice.c:161-162 as two separate string-pool objects; the M7 conclusion 'no compile-time banner in these images' came from grepping only bsp/novosns/ns800/ and requiring date-immediately-followed-by-time. Per-target zero-based byte offsets inside the archived BIN are below.",
+  "banner_source_grades": {
+    "build_stamp_recovered_from_archived_bytes": "AVAILABLE (offsets per target)",
+    "boot_text_actually_read_on_board": "NOT_AVAILABLE_THIS_ROUND (hardware actions = 0)"
+  },
+  "images_not_flashed": true,
+  "hardware_actions_this_round": [],
+  "targets": {
+    "rt-thread": {
+      "macros": "no target -D for the four hardware macros -> motor.h defaults RT_FALSE; macro probe armclang_rc=0",
+      "program_size": "Code=185786 RO-data=79770 RW-data=2188 ZI-data=83792",
+      "result": "0 Error(s), 0 Warning(s)",
+      "bin": {
+        "path": "reports/firmware/phase8-motor-m7-current-calibration-r1/rt-thread.bin",
+        "bytes": 266140,
+        "sha256": "5f080fbc652599c691e31df9825f1149a89248af786fdeacc7ab889bfbf3f8d7"
+      },
+      "axf": {
+        "path": "reports/firmware/phase8-motor-m7-current-calibration-r1/rt-thread.axf",
+        "bytes": 1688212,
+        "sha256": "54479417bff6e9d0be5f2185497621d211dd821e290108a9301a3b918fc6e724"
+      },
+      "banner_date_offset_bin": "Oct 29 2026@260556",
+      "banner_time_offset_bin": "23:11:27@260568",
+      "build_log": {
+        "path": "reports/reviews/phase8-motor-m7-current-calibration-r1/builds/build_rt-thread.log",
+        "bytes": 3779,
+        "sha256": "f733710c26d530a85a551cd631a12a1b7995b51123fbfc5b0ee6397b213bf236",
+        "cr": 143,
+        "expected_blob_bytes": 3636,
+        "expected_blob_sha256": "9e0e6eff14d526958b62e88a4884bb017c177c5c3427a18450fc818f377f0dfd",
+        "lossless": false
+      }
+    },
+    "rt-thread-measure-a0": {
+      "macros": "NS800_TARGET_MEASUREMENT_A0=1; four hardware macros stay RT_FALSE; macro probe armclang_rc=0",
+      "program_size": "Code=193082 RO-data=82730 RW-data=2188 ZI-data=91512",
+      "result": "0 Error(s), 0 Warning(s)",
+      "bin": {
+        "path": "reports/firmware/phase8-motor-m7-current-calibration-r1/rt-thread-measure-a0.bin",
+        "bytes": 276388,
+        "sha256": "f99f3be502341508471ce1c36902126bee9271ed7f8bc92ef565273affbafa7e"
+      },
+      "axf": {
+        "path": "reports/firmware/phase8-motor-m7-current-calibration-r1/rt-thread-measure-a0.axf",
+        "bytes": 1718624,
+        "sha256": "9a9a5d92e488a316ebb59d41f0ed4da3c7365f4d7aeeac23915a4e2389a15b6f"
+      },
+      "banner_date_offset_bin": "Oct 29 2026@270805",
+      "banner_time_offset_bin": "23:11:40@270796",
+      "build_log": {
+        "path": "reports/reviews/phase8-motor-m7-current-calibration-r1/builds/build_rt-thread-measure-a0.log",
+        "bytes": 3819,
+        "sha256": "68011af4cf185fea6f91e10c9efabe294267cd6afb54f74bc7d2b82fc181c19c",
+        "cr": 143,
+        "expected_blob_bytes": 3676,
+        "expected_blob_sha256": "b46709232a56b9848059bfe0dea127df57edb98b798e963606a7458cd090cf9b",
+        "lossless": false
+      }
+    },
+    "rt-thread-motor-m1-candidate": {
+      "macros": "NS800_TARGET_MEASUREMENT_A0=0, MOTOR_HARDWARE_ENABLE_PATH_VALIDATED=1, TMC_DRIVE_CONFIG_HW_VALIDATED=1, STEP_DIAG_ISOLATED_ENV_CONFIRMED=0, SAFETY_LIMIT_INPUTS_ENABLED=0",
+      "program_size": "Code=186018 RO-data=79646 RW-data=2188 ZI-data=83792",
+      "result": "0 Error(s), 0 Warning(s)",
+      "bin": {
+        "path": "reports/firmware/phase8-motor-m7-current-calibration-r1/rt-thread-motor-m1.bin",
+        "bytes": 266244,
+        "sha256": "e614a075ab63eb5b1c4b08e1ab51fb4043f474037ce734b4bcaf666899c8f7da"
+      },
+      "axf": {
+        "path": "reports/firmware/phase8-motor-m7-current-calibration-r1/rt-thread-motor-m1.axf",
+        "bytes": 1688696,
+        "sha256": "2205c7e7ad6bad93e848fd24d1e5f38c76796865a2b21ebcd2d4e22bb4b6d584"
+      },
+      "banner_date_offset_bin": "Oct 29 2026@260674",
+      "banner_time_offset_bin": "23:11:52@260665",
+      "build_log": {
+        "path": "reports/reviews/phase8-motor-m7-current-calibration-r1/builds/build_rt-thread-motor-m1-candidate.log",
+        "bytes": 3879,
+        "sha256": "a6d071e0968eb74898006bcd31805f81a3bd3ca19462b5e7ddec0a72340ecf62",
+        "cr": 143,
+        "expected_blob_bytes": 3736,
+        "expected_blob_sha256": "8490e08931d1f15197cd7be08bc62f07e1443b9b464a6bf377fd3dd00b59fbf5",
+        "lossless": false
+      }
+    }
+  },
+  "static_checks": {
+    "source_files_per_target": "136 each; current_cal.c / motor.c / project_config.c appear exactly once per target (read from project.uvprojx)",
+    "no_new_macro_exceptions": true,
+    "macro_probe": "reports/reviews/phase8-motor-m7-current-calibration-r1/builds/macro_probe.txt (three positives rc=0, three negatives rc=1)",
+    "stack_usage": [
+      "reports/reviews/phase8-motor-m7-current-calibration-r1/builds/stack_usage.txt",
+      "reports/reviews/phase8-motor-m7-current-calibration-r1/builds/stack_usage_O1.txt"
+    ],
+    "stack_high_water": "NOT_MEASURED (no device this round); the .su frames are static local frames only",
+    "finsh_thread_stack_size": "4096, source fact rtconfig.h:125"
+  },
+  "previous_round_images_kept": "reports/firmware/phase8-motor-m7-current-calibration/ stays as delivered; not re-built, not deleted"
+}

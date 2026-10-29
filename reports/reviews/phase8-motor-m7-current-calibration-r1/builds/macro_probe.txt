@@ -1,0 +1,18 @@
+# armclang macro probe for the M7-R1 three targets
+# Define strings taken verbatim from project.uvprojx target <Define>
+# (default line 343 has no hardware -D at all -> motor.h defaults RT_FALSE)
+# flags on every armclang call: --target=arm-arm-none-eabi -mcpu=cortex-m7
+Product: MDK Plus 5.43
+Component: Arm Compiler for Embedded 6.24
+Tool: armclang [5f371800]
+rt-thread (-DMOTOR_EXPECT=0 -DTMC_EXPECT=0; extra none) -> armclang_rc=0
+rt-thread-measure-a0 (-DMOTOR_EXPECT=0 -DTMC_EXPECT=0; extra -DNS800_TARGET_MEASUREMENT_A0=1) -> armclang_rc=0
+rt-thread-motor-m1-candidate (-DMOTOR_EXPECT=1 -DTMC_EXPECT=1; extra -DNS800_TARGET_MEASUREMENT_A0=0 -DMOTOR_HARDWARE_ENABLE_PATH_VALIDATED=1 -DTMC_DRIVE_CONFIG_HW_VALIDATED=1 -DSTEP_DIAG_ISOLATED_ENV_CONFIRMED=0 -DSAFETY_LIMIT_INPUTS_ENABLED=0) -> armclang_rc=0
+NEGATIVE expects MOTOR=1 with no defines -> armclang_rc=1
+NEGATIVE STEP_DIAG written as 1 -> armclang_rc=1
+NEGATIVE SAFETY_LIMIT written as 1 -> armclang_rc=1
+# source file count per target, read from project.uvprojx
+rt-thread                    files=136  current_cal.c=1  motor.c=1  project_config.c=1
+rt-thread-measure-a0         files=136  current_cal.c=1  motor.c=1  project_config.c=1
+rt-thread-motor-m1-candidate files=136  current_cal.c=1  motor.c=1  project_config.c=1
+M7-R1 MACRO PROBE RESULT: PASS
