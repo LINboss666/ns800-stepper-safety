@@ -126,8 +126,9 @@ I/O 四变体（off/on × target/ovr）全部 PASS；证据 `io_behavior.txt`。
 （LF）另跑一次 **25/25 PASS**（`field_candidate_selftest_git_blob.txt`）。原 13 个用例
 （M6D01、M6D02、M6D02b、M6D03–M6D12）身份保留，新增 M6D13–M6D24 覆盖上述三项复审阻断、
 拒绝文本、状态字段缺失/重复/冲突、回执丢失、证据失败和实际发送记录。首个补正失败运行
-保留为 `field_candidate_selftest_first_failure.txt`（4 例先失败后修复）。候选未上板，
-不声称 Windows/USB 硬实时或物理停机上界。
+以**转录**形式保留为 `field_candidate_selftest_first_failure.txt`（4 例先失败后修复；
+临时原文件被后续运行覆盖，文件头已注明这是转录而非设备证据）。候选未上板，不声称
+Windows/USB 硬实时或物理停机上界。
 
 未覆盖/明确不属候选：旧日志归档、清区、两份备份门由 M5 脚本负责并已有 FS01–FS08
 自测；候选不执行 fault_reset（除非未来显式批准并传 `--allow-recovery`），不重开串口、
