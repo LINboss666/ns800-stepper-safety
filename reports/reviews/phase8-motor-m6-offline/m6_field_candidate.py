@@ -1095,7 +1095,7 @@ def selftest():
             dev.after_write = (lambda cmd: setattr(s, "out_dir", path)
                                if cmd == "motor_disarm" else None)
             try:
-                s.run_fault()
+                s.run_fault(allow_recovery=True)
             except Exception:
                 pass
             if s.evidence_error is None:
@@ -1218,7 +1218,7 @@ def selftest():
             dev, ser, link, s, clk = build()
             s.out_dir = path
             try:
-                s.run_fault()
+                s.run_fault(allow_recovery=True)
             except EvidenceError:
                 pass
             else:
@@ -1254,7 +1254,7 @@ def selftest():
             dev, ser, link, s, clk = build(out_dir=valid)
             s.out_dir = path  # exactly the cloud repro: valid dir, then a file
             try:
-                s.run_fault()
+                s.run_fault(allow_recovery=True)
             except EvidenceError:
                 pass
             else:
@@ -1282,7 +1282,7 @@ def selftest():
             dev.after_write = (lambda cmd: setattr(s, "out_dir", path)
                                if cmd == "motor_arm" else None)
             try:
-                s.run_fault()
+                s.run_fault(allow_recovery=True)
             except EvidenceError:
                 pass
             else:
@@ -1311,7 +1311,7 @@ def selftest():
             dev.after_write = (lambda cmd: setattr(s, "out_dir", path)
                                if cmd == "motor_start" else None)
             try:
-                s.run_fault()
+                s.run_fault(allow_recovery=True)
             except EvidenceError:
                 pass
             else:
