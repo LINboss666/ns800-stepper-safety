@@ -1,0 +1,78 @@
+{
+  "task": "phase8-motor-m6-offline",
+  "date": "2026-10-29",
+  "branch": "debug/tmc-uart-rootcause-20261028",
+  "document_base": "a052e8e3dc11a4a983fcaecf5fd36ba9e4139af4",
+  "code_commit": "cf133d6a5d539bb5a7c3b9da4d50d53dc3b47055",
+  "on_board_last_proven": {
+    "image": "M5 candidate",
+    "bin_bytes": 259580,
+    "bin_sha256": "01d3e5ab1ad245949385d50c9f1d5fd2bbaac0806c3920e897321bc46db764bc",
+    "axf_sha256": "8c5bc7bf1efa786013c767ae1e09415ad0d5d5db3e38069c8aeebabf7cebae40",
+    "status": "UNCHANGED / NOT_FLASHED"
+  },
+  "targets": {
+    "rt-thread": {
+      "macros": "four macros = RT_FALSE (no target override)",
+      "program_size": "Code=180586 RO-data=78306 RW-data=2188 ZI-data=83784",
+      "banner": "build Oct 29 2026 11:20:17",
+      "axf": {
+        "bytes": 1667756,
+        "sha256": "377b4e059ebc42aeea999d1d7a9a749e65a57339e86105868ce65b0076d84f96"
+      },
+      "bin": {
+        "bytes": 259468,
+        "sha256": "ccfae5e37cd010e873f3bf1a52c04e5925840d3e9f869a47d3514946bfbc1eec"
+      },
+      "load": {
+        "base": "0x08000000",
+        "file_bytes": 259468,
+        "mem_bytes": 344864
+      }
+    },
+    "rt-thread-measure-a0": {
+      "macros": "four macros = RT_FALSE",
+      "program_size": "Code=187882 RO-data=81266 RW-data=2188 ZI-data=91504",
+      "banner": "build Oct 29 2026 11:20:33",
+      "axf": {
+        "bytes": 1698176,
+        "sha256": "9110c5e38d98cab521987d83057f7ae9438e634c74db67011b419622d645de0f"
+      },
+      "bin": {
+        "bytes": 269724,
+        "sha256": "6458c8417471bed1ea760a9f4a20949efd45056f13e6177f2913afade42b70c1"
+      },
+      "load": {
+        "base": "0x08000000",
+        "file_bytes": 269724,
+        "mem_bytes": 362840
+      }
+    },
+    "rt-thread-motor-m1-candidate": {
+      "macros": "MOTOR_HARDWARE_ENABLE_PATH_VALIDATED=1 TMC_DRIVE_CONFIG_HW_VALIDATED=1 STEP_DIAG_ISOLATED_ENV_CONFIRMED=0 SAFETY_LIMIT_INPUTS_ENABLED=0",
+      "program_size": "Code=180818 RO-data=78186 RW-data=2188 ZI-data=83784",
+      "banner": "build Oct 29 2026 11:20:45",
+      "axf": {
+        "bytes": 1668244,
+        "sha256": "b9bb80ffaa5b7f9a153296a995d21b2e6059e1e6504d3f6c1452315f287af16a"
+      },
+      "bin": {
+        "bytes": 259580,
+        "sha256": "a1ba8226c5d09578c111b61a0b12a7ac182d572db01cc945081c51185b837f7b"
+      },
+      "load": {
+        "base": "0x08000000",
+        "file_bytes": 259580,
+        "mem_bytes": 344976
+      }
+    }
+  },
+  "build": {
+    "tool": "UV4 5.43.1.0 / ARMCLANG V6.24",
+    "command": "UV4.exe -r project.uvprojx -t <target> -j0 -o <log>",
+    "rebuild_all": true,
+    "result": "three targets 0 Error / 0 Warning",
+    "macro_probe": "armclang 6.24; candidate MOTOR=1 TMC=1 STEP=0 LIMIT=0; default/A0 0/0/0/0"
+  },
+  "status": "NEW_IMAGES_BUILT_NOT_FLASHED"
+}
