@@ -6,7 +6,7 @@
   "source_base": "a052e8e3dc11a4a983fcaecf5fd36ba9e4139af4",
   "code_commit": "cf133d6a5d539bb5a7c3b9da4d50d53dc3b47055",
   "delivery_head": "80fc7db4a2cde89375eced0d1da32369b765cda0",
-  "delivery_head_note": "test evidence + build artifacts commit; the handoff documentation commit follows and is reported in the STOP/readback, not self-recorded",
+  "delivery_head_note": "build-artifact commit (test evidence is in parent 0941c75); the handoff documentation commit follows and is reported in the STOP/readback, not self-recorded",
   "status": "M6_OFFLINE_CLOSEOUT_COMPLETE / NEW_IMAGES_BUILT_NOT_FLASHED / FIELD_CANDIDATE_OFFLINE_VERIFIED_NOT_EXECUTED",
   "product_changed": {
     "applications/safety_state.c": "safety_trip_cmd checks ss_log_ctx_ok before ANY argument parsing or output; legal thread retains usage and one safety_post_event; no protection/recovery logic change",

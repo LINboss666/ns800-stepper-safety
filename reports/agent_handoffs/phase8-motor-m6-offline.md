@@ -4,7 +4,7 @@
 分支：`debug/tmc-uart-rootcause-20261028`
 document_base / source_base：`a052e8e3dc11a4a983fcaecf5fd36ba9e4139af4`
 code_commit（产品源码）：`cf133d6a5d539bb5a7c3b9da4d50d53dc3b47055`
-交付 head（测试证据 + 构建镜像）：`80fc7db4a2cde89375eced0d1da32369b765cda0`
+测试/证据提交：`0941c75`；交付 head（构建镜像）：`80fc7db4a2cde89375eced0d1da32369b765cda0`
 状态：**M6_OFFLINE_CLOSEOUT_COMPLETE / NEW_IMAGES_BUILT_NOT_FLASHED /
 FIELD_CANDIDATE_OFFLINE_VERIFIED_NOT_EXECUTED**
 上一阶段：`reports/agent_handoffs/phase8-motor-m5-fault-log.md`（M5 最终收尾见 §12）
