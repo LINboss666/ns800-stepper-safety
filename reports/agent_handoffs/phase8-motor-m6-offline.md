@@ -4,7 +4,7 @@
 分支：`debug/tmc-uart-rootcause-20261028`
 document_base / source_base：`a052e8e3dc11a4a983fcaecf5fd36ba9e4139af4`
 code_commit（产品源码）：`cf133d6a5d539bb5a7c3b9da4d50d53dc3b47055`
-测试/证据提交：`0941c75`；交付 head（构建镜像）：`80fc7db4a2cde89375eced0d1da32369b765cda0`
+测试/证据提交：`0d7f96c12980677ffb988b00fde7df706f2407ed`；构建镜像提交：`80fc7db4a2cde89375eced0d1da32369b765cda0`
 状态：**M6_OFFLINE_CLOSEOUT_COMPLETE / NEW_IMAGES_BUILT_NOT_FLASHED /
 FIELD_CANDIDATE_OFFLINE_VERIFIED_NOT_EXECUTED**
 上一阶段：`reports/agent_handoffs/phase8-motor-m5-fault-log.md`（M5 最终收尾见 §12）
@@ -30,7 +30,8 @@ FIELD_CANDIDATE_OFFLINE_VERIFIED_NOT_EXECUTED**
 - PS17c/d/e：ISR、PRIMASK、无线程对象 + 合法参数 → 静默、0 事件、0 捕获；
 - PS17f/g：ISR、PRIMASK + 非法参数 → 静默、0 事件、0 捕获；
 - PS17h：无线程对象 + 合法与非法参数 → 静默、0 事件、0 捕获；
-- PS17e：事件投递失败（-RT_EIO）→ 保护仍执行、摘要不声称持久化。
+- PS17e：事件投递失败（-RT_EIO）→ 保护仍执行（`safety_trip_pending()==TRUE` 断言）、
+  摘要不声称持久化。
 
 S1 runner 已登记 PS17f/g/h；最终源码复跑 `target 58/58`、`host_ovr 73/73`，反向
 `rev_safety_trip_skip_post` 仍具名命中 PS17a/PS17e，rc=0。证据：
@@ -102,18 +103,21 @@ I/O 四变体（off/on × target/ovr）全部 PASS；证据 `io_behavior.txt`。
 - 新日志完整读回：`flash_dump` 分批（≤100）覆盖新槽，校验槽号连续、session、
   pre event0/step>0、post event9/step0、时间单调；`accepted==completed` 判排空，
   `queue_dropped=51` 作为重试计数不参与完整性；BB `write drops` 取增量；
+- 真实运行必须提供 `--archive-state`：M5 归档未接受、清区后第二份备份缺失或
+  `COPY_VERIFIED.json` 不存在时，在导入 pyserial/打开串口之前拒绝，不发任何电机命令；
 - 只有读回完整且撤能已确认时才允许显式 `--allow-recovery` 执行 fault_reset/selftest；
   任何异常不得自动清锁存；参数错误/`--selftest` 不导入 pyserial、不构造 SerialPort；
 - 每个收发先落 `--out-dir/NNN_*.bin` 与 `raw_index.jsonl`。
 
-离线自测 11/11 PASS（`field_candidate_selftest.txt`）：交错 trip 仍撤能一次、读超时
+离线自测 13/13 PASS（`field_candidate_selftest.txt`）：交错 trip 仍撤能一次、读超时
 5 s 内撤能、撤能回执与合同字段均丢失记 UNKNOWN、arm 回执丢失仍清理、静止拒绝不发
 start、completed=299/缺行/错 session 拒绝、缺一条新记录禁止恢复、无空间不发电机命令、
-原始收发保留、参数错误无串口对象。
+原始收发保留、参数错误无串口对象、归档拒绝/第二份备份缺失/无验证标记均拒绝且不发
+电机命令、坏归档在导入 pyserial 之前被拒绝。
 
-未覆盖/明确不属候选：旧日志归档、清区、两份备份门仍由 M5 脚本负责；候选不执行
-fault_reset（除非未来显式批准并传 `--allow-recovery`），不重开串口、不重发 trip、
-不复位、不自动恢复。
+未覆盖/明确不属候选：旧日志归档、清区、两份备份门由 M5 脚本负责并已有 FS01–FS08
+自测；候选不执行 fault_reset（除非未来显式批准并传 `--allow-recovery`），不重开串口、
+不重发 trip、不复位、不自动恢复。
 
 ## 6. 三目标构建与镜像（仅构建，NOT_FLASHED）
 
@@ -144,7 +148,7 @@ UV4 5.43.1.0 / ARMCLANG V6.24，三目标各 Rebuild All 一次，均 0 Error / 
 | S1 反向 | rev_motor_off 5/5、rev_safety_trip_skip_post 1/1，rc=0 |
 | I/O 四变体 | 33/35/46/48 required PASS；非法宏值拒绝编译；rc=0 |
 | CLI strict target/host_ovr | 10/10 each，rc=0 |
-| 现场候选自测 | M6D01–M6D10 11/11 PASS |
+| 现场候选自测 | M6D01–M6D12 13/13 PASS |
 | M5 原始字节 | 19/19 解码相等；300 行 CSV 逐字节相等 |
 | Keil | 三目标 Rebuild All 0/0 |
 
