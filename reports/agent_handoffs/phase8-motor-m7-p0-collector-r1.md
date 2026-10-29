@@ -111,3 +111,14 @@ P1_METHOD_NOT_READY / P2_NOT_AUTHORIZED / M5_BOARD_IMAGE_UNCHANGED
 
 第三行里的 `REMOTE_BYTES_MATCH` 只在推送后的远端 blob 直取成立时才登记，见
 `remote_readback_r1.md`；下一轮不做任何设备动作，等用户对 P0 整包的一次批准。
+
+## 9. 远端回读已成立（只追加）
+
+`REMOTE_BYTES_MATCH` 已由 `reports/reviews/phase8-motor-m7-p0-collector-r1/remote_readback_r1.md` 证实：
+远端 tip = `699bbf4be80653fc3aed68d478a777efbb01232b`；采集器/验证器/计划的远端 blob 分别 =
+`a2c75ea8…b95a`(19642 B) / `bc438094…69a2`(16343 B) / `dd4924b7…e26b`(9345 B)，CR 均为 0；
+16 个交付路径逐一实测，`reports/firmware/`、`rt-thread-master/`、`tests/` 在本区间变更路径数 = 0，
+六件镜像与 M5 归档 BIN 不变，四项冻结引用不变。
+用远端字节重跑：`--selftest` 37/37（rc=0、stderr 0 字节）、真实 M5 原字节重放 4/4 accept。
+`roles.script_code_commit` 已填 `699bbf4…`；`delivery_head` 仍用解析规则，不自引用。
+五行测点原文不改，登记顺序为：脚本提交 `699bbf4` → 本证据提交（回读件所在）。

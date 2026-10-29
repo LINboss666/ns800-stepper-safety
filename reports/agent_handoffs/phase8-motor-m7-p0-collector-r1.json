@@ -5,9 +5,10 @@
   "roles": {
     "firmware_code_commit": "5b564eb962e8518920f581111d7a460a2b1fce64",
     "reviewed_delivery": "208bf102e6b3bce7159eec672b83a0d6b77f8811",
-    "script_code_commit": "THIS_ROUND_SCRIPT_COMMIT (filled by the follow-up evidence commit; never self-referenced)",
+    "script_code_commit": "699bbf4be80653fc3aed68d478a777efbb01232b",
     "delivery_head": "not self-referenced; resolve with git log -1 --format=%H -- reports/reviews/phase8-motor-m7-p0-collector-r1/remote_readback_r1.md",
-    "note": "the calculator is accepted at 208bf10 and is not rebuilt or re-reviewed here; the P0 collector/verifier/plan belong to their own script commit, and the firmware input stays 5b564eb because no image was rebuilt"
+    "note": "the calculator is accepted at 208bf10 and is not rebuilt or re-reviewed here; the P0 collector/verifier/plan belong to their own script commit, and the firmware input stays 5b564eb because no image was rebuilt",
+    "calculator_commit": "01da9d62c65bb482db7eaec2d5e6a62ae492cf86 (R2 tool commit; untouched this round)"
   },
   "verdicts_consumed": {
     "M7_R2_calculator": "M7_R2_CALCULATOR_REVIEW_GO (accepted=208bf10); R3 source completeness and interval bound closed",
@@ -220,5 +221,43 @@
     "P0_PACKAGE_READY_FOR_SINGLE_USER_APPROVAL / NOT_BOARD_EXECUTED",
     "FIRMWARE_IMAGES_UNCHANGED / NO_KEIL_REBUILD / HARDWARE_ACTIONS=[]",
     "P1_METHOD_NOT_READY / P2_NOT_AUTHORIZED / M5_BOARD_IMAGE_UNCHANGED"
-  ]
+  ],
+  "remote_readback": {
+    "method": "ls-remote before and after push, then git cat-file -p origin/debug/tmc-uart-rootcause-20261028:<path> on the remote blob bytes; CR counted with tr -dc, never grep -c",
+    "branch_tip": "699bbf4be80653fc3aed68d478a777efbb01232b",
+    "frozen_refs_match": true,
+    "changed_paths_208bf10_to_tip": 16,
+    "firmware_product_tests_changed_paths": 0,
+    "collector_remote_blob": {
+      "bytes": 19642,
+      "cr_bytes": 0,
+      "sha256": "a2c75ea83cd3842246397a6eff33eea52745c69f8926fb6800a2561fe36cb95a",
+      "equals_declared_candidate": true
+    },
+    "verifier_remote_blob": {
+      "bytes": 16343,
+      "cr_bytes": 0,
+      "sha256": "bc438094d4193d31fba710622c13d41d3fa19208658dec4b4015f11b444769a2",
+      "equals_declared_candidate": true
+    },
+    "plan_remote_blob": {
+      "bytes": 9345,
+      "sha256": "dd4924b75e1bd70c13fca8198f1628a390a15534605e6079ef41a647a866e26b"
+    },
+    "baseline_archive_note": "the local CRLF redirect (1276 B / 56 CR) normalises to a 1220 B LF blob whose sha256 equals the cloud record 6a693f7f906b17699d936d734f02952c06e6aac611847e0bd8d1fa255f1ff14e byte for byte",
+    "six_images_match_manifest": true,
+    "payload_unchanged": {
+      "bytes": 266244,
+      "sha256": "e614a075ab63eb5b1c4b08e1ab51fb4043f474037ce734b4bcaf666899c8f7da"
+    },
+    "m5_archived_motor_bin": {
+      "bytes": 259580,
+      "sha256": "01d3e5ab1ad245949385d50c9f1d5fd2bbaac0806c3920e897321bc46db764bc"
+    },
+    "reruns_from_remote_bytes": {
+      "p0_selftest": "RC=0 stderr=0B SUMMARY cases=37 pass=37 fail=0 / DEVICE_ACTIONS=0 / NO_REAL_TRANSPORT",
+      "verbatim_m5_replay": "RC=0 VERBATIM_M5_REPLAY=4/4 accept"
+    },
+    "detail": "reports/reviews/phase8-motor-m7-p0-collector-r1/remote_readback_r1.md"
+  }
 }
