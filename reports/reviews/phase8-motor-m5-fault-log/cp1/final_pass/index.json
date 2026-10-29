@@ -1,0 +1,173 @@
+[
+  {
+    "seq": 1,
+    "cmd": "system_status",
+    "file": "D:/ns800-tmc-rc/m5-field-20261029/run\\raw\\finalize3\\001_system_status.bin",
+    "bytes": 984,
+    "sha256": "bf8fa27e010e7ab0de47d43cbf393bccf704c2c39d5dfd2dc695362a500fa116",
+    "t_tx": 196074.328,
+    "t_rx": 196074.937
+  },
+  {
+    "seq": 2,
+    "cmd": "version",
+    "file": "D:/ns800-tmc-rc/m5-field-20261029/run\\raw\\finalize3\\002_version.bin",
+    "bytes": 154,
+    "sha256": "ce6b0f6de77340bc16bf45a458bd25cdb0c1ed4c05d5a190e83fab6a5c28e5b9",
+    "t_tx": 196074.937,
+    "t_rx": 196075.468
+  },
+  {
+    "seq": 3,
+    "cmd": "safety_state",
+    "file": "D:/ns800-tmc-rc/m5-field-20261029/run\\raw\\finalize3\\003_safety_state.bin",
+    "bytes": 79,
+    "sha256": "9eb2fefbe4cd4fba185d8f9f619fcb08dc876e40d739d814932b5b04a681f6a1",
+    "t_tx": 196075.468,
+    "t_rx": 196076.0
+  },
+  {
+    "seq": 4,
+    "cmd": "safety_status",
+    "file": "D:/ns800-tmc-rc/m5-field-20261029/run\\raw\\finalize3\\004_safety_status.bin",
+    "bytes": 488,
+    "sha256": "acd8b6995ff69c499de1a984712f44cf4b22262b07f80c23335d766cafb6ffdf",
+    "t_tx": 196076.0,
+    "t_rx": 196076.578
+  },
+  {
+    "seq": 5,
+    "cmd": "motor_status",
+    "file": "D:/ns800-tmc-rc/m5-field-20261029/run\\raw\\finalize3\\005_motor_status.bin",
+    "bytes": 1091,
+    "sha256": "59985c74abf0ba8cefde31194631c8ce14f5d4acff95da58cbe2fdbbf4a536ae",
+    "t_tx": 196076.578,
+    "t_rx": 196077.203
+  },
+  {
+    "seq": 6,
+    "cmd": "step_status",
+    "file": "D:/ns800-tmc-rc/m5-field-20261029/run\\raw\\finalize3\\006_step_status.bin",
+    "bytes": 233,
+    "sha256": "144a3bdd92cd449a62f0d9adb0c81618c8a3365695e9331e72bcebba67d2f41f",
+    "t_tx": 196077.203,
+    "t_rx": 196077.75
+  },
+  {
+    "seq": 7,
+    "cmd": "blackbox_status",
+    "file": "D:/ns800-tmc-rc/m5-field-20261029/run\\raw\\finalize3\\007_blackbox_status.bin",
+    "bytes": 338,
+    "sha256": "4107e76c384259ff2a0569b3aa175482e09a49709abdd677958c28de59105742",
+    "t_tx": 196077.75,
+    "t_rx": 196078.312
+  },
+  {
+    "seq": 8,
+    "cmd": "flash_logstat",
+    "file": "D:/ns800-tmc-rc/m5-field-20261029/run\\raw\\finalize3\\008_flash_logstat.bin",
+    "bytes": 124,
+    "sha256": "19c566f45293491c4bb789f301483f7fc628d99094dd54cc84155c44a0fad78c",
+    "t_tx": 196078.312,
+    "t_rx": 196078.843
+  },
+  {
+    "seq": 9,
+    "cmd": "flash_dump 0 100",
+    "file": "D:/ns800-tmc-rc/m5-field-20261029/run\\raw\\finalize3\\009_flash_dump_0_100.bin",
+    "bytes": 5891,
+    "sha256": "a7fb278179a33ba7641c84a66c37e7c01d7067bbcadbc11051ac08a2760a7d9f",
+    "t_tx": 196078.859,
+    "t_rx": 196080.484
+  },
+  {
+    "seq": 10,
+    "cmd": "flash_dump 100 100",
+    "file": "D:/ns800-tmc-rc/m5-field-20261029/run\\raw\\finalize3\\010_flash_dump_100_100.bin",
+    "bytes": 6107,
+    "sha256": "e5bd903bff546919b8c3ddd2c50e161b2aa75f8eefa08bff9dd25dc9911209fe",
+    "t_tx": 196080.484,
+    "t_rx": 196082.156
+  },
+  {
+    "seq": 11,
+    "cmd": "flash_dump 200 100",
+    "file": "D:/ns800-tmc-rc/m5-field-20261029/run\\raw\\finalize3\\011_flash_dump_200_100.bin",
+    "bytes": 5905,
+    "sha256": "2b664759f876526c77f126c17b19e0261ceffac7bb045544be73f7d1cde733a6",
+    "t_tx": 196082.156,
+    "t_rx": 196083.796
+  },
+  {
+    "seq": 12,
+    "cmd": "fault_reset",
+    "file": "D:/ns800-tmc-rc/m5-field-20261029/run\\raw\\finalize3\\012_fault_reset.bin",
+    "bytes": 562,
+    "sha256": "10f94203eb4e779fde0a61d18ca505812dacbfb5af372e50a9806130d1f68d80",
+    "t_tx": 196083.953,
+    "t_rx": 196085.062
+  },
+  {
+    "seq": 13,
+    "cmd": "motor_status",
+    "file": "D:/ns800-tmc-rc/m5-field-20261029/run\\raw\\finalize3\\013_motor_status.bin",
+    "bytes": 1046,
+    "sha256": "1b0edc21e54b8ee4d627bcc00f1de208a9cfb78521e1052ff8d7969cfdfa7d02",
+    "t_tx": 196085.062,
+    "t_rx": 196085.687
+  },
+  {
+    "seq": 14,
+    "cmd": "system_selftest",
+    "file": "D:/ns800-tmc-rc/m5-field-20261029/run\\raw\\finalize3\\014_system_selftest.bin",
+    "bytes": 1457,
+    "sha256": "4636a643d597f1c26c0dccdc5980ebdd143e4ac00b05946b9d7c9046b194f4e5",
+    "t_tx": 196085.687,
+    "t_rx": 196086.875
+  },
+  {
+    "seq": 15,
+    "cmd": "safety_state",
+    "file": "D:/ns800-tmc-rc/m5-field-20261029/run\\raw\\finalize3\\015_safety_state.bin",
+    "bytes": 71,
+    "sha256": "6a59468afb1f1684e77ecaf4ff723a69013c620215dc793b9667f8048361dacd",
+    "t_tx": 196086.875,
+    "t_rx": 196087.406
+  },
+  {
+    "seq": 16,
+    "cmd": "safety_state",
+    "file": "D:/ns800-tmc-rc/m5-field-20261029/run\\raw\\finalize3\\016_safety_state.bin",
+    "bytes": 71,
+    "sha256": "6a59468afb1f1684e77ecaf4ff723a69013c620215dc793b9667f8048361dacd",
+    "t_tx": 196087.406,
+    "t_rx": 196087.937
+  },
+  {
+    "seq": 17,
+    "cmd": "safety_status",
+    "file": "D:/ns800-tmc-rc/m5-field-20261029/run\\raw\\finalize3\\017_safety_status.bin",
+    "bytes": 488,
+    "sha256": "acd8b6995ff69c499de1a984712f44cf4b22262b07f80c23335d766cafb6ffdf",
+    "t_tx": 196087.937,
+    "t_rx": 196088.5
+  },
+  {
+    "seq": 18,
+    "cmd": "motor_status",
+    "file": "D:/ns800-tmc-rc/m5-field-20261029/run\\raw\\finalize3\\018_motor_status.bin",
+    "bytes": 650,
+    "sha256": "9cac7640a841c1e6c17e1d0363ff1d3946310a2d961559114028af9bea2aeb37",
+    "t_tx": 196088.5,
+    "t_rx": 196089.093
+  },
+  {
+    "seq": 19,
+    "cmd": "step_status",
+    "file": "D:/ns800-tmc-rc/m5-field-20261029/run\\raw\\finalize3\\019_step_status.bin",
+    "bytes": 233,
+    "sha256": "144a3bdd92cd449a62f0d9adb0c81618c8a3365695e9331e72bcebba67d2f41f",
+    "t_tx": 196089.093,
+    "t_rx": 196089.64
+  }
+]

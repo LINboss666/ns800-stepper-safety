@@ -1,0 +1,4 @@
+safety_state
+[SS] state=FAULT_LATCHED fault_code=9 degraded=0x00
+msh >
+msh >

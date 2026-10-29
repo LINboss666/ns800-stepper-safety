@@ -1,0 +1,13 @@
+{
+  "session": 1,
+  "frames": 300,
+  "pre_event0": 200,
+  "post_event9": 100,
+  "new_log": "PASS",
+  "fault_reset": "MANUAL_CLEAR",
+  "system_selftest": "READY",
+  "final": "armed0 cur0 LOW STEP disabled",
+  "cal_source": "THEORETICAL",
+  "queue_dropped_retries": 51,
+  "bb_write_drops": 0
+}

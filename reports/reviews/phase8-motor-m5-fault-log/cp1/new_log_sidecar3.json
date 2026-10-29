@@ -1,0 +1,12 @@
+{
+  "session": 1,
+  "frames": 300,
+  "pre_event0": 200,
+  "post_event9": 100,
+  "cal_source": "THEORETICAL",
+  "bb_pre_eff": 200,
+  "bb_post_eff": 100,
+  "queue_dropped_retries": 51,
+  "bb_write_drops": 0,
+  "checker": "ARCHIVE=ACCEPT rows=300 batches=3\nCLEAR_ALLOWED=YES"
+}

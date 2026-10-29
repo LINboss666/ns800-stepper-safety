@@ -163,3 +163,20 @@ UV4 5.43.1.0 / ARMCLANG V6.24，三目标均 Rebuild All 0 Error / 0 Warning。
   queue_dropped=51（重试计数）。
 - 脚本把 flash_logstat 的 `queued=`（实际是 accepted）误当待处理队列，要求 0 而中止；
   未读回/未恢复。已改为 `accepted==completed` 且只看批准判据。
+
+
+## 12. CP1h 最终收尾（2026-10-29，PASS）
+
+- 只读确认 FAULT_LATCHED code9、LOW/ENN、STEP off、BB session1 written300、
+  `[BB] write drops=0`；flash used=valid=300、bad0、accepted=completed=300、failed0；
+  queue_dropped=51 为重试计数。
+- 新日志 3 批导出：`ARCHIVE=ACCEPT rows=300`；CSV 300 行，SHA-256
+  `c26cb752d79051f5914350424af9a28adc4a8ceb22e3bd18c2af77c9abb7567a`；
+  session=1、pre200 event0/step300、post100 event9、时间单调、无缺槽/CRC/读错误。
+- fault_reset → MANUAL_CLEAR；system_selftest → READY；终态 armed0/cur0/LOW/STEP disabled；
+  未 arm/start。操作者确认看到转轴停止。
+- 分级：`M5_SOFTWARE_EVENT_STOP_PASS=PASS`（无物理时延测量）、
+  `M5_NEW_FAULT_LOG_PASS=PASS`、`M5_MANUAL_RECOVERY_PASS=PARTIAL`
+  （故障态 arm 拒绝命令未单独执行）、`MONITORING_VALIDITY_DISCLOSED=PASS`、
+  `PROJECT_SAFETY_ACCEPTANCE_PENDING=OPEN`。
+- 板终态：READY/fault0、armed0、LOW、STEP disabled、IRQ OPEN、日志 300 帧保留。

@@ -1,0 +1,8 @@
+blackbox_status
+[BB] state=0 session=1 written=300 last_err=0 health=OK
+[BB] trigger drops: early(pre-consumption)=0 busy(capturing)=0
+[BB] write drops=0 frames (submit retries exhausted)
+[BB] window: pre_eff=200 post_eff=100 frames (pre_n_latched=0)
+[BB] flash: used=300 valid=300 bad=0 acc=300 done=300 fail=0 drop=51
+msh >
+msh >

@@ -8,7 +8,7 @@
     "axf_bytes": 1668244,
     "axf_sha256": "8c5bc7bf1efa786013c767ae1e09415ad0d5d5db3e38069c8aeebabf7cebae40"
   },
-  "status": "M5_CP1_LOG_WRITTEN_AWAITING_READBACK",
+  "status": "M5_CP1_COMPLETE_WITH_ONE_PARTIAL",
   "p0_identity": {
     "flash": "PASS rc=0; erased/programmed 260096 B with pyOCD sector erase",
     "readback": "PASS 259580 B at 0x08000000; SHA matches BIN; byte-equal true",
@@ -44,17 +44,20 @@
     "safety_trips": 0
   },
   "results": {
-    "M5_SOFTWARE_EVENT_STOP_PASS": "PARTIAL_SOFTWARE_EVIDENCE (operator observation and isolated post-trip status pending)",
-    "M5_NEW_FAULT_LOG_PASS": "NOT_REACHED (written 300, readback pending)",
-    "M5_MANUAL_RECOVERY_PASS": "NOT_REACHED"
+    "M5_SOFTWARE_EVENT_STOP_PASS": "PASS (operator saw stop; no physical timing)",
+    "M5_NEW_FAULT_LOG_PASS": "PASS (300 frames read back)",
+    "M5_MANUAL_RECOVERY_PASS": "PARTIAL (recovery/READY pass; fault-state arm refusal not exercised)",
+    "MONITORING_VALIDITY_DISCLOSED": "PASS",
+    "PROJECT_SAFETY_ACCEPTANCE_PENDING": true
   },
-  "next": "one COM5 session without motion: export 0..299 and verify; then optional disarm, fault_reset, system_selftest",
+  "next": "no further action; open items are physical/timing and the unexercised fault-state arm refusal",
   "evidence": "reports/reviews/phase8-motor-m5-fault-log/cp1/",
   "board_state": {
-    "safety": "expected FAULT_LATCHED code=9",
-    "motor": "trip protection requested; physical stop not measured",
-    "log": "BB session1 may hold ~300 frames; not read back",
-    "recovery": "none"
+    "safety": "READY/fault0",
+    "motor": "armed0 cur0 tgt0 LOW STEP disabled",
+    "log": "used=valid=300 bad=0 (session1 retained)",
+    "irq": "OPEN polarity CONFIRMED",
+    "recovery": "MANUAL_CLEAR -> READY"
   },
   "p3_log": {
     "safety": "FAULT_LATCHED code=9",
@@ -63,8 +66,10 @@
     "blackbox": "state=0 session=1 written=300 last_err=0 health=OK bb_write_drops=0 pre_eff=200 post_eff=100",
     "flash": "used=300 valid=300 bad=0 accepted=300 completed=300 failed=0 queue_dropped=51",
     "drop_note": "queue_dropped=51 counts submit retries, not abandoned frames; bb_write_drops=0 and written/used/valid=300",
-    "readback": "NOT_REACHED (script misread accepted as pending queue)",
-    "recovery": "NOT_REACHED",
-    "queue_note": "flash_logstat queued= is accepted (source ns_log_stats.accepted); accepted==completed means drained"
+    "readback": "PASS: 300 rows, session=1, pre200 event0/step300, post100 event9, checker ACCEPT",
+    "recovery": "fault_reset MANUAL_CLEAR; system_selftest READY; no arm/start",
+    "queue_note": "flash_logstat queued= is accepted (source ns_log_stats.accepted); accepted==completed means drained",
+    "csv_sha256": "c26cb752d79051f5914350424af9a28adc4a8ceb22e3bd18c2af77c9abb7567a",
+    "latch_arm_refusal": "NOT_EXERCISED"
   }
 }

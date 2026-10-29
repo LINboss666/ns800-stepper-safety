@@ -4,7 +4,7 @@
 批准载荷：code_commit `8cf23aa6dda20baf7843798bdef9a02cfd71326f`，
 BIN 259580 B / `01d3e5ab1ad245949385d50c9f1d5fd2bbaac0806c3920e897321bc46db764bc`，
 AXF 1668244 B / `8c5bc7bf1efa786013c767ae1e09415ad0d5d5db3e38069c8aeebabf7cebae40`。
-状态：**P0/P1 通过；P2 已真实起转并在运行中投递软件故障，FAULT_LATCHED code=9，BB session=1 已写入 300 帧（used=valid=300）；收尾会话因把 `ns_log` 队列重试计数 `drop=51` 当成硬失败而中止，未读回/未恢复。**
+状态：**P0/P1 通过；P2 软件故障停机通过；P3 新日志 300 帧完整读回通过；P4 人工恢复通过（fault_reset→MANUAL_CLEAR、system_selftest→READY、恢复后未 arm/start）。故障态 arm 拒绝命令未单独执行，M5_MANUAL_RECOVERY_PASS 记 PARTIAL。**
 没有第二次下载、没有第二次清区、没有 safety_trip、没有 fault_reset/system_selftest。
 
 ## 1. P0 身份与静止前置（PASS）
@@ -175,3 +175,35 @@ AXF 1668244 B / `8c5bc7bf1efa786013c767ae1e09415ad0d5d5db3e38069c8aeebabf7cebae4
 - 未执行 flash_dump 读回、未 fault_reset/system_selftest；板仍 FAULT_LATCHED。
 - 修正后的收尾脚本只按批准的判据：`used=valid=300`、`accepted==completed`、`failed=0`、
   `[BB] write drops=0`；`queue_dropped=51` 原样披露，不当作丢帧。
+
+
+## 12. CP1h 最终收尾（PASS）
+
+- 只读前置：FAULT_LATCHED code9、LOW/pad0、ENN FB=1 verdict OK、STEP enabled=0、
+  armed=0；BB state=0 session=1 written=300 last_err=0 health=OK、`[BB] write drops=0`；
+  flash used=valid=300 bad=0、accepted=completed=300、failed=0、queue_dropped=51（重试）。
+- 新日志读回：3 批 `flash_dump`（0..299），生产读取 CRC/commit 通过，
+  `ARCHIVE=ACCEPT rows=300 batches=3`；重建 CSV 300 行，SHA-256
+  `c26cb752d79051f5914350424af9a28adc4a8ceb22e3bd18c2af77c9abb7567a`。
+  逐行核对：session 全为 1；pre 段 200 行 event=0 且含 `step_hz=300`；
+  post 段 100 行 event=9、`step_hz=0`；时间单调；无缺槽/重复/NUL/CRC/读错误。
+- `fault_reset`：`MANUAL_CLEAR`（DRV_ENABLE LOW verified、ENN 禁能侧、STEP 关断结果有效）；
+  `system_selftest`：required PASS，READY/fault0；arm gate fail mask=0x0。
+- 终态（原始件 `final_pass/016..019`）：READY/fault0、armed=0、cur=tgt=0、
+  请求 LOW/pad0、STEP enabled=0、arm_gate_mask=0x0；**未 arm、未 start**。
+- 操作者已确认看到转轴停止；软件侧为 `STEP off-confirmed(api)`，无示波器/停机时延测量。
+- `queue_dropped=51` 作为队列重试计数如实保留；`[BB] write drops=0` 与 300 槽完整读回
+  证明本次 session 无缺帧。
+
+## 13. 最终分级
+
+- `M5_SOFTWARE_EVENT_STOP_PASS` = **PASS**（300 Hz 运行中软件事件→FAULT_LATCHED code9→
+  DRV_ENABLE LOW/ENN/STEP 保护链；操作者确认停转；无物理时延测量）。
+- `M5_NEW_FAULT_LOG_PASS` = **PASS**（新 session 1 共 300 帧完整落盘并读回；
+  pre 200 event0/step300、post 100 event9）。
+- `M5_MANUAL_RECOVERY_PASS` = **PARTIAL**（fault_reset→MANUAL_CLEAR、system_selftest→READY、
+  恢复后未 arm/start；但**故障态 `motor_arm` 拒绝命令未单独执行**，仅由状态门禁显示推断）。
+- `MONITORING_VALIDITY_DISCLOSED` = **PASS**（ADC THEORETICAL、SG 未标定、MONITOR_ONLY、
+  振动含重力基线均可见）。
+- `PROJECT_SAFETY_ACCEPTANCE_PENDING` = **OPEN**（DIAG 物理触发、真实堵转/负载 SG 标定、
+  实测相电流、物理 PWM 精度/停机时延仍未关闭）。

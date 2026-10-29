@@ -1,0 +1,34 @@
+system_selftest
+[SS] self-test start
+[SS] [REQ OK] GPIO
+[SS] [REQ OK] PWM device
+[SS] [REQ OK] DRV_ENABLE=LOW (write+readback verified)
+[SS] [REQ OK] ENN feedback = disabled side (PC.6=H6-5/TMC_ENN)
+[SS] [REQ OK] TMC2209 IOIN=0x21000041 VERSION=0x21
+[SS] [OK] IMU
+[SS] [OK] ADC
+[SS] [OK] Flash (JEDEC EF 40 17)
+[SS] self-test done: required=PASS degraded=0x00
+[SS] MANUAL_CLEAR -> READY (identity epoch=3)
+[SS] state=READY fault_code=0 degraded=0x00
+=== SYSTEM STATUS ===
+[Boot]   bootstrap-complete=YES abort-stage=0
+[Safety] state=READY fault=0 irq_gate=OPEN polarity=CONFIRMED protect_ready=YES
+[Safety] gpio_ready=YES thread=OK drv_en_pad_low=YES
+[Safety] request=LOW pad=0 expected_ENN=HIGH ENN_fb=1(resolved) verdict=OK
+[Safety] limit_inputs=DISABLED_BY_CONFIG (HIGH=safe/LOW=trigger when ENABLED); e-stop=hardware-only, no MCU e-stop input
+[Motor] state=0 cur=0 tgt=0 armed=0 drv_en_verified=0 health=OK
+[Motor] arm gate fail mask=0x0 (all gate conditions pass (incl. ENN feedback))
+[TMC]    runtime write gate mask=0x0 (0=运行态条件全通, 编译期门未翻转前仍然一位不写)
+[Sensor] thread=OK
+[TMC]    OK drive_cfg=CONFIGURED
+[IMU]    OK
+[ADC]    DEGRADED cal=THEORETICAL
+[Flash]  storage bring-up=OK (spi1)
+[Storage] OK (ns_params/log)
+[Config] OK valid=YES cal_source=1
+[Diag]   OK verdict=0 mode=MONITOR_ONLY
+[Blackbox] OK
+[UI]     led/buzzer output=SAFE-OFF (polarity hardware-pending)
+msh >
+msh >

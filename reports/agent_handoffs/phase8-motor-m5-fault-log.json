@@ -4,7 +4,7 @@
   "branch": "debug/tmc-uart-rootcause-20261028",
   "base_commit": "6218efa251cd6b8a16ad2df8f0fef1efd2ba5eeb",
   "code_commit": "8cf23aa6dda20baf7843798bdef9a02cfd71326f",
-  "status": "M5_CP1_LOG_WRITTEN_AWAITING_READBACK",
+  "status": "M5_CP1_COMPLETE_WITH_ONE_PARTIAL",
   "candidate": {
     "target": "rt-thread-motor-m1-candidate",
     "bin": {
@@ -70,9 +70,11 @@
   "field_script": "reports/reviews/phase8-motor-m5-fault-log/m5_field_serial.py",
   "archive_checker": "tests/host/m5_log_archive_check.py",
   "field_results": {
-    "M5_SOFTWARE_EVENT_STOP_PASS": "PARTIAL_SOFTWARE_EVIDENCE",
-    "M5_NEW_FAULT_LOG_PASS": "NOT_REACHED",
-    "M5_MANUAL_RECOVERY_PASS": "NOT_REACHED"
+    "M5_SOFTWARE_EVENT_STOP_PASS": "PASS (operator saw stop; no physical timing)",
+    "M5_NEW_FAULT_LOG_PASS": "PASS (300 frames read back)",
+    "M5_MANUAL_RECOVERY_PASS": "PARTIAL (recovery/READY pass; fault-state arm refusal not exercised)",
+    "MONITORING_VALIDITY_DISCLOSED": "PASS",
+    "PROJECT_SAFETY_ACCEPTANCE_PENDING": true
   },
   "open_items": [
     "DIAG physical trigger",
@@ -107,5 +109,5 @@
     },
     "p3_log": "300/300/0, accepted=completed=300, bb_write_drops=0, queue_dropped=51 retries; readback pending"
   },
-  "next": "one no-motion COM5 session with corrected queue criterion: export 0..299; then fault_reset + system_selftest"
+  "next": "no further action; open physical/timing items and unexercised fault-state arm refusal"
 }
