@@ -4,7 +4,7 @@
 批准载荷：code_commit `8cf23aa6dda20baf7843798bdef9a02cfd71326f`，
 BIN 259580 B / `01d3e5ab1ad245949385d50c9f1d5fd2bbaac0806c3920e897321bc46db764bc`，
 AXF 1668244 B / `8c5bc7bf1efa786013c767ae1e09415ad0d5d5db3e38069c8aeebabf7cebae40`。
-状态：**P0/P1 通过；P2 已真实起转并在运行中投递软件故障：t≈1 s 300 Hz 运行，t≈3 s 原始流出现 FAULT_LATCHED code=9 与 BB trigger session=1；脚本因并发输出匹配失败而中止，未做兜底 disarm、新日志读回与恢复。P3/P4 NOT_REACHED。**
+状态：**P0/P1 通过；P2 已真实起转并在运行中投递软件故障，FAULT_LATCHED code=9，BB session=1 已写入 300 帧（used=valid=300）；收尾会话因把 `ns_log` 队列重试计数 `drop=51` 当成硬失败而中止，未读回/未恢复。**
 没有第二次下载、没有第二次清区、没有 safety_trip、没有 fault_reset/system_selftest。
 
 ## 1. P0 身份与静止前置（PASS）
@@ -128,3 +128,37 @@ AXF 1668244 B / `8c5bc7bf1efa786013c767ae1e09415ad0d5d5db3e38069c8aeebabf7cebae4
 3. 必要时一次普通 `motor_disarm` 清理（若输出/许可未确认禁用）；
 4. 一次 `fault_reset`、一次 `system_selftest`，恢复后不 arm/start；
 5. 不第二次清区、不重烧、不再次触发故障、不升流/堵转/注入；失败不自动重跑。
+
+
+## 10. CP1f 收尾会话（日志已写入，读回/恢复未做）
+
+只读结果（`finalize_pre/`）：
+- `safety_state` = FAULT_LATCHED code 9；
+- `safety_status` = 请求 LOW/pad0、ENN FB=1 verdict=OK；
+- `motor_status` armed=0、cur=0；`step_status` enabled=0；
+- `blackbox_status`：state=0、session=1、written=300、last_err=0、health=OK，
+  **write drops=0**，窗口 pre_eff=200/post_eff=100；
+- `flash_logstat`：`slots=300/4096 valid=300 bad=0`、`queued=0 completed=300 failed=0`，
+  `queue_dropped=51`。
+
+判读：
+- `[BB] write drops=0` 表示黑匣子没有放弃任何帧；`queue_dropped=51` 是
+  `ns_log_submit()` 在队列满时的**重试计数**（源码：失败一次 ++dropped，随后 flush/重试），
+  与 `written=300`、`used=valid=300`、`acc=done=300`、`fail=0` 一致，不能单独证明丢帧。
+- 脚本把 `ns_log_stats.dropped==0` 设为硬门，因此中止；**未执行 flash_dump 读回、
+  未 fault_reset/system_selftest**。板上仍是 FAULT_LATCHED code9，输出由 trip 保护拉低。
+- 新日志是否 PASS 必须由 300 个槽的完整读回决定；在完成前不宣称
+  `M5_NEW_FAULT_LOG_PASS`。
+
+### 需要的新批准（无起转，最后一次收尾）
+
+一次 COM5 会话：
+1. 只读复核 FAULT_LATCHED code9、LOW/ENN、STEP disabled、BB 空闲、session=1、written=300、
+   used=valid=300、bad=0、fail=0、`[BB] write drops=0`；`queue_dropped=51` 如实记录为
+   队列重试，不作为单独的丢帧证据，也不清洗；
+2. `flash_dump` 分批导出 0..299 全部槽（count≤100），按 `start=0 --expected 300` 判读；
+   要求每槽恰好一次、session=1、pre 段 event=0 且含 step_hz>0、post 段 event=9、
+   CRC/commit/读错误为零；若任一缺失/坏页/读错，立即停止并保留故障态；
+3. 完整读回通过后，必要时一次普通 `motor_disarm`；一次 `fault_reset`、一次
+   `system_selftest`；恢复后不 arm/start；
+4. 不第二次清区、不重烧、不再触发故障、不升流/堵转/注入；失败不自动重跑。

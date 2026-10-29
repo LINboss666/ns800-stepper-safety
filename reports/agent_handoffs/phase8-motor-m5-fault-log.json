@@ -4,7 +4,7 @@
   "branch": "debug/tmc-uart-rootcause-20261028",
   "base_commit": "6218efa251cd6b8a16ad2df8f0fef1efd2ba5eeb",
   "code_commit": "8cf23aa6dda20baf7843798bdef9a02cfd71326f",
-  "status": "M5_CP1_TRIPPED_AWAITING_READBACK",
+  "status": "M5_CP1_LOG_WRITTEN_AWAITING_READBACK",
   "candidate": {
     "target": "rt-thread-motor-m1-candidate",
     "bin": {
@@ -88,7 +88,7 @@
     "p0": "PASS: flash/readback byte-equal/reset; banner 5.3.0 build Oct 29 2026 00:38:59",
     "p1_archive": "PASS: 4096 rows/41 batches, two copies verified",
     "clear": "one ERASE; verified log 0/0/0 in the extra session",
-    "p2_p4": "software trip occurred: 300Hz run at t=1s; FAULT_LATCHED code=9 and BB session=1 in raw; script aborted before disarm/readback",
+    "p2_p4": "software trip/trip latch/BB write evidenced; no disarm/readback/recovery",
     "quotas_used": {
       "dap_sessions": 3,
       "com5_sessions": 5,
@@ -104,7 +104,8 @@
       "safety": "READY/fault0",
       "motor": "armed=0 target=300 cur=0",
       "irq": "gate4 CLOSED"
-    }
+    },
+    "p3_log": "written=300 used=valid=300 bb_write_drops=0 queue_dropped=51 (retries); readback pending"
   },
-  "next": "one COM5 session without motion: verify latch/disabled/BB idle; export new log; optional disarm; fault_reset + system_selftest"
+  "next": "one no-motion COM5 session: export 0..299 and verify; optional disarm; fault_reset + system_selftest"
 }

@@ -141,3 +141,16 @@ UV4 5.43.1.0 / ARMCLANG V6.24，三目标均 Rebuild All 0 Error / 0 Warning。
 - 板上预期 FAULT_LATCHED code9；物理停止未测量/未取得操作者书面确认。
 - 需一次**无起转**COM5 会话：只读确认锁存/禁能/BB 空闲 → 导出新日志并判读 →
   必要时一次 disarm → 一次 fault_reset + system_selftest；不清区/不重烧/不再触发。
+
+
+## 10. CP1f 收尾会话（2026-10-29，日志已写入、读回未做）
+
+- 只读：FAULT_LATCHED code9、请求 LOW/ENN OK、STEP enabled=0、BB state0 session1
+  written300 last_err0 health OK、`[BB] write drops=0`；flash used=valid=300 bad0、
+  acc=done=300 fail0、`queue_dropped=51`。
+- `queue_dropped=51` 是 `ns_log_submit` 队列满重试计数，不是已放弃帧；`write drops=0`
+  与 written/used/valid=300 支持日志完整，但必须读回 300 槽才能判 PASS。
+- 脚本把 drop==0 设硬门而中止：未 flash_dump 读回、未 fault_reset/system_selftest；
+  板仍 FAULT_LATCHED。新日志与恢复仍 NOT_REACHED。
+- 需一次无起转收尾会话：导出 0..299 并判读；通过后可选一次 disarm、一次 fault_reset、
+  一次 system_selftest；不清区/不重烧/不再触发。
