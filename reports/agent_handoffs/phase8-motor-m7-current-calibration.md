@@ -5,8 +5,16 @@
 分支：`debug/tmc-uart-rootcause-20261028`
 document_base / source_base：`4a626bc49831345d8366deeb6b01cc81e77ec79d`
 code_commit = tested_commit：**f1883393f37d58f41bb506603e2e54dbf91776d6**
-构建输入 = 同一 code_commit（产品文件在其后未变，其后提交只加 reports/ 与交接）。
+artifact_commit：**424ff308f56d95fb7c1c670231d44639752e8ba7**（三目标镜像由
+`f188339` 的产品/测试字节构建：`git diff --name-only f188339 424ff30 -- rt-thread-master tests/host`
+返回 0 个文件，故镜像身份可绑定回 code_commit）
+handoff_commit：**2f6092a215de1c255791a5ed1af66459b19c1eb7**（已逐 blob 远端回读）
+delivery_head = 发布这最后一次的提交，**不写进本文/JSON 自己**——理由与任务包 manifest
+排除自身相同：一份文档不能给自己的字节作证。它的完整 SHA 在交付回执里给出，
+用 `git ls-remote origin refs/heads/debug/tmc-uart-rootcause-20261028` 即可复核。
 **hardware_actions = []**（全程离线）。
+`BSP/SConscript` 已用 `Glob('*.c')` 收 applications 下全部源文件，新增 `current_cal.c`
+在那里**不需要**也不做改动；`project.uvprojx` 则必须给三个目标各加一条源项（已加）。
 
 ## 1. 做成了什么
 
@@ -118,6 +126,10 @@ document_base/source_base）。D-1 / D-2 / D-2e / D-3 全部关闭，本轮不�
 三枚 BIN/AXF 的**远端字节** sha256 与本包 manifest 完全一致（例：motor BIN
 `4717a718b84043210a52dfedd80fae57bcecc64473ec4f23317b2066162aee53`，265492 B）。
 同一批 `git ls-remote` 复核 main / phase7 / phase8 / tag 对象与解引用，均与冻结值一致。
+交接件自身的 4 个文件（本文、JSON、`build_notes.md`、`remote_readback.md`）在
+`2f6092a` 上以同一方法再读一遍：**4 OK / 0 BAD**，远端分支头 =
+`2f6092a215de1c255791a5ed1af66459b19c1eb7`；其 blob sha256 已记入 JSON 的
+`remote_readback.handoff_commit_blobs`。
 
 **lossless=false 的一项**：本机 `core.autocrlf=true`，三份 Keil 构建 stdout 及其余文本证据
 在入库时把 CRLF 归一为 LF。以 `builds/build_rt-thread.log` 为例：工作树 3779 B/143 CR，

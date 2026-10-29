@@ -9,7 +9,7 @@
   "code_commit": "f1883393f37d58f41bb506603e2e54dbf91776d6",
   "tested_commit": "f1883393f37d58f41bb506603e2e54dbf91776d6",
   "artifact_commit": "424ff308f56d95fb7c1c670231d44639752e8ba7",
-  "delivery_head": "see remote_readback.final_branch_head; this JSON's own commit is not self-hashed",
+  "delivery_head": "NOT_SELF_RECORDABLE: the commit publishing this finalisation is the delivery head and is reported in the delivery receipt (and via git ls-remote), because a file cannot witness its own bytes. The last fully read-back commit is handoff_commit 2f6092a.",
   "working_tree_at_test": "identical bytes to code_commit f188339 (product and tests); host chains were run on those bytes before committing them",
   "authorization": "OFFLINE_DEVELOPMENT_ONLY",
   "scope_note": "only offline development, existing-material verification, host tests, Keil builds, git commit/push and remote readback were authorised",
@@ -447,8 +447,31 @@
       "8307cffdcaa132e78bde182eb750209602168095269fbf20a44d46cfb1ab8d49": "rt-thread-measure-a0",
       "4717a718b84043210a52dfedd80fae57bcecc64473ec4f23317b2066162aee53": "rt-thread-motor-m1-candidate"
     },
-    "final_branch_head": "filled after the handoff commit is pushed; this file does not hash its own commit to avoid a self-reference loop",
-    "frozen_refs": "re-read with git ls-remote in the same call as the branch head"
+    "final_branch_head": "2f6092a215de1c255791a5ed1af66459b19c1eb7",
+    "frozen_refs": "re-read with git ls-remote in the same call as the branch head",
+    "handoff_commit_blobs_verified_at": "2f6092a",
+    "files_checked_at_artifact_commit": 51,
+    "files_checked_at_handoff_commit": 4,
+    "handoff_commit_blobs": {
+      "reports/agent_handoffs/phase8-motor-m7-current-calibration.json": {
+        "bytes": 24296,
+        "sha256": "b9011f5bdbf0fe32dee160cd51d1dbcd6b0c2b3242a02115ce34349276646dc1"
+      },
+      "reports/agent_handoffs/phase8-motor-m7-current-calibration.md": {
+        "bytes": 10345,
+        "sha256": "e077168681c7ac188b1d953815f3f6d319e5023dd5a0ccec7fa50e46999b3bf4"
+      },
+      "reports/reviews/phase8-motor-m7-current-calibration/build_notes.md": {
+        "bytes": 7039,
+        "sha256": "fed995fe44f2f7743661644ad7141f53654bb44d418ba449562c500f19dd66d1"
+      },
+      "reports/reviews/phase8-motor-m7-current-calibration/remote_readback.md": {
+        "bytes": 10758,
+        "sha256": "7ffa308089c59167d8d32d766b61908654fdb6ebacfc2e2f1d164fbc083758c9"
+      },
+      "_note": "bytes and sha256 of the four handoff files AS PUBLISHED AT COMMIT 2f6092a, downloaded from raw.githubusercontent.com and re-hashed. The JSON you are reading now is a later revision and deliberately does not record its own current bytes."
+    },
+    "self_reference_rule": "This file records the remote-verified identities of everything up to and including commit 2f6092a. The commit that finalises these fields is not hashed inside itself, for the same reason the task package manifest excludes itself: a document cannot witness its own bytes. Its identity is reported in the delivery receipt and re-checkable with git ls-remote."
   },
   "stop_state": [
     "M7_CALIBRATION_SOFTWARE_READY",
@@ -456,5 +479,12 @@
     "FIELD_PACKAGE_DRAFT",
     "CALIBRATION_ON_BOARD_NOT_EXECUTED"
   ],
-  "stop_reason": "the authorised offline scope is complete: commands, safe application, consistency, host verification with two named reversals, three-target build with real image identities, and a field candidate that can be reviewed and then approved as one package. Anything further needs independent review of these bytes plus a concrete field-package approval, and P1 additionally needs the meter/fixture inputs listed in remaining_fixture_needs."
+  "stop_reason": "the authorised offline scope is complete: commands, safe application, consistency, host verification with two named reversals, three-target build with real image identities, and a field candidate that can be reviewed and then approved as one package. Anything further needs independent review of these bytes plus a concrete field-package approval, and P1 additionally needs the meter/fixture inputs listed in remaining_fixture_needs.",
+  "handoff_commit": "2f6092a215de1c255791a5ed1af66459b19c1eb7",
+  "product_test_drift_checked": {
+    "command": "git diff --name-only f188339 424ff30 -- rt-thread-master tests/host",
+    "changed_files": 0,
+    "meaning": "the three targets were rebuilt from byte-identical product and test inputs to code_commit/tested_commit f188339, so image identity is bound to that commit"
+  },
+  "sconscript_note": "BSP SConscript already collects applications/*.c by Glob, so the new current_cal.c needed no source-list edit there; adding one would have been a meaningless change. project.uvprojx did need the file added to each of the three targets."
 }
