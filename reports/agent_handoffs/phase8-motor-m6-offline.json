@@ -5,8 +5,8 @@
   "document_base": "a052e8e3dc11a4a983fcaecf5fd36ba9e4139af4",
   "source_base": "a052e8e3dc11a4a983fcaecf5fd36ba9e4139af4",
   "code_commit": "cf133d6a5d539bb5a7c3b9da4d50d53dc3b47055",
-  "delivery_head": "e3dd78c3a45d685c80ccc993cec8ef0924ed9380",
-  "delivery_head_note": "final field-candidate evidence commit (first-failure transcription + worktree/Git-blob selftests); image bytes are in 80fc7db, build manifest/project binding in 9241828; the handoff documentation commit follows and is reported in the STOP/readback, not self-recorded",
+  "delivery_head": "e4f89d30effa3e49a4e0f0335dc6af154dc42940",
+  "delivery_head_note": "final field-candidate evidence commit (32/32 worktree + Git-blob, D-2e first-failure raw log); images are in 80fc7db, build manifest/project binding in 9241828; the handoff documentation commit follows and is reported in the STOP/readback, not self-recorded",
   "status": "M6_OFFLINE_CLOSEOUT_COMPLETE / NEW_IMAGES_BUILT_NOT_FLASHED / FIELD_CANDIDATE_OFFLINE_FIXED_NOT_EXECUTED",
   "product_changed": {
     "applications/safety_state.c": "safety_trip_cmd checks ss_log_ctx_ok before ANY argument parsing or output; legal thread retains usage and one safety_post_event; no protection/recovery logic change",
@@ -79,7 +79,7 @@
     },
     "field_candidate_selftest": {
       "result": "PASS",
-      "cases": "25/25",
+      "cases": "32/32",
       "rc": 0,
       "ids": [
         "M6D01",
@@ -106,7 +106,14 @@
         "M6D21",
         "M6D22",
         "M6D23",
-        "M6D24"
+        "M6D24",
+        "M6D25",
+        "M6D26",
+        "M6D27",
+        "M6D28",
+        "M6D29",
+        "M6D30",
+        "M6D31"
       ],
       "evidence": [
         "reports/reviews/phase8-motor-m6-offline/field_candidate_selftest.txt",
@@ -117,11 +124,14 @@
       "new_ids": 12,
       "status": "FIELD_CANDIDATE_OFFLINE_FIXED / NOT_BOARD_EXECUTED",
       "first_failure": "reports/reviews/phase8-motor-m6-offline/field_candidate_selftest_first_failure.txt",
-      "sha256": "30623f0291e734c636551e5d36c208aa0d37f5f8c31fa2eea08ecf2d7d7e4890",
-      "sha256_worktree_crlf": "b1c5390b2a1f8887393b236e8d5c28888be5060ca8f5f8addc10ffb9a3ff772f",
+      "sha256": "34480647613a80649761f597648e87287abf32dac197f7261a1feaab1af4853d",
+      "sha256_worktree_crlf": "9d424e2f07e1027a05c74e80989eb851cae651fb9f660af81ba5cf929fd63cc2",
       "sha256_note": "Git blob bytes are LF; worktree checkout is CRLF. Both byte sets ran 25/25; line endings only.",
       "evidence_git_blob": "reports/reviews/phase8-motor-m6-offline/field_candidate_selftest_git_blob.txt",
-      "first_failure_provenance": "transcribed console output of the first post-rewrite run; the raw temporary file was later overwritten; not device evidence"
+      "first_failure_provenance": "transcribed console output of the first post-rewrite run; the raw temporary file was later overwritten; not device evidence",
+      "first_failure_d2e": "reports/reviews/phase8-motor-m6-offline/field_candidate_selftest_first_failure_d2e.txt",
+      "first_failure_d2e_note": "raw 23/25 log of the first evidence-gate run; M6D18/M6D24 failed",
+      "d2e_fix": "normal q() raises EvidenceError immediately; cleanup-only q(evidence_required=False); no recovery after any evidence error"
     },
     "raw_recovery": {
       "result": "PASS",
@@ -231,7 +241,8 @@
       "reports/reviews/phase8-motor-m6-offline/build_motor.log"
     ],
     "first_failure": "reports/reviews/phase8-motor-m6-offline/field_candidate_selftest_first_failure.txt",
-    "blob_selftest": "reports/reviews/phase8-motor-m6-offline/field_candidate_selftest_git_blob.txt"
+    "blob_selftest": "reports/reviews/phase8-motor-m6-offline/field_candidate_selftest_git_blob.txt",
+    "first_failure_d2e": "reports/reviews/phase8-motor-m6-offline/field_candidate_selftest_first_failure_d2e.txt"
   },
   "raw_recovery": {
     "scope": "19 final responses listed by reports/reviews/phase8-motor-m5-fault-log/cp1/final_pass/index.json",
@@ -575,6 +586,13 @@
       "D-2": "transport/OSError and evidence failures are recorded separately; primary exception/traceback preserved; unconfirmed disable is UNKNOWN; M6D16/M6D18/M6D23/M6D24",
       "D-3": "arm success requires one complete motor_status snapshot state=0 armed=1 cur=0 tgt=0; refusal/armed=0/missing/duplicate/conflict cannot start; M6D19-M6D22"
     },
-    "candidate_sha256": "30623f0291e734c636551e5d36c208aa0d37f5f8c31fa2eea08ecf2d7d7e4890"
+    "candidate_sha256": "30623f0291e734c636551e5d36c208aa0d37f5f8c31fa2eea08ecf2d7d7e4890",
+    "round2": {
+      "date": "2026-10-29",
+      "result": "A/B/C accepted; D-1 and D-3 closed; D-2 transport fixed; D-2e evidence control flow now fixed; candidate remains NOT_BOARD_EXECUTED",
+      "candidate_sha256": "34480647613a80649761f597648e87287abf32dac197f7261a1feaab1af4853d",
+      "remaining_before_this_fix": "evidence save failure only set a flag; fault_reset/system_selftest could still run",
+      "fix": "immediate EvidenceError on business q; cleanup exemption; no recovery after evidence failure"
+    }
   }
 }

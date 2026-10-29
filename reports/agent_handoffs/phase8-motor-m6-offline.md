@@ -92,9 +92,9 @@ I/O 四变体（off/on × target/ovr）全部 PASS；证据 `io_behavior.txt`。
 
 新增 `reports/reviews/phase8-motor-m6-offline/m6_field_candidate.py`，保留 M5 原脚本。
 状态 **FIELD_CANDIDATE_OFFLINE_FIXED / NOT_BOARD_EXECUTED**；独立复审的三项阻断已修，
-本轮仍无现场批准。候选 **Git blob SHA-256（远端回读）：`30623f0291e734c636551e5d36c208aa0d37f5f8c31fa2eea08ecf2d7d7e4890`**；
-工作树 CRLF 副本 SHA-256 `b1c5390b2a1f8887393b236e8d5c28888be5060ca8f5f8addc10ffb9a3ff772f`
-（仅换行差异；两种字节均执行了 25/25 自测，结果分别归档）。
+本轮仍无现场批准。候选 **Git blob SHA-256（远端回读）：`34480647613a80649761f597648e87287abf32dac197f7261a1feaab1af4853d`**；
+工作树 CRLF 副本 SHA-256 `9d424e2f07e1027a05c74e80989eb851cae651fb9f660af81ba5cf929fd63cc2`
+（仅换行差异；两种字节均执行了 32/32 自测，结果分别归档）。
 
 复审补正（D-1/D-2/D-3）：
 
@@ -104,9 +104,13 @@ I/O 四变体（off/on × target/ovr）全部 PASS；证据 `io_behavior.txt`。
   短有界尝试并记录 `cleanup_late`。M6D13（arm 写阻塞 10.1 s）证明阻塞时间进入同一截止，
   M6D14/M6D15 覆盖 start 写超时与 start 后读阻塞。
 - **D-2 首错与清理分离**：`disarm_once` 捕获传输/`OSError`/查询异常，清理错误与 traceback
-  独立记录；`run_fault` 保留原始主异常与 traceback，证据落盘失败单独记录并在无主错时
-  使本次运行失败；撤能无法用 `request=DISABLE(LOW)` + `pad=0` 确认则 UNKNOWN，绝不
-  回成功。M6D16/M6D18/M6D23/M6D24 覆盖主错+清理再错、证据失败和静止前置失败。
+  独立记录；`run_fault` 保留原始主异常与 traceback；撤能无法用
+  `request=DISABLE(LOW)` + `pad=0` 确认则 UNKNOWN，绝不回成功。M6D16–D18、M6D23、M6D30。
+- **D-2e 证据失败立即停业务**：普通 `q()` 在原始响应保存失败时立即抛 `EvidenceError`；
+  仅清理内部 `motor_disarm`/`safety_status` 使用 `evidence_required=False`，保证降险仍发出。
+  证据失败发生在 arm 前不发任何电机命令；发生在 arm/start 后只做一次必要清理，不继续
+  trip/恢复；disarm、读回或恢复阶段的证据失败都在 `fault_reset`/`system_selftest` 前停止，
+  `--allow-recovery` 不是忽略异常的开关。M6D24–M6D31 覆盖四条实际落盘故障接缝。
 - **D-3 规范 arm 判定**：arm 后读取 `motor_status`，要求恰好一组
   `state=0/armed=1/cur_hz=0/tgt_hz=0` 字段；明确拒绝文本、armed=0、字段缺席/重复/冲突
   均不得发送 target/start；不依赖成功摘要子串。M6D19–M6D22 覆盖拒绝文本、状态冲突、
@@ -122,13 +126,14 @@ I/O 四变体（off/on × target/ovr）全部 PASS；证据 `io_behavior.txt`。
   任何异常不得自动清锁存；参数错误/`--selftest` 不导入 pyserial、不构造 SerialPort；
 - 每个收发先落 `--out-dir/NNN_*.bin` 与 `raw_index.jsonl`。
 
-离线自测 **25/25 PASS**（`field_candidate_selftest.txt`）；同一脚本的 Git blob 字节
-（LF）另跑一次 **25/25 PASS**（`field_candidate_selftest_git_blob.txt`）。原 13 个用例
-（M6D01、M6D02、M6D02b、M6D03–M6D12）身份保留，新增 M6D13–M6D24 覆盖上述三项复审阻断、
-拒绝文本、状态字段缺失/重复/冲突、回执丢失、证据失败和实际发送记录。首个补正失败运行
-以**转录**形式保留为 `field_candidate_selftest_first_failure.txt`（4 例先失败后修复；
-临时原文件被后续运行覆盖，文件头已注明这是转录而非设备证据）。候选未上板，不声称
-Windows/USB 硬实时或物理停机上界。
+离线自测 **32/32 PASS**（`field_candidate_selftest.txt`）；同一脚本的 Git blob 字节
+（LF）另跑一次 **32/32 PASS**（`field_candidate_selftest_git_blob.txt`）。原 25 个用例
+身份保留，新增 M6D25–M6D31 覆盖证据落盘的四条实际接缝；M6D18/M6D24 按要求收紧到
+“证据失败立即停业务”的判据，未删除。首个补正失败运行以**转录**形式保留为
+`field_candidate_selftest_first_failure.txt`（20/24；临时原文件被覆盖，文件头注明转录
+而非设备证据）；D-2e 首次失败保留为原始控制台日志
+`field_candidate_selftest_first_failure_d2e.txt`（23/25，M6D18/M6D24 失败）。候选未上板，
+不声称 Windows/USB 硬实时或物理停机上界。
 
 未覆盖/明确不属候选：旧日志归档、清区、两份备份门由 M5 脚本负责并已有 FS01–FS08
 自测；候选不执行 fault_reset（除非未来显式批准并传 `--allow-recovery`），不重开串口、
@@ -166,7 +171,7 @@ UV4 5.43.1.0 / ARMCLANG V6.24，三目标各 Rebuild All 一次，均 0 Error / 
 | S1 反向 | rev_motor_off 5/5、rev_safety_trip_skip_post 1/1，rc=0 |
 | I/O 四变体 | 33/35/46/48 required PASS；非法宏值拒绝编译；rc=0 |
 | CLI strict target/host_ovr | 10/10 each，rc=0 |
-| 现场候选自测 | M6D01–M6D24 25/25 PASS（原 13 + 新增 12） |
+| 现场候选自测 | M6D01–M6D31 32/32 PASS（原 25 + 新增 7） |
 | M5 原始字节 | 19/19 解码相等；300 行 CSV 逐字节相等 |
 | Keil | 三目标 Rebuild All 0/0 |
 
@@ -190,7 +195,7 @@ NOT_RERUN（说明）：S2 并发链（stop_priority/HAL/persistence 未改）�
   不能写“DIAG 物理路径处于 MONITOR_ONLY”。
 - ADC 仍 THEORETICAL，SG 阈值/有效速度负载范围未标定，振动量含约 1 g 重力；
   `PROJECT_SAFETY_ACCEPTANCE_PENDING=OPEN`。
-- 工作 D 候选仅完成离线补正，**未获现场放行**；25/25 自测不代表板级超时、撤能或物理
+- 工作 D 候选仅完成离线补正，**未获现场放行**；32/32 自测不代表板级超时、撤能或物理
   停机行为，未来使用必须绑定新的具体工作包并重新批准。
 - 本包离线测试、候选脚本与新构建**不能**升级上述实机缺项。
 
@@ -213,6 +218,7 @@ NOT_RERUN（说明）：S2 并发链（stop_priority/HAL/persistence 未改）�
 - 原始/汇总证据：`reports/reviews/phase8-motor-m6-offline/`（`s1_normal.txt`、
   `s1_reverse.txt`、`io_behavior.txt`、`cli_strict.txt`、`field_candidate_selftest.txt`、
   `field_candidate_selftest_git_blob.txt`、`field_candidate_selftest_first_failure.txt`、
-  `test_summary.md`、三份 build_*.log、`macro_probe.c`、`m5_raw_recovery/`）。
+  `field_candidate_selftest_first_failure_d2e.txt`、`test_summary.md`、三份 build_*.log、
+  `macro_probe.c`、`m5_raw_recovery/`）。
 - 新文件仅含仓库相对路径；未复制本机私有绝对路径、端口、仪器序列号或凭据。
 - 本轮云端 52 MiB 交接 ZIP 未更新；仅交仓库级交接与下次打包摘要。
