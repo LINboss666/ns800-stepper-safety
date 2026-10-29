@@ -98,7 +98,7 @@ PS17a-safety_trip_valid_single_event PS17b-safety_trip_bad_args_zero_event \
 PS17c-safety_trip_isr_silent_zero_event PS17d-safety_trip_masked_silent_zero_event \
 PS17e-safety_trip_post_fail_not_persisted \
 PS17f-safety_trip_isr_bad_args_silent PS17g-safety_trip_masked_bad_args_silent \
-PS17h-safety_trip_no_thread_silent"
+PS17h-safety_trip_no_thread_silent PS19a-static_idle_begin_accepted PS19d-static_stop_unknown_refused PS19e-static_lock_unavailable_refused"
 TARGET_ONLY_CASES="PS11a-arm_refused_by_enable_path_macro PS11b-diag_step_denied \
 PS11b2-gate_check_is_read_only \
 PS11c-tmc_write_gate_has_macro_bit PS11d-status_queries_have_no_side_effects \
@@ -120,7 +120,7 @@ PS14h-force_stop_inside_shutdown_stays_silent \
 PS14i-diag_failure_manual_recovers \
 PS15a-apply_fail_single_checked_disable_keeps_first_error \
 PS15b-later_success_does_not_erase_first_error \
-PS15c-apply_fail_control_all_ok_single_close"
+PS15c-apply_fail_control_all_ok_single_close PS19b-static_armed_running_refused PS19c-static_diag_owner_refused"
 
 VARIANTS="target host_ovr"
 

@@ -83,6 +83,7 @@ static void s_collect(sensor_frame_t *f, sensor_frame_t *base_prev,
     rt_int16_t mx, my, mz;
     rt_uint32_t raw;
     float ma;
+    current_adc_cal_t cal;
     motor_snapshot_t snap;
     rt_err_t e;
 
@@ -100,14 +101,14 @@ static void s_collect(sensor_frame_t *f, sensor_frame_t *base_prev,
     else { f->valid_imu = 0; f->fresh_imu = 0; }
 
     /* 电流(单次采样一次换算, 不重复推 EMA) */
-    if (current_adc_read_measurement(&raw, RT_NULL, &ma) == RT_EOK)
+    if (current_adc_read_measurement_cal(&raw, RT_NULL, &ma, &cal) == RT_EOK)
     {
         f->current_raw = raw;
         f->current_filtered = current_adc_get_filtered_raw();
         f->current_ma = ma;
         f->valid_current = 1; f->fresh_current = 1;
-        /* Fix E: 存"标定来源"而不是含糊的 calibrated 位 */
-        f->current_cal_source = (rt_uint8_t)current_adc_cal_source();
+        /* Fix E + M7: mA 与来源取自同一 cal 快照, 不再先算 mA 后读全局来源。 */
+        f->current_cal_source = cal.source;
     }
     else { f->valid_current = 0; f->fresh_current = 0; }
 

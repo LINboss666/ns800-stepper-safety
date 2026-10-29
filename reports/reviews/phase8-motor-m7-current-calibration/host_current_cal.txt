@@ -1,0 +1,137 @@
+build_rc=0 proc_rc=0
+VARIANT|cc_host
+[CFG] load failed (-45) -> safe defaults (THEORETICAL)
+[CFG] defaults restored (RAM; use config_save to persist)
+[CAL] adc health=DEGRADED src=THEORETICAL ver=2
+[CAL] adc offset_uV=1650000 gain_uV_per_A=600000 measured=NO
+[CAL] cfg valid=YES src=1 offset_uV=1650000 gain_uV_per_A=600000
+[CAL] sample seq=1 tick=1 raw=2000 valid=1 fresh=1
+[CAL] sample ma_uA=20000 src=THEORETICAL
+[CAL] note: show/sample do not change cal/motion/flash
+CASE|CC01-show_no_side_effects|PASS|show must not change cal/cfg/Flash/motor or sample ADC
+[CFG] defaults restored (RAM; use config_save to persist)
+[CAL] sample n_req=128 n_seen=128 n_valid=128 dup=0 invalid=0 skip=0
+[CAL] sample seq=1..128 tick=1..128 ver=3..3 reset=0
+[CAL] raw sum=261328 min=2000 max=2099 mean_x1000=2041625
+[CAL] raw sum_sq=533647280
+[CAL] sample cal src=THEORETICAL changed=0 fit=READY reason=OK
+[CAL] note: sample is observation only; no cal/flash/motion change
+CASE|CC02-sample_128_normal|PASS|sample is observation only; no cal/cfg/Flash/motor/ADC write
+[CFG] defaults restored (RAM; use config_save to persist)
+[CAL] sample n_req=32 n_seen=3 n_valid=2 dup=1137 invalid=1 skip=7
+[CAL] sample seq=1..10 tick=1..10 ver=4..4 reset=0
+[CAL] raw sum=4003 min=2000 max=2003 mean_x1000=2001500
+[CAL] raw sum_sq=8012009
+[CAL] sample cal src=THEORETICAL changed=0 fit=NO reason=INSUFFICIENT
+[CAL] note: sample is observation only; no cal/flash/motion change
+CASE|CC03-sample_dup_invalid_skip|PASS|duplicate/invalid/gap counted; insufficient rejected
+[CFG] defaults restored (RAM; use config_save to persist)
+[CAL] sample n_req=32 n_seen=32 n_valid=32 dup=0 invalid=0 skip=0
+[CAL] sample seq=1..32 tick=1..32 ver=5..5 reset=0
+[CAL] raw sum=128560 min=4000 max=4095 mean_x1000=4017500
+[CAL] raw sum_sq=516498480
+[CAL] sample cal src=THEORETICAL changed=0 fit=NO reason=ENDPOINT
+[CAL] note: sample is observation only; no cal/flash/motion change
+CASE|CC04-sample_endpoint_rejected|PASS|endpoint not fit-ready
+[CFG] defaults restored (RAM; use config_save to persist)
+[CAL] sample n_req=32 n_seen=1 n_valid=0 dup=1139 invalid=1 skip=0
+[CAL] sample seq=0..0 tick=0..0 ver=6..6 reset=0
+[CAL] raw sum=0 min=0 max=0 mean_x1000=0
+[CAL] raw sum_sq=0
+[CAL] sample cal src=THEORETICAL changed=0 fit=NO reason=INSUFFICIENT
+[CAL] note: sample is observation only; no cal/flash/motion change
+CASE|CC05-sample_no_frames_bounded|PASS|no-frame wait bounded by deadline
+[CFG] defaults restored (RAM; use config_save to persist)
+CASE|CC06-isr_silent|PASS|ISR context silent, no frame wait
+CASE|CC07-masked_silent|PASS|PRIMASK context silent
+CASE|CC08-no_thread_silent|PASS|no thread object silent, no static gate
+usage: current_cal show
+usage: current_cal sample 32..256
+usage: current_cal apply <offset_uV> <gain_uV_per_A> CONFIRM_MEASURED
+usage: current_cal nominal CONFIRM
+CASE|CC09-bad_n_usage|PASS|N below range rejected
+usage: current_cal show
+usage: current_cal sample 32..256
+usage: current_cal apply <offset_uV> <gain_uV_per_A> CONFIRM_MEASURED
+usage: current_cal nominal CONFIRM
+CASE|CC10-missing_confirm_usage|PASS|apply missing confirmation rejected
+usage: current_cal show
+usage: current_cal sample 32..256
+usage: current_cal apply <offset_uV> <gain_uV_per_A> CONFIRM_MEASURED
+usage: current_cal nominal CONFIRM
+CASE|CC11-bad_nominal_confirm|PASS|nominal confirm is case-sensitive
+[CFG] defaults restored (RAM; use config_save to persist)
+[CAL] apply rejected: numeric range
+[CAL] apply rejected: numeric range
+[CAL] apply rejected: numeric range
+usage: current_cal show
+usage: current_cal sample 32..256
+usage: current_cal apply <offset_uV> <gain_uV_per_A> CONFIRM_MEASURED
+usage: current_cal nominal CONFIRM
+usage: current_cal show
+usage: current_cal sample 32..256
+usage: current_cal apply <offset_uV> <gain_uV_per_A> CONFIRM_MEASURED
+usage: current_cal nominal CONFIRM
+usage: current_cal show
+usage: current_cal sample 32..256
+usage: current_cal apply <offset_uV> <gain_uV_per_A> CONFIRM_MEASURED
+usage: current_cal nominal CONFIRM
+CASE|CC12-apply_numeric_reject|PASS|bad numeric/extra args rejected before static gate; tuple unchanged
+[CFG] defaults restored (RAM; use config_save to persist)
+[CAL] apply REFUSED: static gate rc=-23
+CASE|CC13-apply_static_refused|PASS|static gate refusal leaves tuple/cfg unchanged
+[CFG] defaults restored (RAM; use config_save to persist)
+[CAL] apply OK src=MEASURED offset_uV=1651000 gain_uV_per_A=610000 RAM-only
+[CAL] apply: confirmation is responsibility only; use config_save to persist
+CASE|CC14-apply_success_measured|PASS|apply changes tuple+cfg, RAM only, one static transaction
+CASE|CC15-apply_other_cfg_kept|PASS|apply/nominal only touch cal fields
+[CAL] nominal OK src=THEORETICAL offset_uV=1650000 gain_uV_per_A=600000 RAM-only
+CASE|CC16-nominal_theoretical|PASS|nominal restores only cal/source
+[CFG] defaults restored (RAM; use config_save to persist)
+CASE|CC17-config_publish_order|PASS|runtime follows the last published tuple
+[CFG] defaults restored (RAM; use config_save to persist)
+[CFG] loaded OK (version 0x00010002 cal_source=2)
+CASE|CC18-save_load_preserves_measured|PASS|save/load preserves source+coefficients
+[CFG] load failed (-12) -> safe defaults (THEORETICAL)
+CASE|CC19-load_failure_theoretical|PASS|load failure returns safe THEORETICAL
+[CFG] defaults restored (RAM; use config_save to persist)
+CASE|CC20-cal_snapshot_same_read|PASS|got v=21 s=1 o=1700.0000 g=0.7000 a v=21 s=1 o=1700.0000 g=0.7000 raw=2048 mv=1650.4030
+[CFG] defaults restored (RAM; use config_save to persist)
+[CAL] sample n_req=32 n_seen=32 n_valid=32 dup=0 invalid=0 skip=0
+[CAL] sample seq=1..32 tick=1..32 ver=22..23 reset=0
+[CAL] raw sum=64496 min=2000 max=2031 mean_x1000=2015500
+[CAL] raw sum_sq=129994416
+[CAL] sample cal src=THEORETICAL changed=1 fit=NO reason=CAL_CHANGED
+[CAL] note: sample is observation only; no cal/flash/motion change
+CASE|CC23-sample_cal_changed|PASS|mid-sample cal/version change rejects fit
+[CFG] defaults restored (RAM; use config_save to persist)
+[CAL] sample n_req=256 n_seen=256 n_valid=256 dup=0 invalid=0 skip=0
+[CAL] sample seq=1..256 tick=1..256 ver=24..24 reset=0
+[CAL] raw sum=523440 min=2000 max=2099 mean_x1000=2044687
+[CAL] raw sum_sq=1070473680
+[CAL] sample cal src=THEORETICAL changed=0 fit=READY reason=OK
+[CAL] note: sample is observation only; no cal/flash/motion change
+CASE|CC24-sample_256_boundary|PASS|256-point boundary accepted and bounded
+[CFG] defaults restored (RAM; use config_save to persist)
+CASE|CC25-nan_inf_range_reject|PASS|NaN/Inf/min-gain/offset/source rejected without tuple change
+[CFG] defaults restored (RAM; use config_save to persist)
+CASE|CC26-api_none_legal_config_rejects|PASS|NONE remains legal in ADC API; config only accepts THEORETICAL/MEASURED
+[CFG] defaults restored (RAM; use config_save to persist)
+[CFG] defaults restored (RAM; use config_save to persist)
+[CAL] adc health=DEGRADED src=THEORETICAL ver=29
+[CAL] adc offset_uV=1650000 gain_uV_per_A=600000 measured=NO
+[CAL] cfg valid=YES src=1 offset_uV=1650000 gain_uV_per_A=600000
+[CAL] sample seq=1 tick=1 raw=2000 valid=1 fresh=1
+[CAL] sample ma_uA=20000 src=THEORETICAL
+[CAL] note: show/sample do not change cal/motion/flash
+[CAL] sample n_req=32 n_seen=3 n_valid=3 dup=1137 invalid=0 skip=0
+[CAL] sample seq=1..3 tick=1..3 ver=29..29 reset=0
+[CAL] raw sum=6003 min=2000 max=2002 mean_x1000=2001000
+[CAL] raw sum_sq=12012005
+[CAL] sample cal src=THEORETICAL changed=0 fit=NO reason=INSUFFICIENT
+[CAL] note: sample is observation only; no cal/flash/motion change
+CASE|CC21-key_lines_ascii_110|PASS|all [CAL] lines <=110B and no NUL
+CASE|CC22-msh_export_name|PASS|current_cal alias is exported
+SUMMARY|cases=26 pass=26 fail=0 pre_bad=0
+ledger=26/26 bad=0 SUMMARY|cases=26 pass=26 fail=0 pre_bad=0
+M7 CURRENT_CAL RESULT: PASS

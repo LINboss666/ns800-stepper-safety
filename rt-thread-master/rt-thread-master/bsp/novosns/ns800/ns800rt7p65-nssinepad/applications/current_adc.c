@@ -18,6 +18,7 @@
 
 #include <rtthread.h>
 #include <rtdevice.h>
+#include <float.h>
 #include "project_board.h"
 #include "app_health.h"
 #include "current_adc.h"
@@ -38,6 +39,7 @@ static float cur_offset_mv = 1650.0f;     /* 理论默认: 1.65V 中点 */
 static float cur_gain_v_per_a = 0.6f;     /* 理论默认: 30mΩ × 20V/V */
 static rt_bool_t cur_calibrated = RT_FALSE;
 static current_adc_cal_source_t cur_cal_source = CURRENT_ADC_CAL_NONE;
+static rt_uint32_t cur_cal_version = 0;
 
 /* 轻量滤波状态 */
 static rt_uint32_t cur_ema_raw = 0;
@@ -72,9 +74,17 @@ rt_err_t current_adc_init(void)
 
 rt_err_t current_adc_read_measurement(rt_uint32_t *raw, float *mv, float *ma)
 {
-    rt_uint32_t sample;
+    return current_adc_read_measurement_cal(raw, mv, ma, RT_NULL);
+}
 
-    if (cur_adc == RT_NULL || !cur_enabled) return -RT_ERROR;
+rt_err_t current_adc_read_measurement_cal(rt_uint32_t *raw, float *mv, float *ma,
+                                          current_adc_cal_t *cal)
+{
+    rt_uint32_t sample;
+    current_adc_cal_t snapshot;
+    float mv_sample;
+
+    if (cur_adc == RT_NULL || !cur_enabled || raw == RT_NULL) return -RT_ERROR;
 
     /* 单次快读; EMA 一帧只推一次(P1-13: raw 与换算同源) */
     sample = rt_adc_read(cur_adc, CUR_ADC_CH);
@@ -87,9 +97,20 @@ rt_err_t current_adc_read_measurement(rt_uint32_t *raw, float *mv, float *ma)
                                     (diff * CUR_EMA_ALPHA_PCT) / 100);
     }
 
+    /* 标定元组在同一短临界区一次拷贝; 换算在窗口外完成。 */
+    rt_enter_critical();
+    snapshot.offset_mv = cur_offset_mv;
+    snapshot.gain_v_per_a = cur_gain_v_per_a;
+    snapshot.source = (rt_uint8_t)cur_cal_source;
+    snapshot.version = cur_cal_version;
+    rt_exit_critical();
+
+    mv_sample = current_adc_raw_to_mv(sample);
     *raw = sample;
-    if (mv != RT_NULL) *mv = current_adc_raw_to_mv(sample);
-    if (ma != RT_NULL) *ma = current_adc_raw_to_ma(sample);
+    if (mv != RT_NULL) *mv = mv_sample;
+    if (ma != RT_NULL) *ma = (mv_sample - snapshot.offset_mv) /
+                            snapshot.gain_v_per_a;
+    if (cal != RT_NULL) *cal = snapshot;
     return RT_EOK;
 }
 
@@ -108,7 +129,11 @@ float current_adc_raw_to_ma(rt_uint32_t raw)
     /* 量纲: mV / (V/A) = mA, 已经是 mA —— 早期实现又多乘了 1000, 把 µA 当成 mA
      * 输出(真机实测 ~1.664V 报成 23504 mA, 实际 23 mA), 与本文件头注释
      * "Ibus(mA) ≈ (Vmv - 1650)/0.6" 矛盾。系数由标定时写入, 不在这里换算。 */
-    return (current_adc_raw_to_mv(raw) - cur_offset_mv) / cur_gain_v_per_a;
+    current_adc_cal_t c;
+
+    if (current_adc_get_calibration(&c) != RT_EOK || c.gain_v_per_a <= 0.0f)
+        return 0.0f;
+    return (current_adc_raw_to_mv(raw) - c.offset_mv) / c.gain_v_per_a;
 }
 
 rt_err_t current_adc_read_mv(float *mv)
@@ -123,18 +148,38 @@ rt_err_t current_adc_read_ma(float *ma)
     return current_adc_read_measurement(&raw, RT_NULL, ma);
 }
 
+static rt_bool_t cal_input_ok(float offset_mv, float gain_v_per_a,
+                              current_adc_cal_source_t source)
+{
+    if ((int)source < (int)CURRENT_ADC_CAL_NONE ||
+        (int)source > (int)CURRENT_ADC_CAL_MEASURED)
+        return RT_FALSE;
+    if (!(offset_mv == offset_mv) || offset_mv < -FLT_MAX ||
+        offset_mv > FLT_MAX || offset_mv < 0.0f || offset_mv > 3300.0f)
+        return RT_FALSE;
+    if (!(gain_v_per_a == gain_v_per_a) || gain_v_per_a < -FLT_MAX ||
+        gain_v_per_a > FLT_MAX ||
+        gain_v_per_a < CURRENT_ADC_GAIN_MIN_V_PER_A ||
+        gain_v_per_a > CURRENT_ADC_GAIN_MAX_V_PER_A)
+        return RT_FALSE;
+    return RT_TRUE;
+}
+
 static rt_err_t cal_apply(float offset_mv, float gain_v_per_a,
                           current_adc_cal_source_t source)
 {
-    if (gain_v_per_a <= 0.0f) return -RT_EINVAL;
+    if (!cal_input_ok(offset_mv, gain_v_per_a, source)) return -RT_EINVAL;
 
+    rt_enter_critical();
     cur_offset_mv = offset_mv;
     cur_gain_v_per_a = gain_v_per_a;
     cur_cal_source = source;
     cur_calibrated = (source != CURRENT_ADC_CAL_NONE) ? RT_TRUE : RT_FALSE;
+    cur_cal_version++;
     if (cur_enabled)
         cur_health = (source == CURRENT_ADC_CAL_MEASURED) ? SUBSYS_OK
                                                           : SUBSYS_DEGRADED;
+    rt_exit_critical();
     return RT_EOK;
 }
 
@@ -150,10 +195,62 @@ rt_err_t current_adc_set_calibration_ex(float offset_mv, float gain_v_per_a,
     return cal_apply(offset_mv, gain_v_per_a, source);
 }
 
-rt_bool_t current_adc_is_calibrated(void) { return cur_calibrated; }
-current_adc_cal_source_t current_adc_cal_source(void) { return cur_cal_source; }
-rt_uint32_t current_adc_get_filtered_raw(void) { return cur_ema_raw; }
-subsys_health_t current_adc_get_health(void) { return cur_health; }
+rt_err_t current_adc_get_calibration(current_adc_cal_t *out)
+{
+    if (out == RT_NULL) return -RT_EINVAL;
+    rt_enter_critical();
+    out->offset_mv = cur_offset_mv;
+    out->gain_v_per_a = cur_gain_v_per_a;
+    out->source = (rt_uint8_t)cur_cal_source;
+    out->version = cur_cal_version;
+    rt_exit_critical();
+    return RT_EOK;
+}
+
+rt_uint32_t current_adc_cal_version(void)
+{
+    rt_uint32_t v;
+    rt_enter_critical();
+    v = cur_cal_version;
+    rt_exit_critical();
+    return v;
+}
+
+rt_bool_t current_adc_is_calibrated(void)
+{
+    rt_bool_t v;
+    rt_enter_critical();
+    v = cur_calibrated;
+    rt_exit_critical();
+    return v;
+}
+
+current_adc_cal_source_t current_adc_cal_source(void)
+{
+    current_adc_cal_source_t s;
+    rt_enter_critical();
+    s = cur_cal_source;
+    rt_exit_critical();
+    return s;
+}
+
+rt_uint32_t current_adc_get_filtered_raw(void)
+{
+    rt_uint32_t v;
+    rt_enter_critical();
+    v = cur_ema_raw;
+    rt_exit_critical();
+    return v;
+}
+
+subsys_health_t current_adc_get_health(void)
+{
+    subsys_health_t h;
+    rt_enter_critical();
+    h = cur_health;
+    rt_exit_critical();
+    return h;
+}
 
 /* ---------- boot (P1-8: bootstrap 显式调用, 不用 INIT_APP) ---------- */
 

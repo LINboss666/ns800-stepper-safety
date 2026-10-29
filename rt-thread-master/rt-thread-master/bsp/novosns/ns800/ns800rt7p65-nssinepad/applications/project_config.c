@@ -18,6 +18,7 @@
  */
 
 #include <rtthread.h>
+#include <float.h>
 #include "project_config.h"
 #include "app_health.h"
 #include "ns_storage.h"
@@ -88,9 +89,14 @@ static rt_bool_t config_in_range(const project_config_t *c)
     if (c->cur_cal_source < (rt_uint8_t)CURRENT_ADC_CAL_THEORETICAL ||
         c->cur_cal_source > (rt_uint8_t)CURRENT_ADC_CAL_MEASURED)
         return RT_FALSE;
-    if (c->cur_gain_v_per_a <= 0.0f || c->cur_gain_v_per_a > 100.0f)
+    if (!(c->cur_gain_v_per_a == c->cur_gain_v_per_a) ||
+        c->cur_gain_v_per_a < -FLT_MAX || c->cur_gain_v_per_a > FLT_MAX ||
+        c->cur_gain_v_per_a < CURRENT_ADC_GAIN_MIN_V_PER_A ||
+        c->cur_gain_v_per_a > CURRENT_ADC_GAIN_MAX_V_PER_A)
         return RT_FALSE;
-    if (c->cur_offset_mv < 0.0f || c->cur_offset_mv > 3300.0f)
+    if (!(c->cur_offset_mv == c->cur_offset_mv) ||
+        c->cur_offset_mv < -FLT_MAX || c->cur_offset_mv > FLT_MAX ||
+        c->cur_offset_mv < 0.0f || c->cur_offset_mv > 3300.0f)
         return RT_FALSE;
     if (c->band_hz[0] < 1 || c->band_hz[0] >= c->band_hz[1] ||
         c->band_hz[1] > 20000)
@@ -120,15 +126,24 @@ static rt_bool_t config_in_range(const project_config_t *c)
 
 /* 把一份*显式副本*的标定下发到 current_adc(带来源, 不读全局 cfg → 调用方
  * 可在锁外安全使用)。只有合法标定才下发。 */
-static void cfg_apply_from(const project_config_t *src)
+static rt_err_t cfg_apply_from(const project_config_t *src)
 {
-    if (src->cur_gain_v_per_a <= 0.0f) return;
+    if (!(src->cur_gain_v_per_a == src->cur_gain_v_per_a) ||
+        src->cur_gain_v_per_a < -FLT_MAX || src->cur_gain_v_per_a > FLT_MAX ||
+        src->cur_gain_v_per_a < CURRENT_ADC_GAIN_MIN_V_PER_A ||
+        src->cur_gain_v_per_a > CURRENT_ADC_GAIN_MAX_V_PER_A)
+        return -RT_EINVAL;
+    if (!(src->cur_offset_mv == src->cur_offset_mv) ||
+        src->cur_offset_mv < -FLT_MAX || src->cur_offset_mv > FLT_MAX ||
+        src->cur_offset_mv < 0.0f || src->cur_offset_mv > 3300.0f)
+        return -RT_EINVAL;
     if (src->cur_cal_source < (rt_uint8_t)CURRENT_ADC_CAL_THEORETICAL ||
         src->cur_cal_source > (rt_uint8_t)CURRENT_ADC_CAL_MEASURED)
-        return;
+        return -RT_EINVAL;
     /* Fix B: 必须用 _ex 带上来源, 否则 MEASURED 会被无条件降级成 THEORETICAL */
-    current_adc_set_calibration_ex(src->cur_offset_mv, src->cur_gain_v_per_a,
-                                   (current_adc_cal_source_t)src->cur_cal_source);
+    return current_adc_set_calibration_ex(src->cur_offset_mv,
+                                          src->cur_gain_v_per_a,
+                                          (current_adc_cal_source_t)src->cur_cal_source);
 }
 
 /* ---------- 正式 API (project_config.h) ---------- */
@@ -162,20 +177,58 @@ subsys_health_t project_config_get_health(void)
 
 rt_err_t project_config_set(const project_config_t *c)
 {
-    project_config_t applied;
+    project_config_t tmp;
+    rt_err_t e;
 
     if (c == RT_NULL) return -RT_EINVAL;
     if (!config_in_range(c)) return -RT_EINVAL;   /* 非法整套: 不改现有配置 */
+    tmp = *c;
+
+    /* cal 更新不做 I/O: 与 cfg 发布同锁完成, 防止旧发布晚到覆盖新系数。 */
+    cfg_take();
+    e = cfg_apply_from(&tmp);
+    if (e == RT_EOK)
+    {
+        cfg = tmp;
+        cfg_valid  = RT_TRUE;
+        cfg_health = SUBSYS_OK;
+    }
+    cfg_release();
+    return e;
+}
+
+rt_err_t project_config_set_calibration(float offset_mv, float gain_v_per_a,
+                                        rt_uint8_t source)
+{
+    project_config_t tmp;
+    rt_err_t e;
+
+    if (source != (rt_uint8_t)CURRENT_ADC_CAL_THEORETICAL &&
+        source != (rt_uint8_t)CURRENT_ADC_CAL_MEASURED)
+        return -RT_EINVAL;
+    if (!(offset_mv == offset_mv) || offset_mv < -FLT_MAX || offset_mv > FLT_MAX ||
+        offset_mv < 0.0f || offset_mv > 3300.0f)
+        return -RT_EINVAL;
+    if (!(gain_v_per_a == gain_v_per_a) || gain_v_per_a < -FLT_MAX ||
+        gain_v_per_a > FLT_MAX ||
+        gain_v_per_a < CURRENT_ADC_GAIN_MIN_V_PER_A ||
+        gain_v_per_a > CURRENT_ADC_GAIN_MAX_V_PER_A)
+        return -RT_EINVAL;
 
     cfg_take();
-    cfg = *c;                          /* P1-7: 整套原子发布 */
-    cfg_valid  = RT_TRUE;
-    cfg_health = SUBSYS_OK;
-    applied = cfg;                     /* 锁内取副本, 锁外下发 */
+    tmp = cfg;
+    tmp.cur_offset_mv = offset_mv;
+    tmp.cur_gain_v_per_a = gain_v_per_a;
+    tmp.cur_cal_source = source;
+    e = cfg_apply_from(&tmp);
+    if (e == RT_EOK)
+    {
+        cfg.cur_offset_mv = offset_mv;
+        cfg.cur_gain_v_per_a = gain_v_per_a;
+        cfg.cur_cal_source = source;
+    }
     cfg_release();
-
-    cfg_apply_from(&applied);
-    return RT_EOK;
+    return e;
 }
 
 rt_err_t project_config_save(void)
@@ -207,9 +260,20 @@ rt_err_t project_config_load(void)
     cfg_take();
     if (ok)
     {
-        cfg = tmp;
-        cfg_valid  = RT_TRUE;
-        cfg_health = SUBSYS_OK;
+        if (cfg_apply_from(&tmp) == RT_EOK)
+        {
+            cfg = tmp;
+            cfg_valid  = RT_TRUE;
+            cfg_health = SUBSYS_OK;
+        }
+        else
+        {
+            cfg_fill_defaults_nolock();
+            cfg_valid  = RT_FALSE;
+            cfg_health = SUBSYS_DEGRADED;
+            (void)cfg_apply_from(&cfg);
+            ok = RT_FALSE;
+        }
     }
     else
     {
@@ -217,11 +281,10 @@ rt_err_t project_config_load(void)
         cfg_fill_defaults_nolock();
         cfg_valid  = RT_FALSE;
         cfg_health = SUBSYS_DEGRADED;
+        (void)cfg_apply_from(&cfg);
     }
-    applied = cfg;                     /* 锁内取副本, 锁外下发 */
+    applied = cfg;                     /* 仅用于成功后打印 */
     cfg_release();
-
-    cfg_apply_from(&applied);
 
     if (!ok)
     {
@@ -290,17 +353,13 @@ MSH_CMD_EXPORT(config_show, show runtime configuration);
 
 static void config_default(void)
 {
-    project_config_t applied;
-
-    project_config_defaults();
-
     cfg_take();
+    cfg_fill_defaults_nolock();
     cfg_valid  = RT_TRUE;    /* 操作员显式选定默认值作为工作集 */
     cfg_health = SUBSYS_OK;
-    applied = cfg;
+    (void)cfg_apply_from(&cfg);
     cfg_release();
 
-    cfg_apply_from(&applied);
     rt_kprintf("[CFG] defaults restored (RAM; use config_save to persist)\n");
 }
 MSH_CMD_EXPORT(config_default, restore safe default configuration in RAM);
@@ -334,12 +393,10 @@ rt_err_t project_config_boot(void)
      * 不依赖偶然的 INIT_APP 链接顺序; 失败 → 安全默认 + DEGRADED */
     if (ns_storage_init() != RT_EOK)
     {
-        project_config_t applied;
         rt_kprintf("[CFG] storage init FAILED -> safe defaults, DEGRADED\n");
         cfg_take();
-        applied = cfg;
+        (void)cfg_apply_from(&cfg);    /* 显式回 THEORETICAL */
         cfg_release();
-        cfg_apply_from(&applied);      /* 显式回 THEORETICAL */
         return RT_EOK;
     }
 

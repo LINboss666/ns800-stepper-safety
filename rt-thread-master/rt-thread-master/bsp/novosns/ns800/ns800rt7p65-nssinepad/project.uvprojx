@@ -471,6 +471,11 @@
               <FilePath>applications\current_adc.c</FilePath>
             </File>
             <File>
+              <FileName>current_cal.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>applications\current_cal.c</FilePath>
+            </File>
+            <File>
               <FileName>adxl345.c</FileName>
               <FileType>1</FileType>
               <FilePath>applications\adxl345.c</FilePath>
@@ -3206,6 +3211,11 @@
               <FilePath>applications\current_adc.c</FilePath>
             </File>
             <File>
+              <FileName>current_cal.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>applications\current_cal.c</FilePath>
+            </File>
+            <File>
               <FileName>adxl345.c</FileName>
               <FileType>1</FileType>
               <FilePath>applications\adxl345.c</FilePath>
@@ -5939,6 +5949,11 @@
               <FileName>current_adc.c</FileName>
               <FileType>1</FileType>
               <FilePath>applications\current_adc.c</FilePath>
+            </File>
+            <File>
+              <FileName>current_cal.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>applications\current_cal.c</FilePath>
             </File>
             <File>
               <FileName>adxl345.c</FileName>

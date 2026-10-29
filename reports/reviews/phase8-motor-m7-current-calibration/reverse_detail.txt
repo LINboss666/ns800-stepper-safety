@@ -1,0 +1,18 @@
+REV1 source: motor_calibration_static_begin() 的全部静止复核被替换为立即 return RT_EOK
+REV1 runner: bash tests/host/run_stop_result_s1.sh (SRC_APP 指向仓外副本)
+  判 FAIL: CASE|PS19b-static_armed_running_refused|FAIL|static begin rc=0 (armed/running 必须拒绝)
+  判 FAIL: CASE|PS19c-static_diag_owner_refused|FAIL|static begin rc=0 (诊断持有输出必须拒绝)
+  判 FAIL: CASE|PS19d-static_stop_unknown_refused|FAIL|static begin rc=0 (关断失败锁存期间必须拒绝)
+S1 RUNNER RESULT: FAIL (rc=1; 1=检出失败, 4=基础设施故障) 详见 /tmp/ns800-m7-hostchain/m7-reverse/20261029T103909Z-1341/s1
+
+REV1 具名命中: PS19b / PS19c / PS19d
+CASE|PS19b-static_armed_running_refused|FAIL
+CASE|PS19c-static_diag_owner_refused|FAIL
+CASE|PS19d-static_stop_unknown_refused|FAIL
+
+=== REV2 ===
+REV2 source: project_config_set_calibration() 只发布新来源，运行时系数仍取旧 cfg 值
+SUMMARY|cases=26 pass=24 fail=2 pre_bad=0
+M7 CURRENT_CAL RESULT: FAIL
+CASE|CC14-apply_success_measured|FAIL
+CASE|CC16-nominal_theoretical|FAIL

@@ -1,0 +1,29 @@
+PASS M7C01-positive-fit-slope
+PASS M7C02-positive-gain
+FAIL M7C03-positive-offset value=1598.2905982905984
+PASS M7C04-command-draft-text
+PASS M7C05-status-never-approved
+PASS M7C06-qualified
+FAIL M7C07-holdout-passes value=[{'id': 'H1', 'raw_mean': 2050.0, 'reference_mA': 80.0, 'predicted_mA': 80.0, 'abs_error_mA': 0.0, 'target_mA': 8.0, 'target_rule': 'PROPOSED_FOR_APPROVAL max(5 mA, 10% of reference)', 'combined_error_bound_mA': 66.08043023348532, 'bound_exceeds_target': True, 'pass': False}]
+PASS M7C08-provenance-synthetic
+PASS M7C09-insufficient-fit-points -> INSUFFICIENT_FIT_POINTS
+FAIL M7C10-duplicate-x wanted DUPLICATE_X got ZeroDivisionError('float division by zero')
+PASS M7C11-zero-slope -> NON_POSITIVE_SLOPE
+PASS M7C12-negative-slope -> NON_POSITIVE_SLOPE
+PASS M7C13-nan-reference -> NON_FINITE_VALUE
+PASS M7C14-raw-out-of-range -> RAW_OUT_OF_RANGE
+PASS M7C15-saturated-endpoint -> SATURATED_ENDPOINT
+FAIL M7C16-theoretical-reference-rejected wanted NO_INDEPENDENT_REFERENCE got NO REJECTION
+FAIL M7C17-adapter-total-rejected wanted NO_INDEPENDENT_REFERENCE got NO REJECTION
+PASS M7C18-missing-heldout -> INSUFFICIENT_HOLDOUT_POINTS
+PASS M7C19-low-reference-span -> REJECT ['REF_SPAN_GT_10x_SUM_REF_ERROR_BOUNDS']
+FAIL M7C20-missing-field-not-zeroed wanted MISSING_FIELD got KeyError('raw_source_sha256')
+FAIL M7C21-incomplete-sample wanted INCOMPLETE_SAMPLE got NON_POSITIVE_SLOPE (NON_POSITIVE_SLOPE: slope a=-0.2608695652173913 mA/count; a bus shunt with correct polarity is positive)
+PASS M7C22-null-not-defaulted -> MISSING_FIELD
+FAIL M7C23-schema wanted SCHEMA_MISMATCH got NO REJECTION
+FAIL M7C24-provenance wanted UNKNOWN_PROVENANCE got NO REJECTION
+PASS M7C25-bound-exceeds-target-not-pass
+FAIL M7C27 hits=['import serial']
+FAIL M7C28-field-measured-needs-method wanted METHOD_NOT_READY got NO REJECTION
+SUMMARY cases=27 pass=16 fail=11
+M7 CALCALC SELFTEST: FAIL

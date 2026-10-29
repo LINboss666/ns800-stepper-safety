@@ -227,16 +227,29 @@ rt_err_t adxl345_read_mg(rt_int16_t *x, rt_int16_t *y, rt_int16_t *z)
 subsys_health_t adxl345_get_health(void) { return g_imu_ok ? SUBSYS_OK : SUBSYS_FAILED; }
 
 static rt_uint32_t g_filtered = 4321;
-rt_err_t current_adc_read_measurement(rt_uint32_t *raw, float *mv, float *ma)
+static current_adc_cal_source_t g_cal_source = CURRENT_ADC_CAL_THEORETICAL;
+static rt_uint32_t g_cal_version = 1;
+rt_err_t current_adc_read_measurement_cal(rt_uint32_t *raw, float *mv, float *ma,
+                                          current_adc_cal_t *cal)
 {
     g_adc_calls++;
     (void)mv;
     if (!g_adc_ok) return -RT_EIO;
-    *raw = 2048; *ma = 512.0f;
+    *raw = 2048;
+    *ma = 512.0f;
+    if (cal != RT_NULL)
+    {
+        cal->offset_mv = 1650.0f;
+        cal->gain_v_per_a = 0.6f;
+        cal->source = (rt_uint8_t)g_cal_source;
+        cal->version = g_cal_version;
+    }
     return RT_EOK;
 }
+rt_err_t current_adc_read_measurement(rt_uint32_t *raw, float *mv, float *ma)
+{ return current_adc_read_measurement_cal(raw, mv, ma, RT_NULL); }
 rt_uint32_t current_adc_get_filtered_raw(void) { return g_filtered; }
-current_adc_cal_source_t current_adc_cal_source(void) { return CURRENT_ADC_CAL_THEORETICAL; }
+current_adc_cal_source_t current_adc_cal_source(void) { return g_cal_source; }
 subsys_health_t current_adc_get_health(void) { return g_adc_ok ? SUBSYS_DEGRADED : SUBSYS_FAILED; }
 
 rt_err_t tmc2209_read_sg_result(rt_uint16_t *sg)
@@ -353,6 +366,8 @@ static void reset_all(void)
     g_safety_state = SAFETY_READY;
     g_log_used = g_log_valid = g_log_submit_calls = 0;
     g_thread_create_calls = 0;
+    g_cal_source = CURRENT_ADC_CAL_THEORETICAL;
+    g_cal_version = 1;
     cap_reset();
     (void)sensor_service_init();
     (void)blackbox_init();
@@ -833,6 +848,28 @@ static void sd10_output_distinguishes_states(void)
     check("SD10b-dump-shows-version-and-per-channel-readability", ok, d);
 }
 
+static void sd12_cal_snapshot_source(void)
+{
+    sensor_frame_t sf, prev;
+    rt_uint32_t seq = 0;
+    int ok;
+    char d[160];
+
+    reset_all();
+    g_cal_source = CURRENT_ADC_CAL_MEASURED;
+    g_cal_version = 7;
+    rt_memset(&prev, 0, sizeof(prev));
+    s_collect(&sf, &prev, &seq);
+    ok = (sf.current_cal_source == CURRENT_ADC_CAL_MEASURED) &&
+         sf.valid_current && sf.fresh_current;
+    g_cal_source = CURRENT_ADC_CAL_THEORETICAL;
+    g_cal_version = 8;
+    ok = ok && sf.current_cal_source == CURRENT_ADC_CAL_MEASURED;
+    snprintf(d, sizeof(d), "frame_src=%u live_src=%u", (unsigned)sf.current_cal_source,
+             (unsigned)g_cal_source);
+    check("SD12-cal-source-same-snapshot", ok, d);
+}
+
 static void sd11_readonly_and_layout(void)
 {
     sensor_frame_t f, prev;
@@ -910,6 +947,7 @@ int main(void)
     sd08_flags_vector_and_legacy_fields();
     sd09_legacy_and_unknown_schema();
     sd10_output_distinguishes_states();
+    sd12_cal_snapshot_source();
     sd11_readonly_and_layout();
 
     printf("SUMMARY|cases=%d pass=%d fail=%d\n", g_cases, g_pass, g_fail);

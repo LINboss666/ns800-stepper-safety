@@ -1557,6 +1557,47 @@ static void cases_ramp(void)
 }
 #endif /* PS_GATE_HOST_OVERRIDE */
 
+static void cases_cal_gate(void)
+{
+    rt_err_t e;
+
+    if (!recover_clean()) g_pre_bad++;
+    e = motor_calibration_static_begin();
+    CHECK("PS19a-static_idle_begin_accepted",
+          e == RT_EOK && snap_armed() == 0 && snap_cur_hz() == 0,
+          fm("static begin rc=%d armed=%d cur=%u", (int)e, snap_armed(),
+             (unsigned)snap_cur_hz()));
+    if (e == RT_EOK) motor_calibration_static_end();
+
+    if (!recover_clean()) g_pre_bad++;
+    ps_sim_pwm_set_rc(RT_EOK, RT_EOK, -RT_EIO);
+    (void)motor_disarm();
+    e = motor_calibration_static_begin();
+    CHECK("PS19d-static_stop_unknown_refused", e != RT_EOK,
+          fm("static begin rc=%d (关断失败锁存期间必须拒绝)", (int)e));
+    if (!recover_clean()) g_pre_bad++;
+
+#ifdef PS_GATE_HOST_OVERRIDE
+    if (!arm_for_ramp()) g_pre_bad++;
+    ps_sim_pwm_set_rc(RT_EOK, RT_EOK, RT_EOK);
+    (void)motor_set_target_hz(100);
+    if (motor_start() != RT_EOK) { g_pre_bad++; printf("PRE-FAIL|cal-start\n"); }
+    motor_ramp_tick();
+    e = motor_calibration_static_begin();
+    CHECK("PS19b-static_armed_running_refused", e != RT_EOK,
+          fm("static begin rc=%d (armed/running 必须拒绝)", (int)e));
+    (void)motor_disarm();
+    if (!recover_clean()) g_pre_bad++;
+
+    msh_pwm_test("1000");
+    e = motor_calibration_static_begin();
+    CHECK("PS19c-static_diag_owner_refused", e != RT_EOK,
+          fm("static begin rc=%d (诊断持有输出必须拒绝)", (int)e));
+    msh_pwm_test("stop");
+    if (!recover_clean()) g_pre_bad++;
+#endif
+}
+
 /* ---------------------------------------------------------------------- */
 /* R01(=S1-NEW-01): 关断失败/未知期间不得把"软件 0Hz"当物理静止写 DIR       */
 /* ---------------------------------------------------------------------- */
@@ -1653,6 +1694,13 @@ static void cases_init_missing(void)
     rt_err_t rc;
     rt_bool_t lat;
     int tc0, low0, nul0;
+
+    /* M7 PS19e: 标定静止事务在 mot_lock 尚未建立时必须 fail-closed。 */
+    {
+        rt_err_t ce = motor_calibration_static_begin();
+        CHECK("PS19e-static_lock_unavailable_refused", ce == -RT_EIO,
+              fm("static begin rc=%d (mot_lock 未建立)", (int)ce));
+    }
 
     ps_sim_set_pad_level(PIN_HIGH);               /* 许可脚初态 HIGH */
     ps_sim_dev_set_present(0);                    /* 设备取不到 */
@@ -2291,6 +2339,7 @@ int main(void)
     /* CP3 §9 第 2/5 项的总账: 整条链跑完之后, "在 PRIMASK 窗口内取锁/睡眠/打印"
      * 必须一次都没有发生过。计数由端口在每个可疑入口按当前掩码状态累加。 */
     cases_safety_trip();
+    cases_cal_gate();
     CHECK("PS16a-window_forbidden_calls_zero",
           ps_win_violations() == 0,
           fm("窗口内禁止项命中=%d 最后一次=%s 结束时掩码=%d 深度=%d",

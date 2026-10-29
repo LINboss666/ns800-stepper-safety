@@ -59,6 +59,12 @@ rt_err_t project_config_get_snapshot(project_config_t *out);
 /* 设置并校验(范围非法拒绝, 不改现有)。 */
 rt_err_t project_config_set(const project_config_t *cfg);
 
+/* 只更新电流标定三元组(offset/gain/source), 不改其他字段、不自动保存。
+ * 用于 current_cal apply/nominal; 校验通过后在同一 cfg 锁内发布到运行时 ADC。
+ * source 仅接受 THEORETICAL/MEASURED。 */
+rt_err_t project_config_set_calibration(float offset_mv, float gain_v_per_a,
+                                        rt_uint8_t source);
+
 /* 保存当前配置到 Flash。 */
 rt_err_t project_config_save(void);
 

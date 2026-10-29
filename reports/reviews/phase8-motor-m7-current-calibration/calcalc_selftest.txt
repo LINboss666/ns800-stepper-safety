@@ -1,0 +1,39 @@
+PASS M7C01-slope
+PASS M7C02-gain
+PASS M7C03-offset
+PASS M7C04-gain-uV
+PASS M7C05-offset-uV
+PASS M7C06-command-draft
+PASS M7C07-status-draft
+PASS M7C08-qualified
+PASS M7C09-holdout-pass
+PASS M7C10-provenance-synthetic
+PASS M7C11-insufficient-fit -> INSUFFICIENT_FIT_POINTS
+PASS M7C12-duplicate-x -> DUPLICATE_X
+PASS M7C13-zero-slope -> NON_POSITIVE_SLOPE
+PASS M7C14-negative-slope -> NON_POSITIVE_SLOPE
+PASS M7C15-nan-reference -> NON_FINITE_VALUE
+PASS M7C16-raw-out-of-range -> RAW_OUT_OF_RANGE
+PASS M7C17-saturated-endpoint -> SATURATED_ENDPOINT
+PASS M7C18-raw-mean-inconsistent -> RAW_MEAN_INCONSISTENT
+PASS M7C19-theory-reference -> NO_INDEPENDENT_REFERENCE
+PASS M7C20-adapter-total -> NO_INDEPENDENT_REFERENCE
+PASS M7C21-disabled-baseline -> NO_INDEPENDENT_REFERENCE
+PASS M7C22-missing-heldout -> INSUFFICIENT_HOLDOUT_POINTS
+PASS M7C23-heldout-not-independent -> HOLDOUT_NOT_INDEPENDENT
+PASS M7C24-extrapolating-heldout -> EXTRAPOLATION_HOLDOUT
+PASS M7C25-missing-field -> MISSING_FIELD
+PASS M7C26-incomplete-sample -> INCOMPLETE_SAMPLE
+PASS M7C27-null-not-zeroed -> MISSING_FIELD
+PASS M7C28-schema -> SCHEMA_MISMATCH
+PASS M7C29-provenance -> UNKNOWN_PROVENANCE
+PASS M7C30-bad-role -> BAD_ROLE
+PASS M7C31-duplicate-id -> DUPLICATE_POINT_ID
+PASS M7C32-field-method-missing -> METHOD_NOT_READY
+PASS M7C33-field-partial-branch -> METHOD_NOT_READY
+PASS M7C34-low-reference-span-rejected
+PASS M7C35-bound-exceeds-target-not-pass
+PASS M7C36-no-transport-or-device-imports
+PASS M7C37-reject-codes-enumerated
+SUMMARY cases=37 pass=37 fail=0
+M7 CALCALC SELFTEST: PASS

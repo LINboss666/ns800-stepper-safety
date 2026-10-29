@@ -65,7 +65,8 @@ SD10a-snapshot-distinguishes-valid-invalid-disabled
 SD10b-dump-shows-version-and-per-channel-readability
 SD11a-no-gpio-write-in-sampling-or-conversion
 SD11b-uart-only-the-divided-sg-read
-SD11c-layout-and-storage-offsets-unchanged"
+SD11c-layout-and-storage-offsets-unchanged
+SD12-cal-source-same-snapshot"
 OFF_ONLY_CASES="SD01-off-masks-limits-never-touched
 SD01b-off-output-disabled-not-safe
 SD05b-stale-limit-values-not-valid"

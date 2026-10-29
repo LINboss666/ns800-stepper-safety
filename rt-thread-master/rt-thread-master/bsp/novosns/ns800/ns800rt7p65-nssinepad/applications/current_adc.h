@@ -59,6 +59,28 @@ rt_err_t current_adc_set_calibration(float offset_mv, float gain_v_per_a);
 rt_err_t current_adc_set_calibration_ex(float offset_mv, float gain_v_per_a,
                                         current_adc_cal_source_t source);
 
+/* 标定参数快照: 同一笔读取的 offset/gain/source/version。 */
+typedef struct
+{
+    float offset_mv;
+    float gain_v_per_a;
+    rt_uint8_t source;          /* current_adc_cal_source_t */
+    rt_uint32_t version;        /* 每次成功 cal_apply 递增 */
+} current_adc_cal_t;
+
+/* 数值安全范围(公共 API 与 project_config 共用同一口径)。 */
+#define CURRENT_ADC_GAIN_MIN_V_PER_A   0.001f
+#define CURRENT_ADC_GAIN_MAX_V_PER_A   100.0f
+
+/* 获取当前标定快照(短临界区; 只读)。 */
+rt_err_t current_adc_get_calibration(current_adc_cal_t *out);
+rt_uint32_t current_adc_cal_version(void);
+
+/* 一次采样并同时返回该采样使用的标定快照; raw/mv/ma/cal 同源。
+ * cal 可传 RT_NULL。 */
+rt_err_t current_adc_read_measurement_cal(rt_uint32_t *raw, float *mv, float *ma,
+                                          current_adc_cal_t *cal);
+
 /* 是否已标定(来源 != NONE; 区分来源用 current_adc_cal_source()) */
 rt_bool_t current_adc_is_calibrated(void);
 

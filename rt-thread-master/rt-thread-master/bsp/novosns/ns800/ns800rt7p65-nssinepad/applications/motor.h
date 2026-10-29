@@ -261,6 +261,15 @@ rt_bool_t motor_commit_off(const sp_proof_t *pf, int mode);
  * 因此永远收不到错误(审查探针 reconcile-ignores-lock-error)。 */
 rt_err_t motor_lock_take_checked(void);
 void     motor_recovery_fields_held(void);
+
+/* ---------- M7: 电流标定专用静止事务(窄接口, 仅 current_cal 使用) ----------
+ * begin 取 mot_lock 并在持锁期间复核: Safety READY、未 armed、IDLE、cur/tgt=0、
+ * stop 未锁存、sp owner=NONE 且两路输出不活跃、无 pending/未恢复失败、
+ * STEP 关断已确认且 DRV_ENABLE 读回 LOW。成功时**保持 mot_lock**到 end。
+ * 因此 arm 与诊断借用(其 gate 先做 snapshot 取锁)在事务期间被阻塞。
+ * 不是通用回调/旁路, 不导出 MSH, 不改变 owner/phase/恢复字段。 */
+rt_err_t motor_calibration_static_begin(void);
+void     motor_calibration_static_end(void);
 void     motor_shadow_from_proof_held(const sp_proof_t *pf);
 /* 短窗口内的 Motor 故障字段落位(调用方已持 mot_lock 且已过身份门)。 */
 void     motor_fault_fields_held(void);

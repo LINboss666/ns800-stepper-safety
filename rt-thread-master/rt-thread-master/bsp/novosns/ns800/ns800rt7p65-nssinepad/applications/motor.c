@@ -2019,6 +2019,63 @@ void motor_lock_give_checked(void)
     if (mot_lock_ok) rt_mutex_release(&mot_lock);
 }
 
+/* ---------- M7: 电流标定专用静止事务 ----------
+ * 持 mot_lock 完成"静止/所有权/关断"复核; 成功时锁保持到 end。arm 需要同一把
+ * mot_lock; 诊断 gate 的第一段 motor_get_snapshot() 也需要它, 因此两者在事务
+ * 期间无法取得输出。这里不改变任何 owner/phase/预约/恢复字段。 */
+static rt_bool_t mot_cal_guard_held = RT_FALSE;
+
+rt_err_t motor_calibration_static_begin(void)
+{
+    rt_err_t e;
+    sp_snapshot_t c;
+
+    if (mot_cal_guard_held) return -RT_EBUSY;
+    e = motor_lock_take_checked();
+    if (e != RT_EOK) return e;
+
+    e = -RT_EBUSY;
+    if (mot.armed || mot.state != MOTOR_IDLE || mot.current_hz != 0 ||
+        mot.target_hz != 0 || mot.stop_fail_latched)
+        goto out;
+    if (safety_state_get() != SAFETY_READY)
+    {
+        e = -RT_EPERM;
+        goto out;
+    }
+
+    sp_get(&c);
+    if (c.owner != SP_NONE || c.inhibit || c.exhausted ||
+        c.motor_stop_latched || c.diag_stop_latched ||
+        c.motor_output_active || c.diag_output_active ||
+        c.metadata_pending || c.first_unrecovered_valid ||
+        c.first_permit_valid)
+    {
+        e = -RT_EPERM;
+        goto out;
+    }
+    if (!step_pwm_off_confirmed() || step_pwm_output_active() ||
+        !safety_drv_enable_is_low())
+    {
+        e = -RT_EPERM;
+        goto out;
+    }
+
+    mot_cal_guard_held = RT_TRUE;
+    return RT_EOK;
+
+out:
+    motor_lock_give_checked();
+    return e;
+}
+
+void motor_calibration_static_end(void)
+{
+    if (!mot_cal_guard_held) return;
+    mot_cal_guard_held = RT_FALSE;
+    motor_lock_give_checked();
+}
+
 rt_err_t motor_get_snapshot(motor_snapshot_t *snap)
 {
     sp_snapshot_t c;
