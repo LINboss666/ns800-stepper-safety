@@ -503,22 +503,28 @@ static rt_err_t           f_integrity = RT_EOK;
 static rt_bool_t          f_diag_owner = RT_FALSE;
 static rt_bool_t          f_imu_ok = RT_TRUE, f_adc_ok = RT_TRUE, f_flash_ok = RT_TRUE;
 static tmc_drv_config_t   f_applied;
+static rt_err_t           f_tmc_init_rc = RT_EOK;
+static rt_err_t           f_tmc_read_rc = RT_EOK;
+static rt_uint32_t        f_tmc_ioin = 0x21000006u;
 
 void  io_set_cfg_ok(rt_bool_t ok, tmc_drv_cfg_state_t st) { f_cfg_ok = ok; f_cfg_state = st; }
 void  io_set_tmc_health(subsys_health_t h) { f_tmc_health = h; }
 void  io_set_integrity(rt_err_t e) { f_integrity = e; }
 void  io_set_diag_step_owner(rt_bool_t on) { f_diag_owner = on; }
+void  io_set_tmc_ident(rt_err_t init_rc, rt_err_t read_rc, rt_uint32_t ioin)
+{ f_tmc_init_rc = init_rc; f_tmc_read_rc = read_rc; f_tmc_ioin = ioin; }
 
 rt_bool_t  tmc2209_drive_config_ok_for_arm(void) { return f_cfg_ok ? RT_TRUE : RT_FALSE; }
 tmc_drv_cfg_state_t tmc2209_get_config_state(void) { return f_cfg_state; }
 subsys_health_t     tmc2209_get_health(void)       { return f_tmc_health; }
-rt_err_t  tmc2209_init(void) { return RT_EOK; }
+rt_err_t  tmc2209_init(void) { return f_tmc_init_rc; }
 
 rt_err_t tmc2209_read_register(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *val)
 {
     (void)addr; (void)reg;
     io_fake_bus_reads++;                       /* 假总线, 真实串口调用计数保持 0 */
-    if (val) *val = 0x12340000u | reg;
+    if (f_tmc_read_rc != RT_EOK) return f_tmc_read_rc;
+    if (val) *val = f_tmc_ioin;
     return RT_EOK;
 }
 
@@ -1454,6 +1460,61 @@ static void cases_destructive_tail(void)
           fm("motor_arm rc=%d", (int)motor_arm()));
 }
 
+static void cases_selftest_identity(void)
+{
+    rt_err_t e;
+    motor_snapshot_t sn;
+
+    /* ① init 失败 */
+    recover_to_ready(); open_protection_gate();
+    io_set_cfg_ok(RT_TRUE, TMC_DRV_CONFIGURED);
+    io_set_tmc_ident(-RT_EIO, RT_EOK, 0x21000006u);
+    e = safety_startup_selftest();
+    CHECK("IO11a-tmc_init_fail_not_ready",
+          e != RT_EOK && safety_state_get() != SAFETY_READY,
+          fm("rc=%d state=%s", (int)e, safety_state_name(safety_state_get())));
+
+    /* ② IOIN 读失败 */
+    recover_to_ready(); open_protection_gate();
+    io_set_tmc_ident(RT_EOK, -RT_ETIMEOUT, 0x21000006u);
+    e = safety_startup_selftest();
+    CHECK("IO11b-tmc_read_fail_not_ready",
+          e != RT_EOK && safety_state_get() != SAFETY_READY,
+          fm("rc=%d state=%s", (int)e, safety_state_name(safety_state_get())));
+
+    /* ③ VERSION 0x20 / 0x00 / 0xFF：坏身份不得进入 READY */
+    {
+        static const rt_uint32_t bad[3] = { 0x20000006u, 0x00000006u, 0xFF000006u };
+        static const char *const ids[3] = {
+            "IO11c-tmc_version_0x20_not_ready",
+            "IO11d-tmc_version_0x00_not_ready",
+            "IO11e-tmc_version_0xff_not_ready" };
+        int i;
+        for (i = 0; i < 3; ++i)
+        {
+            recover_to_ready(); open_protection_gate();
+            io_set_tmc_ident(RT_EOK, RT_EOK, bad[i]);
+            e = safety_startup_selftest();
+            CHECK(ids[i], e != RT_EOK && safety_state_get() != SAFETY_READY,
+                  fm("ioin=%08X rc=%d state=%s", bad[i], (int)e,
+                     safety_state_name(safety_state_get())));
+        }
+    }
+
+    /* ④ 0x21 正常对照：允许 READY，但不得自动 arm/STEP/HIGH */
+    recover_to_ready(); open_protection_gate();
+    io_set_tmc_ident(RT_EOK, RT_EOK, 0x21000006u);
+    e = safety_startup_selftest();
+    (void)motor_get_snapshot(&sn);
+    CHECK("IO11f-tmc_version_0x21_ready_control",
+          e == RT_EOK && safety_state_get() == SAFETY_READY &&
+          io_sim_last_write(PIN_NAME_DRV_ENABLE) != PIN_HIGH && sn.armed == 0,
+          fm("rc=%d state=%s enable_writes=%d last=%d armed=%d",
+             (int)e, safety_state_name(safety_state_get()),
+             io_sim_write_calls(PIN_NAME_DRV_ENABLE),
+             (int)io_sim_last_write(PIN_NAME_DRV_ENABLE), sn.armed));
+}
+
 int main(void)
 {
     rt_err_t e;
@@ -1493,6 +1554,7 @@ int main(void)
 #endif
     cases_target_gates();
     cases_host_override_paths();
+    cases_selftest_identity();
     cases_destructive_tail();
 
     printf("SUMMARY|cases=%d|pass=%d|fail=%d\n", g_run, g_pass, g_fail);

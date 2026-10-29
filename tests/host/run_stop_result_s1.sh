@@ -96,7 +96,9 @@ PS14f-unified_shutdown_never_posts_events \
 PS16a-window_forbidden_calls_zero \
 PS17a-safety_trip_valid_single_event PS17b-safety_trip_bad_args_zero_event \
 PS17c-safety_trip_isr_silent_zero_event PS17d-safety_trip_masked_silent_zero_event \
-PS17e-safety_trip_post_fail_not_persisted"
+PS17e-safety_trip_post_fail_not_persisted \
+PS17f-safety_trip_isr_bad_args_silent PS17g-safety_trip_masked_bad_args_silent \
+PS17h-safety_trip_no_thread_silent"
 TARGET_ONLY_CASES="PS11a-arm_refused_by_enable_path_macro PS11b-diag_step_denied \
 PS11b2-gate_check_is_read_only \
 PS11c-tmc_write_gate_has_macro_bit PS11d-status_queries_have_no_side_effects \

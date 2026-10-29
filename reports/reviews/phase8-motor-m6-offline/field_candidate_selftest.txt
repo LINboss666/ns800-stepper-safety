@@ -1,0 +1,7 @@
+CASE|M6D01-interleaved_trip_still_disarms|PASS|ok
+CASE|M6D02-read_timeout_cleanup_within_5s|PASS|ok
+CASE|M6D03-lost_arm_reply_still_cleans_up|PASS|ok
+CASE|M6D04-static_refusal_no_start|PASS|ok
+CASE|M6D05-log_300_accept_299_missing_reject|PASS|ok
+CASE|M6D06-selftest_no_serial_object|PASS|ok
+SUMMARY|cases=6 pass=6 fail=0

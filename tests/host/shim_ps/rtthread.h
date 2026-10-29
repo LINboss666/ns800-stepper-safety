@@ -108,6 +108,7 @@ void ps_win_note(const char *what);   /* CP3 §9 第 2/5 项: 窗口内禁止项
 rt_bool_t   rt_interrupt_get_nest(void);
 rt_thread_t rt_thread_self(void);
 void        ps_isr_set(int v);
+void        ps_thread_null_set(int v);
 
 /* 生产代码里的 rt_kprintf 由 ps_main.c 在本宏之后 #undef 并换成 ps_kprintf(tee)。
  * 默认值只是"别人在包含前不小心用了它"的兜底。 */

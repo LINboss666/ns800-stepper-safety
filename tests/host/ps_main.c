@@ -313,6 +313,9 @@ int  ps_cfg_txn_begins(void) { return cfg_txn_begins; }
 int  ps_cfg_txn_ends(void)   { return cfg_txn_ends; }
 int  ps_fake_bus_reads(void) { return fake_bus_reads; }
 
+static int s_isr_nest;      /* 由 ps_isr_set() 显式置位: 模拟 ISR 上下文 */
+static int s_thread_null;   /* 由 ps_thread_null_set() 显式置位: 无线程对象 */
+
 void ps_sim_reset(void)
 {
     n_pins = 0;
@@ -328,6 +331,8 @@ void ps_sim_reset(void)
     bb_triggers = 0;
     c_mutex_take = c_mutex_release = c_event_send = 0; c_event_bits = 0; c_event_last = 0;
     s_event_send_rc = RT_EOK;
+    s_isr_nest = 0;
+    s_thread_null = 0;
     c_thread_create = c_thread_startup = 0;
     protect_ready = irq_attached = polarity_ok = gpio_ready = 1;
     f_cfg_ok = RT_TRUE; f_cfg_state = TMC_DRV_CONFIGURED; f_tmc_health = SUBSYS_OK;
@@ -553,12 +558,12 @@ void ps_win_violations_clear(void) { s_win_violations = 0; s_win_last = RT_NULL;
  * s_isr_nest 只由测试显式置位(模拟"首条故障来自 ISR"的情境); rt_thread_self()
  * 在屏蔽窗口内返回空 —— 与目标上"窗口里没有可等待上下文"同一事实。
  * ⚠ 这不是完整 ISR 队列/nest 模型(那属于 S2 并发链的 C03/C04)。 */
-static int s_isr_nest;
 void ps_isr_set(int v) { s_isr_nest = v; }
+void ps_thread_null_set(int v) { s_thread_null = v; }
 rt_bool_t rt_interrupt_get_nest(void) { return s_isr_nest ? RT_TRUE : RT_FALSE; }
 rt_thread_t rt_thread_self(void)
 {
-    return (s_intr_masked || s_isr_nest) ? RT_NULL : &c_thread_store[0];
+    return (s_intr_masked || s_isr_nest || s_thread_null) ? RT_NULL : &c_thread_store[0];
 }
 
 /* ---- 许可脚(PC.23 的等价物): 裸写请求 vs 实际焊盘 vs 回读确认, 三者分列 ---- */
@@ -1975,6 +1980,41 @@ static void cases_safety_trip(void)
               fm("event +%d cap_len=%d", ps_event_sends() - ev0, ps_cap_len));
     }
 
+    /* Invalid context must be silent even when the arguments are also invalid:
+     * context is checked before argument parsing/usage output. */
+    ps_isr_set(1);
+    ps_cap_clear();
+    ev0 = ps_event_sends();
+    safety_trip_cmd(3, bad2);
+    safety_trip_cmd(2, bad3);
+    CHECK("PS17f-safety_trip_isr_bad_args_silent",
+          ps_event_sends() == ev0 && ps_cap_len == 0,
+          fm("event +%d cap_len=%d", ps_event_sends() - ev0, ps_cap_len));
+    ps_isr_set(0);
+
+    {
+        rt_base_t lvl;
+        ps_cap_clear();
+        ev0 = ps_event_sends();
+        lvl = sp_win_begin();
+        safety_trip_cmd(3, bad2);
+        safety_trip_cmd(2, bad3);
+        sp_win_end(lvl);
+        CHECK("PS17g-safety_trip_masked_bad_args_silent",
+              ps_event_sends() == ev0 && ps_cap_len == 0,
+              fm("event +%d cap_len=%d", ps_event_sends() - ev0, ps_cap_len));
+    }
+
+    ps_thread_null_set(1);
+    ps_cap_clear();
+    ev0 = ps_event_sends();
+    safety_trip_cmd(2, ok);
+    safety_trip_cmd(3, bad2);
+    CHECK("PS17h-safety_trip_no_thread_silent",
+          ps_event_sends() == ev0 && ps_cap_len == 0,
+          fm("event +%d cap_len=%d", ps_event_sends() - ev0, ps_cap_len));
+    ps_thread_null_set(0);
+
     /* Post failure: protection still runs, but the summary must not claim
      * persistence.  The short-protection pending fact is independent of the
      * failed event send. */
@@ -1996,6 +2036,194 @@ static void cases_safety_trip(void)
 }
 
 /* ===================================================================== */
+/* M6 C1: strict CLI argument contracts (real static command functions)      */
+/* ===================================================================== */
+static rt_uint32_t snap_tgt_hz(void)
+{
+    motor_snapshot_t sn;
+    return (motor_get_snapshot(&sn) == RT_EOK) ? sn.target_hz : 0xFFFFFFFFu;
+}
+
+static int cap_line_max(const char *prefix)
+{
+    int i = 0, best = -1;
+    size_t pl = strlen(prefix);
+    while (i < ps_cap_len)
+    {
+        int j = i;
+        while (j < ps_cap_len && ps_cap[j] != '\n') j++;
+        if (j - i >= (int)pl && memcmp(ps_cap + i, prefix, pl) == 0 && j - i > best)
+            best = j - i;
+        i = j + 1;
+    }
+    return best;
+}
+
+static int cap_has_nul_bytes(void)
+{
+    int i;
+    for (i = 0; i < ps_cap_len; ++i) if (ps_cap[i] == '\0') return 1;
+    return 0;
+}
+
+static void cases_cli(void)
+{
+    char *d1[] = { "motor_dir", "1" };
+    char *d0[] = { "motor_dir", "0" };
+    char *d10[] = { "motor_dir", "10" };
+    char *djunk[] = { "motor_dir", "1junk" };
+    char *dneg[] = { "motor_dir", "-1" };
+    char *dplus[] = { "motor_dir", "+1" };
+    char *dhex[] = { "motor_dir", "0x1" };
+    char *done[] = { "motor_dir" };
+    char *dextra[] = { "motor_dir", "1", "x" };
+    char *tneg[] = { "motor_target", "-1" };
+    char *tjunk[] = { "motor_target", "100x" };
+    char *tover[] = { "motor_target", "4294967296" };
+    char *tmax1[] = { "motor_target", "20001" };  /* MOTOR_MAX_HZ=20000 */
+    char *tmax[] = { "motor_target", "20000" };
+    char *tzero[] = { "motor_target", "0" };
+    char *t300[] = { "motor_target", "300" };
+    char *a1[] = { "motor_arm" };
+    char *a2[] = { "motor_arm", "x" };
+    char *s1[] = { "motor_start" };
+    char *s2[] = { "motor_start", "x" };
+    rt_uint32_t t0;
+    int w0, en0, ev0;
+    rt_int32_t last0;
+
+    /* DIR: invalid forms must not write; 0/1 must write exactly one level. */
+    w0 = ps_sim_pin_write_calls(PIN_NAME_TMC_DIR);
+    last0 = ps_sim_last_write(PIN_NAME_TMC_DIR);
+    cmd_motor_dir(1, done);
+    cmd_motor_dir(3, dextra);
+    cmd_motor_dir(2, d10);
+    cmd_motor_dir(2, djunk);
+    cmd_motor_dir(2, dneg);
+    cmd_motor_dir(2, dplus);
+    cmd_motor_dir(2, dhex);
+    CHECK("PS18a-motor_dir_cli_strict",
+          ps_sim_pin_write_calls(PIN_NAME_TMC_DIR) == w0 &&
+          ps_sim_last_write(PIN_NAME_TMC_DIR) == last0,
+          fm("DIR writes %d->%d last=%d", w0,
+             ps_sim_pin_write_calls(PIN_NAME_TMC_DIR),
+             (int)ps_sim_last_write(PIN_NAME_TMC_DIR)));
+    cmd_motor_dir(2, d1);
+    if (ps_sim_pin_write_calls(PIN_NAME_TMC_DIR) != w0 + 1 ||
+        ps_sim_last_write(PIN_NAME_TMC_DIR) != PIN_HIGH)
+        g_pre_bad++;
+    cmd_motor_dir(2, d0);
+    CHECK("PS18a2-motor_dir_valid_writes",
+          ps_sim_pin_write_calls(PIN_NAME_TMC_DIR) == w0 + 2 &&
+          ps_sim_last_write(PIN_NAME_TMC_DIR) == PIN_LOW,
+          fm("DIR valid writes %d level=%d", ps_sim_pin_write_calls(PIN_NAME_TMC_DIR),
+             (int)ps_sim_last_write(PIN_NAME_TMC_DIR)));
+
+    /* TARGET: invalid forms leave the target unchanged. */
+    cmd_motor_target(2, tzero);
+    t0 = snap_tgt_hz();
+    cmd_motor_target(1, done);
+    cmd_motor_target(3, dextra);
+    cmd_motor_target(2, tneg);
+    cmd_motor_target(2, tjunk);
+    cmd_motor_target(2, tover);
+    cmd_motor_target(2, tmax1);
+    CHECK("PS18b-motor_target_cli_strict",
+          snap_tgt_hz() == t0,
+          fm("target %u->%u (must stay)", (unsigned)t0, (unsigned)snap_tgt_hz()));
+    cmd_motor_target(2, tmax);
+    if (snap_tgt_hz() != MOTOR_MAX_HZ) g_pre_bad++;
+    cmd_motor_target(2, tzero);
+    CHECK("PS18b2-motor_target_valid_bounds",
+          snap_tgt_hz() == 0,
+          fm("target max accepted then 0; now=%u", (unsigned)snap_tgt_hz()));
+
+    /* ARM/START: extra arguments must not write HIGH, arm, start or post. */
+    en0 = ps_enable_write_calls(1);
+    ev0 = ps_event_sends();
+    cmd_motor_arm(2, a2);
+    cmd_motor_start(2, s2);
+    CHECK("PS18c-arm_start_extra_args_zero_action",
+          ps_enable_write_calls(1) == en0 && ps_event_sends() == ev0 &&
+          snap_armed() == 0 && snap_state() == MOTOR_IDLE,
+          fm("HIGH写 %d->%d event +%d armed=%d state=%d",
+             en0, ps_enable_write_calls(1), ps_event_sends() - ev0,
+             snap_armed(), snap_state()));
+
+#ifdef PS_GATE_HOST_OVERRIDE
+    /* Positive control: arm first (target must be 0), then target/start. */
+    cmd_motor_arm(1, a1);
+    if (snap_armed() != 1) g_pre_bad++;
+    cmd_motor_target(2, t300);
+    cmd_motor_start(1, s1);
+    CHECK("PS18d-arm_start_valid_reaches_api",
+          snap_armed() == 1 && (snap_state() == MOTOR_ACCEL || snap_state() == MOTOR_CRUISE) &&
+          snap_tgt_hz() == 300,
+          fm("armed=%d state=%d tgt=%u", snap_armed(), snap_state(),
+             (unsigned)snap_tgt_hz()));
+    cmd_motor_stop();
+    {
+        int i;
+        for (i = 0; i < 4000 && snap_state() != MOTOR_IDLE; ++i) motor_ramp_tick();
+    }
+    cmd_motor_disarm();
+    CHECK("PS18e-valid_cli_cleanup",
+          snap_armed() == 0 && snap_state() == MOTOR_IDLE && snap_cur_hz() == 0,
+          fm("after stop/disarm armed=%d state=%d cur=%u", snap_armed(),
+             snap_state(), (unsigned)snap_cur_hz()));
+#else
+    /* Target build: no gate override, valid arm is refused by the macro gate. */
+    cmd_motor_arm(1, a1);
+    CHECK("PS18d-target_gate_refuses_valid_arm",
+          snap_armed() == 0 && ps_enable_write_calls(1) == en0,
+          fm("armed=%d HIGH写=%d", snap_armed(), ps_enable_write_calls(1)));
+    CHECK("PS18e-valid_cli_cleanup", snap_state() == MOTOR_IDLE, "idle");
+#endif
+
+    /* C3: key machine-field lines stay short and complete (max target). */
+    cmd_motor_target(2, tmax);
+    ps_cap_clear();
+    cmd_motor_status();
+    step_status();
+    safety_state();
+    CHECK("PS18f-key_status_lines_no_truncation",
+          !cap_has_nul_bytes() &&
+          cap_line_max("[MOT] cur_hz=") > 0 && cap_line_max("[MOT] cur_hz=") <= 110 &&
+          cap_line_max("[MOT] armed=") > 0 && cap_line_max("[MOT] armed=") <= 110 &&
+          cap_line_max("[STEP] dev=") > 0 && cap_line_max("[STEP] dev=") <= 110 &&
+          cap_line_max("[SS] state=") > 0 && cap_line_max("[SS] state=") <= 110,
+          fm("max lens mot=%d armed=%d step=%d ss=%d nul=%d",
+             cap_line_max("[MOT] cur_hz="), cap_line_max("[MOT] armed="),
+             cap_line_max("[STEP] dev="), cap_line_max("[SS] state="),
+             cap_has_nul_bytes()));
+    cmd_motor_target(2, tzero);
+
+    /* Longest safety enum line. */
+    safety_force_shutdown(FAULT_SELF_TEST);
+    ps_cap_clear();
+    safety_state();
+    CHECK("PS18g-safety_longest_enum_line",
+          cap_line_max("[SS] state=FAULT_LATCHED") > 0 &&
+          cap_line_max("[SS] state=FAULT_LATCHED") <= 110 && !cap_has_nul_bytes(),
+          fm("len=%d nul=%d", cap_line_max("[SS] state=FAULT_LATCHED"),
+             cap_has_nul_bytes()));
+}
+
+/* ===================================================================== */
+#ifdef PS_CLI_ONLY
+int main(void)
+{
+    ps_sim_reset();
+    wire_pins();
+    if (safety_state_boot() != RT_EOK) { printf("FATAL|boot\n"); return 2; }
+    if (safety_transition(SAFETY_READY) != RT_EOK) { printf("FATAL|ready\n"); return 2; }
+    if (motor_init() != RT_EOK) { printf("FATAL|motor_init\n"); return 2; }
+    cases_cli();
+    printf("SUMMARY|cases=%d pass=%d fail=%d pre_bad=%d\n",
+           g_run, g_pass, g_fail, g_pre_bad);
+    return (g_fail || g_pre_bad) ? 1 : 0;
+}
+#else
 int main(void)
 {
     ps_sim_reset();
@@ -2055,3 +2283,4 @@ int main(void)
     if (g_pre_bad) printf("RESULT|RECOVERY-NOT-ESTABLISHED (前置按业务失败计)\n");
     return (g_fail || g_pre_bad) ? 1 : 0;
 }
+#endif /* PS_CLI_ONLY */

@@ -1,0 +1,11 @@
+M6 work B - M5 19 final responses byte recovery
+baseline document_base: a052e8e3dc11a4a983fcaecf5fd36ba9e4139af4
+source index: reports/reviews/phase8-motor-m5-fault-log/cp1/final_pass/index.json
+
+- all 19 original local files still present; each length/SHA equals index -> ORIGINAL_LOCAL_FILE
+- baseline Git blobs: 3/19 exact; 16/19 LF-normalized but deterministic LF->CRLF restores index length/SHA
+- each .bin.b64 was decoded back: 19/19 length/SHA equal to index
+- 3 flash_dump originals (009..011) decoded from b64 preserve CR/LF/NUL; checker ACCEPT rows=300 batches=3
+- rebuilt CSV length 17314, SHA-256 c26cb752d79051f5914350424af9a28adc4a8ceb22e3bd18c2af77c9abb7567a
+- repo new_log_final3.csv length 17314, same SHA-256; BYTE_EQUAL=True
+- no original/index/history was modified; no device access

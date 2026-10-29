@@ -1,0 +1,21 @@
+drv_epwm.h=D:/ns800/rt-thread-master/rt-thread-master/bsp/novosns/ns800/libraries/HAL_Drivers/drivers/drv_epwm.h (真实公开头) compat=/tmp/ns800-host-chain/s1/20261029T030748Z-270/compat/{rtdef.h,rthw.h}
+###### 关断结果可信链 S1 (基线 a052e8e3dc11a4a983fcaecf5fd36ba9e4139af4) ######
+run_id=20261029T030748Z-270
+SRC_APP=D:/ns800/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications
+OUT_DIR=/tmp/ns800-host-chain/s1/20261029T030748Z-270
+compiler=gcc.exe (tdm64-1) 4.9.2
+negative control: PS99-unregistered rejected by validate_ledger (rc=2, unreg=1, miss=0)
+
+=== 变体 target ===
+  target 真实进程 rc=0 输出 26407 字节
+  台账: 必需=58 唯一出现=58 实际行数=58 SUMMARY(cases=58 pass=58 fail=0) 自洽=1
+
+=== 变体 host_ovr ===
+  host_ovr 真实进程 rc=0 输出 41642 字节
+  台账: 必需=73 唯一出现=73 实际行数=73 SUMMARY(cases=73 pass=73 fail=0) 自洽=1
+
+=== S1 关断结果矩阵 ===
+target | OK 必需用例=58 全部PASS 实际行数=58 自报 fail=0 proc_rc=0
+host_ovr | OK 必需用例=73 全部PASS 实际行数=73 自报 fail=0 proc_rc=0
+
+S1 RUNNER RESULT: PASS (rc=0) —— target 与 host_ovr 两个变体的必需用例全部真执行且判 PASS

@@ -41,7 +41,10 @@ IO3a-disabled_ok IO3b-unexpected_enable_refused IO3c-no_sample_refused \
 IO3e-pure_truth_table IO6a-transition_bounded_not_success \
 IO10a-feedback_readonly_no_bus IO10b-no_real_device_io_total \
 IO8d-ready_ok_before_pin_dead IO8e-dead_feedback_pin_refuses_ready \
-IO8f-arm_refused_with_dead_feedback"
+IO8f-arm_refused_with_dead_feedback \
+IO11a-tmc_init_fail_not_ready IO11b-tmc_read_fail_not_ready \
+IO11c-tmc_version_0x20_not_ready IO11d-tmc_version_0x00_not_ready \
+IO11e-tmc_version_0xff_not_ready IO11f-tmc_version_0x21_ready_control"
 LIMIT_OFF_CASES="IO1OFF-limits_not_resolved IO1OFF-limits_never_touched \
 IO1OFF-unwired_limits_do_not_block_ready IO1OFF-diag_still_real_producer \
 IO1OFF-fault_clear_not_blocked_by_limits"

@@ -1001,14 +1001,15 @@ void safety_trip_cmd(int argc, char **argv)
 {
     rt_err_t e;
 
+    /* ISR / PRIMASK window / no thread object: refuse silently before any
+     * argument parsing or output (no event, no print, no business-state write). */
+    if (!ss_log_ctx_ok()) return;
+
     if (argc != 2 || rt_strcmp(argv[1], "CONFIRM") != 0)
     {
         rt_kprintf("usage: safety_trip CONFIRM\n");
         return;
     }
-    /* ISR / PRIMASK window / no thread object: refuse silently (no event,
-     * no print, no business-state write). */
-    if (!ss_log_ctx_ok()) return;
 
     e = safety_post_event(EVT_SOFT_FAULT);
     rt_kprintf("[SS] safety_trip: EVT_SOFT_FAULT posted rc=%d"
