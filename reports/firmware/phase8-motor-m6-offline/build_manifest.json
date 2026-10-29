@@ -72,7 +72,14 @@
     "command": "UV4.exe -r project.uvprojx -t <target> -j0 -o <log>",
     "rebuild_all": true,
     "result": "three targets 0 Error / 0 Warning",
-    "macro_probe": "armclang 6.24; candidate MOTOR=1 TMC=1 STEP=0 LIMIT=0; default/A0 0/0/0/0"
+    "macro_probe": "armclang 6.24; candidate MOTOR=1 TMC=1 STEP=0 LIMIT=0; default/A0 0/0/0/0",
+    "target_names": [
+      "rt-thread",
+      "rt-thread-measure-a0",
+      "rt-thread-motor-m1-candidate"
+    ]
   },
-  "status": "NEW_IMAGES_BUILT_NOT_FLASHED"
+  "status": "NEW_IMAGES_BUILT_NOT_FLASHED",
+  "project": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/project.uvprojx",
+  "source_commit_note": "images were built on code_commit cf133d6; commits after it change host tests, the offline field candidate and documentation only, not product sources"
 }
