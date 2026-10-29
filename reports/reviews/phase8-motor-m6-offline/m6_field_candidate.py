@@ -43,6 +43,10 @@ class TransportError(Abort):
     """A serial write/read failure; the original OSError stays chained."""
 
 
+class EvidenceError(Abort):
+    """Raw-response persistence failed; business logic must stop now."""
+
+
 def _text(raw):
     return raw.replace(b"\x00", b"<NUL>").decode("utf-8", "replace")
 
@@ -219,13 +223,15 @@ class Session:
         self.trip_response_traceback = None
         self.evidence_error = None
 
-    def q(self, cmd, deadline, quiet=0.15):
+    def q(self, cmd, deadline, quiet=0.15, evidence_required=True):
         remain = deadline - self.clock()
         if remain <= 0:
             raise Timeout("deadline before %s" % cmd)
         raw, t0, t1 = self.link.send(cmd, remain, quiet)
         self.raw.append((cmd, raw, t0, t1))
         self._save_raw(cmd, raw, t0, t1)
+        if evidence_required and self.evidence_error is not None:
+            raise EvidenceError(self.evidence_error)
         return _text(raw)
 
     def _save_raw(self, cmd, raw, t0, t1):
@@ -243,9 +249,9 @@ class Session:
                      "bytes": len(raw), "t_tx": t0, "t_rx": t1}) + "\n")
                 self.raw_index.flush()
         except (OSError, ValueError) as exc:
-            # Evidence failure is recorded, never allowed to hide the primary
-            # command/safety result.
-            self.evidence_error = _safe_exc(exc)
+            # Keep the first evidence error; never hide the primary result.
+            if self.evidence_error is None:
+                self.evidence_error = _safe_exc(exc)
 
     def write_failure(self):
         if not self.out_dir:
@@ -268,7 +274,8 @@ class Session:
                 json.dump(doc, fh, ensure_ascii=False, indent=2)
                 fh.write("\n")
         except (OSError, ValueError) as exc:
-            self.evidence_error = _safe_exc(exc)
+            if self.evidence_error is None:
+                self.evidence_error = _safe_exc(exc)
 
     def wait_until(self, t):
         while self.clock() < t:
@@ -280,9 +287,11 @@ class Session:
         self.disarm_attempts += 1
         self.disarm_time = self.clock()
         try:
-            self.q("motor_disarm", deadline, 0.2)
+            # Cleanup must proceed even after the evidence gate has failed;
+            # the overall run still reports FAIL because evidence_error stays set.
+            self.q("motor_disarm", deadline, 0.2, evidence_required=False)
             # Confirmation is a contract field, not a guessed sentence.
-            st = self.q("safety_status", deadline)
+            st = self.q("safety_status", deadline, evidence_required=False)
             if re.search(r"request=DISABLE\(LOW\)", st) and \
                re.search(r"pad=0\b", st):
                 self.disarm_confirmed = True
@@ -371,19 +380,16 @@ class Session:
             self.wait_until(min(t_start + 1.0, deadline))
             self._confirm_running(deadline)
             self.wait_until(min(t_start + 3.0, deadline))
-            try:
-                # Bound the trip read so fallback disarm keeps its budget.
-                self.q("safety_trip CONFIRM", min(deadline, t_start + 4.0))
-            except Abort as exc:
-                self.trip_response_error = "%s: %s" % (type(exc).__name__, exc)
-                self.trip_response_exc = exc
-                self.trip_response_traceback = traceback.format_exc()
+            # Bound the trip read so fallback disarm keeps its budget.
+            # EvidenceError/TransportError propagate to cleanup; only a
+            # deadline Timeout below may be disambiguated by safety_state.
+            self.q("safety_trip CONFIRM", min(deadline, t_start + 4.0))
             latched = False
             while self.clock() < min(t_start + 4.8, deadline):
                 try:
                     ss = self.q("safety_state", min(deadline,
                                                     t_start + 4.8))
-                except Abort as exc:
+                except Timeout as exc:
                     self.trip_response_error = ("%s: %s"
                                                 % (type(exc).__name__, exc))
                     self.trip_response_exc = exc
@@ -395,6 +401,9 @@ class Session:
                 self.sleep(0.1)
             # Fallback cleanup is independent of the trip response text.
             self.disarm_once(min(t_start + 5.0, deadline))
+            if self.evidence_error is not None:
+                raise EvidenceError("evidence error during cleanup: %s"
+                                    % self.evidence_error)
             if not latched:
                 extra = ("; trip transport: %s" % self.trip_response_error
                          if self.trip_response_error else "")
@@ -407,6 +416,9 @@ class Session:
                             % (used, EXPECTED_FRAMES))
             if not self.disarm_confirmed:
                 raise Abort("output disabled not confirmed")
+            if self.evidence_error is not None:
+                raise EvidenceError("evidence error before recovery: %s"
+                                    % self.evidence_error)
             if allow_recovery:
                 st = self.q("safety_status", min(deadline, self.clock() + 2.0))
                 if "request=DISABLE(LOW)" not in st or "pad=0" not in st:
@@ -422,8 +434,8 @@ class Session:
                 if "state=READY" not in ss or "fault_code=0" not in ss:
                     raise Abort("selftest did not restore READY")
                 recovered = True
-            if self.evidence_error is not None and self.primary_error is None:
-                raise Abort("evidence error: %s" % self.evidence_error)
+            if self.evidence_error is not None:
+                raise EvidenceError("evidence error: %s" % self.evidence_error)
             return {"latched": True, "disarm": self.disarm_confirmed,
                     "frames": used, "recovered": recovered,
                     "cleanup_unknown": self.cleanup_unknown,
@@ -542,6 +554,7 @@ class FDevice:
         self.started = False
         self.motion_started = False
         self.started_ok = True
+        self.after_write = None
         self.arm_sent = False
         self.session_id = 0
         self.used = 0
@@ -696,6 +709,8 @@ class FakeSerial:
             raise OSError("WRITE_TIMEOUT:%s" % cmd)
         self.dev.on_command(cmd)
         self.applied.append(cmd)
+        if self.dev.after_write is not None:
+            self.dev.after_write(cmd)
         if self.dev.motion_started and cmd in self.dev.read_block_cmd_after_start:
             self.block_left = self.dev.read_block_cmd_after_start[cmd]
         lost = cmd in self.dev.response_lost
@@ -1069,14 +1084,16 @@ def selftest():
         return "applied_disarm=1 confirmed=True"
 
     def c18():
-        # D-2: evidence write failure must not replace the primary error.
+        # D-2: primary start write error + evidence failure during cleanup.
+        # The primary must survive; cleanup must still be sent and confirmed.
         import tempfile
         fd, path = tempfile.mkstemp(prefix="m6_evidence_")
         os.close(fd)
         try:
             dev, ser, link, s, clk = build(verify_log=_verify_ok)
-            s.out_dir = path  # not a directory: every raw save fails
             dev.write_block["motor_start"] = 0.5
+            dev.after_write = (lambda cmd: setattr(s, "out_dir", path)
+                               if cmd == "motor_disarm" else None)
             try:
                 s.run_fault()
             except Exception:
@@ -1085,8 +1102,12 @@ def selftest():
                 raise AssertionError("evidence failure not recorded")
             if s.primary_error is None or "WRITE_TIMEOUT" not in s.primary_error:
                 raise AssertionError("primary lost after evidence failure")
-            return ("evidence=%s primary=%s"
-                    % (s.evidence_error, s.primary_error))
+            if sent(ser, "motor_disarm") != 1 or not s.disarm_confirmed:
+                raise AssertionError("cleanup not sent/confirmed after evidence failure")
+            if sent(ser, "fault_reset") or sent(ser, "system_selftest"):
+                raise AssertionError("recovery after evidence failure")
+            return ("primary=%s evidence=%s cleanup_confirmed=%s"
+                    % (s.primary_error, s.evidence_error, s.disarm_confirmed))
         finally:
             os.unlink(path)
 
@@ -1188,7 +1209,8 @@ def selftest():
         return "preflight_write_error no_motor=1"
 
     def c24():
-        # D-2: evidence failure alone must fail the run, not claim success.
+        # D-2: evidence failure alone must fail immediately, without any motor
+        # command (the first static query cannot be saved).
         import tempfile
         fd, path = tempfile.mkstemp(prefix="m6_evidence_only_")
         os.close(fd)
@@ -1197,16 +1219,203 @@ def selftest():
             s.out_dir = path
             try:
                 s.run_fault()
-            except Abort as exc:
-                if "evidence error" not in str(exc):
-                    raise AssertionError("wrong evidence failure: %s" % exc)
+            except EvidenceError:
+                pass
             else:
                 raise AssertionError("evidence failure returned success")
-            if sent(ser, "motor_disarm") != 1 or not s.disarm_confirmed:
-                raise AssertionError("evidence failure disturbed cleanup")
-            if s.primary_error is None or "evidence error" not in s.primary_error:
+            for cmd in ("motor_dir 0", "motor_arm", "motor_target 300",
+                        "motor_start", "motor_disarm", "fault_reset",
+                        "system_selftest"):
+                if sent(ser, cmd):
+                    raise AssertionError("motor/recovery command after early "
+                                         "evidence failure: %s" % cmd)
+            if s.disarm_attempts != 0 or s.output_may_be_on:
+                raise AssertionError("unrelated cleanup after pre-arm evidence failure")
+            if s.primary_error is None or "EvidenceError" not in s.primary_error:
                 raise AssertionError("evidence error not primary")
-            return "evidence_only_failed cleanup_confirmed=1"
+            return "early_evidence_fail no_motor=1 no_disarm=1"
+        finally:
+            os.unlink(path)
+
+    def _bad_path():
+        import tempfile
+        fd, path = tempfile.mkstemp(prefix="m6_evidence_seam_")
+        os.close(fd)
+        return path
+
+    def c25():
+        # Seam 1: first static query save failure -> no arm/target/start,
+        # no fault_reset/system_selftest, and no unrelated disarm.
+        import shutil
+        import tempfile
+        path = _bad_path()
+        valid = tempfile.mkdtemp(prefix="m6_evidence_valid_")
+        try:
+            dev, ser, link, s, clk = build(out_dir=valid)
+            s.out_dir = path  # exactly the cloud repro: valid dir, then a file
+            try:
+                s.run_fault()
+            except EvidenceError:
+                pass
+            else:
+                raise AssertionError("static evidence failure returned")
+            if sent(ser, "safety_state") != 1:
+                raise AssertionError("first static query not sent")
+            for cmd in ("motor_dir 0", "motor_arm", "motor_target 300",
+                        "motor_start", "motor_disarm", "fault_reset",
+                        "system_selftest"):
+                if sent(ser, cmd):
+                    raise AssertionError("command after static evidence failure: %s" % cmd)
+            if s.disarm_attempts != 0:
+                raise AssertionError("unrelated disarm after static evidence failure")
+            return "static_save_fail no_motor=1 no_disarm=1"
+        finally:
+            os.unlink(path)
+            shutil.rmtree(valid, ignore_errors=True)
+
+    def c26():
+        # Seam 2: arm reached, its response cannot be saved -> no target/start;
+        # one necessary disarm; no recovery.
+        path = _bad_path()
+        try:
+            dev, ser, link, s, clk = build(verify_log=_verify_ok)
+            dev.after_write = (lambda cmd: setattr(s, "out_dir", path)
+                               if cmd == "motor_arm" else None)
+            try:
+                s.run_fault()
+            except EvidenceError:
+                pass
+            else:
+                raise AssertionError("arm evidence failure returned")
+            if "motor_arm" not in ser.applied:
+                raise AssertionError("arm did not reach the device")
+            if sent(ser, "motor_target 300") or sent(ser, "motor_start"):
+                raise AssertionError("target/start after arm evidence failure")
+            if sent(ser, "motor_disarm") != 1 or not s.disarm_confirmed:
+                raise AssertionError("necessary disarm missing/unconfirmed")
+            if sent(ser, "fault_reset") or sent(ser, "system_selftest"):
+                raise AssertionError("recovery after arm evidence failure")
+            if "EvidenceError" not in (s.primary_error or ""):
+                raise AssertionError("primary evidence error lost")
+            return ("arm_save_fail applied_arm=1 disarm=1 confirmed=%s"
+                    % s.disarm_confirmed)
+        finally:
+            os.unlink(path)
+
+    def c27():
+        # Seam 3: start reached, its response cannot be saved -> immediate
+        # cleanup, no trip/recovery; one necessary disarm.
+        path = _bad_path()
+        try:
+            dev, ser, link, s, clk = build(verify_log=_verify_ok)
+            dev.after_write = (lambda cmd: setattr(s, "out_dir", path)
+                               if cmd == "motor_start" else None)
+            try:
+                s.run_fault()
+            except EvidenceError:
+                pass
+            else:
+                raise AssertionError("start evidence failure returned")
+            if "motor_start" not in ser.applied:
+                raise AssertionError("start did not reach the device")
+            if sent(ser, "safety_trip CONFIRM"):
+                raise AssertionError("trip after start evidence failure")
+            if sent(ser, "motor_disarm") != 1 or not s.disarm_confirmed:
+                raise AssertionError("necessary disarm missing/unconfirmed")
+            if sent(ser, "fault_reset") or sent(ser, "system_selftest"):
+                raise AssertionError("recovery after start evidence failure")
+            if "EvidenceError" not in (s.primary_error or ""):
+                raise AssertionError("primary evidence error lost")
+            return ("start_save_fail applied_start=1 disarm=1 confirmed=%s"
+                    % s.disarm_confirmed)
+        finally:
+            os.unlink(path)
+
+    def c28():
+        # Seam 4: disarm/confirmation save failure with --allow-recovery:
+        # overall FAIL, no fault_reset/selftest; confirmed or UNKNOWN.
+        details = []
+        for lose_status in (False, True):
+            path = _bad_path()
+            try:
+                dev, ser, link, s, clk = build(verify_log=_verify_ok)
+                if lose_status:
+                    dev.response_lost_after_arm.add("safety_status")
+                dev.after_write = (lambda cmd, _s=s, _p=path:
+                                   setattr(_s, "out_dir", _p)
+                                   if cmd == "motor_disarm" else None)
+                try:
+                    s.run_fault(allow_recovery=True)
+                except EvidenceError:
+                    pass
+                else:
+                    raise AssertionError("disarm evidence failure returned")
+                if "motor_disarm" not in ser.applied:
+                    raise AssertionError("disarm did not reach the device")
+                if sent(ser, "motor_disarm") != 1:
+                    raise AssertionError("disarm repeated after evidence failure")
+                if sent(ser, "fault_reset") or sent(ser, "system_selftest"):
+                    raise AssertionError("recovery after disarm evidence failure")
+                if "EvidenceError" not in (s.primary_error or ""):
+                    raise AssertionError("primary evidence error lost")
+                if lose_status:
+                    if not s.cleanup_unknown or s.disarm_confirmed:
+                        raise AssertionError("lost confirmation not UNKNOWN")
+                    details.append("disarm_save_fail confirmed=False UNKNOWN=1")
+                else:
+                    if not s.disarm_confirmed or s.cleanup_unknown:
+                        raise AssertionError("confirmed disarm marked UNKNOWN")
+                    details.append("disarm_save_fail confirmed=True FAIL=1")
+            finally:
+                os.unlink(path)
+        return "; ".join(details)
+
+    def c29():
+        # Seam 4b: evidence failure during new-log verification must stop
+        # before fault_reset/system_selftest even with --allow-recovery.
+        path = _bad_path()
+        try:
+            dev, ser, link, s, clk = build()
+            dev.after_write = (lambda cmd: setattr(s, "out_dir", path)
+                               if cmd == "flash_logstat"
+                               and dev.motion_started else None)
+            try:
+                s.run_fault(allow_recovery=True)
+            except EvidenceError:
+                pass
+            else:
+                raise AssertionError("log evidence failure returned")
+            if sent(ser, "fault_reset") or sent(ser, "system_selftest"):
+                raise AssertionError("recovery after log evidence failure")
+            if sent(ser, "motor_disarm") != 1 or not s.disarm_confirmed:
+                raise AssertionError("disarm not confirmed before log evidence failure")
+            if "EvidenceError" not in (s.primary_error or ""):
+                raise AssertionError("primary evidence error lost")
+            return "log_save_fail no_recovery=1 disarm_confirmed=1"
+        finally:
+            os.unlink(path)
+
+    def c30():
+        # Seam 4c: evidence failure on the trip response must not be swallowed
+        # by the trip except branch; cleanup, no recovery.
+        path = _bad_path()
+        try:
+            dev, ser, link, s, clk = build()
+            dev.after_write = (lambda cmd: setattr(s, "out_dir", path)
+                               if cmd == "safety_trip CONFIRM" else None)
+            try:
+                s.run_fault(allow_recovery=True)
+            except EvidenceError:
+                pass
+            else:
+                raise AssertionError("trip evidence failure was swallowed")
+            if sent(ser, "fault_reset") or sent(ser, "system_selftest"):
+                raise AssertionError("recovery after trip evidence failure")
+            if sent(ser, "motor_disarm") != 1 or not s.disarm_confirmed:
+                raise AssertionError("cleanup missing after trip evidence failure")
+            if "EvidenceError" not in (s.primary_error or ""):
+                raise AssertionError("primary evidence error lost")
+            return "trip_save_fail not_swallowed=1 disarm_confirmed=1"
         finally:
             os.unlink(path)
 
@@ -1235,6 +1444,36 @@ def selftest():
     case("M6D22-arm_reply_lost_status_unavailable", c22)
     case("M6D23-static_preflight_error_no_motor", c23)
     case("M6D24-evidence_failure_alone_fails", c24)
+    case("M6D25-first_static_evidence_failure_no_motor", c25)
+    case("M6D26-arm_evidence_failure_no_start", c26)
+    case("M6D27-start_evidence_failure_cleanup", c27)
+    case("M6D28-disarm_evidence_failure_no_recovery", c28)
+    case("M6D29-log_evidence_failure_no_recovery", c29)
+    def c31():
+        # Evidence failure on fault_reset must stop before system_selftest.
+        path = _bad_path()
+        try:
+            dev, ser, link, s, clk = build()
+            dev.after_write = (lambda cmd: setattr(s, "out_dir", path)
+                               if cmd == "fault_reset" else None)
+            try:
+                s.run_fault(allow_recovery=True)
+            except EvidenceError:
+                pass
+            else:
+                raise AssertionError("recovery evidence failure returned")
+            if "fault_reset" not in ser.applied:
+                raise AssertionError("fault_reset did not reach the device")
+            if sent(ser, "system_selftest"):
+                raise AssertionError("selftest sent after fault_reset evidence failure")
+            if "EvidenceError" not in (s.primary_error or ""):
+                raise AssertionError("primary evidence error lost")
+            return "fault_reset_save_fail no_selftest=1"
+        finally:
+            os.unlink(path)
+
+    case("M6D30-trip_evidence_failure_not_swallowed", c30)
+    case("M6D31-recovery_evidence_failure_no_selftest", c31)
     print("SUMMARY|cases=%d pass=%d fail=%d" % (passed + failed, passed, failed))
     return 0 if failed == 0 else 1
 

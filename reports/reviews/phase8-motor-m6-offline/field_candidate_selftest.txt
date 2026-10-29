@@ -22,11 +22,18 @@ CASE|M6D14-write_timeout_preserves_primary|PASS|start_write_block=1.0 disarm_dt=
 CASE|M6D15-start_read_block_within_cleanup|PASS|start_read_block=1.5 grace=0.5 disarm_dt=1.20 primary=Abort: start not confirmed running: {'state': 0, 'armed': 1, 'cur': 0, 'tgt': 0}
 CASE|M6D16-primary_and_cleanup_errors_separate|PASS|primary=TransportError: write/read failed: OSError: WRITE_TIMEOUT:motor_start cleanup=TransportError: write/read failed: OSError: WRITE_TIMEOUT:motor_disarm
 CASE|M6D17-write_reached_reply_lost|PASS|applied_disarm=1 confirmed=True
-CASE|M6D18-evidence_failure_keeps_primary|PASS|evidence=FileNotFoundError: No such file or directory primary=TransportError: write/read failed: OSError: WRITE_TIMEOUT:motor_start
+CASE|M6D18-evidence_failure_keeps_primary|PASS|primary=TransportError: write/read failed: OSError: WRITE_TIMEOUT:motor_start evidence=FileNotFoundError: No such file or directory cleanup_confirmed=True
 CASE|M6D19-arm_refusal_text_no_start|PASS|modes=refused_text,not_armed no_start=1
 CASE|M6D20-arm_status_missing_duplicate_conflict|PASS|modes=armed_zero,missing,duplicate,conflict no_start=1
 CASE|M6D21-arm_reply_lost_status_confirmed|PASS|applied_arm=1 start=1 disarm=1
 CASE|M6D22-arm_reply_lost_status_unavailable|PASS|arm_lost_status_unavailable no_start=1
 CASE|M6D23-static_preflight_error_no_motor|PASS|preflight_write_error no_motor=1
-CASE|M6D24-evidence_failure_alone_fails|PASS|evidence_only_failed cleanup_confirmed=1
-SUMMARY|cases=25 pass=25 fail=0
+CASE|M6D24-evidence_failure_alone_fails|PASS|early_evidence_fail no_motor=1 no_disarm=1
+CASE|M6D25-first_static_evidence_failure_no_motor|PASS|static_save_fail no_motor=1 no_disarm=1
+CASE|M6D26-arm_evidence_failure_no_start|PASS|arm_save_fail applied_arm=1 disarm=1 confirmed=True
+CASE|M6D27-start_evidence_failure_cleanup|PASS|start_save_fail applied_start=1 disarm=1 confirmed=True
+CASE|M6D28-disarm_evidence_failure_no_recovery|PASS|disarm_save_fail confirmed=True FAIL=1; disarm_save_fail confirmed=False UNKNOWN=1
+CASE|M6D29-log_evidence_failure_no_recovery|PASS|log_save_fail no_recovery=1 disarm_confirmed=1
+CASE|M6D30-trip_evidence_failure_not_swallowed|PASS|trip_save_fail not_swallowed=1 disarm_confirmed=1
+CASE|M6D31-recovery_evidence_failure_no_selftest|PASS|fault_reset_save_fail no_selftest=1
+SUMMARY|cases=32 pass=32 fail=0
