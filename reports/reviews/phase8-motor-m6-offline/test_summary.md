@@ -14,6 +14,11 @@ Final-source runs (product source unchanged since `cf133d6`):
 | M5 raw recovery | 19/19 b64 decode length/SHA equal; 3 flash batches rebuild CSV byte-equal (SHA c26cb75…) |
 
 Notes:
+- Candidate identity: Git blob SHA-256 `30623f0291e734c636551e5d36c208aa0d37f5f8c31fa2eea08ecf2d7d7e4890`
+  (LF, remote readback); the worktree CRLF copy is
+  `b1c5390b2a1f8887393b236e8d5c28888be5060ca8f5f8addc10ffb9a3ff772f`. Both byte sets
+  ran the full selftest 25/25 (`field_candidate_selftest.txt` and
+  `field_candidate_selftest_git_blob.txt`); the difference is line endings only.
 - S2 not rerun: no stop_priority/HAL/persistence change; safety_trip command ordering covered by S1.
 - V1/V2 not rerun: safety_state.c is stubbed there; no tmc2209/motor semantic change.
 - The independent review (2026-10-29) rejected the old candidate for three reasons; the
