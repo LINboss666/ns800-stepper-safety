@@ -154,3 +154,12 @@ UV4 5.43.1.0 / ARMCLANG V6.24，三目标均 Rebuild All 0 Error / 0 Warning。
   板仍 FAULT_LATCHED。新日志与恢复仍 NOT_REACHED。
 - 需一次无起转收尾会话：导出 0..299 并判读；通过后可选一次 disarm、一次 fault_reset、
   一次 system_selftest；不清区/不重烧/不再触发。
+
+
+## 11. CP1g 收尾重试（2026-10-29）
+
+- 只读再次确认 FAULT_LATCHED code9、LOW/ENN、STEP off、BB session1 written300、
+  `[BB] write drops=0`；flash used=valid=300 bad0、accepted=completed=300 failed0、
+  queue_dropped=51（重试计数）。
+- 脚本把 flash_logstat 的 `queued=`（实际是 accepted）误当待处理队列，要求 0 而中止；
+  未读回/未恢复。已改为 `accepted==completed` 且只看批准判据。

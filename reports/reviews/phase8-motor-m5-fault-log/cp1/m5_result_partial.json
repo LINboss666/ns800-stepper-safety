@@ -61,9 +61,10 @@
     "output": "request LOW pad0 ENN FB=1 verdict OK",
     "step": "enabled=0",
     "blackbox": "state=0 session=1 written=300 last_err=0 health=OK bb_write_drops=0 pre_eff=200 post_eff=100",
-    "flash": "used=300 valid=300 bad=0 queued=0 completed=300 failed=0 queue_dropped=51",
+    "flash": "used=300 valid=300 bad=0 accepted=300 completed=300 failed=0 queue_dropped=51",
     "drop_note": "queue_dropped=51 counts submit retries, not abandoned frames; bb_write_drops=0 and written/used/valid=300",
-    "readback": "NOT_REACHED",
-    "recovery": "NOT_REACHED"
+    "readback": "NOT_REACHED (script misread accepted as pending queue)",
+    "recovery": "NOT_REACHED",
+    "queue_note": "flash_logstat queued= is accepted (source ns_log_stats.accepted); accepted==completed means drained"
   }
 }

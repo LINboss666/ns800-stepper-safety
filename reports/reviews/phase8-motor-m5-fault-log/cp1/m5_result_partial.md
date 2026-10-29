@@ -162,3 +162,16 @@ AXF 1668244 B / `8c5bc7bf1efa786013c767ae1e09415ad0d5d5db3e38069c8aeebabf7cebae4
 3. 完整读回通过后，必要时一次普通 `motor_disarm`；一次 `fault_reset`、一次
    `system_selftest`；恢复后不 arm/start；
 4. 不第二次清区、不重烧、不再触发故障、不升流/堵转/注入；失败不自动重跑。
+
+
+## 11. CP1g 收尾重试（日志完整，仍卡在读回前）
+
+- 只读（`finalize2_pre/`）：FAULT_LATCHED code9、LOW/ENN OK、STEP off；
+  BB `state=0 session=1 written=300 last_err=0 health=OK`、`[BB] write drops=0`；
+  flash `used=300 valid=300 bad=0`、`accepted=300 completed=300 failed=0`、
+  `queue_dropped=51`（重试计数）。
+- `flash_logstat` 的 `queued=` 字段实际是 **accepted**（源码 `ns_log_stats.accepted`），
+  脚本误把它当“待处理队列”并要求为 0，于是中止；`accepted==completed==300` 表明队列已排空。
+- 未执行 flash_dump 读回、未 fault_reset/system_selftest；板仍 FAULT_LATCHED。
+- 修正后的收尾脚本只按批准的判据：`used=valid=300`、`accepted==completed`、`failed=0`、
+  `[BB] write drops=0`；`queue_dropped=51` 原样披露，不当作丢帧。

@@ -1,0 +1,22 @@
+system_status
+=== SYSTEM STATUS ===
+[Boot]   bootstrap-complete=YES abort-stage=0
+[Safety] state=FAULT_LATCHED fault=9 irq_gate=OPEN polarity=CONFIRMED protect_ready=YES
+[Safety] gpio_ready=YES thread=OK drv_en_pad_low=YES
+[Safety] request=LOW pad=0 expected_ENN=HIGH ENN_fb=1(resolved) verdict=OK
+[Safety] limit_inputs=DISABLED_BY_CONFIG (HIGH=safe/LOW=trigger when ENABLED); e-stop=hardware-only, no MCU e-stop input
+[Motor] state=4 cur=0 tgt=0 armed=0 drv_en_verified=1 health=OK
+[Motor] arm gate fail mask=0x2 (arm REFUSED)
+[TMC]    runtime write gate mask=0x1A (0=运行态条件全通, 编译期门未翻转前仍然一位不写)
+[Sensor] thread=OK
+[TMC]    OK drive_cfg=CONFIGURED
+[IMU]    OK
+[ADC]    DEGRADED cal=THEORETICAL
+[Flash]  storage bring-up=OK (spi1)
+[Storage] OK (ns_params/log)
+[Config] OK valid=YES cal_source=1
+[Diag]   OK verdict=0 mode=MONITOR_ONLY
+[Blackbox] OK
+[UI]     led/buzzer output=SAFE-OFF (polarity hardware-pending)
+msh >
+msh >

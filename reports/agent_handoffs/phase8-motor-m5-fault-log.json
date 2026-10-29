@@ -105,7 +105,7 @@
       "motor": "armed=0 target=300 cur=0",
       "irq": "gate4 CLOSED"
     },
-    "p3_log": "written=300 used=valid=300 bb_write_drops=0 queue_dropped=51 (retries); readback pending"
+    "p3_log": "300/300/0, accepted=completed=300, bb_write_drops=0, queue_dropped=51 retries; readback pending"
   },
-  "next": "one no-motion COM5 session: export 0..299 and verify; optional disarm; fault_reset + system_selftest"
+  "next": "one no-motion COM5 session with corrected queue criterion: export 0..299; then fault_reset + system_selftest"
 }
