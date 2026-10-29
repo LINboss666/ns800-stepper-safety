@@ -1,5 +1,5 @@
 === target rc=0 ===
-  ledger 9/9 PASS; SUMMARY|cases=9 pass=9 fail=0 pre_bad=0
+  ledger 10/10 PASS; SUMMARY|cases=10 pass=10 fail=0 pre_bad=0
 === host_ovr rc=0 ===
-  ledger 9/9 PASS; SUMMARY|cases=9 pass=9 fail=0 pre_bad=0
+  ledger 10/10 PASS; SUMMARY|cases=10 pass=10 fail=0 pre_bad=0
 M6 CLI RESULT: PASS

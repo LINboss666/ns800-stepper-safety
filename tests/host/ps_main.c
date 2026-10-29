@@ -2198,6 +2198,27 @@ static void cases_cli(void)
              cap_has_nul_bytes()));
     cmd_motor_target(2, tzero);
 
+    /* C3: a negative rc in the stop-result machine line must survive intact.
+     * Inject one STEP-disable failure so the recorded stop_rc is -EIO, then
+     * read the line back from the real status command. */
+    ps_sim_pwm_set_rc(RT_EOK, RT_EOK, -RT_EIO);
+    cmd_motor_disarm();
+    ps_sim_pwm_set_rc(RT_EOK, RT_EOK, RT_EOK);
+    ps_cap_clear();
+    cmd_motor_status();
+    {
+        char expect_rc[32];
+        snprintf(expect_rc, sizeof(expect_rc), "rc=%d", (int)-RT_EIO);
+        CHECK("PS18h-negative_rc_status_line",
+              !cap_has_nul_bytes() &&
+              cap_line_max("[MOT] stop result=") > 0 &&
+              cap_line_max("[MOT] stop result=") <= 110 &&
+              ps_cap_has("stop result=api-failed") &&
+              ps_cap_has("src=disarm") && ps_cap_has(expect_rc),
+              fm("len=%d has_rc=%d cap=%s",
+                 cap_line_max("[MOT] stop result="), ps_cap_has(expect_rc), ps_cap));
+    }
+
     /* Longest safety enum line. */
     safety_force_shutdown(FAULT_SELF_TEST);
     ps_cap_clear();

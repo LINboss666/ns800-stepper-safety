@@ -17,7 +17,7 @@ printf '#ifndef H\n#define H\n#include <rtthread.h>\nrt_base_t rt_hw_interrupt_d
 GCC="$(env_detect_gcc || true)"
 [ -n "$GCC" ] || { echo "FATAL: no gcc"; exit 127; }
 FLAGS="-std=gnu11 -Wall -Wextra -Wno-unused-function"
-common="PS18a-motor_dir_cli_strict PS18a2-motor_dir_valid_writes PS18b-motor_target_cli_strict PS18b2-motor_target_valid_bounds PS18c-arm_start_extra_args_zero_action PS18f-key_status_lines_no_truncation PS18g-safety_longest_enum_line"
+common="PS18a-motor_dir_cli_strict PS18a2-motor_dir_valid_writes PS18b-motor_target_cli_strict PS18b2-motor_target_valid_bounds PS18c-arm_start_extra_args_zero_action PS18f-key_status_lines_no_truncation PS18h-negative_rc_status_line PS18g-safety_longest_enum_line"
 target_ids="$common PS18d-target_gate_refuses_valid_arm PS18e-valid_cli_cleanup"
 ovr_ids="$common PS18d-arm_start_valid_reaches_api PS18e-valid_cli_cleanup"
 rc_all=0

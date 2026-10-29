@@ -1,8 +1,8 @@
-drv_epwm.h=D:/ns800/rt-thread-master/rt-thread-master/bsp/novosns/ns800/libraries/HAL_Drivers/drivers/drv_epwm.h (真实公开头) compat=/tmp/ns800-host-chain/s1/20261029T030832Z-744/compat/{rtdef.h,rthw.h}
-###### 关断结果可信链 S1 (基线 a052e8e3dc11a4a983fcaecf5fd36ba9e4139af4) ######
-run_id=20261029T030832Z-744
+drv_epwm.h=D:/ns800/rt-thread-master/rt-thread-master/bsp/novosns/ns800/libraries/HAL_Drivers/drivers/drv_epwm.h (真实公开头) compat=/tmp/ns800-host-chain/s1/20261029T032420Z-1517/compat/{rtdef.h,rthw.h}
+###### 关断结果可信链 S1 (基线 cf133d6a5d539bb5a7c3b9da4d50d53dc3b47055) ######
+run_id=20261029T032420Z-1517
 SRC_APP=D:/ns800/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications
-OUT_DIR=/tmp/ns800-host-chain/s1/20261029T030832Z-744
+OUT_DIR=/tmp/ns800-host-chain/s1/20261029T032420Z-1517
 compiler=gcc.exe (tdm64-1) 4.9.2
 negative control: PS99-unregistered rejected by validate_ledger (rc=2, unreg=1, miss=0)
 
