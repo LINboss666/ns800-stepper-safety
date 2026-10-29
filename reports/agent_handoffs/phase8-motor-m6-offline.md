@@ -213,6 +213,11 @@ NOT_RERUN（说明）：S2 并发链（stop_priority/HAL/persistence 未改）�
 做身份回读/静止前置；只在已有故障场景内补 fault-state arm 拒绝；ADC/SG 标定另行
 设计，不与故障注入混在同一会话。
 
+万用表已确认 **UT39A+**（不再询问型号）；官方规格含 4 V 电压档 1 mV 分辨力、400 mA
+直流档 0.1 mA 分辨力。方法必须纳入量程、仪表误差、串联压降与实际采样支路；母线直流
+电流不等于相电流 RMS，IRUN/VREF 计算值不得标成 MEASURED；驱动禁能读数只作禁能基线，
+不能未经验证定义为“零电流”。
+
 ## 10. 证据与隐私
 
 - 原始/汇总证据：`reports/reviews/phase8-motor-m6-offline/`（`s1_normal.txt`、

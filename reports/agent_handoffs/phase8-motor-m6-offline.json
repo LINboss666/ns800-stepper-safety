@@ -594,5 +594,10 @@
       "remaining_before_this_fix": "evidence save failure only set a flag; fault_reset/system_selftest could still run",
       "fix": "immediate EvidenceError on business q; cleanup exemption; no recovery after evidence failure"
     }
+  },
+  "field_measurement_basis": {
+    "meter": "UT39A+ (confirmed; do not ask for the model again)",
+    "specs": "4 V range 1 mV resolution; 400 mA DC range 0.1 mA resolution",
+    "method_requirements": "include range, meter error, series burden voltage and the actual sampling branch; bus DC current is not phase-current RMS; IRUN/VREF computed values cannot be labeled MEASURED; a driver-disabled reading is only a disable baseline, not a verified zero current"
   }
 }
