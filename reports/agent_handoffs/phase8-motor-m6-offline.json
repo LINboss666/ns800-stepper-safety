@@ -5,9 +5,9 @@
   "document_base": "a052e8e3dc11a4a983fcaecf5fd36ba9e4139af4",
   "source_base": "a052e8e3dc11a4a983fcaecf5fd36ba9e4139af4",
   "code_commit": "cf133d6a5d539bb5a7c3b9da4d50d53dc3b47055",
-  "delivery_head": "9241828d555e1f376bc80ef35521af89f6001d71",
-  "delivery_head_note": "build-manifest/project-binding commit; test evidence is in 0d7f96c; image bytes are in parent 80fc7db; the handoff documentation commit follows and is reported in the STOP/readback, not self-recorded",
-  "status": "M6_OFFLINE_CLOSEOUT_COMPLETE / NEW_IMAGES_BUILT_NOT_FLASHED / FIELD_CANDIDATE_OFFLINE_VERIFIED_NOT_EXECUTED",
+  "delivery_head": "d8ee03c9bb547b26c9362b98c69e8a14f6ed53b7",
+  "delivery_head_note": "final field-candidate review-fix/evidence commit; image bytes are in 80fc7db, build manifest/project binding in 9241828; the handoff documentation commit follows and is reported in the STOP/readback, not self-recorded",
+  "status": "M6_OFFLINE_CLOSEOUT_COMPLETE / NEW_IMAGES_BUILT_NOT_FLASHED / FIELD_CANDIDATE_OFFLINE_FIXED_NOT_EXECUTED",
   "product_changed": {
     "applications/safety_state.c": "safety_trip_cmd checks ss_log_ctx_ok before ANY argument parsing or output; legal thread retains usage and one safety_post_event; no protection/recovery logic change",
     "other_product_sources": "none"
@@ -79,7 +79,7 @@
     },
     "field_candidate_selftest": {
       "result": "PASS",
-      "cases": "13/13",
+      "cases": "25/25",
       "rc": 0,
       "ids": [
         "M6D01",
@@ -94,12 +94,29 @@
         "M6D09",
         "M6D10",
         "M6D11",
-        "M6D12"
+        "M6D12",
+        "M6D13",
+        "M6D14",
+        "M6D15",
+        "M6D16",
+        "M6D17",
+        "M6D18",
+        "M6D19",
+        "M6D20",
+        "M6D21",
+        "M6D22",
+        "M6D23",
+        "M6D24"
       ],
       "evidence": [
         "reports/reviews/phase8-motor-m6-offline/field_candidate_selftest.txt"
       ],
-      "archive_gate": "real run requires accepted archive_state.json; missing second copy or COPY_VERIFIED.json rejected before pyserial"
+      "archive_gate": "real run requires accepted archive_state.json; missing second copy or COPY_VERIFIED.json rejected before pyserial",
+      "original_ids_retained": 13,
+      "new_ids": 12,
+      "status": "FIELD_CANDIDATE_OFFLINE_FIXED / NOT_BOARD_EXECUTED",
+      "first_failure": "reports/reviews/phase8-motor-m6-offline/field_candidate_selftest_first_failure.txt",
+      "sha256": "b1c5390b2a1f8887393b236e8d5c28888be5060ca8f5f8addc10ffb9a3ff772f"
     },
     "raw_recovery": {
       "result": "PASS",
@@ -128,6 +145,10 @@
     {
       "chain": "A0 export gate",
       "reason": "export/collection logic unchanged"
+    },
+    {
+      "chain": "script-only D-1/D-2/D-3 round",
+      "reason": "S1/I/O/CLI/S2 not rerun and Keil not rebuilt; no product source change in this round"
     }
   ],
   "builds_executed": {
@@ -186,14 +207,25 @@
       "reports/reviews/phase8-motor-m6-offline/build_motor.log"
     ],
     "project": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/project.uvprojx",
-    "source_commit_note": "images built on code_commit cf133d6; later commits are tests/candidate/docs only"
+    "source_commit_note": "images built on code_commit cf133d6; later commits are tests/candidate/docs only",
+    "build_logs_archived": [
+      "reports/reviews/phase8-motor-m6-offline/build_default.log",
+      "reports/reviews/phase8-motor-m6-offline/build_a0.log",
+      "reports/reviews/phase8-motor-m6-offline/build_motor.log"
+    ]
   },
   "artifacts": {
     "firmware_dir": "reports/firmware/phase8-motor-m6-offline/",
     "review_dir": "reports/reviews/phase8-motor-m6-offline/",
     "handoff_md": "reports/agent_handoffs/phase8-motor-m6-offline.md",
     "handoff_json": "reports/agent_handoffs/phase8-motor-m6-offline.json",
-    "field_candidate": "reports/reviews/phase8-motor-m6-offline/m6_field_candidate.py"
+    "field_candidate": "reports/reviews/phase8-motor-m6-offline/m6_field_candidate.py",
+    "build_logs": [
+      "reports/reviews/phase8-motor-m6-offline/build_default.log",
+      "reports/reviews/phase8-motor-m6-offline/build_a0.log",
+      "reports/reviews/phase8-motor-m6-offline/build_motor.log"
+    ],
+    "first_failure": "reports/reviews/phase8-motor-m6-offline/field_candidate_selftest_first_failure.txt"
   },
   "raw_recovery": {
     "scope": "19 final responses listed by reports/reviews/phase8-motor-m5-fault-log/cp1/final_pass/index.json",
@@ -511,19 +543,32 @@
   "open_items": [
     "M5_MANUAL_RECOVERY_PASS remains PARTIAL: fault-state motor_arm refusal not separately executed on hardware",
     "PROJECT_SAFETY_ACCEPTANCE_PENDING: ADC current calibration, SG/fusion calibration, DIAG physical trigger, scope/A0 deferred",
-    "M6 images are NOT_FLASHED; board image remains the M5 candidate"
+    "M6 images are NOT_FLASHED; board image remains the M5 candidate",
+    "work D candidate is offline-fixed only and not released for field use; any future use needs a new approved work package and cannot inherit M5 approval"
   ],
   "next_steps": [
     "future approved static fault session may exercise fault-state motor_arm refusal without re-spinning the motor",
     "bus-current ADC needs an independent current reference/front-end calibration, distinguished from phase-current measurement",
     "SG/fusion thresholds must be calibrated at final speed/current/load and kept MONITOR_ONLY until evidence exists",
     "DIAG physical trigger method remains to be defined; IRQ OPEN is not a measurement",
-    "scope/A0 remain deferred per user decision, not hard prerequisites for the next software prep"
+    "scope/A0 remain deferred per user decision, not hard prerequisites for the next software prep",
+    "independent re-review of the fixed field candidate before any field packaging"
   ],
   "privacy": {
     "absolute_user_paths": 0,
     "port_names": 0,
     "instrument_serials": 0,
     "credentials": 0
+  },
+  "independent_review": {
+    "date": "2026-10-29",
+    "source": "NS800_M6_Independent_Review_and_Next_20261029.md (external attachment)",
+    "result": "M6 work A/B/C accepted; work D candidate not released for field",
+    "fixes": {
+      "D-1": "Session/FDevice/FakeSerial share one clock; SerialLink sets write timeout and recomputes read timeout from the remaining budget; M6D13/M6D14/M6D15",
+      "D-2": "transport/OSError and evidence failures are recorded separately; primary exception/traceback preserved; unconfirmed disable is UNKNOWN; M6D16/M6D18/M6D23/M6D24",
+      "D-3": "arm success requires one complete motor_status snapshot state=0 armed=1 cur=0 tgt=0; refusal/armed=0/missing/duplicate/conflict cannot start; M6D19-M6D22"
+    },
+    "candidate_sha256": "b1c5390b2a1f8887393b236e8d5c28888be5060ca8f5f8addc10ffb9a3ff772f"
   }
 }

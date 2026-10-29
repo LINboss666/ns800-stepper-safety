@@ -4,9 +4,11 @@
 分支：`debug/tmc-uart-rootcause-20261028`
 document_base / source_base：`a052e8e3dc11a4a983fcaecf5fd36ba9e4139af4`
 code_commit（产品源码）：`cf133d6a5d539bb5a7c3b9da4d50d53dc3b47055`
-测试/证据提交：`0d7f96c12980677ffb988b00fde7df706f2407ed`；构建镜像/清单提交：`9241828d555e1f376bc80ef35521af89f6001d71`
+测试/证据提交（脚本补正）：`d8ee03c9bb547b26c9362b98c69e8a14f6ed53b7`；构建镜像/清单提交：`9241828d555e1f376bc80ef35521af89f6001d71`
 状态：**M6_OFFLINE_CLOSEOUT_COMPLETE / NEW_IMAGES_BUILT_NOT_FLASHED /
-FIELD_CANDIDATE_OFFLINE_VERIFIED_NOT_EXECUTED**
+FIELD_CANDIDATE_OFFLINE_FIXED_NOT_EXECUTED**
+独立复审（2026-10-29）：工作 A/B/C 接受；工作 D 原候选暂不放行，D-1/D-2/D-3 已离线补正，
+未执行任何设备动作，也未获现场放行。
 上一阶段：`reports/agent_handoffs/phase8-motor-m5-fault-log.md`（M5 最终收尾见 §12）
 
 本包未执行任何硬件动作：无串口/DAP/仪器、无设备枚举、无上电/复位/烧录/读目标内存、
@@ -89,17 +91,26 @@ I/O 四变体（off/on × target/ovr）全部 PASS；证据 `io_behavior.txt`。
 ## 5. 工作 D：未来现场脚本候选（离线）
 
 新增 `reports/reviews/phase8-motor-m6-offline/m6_field_candidate.py`，保留 M5 原脚本。
-状态 **OFFLINE_VERIFIED / NOT_BOARD_EXECUTED**；本轮无现场批准。
+状态 **FIELD_CANDIDATE_OFFLINE_FIXED / NOT_BOARD_EXECUTED**；独立复审的三项阻断已修，
+本轮仍无现场批准。候选文件 SHA-256：`b1c5390b2a1f8887393b236e8d5c28888be5060ca8f5f8addc10ffb9a3ff772f`。
 
-只处理已暴露的编排问题：
+复审补正（D-1/D-2/D-3）：
 
-- arm/start 前设置“输出可能已打开”责任位；应答丢失不假定命令未执行；
-- 所有读等待受单调时钟剩余截止约束；start 读最多 1.5 s、trip 读最多到 start+4 s，
-  兜底 disarm 计划 start+5 s；计划窗口被挂起读耗尽时仍做一次短有界尝试并记录
-  `cleanup_late`；
-- 普通与异常路径共享一次 `motor_disarm`；清理成功不覆盖主失败；
-- 撤能确认以 `safety_status` 合同字段 `request=DISABLE(LOW)` + `pad=0` 为准，不以
-  命令行摘要判定；无法确认则 UNKNOWN；
+- **D-1 统一时钟**：`Session`、`FDevice`、`FakeSerial` 共用同一个 `FClock`；`SerialLink`
+  在写前用剩余预算设置 `write_timeout`，每次读前重算 `timeout`；`start` 读最多 1.5 s、
+  trip 读最多到 start+4 s，兜底 disarm 计划 start+5 s；窗口被挂起读写耗尽时仍做一次
+  短有界尝试并记录 `cleanup_late`。M6D13（arm 写阻塞 10.1 s）证明阻塞时间进入同一截止，
+  M6D14/M6D15 覆盖 start 写超时与 start 后读阻塞。
+- **D-2 首错与清理分离**：`disarm_once` 捕获传输/`OSError`/查询异常，清理错误与 traceback
+  独立记录；`run_fault` 保留原始主异常与 traceback，证据落盘失败单独记录并在无主错时
+  使本次运行失败；撤能无法用 `request=DISABLE(LOW)` + `pad=0` 确认则 UNKNOWN，绝不
+  回成功。M6D16/M6D18/M6D23/M6D24 覆盖主错+清理再错、证据失败和静止前置失败。
+- **D-3 规范 arm 判定**：arm 后读取 `motor_status`，要求恰好一组
+  `state=0/armed=1/cur_hz=0/tgt_hz=0` 字段；明确拒绝文本、armed=0、字段缺席/重复/冲突
+  均不得发送 target/start；不依赖成功摘要子串。M6D19–M6D22 覆盖拒绝文本、状态冲突、
+  回执丢失但状态确认/无法确认。
+- arm/start 前仍先设置“输出可能已打开”责任位；应答丢失不假定命令未执行；
+- 撤能确认以 `safety_status` 合同字段为准；普通与异常路径共享一次 `motor_disarm`；
 - 新日志完整读回：`flash_dump` 分批（≤100）覆盖新槽，校验槽号连续、session、
   pre event0/step>0、post event9/step0、时间单调；`accepted==completed` 判排空，
   `queue_dropped=51` 作为重试计数不参与完整性；BB `write drops` 取增量；
@@ -109,11 +120,11 @@ I/O 四变体（off/on × target/ovr）全部 PASS；证据 `io_behavior.txt`。
   任何异常不得自动清锁存；参数错误/`--selftest` 不导入 pyserial、不构造 SerialPort；
 - 每个收发先落 `--out-dir/NNN_*.bin` 与 `raw_index.jsonl`。
 
-离线自测 13/13 PASS（`field_candidate_selftest.txt`）：交错 trip 仍撤能一次、读超时
-5 s 内撤能、撤能回执与合同字段均丢失记 UNKNOWN、arm 回执丢失仍清理、静止拒绝不发
-start、completed=299/缺行/错 session 拒绝、缺一条新记录禁止恢复、无空间不发电机命令、
-原始收发保留、参数错误无串口对象、归档拒绝/第二份备份缺失/无验证标记均拒绝且不发
-电机命令、坏归档在导入 pyserial 之前被拒绝。
+离线自测 **25/25 PASS**（`field_candidate_selftest.txt`）：原 13 个用例（M6D01、M6D02、
+M6D02b、M6D03–M6D12）身份保留，新增 M6D13–M6D24 覆盖上述三项复审阻断、拒绝文本、
+状态字段缺失/重复/冲突、回执丢失、证据失败和实际发送记录。首个补正失败运行保留为
+`field_candidate_selftest_first_failure.txt`（4 例先失败后修复）。候选未上板，不声称
+Windows/USB 硬实时或物理停机上界。
 
 未覆盖/明确不属候选：旧日志归档、清区、两份备份门由 M5 脚本负责并已有 FS01–FS08
 自测；候选不执行 fault_reset（除非未来显式批准并传 `--allow-recovery`），不重开串口、
@@ -132,7 +143,10 @@ UV4 5.43.1.0 / ARMCLANG V6.24，三目标各 Rebuild All 一次，均 0 Error / 
 
 - 横幅：`build Oct 29 2026 11:20:17` / `11:20:33` / `11:20:45`。
 - manifest：`reports/firmware/phase8-motor-m6-offline/build_manifest.json`
-  （code_commit `cf133d6…`，build 日志同目录）。
+  （code_commit `cf133d6…`，project 路径、Target、宏探针与 source scope 均已绑定）。
+- 三份 Keil 完整 stdout 已归档：`reports/reviews/phase8-motor-m6-offline/build_default.log`、
+  `build_a0.log`、`build_motor.log`（原始 2026-10-29 11:20 构建；因 `*.log` 被忽略而
+  force-add，未为补文件重复构建）。
 - **NOT_FLASHED**：板上最后已证仍是 M5 候选
   BIN `01d3e5ab1ad245949385d50c9f1d5fd2bbaac0806c3920e897321bc46db764bc`、
   AXF `8c5bc7bf1efa786013c767ae1e09415ad0d5d5db3e38069c8aeebabf7cebae40`；
@@ -148,13 +162,14 @@ UV4 5.43.1.0 / ARMCLANG V6.24，三目标各 Rebuild All 一次，均 0 Error / 
 | S1 反向 | rev_motor_off 5/5、rev_safety_trip_skip_post 1/1，rc=0 |
 | I/O 四变体 | 33/35/46/48 required PASS；非法宏值拒绝编译；rc=0 |
 | CLI strict target/host_ovr | 10/10 each，rc=0 |
-| 现场候选自测 | M6D01–M6D12 13/13 PASS |
+| 现场候选自测 | M6D01–M6D24 25/25 PASS（原 13 + 新增 12） |
 | M5 原始字节 | 19/19 解码相等；300 行 CSV 逐字节相等 |
 | Keil | 三目标 Rebuild All 0/0 |
 
 NOT_RERUN（说明）：S2 并发链（stop_priority/HAL/persistence 未改）、V1/V2（safety_state.c
 在其中有桩，未改 tmc2209/motor 语义）、SD 链（sensor_service/blackbox 未改）、A0 采集门
-（未改采集/导出逻辑）。GCC 主机诊断与 Keil 0/0 分列；不声称 FinSH 函数指针类通用警告
+（未改采集/导出逻辑）。脚本补正轮未重跑 S1/I/O/CLI/S2，未重编 Keil；上表前五项沿用本轮
+产品源码未变时的既有结果。GCC 主机诊断与 Keil 0/0 分列；不声称 FinSH 函数指针类通用警告
 为主机零警告。
 
 ## 8. 当前接受对象与边界（不得被离线结果升级）
@@ -171,6 +186,8 @@ NOT_RERUN（说明）：S2 并发链（stop_priority/HAL/persistence 未改）�
   不能写“DIAG 物理路径处于 MONITOR_ONLY”。
 - ADC 仍 THEORETICAL，SG 阈值/有效速度负载范围未标定，振动量含约 1 g 重力；
   `PROJECT_SAFETY_ACCEPTANCE_PENDING=OPEN`。
+- 工作 D 候选仅完成离线补正，**未获现场放行**；25/25 自测不代表板级超时、撤能或物理
+  停机行为，未来使用必须绑定新的具体工作包并重新批准。
 - 本包离线测试、候选脚本与新构建**不能**升级上述实机缺项。
 
 ## 9. 下一轮现场准备（一页表，不索取材料/不要求操作）
@@ -191,6 +208,7 @@ NOT_RERUN（说明）：S2 并发链（stop_priority/HAL/persistence 未改）�
 
 - 原始/汇总证据：`reports/reviews/phase8-motor-m6-offline/`（`s1_normal.txt`、
   `s1_reverse.txt`、`io_behavior.txt`、`cli_strict.txt`、`field_candidate_selftest.txt`、
-  `test_summary.md`、build 日志、macro_probe.c、`m5_raw_recovery/`）。
+  `field_candidate_selftest_first_failure.txt`、`test_summary.md`、三份 build_*.log、
+  `macro_probe.c`、`m5_raw_recovery/`）。
 - 新文件仅含仓库相对路径；未复制本机私有绝对路径、端口、仪器序列号或凭据。
 - 本轮云端 52 MiB 交接 ZIP 未更新；仅交仓库级交接与下次打包摘要。
