@@ -116,3 +116,13 @@ UV4 5.43.1.0 / ARMCLANG V6.24，三目标均 Rebuild All 0 Error / 0 Warning。
 - 结果：`M5_CP1_STOPPED_AT_ARM`；需新批准一次 COM5 会话：target 0 清理 + 现场确认
   DIAG/H6-7 0 V 后一次 `safety_polarity_confirm CONFIRM` + 一次 `safety_irq_enable`，
   复核 mask=0 再执行 P2–P4；不清区/不重烧/不自动重跑。
+
+
+## 8. CP1d 追加尝试（2026-10-29，停在 target 清理前的旧值检查）
+
+- 第二次追加会话在 `preflight` 阶段因 target 仍为 300 Hz 中止；**未发送 motor_target 0、
+  未执行 polarity/IRQ、未发送 arm/start**。板上 gate 仍 0x8、日志 0/0/0。
+- 根因：编排顺序错误；`fault()` 已改为默认先 `motor_target 0` 再 preflight，并提供
+  `clear_target=False` 供编排方避免重复；自测 FS01–FS08 8/8。
+- 需要再一次 COM5 会话：target 0 → preflight → `safety_polarity_confirm CONFIRM` +
+  `safety_irq_enable` → 复核 mask=0 → P2–P4；不清区/不重烧。

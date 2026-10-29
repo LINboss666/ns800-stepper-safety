@@ -8,7 +8,7 @@
     "axf_bytes": 1668244,
     "axf_sha256": "8c5bc7bf1efa786013c767ae1e09415ad0d5d5db3e38069c8aeebabf7cebae40"
   },
-  "status": "M5_CP1_STOPPED_AT_ARM",
+  "status": "M5_CP1_STOPPED_PRE_TARGET",
   "p0_identity": {
     "flash": "PASS rc=0; erased/programmed 260096 B with pyOCD sector erase",
     "readback": "PASS 259580 B at 0x08000000; SHA matches BIN; byte-equal true",
@@ -35,11 +35,13 @@
     "safety_trip": "NOT_REACHED",
     "fault_latch": "NOT_REACHED",
     "new_log": "NOT_REACHED",
-    "recovery": "NOT_REACHED"
+    "recovery": "NOT_REACHED",
+    "second_attempt": "preflight aborted before motor_target 0 because target was still 300; no IRQ/motor command sent",
+    "gate": "0x8 (gate4 IRQ CLOSED/polarity not confirmed)"
   },
   "quotas_used": {
     "dap_sessions": 3,
-    "com5_sessions": 3,
+    "com5_sessions": 4,
     "downloads": 1,
     "readbacks": 1,
     "resets": 1,
@@ -54,13 +56,13 @@
     "MONITORING_VALIDITY_DISCLOSED": "PRESENT in diag output",
     "PROJECT_SAFETY_ACCEPTANCE_PENDING": true
   },
-  "next": "one additional COM5 session: target 0 cleanup + operator-confirmed 0V + polarity confirm + IRQ enable; verify mask 0; then P2-P4; else stop",
+  "next": "one additional COM5 session with corrected order: target 0 -> preflight -> polarity confirm + IRQ enable -> mask 0 -> P2-P4",
   "evidence": "reports/reviews/phase8-motor-m5-fault-log/cp1/",
   "board_state": {
     "image": "approved candidate",
     "log": "0/0/0",
     "safety": "READY/fault0",
-    "motor": "armed=0, target=300, cur=0",
+    "motor": "armed=0 target=300 cur=0",
     "irq": "gate4 CLOSED, polarity not-confirmed",
     "fault": false
   }

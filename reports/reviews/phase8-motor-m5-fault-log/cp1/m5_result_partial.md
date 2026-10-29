@@ -4,8 +4,7 @@
 批准载荷：code_commit `8cf23aa6dda20baf7843798bdef9a02cfd71326f`，
 BIN 259580 B / `01d3e5ab1ad245949385d50c9f1d5fd2bbaac0806c3920e897321bc46db764bc`，
 AXF 1668244 B / `8c5bc7bf1efa786013c767ae1e09415ad0d5d5db3e38069c8aeebabf7cebae40`。
-状态：**P0 通过；P1 旧日志归档与唯一一次清区均通过；P2 在 `motor_arm` 门禁处停止（gate4 IRQ CLOSED），
-电机从未起转；P3/P4 NOT_REACHED。**
+状态：**P0 通过；P1 旧日志归档与唯一一次清区均通过；P2 未起转：两次尝试均停在起转前（arm gate 0x8；第二次在 target 清理前被前置检查拦住）。P3/P4 NOT_REACHED。**
 没有第二次下载、没有第二次清区、没有 safety_trip、没有 fault_reset/system_selftest。
 
 ## 1. P0 身份与静止前置（PASS）
@@ -51,7 +50,7 @@ AXF 1668244 B / `8c5bc7bf1efa786013c767ae1e09415ad0d5d5db3e38069c8aeebabf7cebae4
   这是 M5 包前置“IRQ/软件门就绪”不成立的真实门禁拒绝，不是产品故障。
 - 现场副作用：软件 target 留在 **300 Hz**（armed=0、start 已拒绝、无 STEP）；日志仍 `0/0/0`。
 - 工具修正（离线，已加自测）：`fault()` 现在先要求 `arm_gate_mask==0`，且 arm 后必须读到
-  `armed=1` 才发送 target/start；门禁不成立时**不发送任何电机命令**。自测 FS01–FS06 6/6。
+  `armed=1` 才发送 target/start；门禁不成立时**不发送任何电机命令**。自测 FS01–FS08 8/8。
 
 ## 4. P3/P4（NOT_REACHED）
 
@@ -84,3 +83,15 @@ AXF 1668244 B / `8c5bc7bf1efa786013c767ae1e09415ad0d5d5db3e38069c8aeebabf7cebae4
 软件故障停机链在起转前被真实保护门禁（IRQ CLOSED/polarity not confirmed）拒绝，电机未运动；
 `M5_SOFTWARE_EVENT_STOP_PASS` / `M5_NEW_FAULT_LOG_PASS` / `M5_MANUAL_RECOVERY_PASS`
 均 NOT_REACHED。M4 已接受功能不撤回；安全验收仍 PENDING。
+
+
+## 8. CP1d 追加尝试（停在 target 清理前的旧值检查）
+
+- 第二次追加会话打开 COM5 后，编排脚本先调用 `preflight`，而板上 target 仍为上次留下的 300 Hz；
+  `preflight` 按“target 必须为 0”立即中止，**未发送 `motor_target 0`、未执行
+  polarity/IRQ 命令、未发送任何 motor arm/start**。
+- 原始件：`irq_pre_target/`（12 个只读响应）与 `irq_fault.log`；gate 仍 0x8、日志 0/0/0。
+- 根因是编排顺序错误（应在 preflight 之前先 `motor_target 0`），不是产品/门禁失败。
+- 修正：`fault()` 默认先 `motor_target 0` 再 preflight；调用方可传 `clear_target=False`
+  避免重复；已加 FS07/FS08 自测，当前 8/8。
+- 第三次尝试仍需要一次新的 COM5 会话；板上 target 仍为 300、armed=0、无运动。

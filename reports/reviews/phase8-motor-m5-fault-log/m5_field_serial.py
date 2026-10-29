@@ -382,7 +382,7 @@ class Runner:
         return state
 
     # ---------- P2/P3/P4 ----------
-    def fault(self):
+    def fault(self, clear_target=True):
         st_path = os.path.join(self.out, "archive_state.json")
         if not os.path.exists(st_path):
             raise Abort("archive_state.json missing; run archive phase first")
@@ -392,6 +392,9 @@ class Runner:
         if not state.get("clear_done") and state.get("free", 0) < NEED_SLOTS:
             raise Abort("log space insufficient and clear not done")
         rec = Recorder(self.out, "fault")
+        # Approved P2 starts from target 0; clear any stale command value first.
+        if clear_target:
+            self.q(rec, "motor_target 0")
         text, bb0, f0 = self.preflight(rec)
         mo = self.parse_motor(text["motor_status"])
         if mo["gate"] != 0:
@@ -625,9 +628,9 @@ class FakeDevice:
                 return "[MOT] arm REFUSED (gates failing)\n[MOT] arm_gate_mask=0x2\n"
             self.motor["armed"] = 1
             return "[MOT] armed\n"
-        if cmd == "motor_target 300":
-            self.motor["tgt"] = 300
-            return "[MOT] set target 300 Hz: OK\n"
+        if cmd.startswith("motor_target "):
+            self.motor["tgt"] = int(cmd.split()[1])
+            return "[MOT] set target %s Hz: OK\n" % cmd.split()[1]
         if cmd == "motor_start":
             self.motor["state"] = 1
             self.motor["cur"] = 300
@@ -833,9 +836,31 @@ def selftest():
             if "arm gate not clear" not in str(exc):
                 raise
         sent = [c for _, c in link.commands[before:]]
-        for bad in ("motor_dir", "motor_arm", "motor_target", "motor_start"):
+        for bad in ("motor_dir", "motor_arm", "motor_start", "motor_target 300"):
             if any(c.startswith(bad) for c in sent):
                 raise AssertionError("motor command sent before gate check: %s" % sent)
+
+    # 7. stale target 300: fault must clear it before preflight/arm
+    def t7():
+        runner, dev, link, _ = _runner_for_selftest(tmp, _fake_checker_accept)
+        runner.archive(expect_banner="FAKEBANNER", allow_clear=False)
+        dev.motor["tgt"] = 300
+        runner.fault()
+        cmds = [c for _, c in link.commands]
+        if "motor_target 0" not in cmds or "motor_dir 0" not in cmds or \
+           cmds.index("motor_target 0") > cmds.index("motor_dir 0"):
+            raise AssertionError("stale target not cleared before motion: %s" % cmds[-12:])
+
+    # 8. caller already set target 0: fault(clear_target=False) must not repeat it
+    def t8():
+        runner, dev, link, _ = _runner_for_selftest(tmp, _fake_checker_accept)
+        runner.archive(expect_banner="FAKEBANNER", allow_clear=False)
+        dev.motor["tgt"] = 0
+        before = [c for _, c in link.commands].count("motor_target 0")
+        runner.fault(clear_target=False)
+        after = [c for _, c in link.commands].count("motor_target 0")
+        if after != before:
+            raise AssertionError("clear_target=False still sent motor_target 0")
 
     case("FS01-archive_reject_blocks_clear", t1)
     case("FS02-order_3s_5s_and_clear", t2)
@@ -843,6 +868,8 @@ def selftest():
     case("FS04-no_new_log_blocks_recovery", t4)
     case("FS05-clear_requires_two_copies", t5)
     case("FS06-arm_gate_blocks_before_any_motor_command", t6)
+    case("FS07-stale_target_cleared_first", t7)
+    case("FS08-clear_target_false_no_repeat", t8)
     print("SUMMARY|cases=%d pass=%d fail=%d" % (passed + failed, passed, failed))
     return 0 if failed == 0 else 1
 

@@ -4,7 +4,7 @@
   "branch": "debug/tmc-uart-rootcause-20261028",
   "base_commit": "6218efa251cd6b8a16ad2df8f0fef1efd2ba5eeb",
   "code_commit": "8cf23aa6dda20baf7843798bdef9a02cfd71326f",
-  "status": "M5_CP1_STOPPED_AT_ARM",
+  "status": "M5_CP1_STOPPED_PRE_TARGET",
   "candidate": {
     "target": "rt-thread-motor-m1-candidate",
     "bin": {
@@ -88,10 +88,10 @@
     "p0": "PASS: flash/readback byte-equal/reset; banner 5.3.0 build Oct 29 2026 00:38:59",
     "p1_archive": "PASS: 4096 rows/41 batches, two copies verified",
     "clear": "one ERASE; verified log 0/0/0 in the extra session",
-    "p2_p4": "BLOCKED: motor_arm refused gate4 IRQ CLOSED/polarity not confirmed; no motion",
+    "p2_p4": "BLOCKED: gate4 IRQ CLOSED; a second attempt aborted before target 0 due to script ordering; no motion",
     "quotas_used": {
       "dap_sessions": 3,
-      "com5_sessions": 3,
+      "com5_sessions": 4,
       "downloads": 1,
       "readbacks": 1,
       "resets": 1,
@@ -106,5 +106,5 @@
       "irq": "gate4 CLOSED"
     }
   },
-  "next": "one additional COM5 session: target 0 + operator-confirmed 0V + polarity confirm + IRQ enable; verify mask 0; then P2-P4"
+  "next": "one more COM5 session: target 0 -> preflight -> polarity confirm + IRQ enable -> mask 0 -> P2-P4"
 }

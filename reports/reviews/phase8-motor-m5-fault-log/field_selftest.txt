@@ -8,4 +8,10 @@ CASE|FS04-no_new_log_blocks_recovery|PASS|ok
 CASE|FS05-clear_requires_two_copies|PASS|ok
 ARCHIVE=PASS used=0 clear=NO free_after=4096
 CASE|FS06-arm_gate_blocks_before_any_motor_command|PASS|ok
-SUMMARY|cases=6 pass=6 fail=0
+ARCHIVE=PASS used=0 clear=NO free_after=4096
+FAULT_CLOSURE=PASS trip=3.000s disarm=5.000s frames=300 session=1
+CASE|FS07-stale_target_cleared_first|PASS|ok
+ARCHIVE=PASS used=0 clear=NO free_after=4096
+FAULT_CLOSURE=PASS trip=3.000s disarm=5.000s frames=300 session=1
+CASE|FS08-clear_target_false_no_repeat|PASS|ok
+SUMMARY|cases=8 pass=8 fail=0
