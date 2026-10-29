@@ -1,0 +1,8 @@
+{"case": "CONTROL_FULL_REAL_FORMAT", "command": "current_cal apply 1598291 671551 CONFIRM_MEASURED", "rc": 0, "status": "DRAFT_NOT_APPROVED", "usable": true}
+{"case": "HEADER_ONLY", "command": "current_cal apply 1598291 671551 CONFIRM_MEASURED", "rc": 0, "status": "DRAFT_NOT_APPROVED", "usable": true}
+{"case": "MISSING_DECISION_TAIL", "command": "current_cal apply 1598291 671551 CONFIRM_MEASURED", "rc": 0, "status": "DRAFT_NOT_APPROVED", "usable": true}
+{"case": "NUL_IN_NEGATIVE_DECISION", "command": "current_cal apply 1598291 671551 CONFIRM_MEASURED", "rc": 0, "status": "DRAFT_NOT_APPROVED", "usable": true}
+{"case": "CHANGED_VERSION", "command": "current_cal apply 1598291 671551 CONFIRM_MEASURED", "rc": 0, "status": "DRAFT_NOT_APPROVED", "usable": true}
+{"case": "REUSED_FIT_AS_HOLDOUT_RENAMED", "command": "current_cal apply 1598291 671551 CONFIRM_MEASURED", "rc": 0, "status": "DRAFT_NOT_APPROVED", "usable": true}
+{"case": "NONLINEAR_INTERVAL_CORNER", "corner_fit_x": [2000.5, 2010.5], "corner_fit_y": [22.759040000000006, 102.89927999999999], "corner_hold_reference": 98.9, "corner_hold_x": 2011.25, "corner_prediction": 108.90979800000059, "exact_corner_difference": 10.009798000000586, "nominal_prediction": 100.0, "reference_limits": [0.48596000000000006, 1.11428, 1.1], "reported_bound": 9.614344956063261, "status": "DRAFT_NOT_APPROVED", "target": 10.0, "usable": true}
+All source transcripts and numeric references in this script are HOST_REVIEW_SYNTHETIC, not target evidence.

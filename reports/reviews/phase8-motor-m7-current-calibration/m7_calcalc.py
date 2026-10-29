@@ -14,8 +14,8 @@ Two things v1 got wrong and this revision is explicitly about:
   diagnostics are still printed, but labelled not-applicable.
 * Error arithmetic - a meter's +/- limit is a **bound**, not a standard
   deviation. v1 root-sum-squared those limits and called the result a
-  conservative bound. Here every bounded term is propagated by absolute value
-  (worst case, valid without any distribution or independence claim), and the
+  conservative bound. Here two fit points use an exact corner envelope on
+  declared input intervals; first-order sensitivity terms are diagnostic only, and the
   repeatability estimate is carried linearly on top, labelled as a 1-sigma
   estimate rather than folded into a coverage factor.
 
@@ -24,6 +24,8 @@ v1's bytes remain recoverable from git (f188339 / 68d0774); this file replaces i
 
 import argparse
 import ast
+import itertools
+from fractions import Fraction
 import hashlib
 import json
 import math
@@ -31,7 +33,7 @@ import os
 import re
 import sys
 
-TOOL_ID = "ns800-m7-calcalc-v2"
+TOOL_ID = "ns800-m7-calcalc-v2.1-cloud-candidate"
 SCHEMA = "ns800.m7.calinputs/2"
 V1_SCHEMA = "ns800.m7.calinputs/1"
 
@@ -224,29 +226,60 @@ def validate(doc, base_dir=None):
 
 
 def _parse_capture(path):
-    """Read a saved `current_cal sample` transcript into its declared statistics."""
-    with open(path, "r", encoding="utf-8", errors="replace") as fh:
-        text = fh.read()
-    out = {}
-    m = SAMPLE_HEADER_RE.search(text)
-    if m:
-        out["n_valid"] = int(m.group(3))
-    m = SAMPLE_RAW_RE.search(text)
-    if m:
-        out["raw_sum"] = int(m.group(1))
-        out["raw_min"] = int(m.group(2))
-        out["raw_max"] = int(m.group(3))
-    m = SAMPLE_SQ_RE.search(text)
-    if m:
-        out["raw_sum_sq"] = int(m.group(1))
-    m = SAMPLE_SEQ_RE.search(text)
-    if m:
-        out["seq_first"] = int(m.group(1))
-        out["seq_last"] = int(m.group(2))
-    m = SAMPLE_FIT_RE.search(text)
-    if m:
-        out["fit"] = m.group(1)
-    return out
+    """Exactly one complete real current_cal response per FIELD source file.
+
+    LF/CRLF and a known command-echo CR are accepted. Raw files are never rewritten.
+    Missing evidence is rejected rather than conditionally skipping its comparisons.
+    """
+    data = open(path, "rb").read()
+    if b"\x00" in data:
+        raise Reject("FIELD_SOURCE_PROTOCOL", "NUL in sample source")
+    try:
+        text = data.decode("utf-8", errors="strict")
+    except UnicodeError:
+        raise Reject("FIELD_SOURCE_PROTOCOL", "invalid source encoding")
+    lines = []
+    for line in text.replace("\r\n", "\n").split("\n"):
+        if "[CAL" not in line:
+            continue
+        at = line.index("[CAL")
+        prefix, line = line[:at], line[at:]
+        if prefix and not re.fullmatch(
+                r"(?:msh\s*(?:>|/>)\s*)?current_cal sample [0-9]+\r", prefix):
+            raise Reject("FIELD_SOURCE_PROTOCOL", "interleaved sample line")
+        if "\r" in line:
+            raise Reject("FIELD_SOURCE_PROTOCOL", "bare CR inside protocol line")
+        lines.append(line)
+    patterns = (
+        r"\[CAL\] sample n_req=(\d+) n_seen=(\d+) n_valid=(\d+) dup=(\d+) invalid=(\d+) skip=(\d+)",
+        r"\[CAL\] sample seq=(\d+)\.\.(\d+) tick=(\d+)\.\.(\d+) ver=(\d+)\.\.(\d+) reset=(\d+)",
+        r"\[CAL\] raw sum=(\d+) min=(\d+) max=(\d+) mean_x1000=(\d+)",
+        r"\[CAL\] raw sum_sq=(\d+)",
+        r"\[CAL\] sample cal src=(NONE|THEORETICAL|MEASURED) changed=([01]) fit=(READY|NO) reason=([A-Z_]+)",
+        r"\[CAL\] note: sample is observation only; no cal/flash/motion change",
+    )
+    if len(lines) != len(patterns):
+        raise Reject("FIELD_SOURCE_PROTOCOL", "need one complete six-line sample response")
+    matches = [re.fullmatch(pat, line) for pat, line in zip(patterns, lines)]
+    if not all(matches):
+        raise Reject("FIELD_SOURCE_PROTOCOL", "wrong order, missing field or malformed token")
+    h, seq, raw, sq, decision, note = matches
+    nreq, seen, nv, dup, invalid, skip = map(int, h.groups())
+    sf, sl, tf, tl, vf, vl, reset = map(int, seq.groups())
+    sm, lo, hi, mean1000 = map(int, raw.groups())
+    square = int(sq.group(1))
+    src, changed, fit, reason = decision.groups()
+    if any(v > 0xFFFFFFFF for v in (nreq,seen,nv,dup,invalid,skip,sf,sl,tf,tl,vf,vl,reset,sm,lo,hi)):
+        raise Reject("FIELD_SOURCE_PROTOCOL", "u32 field outside storage domain")
+    if square > 0xFFFFFFFFFFFFFFFF or not 32 <= nreq <= 256:
+        raise Reject("FIELD_SOURCE_PROTOCOL", "count or sum_sq outside export domain")
+    if nv != nreq or seen != nv + invalid or mean1000 != sm * 1000 // nv:
+        raise Reject("FIELD_SOURCE_PROTOCOL", "sample count or derived mean contradiction")
+    if fit != "READY" or reason != "OK" or changed != "0" or vf != vl or reset != 0:
+        raise Reject("FIELD_SOURCE_NOT_FITTABLE", "source did not positively prove a stable READY sample")
+    return dict(n_requested=nreq,n_valid=nv,raw_sum=sm,raw_min=lo,raw_max=hi,
+                raw_sum_sq=square,seq_first=sf,seq_last=sl,tick_first=tf,tick_last=tl,
+                fit=fit,cal_source=src,cal_version=vf)
 
 
 def _verify_capture_independence(points):
@@ -276,51 +309,41 @@ def _verify_capture_independence(points):
 
 
 def _verify_field_evidence(points, base_dir):
-    """FIELD inputs must bind to a real capture, and the declared numbers must match it.
-
-    A reference declaration alone is not evidence: copying a file name and a fake
-    digest used to be enough for the tool to call a run FIELD_MEASURED.  Independence
-    is settled before this by _verify_capture_independence, so a fabricated FIELD
-    declaration cannot dodge it by naming a file that does not exist.
-    """
+    """Bind every FIELD point to one complete, immutable response and its digest."""
+    identities = []
     for p in points:
         pid = p["id"]
         name = p["raw_source_file"]
+        if not isinstance(name, str) or not name:
+            raise Reject("FIELD_SOURCE_MISSING", "%s has no source filename" % pid)
         path = name if os.path.isabs(name) else os.path.join(base_dir or ".", name)
         if not os.path.isfile(path):
-            raise Reject("FIELD_SOURCE_MISSING",
-                         "%s declares FIELD evidence %r that does not exist; a "
-                         "declared provenance is not a captured response"
-                         % (pid, name))
-        want = str(p["raw_source_sha256"])
+            raise Reject("FIELD_SOURCE_MISSING", "%s source does not exist" % pid)
         got = sha256_file(path)
-        if got != want:
-            raise Reject("FIELD_SOURCE_SHA_MISMATCH",
-                         "%s declared sha256=%s but the artifact hashes to %s"
-                         % (pid, want, got))
+        if got != str(p["raw_source_sha256"]):
+            raise Reject("FIELD_SOURCE_SHA_MISMATCH", "%s digest differs from its file" % pid)
         cap = _parse_capture(path)
-        if not cap:
-            raise Reject("FIELD_SOURCE_UNPARSEABLE",
-                         "%s: %r holds no `current_cal sample` statistics" % (pid, name))
-        if cap.get("fit") == "NO":
-            raise Reject("FIELD_SOURCE_NOT_FITTABLE",
-                         "%s: the capture itself reported fit=NO" % pid)
-        for fld in ("n_valid", "raw_sum", "raw_min", "raw_max", "raw_sum_sq",
-                    "seq_first", "seq_last"):
-            if fld in cap and float(cap[fld]) != float(p[fld]):
-                raise Reject("FIELD_SOURCE_STATS_MISMATCH",
-                             "%s declares %s=%r but %r says %r"
-                             % (pid, fld, p[fld], name, cap[fld]))
+        for fld in ("n_requested","n_valid","raw_sum","raw_min","raw_max","raw_sum_sq",
+                    "seq_first","seq_last","tick_first","tick_last"):
+            if float(cap[fld]) != float(p[fld]):
+                raise Reject("FIELD_SOURCE_STATS_MISMATCH", "%s %s differs from the source" % (pid,fld))
         p["_capture"] = cap
+        identities.append((p["role"],pid,os.path.normcase(os.path.realpath(path)),got))
+    for role,pid,path,digest in identities:
+        if role != "holdout":
+            continue
+        for frole,fid,fpath,fdigest in identities:
+            if frole == "fit" and (path == fpath or digest == fdigest):
+                raise Reject("HOLDOUT_NOT_INDEPENDENT", "%s copies fit source %s, including renamed copies" % (pid,fid))
 
 
 def point_stats(p):
     pid = p["id"]
     n = _int_count(p["n_valid"], pid + ".n_valid")
-    s = _num(p["raw_sum"], pid + ".raw_sum")
-    sq = _num(p["raw_sum_sq"], pid + ".raw_sum_sq")
-    rmin = _num(p["raw_min"], pid + ".raw_min")
-    rmax = _num(p["raw_max"], pid + ".raw_max")
+    s = _int_count(p["raw_sum"], pid + ".raw_sum")
+    sq = _int_count(p["raw_sum_sq"], pid + ".raw_sum_sq")
+    rmin = _int_count(p["raw_min"], pid + ".raw_min")
+    rmax = _int_count(p["raw_max"], pid + ".raw_max")
     mean = s / n
     if rmin < 0 or rmax > RAW_BITS_MAX or mean < 0 or mean > RAW_BITS_MAX:
         raise Reject("RAW_OUT_OF_RANGE",
@@ -348,6 +371,17 @@ def point_stats(p):
         raise Reject("IMPOSSIBLE_SECOND_MOMENT",
                      "%s raw_sum_sq=%g cannot come from values inside [%g,%g]"
                      % (pid, sq, rmin, rmax))
+    if sq > (rmin+rmax)*s - n*rmin*rmax:
+        raise Reject("IMPOSSIBLE_SECOND_MOMENT", "range and sum imply a smaller second moment")
+    if rmin < rmax:
+        if n == 2:
+            attainable = s == rmin+rmax and sq == rmin*rmin+rmax*rmax
+        else:
+            remaining = s-rmin-rmax
+            attainable = ((n-2)*rmin <= remaining <= (n-2)*rmax and
+                          sq+1e-6 >= rmin*rmin+rmax*rmax+remaining*remaining/(n-2))
+        if not attainable:
+            raise Reject("IMPOSSIBLE_SECOND_MOMENT", "declared min/max cannot both have occurred")
     var = (sq - floor) / (n - 1.0)
     if var < 0.0:
         var = 0.0
@@ -373,6 +407,8 @@ def split_points(points):
         raise Reject("INSUFFICIENT_FIT_POINTS", "need >=2 fit points, got %d" % len(fit))
     if len(hold) < 1:
         raise Reject("INSUFFICIENT_HOLDOUT_POINTS", "need >=1 held-out point, got %d" % len(hold))
+    if len(fit) != 2:
+        raise Reject("UNSUPPORTED_BOUND_MODEL", "exactly two fit points are supported by the verified interval model")
     return fit, hold
 
 
@@ -435,6 +471,24 @@ def jac(fit, x_h, h=1e-5):
     return gx, gy, gh
 
 
+def _two_point_envelope(fit, held):
+    if len(fit) != 2:
+        raise Reject("UNSUPPORTED_BOUND_MODEL", "this verified interval model supports exactly two fit points")
+    q0,q1 = sorted(fit, key=lambda q: q["_stats"]["mean"])
+    F = Fraction.from_float
+    def interval(center, half):
+        c,h = F(float(center)),F(float(half))
+        return (c-h,c+h)
+    x0 = interval(q0["_stats"]["mean"],q0["_stats"]["u_counts"])
+    x1 = interval(q1["_stats"]["mean"],q1["_stats"]["u_counts"])
+    if x1[0] <= x0[1]:
+        raise Reject("UNCERTAINTY_INTERVALS_OVERLAP", "fit denominator can reach zero")
+    y0 = interval(q0["reference_mA"],q0["reference_error_mA"])
+    y1 = interval(q1["reference_mA"],q1["reference_error_mA"])
+    xh = interval(held["_stats"]["mean"],held["_stats"]["u_counts"])
+    values = [a+(b-a)*(x-u)/(v-u) for u,v,a,b,x in itertools.product(x0,x1,y0,y1,xh)]
+    return min(values),max(values)
+
 def bounds(doc, fit, hold, a, b):
     """Worst-case (absolute-sum) interval on the prediction at each held-out point."""
     unc = 0.0
@@ -477,7 +531,11 @@ def bounds(doc, fit, hold, a, b):
         # Absolute sum, then the held-out point's own meter limit and any declared
         # uncovered-branch term. Nothing is root-sum-squared here: a +/- limit is a
         # bound, and v1's RSS made the "bound" smaller than the meter alone allows.
-        bound = total + float(p["reference_error_mA"]) + unc
+        low,high = _two_point_envelope(fit,p)
+        centre = Fraction.from_float(float(i_pred))
+        exact_radius = max(abs(low-centre),abs(high-centre))
+        exact_bound = exact_radius + Fraction.from_float(float(p["reference_error_mA"])) + Fraction.from_float(unc)
+        bound = math.nextafter(float(exact_bound),math.inf)
         target = max(HOLDOUT_TARGET_ABS_MA, HOLDOUT_TARGET_REL * abs(i_ref))
         err = abs(i_pred - i_ref)
         bound_ok = bound <= target
@@ -489,11 +547,16 @@ def bounds(doc, fit, hold, a, b):
             "abs_error_mA": err, "target_mA": target,
             "target_rule": "PROPOSED_FOR_APPROVAL max(5 mA, 10%% of reference); not "
                            "an inherited project safety limit",
-            "error_model": "interval / absolute-sum; no distribution, coverage "
+            "error_model": "exact two-point interval / absolute-sum; no distribution, coverage "
                            "factor or independence claim is made for the bounded "
                            "meter and quantisation terms; the repeatability term "
                            "is a 1-sigma estimate carried linearly",
             "terms": terms,
+            "interval_method": "exact 32-corner two-point envelope; rational arithmetic; absolute-sum held reference and branch limits",
+            "interval_prediction_min_mA": math.nextafter(float(low),-math.inf),
+            "interval_prediction_max_mA": math.nextafter(float(high),math.inf),
+            "first_order_terms_are_diagnostic_only": True,
+            "coverage_scope": "conditional on the declared input intervals; repeatability remains an estimate, not an unconditional physical confidence guarantee",
             "worst_case_bound_mA": bound,
             "holdout_reference_limit_mA": float(p["reference_error_mA"]),
             "uncovered_branch_mA": unc,
@@ -926,7 +989,8 @@ def selftest():
                      % (p["raw_sum"], p["raw_min"], p["raw_max"],
                         int(round(p["raw_sum"] * 1000.0 / p["n_valid"]))))
             fh.write("[CAL] raw sum_sq=%d\n" % p["raw_sum_sq"])
-            fh.write("[CAL] sample cal src=THEORETICAL changed=0 fit=YES reason=-\n")
+            fh.write("[CAL] sample cal src=THEORETICAL changed=0 fit=READY reason=OK\n")
+            fh.write("[CAL] note: sample is observation only; no cal/flash/motion change\n")
         return path
 
     with tempfile.TemporaryDirectory() as td:

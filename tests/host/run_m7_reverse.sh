@@ -159,7 +159,7 @@ cp -f "$CALC" "$R5/m7_calcalc_rev5.py" || exit 4
 import sys
 p = sys.argv[1]
 s = open(p, encoding="utf-8").read()
-old = "        bound = total + float(p[\"reference_error_mA\"]) + unc"
+old = "        bound = math.nextafter(float(exact_bound),math.inf)"
 new = ("        # REVERSE-5a: v1 shape - RSS the bounded meter limits and call that "
        "a bound\n        bound = (total ** 2 + float(p[\"reference_error_mA\"]) ** 2) "
        "** 0.5 + unc")

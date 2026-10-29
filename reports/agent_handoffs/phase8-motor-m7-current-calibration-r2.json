@@ -1,0 +1,150 @@
+{
+  "task": "phase8-motor-m7-current-calibration-r2",
+  "date": "2026-10-29",
+  "reviewed_delivery": "c78f7865292d387a0533c2f22c39e8c848bcd689",
+  "roles": {
+    "firmware_code_commit": "5b564eb962e8518920f581111d7a460a2b1fce64",
+    "reviewed_delivery": "c78f7865292d387a0533c2f22c39e8c848bcd689",
+    "calculator_code_commit": "THIS_ROUND_TOOL_COMMIT (filled by the R2 calculator commit; never self-referenced)",
+    "delivery_head": "THIS_ROUND_EVIDENCE_COMMIT (filled after push, see remote_readback_r2.md)"
+  },
+  "scope": {
+    "authorized": [
+      "apply the reviewed calculator patch byte-exactly",
+      "finalise the P0 package offline",
+      "git delivery"
+    ],
+    "forbidden_and_not_done": [
+      "C/.h edits",
+      "HAL/kernel/stop_priority edits",
+      "clock/pin/macro changes",
+      "TMC/current-limit/SG changes",
+      "flash layout/schema",
+      "Keil project edits",
+      "three-target rebuild",
+      "flashing",
+      "any device object"
+    ],
+    "hardware_actions": [],
+    "keil_builds_executed": [],
+    "new_flash_actions": 0,
+    "motor_actions": []
+  },
+  "verdicts_consumed": {
+    "R1a": "CLOSED",
+    "R1b": "CLOSED",
+    "R2": "CLOSED",
+    "firmware_and_six_images": "ACCEPTED FOR P0",
+    "FIRMWARE_REVIEW_GO": "scope=P0_OBSERVATION only, no device action approved",
+    "R3_calculator": "PARTIAL / REWORK -> handled here",
+    "P1": "METHOD_NOT_READY",
+    "P2": "NOT_AUTHORIZED"
+  },
+  "calculator": {
+    "expected_start": {
+      "bytes": 49672,
+      "sha256": "622ad049ee8f520ffc14247986a5192e143c58ef10e9185e823c646bdb528c63"
+    },
+    "expected_candidate": {
+      "bytes": 54267,
+      "sha256": "5c7a2340b4d350b1e8932798a57b85e8a6f4818501e469ad6dfd5c1bd29163ad"
+    },
+    "combined_patch_sha256": "c0d1d67abf6826db3bc73443065bf3c3ba930ba0af1ba42fdf1c51cd18e7f7f0",
+    "tool_id_after_patch": "ns800-m7-calcalc-v2.1-cloud-candidate",
+    "reverse_script_staged_blob": {
+      "blob": "a754898c5d363261c6a62a23a05a58eb8633cd9d",
+      "bytes": 10083,
+      "sha256": "a32be1db2a579bcda6afe0f45bfba2fe9d9bd5bc66d71f6789aeadc6d1de96d4"
+    },
+    "patch_line_ending_incident": "first git apply produced 55420 B with 1153 CR (content identical, only CRLF added) because core.autocrlf=true; re-applied outside the repo with a per-command -c core.autocrlf=false, no git config was changed, result byte-identical to the packaged candidate",
+    "staged_tool_blob_after_patch": {
+      "blob": "24e283d8c1f7fa8bcb92b0b6f94b424edc8ff803",
+      "bytes": 54267,
+      "sha256": "5c7a2340b4d350b1e8932798a57b85e8a6f4818501e469ad6dfd5c1bd29163ad"
+    },
+    "staged_equals_expected_candidate": true
+  },
+  "executed_here": {
+    "calcalc_selftest": "SUMMARY cases=54 pass=54 fail=0",
+    "candidate_focused_checks": "SUMMARY 21 pass 21 fail 0",
+    "same_input_probes": "pre: 5 defective sources accepted + nonlinear corner bound 9.614344956063261 usable; post: all rc=1 no command, nonlinear corner bound 10.317726165210626 REJECT, control unchanged",
+    "reverse_battery_six_families": "REV1 3/3 REV2 1/1 REV3 1/1 REV4 2/2 REV5 3/3 REV6 2/2 -> PASS",
+    "p0_collector_selftest": "SUMMARY cases=11 pass=11 fail=0",
+    "keil": "not executed this round (no firmware change); KEIL_BUILDS_EXECUTED=[]"
+  },
+  "not_executed_here": [
+    "any device action: no serial/DAP/instrument object, no enumeration, no target memory read, no download, no reset, no target command, no power/wiring/SW1 change, no arm/start, no STEP/DIR/HIGH",
+    "three-target rebuild; the six accepted images are unchanged",
+    "I/O, SD and V1/V2 re-runs (product and fixtures untouched this round)"
+  ],
+  "cross_platform_differences": {
+    "REV3_cloud": "sub-runner rc=4, overall rc=1, C22f did fail; focused cal_static run confirmed the named detection; the cloud did not call the six-family battery a package PASS; cause undetermined",
+    "REV3_local": "rc=1 hits=1/1 with the whole battery PASS; kept as AGENT_LOCAL source grade",
+    "rule": "local green is not cross-platform correctness; both records kept side by side"
+  },
+  "images_unchanged": {
+    "bin": {
+      "path": "reports/firmware/phase8-motor-m7-current-calibration-r1/rt-thread-motor-m1.bin",
+      "bytes": 266244,
+      "sha256": "e614a075ab63eb5b1c4b08e1ab51fb4043f474037ce734b4bcaf666899c8f7da"
+    },
+    "axf": {
+      "path": "reports/firmware/phase8-motor-m7-current-calibration-r1/rt-thread-motor-m1.axf",
+      "bytes": 1688696,
+      "sha256": "2205c7e7ad6bad93e848fd24d1e5f38c76796865a2b21ebcd2d4e22bb4b6d584"
+    },
+    "matches_reviewed_p0_payload": true
+  },
+  "p0_package": {
+    "path": "reports/reviews/phase8-motor-m7-current-calibration-r2/p0_package.md",
+    "collector": {
+      "path": "reports/reviews/phase8-motor-m7-current-calibration-r2/p0_voltage_observation.py",
+      "bytes": 15503,
+      "sha256": "1e34589fd3f0250abc5db6a63df2800cf8883c6f65de6219ff350540d138c44f"
+    },
+    "readback_range": {
+      "address": "0x08000000",
+      "length_bytes": 266244,
+      "length_hex": "0x00041004"
+    },
+    "expected_boot_banner": "5.3.0 build Oct 29 2026 23:11:52",
+    "banner_derivation": "kservice.c:161-162 format + rtdef.h:85-87 5/3/0 + BIN offsets Oct 29 2026@259925 / 23:11:52@259916; method validated end-to-end by the M5 round where the board-read banner matched that image's archived byte-recovered stamp",
+    "whitelist": [
+      "safety_state",
+      "safety_status",
+      "motor_status",
+      "step_status",
+      "current_cal show",
+      "current_cal sample 128"
+    ],
+    "transmission_precedent": "phase8-motor-m5-fault-log m5_field_package.md section 3 + cp1/flash.log + cp1/readback_sha256.txt",
+    "quota": {
+      "download": 1,
+      "fixed_length_readback": 1,
+      "explicit_sysresetreq": 1,
+      "com5_open": 1,
+      "status_queries_each": 1,
+      "current_cal_show": 2,
+      "current_cal_sample_128": 1,
+      "dmm_readings": 4
+    },
+    "conclusion_ceiling": "VOLTAGE_OBSERVATION_ONLY",
+    "tool_internal_reset": "TOOL_INTERNAL_RESET_NOT_OBSERVABLE - the package does not claim the physical reset total is 1",
+    "status": "PREPARED_NOT_EXECUTED"
+  },
+  "open": [
+    "more than two fit points stays UNSUPPORTED_BOUND_MODEL",
+    "no automatic splitting of a shared session transcript",
+    "old cfg_take() users still discard the take result (out of scope by review)",
+    "P1 METHOD_NOT_READY, P2 NOT_AUTHORIZED, no FIELD data yet",
+    "REV3 cloud rc=4 cause undetermined; tshell stack high-water NOT_MEASURED"
+  ],
+  "synthetic_data_warning": "every calculator example including reports/reviews/phase8-motor-m7-current-calibration-r2/example_result_HOST_SYNTHETIC.json (current_cal apply 1598291 671551 CONFIRM_MEASURED) is HOST_SYNTHETIC and must never be sent to hardware",
+  "receipt": [
+    "M7_R2_CALCULATOR_PATCH_APPLIED / OFFLINE_VERIFIED / AWAITING_REMOTE_BYTE_REVIEW",
+    "M7_R1_FIRMWARE_ACCEPTED_FOR_P0 / SIX_IMAGE_BYTES_UNCHANGED",
+    "P0_PACKAGE_PREPARED_NOT_EXECUTED / P1_METHOD_NOT_READY / P2_NOT_AUTHORIZED",
+    "HARDWARE_ACTIONS=[] / KEIL_BUILDS_EXECUTED=[] / NEW_FLASH_ACTIONS=0",
+    "M5_BOARD_IMAGE_UNCHANGED / NO_MOTOR_ACTIONS / NO_HARDWARE_GO_SELF_CLAIMED"
+  ]
+}

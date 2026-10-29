@@ -368,5 +368,31 @@
     "P1_METHOD_NOT_READY",
     "M5_BOARD_IMAGE_UNCHANGED / NO_HARDWARE_GO_SELF_CLAIMED"
   ],
+  "m7_r2_review_pointer": {
+    "date": "2026-10-29",
+    "reviewed_delivery": "c78f7865292d387a0533c2f22c39e8c848bcd689",
+    "appended_by": "phase8-motor-m7-current-calibration-r2; sections 1-8 above are kept unmodified",
+    "per_item_verdicts": {
+      "R1a": "CLOSED",
+      "R1b": "CLOSED",
+      "R2": "CLOSED (cloud UBSan re-run shows no out-of-range conversion)",
+      "firmware_and_six_images": "ACCEPTED FOR P0 under FIRMWARE_REVIEW_GO(scope=P0_OBSERVATION)",
+      "R3_calculator": "PARTIAL / REWORK, handled by the R2 round",
+      "P0_plan": "can be finalised independently, no P1 material needed",
+      "P1_P2_real_calibration_and_protection_acceptance": "not released"
+    },
+    "go_scope_limit": "P0 payload acceptance only; not a GO for the whole M7 calibration work package; no device action approved",
+    "cross_platform_differences_kept_side_by_side": [
+      "REV3 on the cloud: sub-runner rc=4 and overall entry rc=1 while C22f really failed; the cloud then ran cal_static focused (target declared SKIP, host_ovr 9 cases = 8 PASS / 1 FAIL, pre_bad=0) to confirm the named detection, and did NOT claim a six-family package PASS. Locally REV3 reported rc=1 hits=1/1 with the whole battery PASS; that stays an AGENT_LOCAL source grade.",
+      "I/O, SD and V1/V2 were not re-run by the cloud this round, so they are not counted there; the local results and archives remain as recorded."
+    ],
+    "reason_for_REV3_cloud_rc4": "UNDETERMINED - not presented as a product defect",
+    "r2_evidence": [
+      "reports/reviews/phase8-motor-m7-current-calibration-r2/calculator_r2.md",
+      "reports/reviews/phase8-motor-m7-current-calibration-r2/patch_application_log.txt",
+      "reports/reviews/phase8-motor-m7-current-calibration-r2/p0_package.md",
+      "reports/agent_handoffs/phase8-motor-m7-current-calibration-r2.md"
+    ]
+  },
   "next_step_awaiting_review": "one concrete P0 voltage-observation package for a single user approval; P1 reference conditions keep being closed offline; communication, basic start/stop and the 300-frame software-fault demo are not reopened"
 }

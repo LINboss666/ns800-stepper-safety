@@ -1,0 +1,191 @@
+{
+  "candidate": {
+    "applicable": true,
+    "gain_V_per_A": 0.6715506715506716,
+    "gain_uV_per_A": 671551,
+    "intercept_mA": -2380.0,
+    "nominal_mv_per_count_assumed": 0.8058608058608059,
+    "offset_mV": 1598.2905982905984,
+    "offset_uV": 1598291,
+    "slope_mA_per_count": 1.2
+  },
+  "candidate_command_DRAFT_NOT_APPROVED": "current_cal apply 1598291 671551 CONFIRM_MEASURED",
+  "fit_points": [
+    {
+      "h10_mv": 1611.7216117216117,
+      "id": "F1",
+      "n_valid": 128,
+      "raw_mean": 2000.0,
+      "raw_source_file": "synth_f1.txt",
+      "raw_source_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "read_window_s": 12.0,
+      "reference_error_mA": 0.5,
+      "reference_mA": 20.0,
+      "reference_source": "METER_IN_SERIES",
+      "sd_counts": 2.0078585764421075,
+      "seq": [
+        10,
+        137
+      ],
+      "temp_c": 25.0,
+      "tick": [
+        1000,
+        3560
+      ],
+      "u_bound_counts": 0.5,
+      "u_counts": 0.6774713018832228,
+      "u_repeat_counts": 0.17747130188322274,
+      "vdd33_mv": 3300.0
+    },
+    {
+      "h10_mv": 1692.3076923076924,
+      "id": "F2",
+      "n_valid": 128,
+      "raw_mean": 2100.0,
+      "raw_source_file": "synth_f2.txt",
+      "raw_source_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "read_window_s": 12.0,
+      "reference_error_mA": 1.42,
+      "reference_mA": 140.0,
+      "reference_source": "METER_IN_SERIES",
+      "sd_counts": 2.0078585764421075,
+      "seq": [
+        10,
+        137
+      ],
+      "temp_c": 25.0,
+      "tick": [
+        1000,
+        3560
+      ],
+      "u_bound_counts": 0.5,
+      "u_counts": 0.6774713018832228,
+      "u_repeat_counts": 0.17747130188322274,
+      "vdd33_mv": 3300.0
+    }
+  ],
+  "holdout_all_pass": true,
+  "holdout_points": [
+    {
+      "abs_error_mA": 0.0,
+      "bound_exceeds_target": false,
+      "coverage_scope": "conditional on the declared input intervals; repeatability remains an estimate, not an unconditional physical confidence guarantee",
+      "error_model": "exact two-point interval / absolute-sum; no distribution, coverage factor or independence claim is made for the bounded meter and quantisation terms; the repeatability term is a 1-sigma estimate carried linearly",
+      "first_order_terms_are_diagnostic_only": true,
+      "holdout_reference_limit_mA": 0.94,
+      "id": "H1",
+      "interval_method": "exact 32-corner two-point envelope; rational arithmetic; absolute-sum held reference and branch limits",
+      "interval_prediction_max_mA": 82.5983965964744,
+      "interval_prediction_min_mA": 77.42653434743491,
+      "n_valid": 128,
+      "pass": true,
+      "predicted_mA": 80.0,
+      "raw_mean": 2050.0,
+      "reference_mA": 80.0,
+      "target_mA": 8.0,
+      "target_rule": "PROPOSED_FOR_APPROVAL max(5 mA, 10%% of reference); not an inherited project safety limit",
+      "terms": [
+        {
+          "bounded_mA": 0.2999999992425728,
+          "half_width_mA": 0.4064827801036633,
+          "kind": "bounded+repeatability",
+          "repeatability_mA": 0.10648278086109046,
+          "term": "fit_raw_code:F1"
+        },
+        {
+          "bounded_mA": 0.3000000106112566,
+          "half_width_mA": 0.4064827955075773,
+          "kind": "bounded+repeatability",
+          "repeatability_mA": 0.10648278489632068,
+          "term": "fit_raw_code:F2"
+        },
+        {
+          "half_width_mA": 0.25000001642183634,
+          "kind": "bounded(meter limit, not a standard deviation)",
+          "term": "fit_reference:F1"
+        },
+        {
+          "half_width_mA": 0.7099999820638913,
+          "kind": "bounded(meter limit, not a standard deviation)",
+          "term": "fit_reference:F2"
+        },
+        {
+          "bounded_mA": 0.6000000098538294,
+          "half_width_mA": 0.8129655756112406,
+          "kind": "bounded+repeatability",
+          "repeatability_mA": 0.21296556575741116,
+          "term": "holdout_raw_code:H1"
+        }
+      ],
+      "uncovered_branch_mA": 0.0,
+      "worst_case_bound_mA": 3.5383965964743864
+    }
+  ],
+  "meter": {
+    "dc_range": "400mA",
+    "error_expression": "0.8%+3",
+    "model": "UT39A+",
+    "resolution": "0.1mA"
+  },
+  "method": {
+    "branch": "HOST_SYNTHETIC",
+    "connection": "HOST_SYNTHETIC",
+    "covers_all_measured_current": true,
+    "environment": null,
+    "fuse_rating": null,
+    "series_voltage_drop_mV": null,
+    "surcharge_handling": null,
+    "uncovered_branch_error_mA": null
+  },
+  "not_applicable_reason": null,
+  "notes": [
+    "the mV display uses the nominal 3300/4095 assumption; it is not proof that VDDA was measured",
+    "a pass here qualifies the fitted link only, not the whole protection chain",
+    "status stays DRAFT_NOT_APPROVED until an independent review and one approval of the concrete field package",
+    "the fit numbers above are still reported when the run REJECTs, so a reviewer can see how close it was; they are not an applicable candidate"
+  ],
+  "provenance": "HOST_SYNTHETIC",
+  "qualification": {
+    "checks": [
+      {
+        "expr": "span_I > 10 * (E_lo + E_hi)",
+        "gate": "REF_SPAN_GT_10x_SUM_REF_ERROR_BOUNDS",
+        "pass": true,
+        "reason": "the reference span must dominate the meter error limits at both ends, otherwise the fitted slope sits inside the instrument",
+        "substituted": {
+          "E_lo_plus_E_hi_mA": 1.92,
+          "limit": 10.0,
+          "ratio": 62.5,
+          "span_I_mA": 120.0
+        }
+      },
+      {
+        "expr": "span_raw > 10 * (u(lo) + u(hi))",
+        "gate": "RAW_SPAN_GT_10x_SUM_CODE_UNCERTAINTY",
+        "pass": true,
+        "reason": "raw-code span must dominate the half-count bound plus the dispersion of the two end points",
+        "substituted": {
+          "limit": 10.0,
+          "ratio": 73.80386425374903,
+          "span_raw_counts": 100.0,
+          "sum_u_counts": 1.3549426037664456
+        }
+      }
+    ],
+    "qualified": true
+  },
+  "status": "DRAFT_NOT_APPROVED",
+  "tool": "ns800-m7-calcalc-v2.1-cloud-candidate",
+  "usable": true,
+  "valid_range": {
+    "note": "Only inside the measured current, supply, temperature and load window of these points. No extrapolation to over-current or stall thresholds.",
+    "raw_counts": [
+      2000.0,
+      2100.0
+    ],
+    "reference_mA": [
+      20.0,
+      140.0
+    ]
+  }
+}

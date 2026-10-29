@@ -1,0 +1,13 @@
+PASS P0T01-whitelist-is-exactly-six safety_state|safety_status|motor_status|step_status|current_cal show|current_cal sample 128
+PASS P0T02-no-privileged-command-in-whitelist 0 hits
+PASS P0T03-no-transport-import-at-module-scope import serial appears only after run_execute starts
+PASS P0T04-real-port-only-behind-approval-flag constructor in execute path
+PASS P0T05-banner-saved-before-decision raw_boot.bin
+PASS P0T06-non-whitelist-refused-before-wire 0 bytes written
+PASS P0T07-read-is-bounded captured=262144 cap=262144
+PASS P0T08-first-failure-stops writes=1
+PASS P0T09-danger-stops-after-saving raw_danger.bin
+PASS P0T10-fixed-order-one-write-each 6 writes
+PASS P0T11-ledger-separates-tx-from-result TX_ATTEMPT rows=8
+SUMMARY cases=11 pass=11 fail=0
+M7-R2 P0 COLLECTOR SELFTEST: PASS

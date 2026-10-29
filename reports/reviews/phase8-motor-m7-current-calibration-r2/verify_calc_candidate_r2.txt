@@ -1,0 +1,19 @@
+{"case": "FULL_LF", "pass_": true, "rc": 0}
+{"case": "FULL_CRLF", "pass_": true, "rc": 0}
+{"case": "FULL_KNOWN_MSH_ECHO", "pass_": true, "rc": 0}
+{"case": "HEADER_ONLY", "pass_": true, "rc": 1}
+{"case": "NO_DECISION_TAIL", "pass_": true, "rc": 1}
+{"case": "NUL_IN_NEGATIVE_DECISION", "pass_": true, "rc": 1}
+{"case": "VERSION_CHANGED", "pass_": true, "rc": 1}
+{"case": "CHANGE_FLAG", "pass_": true, "rc": 1}
+{"case": "NO_POSITIVE_FIT", "pass_": true, "rc": 1}
+{"case": "NO_REASON_FIELD", "pass_": true, "rc": 1}
+{"case": "DUPLICATED_SAMPLE", "pass_": true, "rc": 1}
+{"case": "REORDERED_LINES", "pass_": true, "rc": 1}
+{"case": "TICK_DIFFERENT_FROM_DECLARATION", "pass_": true, "rc": 1}
+{"case": "NREQ_DIFFERENT", "pass_": true, "rc": 1}
+{"case": "NUMERIC_TOKEN_SUFFIX", "pass_": true, "rc": 1}
+{"case": "RENAMED_COPY_OF_FIT", "pass_": true, "rc": 1}
+{"case": "BARE_CR_INSIDE_LINE", "pass_": true, "rc": 1}
+{"case": "FORGED_SHA", "pass_": true, "rc": 1}
+SUMMARY 21 pass 21 fail 0 []

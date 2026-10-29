@@ -175,3 +175,31 @@ UT39A+/C+ 原厂说明书正文（中/英文手册下载均返回 502，只有�
 （`board_candidate.md` §2，含 §2.1 的身份次序与 §2.3 的整包配对表）；
 P1 的参考条件继续独立离线补齐。通信、基础启停、300 帧软件故障演示不重开。
 M6 现场候选仍不执行，示波器与 A0 继续暂缓。
+
+## 9. 追加：M7-R1 分项复审结论（2026-10-29，下一轮登记）
+
+本节由 `phase8-motor-m7-current-calibration-r2` 追加，上面 §1–§8 原文不改写。
+被审交付 `c78f7865292d387a0533c2f22c39e8c848bcd689` 的分项判定：
+
+| 对象 | 判定 |
+|---|---|
+| R1a 诊断预约与静止事务 | CLOSED |
+| R1b 配置锁失败 | CLOSED |
+| R2 µA 导出 | CLOSED（云端 UBSan 复跑无越界转换） |
+| 三份固件与六件 BIN/AXF 身份 | **ACCEPTED FOR P0**，`FIRMWARE_REVIEW_GO(scope=P0_OBSERVATION)` |
+| R3 计算工具 | **PARTIAL / REWORK** → 由 R2 轮处理 |
+| P0 计划 | 可独立定稿，不依赖 P1 物料 |
+| P1/P2、真实标定与保护验收 | 未放行 |
+
+复审同时登记了两条与本机结果的差异，原样保留、不择一采信：
+
+1. **REV3 在云端不是整包绿**：子 runner `rc=4`、总入口 `rc=1`；其 C22f 确实实际 FAIL，
+   随后云端只跑 `cal_static`（target 声明 SKIP；host_ovr 9 例 = 8 PASS/1 FAIL、`pre_bad=0`）
+   确认具名检出。云端**未**把六族写成整包 PASS，原因未定，也不据此称产品坏了。
+   本机 `m7_reverse_final.log` 是 `REV3 rc=1 hits=1/1` 且整包 PASS —— 保留为"Agent 本机"来源等级。
+2. I/O、SD、V1/V2 云端本轮未复跑，因此不计入其"实际执行"表；本机结果与归档照旧可查。
+
+本轮真实工具/计划工作与上述指针在
+`reports/reviews/phase8-motor-m7-current-calibration-r2/`（`calculator_r2.md`、
+`p0_package.md`、`patch_application_log.txt`）与
+`reports/agent_handoffs/phase8-motor-m7-current-calibration-r2.md/.json`。

@@ -1,0 +1,24 @@
+# M7-R2 patch application log (verbatim commands and outputs, this machine)
+
+## identities before
+HEAD = c78f7865292d387a0533c2f22c39e8c848bcd689
+tool blob at HEAD = 49672 B / 622ad049ee8f520ffc14247986a5192e143c58ef10e9185e823c646bdb528c63
+
+## step 1: apply to canonical LF bytes OUTSIDE the repo, first attempt (no per-command autocrlf override)
+  cd <scratch> && git apply --check -p1 calculator/m7_r2_combined.patch   -> APPLY-CHECK OK
+  cd <scratch> && git apply        -p1 calculator/m7_r2_combined.patch   -> APPLIED
+  result: bytes=55420 cr=1153 sha256=c1f62e1e31f6f0103377d28ceab6f8a6b83bc56a1e3cb9349fe64d3017039b9d  <- NOT the candidate
+  line-content diff vs packaged candidate: 0 lines (1153 vs 1153); byte delta = 1153 CR = one per line
+
+## step 2: re-apply with -c core.autocrlf=false (per command; global/repo config untouched)
+  git -c core.autocrlf=false apply --check -p1 ... -> OK
+  git -c core.autocrlf=false apply        -p1 ... -> APPLIED
+  result: bytes=54267 cr=0 sha256=5c7a2340b4d350b1e8932798a57b85e8a6f4818501e469ad6dfd5c1bd29163ad
+  byte-for-byte equal to packaged candidate: True
+  run_m7_reverse.sh: bytes=10083 cr=0 sha256=a32be1db2a579bcda6afe0f45bfba2fe9d9bd5bc66d71f6789aeadc6d1de96d4
+
+## step 3: staged blob after copying the LF results back into the repo
+100644 24e283d8c1f7fa8bcb92b0b6f94b424edc8ff803 0	reports/reviews/phase8-motor-m7-current-calibration/m7_calcalc.py
+staged tool blob sha256 = 5c7a2340b4d350b1e8932798a57b85e8a6f4818501e469ad6dfd5c1bd29163ad
+expected candidate      = 5c7a2340b4d350b1e8932798a57b85e8a6f4818501e469ad6dfd5c1bd29163ad
+config unchanged: core.autocrlf = true (repo scope, never edited)
