@@ -1,0 +1,129 @@
+{
+  "task": "phase8-motor-m7-current-calibration",
+  "date": "2026-10-29",
+  "branch": "debug/tmc-uart-rootcause-20261028",
+  "document_base": "4a626bc49831345d8366deeb6b01cc81e77ec79d",
+  "source_base": "4a626bc49831345d8366deeb6b01cc81e77ec79d",
+  "code_commit": "f1883393f37d58f41bb506603e2e54dbf91776d6",
+  "project": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/project.uvprojx",
+  "build": {
+    "tool": "UV4 5.43.1.0 (MDK Plus 5.43) / Arm Compiler for Embedded 6.24",
+    "command": "UV4.exe -r project.uvprojx -t <target> -j0 -o <absolute log path>",
+    "rebuild_all": true,
+    "download_used": false,
+    "hooks_verified_before_build": "BeforeMake RunUserProg=0 for all three targets; AfterMake user command is 'fromelf --bin' only (image conversion, no flasher)",
+    "result": "three targets 0 Error(s), 0 Warning(s)"
+  },
+  "banner_note": "No __DATE__/__TIME__ banner is compiled into these images: grep for the date-time pattern over all three BIN and all three AXF returns 0 hits, and __DATE__ appears nowhere under bsp/novosns/ns800 except a markdown file. This round has no device access, so no boot banner was read from the board. The 'banner' values in the M5/M6 build manifests are therefore not reproducible from the archived image bytes; recorded as a prior-evidence discrepancy, not silently copied forward.",
+  "targets": {
+    "rt-thread": {
+      "macros": "no target -D for the four hardware macros -> motor.h defaults RT_FALSE (probe rc=0)",
+      "program_size": "Code=185218 RO-data=79590 RW-data=2188 ZI-data=83792",
+      "axf": {
+        "bytes": 1686472,
+        "sha256": "54f9c6c3c98d8a30d29d18a874170bd6c22b663c5259d49e52c8e409a78dfa87"
+      },
+      "bin": {
+        "bytes": 265388,
+        "sha256": "1bf17ed8bc4580ea8c2599a458afbe31c689c1ea9c0e3c6a4e65ead6509de542"
+      },
+      "load": {
+        "base": "0x08000000",
+        "size": 267000,
+        "max": "0x00080000",
+        "compressed": 265388,
+        "total_rom_size_bytes": 265384,
+        "total_rw_size_bytes": 85980,
+        "entry_point": "0x080003cd",
+        "note": "armlink Load Region LR_IROM1: base/size/max/compressed from the .map. compressed equals the archived BIN byte count for every target; total_rom_size is 4 B smaller (armlink counts Code+RO+RW without the trailing padding fromelf appends)."
+      },
+      "banner": "NOT_EMBEDDED_IN_IMAGE_BYTES (see banner_note)",
+      "build_log": "reports/reviews/phase8-motor-m7-current-calibration/builds/build_rt-thread.log"
+    },
+    "rt-thread-measure-a0": {
+      "macros": "NS800_TARGET_MEASUREMENT_A0=1; four hardware macros stay RT_FALSE (probe rc=0)",
+      "program_size": "Code=192514 RO-data=82550 RW-data=2188 ZI-data=91512",
+      "axf": {
+        "bytes": 1716896,
+        "sha256": "9e5c9d7c5340c98e31e5d56ab778ac10600d3979dccfbde4cdf7d41b9421f08e"
+      },
+      "bin": {
+        "bytes": 275644,
+        "sha256": "8307cffdcaa132e78bde182eb750209602168095269fbf20a44d46cfb1ab8d49"
+      },
+      "load": {
+        "base": "0x08000000",
+        "size": 277256,
+        "max": "0x00080000",
+        "compressed": 275644,
+        "total_rom_size_bytes": 275640,
+        "total_rw_size_bytes": 93700,
+        "entry_point": "0x080003cd",
+        "note": "armlink Load Region LR_IROM1: base/size/max/compressed from the .map. compressed equals the archived BIN byte count for every target; total_rom_size is 4 B smaller (armlink counts Code+RO+RW without the trailing padding fromelf appends)."
+      },
+      "banner": "NOT_EMBEDDED_IN_IMAGE_BYTES (see banner_note)",
+      "build_log": "reports/reviews/phase8-motor-m7-current-calibration/builds/build_rt-thread-measure-a0.log"
+    },
+    "rt-thread-motor-m1-candidate": {
+      "macros": "MOTOR_HARDWARE_ENABLE_PATH_VALIDATED=1 TMC_DRIVE_CONFIG_HW_VALIDATED=1 STEP_DIAG_ISOLATED_ENV_CONFIRMED=0 SAFETY_LIMIT_INPUTS_ENABLED=0",
+      "program_size": "Code=185450 RO-data=79466 RW-data=2188 ZI-data=83792",
+      "axf": {
+        "bytes": 1686956,
+        "sha256": "8337f9564e3740a1e7708fd9a7b4021f98cdc69aa098b35e769e1c41efd8f63a"
+      },
+      "bin": {
+        "bytes": 265492,
+        "sha256": "4717a718b84043210a52dfedd80fae57bcecc64473ec4f23317b2066162aee53"
+      },
+      "load": {
+        "base": "0x08000000",
+        "size": 267104,
+        "max": "0x00080000",
+        "compressed": 265492,
+        "total_rom_size_bytes": 265492,
+        "total_rw_size_bytes": 85980,
+        "entry_point": "0x080003cd",
+        "note": "armlink Load Region LR_IROM1: base/size/max/compressed from the .map. compressed equals the archived BIN byte count for every target; total_rom_size is 4 B smaller (armlink counts Code+RO+RW without the trailing padding fromelf appends)."
+      },
+      "banner": "NOT_EMBEDDED_IN_IMAGE_BYTES (see banner_note)",
+      "build_log": "reports/reviews/phase8-motor-m7-current-calibration/builds/build_rt-thread-motor-m1-candidate.log"
+    }
+  },
+  "stack": {
+    "method": "armclang -fstack-usage probe on the real product sources, with the target's IncludePath (project.uvprojx:343) and Define (project.uvprojx:5821) lists",
+    "tables": [
+      "reports/reviews/phase8-motor-m7-current-calibration/builds/stack_usage.txt (-O0)",
+      "reports/reviews/phase8-motor-m7-current-calibration/builds/stack_usage_O1.txt (-O1, matches <Optim>1</Optim>)"
+    ],
+    "deepest_new_chains_O1_bytes": {
+      "current_cal_cmd -> cc_sample": 528,
+      "current_cal_cmd -> cc_apply_or_nominal -> motor_calibration_static_begin": 568,
+      "current_cal_cmd -> cc_apply_or_nominal -> project_config_set_calibration -> cfg_apply_from -> current_adc_set_calibration_ex -> cal_apply": 336
+    },
+    "caveat": "These are the compiled static local frames summed along the call path, i.e. a lower bound on that chain's usage. They are NOT the target stack high-water mark, they exclude callee-saved register pushes accounted by the ABI elsewhere, and at -O1 inlining may fold small callees into the caller's frame. Measured on-target high-water: NOT_MEASURED (future field round).",
+    "tshell_stack_size": "NOT_REASSERTED_THIS_ROUND - the command runs on the FinSH/tshell thread and its configured size was not re-derived here; check in the field package."
+  },
+  "on_board_last_proven": {
+    "image": "M5 motor candidate",
+    "bin_bytes": 259580,
+    "bin_sha256": "01d3e5ab1ad245949385d50c9f1d5fd2bbaac0806c3920e897321bc46db764bc",
+    "axf_bytes": 1668244,
+    "axf_sha256": "8c5bc7bf1efa786013c767ae1e09415ad0d5d5db3e38069c8aeebabf7cebae40",
+    "build_stamp": "Oct 29 2026 00:38:59",
+    "status": "UNCHANGED / M7_IMAGES_NOT_FLASHED"
+  },
+  "prior_candidates_not_flashed": {
+    "M6_motor_bin": "a1ba8226c5d09578c111b61a0b12a7ac182d572db01cc945081c51185b837f7b",
+    "M6_field_candidate": {
+      "bytes": 66847,
+      "sha256": "9faaca5904ccd3c2618c4a152cc200f4f756ff45aef3e671cf2815356b706649",
+      "status": "NOT_BOARD_EXECUTED (M6 closed; not invoked by M7)"
+    }
+  },
+  "status": "NEW_IMAGES_BUILT_NOT_FLASHED",
+  "hardware_actions": [],
+  "historical_images_untouched": [
+    "reports/firmware/phase8-motor-m5-fault-log",
+    "reports/firmware/phase8-motor-m6-offline"
+  ]
+}

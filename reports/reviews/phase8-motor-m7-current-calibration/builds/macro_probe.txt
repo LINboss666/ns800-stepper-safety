@@ -1,0 +1,14 @@
+# armclang 宏探针（与三目标同一条 armclang；Define 逐字取自 project.uvprojx 该目标的 <Define>）
+Product: MDK Plus 5.43
+Component: Arm Compiler for Embedded 6.24
+
+rt-thread (expects MOTOR=0 TMC=0; target defines: none) -> armclang_rc=0
+rt-thread-measure-a0 (expects MOTOR=0 TMC=0; target defines: NS800_TARGET_MEASUREMENT_A0=1) -> armclang_rc=0
+rt-thread-motor-m1-candidate (expects MOTOR=1 TMC=1; target defines: A0=0 MOTOR=1 TMC=1 STEP=0 LIMIT=0) -> armclang_rc=0
+
+# 负控: 同一探针在没有任何 -D 时把 MOTOR_EXPECT 写成 1 必须编译失败（证明该门真的在判，不是恒过）
+NEGATIVE expects MOTOR=1 with no defines -> armclang_rc=1
+NEGATIVE STEP_DIAG 被写成 1 -> armclang_rc=1
+NEGATIVE SAFETY_LIMIT 被写成 1 -> armclang_rc=1
+
+M7 MACRO PROBE RESULT: PASS
