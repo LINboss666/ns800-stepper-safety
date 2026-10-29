@@ -17,4 +17,16 @@ CASE|M6D10-argument_error_no_serial|PASS|ok
 CASE|M6D11-archive_gate_blocks_bad_state|PASS|ok
 PRECHECK=FAIL archive=archive not accepted
 CASE|M6D12-bad_archive_before_serial|PASS|ok
-SUMMARY|cases=13 pass=13 fail=0
+CASE|M6D13-shared_clock_charges_arm_block|PASS|ok
+CASE|M6D14-write_timeout_preserves_primary|PASS|ok
+CASE|M6D15-start_read_block_within_cleanup|PASS|ok
+CASE|M6D16-primary_and_cleanup_errors_separate|PASS|ok
+CASE|M6D17-write_reached_reply_lost|PASS|ok
+CASE|M6D18-evidence_failure_keeps_primary|PASS|ok
+CASE|M6D19-arm_refusal_text_no_start|PASS|ok
+CASE|M6D20-arm_status_missing_duplicate_conflict|PASS|ok
+CASE|M6D21-arm_reply_lost_status_confirmed|PASS|ok
+CASE|M6D22-arm_reply_lost_status_unavailable|PASS|ok
+CASE|M6D23-static_preflight_error_no_motor|PASS|ok
+CASE|M6D24-evidence_failure_alone_fails|PASS|ok
+SUMMARY|cases=25 pass=25 fail=0
