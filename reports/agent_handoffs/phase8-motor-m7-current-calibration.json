@@ -1,0 +1,460 @@
+{
+  "task_id": "phase8-motor-m7-current-calibration",
+  "task_title": "NS800 M7 bus-current calibration development and field package preparation",
+  "date": "2026-10-29",
+  "timezone": "Asia/Shanghai",
+  "branch": "debug/tmc-uart-rootcause-20261028",
+  "document_base": "4a626bc49831345d8366deeb6b01cc81e77ec79d",
+  "source_base": "4a626bc49831345d8366deeb6b01cc81e77ec79d",
+  "code_commit": "f1883393f37d58f41bb506603e2e54dbf91776d6",
+  "tested_commit": "f1883393f37d58f41bb506603e2e54dbf91776d6",
+  "artifact_commit": "424ff308f56d95fb7c1c670231d44639752e8ba7",
+  "delivery_head": "see remote_readback.final_branch_head; this JSON's own commit is not self-hashed",
+  "working_tree_at_test": "identical bytes to code_commit f188339 (product and tests); host chains were run on those bytes before committing them",
+  "authorization": "OFFLINE_DEVELOPMENT_ONLY",
+  "scope_note": "only offline development, existing-material verification, host tests, Keil builds, git commit/push and remote readback were authorised",
+  "artifacts": {
+    "source_audit": "reports/reviews/phase8-motor-m7-current-calibration/source_audit.md",
+    "design": "reports/reviews/phase8-motor-m7-current-calibration/design.md",
+    "test_summary": "reports/reviews/phase8-motor-m7-current-calibration/test_summary.md",
+    "build_notes": "reports/reviews/phase8-motor-m7-current-calibration/build_notes.md",
+    "board_candidate": "reports/reviews/phase8-motor-m7-current-calibration/board_candidate.md",
+    "remote_readback": "reports/reviews/phase8-motor-m7-current-calibration/remote_readback.md",
+    "calcalc_tool": "reports/reviews/phase8-motor-m7-current-calibration/m7_calcalc.py",
+    "calcalc_selftest": "reports/reviews/phase8-motor-m7-current-calibration/calcalc_selftest.txt",
+    "calcalc_first_failure": "reports/reviews/phase8-motor-m7-current-calibration/calcalc_selftest_first_failure.txt",
+    "synthetic_example_input": "reports/reviews/phase8-motor-m7-current-calibration/example_input_HOST_SYNTHETIC.json",
+    "synthetic_example_result": "reports/reviews/phase8-motor-m7-current-calibration/example_result_HOST_SYNTHETIC.json",
+    "reverse_detail": "reports/reviews/phase8-motor-m7-current-calibration/reverse_detail.txt",
+    "build_manifest": "reports/firmware/phase8-motor-m7-current-calibration/build_manifest.json",
+    "handoff_md": "reports/agent_handoffs/phase8-motor-m7-current-calibration.md"
+  },
+  "commands_and_contracts": {
+    "exported_name": "current_cal",
+    "verbatim_forms": [
+      "current_cal show",
+      "current_cal sample 32..256",
+      "current_cal apply <offset_uV> <gain_uV_per_A> CONFIRM_MEASURED",
+      "current_cal nominal CONFIRM"
+    ],
+    "units": {
+      "offset_uV": "microvolts; 1650000 == 1650 mV",
+      "gain_uV_per_A": "microvolts per ampere; 600000 == 0.6 V/A"
+    },
+    "context_gate": "refuses silently when rt_interrupt_get_nest()!=0, or PRIMASK is set (sp_intr_masked()), or rt_thread_self()==NULL; never waits for a Sensor frame before refusing",
+    "argument_parsing": "own strict unsigned decimal parser with overflow pre-check; sign, trailing characters, exponent, missing or extra arguments are rejected; no atoi/atof; permission is never inferred from a response containing the substring 'armed'",
+    "sampling": "polls sensor_service_get_latest(); counts only new seq; fresh_current==0 or valid_current==0 is not a new measurement; records dup/invalid/skip/seq-reset; deadline = N*20ms + 500ms capped at 12000 ms; online u64 statistics, no N-element array on the tshell stack",
+    "side_effect_contract": "show and sample change no coefficient, source, motion or protection state and never write Flash; apply and nominal touch only the three cal fields in RAM; config_save remains a separate explicit action and was not invoked",
+    "confirmation_semantics": "CONFIRM_MEASURED is a human evidence-responsibility marker only; it does not mean the MCU verified the meter and is not approval to go ACTIVE",
+    "single_entry_rule": "no second synonymous dangerous entry point was kept"
+  },
+  "calibration_api_changes": {
+    "current_adc.h": [
+      "current_adc_cal_t {offset_mv, gain_v_per_a, source, version}",
+      "CURRENT_ADC_GAIN_MIN_V_PER_A = 0.001f / CURRENT_ADC_GAIN_MAX_V_PER_A = 100.0f",
+      "current_adc_get_calibration(current_adc_cal_t*)",
+      "current_adc_cal_version(void)",
+      "current_adc_read_measurement_cal(raw, mv, ma, cal)"
+    ],
+    "current_adc.c": [
+      "cal_input_ok(): finite offset in 0..3300 mV, finite gain in 0.001..100 V/A, source in {NONE, THEORETICAL, MEASURED}",
+      "cal_apply() publishes offset/gain/source/calibrated/version inside one rt_enter_critical/rt_exit_critical window",
+      "legacy current_adc_read_measurement() now delegates with cal==NULL; its contract and the NONE semantics of the public API are unchanged"
+    ],
+    "project_config": [
+      "cfg_apply_from() returns rt_err_t and validates before publishing",
+      "config_in_range() aligned with the ADC domain and accepts only THEORETICAL/MEASURED as source",
+      "every runtime publication moved inside cfg_lock (set :189, set_calibration :223, load :263/:274/:284, config_default :360, boot :398); Flash I/O stays outside the lock",
+      "new project_config_set_calibration(offset_mv, gain_v_per_a, source)"
+    ],
+    "sensor_service.c": "frame mA and current_cal_source now come from one cal snapshot; sensor_frame layout, log schema and valid/fresh semantics unchanged",
+    "motor": [
+      "motor_calibration_static_begin() / motor_calibration_static_end()",
+      "holds mot_lock across the recheck and the coefficient commit",
+      "no general callback exported, owner/phase never forced, recovery never bypassed",
+      "arm/ramp/stop core semantics unchanged"
+    ],
+    "disclosed_tightening": "gain 0.001..100 V/A is a new numeric-safety range to stop mA output/integer overflow; it is NOT claimed as a hardware-validated range and the board nominal stays 0.6 V/A"
+  },
+  "host_cases": {
+    "current_cal_chain": {
+      "command": "bash tests/host/run_current_cal_m7.sh",
+      "rc": 0,
+      "summary": "cases=26 pass=26 fail=0 pre_bad=0",
+      "ids": "CC01..CC26",
+      "log": "reports/reviews/phase8-motor-m7-current-calibration/host_current_cal.txt",
+      "compiles_real_product_files": true
+    },
+    "s1_stop_result": {
+      "rc": 0,
+      "target_required": 61,
+      "host_ovr_required": 78,
+      "new_ids": [
+        "PS19a-static_idle_begin_accepted",
+        "PS19b-static_armed_running_refused",
+        "PS19c-static_diag_owner_refused",
+        "PS19d-static_stop_unknown_refused",
+        "PS19e-static_lock_unavailable_refused"
+      ],
+      "log": "reports/reviews/phase8-motor-m7-current-calibration/host_s1.txt"
+    },
+    "s2_stop_priority": {
+      "rc": 0,
+      "groups_per_variant": 18,
+      "cases": 109,
+      "rerun_reason": "motor.c is a shared input of this chain",
+      "log": "reports/reviews/phase8-motor-m7-current-calibration/host_s2.txt"
+    },
+    "sd_semantics": {
+      "rc": 0,
+      "off_target_required": 22,
+      "on_target_required": 21,
+      "new_id": "SD12-cal-source-same-snapshot",
+      "log": "reports/reviews/phase8-motor-m7-current-calibration/host_safety_data_semantics.txt"
+    },
+    "m6_cli": {
+      "rc": 0,
+      "target": "10/10",
+      "host_ovr": "10/10",
+      "log": "reports/reviews/phase8-motor-m7-current-calibration/host_m6_cli.txt"
+    },
+    "io_behavior": {
+      "rc": 0,
+      "variants": {
+        "off_target": 33,
+        "on_target": 35,
+        "off_ovr": 46,
+        "on_ovr": 48
+      },
+      "illegal_macro_value": "rejected at compile time",
+      "log": "reports/reviews/phase8-motor-m7-current-calibration/host_io_behavior.txt"
+    },
+    "v1_v2_regression": {
+      "rc": 0,
+      "v1_check_pass": 25,
+      "v2_check_pass": 22,
+      "fail": 0,
+      "log": "reports/reviews/phase8-motor-m7-current-calibration/host_v1v2.txt"
+    },
+    "calcalc_selftest": {
+      "rc": 0,
+      "summary": "cases=37 pass=37 fail=0",
+      "provenance": "HOST_SYNTHETIC",
+      "log": "reports/reviews/phase8-motor-m7-current-calibration/calcalc_selftest.txt"
+    },
+    "not_rerun": [
+      {
+        "chain": "run_sp_measure_a0.sh",
+        "reason": "shares none of the four changed product files; A0 deferred by user"
+      },
+      {
+        "chain": "run_flash_export_m5.sh",
+        "reason": "flash_dump/blackbox inputs untouched; M5 archive judgement frozen"
+      },
+      {
+        "chain": "run_negatives.sh / run_meta_negatives.sh",
+        "reason": "runner ONLY-selection and ledger semantics unchanged this round"
+      },
+      {
+        "chain": "test_path_guard.sh",
+        "reason": "work-directory guard unchanged"
+      },
+      {
+        "chain": "frozen S2/HAL/A0 legacy negative sets",
+        "reason": "not mechanically re-run; S2 itself WAS re-run because motor.c changed"
+      }
+    ]
+  },
+  "reverse_controls": {
+    "script": "tests/host/run_m7_reverse.sh",
+    "rc": 0,
+    "REV1": {
+      "mutation": "motor_calibration_static_begin() static checks replaced by immediate return RT_EOK",
+      "expected": [
+        "PS19b-static_armed_running_refused",
+        "PS19c-static_diag_owner_refused",
+        "PS19d-static_stop_unknown_refused"
+      ],
+      "observed": "s1 runner rc=1, 3/3 named FAIL lines present"
+    },
+    "REV2": {
+      "mutation": "project_config_set_calibration() publishes the new source but keeps the old runtime coefficients",
+      "expected": [
+        "CC14-apply_success_measured"
+      ],
+      "observed": "cc runner rc=1, CC14 FAIL and CC16 FAIL连带 (24/26)"
+    },
+    "control": "both chains rc=0 on unmodified sources",
+    "scope": "two local business-meaningful reversals only; no new reverse platform"
+  },
+  "first_failures": [
+    {
+      "id": "F1",
+      "where": "m7_calcalc.py",
+      "failure": "NameError gain_uv_per_A",
+      "artifact": "console transcript, fixed then rerun"
+    },
+    {
+      "id": "F2",
+      "where": "m7_calcalc.py --selftest",
+      "failure": "11 of 27 checks FAIL",
+      "root_causes": [
+        "held-out error bound treated the slope/intercept correlation as a lever-arm and failed a good fit",
+        "validate() only ran on the load_input() path so compute() skipped schema/reference-source checks",
+        "ZeroDivisionError pre-empted the named DUPLICATE_X rejection",
+        "the 'no serial code' scan matched its own pattern string",
+        "raw mean inconsistent with its own min/max was accepted"
+      ],
+      "artifact": "reports/reviews/phase8-motor-m7-current-calibration/calcalc_selftest_first_failure.txt",
+      "lossless": true,
+      "resolution": "numeric-Jacobian propagation, validation moved into compute(), dx==0 checked first, AST import scan, new RAW_MEAN_INCONSISTENT gate => 37/37 PASS"
+    },
+    {
+      "id": "F3",
+      "where": "macro probe first run",
+      "failure": "armclang_rc reported the exit code of the tail of a pipeline instead of the compiler",
+      "resolution": "capture compiler rc directly and add three named negative controls"
+    },
+    {
+      "id": "F4",
+      "where": "-fstack-usage probe second run",
+      "failure": "fatal error: rtthread.h not found because include dirs were hand-copied",
+      "resolution": "take IncludePath and Define verbatim from project.uvprojx"
+    },
+    {
+      "id": "F5",
+      "where": "whitespace pre-check",
+      "failure": "git diff --check output mixed with CRLF conversion warnings",
+      "resolution": "separate stdout from stderr before judging"
+    },
+    {
+      "note": "earlier implementation/fixture first failures (cc_main.c struct storage, PS19 placed inside a host-only #ifdef, SD runner rejecting the in-repo sentinel path, reverse script anchored grep missing '判 FAIL:') were also hit, fixed and continued per task section 11; their raw transcripts were not all retained"
+    }
+  ],
+  "builds_executed": [
+    {
+      "target": "rt-thread",
+      "command": "C:\\Keil_v5\\UV4\\UV4.exe -r project.uvprojx -t \"rt-thread\" -j0 -o <log>",
+      "rebuild_all": true,
+      "download_flag_used": false,
+      "uv4_rc": 0,
+      "result": "0 Error(s), 0 Warning(s)",
+      "program_size": "Code=185218 RO-data=79590 RW-data=2188 ZI-data=83792",
+      "bin": {
+        "git_blob_sha1": "ee7ecccf0e493a8dd66297c1f30b29a3c6718ccf",
+        "bytes": 265388,
+        "sha256": "1bf17ed8bc4580ea8c2599a458afbe31c689c1ea9c0e3c6a4e65ead6509de542"
+      },
+      "axf": {
+        "git_blob_sha1": "97aa74f69c5228a73a303cec7f78b4e260431b3c",
+        "bytes": 1686472,
+        "sha256": "54f9c6c3c98d8a30d29d18a874170bd6c22b663c5259d49e52c8e409a78dfa87"
+      },
+      "load": {
+        "base": "0x08000000",
+        "max": "0x00080000",
+        "entry_point": "0x080003cd"
+      },
+      "build_log_blob": {
+        "git_blob_sha1": "e0ea5d5d20b8f6173ad72c46ff5318072cfcae11",
+        "bytes": 3636,
+        "sha256": "24aae0943e3ba045b48bc4ae0a1ec7fc85cb204f32fb07be7d191c8579f44886"
+      }
+    },
+    {
+      "target": "rt-thread-measure-a0",
+      "command": "C:\\Keil_v5\\UV4\\UV4.exe -r project.uvprojx -t \"rt-thread-measure-a0\" -j0 -o <log>",
+      "rebuild_all": true,
+      "download_flag_used": false,
+      "uv4_rc": 0,
+      "result": "0 Error(s), 0 Warning(s)",
+      "program_size": "Code=192514 RO-data=82550 RW-data=2188 ZI-data=91512",
+      "bin": {
+        "git_blob_sha1": "51d18e4de8c7753f486d109785137190bdf59fae",
+        "bytes": 275644,
+        "sha256": "8307cffdcaa132e78bde182eb750209602168095269fbf20a44d46cfb1ab8d49"
+      },
+      "axf": {
+        "git_blob_sha1": "80847975729a852a15010629034cc452f701e871",
+        "bytes": 1716896,
+        "sha256": "9e5c9d7c5340c98e31e5d56ab778ac10600d3979dccfbde4cdf7d41b9421f08e"
+      },
+      "load": {
+        "base": "0x08000000",
+        "max": "0x00080000",
+        "entry_point": "0x080003cd"
+      },
+      "build_log_blob": {
+        "git_blob_sha1": "eb50e067ec9bfe070728ac169783fb6210fb1543",
+        "bytes": 3676,
+        "sha256": "1b02f6c9bfc8ed609dea6165c52d9b4d9d00f5a738a25ae5b8d5211f3084d819"
+      }
+    },
+    {
+      "target": "rt-thread-motor-m1-candidate",
+      "command": "C:\\Keil_v5\\UV4\\UV4.exe -r project.uvprojx -t \"rt-thread-motor-m1-candidate\" -j0 -o <log>",
+      "rebuild_all": true,
+      "download_flag_used": false,
+      "uv4_rc": 0,
+      "result": "0 Error(s), 0 Warning(s)",
+      "program_size": "Code=185450 RO-data=79466 RW-data=2188 ZI-data=83792",
+      "bin": {
+        "git_blob_sha1": "e41d7f322d228c11211828fa68dded0981592e63",
+        "bytes": 265492,
+        "sha256": "4717a718b84043210a52dfedd80fae57bcecc64473ec4f23317b2066162aee53"
+      },
+      "axf": {
+        "git_blob_sha1": "428153993f62f7656d5db387e313077eb21717a3",
+        "bytes": 1686956,
+        "sha256": "8337f9564e3740a1e7708fd9a7b4021f98cdc69aa098b35e769e1c41efd8f63a"
+      },
+      "load": {
+        "base": "0x08000000",
+        "max": "0x00080000",
+        "entry_point": "0x080003cd"
+      },
+      "build_log_blob": {
+        "git_blob_sha1": "210a28d1ea5996ff0065c6edf9019f92a086ad2e",
+        "bytes": 3736,
+        "sha256": "6f4ac40adf071541021e110400e8a1315db96419c9d3a4c7f77ca12553e0e5ce"
+      }
+    }
+  ],
+  "builds_executed_note": "three targets, one Rebuild All each, on code_commit f188339; not empty (M6's manifest legitimately had no build because the product directory was byte-identical to its input commit)",
+  "hardware_actions": [],
+  "hardware_actions_note": "no serial/DAP/instrument object created, no device enumeration, no power, no flash, no target memory read, no reset, no target command sent, no motor motion, no supply/wiring/module/SW1 change",
+  "target_calibration_cases": "NOT_EXECUTED",
+  "on_board_last_proven": {
+    "image": "M5 motor candidate",
+    "bin_bytes": 259580,
+    "bin_sha256": "01d3e5ab1ad245949385d50c9f1d5fd2bbaac0806c3920e897321bc46db764bc",
+    "axf_bytes": 1668244,
+    "axf_sha256": "8c5bc7bf1efa786013c767ae1e09415ad0d5d5db3e38069c8aeebabf7cebae40",
+    "unchanged_this_round": true,
+    "last_recorded_state": "READY/fault 0, armed 0, cur/tgt 0, request LOW/pad 0, ENN on the disable side, STEP disabled, IRQ OPEN, drive CONFIGURED; M5 300-frame log retained; motor wired to no load; SW1 left on the permitted side per the user's standing request",
+    "not_reconfirmed": "the board was not contacted this round to re-confirm this state"
+  },
+  "prior_candidates": {
+    "m6_motor_bin": "a1ba8226c5d09578c111b61a0b12a7ac182d572db01cc945081c51185b837f7b",
+    "m6_motor_bin_flashed": false,
+    "m6_field_candidate": {
+      "bytes": 66847,
+      "sha256": "9faaca5904ccd3c2618c4a152cc200f4f756ff45aef3e671cf2815356b706649",
+      "status": "NOT_BOARD_EXECUTED",
+      "invoked_by_m7": false
+    }
+  },
+  "field_package_status": "FIELD_PACKAGE_DRAFT / NOT_AUTHORIZED / NOT_EXECUTED",
+  "field_package_sections": {
+    "P0": "identity / static gate / voltage-chain self-consistency at H10 (1=CURRENT_ADC, 2=GND, 3=3V3) via PH2 / ADCA CH15 / J1-3; 4.000 V range, 1 mV resolution, ±(0.5 %+5); pairing rules for sample vs manual readings. Can be approved on its own even while P1 is not ready.",
+    "P1": "independent bus-current reference and fit with held-out validation. METHOD_NOT_READY.",
+    "P2": "apply -> runtime comparison -> one config_save -> reload/reboot restoration, with verbatim commands, per-step effects, failure handling and the THEORETICAL vs MEASURED decision rule."
+  },
+  "reference_methods": {
+    "meter": "UT39A+ (confirmed by the user; model not re-asked)",
+    "meter_spec_source": "https://meters.uni-trend.com.cn/content/1288.html",
+    "ranges": {
+      "4.000V": "1 mV, ±(0.5 %+5)",
+      "400.0mV": "0.1 mV, ±(0.5 %+5)",
+      "400.0mA": "0.1 mA, ±(0.8 %+3)",
+      "10.00A": "10 mA, ±(1.2 %+5)"
+    },
+    "error_models": {
+      "B_400mA_mA": "0.008*|I| + 0.3",
+      "B_10A_mA": "0.012*|I| + 50"
+    },
+    "candidate_A": "series meter in the branch that actually carries R1's current; state the insertion point and every uncovered VM sibling",
+    "candidate_B": "stable known DC load only if it covers all of the measured R1 current",
+    "candidate_C": "voltage-only -> voltage-chain check, never called a current calibration",
+    "forbidden": [
+      "current range paralleled across 24 V and GND",
+      "hot-swapping TMC or motor phase leads",
+      "series meter in 1A/1B/2A/2B assumed to read phase RMS",
+      "driver-disabled reading defined as zero current",
+      "IRUN/VREF computed values, the same ADC back-solved, or adapter total current used as an independent reference",
+      "raising current/frequency, blocking the shaft or editing protection to widen the span"
+    ],
+    "fixed_qualification_gates": {
+      "reference_span": "span_I > 10 * (E_lo + E_hi)",
+      "raw_code_span": "span_raw > 10 * u(raw_mean difference)",
+      "held_out_target": "PROPOSED_FOR_APPROVAL max(5 mA, 10% of reference); not an inherited project safety limit",
+      "bound_rule": "if the combined error bound exceeds the target, it is not a pass"
+    },
+    "why_not_shunt_voltage": "30 mA across the图纸 30 mΩ is 0.9 mV; the 400 mV range's 5-count term alone is 0.5 mV ~ 16.7 mA"
+  },
+  "remaining_fixture_needs": [
+    "UT39A+ original manual values: current-range fuse rating, jack rating, series burden voltage, range duration limit -> NOT_OBTAINED",
+    "a VM-branch series breakout fixture that can insert the meter into the current that actually flows through R1 without hot-breaking phase leads -> NOT_AVAILABLE",
+    "a known stable DC load (or verifiable power resistor) for method B -> NOT_AVAILABLE",
+    "physical confirmation that the module's VM silkscreen/pad matches图纸 U9 pin 8 -> NOT_VERIFIED"
+  ],
+  "fixture_note": "listed once as a minimum set; it does not stop any offline product work, and no gap was rewritten as 'already excluded'",
+  "calibration_status": {
+    "board": "CALIBRATION_ON_BOARD_NOT_EXECUTED",
+    "software": "M7_CALIBRATION_SOFTWARE_READY",
+    "images": "NEW_IMAGES_NOT_FLASHED",
+    "adc_measured": "NOT_DONE",
+    "synthetic_coefficients": "HOST_SYNTHETIC only; current_cal apply 1598291 671551 CONFIRM_MEASURED is a tool self-test value and must never be sent to hardware",
+    "sg_thresholds": "unchanged",
+    "active_mode": "not switched; MONITOR_ONLY retained where it was",
+    "safety_acceptance": "OPEN - this package is not 'the last item' of the whole safety acceptance"
+  },
+  "risks_open": [
+    "real DIAG/SG end-to-end triggering still unproven",
+    "fault-state motor_arm refusal still lacks its own on-board evidence (left for a future genuine fault scenario, not re-simulated here)",
+    "physical stop latency and oscilloscope-based accuracy still DEFERRED by the user",
+    "A0 measurement chain still DEFERRED",
+    "tshell-thread stack high-water with the new commands NOT_MEASURED; the deepest new chain's compiled static frames are about 528..568 B at -O1 and are a lower bound only",
+    "VDDA/3300 mV remains a configuration assumption until measured",
+    "line-ending normalisation: archived Keil stdout blobs are LF-normalised, not byte-identical to the tool's raw stdout (lossless=false for that claim); the CRLF originals stay off-repo on this machine"
+  ],
+  "prior_evidence_discrepancy": {
+    "topic": "build banner",
+    "observation": "no compile-time date string exists in any of the three M7 BIN or AXF, and __DATE__ appears in no source under bsp/novosns/ns800",
+    "conflict": "the M5 and M6 build manifests each carry a banner value that cannot be reproduced from their archived image bytes (same pattern scan returns 0 hits on the M5 BIN/AXF)",
+    "handling": "both records kept side by side; the M7 manifest records NOT_EMBEDDED_IN_IMAGE_BYTES; neither was rewritten and no conclusion was drawn about how the earlier values were obtained"
+  },
+  "review_go_registration": {
+    "m6": {
+      "verdict": "M6_OFFLINE_REVIEW_GO",
+      "accepted_object": "4a626bc49831345d8366deeb6b01cc81e77ec79d",
+      "closed": [
+        "D-1",
+        "D-2",
+        "D-2e",
+        "D-3"
+      ],
+      "candidate_status": "NOT_BOARD_EXECUTED",
+      "note": "registered here as required by the third review; no separate registration round, no M6 work reopened, run_fault not invoked from M7"
+    },
+    "frozen_refs_verified": {
+      "main": "1b3757eec550802a3973e66790af422d81d3d373",
+      "phase7/full-embedded-software": "6d3fbc559d45673d7550eb73dec5a4ade5bb34df",
+      "phase8/tmc-drive-config": "1696c59f4b56bae5d503fb18888e379dfad6f76f",
+      "tag_object": "097935fec5a6f2467261ab1ad449ff0b1d398250",
+      "tag_dereferenced": "e40a9b95ef709e6a80444f9f3949dfdd70ba96ba",
+      "status": "all unchanged at ls-remote time"
+    }
+  },
+  "remote_readback": {
+    "method": "every changed path between 4a626bc and the artifact commit downloaded from raw.githubusercontent.com and re-hashed; SHA-1 must equal git rev-parse <ref>:<path> and byte count must equal git cat-file -s",
+    "ledger": "reports/reviews/phase8-motor-m7-current-calibration/remote_readback.md",
+    "files_checked": 51,
+    "ok": 51,
+    "bad": 0,
+    "images_verified_by_remote_bytes": {
+      "1bf17ed8bc4580ea8c2599a458afbe31c689c1ea9c0e3c6a4e65ead6509de542": "rt-thread",
+      "8307cffdcaa132e78bde182eb750209602168095269fbf20a44d46cfb1ab8d49": "rt-thread-measure-a0",
+      "4717a718b84043210a52dfedd80fae57bcecc64473ec4f23317b2066162aee53": "rt-thread-motor-m1-candidate"
+    },
+    "final_branch_head": "filled after the handoff commit is pushed; this file does not hash its own commit to avoid a self-reference loop",
+    "frozen_refs": "re-read with git ls-remote in the same call as the branch head"
+  },
+  "stop_state": [
+    "M7_CALIBRATION_SOFTWARE_READY",
+    "NEW_IMAGES_NOT_FLASHED",
+    "FIELD_PACKAGE_DRAFT",
+    "CALIBRATION_ON_BOARD_NOT_EXECUTED"
+  ],
+  "stop_reason": "the authorised offline scope is complete: commands, safe application, consistency, host verification with two named reversals, three-target build with real image identities, and a field candidate that can be reviewed and then approved as one package. Anything further needs independent review of these bytes plus a concrete field-package approval, and P1 additionally needs the meter/fixture inputs listed in remaining_fixture_needs."
+}

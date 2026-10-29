@@ -98,14 +98,28 @@ fromelf --bin !L --output .\build\motor_m1\rt-thread-motor-m1.bin (motor)
   并把这条差异作为**既往证据限制**并列保留，不改写 M5/M6 原件，也不把本轮的
   "镜像里没有"回写成"M6 当时写错了"。
 
-## 7. 隐私与空白处理
+## 7. 隐私、行尾与空白处理
 
 构建日志中的工具路径为本机安装路径（`C:\Keil_v5\…`），不含用户名；
 未归档 `.map`、`.o`、`.crf` 等含绝对路径或机器信息的构建产物。
 交接与回执不写串口序列号、DAP UID 或操作者标识。
 `reports/reviews/phase8-motor-m6-offline/__pycache__` 之类本机生成物未纳入本轮归档。
 
-Keil 的 `Program Size:` 行原文带行尾空格，三份日志各 1 处，按原始 stdout 逐字保留，
-没有为了好看而裁掉。本轮 `git diff --cached --check` 返回 rc=0、无报告行
-（与 M6 复审当时报出的 3 处不同：那次是在 patch/未暂存语境下判的）；
-两种观测并列记录，未来回执不笼统写"整个历史范围 diff-check 为 0"。
+**行尾归一（必须披露，lossless=false）**：本机 `core.autocrlf=true`，三份 Keil stdout 与
+其余 `.log/.txt` 证据在 `git add` 时把 CRLF 归一为 LF 入库。以
+`builds/build_rt-thread.log` 为例：工作树 3779 B / 143 个 CR，Git blob 3636 B / 0 个 CR。
+因此**仓库内归档不是 Keil 原始 stdout 的逐字节副本**，只在内容（去行尾分隔符差异）上逐字保留；
+带原始 CRLF 的私有原件保留在本机仓库外，未随公开包发布，也不再宣称"全部原样"。
+镜像 BIN/AXF 是二进制，不受该归一影响（远端 blob 字节与本地一致，见交接 remote_readback）。
+
+Keil 的 `Program Size:` 行原文带行尾空格，三份日志各 1 处，未为好看而裁掉。
+本轮 `git diff --cached --check` 返回 rc=0、无报告行（与 M6 复审当时报出的 3 处不同：
+那次是在未暂存/patch 语境下判的）；两种观测并列记录，
+未来回执不笼统写"整个历史范围 diff-check 为 0"。
+
+## 8. 远端逐 blob 回读
+
+见 `remote_readback.md`：`4a626bc..424ff30` 全部 51 个变更文件从
+`raw.githubusercontent.com` 按 blob 下载后重算，SHA-1 与 SHA-256/字节数
+与 `git rev-parse 424ff30:<path>` / `git cat-file -s` 逐项一致，51/51 OK、0 BAD。
+冻结引用同时用 `git ls-remote` 复核（main / phase7 / phase8 / tag 对象与解引用）。

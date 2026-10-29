@@ -1,0 +1,75 @@
+# M7 远端逐 blob 回读（4a626bc..424ff308f56d95fb7c1c670231d44639752e8ba7）
+
+方法：对 `git diff --name-only 4a626bc..424ff308f56d95fb7c1c670231d44639752e8ba7` 的每个路径，从
+https://raw.githubusercontent.com/LINboss666/ns800-stepper-safety/<ref>/<path> 下载 blob 原始字节，
+再对该字节流算 SHA-1（应等于 git rev-parse <ref>:<path>）与 SHA-256/长度（应等于 git cat-file -s）。
+判定：http=200 且 SHA-1 相等 且 长度相等 才算 OK。
+
+| 结果 | 数 |
+|---|---|
+| OK | 51 |
+| BAD | 0 |
+| 合计 | 51 |
+
+远端分支头：`424ff308f56d95fb7c1c670231d44639752e8ba7`（git ls-remote 取得）。
+冻结引用复核：main=1b3757eec550802a3973e66790af422d81d3d373 / phase7=6d3fbc559d45673d7550eb73dec5a4ade5bb34df / phase8=1696c59f4b56bae5d503fb18888e379dfad6f76f / tag 对象=097935fec5a6f2467261ab1ad449ff0b1d398250 / tag 解引用=e40a9b95ef709e6a80444f9f3949dfdd70ba96ba —— 全部与冻结值一致。
+
+逐文件（path | blob bytes | sha256 | sha1）：
+
+```
+reports/firmware/phase8-motor-m7-current-calibration/build_manifest.json  7171  fe99f8a588342180820e13ef447590ce66803fa1b16cb783f839fa7ad87aa1fc  ac0bf178e9e1b6f8561ae36a7a1d9177e6cf9f39
+reports/firmware/phase8-motor-m7-current-calibration/rt-thread-a0.axf  1716896  9e5c9d7c5340c98e31e5d56ab778ac10600d3979dccfbde4cdf7d41b9421f08e  80847975729a852a15010629034cc452f701e871
+reports/firmware/phase8-motor-m7-current-calibration/rt-thread-measure-a0.bin  275644  8307cffdcaa132e78bde182eb750209602168095269fbf20a44d46cfb1ab8d49  51d18e4de8c7753f486d109785137190bdf59fae
+reports/firmware/phase8-motor-m7-current-calibration/rt-thread-motor-m1.axf  1686956  8337f9564e3740a1e7708fd9a7b4021f98cdc69aa098b35e769e1c41efd8f63a  428153993f62f7656d5db387e313077eb21717a3
+reports/firmware/phase8-motor-m7-current-calibration/rt-thread-motor-m1.bin  265492  4717a718b84043210a52dfedd80fae57bcecc64473ec4f23317b2066162aee53  e41d7f322d228c11211828fa68dded0981592e63
+reports/firmware/phase8-motor-m7-current-calibration/rt-thread.axf  1686472  54f9c6c3c98d8a30d29d18a874170bd6c22b663c5259d49e52c8e409a78dfa87  97aa74f69c5228a73a303cec7f78b4e260431b3c
+reports/firmware/phase8-motor-m7-current-calibration/rt-thread.bin  265388  1bf17ed8bc4580ea8c2599a458afbe31c689c1ea9c0e3c6a4e65ead6509de542  ee7ecccf0e493a8dd66297c1f30b29a3c6718ccf
+reports/reviews/phase8-motor-m7-current-calibration/board_candidate.md  12852  8ee51b8a25fac148963c4e4120c48cb45b539c28d4c72150cd5522cb7a4b9b51  49416fe689b7ef2ff710e0c668a8561794334dbd
+reports/reviews/phase8-motor-m7-current-calibration/build_notes.md  6035  fda5c05866a2d1f15aab97335b308c513dec4c7934d0a3284a74e58014690328  f4da4bab06ab50436c011a7c58da59d5194af752
+reports/reviews/phase8-motor-m7-current-calibration/builds/build_rt-thread-measure-a0.log  3676  1b02f6c9bfc8ed609dea6165c52d9b4d9d00f5a738a25ae5b8d5211f3084d819  eb50e067ec9bfe070728ac169783fb6210fb1543
+reports/reviews/phase8-motor-m7-current-calibration/builds/build_rt-thread-motor-m1-candidate.log  3736  6f4ac40adf071541021e110400e8a1315db96419c9d3a4c7f77ca12553e0e5ce  210a28d1ea5996ff0065c6edf9019f92a086ad2e
+reports/reviews/phase8-motor-m7-current-calibration/builds/build_rt-thread.log  3636  24aae0943e3ba045b48bc4ae0a1ec7fc85cb204f32fb07be7d191c8579f44886  e0ea5d5d20b8f6173ad72c46ff5318072cfcae11
+reports/reviews/phase8-motor-m7-current-calibration/builds/macro_probe.c  1036  22da04b0a3a338a0e8c3ce3210b962cf99e3b849ce251203829faf463ff73b2d  00ec94d0a491575a9ec017568f5dfb6907264a74
+reports/reviews/phase8-motor-m7-current-calibration/builds/macro_probe.txt  807  cee3811d5916fe9f69e254ca9faeb3f928f2184c7d1ca47f9d40ed568fb71b8a  8cf16e8f26e60cf2c5e1a8fca59179aa56abd2ed
+reports/reviews/phase8-motor-m7-current-calibration/builds/stack_usage.txt  3244  7b18aab88f1b0239f8743d7556ceaade05c2c63afc06d3e6b3ecb02abd53b3f3  dc18bf6005d9d867183735e3f60f4c3b10410467
+reports/reviews/phase8-motor-m7-current-calibration/builds/stack_usage_O1.txt  2763  f1244150821835296389ccbf2c2007ba2d1591be79ed1f5e6a843455660026ff  f2f1e83b0a7ca07cca19510d2d2e1e8b36e2a863
+reports/reviews/phase8-motor-m7-current-calibration/calcalc_selftest.txt  1563  945a82ca76b0d2d26c5226ef06976e7c8c1e2c25f58beb94828b2d7dc2f8d80d  942d12bb4d66e4198386514a745ad756143542f2
+reports/reviews/phase8-motor-m7-current-calibration/calcalc_selftest_first_failure.txt  1892  07755d9477612c7f83d41a1fc4cb203c2600c52271a87214d139cc9508d9d968  4367b751be62f7bbe8e19fd008808471dbe761ed
+reports/reviews/phase8-motor-m7-current-calibration/design.md  7899  9768ed9a94fa2dd783e5eb6a7b421d1eb0318bd7e6335dbbab225a87c1546afc  58f26f11c9df6891e8ce04a8b725ac68257f6951
+reports/reviews/phase8-motor-m7-current-calibration/example_input_HOST_SYNTHETIC.json  2575  7aa88965ae5c8f020b6861341c16d5089a6e08338b52f4a2ca8b41282fe004ae  d551cfde19144ce54565de58b560a53253a3579a
+reports/reviews/phase8-motor-m7-current-calibration/example_result_HOST_SYNTHETIC.json  4685  53fde7679164ef546a0706d37bab4771ba150be9730a823e4a9a5e9f84d37f61  a8d01727c14b0a9406f44d6be2a78f65f3e7d765
+reports/reviews/phase8-motor-m7-current-calibration/host_current_cal.txt  7785  b64c4f25b1dfd0727fa9a5b77688a9481fd3f9ddc66e5c68f9c65c576a96d3ce  939f5abb57aecaed241a3b1a2f4a140ab59c4770
+reports/reviews/phase8-motor-m7-current-calibration/host_io_behavior.txt  1017  ce711e9d7dad504c95abbd5dcaeb8952adf07bad7621f61f493bfd5b44cb0117  bfa89805d650c17939717e89a582f518b6094367
+reports/reviews/phase8-motor-m7-current-calibration/host_m6_cli.txt  188  e3c36f03d24868094c25e81c4449424972699e99610a5ed0242721230ed2b231  dbe7eb74cbc4026a082f954c45d78c35154aace9
+reports/reviews/phase8-motor-m7-current-calibration/host_reverse.txt  164  fa19990d89efed82a08e18c663b104db5c2cf4c92a785deefca0f3b3fb5f1e35  92daa7c3a689ccce8165c66a05e763b5f1430757
+reports/reviews/phase8-motor-m7-current-calibration/host_s1.txt  1246  9508b249b04dc15bcc71a39c78f4efb9e0c90b85631f284e39cc0f0b3f7b63d2  a3b23077545822abb6e6b609e986f0ccd4b1baae
+reports/reviews/phase8-motor-m7-current-calibration/host_s2.txt  8165  5ff5113c4aef804b5e6d6b48fd89977fc3e71c632cfb79d9ba4e6c1d6460abbc  8197fc1072b46dd12a7e09038169adff780254e6
+reports/reviews/phase8-motor-m7-current-calibration/host_safety_data_semantics.txt  804  2db682f62d105b6146b403f0b507a2e2227f47bdf54bc4212941284afc0ef517  9e0e900d3b8bf2105a86e845098f48fbe49d1f35
+reports/reviews/phase8-motor-m7-current-calibration/host_v1v2.txt  1267  0e7bfcd86adf0cef077d80d3d0712cde39648c51ba4b329ada48d7f209ba9c12  41c70b75ec1d0eb622dfc376c97a5f2f62ae6cfa
+reports/reviews/phase8-motor-m7-current-calibration/m7_calcalc.py  30828  150da42e9abeceb775f1538850ba9acc15e17a6cd8bf8d8732a62a8934fae20e  d97b0438fff24c6683ac5fa832acc4625ba2d173
+reports/reviews/phase8-motor-m7-current-calibration/reverse_detail.txt  1067  e25d9aedd1205098b696807c11b74e7fd28b1521ceed111b2255e4edb931c11c  4b63c91e12e7e522151fdee9ba2e48686e0ef90a
+reports/reviews/phase8-motor-m7-current-calibration/source_audit.md  8775  26a28464f95b2bf89c5be395c709d0b9d38fc39f9e6abcd5356de63f4d03ac4f  f602a1a0b5d294fcef4347eb514eb03b135517b8
+reports/reviews/phase8-motor-m7-current-calibration/test_summary.md  5625  03d5b9ade4d185fdd14ad4a46057f534aac64fae2dcc4256d00f13b9c659f530  da8a930077a26623e0a63608c53166b1cfdf7199
+rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/current_adc.c  11489  acf010be1aaeca5d48f6a943289473ee5407f6b1aeccf26231905b1e5152d164  5f446485b84cf3989c424bffd4b99bcc0736e80a
+rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/current_adc.h  4260  eba7f2fa869a76676f984ee6a8f486661495c01fea22ed106b9d2fd34b13deb1  db3a66e09ebaa847154b20944b53610d8e01e29a
+rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/current_cal.c  12243  ae1ea8623d6f90af0cd2a0491c1719ad57eae9b3c2d1175d4ddfcd17b50443a8  c94f2eb5d51ccb78012bf41a6ff6f630cac30a9f
+rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/motor.c  124975  d40c45e90c4f1401499bc478ba9fe7881c665a508504231ced06a240c9c6e0ba  e02e11bdaaf88f258e0922ac51468b22e3f0c48f
+rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/motor.h  20945  04781c1c1f9c35685e9df9c47b6321b0bf8afde1a4aade027bf5507f97e3973c  e152a023a011a56c88099f9c9d2b4075eb05ee02
+rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/project_config.c  15049  c3dcf729ace0a6d23e6c6fe9578f81add7b9ed5c92d55f4cc7aae7c4da752ec5  742ad23869b6a354f32635222cce302af3d61385
+rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/project_config.h  3399  83749975fe3ec83888d9c2982f3a6ac7a717d34980c86f46139c2faa38e1acf5  5d4c99d998afab1e713a8d69dac25029fa310977
+rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/sensor_service.c  17774  aac0ddba44bd39c5132656daf9c14b54f90237e41f21ecb8d0c5b93fe6564696  ca5b4051e3ad243b30ee7caf98ce448d421790fb
+rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/project.uvprojx  339537  8e97ab4f44029a18720fe90ec2fce94da8b6ba491a3c2148f76ded3dac8cb248  bf3eb5208f3183059da890f9c65b9bc382ca96b3
+tests/host/cc_main.c  22676  961767cf1f7b01128a167790f23a632f1ea36ce63c3819fd453daf1c9ce92f4c  3f833ef45ab5ee3eff3c43211d829b5728adc031
+tests/host/ps_main.c  109796  55a7a7e29a4abeb095d6cdec2d68907f04e3402326087c6b5d6ff6c100f959d6  7be5bf7e95367442403d6cab7ab05376cc036954
+tests/host/run_current_cal_m7.sh  2461  51d8a84eb53188eb8ec6a069d7b4bebf9a2158fe76296d18c21eda20bc28e02d  b1f9a69ee7d2020ec1512d19d9f2c6ebb9821515
+tests/host/run_m7_reverse.sh  2914  5db9a1027fb54ce42e3638a4558def178c2fc2bf5013042d0289da80c6b6052f  45cb9ee5972536b8feeace8742f13b2db98843e6
+tests/host/run_safety_data_semantics.sh  21671  c35cf3f01d602db70fdd470e2fe4231747f357c45694e136deaa5d175942bd98  c2f2b6a5536cc4c1eeb4166b90016215d62675c8
+tests/host/run_stop_result_s1.sh  25483  c20006910fa0c5c5b6d256c9193634e80032d6791d4dd4c11f425f5d76bc88ab  1ab59f241e35441a893fb2ee9bbea87e30b1a490
+tests/host/sd_main.c  36506  f3a4399e5aec80d9bfca7399338e51df8e2facecfec2c33e245231ef25feb840  9909ef2e5a69f1c8694c5307b80148aa9c7e36b6
+tests/host/shim_cc/rtdevice.h  547  a771ae760084daf2700fdb0a02cb20e2b13f3a051a3c05002fc286d0096694cf  b45df2b4594a53d9daf07d158252cc40a03cf531
+tests/host/shim_cc/rtthread.h  426  2faf8f1d7bda0043df571694931236e13fe86e2e9b83e8aeaca4677ccb24a130  eaa6365790c50736ab250e6509a79a2526f968ba
+```
+
+注：文本类证据的 blob 字节是 LF 归一后的内容（见 build_notes.md 第 7 节），
+上面列出的 sha256 是**远端 blob 的 sha256**，不是本机工作树文件的 sha256；两者对
+带 CRLF 的日志会不同，这正是声称原字节归档必须用远端 blob 复算的原因。
