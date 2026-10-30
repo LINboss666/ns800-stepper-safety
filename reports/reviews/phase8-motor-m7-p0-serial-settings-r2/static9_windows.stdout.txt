@@ -1,0 +1,12 @@
+WAIT_DMM_BEFORE: H10-1 and H10-3 DC voltage; keep H10-2 GND
+PASS P0C01-capture-never-writes-open-port-settings 
+PASS P0C02-query-never-writes-open-port-settings 
+PASS P0C03-attach-never-writes-open-port-settings 
+PASS P0C04-human-wait-never-writes-open-port-settings 
+PASS P0C05-real-corrupted-62B-remains-rejected 
+PASS P0C06-single-CRLF-before-prompt-is-atomic 
+PASS P0C07-single-LF-before-prompt-healthy 
+PASS P0C08-embedded-bare-CR-remains-rejected 
+FAIL P0C09-one-open-time-config-and-zero-setting-stores UnicodeDecodeError:'gbk' codec can't decode byte 0x8e in position 1759: illegal multibyte sequence
+STATIC_PORT SUMMARY cases=9 pass=8 fail=1
+HOST_GUARD_MODEL_ONLY / DEVICE_ACTIONS=0 / CORRUPTED_WIRE_NOT_REPAIRED

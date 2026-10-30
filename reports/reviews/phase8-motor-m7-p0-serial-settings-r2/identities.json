@@ -1,0 +1,188 @@
+{
+ "baseline": {
+  "delta_280ca81_to_HEAD": "18 files, all under reports/ (evidence + handoff of 4fbb11e, e93971d, b3c07a3, 8bade29)",
+  "frozen_refs_readonly": {
+   "main": "1b3757eec550802a3973e66790af422d81d3d373",
+   "phase7/full-embedded-software": "6d3fbc559d45673d7550eb73dec5a4ade5bb34df",
+   "phase8/tmc-drive-config": "1696c59f4b56bae5d503fb18888e379dfad6f76f",
+   "tag v0.7-phase7-software-board-validated": "097935fec5a6f2467261ab1ad449ff0b1d398250 -> e40a9b95ef709e6a80444f9f3949dfdd70ba96ba"
+  },
+  "local_head": "8bade29677dd3f2395cfd92ce28b9cd7206c89e2",
+  "product_test_firmware_delta": 0,
+  "remote_tip_debug_branch": "8bade29677dd3f2395cfd92ce28b9cd7206c89e2",
+  "reviewed_against_commit": "280ca815c89419184a457fd6334942c9b543d5b1",
+  "working_tree_before_apply": "clean"
+ },
+ "collector": {
+  "byte_identical_to_packaged_candidate": true,
+  "cr_bytes_in_working_copy": 0,
+  "expected": "c98bb712bd454dd66ffabece49b8998075642b5cca4d07c85073a3508d90a726",
+  "post_apply_bytes": 23430,
+  "post_apply_sha256": "c98bb712bd454dd66ffabece49b8998075642b5cca4d07c85073a3508d90a726",
+  "pre_apply_blob_bytes": 23374,
+  "pre_apply_blob_sha256": "0e02ccfcef178f0ceee9dc3fd5aeb17f7b9a3bb924e4b83bd7a0cecde9505467"
+ },
+ "device_actions": [],
+ "evidence_archival": {
+  "line_endings": "every artefact stored in the repo is LF-only",
+  "manifest": "SHA256SUMS.txt, self-excluded to avoid a circular identity",
+  "normalisation_record": "stdout_crlf_normalisation.json (original bytes, CR count, original sha256, normalised sha256 per file)",
+  "raw_serial_bytes_archived_this_round": 0,
+  "reason": "Windows Python stdout redirection emits CRLF; core.autocrlf=true would otherwise silently change committed text bytes"
+ },
+ "host_environment": {
+  "default_text_encoding": "cp936 (GBK), locale.getpreferredencoding(False)",
+  "installed_pyserial_path": "C:\\Users\\LMX\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages\\serial",
+  "installed_pyserial_version": "3.5",
+  "network_or_install_used": 0,
+  "packaged_upstream_v35_serialutil_matches_installed": true,
+  "packaged_upstream_v35_serialwin32_matches_installed": true,
+  "python": "3.12.5 (tags/v3.12.5:ff3bc82, Aug 6 2024) MSC v.1940 64 bit (AMD64)",
+  "python_executable": "C:\\Users\\LMX\\AppData\\Local\\Programs\\Python\\Python312\\python.exe"
+ },
+ "offline_results": {
+  "independent_encoding_safe_substance_check": {
+   "negative_control": "static_port_substance_negative_control.txt (rc=1 over the pre-patch blob)",
+   "output": "static_port_substance.stdout.txt",
+   "rc": 0,
+   "script": "check_static_port_substance.py"
+  },
+  "no_transport_import": "serial and pyocd absent from sys.modules after importing the collector module",
+  "pyserial35_api_stub_probe": {
+   "SetCommState_after": 0,
+   "SetCommState_before": 5,
+   "candidate_used": "local Git index blob export, not the copy shipped in the zip",
+   "equals_cloud": "results/upstream35_setcommstate_probe.txt after CR normalisation",
+   "raw_bytes_read_before_after": [
+    64,
+    64
+   ],
+   "rc": 0,
+   "same_value_setters_probe": 3,
+   "state_validator_before_after": [
+    false,
+    true
+   ],
+   "stdout_native_locale": "upstream35_probe_default_locale.stdout.txt",
+   "stdout_utf8_mode": "upstream35_probe.stdout.txt"
+  },
+  "selftest11_native": {
+   "equals_cloud": "results/retained11.txt after CR normalisation",
+   "rc": 0,
+   "stdout": "selftest11_windows.stdout.txt"
+  },
+  "selftest37_and_11_pythonutf8_1": {
+   "note": "37/37 and 11/11 are also green in UTF-8 mode; the locale dependency is only in the verifier",
+   "rc": [
+    0,
+    0
+   ]
+  },
+  "selftest37_native": {
+   "equals_cloud": "results/retained37.txt after CR normalisation",
+   "rc": 0,
+   "stdout": "selftest37_windows.stdout.txt"
+  },
+  "static9_native": {
+   "equals_cloud": false,
+   "error": "UnicodeDecodeError: 'gbk' codec can't decode byte 0x8e in position 1759",
+   "fail": 1,
+   "failed_case": "P0C09-one-open-time-config-and-zero-setting-stores",
+   "kept_as_first_failure": true,
+   "pass": 8,
+   "rc": 1,
+   "root_cause": "verify_p0_candidate.py:447 Path(m.__file__).read_text() has no encoding argument",
+   "stdout": "static9_windows.stdout.txt"
+  },
+  "static9_pythonutf8_1": {
+   "equals_cloud": "results/static9.txt after CR normalisation",
+   "fail": 0,
+   "pass": 9,
+   "rc": 0,
+   "stdout": "static9_windows_utf8mode.stdout.txt"
+  }
+ },
+ "package_manifest_verified": "33/33 entries OK (sha256sum -c SHA256SUMS.txt)",
+ "package_zip": {
+  "bytes": 85793,
+  "sha256": "36877503dc120ebf3e810a15b24d726e0e656a5f2ee2e9d386e509c4db8c29c0"
+ },
+ "patch": {
+  "apply_check_rc": 0,
+  "apply_rc": 0,
+  "bytes": 10011,
+  "expected_sha256": "c5793e3578d8455f8b98c68825c800f445ec1897cbb44d4b001d8ac7b30caa15",
+  "files_touched": [
+   "reports/reviews/phase8-motor-m7-current-calibration-r2/p0_voltage_observation.py",
+   "reports/reviews/phase8-motor-m7-current-calibration-r2/verify_p0_candidate.py"
+  ],
+  "method": "canonical HEAD blobs exported to D:/p0r2_work/apply (repo-external), git -c core.autocrlf=false apply --check then apply",
+  "other_files_created_by_patch": 0,
+  "path": "candidate/port_settings_r2.patch",
+  "sha256": "c5793e3578d8455f8b98c68825c800f445ec1897cbb44d4b001d8ac7b30caa15"
+ },
+ "prior_quota_note": "the exhausted COM5 allowance of earlier continuation rounds does not carry over; no field action taken this round",
+ "proof_inputs_pinned_to_24ab5a7": {
+  "HEAD_version_deliberately_not_used": {
+   "reason": "task section 6.3 pins the proof to fixed 24ab5a7 objects; the later errata-updated board.json would change the pinned digest",
+   "sha256_of_HEAD_blob": "1fb1a49cd4bb6da88bf2791c89d43d169dd3144983c00ba92c8dc3a87e8fe246"
+  },
+  "board-proof.json": {
+   "bytes": 10116,
+   "expected": "e8df121f3f58af5fadf3d60be24fd8aaf7d88c381ae740be86173c43e6604246",
+   "sha256": "e8df121f3f58af5fadf3d60be24fd8aaf7d88c381ae740be86173c43e6604246"
+  },
+  "boot.b64": {
+   "bytes": 4508,
+   "expected": "46b53e93137a7a4f90ecd16ea73bf70435bc14514e323032d04d0665c478dd46",
+   "sha256": "46b53e93137a7a4f90ecd16ea73bf70435bc14514e323032d04d0665c478dd46"
+  },
+  "decoded_boot": {
+   "bytes": 3381,
+   "sha256": "bc47dc022b25bd483c16ab749895bf2a9d7dba318fdf88826357d2dbb98214fa"
+  }
+ },
+ "quotas_consumed": {
+  "COM5_open": 0,
+  "board_commands_sent": 0,
+  "config_writes": 0,
+  "dap_sessions": 0,
+  "dmm_readings": 0,
+  "downloads": 0,
+  "fault_clears": 0,
+  "motor_actions": 0,
+  "resets": 0,
+  "target_flash_read": 0
+ },
+ "task": "phase8-motor-m7-p0-serial-settings-r2",
+ "unchanged_inputs": {
+  "c_h_hal_kernel_macros_projects_images_changed": 0,
+  "calculator": {
+   "bytes": 54267,
+   "expected": "5c7a2340b4d350b1e8932798a57b85e8a6f4818501e469ad6dfd5c1bd29163ad",
+   "sha256": "5c7a2340b4d350b1e8932798a57b85e8a6f4818501e469ad6dfd5c1bd29163ad"
+  },
+  "firmware_input_commit": "5b564eb962e8518920f581111d7a460a2b1fce64",
+  "flash": 0,
+  "keil_build": 0,
+  "payload_axf": {
+   "bytes": 1688696,
+   "expected": "2205c7e7ad6bad93e848fd24d1e5f38c76796865a2b21ebcd2d4e22bb4b6d584",
+   "sha256": "2205c7e7ad6bad93e848fd24d1e5f38c76796865a2b21ebcd2d4e22bb4b6d584"
+  },
+  "payload_bin": {
+   "bytes": 266244,
+   "expected": "e614a075ab63eb5b1c4b08e1ab51fb4043f474037ce734b4bcaf666899c8f7da",
+   "sha256": "e614a075ab63eb5b1c4b08e1ab51fb4043f474037ce734b4bcaf666899c8f7da"
+  }
+ },
+ "verifier": {
+  "byte_identical_to_packaged_candidate": true,
+  "cr_bytes_in_working_copy": 0,
+  "expected": "99a449f6d80ee2999916b34acfaf6aa5f462f40b1bd7bdd871a4aba366ff8a45",
+  "post_apply_bytes": 26674,
+  "post_apply_sha256": "99a449f6d80ee2999916b34acfaf6aa5f462f40b1bd7bdd871a4aba366ff8a45",
+  "pre_apply_blob_bytes": 21742,
+  "pre_apply_blob_sha256": "2cf87b1dad0c57be3ea0b57c63269fce648093a301766400976b2b1186cfa8c7"
+ }
+}

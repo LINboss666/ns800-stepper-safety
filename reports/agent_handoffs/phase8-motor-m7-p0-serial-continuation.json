@@ -219,7 +219,8 @@
     "SECOND_ATTEMPT_ON_ORIGINAL_PORT / SAME_SIGNATURE / USB_PORT_EXCLUDED_AS_CAUSE",
     "DISCRIMINATOR_RESULT / SAME_BOARD_AND_LINE_BYTE_IDENTICAL_UNDER_HISTORICAL_CONFIG / USB_PORT_AND_CONCURRENT_PRINTER_EXCLUDED",
     "TERMINATOR_EXONERATED / SINGLE_CR_REPLY_BYTE_CLEAN / COLLECTOR_CHANNEL_PATH_REMAINS_THE_ONLY_UNEXCLUDED_DIFFERENCE",
-    "COLLECTOR_CHANNEL_AND_READ_SHAPE_REPRODUCED_THE_DAMAGE / PER_CHUNK_FSYNC_EXONERATED_BY_FIRST_READ / GARBAGE_NOT_RANDOM"
+    "COLLECTOR_CHANNEL_AND_READ_SHAPE_REPRODUCED_THE_DAMAGE / PER_CHUNK_FSYNC_EXONERATED_BY_FIRST_READ / GARBAGE_NOT_RANDOM",
+    "R2_SETTINGS_PATCH_APPLIED_AND_OFFLINE_VERIFIED / SEE phase8-motor-m7-p0-serial-settings-r2 (collector c98bb712, verifier 99a449f6, API 5->0, P0C09 locale defect disclosed)"
   ],
   "second_attempt_after_port_restore": {
     "date": "2026-10-30 20:18",
@@ -384,5 +385,17 @@
       "readpath_probe_01_safety_state.rx.bin.b64",
       "run_evidence.md section 10B"
     ]
+  },
+  "serial_settings_r2_pointer": {
+    "date": "2026-10-30",
+    "task": "phase8-motor-m7-p0-serial-settings-r2",
+    "what_changed": "the accepted collector and verifier were replaced by the reviewed R2 candidate (post-open serial setting writes removed, CRLF prompt boundary fixed); nothing in this file is rewritten",
+    "two_reviewer_proven_bugs": [
+      "R2-PORT",
+      "R2-FRAME"
+    ],
+    "attribution_correction_superseding_the_last_paragraph_of_the_probe_notes": "the per-chunk fsync and the single-CR terminator stay exonerated; the surviving software difference the review isolated is writing serial settings after open, which the four probe rounds could not see because the fake port allowed plain attribute assignment",
+    "still_open": "PHYSICAL_CAUSE_NOT_CLOSED - needs the same-board run under the corrected collector, which needs a new user approval",
+    "no_new_field_action_in_that_round": true
   }
 }

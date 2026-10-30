@@ -1,0 +1,298 @@
+{
+  "task": "phase8-motor-m7-p0-serial-settings-r2",
+  "date": "2026-10-30",
+  "roles": {
+    "firmware_code_commit": "5b564eb962e8518920f581111d7a460a2b1fce64",
+    "prior_board_commit_pinned_by_the_collector": "24ab5a7c1cff259b209f78fcb1abbb5f48271581",
+    "baseline_and_script_code_commit": "8bade29677dd3f2395cfd92ce28b9cd7206c89e2",
+    "delivery_head": "this commit, recorded after the fact and never self-referenced by the scripts",
+    "reviewed_cloud_baseline": "280ca815c89419184a457fd6334942c9b543d5b1"
+  },
+  "review_input": {
+    "document": "01_Review_and_P0_Serial_Settings_R2_Task.md",
+    "sha256": "59ea99f455f99b4912a46c3601f64356f4bbed0968e1100b6b8e7f547a143de4",
+    "zip_sha256": "36877503dc120ebf3e810a15b24d726e0e656a5f2ee2e9d386e509c4db8c29c0",
+    "manifest_check": "33/33 OK",
+    "reviewer_owned_defects_accepted": [
+      "R2-PORT post-open serial timeout/write_timeout writes reconfigure the port",
+      "R2-FRAME prompt-boundary regex consumed only LF and left a stray CR"
+    ]
+  },
+  "baseline_verification": {
+    "delta_280ca81_to_HEAD": "18 files, all under reports/ (evidence + handoff of 4fbb11e, e93971d, b3c07a3, 8bade29)",
+    "frozen_refs_readonly": {
+      "main": "1b3757eec550802a3973e66790af422d81d3d373",
+      "phase7/full-embedded-software": "6d3fbc559d45673d7550eb73dec5a4ade5bb34df",
+      "phase8/tmc-drive-config": "1696c59f4b56bae5d503fb18888e379dfad6f76f",
+      "tag v0.7-phase7-software-board-validated": "097935fec5a6f2467261ab1ad449ff0b1d398250 -> e40a9b95ef709e6a80444f9f3949dfdd70ba96ba"
+    },
+    "local_head": "8bade29677dd3f2395cfd92ce28b9cd7206c89e2",
+    "product_test_firmware_delta": 0,
+    "remote_tip_debug_branch": "8bade29677dd3f2395cfd92ce28b9cd7206c89e2",
+    "reviewed_against_commit": "280ca815c89419184a457fd6334942c9b543d5b1",
+    "working_tree_before_apply": "clean"
+  },
+  "patch_application": {
+    "apply_check_rc": 0,
+    "apply_rc": 0,
+    "bytes": 10011,
+    "expected_sha256": "c5793e3578d8455f8b98c68825c800f445ec1897cbb44d4b001d8ac7b30caa15",
+    "files_touched": [
+      "reports/reviews/phase8-motor-m7-current-calibration-r2/p0_voltage_observation.py",
+      "reports/reviews/phase8-motor-m7-current-calibration-r2/verify_p0_candidate.py"
+    ],
+    "method": "canonical HEAD blobs exported to D:/p0r2_work/apply (repo-external), git -c core.autocrlf=false apply --check then apply",
+    "other_files_created_by_patch": 0,
+    "path": "candidate/port_settings_r2.patch",
+    "sha256": "c5793e3578d8455f8b98c68825c800f445ec1897cbb44d4b001d8ac7b30caa15"
+  },
+  "script_identities": {
+    "collector": {
+      "byte_identical_to_packaged_candidate": true,
+      "cr_bytes_in_working_copy": 0,
+      "expected": "c98bb712bd454dd66ffabece49b8998075642b5cca4d07c85073a3508d90a726",
+      "post_apply_bytes": 23430,
+      "post_apply_sha256": "c98bb712bd454dd66ffabece49b8998075642b5cca4d07c85073a3508d90a726",
+      "pre_apply_blob_bytes": 23374,
+      "pre_apply_blob_sha256": "0e02ccfcef178f0ceee9dc3fd5aeb17f7b9a3bb924e4b83bd7a0cecde9505467"
+    },
+    "verifier": {
+      "byte_identical_to_packaged_candidate": true,
+      "cr_bytes_in_working_copy": 0,
+      "expected": "99a449f6d80ee2999916b34acfaf6aa5f462f40b1bd7bdd871a4aba366ff8a45",
+      "post_apply_bytes": 26674,
+      "post_apply_sha256": "99a449f6d80ee2999916b34acfaf6aa5f462f40b1bd7bdd871a4aba366ff8a45",
+      "pre_apply_blob_bytes": 21742,
+      "pre_apply_blob_sha256": "2cf87b1dad0c57be3ea0b57c63269fce648093a301766400976b2b1186cfa8c7"
+    },
+    "calculator": {
+      "bytes": 54267,
+      "expected": "5c7a2340b4d350b1e8932798a57b85e8a6f4818501e469ad6dfd5c1bd29163ad",
+      "sha256": "5c7a2340b4d350b1e8932798a57b85e8a6f4818501e469ad6dfd5c1bd29163ad"
+    },
+    "images": {
+      "bin": {
+        "bytes": 266244,
+        "expected": "e614a075ab63eb5b1c4b08e1ab51fb4043f474037ce734b4bcaf666899c8f7da",
+        "sha256": "e614a075ab63eb5b1c4b08e1ab51fb4043f474037ce734b4bcaf666899c8f7da"
+      },
+      "axf": {
+        "bytes": 1688696,
+        "expected": "2205c7e7ad6bad93e848fd24d1e5f38c76796865a2b21ebcd2d4e22bb4b6d584",
+        "sha256": "2205c7e7ad6bad93e848fd24d1e5f38c76796865a2b21ebcd2d4e22bb4b6d584"
+      }
+    },
+    "c_h_hal_kernel_macros_projects_changed": 0,
+    "keil_build_or_flash": 0
+  },
+  "proof_identity_pinning": {
+    "HEAD_version_deliberately_not_used": {
+      "reason": "task section 6.3 pins the proof to fixed 24ab5a7 objects; the later errata-updated board.json would change the pinned digest",
+      "sha256_of_HEAD_blob": "1fb1a49cd4bb6da88bf2791c89d43d169dd3144983c00ba92c8dc3a87e8fe246"
+    },
+    "board-proof.json": {
+      "bytes": 10116,
+      "expected": "e8df121f3f58af5fadf3d60be24fd8aaf7d88c381ae740be86173c43e6604246",
+      "sha256": "e8df121f3f58af5fadf3d60be24fd8aaf7d88c381ae740be86173c43e6604246"
+    },
+    "boot.b64": {
+      "bytes": 4508,
+      "expected": "46b53e93137a7a4f90ecd16ea73bf70435bc14514e323032d04d0665c478dd46",
+      "sha256": "46b53e93137a7a4f90ecd16ea73bf70435bc14514e323032d04d0665c478dd46"
+    },
+    "decoded_boot": {
+      "bytes": 3381,
+      "sha256": "bc47dc022b25bd483c16ab749895bf2a9d7dba318fdf88826357d2dbb98214fa"
+    }
+  },
+  "offline_results": {
+    "independent_encoding_safe_substance_check": {
+      "negative_control": "static_port_substance_negative_control.txt (rc=1 over the pre-patch blob)",
+      "output": "static_port_substance.stdout.txt",
+      "rc": 0,
+      "script": "check_static_port_substance.py"
+    },
+    "no_transport_import": "serial and pyocd absent from sys.modules after importing the collector module",
+    "pyserial35_api_stub_probe": {
+      "SetCommState_after": 0,
+      "SetCommState_before": 5,
+      "candidate_used": "local Git index blob export, not the copy shipped in the zip",
+      "equals_cloud": "results/upstream35_setcommstate_probe.txt after CR normalisation",
+      "raw_bytes_read_before_after": [
+        64,
+        64
+      ],
+      "rc": 0,
+      "same_value_setters_probe": 3,
+      "state_validator_before_after": [
+        false,
+        true
+      ],
+      "stdout_native_locale": "upstream35_probe_default_locale.stdout.txt",
+      "stdout_utf8_mode": "upstream35_probe.stdout.txt"
+    },
+    "selftest11_native": {
+      "equals_cloud": "results/retained11.txt after CR normalisation",
+      "rc": 0,
+      "stdout": "selftest11_windows.stdout.txt"
+    },
+    "selftest37_and_11_pythonutf8_1": {
+      "note": "37/37 and 11/11 are also green in UTF-8 mode; the locale dependency is only in the verifier",
+      "rc": [
+        0,
+        0
+      ]
+    },
+    "selftest37_native": {
+      "equals_cloud": "results/retained37.txt after CR normalisation",
+      "rc": 0,
+      "stdout": "selftest37_windows.stdout.txt"
+    },
+    "static9_native": {
+      "equals_cloud": false,
+      "error": "UnicodeDecodeError: 'gbk' codec can't decode byte 0x8e in position 1759",
+      "fail": 1,
+      "failed_case": "P0C09-one-open-time-config-and-zero-setting-stores",
+      "kept_as_first_failure": true,
+      "pass": 8,
+      "rc": 1,
+      "root_cause": "verify_p0_candidate.py:447 Path(m.__file__).read_text() has no encoding argument",
+      "stdout": "static9_windows.stdout.txt"
+    },
+    "static9_pythonutf8_1": {
+      "equals_cloud": "results/static9.txt after CR normalisation",
+      "fail": 0,
+      "pass": 9,
+      "rc": 0,
+      "stdout": "static9_windows_utf8mode.stdout.txt"
+    }
+  },
+  "third_defect_disclosed": {
+    "label": "R2-LOC",
+    "location": "verify_p0_candidate.py:447  tree=ast.parse(Path(m.__file__).read_text())",
+    "symptom": "P0C09 fails with UnicodeDecodeError('gbk' codec can't decode byte 0x8e in position 1759) on this host",
+    "why_cloud_passed": "the cloud host default encoding is UTF-8; this host is cp936 and the collector source is UTF-8 with Chinese text",
+    "class": "harness/host-portability defect in the reviewer's verifier, not in the collector and not a gate loosening",
+    "claim_still_verified": {
+      "negative_control": "static_port_substance_negative_control.txt (rc=1 over the pre-patch blob)",
+      "output": "static_port_substance.stdout.txt",
+      "rc": 0,
+      "script": "check_static_port_substance.py"
+    },
+    "minimal_fix_not_applied_by_me": "read_text(encoding='utf-8') - the exact-byte acceptance binds the shipped hash, so the choice is escalated instead",
+    "same_pattern_seen_untouched": [
+      "verify_p0_candidate.py:90",
+      "verify_p0_candidate.py:239",
+      "verify_p0_candidate.py:262"
+    ],
+    "production_path_unaffected_because": "the collector opens every text file with encoding='utf-8', newline='\\n' (lines 53/63) and reads the UID as ascii",
+    "kept_first_failure_stdout": "static9_windows.stdout.txt"
+  },
+  "pyserial_environment": {
+    "default_text_encoding": "cp936 (GBK), locale.getpreferredencoding(False)",
+    "installed_pyserial_path": "C:\\Users\\LMX\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages\\serial",
+    "installed_pyserial_version": "3.5",
+    "network_or_install_used": 0,
+    "packaged_upstream_v35_serialutil_matches_installed": true,
+    "packaged_upstream_v35_serialwin32_matches_installed": true,
+    "python": "3.12.5 (tags/v3.12.5:ff3bc82, Aug 6 2024) MSC v.1940 64 bit (AMD64)",
+    "python_executable": "C:\\Users\\LMX\\AppData\\Local\\Programs\\Python\\Python312\\python.exe"
+  },
+  "source_fact_and_attribution_correction": {
+    "registered": "reports/reviews/phase8-motor-m5-fault-log/m5_field_serial.py:92 sets timeout=0.05 once at open; the read loop (96-112) never reassigns a port setting",
+    "retracted": "the blanket claim that clean captures came from PowerShell and therefore Python was the suspect - the byte-clean M5 capture came from this pyserial tool",
+    "discriminator_now": "whether serial settings are written after the port is open, indexed per script, not per programming language",
+    "dtr_rts": "unchanged in every comparison; both tools use library defaults"
+  },
+  "proven": [
+    "software call path: one normal query reconfigured the Windows port 5 times before, 0 times after (real v3.5 setter and backend bodies under a fully faked Win32)",
+    "R2-FRAME: the same 64 B healthy reply is rejected before the change and strictly accepted after, with the byte-exact patch applied",
+    "the delivered candidate bytes equal the task section 5 table for both files",
+    "the packaged upstream v3.5 serialutil.py/serialwin32.py are byte-identical to this machine's installed pySerial 3.5, so the proven path is the path this host would execute"
+  ],
+  "not_proven": [
+    "PHYSICAL_CAUSE_NOT_CLOSED: whether the on-board 62 B corruption was caused by post-open reconfiguration needs the same-board A/B run",
+    "no voltage data obtained; result.json absent; P0 still not VOLTAGE_OBSERVATION_ONLY",
+    "CONSOLE_STREAM_INTEGRITY_UNRESOLVED remains open and is not closed by this offline round",
+    "no claim that any other mechanism (usbser/DAPLink behaviour, target print buffer) is excluded"
+  ],
+  "device_actions": [],
+  "quota_consumed": {
+    "COM5_open": 0,
+    "board_commands_sent": 0,
+    "config_writes": 0,
+    "dap_sessions": 0,
+    "dmm_readings": 0,
+    "downloads": 0,
+    "fault_clears": 0,
+    "motor_actions": 0,
+    "resets": 0,
+    "target_flash_read": 0
+  },
+  "prior_quota": "the COM5 allowance of the earlier continuation rounds is exhausted and was not carried over",
+  "approval_status": {
+    "section_7_field_package_approved": false,
+    "basis": "the task states the file does not sign the approval on the user's behalf; the user conditioned field work on that package already carrying an explicit approval, and no such approval text has been given",
+    "verbatim_approval_needed": "批准按本包精确补丁修正并执行一次P0串口对照续测：离线前置通过后允许COM5打开1次、七次固定查询和四个电压读数；首条严格通过则同会话继续P0。禁止下载、目标Flash读取、DAP、主动复位、电机动作、改配置及重试。"
+  },
+  "acceptance_status": {
+    "exact_byte_acceptance": "MET (both hashes, images and calculator unchanged, no firmware change, no build)",
+    "offline_37_and_11": "MET natively on Windows with output byte-equal to the cloud record",
+    "offline_9": "MET only under PYTHONUTF8=1 on this host; natively 8/9 because of R2-LOC",
+    "api_stub_5_to_0": "MET, byte-equal to the cloud record, with the candidate taken from the local Git blob",
+    "self_granted_go": false,
+    "decision_requested": [
+      "(a) accept PYTHONUTF8=1 plus the independent encoding-safe check as this round's Windows reading",
+      "(b) issue a verifier candidate with read_text(encoding='utf-8') for a new exact-byte acceptance"
+    ]
+  },
+  "open": [
+    "same-board A/B under the corrected collector (needs one new COM5 approval)",
+    "R2-LOC correction decision above",
+    "the three read_text sites listed under same_pattern_seen_untouched (read-only follow-up, not fixed here)",
+    "M6 and other candidates were not batch-fixed; only listed as readable follow-ups",
+    "P1 METHOD_NOT_READY, P2 NOT_AUTHORIZED, oscilloscope/A0 still deferred"
+  ],
+  "next_step": "STOP for reviewer decision on R2-LOC plus, separately, the user's one approval for the field package; no device action will be taken without it",
+  "evidence": {
+    "dir": "reports/reviews/phase8-motor-m7-p0-serial-settings-r2",
+    "files": [
+      "SHA256SUMS.txt",
+      "check_static_port_substance.py",
+      "identities.json",
+      "make_identities.py",
+      "run_record.md",
+      "selftest11_windows.stderr.txt",
+      "selftest11_windows.stdout.txt",
+      "selftest11_windows_utf8mode.stderr.txt",
+      "selftest11_windows_utf8mode.stdout.txt",
+      "selftest37_windows.stderr.txt",
+      "selftest37_windows.stdout.txt",
+      "selftest37_windows_utf8mode.stderr.txt",
+      "selftest37_windows_utf8mode.stdout.txt",
+      "selftest_rcs.txt",
+      "static9_windows.stderr.txt",
+      "static9_windows.stdout.txt",
+      "static9_windows_utf8mode.stderr.txt",
+      "static9_windows_utf8mode.stdout.txt",
+      "static_port_substance.stderr.txt",
+      "static_port_substance.stdout.txt",
+      "static_port_substance_negative_control.txt",
+      "stdout_crlf_normalisation.json",
+      "upstream35_probe.stderr.txt",
+      "upstream35_probe.stdout.txt",
+      "upstream35_probe_default_locale.stderr.txt",
+      "upstream35_probe_default_locale.stdout.txt"
+    ]
+  },
+  "receipt": [
+    "P0_SETTINGS_R2_PATCH_APPLIED_BYTE_EXACTLY(collector c98bb712/23430, verifier 99a449f6/26674)",
+    "OFFLINE_WINDOWS_37of37_and_11of11_NATIVE / OUTPUT BYTE-EQUAL TO CLOUD RECORDS AFTER CR NORMALISATION",
+    "STATIC_PORT_9of9_ONLY_UNDER_PYTHONUTF8 / NATIVE 8of9 / NEW DEFECT R2-LOC IN verify_p0_candidate.py:447 / FIRST FAILURE KEPT",
+    "PYSERIAL_3_5_API_STUB_SETCOMMSTATE_5_TO_0 / PACKAGED UPSTREAM SOURCES BYTE-IDENTICAL TO INSTALLED LIBRARY",
+    "M5_FIXED_TIMEOUT_SOURCE_FACT_REGISTERED / LANGUAGE_BASED_ATTRIBUTION_RETRACTED",
+    "SOFTWARE_CALL_PATH_PROVEN / PHYSICAL_CAUSE_NOT_CLOSED / VOLTAGE_DATA_NOT_OBTAINED",
+    "NO_C_OR_FIRMWARE_CHANGE / NO_KEIL / NO_FLASH / DEVICE_ACTIONS=[] / COM5_OPENS=0",
+    "AWAITING_R2_LOC_DECISION_AND_A_SEPARATE_USER_APPROVAL_FOR_THE_FIELD_PACKAGE"
+  ]
+}

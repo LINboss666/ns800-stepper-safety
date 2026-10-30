@@ -1,0 +1,14 @@
+# negative control: same script over the PRE-patch canonical blob (0e02ccfc, 23374 B)
+# expected to FAIL the P0C09B assertion; proves the independent check discriminates
+file           = D:\p0r2_work\canonical\p0_voltage_observation.py
+bytes          = 23374
+sha256         = 0e02ccfcef178f0ceee9dc3fd5aeb17f7b9a3bb924e4b83bd7a0cecde9505467
+serial.Serial call sites = 1
+timeout keyword          = Constant(value=0.1)
+write_timeout keyword    = Name(id='WRITE_SECONDS', ctx=Load())
+Traceback (most recent call last):
+  File "D:\ns800\reports\reviews\phase8-motor-m7-p0-serial-settings-r2\check_static_port_substance.py", line 37, in <module>
+    assert isinstance(kw['timeout'], ast.Constant) and kw['timeout'].value == 0, 'P0C09B: timeout must be the literal 0'
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: P0C09B: timeout must be the literal 0
+rc=1

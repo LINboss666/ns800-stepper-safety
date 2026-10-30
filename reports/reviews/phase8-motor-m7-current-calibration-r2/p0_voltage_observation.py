@@ -32,7 +32,7 @@ WHITELIST = ('safety_state', 'safety_status', 'motor_status', 'step_status',
 SEQUENCE = WHITELIST + ('current_cal show',)
 BODY_TAG = dict(zip(WHITELIST, (b'[SS] state=', b'[SAFETY] ready=', b'[MOT] state=',
                              b'[STEP] dev=', b'[CAL] adc health=', b'[CAL] sample n_req=')))
-PROMPT = re.compile(rb'(?:^|[\r\n])msh\s*(?:>|/>)\s*\Z')
+PROMPT = re.compile(rb'(?:^|\r?\n|\r)msh\s*(?:>|/>)\s*\Z')
 ANSI = re.compile(rb'\x1b\[[0-?]*[ -/]*[@-~]')
 DANGER = re.compile(rb'stack is close|stack overflow|SYSTEM_HALT|HardFault|BusFault|UsageFault', re.I)
 API_ACCEPTED = 'api-accepted(驱动接受关断, 非波形证明)'.encode('utf-8')
@@ -80,7 +80,6 @@ class Session:
                 left = cap - len(buf)
                 if left <= 0:
                     raise Stop('RX_BYTE_CAP:' + name)
-                self.port.timeout = min(.1, max(0., deadline - self.clock.monotonic()))
                 chunk = self.port.read(min(512, left))
                 if chunk:
                     raw.write(chunk); raw.flush(); os.fsync(raw.fileno())
@@ -108,7 +107,6 @@ class Session:
         wire = (command + '\r').encode('ascii')   # One terminator, no second blank command.
         self.event('TX_ATTEMPT', command=command, file=name)
         self.tx.append(command)                  # Failed attempts consume the quota.
-        self.port.write_timeout = WRITE_SECONDS
         before = self.clock.monotonic()
         count = self.port.write(wire)           # Exactly one bounded write; never flush()/retry.
         if count != len(wire) or self.clock.monotonic() - before > WRITE_SECONDS:
@@ -150,7 +148,6 @@ class Session:
                             raise Stop('DMM_VALUE_OUT_OF_RANGE')
                     self.event('DMM_RECEIVED', phase=phase, file=target.name, sha256=sha(data))
                     return v
-                self.port.timeout = min(.1, max(0., deadline - self.clock.monotonic()))
                 chunk = self.port.read(min(512, BOOT_CAP - len(buf)))
                 if chunk:
                     raw.write(chunk); raw.flush(); os.fsync(raw.fileno()); buf.extend(chunk)
@@ -333,7 +330,6 @@ def listen_attach(s, seconds=2.):
     with open(s.out / 'raw_attach.bin', 'xb') as f:
         while s.clock.monotonic() < end:
             if len(data) >= BOOT_CAP: raise Stop('ATTACH_BYTE_CAP')
-            s.port.timeout = min(.1, max(0., end - s.clock.monotonic()))
             b = s.port.read(min(512, BOOT_CAP - len(data)))
             if b:
                 f.write(b); f.flush(); os.fsync(f.fileno()); data.extend(b)
@@ -405,9 +401,11 @@ def execute(args):
                 mode='CONTINUE_PROVEN_BOARD' if args.continue_proven_board else 'FULL_RESET',
                 prior_board_commit=PRIOR_BOARD_COMMIT if args.continue_proven_board else None)
         s.event('PORT_OPEN_ATTEMPT', port='COM5')
-        # timeout/write_timeout are bounded; no flush(), probing, scanning, retries or extra commands.
+        # Configure once. Windows pySerial timeout setters also call SetCommState.
+        # Reads stay nonblocking; deadlines/poll sleeps are enforced by this script.
+        # Never change port properties while open; no flush/probing/retries.
         port = serial.Serial('COM5', 115200, bytesize=8, parity='N', stopbits=1,
-                             timeout=.1, write_timeout=WRITE_SECONDS,
+                             timeout=0, write_timeout=WRITE_SECONDS,
                              xonxoff=False, rtscts=False, dsrdtr=False)
         s.port = port
         s.event('PORT_OPEN', port='COM5')
@@ -435,6 +433,7 @@ def execute(args):
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--selftest', action='store_true')
+    ap.add_argument('--selftest-static-port', action='store_true')
     ap.add_argument('--selftest-continuation', action='store_true')
     ap.add_argument('--continue-proven-board', action='store_true',
                     help='only proof 24ab5a7: one COM5 open, no DAP or reset')
@@ -449,6 +448,9 @@ def main(argv=None):
     ap.add_argument('--calculator', default=str(Path(__file__).resolve().parents[1] /
                     'phase8-motor-m7-current-calibration' / 'm7_calcalc.py'))
     args = ap.parse_args(argv)
+    if args.selftest_static_port:
+        import verify_p0_candidate
+        return verify_p0_candidate.run_static_port(sys.modules[__name__])
     if args.selftest_continuation:
         import verify_p0_candidate
         return verify_p0_candidate.run_continuation(sys.modules[__name__], args.prior_board_json, args.prior_boot_b64)

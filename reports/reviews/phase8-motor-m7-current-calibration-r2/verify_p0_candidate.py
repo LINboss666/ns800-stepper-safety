@@ -372,6 +372,96 @@ def run_continuation(m, proof_path, boot_path):
     return bool(fail)
 
 
+def run_static_port(m):
+    """Settings-aware transport model. No pyserial/device import or object."""
+    import ast
+    checks=[]
+    def ck(name,fn):
+        try:fn();checks.append((name,True,''))
+        except Exception as e:checks.append((name,False,type(e).__name__+':'+str(e)))
+    class Clock:
+        def __init__(self):self.t=0.
+        def monotonic(self):return self.t
+        def sleep(self,n):self.t+=max(n,.001)
+    class Frozen:
+        protected={'timeout','write_timeout','baudrate','bytesize','parity','stopbits',
+                   'xonxoff','rtscts','dsrdtr','rts','dtr','break_condition'}
+        def __init__(self,c,reply=b''):
+            self.c=c;self.buf=b'';self.reply=reply;self.writes=[];self.hook=None
+        def __setattr__(self,k,v):
+            if k in self.protected:raise AssertionError('POST_OPEN_SETTING:'+k)
+            object.__setattr__(self,k,v)
+        @property
+        def in_waiting(self):return len(self.buf)
+        def read(self,n):
+            self.c.sleep(.01)
+            if self.hook:self.hook()
+            b,self.buf=self.buf[:min(n,8)],self.buf[min(n,8):];return b
+        def write(self,b):self.writes.append(b);self.buf=self.reply;return len(b)
+    clean=b'safety_state\r\n[SS] state=READY fault_code=0 degraded=0x00\r\nmsh >'
+    corrupt=b'safety_state\r\nMMu\x81st\xd1\x95\xf5READY fault_code=0 degraded=0x00\r\nmsh >'
+    def run_query(reply,accept=True):
+        with tempfile.TemporaryDirectory() as tmp:
+            c=Clock();port=Frozen(c,reply);ss=m.Session(port,tmp,c)
+            try:
+                try:ss.query('safety_state',m.state)
+                except m.Stop:assert not accept
+                else:assert accept
+                assert port.writes==[b'safety_state\r']
+                assert (Path(tmp)/'01_safety_state.rx.bin').read_bytes()==reply
+            finally:ss.ledger.close()
+    def capture():
+        with tempfile.TemporaryDirectory() as tmp:
+            c=Clock();port=Frozen(c);port.buf=clean;ss=m.Session(port,tmp,c)
+            try:
+                got=ss.capture('capture.bin',1,1000,lambda b:bool(m.PROMPT.search(b)))
+                assert got==clean and not port.writes
+            finally:ss.ledger.close()
+    ck('P0C01-capture-never-writes-open-port-settings',capture)
+    ck('P0C02-query-never-writes-open-port-settings',lambda:run_query(clean))
+    def attach():
+        with tempfile.TemporaryDirectory() as tmp:
+            c=Clock();port=Frozen(c);ss=m.Session(port,tmp,c)
+            try:m.listen_attach(ss,.1);assert not port.writes
+            finally:ss.ledger.close()
+    ck('P0C03-attach-never-writes-open-port-settings',attach)
+    def dmm():
+        with tempfile.TemporaryDirectory() as tmp:
+            c=Clock();port=Frozen(c);ss=m.Session(port,tmp,c);dest=Path(tmp)/'dmm_before.json'
+            def arrival():
+                if not dest.exists():dest.write_text(json.dumps(dict(meter='UT39A+',range_V=4,mode='DCV',
+                    Vadc=dict(V=1.65,observed_at='HOST_SYNTHETIC'),V3v3=dict(V=3.3,observed_at='HOST_SYNTHETIC'))))
+            port.hook=arrival
+            try:val=ss.wait_dmm('before',.1);assert val['meter']=='UT39A+' and not port.writes
+            finally:ss.ledger.close()
+    ck('P0C04-human-wait-never-writes-open-port-settings',dmm)
+    ck('P0C05-real-corrupted-62B-remains-rejected',lambda:run_query(corrupt,False))
+    def crlf():
+        assert len(clean)==64
+        assert m.lines(clean,'safety_state')==[b'[SS] state=READY fault_code=0 degraded=0x00']
+        m.state(clean)
+    ck('P0C06-single-CRLF-before-prompt-is-atomic',crlf)
+    ck('P0C07-single-LF-before-prompt-healthy',lambda:run_query(clean.replace(b'\r\n',b'\n')))
+    ck('P0C08-embedded-bare-CR-remains-rejected',lambda:run_query(clean.replace(b'state=READY',b'sta\rte=READY'),False))
+    def ctor():
+        tree=ast.parse(Path(m.__file__).read_text())
+        calls=[n for n in ast.walk(tree) if isinstance(n,ast.Call) and isinstance(n.func,ast.Attribute)
+               and isinstance(n.func.value,ast.Name) and n.func.value.id=='serial' and n.func.attr=='Serial']
+        assert len(calls)==1
+        kw={x.arg:x.value for x in calls[0].keywords}
+        assert isinstance(kw['timeout'],ast.Constant) and kw['timeout'].value==0
+        assert isinstance(kw['write_timeout'],ast.Name) and kw['write_timeout'].id=='WRITE_SECONDS'
+        for node in ast.walk(tree):
+            if isinstance(node,ast.Attribute) and isinstance(node.ctx,ast.Store):
+                assert node.attr not in Frozen.protected, node.attr
+    ck('P0C09-one-open-time-config-and-zero-setting-stores',ctor)
+    bad=[x for x in checks if not x[1]]
+    for name,ok,detail in checks:print(('PASS ' if ok else 'FAIL ')+name+' '+detail)
+    print('STATIC_PORT SUMMARY cases=%d pass=%d fail=%d'%(len(checks),len(checks)-len(bad),len(bad)))
+    print('HOST_GUARD_MODEL_ONLY / DEVICE_ACTIONS=0 / CORRUPTED_WIRE_NOT_REPAIRED')
+    return bool(bad)
+
+
 if __name__=='__main__':
     p=Path(sys.argv[1]).resolve();spec=importlib.util.spec_from_file_location('p0_candidate',p)
     m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)

@@ -160,3 +160,30 @@ TX safety_state 14 B (CRLF)  -> RX 71 B / 6a59468a…dacd   非 ASCII 字节 = 0
 `result.json` 仍不存在。工装 `historical_reader_probe.py` 随证据入库并静态自检
 （`serial.Serial(` 1 次、`ser.write` 仅 `safety_state\r\n`、无 subprocess/pyOCD/复位），
 它不是被批准的 P0 采集器；采集器字节未动。
+
+---
+
+## 追加指针：R2 串口设置轮（2026-10-30，只追加，上文一字未改）
+
+后续复审从源码层查出**两处由云端方案/代码承担的软件错误**，本轮四次工装之所以看不见，
+是因为假端口把 `port.timeout = …` 当普通变量赋值放行了：
+
+- **R2-PORT**：打开端口后在 capture/query/wait_dmm/listen_attach 每轮反复写 `timeout`/`write_timeout`。
+  上游 pySerial v3.5 的 setter 在同值赋值时也会调 `_reconfigure_port`，而 Windows 后端那里既调
+  `SetCommTimeouts` 又重建 DCB 调 `SetCommState`（波特率、位数、奇偶、停止位、流控）。
+- **R2-FRAME**：去帧尾提示符的正则 `(?:^|[\r\n])msh…` 只吃 LF 留下字段末尾的 CR，
+  正常单行响应被严格 `fullmatch` 误拒；旧健康夹具多一组 CRLF 把这点掩盖了。
+
+精确补丁已按字节应用于本仓库（采集器 c98bb712…a726/23430，验证器 99a449f6…8a45/26674），
+离线 37/37 与 11/11 原生通过，`SetCommState` 5→0 复现。现场对照包**未获批准也未执行**，
+COM5 打开仍为 0，上文登记的额度与停点不因本轮改变。
+
+新查出的第三处是验证器自身的主机可移植性缺陷（`verify_p0_candidate.py:447` 的 `read_text()` 未指定 encoding，
+本机 cp936 下 P0C09 报 `UnicodeDecodeError`，只在 `PYTHONUTF8=1` 下 9/9），已按原样保留失败件并交审核裁决，
+不属于采集器产品逻辑，也不改动任何判据。详见
+`reports/agent_handoffs/phase8-motor-m7-p0-serial-settings-r2.md` 与
+`reports/reviews/phase8-motor-m7-p0-serial-settings-r2/run_record.md`。
+
+另按源码更正上文一处按语言的归因：M5 的干净字节出自 `m5_field_serial.py`（pyserial，`timeout` 仅打开时设一次，
+循环中不重设），不是“PowerShell 才干净”。判别量是打开后是否还写串口设置属性。
+**板上物理根因仍未关闭**，需同板一次对照。
