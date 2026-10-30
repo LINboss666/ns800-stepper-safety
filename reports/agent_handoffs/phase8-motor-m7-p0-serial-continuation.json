@@ -217,7 +217,8 @@
     "COM5_OPENS=1 DOWNLOADS=0 TARGET_FLASH_READS=0 DAP_ACTIONS=0 ACTIVE_RESETS=0 MOTOR_ACTIONS=0 RETRIES=0",
     "CONSOLE_STREAM_INTEGRITY_UNRESOLVED / APPROVAL_QUOTA_CONSUMED / ROOT_CAUSE_NOT_DETERMINED",
     "SECOND_ATTEMPT_ON_ORIGINAL_PORT / SAME_SIGNATURE / USB_PORT_EXCLUDED_AS_CAUSE",
-    "DISCRIMINATOR_RESULT / SAME_BOARD_AND_LINE_BYTE_IDENTICAL_UNDER_HISTORICAL_CONFIG / USB_PORT_AND_CONCURRENT_PRINTER_EXCLUDED"
+    "DISCRIMINATOR_RESULT / SAME_BOARD_AND_LINE_BYTE_IDENTICAL_UNDER_HISTORICAL_CONFIG / USB_PORT_AND_CONCURRENT_PRINTER_EXCLUDED",
+    "TERMINATOR_EXONERATED / SINGLE_CR_REPLY_BYTE_CLEAN / COLLECTOR_CHANNEL_PATH_REMAINS_THE_ONLY_UNEXCLUDED_DIFFERENCE"
   ],
   "second_attempt_after_port_restore": {
     "date": "2026-10-30 20:18",
@@ -309,6 +310,40 @@
       "historical_reader_verdict.json",
       "historical_reader_01_safety_state.rx.bin.b64",
       "run_evidence.md section 9"
+    ]
+  },
+  "terminator_flip_result": {
+    "method": "one-line change to the committed harness: CRLF -> single CR, everything else identical",
+    "reply_bytes": 64,
+    "reply_sha256": "3617c305227f177ddcfd0cc3a8fff23b9385201377b27647771dadbf52374858",
+    "non_ascii_bytes": 0,
+    "exact_clean_line_present": true,
+    "harness_label_bug": "the log still printed \"terminator\": \"CRLF\" because that string was not flipped with the code; bytes_written=13 and the 64-byte reply are authoritative",
+    "conclusion": {
+      "terminator_exonerated": true,
+      "usb_port_exonerated": true,
+      "concurrent_printer_exonerated_on_an_idle_board": true,
+      "time_since_open_exonerated": "the M5-era harness sent 0.2 s after opening and still captured clean bytes",
+      "only_unexcluded_difference": "the accepted collector own channel-open kwargs and its per-chunk read/write/fsync loop, which stays a compatible hypothesis and not a proof"
+    },
+    "next_single_variable_test": "historical harness with only the collector open kwargs and per-chunk fsync loop, single CR kept - needs one further COM5 authorisation",
+    "quota_this_round": {
+      "com5_opens": 2,
+      "commands_sent": 2,
+      "other_commands": 0,
+      "dap": 0,
+      "resets": 0,
+      "flashes": 0,
+      "motor_actions": 0,
+      "retries": 0
+    },
+    "collector_bytes_unchanged": true,
+    "evidence": [
+      "cr_variant_probe.py",
+      "cr_variant_run_log.txt",
+      "cr_variant_verdict.json",
+      "cr_variant_01_safety_state.rx.bin.b64",
+      "run_evidence.md section 10A"
     ]
   }
 }

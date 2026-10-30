@@ -1,0 +1,46 @@
+{
+  "verdict": {
+    "exact_clean_line_present": true,
+    "non_ascii_bytes": 0,
+    "repr": "b'safety_state\\r\\n[SS] state=READY fault_code=0 degraded=0x00\\r\\nmsh >'"
+  },
+  "events": [
+    {
+      "kind": "OPEN_ATTEMPT",
+      "t": 9042.296,
+      "port": "COM5",
+      "baud": 115200,
+      "timeout": 0.05
+    },
+    {
+      "kind": "OPENED",
+      "t": 9042.312
+    },
+    {
+      "kind": "PASSIVE_SILENCE_OK",
+      "t": 9087.531,
+      "seconds": 45.0
+    },
+    {
+      "kind": "TX",
+      "t": 9087.531,
+      "command": "safety_state",
+      "bytes_written": 13,
+      "terminator": "CRLF"
+    },
+    {
+      "kind": "RX",
+      "t": 9088.078,
+      "file": "01_safety_state.rx.bin",
+      "bytes": 64,
+      "sha256": "3617c305227f177ddcfd0cc3a8fff23b9385201377b27647771dadbf52374858",
+      "response_bytes": 64,
+      "quiet_period_end": true,
+      "elapsed": 0.547
+    },
+    {
+      "kind": "CLOSED",
+      "t": 9088.078
+    }
+  ]
+}

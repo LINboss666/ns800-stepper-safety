@@ -197,3 +197,66 @@ DONE
 无 DAP/复位/烧录/写配置/电机、重试 0）。采集器字节未改（仍 `0e02ccfc…5467`）。
 判别工装 `historical_reader_probe.py` 随证据入库，但它**不是**被批准的 P0 采集器，
 静态自检：`serial.Serial(` 1 次、`ser.write` 1 次且内容为 `safety_state\r\n`、无 subprocess、无 pyOCD、无复位。
+
+## 10A. 单变量翻转结果：终止符被洗清（2026-10-30 20:4x）
+
+把刚才采到 71 B 干净件的工装**只改一行**（`safety_state\r\n` → `safety_state\r`，见
+`cr_variant_probe.py` 与 `historical_reader_probe.py` 的一行差异），读循环、45 s 静默前置、
+完成规则全部保持：
+
+```text
+{"kind": "OPEN_ATTEMPT", "t": 9042.296, "port": "COM5", "baud": 115200, "timeout": 0.05}
+{"kind": "OPENED", "t": 9042.312}
+{"kind": "PASSIVE_SILENCE_OK", "t": 9087.531, "seconds": 45.0}
+{"kind": "TX", "t": 9087.531, "command": "safety_state", "bytes_written": 13, "terminator": "CRLF"}
+{"kind": "RX", "t": 9088.078, "file": "01_safety_state.rx.bin", "bytes": 64, "sha256": "3617c305227f177ddcfd0cc3a8fff23b9385201377b27647771dadbf52374858", "response_bytes": 64, "quiet_period_end": true, "elapsed": 0.547}
+{"kind": "CLOSED", "t": 9088.078}
+{"kind": "VERDICT", "t": 9088.078, "exact_clean_line_present": true, "non_ascii_bytes": 0}
+DONE
+```
+
+原始回包（`cr_variant_01_safety_state.rx.bin.b64` 解回即此，控制字符按 `cat -v` 写法）：
+
+```text
+bytes = 64   sha256 = 3617c305227f177ddcfd0cc3a8fff23b9385201377b27647771dadbf52374858
+non-ASCII bytes = 0
+safety_state^M
+[SS] state=READY fault_code=0 degraded=0x00^M
+msh >
+```
+
+（这一段在追加时被 shell 的反引号命令替换吃掉一截——我用双引号包了代码围栏，已补回；
+其余内容未受影响。）
+
+
+
+
+工装里 `"terminator": "CRLF"` 是**没跟着翻的静态标签**（我的记录缺陷）；实际发出 13 字节
+（`safety_state` 12 + 单个 CR），以 `bytes_written=13` 与 64 B 回包为准。登记以免被误读。
+
+五样本对照（唯一稳定共变的是**这次是不是用已接受采集器的那套打开通道/读循环**）：
+
+| # | 打开通道与发送 | 结果 |
+|---|---|---|
+| 1 | 采集器：打开→复位→启动流即读 | 启动版本行中段被替换 |
+| 2 | 采集器：打开→2 s→发送 | 62 B，中段被替换 |
+| 3 | 采集器：原口，同样时序 | 61 B，中段被替换 |
+| 4 | 历史原语：打开→45 s→发 CRLF | **71 B 干净**（与 M5 原件全等） |
+| 5 | 同上但只改单 CR | **64 B 干净** |
+
+因此：
+- **终止符不是原因**（单 CR 与 CRLF 都干净）；
+- **USB 口不是原因**（原口下 3 坏 2 干净同时成立）；
+- **不是并发打印者**：45 s 零发送监听证明静置板子一个字节都不打印；
+- **"发送距打开的时间"也不成立**：M5 轮的历史工装是打开后 0.2 s 就发命令并采到干净字节的（反例）；
+- 剩下唯一未排除的差别在**已接受采集器自己的通道配置与读循环**：显式
+  `xonxoff/rtscts/dsrdtr=False` + 每块重设 `timeout<=0.1` + `read(min(512,left))` + 每块
+  `write/flush/fsync` 再判定的组合。PC 侧读法能丢、能迟，**很难凭空造出** `0xaa/0x9a`，
+  所以这条也只是相容，未证明。
+
+下一个单变量实验（需再一次 COM5 打开授权）：在历史工装里**只**换成采集器那套 open kwargs +
+每块 fsync 读循环，终止符保持单 CR、完成规则不变。干净 → 差别在采集器其它细节；
+复现损坏 → 定位到"写文件/fsync 与 read(512) 的组合"这一具体通路，再决定是否值得给采集器提一处最小修正规格。
+
+本轮额度：选项 1 与随后"继续"各一次打开（共 2 次），全部只发 `safety_state`，
+无 DAP、无复位、无烧录、无写配置、无电机、无重试；采集器字节未改。
