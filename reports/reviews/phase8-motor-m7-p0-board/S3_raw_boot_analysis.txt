@@ -1,0 +1,39 @@
+bytes=3381 sha256=bc47dc022b25bd483c16ab749895bf2a9d7dba318fdf88826357d2dbb98214fa
+CRLF=72 lone_CR=22 lone_LF=0 NUL=1
+
+=== version line accounting ===
+expected form : b' / | \\     5.3.0 build Oct 29 2026 23:11:52'  (len=43)
+observed on wire: b' / | \\     5&\t\x02\xd5\xa5\xb1\x91\x81Oct 29 2026 23:11:52'  (len=40)
+  identical prefix bytes = 12 -> b' / | \\     5'
+  identical suffix bytes = 20 -> b'Oct 29 2026 23:11:52'
+  middle differs: observed b'&\t\x02\xd5\xa5\xb1\x91\x81'  vs expected b'.3.0 build '
+  observed middle has 7 non-ASCII/control byte(s): 09 02 d5 a5 b1 91 81
+
+=== every line whose payload is not clean ASCII-or-known-UTF8 Chinese ===
+ line  3 len= 39 undecodable-as-utf8  b'/ | \\     5&\t\x02\xd5\xa5\xb1\x91\x81Oct 29 2026 23:11:52'
+ line 15 len= 27 undecodable-as-utf8  b'[BOQu\x811safe-gpio ....... OK'
+ line 27 len= 46 undecodable-as-utf8  b'[CFG] l\x91\x95\x91\x81O\x81(version 0x00010002 cal_source=1)'
+ line 29 len=252 undecodable-as-utf8  b'[MOT] init OK (enable-path-validated=YES, arm gate ACTIVE, DRV_ENABLE '
+ line 47 len= 89 undecodable-as-utf8  b'[SS] self-test done: required=PASS degraded=\xc2\xc10h55\xd5\x05\x9a\x151\x19}Q\x15MQ\x81-> READY'
+ line 56 len=118 undecodable-as-utf8  b'[Safety] limit_inputs=DISABLED_BY_CO\xca%\x1d\x81(H\x1d!\xf5safe/LOW=trigger when ENA'
+ line 67 len= 36 undecodable-as-utf8  b'T+\x9d   OK verdict=0 mode=MONITOR_ONLY'
+
+=== prompt / interleaving markers ===
+msh > count = 1
+  at offset 486, context: b'e-7 runtime bootstrap start\r\r\nmsh >[SAFETY] init OK - MCU_DRV_ENABLE=LOW(rea'
+
+=== the last boot lines and the arm-gate line ===
+  b'T+\x9d   OK verdict=0 mode=MONITOR_ONLY'
+  b'[Blackbox] OK'
+  b'[UI]     led/buzzer output=SAFE-OFF (polarity hardware-pending)'
+  b'[MAIN] boot complete: READY (motion still gate-locked)'
+  b'[MAIN] motor arm gate fail mask=0x18 (MOTOR_HARDWARE_ENABLE_PATH_VALIDATED=YES)'
+  b''
+
+=== danger-marker scan (independent of the collector) ===
+  stack is close   present=False
+  stack overflow   present=False
+  SYSTEM_HALT      present=False
+  HardFault        present=False
+  BusFault         present=False
+  UsageFault       present=False

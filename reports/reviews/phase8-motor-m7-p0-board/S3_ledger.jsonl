@@ -1,0 +1,5 @@
+{"kind": "BIND", "monotonic": 1619.89, "payload_sha256": "e614a075ab63eb5b1c4b08e1ab51fb4043f474037ce734b4bcaf666899c8f7da", "readback_sha256": "e614a075ab63eb5b1c4b08e1ab51fb4043f474037ce734b4bcaf666899c8f7da", "axf_sha256": "2205c7e7ad6bad93e848fd24d1e5f38c76796865a2b21ebcd2d4e22bb4b6d584", "calculator_sha256": "5c7a2340b4d350b1e8932798a57b85e8a6f4818501e469ad6dfd5c1bd29163ad"}
+{"kind": "PORT_OPEN_ATTEMPT", "monotonic": 1619.89, "port": "COM5"}
+{"kind": "PORT_OPEN", "monotonic": 1619.89, "port": "COM5"}
+{"kind": "RESET_ATTEMPT", "monotonic": 1619.89, "known_uid_digest_prefix": "d2f530dbd062"}
+{"kind": "PORT_CLOSED", "monotonic": 1649.921}

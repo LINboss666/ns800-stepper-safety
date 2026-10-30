@@ -122,3 +122,23 @@ P1_METHOD_NOT_READY / P2_NOT_AUTHORIZED / M5_BOARD_IMAGE_UNCHANGED
 用远端字节重跑：`--selftest` 37/37（rc=0、stderr 0 字节）、真实 M5 原字节重放 4/4 accept。
 `roles.script_code_commit` 已填 `699bbf4…`；`delivery_head` 仍用解析规则，不自引用。
 五行测点原文不改，登记顺序为：脚本提交 `699bbf4` → 本证据提交（回读件所在）。
+
+## 10. 现场执行结果指针（只追加，上文不改）
+
+用户随后对 `9c5fe0b` 的 P0 整包给了**一次**批准，本轮已实际执行，结果见
+`reports/agent_handoffs/phase8-motor-m7-p0-board.md` / `.json` 与
+`reports/reviews/phase8-motor-m7-p0-board/run_evidence.md`：
+
+- 已证新增事实：M7-R1 motor 载荷 `e614a075…f7da` / 266244 B **第一次真正在板**
+  （`0x08000000` 起 `0x41004` 回读与接受 BIN `cmp` 逐字节相等）。
+- 停点：采集器在启动身份双门前 `REPLY_TIMEOUT:raw_boot.bin`，rc=1，**七条命令 0 次发送**，
+  两个 `WAIT_DMM` 未出现，DMM 读数 0 个，无 `result.json`，**未取得电压观察**。
+- 采集器合同本身表现符合设计：3381 B 启动流先落盘（base64 原字节归档、round-trip 散列一致）、
+  门不过就不发命令、退出仍写 `PORT_CLOSED`。本轮不因此改动任何候选字节。
+- 待判：启动流存在行内字节污染（版本行 43→40 B，中段 11→8 B 且 7 个非 ASCII；另有 6 行同类），
+  而 `[MAIN] boot complete: READY` 逐字完好；三条相容机制（目标侧并发 `rt_kprintf` 争用
+  单个 128 B 静态控制台缓冲 / 链路在复位瞬间丢错字节 / 采集侧读窗口损失）**并列未择一**。
+  判开需要新批准。历史件 `phase8-tmc-uart-rootcause/boot_ms2048.txt` 的横幅是干净的，
+  说明同一板/口/工具链此前取到过完好版本行。
+- 额度：下载 1/1、回读 1/1、COM5 1/1、显式复位 1/1、DAP 会话 2/3、命令 0/7、读数 0/4、重试 0。
+  整包批准已消耗，继续需对新的具体整包再批准一次。

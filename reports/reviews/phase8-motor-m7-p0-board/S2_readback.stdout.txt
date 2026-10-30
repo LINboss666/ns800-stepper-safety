@@ -1,0 +1,3 @@
+Core 0 (None):  Halted
+Saved 266244 bytes to D:/ns800-m7-p0-20261030T182818/readback.bin
+Core 0 (None):  Halted

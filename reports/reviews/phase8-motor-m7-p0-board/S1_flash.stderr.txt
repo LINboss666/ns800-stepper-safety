@@ -1,0 +1,4 @@
+0001675 I Loading D:\ns800\reports\firmware\phase8-motor-m7-current-calibration-r1\rt-thread-motor-m1.axf [load_cmd]
+0001676 I Erasing... [loader]
+0007492 I Programming... [loader]
+0021432 I Erased 267264 bytes (261 sectors), programmed 267264 bytes (261 pages), identical 0 bytes (0 pages) at 13.21 kB/s [loader]

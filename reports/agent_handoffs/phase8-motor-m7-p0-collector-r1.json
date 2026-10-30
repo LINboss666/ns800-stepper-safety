@@ -259,5 +259,16 @@
       "verbatim_m5_replay": "RC=0 VERBATIM_M5_REPLAY=4/4 accept"
     },
     "detail": "reports/reviews/phase8-motor-m7-p0-collector-r1/remote_readback_r1.md"
+  },
+  "board_execution_pointer": {
+    "date": "2026-10-30",
+    "approved_package_commit": "9c5fe0bd088a8a7195a922a2cf3726fb45024503",
+    "executed": true,
+    "outcome": "BOOT_IDENTITY_GATE_FAILED / TX_ATTEMPTS=0 / BUSINESS=NOT_REACHED",
+    "proven": "M7-R1 motor image e614a075...f7da byte-identical readback of 266244 B from 0x08000000 (first time this payload is proven on the board)",
+    "not_obtained": "no sample128, no DMM readings, no result.json, so VOLTAGE_OBSERVATION_ONLY is not registered",
+    "collector_bytes_unchanged_by_the_run": true,
+    "detail": "reports/agent_handoffs/phase8-motor-m7-p0-board.json",
+    "history_rule": "appended only; nothing above is rewritten"
   }
 }

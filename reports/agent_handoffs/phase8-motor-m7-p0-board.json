@@ -1,0 +1,223 @@
+{
+  "task": "phase8-motor-m7-p0-board",
+  "date": "2026-10-30",
+  "execution_baseline_commit": "9c5fe0bd088a8a7195a922a2cf3726fb45024503",
+  "roles": {
+    "firmware_code_commit": "5b564eb962e8518920f581111d7a460a2b1fce64",
+    "script_code_commit": "699bbf4be80653fc3aed68d478a777efbb01232b",
+    "executed_package": "reports/reviews/phase8-motor-m7-current-calibration-r2/p0_package.md @9c5fe0b",
+    "delivery_head": "not self-referenced; resolve with git log -1 --format=%H -- reports/agent_handoffs/phase8-motor-m7-p0-board.json"
+  },
+  "approval": {
+    "source": "user message 2026-10-30",
+    "verbatim": "已批准执行 9c5fe0b 的 P0 整包，按既定镜像、采集器和额度直接执行。到 WAIT_DMM_BEFORE、WAIT_DMM_AFTER 时分别提示我测量；失败即停，不转电机。",
+    "scope": "one whole-package approval, all quotas in p0_package.md section 2",
+    "consumed": true,
+    "further_device_action_requires": "a new concrete package and a new single user approval"
+  },
+  "outcome": {
+    "stage_reached": "boot identity gate (after the single explicit reset, before any command)",
+    "stop_label": "BOOT_IDENTITY_GATE_FAILED / TX_ATTEMPTS=0 / BUSINESS=NOT_REACHED / CAPTURE=INCOMPLETE_BOOT_ONLY",
+    "collector_rc": 1,
+    "collector_error": "P0_FAILED:Stop:REPLY_TIMEOUT:raw_boot.bin",
+    "collector_stdout_bytes": 0,
+    "wait_dmm_emitted": 0,
+    "commands_sent": [],
+    "dmm_readings_taken": 0,
+    "result_json": "absent",
+    "voltage_observation": "NOT_OBTAINED - the VOLTAGE_OBSERVATION_ONLY ceiling is not registered this round"
+  },
+  "proven_this_round": {
+    "m7_r1_motor_image_on_board": true,
+    "readback": {
+      "address": "0x08000000",
+      "length_hex": "0x41004",
+      "length_bytes": 266244,
+      "file_sha256": "e614a075ab63eb5b1c4b08e1ab51fb4043f474037ce734b4bcaf666899c8f7da",
+      "byte_identical_to_accepted_bin": true,
+      "session_status_lines": [
+        "Core 0 (None):  Halted",
+        "Core 0 (None):  Halted"
+      ]
+    },
+    "download": {
+      "rc": 0,
+      "log": "Erased 267264 bytes (261 sectors), programmed 267264 bytes (261 pages), identical 0 bytes (0 pages) at 13.21 kB/s"
+    },
+    "boot_ran_to_ready_line_present_verbatim": "[MAIN] boot complete: READY (motion still gate-locked)"
+  },
+  "quota": {
+    "download": {
+      "limit": 1,
+      "used": 1
+    },
+    "fixed_length_readback": {
+      "limit": 1,
+      "used": 1
+    },
+    "com5_open": {
+      "limit": 1,
+      "used": 1
+    },
+    "explicit_sysresetreq": {
+      "limit": 1,
+      "used": 1
+    },
+    "dap_sessions": {
+      "limit": 3,
+      "used": 2
+    },
+    "status_queries": {
+      "limit": 4,
+      "used": 0
+    },
+    "current_cal_show": {
+      "limit": 2,
+      "used": 0
+    },
+    "current_cal_sample_128": {
+      "limit": 1,
+      "used": 0
+    },
+    "dmm_readings": {
+      "limit": 4,
+      "used": 0
+    },
+    "retries": 0,
+    "extra_resets": 0,
+    "extra_flashes": 0,
+    "extra_port_opens": 0,
+    "motor_actions": [],
+    "config_writes": [],
+    "fault_clears": 0
+  },
+  "boot_stream_facts": {
+    "raw_boot": {
+      "bytes": 3381,
+      "sha256": "bc47dc022b25bd483c16ab749895bf2a9d7dba318fdf88826357d2dbb98214fa"
+    },
+    "base64_archive_roundtrip_sha256": "bc47dc022b25bd483c16ab749895bf2a9d7dba318fdf88826357d2dbb98214fa",
+    "base64_roundtrip_equals_original": true,
+    "banner_expected": "5.3.0 build Oct 29 2026 23:11:52",
+    "banner_present_on_wire": false,
+    "fragment_counts": {
+      "5.3.0": 0,
+      ".3.0": 0,
+      "build": 0,
+      "Oct 29 2026": 1,
+      "23:11:52": 1
+    },
+    "version_line": {
+      "expected_len": 43,
+      "observed_len": 40,
+      "identical_prefix_bytes": 12,
+      "identical_suffix_bytes": 20,
+      "observed_middle": "26 09 02 d5 a5 b1 91 81",
+      "expected_middle": ".3.0 build ",
+      "middle_non_ascii_control_count": 7
+    },
+    "other_intra_line_corruptions": 6,
+    "crlf": 72,
+    "lone_cr": 22,
+    "nul": 1,
+    "lone_cr_is_not_new": "the archived board capture phase8-tmc-uart-rootcause/boot_ms2048.txt ends lines with \\r\\r\\n too and its banner is clean (5.3.0 build Oct 28 2026 17:36:54)",
+    "msh_prompt_occurrences": 1,
+    "msh_prompt_offset": 486,
+    "msh_prompt_interleaved_between": "[BOOT] Phase-7 runtime bootstrap start and [SAFETY] init OK",
+    "danger_markers_present": {
+      "stack is close": false,
+      "stack overflow": false,
+      "SYSTEM_HALT": false,
+      "HardFault": false,
+      "BusFault": false,
+      "UsageFault": false
+    },
+    "reset_subprocess_output": {
+      "stdout_bytes": 0,
+      "stderr_bytes": 0,
+      "rc_observed": false,
+      "label": "RESET_TOOL_RC_NOT_OBSERVED"
+    },
+    "analysis": "D:\\ns800\\reports\\reviews\\phase8-motor-m7-p0-board\\S3_raw_boot_analysis.txt"
+  },
+  "verified_premises_for_the_race_hypothesis": {
+    "single_static_console_buffer": "src/kservice.c:391-422 uses static char rt_log_buf[RT_CONSOLEBUF_SIZE]",
+    "console_buffer_size": "rtconfig.h:107 RT_CONSOLEBUF_SIZE 128",
+    "lock_macros_empty_in_this_build": "src/kservice.c:324-331: without RT_USING_THREADSAFE_PRINTF PRINTF_BUFFER_TAKE/RELEASE are empty macros (already recorded by this repo in phase8-stop-priority-s2a/source_audit.txt:178)",
+    "concurrent_writers_observed": "the only msh prompt sits mid-boot between two bootstrap lines",
+    "status": "compatible mechanism with verified premises; NOT established as the root cause"
+  },
+  "mechanisms_listed_not_chosen": [
+    "concurrent rt_kprintf into the shared 128 B static buffer on the target",
+    "byte loss/errors on the target UART -> DAPLink CDC -> PC path around the reset instant",
+    "capture-side read window loss (write/flush/fsync per chunk before the next read)"
+  ],
+  "discriminating_next_steps": {
+    "A": "re-capture the same boot with the historical PowerShell collector and compare corruption positions - needs one more COM5 open plus one more reset, so a new approval",
+    "B": "build a control image with RT_USING_THREADSAFE_PRINTF (or a lock in _kputs) and re-capture - a firmware/build action, forbidden this round, proposal only",
+    "gate_design_question_left_to_review": "the banner is the very first line, inside the busiest concurrency window, while the complete main-ready line came through clean; whether to make the boot identity gate depend on the ready line and demote the banner is a judgement change for the independent review, not something this agent relaxes on its own"
+  },
+  "collector_contract_behaviour": {
+    "bytes_persisted_before_decision": "3381 B kept intact and archived byte-exactly",
+    "no_command_sent_without_boot_identity": true,
+    "echo_never_accepted": "no command was attempted at all",
+    "port_closed_on_exit": true,
+    "assessment": "this stop did not expose a collector defect; it followed the contract"
+  },
+  "board_end_state": {
+    "serial_port": "closed by the collector (PORT_CLOSED in the ledger)",
+    "image_on_chip": "M7-R1 motor e614a075...f7da, proven by this round readback",
+    "observed_after_reset": "READY line present; arm gate fail mask=0x18; no command was ever sent",
+    "motor": "no motion command, no enable/disable action issued by this round",
+    "untouched": [
+      "power",
+      "wiring",
+      "SW1",
+      "VREF",
+      "VM",
+      "phase wires",
+      "sensor front-end"
+    ]
+  },
+  "open": [
+    "no voltage observation obtained; current_cal sample 128 has never run on the board (M7 sampling chain UNPROVEN_ON_BOARD)",
+    "whether the same console concurrency can corrupt response fields (which would threaten the seven-command validators) is untested",
+    "sensor stack warning sufficiency and tshell high-water still NOT_MEASURED",
+    "independent bus current reference, real DIAG/SG end to end, worst-case stop latency, full safety acceptance remain open",
+    "P1 METHOD_NOT_READY, P2 NOT_AUTHORIZED"
+  ],
+  "unchanged_this_round": {
+    "product_code_images_keil": "no C/.h, HAL, kernel, macro, project or image change",
+    "collector_and_calculator_bytes": {
+      "collector": "a2c75ea83cd3842246397a6eff33eea52745c69f8926fb6800a2561fe36cb95a",
+      "calculator": "5c7a2340b4d350b1e8932798a57b85e8a6f4818501e469ad6dfd5c1bd29163ad"
+    },
+    "privacy": "DAP UID value never printed, never written into the repo; evidence scanned for it (0 hits)"
+  },
+  "evidence": {
+    "run_root_outside_repo": "D:\\ns800-m7-p0-20261030T182818",
+    "archived": [
+      "D:\\ns800\\reports\\reviews\\phase8-motor-m7-p0-board\\S1_flash.stdout.txt",
+      "D:\\ns800\\reports\\reviews\\phase8-motor-m7-p0-board\\S1_flash.stderr.txt",
+      "D:\\ns800\\reports\\reviews\\phase8-motor-m7-p0-board\\S2_readback.stdout.txt",
+      "D:\\ns800\\reports\\reviews\\phase8-motor-m7-p0-board\\S2_readback.stderr.txt",
+      "D:\\ns800\\reports\\reviews\\phase8-motor-m7-p0-board\\S3_collector.stdout.txt",
+      "D:\\ns800\\reports\\reviews\\phase8-motor-m7-p0-board\\S3_collector.stderr.txt",
+      "D:\\ns800\\reports\\reviews\\phase8-motor-m7-p0-board\\S3_ledger.jsonl",
+      "D:\\ns800\\reports\\reviews\\phase8-motor-m7-p0-board\\S3_raw_boot.bin.b64",
+      "D:\\ns800\\reports\\reviews\\phase8-motor-m7-p0-board\\S3_raw_boot.bin.sha256",
+      "D:\\ns800\\reports\\reviews\\phase8-motor-m7-p0-board\\S3_reset.stdout.bin.b64",
+      "D:\\ns800\\reports\\reviews\\phase8-motor-m7-p0-board\\S3_reset.stderr.bin.b64",
+      "D:\\ns800\\reports\\reviews\\phase8-motor-m7-p0-board\\S3_raw_boot_analysis.txt",
+      "D:\\ns800\\reports\\reviews\\phase8-motor-m7-p0-board\\run_evidence.md"
+    ],
+    "first_failure_kept": "all raw files stored unmodified; nothing re-run or regenerated"
+  },
+  "receipt": [
+    "P0_BOARD_RUN_EXECUTED / BOOT_IDENTITY_GATE_FAILED / TX_ATTEMPTS=0 / BUSINESS=NOT_REACHED",
+    "M7_R1_MOTOR_IMAGE_ON_BOARD_PROVEN / READBACK_266244B_BYTE_IDENTICAL",
+    "NO_VOLTAGE_OBSERVATION_OBTAINED / DMM_READINGS_TAKEN=0 / RESULT_JSON_ABSENT",
+    "DOWNLOADS=1 READBACKS=1 COM5_OPENS=1 EXPLICIT_RESETS=1 RETRIES=0 / NO_MOTOR_ACTIONS",
+    "ROOT_CAUSE_NOT_DETERMINED / CONSOLE_RACE_HYPOTHESIS_LISTED_NOT_CHOSEN / APPROVAL_QUOTA_CONSUMED"
+  ]
+}
