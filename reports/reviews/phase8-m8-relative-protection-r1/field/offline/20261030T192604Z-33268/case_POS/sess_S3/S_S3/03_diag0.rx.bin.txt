@@ -1,0 +1,3 @@
+[DIAG] mode=MONITOR_ONLY
+[DIAG] vibration includes ~1g gravity baseline
+msh 

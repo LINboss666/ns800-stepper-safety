@@ -1,0 +1,4 @@
+[DIAG] mode=MONITOR_ONLY
+[DIAG] rel LATCH r=REL_SG_SEVERE id=3 rev=1 ms=510 post_rc=0
+[DIAG] rel cov=COVERED lost=0 gen=1 rearm=1
+msh 

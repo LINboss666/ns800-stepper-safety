@@ -1,0 +1,36 @@
+[
+    {
+        "cmd":  "safety_status",
+        "as":  "boot",
+        "key":  "safety_status@boot"
+    },
+    {
+        "cmd":  "motor_status",
+        "as":  "motor0"
+    },
+    {
+        "cmd":  "diag_status",
+        "as":  "diag0",
+        "expect_contains":  [
+                                "[DIAG] mode="
+                            ]
+    },
+    {
+        "cmd":  "config_show",
+        "as":  "cfg0"
+    },
+    {
+        "cmd":  "diag_profile show",
+        "as":  "prof0"
+    },
+    {
+        "cmd":  "diag_profile zero 32",
+        "as":  "zero",
+        "seconds":  15,
+        "expect_any":  [
+                           "[DIAG] zero OK",
+                           "[DIAG] zero VOIDED",
+                           "[DIAG] zero REFUSED"
+                       ]
+    }
+]

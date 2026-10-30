@@ -1,0 +1,117 @@
+{
+    "scenario":  "POS",
+    "synthetic_expectation":  true,
+    "synthetic_note":  "本文件是**合成期望转写**, 不是任何一次真机输出。每条被断言的行都取自固件源码里的 rt_kprintf 原文(见 needles.json 的 file:line); 未列入 needles 的行只是为了让解析走到下一行, 一律不承载判据(expect_* 不引用它们)。",
+    "flash_state":  "v3",
+    "manual":  {
+                   "cruise_reached":  "yes",
+                   "trusted_disable_verified":  "yes",
+                   "approved_reboot_performed":  "yes"
+               },
+    "responses":  {
+                      "safety_status@boot":  [
+                                                 "[SAFETY] state=READY drv_enable=LOW en_feedback=LOW"
+                                             ],
+                      "motor_status":  [
+                                           "[MOTOR] state=IDLED armed=0 gate=0x0 dir=0 hz=0"
+                                       ],
+                      "diag_status":  [
+                                          "[DIAG] mode=MONITOR_ONLY",
+                                          "[DIAG] vibration includes ~1g gravity baseline"
+                                      ],
+                      "config_show":  [
+                                          "[CFG] loaded OK (version 0x00010003 cal_source=1 profile=v3)"
+                                      ],
+                      "diag_profile show":  [
+                                                "[DIAG] rel profile ABSENT(no_profile_committed)"
+                                            ],
+                      "diag_profile zero 32":  [
+                                                   "[DIAG] zero OK n=32 raw 1980..2010 mean=1995 (cal source untouched)"
+                                               ],
+                      "motor_arm":  [
+                                        "[MOTOR] arm OK gates passed"
+                                    ],
+                      "motor_target 400":  [
+                                               "[MOTOR] target=400 Hz"
+                                           ],
+                      "motor_start":  [
+                                          "[MOTOR] start ramping"
+                                      ],
+                      "motor_stop":  [
+                                         "[MOTOR] stop ramping down"
+                                     ],
+                      "motor_disarm":  [
+                                           "[MOTOR] disarm verified DRV_ENABLE=LOW"
+                                       ],
+                      "diag_profile learn 16 260 340 0":  [
+                                                              "[DIAG] learn OK adc[1980..2010]n16 nz1995 sg[268..332]n16 seq4001..4016",
+                                                              "[DIAG] learn thr tier=2 dev=-8/8 drop=32/48 FIELD_UNVERIFIED"
+                                                          ],
+                      "diag_profile tier 2":  [
+                                                  "[DIAG] tier 2: dev=-8/8 drop=32/48 FIELD_UNVERIFIED (commit to publish)"
+                                              ],
+                      "diag_profile commit":  [
+                                                  "[DIAG] commit OK id=3 rev=1 flags=0001 FIELD_UNVERIFIED",
+                                                  "[DIAG] commit next: config_save to persist, then arm explicitly"
+                                              ],
+                      "config_save":  [
+                                          "[CFG] saved id=3 rev=1"
+                                      ],
+                      "config_show@after_reboot":  [
+                                                       "[CFG] loaded OK (version 0x00010003 cal_source=1 profile=v3)"
+                                                   ],
+                      "diag_profile show@after_reboot":  [
+                                                             "[DIAG] rel profile id=3 rev=1 sig=1163520832",
+                                                             "[DIAG] rel dur=500/300/300 rec=500 mns=3",
+                                                             "[DIAG] rel thr sg dev=-8/8 drop=32 reach=1"
+                                                         ],
+                      "diag_status@after_reboot":  [
+                                                       "[DIAG] mode=MONITOR_ONLY"
+                                                   ],
+                      "diag_mode relative CONFIRM_EXPERIMENTAL":  [
+                                                                      "[DIAG] mode=RELATIVE_PROTECTION"
+                                                                  ],
+                      "__watch__":  [
+                                        "[DIAG] REL TRIP r=REL_SG_SEVERE id=3 rev=1 post_rc=0",
+                                        "[DIAG] REL TRIP val=198 thr=240 ms=510 cov=0",
+                                        "[DIAG] REL TRIP sg=4002 cur=4001 imu=4001 tick=521040 n=16",
+                                        "[DIAG] REL trip ticket used; mode=MONITOR_ONLY rearm required"
+                                    ],
+                      "diag_status@latch":  [
+                                                "[DIAG] mode=MONITOR_ONLY",
+                                                "[DIAG] rel LATCH r=REL_SG_SEVERE id=3 rev=1 ms=510 post_rc=0",
+                                                "[DIAG] rel cov=COVERED lost=0 gen=1 rearm=1"
+                                            ],
+                      "blackbox_status":  [
+                                              "[BB] first_fault=EVT_MULTI_FAULT slot=3 seq=14"
+                                          ],
+                      "flash_logstat":  [
+                                            "[FLASH] log head=14 used=14/128"
+                                        ],
+                      "motor_arm@fault":  [
+                                              "[MOTOR] arm REFUSED: safety state=FAULT, reset required"
+                                          ],
+                      "fault_reset":  [
+                                          "[SAFETY] fault_reset requested"
+                                      ],
+                      "system_selftest":  [
+                                              "[SYS] selftest OK"
+                                          ],
+                      "safety_status@ready":  [
+                                                  "[SAFETY] state=READY drv_enable=LOW en_feedback=LOW"
+                                              ],
+                      "motor_status@after_reset":  [
+                                                       "[MOTOR] state=IDLED armed=0 gate=0x0 dir=0 hz=0"
+                                                   ],
+                      "diag_status@after_reset":  [
+                                                      "[DIAG] mode=MONITOR_ONLY"
+                                                  ]
+                  },
+    "boot_bytes":  [
+                       "*** RS800 NS800RT7P65 board banner ***",
+                       "rt-thread startup"
+                   ],
+    "inject":  {
+                   "readback_flip":  true
+               }
+}

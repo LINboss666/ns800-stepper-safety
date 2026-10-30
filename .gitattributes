@@ -1,0 +1,18 @@
+
+# Raw serial captures: keep CR bytes exactly (autocrlf must not strip them)
+reports/reviews/phase8-tmc-uart-rootcause/stress_ms_boot*.bin -text
+
+# ===== M8-R1 交付证据: 必须逐字节可复算, 禁止行尾转换(与上面 raw capture 同一理由) =====
+# 覆盖: 链接器 map、Keil 构建日志、离线假端口落盘的原始字节与其解析文本、
+#       PowerShell 生成的 json/txt 计划切片、两份 SHA256SUMS 清单自身。
+reports/firmware/phase8-m8-relative-protection-r1/*.map -text
+reports/firmware/phase8-m8-relative-protection-r1/SHA256SUMS.txt -text
+reports/firmware/phase8-m8-relative-protection-r1/build_manifest.json -text
+reports/reviews/phase8-m8-relative-protection-r1/build/*.log -text
+reports/reviews/phase8-m8-relative-protection-r1/field/offline/** -text
+reports/reviews/phase8-m8-relative-protection-r1/host/*.txt -text
+reports/reviews/phase8-m8-relative-protection-r1/host/*.json -text
+reports/reviews/phase8-m8-relative-protection-r1/SHA256SUMS.txt -text
+reports/reviews/phase8-m8-sg-adc-relative-protection/build/*.log -text
+reports/reviews/phase8-m8-sg-adc-relative-protection/build/rc.txt -text
+reports/reviews/phase8-m8-sg-adc-relative-protection/build/SHA256SUMS_backfill.txt -text

@@ -1,0 +1,3 @@
+uv4_rc=0 target=rt-thread
+uv4_rc=0 target=rt-thread-measure-a0
+uv4_rc=0 target=rt-thread-motor-m1-candidate

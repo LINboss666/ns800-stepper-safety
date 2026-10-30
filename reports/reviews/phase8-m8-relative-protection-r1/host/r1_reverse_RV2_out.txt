@@ -1,0 +1,361 @@
+SIZES|project_config_t=220|diag_rprof_t=116|sensor_frame_t=80|diag_input_t=68|v2=104
+SELECTED|REL01-frame-identity-advances-only-on-success|YES
+CASE|REL01-frame-identity-advances-only-on-success|PASS|checks=6
+SELECTED|REL02-sg-read-fail-freezes-identity|YES
+CASE|REL02-sg-read-fail-freezes-identity|PASS|checks=6
+SELECTED|REL03-adc-read-fail-freezes-identity|YES
+CASE|REL03-adc-read-fail-freezes-identity|PASS|checks=7
+SELECTED|REL04-no-profile-no-claim|YES
+CASE|REL04-no-profile-no-claim|PASS|checks=4
+SELECTED|REL05-profile-qualification-matrix|YES
+CASE|REL05-profile-qualification-matrix|PASS|checks=45
+SELECTED|REL06-live-signature-binds-drive-config|YES
+CASE|REL06-live-signature-binds-drive-config|PASS|checks=8
+SELECTED|REL07-sg-severe-needs-samples-and-span|YES
+CASE|REL07-sg-severe-needs-samples-and-span|PASS|checks=43
+SELECTED|REL08-stale-sg-cannot-accumulate|YES
+CASE|REL08-stale-sg-cannot-accumulate|PASS|checks=103
+SELECTED|REL09-adc-severe-both-directions|YES
+    ! 上偏方向最终原因=NONE(期望 REL_ADC_SEVERE)
+    ! verdict=NONE 与原因不一致
+    ! 下偏方向最终原因=NONE(期望 REL_ADC_SEVERE)
+    ! verdict=NONE 与原因不一致
+CASE|REL09-adc-severe-both-directions|FAIL|checks=67 bad=4
+SELECTED|REL10-single-adc-sample-not-duration|YES
+CASE|REL10-single-adc-sample-not-duration|PASS|checks=71
+SELECTED|REL11-fused-needs-overlap|YES
+CASE|REL11-fused-needs-overlap|PASS|checks=242
+SELECTED|REL12-reason-not-stall-confirmed|YES
+[DIAG] REL coverage=NOT-ACTIVE(no-frame) id=1 rev=1 live=1163520832 prof=1163520832
+[DIAG] REL coverage=COVERED id=1 rev=1 live=1163520832 prof=1163520832
+[DIAG] REL TRIP r=REL_SG_SEVERE id=1 rev=1 post_rc=0
+[DIAG] REL TRIP val=383 thr=96 ms=600 cov=0
+[DIAG] REL TRIP sg=4 cur=31 imu=31 tick=1620 n=4
+[DIAG] REL trip ticket used; mode=MONITOR_ONLY rearm required
+[DIAG] rel mode=MONITOR_ONLY prof=PRESENT id=1 rev=1 flg=0005 FIELD_UNVERIFIED
+[DIAG] rel cov=COVERED lost=0 gen=0 rearm=1
+[DIAG] rel win hz=500[400..600] dir=1 ph=4
+[DIAG] rel tmc=2/20/10/1 mst=1 def=1 tier=2
+[DIAG] rel sig live=1163520832 prof=1163520832 match=YES
+[DIAG] rel band adc[1950..2050]n16 nz20 sg[480..520]n12
+[DIAG] rel thr dev=52/116 drop=32/96 reach=2025/1930
+[DIAG] rel dur=500/300/300 rec=500 mns=3
+[DIAG] rel age lim sg=350 frm=100 imu=100 imp=2500/2/100
+[DIAG] rel sg warn=2200/12 strong=2200/12
+[DIAG] rel adc warn=0/0 strong=0/0
+[DIAG] rel fus=0 ok=1960 imp=0/0
+[DIAG] rel bad age=0 out=0 cov=0 imu_use=1
+[DIAG] rel last sg=12 cur=119 imu=119 rsn=REL_SG_SEVERE
+[DIAG] rel LATCH r=REL_SG_SEVERE id=1 rev=1 ms=600 post_rc=0
+[DIAG] rel LATCH val=383 thr=96 n=4 cov=0 tick=1620
+[DIAG] rel LATCH sg=4 cur=31 imu=31
+[DIAG] rel re-arm needed: diag_mode relative CONFIRM_EXPERIMENTAL
+CASE|REL12-reason-not-stall-confirmed|PASS|checks=11
+SELECTED|REL13-protect-before-print|YES
+[DIAG] REL coverage=NOT-ACTIVE(no-frame) id=1 rev=1 live=1163520832 prof=1163520832
+[DIAG] REL coverage=COVERED id=1 rev=1 live=1163520832 prof=1163520832
+[DIAG] REL TRIP r=REL_SG_SEVERE id=1 rev=1 post_rc=0
+[DIAG] REL TRIP val=383 thr=96 ms=600 cov=0
+[DIAG] REL TRIP sg=4 cur=31 imu=31 tick=1620 n=4
+[DIAG] REL trip ticket used; mode=MONITOR_ONLY rearm required
+CASE|REL13-protect-before-print|PASS|checks=5
+SELECTED|REL14-first-latch-immutable|YES
+[DIAG] REL coverage=NOT-ACTIVE(no-frame) id=1 rev=1 live=1163520832 prof=1163520832
+[DIAG] REL coverage=COVERED id=1 rev=1 live=1163520832 prof=1163520832
+[DIAG] REL TRIP r=REL_SG_SEVERE id=1 rev=1 post_rc=0
+[DIAG] REL TRIP val=383 thr=96 ms=600 cov=0
+[DIAG] REL TRIP sg=4 cur=31 imu=31 tick=1620 n=4
+[DIAG] REL trip ticket used; mode=MONITOR_ONLY rearm required
+[DIAG] REL coverage=NOT-ACTIVE(no-frame) id=1 rev=1 live=1163520832 prof=1163520832
+[DIAG] REL coverage=COVERED id=1 rev=1 live=1163520832 prof=1163520832
+[DIAG] REL TRIP r=REL_SG_SEVERE id=1 rev=1 post_rc=-12
+[DIAG] REL TRIP val=383 thr=96 ms=600 cov=0
+[DIAG] REL TRIP sg=4 cur=31 imu=31 tick=1620 n=4
+[DIAG] REL trip ticket used; mode=MONITOR_ONLY rearm required
+CASE|REL14-first-latch-immutable|PASS|checks=7
+SELECTED|REL15-monitor-only-never-acts|YES
+[DIAG] verdict=NORMAL mode=MONITOR_ONLY health=UNINIT
+[DIAG] adc_cal_source=THEORETICAL (NOT a measured current)
+[DIAG] threshold_validation=NOT_ESTABLISHED (SG load/speed applicability unverified)
+[DIAG] mode=MONITOR_ONLY; vibration includes ~1g gravity baseline
+[DIAG] sg_filt=382 delta=0 cur_filt=299 mA delta=0 mA
+[DIAG] vib rms=1212 peak=1212 mg band=1
+[DIAG] cnt sg<warn=0 sg<stall=0 cur>warn=0 cur>stall=0 impact=0 bad=0 clean=0
+[DIAG] rel mode=MONITOR_ONLY prof=PRESENT id=1 rev=1 flg=0005 FIELD_UNVERIFIED
+[DIAG] rel cov=COVERED lost=0 gen=0 rearm=0
+[DIAG] rel win hz=500[400..600] dir=1 ph=4
+[DIAG] rel tmc=2/20/10/1 mst=1 def=1 tier=2
+[DIAG] rel sig live=1163520832 prof=1163520832 match=YES
+[DIAG] rel band adc[1950..2050]n16 nz20 sg[480..520]n12
+[DIAG] rel thr dev=52/116 drop=32/96 reach=2025/1930
+[DIAG] rel dur=500/300/300 rec=500 mns=3
+[DIAG] rel age lim sg=350 frm=100 imu=100 imp=2500/2/100
+[DIAG] rel sg warn=3800/20 strong=3800/20
+[DIAG] rel adc warn=0/0 strong=0/0
+[DIAG] rel fus=0 ok=3560 imp=0/0
+[DIAG] rel bad age=0 out=0 cov=0 imu_use=1
+[DIAG] rel last sg=20 cur=199 imu=199 rsn=REL_SG_SEVERE
+[DIAG] rel latch: none
+CASE|REL15-monitor-only-never-acts|PASS|checks=5
+SELECTED|REL16-relative-mode-arm-gate|YES
+[DIAG] RELATIVE REFUSED: needs explicit CONFIRM_EXPERIMENTAL
+[DIAG] RELATIVE REFUSED: rc=-8 (no committed profile)
+[DIAG] RELATIVE REFUSED: rc=-5 (SAMPLE_COUNT)
+[DIAG] RELATIVE REFUSED: rc=-8 (sig != live)
+[DIAG] mode REFUSED: mode change needs static/idle
+[DIAG] mode REFUSED: safety not READY
+[DIAG] REL thresholds=FIELD_UNVERIFIED id=1 rev=1 tier=2
+[DIAG] mode=RELATIVE_ACTIVE
+[DIAG] mode=MONITOR_ONLY
+[DIAG] RELATIVE REFUSED: needs explicit CONFIRM_EXPERIMENTAL
+[DIAG] RELATIVE REFUSED: rc=-12 (config-lock)
+CASE|REL16-relative-mode-arm-gate|PASS|checks=13
+SELECTED|REL17-active-measured-gate-unchanged|YES
+[DIAG] ACTIVE REFUSED: calibration source=1 (need MEASURED)
+[DIAG] mode=MONITOR_ONLY (unchanged)
+[DIAG] ACTIVE REFUSED: calibration source=1 (need MEASURED)
+CASE|REL17-active-measured-gate-unchanged|PASS|checks=5
+SELECTED|REL18-ramp-phase-is-exception|YES
+[DIAG] REL coverage=NOT-ACTIVE(no-frame) id=1 rev=1 live=1163520832 prof=1163520832
+[DIAG] REL coverage=COVERED id=1 rev=1 live=1163520832 prof=1163520832
+[DIAG] REL coverage=COVERED id=1 rev=1 live=1163520832 prof=1163520832
+[DIAG] REL coverage=COVERED id=1 rev=1 live=1163520832 prof=1163520832
+[DIAG] REL TRIP r=REL_FUSED_SEVERE id=1 rev=1 post_rc=0
+[DIAG] REL TRIP val=383 thr=32 ms=410 cov=0
+[DIAG] REL TRIP sg=28 cur=271 imu=271 tick=6420 n=3
+[DIAG] REL trip ticket used; mode=MONITOR_ONLY rearm required
+CASE|REL18-ramp-phase-is-exception|PASS|checks=6
+SELECTED|REL19-out-of-window-only-in-motion|YES
+[DIAG] REL coverage=NOT-ACTIVE(no-frame) id=1 rev=1 live=1163520832 prof=1163520832
+[DIAG] REL coverage=COVERED id=1 rev=1 live=1163520832 prof=1163520832
+[DIAG] REL coverage=COVERED id=1 rev=1 live=1163520832 prof=1163520832
+[DIAG] REL TRIP r=REL_OUT_OF_WINDOW id=1 rev=1 post_rc=0
+[DIAG] REL TRIP val=300 thr=300 ms=300 cov=0
+[DIAG] REL TRIP sg=2 cur=15 imu=15 tick=1300 n=0
+[DIAG] REL trip ticket used; mode=MONITOR_ONLY rearm required
+[DIAG] REL coverage=NOT-ACTIVE(no-frame) id=1 rev=1 live=1163520832 prof=1163520832
+[DIAG] REL coverage=COVERED id=1 rev=1 live=1163520832 prof=1163520832
+[DIAG] REL TRIP r=REL_OUT_OF_WINDOW id=1 rev=1 post_rc=0
+[DIAG] REL TRIP val=300 thr=300 ms=300 cov=0
+[DIAG] REL TRIP sg=2 cur=15 imu=15 tick=1300 n=0
+[DIAG] REL trip ticket used; mode=MONITOR_ONLY rearm required
+[DIAG] REL coverage=NOT-ACTIVE(no-frame) id=1 rev=1 live=1163520832 prof=1163520832
+[DIAG] REL coverage=COVERED id=1 rev=1 live=1163520832 prof=1163520832
+CASE|REL19-out-of-window-only-in-motion|PASS|checks=6
+SELECTED|REL20-age-check-before-dedup|YES
+CASE|REL20-age-check-before-dedup|PASS|checks=33
+SELECTED|REL21-recovery-needs-fresh-evidence|YES
+CASE|REL21-recovery-needs-fresh-evidence|PASS|checks=84
+SELECTED|REL22-coverage-loss-protects-first|YES
+[DIAG] REL coverage=NOT-ACTIVE(no-frame) id=1 rev=1 live=1163520832 prof=1163520832
+[DIAG] REL coverage=COVERED id=1 rev=1 live=1163520832 prof=1163520832
+[DIAG] REL coverage=NOT-ACTIVE(sig-mismatch) id=1 rev=1 live=1163520832 prof=1163520794
+[DIAG] REL TRIP r=REL_COVERAGE_LOST id=1 rev=1 post_rc=0
+[DIAG] REL TRIP val=500 thr=500 ms=500 cov=3
+[DIAG] REL TRIP sg=4 cur=34 imu=34 tick=1680 n=0
+[DIAG] REL trip ticket used; mode=MONITOR_ONLY rearm required
+CASE|REL22-coverage-loss-protects-first|PASS|checks=10
+SELECTED|REL23-profile-persist-and-v2-migration|YES
+[CFG] loaded OK (version 0x00010003 cal_source=1 profile=PRESENT)
+[CFG] loaded OK (version 0x00010003 cal_source=2 profile=NONE [migrated-from-0x00010002])
+CASE|REL23-profile-persist-and-v2-migration|PASS|checks=27
+SELECTED|REL24-cli-strict-args-no-side-effects|YES
+[DIAG] zero N must be 32..256
+[DIAG] zero N must be 32..256
+[DIAG] zero N must be 32..256
+[DIAG] zero N must be 32..256
+[DIAG] zero N must be 32..256
+[DIAG] zero N must be 32..256
+usage: diag_profile show|zero N|learn N LO HI DIR|tier T|commit|clear CONFIRM
+[DIAG] learn args: N=8..32 LO HI(LO<=HI<=20000) DIR=0|1
+[DIAG] learn args: N=8..32 LO HI(LO<=HI<=20000) DIR=0|1
+[DIAG] learn args: N=8..32 LO HI(LO<=HI<=20000) DIR=0|1
+usage: diag_profile show|zero N|learn N LO HI DIR|tier T|commit|clear CONFIRM
+[DIAG] clear needs: diag_profile clear CONFIRM
+[DIAG] commit REFUSED: pending incomplete (zero=0 learn=0)
+usage: diag_profile show|zero N|learn N LO HI DIR|tier T|commit|clear CONFIRM
+[DIAG] zero N must be 32..256
+[DIAG] learn args: N=8..32 LO HI(LO<=HI<=20000) DIR=0|1
+[DIAG] commit REFUSED: pending incomplete (zero=0 learn=0)
+[DIAG] commit REFUSED: pending incomplete (zero=0 learn=0)
+CASE|REL24-cli-strict-args-no-side-effects|PASS|checks=8
+SELECTED|REL25-cli-capture-and-publish|YES
+[DIAG] zero REFUSED: not static+READY (no capture started)
+[DIAG] zero OK n=32 raw 1660..1660 mean=1660000 (cal source untouched)
+[DIAG] learn OK adc[2000..2000]n68 nz0 sg[500..500]n8 seq4..11
+[DIAG] learn thr tier=2 dev=64/128 drop=16/32 FIELD_UNVERIFIED
+[DIAG] commit OK id=1 rev=1 flags=0005 FIELD_UNVERIFIED
+[DIAG] commit next: config_save to persist, then arm explicitly
+[DIAG] zero OK n=32 raw 1660..1660 mean=1660000 (cal source untouched)
+[DIAG] learn FAILED: left the approved window or source lost
+[DIAG] learn last: st=0 hz=0 dir=0 sig=1163520832 sg_seq=6
+[DIAG] zero OK n=32 raw 1660..1660 mean=1660000 (cal source untouched)
+[DIAG] learn OK adc[2000..2000]n68 nz0 sg[500..500]n8 seq4..11
+[DIAG] learn thr tier=2 dev=64/128 drop=16/32 FIELD_UNVERIFIED
+[DIAG] commit REFUSED: (drive-config-drifted) rc=-8
+[DIAG] mode=MONITOR_ONLY (unchanged)
+[DIAG] profile voided; mode=MONITOR_ONLY (fault state and logs untouched)
+CASE|REL25-cli-capture-and-publish|PASS|checks=41
+SELECTED|REL26-tick-diff-and-threshold-bounds|YES
+CASE|REL26-tick-diff-and-threshold-bounds|PASS|checks=7
+SELECTED|REL27-active-severe-protect-before-print|YES
+[DIAG] ACTIVE: severe STALL_CONFIRMED -> post EVT_MULTI_FAULT post_rc=0
+CASE|REL27-active-severe-protect-before-print|PASS|checks=8
+SELECTED|REL28-strong-needs-own-evidence|YES
+    ! ADC 持续强偏离后=NONE(期望 REL_ADC_SEVERE)
+CASE|REL28-strong-needs-own-evidence|FAIL|checks=10 bad=1
+SELECTED|REL29-frozen-adc-age-degrades|YES
+CASE|REL29-frozen-adc-age-degrades|PASS|checks=6
+SELECTED|REL30-source-gap-restarts-evidence|YES
+CASE|REL30-source-gap-restarts-evidence|PASS|checks=8
+SELECTED|REL31-tick-wrap-and-rate-binding|YES
+CASE|REL31-tick-wrap-and-rate-binding|PASS|checks=14
+SELECTED|REL32-recovery-breaks-on-counter-evidence|YES
+CASE|REL32-recovery-breaks-on-counter-evidence|PASS|checks=8
+SELECTED|REL33-lock-fail-bounded-degrade|YES
+[DIAG] REL coverage=NOT-ACTIVE(no-frame) id=1 rev=1 live=1163520832 prof=1163520832
+[DIAG] REL coverage=COVERED id=1 rev=1 live=1163520832 prof=1163520832
+[DIAG] REL coverage=NOT-ACTIVE(config-lock) id=0 rev=0 live=1163520832 prof=0
+[DIAG] REL TRIP r=REL_COVERAGE_LOST id=0 rev=0 post_rc=0
+[DIAG] REL TRIP val=500 thr=500 ms=500 cov=1
+[DIAG] REL TRIP sg=4 cur=34 imu=34 tick=1680 n=0
+[DIAG] REL trip ticket used; mode=MONITOR_ONLY rearm required
+[DIAG] REL coverage=NOT-ACTIVE(no-frame) id=1 rev=1 live=1163520832 prof=1163520832
+[DIAG] REL coverage=COVERED id=1 rev=1 live=1163520832 prof=1163520832
+[DIAG] REL coverage=NOT-ACTIVE(config-lock) id=0 rev=0 live=1163520832 prof=0
+[DIAG] REL coverage=COVERED id=1 rev=1 live=1163520832 prof=1163520832
+[DIAG] REL coverage=NOT-ACTIVE(no-frame) id=0 rev=0 live=1163520832 prof=0
+[DIAG] REL coverage=NOT-ACTIVE(no-profile) id=0 rev=0 live=1163520832 prof=0
+[DIAG] REL TRIP r=REL_COVERAGE_LOST id=0 rev=0 post_rc=0
+[DIAG] REL TRIP val=510 thr=500 ms=510 cov=2
+[DIAG] REL TRIP sg=3 cur=25 imu=25 tick=1500 n=0
+[DIAG] REL trip ticket used; mode=MONITOR_ONLY rearm required
+CASE|REL33-lock-fail-bounded-degrade|PASS|checks=7
+SELECTED|REL34-no-frame-still-supervises|YES
+[DIAG] REL coverage=NOT-ACTIVE(no-frame) id=1 rev=1 live=1163520832 prof=1163520832
+[DIAG] REL TRIP r=REL_COVERAGE_LOST id=1 rev=1 post_rc=0
+[DIAG] REL TRIP val=500 thr=500 ms=500 cov=4
+[DIAG] REL TRIP sg=0 cur=0 imu=0 tick=1490 n=0
+[DIAG] REL trip ticket used; mode=MONITOR_ONLY rearm required
+[DIAG] REL coverage=NOT-ACTIVE(no-frame) id=1 rev=1 live=1163520832 prof=1163520832
+[DIAG] REL TRIP r=REL_COVERAGE_LOST id=1 rev=1 post_rc=0
+[DIAG] REL TRIP val=500 thr=500 ms=500 cov=4
+[DIAG] REL TRIP sg=0 cur=0 imu=0 tick=1490 n=0
+[DIAG] REL trip ticket used; mode=MONITOR_ONLY rearm required
+[DIAG] REL coverage=NOT-ACTIVE(no-frame) id=1 rev=1 live=1163520832 prof=1163520832
+CASE|REL34-no-frame-still-supervises|PASS|checks=5
+SELECTED|REL35-incident-ticket-lifecycle|YES
+[DIAG] REL coverage=NOT-ACTIVE(no-frame) id=1 rev=1 live=1163520832 prof=1163520832
+[DIAG] REL coverage=COVERED id=1 rev=1 live=1163520832 prof=1163520832
+[DIAG] REL TRIP r=REL_SG_SEVERE id=1 rev=1 post_rc=0
+[DIAG] REL TRIP val=383 thr=96 ms=600 cov=0
+[DIAG] REL TRIP sg=4 cur=31 imu=31 tick=1620 n=4
+[DIAG] REL trip ticket used; mode=MONITOR_ONLY rearm required
+[DIAG] REL thresholds=FIELD_UNVERIFIED id=1 rev=1 tier=2
+[DIAG] REL re-arm prior r=REL_SG_SEVERE id=1 tick=1620 post_rc=0
+[DIAG] mode=RELATIVE_ACTIVE
+[DIAG] REL coverage=COVERED id=1 rev=1 live=1163520832 prof=1163520832
+[DIAG] REL TRIP r=REL_SG_SEVERE id=1 rev=1 post_rc=0
+[DIAG] REL TRIP val=383 thr=96 ms=600 cov=0
+[DIAG] REL TRIP sg=23 cur=221 imu=221 tick=5420 n=4
+[DIAG] REL trip ticket used; mode=MONITOR_ONLY rearm required
+CASE|REL35-incident-ticket-lifecycle|PASS|checks=16
+SELECTED|REL36-null-outparams-still-protects|YES
+CASE|REL36-null-outparams-still-protects|PASS|checks=3
+SELECTED|REL37-post-failure-keeps-first-cause|YES
+[DIAG] REL coverage=NOT-ACTIVE(no-frame) id=1 rev=1 live=1163520832 prof=1163520832
+[DIAG] REL coverage=COVERED id=1 rev=1 live=1163520832 prof=1163520832
+[DIAG] REL TRIP r=REL_SG_SEVERE id=1 rev=1 post_rc=-12
+[DIAG] REL TRIP val=383 thr=96 ms=600 cov=0
+[DIAG] REL TRIP sg=4 cur=31 imu=31 tick=1620 n=4
+[DIAG] REL trip ticket used; mode=MONITOR_ONLY rearm required
+CASE|REL37-post-failure-keeps-first-cause|PASS|checks=6
+SELECTED|REL38-mode-gate-and-static-transaction|YES
+[DIAG] mode REFUSED: mode change needs static/idle
+[DIAG] mode REFUSED: mode change needs static/idle
+[DIAG] RELATIVE REFUSED: static txn not granted
+[DIAG] clear REFUSED: static txn rc=-8 (idle+trusted-disable not proven)
+CASE|REL38-mode-gate-and-static-transaction|PASS|checks=10
+SELECTED|REL39-zero-static-and-failed-relearn|YES
+[DIAG] zero VOIDED: motion/arm/proof lost during capture
+[DIAG] zero OK n=32 raw 1660..1660 mean=1660000 (cal source untouched)
+[DIAG] learn OK adc[2000..2000]n68 nz0 sg[500..500]n8 seq4..11
+[DIAG] learn thr tier=2 dev=64/128 drop=16/32 FIELD_UNVERIFIED
+[DIAG] learn FAILED: left the approved window or source lost
+[DIAG] learn last: st=2 hz=500 dir=0 sig=1163520832 sg_seq=11
+[DIAG] commit REFUSED: pending incomplete (zero=1 learn=0)
+[DIAG] zero OK n=32 raw 1660..1660 mean=1660000 (cal source untouched)
+[DIAG] learn FAILED: left the approved window or source lost
+[DIAG] learn last: st=2 hz=500 dir=0 sig=1163520832 sg_seq=4
+CASE|REL39-zero-static-and-failed-relearn|PASS|checks=11
+SELECTED|REL40-config-lock-failure-writes-nothing|YES
+[CFG] defaults REFUSED: config lock unavailable
+CASE|REL40-config-lock-failure-writes-nothing|PASS|checks=13
+SELECTED|REL41-illegal-context-silent|YES
+[DIAG] profile id=1 rev=1 abi=2 flg=0005 VALID
+[DIAG] profile win hz=500[400..600] dir=1 ph=4 tmc=2/20/10/1 mst=1 def=1
+[DIAG] profile zero n=64 [1650..1670] mean=1660000
+[DIAG] profile adc n=16 [1950..2050] nz=20 sg n=12 [480..520] seq=1..12
+[DIAG] profile thr dev=52/116 drop=32/96 tier=2 reach=2025/1930
+[DIAG] profile dur=500/300/300 rec=500 age=350/100/100 mns=3
+[DIAG] profile imp peak=2500 mg n=2 win=100 age=100
+[DIAG] pending: none
+[DIAG] live sig=1163520832 match=YES cred zero=0 learn=0
+CASE|REL41-illegal-context-silent|PASS|checks=6
+SELECTED|REL42-low-sg-committable-and-named-reject|YES
+[DIAG] zero OK n=32 raw 1660..1660 mean=1660000 (cal source untouched)
+[DIAG] learn OK adc[2000..2000]n68 nz0 sg[64..64]n8 seq4..11
+[DIAG] learn thr tier=2 dev=64/128 drop=16/32 FIELD_UNVERIFIED
+[DIAG] commit OK id=1 rev=1 flags=0005 FIELD_UNVERIFIED
+[DIAG] commit next: config_save to persist, then arm explicitly
+[DIAG] zero OK n=32 raw 1660..1660 mean=1660000 (cal source untouched)
+[DIAG] learn OK adc[2000..2000]n68 nz0 sg[64..72]n8 seq4..11
+[DIAG] learn thr tier=2 dev=64/128 drop=24/40 FIELD_UNVERIFIED
+[DIAG] zero OK n=32 raw 1660..1660 mean=1660000 (cal source untouched)
+[DIAG] learn REFUSED: SG_HEADROOM_INSUFFICIENT
+[DIAG] learn data: sg[1..1] adc[2000..2000] nz=0 tier=2
+[DIAG] zero OK n=32 raw 1660..1660 mean=1660000 (cal source untouched)
+[DIAG] learn REFUSED: SG_HEADROOM_INSUFFICIENT
+[DIAG] learn data: sg[60..480] adc[2000..2000] nz=0 tier=2
+CASE|REL42-low-sg-committable-and-named-reject|PASS|checks=31
+SELECTED|REL43-max-value-lines-fit-console|YES
+[DIAG] REL coverage=NOT-ACTIVE(no-frame) id=4294967295 rev=4294967295 live=1163520832 prof=1163520832
+[DIAG] REL coverage=COVERED id=4294967295 rev=4294967295 live=1163520832 prof=1163520832
+[DIAG] REL TRIP r=REL_SG_SEVERE id=4294967295 rev=4294967295 post_rc=-12
+[DIAG] REL TRIP val=383 thr=96 ms=600 cov=0
+[DIAG] REL TRIP sg=4000000004 cur=4000000031 imu=4000000031 tick=1620 n=4
+[DIAG] REL trip ticket used; mode=MONITOR_ONLY rearm required
+[DIAG] rel mode=MONITOR_ONLY prof=PRESENT id=4294967295 rev=4294967295 flg=0005 FIELD_UNVERIFIED
+[DIAG] rel cov=COVERED lost=0 gen=0 rearm=1
+[DIAG] rel win hz=500[400..600] dir=1 ph=4
+[DIAG] rel tmc=2/20/10/1 mst=1 def=1 tier=2
+[DIAG] rel sig live=1163520832 prof=1163520832 match=YES
+[DIAG] rel band adc[1950..2050]n16 nz20 sg[480..520]n12
+[DIAG] rel thr dev=52/116 drop=32/96 reach=2025/1930
+[DIAG] rel dur=500/300/300 rec=500 mns=3
+[DIAG] rel age lim sg=350 frm=100 imu=100 imp=2500/2/100
+[DIAG] rel sg warn=2600/14 strong=2600/14
+[DIAG] rel adc warn=0/0 strong=0/0
+[DIAG] rel fus=0 ok=2360 imp=0/0
+[DIAG] rel bad age=0 out=0 cov=0 imu_use=1
+[DIAG] rel last sg=4000000014 cur=4000000139 imu=4000000139 rsn=REL_SG_SEVERE
+[DIAG] rel LATCH r=REL_SG_SEVERE id=4294967295 rev=4294967295 ms=600 post_rc=-12
+[DIAG] rel LATCH val=383 thr=96 n=4 cov=0 tick=1620
+[DIAG] rel LATCH sg=4000000004 cur=4000000031 imu=4000000031
+[DIAG] rel re-arm needed: diag_mode relative CONFIRM_EXPERIMENTAL
+[DIAG] REL coverage=NOT-ACTIVE(no-frame) id=0 rev=0 live=1163520832 prof=0
+[DIAG] REL coverage=NOT-ACTIVE(config-lock) id=0 rev=0 live=1163520832 prof=0
+[DIAG] REL TRIP r=REL_COVERAGE_LOST id=0 rev=0 post_rc=0
+[DIAG] REL TRIP val=510 thr=500 ms=510 cov=1
+[DIAG] REL TRIP sg=3 cur=25 imu=25 tick=1500 n=0
+[DIAG] REL trip ticket used; mode=MONITOR_ONLY rearm required
+CASE|REL43-max-value-lines-fit-console|PASS|checks=15
+SELECTED|REL44-impact-fresh-evidence-only|YES
+[DIAG] REL coverage=NOT-ACTIVE(no-frame) id=1 rev=1 live=1163520832 prof=1163520832
+[DIAG] REL coverage=COVERED id=1 rev=1 live=1163520832 prof=1163520832
+[DIAG] REL TRIP r=REL_IMPACT id=1 rev=1 post_rc=0
+[DIAG] REL TRIP val=2856 thr=2500 ms=20 cov=0
+[DIAG] REL TRIP sg=1 cur=2 imu=2 tick=1040 n=2
+[DIAG] REL trip ticket used; mode=MONITOR_ONLY rearm required
+CASE|REL44-impact-fresh-evidence-only|PASS|checks=22
+SUMMARY|cases=44 pass=42 fail=2 pre_bad=0 executed=44

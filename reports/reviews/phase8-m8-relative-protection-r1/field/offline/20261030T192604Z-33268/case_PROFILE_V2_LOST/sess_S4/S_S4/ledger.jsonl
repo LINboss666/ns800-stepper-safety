@@ -1,0 +1,14 @@
+{"kind": "PORT_OPEN", "port": null, "t_s": 0.0, "transport": "stub"}
+{"bytes": "motor_arm\r\n", "kind": "TX", "t_s": 0.0}
+{"bytes": "motor_target 400\r\n", "kind": "TX", "t_s": 0.01}
+{"bytes": "motor_start\r\n", "kind": "TX", "t_s": 0.01}
+{"as": "gate_cruise", "kind": "MANUAL", "name": "cruise_reached", "t_s": 0.01, "value": "yes"}
+{"bytes": "diag_profile learn 16 260 340 0\r\n", "kind": "TX", "t_s": 0.01}
+{"bytes": "motor_stop\r\n", "kind": "TX", "t_s": 0.01}
+{"bytes": "motor_disarm\r\n", "kind": "TX", "t_s": 0.01}
+{"as": "gate_disable", "kind": "MANUAL", "name": "trusted_disable_verified", "t_s": 0.01, "value": "yes"}
+{"bytes": "diag_profile tier 2\r\n", "kind": "TX", "t_s": 0.01}
+{"bytes": "diag_profile commit\r\n", "kind": "TX", "t_s": 0.01}
+{"bytes": "config_save\r\n", "kind": "TX", "t_s": 0.01}
+{"kind": "SESSION_OK", "session": "S_S4", "steps": 11, "t_s": 0.01}
+{"kind": "PORT_CLOSED", "t_s": 0.01}

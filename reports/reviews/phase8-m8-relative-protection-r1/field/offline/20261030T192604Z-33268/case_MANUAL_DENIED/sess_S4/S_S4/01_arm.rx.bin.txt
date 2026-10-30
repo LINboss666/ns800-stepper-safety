@@ -1,0 +1,4 @@
+*** RS800 NS800RT7P65 board banner ***
+rt-thread startup
+[MOTOR] arm OK gates passed
+msh 

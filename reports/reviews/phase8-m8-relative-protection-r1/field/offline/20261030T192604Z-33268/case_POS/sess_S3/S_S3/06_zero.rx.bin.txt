@@ -1,0 +1,2 @@
+[DIAG] zero OK n=32 raw 1980..2010 mean=1995 (cal source untouched)
+msh 

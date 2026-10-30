@@ -1,0 +1,3 @@
+{"kind": "PORT_OPEN", "port": null, "t_s": 0.0, "transport": "stub"}
+{"bytes": "safety_status\r\n", "kind": "TX", "t_s": 0.0}
+{"kind": "PORT_CLOSED", "t_s": 6.005}

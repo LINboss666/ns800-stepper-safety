@@ -1,0 +1,2 @@
+[DIAG] mode=MONITOR_ONLY
+msh 

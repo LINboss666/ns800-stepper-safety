@@ -1,0 +1,23 @@
+[
+    {
+        "cmd":  "config_show",
+        "as":  "cfg1",
+        "key":  "config_show@after_reboot"
+    },
+    {
+        "cmd":  "diag_profile show",
+        "as":  "prof1",
+        "key":  "diag_profile show@after_reboot",
+        "expect_contains":  [
+                                "[DIAG] rel "
+                            ]
+    },
+    {
+        "cmd":  "diag_status",
+        "as":  "diag1",
+        "key":  "diag_status@after_reboot",
+        "expect_contains":  [
+                                "[DIAG] mode=MONITOR_ONLY"
+                            ]
+    }
+]

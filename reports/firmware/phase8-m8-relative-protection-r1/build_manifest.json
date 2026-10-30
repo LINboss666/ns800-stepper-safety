@@ -1,0 +1,233 @@
+{
+ "round": "phase8-m8-relative-protection-r1",
+ "code_commit": "3275356a46e0b503888e9a4869da3b2b41f027a8",
+ "reviewed_delivery_commit": "f939363449c528892fb3d9978d73e085cfa90c91",
+ "m8_software_input_commit": "f9217005f191a601601d315add02c3e8c51f64ed",
+ "m8_image_dir_untouched": "reports/firmware/phase8-m8-sg-adc-relative-protection",
+ "action": "Keil Rebuild All x3 (build only; no -f, no download, no flash-read, no DAP, no reset, no serial)",
+ "command_template": "C:\\Keil_v5\\UV4\\UV4.exe -r project.uvprojx -t <target> -j0 -o <absolute log path>",
+ "build_session_note": "六件镜像、三份 map 与三份原始日志来自第二次构建会话(同一 code_commit)。第一次会话因 -o 路径里的 $T 未被展开, 三份日志写到同一个文件名并互相覆盖, 只剩 motor-m1 一份(已另存为 build/session1_rt-thread-motor-m1-candidate.log, 其 Program Size 与第二次会话同一目标逐项一致: Code=203322 RO-data=85126 RW-data=2188 ZI-data=84704), 据此说明按同一输入重跑是等价的。不声称总共只发生过一次构建。",
+ "worktree_state_at_build": "clean vs 3275356 (git status --porcelain 无非 '?? ' 条目; 构建只写 build/ 下被忽略的产物)",
+ "manifest_self_hash": "EXCLUDED by rule (a manifest must not hash its own bytes)",
+ "targets": [
+  {
+   "target": "rt-thread",
+   "uv4_return_code": 0,
+   "program_size": "Code=203090 RO-data=85246 RW-data=2188 ZI-data=84704",
+   "error_warning_line": "0 Error(s), 0 Warning(s)",
+   "compiler_line_from_log": "*** Using Compiler 'V6.24', folder: 'C:\\Keil_v5\\ARM\\ARMCLANG\\Bin'",
+   "log_bytes": 3809,
+   "log_sha256": "d62470eb19f08ea22fa632e49b5c2bee44ae38409ccf603c47197838df312bb0",
+   "log_archive_path": "reports/reviews/phase8-m8-relative-protection-r1/build/rt-thread.log",
+   "safety_macros_effective": {
+    "MOTOR_HARDWARE_ENABLE_PATH_VALIDATED": "0 (not defined by this target; compile-time default RT_FALSE)",
+    "TMC_DRIVE_CONFIG_HW_VALIDATED": "0 (not defined by this target; compile-time default RT_FALSE)",
+    "STEP_DIAG_ISOLATED_ENV_CONFIRMED": "0 (not defined by this target; compile-time default RT_FALSE)",
+    "SAFETY_LIMIT_INPUTS_ENABLED": "0 (not defined by this target; compile-time default RT_FALSE)"
+   },
+   "effective_preprocessor_defines": [
+    "SYSCLK_USE_PLL, __CLK_TCK=RT_TICK_PER_SECOND, DUAL_CORE_ENABLE=0, USE_HAL_DRIVER, SYSCLK_SOURCE_USE_HXTL, __RTTHREAD__, NS800RT7P65X, __STDC_LIMIT_MACROS, RT_USING_LIBC, RT_USING_ARMLIBC, PLLCLK_SOURCE_USE_HXTL",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_KERNEL_SOURCE__",
+    "__RT_KERNEL_SOURCE__",
+    "__RT_KERNEL_SOURCE__",
+    "__RT_KERNEL_SOURCE__",
+    "__RT_KERNEL_SOURCE__",
+    "__RT_KERNEL_SOURCE__",
+    "__RT_KERNEL_SOURCE__",
+    "__RT_KERNEL_SOURCE__",
+    "__RT_KERNEL_SOURCE__",
+    "__RT_KERNEL_SOURCE__",
+    "__RT_KERNEL_SOURCE__",
+    "__RT_KERNEL_SOURCE__",
+    "__RT_KERNEL_SOURCE__",
+    "__RT_KERNEL_SOURCE__",
+    "__RT_KERNEL_SOURCE__"
+   ],
+   "images": {
+    "rt-thread.bin": {
+     "bytes": 288916,
+     "sha256": "be99bd40d7d87e2ec1751bcdf85c373e51b42ab202beb3bde371112486bc07a9",
+     "source_path_relative_to_project": "rtthread.bin",
+     "identical_to_build_output": true
+    },
+    "rt-thread.axf": {
+     "bytes": 1764928,
+     "sha256": "c3528d843553d15ee32ddd53b838c258bbf32b642d6dc198e44b436ea36e8499",
+     "source_path_relative_to_project": "build/rt-thread.axf",
+     "identical_to_build_output": true
+    }
+   },
+   "map": {
+    "rt-thread.map": {
+     "bytes": 2099228,
+     "sha256": "2fc5b191462ab40ee010c99a7776399167d98df29cc473c7753ffbac24a10d1d",
+     "source_path_relative_to_project": "build/rt-thread.map",
+     "identical_to_build_output": true
+    }
+   }
+  },
+  {
+   "target": "rt-thread-measure-a0",
+   "uv4_return_code": 0,
+   "program_size": "Code=210386 RO-data=88206 RW-data=2188 ZI-data=92424",
+   "error_warning_line": "0 Error(s), 0 Warning(s)",
+   "compiler_line_from_log": "*** Using Compiler 'V6.24', folder: 'C:\\Keil_v5\\ARM\\ARMCLANG\\Bin'",
+   "log_bytes": 3849,
+   "log_sha256": "162bdfe4866889d0f887e6169abccd0786eed90b284354846563069bd0743662",
+   "log_archive_path": "reports/reviews/phase8-m8-relative-protection-r1/build/rt-thread-measure-a0.log",
+   "safety_macros_effective": {
+    "MOTOR_HARDWARE_ENABLE_PATH_VALIDATED": "0 (not defined by this target; compile-time default RT_FALSE)",
+    "TMC_DRIVE_CONFIG_HW_VALIDATED": "0 (not defined by this target; compile-time default RT_FALSE)",
+    "STEP_DIAG_ISOLATED_ENV_CONFIRMED": "0 (not defined by this target; compile-time default RT_FALSE)",
+    "SAFETY_LIMIT_INPUTS_ENABLED": "0 (not defined by this target; compile-time default RT_FALSE)"
+   },
+   "effective_preprocessor_defines": [
+    "SYSCLK_USE_PLL, __CLK_TCK=RT_TICK_PER_SECOND, DUAL_CORE_ENABLE=0, USE_HAL_DRIVER, SYSCLK_SOURCE_USE_HXTL, __RTTHREAD__, NS800RT7P65X, __STDC_LIMIT_MACROS, RT_USING_LIBC, RT_USING_ARMLIBC, PLLCLK_SOURCE_USE_HXTL, NS800_TARGET_MEASUREMENT_A0=1",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_KERNEL_SOURCE__",
+    "__RT_KERNEL_SOURCE__",
+    "__RT_KERNEL_SOURCE__",
+    "__RT_KERNEL_SOURCE__",
+    "__RT_KERNEL_SOURCE__",
+    "__RT_KERNEL_SOURCE__",
+    "__RT_KERNEL_SOURCE__",
+    "__RT_KERNEL_SOURCE__",
+    "__RT_KERNEL_SOURCE__",
+    "__RT_KERNEL_SOURCE__",
+    "__RT_KERNEL_SOURCE__",
+    "__RT_KERNEL_SOURCE__",
+    "__RT_KERNEL_SOURCE__",
+    "__RT_KERNEL_SOURCE__",
+    "__RT_KERNEL_SOURCE__"
+   ],
+   "images": {
+    "rt-thread-measure-a0.bin": {
+     "bytes": 299172,
+     "sha256": "42487b18636a810a657eb4c62aac0101bb0875272ec7ef57a0adf94d2930b6e7",
+     "source_path_relative_to_project": "build/a0/measure-a0.bin",
+     "identical_to_build_output": true
+    },
+    "rt-thread-a0.axf": {
+     "bytes": 1795348,
+     "sha256": "1e60762062d722b7c9d2d70ef7a102fb236860016b32d01840e28245f51d4f7c",
+     "source_path_relative_to_project": "build/a0/rt-thread-a0.axf",
+     "identical_to_build_output": true
+    }
+   },
+   "map": {
+    "rt-thread-a0.map": {
+     "bytes": 2151016,
+     "sha256": "5a1f1c6797bd9a4f4c6427c395523aa0b75dd8b68564a7709727653080c479ed",
+     "source_path_relative_to_project": "build/a0/rt-thread-a0.map",
+     "identical_to_build_output": true
+    }
+   }
+  },
+  {
+   "target": "rt-thread-motor-m1-candidate",
+   "uv4_return_code": 0,
+   "program_size": "Code=203322 RO-data=85126 RW-data=2188 ZI-data=84704",
+   "error_warning_line": "0 Error(s), 0 Warning(s)",
+   "compiler_line_from_log": "*** Using Compiler 'V6.24', folder: 'C:\\Keil_v5\\ARM\\ARMCLANG\\Bin'",
+   "log_bytes": 3909,
+   "log_sha256": "e3198914935e9d1e693c239fedd887ec4d27890814a6f9ae6b5312d02a242c4f",
+   "log_archive_path": "reports/reviews/phase8-m8-relative-protection-r1/build/rt-thread-motor-m1-candidate.log",
+   "safety_macros_effective": {
+    "MOTOR_HARDWARE_ENABLE_PATH_VALIDATED": "1",
+    "TMC_DRIVE_CONFIG_HW_VALIDATED": "1",
+    "STEP_DIAG_ISOLATED_ENV_CONFIRMED": "0",
+    "SAFETY_LIMIT_INPUTS_ENABLED": "0"
+   },
+   "effective_preprocessor_defines": [
+    "SYSCLK_USE_PLL, __CLK_TCK=RT_TICK_PER_SECOND, DUAL_CORE_ENABLE=0, USE_HAL_DRIVER, SYSCLK_SOURCE_USE_HXTL, __RTTHREAD__, NS800RT7P65X, __STDC_LIMIT_MACROS, RT_USING_LIBC, RT_USING_ARMLIBC, PLLCLK_SOURCE_USE_HXTL, NS800_TARGET_MEASUREMENT_A0=0, MOTOR_HARDWARE_ENABLE_PATH_VALIDATED=1, TMC_DRIVE_CONFIG_HW_VALIDATED=1, STEP_DIAG_ISOLATED_ENV_CONFIRMED=0, SAFETY_LIMIT_INPUTS_ENABLED=0",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_IPC_SOURCE__",
+    "__RT_KERNEL_SOURCE__",
+    "__RT_KERNEL_SOURCE__",
+    "__RT_KERNEL_SOURCE__",
+    "__RT_KERNEL_SOURCE__",
+    "__RT_KERNEL_SOURCE__",
+    "__RT_KERNEL_SOURCE__",
+    "__RT_KERNEL_SOURCE__",
+    "__RT_KERNEL_SOURCE__",
+    "__RT_KERNEL_SOURCE__",
+    "__RT_KERNEL_SOURCE__",
+    "__RT_KERNEL_SOURCE__",
+    "__RT_KERNEL_SOURCE__",
+    "__RT_KERNEL_SOURCE__",
+    "__RT_KERNEL_SOURCE__",
+    "__RT_KERNEL_SOURCE__"
+   ],
+   "images": {
+    "rt-thread-motor-m1.bin": {
+     "bytes": 289028,
+     "sha256": "04ccfca5d8e7b30cc1685f6cfca3b65b0fc68f51f2c5e52f89bdda2b20fac59c",
+     "source_path_relative_to_project": "build/motor_m1/rt-thread-motor-m1.bin",
+     "identical_to_build_output": true
+    },
+    "rt-thread-motor-m1.axf": {
+     "bytes": 1765420,
+     "sha256": "e371cebc31b58455365c2fbb923dad470d7ad40185de496d49f00254e019fc2e",
+     "source_path_relative_to_project": "build/motor_m1/rt-thread-motor-m1.axf",
+     "identical_to_build_output": true
+    }
+   },
+   "map": {
+    "rt-thread-motor-m1.map": {
+     "bytes": 2100836,
+     "sha256": "62190e957c3a2534e7339805fa7f516e553a33afe63b125036a2183f1cd8f95b",
+     "source_path_relative_to_project": "build/motor_m1/rt-thread-motor-m1.map",
+     "identical_to_build_output": true
+    }
+   }
+  }
+ ]
+}

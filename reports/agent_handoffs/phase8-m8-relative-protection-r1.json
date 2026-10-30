@@ -1,0 +1,184 @@
+{
+  "task": "phase8-m8-relative-protection-r1",
+  "task_book": "操作者本机提供的返修任务书(文件名 NS800_M8_R1_Review_and_Repair_Task.md); 不记录个人绝对路径。",
+  "task_book_verdict": "M8_IMPLEMENTATION_REVIEW_REWORK_REQUIRED",
+  "task_book_scope_verbatim_summary": "本次不发软件 GO、不发镜像 GO、不含设备动作。完成本文件的集中修复、验证、三目标构建和可执行现场候选包后，一次交付复审；不要拆成纯登记轮。",
+  "date_utc": "2026-10-30T19:34:04Z",
+  "status": "M8_R1_OFFLINE_READY / AWAITING_INDEPENDENT_REVIEW",
+  "safe_for_enable": false,
+  "roles": {
+    "executor": "Qoder agent (LMX 机器, 离线)",
+    "reviewer_required": "独立复审 R1-R6 与现场候选包口径; 本轮不申请 GO"
+  },
+  "reviewed_delivery_commit": "f939363449c528892fb3d9978d73e085cfa90c91",
+  "m8_software_input_commit": "f9217005f191a601601d315add02c3e8c51f64ed",
+  "m8_artifact_commit": "56d67a08",
+  "m8_start_commit": "f1aa2e832d536593641cea44ea890fb8ce9558b9",
+  "branch": "feature/m8-sg-adc-relative-protection",
+  "code_commit": "3275356a46e0b503888e9a4869da3b2b41f027a8",
+  "code_commit_files": 12,
+  "delivery_head_rule": "证据+交接提交在 code_commit 之上顺序追加; 无 rebase/merge/amend/force。",
+  "frozen_refs_untouched": {
+    "main": "1b3757eec550802a3973e66790af422d81d3d373",
+    "phase7/full-embedded-software": "6d3fbc559d45673d7550eb73dec5a4ade5bb34df",
+    "phase8/tmc-drive-config": "1696c59f4b56bae5d503fb18888e379dfad6f76f",
+    "debug/tmc-uart-rootcause-20261028": "f1aa2e832d536593641cea44ea890fb8ce9558b9",
+    "tag_object": "097935fec5a6f2467261ab1ad449ff0b1d398250",
+    "tag_peeled": "e40a9b95ef709e6a80444f9f3949dfdd70ba96ba"
+  },
+  "forbidden_git_ops_performed": [],
+  "hardware_actions": [],
+  "device_libraries_imported": "none (pyserial 仅在 real 分支内 import, 本轮从未走到)",
+  "requirement_closure": {
+    "R1": [
+      "REL28",
+      "REL29",
+      "REL30",
+      "REL31",
+      "REL32",
+      "RV4"
+    ],
+    "R2": [
+      "REL22(改写)",
+      "REL33",
+      "REL34",
+      "REL35",
+      "REL36",
+      "REL37",
+      "RV5",
+      "RV2",
+      "RV1"
+    ],
+    "R3": [
+      "REL38",
+      "REL39",
+      "REL40",
+      "REL41",
+      "REL16",
+      "REL24",
+      "REL25",
+      "RV3",
+      "RV6"
+    ],
+    "R4": [
+      "REL42",
+      "REL43",
+      "REL05"
+    ],
+    "R5": [
+      "field/plan.json",
+      "field/M8R1Field.ps1",
+      "field/m8r1_serial_chain.py",
+      "field/needles.json"
+    ],
+    "R6": [
+      "REL44",
+      "RV7"
+    ]
+  },
+  "host_results": {
+    "m8r1_chain": "SUMMARY|cases=44 pass=44 fail=0 pre_bad=0 executed=44 runner_rc=0 proc_rc=0 warn=0",
+    "reverse_families": 7,
+    "reverse_meta": "RV1..RV7 全 META-OK(具名失败身份命中, 额外身份如实登记)",
+    "reviewer_probes": "13/13 NOT_OBSERVED; REVIEW_SUMMARY|observed=0|hardware_actions=0|sources_unmodified=YES",
+    "normal_run_ids": [
+      "20261030T183455Z-1432",
+      "20261030T185713Z-2046"
+    ],
+    "reverse_run_ids": [
+      "20261030T183508Z-1799",
+      "20261030T185724Z-1431"
+    ],
+    "cross_run_identity": "两次运行的 rel.exe stdout 逐字节一致(JSON 里 cross_run_identity 三项均 true)"
+  },
+  "regressions": {
+    "cc": "34/34 PASS",
+    "sd": "PASS(两变体)",
+    "s1": "PASS(target+host_ovr)",
+    "s2": "PASS(19组x2)",
+    "m6_cli": "PASS(10/10 x4)",
+    "io_behavior": "PASS(4变体+非法宏拒绝)",
+    "m5_flash_export": "PASS",
+    "a0_chain": "A0CHAIN-META: OK"
+  },
+  "keil_build": {
+    "action": "Rebuild All x3 (build only; 无 -f/下载/回读/DAP/复位/串口)",
+    "program_size": {
+      "rt-thread": "Code=203090 RO-data=85246 RW-data=2188 ZI-data=84704",
+      "rt-thread-measure-a0": "Code=210386 RO-data=88206 RW-data=2188 ZI-data=92424",
+      "rt-thread-motor-m1-candidate": "Code=203322 RO-data=85126 RW-data=2188 ZI-data=84704"
+    },
+    "error_warning": "0 Error(s), 0 Warning(s) x3",
+    "build_sessions_disclosure": "第一次会话因 -o 路径未展开 $T 导致三日志同名互覆, 仅 motor-m1 存活; 归档件取自修正后的第二次会话, 存活件保留为 build/session1_*.log 且与第二次同目标数值一致。"
+  },
+  "firmware_dir": "reports/firmware/phase8-m8-relative-protection-r1/",
+  "m8_firmware_dir_untouched": "reports/firmware/phase8-m8-sg-adc-relative-protection",
+  "evidence_dir": "reports/reviews/phase8-m8-relative-protection-r1/",
+  "m8_log_backfill": {
+    "paths": [
+      "reports/reviews/phase8-m8-sg-adc-relative-protection/build/rt-thread.log",
+      "reports/reviews/phase8-m8-sg-adc-relative-protection/build/rt-thread-measure-a0.log",
+      "reports/reviews/phase8-m8-sg-adc-relative-protection/build/rt-thread-motor-m1-candidate.log",
+      "reports/reviews/phase8-m8-sg-adc-relative-protection/build/rc.txt"
+    ],
+    "rule_hit": ".gitignore:28 build/ 与 .gitignore:31 *.log",
+    "hash_match_with_published_manifest": true,
+    "erratum": "reports/reviews/phase8-m8-sg-adc-relative-protection/build/ERRATUM_log_backfill.md"
+  },
+  "byte_identity_fix": {
+    "problem": "core.autocrlf=true 使 262/349 暂存件的 Git blob 与磁盘字节不一致(.map 3, .bin 115, .txt 115, .json 26, .log 3)",
+    "fix": "git add -f .gitattributes + 仅对本轮证据路径加 -text + git add --renormalize reports/",
+    "gitignore_modified": false,
+    "blob_neq_disk_after_fix": 0,
+    "code_commit_check": "12 源码件中 11 件逐字节相等; tests/host/cc_main.c 磁盘含 835 处 CRLF 而 blob 为 LF(git diff 为空, 内容一致)"
+  },
+  "artifact_grades": {
+    "HOST_PROVEN": "R1-R6 判据与时序; 44 例; 7 反向家族; 13 探针闭合; 现场候选包的计划合同(F-01..F-13,G-01)与额度/停机路径",
+    "BUILD_PROVEN": "三目标 0/0, 6 镜像 + 3 map 字节身份, 逐目标有效宏, 清单不哈希自身",
+    "FIELD_UNVERIFIED": "生成的阈值数值本身; tier/噪声裕量在真机分布上的合理性; 学习窗口是否覆盖真实工况",
+    "NOT_VERIFIED": "真机上的武装/覆盖/学习/提交/触发全流程; 真并发与调度抖动; 真串口下的控制台裁剪",
+    "NOT_AUTHORIZED": "现场候选包的任何一步(含下载、烧录、回读、复位、串口、起转、写配置、触发故障、物理碰撞)"
+  },
+  "quota_consumed": {
+    "device": "全部为 0(本轮无设备动作)",
+    "offline_runs": {
+      "host_chain": 2,
+      "reverse_chain": 1,
+      "regressions": 8,
+      "keil_rebuild_all": 3,
+      "field_selftest": 1
+    }
+  },
+  "field_package_offline_results": {
+    "command": "powershell -NoProfile -ExecutionPolicy Bypass -File field/M8R1Field.ps1",
+    "exit_code": 0,
+    "contract_checks_pass": 14,
+    "meta_probes_ok": 9,
+    "scenarios_ok": 10,
+    "run_id": "20261030T192604Z-33268",
+    "iteration_disclosure": "修好之前 PORT_SILENT 曾假通过(得 COMPLETED), 另一次因守卫过宽崩在 INFRA:; 两条都是判据不足, 修后才有 PASS; 失败轮原文留在仓外。"
+  },
+  "design_parameters_not_field_measured": {
+    "dur_sg_ms": 500,
+    "dur_adc_ms": 300,
+    "dur_fused_ms": 300,
+    "dur_recover_ms": 500,
+    "age_sg_ms": 350,
+    "age_frame_ms": 100,
+    "age_imu_ms": 100,
+    "dur_impact_ms": 2500,
+    "impact_new_min": 2,
+    "coverage_lost_ms": 500,
+    "coverage_lost_ms_in_profile": false,
+    "note": "500/300/300/500 与覆盖丢失门都是软件设计参数; 本轮未为掩盖缺陷放宽任何年龄门。"
+  },
+  "open_items": [
+    "独立复审 R1-R6 与 REL22 勘误口径",
+    "现场轮需要单独授权并确认额度提案数字",
+    "learn 窗口需替换为 M4 实测巡航 SG 区间",
+    "P1 独立电流参考(零点/增益)未收口",
+    "真机 Flash 上的 v2->v3 迁移与真串口下的 128 裁剪未验证"
+  ],
+  "approval_status": "AWAITING_INDEPENDENT_REVIEW; 本轮不申请软件 GO/镜像 GO/设备 GO",
+  "manifest_self_hash_policy": "两份 SHA256SUMS 排除自身; 清单生成之后才产生的 remote_readback.md 也在排除之列并已在 run_record §9 声明。"
+}

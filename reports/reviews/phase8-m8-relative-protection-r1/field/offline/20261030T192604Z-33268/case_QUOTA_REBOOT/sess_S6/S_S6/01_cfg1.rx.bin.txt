@@ -1,0 +1,4 @@
+*** RS800 NS800RT7P65 board banner ***
+rt-thread startup
+[CFG] loaded OK (version 0x00010003 cal_source=1 profile=v3)
+msh 

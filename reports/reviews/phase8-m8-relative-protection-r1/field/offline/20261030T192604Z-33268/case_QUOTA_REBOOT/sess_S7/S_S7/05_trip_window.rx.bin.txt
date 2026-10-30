@@ -1,0 +1,4 @@
+[DIAG] REL TRIP r=REL_SG_SEVERE id=3 rev=1 post_rc=0
+[DIAG] REL TRIP val=198 thr=240 ms=510 cov=0
+[DIAG] REL TRIP sg=4002 cur=4001 imu=4001 tick=521040 n=16
+[DIAG] REL trip ticket used; mode=MONITOR_ONLY rearm required

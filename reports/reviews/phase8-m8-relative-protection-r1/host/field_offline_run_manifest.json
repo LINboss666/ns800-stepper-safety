@@ -1,0 +1,1453 @@
+{
+  "offline_run_id": "20261030T192604Z-33268",
+  "offline_run_dir_in_repo": "reports/reviews/phase8-m8-relative-protection-r1/field/offline/20261030T192604Z-33268",
+  "selftest_command": "powershell -NoProfile -ExecutionPolicy Bypass -File field\\M8R1Field.ps1",
+  "ps_return_code": 0,
+  "case_isolation": "每个场景一个 case_<name>/ 子目录, 里面是该场景自己的 steps_*.json、假端口落盘字节与台账; 共享件(6 份场景夹具)在 inputs/。回读模拟只落盘 4 KB 头部切片(全 289028 字节的 SHA 在内存里算), 所以本目录不含整份镜像副本。",
+  "note_console_encoding": "执行前把 [Console]::OutputEncoding 设为 UTF-8, 因此 field_selftest_console.txt 是 UTF-8 原文(已用 python 解码校验通过)。机器可读结果同时另存 field_selftest_result.json(脚本自己以 UTF-8 无 BOM 写盘)。",
+  "files": {
+    "field_selftest_console.txt": {
+      "original_bytes": 13651,
+      "original_cr_bytes": 0,
+      "original_sha256": "cfdd4f37a1960aa602a7228324f2318db38dc50095e217f487bb68bbdd6efb36",
+      "normalised_bytes": 13651,
+      "normalised_sha256": "cfdd4f37a1960aa602a7228324f2318db38dc50095e217f487bb68bbdd6efb36",
+      "changed_by_normalisation": false
+    },
+    "field_selftest_result.json": {
+      "original_bytes": 19545,
+      "original_cr_bytes": 297,
+      "original_sha256": "7d8622be6a50f9c35a94814952831e246b34ec3d44bc1841be400ff391518241",
+      "normalised_bytes": 19248,
+      "normalised_sha256": "1c0586363e4a306b325425ffa6f7fb029ec7583503fdfc08ef98a3ab50b3d3dd",
+      "changed_by_normalisation": true
+    }
+  },
+  "offline_run_inventory": [
+    {
+      "path": "20261030T192604Z-33268/result.json",
+      "bytes": 19545,
+      "sha256": "7d8622be6a50f9c35a94814952831e246b34ec3d44bc1841be400ff391518241"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_MANUAL_DENIED/readback_head4k.bin",
+      "bytes": 4096,
+      "sha256": "b9eca3b858c0c2d56babd2e3e21f650fe834aa59f891b5b74e42ddf1cdf244a4"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_MANUAL_DENIED/inputs/steps_S3.json",
+      "bytes": 819,
+      "sha256": "3505888e3ce13fda92a512d19478be0f93160f405c4be28fa65ca1fbe03b1083"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_MANUAL_DENIED/inputs/steps_S4.json",
+      "bytes": 2174,
+      "sha256": "c92823ee1e9e2ca3ff0116287a46888e9613377ee54e96727cbd5499c057074e"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_MANUAL_DENIED/sess_S3/S_S3/01_boot.rx.bin",
+      "bytes": 116,
+      "sha256": "fd63aac35a8dd51d14901585a7f9c5200637038adbe9edfb53bb7e3be1446fb6"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_MANUAL_DENIED/sess_S3/S_S3/01_boot.rx.bin.txt",
+      "bytes": 116,
+      "sha256": "fd63aac35a8dd51d14901585a7f9c5200637038adbe9edfb53bb7e3be1446fb6"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_MANUAL_DENIED/sess_S3/S_S3/02_motor0.rx.bin",
+      "bytes": 53,
+      "sha256": "4d1bbd5950e94e339206bb49fe01b9749e94cb33982b520913441339414571f2"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_MANUAL_DENIED/sess_S3/S_S3/02_motor0.rx.bin.txt",
+      "bytes": 53,
+      "sha256": "4d1bbd5950e94e339206bb49fe01b9749e94cb33982b520913441339414571f2"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_MANUAL_DENIED/sess_S3/S_S3/03_diag0.rx.bin",
+      "bytes": 78,
+      "sha256": "6529c3ca33dd91fec6bf9489f1c2da1609d150010c1916be15bb3eb65cdad82b"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_MANUAL_DENIED/sess_S3/S_S3/03_diag0.rx.bin.txt",
+      "bytes": 78,
+      "sha256": "6529c3ca33dd91fec6bf9489f1c2da1609d150010c1916be15bb3eb65cdad82b"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_MANUAL_DENIED/sess_S3/S_S3/04_cfg0.rx.bin",
+      "bytes": 66,
+      "sha256": "2cb79a29174a5fe51b527b1e17cc94412b248de5140bc6abe28a3d8e938b297d"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_MANUAL_DENIED/sess_S3/S_S3/04_cfg0.rx.bin.txt",
+      "bytes": 66,
+      "sha256": "2cb79a29174a5fe51b527b1e17cc94412b248de5140bc6abe28a3d8e938b297d"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_MANUAL_DENIED/sess_S3/S_S3/05_prof0.rx.bin",
+      "bytes": 53,
+      "sha256": "76705eb580702fcd6c051177463adf34993b2bec7bb6e37c91a05689da24c45e"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_MANUAL_DENIED/sess_S3/S_S3/05_prof0.rx.bin.txt",
+      "bytes": 53,
+      "sha256": "76705eb580702fcd6c051177463adf34993b2bec7bb6e37c91a05689da24c45e"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_MANUAL_DENIED/sess_S3/S_S3/06_zero.rx.bin",
+      "bytes": 73,
+      "sha256": "37191f786ac027be07f5e032a3c1b36cccccee6509d6882618368191dd55dd44"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_MANUAL_DENIED/sess_S3/S_S3/06_zero.rx.bin.txt",
+      "bytes": 73,
+      "sha256": "37191f786ac027be07f5e032a3c1b36cccccee6509d6882618368191dd55dd44"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_MANUAL_DENIED/sess_S3/S_S3/ledger.jsonl",
+      "bytes": 526,
+      "sha256": "18a811a5568dc55af516daa97d45b4b65a0474da93c9beb0feefd2211a7f6132"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_MANUAL_DENIED/sess_S4/S_S4/01_arm.rx.bin",
+      "bytes": 92,
+      "sha256": "cb7311747cabee89ce31603141f557dbfe2c9262347bad6f6b29e8c33e95bbd0"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_MANUAL_DENIED/sess_S4/S_S4/01_arm.rx.bin.txt",
+      "bytes": 92,
+      "sha256": "cb7311747cabee89ce31603141f557dbfe2c9262347bad6f6b29e8c33e95bbd0"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_MANUAL_DENIED/sess_S4/S_S4/02_target.rx.bin",
+      "bytes": 27,
+      "sha256": "726526b714834229f89316c52b7cd48337ac0008c87d8dbbdaa29670f7561185"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_MANUAL_DENIED/sess_S4/S_S4/02_target.rx.bin.txt",
+      "bytes": 27,
+      "sha256": "726526b714834229f89316c52b7cd48337ac0008c87d8dbbdaa29670f7561185"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_MANUAL_DENIED/sess_S4/S_S4/03_start.rx.bin",
+      "bytes": 27,
+      "sha256": "26de11948ceb9de713b5f29f9e0bd5ef8660e0463e686972899b0d042a5e450d"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_MANUAL_DENIED/sess_S4/S_S4/03_start.rx.bin.txt",
+      "bytes": 27,
+      "sha256": "26de11948ceb9de713b5f29f9e0bd5ef8660e0463e686972899b0d042a5e450d"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_MANUAL_DENIED/sess_S4/S_S4/ledger.jsonl",
+      "bytes": 276,
+      "sha256": "7e5ee67f03cefd27a8d47adebb15e806e3bce984f3cf446885d99db9b7e1e592"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PORT_SILENT/readback_head4k.bin",
+      "bytes": 4096,
+      "sha256": "b9eca3b858c0c2d56babd2e3e21f650fe834aa59f891b5b74e42ddf1cdf244a4"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PORT_SILENT/inputs/steps_S3.json",
+      "bytes": 819,
+      "sha256": "3505888e3ce13fda92a512d19478be0f93160f405c4be28fa65ca1fbe03b1083"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PORT_SILENT/sess_S3/S_S3/01_boot.rx.bin",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PORT_SILENT/sess_S3/S_S3/ledger.jsonl",
+      "bytes": 164,
+      "sha256": "590c396241d6972f5f0f85c17fcd78a428f679a19c9e92e7ea17a9cb490665ed"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/readback_head4k.bin",
+      "bytes": 4096,
+      "sha256": "b9eca3b858c0c2d56babd2e3e21f650fe834aa59f891b5b74e42ddf1cdf244a4"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/inputs/steps_S3.json",
+      "bytes": 819,
+      "sha256": "3505888e3ce13fda92a512d19478be0f93160f405c4be28fa65ca1fbe03b1083"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/inputs/steps_S4.json",
+      "bytes": 2174,
+      "sha256": "c92823ee1e9e2ca3ff0116287a46888e9613377ee54e96727cbd5499c057074e"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/inputs/steps_S6.json",
+      "bytes": 595,
+      "sha256": "3420204454fd02d76e1ab553ab64d42d98ad13c01cca4624865e539252d692c3"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/inputs/steps_S7.json",
+      "bytes": 2436,
+      "sha256": "24f98fa42d536e4ed8980b67f8f25079f95242de1878039475244b75df2f0c3d"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S3/S_S3/01_boot.rx.bin",
+      "bytes": 116,
+      "sha256": "fd63aac35a8dd51d14901585a7f9c5200637038adbe9edfb53bb7e3be1446fb6"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S3/S_S3/01_boot.rx.bin.txt",
+      "bytes": 116,
+      "sha256": "fd63aac35a8dd51d14901585a7f9c5200637038adbe9edfb53bb7e3be1446fb6"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S3/S_S3/02_motor0.rx.bin",
+      "bytes": 53,
+      "sha256": "4d1bbd5950e94e339206bb49fe01b9749e94cb33982b520913441339414571f2"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S3/S_S3/02_motor0.rx.bin.txt",
+      "bytes": 53,
+      "sha256": "4d1bbd5950e94e339206bb49fe01b9749e94cb33982b520913441339414571f2"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S3/S_S3/03_diag0.rx.bin",
+      "bytes": 78,
+      "sha256": "6529c3ca33dd91fec6bf9489f1c2da1609d150010c1916be15bb3eb65cdad82b"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S3/S_S3/03_diag0.rx.bin.txt",
+      "bytes": 78,
+      "sha256": "6529c3ca33dd91fec6bf9489f1c2da1609d150010c1916be15bb3eb65cdad82b"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S3/S_S3/04_cfg0.rx.bin",
+      "bytes": 66,
+      "sha256": "2cb79a29174a5fe51b527b1e17cc94412b248de5140bc6abe28a3d8e938b297d"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S3/S_S3/04_cfg0.rx.bin.txt",
+      "bytes": 66,
+      "sha256": "2cb79a29174a5fe51b527b1e17cc94412b248de5140bc6abe28a3d8e938b297d"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S3/S_S3/05_prof0.rx.bin",
+      "bytes": 53,
+      "sha256": "76705eb580702fcd6c051177463adf34993b2bec7bb6e37c91a05689da24c45e"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S3/S_S3/05_prof0.rx.bin.txt",
+      "bytes": 53,
+      "sha256": "76705eb580702fcd6c051177463adf34993b2bec7bb6e37c91a05689da24c45e"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S3/S_S3/06_zero.rx.bin",
+      "bytes": 73,
+      "sha256": "37191f786ac027be07f5e032a3c1b36cccccee6509d6882618368191dd55dd44"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S3/S_S3/06_zero.rx.bin.txt",
+      "bytes": 73,
+      "sha256": "37191f786ac027be07f5e032a3c1b36cccccee6509d6882618368191dd55dd44"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S3/S_S3/ledger.jsonl",
+      "bytes": 526,
+      "sha256": "18a811a5568dc55af516daa97d45b4b65a0474da93c9beb0feefd2211a7f6132"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S4/S_S4/01_arm.rx.bin",
+      "bytes": 92,
+      "sha256": "cb7311747cabee89ce31603141f557dbfe2c9262347bad6f6b29e8c33e95bbd0"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S4/S_S4/01_arm.rx.bin.txt",
+      "bytes": 92,
+      "sha256": "cb7311747cabee89ce31603141f557dbfe2c9262347bad6f6b29e8c33e95bbd0"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S4/S_S4/02_target.rx.bin",
+      "bytes": 27,
+      "sha256": "726526b714834229f89316c52b7cd48337ac0008c87d8dbbdaa29670f7561185"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S4/S_S4/02_target.rx.bin.txt",
+      "bytes": 27,
+      "sha256": "726526b714834229f89316c52b7cd48337ac0008c87d8dbbdaa29670f7561185"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S4/S_S4/03_start.rx.bin",
+      "bytes": 27,
+      "sha256": "26de11948ceb9de713b5f29f9e0bd5ef8660e0463e686972899b0d042a5e450d"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S4/S_S4/03_start.rx.bin.txt",
+      "bytes": 27,
+      "sha256": "26de11948ceb9de713b5f29f9e0bd5ef8660e0463e686972899b0d042a5e450d"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S4/S_S4/05_learn.rx.bin",
+      "bytes": 139,
+      "sha256": "68d4f3a6ba6e991e6d74767926aa6a7f55ed60061eb7002c2e0a2786e3e0441d"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S4/S_S4/05_learn.rx.bin.txt",
+      "bytes": 139,
+      "sha256": "68d4f3a6ba6e991e6d74767926aa6a7f55ed60061eb7002c2e0a2786e3e0441d"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S4/S_S4/06_stop.rx.bin",
+      "bytes": 31,
+      "sha256": "3880132941d5dff372b4ee4e7f121c99a6ecf8609b3933acccadabd645e68992"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S4/S_S4/06_stop.rx.bin.txt",
+      "bytes": 31,
+      "sha256": "3880132941d5dff372b4ee4e7f121c99a6ecf8609b3933acccadabd645e68992"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S4/S_S4/07_disarm.rx.bin",
+      "bytes": 44,
+      "sha256": "de28a4027b32e0745c66a40b386deb78949dbd9d5cebc44ade04c54e3c464d7c"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S4/S_S4/07_disarm.rx.bin.txt",
+      "bytes": 44,
+      "sha256": "de28a4027b32e0745c66a40b386deb78949dbd9d5cebc44ade04c54e3c464d7c"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S4/S_S4/09_tier.rx.bin",
+      "bytes": 77,
+      "sha256": "91189e0c3f39cac30e92567c0876f7c20d861bcdb2f005155e92af8792eccb39"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S4/S_S4/09_tier.rx.bin.txt",
+      "bytes": 77,
+      "sha256": "91189e0c3f39cac30e92567c0876f7c20d861bcdb2f005155e92af8792eccb39"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S4/S_S4/10_commit.rx.bin",
+      "bytes": 126,
+      "sha256": "56fe0a96e10176d6224dca18cad69e524152022f2fcd1bd5c713f016557f9deb"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S4/S_S4/10_commit.rx.bin.txt",
+      "bytes": 126,
+      "sha256": "56fe0a96e10176d6224dca18cad69e524152022f2fcd1bd5c713f016557f9deb"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S4/S_S4/11_save.rx.bin",
+      "bytes": 28,
+      "sha256": "924059eeebf83a345f160c17766e4899d6cd9afc42274971e3d2723c66bc17b4"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S4/S_S4/11_save.rx.bin.txt",
+      "bytes": 28,
+      "sha256": "924059eeebf83a345f160c17766e4899d6cd9afc42274971e3d2723c66bc17b4"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S4/S_S4/ledger.jsonl",
+      "bytes": 917,
+      "sha256": "977cf51711190fbd920fac41089c9197278daac620b36ecfa98ffd9aced70a4b"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S6/S_S6/01_cfg1.rx.bin",
+      "bytes": 125,
+      "sha256": "7d47166c359c785a1e38c335af791147a17eeb0f8d87e771558d4d8fcf8ae033"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S6/S_S6/01_cfg1.rx.bin.txt",
+      "bytes": 125,
+      "sha256": "7d47166c359c785a1e38c335af791147a17eeb0f8d87e771558d4d8fcf8ae033"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S6/S_S6/02_prof1.rx.bin",
+      "bytes": 136,
+      "sha256": "757cf21cc15c9dbe0dd8b2808ccc071a1c1e0d64a8513e2b0ea2535c7888832f"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S6/S_S6/02_prof1.rx.bin.txt",
+      "bytes": 136,
+      "sha256": "757cf21cc15c9dbe0dd8b2808ccc071a1c1e0d64a8513e2b0ea2535c7888832f"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S6/S_S6/03_diag1.rx.bin",
+      "bytes": 30,
+      "sha256": "853d0e16db8967185d9273bd698fe15d0111805b73cc3921f13d64fa44c8da84"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S6/S_S6/03_diag1.rx.bin.txt",
+      "bytes": 30,
+      "sha256": "853d0e16db8967185d9273bd698fe15d0111805b73cc3921f13d64fa44c8da84"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S6/S_S6/ledger.jsonl",
+      "bytes": 346,
+      "sha256": "0eac88b1096ca5523362f6b4bfeb0cd4b205f53541d0945292011078f1283ba7"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S7/S_S7/01_arm_rel.rx.bin",
+      "bytes": 96,
+      "sha256": "4c067c2a8592787080300f55fb906d9e859f340f4e5fdf918c2af2ed006355a5"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S7/S_S7/01_arm_rel.rx.bin.txt",
+      "bytes": 96,
+      "sha256": "4c067c2a8592787080300f55fb906d9e859f340f4e5fdf918c2af2ed006355a5"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S7/S_S7/02_arm.rx.bin",
+      "bytes": 33,
+      "sha256": "0c5a32390954de8e40e52aa71255c21aa535202e56057505d57de4528b90ee3e"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S7/S_S7/02_arm.rx.bin.txt",
+      "bytes": 33,
+      "sha256": "0c5a32390954de8e40e52aa71255c21aa535202e56057505d57de4528b90ee3e"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S7/S_S7/03_target.rx.bin",
+      "bytes": 27,
+      "sha256": "726526b714834229f89316c52b7cd48337ac0008c87d8dbbdaa29670f7561185"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S7/S_S7/03_target.rx.bin.txt",
+      "bytes": 27,
+      "sha256": "726526b714834229f89316c52b7cd48337ac0008c87d8dbbdaa29670f7561185"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S7/S_S7/04_start.rx.bin",
+      "bytes": 27,
+      "sha256": "26de11948ceb9de713b5f29f9e0bd5ef8660e0463e686972899b0d042a5e450d"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S7/S_S7/04_start.rx.bin.txt",
+      "bytes": 27,
+      "sha256": "26de11948ceb9de713b5f29f9e0bd5ef8660e0463e686972899b0d042a5e450d"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S7/S_S7/05_trip_window.rx.bin",
+      "bytes": 223,
+      "sha256": "480cf2dec77eb8581d79e5b049edc9382f7280b6c6a14bd457694d2f5eb9b6aa"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S7/S_S7/05_trip_window.rx.bin.txt",
+      "bytes": 221,
+      "sha256": "ca83e2b0ac3b6bc16179a89d13411b7bec199c5fc3a8f4ebc265f57ca18f5b9c"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S7/S_S7/06_disarm_obs.rx.bin",
+      "bytes": 53,
+      "sha256": "4d1bbd5950e94e339206bb49fe01b9749e94cb33982b520913441339414571f2"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S7/S_S7/06_disarm_obs.rx.bin.txt",
+      "bytes": 53,
+      "sha256": "4d1bbd5950e94e339206bb49fe01b9749e94cb33982b520913441339414571f2"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S7/S_S7/08_latch.rx.bin",
+      "bytes": 137,
+      "sha256": "1fd7bec0fcbc48430c1361ca9849e276a6479fbfcf9b6dfc77597d708887de75"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S7/S_S7/08_latch.rx.bin.txt",
+      "bytes": 137,
+      "sha256": "1fd7bec0fcbc48430c1361ca9849e276a6479fbfcf9b6dfc77597d708887de75"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S7/S_S7/09_first_cause.rx.bin",
+      "bytes": 52,
+      "sha256": "cc348909545d01795cd068ca761b1d508c092ab701a39271797ea16bb7e44382"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S7/S_S7/09_first_cause.rx.bin.txt",
+      "bytes": 52,
+      "sha256": "cc348909545d01795cd068ca761b1d508c092ab701a39271797ea16bb7e44382"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S7/S_S7/10_newlog.rx.bin",
+      "bytes": 37,
+      "sha256": "f9df8b3c51e6d5c6fbfbe4ff58668ea9b3d002bd12d18be9fbf826b8d130bc34"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S7/S_S7/10_newlog.rx.bin.txt",
+      "bytes": 37,
+      "sha256": "f9df8b3c51e6d5c6fbfbe4ff58668ea9b3d002bd12d18be9fbf826b8d130bc34"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S7/S_S7/11_refused_in_fault.rx.bin",
+      "bytes": 61,
+      "sha256": "946a603d031df133472e88ad91e4f4097d4dc07c757d4236b5883d60c2316faa"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S7/S_S7/11_refused_in_fault.rx.bin.txt",
+      "bytes": 61,
+      "sha256": "946a603d031df133472e88ad91e4f4097d4dc07c757d4236b5883d60c2316faa"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S7/S_S7/12_reset.rx.bin",
+      "bytes": 36,
+      "sha256": "bd40a4b8bdf61f934145e489f569e75473e38eab0f2646316fe94d0328349d89"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S7/S_S7/12_reset.rx.bin.txt",
+      "bytes": 36,
+      "sha256": "bd40a4b8bdf61f934145e489f569e75473e38eab0f2646316fe94d0328349d89"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S7/S_S7/13_selftest.rx.bin",
+      "bytes": 23,
+      "sha256": "179749c773cbd81e19dd7ca16d2d5899f93a1187cf4321b0d719bfbd185de9f4"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S7/S_S7/13_selftest.rx.bin.txt",
+      "bytes": 23,
+      "sha256": "179749c773cbd81e19dd7ca16d2d5899f93a1187cf4321b0d719bfbd185de9f4"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S7/S_S7/14_ready.rx.bin",
+      "bytes": 57,
+      "sha256": "8f23cfb60d5b8dfcd26e37c5e5db2e4a97ebf19c4c77e1afa62b68a0a1f73f51"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S7/S_S7/14_ready.rx.bin.txt",
+      "bytes": 57,
+      "sha256": "8f23cfb60d5b8dfcd26e37c5e5db2e4a97ebf19c4c77e1afa62b68a0a1f73f51"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S7/S_S7/15_armed0.rx.bin",
+      "bytes": 53,
+      "sha256": "4d1bbd5950e94e339206bb49fe01b9749e94cb33982b520913441339414571f2"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S7/S_S7/15_armed0.rx.bin.txt",
+      "bytes": 53,
+      "sha256": "4d1bbd5950e94e339206bb49fe01b9749e94cb33982b520913441339414571f2"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S7/S_S7/16_monitor.rx.bin",
+      "bytes": 30,
+      "sha256": "853d0e16db8967185d9273bd698fe15d0111805b73cc3921f13d64fa44c8da84"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S7/S_S7/16_monitor.rx.bin.txt",
+      "bytes": 30,
+      "sha256": "853d0e16db8967185d9273bd698fe15d0111805b73cc3921f13d64fa44c8da84"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_POS/sess_S7/S_S7/ledger.jsonl",
+      "bytes": 1189,
+      "sha256": "084373b91809c0c47446cdd4b20ad8da3556575d671f7e53e18a0d4fe13eaafb"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PROFILE_V2_LOST/readback_head4k.bin",
+      "bytes": 4096,
+      "sha256": "b9eca3b858c0c2d56babd2e3e21f650fe834aa59f891b5b74e42ddf1cdf244a4"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PROFILE_V2_LOST/inputs/steps_S3.json",
+      "bytes": 819,
+      "sha256": "3505888e3ce13fda92a512d19478be0f93160f405c4be28fa65ca1fbe03b1083"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PROFILE_V2_LOST/inputs/steps_S4.json",
+      "bytes": 2174,
+      "sha256": "c92823ee1e9e2ca3ff0116287a46888e9613377ee54e96727cbd5499c057074e"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PROFILE_V2_LOST/inputs/steps_S6.json",
+      "bytes": 595,
+      "sha256": "3420204454fd02d76e1ab553ab64d42d98ad13c01cca4624865e539252d692c3"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PROFILE_V2_LOST/sess_S3/S_S3/01_boot.rx.bin",
+      "bytes": 116,
+      "sha256": "fd63aac35a8dd51d14901585a7f9c5200637038adbe9edfb53bb7e3be1446fb6"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PROFILE_V2_LOST/sess_S3/S_S3/01_boot.rx.bin.txt",
+      "bytes": 116,
+      "sha256": "fd63aac35a8dd51d14901585a7f9c5200637038adbe9edfb53bb7e3be1446fb6"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PROFILE_V2_LOST/sess_S3/S_S3/02_motor0.rx.bin",
+      "bytes": 53,
+      "sha256": "4d1bbd5950e94e339206bb49fe01b9749e94cb33982b520913441339414571f2"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PROFILE_V2_LOST/sess_S3/S_S3/02_motor0.rx.bin.txt",
+      "bytes": 53,
+      "sha256": "4d1bbd5950e94e339206bb49fe01b9749e94cb33982b520913441339414571f2"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PROFILE_V2_LOST/sess_S3/S_S3/03_diag0.rx.bin",
+      "bytes": 78,
+      "sha256": "6529c3ca33dd91fec6bf9489f1c2da1609d150010c1916be15bb3eb65cdad82b"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PROFILE_V2_LOST/sess_S3/S_S3/03_diag0.rx.bin.txt",
+      "bytes": 78,
+      "sha256": "6529c3ca33dd91fec6bf9489f1c2da1609d150010c1916be15bb3eb65cdad82b"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PROFILE_V2_LOST/sess_S3/S_S3/04_cfg0.rx.bin",
+      "bytes": 66,
+      "sha256": "2cb79a29174a5fe51b527b1e17cc94412b248de5140bc6abe28a3d8e938b297d"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PROFILE_V2_LOST/sess_S3/S_S3/04_cfg0.rx.bin.txt",
+      "bytes": 66,
+      "sha256": "2cb79a29174a5fe51b527b1e17cc94412b248de5140bc6abe28a3d8e938b297d"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PROFILE_V2_LOST/sess_S3/S_S3/05_prof0.rx.bin",
+      "bytes": 53,
+      "sha256": "76705eb580702fcd6c051177463adf34993b2bec7bb6e37c91a05689da24c45e"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PROFILE_V2_LOST/sess_S3/S_S3/05_prof0.rx.bin.txt",
+      "bytes": 53,
+      "sha256": "76705eb580702fcd6c051177463adf34993b2bec7bb6e37c91a05689da24c45e"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PROFILE_V2_LOST/sess_S3/S_S3/06_zero.rx.bin",
+      "bytes": 73,
+      "sha256": "37191f786ac027be07f5e032a3c1b36cccccee6509d6882618368191dd55dd44"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PROFILE_V2_LOST/sess_S3/S_S3/06_zero.rx.bin.txt",
+      "bytes": 73,
+      "sha256": "37191f786ac027be07f5e032a3c1b36cccccee6509d6882618368191dd55dd44"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PROFILE_V2_LOST/sess_S3/S_S3/ledger.jsonl",
+      "bytes": 526,
+      "sha256": "18a811a5568dc55af516daa97d45b4b65a0474da93c9beb0feefd2211a7f6132"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PROFILE_V2_LOST/sess_S4/S_S4/01_arm.rx.bin",
+      "bytes": 92,
+      "sha256": "cb7311747cabee89ce31603141f557dbfe2c9262347bad6f6b29e8c33e95bbd0"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PROFILE_V2_LOST/sess_S4/S_S4/01_arm.rx.bin.txt",
+      "bytes": 92,
+      "sha256": "cb7311747cabee89ce31603141f557dbfe2c9262347bad6f6b29e8c33e95bbd0"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PROFILE_V2_LOST/sess_S4/S_S4/02_target.rx.bin",
+      "bytes": 27,
+      "sha256": "726526b714834229f89316c52b7cd48337ac0008c87d8dbbdaa29670f7561185"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PROFILE_V2_LOST/sess_S4/S_S4/02_target.rx.bin.txt",
+      "bytes": 27,
+      "sha256": "726526b714834229f89316c52b7cd48337ac0008c87d8dbbdaa29670f7561185"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PROFILE_V2_LOST/sess_S4/S_S4/03_start.rx.bin",
+      "bytes": 27,
+      "sha256": "26de11948ceb9de713b5f29f9e0bd5ef8660e0463e686972899b0d042a5e450d"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PROFILE_V2_LOST/sess_S4/S_S4/03_start.rx.bin.txt",
+      "bytes": 27,
+      "sha256": "26de11948ceb9de713b5f29f9e0bd5ef8660e0463e686972899b0d042a5e450d"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PROFILE_V2_LOST/sess_S4/S_S4/05_learn.rx.bin",
+      "bytes": 139,
+      "sha256": "68d4f3a6ba6e991e6d74767926aa6a7f55ed60061eb7002c2e0a2786e3e0441d"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PROFILE_V2_LOST/sess_S4/S_S4/05_learn.rx.bin.txt",
+      "bytes": 139,
+      "sha256": "68d4f3a6ba6e991e6d74767926aa6a7f55ed60061eb7002c2e0a2786e3e0441d"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PROFILE_V2_LOST/sess_S4/S_S4/06_stop.rx.bin",
+      "bytes": 31,
+      "sha256": "3880132941d5dff372b4ee4e7f121c99a6ecf8609b3933acccadabd645e68992"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PROFILE_V2_LOST/sess_S4/S_S4/06_stop.rx.bin.txt",
+      "bytes": 31,
+      "sha256": "3880132941d5dff372b4ee4e7f121c99a6ecf8609b3933acccadabd645e68992"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PROFILE_V2_LOST/sess_S4/S_S4/07_disarm.rx.bin",
+      "bytes": 44,
+      "sha256": "de28a4027b32e0745c66a40b386deb78949dbd9d5cebc44ade04c54e3c464d7c"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PROFILE_V2_LOST/sess_S4/S_S4/07_disarm.rx.bin.txt",
+      "bytes": 44,
+      "sha256": "de28a4027b32e0745c66a40b386deb78949dbd9d5cebc44ade04c54e3c464d7c"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PROFILE_V2_LOST/sess_S4/S_S4/09_tier.rx.bin",
+      "bytes": 77,
+      "sha256": "91189e0c3f39cac30e92567c0876f7c20d861bcdb2f005155e92af8792eccb39"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PROFILE_V2_LOST/sess_S4/S_S4/09_tier.rx.bin.txt",
+      "bytes": 77,
+      "sha256": "91189e0c3f39cac30e92567c0876f7c20d861bcdb2f005155e92af8792eccb39"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PROFILE_V2_LOST/sess_S4/S_S4/10_commit.rx.bin",
+      "bytes": 126,
+      "sha256": "56fe0a96e10176d6224dca18cad69e524152022f2fcd1bd5c713f016557f9deb"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PROFILE_V2_LOST/sess_S4/S_S4/10_commit.rx.bin.txt",
+      "bytes": 126,
+      "sha256": "56fe0a96e10176d6224dca18cad69e524152022f2fcd1bd5c713f016557f9deb"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PROFILE_V2_LOST/sess_S4/S_S4/11_save.rx.bin",
+      "bytes": 28,
+      "sha256": "924059eeebf83a345f160c17766e4899d6cd9afc42274971e3d2723c66bc17b4"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PROFILE_V2_LOST/sess_S4/S_S4/11_save.rx.bin.txt",
+      "bytes": 28,
+      "sha256": "924059eeebf83a345f160c17766e4899d6cd9afc42274971e3d2723c66bc17b4"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PROFILE_V2_LOST/sess_S4/S_S4/ledger.jsonl",
+      "bytes": 917,
+      "sha256": "977cf51711190fbd920fac41089c9197278daac620b36ecfa98ffd9aced70a4b"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PROFILE_V2_LOST/sess_S6/S_S6/01_cfg1.rx.bin",
+      "bytes": 125,
+      "sha256": "7d47166c359c785a1e38c335af791147a17eeb0f8d87e771558d4d8fcf8ae033"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PROFILE_V2_LOST/sess_S6/S_S6/01_cfg1.rx.bin.txt",
+      "bytes": 125,
+      "sha256": "7d47166c359c785a1e38c335af791147a17eeb0f8d87e771558d4d8fcf8ae033"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PROFILE_V2_LOST/sess_S6/S_S6/02_prof1.rx.bin",
+      "bytes": 53,
+      "sha256": "76705eb580702fcd6c051177463adf34993b2bec7bb6e37c91a05689da24c45e"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PROFILE_V2_LOST/sess_S6/S_S6/02_prof1.rx.bin.txt",
+      "bytes": 53,
+      "sha256": "76705eb580702fcd6c051177463adf34993b2bec7bb6e37c91a05689da24c45e"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PROFILE_V2_LOST/sess_S6/S_S6/03_diag1.rx.bin",
+      "bytes": 30,
+      "sha256": "853d0e16db8967185d9273bd698fe15d0111805b73cc3921f13d64fa44c8da84"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PROFILE_V2_LOST/sess_S6/S_S6/03_diag1.rx.bin.txt",
+      "bytes": 30,
+      "sha256": "853d0e16db8967185d9273bd698fe15d0111805b73cc3921f13d64fa44c8da84"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_PROFILE_V2_LOST/sess_S6/S_S6/ledger.jsonl",
+      "bytes": 346,
+      "sha256": "0eac88b1096ca5523362f6b4bfeb0cd4b205f53541d0945292011078f1283ba7"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/readback_head4k.bin",
+      "bytes": 4096,
+      "sha256": "b9eca3b858c0c2d56babd2e3e21f650fe834aa59f891b5b74e42ddf1cdf244a4"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/inputs/steps_S3.json",
+      "bytes": 819,
+      "sha256": "3505888e3ce13fda92a512d19478be0f93160f405c4be28fa65ca1fbe03b1083"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/inputs/steps_S4.json",
+      "bytes": 2604,
+      "sha256": "7263006d5c5f83e795ef6bfd49cf36ef73b6d2dcc9cf9fcd427c7ea1917787b6"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/inputs/steps_S6.json",
+      "bytes": 595,
+      "sha256": "3420204454fd02d76e1ab553ab64d42d98ad13c01cca4624865e539252d692c3"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/sess_S3/S_S3/01_boot.rx.bin",
+      "bytes": 116,
+      "sha256": "fd63aac35a8dd51d14901585a7f9c5200637038adbe9edfb53bb7e3be1446fb6"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/sess_S3/S_S3/01_boot.rx.bin.txt",
+      "bytes": 116,
+      "sha256": "fd63aac35a8dd51d14901585a7f9c5200637038adbe9edfb53bb7e3be1446fb6"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/sess_S3/S_S3/02_motor0.rx.bin",
+      "bytes": 53,
+      "sha256": "4d1bbd5950e94e339206bb49fe01b9749e94cb33982b520913441339414571f2"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/sess_S3/S_S3/02_motor0.rx.bin.txt",
+      "bytes": 53,
+      "sha256": "4d1bbd5950e94e339206bb49fe01b9749e94cb33982b520913441339414571f2"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/sess_S3/S_S3/03_diag0.rx.bin",
+      "bytes": 78,
+      "sha256": "6529c3ca33dd91fec6bf9489f1c2da1609d150010c1916be15bb3eb65cdad82b"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/sess_S3/S_S3/03_diag0.rx.bin.txt",
+      "bytes": 78,
+      "sha256": "6529c3ca33dd91fec6bf9489f1c2da1609d150010c1916be15bb3eb65cdad82b"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/sess_S3/S_S3/04_cfg0.rx.bin",
+      "bytes": 66,
+      "sha256": "2cb79a29174a5fe51b527b1e17cc94412b248de5140bc6abe28a3d8e938b297d"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/sess_S3/S_S3/04_cfg0.rx.bin.txt",
+      "bytes": 66,
+      "sha256": "2cb79a29174a5fe51b527b1e17cc94412b248de5140bc6abe28a3d8e938b297d"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/sess_S3/S_S3/05_prof0.rx.bin",
+      "bytes": 53,
+      "sha256": "76705eb580702fcd6c051177463adf34993b2bec7bb6e37c91a05689da24c45e"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/sess_S3/S_S3/05_prof0.rx.bin.txt",
+      "bytes": 53,
+      "sha256": "76705eb580702fcd6c051177463adf34993b2bec7bb6e37c91a05689da24c45e"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/sess_S3/S_S3/06_zero.rx.bin",
+      "bytes": 73,
+      "sha256": "37191f786ac027be07f5e032a3c1b36cccccee6509d6882618368191dd55dd44"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/sess_S3/S_S3/06_zero.rx.bin.txt",
+      "bytes": 73,
+      "sha256": "37191f786ac027be07f5e032a3c1b36cccccee6509d6882618368191dd55dd44"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/sess_S3/S_S3/ledger.jsonl",
+      "bytes": 526,
+      "sha256": "18a811a5568dc55af516daa97d45b4b65a0474da93c9beb0feefd2211a7f6132"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/sess_S4/S_S4/01_arm.rx.bin",
+      "bytes": 92,
+      "sha256": "cb7311747cabee89ce31603141f557dbfe2c9262347bad6f6b29e8c33e95bbd0"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/sess_S4/S_S4/01_arm.rx.bin.txt",
+      "bytes": 92,
+      "sha256": "cb7311747cabee89ce31603141f557dbfe2c9262347bad6f6b29e8c33e95bbd0"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/sess_S4/S_S4/02_target.rx.bin",
+      "bytes": 27,
+      "sha256": "726526b714834229f89316c52b7cd48337ac0008c87d8dbbdaa29670f7561185"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/sess_S4/S_S4/02_target.rx.bin.txt",
+      "bytes": 27,
+      "sha256": "726526b714834229f89316c52b7cd48337ac0008c87d8dbbdaa29670f7561185"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/sess_S4/S_S4/03_start.rx.bin",
+      "bytes": 27,
+      "sha256": "26de11948ceb9de713b5f29f9e0bd5ef8660e0463e686972899b0d042a5e450d"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/sess_S4/S_S4/03_start.rx.bin.txt",
+      "bytes": 27,
+      "sha256": "26de11948ceb9de713b5f29f9e0bd5ef8660e0463e686972899b0d042a5e450d"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/sess_S4/S_S4/05_learn.rx.bin",
+      "bytes": 139,
+      "sha256": "68d4f3a6ba6e991e6d74767926aa6a7f55ed60061eb7002c2e0a2786e3e0441d"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/sess_S4/S_S4/05_learn.rx.bin.txt",
+      "bytes": 139,
+      "sha256": "68d4f3a6ba6e991e6d74767926aa6a7f55ed60061eb7002c2e0a2786e3e0441d"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/sess_S4/S_S4/06_stop.rx.bin",
+      "bytes": 31,
+      "sha256": "3880132941d5dff372b4ee4e7f121c99a6ecf8609b3933acccadabd645e68992"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/sess_S4/S_S4/06_stop.rx.bin.txt",
+      "bytes": 31,
+      "sha256": "3880132941d5dff372b4ee4e7f121c99a6ecf8609b3933acccadabd645e68992"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/sess_S4/S_S4/07_disarm.rx.bin",
+      "bytes": 44,
+      "sha256": "de28a4027b32e0745c66a40b386deb78949dbd9d5cebc44ade04c54e3c464d7c"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/sess_S4/S_S4/07_disarm.rx.bin.txt",
+      "bytes": 44,
+      "sha256": "de28a4027b32e0745c66a40b386deb78949dbd9d5cebc44ade04c54e3c464d7c"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/sess_S4/S_S4/09_tier.rx.bin",
+      "bytes": 77,
+      "sha256": "91189e0c3f39cac30e92567c0876f7c20d861bcdb2f005155e92af8792eccb39"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/sess_S4/S_S4/09_tier.rx.bin.txt",
+      "bytes": 77,
+      "sha256": "91189e0c3f39cac30e92567c0876f7c20d861bcdb2f005155e92af8792eccb39"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/sess_S4/S_S4/10_commit.rx.bin",
+      "bytes": 126,
+      "sha256": "56fe0a96e10176d6224dca18cad69e524152022f2fcd1bd5c713f016557f9deb"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/sess_S4/S_S4/10_commit.rx.bin.txt",
+      "bytes": 126,
+      "sha256": "56fe0a96e10176d6224dca18cad69e524152022f2fcd1bd5c713f016557f9deb"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/sess_S4/S_S4/11_save.rx.bin",
+      "bytes": 28,
+      "sha256": "924059eeebf83a345f160c17766e4899d6cd9afc42274971e3d2723c66bc17b4"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/sess_S4/S_S4/11_save.rx.bin.txt",
+      "bytes": 28,
+      "sha256": "924059eeebf83a345f160c17766e4899d6cd9afc42274971e3d2723c66bc17b4"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/sess_S4/S_S4/12_extra1.rx.bin",
+      "bytes": 27,
+      "sha256": "26de11948ceb9de713b5f29f9e0bd5ef8660e0463e686972899b0d042a5e450d"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/sess_S4/S_S4/12_extra1.rx.bin.txt",
+      "bytes": 27,
+      "sha256": "26de11948ceb9de713b5f29f9e0bd5ef8660e0463e686972899b0d042a5e450d"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/sess_S4/S_S4/13_extra2.rx.bin",
+      "bytes": 27,
+      "sha256": "26de11948ceb9de713b5f29f9e0bd5ef8660e0463e686972899b0d042a5e450d"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/sess_S4/S_S4/13_extra2.rx.bin.txt",
+      "bytes": 27,
+      "sha256": "26de11948ceb9de713b5f29f9e0bd5ef8660e0463e686972899b0d042a5e450d"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/sess_S4/S_S4/ledger.jsonl",
+      "bytes": 1029,
+      "sha256": "970657ac4b25311e74d4387056c35879d14a6119b226567fdbefd1916377dafc"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/sess_S6/S_S6/01_cfg1.rx.bin",
+      "bytes": 125,
+      "sha256": "7d47166c359c785a1e38c335af791147a17eeb0f8d87e771558d4d8fcf8ae033"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/sess_S6/S_S6/01_cfg1.rx.bin.txt",
+      "bytes": 125,
+      "sha256": "7d47166c359c785a1e38c335af791147a17eeb0f8d87e771558d4d8fcf8ae033"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/sess_S6/S_S6/02_prof1.rx.bin",
+      "bytes": 136,
+      "sha256": "757cf21cc15c9dbe0dd8b2808ccc071a1c1e0d64a8513e2b0ea2535c7888832f"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/sess_S6/S_S6/02_prof1.rx.bin.txt",
+      "bytes": 136,
+      "sha256": "757cf21cc15c9dbe0dd8b2808ccc071a1c1e0d64a8513e2b0ea2535c7888832f"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/sess_S6/S_S6/03_diag1.rx.bin",
+      "bytes": 30,
+      "sha256": "853d0e16db8967185d9273bd698fe15d0111805b73cc3921f13d64fa44c8da84"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/sess_S6/S_S6/03_diag1.rx.bin.txt",
+      "bytes": 30,
+      "sha256": "853d0e16db8967185d9273bd698fe15d0111805b73cc3921f13d64fa44c8da84"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_MOTOR/sess_S6/S_S6/ledger.jsonl",
+      "bytes": 346,
+      "sha256": "0eac88b1096ca5523362f6b4bfeb0cd4b205f53541d0945292011078f1283ba7"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/readback_head4k.bin",
+      "bytes": 4096,
+      "sha256": "b9eca3b858c0c2d56babd2e3e21f650fe834aa59f891b5b74e42ddf1cdf244a4"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/inputs/steps_S3.json",
+      "bytes": 819,
+      "sha256": "3505888e3ce13fda92a512d19478be0f93160f405c4be28fa65ca1fbe03b1083"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/inputs/steps_S4.json",
+      "bytes": 2174,
+      "sha256": "c92823ee1e9e2ca3ff0116287a46888e9613377ee54e96727cbd5499c057074e"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/inputs/steps_S6.json",
+      "bytes": 595,
+      "sha256": "3420204454fd02d76e1ab553ab64d42d98ad13c01cca4624865e539252d692c3"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/inputs/steps_S7.json",
+      "bytes": 2436,
+      "sha256": "24f98fa42d536e4ed8980b67f8f25079f95242de1878039475244b75df2f0c3d"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S3/S_S3/01_boot.rx.bin",
+      "bytes": 116,
+      "sha256": "fd63aac35a8dd51d14901585a7f9c5200637038adbe9edfb53bb7e3be1446fb6"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S3/S_S3/01_boot.rx.bin.txt",
+      "bytes": 116,
+      "sha256": "fd63aac35a8dd51d14901585a7f9c5200637038adbe9edfb53bb7e3be1446fb6"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S3/S_S3/02_motor0.rx.bin",
+      "bytes": 53,
+      "sha256": "4d1bbd5950e94e339206bb49fe01b9749e94cb33982b520913441339414571f2"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S3/S_S3/02_motor0.rx.bin.txt",
+      "bytes": 53,
+      "sha256": "4d1bbd5950e94e339206bb49fe01b9749e94cb33982b520913441339414571f2"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S3/S_S3/03_diag0.rx.bin",
+      "bytes": 78,
+      "sha256": "6529c3ca33dd91fec6bf9489f1c2da1609d150010c1916be15bb3eb65cdad82b"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S3/S_S3/03_diag0.rx.bin.txt",
+      "bytes": 78,
+      "sha256": "6529c3ca33dd91fec6bf9489f1c2da1609d150010c1916be15bb3eb65cdad82b"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S3/S_S3/04_cfg0.rx.bin",
+      "bytes": 66,
+      "sha256": "2cb79a29174a5fe51b527b1e17cc94412b248de5140bc6abe28a3d8e938b297d"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S3/S_S3/04_cfg0.rx.bin.txt",
+      "bytes": 66,
+      "sha256": "2cb79a29174a5fe51b527b1e17cc94412b248de5140bc6abe28a3d8e938b297d"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S3/S_S3/05_prof0.rx.bin",
+      "bytes": 53,
+      "sha256": "76705eb580702fcd6c051177463adf34993b2bec7bb6e37c91a05689da24c45e"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S3/S_S3/05_prof0.rx.bin.txt",
+      "bytes": 53,
+      "sha256": "76705eb580702fcd6c051177463adf34993b2bec7bb6e37c91a05689da24c45e"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S3/S_S3/06_zero.rx.bin",
+      "bytes": 73,
+      "sha256": "37191f786ac027be07f5e032a3c1b36cccccee6509d6882618368191dd55dd44"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S3/S_S3/06_zero.rx.bin.txt",
+      "bytes": 73,
+      "sha256": "37191f786ac027be07f5e032a3c1b36cccccee6509d6882618368191dd55dd44"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S3/S_S3/ledger.jsonl",
+      "bytes": 526,
+      "sha256": "18a811a5568dc55af516daa97d45b4b65a0474da93c9beb0feefd2211a7f6132"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S4/S_S4/01_arm.rx.bin",
+      "bytes": 92,
+      "sha256": "cb7311747cabee89ce31603141f557dbfe2c9262347bad6f6b29e8c33e95bbd0"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S4/S_S4/01_arm.rx.bin.txt",
+      "bytes": 92,
+      "sha256": "cb7311747cabee89ce31603141f557dbfe2c9262347bad6f6b29e8c33e95bbd0"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S4/S_S4/02_target.rx.bin",
+      "bytes": 27,
+      "sha256": "726526b714834229f89316c52b7cd48337ac0008c87d8dbbdaa29670f7561185"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S4/S_S4/02_target.rx.bin.txt",
+      "bytes": 27,
+      "sha256": "726526b714834229f89316c52b7cd48337ac0008c87d8dbbdaa29670f7561185"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S4/S_S4/03_start.rx.bin",
+      "bytes": 27,
+      "sha256": "26de11948ceb9de713b5f29f9e0bd5ef8660e0463e686972899b0d042a5e450d"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S4/S_S4/03_start.rx.bin.txt",
+      "bytes": 27,
+      "sha256": "26de11948ceb9de713b5f29f9e0bd5ef8660e0463e686972899b0d042a5e450d"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S4/S_S4/05_learn.rx.bin",
+      "bytes": 139,
+      "sha256": "68d4f3a6ba6e991e6d74767926aa6a7f55ed60061eb7002c2e0a2786e3e0441d"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S4/S_S4/05_learn.rx.bin.txt",
+      "bytes": 139,
+      "sha256": "68d4f3a6ba6e991e6d74767926aa6a7f55ed60061eb7002c2e0a2786e3e0441d"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S4/S_S4/06_stop.rx.bin",
+      "bytes": 31,
+      "sha256": "3880132941d5dff372b4ee4e7f121c99a6ecf8609b3933acccadabd645e68992"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S4/S_S4/06_stop.rx.bin.txt",
+      "bytes": 31,
+      "sha256": "3880132941d5dff372b4ee4e7f121c99a6ecf8609b3933acccadabd645e68992"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S4/S_S4/07_disarm.rx.bin",
+      "bytes": 44,
+      "sha256": "de28a4027b32e0745c66a40b386deb78949dbd9d5cebc44ade04c54e3c464d7c"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S4/S_S4/07_disarm.rx.bin.txt",
+      "bytes": 44,
+      "sha256": "de28a4027b32e0745c66a40b386deb78949dbd9d5cebc44ade04c54e3c464d7c"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S4/S_S4/09_tier.rx.bin",
+      "bytes": 77,
+      "sha256": "91189e0c3f39cac30e92567c0876f7c20d861bcdb2f005155e92af8792eccb39"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S4/S_S4/09_tier.rx.bin.txt",
+      "bytes": 77,
+      "sha256": "91189e0c3f39cac30e92567c0876f7c20d861bcdb2f005155e92af8792eccb39"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S4/S_S4/10_commit.rx.bin",
+      "bytes": 126,
+      "sha256": "56fe0a96e10176d6224dca18cad69e524152022f2fcd1bd5c713f016557f9deb"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S4/S_S4/10_commit.rx.bin.txt",
+      "bytes": 126,
+      "sha256": "56fe0a96e10176d6224dca18cad69e524152022f2fcd1bd5c713f016557f9deb"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S4/S_S4/11_save.rx.bin",
+      "bytes": 28,
+      "sha256": "924059eeebf83a345f160c17766e4899d6cd9afc42274971e3d2723c66bc17b4"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S4/S_S4/11_save.rx.bin.txt",
+      "bytes": 28,
+      "sha256": "924059eeebf83a345f160c17766e4899d6cd9afc42274971e3d2723c66bc17b4"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S4/S_S4/ledger.jsonl",
+      "bytes": 917,
+      "sha256": "977cf51711190fbd920fac41089c9197278daac620b36ecfa98ffd9aced70a4b"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S6/S_S6/01_cfg1.rx.bin",
+      "bytes": 125,
+      "sha256": "7d47166c359c785a1e38c335af791147a17eeb0f8d87e771558d4d8fcf8ae033"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S6/S_S6/01_cfg1.rx.bin.txt",
+      "bytes": 125,
+      "sha256": "7d47166c359c785a1e38c335af791147a17eeb0f8d87e771558d4d8fcf8ae033"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S6/S_S6/02_prof1.rx.bin",
+      "bytes": 136,
+      "sha256": "757cf21cc15c9dbe0dd8b2808ccc071a1c1e0d64a8513e2b0ea2535c7888832f"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S6/S_S6/02_prof1.rx.bin.txt",
+      "bytes": 136,
+      "sha256": "757cf21cc15c9dbe0dd8b2808ccc071a1c1e0d64a8513e2b0ea2535c7888832f"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S6/S_S6/03_diag1.rx.bin",
+      "bytes": 30,
+      "sha256": "853d0e16db8967185d9273bd698fe15d0111805b73cc3921f13d64fa44c8da84"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S6/S_S6/03_diag1.rx.bin.txt",
+      "bytes": 30,
+      "sha256": "853d0e16db8967185d9273bd698fe15d0111805b73cc3921f13d64fa44c8da84"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S6/S_S6/ledger.jsonl",
+      "bytes": 346,
+      "sha256": "0eac88b1096ca5523362f6b4bfeb0cd4b205f53541d0945292011078f1283ba7"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S7/S_S7/01_arm_rel.rx.bin",
+      "bytes": 96,
+      "sha256": "4c067c2a8592787080300f55fb906d9e859f340f4e5fdf918c2af2ed006355a5"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S7/S_S7/01_arm_rel.rx.bin.txt",
+      "bytes": 96,
+      "sha256": "4c067c2a8592787080300f55fb906d9e859f340f4e5fdf918c2af2ed006355a5"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S7/S_S7/02_arm.rx.bin",
+      "bytes": 33,
+      "sha256": "0c5a32390954de8e40e52aa71255c21aa535202e56057505d57de4528b90ee3e"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S7/S_S7/02_arm.rx.bin.txt",
+      "bytes": 33,
+      "sha256": "0c5a32390954de8e40e52aa71255c21aa535202e56057505d57de4528b90ee3e"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S7/S_S7/03_target.rx.bin",
+      "bytes": 27,
+      "sha256": "726526b714834229f89316c52b7cd48337ac0008c87d8dbbdaa29670f7561185"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S7/S_S7/03_target.rx.bin.txt",
+      "bytes": 27,
+      "sha256": "726526b714834229f89316c52b7cd48337ac0008c87d8dbbdaa29670f7561185"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S7/S_S7/04_start.rx.bin",
+      "bytes": 27,
+      "sha256": "26de11948ceb9de713b5f29f9e0bd5ef8660e0463e686972899b0d042a5e450d"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S7/S_S7/04_start.rx.bin.txt",
+      "bytes": 27,
+      "sha256": "26de11948ceb9de713b5f29f9e0bd5ef8660e0463e686972899b0d042a5e450d"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S7/S_S7/05_trip_window.rx.bin",
+      "bytes": 223,
+      "sha256": "480cf2dec77eb8581d79e5b049edc9382f7280b6c6a14bd457694d2f5eb9b6aa"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S7/S_S7/05_trip_window.rx.bin.txt",
+      "bytes": 221,
+      "sha256": "ca83e2b0ac3b6bc16179a89d13411b7bec199c5fc3a8f4ebc265f57ca18f5b9c"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S7/S_S7/06_disarm_obs.rx.bin",
+      "bytes": 53,
+      "sha256": "4d1bbd5950e94e339206bb49fe01b9749e94cb33982b520913441339414571f2"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S7/S_S7/06_disarm_obs.rx.bin.txt",
+      "bytes": 53,
+      "sha256": "4d1bbd5950e94e339206bb49fe01b9749e94cb33982b520913441339414571f2"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S7/S_S7/08_latch.rx.bin",
+      "bytes": 137,
+      "sha256": "1fd7bec0fcbc48430c1361ca9849e276a6479fbfcf9b6dfc77597d708887de75"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S7/S_S7/08_latch.rx.bin.txt",
+      "bytes": 137,
+      "sha256": "1fd7bec0fcbc48430c1361ca9849e276a6479fbfcf9b6dfc77597d708887de75"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S7/S_S7/09_first_cause.rx.bin",
+      "bytes": 52,
+      "sha256": "cc348909545d01795cd068ca761b1d508c092ab701a39271797ea16bb7e44382"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S7/S_S7/09_first_cause.rx.bin.txt",
+      "bytes": 52,
+      "sha256": "cc348909545d01795cd068ca761b1d508c092ab701a39271797ea16bb7e44382"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S7/S_S7/10_newlog.rx.bin",
+      "bytes": 37,
+      "sha256": "f9df8b3c51e6d5c6fbfbe4ff58668ea9b3d002bd12d18be9fbf826b8d130bc34"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S7/S_S7/10_newlog.rx.bin.txt",
+      "bytes": 37,
+      "sha256": "f9df8b3c51e6d5c6fbfbe4ff58668ea9b3d002bd12d18be9fbf826b8d130bc34"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S7/S_S7/11_refused_in_fault.rx.bin",
+      "bytes": 61,
+      "sha256": "946a603d031df133472e88ad91e4f4097d4dc07c757d4236b5883d60c2316faa"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S7/S_S7/11_refused_in_fault.rx.bin.txt",
+      "bytes": 61,
+      "sha256": "946a603d031df133472e88ad91e4f4097d4dc07c757d4236b5883d60c2316faa"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S7/S_S7/12_reset.rx.bin",
+      "bytes": 36,
+      "sha256": "bd40a4b8bdf61f934145e489f569e75473e38eab0f2646316fe94d0328349d89"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S7/S_S7/12_reset.rx.bin.txt",
+      "bytes": 36,
+      "sha256": "bd40a4b8bdf61f934145e489f569e75473e38eab0f2646316fe94d0328349d89"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S7/S_S7/13_selftest.rx.bin",
+      "bytes": 23,
+      "sha256": "179749c773cbd81e19dd7ca16d2d5899f93a1187cf4321b0d719bfbd185de9f4"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S7/S_S7/13_selftest.rx.bin.txt",
+      "bytes": 23,
+      "sha256": "179749c773cbd81e19dd7ca16d2d5899f93a1187cf4321b0d719bfbd185de9f4"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S7/S_S7/14_ready.rx.bin",
+      "bytes": 57,
+      "sha256": "8f23cfb60d5b8dfcd26e37c5e5db2e4a97ebf19c4c77e1afa62b68a0a1f73f51"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S7/S_S7/14_ready.rx.bin.txt",
+      "bytes": 57,
+      "sha256": "8f23cfb60d5b8dfcd26e37c5e5db2e4a97ebf19c4c77e1afa62b68a0a1f73f51"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S7/S_S7/15_armed0.rx.bin",
+      "bytes": 53,
+      "sha256": "4d1bbd5950e94e339206bb49fe01b9749e94cb33982b520913441339414571f2"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S7/S_S7/15_armed0.rx.bin.txt",
+      "bytes": 53,
+      "sha256": "4d1bbd5950e94e339206bb49fe01b9749e94cb33982b520913441339414571f2"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S7/S_S7/16_monitor.rx.bin",
+      "bytes": 30,
+      "sha256": "853d0e16db8967185d9273bd698fe15d0111805b73cc3921f13d64fa44c8da84"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S7/S_S7/16_monitor.rx.bin.txt",
+      "bytes": 30,
+      "sha256": "853d0e16db8967185d9273bd698fe15d0111805b73cc3921f13d64fa44c8da84"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_QUOTA_REBOOT/sess_S7/S_S7/ledger.jsonl",
+      "bytes": 1189,
+      "sha256": "084373b91809c0c47446cdd4b20ad8da3556575d671f7e53e18a0d4fe13eaafb"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_READBACK_MISMATCH/readback_head4k.bin",
+      "bytes": 4096,
+      "sha256": "8fe1ff132c2a60716524ebe09c8733b0fc376a5755b3cec4da1f232773322e1f"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_STUB_MISS/readback_head4k.bin",
+      "bytes": 4096,
+      "sha256": "b9eca3b858c0c2d56babd2e3e21f650fe834aa59f891b5b74e42ddf1cdf244a4"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_STUB_MISS/inputs/steps_S3.json",
+      "bytes": 819,
+      "sha256": "3505888e3ce13fda92a512d19478be0f93160f405c4be28fa65ca1fbe03b1083"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_STUB_MISS/sess_S3/S_S3/01_boot.rx.bin",
+      "bytes": 116,
+      "sha256": "fd63aac35a8dd51d14901585a7f9c5200637038adbe9edfb53bb7e3be1446fb6"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_STUB_MISS/sess_S3/S_S3/01_boot.rx.bin.txt",
+      "bytes": 116,
+      "sha256": "fd63aac35a8dd51d14901585a7f9c5200637038adbe9edfb53bb7e3be1446fb6"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_STUB_MISS/sess_S3/S_S3/02_motor0.rx.bin",
+      "bytes": 53,
+      "sha256": "4d1bbd5950e94e339206bb49fe01b9749e94cb33982b520913441339414571f2"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_STUB_MISS/sess_S3/S_S3/02_motor0.rx.bin.txt",
+      "bytes": 53,
+      "sha256": "4d1bbd5950e94e339206bb49fe01b9749e94cb33982b520913441339414571f2"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_STUB_MISS/sess_S3/S_S3/ledger.jsonl",
+      "bytes": 276,
+      "sha256": "8d4e559b54c24c1d2e9dd0224ffde6ba7bc5246cdc1b6499552e7328b6d8fa5f"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_TOTAL_DEADLINE/readback_head4k.bin",
+      "bytes": 4096,
+      "sha256": "b9eca3b858c0c2d56babd2e3e21f650fe834aa59f891b5b74e42ddf1cdf244a4"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_TOTAL_DEADLINE/inputs/steps_S3.json",
+      "bytes": 819,
+      "sha256": "3505888e3ce13fda92a512d19478be0f93160f405c4be28fa65ca1fbe03b1083"
+    },
+    {
+      "path": "20261030T192604Z-33268/case_TOTAL_DEADLINE/sess_S3/S_S3/ledger.jsonl",
+      "bytes": 105,
+      "sha256": "a8a312054598eea8a706a78e231762fc0cc42a5c91745ebb0b371e79c4d19a12"
+    },
+    {
+      "path": "20261030T192604Z-33268/inputs/fx_DENY.json",
+      "bytes": 7333,
+      "sha256": "ccf65ad445b1e9e96d8b7cb19ea96130ce380126f6e36366b47d3b58bb8ba660"
+    },
+    {
+      "path": "20261030T192604Z-33268/inputs/fx_MISS.json",
+      "bytes": 7088,
+      "sha256": "599aca0b910b97a393506a29a21d30b7100c70628275e12fc07920b7ba7a990f"
+    },
+    {
+      "path": "20261030T192604Z-33268/inputs/fx_POS.json",
+      "bytes": 7334,
+      "sha256": "66421d72fddef2ac9942ff58897ebfc7f082154d109d1043c217c388ce53cc7f"
+    },
+    {
+      "path": "20261030T192604Z-33268/inputs/fx_RBFLIP.json",
+      "bytes": 7414,
+      "sha256": "0437c28a1d3efce054a6a7afdca07ab636bde7f6704457525cc7a1b0d6ff6d5d"
+    },
+    {
+      "path": "20261030T192604Z-33268/inputs/fx_SILENT.json",
+      "bytes": 7412,
+      "sha256": "925690558ab3f35f958a705665ed1a09edaf45f6553be745eb9cd088a5d83f56"
+    },
+    {
+      "path": "20261030T192604Z-33268/inputs/fx_V2LOST.json",
+      "bytes": 7123,
+      "sha256": "fe9a3d2eac45538c859e768ece7cf50e852f613e8a4b07ed805b0e15046ffea1"
+    }
+  ]
+}

@@ -1,0 +1,100 @@
+[
+    {
+        "cmd":  "diag_mode relative CONFIRM_EXPERIMENTAL",
+        "as":  "arm_rel",
+        "expect_any":  [
+                           "[DIAG] mode=RELATIVE_PROTECTION",
+                           "[DIAG] RELATIVE REFUSED"
+                       ]
+    },
+    {
+        "cmd":  "motor_arm",
+        "as":  "arm"
+    },
+    {
+        "cmd":  "motor_target 400",
+        "as":  "target",
+        "hz_max":  1000
+    },
+    {
+        "cmd":  "motor_start",
+        "as":  "start",
+        "seconds":  5,
+        "quota":  {
+                      "name":  "motor_run",
+                      "n":  1
+                  }
+    },
+    {
+        "cmd":  "__watch__",
+        "as":  "trip_window",
+        "seconds":  10,
+        "expect_any":  [
+                           "[DIAG] REL TRIP r="
+                       ]
+    },
+    {
+        "cmd":  "motor_status",
+        "as":  "disarm_obs"
+    },
+    {
+        "manual":  "trusted_disable_verified",
+        "as":  "gate_disable3"
+    },
+    {
+        "cmd":  "diag_status",
+        "as":  "latch",
+        "key":  "diag_status@latch",
+        "expect_contains":  [
+                                "[DIAG] rel LATCH r="
+                            ]
+    },
+    {
+        "cmd":  "blackbox_status",
+        "as":  "first_cause"
+    },
+    {
+        "cmd":  "flash_logstat",
+        "as":  "newlog"
+    },
+    {
+        "cmd":  "motor_arm",
+        "as":  "refused_in_fault",
+        "key":  "motor_arm@fault",
+        "expect_any":  [
+                           "REFUSED"
+                       ]
+    },
+    {
+        "cmd":  "fault_reset",
+        "as":  "reset",
+        "requires":  [
+                         "gate_disable3"
+                     ]
+    },
+    {
+        "cmd":  "system_selftest",
+        "as":  "selftest"
+    },
+    {
+        "cmd":  "safety_status",
+        "as":  "ready",
+        "key":  "safety_status@ready",
+        "expect_contains":  [
+                                "READY"
+                            ]
+    },
+    {
+        "cmd":  "motor_status",
+        "as":  "armed0",
+        "key":  "motor_status@after_reset"
+    },
+    {
+        "cmd":  "diag_status",
+        "as":  "monitor",
+        "key":  "diag_status@after_reset",
+        "expect_contains":  [
+                                "[DIAG] mode=MONITOR_ONLY"
+                            ]
+    }
+]

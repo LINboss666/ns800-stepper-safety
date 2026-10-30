@@ -1,0 +1,425 @@
+{
+  "policy": "主机链 stdout 一律按原字节采集后 CRLF->LF 规范化入库(仓库 core.autocrlf=true, 入库 blob 必然是 LF 版本)。原始字节身份(bytes/CR/CRLF/孤立CR/SHA256)与规范化后的身份都登记在此; 不重跑、不编辑、不补写任何一行输出。",
+  "code_commit": "3275356a46e0b503888e9a4869da3b2b41f027a8",
+  "runner_console_archived": true,
+  "runs": {
+    "first_normal_run_id": "20261030T183455Z-1432",
+    "first_reverse_run_id": "20261030T183508Z-1799",
+    "archived_normal_run_id": "20261030T185713Z-2046",
+    "archived_reverse_run_id": "20261030T185724Z-1431",
+    "note": "首跑(02:34Z)只落了 rel.exe 的 out.txt, 未保存 runner 控制台; 复跑(02:57Z, 同一 code_commit 与同一 runner)把 runner 控制台与逐 out.txt 一起归档。两次运行的 rel.exe stdout 逐字节一致, 判据见 cross_run_identity。r1_first_run_*.txt 是首跑原文, 保留以证明这一点。"
+  },
+  "cross_run_identity": {
+    "normal_out_first_run_vs_rerun_identical": true,
+    "reverse_RV1_out_first_run_vs_rerun_identical": true,
+    "normal_out_vs_reverse_baseline_out_identical": true
+  },
+  "probe_rerun_note": "probe_rerun_out.txt 是对 review_probes.exe(源 probe_source.c, 见 host_run_manifest.json 的 exe 身份)在修复后树上的复跑原文; 首次复跑输出只在会话里读过、未落盘。登记这一点, 不装作首跑归档。",
+  "personal_path_leak_in_archived_bytes": [],
+  "chain_inputs_git_blob": {
+    "tests/host/run_diag_relative_m8.sh": "3d1f71701ba9d10927c6358ca9ca0fc12210ac60",
+    "tests/host/rel_main.c": "2f971b28f2adde074b1e2c4934676e5f8da1f82a",
+    "tests/host/shim_rel/rtthread.h": "69597264cdfa1448ab156d301bf6fb08f55e5860",
+    "tests/host/shim_rel/rtdevice.h": "6a15e18cb979c1ada3cf95f6161e746b6cd13d18",
+    "tests/host/env.sh": "05b6fa5551738f7e72d2bf9870c9c48967d8c7f2"
+  },
+  "product_inputs_git_blob": {
+    "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diag_relative.c": "8d685f1c7b9765f34204566754b91e95227f46e7",
+    "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diag_relative.h": "d32db62ef1e6c89de312382e94b2f1d1a6e47e38",
+    "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diagnosis.c": "2fea2e609e3bce006a35798a3b7753f7895be02c",
+    "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diagnosis.h": "1299d3cdb0447fa36bc2b8aaacb690b62b665bba",
+    "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/sensor_service.c": "9890f7b1777e480682a5ef14f5d0f1f1e39af882",
+    "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/project_config.c": "242ddbe6fb5bc112590c8479cc76e8c216e09580"
+  },
+  "runtime_artifacts_sha256": {
+    "rel.exe(normal_run)": "68ed86d41906cafd09e4c4fc33a2a5de943aa5990119673d474b7b33c1086c81",
+    "rel.exe(reverse_run_baseline)": "70e7db8e2d5f09f38b1cee066e1b27169233ac69978d30ab5d723234d6787a9d",
+    "review_probes.exe": "592146a0ffa0ebfad8e1475719dd5109ed006e84f330ce209c2d531bb24e697a"
+  },
+  "files": {
+    "probe_rerun_err.txt": {
+      "source_path": "<SCRATCHROOT>/probe/probe_rerun_err.txt",
+      "original_bytes": 0,
+      "original_cr_bytes": 0,
+      "original_crlf_pairs": 0,
+      "original_lone_cr": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalised_bytes": 0,
+      "normalised_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_by_normalisation": false
+    },
+    "probe_rerun_out.txt": {
+      "source_path": "<SCRATCHROOT>/probe/probe_rerun_out.txt",
+      "original_bytes": 5001,
+      "original_cr_bytes": 72,
+      "original_crlf_pairs": 72,
+      "original_lone_cr": 0,
+      "original_sha256": "31d3e0ec51cdb4f9b0d49c1fffd2cf515888551cd65fc70b52d8bbc93366ee05",
+      "normalised_bytes": 4929,
+      "normalised_sha256": "b864e378489c6e599824982e37423efafaaae342128cd1a72782f259e12b64cf",
+      "changed_by_normalisation": true
+    },
+    "probe_source.c": {
+      "source_path": "<SCRATCHROOT>/probe/review_probes.c",
+      "original_bytes": 6139,
+      "original_cr_bytes": 0,
+      "original_crlf_pairs": 0,
+      "original_lone_cr": 0,
+      "original_sha256": "a811561c808b669e9b4ffc97f8f733c034cd73497ac8b3b06f6f32f29838974a",
+      "normalised_bytes": 6139,
+      "normalised_sha256": "a811561c808b669e9b4ffc97f8f733c034cd73497ac8b3b06f6f32f29838974a",
+      "changed_by_normalisation": false
+    },
+    "r1_build.txt": {
+      "source_path": "<SCRATCHROOT>/m8r1v2/20261030T185713Z-2046/build.txt",
+      "original_bytes": 0,
+      "original_cr_bytes": 0,
+      "original_crlf_pairs": 0,
+      "original_lone_cr": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalised_bytes": 0,
+      "normalised_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_by_normalisation": false
+    },
+    "r1_first_run_normal_out.txt": {
+      "source_path": "<SCRATCHROOT>/m8r1/20261030T183455Z-1432/out.txt",
+      "original_bytes": 20464,
+      "original_cr_bytes": 356,
+      "original_crlf_pairs": 356,
+      "original_lone_cr": 0,
+      "original_sha256": "ff1134cd14a8e6fd326b463efb129ae40d699d11906f6d75c25d8bfcdb0b8b8e",
+      "normalised_bytes": 20108,
+      "normalised_sha256": "73ae2d90efd9dff8e2c0102feb667e672d7490e64679db2001f9251b2fc672fd",
+      "changed_by_normalisation": true
+    },
+    "r1_first_run_reverse_RV1_out.txt": {
+      "source_path": "<SCRATCHROOT>/m8r1rev/20261030T183508Z-1799/reverse/RV1_sg_new_sample_identity_gate/out.txt",
+      "original_bytes": 25932,
+      "original_cr_bytes": 444,
+      "original_crlf_pairs": 444,
+      "original_lone_cr": 0,
+      "original_sha256": "d79c2248540bae39cf4a57c9966040a66416856a8b0869f013cc411516ebd6d5",
+      "normalised_bytes": 25488,
+      "normalised_sha256": "9351bf1f6035aaf51e2b659c61d3255dfe67ad1b6ce8722afd6e8e88ac620b04",
+      "changed_by_normalisation": true
+    },
+    "r1_normal_out.txt": {
+      "source_path": "<SCRATCHROOT>/m8r1v2/20261030T185713Z-2046/out.txt",
+      "original_bytes": 20464,
+      "original_cr_bytes": 356,
+      "original_crlf_pairs": 356,
+      "original_lone_cr": 0,
+      "original_sha256": "ff1134cd14a8e6fd326b463efb129ae40d699d11906f6d75c25d8bfcdb0b8b8e",
+      "normalised_bytes": 20108,
+      "normalised_sha256": "73ae2d90efd9dff8e2c0102feb667e672d7490e64679db2001f9251b2fc672fd",
+      "changed_by_normalisation": true
+    },
+    "r1_normal_runner_console.txt": {
+      "source_path": "<SCRATCHROOT>/m8r1v2_console.txt",
+      "original_bytes": 2877,
+      "original_cr_bytes": 0,
+      "original_crlf_pairs": 0,
+      "original_lone_cr": 0,
+      "original_sha256": "20492fc80541fa42dd8d5a75b70dd416c1c2a0244ab21ccf7f06a9ade677c8a8",
+      "normalised_bytes": 2877,
+      "normalised_sha256": "20492fc80541fa42dd8d5a75b70dd416c1c2a0244ab21ccf7f06a9ade677c8a8",
+      "changed_by_normalisation": false
+    },
+    "r1_reverse_RV1_build.txt": {
+      "source_path": "<SCRATCHROOT>/m8r1v2rev/20261030T185724Z-1431/reverse/RV1_sg_new_sample_identity_gate/build.txt",
+      "original_bytes": 0,
+      "original_cr_bytes": 0,
+      "original_crlf_pairs": 0,
+      "original_lone_cr": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalised_bytes": 0,
+      "normalised_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_by_normalisation": false
+    },
+    "r1_reverse_RV1_out.txt": {
+      "source_path": "<SCRATCHROOT>/m8r1v2rev/20261030T185724Z-1431/reverse/RV1_sg_new_sample_identity_gate/out.txt",
+      "original_bytes": 25932,
+      "original_cr_bytes": 444,
+      "original_crlf_pairs": 444,
+      "original_lone_cr": 0,
+      "original_sha256": "d79c2248540bae39cf4a57c9966040a66416856a8b0869f013cc411516ebd6d5",
+      "normalised_bytes": 25488,
+      "normalised_sha256": "9351bf1f6035aaf51e2b659c61d3255dfe67ad1b6ce8722afd6e8e88ac620b04",
+      "changed_by_normalisation": true
+    },
+    "r1_reverse_RV2_build.txt": {
+      "source_path": "<SCRATCHROOT>/m8r1v2rev/20261030T185724Z-1431/reverse/RV2_adc_relative_severe_branch/build.txt",
+      "original_bytes": 0,
+      "original_cr_bytes": 0,
+      "original_crlf_pairs": 0,
+      "original_lone_cr": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalised_bytes": 0,
+      "normalised_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_by_normalisation": false
+    },
+    "r1_reverse_RV2_out.txt": {
+      "source_path": "<SCRATCHROOT>/m8r1v2rev/20261030T185724Z-1431/reverse/RV2_adc_relative_severe_branch/out.txt",
+      "original_bytes": 20731,
+      "original_cr_bytes": 361,
+      "original_crlf_pairs": 361,
+      "original_lone_cr": 0,
+      "original_sha256": "d381109a14fc214e30a750d484fb22602c2538c41b21912b403b61e31f708da0",
+      "normalised_bytes": 20370,
+      "normalised_sha256": "411cc7ab39493c28c09684bbf041d80176c4ce5f51b7e8313e0eb65204786a65",
+      "changed_by_normalisation": true
+    },
+    "r1_reverse_RV3_build.txt": {
+      "source_path": "<SCRATCHROOT>/m8r1v2rev/20261030T185724Z-1431/reverse/RV3_relative_mode_profile_qualification/build.txt",
+      "original_bytes": 0,
+      "original_cr_bytes": 0,
+      "original_crlf_pairs": 0,
+      "original_lone_cr": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalised_bytes": 0,
+      "normalised_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_by_normalisation": false
+    },
+    "r1_reverse_RV3_out.txt": {
+      "source_path": "<SCRATCHROOT>/m8r1v2rev/20261030T185724Z-1431/reverse/RV3_relative_mode_profile_qualification/out.txt",
+      "original_bytes": 20656,
+      "original_cr_bytes": 359,
+      "original_crlf_pairs": 359,
+      "original_lone_cr": 0,
+      "original_sha256": "ae4b7abe4149493426b2b65eade261f763f194f8b2b451bb1fb10ff25b299232",
+      "normalised_bytes": 20297,
+      "normalised_sha256": "3a9271787b96ccda333f59237aea487b5142fa22ec0118de669827eb5c134cbd",
+      "changed_by_normalisation": true
+    },
+    "r1_reverse_RV4_build.txt": {
+      "source_path": "<SCRATCHROOT>/m8r1v2rev/20261030T185724Z-1431/reverse/RV4_severe_borrows_warn_duration/build.txt",
+      "original_bytes": 0,
+      "original_cr_bytes": 0,
+      "original_crlf_pairs": 0,
+      "original_lone_cr": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalised_bytes": 0,
+      "normalised_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_by_normalisation": false
+    },
+    "r1_reverse_RV4_out.txt": {
+      "source_path": "<SCRATCHROOT>/m8r1v2rev/20261030T185724Z-1431/reverse/RV4_severe_borrows_warn_duration/out.txt",
+      "original_bytes": 20534,
+      "original_cr_bytes": 357,
+      "original_crlf_pairs": 357,
+      "original_lone_cr": 0,
+      "original_sha256": "259c0e89d82925218938126f19fbc9e94b140ca8f2ec62c7c022f8747701250d",
+      "normalised_bytes": 20177,
+      "normalised_sha256": "0da42c537039cb453df8b411764c56b0927d70b7ff182596b1e9eb223efb0da6",
+      "changed_by_normalisation": true
+    },
+    "r1_reverse_RV5_build.txt": {
+      "source_path": "<SCRATCHROOT>/m8r1v2rev/20261030T185724Z-1431/reverse/RV5_coverage_loss_protects_nothing/build.txt",
+      "original_bytes": 0,
+      "original_cr_bytes": 0,
+      "original_crlf_pairs": 0,
+      "original_lone_cr": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalised_bytes": 0,
+      "normalised_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_by_normalisation": false
+    },
+    "r1_reverse_RV5_out.txt": {
+      "source_path": "<SCRATCHROOT>/m8r1v2rev/20261030T185724Z-1431/reverse/RV5_coverage_loss_protects_nothing/out.txt",
+      "original_bytes": 19940,
+      "original_cr_bytes": 348,
+      "original_crlf_pairs": 348,
+      "original_lone_cr": 0,
+      "original_sha256": "987752578124f86c1cf3bc2fa6e2b467f3d1a9582a5f439472b672a52bfe8291",
+      "normalised_bytes": 19592,
+      "normalised_sha256": "d6206876f088f1a95a5cbb4ab8c1e248ce5df0de235e4e01040661c2a07771c2",
+      "changed_by_normalisation": true
+    },
+    "r1_reverse_RV6_build.txt": {
+      "source_path": "<SCRATCHROOT>/m8r1v2rev/20261030T185724Z-1431/reverse/RV6_failed_relearn_keeps_credential/build.txt",
+      "original_bytes": 0,
+      "original_cr_bytes": 0,
+      "original_crlf_pairs": 0,
+      "original_lone_cr": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalised_bytes": 0,
+      "normalised_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_by_normalisation": false
+    },
+    "r1_reverse_RV6_out.txt": {
+      "source_path": "<SCRATCHROOT>/m8r1v2rev/20261030T185724Z-1431/reverse/RV6_failed_relearn_keeps_credential/out.txt",
+      "original_bytes": 20748,
+      "original_cr_bytes": 361,
+      "original_crlf_pairs": 361,
+      "original_lone_cr": 0,
+      "original_sha256": "b8bc81334a10dfa34c8f4aaa02acec4dc1d729379fcfdc76dc9cf766766b914f",
+      "normalised_bytes": 20387,
+      "normalised_sha256": "18ffb776252cc5704e94641273983868d0940a6a0b24c7e2c857c7f07190d6d1",
+      "changed_by_normalisation": true
+    },
+    "r1_reverse_RV7_build.txt": {
+      "source_path": "<SCRATCHROOT>/m8r1v2rev/20261030T185724Z-1431/reverse/RV7_impact_independent_trip_removed/build.txt",
+      "original_bytes": 0,
+      "original_cr_bytes": 0,
+      "original_crlf_pairs": 0,
+      "original_lone_cr": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalised_bytes": 0,
+      "normalised_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_by_normalisation": false
+    },
+    "r1_reverse_RV7_out.txt": {
+      "source_path": "<SCRATCHROOT>/m8r1v2rev/20261030T185724Z-1431/reverse/RV7_impact_independent_trip_removed/out.txt",
+      "original_bytes": 20560,
+      "original_cr_bytes": 359,
+      "original_crlf_pairs": 359,
+      "original_lone_cr": 0,
+      "original_sha256": "6390ce4473b673c394d05e581355eba0dd31e87ff7edd6547448ee84e05cf91f",
+      "normalised_bytes": 20201,
+      "normalised_sha256": "23473cd8f87628842b70a83ced8e3cfebaedb079a2141e5af1c67f58cfe0249f",
+      "changed_by_normalisation": true
+    },
+    "r1_reverse_run_out.txt": {
+      "source_path": "<SCRATCHROOT>/m8r1v2rev/20261030T185724Z-1431/out.txt",
+      "original_bytes": 20464,
+      "original_cr_bytes": 356,
+      "original_crlf_pairs": 356,
+      "original_lone_cr": 0,
+      "original_sha256": "ff1134cd14a8e6fd326b463efb129ae40d699d11906f6d75c25d8bfcdb0b8b8e",
+      "normalised_bytes": 20108,
+      "normalised_sha256": "73ae2d90efd9dff8e2c0102feb667e672d7490e64679db2001f9251b2fc672fd",
+      "changed_by_normalisation": true
+    },
+    "r1_reverse_runner_console.txt": {
+      "source_path": "<SCRATCHROOT>/m8r1v2rev_console.txt",
+      "original_bytes": 5330,
+      "original_cr_bytes": 7,
+      "original_crlf_pairs": 7,
+      "original_lone_cr": 0,
+      "original_sha256": "49517f7f3d7b32f34ff167fd59c05d3ba7b0731c540576f717946a45ba539bf0",
+      "normalised_bytes": 5323,
+      "normalised_sha256": "6011c85a5cee7d181b7460402b7212bc6f169a2ce56438355efe551e02a586d7",
+      "changed_by_normalisation": true
+    },
+    "r1_reverse_warning_count.txt": {
+      "source_path": "<SCRATCHROOT>/m8r1v2rev/20261030T185724Z-1431/warning_count.txt",
+      "original_bytes": 2,
+      "original_cr_bytes": 0,
+      "original_crlf_pairs": 0,
+      "original_lone_cr": 0,
+      "original_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "normalised_bytes": 2,
+      "normalised_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "changed_by_normalisation": false
+    },
+    "r1_warning_count.txt": {
+      "source_path": "<SCRATCHROOT>/m8r1v2/20261030T185713Z-2046/warning_count.txt",
+      "original_bytes": 2,
+      "original_cr_bytes": 0,
+      "original_crlf_pairs": 0,
+      "original_lone_cr": 0,
+      "original_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "normalised_bytes": 2,
+      "normalised_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "changed_by_normalisation": false
+    },
+    "regression_a0.txt": {
+      "source_path": "<SCRATCHROOT>/reg/run_sp_measure_a0.txt",
+      "original_bytes": 1694,
+      "original_cr_bytes": 0,
+      "original_crlf_pairs": 0,
+      "original_lone_cr": 0,
+      "original_sha256": "16ad79aa98436766b060ff1d47faa9aece60fe0b9c212f14e7bd13dfc4d1bf63",
+      "normalised_bytes": 1694,
+      "normalised_sha256": "16ad79aa98436766b060ff1d47faa9aece60fe0b9c212f14e7bd13dfc4d1bf63",
+      "changed_by_normalisation": false
+    },
+    "regression_cc.txt": {
+      "source_path": "<SCRATCHROOT>/reg/run_current_cal_m7.txt",
+      "original_bytes": 9704,
+      "original_cr_bytes": 157,
+      "original_crlf_pairs": 157,
+      "original_lone_cr": 0,
+      "original_sha256": "a6ca3da3653614ee722d50601679422a1a7eb17b6683ca77f6ca05c93583c4fe",
+      "normalised_bytes": 9547,
+      "normalised_sha256": "f70d330ce7b59e9c4d750330ae621a8f8d971264a088fc813d7c923e47d84e69",
+      "changed_by_normalisation": true
+    },
+    "regression_io.txt": {
+      "source_path": "<SCRATCHROOT>/reg/run_io_behavior.txt",
+      "original_bytes": 1015,
+      "original_cr_bytes": 0,
+      "original_crlf_pairs": 0,
+      "original_lone_cr": 0,
+      "original_sha256": "e15a7bea38ce8fb6d4f8cef64319a81d091db73dbcc2f09762527fb8eb149a17",
+      "normalised_bytes": 1015,
+      "normalised_sha256": "e15a7bea38ce8fb6d4f8cef64319a81d091db73dbcc2f09762527fb8eb149a17",
+      "changed_by_normalisation": false
+    },
+    "regression_m5_flash.txt": {
+      "source_path": "<SCRATCHROOT>/reg/run_flash_export_m5.txt",
+      "original_bytes": 907,
+      "original_cr_bytes": 0,
+      "original_crlf_pairs": 0,
+      "original_lone_cr": 0,
+      "original_sha256": "d27b9b0c23c432ccba165ed5dc043c9aa649ebcba7bfb3cd67f6519ae5372095",
+      "normalised_bytes": 907,
+      "normalised_sha256": "d27b9b0c23c432ccba165ed5dc043c9aa649ebcba7bfb3cd67f6519ae5372095",
+      "changed_by_normalisation": false
+    },
+    "regression_m6_cli.txt": {
+      "source_path": "<SCRATCHROOT>/reg/run_m6_cli.txt",
+      "original_bytes": 188,
+      "original_cr_bytes": 0,
+      "original_crlf_pairs": 0,
+      "original_lone_cr": 0,
+      "original_sha256": "e3c36f03d24868094c25e81c4449424972699e99610a5ed0242721230ed2b231",
+      "normalised_bytes": 188,
+      "normalised_sha256": "e3c36f03d24868094c25e81c4449424972699e99610a5ed0242721230ed2b231",
+      "changed_by_normalisation": false
+    },
+    "regression_s1.txt": {
+      "source_path": "<SCRATCHROOT>/reg/run_stop_result_s1.txt",
+      "original_bytes": 1239,
+      "original_cr_bytes": 0,
+      "original_crlf_pairs": 0,
+      "original_lone_cr": 0,
+      "original_sha256": "4ed678668d3f3b6058d1e2d2cbdddde7080de854b62771cc0b5204baf642dd98",
+      "normalised_bytes": 1239,
+      "normalised_sha256": "4ed678668d3f3b6058d1e2d2cbdddde7080de854b62771cc0b5204baf642dd98",
+      "changed_by_normalisation": false
+    },
+    "regression_s2.txt": {
+      "source_path": "<SCRATCHROOT>/reg/run_stop_priority_s2.txt",
+      "original_bytes": 8565,
+      "original_cr_bytes": 0,
+      "original_crlf_pairs": 0,
+      "original_lone_cr": 0,
+      "original_sha256": "42047bd3eeb475e4dfba72b4710190321285235f3ae647d9a1e0bc1b44da18b0",
+      "normalised_bytes": 8565,
+      "normalised_sha256": "42047bd3eeb475e4dfba72b4710190321285235f3ae647d9a1e0bc1b44da18b0",
+      "changed_by_normalisation": false
+    },
+    "regression_sd.txt": {
+      "source_path": "<SCRATCHROOT>/reg/run_safety_data_semantics.txt",
+      "original_bytes": 802,
+      "original_cr_bytes": 0,
+      "original_crlf_pairs": 0,
+      "original_lone_cr": 0,
+      "original_sha256": "d02f31ce9f0b53c65885c8999ef938455c422b286b8ad010f8acdb7677abef10",
+      "normalised_bytes": 802,
+      "normalised_sha256": "d02f31ce9f0b53c65885c8999ef938455c422b286b8ad010f8acdb7677abef10",
+      "changed_by_normalisation": false
+    }
+  },
+  "blob_identity_policy": "本轮交付前发现: core.autocrlf=true 会把带 CRLF 的证据文件在入库时剥成 LF, 349 个待提交件里有 262 个的 Git blob 与磁盘字节不一致(逐类: .map 3, .bin 115, .txt 115, .json 26, .log 3)。这会让\"逐字节可复算\"的声称失效。处置: 用 git add -f 把 .gitattributes 纳入版本库(不改 .gitignore 的白名单策略, 与 §7 \"按具体路径 force-add、不动 .gitignore\" 同一手法), 在其中只对本轮证据路径加 -text; 随后 git add --renormalize reports/。复核结果 staged=349, blob_neq_disk=0。",
+  "blob_neq_disk_after_renormalize": 0,
+  "staged_files_total": 349,
+  "blob_neq_disk_by_extension_before_fix": {
+    ".map": 3,
+    ".bin": 115,
+    ".txt": 115,
+    ".json": 26,
+    ".log": 3
+  }
+}

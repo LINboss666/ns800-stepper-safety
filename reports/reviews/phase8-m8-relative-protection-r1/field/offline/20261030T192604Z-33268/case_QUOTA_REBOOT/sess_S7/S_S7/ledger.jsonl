@@ -1,0 +1,19 @@
+{"kind": "PORT_OPEN", "port": null, "t_s": 0.0, "transport": "stub"}
+{"bytes": "diag_mode relative CONFIRM_EXPERIMENTAL\r\n", "kind": "TX", "t_s": 0.0}
+{"bytes": "motor_arm\r\n", "kind": "TX", "t_s": 0.01}
+{"bytes": "motor_target 400\r\n", "kind": "TX", "t_s": 0.01}
+{"bytes": "motor_start\r\n", "kind": "TX", "t_s": 0.01}
+{"kind": "WATCH_DONE", "rx_bytes": 223, "seconds": 10, "t_s": 10.03}
+{"bytes": "motor_status\r\n", "kind": "TX", "t_s": 10.03}
+{"as": "gate_disable3", "kind": "MANUAL", "name": "trusted_disable_verified", "t_s": 10.03, "value": "yes"}
+{"bytes": "diag_status\r\n", "kind": "TX", "t_s": 10.03}
+{"bytes": "blackbox_status\r\n", "kind": "TX", "t_s": 10.03}
+{"bytes": "flash_logstat\r\n", "kind": "TX", "t_s": 10.03}
+{"bytes": "motor_arm\r\n", "kind": "TX", "t_s": 10.03}
+{"bytes": "fault_reset\r\n", "kind": "TX", "t_s": 10.03}
+{"bytes": "system_selftest\r\n", "kind": "TX", "t_s": 10.03}
+{"bytes": "safety_status\r\n", "kind": "TX", "t_s": 10.03}
+{"bytes": "motor_status\r\n", "kind": "TX", "t_s": 10.03}
+{"bytes": "diag_status\r\n", "kind": "TX", "t_s": 10.03}
+{"kind": "SESSION_OK", "session": "S_S7", "steps": 16, "t_s": 10.03}
+{"kind": "PORT_CLOSED", "t_s": 10.03}

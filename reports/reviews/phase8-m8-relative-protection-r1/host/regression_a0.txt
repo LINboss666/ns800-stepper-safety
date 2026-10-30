@@ -1,0 +1,27 @@
+###### 目标机测量 A0 记录器链 (基线 f939363449c528892fb3d9978d73e085cfa90c91) ######
+run_id=20261030T184029Z-5263
+SRC_APP=D:/ns800/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications
+OUT_DIR=/tmp/ns800-host-chain/a0
+GCC=/c/Program Files (x86)/Dev-Cpp/MinGW64/bin/gcc.exe
+NM=/c/Program Files (x86)/Dev-Cpp/MinGW64/bin/nm.exe
+选择组=off counter contract conc batch cli ledger pack export
+BUILD off rc=0 build_log_bytes=0 exe=/tmp/ns800-host-chain/a0/a0_off.exe
+BUILD on rc=0 build_log_bytes=0 exe=/tmp/ns800-host-chain/a0/a0_on.exe
+BUILD min rc=0 build_log_bytes=0 exe=/tmp/ns800-host-chain/a0/a0_min.exe
+--- 符号存在性(编译期绕开的可判定证据) ---
+  符号核对: a0_off 生产记录器符号=0 记录数组=0 命令注册条目=0 (都要求 0) / 三个被测入口存在=3 (要求 3)
+  符号核对: a0_on  生产记录器符号=30 (要求 >=18) 记录数组=1 (要求 1) __fsym_spm=1 (要求 1) __fsym_spm_cmd=0 (要求 0)
+--- 逐组执行 ---
+  off/off: OK (1 例, cases=1 checks=13 fails=0 rc=0)
+  on/counter: OK (8 例, cases=8 checks=111 fails=0 rc=0)
+  on/contract: OK (4 例, cases=4 checks=60 fails=0 rc=0)
+  on/conc: OK (3 例, cases=3 checks=34 fails=0 rc=0)
+  on/batch: OK (3 例, cases=3 checks=36 fails=0 rc=0)
+  on/cli: OK (3 例, cases=3 checks=44 fails=0 rc=0)
+  on/ledger: OK (1 例, cases=1 checks=13 fails=0 rc=0)
+  on/pack: OK (1 例, cases=1 checks=24 fails=0 rc=0)
+  on/export: OK (3 例, cases=3 checks=39 fails=0 rc=0)
+  min/export: OK (3 例, cases=3 checks=26 fails=0 rc=0)
+--- 反向: 本轮未要求(REVERSE=1 才跑) ---
+--- 总结果 ---
+A0CHAIN-META: OK (正向逐组一致 + 反向按声明执行)

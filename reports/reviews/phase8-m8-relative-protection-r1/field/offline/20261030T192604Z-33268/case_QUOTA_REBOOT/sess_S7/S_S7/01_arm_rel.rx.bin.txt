@@ -1,0 +1,4 @@
+*** RS800 NS800RT7P65 board banner ***
+rt-thread startup
+[DIAG] mode=RELATIVE_PROTECTION
+msh 

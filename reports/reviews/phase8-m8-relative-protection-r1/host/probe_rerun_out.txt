@@ -1,0 +1,72 @@
+REVIEW|A1-SG-warn-time-counted-as-severe|NOT_OBSERVED|warn_ms=500 first_strong_sample_reason=NONE span=510
+REVIEW|A2-ADC-warn-time-counted-as-severe|NOT_OBSERVED|warn_ms=390 first_strong_sample_reason=NONE span=400
+REVIEW|B1-frozen-ADC-identity-is-not-expired|NOT_OBSERVED|cur_age=1200 frame_age=0 reason=REL_SENSOR_UNAVAILABLE
+[DIAG] REL coverage=NOT-ACTIVE(no-frame) id=1 rev=1 live=1163520832 prof=1163520832
+[DIAG] REL coverage=COVERED id=1 rev=1 live=1163520832 prof=1163520832
+[DIAG] REL coverage=NOT-ACTIVE(sig-mismatch) id=1 rev=1 live=2143073858 prof=1163520832
+[DIAG] REL TRIP r=REL_COVERAGE_LOST id=1 rev=1 post_rc=0
+[DIAG] REL TRIP val=500 thr=500 ms=500 cov=3
+[DIAG] REL TRIP sg=4 cur=34 imu=34 tick=1680 n=0
+[DIAG] REL trip ticket used; mode=MONITOR_ONLY rearm required
+REVIEW|B2-production-signature-loss-skips-protection|NOT_OBSERVED|post_calls=1 mode=0 mismatch_text=1
+[DIAG] REL coverage=NOT-ACTIVE(no-frame) id=1 rev=1 live=1163520832 prof=1163520832
+[DIAG] REL coverage=COVERED id=1 rev=1 live=1163520832 prof=1163520832
+[DIAG] REL coverage=NOT-ACTIVE(config-lock) id=0 rev=0 live=1163520832 prof=0
+[DIAG] REL TRIP r=REL_COVERAGE_LOST id=0 rev=0 post_rc=0
+[DIAG] REL TRIP val=500 thr=500 ms=500 cov=1
+[DIAG] REL TRIP sg=4 cur=34 imu=34 tick=1680 n=0
+[DIAG] REL trip ticket used; mode=MONITOR_ONLY rearm required
+REVIEW|B3-production-lock-failure-skips-protection|NOT_OBSERVED|post_calls=1 mode=0 lock_fail_text=1
+[DIAG] mode REFUSED: mode change needs static/idle
+REVIEW|C1-mode-can-be-disabled-in-motion|NOT_OBSERVED|rc=-8 moving_state=2 armed=1
+[DIAG] RELATIVE REFUSED: static txn not granted
+REVIEW|C2-enable-ignores-static-transaction-refusal|NOT_OBSERVED|rc=-23 static_begin_calls=1 mode=0
+REVIEW|C3-config-save-writes-after-lock-failure|NOT_OBSERVED|rc=-12 saved=0 releases=1
+[DIAG] zero OK n=32 raw 1660..1660 mean=1660000 (cal source untouched)
+[DIAG] learn OK adc[2000..2000]n68 nz0 sg[500..500]n8 seq4..11
+[DIAG] learn thr tier=2 dev=64/128 drop=16/32 FIELD_UNVERIFIED
+[DIAG] learn FAILED: left the approved window or source lost
+[DIAG] learn last: st=2 hz=500 dir=0 sig=1163520832 sg_seq=11
+[DIAG] commit REFUSED: pending incomplete (zero=1 learn=0)
+REVIEW|C4-failed-relearn-reuses-old-learn-credential|NOT_OBSERVED|learn_credential=0 published_window=0..0 dir_mask=0
+[DIAG] zero VOIDED: motion/arm/proof lost during capture
+REVIEW|C5-zero-accepts-motion-during-capture|NOT_OBSERVED|zero_accepted=0 final_armed=1 zero_band=0..0
+[DIAG] zero OK n=32 raw 1660..1660 mean=1660000 (cal source untouched)
+[DIAG] learn OK adc[2000..2000]n68 nz0 sg[64..64]n8 seq4..11
+[DIAG] learn thr tier=2 dev=64/128 drop=16/32 FIELD_UNVERIFIED
+[DIAG] commit OK id=1 rev=1 flags=0005 FIELD_UNVERIFIED
+[DIAG] commit next: config_save to persist, then arm explicitly
+REVIEW|D1-low-SG-baseline-fixed-margin-is-uncommittable|NOT_OBSERVED|normal_sg_min=64 generated_drop=32 unreachable=0
+[DIAG] REL coverage=NOT-ACTIVE(no-frame) id=4294967295 rev=4294967295 live=1163520832 prof=1163520832
+[DIAG] REL coverage=COVERED id=4294967295 rev=4294967295 live=1163520832 prof=1163520832
+[DIAG] REL TRIP r=REL_ADC_SEVERE id=4294967295 rev=4294967295 post_rc=0
+[DIAG] REL TRIP val=2191 thr=116 ms=300 cov=0
+[DIAG] REL TRIP sg=4000000002 cur=4000000016 imu=16 tick=1320 n=16
+[DIAG] REL trip ticket used; mode=MONITOR_ONLY rearm required
+[DIAG] rel mode=MONITOR_ONLY prof=PRESENT id=4294967295 rev=4294967295 flg=0005 FIELD_UNVERIFIED
+[DIAG] rel cov=COVERED lost=0 gen=0 rearm=1
+[DIAG] rel win hz=500[400..600] dir=1 ph=4
+[DIAG] rel tmc=2/20/10/1 mst=1 def=1 tier=2
+[DIAG] rel sig live=1163520832 prof=1163520832 match=YES
+[DIAG] rel band adc[1950..2050]n16 nz20 sg[480..520]n12
+[DIAG] rel thr dev=52/116 drop=32/96 reach=2025/1930
+[DIAG] rel dur=500/300/300 rec=500 mns=3
+[DIAG] rel age lim sg=350 frm=100 imu=100 imp=2500/2/100
+[DIAG] rel sg warn=0/0 strong=0/0
+[DIAG] rel adc warn=1960/99 strong=1960/99
+[DIAG] rel fus=0 ok=0 imp=0/0
+[DIAG] rel bad age=0 out=0 cov=0 imu_use=1
+[DIAG] rel last sg=4000000010 cur=4000000099 imu=99 rsn=REL_ADC_SEVERE
+[DIAG] rel LATCH r=REL_ADC_SEVERE id=4294967295 rev=4294967295 ms=300 post_rc=0
+[DIAG] rel LATCH val=2191 thr=116 n=16 cov=0 tick=1320
+[DIAG] rel LATCH sg=4000000002 cur=4000000016 imu=16
+[DIAG] rel re-arm needed: diag_mode relative CONFIRM_EXPERIMENTAL
+REVIEW|E1-critical-relative-lines-exceed-console-cap|NOT_OBSERVED|max_line_bytes=101
+[DIAG] REL coverage=NOT-ACTIVE(no-frame) id=1 rev=1 live=1163520832 prof=1163520832
+[DIAG] REL coverage=COVERED id=1 rev=1 live=1163520832 prof=1163520832
+[DIAG] REL TRIP r=REL_ADC_SEVERE id=1 rev=1 post_rc=0
+[DIAG] REL TRIP val=2191 thr=116 ms=300 cov=0
+[DIAG] REL TRIP sg=2 cur=16 imu=16 tick=1320 n=16
+[DIAG] REL trip ticket used; mode=MONITOR_ONLY rearm required
+REVIEW|C6-second-incident-silently-has-no-new-request|NOT_OBSERVED|first_posts=1 total_posts=1 mode=0 latched=1
+REVIEW_SUMMARY|observed=0|hardware_actions=0|sources_unmodified=YES

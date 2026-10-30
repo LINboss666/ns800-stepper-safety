@@ -1,0 +1,5 @@
+{"kind": "PORT_OPEN", "port": null, "t_s": 0.0, "transport": "stub"}
+{"bytes": "motor_arm\r\n", "kind": "TX", "t_s": 0.0}
+{"bytes": "motor_target 400\r\n", "kind": "TX", "t_s": 0.01}
+{"bytes": "motor_start\r\n", "kind": "TX", "t_s": 0.01}
+{"kind": "PORT_CLOSED", "t_s": 0.01}

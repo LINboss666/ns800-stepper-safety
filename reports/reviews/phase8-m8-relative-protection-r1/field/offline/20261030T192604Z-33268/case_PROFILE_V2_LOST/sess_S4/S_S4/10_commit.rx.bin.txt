@@ -1,0 +1,3 @@
+[DIAG] commit OK id=3 rev=1 flags=0001 FIELD_UNVERIFIED
+[DIAG] commit next: config_save to persist, then arm explicitly
+msh 

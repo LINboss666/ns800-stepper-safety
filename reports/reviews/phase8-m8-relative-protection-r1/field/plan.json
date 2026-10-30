@@ -1,0 +1,196 @@
+{
+  "package": "phase8-m8-relative-protection-r1-FIELD-CANDIDATE",
+  "status": "NOT_AUTHORIZED / NOT_EXECUTED",
+  "numbers_are_proposals_not_authorization": true,
+  "identity_binding": {
+    "source_commit": "3275356a46e0b503888e9a4869da3b2b41f027a8",
+    "tested_image_build_commit": "3275356a46e0b503888e9a4869da3b2b41f027a8",
+    "reviewed_delivery_commit": "f939363449c528892fb3d9978d73e085cfa90c91",
+    "note": "source_commit(源码与验证链) 与 tested_image_build_commit(镜像实际取自的那个提交) 是两个独立字段, 必须分别核对与分别登记; 只有当构建确实取自该源码提交时才允许相等。",
+    "image": {
+      "path": "reports/firmware/phase8-m8-relative-protection-r1/rt-thread-motor-m1.bin",
+      "bytes": 289028,
+      "sha256": "04ccfca5d8e7b30cc1685f6cfca3b65b0fc68f51f2c5e52f89bdda2b20fac59c",
+      "sha256_source": "build_manifest.json targets[rt-thread-motor-m1-candidate].images 记录值; S0 必须现场重算并逐字节相等"
+    },
+    "axf_dwarf_note": "AXF/DWARF 与 map 的核对全部在本机离线做(符号读取/反汇编对照), 不属于设备动作, 不占用任何现场额度。"
+  },
+  "quota": {
+    "port_open": 4,
+    "download": 1,
+    "flash_readback": 1,
+    "explicit_reset": 1,
+    "motor_run": 3,
+    "motor_run_seconds_total": 15,
+    "config_save": 1,
+    "approved_reboot": 1,
+    "retry": 0,
+    "physical_collision": 0,
+    "blackbox_clear": 0,
+    "dmm_readings": 0
+  },
+  "flash_state_registering": {
+    "absent": "无有效参数块 -> 只允许 defaults, 且不得把 defaults 当成已持久化 profile",
+    "v2": "需要 v2->v3 迁移 -> 迁移只在主机链证过(FIELD_UNVERIFIED); 现场在第一次 config_save 之前不得宣称 profile 已生效",
+    "v3": "直接加载, 仍要 diag_profile show 核对 id/rev 与 signature"
+  },
+  "serial_sessions": 4,
+  "stages": [
+    {
+      "id": "S0",
+      "title": "离线绑定: 源码提交与被测镜像提交分列, 镜像散列现场重算, Flash 参数区三态分列",
+      "kind": "offline",
+      "requires": [],
+      "halt_after": false
+    },
+    {
+      "id": "S1",
+      "title": "唯一一次下载(单独授权) -> 立即停下, 不在同一批里回读",
+      "kind": "download",
+      "quota": { "name": "download", "n": 1 },
+      "requires": ["S0"],
+      "halt_after": true
+    },
+    {
+      "id": "S2",
+      "title": "唯一一次定长 Flash 回读 -> 与 S0 重算散列比对, 不等即停",
+      "kind": "readback",
+      "quota": { "name": "flash_readback", "n": 1 },
+      "requires": ["S1_halted"],
+      "halt_after": true
+    },
+    {
+      "id": "S3",
+      "title": "串口会话1: 开口->显式复位->首字节; 只读状态 + 静止期 zero(不调用 config_load)",
+      "kind": "serial_session",
+      "port_open": 1,
+      "quota": { "name": "port_open", "n": 1 },
+      "requires": ["S2_hash_equal"],
+      "reset_after_port_open": true,
+      "steps": [
+        { "cmd": "safety_status", "as": "boot", "key": "safety_status@boot" },
+        { "cmd": "motor_status", "as": "motor0" },
+        { "cmd": "diag_status", "as": "diag0", "expect_contains": ["[DIAG] mode="] },
+        { "cmd": "config_show", "as": "cfg0" },
+        { "cmd": "diag_profile show", "as": "prof0" },
+        { "cmd": "diag_profile zero 32", "as": "zero", "seconds": 15,
+          "expect_any": ["[DIAG] zero OK", "[DIAG] zero VOIDED", "[DIAG] zero REFUSED"] }
+      ],
+      "forbidden_commands": ["config_load", "config_default", "blackbox_clear", "flash_logclear"],
+      "halt_after": false
+    },
+    {
+      "id": "S4",
+      "title": "串口会话2: MONITOR_ONLY 下 arm->target->start 进入巡航后单方向学习; 停转并核实可信禁用后 tier+commit+一次 config_save",
+      "kind": "serial_session",
+      "port_open": 1,
+      "quota": { "name": "port_open", "n": 1 },
+      "requires": ["S3", "mode_is_monitor_only"],
+      "steps": [
+        { "cmd": "motor_arm", "as": "arm" },
+        { "cmd": "motor_target 400", "as": "target", "hz_max": 1000 },
+        { "cmd": "motor_start", "as": "start", "seconds": 5, "quota": { "name": "motor_run", "n": 1 } },
+        { "manual": "cruise_reached", "as": "gate_cruise" },
+        { "cmd": "diag_profile learn 16 260 340 0", "as": "learn", "seconds": 15,
+          "requires": ["gate_cruise"],
+          "expect_any": ["[DIAG] learn OK", "[DIAG] learn FAILED", "[DIAG] learn REFUSED"],
+          "window_basis": "260..340 只是参数格式示例; 执行轮必须替换为 M4 已验证巡航区间的 SG 码; 不借学习抬 IRUN(现值 20)",
+          "dir_label": "single_direction_0" },
+        { "cmd": "motor_stop", "as": "stop" },
+        { "cmd": "motor_disarm", "as": "disarm" },
+        { "manual": "trusted_disable_verified", "as": "gate_disable" },
+        { "cmd": "diag_profile tier 2", "as": "tier",
+          "expect_any": ["[DIAG] tier 2", "[DIAG] tier REFUSED"] },
+        { "cmd": "diag_profile commit", "as": "commit", "requires": ["gate_disable", "learn"],
+          "expect_any": ["[DIAG] commit OK", "[DIAG] commit REFUSED"] },
+        { "cmd": "config_save", "as": "save", "quota": { "name": "config_save", "n": 1 },
+          "requires": ["commit"] }
+      ],
+      "halt_after": false
+    },
+    {
+      "id": "S5",
+      "title": "经批准的一次断电重启(会话之间进行, 不持有串口句柄)",
+      "kind": "approved_reboot",
+      "quota": { "name": "approved_reboot", "n": 1 },
+      "requires": ["S4"],
+      "port_open": 0,
+      "halt_after": true
+    },
+    {
+      "id": "S6",
+      "title": "串口会话3: 重启后只读核对(profile 恢复且模式仍 MONITOR_ONLY)",
+      "kind": "serial_session",
+      "port_open": 1,
+      "quota": { "name": "port_open", "n": 1 },
+      "requires": ["S5"],
+      "reset_after_port_open": false,
+      "steps": [
+        { "cmd": "config_show", "as": "cfg1", "key": "config_show@after_reboot" },
+        { "cmd": "diag_profile show", "as": "prof1", "key": "diag_profile show@after_reboot",
+          "expect_contains": ["[DIAG] rel "] },
+        { "cmd": "diag_status", "as": "diag1", "key": "diag_status@after_reboot",
+          "expect_contains": ["[DIAG] mode=MONITOR_ONLY"] }
+      ],
+      "forbidden_commands": ["config_load"],
+      "halt_after": false
+    },
+    {
+      "id": "S7",
+      "title": "串口会话4: 真实保护演示(带负载一次观察, 允许自然触发, 不授权任何碰撞) + 事故链读回与人工恢复",
+      "kind": "serial_session",
+      "port_open": 1,
+      "quota": { "name": "port_open", "n": 1 },
+      "requires": ["S6", "prof1"],
+      "steps": [
+        { "cmd": "diag_mode relative CONFIRM_EXPERIMENTAL", "as": "arm_rel",
+          "expect_any": ["[DIAG] mode=RELATIVE_PROTECTION", "[DIAG] RELATIVE REFUSED"] },
+        { "cmd": "motor_arm", "as": "arm" },
+        { "cmd": "motor_target 400", "as": "target", "hz_max": 1000 },
+        { "cmd": "motor_start", "as": "start", "seconds": 5, "quota": { "name": "motor_run", "n": 1 } },
+        { "cmd": "__watch__", "as": "trip_window", "seconds": 10,
+          "expect_any": ["[DIAG] REL TRIP r="] },
+        { "cmd": "motor_status", "as": "disarm_obs" },
+        { "manual": "trusted_disable_verified", "as": "gate_disable3" },
+        { "cmd": "diag_status", "as": "latch", "key": "diag_status@latch",
+          "expect_contains": ["[DIAG] rel LATCH r="] },
+        { "cmd": "blackbox_status", "as": "first_cause" },
+        { "cmd": "flash_logstat", "as": "newlog" },
+        { "cmd": "motor_arm", "as": "refused_in_fault", "key": "motor_arm@fault",
+          "expect_any": ["REFUSED"] },
+        { "cmd": "fault_reset", "as": "reset", "requires": ["gate_disable3"] },
+        { "cmd": "system_selftest", "as": "selftest" },
+        { "cmd": "safety_status", "as": "ready", "key": "safety_status@ready",
+          "expect_contains": ["READY"] },
+        { "cmd": "motor_status", "as": "armed0", "key": "motor_status@after_reset" },
+        { "cmd": "diag_status", "as": "monitor", "key": "diag_status@after_reset",
+          "expect_contains": ["[DIAG] mode=MONITOR_ONLY"] }
+      ],
+      "halt_after": false,
+      "no_trigger_is_observation_not_failure": true
+    }
+  ],
+  "demo_path_from_review_4_2": [
+    "真实保护触发(自然触发, 不制造) -> REL TRIP 摘要行",
+    "故障闩锁(diag_status 的 rel LATCH 行)",
+    "解除武装观察(motor_status)",
+    "首因 + 新日志(blackbox_status / flash_logstat)",
+    "故障态下一次 motor_arm 被拒绝",
+    "人工 fault_reset + system_selftest 到 READY, armed=0, 模式 MONITOR",
+    "一次 config_save + 经批准重启后 profile 恢复且模式仍 MONITOR"
+  ],
+  "corrections_from_review_4_1": [
+    "F-01 源码提交与被测镜像构建提交分列并各自核对",
+    "F-02 不要求例行断 24 V / 拔 USB / 拨 SW1(断电只出现在经批准的一次重启里)",
+    "F-03 取消\"全程只开一次串口\"的自相矛盾: 每串口会话各开一次, 会话内部绝不重开, 总额 4",
+    "F-04 下载 -> 停 -> 定长回读 -> 停 -> 开口 -> (需要时)显式复位 -> 才读首字节; 顺序与额度写死",
+    "F-05 串口沿用 P0 已证链: 开口时一次配齐, 开口后不写任何串口属性(有静态判据); 原始字节先落盘; 单一写者; 总截止时间",
+    "F-06 config_load 不是只读命令, 只读阶段列入 forbidden_commands",
+    "F-07 Flash 参数区 absent / v2 / v3 三态分别登记, 不同态不同处置",
+    "F-08 AXF/DWARF 与 map 核对是离线符号读取, 不是\"未授权调试\", 不占设备额度",
+    "F-09 learn 只在 arm->target->start 进入巡航之后; commit 只在停转/解除武装并核实可信禁用之后",
+    "F-10 单方向学习不写 dir=2 标签",
+    "F-11 SG 学习窗口取自已验证运动区间, 目标频率 <=1000 Hz, 不借机抬 IRUN",
+    "F-12 R6 碰撞只允许真实负载下的自然触发, 本轮不授权任何物理碰撞(额度 0)"
+  ]
+}

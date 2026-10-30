@@ -1,0 +1,82 @@
+[
+    {
+        "cmd":  "motor_arm",
+        "as":  "arm"
+    },
+    {
+        "cmd":  "motor_target 400",
+        "as":  "target",
+        "hz_max":  1000
+    },
+    {
+        "cmd":  "motor_start",
+        "as":  "start",
+        "seconds":  5,
+        "quota":  {
+                      "name":  "motor_run",
+                      "n":  1
+                  }
+    },
+    {
+        "manual":  "cruise_reached",
+        "as":  "gate_cruise"
+    },
+    {
+        "cmd":  "diag_profile learn 16 260 340 0",
+        "as":  "learn",
+        "seconds":  15,
+        "requires":  [
+                         "gate_cruise"
+                     ],
+        "expect_any":  [
+                           "[DIAG] learn OK",
+                           "[DIAG] learn FAILED",
+                           "[DIAG] learn REFUSED"
+                       ],
+        "window_basis":  "260..340 只是参数格式示例; 执行轮必须替换为 M4 已验证巡航区间的 SG 码; 不借学习抬 IRUN(现值 20)",
+        "dir_label":  "single_direction_0"
+    },
+    {
+        "cmd":  "motor_stop",
+        "as":  "stop"
+    },
+    {
+        "cmd":  "motor_disarm",
+        "as":  "disarm"
+    },
+    {
+        "manual":  "trusted_disable_verified",
+        "as":  "gate_disable"
+    },
+    {
+        "cmd":  "diag_profile tier 2",
+        "as":  "tier",
+        "expect_any":  [
+                           "[DIAG] tier 2",
+                           "[DIAG] tier REFUSED"
+                       ]
+    },
+    {
+        "cmd":  "diag_profile commit",
+        "as":  "commit",
+        "requires":  [
+                         "gate_disable",
+                         "learn"
+                     ],
+        "expect_any":  [
+                           "[DIAG] commit OK",
+                           "[DIAG] commit REFUSED"
+                       ]
+    },
+    {
+        "cmd":  "config_save",
+        "as":  "save",
+        "quota":  {
+                      "name":  "config_save",
+                      "n":  1
+                  },
+        "requires":  [
+                         "commit"
+                     ]
+    }
+]
