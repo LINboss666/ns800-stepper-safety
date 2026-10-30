@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """M7 P0: bounded read-only voltage observation; offline by default.
 
-No flashing is performed by this script. The operator first completes the one
-approved download/readback. This script binds those exact bytes before opening
-COM5, then performs one explicit reset with the already known DAP UID.
+No flashing is performed by this script. Full mode binds the approved image
+and readback before opening COM5 and resetting. The explicit continuation mode
+binds proof 24ab5a7 and continuity, opens COM5 once, and never invokes DAP/reset.
 """
 import argparse
+import base64
 import hashlib
 import importlib.util
 import json
@@ -20,6 +21,9 @@ import time
 BIN_SHA = 'e614a075ab63eb5b1c4b08e1ab51fb4043f474037ce734b4bcaf666899c8f7da'
 AXF_SHA = '2205c7e7ad6bad93e848fd24d1e5f38c76796865a2b21ebcd2d4e22bb4b6d584'
 CALC_SHA = '5c7a2340b4d350b1e8932798a57b85e8a6f4818501e469ad6dfd5c1bd29163ad'
+PRIOR_BOARD_COMMIT = '24ab5a7c1cff259b209f78fcb1abbb5f48271581'
+PRIOR_JSON_SHA = 'e8df121f3f58af5fadf3d60be24fd8aaf7d88c381ae740be86173c43e6604246'
+PRIOR_BOOT_SHA = 'bc47dc022b25bd483c16ab749895bf2a9d7dba318fdf88826357d2dbb98214fa'
 BIN_SIZE, AXF_SIZE = 266244, 1688696
 BANNER = b'5.3.0 build Oct 29 2026 23:11:52'
 BOOT_DONE = b'[MAIN] boot complete: READY (motion still gate-locked)'
@@ -298,6 +302,51 @@ def load_calc(path):
     return mod
 
 
+def prior_board_proof(args):
+    """Only this exact previous readback/boot evidence can support continuation.
+
+    This does not repair the failed banner or declare the old run successful.
+    The fresh command response gates still run in full after opening COM5.
+    """
+    if not getattr(args, 'continuity_since_proof_confirmed', False):
+        raise Stop('IMAGE_CONTINUITY_REQUIRED')
+    if not getattr(args, 'prior_board_json', None) or not getattr(args, 'prior_boot_b64', None):
+        raise Stop('PRIOR_PROOF_FILES_REQUIRED')
+    doc = Path(args.prior_board_json).read_bytes()
+    if sha(doc) != PRIOR_JSON_SHA: raise Stop('PRIOR_BOARD_JSON_IDENTITY_MISMATCH')
+    encoded = Path(args.prior_boot_b64).read_bytes()
+    if len(encoded) > 100000: raise Stop('PRIOR_BOOT_ARCHIVE_TOO_LARGE')
+    try: boot = base64.b64decode(b''.join(encoded.split()), validate=True)
+    except Exception as e: raise Stop('PRIOR_BOOT_ARCHIVE_MALFORMED') from e
+    if len(boot) != 3381 or sha(boot) != PRIOR_BOOT_SHA:
+        raise Stop('PRIOR_BOOT_IDENTITY_MISMATCH')
+    if BOOT_DONE not in boot or b'Oct 29 2026 23:11:52' not in boot:
+        raise Stop('PRIOR_READY_OR_BUILD_SUFFIX_MISSING')
+    return dict(commit=PRIOR_BOARD_COMMIT, board_json_sha256=PRIOR_JSON_SHA,
+                raw_boot_sha256=PRIOR_BOOT_SHA, new_banner_checked=False)
+
+
+def listen_attach(s, seconds=2.):
+    """Finite passive window; silence is allowed. No reset or banner requirement."""
+    end = s.clock.monotonic() + seconds
+    data = bytearray()
+    with open(s.out / 'raw_attach.bin', 'xb') as f:
+        while s.clock.monotonic() < end:
+            if len(data) >= BOOT_CAP: raise Stop('ATTACH_BYTE_CAP')
+            s.port.timeout = min(.1, max(0., end - s.clock.monotonic()))
+            b = s.port.read(min(512, BOOT_CAP - len(data)))
+            if b:
+                f.write(b); f.flush(); os.fsync(f.fileno()); data.extend(b)
+                s.check_danger(bytes(data))
+                if b'[MAIN] boot complete' in data or b'build Oct ' in data or b'[BOOT]' in data:
+                    raise Stop('STARTUP_BYTES_DURING_ATTACH')
+            else:
+                s.clock.sleep(min(.01, max(0., end - s.clock.monotonic())))
+    s.event('CONTINUATION_ATTACH', bytes=len(data), sha256=sha(data),
+            identity_basis='PRIOR_READBACK_PLUS_CONFIRMED_CONTINUITY',
+            prior_board_commit=PRIOR_BOARD_COMMIT, fresh_banner_required=False)
+
+
 def bind(args):
     if not (args.approval_source and args.site_confirmed and args.execute_approved_p0):
         raise Stop('APPROVAL_AND_SITE_REQUIRED')
@@ -309,6 +358,10 @@ def bind(args):
     if Path(args.payload_bin).read_bytes() != Path(args.readback_bin).read_bytes():
         raise Stop('READBACK_BYTES_DIFFER')
     calc = load_calc(args.calculator)
+    if getattr(args, 'continue_proven_board', False):
+        proof = prior_board_proof(args)
+        if Path(args.out).exists(): raise Stop('OUTPUT_DIRECTORY_MUST_BE_NEW')
+        return calc, proof
     uid = Path(args.uid_file).read_text(encoding='ascii').strip()
     if len(uid) != 48 or sha(uid.encode())[:12] != 'd2f530dbd062': raise Stop('KNOWN_DAP_UID_MISMATCH')
     if Path(args.out).exists(): raise Stop('OUTPUT_DIRECTORY_MUST_BE_NEW')
@@ -339,7 +392,7 @@ def reset_once(s, uid):
 
 
 def execute(args):
-    calc, uid = bind(args)                  # Before importing/constructing any serial object.
+    calc, identity = bind(args)                  # Before importing/constructing any serial object.
     Path(args.out).mkdir()
     import serial                         # Offline/selftest paths never import pyserial.
     port = None
@@ -348,7 +401,9 @@ def execute(args):
     cleanup = []
     try:
         s.event('BIND', payload_sha256=BIN_SHA, readback_sha256=BIN_SHA,
-                axf_sha256=AXF_SHA, calculator_sha256=CALC_SHA)
+                axf_sha256=AXF_SHA, calculator_sha256=CALC_SHA,
+                mode='CONTINUE_PROVEN_BOARD' if args.continue_proven_board else 'FULL_RESET',
+                prior_board_commit=PRIOR_BOARD_COMMIT if args.continue_proven_board else None)
         s.event('PORT_OPEN_ATTEMPT', port='COM5')
         # timeout/write_timeout are bounded; no flush(), probing, scanning, retries or extra commands.
         port = serial.Serial('COM5', 115200, bytesize=8, parity='N', stopbits=1,
@@ -356,7 +411,10 @@ def execute(args):
                              xonxoff=False, rtscts=False, dsrdtr=False)
         s.port = port
         s.event('PORT_OPEN', port='COM5')
-        reset_once(s, uid)
+        if args.continue_proven_board:
+            listen_attach(s)
+        else:
+            reset_once(s, identity)
         observe(s, calc)
     except BaseException as e:
         primary = e
@@ -377,6 +435,12 @@ def execute(args):
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--selftest', action='store_true')
+    ap.add_argument('--selftest-continuation', action='store_true')
+    ap.add_argument('--continue-proven-board', action='store_true',
+                    help='only proof 24ab5a7: one COM5 open, no DAP or reset')
+    ap.add_argument('--continuity-since-proof-confirmed', action='store_true')
+    ap.add_argument('--prior-board-json')
+    ap.add_argument('--prior-boot-b64')
     ap.add_argument('--execute-approved-p0', action='store_true')
     ap.add_argument('--approval-source')
     ap.add_argument('--site-confirmed', action='store_true')
@@ -385,6 +449,9 @@ def main(argv=None):
     ap.add_argument('--calculator', default=str(Path(__file__).resolve().parents[1] /
                     'phase8-motor-m7-current-calibration' / 'm7_calcalc.py'))
     args = ap.parse_args(argv)
+    if args.selftest_continuation:
+        import verify_p0_candidate
+        return verify_p0_candidate.run_continuation(sys.modules[__name__], args.prior_board_json, args.prior_boot_b64)
     if args.selftest:
         import verify_p0_candidate
         return verify_p0_candidate.run(sys.modules[__name__], args.calculator)

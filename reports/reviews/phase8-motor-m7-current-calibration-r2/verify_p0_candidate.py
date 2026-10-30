@@ -278,6 +278,100 @@ def run(m, calc_path):
     print('HOST_SYNTHETIC_ONLY / DEVICE_ACTIONS=0 / NO_REAL_TRANSPORT')
     return bool(failed)
 
+def run_continuation(m, proof_path, boot_path):
+    """Offline only; prior files are archived evidence, never fresh measurements."""
+    import base64
+    checks = []
+    def ck(name, fn):
+        try: fn(); checks.append((name,True,''))
+        except Exception as e: checks.append((name,False,type(e).__name__+':'+str(e)))
+    def proof_args(doc=proof_path, boot=boot_path, continuity=True):
+        return types.SimpleNamespace(prior_board_json=doc, prior_boot_b64=boot,
+                                     continuity_since_proof_confirmed=continuity)
+    def accepted():
+        v=m.prior_board_proof(proof_args()); assert v['commit']==m.PRIOR_BOARD_COMMIT
+        assert v['new_banner_checked'] is False
+        raw=base64.b64decode(Path(boot_path).read_bytes())
+        assert m.BANNER not in raw and m.BOOT_DONE in raw
+    ck('P0R01-specific-prior-proof-not-a-global-banner-bypass',accepted)
+    def refused(a, token):
+        try:m.prior_board_proof(a)
+        except m.Stop as e: assert token in str(e),str(e)
+        else:raise AssertionError('bad proof accepted')
+    def bad_json():
+        with tempfile.TemporaryDirectory() as tmp:
+            q=Path(tmp)/'proof.json';q.write_bytes(Path(proof_path).read_bytes()+b' ')
+            refused(proof_args(str(q)), 'PRIOR_BOARD_JSON_IDENTITY_MISMATCH')
+    ck('P0R02-prior-json-must-be-the-exact-reviewed-blob',bad_json)
+    def bad_boot():
+        with tempfile.TemporaryDirectory() as tmp:
+            q=Path(tmp)/'boot.b64';q.write_bytes(base64.b64encode(b'fake READY'))
+            refused(proof_args(boot=str(q)), 'PRIOR_BOOT_IDENTITY_MISMATCH')
+    ck('P0R03-ready-text-alone-cannot-substitute-the-proof',bad_boot)
+    ck('P0R04-continuity-is-explicit',lambda:refused(proof_args(continuity=False),'IMAGE_CONTINUITY_REQUIRED'))
+    class Clock:
+        def __init__(self):self.now=0.
+        def monotonic(self):return self.now
+        def sleep(self,n):self.now+=max(n,.001)
+    class Port:
+        def __init__(self,c,b):self.c=c;self.b=b;self.writes=[]
+        def read(self,n):self.c.sleep(.01);x,self.b=self.b[:n],self.b[n:];return x
+    def attach(data, error=None):
+        with tempfile.TemporaryDirectory() as tmp:
+            c=Clock();p=Port(c,data);ss=m.Session(p,tmp,c)
+            try:
+                try:m.listen_attach(ss,seconds=.2)
+                except m.Stop as e:assert error and error in str(e),str(e)
+                else:assert error is None
+                assert not p.writes
+                assert (Path(tmp)/'raw_attach.bin').read_bytes()==data
+                assert ss.tx==[]
+            finally:ss.ledger.close()
+    ck('P0R05-silent-attach-is-allowed-without-reset',lambda:attach(b''))
+    ck('P0R06-benign-background-does-not-require-quiet',lambda:attach(b'background output\r\nmsh >'))
+    ck('P0R07-danger-is-saved-and-blocks-queries',lambda:attach(b'sensor stack is close\r\n','STACK_DANGER_OBSERVED'))
+    ck('P0R08-startup-bytes-are-not-reinterpreted-as-continuity',lambda:attach(b'[BOOT] phase7\r\n','STARTUP_BYTES_DURING_ATTACH'))
+    def route(continuing, failure=False):
+        trace=[];saved={n:getattr(m,n) for n in ('bind','Session','reset_once','listen_attach','observe')}
+        oldserial=sys.modules.get('serial');hadserial='serial' in sys.modules
+        class SP:
+            def close(self):trace.append('close')
+        def serial_ctor(*a,**k):
+            assert a==('COM5',115200);trace.append('serial');return SP()
+        class SS:
+            def __init__(self,p,out):self.port=p;self.ledger=types.SimpleNamespace(close=lambda:trace.append('ledger_close'))
+            def event(self,*a,**k):pass
+        def listen(s):
+            trace.append('attach')
+            if failure:raise m.Stop('FORCED_ATTACH_FAILURE')
+        try:
+            m.bind=lambda a:('calc','known_identity')
+            m.Session=SS;m.reset_once=lambda *a:trace.append('reset')
+            m.listen_attach=listen;m.observe=lambda *a:trace.append('observe')
+            sys.modules['serial']=types.SimpleNamespace(Serial=serial_ctor)
+            with tempfile.TemporaryDirectory() as tmp:
+                a=types.SimpleNamespace(out=str(Path(tmp)/'new'),continue_proven_board=continuing)
+                try:rc=m.execute(a)
+                except m.Stop as e:assert failure and str(e)=='FORCED_ATTACH_FAILURE'
+                else:assert not failure and rc==0
+            assert trace.count('serial')==1 and trace.count('close')==1
+            assert trace.count('reset')==(0 if continuing else 1),trace
+            assert trace.count('attach')==(1 if continuing else 0),trace
+            assert trace.count('observe')==(0 if failure else 1),trace
+        finally:
+            for n,v in saved.items():setattr(m,n,v)
+            if hadserial:sys.modules['serial']=oldserial
+            else:sys.modules.pop('serial',None)
+    ck('P0R09-continuation-one-COM-zero-reset-zero-DAP-branch',lambda:route(True))
+    ck('P0R10-full-mode-keeps-the-original-reset-contract',lambda:route(False))
+    ck('P0R11-attach-failure-closes-and-does-not-query',lambda:route(True,True))
+    fail=[x for x in checks if not x[1]]
+    for name,ok,detail in checks:print(('PASS ' if ok else 'FAIL ')+name+' '+detail)
+    print('CONTINUATION SUMMARY cases=%d pass=%d fail=%d'%(len(checks),len(checks)-len(fail),len(fail)))
+    print('HOST_FAKE_TRANSPORT_ONLY / DEVICE_ACTIONS=0 / NO_PYOCD_SUBPROCESS')
+    return bool(fail)
+
+
 if __name__=='__main__':
     p=Path(sys.argv[1]).resolve();spec=importlib.util.spec_from_file_location('p0_candidate',p)
     m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)

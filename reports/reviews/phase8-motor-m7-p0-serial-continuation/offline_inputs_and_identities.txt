@@ -1,0 +1,22 @@
+M7 P0 serial-continuation offline inputs (2026-10-30), all measured on this delivery machine
+start HEAD = 24ab5a7c1cff259b209f78fcb1abbb5f48271581 (remote tip equal, working tree clean before apply)
+
+== applied candidate ==
+index blob p0_voltage_observation.py    23374 CR=0 0e02ccfcef178f0ceee9dc3fd5aeb17f7b9a3bb924e4b83bd7a0cecde9505467
+index blob verify_p0_candidate.py    21742 CR=0 2cf87b1dad0c57be3ea0b57c63269fce648093a301766400976b2b1186cfa8c7
+index blob m7_calcalc.py (untouched)    54267 CR=0 5c7a2340b4d350b1e8932798a57b85e8a6f4818501e469ad6dfd5c1bd29163ad
+
+== proof inputs exported from the FIXED commit 24ab5a7 (git cat-file blob, not the CRLF working tree) ==
+board-proof.json     10116 CR=0 e8df121f3f58af5fadf3d60be24fd8aaf7d88c381ae740be86173c43e6604246
+boot.b64              4508 CR=0 46b53e93137a7a4f90ecd16ea73bf70435bc14514e323032d04d0665c478dd46
+boot.b64 decoded back -> bc47dc022b25bd483c16ab749895bf2a9d7dba318fdf88826357d2dbb98214fa (3381 B original raw boot, equals the archived first failure)
+package copies equal these bytes: candidate/*, proof/* SHA256SUMS verified
+
+== continuity inputs still on disk from the previous run root ==
+readback.bin      266244 e614a075ab63eb5b1c4b08e1ab51fb4043f474037ce734b4bcaf666899c8f7da
+P0/raw_boot.bin     3381 bc47dc022b25bd483c16ab749895bf2a9d7dba318fdf88826357d2dbb98214fa
+
+== selftests run from the index blob bytes on Windows Python 3.12.5 ==
+python p0_voltage_observation.py --selftest                                -> RC=0 stderr=0B SUMMARY cases=37 pass=37 fail=0
+python p0_voltage_observation.py --selftest-continuation --prior-board-json inputs/board-proof.json --prior-boot-b64 inputs/boot.b64 -> RC=0 stderr=0B CONTINUATION SUMMARY cases=11 pass=11 fail=0 / NO_PYOCD_SUBPROCESS
+core.autocrlf still true (repo scope, never modified)
