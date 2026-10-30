@@ -1,0 +1,4 @@
+{"case": "UPSTREAM_SAME_VALUE_SETTERS", "SetCommState_calls": 3, "physical_effect_simulated": false}
+{"case": "before_one_query", "SetCommState_calls": 5, "writes": 1, "state_validator_accepted": false, "raw_repr": "b'safety_state\\r\\n[SS] state=READY fault_code=0 degraded=0x00\\r\\nmsh >'", "raw_read": 64}
+{"case": "after_one_query", "SetCommState_calls": 0, "writes": 1, "state_validator_accepted": true, "raw_repr": "b'safety_state\\r\\n[SS] state=READY fault_code=0 degraded=0x00\\r\\nmsh >'", "raw_read": 64}
+SOURCE_API_PATH_PROVEN / FAKE_WIN32_ONLY / DEVICE_ACTIONS=0 / PHYSICAL_CAUSE_NOT_PROVEN

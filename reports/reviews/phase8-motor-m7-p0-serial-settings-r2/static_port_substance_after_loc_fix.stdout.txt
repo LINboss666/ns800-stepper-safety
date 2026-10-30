@@ -1,0 +1,10 @@
+file           = D:\ns800\reports\reviews\phase8-motor-m7-current-calibration-r2\p0_voltage_observation.py
+bytes          = 23430
+sha256         = c98bb712bd454dd66ffabece49b8998075642b5cca4d07c85073a3508d90a726
+serial.Serial call sites = 1
+timeout keyword          = Constant(value=0)
+write_timeout keyword    = Name(id='WRITE_SECONDS', ctx=Load())
+post-open protected stores = []
+serial.* call lines        = [407]
+P0C09_SUBSTANCE_OK / one-open-config-timeout-0 / zero-post-open-setting-stores
+HARNESS_DEFECT_IS_LOCALE_ONLY / DEVICE_ACTIONS=0

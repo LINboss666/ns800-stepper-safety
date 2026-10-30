@@ -1,0 +1,1 @@
+{"utf8_mode_flag": 0, "preferred_encoding": "cp936", "filesystem_encoding": "utf-8", "python": "3.12.5"}

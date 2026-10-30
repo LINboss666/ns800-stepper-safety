@@ -143,3 +143,51 @@ DEVICE_ACTIONS=[] / AWAITING_R2_LOC_DECISION_AND_A_SEPARATE_FIELD_APPROVAL
 (b) 由审核方发一版仅把 `read_text()` 改成 `read_text(encoding='utf-8')` 的验证器候选，重新逐字节接受。
 
 无论择哪条，现场对照仍要用户对任务书 §7.4 单独批准；本文件不构成该批准。
+
+## 11. 裁决结果与单行补正（2026-10-30 追加）
+
+审核方选 **(b)**，并确认这是其验证器漏写编码、属测试工具问题；执行范围限定"只补验证器这一行，
+随后直接接回原 P0 包，不再开一轮完整返修，也不单开 GO 登记"。
+
+改动只有 [verify_p0_candidate.py:447](file:///D:/ns800/reports/reviews/phase8-motor-m7-current-calibration-r2/verify_p0_candidate.py#L447) 一行：
+
+```text
+-        tree=ast.parse(Path(m.__file__).read_text())
++        tree=ast.parse(Path(m.__file__).read_text(encoding='utf-8'))
+```
+
+做法与核对：从**远端 ee6eb33 的规范 blob** 导出到仓外目录，在字节层做这一处替换，
+逐行 diff 证明**全文件仅第 447 行不同**（469 行不变、CR 0、+16 B），得到
+**26690 B / `08559720b607a7cf503ff3ccf8daf787495ef8619ff3c3e1b3ee70b6f889887e`**，与审核方给的新身份一致。
+采集器仍 23430 B / `c98bb712…a726`，计算器、BIN、AXF、固件输入一字未动；未编译、未烧录。
+其余三处 `read_text()`（第 90/239/262 行，读 ledger）**不在授权范围**，保持原样未顺手改。
+
+**默认码页复跑（不依赖 `PYTHONUTF8=1`）**：运行环境实测 `sys.flags.utf8_mode=0`、
+`locale.getpreferredencoding(False)=cp936`（见 `default_codepage_environment.txt`），结果：
+
+| 套件 | rc | 计数 | 与云端记录 |
+|---|---|---|---|
+| `--selftest` | 0 | 37/37 | 相等 |
+| `--selftest-continuation`（固定 24ab5a7 proof） | 0 | 11/11 | 相等 |
+| `--selftest-static-port` | 0 | **9/9** | 相等 |
+
+同时把 API 桩探针对着交付的采集器（字节未变）重跑一次：`SetCommState` **5→0**，与云端记录相等；
+独立编码安全静态检查仍 rc 0；导入采集器后 `serial`/`pyocd` 仍不在 `sys.modules`。
+原始件为 `*_after_loc_fix.*` 与 `default_codepage_environment.txt`，共 7 件；
+**先前的原生 8/9 失败件、`PYTHONUTF8=1` 9/9 件、两次板级失败与 62 B base64 全部原样保留**。
+
+来源等级说明：审核方那句"CP936 默认模型中修前 8/9、修后 9/9"是**云端离线**结论；
+本节是本机 Windows 默认码页的**真实执行**，两者并列，不互相替代，也都不冒充板级结果。
+
+## 12. 停点（单行补正后）
+
+```text
+R2_LOC_FIXED_BY_THE_APPROVED_SINGLE_LINE(verifier 08559720/26690, collector unchanged c98bb712/23430)
+DEFAULT_CODE_PAGE_CP936_UTF8MODE_0: 37_OF_37_AND_11_OF_11_AND_9_OF_9_ALL_RC_0 / OUTPUTS_EQUAL_CLOUD_RECORDS
+API_STUB_5_TO_0_RE_RUN_AGAINST_THE_DELIVERED_COLLECTOR / PRIOR_FIRST_FAILURES_KEPT_UNMODIFIED
+NO_C_OR_FIRMWARE_CHANGE / NO_KEIL / NO_FLASH / DEVICE_ACTIONS=[] / COM5_OPENS=0
+FIELD_PACKAGE_SCOPE_UNCHANGED_AND_NOT_APPROVED_YET
+```
+
+现场范围沿用原 R2 包（一次 COM5、七次查询、四个电压读数，首条严格通过后同会话继续；零烧录/DAP/复位/电机）。
+本轮回执**不含**该包的新现场批准，故不打开串口；待你批准后再执行。

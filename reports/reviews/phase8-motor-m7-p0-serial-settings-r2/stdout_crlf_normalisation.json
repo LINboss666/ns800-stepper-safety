@@ -114,6 +114,55 @@
       "original_sha256": "c63c693067875b134549e146e81d80931292ac99d1813e25abda343837a408c4",
       "normalised_bytes": 624,
       "normalised_sha256": "f3927edbf54087afc749d3bd2684dc1a1d31105c737df28db7c123af28782d11"
+    },
+    "selftest11_default_codepage_after_loc_fix.stdout.txt": {
+      "original_bytes": 713,
+      "cr_bytes": 13,
+      "original_sha256": "22897c2c0b05e320754e7124128807bbd60ac86ff358fff33b292191a2d16d42",
+      "normalised_bytes": 700,
+      "normalised_sha256": "b70ac2628ca8a5c47ae38f8408e42b9c027ffaa6b67da9ad54bd908fba3b551f"
+    },
+    "selftest37_default_codepage_after_loc_fix.stdout.txt": {
+      "original_bytes": 2756,
+      "cr_bytes": 56,
+      "original_sha256": "f82481cd4f3424744b47280d254ce240cf8d52c35965edb9a84461c35e8132b6",
+      "normalised_bytes": 2700,
+      "normalised_sha256": "2a84a5a468babb3b8f5024b1e6289a71e258ea9f67c6cf5658d4c4c4cf519aee"
+    },
+    "static9_default_codepage_after_loc_fix.stdout.txt": {
+      "original_bytes": 636,
+      "cr_bytes": 12,
+      "original_sha256": "c63c693067875b134549e146e81d80931292ac99d1813e25abda343837a408c4",
+      "normalised_bytes": 624,
+      "normalised_sha256": "f3927edbf54087afc749d3bd2684dc1a1d31105c737df28db7c123af28782d11"
+    },
+    "static_port_substance_after_loc_fix.stdout.txt": {
+      "original_bytes": 555,
+      "cr_bytes": 10,
+      "original_sha256": "5f79497e62ccb2749e9f6e1d1d6ff07295d7d23f10776aba87135087b912d20d",
+      "normalised_bytes": 545,
+      "normalised_sha256": "79c9962228e8c2657ba57d1d5c491e14cf2b195a1510eac34938c00f6c024883"
+    },
+    "transport_import_guard_after_loc_fix.txt": {
+      "original_bytes": 48,
+      "cr_bytes": 1,
+      "original_sha256": "95fbe2873d7f62994014b7e83a85ac99a432e0deb406a7821030e16ce2d92a44",
+      "normalised_bytes": 47,
+      "normalised_sha256": "1ee9bff20cb5022181ed115f6ebf2d08c5c610576c0ac4e5d743359d6d3f9a51"
+    },
+    "upstream35_probe_after_loc_fix.stdout.txt": {
+      "original_bytes": 609,
+      "cr_bytes": 4,
+      "original_sha256": "f989ba2a41780f45e9171d7b4998fbc360e53ab4349e0c6affe38bcf7684cfc9",
+      "normalised_bytes": 605,
+      "normalised_sha256": "d7301b7840f80878bc5f8b35cc011d0fdee7b5c59b2a8ab4e3c01215dd5917ce"
+    },
+    "default_codepage_environment.txt": {
+      "original_bytes": 106,
+      "cr_bytes": 1,
+      "original_sha256": "96008f7c4cbe758162bcfb2181d8a6f681f00a51f5c4772ca75253794f05e3e0",
+      "normalised_bytes": 105,
+      "normalised_sha256": "046836250db5eb15d0b092a56e54a2847ae996e1cb58c844a349305cec62bb69"
     }
   },
   "note": "written with newline='\n'; this file itself contains no CR"

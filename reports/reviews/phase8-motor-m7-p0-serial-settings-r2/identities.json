@@ -154,6 +154,67 @@
   "resets": 0,
   "target_flash_read": 0
  },
+ "r2_loc_single_line_follow_up": {
+  "applied_on": "canonical LF blob exported from remote ee6eb33 into a repo-external directory; core.autocrlf never used for the comparison",
+  "calculator_and_images_untouched": true,
+  "change": {
+   "after": "tree=ast.parse(Path(m.__file__).read_text(encoding='utf-8'))",
+   "before": "tree=ast.parse(Path(m.__file__).read_text())",
+   "differing_lines_in_the_whole_file": 1,
+   "file": "reports/reviews/phase8-motor-m7-current-calibration-r2/verify_p0_candidate.py",
+   "line": 447,
+   "other_read_text_sites_left_untouched": [
+    90,
+    239,
+    262
+   ]
+  },
+  "cloud_claim_not_adopted": "the reviewer verified 8/9->9/9 in a CP936-default model; this section records the real Windows default-code-page run, which is a separate source grade",
+  "collector_untouched": {
+   "bytes": 23430,
+   "sha256": "c98bb712bd454dd66ffabece49b8998075642b5cca4d07c85073a3508d90a726"
+  },
+  "device_actions": [],
+  "field_package": "unchanged scope: one COM5 open, seven queries, four voltage readings, same-session continuation after the first strict pass; no flash, DAP, reset or motor action. NOT executed - this reply carries no new field approval",
+  "prior_records_kept": "the native 8/9 failure stdout, the PYTHONUTF8 9/9 run, the first two board failures and the 62 B base64 are all still present unmodified",
+  "requested_by": "user reply 2026-10-30: option (b), only this one line, then back into the original P0 package; no full rework round, no separate GO registration",
+  "results_default_code_page_no_pythonutf8": {
+   "11_equals_cloud_record": true,
+   "37_equals_cloud_record": true,
+   "api_stub_probe_re_run": {
+    "SetCommState_before_after": [
+     5,
+     0
+    ],
+    "equals_cloud_record": true,
+    "rc": 0
+   },
+   "counts": "37/37, 11/11, 9/9",
+   "independent_encoding_safe_substance_check_rc": 0,
+   "no_transport_import": true,
+   "rc": {
+    "selftest11": 0,
+    "selftest37": 0,
+    "static_port": 0
+   },
+   "static9_stdout_equals_cloud_record": true
+  },
+  "run_environment": {
+   "filesystem_encoding": "utf-8",
+   "preferred_encoding": "cp936",
+   "python": "3.12.5",
+   "utf8_mode_flag": 0
+  },
+  "verifier": {
+   "cr_bytes": 0,
+   "delta_bytes": 16,
+   "expected_from_the_reply": "08559720b607a7cf503ff3ccf8daf787495ef8619ff3c3e1b3ee70b6f889887e",
+   "post_bytes": 26690,
+   "post_sha256": "08559720b607a7cf503ff3ccf8daf787495ef8619ff3c3e1b3ee70b6f889887e",
+   "pre_bytes": 26674,
+   "pre_sha256": "99a449f6d80ee2999916b34acfaf6aa5f462f40b1bd7bdd871a4aba366ff8a45"
+  }
+ },
  "remote_blob_readback": {
   "calculator_blob": {
    "bytes": 54267,

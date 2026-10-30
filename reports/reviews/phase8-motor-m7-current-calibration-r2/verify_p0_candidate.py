@@ -444,7 +444,7 @@ def run_static_port(m):
     ck('P0C07-single-LF-before-prompt-healthy',lambda:run_query(clean.replace(b'\r\n',b'\n')))
     ck('P0C08-embedded-bare-CR-remains-rejected',lambda:run_query(clean.replace(b'state=READY',b'sta\rte=READY'),False))
     def ctor():
-        tree=ast.parse(Path(m.__file__).read_text())
+        tree=ast.parse(Path(m.__file__).read_text(encoding='utf-8'))
         calls=[n for n in ast.walk(tree) if isinstance(n,ast.Call) and isinstance(n.func,ast.Attribute)
                and isinstance(n.func.value,ast.Name) and n.func.value.id=='serial' and n.func.attr=='Serial']
         assert len(calls)==1

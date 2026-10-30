@@ -114,3 +114,37 @@ SOFTWARE_CALL_PATH_PROVEN / PHYSICAL_CAUSE_NOT_CLOSED / VOLTAGE_DATA_NOT_OBTAINE
 NO_C_OR_FIRMWARE_CHANGE / NO_KEIL / NO_FLASH / DEVICE_ACTIONS=[] / COM5_OPENS=0
 AWAITING_R2_LOC_DECISION_AND_A_SEPARATE_USER_APPROVAL_FOR_THE_FIELD_PACKAGE
 ```
+
+## 11. 裁决与单行补正（追加，上文不改）
+
+审核方选 **(b)**：只补验证器那一行，随后直接接回原 P0 包，不再开完整返修轮，也不单开 GO 登记。
+并明确定性为"这是我提供的验证器漏写编码，属于测试工具问题"，另引 Python 官方文档区分默认编码与显式编码。
+
+[verify_p0_candidate.py:447](file:///D:/ns800/reports/reviews/phase8-motor-m7-current-calibration-r2/verify_p0_candidate.py#L447)：
+
+```text
+-        tree=ast.parse(Path(m.__file__).read_text())
++        tree=ast.parse(Path(m.__file__).read_text(encoding='utf-8'))
+```
+
+从远端 ee6eb33 的规范 blob 导出、在仓外做这一处字节替换、逐行 diff 证明全文件仅第 447 行不同，
+得 **26690 B / 08559720b607a7cf503ff3ccf8daf787495ef8619ff3c3e1b3ee70b6f889887e**，与审核方给的新身份一致；
+采集器仍 23430 B / c98bb712…a726，计算器/镜像/固件输入未动。第 90/239/262 行那三处 `read_text()` 不在授权范围，未顺手改。
+
+**默认码页复跑**（实测 `utf8_mode=0`、`locale.getpreferredencoding=False`=`cp936`，不依赖 `PYTHONUTF8=1`）：
+37/37 rc 0、11/11 rc 0、**static 9/9 rc 0**，三份 stdout 与云端记录逐字节相等；
+API 桩对着交付采集器重跑仍 **5→0**；独立编码安全检查仍 rc 0。
+原生 8/9 失败件、`PYTHONUTF8=1` 9/9 件、两次板级失败与 62 B base64 **全部原样保留**。
+来源等级并列声明：审核方的 CP936 模型结论属云端离线；本节是本机 Windows 默认码页的真实执行；两者都不冒充板级结果。
+
+## 12. 停点
+
+```text
+R2_LOC_FIXED_BY_THE_APPROVED_SINGLE_LINE(verifier 08559720/26690; collector unchanged c98bb712/23430)
+DEFAULT_CODE_PAGE_CP936_UTF8MODE_0 / 37+11+9_ALL_GREEN_RC0 / OUTPUTS_EQUAL_CLOUD_RECORDS / API_5_TO_0_RE-RUN
+NO_C_OR_FIRMWARE_CHANGE / NO_KEIL / NO_FLASH / DEVICE_ACTIONS=[] / COM5_OPENS=0
+FIELD_PACKAGE_SCOPE_UNCHANGED_AND_NOT_APPROVED_YET
+```
+
+现场范围沿用原 R2 包（一次 COM5、七次查询、四个电压读数，首条严格通过后同会话继续；零烧录/DAP/复位/电机）。
+你这句回执里没有该包的新现场批准，所以我没有打开串口——要执行请给 §7.4 那句批准文字。

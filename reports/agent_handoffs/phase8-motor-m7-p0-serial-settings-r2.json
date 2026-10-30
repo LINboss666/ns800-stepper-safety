@@ -5,7 +5,7 @@
     "firmware_code_commit": "5b564eb962e8518920f581111d7a460a2b1fce64",
     "prior_board_commit_pinned_by_the_collector": "24ab5a7c1cff259b209f78fcb1abbb5f48271581",
     "baseline_before_this_round": "8bade29677dd3f2395cfd92ce28b9cd7206c89e2",
-    "script_code_commit": "01f0e429581bdb507910b1061bb914254d1079af",
+    "script_code_commit": "ee6eb337b4ed48d354e575cf884cb3a2d7c102c8 for the R2 candidate pair; the one-line verifier follow-up is its own single commit whose hash is reported to the reviewer instead of being self-recorded, so no manifest hashes its own bytes",
     "delivery_head": "the docs commit that follows this one; the scripts were already committed and pushed as 01f0e42 and are never self-referenced",
     "reviewed_cloud_baseline": "280ca815c89419184a457fd6334942c9b543d5b1"
   },
@@ -281,32 +281,33 @@
     "verbatim_approval_needed": "批准按本包精确补丁修正并执行一次P0串口对照续测：离线前置通过后允许COM5打开1次、七次固定查询和四个电压读数；首条严格通过则同会话继续P0。禁止下载、目标Flash读取、DAP、主动复位、电机动作、改配置及重试。"
   },
   "acceptance_status": {
-    "exact_byte_acceptance": "MET (both hashes, images and calculator unchanged, no firmware change, no build)",
+    "exact_byte_acceptance": "MET for the collector (c98bb712/23430, unchanged) and for the corrected verifier (08559720/26690)",
     "offline_37_and_11": "MET natively on Windows with output byte-equal to the cloud record",
-    "offline_9": "MET only under PYTHONUTF8=1 on this host; natively 8/9 because of R2-LOC",
+    "offline_9": "MET natively on the Windows default code page (cp936, utf8_mode=0) after the approved single-line verifier fix; 9/9 with output byte-equal to the cloud record",
     "api_stub_5_to_0": "MET, byte-equal to the cloud record, with the candidate taken from the local Git blob",
     "self_granted_go": false,
     "decision_requested": [
-      "(a) accept PYTHONUTF8=1 plus the independent encoding-safe check as this round's Windows reading",
-      "(b) issue a verifier candidate with read_text(encoding='utf-8') for a new exact-byte acceptance"
+      "none - option (b) was chosen and executed"
     ]
   },
   "open": [
     "same-board A/B under the corrected collector (needs one new COM5 approval)",
-    "R2-LOC correction decision above",
     "the three read_text sites listed under same_pattern_seen_untouched (read-only follow-up, not fixed here)",
     "M6 and other candidates were not batch-fixed; only listed as readable follow-ups",
     "P1 METHOD_NOT_READY, P2 NOT_AUTHORIZED, oscilloscope/A0 still deferred"
   ],
-  "next_step": "STOP for reviewer decision on R2-LOC plus, separately, the user's one approval for the field package; no device action will be taken without it",
+  "next_step": "STOP: the field package still needs the user approval for one COM5 open, seven queries and four voltage readings. Nothing was flashed, built or connected in this reply.",
   "evidence": {
     "dir": "reports/reviews/phase8-motor-m7-p0-serial-settings-r2",
     "files": [
       "SHA256SUMS.txt",
       "check_static_port_substance.py",
+      "default_codepage_environment.txt",
       "identities.json",
       "make_identities.py",
       "run_record.md",
+      "selftest11_default_codepage_after_loc_fix.stderr.txt",
+      "selftest11_default_codepage_after_loc_fix.stdout.txt",
       "selftest11_from_remote_blob_fromblob_native.stderr.txt",
       "selftest11_from_remote_blob_fromblob_native.stdout.txt",
       "selftest11_from_remote_blob_fromblob_utf8.stderr.txt",
@@ -315,6 +316,8 @@
       "selftest11_windows.stdout.txt",
       "selftest11_windows_utf8mode.stderr.txt",
       "selftest11_windows_utf8mode.stdout.txt",
+      "selftest37_default_codepage_after_loc_fix.stderr.txt",
+      "selftest37_default_codepage_after_loc_fix.stdout.txt",
       "selftest37_from_remote_blob_fromblob_native.stderr.txt",
       "selftest37_from_remote_blob_fromblob_native.stdout.txt",
       "selftest37_from_remote_blob_fromblob_utf8.stderr.txt",
@@ -324,6 +327,9 @@
       "selftest37_windows_utf8mode.stderr.txt",
       "selftest37_windows_utf8mode.stdout.txt",
       "selftest_rcs.txt",
+      "selftest_rcs_after_loc_fix.txt",
+      "static9_default_codepage_after_loc_fix.stderr.txt",
+      "static9_default_codepage_after_loc_fix.stdout.txt",
       "static9_from_remote_blob_fromblob_native.stderr.txt",
       "static9_from_remote_blob_fromblob_native.stdout.txt",
       "static9_from_remote_blob_fromblob_utf8.stderr.txt",
@@ -334,10 +340,15 @@
       "static9_windows_utf8mode.stdout.txt",
       "static_port_substance.stderr.txt",
       "static_port_substance.stdout.txt",
+      "static_port_substance_after_loc_fix.stderr.txt",
+      "static_port_substance_after_loc_fix.stdout.txt",
       "static_port_substance_negative_control.txt",
       "stdout_crlf_normalisation.json",
+      "transport_import_guard_after_loc_fix.txt",
       "upstream35_probe.stderr.txt",
       "upstream35_probe.stdout.txt",
+      "upstream35_probe_after_loc_fix.stderr.txt",
+      "upstream35_probe_after_loc_fix.stdout.txt",
       "upstream35_probe_default_locale.stderr.txt",
       "upstream35_probe_default_locale.stdout.txt"
     ]
@@ -351,6 +362,86 @@
     "SOFTWARE_CALL_PATH_PROVEN / PHYSICAL_CAUSE_NOT_CLOSED / VOLTAGE_DATA_NOT_OBTAINED",
     "NO_C_OR_FIRMWARE_CHANGE / NO_KEIL / NO_FLASH / DEVICE_ACTIONS=[] / COM5_OPENS=0",
     "REMOTE_BLOB_READBACK_OK / EVERY SCRIPT IMAGE PROOF AND EVIDENCE BLOB RECOMPUTED FROM THE PUSHED REF / SELFTESTS RE-RUN FROM THOSE REMOTE BYTES REPRODUCE THE SAME LOCALE SPLIT",
-    "AWAITING_R2_LOC_DECISION_AND_A_SEPARATE_USER_APPROVAL_FOR_THE_FIELD_PACKAGE"
-  ]
+    "AWAITING_R2_LOC_DECISION_AND_A_SEPARATE_USER_APPROVAL_FOR_THE_FIELD_PACKAGE",
+    "R2_LOC_FOLLOW_UP_APPLIED_AS_THE_APPROVED_SINGLE_LINE / verifier 08559720b607a7cf503ff3ccf8daf787495ef8619ff3c3e1b3ee70b6f889887e 26690, whole-file diff = line 447 only",
+    "DEFAULT_CODE_PAGE_RUN_cp936_UTF8MODE_0 / 37_OF_37_AND_11_OF_11_AND_9_OF_9_RC_0 / OUTPUTS_BYTE_EQUAL_TO_CLOUD_RECORDS",
+    "COLLECTOR_AND_FIRMWARE_AND_IMAGES_UNCHANGED / OTHER_READ_TEXT_SITES_LEFT_UNTOUCHED_AS_OUT_OF_SCOPE / PRIOR_FIRST_FAILURES_KEPT",
+    "API_STUB_5_TO_0_RE_RUN_AGAINST_THE_DELIVERED_COLLECTOR / DEVICE_ACTIONS=[] / COM5_OPENS=0 / FIELD_PACKAGE_NOT_APPROVED_YET"
+  ],
+  "r2_loc_follow_up": {
+    "applied_on": "canonical LF blob exported from remote ee6eb33 into a repo-external directory; core.autocrlf never used for the comparison",
+    "calculator_and_images_untouched": true,
+    "change": {
+      "after": "tree=ast.parse(Path(m.__file__).read_text(encoding='utf-8'))",
+      "before": "tree=ast.parse(Path(m.__file__).read_text())",
+      "differing_lines_in_the_whole_file": 1,
+      "file": "reports/reviews/phase8-motor-m7-current-calibration-r2/verify_p0_candidate.py",
+      "line": 447,
+      "other_read_text_sites_left_untouched": [
+        90,
+        239,
+        262
+      ]
+    },
+    "cloud_claim_not_adopted": "the reviewer verified 8/9->9/9 in a CP936-default model; this section records the real Windows default-code-page run, which is a separate source grade",
+    "collector_untouched": {
+      "bytes": 23430,
+      "sha256": "c98bb712bd454dd66ffabece49b8998075642b5cca4d07c85073a3508d90a726"
+    },
+    "device_actions": [],
+    "field_package": "unchanged scope: one COM5 open, seven queries, four voltage readings, same-session continuation after the first strict pass; no flash, DAP, reset or motor action. NOT executed - this reply carries no new field approval",
+    "prior_records_kept": "the native 8/9 failure stdout, the PYTHONUTF8 9/9 run, the first two board failures and the 62 B base64 are all still present unmodified",
+    "requested_by": "user reply 2026-10-30: option (b), only this one line, then back into the original P0 package; no full rework round, no separate GO registration",
+    "results_default_code_page_no_pythonutf8": {
+      "11_equals_cloud_record": true,
+      "37_equals_cloud_record": true,
+      "api_stub_probe_re_run": {
+        "SetCommState_before_after": [
+          5,
+          0
+        ],
+        "equals_cloud_record": true,
+        "rc": 0
+      },
+      "counts": "37/37, 11/11, 9/9",
+      "independent_encoding_safe_substance_check_rc": 0,
+      "no_transport_import": true,
+      "rc": {
+        "selftest11": 0,
+        "selftest37": 0,
+        "static_port": 0
+      },
+      "static9_stdout_equals_cloud_record": true
+    },
+    "run_environment": {
+      "filesystem_encoding": "utf-8",
+      "preferred_encoding": "cp936",
+      "python": "3.12.5",
+      "utf8_mode_flag": 0
+    },
+    "verifier": {
+      "cr_bytes": 0,
+      "delta_bytes": 16,
+      "expected_from_the_reply": "08559720b607a7cf503ff3ccf8daf787495ef8619ff3c3e1b3ee70b6f889887e",
+      "post_bytes": 26690,
+      "post_sha256": "08559720b607a7cf503ff3ccf8daf787495ef8619ff3c3e1b3ee70b6f889887e",
+      "pre_bytes": 26674,
+      "pre_sha256": "99a449f6d80ee2999916b34acfaf6aa5f462f40b1bd7bdd871a4aba366ff8a45"
+    },
+    "evidence_files_added": [
+      "default_codepage_environment.txt",
+      "selftest11_default_codepage_after_loc_fix.stderr.txt",
+      "selftest11_default_codepage_after_loc_fix.stdout.txt",
+      "selftest37_default_codepage_after_loc_fix.stderr.txt",
+      "selftest37_default_codepage_after_loc_fix.stdout.txt",
+      "selftest_rcs_after_loc_fix.txt",
+      "static9_default_codepage_after_loc_fix.stderr.txt",
+      "static9_default_codepage_after_loc_fix.stdout.txt",
+      "static_port_substance_after_loc_fix.stderr.txt",
+      "static_port_substance_after_loc_fix.stdout.txt",
+      "transport_import_guard_after_loc_fix.txt",
+      "upstream35_probe_after_loc_fix.stderr.txt",
+      "upstream35_probe_after_loc_fix.stdout.txt"
+    ]
+  }
 }
