@@ -218,7 +218,8 @@
     "CONSOLE_STREAM_INTEGRITY_UNRESOLVED / APPROVAL_QUOTA_CONSUMED / ROOT_CAUSE_NOT_DETERMINED",
     "SECOND_ATTEMPT_ON_ORIGINAL_PORT / SAME_SIGNATURE / USB_PORT_EXCLUDED_AS_CAUSE",
     "DISCRIMINATOR_RESULT / SAME_BOARD_AND_LINE_BYTE_IDENTICAL_UNDER_HISTORICAL_CONFIG / USB_PORT_AND_CONCURRENT_PRINTER_EXCLUDED",
-    "TERMINATOR_EXONERATED / SINGLE_CR_REPLY_BYTE_CLEAN / COLLECTOR_CHANNEL_PATH_REMAINS_THE_ONLY_UNEXCLUDED_DIFFERENCE"
+    "TERMINATOR_EXONERATED / SINGLE_CR_REPLY_BYTE_CLEAN / COLLECTOR_CHANNEL_PATH_REMAINS_THE_ONLY_UNEXCLUDED_DIFFERENCE",
+    "COLLECTOR_CHANNEL_AND_READ_SHAPE_REPRODUCED_THE_DAMAGE / PER_CHUNK_FSYNC_EXONERATED_BY_FIRST_READ / GARBAGE_NOT_RANDOM"
   ],
   "second_attempt_after_port_restore": {
     "date": "2026-10-30 20:18",
@@ -344,6 +345,44 @@
       "cr_variant_verdict.json",
       "cr_variant_01_safety_state.rx.bin.b64",
       "run_evidence.md section 10A"
+    ]
+  },
+  "collector_read_path_reproduction": {
+    "user_authorisation": "user: 繼續 (one further single-variable probe)",
+    "method": "historical harness with exactly two things replaced by the accepted collector shape: the Serial() kwargs (timeout=0.1, write_timeout=2.0, explicit xonxoff/rtscts/dsrdtr=False) and the capture loop (per-iteration timeout, read(min(512,left)), write+flush+fsync per chunk before deciding). Terminator stayed a single CR, the 45 s zero-send silence stayed, one port open, one command.",
+    "result": {
+      "bytes": 61,
+      "sha256": "2f11b23967cded4ab9d69228d3b342c5f5c6477b0aa77a523267ffc3da6452ff",
+      "non_ascii_bytes": 4,
+      "exact_clean_line_present": false,
+      "in_memory_equals_disk": true,
+      "middle_observed": "[SS] st + d1 95 f5 54 11 65 81 (6 head bytes intact, then 10 B became 7 B)"
+    },
+    "new_facts": {
+      "damage_reproduced_with_collector_channel_and_read_shape": "3/3 attempts using it damaged, 2/2 attempts using the historical channel and read shape came back byte-clean, same board, same restored port, minutes apart",
+      "per_chunk_fsync_exonerated": "the whole 61-byte reply arrived inside the first read() call and was already damaged, so writing/fsyncing chunks cannot have caused it",
+      "garbage_is_not_random": "the byte run d1 95 f5 recurs verbatim in collector attempt 2 and in this probe, and the damaged prefix [SS] st stayed exact while 10 bytes collapsed to 7 - compatible with a bit-window/framing resynchronisation, not with random noise or a trashed memory"
+    },
+    "remaining_split": "only two sub-variables are left inside this bundle: the Serial() kwargs (timeout=0.1 and the explicit flow-control flags, hence the modem-line state at open) versus the blocking read(min(512,...)) call itself. Each needs one port open.",
+    "p0_path_note": "a collector read change to the twice-proven-clean shape (read(max(1,in_waiting)), timeout=0.05), leaving the single-CR contract, persist-before-decide, frame-end gate and the seven-send quota untouched, would be enough to finish P0 - but it edits accepted judge bytes and is therefore a review decision, not something this agent does",
+    "quota_this_probe": {
+      "com5_opens": 1,
+      "commands_sent": 1,
+      "dap": 0,
+      "resets": 0,
+      "flashes": 0,
+      "target_flash_reads": 0,
+      "motor_actions": 0,
+      "config_writes": 0,
+      "retries": 0
+    },
+    "collector_bytes_unchanged": true,
+    "evidence": [
+      "readpath_probe.py",
+      "readpath_probe_run_log.txt",
+      "readpath_probe_verdict.json",
+      "readpath_probe_01_safety_state.rx.bin.b64",
+      "run_evidence.md section 10B"
     ]
   }
 }

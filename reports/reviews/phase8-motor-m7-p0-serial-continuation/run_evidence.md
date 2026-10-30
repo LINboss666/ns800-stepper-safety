@@ -260,3 +260,51 @@ msh >
 
 本轮额度：选项 1 与随后"继续"各一次打开（共 2 次），全部只发 `safety_state`，
 无 DAP、无复位、无烧录、无写配置、无电机、无重试；采集器字节未改。
+
+## 10B. 单变量翻转结果：采集器那套通道+读循环**复现损坏**
+
+只改两处（其余与 10A 的干净工装完全相同：单 CR、45 s 零发送静默、同一命令、一次打开）：
+
+1. `Serial()` 用采集器的 kwargs：`bytesize=8, parity='N', stopbits=1, timeout=.1,
+   write_timeout=2.0, xonxoff=False, rtscts=False, dsrdtr=False`；
+2. 读循环用采集器 `capture()` 的形状：每圈重设 `port.timeout=min(.1, 剩余)` +
+   `read(min(512, 余量))` + 每块 `write/flush/fsync` 到独占文件后再判定。
+
+```text
+PASSIVE_SILENCE_OK seconds=45
+TX safety_state bytes_written=13 terminator=single CR
+CHUNK size=61 total=61 sha_so_far=2f11b23967cded4ab9d69228d3b342c5f5c6477b0aa77a523267ffc3da6452ff
+VERDICT bytes_on_disk=61 non_ascii_bytes=4 exact_clean_line_present=false in_memory_equals_disk=true
+
+safety_state^M
+[SS] stM-QM-^UM-uT^QeM-^Afault_code=0 degraded=0x00^M
+msh >
+```
+
+对齐看损坏位置（同一段 `[SS] state=READY` 上下文）：
+
+| 采样 | 通道+读法 | 实到中位 |
+|---|---|---|
+| 4 | 历史 | `5b 53 53 5d 20 73 74 61 74 65 3d`（完整） |
+| 5 | 历史 + 单 CR | `5b 53 53 5d 20 73 74 61 74 65 3d`（完整） |
+| 2 | 采集器 | `4d 4d 75 81 73 74 d1 95 f5` |
+| 3 | 采集器 | `5b aa 05 9a 61 74 65 3d` |
+| 6 | **本次** | `5b 53 53 5d 20 73 74` + `d1 95 f5 54 11 65 81`（`[SS] st` 完好，之后 10 B 变 7 B） |
+
+由此新增三条硬事实：
+
+- **复现成功**：3/3 用采集器这套通道+读法都坏，2/2 用历史这套都干净；同一条物理通路、
+  同一个 USB 口、相隔几分钟。**触发量在 PC 侧的打开/读取配置里，不在板子控制台内部、
+  不在链路上、不在终止符上。**
+- **每块 fsync 被排除**：整份 61 字节响应在**第一次 `read()` 里就到齐且已损坏**，
+  所以"写文件/fsync 拖慢读取"不可能是原因。剩下的子束只有两个：`Serial()` 的 kwargs
+  （含 `timeout=0.1` 与显式流控标志/调制线状态）与 `read(min(512,…))` 这个阻塞式读法。
+- **垃圾不是随机噪声**：`d1 95 f5` 这三字节在第 2 次与本次**逐字节重复出现**，
+  且这次前 6 字节 `[SS] st` 完好、随后 10 B 缩成 7 B —— 形状与"采样位窗错位/流控把发送方
+  在中途掐停后重同步"相容，与随机噪声或内存被踩不相容。
+
+尚未做、代价各为一次打开的下一刀（二选一即可继续收窄）：
+(a) 只换 kwargs、读法仍用 `in_waiting`；(b) 只换读法、kwargs 仍用历史式。
+另有一条不查根因但能直接推进 P0 的路径：把采集器的读法改成已被两次证明干净的
+`read(max(1, in_waiting))` + `timeout=0.05`，其余合同（单 CR、先落盘后判定、帧尾判据、
+七次发送额度）一字不动——这属于修改判据字节，必须交复审决定，我不自行改。

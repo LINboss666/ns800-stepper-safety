@@ -1,0 +1,9 @@
+{"kind": "OPEN_ATTEMPT", "t": 9620.39, "port": "COM5", "kwargs": "collector shape: timeout=0.1 write_timeout=2.0 xonxoff/rtscts/dsrdtr=False"}
+{"kind": "OPENED", "t": 9620.39}
+{"kind": "PASSIVE_SILENCE_OK", "t": 9665.687, "seconds": 45.0}
+{"kind": "TX", "t": 9665.687, "command": "safety_state", "bytes_written": 13, "terminator": "single CR"}
+{"kind": "CHUNK", "t": 9665.812, "size": 61, "total": 61, "sha_so_far": "2f11b23967cded4ab9d69228d3b342c5f5c6477b0aa77a523267ffc3da6452ff"}
+{"kind": "PROMPT_TAIL_SEEN", "t": 9665.812}
+{"kind": "CLOSED", "t": 9678.906}
+{"kind": "VERDICT", "t": 9678.906, "bytes_on_disk": 61, "sha256_on_disk": "2f11b23967cded4ab9d69228d3b342c5f5c6477b0aa77a523267ffc3da6452ff", "in_memory_equals_disk": true, "non_ascii_bytes": 4, "exact_clean_line_present": false}
+DONE
