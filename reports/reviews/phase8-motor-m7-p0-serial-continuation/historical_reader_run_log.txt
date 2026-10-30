@@ -1,0 +1,8 @@
+{"kind": "OPEN_ATTEMPT", "t": 8492.203, "port": "COM5", "baud": 115200, "timeout": 0.05}
+{"kind": "OPENED", "t": 8492.203}
+{"kind": "PASSIVE_SILENCE_OK", "t": 8537.437, "seconds": 45.0}
+{"kind": "TX", "t": 8537.437, "command": "safety_state", "bytes_written": 14, "terminator": "CRLF"}
+{"kind": "RX", "t": 8537.968, "file": "01_safety_state.rx.bin", "bytes": 71, "sha256": "6a59468afb1f1684e77ecaf4ff723a69013c620215dc793b9667f8048361dacd", "response_bytes": 71, "quiet_period_end": true, "elapsed": 0.531}
+{"kind": "CLOSED", "t": 8537.968}
+{"kind": "VERDICT", "t": 8537.968, "exact_clean_line_present": true, "non_ascii_bytes": 0}
+DONE

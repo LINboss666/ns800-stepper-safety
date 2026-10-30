@@ -216,7 +216,8 @@
     "NO_VOLTAGE_OBSERVATION_OBTAINED / DMM_READINGS_TAKEN=0 / RESULT_JSON_ABSENT",
     "COM5_OPENS=1 DOWNLOADS=0 TARGET_FLASH_READS=0 DAP_ACTIONS=0 ACTIVE_RESETS=0 MOTOR_ACTIONS=0 RETRIES=0",
     "CONSOLE_STREAM_INTEGRITY_UNRESOLVED / APPROVAL_QUOTA_CONSUMED / ROOT_CAUSE_NOT_DETERMINED",
-    "SECOND_ATTEMPT_ON_ORIGINAL_PORT / SAME_SIGNATURE / USB_PORT_EXCLUDED_AS_CAUSE"
+    "SECOND_ATTEMPT_ON_ORIGINAL_PORT / SAME_SIGNATURE / USB_PORT_EXCLUDED_AS_CAUSE",
+    "DISCRIMINATOR_RESULT / SAME_BOARD_AND_LINE_BYTE_IDENTICAL_UNDER_HISTORICAL_CONFIG / USB_PORT_AND_CONCURRENT_PRINTER_EXCLUDED"
   ],
   "second_attempt_after_port_restore": {
     "date": "2026-10-30 20:18",
@@ -266,6 +267,48 @@
       "01_safety_state_try2.rx.bin.b64",
       "port_swap_and_three_capture_analysis.txt",
       "run_evidence.md section 8"
+    ]
+  },
+  "discriminator_with_historical_reader": {
+    "user_authorisation": "user: 按 1 继续 (option 1: re-capture with the historical read primitive)",
+    "correction_made_before_running": "the archived byte-clean M5 reply was itself captured with pyserial (m5_field_serial.py: serial.Serial(port,115200,timeout=0.05), read(max(1,in_waiting)), 0.5 s quiet-period end, CRLF terminator, reset_input_buffer before the write), not PowerShell, so the discriminator became \"reproduce that exact send/read configuration\" rather than \"switch to PowerShell\" - my earlier framing was wrong and is corrected here",
+    "device_actions": {
+      "com5_opens": 1,
+      "command_sends": 1,
+      "command": "safety_state",
+      "passive_zero_send_listen_seconds": 45,
+      "dap": 0,
+      "resets": 0,
+      "flashes": 0,
+      "target_flash_reads": 0,
+      "motor_actions": 0,
+      "config_writes": 0,
+      "retries": 0
+    },
+    "result": {
+      "reply_bytes": 71,
+      "reply_sha256": "6a59468afb1f1684e77ecaf4ff723a69013c620215dc793b9667f8048361dacd",
+      "identical_to_archived_m5_capture": true,
+      "non_ascii_bytes": 0,
+      "live_state_observed": "[SS] state=READY fault_code=0 degraded=0x00 (taken through a non-approved harness: evidence only, NOT a P0 gate pass)",
+      "passive_window_bytes": 0
+    },
+    "established": {
+      "usb_port_is_not_the_cause": true,
+      "no_concurrent_printer_on_an_idle_board": "45 s of complete silence with no send",
+      "board_and_current_image_can_emit_this_line_perfectly": true,
+      "remaining_difference": "the request/read configuration of the accepted collector, separable into (a) single CR versus CRLF and (b) fixed-512 plus per-chunk fsync versus in_waiting plus quiet-period completion",
+      "leading_candidate": "the terminator, because the garbage carries 0x02/0x05/0x09 which is the shape of line-editor or echo activity rather than memory corruption, while a PC-side read loop can lose or delay bytes but can hardly invent 0xaa/0x9a"
+    },
+    "not_claimed": "root cause - the next test must flip exactly one variable, not both",
+    "collector_bytes_unchanged": "0e02ccfcef178f0ceee9dc3fd5aeb17f7b9a3bb924e4b83bd7a0cecde9505467",
+    "harness_is_not_the_approved_collector": true,
+    "evidence_files": [
+      "historical_reader_probe.py",
+      "historical_reader_run_log.txt",
+      "historical_reader_verdict.json",
+      "historical_reader_01_safety_state.rx.bin.b64",
+      "run_evidence.md section 9"
     ]
   }
 }

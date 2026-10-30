@@ -127,3 +127,36 @@ b'safety_state\r\n[\xaa\x05\x9aate=READY fault_code=0 degraded=0x00\r\nmsh >'
 额度：用户第二次授权给出的是第二次仅串口额度，同样耗尽（COM5 1/1、发送尝试 1、接受 0、
 DMM 0/4、下载/DAP/复位/电机/配置写 0、重试 0）。板子未写入任何东西，串口已正常关闭；
 `e614a075…f7da` 在板的既有证明不受影响。P0 电压观察仍未取得。
+
+## 10. 判别实验（用户"按 1 继续"）追加
+
+跑之前先纠正我自己上一轮的错话：那条干净的 M5 原件**本来就是 pyserial 采的**
+（`m5_field_serial.py`：`serial.Serial(port,115200,timeout=0.05)` + `read(max(1,in_waiting))` +
+0.5 s 静默判完 + CRLF + 发送前 `reset_input_buffer()`），不是 PowerShell 链。
+所以判据改成"照抄这套历史发送/读取配置"，而不是"换语言"。
+
+一次 COM5 打开、一条只读命令，外加 **45 秒零发送被动监听**：
+
+```text
+PASSIVE_SILENCE_OK seconds=45          ← 静置板子什么都不打印
+TX safety_state 14 B (CRLF)  -> RX 71 B / 6a59468a…dacd   非 ASCII 字节 = 0
+   b'safety_state\r\n[SS] state=READY fault_code=0 degraded=0x00\r\nmsh >\r\nmsh >'
+与 reports/reviews/phase8-motor-m5-fault-log/cp1/final_pass/016_safety_state.bin cmp 全等
+```
+
+| 配置 | 结果 |
+|---|---|
+| 已接受 P0 采集器（单 CR；固定 512 B 读；每块 fsync；body-tag + 帧尾判完） | 62 B / 61 B，中段被替换，2/2 复现 |
+| 历史读取原语（CRLF；`in_waiting` 读；0.5 s 静默判完；发送前清缓冲） | **71 B 逐字节干净，且与 M5 原件全等** |
+
+确立：不是 USB 口（原口下两种配置一个干净一个坏）；不是并发打印者（静置 45 s 零字节，
+说明两次损坏时没有别的线程在写控制台）；当前镜像与这条物理通路**有能力**发出完全正确的该行。
+剩下的差异只在**已接受采集器的请求/读取配置**里，可拆成两个量：
+(a) 单 CR vs CRLF；(b) 固定 512+每块 fsync vs `in_waiting`+静默判完。
+目前更可疑的是 (a)：垃圾段含 `0x02/0x05/0x09`，那是行编辑/回显的形状而不是内存被踩的形状，
+而 PC 侧读法能丢、能迟，很难**凭空造出** `0xaa/0x9a`。**本轮仍不定根因**——下一次只翻一个量。
+
+边界：本次回包是经**非批准工装**取到的，只作证据；P0 的现时状态门（READY/fault0）**不算通过**，
+`result.json` 仍不存在。工装 `historical_reader_probe.py` 随证据入库并静态自检
+（`serial.Serial(` 1 次、`ser.write` 仅 `safety_state\r\n`、无 subprocess/pyOCD/复位），
+它不是被批准的 P0 采集器；采集器字节未动。

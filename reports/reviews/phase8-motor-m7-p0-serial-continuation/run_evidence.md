@@ -150,3 +150,50 @@ b'safety_state\r\n[\xaa\x05\x9aate=READY fault_code=0 degraded=0x00\r\nmsh >'
 用户"我授权你再试试"给出的是第二次仅串口额度，已同样耗尽：COM5 1/1、`TX_ATTEMPTS=1 ACCEPTED=0`、
 `DMM_READINGS_TAKEN=0`、无 `result.json`；下载 / 目标 Flash 读 / DAP / 主动复位 / 电机 / 配置写 = 0；重试 0。
 板子未被动过任何东西，串口已由采集器正常关闭；`e614a075…f7da` 在板的既有证明不受影响。
+
+## 9. 判别实验：改用 M5 当时的读取原语，同一块板回包逐字节干净
+
+用户授权的选项 1 落地时我做了一处纠正：那条干净的 M5 原件**也是 pyserial 采的**
+（`m5_field_serial.py`: `serial.Serial(port,115200,timeout=0.05)` + `read(max(1,in_waiting))` +
+0.5 s 静默判完 + CRLF 结束 + 发送前 `reset_input_buffer()`），不是 PowerShell 链。
+所以判别量改成"照抄这套历史读取/发送配置"，而不是换语言。
+
+一次 COM5 打开、一条只读命令，另加 **45 秒零发送被动监听**：
+
+```text
+{"kind": "OPEN_ATTEMPT", "t": 8492.203, "port": "COM5", "baud": 115200, "timeout": 0.05}
+{"kind": "OPENED", "t": 8492.203}
+{"kind": "PASSIVE_SILENCE_OK", "t": 8537.437, "seconds": 45.0}
+{"kind": "TX", "t": 8537.437, "command": "safety_state", "bytes_written": 14, "terminator": "CRLF"}
+{"kind": "RX", "t": 8537.968, "file": "01_safety_state.rx.bin", "bytes": 71, "sha256": "6a59468afb1f1684e77ecaf4ff723a69013c620215dc793b9667f8048361dacd", "response_bytes": 71, "quiet_period_end": true, "elapsed": 0.531}
+{"kind": "CLOSED", "t": 8537.968}
+{"kind": "VERDICT", "t": 8537.968, "exact_clean_line_present": true, "non_ascii_bytes": 0}
+DONE
+
+01_safety_state.rx.bin = 71 B / 6a59468afb1f1684e77ecaf4ff723a69013c620215dc793b9667f8048361dacd
+与 reports/reviews/phase8-motor-m5-fault-log/cp1/final_pass/016_safety_state.bin  cmp 全等
+```
+
+| 配置 | 结果 |
+|---|---|
+| 已接受 P0 采集器（单 CR、固定 512 B 读、每块 fsync、body-tag+帧尾判完） | 62 B / 61 B，中段被替换，2/2 复现 |
+| 历史读取原语（CRLF、in_waiting 读、0.5 s 静默判完、发送前清缓冲） | **71 B 逐字节干净** |
+
+由此确立与排除：
+
+- **不是 USB 口**：原口下两种配置同时成立，一个干净一个坏。
+- **不是并发打印者**：静置板子 45 秒零字节，说明两次损坏发生时没有任何别的线程在打印。
+- **板子与当前 M7-R1 镜像有能力输出完全正确的该行**（本次还顺带取到真实的现时状态：
+  `state=READY fault_code=0 degraded=0x00`，但它是**经非批准采集器**取到的，只作证据，不算 P0 门通过）。
+- 剩下的差异只在**已接受采集器的请求/读取配置**里，可分两个量：
+  (a) 终止符单 CR vs CRLF（改变 shell 自己往流里写什么；垃圾里出现 0x02/0x05/0x09=TAB 这类控制值，
+      与行编辑/回显活动的形状相容）；
+  (b) 读循环（固定 512 B + 每块 fsync vs in_waiting + 静默判完）——PC 侧读法能丢/能迟，
+      但**凭空造出** 0xaa/0x9a 很难解释，排位明显低于 (a)。
+- 本轮**不宣布根因**：下一步应当只翻一个量（单 CR + 历史读法，或 CRLF + 采集器读法）各一次打开，
+  而不是同时改。
+
+额度：用户批准的选项 1 已用掉（COM5 1/1、只读命令 1 条、被动监听 45 s、无发送其它命令、
+无 DAP/复位/烧录/写配置/电机、重试 0）。采集器字节未改（仍 `0e02ccfc…5467`）。
+判别工装 `historical_reader_probe.py` 随证据入库，但它**不是**被批准的 P0 采集器，
+静态自检：`serial.Serial(` 1 次、`ser.write` 1 次且内容为 `safety_state\r\n`、无 subprocess、无 pyOCD、无复位。
