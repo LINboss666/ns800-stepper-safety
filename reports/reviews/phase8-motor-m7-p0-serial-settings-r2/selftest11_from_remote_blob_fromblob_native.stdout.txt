@@ -1,0 +1,13 @@
+PASS P0R01-specific-prior-proof-not-a-global-banner-bypass 
+PASS P0R02-prior-json-must-be-the-exact-reviewed-blob 
+PASS P0R03-ready-text-alone-cannot-substitute-the-proof 
+PASS P0R04-continuity-is-explicit 
+PASS P0R05-silent-attach-is-allowed-without-reset 
+PASS P0R06-benign-background-does-not-require-quiet 
+PASS P0R07-danger-is-saved-and-blocks-queries 
+PASS P0R08-startup-bytes-are-not-reinterpreted-as-continuity 
+PASS P0R09-continuation-one-COM-zero-reset-zero-DAP-branch 
+PASS P0R10-full-mode-keeps-the-original-reset-contract 
+PASS P0R11-attach-failure-closes-and-does-not-query 
+CONTINUATION SUMMARY cases=11 pass=11 fail=0
+HOST_FAKE_TRANSPORT_ONLY / DEVICE_ACTIONS=0 / NO_PYOCD_SUBPROCESS

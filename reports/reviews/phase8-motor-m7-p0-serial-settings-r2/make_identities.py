@@ -10,6 +10,8 @@ CAL = 'reports/reviews/phase8-motor-m7-current-calibration/m7_calcalc.py'
 BIN = 'reports/firmware/phase8-motor-m7-current-calibration-r1/rt-thread-motor-m1.bin'
 AXF = 'reports/firmware/phase8-motor-m7-current-calibration-r1/rt-thread-motor-m1.axf'
 HEAD = '8bade29677dd3f2395cfd92ce28b9cd7206c89e2'
+HEAD_READBACK = '01f0e429581bdb507910b1061bb914254d1079af'
+EV_DIR = 'reports/reviews/phase8-motor-m7-p0-serial-settings-r2'
 PIN = '24ab5a7c1cff259b209f78fcb1abbb5f48271581'
 pkg = Path('C:/Users/LMX/Downloads/p0_settings_r2_unzip')
 SP = Path('C:/Users/LMX/AppData/Local/Programs/Python/Python312/Lib/site-packages/serial')
@@ -108,6 +110,23 @@ d = {
    "reason": "Windows Python stdout redirection emits CRLF; core.autocrlf=true would otherwise silently change committed text bytes",
    "manifest": "SHA256SUMS.txt, self-excluded to avoid a circular identity",
    "raw_serial_bytes_archived_this_round": 0},
+ "remote_blob_readback": {
+   "delivery_head": "01f0e429581bdb507910b1061bb914254d1079af",
+   "method": "push, then git fetch and read every artefact out of the fetched remote blob - never the autocrlf working tree",
+   "collector_blob": {"bytes": len(blob(HEAD_READBACK, COL)), "sha256": sh(blob(HEAD_READBACK, COL))},
+   "verifier_blob": {"bytes": len(blob(HEAD_READBACK, VER)), "sha256": sh(blob(HEAD_READBACK, VER))},
+   "calculator_blob": {"bytes": len(blob(HEAD_READBACK, CAL)), "sha256": sh(blob(HEAD_READBACK, CAL))},
+   "images_blob": {"bin": sh(blob(HEAD_READBACK, BIN)), "axf": sh(blob(HEAD_READBACK, AXF))},
+   "pinned_24ab5a7_board_proof_still": sh(blob(PIN, 'reports/agent_handoffs/phase8-motor-m7-p0-board.json')),
+   "prior_corrupted_62B_b64_still": sh(blob(HEAD_READBACK, 'reports/reviews/phase8-motor-m7-p0-serial-continuation/01_safety_state.rx.bin.b64')),
+   "evidence_manifest_entries_checked_against_remote_blobs": 25,
+   "final_manifest_entries_in_this_directory": len([p for p in Path(EV_DIR).iterdir()
+                                                    if p.is_file() and p.name != 'SHA256SUMS.txt']),
+   "evidence_manifest_mismatches": 0,
+   "selftests_re_run_from_remote_blob_bytes": {
+     "native_locale": {"rc": [0, 0, 1], "counts": "37/37, 11/11, static 8/9 (same P0C09 UnicodeDecodeError)"},
+     "pythonutf8_1": {"rc": [0, 0, 0], "counts": "37/37, 11/11, static 9/9"},
+     "conclusion": "the remote bytes behave exactly like the local candidate, so R2-LOC is a property of the host locale and not of a divergent copy"}},
  "device_actions": [],
  "quotas_consumed": {"COM5_open": 0, "downloads": 0, "target_flash_read": 0, "dap_sessions": 0,
    "resets": 0, "motor_actions": 0, "config_writes": 0, "fault_clears": 0,

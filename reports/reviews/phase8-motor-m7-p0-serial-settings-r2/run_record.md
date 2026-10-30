@@ -108,10 +108,38 @@ DTR/RTS 默认值在本对照中不变（M5 与当前都用库默认）。
   P1 仍 METHOD_NOT_READY，P2 仍 NOT_AUTHORIZED，示波器/A0 仍暂缓。
 - 未重跑未改的 C 回归、未编 Keil；M6 等其它候选未顺手批量修（可只读列出同类写法留后续）。
 
-## 8. 待裁决的一点
+## 8. 推送后的远端 blob 回读与重跑
+
+脚本与证据先以 `01f0e429…d1079af` 提交并推送（`8bade29..01f0e42`），随后 `git fetch` 得到远端 ref，
+**所有比对都从远端 blob 读，不用 autocrlf 工作树**：
+
+- 采集器 blob 23430 / c98bb712…a726；验证器 blob 26674 / 99a449f6…8a45；
+  计算器 54267 / 5c7a2340…63ad；BIN e614a075…f7da；AXF 2205c7e7…d584；
+  固定 24ab5a7 的 board-proof.json 仍 e8df121f…4246；62 B 污染件 b64 仍 473161e5…a37f（解回 c26f480a…8305/62 B）。
+- 证据清单 25 条逐项与远端 blob 复算：**0 失配**。本轮新增 from-blob 证据后清单共 37 条（不含清单自身）。
+- 把远端 blob 的三个脚本导出到仓外固定结构再跑一遍：
+  原生码页 37/37 rc0、11/11 rc0、static **8/9 rc1**（同一个 `UnicodeDecodeError`）；
+  `PYTHONUTF8=1` 下 37/37、11/11、static **9/9 rc0**。
+  原始件为 `selftest37_from_remote_blob_fromblob_native.stdout.txt` 等 6 个 stdout/stderr。
+  远端字节与本机候选表现一致，进一步说明 R2-LOC 是主机码页性质，不是某份副本漂移。
+- 冻结引用未动；本轮设备动作仍为 0，COM5 打开仍为 0。
+
+## 9. 停点
+
+```text
+P0_SETTINGS_R2_APPLIED_AND_PUSHED(01f0e42) / REMOTE_BLOB_READBACK_MATCHES
+OFFLINE_37_AND_11_NATIVE / STATIC_9_ONLY_UNDER_PYTHONUTF8 / R2_LOC_DISCLOSED_NOT_SELF_FIXED
+SETCOMMSTATE_5_TO_0 / UPSTREAM_V35_SOURCES_IDENTICAL_TO_INSTALLED_PYLIB
+SOFTWARE_CALL_PATH_PROVEN / PHYSICAL_CAUSE_NOT_CLOSED / VOLTAGE_DATA_NOT_OBTAINED
+DEVICE_ACTIONS=[] / AWAITING_R2_LOC_DECISION_AND_A_SEPARATE_FIELD_APPROVAL
+```
+
+## 10. 待裁决的一点
 
 精确补丁的字节接受条件成立（两散列相等、镜像与计算器不变、远端字节一致）。
 但 §6 的“Windows 37＋11＋9 通过”在本机**只在 UTF-8 模式下**成立，默认码页下 P0C09 因夹具缺陷失败。
 两条可走的路，由审核方择一，不自行认定：
 (a) 接受 `PYTHONUTF8=1` 作为本轮运行口径＋独立等价检查（已有 rc 0 与负控）；
 (b) 由审核方发一版仅把 `read_text()` 改成 `read_text(encoding='utf-8')` 的验证器候选，重新逐字节接受。
+
+无论择哪条，现场对照仍要用户对任务书 §7.4 单独批准；本文件不构成该批准。

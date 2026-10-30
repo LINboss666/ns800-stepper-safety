@@ -154,6 +154,50 @@
   "resets": 0,
   "target_flash_read": 0
  },
+ "remote_blob_readback": {
+  "calculator_blob": {
+   "bytes": 54267,
+   "sha256": "5c7a2340b4d350b1e8932798a57b85e8a6f4818501e469ad6dfd5c1bd29163ad"
+  },
+  "collector_blob": {
+   "bytes": 23430,
+   "sha256": "c98bb712bd454dd66ffabece49b8998075642b5cca4d07c85073a3508d90a726"
+  },
+  "delivery_head": "01f0e429581bdb507910b1061bb914254d1079af",
+  "evidence_manifest_entries_checked_against_remote_blobs": 25,
+  "evidence_manifest_mismatches": 0,
+  "final_manifest_entries_in_this_directory": 37,
+  "images_blob": {
+   "axf": "2205c7e7ad6bad93e848fd24d1e5f38c76796865a2b21ebcd2d4e22bb4b6d584",
+   "bin": "e614a075ab63eb5b1c4b08e1ab51fb4043f474037ce734b4bcaf666899c8f7da"
+  },
+  "method": "push, then git fetch and read every artefact out of the fetched remote blob - never the autocrlf working tree",
+  "pinned_24ab5a7_board_proof_still": "e8df121f3f58af5fadf3d60be24fd8aaf7d88c381ae740be86173c43e6604246",
+  "prior_corrupted_62B_b64_still": "473161e5cd6c6be082e731a2102b342ca2962dea17e33d6be31ca8c5e69ba37f",
+  "selftests_re_run_from_remote_blob_bytes": {
+   "conclusion": "the remote bytes behave exactly like the local candidate, so R2-LOC is a property of the host locale and not of a divergent copy",
+   "native_locale": {
+    "counts": "37/37, 11/11, static 8/9 (same P0C09 UnicodeDecodeError)",
+    "rc": [
+     0,
+     0,
+     1
+    ]
+   },
+   "pythonutf8_1": {
+    "counts": "37/37, 11/11, static 9/9",
+    "rc": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  "verifier_blob": {
+   "bytes": 26674,
+   "sha256": "99a449f6d80ee2999916b34acfaf6aa5f462f40b1bd7bdd871a4aba366ff8a45"
+  }
+ },
  "task": "phase8-motor-m7-p0-serial-settings-r2",
  "unchanged_inputs": {
   "c_h_hal_kernel_macros_projects_images_changed": 0,
