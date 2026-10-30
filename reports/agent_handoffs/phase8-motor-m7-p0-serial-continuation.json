@@ -215,6 +215,57 @@
     "CONTINUATION_IDENTITY_BASIS_USED / PRIOR_READBACK_PLUS_CONFIRMED_CONTINUITY fresh_banner_required=false",
     "NO_VOLTAGE_OBSERVATION_OBTAINED / DMM_READINGS_TAKEN=0 / RESULT_JSON_ABSENT",
     "COM5_OPENS=1 DOWNLOADS=0 TARGET_FLASH_READS=0 DAP_ACTIONS=0 ACTIVE_RESETS=0 MOTOR_ACTIONS=0 RETRIES=0",
-    "CONSOLE_STREAM_INTEGRITY_UNRESOLVED / APPROVAL_QUOTA_CONSUMED / ROOT_CAUSE_NOT_DETERMINED"
-  ]
+    "CONSOLE_STREAM_INTEGRITY_UNRESOLVED / APPROVAL_QUOTA_CONSUMED / ROOT_CAUSE_NOT_DETERMINED",
+    "SECOND_ATTEMPT_ON_ORIGINAL_PORT / SAME_SIGNATURE / USB_PORT_EXCLUDED_AS_CAUSE"
+  ],
+  "second_attempt_after_port_restore": {
+    "date": "2026-10-30 20:18",
+    "user_variable": "USB cable moved back to the original port (still enumerated as COM5)",
+    "authorized_again_by": "user: 我授权你再试试 / 我已经换回来了",
+    "collector_bytes_unchanged": "0e02ccfcef178f0ceee9dc3fd5aeb17f7b9a3bb924e4b83bd7a0cecde9505467",
+    "out_dir": "P0_try2 (new)",
+    "error": "P0_FAILED:Stop:REPLY_TIMEOUT:01_safety_state.rx.bin",
+    "reply": {
+      "bytes": 61,
+      "sha256": "54ee1e7e7253acb519c586ac96253225504d7cd57c0dc106e4e199889d080cb8",
+      "repr": "safety_state\r\n[ª\u0005ate=READY fault_code=0 degraded=0x00\r\nmsh >",
+      "middle_expected": "[SS] state= (11 B)",
+      "middle_observed_hex": "5b aa 05 9a 61 74 65 3d",
+      "head_intact": "echo plus the [ (15 B)",
+      "tail_intact": "ate=... frame-end prompt (47 B)"
+    },
+    "attach_bytes": 0,
+    "conclusion": {
+      "usb_port_change_is_not_the_cause": true,
+      "reason": "the original port reproduces the same shape and the damaged position/content differs every time",
+      "coherent_foreign_line_version_weakened": "the garbage holds 0x05/0x02/0x09 (impossible in ASCII text or inside a UTF-8 sequence) and the pairs 91 81 / 91 95 occur in zero printed strings of the frozen firmware",
+      "best_fitting_mechanism_still_unproven": "single shared static rt_log_buf[128] plus per-character _serial_poll_tx with the empty lock macros: already-sent head bytes stay correct, the sender then reads another writer fragment, and the remainder of its own line resumes - which also explains shortening",
+      "strong_actionable_conclusion": "while this signature is present, no gate that reads console text can be trusted; this is not fixable by the collector script and not avoidable by changing the USB port"
+    },
+    "quota": {
+      "com5_open": 1,
+      "tx_attempts": 1,
+      "accepted": 0,
+      "dmm_readings": 0,
+      "downloads": 0,
+      "target_flash_reads": 0,
+      "dap_or_reset_actions": 0,
+      "motor_actions": 0,
+      "retries": 0
+    },
+    "next_step_options_requiring_new_authorisation": {
+      "control_build": "RT_USING_THREADSAFE_PRINTF on, or a lock spanning format-through-output, rebuilt as a measure-only candidate - needs review plus a fresh flash approval",
+      "line_probe": "logic analyser/scope on the NS800 TX to DAPLink UART - the only single-shot separator between a firmware write-buffer race and line timing; previously deferred by user preference",
+      "rejected": "relaxing the field validators to accept a partially damaged line"
+    },
+    "evidence_files": [
+      "collector2_stderr.txt",
+      "collector2_stdout.txt",
+      "ledger_try2.jsonl",
+      "raw_attach_try2.bin.b64",
+      "01_safety_state_try2.rx.bin.b64",
+      "port_swap_and_three_capture_analysis.txt",
+      "run_evidence.md section 8"
+    ]
+  }
 }

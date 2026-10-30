@@ -1,0 +1,188 @@
+=== attempt 3 (port restored to the original one) ===
+bytes=61 sha256=54ee1e7e7253acb519c586ac96253225504d7cd57c0dc106e4e199889d080cb8
+repr=b'safety_state\r\n[\xaa\x05\x9aate=READY fault_code=0 degraded=0x00\r\nmsh >'
+middle observed : b'[\xaa\x05\x9aate='  (5b aa 05 9a 61 74 65 3d)
+middle expected : b'[SS] state='
+
+=== attempt 2 (other USB port) ===
+middle observed : b'MMu\x81st\xd1\x95\xf5'  (4d 4d 75 81 73 74 d1 95 f5)
+
+=== attempt 1 (boot stream, same link as attempt 2) ===
+middle observed : b'&\t\x02\xd5\xa5\xb1\x91\x81'  (26 09 02 d5 a5 b1 91 81)
+
+=> port swap changed nothing qualitative: same head-intact / middle-broken / tail-intact shape
+
+=== non-ASCII runs found in the three captures ===
+  boot      81  b'\x81'
+  boot      91 95 91 81  b'\x91\x95\x91\x81'
+  boot      9a  b'\x9a'
+  boot      9d  b'\x9d'
+  boot      c2 c1  b'\xc2\xc1'
+  boot      ca  b'\xca'
+  boot      d5  b'\xd5'
+  boot      d5 a5 b1 91 81  b'\xd5\xa5\xb1\x91\x81'
+  boot      e4 b8 8d e6 98 af e7 a4 ba e6 b3 a2 e5 99 a8 e8 af 81 e6 98 8e e6 97 a0 e8 84 89 e5 86 b2  b'\xe4\xb8\x8d\xe6\x98\xaf\xe7\xa4\xba\xe6\xb3\xa2\xe5\x99\xa8\xe8\xaf\x81\xe6\x98\x8e\xe6\x97\xa0\xe8\x84\x89\xe5\x86\xb2'
+  boot      e4 bb 8d e6 9c aa e9 aa 8c e6 94 b6  b'\xe4\xbb\x8d\xe6\x9c\xaa\xe9\xaa\x8c\xe6\x94\xb6'
+  boot      e5 8f aa e8 af b4 e6 98 8e e9 a9 b1 e5 8a a8  b'\xe5\x8f\xaa\xe8\xaf\xb4\xe6\x98\x8e\xe9\xa9\xb1\xe5\x8a\xa8'
+  boot      e6 8e a5 e5 8f 97 e4 ba 86 e5 85 b3 e6 96 ad e8 af b7 e6 b1 82  b'\xe6\x8e\xa5\xe5\x8f\x97\xe4\xba\x86\xe5\x85\xb3\xe6\x96\xad\xe8\xaf\xb7\xe6\xb1\x82'
+  boot      e6 b3 a8  b'\xe6\xb3\xa8'
+  boot      e7 bc 96 e8 af 91 e6 9c 9f e9 97 a8 e6 9c aa e7 bf bb e8 bd ac e5 89 8d e4 bb 8d e7 84 b6 e4 b8 80 e4 bd 8d e4 b8 8d e5 86 99  b'\xe7\xbc\x96\xe8\xaf\x91\xe6\x9c\x9f\xe9\x97\xa8\xe6\x9c\xaa\xe7\xbf\xbb\xe8\xbd\xac\xe5\x89\x8d\xe4\xbb\x8d\xe7\x84\xb6\xe4\xb8\x80\xe4\xbd\x8d\xe4\xb8\x8d\xe5\x86\x99'
+  boot      e8 be 93 e5 87 ba e5 ae 89 e5 85 a8 e6 80 81 e5 b7 b2 e5 bb ba e7 ab 8b  b'\xe8\xbe\x93\xe5\x87\xba\xe5\xae\x89\xe5\x85\xa8\xe6\x80\x81\xe5\xb7\xb2\xe5\xbb\xba\xe7\xab\x8b'
+  boot      e8 bf 90 e8 a1 8c e6 80 81 e6 9d a1 e4 bb b6 e5 85 a8 e9 80 9a  b'\xe8\xbf\x90\xe8\xa1\x8c\xe6\x80\x81\xe6\x9d\xa1\xe4\xbb\xb6\xe5\x85\xa8\xe9\x80\x9a'
+  boot      e9 9d 9e e6  b'\xe9\x9d\x9e\xe6'
+  boot      e9 a9 b1 e5 8a a8 e6 8e a5 e5 8f 97 e5 85 b3 e6 96 ad  b'\xe9\xa9\xb1\xe5\x8a\xa8\xe6\x8e\xa5\xe5\x8f\x97\xe5\x85\xb3\xe6\x96\xad'
+  boot      f5  b'\xf5'
+  reply_t1  81  b'\x81'
+  reply_t1  d1 95 f5  b'\xd1\x95\xf5'
+  reply_t2  9a  b'\x9a'
+  reply_t2  aa  b'\xaa'
+
+=== do those byte pairs occur inside strings the firmware actually prints? ===
+  8081 : 19 file hit(s)  e.g. blackbox.c " 不称其为已确认的急停/ENN 状态\n"
+  809a : 10 file hit(s)  e.g. motor.c "[MOT] arm REFUSED: 驱动配置完整性复核未通过(rc=%d,"
+  80e4 : 9 file hit(s)  e.g. motor.c "清锁存但不核对新一代故障"
+  81e5 : 15 file hit(s)  e.g. motor.c "已证实门芯片坏"
+  81e6 : 14 file hit(s)  e.g. motor.c "api-accepted(驱动接受关断, 非波形证明)"
+  8489 : 5 file hit(s)  e.g. motor.c " 不是示波器证明无脉冲(BUG-008 仍未验收)\n"
+  84b6 : 3 file hit(s)  e.g. safety_state.c " 已换 epoch 并保持抑制, 本次票据自然失效, 保持锁存\n"
+  85a8 : 12 file hit(s)  e.g. motor.c "旧操作在慢步骤之后重新去读全局"
+  85b3 : 12 file hit(s)  e.g. motor.c "驱动 API 接受了关断请求"
+  8699 : 14 file hit(s)  e.g. blackbox.c "已进入捕获/写盘"
+  86b2 : 5 file hit(s)  e.g. motor.c " 不是示波器证明无脉冲(BUG-008 仍未验收)\n"
+  86e5 : 12 file hit(s)  e.g. diagnosis.c "喂到 NORMAL 为止, 但必须在数学上界之内"
+  87ba : 12 file hit(s)  e.g. motor.c "开始输出"
+  898d : 12 file hit(s)  e.g. blackbox.c "忙时才发现 pending"
+  89e5 : 14 file hit(s)  e.g. motor.c " pwm_rc=%d, low=%d, 代次=%u) - 抑制与整理义务已建立, 待人工恢复\n"
+  8aa8 : 15 file hit(s)  e.g. motor.c "驱动 API 接受了关断请求"
+  8ce6 : 10 file hit(s)  e.g. motor.c "查门→完整性复核→请求使能"
+  8de4 : 14 file hit(s)  e.g. blackbox.c " (禁用或无样本的电平位不代表测量结果)\n"
+  8de5 : 17 file hit(s)  e.g. adxl345.c "稍后生效"
+  8de6 : 15 file hit(s)  e.g. blackbox.c " raw_flags=%08X —— 不按新定义解释,"
+  8de7 : 15 file hit(s)  e.g. blackbox.c " 不称其为已确认的急停/ENN 状态\n"
+  8ea5 : 13 file hit(s)  e.g. diagnosis.c "自检有没有直接写它"
+  8ee6 : 11 file hit(s)  e.g. adxl345.c "[IMU] 静置时某一轴应约 ±1000mg(1g 重力), 敲击应有明显变化\n"
+  8ee9 : 5 file hit(s)  e.g. motor.c "与门/非门损坏"
+  8f97 : 8 file hit(s)  e.g. motor.c "驱动 API 接受了关断请求"
+  8faa : 7 file hit(s)  e.g. motor.c " current_hz=0 只是软件命令值 !!\n"
+  90e8 : 6 file hit(s)  e.g. motor.c "斜坡减到 0 / apply 失败回退 / 运行守卫停机"
+  9181 : 0 file hit(s)
+  9195 : 0 file hit(s)
+  91e6 : 7 file hit(s)  e.g. safety_state.c " (新故障/新预约/已恢复) - 不写新影子, 不动新 pending, 不触发旧黑匣子\n"
+  93e5 : 15 file hit(s)  e.g. diagnosis.c "当前生效阈值"
+  94b6 : 8 file hit(s)  e.g. diagnosis.c "已经收敛之后"
+  9591 : 0 file hit(s)
+  95f5 : 0 file hit(s)
+  96ad : 10 file hit(s)  e.g. motor.c "驱动 API 接受了关断请求"
+  96e8 : 8 file hit(s)  e.g. motor.c "[MOT] grant REFUSED: 标定静止事务正在进行, 不取诊断预约\n"
+  97a0 : 14 file hit(s)  e.g. blackbox.c " (禁用或无样本的电平位不代表测量结果)\n"
+  97a8 : 11 file hit(s)  e.g. motor.c "与门/非门损坏"
+  97e4 : 5 file hit(s)  e.g. motor.c "驱动 API 接受了关断请求"
+  97e5 : 8 file hit(s)  e.g. motor.c "检测窗口"
+  988e : 7 file hit(s)  e.g. adxl345.c "[IMU] 静置时某一轴应约 ±1000mg(1g 重力), 敲击应有明显变化\n"
+  98af : 13 file hit(s)  e.g. motor.c "400/405ms 是停机上界"
+  99a8 : 11 file hit(s)  e.g. blackbox.c "早到/忙时两个计数器合计至少加一"
+  9c9f : 11 file hit(s)  e.g. blackbox.c "捕获/写盘期间后续触发必须丢弃"
+  9caa : 17 file hit(s)  e.g. blackbox.c "源帧序号未变化就返回空帧"
+  9d9e : 7 file hit(s)  e.g. motor.c "与门/非门损坏"
+  9da1 : 8 file hit(s)  e.g. motor.c " owner、不写新影子、不 ack; 由那条更新的请求自己负责整理\n"
+  9ee6 : 8 file hit(s)  e.g. motor.c "api-accepted(驱动接受关断, 非波形证明)"
+  9fe9 : 5 file hit(s)  e.g. blackbox.c "捕获/写盘期间后续触发必须丢弃"
+  a0e8 : 10 file hit(s)  e.g. blackbox.c "因该故障而被记录"
+  a18c : 11 file hit(s)  e.g. motor.c "斜坡减到 0 / apply 失败回退 / 运行守卫停机"
+  a1e4 : 8 file hit(s)  e.g. motor.c " 已被更新的一代取代(既不是本次保护, 也不是同一次已保护) - 不清新"
+  a2e5 : 7 file hit(s)  e.g. blackbox.c "捕获/写盘期间后续触发必须丢弃"
+  a4ba : 7 file hit(s)  e.g. motor.c " 不是示波器证明无脉冲(BUG-008 仍未验收)\n"
+  a5b1 : 3 file hit(s)  e.g. motor.c "已抑制/饱和/他人持有或未复核的关断失败"
+  a5e5 : 17 file hit(s)  e.g. blackbox.c " 不称其为已确认的急停/ENN 状态\n"
+  a8e6 : 15 file hit(s)  e.g. blackbox.c " (禁用或无样本的电平位不代表测量结果)\n"
+  a8e8 : 8 file hit(s)  e.g. motor.c "已证实门芯片坏"
+  a8e9 : 11 file hit(s)  e.g. motor.c "[MOT] !! STEP 关断未确认 (rc=%d src=%s): 许可 LOW 裸写已在门内发出(%s)"
+  a9b1 : 8 file hit(s)  e.g. motor.c "驱动 API 接受了关断请求"
+  aa8c : 8 file hit(s)  e.g. motor.c "未知电流 + 安全链未验收"
+  aae7 : 11 file hit(s)  e.g. motor.c "[MOT] !! STEP 关断未确认 (rc=%d, src=%s): 输出状态未知; 同一短临界区内"
+  aae8 : 10 file hit(s)  e.g. blackbox.c "早到/忙时两个计数器合计至少加一"
+  aae9 : 3 file hit(s)  e.g. motor.c "未知电流 + 安全链未验收"
+  ab8b : 5 file hit(s)  e.g. motor.c "恰好一次 disable + 独立一次 LOW + 两个 raw rc 与原业务错误分别留档"
+  ace5 : 4 file hit(s)  e.g. motor.c " 本命令按原身份终止, 不重采数字续命\n"
+  ade8 : 6 file hit(s)  e.g. blackbox.c "捕获/写盘期间后续触发必须丢弃"
+  ae89 : 8 file hit(s)  e.g. motor.c "未知电流 + 安全链未验收"
+  af81 : 9 file hit(s)  e.g. motor.c "已证实门芯片坏"
+  af91 : 4 file hit(s)  e.g. sp_measure_a0.c "[spm] 编译四宏: MOTOR_HW=%d STEP_DIAG_ISO=%d TMC_CFG_HW=%d LIMI
+  afb4 : 4 file hit(s)  e.g. motor.c "[MOT]   注: STEP=api-accepted 只说明驱动**接受了关断请求**,"
+  afb7 : 11 file hit(s)  e.g. motor.c "请求"
+  afe7 : 4 file hit(s)  e.g. motor.c "已证实门芯片坏"
+  b182 : 12 file hit(s)  e.g. motor.c "请求"
+  b191 : 0 file hit(s)
+  b1e5 : 9 file hit(s)  e.g. motor.c "驱动 API 接受了关断请求"
+  b2e5 : 12 file hit(s)  e.g. adxl345.c "[IMU] 静置时某一轴应约 ±1000mg(1g 重力), 敲击应有明显变化\n"
+  b3a2 : 4 file hit(s)  e.g. motor.c "api-accepted(驱动接受关断, 非波形证明)"
+  b3a8 : 6 file hit(s)  e.g. motor.c "[MOT]   注: STEP=api-accepted 只说明驱动**接受了关断请求**,"
+  b3e6 : 10 file hit(s)  e.g. motor.c "驱动 API 接受了关断请求"
+  b4e6 : 9 file hit(s)  e.g. diagnosis.c "自检有没有直接写它"
+  b6e4 : 8 file hit(s)  e.g. blackbox.c " 不称其为已确认的急停/ENN 状态\n"
+  b6e5 : 8 file hit(s)  e.g. motor.c "已追加抑制并请求许可 LOW - 频率字段清零不能替代它\n"
+  b7b2 : 21 file hit(s)  e.g. blackbox.c "已进入捕获/写盘"
+  b7e6 : 14 file hit(s)  e.g. blackbox.c "源帧序号未变化就返回空帧"
+  b880 : 17 file hit(s)  e.g. adxl345.c "[IMU] 静置时某一轴应约 ±1000mg(1g 重力), 敲击应有明显变化\n"
+  b88d : 16 file hit(s)  e.g. blackbox.c "绝不可能"
+  ba86 : 12 file hit(s)  e.g. motor.c "驱动 API 接受了关断请求"
+  bae5 : 13 file hit(s)  e.g. blackbox.c "源帧序号未变化就返回空帧"
+  bae6 : 7 file hit(s)  e.g. diagnosis.c "喂到 NORMAL 为止, 但必须在数学上界之内"
+  bae7 : 8 file hit(s)  e.g. motor.c "[MOT] !! STEP 关断未确认 (rc=%d, src=%s): 输出状态未知; 同一短临界区内"
+  bb8d : 11 file hit(s)  e.g. motor.c "现在某个同 owner 仍有效"
+  bbb6 : 13 file hit(s)  e.g. motor.c "软件已把目标命令值写成 0Hz"
+  bbba : 3 file hit(s)  e.g. motor.c " pwm_rc=%d, low=%d, 代次=%u) - 抑制与整理义务已建立, 待人工恢复\n"
+  bbe8 : 6 file hit(s)  e.g. motor.c "旧操作在慢步骤之后重新去读全局"
+  bc96 : 4 file hit(s)  e.g. sp_measure_a0.c "[spm] 编译四宏: MOTOR_HW=%d STEP_DIAG_ISO=%d TMC_CFG_HW=%d LIMI
+  bd8d : 12 file hit(s)  e.g. blackbox.c " (禁用或无样本的电平位不代表测量结果)\n"
+  bdac : 4 file hit(s)  e.g. motor.c "[MOT] start REFUSED: 起转前门禁未通过 -> 按本命令身份做受检处置\n"
+  be93 : 11 file hit(s)  e.g. motor.c "开始输出"
+  bf90 : 6 file hit(s)  e.g. motor.c "斜坡减到 0 / apply 失败回退 / 运行守卫停机"
+  bfbb : 3 file hit(s)  e.g. motor.c "翻转 STEP_DIAG_ISOLATED_ENV_CONFIRMED 并留证。\n"
+  c2c1 : 0 file hit(s)
+  d195 : 0 file hit(s)
+  d5a5 : 0 file hit(s)
+  e4b8 : 23 file hit(s)  e.g. adxl345.c "[IMU] 静置时某一轴应约 ±1000mg(1g 重力), 敲击应有明显变化\n"
+  e4ba : 16 file hit(s)  e.g. motor.c "驱动 API 接受了关断请求"
+  e4bb : 17 file hit(s)  e.g. blackbox.c " (禁用或无样本的电平位不代表测量结果)\n"
+  e4bd : 18 file hit(s)  e.g. blackbox.c " (禁用或无样本的电平位不代表测量结果)\n"
+  e585 : 18 file hit(s)  e.g. blackbox.c "已进入捕获/写盘"
+  e586 : 18 file hit(s)  e.g. blackbox.c "已进入捕获/写盘"
+  e587 : 14 file hit(s)  e.g. adxl345.c "[IMU] 静置时某一轴应约 ±1000mg(1g 重力), 敲击应有明显变化\n"
+  e589 : 11 file hit(s)  e.g. diagnosis.c "当前生效阈值"
+  e58a : 18 file hit(s)  e.g. adxl345.c "[IMU] 静置时某一轴应约 ±1000mg(1g 重力), 敲击应有明显变化\n"
+  e58f : 22 file hit(s)  e.g. adxl345.c "[IMU] 静置时某一轴应约 ±1000mg(1g 重力), 敲击应有明显变化\n"
+  e599 : 11 file hit(s)  e.g. blackbox.c "早到/忙时两个计数器合计至少加一"
+  e5ae : 22 file hit(s)  e.g. blackbox.c " raw_flags=%08X —— 不按新定义解释,"
+  e5b7 : 22 file hit(s)  e.g. blackbox.c "已进入捕获/写盘"
+  e5bb : 3 file hit(s)  e.g. motor.c " pwm_rc=%d, low=%d, 代次=%u) - 抑制与整理义务已建立, 待人工恢复\n"
+  e680 : 20 file hit(s)  e.g. blackbox.c " 不称其为已确认的急停/ENN 状态\n"
+  e68e : 14 file hit(s)  e.g. diagnosis.c "自检有没有直接写它"
+  e694 : 10 file hit(s)  e.g. diagnosis.c "已经收敛之后"
+  e696 : 17 file hit(s)  e.g. blackbox.c " raw_flags=%08X —— 不按新定义解释,"
+  e697 : 17 file hit(s)  e.g. adxl345.c "[IMU] 静置时某一轴应约 ±1000mg(1g 重力), 敲击应有明显变化\n"
+  e698 : 18 file hit(s)  e.g. adxl345.c "[IMU] 静置时某一轴应约 ±1000mg(1g 重力), 敲击应有明显变化\n"
+  e69c : 22 file hit(s)  e.g. adxl345.c "[IMU] 静置时某一轴应约 ±1000mg(1g 重力), 敲击应有明显变化\n"
+  e69d : 15 file hit(s)  e.g. blackbox.c "日志来自哪块板"
+  e6b1 : 11 file hit(s)  e.g. motor.c "请求"
+  e6b3 : 9 file hit(s)  e.g. motor.c "api-accepted(驱动接受关断, 非波形证明)"
+  e784 : 7 file hit(s)  e.g. motor.c "焊盘 LOW + 电机静止"
+  e7a4 : 7 file hit(s)  e.g. motor.c " 不是示波器证明无脉冲(BUG-008 仍未验收)\n"
+  e7ab : 5 file hit(s)  e.g. motor.c "恰好一次 disable + 独立一次 LOW + 两个 raw rc 与原业务错误分别留档"
+  e7bc : 4 file hit(s)  e.g. sp_measure_a0.c "[spm] init: 非静止态 => 拒绝, 未读任何 PPB, 未改能力缓存 "
+  e7bf : 3 file hit(s)  e.g. motor.c "翻转 STEP_DIAG_ISOLATED_ENV_CONFIRMED 并留证。\n"
+  e884 : 6 file hit(s)  e.g. motor.c " 不是示波器证明无脉冲(BUG-008 仍未验收)\n"
+  e8a1 : 12 file hit(s)  e.g. blackbox.c " (禁用或无样本的电平位不代表测量结果)\n"
+  e8af : 20 file hit(s)  e.g. blackbox.c "因该故障而被记录"
+  e8bd : 12 file hit(s)  e.g. adxl345.c "[IMU] 静置时某一轴应约 ±1000mg(1g 重力), 敲击应有明显变化\n"
+  e8be : 13 file hit(s)  e.g. motor.c "开始输出"
+  e8bf : 19 file hit(s)  e.g. blackbox.c "源帧序号未变化就返回空帧"
+  e980 : 13 file hit(s)  e.g. motor.c "斜坡减到 0 / apply 失败回退 / 运行守卫停机"
+  e997 : 14 file hit(s)  e.g. blackbox.c "捕获/写盘期间后续触发必须丢弃"
+  e99d : 10 file hit(s)  e.g. adxl345.c "[IMU] 静置时某一轴应约 ±1000mg(1g 重力), 敲击应有明显变化\n"
+  e9a9 : 8 file hit(s)  e.g. motor.c "驱动 API 接受了关断请求"
+  e9aa : 8 file hit(s)  e.g. motor.c "旧操作在慢步骤之后重新去读全局"
+
+note: a hit means "this pair exists in a printed string", which is compatible with a foreign
+line bleeding into our line; it is not proof by itself, because ASCII-ish pairs also occur in
+ordinary Chinese text elsewhere. Absence of every pair would argue against the interleaving idea.
