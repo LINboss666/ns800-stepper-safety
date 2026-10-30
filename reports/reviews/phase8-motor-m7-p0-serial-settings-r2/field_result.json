@@ -1,0 +1,82 @@
+{
+  "status": "VOLTAGE_OBSERVATION_ONLY",
+  "commands": [
+    "safety_state",
+    "safety_status",
+    "motor_status",
+    "step_status",
+    "current_cal show",
+    "current_cal sample 128",
+    "current_cal show"
+  ],
+  "sample": {
+    "n_requested": 128,
+    "n_valid": 128,
+    "raw_sum": 263690,
+    "raw_min": 2034,
+    "raw_max": 2079,
+    "raw_sum_sq": 543223348,
+    "seq_first": 549607,
+    "seq_last": 549734,
+    "tick_first": 5618161,
+    "tick_last": 5619457,
+    "fit": "READY",
+    "cal_source": "THEORETICAL",
+    "cal_version": 1
+  },
+  "nominal_mean_mV": 1660.136217948718,
+  "nominal_min_mV": 1639.1208791208792,
+  "nominal_max_mV": 1675.3846153846155,
+  "readings": [
+    {
+      "phase": "before",
+      "node": "Vadc",
+      "measured_mV": 1661.0,
+      "observed_at": "UNKNOWN_TIME",
+      "dmm_limit_mV": 13.305,
+      "dmm_interval_mV": [
+        1647.695,
+        1674.305
+      ],
+      "nominal_adc_minus_dmm_mV": -0.8637820512819872
+    },
+    {
+      "phase": "before",
+      "node": "V3v3",
+      "measured_mV": 3324.0,
+      "observed_at": "UNKNOWN_TIME",
+      "dmm_limit_mV": 21.62,
+      "dmm_interval_mV": [
+        3302.38,
+        3345.62
+      ],
+      "nominal_adc_minus_dmm_mV": null
+    },
+    {
+      "phase": "after",
+      "node": "Vadc",
+      "measured_mV": 1663.0,
+      "observed_at": "UNKNOWN_TIME",
+      "dmm_limit_mV": 13.315,
+      "dmm_interval_mV": [
+        1649.685,
+        1676.315
+      ],
+      "nominal_adc_minus_dmm_mV": -2.863782051281987
+    },
+    {
+      "phase": "after",
+      "node": "V3v3",
+      "measured_mV": 3323.0,
+      "observed_at": "UNKNOWN_TIME",
+      "dmm_limit_mV": 21.615000000000002,
+      "dmm_interval_mV": [
+        3301.385,
+        3344.615
+      ],
+      "nominal_adc_minus_dmm_mV": null
+    }
+  ],
+  "calibrated": false,
+  "physical_accuracy_accepted": false
+}

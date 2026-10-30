@@ -1,0 +1,2 @@
+WAIT_DMM_BEFORE: H10-1 and H10-3 DC voltage; keep H10-2 GND
+WAIT_DMM_AFTER: H10-1 and H10-3 DC voltage; keep H10-2 GND

@@ -1,0 +1,51 @@
+### 01_safety_state.rx.bin  64 B
+  'safety_state
+  '[SS] state=READY fault_code=0 degraded=0x00
+  'msh >
+
+### 02_safety_status.rx.bin  481 B
+  'safety_status
+  '[SAFETY] ready=YES first_err=0
+  '[SAFETY] MCU_DRV_ENABLE = 0 (\xe7\xa6\x81\xe6\xad\xa2(\xe5\xae\x89\xe5\x85\xa8))
+  '[SAFETY] DRV_ENABLE last write+readback verified = 0 (-1 = never verified)
+  '[SAFETY] ENN_FEEDBACK(PC.6 = \xe6\x9d\xbf\xe4\xb8\x8a TMC_ENN) raw=1 resolved=YES [\xe5\x8f\xaa\xe8\xaf\xbb\xe8\xbe\x93\xe5\x85\xa5, \xe9\x9d\x9e\xe6\x80\xa5\xe5\x81\x9c\xe6\x84\x9f\xe6\xb5\x8b; HIGH=\xe7\xa6\x81\xe8\x83\xbd\xe4\xbe\xa7, LOW=\xe6\x9c\xaa\xe6\x96\xbd\xe5\x8a\xa0\xe7\x00[SAFETY] request=DISABLE(LOW) pad=0 expected_FB=HIGH FB=1 -> verdict=OK
+  '[SAFETY] LIMIT inputs = DISABLED_BY_CONFIG (\xe9\x99\x90\xe4\xbd\x8d\xe5\xae\x9e\xe7\x8e\xb0\xe4\xbf\x9d\xe7\x95\x99, \xe4\xb8\x8d\xe8\xa7\xa3\xe6\x9e\x90/\xe4\xb8\x8d\xe9\x85\x8d\xe7\xbd\xae/\xe4\xb8\x8d\xe8\xaf\xbb/\xe4\xb8\x8d\xe6\xb3\xa8\xe5\x86\x8c IRQ)
+  'msh >
+
+### 03_motor_status.rx.bin  1121 B
+  'motor_status
+  '[MOT] state=0 name=OTHER
+  '[MOT] cur_hz=0 tgt_hz=0 accel=2000 decel=2000 dir=0
+  '[MOT] armed=0 drv_en_request=0 health=OK
+  '[MOT] guard stops=0 reason=0
+  '[MOT] guard reason map: 0=none 1=cfg-lost 2=integrity 3=txn-busy 4=enn-fb
+  '[MOT] stop result=api-accepted(\xe9\xa9\xb1\xe5\x8a\xa8\xe6\x8e\xa5\xe5\x8f\x97\xe5\x85\xb3\xe6\x96\xad, \xe9\x9d\x9e\xe6\xb3\xa2\xe5\xbd\xa2\xe8\xaf\x81\xe6\x98\x8e) src=init rc=0 latched=0
+  '[MOT] diag_off_confirmed=YES
+  '[MOT] arm_gate_mask=0x18 REFUSED
+  '[MOT] arm_gate_mask=0x18
+  '[MOT] gate_reason=protection-not-ready
+  '[MOT] gate_reason=drive-config-not-applied
+  '[MOT] gate4 irq_gate=CLOSED polarity=not-confirmed
+  '[MOT] gate4 gpio_ready=YES
+  '[MOT] gate5 tmc_drive_cfg=UNCONFIGURED
+  '[MOT] gate6 request_basis=DISABLED
+  '[MOT] gate6 enn_verdict=OK
+  '[MOT] gate7 motor_stop=api-accepted(\xe9\xa9\xb1\xe5\x8a\xa8\xe6\x8e\xa5\xe5\x8f\x97\xe5\x85\xb3\xe6\x96\xad, \xe9\x9d\x9e\xe6\xb3\xa2\xe5\xbd\xa2\xe8\xaf\x81\xe6\x98\x8e) src=init rc=0
+  '[MOT] gate7 latched=no diag_off=YES
+  '[MOT] note: current_hz=0 is a command value, not stop proof
+  '[MOT] drv_request=LOW pad=0
+  '[MOT] expected_ENN=HIGH ENN_fb=1 resolved verdict=OK
+  '[MOT] limit_inputs=DISABLED_BY_CONFIG
+  '[MOT] step_diag=GRANTED
+  '[MOT] tmc_write_gate=0x0
+  '[MOT] note: state/cur/tgt=0 does not prove physical STEP stopped
+  'msh >
+
+### 04_step_status.rx.bin  226 B
+  'step_status
+  '[STEP] dev=epwm1 ch=0 enabled=0
+  '[STEP] last_stop=not-attempted stop_rc=0 latched=0
+  '[STEP] note: api-accepted != physical no-pulse (BUG-008 unverified)
+  '[STEP] note: no diag ownership != physically no STEP
+  'msh >
+

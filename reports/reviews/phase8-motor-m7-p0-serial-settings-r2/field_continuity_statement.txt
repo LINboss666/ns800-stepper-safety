@@ -1,0 +1,9 @@
+Checked from this session's own complete operation log, not from a tool query:
+after 24ab5a7 (which recorded the one sector download + one fixed readback of the M7-R1 image),
+every action was offline file work or a COM5 read-only/console action:
+  1d13ea5 apply collector candidate (offline)   280ca81 review docs (offline)
+  4fbb11e COM5 reopen after the user moved the cable back - no pyOCD, no flash
+  e93971d / b3c07a3 / 8bade29 three harness probes that only opened COM5 and sent safety_state
+  01f0e42 / ee6eb33 / 1e10507 patch, evidence and readback commits (offline)
+No pyocd flash / commander savemem / reset / target write / DAP session was started after the
+board round, so no other download or debug write touched this board since 24ab5a7.

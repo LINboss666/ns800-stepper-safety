@@ -1,0 +1,31 @@
+{"kind": "BIND", "monotonic": 13323.218, "payload_sha256": "e614a075ab63eb5b1c4b08e1ab51fb4043f474037ce734b4bcaf666899c8f7da", "readback_sha256": "e614a075ab63eb5b1c4b08e1ab51fb4043f474037ce734b4bcaf666899c8f7da", "axf_sha256": "2205c7e7ad6bad93e848fd24d1e5f38c76796865a2b21ebcd2d4e22bb4b6d584", "calculator_sha256": "5c7a2340b4d350b1e8932798a57b85e8a6f4818501e469ad6dfd5c1bd29163ad", "mode": "CONTINUE_PROVEN_BOARD", "prior_board_commit": "24ab5a7c1cff259b209f78fcb1abbb5f48271581"}
+{"kind": "PORT_OPEN_ATTEMPT", "monotonic": 13323.218, "port": "COM5"}
+{"kind": "PORT_OPEN", "monotonic": 13323.218, "port": "COM5"}
+{"kind": "CONTINUATION_ATTACH", "monotonic": 13325.218, "bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "identity_basis": "PRIOR_READBACK_PLUS_CONFIRMED_CONTINUITY", "prior_board_commit": "24ab5a7c1cff259b209f78fcb1abbb5f48271581", "fresh_banner_required": false}
+{"kind": "TX_ATTEMPT", "monotonic": 13325.218, "command": "safety_state", "file": "01_safety_state.rx.bin"}
+{"kind": "RX_COMPLETE", "monotonic": 13325.234, "file": "01_safety_state.rx.bin", "bytes": 64, "sha256": "3617c305227f177ddcfd0cc3a8fff23b9385201377b27647771dadbf52374858"}
+{"kind": "COMMAND_ACCEPTED", "monotonic": 13325.234, "command": "safety_state"}
+{"kind": "TX_ATTEMPT", "monotonic": 13325.234, "command": "safety_status", "file": "02_safety_status.rx.bin"}
+{"kind": "RX_COMPLETE", "monotonic": 13325.281, "file": "02_safety_status.rx.bin", "bytes": 481, "sha256": "e5e13e52b47af4c10c824635a84bb7b14673d985d4d22510675da2127aa6358f"}
+{"kind": "COMMAND_ACCEPTED", "monotonic": 13325.281, "command": "safety_status"}
+{"kind": "TX_ATTEMPT", "monotonic": 13325.281, "command": "motor_status", "file": "03_motor_status.rx.bin"}
+{"kind": "RX_COMPLETE", "monotonic": 13325.39, "file": "03_motor_status.rx.bin", "bytes": 1121, "sha256": "fcd210a1b752c1114fd60b4cfd93bede29dedf4c87bc2b87f2e667f4f180a00e"}
+{"kind": "COMMAND_ACCEPTED", "monotonic": 13325.39, "command": "motor_status"}
+{"kind": "TX_ATTEMPT", "monotonic": 13325.39, "command": "step_status", "file": "04_step_status.rx.bin"}
+{"kind": "RX_COMPLETE", "monotonic": 13325.421, "file": "04_step_status.rx.bin", "bytes": 226, "sha256": "a1a49eb217f75e535d3aec7cdf1f55cb26f25e4fa7ae65eccb5f42fa800c320c"}
+{"kind": "COMMAND_ACCEPTED", "monotonic": 13325.421, "command": "step_status"}
+{"kind": "WAIT_DMM", "monotonic": 13325.421, "phase": "before", "required_file": "dmm_before.json"}
+{"kind": "DMM_RECEIVED", "monotonic": 13586.468, "phase": "before", "file": "dmm_before.json", "sha256": "c1ba10218f2f32905293bca8c0460758c6f506d1d65f9fc7ce1bdf1c951db867"}
+{"kind": "TX_ATTEMPT", "monotonic": 13586.468, "command": "current_cal show", "file": "05_current_cal_show.rx.bin"}
+{"kind": "RX_COMPLETE", "monotonic": 13586.5, "file": "05_current_cal_show.rx.bin", "bytes": 361, "sha256": "0f505a2e1f27e5639758ab4110f590f92a91a6c53823fe63d8ffb641596b9bfb"}
+{"kind": "COMMAND_ACCEPTED", "monotonic": 13586.5, "command": "current_cal show"}
+{"kind": "TX_ATTEMPT", "monotonic": 13586.5, "command": "current_cal sample 128", "file": "06_current_cal_sample_128.rx.bin"}
+{"kind": "RX_COMPLETE", "monotonic": 13587.828, "file": "06_current_cal_sample_128.rx.bin", "bytes": 393, "sha256": "df0e52107b880f821a0362b68779bff841efeab8cf800b0c893d6b2131e8e704"}
+{"kind": "COMMAND_ACCEPTED", "monotonic": 13587.843, "command": "current_cal sample 128"}
+{"kind": "TX_ATTEMPT", "monotonic": 13587.843, "command": "current_cal show", "file": "07_current_cal_show.rx.bin"}
+{"kind": "RX_COMPLETE", "monotonic": 13587.875, "file": "07_current_cal_show.rx.bin", "bytes": 361, "sha256": "3d3c9c226de52647748cf8e8242dc664abf3d733dce79b4b1b16d4a901d88970"}
+{"kind": "COMMAND_ACCEPTED", "monotonic": 13587.875, "command": "current_cal show"}
+{"kind": "WAIT_DMM", "monotonic": 13587.875, "phase": "after", "required_file": "dmm_after.json"}
+{"kind": "DMM_RECEIVED", "monotonic": 13710.203, "phase": "after", "file": "dmm_after.json", "sha256": "446038dd5c510cbfaa698a7c84f0c90d3a209390a439023d7ab1dd02f940eaa1"}
+{"kind": "COMPLETE", "monotonic": 13710.203, "status": "VOLTAGE_OBSERVATION_ONLY", "tx": 7}
+{"kind": "PORT_CLOSED", "monotonic": 13710.203}

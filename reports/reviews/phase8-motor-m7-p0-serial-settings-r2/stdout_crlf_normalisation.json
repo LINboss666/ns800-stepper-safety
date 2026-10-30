@@ -163,7 +163,15 @@
       "original_sha256": "96008f7c4cbe758162bcfb2181d8a6f681f00a51f5c4772ca75253794f05e3e0",
       "normalised_bytes": 105,
       "normalised_sha256": "046836250db5eb15d0b092a56e54a2847ae996e1cb58c844a349305cec62bb69"
+    },
+    "field_collector.stdout.txt": {
+      "original_bytes": 121,
+      "cr_bytes": 2,
+      "original_sha256": "ddc0405a7dca6cc6d5ae7d1b61d494549b4cd6f2215b1df4a91256bf16d85900",
+      "normalised_bytes": 119,
+      "normalised_sha256": "c8f141f83760db8c8d144f9095ff578c677030e7a91e4ac0935eafb25bbb3836"
     }
   },
-  "note": "written with newline='\n'; this file itself contains no CR"
+  "note": "written with newline='\n'; this file itself contains no CR",
+  "field_stdout_note": "the two CR bytes here are the Windows redirection of the WAIT_DMM lines; the device bytes themselves are archived separately as base64"
 }

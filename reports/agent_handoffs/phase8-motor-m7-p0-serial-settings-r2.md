@@ -148,3 +148,40 @@ FIELD_PACKAGE_SCOPE_UNCHANGED_AND_NOT_APPROVED_YET
 
 现场范围沿用原 R2 包（一次 COM5、七次查询、四个电压读数，首条严格通过后同会话继续；零烧录/DAP/复位/电机）。
 你这句回执里没有该包的新现场批准，所以我没有打开串口——要执行请给 §7.4 那句批准文字。
+
+## 13. 现场执行结果（用户签署 §7.4 原文后，2026-10-30 21:45–21:51）
+
+批准原文即任务书 §7.4 那句话，逐字收到后执行。**P0 完成**：采集器 rc 0 ＋ 台账 `COMPLETE` ＋
+`result.json = VOLTAGE_OBSERVATION_ONLY` 三者同时成立。
+
+- **决定性对照（同板、同线、同 COM5、同单 CR，唯一变量是去掉打开后的串口设置写入）**：
+  `01_safety_state.rx.bin` = 64 B / `3617c305…74858`，与历史干净件**逐字节相同**；
+  上一轮修前采集器在同一块板上取到的是 62 B / `c26f480a…`，中段 `4d4d 7581 7374 d195 f5`。
+  **损坏没有再现。** 这支持 R2-PORT 为该损坏的原因；本轮 N=1 且无 USB/物理交叉对照，
+  故不写成"排除一切其它机制"，也不把控制台完整性当作一般性质关闭。
+- 七次发送全部 `COMMAND_ACCEPTED`：64 / 481 / 1121 / 226 / 361 / 393 / 361 B；台账 31 行；
+  首条严格通过后按批准在**同一次会话**内继续，未关口重开，未另起单条诊断轮。
+- 额度：COM5 打开 1/1；下载、目标 Flash 读取、DAP、主动复位、电机动作、配置写、清故障、重开、重试**全 0**。
+- 静止/禁能门按合同通过（READY/fault0/degraded 0x00、ready=YES first_err=0、ENN FB=1 verdict=OK、
+  Motor state0 armed0 cur/tgt0、stop api-accepted rc0 latched0、diag_off YES）；
+  `UNCONFIGURED`/`IRQ CLOSED`/`arm_gate_mask=0x18 REFUSED` 如实记录，未为其去 apply。
+- `sample128`：128/128 有效，`dup=1164 invalid=0 skip=0`，raw min/max/mean = 2034/2079/2060.078，
+  名义换算 1660.136 mV（min 1639.12 / max 1675.38）。两次 `show` 系数一致且 `measured=NO`。
+- 四个读数（`observed_at` 全为 `UNKNOWN_TIME`，用户未报时刻）：
+  before H10-1 **1661 mV** / H10-3 **3324 mV**；after H10-1 **1663 mV** / H10-3 **3323 mV**。
+  名义−万用表 = −0.864 mV / −2.864 mV，落在万用表自身 ±13.3 mV 限内。
+- **上限**：仅 VOLTAGE_OBSERVATION_ONLY。H10-3 未证等于 VDDA，3300/4095 只是名义换算，
+  实际 VDDA/ADC 转换误差未证 → 不做精度认证、不产 MEASURED 系数、不改阈值、不外推相电流 RMS，
+  也不关闭最坏停机时延、真实 DIAG/SG 触发与整机验收。
+- 两次先前失败轮次、62 B 污染原件与其台账**未改写**；本轮只新增 `field_*` 归档件与指针。
+
+```text
+P0_FIELD_RUN_EXECUTED(rc0 / COMPLETE / VOLTAGE_OBSERVATION_ONLY)
+FIRST_STRICT_PASS_AND_SAME_SESSION_CONTINUED / 64B_CLEAN_3617c305 / 62B_CORRUPTION_DID_NOT_RECURE
+COM5_OPENS=1_OF_1 / DOWNLOADS=0 TARGET_FLASH_READS=0 DAP=0 RESETS=0 MOTOR_ACTIONS=0 CONFIG_WRITES=0 RETRIES=0
+SUPPORTS_R2_PORT_AS_THE_CAUSE(N=1, no USB cross-check) / CONSOLE_INTEGRITY_NOT_CLOSED_AS_A_GENERAL_PROPERTY
+NO_MEASURED_COEFFICIENT / ADC_ACCURACY_NOT_VERIFIED / P1_STILL_METHOD_NOT_READY / P2_NOT_AUTHORIZED
+```
+
+板子留在上电、静止、msh 提示符状态；无后续设备动作授权。详细逐条见
+`reports/reviews/phase8-motor-m7-p0-serial-settings-r2/field_run_record.md`。

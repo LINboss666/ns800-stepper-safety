@@ -30,6 +30,204 @@
   "raw_serial_bytes_archived_this_round": 0,
   "reason": "Windows Python stdout redirection emits CRLF; core.autocrlf=true would otherwise silently change committed text bytes"
  },
+ "field_execution": {
+  "approval_source_recorded_in_ledger_BIND": true,
+  "approved_verbatim": "批准按本包精确补丁修正并执行一次P0串口对照续测：离线前置通过后允许COM5打开1次、七次固定查询和四个电压读数；首条严格通过则同会话继续P0。禁止下载、目标Flash读取、DAP、主动复位、电机动作、改配置及重试。",
+  "ceiling": "VOLTAGE_OBSERVATION_ONLY; no MEASURED coefficient; H10-3 not proven to be VDDA; 3300/4095 nominal only; no ADC accuracy verdict; no phase-current RMS extrapolation; does not close console integrity as a general property or the whole-machine acceptance",
+  "collector_rc": 0,
+  "collector_sha256": "c98bb712bd454dd66ffabece49b8998075642b5cca4d07c85073a3508d90a726",
+  "command_accepted": 7,
+  "completions": 1,
+  "dmm": {
+   "after": {
+    "V3v3": {
+     "V": 3.323,
+     "observed_at": "UNKNOWN_TIME"
+    },
+    "Vadc": {
+     "V": 1.663,
+     "observed_at": "UNKNOWN_TIME"
+    },
+    "meter": "UT39A+",
+    "mode": "DCV",
+    "range_V": 4
+   },
+   "after_sha256": "446038dd5c510cbfaa698a7c84f0c90d3a209390a439023d7ab1dd02f940eaa1",
+   "before": {
+    "V3v3": {
+     "V": 3.324,
+     "observed_at": "UNKNOWN_TIME"
+    },
+    "Vadc": {
+     "V": 1.661,
+     "observed_at": "UNKNOWN_TIME"
+    },
+    "meter": "UT39A+",
+    "mode": "DCV",
+    "range_V": 4
+   },
+   "before_sha256": "c1ba10218f2f32905293bca8c0460758c6f506d1d65f9fc7ce1bdf1c951db867",
+   "observed_at_basis": "UNKNOWN_TIME - the user did not report clock times; log times were not substituted"
+  },
+  "dmm_received": 2,
+  "first_reply_decisive": {
+   "bytes": 64,
+   "equals_historical_clean_capture": true,
+   "equals_previous_corrupted_62B": false,
+   "previous_corrupted": {
+    "bytes": 62,
+    "sha256": "c26f480a5ebbd31500f7ac4219afe7dd2f6890c53d1bae591bcb66352aa88305"
+   },
+   "sha256": "3617c305227f177ddcfd0cc3a8fff23b9385201377b27647771dadbf52374858"
+  },
+  "identity_basis": "PRIOR_READBACK_PLUS_CONFIRMED_CONTINUITY, fresh_banner_required=false",
+  "ledger_kinds": {
+   "first": [
+    "BIND",
+    "PORT_OPEN_ATTEMPT",
+    "PORT_OPEN",
+    "CONTINUATION_ATTACH",
+    "TX_ATTEMPT",
+    "RX_COMPLETE"
+   ],
+   "last": [
+    "DMM_RECEIVED",
+    "COMPLETE",
+    "PORT_CLOSED"
+   ],
+   "lines": 31
+  },
+  "nominal": {
+   "max_mV": 1675.3846153846155,
+   "mean_mV": 1660.136217948718,
+   "min_mV": 1639.1208791208792
+  },
+  "out_dir": "D:\\ns800-m7-p0-r2-20261030T214542\\P0",
+  "physical_cause_grade": "supporting only: same board, same cable/port, same single CR, only change = no post-open serial settings writes; N=1, no USB/physical cross-check, so other mechanisms are not generally excluded",
+  "port_closed": 1,
+  "quota_consumed": {
+   "COM5_open": 1,
+   "active_resets": 0,
+   "config_writes": 0,
+   "dap_or_pyocd": 0,
+   "dmm_readings": 4,
+   "downloads": 0,
+   "fault_clears": 0,
+   "motor_actions": 0,
+   "port_reopens": 0,
+   "retries": 0,
+   "sends": 7,
+   "target_flash_reads": 0
+  },
+  "readings": [
+   {
+    "dmm_interval_mV": [
+     1647.695,
+     1674.305
+    ],
+    "dmm_limit_mV": 13.305,
+    "measured_mV": 1661.0,
+    "node": "Vadc",
+    "nominal_adc_minus_dmm_mV": -0.8637820512819872,
+    "observed_at": "UNKNOWN_TIME",
+    "phase": "before"
+   },
+   {
+    "dmm_interval_mV": [
+     3302.38,
+     3345.62
+    ],
+    "dmm_limit_mV": 21.62,
+    "measured_mV": 3324.0,
+    "node": "V3v3",
+    "nominal_adc_minus_dmm_mV": null,
+    "observed_at": "UNKNOWN_TIME",
+    "phase": "before"
+   },
+   {
+    "dmm_interval_mV": [
+     1649.685,
+     1676.315
+    ],
+    "dmm_limit_mV": 13.315,
+    "measured_mV": 1663.0,
+    "node": "Vadc",
+    "nominal_adc_minus_dmm_mV": -2.863782051281987,
+    "observed_at": "UNKNOWN_TIME",
+    "phase": "after"
+   },
+   {
+    "dmm_interval_mV": [
+     3301.385,
+     3344.615
+    ],
+    "dmm_limit_mV": 21.615000000000002,
+    "measured_mV": 3323.0,
+    "node": "V3v3",
+    "nominal_adc_minus_dmm_mV": null,
+    "observed_at": "UNKNOWN_TIME",
+    "phase": "after"
+   }
+  ],
+  "responses": {
+   "01_safety_state.rx.bin": {
+    "b64_roundtrip_equal": true,
+    "bytes": 64,
+    "sha256": "3617c305227f177ddcfd0cc3a8fff23b9385201377b27647771dadbf52374858"
+   },
+   "02_safety_status.rx.bin": {
+    "b64_roundtrip_equal": true,
+    "bytes": 481,
+    "sha256": "e5e13e52b47af4c10c824635a84bb7b14673d985d4d22510675da2127aa6358f"
+   },
+   "03_motor_status.rx.bin": {
+    "b64_roundtrip_equal": true,
+    "bytes": 1121,
+    "sha256": "fcd210a1b752c1114fd60b4cfd93bede29dedf4c87bc2b87f2e667f4f180a00e"
+   },
+   "04_step_status.rx.bin": {
+    "b64_roundtrip_equal": true,
+    "bytes": 226,
+    "sha256": "a1a49eb217f75e535d3aec7cdf1f55cb26f25e4fa7ae65eccb5f42fa800c320c"
+   },
+   "05_current_cal_show.rx.bin": {
+    "b64_roundtrip_equal": true,
+    "bytes": 361,
+    "sha256": "0f505a2e1f27e5639758ab4110f590f92a91a6c53823fe63d8ffb641596b9bfb"
+   },
+   "06_current_cal_sample_128.rx.bin": {
+    "b64_roundtrip_equal": true,
+    "bytes": 393,
+    "sha256": "df0e52107b880f821a0362b68779bff841efeab8cf800b0c893d6b2131e8e704"
+   },
+   "07_current_cal_show.rx.bin": {
+    "b64_roundtrip_equal": true,
+    "bytes": 361,
+    "sha256": "3d3c9c226de52647748cf8e8242dc664abf3d733dce79b4b1b16d4a901d88970"
+   }
+  },
+  "result_status": "VOLTAGE_OBSERVATION_ONLY",
+  "run_root_outside_repo": "D:\\ns800-m7-p0-r2-20261030T214542",
+  "sample": {
+   "cal_source": "THEORETICAL",
+   "cal_version": 1,
+   "fit": "READY",
+   "n_requested": 128,
+   "n_valid": 128,
+   "raw_max": 2079,
+   "raw_min": 2034,
+   "raw_sum": 263690,
+   "raw_sum_sq": 543223348,
+   "seq_first": 549607,
+   "seq_last": 549734,
+   "tick_first": 5618161,
+   "tick_last": 5619457
+  },
+  "stderr_bytes": 0,
+  "tx_attempts": 7,
+  "verifier_sha256": "08559720b607a7cf503ff3ccf8daf787495ef8619ff3c3e1b3ee70b6f889887e",
+  "wait_dmm": 2
+ },
  "host_environment": {
   "default_text_encoding": "cp936 (GBK), locale.getpreferredencoding(False)",
   "installed_pyserial_path": "C:\\Users\\LMX\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages\\serial",

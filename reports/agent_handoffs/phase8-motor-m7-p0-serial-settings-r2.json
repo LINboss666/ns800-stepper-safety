@@ -209,13 +209,15 @@
     "software call path: one normal query reconfigured the Windows port 5 times before, 0 times after (real v3.5 setter and backend bodies under a fully faked Win32)",
     "R2-FRAME: the same 64 B healthy reply is rejected before the change and strictly accepted after, with the byte-exact patch applied",
     "the delivered candidate bytes equal the task section 5 table for both files",
-    "the packaged upstream v3.5 serialutil.py/serialwin32.py are byte-identical to this machine's installed pySerial 3.5, so the proven path is the path this host would execute"
+    "the packaged upstream v3.5 serialutil.py/serialwin32.py are byte-identical to this machine's installed pySerial 3.5, so the proven path is the path this host would execute",
+    "same board, same cable/port, same single CR: with post-open serial settings writes removed the reply is byte-identical to the historical clean capture (64 B / 3617c305) and the 62 B corruption did not recur"
   ],
   "not_proven": [
     "PHYSICAL_CAUSE_NOT_CLOSED: whether the on-board 62 B corruption was caused by post-open reconfiguration needs the same-board A/B run",
     "no voltage data obtained; result.json absent; P0 still not VOLTAGE_OBSERVATION_ONLY",
     "CONSOLE_STREAM_INTEGRITY_UNRESOLVED remains open and is not closed by this offline round",
-    "no claim that any other mechanism (usbser/DAPLink behaviour, target print buffer) is excluded"
+    "no claim that any other mechanism (usbser/DAPLink behaviour, target print buffer) is excluded",
+    "one observation without a USB/physical cross-check: it supports R2-PORT as the cause of that corruption without excluding every other mechanism in general"
   ],
   "remote_blob_readback": {
     "calculator_blob": {
@@ -261,24 +263,31 @@
       "sha256": "99a449f6d80ee2999916b34acfaf6aa5f462f40b1bd7bdd871a4aba366ff8a45"
     }
   },
-  "device_actions": [],
+  "device_actions": [
+    "COM5 open 1 (success, one session, no reopen)",
+    "7 whitelisted sends",
+    "4 DMM voltage readings relayed from the operator"
+  ],
   "quota_consumed": {
-    "COM5_open": 0,
-    "board_commands_sent": 0,
+    "COM5_open": 1,
+    "active_resets": 0,
     "config_writes": 0,
-    "dap_sessions": 0,
-    "dmm_readings": 0,
+    "dap_or_pyocd": 0,
+    "dmm_readings": 4,
     "downloads": 0,
     "fault_clears": 0,
     "motor_actions": 0,
-    "resets": 0,
-    "target_flash_read": 0
+    "port_reopens": 0,
+    "retries": 0,
+    "sends": 7,
+    "target_flash_reads": 0
   },
   "prior_quota": "the COM5 allowance of the earlier continuation rounds is exhausted and was not carried over",
   "approval_status": {
-    "section_7_field_package_approved": false,
-    "basis": "the task states the file does not sign the approval on the user's behalf; the user conditioned field work on that package already carrying an explicit approval, and no such approval text has been given",
-    "verbatim_approval_needed": "批准按本包精确补丁修正并执行一次P0串口对照续测：离线前置通过后允许COM5打开1次、七次固定查询和四个电压读数；首条严格通过则同会话继续P0。禁止下载、目标Flash读取、DAP、主动复位、电机动作、改配置及重试。"
+    "section_7_field_package_approved": true,
+    "basis": "the user signed the section 7.4 sentence verbatim in this session after the single-line follow-up landed (2026-10-30 21:45)",
+    "verbatim_approval_needed": "批准按本包精确补丁修正并执行一次P0串口对照续测：离线前置通过后允许COM5打开1次、七次固定查询和四个电压读数；首条严格通过则同会话继续P0。禁止下载、目标Flash读取、DAP、主动复位、电机动作、改配置及重试。",
+    "verbatim": "批准按本包精确补丁修正并执行一次P0串口对照续测：离线前置通过后允许COM5打开1次、七次固定查询和四个电压读数；首条严格通过则同会话继续P0。禁止下载、目标Flash读取、DAP、主动复位、电机动作、改配置及重试。"
   },
   "acceptance_status": {
     "exact_byte_acceptance": "MET for the collector (c98bb712/23430, unchanged) and for the corrected verifier (08559720/26690)",
@@ -291,18 +300,37 @@
     ]
   },
   "open": [
-    "same-board A/B under the corrected collector (needs one new COM5 approval)",
-    "the three read_text sites listed under same_pattern_seen_untouched (read-only follow-up, not fixed here)",
-    "M6 and other candidates were not batch-fixed; only listed as readable follow-ups",
-    "P1 METHOD_NOT_READY, P2 NOT_AUTHORIZED, oscilloscope/A0 still deferred"
+    "P1 independent current reference still METHOD_NOT_READY with the four documented material/data prerequisites",
+    "real DIAG/SG trigger, worst-case stop latency and whole-machine acceptance remain open",
+    "the three other locale-dependent read_text() sites in the verifier stay untouched as a read-only follow-up",
+    "M6 and other candidates were not batch-fixed"
   ],
-  "next_step": "STOP: the field package still needs the user approval for one COM5 open, seven queries and four voltage readings. Nothing was flashed, built or connected in this reply.",
+  "next_step": "P0 registered as VOLTAGE_OBSERVATION_ONLY. Board left running and idle at the msh prompt; no further device action is authorized.",
   "evidence": {
     "dir": "reports/reviews/phase8-motor-m7-p0-serial-settings-r2",
     "files": [
       "SHA256SUMS.txt",
       "check_static_port_substance.py",
       "default_codepage_environment.txt",
+      "field_01_safety_state.rx.bin.b64",
+      "field_02_safety_status.rx.bin.b64",
+      "field_03_motor_status.rx.bin.b64",
+      "field_04_step_status.rx.bin.b64",
+      "field_05_current_cal_show.rx.bin.b64",
+      "field_06_current_cal_sample_128.rx.bin.b64",
+      "field_07_current_cal_show.rx.bin.b64",
+      "field_business_lines_as_read.txt",
+      "field_collector.stderr.txt",
+      "field_collector.stdout.txt",
+      "field_continuity_statement.txt",
+      "field_dmm_after.json",
+      "field_dmm_before.json",
+      "field_ledger.jsonl",
+      "field_passive_dmm_after.bin.b64",
+      "field_passive_dmm_before.bin.b64",
+      "field_raw_attach.bin.b64",
+      "field_result.json",
+      "field_run_record.md",
       "identities.json",
       "make_identities.py",
       "run_record.md",
@@ -366,7 +394,12 @@
     "R2_LOC_FOLLOW_UP_APPLIED_AS_THE_APPROVED_SINGLE_LINE / verifier 08559720b607a7cf503ff3ccf8daf787495ef8619ff3c3e1b3ee70b6f889887e 26690, whole-file diff = line 447 only",
     "DEFAULT_CODE_PAGE_RUN_cp936_UTF8MODE_0 / 37_OF_37_AND_11_OF_11_AND_9_OF_9_RC_0 / OUTPUTS_BYTE_EQUAL_TO_CLOUD_RECORDS",
     "COLLECTOR_AND_FIRMWARE_AND_IMAGES_UNCHANGED / OTHER_READ_TEXT_SITES_LEFT_UNTOUCHED_AS_OUT_OF_SCOPE / PRIOR_FIRST_FAILURES_KEPT",
-    "API_STUB_5_TO_0_RE_RUN_AGAINST_THE_DELIVERED_COLLECTOR / DEVICE_ACTIONS=[] / COM5_OPENS=0 / FIELD_PACKAGE_NOT_APPROVED_YET"
+    "API_STUB_5_TO_0_RE_RUN_AGAINST_THE_DELIVERED_COLLECTOR / DEVICE_ACTIONS=[] / COM5_OPENS=0 / FIELD_PACKAGE_NOT_APPROVED_YET",
+    "P0_FIELD_RUN_EXECUTED_RC0 / LEDGER_31_LINES / TX=7 COMMAND_ACCEPTED=7 WAIT_DMM=2 DMM_RECEIVED=2 COMPLETE=1 PORT_CLOSED=1",
+    "FIRST_STRICT_PASS_THEN_SAME_SESSION_CONTINUED / 01_safety_state 64 B 3617c305 IDENTICAL TO THE HISTORICAL CLEAN CAPTURE / 62 B CORRUPTION_DID_NOT_RECURE",
+    "COM5_OPENS=1_OF_1 DOWNLOADS=0 TARGET_FLASH_READS=0 DAP=0 ACTIVE_RESETS=0 MOTOR_ACTIONS=0 CONFIG_WRITES=0 RETRIES=0",
+    "VOLTAGE_OBSERVATION_ONLY_REGISTERED / sample128 128_of_128_valid raw_mean 2060.078 nominal 1660.14 mV / DMM 1661 then 1663 mV / V3v3 3324 then 3323 mV",
+    "NO_MEASURED_COEFFICIENT / ADC_ACCURACY_NOT_VERIFIED / H10-3_NOT_PROVEN_TO_BE_VDDA / CONSOLE_INTEGRITY_NOT_CLOSED_AS_A_GENERAL_PROPERTY"
   ],
   "r2_loc_follow_up": {
     "applied_on": "canonical LF blob exported from remote ee6eb33 into a repo-external directory; core.autocrlf never used for the comparison",
@@ -443,5 +476,203 @@
       "upstream35_probe_after_loc_fix.stderr.txt",
       "upstream35_probe_after_loc_fix.stdout.txt"
     ]
+  },
+  "field_execution": {
+    "approval_source_recorded_in_ledger_BIND": true,
+    "approved_verbatim": "批准按本包精确补丁修正并执行一次P0串口对照续测：离线前置通过后允许COM5打开1次、七次固定查询和四个电压读数；首条严格通过则同会话继续P0。禁止下载、目标Flash读取、DAP、主动复位、电机动作、改配置及重试。",
+    "ceiling": "VOLTAGE_OBSERVATION_ONLY; no MEASURED coefficient; H10-3 not proven to be VDDA; 3300/4095 nominal only; no ADC accuracy verdict; no phase-current RMS extrapolation; does not close console integrity as a general property or the whole-machine acceptance",
+    "collector_rc": 0,
+    "collector_sha256": "c98bb712bd454dd66ffabece49b8998075642b5cca4d07c85073a3508d90a726",
+    "command_accepted": 7,
+    "completions": 1,
+    "dmm": {
+      "after": {
+        "V3v3": {
+          "V": 3.323,
+          "observed_at": "UNKNOWN_TIME"
+        },
+        "Vadc": {
+          "V": 1.663,
+          "observed_at": "UNKNOWN_TIME"
+        },
+        "meter": "UT39A+",
+        "mode": "DCV",
+        "range_V": 4
+      },
+      "after_sha256": "446038dd5c510cbfaa698a7c84f0c90d3a209390a439023d7ab1dd02f940eaa1",
+      "before": {
+        "V3v3": {
+          "V": 3.324,
+          "observed_at": "UNKNOWN_TIME"
+        },
+        "Vadc": {
+          "V": 1.661,
+          "observed_at": "UNKNOWN_TIME"
+        },
+        "meter": "UT39A+",
+        "mode": "DCV",
+        "range_V": 4
+      },
+      "before_sha256": "c1ba10218f2f32905293bca8c0460758c6f506d1d65f9fc7ce1bdf1c951db867",
+      "observed_at_basis": "UNKNOWN_TIME - the user did not report clock times; log times were not substituted"
+    },
+    "dmm_received": 2,
+    "first_reply_decisive": {
+      "bytes": 64,
+      "equals_historical_clean_capture": true,
+      "equals_previous_corrupted_62B": false,
+      "previous_corrupted": {
+        "bytes": 62,
+        "sha256": "c26f480a5ebbd31500f7ac4219afe7dd2f6890c53d1bae591bcb66352aa88305"
+      },
+      "sha256": "3617c305227f177ddcfd0cc3a8fff23b9385201377b27647771dadbf52374858"
+    },
+    "identity_basis": "PRIOR_READBACK_PLUS_CONFIRMED_CONTINUITY, fresh_banner_required=false",
+    "ledger_kinds": {
+      "first": [
+        "BIND",
+        "PORT_OPEN_ATTEMPT",
+        "PORT_OPEN",
+        "CONTINUATION_ATTACH",
+        "TX_ATTEMPT",
+        "RX_COMPLETE"
+      ],
+      "last": [
+        "DMM_RECEIVED",
+        "COMPLETE",
+        "PORT_CLOSED"
+      ],
+      "lines": 31
+    },
+    "nominal": {
+      "max_mV": 1675.3846153846155,
+      "mean_mV": 1660.136217948718,
+      "min_mV": 1639.1208791208792
+    },
+    "out_dir": "D:\\ns800-m7-p0-r2-20261030T214542\\P0",
+    "physical_cause_grade": "supporting only: same board, same cable/port, same single CR, only change = no post-open serial settings writes; N=1, no USB/physical cross-check, so other mechanisms are not generally excluded",
+    "port_closed": 1,
+    "quota_consumed": {
+      "COM5_open": 1,
+      "active_resets": 0,
+      "config_writes": 0,
+      "dap_or_pyocd": 0,
+      "dmm_readings": 4,
+      "downloads": 0,
+      "fault_clears": 0,
+      "motor_actions": 0,
+      "port_reopens": 0,
+      "retries": 0,
+      "sends": 7,
+      "target_flash_reads": 0
+    },
+    "readings": [
+      {
+        "dmm_interval_mV": [
+          1647.695,
+          1674.305
+        ],
+        "dmm_limit_mV": 13.305,
+        "measured_mV": 1661.0,
+        "node": "Vadc",
+        "nominal_adc_minus_dmm_mV": -0.8637820512819872,
+        "observed_at": "UNKNOWN_TIME",
+        "phase": "before"
+      },
+      {
+        "dmm_interval_mV": [
+          3302.38,
+          3345.62
+        ],
+        "dmm_limit_mV": 21.62,
+        "measured_mV": 3324.0,
+        "node": "V3v3",
+        "nominal_adc_minus_dmm_mV": null,
+        "observed_at": "UNKNOWN_TIME",
+        "phase": "before"
+      },
+      {
+        "dmm_interval_mV": [
+          1649.685,
+          1676.315
+        ],
+        "dmm_limit_mV": 13.315,
+        "measured_mV": 1663.0,
+        "node": "Vadc",
+        "nominal_adc_minus_dmm_mV": -2.863782051281987,
+        "observed_at": "UNKNOWN_TIME",
+        "phase": "after"
+      },
+      {
+        "dmm_interval_mV": [
+          3301.385,
+          3344.615
+        ],
+        "dmm_limit_mV": 21.615000000000002,
+        "measured_mV": 3323.0,
+        "node": "V3v3",
+        "nominal_adc_minus_dmm_mV": null,
+        "observed_at": "UNKNOWN_TIME",
+        "phase": "after"
+      }
+    ],
+    "responses": {
+      "01_safety_state.rx.bin": {
+        "b64_roundtrip_equal": true,
+        "bytes": 64,
+        "sha256": "3617c305227f177ddcfd0cc3a8fff23b9385201377b27647771dadbf52374858"
+      },
+      "02_safety_status.rx.bin": {
+        "b64_roundtrip_equal": true,
+        "bytes": 481,
+        "sha256": "e5e13e52b47af4c10c824635a84bb7b14673d985d4d22510675da2127aa6358f"
+      },
+      "03_motor_status.rx.bin": {
+        "b64_roundtrip_equal": true,
+        "bytes": 1121,
+        "sha256": "fcd210a1b752c1114fd60b4cfd93bede29dedf4c87bc2b87f2e667f4f180a00e"
+      },
+      "04_step_status.rx.bin": {
+        "b64_roundtrip_equal": true,
+        "bytes": 226,
+        "sha256": "a1a49eb217f75e535d3aec7cdf1f55cb26f25e4fa7ae65eccb5f42fa800c320c"
+      },
+      "05_current_cal_show.rx.bin": {
+        "b64_roundtrip_equal": true,
+        "bytes": 361,
+        "sha256": "0f505a2e1f27e5639758ab4110f590f92a91a6c53823fe63d8ffb641596b9bfb"
+      },
+      "06_current_cal_sample_128.rx.bin": {
+        "b64_roundtrip_equal": true,
+        "bytes": 393,
+        "sha256": "df0e52107b880f821a0362b68779bff841efeab8cf800b0c893d6b2131e8e704"
+      },
+      "07_current_cal_show.rx.bin": {
+        "b64_roundtrip_equal": true,
+        "bytes": 361,
+        "sha256": "3d3c9c226de52647748cf8e8242dc664abf3d733dce79b4b1b16d4a901d88970"
+      }
+    },
+    "result_status": "VOLTAGE_OBSERVATION_ONLY",
+    "run_root_outside_repo": "D:\\ns800-m7-p0-r2-20261030T214542",
+    "sample": {
+      "cal_source": "THEORETICAL",
+      "cal_version": 1,
+      "fit": "READY",
+      "n_requested": 128,
+      "n_valid": 128,
+      "raw_max": 2079,
+      "raw_min": 2034,
+      "raw_sum": 263690,
+      "raw_sum_sq": 543223348,
+      "seq_first": 549607,
+      "seq_last": 549734,
+      "tick_first": 5618161,
+      "tick_last": 5619457
+    },
+    "stderr_bytes": 0,
+    "tx_attempts": 7,
+    "verifier_sha256": "08559720b607a7cf503ff3ccf8daf787495ef8619ff3c3e1b3ee70b6f889887e",
+    "wait_dmm": 2
   }
 }
