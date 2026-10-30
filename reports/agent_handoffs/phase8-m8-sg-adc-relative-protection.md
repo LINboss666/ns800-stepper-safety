@@ -62,3 +62,14 @@ P1 前提进展（本轮只做了有界离线核对，未收口）：`meters.uni
 3. 机载侧缺一个 `diag_relative` 自检（现在只能靠 `diag_status`/`diag_profile show` 观察）。
 4. 真机严重触发需要另一次显式加载实验授权（含人工切断手段）才可能推进。
 5. P1 的三项物料/资料前提仍未闭合（见 §1）。
+
+## 6. 远端逐 blob 回读（独立 fetch 后按 Git blob 复算）
+
+`remote_readback.md`：按**远端真实 ref 全名**复核（`main`、`phase7/full-embedded-software`、
+`phase8/tmc-drive-config`、`debug/tmc-uart-rootcause-20261028`、tag
+`v0.7-phase7-software-board-validated`），并对 `origin/<本轮分支>` 逐 blob 复算 39 个文件：
+判定口径、命中数与不一致数直接记在那份文件的 §3（本处不重复抄数，避免二次转录错误）；
+六枚镜像的远端散列与 `build_manifest.json` 登记值逐条 MATCH 记录在其 §4。
+
+证据目录的 `SHA256SUMS.txt` 明确**排除两个文件**：自身（清单不能哈希自己）与
+`remote_readback.md`（它是在清单定稿之后生成的，把它纳入清单会制造自我引用）。
