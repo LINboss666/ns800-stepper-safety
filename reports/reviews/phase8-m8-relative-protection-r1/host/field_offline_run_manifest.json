@@ -1449,5 +1449,6 @@
       "bytes": 7123,
       "sha256": "fe9a3d2eac45538c859e768ece7cf50e852f613e8a4b07ed805b0e15046ffea1"
     }
-  ]
+  ],
+  "console_recapture_note": "本轮第一次捕获控制台时没设 [Console]::OutputEncoding, 得到 cp936 字节, 那份件已作废未入库; 现在归档的 console.txt 是用带 OutputEncoding=UTF8 的命令重取的 UTF-8 原文, 并用 python 解码校验通过。"
 }

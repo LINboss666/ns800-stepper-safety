@@ -130,10 +130,13 @@ S7 会话4：真实保护演示（带负载一次观察，允许自然触发）�
 ## 8. 离线自检（本轮真跑，全部命中期望）
 
 ```
-powershell -NoProfile -ExecutionPolicy Bypass -File field\M8R1Field.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -Command
+  '[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; & "<仓库绝对路径>
+eports
+eviews\phase8-m8-relative-protection-r1ield\M8R1Field.ps1"'
 ```
 
-- 环境：Windows PowerShell 5.1；`python` 为主机解释器；不开任何串口、不导入 pyserial/pyOCD 设备对象。
+- 环境：Windows PowerShell 5.1；`python` 为主机解释器；不开任何串口、不导入 pyserial/pyOCD 设备对象。前面那句 `OutputEncoding` 不是可选的：直接 `-File` 跑时 Windows PowerShell 会按控制台代码页(cp936)输出中文，台账里的中文行就成了非 UTF-8 字节；本轮归档件是按上面这条命令取的 UTF-8 原文。
 - 计划合同：`F-01…F-13` 与 `G-01` 共 14 位在 SHIP 计划上全 PASS。
 - 元探针 9 个全 META-OK（每个只在指定合同位制造一次失败且无附带损伤）：
   `F-01_MIXEDCOMMIT`、`F-02_ROUTINE_POWER`、`F-03_TWOOPEN`、`F-06_CFGLOAD`、
@@ -147,7 +150,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File field\M8R1Field.ps1
   `REAL_UNAUTHORIZED → STOP:REAL_TRANSPORT_REFUSED`。
 - `M8FIELD RESULT: PASS(离线自检, 无设备动作)`，脚本退出码 0；台账原文见
   `host/field_selftest_console.txt` 与 `host/field_selftest_result.json`
-  （后者是 UTF-8 权威件；前者是控制台字节，中文按 cp936 渲染）。
+  （两份都是 UTF-8：`result.json` 由脚本自己以无 BOM UTF-8 写盘，`console.txt` 是按上面这条
+  带 `OutputEncoding` 的命令取的控制台原文。本轮第一次取控制台时漏了那句，得到的是 cp936 字节，
+  已作废并重取——这点在 `host/field_offline_run_manifest.json.note_console_encoding` 里也有登记）。
 
 **这些判据证明的是计划与门禁逻辑（含额度、顺序、拒绝路径）自洽，不证明任何板上的事。**
 真机行为仍是 `NOT_VERIFIED`；`safe_for_enable = false` 不变。
