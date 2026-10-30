@@ -71,13 +71,21 @@ typedef struct
      *   sg_seq/cur_seq: 来自 sensor_frame 的同名计数(仅真实成功读取才 +1)。
      *   sg_tick/cur_tick: 那次成功读取所在帧的 tick。
      *   cur_raw: 与 cur_valid 同一次采样的 12bit ADC 原始码(相对判据用它, 不用 mA)。
-     *   dir: motor_snapshot.dir(0/1), 工况门用。 */
+     *   dir: motor_snapshot.dir(0/1), 工况门用。
+     *   M8-R1/R6 追加 imu_seq/imu_tick: "IMU 真的采到了"的身份与时刻 —— 碰撞判据只认
+     *   新样本, 16 帧滑窗里留着的旧 peak 不构成"又撞了一次"。 */
     rt_uint32_t sg_seq;
     rt_uint32_t sg_tick;
     rt_uint32_t cur_seq;
     rt_uint32_t cur_tick;
     rt_uint32_t cur_raw;
+    rt_uint32_t imu_seq;
+    rt_uint32_t imu_tick;
     rt_uint8_t  dir;
+    /* M8-R1/R2.2: "运动事实是否真的取到了"。motor_state_t 的 0 就是 MOTOR_IDLE,
+     * 所以零初始化的输入看起来完全"静止" —— 取帧失败又取不到 motor 快照时, 必须
+     * 用这个位说明**不知道**在不在动, 引擎才敢把覆盖丢失算成降险义务。 */
+    rt_uint8_t  motion_known;
     /* 调用方按**当前**驱动配置+工况+采样定义算出的身份签名(与 profile.signature
      * 比较即知是否还在被批准的那个工况里)。0 = 未提供。 */
     rt_uint32_t live_signature;

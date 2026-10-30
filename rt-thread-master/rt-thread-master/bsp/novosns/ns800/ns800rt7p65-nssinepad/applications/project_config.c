@@ -116,7 +116,12 @@ static void cfg_fill_defaults_nolock(void)
 
 void project_config_defaults(void)
 {
-    cfg_take();
+    /* M8-R1 R3.8: 连"回默认"也是一次发布 —— 没有锁就什么都不写。 */
+    if (cfg_take_checked() != RT_EOK)
+    {
+        rt_kprintf("[CFG] defaults REFUSED: config lock unavailable\n");
+        return;
+    }
     cfg_fill_defaults_nolock();
     cfg_valid  = RT_FALSE;          /* 未经加载/显式设定 = 按降级处理 */
     cfg_health = SUBSYS_DEGRADED;
@@ -224,10 +229,18 @@ static rt_err_t cfg_apply_from(const project_config_t *src)
 
 /* ---------- 正式 API (project_config.h) ---------- */
 
+/* M8-R1 R3.8(复现 C3): profile 会经过的每一条 get/set/save/load/migration/default 路径
+ * 都必须处理"取锁失败"。三条硬规则:
+ *   - 没拿到锁就**不复制、不发布、不写 Flash**;
+ *   - 不 release 自己没获得的锁(未持有就 release 是 UB, 旧 cfg_take() 语义恰好会
+ *     在失败路径上走到 release);
+ *   - Flash I/O 只在拿到一致快照之后、且在锁**外**进行。
+ * 旧的 cfg_take()/cfg_release() 只保留给单字读(is_valid/health/migrated)那种
+ * "读到旧值也不构成副作用"的场合。 */
 rt_err_t project_config_get_snapshot(project_config_t *out)
 {
     if (out == RT_NULL) return -RT_EINVAL;
-    cfg_take();
+    if (cfg_take_checked() != RT_EOK) return -RT_EIO;   /* 没拿到锁: 不出快照 */
     *out = cfg;                        /* P1-7: 原子快照 */
     cfg_release();
     return RT_EOK;
@@ -260,8 +273,10 @@ rt_err_t project_config_set(const project_config_t *c)
     if (!config_in_range(c)) return -RT_EINVAL;   /* 非法整套: 不改现有配置 */
     tmp = *c;
 
-    /* cal 更新不做 I/O: 与 cfg 发布同锁完成, 防止旧发布晚到覆盖新系数。 */
-    cfg_take();
+    /* cal 更新不做 I/O: 与 cfg 发布同锁完成, 防止旧发布晚到覆盖新系数。
+     * M8-R1 R3.8: 取锁失败 ⇒ 一个字段都不改, 也不 release。 */
+    e = cfg_take_checked();
+    if (e != RT_EOK) return e;
     e = cfg_apply_from(&tmp);
     if (e == RT_EOK)
     {
@@ -313,8 +328,11 @@ rt_err_t project_config_save(void)
     project_config_t snap;
 
     /* Fix B: 先在锁内取一致副本, 再在锁外做 Flash IO —— 既不会把半套配置
-     * 写进 Flash, 也不会让 Flash 擦写(毫秒级)阻塞 cfg_lock 的持有者。 */
-    cfg_take();
+     * 写进 Flash, 也不会让 Flash 擦写(毫秒级)阻塞 cfg_lock 的持有者。
+     * M8-R1 C3: 这条路径原来用的是**无返回码的 cfg_take()** —— 取锁失败时照样
+     * `snap = cfg` 往下写 Flash, 并且 release 了一把根本没获得的锁(实测 rc=0、
+     * saved=1、releases=2)。现在: 没拿到锁 = 不出快照 = 不发 Flash 写。 */
+    if (cfg_take_checked() != RT_EOK) return -RT_EIO;
     snap = cfg;
     cfg_release();
 
@@ -362,7 +380,10 @@ rt_err_t project_config_load(void)
         }
     }
 
-    cfg_take();
+    /* M8-R1 R3.8: 发布(load 与 v2→v3 migration 走的同一段)必须有锁。取不到锁就
+     * **什么都不改**直接返回 —— 运行期消费者(Diagnosis 的覆盖档)会把"拿不到
+     * profile"如实算成一次降险义务, 而不是拿一份半新半旧的旧工作集继续跑。 */
+    if (cfg_take_checked() != RT_EOK) return -RT_EIO;
     if (ok)
     {
         apply_e = cfg_apply_from(&tmp);
@@ -516,7 +537,11 @@ MSH_CMD_EXPORT(config_show, show runtime configuration);
 
 static void config_default(void)
 {
-    cfg_take();
+    if (cfg_take_checked() != RT_EOK)        /* M8-R1 R3.8: 无锁不发布 */
+    {
+        rt_kprintf("[CFG] default REFUSED: config lock unavailable\n");
+        return;
+    }
     cfg_fill_defaults_nolock();
     cfg_valid  = RT_TRUE;    /* 操作员显式选定默认值作为工作集 */
     cfg_health = SUBSYS_OK;
@@ -557,9 +582,11 @@ rt_err_t project_config_boot(void)
     if (ns_storage_init() != RT_EOK)
     {
         rt_kprintf("[CFG] storage init FAILED -> safe defaults, DEGRADED\n");
-        cfg_take();
-        (void)cfg_apply_from(&cfg);    /* 显式回 THEORETICAL */
-        cfg_release();
+        if (cfg_take_checked() == RT_EOK)   /* M8-R1 R3.8: 无锁不改 ADC 运行时系数 */
+        {
+            (void)cfg_apply_from(&cfg);    /* 显式回 THEORETICAL */
+            cfg_release();
+        }
         return RT_EOK;
     }
 

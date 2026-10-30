@@ -9,6 +9,11 @@
 
 #include "rtthread.h"
 
+/* stop_priority.h 里有以 struct rt_device_pwm* 为参数的声明。真实 rtdevice.h 在
+ * pwm 子头里定义它, 本 shim 不实现 PWM 设备 —— 前置声明只为让"指针形参"有作用域,
+ * 不引入任何新语义(被测代码从不解引用它)。 */
+struct rt_device_pwm;
+
 #define PIN_INPUT          0
 #define PIN_OUTPUT         1
 #define PIN_MODE_INPUT     0

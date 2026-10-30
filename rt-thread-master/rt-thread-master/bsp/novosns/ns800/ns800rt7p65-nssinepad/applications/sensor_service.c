@@ -97,8 +97,13 @@ static void s_collect(sensor_frame_t *f, sensor_frame_t *base_prev,
         f->vib_mg = (rt_int16_t)s_isqrt((rt_uint32_t)(
             (rt_int32_t)mx * mx + (rt_int32_t)my * my + (rt_int32_t)mz * mz));
         f->valid_imu = 1; f->fresh_imu = 1;
+        /* M8-R1/R6: 与 sg_seq/cur_seq 同纪律 —— 只有**这次真的读成功**才 +1 并盖 tick。
+         * 碰撞判据要靠它把"又采到一次"与"帧里还留着上一次的峰值"分开。 */
+        f->imu_seq  = base_prev->imu_seq + 1u;
+        f->imu_tick = f->timestamp;
     }
     else { f->valid_imu = 0; f->fresh_imu = 0; }
+    /* 失败分支: imu_seq/imu_tick 原样继承基帧(保留值不是新样本)。 */
 
     /* 电流(单次采样一次换算, 不重复推 EMA) */
     if (current_adc_read_measurement_cal(&raw, RT_NULL, &ma, &cal) == RT_EOK)
@@ -312,7 +317,7 @@ static void sensor_selftest(void)
 {
     sensor_frame_t f;
     sensor_frame_t test_prev;           /* 自检专用基帧 */
-    rt_uint32_t base_sg_seq, base_cur_seq;   /* M8: 身份断言的基值 */
+    rt_uint32_t base_sg_seq, base_cur_seq, base_imu_seq;   /* M8/M8-R1: 身份断言的基值 */
     sensor_frame_t prod_prev_before;
     rt_uint32_t test_seq = 0;
     rt_uint32_t prod_seq_before, prod_seq_after;
@@ -328,6 +333,7 @@ static void sensor_selftest(void)
     rt_memset(&f, 0, sizeof(f));
     base_sg_seq = test_prev.sg_seq;                  /* M8: 断言增量前先取基值 */
     base_cur_seq = test_prev.cur_seq;
+    base_imu_seq = test_prev.imu_seq;
     s_collect(&f, &test_prev, &test_seq);            /* 不碰 s_prev / s_seq */
 
     /* 垃圾 valid 位(0xAB 非零)必须被真实采集结果覆盖。
@@ -382,13 +388,21 @@ static void sensor_selftest(void)
     if (f.valid_current && (f.cur_seq != base_cur_seq + 1u || f.cur_tick != f.timestamp))
     { rt_kprintf("[SNS-ST] adc identity FAIL (cur_seq %u)\n",
                  (unsigned)f.cur_seq); pass = 0; }
-    rt_kprintf("[SNS-ST] identity base sg=%u cur=%u -> now sg=%u cur=%u\n",
-               (unsigned)base_sg_seq, (unsigned)base_cur_seq,
-               (unsigned)f.sg_seq, (unsigned)f.cur_seq);
+    /* M8-R1/R6: IMU 同一纪律 —— 碰撞判据的"独立样本"完全靠这个身份。 */
+    if (f.valid_imu && (f.fresh_imu != 1 || f.imu_seq != base_imu_seq + 1u ||
+                        f.imu_tick != f.timestamp))
+    { rt_kprintf("[SNS-ST] imu identity FAIL (imu_seq %u ->%u fresh=%d)\n",
+                 (unsigned)base_imu_seq, (unsigned)f.imu_seq, f.fresh_imu); pass = 0; }
+    if (!f.valid_imu && f.fresh_imu == 1)
+    { rt_kprintf("[SNS-ST] imu fresh without valid\n"); pass = 0; }
+    rt_kprintf("[SNS-ST] identity base sg=%u cur=%u imu=%u -> now sg=%u cur=%u imu=%u\n",
+               (unsigned)base_sg_seq, (unsigned)base_cur_seq, (unsigned)base_imu_seq,
+               (unsigned)f.sg_seq, (unsigned)f.cur_seq, (unsigned)f.imu_seq);
 
-    rt_kprintf("[SNS-ST] frame: imu[v=%d f=%d] cur[v=%d f=%d] sg[v=%d f=%d] id(sg=%u cur=%u)\n",
+    rt_kprintf("[SNS-ST] frame: imu[v=%d f=%d] cur[v=%d f=%d] sg[v=%d f=%d] id(sg=%u cur=%u imu=%u)\n",
                f.valid_imu, f.fresh_imu, f.valid_current, f.fresh_current,
-               f.valid_sg, f.fresh_sg, (unsigned)f.sg_seq, (unsigned)f.cur_seq);
+               f.valid_sg, f.fresh_sg, (unsigned)f.sg_seq, (unsigned)f.cur_seq,
+               (unsigned)f.imu_seq);
     rt_kprintf("[SNS-ST] private seq advanced to %u (live s_seq was %u)\n",
                test_seq, prod_seq_before);
 

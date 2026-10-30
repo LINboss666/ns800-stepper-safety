@@ -342,36 +342,24 @@ static diag_verdict_t diag_engine_step(diag_engine_t *e, const diag_input_t *in)
  * 跳过 mdelay, 在同帧未更新时会把 prio 9 线程变成忙等, 饿死 prio >= 9 的
  * bblog(18)/ui(20)/tshell(20)。同帧去重现在由引擎负责。
  *
- * M8: "相对保护是否真的在覆盖"是一个**状态**, 只在状态变化时打印一次。
- * 早期写法是每帧打印 "profile absent -> protection NOT active", 而 100Hz 线程
- * 每帧打印会把控制台刷爆(本板已有 stack-watermark 刷屏导致采集器不可用的先例),
- * 同时把真正的触发摘要埋掉。三个非 OK 态一律 fail-closed: 不步进、不宣称有效。 */
-
-typedef enum
-{
-    RELCOV_OK = 0,            /* profile 在、校验通过、签名与 live 一致 */
-    RELCOV_LOCK_FAIL,         /* 取不到配置快照: 不知道有没有 profile */
-    RELCOV_ABSENT,            /* 没有已提交 profile */
-    RELCOV_SIG_MISMATCH       /* profile 属于别的工况/驱动配置 */
-} rel_cov_t;
-
-static const char *rel_cov_name(rel_cov_t c)
-{
-    switch (c)
-    {
-    case RELCOV_OK:            return "COVERED";
-    case RELCOV_LOCK_FAIL:     return "NOT-ACTIVE(config-lock)";
-    case RELCOV_ABSENT:        return "NOT-ACTIVE(no-profile)";
-    default:                   return "NOT-ACTIVE(sig-mismatch)";
-    }
-}
-
+ * M8-R1 取代 M8 的"三个非 OK 覆盖态一律不步进", 落成两条相反方向的纪律:
+ *   1) **先保护, 后披露**。失去判据覆盖(profile 丢/签名漂移/取锁失败/取不到帧)
+ *      不是一条"这一步可以跳过"的信息 —— 已显式 RELATIVE 武装时它是一条有界的
+ *      降险义务, 由引擎判 REL_COVERAGE_LOST 并走同一条 Safety 短保护。所有状态
+ *      打印都排在 rel_prod_evaluate() 之后(B2/B3 的复现点正是这个次序)。
+ *   2) **取不到帧也要推进监督**。旧写法在 get_latest 失败/seq==0 时直接 continue,
+ *      于是"帧流停了"这个状态永远不会累积成失效; 现在用当前 tick + 能取到的运动
+ *      事实照样步进一步(coverage=NOFRAME), 运动事实也取不到时 motion_known=0,
+ *      引擎不因此宣称覆盖有效(R2.2)。
+ * 覆盖状态只在**变化**时打印一次(100Hz 线程每帧打印会把真正的触发摘要埋掉,
+ * 本板已有 stack-watermark 刷屏导致采集器不可用的先例)。 */
 static void diag_thread_entry(void *param)
 {
     sensor_frame_t f;
     diag_input_t in;
     diag_rprof_t prof;
     rt_uint8_t cov_shown = 0xFFu;      /* 0xFF = 尚未打印过任何覆盖状态 */
+    rt_uint8_t cov = RELCOV_OK;
 
     (void)param;
 
@@ -380,43 +368,97 @@ static void diag_thread_entry(void *param)
         rt_bool_t acted = RT_FALSE;
         rt_err_t post_rc = RT_EOK;
         rt_err_t ge;
-        rel_cov_t cov;
+        rt_uint8_t have_frame;
+        rel_step_arg_t a;
 
         diag_sync_config();              /* 阈值跟随持久化配置(每帧同步) */
-        if (sensor_service_get_latest(&f) != RT_EOK || f.seq == 0)
-        {
-            rt_thread_mdelay(10);
-            continue;
-        }
+        have_frame = (sensor_service_get_latest(&f) == RT_EOK && f.seq != 0);
 
         rt_memset(&in, 0, sizeof(in));
-        in.seq         = f.seq;
-        in.timestamp   = f.timestamp;
-        in.sg_valid    = f.valid_sg;
-        in.sg          = f.sg_result;
-        in.cur_valid   = f.valid_current;
-        in.current_ma  = f.current_ma;
-        in.imu_valid   = f.valid_imu;
-        in.vib_mg      = f.vib_mg;
-        in.motor_state = f.motor_state;
-        in.step_hz     = f.step_hz;
-        /* M8: 源样本身份与 live 签名。年龄/独立样本判定全靠这几个值。 */
-        in.sg_seq  = f.sg_seq;
-        in.sg_tick = f.sg_tick;
-        in.cur_seq = f.cur_seq;
-        in.cur_tick = f.cur_tick;
-        in.cur_raw = f.current_raw;
-        in.dir     = f.dir;
+        if (have_frame)
+        {
+            in.seq         = f.seq;
+            in.timestamp   = f.timestamp;
+            in.sg_valid    = f.valid_sg;
+            in.sg          = f.sg_result;
+            in.cur_valid   = f.valid_current;
+            in.current_ma  = f.current_ma;
+            in.imu_valid   = f.valid_imu;
+            in.vib_mg      = f.vib_mg;
+            in.motor_state = f.motor_state;
+            in.step_hz     = f.step_hz;
+            /* M8: 源样本身份与 live 签名。年龄/独立样本判定全靠这几个值。 */
+            in.sg_seq  = f.sg_seq;
+            in.sg_tick = f.sg_tick;
+            in.cur_seq = f.cur_seq;
+            in.cur_tick = f.cur_tick;
+            in.cur_raw = f.current_raw;
+            in.imu_seq = f.imu_seq;
+            in.imu_tick = f.imu_tick;
+            in.dir     = f.dir;
+            in.motion_known = 1;         /* 帧里的运动字段来自成功的 motor 快照 */
+        }
+        else
+        {
+            /* 没有帧: 用当前时刻与**能取到的**运动事实推进失效监督。 */
+            motor_snapshot_t ms;
+
+            in.timestamp = rt_tick_get();
+            in.motion_known = (motor_get_snapshot(&ms) == RT_EOK) ? 1u : 0u;
+            if (in.motion_known)
+            {
+                in.motor_state = (rt_uint8_t)ms.state;
+                in.step_hz     = ms.current_hz;
+                in.dir         = ms.dir;
+            }
+        }
         in.live_signature = rel_live_signature();
 
         diag_engine_step(&d_prod, &in);     /* 重复 seq 由引擎直接返回当前判定 */
 
         rt_memset(&prof, 0, sizeof(prof));
         ge = project_config_get_rprof(&prof);
-        if (ge != RT_EOK)                             cov = RELCOV_LOCK_FAIL;
-        else if (prof.magic == 0)                     cov = RELCOV_ABSENT;
+        if (!have_frame)                         cov = RELCOV_NOFRAME;
+        else if (ge != RT_EOK)                   cov = RELCOV_LOCK_FAIL;
+        else if (prof.magic == 0)                cov = RELCOV_ABSENT;
         else if (prof.signature != in.live_signature) cov = RELCOV_SIG_MISMATCH;
-        else                                          cov = RELCOV_OK;
+        else                                     cov = RELCOV_OK;
+
+        rt_memset(&a, 0, sizeof(a));
+        a.in       = in;
+        a.prof     = prof;
+        a.now_tick = rt_tick_get();
+        a.coverage = cov;
+        a.mode     = (rt_uint8_t)d_mode;
+        /* 即使 MONITOR_ONLY 也步进: 让 diag_status 能给出"若启用会怎样"的实时状态,
+         * 但真实 post 只在 RELATIVE_PROTECTION 内发生(rel_prod_evaluate 内部判)。 */
+        (void)rel_prod_evaluate(&a, (rt_uint8_t)d_mode, &post_rc, &acted);
+
+        /* ---- 以下全是"保护之后"的披露 ---- */
+        if (acted)
+        {
+            rel_latch_t l;
+
+            /* R2.4: 一次真实触发消耗本次武装的票据。模式当场退回 MONITOR_ONLY 并
+             * 明说 REARM_REQUIRED —— 不允许出现"界面仍写 RELATIVE_ACTIVE、引擎却
+             * 永久不再发第二次请求"这种自相矛盾(C6 就是这个状态)。
+             * 这是 Safety 降险引起的**内部**安全转换, 不走人工模式门(R3.1)。 */
+            d_mode = DIAG_MODE_MONITOR_ONLY;
+            if (rel_prod_get_latch(&l))
+            {
+                rt_kprintf("[DIAG] REL TRIP r=%s id=%u rev=%u post_rc=%d\n",
+                           rel_reason_name(l.reason), (unsigned)l.profile_id,
+                           (unsigned)l.revision, (int)l.post_rc);
+                rt_kprintf("[DIAG] REL TRIP val=%d thr=%d ms=%u cov=%u\n",
+                           (int)l.value_raw, (int)l.threshold_raw,
+                           (unsigned)l.persisted_ms, (unsigned)l.coverage_at_trip);
+                rt_kprintf("[DIAG] REL TRIP sg=%u cur=%u imu=%u tick=%u n=%u\n",
+                           (unsigned)l.first_sg_seq, (unsigned)l.first_cur_seq,
+                           (unsigned)l.first_imu_seq, (unsigned)l.trig_tick,
+                           (unsigned)l.severe_cnt);
+            }
+            rt_kprintf("[DIAG] REL trip ticket used; mode=MONITOR_ONLY rearm required\n");
+        }
 
         if ((rt_uint8_t)cov != cov_shown)
         {
@@ -424,35 +466,10 @@ static void diag_thread_entry(void *param)
             /* 只有真的开了相对保护, "不再覆盖"才是操作员必须立刻知道的事;
              * MONITOR_ONLY 下同一状态由 diag_status 按需查看, 不占串口。 */
             if (d_mode == DIAG_MODE_RELATIVE_PROTECTION)
-                rt_kprintf("[DIAG] RELATIVE coverage=%s id=%u rev=%u live=%u prof=%u\n",
+                rt_kprintf("[DIAG] REL coverage=%s id=%u rev=%u live=%u prof=%u\n",
                            rel_cov_name(cov), (unsigned)prof.profile_id,
                            (unsigned)prof.revision, (unsigned)in.live_signature,
                            (unsigned)prof.signature);
-        }
-
-        if (cov == RELCOV_OK)
-        {
-            rel_step_arg_t a;
-            rt_memset(&a, 0, sizeof(a));
-            a.in = in;
-            a.prof = prof;
-            a.now_tick = rt_tick_get();
-            /* 即使 MONITOR_ONLY 也步进: 让 diag_status 能给出"若启用会怎样"的
-             * 实时状态, 但**只有** RELATIVE_ACTIVE 才允许 rel_prod_evaluate 内部
-             * 真实 post(见 acted 判据)。 */
-            (void)rel_prod_evaluate(&a, (rt_uint8_t)d_mode, &post_rc, &acted);
-            if (acted)
-            {
-                rel_latch_t l;
-                if (rel_prod_get_latch(&l))
-                    rt_kprintf("[DIAG] RELATIVE: reason=%s id=%u rev=%u val=%d thr=%d"
-                               " for=%ums sg_seq=%u cur_seq=%u post_rc=%d\n",
-                               rel_reason_name(l.reason), (unsigned)l.profile_id,
-                               (unsigned)l.revision, (int)l.value_raw,
-                               (int)l.threshold_raw, (unsigned)l.persisted_ms,
-                               (unsigned)l.first_sg_seq, (unsigned)l.first_cur_seq,
-                               (int)l.post_rc);
-            }
         }
         rt_thread_mdelay(10);               /* 100Hz */
     }
@@ -479,6 +496,8 @@ rt_err_t diagnosis_init(void)
     d_prod.may_report = RT_TRUE;            /* 生产上下文才允许上报 Safety 事件 */
     diag_engine_reset(&d_prod);
 
+    rel_ctl_lock_init();              /* M8-R1: 事故快照/代际的短临界区 */
+
     d_tid = rt_thread_create("diag", diag_thread_entry, RT_NULL,
                              1024, 9, 10);  /* prio 9, 100Hz */
     if (d_tid == RT_NULL) { d_health = SUBSYS_FAILED; return -RT_ERROR; }
@@ -490,12 +509,37 @@ rt_err_t diagnosis_init(void)
     return RT_EOK;
 }
 
+/* 人工模式门(M8-R1 R3.1 / 复现 C1): 任何**实际发生的**模式改变都必须先证得静止+
+ * 可信禁能。"关保护"同样是模式改变 —— CRUISE 中把 RELATIVE 关掉, 正在转的轴会
+ * 瞬间失去判据而不产生任何降险, 这与"开启不得在运动中"是同一条理由。
+ * Safety 降险引起的内部退回(diag_thread_entry 里那次)不走本门, 否则一次真实触发
+ * 之后连降级本身都做不了。 */
+static rt_err_t diag_human_mode_gate(const char *who)
+{
+    motor_snapshot_t ms;
+
+    if (motor_get_snapshot(&ms) != RT_EOK ||
+        ms.state != MOTOR_IDLE || ms.armed != 0 ||
+        ms.current_hz != 0 || ms.target_hz != 0)
+    { rt_kprintf("[DIAG] %s REFUSED: mode change needs static/idle\n", who); return -RT_EPERM; }
+    if (safety_state_get() != SAFETY_READY)
+    { rt_kprintf("[DIAG] %s REFUSED: safety not READY\n", who); return -RT_EPERM; }
+    return RT_EOK;
+}
+
 rt_err_t diagnosis_set_mode(diag_mode_t mode)
 {
+    if (mode == d_mode)                    /* 同值请求: 不改状态、不重置引擎 */
+    {
+        rt_kprintf("[DIAG] mode=%s (unchanged)\n", mode_name(d_mode));
+        return RT_EOK;
+    }
+    if (diag_human_mode_gate("mode") != RT_EOK) return -RT_EPERM;
+
     if (mode == DIAG_MODE_ACTIVE_PROTECTION)
     {
         /* P1-7 / Fix B 标定门禁: 只有实测标定来源才允许 ACTIVE_PROTECTION;
-         * 理论默认值(THEORETICAL)不得驱动保护动作 */
+         * 理论默认值(THEORETICAL)不得驱动保护动作。本门与相对模式互不影响。 */
         if (current_adc_cal_source() != CURRENT_ADC_CAL_MEASURED)
         {
             rt_kprintf("[DIAG] ACTIVE REFUSED: calibration source=%d"
@@ -506,12 +550,14 @@ rt_err_t diagnosis_set_mode(diag_mode_t mode)
     }
     else if (mode == DIAG_MODE_RELATIVE_PROTECTION)
     {
-        /* M8 相对保护的开启门禁。顺序固定, 任一不过 ⇒ 直接返回, **d_mode 保持原值**
+        /* 相对保护的开启门禁。顺序固定, 任一不过 ⇒ 直接返回, **d_mode 保持原值**
          * (拒绝不得留下"半个相对模式")。CONFIRM 凭据用掉即清, 不存在自动放行。 */
         diag_rprof_t p;
         const char *why = RT_NULL;
-        motor_snapshot_t ms;
-        rt_err_t e;
+        sensor_frame_t fr;
+        rt_err_t rc, get;
+        rt_uint32_t live;
+        rel_incident_t inc;
 
         if (d_relative_confirm_given != RT_TRUE)
         {
@@ -520,43 +566,53 @@ rt_err_t diagnosis_set_mode(diag_mode_t mode)
         }
         d_relative_confirm_given = RT_FALSE;
 
-        rt_memset(&p, 0, sizeof(p));
-        e = project_config_get_rprof(&p);
-        if (e != RT_EOK)
-        { rt_kprintf("[DIAG] RELATIVE REFUSED: config snapshot rc=%d\n", e); return -RT_EIO; }
-        if (p.magic == 0)
-        { rt_kprintf("[DIAG] RELATIVE REFUSED: no committed profile\n"); return -RT_EPERM; }
-        if (rel_profile_validate(&p, &why) != RT_EOK)
-        { rt_kprintf("[DIAG] RELATIVE REFUSED: profile rejected(%s)\n", why); return -RT_EINVAL; }
-        if (p.signature != rel_live_signature())
+        /* M8-R1 C2: 最终资格复核必须发生在**同一个静止事务**里。
+         * motor_calibration_static_begin() 自身重查 armed=0 / IDLE / hz=0 /
+         * SAFETY_READY / 停机协调器空闲 / PWM 已关且输出不活动 / DRV_ENABLE 为低
+         * (即可信禁能) —— 入口另读一份快照替代不了它, 而且 begin 被拒时必须拒绝
+         * 开启(旧实现根本没调过这道门)。 */
+        if (motor_calibration_static_begin() != RT_EOK)
         {
-            rt_kprintf("[DIAG] RELATIVE REFUSED: sig %u != live %u\n",
-                       (unsigned)p.signature, (unsigned)rel_live_signature());
-            return -RT_EPERM;
+            rt_kprintf("[DIAG] RELATIVE REFUSED: static txn not granted\n");
+            return -RT_EBUSY;
         }
-        /* 开启保护动作模式不得发生在运动中, 也不得在安全链未就绪时发生。 */
-        if (motor_get_snapshot(&ms) != RT_EOK || ms.state != MOTOR_IDLE ||
-            ms.armed != 0 || ms.current_hz != 0 || ms.target_hz != 0)
-        { rt_kprintf("[DIAG] RELATIVE REFUSED: motor not static/idle\n"); return -RT_EPERM; }
-        if (safety_state_get() != SAFETY_READY)
-        { rt_kprintf("[DIAG] RELATIVE REFUSED: safety not READY\n"); return -RT_EPERM; }
+        rt_memset(&p, 0, sizeof(p));
+        get  = project_config_get_rprof(&p);          /* mot -> cfg 顺序, 与 M7 一致 */
+        live = rel_live_signature();
+        rc = RT_EOK;
+        if (get != RT_EOK)                            rc = -RT_EIO;
+        else if (p.magic == 0)                        rc = -RT_EPERM;
+        else if (rel_profile_validate(&p, &why) != RT_EOK) rc = -RT_EINVAL;
+        else if (p.signature != live)                 rc = -RT_EPERM;
+        else if (sensor_service_get_latest(&fr) != RT_EOK || fr.seq == 0 ||
+                 !fr.valid_sg || !fr.valid_current)   rc = -RT_EPERM;
+        motor_calibration_static_end();
+        if (rc != RT_EOK)
+        {
+            rt_kprintf("[DIAG] RELATIVE REFUSED: rc=%d (%s)\n", (int)rc,
+                       (rc == -RT_EINVAL && why) ? why :
+                       (get != RT_EOK ? "config-lock" :
+                        p.magic == 0 ? "no committed profile" :
+                        p.signature != live ? "sig != live" : "source unhealthy"));
+            return rc;
+        }
 
         /* 阈值来源如实披露: 学习生成的裕量从未经过真实异常样本验证。 */
-        rt_kprintf("[DIAG] RELATIVE thresholds=%s\n",
-                   (p.flags & RPF_FIELD_VERIFIED) ? "FIELD_VERIFIED" : "FIELD_UNVERIFIED");
+        rt_kprintf("[DIAG] REL thresholds=%s id=%u rev=%u tier=%u\n",
+                   (p.flags & RPF_FIELD_VERIFIED) ? "FIELD_VERIFIED" : "FIELD_UNVERIFIED",
+                   (unsigned)p.profile_id, (unsigned)p.revision,
+                   (unsigned)p.threshold_tier);
         /* 清事故 latch 只能发生在"操作员显式重新武装"这一刻, 而且必须**先把旧
-         * 原因打出来再清** —— 静默擦掉上一轮首次触发就等于抹掉证据。
-         * 反过来, latch 不清就无法保护下一次事故, 所以重新武装是唯一的清闸路径,
-         * 这一点也写进状态行(diag_relative_status_lines)。 */
-        {
-            rel_latch_t old;
-
-            if (rel_prod_get_latch(&old))
-                rt_kprintf("[DIAG] RELATIVE re-arm: clearing prior latch=%s id=%u tick=%u rc=%d\n",
-                           rel_reason_name(old.reason), (unsigned)old.profile_id,
-                           (unsigned)old.trig_tick, (int)old.post_rc);
-        }
-        rel_prod_wipe();               /* 新一次武装: 不带入上一轮的年龄/持续/latch */
+         * 原因宣布出来** —— 静默擦掉上一轮首次触发就等于抹掉证据。真正 wipe 引擎
+         * 上下文的是 Diagnosis Thread 自己(见 rel_prod_sync_generation), 命令线程
+         * 只 bump 代际: 这样"命令擦掉在途义务"在结构上不可能(R3.3)。 */
+        rel_prod_get_incident(&inc);
+        if (inc.have_current)
+            rt_kprintf("[DIAG] REL re-arm prior r=%s id=%u tick=%u post_rc=%d\n",
+                       rel_reason_name(inc.current.reason),
+                       (unsigned)inc.current.profile_id, (unsigned)inc.current.trig_tick,
+                       (int)inc.current.post_rc);
+        rel_prod_request_rearm();
     }
     d_mode = mode;
     rt_kprintf("[DIAG] mode=%s\n", mode_name(d_mode));
@@ -619,49 +675,105 @@ static void diag_status(void)
     diag_relative_status_lines();
 }
 
-/* M8 相对保护状态行: 从一致快照只读打印, 每行目标 <=110 字节。 */
+/* M8-R1 R4.5 相对保护状态行: 每个字段都来自**同一批快照**(引擎快照 + profile 快照 +
+ * 事故快照各一次), 并且每行都按"合法 u32 最大值 / 最长原因名 / 负错误码"算过宽度,
+ * 目标 <=110 字节。
+ *
+ * 为什么要按最坏值算: 本板 RT-Thread 控制台缓冲是 128B(rt_kprintf 会剪到约 126B
+ * 并漏掉结尾 NUL), M8 交付的实测最长行是 141B —— 也就是说现场看到的"最后一列"
+ * 可能根本不是固件想说的内容。这里不加 RT_CONSOLEBUF_SIZE、不加全局打印大锁、
+ * 不动 UART 叶子, 只把行拆短。 */
 void diag_relative_status_lines(void)
 {
     diag_rprof_t p;
-    rel_latch_t l;
-    rt_uint32_t sgr, adcr, fused, ageb, outr, okr, sgn, adcn;
+    rel_state_t s;
+    rel_incident_t inc;
+    rt_uint32_t rup = 0, rdn = 0;
     rt_bool_t have;
     rt_uint32_t sig;
 
-    rel_prod_get_state(&sgr, &adcr, &fused, &ageb, &outr, &okr, &sgn, &adcn);
+    rel_prod_get_snapshot(&s);
     rt_memset(&p, 0, sizeof(p));       /* 取快照失败时也必须打印确定值, 不能是栈垃圾 */
     have = (project_config_get_rprof(&p) == RT_EOK && p.magic != 0);
     sig = rel_live_signature();
-    rt_kprintf("[DIAG] relative: mode=%s profile=%s id=%u rev=%u flags=%04X %s\n",
+    rel_prod_get_incident(&inc);
+    rel_adc_reach(&p, &rup, &rdn);
+
+    rt_kprintf("[DIAG] rel mode=%s prof=%s id=%u rev=%u flg=%04X %s\n",
                mode_name(d_mode), have ? "PRESENT" : "NONE",
                (unsigned)p.profile_id, (unsigned)p.revision, (unsigned)p.flags,
-               (have && (p.flags & RPF_FIELD_VERIFIED)) ? "FIELD_VALIDATED"
+               (have && (p.flags & RPF_FIELD_VERIFIED)) ? "FIELD_VERIFIED"
                                                        : "FIELD_UNVERIFIED");
-    if (have)
-        rt_kprintf("[DIAG] rel band adc[%u..%u]n%u sg[%u..%u] dev%d/%d drop%u/%u\n",
-                   p.run_adc_min, p.run_adc_max, p.run_adc_n,
-                   p.run_sg_min, p.run_sg_max,
-                   p.adc_dev_warn, p.adc_dev_trip, p.sg_drop_warn, p.sg_drop_trip);
-    rt_kprintf("[DIAG] rel run sg=%ums/%u adc=%ums/%u fused=%ums age=%ums out=%ums\n",
-               (unsigned)sgr, (unsigned)sgn, (unsigned)adcr, (unsigned)adcn,
-               (unsigned)fused, (unsigned)ageb, (unsigned)outr);
-    if (rel_prod_get_latch(&l))
+    rt_kprintf("[DIAG] rel cov=%s lost=%u gen=%u rearm=%d\n",
+               rel_cov_name(s.coverage), (unsigned)s.cov_lost_ms,
+               (unsigned)inc.generation, (int)inc.rearm_required);
+    rt_kprintf("[DIAG] rel win hz=%u[%u..%u] dir=%u ph=%u\n",
+               (unsigned)p.hz_nominal, (unsigned)p.hz_low, (unsigned)p.hz_high,
+               (unsigned)p.dir_mask, (unsigned)p.phase_mask);
+    rt_kprintf("[DIAG] rel tmc=%u/%u/%u/%u mst=%u def=%u tier=%u\n",
+               (unsigned)p.tmc_cfg_state, (unsigned)p.tmc_irun, (unsigned)p.tmc_ihold,
+               (unsigned)p.tmc_vsense, (unsigned)p.mstep_source,
+               (unsigned)p.sampling_def, (unsigned)p.threshold_tier);
+    rt_kprintf("[DIAG] rel sig live=%u prof=%u match=%s\n",
+               (unsigned)sig, (unsigned)p.signature,
+               (have && p.signature == sig) ? "YES" : "NO");
+    rt_kprintf("[DIAG] rel band adc[%u..%u]n%u nz%u sg[%u..%u]n%u\n",
+               (unsigned)p.run_adc_min, (unsigned)p.run_adc_max,
+               (unsigned)p.run_adc_n, (unsigned)p.run_adc_noise,
+               (unsigned)p.run_sg_min, (unsigned)p.run_sg_max, (unsigned)p.run_sg_n);
+    rt_kprintf("[DIAG] rel thr dev=%d/%d drop=%u/%u reach=%u/%u\n",
+               (int)p.adc_dev_warn, (int)p.adc_dev_trip,
+               (unsigned)p.sg_drop_warn, (unsigned)p.sg_drop_trip,
+               (unsigned)rup, (unsigned)rdn);
+    rt_kprintf("[DIAG] rel dur=%u/%u/%u rec=%u mns=%u\n",
+               (unsigned)p.dur_sg_ms, (unsigned)p.dur_adc_ms, (unsigned)p.dur_fused_ms,
+               (unsigned)p.dur_recover_ms, (unsigned)p.min_new_sg);
+    rt_kprintf("[DIAG] rel age lim sg=%u frm=%u imu=%u imp=%u/%u/%u\n",
+               (unsigned)p.age_sg_ms, (unsigned)p.age_frame_ms, (unsigned)p.age_imu_ms,
+               (unsigned)p.impact_peak_mg, (unsigned)p.impact_new_min,
+               (unsigned)p.dur_impact_ms);
+    /* warn 与 strong 两级分别导出: 严重判据借 warn 的时间是 A1/A2 的复现点,
+     * 现场必须能看见"这一级自己攒了多少"。 */
+    rt_kprintf("[DIAG] rel sg warn=%u/%u strong=%u/%u\n",
+               (unsigned)s.sg_run_ms, (unsigned)s.sg_new_cnt,
+               (unsigned)s.sg_strong_run_ms, (unsigned)s.sg_strong_cnt);
+    rt_kprintf("[DIAG] rel adc warn=%u/%u strong=%u/%u\n",
+               (unsigned)s.adc_run_ms, (unsigned)s.adc_new_cnt,
+               (unsigned)s.adc_strong_run_ms, (unsigned)s.adc_strong_cnt);
+    rt_kprintf("[DIAG] rel fus=%u ok=%u imp=%u/%u\n",
+               (unsigned)s.fused_run_ms, (unsigned)s.ok_run_ms,
+               (unsigned)s.imp_run_ms, (unsigned)s.imp_cnt);
+    rt_kprintf("[DIAG] rel bad age=%u out=%u cov=%u imu_use=%u\n",
+               (unsigned)s.age_bad_ms, (unsigned)s.out_run_ms,
+               (unsigned)s.cov_lost_ms, (unsigned)s.imu_usable);
+    rt_kprintf("[DIAG] rel last sg=%u cur=%u imu=%u rsn=%s\n",
+               (unsigned)s.last_sg_seq, (unsigned)s.last_cur_seq,
+               (unsigned)s.last_imu_seq, rel_reason_name(s.verdict));
+    if (inc.have_current)
     {
-        rt_kprintf("[DIAG] rel LATCHED reason=%s id=%u val=%d thr=%d for=%ums rc=%d\n",
-                   rel_reason_name(l.reason), (unsigned)l.profile_id,
-                   (int)l.value_raw, (int)l.threshold_raw,
-                   (unsigned)l.persisted_ms, (int)l.post_rc);
+        rt_kprintf("[DIAG] rel LATCH r=%s id=%u rev=%u ms=%u post_rc=%d\n",
+                   rel_reason_name(inc.current.reason), (unsigned)inc.current.profile_id,
+                   (unsigned)inc.current.revision, (unsigned)inc.current.persisted_ms,
+                   (int)inc.current.post_rc);
+        rt_kprintf("[DIAG] rel LATCH val=%d thr=%u n=%u cov=%u tick=%u\n",
+                   (int)inc.current.value_raw, (unsigned)inc.current.threshold_raw,
+                   (unsigned)inc.current.severe_cnt, (unsigned)inc.current.coverage_at_trip,
+                   (unsigned)inc.current.trig_tick);
+        rt_kprintf("[DIAG] rel LATCH sg=%u cur=%u imu=%u\n",
+                   (unsigned)inc.current.first_sg_seq, (unsigned)inc.current.first_cur_seq,
+                   (unsigned)inc.current.first_imu_seq);
         /* 首次原因不可覆盖, 因此同一次武装内**不会**再触发新的保护请求。
          * 这一点必须显式说出来, 否则操作员看到 coverage=COVERED 会以为还在防护。 */
-        rt_kprintf("[DIAG] rel trip budget used: re-arm with 'diag_mode relative CONFIRM_EXPERIMENTAL'\n");
+        if (inc.rearm_required)
+            rt_kprintf("[DIAG] rel re-arm needed: diag_mode relative CONFIRM_EXPERIMENTAL\n");
     }
     else
         rt_kprintf("[DIAG] rel latch: none\n");
-    rt_kprintf("[DIAG] rel sig live=%u profile=%u match=%s\n",
-               (unsigned)sig, (unsigned)p.signature,
-               (have && p.signature == sig) ? "YES" : "NO");
+    if (inc.have_archived)
+        rt_kprintf("[DIAG] rel ARCHIVED r=%s id=%u tick=%u post_rc=%d\n",
+                   rel_reason_name(inc.archived.reason), (unsigned)inc.archived.profile_id,
+                   (unsigned)inc.archived.trig_tick, (int)inc.archived.post_rc);
 }
-
 
 MSH_CMD_EXPORT(diag_status, show diagnosis engine features and verdict);
 

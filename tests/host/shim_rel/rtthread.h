@@ -102,6 +102,13 @@ void        rt_exit_critical(void);
 rt_base_t   rt_hw_interrupt_disable(void);
 void        rt_hw_interrupt_enable(rt_base_t level);
 
+/* M8-R1 R3.7: CLI 入口的"合法上下文"三件套(ISR 嵌套 / PRIMASK 窗口 / 线程对象)。
+ * 判据与 current_cal.c、safety_state.c 完全同源, 实现在 rel_main.c 里可注入 ——
+ * 用例据此证明"非法上下文静默拒绝"这条分支真的被执行过, 而不是写在纸上。 */
+rt_bool_t   rt_interrupt_get_nest(void);
+rt_thread_t rt_thread_self(void);
+rt_bool_t   sp_intr_masked(void);
+
 #define rt_kprintf   rel_kprintf
 #define rt_memset    memset
 #define rt_memmove   memmove

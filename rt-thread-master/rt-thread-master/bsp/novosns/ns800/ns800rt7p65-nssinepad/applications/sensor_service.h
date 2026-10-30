@@ -21,6 +21,11 @@ typedef struct
     rt_int16_t  vib_mg;                 /* 振动幅值: isqrt(mx²+my²+mz²) mg */
     rt_uint8_t  valid_imu;      /* 1=当前值有效(本次采样成功或保留上次成功值) */
     rt_uint8_t  fresh_imu;      /* 1=本帧实际重新采样(区分保留值) */
+    /* M8-R1/R6: IMU 的独立样本身份(与下面 sg_seq/cur_seq 同一口径, 仅本次真的
+     * adxl345_read_mg 成功才 +1)与所在帧 tick。碰撞判据必须靠它区分"又采到一次
+     * 超阈值"与"上一次撞击的值还留在滑窗里"。仍只占 RAM, 不进黑匣子 Flash 记录。 */
+    rt_uint32_t imu_seq;
+    rt_uint32_t imu_tick;
     /* 电流 (current_adc) */
     rt_uint32_t current_raw;    /* 最新单次 raw */
     rt_uint32_t current_filtered;       /* EMA */

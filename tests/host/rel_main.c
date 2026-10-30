@@ -118,6 +118,7 @@ static void        (*g_tick_hook)(int tick);  /* 在 diag 节拍里注入状态�
 static int           g_cmd_pump;              /* 1 = 命令等待循环也泵 sensor 帧 */
 static void        (*g_pump_hook)(int n);     /* 在命令泵帧节拍里注入状态变化 */
 static int           g_pump_n;
+static int           g_stop_sensor;           /* 1 = 传感器服务一帧都没出过 */
 
 rt_tick_t rel_tick_get(void) { return g_now; }
 
@@ -136,7 +137,10 @@ void rel_mdelay(rt_int32_t ms)
     else if (role == ROLE_DIAG)
     {
         g_now += 10u;
-        run_thread(ROLE_SENSOR, sensor_thread_entry, RT_NULL, 1);   /* 泵一帧 */
+        /* g_stop_sensor: 传感器服务一次都没出过帧(s_seq 保持 0)那种运行期状态。
+         * 时钟照走, 但 latest 帧永远取不到 —— REL34 用它验证"取不到帧也必须推进
+         * 失效监督", 而不是每次 sleep 直接跳过。 */
+        if (!g_stop_sensor) run_thread(ROLE_SENSOR, sensor_thread_entry, RT_NULL, 1);
         g_ticks++;
         if (g_tick_hook) g_tick_hook(g_ticks);
     }
@@ -237,6 +241,14 @@ rt_thread_t rt_thread_create(const char *name, void (*entry)(void *), void *para
 rt_err_t rt_thread_startup(rt_thread_t t) { if (t) t->started = 1; return RT_EOK; }
 rt_err_t rt_thread_delete(rt_thread_t t) { (void)t; return RT_EOK; }
 
+/* ======================= 上下文注入(M8-R1 R3.7) =======================
+ * diag_profile 的入口先查"ISR 嵌套 / PRIMASK 屏蔽窗口 / 有没有线程对象"。
+ * 三个都可以注入, 用例据此断言非法上下文**静默**拒绝(连 usage 都不打印)。 */
+static int g_isr_nest, g_primask_masked, g_no_thread;
+rt_bool_t rt_interrupt_get_nest(void) { return (rt_bool_t)g_isr_nest; }
+rt_bool_t sp_intr_masked(void)        { return (rt_bool_t)g_primask_masked; }
+rt_thread_t rt_thread_self(void)      { return g_no_thread ? RT_NULL : &g_fake_thread; }
+
 /* ======================= GPIO / safety_pin 桩 ======================= */
 
 struct sim_pin { const char *name; rt_base_t handle; rt_int32_t level; int reads; };
@@ -329,19 +341,25 @@ rt_err_t current_adc_set_calibration_ex(float o, float g, current_adc_cal_source
     (void)o; (void)g; g_cal_ex_applies++; g_cal_ex_last = s; return RT_EOK;
 }
 
+/* SG 源值可以由夹具按"第几次成功读"变化 —— 正常基线本身是波动的, R4 的正/负控
+ * 必须靠**源输出**造出这个波动, 而不是手填统计量。 */
+static int (*g_sg_hook)(int read_no);
 rt_err_t tmc2209_read_sg_result(rt_uint16_t *sg)
 {
     S.sg_reads++;
     if (!S.sg_ok) return -RT_EIO;
+    if (g_sg_hook) S.sg = (rt_uint16_t)g_sg_hook(S.sg_reads);
     if (sg) *sg = S.sg;
     return RT_EOK;
 }
 tmc_drv_cfg_state_t tmc2209_get_config_state(void) { return S.cfg_state; }
 void tmc2209_get_planned_config(tmc_drv_config_t *out) { if (out) *out = S.planned; }
 
+static int g_snap_fail;                       /* 1 = 连运动事实都取不到 */
 rt_err_t motor_get_snapshot(motor_snapshot_t *snap)
 {
     if (!snap) return -RT_EINVAL;
+    if (g_snap_fail) return -RT_EIO;
     memset(snap, 0, sizeof(*snap));
     snap->state = S.mstate;
     snap->current_hz = S.mhz;
@@ -352,10 +370,16 @@ rt_err_t motor_get_snapshot(motor_snapshot_t *snap)
     return RT_EOK;
 }
 static int g_static_begin_calls, g_static_end_calls, g_static_begin_busy;
+/* 真实 motor_calibration_static_begin() 在锁内重查 armed/IDLE/hz=0/target=0/
+ * stop_fail/SAFETY_READY/停机协调器空闲/PWM 已关/DRV_ENABLE 低。夹具按同样的
+ * **环境事实**回答(取到的是环境状态, 不是产品逻辑), 因此"命令有没有把最终复核
+ * 放进这道门"是用例可判定的: C2/C5 的复现点就在这里。 */
 rt_err_t motor_calibration_static_begin(void)
 {
     g_static_begin_calls++;
     if (g_static_begin_busy) return -RT_EBUSY;
+    if (S.armed || S.mstate != MOTOR_IDLE || S.mhz != 0 ||
+        S.safety != SAFETY_READY) return -RT_EPERM;
     return RT_EOK;
 }
 void motor_calibration_static_end(void) { g_static_end_calls++; }
@@ -374,7 +398,7 @@ rt_err_t safety_post_event(rt_uint32_t event)
     (void)event;
     g_post_calls++;
     g_post_cap_len = g_cap_len;
-    g_post_reason_lines_at_call = cap_count("[DIAG] RELATIVE: reason=");
+    g_post_reason_lines_at_call = cap_count("[DIAG] REL TRIP r=");
     g_post_active_lines_at_call = cap_count("[DIAG] ACTIVE: severe");
     return g_post_rc_inject;
 }
@@ -449,6 +473,10 @@ static diag_rprof_t make_profile(void)
     p.sg_drop_warn = 32; p.sg_drop_trip = 96;
     p.dur_sg_ms = 500; p.dur_adc_ms = 300; p.dur_fused_ms = 300; p.dur_recover_ms = 500;
     p.age_sg_ms = 350; p.age_frame_ms = 100; p.min_new_sg = 3;
+    /* R6: 碰撞门沿用项目 vib_impact_mg 默认 2500 mg(明显高于 ~1g 基线)。 */
+    p.impact_peak_mg = 2500; p.impact_new_min = 2;
+    p.dur_impact_ms = 100; p.age_imu_ms = 100;
+    p.threshold_tier = 2;
     p.signature = rel_profile_signature(&p);
     return p;
 }
@@ -481,7 +509,9 @@ static void world_reset(void)
     g_blob_valid = 0; g_blob_len = 0;
     g_mdelay_calls = 0;
     g_ticks = 0; g_tick_hook = RT_NULL;
+    g_isr_nest = 0; g_primask_masked = 0; g_no_thread = 0;
     g_cmd_pump = 0; g_pump_hook = RT_NULL; g_pump_n = 0;
+    g_stop_sensor = 0; g_snap_fail = 0; g_sg_hook = RT_NULL;
     g_depth = 0;
 
     memset(&s_frame, 0, sizeof(s_frame));
@@ -493,6 +523,8 @@ static void world_reset(void)
     memset(&d_prod, 0, sizeof(d_prod));
     diag_engine_reset(&d_prod);
     memset(&d_rel_prod, 0, sizeof(d_rel_prod));
+    memset(&d_ctl, 0, sizeof(d_ctl));
+    memset(&d_incident, 0, sizeof(d_incident));
     memset(&d_cap, 0, sizeof(d_cap));
     memset(&d_pending, 0, sizeof(d_pending));
     d_pending_zero = RT_FALSE; d_pending_learn = RT_FALSE;
@@ -514,7 +546,7 @@ struct feed
 {
     rel_engine_t *e;
     rel_step_arg_t a;
-    rt_uint32_t seq, sg_seq, cur_seq;
+    rt_uint32_t seq, sg_seq, cur_seq, imu_seq;
     rt_uint32_t t;
     int sg_fresh_every;
 };
@@ -531,14 +563,20 @@ static void feed_init(rel_engine_t *e, const diag_rprof_t *p, struct feed *f)
     f->a.in.motor_state = (rt_uint8_t)MOTOR_CRUISE;
     f->a.in.step_hz = 500;
     f->a.in.dir = 0;
+    f->a.in.motion_known = 1;
+    /* 引擎级用例默认按"操作员已显式武装"评估: 覆盖丢失的降险义务只在武装时存在,
+     * MONITOR_ONLY 的"没有 profile 也只披露"由 REL04/REL15 在生产入口单独测。 */
+    f->a.mode = (rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION;
     f->t = 1000u;
-    f->seq = 0; f->sg_seq = 0; f->cur_seq = 0;
+    f->seq = 0; f->sg_seq = 0; f->cur_seq = 0; f->imu_seq = 0;
     f->sg_fresh_every = 1;
 }
 
-/* 走一帧(10ms)。sg/cur 新鲜度、有效位、值都由调用方给。 */
-static rel_reason_t feed_step(struct feed *f, rt_uint16_t sg, rt_uint32_t raw,
-                              int sg_fresh, int adc_fresh, int sg_valid, int adc_valid)
+/* 走一帧(10ms), 并可给一次**新的 IMU 采样**(R6 碰撞证据独立于 SG/ADC)。
+ * imu_fresh=0 时 imu_seq/imu_tick 一律不动 —— 那正是"外壳帧前进但这一路没采过"。 */
+static rel_reason_t feed_step_imu(struct feed *f, rt_uint16_t sg, rt_uint32_t raw,
+                                  int sg_fresh, int adc_fresh, int sg_valid, int adc_valid,
+                                  rt_int16_t vib, int imu_fresh)
 {
     f->t += 10u;
     f->a.now_tick = f->t;
@@ -546,9 +584,18 @@ static rel_reason_t feed_step(struct feed *f, rt_uint16_t sg, rt_uint32_t raw,
     f->a.in.timestamp = f->t;
     if (sg_fresh)  { f->a.in.sg_seq  = ++f->sg_seq;  f->a.in.sg_tick  = f->t; f->a.in.sg = sg; }
     if (adc_fresh) { f->a.in.cur_seq = ++f->cur_seq; f->a.in.cur_tick = f->t; f->a.in.cur_raw = raw; }
+    if (imu_fresh) { f->a.in.imu_seq = ++f->imu_seq; f->a.in.imu_tick = f->t; f->a.in.vib_mg = vib; }
     f->a.in.sg_valid = (rt_uint8_t)sg_valid;
     f->a.in.cur_valid = (rt_uint8_t)adc_valid;
+    f->a.in.imu_valid = 1;
     return rel_engine_step(f->e, &f->a);
+}
+
+/* 走一帧(10ms)。sg/cur 新鲜度、有效位、值都由调用方给; IMU 保持"从未采到"。 */
+static rel_reason_t feed_step(struct feed *f, rt_uint16_t sg, rt_uint32_t raw,
+                              int sg_fresh, int adc_fresh, int sg_valid, int adc_valid)
+{
+    return feed_step_imu(f, sg, raw, sg_fresh, adc_fresh, sg_valid, adc_valid, 1200, 0);
 }
 
 /* ======================= 用例 ======================= */
@@ -909,7 +956,7 @@ static void c_REL12(void)
     /* 状态行必须自称 REL_SG_SEVERE 而不是 STALL_CONFIRMED */
     cap_reset();
     diag_relative_status_lines();
-    CHECK(cap_has("reason=REL_SG_SEVERE"), "状态行没写 REL_SG_SEVERE: [%.80s]", cap_text());
+    CHECK(cap_has("rel LATCH r=REL_SG_SEVERE"), "状态行没写 REL_SG_SEVERE: [%.80s]", cap_text());
     CHECK(cap_has("FIELD_UNVERIFIED"), "学习生成的阈值没披露 FIELD_UNVERIFIED");
 }
 
@@ -927,11 +974,11 @@ static void c_REL13(void)
     CHECK(g_post_calls == 1, "post=%d", g_post_calls);
     CHECK(g_post_reason_lines_at_call == 0,
           "post 时捕获里已有 %d 条 reason 行 —— 打印跑到了保护前面", g_post_reason_lines_at_call);
-    CHECK(cap_has("[DIAG] RELATIVE: reason=REL_SG_SEVERE"), "保护后没打印触发摘要");
-    CHECK(strncmp(g_cap + g_post_cap_len, "[DIAG] RELATIVE: reason=",
-                  strlen("[DIAG] RELATIVE: reason=")) == 0,
+    CHECK(cap_has("[DIAG] REL TRIP r=REL_SG_SEVERE"), "保护后没打印触发摘要");
+    CHECK(strncmp(g_cap + g_post_cap_len, "[DIAG] REL TRIP r=REL_SG_SEVERE",
+                  strlen("[DIAG] REL TRIP r=REL_SG_SEVERE")) == 0,
           "post 之后的第一段不是摘要: [%.40s]", g_cap + g_post_cap_len);
-    CHECK(cap_max_line_len() <= 126, "最长行 %d 字节会撞上控制台 128B 裁剪", cap_max_line_len());
+    CHECK(cap_max_line_len() <= 110, "最长行 %d 字节超过 110B 短行预算", cap_max_line_len());
 }
 
 /* REL14 首次原因不可覆盖; 同一次武装只 post 一次; post 失败也留事实 */
@@ -947,8 +994,8 @@ static void c_REL14(void)
     S.sg = (rt_uint16_t)(p.run_sg_min - p.sg_drop_trip - 1);
     pump(150);
     CHECK(g_post_calls == 1, "持续严重 150 帧后 post=%d(期望仍为 1)", g_post_calls);
-    CHECK(cap_count("[DIAG] RELATIVE: reason=") == 1, "摘要打印了 %d 次(期望 1)",
-          cap_count("[DIAG] RELATIVE: reason="));
+    CHECK(cap_count("[DIAG] REL TRIP r=REL_SG_SEVERE") == 1, "摘要打印了 %d 次(期望 1)",
+          cap_count("[DIAG] REL TRIP r=REL_SG_SEVERE"));
     /* 换成 ADC 严重也不得改写首次原因 */
     S.sg = 500;
     S.raw = p.run_adc_max + p.run_adc_noise + p.adc_dev_trip + 5u;
@@ -985,8 +1032,8 @@ static void c_REL15(void)
     CHECK(rel_prod_get_latch(&l) == RT_FALSE, "MONITOR_ONLY 落了假 latch");
     CHECK(d_rel_prod.verdict == REL_SG_SEVERE,
           "MONITOR_ONLY 连原因都不给(verdict=%s) —— 无法评估", rel_reason_name(d_rel_prod.verdict));
-    CHECK(cap_count("[DIAG] RELATIVE: reason=") == 0, "MONITOR_ONLY 也打了行动摘要(%d 次)",
-          cap_count("[DIAG] RELATIVE: reason="));
+    CHECK(cap_count("[DIAG] REL TRIP r=REL_SG_SEVERE") == 0, "MONITOR_ONLY 也打了行动摘要(%d 次)",
+          cap_count("[DIAG] REL TRIP r=REL_SG_SEVERE"));
     cap_reset();
     diag_status();
     CHECK(cap_has("mode=MONITOR_ONLY"), "状态行没写清模式");
@@ -1020,7 +1067,7 @@ static void c_REL16(void)
     diagnosis_take_relative_confirm();
     e = diagnosis_set_mode(DIAG_MODE_RELATIVE_PROTECTION);
     CHECK(e == -RT_EINVAL, "残缺 profile 却开启(rc=%d) —— 资格校验被绕过", e);
-    CHECK(cap_has("profile rejected(SAMPLE_COUNT)"), "拒绝原因没具名: [%.80s]", cap_text());
+    CHECK(cap_has("(SAMPLE_COUNT)"), "拒绝原因没具名: [%.80s]", cap_text());
 
     /* 工况失配 */
     p = make_profile();
@@ -1049,7 +1096,8 @@ static void c_REL16(void)
     CHECK(e == -RT_EPERM, "安全未就绪却开启(rc=%d)", e);
     S.safety = SAFETY_READY;
 
-    /* 全部满足 */
+    /* 全部满足(源健康现在也是资格之一: 必须先有真帧) */
+    pump_sensor(2);
     diagnosis_take_relative_confirm();
     e = diagnosis_set_mode(DIAG_MODE_RELATIVE_PROTECTION);
     CHECK(e == RT_EOK && d_mode == DIAG_MODE_RELATIVE_PROTECTION, "合格条件被拒绝(rc=%d)", e);
@@ -1079,6 +1127,10 @@ static void c_REL17(void)
 {
     rt_err_t e;
     world_reset();
+    /* M8-R1 R3.1: 任何人工模式改变现在都先过静止门。本例测的是"既有的 MEASURED
+     * 门禁没有因为 RELATIVE 的加入而放宽", 所以先把静止条件摆正, 让标定来源成为
+     * 唯一的拒绝理由(静止门由 REL16 与新的 C1 用例单独覆盖)。 */
+    S.mstate = MOTOR_IDLE; S.armed = 0; S.mhz = 0;
     cap_reset();
     e = diagnosis_set_mode(DIAG_MODE_ACTIVE_PROTECTION);
     CHECK(e == -RT_EPERM, "THEORETICAL 标定下 ACTIVE 竟然通过(rc=%d)", e);
@@ -1107,7 +1159,11 @@ static void c_REL18(void)
     pump(150);
     CHECK(g_post_calls == 0, "加速段被当成异常并 post %d 次(斜坡例外失效)", g_post_calls);
     CHECK(rel_prod_get_latch(&l) == RT_FALSE, "加速段落了 latch");
-    CHECK(cap_count("NOT-ACTIVE") == 0, "斜坡阶段被报成离窗: [%.80s]", cap_text());
+    /* 斜坡例外仍然成立: 不得因为"加速段不在批准阶段里"就报成离窗/覆盖丢失。
+     * 开机头一帧的 no-frame 披露是另一件事(只在状态变化时打一次), 不属于本判据。 */
+    CHECK(cap_has("REL_OUT_OF_WINDOW") == 0, "斜坡阶段被报成离窗: [%.80s]", cap_text());
+    CHECK(cap_count("coverage=NOT-ACTIVE") <= 1,
+          "no-frame 披露刷屏(%d 次, 期望 <=1)", cap_count("coverage=NOT-ACTIVE"));
     S.mstate = MOTOR_DECEL;
     pump(100);
     CHECK(g_post_calls == 0, "减速段 post %d 次", g_post_calls);
@@ -1213,52 +1269,6 @@ static void c_REL21(void)
     for (i = 1; i <= 70; ++i) feed_step(&f, 500, 2000, (i % 10) == 0, 1, 1, 1);
     CHECK(e.severe_active == 0, "两源都新鲜正常 70 帧后 severe_active 仍=%d(恢复卡死)",
           e.severe_active);
-}
-
-/* REL22 覆盖披露只在状态变化时打印一次(不得 100Hz 刷屏) */
-static void hook_break_sig(int tick);
-static void hook_install(int tick)
-{
-    diag_rprof_t p;
-    if (tick != 50) return;                 /* 单帧事件: 每帧重装会让状态一直"没变" */
-    p = make_profile();
-    install_profile(&p);
-}
-static void hook_dispatch(int tick)
-{
-    if (tick == 50)  hook_install(tick);
-    if (tick == 150) hook_break_sig(tick);
-}
-static void hook_break_sig(int tick)
-{
-    if (tick != 150) return;               /* 只在指定的一帧破坏一次, 否则每帧翻转签名 */
-    cfg_take();
-    cfg.rprof.signature ^= 0x5Au;
-    cfg_release();
-}
-static void c_REL22(void)
-{
-    world_reset();
-    d_mode = DIAG_MODE_RELATIVE_PROTECTION;
-    /* 单次连续运行(与真机同一线程生命周期), 在第 50/150 tick 各制造一次状态变化 */
-    g_tick_hook = hook_dispatch;
-    run_thread(ROLE_DIAG, diag_thread_entry, RT_NULL, 450);
-    g_tick_hook = RT_NULL;
-    CHECK(cap_count("RELATIVE coverage=") == 3,
-          "coverage 行打印了 %d 次(3 次状态变化: no-profile→COVERED→sig-mismatch 各一次)",
-          cap_count("RELATIVE coverage="));
-    CHECK(cap_has("NOT-ACTIVE(no-profile)"), "没披露 no-profile");
-    CHECK(cap_has("coverage=COVERED"), "没披露 COVERED");
-    CHECK(cap_has("NOT-ACTIVE(sig-mismatch)"), "没披露 sig-mismatch");
-    CHECK(g_post_calls == 0, "非覆盖态里竟然 post %d 次", g_post_calls);
-    CHECK(cap_max_line_len() <= 126, "coverage 行 %d 字节会撞裁剪", cap_max_line_len());
-
-    /* MONITOR_ONLY 下同一状态不得占用串口 */
-    world_reset();
-    cap_reset();
-    pump(200);
-    CHECK(cap_count("RELATIVE coverage=") == 0, "MONITOR_ONLY 下打了 %d 条 coverage 行",
-          cap_count("RELATIVE coverage="));
 }
 
 /* REL23 profile 持久化: v3 往返 + v2→v3 迁移 + 半套拒绝 + 不改可信度 */
@@ -1402,7 +1412,7 @@ static void c_REL24(void)
 /* ---- diag_profile 命令桥(在 ROLE_MAIN 帧泵模式下执行真实命令循环) ---- */
 
 static void cmd_zero(void *p)   { char *av[] = { "diag_profile", "zero", "32" }; (void)p; g_cmd_pump = 1; diag_profile(3, av); g_cmd_pump = 0; }
-static void cmd_learn(void *p)  { char *av[] = { "diag_profile", "learn", "8", "450", "550", "2" }; (void)p; g_cmd_pump = 1; diag_profile(6, av); g_cmd_pump = 0; }
+static void cmd_learn(void *p)  { char *av[] = { "diag_profile", "learn", "8", "450", "550", "0" }; (void)p; g_cmd_pump = 1; diag_profile(6, av); g_cmd_pump = 0; }
 static void cmd_commit(void *p) { char *av[] = { "diag_profile", "commit" }; (void)p; g_cmd_pump = 1; diag_profile(2, av); g_cmd_pump = 0; }
 static void cmd_clear(void *p)  { char *av[] = { "diag_profile", "clear", "CONFIRM" }; (void)p; g_cmd_pump = 1; diag_profile(3, av); g_cmd_pump = 0; }
 
@@ -1416,7 +1426,7 @@ static void pump_break_window(int n)
 }
 static void cmd_learn_window_break(void *p)
 {
-    char *av[] = { "diag_profile", "learn", "8", "450", "550", "2" };
+    char *av[] = { "diag_profile", "learn", "8", "450", "550", "0" };
     (void)p;
     g_pump_hook = pump_break_window; g_pump_n = 0; g_cmd_pump = 1;
     diag_profile(6, av);
@@ -1621,6 +1631,942 @@ static void c_REL27(void)
     CHECK(g_post_calls == 0, "单帧严重判据竟然 post 了 %d 次", g_post_calls);
 }
 
+/* ======================= M8-R1 追加用例 =======================
+ * 每例对应任务书 R1..R6 的一条被复现缺陷(A1..E1)或其健康对照。
+ * 纪律: 断言走**真实产品入口**(rel_engine_step / rel_prod_evaluate /
+ * diag_thread_entry / diag_profile / project_config_*), 不复制判定算法自证。
+ */
+
+/* ---- 注入钩子(只改"环境事实", 不碰产品判据) ---- */
+static void r1_hook_sig_break(int tick)        /* 运行中驱动身份漂移一次 */
+{
+    diag_rprof_t q;
+    if (tick != 10) return;
+    project_config_get_rprof(&q);
+    q.signature ^= 0x5Au;
+    cfg_take(); cfg.rprof = q; cfg_release();
+}
+static void r1_hook_lock_sticky(int tick)      /* profile 快照从此取不到锁 */
+{
+    if (tick == 10) g_mutex_take_fail = 1;
+}
+static void r1_hook_lock_blink(int tick)       /* 瞬态: 11 帧(110ms)后恢复 */
+{
+    if (tick == 10) g_mutex_take_fail = 1;
+    if (tick == 21) g_mutex_take_fail = 0;
+}
+static void r1_hook_arm_midway(int n)          /* zero 中途被 arm/起转 */
+{
+    if (n == 5) { S.mstate = MOTOR_CRUISE; S.armed = 1; S.mhz = 500; S.raw = 3500; }
+}
+static int r1_sg_646872(int n) { return 64 + 4 * ((n - 1) % 3); }
+static int r1_sg_wide(int n)
+{
+    static const int v[4] = { 60, 150, 300, 480 };
+    return v[(n - 1) % 4];
+}
+static void cmd_learn_far_window(void *p)
+{
+    char *av[] = { "diag_profile", "learn", "8", "900", "1100", "0" };
+    (void)p;
+    g_cmd_pump = 1;
+    diag_profile(6, av);
+    g_cmd_pump = 0;
+}
+
+/* REL28 严重判据只能用自己的证据(A1/A2), 且持续强异常仍然必须触发 */
+static void c_REL28(void)
+{
+    rel_engine_t e;
+    struct feed f;
+    diag_rprof_t p;
+    rel_reason_t r = REL_REASON_NONE;
+    int i;
+
+    world_reset();
+    p = make_profile();
+    feed_init(&e, &p, &f);
+    for (i = 1; i <= 60; ++i)                            /* 600ms 中等警告 */
+        r = feed_step(&f, (rt_uint16_t)(p.run_sg_min - p.sg_drop_warn - 1), 2000,
+                      (i % 10) == 0, 1, 1, 1);
+    CHECK(e.sg_run_ms >= p.dur_sg_ms && e.sg_new_cnt >= p.min_new_sg,
+          "反例前提不成立: 警告级自己没攒够(%ums/%u)", e.sg_run_ms, e.sg_new_cnt);
+    r = feed_step(&f, (rt_uint16_t)(p.run_sg_min - p.sg_drop_trip - 1), 2000, 1, 1, 1, 1);
+    CHECK(r != REL_SG_SEVERE, "第一笔更强样本就判严重(借了警告的 %ums)", e.sg_run_ms);
+    CHECK(e.sg_strong_run_ms == 0u && e.sg_strong_cnt == 1u,
+          "严重级自己=run %u cnt %u(期望 0/1)", e.sg_strong_run_ms, e.sg_strong_cnt);
+    for (i = 1; i <= 60; ++i)                            /* 正控: 强条件自己攒 */
+        r = feed_step(&f, (rt_uint16_t)(p.run_sg_min - p.sg_drop_trip - 1), 2000,
+                      (i % 10) == 0, 1, 1, 1);
+    CHECK(r == REL_SG_SEVERE, "持续强 SG 异常 600ms 后=%s(期望 REL_SG_SEVERE)",
+          rel_reason_name(r));
+    CHECK(e.sg_strong_run_ms >= p.dur_sg_ms && e.sg_strong_cnt >= p.min_new_sg,
+          "严重成立但自己的证据不足(run=%u cnt=%u)", e.sg_strong_run_ms, e.sg_strong_cnt);
+
+    world_reset();                                       /* A2: ADC 同类 */
+    p = make_profile();
+    feed_init(&e, &p, &f);
+    for (i = 1; i <= 40; ++i)
+        r = feed_step(&f, 500, (rt_uint32_t)(p.run_adc_max + p.run_adc_noise
+                                             + p.adc_dev_warn + 1),
+                      (i % 10) == 0, 1, 1, 1);
+    CHECK(e.adc_run_ms >= p.dur_adc_ms, "ADC 警告没攒够(%ums)", e.adc_run_ms);
+    r = feed_step(&f, 500, (rt_uint32_t)(p.run_adc_max + p.run_adc_noise
+                                         + p.adc_dev_trip + 1), 0, 1, 1, 1);
+    CHECK(r != REL_ADC_SEVERE, "ADC 第一笔更强样本就判严重(借了警告的 %ums)", e.adc_run_ms);
+    CHECK(e.adc_strong_run_ms == 0u && e.adc_strong_cnt == 1u,
+          "ADC 严重级自己=run %u cnt %u", e.adc_strong_run_ms, e.adc_strong_cnt);
+    for (i = 1; i <= 40; ++i)
+        r = feed_step(&f, 500, (rt_uint32_t)(p.run_adc_max + p.run_adc_noise
+                                             + p.adc_dev_trip + 1),
+                      (i % 10) == 0, 1, 1, 1);
+    CHECK(r == REL_ADC_SEVERE, "ADC 持续强偏离后=%s(期望 REL_ADC_SEVERE)", rel_reason_name(r));
+    CHECK(e.adc_strong_run_ms >= p.dur_adc_ms && e.adc_strong_cnt >= 2u,
+          "ADC 严重自己的证据(run=%ums cnt=%u)", e.adc_strong_run_ms, e.adc_strong_cnt);
+}
+
+/* REL29 ADC 身份冻结/无效/未来 tick 都必须给具名失效结果(B1) */
+static void c_REL29(void)
+{
+    rel_engine_t e;
+    struct feed f;
+    diag_rprof_t p;
+    rel_reason_t r = REL_REASON_NONE;
+    int i;
+
+    world_reset();
+    p = make_profile();
+    feed_init(&e, &p, &f);
+    feed_step(&f, 500, 2000, 1, 1, 1, 1);
+    for (i = 1; i <= 120; ++i)
+        r = feed_step(&f, 500, 2000, (i % 10) == 0, 0, 1, 1);
+    CHECK(r == REL_SENSOR_UNAVAILABLE, "ADC 冻结 1200ms 后=%s(期望 REL_SENSOR_UNAVAILABLE)",
+          rel_reason_name(r));
+    CHECK((f.a.now_tick - f.a.in.cur_tick) > p.age_frame_ms,
+          "反例前提不成立: cur_age=%u <= %u", f.a.now_tick - f.a.in.cur_tick,
+          p.age_frame_ms);
+    CHECK(e.age_bad_ms >= p.dur_adc_ms, "age_bad_ms=%u < %u", e.age_bad_ms, p.dur_adc_ms);
+    /* 外壳帧年龄明明是 10ms, 单查 frame 就是查不出来 —— 这正是 B1 的机理 */
+    CHECK((f.a.now_tick - f.a.in.timestamp) <= p.age_frame_ms,
+          "帧龄本身已超上限(%u), 这一例没能把 ADC 与帧分开",
+          f.a.now_tick - f.a.in.timestamp);
+
+    world_reset();
+    feed_init(&e, &p, &f);
+    for (i = 1; i <= 120; ++i)
+        r = feed_step(&f, 500, 2000, (i % 10) == 0, 1, 1, 0);   /* ADC 一直读失败 */
+    CHECK(r == REL_SENSOR_UNAVAILABLE, "ADC 持续无效时=%s", rel_reason_name(r));
+
+    world_reset();                                           /* 未来 tick */
+    feed_init(&e, &p, &f);
+    feed_step(&f, 500, 2000, 1, 1, 1, 1);
+    f.a.in.cur_tick = f.t + 4000u;
+    for (i = 1; i <= 120; ++i)
+        r = feed_step(&f, 500, 2000, (i % 10) == 0, 0, 1, 1);
+    CHECK(r == REL_SENSOR_UNAVAILABLE, "未来 ADC tick 被当成新鲜样本(%s)", rel_reason_name(r));
+}
+
+/* REL30 源间断的两端不得凑成一段连续异常(R1.2) */
+static void c_REL30(void)
+{
+    rel_engine_t e;
+    struct feed f;
+    diag_rprof_t p;
+    rel_reason_t r = REL_REASON_NONE;
+    int i;
+
+    world_reset();
+    p = make_profile();
+    feed_init(&e, &p, &f);
+    for (i = 1; i <= 40; ++i)                                /* 4 枚强样本, 跨度 300ms */
+        r = feed_step(&f, (rt_uint16_t)(p.run_sg_min - p.sg_drop_trip - 1), 2000,
+                      (i % 10) == 0, 1, 1, 1);
+    CHECK(e.sg_strong_cnt == 4u, "前置: 强样本数=%u(期望 4)", e.sg_strong_cnt);
+    CHECK(e.sg_strong_run_ms == 300u, "前置: 强跨度=%u(期望 300)", e.sg_strong_run_ms);
+    CHECK(r != REL_SG_SEVERE, "300ms 就判严重了");
+    for (i = 1; i <= 36; ++i)                                /* 360ms 没有任何 SG 样本 */
+        r = feed_step(&f, (rt_uint16_t)(p.run_sg_min - p.sg_drop_trip - 1), 2000, 0, 1, 1, 1);
+    CHECK(r != REL_SG_SEVERE, "间断中提前触发=%s", rel_reason_name(r));
+    r = feed_step(&f, (rt_uint16_t)(p.run_sg_min - p.sg_drop_trip - 1), 2000, 1, 1, 1, 1);
+    CHECK(e.sg_strong_cnt == 1u, "间断后样本数=%u(期望重开为 1)", e.sg_strong_cnt);
+    CHECK(e.sg_strong_run_ms == 0u, "间断后跨度=%u(期望 0, 不得凑成 700ms)",
+          e.sg_strong_run_ms);
+    CHECK(r != REL_SG_SEVERE, "凑出来的严重=%s", rel_reason_name(r));
+    /* 间断两端各自继续攒, 到真正连续 500ms 时才触发 */
+    for (i = 1; i <= 60; ++i)
+        r = feed_step(&f, (rt_uint16_t)(p.run_sg_min - p.sg_drop_trip - 1), 2000,
+                      (i % 10) == 0, 1, 1, 1);
+    CHECK(r == REL_SG_SEVERE, "间断之后重新积累到 600ms 仍不触发(%s)", rel_reason_name(r));
+}
+
+/* REL31 完整引擎序列: tick 回绕 + 采样率与年龄上限的绑定(R1.4) */
+static void c_REL31(void)
+{
+    rel_engine_t e;
+    struct feed f;
+    diag_rprof_t p;
+    rel_reason_t r = REL_REASON_NONE;
+    int i;
+
+    world_reset();
+    p = make_profile();
+    feed_init(&e, &p, &f);
+    f.t = 0xFFFFFFF0u;                        /* 下一步就跨过 0 */
+    for (i = 1; i <= 8; ++i)
+        r = feed_step(&f, (rt_uint16_t)(p.run_sg_min - p.sg_drop_trip - 1), 2000,
+                      (i % 4) == 0, 1, 1, 1);
+    CHECK(e.sg_new_cnt == 2u, "跨回绕后 SG 警告级样本数=%u(期望 2)", e.sg_new_cnt);
+    /* ADC 全程在带内, 警告级计数为 0 才是对的; 这里要证明的是"帧被继续消费、
+     * 身份继续推进", 所以看 last_cur_seq 而不是警告计数。 */
+    CHECK(e.last_cur_seq == 8u, "跨回绕后 ADC 身份=%u(期望 8, 帧没被继续消费)",
+          e.last_cur_seq);
+    CHECK(e.adc_new_cnt == 0u, "ADC 在带内却攒了警告级样本(%u)", e.adc_new_cnt);
+    CHECK(r != REL_SENSOR_UNAVAILABLE, "回绕把新鲜样本算成了过期(%s)", rel_reason_name(r));
+    CHECK(r != REL_SG_SEVERE, "两枚样本就判严重");
+
+    world_reset();                            /* 200ms 采样率: 在年龄上限内 */
+    feed_init(&e, &p, &f);
+    /* 200ms 一枚样本: 第 1 枚在 200ms, 要凑满 dur_sg_ms=500ms 需要第 4 枚(=800ms),
+     * 也就是第 4 帧样本。判据按**真实时间**走, 与帧数无关。 */
+    for (i = 1; i <= 60; ++i)
+        r = feed_step(&f, (rt_uint16_t)(p.run_sg_min - p.sg_drop_trip - 1), 2000,
+                      (i % 20) == 0, 1, 1, 1);
+    CHECK(e.sg_strong_cnt == 3u && e.sg_strong_run_ms == 400u,
+          "200ms 采样率下 60 帧的证据=cnt %u run %u(期望 3/400)",
+          e.sg_strong_cnt, e.sg_strong_run_ms);
+    CHECK(r != REL_SG_SEVERE, "只过了 400ms 就判严重");
+    for (; i <= 100; ++i)
+        r = feed_step(&f, (rt_uint16_t)(p.run_sg_min - p.sg_drop_trip - 1), 2000,
+                      (i % 20) == 0, 1, 1, 1);
+    CHECK(r == REL_SG_SEVERE, "200ms 采样率到 800ms 后=%s(期望触发)", rel_reason_name(r));
+
+    world_reset();                            /* 500ms 采样率: 超过年龄上限 */
+    feed_init(&e, &p, &f);
+    for (i = 1; i <= 120; ++i)
+        r = feed_step(&f, (rt_uint16_t)(p.run_sg_min - p.sg_drop_trip - 1), 2000,
+                      (i % 50) == 0, 1, 1, 1);
+    CHECK(e.sg_strong_cnt <= 1u,
+          "500ms 间隔(> age_sg_ms=%u)却被当成连续证据(cnt=%u)", p.age_sg_ms,
+          e.sg_strong_cnt);
+    CHECK(r == REL_SENSOR_UNAVAILABLE, "采样慢到超出绑定定义时=%s(期望具名降险)",
+          rel_reason_name(r));
+
+    world_reset();                            /* 融合起点跨回绕 */
+    feed_init(&e, &p, &f);
+    f.t = 0xFFFFFF00u;
+    feed_step(&f, (rt_uint16_t)(p.run_sg_min - p.sg_drop_warn - 1), 2000, 1, 0, 1, 1);
+    CHECK(e.sg_span_first != 0u, "SG 警告段没起点");
+    for (i = 1; i <= 20; ++i)                 /* 跨过 0 之后 ADC 才开始警告 */
+        r = feed_step(&f, (rt_uint16_t)(p.run_sg_min - p.sg_drop_warn - 1),
+                      (rt_uint32_t)(p.run_adc_max + p.run_adc_noise + p.adc_dev_warn + 1),
+                      0, 1, 1, 1);
+    CHECK(e.adc_span_first != 0u, "ADC 警告段没起点");
+    CHECK(e.fused_run_ms < 300u,
+          "融合时长=%u: 裸 lo>hi 的回绕比较会把起点算到半个周期之前", e.fused_run_ms);
+    CHECK(r != REL_FUSED_SEVERE, "回绕处凑出假融合严重(%s)", rel_reason_name(r));
+}
+
+/* REL32 恢复段: 任一新鲜反向证据打断; 推进需要两路独立正常证据(R1.3) */
+static void c_REL32(void)
+{
+    rel_engine_t e;
+    struct feed f;
+    diag_rprof_t p;
+    rel_reason_t r = REL_REASON_NONE;
+    int i;
+
+    world_reset();
+    p = make_profile();
+    feed_init(&e, &p, &f);
+    for (i = 1; i <= 100 && e.severe_active == 0; ++i)
+        r = feed_step(&f, (rt_uint16_t)(p.run_sg_min - p.sg_drop_warn - 1),
+                      (rt_uint32_t)(p.run_adc_max + p.run_adc_noise + p.adc_dev_warn + 1),
+                      (i % 10) == 0, 1, 1, 1);
+    CHECK(r == REL_FUSED_SEVERE && e.severe_active == 1,
+          "前置融合没成立(r=%s severe=%d)", rel_reason_name(r), e.severe_active);
+
+    for (i = 1; i <= 100; ++i)                 /* SG 回带内, ADC 仍警告 */
+        r = feed_step(&f, 500,
+                      (rt_uint32_t)(p.run_adc_max + p.run_adc_noise + p.adc_dev_warn + 1),
+                      (i % 10) == 0, 1, 1, 1);
+    CHECK(e.severe_active == 1, "中间那次 ADC 异常被忽略了(严重已解除)");
+    CHECK(e.ok_run_ms == 0u, "恢复段没被反向证据清零(ok=%ums)", e.ok_run_ms);
+
+    for (i = 1; i <= 80; ++i)                  /* 正控: 两路都新鲜正常 */
+        r = feed_step(&f, 500, 2000, (i % 10) == 0, 1, 1, 1);
+    CHECK(e.severe_active == 0u, "两路新鲜正常 800ms 后仍粘着严重");
+    CHECK(r == REL_REASON_NONE, "解除后原因=%s(期望 NONE)", rel_reason_name(r));
+
+    world_reset();                             /* 单路正常不得冒充恢复 */
+    feed_init(&e, &p, &f);
+    for (i = 1; i <= 100 && e.severe_active == 0; ++i)
+        r = feed_step(&f, (rt_uint16_t)(p.run_sg_min - p.sg_drop_warn - 1),
+                      (rt_uint32_t)(p.run_adc_max + p.run_adc_noise + p.adc_dev_warn + 1),
+                      (i % 10) == 0, 1, 1, 1);
+    CHECK(e.severe_active == 1, "前置严重没成立, 无法验证单路恢复");
+    for (i = 1; i <= 200; ++i)                 /* SG 新鲜正常, ADC 身份冻结 */
+        r = feed_step(&f, 500, 2000, (i % 10) == 0, 0, 1, 1);
+    CHECK(e.ok_src_seen != 3u || e.severe_active == 1,
+          "ADC 停止出新样本却完成了恢复(ok=%ums seen=%d)", e.ok_run_ms, (int)e.ok_src_seen);
+    CHECK(r == REL_SENSOR_UNAVAILABLE || e.severe_active == 1,
+          "单源解除严重(%s)", rel_reason_name(r));
+}
+
+/* REL22 覆盖丢失的合同(勘误版): 已武装却失去判据 = 先保护, 后披露
+ * 原 REL22 把"签名失配仍然 post=0"当成正确期望, 那是**错误的合同**; M8-R1 明确
+ * 更正: 失配必须走真实短保护, 状态打印只能排在保护之后。身份 REL22 保留。 */
+static void c_REL22(void)
+{
+    diag_rprof_t p;
+    rel_latch_t l;
+
+    world_reset();
+    p = make_profile();
+    install_profile(&p);
+    d_mode = DIAG_MODE_RELATIVE_PROTECTION;
+    g_tick_hook = r1_hook_sig_break;
+    pump(200);
+    g_tick_hook = RT_NULL;
+    CHECK(g_post_calls == 1, "签名漂移后 post=%d(期望恰好 1 次真实保护)", g_post_calls);
+    CHECK(rel_prod_get_latch(&l) && l.reason == REL_COVERAGE_LOST,
+          "保护原因=%s(期望 REL_COVERAGE_LOST)", rel_reason_name(l.reason));
+    CHECK(l.coverage_at_trip == RELCOV_SIG_MISMATCH, "档位=%u(期望 SIG_MISMATCH)",
+          (unsigned)l.coverage_at_trip);
+    CHECK(g_post_reason_lines_at_call == 0,
+          "post 时已有 %d 条触发摘要 —— 打印跑到了保护前面", g_post_reason_lines_at_call);
+    CHECK(cap_has("NOT-ACTIVE(sig-mismatch)"), "覆盖状态没披露");
+    CHECK(cap_count("REL coverage=") <= 3, "覆盖行刷屏(%d 条)",
+          cap_count("REL coverage="));
+    CHECK(d_mode == DIAG_MODE_MONITOR_ONLY, "触发后模式=%d(期望退回 MONITOR_ONLY)",
+          (int)d_mode);
+    CHECK(cap_max_line_len() <= 110, "覆盖披露行 %d 字节(预算 110)", cap_max_line_len());
+
+    world_reset();                             /* MONITOR_ONLY 无 profile: 只披露不触发 */
+    cap_reset();
+    pump(200);
+    CHECK(g_post_calls == 0, "MONITOR_ONLY 无 profile 却 post %d 次", g_post_calls);
+    CHECK(cap_count("REL coverage=") == 0, "MONITOR_ONLY 占了串口(%d 条)",
+          cap_count("REL coverage="));
+}
+
+/* REL33 取锁失败与"没有 profile"同样是有界降险(B3 + R2.1) */
+static void c_REL33(void)
+{
+    diag_rprof_t p;
+    rel_latch_t l;
+
+    world_reset();
+    p = make_profile();
+    install_profile(&p);
+    d_mode = DIAG_MODE_RELATIVE_PROTECTION;
+    g_tick_hook = r1_hook_lock_sticky;
+    pump(120);
+    g_tick_hook = RT_NULL;
+    CHECK(g_post_calls == 1, "取锁失败后 post=%d(期望 1)", g_post_calls);
+    CHECK(rel_prod_get_latch(&l) && l.reason == REL_COVERAGE_LOST &&
+          l.coverage_at_trip == RELCOV_LOCK_FAIL,
+          "身份不对(reason=%s cov=%u)", rel_reason_name(l.reason),
+          (unsigned)l.coverage_at_trip);
+    CHECK(cap_has("NOT-ACTIVE(config-lock)"), "取锁失败没披露");
+
+    world_reset();                             /* 有界容错: 110ms 的瞬态不得触发 */
+    install_profile(&p);
+    d_mode = DIAG_MODE_RELATIVE_PROTECTION;
+    g_tick_hook = r1_hook_lock_blink;
+    pump(120);
+    g_tick_hook = RT_NULL;
+    CHECK(g_post_calls == 0, "瞬态锁失败就保护了(post=%d)", g_post_calls);
+    CHECK(d_rel_prod.cov_lost_ms == 0u, "覆盖恢复后 cov_lost_ms 没清零(%u)",
+          d_rel_prod.cov_lost_ms);
+
+    world_reset();                             /* 已武装但一个 profile 都没有 */
+    d_mode = DIAG_MODE_RELATIVE_PROTECTION;
+    pump(120);
+    CHECK(g_post_calls == 1, "武装态无 profile 未降险(post=%d)", g_post_calls);
+    CHECK(cap_has("NOT-ACTIVE(no-profile)"), "无 profile 没披露");
+}
+
+/* REL34 取不到帧也要推进监督; 运动事实不可得时不得宣称覆盖有效(R2.2) */
+static void c_REL34(void)
+{
+    diag_rprof_t p;
+    rel_latch_t l;
+
+    world_reset();
+    p = make_profile();
+    install_profile(&p);
+    d_mode = DIAG_MODE_RELATIVE_PROTECTION;
+    g_stop_sensor = 1;                        /* 从未出过帧 */
+    pump(80);
+    CHECK(g_post_calls == 1, "持续无帧时 post=%d(期望 1)", g_post_calls);
+    CHECK(rel_prod_get_latch(&l) && l.reason == REL_COVERAGE_LOST &&
+          l.coverage_at_trip == RELCOV_NOFRAME,
+          "无帧降险身份不对(reason=%s cov=%u)", rel_reason_name(l.reason),
+          (unsigned)l.coverage_at_trip);
+    CHECK(cap_has("NOT-ACTIVE(no-frame)"), "无帧状态没披露");
+
+    world_reset();                             /* 连运动事实也取不到 */
+    install_profile(&p);
+    d_mode = DIAG_MODE_RELATIVE_PROTECTION;
+    g_stop_sensor = 1; g_snap_fail = 1;
+    pump(80);
+    CHECK(g_post_calls == 1, "无帧且无运动事实时 post=%d(不知道在不在动就不能宣称有效)",
+          g_post_calls);
+    g_snap_fail = 0;
+
+    world_reset();                             /* 证得静止: 没有需要保护的运动 */
+    install_profile(&p);
+    d_mode = DIAG_MODE_RELATIVE_PROTECTION;
+    S.mstate = MOTOR_IDLE; S.armed = 0; S.mhz = 0;
+    g_stop_sensor = 1;
+    pump(200);
+    CHECK(g_post_calls == 0, "证得静止仍然触发(post=%d)", g_post_calls);
+    g_stop_sensor = 0;
+}
+
+/* REL35 事故生命周期: 一次武装一张票据, 人工恢复不自动再武装(C6/R2.4) */
+static void c_REL35(void)
+{
+    diag_rprof_t p;
+    rel_latch_t l;
+    rel_incident_t inc;
+    rt_uint32_t gen_before;
+
+    world_reset();
+    p = make_profile();
+    install_profile(&p);
+    d_mode = DIAG_MODE_RELATIVE_PROTECTION;
+    S.sg = (rt_uint16_t)(p.run_sg_min - p.sg_drop_trip - 1);
+    pump(120);
+    CHECK(g_post_calls == 1, "第一次事故 post=%d", g_post_calls);
+    CHECK(rel_prod_get_latch(&l) && l.reason == REL_SG_SEVERE, "首因=%s",
+          rel_reason_name(l.reason));
+    CHECK(d_mode == DIAG_MODE_MONITOR_ONLY, "触发后没退回 MONITOR_ONLY(%d)", (int)d_mode);
+    rel_prod_get_incident(&inc);
+    CHECK(inc.rearm_required == 1, "票据没被标记为已消耗");
+    CHECK(cap_has("rearm required"), "没把'需要重新武装'说出来: [%.120s]", cap_text());
+
+    S.safety = SAFETY_FAULT_LATCHED; S.mstate = MOTOR_FAULT; S.armed = 0; S.mhz = 0;
+    pump(5);
+    S.safety = SAFETY_READY; S.mstate = MOTOR_IDLE; S.mhz = 0; S.raw = 2000; S.sg = 500;
+    pump(60);
+    CHECK(g_post_calls == 1, "人工恢复过程里多 post 了(%d)", g_post_calls);
+    CHECK(d_mode == DIAG_MODE_MONITOR_ONLY, "相对保护被自动恢复了(%d)", (int)d_mode);
+    CHECK(d_relative_confirm_given == RT_FALSE, "恢复路径凭空造出了 CONFIRM 凭据");
+
+    rel_prod_get_incident(&inc);
+    gen_before = inc.generation;
+    diagnosis_take_relative_confirm();
+    CHECK(diagnosis_set_mode(DIAG_MODE_RELATIVE_PROTECTION) == RT_EOK &&
+          d_mode == DIAG_MODE_RELATIVE_PROTECTION, "显式重新武装失败");
+    CHECK(cap_has("REL re-arm prior r=REL_SG_SEVERE"), "旧事故首因没被宣布: [%.120s]",
+          cap_text());
+    S.mstate = MOTOR_CRUISE; S.armed = 1; S.mhz = 500;
+    S.sg = (rt_uint16_t)(p.run_sg_min - p.sg_drop_trip - 1);
+    pump(140);
+    CHECK(g_post_calls == 2, "新代际里第二次事故 post 总数=%d(期望 2)", g_post_calls);
+    rel_prod_get_incident(&inc);
+    CHECK(inc.have_archived && inc.archived.reason == REL_SG_SEVERE,
+          "旧事故归档丢了(%d %s)", (int)inc.have_archived, rel_reason_name(inc.archived.reason));
+    CHECK(inc.current.reason == REL_SG_SEVERE &&
+          inc.current.trig_tick > inc.archived.trig_tick, "本轮首因没独立记录");
+    CHECK(inc.generation > gen_before, "显式再武装后代际没前进(%u -> %u)",
+          (unsigned)gen_before, (unsigned)inc.generation);
+    CHECK(inc.rearm_required == 1, "第二次事故后票据没被消耗");
+    CHECK(d_mode == DIAG_MODE_MONITOR_ONLY, "第二次触发后模式=%d", (int)d_mode);
+}
+
+/* REL36 输出参数为 NULL 也不能跳过真实保护(R2.5) */
+static void c_REL36(void)
+{
+    diag_rprof_t p;
+    rel_step_arg_t a;
+    rel_state_t s;
+    rel_latch_t l;
+    int i;
+
+    world_reset();
+    p = make_profile();
+    install_profile(&p);
+    memset(&a, 0, sizeof(a));
+    a.prof = p;
+    a.mode = (rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION;
+    a.coverage = RELCOV_ABSENT;
+    a.in.motion_known = 1;
+    a.in.motor_state = (rt_uint8_t)MOTOR_CRUISE;
+    for (i = 0; i < 100; ++i)
+    {
+        a.now_tick = 1000u + (rt_uint32_t)i * 10u;
+        a.in.seq = (rt_uint32_t)i + 1u;
+        a.in.timestamp = a.now_tick;
+        (void)rel_prod_evaluate(&a, (rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION,
+                                RT_NULL, RT_NULL);
+    }
+    CHECK(g_post_calls == 1, "NULL 输出参数把保护吞掉了(post=%d)", g_post_calls);
+    CHECK(rel_prod_get_latch(&l) && l.reason == REL_COVERAGE_LOST, "首因=%s",
+          rel_reason_name(l.reason));
+    rel_prod_get_snapshot(&s);
+    CHECK(s.coverage == RELCOV_ABSENT && s.cov_lost_ms >= 500u,
+          "快照没反映覆盖丢失(cov=%u ms=%u)", (unsigned)s.coverage, (unsigned)s.cov_lost_ms);
+}
+
+/* REL37 事件投递失败仍然先保护、首因与票据都留着(R2.6) */
+static void c_REL37(void)
+{
+    diag_rprof_t p;
+    rel_latch_t l;
+    rel_incident_t inc;
+
+    world_reset();
+    p = make_profile();
+    g_post_rc_inject = -RT_EIO;
+    install_profile(&p);
+    d_mode = DIAG_MODE_RELATIVE_PROTECTION;
+    S.sg = (rt_uint16_t)(p.run_sg_min - p.sg_drop_trip - 1);
+    pump(200);
+    CHECK(g_post_calls == 1, "投递失败后重复投递(%d 次)", g_post_calls);
+    CHECK(rel_prod_get_latch(&l), "投递失败却连 latch 都没有");
+    CHECK(l.post_rc == (rt_int16_t)(-RT_EIO), "post_rc=%d 没如实记录", (int)l.post_rc);
+    CHECK(l.reason == REL_SG_SEVERE && l.value_raw == (rt_int32_t)S.sg,
+          "首因/触发量丢了(%s val=%d)", rel_reason_name(l.reason), (int)l.value_raw);
+    rel_prod_get_incident(&inc);
+    CHECK(inc.rearm_required == 1, "以'成功排队'替代'实际已保护': rearm=%d",
+          (int)inc.rearm_required);
+    CHECK(d_mode == DIAG_MODE_MONITOR_ONLY, "投递失败后模式没降(%d)", (int)d_mode);
+}
+
+/* REL38 人工模式与 profile 变更在活动运行中一律拒绝(C1), 开启必须过最终静止门(C2) */
+static void c_REL38(void)
+{
+    diag_rprof_t p, back;
+    rt_err_t e;
+
+    world_reset();
+    p = make_profile();
+    install_profile(&p);
+    d_mode = DIAG_MODE_RELATIVE_PROTECTION;
+    cap_reset();
+    e = diagnosis_set_mode(DIAG_MODE_MONITOR_ONLY);
+    CHECK(e != RT_EOK, "运动中关掉了相对保护(rc=%d)", (int)e);
+    CHECK(d_mode == DIAG_MODE_RELATIVE_PROTECTION, "被拒绝的切换仍然改了模式(%d)", (int)d_mode);
+    CHECK(cap_has("needs static/idle"), "拒绝理由没披露: [%.90s]", cap_text());
+    e = diagnosis_set_mode(DIAG_MODE_ACTIVE_PROTECTION);
+    CHECK(e != RT_EOK, "运动中还能切 ACTIVE(rc=%d)", (int)e);
+
+    world_reset();                             /* C2: 静止事务被占用 ⇒ 拒绝且问过门 */
+    install_profile(&p);
+    S.mstate = MOTOR_IDLE; S.armed = 0; S.mhz = 0;
+    g_static_begin_busy = 1;
+    diagnosis_take_relative_confirm();
+    e = diagnosis_set_mode(DIAG_MODE_RELATIVE_PROTECTION);
+    CHECK(e != RT_EOK, "静止事务被占用时却启用成功(rc=%d)", (int)e);
+    CHECK(g_static_begin_calls == 1, "根本没问静止事务门(calls=%d)", g_static_begin_calls);
+    CHECK(d_mode == DIAG_MODE_MONITOR_ONLY, "拒绝后模式变成 %d", (int)d_mode);
+    CHECK(cap_has("static txn not granted"), "没披露门被拒: [%.90s]", cap_text());
+    g_static_begin_busy = 0;
+
+    world_reset();                             /* clear 在运动中不得生效 */
+    install_profile(&p);
+    S.mstate = MOTOR_CRUISE; S.armed = 1; S.mhz = 500;
+    cap_reset();
+    {
+        char *av[] = { "diag_profile", "clear", "CONFIRM" };
+        diag_profile(3, av);
+    }
+    CHECK(cap_has("clear REFUSED"), "运动中却作废了 profile: [%.90s]", cap_text());
+    CHECK(project_config_get_rprof(&back) == RT_EOK && back.magic == DIAG_RPROF_MAGIC,
+          "被拒绝的 clear 仍然改了配置");
+}
+
+/* REL39 zero 全程静止(C5) + 失败重学不得复用旧凭据(C4) */
+static void c_REL39(void)
+{
+    diag_rprof_t good, back;
+
+    world_reset();                             /* C5 */
+    S.mstate = MOTOR_IDLE; S.armed = 0; S.mhz = 0; S.raw = 1660; S.sg = 500;
+    g_pump_hook = r1_hook_arm_midway; g_pump_n = 0; g_cmd_pump = 1;
+    run_thread(ROLE_MAIN, cmd_zero, RT_NULL, 0);
+    g_cmd_pump = 0; g_pump_hook = RT_NULL;
+    CHECK(d_pending_zero == RT_FALSE, "中途起转的零点却发布了凭据");
+    CHECK(d_cap.active == 0, "作废后采集状态机还挂着");
+    CHECK(cap_has("zero VOIDED"), "没有具名作废行: [%.90s]", cap_text());
+    CHECK(d_pending.zero_n == 0u, "作废的候选里留了零点数(%u, 带 %u..%u)",
+          (unsigned)d_pending.zero_n, (unsigned)d_pending.zero_min,
+          (unsigned)d_pending.zero_max);
+
+    world_reset();                             /* C4 */
+    S.mstate = MOTOR_IDLE; S.armed = 0; S.mhz = 0; S.raw = 1660;
+    do_cmd(cmd_zero);
+    CHECK(d_pending_zero == RT_TRUE, "前置零点没成功: [%.80s]", cap_text());
+    S.mstate = MOTOR_CRUISE; S.armed = 1; S.mhz = 500; S.raw = 2000; S.sg = 500;
+    pump_sensor(2);
+    do_cmd(cmd_learn);
+    CHECK(d_pending_learn == RT_TRUE, "前置学习没成功: [%.80s]", cap_text());
+    S.mstate = MOTOR_IDLE; S.armed = 0; S.mhz = 0;
+    cap_reset();
+    do_cmd(cmd_learn_far_window);
+    CHECK(cap_has("learn FAILED") || cap_has("learn REFUSED"),
+          "离窗重学没具名失败: [%.90s]", cap_text());
+    CHECK(d_pending_learn == RT_FALSE, "失败的重学却保留了旧 learn 凭据");
+    cap_reset();
+    do_cmd(cmd_commit);
+    CHECK(cap_has("commit REFUSED"), "失败重学之后竟然提交了: [%.90s]", cap_text());
+    {
+        int got = (project_config_get_rprof(&back) == RT_EOK &&
+                   back.magic == DIAG_RPROF_MAGIC);
+        CHECK(got == 0, "发布出了 %u..%u", (unsigned)back.hz_low, (unsigned)back.hz_high);
+    }
+
+    world_reset();                             /* 已提交的 profile 不被失败尝试改坏 */
+    good = make_profile();
+    install_profile(&good);
+    S.mstate = MOTOR_IDLE; S.armed = 0; S.mhz = 0; S.raw = 1660;
+    do_cmd(cmd_zero);
+    S.mstate = MOTOR_CRUISE; S.armed = 1; S.mhz = 500; S.raw = 2000; S.sg = 500;
+    pump_sensor(2);
+    do_cmd(cmd_learn_far_window);
+    project_config_get_rprof(&back);
+    CHECK(back.magic == DIAG_RPROF_MAGIC && back.profile_id == good.profile_id &&
+          back.hz_low == good.hz_low, "失败的学习改了已发布 profile(id=%u lo=%u)",
+          (unsigned)back.profile_id, (unsigned)back.hz_low);
+}
+
+/* REL40 配置取锁失败: 不写 Flash、不 release 未持有的锁、字段不动(C3/R3.8) */
+static void c_REL40(void)
+{
+    diag_rprof_t p, after;
+    project_config_t snap;
+    rt_err_t rc;
+    int rel_before;
+
+    world_reset();
+    p = make_profile();
+    install_profile(&p);
+    rel_before = g_mutex_release_calls;
+    g_mutex_take_fail = 1;
+    rc = project_config_save();
+    CHECK(rc != RT_EOK, "取锁失败却返回 rc=%d", (int)rc);
+    CHECK(g_blob_valid == 0, "取锁失败仍然写了 Flash 副本");
+    CHECK(g_mutex_release_calls == rel_before,
+          "未持有却 release 了(%d 次)", g_mutex_release_calls - rel_before);
+    rc = project_config_get_snapshot(&snap);
+    CHECK(rc != RT_EOK, "取锁失败却给了整套快照(rc=%d)", (int)rc);
+    rc = project_config_get_rprof(&after);
+    CHECK(rc != RT_EOK, "取锁失败却给了 profile(rc=%d)", (int)rc);
+    rc = project_config_set_rprof(&p);
+    CHECK(rc != RT_EOK, "取锁失败却发布了 profile(rc=%d)", (int)rc);
+    rc = project_config_clear_rprof();
+    CHECK(rc != RT_EOK, "取锁失败却作废了 profile(rc=%d)", (int)rc);
+    rc = project_config_load();
+    CHECK(rc != RT_EOK, "取锁失败却改了工作集(rc=%d)", (int)rc);
+    rc = project_config_set(&snap);
+    CHECK(rc != RT_EOK, "取锁失败却接受了整套设置(rc=%d)", (int)rc);
+    CHECK(cap_has("defaults REFUSED") == 0, "本例没调 defaults 却报了名");
+    project_config_defaults();
+    CHECK(cap_has("defaults REFUSED"), "回默认没披露被锁挡住: [%.120s]", cap_text());
+    g_mutex_take_fail = 0;
+    rel_before = g_mutex_release_calls;
+    CHECK(project_config_save() == RT_EOK && g_blob_valid == 1,
+          "恢复锁之后仍然存不了");
+    CHECK(project_config_get_rprof(&after) == RT_EOK &&
+          memcmp(&after, &p, sizeof(p)) == 0, "一路失败之后 profile 字段被改动了");
+}
+
+/* REL41 非法上下文静默拒绝(R3.7): 不解析、不取锁、不打印 */
+static void c_REL41(void)
+{
+    diag_rprof_t after;
+    int got;
+    char *av_show[]  = { "diag_profile", "show" };
+    char *av_commit[] = { "diag_profile", "commit" };
+    char *av_junk[]  = { "diag_profile", "nonsense" };
+
+    world_reset();
+    {
+        diag_rprof_t p = make_profile();
+        install_profile(&p);
+    }
+    S.mstate = MOTOR_IDLE; S.armed = 0; S.mhz = 0;
+
+    g_isr_nest = 1;
+    cap_reset();
+    diag_profile(2, av_show);
+    CHECK(cap_text()[0] == 0, "ISR 上下文里竟然打印了: [%.80s]", cap_text());
+    CHECK(g_static_begin_calls == 0, "ISR 上下文里竟然动了静止事务门(%d)",
+          g_static_begin_calls);
+    g_isr_nest = 0;
+
+    g_primask_masked = 1;
+    cap_reset();
+    diag_profile(2, av_commit);
+    CHECK(cap_text()[0] == 0, "PRIMASK 窗口里竟然打印了: [%.80s]", cap_text());
+    g_primask_masked = 0;
+
+    g_no_thread = 1;
+    cap_reset();
+    diag_profile(2, av_junk);
+    CHECK(cap_text()[0] == 0, "无线程对象时连 usage 都打印了: [%.80s]", cap_text());
+    g_no_thread = 0;
+
+    cap_reset();                               /* 合法上下文必须照常给结论 */
+    diag_profile(2, av_show);
+    CHECK(cap_has("profile id="), "合法上下文却什么都没打印: [%.80s]", cap_text());
+    got = (project_config_get_rprof(&after) == RT_EOK && after.magic == DIAG_RPROF_MAGIC);
+    CHECK(got, "前置 profile 丢了");
+}
+
+/* REL42 低 SG 基线要能生成可达阈值(D1), 分不开的工况具名拒绝并给数据(R4.1/R4.3) */
+static void c_REL42(void)
+{
+    diag_rprof_t back, p, q;
+    const char *why = RT_NULL;
+    rt_uint32_t rup = 0, rdn = 0, t;
+    int got;
+
+    world_reset();                             /* D1 同前置: 稳定 SG=64 */
+    S.mstate = MOTOR_IDLE; S.armed = 0; S.mhz = 0; S.raw = 1660; S.sg = 64;
+    do_cmd(cmd_zero);
+    S.mstate = MOTOR_CRUISE; S.armed = 1; S.mhz = 500; S.raw = 2000; S.sg = 64;
+    pump_sensor(2);
+    do_cmd(cmd_learn);
+    CHECK(d_pending_learn == RT_TRUE, "稳定低 SG 学不出候选: [%.90s]", cap_text());
+    CHECK(d_pending.run_sg_min == 64u, "基线=%u(期望 64)", (unsigned)d_pending.run_sg_min);
+    CHECK(d_pending.sg_drop_trip <= d_pending.run_sg_min,
+          "生成的 trip=%u 仍大于码域上限 %u", (unsigned)d_pending.sg_drop_trip,
+          (unsigned)d_pending.run_sg_min);
+    CHECK(d_pending.sg_drop_warn > 0u && d_pending.sg_drop_warn < d_pending.sg_drop_trip,
+          "层次不对(%u/%u)", (unsigned)d_pending.sg_drop_warn,
+          (unsigned)d_pending.sg_drop_trip);
+    /* 结构自洽先看层次(上面三条), 完整 rel_profile_validate 要等 commit 之后
+     * 对**已发布**的那一份做 —— COMMITTED/profile_id/设计初值都是 commit 赋的,
+     * 拿它们去校验一个还没发布的候选是在校验不存在的东西。 */
+    S.mstate = MOTOR_IDLE; S.armed = 0; S.mhz = 0;
+    cap_reset();
+    do_cmd(cmd_commit);
+    CHECK(!cap_has("SG_TRIP_UNREACHABLE"), "低 SG 基线仍然被判不可达: [%.90s]", cap_text());
+    got = (project_config_get_rprof(&back) == RT_EOK && back.magic == DIAG_RPROF_MAGIC);
+    CHECK(got, "稳定低 SG 提交不了: [%.90s]", cap_text());
+    CHECK((back.flags & RPF_COMMITTED) != 0, "提交后没有 COMMITTED 位");
+    CHECK((back.flags & RPF_FIELD_VERIFIED) == 0, "自动生成的阈值自称 FIELD_VERIFIED");
+    CHECK(back.threshold_tier >= 1u && back.threshold_tier <= 3u, "档位没落盘(%u)",
+          (unsigned)back.threshold_tier);
+    why = RT_NULL;
+    CHECK(rel_profile_validate(&back, &why) == RT_EOK, "发布出去的 profile 不合格(%s)",
+          why ? why : "?");
+
+    world_reset();                             /* 正常波动 64/68/72 */
+    S.mstate = MOTOR_IDLE; S.armed = 0; S.mhz = 0; S.raw = 1660; S.sg = 64;
+    do_cmd(cmd_zero);
+    S.mstate = MOTOR_CRUISE; S.armed = 1; S.mhz = 500; S.raw = 2000;
+    g_sg_hook = r1_sg_646872;
+    pump_sensor(2);
+    do_cmd(cmd_learn);
+    CHECK(d_pending_learn == RT_TRUE, "小幅正常波动学不出: [%.90s]", cap_text());
+    CHECK(d_pending.run_sg_min == 64u && d_pending.run_sg_max == 72u,
+          "波动带 [%u..%u]", (unsigned)d_pending.run_sg_min, (unsigned)d_pending.run_sg_max);
+    CHECK(d_pending.sg_drop_warn > (rt_uint16_t)(d_pending.run_sg_max - d_pending.run_sg_min),
+          "警告层没盖住正常波动(warn=%u span=%u)", (unsigned)d_pending.sg_drop_warn,
+          (unsigned)(d_pending.run_sg_max - d_pending.run_sg_min));
+    g_sg_hook = RT_NULL;
+
+    world_reset();                             /* 负控: SG 接近 0 */
+    S.mstate = MOTOR_IDLE; S.armed = 0; S.mhz = 0; S.raw = 1660; S.sg = 1;
+    do_cmd(cmd_zero);
+    S.mstate = MOTOR_CRUISE; S.armed = 1; S.mhz = 500; S.raw = 2000; S.sg = 1;
+    pump_sensor(2);
+    cap_reset();
+    do_cmd(cmd_learn);
+    CHECK(cap_has("learn REFUSED: SG_HEADROOM_INSUFFICIENT"),
+          "近零基线没被具名拒绝: [%.120s]", cap_text());
+    CHECK(cap_has("sg[1..1]"), "拒绝行没带数据依据: [%.120s]", cap_text());
+    CHECK(d_pending_learn == RT_FALSE, "被拒绝的候选却置了凭据");
+
+    world_reset();                             /* 负控: 噪声吃掉大半余量 */
+    S.mstate = MOTOR_IDLE; S.armed = 0; S.mhz = 0; S.raw = 1660; S.sg = 300;
+    do_cmd(cmd_zero);
+    S.mstate = MOTOR_CRUISE; S.armed = 1; S.mhz = 500; S.raw = 2000;
+    g_sg_hook = r1_sg_wide;
+    pump_sensor(2);
+    cap_reset();
+    do_cmd(cmd_learn);
+    CHECK(cap_has("learn REFUSED"), "噪声过大的工况没被拒绝: [%.120s]", cap_text());
+    CHECK(cap_has("SG_HEADROOM_INSUFFICIENT"), "拒绝原因没具名: [%.120s]", cap_text());
+    g_sg_hook = RT_NULL;
+
+    p = make_profile();                        /* R4.3: 可达性按扩张带核定 */
+    p.run_adc_min = 100; p.run_adc_max = 4000; p.run_adc_noise = 500;
+    p.run_adc_mean_x1000 = 2000000u;
+    p.adc_dev_warn = 90; p.adc_dev_trip = 100;
+    p.signature = rel_profile_signature(&p);
+    rel_adc_reach(&p, &rup, &rdn);
+    CHECK(rup == 0u && rdn == 0u, "扩张带两侧余量=%u/%u(带已被撑满, 期望 0/0)",
+          (unsigned)rup, (unsigned)rdn);
+    why = RT_NULL;
+    CHECK(rel_profile_validate(&p, &why) == -RT_EINVAL && why &&
+          strcmp(why, "ADC_TRIP_UNREACHABLE") == 0,
+          "拿未扩张的带校验、执行时却用扩张带: why=%s", why ? why : "(null)");
+
+    p = make_profile();                        /* 三档都在健康基线上张开 */
+    for (t = 1; t <= 3; ++t)
+    {
+        why = RT_NULL;
+        q = p;
+        CHECK(rel_profile_gen_thresholds(&q, (rt_uint8_t)t, &why) == RT_EOK,
+              "档 %u 在健康基线上被拒(%s)", (unsigned)t, why ? why : "?");
+        CHECK(q.sg_drop_warn > (rt_uint16_t)(q.run_sg_max - q.run_sg_min) &&
+              q.sg_drop_warn < q.sg_drop_trip && q.sg_drop_trip <= q.run_sg_min,
+              "档 %u 的 SG 层次不对(%u/%u, min=%u)", (unsigned)t,
+              (unsigned)q.sg_drop_warn, (unsigned)q.sg_drop_trip, (unsigned)q.run_sg_min);
+        CHECK(q.adc_dev_warn > (rt_int16_t)q.run_adc_noise &&
+              q.adc_dev_warn < q.adc_dev_trip, "档 %u 的 ADC 层次不对", (unsigned)t);
+    }
+    why = RT_NULL;
+    CHECK(rel_profile_gen_thresholds(&p, 0, &why) != RT_EOK, "档 0 没被拒绝");
+    why = RT_NULL;
+    CHECK(rel_profile_gen_thresholds(&p, 4, &why) != RT_EOK && why &&
+          strcmp(why, "TIER_RANGE") == 0, "档 4 没具名拒绝");
+}
+
+/* REL43 关键行在合法最大值/最长原因/负错误码下仍然完整(E1) */
+static void c_REL43(void)
+{
+    diag_rprof_t p;
+    rel_state_t s;
+    int mx;
+
+    world_reset();
+    p = make_profile();
+    p.profile_id = 0xFFFFFFFFu;
+    p.revision = 0xFFFFFFFFu;
+    p.signature = rel_profile_signature(&p);
+    install_profile(&p);
+    d_mode = DIAG_MODE_RELATIVE_PROTECTION;
+    S.sg = (rt_uint16_t)(p.run_sg_min - p.sg_drop_trip - 1);
+    s_prev.sg_seq = 4000000000u; s_prev.cur_seq = 4000000000u;
+    s_prev.imu_seq = 4000000000u;
+    g_post_rc_inject = -RT_EIO;
+    pump(140);
+    cap_reset();
+    diag_relative_status_lines();
+    mx = cap_max_line_len();
+    CHECK(mx <= 110, "状态行最长 %d 字节(预算 110)", mx);
+    CHECK(cap_has("id=4294967295") && cap_has("rev=4294967295"), "最大身份没导出完整");
+    CHECK(cap_has("post_rc=-"), "负错误码没导出: [%.120s]", cap_text());
+    CHECK(cap_has("r=REL_SG_SEVERE"), "首因没出现在状态行: [%.120s]", cap_text());
+    CHECK(cap_has("warn=") && cap_has("strong="), "warn/strong 两级没分别导出");
+    CHECK(cap_has("reach=") && cap_has("tier="), "可达余量/档位没导出");
+    CHECK(cap_has("imu_use="), "IMU 覆盖没披露");
+    CHECK(cap_has("cov=") && cap_has("gen="), "覆盖档位/代际没披露");
+    rel_prod_get_snapshot(&s);
+    CHECK(s.last_sg_seq != 0u && s.last_cur_seq != 0u, "样本身份没进快照");
+
+    world_reset();                             /* 最长档位名 + 触发摘要三行 */
+    p = make_profile();
+    install_profile(&p);
+    d_mode = DIAG_MODE_RELATIVE_PROTECTION;
+    g_mutex_take_fail = 1;
+    cap_reset();
+    pump(70);
+    mx = cap_max_line_len();
+    CHECK(mx <= 110, "config-lock 档与触发摘要最长 %d 字节(预算 110)", mx);
+    CHECK(cap_has("NOT-ACTIVE(config-lock)"), "config-lock 档没披露");
+    CHECK(cap_has("r=REL_COVERAGE_LOST"), "覆盖丢失原因名没导出(最长原因 17B)");
+    CHECK(cap_count("[DIAG] REL TRIP r=") == 1, "触发摘要打成 %d 份",
+          cap_count("[DIAG] REL TRIP r="));
+    CHECK(cap_count("[DIAG] REL TRIP val=") == 1, "触发摘要第二行没跟着出");
+    CHECK(cap_count("[DIAG] REL TRIP sg=") == 1, "触发摘要第三行没跟着出");
+    g_mutex_take_fail = 0;
+}
+
+/* REL44 碰撞独立保护(R6): 只认新鲜有效 IMU 证据 */
+static void c_REL44(void)
+{
+    rel_engine_t e;
+    struct feed f;
+    diag_rprof_t p;
+    rel_reason_t r = REL_REASON_NONE;
+    rel_latch_t l;
+    int i;
+
+    world_reset();
+    p = make_profile();
+    p.impact_peak_mg = 2500; p.impact_new_min = 2;
+    p.dur_impact_ms = 100; p.age_imu_ms = 100;
+    p.signature = rel_profile_signature(&p);
+
+    feed_init(&e, &p, &f);                     /* 静止 ~1g 连续 200 帧 */
+    for (i = 1; i <= 200; ++i)
+        r = feed_step_imu(&f, 500, 2000, (i % 10) == 0, 1, 1, 1, 1212, 1);
+    CHECK(r == REL_REASON_NONE, "静止重力被当成碰撞(%s)", rel_reason_name(r));
+    CHECK(e.imp_cnt == 0u, "冲击计数=%u(期望 0)", e.imp_cnt);
+
+    feed_init(&e, &p, &f);                     /* 两枚新样本过门 */
+    r = feed_step_imu(&f, 500, 2000, 1, 1, 1, 1, 3000, 1);
+    CHECK(r == REL_REASON_NONE && e.imp_cnt == 1u, "第一枚冲击后计数=%u", e.imp_cnt);
+    r = feed_step_imu(&f, 500, 2000, 0, 1, 1, 1, 2900, 1);
+    CHECK(r == REL_IMPACT, "两枚独立冲击后=%s(期望 REL_IMPACT)", rel_reason_name(r));
+    CHECK(e.severe_active == 1 && e.imp_run_ms <= p.dur_impact_ms,
+          "冲击窗口=%u(上限 %u)", e.imp_run_ms, p.dur_impact_ms);
+
+    feed_init(&e, &p, &f);                     /* 旧 peak 不冒充第二次冲击 */
+    feed_step_imu(&f, 500, 2000, 0, 1, 1, 1, 3000, 1);
+    for (i = 1; i <= 200; ++i)
+        r = feed_step_imu(&f, 500, 2000, (i % 10) == 0, 1, 1, 1, 3000, 0);
+    CHECK(e.imp_cnt == 1u, "冻结身份把一次冲击数成了 %u 次", e.imp_cnt);
+    CHECK(r != REL_IMPACT, "滑窗里留着的 peak 被当成又撞一次(%s)", rel_reason_name(r));
+
+    feed_init(&e, &p, &f);                     /* 中间夹着新鲜正常样本 = 打断这一组 */
+    feed_step_imu(&f, 500, 2000, 0, 1, 1, 1, 3000, 1);
+    for (i = 1; i <= 20; ++i)
+        r = feed_step_imu(&f, 500, 2000, 0, 1, 1, 1, 1000, 1);
+    CHECK(r == REL_REASON_NONE, "相隔 200ms 的两枚样本被判成一组冲击(%s)",
+          rel_reason_name(r));
+    CHECK(e.imp_cnt == 0u, "中间的正常样本没打断这一组(imp_cnt=%u)", e.imp_cnt);
+    /* 打断之后必须能重新起算: 连续两枚过门样本仍然触发 */
+    r = feed_step_imu(&f, 500, 2000, 0, 1, 1, 1, 3000, 1);
+    CHECK(r == REL_REASON_NONE && e.imp_cnt == 1u, "重起算后第一枚=%u", e.imp_cnt);
+    r = feed_step_imu(&f, 500, 2000, 0, 1, 1, 1, 3100, 1);
+    CHECK(r == REL_IMPACT, "重新起算的连续两枚没有触发(%s)", rel_reason_name(r));
+
+    world_reset();                             /* IMU 缺失不影响 SG/ADC 判据 */
+    feed_init(&e, &p, &f);
+    for (i = 1; i <= 200; ++i)
+        r = feed_step_imu(&f, (rt_uint16_t)(p.run_sg_min - p.sg_drop_trip - 1), 2000,
+                          (i % 10) == 0, 1, 1, 1, 1000, 0);
+    CHECK(r == REL_SG_SEVERE, "IMU 缺失让 SG 判据也不可用了(%s)", rel_reason_name(r));
+    CHECK(e.imu_usable == 0u, "imu_usable 没如实置 0");
+
+    world_reset();                             /* 生产入口: 恰好一次真实保护 */
+    install_profile(&p);
+    d_mode = DIAG_MODE_RELATIVE_PROTECTION;
+    S.mx = 2000; S.my = 2000; S.mz = 400;      /* 合成幅值约 2857mg > 2500 */
+    pump(40);
+    CHECK(g_post_calls == 1, "碰撞后 post=%d(期望恰好 1)", g_post_calls);
+    CHECK(rel_prod_get_latch(&l) && l.reason == REL_IMPACT, "碰撞原因没进首因(%s)",
+          rel_reason_name(l.reason));
+    if (l.latched)
+    {
+        CHECK(l.value_raw >= (rt_int32_t)p.impact_peak_mg, "触发量=%d 不是振动 mg",
+              (int)l.value_raw);
+        CHECK(l.threshold_raw == (rt_int32_t)p.impact_peak_mg, "阈值=%d",
+              (int)l.threshold_raw);
+        CHECK(l.first_imu_seq != 0u, "首因没记 IMU 样本身份");
+    }
+    CHECK(d_mode == DIAG_MODE_MONITOR_ONLY, "碰撞后没退 MONITOR(%d)", (int)d_mode);
+
+    world_reset();                             /* MONITOR 下只评估不行动 */
+    cap_reset();
+    install_profile(&p);
+    d_mode = DIAG_MODE_MONITOR_ONLY;
+    S.mx = 2000; S.my = 2000; S.mz = 400;
+    pump(60);
+    CHECK(g_post_calls == 0, "MONITOR_ONLY 下碰撞也 post 了(%d)", g_post_calls);
+    CHECK(d_rel_prod.verdict == REL_IMPACT, "MONITOR 下读不到假设结果: %s",
+          rel_reason_name(d_rel_prod.verdict));
+    CHECK(cap_count("[DIAG] REL TRIP r=") == 0, "MONITOR 却打了行动摘要");
+}
+
 /* ======================= main ======================= */
 
 struct case_ent { const char *id; void (*fn)(void); };
@@ -1646,12 +2592,29 @@ static const struct case_ent TAB[] = {
     { "REL19-out-of-window-only-in-motion",            c_REL19 },
     { "REL20-age-check-before-dedup",                  c_REL20 },
     { "REL21-recovery-needs-fresh-evidence",           c_REL21 },
-    { "REL22-coverage-disclosure-no-flood",            c_REL22 },
+    { "REL22-coverage-loss-protects-first",            c_REL22 },
     { "REL23-profile-persist-and-v2-migration",        c_REL23 },
     { "REL24-cli-strict-args-no-side-effects",         c_REL24 },
     { "REL25-cli-capture-and-publish",                 c_REL25 },
     { "REL26-tick-diff-and-threshold-bounds",          c_REL26 },
     { "REL27-active-severe-protect-before-print",      c_REL27 },
+    { "REL28-strong-needs-own-evidence",               c_REL28 },
+    { "REL29-frozen-adc-age-degrades",                 c_REL29 },
+    { "REL30-source-gap-restarts-evidence",            c_REL30 },
+    { "REL31-tick-wrap-and-rate-binding",              c_REL31 },
+    { "REL32-recovery-breaks-on-counter-evidence",     c_REL32 },
+    { "REL33-lock-fail-bounded-degrade",               c_REL33 },
+    { "REL34-no-frame-still-supervises",               c_REL34 },
+    { "REL35-incident-ticket-lifecycle",               c_REL35 },
+    { "REL36-null-outparams-still-protects",           c_REL36 },
+    { "REL37-post-failure-keeps-first-cause",          c_REL37 },
+    { "REL38-mode-gate-and-static-transaction",        c_REL38 },
+    { "REL39-zero-static-and-failed-relearn",          c_REL39 },
+    { "REL40-config-lock-failure-writes-nothing",      c_REL40 },
+    { "REL41-illegal-context-silent",                  c_REL41 },
+    { "REL42-low-sg-committable-and-named-reject",     c_REL42 },
+    { "REL43-max-value-lines-fit-console",             c_REL43 },
+    { "REL44-impact-fresh-evidence-only",              c_REL44 },
 };
 #define NTAB ((int)(sizeof(TAB)/sizeof(TAB[0])))
 

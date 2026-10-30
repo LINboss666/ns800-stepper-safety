@@ -805,7 +805,7 @@ int main(void)
  * 保证 profile 门禁走真实现, 而不是被假符号掩盖。
  * 下面这些只是满足链接的确定返回值: diag_relative.c 引用的 TMC 身份 / 电机快照 /
  * 安全状态 / 诊断模式接口在 CC01-CC29 的任何判据里都不被读取。
- * 这些路径自身的行为判据在 M8 链(REL01-REL27)上验, **不在本链重复**。 */
+ * 这些路径自身的行为判据在 M8-R1 链(REL01-REL44)上验, **不在本链重复**。 */
 
 #include "safety_state.h"
 #include "tmc2209.h"
@@ -830,3 +830,6 @@ rt_err_t motor_get_snapshot(motor_snapshot_t *s)
 safety_state_t safety_state_get(void) { return SAFETY_READY; }
 rt_err_t safety_post_event(rt_uint32_t e) { (void)e; return RT_EOK; }
 rt_err_t diagnosis_set_mode(diag_mode_t m) { (void)m; return RT_EOK; }
+/* M8-R1 R3.6: learn 新增"必须是 MONITOR_ONLY"的资格门, 因此要多读一次当前模式。
+ * 给确定的 MONITOR_ONLY: CC 链不跑 learn, 这个返回值不进入本链任何判据。 */
+diag_mode_t diagnosis_get_mode(void) { return DIAG_MODE_MONITOR_ONLY; }
