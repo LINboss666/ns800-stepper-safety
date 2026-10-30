@@ -1,0 +1,6 @@
+PROBE|tree=baseline|diag_input_t_size=32|sensor_frame_size=56
+CASE|M8-PRE-1-baseline-has-no-source-age|PASS|checks=502
+CASE|M8-PRE-2-baseline-has-no-single-source-severe|PASS|checks=4
+[DIAG] ACTIVE: severe STALL_CONFIRMED -> post EVT_MULTI_FAULT
+CASE|M8-PRE-3-baseline-print-before-protect|PASS|checks=5
+SUMMARY|cases=3 pass=3 fail=0 pre_bad=0 executed=3

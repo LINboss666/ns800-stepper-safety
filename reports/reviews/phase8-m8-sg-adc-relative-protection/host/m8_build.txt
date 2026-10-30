@@ -1,0 +1,9 @@
+In file included from D:/ns800/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/motor.h:65:0,
+                 from D:/ns800/tests/host/rel_main.c:43:
+D:/ns800/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/stop_priority.h:158:29: warning: 'struct rt_device_pwm' declared inside parameter list
+ rt_err_t sp_bind_pwm(struct rt_device_pwm *pwm, int channel);
+                             ^
+D:/ns800/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/stop_priority.h:158:29: warning: its scope is only this definition or declaration, which is probably not what you want
+D:/ns800/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/stop_priority.h:160:30: warning: 'struct rt_device_pwm' declared inside parameter list
+ void     sp_get_bound(struct rt_device_pwm **out_pwm, int *out_ch, rt_base_t *out_pin);
+                              ^

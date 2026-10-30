@@ -1,0 +1,91 @@
+{
+  "round": "phase8-m8-sg-adc-relative-protection",
+  "software_input_commit": "f9217005f191a601601d315add02c3e8c51f64ed",
+  "baseline_commit": "f1aa2e832d536593641cea44ea890fb8ce9558b9",
+  "action": "Keil Rebuild All x3 (build only; no -f, no download, no flash-read, no DAP, no reset)",
+  "command_template": "C:\\Keil_v5\\UV4\\UV4.exe -r project.uvprojx -t <target> -j0 -o <absolute log path>",
+  "compiler_version_line": "*** Using Compiler 'V6.24', folder: 'C:\\Keil_v5\\ARM\\ARMCLANG\\Bin'",
+  "build_hooks": {
+    "BeforeMake_RunUserProg1": "0 for all three targets (verified from project.uvprojx XML)",
+    "AfterMake_RunUserProg1": "1 for all three; UserProg1Name = fromelf --bin only (image conversion, not a downloader)"
+  },
+  "targets": [
+    {
+      "target": "rt-thread",
+      "uv4_return_code": 0,
+      "program_size": "Code=197666 RO-data=83750 RW-data=2188 ZI-data=84384",
+      "error_warning_line": "0 Error(s), 0 Warning(s)",
+      "log_bytes": 3809,
+      "log_sha256": "681ecb731d75e0677c8bffa1f8e8917757179be3ad23f4e5eaa8ca6d2efd79f0",
+      "images": {
+        "rt-thread.bin": {
+          "bytes": 281996,
+          "sha256": "ff7883736702eb32e6927a93579e70b5b88d4c6a1018c19f32ab6b7a2466ca9d",
+          "identical_to_build_output": true
+        },
+        "rt-thread.axf": {
+          "bytes": 1741680,
+          "sha256": "0b47baee950fb0a606f3814b142c07ba27cd26f5d087c4714dd91511c5431583",
+          "identical_to_build_output": true
+        }
+      }
+    },
+    {
+      "target": "rt-thread-measure-a0",
+      "uv4_return_code": 0,
+      "program_size": "Code=204962 RO-data=86710 RW-data=2188 ZI-data=92104",
+      "error_warning_line": "0 Error(s), 0 Warning(s)",
+      "log_bytes": 3849,
+      "log_sha256": "c8a79c8261622fa4c3050e19bc8bdbf88533136c7790eeaa1f655e614c01e4d1",
+      "images": {
+        "rt-thread-measure-a0.bin": {
+          "bytes": 292252,
+          "sha256": "86013070ffa6f0f097d977244abdfef165d59bf75314da460f854f7a27829f75",
+          "identical_to_build_output": true
+        },
+        "rt-thread-a0.axf": {
+          "bytes": 1772100,
+          "sha256": "67d74b6652310f2d52329959fc323b5e8e6bda6fa6c58daf21b5cafd6fd1166c",
+          "identical_to_build_output": true
+        }
+      }
+    },
+    {
+      "target": "rt-thread-motor-m1-candidate",
+      "uv4_return_code": 0,
+      "program_size": "Code=197898 RO-data=83626 RW-data=2188 ZI-data=84384",
+      "error_warning_line": "0 Error(s), 0 Warning(s)",
+      "log_bytes": 3909,
+      "log_sha256": "3035d0cfb0b15fbc7c05892abe126868db89b189c84e6f2a5dbe8116d0780733",
+      "images": {
+        "rt-thread-motor-m1.bin": {
+          "bytes": 282100,
+          "sha256": "3b226367f9f4a60da60452c383c134d4e45c121b4ce60603a75df9bcc21a3a86",
+          "identical_to_build_output": true
+        },
+        "rt-thread-motor-m1.axf": {
+          "bytes": 1742164,
+          "sha256": "78bd23e70747773b4605a7b0d4f927a7cce2f7746d0a6bf542bdc76d5ab8fde5",
+          "identical_to_build_output": true
+        }
+      }
+    }
+  ],
+  "armclang_static_sizes_bytes_from_map": {
+    "cfg": 212,
+    "d_rel_prod": 124,
+    "d_cap": 200,
+    "d_pending": 108,
+    "s_frame": 72,
+    "s_prev": 72
+  },
+  "gcc_host_sizes_bytes": {
+    "project_config_t": 212,
+    "diag_rprof_t": 108,
+    "sensor_frame_t": 72,
+    "diag_input_t": 60,
+    "project_config_v2_t": 104
+  },
+  "note_on_sizes": "ARMCLANG .bss object 'cfg' size equals the host-GCC sizeof(project_config_t)=212, and 's_frame' equals sizeof(sensor_frame_t)=72; the two compilers agree on this layout.",
+  "manifest_self_hash": "EXCLUDED by rule (a manifest must not hash its own bytes)"
+}

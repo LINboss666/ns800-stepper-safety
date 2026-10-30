@@ -1,0 +1,308 @@
+{
+  "task": "phase8-m8-sg-adc-relative-protection",
+  "task_book_scope_verbatim_summary": "离线读源码、改代码、主机验证、Keil 只构建、个人分支提交推送、远端回读、具体现场候选包制作; 不包含任何新设备动作; 不得把本任务书当作烧录或转电机的批准; 三目标各一次 Rebuild All, 只构建、禁止 -f/下载动作。",
+  "date_utc": "2026-10-30T16:45:09Z",
+  "roles": {
+    "executor": "Qoder agent",
+    "reviewer": "独立复审方(未在本轮自授 GO)"
+  },
+  "baseline_commit": "f1aa2e832d536593641cea44ea890fb8ce9558b9",
+  "branch": "feature/m8-sg-adc-relative-protection",
+  "source_input_commit": "f9217005f191a601601d315add02c3e8c51f64ed",
+  "delivery_head_at_generation": "f9217005f191a601601d315add02c3e8c51f64ed",
+  "delivery_head_rule": "证据/交接提交即交付头; 其父 f921700 是软件输入提交(镜像与构建只绑定它)。复审取镜像-源码对应关系时以 build_manifest.json 的 software_input_commit 为准, 不以交付头为准。",
+  "frozen_refs_untouched": [
+    "main",
+    "phase7",
+    "phase8",
+    "所有既有 tag",
+    "debug/tmc-uart-rootcause-20261028(未被覆盖)"
+  ],
+  "forbidden_git_ops_performed": [],
+  "source_changes": [
+    {
+      "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diag_relative.c",
+      "bytes": 41722,
+      "sha256_worktree": "4fb75e160e2b5ceacd75886d374a326fbd1b5412d22e53170ed1573835ae96f2"
+    },
+    {
+      "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diag_relative.h",
+      "bytes": 10784,
+      "sha256_worktree": "d4cdf2d3e36d725202e4971d876c52e0c45d50c8274ac7d6cb4ff7213feee1bf"
+    },
+    {
+      "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diagnosis.c",
+      "bytes": 43452,
+      "sha256_worktree": "fbf23c88ba1636f91d1d5ee374ce29d12bb48c421db2c2ce09f805345e3ee8a6"
+    },
+    {
+      "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diagnosis.h",
+      "bytes": 5591,
+      "sha256_worktree": "09bee9c1aaaedc23ed982c911ea7a9b126b954a6cac66e7730e5071daf616d79"
+    },
+    {
+      "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/project_config.c",
+      "bytes": 22029,
+      "sha256_worktree": "0b4cb9561c8875adcae411b9ec2dced2d8efb130ce16f891b806ec6530469713"
+    },
+    {
+      "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/project_config.h",
+      "bytes": 4775,
+      "sha256_worktree": "6ab66e7f96de99bad153c2b26ec1464e4564e41d0f4897fa753f8e68fd09d063"
+    },
+    {
+      "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/sensor_service.c",
+      "bytes": 19633,
+      "sha256_worktree": "9e1ee35211bfb6dbaa5a36a60b0905007767a171eca6f6e2c27208cc0d8ae2c4"
+    },
+    {
+      "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/sensor_service.h",
+      "bytes": 4577,
+      "sha256_worktree": "da95e7eded3393e8acfb570286141af1107f32d7f9b3ceb1c140d495b2fe9215"
+    },
+    {
+      "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/project.uvprojx",
+      "bytes": 348371,
+      "sha256_worktree": "17a34efaca74b6225bc45941a070e75bcb692d41d04947f2d16b18d4b0d841f4"
+    }
+  ],
+  "verification_chain_changes": [
+    {
+      "path": "tests/host/rel_main.c",
+      "bytes": 72797,
+      "sha256_worktree": "957e3e0927e2baedc248bd87b5d935fe002d2ba52f42b0b4324f17c71f496338"
+    },
+    {
+      "path": "tests/host/rel_pre_probe.c",
+      "bytes": 12003,
+      "sha256_worktree": "7baffd23197a26b44a19e3f233dc5b9d583be1077abf4de26d9f3eb60d5a2706"
+    },
+    {
+      "path": "tests/host/run_diag_relative_m8.sh",
+      "bytes": 15439,
+      "sha256_worktree": "c14fb4d338a5c6b9478c2ba7070ffc8c7a55c186d35ded6d186e74135bd24401"
+    },
+    {
+      "path": "tests/host/run_m8_prefix_probe.sh",
+      "bytes": 4928,
+      "sha256_worktree": "30d6f81e40f11f4130580c3fea7de58850da57f37ad6c22cdc493eea9f407b2b"
+    },
+    {
+      "path": "tests/host/shim_rel/rtthread.h",
+      "bytes": 4528,
+      "sha256_worktree": "92eefe628ef632ae9af3aeeecdb523248777cc16490e9ed72933e49b6bc5fa05"
+    },
+    {
+      "path": "tests/host/shim_rel/rtdevice.h",
+      "bytes": 1206,
+      "sha256_worktree": "6378eac52f197a2d5d84b9a11b0d63df6fe0f40437224307a3c6f0ea6832aefe"
+    },
+    {
+      "path": "tests/host/cc_main.c",
+      "bytes": 31671,
+      "sha256_worktree": "94c7a2dc0095b81da1e16719d5d3781384192334861b78f95c331a5ab427c11a"
+    },
+    {
+      "path": "tests/host/run_current_cal_m7.sh",
+      "bytes": 2805,
+      "sha256_worktree": "3cf5932954908468ca15f7eedf6e9d6fc7ac669beb0ef354e075b569f5fa849e"
+    },
+    {
+      "path": "tests/host/shim_cc/rtthread.h",
+      "bytes": 772,
+      "sha256_worktree": "9ed89c981faf98adfdbf5d19a664c17a9d464c9dc85cd1cec4c8e5e4316f471e"
+    }
+  ],
+  "host_results": {
+    "m8_chain": {
+      "command": "bash tests/host/run_diag_relative_m8.sh",
+      "rc": 0,
+      "ledger": "SUMMARY|cases=27 pass=27 fail=0 pre_bad=0 executed=27",
+      "archived": "reports/reviews/phase8-m8-sg-adc-relative-protection/host/m8_normal_out.txt"
+    },
+    "m8_reverse": {
+      "command": "REVERSE=1 bash tests/host/run_diag_relative_m8.sh",
+      "rc": 0,
+      "families": {
+        "RV1_sg_new_sample_identity_gate": "META-OK 命中 REL08 (额外失败 REL07,REL11 已登记)",
+        "RV2_adc_relative_severe_branch": "META-OK 命中 REL09",
+        "RV3_relative_mode_profile_qualification": "META-OK 命中 REL16"
+      }
+    },
+    "prefix_probe": {
+      "command": "bash tests/host/run_m8_prefix_probe.sh",
+      "rc": 0,
+      "ledger": "SUMMARY|cases=3 pass=3 fail=0",
+      "baseline_source": "git blob of f1aa2e8 applications (不碰工作树, 不受 autocrlf 影响)",
+      "baseline_diagnosis_blob": "cb5d0a4a3e719f05845a8c0a7d180e534e6bc0bd",
+      "baseline_diagnosis_bytes": 33554
+    },
+    "dependent_regressions": {
+      "current_cal_m7": "rc=0 34/34 (本链新增真实 diag_relative.c 参与链接, 使 config_in_range 的 profile 门禁不被假符号掩盖)",
+      "safety_data_semantics": "rc=0 PASS 两变体",
+      "stop_result_s1": "rc=0 PASS 78 例两变体",
+      "stop_priority_s2": "rc=0 PASS 19 组两变体",
+      "m6_cli": "rc=0 PASS 10 例",
+      "io_behavior": "rc=0 PASS 4 变体"
+    }
+  },
+  "time_model_disclosure": {
+    "clock": "虚拟时钟; 生产线程体经 setjmp/longjmp 按 mdelay 次数驱动(跑真实循环体)",
+    "alignment": "sensor 与 diagnosis 对在同一 10ms tick; SG 采样周期 100ms 与真机一致",
+    "known_deviation": "模型帧龄恒 10ms, 真机 0..10ms 抖动",
+    "not_claimed": [
+      "真实时序精度",
+      "抢占式并发正确性(由 M7/S2 链负责其自身范围)"
+    ]
+  },
+  "keil_build": {
+    "command_template": "C:\\Keil_v5\\UV4\\UV4.exe -r project.uvprojx -t <target> -j0 -o <abs log>",
+    "download_or_flash_flags_used": [],
+    "compiler": "armclang V6.24",
+    "per_target": [
+      {
+        "target": "rt-thread",
+        "uv4_return_code": 0,
+        "program_size": "Code=197666 RO-data=83750 RW-data=2188 ZI-data=84384",
+        "error_warning_line": "0 Error(s), 0 Warning(s)",
+        "log_bytes": 3809,
+        "log_sha256": "681ecb731d75e0677c8bffa1f8e8917757179be3ad23f4e5eaa8ca6d2efd79f0",
+        "images": {
+          "rt-thread.bin": {
+            "bytes": 281996,
+            "sha256": "ff7883736702eb32e6927a93579e70b5b88d4c6a1018c19f32ab6b7a2466ca9d",
+            "identical_to_build_output": true
+          },
+          "rt-thread.axf": {
+            "bytes": 1741680,
+            "sha256": "0b47baee950fb0a606f3814b142c07ba27cd26f5d087c4714dd91511c5431583",
+            "identical_to_build_output": true
+          }
+        }
+      },
+      {
+        "target": "rt-thread-measure-a0",
+        "uv4_return_code": 0,
+        "program_size": "Code=204962 RO-data=86710 RW-data=2188 ZI-data=92104",
+        "error_warning_line": "0 Error(s), 0 Warning(s)",
+        "log_bytes": 3849,
+        "log_sha256": "c8a79c8261622fa4c3050e19bc8bdbf88533136c7790eeaa1f655e614c01e4d1",
+        "images": {
+          "rt-thread-measure-a0.bin": {
+            "bytes": 292252,
+            "sha256": "86013070ffa6f0f097d977244abdfef165d59bf75314da460f854f7a27829f75",
+            "identical_to_build_output": true
+          },
+          "rt-thread-a0.axf": {
+            "bytes": 1772100,
+            "sha256": "67d74b6652310f2d52329959fc323b5e8e6bda6fa6c58daf21b5cafd6fd1166c",
+            "identical_to_build_output": true
+          }
+        }
+      },
+      {
+        "target": "rt-thread-motor-m1-candidate",
+        "uv4_return_code": 0,
+        "program_size": "Code=197898 RO-data=83626 RW-data=2188 ZI-data=84384",
+        "error_warning_line": "0 Error(s), 0 Warning(s)",
+        "log_bytes": 3909,
+        "log_sha256": "3035d0cfb0b15fbc7c05892abe126868db89b189c84e6f2a5dbe8116d0780733",
+        "images": {
+          "rt-thread-motor-m1.bin": {
+            "bytes": 282100,
+            "sha256": "3b226367f9f4a60da60452c383c134d4e45c121b4ce60603a75df9bcc21a3a86",
+            "identical_to_build_output": true
+          },
+          "rt-thread-motor-m1.axf": {
+            "bytes": 1742164,
+            "sha256": "78bd23e70747773b4605a7b0d4f927a7cce2f7746d0a6bf542bdc76d5ab8fde5",
+            "identical_to_build_output": true
+          }
+        }
+      }
+    ],
+    "build_hooks": "BeforeMake.RunUserProg1=0; AfterMake 仅 fromelf --bin",
+    "effective_macros_note": "三目标沿用既有口径: 默认/A0 四个安全宏全 0; motor-m1-candidate 为 MOTOR=1/TMC=1/STEP_DIAG=0/LIMIT=0; 本轮未改动任何宏定义, 只新增一个源文件条目。"
+  },
+  "cross_compiler_sizes_bytes": {
+    "project_config_t_gcc": 212,
+    "bss_cfg_armclang": 212,
+    "diag_rprof_t": 108,
+    "sensor_frame_t_gcc": 72,
+    "bss_s_frame_armclang": 72,
+    "diag_input_t": 60,
+    "project_config_v2_t": 104
+  },
+  "zi_delta_bytes_per_target": 592,
+  "zi_delta_named_objects_bytes": 576,
+  "zi_delta_unattributed_bytes": 16,
+  "artifact_grades": {
+    "HOST_PROVEN": [
+      "相对判据/资格矩阵/样本身份/tick 持续时间/融合重叠/年龄先于去重",
+      "先保护后打印(RELATIVE 与旧 ACTIVE 两条边沿)",
+      "首次原因不可覆盖的 latch",
+      "覆盖披露只在状态变化时打印(反刷屏)",
+      "profile 持久化往返与 v2→v3 迁移",
+      "三项具名反向在真实产品分支上被检出"
+    ],
+    "BUILD_PROVEN": [
+      "三目标各一次 Rebuild All 0 Error 0 Warning",
+      "镜像与 AXF 身份",
+      "两编译器结构尺寸一致"
+    ],
+    "NOT_VERIFIED": [
+      "真机 RELATIVE 武装/覆盖/学习/commit/clear 全流程",
+      "真 Flash 上的 v2 参数迁移",
+      "任何 REL_* 严重触发的真机证据",
+      "SG/ADC 阈值的物理合理性(仍是学习裕量+设计初值)",
+      "真实并发与调度抖动下的时序"
+    ],
+    "NOT_AUTHORIZED_NOT_EXECUTED": [
+      "field_candidate_package.md 的 S0-S6 全部阶段"
+    ]
+  },
+  "hardware_actions": [],
+  "quota_consumed": {
+    "com_opens": 0,
+    "downloads": 0,
+    "flash_reads": 0,
+    "resets": 0,
+    "motor_starts": 0,
+    "config_writes_to_flash": 0,
+    "dmm_readings": 0
+  },
+  "prior_quota_carried_forward": "无(旧试验额度不结转; P0 串口对照线已由复审收口)",
+  "p0_go_registration": {
+    "accepted_commit": "f1aa2e832d536593641cea44ea890fb8ce9558b9",
+    "conclusion": "P0 电压观察完成, 无新增必须返修项; 采集器问题按'修复后现场验证通过'收口",
+    "no_further_serial_comparison_rounds": true,
+    "mainline_next": "P1 独立电流参考(零点+增益)",
+    "new_device_authorization_in_that_receipt": false,
+    "registered_here_instead_of_a_separate_go_round": true
+  },
+  "p1_prerequisite_status_offline_only": {
+    "gap1_meter_datasheet": "narrowed-not-closed: UT39A+ 型号/精度/分辨率口径已确认; 保险丝/插孔额定、压降、量程持续时间未公布(厂商与镜像手册均为图片扫描)",
+    "gap2_inline_fixture": "open(实物项)",
+    "gap3_vm_pad_to_u9_pin8": "open(现场项)"
+  },
+  "defects_found_by_this_rounds_own_tests_and_fixed": 12,
+  "defect_list_source": "reports/reviews/phase8-m8-sg-adc-relative-protection/run_record.md §3",
+  "open_items": [
+    "现场采集器脚本未写(须在获准执行的那一轮产出并跑 -SelfTest, 绑定当轮镜像身份)",
+    "BSP 三份阶段文档本轮未同步",
+    "机载缺 diag_relative 自检",
+    "真机严重触发需另一次显式加载实验授权",
+    "P1 三项物料/资料前提未闭合"
+  ],
+  "evidence_dir": "reports/reviews/phase8-m8-sg-adc-relative-protection/",
+  "firmware_dir": "reports/firmware/phase8-m8-sg-adc-relative-protection/",
+  "manifest_self_hash_policy": "build_manifest.json 不哈希自身字节; 证据目录 SHA256SUMS.txt 排除自身",
+  "approval_status": "本轮未自授 GO; 等待独立复审",
+  "next_package_required_authorization": [
+    "1 次 sector 下载(绑定 rt-thread-motor-m1.bin 的 sha256)+1 次定长回读",
+    "1 次 COM5 打开口(打开后不写任何端口属性)",
+    "<=6 次起转, 单次 <=5s, 累计运动 <=60s",
+    "0 次 config_save(Flash 参数写)",
+    "0 次主动复位/DAP"
+  ]
+}

@@ -1,0 +1,24 @@
+############ 独立 I/O 行为链 (基线 f1aa2e832d536593641cea44ea890fb8ce9558b9) ############
+SRC_APP=D:/ns800/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications
+OUT_DIR=/tmp/ns800-host-chain/io
+compiler=gcc.exe (tdm64-1) 4.9.2
+
+=== 变体 off_target ===
+
+=== 变体 on_target ===
+
+=== 变体 off_ovr ===
+
+=== 变体 on_ovr ===
+
+=== 变体 illegal ===
+  illegal 宏值: 编译如预期被拒绝 (rc=1) —— 配置合法性成立
+
+=== I/O 行为矩阵 ===
+off_target | OK 必需用例=33 全部PASS 自报fail=0 proc_rc=0 (输出 18137 字节)
+on_target | OK 必需用例=35 全部PASS 自报fail=0 proc_rc=0 (输出 19828 字节)
+off_ovr | OK 必需用例=46 全部PASS 自报fail=0 proc_rc=0 (输出 34250 字节)
+on_ovr | OK 必需用例=48 全部PASS 自报fail=0 proc_rc=0 (输出 35698 字节)
+IO1_CFG-illegal_macro_rejected | OK(拒绝编译 rc=1)
+
+IO RUNNER RESULT: PASS (rc=0) —— 4 个变体的必需用例全部真执行且判 PASS, 非法宏值被编译拒绝

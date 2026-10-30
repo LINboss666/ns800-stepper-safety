@@ -1,0 +1,148 @@
+{
+  "policy": "stdout 归档一律 CRLF->LF 后入库; 原始与规范化双身份都登记在这里。 仓库 core.autocrlf=true, 所以入库 blob 必然是 LF 版本。",
+  "files": {
+    "m8_normal_out.txt": {
+      "source_path": "<HOST_CHAIN_WORK_ROOT>\\m8\\20261030T163246Z-1967\\out.txt",
+      "original_bytes": 8668,
+      "original_crlf_pairs": 143,
+      "original_cr_bytes": 143,
+      "original_sha256": "bfea031e3091a9c5285853953c444943fbb1b5fa5ebaa658ac569ff0b2450f3c",
+      "normalised_bytes": 8525,
+      "normalised_sha256": "52c49d0407061bd85632d305fcf297146261f9f9a1241c3f41169474157465d8"
+    },
+    "m8_build.txt": {
+      "source_path": "<HOST_CHAIN_WORK_ROOT>\\m8\\20261030T163246Z-1967\\build.txt",
+      "original_bytes": 994,
+      "original_crlf_pairs": 9,
+      "original_cr_bytes": 9,
+      "original_sha256": "6813bfce4ad9d4d51c2828799c07f58a2c48aab702e95a08ef48f1274e931978",
+      "normalised_bytes": 985,
+      "normalised_sha256": "bafc4779969dfe45e0dc1447bb38cc4220f0df30164d0d8cd279b0b329b2d33a"
+    },
+    "m8_reverse_run_out.txt": {
+      "source_path": "<HOST_CHAIN_WORK_ROOT>\\m8\\20261030T163255Z-2159\\out.txt",
+      "original_bytes": 8668,
+      "original_crlf_pairs": 143,
+      "original_cr_bytes": 143,
+      "original_sha256": "bfea031e3091a9c5285853953c444943fbb1b5fa5ebaa658ac569ff0b2450f3c",
+      "normalised_bytes": 8525,
+      "normalised_sha256": "52c49d0407061bd85632d305fcf297146261f9f9a1241c3f41169474157465d8"
+    },
+    "m8_reverse_RV1_out.txt": {
+      "source_path": "<HOST_CHAIN_WORK_ROOT>\\m8\\20261030T163255Z-2159\\reverse\\RV1_sg_new_sample_identity_gate\\out.txt",
+      "original_bytes": 11237,
+      "original_crlf_pairs": 184,
+      "original_cr_bytes": 184,
+      "original_sha256": "186fa5b23a21af9e06017d1b38c50814ab79f5d31093be6ec7c73c2d3d21aeec",
+      "normalised_bytes": 11053,
+      "normalised_sha256": "376b79851a6316711d0a0512dc07f1fede9c986218de7e456231ea72b3afdd35"
+    },
+    "m8_reverse_RV2_out.txt": {
+      "source_path": "<HOST_CHAIN_WORK_ROOT>\\m8\\20261030T163255Z-2159\\reverse\\RV2_adc_relative_severe_branch\\out.txt",
+      "original_bytes": 8872,
+      "original_crlf_pairs": 147,
+      "original_cr_bytes": 147,
+      "original_sha256": "0c8d10f14569f58f5658032d5ba3acbdbced8f3df9afa37ca79a634aa5ddfa50",
+      "normalised_bytes": 8725,
+      "normalised_sha256": "16ca9f20aa17d3d676e998c7856b2a01141fe3e7d06b6cf5af233a7395d442f2"
+    },
+    "m8_reverse_RV3_out.txt": {
+      "source_path": "<HOST_CHAIN_WORK_ROOT>\\m8\\20261030T163255Z-2159\\reverse\\RV3_relative_mode_profile_qualification\\out.txt",
+      "original_bytes": 8872,
+      "original_crlf_pairs": 147,
+      "original_cr_bytes": 147,
+      "original_sha256": "8db43fb554df9d40fea2918bd0e1c63c7df648196b42d4fe6d8556a7b590e1a4",
+      "normalised_bytes": 8725,
+      "normalised_sha256": "97552b8ad1bd18fb6df82b2d8d4328e9eb45793b9d5a1d48af9e0a9ccec5b36c"
+    },
+    "prefix_probe_out.txt": {
+      "source_path": "<HOST_CHAIN_WORK_ROOT>\\m8-prefix\\20261030T163251Z-2097\\out.txt",
+      "original_bytes": 361,
+      "original_crlf_pairs": 6,
+      "original_cr_bytes": 6,
+      "original_sha256": "34c6c2e7492623358b1285eb96c674b5a39f75809897452c19a56cb860e1b0a1",
+      "normalised_bytes": 355,
+      "normalised_sha256": "198de90de74bf1067f39fc001dffb58929bc50e74871191e527f81c898d55326"
+    },
+    "prefix_probe_build.txt": {
+      "source_path": "<HOST_CHAIN_WORK_ROOT>\\m8-prefix\\20261030T163251Z-2097\\build.txt",
+      "original_bytes": 1339,
+      "original_crlf_pairs": 9,
+      "original_cr_bytes": 9,
+      "original_sha256": "779e1c027c631fd21c628f3bb66dc2faf816ef1ac8e0a47730218c8ba7332c6a",
+      "normalised_bytes": 1330,
+      "normalised_sha256": "f5152fc56c203ca47f1cfd2995e08ae8dab858203f060b56a5bf664b142623ec"
+    },
+    "prefix_baseline_diagnosis_bytes.txt": {
+      "source_path": "<HOST_CHAIN_WORK_ROOT>\\m8-prefix\\20261030T163251Z-2097\\baseline_diagnosis_bytes.txt",
+      "original_bytes": 6,
+      "original_crlf_pairs": 0,
+      "original_cr_bytes": 0,
+      "original_sha256": "be55221b70c7c93bdb0949ee7c147c5ead3a0a183c025de2fd7f91578be5dc2e",
+      "normalised_bytes": 6,
+      "normalised_sha256": "be55221b70c7c93bdb0949ee7c147c5ead3a0a183c025de2fd7f91578be5dc2e"
+    },
+    "regression_cc_current_cal_out.txt": {
+      "source_path": "<HOST_CHAIN_WORK_ROOT>\\current-cal-m7\\20261030T164132Z-591\\out.txt",
+      "original_bytes": 9594,
+      "original_crlf_pairs": 157,
+      "original_cr_bytes": 157,
+      "original_sha256": "305f9581914084a12f731f27a6ccdee8864c7dfeeb4ead85b181ac9a18023e59",
+      "normalised_bytes": 9437,
+      "normalised_sha256": "63eac326a7c1d63295f014de056122ab97c5ec4f5718a7749d914351693a5c05"
+    },
+    "regression_sd.txt": {
+      "source_path": "<SCRATCH_WORK_DIR>\\run_safety_data_semantics.log",
+      "original_bytes": 802,
+      "original_crlf_pairs": 0,
+      "original_cr_bytes": 0,
+      "original_sha256": "fa9123f12baa28240b0d9a4a082f271ae73a6b05e7a586af2d6bc8be2fdac2dd",
+      "normalised_bytes": 802,
+      "normalised_sha256": "fa9123f12baa28240b0d9a4a082f271ae73a6b05e7a586af2d6bc8be2fdac2dd"
+    },
+    "regression_s1.txt": {
+      "source_path": "<SCRATCH_WORK_DIR>\\run_stop_result_s1.log",
+      "original_bytes": 1239,
+      "original_crlf_pairs": 0,
+      "original_cr_bytes": 0,
+      "original_sha256": "4da2111a0eb956017f49dd058b10e0a34f6fad65049f75d945acc56d1e5832bc",
+      "normalised_bytes": 1239,
+      "normalised_sha256": "4da2111a0eb956017f49dd058b10e0a34f6fad65049f75d945acc56d1e5832bc"
+    },
+    "regression_s2.txt": {
+      "source_path": "<SCRATCH_WORK_DIR>\\run_stop_priority_s2.log",
+      "original_bytes": 8565,
+      "original_crlf_pairs": 0,
+      "original_cr_bytes": 0,
+      "original_sha256": "ea94d4f308110931b85aa9b5e95d546fdc7de9f8aa4851e1d05be54ac43530d8",
+      "normalised_bytes": 8565,
+      "normalised_sha256": "ea94d4f308110931b85aa9b5e95d546fdc7de9f8aa4851e1d05be54ac43530d8"
+    },
+    "regression_m6_cli.txt": {
+      "source_path": "<SCRATCH_WORK_DIR>\\run_m6_cli.log",
+      "original_bytes": 188,
+      "original_crlf_pairs": 0,
+      "original_cr_bytes": 0,
+      "original_sha256": "e3c36f03d24868094c25e81c4449424972699e99610a5ed0242721230ed2b231",
+      "normalised_bytes": 188,
+      "normalised_sha256": "e3c36f03d24868094c25e81c4449424972699e99610a5ed0242721230ed2b231"
+    },
+    "regression_io.txt": {
+      "source_path": "<SCRATCH_WORK_DIR>\\run_io_behavior.log",
+      "original_bytes": 1015,
+      "original_crlf_pairs": 0,
+      "original_cr_bytes": 0,
+      "original_sha256": "af88dba23bd4a66b9a41695625344bc6b22b90158231e41c9174572ca8369aa6",
+      "normalised_bytes": 1015,
+      "normalised_sha256": "af88dba23bd4a66b9a41695625344bc6b22b90158231e41c9174572ca8369aa6"
+    }
+  },
+  "sanitisation": "仓外工作根与临时目录以占位符表示, 不落个人绝对路径",
+  "personal_path_scrub": {
+    "file": "host/prefix_probe_build.txt",
+    "reason": "gcc 诊断行里的仓外临时根含 Windows 用户名, 归档前替换为 <TMPROOT>",
+    "final_sha256": "b1b5b0b3496f634e31883de61a62edbce84186c69942ab613eee1685a3dcff73",
+    "final_bytes": 1242,
+    "note": "该文件是编译告警日志, 不参与任何用例判定; 台账判定文件(host/*_out.txt)未改动"
+  }
+}
