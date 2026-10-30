@@ -1,0 +1,29 @@
+file      : P0/01_safety_state.rx.bin
+bytes     : 62
+sha256    : c26f480a5ebbd31500f7ac4219afe7dd2f6890c53d1bae591bcb66352aa88305
+CR=2 LF=2 NUL=0  msh count=1
+
+raw repr  : b'safety_state\r\nMMu\x81st\xd1\x95\xf5READY fault_code=0 degraded=0x00\r\nmsh >'
+
+=== byte map (expected from the frozen firmware format, position by position) ===
+echo   b'safety_state\r\n'  present at offset 0 : True
+tail   b'READY fault_code=0 degraded=0x00\r\nmsh >'  present             : True
+middle where b'[SS] state=' should be (len 11): b'MMu\x81st\xd1\x95\xf5' (len 9)
+middle hex      : 4d 4d 75 81 73 74 d1 95 f5
+expected hex    : 5b 53 53 5d 20 73 74 61 74 65 3d
+non-ASCII/control bytes in middle: 81 d1 95 f5
+
+=== the collector gates ===
+BODY_TAG present                : False
+full-line fullmatch             : False
+PROMPT at true frame end        : True
+danger markers present          : False
+
+=== the same signature as the boot stream (24ab5a7 round) ===
+prior boot  : 3381 B, version line head 12 B and tail 20 B intact, middle 11 B -> 8 B with 7 non-ASCII
+this reply  : 62 B, head 14 B and tail 39 B intact, middle 11 B -> 9 B with 4 non-ASCII
+
+readback of the same payload last round: 266244 B byte-identical (no corruption on the SWD path)
+prior clean sample from this board (archived 208bf10 tree, M5 final_pass):
+  b'safety_state\r\n[SS] state=READY fault_code=0 degraded=0x00\r\nmsh >\r\nmsh >'
+  sha256 6a59468afb1f1684e77ecaf4ff723a69013c620215dc793b9667f8048361dacd  -> the same command produced a byte-perfect line before

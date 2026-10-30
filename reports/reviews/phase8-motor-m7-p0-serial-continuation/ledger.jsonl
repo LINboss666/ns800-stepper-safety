@@ -1,0 +1,6 @@
+{"kind": "BIND", "monotonic": 6384.578, "payload_sha256": "e614a075ab63eb5b1c4b08e1ab51fb4043f474037ce734b4bcaf666899c8f7da", "readback_sha256": "e614a075ab63eb5b1c4b08e1ab51fb4043f474037ce734b4bcaf666899c8f7da", "axf_sha256": "2205c7e7ad6bad93e848fd24d1e5f38c76796865a2b21ebcd2d4e22bb4b6d584", "calculator_sha256": "5c7a2340b4d350b1e8932798a57b85e8a6f4818501e469ad6dfd5c1bd29163ad", "mode": "CONTINUE_PROVEN_BOARD", "prior_board_commit": "24ab5a7c1cff259b209f78fcb1abbb5f48271581"}
+{"kind": "PORT_OPEN_ATTEMPT", "monotonic": 6384.578, "port": "COM5"}
+{"kind": "PORT_OPEN", "monotonic": 6384.578, "port": "COM5"}
+{"kind": "CONTINUATION_ATTACH", "monotonic": 6386.578, "bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "identity_basis": "PRIOR_READBACK_PLUS_CONFIRMED_CONTINUITY", "prior_board_commit": "24ab5a7c1cff259b209f78fcb1abbb5f48271581", "fresh_banner_required": false}
+{"kind": "TX_ATTEMPT", "monotonic": 6386.578, "command": "safety_state", "file": "01_safety_state.rx.bin"}
+{"kind": "PORT_CLOSED", "monotonic": 6398.578}

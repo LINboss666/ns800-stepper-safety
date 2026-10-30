@@ -1,0 +1,220 @@
+{
+  "task": "phase8-motor-m7-p0-serial-continuation",
+  "date": "2026-10-30",
+  "roles": {
+    "firmware_code_commit": "5b564eb962e8518920f581111d7a460a2b1fce64",
+    "prior_board_commit_bound_by_the_collector": "24ab5a7c1cff259b209f78fcb1abbb5f48271581",
+    "script_code_commit": "1d13ea58df7f1bf9138dc2adf5fd56a2d479e2e5",
+    "delivery_head": "not self-referenced; resolve with git log -1 --format=%H -- reports/agent_handoffs/phase8-motor-m7-p0-serial-continuation.json"
+  },
+  "approval": {
+    "verbatim": "批准 P0 仅串口续测",
+    "scope": "p0 review package section 5: one COM5 open, seven fixed sends (4 status x1, show x2, sample128 x1), four DMM voltage readings; no flash, no target flash read, no DAP, no active reset, no motor action, no config write; stop on failure, no retry",
+    "consumed": true,
+    "quota_not_carried_over": "the previous rounds did not bank any DAP or serial attempts"
+  },
+  "offline_round": {
+    "patch": {
+      "bytes": 13482,
+      "sha256": "f6b69d20bedea8967eae8af43e4cf4e3c9380baeb18dd1af8f8340720774b68f",
+      "applied": "git -c core.autocrlf=false apply --check then apply on canonical LF bytes outside the repo; no git config modified; packaged complete files not re-applied on top"
+    },
+    "collector_after_patch": {
+      "bytes": 23374,
+      "sha256": "0e02ccfcef178f0ceee9dc3fd5aeb17f7b9a3bb924e4b83bd7a0cecde9505467"
+    },
+    "verifier_after_patch": {
+      "bytes": 21742,
+      "sha256": "2cf87b1dad0c57be3ea0b57c63269fce648093a301766400976b2b1186cfa8c7"
+    },
+    "collector_expected_sha": "0e02ccfcef178f0ceee9dc3fd5aeb17f7b9a3bb924e4b83bd7a0cecde9505467",
+    "verifier_expected_sha": "2cf87b1dad0c57be3ea0b57c63269fce648093a301766400976b2b1186cfa8c7",
+    "identities_match": true,
+    "selftests_on_windows": "37/37 rc=0 stderr 0 B; continuation 11/11 rc=0 NO_PYOCD_SUBPROCESS",
+    "proof_inputs_from_fixed_commit": {
+      "board-proof.json": {
+        "bytes": 10116,
+        "sha256": "e8df121f3f58af5fadf3d60be24fd8aaf7d88c381ae740be86173c43e6604246"
+      },
+      "boot.b64": {
+        "bytes": 4508,
+        "sha256": "46b53e93137a7a4f90ecd16ea73bf70435bc14514e323032d04d0665c478dd46"
+      },
+      "boot_b64_decodes_to": {
+        "bytes": 3381,
+        "sha256": "bc47dc022b25bd483c16ab749895bf2a9d7dba318fdf88826357d2dbb98214fa"
+      }
+    },
+    "remote_readback_at_script_commit": {
+      "collector": "0e02ccfcef178f0ceee9dc3fd5aeb17f7b9a3bb924e4b83bd7a0cecde9505467",
+      "verifier": "2cf87b1dad0c57be3ea0b57c63269fce648093a301766400976b2b1186cfa8c7",
+      "prior_proof_files_unchanged": true,
+      "firmware_product_tests_changed_paths_24ab5a7_to_1d13ea5": 0,
+      "frozen_refs_match": true
+    }
+  },
+  "board_run": {
+    "run_root_outside_repo": "D:\\ns800-m7-p0-cont-20261030T194941",
+    "stop_label": "FIRST_FIELD_GATE_BYTE_CORRUPTION",
+    "collector_rc": 1,
+    "collector_error": "P0_FAILED:Stop:REPLY_TIMEOUT:01_safety_state.rx.bin",
+    "ledger_events": [
+      "BIND",
+      "PORT_OPEN_ATTEMPT",
+      "PORT_OPEN",
+      "CONTINUATION_ATTACH",
+      "TX_ATTEMPT",
+      "PORT_CLOSED"
+    ],
+    "identity_basis_recorded": "PRIOR_READBACK_PLUS_CONFIRMED_CONTINUITY",
+    "fresh_banner_required": false,
+    "new_banner_checked": false,
+    "attach_window": {
+      "seconds": 2,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "silent": true,
+      "startup_bytes_during_attach": false
+    },
+    "commands": {
+      "attempted": [
+        "safety_state"
+      ],
+      "accepted": [],
+      "not_attempted": [
+        "safety_status",
+        "motor_status",
+        "step_status",
+        "current_cal show",
+        "current_cal sample 128"
+      ]
+    },
+    "wait_dmm_emitted": 0,
+    "dmm_readings_taken": 0,
+    "result_json": "absent",
+    "voltage_observation": "NOT_OBTAINED"
+  },
+  "decisive_new_fact": {
+    "raw_response": {
+      "bytes": 62,
+      "sha256": "c26f480a5ebbd31500f7ac4219afe7dd2f6890c53d1bae591bcb66352aa88305",
+      "repr": "safety_state\\r\\nMMu\\x81st\\xd1\\x95\\xf5READY fault_code=0 degraded=0x00\\r\\nmsh >"
+    },
+    "structure": {
+      "head_intact_bytes": 14,
+      "tail_intact_bytes": 39,
+      "expected_middle": "[SS] state=",
+      "expected_middle_len": 11,
+      "observed_middle_len": 9,
+      "observed_middle_hex": "4d 4d 75 81 73 74 d1 95 f5",
+      "non_ascii_control_count": 4,
+      "prompt_at_frame_end_present": true,
+      "danger_markers_present": false
+    },
+    "same_signature_as_the_boot_stream": {
+      "boot": "head 12 B and tail 20 B intact, middle 11 B became 8 B with 7 non-ASCII",
+      "this_response": "head 14 B and tail 39 B intact, middle 11 B became 9 B with 4 non-ASCII"
+    },
+    "same_command_was_byte_clean_on_this_board_before": {
+      "archived": "reports/reviews/phase8-motor-m5-fault-log/cp1/final_pass/016_safety_state.bin",
+      "bytes": 71,
+      "sha256": "6a59468afb1f1684e77ecaf4ff723a69013c620215dc793b9667f8048361dacd",
+      "repr_head": "safety_state\r\n[SS] state"
+    },
+    "implications": {
+      "weakens_not_refutes": "boot-time concurrent rt_kprintf as the only explanation - this response came in a silent idle window with a clean echo and a clean tail, and a foreign print cannot be told apart from the PC side bytes",
+      "not_excluded": "byte error or loss on the target UART / DAPLink CDC / PC read path; both corrupted streams were captured by this Python collector while the historical clean captures came from the PowerShell collector, which is a correlation, not a cause",
+      "unsupported": "any fault of the SWD readback path - the 266244 B readback was byte-identical",
+      "root_cause": "NOT DETERMINED"
+    }
+  },
+  "collector_contract_assessment": {
+    "identity_gate_worked_as_designed": true,
+    "silence_not_treated_as_device_failure": true,
+    "raw_bytes_persisted_before_decision": true,
+    "refused_to_accept_a_corrupted_authoritative_field": true,
+    "no_downgrade_to_ready_substring_matching": true,
+    "port_closed_on_error_exit": true,
+    "defect_found_this_round": "none - this stop is not a collector defect"
+  },
+  "corrections_to_previous_registers": {
+    "dap_sessions_2_of_3": "void - there were three tool launch attempts (flash, readback, internal reset subprocess); whether the reset subprocess opened a session and its exit code were NOT observed (both reset output files are 0 bytes because the read timed out before p.wait), so it is UNKNOWN and no remaining DAP quota may be claimed",
+    "ledger_six_rows_in_the_board_round": "void - that ledger has five rows; this continuation run has six and is a different execution",
+    "fault_code_zero_in_clean_boot_text": "BOOT_TEXT_ONLY, never a substitute for a live query",
+    "history_rule": "the archived originals at 24ab5a7 are not rewritten; the corrections live here"
+  },
+  "quota": {
+    "com5_open": {
+      "limit": 1,
+      "used": 1
+    },
+    "downloads": 0,
+    "target_flash_reads": 0,
+    "dap_or_pyocd_actions": 0,
+    "active_resets": 0,
+    "motor_actions": 0,
+    "config_writes": 0,
+    "fault_clears": 0,
+    "retries": 0,
+    "safety_state": {
+      "limit": 1,
+      "attempted": 1,
+      "accepted": 0
+    },
+    "other_status_queries": {
+      "attempted": 0
+    },
+    "current_cal_show": {
+      "attempted": 0
+    },
+    "current_cal_sample_128": {
+      "attempted": 0
+    },
+    "dmm_readings": {
+      "limit": 4,
+      "taken": 0
+    }
+  },
+  "continuity_check": {
+    "no_download_or_target_write_between_24ab5a7_and_this_run": true,
+    "basis": "my own complete operation log for this session: after the board round commit only offline work (package verification, patch apply, selftests, commit, push) happened; the script commit touched repository text only",
+    "prior_readback_file_still_present_and_hash_matches": true
+  },
+  "open": [
+    "P0 voltage observation still not obtained; current_cal sample 128 has never run on the board",
+    "CONSOLE_STREAM_INTEGRITY_UNRESOLVED, and it now blocks both the banner gate and the field gate",
+    "sensor stack warning sufficiency and tshell high-water still NOT_MEASURED",
+    "independent bus current reference, real DIAG/SG end to end, worst-case stop latency, full safety acceptance",
+    "P1 METHOD_NOT_READY, P2 NOT_AUTHORIZED"
+  ],
+  "next_step_requires_new_approval": {
+    "A": "re-capture the same idle safety_state response with the historical PowerShell collector at the same quiet moment without changing the accepted collector bytes - one more COM5 open",
+    "B": "a collector variant without per-chunk fsync as a control - that changes the judged code and needs review first",
+    "note": "no device action taken beyond the approved quota this round"
+  },
+  "evidence": {
+    "dir": "reports/reviews/phase8-motor-m7-p0-serial-continuation",
+    "files": [
+      "continuation_package.md",
+      "offline_inputs_and_identities.txt",
+      "selftest37_windows.txt",
+      "selftest11_windows.txt",
+      "collector_stderr.txt",
+      "ledger.jsonl",
+      "S_cont.stdout.txt",
+      "raw_attach.bin.b64",
+      "01_safety_state.rx.bin.b64",
+      "01_safety_state.rx.bin.sha256",
+      "first_response_analysis.txt",
+      "run_evidence.md"
+    ],
+    "first_failure_kept_verbatim": true
+  },
+  "receipt": [
+    "P0_SERIAL_CONTINUATION_EXECUTED / FIRST_FIELD_GATE_BYTE_CORRUPTION / TX_ATTEMPTS=1 ACCEPTED=0",
+    "CONTINUATION_IDENTITY_BASIS_USED / PRIOR_READBACK_PLUS_CONFIRMED_CONTINUITY fresh_banner_required=false",
+    "NO_VOLTAGE_OBSERVATION_OBTAINED / DMM_READINGS_TAKEN=0 / RESULT_JSON_ABSENT",
+    "COM5_OPENS=1 DOWNLOADS=0 TARGET_FLASH_READS=0 DAP_ACTIONS=0 ACTIVE_RESETS=0 MOTOR_ACTIONS=0 RETRIES=0",
+    "CONSOLE_STREAM_INTEGRITY_UNRESOLVED / APPROVAL_QUOTA_CONSUMED / ROOT_CAUSE_NOT_DETERMINED"
+  ]
+}

@@ -84,3 +84,22 @@ ROOT_CAUSE_NOT_DETERMINED / CONSOLE_RACE_HYPOTHESIS_LISTED_NOT_CHOSEN / APPROVAL
 ```
 
 下一轮等我方给出上面的 A/B 判开方案，由独立复审与用户决定授权哪一条。本轮不追加任何设备动作。
+
+## 8. 仅串口续测轮指针（只追加，上文不改）
+
+用户随后批准了 §5 仅串口续测包，本轮已执行，结果见
+`reports/agent_handoffs/phase8-motor-m7-p0-serial-continuation.md` / `.json`：
+
+- 续测身份门按设计生效（`PRIOR_READBACK_PLUS_CONFIRMED_CONTINUITY`、`fresh_banner_required=false`、
+  2 秒静默挂载允许），停点向深处走一层：第一条 `safety_state` 有回包（62 B / `c26f480a…8305`），
+  但中段 `[SS] state=` 的 11 字节被替换成 9 字节（`4d 4d 75 81 73 74 d1 95 f5`，4 个非 ASCII），
+  回显 14 B 与尾段 39 B（含帧尾 `msh >`）完好。采集器按合同拒绝接受，12 s 超时停止。
+- 同一条命令在本仓既存 M5 原件（`…/cp1/final_pass/016_safety_state.bin`，6a59468a…dacd）里是逐字节干净的，
+  所以这不是格式本身变了。本文件 §5 的三条机制清单**继续并列不择一**，且"只是开机并发写"被削弱
+  （本轮窗口静默、单条查询）；两次污染都由本 Python 采集器采到，历史干净取样来自 PowerShell 链——
+  这是相关性，不是因果。
+- 本文件 §2 的两条待更正登记已在续测交接作废并重写：DAP 会话不得记 2/3（实为三次工具启动尝试，
+  reset 子进程是否建会话与退出码 UNKNOWN，不宣称剩余额度）；"台账 6 行"应为 5 行（本文件那轮），
+  续测轮是另一次运行的 6 行。
+- 额度：COM5 1/1、七次发送只用掉 1 次尝试且 0 次接受、DMM 0/4；下载/目标 Flash 读/DAP/主动复位/电机
+  全程为 0，重试 0。两轮失败的原件与"镜像已在板"的已证事实并列保留，P0 电压观察仍未取得。

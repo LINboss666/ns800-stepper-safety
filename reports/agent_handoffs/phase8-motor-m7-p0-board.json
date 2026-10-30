@@ -219,5 +219,21 @@
     "NO_VOLTAGE_OBSERVATION_OBTAINED / DMM_READINGS_TAKEN=0 / RESULT_JSON_ABSENT",
     "DOWNLOADS=1 READBACKS=1 COM5_OPENS=1 EXPLICIT_RESETS=1 RETRIES=0 / NO_MOTOR_ACTIONS",
     "ROOT_CAUSE_NOT_DETERMINED / CONSOLE_RACE_HYPOTHESIS_LISTED_NOT_CHOSEN / APPROVAL_QUOTA_CONSUMED"
-  ]
+  ],
+  "serial_continuation_pointer": {
+    "date": "2026-10-30",
+    "approved": "user: 批准 P0 仅串口续测 (section 5 scope)",
+    "executed": true,
+    "outcome": "FIRST_FIELD_GATE_BYTE_CORRUPTION / TX_ATTEMPTS=1 ACCEPTED=0 / DMM_READINGS_TAKEN=0",
+    "identity_gate_worked": "PRIOR_READBACK_PLUS_CONFIRMED_CONTINUITY, fresh_banner_required=false, silent 2 s attach allowed",
+    "new_fact": "in a silent idle window the single safety_state reply came back with its middle 11 bytes ([SS] state=) replaced by 9 bytes containing 4 non-ASCII values while the 14-byte echo and the 39-byte tail including the end-of-frame prompt stayed intact; the same command is byte-clean in the archived M5 original (6a59468a...dacd)",
+    "mechanisms_still_listed_not_chosen": true,
+    "boot_time_concurrency_hypothesis": "weakened (silent window, single command) but not refuted",
+    "corrections_absorbed_here": [
+      "DAP sessions must not be booked as 2/3 - three tool launch attempts, reset subprocess session and rc UNKNOWN",
+      "this round ledger is five rows, not six"
+    ],
+    "detail": "reports/agent_handoffs/phase8-motor-m7-p0-serial-continuation.json",
+    "history_rule": "appended only; the archived first failure at 24ab5a7 is not rewritten"
+  }
 }
