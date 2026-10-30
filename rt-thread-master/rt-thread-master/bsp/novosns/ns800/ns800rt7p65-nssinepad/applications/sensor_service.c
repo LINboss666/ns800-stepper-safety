@@ -109,16 +109,25 @@ static void s_collect(sensor_frame_t *f, sensor_frame_t *base_prev,
         f->valid_current = 1; f->fresh_current = 1;
         /* Fix E + M7: mA 与来源取自同一 cal 快照, 不再先算 mA 后读全局来源。 */
         f->current_cal_source = cal.source;
+        /* M8: 成功采样才推进身份; 计数来自基帧(调用方持有), 不是文件静态。 */
+        f->cur_seq  = base_prev->cur_seq + 1u;
+        f->cur_tick = f->timestamp;
     }
     else { f->valid_current = 0; f->fresh_current = 0; }
+    /* 失败分支: cur_seq/cur_tick 原样继承基帧 —— 保留值不得被当成新样本。 */
 
     /* TMC SG_RESULT: 10Hz 分频 */
     if ((*seq % SENSOR_SG_DIV) == 0)
     {
         rt_uint16_t sg = 0;
         e = tmc2209_read_sg_result(&sg);
-        if (e == RT_EOK) { f->sg_result = sg; f->valid_sg = 1; f->fresh_sg = 1; }
-        else { f->valid_sg = 0; f->fresh_sg = 0; }
+        if (e == RT_EOK)
+        {
+            f->sg_result = sg; f->valid_sg = 1; f->fresh_sg = 1;
+            f->sg_seq  = base_prev->sg_seq + 1u;    /* M8: 真实成功 UART 读 */
+            f->sg_tick = f->timestamp;
+        }
+        else { f->valid_sg = 0; f->fresh_sg = 0; }  /* 失败: 不发布新有效 SG */
     }
     else f->fresh_sg = 0;               /* 非采样帧: 值与 valid 沿用, fresh=0 */
 
@@ -303,6 +312,7 @@ static void sensor_selftest(void)
 {
     sensor_frame_t f;
     sensor_frame_t test_prev;           /* 自检专用基帧 */
+    rt_uint32_t base_sg_seq, base_cur_seq;   /* M8: 身份断言的基值 */
     sensor_frame_t prod_prev_before;
     rt_uint32_t test_seq = 0;
     rt_uint32_t prod_seq_before, prod_seq_after;
@@ -316,6 +326,8 @@ static void sensor_selftest(void)
     rt_kprintf("[SNS-ST] inject 0xAB-pattern base frame into a PRIVATE context\n");
     rt_memset(&test_prev, 0xAB, sizeof(test_prev));  /* 垃圾基帧(作为输入) */
     rt_memset(&f, 0, sizeof(f));
+    base_sg_seq = test_prev.sg_seq;                  /* M8: 断言增量前先取基值 */
+    base_cur_seq = test_prev.cur_seq;
     s_collect(&f, &test_prev, &test_seq);            /* 不碰 s_prev / s_seq */
 
     /* 垃圾 valid 位(0xAB 非零)必须被真实采集结果覆盖。
@@ -358,9 +370,25 @@ static void sensor_selftest(void)
     if (f.current_cal_source > (rt_uint8_t)CURRENT_ADC_CAL_MEASURED)
     { rt_kprintf("[SNS-ST] cal source out of range\n"); pass = 0; }
 
-    rt_kprintf("[SNS-ST] frame: imu[v=%d f=%d] cur[v=%d f=%d] sg[v=%d f=%d]\n",
+    /* M8 样本身份: 计数只能随"真实成功读取"前进, 且必须带上那次读取的 tick。
+     * 基帧是 0xAB 垃圾 => 起点值本身就是垃圾, 这里断言的是**增量与配对关系**,
+     * 不是绝对值: 垃圾起点也必须被如实继承, 否则说明有人拿 0 冒充"没有样本"。 */
+    if (f.valid_sg && (f.fresh_sg != 1 || f.sg_seq != base_sg_seq + 1u ||
+                       f.sg_tick != f.timestamp))
+    { rt_kprintf("[SNS-ST] sg identity FAIL (sg_seq %u ->%u fresh=%d)\n",
+                 (unsigned)base_sg_seq, (unsigned)f.sg_seq, f.fresh_sg); pass = 0; }
+    if (!f.valid_sg && f.fresh_sg == 1)
+    { rt_kprintf("[SNS-ST] sg fresh without valid\n"); pass = 0; }
+    if (f.valid_current && (f.cur_seq != base_cur_seq + 1u || f.cur_tick != f.timestamp))
+    { rt_kprintf("[SNS-ST] adc identity FAIL (cur_seq %u)\n",
+                 (unsigned)f.cur_seq); pass = 0; }
+    rt_kprintf("[SNS-ST] identity base sg=%u cur=%u -> now sg=%u cur=%u\n",
+               (unsigned)base_sg_seq, (unsigned)base_cur_seq,
+               (unsigned)f.sg_seq, (unsigned)f.cur_seq);
+
+    rt_kprintf("[SNS-ST] frame: imu[v=%d f=%d] cur[v=%d f=%d] sg[v=%d f=%d] id(sg=%u cur=%u)\n",
                f.valid_imu, f.fresh_imu, f.valid_current, f.fresh_current,
-               f.valid_sg, f.fresh_sg);
+               f.valid_sg, f.fresh_sg, (unsigned)f.sg_seq, (unsigned)f.cur_seq);
     rt_kprintf("[SNS-ST] private seq advanced to %u (live s_seq was %u)\n",
                test_seq, prod_seq_before);
 

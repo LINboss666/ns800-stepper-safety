@@ -23,8 +23,40 @@
 #include "app_health.h"
 #include "ns_storage.h"
 #include "current_adc.h"
+#include "ns_storage.h"
+#include "diag_relative.h"
+
+/* M8: 旧 0x00010002 的**精确**布局镜像, 只用于按字段迁移。字段次序/类型必须与
+ * f1aa2e8 的 project_config_t 完全一致 —— 用断言钉住尺寸, 不靠注释。 */
+typedef struct
+{
+    rt_uint32_t magic;
+    rt_uint32_t version;
+    float cur_offset_mv;
+    float cur_gain_v_per_a;
+    rt_uint8_t cur_cal_source;
+    rt_uint32_t band_hz[2];
+    rt_int32_t  sg_warn[3];
+    rt_int32_t  sg_stall[3];
+    float cur_warn_ma[3];
+    float cur_stall_ma[3];
+    rt_uint32_t vib_impact_mg;
+    rt_uint32_t persist_warn;
+    rt_uint32_t persist_stall;
+    rt_uint32_t impact_frames;
+    rt_uint32_t hysteresis_frames;
+    rt_uint32_t pre_fault_ms;
+    rt_uint32_t post_fault_ms;
+} project_config_v2_t;
+
+/* GCC 与 ARMCLANG 的实际尺寸在交付时按真实构建记录(交接 evidence); 这里只保证
+ * 两个编译器都必须满足的硬界。 */
+typedef char cfg_assert_v2_size[(sizeof(project_config_v2_t) <= 112) ? 1 : -1];
+typedef char cfg_assert_new_size[(sizeof(project_config_t) <= NS_PARAM_MAX) ? 1 : -1];
+typedef char cfg_assert_param_cap[(NS_PARAM_MAX <= 224) ? 1 : -1];
 
 static project_config_t cfg;
+static rt_bool_t cfg_migrated_v2 = RT_FALSE;     /* 本次启动是否由 v2 迁移而来 */
 static rt_bool_t cfg_valid = RT_FALSE;      /* 加载/设置是否通过校验 */
 static subsys_health_t cfg_health = SUBSYS_UNINIT;
 static struct rt_mutex cfg_lock;            /* P1-7 + Fix B: 保护全部 cfg 访问 */
@@ -52,7 +84,8 @@ static rt_err_t cfg_take_checked(void)
 /* 无锁内部实现: 只允许已持有 cfg_lock 的调用者使用 */
 static void cfg_fill_defaults_nolock(void)
 {
-    rt_memset(&cfg, 0, sizeof(cfg));
+    rt_memset(&cfg, 0, sizeof(cfg));      /* 含 rprof: magic 0 = 没有 profile */
+    cfg_migrated_v2 = RT_FALSE;
     cfg.magic  = PROJ_CFG_MAGIC;
     cfg.version = PROJ_CFG_VERSION;
 
@@ -96,8 +129,8 @@ static rt_bool_t config_in_range(const project_config_t *c)
 {
     int i;
 
-    if (c->magic != PROJ_CFG_MAGIC || c->version != PROJ_CFG_VERSION)
-        return RT_FALSE;
+    if (c->magic != PROJ_CFG_MAGIC) return RT_FALSE;
+    /* 版本由调用方按 v2/v3 分别判定; 这里只判字段域。 */
     /* Fix B: 标定来源纳入校验。NONE(0) 视为非法 → 回退安全默认(THEORETICAL),
      * 避免出现"配置说自己是 THEORETICAL 之外的第三种状态却无人解释"的历史数据。 */
     if (c->cur_cal_source < (rt_uint8_t)CURRENT_ADC_CAL_THEORETICAL ||
@@ -135,7 +168,36 @@ static rt_bool_t config_in_range(const project_config_t *c)
     if (c->pre_fault_ms < 100 || c->pre_fault_ms > 3000 ||
         c->post_fault_ms < 100 || c->post_fault_ms > 1500)
         return RT_FALSE;   /* 与 blackbox 静态缓冲容量一致(300/150 帧) */
+    /* M8 profile: magic==0 表示"没有 profile"(合法, 相对模式此时不可用);
+     * 非 0 必须是完整且自洽的一套阈值, 半套一律拒绝。 */
+    if (c->rprof.magic != 0 && rel_profile_validate(&c->rprof, RT_NULL) != RT_EOK)
+        return RT_FALSE;
     return RT_TRUE;
+}
+
+/* v2 blob -> v3: 逐字段搬移。绝不做结构体整体拷贝(源是旧布局);
+ * 新 profile 显式置无效, 不把旧系数当成"相对学习已完成"。 */
+static void cfg_migrate_v2(const project_config_v2_t *v2, project_config_t *out)
+{
+    out->magic            = PROJ_CFG_MAGIC;
+    out->version          = PROJ_CFG_VERSION;
+    out->cur_offset_mv    = v2->cur_offset_mv;
+    out->cur_gain_v_per_a = v2->cur_gain_v_per_a;
+    out->cur_cal_source   = v2->cur_cal_source;
+    out->band_hz[0]       = v2->band_hz[0];
+    out->band_hz[1]       = v2->band_hz[1];
+    rt_memcpy(out->sg_warn,        v2->sg_warn,        sizeof(out->sg_warn));
+    rt_memcpy(out->sg_stall,       v2->sg_stall,       sizeof(out->sg_stall));
+    rt_memcpy(out->cur_warn_ma,    v2->cur_warn_ma,    sizeof(out->cur_warn_ma));
+    rt_memcpy(out->cur_stall_ma,   v2->cur_stall_ma,   sizeof(out->cur_stall_ma));
+    out->vib_impact_mg    = v2->vib_impact_mg;
+    out->persist_warn     = v2->persist_warn;
+    out->persist_stall    = v2->persist_stall;
+    out->impact_frames    = v2->impact_frames;
+    out->hysteresis_frames = v2->hysteresis_frames;
+    out->pre_fault_ms     = v2->pre_fault_ms;
+    out->post_fault_ms    = v2->post_fault_ms;
+    rt_memset(&out->rprof, 0, sizeof(out->rprof));    /* 无 profile: 相对保护不可用 */
 }
 
 /* 把一份*显式副本*的标定下发到 current_adc(带来源, 不读全局 cfg → 调用方
@@ -262,60 +324,146 @@ rt_err_t project_config_save(void)
 
 rt_err_t project_config_load(void)
 {
-    project_config_t tmp;
-    project_config_t applied;
+    project_config_t tmp, applied;
+    project_config_v2_t v2;
     rt_size_t len = 0;
-    rt_bool_t ok;
-    rt_err_t e;
+    rt_bool_t ok, migrated = RT_FALSE;
+    rt_err_t e, apply_e = RT_EOK;
 
-    /* Flash IO 完全在锁外: 先读进局部变量 */
+    /* Flash IO 完全在锁外: 先读进局部变量。
+     * M8: 允许两种长度 —— 当前 v3(整结构) 与历史 v2(旧 104B 布局)。
+     * v2 走逐字段迁移, 新 profile 置无效; 其它长度/版本一律安全默认。 */
     e = ns_params_load(&tmp, sizeof(tmp), &len);
-    ok = (e == RT_EOK) && (len == sizeof(tmp)) && config_in_range(&tmp);
+    if (e == RT_EOK && len == sizeof(project_config_t) &&
+        tmp.magic == PROJ_CFG_MAGIC && tmp.version == PROJ_CFG_VERSION &&
+        config_in_range(&tmp))
+    {
+        ok = RT_TRUE;
+    }
+    else
+    {
+        rt_size_t l2 = 0;
+        e = ns_params_load(&v2, sizeof(v2), &l2);
+        /* 先按 v2 自己的字段判身份, 再把**迁移后的完整 v3 副本**送进范围校验。
+         * 绝不把 v2 指针强转成 v3 去读 rprof —— 那会读到对象之外的字节。 */
+        ok = (e == RT_EOK) && (l2 == sizeof(v2)) &&
+             (v2.magic == PROJ_CFG_MAGIC) && (v2.version == PROJ_CFG_VERSION_V2);
+        if (ok)
+        {
+            cfg_migrate_v2(&v2, &tmp);
+            ok = config_in_range(&tmp);
+            if (ok) migrated = RT_TRUE;
+        }
+        else
+        {
+            /* 两条路都不成立: 回安全默认(来源=THEORETICAL), 不残留 RAM 里的 MEASURED。 */
+            len = l2;
+            ok = RT_FALSE;
+        }
+    }
 
     cfg_take();
     if (ok)
     {
-        if (cfg_apply_from(&tmp) == RT_EOK)
+        apply_e = cfg_apply_from(&tmp);
+        if (apply_e == RT_EOK)
         {
             cfg = tmp;
             cfg_valid  = RT_TRUE;
             cfg_health = SUBSYS_OK;
+            cfg_migrated_v2 = migrated;
         }
         else
         {
             cfg_fill_defaults_nolock();
             cfg_valid  = RT_FALSE;
             cfg_health = SUBSYS_DEGRADED;
+            cfg_migrated_v2 = RT_FALSE;
             (void)cfg_apply_from(&cfg);
             ok = RT_FALSE;
         }
     }
     else
     {
-        /* 失败: 回到安全默认(来源=THEORETICAL), 不残留 RAM 里的 MEASURED */
         cfg_fill_defaults_nolock();
         cfg_valid  = RT_FALSE;
         cfg_health = SUBSYS_DEGRADED;
+        cfg_migrated_v2 = RT_FALSE;
         (void)cfg_apply_from(&cfg);
     }
-    applied = cfg;                     /* 仅用于成功后打印 */
+    applied = cfg;
     cfg_release();
 
     if (!ok)
     {
         if (e != RT_EOK)
             rt_kprintf("[CFG] load failed (%d) -> safe defaults (THEORETICAL)\n", e);
-        else if (len != sizeof(tmp))
-            rt_kprintf("[CFG] load size mismatch (%d != %d) -> safe defaults\n",
-                       (int)len, (int)sizeof(tmp));
+        else if (apply_e != RT_EOK)
+            rt_kprintf("[CFG] loaded config rejected by cal check (%d) -> safe defaults\n", apply_e);
         else
-            rt_kprintf("[CFG] load validation FAILED (magic/version/range/cal-source)"
+            rt_kprintf("[CFG] load validation FAILED (magic/version/len/range/cal-source)"
                        " -> safe defaults\n");
         return (e != RT_EOK) ? e : -RT_EINVAL;
     }
 
-    rt_kprintf("[CFG] loaded OK (version 0x%08X cal_source=%u)\n",
-               applied.version, applied.cur_cal_source);
+    rt_kprintf("[CFG] loaded OK (version 0x%08X cal_source=%u profile=%s%s)\n",
+               applied.version, applied.cur_cal_source,
+               applied.rprof.magic == DIAG_RPROF_MAGIC ? "PRESENT" : "NONE",
+               migrated ? " [migrated-from-0x00010002]" : "");
+    return RT_EOK;
+}
+
+rt_bool_t project_config_migrated_from_v2(void)
+{
+    rt_bool_t v;
+    cfg_take();
+    v = cfg_migrated_v2;
+    cfg_release();
+    return v;
+}
+
+/* ---------- M8: 相对 profile 的一致读写(全部走有返回码的锁路径) ---------- */
+
+rt_err_t project_config_get_rprof(diag_rprof_t *out)
+{
+    if (out == RT_NULL) return -RT_EINVAL;
+    if (cfg_take_checked() != RT_EOK) return -RT_EIO;    /* 没拿到锁: 不读、不 release */
+    *out = cfg.rprof;
+    cfg_release();
+    return RT_EOK;
+}
+
+/* 整套候选先校验再一次性发布; 任一非法 ⇒ 一个字段都不改。 */
+rt_err_t project_config_set_rprof(const diag_rprof_t *cand)
+{
+    project_config_t tmp;
+    diag_rprof_t p;
+    rt_err_t e;
+
+    if (cand == RT_NULL) return -RT_EINVAL;
+    p = *cand;
+    if (rel_profile_validate(&p, RT_NULL) != RT_EOK) return -RT_EINVAL;
+
+    e = cfg_take_checked();
+    if (e != RT_EOK) return e;
+    tmp = cfg;
+    tmp.rprof = p;
+    if (!config_in_range(&tmp)) { cfg_release(); return -RT_EINVAL; }
+    cfg.rprof = p;
+    /* 只发布 rprof: **不得**顺手把 cfg_valid/cfg_health 改成"整套配置已可信"。
+     * 加载失败后的安全默认仍然是 DEGRADED, 写进一个 profile 不改变这件事;
+     * 否则 project_config_is_valid() 会说谎, 而它是其它消费者的判据。 */
+    cfg_release();
+    return RT_EOK;
+}
+
+/* 作废 profile: 不动其他字段、不清故障、不清日志; 调用方须已确认静止。 */
+rt_err_t project_config_clear_rprof(void)
+{
+    rt_err_t e = cfg_take_checked();
+    if (e != RT_EOK) return e;
+    rt_memset(&cfg.rprof, 0, sizeof(cfg.rprof));
+    cfg_release();
     return RT_EOK;
 }
 

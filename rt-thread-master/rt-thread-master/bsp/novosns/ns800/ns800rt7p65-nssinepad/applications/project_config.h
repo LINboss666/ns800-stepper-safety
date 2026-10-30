@@ -17,9 +17,14 @@
 
 #include <rtthread.h>
 #include "app_health.h"
+#include "diag_relative.h"      /* M8: diag_rprof_t */
 
 #define PROJ_CFG_MAGIC     0x4E533343u      /* "NS3C" */
-#define PROJ_CFG_VERSION   0x00010002u
+/* M8(2026-10-30): 0x00010002 -> 0x00010003, 只在**末尾追加** rprof。
+ * 旧 blob 不丢弃: project_config_load() 按 v2 布局逐字段迁移, 新 profile 置无效。
+ * 分区/双副本/CRC/commit 布局均未改(见 ns_storage.h), 只改应用自己的 schema 版本。 */
+#define PROJ_CFG_VERSION      0x00010003u
+#define PROJ_CFG_VERSION_V2   0x00010002u
 
 typedef struct
 {
@@ -48,6 +53,10 @@ typedef struct
     /* 黑匣子预/后故障时间(Phase 7-D 使用, 本阶段仅存储) */
     rt_uint32_t pre_fault_ms;
     rt_uint32_t post_fault_ms;
+    /* ---- M8 追加(末尾, 不改上面任何字段次序/偏移): 单一工况的相对保护 profile ----
+     * 持久化的是**工况参数与签名**, 不是某次启动的 live epoch; 重启加载后模式仍
+     * 默认 MONITOR_ONLY、armed=0, 绝不自动启用相对保护或起转。 */
+    diag_rprof_t rprof;
 } project_config_t;
 
 /* P1-8: bootstrap 显式调用(幂等, 含 ns_storage_init 前置)。 */
@@ -58,6 +67,16 @@ rt_err_t project_config_get_snapshot(project_config_t *out);
 
 /* 设置并校验(范围非法拒绝, 不改现有)。 */
 rt_err_t project_config_set(const project_config_t *cfg);
+
+/* M8: 相对 profile 的一致读写(全部走有返回码的锁路径)。
+ * set: 整套校验(含 rel_profile_validate + 全结构范围)后才发布; 失败一个字段都不改。
+ * get: 取一致快照副本。 clear: 把 rprof.magic 归零(作废), 其余字段与故障/日志不动。
+ * 三者都不做 Flash I/O(保存仍走 config_save)。 */
+rt_err_t project_config_set_rprof(const diag_rprof_t *p);
+rt_err_t project_config_get_rprof(diag_rprof_t *out);
+rt_err_t project_config_clear_rprof(void);
+/* 迁移标记: 本次启动是否从 0x00010002 迁移而来(只读, 供状态行如实显示)。 */
+rt_bool_t project_config_migrated_from_v2(void);
 
 /* 只更新电流标定三元组(offset/gain/source), 不改其他字段、不自动保存。
  * 用于 current_cal apply/nominal; 校验通过后在同一 cfg 锁内发布到运行时 ADC。

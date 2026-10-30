@@ -49,6 +49,10 @@ typedef enum
 {
     DIAG_MODE_MONITOR_ONLY = 0,
     DIAG_MODE_ACTIVE_PROTECTION,
+    /* M8(2026-10-30): 并行新增, 不改上面两个值的含义, 也不放宽 ACTIVE 的
+     * MEASURED 门禁。RELATIVE 用 raw 码带与 SG 相对变化判异常, 因此它不要求
+     * 电流标定来源是 MEASURED; 但它也不得对外宣称是"已验证的安培限流"。 */
+    DIAG_MODE_RELATIVE_PROTECTION,
 } diag_mode_t;
 
 /* 引擎单步输入(由 sensor_frame 提取; 合成注入也必须填 seq) */
@@ -61,6 +65,22 @@ typedef struct
     rt_uint8_t  imu_valid;      rt_int16_t  vib_mg;      /* 含重力基线 ~1000 */
     rt_uint8_t  motor_state;    /* motor_state_t */
     rt_uint32_t step_hz;
+    /* ---- M8 追加(只在末尾追加, 上面字段次序与含义不变) ----
+     * 源样本身份与年龄判定所需; 相对引擎**必须**能区分"新帧携带旧样本"与
+     * "新样本", 否则"持续 500ms 且 ≥3 个独立 SG"是假的。
+     *   sg_seq/cur_seq: 来自 sensor_frame 的同名计数(仅真实成功读取才 +1)。
+     *   sg_tick/cur_tick: 那次成功读取所在帧的 tick。
+     *   cur_raw: 与 cur_valid 同一次采样的 12bit ADC 原始码(相对判据用它, 不用 mA)。
+     *   dir: motor_snapshot.dir(0/1), 工况门用。 */
+    rt_uint32_t sg_seq;
+    rt_uint32_t sg_tick;
+    rt_uint32_t cur_seq;
+    rt_uint32_t cur_tick;
+    rt_uint32_t cur_raw;
+    rt_uint8_t  dir;
+    /* 调用方按**当前**驱动配置+工况+采样定义算出的身份签名(与 profile.signature
+     * 比较即知是否还在被批准的那个工况里)。0 = 未提供。 */
+    rt_uint32_t live_signature;
 } diag_input_t;
 
 /* 创建 Diagnosis Thread(幂等, prio 9, 100Hz 消费最新帧)。 */
@@ -80,6 +100,10 @@ void diag_reset(void);
  * (理论默认值 THEORETICAL 不得驱动保护动作)。 */
 rt_err_t diagnosis_set_mode(diag_mode_t mode);
 diag_mode_t diagnosis_get_mode(void);
+
+/* M8: "CONFIRM_EXPERIMENTAL" 的一次性凭据入口 —— 只允许由 diag_mode CLI 在操作员
+ * 显式写出该词时置位; diagnosis_set_mode() 用掉即清。不给任何隐式放行路径。 */
+void diagnosis_take_relative_confirm(void);
 
 diag_verdict_t diagnosis_get_verdict(void);
 

@@ -797,3 +797,36 @@ int main(void)
            g_run, g_pass, g_fail, g_pre_bad);
     return (g_fail || g_pre_bad) ? 1 : 0;
 }
+
+
+/* ======================= M8 新增依赖的链接桩 =======================
+ * project_config.c 从 M8 起内嵌 diag_rprof_t 并在 config_in_range/load 里调用
+ * rel_profile_validate; 本 runner 因此把**真实** diag_relative.c 一起编进来,
+ * 保证 profile 门禁走真实现, 而不是被假符号掩盖。
+ * 下面这些只是满足链接的确定返回值: diag_relative.c 引用的 TMC 身份 / 电机快照 /
+ * 安全状态 / 诊断模式接口在 CC01-CC29 的任何判据里都不被读取。
+ * 这些路径自身的行为判据在 M8 链(REL01-REL27)上验, **不在本链重复**。 */
+
+#include "safety_state.h"
+#include "tmc2209.h"
+#include "diagnosis.h"
+
+static tmc_drv_config_t g_rel_planned;
+static tmc_drv_cfg_state_t g_rel_cfg_state = TMC_DRV_CONFIGURED;
+
+void tmc2209_get_planned_config(tmc_drv_config_t *out)
+{
+    if (out) *out = g_rel_planned;
+}
+tmc_drv_cfg_state_t tmc2209_get_config_state(void) { return g_rel_cfg_state; }
+
+rt_err_t motor_get_snapshot(motor_snapshot_t *s)
+{
+    if (!s) return -RT_EINVAL;
+    rt_memset(s, 0, sizeof(*s));
+    s->state = MOTOR_IDLE;
+    return RT_EOK;
+}
+safety_state_t safety_state_get(void) { return SAFETY_READY; }
+rt_err_t safety_post_event(rt_uint32_t e) { (void)e; return RT_EOK; }
+rt_err_t diagnosis_set_mode(diag_mode_t m) { (void)m; return RT_EOK; }

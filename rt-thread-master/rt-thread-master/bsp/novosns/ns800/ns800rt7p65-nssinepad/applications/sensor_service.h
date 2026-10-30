@@ -55,6 +55,22 @@ typedef struct
      * 安全电平或线路完整性证明; 限位/ENN 读到"触发态"仍算有效样本。 */
     rt_uint8_t  valid_safety;
     rt_uint32_t seq;            /* 帧序号 */
+    /* ---- M8(2026-10-30 相对保护): 源样本身份, 只追加在末尾 ----
+     * 之前只有 valid_sg/fresh_sg: 一个 SG 读数一旦被保留, 消费方无法区分
+     * "这是第几次独立采样"与"这是上一帧的旧值被重放"。诊断因此不能证明
+     * 持续时间是跨**独立样本**建立的。
+     *   sg_seq / cur_seq: 该源**成功读取**的累计次数。只在真实成功(SG=UART 读成功,
+     *     ADC=current_adc 读成功)时 +1; 分频帧与失败帧都原样继承, 绝不前进。
+     *     计数存在帧链里(由调用方持有的基帧携带), 不是文件静态 ⇒ 自检用私有
+     *     基帧时结构上不可能推进生产计数(与 Fix E 同一纪律)。
+     *   sg_tick / cur_tick: 那次成功读取所在帧的 rt_tick_get(), 用于跨重启
+     *     无关的年龄/时间跨度计算(帧 tick 与"诊断当前 tick"必须分开)。
+     * 这些字段只在 RAM 帧内; 黑匣子落盘仍是 bb_to_sample() 的固定
+     * ns_fault_sample_t 布局, Flash schema 未变。 */
+    rt_uint32_t sg_seq;
+    rt_uint32_t sg_tick;
+    rt_uint32_t cur_seq;
+    rt_uint32_t cur_tick;
 } sensor_frame_t;
 
 /* 创建 Sensor Thread(幂等)。 */

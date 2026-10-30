@@ -15,7 +15,7 @@ GCC="$(env_detect_gcc || true)"
 [ -n "$GCC" ] || { echo "FATAL: no gcc"; exit 127; }
 [ -f "$HERE/cc_main.c" ] || { echo "FATAL: cc_main.c missing"; exit 127; }
 FLAGS="-std=gnu11 -Wall -Wextra -Wno-unused-function -DPS_LEAF_SCRIPTED_TIME -Drt_kprintf=cc_kprintf"
-"$GCC" $FLAGS -I "$HERE/shim_cc" -I "$SRC_APP" "$HERE/cc_main.c" \
+"$GCC" $FLAGS -I "$HERE/shim_cc" -I "$SRC_APP" "$HERE/cc_main.c" "$SRC_APP/diag_relative.c" \
     -o "$OUT_DIR/cc.exe" > "$OUT_DIR/build.txt" 2>&1
 brc=$?
 if [ "$brc" -ne 0 ]; then

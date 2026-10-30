@@ -420,6 +420,11 @@
               <FilePath>applications\diagnosis.c</FilePath>
             </File>
             <File>
+              <FileName>diag_relative.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>applications\diag_relative.c</FilePath>
+            </File>
+            <File>
               <FileName>project_config.c</FileName>
               <FileType>1</FileType>
               <FilePath>applications\project_config.c</FilePath>
@@ -3160,6 +3165,11 @@
               <FilePath>applications\diagnosis.c</FilePath>
             </File>
             <File>
+              <FileName>diag_relative.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>applications\diag_relative.c</FilePath>
+            </File>
+            <File>
               <FileName>project_config.c</FileName>
               <FileType>1</FileType>
               <FilePath>applications\project_config.c</FilePath>
@@ -5898,6 +5908,11 @@
               <FileName>diagnosis.c</FileName>
               <FileType>1</FileType>
               <FilePath>applications\diagnosis.c</FilePath>
+            </File>
+            <File>
+              <FileName>diag_relative.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>applications\diag_relative.c</FilePath>
             </File>
             <File>
               <FileName>project_config.c</FileName>
