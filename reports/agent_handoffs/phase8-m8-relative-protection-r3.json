@@ -153,7 +153,20 @@
     "why_plan_json_is_a_manifest": "计划申报的候选镜像 bytes/sha256 必须从远端字节复算, 否则'计划里写的镜像'与'仓库里的镜像'不一致只能靠本机核对发现",
     "prior_rounds": "往轮清单的问题逐条披露不改写(R2 的 64 问题与 no_path=32 保持), 判定分 SCOPE_R3 / SCOPE_PRIOR",
     "transport": "新建空 bare 仓 + git 协议 fetch --depth=1, 之后一律 git cat-file blob <tip>:<path>; 不复用本地对象库或工作树",
-    "result": "本轮尚未执行 => 结论只写在 remote_readback.md / host/remote_readback_console.txt, 不预填进本交接"
+    "runs": [
+      {"tip": "26809b9222b10abe894bdbd75a334d9b27531573", "scope_r3": "entries=1597 verified=1597 problems=0",
+       "keys": "评审1585+固件10+plan.json 2; build_manifest 9 件与固件清单同键去重",
+       "console": "host/remote_readback_console.txt", "rc": 0},
+      {"tip": "3411d926a45a8849495782175aed3d086b3fbf98", "scope_r3": "entries=1598 verified=1598 problems=0",
+       "unlisted_r3": 5, "unlisted_r3_items": "两份 SHA256SUMS.txt + 两份交接件 + remote_readback.md(全部按规则排除)",
+       "prior": "64 条披露与 no_path=32 与 R2 交付头完全一致, 本轮未改写往轮",
+       "console": "host/remote_readback_console_finaltip.txt", "rc": 0}
+    ],
+    "defects_found_by_actually_running_the_readback": [
+      "反向'清单未登记'沿用候选键判定: 本轮清单改仓库相对路径后把 1594 条已验证件全报成 unlisted_r3=1584 => 改按解析后真实路径集合",
+      "build_manifest.json 的 map 没有 path => 3 条落 NO_PATH, 只能按后缀猜; 生成器补显式 path, 重算后仅 9 个 path 字段新增, 其余一字未变"
+    ],
+    "self_limit": "最终交付头之后新加入的件不在任何清单里 => 由复审方独立回读覆盖, 本交接不预填其结论"
   },
   "artifact_grades": {
     "host_proved": "R3-A 补丁的同输入回归(REL50 八支 + RV10 反向)、现场执行器控制流与整包调度(假端口 + 假动作后端)、三目标构建产物字节与原始日志、PS 三入口真实执行、构建产物与构建输出逐件 BYTE_EQUAL",

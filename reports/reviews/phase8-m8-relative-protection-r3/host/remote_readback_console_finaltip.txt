@@ -1,0 +1,56 @@
+remote_tip=3411d926a45a8849495782175aed3d086b3fbf98
+remote_files=6767
+sums_manifests=11 comment_lines_skipped=11
+json_manifests=28 sha_declared_without_path=32
+tree_not_in_any_manifest=4531 of_which_in_r3_paths=5
+   UNLISTED_R3 reports/agent_handoffs/phase8-m8-relative-protection-r3.json
+   UNLISTED_R3 reports/agent_handoffs/phase8-m8-relative-protection-r3.md
+   UNLISTED_R3 reports/firmware/phase8-m8-relative-protection-r3/SHA256SUMS.txt
+   UNLISTED_R3 reports/reviews/phase8-m8-relative-protection-r3/SHA256SUMS.txt
+   UNLISTED_R3 reports/reviews/phase8-m8-relative-protection-r3/remote_readback.md
+declared_entries=2591 verified=2529 base_used={'manifest_dir': 621, 'parent_dir': 4, 'repo_root': 1623, 'suffix': 285}
+SCOPE_R3|entries=1598 verified=1598 problems=0
+SCOPE_PRIOR|problems=64|declared_but_absent=50,duplicate_conflict=2,hash_mismatch=4,suffix_ambiguous=8
+   PRIOR_HARD duplicate_conflict | reports/reviews/phase8-target-measurement-a0/build_manifest.json | reports/reviews/phase8-target-measurement-a0/default.bin | ef69404d388a | 41717367e4e1
+   PRIOR_HARD duplicate_conflict | reports/reviews/phase8-target-measurement-a0/build_manifest.json | reports/reviews/phase8-target-measurement-a0/measure-a0.bin | e9ba8dae1a4b | 358fd81ae585
+   PRIOR_HARD suffix_ambiguous | reports/firmware/phase8-motor-bringup-m1-prep/build_manifest.json | rt-thread-a0.map | candidates=3
+   PRIOR_HARD suffix_ambiguous | reports/firmware/phase8-motor-bringup-m1-prep/build_manifest.json | rt-thread.axf | candidates=9
+   PRIOR_HARD suffix_ambiguous | reports/firmware/phase8-motor-bringup-m1-prep/build_manifest.json | rt-thread.map | candidates=3
+   PRIOR_HARD suffix_ambiguous | reports/firmware/phase8-motor-bringup-m1-prep/build_manifest.json | rt-thread-motor-m1.bin | candidates=7
+   PRIOR_HARD suffix_ambiguous | reports/firmware/phase8-motor-bringup-m1-prep/build_manifest.json | rt-thread-motor-m1.axf | candidates=9
+   PRIOR_HARD suffix_ambiguous | reports/firmware/phase8-motor-bringup-m1-prep/build_manifest.json | rt-thread-motor-m1.map | candidates=3
+   PRIOR_HARD hash_mismatch | reports/firmware/phase8-motor-m7-current-calibration-r1/build_manifest.json | reports/reviews/phase8-motor-m7-current-calibration-r1/builds/build_rt-thread.log | 9e0e6eff14d5 | f733710c26d5
+   PRIOR_HARD hash_mismatch | reports/firmware/phase8-motor-m7-current-calibration-r1/build_manifest.json | reports/reviews/phase8-motor-m7-current-calibration-r1/builds/build_rt-thread-measure-a0.log | b46709232a56 | 68011af4cf18
+   PRIOR_HARD hash_mismatch | reports/firmware/phase8-motor-m7-current-calibration-r1/build_manifest.json | reports/reviews/phase8-motor-m7-current-calibration-r1/builds/build_rt-thread-motor-m1-candidate.log | 8490e08931d1 | a6d071e0968e
+   PRIOR_HARD hash_mismatch | reports/reviews/phase8-motor-m5-fault-log/cp1/old_archive_manifest.json | reports/reviews/phase8-motor-m5-fault-log/cp1/old_archive_checker_first_failure.txt | c0c6a9b6b65f | 9e1b65dc092e
+   PRIOR_HARD suffix_ambiguous | reports/reviews/phase8-target-measurement-a0/build_manifest.json | default.bin | candidates=7
+   PRIOR_HARD suffix_ambiguous | reports/reviews/phase8-target-measurement-a0/build_manifest.json | measure-a0.bin | candidates=9
+   PRIOR_BY_MANIFEST reports/reviews/phase8-motor-m5-fault-log/cp1/old_archive_manifest.json | 42
+   PRIOR_BY_MANIFEST reports/firmware/phase8-motor-bringup-m1-prep/build_manifest.json | 9
+   PRIOR_BY_MANIFEST reports/reviews/phase8-target-measurement-a0/build_manifest.json | 4
+   PRIOR_BY_MANIFEST reports/firmware/phase8-motor-m7-current-calibration-r1/build_manifest.json | 3
+   PRIOR_BY_MANIFEST reports/firmware/phase8-sensor-stack-uart-r2/build_manifest.json | 2
+   PRIOR_BY_MANIFEST reports/firmware/phase8-tmc-uart-read-observation-r1/build_manifest.json | 2
+   PRIOR_BY_MANIFEST reports/firmware/phase8-tmc-uart-read-observation/build_manifest.json | 2
+   NO_PATH reports/firmware/phase8-motor-bringup-m1-prep/build_manifest.json | /project_input/generator_identity | 有 sha256 但解析不出路径(键名是角色名)
+   NO_PATH reports/firmware/phase8-motor-bringup-m1-prep/build_manifest.json | /targets/rt-thread/log | 有 sha256 但解析不出路径(键名是角色名)
+   NO_PATH reports/firmware/phase8-motor-bringup-m1-prep/build_manifest.json | /targets/rt-thread-motor-m1-candidate/log | 有 sha256 但解析不出路径(键名是角色名)
+   NO_PATH reports/firmware/phase8-motor-bringup-m1-prep/build_manifest.json | /binary_diff_vs_accepted/default_bin_vs_accepted_default_bin/accepted | 有 sha256 但解析不出路径(键名是角色名)
+   NO_PATH reports/firmware/phase8-motor-bringup-m1-prep/build_manifest.json | /binary_diff_vs_accepted/default_bin_vs_accepted_default_bin/built | 有 sha256 但解析不出路径(键名是角色名)
+   NO_PATH reports/firmware/phase8-motor-bringup-m1-prep/build_manifest.json | /board_last_proven_image | 有 sha256 但解析不出路径(键名是角色名)
+   NO_PATH reports/firmware/phase8-motor-chain-dev/build_manifest.json | /targets/rt-thread/axf | 有 sha256 但解析不出路径(键名是角色名)
+   NO_PATH reports/firmware/phase8-motor-chain-dev/build_manifest.json | /targets/rt-thread/bin | 有 sha256 但解析不出路径(键名是角色名)
+   NO_PATH reports/firmware/phase8-motor-chain-dev/build_manifest.json | /targets/rt-thread-measure-a0/axf | 有 sha256 但解析不出路径(键名是角色名)
+   NO_PATH reports/firmware/phase8-motor-chain-dev/build_manifest.json | /targets/rt-thread-measure-a0/bin | 有 sha256 但解析不出路径(键名是角色名)
+   NO_PATH reports/firmware/phase8-motor-chain-dev/build_manifest.json | /targets/rt-thread-motor-m1-candidate/axf | 有 sha256 但解析不出路径(键名是角色名)
+   NO_PATH reports/firmware/phase8-motor-chain-dev/build_manifest.json | /targets/rt-thread-motor-m1-candidate/bin | 有 sha256 但解析不出路径(键名是角色名)
+   NO_PATH reports/firmware/phase8-motor-m5-fault-log/build_manifest.json | /targets/rt-thread/axf | 有 sha256 但解析不出路径(键名是角色名)
+   NO_PATH reports/firmware/phase8-motor-m5-fault-log/build_manifest.json | /targets/rt-thread/bin | 有 sha256 但解析不出路径(键名是角色名)
+   NO_PATH reports/firmware/phase8-motor-m5-fault-log/build_manifest.json | /targets/rt-thread-measure-a0/axf | 有 sha256 但解析不出路径(键名是角色名)
+   NO_PATH reports/firmware/phase8-motor-m5-fault-log/build_manifest.json | /targets/rt-thread-measure-a0/bin | 有 sha256 但解析不出路径(键名是角色名)
+   NO_PATH reports/firmware/phase8-motor-m5-fault-log/build_manifest.json | /targets/rt-thread-motor-m1-candidate/axf | 有 sha256 但解析不出路径(键名是角色名)
+   NO_PATH reports/firmware/phase8-motor-m5-fault-log/build_manifest.json | /targets/rt-thread-motor-m1-candidate/bin | 有 sha256 但解析不出路径(键名是角色名)
+   NO_PATH reports/firmware/phase8-motor-m6-offline/build_manifest.json | /targets/rt-thread/axf | 有 sha256 但解析不出路径(键名是角色名)
+   NO_PATH reports/firmware/phase8-motor-m6-offline/build_manifest.json | /targets/rt-thread/bin | 有 sha256 但解析不出路径(键名是角色名)
+REMOTE_READBACK_SUMMARY|tip=3411d926a4|declared=2591|verified=2529|r3_entries=1598|r3_verified=1598|r3_problems=0|prior_problems=64|prior_hard=14|no_path=32|unlisted=4531
+hardware_actions=0|sources_read_from=remote_git_protocol_only

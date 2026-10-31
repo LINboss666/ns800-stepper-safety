@@ -1,6 +1,6 @@
 # sha256 * <repo相对路径>(LF, 无 BOM; 本清单不哈希自身字节 —— 一条清单不能给自己的字节作证)
 # 生成方式: 对 reports/reviews/phase8-m8-relative-protection-r3/ 下每个常规文件(排除 SHA256SUMS.txt、remote_readback.md 与 __pycache__) 直接读磁盘字节算 sha256
-# 条目数=1586; 逐条与 Git blob 的复算由 host/staged_blob_preflight.txt(提交前)与 host/remote_readback.py(推送后, 从远端 blob)完成
+# 条目数=1587; 逐条与 Git blob 的复算由 host/staged_blob_preflight.txt(提交前)与 host/remote_readback.py(推送后, 从远端 blob)完成
 6239911fbd44b814e769e75c531df369c76a04e6a2ba7e4dbe119cb4b30a7b5d  reports/reviews/phase8-m8-relative-protection-r3/build/rc.txt
 278c6c927c4a17d5cd31846c2cf97da7f826c1ba433aebe4f214098c7cdbc866  reports/reviews/phase8-m8-relative-protection-r3/build/rt-thread-measure-a0.log
 9114d6024382982ff45c1683b3063a3c5cb0193a117c67ee188e0c7f912ca697  reports/reviews/phase8-m8-relative-protection-r3/build/rt-thread-motor-m1-candidate.log
@@ -30,6 +30,7 @@ af679636c9004231538e7762411707a83ad6235846edd0d2ebbcf36ec060a116  reports/review
 687090583031c38f8247473b20b916e41d0682a3095976bee1229313eac3f4f0  reports/reviews/phase8-m8-relative-protection-r3/host/regression_m8_reverse_console.txt
 fa0c61f7a4a59e44659fd2dd899ee58af735536c5b6ab4dbb0af1618cece7c4d  reports/reviews/phase8-m8-relative-protection-r3/host/remote_readback.py
 f43e2358ccf9772b34f972f571a9c4aaf07095011f7b3f4c4010a15a36fd4077  reports/reviews/phase8-m8-relative-protection-r3/host/remote_readback_console.txt
+9aa9317aa14de447131e069f8a814da988ee8db6b5f714955a6b12815724e70d  reports/reviews/phase8-m8-relative-protection-r3/host/remote_readback_console_finaltip.txt
 5d455aafc440f3d206b3ab507fc018d77e4e63979f3d3c19f0a5d35e0b52ce94  reports/reviews/phase8-m8-relative-protection-r3/host/rows_provenance_check.py
 eca7808aeb116eab469a893fcacbae074bea28dfd1439c57adaa6d95de22eabe  reports/reviews/phase8-m8-relative-protection-r3/host/rows_provenance_console.txt
 53e5340b7f348a800a8714c4e0092d9ac8f62c22323b00979e5ef9eb416b982d  reports/reviews/phase8-m8-relative-protection-r3/host/staged_blob_preflight.txt

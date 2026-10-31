@@ -65,7 +65,22 @@ SCOPE_PRIOR|problems=64|declared_but_absent=50,duplicate_conflict=2,hash_mismatc
 `duplicate_conflict=2`、`suffix_ambiguous=8`，其中"硬"问题 14 条（除 absent 之外的那些）。
 本轮不替往轮改历史；这些条目逐条打印在 `host/remote_readback_console.txt` 里。
 
-## 4. 这份记录本身的可核对性
+## 4. 交付头自己的复跑（`3411d926a45a8849495782175aed3d086b3fbf98`）
+
+同一程序、同一远端方式，在上一节那次提交推送之后再跑一次（`host/remote_readback_console_finaltip.txt`）：
+
+```
+SCOPE_R3|entries=1598 verified=1598 problems=0
+REMOTE_READBACK_SUMMARY|tip=3411d926a4|declared=2591|verified=2529|r3_entries=1598|r3_verified=1598
+  |r3_problems=0|prior_problems=64|prior_hard=14|no_path=32|unlisted=4531
+```
+
+比上一轮多的那 1 条正是新登记的 `host/remote_readback_console.txt`；本轮 `unlisted_r3=5` 就是按规则
+本就不该被散列的五件：两份 `SHA256SUMS.txt`、两份交接件、以及本文件 `remote_readback.md`。
+往轮 64 条披露与 `no_path=32` 保持完全一致。**本文件与最终交付头之后新加入的件，由复审方独立回读覆盖**
+—— 一条记录不能给自己的字节作证，这条边界在 R1/R2 就已按同一方式处理并被接受。
+
+## 5. 这份记录本身的可核对性
 
 - 本文件与 `host/remote_readback_console.txt` 的字节都在 Git 里；`remote_readback.md` 按规则不被任何清单散列，
   `host/remote_readback_console.txt` 在**下一次清单重算**里被登记（提交顺序：本次回读 → 归档 → 重算清单 → 提交），
