@@ -28,283 +28,283 @@
         }
       },
       "entries": {
-        "field/offline/20261031T042322Z-21311/pre/precheck_20261031T042326Z-37748.json": {
+        "../field/offline/20261031T042322Z-21311/pre/precheck_20261031T042326Z-37748.json": {
           "bytes": 199,
           "sha256": "2feac99d9bd555e34f23feb591001a783aa5a05c35ba6fb822d921c23d509902"
         },
-        "field/offline/20261031T042322Z-21311/precheck_console.txt": {
+        "../field/offline/20261031T042322Z-21311/precheck_console.txt": {
           "bytes": 947,
           "sha256": "3c87405738b8864a20dadaf5961789ca0af03258259a478d1249694dbcb2d7f0"
         },
-        "field/offline/20261031T042322Z-21311/runf/runfield/fixtures/FX_S1_POS.json": {
+        "../field/offline/20261031T042322Z-21311/runf/runfield/fixtures/FX_S1_POS.json": {
           "bytes": 5736,
           "sha256": "690acb78abeb38a8b0452ed46d3ecdc9d44245807abb61148862d7585c8e74af"
         },
-        "field/offline/20261031T042322Z-21311/runf/runfield/runfield_20261031T042328Z-42840.json": {
+        "../field/offline/20261031T042322Z-21311/runf/runfield/runfield_20261031T042328Z-42840.json": {
           "bytes": 1172,
           "sha256": "35b5e95ce0f43cfc121c47c4c17c21f171fcb1583f7811bac99020b8d1af11c3"
         },
-        "field/offline/20261031T042322Z-21311/runf/runfield/sess_S1/bootstrap.jsonl": {
+        "../field/offline/20261031T042322Z-21311/runf/runfield/sess_S1/bootstrap.jsonl": {
           "bytes": 0,
           "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         },
-        "field/offline/20261031T042322Z-21311/runf/runfield/sess_S1/ledger.jsonl": {
+        "../field/offline/20261031T042322Z-21311/runf/runfield/sess_S1/ledger.jsonl": {
           "bytes": 598,
           "sha256": "a04b642f208aa9cc9b2a981750c95e9b583eae84821df039f795063423e356ab"
         },
-        "field/offline/20261031T042322Z-21311/runf/runfield/steps_S1.json": {
+        "../field/offline/20261031T042322Z-21311/runf/runfield/steps_S1.json": {
           "bytes": 930,
           "sha256": "0915bb1d7de0991b4ad087c6d3ce1b67056b81f42b84366ba43ef34e220dc7f2"
         },
-        "field/offline/20261031T042322Z-21311/runfield/fixtures/FX_S1_POS.json": {
+        "../field/offline/20261031T042322Z-21311/runfield/fixtures/FX_S1_POS.json": {
           "bytes": 5736,
           "sha256": "690acb78abeb38a8b0452ed46d3ecdc9d44245807abb61148862d7585c8e74af"
         },
-        "field/offline/20261031T042322Z-21311/runfield/fixtures/FX_S2_POS.json": {
+        "../field/offline/20261031T042322Z-21311/runfield/fixtures/FX_S2_POS.json": {
           "bytes": 5736,
           "sha256": "690acb78abeb38a8b0452ed46d3ecdc9d44245807abb61148862d7585c8e74af"
         },
-        "field/offline/20261031T042322Z-21311/runfield/fixtures/FX_S3_POS.json": {
+        "../field/offline/20261031T042322Z-21311/runfield/fixtures/FX_S3_POS.json": {
           "bytes": 5736,
           "sha256": "690acb78abeb38a8b0452ed46d3ecdc9d44245807abb61148862d7585c8e74af"
         },
-        "field/offline/20261031T042322Z-21311/runfield/fixtures/FX_S4_POS.json": {
+        "../field/offline/20261031T042322Z-21311/runfield/fixtures/FX_S4_POS.json": {
           "bytes": 5736,
           "sha256": "690acb78abeb38a8b0452ed46d3ecdc9d44245807abb61148862d7585c8e74af"
         },
-        "field/offline/20261031T042322Z-21311/runfield/fixtures/FX_S5_POS.json": {
+        "../field/offline/20261031T042322Z-21311/runfield/fixtures/FX_S5_POS.json": {
           "bytes": 5736,
           "sha256": "690acb78abeb38a8b0452ed46d3ecdc9d44245807abb61148862d7585c8e74af"
         },
-        "field/offline/20261031T042322Z-21311/runfield/fixtures/FX_S6_POS.json": {
+        "../field/offline/20261031T042322Z-21311/runfield/fixtures/FX_S6_POS.json": {
           "bytes": 5736,
           "sha256": "690acb78abeb38a8b0452ed46d3ecdc9d44245807abb61148862d7585c8e74af"
         },
-        "field/offline/20261031T042322Z-21311/runfield/fixtures/FX_S7_POS.json": {
+        "../field/offline/20261031T042322Z-21311/runfield/fixtures/FX_S7_POS.json": {
           "bytes": 5736,
           "sha256": "690acb78abeb38a8b0452ed46d3ecdc9d44245807abb61148862d7585c8e74af"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S1/bootstrap.jsonl": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S1/bootstrap.jsonl": {
           "bytes": 0,
           "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S1/ledger.jsonl": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S1/ledger.jsonl": {
           "bytes": 598,
           "sha256": "a04b642f208aa9cc9b2a981750c95e9b583eae84821df039f795063423e356ab"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S2/bootstrap.jsonl": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S2/bootstrap.jsonl": {
           "bytes": 0,
           "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S2/ledger.jsonl": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S2/ledger.jsonl": {
           "bytes": 470,
           "sha256": "f206b8496433c64cdecfae769730e1ceaa00780aef575c9638c927afd3bede7d"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S3/02_health.rx.bin": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S3/02_health.rx.bin": {
           "bytes": 75,
           "sha256": "db43542937aab5c0c57a04dc4db19aa06437920c7572f04c4d85e741e50bb439"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S3/03_boot.rx.bin": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S3/03_boot.rx.bin": {
           "bytes": 81,
           "sha256": "01f9c40eda67bcf034e2c8b3f6d6683ab54a522c125c4ab06d80b17fa1846fdb"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S3/04_cfgplan.rx.bin": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S3/04_cfgplan.rx.bin": {
           "bytes": 69,
           "sha256": "65a6eb46c0745b536730eab5f41e5a3bc81e927c2f4347a91088d6eeea881307"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S3/05_cfgapply.rx.bin": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S3/05_cfgapply.rx.bin": {
           "bytes": 78,
           "sha256": "c152a7160591fc6a64f56f0eeee1d72105f08650fcb0bb5650e4cb505f8d524e"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S3/06_irq.rx.bin": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S3/06_irq.rx.bin": {
           "bytes": 70,
           "sha256": "7eab75cd1603ff0e9da32f0ec2ae137430037be11b80fb03af2b4591cfd0d47d"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S3/07_motor0.rx.bin": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S3/07_motor0.rx.bin": {
           "bytes": 126,
           "sha256": "497c0a78a778626d498bc42a8f2ae7b200ff97b771ccf9a225ecc09fd99e3705"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S3/08_diag0.rx.bin": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S3/08_diag0.rx.bin": {
           "bytes": 119,
           "sha256": "f65da94a9c0b71b455142aefdc27c1dbb621b725a876a2bc81ee0c4c17f65b17"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S3/09_cfg0.rx.bin": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S3/09_cfg0.rx.bin": {
           "bytes": 72,
           "sha256": "7ffa38735d511f17e5b38f119ecc4ac95c0c7104475222e56a712286979aa363"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S3/10_prof0.rx.bin": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S3/10_prof0.rx.bin": {
           "bytes": 122,
           "sha256": "6647f2562c62ba3a88149b5dc75312704f1e176cef84109056d3c733a6aa96cc"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S3/11_zero.rx.bin": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S3/11_zero.rx.bin": {
           "bytes": 77,
           "sha256": "8865357382e1c319134e14f18627fb1e5267f45a6ddeeafae721f699439a423a"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S3/bootstrap.jsonl": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S3/bootstrap.jsonl": {
           "bytes": 0,
           "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S3/ledger.jsonl": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S3/ledger.jsonl": {
           "bytes": 3019,
           "sha256": "3bbda36cf11be4fabd8d8e2f8daae5cb6ee36e46d550284328e62372480cbc4f"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S4/01_dir0.rx.bin": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S4/01_dir0.rx.bin": {
           "bytes": 44,
           "sha256": "40a2309e21aa6bc5f8b7c0fb36ae4252c4d818aac7c17b8e0dab9e37d03bdf42"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S4/02_arm.rx.bin": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S4/02_arm.rx.bin": {
           "bytes": 47,
           "sha256": "b12f06f4d16558a8093a7419fc895237a2fb214239e1192bf96b0a65d0e9444c"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S4/03_target.rx.bin": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S4/03_target.rx.bin": {
           "bytes": 56,
           "sha256": "26e46a1254659285f88db7684ea20f208c4e1327ba41a541c18cb4e60e109d7d"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S4/04_start.rx.bin": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S4/04_start.rx.bin": {
           "bytes": 32,
           "sha256": "5f540607e70ffdaaf83240db7863312a675e5ad582eb5b94c60859409f4247fb"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S4/05_learn.rx.bin": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S4/05_learn.rx.bin": {
           "bytes": 69,
           "sha256": "2e17e45a0f942ef68b0b01ed632f8a6cb2dd99fc628a14410fdbb4cfe82d6e10"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S4/06_cruise_probe.rx.bin": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S4/06_cruise_probe.rx.bin": {
           "bytes": 32,
           "sha256": "5f540607e70ffdaaf83240db7863312a675e5ad582eb5b94c60859409f4247fb"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S4/bootstrap.jsonl": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S4/bootstrap.jsonl": {
           "bytes": 0,
           "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S4/cleanup_motor_disarm.bin": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S4/cleanup_motor_disarm.bin": {
           "bytes": 47,
           "sha256": "2d13aa5588ab07f3b5fa8945152b7944450529354828ae8a8b39b307a2d2f3cb"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S4/cleanup_motor_status.bin": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S4/cleanup_motor_status.bin": {
           "bytes": 126,
           "sha256": "497c0a78a778626d498bc42a8f2ae7b200ff97b771ccf9a225ecc09fd99e3705"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S4/cleanup_motor_stop.bin": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S4/cleanup_motor_stop.bin": {
           "bytes": 51,
           "sha256": "18978ef52f8a9d8028a5de51717515cb5c6a4a85c679cbea7e2f03435b322abc"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S4/ledger.jsonl": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S4/ledger.jsonl": {
           "bytes": 2466,
           "sha256": "5aa4a8dd883997bdca5730804819a3d8bcb11c1c5e361cc3584b78edb991e7f6"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S5/bootstrap.jsonl": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S5/bootstrap.jsonl": {
           "bytes": 0,
           "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S5/ledger.jsonl": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S5/ledger.jsonl": {
           "bytes": 451,
           "sha256": "0967792ff2ec61ef0d8bed31debe726230d85eebbefb37dadf091a9c48f88251"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S6/01_cfg1.rx.bin": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S6/01_cfg1.rx.bin": {
           "bytes": 72,
           "sha256": "7ffa38735d511f17e5b38f119ecc4ac95c0c7104475222e56a712286979aa363"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S6/02_prof1.rx.bin": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S6/02_prof1.rx.bin": {
           "bytes": 122,
           "sha256": "6647f2562c62ba3a88149b5dc75312704f1e176cef84109056d3c733a6aa96cc"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S6/03_cfgapply2.rx.bin": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S6/03_cfgapply2.rx.bin": {
           "bytes": 78,
           "sha256": "c152a7160591fc6a64f56f0eeee1d72105f08650fcb0bb5650e4cb505f8d524e"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S6/04_irq2.rx.bin": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S6/04_irq2.rx.bin": {
           "bytes": 70,
           "sha256": "7eab75cd1603ff0e9da32f0ec2ae137430037be11b80fb03af2b4591cfd0d47d"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S6/05_diag1.rx.bin": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S6/05_diag1.rx.bin": {
           "bytes": 119,
           "sha256": "f65da94a9c0b71b455142aefdc27c1dbb621b725a876a2bc81ee0c4c17f65b17"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S6/bootstrap.jsonl": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S6/bootstrap.jsonl": {
           "bytes": 0,
           "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S6/ledger.jsonl": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S6/ledger.jsonl": {
           "bytes": 1548,
           "sha256": "6ff2b9cd2220803a0268cd7f47ebfb5e499f6dd7687818b4f5ae8a16e643081f"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S7/01_arm_rel.rx.bin": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S7/01_arm_rel.rx.bin": {
           "bytes": 34,
           "sha256": "564215defdd55d4d437760c18ad7103e9784ab2b486f4de126f37272b73aed89"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S7/02_arm.rx.bin": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S7/02_arm.rx.bin": {
           "bytes": 47,
           "sha256": "b12f06f4d16558a8093a7419fc895237a2fb214239e1192bf96b0a65d0e9444c"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S7/03_target.rx.bin": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S7/03_target.rx.bin": {
           "bytes": 56,
           "sha256": "26e46a1254659285f88db7684ea20f208c4e1327ba41a541c18cb4e60e109d7d"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S7/04_start.rx.bin": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S7/04_start.rx.bin": {
           "bytes": 32,
           "sha256": "5f540607e70ffdaaf83240db7863312a675e5ad582eb5b94c60859409f4247fb"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S7/05_trip_window.rx.bin": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S7/05_trip_window.rx.bin": {
           "bytes": 32,
           "sha256": "5f540607e70ffdaaf83240db7863312a675e5ad582eb5b94c60859409f4247fb"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S7/bootstrap.jsonl": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S7/bootstrap.jsonl": {
           "bytes": 0,
           "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S7/cleanup_motor_disarm.bin": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S7/cleanup_motor_disarm.bin": {
           "bytes": 47,
           "sha256": "2d13aa5588ab07f3b5fa8945152b7944450529354828ae8a8b39b307a2d2f3cb"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S7/cleanup_motor_status.bin": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S7/cleanup_motor_status.bin": {
           "bytes": 126,
           "sha256": "497c0a78a778626d498bc42a8f2ae7b200ff97b771ccf9a225ecc09fd99e3705"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S7/cleanup_motor_stop.bin": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S7/cleanup_motor_stop.bin": {
           "bytes": 51,
           "sha256": "18978ef52f8a9d8028a5de51717515cb5c6a4a85c679cbea7e2f03435b322abc"
         },
-        "field/offline/20261031T042322Z-21311/runfield/sess_S7/ledger.jsonl": {
+        "../field/offline/20261031T042322Z-21311/runfield/sess_S7/ledger.jsonl": {
           "bytes": 2236,
           "sha256": "565ea0b736a175168da133efc47f190eb23b07c009283628f12feb38634a576e"
         },
-        "field/offline/20261031T042322Z-21311/runfield/steps_S1.json": {
+        "../field/offline/20261031T042322Z-21311/runfield/steps_S1.json": {
           "bytes": 930,
           "sha256": "0915bb1d7de0991b4ad087c6d3ce1b67056b81f42b84366ba43ef34e220dc7f2"
         },
-        "field/offline/20261031T042322Z-21311/runfield/steps_S2.json": {
+        "../field/offline/20261031T042322Z-21311/runfield/steps_S2.json": {
           "bytes": 940,
           "sha256": "a06eb209e6df12bc235f6b9ff85248d64a09c092f463594dff1783d8ee9a5d24"
         },
-        "field/offline/20261031T042322Z-21311/runfield/steps_S3.json": {
+        "../field/offline/20261031T042322Z-21311/runfield/steps_S3.json": {
           "bytes": 3206,
           "sha256": "7e96bb358e94007ad9b8b9e5c1982f8019566854acff7eb5066e6d33076ec31d"
         },
-        "field/offline/20261031T042322Z-21311/runfield/steps_S4.json": {
+        "../field/offline/20261031T042322Z-21311/runfield/steps_S4.json": {
           "bytes": 3573,
           "sha256": "b48d10c5268db8ce91237f599b9cd895129b0509a4aab8d15e5f67732863c429"
         },
-        "field/offline/20261031T042322Z-21311/runfield/steps_S5.json": {
+        "../field/offline/20261031T042322Z-21311/runfield/steps_S5.json": {
           "bytes": 955,
           "sha256": "57aca59b072ed0063ef423b28bc77776d41890e3127c39af87ae0e8fb27f6f3f"
         },
-        "field/offline/20261031T042322Z-21311/runfield/steps_S6.json": {
+        "../field/offline/20261031T042322Z-21311/runfield/steps_S6.json": {
           "bytes": 1565,
           "sha256": "8c6be4fe4c621da4aac3570c28d6a3a41c41335f0c85378083af061c565b4db7"
         },
-        "field/offline/20261031T042322Z-21311/runfield/steps_S7.json": {
+        "../field/offline/20261031T042322Z-21311/runfield/steps_S7.json": {
           "bytes": 3451,
           "sha256": "fb37974bbdf38d978e953a0205f3dbc0797ea90d370a1e34760ded6b1fd04b96"
         },
-        "field/offline/20261031T042322Z-21311/runfield_console.txt": {
+        "../field/offline/20261031T042322Z-21311/runfield_console.txt": {
           "bytes": 462,
           "sha256": "6d40cde172851d7493e7d6a0e7a3ad59d8bda2e46545d1ee085965417c75d46a"
         },
-        "field/offline/20261031T042322Z-21311/selftest_20261031T042323Z-48720.json": {
+        "../field/offline/20261031T042322Z-21311/selftest_20261031T042323Z-48720.json": {
           "bytes": 4510,
           "sha256": "2f192dcd6dccab22d64a0804a28fa0e0c9dbdfe5a7f00e91dfca3c5bfa1744e9"
         },
-        "field/offline/20261031T042322Z-21311/selftest_console.txt": {
+        "../field/offline/20261031T042322Z-21311/selftest_console.txt": {
           "bytes": 4786,
           "sha256": "71335d9e7be9ed824a682d79e601b204b9f85c4f342e31d3fadfb82c787dd673"
         }
@@ -329,271 +329,271 @@
         }
       },
       "entries": {
-        "field/offline/20261031T043158Z-22714/Precheck/precheck_20261031T043203Z-17256.json": {
+        "../field/offline/20261031T043158Z-22714/Precheck/precheck_20261031T043203Z-17256.json": {
           "bytes": 161,
           "sha256": "a82c2607d8d77be546c94b7d8acc280ab173e8602512547635c9d557659ad0b3"
         },
-        "field/offline/20261031T043158Z-22714/RunField/runfield/fixtures/FX_S1_POS.json": {
+        "../field/offline/20261031T043158Z-22714/RunField/runfield/fixtures/FX_S1_POS.json": {
           "bytes": 5736,
           "sha256": "690acb78abeb38a8b0452ed46d3ecdc9d44245807abb61148862d7585c8e74af"
         },
-        "field/offline/20261031T043158Z-22714/RunField/runfield/runfield_20261031T043205Z-51708.json": {
+        "../field/offline/20261031T043158Z-22714/RunField/runfield/runfield_20261031T043205Z-51708.json": {
           "bytes": 1176,
           "sha256": "f811fe973365d00e0815c0231e73d90f0465789ea0a01c5ef6212498e478d5d6"
         },
-        "field/offline/20261031T043158Z-22714/RunField/runfield/sess_S1/bootstrap.jsonl": {
+        "../field/offline/20261031T043158Z-22714/RunField/runfield/sess_S1/bootstrap.jsonl": {
           "bytes": 0,
           "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         },
-        "field/offline/20261031T043158Z-22714/RunField/runfield/sess_S1/ledger.jsonl": {
+        "../field/offline/20261031T043158Z-22714/RunField/runfield/sess_S1/ledger.jsonl": {
           "bytes": 608,
           "sha256": "4ee9755c70453be628e82ceb069932648abe0ca1886416ec35d246418f696c15"
         },
-        "field/offline/20261031T043158Z-22714/RunField/runfield/steps_S1.json": {
+        "../field/offline/20261031T043158Z-22714/RunField/runfield/steps_S1.json": {
           "bytes": 960,
           "sha256": "7c416f1947a6cfc500854a5894abfb5ecd6e670c993d27ea69802c713697a759"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/fixtures/FX_S1_POS.json": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/fixtures/FX_S1_POS.json": {
           "bytes": 5736,
           "sha256": "690acb78abeb38a8b0452ed46d3ecdc9d44245807abb61148862d7585c8e74af"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/fixtures/FX_S2_POS.json": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/fixtures/FX_S2_POS.json": {
           "bytes": 5736,
           "sha256": "690acb78abeb38a8b0452ed46d3ecdc9d44245807abb61148862d7585c8e74af"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/fixtures/FX_S3_POS.json": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/fixtures/FX_S3_POS.json": {
           "bytes": 5736,
           "sha256": "690acb78abeb38a8b0452ed46d3ecdc9d44245807abb61148862d7585c8e74af"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/fixtures/FX_S4_POS.json": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/fixtures/FX_S4_POS.json": {
           "bytes": 5736,
           "sha256": "690acb78abeb38a8b0452ed46d3ecdc9d44245807abb61148862d7585c8e74af"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/fixtures/FX_S5_POS.json": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/fixtures/FX_S5_POS.json": {
           "bytes": 5736,
           "sha256": "690acb78abeb38a8b0452ed46d3ecdc9d44245807abb61148862d7585c8e74af"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/fixtures/FX_S6_POS.json": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/fixtures/FX_S6_POS.json": {
           "bytes": 5736,
           "sha256": "690acb78abeb38a8b0452ed46d3ecdc9d44245807abb61148862d7585c8e74af"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/fixtures/FX_S7_POS.json": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/fixtures/FX_S7_POS.json": {
           "bytes": 5736,
           "sha256": "690acb78abeb38a8b0452ed46d3ecdc9d44245807abb61148862d7585c8e74af"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S1/bootstrap.jsonl": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S1/bootstrap.jsonl": {
           "bytes": 0,
           "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S1/ledger.jsonl": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S1/ledger.jsonl": {
           "bytes": 608,
           "sha256": "4ee9755c70453be628e82ceb069932648abe0ca1886416ec35d246418f696c15"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S2/bootstrap.jsonl": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S2/bootstrap.jsonl": {
           "bytes": 0,
           "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S2/ledger.jsonl": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S2/ledger.jsonl": {
           "bytes": 470,
           "sha256": "134852a0128a894bf67274f6d8dd1a6a8d01b3d29268eeab37c1d78eb4de654d"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S3/02_health.rx.bin": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S3/02_health.rx.bin": {
           "bytes": 75,
           "sha256": "db43542937aab5c0c57a04dc4db19aa06437920c7572f04c4d85e741e50bb439"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S3/03_boot.rx.bin": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S3/03_boot.rx.bin": {
           "bytes": 81,
           "sha256": "01f9c40eda67bcf034e2c8b3f6d6683ab54a522c125c4ab06d80b17fa1846fdb"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S3/04_cfgplan.rx.bin": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S3/04_cfgplan.rx.bin": {
           "bytes": 69,
           "sha256": "65a6eb46c0745b536730eab5f41e5a3bc81e927c2f4347a91088d6eeea881307"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S3/05_cfgapply.rx.bin": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S3/05_cfgapply.rx.bin": {
           "bytes": 78,
           "sha256": "c152a7160591fc6a64f56f0eeee1d72105f08650fcb0bb5650e4cb505f8d524e"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S3/06_irq.rx.bin": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S3/06_irq.rx.bin": {
           "bytes": 70,
           "sha256": "7eab75cd1603ff0e9da32f0ec2ae137430037be11b80fb03af2b4591cfd0d47d"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S3/07_motor0.rx.bin": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S3/07_motor0.rx.bin": {
           "bytes": 126,
           "sha256": "497c0a78a778626d498bc42a8f2ae7b200ff97b771ccf9a225ecc09fd99e3705"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S3/08_diag0.rx.bin": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S3/08_diag0.rx.bin": {
           "bytes": 119,
           "sha256": "f65da94a9c0b71b455142aefdc27c1dbb621b725a876a2bc81ee0c4c17f65b17"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S3/09_cfg0.rx.bin": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S3/09_cfg0.rx.bin": {
           "bytes": 72,
           "sha256": "7ffa38735d511f17e5b38f119ecc4ac95c0c7104475222e56a712286979aa363"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S3/10_prof0.rx.bin": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S3/10_prof0.rx.bin": {
           "bytes": 122,
           "sha256": "6647f2562c62ba3a88149b5dc75312704f1e176cef84109056d3c733a6aa96cc"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S3/11_zero.rx.bin": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S3/11_zero.rx.bin": {
           "bytes": 77,
           "sha256": "8865357382e1c319134e14f18627fb1e5267f45a6ddeeafae721f699439a423a"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S3/bootstrap.jsonl": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S3/bootstrap.jsonl": {
           "bytes": 0,
           "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S3/ledger.jsonl": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S3/ledger.jsonl": {
           "bytes": 3019,
           "sha256": "3bbda36cf11be4fabd8d8e2f8daae5cb6ee36e46d550284328e62372480cbc4f"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S4/01_dir0.rx.bin": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S4/01_dir0.rx.bin": {
           "bytes": 44,
           "sha256": "40a2309e21aa6bc5f8b7c0fb36ae4252c4d818aac7c17b8e0dab9e37d03bdf42"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S4/02_arm.rx.bin": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S4/02_arm.rx.bin": {
           "bytes": 47,
           "sha256": "b12f06f4d16558a8093a7419fc895237a2fb214239e1192bf96b0a65d0e9444c"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S4/03_target.rx.bin": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S4/03_target.rx.bin": {
           "bytes": 56,
           "sha256": "26e46a1254659285f88db7684ea20f208c4e1327ba41a541c18cb4e60e109d7d"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S4/04_start.rx.bin": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S4/04_start.rx.bin": {
           "bytes": 32,
           "sha256": "5f540607e70ffdaaf83240db7863312a675e5ad582eb5b94c60859409f4247fb"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S4/05_learn.rx.bin": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S4/05_learn.rx.bin": {
           "bytes": 69,
           "sha256": "2e17e45a0f942ef68b0b01ed632f8a6cb2dd99fc628a14410fdbb4cfe82d6e10"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S4/06_cruise_probe.rx.bin": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S4/06_cruise_probe.rx.bin": {
           "bytes": 32,
           "sha256": "5f540607e70ffdaaf83240db7863312a675e5ad582eb5b94c60859409f4247fb"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S4/bootstrap.jsonl": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S4/bootstrap.jsonl": {
           "bytes": 0,
           "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S4/cleanup_motor_disarm.bin": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S4/cleanup_motor_disarm.bin": {
           "bytes": 47,
           "sha256": "2d13aa5588ab07f3b5fa8945152b7944450529354828ae8a8b39b307a2d2f3cb"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S4/cleanup_motor_status.bin": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S4/cleanup_motor_status.bin": {
           "bytes": 126,
           "sha256": "497c0a78a778626d498bc42a8f2ae7b200ff97b771ccf9a225ecc09fd99e3705"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S4/cleanup_motor_stop.bin": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S4/cleanup_motor_stop.bin": {
           "bytes": 51,
           "sha256": "18978ef52f8a9d8028a5de51717515cb5c6a4a85c679cbea7e2f03435b322abc"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S4/ledger.jsonl": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S4/ledger.jsonl": {
           "bytes": 2466,
           "sha256": "5aa4a8dd883997bdca5730804819a3d8bcb11c1c5e361cc3584b78edb991e7f6"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S5/bootstrap.jsonl": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S5/bootstrap.jsonl": {
           "bytes": 0,
           "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S5/ledger.jsonl": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S5/ledger.jsonl": {
           "bytes": 451,
           "sha256": "0967792ff2ec61ef0d8bed31debe726230d85eebbefb37dadf091a9c48f88251"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S6/01_cfg1.rx.bin": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S6/01_cfg1.rx.bin": {
           "bytes": 72,
           "sha256": "7ffa38735d511f17e5b38f119ecc4ac95c0c7104475222e56a712286979aa363"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S6/02_prof1.rx.bin": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S6/02_prof1.rx.bin": {
           "bytes": 122,
           "sha256": "6647f2562c62ba3a88149b5dc75312704f1e176cef84109056d3c733a6aa96cc"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S6/03_cfgapply2.rx.bin": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S6/03_cfgapply2.rx.bin": {
           "bytes": 78,
           "sha256": "c152a7160591fc6a64f56f0eeee1d72105f08650fcb0bb5650e4cb505f8d524e"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S6/04_irq2.rx.bin": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S6/04_irq2.rx.bin": {
           "bytes": 70,
           "sha256": "7eab75cd1603ff0e9da32f0ec2ae137430037be11b80fb03af2b4591cfd0d47d"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S6/05_diag1.rx.bin": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S6/05_diag1.rx.bin": {
           "bytes": 119,
           "sha256": "f65da94a9c0b71b455142aefdc27c1dbb621b725a876a2bc81ee0c4c17f65b17"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S6/bootstrap.jsonl": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S6/bootstrap.jsonl": {
           "bytes": 0,
           "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S6/ledger.jsonl": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S6/ledger.jsonl": {
           "bytes": 1548,
           "sha256": "6ff2b9cd2220803a0268cd7f47ebfb5e499f6dd7687818b4f5ae8a16e643081f"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S7/01_arm_rel.rx.bin": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S7/01_arm_rel.rx.bin": {
           "bytes": 34,
           "sha256": "564215defdd55d4d437760c18ad7103e9784ab2b486f4de126f37272b73aed89"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S7/02_arm.rx.bin": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S7/02_arm.rx.bin": {
           "bytes": 47,
           "sha256": "b12f06f4d16558a8093a7419fc895237a2fb214239e1192bf96b0a65d0e9444c"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S7/03_target.rx.bin": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S7/03_target.rx.bin": {
           "bytes": 56,
           "sha256": "26e46a1254659285f88db7684ea20f208c4e1327ba41a541c18cb4e60e109d7d"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S7/04_start.rx.bin": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S7/04_start.rx.bin": {
           "bytes": 32,
           "sha256": "5f540607e70ffdaaf83240db7863312a675e5ad582eb5b94c60859409f4247fb"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S7/05_trip_window.rx.bin": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S7/05_trip_window.rx.bin": {
           "bytes": 32,
           "sha256": "5f540607e70ffdaaf83240db7863312a675e5ad582eb5b94c60859409f4247fb"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S7/bootstrap.jsonl": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S7/bootstrap.jsonl": {
           "bytes": 0,
           "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S7/cleanup_motor_disarm.bin": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S7/cleanup_motor_disarm.bin": {
           "bytes": 47,
           "sha256": "2d13aa5588ab07f3b5fa8945152b7944450529354828ae8a8b39b307a2d2f3cb"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S7/cleanup_motor_status.bin": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S7/cleanup_motor_status.bin": {
           "bytes": 126,
           "sha256": "497c0a78a778626d498bc42a8f2ae7b200ff97b771ccf9a225ecc09fd99e3705"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S7/cleanup_motor_stop.bin": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S7/cleanup_motor_stop.bin": {
           "bytes": 51,
           "sha256": "18978ef52f8a9d8028a5de51717515cb5c6a4a85c679cbea7e2f03435b322abc"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S7/ledger.jsonl": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/sess_S7/ledger.jsonl": {
           "bytes": 2236,
           "sha256": "565ea0b736a175168da133efc47f190eb23b07c009283628f12feb38634a576e"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/steps_S1.json": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/steps_S1.json": {
           "bytes": 960,
           "sha256": "7c416f1947a6cfc500854a5894abfb5ecd6e670c993d27ea69802c713697a759"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/steps_S2.json": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/steps_S2.json": {
           "bytes": 970,
           "sha256": "7c45854c3bd393b1c85bdfb8ace8377c151717355cff80cfb46cf9950b6b5f08"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/steps_S3.json": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/steps_S3.json": {
           "bytes": 3206,
           "sha256": "7e96bb358e94007ad9b8b9e5c1982f8019566854acff7eb5066e6d33076ec31d"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/steps_S4.json": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/steps_S4.json": {
           "bytes": 3573,
           "sha256": "b48d10c5268db8ce91237f599b9cd895129b0509a4aab8d15e5f67732863c429"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/steps_S5.json": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/steps_S5.json": {
           "bytes": 985,
           "sha256": "aece88da88ce10b4e1d500eaa0dd7fa557d223c03375be16b2b160cbd38ee939"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/steps_S6.json": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/steps_S6.json": {
           "bytes": 1565,
           "sha256": "8c6be4fe4c621da4aac3570c28d6a3a41c41335f0c85378083af061c565b4db7"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/runfield/steps_S7.json": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/runfield/steps_S7.json": {
           "bytes": 3451,
           "sha256": "fb37974bbdf38d978e953a0205f3dbc0797ea90d370a1e34760ded6b1fd04b96"
         },
-        "field/offline/20261031T043158Z-22714/SelfTest/selftest_20261031T043200Z-25560.json": {
+        "../field/offline/20261031T043158Z-22714/SelfTest/selftest_20261031T043200Z-25560.json": {
           "bytes": 4594,
           "sha256": "481e3ced560353412400952828d9c9952fba292f7c46ecff80fd6c18d4bb0ec7"
         }
@@ -605,5 +605,6 @@
     "artifacts": 137,
     "bytes": 168353,
     "self_exclusion": "本清单不散列自身字节(manifest must not hash its own bytes)"
-  }
+  },
+  "path_resolution": "清单内所有条目路径(entries 的键、console_captures_outside_run_dir 的键)一律相对**本清单所在目录** host/ 解析; run_dir 字段仍写评审目录相对形式, 仅供阅读, 不作为散列条目的路径。 本字段是 M8-R2 远端逐 blob 回读第一次真跑时暴露的缺陷修正: 原 entries 键写成评审目录相对, 使同一份回读程序把它解析成 host/field/... 而报 declared_but_absent。 137 条测量值(bytes/sha256)一字未改, 只改键的基准目录。"
 }

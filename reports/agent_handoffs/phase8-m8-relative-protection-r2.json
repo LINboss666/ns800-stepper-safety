@@ -99,7 +99,10 @@
     "R2-D": [
       "host/remote_readback.py 改为清单优先: 先枚举远端 blob 里的每一张清单, 逐条核存在/唯一身份/字节数/散列, 再反向列未登记件",
       "declared_but_absent / duplicate_conflict / read_failed / hash_mismatch / byte_count_mismatch / self_reference 任一命中即非成功",
-      "R1 的 5 件登记但不存在的构建日志原件仍在, 本机 sha256 与 R1 已发布清单逐字相符, 按具体路径 git add -f 补入库(未改 .gitignore, 未重造历史)"
+      "R1 的 5 件登记但不存在的构建日志原件仍在, 本机 sha256 与 R1 已发布清单逐字相符, 按具体路径 git add -f 补入库(未改 .gitignore, 未重造历史)",
+      "第一次真跑暴露程序自身两处缺陷并已修: 只认本轮 build_manifest 的 targets:[{images,map}] 结构(撞 AttributeError, 仓库另有三种历史形态等于被静默跳过); 本轮 field_offline_run_manifest.json 的 entries 键基准写成评审目录相对, 137 条被解析为 host/field/... 报 declared_but_absent",
+      "修法: 递归解析所有 JSON 清单 + 条目路径一律相对清单自身所在目录解析(normpath, 越出仓库即拒绝) + 键名不像路径且无 path/file 的登记为 sha_declared_without_path 逐条披露; 清单加 path_resolution 自描述(143 对 (路径,sha256,bytes) 与改前逐条相等, 只改基准)",
+      "判定分 SCOPE_R2(本轮四张清单必须零问题) 与 SCOPE_PRIOR(往轮清单逐条披露, 不由本轮改写历史); remote_readback.md 记录自身显式排除在 SHA256SUMS 之外(记录不能散列自己正在写的字节)"
     ]
   },
   "host_results": {
@@ -241,5 +244,11 @@
     "image_field_go": "NOT_GRANTED",
     "new_device_permission_created": false,
     "next_required": "独立复审; 若放行现场轮需逐项单独授权(下载/定长回读/显式复位/串口/短转/一次 config_save/一次经批准重启), physical_collision 仍为 0"
+  },
+  "readback_program_defects_found_by_running": {
+    "crash_1": "AttributeError: 'str' object has no attribute 'get' @ build_manifest targets 遍历 (历史 schema: targets 为 dict / 顶层 images / 键名为角色名)",
+    "crash_2": "137 条 declared_but_absent: 本轮离线运行清单的 entries 键基准与清单所在目录不一致",
+    "disclosed_as_fact": true,
+    "history_rewritten": false
   }
 }

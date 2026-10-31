@@ -93,6 +93,22 @@
 复核为 `problems=0`；同一判据顺带复算 R1 的 336 条与 M8 的 23 条。远端逐 blob 回读仍单独跑，本机结论不作为交付判定。
 原始输出归档在 `host/staged_blob_preflight.txt`（该文件自身的条目由推送后的远端回读覆盖）。
 
+回读程序**第一次真跑**就把自身两个缺陷暴露出来（都不是"跳过就算过"，逐条记在这里）：
+
+1. `AttributeError: 'str' object has no attribute 'get'` —— 程序只认本轮/R1 那种 `targets: [ {images,map} ]` 结构，
+   仓库里另有 `targets` 为 dict、`targets` 缺失而顶层有 `images`、以及键名是角色名(`axf`/`bin`/`load`)的三份历史形态。
+   只认一种结构就等于把别的清单**静默跳过**，与 R2-D 要修的"登记但不存在"是同一类缺陷。
+   改为递归解析 + 一条明确规则：条目路径按**清单自身所在目录**解析；键名不像路径(不含斜杠且无文件后缀)
+   且没有 `path`/`file` 字段的，登记为 `sha_declared_without_path` 逐条披露，不猜文件名、也不当成已通过。
+2. 本轮自己的 `host/field_offline_run_manifest.json` 把 `entries` 的键写成**评审目录相对**，而清单住在 `host/`，
+   于是 137 条按规则解析成 `host/field/offline/...` 报 `declared_but_absent`。修正方式是让清单自描述：
+   键改为 `host/` 相对(`../field/offline/...`)并加 `path_resolution` 字段说明基准；
+   143 对 `(解析后路径, sha256, bytes)` 与 HEAD 版本逐条相等(只改基准，测量值一字未改)。
+
+判定范围随之分两层：本轮交付的四张清单(`SCOPE_R2`)必须零问题；往轮清单的问题逐条披露(`SCOPE_PRIOR`)，
+不由本轮改写历史去"修绿"。`remote_readback.md` 自身不进 `SHA256SUMS.txt`(记录不能散列自己正在写的字节)，
+该排除在清单生成规则里显式写明。
+
 ## 5. 构建产物身份（本轮唯一一次 Rebuild All / 目标）
 
 | 目标 | rc | Program Size | 有效宏 |

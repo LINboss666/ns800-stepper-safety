@@ -55,7 +55,7 @@ PowerShell 5.1 三入口各一次真实执行，`SELFTEST_VERDICT|PASS|checks=21
 - `.gitattributes`：按审核裁定保留（KEEP_BYTES）。本轮只追加 R2 路径的窄规则并在文件里写明范围；
   未加全局 `* -text`，未做全仓 renormalize。
 
-## 3. 三条必须说清的取证事实（不掩盖）
+## 3. 四条必须说清的取证事实（不掩盖）
 
 1. **字节身份的前置校验方式**：清单散列是按本机磁盘字节算的，而 `core.autocrlf=true` 会在 `git add` 时把带 CRLF
    的文本剥成 LF。本轮在提交前用 `git cat-file blob :<path>` 逐条比对暂存 blob 与清单，抓到 **6 件**
@@ -69,6 +69,13 @@ PowerShell 5.1 三入口各一次真实执行，`SELFTEST_VERDICT|PASS|checks=21
 3. **本轮的"门内/门外"结论是确定交错模型**，不是实测调度：夹具在"仍持静止门的最后一刻"回调读状态，
    `review_harness.c` 只增加一个"静止门释放之后"的平台会合钩子，产品源码未因它改动。真实目标调度时序仍属
    `FIELD_UNVERIFIED`。
+4. **回读程序是被"真跑"才修好的**：第一次执行暴露两处它自己的缺陷——只认本轮 `build_manifest.json` 的
+   `targets:[{images,map}]` 结构（撞 `AttributeError`，而仓库里另有三种历史形态，等于静默跳过别的清单），
+   以及本轮 `field_offline_run_manifest.json` 的 `entries` 键基准写错（137 条被解析成 `host/field/...` 报
+   `declared_but_absent`）。修法与判据见 `run_record.md` §4：递归解析 + 路径一律相对清单自身目录解析 +
+   解析不出路径的逐条披露为 `sha_declared_without_path`；清单加 `path_resolution` 自描述，143 对
+   `(路径, sha256, bytes)` 与改前逐条相等，只改基准。判定分 `SCOPE_R2`(本轮四张清单，必须零问题)与
+   `SCOPE_PRIOR`(往轮清单，逐条披露、不由本轮改写历史)。
 
 ## 4. 分级
 
