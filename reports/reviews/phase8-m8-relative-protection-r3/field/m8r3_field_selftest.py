@@ -514,12 +514,8 @@ def s23_negative_five_second_cap(m):
 
 def s24_negative_cleanup_gate(m):
     """定向检出 2: finally 只关端口(不 stop/disarm) => s11 必须不再成立。"""
-    mod = _mutant("RV10b",
-                  [('            disarm_state, cerr = cleanup(port, led, clock, budget, transport, fixture,\n'
-                    '                                         hook, quota_box if plan else None,\n'
-                    '                                         cleanup_overruns, used)',
-                    '            # NEGATIVE-INJECTION RV10b: finally 只关端口, 不 stop/disarm\n'
-                    '            disarm_state, cerr = "SKIPPED_BY_MUTANT", []')])
+    mod = _mutant("RV10b", [('        if obligation:',
+                             '        if obligation and False:   # NEGATIVE-INJECTION RV10b: 撤能清理被摘掉')])
     ok, msg = s11_error_after_start_still_disarms(mod)
     return (not ok, "去掉撤能清理后 s11 仍然通过 => 判据不足: " + msg)
 
@@ -767,9 +763,17 @@ def s41_dispatch_healthy_reaches_commit_and_save(m):
     asaved = [x["as"] for x in json.loads((Path(s5["dir"]) / "results.json").read_text(
         encoding="utf-8"))] if (Path(s5["dir"]) / "results.json").exists() else None
     ok_save = s5["success"] and res["quota_used"].get("config_save") == 1
+    flags = res["recorded"].get("flags") or ""
+    ok_flags = (flags == "0005" and
+                int(flags, 16) & m.RPF_BITS["COMMITTED"] and
+                not int(flags, 16) & m.RPF_BITS["FIELD_VERIFIED"] and
+                int(flags, 16) & m.RPF_BITS["FROM_LEARN"])
     return (res["status"] == "OK" and ids == res["expected_stages"] and not res["not_run"] and
-            ok_save and res["recorded"].get("id") == "7" and
-            res["recorded"].get("flags") == "0010" and
+            ok_save and ok_flags and
+            res["recorded"].get("id") == "7" and
+            # 签名不再钉夹具数字: 记录的是本次 show 行的实际值, 且产品自己判定 match=YES
+            (res["recorded"].get("sig") or "").isdigit() and
+            res["recorded"].get("match") == "YES" and
             all(v >= 0 for v in res["quota_left"].values()),
             "status=%s ids=%s recorded=%s quota_used=%s asaved=%s" % (
                 res["status"], ",".join(ids), res["recorded"],
@@ -872,12 +876,15 @@ def s47_plan_placeholder_and_forbidden_rejected(m):
 
 
 def s48_real_transport_without_token_sends_nothing(m):
-    res, _d = dispatch(m, "healthy", transport="real", backend="real")
-    return (res["status"] == "REFUSED" and res["stages"] == [] and
-            len(res["not_run"]) == len(PLAN["stages"]) and
-            res["code"] == "REAL_TRANSPORT_REFUSED",
-            "status=%s code=%s not_run=%d executed=%d" % (
-                res["status"], res.get("code", ""), len(res["not_run"]), len(res["stages"])))
+    a, _da = dispatch(m, m.REAL_PROFILE, transport="real", backend="real")
+    b, _db = dispatch(m, "healthy", transport="real", backend="real")
+    return (a["status"] == "REFUSED" and a["stages"] == [] and
+            len(a["not_run"]) == len(PLAN["stages"]) and
+            a["code"] == "REAL_TRANSPORT_REFUSED" and
+            b["status"] == "REFUSED" and b["code"] == "REAL_PROFILE_NOT_RESPONSE_DRIVEN" and
+            b["actions_attempted"] == [],
+            "token=%s(%d) profile=%s(%d)" % (
+                a.get("code", ""), len(a["stages"]), b.get("code", ""), len(b["stages"])))
 
 
 def s49_real_argv_tokens_refuse_to_run(m):
@@ -954,6 +961,567 @@ def s54_negative_profile_check_removed(m):
                             '    if False:   # NEGATIVE-INJECTION RV14: 静止/运行一致性判据被摘掉')])
     ok, msg = s36_running_and_rest_profiles_both_directions(mod)
     return (not ok, "摘掉一致性判据后 s36 仍然通过 => 判据不足: " + msg)
+
+
+# ==================================================== R3 收尾(§2/§3/§4)的确定反例与健康对照
+# 下面每一条都跑**同一条交付执行器**, 只替换纯内存端口/动作后端/subprocess; 不导入 serial,
+# 不碰设备。审核方给的 remaining_field_probes.py 断言的是修前行为, 这里断言修后行为。
+
+def _halted_port_factory(m, state, clock, boot_after_reset=True):
+    """回读之后核是 Halted 的内存端口: 复位之前**任何**写都得不到应答; 复位之后才把启动流交出来。"""
+    class Port(m.FakePort):
+        def write(self, data):
+            n = m.FakePort.write(self, data)
+            cmd = data.decode("ascii").strip()
+            if not state["running"]:
+                return n                        # 核心没跑: 一个字都不回(不是"观测缺失")
+            per = ROWS["commands"].get(cmd)
+            self.feed(ok_rows(per["healthy"] if per else []))
+            return n
+
+        def read(self, nn):
+            if state["running"] and boot_after_reset and not state.get("booted"):
+                state["booted"] = True
+                self.feed(b"msh >")
+            return m.FakePort.read(self, nn)
+    return Port
+
+
+def s56_halted_readback_reset_before_first_query(m):
+    """审核 §2A: S2 的定长回读用 connect_mode=halt + resume_on_disconnect=false => 会话开头核是
+    Halted。计划必须是 开口 -> 唯一一次已批准复位 -> 消费启动流 -> 首个合法查询。"""
+    stg = copy.deepcopy(next(s for s in PLAN["stages"] if s["id"] == "S3"))
+    rst, query = stg["steps"][0], stg["steps"][1]
+    assert rst.get("action") == "reset" and query.get("cmd") == "system_status", \
+        "计划 S3 的前两步不再满足 复位->查询 的顺序"
+
+    def run(steps, boot=True):
+        state = {"running": False, "resets": 0}
+        clock = m.SimClock()
+
+        class Backend:
+            kind = "memory_reset"
+            attempts = []
+
+            def reset(self, act, ctx):
+                state["running"] = True
+                state["resets"] += 1
+                return {"identity_gate": "MODEL_ONLY"}
+
+        saved = m.make_real_port
+        m.make_real_port = lambda port_name, led: _halted_port_factory(m, state, clock, boot)(
+            [], led, clock=clock)
+        try:
+            r = m.exec_session("s56", steps, out_dir("s56"), "real",
+                               {"post_reset_boot": stg["post_reset_boot"]}, "MEMORY", 40, clock,
+                               backend=Backend(), plan={"quota": {"port_open": 1,
+                                                                  "explicit_reset": 1}})
+        finally:
+            m.make_real_port = saved
+        return r, state
+
+    good, st_good = run([rst, query])
+    reversed_steps, st_rev = run([query, rst])
+    no_boot, st_nb = run([rst, query], boot=False)
+    kinds = [x.get("kind") for x in good["results"]]
+    return (good["status"] == "OK" and st_good["resets"] == 1 and "boot_stream" in kinds and
+            reversed_steps["code"] == "MISSING_RESPONSE_PROMPT" and st_rev["resets"] == 0 and
+            [x["as"] for x in reversed_steps["results"]] == [] and
+            no_boot["code"] == "POST_RESET_BOOT_PROMPT_MISSING" and st_nb["resets"] == 1,
+            "good=%s resets=%d kinds=%s | reversed=%s resets=%d results=%d | no_boot=%s" % (
+                good["status"], st_good["resets"], ",".join(kinds), reversed_steps["code"],
+                st_rev["resets"], len(reversed_steps["results"]), no_boot["code"]))
+
+
+def _real_backend_with_fake_subprocess(m, tag, stdout_map, rc=0):
+    """只替换 subprocess.run 与交付文件, 其余按**原 RealActionBackend** 执行(审核 §2A)。"""
+    d = out_dir(tag)
+    led = m.Ledger(d / "l.jsonl", m.SimClock())
+    calls = []
+
+    class Completed:
+        def __init__(self, out, err):
+            self.returncode, self.stdout, self.stderr = rc, out, err
+
+    def fake_run(argv, **kw):
+        calls.append({"argv": list(argv), "cwd": kw.get("cwd")})
+        key = "readback" if "commander" in argv else ("download" if "flash" in argv else "reset")
+        return Completed(stdout_map.get(key, b""), stdout_map.get(key + "_err", b""))
+
+    return d, led, calls, fake_run
+
+
+def s57_real_backend_zero_device_injection(m):
+    """RealActionBackend 的下载原文门 / 定长比较 / 复位处理, 用**既存 P0 日志**做输入,
+    不执行 pyocd, 不拿 SimActionBackend 的 rc0 冒充这条路已测。"""
+    flash_err = (REPO / "reports/reviews/phase8-motor-m7-p0-board/S1_flash.stderr.txt").read_bytes()
+    rb_out = (REPO / "reports/reviews/phase8-motor-m7-p0-board/S2_readback.stdout.txt").read_bytes()
+    image_rel = PLAN["tools"]["readback"]["image"]["path"]
+    image_bytes = (REPO / image_rel).read_bytes()
+    d, led, calls, fake_run = _real_backend_with_fake_subprocess(
+        m, "s57", {"download_err": flash_err, "readback": rb_out})
+    (d / "readback.bin").write_bytes(image_bytes)
+    subs = {"@UID_FILE": "U" * 48, "@RUN_ROOT": str(d), "@IMAGE_BYTES": "0x%X" % len(image_bytes)}
+    saved = m.subprocess.run
+    m.subprocess.run = fake_run
+    codes, good = [], {}
+    try:
+        be = m.RealActionBackend(led, d, m.SimClock(), 30, subs, repo_root=str(REPO))
+        act_rb = copy.deepcopy(PLAN["tools"]["readback"])
+        act_rb["run_root"] = str(d)
+        good["download"] = be.download(copy.deepcopy(PLAN["tools"]["download"]), {})
+        good["readback"] = be.readback(act_rb, {})
+        good["reset"] = be.reset(copy.deepcopy(PLAN["tools"]["reset"]), {})
+        # 负控: 非零 rc / 成功原文缺一行 / 交付件短一字节 / 交付件改一字节
+        bad = m.RealActionBackend(led, d, m.SimClock(), 30, subs, repo_root=str(REPO))
+        m.subprocess.run = lambda argv, **kw: type("C", (), {"returncode": 1, "stdout": b"",
+                                                             "stderr": b""})()
+        try:
+            bad.download(copy.deepcopy(PLAN["tools"]["download"]), {})
+        except m.Stop as e:
+            codes.append(e.code)
+        m.subprocess.run = fake_run
+        cut = copy.deepcopy(PLAN["tools"]["download"])
+        cut["expect_all"] = list(cut["expect_all"]) + ["NEVER_PRINTED_MARKER"]
+        try:
+            bad.download(cut, {})
+        except m.Stop as e:
+            codes.append(e.code)
+        short = copy.deepcopy(act_rb)
+        (d / "readback.bin").write_bytes(image_bytes[:-1])
+        try:
+            bad.readback(short, {})
+        except m.Stop as e:
+            codes.append(e.code)
+        # 末字节 XOR: 保证一定与镜像不同(直接补 \x00 会撞上"镜像末字节本来就是 0")
+        flipped = image_bytes[:-1] + bytes([image_bytes[-1] ^ 0xFF])
+        (d / "readback.bin").write_bytes(flipped)
+        try:
+            bad.readback(short, {})
+        except m.Stop as e:
+            codes.append(e.code)
+        # 第三个门单独核: 尺寸与声明散列都**自洽**, 但交付件与镜像文件不是同一份字节
+        eq = copy.deepcopy(act_rb)
+        eq["image"] = dict(eq["image"], bytes=len(flipped),
+                           sha256=m.sha_bytes(flipped))
+        try:
+            bad.readback(eq, {})
+        except m.Stop as e:
+            codes.append(e.code)
+        (d / "readback.bin").write_bytes(image_bytes)
+    finally:
+        m.subprocess.run = saved
+        led.close()
+    dl_argv = calls[0]["argv"]
+    axf = [a for a in dl_argv if a.endswith(".axf")]
+    return (all(k in good for k in ("download", "readback", "reset")) and
+            good["download"]["identity_gate"] == "REAL_TOOL_RC0_AND_SUCCESS_TEXT" and
+            good["readback"]["identity_gate"] == "REAL_BYTES_HASH_AND_FILE_EQUAL" and
+            good["readback"]["out_file"]["bytes"] == len(image_bytes) and
+            calls[0]["cwd"] == str(REPO) and len(axf) == 1 and str(axf[0]).startswith(str(REPO)) and
+            codes == ["ACTION_NONZERO_RC", "ACTION_SUCCESS_TEXT_MISSING", "READBACK_BYTE_COUNT",
+                      "READBACK_HASH_MISMATCH", "READBACK_NOT_BYTE_EQUAL_TO_IMAGE"],
+            "gates=%s cwd=%s axf=%s codes=%s" % (
+                [good[k]["identity_gate"] for k in ("download", "readback")],
+                calls[0]["cwd"], axf, ",".join(codes)))
+
+
+def s58_uid_stays_out_of_public_evidence(m):
+    """审核 §2C 最后一条: 展开后的 UID 不许进 ARGV.json, 也不许进台账; 公开件只登记
+    脱敏副本 + **原 argv 的散列** + 长度/sha12 披露。"""
+    flash_err = (REPO / "reports/reviews/phase8-motor-m7-p0-board/S1_flash.stderr.txt").read_bytes()
+    d, led, calls, fake_run = _real_backend_with_fake_subprocess(m, "s58", {"download_err": flash_err})
+    secret = "0684615234575061" + "0" * 32          # 48 字符形状的私有件(本轮虚构值, 不是板子的)
+    saved = m.subprocess.run
+    m.subprocess.run = fake_run
+    try:
+        be = m.RealActionBackend(led, d, m.SimClock(), 30, {"@UID_FILE": secret},
+                                 repo_root=str(REPO))
+        be.download(copy.deepcopy(PLAN["tools"]["download"]), {})
+    finally:
+        m.subprocess.run = saved
+        led.close()
+    argv_txt = (d / "action_download" / "ARGV.json").read_text(encoding="utf-8")
+    led_txt = (d / "l.jsonl").read_text(encoding="utf-8")
+    rec = json.loads(argv_txt)
+    real = calls[0]["argv"]
+    return (secret not in argv_txt and secret not in led_txt and secret in real and
+            rec["uid_disclosure"]["length"] == 48 and
+            rec["uid_disclosure"]["sha256_12"] == __import__("hashlib").sha256(
+                secret.encode()).hexdigest()[:12] and
+            len(rec["argv_sha256_of_private_original"]) == 64 and
+            any("@UID_FILE<redacted" in a for a in rec["argv_masked"]) and
+            all(secret not in a for a in rec["argv_masked"]),
+            "leak_argv=%s leak_ledger=%s masked=%s disclosure=%s" % (
+                secret in argv_txt, secret in led_txt,
+                sum(1 for a in rec["argv_masked"] if "@UID_FILE<redacted" in a),
+                rec["uid_disclosure"]))
+
+
+def s59_stop_read_exception_still_disarms(m):
+    """审核 §2B: stop 的**读异常**不能阻止唯一必要的 disarm; 主错与清理错分列; 外层 finally 仍关端口。"""
+    state = {"last": "", "closed": [None]}
+
+    class Port(m.FakePort):
+        def write(self, data):
+            state["last"] = data.decode("ascii").strip()
+            n = m.FakePort.write(self, data)
+            if state["last"] == "motor_status":
+                self.feed(ok_rows(DISARM_ROWS))
+            elif state["last"] in ("motor_stop", "motor_disarm"):
+                self.feed(ok_rows(STOP_OK if state["last"] == "motor_stop" else DISARM_OK))
+            return n
+
+        def read(self, nn):
+            if state["last"] == "motor_stop":
+                raise OSError("injected stop-response read transport failure")
+            return m.FakePort.read(self, nn)
+
+        def close(self):
+            state["closed"][0] = True
+            m.FakePort.close(self)
+
+    clock = m.SimClock()
+    saved = m.make_real_port
+    m.make_real_port = lambda port_name, led: Port([], led, clock=clock)
+    try:
+        r = m.exec_session("s59", [{"cmd": "motor_start", "as": "start", "seconds": 2,
+                                    "expect_absent": ["REFUSED"]}], out_dir("s59"), "real", {},
+                           "MEMORY", 30, clock, motion_cap_seconds=5,
+                           plan={"quota": dict(BASE_QUOTA)})
+    except Exception as e:                                     # noqa: BLE001
+        r = {"escaped": type(e).__name__}
+    finally:
+        m.make_real_port = saved
+    tx = tx_seq(r)
+    return ("escaped" not in r and "motor_disarm" in tx and "motor_status" in tx and
+            r["obligation"] is True and
+            any(e["kind"] == "PORT_CLOSED" for e in _ledger_events(r["ledger"])) and
+            any("READ_EXCEPTION" in x for x in r["cleanup_errors"]) and
+            r["code"] and r["success"] is False,
+            "tx=%s disarm=%s terminal=%s cleanup_errs=%s code=%s" % (
+                ",".join(tx), r["disarm"], r["terminal"], r["cleanup_errors"], r["code"]))
+
+
+def s60_short_write_is_not_success(m):
+    """审核 §2B 第 2 条: 业务与清理的写都要核实**实际写入字节数**; 短写不是成功,
+    而已建立的起转义务继续成立(照样走撤能)。"""
+    n_written = []
+
+    class Port(m.FakePort):
+        def write(self, data):
+            short = bytes(data[:-1])                 # 少写一个字节(到 \n 之前)
+            n = m.FakePort.write(self, short)
+            n_written.append((data.decode().strip(), n, len(data)))
+            return n - 1 if n > 1 else n
+
+    clock = m.SimClock()
+    saved = m.make_real_port
+    m.make_real_port = lambda port_name, led: Port([], led, clock=clock)
+    try:
+        r = m.exec_session("s60", [{"cmd": "motor_start", "as": "start", "seconds": 2}],
+                           out_dir("s60"), "real", {}, "MEMORY", 30, clock,
+                           motion_cap_seconds=5, plan={"quota": dict(BASE_QUOTA)})
+    finally:
+        m.make_real_port = saved
+    return (r["code"] == "COMMAND_SHORT_WRITE" and r["obligation"] is True and
+            r["disarm"] in ("CONFIRMED_DISABLED", "UNKNOWN") and r["success"] is False,
+            "code=%s obligation=%s disarm=%s writes=%s" % (
+                r["code"], r["obligation"], r["disarm"], n_written[:2]))
+
+
+def s61_open_quota_charged_before_attempt(m):
+    """审核 §2B 第 4 条: 开口额度在**尝试开口之前**消费。零额度 => 一次尝试都没有;
+    开口抛错 => 额度已扣且尝试留痕, 不许漏账。"""
+    attempts = []
+    clock = m.SimClock()
+
+    def boom(port_name, led):
+        attempts.append(port_name)
+        raise OSError(2, "injected open failure")
+
+    saved = m.make_real_port
+    m.make_real_port = boom
+    zero, threw = None, None
+    try:
+        zero = m.exec_session("s61z", [{"cmd": "system_status", "as": "q"}], out_dir("s61z"),
+                              "real", {}, "COM9", 20, clock,
+                              plan={"quota": {"port_open": 0}})
+        zero_attempts = len(attempts)
+        q = dict(BASE_QUOTA)
+        q["port_open"] = 2
+        threw = m.exec_session("s61t", [{"cmd": "system_status", "as": "q"}], out_dir("s61t"),
+                               "real", {}, "COM9", 20, m.SimClock(), plan={"quota": q})
+    finally:
+        m.make_real_port = saved
+    return (zero["code"] == "QUOTA_EXHAUSTED" and zero_attempts == 0 and
+            zero["quota_used"].get("port_open", 0) == 0 and
+            threw["code"] == "PORT_OPEN_FAILED" and len(attempts) == 1 and
+            threw["quota_used"]["port_open"] == 1,
+            "zero=%s used=%s attempts_after_zero=%d threw=%s attempts=%d used_after=%s" % (
+                zero["code"], zero["quota_used"], zero_attempts, threw["code"], len(attempts),
+                threw["quota_used"].get("port_open")))
+
+
+def s62_expected_refusal_never_waives_cleanup_failure(m):
+    """审核 §2B 第 3 条: "这阶段就是演示 arm 拒绝"只豁免**业务结果**; 清理 UNKNOWN/清理错/
+    预留耗尽/证据失败一律仍然非成功。健康支仍然作为预期结果接受。"""
+    broken = copy.deepcopy(ROWS)
+    broken["commands"]["motor_status"]["healthy"] = []      # 清理那一份新响应缺字段
+    only10 = copy.deepcopy(PLAN)
+    only10["stages"] = [s for s in only10["stages"] if s["id"] == "S10"]
+    ok_res, _od = dispatch(m, "trip", plan=only10)
+    bad_res, _bd = dispatch(m, "trip", rows=broken, plan=copy.deepcopy(only10))
+    s10_ok = stage(ok_res, "S10")
+    s10_bad = next((s for s in bad_res["stages"] if s["id"] == "S10"), None)
+    return (s10_ok.get("success") is True and s10_ok.get("expected_refusal") == "REFUSED" and
+            s10_bad is not None and s10_bad["success"] is False and
+            s10_bad["terminal"] == "UNKNOWN" and bool(s10_bad["cleanup_errors"]) and
+            bad_res["status"] != "OK",
+            "healthy_s10=%s/%s broken_s10=%s/%s errs=%d dispatch=%s" % (
+                s10_ok.get("success"), s10_ok.get("expected_refusal"), s10_bad["success"],
+                s10_bad["terminal"], len(s10_bad["cleanup_errors"]), bad_res["status"]))
+
+
+def s63_mode_combinations_refused_before_any_action(m):
+    """审核 §2C: 离线只允许 stub+sim; 真实允许 real+real / real+manual。混合模式在任何
+    UID 读取/工具/端口动作之前具名拒绝, 且**副作用清单为空**。"""
+    out = []
+    for t, b in (("real", "sim"), ("stub", "real"), ("stub", "manual")):
+        res, _d = dispatch(m, "healthy" if t == "stub" else m.REAL_PROFILE,
+                           transport=t, backend=b, token="X", expected="X")
+        out.append((t + "+" + b, res["status"], res.get("code"), res["stages"],
+                    res["actions_attempted"]))
+    allowed = [dispatch(m, "healthy", transport="stub", backend="sim")[0]["status"],
+               dispatch(m, m.REAL_PROFILE, transport="real", backend="manual",
+                        token="X", expected="X")[0].get("code")]
+    bad = [x for x in out if not (x[1] == "REFUSED" and x[2] == "MODE_COMBINATION_REFUSED"
+                                  and x[3] == [] and x[4] == [])]
+    return (not bad and allowed[0] in ("OK", "STOP") and
+            allowed[1] in ("MODE_COMBINATION_REFUSED", "TOOL_ARGV_UNRESOLVED", "UID_FILE_REQUIRED",
+                           None, "MANUAL_GATE_DENIED", "ACTION_DELIVERABLES_MISSING"),
+            "rejected=%s allowed_stub=%s real_manual=%s" % (
+                [x[0] for x in out], allowed[0], allowed[1]))
+
+
+def s64_signature_not_hardcoded_but_drift_still_refused(m):
+    """审核 §2D 第 1 条: sig 是产品函数算的, 不是用户输入值。把**所有**出现一致改掉 => 仍通过;
+    只改重启后那一处(真漂移) => 仍然 RESTORE_MISMATCH。"""
+    consistent = json.loads(json.dumps(ROWS).replace("2138438894", "2138438899"))
+    ok_res, _d = dispatch(m, "healthy", rows=consistent)
+    drift = copy.deepcopy(ROWS)
+    rb = drift["commands"]["diag_profile show@after_reboot"]["healthy"]
+    rb[:] = [x.replace("2138438894", "2999999999") for x in rb]
+    bad_res, _bd = dispatch(m, "healthy", rows=drift)
+    s7 = next((s for s in bad_res["stages"] if s["id"] == "S7"), {"code": "S7_NOT_REACHED"})
+    return (ok_res["status"] == "OK" and ok_res["recorded"].get("sig") == "2138438899" and
+            s7.get("code") == "RESTORE_MISMATCH" and bad_res["status"] != "OK",
+            "consistent=%s sig=%s drift_s7=%s" % (
+                ok_res["status"], ok_res["recorded"].get("sig"), s7.get("code")))
+
+
+def s65_flags_by_bit_reject_illegal_commit(m):
+    """审核 §2D 第 2 条: flags=0010 连 COMMITTED 位都没有, 不再因为"两处都印 0010"被接受。"""
+    bad_rows = json.loads(json.dumps(ROWS).replace("flags=0005", "flags=0010")
+                          .replace("flg=0005", "flg=0010"))
+    res, _d = dispatch(m, "healthy", rows=bad_rows)
+    s5 = next((s for s in res["stages"] if s["id"] == "S5"), {"code": "S5_NOT_REACHED",
+                                                               "detail": ""})
+    led = _ledger_events(str(Path(s5.get("dir", WORK)) / "ledger.jsonl")) if s5.get("dir") else []
+    bits = [e for e in led if e["kind"] == "FLAG_BITS"]
+    good = copy.deepcopy(PLAN)
+    step = next(x for x in next(s for s in good["stages"] if s["id"] == "S5")["steps"]
+                if x.get("as") == "commit")
+    step["expect_flag_bits"] = dict(step["expect_flag_bits"], must_clear=["COMMITTED"])
+    inv, _id = dispatch(m, "healthy", plan=good)
+    return (s5.get("code") == "PROFILE_FLAGS_NOT_QUALIFIED" and res["status"] != "OK" and
+            any("缺位COMMITTED" in json.dumps(b, ensure_ascii=False) for b in bits) and
+            inv["status"] != "OK",
+            "s5=%s bits=%s inverted_expect=%s" % (
+                s5.get("code"), [b.get("value") for b in bits], inv["status"]))
+
+
+def s66_running_needs_numeric_cruise_and_bounded_polling(m):
+    """审核 §2D 第 3 条: 起转后有限轮询证得**数值** state=2; 一直在 ACCEL => 到期撤能;
+    矛盾字段(armed=1 而 state=0/cur=0/request=LOW) => 立刻拒绝, 不许当成"已运行"。"""
+    accel_rows = ROWS["commands"]["motor_status@accel"]["healthy"]
+    contradiction = [r.replace("armed=1", "armed=1").replace("state=2 name=OTHER",
+                                                              "state=0 name=OTHER")
+                     .replace("cur_hz=100 tgt_hz=100", "cur_hz=0 tgt_hz=100")
+                     .replace("drv_request=HIGH pad=1", "drv_request=LOW pad=0")
+                     for r in RUNNING_ROWS]
+
+    def session(rows_seq, cap, poll=True):
+        fx = motion_fx({"motor_start": [], "motor_status": DISARM_ROWS})
+        fx["sequence"] = {"motor_status": rows_seq}     # 只有轮询读走序列, 清理读走撤能块
+        steps = [{"cmd": "motor_start", "as": "start", "seconds": 2, "expect_absent": ["REFUSED"]}]
+        st = {"cmd": "motor_status", "as": "running_proof", "expect_profile": "RUNNING", "seconds": 2}
+        if poll:
+            st["poll"] = {"until_seconds": 3, "interval_seconds": 0.5,
+                          "retry_codes": ["PROFILE_NOT_RUNNING", "FIELD_VALUE_MISMATCH"]}
+        steps.append(st)
+        return m.exec_session("s66", steps, out_dir("s66"), "stub", fx, "NO_DEVICE", 60,
+                              m.SimClock(), motion_cap_seconds=cap,
+                              plan={"quota": dict(BASE_QUOTA)})
+
+    up = session([accel_rows, RUNNING_ROWS], 15)
+    stuck = session([accel_rows, accel_rows, accel_rows, accel_rows, accel_rows], 15)
+    contra = session([contradiction], 15)
+    single = session([accel_rows], 15, poll=False)
+    up_attempts = max(x.get("attempt", 0) for x in up["results"] if x.get("as") == "running_proof")
+    return (up["status"] == "OK" and up_attempts == 2 and
+            stuck["code"] == "POLL_WINDOW_EXPIRED" and stuck["success"] is False and
+            stuck["disarm"] == "CONFIRMED_DISABLED" and
+            contra["code"] == "PROFILE_NOT_RUNNING" and
+            len([x for x in contra["results"] if x.get("as") == "running_proof"]) == 1 and
+            single["code"] == "PROFILE_NOT_RUNNING",
+            "up=%s attempts=%d stuck=%s disarm=%s contra=%s single=%s" % (
+                up["status"], up_attempts, stuck["code"], stuck["disarm"], contra["code"],
+                single["code"]))
+
+
+def s67_busy_msh_twelve_second_boundary(m):
+    """审核 §3: 用真实 C 的 12000 ms 结果驱动已有 FakePort 的忙 msh 模型 —— 不是注入
+    "立刻送达的一行 12s timeout 文本"。学习支(15 s 上限)能等到; 保护支(5 s 上限)等不到,
+    忙期里 stop/disarm 只能排队, 物理停不下来就记 UNKNOWN。"""
+    learn_rows = ROWS["commands"]["diag_profile learn 8 80 120 0"]["healthy"]
+
+    def run(cap, window):
+        fx = motion_fx({"motor_start": [], "diag_profile learn 8 80 120 0": learn_rows})
+        fx["block"] = {"diag_profile learn 8 80 120 0": 12.0}
+        steps = [{"cmd": "motor_start", "as": "start", "seconds": 2, "expect_absent": ["REFUSED"]},
+                 {"cmd": "diag_profile learn 8 80 120 0", "as": "learn", "seconds": window,
+                  "expect_contains": ["[DIAG] learn OK"]}]
+        return m.exec_session("s67", steps, out_dir("s67"), "stub", fx, "NO_DEVICE", 60,
+                              m.SimClock(), motion_cap_seconds=cap, plan={"quota": dict(BASE_QUOTA)})
+
+    learns = run(15, 14)
+    tight = run(5, 3)
+    busy_ev = [e for e in _ledger_events(learns["ledger"]) if e["kind"] == "PORT_BUSY_UNTIL"]
+    tx_busy = [e for e in _ledger_events(tight["ledger"]) if e["kind"] == "TX"]
+    stop_t = next((e["t_s"] for e in tx_busy if e["bytes"] == "motor_stop\r\n"), None)
+    until = busy_ev[0]["until"] if busy_ev else None
+    return (learns["status"] == "OK" and until is not None and
+            float(learns["budget_seconds"]) >= until and
+            busy_ev[0]["block_seconds"] == 12.0 and
+            tight["code"] == "MISSING_RESPONSE_PROMPT" and tight["disarm"] == "UNKNOWN" and
+            tight["terminal"] == "UNKNOWN" and tight["success"] is False and
+            stop_t is not None and stop_t < until,
+            "learns=%s elapsed=%s busy_until=%s | tight=%s disarm=%s stop@%s" % (
+                learns["status"], learns["budget_seconds"], until, tight["code"],
+                tight["disarm"], stop_t))
+
+
+def s68_response_driven_branch_and_undetermined_stop(m):
+    """审核 §2C: 真实入口不能预选夹具档案。分支由本次响应决定; 还没决定就遇到依赖分支的阶段
+    => 具名停止, 绝不默默跳过事故取证。"""
+    b_none = m.response_branch({"status": "OBSERVATION_NO_TRIGGER", "results": []},
+                               {"decides_response_branch": True})
+    b_trip = m.response_branch({"status": "OK", "results": [
+        {"kind": "watch", "trigger_seen": ["[DIAG] REL TRIP r="]}]}, {"decides_response_branch": True})
+    b_ignore = m.response_branch({"status": "OBSERVATION_NO_TRIGGER", "results": []}, {})
+    late = copy.deepcopy(PLAN)
+    late["stages"] = [s for s in late["stages"] if s["id"] in ("S0", "S8", "S9")]
+    order = late["stages"]
+    order[1], order[2] = order[2], order[1]           # 把 trip-only 阶段搬到分支决定点之前
+    calls = []
+
+    def no_tools(self, name, act, argv):
+        calls.append(name)
+        raise AssertionError("tool attempted")
+
+    saved_tool, saved_port = m.RealActionBackend._run, m.make_real_port
+    m.RealActionBackend._run = no_tools
+    m.make_real_port = lambda port_name, led: m.FakePort([], led, clock=m.SimClock())
+    try:
+        res = m.dispatch_plan(late, "real", "real", out_dir("s68-real"), m.SimClock(),
+                              m.REAL_PROFILE, "MEMORY", str(REPO), "APPR", "APPR", "",
+                              plan_dir=str(HERE))
+    finally:
+        m.RealActionBackend._run, m.make_real_port = saved_tool, saved_port
+    codes = [s.get("code") for s in res["stages"]]
+    return (b_none == "no_trigger" and b_trip == "trip" and b_ignore is None and
+            "RESPONSE_BRANCH_UNDETERMINED" in codes and res["status"] != "OK" and
+            calls == [] and res["actions_attempted"] == [],
+            "none=%s trip=%s ignore=%s codes=%s tool_calls=%d attempted=%s" % (
+                b_none, b_trip, b_ignore, ",".join([c or "" for c in codes]), len(calls),
+                res["actions_attempted"]))
+
+
+def s69_new_session_without_frames_is_not_forensics(m):
+    """审核 §2D 第 4 条: 计数增大只是身份前置。帧读不回来(或不是本次新增 session 的帧)
+    => 取证未完成, 不许称新日志读回通过。"""
+    head_idx = {n: i for i, n in enumerate(m.FLASH_DUMP_HEADER.split(","))}
+
+    def edit(g, keep=lambda p: True, set_session=None, append=()):
+        rows_ = [g[0]]
+        for line in g[1:]:
+            p = line.split(",")
+            if len(p) != m.FLASH_DUMP_COLUMNS or not all(x.isdigit() for x in p):
+                continue
+            if not keep(p):
+                continue
+            if set_session is not None:
+                p[head_idx["session"]] = str(set_session)
+            rows_.append(",".join(p))
+        return rows_ + list(append)
+
+    def mutate(fn):
+        rows = copy.deepcopy(ROWS)
+        fn(rows["commands"]["flash_dump 0 8"])
+        return rows
+
+    no_frames = dispatch(m, "trip", rows=mutate(
+        lambda g: g.__setitem__("trip", edit(g["trip"], keep=lambda p: False))))[0]
+    wrong_session = dispatch(m, "trip", rows=mutate(
+        lambda g: g.__setitem__("trip", edit(g["trip"], set_session=7))))[0]
+    no_post = dispatch(m, "trip", rows=mutate(
+        lambda g: g.__setitem__("trip", edit(g["trip"], keep=lambda p: p[head_idx["event"]] != "9"))))[0]
+    errored = dispatch(m, "trip", rows=mutate(
+        lambda g: g.__setitem__("trip", edit(g["trip"]) + ["slot 9 error -5"])))[0]
+    ok_res, _d = dispatch(m, "trip")
+    out = {}
+    for tag, res in (("no_frames", no_frames), ("wrong_session", wrong_session),
+                     ("no_post_stop", no_post), ("slot_error", errored), ("control", ok_res)):
+        s9 = next((s for s in res["stages"] if s["id"] == "S9"), {"status": "ABSENT"})
+        out[tag] = (s9.get("code"), s9.get("success"), s9.get("status"))
+    return (all(out[t][0] == "FLASH_FRAMES_NOT_RECOVERED" and out[t][1] is not True
+                for t in ("no_frames", "wrong_session", "no_post_stop", "slot_error")) and
+            out["control"][2] == "OK" and out["control"][1] is True,
+            " | ".join("%s=%s" % (t, out[t]) for t in
+                       ("control", "no_frames", "wrong_session", "no_post_stop", "slot_error")))
+
+
+def s70_negative_flag_gate_removed(m):
+    """定向检出 8: 摘掉按位资格判定 => s65 的非法 flags 必须被接受(判据消失)。"""
+    mod = _mutant("RV15", [('        if bad_bits:',
+                            '        if False:   # NEGATIVE-INJECTION RV15: 按位资格判定被摘掉')])
+    ok, msg = s65_flags_by_bit_reject_illegal_commit(mod)
+    return (not ok, "摘掉按位判定后 s65 仍然拒绝非法 flags => 判据不足: " + str(msg)[:120])
+
+
+def s71_negative_busy_model_removed(m):
+    """定向检出 9: 忙期模型被摘(feed 无视 block) => s67 必须不再成立(12 秒边界消失了)。"""
+    mod = _mutant("RV16", [("        if block_seconds and self._clock is not None:",
+                            "        if False:   # NEGATIVE-INJECTION RV16: 忙 msh 模型被摘掉")] )
+    ok, msg = s67_busy_msh_twelve_second_boundary(mod)
+    return (not ok, "摘掉忙期模型后 s67 仍然通过 => 判据不足: " + str(msg)[:120])
+
+
+def s72_negative_poll_removed(m):
+    """定向检出 10: 轮询退回单发 => s66 的 ACCEL->CRUISE 正控必须失败(一条立即查询不算巡航)。"""
+    mod = _mutant("RV17", [('            if st.get("poll"):',
+                            '            if False:   # NEGATIVE-INJECTION RV17: 有限轮询被摘掉')] )
+    ok, msg = s66_running_needs_numeric_cruise_and_bounded_polling(mod)
+    return (not ok, "摘掉轮询后 s66 仍然通过 => 判据不足: " + str(msg)[:120])
+
+
+def s73_negative_boot_drain_removed(m):
+    """定向检出 11: 复位后的启动流消费被摘掉 => s56 必须不再成立(查询会咬进启动字节)。"""
+    mod = _mutant("RV18", [("                if st[\"action\"] == \"reset\":",
+                            "                if False:   # NEGATIVE-INJECTION RV18: 不消费启动流")] )
+    ok, msg = s56_halted_readback_reset_before_first_query(mod)
+    return (not ok, "摘掉启动流消费后 s56 仍然通过 => 判据不足: " + str(msg)[:120])
 
 
 def _ledger_events(path):
@@ -1043,6 +1611,24 @@ CASES = [
     ("FS53", "反向-禁能退回只认IDLE", s52_negative_idle_only_disable),
     ("FS54", "反向-义务推到写成功之后", s53_negative_obligation_after_write),
     ("FS55", "反向-摘掉静止运行一致性判据", s54_negative_profile_check_removed),
+    ("FS56", "回读后Halted先复位再查询", s56_halted_readback_reset_before_first_query),
+    ("FS57", "Real后端零设备注入(P0原文)", s57_real_backend_zero_device_injection),
+    ("FS58", "UID不入公开件双身份登记", s58_uid_stays_out_of_public_evidence),
+    ("FS59", "stop读异常仍撤能并关端口", s59_stop_read_exception_still_disarms),
+    ("FS60", "短写不算成功且义务仍成立", s60_short_write_is_not_success),
+    ("FS61", "开口额度先于尝试且失败留痕", s61_open_quota_charged_before_attempt),
+    ("FS62", "预期拒绝不豁免清理失败", s62_expected_refusal_never_waives_cleanup_failure),
+    ("FS63", "模式混搭在动作前具名拒绝", s63_mode_combinations_refused_before_any_action),
+    ("FS64", "签名不钉数字漂移仍拒", s64_signature_not_hardcoded_but_drift_still_refused),
+    ("FS65", "非法flags按位被拒绝", s65_flags_by_bit_reject_illegal_commit),
+    ("FS66", "轮询证得CRUISE与矛盾拒绝", s66_running_needs_numeric_cruise_and_bounded_polling),
+    ("FS67", "忙msh的12秒真实边界", s67_busy_msh_twelve_second_boundary),
+    ("FS68", "真实分支由响应决定", s68_response_driven_branch_and_undetermined_stop),
+    ("FS69", "无实际帧即取证未完成", s69_new_session_without_frames_is_not_forensics),
+    ("FS70", "反向-摘掉按位资格判定", s70_negative_flag_gate_removed),
+    ("FS71", "反向-摘掉忙msh模型", s71_negative_busy_model_removed),
+    ("FS72", "反向-轮询退回单发查询", s72_negative_poll_removed),
+    ("FS73", "反向-复位后不消费启动流", s73_negative_boot_drain_removed),
 ]
 
 

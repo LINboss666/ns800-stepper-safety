@@ -51,7 +51,7 @@
     "explicit_reset": 1,
     "approved_reboot": 1,
     "motor_run": 2,
-    "motor_run_seconds_total": 10,
+    "motor_run_seconds_total": 20,
     "motion_cap_seconds_per_run": 5,
     "config_save": 1,
     "tmc_config_apply": 2,
@@ -378,7 +378,7 @@
     },
     {
       "id": "S3",
-      "title": "会话1: 开口(扣额度) -> 一次显式 DAP 复位 -> 首读 -> 前置重新证明(apply CONFIRM + 极性/IRQ) -> 静止期零点",
+      "title": "会话1: 开口(扣额度) -> 唯一一次已批准复位 -> 消费启动流 -> 首读 -> 前置重新证明(apply CONFIRM + 极性/IRQ) -> 静止期零点",
       "kind": "serial_session",
       "requires": [
         "S2_byte_equal"
@@ -399,27 +399,9 @@
         "motor_arm"
       ],
       "boot_bytes": [],
-      "boot_bytes_note": "本轮离线不伪造启动横幅(启动事实由 S1/S2 的镜像身份与 S3 首读的系统状态共同承担); 真实现场的启动流由 PS 侧控制台采集另存。",
+      "boot_bytes_note": "开口时的 boot_bytes 仍为空(本轮离线不伪造上电横幅); 复位之后的启动流由 post_reset_boot + drain_post_reset_boot 消费, 原字节进 NN_rst.boot.rx.bin。",
       "manual_answers": {},
       "steps": [
-        {
-          "cmd": "system_status",
-          "as": "sysboot",
-          "seconds": 6,
-          "expect_contains": [
-            "=== SYSTEM STATUS ===",
-            "[Boot]   bootstrap-complete=YES"
-          ],
-          "expect_values": [
-            {
-              "row": "^\\[Boot\\]   bootstrap-complete=(?P<bc>\\w+) abort-stage=(?P<ab>\\d+)$",
-              "must": {
-                "bc": "YES",
-                "ab": "0"
-              }
-            }
-          ]
-        },
         {
           "action": "reset",
           "as": "rst",
@@ -442,6 +424,26 @@
             "cortex_m",
             "-u",
             "@UID_FILE"
+          ],
+          "boot_drain_seconds": 20,
+          "boot_drain_note": "复位之后、第一条查询之前, 执行器把板子自己发出的启动流按**原字节**收进 NN_rst.boot.rx.bin 并等到提示符边界(复用 P0 的完整响应门)。窗口内没有提示符 => POST_RESET_BOOT_PROMPT_MISSING, 一条查询都不发。20 s 的依据: 既存板级原始件 reports/reviews/phase8-motor-m5-fault-log/cp1/final_pass/002_version.bin 里 复位/上电后的启动横幅与 'msh >' 在同一次连接内就出现了(该件 154 B)。"
+        },
+        {
+          "cmd": "system_status",
+          "as": "sysboot",
+          "seconds": 6,
+          "expect_contains": [
+            "=== SYSTEM STATUS ===",
+            "[Boot]   bootstrap-complete=YES"
+          ],
+          "expect_values": [
+            {
+              "row": "^\\[Boot\\]   bootstrap-complete=(?P<bc>\\w+) abort-stage=(?P<ab>\\d+)$",
+              "must": {
+                "bc": "YES",
+                "ab": "0"
+              }
+            }
           ]
         },
         {
@@ -580,7 +582,17 @@
             }
           ]
         }
-      ]
+      ],
+      "post_reset_boot": [
+        "msh >"
+      ],
+      "post_reset_boot_provenance": {
+        "kind": "source_shape",
+        "basis": "reports/reviews/phase8-motor-m5-fault-log/cp1/final_pass/002_version.bin",
+        "what_is_real": "既存板级原始字节里, 复位/上电后的控制台确实以 'msh >' 结束启动流(同件内 RT-Thread 5.3.0 横幅 + 两次 'msh >')。",
+        "what_is_not_claimed": "这里**不**预写横幅的具体字节: 本轮离线不伪造启动内容, 真实执行时启动流按现场实收原样落盘, 计划只申报'必须等到提示符'这一条边界。"
+      },
+      "order_note": "S2 的定长回读用 connect_mode=halt + resume_on_disconnect=false, 结束时核留在 Halted: 核心不跑, 第一条串口查询就没有任何应答(审核 §2A 的纯内存模拟: 原顺序 STOP/MISSING_RESPONSE_PROMPT/resets=0, 只对调两步即 OK/resets=1)。所以复位必须在最前, 并且**不自发提示符/绝对静默**都不被当作前置——它们是失败证据, 不是继续的理由。本轮不新增下载, 也不追加复位额度: 仍是那唯一一次 explicit_reset。"
     },
     {
       "id": "S4",
@@ -682,13 +694,28 @@
               }
             }
           ],
-          "expect_values_note": "目标频率与方向必须等于本轮下发的 100 Hz/dir=0; 只核行数不算(旧 expect_fields 的形状判据armed=1 也能满足)。"
+          "expect_values_note": "目标频率与方向必须等于本轮下发的 100 Hz/dir=0; 只核行数不算(旧 expect_fields 的形状判据armed=1 也能满足)。",
+          "poll": {
+            "until_seconds": 8,
+            "interval_seconds": 0.5,
+            "retry_codes": [
+              "PROFILE_NOT_RUNNING",
+              "FIELD_VALUE_MISMATCH"
+            ],
+            "why": "起转后**有限轮询**直到证得 state=MOTOR_CRUISE(2) 且 cur/tgt 都落在本次窗口; ACCEL 不是异常, 可以在同一预算内继续等, 到期或不一致就撤能(审核 §2D 第 3 条)。一条立即查询、或只看 tgt>0, 都不算稳定巡航。",
+            "retry_basis": "重试的**充分条件**是数值状态还在 ACCEL/DECEL(ramping_state 从这一次的原字节里重读), 并且失败码在申报集合内; armed=1 而 state=0 这种矛盾字段不满足条件, 会立刻具名拒绝。"
+          },
+          "poll_sequence": [
+            "motor_status@accel",
+            "motor_status@running"
+          ],
+          "poll_sequence_note": "第 1 次读到 MOTOR_ACCEL(爬坡中, 不是异常), 之后读到 MOTOR_CRUISE(2)。序列来自行表里申报过的两组, 执行器不许临时编响应。"
         },
         {
           "cmd": "diag_profile learn 8 80 120 0",
           "as": "learn",
           "key": "diag_profile learn 8 80 120 0",
-          "seconds": 3,
+          "seconds": 14,
           "quota": {
             "name": "diag_profile_learn",
             "n": 1
@@ -707,7 +734,9 @@
           ],
           "unit": "LO/HI 是 STEP 频率 Hz 区间(hz_low/hz_high), 不是 SG 码; hz_nominal 取窗中值=100",
           "basis": "M4 R1-R4 已在板上以 100 Hz 各 5 s 运行通过; N=8 是产品允许的最小值 => SG(10 Hz)下约 800 ms, 在 5 s 硬截止内并仍留清理机会(见 motion_window_budget_proof)",
-          "dir_label": "single_direction_0"
+          "dir_label": "single_direction_0",
+          "blocking_note": "产品自己的同步等待: diag_relative.c:1318 #define REL_CMD_DEADLINE_MS 12000u, 本次编译实际执行的 learn_block_probe 观察为**命令到 12000 ms 才返回**, 期间单线程 msh 不能处理别的命令。rows.json 给这一组申报 _block_seconds=12.0, 假端口据此让响应排在忙期之后 —— 不再用\"立刻送达的一行 12s timeout 文本\"代替(审核 §3)。",
+          "seconds_note": "学习响应等待要**覆盖产品自己的 12 秒同步等待**再加本次传输余量(审核 §3): 14 s 的请求窗仍受本阶段 15 s 单调硬截止约束 —— business_deadline 取 min(now+14+slack, motor_start 起算的 15 s), 所以到期仍是截止点而不是 14 s。"
         },
         {
           "cmd": "__watch__",
@@ -720,7 +749,9 @@
           ],
           "note": "观察窗跑到剩余预算的截止点(不因先看见一个提示符提前收); 无触发 => OBSERVATION_NO_TRIGGER 并进入同一清理路径, **不**跳过 S5 的提交与保存(那一步在静止会话里, 不共用本次运动)。"
         }
-      ]
+      ],
+      "motion_cap_seconds": 15,
+      "motion_cap_note": "本阶段起转硬截止 = 15 s(学习 15 / 保护观察 5 的分工, 见 quota_note_r3_closeout)。"
     },
     {
       "id": "S5",
@@ -814,7 +845,19 @@
           "expect_contains": [
             "[DIAG] commit OK",
             "FIELD_UNVERIFIED"
-          ]
+          ],
+          "expect_flag_bits": {
+            "row": "^\\[DIAG\\] commit OK id=(?P<id>\\d+) rev=(?P<rev>\\d+) flags=(?P<flags>[0-9A-Fa-f]{4})",
+            "group": "flags",
+            "must_set": [
+              "COMMITTED",
+              "FROM_LEARN"
+            ],
+            "must_clear": [
+              "FIELD_VERIFIED"
+            ],
+            "basis": "diag_relative.h:39-41 的 RPF_COMMITTED(1u<<0)/RPF_FIELD_VERIFIED(1u<<1)/RPF_FROM_LEARN(1u<<2); 本轮是离线学习提交, 现场从未验证过, 所以 FIELD_VERIFIED 必须为 0。旧夹具的 0010 连 COMMITTED 位都没置, 却因为\"两处都印 0010\"被当成一致 —— 按字符串比相等不算资格判定(审核 §2D 第 2 条)。"
+          }
         },
         {
           "cmd": "diag_profile show",
@@ -823,8 +866,30 @@
           "seconds": 3,
           "expect_contains": [
             "[DIAG] profile id=",
-            "[DIAG] live sig=44100 match=YES"
-          ]
+            "[DIAG] live sig=",
+            "match=YES"
+          ],
+          "expect_values": [
+            {
+              "row": "^\\[DIAG\\] live sig=(?P<sig>\\d+) match=(?P<match>\\w+)",
+              "must": {
+                "match": "YES"
+              },
+              "why": "sig 的**数字**由产品函数按平台输入算出, 不是用户输入值, 因此这里只钉形状与产品自己给出的一致性结论(match=YES); 具体值由 record_from 记进整包账, S7 重启后再逐项比较(审核 §2D 第 1 条)。"
+            }
+          ],
+          "expect_flag_bits": {
+            "row": "^\\[DIAG\\] profile id=(?P<id>\\d+) rev=(?P<rev>\\d+) abi=(?P<abi>\\d+) flg=(?P<flags>[0-9A-Fa-f]{4})\\s+(?P<state>\\w+)",
+            "group": "flags",
+            "must_set": [
+              "COMMITTED",
+              "FROM_LEARN"
+            ],
+            "must_clear": [
+              "FIELD_VERIFIED"
+            ],
+            "basis": "同一位定义用于 show 的 flg 字段; 与 commit 行的 flags 由 compare_recorded 再逐值比一次。"
+          }
         },
         {
           "cmd": "config_save",
@@ -1010,7 +1075,17 @@
           "seconds": 3,
           "expect_contains": [
             "[DIAG] profile id=",
-            "[DIAG] live sig=44100 match=YES"
+            "[DIAG] live sig=",
+            "match=YES"
+          ],
+          "expect_values": [
+            {
+              "row": "^\\[DIAG\\] live sig=(?P<sig>\\d+) match=(?P<match>\\w+)",
+              "must": {
+                "match": "YES"
+              },
+              "why": "sig 的**数字**由产品函数按平台输入算出, 不是用户输入值, 因此这里只钉形状与产品自己给出的一致性结论(match=YES); 具体值由 record_from 记进整包账, S7 重启后再逐项比较(审核 §2D 第 1 条)。"
+            }
           ]
         },
         {
@@ -1137,7 +1212,22 @@
                 "dir": "0"
               }
             }
-          ]
+          ],
+          "poll": {
+            "until_seconds": 4,
+            "interval_seconds": 0.5,
+            "retry_codes": [
+              "PROFILE_NOT_RUNNING",
+              "FIELD_VALUE_MISMATCH"
+            ],
+            "why": "起转后**有限轮询**直到证得 state=MOTOR_CRUISE(2) 且 cur/tgt 都落在本次窗口; ACCEL 不是异常, 可以在同一预算内继续等, 到期或不一致就撤能(审核 §2D 第 3 条)。一条立即查询、或只看 tgt>0, 都不算稳定巡航。",
+            "retry_basis": "重试的**充分条件**是数值状态还在 ACCEL/DECEL(ramping_state 从这一次的原字节里重读), 并且失败码在申报集合内; armed=1 而 state=0 这种矛盾字段不满足条件, 会立刻具名拒绝。"
+          },
+          "poll_sequence": [
+            "motor_status@accel",
+            "motor_status@running"
+          ],
+          "poll_sequence_note": "第 1 次读到 MOTOR_ACCEL(爬坡中, 不是异常), 之后读到 MOTOR_CRUISE(2)。序列来自行表里申报过的两组, 执行器不许临时编响应。"
         },
         {
           "cmd": "__watch__",
@@ -1155,11 +1245,15 @@
         "healthy_and_no_trigger": "观察窗到时无触发 => OBSERVATION_NO_TRIGGER(成功终态) + stop/disarm/证禁能; 不跑任何假故障恢复步骤(S9/S10 用 profiles=[trip] 整体不参与)。",
         "trip": "看见 [DIAG] REL TRIP => 本会话按预算结束后清理并证禁能; 事故取证在 S9、锁存态 arm 拒绝在 S10。两支持平结论都只到'离线控制流成立', 不写设备 PASS。"
       },
-      "record_note": "S8 只**记录**事故前的黑匣子基线(bb_before 的 session/written); 增大与否的比较在 S9(bb_after)做 —— 取证会话与运动会话分开, 才不会被 MOTION_BUDGET_EXHAUSTED 挡掉。"
+      "record_note": "S8 只**记录**事故前的黑匣子基线(bb_before 的 session/written); 增大与否的比较在 S9(bb_after)做 —— 取证会话与运动会话分开, 才不会被 MOTION_BUDGET_EXHAUSTED 挡掉。",
+      "motion_cap_seconds": 5,
+      "motion_cap_note": "本阶段起转硬截止 = 5 s(学习 15 / 保护观察 5 的分工, 见 quota_note_r3_closeout)。",
+      "decides_response_branch": true,
+      "decides_response_branch_note": "真实执行(transport=real)下事故支线由**本阶段的实际响应**决定: 看见申报过的 trigger_needles => trip, 把 S9/S10/S11 排进期望序列; 到时未触发 => no_trigger, 事故支线不参与(既不算已执行也不算 NOT_RUN)。学习会话(S4)的未触发不参与判定 —— 它不是保护观察。"
     },
     {
       "id": "S9",
-      "title": "事故取证会话(仅 trip): 锁存视图 + 按实际新增 session 的黑匣子 + 新日志计数 + 锁存态仍可证得禁能",
+      "title": "事故取证会话(仅 trip): 锁存视图 + 按实际新增 session 的黑匣子计数增大 + flash_dump 读回新 session 的实际帧 + 锁存态仍可证得禁能",
       "kind": "serial_session",
       "profiles": [
         "trip"
@@ -1228,6 +1322,30 @@
           "seconds": 3,
           "expect_profile": "AT_REST",
           "note": "故障锁存后的禁能同样必须证得(name=FAULT 允许, 见 cleaning_and_terminal.why_not_idle); 这一步只用同一份响应的六个合同字段判。"
+        },
+        {
+          "cmd": "flash_dump 0 8",
+          "as": "frames",
+          "key": "flash_dump 0 8",
+          "seconds": 8,
+          "expect_contains": [
+            "slot,seq,session,time_ms,event,valid,sg,current_ma,ax_mg,ay_mg,az_mg,step_hz,vibration_mg,flags"
+          ],
+          "note": "复用 M5/M6 既有的 flash_dump 原字节归档与同一张 14 列表头(ns_flash_shell.c:153/159-163), 只取**有代表性的前 8 槽**, 不再完整演示 300 帧软件触发, 也不新写日志判定工具。"
+        }
+      ],
+      "require_frames": [
+        {
+          "step": "frames",
+          "session_key": "bb_session",
+          "min_frames": 1,
+          "must_include": [
+            {
+              "event": "9",
+              "step_hz": "0"
+            }
+          ],
+          "why": "计数增大只是\"本轮确实多写了一笔\"的身份前置(S8 基线 -> S9 严格增大)。取证成立的条件是从**本次新增且提交完整的 session** 读回到实际帧, 并且含停后帧(event=9 且 step_hz=0); 批内出现 slot empty/error 或 [FLASH] flash_dump ERROR 就是产品读槽时 CRC/commit 没过 => FLASH_FRAMES_NOT_RECOVERED, 一律报\"取证未完成\", 不许称新日志读回通过(审核 §2D 第 4 条)。"
         }
       ]
     },
@@ -1361,5 +1479,6 @@
     "profile_scope": "--profile 只有三个值 healthy|trip|no_trigger, 作用范围**仅限**被动观察窗 __watch__ 的行; 事故链与锁存态用独立阶段(S9/S10/S11)+ 专用行键, 并用 stages[].profiles=[trip] 决定是否参与本轮。"
   },
   "hardware_actions_this_round": [],
-  "offline_only_statement": "本轮离线: 只有 transport=stub / backend=sim 的分支被真正执行过; real/manual 分支的 argv、成功原文判据、交付物门与 UID 处理都已就位并经过静态/离线核对, 但**从未运行** => 不记任何设备 PASS。自检通过只说明离线控制流。"
+  "offline_only_statement": "本轮离线: 只有 transport=stub / backend=sim 的分支被真正执行过; real/manual 分支的 argv、成功原文判据、交付物门与 UID 处理都已就位并经过静态/离线核对, 但**从未运行** => 不记任何设备 PASS。自检通过只说明离线控制流。",
+  "quota_note_r3_closeout": "R3 收尾 §3 的新离线合同: 学习起转单次上限提案 15 s(N=8、IRUN20/100Hz/方向 0 不变), RELATIVE 保护演示起转仍 5 s, 整包最多两次 start => 时间总额 15+5=20 s。上限**按阶段**传入执行器(S4=15 / S8=5), 并由 --validate-plan 的 PLAN_MOTION_CAP_BUDGET 逐项审计。15 s 不是当前硬件授权, 也不是把旧的 5 秒测试记成通过; 将来一次具体的板级批准必须写明\"学习<=15s、保护观察<=5s\"。"
 }

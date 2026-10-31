@@ -58,6 +58,7 @@ $script:Failures = New-Object System.Collections.ArrayList
 $script:Py = $null
 $script:Root = $null
 $script:OutDir = $null
+$script:Attempts = @()
 $script:RunId = (Get-Date).ToUniversalTime().ToString('yyyyMMddTHHmmssZ') + '-' + $PID
 $script:Chain = Join-Path $script:Self 'm8r3_serial_chain.py'
 $script:SelftestCase = Join-Path $script:Self 'm8r3_field_selftest.py'
@@ -168,6 +169,7 @@ function Get-DispatchVerdict($res) {
             CleanupOverruns = @(); EvidenceFailures = @(); QuotaAuditFailures = @()
             NotRunLines = @($stages | Where-Object { $_ -match '\|status=NOT_RUN' })
             QuotaLeft = ''; QuotaUsed = ''; Profile = ''; Recorded = ''; Ledger = ''
+            Branch = 'NONE'; ActionsAttempted = ''; Code = ($sum -replace '^.*\|code=','' -replace '\|.*$','')
             RefusedText = $refused }
     }
     $kv = Split-Summary $sum
@@ -181,6 +183,8 @@ function Get-DispatchVerdict($res) {
         QuotaAuditFailures = @($res.Lines | Where-Object { $_ -match '^QUOTA_AUDIT_FAIL' })
         NotRunLines = @($stages | Where-Object { $_ -match '\|status=NOT_RUN' })
         QuotaLeft = $kv['quota_left']; QuotaUsed = $kv['quota_used']; Profile = $kv['profile']
+        Branch = $kv['branch']; ActionsAttempted = ($kv['actions_attempted'] -replace '[\[\]"]', '')
+        Code = $kv['code']
         Recorded = ($res.Lines | Where-Object { $_ -match '"recorded":' } | Select-Object -Last 1)
         Ledger = $kv['ledger']; RefusedText = '' }
 }
@@ -209,6 +213,8 @@ function Invoke-Dispatch([string]$profile, [string]$transport, [string]$backend,
     if ($uid) { $argl += @('--uid-file', $uid) }
     $res = Invoke-Py $argl
     $v = Get-DispatchVerdict $res
+    # 副作用总账由执行器自己的 actions_attempted 累计, 不在 PS 里凭"这是离线"写空清单
+    $script:Attempts += @($v.ActionsAttempted -split ',' | Where-Object { $_ })
     Write-EvidenceNew ("console_" + $tag + "_" + $profile + ".txt") (
         @($res.Lines) + @('STDERR>') + @($res.Err)) | Out-Null
     return $v
@@ -323,6 +329,20 @@ if ($Precheck) {
 # --------------------------------------------------------------------------- 入口: -RunField
 if ($RunField) {
     $root = Get-RepoRootOrThrow
+    # 分流门在 PS 侧先判一遍(执行器里同一件事还有一道): 真实入口 = 一次 dispatch + 一本总账 +
+    # 由本次响应决定分支; -Profile all 的多遍整包(每遍重新给 download=1 等额度)只属于离线工装。
+    if ($Transport -eq 'real' -and $Profile -eq 'all') {
+        Say 'RUNFIELD_REFUSED|REAL_PROFILE_ALL_FORBIDDEN(one_dispatch_one_ledger_per_approval)'
+        exit 4
+    }
+    if ($Transport -eq 'real' -and $Profile -ne 'response_driven') {
+        Say ('RUNFIELD_REFUSED|REAL_PROFILE_MUST_BE_RESPONSE_DRIVEN|got=' + $Profile)
+        exit 4
+    }
+    if ($Transport -eq 'stub' -and $Profile -eq 'response_driven') {
+        Say 'RUNFIELD_REFUSED|STUB_PROFILE_MUST_BE_A_DECLARED_FIXTURE_BRANCH'
+        exit 4
+    }
     if ($Transport -eq 'real' -and (-not $ApprovalToken -or -not $UidFile)) {
         Say 'RUNFIELD_REFUSED|real_transport_needs_approval_token_and_uid_file'
         exit 4
@@ -332,22 +352,28 @@ if ($RunField) {
         $v = Invoke-Dispatch $pf $Transport $Backend ("run-$Backend") $script:PlanPath `
                              $ApprovalToken $ExpectedToken $UidFile
         Say ('PROFILE|' + $pf + '|status=' + $v.Status + '|executed=' + $v.Executed +
-             '|not_run=' + $v.NotRunCount)
+             '|not_run=' + $v.NotRunCount + '|branch=' + $v.Branch)
         foreach ($s in $v.Stages) { Say ('  ' + $s) }
         if ($v.Recorded) { Say ('  ' + ($v.Recorded -replace '^\s*', '')) }
         Assert-DispatchOk $v $pf | Out-Null
         if ($Transport -eq 'stub') {
             # 假端口/假动作后端的通过只证明离线控制流: 这里显式声明它**不是**设备结论
             Say ('FIELD_PROOF|' + $pf + '|NO(transport=stub simulated_bytes_never_reach_real_identity_gate)')
+        } else {
+            # 真实摘要按**实际尝试过**的动作记账, 不再固定写 [] / 0(审核 §2C): 未尝试也写空,
+            # 但那个空是执行器给的, 不是脚本里硬编码的。
+            Say ('DEVICE_ACTIONS_ATTEMPTED|' + $pf + '|' + (($script:Attempts | Sort-Object) -join ','))
         }
     }
     $summary = [ordered]@{ run_id = $script:RunId; entry = 'RunField'; transport = $Transport;
                            backend = $Backend; profiles = $profiles; checks = $script:Checks;
                            failures = @($script:Failures)
-                           hardware_actions = @() }
+                           actions_attempted = @($script:Attempts | Sort-Object)
+                           actions_attempted_count = @($script:Attempts).Count
+                           note = 'actions_attempted 来自执行器自己的账(real/manual 后端实际尝试); 离线入口恒为空是事实而非硬编码' }
     Write-EvidenceNew 'runfield_summary.json' ($summary | ConvertTo-Json -Depth 6) | Out-Null
-    Say ('RUNFIELD_SUMMARY|checks={0}|failures={1}|transport={2}|backend={3}|hardware_actions=0' -f `
-         $script:Checks, $script:Failures.Count, $Transport, $Backend)
+    Say ('RUNFIELD_SUMMARY|checks={0}|failures={1}|transport={2}|backend={3}|actions_attempted={4}' -f `
+         $script:Checks, $script:Failures.Count, $Transport, $Backend, @($script:Attempts).Count)
     Flush-Transcript
     if ($script:Failures.Count) { exit 1 }
     exit 0
@@ -363,8 +389,9 @@ foreach ($pf in @('healthy', 'trip', 'no_trigger')) {
     Check ("ST_" + $pf + "_STAGE_COUNT") ($v.Executed -eq $exp -and $v.NotRunCount -eq 0)
           ("executed=$($v.Executed) expected=$exp not_run=$($v.NotRunCount)") | Out-Null
     Check ("ST_" + $pf + "_RECORDED_IDENTITY") ($v.Recorded -match '"id":\s*"7"' -and
-                                                $v.Recorded -match '"flags":\s*"0010"' -and
-                                                $v.Recorded -match '"match":\s*"YES"')
+                                                $v.Recorded -match '"flags":\s*"0005"' -and
+                                                $v.Recorded -match '"match":\s*"YES"' -and
+                                                $v.Recorded -match '"sig":\s*"\d+"')
           (($v.Recorded -replace '^.*"recorded": ', '') -replace '"results.*', '') | Out-Null
     if ($pf -eq 'trip') {
         Check 'ST_TRIP_ARM_REFUSAL_IS_NAMED' (@($v.Stages | Where-Object {
@@ -398,11 +425,13 @@ $failRows = @($st.Lines | Where-Object { $_ -match '\|FAIL\|' })
 Check 'ST_PYTHON_NO_FAIL_ROWS' ($failRows.Count -eq 0) ("fail_rows=$($failRows.Count)") | Out-Null
 
 # 负控 1: 真传输但没令牌/没 UID => 执行器必须拒, 一条命令都不发
-$nv = Invoke-Dispatch 'healthy' 'real' 'real' 'neg-no-token' $script:PlanPath '' '' ''
+# (档案用真实入口唯一允许的 response_driven, 让拒绝原因落在**令牌**上而不是档案上)
+$nv = Invoke-Dispatch 'response_driven' 'real' 'real' 'neg-no-token' $script:PlanPath '' '' ''
 $refText = ($nv.RefusedText -replace '\s+', ' ')
 if ($refText.Length -gt 90) { $refText = $refText.Substring(0, 90) }
 Check 'ST_NEG_REAL_WITHOUT_TOKEN' ($nv.Rc -ne 0 -and $nv.Stages.Count -eq 0 -and
-                                   $nv.RefusedText -match 'REAL_TRANSPORT_REFUSED')
+                                   ($nv.RefusedText -match 'REAL_TRANSPORT_REFUSED') -and
+                                   $nv.ActionsAttempted -eq '')
       ('rc=' + $nv.Rc + ' stages=' + $nv.Stages.Count + ' text=' + $refText) | Out-Null
 
 # 负控 2: 把某个阶段的判据改成不可能成立 => 该阶段 STOP, 后续一律 NOT_RUN(不被算成已执行)
@@ -420,10 +449,26 @@ Check 'ST_NEG_STAGE_FAILURE_HALTS' ($nv2.Rc -ne 0 -and $nv2.Status -eq 'STOP' -a
                                     $nv2.NotRunCount -gt 0 -and $nv2.Executed -lt 12)
       ("rc=$($nv2.Rc) status=$($nv2.Status) executed=$($nv2.Executed) not_run=$($nv2.NotRunCount)") | Out-Null
 
+# 负控 3: 混合模式在**任何** UID 读取/工具/端口动作之前具名拒绝, 且副作用清单为空
+$nv3 = Invoke-Dispatch 'response_driven' 'real' 'sim' 'neg-mode-mix' $script:PlanPath 'X' 'X' ''
+$nv4 = Invoke-Dispatch 'healthy' 'stub' 'real' 'neg-mode-mix2' $script:PlanPath '' '' ''
+$mixOk = (@($nv3, $nv4) | Where-Object { $_.Rc -ne 0 -and $_.Stages.Count -eq 0 -and
+        ($_.RefusedText -match 'MODE_COMBINATION_REFUSED') -and $_.ActionsAttempted -eq '' }).Count
+Check 'ST_NEG_MODE_MIX_REFUSED' ($mixOk -eq 2) "accepted=$mixOk/2 codes=$($nv3.Code),$($nv4.Code)" | Out-Null
+
+# 负控 4: 真实入口带 -Profile all 必须在 PS 自己的门上就拒(不起 Python, 不碰设备)
+$self = Join-Path $script:Self 'M8R3Field.ps1'
+$child = @(& powershell -NoProfile -ExecutionPolicy Bypass -File $self -RunField `
+              -Transport real -Backend real -Profile all 2>&1 | Out-String)
+$rcAll = $LASTEXITCODE
+Check 'ST_NEG_REAL_PROFILE_ALL' ($rcAll -eq 4 -and ($child -match 'REAL_PROFILE_ALL_FORBIDDEN') `
+        -and ($child -notmatch 'DISPATCH_SUMMARY')) ("rc=$rcAll out=$($child -replace '\s+',' ')") | Out-Null
+
 $summary = [ordered]@{ run_id = $script:RunId; entry = 'SelfTest'; checks = $script:Checks;
-                       failures = @($script:Failures); hardware_actions = @();
-                       python_selftest_summary = $sumLine }
+                       failures = @($script:Failures);
+                       actions_attempted = @($script:Attempts | Sort-Object) }
 Write-EvidenceNew 'selftest_summary.json' ($summary | ConvertTo-Json -Depth 6) | Out-Null
+
 Say ('SELFTEST_SUMMARY|checks={0}|failures={1}|python={2}' -f $script:Checks,
      $script:Failures.Count, $sumLine)
 Flush-Transcript

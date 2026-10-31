@@ -336,7 +336,7 @@
         "[DIAG] rel cov=NOT-ACTIVE(no-profile) lost=0 gen=0 rearm=0",
         "[DIAG] rel win hz=0[0..0] dir=0 ph=0",
         "[DIAG] rel tmc=0/0/0/0 mst=0 def=0 tier=0",
-        "[DIAG] rel sig live=44100 prof=0 match=NO"
+        "[DIAG] rel sig live=2138438894 prof=0 match=NO"
       ],
       "_provenance": {
         "kind": "board_capture+source_shape",
@@ -352,7 +352,7 @@
         "[DIAG] vib rms=1005 peak=1010 mg band=1",
         "[DIAG] cnt sg<warn=1095 sg<stall=0 cur>warn=0 cur>stall=0 impact=0 bad=0 clean=0",
         "[DIAG] rel snap=OK inc=OK seq=12 pubfail=0",
-        "[DIAG] rel mode=MONITOR_ONLY prof=PRESENT id=7 rev=1 flg=0010 FIELD_UNVERIFIED",
+        "[DIAG] rel mode=MONITOR_ONLY prof=PRESENT id=7 rev=1 flg=0005 FIELD_UNVERIFIED",
         "[DIAG] rel cov=COVERED lost=0 gen=1 rearm=1"
       ],
       "_provenance_trip": {
@@ -368,7 +368,7 @@
       "healthy": [
         "[DIAG] verdict=STALL_SUSPECT mode=MONITOR_ONLY health=OK",
         "[DIAG] rel snap=OK inc=OK seq=12 pubfail=0",
-        "[DIAG] rel mode=MONITOR_ONLY prof=PRESENT id=7 rev=1 flg=0010 FIELD_UNVERIFIED",
+        "[DIAG] rel mode=MONITOR_ONLY prof=PRESENT id=7 rev=1 flg=0005 FIELD_UNVERIFIED",
         "[DIAG] rel cov=COVERED lost=0 gen=1 rearm=1",
         "[DIAG] rel LATCH r=REL_SG_SEVERE id=7 rev=1 ms=120 post_rc=0",
         "[DIAG] rel LATCH val=61 thr=45 n=3 cov=0 tick=4588411",
@@ -459,7 +459,7 @@
       },
       "timeout_12s": [
         "[DIAG] learn FAILED: 12s timeout, need 8 independent SG and ADC samples",
-        "[DIAG] learn last: st=2 hz=100 dir=0 sig=44100 sg_seq=1004"
+        "[DIAG] learn last: st=2 hz=100 dir=0 sig=2138438894 sg_seq=1004"
       ],
       "_provenance_timeout_12s": {
         "kind": "source_shape",
@@ -467,6 +467,15 @@
           "applications/diag_relative.c:1583 与 :1570"
         ],
         "note": "具名负控档案: 产品的 learn 自带 12 s 超时 > 本轮 5 s 运动硬截止, 且 msh 是单线程 => 这 12 s 里 motor_stop 不会被处理。该档案用来证明执行器在**超时会吃掉清理机会**时仍然具名停止并走清理, 同时把风险登记在 plan.json 的 residual_risk 里(物理制止手段仍是操作者的 SW1/断电)。"
+      },
+      "_block_seconds": 12.0,
+      "_block_seconds_note": "单线程 msh 在 learn 期间不处理别的命令: diag_relative.c:1318 `#define REL_CMD_DEADLINE_MS 12000u`, 本次编译实际执行该命令的 learn_block_probe 观察到**命令到 12000 ms 才返回**(平台观察, 不是板级时延证据)。假端口据此把这组响应排在忙期结束之后 => stop/disarm 在忙期只能排队, 不许立刻返回成功。",
+      "_provenance_block": {
+        "kind": "source_shape",
+        "files": [
+          "applications/diag_relative.c:1583 (learn 的 12s 超时打印; 同一函数等待的就是 :1318 的 #define REL_CMD_DEADLINE_MS 12000u)"
+        ],
+        "note": "_block_seconds=12.0 的取值来自本轮主机编译并实际执行 learn_block_probe 的观察(命令到 12000 ms 才返回), 与产品源码里同一个等待常量(diag_relative.c 的 REL_CMD_DEADLINE_MS = 12000u)一致; 两者都不是板上实测时延。"
       }
     },
     "diag_profile tier 2": {
@@ -483,7 +492,7 @@
     },
     "diag_profile commit": {
       "healthy": [
-        "[DIAG] commit OK id=7 rev=1 flags=0010 FIELD_UNVERIFIED",
+        "[DIAG] commit OK id=7 rev=1 flags=0005 FIELD_UNVERIFIED",
         "[DIAG] commit next: config_save to persist, then arm explicitly"
       ],
       "_provenance": {
@@ -505,7 +514,7 @@
     },
     "diag_profile show": {
       "healthy": [
-        "[DIAG] profile id=7 rev=1 abi=2 flg=0010 VALID",
+        "[DIAG] profile id=7 rev=1 abi=2 flg=0005 VALID",
         "[DIAG] profile win hz=100[80..120] dir=0 ph=0 tmc=2/20/8/1 mst=1 def=0",
         "[DIAG] profile zero n=32 [180..210] mean=195",
         "[DIAG] profile adc n=8 [2050..2090] nz=3 sg n=8 [68..75] seq=1001..1008",
@@ -513,7 +522,7 @@
         "[DIAG] profile dur=30/30/60 rec=100 age=100/100/50 mns=2",
         "[DIAG] profile imp peak=2500 mg n=2 win=40 age=50",
         "[DIAG] pending: none",
-        "[DIAG] live sig=44100 match=YES cred zero=1 learn=1"
+        "[DIAG] live sig=2138438894 match=YES cred zero=1 learn=1"
       ],
       "_provenance": {
         "kind": "source_shape",
@@ -525,7 +534,7 @@
     },
     "diag_profile show@after_reboot": {
       "healthy": [
-        "[DIAG] profile id=7 rev=1 abi=2 flg=0010 VALID",
+        "[DIAG] profile id=7 rev=1 abi=2 flg=0005 VALID",
         "[DIAG] profile win hz=100[80..120] dir=0 ph=0 tmc=2/20/8/1 mst=1 def=0",
         "[DIAG] profile zero n=32 [180..210] mean=195",
         "[DIAG] profile adc n=8 [2050..2090] nz=3 sg n=8 [68..75] seq=1001..1008",
@@ -533,7 +542,7 @@
         "[DIAG] profile dur=30/30/60 rec=100 age=100/100/50 mns=2",
         "[DIAG] profile imp peak=2500 mg n=2 win=40 age=50",
         "[DIAG] pending: none",
-        "[DIAG] live sig=44100 match=YES cred zero=1 learn=1"
+        "[DIAG] live sig=2138438894 match=YES cred zero=1 learn=1"
       ],
       "_provenance": {
         "kind": "source_shape",
@@ -544,9 +553,9 @@
         "note": "这是重启后的期望值: 相等由执行器机械比较(RESTORE_MISMATCH), 不是文档声明。Flash 的 v2 迁移是否真的成立仍属现场待证。"
       },
       "drift": [
-        "[DIAG] profile id=7 rev=2 abi=2 flg=0010 VALID",
+        "[DIAG] profile id=7 rev=2 abi=2 flg=0005 VALID",
         "[DIAG] pending: none",
-        "[DIAG] live sig=51200 match=NO cred zero=1 learn=1"
+        "[DIAG] live sig=2138438895 match=NO cred zero=1 learn=1"
       ],
       "_provenance_drift": {
         "kind": "source_shape",
@@ -560,7 +569,7 @@
       "healthy": [
         "[DIAG] profile: none",
         "[DIAG] pending: none",
-        "[DIAG] live sig=44100 match=NO cred zero=0 learn=0"
+        "[DIAG] live sig=2138438894 match=NO cred zero=0 learn=0"
       ],
       "_provenance": {
         "kind": "source_shape",
@@ -735,6 +744,60 @@
           "reports/reviews/phase8-motor-chain-dev/m4/l1_monitor_console.txt:37-39(arm_gate_mask=0x2 / gate_reason=safety-not-READY 两行是板上真采集)"
         ],
         "note": "S10 的期望就是看见这条**具名拒绝**: 计划把它申报成 expected_terminal=REFUSED, 会话在此结束, 之后不得继续任何危险步骤(R2-C3 的规则本轮没有放宽)。 | 专用键 motor_arm@refused(S10), 不由档案选中。"
+      }
+    },
+    "motor_status@accel": {
+      "healthy": [
+        "[MOT] state=1 name=OTHER",
+        "[MOT] cur_hz=50 tgt_hz=100 accel=2000 decel=2000 dir=0",
+        "[MOT] armed=1 drv_en_request=1 health=OK",
+        "[MOT] guard stops=0 reason=0",
+        "[MOT] guard reason map: 0=none 1=cfg-lost 2=integrity 3=txn-busy 4=enn-fb",
+        "[MOT] stop result=api-accepted(驱动接受关断, 非波形证明) src=init rc=0 latched=0",
+        "[MOT] diag_off_confirmed=YES",
+        "[MOT] arm_gate_mask=0x0 ALL-PASS",
+        "[MOT] drv_request=HIGH pad=1",
+        "[MOT] expected_ENN=LOW ENN_fb=0 resolved verdict=OK"
+      ],
+      "_provenance_accel": {
+        "kind": "source_shape",
+        "files": [
+          "applications/motor.c:2394 (state=%d name=%s 的字面量; 同一份响应的其余行见 motor_status@running 的逐条出处)"
+        ],
+        "note": "形状与 motor_status@running 同源(motor.c 的 cmd_motor_status 打印顺序不变), 只有本轮计划要证的取值换成 state=1/cur_hz=50/tgt_hz=100/dir=0; 这里的 1 就是 motor.h 的 motor_state_t 里 MOTOR_ACCEL 的隐式值(IDLE=0 之后第一项), 执行器把它当常量核对源码(motor.h:110-116 那张枚举表由 --validate-plan 的 PLAN_STATE_AND_FLAG_CONSTANTS 逐项回查)。这一组只为证明 ACCEL 被判为还没到巡航并继续轮询, 不构成板上该状态的证据。"
+      }
+    },
+    "flash_dump 0 8": {
+      "healthy": [
+        "slot,seq,session,time_ms,event,valid,sg,current_ma,ax_mg,ay_mg,az_mg,step_hz,vibration_mg,flags",
+        "0,1,8,1790589,0,31,74,26,23,11,1002,300,1002,423792640",
+        "1,2,8,1790601,0,31,74,26,23,15,1006,300,1006,423792640",
+        "2,3,8,1790614,0,31,75,27,22,14,1004,300,1004,423792640",
+        "3,4,8,1792118,9,31,76,15,27,15,1010,0,1010,427069705",
+        "4,5,8,1792130,9,31,76,16,26,14,1008,0,1008,427069705",
+        "5,6,8,1792143,9,31,77,15,28,15,1012,0,1012,427069705",
+        "6,7,8,1792156,9,31,77,16,27,16,1010,0,1010,427069705",
+        "7,8,8,1792169,9,31,78,15,26,15,1009,0,1009,427069705"
+      ],
+      "trip": [
+        "slot,seq,session,time_ms,event,valid,sg,current_ma,ax_mg,ay_mg,az_mg,step_hz,vibration_mg,flags",
+        "0,1,8,1790589,0,31,74,26,23,11,1002,300,1002,423792640",
+        "1,2,8,1790601,0,31,74,26,23,15,1006,300,1006,423792640",
+        "2,3,8,1790614,0,31,75,27,22,14,1004,300,1004,423792640",
+        "3,4,8,1792118,9,31,76,15,27,15,1010,0,1010,427069705",
+        "4,5,8,1792130,9,31,76,16,26,14,1008,0,1008,427069705",
+        "5,6,8,1792143,9,31,77,15,28,15,1012,0,1012,427069705",
+        "6,7,8,1792156,9,31,77,16,27,16,1010,0,1010,427069705",
+        "7,8,8,1792169,9,31,78,15,26,15,1009,0,1009,427069705"
+      ],
+      "_provenance_flash_dump": {
+        "kind": "board_capture_composed",
+        "files": [
+          "reports/reviews/phase8-motor-m5-fault-log/cp1/final_pass/009_flash_dump_0_100.bin (板上原字节 5891 B: 表头 + slot 0.. 的 14 列 CSV, 逐字)",
+          "reports/reviews/phase8-motor-m6-offline/m5_raw_recovery/011_flash_dump_200_100.bin.b64 (同一现场原件的 base64 副本, 停后帧 event=9 且 step_hz=0 的形状来源)",
+          "applications/ns_flash_shell.c:157-163 (empty/error/overflow 三种读槽失败的打印分支)"
+        ],
+        "note": "两块都是真机逐字采集; 换掉的只有本轮计划要证的三个值(session=8 即 S8 记录->S9 严格增大后的本次新增 session、time_ms 取本次窗口、slot/seq 连续)。表头与逐帧格式串在 ns_flash_shell.c 的 flash_dump 里(表头 rt_kputs, 帧体 rt_snprintf); CRC/commit 不在 CSV 里, 由 ns_storage.c 的读槽路径内部校验, 失败就走上面那几条 empty/error 分支 => 本组出现 empty/error/overflow 即取证未完成。"
       }
     }
   }

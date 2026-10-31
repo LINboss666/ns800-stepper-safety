@@ -110,15 +110,34 @@ class Ledger:
 class FakePort:
     """脚本化假端口: 只有 read/write/feed/close/in_waiting, 任何"开口后写属性"都当场报错。"""
 
-    def __init__(self, script, ledger):
+    def __init__(self, script, ledger, clock=None):
         object.__setattr__(self, "_chunks", list(script))
         object.__setattr__(self, "_buf", b"")
         object.__setattr__(self, "_closed", False)
         object.__setattr__(self, "_ledger", ledger)
+        object.__setattr__(self, "_clock", clock)
+        object.__setattr__(self, "_busy_until", None)
+        object.__setattr__(self, "_held", [])
         object.__setattr__(self, "written", [])
 
-    def feed(self, data):
+    def feed(self, data, block_seconds=0.0):
+        """block_seconds>0 建模**单线程 msh 被同步命令占住**: 这期间一个字节都不产出,
+        响应排在忙期结束之后才可见(审核 §3: stop/disarm 在忙期只能排队, 不能立刻返回成功)。"""
+        if block_seconds and self._clock is not None:
+            until = self._clock.monotonic() + float(block_seconds)
+            self._held.append((until, data))
+            if self._busy_until is None or until > self._busy_until:
+                object.__setattr__(self, "_busy_until", until)
+            self._ledger.ev("PORT_BUSY_UNTIL", until=round(until, 3),
+                            block_seconds=float(block_seconds))
+            return
         self._chunks.append(data)
+
+    def _release_held(self):
+        now = self._clock.monotonic() if self._clock is not None else None
+        while self._held and (now is None or self._held[0][0] <= now):
+            self._chunks.append(self._held.pop(0)[1])
+        object.__setattr__(self, "_busy_until", self._held[0][0] if self._held else None)
 
     @property
     def in_waiting(self):
@@ -134,6 +153,10 @@ class FakePort:
     def read(self, n):
         if self._closed:
             return b""
+        now = self._clock.monotonic() if self._clock is not None else None
+        if now is not None and self._busy_until is not None and now < self._busy_until:
+            return b""                    # 忙期: 板子还没把话讲完(不是"观测缺失")
+        self._release_held()
         while not self._buf and self._chunks:
             nxt = self._chunks.pop(0)
             if nxt is None:
@@ -156,6 +179,15 @@ def uid_from_file(path):
     """DAP UID 只在真实分支从既存私有文件读取: 永不打印、永不入库, 只披露长度与 sha256 前 12 位。"""
     raw = Path(path).read_text(encoding="utf-8").strip()
     return raw
+
+
+def uid_disclosure(secret):
+    """UID 的**公开**身份形式: 长度 + sha256 前 12 位(与 M7/P0 记录同一口径)。
+    私有原始件仍在操作者手里, 仓库里只允许出现这个形式。"""
+    s = str(secret or "")
+    if not s:
+        return {"present": False}
+    return {"present": True, "length": len(s), "sha256_12": sha_bytes(s.encode("utf-8"))[:12]}
 
 
 def make_real_port(port_name, ledger):
@@ -336,11 +368,22 @@ def assert_step(st, rows, asname, led, raw=None):
         summ, _ = disable_contract(rows)
         if summ is None:
             return {"verdict": "STOP", "code": "PROFILE_FIELDS_UNREADABLE"}
+        # "能解析出一份完整 summary" **不等于**"在跑"(审核 §2B 第 5 条): 同一份
+        # state=0 cur=0 tgt=100 armed=1 request=LOW pad=0 ENN=HIGH 之前会被收为 OK。
+        # 运行只能由数值状态 + 实际频率证明: state=MOTOR_CRUISE(2) 且 cur_hz>0。
         inconsistent = []
+        if summ["state_num"] != RUNNING_REQUIRED_STATE:
+            inconsistent.append("state=%d(要求 MOTOR_CRUISE=%d)" % (summ["state_num"],
+                                                                    RUNNING_REQUIRED_STATE))
         if summ["armed"] != 1:
             inconsistent.append("armed=%d(要求 1)" % summ["armed"])
-        if summ["cur_hz"] <= 0 and summ["tgt_hz"] <= 0:
-            inconsistent.append("cur_hz/tgt_hz 都是 0(没在动)")
+        if summ["cur_hz"] <= 0:
+            inconsistent.append("cur_hz=%d(没在动)" % summ["cur_hz"])
+        if summ["tgt_hz"] <= 0:
+            inconsistent.append("tgt_hz=%d(没在动)" % summ["tgt_hz"])
+        if summ["drv_request"] != "HIGH" or summ["pad"] != 1:
+            inconsistent.append("drv_request=%s/pad=%d(与武装运行不相容)" %
+                                (summ["drv_request"], summ["pad"]))
         if summ["verdict"] not in ("OK", "CUT_BY_HARDWARE") or summ["fb_state"] != "resolved":
             inconsistent.append("反馈未解析或判决不可用")
         if inconsistent:
@@ -348,9 +391,43 @@ def assert_step(st, rows, asname, led, raw=None):
                                        "bad": inconsistent})
             return {"verdict": "STOP", "code": "PROFILE_NOT_RUNNING", "bad": inconsistent,
                     "fields": summ}
-    if st.get("no_trigger_is_observation") and not any(
-            n in text for n in st.get("trigger_needles", [])):
-        return {"verdict": "NO_TRIGGER", "asserted": True}
+    # expect_flag_bits: 提交资格按**位**判, 不再把"字段字符串前后相同"当合法(审核 §2D 第 2 条)。
+    # 0x0010 连 COMMITTED(bit0) 都没置, 却曾因为"两处都印 0010"被判成一致。
+    bits_specs = st.get("expect_flag_bits") or []
+    if isinstance(bits_specs, dict):
+        bits_specs = [bits_specs]
+    for spec in bits_specs:
+        hits = [h for h in (re.match(spec["row"], r) for r in rows if r) if h]
+        if len(hits) != 1:
+            led.ev("FLAG_ASSERT_FAIL", **{"as": asname, "err": "ROW_NOT_UNIQUE",
+                                          "count": len(hits), "row": spec["row"]})
+            return {"verdict": "STOP", "code": "FLAG_ROW_NOT_EXACTLY_ONE", "row": spec["row"],
+                    "count": len(hits)}
+        try:
+            value = int(hits[0].group(spec["group"]), 16)
+        except (ValueError, IndexError):
+            return {"verdict": "STOP", "code": "FLAG_VALUE_UNREADABLE",
+                    "detail": hits[0].groupdict()}
+        bad_bits = []
+        for name in spec.get("must_set", []):
+            if not value & RPF_BITS[name]:
+                bad_bits.append("缺位%s" % name)
+        for name in spec.get("must_clear", []):
+            if value & RPF_BITS[name]:
+                bad_bits.append("不应置%s" % name)
+        unknown = value & ~((1 << len(RPF_BITS)) - 1)
+        if unknown:
+            bad_bits.append("未知位=0x%X" % unknown)
+        led.ev("FLAG_BITS", **{"as": asname, "value": "0x%04X" % value, "bad": bad_bits})
+        if bad_bits:
+            return {"verdict": "STOP", "code": "PROFILE_FLAGS_NOT_QUALIFIED",
+                    "bad": bad_bits, "flags": "0x%04X" % value, "basis": list(RPF_BITS)}
+    if st.get("no_trigger_is_observation"):
+        seen = [n for n in st.get("trigger_needles", []) if n in text]
+        if not seen:
+            return {"verdict": "NO_TRIGGER", "asserted": True, "trigger_seen": []}
+        # 触发**是**这次观察要拿到的东西: 命中原文要进结果, 真实调度据此决定事故取证支线。
+        return {"verdict": "OK", "asserted": True, "trigger_seen": seen}
     return {"verdict": "OK", "asserted": bool(rows)}
 
 
@@ -385,6 +462,13 @@ class ActionBackend:
 
     kind = "abstract"
 
+    # 真实/人工后端**实际尝试过**的设备动作(R3 复审 §2C: 真实摘要不许再固定写 hardware_actions=[])。
+    # sim 后端永远留空 —— 它没有设备副作用, 把它算进"已尝试"就是冒充。
+    def note_attempt(self, name, how):
+        if self.kind == "sim":
+            return
+        self.attempts.append("%s:%s" % (name, how))
+
     def download(self, act, ctx):
         raise NotImplementedError
 
@@ -412,6 +496,7 @@ class SimActionBackend(ActionBackend):
         self.timeout = timeout_seconds
         self.subs = dict(subs or {})
         self.calls = []
+        self.attempts = []          # sim 恒空: 没有设备副作用就不许进"已尝试"清单
 
     def _rec(self, name, act, ctx, result):
         self.calls.append(name)
@@ -448,12 +533,15 @@ class ManualActionBackend(ActionBackend):
         self.clock = clock
         self.wait = wait_seconds
         self.subs = dict(subs or {})
+        self.attempts = []
 
     def _gate(self, name, act, want):
         """want: {相对名: (是否必需, 判据)}; 全部交付物到齐才返回, 超时即具名停止。"""
         need_dir = self.out / ("action_" + name)
         need_dir.mkdir(parents=True, exist_ok=True)
         (need_dir / "COMMAND.txt").write_text(act["command"] + "\n", encoding="utf-8")
+        # 命令已经交到操作者手上 = 一次真实的设备动作尝试(哪怕后续交付物不齐), 必须进总账。
+        self.note_attempt(name, "operator_hand")
         self.led.ev("ACTION_WAITING", backend=self.kind, name=name,
                     command=act["command"], need=list(want))
         print("ACTION %s: 请执行下列逐字命令并把交付物放入 %s\n  %s" %
@@ -517,13 +605,26 @@ class RealActionBackend(ActionBackend):
 
     kind = "real"
 
-    def __init__(self, ledger, outdir, clock, timeout_seconds, subs=None):
+    def __init__(self, ledger, outdir, clock, timeout_seconds, subs=None, repo_root=None):
+        # 计划里只允许三个机械占位; 展开表由调度器给(UID 只在 real 分支从私有文件读)。
         self.led = ledger
         self.out = Path(outdir)
         self.clock = clock
         self.timeout = timeout_seconds
-        # 计划里只允许三个机械占位; 展开表由调度器给(UID 只在 real 分支从私有文件读)。
         self.subs = dict(subs or {})
+        # 工具 argv 里的相对路径**以 repo_root 为基准**解析(R3 复审 §2A): 不能依赖操作者
+        # 从哪个当前目录启动 PS —— 换个目录就找不到 .axf 是执行器的事, 不是"现场环境问题"。
+        self.repo_root = Path(repo_root).resolve() if repo_root else Path.cwd()
+        self.secret = str(self.subs.get("@UID_FILE") or "")
+        self.attempts = []
+
+    def _p(self, x):
+        """相对路径 -> repo_root 下的绝对路径; 绝对路径与取值参数原样返回。"""
+        if not isinstance(x, str) or x.startswith("-") or not any(s in x for s in ("/", "\\")):
+            return x
+        if os.path.isabs(x) or re.match(r"^[A-Za-z]:", x):
+            return x
+        return str(self.repo_root / x)
 
     def _resolve(self, name, argv):
         """@UID_FILE/@RUN_ROOT/@IMAGE_BYTES 展开; 展开后仍残留占位 => 具名拒绝,
@@ -540,16 +641,33 @@ class RealActionBackend(ActionBackend):
             raise Stop("TOOL_ARGV_UNRESOLVED", "%s:%s" % (name, left))
         return out
 
+    def _mask(self, argv):
+        """脱敏副本: 把展开后的 UID 换回占位形式, 公开件里不出现私有值本身。"""
+        if not self.secret:
+            return list(argv)
+        tag = "@UID_FILE<redacted len=%d sha256_%s>" % (
+            len(self.secret), sha_bytes(self.secret.encode("utf-8"))[:12])
+        return [x.replace(self.secret, tag) for x in argv]
+
     def _run(self, name, act, argv):
-        argv = self._resolve(name, argv)
+        argv = [self._p(x) for x in self._resolve(name, argv)]
         d = self.out / ("action_" + name)
         d.mkdir(parents=True, exist_ok=True)
-        (d / "ARGV.json").write_text(json.dumps(argv, ensure_ascii=False), encoding="utf-8")
-        self.led.ev("ACTION_ATTEMPT", backend=self.kind, name=name, argv=argv)
+        masked = self._mask(argv)
+        real_sha = sha_bytes(json.dumps(argv, ensure_ascii=False).encode("utf-8"))
+        # 公开归档只有脱敏 argv + **原 argv 的散列**: 事后拿同一私有 UID 文件可重算散列来证明
+        # 当时执行的正是这条命令, 而仓库里永远不含 UID 值(R3 复审 §2C 最后一条)。
+        (d / "ARGV.json").write_text(json.dumps(
+            {"argv_masked": masked, "argv_sha256_of_private_original": real_sha,
+             "cwd": str(self.repo_root), "uid_disclosure": uid_disclosure(self.secret)},
+            ensure_ascii=False, indent=1), encoding="utf-8")
+        self.note_attempt(name, "real_tool")
+        self.led.ev("ACTION_ATTEMPT", backend=self.kind, name=name, argv=masked,
+                    argv_sha256=real_sha)
         t0 = self.clock.monotonic()
         try:
             p = subprocess.run(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                               timeout=self.timeout)
+                               timeout=self.timeout, cwd=str(self.repo_root))
             rc, out, err = p.returncode, p.stdout, p.stderr
         except subprocess.TimeoutExpired:
             raise Stop("ACTION_TIMEOUT", name)
@@ -596,7 +714,7 @@ class RealActionBackend(ActionBackend):
             raise Stop("READBACK_BYTE_COUNT", "%d != %d" % (len(data), int(want["bytes"])))
         if sha_bytes(data) != want["sha256"]:
             raise Stop("READBACK_HASH_MISMATCH", sha_bytes(data)[:16])
-        if data != Path(want["path"]).read_bytes():
+        if data != Path(self._p(want["path"])).read_bytes():
             raise Stop("READBACK_NOT_BYTE_EQUAL_TO_IMAGE", act["out_file"])
         r["identity_gate"] = "REAL_BYTES_HASH_AND_FILE_EQUAL"
         r["out_file"] = {"name": act["out_file"], "bytes": len(data),
@@ -681,6 +799,26 @@ MOTION_OBLIGATION_CMDS = ("motor_arm", "motor_start")
 CLEANUP_CMDS = ("motor_stop", "motor_disarm", "motor_status")
 CLEANUP_WINDOW_SECONDS = 1.2   # 每条清理命令自己的确认窗(三段互不抢占)
 
+# 运动状态枚举与提交位都来自产品源码, 不是本轮自造的名字:
+#   motor.h:110-116  MOTOR_IDLE=0, ACCEL, CRUISE, DECEL, FAULT  (隐式递增)
+#   diag_relative.h:39-41  RPF_COMMITTED(1u<<0) / RPF_FIELD_VERIFIED(1u<<1) / RPF_FROM_LEARN(1u<<2)
+# `--validate-plan` 会回到这两处源码逐项核对(PLAN_STATE_AND_FLAG_CONSTANTS), 常量漂移就 FAIL。
+MOTOR_STATE_ENUM = {"IDLE": 0, "ACCEL": 1, "CRUISE": 2, "DECEL": 3, "FAULT": 4}
+MOTOR_STATE_SOURCE = ("motor.h", "MOTOR_IDLE = 0")
+RPF_BITS = {"COMMITTED": 1 << 0, "FIELD_VERIFIED": 1 << 1, "FROM_LEARN": 1 << 2}
+RPF_BITS_SOURCE = ("diag_relative.h", "#define RPF_COMMITTED")
+# RUNNING 判据要的**数值**状态: 产品的 name 只打 FAULT|OTHER, 所以"在巡航"只能由 state=2 证明。
+RUNNING_REQUIRED_STATE = MOTOR_STATE_ENUM["CRUISE"]
+
+# flash_dump 的表头与逐帧 CSV 来自 ns_flash_shell.c:153/159-163(M5 现场原字节归档同一形状);
+# CRC/commit 由 ns_storage.c 的读取路径内部校验, 校验不过的槽打成 "slot N error -x" ——
+# 所以"这一批里没有 empty/error/overflow 行"就是产品自己给出的 CRC/commit 通过形式。
+FLASH_DUMP_HEADER = ("slot,seq,session,time_ms,event,valid,sg,current_ma,"
+                     "ax_mg,ay_mg,az_mg,step_hz,vibration_mg,flags")
+FLASH_DUMP_COLUMNS = 14
+FLASH_DUMP_BAD = ("empty", "error", "ERROR")
+FLASH_EVENT_PRE, FLASH_EVENT_POST_STOP = 0, 9
+
 
 def _cleanup_read(port, led, clock, dl, cmd, out_dir, feed_hook=None):
     """发一条清理/只读命令并取回响应。返回 (rows, raw, sent_t, ended_t, errs):
@@ -694,15 +832,8 @@ def _cleanup_read(port, led, clock, dl, cmd, out_dir, feed_hook=None):
     except (OSError, Stop) as e:
         return [], b"", sent_t, clock.monotonic(), ["%s:WRITE_FAILED:%s" %
                                                     (cmd, getattr(e, "code", e.__class__.__name__))]
-        if quota_box is not None:
-            nm = "cleanup_" + cmd
-            if nm not in quota_box:
-                if overruns is not None:
-                    overruns.append("QUOTA_UNDECLINED_" + nm)
-            else:
-                quota_box[nm] -= 1
-                if quota_box[nm] < 0 and overruns is not None:
-                    overruns.append("%s_OVERRESERVED=%d" % (nm, -quota_box[nm]))
+    # (这里曾挂着一段"清理额度扣减", 挂在 return 之后 => 永不执行, 且引用了本函数没有的参数。
+    #  清理额度的唯一记账点在 cleanup() 里, 不在读函数里。)
     sent_ok_t = clock.monotonic()
     raw_path = Path(out_dir) / ("cleanup_%s.bin" % cmd.replace(" ", "_"))
     buf = bytearray()
@@ -712,7 +843,12 @@ def _cleanup_read(port, led, clock, dl, cmd, out_dir, feed_hook=None):
         return [], b"", sent_ok_t, clock.monotonic(), ["%s:EVIDENCE_OPEN_FAILED" % cmd]
     with f:
         while clock.monotonic() < dl:
-            chunk = port.read(512)
+            try:
+                chunk = port.read(512)
+            except Exception as e:
+                # 端口读抛出同样是"这条没回": 记错并结束本命令的窗, 让后面的必要撤能还有机会
+                errs.append("%s:READ_EXCEPTION_%s" % (cmd, e.__class__.__name__))
+                break
             if chunk:
                 buf += chunk
                 try:
@@ -827,8 +963,12 @@ def cleanup(port, led, clock, budget, transport, fixture, feed_hook=None,
                 quota_box[key] -= 1
                 if used_box is not None:
                     used_box[key] = used_box.get(key, 0) + 1
-        rows, raw, sent_t, ended_t, errs = _cleanup_read(port, led, clock, dl, cmd,
-                                                          out_dir, feed_hook)
+        try:
+            rows, raw, sent_t, ended_t, errs = _cleanup_read(port, led, clock, dl, cmd,
+                                                             out_dir, feed_hook)
+        except Exception as e:
+            errors.append("%s:CLEANUP_RAISED_%s" % (cmd, e.__class__.__name__))
+            continue                # 本函数的合同是"绝不抛": 一条异常不吃掉下一条必要撤能
         errors.extend(errs)
         if cmd == "motor_status":
             status_rows = rows
@@ -860,6 +1000,119 @@ def profile_of(fixture):
     return (fixture or {}).get("profile", "healthy")
 
 
+def drain_post_reset_boot(port, st, asname, out, idx, led, results, clock, fixture, transport):
+    """复位之后、**任何**合法查询之前: 把板子自己发出的启动流按原字节收进证据, 并等它落到
+    一个干净的提示符边界(R3 复审 §2A: 回读把核留在 Halted, 复位才是前置)。
+
+    提示符不是"可以不复位"的替代前置 —— 复位已经真实发生并记账, 这里只是把启动流消费掉,
+    免得启动字节混进第一条查询的响应里。窗口内没有提示符 = 具名停止, 绝不发查询。
+    """
+    window = float(st.get("boot_drain_seconds", 20))
+    dl = clock.monotonic() + window
+    raw = out / ("%02d_%s.boot.rx.bin" % (idx, asname))
+    if transport == "stub":
+        for line in (fixture or {}).get("post_reset_boot", []):
+            port.feed((line + "\r\n").encode("utf-8"))
+    lines, nbytes = read_until_prompt(port, dl, led, raw, clock)
+    if not lines:
+        raise Stop("POST_RESET_BOOT_PROMPT_MISSING", "window=%.0fs bytes=%d" % (window, nbytes))
+    try:
+        txt = emit_text(raw, lines)
+    except OSError as e:
+        raise Stop("EVIDENCE_WRITE_FAILED", "boot=%s:%s" % (asname, e))
+    results.append({"as": asname + "_boot", "kind": "boot_stream", "rx_bytes": nbytes,
+                    "rx_sha256": sha_of(raw), "txt": txt, "rows": len(lines)})
+    led.ev("BOOT_STREAM_DRAINED", **{"as": asname, "bytes": nbytes, "rows": len(lines),
+                                     "raw": str(raw)})
+
+
+def command_attempt(port, cmd, st, asname, raw, step_dl, transport, fixture, silent, led, clock,
+                    attempt=1):
+    """一次"发送 -> 取回完整响应 -> 判据 -> 原字节/文本落盘"的最小单元。
+    单发步骤与业务轮询走**同一条门**, 所以轮询不会绕过短写、提示符、具名字段这些判据。"""
+    data = (cmd + "\r\n").encode("ascii")
+    try:
+        written = port.write(data)
+    except (OSError, Stop) as e:
+        raise Stop("COMMAND_WRITE_FAILED",
+                   "%s:%s" % (cmd, getattr(e, "code", e.__class__.__name__)))
+    if written is not None and written != len(data):
+        # 短写: 命令可能只进去一半, 而义务已经建立 => 具名停止并照常走撤能清理
+        raise Stop("COMMAND_SHORT_WRITE", "%s wrote=%s want=%d" % (cmd, written, len(data)))
+    if transport == "stub":
+        if silent:
+            pass                        # 注入: 板子不回话 => 只能靠截止时间具名停止
+        else:
+            key = st.get("key") or cmd
+            seq = (fixture.get("sequence") or {}).get(key)
+            if seq:                     # 轮询用**申报过的**响应序列(如先 ACCEL 后 CRUISE), 越界取最后一份
+                resp = seq[min(attempt, len(seq)) - 1]
+            else:
+                resp = fixture.get("responses", {}).get(key)
+            if resp is None:
+                raise Stop("STUB_MISS", cmd)
+            # 同步命令会把单线程 msh 占住: 响应只在忙期结束后才可见(审核 §3 "忙 msh")。
+            block = float((fixture.get("block") or {}).get(key, 0) or 0)
+            port.feed(("\r\n".join(resp) + "\r\nmsh >").encode("utf-8"), block_seconds=block)
+    lines, nbytes = read_until_prompt(port, step_dl, led, raw, clock)
+    if not lines:
+        raise Stop("MISSING_RESPONSE_PROMPT", "as=%s bytes=%d" % (asname, nbytes))
+    v = assert_step(st, lines, asname, led, raw=Path(raw).read_bytes())
+    try:
+        txt = emit_text(raw, lines)
+    except OSError as e:
+        raise Stop("EVIDENCE_WRITE_FAILED", "as=%s:%s" % (asname, e))
+    return v, nbytes, txt
+
+
+def ramping_state(txt_path):
+    """这次尝试的响应里 [MOT] state= 的**数值**(唯一一条才认)。轮询只允许在 ACCEL/DECEL
+    这类"还在爬坡"的状态上重试 —— 矛盾字段(armed=1 但 state=0)必须立刻具名拒绝, 不能被
+    重试到窗口耗尽而看起来像"只是没等到"。"""
+    try:
+        rows = Path(str(txt_path)).read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return None
+    hits = [h for h in (re.match(ROW_MOT_STATE, r) for r in rows if r) if h]
+    return int(hits[0].group(1)) if len(hits) == 1 else None
+
+
+def poll_command_step(port, cmd, st, asname, idx, out, step_dl, transport, fixture, silent,
+                      led, clock, budget, results):
+    """起转后的**有限轮询**(审核 §2D 第 3 条): 一条立即查询或 tgt>0 都不算稳定巡航。
+    只在申报的 retry_codes 里重试(ACCEL 不是异常 => 同一预算内继续等), 窗口到期或不一致就
+    具名停止并交由同一条清理路径撤能。"""
+    p = st["poll"]
+    window = float(p.get("until_seconds", 3))
+    interval = float(p.get("interval_seconds", 0.5))
+    codes = tuple(p.get("retry_codes", ["PROFILE_NOT_RUNNING"]))
+    ramping = {MOTOR_STATE_ENUM["ACCEL"], MOTOR_STATE_ENUM["DECEL"]}
+    until = min(clock.monotonic() + window, step_dl)
+    n = 0
+    while True:
+        n += 1
+        raw = out / ("%02d_%s.poll%02d.rx.bin" % (idx, asname, n))
+        v, nbytes, txt = command_attempt(port, cmd, st, "%s#%d" % (asname, n), raw, until,
+                                         transport, fixture, silent, led, clock, attempt=n)
+        results.append(dict({"as": asname, "kind": "command_poll", "cmd": cmd, "attempt": n,
+                             "rx_bytes": nbytes, "rx_sha256": sha_of(raw), "txt": txt}, **v))
+        if v["verdict"] == "OK":
+            led.ev("POLL_OK", **{"as": asname, "attempts": n,
+                                 "elapsed_s": round(clock.monotonic() - led.t0, 3)})
+            return v
+        state = ramping_state(txt)
+        if not (v["verdict"] == "STOP" and v.get("code") in codes and state in ramping):
+            raise Stop(v["code"], json.dumps(v, ensure_ascii=False))
+        if clock.monotonic() + interval >= until or (budget.armed and
+                                                    budget.business_deadline(0) <= clock.monotonic()):
+            raise Stop("POLL_WINDOW_EXPIRED", json.dumps(
+                {"as": asname, "attempts": n, "last": v.get("code"), "state": state,
+                 "bad": v.get("bad", []), "window_s": window}, ensure_ascii=False))
+        led.ev("POLL_RETRY", **{"as": asname, "attempt": n, "code": v.get("code"),
+                                "state": state, "waiting_s": interval})
+        clock.sleep(interval)
+
+
 def exec_session(session_id, steps, outdir, transport, fixture, port_name,
                  total_deadline_seconds, clock, backend=None, motion_cap_seconds=None,
                  plan=None, quota_box=None, used_box=None):
@@ -887,42 +1140,43 @@ def exec_session(session_id, steps, outdir, transport, fixture, port_name,
     obligation = False
     cleanup_overruns = []
     used = used_box if used_box is not None else {}
-    quota = {}
+    # 这本账在开口之前就要能用: "试了但没开成"也必须留痕, 所以 spend 定义在 try 之前。
+    quota = quota_box if quota_box is not None else (dict(plan["quota"]) if plan else {})
+
+    def spend(name, n):
+        "额度是**执行时**扣的, 不是声明的: 超了就具名停止, 且不发送那条命令。"
+        if not plan:
+            return
+        if name not in quota:
+            raise Stop("QUOTA_UNDECLINED", name)      # 计划里没有的动作一律禁止
+        if quota[name] < n:
+            raise Stop("QUOTA_EXHAUSTED", "%s want=%d left=%d" % (name, n, quota[name]))
+        quota[name] -= n
+        used[name] = used.get(name, 0) + n
+        led.ev("QUOTA_CONSUMED", name=name, n=n, left=quota[name])
+
     budget = MotionBudget(clock, motion_cap_seconds) if motion_cap_seconds else \
         MotionBudget(clock, total_deadline_seconds)
     silent = bool(fixture.get("inject", {}).get("port_silent"))
     port = None
     ret = None
     try:
+        spend("port_open", 1)               # 先记账再尝试开口(尝试数 == 扣减数)
         if transport == "stub":
             script = [l.encode("utf-8") + b"\r\n" for l in fixture.get("boot_bytes", [])]
             if silent:
                 script = [None]
-            port = FakePort(script, led)
+            port = FakePort(script, led, clock=clock)
         else:
-            port = make_real_port(port_name, led)
+            try:
+                port = make_real_port(port_name, led)
+            except (OSError, Stop) as e:
+                # 额度已经消费、尝试已经发生: 具名上报而不是让它在通用异常里变成 UNEXPECTED
+                raise Stop("PORT_OPEN_FAILED",
+                           "%s:%s" % (port_name, getattr(e, "code", e.__class__.__name__)))
         led.ev("PORT_OPEN", transport=transport,
                port=port_name if transport == "real" else None)
-        # 额度是**整包共用**的一本账(由调度器传进来), 不是每个会话各自复制一份。
-        # 这两个名字在 try 之前已经绑定: 开口失败时 finally 与末尾汇总仍要能用。
-        if quota_box is not None:
-            quota = quota_box
-        elif plan:
-            quota = dict(plan["quota"])
-
-        def spend(name, n):
-            """额度是**执行时**扣的, 不是声明的: 超了就具名停止, 且不发送那条命令。"""
-            if not plan:
-                return
-            if name not in quota:
-                raise Stop("QUOTA_UNDECLINED", name)      # 计划里没有的动作一律禁止
-            if quota[name] < n:
-                raise Stop("QUOTA_EXHAUSTED", "%s want=%d left=%d" % (name, n, quota[name]))
-            quota[name] -= n
-            used[name] = used.get(name, 0) + n
-            led.ev("QUOTA_CONSUMED", name=name, n=n, left=quota[name])
-
-        spend("port_open", 1)
+        # (整包共用一本账: quota/used/spend 都在 try 之前绑定, 见上面那里)
         steps = [st for st in steps if not st.get("when")
                  or profile_of(fixture) in st["when"]]
         for idx, st in enumerate(steps, start=1):
@@ -944,6 +1198,10 @@ def exec_session(session_id, steps, outdir, transport, fixture, port_name,
                 if r["verdict"] != "OK":
                     primary = Stop(r["code"], r.get("detail", ""))
                     raise primary
+                if st["action"] == "reset":
+                    # 复位把核从 Halted 放出来: 启动流必须在第一条查询之前消费掉。
+                    drain_post_reset_boot(port, st, asname, out, idx, led, results, clock,
+                                          fixture, transport)
                 continue
             cmd = st["cmd"]
             if cmd == "__approved_reboot__":
@@ -1021,27 +1279,13 @@ def exec_session(session_id, steps, outdir, transport, fixture, port_name,
                     budget.start_attempt()
                 led.ev("OBLIGATION_SET", cmd=cmd, t_s=round(clock.monotonic() - led.t0, 3),
                        cap_seconds=budget.cap)
-            try:
-                port.write((cmd + "\r\n").encode("ascii"))
-            except (OSError, Stop) as e:
-                raise Stop("COMMAND_WRITE_FAILED",
-                           "%s:%s" % (cmd, getattr(e, "code", e.__class__.__name__)))
-            if transport == "stub":
-                if silent:
-                    pass                        # 注入: 板子不回话 => 只能靠截止时间具名停止
-                else:
-                    resp = fixture.get("responses", {}).get(st.get("key") or cmd)
-                    if resp is None:
-                        raise Stop("STUB_MISS", cmd)
-                    port.feed(("\r\n".join(resp) + "\r\nmsh >").encode("utf-8"))
-            lines, nbytes = read_until_prompt(port, step_dl, led, raw, clock)
-            if not lines:
-                raise Stop("MISSING_RESPONSE_PROMPT", "as=%s bytes=%d" % (asname, nbytes))
-            v = assert_step(st, lines, asname, led, raw=Path(raw).read_bytes())
-            try:
-                txt = emit_text(raw, lines)
-            except OSError as e:
-                raise Stop("EVIDENCE_WRITE_FAILED", "as=%s:%s" % (asname, e))
+            if st.get("poll"):
+                # 有限轮询取证(只在申报的重试码内等): 到期/不一致 => 撤能由 finally 统一走
+                poll_command_step(port, cmd, st, asname, idx, out, step_dl, transport, fixture,
+                                  silent, led, clock, budget, results)
+                continue
+            v, nbytes, txt = command_attempt(port, cmd, st, asname, raw, step_dl, transport,
+                                             fixture, silent, led, clock)
             results.append(dict({"as": asname, "kind": "command", "cmd": cmd,
                                  "rx_bytes": nbytes, "rx_sha256": sha_of(raw),
                                  "txt": txt}, **v))
@@ -1065,13 +1309,22 @@ def exec_session(session_id, steps, outdir, transport, fixture, port_name,
     finally:
         if obligation:                     # 不只是"起转成功之后": 潜在已武装同样清理
             hook = _stub_feed(port, fixture) if transport == "stub" else None
-            disarm_state, cerr = cleanup(port, led, clock, budget, transport, fixture,
-                                         hook, quota_box if plan else None,
-                                         cleanup_overruns, used)
-            errors.extend(cerr)
+            try:
+                disarm_state, cerr = cleanup(port, led, clock, budget, transport, fixture,
+                                             hook, quota_box if plan else None,
+                                             cleanup_overruns, used)
+                errors.extend(cerr)          # 清理错独立留账: 主错在 ret, 不能被吞成空成功
+            except Exception as e:
+                # 清理框架自己炸了: 禁能一律 UNKNOWN(不猜"应该已经撤了"), 但端口仍要关
+                disarm_state = "UNKNOWN"
+                errors.append("CLEANUP_FRAME_RAISED_%s:%s" % (e.__class__.__name__, repr(e)))
+                led.ev("CLEANUP_FRAME_EXCEPTION", err=repr(e))
         try:
-            port.close()
-            led.ev("PORT_CLOSED")
+            if port is not None:
+                port.close()
+                led.ev("PORT_CLOSED")
+            else:
+                led.ev("PORT_NEVER_OPENED")
         except Exception as e:
             errors.append("PORT_CLOSE:" + repr(e))
         led.close()
@@ -1193,6 +1446,46 @@ def msh_command_names(app_dir):
     return names
 
 
+def prove_state_and_flag_constants(app_dir):
+    """把执行器里的两张常量表**回到产品源码**逐项核对(与 prove_needles 同一纪律):
+      motor.h 的 motor_state_t 枚举(隐式递增) 与 diag_relative.h 的 RPF_* 位。
+    返回 (ok, detail)。名字或数值漂了就必须在这里 FAIL, 而不是等现场判错。"""
+    bad = []
+    mh = Path(app_dir) / "motor.h"
+    if not mh.exists():
+        return False, "motor.h_missing"
+    body = re.search(r"typedef enum\s*\{(.*?)\}\s*motor_state_t;", mh.read_text(encoding="utf-8",
+                                                                                   errors="replace"),
+                     re.S)
+    if not body:
+        return False, "motor_state_t_enum_not_found"
+    found, value = {}, -1
+    for mo in re.finditer(r"\bMOTOR_([A-Z_]+)\s*(?:=\s*(\d+))?\s*(?:,|\n)", body.group(1)):
+        v = int(mo.group(2)) if mo.group(2) else value + 1
+        value = v
+        found[mo.group(1)] = v
+    for k, want in MOTOR_STATE_ENUM.items():
+        if found.get(k) != want:
+            bad.append("MOTOR_%s=源码%s/执行器%s" % (k, found.get(k), want))
+    dh = Path(app_dir) / "diag_relative.h"
+    if not dh.exists():
+        return False, "diag_relative.h_missing" + (";" + ",".join(bad) if bad else "")
+    bits = {mo.group(1): 1 << int(mo.group(2)) for mo in re.finditer(
+        r"#define\s+RPF_([A-Z_]+)\s+\(1u\s*<<\s*(\d)\)", dh.read_text(encoding="utf-8",
+                                                                       errors="replace"))}
+    for k, want in RPF_BITS.items():
+        if bits.get(k) != want:
+            bad.append("RPF_%s=源码%s/执行器%s" % (k, bits.get(k), want))
+    hdr = re.search(r'rt_kputs\("(slot,seq,[^"]*)"|rt_snprintf\([^;]*?"(slot,seq,[^"]*)"',
+                    (Path(app_dir) / "ns_flash_shell.c").read_text(encoding="utf-8", errors="replace")
+                    if (Path(app_dir) / "ns_flash_shell.c").exists() else "")
+    src_header = (hdr.group(1) or hdr.group(2)).replace("\\n", "").strip() if hdr else None
+    if src_header and src_header.strip() != FLASH_DUMP_HEADER:
+        bad.append("FLASH_DUMP_HEADER 漂移")
+    return (not bad), (";" .join(bad) if bad else
+                       "motor=%s rpf=%s columns=%d" % (found, bits, FLASH_DUMP_COLUMNS))
+
+
 def validate_plan(plan, rows_doc, app_dir):
     """整包计划的离线门: 逐项返回 "检查名|PASS/FAIL|细节" 行。
     这里只判定**结构可执行性**(命令真实存在、取行取得到、额度申报过、as 唯一、
@@ -1203,6 +1496,21 @@ def validate_plan(plan, rows_doc, app_dir):
     quota = plan["quota"]
     for stg in plan["stages"]:
         sid = stg["id"]
+        if stg.get("reset_after_port_open"):
+            # 定长回读用 connect_mode=halt + resume_on_disconnect=false, 结束时核是 **Halted**
+            # (审核 §2A): 核心还没跑, 第一条串口查询必然没有应答。所以这一步的结构判据是
+            # "复位在最前 + 启动流已申报", 不是"等它自己冒提示符"。
+            steps = stg.get("steps", [])
+            first_cmd = next((i for i, s in enumerate(steps) if s.get("cmd")), None)
+            first_reset = next((i for i, s in enumerate(steps)
+                                if s.get("action") == "reset"), None)
+            ok = (first_reset == 0 and (first_cmd is None or first_reset < first_cmd)
+                  and bool(stg.get("post_reset_boot")))
+            out.append("PLAN_RESET_BEFORE_FIRST_QUERY|%s|%s|reset@%s first_cmd@%s boot=%d" %
+                       (sid, "PASS" if ok else "FAIL", first_reset, first_cmd,
+                        len(stg.get("post_reset_boot") or [])))
+            if not ok:
+                bad += 1
         seen_as = []
         for st in stg.get("steps", []):
             asname = st.get("as") or "?"
@@ -1273,6 +1581,23 @@ def validate_plan(plan, rows_doc, app_dir):
     out.append("PLAN_QUOTA_COVERAGE|all|%s|used=%s missing=%s" %
                ("PASS" if not missing else "FAIL", ",".join(undeclared), ",".join(missing)))
     bad += len(missing)
+    # 状态/位/表头三张常量表回到源码核对(不靠注释声明"我是照抄产品的")
+    ok_c, detail_c = prove_state_and_flag_constants(app_dir)
+    out.append("PLAN_STATE_AND_FLAG_CONSTANTS|all|%s|%s" % ("PASS" if ok_c else "FAIL", detail_c))
+    if not ok_c:
+        bad += 1
+    # 起转上限按阶段申报, 总额受 quota.motor_run_seconds_total 全局审计(审核 §3 新离线合同)
+    caps = [(sg["id"], int(sg["motion_cap_seconds"])) for sg in plan["stages"]
+            if sg.get("motion_cap_seconds")]
+    starts = sum(1 for sg in plan["stages"] for st in sg.get("steps", [])
+                 if st.get("cmd") == "motor_start")
+    total = int(quota.get("motor_run_seconds_total", 0))
+    ok_t = caps and sum(c for _, c in caps) <= total and starts <= int(quota.get("motor_run", 0)) \
+        and all(c <= total for _, c in caps)
+    out.append("PLAN_MOTION_CAP_BUDGET|all|%s|caps=%s sum=%d total=%d starts=%d" %
+               ("PASS" if ok_t else "FAIL", caps, sum(c for _, c in caps), total, starts))
+    if not ok_t:
+        bad += 1
     return out, bad, len(names)
 
 
@@ -1365,9 +1690,63 @@ def record_from_rows(stage, results, recorded, profile="healthy"):
     return recorded
 
 
+def flash_frames_verdict(stage, results, recorded, led):
+    """事故取证要**读回到实际日志帧**(审核 §2D 第 4 条): 计数增大只是"本轮确实多写了一笔"的
+    身份前置, 不是日志内容。这里复用 M5/M6 既有的 flash_dump 原字节归档与同一张 14 列表头
+    (ns_flash_shell.c:153/159-163), 不新造日志判定工具, 也不重跑 300 帧软件触发。
+
+    逐帧行必须: 列数=14、session 列 == 本轮记录的新 session、批内没有 empty/error/overflow
+    (产品读槽时内部校 CRC/commit, 不过就打成 "slot N error -x" => 有这类行就是取证未完成)。"""
+    bad = []
+    got = dict((r.get("as"), r.get("txt")) for r in results if r.get("txt"))
+    for spec in stage.get("require_frames", []):
+        txt = got.get(spec["step"])
+        if not txt:
+            bad.append("%s:STEP_TEXT_MISSING" % spec["step"])
+            continue
+        rows = Path(txt).read_text(encoding="utf-8", errors="replace").splitlines()
+        frames, read_errors = [], []
+        for line in rows:
+            s = line.strip()
+            if not s or s == FLASH_DUMP_HEADER:
+                continue
+            if any(b in s for b in FLASH_DUMP_BAD):
+                read_errors.append(s[:80])
+                continue
+            parts = s.split(",")
+            if len(parts) == FLASH_DUMP_COLUMNS and all(p.isdigit() for p in parts):
+                frames.append(parts)
+        want = recorded.get(spec["session_key"])
+        keyed = [f for f in frames if want is not None and f[2] == str(want)]
+        miss = []
+        if not frames:
+            miss.append("CSV_FRAMES=0")
+        if want is None:
+            miss.append("SESSION_NOT_RECORDED(%s)" % spec["session_key"])
+        elif len(keyed) < int(spec.get("min_frames", 1)):
+            miss.append("SESSION_FRAMES=%d<%d(session=%s)" %
+                        (len(keyed), int(spec.get("min_frames", 1)), want))
+        if read_errors:
+            miss.append("SLOT_READ_ERRORS=%d:%s" % (len(read_errors), read_errors[0]))
+        for need in spec.get("must_include", []):
+            hit = [f for f in keyed
+                   if all(f[FLASH_DUMP_HEADER.split(",").index(k)] == str(v)
+                          for k, v in need.items())]
+            if not hit:
+                miss.append("NO_FRAME_WITH(%s)" % json.dumps(need, sort_keys=True))
+        led.ev("FLASH_FRAMES", **{"as": spec["step"], "csv_frames": len(frames),
+                                  "session_frames": len(keyed), "session": want,
+                                  "read_errors": len(read_errors), "bad": miss})
+        if miss:
+            bad.append("%s:%s" % (spec["step"], ",".join(miss)))
+    return bad
+
+
 def build_session_fixture(stage, table, profile):
     """按阶段步骤 + 行表 + 分支档案装配一个会话的响应表(不含任何人工门的答案)。"""
     responses = {}
+    sequence = {}
+    block = {}
     for st in stage.get("steps", []):
         key = st.get("key") or st.get("cmd")
         if not key or key == "__approved_reboot__":
@@ -1378,12 +1757,22 @@ def build_session_fixture(stage, table, profile):
                 else list(st.get("watch_rows", []))
             continue
         responses[key] = rows_for(table, key, profile)
+        if st.get("poll_sequence"):
+            # 轮询的响应序列也要**申报**: 第 1 次读到 ACCEL、之后读到 CRUISE 是行表里的两组,
+            # 不是执行器临时编出来的。
+            sequence[key] = [rows_for(table, k, profile) for k in st["poll_sequence"]]
+            responses[key] = sequence[key][-1]
+        bs = (table["commands"].get(key) or {}).get("_block_seconds")
+        if bs:
+            block[key] = float(bs)
     # 清理三条命令**总是**要在同一张表里有一行: 义务建立后的 stop/disarm/status 是执行器
     # 自己发的, 不是阶段步骤 —— 少一份响应就会变成"清理查不到东西"的假 NO_RESPONSE。
     for cmd in CLEANUP_CMDS:
         if cmd not in responses:
             responses[cmd] = rows_for(table, cmd, profile)
     return {"boot_bytes": list(stage.get("boot_bytes", [])), "responses": responses,
+            "sequence": sequence, "block": block,
+            "post_reset_boot": list(stage.get("post_reset_boot", [])),
             "manual": dict(stage.get("manual_answers", {})),
             "cleanup_rows_source": list(CLEANUP_CMDS)}
 
@@ -1492,6 +1881,58 @@ def s0_binding(plan, repo_root):
     return facts
 
 
+# ---------------------------------------------------- 模式分流与响应分支(R3 复审 §2C)
+# 离线工装与真实执行是两条互不相交的路: 混合模式既没有离线工装的确定性, 也没有真实执行的
+# 身份交付门 —— `transport=real + backend=sim` 会把"模拟下载"记成真实执行, 反过来
+# `transport=stub + backend=real` 会在假端口上跑真工具。两者都必须在**任何 UID 读取/工具调用/
+# 开口动作之前**具名拒绝, 而不是走到某一步才偶然发现。
+ALLOWED_MODES = {("stub", "sim"), ("real", "real"), ("real", "manual")}
+STUB_PROFILES = ("healthy", "trip", "no_trigger", "denied", "silent")
+REAL_PROFILE = "response_driven"
+
+
+def mode_gate(transport, backend_name, profile=None):
+    """合法组合返回 "", 否则返回具名拒绝码。真实入口只接受一次 dispatch + 一本总账 +
+    **由本次响应决定分支**的 profile; 预选夹具档案(healthy/trip/no_trigger)与 -Profile all
+    的多遍整包只属于离线工装。profile=None 只核模式组合(单会话入口没有档案概念)。"""
+    if (transport, backend_name) not in ALLOWED_MODES:
+        return "MODE_COMBINATION_REFUSED"
+    if profile is None:
+        return ""
+    if transport == "real":
+        return "" if profile == REAL_PROFILE else "REAL_PROFILE_NOT_RESPONSE_DRIVEN"
+    return "" if profile in STUB_PROFILES else "STUB_PROFILE_UNKNOWN"
+
+
+def response_branch(res, stage):
+    """本次响应决定的分支: 观察窗到时无触发 => no_trigger; 窗内出现申报过的触发 needle
+    (会话按业务正常结束, 而不是 OBSERVATION_NO_TRIGGER) => trip。两者都没证据 => None,
+    此时依赖分支的阶段一律不许默默跳过, 而是 RESPONSE_BRANCH_UNDETERMINED 停止。
+
+    只有**申报了自己是分支决定点**的阶段才参与判定(decides_response_branch): 学习会话里的
+    到时未触发是常态, 把它当"本次没有事故"来决定事故支线就是拿错的观察点下结论。"""
+    if not stage.get("decides_response_branch"):
+        return None
+    if res.get("status") == "OBSERVATION_NO_TRIGGER":
+        return "no_trigger"
+    if any(r.get("kind") == "watch" and r.get("trigger_seen") for r in res.get("results", [])):
+        return "trip"
+    return None
+
+
+def dispatch_refusal(plan, profile, outdir, code):
+    """拒绝分支也要带回调度层的完整字段: 调用方会照样打印 stages/not_run/quota,
+    少一个键就是 KeyError, 现场只会看到崩栈而不是"被拒绝"。"""
+    return {"status": "REFUSED", "code": code, "stages": [],
+            "not_run": [s["id"] for s in plan["stages"]], "recorded": {},
+            "quota_left": dict(plan["quota"]), "quota_used": {},
+            "expected_stages": [], "profile": profile, "dir": str(outdir),
+            "branch": None,
+            "actions_attempted": [],
+            "quota_audit": {"undeclared_used": [], "negative_left": [], "lines": []},
+            "ledger": str(Path(outdir) / "dispatch_ledger.jsonl")}
+
+
 def dispatch_plan(plan, transport, backend_name, outdir, clock, profile, port,
                   repo_root, approval_token=None, expected_token=None, uid_file=None,
                   plan_dir=None):
@@ -1499,6 +1940,13 @@ def dispatch_plan(plan, transport, backend_name, outdir, clock, profile, port,
     重新批准、不重新下载), **失败**才终止。
     整包共用同一本额度账(quota_box)与同一个动作后端; 每个串口会话仍各开一次端口。
     任何会话非成功(含清理 UNKNOWN / 清理错误 / 预留耗尽 / 证据失败)都阻断后续阶段并非零返回。"""
+    code = mode_gate(transport, backend_name, profile)
+    if code:
+        # 模式账先于一切: 这一刻 UID 没读、工具没起、端口没开, 所以"副作用清单为空"是真空而不是漏记。
+        return dispatch_refusal(plan, profile, outdir, code)
+    if transport == "real" and (not approval_token or approval_token != expected_token):
+        # 批准门也在读私有 UID 之前: 没批准就没有任何一次私有材料的消费。
+        return dispatch_refusal(plan, profile, outdir, "REAL_TRANSPORT_REFUSED")
     quota_box = dict(plan["quota"])
     used_box = {}
 
@@ -1512,27 +1960,30 @@ def dispatch_plan(plan, transport, backend_name, outdir, clock, profile, port,
         subs["@UID_FILE"] = uid_from_file(uid_file)
     backend_cls = {"sim": SimActionBackend, "manual": ManualActionBackend,
                    "real": RealActionBackend}[backend_name]
-    backend = backend_cls(led, out, clock, 900, subs)
-    if transport == "real" and (not approval_token or approval_token != expected_token):
-        # 拒绝分支也要带回调度层的完整字段: main 会照样打印 stages/not_run/quota,
-        # 少一个键就是 KeyError, 现场只会看到崩栈而不是"被拒绝"。
-        return {"status": "REFUSED", "code": "REAL_TRANSPORT_REFUSED", "stages": [],
-                "not_run": [s["id"] for s in plan["stages"]], "recorded": {},
-                "quota_left": dict(plan["quota"]), "quota_used": {},
-                "expected_stages": [], "profile": profile, "dir": str(out),
-                "quota_audit": {"undeclared_used": [], "negative_left": [], "lines": []},
-                "ledger": str(led_path)}
+    backend = (backend_cls(led, out, clock, 900, subs, repo_root=repo_root)
+               if backend_cls is RealActionBackend else backend_cls(led, out, clock, 900, subs))
     table = load_rows(Path(plan_dir or out.parent) / plan.get("rows_file", "rows.json"))
     recorded = {}
     stages, done, notrun = plan["stages"], [], []
+    # 分支: 离线由档案**声明**; 真实由本次响应**决定**(response_branch), 决定前依赖分支的阶段不许走。
+    branch = profile if transport == "stub" else None
+    active_profile = profile
+    expected_ids = []
     for i, stg in enumerate(stages):
         sid = stg["id"]
         rest = [x["id"] for x in stages[i:]]
-        if stg.get("profiles") and profile not in stg["profiles"]:
-            # 档案不参与 = **不在期望序列里**, 因此既不算已执行也不算 NOT_RUN; 台账留具名跳过事件。
-            led.ev("STAGE_SKIPPED_BY_PROFILE", stage=sid, profiles=stg["profiles"],
-                   profile=profile)
-            continue
+        tags = stg.get("profiles")
+        if tags:
+            if transport == "real" and branch is None:
+                done.append({"id": sid, "status": "STOP", "code": "RESPONSE_BRANCH_UNDETERMINED",
+                             "detail": "%s 依赖 %s, 但本次响应还没给出分支" % (sid, tags)})
+                notrun = rest
+                break
+            if branch not in tags:
+                # 档案/分支不参与 = **不在期望序列里**, 因此既不算已执行也不算 NOT_RUN; 台账留具名跳过事件。
+                led.ev("STAGE_SKIPPED_BY_PROFILE", stage=sid, profiles=tags, branch=branch)
+                continue
+        expected_ids.append(sid)
         if transport == "stub" and stg["kind"] in ("download", "readback", "reset"):
             pass                                   # sim 后端记录调用序列, 不碰设备
         kind = stg["kind"]
@@ -1590,23 +2041,51 @@ def dispatch_plan(plan, transport, backend_name, outdir, clock, profile, port,
                     led.ev("CHECKPOINT", stage=sid, note=stg["operator_checkpoint"])
                 continue
             if kind == "serial_session":
-                steps = stage_steps(stg, profile)
-                fx = build_session_fixture(stg, table, profile)
-                fx["profile"] = profile
+                steps = stage_steps(stg, active_profile)
+                fx = build_session_fixture(stg, table, active_profile)
+                fx["profile"] = active_profile
+                # 起转上限**按阶段**传入(R3 复审 §3): 学习 15 s、保护观察 5 s 是两种不同的
+                # 时间合同, 不能都套同一个 5 s; 总额仍由 plan.quota.motor_run_seconds_total 全局审计。
+                cap = int(stg.get("motion_cap_seconds",
+                                  plan["quota"]["motion_cap_seconds_per_run"]))
                 res = exec_session("S_" + sid, steps, out, transport, fx, port,
                                    int(stg.get("total_deadline_seconds", 120)), clock,
                                    backend=backend,
-                                   motion_cap_seconds=plan["quota"]["motion_cap_seconds_per_run"],
+                                   motion_cap_seconds=cap,
                                    plan=plan, quota_box=quota_box, used_box=used_box)
+                if transport == "real":
+                    # 分支由**本次响应**决定: 未触发就把事故取证支线留在 NOT_RUN 之外,
+                    # 真实触发就必须走 S9/S10/S11 —— 不许用"先前选了一个夹具档案"把它跳过。
+                    seen = response_branch(res, stg)
+                    if seen:
+                        if branch and branch != seen:
+                            raise Stop("RESPONSE_BRANCH_CONFLICT",
+                                       "%s=%s 与本次 %s=%s 相冲" % (sid, "prior", branch, seen))
+                        branch = seen
+                        active_profile = seen
+                        led.ev("RESPONSE_BRANCH", stage=sid, branch=seen)
                 # 计划可以**申报**某个具名拒绝就是这一阶段的目的(expected_terminal):
                 # 该会话仍然在拒绝处结束(绝不继续 commit/save/start/arm/fault_reset), 危险面
                 # 与不申报时完全一致, 只是不再把"观察到了预期拒绝"当成阶段失败。拒绝的原文与
                 # code 照样进结果, 台账里仍是 status=REFUSED。
-                if (not res["success"] and res["status"] in stg.get("expected_terminal", [])):
+                # 计划可以申报"这一阶段的目的就是看见这条具名拒绝"。豁免的**只有业务结果**这一项:
+                # 清理 UNKNOWN / 清理错 / 预留耗尽 / 证据失败一律仍然非成功。
+                expected_refusal_ok = (
+                    res["status"] == "REFUSED"
+                    and res["status"] in stg.get("expected_terminal", [])
+                    and res["code"] == "NAMED_REFUSAL"
+                    and res["terminal"] == "KNOWN"
+                    and not res["cleanup_errors"]
+                    and not res.get("cleanup_overruns")
+                    and (not res["obligation"] or res["disarm"] == "CONFIRMED_DISABLED")
+                    and bool(res.get("refused"))
+                    and all(t in " ".join(res.get("refused") or [])
+                            for t in stg.get("expected_refusal_needles", [])))
+                if (not res["success"] and expected_refusal_ok):
                     res = {**res, "success": True, "expected_refusal": res["status"],
                             "refused_lines": res.get("refused")}
                 try:
-                    record_from_rows(stg, res["results"], recorded, profile)
+                    record_from_rows(stg, res["results"], recorded, active_profile)
                 except Stop as e:
                     # 会话本身已经带着主错(例如 QUOTA_EXHAUSTED)时**不覆盖**它: 记录/比较
                     # 的失败另记 record_code, 否则现场只会看到"比较缺步骤"而看不到真因。
@@ -1615,10 +2094,20 @@ def dispatch_plan(plan, transport, backend_name, outdir, clock, profile, port,
                            "code": res.get("code") or e.code,
                            "detail": res.get("detail") or e.detail,
                            "record_code": e.code, "record_detail": e.detail}
+                if stg.get("require_frames"):
+                    # 计数增大只证明"本轮多写了一笔"; 帧本身读不回来 = 取证未完成, 阶段不许成功。
+                    fb = flash_frames_verdict(stg, res["results"], recorded, led)
+                    if fb:
+                        res = {**res, "success": False, "forensics": "INCOMPLETE",
+                               "code": res.get("code") or "FLASH_FRAMES_NOT_RECOVERED",
+                               "detail": res.get("detail") or json.dumps(fb, ensure_ascii=False)}
+                        led.ev("FORENSICS_INCOMPLETE", stage=sid, bad=fb)
                 done.append({"id": sid, "status": res["status"], "code": res["code"],
                              "recorded": dict(recorded),
                              "success": res["success"], "disarm": res["disarm"],
                              "terminal": res["terminal"],
+                             "expected_refusal": res.get("expected_refusal"),
+                             "forensics": res.get("forensics"),
                              "cleanup_errors": res["cleanup_errors"],
                              "obligation": res["obligation"],
                              "dir": res["dir"], "steps": len(res["results"])})
@@ -1640,7 +2129,7 @@ def dispatch_plan(plan, transport, backend_name, outdir, clock, profile, port,
     audit_lines = ["QUOTA_AUDIT|%s|declared=%d|used=%d|left=%d" %
                    (k, plan["quota"][k], used_box.get(k, 0), quota_box.get(k))
                    for k in sorted(plan["quota"])]
-    expected = [x["id"] for x in stages if not x.get("profiles") or profile in x["profiles"]]
+    expected = expected_ids
     ok = (not notrun) and all(d.get("success", True) for d in done) \
         and [d["id"] for d in done] == expected \
         and not undeclared and not negative
@@ -1650,6 +2139,7 @@ def dispatch_plan(plan, transport, backend_name, outdir, clock, profile, port,
                             "lines": audit_lines},
             "expected_stages": expected, "recorded": recorded,
             "quota_left": quota_box, "quota_used": used_box, "profile": profile,
+            "branch": branch, "actions_attempted": list(backend.attempts),
             "ledger": str(led_path), "dir": str(out)}
 
 
@@ -1691,6 +2181,12 @@ def main(argv=None):
             print(l)
         print("NEEDLES|total=%d|unproven=%d" % (len(lines), bad))
         return 1 if bad else 0
+    mcode = mode_gate(a.transport, a.backend, a.profile if a.dispatch else None)
+    if mcode:
+        # 分流门在批准令牌/UID/工具/端口之前: 混合模式或真实预选档案 => 一条命令都不发。
+        print("%s:transport=%s backend=%s profile=%s" %
+              (mcode, a.transport, a.backend, a.profile), file=sys.stderr)
+        return 4
     if a.transport == "real":
         if not a.approval_token or a.approval_token != a.expected_token:
             print("REAL_TRANSPORT_REFUSED:approval_token_missing_or_mismatch", file=sys.stderr)
@@ -1738,11 +2234,12 @@ def main(argv=None):
             print("QUOTA_AUDIT_FAIL|negative_left=%s" % k)
         for sid in res["not_run"]:
             print("DISPATCH|stage=%s|status=NOT_RUN" % sid)
-        print("DISPATCH_SUMMARY|status=%s|stages_executed=%d|stages_not_run=%d|"
-              "quota_left=%s|quota_used=%s|profile=%s|ledger=%s" %
-              (res["status"], len(res["stages"]), len(res["not_run"]),
+        print("DISPATCH_SUMMARY|status=%s|code=%s|stages_executed=%d|stages_not_run=%d|"
+              "quota_left=%s|quota_used=%s|profile=%s|branch=%s|actions_attempted=%s|ledger=%s" %
+              (res["status"], res.get("code", ""), len(res["stages"]), len(res["not_run"]),
                json.dumps(res["quota_left"], sort_keys=True),
-               json.dumps(res["quota_used"], sort_keys=True), res["profile"], res["ledger"]))
+               json.dumps(res["quota_used"], sort_keys=True), res["profile"],
+               res.get("branch"), json.dumps(res.get("actions_attempted", [])), res["ledger"]))
         return 0 if res["status"] == "OK" else 1
     steps = json.loads(Path(a.steps).read_text(encoding="utf-8-sig"))
     if not isinstance(steps, list):
