@@ -632,13 +632,15 @@
     },
     "flash_logstat": {
       "healthy": [
-        "slots=0/4096 valid=0 bad=0",
-        "queued=0 completed=0 failed=0 queue_dropped=0 last_error=0"
+        "slots=600/4096 valid=600 bad=0",
+        "queued=300 completed=300 failed=0 queue_dropped=0 last_error=0"
       ],
       "_provenance": {
-        "kind": "board_capture",
-        "file": "reports/reviews/phase8-motor-m5-fault-log/cp1/fault_attempt/012_flash_logstat.bin",
-        "lines": "整块两行(ASCII 原始 RX)"
+        "kind": "source_shape",
+        "files": [
+          "applications/ns_flash_shell.c:100-110"
+        ],
+        "note": "Offline declared append scenario only: 300 existing committed slots, 300 new frames, tail slots 592..599. Not board evidence."
       }
     },
     "fault_reset": {
@@ -770,34 +772,47 @@
     "flash_dump 0 8": {
       "healthy": [
         "slot,seq,session,time_ms,event,valid,sg,current_ma,ax_mg,ay_mg,az_mg,step_hz,vibration_mg,flags",
-        "0,1,8,1790589,0,31,74,26,23,11,1002,300,1002,423792640",
-        "1,2,8,1790601,0,31,74,26,23,15,1006,300,1006,423792640",
-        "2,3,8,1790614,0,31,75,27,22,14,1004,300,1004,423792640",
-        "3,4,8,1792118,9,31,76,15,27,15,1010,0,1010,427069705",
-        "4,5,8,1792130,9,31,76,16,26,14,1008,0,1008,427069705",
-        "5,6,8,1792143,9,31,77,15,28,15,1012,0,1012,427069705",
-        "6,7,8,1792156,9,31,77,16,27,16,1010,0,1010,427069705",
-        "7,8,8,1792169,9,31,78,15,26,15,1009,0,1009,427069705"
+        "592,1,8,1790589,9,31,74,26,-23,11,1002,0,1002,423792640",
+        "593,2,8,1790601,9,31,74,26,-23,15,1006,0,1006,423792640",
+        "594,3,8,1790614,9,31,75,27,-23,14,1004,0,1004,423792640",
+        "595,4,8,1792118,9,31,76,15,-23,15,1010,0,1010,427069705",
+        "596,5,8,1792130,9,31,76,16,-23,14,1008,0,1008,427069705",
+        "597,6,8,1792143,9,31,77,15,-23,15,1012,0,1012,427069705",
+        "598,7,8,1792156,9,31,77,16,-23,16,1010,0,1010,427069705",
+        "599,8,8,1792169,9,31,78,15,-23,15,1009,0,1009,427069705"
       ],
       "trip": [
         "slot,seq,session,time_ms,event,valid,sg,current_ma,ax_mg,ay_mg,az_mg,step_hz,vibration_mg,flags",
-        "0,1,8,1790589,0,31,74,26,23,11,1002,300,1002,423792640",
-        "1,2,8,1790601,0,31,74,26,23,15,1006,300,1006,423792640",
-        "2,3,8,1790614,0,31,75,27,22,14,1004,300,1004,423792640",
-        "3,4,8,1792118,9,31,76,15,27,15,1010,0,1010,427069705",
-        "4,5,8,1792130,9,31,76,16,26,14,1008,0,1008,427069705",
-        "5,6,8,1792143,9,31,77,15,28,15,1012,0,1012,427069705",
-        "6,7,8,1792156,9,31,77,16,27,16,1010,0,1010,427069705",
-        "7,8,8,1792169,9,31,78,15,26,15,1009,0,1009,427069705"
+        "592,1,8,1790589,9,31,74,26,-23,11,1002,0,1002,423792640",
+        "593,2,8,1790601,9,31,74,26,-23,15,1006,0,1006,423792640",
+        "594,3,8,1790614,9,31,75,27,-23,14,1004,0,1004,423792640",
+        "595,4,8,1792118,9,31,76,15,-23,15,1010,0,1010,427069705",
+        "596,5,8,1792130,9,31,76,16,-23,14,1008,0,1008,427069705",
+        "597,6,8,1792143,9,31,77,15,-23,15,1012,0,1012,427069705",
+        "598,7,8,1792156,9,31,77,16,-23,16,1010,0,1010,427069705",
+        "599,8,8,1792169,9,31,78,15,-23,15,1009,0,1009,427069705"
       ],
       "_provenance_flash_dump": {
-        "kind": "board_capture_composed",
+        "kind": "source_shape",
         "files": [
           "reports/reviews/phase8-motor-m5-fault-log/cp1/final_pass/009_flash_dump_0_100.bin (板上原字节 5891 B: 表头 + slot 0.. 的 14 列 CSV, 逐字)",
           "reports/reviews/phase8-motor-m6-offline/m5_raw_recovery/011_flash_dump_200_100.bin.b64 (同一现场原件的 base64 副本, 停后帧 event=9 且 step_hz=0 的形状来源)",
           "applications/ns_flash_shell.c:157-163 (empty/error/overflow 三种读槽失败的打印分支)"
         ],
-        "note": "两块都是真机逐字采集; 换掉的只有本轮计划要证的三个值(session=8 即 S8 记录->S9 严格增大后的本次新增 session、time_ms 取本次窗口、slot/seq 连续)。表头与逐帧格式串在 ns_flash_shell.c 的 flash_dump 里(表头 rt_kputs, 帧体 rt_snprintf); CRC/commit 不在 CSV 里, 由 ns_storage.c 的读槽路径内部校验, 失败就走上面那几条 empty/error 分支 => 本组出现 empty/error/overflow 即取证未完成。"
+        "note": "C CSV shape, signed ax_mg and a declared new committed tail range 592..599; numerical values are injected, not board observations. The legacy key is only a stub selector."
+      }
+    },
+    "flash_logstat@before": {
+      "healthy": [
+        "slots=300/4096 valid=300 bad=0",
+        "queued=0 completed=0 failed=0 queue_dropped=0 last_error=0"
+      ],
+      "_provenance": {
+        "kind": "source_shape",
+        "files": [
+          "applications/ns_flash_shell.c:100-110"
+        ],
+        "note": "Offline declared append scenario only: 300 existing committed slots, 300 new frames, tail slots 592..599. Not board evidence."
       }
     }
   }

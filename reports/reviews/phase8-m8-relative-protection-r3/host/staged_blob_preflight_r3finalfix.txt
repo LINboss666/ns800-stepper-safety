@@ -1,0 +1,21 @@
+# 提交前置校验(FF 最终补正轮): 清单登记的每一件, 其 **Git 暂存 blob** 的 sha256 等于清单值(等于磁盘字节)。
+#
+# 命令(逐字): python D:/ns800_m8r3_scratch/staged_preflight_r3.py    (工作目录 D:/ns800, PYTHONIOENCODING=utf-8)
+# 判据实现要点: 用 `git cat-file blob :<path>` 取**暂存区对象**再算 sha256 —— 只查磁盘字节会被
+#   core.autocrlf=true 骗过(add 时剥 CR, blob 与清单就不相等)。三方对照: 清单 sha == blob sha == 磁盘 sha。
+# 本轮另加一层直接对五件候选的身份核对(不依赖清单): field/ 五件的**暂存 blob** 散列必须等于
+#   审核方 patch_identity.json 的候选散列, 基线则从 15745e5 的 Git blob 复算 —— 见 host/ff_identity.json。
+# 范围声明: 本文件自身的条目与 SHA256SUMS.txt 都不在本清单内自证; 它们的逐字节身份由推送后
+#   host/remote_readback.py 从**远端 blob** 复算覆盖, 结果按任务书 §4 第 7 条写进回执。
+# 另: field/__pycache__/ 的两件 .pyc 是本轮 import 副产物, 已从暂存区撤出(git restore --staged),
+#   从未入库; 清单生成规则本来就排除 __pycache__, 所以不影响任何登记条目。
+
+
+MANIFEST reports/reviews/phase8-m8-relative-protection-r3/SHA256SUMS.txt entries=4190 problems=0 []
+MANIFEST reports/firmware/phase8-m8-relative-protection-r3/SHA256SUMS.txt entries=10 problems=0 []
+BUILD_MANIFEST reports/firmware/phase8-m8-relative-protection-r3/build_manifest.json resolved=9 problems=0 []
+BUILD_MANIFEST_BLOBS(same items via firmware manifest path) entries=9 problems=0 []
+STAGED_PREFLIGHT_TOTAL problems=0  (0 => 每个登记件的 Git blob 都与清单逐字节相符)
+
+FF_CANDIDATE_BLOBS(base=15745e5) entries=5 problems=0 []
+FF_CANDIDATE_BLOB_NOTE|blob=git cat-file :<path>(暂存区对象)|base=同一命令取 15745e5 的提交对象

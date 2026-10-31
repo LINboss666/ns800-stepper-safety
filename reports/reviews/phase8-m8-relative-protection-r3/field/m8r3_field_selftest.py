@@ -1027,7 +1027,8 @@ def s56_halted_readback_reset_before_first_query(m):
     return (good["status"] == "OK" and st_good["resets"] == 1 and "boot_stream" in kinds and
             reversed_steps["code"] == "MISSING_RESPONSE_PROMPT" and st_rev["resets"] == 0 and
             [x["as"] for x in reversed_steps["results"]] == [] and
-            no_boot["code"] == "POST_RESET_BOOT_PROMPT_MISSING" and st_nb["resets"] == 1,
+            no_boot["status"] == "OK" and st_nb["resets"] == 1 and
+            len([r for r in no_boot["results"] if r.get("cmd")=="system_status"]) == 1,
             "good=%s resets=%d kinds=%s | reversed=%s resets=%d results=%d | no_boot=%s" % (
                 good["status"], st_good["resets"], ",".join(kinds), reversed_steps["code"],
                 st_rev["resets"], len(reversed_steps["results"]), no_boot["code"]))

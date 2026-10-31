@@ -1,0 +1,2 @@
+ROWS_PROVENANCE|groups=41 capture_refs=28 source_anchor_refs=33 problems=0 notes=0
+hardware_actions=0|writes=0|reads=repo_files_only

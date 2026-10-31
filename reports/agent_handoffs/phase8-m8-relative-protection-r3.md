@@ -137,3 +137,31 @@
 
 **15 s 只是离线合同提案, 不是硬件授权, 也没有把旧的 5 秒测试记成通过** —— 将来一次具体板级批准必须
 写明"学习 ≤15 s、保护观察 ≤5 s"。本轮同样未做: 不改产品命令、不实现可取消/有界学习接口。
+
+## 8. 最终补正轮(FF, 2026-11-01)对账
+
+任务书: `NS800_M8_R3_Field_Final_Fixes.md`(完整书，接替此前只给了四处的先行消息) +
+同名 zip(14 件，按其 `SHA256SUMS` 逐件复算 0 不一致)。复审对象 `15745e5`，核心软件输入 `805c29b` 继续有效。
+
+| 项 | 本机落点 | 判据/证据 |
+| --- | --- | --- |
+| F1 | `drain_post_reset_boot` 改有界被动存档(chain:1011-1046)，S3 首查新增 `state=READY/fault=0` 唯一判据 | TB01/TB02/TB03/TB04 + TB17(命令响应提示符门仍强制) + TB21/TB22；修前同一输入被 `POST_RESET_BOOT_PROMPT_MISSING` 拦下 |
+| F2 | `_run` 对 `-c` 后的整条命令串跳过路径映射(chain:657-661) | TB05; 修前实测 argv 变成 `<repo>\savemem 0x08000000 …` |
+| F3 | 帧列按符号分治: 6..12 允许负号，0..5/13 不允许(chain:1767-1769) | TB06/TB07/TB11/TB12 |
+| F4 | S8 第 4 步只读 `flash_logstat` + ≥300 空槽门；S9 由 before/after 推导 `flash_dump first count` 并逐槽核对(chain:1717/1720-1740/1228-1230) | TB08-TB10、TB13-TB16、TB18/TB19; stub 实跑 `NEW_LOG_WINDOW{300,600,592,8}` |
+| F5 | `M8R3Field.ps1:36` 白名单加 `response_driven` | TB20 + 本机 Parser/参数 AST(0 语法错误)；`real+all` 负控仍 PASS |
+
+本轮结果: 候选 73/73 与 22/22、修前对照 7/22、`--validate-plan` 154/0、rows 41 组 problems=0、
+PS 5.1 三入口 22/0 + 14/0 + 3/0(`actions_attempted=0`)。原文与身份表在
+`host/*_r3finalfix.*`、`host/ff_identity.json`、`host/ff_runs.json`、`host/reviewer_ff/`。
+
+结论标签(按任务书 §4 第 7 条，本机条件齐备):
+`M8_R3_FIELD_PACKAGE_OFFLINE_REVIEW_GO_CONDITIONS_MET` —— 这是"候选散列 + 本机复核"的条件式离线接受，
+**不是**硬件许可。
+
+一处偏差照原文保留并登记(见 `run_record.md` §7 末段): `rows.json` 的 `flash_logstat` 系来源锚点
+`ns_flash_shell.c:100-110` 与实际打印行 `:89-99`(`:94-95`/`:96-98`)不符；未改候选字节。
+
+**下一步是向用户呈现一份绑定现有 M8 候选散列的完整现场批准**(学习 ≤15 s、保护观察 ≤5 s、
+最多 2 次 start、合计 ≤20 s、IRUN20/100 Hz/DIR0，其余额度按修正后的 plan，
+并新增 S8 那一次只读 `flash_logstat`); 该批准落地之前不连接、不下载、不复位、不起转。

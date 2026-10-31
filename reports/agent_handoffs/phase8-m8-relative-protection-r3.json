@@ -427,5 +427,55 @@
    "no_path_kept": 32,
    "note": "推送后从远端 Git 协议读 blob 复算, 不读工作树; 该记录写进 remote_readback.md §6。"
   }
+ },
+ "final_fixes_r3": {
+  "task_book": "NS800_M8_R3_Field_Final_Fixes.md + .zip(完整任务书, 接替此前只列四处的先行消息)",
+  "reviewed_base_commit": "15745e548dcfc4983fb91563fdac81ad5fdf3dc9",
+  "core_software_input_still_accepted": "805c29bd73c4ea861c9b9c65f61e946aec9548e3",
+  "field_package_state": "五件候选字节逐字节复算通过(基线=15745e5 的 Git blob, 候选=tail_candidate.patch 在仓外 LF 副本上的输出)",
+  "patch": {
+   "bytes": 21667,
+   "sha256": "07de65f0e94f6ebe682eb6a29c96fe4626d7e1e479423347146ebd19a6045eee",
+   "apply_check_rc": 0,
+   "apply_rc": 0,
+   "five_outputs_identical_to_declared": true
+  },
+  "verdict_label_this_round": "M8_R3_FIELD_PACKAGE_OFFLINE_REVIEW_GO_CONDITIONS_MET",
+  "conditions_locally_met": {
+   "candidate_hashes": true,
+   "original_73": "73/73 rc=0",
+   "boundary_probes": "candidate 22/22 rc=0",
+   "boundary_probes_on_preimage": "7/22 rc=1(逐件旧行为复现, 不是新的产品缺陷计数)",
+   "three_stub_dispatch_paths": "healthy/trip/no_trigger 各 rc=0",
+   "native_powershell_51": "SelfTest 22/0 + Precheck 14/0 + RunField(stub/sim/all) 3/0",
+   "profile_whitelist_ast": "PARSE_ERRORS=0, Profile=healthy,trip,no_trigger,all,response_driven",
+   "rows_source_check": "groups=41 problems=0 notes=0",
+   "plan_structure": "checks=154 fail=0",
+   "zip_inputs_recomputed": "14 件按 SHA256SUMS 复算 0 不一致"
+  },
+  "hardware_authorization": "NONE —— 本任务书未给硬件许可; 未打开串口/DAP, 未下载/复位/起转",
+  "next_step": "向用户呈现绑定现有 M8 候选散列的完整现场批准(含新增的 S8 只读 flash_logstat)",
+  "unchanged_this_round": [
+   "产品 C/H",
+   "Keil 工程",
+   "六镜像/三 map",
+   "固件 manifest",
+   "UART/内核/安全宏",
+   "Flash schema",
+   "历史清单与历史证据",
+   "旧 64/32 历史问题"
+  ],
+  "deviation_reported_not_fixed": {
+   "where": "field/rows.json 的 flash_logstat 与 flash_logstat@before 两处 _provenance.files",
+   "declared": "applications/ns_flash_shell.c:100-110",
+   "actual": "flash_logstat 函数体 applications/ns_flash_shell.c:89-99, 两条 rt_kprintf 在 :94-95 与 :96-98(:100 是 MSH_CMD_EXPORT)",
+   "why_untouched": "候选散列已绑定(任务书要求同字节), 且来源检查器按窗口命中所以 problems=0; 只登记不擅改"
+  },
+  "evidence": {
+   "identity": "reports/reviews/.../host/ff_identity.json",
+   "runs": "reports/reviews/.../host/ff_runs.json",
+   "reviewer_inputs": "reports/reviews/.../host/reviewer_ff/(12 件 + inputs_identity.md)",
+   "reviewer_ff_inputs_not_duplicated": "两份启动件按仓库内同字节来源登记(p0 3381 B = phase8-motor-m7-p0-board/S3_raw_boot.bin.b64 解码; 3757 B = cp3_wire_archive.md 的 base64 段)"
+  }
  }
 }

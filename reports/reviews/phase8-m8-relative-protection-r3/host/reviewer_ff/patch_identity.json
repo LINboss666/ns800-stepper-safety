@@ -1,0 +1,49 @@
+{
+  "base": "15745e548dcfc4983fb91563fdac81ad5fdf3dc9",
+  "patch_bytes": 21667,
+  "patch_sha256": "07de65f0e94f6ebe682eb6a29c96fe4626d7e1e479423347146ebd19a6045eee",
+  "git_apply_check_rc": 0,
+  "git_apply_rc": 0,
+  "files": [
+    {
+      "path": "reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py",
+      "input_bytes": 118261,
+      "input_sha256": "d0baddce2bc5a12a79d3c5d19fc657d84804578ec8196f769ed49ef225603fbc",
+      "candidate_bytes": 121358,
+      "candidate_sha256": "16478ac308c7e72bcf8c08e0822f351879088763cdd8dcf745adc9bfafce1d1b",
+      "patch_output_identical": true
+    },
+    {
+      "path": "reports/reviews/phase8-m8-relative-protection-r3/field/plan.json",
+      "input_bytes": 67229,
+      "input_sha256": "dfa63ab6039a628a27358ecc76d55d3d7b4e686623ad69cab77b386eb4aace67",
+      "candidate_bytes": 67220,
+      "candidate_sha256": "0347230df1f36c94bc5b1e984a347787508d0930ae653125a0494a182e825926",
+      "patch_output_identical": true
+    },
+    {
+      "path": "reports/reviews/phase8-m8-relative-protection-r3/field/rows.json",
+      "input_bytes": 45505,
+      "input_sha256": "05efa69e4bd608b3ac1d5bef73c14f7ec111951e39d3809e765903f7eb08748b",
+      "candidate_bytes": 45773,
+      "candidate_sha256": "f21b8ac346dcb68f798c6578726fe8fe7e6d761fcf9e3f4556bbb8e721e727fa",
+      "patch_output_identical": true
+    },
+    {
+      "path": "reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_field_selftest.py",
+      "input_bytes": 90006,
+      "input_sha256": "b832a275322588e3a0f512b3ee7bf76039d11e6cd2f28c7ee3378af024f962bd",
+      "candidate_bytes": 90071,
+      "candidate_sha256": "ce4efe0200a037fb7af0e36c25d12f14c7f0750b975cd9efb28b9eae3d8fe864",
+      "patch_output_identical": true
+    },
+    {
+      "path": "reports/reviews/phase8-m8-relative-protection-r3/field/M8R3Field.ps1",
+      "input_bytes": 27861,
+      "input_sha256": "02ccee449087e53d1d9ab3abced3745ba55a6a7e2f2af2534001b4dc90415084",
+      "candidate_bytes": 27880,
+      "candidate_sha256": "908c0d87b3352ee99839ff1f57381ba4b5a4aded32c56c397ed3bb6ae408ab13",
+      "patch_output_identical": true
+    }
+  ]
+}

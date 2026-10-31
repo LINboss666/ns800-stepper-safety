@@ -426,7 +426,7 @@
             "@UID_FILE"
           ],
           "boot_drain_seconds": 20,
-          "boot_drain_note": "复位之后、第一条查询之前, 执行器把板子自己发出的启动流按**原字节**收进 NN_rst.boot.rx.bin 并等到提示符边界(复用 P0 的完整响应门)。窗口内没有提示符 => POST_RESET_BOOT_PROMPT_MISSING, 一条查询都不发。20 s 的依据: 既存板级原始件 reports/reviews/phase8-motor-m5-fault-log/cp1/final_pass/002_version.bin 里 复位/上电后的启动横幅与 'msh >' 在同一次连接内就出现了(该件 154 B)。"
+          "boot_drain_note": "Bounded passive boot capture; no spontaneous prompt required. First system_status must return its own complete prompt and canonical READY facts. No extra reset/query/retry."
         },
         {
           "cmd": "system_status",
@@ -442,6 +442,13 @@
               "must": {
                 "bc": "YES",
                 "ab": "0"
+              }
+            },
+            {
+              "row": "^\\[Safety\\] state=(?P<state>\\w+) fault=(?P<fault>\\d+) irq_gate=\\w+ polarity=\\w+ protect_ready=\\w+$",
+              "must": {
+                "state": "READY",
+                "fault": "0"
               }
             }
           ]
@@ -588,11 +595,10 @@
       ],
       "post_reset_boot_provenance": {
         "kind": "source_shape",
-        "basis": "reports/reviews/phase8-motor-m5-fault-log/cp1/final_pass/002_version.bin",
-        "what_is_real": "既存板级原始字节里, 复位/上电后的控制台确实以 'msh >' 结束启动流(同件内 RT-Thread 5.3.0 横幅 + 两次 'msh >')。",
-        "what_is_not_claimed": "这里**不**预写横幅的具体字节: 本轮离线不伪造启动内容, 真实执行时启动流按现场实收原样落盘, 计划只申报'必须等到提示符'这一条边界。"
+        "basis": "Historical full boot captures have no final prompt; 002_version.bin is a version command response, not spontaneous boot evidence.",
+        "what_is_not_claimed": "Synthetic post_reset_boot is only a stub input; all real bytes are archived."
       },
-      "order_note": "S2 的定长回读用 connect_mode=halt + resume_on_disconnect=false, 结束时核留在 Halted: 核心不跑, 第一条串口查询就没有任何应答(审核 §2A 的纯内存模拟: 原顺序 STOP/MISSING_RESPONSE_PROMPT/resets=0, 只对调两步即 OK/resets=1)。所以复位必须在最前, 并且**不自发提示符/绝对静默**都不被当作前置——它们是失败证据, 不是继续的理由。本轮不新增下载, 也不追加复位额度: 仍是那唯一一次 explicit_reset。"
+      "order_note": "Open -> one reset -> bounded passive archive -> one system_status; boot capture is not readiness proof."
     },
     {
       "id": "S4",
@@ -1123,6 +1129,14 @@
             "bb_session",
             "bb_written"
           ]
+        },
+        {
+          "step": "log_before",
+          "regex": "^slots=(?P<flash_used_before>[0-9]+)/(?P<flash_capacity>[0-9]+) valid=[0-9]+ bad=[0-9]+$",
+          "as": [
+            "flash_used_before",
+            "flash_capacity"
+          ]
         }
       ],
       "steps": [
@@ -1144,6 +1158,17 @@
           "seconds": 3,
           "expect_contains": [
             "[BB] state="
+          ]
+        },
+        {
+          "cmd": "flash_logstat",
+          "as": "log_before",
+          "key": "flash_logstat@before",
+          "seconds": 3,
+          "min_free_log_slots": 300,
+          "expect_contains": [
+            "slots=",
+            "completed="
           ]
         },
         {
@@ -1324,14 +1349,19 @@
           "note": "故障锁存后的禁能同样必须证得(name=FAULT 允许, 见 cleaning_and_terminal.why_not_idle); 这一步只用同一份响应的六个合同字段判。"
         },
         {
-          "cmd": "flash_dump 0 8",
+          "cmd": "flash_dump",
           "as": "frames",
           "key": "flash_dump 0 8",
           "seconds": 8,
           "expect_contains": [
             "slot,seq,session,time_ms,event,valid,sg,current_ma,ax_mg,ay_mg,az_mg,step_hz,vibration_mg,flags"
           ],
-          "note": "复用 M5/M6 既有的 flash_dump 原字节归档与同一张 14 列表头(ns_flash_shell.c:153/159-163), 只取**有代表性的前 8 槽**, 不再完整演示 300 帧软件触发, 也不新写日志判定工具。"
+          "note": "Runtime first/count select the final at most eight appended slots from pre-trigger used_slots and current committed used_slots; never hardcode slot 0. key is a stub row selector only.",
+          "new_log_window": {
+            "before_key": "flash_used_before",
+            "stats_step": "newlog",
+            "max_frames": 8
+          }
         }
       ],
       "require_frames": [

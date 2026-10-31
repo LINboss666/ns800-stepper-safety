@@ -1,0 +1,2 @@
+STDERR>
+MODE_COMBINATION_REFUSED:transport=real backend=sim profile=response_driven

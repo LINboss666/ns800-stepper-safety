@@ -1,0 +1,305 @@
+{
+ "round": "M8-R3 现场包最终补正(FF)",
+ "reviewed_base_commit": "15745e548dcfc4983fb91563fdac81ad5fdf3dc9",
+ "core_software_input_still_accepted": "805c29bd73c4ea861c9b9c65f61e946aec9548e3",
+ "task_book": "NS800_M8_R3_Field_Final_Fixes.md / .zip(审核方 2026-10-31 完整任务书)",
+ "host": {
+  "os": "Windows 10.0.26200 x64",
+  "powershell": "5.1.26100.9711",
+  "python": "3.12.5",
+  "git_applies_patch": "git -c core.autocrlf=false apply"
+ },
+ "patch": {
+  "bytes": 21667,
+  "sha256": "07de65f0e94f6ebe682eb6a29c96fe4626d7e1e479423347146ebd19a6045eee",
+  "declared_sha256": "07de65f0e94f6ebe682eb6a29c96fe4626d7e1e479423347146ebd19a6045eee",
+  "declared_bytes": 21667,
+  "matches_declaration": true,
+  "apply_check_rc_local": 0,
+  "apply_rc_local": 0,
+  "applied_on": "仓外规范 LF 副本(逐件取自 15745e5 的 Git blob)"
+ },
+ "zip_sha256sums_recomputed": {
+  "entries": 13,
+  "mismatched": 0,
+  "detail": [
+   {
+    "path": "README.md",
+    "declared_sha256": "1cc19b3e3e6b4d508f836b6d3ec29764175a538b80685c47ba1014d09ba344fc",
+    "received_matches": true,
+    "copied_into_repo": true
+   },
+   {
+    "path": "boundaries_baseline.stdout.txt",
+    "declared_sha256": "664ed0159d85f3923312defa1c3c42ef6d90c596a3aa94ac4853272e6df9f535",
+    "received_matches": true,
+    "copied_into_repo": true
+   },
+   {
+    "path": "boundaries_candidate.stdout.txt",
+    "declared_sha256": "80031a05a06afc22a082e617ce1cffe002682794c01005cdeb9b7f2b43185f4d",
+    "received_matches": true,
+    "copied_into_repo": true
+   },
+   {
+    "path": "candidate_plan_checks.json",
+    "declared_sha256": "fbb2451bf8621f25866b4c5ca89e705f27d7d297832bc881f3cc48a4c1dbbfbd",
+    "received_matches": true,
+    "copied_into_repo": true
+   },
+   {
+    "path": "candidate_rows_provenance.stdout.txt",
+    "declared_sha256": "77ccaf7ba6896e86332fc377da064fed67e0a04c3c727b14d8e48ef6282918ca",
+    "received_matches": true,
+    "copied_into_repo": true
+   },
+   {
+    "path": "patch_identity.json",
+    "declared_sha256": "f626daaa1ac40dad7ec1609256319d4a80318f050b06a74ddf835b0852a4dca8",
+    "received_matches": true,
+    "copied_into_repo": true
+   },
+   {
+    "path": "prior_raw/cp3_wire_archive.md",
+    "declared_sha256": "5f84d459386c52bebc6c13b82debfaced06db74d241a54cd1f264618bf610819",
+    "received_matches": true,
+    "copied_into_repo": false
+   },
+   {
+    "path": "prior_raw/p0_boot.bin",
+    "declared_sha256": "bc47dc022b25bd483c16ab749895bf2a9d7dba318fdf88826357d2dbb98214fa",
+    "received_matches": true,
+    "copied_into_repo": false
+   },
+   {
+    "path": "review_summary.json",
+    "declared_sha256": "466a9bd5d4aa4820c97ebc102ef479e13f0dfd8eae76d8dedddb0094ae7621b8",
+    "received_matches": true,
+    "copied_into_repo": true
+   },
+   {
+    "path": "selftest_candidate.stdout.txt",
+    "declared_sha256": "35427b17b5c920482ebdbd6fc836997fc8d19200de75e81f0ea6247d5eddbeb3",
+    "received_matches": true,
+    "copied_into_repo": true
+   },
+   {
+    "path": "selftest_original.stdout.txt",
+    "declared_sha256": "b82fd154695288fbbc742cbc4d7b62bed41e45a41ebb3a273501e8f06c3f89b8",
+    "received_matches": true,
+    "copied_into_repo": true
+   },
+   {
+    "path": "tail_boundary_probes.py",
+    "declared_sha256": "d44eee3f2b6c24843fbc53236160ea7c509fd48d690a1d319f88124596f12595",
+    "received_matches": true,
+    "copied_into_repo": true
+   },
+   {
+    "path": "tail_candidate.patch",
+    "declared_sha256": "07de65f0e94f6ebe682eb6a29c96fe4626d7e1e479423347146ebd19a6045eee",
+    "received_matches": true,
+    "copied_into_repo": true
+   }
+  ]
+ },
+ "boundary_replay_inputs": [
+  {
+   "as": "prior_raw/p0_boot.bin",
+   "declared_sha256": "bc47dc022b25bd483c16ab749895bf2a9d7dba318fdf88826357d2dbb98214fa",
+   "bytes_local": 3381,
+   "in_repo_same_bytes": {
+    "path": "reports/reviews/phase8-motor-m7-p0-board/S3_raw_boot.bin.b64",
+    "decoded_bytes": 3381,
+    "decoded_sha256": "bc47dc022b25bd483c16ab749895bf2a9d7dba318fdf88826357d2dbb98214fa",
+    "identical": true
+   },
+   "regenerate": "python -c \"import base64,pathlib;pathlib.Path('prior_raw/p0_boot.bin').write_bytes(base64.b64decode(''.join(pathlib.Path('D:/ns800/reports/reviews/phase8-motor-m7-p0-board/S3_raw_boot.bin.b64').read_text().split())))\""
+  },
+  {
+   "as": "prior_raw/cp3_wire_archive.md",
+   "in_repo_same_bytes": {
+    "path": "reports/reviews/phase8-target-measurement-a0-board-b/cp3_wire_archive.md",
+    "bytes": 7925,
+    "sha256": "5f84d459386c52bebc6c13b82debfaced06db74d241a54cd1f264618bf610819",
+    "identical": true
+   },
+   "note": "3757 B 的 002_boot.rx.bin 由本件内的 base64 段现场解出(TB02 就是这么取的)",
+   "decoded_002_boot": {
+    "bytes": 3757,
+    "sha256": "97b37f32aa03c86b8708ae088d0ae65a8f92520f1a1ed70beb74663049321749"
+   }
+  }
+ ],
+ "five_files": [
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py",
+   "baseline_git_blob_bytes": 118261,
+   "baseline_git_blob_sha256": "d0baddce2bc5a12a79d3c5d19fc657d84804578ec8196f769ed49ef225603fbc",
+   "baseline_declared_sha256": "d0baddce2bc5a12a79d3c5d19fc657d84804578ec8196f769ed49ef225603fbc",
+   "baseline_matches_declaration": true,
+   "candidate_working_tree_bytes": 121358,
+   "candidate_working_tree_sha256": "16478ac308c7e72bcf8c08e0822f351879088763cdd8dcf745adc9bfafce1d1b",
+   "candidate_declared_sha256": "16478ac308c7e72bcf8c08e0822f351879088763cdd8dcf745adc9bfafce1d1b",
+   "candidate_matches_declaration": true
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/field/plan.json",
+   "baseline_git_blob_bytes": 67229,
+   "baseline_git_blob_sha256": "dfa63ab6039a628a27358ecc76d55d3d7b4e686623ad69cab77b386eb4aace67",
+   "baseline_declared_sha256": "dfa63ab6039a628a27358ecc76d55d3d7b4e686623ad69cab77b386eb4aace67",
+   "baseline_matches_declaration": true,
+   "candidate_working_tree_bytes": 67220,
+   "candidate_working_tree_sha256": "0347230df1f36c94bc5b1e984a347787508d0930ae653125a0494a182e825926",
+   "candidate_declared_sha256": "0347230df1f36c94bc5b1e984a347787508d0930ae653125a0494a182e825926",
+   "candidate_matches_declaration": true
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/field/rows.json",
+   "baseline_git_blob_bytes": 45505,
+   "baseline_git_blob_sha256": "05efa69e4bd608b3ac1d5bef73c14f7ec111951e39d3809e765903f7eb08748b",
+   "baseline_declared_sha256": "05efa69e4bd608b3ac1d5bef73c14f7ec111951e39d3809e765903f7eb08748b",
+   "baseline_matches_declaration": true,
+   "candidate_working_tree_bytes": 45773,
+   "candidate_working_tree_sha256": "f21b8ac346dcb68f798c6578726fe8fe7e6d761fcf9e3f4556bbb8e721e727fa",
+   "candidate_declared_sha256": "f21b8ac346dcb68f798c6578726fe8fe7e6d761fcf9e3f4556bbb8e721e727fa",
+   "candidate_matches_declaration": true
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_field_selftest.py",
+   "baseline_git_blob_bytes": 90006,
+   "baseline_git_blob_sha256": "b832a275322588e3a0f512b3ee7bf76039d11e6cd2f28c7ee3378af024f962bd",
+   "baseline_declared_sha256": "b832a275322588e3a0f512b3ee7bf76039d11e6cd2f28c7ee3378af024f962bd",
+   "baseline_matches_declaration": true,
+   "candidate_working_tree_bytes": 90071,
+   "candidate_working_tree_sha256": "ce4efe0200a037fb7af0e36c25d12f14c7f0750b975cd9efb28b9eae3d8fe864",
+   "candidate_declared_sha256": "ce4efe0200a037fb7af0e36c25d12f14c7f0750b975cd9efb28b9eae3d8fe864",
+   "candidate_matches_declaration": true
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/field/M8R3Field.ps1",
+   "baseline_git_blob_bytes": 27861,
+   "baseline_git_blob_sha256": "02ccee449087e53d1d9ab3abced3745ba55a6a7e2f2af2534001b4dc90415084",
+   "baseline_declared_sha256": "02ccee449087e53d1d9ab3abced3745ba55a6a7e2f2af2534001b4dc90415084",
+   "baseline_matches_declaration": true,
+   "candidate_working_tree_bytes": 27880,
+   "candidate_working_tree_sha256": "908c0d87b3352ee99839ff1f57381ba4b5a4aded32c56c397ed3bb6ae408ab13",
+   "candidate_declared_sha256": "908c0d87b3352ee99839ff1f57381ba4b5a4aded32c56c397ed3bb6ae408ab13",
+   "candidate_matches_declaration": true
+  }
+ ],
+ "local_exit_codes": {
+  "selftest": 0,
+  "boundaries_candidate": 0,
+  "boundaries_baseline": 1,
+  "validate_plan": 0,
+  "rows_provenance": 0,
+  "ps_ast_check": 0,
+  "ps_selftest": 0,
+  "ps_precheck": 0,
+  "ps_runfield": 0
+ },
+ "local_measured_summaries": {
+  "python_selftest": "SUMMARY|cases=73 pass=73 fail=0 executed=73 preserved_r2_identities=25|negative_injections=11|hardware_actions=0|transport=stub_only|port=IN_MEMORY",
+  "boundaries_candidate": "BOUNDARY_SUMMARY|pass=22 cases=22 hardware_actions=0 real_tool_calls=0",
+  "boundaries_baseline_preimage": "BOUNDARY_SUMMARY|pass=7 cases=22 hardware_actions=0 real_tool_calls=0",
+  "validate_plan": "PLAN_VALIDATE_SUMMARY|checks=154|fail=0|msh_commands=70|plan=reports/reviews/phase8-m8-relative-protection-r3/field/plan.json",
+  "rows_provenance": "ROWS_PROVENANCE|groups=41 capture_refs=28 source_anchor_refs=33 problems=0 notes=0",
+  "ps_ast_check": "PARAM=Profile VALIDATE_SET=healthy,trip,no_trigger,all,response_driven DEFAULT=all",
+  "ps_selftest": "SELFTEST_SUMMARY|checks=22|failures=0|python=SUMMARY|cases=73 pass=73 fail=0 executed=73 preserved_r2_identities=25|negative_injections=11|hardware_actions=0|transport=stub_only|port=IN_MEMORY",
+  "ps_precheck": "PRECHECK_SUMMARY|checks=14|failures=0",
+  "ps_runfield": "RUNFIELD_SUMMARY|checks=3|failures=0|transport=stub|backend=sim|actions_attempted=0"
+ },
+ "baseline_preimage_old_behaviour_by_item": [
+  {
+   "id": "TB01_REAL_BOOT_3381_NO_SPONTANEOUS_PROMPT",
+   "detail": "Stop:POST_RESET_BOOT_PROMPT_MISSING:window=20s bytes=3381"
+  },
+  {
+   "id": "TB02_REAL_BOOT_3757_NO_SPONTANEOUS_PROMPT",
+   "detail": "Stop:POST_RESET_BOOT_PROMPT_MISSING:window=20s bytes=3757"
+  },
+  {
+   "id": "TB03_EMPTY_BOOT_REQUIRES_QUERY_NOT_READY",
+   "detail": "Stop:POST_RESET_BOOT_PROMPT_MISSING:window=20s bytes=0"
+  },
+  {
+   "id": "TB04_BOOT_DANGER_STILL_STOPS",
+   "detail": "POST_RESET_BOOT_PROMPT_MISSING"
+  },
+  {
+   "id": "TB05_COMMANDER_C_ARGUMENT_IS_NOT_A_PATH",
+   "detail": {
+    "commands": [
+     "status",
+     "D:\\ns800_m8r3_scratch\\ff_pre_root\\savemem 0x08000000 290916 C:\\Users\\LMX\\AppData\\Local\\Temp\\m8-tail-boundaries-dxj7um5n\\readback.bin",
+     "status",
+     "exit"
+    ],
+    "cwd_correct": true,
+    "real_tool_calls": 0
+   }
+  },
+  {
+   "id": "TB06_SIGNED_ACCELERATION_IS_VALID_CSV",
+   "detail": [
+    "frames:CSV_FRAMES=0,SESSION_FRAMES=0<8(session=8),NO_FRAME_WITH({\"event\": 9, \"step_hz\": 0})"
+   ]
+  },
+  {
+   "id": "TB08_OLD_SLOTS_SAME_SESSION_REJECTED",
+   "detail": []
+  },
+  {
+   "id": "TB09_DUPLICATED_SLOT_REJECTED",
+   "detail": []
+  },
+  {
+   "id": "TB13_APPEND_RANGE_300_TO_600",
+   "detail": "AttributeError:module 'reviewed_chain' has no attribute 'select_new_log_window'"
+  },
+  {
+   "id": "TB14_EMPTY_STORE_0_TO_300_TAIL",
+   "detail": "AttributeError:module 'reviewed_chain' has no attribute 'select_new_log_window'"
+  },
+  {
+   "id": "TB15_NO_APPEND_REJECTED",
+   "detail": "AttributeError:module 'reviewed_chain' has no attribute 'select_new_log_window'"
+  },
+  {
+   "id": "TB16_OVER_CAPACITY_REJECTED",
+   "detail": "AttributeError:module 'reviewed_chain' has no attribute 'select_new_log_window'"
+  },
+  {
+   "id": "TB18_LOG_CAPACITY_REJECT_BEFORE_ARM",
+   "detail": {
+    "verdict": "OK",
+    "asserted": true
+   }
+  },
+  {
+   "id": "TB20_PS_PARAMETER_ACCEPTS_REQUIRED_REAL_PROFILE",
+   "detail": {
+    "accepted_profiles": [
+     "healthy",
+     "trip",
+     "no_trigger",
+     "all"
+    ],
+    "powershell_executed": false
+   }
+  },
+  {
+   "id": "TB21_BOOT_QUERY_FAULT_REFUSED",
+   "detail": {
+    "verdict": "OK",
+    "asserted": true
+   }
+  }
+ ],
+ "note_baseline_preimage": "同一边界程序跑 15745e5 的原交付字节: 7/22(rc=1)。逐件复算见上, 其中 helper 缺失类失败只表示当时尚无该功能, 不当作额外缺陷数。",
+ "hardware_actions": [],
+ "serial_port_opened": false,
+ "keil_rebuilt": false,
+ "device_state_unchanged": true
+}

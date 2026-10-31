@@ -1,0 +1,20 @@
+{
+    "run_id":  "20261031T175313Z-16908",
+    "entry":  "RunField",
+    "transport":  "stub",
+    "backend":  "sim",
+    "profiles":  [
+                     "healthy",
+                     "trip",
+                     "no_trigger"
+                 ],
+    "checks":  3,
+    "failures":  [
+
+                 ],
+    "actions_attempted":  [
+
+                          ],
+    "actions_attempted_count":  0,
+    "note":  "actions_attempted 来自执行器自己的账(real/manual 后端实际尝试); 离线入口恒为空是事实而非硬编码"
+}

@@ -1,0 +1,28 @@
+{
+  "reviewed_sha": "15745e548dcfc4983fb91563fdac81ad5fdf3dc9",
+  "unique_remote_files_verified": 3336,
+  "images_and_maps": 9,
+  "existing_selftest": {
+    "original": 73,
+    "candidate": 73,
+    "case_count": 73
+  },
+  "boundaries": {
+    "candidate_pass": 22,
+    "case_count": 22
+  },
+  "plan_checks": 154,
+  "plan_bad": 0,
+  "stub_dispatch": {
+    "healthy": 0,
+    "no_trigger": 0,
+    "trip": 0
+  },
+  "windows_powershell_51": "NOT_EXECUTED_HERE",
+  "hardware_actions": [],
+  "rows_provenance": {
+    "groups": 41,
+    "problems": 0,
+    "notes": 0
+  }
+}

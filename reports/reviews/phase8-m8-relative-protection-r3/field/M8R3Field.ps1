@@ -33,7 +33,7 @@ param(
     [ValidateSet('sim', 'manual', 'real')]
     [string]$Backend = 'sim',
     [Parameter(ParameterSetName = 'RunField')]
-    [ValidateSet('healthy', 'trip', 'no_trigger', 'all')]
+    [ValidateSet('healthy', 'trip', 'no_trigger', 'all', 'response_driven')]
     [string]$Profile = 'all',
     [Parameter(ParameterSetName = 'RunField')]
     [string]$Port = 'COM5',

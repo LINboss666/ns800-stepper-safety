@@ -1,0 +1,218 @@
+{
+ "round": "ff",
+ "base_commit": "15745e548dcfc4983fb91563fdac81ad5fdf3dc9",
+ "ps_run_roots": [
+  {
+   "run_id": "psrun-20261031T175241Z-48804-SelfTest",
+   "run_root": "reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T175241Z-48804-SelfTest"
+  },
+  {
+   "run_id": "psrun-20261031T175308Z-37156-Precheck",
+   "run_root": "reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T175308Z-37156-Precheck"
+  },
+  {
+   "run_id": "psrun-20261031T175313Z-16908-RunField",
+   "run_root": "reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T175313Z-16908-RunField"
+  }
+ ],
+ "three_entry_verdicts": {
+  "SelfTest": "SELFTEST_SUMMARY|checks=22|failures=0|python=SUMMARY|cases=73 pass=73 fail=0 executed=73 preserved_r2_identities=25|negative_injections=11|hardware_actions=0|transport=stub_only|port=IN_MEMORY",
+  "Precheck": "PRECHECK_SUMMARY|checks=14|failures=0",
+  "RunField": "RUNFIELD_SUMMARY|checks=3|failures=0|transport=stub|backend=sim|actions_attempted=0"
+ },
+ "stub_dispatch_rc": {
+  "healthy": 0,
+  "trip": 0,
+  "no_trigger": 0
+ },
+ "python": {
+  "selftest_cases": 73,
+  "selftest_fail": 0,
+  "boundary_cases": 22,
+  "boundary_pass_candidate": 22,
+  "boundary_pass_baseline_preimage": 7,
+  "plan_checks": 154,
+  "plan_bad": 0,
+  "rows_groups": 41,
+  "rows_problems": 0,
+  "rows_notes": 0
+ },
+ "artifacts": [
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/host/boundaries_baseline_preimage_r3finalfix.txt",
+   "bytes": 2994,
+   "sha256": "9439a0bcc25007bcd6116870c634535621b4764c0036cd1184ae714bef564687",
+   "cr": 23,
+   "lf": 23
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/host/boundaries_candidate_r3finalfix.txt",
+   "bytes": 3313,
+   "sha256": "cada980eb5670098ef4a1bd2bb808493c1fe9027f6e193049bc1afaaef7f36b2",
+   "cr": 23,
+   "lf": 23
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/host/field_Precheck_console_r3finalfix.txt",
+   "bytes": 1474,
+   "sha256": "c637961f52e26a93c1ddc50c599a215dcfd8620e0664e92cf4e6d699f3374a6c",
+   "cr": 0,
+   "lf": 16
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/host/field_RunField_console_r3finalfix.txt",
+   "bytes": 14693,
+   "sha256": "9e4da8d05d864da5a968030281d4a14b07ed4f7abc754c66699914e617386d13",
+   "cr": 0,
+   "lf": 44
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/host/field_SelfTest_console_r3finalfix.txt",
+   "bytes": 2221,
+   "sha256": "8379f79a09e5840de666b1387f84a6733eea8a1769abee64203fb46be6faecf1",
+   "cr": 0,
+   "lf": 27
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/host/precheck_summary_r3finalfix.json",
+   "bytes": 299,
+   "sha256": "f4f60fcc362d2babebc5d5c92eae018859e433aac5e5850f22cce17a942d51ba",
+   "cr": 12,
+   "lf": 12
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/host/ps_ast_check_r3finalfix.txt",
+   "bytes": 386,
+   "sha256": "f3ed69fef6aeed5b781d70f2e06ad2061c87234f2960a0cee39280b60e0e6f4e",
+   "cr": 8,
+   "lf": 8
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/host/python_selftest_r3finalfix.txt",
+   "bytes": 10945,
+   "sha256": "26fd91152a550e61201145d4d04a61e72d4e260cc0203abd4c5741b459a5ecdd",
+   "cr": 81,
+   "lf": 81
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/host/rows_provenance_console_r3finalfix.txt",
+   "bytes": 135,
+   "sha256": "5107ee2bae64b3e6b76f63c78db0210db6c867cba1512562debbc238a78acab1",
+   "cr": 2,
+   "lf": 2
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/host/runfield_summary_r3finalfix.json",
+   "bytes": 565,
+   "sha256": "2c7e5c9e48a7e562c441623c20a4719efea2310be9b0d7fb904bd96d224f0fa7",
+   "cr": 20,
+   "lf": 20
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/host/selftest_summary_r3finalfix.json",
+   "bytes": 198,
+   "sha256": "a0dbbcd50590286e33f6ec19c493aa4750803250bc24eb28fce4b74615b5c0e4",
+   "cr": 11,
+   "lf": 11
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/host/validate_plan_r3finalfix.txt",
+   "bytes": 8144,
+   "sha256": "0360f306c3599bc102e958fa5a913d984b740c62f29361fa0604c893240043b6",
+   "cr": 155,
+   "lf": 155
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/host/reviewer_ff/boundaries_baseline.stdout.txt",
+   "bytes": 2971,
+   "sha256": "664ed0159d85f3923312defa1c3c42ef6d90c596a3aa94ac4853272e6df9f535",
+   "cr": 0,
+   "lf": 23
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/host/reviewer_ff/boundaries_candidate.stdout.txt",
+   "bytes": 3257,
+   "sha256": "80031a05a06afc22a082e617ce1cffe002682794c01005cdeb9b7f2b43185f4d",
+   "cr": 0,
+   "lf": 23
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/host/reviewer_ff/candidate_plan_checks.json",
+   "bytes": 8962,
+   "sha256": "fbb2451bf8621f25866b4c5ca89e705f27d7d297832bc881f3cc48a4c1dbbfbd",
+   "cr": 0,
+   "lf": 159
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/host/reviewer_ff/candidate_rows_provenance.stdout.txt",
+   "bytes": 133,
+   "sha256": "77ccaf7ba6896e86332fc377da064fed67e0a04c3c727b14d8e48ef6282918ca",
+   "cr": 0,
+   "lf": 2
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/host/reviewer_ff/inputs_identity.md",
+   "bytes": 1191,
+   "sha256": "3f7489eb46cf68092c5b7cc85def0f0ca4dc6468ad76ac56ede283de00ac1916",
+   "cr": 0,
+   "lf": 14
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/host/reviewer_ff/patch_identity.json",
+   "bytes": 2142,
+   "sha256": "f626daaa1ac40dad7ec1609256319d4a80318f050b06a74ddf835b0852a4dca8",
+   "cr": 0,
+   "lf": 49
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/host/reviewer_ff/README.md",
+   "bytes": 10384,
+   "sha256": "1cc19b3e3e6b4d508f836b6d3ec29764175a538b80685c47ba1014d09ba344fc",
+   "cr": 0,
+   "lf": 74
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/host/reviewer_ff/review_summary.json",
+   "bytes": 563,
+   "sha256": "466a9bd5d4aa4820c97ebc102ef479e13f0dfd8eae76d8dedddb0094ae7621b8",
+   "cr": 0,
+   "lf": 28
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/host/reviewer_ff/selftest_candidate.stdout.txt",
+   "bytes": 10885,
+   "sha256": "35427b17b5c920482ebdbd6fc836997fc8d19200de75e81f0ea6247d5eddbeb3",
+   "cr": 0,
+   "lf": 81
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/host/reviewer_ff/selftest_original.stdout.txt",
+   "bytes": 10827,
+   "sha256": "b82fd154695288fbbc742cbc4d7b62bed41e45a41ebb3a273501e8f06c3f89b8",
+   "cr": 0,
+   "lf": 81
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/host/reviewer_ff/SHA256SUMS",
+   "bytes": 1191,
+   "sha256": "b223525df405a70116c632b35cc574a450024572059cf1e9b82dbbda2145ea54",
+   "cr": 0,
+   "lf": 13
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/host/reviewer_ff/tail_boundary_probes.py",
+   "bytes": 9572,
+   "sha256": "d44eee3f2b6c24843fbc53236160ea7c509fd48d690a1d319f88124596f12595",
+   "cr": 0,
+   "lf": 192
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/host/reviewer_ff/tail_candidate.patch",
+   "bytes": 21667,
+   "sha256": "07de65f0e94f6ebe682eb6a29c96fe4626d7e1e479423347146ebd19a6045eee",
+   "cr": 0,
+   "lf": 391
+  }
+ ],
+ "hardware_actions": []
+}

@@ -1,0 +1,23 @@
+{"id": "TB01_REAL_BOOT_3381_NO_SPONTANEOUS_PROMPT", "pass": false, "detail": "Stop:POST_RESET_BOOT_PROMPT_MISSING:window=20s bytes=3381"}
+{"id": "TB02_REAL_BOOT_3757_NO_SPONTANEOUS_PROMPT", "pass": false, "detail": "Stop:POST_RESET_BOOT_PROMPT_MISSING:window=20s bytes=3757"}
+{"id": "TB03_EMPTY_BOOT_REQUIRES_QUERY_NOT_READY", "pass": false, "detail": "Stop:POST_RESET_BOOT_PROMPT_MISSING:window=20s bytes=0"}
+{"id": "TB04_BOOT_DANGER_STILL_STOPS", "pass": false, "detail": "POST_RESET_BOOT_PROMPT_MISSING"}
+{"id": "TB05_COMMANDER_C_ARGUMENT_IS_NOT_A_PATH", "pass": false, "detail": {"commands": ["status", "/workspace/scratch/b6287b94a5dc/m8-r3-closeout-independent-review/tree/savemem 0x08000000 290916 /tmp/m8-tail-boundaries-1pxzhfbg/readback.bin", "status", "exit"], "cwd_correct": true, "real_tool_calls": 0}}
+{"id": "TB06_SIGNED_ACCELERATION_IS_VALID_CSV", "pass": false, "detail": ["frames:CSV_FRAMES=0,SESSION_FRAMES=0<8(session=8),NO_FRAME_WITH({\"event\": 9, \"step_hz\": 0})"]}
+{"id": "TB07_UNSIGNED_HEALTHY_CONTROL", "pass": true, "detail": []}
+{"id": "TB08_OLD_SLOTS_SAME_SESSION_REJECTED", "pass": false, "detail": []}
+{"id": "TB09_DUPLICATED_SLOT_REJECTED", "pass": false, "detail": []}
+{"id": "TB10_MISSING_TAIL_SLOT_REJECTED", "pass": true, "detail": ["frames:SESSION_FRAMES=7<8(session=8)"]}
+{"id": "TB11_UNSIGNED_SLOT_NEGATIVE_REJECTED", "pass": true, "detail": ["frames:CSV_FRAMES=0,SESSION_FRAMES=0<8(session=8),NO_FRAME_WITH({\"event\": 9, \"step_hz\": 0})"]}
+{"id": "TB12_DEVICE_READ_ERROR_STILL_REJECTED", "pass": true, "detail": ["frames:SLOT_READ_ERRORS=1:slot 599 error -12"]}
+{"id": "TB13_APPEND_RANGE_300_TO_600", "pass": false, "detail": "AttributeError:module 'reviewed_chain' has no attribute 'select_new_log_window'"}
+{"id": "TB14_EMPTY_STORE_0_TO_300_TAIL", "pass": false, "detail": "AttributeError:module 'reviewed_chain' has no attribute 'select_new_log_window'"}
+{"id": "TB15_NO_APPEND_REJECTED", "pass": false, "detail": "AttributeError:module 'reviewed_chain' has no attribute 'select_new_log_window'"}
+{"id": "TB16_OVER_CAPACITY_REJECTED", "pass": false, "detail": "AttributeError:module 'reviewed_chain' has no attribute 'select_new_log_window'"}
+{"id": "TB17_COMMAND_RESPONSE_PROMPT_STILL_MANDATORY", "pass": true, "detail": {"lines": [], "bytes": 31}}
+{"id": "TB18_LOG_CAPACITY_REJECT_BEFORE_ARM", "pass": false, "detail": {"verdict": "OK", "asserted": true}}
+{"id": "TB19_LOG_CAPACITY_HEALTHY_CONTROL", "pass": true, "detail": {"verdict": "OK", "asserted": true}}
+{"id": "TB20_PS_PARAMETER_ACCEPTS_REQUIRED_REAL_PROFILE", "pass": false, "detail": {"accepted_profiles": ["healthy", "trip", "no_trigger", "all"], "powershell_executed": false}}
+{"id": "TB21_BOOT_QUERY_FAULT_REFUSED", "pass": false, "detail": {"verdict": "OK", "asserted": true}}
+{"id": "TB22_BOOT_QUERY_READY_ZERO_FAULT_CONTROL", "pass": true, "detail": {"verdict": "OK", "asserted": true}}
+BOUNDARY_SUMMARY|pass=7 cases=22 hardware_actions=0 real_tool_calls=0

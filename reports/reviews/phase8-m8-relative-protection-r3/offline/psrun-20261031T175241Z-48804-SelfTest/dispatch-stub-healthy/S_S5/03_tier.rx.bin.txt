@@ -1,0 +1,2 @@
+[DIAG] tier data: sg[68..75] adc[2050..2090] nz=3 room up=40 dn=45
+[DIAG] tier 2: dev=-45/-90 drop=40/70 FIELD_UNVERIFIED (commit to publish)

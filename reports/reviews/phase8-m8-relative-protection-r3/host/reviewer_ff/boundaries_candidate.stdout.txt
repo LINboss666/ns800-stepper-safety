@@ -1,0 +1,23 @@
+{"id": "TB01_REAL_BOOT_3381_NO_SPONTANEOUS_PROMPT", "pass": true, "detail": {"bytes": 3381, "sha256": "bc47dc022b25bd483c16ab749895bf2a9d7dba318fdf88826357d2dbb98214fa", "elapsed": 2.0000000000000013, "writes": 0}}
+{"id": "TB02_REAL_BOOT_3757_NO_SPONTANEOUS_PROMPT", "pass": true, "detail": {"bytes": 3757, "sha256": "97b37f32aa03c86b8708ae088d0ae65a8f92520f1a1ed70beb74663049321749", "elapsed": 2.0000000000000013, "writes": 0}}
+{"id": "TB03_EMPTY_BOOT_REQUIRES_QUERY_NOT_READY", "pass": true, "detail": {"bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "elapsed": 2.0000000000000013, "writes": 0}}
+{"id": "TB04_BOOT_DANGER_STILL_STOPS", "pass": true, "detail": "DANGER_TEXT_IN_STREAM"}
+{"id": "TB05_COMMANDER_C_ARGUMENT_IS_NOT_A_PATH", "pass": true, "detail": {"commands": ["status", "savemem 0x08000000 290916 /tmp/m8-tail-boundaries-g17m4qgo/readback.bin", "status", "exit"], "cwd_correct": true, "real_tool_calls": 0}}
+{"id": "TB06_SIGNED_ACCELERATION_IS_VALID_CSV", "pass": true, "detail": []}
+{"id": "TB07_UNSIGNED_HEALTHY_CONTROL", "pass": true, "detail": []}
+{"id": "TB08_OLD_SLOTS_SAME_SESSION_REJECTED", "pass": true, "detail": ["frames:NEW_LOG_SLOT_COVERAGE_MISMATCH"]}
+{"id": "TB09_DUPLICATED_SLOT_REJECTED", "pass": true, "detail": ["frames:NEW_LOG_SLOT_COVERAGE_MISMATCH"]}
+{"id": "TB10_MISSING_TAIL_SLOT_REJECTED", "pass": true, "detail": ["frames:NEW_LOG_SLOT_COVERAGE_MISMATCH,SESSION_FRAMES=7<8(session=8)"]}
+{"id": "TB11_UNSIGNED_SLOT_NEGATIVE_REJECTED", "pass": true, "detail": ["frames:CSV_FRAMES=0,NEW_LOG_SLOT_COVERAGE_MISMATCH,SESSION_FRAMES=0<8(session=8),NO_FRAME_WITH({\"event\": 9, \"step_hz\": 0})"]}
+{"id": "TB12_DEVICE_READ_ERROR_STILL_REJECTED", "pass": true, "detail": ["frames:SLOT_READ_ERRORS=1:slot 599 error -12"]}
+{"id": "TB13_APPEND_RANGE_300_TO_600", "pass": true, "detail": {"cmd": "flash_dump 592 8", "selected": {"before": 300, "after": 600, "first": 592, "count": 8}}}
+{"id": "TB14_EMPTY_STORE_0_TO_300_TAIL", "pass": true, "detail": {"cmd": "flash_dump 292 8", "selected": {"before": 0, "after": 300, "first": 292, "count": 8}}}
+{"id": "TB15_NO_APPEND_REJECTED", "pass": true, "detail": "NEW_LOG_NO_APPENDED_RANGE"}
+{"id": "TB16_OVER_CAPACITY_REJECTED", "pass": true, "detail": "NEW_LOG_NO_APPENDED_RANGE"}
+{"id": "TB17_COMMAND_RESPONSE_PROMPT_STILL_MANDATORY", "pass": true, "detail": {"lines": [], "bytes": 31}}
+{"id": "TB18_LOG_CAPACITY_REJECT_BEFORE_ARM", "pass": true, "detail": {"verdict": "STOP", "code": "EVENT_LOG_CAPACITY_LOW", "free_slots": 196}}
+{"id": "TB19_LOG_CAPACITY_HEALTHY_CONTROL", "pass": true, "detail": {"verdict": "OK", "asserted": true}}
+{"id": "TB20_PS_PARAMETER_ACCEPTS_REQUIRED_REAL_PROFILE", "pass": true, "detail": {"accepted_profiles": ["healthy", "trip", "no_trigger", "all", "response_driven"], "powershell_executed": false}}
+{"id": "TB21_BOOT_QUERY_FAULT_REFUSED", "pass": true, "detail": {"verdict": "STOP", "code": "FIELD_VALUE_MISMATCH", "wrong": {"state": ["FAULT_LATCHED", "READY"], "fault": ["9", "0"]}, "forbidden_val": {}, "absent_groups": []}}
+{"id": "TB22_BOOT_QUERY_READY_ZERO_FAULT_CONTROL", "pass": true, "detail": {"verdict": "OK", "asserted": true}}
+BOUNDARY_SUMMARY|pass=22 cases=22 hardware_actions=0 real_tool_calls=0

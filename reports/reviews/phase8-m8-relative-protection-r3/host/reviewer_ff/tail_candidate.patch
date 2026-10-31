@@ -1,0 +1,391 @@
+--- a/reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py
++++ b/reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py
+@@ -357,6 +357,11 @@
+                                            "absent_groups": unknown})
+             return {"verdict": "STOP", "code": "FIELD_VALUE_MISMATCH", "wrong": wrong,
+                     "forbidden_val": loose, "absent_groups": unknown}
++    if st.get("min_free_log_slots") is not None:
++        hit = one_row(rows, FLASH_LOGSTAT_ROW, "event-log-capacity")
++        free = int(hit["capacity"]) - int(hit["used"])
++        if free < int(st["min_free_log_slots"]):
++            return {"verdict": "STOP", "code": "EVENT_LOG_CAPACITY_LOW", "free_slots": free}
+     # expect_profile: 用与清理同一条合同判读一份完整 motor_status(静止/武装/运行的一致性)
+     if st.get("expect_profile") == "AT_REST":
+         summ, bad = disable_contract(rows)
+@@ -650,7 +655,10 @@
+         return [x.replace(self.secret, tag) for x in argv]
+ 
+     def _run(self, name, act, argv):
+-        argv = [self._p(x) for x in self._resolve(name, argv)]
++        resolved = self._resolve(name, argv)
++        # A commander -c argument is an opaque command, not a filesystem path.
++        argv = [x if i > 0 and resolved[i - 1] == "-c" else self._p(x)
++                for i, x in enumerate(resolved)]
+         d = self.out / ("action_" + name)
+         d.mkdir(parents=True, exist_ok=True)
+         masked = self._mask(argv)
+@@ -1001,29 +1009,41 @@
+ 
+ 
+ def drain_post_reset_boot(port, st, asname, out, idx, led, results, clock, fixture, transport):
+-    """复位之后、**任何**合法查询之前: 把板子自己发出的启动流按原字节收进证据, 并等它落到
+-    一个干净的提示符边界(R3 复审 §2A: 回读把核留在 Halted, 复位才是前置)。
+-
+-    提示符不是"可以不复位"的替代前置 —— 复位已经真实发生并记账, 这里只是把启动流消费掉,
+-    免得启动字节混进第一条查询的响应里。窗口内没有提示符 = 具名停止, 绝不发查询。
++    """Archive passive boot bytes; application readiness is proved by the next query.
++    A spontaneous boot prompt is optional. Command-response prompts remain mandatory.
+     """
+     window = float(st.get("boot_drain_seconds", 20))
+-    dl = clock.monotonic() + window
++    t0 = last = clock.monotonic()
++    dl = t0 + window
+     raw = out / ("%02d_%s.boot.rx.bin" % (idx, asname))
++    buf = bytearray()
+     if transport == "stub":
+         for line in (fixture or {}).get("post_reset_boot", []):
+             port.feed((line + "\r\n").encode("utf-8"))
+-    lines, nbytes = read_until_prompt(port, dl, led, raw, clock)
+-    if not lines:
+-        raise Stop("POST_RESET_BOOT_PROMPT_MISSING", "window=%.0fs bytes=%d" % (window, nbytes))
+-    try:
+-        txt = emit_text(raw, lines)
+-    except OSError as e:
+-        raise Stop("EVIDENCE_WRITE_FAILED", "boot=%s:%s" % (asname, e))
+-    results.append({"as": asname + "_boot", "kind": "boot_stream", "rx_bytes": nbytes,
+-                    "rx_sha256": sha_of(raw), "txt": txt, "rows": len(lines)})
+-    led.ev("BOOT_STREAM_DRAINED", **{"as": asname, "bytes": nbytes, "rows": len(lines),
+-                                     "raw": str(raw)})
++    with open(raw, "wb") as f:
++        while clock.monotonic() < dl:
++            chunk = port.read(512)
++            if chunk:
++                buf += chunk
++                f.write(chunk)
++                f.flush()
++                os.fsync(f.fileno())
++                last = clock.monotonic()
++                if len(buf) > BOOT_CAP:
++                    raise Stop("BOOT_BYTE_CAP")
++                check_danger(bytes(buf))
++            now = clock.monotonic()
++            if now - t0 >= min(2.0, window) and now - last >= 0.2:
++                break
++            clock.sleep(min(0.01, max(0.0, dl - now)))
++    # Bytes repr is presentation only; do not decode/repair boot text into business facts.
++    txt = emit_text(raw, [repr(bytes(buf))])
++    end_reason = "DRAIN_BUDGET_REACHED" if clock.monotonic() >= dl else "BOUNDED_DRAIN"
++    results.append({"as": asname + "_boot", "kind": "boot_stream", "rx_bytes": len(buf),
++                    "rx_sha256": sha_of(raw), "txt": txt,
++                    "readiness": "NOT_ASSESSED_QUERY_REQUIRED", "end_reason": end_reason})
++    led.ev("BOOT_STREAM_DRAINED", **{"as": asname, "bytes": len(buf),
++           "raw": str(raw), "end_reason": end_reason, "prompt_required": False})
+ 
+ 
+ def command_attempt(port, cmd, st, asname, raw, step_dl, transport, fixture, silent, led, clock,
+@@ -1115,7 +1135,7 @@
+ 
+ def exec_session(session_id, steps, outdir, transport, fixture, port_name,
+                  total_deadline_seconds, clock, backend=None, motion_cap_seconds=None,
+-                 plan=None, quota_box=None, used_box=None):
++                 plan=None, quota_box=None, used_box=None, context=None):
+     """一个会话 = 一个端口 = 一个写者。
+ 
+     与 R1 交付版的三处实质差别:
+@@ -1204,6 +1224,10 @@
+                                           fixture, transport)
+                 continue
+             cmd = st["cmd"]
++            selected_window = None
++            if st.get("new_log_window"):
++                cmd, selected_window = select_new_log_window(st["new_log_window"], results, context)
++                led.ev("NEW_LOG_WINDOW", **selected_window)
+             if cmd == "__approved_reboot__":
+                 spend("approved_reboot", 1)
+                 r = run_action({"action": "reboot", "as": asname,
+@@ -1288,7 +1312,7 @@
+                                              fixture, silent, led, clock)
+             results.append(dict({"as": asname, "kind": "command", "cmd": cmd,
+                                  "rx_bytes": nbytes, "rx_sha256": sha_of(raw),
+-                                 "txt": txt}, **v))
++                                 "txt": txt, "selected_log_window": selected_window}, **v))
+             if v["verdict"] == "REFUSED":
+                 ret = {"status": "REFUSED", "code": v.get("code", ""),
+                        "refused": v.get("lines")}
+@@ -1690,6 +1714,32 @@
+     return recorded
+ 
+ 
++FLASH_LOGSTAT_ROW = r"^slots=(?P<used>[0-9]+)/(?P<capacity>[0-9]+) valid=(?P<valid>[0-9]+) bad=(?P<bad>[0-9]+)$"
++
++
++def select_new_log_window(spec, results, context):
++    """Select only appended committed slots; event storage is stop-when-full, not a ring."""
++    if context is None or spec["before_key"] not in context:
++        raise Stop("NEW_LOG_BASELINE_MISSING")
++    before = int(context[spec["before_key"]])
++    rows = [r for r in results if r.get("as") == spec["stats_step"] and r.get("txt")]
++    if len(rows) != 1:
++        raise Stop("NEW_LOG_STATS_MISSING")
++    text = Path(rows[0]["txt"]).read_text(encoding="utf-8")
++    hits = list(re.finditer(FLASH_LOGSTAT_ROW, text, re.M))
++    if len(hits) != 1:
++        raise Stop("NEW_LOG_STATS_NOT_UNIQUE")
++    after, capacity = int(hits[0]['used']), int(hits[0]['capacity'])
++    if not 0 <= before < after <= capacity <= 4096:
++        raise Stop("NEW_LOG_NO_APPENDED_RANGE", "before=%d after=%d capacity=%d" % (before, after, capacity))
++    count = min(after - before, int(spec.get("max_frames", 8)))
++    if not 1 <= count <= 100:
++        raise Stop("NEW_LOG_COUNT_OUT_OF_RANGE")
++    first = after - count
++    return "flash_dump %d %d" % (first, count), {"before": before, "after": after,
++                                                "first": first, "count": count}
++
++
+ def flash_frames_verdict(stage, results, recorded, led):
+     """事故取证要**读回到实际日志帧**(审核 §2D 第 4 条): 计数增大只是"本轮确实多写了一笔"的
+     身份前置, 不是日志内容。这里复用 M5/M6 既有的 flash_dump 原字节归档与同一张 14 列表头
+@@ -1714,13 +1764,24 @@
+                 read_errors.append(s[:80])
+                 continue
+             parts = s.split(",")
+-            if len(parts) == FLASH_DUMP_COLUMNS and all(p.isdigit() for p in parts):
++            if len(parts) == FLASH_DUMP_COLUMNS and all(
++                    re.fullmatch(r"[0-9]+" if i < 6 or i == 13 else r"-?[0-9]+", p)
++                    for i, p in enumerate(parts)):
+                 frames.append(parts)
++        selection = next((r.get("selected_log_window") for r in results
++                          if r.get("as") == spec["step"]), None)
+         want = recorded.get(spec["session_key"])
+         keyed = [f for f in frames if want is not None and f[2] == str(want)]
+         miss = []
+         if not frames:
+             miss.append("CSV_FRAMES=0")
++        if not selection:
++            miss.append("NEW_LOG_WINDOW_NOT_RECORDED")
++        else:
++            slots = [int(f[0]) for f in frames]
++            expected = set(range(selection["first"], selection["first"] + selection["count"]))
++            if len(slots) != len(expected) or set(slots) != expected or min(expected) < selection["before"]:
++                miss.append("NEW_LOG_SLOT_COVERAGE_MISMATCH")
+         if want is None:
+             miss.append("SESSION_NOT_RECORDED(%s)" % spec["session_key"])
+         elif len(keyed) < int(spec.get("min_frames", 1)):
+@@ -2052,7 +2113,7 @@
+                                    int(stg.get("total_deadline_seconds", 120)), clock,
+                                    backend=backend,
+                                    motion_cap_seconds=cap,
+-                                   plan=plan, quota_box=quota_box, used_box=used_box)
++                                   plan=plan, quota_box=quota_box, used_box=used_box, context=recorded)
+                 if transport == "real":
+                     # 分支由**本次响应**决定: 未触发就把事故取证支线留在 NOT_RUN 之外,
+                     # 真实触发就必须走 S9/S10/S11 —— 不许用"先前选了一个夹具档案"把它跳过。
+--- a/reports/reviews/phase8-m8-relative-protection-r3/field/plan.json
++++ b/reports/reviews/phase8-m8-relative-protection-r3/field/plan.json
+@@ -426,7 +426,7 @@
+             "@UID_FILE"
+           ],
+           "boot_drain_seconds": 20,
+-          "boot_drain_note": "复位之后、第一条查询之前, 执行器把板子自己发出的启动流按**原字节**收进 NN_rst.boot.rx.bin 并等到提示符边界(复用 P0 的完整响应门)。窗口内没有提示符 => POST_RESET_BOOT_PROMPT_MISSING, 一条查询都不发。20 s 的依据: 既存板级原始件 reports/reviews/phase8-motor-m5-fault-log/cp1/final_pass/002_version.bin 里 复位/上电后的启动横幅与 'msh >' 在同一次连接内就出现了(该件 154 B)。"
++          "boot_drain_note": "Bounded passive boot capture; no spontaneous prompt required. First system_status must return its own complete prompt and canonical READY facts. No extra reset/query/retry."
+         },
+         {
+           "cmd": "system_status",
+@@ -442,6 +442,13 @@
+               "must": {
+                 "bc": "YES",
+                 "ab": "0"
++              }
++            },
++            {
++              "row": "^\\[Safety\\] state=(?P<state>\\w+) fault=(?P<fault>\\d+) irq_gate=\\w+ polarity=\\w+ protect_ready=\\w+$",
++              "must": {
++                "state": "READY",
++                "fault": "0"
+               }
+             }
+           ]
+@@ -588,11 +595,10 @@
+       ],
+       "post_reset_boot_provenance": {
+         "kind": "source_shape",
+-        "basis": "reports/reviews/phase8-motor-m5-fault-log/cp1/final_pass/002_version.bin",
+-        "what_is_real": "既存板级原始字节里, 复位/上电后的控制台确实以 'msh >' 结束启动流(同件内 RT-Thread 5.3.0 横幅 + 两次 'msh >')。",
+-        "what_is_not_claimed": "这里**不**预写横幅的具体字节: 本轮离线不伪造启动内容, 真实执行时启动流按现场实收原样落盘, 计划只申报'必须等到提示符'这一条边界。"
++        "basis": "Historical full boot captures have no final prompt; 002_version.bin is a version command response, not spontaneous boot evidence.",
++        "what_is_not_claimed": "Synthetic post_reset_boot is only a stub input; all real bytes are archived."
+       },
+-      "order_note": "S2 的定长回读用 connect_mode=halt + resume_on_disconnect=false, 结束时核留在 Halted: 核心不跑, 第一条串口查询就没有任何应答(审核 §2A 的纯内存模拟: 原顺序 STOP/MISSING_RESPONSE_PROMPT/resets=0, 只对调两步即 OK/resets=1)。所以复位必须在最前, 并且**不自发提示符/绝对静默**都不被当作前置——它们是失败证据, 不是继续的理由。本轮不新增下载, 也不追加复位额度: 仍是那唯一一次 explicit_reset。"
++      "order_note": "Open -> one reset -> bounded passive archive -> one system_status; boot capture is not readiness proof."
+     },
+     {
+       "id": "S4",
+@@ -1123,6 +1129,14 @@
+             "bb_session",
+             "bb_written"
+           ]
++        },
++        {
++          "step": "log_before",
++          "regex": "^slots=(?P<flash_used_before>[0-9]+)/(?P<flash_capacity>[0-9]+) valid=[0-9]+ bad=[0-9]+$",
++          "as": [
++            "flash_used_before",
++            "flash_capacity"
++          ]
+         }
+       ],
+       "steps": [
+@@ -1144,6 +1158,17 @@
+           "seconds": 3,
+           "expect_contains": [
+             "[BB] state="
++          ]
++        },
++        {
++          "cmd": "flash_logstat",
++          "as": "log_before",
++          "key": "flash_logstat@before",
++          "seconds": 3,
++          "min_free_log_slots": 300,
++          "expect_contains": [
++            "slots=",
++            "completed="
+           ]
+         },
+         {
+@@ -1324,14 +1349,19 @@
+           "note": "故障锁存后的禁能同样必须证得(name=FAULT 允许, 见 cleaning_and_terminal.why_not_idle); 这一步只用同一份响应的六个合同字段判。"
+         },
+         {
+-          "cmd": "flash_dump 0 8",
++          "cmd": "flash_dump",
+           "as": "frames",
+           "key": "flash_dump 0 8",
+           "seconds": 8,
+           "expect_contains": [
+             "slot,seq,session,time_ms,event,valid,sg,current_ma,ax_mg,ay_mg,az_mg,step_hz,vibration_mg,flags"
+           ],
+-          "note": "复用 M5/M6 既有的 flash_dump 原字节归档与同一张 14 列表头(ns_flash_shell.c:153/159-163), 只取**有代表性的前 8 槽**, 不再完整演示 300 帧软件触发, 也不新写日志判定工具。"
++          "note": "Runtime first/count select the final at most eight appended slots from pre-trigger used_slots and current committed used_slots; never hardcode slot 0. key is a stub row selector only.",
++          "new_log_window": {
++            "before_key": "flash_used_before",
++            "stats_step": "newlog",
++            "max_frames": 8
++          }
+         }
+       ],
+       "require_frames": [
+--- a/reports/reviews/phase8-m8-relative-protection-r3/field/rows.json
++++ b/reports/reviews/phase8-m8-relative-protection-r3/field/rows.json
+@@ -632,13 +632,15 @@
+     },
+     "flash_logstat": {
+       "healthy": [
+-        "slots=0/4096 valid=0 bad=0",
+-        "queued=0 completed=0 failed=0 queue_dropped=0 last_error=0"
+-      ],
+-      "_provenance": {
+-        "kind": "board_capture",
+-        "file": "reports/reviews/phase8-motor-m5-fault-log/cp1/fault_attempt/012_flash_logstat.bin",
+-        "lines": "整块两行(ASCII 原始 RX)"
++        "slots=600/4096 valid=600 bad=0",
++        "queued=300 completed=300 failed=0 queue_dropped=0 last_error=0"
++      ],
++      "_provenance": {
++        "kind": "source_shape",
++        "files": [
++          "applications/ns_flash_shell.c:100-110"
++        ],
++        "note": "Offline declared append scenario only: 300 existing committed slots, 300 new frames, tail slots 592..599. Not board evidence."
+       }
+     },
+     "fault_reset": {
+@@ -770,34 +772,47 @@
+     "flash_dump 0 8": {
+       "healthy": [
+         "slot,seq,session,time_ms,event,valid,sg,current_ma,ax_mg,ay_mg,az_mg,step_hz,vibration_mg,flags",
+-        "0,1,8,1790589,0,31,74,26,23,11,1002,300,1002,423792640",
+-        "1,2,8,1790601,0,31,74,26,23,15,1006,300,1006,423792640",
+-        "2,3,8,1790614,0,31,75,27,22,14,1004,300,1004,423792640",
+-        "3,4,8,1792118,9,31,76,15,27,15,1010,0,1010,427069705",
+-        "4,5,8,1792130,9,31,76,16,26,14,1008,0,1008,427069705",
+-        "5,6,8,1792143,9,31,77,15,28,15,1012,0,1012,427069705",
+-        "6,7,8,1792156,9,31,77,16,27,16,1010,0,1010,427069705",
+-        "7,8,8,1792169,9,31,78,15,26,15,1009,0,1009,427069705"
++        "592,1,8,1790589,9,31,74,26,-23,11,1002,0,1002,423792640",
++        "593,2,8,1790601,9,31,74,26,-23,15,1006,0,1006,423792640",
++        "594,3,8,1790614,9,31,75,27,-23,14,1004,0,1004,423792640",
++        "595,4,8,1792118,9,31,76,15,-23,15,1010,0,1010,427069705",
++        "596,5,8,1792130,9,31,76,16,-23,14,1008,0,1008,427069705",
++        "597,6,8,1792143,9,31,77,15,-23,15,1012,0,1012,427069705",
++        "598,7,8,1792156,9,31,77,16,-23,16,1010,0,1010,427069705",
++        "599,8,8,1792169,9,31,78,15,-23,15,1009,0,1009,427069705"
+       ],
+       "trip": [
+         "slot,seq,session,time_ms,event,valid,sg,current_ma,ax_mg,ay_mg,az_mg,step_hz,vibration_mg,flags",
+-        "0,1,8,1790589,0,31,74,26,23,11,1002,300,1002,423792640",
+-        "1,2,8,1790601,0,31,74,26,23,15,1006,300,1006,423792640",
+-        "2,3,8,1790614,0,31,75,27,22,14,1004,300,1004,423792640",
+-        "3,4,8,1792118,9,31,76,15,27,15,1010,0,1010,427069705",
+-        "4,5,8,1792130,9,31,76,16,26,14,1008,0,1008,427069705",
+-        "5,6,8,1792143,9,31,77,15,28,15,1012,0,1012,427069705",
+-        "6,7,8,1792156,9,31,77,16,27,16,1010,0,1010,427069705",
+-        "7,8,8,1792169,9,31,78,15,26,15,1009,0,1009,427069705"
++        "592,1,8,1790589,9,31,74,26,-23,11,1002,0,1002,423792640",
++        "593,2,8,1790601,9,31,74,26,-23,15,1006,0,1006,423792640",
++        "594,3,8,1790614,9,31,75,27,-23,14,1004,0,1004,423792640",
++        "595,4,8,1792118,9,31,76,15,-23,15,1010,0,1010,427069705",
++        "596,5,8,1792130,9,31,76,16,-23,14,1008,0,1008,427069705",
++        "597,6,8,1792143,9,31,77,15,-23,15,1012,0,1012,427069705",
++        "598,7,8,1792156,9,31,77,16,-23,16,1010,0,1010,427069705",
++        "599,8,8,1792169,9,31,78,15,-23,15,1009,0,1009,427069705"
+       ],
+       "_provenance_flash_dump": {
+-        "kind": "board_capture_composed",
++        "kind": "source_shape",
+         "files": [
+           "reports/reviews/phase8-motor-m5-fault-log/cp1/final_pass/009_flash_dump_0_100.bin (板上原字节 5891 B: 表头 + slot 0.. 的 14 列 CSV, 逐字)",
+           "reports/reviews/phase8-motor-m6-offline/m5_raw_recovery/011_flash_dump_200_100.bin.b64 (同一现场原件的 base64 副本, 停后帧 event=9 且 step_hz=0 的形状来源)",
+           "applications/ns_flash_shell.c:157-163 (empty/error/overflow 三种读槽失败的打印分支)"
+         ],
+-        "note": "两块都是真机逐字采集; 换掉的只有本轮计划要证的三个值(session=8 即 S8 记录->S9 严格增大后的本次新增 session、time_ms 取本次窗口、slot/seq 连续)。表头与逐帧格式串在 ns_flash_shell.c 的 flash_dump 里(表头 rt_kputs, 帧体 rt_snprintf); CRC/commit 不在 CSV 里, 由 ns_storage.c 的读槽路径内部校验, 失败就走上面那几条 empty/error 分支 => 本组出现 empty/error/overflow 即取证未完成。"
++        "note": "C CSV shape, signed ax_mg and a declared new committed tail range 592..599; numerical values are injected, not board observations. The legacy key is only a stub selector."
++      }
++    },
++    "flash_logstat@before": {
++      "healthy": [
++        "slots=300/4096 valid=300 bad=0",
++        "queued=0 completed=0 failed=0 queue_dropped=0 last_error=0"
++      ],
++      "_provenance": {
++        "kind": "source_shape",
++        "files": [
++          "applications/ns_flash_shell.c:100-110"
++        ],
++        "note": "Offline declared append scenario only: 300 existing committed slots, 300 new frames, tail slots 592..599. Not board evidence."
+       }
+     }
+   }
+--- a/reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_field_selftest.py
++++ b/reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_field_selftest.py
+@@ -1027,7 +1027,8 @@
+     return (good["status"] == "OK" and st_good["resets"] == 1 and "boot_stream" in kinds and
+             reversed_steps["code"] == "MISSING_RESPONSE_PROMPT" and st_rev["resets"] == 0 and
+             [x["as"] for x in reversed_steps["results"]] == [] and
+-            no_boot["code"] == "POST_RESET_BOOT_PROMPT_MISSING" and st_nb["resets"] == 1,
++            no_boot["status"] == "OK" and st_nb["resets"] == 1 and
++            len([r for r in no_boot["results"] if r.get("cmd")=="system_status"]) == 1,
+             "good=%s resets=%d kinds=%s | reversed=%s resets=%d results=%d | no_boot=%s" % (
+                 good["status"], st_good["resets"], ",".join(kinds), reversed_steps["code"],
+                 st_rev["resets"], len(reversed_steps["results"]), no_boot["code"]))
+--- a/reports/reviews/phase8-m8-relative-protection-r3/field/M8R3Field.ps1
++++ b/reports/reviews/phase8-m8-relative-protection-r3/field/M8R3Field.ps1
+@@ -33,7 +33,7 @@
+     [ValidateSet('sim', 'manual', 'real')]
+     [string]$Backend = 'sim',
+     [Parameter(ParameterSetName = 'RunField')]
+-    [ValidateSet('healthy', 'trip', 'no_trigger', 'all')]
++    [ValidateSet('healthy', 'trip', 'no_trigger', 'all', 'response_driven')]
+     [string]$Profile = 'all',
+     [Parameter(ParameterSetName = 'RunField')]
+     [string]$Port = 'COM5',

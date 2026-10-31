@@ -1,0 +1,15 @@
+{"kind": "QUOTA_CONSUMED", "left": 2, "n": 1, "name": "port_open", "t_s": 0.0}
+{"kind": "PORT_OPEN", "port": null, "t_s": 0.0, "transport": "stub"}
+{"bytes": "diag_status\r\n", "kind": "TX", "t_s": 0.0}
+{"bytes": 391, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "49a079d9b2adeac9c7470e9eb078c0e09a7608339d2aa6e78f792bb3da40ed3f", "t_s": 0.0, "tail": "b'041 imu=0\\r\\nmsh >'"}
+{"bytes": "blackbox_status\r\n", "kind": "TX", "t_s": 0.0}
+{"bytes": 311, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "d75710682b20612eaab26ca3b125942d4840bfa304cec48e93a1c7a1d814b2cb", "t_s": 0.0, "tail": "b'=0 drop=0\\r\\nmsh >'"}
+{"bytes": "flash_logstat\r\n", "kind": "TX", "t_s": 0.0}
+{"bytes": 101, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "e5ba2e294b4aa72b73e3430005b691e7c20b92ae9e3a22f4e7f02d81eb14fb6f", "t_s": 0.0, "tail": "b't_error=0\\r\\nmsh >'"}
+{"bytes": "motor_status\r\n", "kind": "TX", "t_s": 0.0}
+{"bytes": 628, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "b89a410285b149c10437872b76aa31ed329bd6068b5e7010f4eb0d3066a2e53c", "t_s": 0.005, "tail": "b'P stopped\\r\\nmsh >'"}
+{"after": 600, "before": 300, "count": 8, "first": 592, "kind": "NEW_LOG_WINDOW", "t_s": 0.005}
+{"bytes": "flash_dump 592 8\r\n", "kind": "TX", "t_s": 0.005}
+{"bytes": 558, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "9906b1d6e92575d30b42329797d7072c53a6c57c36375e9e73e4d223dc5763a5", "t_s": 0.01, "tail": "b'427069705\\r\\nmsh >'"}
+{"kind": "SESSION_OK", "session": "S_S9", "steps": 5, "t_s": 0.01}
+{"kind": "PORT_CLOSED", "t_s": 0.01}

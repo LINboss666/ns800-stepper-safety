@@ -104,3 +104,42 @@ powershell -NoProfile -ExecutionPolicy Bypass -File field\M8R3Field.ps1 -RunFiel
 - `--validate-plan` 现在 151 项(新增首查顺序、常量回查、时间预算三项门); `rows.json` 40 组的来源核查
   problems=0; 三入口在 Windows PowerShell 5.1 各跑一遍到新 run 目录(`offline/psrun-*`),
   汇总见 `host/r3_closeout_runs.json`。
+
+## 7. 最终补正轮(FF, 2026-11-01)之后的读法
+
+本轮软件变动**只在 `field/` 的既有五件**，逐字节等于审核方 `patch_identity.json` 的候选散列:
+基线取 `15745e5` 的 Git blob 复算(五件全对)，候选由仓外规范 LF 副本上的 `tail_candidate.patch`
+(21667 B / `07de65f0e94f6ebe682eb6a29c96fe4626d7e1e479423347146ebd19a6045eee`) 产出，
+`git -c core.autocrlf=false apply --check` 与 `apply` 均 rc=0，五件输出散列与申报一致
+(复算表见 `host/ff_identity.json`)。产品 C/H、Keil 工程、六镜像、三 map、固件 manifest
+一律未改，未重编，未重跑不变的 C 链。
+
+| 项 | 现在必须按这个口径读 | 落点(候选字节) |
+| --- | --- | --- |
+| F1 启动边界 | 复位后只**有界被动**收启动字节(`BOOT_STREAM_DRAINED` 带 `prompt_required=false` 与 `end_reason`)，结果里写死 `readiness=NOT_ASSESSED_QUERY_REQUIRED`: 启动文本不作 READY 证明，也不得据它继续。就绪只由**同一条**首查 `system_status` 的完整提示符响应证明，并新增唯一核对 `[Safety] state=READY fault=0`(与既有 `bootstrap-complete=YES abort-stage=0` 同响应) | `m8r3_serial_chain.py:1011-1046`; `plan.json` 的 `boot_drain_note`/`order_note`/S3 新行判据 |
+| F2 工具 argv | `-c` 之后的整条命令串**不再**被当相对路径加 repo_root 前缀(`savemem 0x08000000 <len> <file>` 原样交给 pyOCD)；镜像/独立文件参数仍以 repo_root 解析 | `m8r3_serial_chain.py:657-661` |
+| F3 有符号日志列 | 14 列里只有产品的有符号列(零基 6..12: `sg,current_ma,ax_mg,ay_mg,az_mg,step_hz,vibration_mg`)允许负号；`slot/seq/session/time_ms/event/valid` 与 `flags`(13)仍不许。合法 `ax_mg=-23` 的帧现在算证据，缺帧与 `slot N error` 仍拒绝 | `m8r3_serial_chain.py:1767-1769` |
+| F4 新日志槽位 | S8 起转前**新增一次只读** `flash_logstat`(`min_free_log_slots=300`，不足即 `EVENT_LOG_CAPACITY_LOW` 且不发运动命令)；S9 的 `flash_dump first count` 由 S8 记录的 used 与 S9 当前 used 推导末尾最多 8 槽，并逐槽核对覆盖/session/event=9/step_hz=0。事件存储是追加、满即停，不是环；**不得**为腾空间自动清日志 | `m8r3_serial_chain.py:1717/1720-1740/1228-1230`; `plan.json` S8 第 4 步 + S9 第 5 步 `new_log_window`; `rows.json:805` 新组 |
+| F5 PS 真入口 | `-Profile` 白名单加入 `response_driven`，因此正确的实机参数在绑定阶段不再被拒；`real + all` 仍禁止、传输/后端分流与"分支由本次响应决定"都保留 | `M8R3Field.ps1:36` |
+
+**作废的旧口径(不得再引用)**:
+- `POST_RESET_BOOT_PROMPT_MISSING` 与"启动流必须以提示符结束"这条前置已删除 —— 两份真实历史启动件(3381 B / 3757 B)在原字节下会被它拦死，`002_version.bin` 也确实是 `version` 命令的回复而不是自发启动证据。
+- S9 的 `flash_dump 0 8` 只剩下 **stub 取行键**的用途；真实发送的命令由新增区间算出(离线声明的对照场景 300→600 → `flash_dump 592 8`)。固定读槽位 0 会把上一轮旧日志当成取证通过。
+- `flash_logstat` 与 `flash_dump` 两组行表是**离线声明的追加场景**(kind=source_shape)，不是板级观测。
+
+真实入口参数是 `-Transport real -Backend real -Profile response_driven` 加审批令牌与 UID 文件；
+`-Profile all` 只用于离线，real+all 在 PS 自己的门上即拒(`REAL_PROFILE_ALL_FORBIDDEN`，rc=4，
+不起 Python)。
+
+额度与硬件边界不变: 学习起转 ≤15 s(S4)、保护观察起转 ≤5 s(S8)、最多 2 次 start、合计 ≤20 s，
+由 `PLAN_MOTION_CAP_BUDGET` 审计; 保持 IRUN20/100 Hz/DIR0。**15 s 仍只是离线合同提案，不是硬件授权**，
+也没有把旧的 5 秒测试记成通过。
+
+本机验证(原文见 `host/*_r3finalfix.*` 与 `host/reviewer_ff/`): 原 73 项 73/73 rc=0；同一边界程序
+跑候选 22/22 rc=0、跑 `15745e5` 原交付字节 7/22 rc=1(逐件旧行为复现)；`--validate-plan` 154 项
+0 失败；rows 来源检查 41 组 problems=0 notes=0；PowerShell 5.1 三入口到新 run 目录
+SelfTest 22/0、Precheck 14/0、RunField(stub/sim/all) 3/0 且 `actions_attempted=0`；
+Parser/参数 AST 离线复核 0 语法错误且白名单含 `response_driven`(未调用 real 入口试绑定)。
+
+假端口 + 假子进程通过**不等于**物理 SG/ADC/IMU 触发通过；SG 分离度、ADC 相对阈值实际作用、
+IMU 激励与物理保护效果仍待现场验证。

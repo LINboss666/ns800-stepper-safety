@@ -357,6 +357,11 @@ def assert_step(st, rows, asname, led, raw=None):
                                            "absent_groups": unknown})
             return {"verdict": "STOP", "code": "FIELD_VALUE_MISMATCH", "wrong": wrong,
                     "forbidden_val": loose, "absent_groups": unknown}
+    if st.get("min_free_log_slots") is not None:
+        hit = one_row(rows, FLASH_LOGSTAT_ROW, "event-log-capacity")
+        free = int(hit["capacity"]) - int(hit["used"])
+        if free < int(st["min_free_log_slots"]):
+            return {"verdict": "STOP", "code": "EVENT_LOG_CAPACITY_LOW", "free_slots": free}
     # expect_profile: 用与清理同一条合同判读一份完整 motor_status(静止/武装/运行的一致性)
     if st.get("expect_profile") == "AT_REST":
         summ, bad = disable_contract(rows)
@@ -650,7 +655,10 @@ class RealActionBackend(ActionBackend):
         return [x.replace(self.secret, tag) for x in argv]
 
     def _run(self, name, act, argv):
-        argv = [self._p(x) for x in self._resolve(name, argv)]
+        resolved = self._resolve(name, argv)
+        # A commander -c argument is an opaque command, not a filesystem path.
+        argv = [x if i > 0 and resolved[i - 1] == "-c" else self._p(x)
+                for i, x in enumerate(resolved)]
         d = self.out / ("action_" + name)
         d.mkdir(parents=True, exist_ok=True)
         masked = self._mask(argv)
@@ -1001,29 +1009,41 @@ def profile_of(fixture):
 
 
 def drain_post_reset_boot(port, st, asname, out, idx, led, results, clock, fixture, transport):
-    """复位之后、**任何**合法查询之前: 把板子自己发出的启动流按原字节收进证据, 并等它落到
-    一个干净的提示符边界(R3 复审 §2A: 回读把核留在 Halted, 复位才是前置)。
-
-    提示符不是"可以不复位"的替代前置 —— 复位已经真实发生并记账, 这里只是把启动流消费掉,
-    免得启动字节混进第一条查询的响应里。窗口内没有提示符 = 具名停止, 绝不发查询。
+    """Archive passive boot bytes; application readiness is proved by the next query.
+    A spontaneous boot prompt is optional. Command-response prompts remain mandatory.
     """
     window = float(st.get("boot_drain_seconds", 20))
-    dl = clock.monotonic() + window
+    t0 = last = clock.monotonic()
+    dl = t0 + window
     raw = out / ("%02d_%s.boot.rx.bin" % (idx, asname))
+    buf = bytearray()
     if transport == "stub":
         for line in (fixture or {}).get("post_reset_boot", []):
             port.feed((line + "\r\n").encode("utf-8"))
-    lines, nbytes = read_until_prompt(port, dl, led, raw, clock)
-    if not lines:
-        raise Stop("POST_RESET_BOOT_PROMPT_MISSING", "window=%.0fs bytes=%d" % (window, nbytes))
-    try:
-        txt = emit_text(raw, lines)
-    except OSError as e:
-        raise Stop("EVIDENCE_WRITE_FAILED", "boot=%s:%s" % (asname, e))
-    results.append({"as": asname + "_boot", "kind": "boot_stream", "rx_bytes": nbytes,
-                    "rx_sha256": sha_of(raw), "txt": txt, "rows": len(lines)})
-    led.ev("BOOT_STREAM_DRAINED", **{"as": asname, "bytes": nbytes, "rows": len(lines),
-                                     "raw": str(raw)})
+    with open(raw, "wb") as f:
+        while clock.monotonic() < dl:
+            chunk = port.read(512)
+            if chunk:
+                buf += chunk
+                f.write(chunk)
+                f.flush()
+                os.fsync(f.fileno())
+                last = clock.monotonic()
+                if len(buf) > BOOT_CAP:
+                    raise Stop("BOOT_BYTE_CAP")
+                check_danger(bytes(buf))
+            now = clock.monotonic()
+            if now - t0 >= min(2.0, window) and now - last >= 0.2:
+                break
+            clock.sleep(min(0.01, max(0.0, dl - now)))
+    # Bytes repr is presentation only; do not decode/repair boot text into business facts.
+    txt = emit_text(raw, [repr(bytes(buf))])
+    end_reason = "DRAIN_BUDGET_REACHED" if clock.monotonic() >= dl else "BOUNDED_DRAIN"
+    results.append({"as": asname + "_boot", "kind": "boot_stream", "rx_bytes": len(buf),
+                    "rx_sha256": sha_of(raw), "txt": txt,
+                    "readiness": "NOT_ASSESSED_QUERY_REQUIRED", "end_reason": end_reason})
+    led.ev("BOOT_STREAM_DRAINED", **{"as": asname, "bytes": len(buf),
+           "raw": str(raw), "end_reason": end_reason, "prompt_required": False})
 
 
 def command_attempt(port, cmd, st, asname, raw, step_dl, transport, fixture, silent, led, clock,
@@ -1115,7 +1135,7 @@ def poll_command_step(port, cmd, st, asname, idx, out, step_dl, transport, fixtu
 
 def exec_session(session_id, steps, outdir, transport, fixture, port_name,
                  total_deadline_seconds, clock, backend=None, motion_cap_seconds=None,
-                 plan=None, quota_box=None, used_box=None):
+                 plan=None, quota_box=None, used_box=None, context=None):
     """一个会话 = 一个端口 = 一个写者。
 
     与 R1 交付版的三处实质差别:
@@ -1204,6 +1224,10 @@ def exec_session(session_id, steps, outdir, transport, fixture, port_name,
                                           fixture, transport)
                 continue
             cmd = st["cmd"]
+            selected_window = None
+            if st.get("new_log_window"):
+                cmd, selected_window = select_new_log_window(st["new_log_window"], results, context)
+                led.ev("NEW_LOG_WINDOW", **selected_window)
             if cmd == "__approved_reboot__":
                 spend("approved_reboot", 1)
                 r = run_action({"action": "reboot", "as": asname,
@@ -1288,7 +1312,7 @@ def exec_session(session_id, steps, outdir, transport, fixture, port_name,
                                              fixture, silent, led, clock)
             results.append(dict({"as": asname, "kind": "command", "cmd": cmd,
                                  "rx_bytes": nbytes, "rx_sha256": sha_of(raw),
-                                 "txt": txt}, **v))
+                                 "txt": txt, "selected_log_window": selected_window}, **v))
             if v["verdict"] == "REFUSED":
                 ret = {"status": "REFUSED", "code": v.get("code", ""),
                        "refused": v.get("lines")}
@@ -1690,6 +1714,32 @@ def record_from_rows(stage, results, recorded, profile="healthy"):
     return recorded
 
 
+FLASH_LOGSTAT_ROW = r"^slots=(?P<used>[0-9]+)/(?P<capacity>[0-9]+) valid=(?P<valid>[0-9]+) bad=(?P<bad>[0-9]+)$"
+
+
+def select_new_log_window(spec, results, context):
+    """Select only appended committed slots; event storage is stop-when-full, not a ring."""
+    if context is None or spec["before_key"] not in context:
+        raise Stop("NEW_LOG_BASELINE_MISSING")
+    before = int(context[spec["before_key"]])
+    rows = [r for r in results if r.get("as") == spec["stats_step"] and r.get("txt")]
+    if len(rows) != 1:
+        raise Stop("NEW_LOG_STATS_MISSING")
+    text = Path(rows[0]["txt"]).read_text(encoding="utf-8")
+    hits = list(re.finditer(FLASH_LOGSTAT_ROW, text, re.M))
+    if len(hits) != 1:
+        raise Stop("NEW_LOG_STATS_NOT_UNIQUE")
+    after, capacity = int(hits[0]['used']), int(hits[0]['capacity'])
+    if not 0 <= before < after <= capacity <= 4096:
+        raise Stop("NEW_LOG_NO_APPENDED_RANGE", "before=%d after=%d capacity=%d" % (before, after, capacity))
+    count = min(after - before, int(spec.get("max_frames", 8)))
+    if not 1 <= count <= 100:
+        raise Stop("NEW_LOG_COUNT_OUT_OF_RANGE")
+    first = after - count
+    return "flash_dump %d %d" % (first, count), {"before": before, "after": after,
+                                                "first": first, "count": count}
+
+
 def flash_frames_verdict(stage, results, recorded, led):
     """事故取证要**读回到实际日志帧**(审核 §2D 第 4 条): 计数增大只是"本轮确实多写了一笔"的
     身份前置, 不是日志内容。这里复用 M5/M6 既有的 flash_dump 原字节归档与同一张 14 列表头
@@ -1714,13 +1764,24 @@ def flash_frames_verdict(stage, results, recorded, led):
                 read_errors.append(s[:80])
                 continue
             parts = s.split(",")
-            if len(parts) == FLASH_DUMP_COLUMNS and all(p.isdigit() for p in parts):
+            if len(parts) == FLASH_DUMP_COLUMNS and all(
+                    re.fullmatch(r"[0-9]+" if i < 6 or i == 13 else r"-?[0-9]+", p)
+                    for i, p in enumerate(parts)):
                 frames.append(parts)
+        selection = next((r.get("selected_log_window") for r in results
+                          if r.get("as") == spec["step"]), None)
         want = recorded.get(spec["session_key"])
         keyed = [f for f in frames if want is not None and f[2] == str(want)]
         miss = []
         if not frames:
             miss.append("CSV_FRAMES=0")
+        if not selection:
+            miss.append("NEW_LOG_WINDOW_NOT_RECORDED")
+        else:
+            slots = [int(f[0]) for f in frames]
+            expected = set(range(selection["first"], selection["first"] + selection["count"]))
+            if len(slots) != len(expected) or set(slots) != expected or min(expected) < selection["before"]:
+                miss.append("NEW_LOG_SLOT_COVERAGE_MISMATCH")
         if want is None:
             miss.append("SESSION_NOT_RECORDED(%s)" % spec["session_key"])
         elif len(keyed) < int(spec.get("min_frames", 1)):
@@ -2052,7 +2113,7 @@ def dispatch_plan(plan, transport, backend_name, outdir, clock, profile, port,
                                    int(stg.get("total_deadline_seconds", 120)), clock,
                                    backend=backend,
                                    motion_cap_seconds=cap,
-                                   plan=plan, quota_box=quota_box, used_box=used_box)
+                                   plan=plan, quota_box=quota_box, used_box=used_box, context=recorded)
                 if transport == "real":
                     # 分支由**本次响应**决定: 未触发就把事故取证支线留在 NOT_RUN 之外,
                     # 真实触发就必须走 S9/S10/S11 —— 不许用"先前选了一个夹具档案"把它跳过。

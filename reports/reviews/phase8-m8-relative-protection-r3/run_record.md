@@ -155,3 +155,40 @@ S_S10(trip, 锁存态 arm 被拒) motor_stop 0.005→0.005 | motor_disarm 0.005�
 - FS68 真实入口的分支由本次响应决定, 未定即 `RESPONSE_BRANCH_UNDETERMINED`(零工具调用)。
 - FS69 新增 session 无实际帧/帧不属本次 session/无停后帧/槽读错 => `FLASH_FRAMES_NOT_RECOVERED`。
 - FS70–FS73 四项新增定向检出(按位判定 / 忙期模型 / 轮询 / 启动流消费), 每项都让对应正控转为 FAIL。
+
+## 7. 最终补正轮(FF, 2026-11-01)的实际执行
+
+基线 `15745e548dcfc4983fb91563fdac81ad5fdf3dc9`(未前进)，核心软件/镜像输入仍为 `805c29b…`，
+主机 Windows 10.0.26200 / PowerShell 5.1.26100.9711 / Python 3.12.5。以下每条都是本机真实执行，
+退出码取自当次调用。
+
+| # | 命令 | rc | 关键原文 |
+| --- | --- | --- | --- |
+| 1 | 五件基线: `git cat-file blob 15745e5:<field 路径>` → 仓外 LF 副本 → sha256 对 `patch_identity.json` | 0 | 五件基线全对(表在 `host/ff_identity.json`) |
+| 2 | `git -c core.autocrlf=false apply --check -p1 tail_candidate.patch` / `apply` | 0 / 0 | 五件输出散列 = 候选散列; 补丁 21667 B / `07de65f0…45eee` |
+| 3 | `python field/m8r3_field_selftest.py` | 0 | `SUMMARY|cases=73 pass=73 fail=0 executed=73 preserved_r2_identities=25|negative_injections=11` |
+| 4 | `python host/reviewer_ff/tail_boundary_probes.py --root D:/ns800 --inputs …` | 0 | `BOUNDARY_SUMMARY|pass=22 cases=22 hardware_actions=0 real_tool_calls=0` |
+| 5 | 同一程序 `--root <15745e5 的 Git blob 副本>`(修前对照) | 1 | `BOUNDARY_SUMMARY|pass=7 cases=22`，逐件旧行为: F1 三件启动都被 `POST_RESET_BOOT_PROMPT_MISSING` 拦下、F2 的 `-c` 串被前缀成 `<repo>\savemem 0x08000000 …`、F3 有符号帧 `CSV_FRAMES=0`、F4 旧槽/重槽不拒且无区间推导、F5 白名单无 `response_driven` |
+| 6 | `python field/m8r3_serial_chain.py --validate-plan --plan … --repo-root D:/ns800` | 0 | `PLAN_VALIDATE_SUMMARY|checks=154|fail=0|msh_commands=70` |
+| 7 | `python host/rows_provenance_check.py` | 0 | `ROWS_PROVENANCE|groups=41 capture_refs=28 source_anchor_refs=33 problems=0 notes=0` |
+| 8 | `powershell -File field/M8R3Field.ps1 -SelfTest` | 0 | `SELFTEST_SUMMARY|checks=22|failures=0`，含 `ST_NEG_REAL_PROFILE_ALL`/`ST_NEG_MODE_MIX_REFUSED` 仍 PASS |
+| 9 | `powershell -File field/M8R3Field.ps1 -Precheck` | 0 | `PRECHECK_SUMMARY|checks=14|failures=0` |
+| 10 | `powershell -File field/M8R3Field.ps1 -RunField -Transport stub -Backend sim -Profile all` | 0 | `RUNFIELD_SUMMARY|checks=3|failures=0|actions_attempted=0`; healthy/trip/no_trigger 三条 dispatch 各 rc=0 |
+| 11 | `powershell -File <仓外> ff_ps_ast_check.ps1`(Parser + 参数 AST) | 0 | `PARSE_ERRORS=0`、`PARAM=Profile VALIDATE_SET=healthy,trip,no_trigger,all,response_driven` |
+
+新 run 目录(原产物未覆盖): `offline/psrun-20261031T175241Z-48804-SelfTest`、
+`offline/psrun-20261031T175308Z-37156-Precheck`、`offline/psrun-20261031T175313Z-16908-RunField`。
+
+候选路径里可核对的新事实(stub 实跑证据): `S_S8/04_log_before.rx.bin.txt` 是
+`slots=300/4096 valid=300 bad=0`；`S_S9/ledger.jsonl` 记 `NEW_LOG_WINDOW
+{before:300, after:600, first:592, count:8}`；`S_S9/05_frames.rx.bin.txt` 的槽位是 592..599
+且 `ax_mg=-23` 被收下；`S_S3/01_rst.boot.rx.bin.txt` 只有原字节的 repr，没有 READY 结论。
+容量 4096 与产品一致(`ns_storage.h:10` `NS_LOG_SIZE 0x100000u` / `:15` `NS_LOG_SLOTS = /256u`)。
+
+**本机核对发现的偏差(未改候选字节，只登记)**: `rows.json` 两处 `flash_logstat` 系来源锚点写
+`applications/ns_flash_shell.c:100-110`，实读产品源码 `flash_logstat` 函数体是 :89-99，两条
+`rt_kprintf` 在 :94-95 与 :96-98，而 :100 是 `MSH_CMD_EXPORT` 行 —— 行号偏了但形状与内容正确，
+`host/rows_provenance_check.py` 按窗口命中所以 problems=0。候选散列已绑定，本轮不动这些字节;
+准确的锚点应写作 `ns_flash_shell.c:89-99`。
+
+硬件动作: 无。未打开 COM5，未创建 DAP/串口对象，未调用 pyOCD/Keil，未复位/下载/起转。

@@ -1,0 +1,1 @@
+[DIAG] mode=RELATIVE_ACTIVE
