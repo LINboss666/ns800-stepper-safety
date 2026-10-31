@@ -1556,6 +1556,103 @@ def _mutant(marker, pairs):
     return load(p, "mut_" + hashlib_sha(key))
 
 
+def _pyocd_shlex_fake(m, image_bytes):
+    """假 pyOCD: 像真 commander 那样对 `-c` **命令串**再做一次分词(反斜杠在这里是转义符),
+    然后按分出来的路径落盘。现场实证就是这个形状: 解析后的名字被咬掉分隔符 => 落不下去 => rc=1。
+    git 调用原样交回真实 subprocess(离线只读, 与 FS68 同一手法)。"""
+    saved = m.subprocess.run
+    calls = []
+
+    class Completed:
+        def __init__(self, rc, out, err):
+            self.returncode, self.stdout, self.stderr = rc, out, err
+
+    def fake_run(argv, **kw):
+        import shlex
+        argv = [str(x) for x in argv]
+        calls.append(list(argv))
+        if argv and argv[0] in ("git", "git.exe"):
+            return saved(argv, **kw)
+        if "flash" in argv:                       # S1: 既存成功原文的三条 loader 行
+            return Completed(0, b"", b"0002300 I Erasing... [loader]\r\n"
+                                   b"0008619 I Programming... [loader]\r\n"
+                                   b"0023790 I Erased 291840 bytes (285 sectors), programmed "
+                                   b"291840 bytes (285 pages), identical 0 bytes (0 pages) [loader]\r\n")
+        if "commander" in argv:                   # S2: 只有真写得下去的文件才算"取回来了"
+            ctoks = [argv[i + 1] for i, x in enumerate(argv[:-1]) if x == "-c"]
+            target = None
+            for t in ctoks:
+                parts = shlex.split(t)
+                if parts and parts[0] == "savemem" and len(parts) >= 4:
+                    target = parts[-1]
+            if target is None:
+                return Completed(1, b"", b"no savemem target in -c\r\n")
+            try:
+                with open(target, "wb") as f:
+                    f.write(image_bytes)
+            except OSError as e:
+                return Completed(1, b"", ("Error: [Errno %s] %s: %r [__main__]\r\n" % (
+                    getattr(e, "errno", 2), e.strerror or "No such file or directory", target)
+                ).encode("utf-8", "replace"))
+            out = ("Core 0 (None):  Halted\r\nSaved %d bytes to %s\r\n"
+                   "Core 0 (None):  Halted\r\n" % (len(image_bytes), target)).encode("utf-8")
+            return Completed(0, out, b"")
+        return Completed(0, b"", b"")
+    return calls, fake_run
+
+
+def s74_run_root_inside_commander_c_is_shlex_safe(m):
+    """首次真跑(FIELD-1)打出来的形状缺陷: `@RUN_ROOT` 会被展开进 pyOCD 的 `-c` 命令串,
+    而 commander 对整条命令串再分词一次 —— Windows 的反斜杠在那里是**转义符**,
+    `D:\\ns800\\...` 被咬成一串控制字符, 于是回读 rc=1(现场 stderr 原文见 host/field_run_...)。
+    这条用例走**真 dispatch 的 subs 构造**(不是测试自己拼 subs —— 那正是当初漏掉它的原因),
+    只把工具换成会分词的假件。既存成功原文里 savemem 的目标本来就是正斜杠形式
+    (P0 的 S2_readback.stdout.txt: `Saved 266244 bytes to D:/ns800-m7-p0-.../readback.bin`)。"""
+    import re
+    import shlex
+    image_bytes = (REPO / PLAN["tools"]["readback"]["image"]["path"]).read_bytes()
+    plan = copy.deepcopy(PLAN)
+    plan["stages"] = [s for s in plan["stages"] if s["id"] in ("S0", "S1", "S2")]
+    d = out_dir("s74-run")
+    uidf = Path(d) / "uid.txt"
+    uidf.write_text("U" * 48, encoding="utf-8")
+    calls, fake_run = _pyocd_shlex_fake(m, image_bytes)
+    saved = m.subprocess.run
+    m.subprocess.run = fake_run
+    try:
+        res = m.dispatch_plan(plan, "real", "real", d, m.SimClock(), m.REAL_PROFILE, "NO_PORT",
+                              str(REPO), "APPR", "APPR", str(uidf), plan_dir=str(HERE))
+    finally:
+        m.subprocess.run = saved
+    st = {s["id"]: s for s in res["stages"]}
+    rb = [c for c in calls if "commander" in c]
+    ctoks = [c[i + 1] for c in rb for i, x in enumerate(c[:-1]) if x == "-c"]
+    savemem = [t for t in ctoks if t.split(" ")[0] == "savemem"]
+    tgt = shlex.split(savemem[0])[-1] if savemem else ""
+    one_token = bool(rb) and any(x.startswith("savemem ") for x in rb[0])   # F2 那半不许退回去
+    clean = bool(tgt) and not any(ch in tgt for ch in "\\\r\n\x0c\x1a") and re.match(
+        r"^[A-Za-z]:/", tgt) and tgt.endswith("/readback.bin")
+    ok = (one_token and clean and not any("\\" in t for t in ctoks) and
+          st.get("S2", {}).get("status") == "OK" and Path(tgt).is_file() and
+          Path(tgt).read_bytes() == image_bytes and res["quota_used"].get("download") == 1)
+    return ok, "s2=%s one_token=%s ctoks=%d backslash_in_c=%d target=%s written=%s" % (
+        st.get("S2", {}).get("status"), one_token, len(ctoks),
+        sum("\\" in t for t in ctoks), tgt[-46:] or "(none)", Path(tgt).is_file() if tgt else False)
+
+
+def s75_negative_backslash_run_root_removed(m):
+    """定向检出 8: 把 `@RUN_ROOT`/`run_root` 退回反斜杠形式(即现场翻车的那份字节),
+    s74 必须转为失败 —— 否则说明这条判据其实没在管事。"""
+    mod = _mutant("RV19", [
+        ('    subs = {"@RUN_ROOT": out.as_posix(), "@IMAGE_BYTES": "0x%X" % img_bytes}',
+         '    subs = {"@RUN_ROOT": str(out), "@IMAGE_BYTES": "0x%X" % img_bytes}  '
+         '# NEGATIVE-INJECTION RV19: 回读根退回反斜杠形式'),
+        ('payload["run_root"] = out.as_posix()      # 与 @RUN_ROOT 同形(见上面注释)',
+         'payload["run_root"] = str(out)      # NEGATIVE-INJECTION RV19b: 同形性一起退回反斜杠')])
+    ok, msg = s74_run_root_inside_commander_c_is_shlex_safe(mod)
+    return (not ok, "反斜杠形式回来时 s74 仍然通过 => 判据不足: " + msg)
+
+
 CASES = [
     ("FS01", "提示符识别", s01_prompt_recognized),
     ("FS02", "缺提示符不算完整", s02_missing_prompt_is_not_complete),
@@ -1630,6 +1727,8 @@ CASES = [
     ("FS71", "反向-摘掉忙msh模型", s71_negative_busy_model_removed),
     ("FS72", "反向-轮询退回单发查询", s72_negative_poll_removed),
     ("FS73", "反向-复位后不消费启动流", s73_negative_boot_drain_removed),
+    ("FS74", "回读落盘名不被去转义(shlex 安全)", s74_run_root_inside_commander_c_is_shlex_safe),
+    ("FS75", "反向-回读根退回反斜杠形式", s75_negative_backslash_run_root_removed),
 ]
 
 

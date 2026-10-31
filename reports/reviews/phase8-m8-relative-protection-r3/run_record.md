@@ -254,3 +254,29 @@ Windows 路径里的反斜杠被当转义吃掉**，于是目标文件变成
 `host/field_run_r3field1_artifacts.json`（24 件逐字节身份 + 重发包身份：`.md` 与已归档
 `host/reviewer_ff/README.md` 逐字节相同，说明重发的是同一份任务书，无新增指令；
 zip `4e2bf97e…287fe` / 39796 B）。失败件一律原样保留，不删不改。
+
+## 9. 续测轮(M8-S2, 2026-11-01)执行前的绑定与门重跑
+
+现场首次真跑把回读打停之后, 本轮只做一件事: 把那个**只有真跑才会暴露**的形状缺陷修在最里侧,
+并把"不重复下载"写成一份可核对的续测计划, 然后在设备上继续。
+
+- 缺陷 F6 的修正在 `field/m8r3_serial_chain.py` 两行(`@RUN_ROOT` 与 `payload["run_root"]` 改
+  `out.as_posix()`)。依据是现场实证的机制(commander 对 `-c` 串再分词一次, `\` 在那里是转义符),
+  以及既存成功原文里 savemem 目标**本来就是正斜杠**
+  (`phase8-motor-m7-p0-board/S2_readback.stdout.txt`: `Saved 266244 bytes to D:/ns800-m7-p0-.../readback.bin`)。
+  `plan.json` 的 argv 一个字没动 —— 它写的就是 `@RUN_ROOT/readback.bin`, 错的是展开形式。
+- 新增 FS74/FS75 各一项(FS74 走**真 dispatch 的 subs 构造**, 假 pyOCD 会像真的一样分词并落盘;
+  FS75 把两处退回 `str(out)`, FS74 必须转为失败 —— 实测 `s2=STOP / backslash_in_c=1 / 文件写不下去`)。
+  套件从 73 项变 75 项, `negative_injections` 从 11 变 12, 往轮 25 个身份原序保留。
+- 续测计划 `field/plan_continuation_s2.json` 由 `plan.json` 程序化派生: **只**从 stages 里移除 S1,
+  并在 `_continuation_s2.carried_in` 里绑定上轮下载的证据(commit `0c96e12`、run 根、
+  `action_download/*` 逐件散列、rc=0)。`download` 额度仍申报 1, 本轮 used 必须为 0。
+- 本机门(原文在 `host/*_m8s2.*`): 75/75 rc=0; 审核边界探针同一程序同一输入 22/22 rc=0;
+  `--validate-plan` 对 `plan.json` 154/0、对续测计划 153/0; rows 来源 41 组 problems=0;
+  PowerShell 5.1 三入口各新目录: SelfTest 22/0、Precheck 14/0、RunField(stub/sim/all) 3/0
+  且 `actions_attempted=0`。
+- 上一轮那次单独串口调用(0 字节回来)的证据 `offline/serialprobe-20261031T193341Z-SERIAL1/`
+  随本提交入库(原始件 0 B, sha=`e3b0c442…`, 台账 6 行), 与"操作者口述已断电再上电"分开登记。
+- 本轮提交**不含任何设备动作**: 产品 C/H、Keil、六镜像/三 map、固件 manifest 未改;
+  `plan.json`/`rows.json`/`M8R3Field.ps1`/`needles.json` 与绑定基线 `0c96e12` 逐字节相同
+  (逐条核过, 见 `host/m8s2_identity.json` 的 `unchanged_bound_files`)。

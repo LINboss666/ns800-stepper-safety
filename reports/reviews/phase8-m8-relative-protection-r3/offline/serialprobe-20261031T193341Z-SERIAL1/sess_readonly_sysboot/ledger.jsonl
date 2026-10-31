@@ -1,0 +1,6 @@
+{"kind": "QUOTA_CONSUMED", "left": 7, "n": 1, "name": "port_open", "t_s": 0.0}
+{"baud": 115200, "kind": "PORT_OPEN_ATTEMPT", "port": "COM5", "t_s": 0.016}
+{"kind": "PORT_OPEN", "port": "COM5", "t_s": 0.016, "transport": "real"}
+{"bytes": 0, "kind": "RX_DONE", "prompt_seen": false, "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "t_s": 9.031, "tail": "b''"}
+{"code": "MISSING_RESPONSE_PROMPT", "detail": "as=sysboot bytes=0", "kind": "SESSION_STOP", "t_s": 9.031}
+{"kind": "PORT_CLOSED", "t_s": 9.031}

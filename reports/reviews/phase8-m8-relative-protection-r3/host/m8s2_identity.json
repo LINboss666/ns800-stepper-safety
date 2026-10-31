@@ -1,0 +1,89 @@
+{
+ "round": "M8-S2 续测包(执行前绑定提交)",
+ "approved_scope": "操作者批准: 不重复下载, 从唯一一次定长回读起继续; 令牌沿用同串机制; 人工门由操作者在窗口里答",
+ "base_commit": "0c96e12efb74de88e64282497908c9abc9b2329a",
+ "defect_fixed": {
+  "id": "F6(现场首次真跑发现)",
+  "where": "field/m8r3_serial_chain.py: dispatch 的 @RUN_ROOT 与 payload['run_root'] 构造",
+  "what": "Windows 反斜杠绝对路径被展开进 pyOCD commander 的 `-c` 命令串, commander 再分词时把 \\ 当转义符, 落盘名被咬成控制字符串 => 回读 rc=1(FIELD-1 实证)",
+  "fix": "两处改为 out.as_posix()(正斜杠形式); Path 在 Windows 上照样解析, 指向的文件不变",
+  "provenance_of_form": "既存成功原文里 savemem 目标本来就是正斜杠: reports/reviews/phase8-motor-m7-p0-board/S2_readback.stdout.txt `Saved 266244 bytes to D:/ns800-m7-p0-20261030T182818/readback.bin`"
+ },
+ "changed_files": {
+  "field/m8r3_serial_chain.py": {
+   "bytes": 121774,
+   "sha256": "44e2a271409192478c3be2ce3bcf27597ef050ed823b1fb1b167daa3d73aa583"
+  },
+  "field/m8r3_field_selftest.py": {
+   "bytes": 95933,
+   "sha256": "95222a32688a451af31b1e2368cd10464f61ddeb2cf1ea058990eb9f10c9ecec"
+  },
+  "field/plan_continuation_s2.json": {
+   "bytes": 61882,
+   "sha256": "86ed7804e228a4f6fa17370ede3e2285d90d36cc4a7e39e7c26996c4b9fd8155"
+  }
+ },
+ "changed_against_base": {
+  "field/m8r3_serial_chain.py": {
+   "bytes": 121358,
+   "sha256": "16478ac308c7e72bcf8c08e0822f351879088763cdd8dcf745adc9bfafce1d1b"
+  },
+  "field/m8r3_field_selftest.py": {
+   "bytes": 90071,
+   "sha256": "ce4efe0200a037fb7af0e36c25d12f14c7f0750b975cd9efb28b9eae3d8fe864"
+  }
+ },
+ "unchanged_bound_files": [
+  {
+   "path": "field/plan.json",
+   "identical_to_bound_base": true
+  },
+  {
+   "path": "field/rows.json",
+   "identical_to_bound_base": true
+  },
+  {
+   "path": "field/M8R3Field.ps1",
+   "identical_to_bound_base": true
+  },
+  {
+   "path": "field/needles.json",
+   "identical_to_bound_base": true
+  }
+ ],
+ "continuation_plan": {
+  "path": "field/plan_continuation_s2.json",
+  "derived_from": "field/plan.json",
+  "difference": "仅从 stages 移除 S1(下载已在上轮完成并绑定证据), 其余逐字段同 plan.json; download 额度仍申报 1 但本轮 used 必为 0",
+  "carried_in_download": {
+   "rc": 0,
+   "at_commit": "0c96e12efb74de88e64282497908c9abc9b2329a",
+   "run_root": "reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T185843Z-20080-RunField"
+  },
+  "validate_plan": "checks=153 fail=0(比整包少的那一条是 S1 自身的结构检查)"
+ },
+ "local_gates": {
+  "python_selftest": "cases=75 pass=75 fail=0 preserved_r2_identities=25 negative_injections=12",
+  "new_cases": {
+   "FS74": "回读落盘名不被去转义(shlex 安全) —— 走真 dispatch 的 subs 构造",
+   "FS75": "反向-回读根退回反斜杠形式(突变后 FS74 必须失败, 实测 s2=STOP/backslash_in_c=1/文件写不下去)"
+  },
+  "reviewer_boundary_probes": "22/22 rc=0(同一程序同一输入, 候选链改动后仍全绿)",
+  "validate_plan_plan_json": "154 项 0 失败",
+  "validate_plan_continuation": "153 项 0 失败",
+  "rows_provenance": "ROWS_PROVENANCE|groups=41 capture_refs=28 source_anchor_refs=33 problems=0 notes=0",
+  "powershell_51": {
+   "SelfTest": "22/0 (python cases=75)",
+   "Precheck": "14/0",
+   "RunField stub/sim/all": "3/0 actions_attempted=0",
+   "new_run_dirs": [
+    "psrun-20261031T194653Z-48040-SelfTest",
+    "psrun-20261031T194715Z-25128-Precheck",
+    "psrun-20261031T194719Z-16688-RunField"
+   ]
+  }
+ },
+ "hardware_actions_this_commit": [],
+ "serial_probe_registered": "上一轮那次单独串口调用(0 字节)的证据已在 offline/serialprobe-20261031T193341Z-SERIAL1/ 随本提交入库",
+ "execution_after_this_commit": "绑定提交推送并远端逐 blob 回读后, 才用同一份 plan_continuation_s2.json 在可见窗口跑唯一一次续测 dispatch"
+}

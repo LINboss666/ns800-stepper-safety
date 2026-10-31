@@ -2016,7 +2016,10 @@ def dispatch_plan(plan, transport, backend_name, outdir, clock, profile, port,
     led_path = out / "dispatch_ledger.jsonl"
     led = Ledger(led_path, clock, out_dir=out)
     img_bytes = int(plan["identity_binding"]["image"]["bytes"])
-    subs = {"@RUN_ROOT": str(out), "@IMAGE_BYTES": "0x%X" % img_bytes}
+    # `@RUN_ROOT` 会被展开进 pyOCD 的 `-c` **命令字符串**里, 而 commander 对该串做 shlex 解析:
+    # Windows 的反斜杠在这里是转义符, 会把 D:\ns800\... 咬成 D:ns800...(首次真跑的回读就是这样 rc=1)。
+    # 所以这两个根都必须是正斜杠形式; Path 在 Windows 上照样能拼, 不改变指向的文件。
+    subs = {"@RUN_ROOT": out.as_posix(), "@IMAGE_BYTES": "0x%X" % img_bytes}
     if uid_file:
         subs["@UID_FILE"] = uid_from_file(uid_file)
     backend_cls = {"sim": SimActionBackend, "manual": ManualActionBackend,
@@ -2093,7 +2096,7 @@ def dispatch_plan(plan, transport, backend_name, outdir, clock, profile, port,
                 payload = {"as": name}
                 payload.update(act)
                 payload["action"] = name
-                payload["run_root"] = str(out)
+                payload["run_root"] = out.as_posix()      # 与 @RUN_ROOT 同形(见上面注释)
                 r = run_action(payload, backend, led, {"session": sid})
                 if r["verdict"] != "OK":
                     raise Stop(r["code"], r.get("detail", ""))

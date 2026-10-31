@@ -1,0 +1,27 @@
+[
+ {
+  "cmd": "system_status",
+  "as": "sysboot",
+  "seconds": 6,
+  "expect_contains": [
+   "=== SYSTEM STATUS ===",
+   "[Boot]   bootstrap-complete=YES"
+  ],
+  "expect_values": [
+   {
+    "row": "^\\[Boot\\]   bootstrap-complete=(?P<bc>\\w+) abort-stage=(?P<ab>\\d+)$",
+    "must": {
+     "bc": "YES",
+     "ab": "0"
+    }
+   },
+   {
+    "row": "^\\[Safety\\] state=(?P<state>\\w+) fault=(?P<fault>\\d+) irq_gate=\\w+ polarity=\\w+ protect_ready=\\w+$",
+    "must": {
+     "state": "READY",
+     "fault": "0"
+    }
+   }
+  ]
+ }
+]
