@@ -1,0 +1,26 @@
+
+ \ | /
+- RT -     Thread Operating System
+ / | \     5.3.0 build Oct 31 2026 16:54:33
+ 2006 - 2024 Copyright by RT-Thread team
+
+========================================
+  NS800 stepper safety system startup
+  stages: 1 safe-hw / 2 safety-state / 3 safety-thread /
+          4 hw-svc / 5 storage / 6 config / 7 motor+sensor /
+          8 diag / 9 blackbox / 10 ui / 11 selftest->READY
+========================================
+
+[BOOT] Phase-7 runtime bootstrap start
+msh [SAFETY] init OK - MCU_DRV_ENABLE=LOW(readback verified), 输出安全态已建立
+[BOOT] 1 safe-gpio ....... OK
+[SS] state machine inited (event+lock), BOOT->INIT->SELF_TEST
+[SS] BOOT -> INIT
+[SS] INIT -> SELF_TEST
+[BOOT] 2 safety-state .... OK
+[SAFETY] thread started (prio 4, IRQ gate CLOSED)
+[BOOT] 3 safety-thread ... OK
+>[CUR] adc0 ch15 enabled, cal_source=0, health=DEGRADED
+[BOOT] 4 hw-services ... tmc=OK imu=OK adc=OK (re-checked at stage 11)
+[FLASH] CS=22 JEDEC=EF 40 17
+[FLASH] scanning 1 MiB event log...

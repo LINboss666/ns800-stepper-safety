@@ -1,0 +1,52 @@
+{
+ "round": "M8-S2 续测轮(执行完成)",
+ "bound_commit": "d9ff6642126df06c8cc9e49bc4d9e1c7415cddf4",
+ "plan": "field/plan_continuation_s2.json (S1 已移除)",
+ "run_root": "reports/reviews/phase8-m8-relative-protection-r3/offline/fieldcont-d9ff664-20261031T200214Z-41860",
+ "token": "M8-S2-D9FF664-20261101(两参同串; 由批准绑定的续测标识派生, 非外部凭证)",
+ "result_by_stage": {
+  "S0_offline": "OK(镜像按路径重算 290916 B / 00608ec9… 与 manifest 相等)",
+  "S2_readback": "OK rc=0 elapsed=11.578s —— **readback.bin 与候选镜像逐字节相等**(bytes=290916, sha256=00608ec93c6a3027d68b44b5317574209fccfb0ba82a9974793d13b54b79e304)",
+  "S3_serial": "STOP MISSING_RESPONSE_PROMPT: 开口 OK -> 唯一一次 explicit_reset rc=0(pyocd reset --method sysresetreq, 2.391s) -> 被动收到 1027 B 启动流 -> 首条 system_status 在 6 s 步窗内 0 字节(连回显都没有)",
+  "S4_to_S11": "NOT_RUN(人工门一次没弹; 无 motor_start, 故义务未建立, 无需撤能清理)"
+ },
+ "quota_consumed_by_run": {},
+ "quota_left_after_run": {
+  "download": "1 申报 0 用(S1 未列入本轮 stages)",
+  "readback": "0/1(已用满)",
+  "explicit_reset": "0/1(已用满)",
+  "port_open": "7/8",
+  "motor_run": "2/2(未动)",
+  "approved_reboot": "1/1(未动)",
+  "config_write": "0"
+ },
+ "hardware_actions_this_round": [
+  "readback:real_tool(rc=0)",
+  "reset:real_tool(rc=0)",
+  "port_open x1(读 1027 B 启动流 + 发 1 条只读查询)"
+ ],
+ "proven": {
+  "image_on_board_byte_equal_to_candidate_bin": true,
+  "path_fix_effect_on_real_tool": "反斜杠修正后 savemem 真的落盘且被比较门接受"
+ },
+ "not_proven": {
+  "protection_branch": "NOT_REACHED(未走到观察窗)",
+  "anomaly_on_hardware": "NONE_OBSERVED(不得记 NO_TRIGGER, 也不得记触发)",
+  "console_interactive": "本轮未证得: 复位后启动流停在事件日志扫描一行,首查无任何回字节; 是扫描尚在进行还是 RX 通路问题,两个可能都未排除, 不择一采信"
+ },
+ "boot_stream_tail_verbatim": [
+  "[BOOT] 4 hw-services ... tmc=OK imu=OK adc=OK (re-checked at stage 11)",
+  "[FLASH] CS=22 JEDEC=EF 40 17",
+  "[FLASH] scanning 1 MiB event log..."
+ ],
+ "boot_stream_sha256": "abd971542f7ff267d968fcf6af00d46548b24e0cf2cf9b995be79e229a5f67a1",
+ "board_state_end": "端口已关(PORT_CLOSED); 复位后未取到提示符, 是否在跑新固件仍 NOT_ASSESSED;无电机使能/无运动, 24 V 与 SW1 由操作者控制, 我未触碰电源",
+ "next_step_needs_authorization": "再要一次串口动作才能分辨上面两个可能: 一次**纯被动**观察窗(不发任何命令、不复位, 只读 N 秒看 msh > 是否最终出现),或在 plan 层面把首查窗口放宽(那要改 plan/续测计划并重新绑定)",
+ "ledger_kinds": [
+  "S0_FACTS",
+  "ACTION_ATTEMPT",
+  "ACTION",
+  "CHECKPOINT",
+  "DISPATCH_DONE"
+ ]
+}

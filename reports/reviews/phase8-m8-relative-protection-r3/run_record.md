@@ -280,3 +280,34 @@ zip `4e2bf97e…287fe` / 39796 B）。失败件一律原样保留，不删不改
 - 本轮提交**不含任何设备动作**: 产品 C/H、Keil、六镜像/三 map、固件 manifest 未改;
   `plan.json`/`rows.json`/`M8R3Field.ps1`/`needles.json` 与绑定基线 `0c96e12` 逐字节相同
   (逐条核过, 见 `host/m8s2_identity.json` 的 `unchanged_bound_files`)。
+
+## 10. 续测轮(M8-S2)在设备上的实际结果
+
+绑定提交 `d9ff664`（远端逐 blob 回读 5079/5079 problems=0）之后，用
+`field/plan_continuation_s2.json`（S1 已移除）在可见窗口跑唯一一次续测 dispatch，
+run 根 `offline/fieldcont-d9ff664-20261031T200214Z-41860`。
+
+| 阶段 | 实际 |
+| --- | --- |
+| S0 离线绑定 | OK：镜像按路径重算 290916 B / `00608ec9…e304` 与 manifest 逐字段相等 |
+| S2 定长回读 | **rc=0，11.578 s**；`readback.bin` 290916 B、sha256 与候选镜像**逐字节相等** |
+| S3 串口会话 | 开口 OK → 唯一一次 `explicit_reset` rc=0（`pyocd reset --method sysresetreq`，2.391 s）→ 被动收到 **1027 B 启动流** → 首条 `system_status` 在 6 s 步窗内**一个字节都没有** → `MISSING_RESPONSE_PROMPT` 停止 |
+| S4–S11 | NOT_RUN；人工门一次都没弹；没有 `motor_start`，义务未建立，因此无需撤能清理；端口已关 |
+
+额度真实消耗：`port_open 1/8`、`explicit_reset 1/1`、`readback 1/1`；`download` 申报 1 而**用了 0**
+（S1 不在本轮 stages 里，这正是续测计划要证的事）。电机/配置/清日志/碰撞激励全 0。
+
+这一轮把两件事同时钉住、又把第三件事暴露出来：
+
+1. **`00608ec9…` 这枚候选镜像确实在板上**，是定长回读逐字节比出来的，不再是"下载 rc=0"的推定。
+   上一轮 UNPROVEN 的那条已经翻成 PROVEN，而且直接确认了路径修正对真工具有效（不是假子进程的自证）。
+2. F1 的"启动流不要求自发提示符"这轮真用上了：1027 B 是**原字节**收进证据的（sha 见
+   `host/field_run_m8s2.json`），修之前这里会直接 `POST_RESET_BOOT_PROMPT_MISSING` 什么都拿不到。
+   拿到的启动流末端停在 `[FLASH] scanning 1 MiB event log...` 一行。
+3. 新暴露的现场事实：复位后控制台在这 6 s 里不回答输入。**"日志扫描仍在进行/卡住"与"RX 通路问题"
+   两个可能都没排除**，不择一采信；配合上一轮"上电约 10 分钟后同样 0 字节"这条观察，
+   目前只能记 `console_interactive=未证得`。要分辨它需要再一次串口动作（纯被动观察窗，
+   不发命令不复位），或在计划层面放宽首查窗口后重新绑定 —— 两者都超出本轮批准范围，我停在这里。
+
+本轮之后剩余可用额度：`port_open 7/8`、`approved_reboot 1/1`、`motor_run 2/2`、
+`config_save/tmc_config_apply/diag_profile/*` 均未动；**`readback` 与 `explicit_reset` 已用满**。

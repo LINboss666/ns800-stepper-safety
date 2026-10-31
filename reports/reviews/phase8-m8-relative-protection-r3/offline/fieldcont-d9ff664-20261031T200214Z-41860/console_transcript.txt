@@ -1,0 +1,27 @@
+﻿**********************
+Windows PowerShell 脚本开始
+开始时间: 20261101040215
+用户名: LAPTOP-0AICPJF1\LMX
+RunAs 用户: LAPTOP-0AICPJF1\LMX
+配置名称: 
+计算机: LAPTOP-0AICPJF1 (Microsoft Windows NT 10.0.26200.0)
+主机应用程序: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass -File D:\ns800_m8r3_scratch\m8s2_launch_field.ps1
+进程 ID: 41860
+PSVersion: 5.1.26100.9711
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.26100.9711
+BuildVersion: 10.0.26100.9711
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+RUN_ROOT=D:\ns800\reports\reviews\phase8-m8-relative-protection-r3\offline\fieldcont-d9ff664-20261031T200214Z-41860
+BIND_HEAD=d9ff6642126df06c8cc9e49bc4d9e1c7415cddf4  PLAN=plan_continuation_s2.json (S1 removed: no second download)
+OPERATOR GATES in this window: S4 bounded cruise / S6 power-cycle delivery / S8 armed run (+ S11 only after a real trip)
+
+FIELD_RUN_RC=1
+**********************
+Windows PowerShell 脚本结束
+结束时间: 20261101040240
+**********************

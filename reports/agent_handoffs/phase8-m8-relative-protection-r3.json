@@ -562,5 +562,46 @@
    "ANOMALY_ON_HARDWARE=NONE_OBSERVED"
   ],
   "awaiting": "下一轮批准: 改正斜杠路径后的续测包(只做回读 + S3 起), 或按审核方另行给法"
+ },
+ "field_run_m8s2": {
+  "bound_commit": "d9ff6642126df06c8cc9e49bc4d9e1c7415cddf4",
+  "plan": "field/plan_continuation_s2.json",
+  "run_root": "reports/reviews/phase8-m8-relative-protection-r3/offline/fieldcont-d9ff664-20261031T200214Z-41860",
+  "verdict": "M8_S2_READBACK_PROVEN_STOP_AT_S3_FIRST_QUERY_NO_BYTES",
+  "proven": {
+   "image_on_board_byte_equal_to_candidate_bin": true,
+   "path_fix_effect_on_real_tool": "反斜杠修正后 savemem 真的落盘且被比较门接受"
+  },
+  "not_proven": {
+   "protection_branch": "NOT_REACHED(未走到观察窗)",
+   "anomaly_on_hardware": "NONE_OBSERVED(不得记 NO_TRIGGER, 也不得记触发)",
+   "console_interactive": "本轮未证得: 复位后启动流停在事件日志扫描一行,首查无任何回字节; 是扫描尚在进行还是 RX 通路问题,两个可能都未排除, 不择一采信"
+  },
+  "quota_consumed": {},
+  "quota_now_left": {
+   "port_open": 7,
+   "readback": 0,
+   "explicit_reset": 0,
+   "download": "1 申报未用",
+   "motor_run": 2,
+   "approved_reboot": 1
+  },
+  "hardware_actions": [
+   "readback:real_tool(rc=0)",
+   "reset:real_tool(rc=0)",
+   "port_open x1(读 1027 B 启动流 + 发 1 条只读查询)"
+  ],
+  "board_end_state": "端口已关(PORT_CLOSED); 复位后未取到提示符, 是否在跑新固件仍 NOT_ASSESSED;无电机使能/无运动, 24 V 与 SW1 由操作者控制, 我未触碰电源",
+  "boot_stream_last_line": "[FLASH] scanning 1 MiB event log...",
+  "stopped_because": "首条 system_status 在 6 s 步窗内 0 字节 => MISSING_RESPONSE_PROMPT; 复位额度已用满, 再取需要新批准(纯被动观察窗或放宽首查窗口后重新绑定)",
+  "open_questions_two_not_chosen": [
+   "事件日志扫描仍在进行/卡住(启动流末端停在 scanning 1 MiB event log)",
+   "COM5 这路 VCOM 到板子 console 的 RX 方向不通"
+  ],
+  "evidence": [
+   "host/field_run_m8s2.json",
+   "host/field_run_m8s2_artifacts.json",
+   "offline/fieldcont-d9ff664-20261031T200214Z-41860/**"
+  ]
  }
 }

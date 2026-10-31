@@ -1,0 +1,81 @@
+{
+ "round": "m8s2_run",
+ "bound_commit": "d9ff6642126df06c8cc9e49bc4d9e1c7415cddf4",
+ "artifacts": [
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/offline/fieldcont-d9ff664-20261031T200214Z-41860/action_readback/ARGV.json",
+   "bytes": 880,
+   "sha256": "42ff95d95b3c67b9fc824c038d25ab5b2a0bb9e76c0b0e6be8102a2208c173e0"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/offline/fieldcont-d9ff664-20261031T200214Z-41860/action_readback/rc.txt",
+   "bytes": 3,
+   "sha256": "13bf7b3039c63bf5a50491fa3cfd8eb4e699d1ba1436315aef9cbe5711530354"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/offline/fieldcont-d9ff664-20261031T200214Z-41860/action_readback/stderr.bin",
+   "bytes": 0,
+   "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/offline/fieldcont-d9ff664-20261031T200214Z-41860/action_readback/stdout.bin",
+   "bytes": 191,
+   "sha256": "c732cf9e3b936596345d6a42acf7d07a84ea72828c682d323325c23e945c1d34"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/offline/fieldcont-d9ff664-20261031T200214Z-41860/action_reset/ARGV.json",
+   "bytes": 497,
+   "sha256": "cd6aa34777eb4e638800f2d718c28fd2bdcb08f628f7cb149a50ada80523f8c8"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/offline/fieldcont-d9ff664-20261031T200214Z-41860/action_reset/rc.txt",
+   "bytes": 3,
+   "sha256": "13bf7b3039c63bf5a50491fa3cfd8eb4e699d1ba1436315aef9cbe5711530354"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/offline/fieldcont-d9ff664-20261031T200214Z-41860/action_reset/stderr.bin",
+   "bytes": 0,
+   "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/offline/fieldcont-d9ff664-20261031T200214Z-41860/action_reset/stdout.bin",
+   "bytes": 0,
+   "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/offline/fieldcont-d9ff664-20261031T200214Z-41860/console_transcript.txt",
+   "bytes": 1185,
+   "sha256": "fe47e6977793fdd8b79b284117ab92dc6ee58e5fd3a1f9060134c1318d0a0648"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/offline/fieldcont-d9ff664-20261031T200214Z-41860/dispatch_ledger.jsonl",
+   "bytes": 2482,
+   "sha256": "6187f075660b15d18710be77362085b967df31498a43fe15bb9caea8b52806bb"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/offline/fieldcont-d9ff664-20261031T200214Z-41860/readback.bin",
+   "bytes": 290916,
+   "sha256": "00608ec93c6a3027d68b44b5317574209fccfb0ba82a9974793d13b54b79e304"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/offline/fieldcont-d9ff664-20261031T200214Z-41860/S_S3/01_rst.boot.rx.bin",
+   "bytes": 1027,
+   "sha256": "abd971542f7ff267d968fcf6af00d46548b24e0cf2cf9b995be79e229a5f67a1"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/offline/fieldcont-d9ff664-20261031T200214Z-41860/S_S3/01_rst.boot.rx.bin.txt",
+   "bytes": 1169,
+   "sha256": "955e9a11a96072eba92405e3efea7dfaf7a583dcd1ed7fdbe81c97792d73c02c"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/offline/fieldcont-d9ff664-20261031T200214Z-41860/S_S3/02_sysboot.rx.bin",
+   "bytes": 0,
+   "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/offline/fieldcont-d9ff664-20261031T200214Z-41860/S_S3/ledger.jsonl",
+   "bytes": 1545,
+   "sha256": "58dc7db99e90e87cdcb465a1d5524d9e8d76ec1905ad8f4b8959de46abb113ac"
+  }
+ ]
+}
