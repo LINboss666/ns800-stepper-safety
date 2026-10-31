@@ -2964,6 +2964,120 @@ static void c_REL49(void)
     CHECK(g_post_calls == 0, "运动快照正常时误降险(post=%d)", g_post_calls);
 }
 
+/* REL50 过期的"静止"事实不是现在的静止豁免(R3-A, 审核反例 STALE_IDLE_EXEMPTS_FOREVER)。
+ * 覆盖丢失分支的豁免只认**当前可信**的静止: 运动快照过期、事实未知、或另一覆盖门先失败时,
+ * 帧里继承来的 IDLE 一律不豁免; profile 年龄无效/缺失时按既有帧设计值 100 ms 判新鲜度。 */
+static void c_REL50(void)
+{
+    diag_rprof_t p;
+    rel_engine_t e;
+    struct feed f;
+    rel_reason_t r = REL_REASON_NONE;
+    int i;
+
+    /* a) 审核包同输入第一条: 帧/SG/ADC 继续更新, 运动快照冻在 1200 ms 前, 事实说 IDLE */
+    world_reset();
+    p = make_profile();
+    feed_init(&e, &p, &f);
+    f.a.in.motor_state = (rt_uint8_t)MOTOR_IDLE;
+    f.a.in.step_hz = 0;
+    feed_step(&f, 500, 2000, 1, 1, 1, 1);
+    f.motion_freeze = 1;
+    for (i = 1; i <= 120; ++i) r = feed_step(&f, 500, 2000, (i % 10) == 0, 1, 1, 1);
+    CHECK(r == REL_COVERAGE_LOST && e.coverage == RELCOV_MOTION_UNKNOWN &&
+          e.cov_lost_ms == 1100u && (f.a.now_tick - f.a.in.motion_tick) == 1200u,
+          "过期 IDLE 仍被当成现在的静止(reason=%s cov=%u lost=%u age=%u)",
+          rel_reason_name(r), (unsigned)e.coverage, (unsigned)e.cov_lost_ms,
+          (unsigned)(f.a.now_tick - f.a.in.motion_tick));
+
+    /* b) 同输入的对照: 事实说 CRUISE 时同样降险(豁免只由"当前可信静止"决定, 不由 IDLE 名字决定) */
+    world_reset();
+    feed_init(&e, &p, &f);
+    feed_step(&f, 500, 2000, 1, 1, 1, 1);
+    f.motion_freeze = 1;
+    for (i = 1; i <= 120; ++i) r = feed_step(&f, 500, 2000, (i % 10) == 0, 1, 1, 1);
+    CHECK(r == REL_COVERAGE_LOST && e.coverage == RELCOV_MOTION_UNKNOWN &&
+          e.cov_lost_ms == 1100u,
+          "CRUISE 对照没给出同一档位降险(reason=%s cov=%u lost=%u)",
+          rel_reason_name(r), (unsigned)e.coverage, (unsigned)e.cov_lost_ms);
+
+    /* c) 新鲜 IDLE 不误停: 运动快照每帧都成功, 静止是现在证得的 */
+    world_reset();
+    feed_init(&e, &p, &f);
+    f.a.in.motor_state = (rt_uint8_t)MOTOR_IDLE;
+    f.a.in.step_hz = 0;
+    feed_step(&f, 500, 2000, 1, 1, 1, 1);
+    for (i = 1; i <= 120; ++i) r = feed_step(&f, 500, 2000, (i % 10) == 0, 1, 1, 1);
+    CHECK(r == REL_REASON_NONE && e.coverage == RELCOV_OK && e.cov_lost_ms == 0u,
+          "真静止被误降险(reason=%s cov=%u lost=%u)",
+          rel_reason_name(r), (unsigned)e.coverage, (unsigned)e.cov_lost_ms);
+
+    /* d) motion_known=0 的 IDLE: 取不到事实就不知道在不在动, 不豁免(REL49 的静止侧) */
+    world_reset();
+    feed_init(&e, &p, &f);
+    f.a.in.motor_state = (rt_uint8_t)MOTOR_IDLE;
+    f.a.in.step_hz = 0;
+    feed_step(&f, 500, 2000, 1, 1, 1, 1);
+    f.a.in.motion_known = 0;
+    for (i = 1; i <= 120; ++i) r = feed_step(&f, 500, 2000, (i % 10) == 0, 1, 1, 1);
+    CHECK(r == REL_COVERAGE_LOST && e.coverage == RELCOV_MOTION_UNKNOWN,
+          "运动事实未知却靠 IDLE 免降险(reason=%s cov=%u)",
+          rel_reason_name(r), (unsigned)e.coverage);
+
+    /* e) profile 年龄无效(5000 ms 超出 20..1000)时按既有帧设计值 100 ms 判新鲜度:
+     *    快照 1200 ms 前 => 不可信 => 覆盖先失败(ENGINE_ERR)也要降险。 */
+    world_reset();
+    p = make_profile();
+    p.age_frame_ms = 5000u;
+    feed_init(&e, &p, &f);
+    f.a.in.motor_state = (rt_uint8_t)MOTOR_IDLE;
+    f.a.in.step_hz = 0;
+    feed_step(&f, 500, 2000, 1, 1, 1, 1);
+    f.motion_freeze = 1;
+    for (i = 1; i <= 120; ++i) r = feed_step(&f, 500, 2000, (i % 10) == 0, 1, 1, 1);
+    CHECK(e.coverage == RELCOV_ENGINE_ERR && r == REL_COVERAGE_LOST,
+          "无效年龄没退回 100 ms 设计限(cov=%u reason=%s)",
+          (unsigned)e.coverage, rel_reason_name(r));
+
+    /* f) 同一条无效 profile, 但运动快照每帧都新 => 现在是真静止, 不误停 */
+    world_reset();
+    feed_init(&e, &p, &f);
+    f.a.in.motor_state = (rt_uint8_t)MOTOR_IDLE;
+    f.a.in.step_hz = 0;
+    feed_step(&f, 500, 2000, 1, 1, 1, 1);
+    for (i = 1; i <= 120; ++i) r = feed_step(&f, 500, 2000, (i % 10) == 0, 1, 1, 1);
+    CHECK(r == REL_REASON_NONE && e.coverage == RELCOV_ENGINE_ERR,
+          "无效 profile 下新鲜静止被误停(reason=%s cov=%u)",
+          rel_reason_name(r), (unsigned)e.coverage);
+
+    /* g) 另一覆盖门先失败(调用方给 LOCK_FAIL)时, 过期 IDLE 同样不豁免:
+     *    新鲜度判断排在其他门之前, 不被它们的短路绕过。 */
+    world_reset();
+    p = make_profile();
+    feed_init(&e, &p, &f);
+    f.a.coverage = RELCOV_LOCK_FAIL;
+    f.a.in.motor_state = (rt_uint8_t)MOTOR_IDLE;
+    f.a.in.step_hz = 0;
+    feed_step(&f, 500, 2000, 1, 1, 1, 1);
+    f.motion_freeze = 1;
+    for (i = 1; i <= 120; ++i) r = feed_step(&f, 500, 2000, (i % 10) == 0, 1, 1, 1);
+    CHECK(e.coverage == RELCOV_LOCK_FAIL && r == REL_COVERAGE_LOST,
+          "锁失败档里过期 IDLE 免了降险(cov=%u reason=%s)",
+          (unsigned)e.coverage, rel_reason_name(r));
+
+    /* h) 同一条 LOCK_FAIL 档, 运动快照新鲜 => 豁免成立(证明上面不是靠删掉豁免变绿的) */
+    world_reset();
+    feed_init(&e, &p, &f);
+    f.a.coverage = RELCOV_LOCK_FAIL;
+    f.a.in.motor_state = (rt_uint8_t)MOTOR_IDLE;
+    f.a.in.step_hz = 0;
+    feed_step(&f, 500, 2000, 1, 1, 1, 1);
+    for (i = 1; i <= 120; ++i) r = feed_step(&f, 500, 2000, (i % 10) == 0, 1, 1, 1);
+    CHECK(r == REL_REASON_NONE && e.coverage == RELCOV_LOCK_FAIL,
+          "锁失败档里新鲜静止没保持豁免(reason=%s cov=%u)",
+          rel_reason_name(r), (unsigned)e.coverage);
+}
+
 /* ======================= main ======================= */
 
 struct case_ent { const char *id; void (*fn)(void); };
@@ -3017,6 +3131,7 @@ static const struct case_ent TAB[] = {
     { "REL47-commit-inside-static-gate",               c_REL47 },
     { "REL48-new-generation-clears-evidence",          c_REL48 },
     { "REL49-frame-not-same-as-motion-known",          c_REL49 },
+    { "REL50-stale-idle-not-static-exemption",         c_REL50 },
 };
 #define NTAB ((int)(sizeof(TAB)/sizeof(TAB[0])))
 

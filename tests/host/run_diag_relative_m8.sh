@@ -15,7 +15,7 @@
 #   1) 在任何 rm/mkdir/重定向/编译**之前**先验证工作目录(require_outside_repo);
 #   2) 只删除带本工具哨兵(NS800-HOSTCHAIN-WORK)的目录;
 #   3) ONLY 选择词必须在入口校验: 未知/重复/纯空白一律 rc=4 拒绝且不动任何文件;
-#      未设置或空串 = 默认执行全部 49 例(不是零执行); 汇总只声明实际执行集合,
+#      未设置或空串 = 默认执行全部 50 例(不是零执行); 汇总只声明实际执行集合,
 #      未执行的显式 NOT_RUN;
 #   4) 逐 id 台账必须"恰好出现一次且判 PASS"; 缺席/重复/未登记/SUMMARY 不自洽
 #      = 基础设施故障(4); 编译失败或异常退出(非 0/1/4)也不算检出;
@@ -94,7 +94,8 @@ REL45-ctl-take-failure-writes-nothing
 REL46-ctl-uninit-take-and-protect
 REL47-commit-inside-static-gate
 REL48-new-generation-clears-evidence
-REL49-frame-not-same-as-motion-known"
+REL49-frame-not-same-as-motion-known
+REL50-stale-idle-not-static-exemption"
 ALL_CASES="$(printf '%s' "$ALL_CASES" | tr '\n' ' ')"
 
 note() { printf '%s\n' "$*"; }
@@ -320,7 +321,7 @@ reverse_case() {            # reverse_case <name> <target-file> <old> <new> <期
 
 if [ "$REVERSE" = "1" ]; then
     note ""
-    note "=== 反向验证(9 组具名家族, 仓外一次性副本) ==="
+    note "=== 反向验证(10 组具名家族, 仓外一次性副本) ==="
     # RV1: 去掉"SG 必须是新独立样本"的身份门 —— 旧样本必须被 REL08 检出
     reverse_case RV1_sg_new_sample_identity_gate diag_relative.c \
 '    fresh_sg  = (in->sg_valid  && in->sg_seq  != 0 && in->sg_seq  != e->last_sg_seq);' \
@@ -353,9 +354,9 @@ if [ "$REVERSE" = "1" ]; then
     # RV5: 覆盖丢失退回"只跳过判据不保护"(B2/B3) —— 生产入口三例都必须检出
     reverse_case RV5_coverage_loss_protects_nothing diag_relative.c \
 '        if (armed && e->cov_lost_ms >= REL_COVERAGE_LOST_MS &&
-            (in->motion_known ? motion_active(in->motor_state) : 1))' \
+            (motion_trusted ? motion_active(in->motor_state) : 1))' \
 '        if (RT_FALSE && armed && e->cov_lost_ms >= REL_COVERAGE_LOST_MS &&
-            (in->motion_known ? motion_active(in->motor_state) : 1))  /* NEGATIVE-INJECTION RV5: 覆盖丢失不再降险 */' \
+            (motion_trusted ? motion_active(in->motor_state) : 1))  /* NEGATIVE-INJECTION RV5: 覆盖丢失不再降险 */' \
         REL22-coverage-loss-protects-first REL33-lock-fail-bounded-degrade \
         REL34-no-frame-still-supervises REL36-null-outparams-still-protects
     # RV6: 失败的重学保留旧 learn 凭据(C4) —— REL39 必须检出
@@ -390,6 +391,13 @@ rt_err_t rel_ctl_take(void) { return RT_EOK; }' \
 '    if (need_wipe) rel_engine_new_generation(&d_rel_prod, g);' \
 '    (void)need_wipe;   /* NEGATIVE-INJECTION RV9: 新一代不再清旧证据 */' \
         REL48-new-generation-clears-evidence
+    # RV10(M8-R3 R3-A): **只**把"年龄"从运动事实可信判据里摘掉(覆盖保护本身还在) ——
+    # REL50 的过期 IDLE/无效年龄/锁失败档三条不豁免断言与 REL49 的过期支必须检出。
+    reverse_case RV10_motion_age_dropped_from_trust diag_relative.c \
+'    motion_trusted = (in->motion_known &&
+                     diag_rel_tick_diff(now, in->motion_tick) <= motion_age_limit);' \
+'    motion_trusted = in->motion_known;   /* NEGATIVE-INJECTION RV10: 过期事实仍被当现在的静止 */' \
+        REL50-stale-idle-not-static-exemption REL49-frame-not-same-as-motion-known
 fi
 
 note ""

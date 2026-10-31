@@ -395,6 +395,16 @@ rel_reason_t rel_engine_step(rel_engine_t *e, const rel_step_arg_t *a)
     rt_uint8_t fresh_sg, fresh_adc, fresh_imu, win, stale, cov, sg_warn_hit, sg_strong_hit;
     rt_uint8_t adc_warn_hit, adc_strong_hit, imp_hit;
     rt_bool_t armed, released = RT_FALSE;
+    rt_bool_t motion_trusted;
+    rt_uint32_t motion_age_limit;
+
+    /* Current motion proof must be fresh even if another coverage gate failed.
+     * An old successful IDLE snapshot is not a present static exemption.
+     * Missing/invalid profile age uses the existing 100 ms frame design limit. */
+    motion_age_limit = (p->age_frame_ms >= 20u && p->age_frame_ms <= 1000u)
+                         ? p->age_frame_ms : 100u;
+    motion_trusted = (in->motion_known &&
+                     diag_rel_tick_diff(now, in->motion_tick) <= motion_age_limit);
 
     /* ---- 0) 判据覆盖档位: 调用方给的 + 引擎自己独立复核的 ----
      * 引擎不轻信"OK": profile 为空或被同一套校验拒绝, 一律就地降级成对应非 OK 档。
@@ -413,9 +423,7 @@ rel_reason_t rel_engine_step(rel_engine_t *e, const rel_step_arg_t *a)
      * 就是无限免保护证据。事实未知一律并入有界降险, 不进任何单源判据。 */
     if (cov == RELCOV_OK)
     {
-        if (!in->motion_known)                             cov = RELCOV_MOTION_UNKNOWN;
-        else if (diag_rel_tick_diff(now, in->motion_tick) > p->age_frame_ms)
-            cov = RELCOV_MOTION_UNKNOWN;
+        if (!motion_trusted) cov = RELCOV_MOTION_UNKNOWN;
     }
     e->coverage = cov;
     armed = (a->mode == (rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION);
@@ -434,7 +442,7 @@ rel_reason_t rel_engine_step(rel_engine_t *e, const rel_step_arg_t *a)
         /* 只有在"证得的静止"下才免降险义务: 取不到运动事实(motion_known=0)时
          * 不知道在不在动, 不能宣称覆盖仍然有效(M8-R1 R2.2)。 */
         if (armed && e->cov_lost_ms >= REL_COVERAGE_LOST_MS &&
-            (in->motion_known ? motion_active(in->motor_state) : 1))
+            (motion_trusted ? motion_active(in->motor_state) : 1))
         {
             e->verdict = REL_COVERAGE_LOST;
             e->severe_active = 1; e->active_reason = (rt_uint8_t)e->verdict;
