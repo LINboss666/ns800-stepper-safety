@@ -235,7 +235,6 @@
     "NOT_AUTHORIZED": "现场候选包的任何一个阶段(下载、回读、复位、串口、起转、写配置、重启、加载、碰撞)"
   },
   "open_items": [
-    "本轮交付的 remote 逐 blob 回读结果记在 remote_readback.md(推送后产出), 不在本 JSON 里预填",
     "受控加载的具体工具与作用点待补",
     "P1 独立电流参考与零点增益、RT_CONSOLEBUF_SIZE 128 真串口表现、v2->v3 真 Flash 迁移仍未现场验证"
   ],
@@ -246,9 +245,26 @@
     "next_required": "独立复审; 若放行现场轮需逐项单独授权(下载/定长回读/显式复位/串口/短转/一次 config_save/一次经批准重启), physical_collision 仍为 0"
   },
   "readback_program_defects_found_by_running": {
-    "crash_1": "AttributeError: 'str' object has no attribute 'get' @ build_manifest targets 遍历 (历史 schema: targets 为 dict / 顶层 images / 键名为角色名)",
-    "crash_2": "137 条 declared_but_absent: 本轮离线运行清单的 entries 键基准与清单所在目录不一致",
-    "disclosed_as_fact": true,
-    "history_rewritten": false
+    "defect_1": "只认本轮 build_manifest 的 targets:[{images,map}] 结构 -> AttributeError(仓库另有三种历史形态, 等于静默跳过别的清单)",
+    "defect_2": "本轮 field_offline_run_manifest.json 的 entries 键基准与清单所在目录不一致 -> 137 条误报 declared_but_absent",
+    "defect_3": "只按'清单自身目录'一种基准解析 -> R1 的 285 件离线产物误报缺件(其基准写在文档别处)",
+    "fix": "递归解析任意 JSON 清单 + 三种常规基准(自身目录/上一级/仓库根) + 后缀索引兜底(唯一命中且散列相等才通过, 多条命中报 suffix_ambiguous) + 解析不出路径逐条披露 sha_declared_without_path; 本轮清单加 path_resolution, 143 对 (路径,sha256,bytes) 与改前逐条相等",
+    "scope_split": "SCOPE_R2 必须零问题才返回成功; SCOPE_PRIOR 逐条披露并按清单聚合, 不改写任何往轮清单/镜像/原始证据",
+    "history_rewritten": false,
+    "disclosed_as_fact": true
+  },
+  "remote_readback": {
+    "remote_tip": "4df1e03246c11c1172f0c897371314dbdb83aa9d",
+    "method": "仓库外新建空 bare 仓 git fetch --depth=1 一次; 所有字节来自远端对象; 本地工作树与对象库不参与",
+    "scope_r2": "SCOPE_R2|entries=171 verified=171 problems=0  退出码=0",
+    "all_manifests": "declared=985 verified=923 base_used={manifest_dir:619,parent_dir:4,repo_root:19,suffix:285}",
+    "prior_disclosure": "problems=64 (declared_but_absent=50, duplicate_conflict=2, hash_mismatch=4, suffix_ambiguous=8) + sha_declared_without_path=32; 4 条散列不符登记为事实, 未复算差异是否等于 CR 字节集合, 不作根因结论",
+    "r1_manifest_now": "R1 评审清单 336/336 存在且散列相符(原 5 件缺件已 force-add); 旧 M8 清单 23/23; R1 固件 9 件镜像/map 字节相符",
+    "evidence": [
+      "reports/reviews/phase8-m8-relative-protection-r2/remote_readback.md",
+      "reports/reviews/phase8-m8-relative-protection-r2/host/remote_readback_console.txt",
+      "reports/reviews/phase8-m8-relative-protection-r2/host/remote_readback.py"
+    ],
+    "record_self_exclusion": "remote_readback.md 显式排除在 SHA256SUMS.txt 之外(记录不能散列自己正在写的字节)"
   }
 }

@@ -34,7 +34,7 @@
 | R2-C 5 秒硬预算 / watch 失败停机 / finally 撤能 | 预算从 `motor_start` 尝试起算的单调硬预算（含清理预留 4 s）；watch STOP 后危险步骤不再发出；错误路径仍发 `motor_stop→motor_disarm→motor_status`，撤能字段不可确认就写 `UNKNOWN` | `FS08/FS09/FS10/FS11/FS12` + 定向检出 `FS23/FS24` |
 | R2-C3 协议完整 ≠ 业务成功 | `MISSING_RESPONSE_PROMPT` / `ILLEGAL_BYTES_IN_RESPONSE` / `FIELD_NOT_EXACTLY_ONE` 是协议层；`FAILED`/`REFUSED`/`VOIDED`/`not supported` 是业务层；正控用本轮真实 C 输出 `mode=RELATIVE_ACTIVE` | `FS01..FS07`（真实学习失败→`BUSINESS_FAILED`；真实成功模式→`OK`）+ `FS25` 定向检出 |
 | R2-C4 参数单位与保护前置 | `learn` 的 `LO/HI` 明确是 STEP 频率 Hz（不是 SG 码）；`motor_target 100` + `diag_profile learn 16 80 120 0` 取自同一已验证频率；板级不再继承 M4/M5 的 CONFIGURED/IRQ OPEN（`tmc_config_apply` 2 次、`irq_polarity_prep` 2 次已入额度）；IRUN20 未动；重启后按**本轮** commit 的 id/rev/signature 比对；受控加载 `verdict=NAMED_PREREQUISITE_MISSING`；无触发只写 `OBSERVATION_NO_TRIGGER` | `field/plan.json` + `field/needles.json` 40 条全部由 C 源码字面量证明（`total=40 unproven=0`） |
-| R2-D 清单要查"登记但不存在" | `host/remote_readback.py` 改为清单优先：先逐条核存在/唯一/字节数/散列，`declared_but_absent`、`duplicate_conflict`、`read_failed` 任一命中即非成功，再反向列未登记件 | 见 `remote_readback.md`（推送后） |
+| R2-D 清单要查"登记但不存在" | `host/remote_readback.py` 改为清单优先：逐条核存在/唯一/字节数/散列，`declared_but_absent`、`duplicate_conflict`、`read_failed`、`hash_mismatch`、`suffix_ambiguous` 任一命中即披露；范围分 `SCOPE_R2`(本轮，必须零问题)与 `SCOPE_PRIOR`(往轮，只披露) | 远端头 `4df1e03`：`SCOPE_R2 171/171 problems=0`，退出码 0；往轮 64 条 + 无路径 32 条逐条披露，见 `remote_readback.md` |
 
 主机链：`SUMMARY|cases=49 pass=49 fail=0 pre_bad=0 executed=49`，`warning_count=0`；
 反向 9 家族（RV1–RV9）全 META-OK；三目标各一次 Rebuild All，`0 Error(s), 0 Warning(s)`，`uv4_rc=0`。
@@ -55,7 +55,7 @@ PowerShell 5.1 三入口各一次真实执行，`SELFTEST_VERDICT|PASS|checks=21
 - `.gitattributes`：按审核裁定保留（KEEP_BYTES）。本轮只追加 R2 路径的窄规则并在文件里写明范围；
   未加全局 `* -text`，未做全仓 renormalize。
 
-## 3. 四条必须说清的取证事实（不掩盖）
+## 3. 五条必须说清的取证事实（不掩盖）
 
 1. **字节身份的前置校验方式**：清单散列是按本机磁盘字节算的，而 `core.autocrlf=true` 会在 `git add` 时把带 CRLF
    的文本剥成 LF。本轮在提交前用 `git cat-file blob :<path>` 逐条比对暂存 blob 与清单，抓到 **6 件**
@@ -69,13 +69,21 @@ PowerShell 5.1 三入口各一次真实执行，`SELFTEST_VERDICT|PASS|checks=21
 3. **本轮的"门内/门外"结论是确定交错模型**，不是实测调度：夹具在"仍持静止门的最后一刻"回调读状态，
    `review_harness.c` 只增加一个"静止门释放之后"的平台会合钩子，产品源码未因它改动。真实目标调度时序仍属
    `FIELD_UNVERIFIED`。
-4. **回读程序是被"真跑"才修好的**：第一次执行暴露两处它自己的缺陷——只认本轮 `build_manifest.json` 的
-   `targets:[{images,map}]` 结构（撞 `AttributeError`，而仓库里另有三种历史形态，等于静默跳过别的清单），
-   以及本轮 `field_offline_run_manifest.json` 的 `entries` 键基准写错（137 条被解析成 `host/field/...` 报
-   `declared_but_absent`）。修法与判据见 `run_record.md` §4：递归解析 + 路径一律相对清单自身目录解析 +
-   解析不出路径的逐条披露为 `sha_declared_without_path`；清单加 `path_resolution` 自描述，143 对
-   `(路径, sha256, bytes)` 与改前逐条相等，只改基准。判定分 `SCOPE_R2`(本轮四张清单，必须零问题)与
-   `SCOPE_PRIOR`(往轮清单，逐条披露、不由本轮改写历史)。
+4. **回读程序是被"真跑"才修好的**（三处，全部由执行暴露，见 `run_record.md` §4）：
+   ① 只认本轮 `build_manifest.json` 的 `targets:[{images,map}]` 结构，撞 `AttributeError`——仓库里另有三种
+   历史形态，只认一种等于静默跳过别的清单；② 本轮 `field_offline_run_manifest.json` 的 `entries` 键基准
+   写错，137 条被解析成 `host/field/...` 报缺件；③ 只按"清单自身目录"这一种基准，把 R1 的离线产物 285 件
+   误报缺件（那件的基准写在文档别处）。修法：递归解析任何 JSON 清单 + 三种常规基准（清单自身目录→上一级→
+   仓库根）+ **后缀索引兜底**（唯一命中且散列相等才算通过，多条命中报 `suffix_ambiguous` 而不是挑一个）+
+   解析不出路径的逐条披露 `sha_declared_without_path`；本轮清单加 `path_resolution` 自描述，143 对
+   `(路径, sha256, bytes)` 与改前逐条相等，只改基准。判定分 `SCOPE_R2`（本轮四张清单，必须零问题）与
+   `SCOPE_PRIOR`（往轮清单逐条披露，不改写历史）。
+5. **远端回读的最终数字**（头 `4df1e03`，原始 stdout `host/remote_readback_console.txt`，判读全文
+   `remote_readback.md`）：`SCOPE_R2|entries=171 verified=171 problems=0`，退出码 0；
+   仓库内全部清单去重后 `declared=985 verified=923`（其中 `suffix` 兜底 285 条全通过）；
+   `SCOPE_PRIOR|problems=64`（缺件 50 / 重复冲突 2 / 散列不符 4 / 后缀歧义 8）+ `no_path=32` 逐条披露，
+   4 条散列不符只在记录里登记为"往轮清单登记值与远端字节不一致"，未复算差异是否等于 CR 字节集合，
+   因此不写成根因，也不改写任何往轮清单、镜像或原始证据。
 
 ## 4. 分级
 
