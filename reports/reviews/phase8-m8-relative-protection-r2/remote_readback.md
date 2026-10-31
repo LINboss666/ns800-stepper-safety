@@ -98,3 +98,27 @@ PRIOR_BY_MANIFEST reports/firmware/phase8-tmc-uart-read-observation/build_manife
 ## 6. 追加：最终交付头的复跑
 
 （本节在 §1–§5 定稿并提交、推送之后追加；追加会改变本文件字节，故本文件仍按 §1 的排除规则不进清单。）
+
+把 §2 那三处修正一并提交后的头是 `d80ebbbbfe969a144b284d8d6c22261ea22679f6`。同一程序、同一判据再跑一次
+（只读远端 Git 对象，`hardware_actions=0`）：
+
+```
+remote_tip=d80ebbbbfe969a144b284d8d6c22261ea22679f6
+sums_manifests=9 comment_lines_skipped=5
+json_manifests=20 sha_declared_without_path=32
+declared_entries=986 verified=924 base_used={'manifest_dir': 620, 'parent_dir': 4, 'repo_root': 19, 'suffix': 285}
+SCOPE_R2|entries=172 verified=172 problems=0        (退出码 0)
+SCOPE_PRIOR|problems=64|declared_but_absent=50,duplicate_conflict=2,hash_mismatch=4,suffix_ambiguous=8
+REMOTE_READBACK_SUMMARY|tip=d80ebbbbfe|declared=986|verified=924|r2_entries=172|r2_verified=172|r2_problems=0
+  |prior_problems=64|prior_hard=14|no_path=32|unlisted=4545
+hardware_actions=0|sources_read_from=remote_git_protocol_only
+```
+
+与 §1 的差别只在于条目从 171 变 172：新增的一条正是这一版 `host/remote_readback.py` 自身
+（§1 那次跑的时候，仓库里还是修好前的程序）。`SCOPE_PRIOR` 的 64 条与 §3 逐条同一集合，未增减 ——
+即"本轮提交没有改动任何往轮证据"这一点被同一条判据复算证明。
+`UNLISTED_R2` 6 件是本记录 + 两份评审/固件清单 + `build_manifest.json` + 两份交接件，全部属于
+"清单不散列自身、交接件不登记"的既有惯例，已显式披露。
+
+结论：M8-R2 交付头 `d80ebbbb…` 的本轮四张清单逐条存在、散列与字节数相符，零问题；
+`M8_R2_OFFLINE_READY / AWAITING_INDEPENDENT_REVIEW`，`safe_for_enable = false`，零设备动作，不申请 GO。
