@@ -192,3 +192,13 @@ S_S10(trip, 锁存态 arm 被拒) motor_stop 0.005→0.005 | motor_disarm 0.005�
 准确的锚点应写作 `ns_flash_shell.c:89-99`。
 
 硬件动作: 无。未打开 COM5，未创建 DAP/串口对象，未调用 pyOCD/Keil，未复位/下载/起转。
+
+### 7.1 本轮自己的失误(发现即登记, 不靠工具掩盖)
+
+`e1778ed` 误把 `field/__pycache__/` 的两件 `.pyc`(本机 import 副产物)随目录级 `git add -f`
+带进索引: 先前已 `git restore --staged` 撤过一次, 但随后为写前置件又执行了一次目录级 `git add -f`,
+把两条又拉回来了; 当时的范围检查只过滤了"是否在 reports/ 之外", 没复核 `__pycache__`。
+发现途径 = 推送后的远端逐 blob 回读把 in-r3-paths 未登记项从 5 条披露成 7 条。
+处置: `git rm --cached` + 删磁盘(可从 `.py` 重建), 清单条目数因此不变(规则本就排除),
+在 `remote_readback.md` §7 与这里各留一条原文记录。教训: 目录级 `-f` 之后必须按
+`git diff --cached --name-only | grep __pycache__` 复核, 不能只看顶层目录。

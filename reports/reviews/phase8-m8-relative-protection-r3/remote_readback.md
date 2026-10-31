@@ -104,3 +104,24 @@ REMOTE_READBACK_SUMMARY|tip=0959f76111|declared=4336|verified=4274|r3_entries=33
 - 收尾轮的两件审核观察程序对照已入库：修前 `host/reviewer_probes_prefix_r3closeout.txt`
   （两份 stdout 与审核包 expected 逐行一致）与修后
   `host/reviewer_probe_post_fix_r3closeout.txt`（其修前断言不再成立 = 缺陷行为已关闭）。
+
+## 7. 最终补正轮(FF)交付头的回读(tip `e1778ed07f9d`)
+
+命令(逐字): `RBI_ROOT=D:/ns800_m8r3_scratch/remotecheck_ff RBI_TIP=e1778ed07f9d2566b9f4ddcb21edb98811b628d9 python
+reports/reviews/phase8-m8-relative-protection-r3/host/remote_readback.py`
+(退出码 0; 只经 git 协议从远端取 blob, 未开串口/DAP/下载)。原文
+`host/remote_readback_console_r3finalfix.txt`(58 行)。
+
+- `SCOPE_R3|entries=4202 verified=4202 problems=0`
+- `REMOTE_READBACK_SUMMARY|tip=e1778ed07f|declared=5203|verified=5141|r3_entries=4202|r3_verified=4202|r3_problems=0|prior_problems=64|prior_hard=14|no_path=32|unlisted=4533`
+- 本轮范围条目数从往轮 3337 涨到 4202: 增的是三入口新 run 目录的逐步骤原字节/台账(863 件)、
+  本机 9 份验证原文、审核方输入 13 件, 以及候选五件本身; **不是**新增判据框架。
+- UNLISTED_R3 由往轮 5 条变 7 条, 多出的两条是 `field/__pycache__/*.cpython-312.pyc` ——
+  本机 `import` 副产物被一次目录级 `git add -f` 误带进 `e1778ed`(先前的 `git restore --staged`
+  被后面的再添加覆盖)。它们是可从 `.py` 重建的编译件, 清单规则本来就排除 `__pycache__`,
+  所以既不在登记内也没被核对过。**本条随记录提交一并撤出索引与磁盘**, 见
+  `run_record.md` 末尾与提交信息; 其余 5 条与往轮同形(两份清单自身、`remote_readback.md`
+  与两份交接件), 属既有披露。
+
+撤出后最终 tip 的逐 blob 回读结果按任务书 §4 第 7 条写进当轮回执, 不再为"记录刚验证过的头"
+继续追加提交。
