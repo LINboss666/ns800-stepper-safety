@@ -109,3 +109,27 @@ PowerShell 5.1 三入口各一次真实执行，`SELFTEST_VERDICT|PASS|checks=21
   并且先补上受控加载的具体工具与作用点；`physical_collision` 仍为 0。
 - 仍然悬着的实物/现场项（本轮未触碰）：P1 独立电流参考与零点增益、`RT_CONSOLEBUF_SIZE` 128 裁剪在真串口下的表现、
   v2→v3 参数迁移在真 Flash 上的行为、真实触发后的降险计时。
+
+## 6. 追加指针：M8-R3 轮（本节为追加，上文 §1–§5 一字未改）
+
+- 独立复审在本轮交付头 `5c549f2af0740425c4014f374d064f77ee62d6b4` 上给出的结论是
+  **`M8_R2_REVIEW_REWORK_REQUIRED。不进入现场。`**，其中与本交接直接相关的事实（原样保留）：
+  - `R2_CURRENT_MANIFEST = 173/173_MATCHED`、`R2_ORIGINAL_C_CHAIN = 49/49 + RV1..RV9_META_OK`、
+    `R2_ORIGINAL_FIELD_SELFTEST = 25/25 (remaining boundaries reproduced separately)` —— 本交接 §1 的这三项**已被接受**，R3 未改写；
+  - `REVIEWED_SMALL_PRODUCT_PATCH = SAME_INPUT_FIXED`（复审方自己给出的小补丁被判为同输入修复，R3 按字节应用它，不再单开"接受补丁"轮）；
+  - `FIELD_REAL_EXECUTION_CHAIN = REWORK_REQUIRED`（本交接 §1 的 R2-C1/C2/C3/C4 行不足以进入现场，转 R3 集中返修）；
+  - `HARDWARE_ACTIONS_THIS_REVIEW = 0`、`NO_HARDWARE_GO`。
+- 复审另外指出的一处**产品边界**归入 R3-A：过期的 IDLE 快照仍会豁免覆盖丢失保护。
+  R3 的落地是 `motion_trusted` 增加年龄项（`diag_rel_tick_diff(now, motion_tick) <= motion_age_limit`），
+  判据并入原 C 链 `REL50`，反向 `RV10` 只摘年龄项。本交接 §1 的 R2-B3 行（"新帧 ≠ 运动事实新"）保持原文，
+  它与 R3-A 是同一处的两个层面：R2 让运动事实有身份，R3 让它的**年龄**参与豁免判定。
+- R2-C 现场链的三条具体不足由 R3 修在同一套执行器上（未另起新工具）：
+  ① `motor_start` 写入报错可能跳过撤能；② `motor_stop` 无应答可能耗尽清理预算；
+  ③ 禁能判据与真实固件字段不符（R2 用的是许可状态集合，真实产品只有 `FAULT/OTHER` 静止态，不存在 `IDLE`）。
+  本交接 §1 那三行的文字不改，修正过程与判据见 R3 的 `run_record.md` §3、§5。
+- 本交接对应的实物**逐字节未动**：`reports/reviews/phase8-m8-relative-protection-r2/**` 与
+  `reports/firmware/phase8-m8-relative-protection-r2/**`；已接受的 173/173 清单、
+  往轮回读披露的 64 问题与 `no_path=32` 均按原样保留，R3 未替往轮改写历史。
+- R3 轮的返修、验证与交付见 `reports/agent_handoffs/phase8-m8-relative-protection-r3.md` / `.json`
+  与 `reports/reviews/phase8-m8-relative-protection-r3/`；R3 的代码提交为 `805c29bd73c4ea861c9b9c65f61e946aec9548e3`
+  （直接续作在本分支，无 reset / rebase / merge / force）。

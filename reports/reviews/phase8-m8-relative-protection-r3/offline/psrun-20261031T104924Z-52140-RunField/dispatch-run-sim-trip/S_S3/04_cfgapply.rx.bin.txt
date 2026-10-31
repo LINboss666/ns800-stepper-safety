@@ -1,0 +1,1 @@
+[TMC-CFG] CONFIGURED (各次写入均经 IFCNT 确认; GCONF/CHOPCONF 读回一致)。电流值仍为理论计算, 未实测

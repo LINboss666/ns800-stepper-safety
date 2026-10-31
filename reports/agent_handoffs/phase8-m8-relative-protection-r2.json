@@ -266,5 +266,33 @@
       "reports/reviews/phase8-m8-relative-protection-r2/host/remote_readback.py"
     ],
     "record_self_exclusion": "remote_readback.md 显式排除在 SHA256SUMS.txt 之外(记录不能散列自己正在写的字节)"
+  },
+  "appended_pointer_r3": {
+    "r3_task": "phase8-m8-relative-protection-r3",
+    "r3_document_base": "5c549f2af0740425c4014f374d064f77ee62d6b4",
+    "r3_task_book_verdict": "M8_R2_REVIEW_REWORK_REQUIRED。不进入现场。",
+    "accepted_by_r3_review": [
+      "R2_CURRENT_MANIFEST = 173/173_MATCHED",
+      "R2_ORIGINAL_C_CHAIN = 49/49 + RV1..RV9_META_OK",
+      "R2_ORIGINAL_FIELD_SELFTEST = 25/25 (remaining boundaries reproduced separately)",
+      "REVIEWED_SMALL_PRODUCT_PATCH = SAME_INPUT_FIXED + 49/49 + RV1..RV9_META_OK"
+    ],
+    "rework_required_by_r3_review": [
+      "FIELD_REAL_EXECUTION_CHAIN = REWORK_REQUIRED",
+      "NO_HARDWARE_GO",
+      "产品边界一处: 过期的 IDLE 快照仍会豁免覆盖丢失保护(归入 R3-A, 与 R2-B3 同处不同层面)"
+    ],
+    "field_chain_gaps_named_by_reviewer": [
+      "start 写入报错可能跳过撤能(R3-B1)",
+      "stop 无应答可能耗尽清理预算(R3-B3)",
+      "禁能判据与真实固件字段不符: 真实产品静止态只有 FAULT/OTHER, 不存在 IDLE(R3-B5)"
+    ],
+    "this_file_body_rewritten": false,
+    "r2_facts_kept_byte_identical": "reports/reviews/phase8-m8-relative-protection-r2/** 与 reports/firmware/phase8-m8-relative-protection-r2/** 逐字节未改; 往轮回读披露的 64 问题与 no_path=32 保持原样, R3 未替往轮改写历史",
+    "r3_code_commit": "805c29bd73c4ea861c9b9c65f61e946aec9548e3",
+    "r3_handoff_md": "reports/agent_handoffs/phase8-m8-relative-protection-r3.md",
+    "r3_handoff_json": "reports/agent_handoffs/phase8-m8-relative-protection-r3.json",
+    "r3_evidence_dir": "reports/reviews/phase8-m8-relative-protection-r3/",
+    "r3_firmware_dir": "reports/firmware/phase8-m8-relative-protection-r3/"
   }
 }

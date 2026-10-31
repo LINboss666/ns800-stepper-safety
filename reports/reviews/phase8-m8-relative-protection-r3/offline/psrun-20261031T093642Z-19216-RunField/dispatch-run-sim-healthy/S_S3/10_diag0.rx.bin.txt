@@ -1,0 +1,10 @@
+[DIAG] verdict=NORMAL mode=MONITOR_ONLY health=OK
+[DIAG] sg_filt=18 delta=0 cur_filt=15 mA delta=0 mA
+[DIAG] vib rms=1006 peak=1014 mg band=-1
+[DIAG] cnt sg<warn=0 sg<stall=0 cur>warn=0 cur>stall=0 impact=0 bad=0 clean=0
+[DIAG] rel snap=OK inc=OK seq=12 pubfail=0
+[DIAG] rel mode=MONITOR_ONLY prof=NONE id=0 rev=0 flg=0000 FIELD_UNVERIFIED
+[DIAG] rel cov=NOT-ACTIVE(no-profile) lost=0 gen=0 rearm=0
+[DIAG] rel win hz=0[0..0] dir=0 ph=0
+[DIAG] rel tmc=0/0/0/0 mst=0 def=0 tier=0
+[DIAG] rel sig live=44100 prof=0 match=NO

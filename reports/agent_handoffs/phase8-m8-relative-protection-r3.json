@@ -1,0 +1,208 @@
+{
+  "task": "phase8-m8-relative-protection-r3",
+  "task_book": "操作者本机提供的 R3 集中返修任务书与复审包(文件名 NS800_M8_R3_Concentrated_Repair_Task_20261031.md + NS800_M8_R3_Review_Repair_Package_20261031.zip); 本记录不写个人绝对路径",
+  "task_book_verdict": "M8_R2_REVIEW_REWORK_REQUIRED。不进入现场。",
+  "task_book_review_verdict_block_verbatim": [
+    "M8_R2_REVIEW = REWORK_REQUIRED",
+    "R2_CURRENT_MANIFEST = 173/173_MATCHED",
+    "R2_ORIGINAL_C_CHAIN = 49/49 + RV1..RV9_META_OK",
+    "R2_ORIGINAL_FIELD_SELFTEST = 25/25 (remaining boundaries reproduced separately)",
+    "REVIEWED_SMALL_PRODUCT_PATCH = SAME_INPUT_FIXED + 49/49 + RV1..RV9_META_OK",
+    "FIELD_REAL_EXECUTION_CHAIN = REWORK_REQUIRED",
+    "HARDWARE_ACTIONS_THIS_REVIEW = 0",
+    "NO_HARDWARE_GO"
+  ],
+  "task_book_scope_verbatim_summary": "授权离线开发、相关主机执行、三目标构建及原 feature 分支追加提交/推送; 不授权连接任何设备; 若分支已前进先读差异并接续, 不 reset/rebase/merge/force; 此次已接受的 173/173 与既有产品修复保留; 历史 64 问题与 no_path=32 保持披露, 不作为 R3 扩大修复范围; 不单开纯 GO 登记轮; 不继承之前现场额度, 也不向用户索要本轮例行断电/SW1 操作。",
+  "date_utc": "2026-10-31T09:55:00Z",
+  "status": "M8_R3_OFFLINE_READY / AWAITING_INDEPENDENT_REVIEW",
+  "safe_for_enable": false,
+  "go_requested": false,
+  "roles": {
+    "executor": "Qoder agent(本会话)",
+    "reviewer": "独立复审方(ChatGPT 侧)",
+    "hardware_approval": "尚未请求; 硬件候选待软件 + 执行包一次复审之后才交用户一次具体批准"
+  },
+  "document_base_commit": "5c549f2af0740425c4014f374d064f77ee62d6b4",
+  "branch": "feature/m8-sg-adc-relative-protection",
+  "code_commit": "805c29bd73c4ea861c9b9c65f61e946aec9548e3",
+  "software_input_commit": "805c29bd73c4ea861c9b9c65f61e946aec9548e3",
+  "tested_image_build_commit": "805c29bd73c4ea861c9b9c65f61e946aec9548e3",
+  "dual_identity_note": "两个提交相等的前提是镜像确实取自该提交的产品源码: 三目标构建发生在 805c29b 之后, 且构建时 git status 对已跟踪文件为空; 之后的提交只新增 reports/** 与 .gitattributes 的两条本轮 -text 规则。S0 现场用 git rev-parse <sha>^{commit} 证明提交存在, 并重算镜像 bytes/sha256 与 build_manifest.json 逐字段相等。",
+  "delivery_head_rule": "证据提交严格接在 code_commit 之后顺序追加; 无 rebase/merge/amend/force; 交付 tip 不写进交接正文, 由推送后的远端逐 blob 回读程序从远端 blob 复算并记录。",
+  "frozen_refs_untouched": {"main": true, "tags": true, "other_phase8_branches": true, "note": "本轮只在当前 feature 分支追加提交"},
+  "forbidden_git_ops_performed": [],
+  "gitignore_modified": false,
+  "gitattributes_change": "只追加两条本轮目录的 -text 规则(reports/firmware/phase8-m8-relative-protection-r3/** 与 reports/reviews/phase8-m8-relative-protection-r3/**); 不做全局 * -text, 不 --renormalize 全仓; 理由与 R1/R2 同一: 交付证据要能逐字节复算, CR 字节即证据。范围写全整轮目录是为了避免 R2 那种提交后才逐条发现本机 CRLF 再补规则的事后修补。",
+  "hardware_actions": [],
+  "device_libraries_imported": "none (pyserial 只在 real 分支 import, 本轮从未走到该分支; 未创建任何 DAP/串口对象; pyocd 只跑了 --version 与 reset --help 的离线参数核对)",
+  "r2_facts_preserved": "reports/reviews/phase8-m8-relative-protection-r2/** 与 reports/firmware/phase8-m8-relative-protection-r2/** 逐字节未改(git status 对 R2 路径无已跟踪改动); 已接受的 173/173、R1 补回的五件、历史 64 问题与 no_path=32 披露全部保持原样。",
+  "product_patch": {
+    "file": "applications/diag_relative.c",
+    "input_sha256": "3960fb7e4a2d7db31869debc703119f5fe671d6d436aec4976e9372ad89ed57d",
+    "patch_sha256": "5baffaeb54b63e138b9af8adbc6b32e44df822ce3e5aec5e8c22481d2301f8cd",
+    "output_sha256": "059fc7535a550462c8c1c10039d5efdc419842811eadcf7ad8f2711bff541ce5",
+    "equals_reviewer_candidate": true,
+    "applied": "git apply 于规范 LF blob(未手抄 C 文件); 任务书说该补丁已做候选验证, 本轮不再单开接受补丁的轮次"
+  },
+  "host_results": {
+    "c_chain": {
+      "cases": 50, "pass": 50, "fail": 0, "executed": 50, "build_rc": 0, "local_warnings": 0,
+      "cross_platform_note": "复审方在 Linux GCC 13.3 对既有 rel_main.c:312 报一条 -Wmisleading-indentation 并保留; 本机 warnings=0 不外推为云端零告警",
+      "ledger_sha256": "af679636c9004231538e7762411707a83ad6235846edd0d2ebbcf36ec060a116",
+      "c_chain_output_lines": 342,
+      "derivation": "host/c_chain_output.derivation.txt: 由同一次运行的 <REL_OUT_DIR>/<run-id>/out.txt 取行首为 [ 的行; 规则可复算"
+    },
+    "reverses": {
+      "families": "RV1..RV10", "meta_ok": 10, "not_detected": 0, "runner_rc": 0,
+      "rv10": "只把年龄项从 motion_trusted 的豁免条件里摘掉(不是删整个覆盖保护), 命中 REL50 与 REL49 两个身份, 额外 FAIL 0 条"
+    },
+    "change_relevant_chains": {
+      "current_cal_m7": "34/34 (diag_relative.c 在该链的编译集合内)",
+      "m8_prefix_probe": "3/3 (在精确基线 f1aa2e832d536593641cea44ea890fb8ce9558b9 上按预期复现修前观察)",
+      "not_re_run": "S1/S2/IO/SD/M6 等链的输入本轮未变, 按任务书不机械重复"
+    },
+    "field_selftest": {
+      "cases": 55, "pass": 55, "fail": 0, "preserved_r2_identities": 25,
+      "negative_injections": 7, "transport": "stub_only", "port": "IN_MEMORY", "hardware_actions": 0
+    },
+    "reviewer_boundary_probes_after_fix": {
+      "cases": 18, "fail": 0,
+      "note": "仓外纯内存探针(与复审包 field_boundary_probes.py 同输入): 修前 5/5 缺陷复现保留、修后 18/18; 判据同时已并入包内自检 FS26..FS55, 不再是第二套工具"
+    }
+  },
+  "powershell_runs": {
+    "host": "Windows PowerShell 5.1 (powershell.exe -NoProfile -ExecutionPolicy Bypass -File field/M8R3Field.ps1)",
+    "env_discipline": "三次入口都在**不预设任何编码变量**的 shell 里跑(env -u PYTHONIOENCODING -u PYTHONUTF8): 编码正确性由脚本自己负责, 不能靠调用环境兜住",
+    "SelfTest": {"checks": 20, "failures": 0, "rc": 0, "run_id": "psrun-20261031T104907Z-38116-SelfTest"},
+    "Precheck": {"checks": 14, "failures": 0, "rc": 0, "run_id": "psrun-20261031T104920Z-46908-Precheck"},
+    "RunField": {"checks": 3, "failures": 0, "rc": 0, "transport": "stub", "backend": "sim",
+                 "profiles": ["healthy", "trip", "no_trigger"],
+                 "run_id": "psrun-20261031T104924Z-52140-RunField"},
+    "console_archives": ["host/field_SelfTest_console.txt", "host/field_Precheck_console.txt", "host/field_RunField_console.txt"],
+    "archive_provenance": "三件 host 控制台现在是各自运行目录 transcript_console.txt 的字节副本(Say 逐行缓冲 + .NET UTF-8 写盘), 不再经过 console codepage; 换源前的旧三件改名保留为 host/field_*_console_superseded-cp936capture.txt, 对照与理由在 host/offline_run_compare.txt",
+    "encoding_gate_negative_control": "host/encoding_gate_negative_control.txt: 仓库外副本删掉 $env:PYTHONIOENCODING 那一行 => -Precheck rc=1 且具名 PYTHON_OUTPUT_NOT_UTF8(门真的咬)"
+  },
+  "field_data_checks": {
+    "rows_provenance": {"script": "host/rows_provenance_check.py", "groups": 38, "capture_refs": 27,
+                        "source_anchor_refs": 28, "problems": 0, "notes": 0, "rc": 0,
+                        "console": "host/rows_provenance_console.txt",
+                        "rules": "kind 必须在 legend 内(含复合级); reports/** 采集件必须存在且行号落在**解码后**行数内(.b64 先 base64 解码); applications/*.c:NN 锚点必须存在、行号在文件行数内、且 ±6 行内确有 rt_kprintf; 复合 kind 必须同时给采集件与源码锚点; 一组里所有 _provenance* 键都查(含档案级)",
+                        "first_run_found": "3 problems + 4 notes: legend 缺 board_capture_composed 一级、__watch__ 只给缩写路径、after_reboot 来源写「同上」、no_trigger 把打印条件冒充板级采集、4 个锚点没给行号 => 全部改完才是 problems=0 notes=0; 只动元数据, PS 三入口与 dispatch 判定不变(host/offline_run_compare.txt)"}
+  },
+  "dispatch_runs": {
+    "healthy": {"stages_executed": 9, "not_run": 0, "rc": 0},
+    "no_trigger": {"stages_executed": 9, "not_run": 0, "rc": 0},
+    "trip": {"stages_executed": 12, "not_run": 0, "rc": 0,
+             "notes": "S10 状态=REFUSED(计划申报 expected_terminal, 会话到此结束, 之后无任何危险步骤); S9 事故取证按实际新增 session 判; S11 人工恢复且 forbidden 含 motor_start"},
+    "quota_used_healthy": {
+      "port_open": 5, "download": 1, "readback": 1, "explicit_reset": 1, "approved_reboot": 1,
+      "motor_run": 2, "config_save": 1, "tmc_config_apply": 2, "irq_polarity_prep": 4,
+      "diag_profile_zero": 1, "diag_profile_learn": 1, "diag_profile_commit": 1,
+      "cleanup_motor_stop": 2, "cleanup_motor_disarm": 2, "cleanup_motor_status": 2
+    },
+    "quota_used_trip_delta_vs_healthy": {"port_open": 8, "cleanup_motor_stop": 3, "cleanup_motor_disarm": 3, "cleanup_motor_status": 3},
+    "quota_is_executed": "额度在发送前扣; dispatch 结束逐键打印 QUOTA_AUDIT|key|declared|used|left; 出现未申报用量或负余额即整体非成功(QUOTA_AUDIT_FAIL)",
+    "motion_timing": "义务与硬截止起点在 port.write 之前(t=0.005 s); 清理三条各 1.2 s 独立窗, 实测发送/确认 5.005→5.015(S_S4) 与 5.010→5.020(S_S8); disarm=CONFIRMED_DISABLED, terminal=KNOWN",
+    "recorded_values": {"id": "7", "rev": "1", "flags": "0010", "sig": "44100", "match": "YES", "bb_session": "0 -> 8", "bb_written": "0 -> 612"},
+    "negative_controls": {
+      "real_without_token": "REAL_TRANSPORT_REFUSED, 阶段结果 0 条, rc!=0",
+      "stage_expectation_mutated": "S5 STOP + 后续阶段一律 NOT_RUN, rc!=0",
+      "restore_drift": "RESTORE_MISMATCH(记录值与实际读值逐项比较)",
+      "bb_no_increase": "SESSION_NOT_INCREASED",
+      "cleanup_reserve_zero": "CLEANUP_RESERVE_EXHAUSTED 且 success=False(必要撤能仍发出, 但披露)",
+      "plan_placeholder": "S0_PLAN_PLACEHOLDER(<CMSIS-Pack>/packmem 一律拒绝)",
+      "forbidden_command": "S0_PLAN_FORBIDDEN_COMMAND_PRESENT(阶段自己申报的禁令真能拒绝)",
+      "manual_after_motion": "PLAN_MANUAL_AFTER_MOTION 且开口前拒绝、零发送"
+    },
+    "not_counted_as_executed": "NOT_RUN 绝不计入 stages_executed; 已执行阶段序列还必须与按 profiles 过滤后的期望序列逐个相等"
+  },
+  "keil_build": {
+    "targets": ["rt-thread", "rt-thread-measure-a0", "rt-thread-motor-m1-candidate"],
+    "each_target_once": true,
+    "return_codes": [0, 0, 0],
+    "error_warning_lines": ["0 Error(s), 0 Warning(s)", "0 Error(s), 0 Warning(s)", "0 Error(s), 0 Warning(s)"],
+    "program_sizes": ["Code=204530 RO-data=85702 RW-data=2188 ZI-data=84824", "Code=211826 RO-data=88662 RW-data=2188 ZI-data=92544", "Code=204762 RO-data=85578 RW-data=2188 ZI-data=84824"],
+    "macros_effective": {
+      "rt-thread": "四宏全 0",
+      "rt-thread-measure-a0": "四宏全 0",
+      "rt-thread-motor-m1-candidate": "MOTOR=1 TMC=1 STEP=0 LIMIT=0(原样不扩权)"
+    },
+    "logs": ["build/rt-thread.log", "build/rt-thread-measure-a0.log", "build/rt-thread-motor-m1-candidate.log", "build/rc.txt"]
+  },
+  "firmware_dir": "reports/firmware/phase8-m8-relative-protection-r3",
+  "candidate_image": {
+    "path": "reports/firmware/phase8-m8-relative-protection-r3/rt-thread-motor-m1-candidate.bin",
+    "bytes": 290916,
+    "sha256": "00608ec93c6a3027d68b44b5317574209fccfb0ba82a9974793d13b54b79e304"
+  },
+  "download_payload": {
+    "path": "reports/firmware/phase8-m8-relative-protection-r3/rt-thread-motor-m1.axf",
+    "bytes": 1771288,
+    "sha256": "0bba8ca74ed8c11e149395efd64c42072fce0b3ced5ab76281210ddc04550963"
+  },
+  "manifest_self_hash_policy": "两份 SHA256SUMS.txt 与 build_manifest.json 都不哈希自身字节; 清单只写构建来源、条目数与自检规则, 提交身份由 git 对象本身承担。",
+  "remote_readback": {
+    "program": "host/remote_readback.py",
+    "lineage": "R2-D 已修好的清单优先判定, 本轮只换范围与身份(变量/标签/清单集/scratch 根), 语义逐字一致; 不另起新工具",
+    "scope_this_round": [
+      "reports/reviews/phase8-m8-relative-protection-r3/SHA256SUMS.txt",
+      "reports/firmware/phase8-m8-relative-protection-r3/SHA256SUMS.txt",
+      "reports/firmware/phase8-m8-relative-protection-r3/build_manifest.json",
+      "reports/reviews/phase8-m8-relative-protection-r3/field/plan.json"
+    ],
+    "why_plan_json_is_a_manifest": "计划申报的候选镜像 bytes/sha256 必须从远端字节复算, 否则'计划里写的镜像'与'仓库里的镜像'不一致只能靠本机核对发现",
+    "prior_rounds": "往轮清单的问题逐条披露不改写(R2 的 64 问题与 no_path=32 保持), 判定分 SCOPE_R3 / SCOPE_PRIOR",
+    "transport": "新建空 bare 仓 + git 协议 fetch --depth=1, 之后一律 git cat-file blob <tip>:<path>; 不复用本地对象库或工作树",
+    "result": "本轮尚未执行 => 结论只写在 remote_readback.md / host/remote_readback_console.txt, 不预填进本交接"
+  },
+  "artifact_grades": {
+    "host_proved": "R3-A 补丁的同输入回归(REL50 八支 + RV10 反向)、现场执行器控制流与整包调度(假端口 + 假动作后端)、三目标构建产物字节与原始日志、PS 三入口真实执行、构建产物与构建输出逐件 BYTE_EQUAL",
+    "board_proved_this_round": "无(本轮零设备动作)",
+    "synthetic_in_offline_fixtures": "rows.json 中 kind=source_shape 或 board_capture_composed 的行(含 REL TRIP / REL LATCH / [BB] session 增量 / 锁存态 motor_status / 重启后的 diag_profile show 值): 行形状取自产品 rt_kprintf 字面量, 数值为下发或注入 => 只喂离线控制流, 不构成现场观察",
+    "not_verified": [
+      "设备侧一切: 下载 / Flash 读 / 复位 / 串口 / 起转 / apply / 触发观察 / 清故障 / 重启后 Flash v2->v3 迁移是否真成立",
+      "RealActionBackend 与 ManualActionBackend 的执行路径(从未运行; 其 argv、成功原文判据、交付物门只做了离线核对与静态证明)",
+      "learn 撞产品自身 12 s 超时时的真实行为(仅按计划分支建模; 风险登记在 plan.json:residual_risk)",
+      "SG 在该工作点是否有可靠分离度、真实触发条件、IMU 现场激励",
+      "保护动作的物理效果与安全验收(仍 FIELD_UNVERIFIED / PENDING)"
+    ]
+  },
+  "open_items": [
+    "R3 交付待独立复审(软件 + 执行包一次复审, 不拆 A/B 两轮)",
+    "复审通过后才向用户请求一次具体的硬件批准(不继承旧额度, 不索要例行断电/SW1)",
+    "现场执行时: 所有 source_shape 行必须由真实响应替换; 重启后的 profile 值要与本轮 commit 记录实际比较; 事故链按实际新增 session 取证",
+    "受控加载工具与作用点仍 NAMED_PREREQUISITE_MISSING; IMU 非破坏激励未选择 => FIELD_NOT_TRIGGERED",
+    "R1 的 B-CP4/R1-CP1 等历史现场待批事项与本轮无关, 保持原状态"
+  ],
+  "defects_found_by_actually_running_this_round": [
+    "emit_text 已定义但从未接线(上一段补丁自称已接) => 判读文本 .txt 不落盘, record/compare 无数据可读; 已接线并加 FS39/FS40",
+    "自检用例分批补入使 FS 编号从 FS39 起整体下移一位, 而 run_record/交接的判据表照旧引用 => 文档里凡 FS39 之后的判据都指向别的用例(FS51 实为 learn 12s 超时却写成清理反向); 已按 m8r3_field_selftest.py 的 CASES 表逐条回读重算, 并在两处写明编号以 CASES 表为准。测试抓不到这类错位, 它只在文档里",
+    "assert_step 中内容缺失先于业务失败返回 => 真实 learn FAILED 被报成 EXPECTATION_NOT_MET; 改为业务层先判(FS05/FS25 仍成立)",
+    "cleanup 的 quota_box/overruns 是死参数(从未扣减) => 现按 cleanup_<cmd> 真实扣减并具名披露耗尽",
+    "PowerShell 变量名大小写不敏感: 局部 $entry 顶掉脚本级 $script:Entry => 运行目录名被塞进整张镜像对象、New-Item 报路径格式错误; 已改名并在脚本内写明",
+    "自检里仓库根层级少一层(parents[2] 应为 parents[3]) => 调度 S0_IMAGE_ABSENT",
+    "msh 命令名刮取把 MSH_CMD_EXPORT 的第二参(描述词)当命令名(得 45 个) => 修后 70 个, --validate-plan 的 146 项检查才有意义",
+    "按 profile 选行会误伤无关命令(trip 档案把 S4 的 motor_arm 也换成拒绝行) => 场景差异改用专用行键 + stages[].profiles, --profile 只影响被动观察窗",
+    "观察窗吃掉 5 s 预算后, 同会话排在其后的业务步必然 MOTION_BUDGET_EXHAUSTED => 提交/保存与事故取证拆到独立静止会话(不放宽截止点)",
+    "一次模块 docstring 编辑自伤(少一个三引号)导致文件短暂不可解析 => 已修复并用 18/18 边界探针 + 55/55 自检 + 三档案 dispatch + PS 三入口复验",
+    "被取代的 5 个 offline 运行目录(3 个空 + 2 个共 771 文件)在提交前删除; 交付保留缺陷原件 0936xx 三个运行 + 权威 1049xx 三个运行",
+    "rows.json 的来源声明经不起机器核对(新增 host/rows_provenance_check.py 首跑 3 problems + 4 notes): legend 少一级 board_capture_composed、__watch__ 只给缩写路径 m4/l1_monitor_console.txt、diag_profile show@after_reboot 的来源写成「同上」、_provenance_no_trigger 把打印条件冒充板级采集、4 个锚点没给行号 => 逐项修到 problems=0 notes=0; 只动 _provenance*/_about 元数据, 重跑证明判定未变",
+    "交付归档里的中文是坏的: host/field_*_console.txt 原先是 PS 进程 stdout 的直接重定向, 而 python 被 Start-Process 重定向到文件时按本机 cp936 编码 stdout, 脚本再按 UTF-8 读回 => 带中文的行从一开始就是乱码/U+FFFD; '严格 UTF-8 可解码'掩盖了它。修法: Invoke-Py 钉 PYTHONIOENCODING=utf-8 并把出现 U+FFFD 变成具名停止 PYTHON_OUTPUT_NOT_UTF8; Say 缓冲后由 .NET UTF-8 写 transcript_console.txt, host 三件改取它的字节副本; 旧三件改名保留; 反向自证见 host/encoding_gate_negative_control.txt",
+    "第二次重跑留下的 6 个中间运行目录(1033xx 与 1040xx/1042xx 各三个)在**逐文件归一对照写进 host/offline_run_compare.txt 之后**删除: RunField 344/344 全等, SelfTest 418/420(差的是夹具临时目录随机名 + 只有权威版才有的 transcript), 且六个目录从未提交入 Git(git ls-files=0)。删除只按 psrun-* 目录名逐个点名, 不是通配清理"
+  ],
+  "evidence_dir": "reports/reviews/phase8-m8-relative-protection-r3",
+  "manifests": {"reviews_entries": 1576, "firmware_entries": 10,
+                "path_base": "仓库相对路径(与 R2 的清单基准不同, 本轮不再用 ../ 前缀以免歧义)",
+                "excluded_by_rule": ["SHA256SUMS.txt 自身", "remote_readback.md(回读记录不能散列自己正在写的字节)", "__pycache__"],
+                "growth_note": "从早先的 793 条涨到 1576 条: 评审目录下新增了 PS 的 transcript_console.txt 与逐阶段原始件、host 的 6 件核对件(含三件改名保留的坏归档), 以及 rows.json 元数据修复后的重跑运行目录"},
+  "staged_preflight": {
+    "record": "host/staged_blob_preflight.txt",
+    "tool": "D:/ns800_m8r3_scratch/staged_preflight_r3.py (逐条 git cat-file blob :<path> 复算)",
+    "result": "MANIFEST 评审 entries=1575 problems=0 / MANIFEST 固件 entries=10 problems=0 / BUILD_MANIFEST resolved=9 problems=0 / TOTAL problems=0, rc=0",
+    "why_blob_not_disk": "core.autocrlf=true 会在 add 时剥 CR, 只查磁盘字节会漏(R2 真踩过 6 件); 交付方最终读回的是 blob",
+    "build_manifest_has_no_repo_paths": "images/map 只带构建目录内相对名, 所以不猜路径: 用固件清单的 sha->path 反查并要求声明字节与 blob 字节一致",
+    "self_scope": "本文件记录 1575 条那一版; 它自身与含它的新清单(1576 条)里它的条目由推送后的远端逐 blob 回读覆盖",
+    "pycache_removed_before_commit": "field/__pycache__/m8r3_serial_chain.cpython-312.pyc 删除(import 副产物, 未入库, 清单规则本来就排除 __pycache__ => 不影响任何登记条目散列)"
+  },
+  "approval_status": "本任务书只布置离线工作; 未请求任何 GO; safe_for_enable=false"
+}

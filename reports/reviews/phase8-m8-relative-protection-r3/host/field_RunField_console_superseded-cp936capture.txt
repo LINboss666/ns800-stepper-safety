@@ -1,0 +1,414 @@
+M8-R3 RunField 入口的 Windows PowerShell 5.1 控制台原文(powershell.exe -NoProfile -ExecutionPolicy Bypass)
+命令: powershell.exe -NoProfile -ExecutionPolicy Bypass -File field/M8R3Field.ps1 -RunField -Transport stub -Backend sim -Profile all
+证据运行目录: offline/psrun-20261031T093642Z-19216-RunField (文件数 365)
+----- 原始输出 -----
+OUT_DIR_TRIED|base=[D:\ns800\reports\reviews\phase8-m8-relative-protection-r3\offline] leaf=[psrun-20261031T093642Z-19216-RunField]
+PROFILE|healthy|status=OK|executed=9|not_run=0
+  DISPATCH|stage=S0|status=OK|kind=offline|{"facts": {"image_path": "reports/firmware/phase8-m8-relative-protection-r3/rt-thread-motor-m1-candidate.bin", "image_bytes": 290916, "image_sha256": "00608ec93c6a3027d68b44b5317574209fccfb0ba82a9974793d13b54b79e304", "manifest_target": "rt-thread-motor-m1-candidate", "software_input_commit": "805c29bd73c4ea861c9b9c65f61e946aec9548e3", "tested_image_build_commit": "805c29bd73c4ea861c9b9c65f61e946aec9548e3", "reviewed_delivery_commit": "5c549f2af0740425c4014f374d064f77ee62d6b4", "plan_placeholders": 0, "plan_forbidden_hits": 0, "needles_source_root": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad", "needles_total": 40}}
+  DISPATCH|stage=S1|status=OK|kind=download|{"action": "download"}
+  DISPATCH|stage=S2|status=OK|kind=readback|{"action": "readback"}
+  DISPATCH|stage=S3|status=OK|kind=|{"code": "", "recorded": {}, "success": true, "disarm": "NOT_ARMED", "terminal": "KNOWN", "cleanup_errors": [], "obligation": false, "dir": "D:\\ns800\\reports\\reviews\\phase8-m8-relative-protection-r3\\offline\\psrun-20261031T093642Z-19216-RunField\\dispatch-run-sim-healthy\\S_S3", "steps": 13}
+  DISPATCH|stage=S4|status=OBSERVATION_NO_TRIGGER|kind=|{"code": "", "recorded": {}, "success": true, "disarm": "CONFIRMED_DISABLED", "terminal": "KNOWN", "cleanup_errors": [], "obligation": true, "dir": "D:\\ns800\\reports\\reviews\\phase8-m8-relative-protection-r3\\offline\\psrun-20261031T093642Z-19216-RunField\\dispatch-run-sim-healthy\\S_S4", "steps": 9}
+  DISPATCH|stage=S5|status=OK|kind=|{"code": "", "recorded": {"id": "7", "rev": "1", "flags": "0010", "sig": "44100", "match": "YES"}, "success": true, "disarm": "NOT_ARMED", "terminal": "KNOWN", "cleanup_errors": [], "obligation": false, "dir": "D:\\ns800\\reports\\reviews\\phase8-m8-relative-protection-r3\\offline\\psrun-20261031T093642Z-19216-RunField\\dispatch-run-sim-healthy\\S_S5", "steps": 6}
+  DISPATCH|stage=S6|status=OK|kind=operator_gate|{"gate": "operator_power_cycle_done", "success": true, "post_facts": ["��������¶�ȡ system_status/safety_status/tmc_config_show ֤�� CONFIGURED �� IRQ ����(S7 �����벽��)", "profile �ָ��� S5 ��¼�� id/rev/flags/live sig ʵ�ʱȽ�(S7 �� compare_recorded)"]}
+  DISPATCH|stage=S7|status=OK|kind=|{"code": "", "recorded": {"id": "7", "rev": "1", "flags": "0010", "sig": "44100", "match": "YES"}, "success": true, "disarm": "NOT_ARMED", "terminal": "KNOWN", "cleanup_errors": [], "obligation": false, "dir": "D:\\ns800\\reports\\reviews\\phase8-m8-relative-protection-r3\\offline\\psrun-20261031T093642Z-19216-RunField\\dispatch-run-sim-healthy\\S_S7", "steps": 10}
+  DISPATCH|stage=S8|status=OBSERVATION_NO_TRIGGER|kind=|{"code": "", "recorded": {"id": "7", "rev": "1", "flags": "0010", "sig": "44100", "match": "YES", "bb_session": "0", "bb_written": "0"}, "success": true, "disarm": "CONFIRMED_DISABLED", "terminal": "KNOWN", "cleanup_errors": [], "obligation": true, "dir": "D:\\ns800\\reports\\reviews\\phase8-m8-relative-protection-r3\\offline\\psrun-20261031T093642Z-19216-RunField\\dispatch-run-sim-healthy\\S_S8", "steps": 10}
+  DISPATCH|stage=S8|status=OBSERVATION_NO_TRIGGER|kind=|{"code": "", "recorded": {"id": "7", "rev": "1", "flags": "0010", "sig": "44100", "match": "YES", "bb_session": "0", "bb_written": "0"}, "success": true, "disarm": "CONFIRMED_DISABLED", "terminal": "KNOWN", "cleanup_errors": [], "obligation": true, "dir": "D:\\ns800\\reports\\reviews\\phase8-m8-relative-protection-r3\\offline\\psrun-20261031T093642Z-19216-RunField\\dispatch-run-sim-healthy\\S_S8", "steps": 10}
+CHECK|DISPATCH_healthy|PASS|status=OK rc=0 executed=9 not_run=0 unknown=0 cleanup_err=0 reserve_breach=0 evidence_fail=0 quota_fail=0
+FIELD_PROOF|healthy|NO(transport=stub simulated_bytes_never_reach_real_identity_gate)
+PROFILE|trip|status=OK|executed=12|not_run=0
+  DISPATCH|stage=S0|status=OK|kind=offline|{"facts": {"image_path": "reports/firmware/phase8-m8-relative-protection-r3/rt-thread-motor-m1-candidate.bin", "image_bytes": 290916, "image_sha256": "00608ec93c6a3027d68b44b5317574209fccfb0ba82a9974793d13b54b79e304", "manifest_target": "rt-thread-motor-m1-candidate", "software_input_commit": "805c29bd73c4ea861c9b9c65f61e946aec9548e3", "tested_image_build_commit": "805c29bd73c4ea861c9b9c65f61e946aec9548e3", "reviewed_delivery_commit": "5c549f2af0740425c4014f374d064f77ee62d6b4", "plan_placeholders": 0, "plan_forbidden_hits": 0, "needles_source_root": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad", "needles_total": 40}}
+  DISPATCH|stage=S1|status=OK|kind=download|{"action": "download"}
+  DISPATCH|stage=S2|status=OK|kind=readback|{"action": "readback"}
+  DISPATCH|stage=S3|status=OK|kind=|{"code": "", "recorded": {}, "success": true, "disarm": "NOT_ARMED", "terminal": "KNOWN", "cleanup_errors": [], "obligation": false, "dir": "D:\\ns800\\reports\\reviews\\phase8-m8-relative-protection-r3\\offline\\psrun-20261031T093642Z-19216-RunField\\dispatch-run-sim-trip\\S_S3", "steps": 13}
+  DISPATCH|stage=S4|status=OK|kind=|{"code": "", "recorded": {}, "success": true, "disarm": "CONFIRMED_DISABLED", "terminal": "KNOWN", "cleanup_errors": [], "obligation": true, "dir": "D:\\ns800\\reports\\reviews\\phase8-m8-relative-protection-r3\\offline\\psrun-20261031T093642Z-19216-RunField\\dispatch-run-sim-trip\\S_S4", "steps": 9}
+  DISPATCH|stage=S5|status=OK|kind=|{"code": "", "recorded": {"id": "7", "rev": "1", "flags": "0010", "sig": "44100", "match": "YES"}, "success": true, "disarm": "NOT_ARMED", "terminal": "KNOWN", "cleanup_errors": [], "obligation": false, "dir": "D:\\ns800\\reports\\reviews\\phase8-m8-relative-protection-r3\\offline\\psrun-20261031T093642Z-19216-RunField\\dispatch-run-sim-trip\\S_S5", "steps": 6}
+  DISPATCH|stage=S6|status=OK|kind=operator_gate|{"gate": "operator_power_cycle_done", "success": true, "post_facts": ["��������¶�ȡ system_status/safety_status/tmc_config_show ֤�� CONFIGURED �� IRQ ����(S7 �����벽��)", "profile �ָ��� S5 ��¼�� id/rev/flags/live sig ʵ�ʱȽ�(S7 �� compare_recorded)"]}
+  DISPATCH|stage=S7|status=OK|kind=|{"code": "", "recorded": {"id": "7", "rev": "1", "flags": "0010", "sig": "44100", "match": "YES"}, "success": true, "disarm": "NOT_ARMED", "terminal": "KNOWN", "cleanup_errors": [], "obligation": false, "dir": "D:\\ns800\\reports\\reviews\\phase8-m8-relative-protection-r3\\offline\\psrun-20261031T093642Z-19216-RunField\\dispatch-run-sim-trip\\S_S7", "steps": 10}
+  DISPATCH|stage=S8|status=OK|kind=|{"code": "", "recorded": {"id": "7", "rev": "1", "flags": "0010", "sig": "44100", "match": "YES", "bb_session": "0", "bb_written": "0"}, "success": true, "disarm": "CONFIRMED_DISABLED", "terminal": "KNOWN", "cleanup_errors": [], "obligation": true, "dir": "D:\\ns800\\reports\\reviews\\phase8-m8-relative-protection-r3\\offline\\psrun-20261031T093642Z-19216-RunField\\dispatch-run-sim-trip\\S_S8", "steps": 10}
+  DISPATCH|stage=S9|status=OK|kind=|{"code": "", "recorded": {"id": "7", "rev": "1", "flags": "0010", "sig": "44100", "match": "YES", "bb_session": "8", "bb_written": "612"}, "success": true, "disarm": "NOT_ARMED", "terminal": "KNOWN", "cleanup_errors": [], "obligation": false, "dir": "D:\\ns800\\reports\\reviews\\phase8-m8-relative-protection-r3\\offline\\psrun-20261031T093642Z-19216-RunField\\dispatch-run-sim-trip\\S_S9", "steps": 4}
+  DISPATCH|stage=S10|status=REFUSED|kind=|{"code": "NAMED_REFUSAL", "recorded": {"id": "7", "rev": "1", "flags": "0010", "sig": "44100", "match": "YES", "bb_session": "8", "bb_written": "612"}, "success": true, "disarm": "CONFIRMED_DISABLED", "terminal": "KNOWN", "cleanup_errors": [], "obligation": true, "dir": "D:\\ns800\\reports\\reviews\\phase8-m8-relative-protection-r3\\offline\\psrun-20261031T093642Z-19216-RunField\\dispatch-run-sim-trip\\S_S10", "steps": 2}
+  DISPATCH|stage=S11|status=OK|kind=|{"code": "", "recorded": {"id": "7", "rev": "1", "flags": "0010", "sig": "44100", "match": "YES", "bb_session": "8", "bb_written": "612"}, "success": true, "disarm": "NOT_ARMED", "terminal": "KNOWN", "cleanup_errors": [], "obligation": false, "dir": "D:\\ns800\\reports\\reviews\\phase8-m8-relative-protection-r3\\offline\\psrun-20261031T093642Z-19216-RunField\\dispatch-run-sim-trip\\S_S11", "steps": 6}
+  DISPATCH|stage=S11|status=OK|kind=|{"code": "", "recorded": {"id": "7", "rev": "1", "flags": "0010", "sig": "44100", "match": "YES", "bb_session": "8", "bb_written": "612"}, "success": true, "disarm": "NOT_ARMED", "terminal": "KNOWN", "cleanup_errors": [], "obligation": false, "dir": "D:\\ns800\\reports\\reviews\\phase8-m8-relative-protection-r3\\offline\\psrun-20261031T093642Z-19216-RunField\\dispatch-run-sim-trip\\S_S11", "steps": 6}
+CHECK|DISPATCH_trip|PASS|status=OK rc=0 executed=12 not_run=0 unknown=0 cleanup_err=0 reserve_breach=0 evidence_fail=0 quota_fail=0
+FIELD_PROOF|trip|NO(transport=stub simulated_bytes_never_reach_real_identity_gate)
+PROFILE|no_trigger|status=OK|executed=9|not_run=0
+  DISPATCH|stage=S0|status=OK|kind=offline|{"facts": {"image_path": "reports/firmware/phase8-m8-relative-protection-r3/rt-thread-motor-m1-candidate.bin", "image_bytes": 290916, "image_sha256": "00608ec93c6a3027d68b44b5317574209fccfb0ba82a9974793d13b54b79e304", "manifest_target": "rt-thread-motor-m1-candidate", "software_input_commit": "805c29bd73c4ea861c9b9c65f61e946aec9548e3", "tested_image_build_commit": "805c29bd73c4ea861c9b9c65f61e946aec9548e3", "reviewed_delivery_commit": "5c549f2af0740425c4014f374d064f77ee62d6b4", "plan_placeholders": 0, "plan_forbidden_hits": 0, "needles_source_root": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad", "needles_total": 40}}
+  DISPATCH|stage=S1|status=OK|kind=download|{"action": "download"}
+  DISPATCH|stage=S2|status=OK|kind=readback|{"action": "readback"}
+  DISPATCH|stage=S3|status=OK|kind=|{"code": "", "recorded": {}, "success": true, "disarm": "NOT_ARMED", "terminal": "KNOWN", "cleanup_errors": [], "obligation": false, "dir": "D:\\ns800\\reports\\reviews\\phase8-m8-relative-protection-r3\\offline\\psrun-20261031T093642Z-19216-RunField\\dispatch-run-sim-no_trigger\\S_S3", "steps": 13}
+  DISPATCH|stage=S4|status=OBSERVATION_NO_TRIGGER|kind=|{"code": "", "recorded": {}, "success": true, "disarm": "CONFIRMED_DISABLED", "terminal": "KNOWN", "cleanup_errors": [], "obligation": true, "dir": "D:\\ns800\\reports\\reviews\\phase8-m8-relative-protection-r3\\offline\\psrun-20261031T093642Z-19216-RunField\\dispatch-run-sim-no_trigger\\S_S4", "steps": 9}
+  DISPATCH|stage=S5|status=OK|kind=|{"code": "", "recorded": {"id": "7", "rev": "1", "flags": "0010", "sig": "44100", "match": "YES"}, "success": true, "disarm": "NOT_ARMED", "terminal": "KNOWN", "cleanup_errors": [], "obligation": false, "dir": "D:\\ns800\\reports\\reviews\\phase8-m8-relative-protection-r3\\offline\\psrun-20261031T093642Z-19216-RunField\\dispatch-run-sim-no_trigger\\S_S5", "steps": 6}
+  DISPATCH|stage=S6|status=OK|kind=operator_gate|{"gate": "operator_power_cycle_done", "success": true, "post_facts": ["��������¶�ȡ system_status/safety_status/tmc_config_show ֤�� CONFIGURED �� IRQ ����(S7 �����벽��)", "profile �ָ��� S5 ��¼�� id/rev/flags/live sig ʵ�ʱȽ�(S7 �� compare_recorded)"]}
+  DISPATCH|stage=S7|status=OK|kind=|{"code": "", "recorded": {"id": "7", "rev": "1", "flags": "0010", "sig": "44100", "match": "YES"}, "success": true, "disarm": "NOT_ARMED", "terminal": "KNOWN", "cleanup_errors": [], "obligation": false, "dir": "D:\\ns800\\reports\\reviews\\phase8-m8-relative-protection-r3\\offline\\psrun-20261031T093642Z-19216-RunField\\dispatch-run-sim-no_trigger\\S_S7", "steps": 10}
+  DISPATCH|stage=S8|status=OBSERVATION_NO_TRIGGER|kind=|{"code": "", "recorded": {"id": "7", "rev": "1", "flags": "0010", "sig": "44100", "match": "YES", "bb_session": "0", "bb_written": "0"}, "success": true, "disarm": "CONFIRMED_DISABLED", "terminal": "KNOWN", "cleanup_errors": [], "obligation": true, "dir": "D:\\ns800\\reports\\reviews\\phase8-m8-relative-protection-r3\\offline\\psrun-20261031T093642Z-19216-RunField\\dispatch-run-sim-no_trigger\\S_S8", "steps": 10}
+  DISPATCH|stage=S8|status=OBSERVATION_NO_TRIGGER|kind=|{"code": "", "recorded": {"id": "7", "rev": "1", "flags": "0010", "sig": "44100", "match": "YES", "bb_session": "0", "bb_written": "0"}, "success": true, "disarm": "CONFIRMED_DISABLED", "terminal": "KNOWN", "cleanup_errors": [], "obligation": true, "dir": "D:\\ns800\\reports\\reviews\\phase8-m8-relative-protection-r3\\offline\\psrun-20261031T093642Z-19216-RunField\\dispatch-run-sim-no_trigger\\S_S8", "steps": 10}
+CHECK|DISPATCH_no_trigger|PASS|status=OK rc=0 executed=9 not_run=0 unknown=0 cleanup_err=0 reserve_breach=0 evidence_fail=0 quota_fail=0
+FIELD_PROOF|no_trigger|NO(transport=stub simulated_bytes_never_reach_real_identity_gate)
+RUNFIELD_SUMMARY|checks=3|failures=0|transport=stub|backend=sim|hardware_actions=0
+----- 目录清单(路径|类型|字节) -----
+F|console_run-sim_healthy.txt|5371
+F|console_run-sim_no_trigger.txt|5392
+F|console_run-sim_trip.txt|6658
+D|dispatch-run-sim-healthy|0
+F|dispatch-run-sim-healthy/dispatch_ledger.jsonl|2993
+D|dispatch-run-sim-healthy/S_S3|0
+F|dispatch-run-sim-healthy/S_S3/01_sysboot.rx.bin|987
+F|dispatch-run-sim-healthy/S_S3/01_sysboot.rx.bin.txt|980
+F|dispatch-run-sim-healthy/S_S3/03_cfgboot.rx.bin|987
+F|dispatch-run-sim-healthy/S_S3/03_cfgboot.rx.bin.txt|980
+F|dispatch-run-sim-healthy/S_S3/04_cfgapply.rx.bin|131
+F|dispatch-run-sim-healthy/S_S3/04_cfgapply.rx.bin.txt|124
+F|dispatch-run-sim-healthy/S_S3/05_cfgafter.rx.bin|961
+F|dispatch-run-sim-healthy/S_S3/05_cfgafter.rx.bin.txt|954
+F|dispatch-run-sim-healthy/S_S3/06_pol.rx.bin|876
+F|dispatch-run-sim-healthy/S_S3/06_pol.rx.bin.txt|869
+F|dispatch-run-sim-healthy/S_S3/07_irq.rx.bin|234
+F|dispatch-run-sim-healthy/S_S3/07_irq.rx.bin.txt|227
+F|dispatch-run-sim-healthy/S_S3/08_irqafter.rx.bin|543
+F|dispatch-run-sim-healthy/S_S3/08_irqafter.rx.bin.txt|536
+F|dispatch-run-sim-healthy/S_S3/09_rest0.rx.bin|627
+F|dispatch-run-sim-healthy/S_S3/09_rest0.rx.bin.txt|620
+F|dispatch-run-sim-healthy/S_S3/10_diag0.rx.bin|535
+F|dispatch-run-sim-healthy/S_S3/10_diag0.rx.bin.txt|528
+F|dispatch-run-sim-healthy/S_S3/11_cfg0.rx.bin|507
+F|dispatch-run-sim-healthy/S_S3/11_cfg0.rx.bin.txt|500
+F|dispatch-run-sim-healthy/S_S3/12_prof0.rx.bin|101
+F|dispatch-run-sim-healthy/S_S3/12_prof0.rx.bin.txt|94
+F|dispatch-run-sim-healthy/S_S3/13_zero.rx.bin|71
+F|dispatch-run-sim-healthy/S_S3/13_zero.rx.bin.txt|64
+F|dispatch-run-sim-healthy/S_S3/ledger.jsonl|3796
+D|dispatch-run-sim-healthy/S_S4|0
+F|dispatch-run-sim-healthy/S_S4/02_rest_before_arm.rx.bin|627
+F|dispatch-run-sim-healthy/S_S4/02_rest_before_arm.rx.bin.txt|620
+F|dispatch-run-sim-healthy/S_S4/03_dir0.rx.bin|59
+F|dispatch-run-sim-healthy/S_S4/03_dir0.rx.bin.txt|52
+F|dispatch-run-sim-healthy/S_S4/04_arm.rx.bin|86
+F|dispatch-run-sim-healthy/S_S4/04_arm.rx.bin.txt|79
+F|dispatch-run-sim-healthy/S_S4/05_target.rx.bin|34
+F|dispatch-run-sim-healthy/S_S4/05_target.rx.bin.txt|27
+F|dispatch-run-sim-healthy/S_S4/06_start.rx.bin|7
+F|dispatch-run-sim-healthy/S_S4/06_start.rx.bin.txt|0
+F|dispatch-run-sim-healthy/S_S4/07_running_proof.rx.bin|573
+F|dispatch-run-sim-healthy/S_S4/07_running_proof.rx.bin.txt|566
+F|dispatch-run-sim-healthy/S_S4/08_learn.rx.bin|136
+F|dispatch-run-sim-healthy/S_S4/08_learn.rx.bin.txt|129
+F|dispatch-run-sim-healthy/S_S4/09_cruise_observe.rx.bin|7
+F|dispatch-run-sim-healthy/S_S4/09_cruise_observe.rx.bin.txt|0
+F|dispatch-run-sim-healthy/S_S4/cleanup_motor_disarm.bin|130
+F|dispatch-run-sim-healthy/S_S4/cleanup_motor_status.bin|627
+F|dispatch-run-sim-healthy/S_S4/cleanup_motor_stop.bin|126
+F|dispatch-run-sim-healthy/S_S4/ledger.jsonl|3722
+D|dispatch-run-sim-healthy/S_S5|0
+F|dispatch-run-sim-healthy/S_S5/01_rest_before_tier.rx.bin|627
+F|dispatch-run-sim-healthy/S_S5/01_rest_before_tier.rx.bin.txt|620
+F|dispatch-run-sim-healthy/S_S5/02_diag_before_tier.rx.bin|535
+F|dispatch-run-sim-healthy/S_S5/02_diag_before_tier.rx.bin.txt|528
+F|dispatch-run-sim-healthy/S_S5/03_tier.rx.bin|149
+F|dispatch-run-sim-healthy/S_S5/03_tier.rx.bin.txt|142
+F|dispatch-run-sim-healthy/S_S5/04_commit.rx.bin|127
+F|dispatch-run-sim-healthy/S_S5/04_commit.rx.bin.txt|120
+F|dispatch-run-sim-healthy/S_S5/05_prof_after_commit.rx.bin|491
+F|dispatch-run-sim-healthy/S_S5/05_prof_after_commit.rx.bin.txt|484
+F|dispatch-run-sim-healthy/S_S5/06_save.rx.bin|21
+F|dispatch-run-sim-healthy/S_S5/06_save.rx.bin.txt|14
+F|dispatch-run-sim-healthy/S_S5/ledger.jsonl|1893
+D|dispatch-run-sim-healthy/S_S7|0
+F|dispatch-run-sim-healthy/S_S7/01_sys2.rx.bin|987
+F|dispatch-run-sim-healthy/S_S7/01_sys2.rx.bin.txt|980
+F|dispatch-run-sim-healthy/S_S7/02_cfg2boot.rx.bin|987
+F|dispatch-run-sim-healthy/S_S7/02_cfg2boot.rx.bin.txt|980
+F|dispatch-run-sim-healthy/S_S7/03_cfgapply2.rx.bin|131
+F|dispatch-run-sim-healthy/S_S7/03_cfgapply2.rx.bin.txt|124
+F|dispatch-run-sim-healthy/S_S7/04_cfg2after.rx.bin|961
+F|dispatch-run-sim-healthy/S_S7/04_cfg2after.rx.bin.txt|954
+F|dispatch-run-sim-healthy/S_S7/05_pol2.rx.bin|876
+F|dispatch-run-sim-healthy/S_S7/05_pol2.rx.bin.txt|869
+F|dispatch-run-sim-healthy/S_S7/06_irq2.rx.bin|234
+F|dispatch-run-sim-healthy/S_S7/06_irq2.rx.bin.txt|227
+F|dispatch-run-sim-healthy/S_S7/07_irq2after.rx.bin|543
+F|dispatch-run-sim-healthy/S_S7/07_irq2after.rx.bin.txt|536
+F|dispatch-run-sim-healthy/S_S7/08_cfg2.rx.bin|507
+F|dispatch-run-sim-healthy/S_S7/08_cfg2.rx.bin.txt|500
+F|dispatch-run-sim-healthy/S_S7/09_prof_after_reboot.rx.bin|491
+F|dispatch-run-sim-healthy/S_S7/09_prof_after_reboot.rx.bin.txt|484
+F|dispatch-run-sim-healthy/S_S7/10_rest2.rx.bin|627
+F|dispatch-run-sim-healthy/S_S7/10_rest2.rx.bin.txt|620
+F|dispatch-run-sim-healthy/S_S7/ledger.jsonl|3034
+D|dispatch-run-sim-healthy/S_S8|0
+F|dispatch-run-sim-healthy/S_S8/02_diag_before_arm.rx.bin|535
+F|dispatch-run-sim-healthy/S_S8/02_diag_before_arm.rx.bin.txt|528
+F|dispatch-run-sim-healthy/S_S8/03_bb_before.rx.bin|309
+F|dispatch-run-sim-healthy/S_S8/03_bb_before.rx.bin.txt|302
+F|dispatch-run-sim-healthy/S_S8/04_rest_before_arm.rx.bin|627
+F|dispatch-run-sim-healthy/S_S8/04_rest_before_arm.rx.bin.txt|620
+F|dispatch-run-sim-healthy/S_S8/05_arm_rel.rx.bin|34
+F|dispatch-run-sim-healthy/S_S8/05_arm_rel.rx.bin.txt|27
+F|dispatch-run-sim-healthy/S_S8/06_arm.rx.bin|86
+F|dispatch-run-sim-healthy/S_S8/06_arm.rx.bin.txt|79
+F|dispatch-run-sim-healthy/S_S8/07_target.rx.bin|34
+F|dispatch-run-sim-healthy/S_S8/07_target.rx.bin.txt|27
+F|dispatch-run-sim-healthy/S_S8/08_start.rx.bin|7
+F|dispatch-run-sim-healthy/S_S8/08_start.rx.bin.txt|0
+F|dispatch-run-sim-healthy/S_S8/09_running_proof.rx.bin|573
+F|dispatch-run-sim-healthy/S_S8/09_running_proof.rx.bin.txt|566
+F|dispatch-run-sim-healthy/S_S8/10_trip_window.rx.bin|7
+F|dispatch-run-sim-healthy/S_S8/10_trip_window.rx.bin.txt|0
+F|dispatch-run-sim-healthy/S_S8/cleanup_motor_disarm.bin|130
+F|dispatch-run-sim-healthy/S_S8/cleanup_motor_status.bin|627
+F|dispatch-run-sim-healthy/S_S8/cleanup_motor_stop.bin|126
+F|dispatch-run-sim-healthy/S_S8/ledger.jsonl|3832
+D|dispatch-run-sim-no_trigger|0
+F|dispatch-run-sim-no_trigger/dispatch_ledger.jsonl|3002
+D|dispatch-run-sim-no_trigger/S_S3|0
+F|dispatch-run-sim-no_trigger/S_S3/01_sysboot.rx.bin|987
+F|dispatch-run-sim-no_trigger/S_S3/01_sysboot.rx.bin.txt|980
+F|dispatch-run-sim-no_trigger/S_S3/03_cfgboot.rx.bin|987
+F|dispatch-run-sim-no_trigger/S_S3/03_cfgboot.rx.bin.txt|980
+F|dispatch-run-sim-no_trigger/S_S3/04_cfgapply.rx.bin|131
+F|dispatch-run-sim-no_trigger/S_S3/04_cfgapply.rx.bin.txt|124
+F|dispatch-run-sim-no_trigger/S_S3/05_cfgafter.rx.bin|961
+F|dispatch-run-sim-no_trigger/S_S3/05_cfgafter.rx.bin.txt|954
+F|dispatch-run-sim-no_trigger/S_S3/06_pol.rx.bin|876
+F|dispatch-run-sim-no_trigger/S_S3/06_pol.rx.bin.txt|869
+F|dispatch-run-sim-no_trigger/S_S3/07_irq.rx.bin|234
+F|dispatch-run-sim-no_trigger/S_S3/07_irq.rx.bin.txt|227
+F|dispatch-run-sim-no_trigger/S_S3/08_irqafter.rx.bin|543
+F|dispatch-run-sim-no_trigger/S_S3/08_irqafter.rx.bin.txt|536
+F|dispatch-run-sim-no_trigger/S_S3/09_rest0.rx.bin|627
+F|dispatch-run-sim-no_trigger/S_S3/09_rest0.rx.bin.txt|620
+F|dispatch-run-sim-no_trigger/S_S3/10_diag0.rx.bin|535
+F|dispatch-run-sim-no_trigger/S_S3/10_diag0.rx.bin.txt|528
+F|dispatch-run-sim-no_trigger/S_S3/11_cfg0.rx.bin|507
+F|dispatch-run-sim-no_trigger/S_S3/11_cfg0.rx.bin.txt|500
+F|dispatch-run-sim-no_trigger/S_S3/12_prof0.rx.bin|101
+F|dispatch-run-sim-no_trigger/S_S3/12_prof0.rx.bin.txt|94
+F|dispatch-run-sim-no_trigger/S_S3/13_zero.rx.bin|71
+F|dispatch-run-sim-no_trigger/S_S3/13_zero.rx.bin.txt|64
+F|dispatch-run-sim-no_trigger/S_S3/ledger.jsonl|3796
+D|dispatch-run-sim-no_trigger/S_S4|0
+F|dispatch-run-sim-no_trigger/S_S4/02_rest_before_arm.rx.bin|627
+F|dispatch-run-sim-no_trigger/S_S4/02_rest_before_arm.rx.bin.txt|620
+F|dispatch-run-sim-no_trigger/S_S4/03_dir0.rx.bin|59
+F|dispatch-run-sim-no_trigger/S_S4/03_dir0.rx.bin.txt|52
+F|dispatch-run-sim-no_trigger/S_S4/04_arm.rx.bin|86
+F|dispatch-run-sim-no_trigger/S_S4/04_arm.rx.bin.txt|79
+F|dispatch-run-sim-no_trigger/S_S4/05_target.rx.bin|34
+F|dispatch-run-sim-no_trigger/S_S4/05_target.rx.bin.txt|27
+F|dispatch-run-sim-no_trigger/S_S4/06_start.rx.bin|7
+F|dispatch-run-sim-no_trigger/S_S4/06_start.rx.bin.txt|0
+F|dispatch-run-sim-no_trigger/S_S4/07_running_proof.rx.bin|573
+F|dispatch-run-sim-no_trigger/S_S4/07_running_proof.rx.bin.txt|566
+F|dispatch-run-sim-no_trigger/S_S4/08_learn.rx.bin|136
+F|dispatch-run-sim-no_trigger/S_S4/08_learn.rx.bin.txt|129
+F|dispatch-run-sim-no_trigger/S_S4/09_cruise_observe.rx.bin|7
+F|dispatch-run-sim-no_trigger/S_S4/09_cruise_observe.rx.bin.txt|0
+F|dispatch-run-sim-no_trigger/S_S4/cleanup_motor_disarm.bin|130
+F|dispatch-run-sim-no_trigger/S_S4/cleanup_motor_status.bin|627
+F|dispatch-run-sim-no_trigger/S_S4/cleanup_motor_stop.bin|126
+F|dispatch-run-sim-no_trigger/S_S4/ledger.jsonl|3722
+D|dispatch-run-sim-no_trigger/S_S5|0
+F|dispatch-run-sim-no_trigger/S_S5/01_rest_before_tier.rx.bin|627
+F|dispatch-run-sim-no_trigger/S_S5/01_rest_before_tier.rx.bin.txt|620
+F|dispatch-run-sim-no_trigger/S_S5/02_diag_before_tier.rx.bin|535
+F|dispatch-run-sim-no_trigger/S_S5/02_diag_before_tier.rx.bin.txt|528
+F|dispatch-run-sim-no_trigger/S_S5/03_tier.rx.bin|149
+F|dispatch-run-sim-no_trigger/S_S5/03_tier.rx.bin.txt|142
+F|dispatch-run-sim-no_trigger/S_S5/04_commit.rx.bin|127
+F|dispatch-run-sim-no_trigger/S_S5/04_commit.rx.bin.txt|120
+F|dispatch-run-sim-no_trigger/S_S5/05_prof_after_commit.rx.bin|491
+F|dispatch-run-sim-no_trigger/S_S5/05_prof_after_commit.rx.bin.txt|484
+F|dispatch-run-sim-no_trigger/S_S5/06_save.rx.bin|21
+F|dispatch-run-sim-no_trigger/S_S5/06_save.rx.bin.txt|14
+F|dispatch-run-sim-no_trigger/S_S5/ledger.jsonl|1893
+D|dispatch-run-sim-no_trigger/S_S7|0
+F|dispatch-run-sim-no_trigger/S_S7/01_sys2.rx.bin|987
+F|dispatch-run-sim-no_trigger/S_S7/01_sys2.rx.bin.txt|980
+F|dispatch-run-sim-no_trigger/S_S7/02_cfg2boot.rx.bin|987
+F|dispatch-run-sim-no_trigger/S_S7/02_cfg2boot.rx.bin.txt|980
+F|dispatch-run-sim-no_trigger/S_S7/03_cfgapply2.rx.bin|131
+F|dispatch-run-sim-no_trigger/S_S7/03_cfgapply2.rx.bin.txt|124
+F|dispatch-run-sim-no_trigger/S_S7/04_cfg2after.rx.bin|961
+F|dispatch-run-sim-no_trigger/S_S7/04_cfg2after.rx.bin.txt|954
+F|dispatch-run-sim-no_trigger/S_S7/05_pol2.rx.bin|876
+F|dispatch-run-sim-no_trigger/S_S7/05_pol2.rx.bin.txt|869
+F|dispatch-run-sim-no_trigger/S_S7/06_irq2.rx.bin|234
+F|dispatch-run-sim-no_trigger/S_S7/06_irq2.rx.bin.txt|227
+F|dispatch-run-sim-no_trigger/S_S7/07_irq2after.rx.bin|543
+F|dispatch-run-sim-no_trigger/S_S7/07_irq2after.rx.bin.txt|536
+F|dispatch-run-sim-no_trigger/S_S7/08_cfg2.rx.bin|507
+F|dispatch-run-sim-no_trigger/S_S7/08_cfg2.rx.bin.txt|500
+F|dispatch-run-sim-no_trigger/S_S7/09_prof_after_reboot.rx.bin|491
+F|dispatch-run-sim-no_trigger/S_S7/09_prof_after_reboot.rx.bin.txt|484
+F|dispatch-run-sim-no_trigger/S_S7/10_rest2.rx.bin|627
+F|dispatch-run-sim-no_trigger/S_S7/10_rest2.rx.bin.txt|620
+F|dispatch-run-sim-no_trigger/S_S7/ledger.jsonl|3034
+D|dispatch-run-sim-no_trigger/S_S8|0
+F|dispatch-run-sim-no_trigger/S_S8/02_diag_before_arm.rx.bin|535
+F|dispatch-run-sim-no_trigger/S_S8/02_diag_before_arm.rx.bin.txt|528
+F|dispatch-run-sim-no_trigger/S_S8/03_bb_before.rx.bin|309
+F|dispatch-run-sim-no_trigger/S_S8/03_bb_before.rx.bin.txt|302
+F|dispatch-run-sim-no_trigger/S_S8/04_rest_before_arm.rx.bin|627
+F|dispatch-run-sim-no_trigger/S_S8/04_rest_before_arm.rx.bin.txt|620
+F|dispatch-run-sim-no_trigger/S_S8/05_arm_rel.rx.bin|34
+F|dispatch-run-sim-no_trigger/S_S8/05_arm_rel.rx.bin.txt|27
+F|dispatch-run-sim-no_trigger/S_S8/06_arm.rx.bin|86
+F|dispatch-run-sim-no_trigger/S_S8/06_arm.rx.bin.txt|79
+F|dispatch-run-sim-no_trigger/S_S8/07_target.rx.bin|34
+F|dispatch-run-sim-no_trigger/S_S8/07_target.rx.bin.txt|27
+F|dispatch-run-sim-no_trigger/S_S8/08_start.rx.bin|7
+F|dispatch-run-sim-no_trigger/S_S8/08_start.rx.bin.txt|0
+F|dispatch-run-sim-no_trigger/S_S8/09_running_proof.rx.bin|573
+F|dispatch-run-sim-no_trigger/S_S8/09_running_proof.rx.bin.txt|566
+F|dispatch-run-sim-no_trigger/S_S8/10_trip_window.rx.bin|7
+F|dispatch-run-sim-no_trigger/S_S8/10_trip_window.rx.bin.txt|0
+F|dispatch-run-sim-no_trigger/S_S8/cleanup_motor_disarm.bin|130
+F|dispatch-run-sim-no_trigger/S_S8/cleanup_motor_status.bin|627
+F|dispatch-run-sim-no_trigger/S_S8/cleanup_motor_stop.bin|126
+F|dispatch-run-sim-no_trigger/S_S8/ledger.jsonl|3832
+D|dispatch-run-sim-trip|0
+F|dispatch-run-sim-trip/dispatch_ledger.jsonl|2662
+D|dispatch-run-sim-trip/S_S10|0
+F|dispatch-run-sim-trip/S_S10/01_still_latched.rx.bin|628
+F|dispatch-run-sim-trip/S_S10/01_still_latched.rx.bin.txt|621
+F|dispatch-run-sim-trip/S_S10/02_arm_refused.rx.bin|101
+F|dispatch-run-sim-trip/S_S10/02_arm_refused.rx.bin.txt|94
+F|dispatch-run-sim-trip/S_S10/cleanup_motor_disarm.bin|130
+F|dispatch-run-sim-trip/S_S10/cleanup_motor_status.bin|627
+F|dispatch-run-sim-trip/S_S10/cleanup_motor_stop.bin|126
+F|dispatch-run-sim-trip/S_S10/ledger.jsonl|2005
+D|dispatch-run-sim-trip/S_S11|0
+F|dispatch-run-sim-trip/S_S11/02_latched_before_clear.rx.bin|466
+F|dispatch-run-sim-trip/S_S11/02_latched_before_clear.rx.bin.txt|459
+F|dispatch-run-sim-trip/S_S11/03_manual_clear.rx.bin|72
+F|dispatch-run-sim-trip/S_S11/03_manual_clear.rx.bin.txt|65
+F|dispatch-run-sim-trip/S_S11/04_selftest_after.rx.bin|90
+F|dispatch-run-sim-trip/S_S11/04_selftest_after.rx.bin.txt|83
+F|dispatch-run-sim-trip/S_S11/05_ready_after.rx.bin|466
+F|dispatch-run-sim-trip/S_S11/05_ready_after.rx.bin.txt|459
+F|dispatch-run-sim-trip/S_S11/06_still_disabled_after_recovery.rx.bin|627
+F|dispatch-run-sim-trip/S_S11/06_still_disabled_after_recovery.rx.bin.txt|620
+F|dispatch-run-sim-trip/S_S11/ledger.jsonl|1648
+D|dispatch-run-sim-trip/S_S3|0
+F|dispatch-run-sim-trip/S_S3/01_sysboot.rx.bin|987
+F|dispatch-run-sim-trip/S_S3/01_sysboot.rx.bin.txt|980
+F|dispatch-run-sim-trip/S_S3/03_cfgboot.rx.bin|987
+F|dispatch-run-sim-trip/S_S3/03_cfgboot.rx.bin.txt|980
+F|dispatch-run-sim-trip/S_S3/04_cfgapply.rx.bin|131
+F|dispatch-run-sim-trip/S_S3/04_cfgapply.rx.bin.txt|124
+F|dispatch-run-sim-trip/S_S3/05_cfgafter.rx.bin|961
+F|dispatch-run-sim-trip/S_S3/05_cfgafter.rx.bin.txt|954
+F|dispatch-run-sim-trip/S_S3/06_pol.rx.bin|876
+F|dispatch-run-sim-trip/S_S3/06_pol.rx.bin.txt|869
+F|dispatch-run-sim-trip/S_S3/07_irq.rx.bin|234
+F|dispatch-run-sim-trip/S_S3/07_irq.rx.bin.txt|227
+F|dispatch-run-sim-trip/S_S3/08_irqafter.rx.bin|543
+F|dispatch-run-sim-trip/S_S3/08_irqafter.rx.bin.txt|536
+F|dispatch-run-sim-trip/S_S3/09_rest0.rx.bin|627
+F|dispatch-run-sim-trip/S_S3/09_rest0.rx.bin.txt|620
+F|dispatch-run-sim-trip/S_S3/10_diag0.rx.bin|408
+F|dispatch-run-sim-trip/S_S3/10_diag0.rx.bin.txt|401
+F|dispatch-run-sim-trip/S_S3/11_cfg0.rx.bin|507
+F|dispatch-run-sim-trip/S_S3/11_cfg0.rx.bin.txt|500
+F|dispatch-run-sim-trip/S_S3/12_prof0.rx.bin|101
+F|dispatch-run-sim-trip/S_S3/12_prof0.rx.bin.txt|94
+F|dispatch-run-sim-trip/S_S3/13_zero.rx.bin|71
+F|dispatch-run-sim-trip/S_S3/13_zero.rx.bin.txt|64
+F|dispatch-run-sim-trip/S_S3/ledger.jsonl|3786
+D|dispatch-run-sim-trip/S_S4|0
+F|dispatch-run-sim-trip/S_S4/02_rest_before_arm.rx.bin|627
+F|dispatch-run-sim-trip/S_S4/02_rest_before_arm.rx.bin.txt|620
+F|dispatch-run-sim-trip/S_S4/03_dir0.rx.bin|59
+F|dispatch-run-sim-trip/S_S4/03_dir0.rx.bin.txt|52
+F|dispatch-run-sim-trip/S_S4/04_arm.rx.bin|86
+F|dispatch-run-sim-trip/S_S4/04_arm.rx.bin.txt|79
+F|dispatch-run-sim-trip/S_S4/05_target.rx.bin|34
+F|dispatch-run-sim-trip/S_S4/05_target.rx.bin.txt|27
+F|dispatch-run-sim-trip/S_S4/06_start.rx.bin|7
+F|dispatch-run-sim-trip/S_S4/06_start.rx.bin.txt|0
+F|dispatch-run-sim-trip/S_S4/07_running_proof.rx.bin|573
+F|dispatch-run-sim-trip/S_S4/07_running_proof.rx.bin.txt|566
+F|dispatch-run-sim-trip/S_S4/08_learn.rx.bin|136
+F|dispatch-run-sim-trip/S_S4/08_learn.rx.bin.txt|129
+F|dispatch-run-sim-trip/S_S4/09_cruise_observe.rx.bin|224
+F|dispatch-run-sim-trip/S_S4/09_cruise_observe.rx.bin.txt|217
+F|dispatch-run-sim-trip/S_S4/cleanup_motor_disarm.bin|130
+F|dispatch-run-sim-trip/S_S4/cleanup_motor_status.bin|627
+F|dispatch-run-sim-trip/S_S4/cleanup_motor_stop.bin|126
+F|dispatch-run-sim-trip/S_S4/ledger.jsonl|3683
+D|dispatch-run-sim-trip/S_S5|0
+F|dispatch-run-sim-trip/S_S5/01_rest_before_tier.rx.bin|627
+F|dispatch-run-sim-trip/S_S5/01_rest_before_tier.rx.bin.txt|620
+F|dispatch-run-sim-trip/S_S5/02_diag_before_tier.rx.bin|408
+F|dispatch-run-sim-trip/S_S5/02_diag_before_tier.rx.bin.txt|401
+F|dispatch-run-sim-trip/S_S5/03_tier.rx.bin|149
+F|dispatch-run-sim-trip/S_S5/03_tier.rx.bin.txt|142
+F|dispatch-run-sim-trip/S_S5/04_commit.rx.bin|127
+F|dispatch-run-sim-trip/S_S5/04_commit.rx.bin.txt|120
+F|dispatch-run-sim-trip/S_S5/05_prof_after_commit.rx.bin|491
+F|dispatch-run-sim-trip/S_S5/05_prof_after_commit.rx.bin.txt|484
+F|dispatch-run-sim-trip/S_S5/06_save.rx.bin|21
+F|dispatch-run-sim-trip/S_S5/06_save.rx.bin.txt|14
+F|dispatch-run-sim-trip/S_S5/ledger.jsonl|1906
+D|dispatch-run-sim-trip/S_S7|0
+F|dispatch-run-sim-trip/S_S7/01_sys2.rx.bin|987
+F|dispatch-run-sim-trip/S_S7/01_sys2.rx.bin.txt|980
+F|dispatch-run-sim-trip/S_S7/02_cfg2boot.rx.bin|987
+F|dispatch-run-sim-trip/S_S7/02_cfg2boot.rx.bin.txt|980
+F|dispatch-run-sim-trip/S_S7/03_cfgapply2.rx.bin|131
+F|dispatch-run-sim-trip/S_S7/03_cfgapply2.rx.bin.txt|124
+F|dispatch-run-sim-trip/S_S7/04_cfg2after.rx.bin|961
+F|dispatch-run-sim-trip/S_S7/04_cfg2after.rx.bin.txt|954
+F|dispatch-run-sim-trip/S_S7/05_pol2.rx.bin|876
+F|dispatch-run-sim-trip/S_S7/05_pol2.rx.bin.txt|869
+F|dispatch-run-sim-trip/S_S7/06_irq2.rx.bin|234
+F|dispatch-run-sim-trip/S_S7/06_irq2.rx.bin.txt|227
+F|dispatch-run-sim-trip/S_S7/07_irq2after.rx.bin|543
+F|dispatch-run-sim-trip/S_S7/07_irq2after.rx.bin.txt|536
+F|dispatch-run-sim-trip/S_S7/08_cfg2.rx.bin|507
+F|dispatch-run-sim-trip/S_S7/08_cfg2.rx.bin.txt|500
+F|dispatch-run-sim-trip/S_S7/09_prof_after_reboot.rx.bin|491
+F|dispatch-run-sim-trip/S_S7/09_prof_after_reboot.rx.bin.txt|484
+F|dispatch-run-sim-trip/S_S7/10_rest2.rx.bin|627
+F|dispatch-run-sim-trip/S_S7/10_rest2.rx.bin.txt|620
+F|dispatch-run-sim-trip/S_S7/ledger.jsonl|3034
+D|dispatch-run-sim-trip/S_S8|0
+F|dispatch-run-sim-trip/S_S8/02_diag_before_arm.rx.bin|408
+F|dispatch-run-sim-trip/S_S8/02_diag_before_arm.rx.bin.txt|401
+F|dispatch-run-sim-trip/S_S8/03_bb_before.rx.bin|309
+F|dispatch-run-sim-trip/S_S8/03_bb_before.rx.bin.txt|302
+F|dispatch-run-sim-trip/S_S8/04_rest_before_arm.rx.bin|627
+F|dispatch-run-sim-trip/S_S8/04_rest_before_arm.rx.bin.txt|620
+F|dispatch-run-sim-trip/S_S8/05_arm_rel.rx.bin|34
+F|dispatch-run-sim-trip/S_S8/05_arm_rel.rx.bin.txt|27
+F|dispatch-run-sim-trip/S_S8/06_arm.rx.bin|86
+F|dispatch-run-sim-trip/S_S8/06_arm.rx.bin.txt|79
+F|dispatch-run-sim-trip/S_S8/07_target.rx.bin|34
+F|dispatch-run-sim-trip/S_S8/07_target.rx.bin.txt|27
+F|dispatch-run-sim-trip/S_S8/08_start.rx.bin|7
+F|dispatch-run-sim-trip/S_S8/08_start.rx.bin.txt|0
+F|dispatch-run-sim-trip/S_S8/09_running_proof.rx.bin|573
+F|dispatch-run-sim-trip/S_S8/09_running_proof.rx.bin.txt|566
+F|dispatch-run-sim-trip/S_S8/10_trip_window.rx.bin|224
+F|dispatch-run-sim-trip/S_S8/10_trip_window.rx.bin.txt|217
+F|dispatch-run-sim-trip/S_S8/cleanup_motor_disarm.bin|130
+F|dispatch-run-sim-trip/S_S8/cleanup_motor_status.bin|627
+F|dispatch-run-sim-trip/S_S8/cleanup_motor_stop.bin|126
+F|dispatch-run-sim-trip/S_S8/ledger.jsonl|3817
+D|dispatch-run-sim-trip/S_S9|0
+F|dispatch-run-sim-trip/S_S9/01_latch.rx.bin|391
+F|dispatch-run-sim-trip/S_S9/01_latch.rx.bin.txt|384
+F|dispatch-run-sim-trip/S_S9/02_bb_after.rx.bin|311
+F|dispatch-run-sim-trip/S_S9/02_bb_after.rx.bin.txt|304
+F|dispatch-run-sim-trip/S_S9/03_newlog.rx.bin|93
+F|dispatch-run-sim-trip/S_S9/03_newlog.rx.bin.txt|86
+F|dispatch-run-sim-trip/S_S9/04_latched_disable_proof.rx.bin|628
+F|dispatch-run-sim-trip/S_S9/04_latched_disable_proof.rx.bin.txt|621
+F|dispatch-run-sim-trip/S_S9/ledger.jsonl|1218
+F|pyout-20261031T093642Z-19216-01.txt|5291
+F|pyout-20261031T093642Z-19216-01.txt.err|0
+F|pyout-20261031T093642Z-19216-02.txt|6578
+F|pyout-20261031T093642Z-19216-02.txt.err|0
+F|pyout-20261031T093642Z-19216-03.txt|5312
+F|pyout-20261031T093642Z-19216-03.txt.err|0
+F|runfield_summary.json|385

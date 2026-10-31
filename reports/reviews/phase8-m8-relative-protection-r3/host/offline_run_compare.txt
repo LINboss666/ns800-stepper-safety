@@ -1,0 +1,47 @@
+# 交付归档的换源记录与逐运行对照（R3-D）
+
+- 生成方式：python 逐文件读字节 → CR 去掉（统一 LF）→ 把运行号 `20261031THHMMSSZ-<pid>` 替换成 `<TS>` → 比字节。
+  规则可复算，不含人工判断；本文件自身不散列自己。
+- 为什么换源：`host/field_*_console.txt` 原先是把 **PowerShell 进程 stdout 直接重定向**得到的。
+  python 的 stdout 被 `Start-Process -RedirectStandardOutput` 落到文件时按**本机 locale（这台机器 cp936）**编码，
+  脚本再按 UTF-8 读回来 ⇒ 运行目录里带中文的那几行本身就是乱码/替换符，PS stdout 的二次重定向只是把同一份乱码存档
+  （严格 UTF-8 可解码，但里面是 U+FFFD —— 所以"能不能解码"不是判据，"有没有替换符"才是）。
+- 修法两半（都在 `field/M8R3Field.ps1` 里，不在归档侧手改字节）：
+  1. `Invoke-Py` 显式钉 `PYTHONIOENCODING=utf-8`，并拒绝任何含 U+FFFD 的 python 输出（具名 `PYTHON_OUTPUT_NOT_UTF8`）；
+  2. `Say` 逐行缓冲，入口收口时由 .NET 按 UTF-8 写 `transcript_console.txt`；`host/` 的三件控制台改为取它的
+     **字节副本**，不再经过 console codepage。被替换下来的旧归档改名保留（`*_superseded-cp936capture.txt`），不删。
+- 对照结论（下面逐行给出）：缺陷原件与权威运行之间，只有 python 派生的那几件（console_*/pyout-*，即编码链
+  修好前后）与 `neg-stagemutate/rows.json`（本轮补了 `_provenance*` 元数据）不同，其余逐文件字节相等；
+  两次中间 clean 运行与权威 clean 运行之间，RunField **344/344 全等**，SelfTest 418/420 相等，剩两件是
+  `console_python_selftest.txt` 与 `pyout-07` 里的**夹具临时目录随机名**（每次运行用自己的 Temp 目录），
+  以及只有权威版才有的 `transcript_console.txt`。=> 重跑没有改变任何一条判定。
+ALREADY_IN_PLACE field_Precheck_console.txt
+  NOW field_Precheck_console.txt <- offline/psrun-20261031T104920Z-46908-Precheck/transcript_console.txt bytes=1490 sha256=58ca4ddfd3dd1052 strict_utf8=True U+FFFD=0
+ALREADY_IN_PLACE field_RunField_console.txt
+  NOW field_RunField_console.txt <- offline/psrun-20261031T104924Z-52140-RunField/transcript_console.txt bytes=13177 sha256=760bc7749fabf9e9 strict_utf8=True U+FFFD=0
+ALREADY_IN_PLACE field_SelfTest_console.txt
+  NOW field_SelfTest_console.txt <- offline/psrun-20261031T104907Z-38116-SelfTest/transcript_console.txt bytes=2061 sha256=68e879b2751ddc0f strict_utf8=True U+FFFD=0
+COMPARE SELFTEST_original_vs_final|a=psrun-20261031T093624Z-41784-SelfTest b=psrun-20261031T104907Z-38116-SelfTest|names_common=420 equal_after_runid_and_crlf_normalization=410 differing=10 only_a=0 only_b=1
+   DIFF_OF_SELFTEST_original_vs_final console_python_selftest.txt
+   DIFF_OF_SELFTEST_original_vs_final console_stub_healthy.txt
+   DIFF_OF_SELFTEST_original_vs_final console_stub_no_trigger.txt
+   DIFF_OF_SELFTEST_original_vs_final console_stub_trip.txt
+   DIFF_OF_SELFTEST_original_vs_final neg-stagemutate/rows.json
+   DIFF_OF_SELFTEST_original_vs_final pyout-<TS>-01.txt
+   DIFF_OF_SELFTEST_original_vs_final pyout-<TS>-02.txt
+   DIFF_OF_SELFTEST_original_vs_final pyout-<TS>-03.txt
+COMPARE RUNFIELD_original_vs_final|a=psrun-20261031T093642Z-19216-RunField b=psrun-20261031T104924Z-52140-RunField|names_common=344 equal_after_runid_and_crlf_normalization=338 differing=6 only_a=0 only_b=1
+   DIFF_OF_RUNFIELD_original_vs_final console_run-sim_healthy.txt
+   DIFF_OF_RUNFIELD_original_vs_final console_run-sim_no_trigger.txt
+   DIFF_OF_RUNFIELD_original_vs_final console_run-sim_trip.txt
+   DIFF_OF_RUNFIELD_original_vs_final pyout-<TS>-01.txt
+   DIFF_OF_RUNFIELD_original_vs_final pyout-<TS>-02.txt
+   DIFF_OF_RUNFIELD_original_vs_final pyout-<TS>-03.txt
+COMPARE SELFTEST_intermediate1_vs_final|a=psrun-20261031T103307Z-35912-SelfTest b=psrun-20261031T104907Z-38116-SelfTest|names_common=420 equal_after_runid_and_crlf_normalization=418 differing=2 only_a=0 only_b=1
+   DIFF_OF_SELFTEST_intermediate1_vs_final console_python_selftest.txt
+   DIFF_OF_SELFTEST_intermediate1_vs_final pyout-<TS>-07.txt
+COMPARE RUNFIELD_intermediate1_vs_final|a=psrun-20261031T103331Z-8552-RunField b=psrun-20261031T104924Z-52140-RunField|names_common=344 equal_after_runid_and_crlf_normalization=344 differing=0 only_a=0 only_b=1
+COMPARE SELFTEST_intermediate2_vs_final|a=psrun-20261031T104046Z-18932-SelfTest b=psrun-20261031T104907Z-38116-SelfTest|names_common=420 equal_after_runid_and_crlf_normalization=418 differing=2 only_a=0 only_b=1
+   DIFF_OF_SELFTEST_intermediate2_vs_final console_python_selftest.txt
+   DIFF_OF_SELFTEST_intermediate2_vs_final pyout-<TS>-07.txt
+COMPARE RUNFIELD_intermediate2_vs_final|a=psrun-20261031T104218Z-44972-RunField b=psrun-20261031T104924Z-52140-RunField|names_common=344 equal_after_runid_and_crlf_normalization=344 differing=0 only_a=0 only_b=1

@@ -1,0 +1,11 @@
+[SAFETY] current raw levels of the ACTIVE protection inputs (operator must have MEASURED these):
+[SAFETY] TMC_DIAG     pin=3 raw=0 safe=0 irq=RISING [safe]
+[SAFETY] LIMIT inputs config = DISABLED_BY_CONFIG (SAFETY_LIMIT_INPUTS_ENABLED; OFF => PF.14/PF.15 不解析/不配置/不读/
+[SAFETY] PC.6(ENN_FB) pin=ok raw=HIGH = TMC_ENN feedback (HIGH=disabled side). NOT an e-stop input, no IRQ registered on it
+[SAFETY] NOTE: this is an OPERATOR DECLARATION. Software does NOT
+[SAFETY]       verify wiring. Status stays HARDWARE-PENDING for the
+[SAFETY]       hardware chain; only the polarity flag changes here.
+[SAFETY]       User-confirmed wire names / gate replacement are NOT a
+[SAFETY]       measurement and never set this flag by themselves.
+[SAFETY] input polarity MARKED VALIDATED (operator confirm)
+[SAFETY] protection_ready = NO (IRQ gate still CLOSED)

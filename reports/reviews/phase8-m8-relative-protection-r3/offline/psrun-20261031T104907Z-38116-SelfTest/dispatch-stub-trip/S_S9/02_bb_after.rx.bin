@@ -1,0 +1,6 @@
+[BB] state=0 session=8 written=612 last_err=0 health=OK
+[BB] trigger drops: early(pre-consumption)=0 busy(capturing)=0
+[BB] write drops=0 frames (submit retries exhausted)
+[BB] window: pre_eff=200 post_eff=100 frames (pre_n_latched=1)
+[BB] flash: used=4096 valid=4096 bad=0 acc=8 done=8 fail=0 drop=0
+msh >

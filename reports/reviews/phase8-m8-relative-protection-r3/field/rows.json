@@ -1,0 +1,741 @@
+{
+  "_about": "M8-R3 现场包的响应行表: 执行器在 stub 传输下按 (命令, 档案) 取这里的行装配会话夹具。这里**不发明产品从不打印的形状**: 每一组都在 _provenance 里标明是(1)板上原始采集的逐字行、(2)板上原始采集但被控制台 128 字节缓冲截断后按原文拆分、(3)产品源码 rt_kprintf 字面量的形状 + 本轮计划自己下发的取值(无板级采集时唯一可选), 并在 kind 里区分。第 3 类的任何一行都不构成设备证据。 kind 取值与含义见 `_provenance_legend`(board_capture / board_capture_split / board_capture_composed / source_shape, 以及混合类 board_capture+source_shape 必须**同时**给出采集件与源码锚点); 一组里的每个 `_provenance*`(含 `_provenance_trip` / `_provenance_drift` 等档案级说明)都受 `host/rows_provenance_check.py` 的行级核对。 行选择规则(R3-C 定稿): dispatch 的 --profile 只影响 __watch__(观察窗里有没有真触发), 其余每一步用什么行由步骤自己的 key 决定(motor_status@latched / motor_arm@refused / tmc_config_show@boot / diag_profile show@after_reboot / blackbox_status@after ...); 这样同一个场景档案不会把与本支线无关的命令也换成失败行。",
+  "_provenance_legend": {
+    "board_capture": "逐字取自仓库内已归档的真机串口原始采集(文本或 base64 的 RX 字节), 给出文件与行号",
+    "board_capture_split": "同一采集里被 RT_CONSOLEBUF_SIZE=128 截断、把下一条 rt_kprintf 咬进同一行的那一条: 按**内容**拆成两行(线上字节里两条之间并没有 CR/LF), 截断处保留原样并以 '…' 结尾",
+    "board_capture_composed": "两块**都是**真机逐字采集, 但没有任何一次板上采集在同一份响应里给出判据要的全部字段: 按产品一次打印的顺序把它们并成一份, 并把计划自己下发的取值(频率/方向等)替换进去。逐块给出文件与行号, 并说明哪一段是替换值。成立的是执行器的判据, 不构成板上该状态的证据。",
+    "source_shape": "本轮没有板级采集: 行的**形状**取自产品源码 rt_kprintf 字面量(给出 file:line), 数值取本轮计划下发的目标/本轮已证的板上量级; 只用于验证离线控制流, 不得当成现场结论"
+  },
+  "_board_sources": {
+    "final_console": "reports/reviews/phase8-motor-chain-dev/m4/final_console.txt",
+    "l1_monitor": "reports/reviews/phase8-motor-chain-dev/m4/l1_monitor_console.txt",
+    "s1_speed": "reports/reviews/phase8-motor-chain-dev/m4/s1_speed_console.txt",
+    "dir0b": "reports/reviews/phase8-motor-chain-dev/dir-closure/dir0b_console.txt",
+    "m3_irq": "reports/reviews/phase8-motor-chain-dev/m3/irq.bin.b64 (base64 的 RX 原始字节, 解码后引用行号)",
+    "m3_apply": "reports/reviews/phase8-motor-chain-dev/m3/apply.bin.b64 (同上)",
+    "m2_seq": "reports/reviews/phase8-motor-chain-dev/m2/seq.bin.b64 (同上)",
+    "m5_logstat": "reports/reviews/phase8-motor-m5-fault-log/cp1/fault_attempt/012_flash_logstat.bin",
+    "p0r2_lines": "reports/reviews/phase8-motor-m7-p0-serial-settings-r2/field_business_lines_as_read.txt",
+    "A": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/"
+  },
+  "commands": {
+    "system_status": {
+      "healthy": [
+        "=== SYSTEM STATUS ===",
+        "[Boot]   bootstrap-complete=YES abort-stage=0",
+        "[Safety] state=READY fault=0 irq_gate=OPEN polarity=CONFIRMED protect_ready=YES",
+        "[Safety] gpio_ready=YES thread=OK drv_en_pad_low=YES",
+        "[Safety] request=LOW pad=0 expected_ENN=HIGH ENN_fb=1(resolved) verdict=OK",
+        "[Safety] limit_inputs=DISABLED_BY_CONFIG (HIGH=safe/LOW=trigger when ENABLED); e-stop=hardware-only, no MCU e-stop input",
+        "[Motor] state=0 cur=0 tgt=0 armed=0 drv_en_verified=1 health=OK",
+        "[Motor] arm gate fail mask=0x0 (all gate conditions pass (incl. ENN feedback))",
+        "[TMC]    runtime write gate mask=0x0 (0=运行态条件全通, 编译期门未翻转前仍然一位不写)",
+        "[Sensor] thread=OK",
+        "[TMC]    OK drive_cfg=CONFIGURED",
+        "[IMU]    OK",
+        "[ADC]    DEGRADED cal=THEORETICAL",
+        "[Flash]  storage bring-up=OK (spi1)",
+        "[Storage] OK (ns_params/log)",
+        "[Config] OK valid=YES cal_source=1",
+        "[Diag]   OK verdict=0 mode=MONITOR_ONLY",
+        "[Blackbox] OK",
+        "[UI]     led/buzzer output=SAFE-OFF (polarity hardware-pending)"
+      ],
+      "_provenance": {
+        "kind": "board_capture",
+        "file": "reports/reviews/phase8-motor-chain-dev/m4/final_console.txt",
+        "lines": "16-34"
+      }
+    },
+    "safety_status": {
+      "healthy": [
+        "[SAFETY] ready=YES first_err=0",
+        "[SAFETY] MCU_DRV_ENABLE = 0 (禁止(安全))",
+        "[SAFETY] DRV_ENABLE last write+readback verified = 0 (-1 = never verified)",
+        "[SAFETY] ENN_FEEDBACK(PC.6 = 板上 TMC_ENN) raw=1 resolved=YES [只读输入, 非急停感测; HIGH=禁能侧, LOW=未施加",
+        "[SAFETY] request=DISABLE(LOW) pad=0 expected_FB=HIGH FB=1 -> verdict=OK",
+        "[SAFETY] LIMIT inputs = DISABLED_BY_CONFIG (限位实现保留, 不解析/不配置/不读/不注册 IRQ)"
+      ],
+      "_provenance": {
+        "kind": "board_capture_split",
+        "file": "reports/reviews/phase8-motor-chain-dev/m3/irq.bin.b64",
+        "lines": "100-104 (解码后)",
+        "note": "第 4/5 行在原始字节里是同一条被 128 字节截断的连续流(EN_FEEDBACK 行尾被截, 紧接 request= 行头), 按内容拆分保留截断处; 拆出的 request 行与 m4/final_console.txt:65 完全一致"
+      }
+    },
+    "safety_irq_status": {
+      "healthy": [
+        "[SAFETY] irq gate   = OPEN (EXTI registered)",
+        "[SAFETY] polarity   = operator CONFIRMED (HARDWARE-PENDING unless CONFIRMed)",
+        "[SAFETY] gpio_ready = YES",
+        "[SAFETY] thread     = running health=OK",
+        "[SAFETY] protection_ready = YES",
+        "[SAFETY] TMC_DIAG     pin=3 raw=0 safe=0 irq=RISING [safe]",
+        "[SAFETY] LIMIT inputs config = DISABLED_BY_CONFIG (SAFETY_LIMIT_INPUTS_ENABLED; OFF => PF.14/PF.15 不解析/不配置/不读/",
+        "[SAFETY] PC.6(ENN_FB) pin=ok raw=HIGH = TMC_ENN feedback (HIGH=disabled side). NOT an e-stop input, no IRQ registered on it"
+      ],
+      "_provenance": {
+        "kind": "board_capture_split",
+        "file": "reports/reviews/phase8-motor-chain-dev/m3/irq.bin.b64",
+        "lines": "126-132 (解码后)",
+        "note": "第 7/8 行同样是一条 128 字节截断的连续流; 未改文案"
+      },
+      "boot_gate_closed": [
+        "[SAFETY] irq gate   = CLOSED (polled only)",
+        "[SAFETY] polarity   = NOT confirmed (operator must have MEASURED these):",
+        "[SAFETY] gpio_ready = YES",
+        "[SAFETY] thread     = running health=OK",
+        "[SAFETY] protection_ready = NO (IRQ gate still CLOSED)",
+        "[SAFETY] TMC_DIAG     pin=3 raw=0 safe=0 irq=RISING [safe]"
+      ],
+      "_provenance_boot_gate_closed": {
+        "kind": "source_shape",
+        "file": "applications/safety_thread.c:385-392 (safety_irq_status 的 irq gate / polarity / protection_ready 三条打印)",
+        "note": "新烧录/重启后的门未开状态: 每行的形状与 token 取自源码(safety_thread.c 的 irq gate/polarity/protection_ready 三条), 数值取本轮已证的板上实值(TMC_DIAG pin=3 raw=0 safe=0)。无该状态的板级整块采集 => 只用于离线控制流。"
+      }
+    },
+    "safety_polarity_confirm CONFIRM": {
+      "healthy": [
+        "[SAFETY] current raw levels of the ACTIVE protection inputs (operator must have MEASURED these):",
+        "[SAFETY] TMC_DIAG     pin=3 raw=0 safe=0 irq=RISING [safe]",
+        "[SAFETY] LIMIT inputs config = DISABLED_BY_CONFIG (SAFETY_LIMIT_INPUTS_ENABLED; OFF => PF.14/PF.15 不解析/不配置/不读/",
+        "[SAFETY] PC.6(ENN_FB) pin=ok raw=HIGH = TMC_ENN feedback (HIGH=disabled side). NOT an e-stop input, no IRQ registered on it",
+        "[SAFETY] NOTE: this is an OPERATOR DECLARATION. Software does NOT",
+        "[SAFETY]       verify wiring. Status stays HARDWARE-PENDING for the",
+        "[SAFETY]       hardware chain; only the polarity flag changes here.",
+        "[SAFETY]       User-confirmed wire names / gate replacement are NOT a",
+        "[SAFETY]       measurement and never set this flag by themselves.",
+        "[SAFETY] input polarity MARKED VALIDATED (operator confirm)",
+        "[SAFETY] protection_ready = NO (IRQ gate still CLOSED)"
+      ],
+      "_provenance": {
+        "kind": "board_capture_split",
+        "file": "reports/reviews/phase8-motor-chain-dev/m3/irq.bin.b64",
+        "lines": "110-119 (解码后)",
+        "note": "第 3/4 行是 128 字节截断的连续流; 其余逐字"
+      }
+    },
+    "safety_irq_enable": {
+      "healthy": [
+        "[SAFETY] IRQ gate OPEN: 1 active protection input(s) registered (limits: falling edge / HIGH=safe; diag: rising)",
+        "[SAFETY] PC.6 = TMC_ENN feedback input, NOT an IRQ source; board e-stop cuts the chain in hardware, never via MCU"
+      ],
+      "_provenance": {
+        "kind": "board_capture",
+        "file": "reports/reviews/phase8-motor-chain-dev/m3/irq.bin.b64",
+        "lines": "122-123 (解码后)"
+      }
+    },
+    "tmc_config_show": {
+      "healthy": [
+        "[TMC-CFG] state=CONFIGURED fail_reg=0x00 last_err=0 from_integrity=0 snapshot_valid=1",
+        "[TMC-CFG] hw_write_gate(compile)=OPEN runtime_gate_mask=0x0",
+        "[TMC-CFG] !! 运行态门禁全通, 但编译期门未翻转前仍然一位不写",
+        "[TMC-CFG] planned irun=20 ihold=8 dly=4",
+        "[TMC-CFG] planned tpd=8 vsense=1 mstep_sel=0 mres=0",
+        "[TMC-CFG] target GCONF=00000141 CHOPCONF=15030053",
+        "[TMC-CFG] target IHOLD_IRUN=00041408 TPOWERDOWN(0x11)=08",
+        "[TMC-CFG] theory V_FS=180mV Rsense=110mO Rds=20mO",
+        "[TMC-CFG] theory VREF=1270mV",
+        "[TMC-CFG] theory_current run=326 mA RMS hold=139 mA RMS",
+        "[TMC-CFG] note: theoretical, NOT measured; motor rating not confirmed",
+        "[TMC-CFG] note: VREF unverified in firmware; RSENSE from listing only",
+        "[TMC-CFG] applied snapshot: GCONF=00000141 CHOPCONF=15030053",
+        "[TMC-CFG] live GCONF=00000141 i_scale_analog=1 internal_Rsense=0 en_spreadCycle=0 pdn_disable=1 mstep_reg_select=0",
+        "[TMC-CFG] live CHOPCONF=15030053 TOFF=3 vsense(bit17)=1 MRES=5"
+      ],
+      "_provenance": {
+        "kind": "board_capture",
+        "file": "reports/reviews/phase8-motor-chain-dev/m4/final_console.txt",
+        "lines": "90-104"
+      }
+    },
+    "tmc_config_show@boot": {
+      "healthy": [
+        "[TMC-CFG] state=UNCONFIGURED fail_reg=0x00 last_err=0 from_integrity=0 snapshot_valid=0",
+        "[TMC-CFG] hw_write_gate(compile)=OPEN runtime_gate_mask=0x0",
+        "[TMC-CFG] !! 运行态门禁全通, 但编译期门未翻转前仍然一位不写",
+        "[TMC-CFG] planned irun=20 ihold=8 dly=4",
+        "[TMC-CFG] planned tpd=8 vsense=1 mstep_sel=0 mres=0",
+        "[TMC-CFG] target GCONF=00000141 CHOPCONF=15030053",
+        "[TMC-CFG] target IHOLD_IRUN=00041408 TPOWERDOWN(0x11)=08",
+        "[TMC-CFG] theory V_FS=180mV Rsense=110mO Rds=20mO",
+        "[TMC-CFG] theory VREF=1270mV",
+        "[TMC-CFG] theory_current run=326 mA RMS hold=139 mA RMS",
+        "[TMC-CFG] note: theoretical, NOT measured; motor rating not confirmed",
+        "[TMC-CFG] note: VREF unverified in firmware; RSENSE from listing only",
+        "[TMC-CFG] applied snapshot: 无效(从未成功下发, 或已因失败/失联作废)",
+        "[TMC-CFG] live GCONF=00000040 i_scale_analog=0 internal_Rsense=0 en_spreadCycle=0 pdn_disable=1 mstep_reg_select=0",
+        "[TMC-CFG] live CHOPCONF=15010053 TOFF=3 vsense(bit17)=0 MRES=5"
+      ],
+      "_provenance": {
+        "kind": "board_capture",
+        "file": "reports/reviews/phase8-motor-chain-dev/m2/seq.bin.b64",
+        "lines": "112-127 (解码后, 首次 show 即 UNCONFIGURED)"
+      }
+    },
+    "tmc_config_apply CONFIRM": {
+      "healthy": [
+        "[TMC-CFG] CONFIGURED (各次写入均经 IFCNT 确认; GCONF/CHOPCONF 读回一致)。电流值仍为理论计算, 未实测"
+      ],
+      "_provenance": {
+        "kind": "board_capture",
+        "file": "reports/reviews/phase8-motor-chain-dev/m3/apply.bin.b64",
+        "lines": "3-4 (解码后: 命令回显后紧跟这一行)",
+        "note": "该命令**不打印逐寄存器写**(四写/IFCNT 由产品内部确认); 因此本轮判据不靠 [TMC-CFG] 字串, 而由后续 tmc_config_show 的 state=CONFIGURED + live 读回 + motor_status 的 gate5 tmc_drive_cfg=CONFIGURED 三处实值成立"
+      },
+      "link_dead": [
+        "[TMC-CFG] state=CONFIG_PARTIAL fail_reg=0x11 last_err=-5 from_integrity=0 snapshot_valid=0",
+        "[TMC-CFG] live CHOPCONF: 读不到(链路/供电未就绪)"
+      ],
+      "_provenance_link_dead": {
+        "kind": "source_shape",
+        "file": "applications/tmc2209.c:3141 与 :3189 (tmc_config_show 的 state=%s 行与 live CHOPCONF 读不到 行, 两条字面量)",
+        "note": "负控档案: 链路取不到时的形状取自源码字面量(该两条都在 needles.json 里逐字证明过), 数值为注入值"
+      }
+    },
+    "motor_status": {
+      "healthy": [
+        "[MOT] state=0 name=OTHER",
+        "[MOT] cur_hz=0 tgt_hz=0 accel=2000 decel=2000 dir=0",
+        "[MOT] armed=0 drv_en_request=0 health=OK",
+        "[MOT] guard stops=0 reason=0",
+        "[MOT] guard reason map: 0=none 1=cfg-lost 2=integrity 3=txn-busy 4=enn-fb",
+        "[MOT] stop result=api-accepted(驱动接受关断, 非波形证明) src=init rc=0 latched=0",
+        "[MOT] diag_off_confirmed=YES",
+        "[MOT] arm_gate_mask=0x0 ALL-PASS",
+        "[MOT] drv_request=LOW pad=0",
+        "[MOT] expected_ENN=HIGH ENN_fb=1 resolved verdict=OK",
+        "[MOT] limit_inputs=DISABLED_BY_CONFIG",
+        "[MOT] step_diag=GRANTED",
+        "[MOT] tmc_write_gate=0x0",
+        "[MOT] note: state/cur/tgt=0 does not prove physical STEP stopped"
+      ],
+      "_provenance": {
+        "kind": "board_capture",
+        "file": "reports/reviews/phase8-motor-chain-dev/m3/irq.bin.b64",
+        "lines": "144-157 (解码后)",
+        "note": "本轮清理/静止判据就用这一整块: 六个合同字段(state/cur_hz/armed/drv_request/expected_ENN/diag_off_confirmed)各自恰好一条, 全部来自**同一份**响应"
+      }
+    },
+    "motor_status@armed": {
+      "healthy": [
+        "[MOT] state=0 name=OTHER",
+        "[MOT] cur_hz=0 tgt_hz=0 accel=2000 decel=2000 dir=0",
+        "[MOT] armed=1 drv_en_request=1 health=OK",
+        "[MOT] guard stops=0 reason=0",
+        "[MOT] guard reason map: 0=none 1=cfg-lost 2=integrity 3=txn-busy 4=enn-fb",
+        "[MOT] stop result=api-accepted(驱动接受关断, 非波形证明) src=disarm rc=0 latched=0",
+        "[MOT] diag_off_confirmed=YES",
+        "[MOT] arm_gate_mask=0x0 ALL-PASS",
+        "[MOT] drv_request=HIGH pad=1",
+        "[MOT] expected_ENN=LOW ENN_fb=0 resolved verdict=OK",
+        "[MOT] limit_inputs=DISABLED_BY_CONFIG",
+        "[MOT] step_diag=GRANTED",
+        "[MOT] tmc_write_gate=0x86",
+        "[MOT] note: state/cur/tgt=0 does not prove physical STEP stopped"
+      ],
+      "_provenance": {
+        "kind": "board_capture",
+        "file": "reports/reviews/phase8-motor-chain-dev/dir-closure/dir0b_console.txt",
+        "lines": "26-39 (已武装、尚未起转)"
+      }
+    },
+    "motor_status@running": {
+      "healthy": [
+        "[MOT] state=2 name=OTHER",
+        "[MOT] cur_hz=100 tgt_hz=100 accel=2000 decel=2000 dir=0",
+        "[MOT] armed=1 drv_en_request=1 health=OK",
+        "[MOT] guard stops=0 reason=0",
+        "[MOT] guard reason map: 0=none 1=cfg-lost 2=integrity 3=txn-busy 4=enn-fb",
+        "[MOT] stop result=output-requested(running) src=none rc=0 latched=0",
+        "[MOT] diag_off_confirmed=YES",
+        "[MOT] drv_request=HIGH pad=1",
+        "[MOT] expected_ENN=LOW ENN_fb=0 resolved verdict=OK",
+        "[MOT] limit_inputs=DISABLED_BY_CONFIG",
+        "[MOT] step_diag=GRANTED",
+        "[MOT] tmc_write_gate=0x0",
+        "[MOT] note: state/cur/tgt=0 does not prove physical STEP stopped"
+      ],
+      "_provenance": {
+        "kind": "board_capture_composed",
+        "files": [
+          "reports/reviews/phase8-motor-chain-dev/m4/l1_monitor_console.txt:30-37 (state=2 name=OTHER / cur_hz tgt_hz / armed=1 drv_en_request=1 health=OK / guard / stop result=output-requested(running) src=none / diag_off_confirmed / arm_gate_mask=0x2 REFUSED)",
+          "reports/reviews/phase8-motor-chain-dev/dir-closure/dir0b_console.txt:34-39 (drv_request=HIGH pad=1 / expected_ENN=LOW ENN_fb=0 resolved verdict=OK / limit_inputs / step_diag / tmc_write_gate / note)"
+        ],
+        "note": "两块采集都是真机逐字行, 但**没有任何一次板上采集**在同一份响应里同时给出这六个合同字段且 cur_hz>0(l1 的 RUNNING 块被 128 字节截断在 armed 之后)。这里按 cmd_motor_status 一次打印的**同一响应**把它们并起来, 并把 300 Hz/dir=1 换成本轮下发的 100 Hz/dir=0(频率与方向是计划自己下发的值, 不是新观察)。=> RUNNING 档案成立的是执行器的运行态判据, 不构成板上运行证据。另: l1 原文里的 '[MOT] arm_gate_mask=0x2 REFUSED'(运行中再次 arm 被正确拒绝)**故意不放进这一块** —— 执行器按 R2-C3 的规则把任何含 REFUSED 的行判成业务失败并结束会话, 该规则不因夹具需要而放宽; 因此运行态档案只保留与合同字段同批的真机行, 该 arm_gate_mask 行的存在与否不参与禁能/运行判据。"
+      }
+    },
+    "motor_dir 0": {
+      "healthy": [
+        "[MOT] dir=0 (at rest, 全部条件与 DIR 写同窗)"
+      ],
+      "_provenance": {
+        "kind": "board_capture",
+        "file": "reports/reviews/phase8-motor-chain-dev/m4/s1_speed_console.txt",
+        "lines": "15"
+      }
+    },
+    "motor_arm": {
+      "healthy": [
+        "[MOT] ARMED (drv_en request=HIGH readback verified, ENN feedback=LOW confirmed)"
+      ],
+      "_provenance": {
+        "kind": "board_capture",
+        "file": "reports/reviews/phase8-motor-chain-dev/dir-closure/dir0b_console.txt",
+        "lines": "22"
+      }
+    },
+    "motor_target 100": {
+      "healthy": [
+        "[MOT] set target 100 Hz: OK"
+      ],
+      "_provenance": {
+        "kind": "board_capture",
+        "file": "reports/reviews/phase8-motor-chain-dev/dir-closure/dir0b_console.txt",
+        "lines": "44"
+      }
+    },
+    "motor_start": {
+      "healthy": [],
+      "_provenance": {
+        "kind": "board_capture",
+        "file": "reports/reviews/phase8-motor-chain-dev/dir-closure/dir0b_console.txt",
+        "lines": "48-49 ([RX] motor_start 之后直接是 msh >); 另见 m4/l1_monitor_console.txt:27-28",
+        "note": "产品成功起转**不打印任何 [MOT] 行**(A/motor.c 的 cmd_motor_start 只在失败/拒绝支打印)。因此本计划绝不要求 motor_start 的响应里有 [MOT]: 收到完整提示符只代表命令返回, 实际运行由本轮随后的 motor_status(RUNNING 档案)证明。"
+      }
+    },
+    "motor_stop": {
+      "healthy": [
+        "[MOT] stop requested: target_hz=0 (软件命令值), STEP 实际关断结果看 stop_result(当前=cmd-0hz-unconfirmed)"
+      ],
+      "_provenance": {
+        "kind": "board_capture",
+        "file": "reports/reviews/phase8-motor-chain-dev/dir-closure/dir0b_console.txt",
+        "lines": "51"
+      }
+    },
+    "motor_disarm": {
+      "healthy": [
+        "[MOT] DISARM (动作已做: STEP api-accepted(驱动接受关断, 非波形证明) / 许可 LOW verified / ENN feedback=OK)"
+      ],
+      "_provenance": {
+        "kind": "board_capture",
+        "file": "reports/reviews/phase8-motor-chain-dev/dir-closure/dir0b_console.txt",
+        "lines": "55"
+      }
+    },
+    "diag_status": {
+      "healthy": [
+        "[DIAG] verdict=NORMAL mode=MONITOR_ONLY health=OK",
+        "[DIAG] sg_filt=18 delta=0 cur_filt=15 mA delta=0 mA",
+        "[DIAG] vib rms=1006 peak=1014 mg band=-1",
+        "[DIAG] cnt sg<warn=0 sg<stall=0 cur>warn=0 cur>stall=0 impact=0 bad=0 clean=0",
+        "[DIAG] rel snap=OK inc=OK seq=12 pubfail=0",
+        "[DIAG] rel mode=MONITOR_ONLY prof=NONE id=0 rev=0 flg=0000 FIELD_UNVERIFIED",
+        "[DIAG] rel cov=NOT-ACTIVE(no-profile) lost=0 gen=0 rearm=0",
+        "[DIAG] rel win hz=0[0..0] dir=0 ph=0",
+        "[DIAG] rel tmc=0/0/0/0 mst=0 def=0 tier=0",
+        "[DIAG] rel sig live=44100 prof=0 match=NO"
+      ],
+      "_provenance": {
+        "kind": "board_capture+source_shape",
+        "files": [
+          "reports/reviews/phase8-motor-chain-dev/m4/final_console.txt:177-180 (前四行逐字)",
+          "applications/diagnosis.c:756-777 (后六行: rel snap/mode/cov/win/tmc/sig 的 rt_kprintf 字面量形状; 板上从未采到过这六行, 因为采集那次固件还没有 RELATIVE 判据)"
+        ],
+        "note": "rel mode=%s 的 %s 取 A/diagnosis.c:119 mode_name() 的真实 token(MONITOR_ONLY/ACTIVE_PROTECTION/RELATIVE_ACTIVE); rel cov=%s 取 A/diag_relative.c:48 rel_cov_name() 的真实 token(COVERED/NOT-ACTIVE(...)/MOTION-UNKNOWN)。后六行只证明执行器读的确实是产品会打的形状, 不是设备结论。"
+      },
+      "trip": [
+        "[DIAG] verdict=STALL_SUSPECT mode=MONITOR_ONLY health=OK",
+        "[DIAG] sg_filt=66 delta=0 cur_filt=25 mA delta=0 mA",
+        "[DIAG] vib rms=1005 peak=1010 mg band=1",
+        "[DIAG] cnt sg<warn=1095 sg<stall=0 cur>warn=0 cur>stall=0 impact=0 bad=0 clean=0",
+        "[DIAG] rel snap=OK inc=OK seq=12 pubfail=0",
+        "[DIAG] rel mode=MONITOR_ONLY prof=PRESENT id=7 rev=1 flg=0010 FIELD_UNVERIFIED",
+        "[DIAG] rel cov=COVERED lost=0 gen=1 rearm=1"
+      ],
+      "_provenance_trip": {
+        "kind": "board_capture+source_shape",
+        "files": [
+          "reports/reviews/phase8-motor-chain-dev/m4/l1_monitor_console.txt:52-55 (前四行逐字: 板上真在 300 Hz 巡航时打出过 verdict=STALL_SUSPECT band=1)",
+          "applications/diagnosis.c:756-767 (后三行形状)"
+        ],
+        "note": "触发后模式退回 MONITOR_ONLY 且 rearm 需要人工: 这两条都是 A/diagnosis.c:455-478 的真实行为, 值是注入值。"
+      }
+    },
+    "diag_status@latch": {
+      "healthy": [
+        "[DIAG] verdict=STALL_SUSPECT mode=MONITOR_ONLY health=OK",
+        "[DIAG] rel snap=OK inc=OK seq=12 pubfail=0",
+        "[DIAG] rel mode=MONITOR_ONLY prof=PRESENT id=7 rev=1 flg=0010 FIELD_UNVERIFIED",
+        "[DIAG] rel cov=COVERED lost=0 gen=1 rearm=1",
+        "[DIAG] rel LATCH r=REL_SG_SEVERE id=7 rev=1 ms=120 post_rc=0",
+        "[DIAG] rel LATCH val=61 thr=45 n=3 cov=0 tick=4588411",
+        "[DIAG] rel LATCH sg=1008 cur=10041 imu=0"
+      ],
+      "_provenance": {
+        "kind": "source_shape",
+        "files": [
+          "reports/reviews/phase8-motor-chain-dev/m4/l1_monitor_console.txt:52 (verdict 行逐字)",
+          "applications/diagnosis.c:812-820 (rel LATCH 三行的 rt_kprintf 字面量) + A/diag_relative.c:32-42 (reason token REL_SG_SEVERE)"
+        ],
+        "note": "板上从未产生过 REL LATCH(该判据本轮才进产品, 且未在现场触发)。这三行是**形状真实、数值注入**的离线控制流夹具, 明确不构成现场异常证据。"
+      }
+    },
+    "config_show": {
+      "healthy": [
+        "[CFG] valid=YES version=0x00010002",
+        "[CFG] cal: offset=1650.0 mV gain=0.600 V/A source=THEORETICAL(1)",
+        "[CFG] bands: 200 / 1000 Hz",
+        "[CFG] band0: sg_warn=30 sg_stall=15 cur_warn=300 mA cur_stall=800 mA",
+        "[CFG] band1: sg_warn=100 sg_stall=50 cur_warn=500 mA cur_stall=1200 mA",
+        "[CFG] band2: sg_warn=200 sg_stall=100 cur_warn=800 mA cur_stall=1500 mA",
+        "[CFG] vib_impact=2500 mg",
+        "[CFG] persist warn=50 stall=100 impact=2 hyst=100 frames",
+        "[CFG] blackbox pre=2000 ms post=1000 ms",
+        "[CFG] adc runtime cal_source=1"
+      ],
+      "_provenance": {
+        "kind": "board_capture",
+        "file": "reports/reviews/phase8-motor-chain-dev/m4/final_console.txt",
+        "lines": "185-194"
+      }
+    },
+    "config_save": {
+      "healthy": [
+        "[CFG] save: OK"
+      ],
+      "_provenance": {
+        "kind": "source_shape",
+        "files": [
+          "applications/project_config.c:558 (rt_kprintf(\"[CFG] save: %s\\n\", e == RT_EOK ? \"OK\" : \"FAILED\"))"
+        ],
+        "note": "成功支只这一行。板上没有采集(仓库里唯一的 [CFG] save 文本出现在 stub 夹具里, 不算) => 本轮以源码字面量成立形状; 真实保存事实必须等现场证据。"
+      },
+      "failed": [
+        "[CFG] save: FAILED"
+      ],
+      "_provenance_failed": {
+        "kind": "source_shape",
+        "files": [
+          "applications/project_config.c:558"
+        ]
+      }
+    },
+    "diag_profile zero 32": {
+      "healthy": [
+        "[DIAG] zero OK n=32 raw 180..210 mean=195 (cal source untouched)"
+      ],
+      "_provenance": {
+        "kind": "source_shape",
+        "files": [
+          "applications/diag_relative.c:1523"
+        ],
+        "note": "n=32 是本轮下发的请求值(SENSOR 100 Hz 下 32 个不同有效 ADC 帧约 320 ms); raw/mean 量级取 m4/final_console.txt:178 的板上 sg_filt=18/cur_filt=15 与 sensor_snapshot 的 curr raw≈2066 同数量级, 不是新观察。"
+      },
+      "refused": [
+        "[DIAG] zero REFUSED: not static+READY (no capture started)"
+      ],
+      "_provenance_refused": {
+        "kind": "source_shape",
+        "files": [
+          "applications/diag_relative.c:1462"
+        ]
+      }
+    },
+    "diag_profile learn 8 80 120 0": {
+      "healthy": [
+        "[DIAG] learn OK adc[2050..2090]n8 nz3 sg[68..75]n8 seq1001..1008",
+        "[DIAG] learn thr tier=0 dev=-45/-90 drop=40/70 FIELD_UNVERIFIED"
+      ],
+      "_provenance": {
+        "kind": "source_shape",
+        "files": [
+          "applications/diag_relative.c:1600 与 :1607 (成功支按源码顺序就是这两行)",
+          "A/sensor_service.c:37-38 SENSOR_PERIOD_MS=10(100Hz)/SENSOR_SG_DIV=10 => SG 10 Hz"
+        ],
+        "note": "N=8 是产品允许的最小值(diag_relative.c: learn args: N=8..32), 8 个**独立 SG** 样本在 SG=10 Hz 下最少约 800 ms => 在 5 s 运动硬截止内完成并给清理留出预算(算式见 plan.json 的 motion_window_budget_proof)。adc/sg 的量级取板上真采集(sensor_snapshot curr raw≈2066、SNS sg SG_RESULT=72)。=> 行形状真实、数值合成。"
+      },
+      "timeout_12s": [
+        "[DIAG] learn FAILED: 12s timeout, need 8 independent SG and ADC samples",
+        "[DIAG] learn last: st=2 hz=100 dir=0 sig=44100 sg_seq=1004"
+      ],
+      "_provenance_timeout_12s": {
+        "kind": "source_shape",
+        "files": [
+          "applications/diag_relative.c:1583 与 :1570"
+        ],
+        "note": "具名负控档案: 产品的 learn 自带 12 s 超时 > 本轮 5 s 运动硬截止, 且 msh 是单线程 => 这 12 s 里 motor_stop 不会被处理。该档案用来证明执行器在**超时会吃掉清理机会**时仍然具名停止并走清理, 同时把风险登记在 plan.json 的 residual_risk 里(物理制止手段仍是操作者的 SW1/断电)。"
+      }
+    },
+    "diag_profile tier 2": {
+      "healthy": [
+        "[DIAG] tier data: sg[68..75] adc[2050..2090] nz=3 room up=40 dn=45",
+        "[DIAG] tier 2: dev=-45/-90 drop=40/70 FIELD_UNVERIFIED (commit to publish)"
+      ],
+      "_provenance": {
+        "kind": "source_shape",
+        "files": [
+          "applications/diag_relative.c:1635 与 :1641 (成功支顺序)"
+        ]
+      }
+    },
+    "diag_profile commit": {
+      "healthy": [
+        "[DIAG] commit OK id=7 rev=1 flags=0010 FIELD_UNVERIFIED",
+        "[DIAG] commit next: config_save to persist, then arm explicitly"
+      ],
+      "_provenance": {
+        "kind": "source_shape",
+        "files": [
+          "applications/diag_relative.c:1704 与 :1706"
+        ],
+        "note": "id/rev/flags 是本轮 record_from 要抓住并与重启后实际比较的三个值"
+      },
+      "refused": [
+        "[DIAG] commit REFUSED: pending incomplete (zero=1 learn=0)"
+      ],
+      "_provenance_refused": {
+        "kind": "source_shape",
+        "files": [
+          "applications/diag_relative.c:1657"
+        ]
+      }
+    },
+    "diag_profile show": {
+      "healthy": [
+        "[DIAG] profile id=7 rev=1 abi=2 flg=0010 VALID",
+        "[DIAG] profile win hz=100[80..120] dir=0 ph=0 tmc=2/20/8/1 mst=1 def=0",
+        "[DIAG] profile zero n=32 [180..210] mean=195",
+        "[DIAG] profile adc n=8 [2050..2090] nz=3 sg n=8 [68..75] seq=1001..1008",
+        "[DIAG] profile thr dev=-45/-90 drop=40/70 tier=2 reach=120/95",
+        "[DIAG] profile dur=30/30/60 rec=100 age=100/100/50 mns=2",
+        "[DIAG] profile imp peak=2500 mg n=2 win=40 age=50",
+        "[DIAG] pending: none",
+        "[DIAG] live sig=44100 match=YES cred zero=1 learn=1"
+      ],
+      "_provenance": {
+        "kind": "source_shape",
+        "files": [
+          "applications/diag_relative.c:1414-1450 (rel_show_one 的六行 + [DIAG] %s: none) 与 :1745-1746 (tag 依次是 profile/pending), :1747 附近 live sig 行"
+        ],
+        "note": "七行顺序完全按 rel_show_one 的打印顺序; tag 名 profile/pending 是调用点实参(diag_relative.c:1745-1746), 不是自造。abi/flg 与 commit 行的 abi/flags 是同一份 profile 的两个字段。"
+      }
+    },
+    "diag_profile show@after_reboot": {
+      "healthy": [
+        "[DIAG] profile id=7 rev=1 abi=2 flg=0010 VALID",
+        "[DIAG] profile win hz=100[80..120] dir=0 ph=0 tmc=2/20/8/1 mst=1 def=0",
+        "[DIAG] profile zero n=32 [180..210] mean=195",
+        "[DIAG] profile adc n=8 [2050..2090] nz=3 sg n=8 [68..75] seq=1001..1008",
+        "[DIAG] profile thr dev=-45/-90 drop=40/70 tier=2 reach=120/95",
+        "[DIAG] profile dur=30/30/60 rec=100 age=100/100/50 mns=2",
+        "[DIAG] profile imp peak=2500 mg n=2 win=40 age=50",
+        "[DIAG] pending: none",
+        "[DIAG] live sig=44100 match=YES cred zero=1 learn=1"
+      ],
+      "_provenance": {
+        "kind": "source_shape",
+        "files": [
+          "applications/diag_relative.c:1414-1450 (rel_show_one 的六行 + [DIAG] %s: none) 与 :1745-1747 (tag 依次 profile/pending, 其后是 live sig 行) —— 与 diag_profile show 同一套打印字面量",
+          "数值不是新观察: id/rev/flg/live sig 与 diag_profile commit + diag_profile show 的 S5 记录**必须逐项相等**才会被 compare_recorded 放行(相等由执行器机械比较, 不等即 RESTORE_MISMATCH)"
+        ],
+        "note": "这是重启后的期望值: 相等由执行器机械比较(RESTORE_MISMATCH), 不是文档声明。Flash 的 v2 迁移是否真的成立仍属现场待证。"
+      },
+      "drift": [
+        "[DIAG] profile id=7 rev=2 abi=2 flg=0010 VALID",
+        "[DIAG] pending: none",
+        "[DIAG] live sig=51200 match=NO cred zero=1 learn=1"
+      ],
+      "_provenance_drift": {
+        "kind": "source_shape",
+        "files": [
+          "applications/diag_relative.c:1414-1450 (行形状与上面同一套 rel_show_one 字面量; rev 与 live sig 是**故意**漂移的负控输入, 不是观察值)"
+        ],
+        "note": "负控档案: rev 与 live sig 漂移 => compare_recorded 必须具名 STOP(RESTORE_MISMATCH) 并给出(记录值, 现读值)"
+      }
+    },
+    "diag_profile show@boot": {
+      "healthy": [
+        "[DIAG] profile: none",
+        "[DIAG] pending: none",
+        "[DIAG] live sig=44100 match=NO cred zero=0 learn=0"
+      ],
+      "_provenance": {
+        "kind": "source_shape",
+        "files": [
+          "applications/diag_relative.c:1419 (magic==0 时 rel_show_one 只打 '[DIAG] %s: none'), :1745-1746 (tag 依次 profile/pending), :1747 附近的 live sig 行"
+        ],
+        "note": "新烧录后没有任何 profile: 这一组的价值就在于**不假装健康**(旧计划要求 '[DIAG] profile id=' 会在真实起点上失败)。match=NO 是因为 profile 不存在(p->signature 为 0 而 live 非 0), 与源码判式一致。"
+      }
+    },
+    "diag_mode relative CONFIRM_EXPERIMENTAL": {
+      "healthy": [
+        "[DIAG] mode=RELATIVE_ACTIVE"
+      ],
+      "_provenance": {
+        "kind": "source_shape",
+        "files": [
+          "applications/diagnosis.c:667 (mode=%s) + :119-128 (mode_name(DIAG_MODE_RELATIVE_PROTECTION)=\"RELATIVE_ACTIVE\")"
+        ],
+        "note": "旧 R2 计划里的 [DIAG] mode=RELATIVE_ACTIVE 这一条**形状是对的**(之前我按字面查过 mode_name); 板上尚无该模式采集。"
+      },
+      "refused": [
+        "[DIAG] RELATIVE REFUSED: needs explicit CONFIRM_EXPERIMENTAL"
+      ],
+      "_provenance_refused": {
+        "kind": "source_shape",
+        "files": [
+          "applications/diagnosis.c:591"
+        ]
+      }
+    },
+    "blackbox_status": {
+      "healthy": [
+        "[BB] state=0 session=0 written=0 last_err=0 health=OK",
+        "[BB] trigger drops: early(pre-consumption)=0 busy(capturing)=0",
+        "[BB] write drops=0 frames (submit retries exhausted)",
+        "[BB] window: pre_eff=200 post_eff=100 frames (pre_n_latched=0)",
+        "[BB] flash: used=4096 valid=4096 bad=0 acc=0 done=0 fail=0 drop=0"
+      ],
+      "_provenance": {
+        "kind": "board_capture",
+        "file": "reports/reviews/phase8-motor-chain-dev/m4/final_console.txt",
+        "lines": "199-203"
+      }
+    },
+    "blackbox_status@after": {
+      "healthy": [
+        "[BB] state=0 session=8 written=612 last_err=0 health=OK",
+        "[BB] trigger drops: early(pre-consumption)=0 busy(capturing)=0",
+        "[BB] write drops=0 frames (submit retries exhausted)",
+        "[BB] window: pre_eff=200 post_eff=100 frames (pre_n_latched=1)",
+        "[BB] flash: used=4096 valid=4096 bad=0 acc=8 done=8 fail=0 drop=0"
+      ],
+      "_provenance": {
+        "kind": "source_shape",
+        "files": [
+          "applications/blackbox.c:459-478 (五行字面量) + M5 已证的\"按实际新增 session 取回\"口径"
+        ],
+        "note": "与 blackbox_status(事故前的板上原始整块)同形状, 只有 session/written/acc/pre_n_latched 的增量是注入值; 判据由 compare_recorded_gt 要求 session 与 written **严格增大**(SESSION_NOT_INCREASED), 不接受只读旧 logstat 计数。"
+      }
+    },
+    "flash_logstat": {
+      "healthy": [
+        "slots=0/4096 valid=0 bad=0",
+        "queued=0 completed=0 failed=0 queue_dropped=0 last_error=0"
+      ],
+      "_provenance": {
+        "kind": "board_capture",
+        "file": "reports/reviews/phase8-motor-m5-fault-log/cp1/fault_attempt/012_flash_logstat.bin",
+        "lines": "整块两行(ASCII 原始 RX)"
+      }
+    },
+    "fault_reset": {
+      "healthy": [
+        "[SS] ==> MANUAL_CLEAR (重跑自检进 READY 后仍需重新 arm)"
+      ],
+      "_provenance": {
+        "kind": "source_shape",
+        "files": [
+          "applications/safety_state.c:980 (fault_reset 链里 ==> MANUAL_CLEAR 那条 rt_kprintf 的逐字形状; MANUAL_CLEAR 这个 token 本身也出现在真机采集里, 但那是 [SS] state= 行, 不是本行)"
+        ],
+        "note": "仓库里**没有** fault_reset 的整块板级采集(命中的 [SS] 行都来自主机夹具)。这条只验证离线控制流里\"人工恢复进入 MANUAL_CLEAR 而不是自动重启\"。"
+      }
+    },
+    "system_selftest": {
+      "healthy": [
+        "[SELFTEST] 0.bootstrap-complete OK",
+        "[SELFTEST] ALL PASS (final state=READY motor=0)"
+      ],
+      "_provenance": {
+        "kind": "source_shape",
+        "files": [
+          "applications/supervisor.c:401-420 与 safety_state.c 的 [SELFTEST] 字面量(: %s (final state=%s motor=%d) + ALL PASS/FAIL token)"
+        ],
+        "note": "无板级整块采集; 两行的形状与 token 都在源码里。"
+      }
+    },
+    "safety_state": {
+      "healthy": [
+        "[SS] state=READY fault_code=0 degraded=0x00"
+      ],
+      "_provenance": {
+        "kind": "board_capture",
+        "file": "reports/reviews/phase8-motor-chain-dev/m3/irq.bin.b64",
+        "lines": "97 (解码后)"
+      }
+    },
+    "__watch__": {
+      "healthy": [],
+      "_provenance": {
+        "kind": "board_capture+source_shape",
+        "files": [
+          "reports/reviews/phase8-motor-chain-dev/m4/l1_monitor_console.txt:42-50 (MONITOR_ONLY 巡航期间板上确实只输出 [S]/[SNS] 采样行, 逐字; 被动窗没有命令也就没有提示符)",
+          "applications/diagnosis.c:467-478 (REL TRIP 三行 + ticket 行是**唯一**会进观察窗的打印分支: 该分支条件不成立时一行不打 => healthy/no_trigger 的窗口为空是源码事实, 不是「板上采到了空」)"
+        ],
+        "note": "健康档案 = 观察窗内没有 REL TRIP(产品在没有异常时不打印), 到期即 OBSERVATION_NO_TRIGGER 并进入同一清理路径。"
+      },
+      "trip": [
+        "[DIAG] REL TRIP r=REL_SG_SEVERE id=7 rev=1 post_rc=0",
+        "[DIAG] REL TRIP val=61 thr=45 ms=120 cov=0",
+        "[DIAG] REL TRIP sg=1008 cur=10041 imu=0 tick=4588411 n=3",
+        "[DIAG] REL trip ticket used; mode=MONITOR_ONLY rearm required"
+      ],
+      "_provenance_trip": {
+        "kind": "source_shape",
+        "files": [
+          "applications/diagnosis.c:467-478 (三条 REL TRIP + ticket 行字面量)"
+        ],
+        "note": "**板上从未产生过这些行**(相对保护本轮才进产品, 且现场未触发)。数值为注入。用来跑通\"真实触发分支\"的离线控制流, 不得写成设备异常证据。cov=0 = RELCOV_OK 的枚举值。"
+      },
+      "no_trigger": [],
+      "_provenance_no_trigger": {
+        "kind": "source_shape",
+        "files": [
+          "applications/diagnosis.c:467-478 (只有这一支打印 REL TRIP/ticket; 无触发时一行不打, 所以 no_trigger 的窗口是空列表 —— 「空」取自源码的打印条件, 不是板上采到的一次空窗)"
+        ],
+        "note": "与 healthy 同: 到时无触发 => NO_TRIGGER, 不跑假故障恢复。"
+      }
+    },
+    "motor_status@latched": {
+      "healthy": [
+        "[MOT] state=4 name=FAULT",
+        "[MOT] cur_hz=0 tgt_hz=0 accel=2000 decel=2000 dir=0",
+        "[MOT] armed=0 drv_en_request=0 health=OK",
+        "[MOT] guard stops=1 reason=4",
+        "[MOT] guard reason map: 0=none 1=cfg-lost 2=integrity 3=txn-busy 4=enn-fb",
+        "[MOT] stop result=api-accepted(驱动接受关断, 非波形证明) src=guard rc=0 latched=1",
+        "[MOT] diag_off_confirmed=YES",
+        "[MOT] arm_gate_mask=0x0 ALL-PASS",
+        "[MOT] drv_request=LOW pad=0",
+        "[MOT] expected_ENN=HIGH ENN_fb=1 resolved verdict=OK",
+        "[MOT] limit_inputs=DISABLED_BY_CONFIG",
+        "[MOT] step_diag=GRANTED",
+        "[MOT] tmc_write_gate=0x0",
+        "[MOT] note: state/cur/tgt=0 does not prove physical STEP stopped"
+      ],
+      "_provenance": {
+        "kind": "source_shape",
+        "file": "applications/motor.c:2394 (cmd_motor_status 的整块字面量) + A/motor.c 的 name 只可能 FAULT|OTHER",
+        "note": "故障锁存后的禁能块: 行形状逐字取自 cmd_motor_status 的 rt_kprintf 字面量, state=4/name=FAULT/guard stops=1/src=guard/latched=1 是注入值(本轮无该状态板级整块采集)。判据**不要求** name=IDLE: DISABLE_ALLOWED_STATES=(FAULT, OTHER)。=> 只用于离线控制流。 | 本键是**锁存态场景专用**(S9/S10 用 key=motor_status@latched 取), 不再用 dispatch 档案选行: 档案只应当改变被动观察窗(__watch__)的内容, 否则连 S4 的 motor_arm 都会被换成拒绝行(本轮实测到过)。"
+      }
+    },
+    "motor_arm@refused": {
+      "healthy": [
+        "[MOT] arm REFUSED (gates failing)",
+        "[MOT] arm_gate_mask=0x2",
+        "[MOT] gate_reason=safety-not-READY"
+      ],
+      "_provenance": {
+        "kind": "board_capture+source_shape",
+        "files": [
+          "applications/motor.c:1104 的字面量 \"[MOT] arm REFUSED (gates failing)\\n\"(拒绝支的确切输出)",
+          "reports/reviews/phase8-motor-chain-dev/m4/l1_monitor_console.txt:37-39(arm_gate_mask=0x2 / gate_reason=safety-not-READY 两行是板上真采集)"
+        ],
+        "note": "S10 的期望就是看见这条**具名拒绝**: 计划把它申报成 expected_terminal=REFUSED, 会话在此结束, 之后不得继续任何危险步骤(R2-C3 的规则本轮没有放宽)。 | 专用键 motor_arm@refused(S10), 不由档案选中。"
+      }
+    }
+  }
+}

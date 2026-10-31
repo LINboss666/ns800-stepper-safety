@@ -1,0 +1,61 @@
+CASE|FS01|PASS|elapsed=0.000 rows=1 bytes=37
+CASE|FS02|PASS|verdict=STOP rows=0 bytes=32
+CASE|FS03|PASS|ILLEGAL_BYTES_IN_RESPONSE
+CASE|FS04|PASS|verdict=STOP code=FIELD_NOT_EXACTLY_ONE
+CASE|FS05|PASS|verdict=STOP code=BUSINESS_FAILED text=[DIAG] learn FAILED: left the approved window or source lost
+CASE|FS06|PASS|status=REFUSED commands=diag_profile commit
+CASE|FS07|PASS|verdict=OK text=[DIAG] mode=RELATIVE_ACTIVE
+CASE|FS08|PASS|status=STOP code=EXPECTATION_NOT_MET commands=
+CASE|FS09|PASS|status=OBSERVATION_NO_TRIGGER success=True disarm=CONFIRMED_DISABLED tx=motor_arm,motor_target 100,motor_start,motor_stop,motor_disarm,motor_status
+CASE|FS10|PASS|start_to_stop=5.0 declared=5 disarm=CONFIRMED_DISABLED
+CASE|FS11|PASS|code=STUB_MISS tx=motor_start,not_in_fixture,motor_stop,motor_disarm,motor_status disarm=CONFIRMED_DISABLED
+CASE|FS12|PASS|disarm=UNKNOWN terminal=UNKNOWN cleanup=motor_stop:NO_RESPONSE primary=STUB_MISS
+CASE|FS13|PASS|operator_calls=1 answer=yes fixture_ignored=yes
+CASE|FS14|PASS|code=OPERATOR_ASSERTION
+CASE|FS15|PASS|code=MANUAL_GATE_DENIED tx= obligation=False
+CASE|FS16|PASS|calls=download,readback,reset status=OK code=
+ACTION readback: 请执行下列逐字命令并把交付物放入 C:\Users\LMX\AppData\Local\Temp\m8r3-field-selftest-vwrto262\s17-2\action_readback
+  python -m pyocd commander --no-config -t cortex_m -u @UID_FILE -f 1000000 -O auto_unlock=false -O connect_mode=halt -O resume_on_disconnect=false -O cache.enable_memory=false -O cache.read_code_from_elf=false -O scan_all_aps=false -c status -c "savemem 0x08000000 @IMAGE_BYTES @RUN_ROOT/readback.bin" -c status -c exit
+CASE|FS17|PASS|ACTION_DELIVERABLES_MISSING
+ACTION readback: 请执行下列逐字命令并把交付物放入 C:\Users\LMX\AppData\Local\Temp\m8r3-field-selftest-vwrto262\s18-1\action_readback
+  python -m pyocd commander --no-config -t cortex_m -u @UID_FILE -f 1000000 -O auto_unlock=false -O connect_mode=halt -O resume_on_disconnect=false -O cache.enable_memory=false -O cache.read_code_from_elf=false -O scan_all_aps=false -c status -c "savemem 0x08000000 @IMAGE_BYTES @RUN_ROOT/readback.bin" -c status -c exit
+CASE|FS18|PASS|READBACK_HASH_MISMATCH
+CASE|FS19|PASS|tx=1 code=MISSING_RESPONSE_PROMPT
+CASE|FS20|PASS|total=40 declared=40 unproven=0
+CASE|FS21|PASS|post_open_attribute_writes=none
+CASE|FS22|PASS|code=QUOTA_EXHAUSTED starts=1
+CASE|FS23|PASS|去掉硬截止后 s10 仍然通过 => 判据不足: start_to_stop=13.0 declared=5 disarm=UNKNOWN
+CASE|FS24|PASS|去掉撤能清理后 s11 仍然通过 => 判据不足: code=STUB_MISS tx=motor_start,not_in_fixture disarm=SKIPPED_BY_MUTANT
+CASE|FS25|PASS|去掉业务层后 s05 仍然通过 => 判据不足: verdict=STOP code=EXPECTATION_NOT_MET text=[DIAG] learn FAILED: left the approved window or source lost
+CASE|FS26|PASS|obligation=True writes=motor_stop,motor_disarm,motor_status code=COMMAND_WRITE_FAILED disarm=CONFIRMED_DISABLED
+CASE|FS27|PASS|start_t=[2.0] stop_t=[5.0] cap=5 disarm=CONFIRMED_DISABLED
+CASE|FS28|PASS|writes=motor_start,motor_stop,motor_disarm,motor_status errs=['motor_stop:NO_RESPONSE'] stop_t=[5.0] disarm_t=[6.21] success=False
+CASE|FS29|PASS|writes=[] code=PLAN_MANUAL_AFTER_MOTION
+CASE|FS30|PASS|bad=[] fields={"armed": 0, "cur_hz": 0, "diag_off_confirmed": "YES", "drv_en_request_hist": 0, "drv_request": "LOW", "enn_fb": 1, "expected_ENN": "HIGH", "fb_state": "resolved", "health": "OK", "pad": 0, "state_name": "OTHER", "state_num": 0, "tgt_hz": 0, "verdict": "OK"}
+CASE|FS31|PASS|bad=[] state=FAULT armed=0
+CASE|FS32|PASS|rows_with_idle_or_cruise=False allowed_states=FAULT,OTHER
+CASE|FS33|PASS|writes=motor_arm,motor_stop,motor_disarm,motor_status obligation=True code=MISSING_RESPONSE_PROMPT
+CASE|FS34|PASS|writes=motor_start,motor_stop,motor_disarm,motor_status disarm=UNKNOWN errs=['motor_status:NO_RESPONSE', 'DISARM_NOT_CONFIRMED FIELD_MISSING_state FIELD_MISSING_hz FIELD_MISSING_armed FIELD_MISSING_drvreq FIELD_MISSING_fb FIELD_MISSING_off']
+CASE|FS35|PASS|disarm=UNKNOWN errs=['DISARM_NOT_CONFIRMED FIELD_NOT_UNIQUE_armed=2']
+CASE|FS36|PASS|disarm=UNKNOWN errs=['DISARM_NOT_CONFIRMED drv_request=HIGH/pad=1']
+CASE|FS37|PASS|ok=OK bad=PROFILE_NOT_AT_REST
+CASE|FS38|PASS|bad=FIELD_VALUE_MISMATCH good=OK
+CASE|FS39|PASS|txt=01_boot.rx.bin.txt bytes=459 raw_exists=True
+CASE|FS40|PASS|code=EVIDENCE_OPEN_FAILED tx=safety_status
+CASE|FS41|PASS|first=CONFIRMED_DISABLED after_first={'cleanup_motor_stop': 0, 'cleanup_motor_disarm': 0, 'cleanup_motor_status': 0} second=CONFIRMED_DISABLED over=['cleanup_motor_stop:RESERVE_EXHAUSTED_SENT_ANYWAY', 'cleanup_motor_disarm:RESERVE_EXHAUSTED_SENT_ANYWAY', 'cleanup_motor_status:RESERVE_EXHAUSTED_SENT_ANYWAY'] session=CLEANUP_RESERVE_EXHAUSTED/False tx=motor_start,motor_stop,motor_disarm,motor_status
+CASE|FS42|PASS|status=OK ids=S0,S1,S2,S3,S4,S5,S6,S7,S8 recorded={'id': '7', 'rev': '1', 'flags': '0010', 'sig': '44100', 'match': 'YES', 'bb_session': '0', 'bb_written': '0'} quota_used={"approved_reboot": 1, "cleanup_motor_disarm": 2, "cleanup_motor_status": 2, "cleanup_motor_stop": 2, "config_save": 1, "diag_profile_commit": 1, "diag_profile_learn": 1, "diag_profile_zero": 1, "download": 1, "explicit_reset": 1, "irq_polarity_prep": 4, "motor_run": 2, "port_open": 5, "readback": 1, "tmc_config_apply": 2} asaved=None
+CASE|FS43|PASS|nt=OK(OBSERVATION_NO_TRIGGER) trip=OK s10=REFUSED s11=OK bb={'id': '7', 'rev': '1', 'flags': '0010', 'sig': '44100', 'match': 'YES', 'bb_session': '8', 'bb_written': '612'}
+CASE|FS44|PASS|s9_tx=diag_status,blackbox_status,flash_logstat,motor_status s11_tx=safety_status,fault_reset,system_selftest,safety_status,motor_status
+CASE|FS45|PASS|status=STOP executed=S0,S1,S2,S3,S4,S5 not_run=S5,S6,S7,S8,S9,S10,S11
+CASE|FS46|PASS|status=STOP code=RESTORE_MISMATCH detail=
+CASE|FS47|PASS|status=STOP code=SESSION_NOT_INCREASED not_run=S9,S10,S11
+CASE|FS48|PASS|placeholder=True(S0_PLAN_PLACEHOLDER) forbidden=True(S0_PLAN_FORBIDDEN_COMMAND_PRESENT)
+CASE|FS49|PASS|status=REFUSED code=REAL_TRANSPORT_REFUSED not_run=12 executed=0
+CASE|FS50|PASS|UID_FILE_REQUIRED,TOOL_ARGV_UNRESOLVED
+CASE|FS51|PASS|code=BUSINESS_FAILED tx=motor_start,diag_profile learn 8 80 120 0,motor_stop,motor_disarm,motor_status disarm=CONFIRMED_DISABLED
+CASE|FS52|PASS|共享截止下 s28 仍然通过 => 判据不足: writes=motor_start,motor_stop errs=['motor_stop:NO_RESPONSE', 'CLEANUP_HARD_DEADLINE_BEFORE_motor_disarm', 'CLEANUP_HARD_DEADLINE_BEFORE_motor_status', 'DISARM_NOT_CONFIRMED FIELD_MISSING_state FIELD_MISSING_hz FIELD_MISSING_armed FIELD_MISSING_drvreq FIELD_MISSING_fb FIELD_MISSING_off'] stop_t=[5.0] disarm_t=[] success=False
+CASE|FS53|PASS|IDLE-only 判据下 s30 仍然通过 => 判据不足: bad=['state_name=OTHER'] fields={"armed": 0, "cur_hz": 0, "diag_off_confirmed": "YES", "drv_en_request_hist": 0, "drv_request": "LOW", "enn_fb": 1, "expected_ENN": "HIGH", "fb_state": "resolved", "health": "OK", "pad": 0, "state_name": "OTHER", "state_num": 0, "tgt_hz": 0, "verdict": "OK"}
+CASE|FS54|PASS|写后才建义务时 s26 仍然通过 => 判据不足: obligation=False writes= code=COMMAND_WRITE_FAILED disarm=NOT_ARMED
+CASE|FS55|PASS|摘掉一致性判据后 s36 仍然通过 => 判据不足: ok=OK bad=
+SUMMARY|cases=55 pass=55 fail=0 executed=55 preserved_r2_identities=25|negative_injections=7|hardware_actions=0|transport=stub_only|port=IN_MEMORY
+SELFTEST_WORKDIR|C:\Users\LMX\AppData\Local\Temp\m8r3-field-selftest-vwrto262

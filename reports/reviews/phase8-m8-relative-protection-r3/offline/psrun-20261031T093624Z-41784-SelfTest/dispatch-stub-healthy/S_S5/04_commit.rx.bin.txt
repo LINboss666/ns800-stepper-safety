@@ -1,0 +1,2 @@
+[DIAG] commit OK id=7 rev=1 flags=0010 FIELD_UNVERIFIED
+[DIAG] commit next: config_save to persist, then arm explicitly

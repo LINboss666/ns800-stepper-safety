@@ -1,0 +1,15 @@
+{"kind": "PORT_OPEN", "port": null, "t_s": 0.0, "transport": "stub"}
+{"kind": "QUOTA_CONSUMED", "left": 0, "n": 1, "name": "port_open", "t_s": 0.0}
+{"as": "gate_recovery", "kind": "MANUAL", "name": "operator_confirms_manual_recovery", "source": "stub_fixture", "t_s": 0.0, "value": "yes"}
+{"bytes": "safety_status\r\n", "kind": "TX", "t_s": 0.0}
+{"bytes": 466, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "3dc0fc8a796986e549178d26085ea57b2ca84964ecc88e0d6e4fcaff30e6dee9", "t_s": 0.0, "tail": "b'\\xa8\\xe5\\x86\\x8c IRQ)\\r\\nmsh >'"}
+{"bytes": "fault_reset\r\n", "kind": "TX", "t_s": 0.0}
+{"bytes": 72, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "86177e8948acd22cf6f8917f7354c665c8edfda98404c369341dcf2286365409", "t_s": 0.0, "tail": "b'\\x8d\\xe6\\x96\\xb0 arm)\\r\\nmsh >'"}
+{"bytes": "system_selftest\r\n", "kind": "TX", "t_s": 0.0}
+{"bytes": 90, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "0c3f8a1090329601bd1376aba24a1e5bf8255358da71d504fefa36c0edb9f31b", "t_s": 0.0, "tail": "b' motor=0)\\r\\nmsh >'"}
+{"bytes": "safety_status\r\n", "kind": "TX", "t_s": 0.0}
+{"bytes": 466, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "3dc0fc8a796986e549178d26085ea57b2ca84964ecc88e0d6e4fcaff30e6dee9", "t_s": 0.0, "tail": "b'\\xa8\\xe5\\x86\\x8c IRQ)\\r\\nmsh >'"}
+{"bytes": "motor_status\r\n", "kind": "TX", "t_s": 0.0}
+{"bytes": 627, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "092f7aab804b9be56fd57569f33ec33d63afaa821de1a51fb131cef4d8f042cd", "t_s": 0.005, "tail": "b'P stopped\\r\\nmsh >'"}
+{"kind": "SESSION_OK", "session": "S_S11", "steps": 6, "t_s": 0.005}
+{"kind": "PORT_CLOSED", "t_s": 0.005}

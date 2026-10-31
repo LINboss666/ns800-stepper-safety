@@ -1,0 +1,11 @@
+[CFG] valid=YES version=0x00010002
+[CFG] cal: offset=1650.0 mV gain=0.600 V/A source=THEORETICAL(1)
+[CFG] bands: 200 / 1000 Hz
+[CFG] band0: sg_warn=30 sg_stall=15 cur_warn=300 mA cur_stall=800 mA
+[CFG] band1: sg_warn=100 sg_stall=50 cur_warn=500 mA cur_stall=1200 mA
+[CFG] band2: sg_warn=200 sg_stall=100 cur_warn=800 mA cur_stall=1500 mA
+[CFG] vib_impact=2500 mg
+[CFG] persist warn=50 stall=100 impact=2 hyst=100 frames
+[CFG] blackbox pre=2000 ms post=1000 ms
+[CFG] adc runtime cal_source=1
+msh >

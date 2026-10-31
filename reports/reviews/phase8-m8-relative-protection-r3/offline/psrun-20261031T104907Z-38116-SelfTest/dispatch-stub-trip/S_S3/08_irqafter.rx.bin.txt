@@ -1,0 +1,8 @@
+[SAFETY] irq gate   = OPEN (EXTI registered)
+[SAFETY] polarity   = operator CONFIRMED (HARDWARE-PENDING unless CONFIRMed)
+[SAFETY] gpio_ready = YES
+[SAFETY] thread     = running health=OK
+[SAFETY] protection_ready = YES
+[SAFETY] TMC_DIAG     pin=3 raw=0 safe=0 irq=RISING [safe]
+[SAFETY] LIMIT inputs config = DISABLED_BY_CONFIG (SAFETY_LIMIT_INPUTS_ENABLED; OFF => PF.14/PF.15 不解析/不配置/不读/
+[SAFETY] PC.6(ENN_FB) pin=ok raw=HIGH = TMC_ENN feedback (HIGH=disabled side). NOT an e-stop input, no IRQ registered on it

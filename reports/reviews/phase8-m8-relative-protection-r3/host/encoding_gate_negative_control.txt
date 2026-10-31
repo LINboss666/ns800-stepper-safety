@@ -1,0 +1,31 @@
+# 反向自证: 把 field/M8R3Field.ps1 里 `Invoke-Py` 的 $env:PYTHONIOENCODING='utf-8' 一行换成
+# NEGATIVE-INJECTION R3-ENC 注释后, 在**仓库外副本**上跑 -Precheck(不在 shell 预设任何编码变量)。
+# 命令(逐字):
+#   cd /d/ns800_m8r3_scratch/neg-enc-field
+#   env -u PYTHONIOENCODING -u PYTHONUTF8 powershell.exe -NoProfile -ExecutionPolicy Bypass \n#     -File ./M8R3Field.ps1 -Precheck -RepoRoot D:/ns800 -OutRoot D:/ns800_m8r3_scratch/neg-enc-out
+# 期望(且实测得到): 退出码 1 + 具名 PYTHON_OUTPUT_NOT_UTF8, 并给出坏行。
+# 结论: 编码门是真的会咬 —— 生产脚本那一行不是装饰。突变副本在仓库外, 仓库内脚本未被打突。
+# 注意: 下面原文里出现的 U+FFFD 替换符**就是被演示的缺陷本身**(坏归档长什么样的样本), 不是本文件的编码失误。
+#       本文件自身是严格 UTF-8; 判据区分这两件事: "文件能否解码" 与 "解码出来的文本里有没有替换符"。
+CHECK|PRE_FILES|PASS|执行器/自检/计划/行表/needles 五件齐全
+CHECK|PRE_COMMITS_SHAPE|PASS|
+CHECK|PRE_QUOTA_INTEGERS|PASS|
+CHECK|PRE_IMAGE_RECALC_EQ_PLAN|PASS|bytes=290916 sha=00608ec93c6a3027
+CHECK|PRE_IMAGE_EQ_MANIFEST|PASS|manifest_bytes=290916 manifest_sha=00608ec93c6a3027
+CHECK|PRE_MANIFEST_CODE_COMMIT|PASS|manifest.code_commit=805c29bd73c4ea861c9b9c65f61e946aec9548e3
+CHECK|PRE_COMMIT_EXISTS_software_input_commit|PASS|rev-parse=805c29bd73c4ea861c9b9c65f61e946aec9548e3 want=805c29bd73c4ea861c9b9c65f61e946aec9548e3
+CHECK|PRE_COMMIT_EXISTS_tested_image_build_commit|PASS|rev-parse=805c29bd73c4ea861c9b9c65f61e946aec9548e3 want=805c29bd73c4ea861c9b9c65f61e946aec9548e3
+CHECK|PRE_COMMIT_EXISTS_reviewed_delivery_commit|PASS|rev-parse=5c549f2af0740425c4014f374d064f77ee62d6b4 want=5c549f2af0740425c4014f374d064f77ee62d6b4
+CHECK|PRE_PRODUCT_SHA_EQ_PATCH_OUTPUT|PASS|applications\diag_relative.c sha=059fc7535a550462
+CHECK|PRE_ROWS_PROVENANCE_FILES|PASS|refs=36 missing=0 
+OUT_DIR_TRIED|base=[D:/ns800_m8r3_scratch/neg-enc-out] leaf=[psrun-20261031T104151Z-20300-Precheck]
+CHECK|PRE_STATIC_PORT_DISCIPLINE|PASS|F05_STATIC_PORT_DISCIPLINE|PASS|post_open_attribute_writes=none
+CHECK|PRE_NEEDLES|PASS|NEEDLES|total=40|unproven=0
+PYTHON_OUTPUT_NOT_UTF8|file=D:\ns800_m8r3_scratch\neg-enc-out\psrun-20261031T104151Z-20300-Precheck\pyout-20261031T1041
+51Z-20300-03.txt|first_bad_line=PLAN_MOTION_WINDOW|S0|PASS|�˹��Ŷ����˶�֮ǰ
+所在位置 D:\ns800_m8r3_scratch\neg-enc-field\M8R3Field.ps1:131 字符: 9
++         throw ('PYTHON_OUTPUT_NOT_UTF8|file=' + $tmp + '|first_bad_li ...
++         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OperationStopped: (PYTHON_OUTPUT_N...S|�˹��Ŷ����˶�֮ǰ:String) [], RuntimeException
+    + FullyQualifiedErrorId : PYTHON_OUTPUT_NOT_UTF8|file=D:\ns800_m8r3_scratch\neg-enc-out\psrun-20261031T104151Z-203 
+   00-Precheck\pyout-20261031T104151Z-20300-03.txt|first_bad_line=PLAN_MOTION_WINDOW|S0|PASS|�˹��Ŷ����˶�֮ǰ

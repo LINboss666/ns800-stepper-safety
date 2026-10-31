@@ -1,0 +1,2 @@
+[DIAG] learn OK adc[2050..2090]n8 nz3 sg[68..75]n8 seq1001..1008
+[DIAG] learn thr tier=0 dev=-45/-90 drop=40/70 FIELD_UNVERIFIED

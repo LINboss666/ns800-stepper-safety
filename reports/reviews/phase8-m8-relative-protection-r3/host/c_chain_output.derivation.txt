@@ -1,0 +1,7 @@
+c_chain_output.txt 的来历(可复算, 不是手抄):
+  1) bash tests/host/run_diag_relative_m8.sh   在 REL_OUT_DIR=D:/ns800_m8r3_scratch/relout_final 上跑, rc=0;
+     夹具 stdout 落在 <REL_OUT_DIR>/<run-id>/out.txt (447 行, 含 CASE| 台账与产品 rt_kprintf 行)。
+  2) c_chain_output.txt = out.txt 中以 '[' 开头的行(共 342 行), 顺序不变、逐字不改;
+     regression_m8_ledger.txt = 其中的 CASE|/SUMMARY| 行(共 51 行)。
+  3) 编译诊断计数与 warning 行数取自同一次运行的 build.txt / warning_count.txt(见 run_record)。
+  派生规则与 R2 同一条, 但本轮**保留全部** '[' 前缀行(不只 [DIAG]/[CFG]): 现场判据需要 [MOT]/[SS] 等行,  而筛选会掩盖来源。自检里 c_line() 就是按前缀在本文件里取行, 取不到即报错。

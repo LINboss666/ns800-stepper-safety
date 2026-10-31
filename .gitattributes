@@ -33,3 +33,10 @@ reports/reviews/phase8-m8-relative-protection-r2/SHA256SUMS.txt -text
 reports/reviews/phase8-m8-relative-protection-r2/field/*.py -text
 reports/reviews/phase8-m8-relative-protection-r2/field/*.json -text
 reports/reviews/phase8-m8-relative-protection-r2/*.md -text
+
+# ===== M8-R3 交付证据(范围: 仅 R3 两个任务目录; 仍不做全局 * -text, 不 --renormalize 全仓) =====
+# 理由与 R1/R2 同一: 这些件要能被第三方逐字节复算(CR 字节即证据的一部分)。
+# 与 R2 的差别只是范围写全: R2 是提交后才逐条复算发现 6 件本机带 CRLF 才补规则, 本轮一次性覆盖
+# 该轮全部文件类型(.py/.json/.ps1/.md/日志/raw .rx.bin/镜像/map/清单), 避免同类事后修补。
+reports/firmware/phase8-m8-relative-protection-r3/** -text
+reports/reviews/phase8-m8-relative-protection-r3/** -text

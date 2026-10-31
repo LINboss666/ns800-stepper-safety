@@ -1,0 +1,9 @@
+[DIAG] profile id=7 rev=1 abi=2 flg=0010 VALID
+[DIAG] profile win hz=100[80..120] dir=0 ph=0 tmc=2/20/8/1 mst=1 def=0
+[DIAG] profile zero n=32 [180..210] mean=195
+[DIAG] profile adc n=8 [2050..2090] nz=3 sg n=8 [68..75] seq=1001..1008
+[DIAG] profile thr dev=-45/-90 drop=40/70 tier=2 reach=120/95
+[DIAG] profile dur=30/30/60 rec=100 age=100/100/50 mns=2
+[DIAG] profile imp peak=2500 mg n=2 win=40 age=50
+[DIAG] pending: none
+[DIAG] live sig=44100 match=YES cred zero=1 learn=1

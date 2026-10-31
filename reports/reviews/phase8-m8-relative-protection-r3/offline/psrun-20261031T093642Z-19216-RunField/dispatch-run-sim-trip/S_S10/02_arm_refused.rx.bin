@@ -1,0 +1,4 @@
+[MOT] arm REFUSED (gates failing)
+[MOT] arm_gate_mask=0x2
+[MOT] gate_reason=safety-not-READY
+msh >

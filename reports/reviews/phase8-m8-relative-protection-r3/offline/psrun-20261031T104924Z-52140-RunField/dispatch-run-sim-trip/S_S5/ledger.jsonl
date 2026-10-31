@@ -1,0 +1,18 @@
+{"kind": "PORT_OPEN", "port": null, "t_s": 0.0, "transport": "stub"}
+{"kind": "QUOTA_CONSUMED", "left": 5, "n": 1, "name": "port_open", "t_s": 0.0}
+{"bytes": "motor_status\r\n", "kind": "TX", "t_s": 0.0}
+{"bytes": 627, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "092f7aab804b9be56fd57569f33ec33d63afaa821de1a51fb131cef4d8f042cd", "t_s": 0.005, "tail": "b'P stopped\\r\\nmsh >'"}
+{"bytes": "diag_status\r\n", "kind": "TX", "t_s": 0.005}
+{"bytes": 408, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "6232f4a9c0f3babb5100207c39d93ca82873634e7553f350172b365c38f8100f", "t_s": 0.005, "tail": "b'1 rearm=1\\r\\nmsh >'"}
+{"bytes": "diag_profile tier 2\r\n", "kind": "TX", "t_s": 0.005}
+{"bytes": 149, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "98b66ee3a8c469b172bc20299912e6156d6d3c3fc4db0b97fa3be49846ed8831", "t_s": 0.005, "tail": "b' publish)\\r\\nmsh >'"}
+{"kind": "QUOTA_CONSUMED", "left": 0, "n": 1, "name": "diag_profile_commit", "t_s": 0.005}
+{"bytes": "diag_profile commit\r\n", "kind": "TX", "t_s": 0.005}
+{"bytes": 127, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "d8b097e189845ca3018f0248ab2ca8049ede5a70de1b3dd03c3b177c2f6e7f10", "t_s": 0.005, "tail": "b'xplicitly\\r\\nmsh >'"}
+{"bytes": "diag_profile show\r\n", "kind": "TX", "t_s": 0.005}
+{"bytes": 491, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "c99ac8b4937d922e0d497a7229dd79dad530ed07cb069d48a14ba3a6dfa346cc", "t_s": 0.005, "tail": "b'1 learn=1\\r\\nmsh >'"}
+{"kind": "QUOTA_CONSUMED", "left": 0, "n": 1, "name": "config_save", "t_s": 0.005}
+{"bytes": "config_save\r\n", "kind": "TX", "t_s": 0.005}
+{"bytes": 21, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "9abd9102f9d22729c811b4c14eaee23610274338e6d532071274252cf5e893f6", "t_s": 0.005, "tail": "b' save: OK\\r\\nmsh >'"}
+{"kind": "SESSION_OK", "session": "S_S5", "steps": 6, "t_s": 0.005}
+{"kind": "PORT_CLOSED", "t_s": 0.005}

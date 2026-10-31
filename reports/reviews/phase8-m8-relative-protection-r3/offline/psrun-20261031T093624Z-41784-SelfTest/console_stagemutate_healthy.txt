@@ -1,0 +1,36 @@
+DISPATCH|stage=S0|status=OK|kind=offline|{"facts": {"image_path": "reports/firmware/phase8-m8-relative-protection-r3/rt-thread-motor-m1-candidate.bin", "image_bytes": 290916, "image_sha256": "00608ec93c6a3027d68b44b5317574209fccfb0ba82a9974793d13b54b79e304", "manifest_target": "rt-thread-motor-m1-candidate", "software_input_commit": "805c29bd73c4ea861c9b9c65f61e946aec9548e3", "tested_image_build_commit": "805c29bd73c4ea861c9b9c65f61e946aec9548e3", "reviewed_delivery_commit": "5c549f2af0740425c4014f374d064f77ee62d6b4", "plan_placeholders": 0, "plan_forbidden_hits": 0, "needles_source_root": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad", "needles_total": 40}}
+DISPATCH|stage=S1|status=OK|kind=download|{"action": "download"}
+DISPATCH|stage=S2|status=OK|kind=readback|{"action": "readback"}
+DISPATCH|stage=S3|status=OK|kind=|{"code": "", "recorded": {}, "success": true, "disarm": "NOT_ARMED", "terminal": "KNOWN", "cleanup_errors": [], "obligation": false, "dir": "D:\\ns800\\reports\\reviews\\phase8-m8-relative-protection-r3\\offline\\psrun-20261031T093624Z-41784-SelfTest\\dispatch-stagemutate-healthy\\S_S3", "steps": 13}
+DISPATCH|stage=S4|status=OBSERVATION_NO_TRIGGER|kind=|{"code": "", "recorded": {}, "success": true, "disarm": "CONFIRMED_DISABLED", "terminal": "KNOWN", "cleanup_errors": [], "obligation": true, "dir": "D:\\ns800\\reports\\reviews\\phase8-m8-relative-protection-r3\\offline\\psrun-20261031T093624Z-41784-SelfTest\\dispatch-stagemutate-healthy\\S_S4", "steps": 9}
+DISPATCH|stage=S5|status=STOP|kind=|{"code": "FIELD_VALUE_MISMATCH", "recorded": {"id": "7", "rev": "1", "flags": "0010", "sig": "44100", "match": "YES"}, "success": false, "disarm": "NOT_ARMED", "terminal": "KNOWN", "cleanup_errors": [], "obligation": false, "dir": "D:\\ns800\\reports\\reviews\\phase8-m8-relative-protection-r3\\offline\\psrun-20261031T093624Z-41784-SelfTest\\dispatch-stagemutate-healthy\\S_S5", "steps": 6}
+QUOTA_AUDIT|approved_reboot|declared=1|used=0|left=1
+QUOTA_AUDIT|blackbox_clear|declared=0|used=0|left=0
+QUOTA_AUDIT|cleanup_motor_disarm|declared=3|used=1|left=2
+QUOTA_AUDIT|cleanup_motor_status|declared=3|used=1|left=2
+QUOTA_AUDIT|cleanup_motor_stop|declared=3|used=1|left=2
+QUOTA_AUDIT|config_save|declared=1|used=1|left=0
+QUOTA_AUDIT|diag_profile_commit|declared=1|used=1|left=0
+QUOTA_AUDIT|diag_profile_learn|declared=1|used=1|left=0
+QUOTA_AUDIT|diag_profile_zero|declared=1|used=1|left=0
+QUOTA_AUDIT|dmm_readings|declared=0|used=0|left=0
+QUOTA_AUDIT|download|declared=1|used=1|left=0
+QUOTA_AUDIT|explicit_reset|declared=1|used=1|left=0
+QUOTA_AUDIT|irq_polarity_prep|declared=4|used=2|left=2
+QUOTA_AUDIT|motion_cap_seconds_per_run|declared=5|used=0|left=5
+QUOTA_AUDIT|motor_run|declared=2|used=1|left=1
+QUOTA_AUDIT|motor_run_seconds_total|declared=10|used=0|left=10
+QUOTA_AUDIT|physical_collision|declared=0|used=0|left=0
+QUOTA_AUDIT|port_open|declared=8|used=3|left=5
+QUOTA_AUDIT|readback|declared=1|used=1|left=0
+QUOTA_AUDIT|retry|declared=0|used=0|left=0
+QUOTA_AUDIT|tmc_config_apply|declared=2|used=1|left=1
+DISPATCH|stage=S5|status=NOT_RUN
+DISPATCH|stage=S6|status=NOT_RUN
+DISPATCH|stage=S7|status=NOT_RUN
+DISPATCH|stage=S8|status=NOT_RUN
+DISPATCH|stage=S9|status=NOT_RUN
+DISPATCH|stage=S10|status=NOT_RUN
+DISPATCH|stage=S11|status=NOT_RUN
+DISPATCH_SUMMARY|status=STOP|stages_executed=6|stages_not_run=7|quota_left={"approved_reboot": 1, "blackbox_clear": 0, "cleanup_motor_disarm": 2, "cleanup_motor_status": 2, "cleanup_motor_stop": 2, "config_save": 0, "diag_profile_commit": 0, "diag_profile_learn": 0, "diag_profile_zero": 0, "dmm_readings": 0, "download": 0, "explicit_reset": 0, "irq_polarity_prep": 2, "motion_cap_seconds_per_run": 5, "motor_run": 1, "motor_run_seconds_total": 10, "physical_collision": 0, "port_open": 5, "readback": 0, "retry": 0, "tmc_config_apply": 1}|quota_used={"cleanup_motor_disarm": 1, "cleanup_motor_status": 1, "cleanup_motor_stop": 1, "config_save": 1, "diag_profile_commit": 1, "diag_profile_learn": 1, "diag_profile_zero": 1, "download": 1, "explicit_reset": 1, "irq_polarity_prep": 2, "motor_run": 1, "port_open": 3, "readback": 1, "tmc_config_apply": 1}|profile=healthy|ledger=D:\ns800\reports\reviews\phase8-m8-relative-protection-r3\offline\psrun-20261031T093624Z-41784-SelfTest\dispatch-stagemutate-healthy\dispatch_ledger.jsonl
+STDERR>

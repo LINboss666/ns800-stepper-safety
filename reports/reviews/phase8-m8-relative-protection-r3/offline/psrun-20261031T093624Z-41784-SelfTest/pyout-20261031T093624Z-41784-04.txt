@@ -1,0 +1,1 @@
+F05_STATIC_PORT_DISCIPLINE|PASS|post_open_attribute_writes=none

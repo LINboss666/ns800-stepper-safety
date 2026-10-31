@@ -1,0 +1,2 @@
+[MOT] stop requested: target_hz=0 (软件命令值), STEP 实际关断结果看 stop_result(当前=cmd-0hz-unconfirmed)
+msh >

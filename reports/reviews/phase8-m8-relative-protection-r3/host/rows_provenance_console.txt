@@ -1,0 +1,7 @@
+# host/rows_provenance_check.py 的原始 stdout(逐字, 未编辑)。
+# 命令: python reports/reviews/phase8-m8-relative-protection-r3/host/rows_provenance_check.py
+# 环境: Windows 10.0.26200 / Python 3.12 / 工作目录 D:/ns800 / PYTHONIOENCODING=utf-8 / 退出码 0
+# 首跑(修 rows.json 之前)的 3 项 problems 与 4 项 notes 原样登记在 run_record.md 5.10, 那份 stdout 未保留为文件
+# (它被同一次修复覆盖掉了判据价值低于结果); 这里给的是修复后的干净一次, 可复算。
+ROWS_PROVENANCE|groups=38 capture_refs=27 source_anchor_refs=28 problems=0 notes=0
+hardware_actions=0|writes=0|reads=repo_files_only

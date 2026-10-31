@@ -1,0 +1,34 @@
+{"kind": "PORT_OPEN", "port": null, "t_s": 0.0, "transport": "stub"}
+{"kind": "QUOTA_CONSUMED", "left": 7, "n": 1, "name": "port_open", "t_s": 0.0}
+{"bytes": "system_status\r\n", "kind": "TX", "t_s": 0.0}
+{"bytes": 987, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "1b2819eb44d15824afa6c92e212421630f12ddb4108baca6d887fdbf0f0c6cf7", "t_s": 0.005, "tail": "b'-pending)\\r\\nmsh >'"}
+{"kind": "QUOTA_CONSUMED", "left": 0, "n": 1, "name": "explicit_reset", "t_s": 0.005}
+{"backend": "sim", "kind": "ACTION", "name": "reset", "plan": "rst", "rc": 0, "t_s": 0.005}
+{"bytes": "tmc_config_show\r\n", "kind": "TX", "t_s": 0.005}
+{"bytes": 987, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "643ae2aa47213831580fe2e320e94f9b37126d7e32ffb702013c5ce56d568fbd", "t_s": 0.01, "tail": "b'=0 MRES=5\\r\\nmsh >'"}
+{"kind": "QUOTA_CONSUMED", "left": 1, "n": 1, "name": "tmc_config_apply", "t_s": 0.01}
+{"bytes": "tmc_config_apply CONFIRM\r\n", "kind": "TX", "t_s": 0.01}
+{"bytes": 131, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "848c0369d64b7c6812069299fd6d22ca588e85a52f0c19733d25a225e43d50db", "t_s": 0.01, "tail": "b'\\xe6\\x9c\\xaa\\xe5\\xae\\x9e\\xe6\\xb5\\x8b\\r\\nmsh >'"}
+{"bytes": "tmc_config_show\r\n", "kind": "TX", "t_s": 0.01}
+{"bytes": 961, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "95f09b8578b31003b366d14f182029f51e66358aa5ff49a08bf24ea3b1e11c45", "t_s": 0.015, "tail": "b'=1 MRES=5\\r\\nmsh >'"}
+{"kind": "QUOTA_CONSUMED", "left": 3, "n": 1, "name": "irq_polarity_prep", "t_s": 0.015}
+{"bytes": "safety_polarity_confirm CONFIRM\r\n", "kind": "TX", "t_s": 0.015}
+{"bytes": 876, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "ca92ad746abc547f68e13f0d4f1748913ebb542d8c27c23430ee741cfa5adc1e", "t_s": 0.02, "tail": "b'l CLOSED)\\r\\nmsh >'"}
+{"kind": "QUOTA_CONSUMED", "left": 2, "n": 1, "name": "irq_polarity_prep", "t_s": 0.02}
+{"bytes": "safety_irq_enable\r\n", "kind": "TX", "t_s": 0.02}
+{"bytes": 234, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "47b0c0c807102880ba9cbd094a68c759ac2c6c1e748c932ecf6070f5b6331587", "t_s": 0.02, "tail": "b'r via MCU\\r\\nmsh >'"}
+{"bytes": "safety_irq_status\r\n", "kind": "TX", "t_s": 0.02}
+{"bytes": 543, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "dcb8973b6f798780e197dbb5ddc8438376ed2ef84cef4f6004e78330d71b41d4", "t_s": 0.025, "tail": "b'red on it\\r\\nmsh >'"}
+{"bytes": "motor_status\r\n", "kind": "TX", "t_s": 0.025}
+{"bytes": 627, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "092f7aab804b9be56fd57569f33ec33d63afaa821de1a51fb131cef4d8f042cd", "t_s": 0.03, "tail": "b'P stopped\\r\\nmsh >'"}
+{"bytes": "diag_status\r\n", "kind": "TX", "t_s": 0.03}
+{"bytes": 408, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "6232f4a9c0f3babb5100207c39d93ca82873634e7553f350172b365c38f8100f", "t_s": 0.03, "tail": "b'1 rearm=1\\r\\nmsh >'"}
+{"bytes": "config_show\r\n", "kind": "TX", "t_s": 0.03}
+{"bytes": 507, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "cd5ca49fa36ee08adf4eea2108f8e617875ec481826a75c025da84bedf0bea41", "t_s": 0.03, "tail": "b'_source=1\\r\\nmsh >'"}
+{"bytes": "diag_profile show\r\n", "kind": "TX", "t_s": 0.03}
+{"bytes": 101, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "4abbfe2ac4e312f78e29af09631bd28496d2483f87ce51c3658a49091061e218", "t_s": 0.03, "tail": "b'0 learn=0\\r\\nmsh >'"}
+{"kind": "QUOTA_CONSUMED", "left": 0, "n": 1, "name": "diag_profile_zero", "t_s": 0.03}
+{"bytes": "diag_profile zero 32\r\n", "kind": "TX", "t_s": 0.03}
+{"bytes": 71, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "d4fee34ff3b1ee316dba90f20ee8c672a2de143bc28c63b7b46b68315966949d", "t_s": 0.03, "tail": "b'ntouched)\\r\\nmsh >'"}
+{"kind": "SESSION_OK", "session": "S_S3", "steps": 13, "t_s": 0.03}
+{"kind": "PORT_CLOSED", "t_s": 0.03}

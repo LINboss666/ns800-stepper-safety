@@ -1,0 +1,14 @@
+base_commit=f1aa2e832d536593641cea44ea890fb8ce9558b9
+app_rel=rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications
+baseline_diag_blob=cb5d0a4a3e719f05845a8c0a7d180e534e6bc0bd
+baseline_frame_hdr_blob=f71e956f2f41c2832c12a98ba405c45318183ef1
+baseline_diagnosis_bytes=33554
+build_rc=0 warnings=0
+proc_rc=0
+PROBE|tree=baseline|diag_input_t_size=32|sensor_frame_size=56
+CASE|M8-PRE-1-baseline-has-no-source-age|PASS|checks=502
+CASE|M8-PRE-2-baseline-has-no-single-source-severe|PASS|checks=4
+[DIAG] ACTIVE: severe STALL_CONFIRMED -> post EVT_MULTI_FAULT
+CASE|M8-PRE-3-baseline-print-before-protect|PASS|checks=5
+SUMMARY|cases=3 pass=3 fail=0 pre_bad=0 executed=3
+M8 修前观察复现: PASS(三项都在精确基线 f1aa2e832d536593641cea44ea890fb8ce9558b9 上按预期复现; pass=3/3)

@@ -1,0 +1,8 @@
+[DIAG] verdict=STALL_SUSPECT mode=MONITOR_ONLY health=OK
+[DIAG] sg_filt=66 delta=0 cur_filt=25 mA delta=0 mA
+[DIAG] vib rms=1005 peak=1010 mg band=1
+[DIAG] cnt sg<warn=1095 sg<stall=0 cur>warn=0 cur>stall=0 impact=0 bad=0 clean=0
+[DIAG] rel snap=OK inc=OK seq=12 pubfail=0
+[DIAG] rel mode=MONITOR_ONLY prof=PRESENT id=7 rev=1 flg=0010 FIELD_UNVERIFIED
+[DIAG] rel cov=COVERED lost=0 gen=1 rearm=1
+msh >

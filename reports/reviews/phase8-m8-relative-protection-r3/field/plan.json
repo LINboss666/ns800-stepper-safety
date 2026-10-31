@@ -1,0 +1,1365 @@
+{
+  "package": "phase8-m8-relative-protection-r3-FIELD-CANDIDATE",
+  "status": "NOT_AUTHORIZED / NOT_EXECUTED (本轮离线: hardware_actions=[], 未连接任何设备)",
+  "task_id": "phase8-m8-relative-protection-r3",
+  "numbers_are_proposals_not_authorization": true,
+  "identity_binding": {
+    "reviewed_delivery_commit": "5c549f2af0740425c4014f374d064f77ee62d6b4",
+    "software_input_commit": "805c29bd73c4ea861c9b9c65f61e946aec9548e3",
+    "tested_image_build_commit": "805c29bd73c4ea861c9b9c65f61e946aec9548e3",
+    "note": "software_input_commit(被验证的源码/验证链提交)与 tested_image_build_commit(镜像实际取自的提交)分列登记。本轮三目标构建发生在该提交之后、且构建输入的产品源码与该提交逐字节相同(构建时 git status --porcelain 对已跟踪文件为空), 因此两者允许相等; 相等这件事由 S0 的 git rev-parse + 现场重算 sha 证明, 不是由本字段声明。",
+    "build_input_proof": {
+      "how": "S0 逐件核验: (1) 镜像按 path 重算 bytes+sha256 并与 build_manifest.json 的该 target.images 条目逐字段相等; (2) 两个提交都必须是仓库里真实存在的 commit 对象(git rev-parse <sha>^{commit}); (3) needles.json 的每条 needle 必须回到 A/ 下的 C 源码字面量; (4) 计划里不许残留 <待填> 占位或已废弃的 pyocd packmem; (5) 阶段自己声明的 forbidden_commands 若在 steps 里出现即拒绝。",
+      "product_file_changed_this_round": "applications/diag_relative.c",
+      "product_file_sha256": "059fc7535a550462c8c1c10039d5efdc419842811eadcf7ad8f2711bff541ce5",
+      "sha_source": "复审包内 patches/motion_freshness.patch 的候选输出散列(同一补丁应用到 3960fb7e… 输入)"
+    },
+    "image": {
+      "path": "reports/firmware/phase8-m8-relative-protection-r3/rt-thread-motor-m1-candidate.bin",
+      "bytes": 290916,
+      "sha256": "00608ec93c6a3027d68b44b5317574209fccfb0ba82a9974793d13b54b79e304",
+      "sha256_source": "build_manifest.json targets[rt-thread-motor-m1-candidate].images; S0 现场重算并要求逐字节相等",
+      "axf": {
+        "path": "reports/firmware/phase8-m8-relative-protection-r3/rt-thread-motor-m1.axf",
+        "bytes": 1771288,
+        "sha256": "0bba8ca74ed8c11e149395efd64c42072fce0b3ced5ab76281210ddc04550963",
+        "note": "下载载荷用 .axf(P0 已成功的那条 -e sector 形式就是喂 .axf), 回读比对基准用 .bin(定长 savemem 的长度就是它的字节数)"
+      },
+      "manifest": "reports/firmware/phase8-m8-relative-protection-r3/build_manifest.json",
+      "built_from_code_commit": "805c29bd73c4ea861c9b9c65f61e946aec9548e3",
+      "effective_macros_this_image": {
+        "MOTOR_HARDWARE_ENABLE_PATH_VALIDATED": "1",
+        "TMC_DRIVE_CONFIG_HW_VALIDATED": "1",
+        "STEP_DIAG_ISOLATED_ENV_CONFIRMED": "0",
+        "SAFETY_LIMIT_INPUTS_ENABLED": "0"
+      },
+      "reproducibility_note": ".axf/.map 内含链接时间戳, 不宣称跨次构建字节可重放; 这里登记本轮每个目标唯一一次 Rebuild All 的实际产物字节。"
+    },
+    "executor": {
+      "path": "reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py",
+      "note": "执行器自身的字节身份记在 run_record/SHA256SUMS(交付清单)里, 不在本计划里自引用: 计划与执行器互相引用会把清单算成闭合。"
+    }
+  },
+  "rows_file": "rows.json",
+  "needles_file": "reports/reviews/phase8-m8-relative-protection-r3/field/needles.json",
+  "needles_source_root": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad",
+  "needles_source_root_note": "needles.json 的 source 字段是 applications/*.c(相对 BSP 目录), 所以证明根必须是 BSP 目录而不是仓库根: 用仓库根会把 40 条全部判成找不到文件(本轮实测过)。",
+  "quota": {
+    "port_open": 8,
+    "download": 1,
+    "readback": 1,
+    "explicit_reset": 1,
+    "approved_reboot": 1,
+    "motor_run": 2,
+    "motor_run_seconds_total": 10,
+    "motion_cap_seconds_per_run": 5,
+    "config_save": 1,
+    "tmc_config_apply": 2,
+    "irq_polarity_prep": 4,
+    "diag_profile_zero": 1,
+    "diag_profile_learn": 1,
+    "diag_profile_commit": 1,
+    "cleanup_motor_stop": 3,
+    "cleanup_motor_disarm": 3,
+    "cleanup_motor_status": 3,
+    "retry": 0,
+    "physical_collision": 0,
+    "blackbox_clear": 0,
+    "dmm_readings": 0
+  },
+  "quota_is_executed_not_declared": "exec_session 在**发送之前**扣额度; 不足 => QUOTA_EXHAUSTED 且那条命令不会被发出; 计划里没有的动作 => QUOTA_UNDECLINED。整包共用**一本账**: dispatch_plan 建一个 quota_box 并把同一个 dict 交给每个会话与每个动作阶段(不是每个会话从 plan 复制一份), 结束时输出 quota_left/quota_used 与逐键 QUOTA_AUDIT 行, 用了但没申报的键或负余额都会让调度非成功。",
+  "cleanup_reserve_semantics": "清理三条命令各有**独立**预留(cleanup_motor_stop/disarm/status), 在 cleanup() 里逐条扣减并记入同一本账; 某一条的预留耗尽**不会**取消另一条的发送机会(这正是 R2 交付版的缺陷)。预留未申报或耗尽时仍然发送(必要撤能优先于额度), 但会写入 cleanup_overruns 并具名 CLEANUP_RESERVE_EXHAUSTED => 该会话不是成功、调度停止后续阶段。",
+  "approved_reboot_semantics": "重启不是一条可以发的命令: S6 是操作者交付门(operator_gate), approved_reboot=1 只由这道门扣, 交付不成立(MANUAL_GATE_DENIED)就停止后续阶段。计划里若再出现 __approved_reboot__ 步骤会走 action 支并同样扣这笔额度, 但本轮没有任何工具被申报为 reboot => RealActionBackend 收到的 argv 为空会具名失败, 不会静默'重启成功'。",
+  "quota_accounting": {
+    "normal_usage": {
+      "port_open": 8,
+      "download": 1,
+      "readback": 1,
+      "explicit_reset": 1,
+      "approved_reboot": 1,
+      "motor_run": 2,
+      "config_save": 1,
+      "tmc_config_apply": 2,
+      "irq_polarity_prep": 4,
+      "diag_profile_zero": 1,
+      "diag_profile_learn": 1,
+      "diag_profile_commit": 1
+    },
+    "cleanup_reserve": {
+      "cleanup_motor_stop": 3,
+      "cleanup_motor_disarm": 3,
+      "cleanup_motor_status": 3
+    },
+    "per_profile_note": "申报值是**上限**, 不是预期用量: healthy/no_trigger 实际用 5 次开口 + 2×清理三条; trip 实际用 8 次开口(S9 事故取证 / S10 锁存态 arm 拒绝 / S11 人工恢复各一次) + 3×清理三条。两个数字都逐键进 QUOTA_AUDIT 行, 用了没申报的键或负余额 => 调度非成功。",
+    "not_expanded": "retry=0/physical_collision=0/blackbox_clear=0/dmm_readings=0 一律不许在运行中临时抬: 需要追加就是**新的具体批准**, 不是本包的一部分。"
+  },
+  "motion_budget": {
+    "kind": "monotonic hard cap established at the motor_start write attempt",
+    "applies_to": [
+      "blocking write",
+      "read",
+      "watch window",
+      "manual wait",
+      "learn capture",
+      "cleanup sends"
+    ],
+    "cap_seconds": 5,
+    "cleanup_reserve_seconds": 4,
+    "cleanup_window_per_command_seconds": 1.2,
+    "measured_field": "budget_seconds (start attempt -> stop/disarm send), 逐条清理命令另有 CLEANUP_READ 事件的 sent_t/ended_t/window",
+    "not_a_physics_claim": "主机侧截止是调度约束: 串口写入不等于物理停机保证。未证禁能一律 UNKNOWN, 现场操作者保留应急制止(SW1/先关 24 V 再拔 USB)前提。",
+    "motion_window_budget_proof": {
+      "claim": "在 5 s 硬截止内, 起转后的业务步(RUNNING 复核 + learn)能完成, 并且仍留有清理机会。",
+      "facts": [
+        "SENSOR_PERIOD_MS=10(100 Hz), SENSOR_SG_DIV=10 => SG 独立样本 10 Hz (A/sensor_service.c:37-38)",
+        "learn 的最小 N=8 (A/diag_relative.c 'learn args: N=8..32'), 8 个独立 SG 样本 => 约 800 ms",
+        "起转后第一步是同一次会话里的一条 motor_status(RUNNING 复核), 一条命令的响应在板上是 27 行以内、128 B 行裁剪 => 亚 100 ms 量级(M4/M6 采集实测单条 <100 ms)",
+        "清理段另有 4 s 保留, 三条命令各 1.2 s 窗(1.2*3=3.6 <= 4)"
+      ],
+      "arithmetic": "0.1(status) + 0.8(learn 最小) + 余量 >= 4.1 s 仍可用; 观察窗在剩余预算内自然到期(实测 budget_seconds=5.000) => 清理在 t=cap..cap+4 内完成",
+      "measured_this_round": "离线 stub 用 SimClock 计到的 S4/S8 budget_seconds 与三条清理命令的发送/确认时刻记在 run_record 与 dispatch 台账里(不是靠把 seconds 改大)",
+      "worst_case_disclosed": "产品 learn 自带 12 s 超时(> 5 s 硬截止), 而 msh 是单线程: learn 卡住时 motor_stop 不会被处理。该风险不靠放宽上限掩盖, 见 residual_risk。"
+    }
+  },
+  "residual_risk": [
+    "learn 的 12 s 内部超时 > 5 s 运动硬截止: 期间唯一可执行的物理制止手段是操作者的 SW1/断电(本包不假装串口写入能保证停机)。缓解: N 取产品允许最小值 8、学习前先证得 RUNNING、观察窗在剩余预算内到期。",
+    "回读长度绑 @IMAGE_BYTES(= S0 现场重算并与 manifest 相等的字节数): 若批准时换镜像, 计划与镜像散列必须一起重新生成, 不许手改单条参数。",
+    "重启后的 Flash v2->v3 迁移是否真的成立, 本轮只证到代码/离线控制流; 现场必须按 config_show 的 valid/version 与 diag_profile show 的 id/rev 实测。"
+  ],
+  "cleaning_and_terminal": {
+    "path": "motor_stop -> motor_disarm -> motor_status(一次读回全部撤能字段), 每条各 1.2 s 确认窗, 总额 4 s 保留",
+    "confirmed_only_if": "同一份新 motor_status 响应里六个合同字段各恰好一条且: state name ∈ {FAULT, OTHER}、armed=0、cur_hz=0 且 tgt_hz=0、drv_request=LOW 且 pad=0、expected_ENN=HIGH 且 ENN_fb=1、resolved、verdict ∈ {OK, CUT_BY_HARDWARE}、diag_off_confirmed=YES、health=OK",
+    "why_not_idle": "A/motor.c 的 cmd_motor_status 只打印 name=FAULT|OTHER(取 snap.state==MOTOR_FAULT), 永远不会打印 IDLE; 故障锁存后的禁能也必须能证得, 所以判据按 state 数值+其余字段, 不按 IDLE 字串。",
+    "drv_en_request_is_historical": "drv_en_request 是**最近一次确认值**(A/motor.c), 不是当前请求; 当前请求侧必须看 drv_request=LOW pad=0, 仍为 HIGH 一律 UNKNOWN(本轮具名负控 B8 就是这个支)。",
+    "not_spliced_across_responses": "六个字段必须来自同一份响应; 缺/重/冲突一律不可证实 => UNKNOWN, 不跨响应拼字段。",
+    "otherwise": "disarm=UNKNOWN, terminal=UNKNOWN; 主错与清理错分别保留; 证据落盘失败(EVIDENCE_OPEN_FAILED/EVIDENCE_WRITE_FAILED)立即终止业务, 仅必要清理继续。",
+    "gate_on_success": "清理 UNKNOWN、清理错误、预留耗尽、证据失败都令 exec_session.success=False 且 CLI 返回非 0; dispatch_plan 遇非成功立即停止后续阶段(NOT_RUN 明列, 不计入 stages_executed)。"
+  },
+  "prerequisites_after_fresh_flash_or_reboot": {
+    "why": "新烧录/重启后板子不继承 M4/M5/M7 的 CONFIGURED 与 IRQ OPEN; 缺这些前置就没有'保护已就绪'的运动窗口。",
+    "chain": "tmc_config_show(读实际态) -> tmc_config_apply CONFIRM -> tmc_config_show(必须证到 state=CONFIGURED 且 snapshot_valid=1) -> safety_polarity_confirm CONFIRM -> safety_irq_enable -> safety_irq_status(证到 irq gate=OPEN) -> motor_status(AT_REST 档案) -> diag_status/config_show",
+    "each_step_proven_by": "expect_values 对**值**判(不是正则形状): CONFIGURED/snapshot_valid=1/gate=OPEN, 静止支由 disable_contract 的六个合同字段判",
+    "irun_policy": "保持 IRUN20 现值, 不抬流; apply 次数如实计入 quota_used(tmc_config_apply=2: 烧后一次 + 重启后一次)。",
+    "why_unconditional": "R2 计划里的 only_if '探针显示未成立才做' 不是实现(执行器没有分支)。本轮把前置固定为**每次都要重新证明**: 顺序确定、额度确定, 不需要运行时推断。"
+  },
+  "load_step": {
+    "verdict": "NAMED_PREREQUISITE_MISSING",
+    "missing": [
+      "受控加载工具",
+      "可重复施加且可量化的作用点"
+    ],
+    "policy": "本轮不宣称有机械加载方法; 不许以'允许自然触发'代替约束, 也不手捏旋转轴或为凑阈值加危险力。",
+    "operator_would_do": "只有当操作者在批准范围里明确写出'在哪个作用点、用什么夹具、加多大'之后, 才允许把加载作为 S8 的激励步骤; 本包里该步骤不存在。"
+  },
+  "impact_r6_excitation": {
+    "selected": false,
+    "approval": "非破坏性激励必须写成可单独选择的批准范围; 本轮批准里没有这一项。",
+    "default_outcome": "FIELD_NOT_TRIGGERED(不得把'自然未撞'写成物理通过)"
+  },
+  "flash_state_registering": {
+    "absent": "无有效参数块 -> 只允许 defaults, 且不得把 defaults 当成已持久化 profile",
+    "v2": "需要 v2->v3 迁移 -> 迁移只在主机链证过(FIELD_UNVERIFIED); 现场在第一次 config_save 之前不得宣称 profile 已生效",
+    "v3": "直接加载, 仍要 diag_profile show 核对 id/rev 与 signature"
+  },
+  "profile_restore_check_after_reboot": {
+    "implemented_by": "S5 的 record_from(从本轮 commit OK 行与 diag_profile show 行机械抓 id/rev/flags/live sig/match) + S7 的 compare_recorded(重启后重新读 diag_profile show, 逐项与记录比) + S8 的 compare_recorded_gt(事故后的 [BB] session/written 必须**实际增大**)",
+    "must_compare": [
+      "profile id",
+      "revision",
+      "abi/flags",
+      "signature 与 live sig 的 match=YES",
+      "blackbox session 与 written 的本轮增量"
+    ],
+    "stop_codes": [
+      "RECORD_STEP_MISSING",
+      "RECORD_PATTERN_NOT_FOUND",
+      "COMPARE_STEP_MISSING",
+      "COMPARE_PATTERN_NOT_FOUND",
+      "RESTORE_MISMATCH",
+      "COMPARE_GT_STEP_MISSING",
+      "COMPARE_GT_PATTERN_NOT_FOUND",
+      "SESSION_NOT_INCREASED"
+    ],
+    "never_satisfied_by": [
+      "文档里的 must_compare 列表本身",
+      "[DIAG] rel 行首字符串",
+      "fixture 里写的 flash_state",
+      "只读旧 flash_logstat 计数"
+    ]
+  },
+  "c3_protocol_vs_business": {
+    "protocol": [
+      "提示符 msh > / msh /> 必须命中(缺 => MISSING_RESPONSE_PROMPT)",
+      "非法 UTF-8 字节 => ILLEGAL_BYTES_IN_RESPONSE(不得 replace 后收数)",
+      "权威字段必须恰好一条 => FIELD_NOT_EXACTLY_ONE / FIELD_NOT_UNIQUE_<key>",
+      "原始字节先落盘(fsync)后判读; 判读文本 emit_text 真写出(不再是没落盘的 .txt 名字)",
+      "被动观察窗不带提示符是允许的(require_prompt=False), 但只用于无命令的那段时间"
+    ],
+    "business": [
+      "FAILED / REFUSED / VOIDED / 'not supported' 一律业务失败",
+      "拒绝可被正确观察(allowed_outcomes), 但之后不得继续 commit/save/start/arm/fault_reset",
+      "收到完整提示符只代表**命令返回**, 不代表业务成立: motor_start 成功不打印 [MOT](A/motor.c:2487), 运行事实必须由本轮新的 motor_status(RUNNING 档案)证明"
+    ],
+    "row_provenance": "field/rows.json 逐组标注来源: 板上原始采集 / 被 128 字节控制台缓冲截断后按内容拆分 / 源码字面量形状+本轮下发值(无板级采集时)。第 3 类不构成设备证据。"
+  },
+  "corrections_from_review_r3": [
+    "R3-A: A/diag_relative.c 应用复审精确补丁(motion_freshness.patch, 输入 3960fb7e… 输出 059fc753…), 过期 IDLE 不再豁免覆盖丢失; 原 C 链加入 REL50 具名断言(49 身份保留, 50/50)与 RV10 只删年龄项的局部反向。",
+    "R3-B1(部分字节写失败): 义务在 port.write **之前**建立, 写异常/短写同样走一次必要撤能; 未证禁能 UNKNOWN; 主错 COMMAND_WRITE_FAILED 保留。",
+    "R3-B2(写耗时吃掉预算): 硬截止起点在尝试之前, 业务剩余量扣掉写耗时(实测 motor_start 在 t=2.0 写出、motor_stop 在 t=5.0 发出, 而不是 t=7)。",
+    "R3-B3(stop 无应答): 清理改为每条命令各 1.2 s 独立窗且**不中断后续发送**(disarm 仍发出), 主错与清理错分开登记, 该会话 success=False。",
+    "R3-B4(运动窗口内人工门): 计划的静态判据 plan_motion_window_violations() 在**开口之前**拒绝 => PLAN_MANUAL_AFTER_MOTION, 一条命令都不发; 本轮所有 manual 步骤都排在 arm/start 之前。",
+    "R3-B5(禁能判据与真实固件不符): disable_contract() 用同一份响应的六个合同字段(含 cur_hz/tgt_hz、drv_request/pad、diag_off_confirmed), 允许 name=FAULT|OTHER 而不是要求 IDLE; drv_en_request 只按历史值披露; 重复/缺失/冲突/未解析一律 UNKNOWN。expect_fields 之外新增 expect_values(逐值) 与 expect_profile(AT_REST/RUNNING 一致性)。",
+    "R3-C1(整包贯通): dispatch_plan 一次批准从 S0 走到最后一个阶段, 成功阶段只记检查点(不重新批准、不重下载), 失败才停; S0 是真实文件哈希/git 对象/needles 三重绑定(不再是 OFFLINE_BINDING 一行); 额度是整包共用一本账, 开口在发送前扣, DAP-only 阶段不额外开 COM; 正常用量与清理预留分别登记并输出逐键 QUOTA_AUDIT。",
+    "R3-C1b(工具真实化): plan.tools 用本机既存**已成功**的 pyocd 形态逐字绑定(pack/target/选项来自 P0 的 S1/S2 原始日志), download 与 readback 的成功原文按 expect_all/expect_counts 核对(不能只看 rc), 回读定长从 0x08000000 起、交付物是 savemem 明确写出的文件、并与镜像逐字节相等; 三个机械占位(@UID_FILE/@RUN_ROOT/@IMAGE_BYTES)由执行器展开, 展开后仍残留占位 => TOOL_ARGV_UNRESOLVED; 计划里不再有 <CMSIS-Pack>/<bytes> 占位与 pyocd packmem(由 plan_placeholder_scan 在 S0 拒绝)。",
+    "R3-C1c(重启不是命令): S6 改为 operator_gate 交付门并显式扣 approved_reboot=0; 不保留凑接口的空实现路径。",
+    "R3-C2(真固件协议): 两处 apply 改为 tmc_config_apply CONFIRM; motor_start 成功不再要求 [MOT], 由本轮 motor_status 证 RUNNING(先证再起 learn); 学习前先有限轮询证得 CRUISE/稳定窗, 学习与串口阻塞受同一运动预算, 上限内的可完成性用 sensor 分频实算(motion_window_budget_proof)。",
+    "R3-C2b(commit/save 不再被未触发跳掉): 静止期的 tier/commit/show/config_save 移到独立阶段 S5(不与起转共用一个会话), 因此'到时未触发'只结束运动会话本身, 主线仍然走到提交与保存; 重启后 S7 实际比较记录值。",
+    "R3-C2c(成功口径): CLI 返回码只认 success(清理 UNKNOWN/清理错误/预留耗尽/证据失败一律非 0), 不再只看 status=OK/NO_TRIGGER; PS 调度据同一口径停止后续阶段。",
+    "R3-C3(演示目的不缩水): 静止零点 -> 单向巡航学习 -> 正常片段 -> 静止提交保存(S5) -> 一次重启并**实际比较**恢复值(S6/S7) -> 显式 RELATIVE 武装 + 有界观察(S8) -> 真实触发才分岔: S9 事故取证(锁存视图/黑匣子按实际新增 session 判/新日志计数/锁存态仍可证禁能)、S10 锁存态 motor_arm 具名拒绝(申报 expected_terminal=REFUSED, 会话到此结束)、S11 人工恢复(MANUAL_CLEAR + 重跑自检 + 就绪复核, 禁 motor_start)。到时无触发只登记 NO_TRIGGER, S9/S10/S11 用 profiles=[trip] 整体不参与, 不跑假故障恢复。事故链不与运动共用会话: 观察窗跑到 5 s 截止点后, 同会话的后续业务步一律 MOTION_BUDGET_EXHAUSTED(本轮实测到该支, 因此拆会话, 而不是放宽截止点)。"
+  ],
+  "tools": {
+    "provenance": {
+      "why_these_arguments": "逐字取自本机**已经成功**的 P0 记录: reports/reviews/phase8-motor-m7-current-calibration-r2/p0_package.md(命令段) 与 reports/reviews/phase8-motor-m7-p0-board/S1_flash.stderr.txt + S2_readback.stdout.txt(成功原文)。本轮没有为查参数连接或枚举任何设备。",
+      "cli_options_verified_offline": [
+        "python -m pyocd --version => 0.45.1",
+        "python -m pyocd reset --help => -u/--uid, -t/--target, -W/--no-wait, -M/--connect, -m/--method(含 sysresetreq), -c/--core 均存在(原文存 pyocd_reset_help.txt)"
+      ],
+      "uid_handling": "DAP UID 只在 real 分支从既存私有文件读取(48 字符, sha256 前 12 位 d2f530dbd062 已在 M7/P0 记录里登记), 永不打印、永不入库。"
+    },
+    "substitutions": {
+      "@UID_FILE": "既存私有 UID 文件内容(real 后端; 缺 --uid-file => UID_FILE_REQUIRED)",
+      "@RUN_ROOT": "本次 dispatch 的运行根目录(执行器自己的 out)",
+      "@IMAGE_BYTES": "0x%X 形式的镜像长度, 数值 = identity_binding.image.bytes = S0 现场重算并与 manifest 相等的字节数"
+    },
+    "download": {
+      "command": "python -m pyocd flash --pack C:/Keil_v5/ARM/PACK/.Download/NOVOSENSE.NS800RT7XXX.0.5.3.pack -t ns800rt7p65d_dhqfby2 -u @UID_FILE -f 1000000 --no-config -Oauto_unlock=false -Ocache.enable_memory=false -Ocache.read_code_from_elf=false -e sector reports/firmware/phase8-m8-relative-protection-r3/rt-thread-motor-m1.axf",
+      "argv": [
+        "python",
+        "-m",
+        "pyocd",
+        "flash",
+        "--pack",
+        "C:/Keil_v5/ARM/PACK/.Download/NOVOSENSE.NS800RT7XXX.0.5.3.pack",
+        "-t",
+        "ns800rt7p65d_dhqfby2",
+        "-u",
+        "@UID_FILE",
+        "-f",
+        "1000000",
+        "--no-config",
+        "-Oauto_unlock=false",
+        "-Ocache.enable_memory=false",
+        "-Ocache.read_code_from_elf=false",
+        "-e",
+        "sector",
+        "reports/firmware/phase8-m8-relative-protection-r3/rt-thread-motor-m1.axf"
+      ],
+      "image": {
+        "path": "reports/firmware/phase8-m8-relative-protection-r3/rt-thread-motor-m1.axf",
+        "bytes": 1771288,
+        "sha256": "0bba8ca74ed8c11e149395efd64c42072fce0b3ced5ab76281210ddc04550963"
+      },
+      "expect_all": [
+        "Erasing... [loader]",
+        "Programming... [loader]"
+      ],
+      "expect_counts": {
+        "Erased [0-9]+ bytes \\([0-9]+ sectors\\), programmed [0-9]+ bytes \\([0-9]+ pages\\)": 1
+      },
+      "expectation_basis": "P0 的 S1_flash.stderr.txt 里这三行是 loader 的成功原文(第 1/2 行 + 末行的 Erased/programmed 摘要); 只 rc=0 不算通过。",
+      "no_retry": "额度 1, 失败不重试: 第二次下载是**新的批准范围**。"
+    },
+    "readback": {
+      "command": "python -m pyocd commander --no-config -t cortex_m -u @UID_FILE -f 1000000 -O auto_unlock=false -O connect_mode=halt -O resume_on_disconnect=false -O cache.enable_memory=false -O cache.read_code_from_elf=false -O scan_all_aps=false -c status -c \"savemem 0x08000000 @IMAGE_BYTES @RUN_ROOT/readback.bin\" -c status -c exit",
+      "argv": [
+        "python",
+        "-m",
+        "pyocd",
+        "commander",
+        "--no-config",
+        "-t",
+        "cortex_m",
+        "-u",
+        "@UID_FILE",
+        "-f",
+        "1000000",
+        "-O",
+        "auto_unlock=false",
+        "-O",
+        "connect_mode=halt",
+        "-O",
+        "resume_on_disconnect=false",
+        "-O",
+        "cache.enable_memory=false",
+        "-O",
+        "cache.read_code_from_elf=false",
+        "-O",
+        "scan_all_aps=false",
+        "-c",
+        "status",
+        "-c",
+        "savemem 0x08000000 @IMAGE_BYTES @RUN_ROOT/readback.bin",
+        "-c",
+        "status",
+        "-c",
+        "exit"
+      ],
+      "out_file": "readback.bin",
+      "start_address": "0x08000000",
+      "length_rule": "长度 = 本轮候选 BIN 的字节数(由 @IMAGE_BYTES 机械展开, 与 S0 重算值绑定); 不是任意窗口",
+      "image": {
+        "path": "reports/firmware/phase8-m8-relative-protection-r3/rt-thread-motor-m1-candidate.bin",
+        "bytes": 290916,
+        "sha256": "00608ec93c6a3027d68b44b5317574209fccfb0ba82a9974793d13b54b79e304"
+      },
+      "expect_all": [
+        "Saved "
+      ],
+      "expect_counts": {
+        "Core 0 \\(None\\):  Halted": 2
+      },
+      "expectation_basis": "P0 的 S2_readback.stdout.txt 就是 'Core 0 (None):  Halted' 两条夹一条 'Saved <n> bytes to <path>'; 交付物判据是那个文件的字节数/散列/与镜像逐字节相等(READBACK_BYTE_COUNT / READBACK_HASH_MISMATCH / READBACK_NOT_BYTE_EQUAL_TO_IMAGE), stdout 里的工具文字不参与字节比较。",
+      "no_retry": "额度 1。"
+    },
+    "reset": {
+      "command": "python -m pyocd reset --method sysresetreq --no-config --no-wait --connect attach --core 0 -t cortex_m -u @UID_FILE",
+      "argv": [
+        "python",
+        "-m",
+        "pyocd",
+        "reset",
+        "--method",
+        "sysresetreq",
+        "--no-config",
+        "--no-wait",
+        "--connect",
+        "attach",
+        "--core",
+        "0",
+        "-t",
+        "cortex_m",
+        "-u",
+        "@UID_FILE"
+      ],
+      "expect_all": [],
+      "expect_counts": {},
+      "expectation_basis": "P0 采集器用的就是这条显式形态(明确方法与已知 UID), 避免旧裸 'pyocd reset -t cortex_m' 的默认选择/等待; --no-wait 是不等待缺席探针, 不是第二次试连。pyocd 该子命令不产出稳定成功文案, 因此本步只按 rc=0 + 原始 stdout/stderr 落盘判定, 成功与否由后续读取的**状态变化**证明(tmc_config_show 必须落到 UNCONFIGURED 起点)。",
+      "note": "工具内部定位该 UID 的行为不冒称零内部枚举。"
+    }
+  },
+  "stages": [
+    {
+      "id": "S0",
+      "title": "离线绑定: 镜像按路径重算 bytes/sha256 并与 manifest 逐字段相等; 两个提交必须是仓库里的 commit 对象; needles 回 C 源码证明; 计划占位与禁止命令静态拒绝",
+      "kind": "offline",
+      "requires": [],
+      "halt_after": false,
+      "device_actions": 0
+    },
+    {
+      "id": "S1",
+      "title": "唯一一次下载(real 后端跑逐字 pyocd flash; sim 只记调用序列)",
+      "kind": "download",
+      "requires": [
+        "S0"
+      ],
+      "halt_after": false,
+      "operator_checkpoint": "拿到 S1 的 rc/原始 stdout+stderr 后**不需要**重新批准即可进 S2(同一份批准)"
+    },
+    {
+      "id": "S2",
+      "title": "唯一一次定长 Flash 回读: 0x08000000 起取本轮 BIN 长度, 与 S0 重算散列/镜像逐字节比对",
+      "kind": "readback",
+      "requires": [
+        "S1"
+      ],
+      "halt_after": false,
+      "operator_checkpoint": "回读件路径/长度/散列记入台账; 不等即 READBACK_* 具名停止, 不进 S3"
+    },
+    {
+      "id": "S3",
+      "title": "会话1: 开口(扣额度) -> 一次显式 DAP 复位 -> 首读 -> 前置重新证明(apply CONFIRM + 极性/IRQ) -> 静止期零点",
+      "kind": "serial_session",
+      "requires": [
+        "S2_byte_equal"
+      ],
+      "total_deadline_seconds": 90,
+      "reset_after_port_open": true,
+      "halt_after": false,
+      "forbidden_commands": [
+        "config_load",
+        "config_default",
+        "blackbox_clear",
+        "flash_logclear",
+        "flash_test",
+        "flash_unlock",
+        "pwm_test",
+        "safety_trip",
+        "motor_start",
+        "motor_arm"
+      ],
+      "boot_bytes": [],
+      "boot_bytes_note": "本轮离线不伪造启动横幅(启动事实由 S1/S2 的镜像身份与 S3 首读的系统状态共同承担); 真实现场的启动流由 PS 侧控制台采集另存。",
+      "manual_answers": {},
+      "steps": [
+        {
+          "cmd": "system_status",
+          "as": "sysboot",
+          "seconds": 6,
+          "expect_contains": [
+            "=== SYSTEM STATUS ===",
+            "[Boot]   bootstrap-complete=YES"
+          ],
+          "expect_values": [
+            {
+              "row": "^\\[Boot\\]   bootstrap-complete=(?P<bc>\\w+) abort-stage=(?P<ab>\\d+)$",
+              "must": {
+                "bc": "YES",
+                "ab": "0"
+              }
+            }
+          ]
+        },
+        {
+          "action": "reset",
+          "as": "rst",
+          "quota_name": "explicit_reset",
+          "command": "python -m pyocd reset --method sysresetreq --no-config --no-wait --connect attach --core 0 -t cortex_m -u @UID_FILE",
+          "argv": [
+            "python",
+            "-m",
+            "pyocd",
+            "reset",
+            "--method",
+            "sysresetreq",
+            "--no-config",
+            "--no-wait",
+            "--connect",
+            "attach",
+            "--core",
+            "0",
+            "-t",
+            "cortex_m",
+            "-u",
+            "@UID_FILE"
+          ]
+        },
+        {
+          "cmd": "tmc_config_show",
+          "as": "cfgboot",
+          "key": "tmc_config_show@boot",
+          "seconds": 4,
+          "expect_contains": [
+            "[TMC-CFG] state=",
+            "[TMC-CFG] planned irun=20"
+          ]
+        },
+        {
+          "cmd": "tmc_config_apply CONFIRM",
+          "as": "cfgapply",
+          "key": "tmc_config_apply CONFIRM",
+          "seconds": 8,
+          "quota": {
+            "name": "tmc_config_apply",
+            "n": 1
+          },
+          "expect_contains": [
+            "[TMC-CFG] CONFIGURED"
+          ]
+        },
+        {
+          "cmd": "tmc_config_show",
+          "as": "cfgafter",
+          "key": "tmc_config_show",
+          "seconds": 4,
+          "expect_values": [
+            {
+              "row": "^\\[TMC-CFG\\] state=(?P<st>\\w+) fail_reg=(?P<fr>\\S+) last_err=(?P<le>-?\\d+) from_integrity=(?P<fi>\\d+) snapshot_valid=(?P<sv>\\d+)$",
+              "must": {
+                "st": "CONFIGURED",
+                "sv": "1",
+                "fr": "0x00"
+              }
+            }
+          ],
+          "expect_values_note": "IRUN20 实值由同一次响应的 planned irun=20 + live CHOPCONF/GCONF 读回共同承担(见 rows.json 的板级原文), 不抬流。"
+        },
+        {
+          "cmd": "safety_polarity_confirm CONFIRM",
+          "as": "pol",
+          "key": "safety_polarity_confirm CONFIRM",
+          "seconds": 4,
+          "quota": {
+            "name": "irq_polarity_prep",
+            "n": 1
+          },
+          "expect_contains": [
+            "[SAFETY] input polarity MARKED VALIDATED",
+            "[SAFETY] NOTE: this is an OPERATOR DECLARATION"
+          ]
+        },
+        {
+          "cmd": "safety_irq_enable",
+          "as": "irq",
+          "seconds": 4,
+          "quota": {
+            "name": "irq_polarity_prep",
+            "n": 1
+          },
+          "expect_contains": [
+            "[SAFETY] IRQ gate OPEN"
+          ]
+        },
+        {
+          "cmd": "safety_irq_status",
+          "as": "irqafter",
+          "seconds": 3,
+          "expect_values": [
+            {
+              "row": "^\\[SAFETY\\] irq gate\\s+=\\s+(?P<gate>\\w+)",
+              "must": {
+                "gate": "OPEN"
+              }
+            }
+          ]
+        },
+        {
+          "cmd": "motor_status",
+          "as": "rest0",
+          "seconds": 3,
+          "expect_profile": "AT_REST",
+          "expect_contains": [
+            "[MOT] state="
+          ]
+        },
+        {
+          "cmd": "diag_status",
+          "as": "diag0",
+          "seconds": 3,
+          "expect_contains": [
+            "[DIAG] verdict=",
+            "[DIAG] rel cov="
+          ]
+        },
+        {
+          "cmd": "config_show",
+          "as": "cfg0",
+          "seconds": 3,
+          "expect_contains": [
+            "[CFG] valid="
+          ]
+        },
+        {
+          "cmd": "diag_profile show",
+          "as": "prof0",
+          "key": "diag_profile show@boot",
+          "seconds": 3,
+          "expect_contains": [
+            "[DIAG] profile",
+            "[DIAG] live sig="
+          ]
+        },
+        {
+          "cmd": "diag_profile zero 32",
+          "as": "zero",
+          "key": "diag_profile zero 32",
+          "seconds": 6,
+          "quota": {
+            "name": "diag_profile_zero",
+            "n": 1
+          },
+          "expect_contains": [
+            "[DIAG] zero OK"
+          ],
+          "expect_values": [
+            {
+              "row": "^\\[DIAG\\] zero OK n=(?P<n>\\d+) raw (?P<lo>\\d+)\\.\\.(?P<hi>\\d+) mean=(?P<mean>\\d+) \\(cal source untouched\\)$",
+              "must": {
+                "n": "32"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "S4",
+      "title": "会话2(唯一一次学习起转): 静止证明 -> dir0 -> arm -> target 100 -> start(硬截止起点) -> 本轮 RUNNING 复核 -> learn N=8 -> 有界观察窗 -> 清理并证禁能",
+      "kind": "serial_session",
+      "requires": [
+        "S3"
+      ],
+      "total_deadline_seconds": 60,
+      "halt_after": false,
+      "forbidden_commands": [
+        "config_load",
+        "config_default",
+        "blackbox_clear",
+        "flash_logclear",
+        "pwm_test",
+        "safety_trip"
+      ],
+      "manual_answers": {
+        "operator_ready_for_bounded_cruise": "yes"
+      },
+      "steps": [
+        {
+          "manual": "operator_ready_for_bounded_cruise",
+          "as": "gate_cruise",
+          "note": "人工门排在**任何 arm/start 之前**(运动窗口内不许阻塞)。"
+        },
+        {
+          "cmd": "motor_status",
+          "as": "rest_before_arm",
+          "seconds": 3,
+          "expect_profile": "AT_REST"
+        },
+        {
+          "cmd": "motor_dir 0",
+          "as": "dir0",
+          "seconds": 3,
+          "expect_contains": [
+            "[MOT] dir=0 (at rest, 全部条件与 DIR 写同窗)"
+          ]
+        },
+        {
+          "cmd": "motor_arm",
+          "as": "arm",
+          "seconds": 4,
+          "expect_contains": [
+            "[MOT] ARMED (drv_en request=HIGH readback verified"
+          ]
+        },
+        {
+          "cmd": "motor_target 100",
+          "as": "target",
+          "seconds": 3,
+          "expect_values": [
+            {
+              "row": "^\\[MOT\\] set target (?P<hz>\\d+) Hz: (?P<res>\\w+)$",
+              "must": {
+                "hz": "100",
+                "res": "OK"
+              }
+            }
+          ]
+        },
+        {
+          "cmd": "motor_start",
+          "as": "start",
+          "seconds": 3,
+          "quota": {
+            "name": "motor_run",
+            "n": 1
+          },
+          "expect_absent": [
+            "REFUSED",
+            "FAILED",
+            "not supported"
+          ],
+          "expect_absent_note": "成功起转**不打印任何 [MOT] 行**(A/motor.c 的 cmd_motor_start 只在失败/拒绝支打印)。完整提示符只代表命令返回; 运行事实由下一步本轮新的 motor_status 证明。"
+        },
+        {
+          "cmd": "motor_status",
+          "as": "running_proof",
+          "key": "motor_status@running",
+          "seconds": 2,
+          "expect_profile": "RUNNING",
+          "expect_values": [
+            {
+              "row": "^\\[MOT\\] cur_hz=(?P<cur>\\d+) tgt_hz=(?P<tgt>\\d+) accel=(?P<ac>\\d+) decel=(?P<de>\\d+) dir=(?P<dir>\\d+)$",
+              "must": {
+                "cur": "100",
+                "tgt": "100",
+                "dir": "0"
+              }
+            },
+            {
+              "row": "^\\[MOT\\] armed=(?P<armed>\\d) drv_en_request=(?P<hist>\\d) health=(?P<health>\\w+)$",
+              "must": {
+                "armed": "1",
+                "health": "OK"
+              }
+            }
+          ],
+          "expect_values_note": "目标频率与方向必须等于本轮下发的 100 Hz/dir=0; 只核行数不算(旧 expect_fields 的形状判据armed=1 也能满足)。"
+        },
+        {
+          "cmd": "diag_profile learn 8 80 120 0",
+          "as": "learn",
+          "key": "diag_profile learn 8 80 120 0",
+          "seconds": 3,
+          "quota": {
+            "name": "diag_profile_learn",
+            "n": 1
+          },
+          "expect_contains": [
+            "[DIAG] learn OK"
+          ],
+          "expect_values": [
+            {
+              "row": "^\\[DIAG\\] learn OK adc\\[(?P<alo>\\d+)\\.\\.(?P<ahi>\\d+)\\]n(?P<adc_n>\\d+) nz(?P<nz>\\d+) sg\\[(?P<slo>\\d+)\\.\\.(?P<shi>\\d+)\\]n(?P<sg_n>\\d+) seq(?P<seq_f>\\d+)\\.\\.(?P<seq_l>\\d+)$",
+              "must": {
+                "adc_n": "8",
+                "sg_n": "8"
+              }
+            }
+          ],
+          "unit": "LO/HI 是 STEP 频率 Hz 区间(hz_low/hz_high), 不是 SG 码; hz_nominal 取窗中值=100",
+          "basis": "M4 R1-R4 已在板上以 100 Hz 各 5 s 运行通过; N=8 是产品允许的最小值 => SG(10 Hz)下约 800 ms, 在 5 s 硬截止内并仍留清理机会(见 motion_window_budget_proof)",
+          "dir_label": "single_direction_0"
+        },
+        {
+          "cmd": "__watch__",
+          "as": "cruise_observe",
+          "key": "__watch__",
+          "seconds": 5,
+          "no_trigger_is_observation": true,
+          "trigger_needles": [
+            "[DIAG] REL TRIP r="
+          ],
+          "note": "观察窗跑到剩余预算的截止点(不因先看见一个提示符提前收); 无触发 => OBSERVATION_NO_TRIGGER 并进入同一清理路径, **不**跳过 S5 的提交与保存(那一步在静止会话里, 不共用本次运动)。"
+        }
+      ]
+    },
+    {
+      "id": "S5",
+      "title": "静止会话(提交与保存主线): 再证静止 -> tier -> commit -> show(抓 id/rev/flags/sig) -> config_save; 同一会话内先交叉核对 commit 行与 show 行",
+      "kind": "serial_session",
+      "requires": [
+        "S4_disarm_confirmed"
+      ],
+      "total_deadline_seconds": 60,
+      "halt_after": false,
+      "forbidden_commands": [
+        "config_load",
+        "config_default",
+        "blackbox_clear",
+        "flash_logclear",
+        "motor_start",
+        "pwm_test",
+        "safety_trip"
+      ],
+      "manual_answers": {},
+      "record_from": [
+        {
+          "step": "prof_after_commit",
+          "regex": "^\\[DIAG\\] profile id=(?P<id>\\d+) rev=(?P<rev>\\d+) abi=(?P<abi>\\d+) flg=(?P<flags>[0-9A-Fa-f]{4})",
+          "as": [
+            "id",
+            "rev",
+            "flags"
+          ]
+        },
+        {
+          "step": "prof_after_commit",
+          "regex": "^\\[DIAG\\] live sig=(?P<sig>\\d+) match=(?P<match>\\w+)",
+          "as": [
+            "sig",
+            "match"
+          ]
+        }
+      ],
+      "compare_recorded": [
+        {
+          "step": "commit",
+          "keys": [
+            "id",
+            "rev",
+            "flags"
+          ],
+          "regex": "^\\[DIAG\\] commit OK id=(?P<id>\\d+) rev=(?P<rev>\\d+) flags=(?P<flags>[0-9A-Fa-f]{4})",
+          "why": "同一次事务里 commit 行与 show 行必须逐值一致(不一致 = RESTORE_MISMATCH, 说明发布与视图不是同一代)"
+        }
+      ],
+      "steps": [
+        {
+          "cmd": "motor_status",
+          "as": "rest_before_tier",
+          "seconds": 3,
+          "expect_profile": "AT_REST"
+        },
+        {
+          "cmd": "diag_status",
+          "as": "diag_before_tier",
+          "seconds": 3,
+          "expect_values": [
+            {
+              "row": "^\\[DIAG\\] verdict=(?P<v>\\w+) mode=(?P<mode>\\w+) health=(?P<h>\\w+)$",
+              "must": {
+                "mode": "MONITOR_ONLY"
+              }
+            }
+          ]
+        },
+        {
+          "cmd": "diag_profile tier 2",
+          "as": "tier",
+          "key": "diag_profile tier 2",
+          "seconds": 3,
+          "expect_contains": [
+            "[DIAG] tier 2:",
+            "(commit to publish)"
+          ]
+        },
+        {
+          "cmd": "diag_profile commit",
+          "as": "commit",
+          "key": "diag_profile commit",
+          "seconds": 4,
+          "quota": {
+            "name": "diag_profile_commit",
+            "n": 1
+          },
+          "expect_contains": [
+            "[DIAG] commit OK",
+            "FIELD_UNVERIFIED"
+          ]
+        },
+        {
+          "cmd": "diag_profile show",
+          "as": "prof_after_commit",
+          "key": "diag_profile show",
+          "seconds": 3,
+          "expect_contains": [
+            "[DIAG] profile id=",
+            "[DIAG] live sig=44100 match=YES"
+          ]
+        },
+        {
+          "cmd": "config_save",
+          "as": "save",
+          "seconds": 8,
+          "quota": {
+            "name": "config_save",
+            "n": 1
+          },
+          "expect_values": [
+            {
+              "row": "^\\[CFG\\] save: (?P<r>\\w+)$",
+              "must": {
+                "r": "OK"
+              }
+            }
+          ],
+          "requires": [
+            "commit"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "S6",
+      "title": "经批准的一次断电重启(操作者交付门, 不是一条伪命令): 先关 24 V 再拔 USB, 完成后按交付事实进 S7",
+      "kind": "operator_gate",
+      "manual": "operator_power_cycle_done",
+      "manual_answers": {
+        "operator_power_cycle_done": "yes"
+      },
+      "quota_name": "approved_reboot",
+      "requires": [
+        "S5_saved_ok"
+      ],
+      "post_fact_required": [
+        "重启后重新读取 system_status/safety_status/tmc_config_show 证明 CONFIGURED 与 IRQ 就绪(S7 已排入步骤)",
+        "profile 恢复按 S5 记录的 id/rev/flags/live sig 实际比较(S7 的 compare_recorded)"
+      ],
+      "why_not_an_action": "现场重启在这块板上是**断电再上电**, 不存在可以逐字执行的子进程命令; 把它伪装成 reboot 动作会产生'工具有效'的假象。故: 额度申报 0 + 操作者门交付; 交付物在 real 传输下必须由操作者输入确认词, 不读任何夹具。"
+    },
+    {
+      "id": "S7",
+      "title": "重启后会话: 前置重新证明(apply CONFIRM + 极性/IRQ) -> 只读核对 -> 与 S5 记录逐项比较(恢复不是声明, 是机械比较)",
+      "kind": "serial_session",
+      "requires": [
+        "S6"
+      ],
+      "total_deadline_seconds": 90,
+      "halt_after": false,
+      "forbidden_commands": [
+        "config_load",
+        "config_default",
+        "blackbox_clear",
+        "flash_logclear",
+        "motor_start",
+        "motor_arm",
+        "pwm_test",
+        "safety_trip"
+      ],
+      "manual_answers": {},
+      "compare_recorded": [
+        {
+          "step": "prof_after_reboot",
+          "keys": [
+            "id",
+            "rev",
+            "flags"
+          ],
+          "regex": "^\\[DIAG\\] profile id=(?P<id>\\d+) rev=(?P<rev>\\d+) abi=(?P<abi>\\d+) flg=(?P<flags>[0-9A-Fa-f]{4})"
+        },
+        {
+          "step": "prof_after_reboot",
+          "keys": [
+            "sig",
+            "match"
+          ],
+          "regex": "^\\[DIAG\\] live sig=(?P<sig>\\d+) match=(?P<match>\\w+)"
+        }
+      ],
+      "steps": [
+        {
+          "cmd": "system_status",
+          "as": "sys2",
+          "seconds": 6,
+          "expect_contains": [
+            "=== SYSTEM STATUS ==="
+          ]
+        },
+        {
+          "cmd": "tmc_config_show",
+          "as": "cfg2boot",
+          "key": "tmc_config_show@boot",
+          "seconds": 4,
+          "expect_contains": [
+            "[TMC-CFG] state="
+          ]
+        },
+        {
+          "cmd": "tmc_config_apply CONFIRM",
+          "as": "cfgapply2",
+          "key": "tmc_config_apply CONFIRM",
+          "seconds": 8,
+          "quota": {
+            "name": "tmc_config_apply",
+            "n": 1
+          },
+          "expect_contains": [
+            "[TMC-CFG] CONFIGURED"
+          ]
+        },
+        {
+          "cmd": "tmc_config_show",
+          "as": "cfg2after",
+          "key": "tmc_config_show",
+          "seconds": 4,
+          "expect_values": [
+            {
+              "row": "^\\[TMC-CFG\\] state=(?P<st>\\w+) fail_reg=(?P<fr>\\S+) last_err=(?P<le>-?\\d+) from_integrity=(?P<fi>\\d+) snapshot_valid=(?P<sv>\\d+)$",
+              "must": {
+                "st": "CONFIGURED",
+                "sv": "1",
+                "fr": "0x00"
+              }
+            }
+          ]
+        },
+        {
+          "cmd": "safety_polarity_confirm CONFIRM",
+          "as": "pol2",
+          "key": "safety_polarity_confirm CONFIRM",
+          "seconds": 4,
+          "quota": {
+            "name": "irq_polarity_prep",
+            "n": 1
+          },
+          "expect_contains": [
+            "[SAFETY] input polarity MARKED VALIDATED"
+          ]
+        },
+        {
+          "cmd": "safety_irq_enable",
+          "as": "irq2",
+          "seconds": 4,
+          "quota": {
+            "name": "irq_polarity_prep",
+            "n": 1
+          },
+          "expect_contains": [
+            "[SAFETY] IRQ gate OPEN"
+          ]
+        },
+        {
+          "cmd": "safety_irq_status",
+          "as": "irq2after",
+          "seconds": 3,
+          "expect_values": [
+            {
+              "row": "^\\[SAFETY\\] irq gate\\s+=\\s+(?P<gate>\\w+)",
+              "must": {
+                "gate": "OPEN"
+              }
+            }
+          ]
+        },
+        {
+          "cmd": "config_show",
+          "as": "cfg2",
+          "seconds": 3,
+          "expect_values": [
+            {
+              "row": "^\\[CFG\\] valid=(?P<valid>\\w+) version=(?P<ver>\\S+)$",
+              "must": {
+                "valid": "YES"
+              }
+            }
+          ]
+        },
+        {
+          "cmd": "diag_profile show",
+          "as": "prof_after_reboot",
+          "key": "diag_profile show@after_reboot",
+          "seconds": 3,
+          "expect_contains": [
+            "[DIAG] profile id=",
+            "[DIAG] live sig=44100 match=YES"
+          ]
+        },
+        {
+          "cmd": "motor_status",
+          "as": "rest2",
+          "seconds": 3,
+          "expect_profile": "AT_REST"
+        }
+      ]
+    },
+    {
+      "id": "S8",
+      "title": "武装相对保护 + 一次 5 s 有界观察: 未触发只登记 NO_TRIGGER; 真实触发才走事故链(锁存/新增日志/故障态 arm 拒绝/人工恢复)",
+      "kind": "serial_session",
+      "requires": [
+        "S7_restore_equal"
+      ],
+      "total_deadline_seconds": 90,
+      "halt_after": false,
+      "forbidden_commands": [
+        "config_load",
+        "config_default",
+        "blackbox_clear",
+        "flash_logclear",
+        "pwm_test"
+      ],
+      "manual_answers": {
+        "operator_ready_for_armed_relative_run": "yes"
+      },
+      "record_from": [
+        {
+          "step": "bb_before",
+          "regex": "^\\[BB\\] state=(?P<bb_state>\\d+) session=(?P<bb_session>\\d+) written=(?P<bb_written>\\d+) last_err=(?P<bb_err>\\d+) health=(?P<bb_health>\\w+)$",
+          "as": [
+            "bb_session",
+            "bb_written"
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "manual": "operator_ready_for_armed_relative_run",
+          "as": "gate_armed"
+        },
+        {
+          "cmd": "diag_status",
+          "as": "diag_before_arm",
+          "seconds": 3,
+          "expect_contains": [
+            "[DIAG] rel cov="
+          ]
+        },
+        {
+          "cmd": "blackbox_status",
+          "as": "bb_before",
+          "seconds": 3,
+          "expect_contains": [
+            "[BB] state="
+          ]
+        },
+        {
+          "cmd": "motor_status",
+          "as": "rest_before_arm",
+          "seconds": 3,
+          "expect_profile": "AT_REST"
+        },
+        {
+          "cmd": "diag_mode relative CONFIRM_EXPERIMENTAL",
+          "as": "arm_rel",
+          "seconds": 3,
+          "key": "diag_mode relative CONFIRM_EXPERIMENTAL",
+          "expect_contains": [
+            "[DIAG] mode=RELATIVE_ACTIVE"
+          ]
+        },
+        {
+          "cmd": "motor_arm",
+          "as": "arm",
+          "seconds": 4,
+          "expect_contains": [
+            "[MOT] ARMED (drv_en request=HIGH"
+          ]
+        },
+        {
+          "cmd": "motor_target 100",
+          "as": "target",
+          "seconds": 3,
+          "expect_values": [
+            {
+              "row": "^\\[MOT\\] set target (?P<hz>\\d+) Hz: (?P<res>\\w+)$",
+              "must": {
+                "hz": "100",
+                "res": "OK"
+              }
+            }
+          ]
+        },
+        {
+          "cmd": "motor_start",
+          "as": "start",
+          "seconds": 3,
+          "quota": {
+            "name": "motor_run",
+            "n": 1
+          },
+          "expect_absent": [
+            "REFUSED",
+            "FAILED",
+            "not supported"
+          ]
+        },
+        {
+          "cmd": "motor_status",
+          "as": "running_proof",
+          "key": "motor_status@running",
+          "seconds": 2,
+          "expect_profile": "RUNNING",
+          "expect_values": [
+            {
+              "row": "^\\[MOT\\] cur_hz=(?P<cur>\\d+) tgt_hz=(?P<tgt>\\d+) accel=(?P<ac>\\d+) decel=(?P<de>\\d+) dir=(?P<dir>\\d+)$",
+              "must": {
+                "cur": "100",
+                "tgt": "100",
+                "dir": "0"
+              }
+            }
+          ]
+        },
+        {
+          "cmd": "__watch__",
+          "as": "trip_window",
+          "key": "__watch__",
+          "seconds": 5,
+          "no_trigger_is_observation": true,
+          "trigger_needles": [
+            "[DIAG] REL TRIP r="
+          ],
+          "watch_profile_note": "档案 trip => rows.json 的 __watch__.trip(真触发形状); 档案 no_trigger/healthy => 空窗(到时未触发)。观察窗把剩余预算跑到截止点是**故意的**: 事故链步骤绝不挤在同一个运动会话里 —— 运动会话只做运动, 事故取证与锁存后的复核各走自己的静止会话(S9/S10), 否则它们必然撞上 MOTION_BUDGET_EXHAUSTED。"
+        }
+      ],
+      "profile_note": {
+        "healthy_and_no_trigger": "观察窗到时无触发 => OBSERVATION_NO_TRIGGER(成功终态) + stop/disarm/证禁能; 不跑任何假故障恢复步骤(S9/S10 用 profiles=[trip] 整体不参与)。",
+        "trip": "看见 [DIAG] REL TRIP => 本会话按预算结束后清理并证禁能; 事故取证在 S9、锁存态 arm 拒绝在 S10。两支持平结论都只到'离线控制流成立', 不写设备 PASS。"
+      },
+      "record_note": "S8 只**记录**事故前的黑匣子基线(bb_before 的 session/written); 增大与否的比较在 S9(bb_after)做 —— 取证会话与运动会话分开, 才不会被 MOTION_BUDGET_EXHAUSTED 挡掉。"
+    },
+    {
+      "id": "S9",
+      "title": "事故取证会话(仅 trip): 锁存视图 + 按实际新增 session 的黑匣子 + 新日志计数 + 锁存态仍可证得禁能",
+      "kind": "serial_session",
+      "profiles": [
+        "trip"
+      ],
+      "requires": [
+        "S8_trip_observed"
+      ],
+      "total_deadline_seconds": 60,
+      "halt_after": false,
+      "forbidden_commands": [
+        "config_load",
+        "config_default",
+        "blackbox_clear",
+        "flash_logclear",
+        "motor_start",
+        "motor_arm",
+        "pwm_test",
+        "safety_trip"
+      ],
+      "manual_answers": {},
+      "compare_recorded_gt": [
+        {
+          "step": "bb_after",
+          "keys": [
+            "bb_session",
+            "bb_written"
+          ],
+          "regex": "^\\[BB\\] state=(?P<bb_state>\\d+) session=(?P<bb_session>\\d+) written=(?P<bb_written>\\d+) last_err=(?P<bb_err>\\d+) health=(?P<bb_health>\\w+)$",
+          "why": "M5 口径: 新日志按**本轮实际新增的 session/写入帧**取回(基线在 S8 的 bb_before 记录), 增大不成立就具名停止(SESSION_NOT_INCREASED), 不接受只查旧 logstat 计数"
+        }
+      ],
+      "steps": [
+        {
+          "cmd": "diag_status",
+          "as": "latch",
+          "key": "diag_status@latch",
+          "seconds": 3,
+          "expect_contains": [
+            "[DIAG] rel snap=",
+            "[DIAG] rel LATCH r=",
+            "rearm"
+          ]
+        },
+        {
+          "cmd": "blackbox_status",
+          "as": "bb_after",
+          "key": "blackbox_status@after",
+          "seconds": 3,
+          "expect_contains": [
+            "[BB] flash:"
+          ]
+        },
+        {
+          "cmd": "flash_logstat",
+          "as": "newlog",
+          "seconds": 6,
+          "expect_contains": [
+            "slots=",
+            "queued="
+          ]
+        },
+        {
+          "cmd": "motor_status",
+          "as": "latched_disable_proof",
+          "key": "motor_status@latched",
+          "seconds": 3,
+          "expect_profile": "AT_REST",
+          "note": "故障锁存后的禁能同样必须证得(name=FAULT 允许, 见 cleaning_and_terminal.why_not_idle); 这一步只用同一份响应的六个合同字段判。"
+        }
+      ]
+    },
+    {
+      "id": "S10",
+      "title": "锁存态再武装演示(仅 trip): 静止且已锁存时 motor_arm 必须被具名拒绝, 会话到此结束, 之后没有任何危险步骤",
+      "kind": "serial_session",
+      "profiles": [
+        "trip"
+      ],
+      "requires": [
+        "S9"
+      ],
+      "total_deadline_seconds": 60,
+      "halt_after": false,
+      "expected_terminal": [
+        "REFUSED"
+      ],
+      "forbidden_commands": [
+        "config_load",
+        "config_default",
+        "blackbox_clear",
+        "flash_logclear",
+        "motor_start",
+        "config_save",
+        "pwm_test",
+        "diag_profile commit"
+      ],
+      "manual_answers": {},
+      "steps": [
+        {
+          "cmd": "motor_status",
+          "as": "still_latched",
+          "key": "motor_status@latched",
+          "seconds": 3,
+          "expect_profile": "AT_REST"
+        },
+        {
+          "cmd": "motor_arm",
+          "as": "arm_refused",
+          "seconds": 3,
+          "allowed_outcomes": [
+            "[MOT] arm REFUSED (gates failing)"
+          ],
+          "note": "恢复后**不自动 start**: 本阶段的目的就是看见拒绝并在拒绝处结束(arm 尝试同样建立清理义务 => 清理仍会发 stop/disarm/status)。故意不给 fault_reset/selftest 步骤: R2-C3 规定具名拒绝之后不得继续 commit/save/start/arm/fault_reset, 该规则本轮没有放宽。",
+          "key": "motor_arm@refused"
+        }
+      ]
+    },
+    {
+      "id": "S11",
+      "title": "人工恢复会话(仅 trip): fault_reset 进 MANUAL_CLEAR + 重跑 system_selftest + 就绪复核; 本会话禁止 motor_start(恢复后不自动起转)",
+      "kind": "serial_session",
+      "profiles": [
+        "trip"
+      ],
+      "requires": [
+        "S10_expected_refusal_recorded"
+      ],
+      "total_deadline_seconds": 90,
+      "halt_after": false,
+      "forbidden_commands": [
+        "config_load",
+        "config_default",
+        "blackbox_clear",
+        "flash_logclear",
+        "motor_start",
+        "motor_arm",
+        "config_save",
+        "pwm_test",
+        "diag_profile commit"
+      ],
+      "manual_answers": {
+        "operator_confirms_manual_recovery": "yes"
+      },
+      "steps": [
+        {
+          "manual": "operator_confirms_manual_recovery",
+          "as": "gate_recovery",
+          "note": "人工恢复本身就是操作者动作: 真传输下必须由人确认(非 stub 绝不读夹具)。"
+        },
+        {
+          "cmd": "safety_status",
+          "as": "latched_before_clear",
+          "seconds": 3,
+          "expect_contains": [
+            "[SAFETY] request="
+          ]
+        },
+        {
+          "cmd": "fault_reset",
+          "as": "manual_clear",
+          "seconds": 8,
+          "expect_contains": [
+            "[SS] ==> MANUAL_CLEAR"
+          ],
+          "note": "C3 的\"人工恢复\"支: 期望是进 MANUAL_CLEAR(重跑自检进 READY 后仍需**重新 arm**), 不是自动恢复运行。该行形状取自产品字面量, 见 rows.json 的 _provenance。"
+        },
+        {
+          "cmd": "system_selftest",
+          "as": "selftest_after",
+          "seconds": 12,
+          "expect_contains": [
+            "[SELFTEST]"
+          ]
+        },
+        {
+          "cmd": "safety_status",
+          "as": "ready_after",
+          "seconds": 3,
+          "expect_contains": [
+            "[SAFETY] request="
+          ]
+        },
+        {
+          "cmd": "motor_status",
+          "as": "still_disabled_after_recovery",
+          "key": "motor_status",
+          "seconds": 3,
+          "expect_profile": "AT_REST",
+          "note": "恢复会话结束时仍然必须证得到禁能 —— 与'恢复后不自动 start'是同一件事的两面。"
+        }
+      ]
+    }
+  ],
+  "dispatch_semantics": {
+    "one_approval": "一次批准(transport=real 时必须 --approval-token 与 --expected-token 相等, 否则 REAL_TRANSPORT_REFUSED 且一条命令都不发) -> 从 S0 连续走到最后一个阶段",
+    "stop_on": "任一阶段非成功(含清理 UNKNOWN、清理错误、预留耗尽、证据失败、额度不符、恢复比较不等、新增 session 未增大) => 停止后续阶段并把它们明列为 NOT_RUN",
+    "success_gate": "status=OK 要求: 无 NOT_RUN、每个已执行阶段 success、已执行阶段序列与按 profiles 过滤后的期望序列**逐个相等**、额度审计无未申报用量且无负余额",
+    "not_counted_as_executed": "NOT_RUN 绝不计入 stages_executed(不能用 stages=8 掩盖停在中途)",
+    "profile_scope": "--profile 只有三个值 healthy|trip|no_trigger, 作用范围**仅限**被动观察窗 __watch__ 的行; 事故链与锁存态用独立阶段(S9/S10/S11)+ 专用行键, 并用 stages[].profiles=[trip] 决定是否参与本轮。"
+  },
+  "hardware_actions_this_round": [],
+  "offline_only_statement": "本轮离线: 只有 transport=stub / backend=sim 的分支被真正执行过; real/manual 分支的 argv、成功原文判据、交付物门与 UID 处理都已就位并经过静态/离线核对, 但**从未运行** => 不记任何设备 PASS。自检通过只说明离线控制流。"
+}

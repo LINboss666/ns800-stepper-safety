@@ -1,0 +1,16 @@
+{"kind": "PORT_OPEN", "port": null, "t_s": 0.0, "transport": "stub"}
+{"kind": "QUOTA_CONSUMED", "left": 1, "n": 1, "name": "port_open", "t_s": 0.0}
+{"bytes": "motor_status\r\n", "kind": "TX", "t_s": 0.0}
+{"bytes": 628, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "b89a410285b149c10437872b76aa31ed329bd6068b5e7010f4eb0d3066a2e53c", "t_s": 0.005, "tail": "b'P stopped\\r\\nmsh >'"}
+{"cap_seconds": 5.0, "cmd": "motor_arm", "kind": "OBLIGATION_SET", "t_s": 0.005}
+{"bytes": "motor_arm\r\n", "kind": "TX", "t_s": 0.005}
+{"bytes": 101, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "bf036edd57d8ddd1b93f8344e5dc9e0f2f0c97d4462f2c50b183b8abfec44cf3", "t_s": 0.005, "tail": "b'not-READY\\r\\nmsh >'"}
+{"allowed": true, "as": "arm_refused", "kind": "BUSINESS_OUTCOME", "lines": ["[MOT] arm REFUSED (gates failing)"], "t_s": 0.005}
+{"bytes": "motor_stop\r\n", "kind": "TX", "t_s": 0.005}
+{"bytes": 126, "cmd": "motor_stop", "ended_t": 0.005, "kind": "CLEANUP_READ", "raw_sha256": "ab6451a9a6300524d235ab9de5344a5b33113471f0a25efe01220530de5e10b2", "sent_t": 0.005, "t_s": 0.005, "window_s": 1.2}
+{"bytes": "motor_disarm\r\n", "kind": "TX", "t_s": 0.005}
+{"bytes": 130, "cmd": "motor_disarm", "ended_t": 0.005, "kind": "CLEANUP_READ", "raw_sha256": "d954735075e19076cce15af5bf8df2b233525a93b42f20b68c6c08ea618d5f80", "sent_t": 0.005, "t_s": 0.005, "window_s": 1.2}
+{"bytes": "motor_status\r\n", "kind": "TX", "t_s": 0.005}
+{"bytes": 627, "cmd": "motor_status", "ended_t": 0.015, "kind": "CLEANUP_READ", "raw_sha256": "092f7aab804b9be56fd57569f33ec33d63afaa821de1a51fb131cef4d8f042cd", "sent_t": 0.005, "t_s": 0.015, "window_s": 1.2}
+{"fields": {"armed": 0, "cur_hz": 0, "diag_off_confirmed": "YES", "drv_en_request_hist": 0, "drv_request": "LOW", "enn_fb": 1, "expected_ENN": "HIGH", "fb_state": "resolved", "health": "OK", "pad": 0, "state_name": "OTHER", "state_num": 0, "tgt_hz": 0, "verdict": "OK"}, "kind": "DISARM_FIELDS", "t_s": 0.015, "unproven": ""}
+{"kind": "PORT_CLOSED", "t_s": 0.015}

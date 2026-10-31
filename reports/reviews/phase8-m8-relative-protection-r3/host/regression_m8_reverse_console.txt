@@ -1,0 +1,105 @@
+compiler=gcc.exe (tdm64-1) 4.9.2
+src_app=D:/ns800/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications
+out_dir=/d/ns800_m8r3_scratch/relrev/20261031T092038Z-1753
+selected=50 mode=default
+build_rc=0 warnings=0
+proc_rc=0
+CASE|REL01-frame-identity-advances-only-on-success|PASS|checks=6
+CASE|REL02-sg-read-fail-freezes-identity|PASS|checks=6
+CASE|REL03-adc-read-fail-freezes-identity|PASS|checks=7
+CASE|REL04-no-profile-no-claim|PASS|checks=4
+CASE|REL05-profile-qualification-matrix|PASS|checks=45
+CASE|REL06-live-signature-binds-drive-config|PASS|checks=8
+CASE|REL07-sg-severe-needs-samples-and-span|PASS|checks=43
+CASE|REL08-stale-sg-cannot-accumulate|PASS|checks=103
+CASE|REL09-adc-severe-both-directions|PASS|checks=67
+CASE|REL10-single-adc-sample-not-duration|PASS|checks=71
+CASE|REL11-fused-needs-overlap|PASS|checks=242
+CASE|REL12-reason-not-stall-confirmed|PASS|checks=11
+CASE|REL13-protect-before-print|PASS|checks=5
+CASE|REL14-first-latch-immutable|PASS|checks=7
+CASE|REL15-monitor-only-never-acts|PASS|checks=5
+CASE|REL16-relative-mode-arm-gate|PASS|checks=13
+CASE|REL17-active-measured-gate-unchanged|PASS|checks=5
+CASE|REL18-ramp-phase-is-exception|PASS|checks=6
+CASE|REL19-out-of-window-only-in-motion|PASS|checks=6
+CASE|REL20-age-check-before-dedup|PASS|checks=33
+CASE|REL21-recovery-needs-fresh-evidence|PASS|checks=84
+CASE|REL22-coverage-loss-protects-first|PASS|checks=10
+CASE|REL23-profile-persist-and-v2-migration|PASS|checks=27
+CASE|REL24-cli-strict-args-no-side-effects|PASS|checks=8
+CASE|REL25-cli-capture-and-publish|PASS|checks=41
+CASE|REL26-tick-diff-and-threshold-bounds|PASS|checks=7
+CASE|REL27-active-severe-protect-before-print|PASS|checks=8
+CASE|REL28-strong-needs-own-evidence|PASS|checks=10
+CASE|REL29-frozen-adc-age-degrades|PASS|checks=6
+CASE|REL30-source-gap-restarts-evidence|PASS|checks=8
+CASE|REL31-tick-wrap-and-rate-binding|PASS|checks=14
+CASE|REL32-recovery-breaks-on-counter-evidence|PASS|checks=8
+CASE|REL33-lock-fail-bounded-degrade|PASS|checks=10
+CASE|REL34-no-frame-still-supervises|PASS|checks=5
+CASE|REL35-incident-ticket-lifecycle|PASS|checks=16
+CASE|REL36-null-outparams-still-protects|PASS|checks=3
+CASE|REL37-post-failure-keeps-first-cause|PASS|checks=6
+CASE|REL38-mode-gate-and-static-transaction|PASS|checks=10
+CASE|REL39-zero-static-and-failed-relearn|PASS|checks=11
+CASE|REL40-config-lock-failure-writes-nothing|PASS|checks=13
+CASE|REL41-illegal-context-silent|PASS|checks=6
+CASE|REL42-low-sg-committable-and-named-reject|PASS|checks=31
+CASE|REL43-max-value-lines-fit-console|PASS|checks=20
+CASE|REL44-impact-fresh-evidence-only|PASS|checks=22
+CASE|REL45-ctl-take-failure-writes-nothing|PASS|checks=16
+CASE|REL46-ctl-uninit-take-and-protect|PASS|checks=11
+CASE|REL47-commit-inside-static-gate|PASS|checks=14
+CASE|REL48-new-generation-clears-evidence|PASS|checks=10
+CASE|REL49-frame-not-same-as-motion-known|PASS|checks=12
+CASE|REL50-stale-idle-not-static-exemption|PASS|checks=8
+SUMMARY|cases=50 pass=50 fail=0 pre_bad=0 executed=50
+
+=== 反向验证(10 组具名家族, 仓外一次性副本) ===
+INJECTED RV1_sg_new_sample_identity_gate
+  命中期望失败身份: REL08-stale-sg-cannot-accumulate
+  额外失败身份(登记但不改变判定): REL07-sg-severe-needs-samples-and-span REL11-fused-needs-overlap REL21-recovery-needs-fresh-evidence REL30-source-gap-restarts-evidence REL31-tick-wrap-and-rate-binding REL32-recovery-breaks-on-counter-evidence
+INJECTED RV2_adc_relative_severe_branch
+  命中期望失败身份: REL09-adc-severe-both-directions
+  命中期望失败身份: REL28-strong-needs-own-evidence
+INJECTED RV3_relative_mode_profile_qualification
+  命中期望失败身份: REL16-relative-mode-arm-gate
+INJECTED RV4_severe_borrows_warn_duration
+  命中期望失败身份: REL28-strong-needs-own-evidence
+INJECTED RV5_coverage_loss_protects_nothing
+  命中期望失败身份: REL22-coverage-loss-protects-first
+  命中期望失败身份: REL33-lock-fail-bounded-degrade
+  命中期望失败身份: REL34-no-frame-still-supervises
+  命中期望失败身份: REL36-null-outparams-still-protects
+  额外失败身份(登记但不改变判定): REL43-max-value-lines-fit-console REL46-ctl-uninit-take-and-protect REL49-frame-not-same-as-motion-known REL50-stale-idle-not-static-exemption
+INJECTED RV6_failed_relearn_keeps_credential
+  命中期望失败身份: REL39-zero-static-and-failed-relearn
+INJECTED RV7_impact_independent_trip_removed
+  命中期望失败身份: REL44-impact-fresh-evidence-only
+INJECTED RV8_ctl_lock_silently_bypassed
+  命中期望失败身份: REL45-ctl-take-failure-writes-nothing
+  命中期望失败身份: REL46-ctl-uninit-take-and-protect
+  额外失败身份(登记但不改变判定): REL16-relative-mode-arm-gate REL33-lock-fail-bounded-degrade REL43-max-value-lines-fit-console REL47-commit-inside-static-gate
+INJECTED RV9_new_generation_keeps_old_evidence
+  命中期望失败身份: REL48-new-generation-clears-evidence
+  额外失败身份(登记但不改变判定): REL35-incident-ticket-lifecycle
+INJECTED RV10_motion_age_dropped_from_trust
+  命中期望失败身份: REL50-stale-idle-not-static-exemption
+  命中期望失败身份: REL49-frame-not-same-as-motion-known
+
+=== 汇总 ===
+  normal | PASS 执行=50 全部通过 proc_rc=0
+  RV1_sg_new_sample_identity_gate | META-OK 命中 1 个失败身份 (实际FAIL行=7 额外=6 proc_rc=1)
+  RV2_adc_relative_severe_branch | META-OK 命中 2 个失败身份 (实际FAIL行=2 额外=0 proc_rc=1)
+  RV3_relative_mode_profile_qualification | META-OK 命中 1 个失败身份 (实际FAIL行=1 额外=0 proc_rc=1)
+  RV4_severe_borrows_warn_duration | META-OK 命中 1 个失败身份 (实际FAIL行=1 额外=0 proc_rc=1)
+  RV5_coverage_loss_protects_nothing | META-OK 命中 4 个失败身份 (实际FAIL行=8 额外=4 proc_rc=1)
+  RV6_failed_relearn_keeps_credential | META-OK 命中 1 个失败身份 (实际FAIL行=1 额外=0 proc_rc=1)
+  RV7_impact_independent_trip_removed | META-OK 命中 1 个失败身份 (实际FAIL行=1 额外=0 proc_rc=1)
+  RV8_ctl_lock_silently_bypassed | META-OK 命中 2 个失败身份 (实际FAIL行=6 额外=4 proc_rc=1)
+  RV9_new_generation_keeps_old_evidence | META-OK 命中 1 个失败身份 (实际FAIL行=2 额外=1 proc_rc=1)
+  RV10_motion_age_dropped_from_trust | META-OK 命中 2 个失败身份 (实际FAIL行=2 额外=0 proc_rc=1)
+  执行集合: normal reverse:RV1_sg_new_sample_identity_gate reverse:RV2_adc_relative_severe_branch reverse:RV3_relative_mode_profile_qualification reverse:RV4_severe_borrows_warn_duration reverse:RV5_coverage_loss_protects_nothing reverse:RV6_failed_relearn_keeps_credential reverse:RV7_impact_independent_trip_removed reverse:RV8_ctl_lock_silently_bypassed reverse:RV9_new_generation_keeps_old_evidence reverse:RV10_motion_age_dropped_from_trust
+  声明用例数=50 执行用例数=50
+M8 RELATIVE RESULT: PASS(主机链, 离线; 现场项未验证)

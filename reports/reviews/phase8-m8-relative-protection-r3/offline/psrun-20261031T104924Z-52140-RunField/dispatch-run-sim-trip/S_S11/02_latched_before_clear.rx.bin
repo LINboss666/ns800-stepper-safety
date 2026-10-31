@@ -1,0 +1,7 @@
+[SAFETY] ready=YES first_err=0
+[SAFETY] MCU_DRV_ENABLE = 0 (禁止(安全))
+[SAFETY] DRV_ENABLE last write+readback verified = 0 (-1 = never verified)
+[SAFETY] ENN_FEEDBACK(PC.6 = 板上 TMC_ENN) raw=1 resolved=YES [只读输入, 非急停感测; HIGH=禁能侧, LOW=未施加
+[SAFETY] request=DISABLE(LOW) pad=0 expected_FB=HIGH FB=1 -> verdict=OK
+[SAFETY] LIMIT inputs = DISABLED_BY_CONFIG (限位实现保留, 不解析/不配置/不读/不注册 IRQ)
+msh >

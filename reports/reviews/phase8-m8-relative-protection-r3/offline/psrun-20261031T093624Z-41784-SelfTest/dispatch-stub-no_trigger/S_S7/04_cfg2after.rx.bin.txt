@@ -1,0 +1,15 @@
+[TMC-CFG] state=CONFIGURED fail_reg=0x00 last_err=0 from_integrity=0 snapshot_valid=1
+[TMC-CFG] hw_write_gate(compile)=OPEN runtime_gate_mask=0x0
+[TMC-CFG] !! 运行态门禁全通, 但编译期门未翻转前仍然一位不写
+[TMC-CFG] planned irun=20 ihold=8 dly=4
+[TMC-CFG] planned tpd=8 vsense=1 mstep_sel=0 mres=0
+[TMC-CFG] target GCONF=00000141 CHOPCONF=15030053
+[TMC-CFG] target IHOLD_IRUN=00041408 TPOWERDOWN(0x11)=08
+[TMC-CFG] theory V_FS=180mV Rsense=110mO Rds=20mO
+[TMC-CFG] theory VREF=1270mV
+[TMC-CFG] theory_current run=326 mA RMS hold=139 mA RMS
+[TMC-CFG] note: theoretical, NOT measured; motor rating not confirmed
+[TMC-CFG] note: VREF unverified in firmware; RSENSE from listing only
+[TMC-CFG] applied snapshot: GCONF=00000141 CHOPCONF=15030053
+[TMC-CFG] live GCONF=00000141 i_scale_analog=1 internal_Rsense=0 en_spreadCycle=0 pdn_disable=1 mstep_reg_select=0
+[TMC-CFG] live CHOPCONF=15030053 TOFF=3 vsense(bit17)=1 MRES=5

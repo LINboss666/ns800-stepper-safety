@@ -1,0 +1,12 @@
+{
+    "run_id":  "20261031T093624Z-41784",
+    "entry":  "SelfTest",
+    "checks":  20,
+    "failures":  [
+
+                 ],
+    "hardware_actions":  [
+
+                         ],
+    "python_selftest_summary":  "SUMMARY|cases=55 pass=55 fail=0 executed=55 preserved_r2_identities=25|negative_injections=7|hardware_actions=0|transport=stub_only|port=IN_MEMORY"
+}
