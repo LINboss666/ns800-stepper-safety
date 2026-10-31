@@ -1,0 +1,1 @@
+[MOT] set target 100 Hz: OK

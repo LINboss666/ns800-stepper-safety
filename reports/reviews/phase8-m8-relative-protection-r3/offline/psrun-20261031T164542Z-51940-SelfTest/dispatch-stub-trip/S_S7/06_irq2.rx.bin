@@ -1,0 +1,3 @@
+[SAFETY] IRQ gate OPEN: 1 active protection input(s) registered (limits: falling edge / HIGH=safe; diag: rising)
+[SAFETY] PC.6 = TMC_ENN feedback input, NOT an IRQ source; board e-stop cuts the chain in hardware, never via MCU
+msh >

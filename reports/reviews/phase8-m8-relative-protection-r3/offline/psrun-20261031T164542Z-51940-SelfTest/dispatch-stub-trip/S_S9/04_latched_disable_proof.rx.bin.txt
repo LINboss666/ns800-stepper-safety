@@ -1,0 +1,14 @@
+[MOT] state=4 name=FAULT
+[MOT] cur_hz=0 tgt_hz=0 accel=2000 decel=2000 dir=0
+[MOT] armed=0 drv_en_request=0 health=OK
+[MOT] guard stops=1 reason=4
+[MOT] guard reason map: 0=none 1=cfg-lost 2=integrity 3=txn-busy 4=enn-fb
+[MOT] stop result=api-accepted(驱动接受关断, 非波形证明) src=guard rc=0 latched=1
+[MOT] diag_off_confirmed=YES
+[MOT] arm_gate_mask=0x0 ALL-PASS
+[MOT] drv_request=LOW pad=0
+[MOT] expected_ENN=HIGH ENN_fb=1 resolved verdict=OK
+[MOT] limit_inputs=DISABLED_BY_CONFIG
+[MOT] step_diag=GRANTED
+[MOT] tmc_write_gate=0x0
+[MOT] note: state/cur/tgt=0 does not prove physical STEP stopped

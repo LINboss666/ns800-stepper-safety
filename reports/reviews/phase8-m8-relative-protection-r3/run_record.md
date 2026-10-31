@@ -121,3 +121,37 @@ S_S10(trip, 锁存态 arm 被拒) motor_stop 0.005→0.005 | motor_disarm 0.005�
 - 本包尚未获得任何硬件批准：`plan.json:status = NOT_AUTHORIZED / NOT_EXECUTED`，`hardware_actions_this_round=[]`，交接写 `M8_R3_OFFLINE_READY / AWAITING_INDEPENDENT_REVIEW`，`safe_for_enable=false`。
 - 不继承 M4/M5/M6/M7/P0/M8-R2 的任何现场额度；本轮不向用户索要例行断电或 SW1 操作。
 - 硬件候选要等软件 + 执行包**一次复审**之后，才交用户一次具体批准；`-RunField -Transport real` 需要 `--approval-token` 与既存私有 `--uid-file`，且 DAP UID 永不入库、永不打印（只披露长度与 sha256 前 12 位）。
+---
+
+## 6. R3 收尾轮(复审 §2A–§2D + §3)的实际执行
+
+日期 2026-10-31 → 2026-11-01。同一任务、同一 feature 分支、同一执行器; **未改 C、未重编 Keil、
+未重跑未改输入的 C 全链、未改六镜像/三 map、零设备动作**(无串口/DAP/复位/下载/回读/运动/配置写)。
+
+| 项 | 本轮实际数字 | 原始 stdout |
+| --- | --- | --- |
+| 交付 Python 自检 | 73/73 PASS(原 55 身份与 25 条 R2 身份原序保留, 定向检出 7→11) | `host/python_selftest_r3closeout.txt` |
+| 计划离线门 | 151 项 PASS/0 FAIL(新增 PLAN_RESET_BEFORE_FIRST_QUERY、PLAN_STATE_AND_FLAG_CONSTANTS、PLAN_MOTION_CAP_BUDGET) | `host/validate_plan_r3closeout.txt` |
+| 行表来源核查 | groups=40 capture_refs=29 source_anchor_refs=31 problems=0 | `host/rows_provenance_console_r3closeout.txt` |
+| PS -SelfTest | checks=22 failures=0(run_id `20261031T164542Z`) | `host/field_SelfTest_console_r3closeout.txt` |
+| PS -Precheck | checks=14 failures=0(run_id `20261031T164316Z`) | `host/field_Precheck_console_r3closeout.txt` |
+| PS -RunField(stub+sim, -Profile all) | checks=3 failures=0 actions_attempted=0(run_id `20261031T164321Z`) | `host/field_RunField_console_r3closeout.txt` |
+| 审核方观察程序 `remaining_field_probes.py` 指向收尾后的工作树 | rc=1: 其**修前**断言 `observations[0]["resets"]==0 且 status=="STOP"` 已不再成立(S3 现在先复位) | `host/reviewer_probe_post_fix_r3closeout.txt` |
+
+新落入执行器的确定反例/健康对照(FS56…FS73, 全部跑同一条交付执行器, 只替换纯内存端口/动作后端/
+`subprocess`; 不导入 `serial`):
+
+- FS56 回读后 Halted: 复位先于首条查询才通过; 反序 => `MISSING_RESPONSE_PROMPT` 且 resets=0; 无提示符 =>
+  `POST_RESET_BOOT_PROMPT_MISSING`。
+- FS57 `RealActionBackend` 零设备注入: 只替换 subprocess 与交付文件, 用既存 P0 原文跑下载原文门 /
+  定长比较 / 逐字节等值 / 非零 rc / 复位处理, 并核 `cwd=repo_root` 与 argv 已按 repo_root 解析。
+- FS58 UID 只在内存: 公开件里 `ARGV.json` 与台账均无 UID, 只登记脱敏 argv + 原 argv 的 sha256 + 长度/sha12。
+- FS59 stop 的读异常不阻止唯一必要 disarm, 端口仍关, 主错与清理错分列。FS60 短写具名停止且义务仍成立。
+- FS61 开口额度在尝试之前消费(零额度 => 零尝试; 开口抛错 => `PORT_OPEN_FAILED` 且额度已扣)。
+- FS62 预期拒绝 + 清理 UNKNOWN/清理错 绝不进恢复; 健康具名拒绝仍作为预期结果接受。
+- FS63 混合模式(real+sim / stub+real)在任何动作之前 `MODE_COMBINATION_REFUSED`, 副作用清单为空。
+- FS64 一致但不同于夹具的签名通过, 真漂移仍 `RESTORE_MISMATCH`。FS65 非法 flags(0010)按位拒绝。
+- FS66 轮询证得 `state=2`, 一直 ACCEL 到期撤能, 矛盾 RUNNING 字段立刻拒绝。FS67 忙 msh 真 12 s 边界。
+- FS68 真实入口的分支由本次响应决定, 未定即 `RESPONSE_BRANCH_UNDETERMINED`(零工具调用)。
+- FS69 新增 session 无实际帧/帧不属本次 session/无停后帧/槽读错 => `FLASH_FRAMES_NOT_RECOVERED`。
+- FS70–FS73 四项新增定向检出(按位判定 / 忙期模型 / 轮询 / 启动流消费), 每项都让对应正控转为 FAIL。

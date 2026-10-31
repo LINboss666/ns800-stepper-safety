@@ -13,7 +13,7 @@
 | `plan.json` | 一次批准的计划：S0…S11 阶段、整包共用额度与**清理预留**、真实工具 argv（含 `@UID_FILE/@RUN_ROOT/@IMAGE_BYTES` 三个机械占位）、身份绑定、预算算式、残留风险、对复审条目的逐条对账 |
 | `rows.json` | 响应行表，逐组（含 `_provenance_trip` / `_provenance_drift` 等档案级）标注来源：板上原始采集 / 128 字节截断按内容拆分 / 两块真机采集并成一份（`board_capture_composed`）/ 源码字面量形状+本轮下发值，后两类不构成设备证据。每一处声明都由 `../host/rows_provenance_check.py` 做**行级**核对（采集件路径存在 + 行号落在解码后行数内；`applications/*.c:NN` 存在 + 该行 ±6 行内确有 `rt_kprintf`） |
 | `needles.json` | 40 条 needle，每条由 `prove_needles()` 回到 `applications/*.c` 的 `rt_kprintf` 字面量证明 |
-| `m8r3_field_selftest.py` | 55 条离线场景（R2 的 FS01…FS25 身份原序保留 + R3 边界/整包/负控），含 7 项仓库外副本的定向检出 |
+| `m8r3_field_selftest.py` | 73 条离线场景（R2 的 FS01…FS25 身份原序保留 + R3 边界/整包/负控 + R3 收尾轮的 §2A–§2D 反例与健康对照），含 7 项仓库外副本的定向检出（收尾后共 11 项） |
 | `M8R3Field.ps1` | Windows PowerShell 5.1 三个互斥入口（`-SelfTest / -Precheck / -RunField`），只做参数门、证据落盘、退出码与独立复算；**不另实现一套调度或判定** |
 
 ## 2. 三个入口
@@ -78,3 +78,29 @@ powershell -NoProfile -ExecutionPolicy Bypass -File field\M8R3Field.ps1 -RunFiel
 动作后端只用过 `sim`；`RealActionBackend` 的 subprocess 路径、`ManualActionBackend` 的交付物门、
 `pyocd`/串口的任何调用都**从未运行**（其参数与成功原文只做了离线核对与静态证明）。
 因此本包的任何"通过"都只是离线控制流，不是设备 PASS。
+
+
+## 4. R3 收尾轮(2026-10-31)之后的合同变化
+
+复审 `M8_R3_FIELD_PACKAGE_REWORK_REQUIRED` 的五条真实执行路径缺陷已在**同一执行器**里关闭, 并留下
+确定反例 + 健康对照(FS56…FS73, 11 项定向检出)。要点:
+
+- **模式分流**: 只允许 `stub+sim`(离线) / `real+real` / `real+manual`(受同一身份交付门约束)。
+  混合模式在任何 UID 读取、工具调用、开口动作之前 `MODE_COMBINATION_REFUSED`, 副作用清单为空。
+  真实入口的档案只接受 `response_driven`: 事故支线由本次响应决定, `-Profile all` 只属于离线。
+- **回读后 Halted**: S3 现在是 开口 → 唯一一次已批准复位 → **消费启动流**(原字节 `NN_rst.boot.rx.bin`
+  并等到提示符) → 首个合法查询; 反序仍会 `MISSING_RESPONSE_PROMPT`, 没有提示符则
+  `POST_RESET_BOOT_PROMPT_MISSING`, 两者都由自检真跑断言。
+- **失败门**: 清理的读/写/证据异常各自独立捕获(stop 的异常不再吞掉唯一必要 disarm), 短写具名停止,
+  开口额度在尝试之前消费, `expected_terminal` 只豁免业务结果本身。
+- **夹具值 → 固件事实**: 删除两处 `live sig=44100 match=YES` 硬编码(改为记录本次真实签名 +
+  `match=YES` + 重启后逐项比较); flags 按 `RPF_*` 位判定, 夹具改 `0005`; 起转后有限轮询必须证得
+  数值 `state=MOTOR_CRUISE(2)`; S9 在计数严格增大之后用 `flash_dump` 读回**实际帧**(取不回来 =
+  `FLASH_FRAMES_NOT_RECOVERED`, 报取证未完成)。
+- **时间合同(仅离线提案)**: 学习起转 15 s、保护观察 5 s 按阶段传入, 整包 ≤ 2 次 start、总额 20 s 由
+  `PLAN_MOTION_CAP_BUDGET` 审计; 假端口按产品源码的 12000 ms 与本轮 probe 观察建模"忙 msh",
+  stop/disarm 在忙期只能排队。**15 s 不是硬件授权**, 也没有把旧的 5 秒测试记成通过。
+- **隐私**: 公开件只登记脱敏 argv + 原 argv 的 sha256 + UID 长度/sha12; 真实 UID 不入库、不打印。
+- `--validate-plan` 现在 151 项(新增首查顺序、常量回查、时间预算三项门); `rows.json` 40 组的来源核查
+  problems=0; 三入口在 Windows PowerShell 5.1 各跑一遍到新 run 目录(`offline/psrun-*`),
+  汇总见 `host/r3_closeout_runs.json`。

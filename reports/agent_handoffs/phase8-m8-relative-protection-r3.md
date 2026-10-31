@@ -111,3 +111,29 @@
   重启后的 profile 值与本轮 commit 记录实际比较；事故链按实际新增 session 取证；`--transport real` 必须带操作者令牌，
   否则 `REAL_TRANSPORT_REFUSED`（本轮作为负控真跑过）。
 - R1 的 `B-CP4` / `R1-CP1` 等历史现场待批事项与本轮无关，保持原状态。
+## 7. 收尾轮(R3 复审 §2A–§2D + §3)对账
+
+复审结论原样接受: `M8_R3_CORE_SOFTWARE_IMAGE_REVIEW_GO`(输入 `805c29b`, 限定离线合同)+
+`M8_R3_FIELD_PACKAGE_REWORK_REQUIRED` + `NO HARDWARE AUTHORIZATION`。核心 C 与六镜像/三 map 本轮**未动**
+(`build/`、`reports/firmware/...` 与镜像散列原样); 本轮只改现场包的 Python/PS/plan/rows/自检与文档。
+
+| 复审条 | 缺陷(修前, 本机已复现) | 现在的落点 | 可检判据 |
+| --- | --- | --- | --- |
+| §2A | S3 先查询后复位 => Halted 核心不应答, `MISSING_RESPONSE_PROMPT`/resets=0 | `plan.json` S3 = 复位→消费启动流→首条查询; `drain_post_reset_boot()` 原字节落盘并等提示符; `validate_plan` 加 `PLAN_RESET_BEFORE_FIRST_QUERY` | FS56 / FS73; 审核探针修前断言不再成立 |
+| §2A | Real 后端从未被真跑 | FS57 零设备注入(既存 P0 原文 + 真实镜像字节) | `host/reviewer_probe_post_fix_r3closeout.txt` 之外的 `python_selftest_r3closeout.txt` |
+| §2A | 工具相对路径依赖启动目录 | `RealActionBackend(repo_root=...)`: `_p()` 以 repo_root 解析 argv 与镜像件, `subprocess(cwd=repo_root)` | FS57 断言 `cwd==repo_root` 且 axf 绝对 |
+| §2B | stop 读异常穿出 cleanup: 没 disarm、没关端口 | `_cleanup_read` 读异常单独记账; `cleanup()` 每条命令独立 try + `continue`; `exec_session.finally` 再兜一层并仍关端口 | FS59 |
+| §2B | 短写当成功; 开口额度开口后才扣; 禁能只核 name | `COMMAND_SHORT_WRITE`; `spend("port_open")` 先于尝试; 运行/静止判据用 `state_num` 数值 | FS60 / FS61 |
+| §2B | expected_terminal 把清理未知/错也豁免 | `expected_refusal_ok` 合取门(terminal/cleanup_errors/overruns/disarm/needle 原文) | FS62 |
+| §2B | RUNNING 收 "state=0 cur=0 tgt=100 armed=1 request=LOW pad=0" 为 OK | 数值 `state=MOTOR_CRUISE(2)` + cur>0 + drv_request HIGH/pad=1; 常量由 `PLAN_STATE_AND_FLAG_CONSTANTS` 回查 motor.h/diag_relative.h | FS66 |
+| §2C | real+sim 被收为 OK; stub+real 无前置拒绝 | `ALLOWED_MODES` + `mode_gate()` 在 UID/工具/端口之前; PS `-Profile all` 真实入口拒 | FS63 / FS49 / PS `ST_NEG_MODE_MIX_REFUSED` / `ST_NEG_REAL_PROFILE_ALL` |
+| §2C | real 预选夹具档案决定是否恢复 | `REAL_PROFILE=response_driven`, `decides_response_branch` 的阶段由本次响应决定分支 | FS68 |
+| §2C | 真实摘要硬编码 `hardware_actions=[]/0`; 完整 argv(含 UID)落公开件 | `actions_attempted` 由后端实际尝试生成, PS 只累计; `ARGV.json` 脱敏 + 原 argv sha + UID 长度/sha12 | FS58 + `DISPATCH_SUMMARY\|actions_attempted=…` |
+| §2D-1 | 两处 `live sig=44100 match=YES` 硬编码 | 只钉形状与产品自己的 `match=YES`; 数字由 `record_from`/`compare_recorded` 跨会话比较 | FS64 |
+| §2D-2 | `flags=0010`(无 COMMITTED 位)当合法 | 夹具换成 `0005`, 判定改 `expect_flag_bits`(按 RPF_* 位, 含"未知位"门) | FS65 / FS70 |
+| §2D-3 | 一条立即查询当稳定巡航 | `poll`+`poll_sequence`(先 ACCEL 后 CRUISE), 只在数值爬坡态重试 | FS66 / FS72 |
+| §2D-4 | S9 只看计数, 没读回帧 | `flash_dump 0 8` + `require_frames`(14 列、session==本轮新增、含 event=9/step_hz=0、无 empty/error) | FS69 |
+| §3 | 5 s 起转 × 12 s 同步学习不相容 | 离线新合同: 学习 15 s(S4)/保护 5 s(S8)按阶段传入, 总额 20 s 由 `PLAN_MOTION_CAP_BUDGET` 审计; 忙 msh 用真实 12000 ms 驱动假端口 | FS67 + `plan.quota_note_r3_closeout` |
+
+**15 s 只是离线合同提案, 不是硬件授权, 也没有把旧的 5 秒测试记成通过** —— 将来一次具体板级批准必须
+写明"学习 ≤15 s、保护观察 ≤5 s"。本轮同样未做: 不改产品命令、不实现可取消/有界学习接口。

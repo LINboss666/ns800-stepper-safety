@@ -1,0 +1,12 @@
+{
+    "run_id":  "20261031T164124Z-13680",
+    "entry":  "SelfTest",
+    "checks":  22,
+    "failures":  [
+                     "ST_NEG_REAL_WITHOUT_TOKEN",
+                     "ST_NEG_MODE_MIX_REFUSED"
+                 ],
+    "actions_attempted":  [
+
+                          ]
+}

@@ -1,0 +1,90 @@
+{
+ "generated_from_working_tree": true,
+ "entries": [
+  {
+   "entry": "SelfTest",
+   "run_id": "20261031T164542Z",
+   "run_root": "reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T164542Z-51940-SelfTest",
+   "other_run_roots_present": 4,
+   "artifacts": [
+    {
+     "path": "reports/reviews/phase8-m8-relative-protection-r3/host/field_SelfTest_console_r3closeout.txt",
+     "bytes": 2248,
+     "sha256": "bf7e6aa21057f3923075ab5cd71360a7bae6ec3c11899d5bcb8397df18c1a7d8",
+     "role": "console_transcript"
+    },
+    {
+     "path": "reports/reviews/phase8-m8-relative-protection-r3/host/selftest_summary_r3closeout.json",
+     "bytes": 198,
+     "sha256": "f3427da35d94af761725ed6b086412bb8c64d702e731c52c518b0dc1a77cfe56",
+     "role": "entry_summary_json"
+    }
+   ]
+  },
+  {
+   "entry": "Precheck",
+   "run_id": "20261031T164316Z",
+   "run_root": "reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T164316Z-46076-Precheck",
+   "other_run_roots_present": 3,
+   "artifacts": [
+    {
+     "path": "reports/reviews/phase8-m8-relative-protection-r3/host/field_Precheck_console_r3closeout.txt",
+     "bytes": 1490,
+     "sha256": "15dd42dfe8dc9209c01d4e5657b96435b32679046a1aed79b8b0f86c0cfbbd73",
+     "role": "console_transcript"
+    },
+    {
+     "path": "reports/reviews/phase8-m8-relative-protection-r3/host/precheck_summary_r3closeout.json",
+     "bytes": 299,
+     "sha256": "309cfb270cfc36cd78983ca0ee4b4a08ad2cbf389bef90e84506675764ea17a9",
+     "role": "entry_summary_json"
+    }
+   ]
+  },
+  {
+   "entry": "RunField",
+   "run_id": "20261031T164321Z",
+   "run_root": "reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T164321Z-43412-RunField",
+   "other_run_roots_present": 2,
+   "artifacts": [
+    {
+     "path": "reports/reviews/phase8-m8-relative-protection-r3/host/field_RunField_console_r3closeout.txt",
+     "bytes": 14251,
+     "sha256": "31e6a9d44edc8309d39faeb35b934ffaff8cba1eb6b7e8d9bb48a7d5ae878124",
+     "role": "console_transcript"
+    },
+    {
+     "path": "reports/reviews/phase8-m8-relative-protection-r3/host/runfield_summary_r3closeout.json",
+     "bytes": 565,
+     "sha256": "828da4f14712f16bc018306c65e959e7eef83b8958231b24f0fc98f7a8e7a09a",
+     "role": "entry_summary_json"
+    }
+   ]
+  },
+  {
+   "artifact": "reports/reviews/phase8-m8-relative-protection-r3/host/python_selftest_r3closeout.txt",
+   "rc": 0,
+   "bytes": 10907,
+   "sha256": "059631841546c1766e0065fa3947127ebaeceeff2f01ca52a31a00f5d18c3502"
+  },
+  {
+   "artifact": "reports/reviews/phase8-m8-relative-protection-r3/host/validate_plan_r3closeout.txt",
+   "rc": 0,
+   "bytes": 7953,
+   "sha256": "eaf30b55ed31fa406a8a5a710ca1efff6e9724859795898572946a7d3e8a2ef6"
+  },
+  {
+   "artifact": "reports/reviews/phase8-m8-relative-protection-r3/host/rows_provenance_console_r3closeout.txt",
+   "rc": 0,
+   "bytes": 145,
+   "sha256": "a2e7588aacad0c69a075b1f6275cac9fac9281b121a75afdef1efdf684d1f52f"
+  },
+  {
+   "artifact": "reports/reviews/phase8-m8-relative-protection-r3/host/reviewer_probe_post_fix_r3closeout.txt",
+   "rc": 1,
+   "bytes": 4349,
+   "sha256": "65307c342df1c7a7bbcea13171533ee1bf6cc52d0e6dde5d84ac20af8c6ce778",
+   "note": "审核方 remaining_field_probes.py 指向收尾后的工作树: 其修前断言 observations[0](resets==0 且 STOP) 已不再成立 => 该缺陷的行为在本机已关闭; rc=1 是这条断言。"
+  }
+ ]
+}
