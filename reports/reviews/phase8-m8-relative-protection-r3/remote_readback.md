@@ -86,3 +86,21 @@ REMOTE_READBACK_SUMMARY|tip=3411d926a4|declared=2591|verified=2529|r3_entries=15
   `host/remote_readback_console.txt` 在**下一次清单重算**里被登记（提交顺序：本次回读 → 归档 → 重算清单 → 提交），
   所以它的 blob 由后续提交里的清单与再下一次远端回读覆盖。
 - `hardware_actions=0`：整个过程只有 git 协议 fetch 与本地读文件，未连接任何设备。
+
+
+## 6. R3 收尾轮交付头的回读（tip `0959f76111…`，两份提交之后）
+
+```text
+REMOTE_READBACK_SUMMARY|tip=0959f76111|declared=4336|verified=4274|r3_entries=3337|r3_verified=3337|r3_problems=0|prior_problems=64|prior_hard=14|no_path=32|unlisted=4531
+```
+
+- 本轮范围 `SCOPE_R3` = **3337** 条全部按远端 Git blob 逐条复算通过，`r3_problems=0`；
+  清单条目数从 1587 涨到 3325 是因为 `offline/psrun-*` 又新增 5 个运行根（每个会话的
+  原字节 `.rx.bin` + 判读 `.txt` + 台账都在内），未删除任何既往证据。
+- 往轮清单口径不变：`prior_problems=64 / prior_hard=14 / no_path=32` 原样披露，
+  本轮不修历史 64 项，也不为它加通用清单工具。
+- 提交前另有 `host/staged_blob_preflight.txt` 同口径预检（`STAGED_PREFLIGHT_TOTAL problems=0`），
+  两段一起构成"清单=磁盘=远端 blob"的三方一致。
+- 收尾轮的两件审核观察程序对照已入库：修前 `host/reviewer_probes_prefix_r3closeout.txt`
+  （两份 stdout 与审核包 expected 逐行一致）与修后
+  `host/reviewer_probe_post_fix_r3closeout.txt`（其修前断言不再成立 = 缺陷行为已关闭）。

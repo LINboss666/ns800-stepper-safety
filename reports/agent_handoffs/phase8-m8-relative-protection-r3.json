@@ -415,6 +415,17 @@
    "flash_dump 停后帧的真实内容: 行表用 M5/M6 板上原件的形状 + 本轮 session/时间取值, 不构成板上证据",
    "Windows/Keil 侧构建: 本轮未重编; 交付头与镜像身份沿用 805c29b 的既有归档"
   ],
-  "approval_boundary": "现场执行仍需一次具体批准(含学习≤15s/保护≤5s 的明示), 且 real 入口只允许一次 dispatch + 一本总账 + response_driven 档案; 本轮不请求硬件操作。"
+  "approval_boundary": "现场执行仍需一次具体批准(含学习≤15s/保护≤5s 的明示), 且 real 入口只允许一次 dispatch + 一本总账 + response_driven 档案; 本轮不请求硬件操作。",
+  "remote_readback_at_0959f76": {
+   "summary_line": "REMOTE_READBACK_SUMMARY|tip=0959f76111|declared=4336|verified=4274|r3_entries=3337|r3_verified=3337|r3_problems=0|prior_problems=64|prior_hard=14|no_path=32|unlisted=4531",
+   "tip": "0959f76",
+   "console": "host/remote_readback_console_r3closeout.txt",
+   "console_sha256": "297f57e41c0f5aab344e295f9b7a428e839fbbabeb08b308e14b742e3f7fe2ec",
+   "r3_verified": 3337,
+   "r3_problems": 0,
+   "prior_problems_kept": 64,
+   "no_path_kept": 32,
+   "note": "推送后从远端 Git 协议读 blob 复算, 不读工作树; 该记录写进 remote_readback.md §6。"
+  }
  }
 }
