@@ -1,6 +1,6 @@
 # sha256 * <repo相对路径>(LF, 无 BOM; 本清单不哈希自身字节 —— 一条清单不能给自己的字节作证)
 # 生成方式: 对 reports/reviews/phase8-m8-relative-protection-r3/ 下每个常规文件(排除 SHA256SUMS.txt、remote_readback.md 与 __pycache__) 直接读磁盘字节算 sha256
-# 条目数=5084; 逐条与 Git blob 的复算由 host/staged_blob_preflight.txt(提交前)与 host/remote_readback.py(推送后, 从远端 blob)完成
+# 条目数=5090; 逐条与 Git blob 的复算由 host/staged_blob_preflight.txt(提交前)与 host/remote_readback.py(推送后, 从远端 blob)完成
 6239911fbd44b814e769e75c531df369c76a04e6a2ba7e4dbe119cb4b30a7b5d  reports/reviews/phase8-m8-relative-protection-r3/build/rc.txt
 278c6c927c4a17d5cd31846c2cf97da7f826c1ba433aebe4f214098c7cdbc866  reports/reviews/phase8-m8-relative-protection-r3/build/rt-thread-measure-a0.log
 9114d6024382982ff45c1683b3063a3c5cb0193a117c67ee188e0c7f912ca697  reports/reviews/phase8-m8-relative-protection-r3/build/rt-thread-motor-m1-candidate.log
@@ -91,6 +91,12 @@ a0dbbcd50590286e33f6ec19c493aa4750803250bc24eb28fce4b74615b5c0e4  reports/review
 0360f306c3599bc102e958fa5a913d984b740c62f29361fa0604c893240043b6  reports/reviews/phase8-m8-relative-protection-r3/host/validate_plan_m8s2.txt
 eaf30b55ed31fa406a8a5a710ca1efff6e9724859795898572946a7d3e8a2ef6  reports/reviews/phase8-m8-relative-protection-r3/host/validate_plan_r3closeout.txt
 0360f306c3599bc102e958fa5a913d984b740c62f29361fa0604c893240043b6  reports/reviews/phase8-m8-relative-protection-r3/host/validate_plan_r3finalfix.txt
+d4d4d8178639e4ef320ebefd4e1ac0d32098d7e8039efbf536811259271a5436  reports/reviews/phase8-m8-relative-protection-r3/offline/diag-com5-20261031T234328Z-48972/console_transcript.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  reports/reviews/phase8-m8-relative-protection-r3/offline/diag-com5-20261031T234328Z-48972/sess_diag/01_passive60.rx.bin
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  reports/reviews/phase8-m8-relative-protection-r3/offline/diag-com5-20261031T234328Z-48972/sess_diag/01_passive60.rx.bin.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  reports/reviews/phase8-m8-relative-protection-r3/offline/diag-com5-20261031T234328Z-48972/sess_diag/02_ver.rx.bin
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  reports/reviews/phase8-m8-relative-protection-r3/offline/diag-com5-20261031T234328Z-48972/sess_diag/bootstrap.jsonl
+2d617abea0c7b6d8fb7728b2dc484de0a53713d981aba5c8cd51d4e4f57ab090  reports/reviews/phase8-m8-relative-protection-r3/offline/diag-com5-20261031T234328Z-48972/sess_diag/ledger.jsonl
 42ff95d95b3c67b9fc824c038d25ab5b2a0bb9e76c0b0e6be8102a2208c173e0  reports/reviews/phase8-m8-relative-protection-r3/offline/fieldcont-d9ff664-20261031T200214Z-41860/action_readback/ARGV.json
 13bf7b3039c63bf5a50491fa3cfd8eb4e699d1ba1436315aef9cbe5711530354  reports/reviews/phase8-m8-relative-protection-r3/offline/fieldcont-d9ff664-20261031T200214Z-41860/action_readback/rc.txt
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  reports/reviews/phase8-m8-relative-protection-r3/offline/fieldcont-d9ff664-20261031T200214Z-41860/action_readback/stderr.bin

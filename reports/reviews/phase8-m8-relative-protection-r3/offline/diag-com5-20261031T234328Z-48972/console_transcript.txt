@@ -1,0 +1,36 @@
+﻿**********************
+Windows PowerShell 脚本开始
+开始时间: 20261101074328
+用户名: LAPTOP-0AICPJF1\LMX
+RunAs 用户: LAPTOP-0AICPJF1\LMX
+配置名称: 
+计算机: LAPTOP-0AICPJF1 (Microsoft Windows NT 10.0.26200.0)
+主机应用程序: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass -File D:\ns800_m8r3_scratch\field_diag_launch.ps1
+进程 ID: 48972
+PSVersion: 5.1.26100.9711
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.26100.9711
+BuildVersion: 10.0.26100.9711
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+RUN_ROOT=D:\ns800\reports\reviews\phase8-m8-relative-protection-r3\offline\diag-com5-20261031T234328Z-48972
+SCOPE: 1 port open, 60s passive capture, then version (<=1), then system_status (<=1). No DAP, no download, no readback, no reset, no config write, no motion.
+{"status": "STOP", "code": "MISSING_RESPONSE_PROMPT", "detail": "as=ver bytes=0", "session": "sess_diag", "results": [{"
+as": "passive60", "kind": "watch", "seconds": 60, "rx_bytes": 0, "txt": "D:\\ns800\\reports\\reviews\\phase8-m8-relative
+-protection-r3\\offline\\diag-com5-20261031T234328Z-48972\\sess_diag\\01_passive60.rx.bin.txt", "verdict": "OK", "assert
+ed": false}], "disarm": "NOT_ARMED", "obligation": false, "success": false, "cleanup_errors": [], "cleanup_overruns": []
+, "budget_seconds": null, "quota_left": {"port_open": 7, "download": 1, "readback": 1, "explicit_reset": 1, "approved_re
+boot": 1, "motor_run": 2, "motor_run_seconds_total": 20, "motion_cap_seconds_per_run": 5, "config_save": 1, "tmc_config_
+apply": 2, "irq_polarity_prep": 4, "diag_profile_zero": 1, "diag_profile_learn": 1, "diag_profile_commit": 1, "cleanup_m
+otor_stop": 3, "cleanup_motor_disarm": 3, "cleanup_motor_status": 3, "retry": 0, "physical_collision": 0, "blackbox_clea
+r": 0, "dmm_readings": 0}, "quota_used": {"port_open": 1}, "dir": "D:\\ns800\\reports\\reviews\\phase8-m8-relative-prote
+ction-r3\\offline\\diag-com5-20261031T234328Z-48972\\sess_diag", "ledger": "D:\\ns800\\reports\\reviews\\phase8-m8-relat
+ive-protection-r3\\offline\\diag-com5-20261031T234328Z-48972\\sess_diag\\ledger.jsonl", "terminal": "KNOWN"}
+DIAG_RC=1
+**********************
+Windows PowerShell 脚本结束
+结束时间: 20261101074449
+**********************
