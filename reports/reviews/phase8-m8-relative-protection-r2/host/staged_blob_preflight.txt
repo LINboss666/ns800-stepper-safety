@@ -1,0 +1,22 @@
+$ python  (逐条 git cat-file blob :<path> 与清单复算, 提交前置校验)
+MANIFEST reports/reviews/phase8-m8-relative-protection-r2/SHA256SUMS.txt entries=161 problems=0 []
+MANIFEST reports/firmware/phase8-m8-relative-protection-r2/SHA256SUMS.txt entries=9 problems=0 []
+MANIFEST reports/reviews/phase8-m8-relative-protection-r1/SHA256SUMS.txt entries=336 problems=0 []
+MANIFEST reports/firmware/phase8-m8-relative-protection-r1/SHA256SUMS.txt entries=10 problems=0 []
+MANIFEST reports/reviews/phase8-m8-sg-adc-relative-protection/SHA256SUMS.txt entries=23 problems=0 []
+BUILD_MANIFEST reports/firmware/phase8-m8-relative-protection-r2 entries=9 problems=0 []
+BUILD_MANIFEST reports/firmware/phase8-m8-relative-protection-r1 entries=9 problems=0 []
+
+首轮(清单 162 条, 含当时的 field/__pycache__ 残留)暴露的问题与处置:
+  ABSENT  field/__pycache__/m8r2_serial_chain.cpython-312.pyc  -> 本机运行副产物, 删除该目录后清单重算(162->161)
+  SHA_DIFF field/m8r2_field_selftest.py / field/m8r2_serial_chain.py / field/needles.json / field/plan.json
+           field_candidate_package.md / run_record.md  (共 6 件)
+    根因: 本机磁盘字节含 CRLF, core.autocrlf=true 在 git add 时剥成 LF, 于是 blob != 清单登记的散列。
+    处置: .gitattributes 追加三条**具体 R2 路径**的窄 -text 规则(field/*.py、field/*.json、评审根 *.md),
+          再 git add --renormalize reports/reviews/phase8-m8-relative-protection-r2;
+          未加全局 * -text, 未做全仓 renormalize, 未改 .gitignore。
+  R1 那 5 件"登记但不存在"的构建日志: 本机原件 sha256 与 R1 已发布清单逐字相符, 按具体路径 git add -f 后
+  R1 清单从 331/336 变为 336/336(见上一行 problems=0)。
+
+范围声明: 本文件记录的是"清单为 161 条"那一版的重算结果; 本文件自身与新 SHA256SUMS.txt(162 条)
+里它的条目, 由推送后 host/remote_readback.py 的远端逐 blob 回读独立覆盖, 不靠本文件自证。

@@ -1,0 +1,52 @@
+[
+    {
+        "cmd":  "config_show",
+        "as":  "cfg1",
+        "expect_contains":  [
+                                "[CFG]"
+                            ]
+    },
+    {
+        "cmd":  "diag_profile show",
+        "as":  "prof1",
+        "expect_contains":  [
+                                "[DIAG] profile id=",
+                                "[DIAG] live sig="
+                            ],
+        "restore_compare":  [
+                                "id",
+                                "rev",
+                                "abi",
+                                "flg",
+                                "signature match=YES"
+                            ]
+    },
+    {
+        "cmd":  "tmc_config_apply",
+        "as":  "cfgapply2",
+        "seconds":  8,
+        "expect_contains":  [
+                                "[TMC-CFG]"
+                            ],
+        "quota":  {
+                      "name":  "tmc_config_apply",
+                      "n":  1
+                  },
+        "only_if":  "tmc_config_show/探针显示 CONFIGURED 未成立"
+    },
+    {
+        "cmd":  "safety_irq_enable",
+        "as":  "irq2",
+        "expect_contains":  [
+                                "[SAFETY] IRQ gate OPEN"
+                            ],
+        "only_if":  "safety_status 显示保护门未开"
+    },
+    {
+        "cmd":  "diag_status",
+        "as":  "diag1",
+        "expect_contains":  [
+                                "[DIAG] mode=MONITOR_ONLY"
+                            ]
+    }
+]

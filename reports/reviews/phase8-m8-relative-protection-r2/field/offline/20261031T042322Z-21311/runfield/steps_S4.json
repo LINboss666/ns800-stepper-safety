@@ -1,0 +1,115 @@
+[
+    {
+        "cmd":  "motor_dir 0",
+        "as":  "dir0",
+        "expect_contains":  [
+                                "[MOT]"
+                            ]
+    },
+    {
+        "cmd":  "motor_arm",
+        "as":  "arm",
+        "expect_contains":  [
+                                "[MOT]"
+                            ]
+    },
+    {
+        "cmd":  "motor_target 100",
+        "as":  "target",
+        "expect_contains":  [
+                                "[MOT]"
+                            ]
+    },
+    {
+        "cmd":  "motor_start",
+        "as":  "start",
+        "seconds":  5,
+        "quota":  {
+                      "name":  "motor_run",
+                      "n":  1
+                  },
+        "expect_contains":  [
+                                "[MOT]"
+                            ]
+    },
+    {
+        "cmd":  "diag_profile learn 16 80 120 0",
+        "as":  "learn",
+        "seconds":  15,
+        "expect_contains":  [
+                                "[DIAG] learn "
+                            ],
+        "allowed_outcomes":  [
+                                 "[DIAG] learn REFUSED"
+                             ],
+        "unit":  "LO/HI 是 STEP 频率 Hz 区间(hz_low/hz_high), 不是 SG 码; hz_nominal 取窗中值=100",
+        "basis":  "M4 R1-R4 已在板上以 100 Hz 各 5 s 运行通过(m4_result.txt), 故选 100 Hz + [80,120] 窄窗; 不借学习抬 IRUN(现值 20)",
+        "dir_label":  "single_direction_0"
+    },
+    {
+        "cmd":  "__watch__",
+        "as":  "cruise_probe",
+        "seconds":  5,
+        "expect_contains":  [
+                                "[MOT]"
+                            ],
+        "no_trigger_is_observation":  true,
+        "trigger_needles":  [
+                                "[DIAG] REL TRIP r="
+                            ]
+    },
+    {
+        "cmd":  "motor_stop",
+        "as":  "stop"
+    },
+    {
+        "cmd":  "motor_disarm",
+        "as":  "disarm"
+    },
+    {
+        "cmd":  "motor_status",
+        "as":  "disable_proof",
+        "expect_fields":  [
+                              [
+                                  "\\[MOT\\] state=\\d+ name=\\w+",
+                                  "state"
+                              ],
+                              [
+                                  "\\[MOT\\] armed=\\d drv_en_request=\\d health=\\w+",
+                                  "armed"
+                              ],
+                              [
+                                  "\\[MOT\\] expected_ENN=\\w+ ENN_fb=\\d \\w+ verdict=(OK|CUT_BY_HARDWARE|TRANSITION|UNEXPECTED_ENABLE|PAD_MISMATCH|NO_SAMPLE)",
+                                  "enn"
+                              ]
+                          ]
+    },
+    {
+        "cmd":  "diag_profile tier 2",
+        "as":  "tier",
+        "expect_contains":  [
+                                "[DIAG] tier "
+                            ]
+    },
+    {
+        "cmd":  "diag_profile commit",
+        "as":  "commit",
+        "expect_contains":  [
+                                "[DIAG] commit "
+                            ]
+    },
+    {
+        "cmd":  "config_save",
+        "as":  "save",
+        "quota":  {
+                      "name":  "config_save",
+                      "n":  1
+                  },
+        "requires":  [
+                         "commit"
+                     ],
+        "expect_contains":  [
+                                "[CFG] save:"
+                            ]
+    }
+]

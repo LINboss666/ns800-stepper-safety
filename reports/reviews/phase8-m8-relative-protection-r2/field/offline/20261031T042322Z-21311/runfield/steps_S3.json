@@ -1,0 +1,105 @@
+[
+    {
+        "action":  "reset",
+        "as":  "rst",
+        "quota_name":  "explicit_reset",
+        "command":  "pyocd reset -t cortex_m"
+    },
+    {
+        "cmd":  "system_status",
+        "as":  "health",
+        "expect_contains":  [
+                                "SYSTEM STATUS"
+                            ]
+    },
+    {
+        "cmd":  "safety_status",
+        "as":  "boot",
+        "expect_contains":  [
+                                "[Safety] request="
+                            ]
+    },
+    {
+        "cmd":  "tmc_config_show",
+        "as":  "cfgplan",
+        "expect_contains":  [
+                                "[TMC-CFG]"
+                            ]
+    },
+    {
+        "cmd":  "tmc_config_apply",
+        "as":  "cfgapply",
+        "seconds":  8,
+        "expect_contains":  [
+                                "[TMC-CFG]"
+                            ],
+        "quota":  {
+                      "name":  "tmc_config_apply",
+                      "n":  1
+                  }
+    },
+    {
+        "cmd":  "safety_irq_enable",
+        "as":  "irq",
+        "expect_contains":  [
+                                "[SAFETY] IRQ gate OPEN"
+                            ],
+        "quota":  {
+                      "name":  "irq_polarity_prep",
+                      "n":  1
+                  }
+    },
+    {
+        "cmd":  "motor_status",
+        "as":  "motor0",
+        "expect_fields":  [
+                              [
+                                  "\\[MOT\\] state=\\d+ name=\\w+",
+                                  "state"
+                              ],
+                              [
+                                  "\\[MOT\\] armed=\\d drv_en_request=\\d health=\\w+",
+                                  "armed"
+                              ],
+                              [
+                                  "\\[MOT\\] expected_ENN=\\w+ ENN_fb=\\d \\w+ verdict=(OK|CUT_BY_HARDWARE|TRANSITION|UNEXPECTED_ENABLE|PAD_MISMATCH|NO_SAMPLE)",
+                                  "enn"
+                              ]
+                          ]
+    },
+    {
+        "cmd":  "diag_status",
+        "as":  "diag0",
+        "expect_contains":  [
+                                "[DIAG] mode=",
+                                "[DIAG] rel cov="
+                            ]
+    },
+    {
+        "cmd":  "config_show",
+        "as":  "cfg0",
+        "expect_contains":  [
+                                "[CFG]"
+                            ]
+    },
+    {
+        "cmd":  "diag_profile show",
+        "as":  "prof0",
+        "expect_contains":  [
+                                "[DIAG] profile id=",
+                                "[DIAG] live sig="
+                            ]
+    },
+    {
+        "cmd":  "diag_profile zero 32",
+        "as":  "zero",
+        "seconds":  15,
+        "expect_contains":  [
+                                "[DIAG] zero "
+                            ],
+        "allowed_outcomes":  [
+                                 "[DIAG] zero REFUSED",
+                                 "[DIAG] zero VOIDED"
+                             ]
+    }
+]

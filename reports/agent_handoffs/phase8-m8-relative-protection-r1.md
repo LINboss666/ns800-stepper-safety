@@ -57,3 +57,18 @@
   并明确 `plan.json` 里的提案数字是否作为额度上限；学习窗口的 SG 码必须先换成 M4 实测巡航区间。
 - 仍然悬着的实物/现场项（本轮未触碰）：P1 独立电流参考与零点增益、
   `RT_CONSOLEBUF_SIZE` 128 裁剪在真串口下的表现、v2→v3 参数迁移在真 Flash 上的行为。
+
+## 5. 追加指针：M8-R2 轮（本节为追加，上文一字未改）
+
+- 独立复审在 `b4d4079c8a2ae22405fa436d4513d0b2807839f8` 上给出的结论是
+  `M8_R1_REVIEW_REWORK_REQUIRED`，其中与本交接直接相关的两条事实：
+  - `OLD_13_COUNTEREXAMPLES = NOT_REPRODUCED`（R1 已修的 13 项判据缺口，本轮结论保留）；
+  - `FIELD_RUNFIELD_AND_CONTROL_FLOW = REWORK_REQUIRED`（R1 的现场 `-RunField` 与控制流不足，转 R2 返修）。
+- `R1_REVIEW_MANIFEST = 331/336_PRESENT_AND_MATCHED / FIVE_MISSING` 是本轮新暴露的**取证缺口**，
+  与本交接 §2 的"5 件构建日志已入库"说法不符：那 5 件当时只在本机，未进 Git（`.gitignore` 的 `build/` 规则挡住）。
+  M8-R2 轮已把 5 件原件（本机 sha256 与 R1 已发布清单逐字相符）按具体路径 `git add -f` 补齐，
+  未改 `.gitignore`、未改 R1 清单原文、未重造历史。
+- R1 的 C 链事实不变：44 例正向 + 7 组反向 META-OK + 9 件镜像/map 工件身份，
+  其 `code_commit 3275356`、镜像目录 `reports/firmware/phase8-m8-relative-protection-r1/` 均未被后续轮次改写。
+- 本轮之后的返修与交付见 `reports/agent_handoffs/phase8-m8-relative-protection-r2.md` /
+  `.json` 与 `reports/reviews/phase8-m8-relative-protection-r2/`。

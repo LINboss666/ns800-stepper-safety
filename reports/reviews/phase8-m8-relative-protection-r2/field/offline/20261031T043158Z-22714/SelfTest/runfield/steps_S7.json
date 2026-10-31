@@ -1,0 +1,115 @@
+[
+    {
+        "cmd":  "diag_mode relative CONFIRM_EXPERIMENTAL",
+        "as":  "arm_rel",
+        "expect_contains":  [
+                                "[DIAG] mode=RELATIVE_ACTIVE"
+                            ],
+        "allowed_outcomes":  [
+                                 "[DIAG] RELATIVE REFUSED"
+                             ]
+    },
+    {
+        "cmd":  "motor_arm",
+        "as":  "arm",
+        "expect_contains":  [
+                                "[MOT]"
+                            ]
+    },
+    {
+        "cmd":  "motor_target 100",
+        "as":  "target",
+        "expect_contains":  [
+                                "[MOT]"
+                            ]
+    },
+    {
+        "cmd":  "motor_start",
+        "as":  "start",
+        "seconds":  5,
+        "quota":  {
+                      "name":  "motor_run",
+                      "n":  1
+                  },
+        "expect_contains":  [
+                                "[MOT]"
+                            ]
+    },
+    {
+        "cmd":  "__watch__",
+        "as":  "trip_window",
+        "seconds":  5,
+        "expect_contains":  [
+                                "[MOT]"
+                            ],
+        "trigger_needles":  [
+                                "[DIAG] REL TRIP r="
+                            ],
+        "no_trigger_is_observation":  true
+    },
+    {
+        "cmd":  "motor_status",
+        "as":  "disarm_obs",
+        "expect_fields":  [
+                              [
+                                  "\\[MOT\\] state=\\d+ name=\\w+",
+                                  "state"
+                              ],
+                              [
+                                  "\\[MOT\\] armed=\\d drv_en_request=\\d health=\\w+",
+                                  "armed"
+                              ],
+                              [
+                                  "\\[MOT\\] expected_ENN=\\w+ ENN_fb=\\d \\w+ verdict=(OK|CUT_BY_HARDWARE|TRANSITION|UNEXPECTED_ENABLE|PAD_MISMATCH|NO_SAMPLE)",
+                                  "enn"
+                              ]
+                          ]
+    },
+    {
+        "cmd":  "diag_status",
+        "as":  "latch",
+        "key":  "diag_status@latch",
+        "branch":  "on_trip",
+        "expect_contains":  [
+                                "[DIAG] rel snap=",
+                                "[DIAG] rel LATCH r="
+                            ]
+    },
+    {
+        "cmd":  "blackbox_status",
+        "as":  "first_cause",
+        "branch":  "on_trip",
+        "expect_contains":  [
+                                "[BB]"
+                            ]
+    },
+    {
+        "cmd":  "flash_logstat",
+        "as":  "newlog",
+        "branch":  "on_trip",
+        "expect_contains":  [
+                                "slots="
+                            ]
+    },
+    {
+        "cmd":  "fault_reset",
+        "as":  "reset",
+        "branch":  "on_trip"
+    },
+    {
+        "cmd":  "system_selftest",
+        "as":  "selftest",
+        "branch":  "on_trip",
+        "expect_contains":  [
+                                "[SELFTEST]"
+                            ]
+    },
+    {
+        "cmd":  "safety_status",
+        "as":  "ready",
+        "branch":  "on_trip",
+        "expect_contains":  [
+                                "[Safety] request="
+                            ]
+    }
+]

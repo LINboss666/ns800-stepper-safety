@@ -1,0 +1,13 @@
+PRECHECK_START|run=20261031T043203Z-17256
+CHECK|PC01_plan_shape|PASS|violations=
+CHECK|PC02_identity_fields|PASS|missing=
+CHECK|PC03_image_declared|PASS|bytes=290868
+CHECK|PC04_image_hash|PASS|disk=874df24187c4 bytes=290868
+CHECK|PC05_needles_proven|PASS|total=40 unproven=0
+CHECK|PC06_static_port_discipline|PASS|F05_STATIC_PORT_DISCIPLINE|PASS|post_open_attribute_writes=none
+CHECK|PC07_no_serial_import|PASS|real 分支存在但需令牌; 本轮 hardware_actions=0
+CHECK|PC08_prerequisites_present|PASS|C4 前置与额度已写入计划
+CHECK|PC09_load_step_named_gap|PASS|NAMED_PREREQUISITE_MISSING
+CHECK|PC10_impact_not_selected|PASS|R6 激励未选择 => FIELD_NOT_TRIGGERED
+PRECHECK_VERDICT|PASS|failures=
+PRECHECK_EVIDENCE|D:\ns800\reports\reviews\phase8-m8-relative-protection-r2\field\offline\20261031T043158Z-22714\Precheck\precheck_20261031T043203Z-17256.json

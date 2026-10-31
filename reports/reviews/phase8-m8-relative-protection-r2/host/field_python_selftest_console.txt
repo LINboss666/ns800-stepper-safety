@@ -1,0 +1,31 @@
+CASE|FS01|PASS|elapsed=0.000 rows=1 bytes=33
+CASE|FS02|PASS|verdict=STOP rows=0 bytes=28
+CASE|FS03|PASS|ILLEGAL_BYTES_IN_RESPONSE
+CASE|FS04|PASS|verdict=STOP code=FIELD_NOT_EXACTLY_ONE
+CASE|FS05|PASS|verdict=STOP code=BUSINESS_FAILED text=[DIAG] learn FAILED: left the approved window or source lost
+CASE|FS06|PASS|status=REFUSED commands=diag_profile commit
+CASE|FS07|PASS|verdict=OK code=None text=[DIAG] mode=RELATIVE_ACTIVE
+CASE|FS08|PASS|status=STOP code=EXPECTATION_NOT_MET commands=
+CASE|FS09|PASS|status=OBSERVATION_NO_TRIGGER disarm=CONFIRMED_DISABLED cleanup=motor_stop,motor_disarm,motor_status tx=motor_arm,motor_target 100,motor_start,motor_stop,motor_disarm,motor_status
+CASE|FS10|PASS|start_to_stop=5.0 declared=5 disarm=CONFIRMED_DISABLED
+CASE|FS11|PASS|code=STUB_MISS tx=motor_start,not_in_fixture,motor_stop,motor_disarm,motor_status disarm=CONFIRMED_DISABLED
+CASE|FS12|PASS|disarm=UNKNOWN terminal=UNKNOWN cleanup=motor_stop:MISSING_RESPONSE_PROMPT primary=STUB_MISS
+CASE|FS13|PASS|operator_calls=1 answer=yes fixture_ignored=yes
+CASE|FS14|PASS|code=OPERATOR_ASSERTION
+CASE|FS15|PASS|code=MANUAL_GATE_DENIED tx=motor_arm
+CASE|FS16|PASS|calls=download,readback,reset status=OK code= detail=
+ACTION readback: 请执行下列逐字命令并把交付物放入 C:\Users\LMX\AppData\Local\Temp\m8r2-field-selftest-9jcmxmi7\s17-2\action_readback
+  pyocd packmem -t cortex_m -O no_pack -c 289028 -o readback.bin 0 289028
+CASE|FS17|PASS|ACTION_DELIVERABLES_MISSING
+ACTION readback: 请执行下列逐字命令并把交付物放入 C:\Users\LMX\AppData\Local\Temp\m8r2-field-selftest-9jcmxmi7\s18-1\action_readback
+  pyocd packmem ...
+CASE|FS18|PASS|READBACK_HASH_MISMATCH
+CASE|FS19|PASS|tx=1 code=MISSING_RESPONSE_PROMPT
+CASE|FS20|PASS|total=40 unproven=0
+CASE|FS21|PASS|post_open_attribute_writes=none
+CASE|FS22|PASS|code=QUOTA_EXHAUSTED starts=1
+CASE|FS23|PASS|去掉硬截止后 s10 仍然通过 => 判据不足: start_to_stop=13.0 declared=5 disarm=UNKNOWN
+CASE|FS24|PASS|去掉撤能清理后 s11 仍然通过 => 判据不足: code=STUB_MISS tx=motor_start,not_in_fixture disarm=SKIPPED_BY_MUTANT
+CASE|FS25|PASS|去掉业务层后 s05 仍然通过 => 判据不足: verdict=OK code=None text=[DIAG] learn FAILED: left the approved window or source lost
+SUMMARY|cases=25 pass=25 fail=0 executed=25
+SELFTEST_WORKDIR|C:\Users\LMX\AppData\Local\Temp\m8r2-field-selftest-9jcmxmi7

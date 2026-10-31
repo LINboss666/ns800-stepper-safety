@@ -1,0 +1,4 @@
+[DIAG] mode=MONITOR_ONLY
+[DIAG] rel cov=COVERED lost=0 gen=0 rearm=0
+[DIAG] rel snap=OK inc=OK seq=1 pubfail=0
+msh >

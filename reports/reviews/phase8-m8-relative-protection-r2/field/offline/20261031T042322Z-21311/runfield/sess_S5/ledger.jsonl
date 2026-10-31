@@ -1,0 +1,6 @@
+{"kind": "PORT_OPEN", "port": null, "t_s": 0.0, "transport": "stub"}
+{"kind": "QUOTA_CONSUMED", "left": 3, "n": 1, "name": "port_open", "t_s": 0.0}
+{"kind": "QUOTA_CONSUMED", "left": 0, "n": 1, "name": "approved_reboot", "t_s": 0.0}
+{"backend": "sim", "kind": "ACTION", "name": "reboot", "operator_fact": null, "plan": "rb", "rc": 0, "t_s": 0.0}
+{"kind": "SESSION_OK", "session": "sess_S5", "steps": 1, "t_s": 0.0}
+{"kind": "PORT_CLOSED", "t_s": 0.0}

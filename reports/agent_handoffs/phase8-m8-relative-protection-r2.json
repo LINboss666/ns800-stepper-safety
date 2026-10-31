@@ -1,0 +1,245 @@
+{
+  "task": "phase8-m8-relative-protection-r2",
+  "task_book": "操作者本机提供的审核任务书与复现包(文件名 NS800_M8_R2_Review_and_Repair_Task_20261031.md + NS800_M8_R2_Review_and_Repair_Package_20261031.zip); 本记录不写个人绝对路径",
+  "task_book_verdict": "M8_R1_REVIEW_REWORK_REQUIRED",
+  "task_book_review_verdict_block_verbatim": [
+    "ATTRIBUTES_RAW_EVIDENCE_EXCEPTION = ACCEPTED / KEEP_BYTES",
+    "OLD_13_COUNTEREXAMPLES = NOT_REPRODUCED",
+    "M8_R1_C_CHAIN = 44/44 + SEVEN_REVERSES_META_OK",
+    "NEW_CONTROL_COUNTEREXAMPLES = REPRODUCED",
+    "FIELD_RUNFIELD_AND_CONTROL_FLOW = REWORK_REQUIRED",
+    "R1_REVIEW_MANIFEST = 331/336_PRESENT_AND_MATCHED / FIVE_MISSING",
+    "SOFTWARE_IMAGE_FIELD_GO = NOT_GRANTED",
+    "HARDWARE_ACTIONS_THIS_REVIEW = 0"
+  ],
+  "task_book_scope_verbatim_summary": "继续原分支, 集中完成修复、真实C用例、最终相关回归、三目标只构建、完整可执行现场候选和一次交付; 不拆纯登记轮; 不reset/rebase/force/merge; 本文件仅布置离线工作, 不允许任何设备动作。",
+  "date_utc": "2026-10-31T04:42:53Z",
+  "status": "M8_R2_OFFLINE_READY / AWAITING_INDEPENDENT_REVIEW",
+  "safe_for_enable": false,
+  "go_requested": false,
+  "roles": {
+    "executor": "Qoder agent (LMX 本机, 离线轮)",
+    "reviewer_required": "独立复审 R2-A/B/C/D 是否真做到 + 现场候选包额度与参数是否可接受; 本轮不申请任何 GO"
+  },
+  "reviewed_delivery_commit": "b4d4079c8a2ae22405fa436d4513d0b2807839f8",
+  "previous_review_delivery_commit": "f939363449c528892fb3d9978d73e085cfa90c91",
+  "branch": "feature/m8-sg-adc-relative-protection",
+  "code_commit": "207b3747efa5d54f7549dca79ececc81c4766794",
+  "software_input_commit": "207b3747efa5d54f7549dca79ececc81c4766794",
+  "tested_image_build_commit": "207b3747efa5d54f7549dca79ececc81c4766794",
+  "dual_identity_note": "software_input_commit 与 tested_image_build_commit 分列登记; 本次相等因为三目标构建确实取自该源码提交, 且每目标恰好一次 Rebuild All。",
+  "delivery_head_rule": "证据提交严格接在 code_commit 之后顺序追加; 无 rebase/merge/amend/force; 交付 tip 不写进交接正文, 由 remote_readback.md 从远端 blob 复算后记录。",
+  "frozen_refs_untouched": {
+    "main": "1b3757eec550802a3973e66790af422d81d3d373",
+    "phase7/full-embedded-software": "6d3fbc559d45673d7550eb73dec5a4ade5bb34df",
+    "phase8/tmc-drive-config": "1696c59f4b56bae5d503fb18888e379dfad6f76f",
+    "debug/tmc-uart-rootcause-20261028": "f1aa2e832d536593641cea44ea890fb8ce9558b9",
+    "tag_object": "097935fec5a6f2467261ab1ad449ff0b1d398250",
+    "tag_peeled": "e40a9b95ef709e6a80444f9f3949dfdd70ba96ba"
+  },
+  "forbidden_git_ops_performed": [],
+  "gitignore_modified": false,
+  "hardware_actions": [],
+  "device_libraries_imported": "none (pyserial 只在 real 分支 import; 本轮从未走到该分支; 未创建任何 DAP/串口对象)",
+  "requirement_closure": {
+    "R2-A": [
+      "rel_ctl_take(): 未初始化 -> -RT_EINVAL; 取不到 -> -RT_EBUSY; '初始化过'与'这次拿到了'分开回答",
+      "rel_prod_commit() 取锁失败时一个字段都不写, 错误回命令调用方(不再静默绕过)",
+      "快照/事故整份发布: rel_prod_publish() 每帧重试首因镜像, 失败计数 pubfail= 在状态行具名披露",
+      "首因权威副本留在唯一写者引擎, 命令侧读闩锁走 rel_writer_latch(), 不借控制锁",
+      "锁内不打印/不做 UART/不等待/不转 Flash: diagnosis_set_mode() 全部打印排在释放之后",
+      "rel_prod_init_wipe() 只在诊断线程起来前调用, 运行期无命令侧擦生产上下文入口",
+      "夹具真实创建控制锁(rel_ctl_init 在 world_reset 里), 反向 RV8 去掉拒绝必然大面积具名失败"
+    ],
+    "R2-B1": [
+      "模式与代际走同一个提交协议 rel_prod_commit(mode, bump_gen), 整段落在同一次静止事务内",
+      "两个模式视图不一致时引擎不采取保护动作(ctl_committed && ctl_mode != mode -> MONITOR_ONLY)",
+      "确定接缝: 夹具在'仍持静止门的最后一刻'回调读 d_mode/gen_want/held, 并断言门内打印字节数==进门时; 无 usleep 猜测",
+      "反向 RV8_ctl_lock_silently_bypassed META-OK(命中 2 个失败身份)"
+    ],
+    "R2-B2": [
+      "rel_prod_sync_generation() 在步进前调 rel_engine_new_generation(), 新一代首帧不可能带旧证据",
+      "旧首因挪到 archived, 不被本轮覆盖",
+      "反向 RV9_new_generation_keeps_old_evidence META-OK"
+    ],
+    "R2-B3": [
+      "sensor_frame 新增 RAM-only motion_ok/motion_seq/motion_tick, 只有成功才推进身份",
+      "读失败继承身份并置 motion_ok=0 -> 新帧不等于运动事实新",
+      "规则 0 未知/过期并入有界降险 RELCOV_MOTION_UNKNOWN(6u), 首因记引擎复核后的档位",
+      "sensor_selftest 双向断言运动身份; REL49 + SNS-ST 命中"
+    ],
+    "R2-C1": [
+      "SelfTest / Precheck / RunField 真正分成三个互斥参数集, 各自独立入口与判据集合(ST00-ST08 / PC01-PC10 / RF00)",
+      "动作后端可注入: SimActionBackend(标记 identity_gate=NOT_EXERCISED) / ManualActionBackend(交付物门禁) / RealActionBackend(固定 argv 子进程)",
+      "额度在发送前扣减且具名拒绝: QUOTA_UNDECLINED / QUOTA_EXHAUSTED; 单一退出路径披露 status/disarm/terminal/quota_left/quota_used"
+    ],
+    "R2-C2": [
+      "模拟字节不得喂真实身份门: 真实传输下 fixture 一律忽略, 人工门强制走 input 并计 operator_calls",
+      "5 秒上限是从 motor_start 尝试起算的单调硬预算(MotionBudget, 含清理预留 4 s), 实测 start->stop = 5.0 s",
+      "watch 判 STOP 后不再发出后续危险步骤; 错误路径 finally 仍发 motor_stop -> motor_disarm -> motor_status",
+      "撤能字段不可逐条确认(unique rows + armed=0 + drv_en_request=0 + name=IDLE)就写 UNKNOWN, 不写 OK"
+    ],
+    "R2-C3": [
+      "提示符 msh > / msh /> 真识别(PROMPT_RE), 缺提示符 = MISSING_RESPONSE_PROMPT 而非'响应完整'",
+      "原始字节先落盘再解析(NN_<as>.rx.bin), 非法字节 ILLEGAL_BYTES_IN_RESPONSE, 字段非唯一 FIELD_NOT_EXACTLY_ONE",
+      "'响应完整'与'业务成功'分层: FAILED/REFUSED/VOIDED/not supported 判 BUSINESS_FAILED 或具名 REFUSED",
+      "正控改用本轮真实 C 输出 [DIAG] mode=RELATIVE_ACTIVE; 真实学习失败行不再被收成 OK",
+      "台账独占创建(x), 撞名 LEDGER_PREEXISTING"
+    ],
+    "R2-C4": [
+      "needles.json 40 条全部由 prove_needles() 回到 C 源码字面量证明: total=40 unproven=0",
+      "learn 的 LO/HI 是 STEP 频率 Hz 而非 SG 码; motor_target 100 + diag_profile learn 16 80 120 0 同一已验证频率",
+      "板级不继承 M4/M5 的 CONFIGURED/IRQ OPEN: tmc_config_apply 额度 2、irq_polarity_prep 额度 2 已写入额度表",
+      "IRUN 保持 20 未抬; F-11 的过度禁令改为'不借学习抬 IRUN'",
+      "重启后 profile 核对与**本轮** commit 的 id/rev/signature 比对(restore_compare 绑定 plan 内本轮值)",
+      "受控加载具体化并保持缺口: plan.load_step.verdict=NAMED_PREREQUISITE_MISSING; R6 非破坏激励 selected=false",
+      "无触发只写 OBSERVATION_NO_TRIGGER, 不当业务失败也不当通过",
+      "复用 m6_field_candidate.py 的首错/证据失败/清理语义与 p0_voltage_observation.py 的固定静态开口设置; 未搬回 M6 的开口后 timeout/write_timeout 赋值(静态判据 F05 post_open_attribute_writes=none)"
+    ],
+    "R2-D": [
+      "host/remote_readback.py 改为清单优先: 先枚举远端 blob 里的每一张清单, 逐条核存在/唯一身份/字节数/散列, 再反向列未登记件",
+      "declared_but_absent / duplicate_conflict / read_failed / hash_mismatch / byte_count_mismatch / self_reference 任一命中即非成功",
+      "R1 的 5 件登记但不存在的构建日志原件仍在, 本机 sha256 与 R1 已发布清单逐字相符, 按具体路径 git add -f 补入库(未改 .gitignore, 未重造历史)"
+    ]
+  },
+  "host_results": {
+    "m8r2_chain": "SUMMARY|cases=49 pass=49 fail=0 pre_bad=0 executed=49 runner_rc=0 proc_rc=0 warn=0",
+    "new_case_ids": [
+      "REL45-ctl-take-failure-writes-nothing",
+      "REL46-ctl-uninit-take-and-protect",
+      "REL47-commit-inside-static-gate",
+      "REL48-new-generation-clears-evidence",
+      "REL49-frame-not-same-as-motion-known"
+    ],
+    "reverse_families": 9,
+    "reverse_meta": "RV1..RV9 全 META-OK(逐条命中具名失败身份; RV8/RV9 的额外失败身份已在 host/regression_m8_reverse_console.txt 逐条披露)",
+    "warning_count": 0,
+    "compiler": "tdm64 gcc 4.9.2, -std=gnu11 -Wall -Wextra -Wno-unused-function -Wno-unused-parameter",
+    "field_python_selftest": "SUMMARY|cases=25 pass=25 fail=0 executed=25",
+    "field_directed_detections": [
+      "RV10a 去掉 5 秒硬截止 => start_to_stop=13.0/disarm=UNKNOWN 具名失败",
+      "RV10b 去掉撤能清理 => tx 停在 motor_start, disarm=SKIPPED_BY_MUTANT",
+      "RV10c 去掉业务失败层 => 真实 learn FAILED 被收成 OK(判据不足)"
+    ],
+    "reviewer_r1_probes_recomputed": "FIELD|MISSING_PROMPT_ACCEPTED / FAILED_WATCH_CONTINUES / FIVE_SECOND_CAP_NOT_ENFORCED / ERROR_AFTER_START_ONLY_CLOSES_PORT / REAL_MANUAL_USES_SYNTHETIC_YES / REAL_C_LEARN_FAILURE_ACCEPTED_AS_STEP_OK / REAL_C_SUCCESS_MODE_REJECTED 七项在本包上全部翻为具名拒绝或真实正控"
+  },
+  "keil_build": {
+    "action": "Rebuild All x3 (build only; 无 -f/下载/回读/DAP/复位/烧录)",
+    "program_size": {
+      "rt-thread": "Code=204482 RO-data=85702 RW-data=2188 ZI-data=84824",
+      "rt-thread-measure-a0": "Code=211778 RO-data=88662 RW-data=2188 ZI-data=92544",
+      "rt-thread-motor-m1-candidate": "Code=204714 RO-data=85578 RW-data=2188 ZI-data=84824"
+    },
+    "effective_macros": {
+      "rt-thread": "MOTOR=0, TMC=0, STEP=0, SAFETY=0",
+      "rt-thread-measure-a0": "MOTOR=0, TMC=0, STEP=0, SAFETY=0",
+      "rt-thread-motor-m1-candidate": "MOTOR=1, TMC=1, STEP_DIAG=0, LIMIT=0"
+    },
+    "error_warning": "0 Error(s), 0 Warning(s) x3",
+    "uv4_rc": 0,
+    "per_target_once": true
+  },
+  "firmware_dir": "reports/firmware/phase8-m8-relative-protection-r2/",
+  "candidate_image": {
+    "path": "reports/firmware/phase8-m8-relative-protection-r2/rt-thread-motor-m1-candidate.bin",
+    "bytes": 290868,
+    "sha256": "874df24187c4153058202a4e632ba7ee8eec00a8c7b121d54165a379cd6557e3"
+  },
+  "r1_facts_preserved": {
+    "old_13_counterexamples": "NOT_REPRODUCED(审核方在 b4d4079 上的判定, 原文保留, 本轮未改写为'R1 什么也没做')",
+    "r1_host_identities": 44,
+    "r1_reverse_families": 7,
+    "r1_firmware_artifact_identities": 9,
+    "r1_firmware_dir": "reports/firmware/phase8-m8-relative-protection-r1/",
+    "r1_firmware_dir_touched": false,
+    "r1_manifest": "336 登记 / 331 相符 / 5 缺失; 缺失的 5 件原件本机 sha256 与清单逐字相符, 本轮按具体路径 force-add 补齐",
+    "m8_firmware_dir_touched": false
+  },
+  "evidence_dir": "reports/reviews/phase8-m8-relative-protection-r2/",
+  "manifest_self_hash_policy": "SHA256SUMS.txt 不含自身字节散列; 清单由逐条 blob/远端字节复算, 不由声明值自证。",
+  "byte_identity_fix": {
+    "problem": "本机磁盘带 CRLF 的交付件在 git add 时被 core.autocrlf=true 剥成 LF, blob 与清单散列不符",
+    "detected_by": "提交前逐条 git cat-file blob :<path> 与清单复算",
+    "paths": [
+      "field/m8r2_field_selftest.py",
+      "field/m8r2_serial_chain.py",
+      "field/needles.json",
+      "field/plan.json",
+      "field_candidate_package.md",
+      "run_record.md"
+    ],
+    "count_found": 6,
+    "fix": "对这三条具体 R2 路径补窄 -text 规则(field/*.py, field/*.json, 评审根 *.md)并 git add --renormalize 这些路径",
+    "global_rule_added": false,
+    "repo_wide_renormalize": false,
+    "gitignore_modified": false,
+    "recheck": "固件清单 9/9 相符; 评审清单重算后逐条相符(problems=0), 同时复算 R1 336 条与 M8 23 条"
+  },
+  "quota_consumed": {
+    "device": "全部为 0(本轮零设备动作)",
+    "offline_runs": {
+      "host_chain_final_bytes": 1,
+      "reverse_chain": 1,
+      "field_python_selftest": 1,
+      "field_powershell_entry_points": 3,
+      "keil_rebuild_all": 3
+    }
+  },
+  "field_package": {
+    "dir": "reports/reviews/phase8-m8-relative-protection-r2/field/",
+    "entry": "M8R2Field.ps1 (-SelfTest | -Precheck | -RunField 互斥参数集)",
+    "executor": "m8r2_serial_chain.py (transport=stub|real 可注入, backend=sim|manual|real 可注入)",
+    "windows_powershell": "5.1 真实执行三入口各一次; SELFTEST_VERDICT|PASS|checks=21|failures=",
+    "offline_runs_archived": 2,
+    "offline_artifacts": 137,
+    "offline_artifact_bytes": 168353,
+    "stages": [
+      "S0 offline",
+      "S1 action(download)",
+      "S2 action(readback)",
+      "S3 serial_session",
+      "S4 serial_session",
+      "S5 approved_reboot",
+      "S6 serial_session",
+      "S7 serial_session"
+    ],
+    "quota": {
+      "port_open": 4,
+      "download": 1,
+      "flash_readback": 1,
+      "explicit_reset": 1,
+      "motor_run": 3,
+      "motor_run_seconds_total": 15,
+      "motion_cap_seconds_per_run": 5,
+      "config_save": 1,
+      "approved_reboot": 1,
+      "tmc_config_apply": 2,
+      "irq_polarity_prep": 2,
+      "retry": 0,
+      "physical_collision": 0,
+      "blackbox_clear": 0,
+      "dmm_readings": 0
+    },
+    "status": "NOT_AUTHORIZED / NOT_EXECUTED_ON_DEVICE; 数字是提案不是授权"
+  },
+  "artifact_grades": {
+    "HOST_PROVEN": "R2-A/B1/B2/B3 的判据、时序与并发纪律级结论(虚拟时钟 + 单写者夹具); 49 例; 9 组反向; 3 项定向检出",
+    "BUILD_PROVEN": "三目标各 0/0, 6 镜像 + 3 map 字节与散列, 每目标有效宏与来源 manifest",
+    "OFFLINE_EXECUTED": "现场包调度、5 秒硬预算、清理与撤能字段判定、协议/业务分层、额度扣减、动作后端调用序列",
+    "FIELD_UNVERIFIED": "真实抢占时序、真实撤能物理时延、profile 现场学习质量、安培标定分离度、v2->v3 真 Flash 迁移",
+    "FIELD_NOT_TRIGGERED": "任何板级异常/真实触发/真实碰撞; R6 非破坏激励 selected=false",
+    "NOT_VERIFIED": "受控加载工具与作用点(NAMED_PREREQUISITE_MISSING)",
+    "NOT_AUTHORIZED": "现场候选包的任何一个阶段(下载、回读、复位、串口、起转、写配置、重启、加载、碰撞)"
+  },
+  "open_items": [
+    "本轮交付的 remote 逐 blob 回读结果记在 remote_readback.md(推送后产出), 不在本 JSON 里预填",
+    "受控加载的具体工具与作用点待补",
+    "P1 独立电流参考与零点增益、RT_CONSOLEBUF_SIZE 128 真串口表现、v2->v3 真 Flash 迁移仍未现场验证"
+  ],
+  "approval_status": {
+    "software_go": "NOT_GRANTED, 且本轮不申请",
+    "image_field_go": "NOT_GRANTED",
+    "new_device_permission_created": false,
+    "next_required": "独立复审; 若放行现场轮需逐项单独授权(下载/定长回读/显式复位/串口/短转/一次 config_save/一次经批准重启), physical_collision 仍为 0"
+  }
+}

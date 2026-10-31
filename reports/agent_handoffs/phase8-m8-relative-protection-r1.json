@@ -180,5 +180,22 @@
     "真机 Flash 上的 v2->v3 迁移与真串口下的 128 裁剪未验证"
   ],
   "approval_status": "AWAITING_INDEPENDENT_REVIEW; 本轮不申请软件 GO/镜像 GO/设备 GO",
-  "manifest_self_hash_policy": "两份 SHA256SUMS 排除自身; 清单生成之后才产生的 remote_readback.md 也在排除之列并已在 run_record §9 声明。"
+  "manifest_self_hash_policy": "两份 SHA256SUMS 排除自身; 清单生成之后才产生的 remote_readback.md 也在排除之列并已在 run_record §9 声明。",
+  "appended_pointer_r2": {
+    "r2_task": "phase8-m8-relative-protection-r2",
+    "r2_reviewed_delivery_commit": "b4d4079c8a2ae22405fa436d4513d0b2807839f8",
+    "r2_task_book_verdict": "M8_R1_REVIEW_REWORK_REQUIRED",
+    "r2_code_commit": "207b3747efa5d54f7549dca79ececc81c4766794",
+    "facts_kept": [
+      "OLD_13_COUNTEREXAMPLES = NOT_REPRODUCED",
+      "M8_R1_C_CHAIN = 44/44 + SEVEN_REVERSES_META_OK",
+      "R1 firmware 9 件镜像/map 工件身份未改写",
+      "R1 证据目录与清单原文未改写"
+    ],
+    "new_defact_disclosed": "R1_REVIEW_MANIFEST = 331/336_PRESENT_AND_MATCHED / FIVE_MISSING: 本交接原 §2 声称的 5 件构建日志当时只在本机、未进 Git",
+    "correction_by_r2": "5 件原件本机 sha256 与 R1 已发布清单逐字相符, R2 轮按具体路径 git add -f 补齐; 未改 .gitignore, 未重造历史",
+    "this_file_rewritten": false,
+    "r2_handoff_md": "reports/agent_handoffs/phase8-m8-relative-protection-r2.md",
+    "r2_evidence_dir": "reports/reviews/phase8-m8-relative-protection-r2/"
+  }
 }

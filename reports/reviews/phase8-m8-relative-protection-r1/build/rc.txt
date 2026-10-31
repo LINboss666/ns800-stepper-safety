@@ -1,0 +1,3 @@
+uv4_rc=0 target=rt-thread log=D:\ns800\reports\reviews\phase8-m8-relative-protection-r1\build\rt-thread.log
+uv4_rc=0 target=rt-thread-measure-a0 log=D:\ns800\reports\reviews\phase8-m8-relative-protection-r1\build\rt-thread-measure-a0.log
+uv4_rc=0 target=rt-thread-motor-m1-candidate log=D:\ns800\reports\reviews\phase8-m8-relative-protection-r1\build\rt-thread-motor-m1-candidate.log

@@ -29,3 +29,7 @@ reports/reviews/phase8-m8-relative-protection-r2/field/offline/** -text
 reports/reviews/phase8-m8-relative-protection-r2/host/*.txt -text
 reports/reviews/phase8-m8-relative-protection-r2/host/*.json -text
 reports/reviews/phase8-m8-relative-protection-r2/SHA256SUMS.txt -text
+# 提交前逐条 blob≠磁盘 复算暴露出这 6 件本机带 CRLF(PS/Python 写盘), 窄补下列三条 R2 路径规则:
+reports/reviews/phase8-m8-relative-protection-r2/field/*.py -text
+reports/reviews/phase8-m8-relative-protection-r2/field/*.json -text
+reports/reviews/phase8-m8-relative-protection-r2/*.md -text

@@ -1,0 +1,15 @@
+[
+    {
+        "action":  "download",
+        "as":  "dl",
+        "quota_name":  "download",
+        "command":  "pyocd flash -t cortex_m --pack \u003cCMSIS-Pack\u003e \u003c镜像路径\u003e",
+        "image":  {
+                      "path":  "reports/firmware/phase8-m8-relative-protection-r2/rt-thread-motor-m1.bin",
+                      "bytes":  289028,
+                      "sha256":  "04ccfca5d8e7b30cc1685f6cfca3b65b0fc68f51f2c5e52f89bdda2b20fac59c",
+                      "identity_note":  "这两项取自 R1 同一 Target(motor-m1-candidate)的**已归档镜像**, 用途是让离线自检的字节数/散列门有非平凡输入。R2 构建轮完成后必须用本轮 manifest 的真实 bytes/sha256 覆盖, 现场 S0 再独立重算并要求逐字节相等。",
+                      "sha256_source":  "build_manifest.json targets[rt-thread-motor-m1-candidate].images"
+                  }
+    }
+]

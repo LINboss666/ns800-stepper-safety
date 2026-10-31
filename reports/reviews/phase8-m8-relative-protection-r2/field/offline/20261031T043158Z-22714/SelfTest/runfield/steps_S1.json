@@ -1,0 +1,16 @@
+[
+    {
+        "action":  "download",
+        "as":  "dl",
+        "quota_name":  "download",
+        "command":  "pyocd flash -t cortex_m --pack \u003cCMSIS-Pack\u003e \u003c镜像路径\u003e",
+        "image":  {
+                      "path":  "reports/firmware/phase8-m8-relative-protection-r2/rt-thread-motor-m1-candidate.bin",
+                      "bytes":  290868,
+                      "sha256":  "874df24187c4153058202a4e632ba7ee8eec00a8c7b121d54165a379cd6557e3",
+                      "sha256_source":  "build_manifest.json targets[rt-thread-motor-m1-candidate].images; S0 现场重算并要求逐字节相等",
+                      "built_from_code_commit":  "207b3747efa5d54f7549dca79ececc81c4766794",
+                      "reproducibility_note":  ".axf/.map 内含链接时间戳, 不宣称跨次构建字节可重放; 这里登记本轮每个目标唯一一次 Rebuild All 的实际产物字节。"
+                  }
+    }
+]

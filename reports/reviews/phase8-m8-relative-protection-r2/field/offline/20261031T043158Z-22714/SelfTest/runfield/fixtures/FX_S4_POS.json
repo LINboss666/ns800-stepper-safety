@@ -1,0 +1,97 @@
+{
+    "boot_bytes":  [
+
+                   ],
+    "manual":  {
+
+               },
+    "responses":  {
+                      "system_status":  [
+                                            "=== SYSTEM STATUS ===",
+                                            "[Boot]   bootstrap-complete=YES abort-stage=0"
+                                        ],
+                      "safety_status":  [
+                                            "[Safety] request=LOW pad=0 expected_ENN=HIGH ENN_fb=1(resolved) verdict=OK"
+                                        ],
+                      "tmc_config_show":  [
+                                              "[TMC-CFG] planned irun=20 iheld=4 target IHOLD_IRUN=0x00041408"
+                                          ],
+                      "tmc_config_apply":  [
+                                               "[TMC-CFG] write gate mask=0x0: applied",
+                                               "[TMC] GSTAT=0x0 IOIN=0x210002C1"
+                                           ],
+                      "safety_irq_enable":  [
+                                                "[SAFETY] IRQ gate OPEN: 0 active protection input(s) registered"
+                                            ],
+                      "motor_status":  [
+                                           "[MOT] state=0 name=IDLE",
+                                           "[MOT] armed=0 drv_en_request=0 health=OK",
+                                           "[MOT] expected_ENN=HIGH ENN_fb=1 resolved verdict=OK"
+                                       ],
+                      "motor_arm":  [
+                                        "[MOT] armed=1 drv_en_request=1 health=OK"
+                                    ],
+                      "motor_dir 0":  [
+                                          "[MOT] dir=0 (set while fully at rest)"
+                                      ],
+                      "motor_target 100":  [
+                                               "[MOT] cur_hz=0 tgt_hz=100 accel=40 decel=40 dir=0"
+                                           ],
+                      "motor_start":  [
+                                          "[MOT] state=2 name=CRUISE"
+                                      ],
+                      "motor_stop":  [
+                                         "[MOT] stop result=OK src=stop rc=0 latched=0"
+                                     ],
+                      "motor_disarm":  [
+                                           "[MOT] armed=0 drv_en_request=0 health=OK"
+                                       ],
+                      "diag_status":  [
+                                          "[DIAG] mode=MONITOR_ONLY",
+                                          "[DIAG] rel cov=COVERED lost=0 gen=0 rearm=0",
+                                          "[DIAG] rel snap=OK inc=OK seq=1 pubfail=0"
+                                      ],
+                      "config_show":  [
+                                          "[CFG] loaded OK (version 0x00010003 cal_source=1 profile=PRESENT)"
+                                      ],
+                      "config_save":  [
+                                          "[CFG] save: OK"
+                                      ],
+                      "diag_profile show":  [
+                                                "[DIAG] profile id=1 rev=1 abi=2 flg=0005 FIELD_UNVERIFIED",
+                                                "[DIAG] live sig=1163520832 match=YES cred zero=0 learn=0"
+                                            ],
+                      "diag_profile zero 32":  [
+                                                   "[DIAG] zero OK n=32 raw 1660..1660 mean=1660000 (cal source untouched)"
+                                               ],
+                      "diag_profile learn 16 80 120 0":  [
+                                                             "[DIAG] learn OK adc[2000..2000]n68 nz0 sg[500..500]n8 seq4..11"
+                                                         ],
+                      "diag_profile tier 2":  [
+                                                  "[DIAG] tier 2: dev=64/128 drop=16/32 FIELD_UNVERIFIED (commit to publish)"
+                                              ],
+                      "diag_profile commit":  [
+                                                  "[DIAG] commit OK id=1 rev=1 flags=0005 FIELD_UNVERIFIED"
+                                              ],
+                      "diag_mode relative CONFIRM_EXPERIMENTAL":  [
+                                                                      "[DIAG] mode=RELATIVE_ACTIVE"
+                                                                  ],
+                      "blackbox_status":  [
+                                              "[BB] session=7 records=12"
+                                          ],
+                      "flash_logstat":  [
+                                            "slots=3/64 valid=3 bad=0",
+                                            "queued=0 completed=3 failed=0 queue_dropped=0 last_error=0"
+                                        ],
+                      "fault_reset":  [
+                                          "[SAFETY] fault cleared"
+                                      ],
+                      "system_selftest":  [
+                                              "[SELFTEST] start (state0=FAULT)",
+                                              "[SELFTEST] verdict=PASS"
+                                          ],
+                      "__watch__":  [
+                                        "[MOT] state=2 name=CRUISE"
+                                    ]
+                  }
+}

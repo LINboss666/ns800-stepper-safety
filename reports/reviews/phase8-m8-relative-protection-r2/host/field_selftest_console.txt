@@ -1,0 +1,34 @@
+SELFTEST_START|run=20261031T043200Z-25560
+CHECK|ST00_ps1_parse|PASS|parse_errors=0
+CHECK|ST01_plan_shape|PASS|violations=
+CHECK|ST02_static_port_discipline|PASS|F05_STATIC_PORT_DISCIPLINE|PASS|post_open_attribute_writes=none
+CHECK|ST03_needles_proven|PASS|total=40 unproven=0
+CHECK|ST04_python_selftest_all_pass|PASS|rc=0 SUMMARY|cases=25 pass=25 fail=0 executed=25
+CHECK|ST05_FS05|PASS|CASE|FS05|PASS|verdict=STOP code=BUSINESS_FAILED text=[DIAG] learn FAILED: left the approved window or source lost
+CHECK|ST05_FS10|PASS|CASE|FS10|PASS|start_to_stop=5.0 declared=5 disarm=CONFIRMED_DISABLED
+CHECK|ST05_FS11|PASS|CASE|FS11|PASS|code=STUB_MISS tx=motor_start,not_in_fixture,motor_stop,motor_disarm,motor_status disarm=CONFIRMED_DISABLED
+CHECK|ST05_FS13|PASS|CASE|FS13|PASS|operator_calls=1 answer=yes fixture_ignored=yes
+CHECK|ST05_FS17|PASS|CASE|FS17|PASS|ACTION_DELIVERABLES_MISSING
+CHECK|ST05_FS18|PASS|CASE|FS18|PASS|READBACK_HASH_MISMATCH
+CHECK|ST05_FS20|PASS|CASE|FS20|PASS|total=40 unproven=0
+CHECK|ST05_FS23|PASS|CASE|FS23|PASS|去掉硬截止后 s10 仍然通过 => 判据不足: start_to_stop=13.0 declared=5 disarm=UNKNOWN
+CHECK|ST05_FS24|PASS|CASE|FS24|PASS|去掉撤能清理后 s11 仍然通过 => 判据不足: code=STUB_MISS tx=motor_start,not_in_fixture disarm=SKIPPED_BY_MUTANT
+CHECK|ST05_FS25|PASS|CASE|FS25|PASS|去掉业务层后 s05 仍然通过 => 判据不足: verdict=OK code=None text=[DIAG] learn FAILED: left the approved window or source lost
+STAGE|S1|OK||disarm=NOT_ARMED|budget=
+HALT_POINT|S1|after=OK
+STAGE|S2|OK||disarm=NOT_ARMED|budget=
+HALT_POINT|S2|after=OK
+STAGE|S3|OK||disarm=NOT_ARMED|budget=
+STAGE|S4|OBSERVATION_NO_TRIGGER||disarm=CONFIRMED_DISABLED|budget=5.0
+STAGE|S5|OK||disarm=NOT_ARMED|budget=
+HALT_POINT|S5|after=OK
+STAGE|S6|OK||disarm=NOT_ARMED|budget=
+STAGE|S7|OBSERVATION_NO_TRIGGER||disarm=CONFIRMED_DISABLED|budget=5.0
+CHECK|ST06_action_download|PASS|seen=action:download,action:readback,action:reset,tx:system_status,tx:safety_status,tx:tmc_config_show,tx:tmc_config_apply,tx:safety_irq_enable,tx:motor_status,tx:diag_status,tx:config_show,tx:diag_profile show,tx:diag_profile zero 32,tx:motor_dir 0,tx:motor_arm,tx:motor_target 100,tx:motor_start,tx:diag_profile learn 16 80 120 0,tx:motor_stop,tx:motor_disarm,tx:motor_status,action:reboot,tx:config_show,tx:diag_profile show,tx:tmc_config_apply,tx:safety_irq_enable,tx:diag_status,tx:diag_mode relative CONFIRM_EXPERIMENTAL,tx:motor_arm,tx:motor_target 100,tx:motor_start,tx:motor_stop,tx:motor_disarm,tx:motor_status
+CHECK|ST06_action_readback|PASS|seen=action:download,action:readback,action:reset,tx:system_status,tx:safety_status,tx:tmc_config_show,tx:tmc_config_apply,tx:safety_irq_enable,tx:motor_status,tx:diag_status,tx:config_show,tx:diag_profile show,tx:diag_profile zero 32,tx:motor_dir 0,tx:motor_arm,tx:motor_target 100,tx:motor_start,tx:diag_profile learn 16 80 120 0,tx:motor_stop,tx:motor_disarm,tx:motor_status,action:reboot,tx:config_show,tx:diag_profile show,tx:tmc_config_apply,tx:safety_irq_enable,tx:diag_status,tx:diag_mode relative CONFIRM_EXPERIMENTAL,tx:motor_arm,tx:motor_target 100,tx:motor_start,tx:motor_stop,tx:motor_disarm,tx:motor_status
+CHECK|ST06_action_reset|PASS|seen=action:download,action:readback,action:reset,tx:system_status,tx:safety_status,tx:tmc_config_show,tx:tmc_config_apply,tx:safety_irq_enable,tx:motor_status,tx:diag_status,tx:config_show,tx:diag_profile show,tx:diag_profile zero 32,tx:motor_dir 0,tx:motor_arm,tx:motor_target 100,tx:motor_start,tx:diag_profile learn 16 80 120 0,tx:motor_stop,tx:motor_disarm,tx:motor_status,action:reboot,tx:config_show,tx:diag_profile show,tx:tmc_config_apply,tx:safety_irq_enable,tx:diag_status,tx:diag_mode relative CONFIRM_EXPERIMENTAL,tx:motor_arm,tx:motor_target 100,tx:motor_start,tx:motor_stop,tx:motor_disarm,tx:motor_status
+CHECK|ST06_action_reboot|PASS|seen=action:download,action:readback,action:reset,tx:system_status,tx:safety_status,tx:tmc_config_show,tx:tmc_config_apply,tx:safety_irq_enable,tx:motor_status,tx:diag_status,tx:config_show,tx:diag_profile show,tx:diag_profile zero 32,tx:motor_dir 0,tx:motor_arm,tx:motor_target 100,tx:motor_start,tx:diag_profile learn 16 80 120 0,tx:motor_stop,tx:motor_disarm,tx:motor_status,action:reboot,tx:config_show,tx:diag_profile show,tx:tmc_config_apply,tx:safety_irq_enable,tx:diag_status,tx:diag_mode relative CONFIRM_EXPERIMENTAL,tx:motor_arm,tx:motor_target 100,tx:motor_start,tx:motor_stop,tx:motor_disarm,tx:motor_status
+CHECK|ST07_no_transport_real|PASS|offline dispatch only
+CHECK|ST08_terminal_known_after_start|PASS|disarm_sent=True
+SELFTEST_VERDICT|PASS|checks=21|failures=
+SELFTEST_EVIDENCE|D:\ns800\reports\reviews\phase8-m8-relative-protection-r2\field\offline\20261031T043158Z-22714\SelfTest\selftest_20261031T043200Z-25560.json

@@ -1,0 +1,6 @@
+{"kind": "PORT_OPEN", "port": null, "t_s": 0.0, "transport": "stub"}
+{"kind": "QUOTA_CONSUMED", "left": 3, "n": 1, "name": "port_open", "t_s": 0.0}
+{"kind": "QUOTA_CONSUMED", "left": 0, "n": 1, "name": "download", "t_s": 0.0}
+{"backend": "sim", "declared_sha256": "874df24187c4153058202a4e632ba7ee8eec00a8c7b121d54165a379cd6557e3", "kind": "ACTION", "log": "sim: reports/firmware/phase8-m8-relative-protection-r2/rt-thread-motor-m1-candidate.bin", "name": "download", "plan": "dl", "rc": 0, "t_s": 0.0}
+{"kind": "SESSION_OK", "session": "sess_S1", "steps": 1, "t_s": 0.0}
+{"kind": "PORT_CLOSED", "t_s": 0.0}
