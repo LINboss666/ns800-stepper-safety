@@ -10,8 +10,11 @@
     - plan.json 加入 JSON 解析集合: 计划里申报的镜像 bytes/sha256 也要从**远端字节**复算,
       这样"计划说的镜像"和"仓库里的镜像"不一致时会被 hash_mismatch 抓出来, 不靠本机核对;
     - R3_MARK: 反向缺件披露只在本轮路径内逐条列出, 往轮仍只计数不判。
-  清单优先、三种基准 + 后缀唯一命中、判定分 SCOPE_R3 / SCOPE_PRIOR、清单不哈希自身、
-  只用 git 协议从新建空 bare 仓 fetch —— 这些语义与 R2 版逐字一致。
+  本轮真跑又暴露并修掉两处(R2 版在"目录相对路径 + 单一清单"下看不见的)问题:
+    5) 反向"树里有但清单没登记"改按**解析后的真实路径**判定 —— 沿用候选键去重时, 本轮的
+       仓库相对路径会让 1594 条全部 verified 却同时报 unlisted_r3=1584, 那是判据本身错;
+    6) 同一个远端文件被两份清单登记成不同散列 => 新增具名 cross_manifest_sha_conflict,
+       这样"plan.json 申报的镜像"与"固件清单/清单文件"不一致会当场炸, 不必等人比对。
 """
 import hashlib
 import json
@@ -265,6 +268,8 @@ def main():
     # 3) 逐条回远端验字节(候选路径里取**远端存在**的那个; 三个都不存在才算缺件)
     ok = 0
     ok_r3 = 0
+    resolved = set()
+    by_resolved = {}
     r3_total = sum(1 for k in order if declared[k][2] in R3_MANIFESTS)
     for key in order:
         sha, wb, src, cps, rel = declared[key]
@@ -286,6 +291,13 @@ def main():
             scoped.append(("declared_but_absent", src, rel, "tried=" + ",".join(cps)))
             continue
         base_used[how] += 1
+        resolved.add(hit)
+        prev = by_resolved.get(hit)
+        if prev is not None and prev[0] != sha:
+            # 同一个远端文件被两份清单登记成不同散列: 这才是真正要炸的不一致
+            scoped.append(("cross_manifest_sha_conflict", src, hit, prev[0][:12], sha[:12], prev[1]))
+        else:
+            by_resolved.setdefault(hit, (sha, src))
         raw = blob(hit)
         if raw is None:
             scoped.append(("read_failed", src, hit))
@@ -301,8 +313,10 @@ def main():
         if src in R3_MANIFESTS:
             ok_r3 += 1
 
-    # 4) 反向: 树里有但任何清单都没登记的, 披露计数 + 本轮路径内的逐条列出
-    unlisted = sorted(p for p in remote if p not in declared)
+    # 4) 反向: 树里有但**没有任何清单逐条验证到**的(按解析后的真实路径判定, 不是按候选键)。
+    #    候选键去重(R2 版的做法)在"仓库相对路径 + 三种基准"下会把每个已验证件都算成未登记,
+    #    本轮真跑就撞上了: 1594 条全部 verified 却报 unlisted_r3=1584 —— 那是判据本身错, 不是缺件。
+    unlisted = sorted(p for p in remote if p not in resolved)
     unlisted_r3 = [p for p in unlisted if R3_MARK in p]
     print("tree_not_in_any_manifest=%d of_which_in_r3_paths=%d" % (len(unlisted), len(unlisted_r3)))
     for p in unlisted_r3[:20]:

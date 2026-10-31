@@ -1,0 +1,147 @@
+PLAN_MOTION_WINDOW|S0|PASS|人工门都在运动之前
+PLAN_MOTION_WINDOW|S1|PASS|人工门都在运动之前
+PLAN_MOTION_WINDOW|S2|PASS|人工门都在运动之前
+PLAN_COMMAND_EXISTS|S3|sysboot|PASS|system_status
+PLAN_ROWS_KEY|S3|sysboot|PASS|system_status
+PLAN_QUOTA|S3|rst|PASS
+PLAN_COMMAND_EXISTS|S3|cfgboot|PASS|tmc_config_show
+PLAN_ROWS_KEY|S3|cfgboot|PASS|tmc_config_show@boot
+PLAN_COMMAND_EXISTS|S3|cfgapply|PASS|tmc_config_apply
+PLAN_ROWS_KEY|S3|cfgapply|PASS|tmc_config_apply CONFIRM
+PLAN_QUOTA|S3|cfgapply|PASS
+PLAN_COMMAND_EXISTS|S3|cfgafter|PASS|tmc_config_show
+PLAN_ROWS_KEY|S3|cfgafter|PASS|tmc_config_show
+PLAN_COMMAND_EXISTS|S3|pol|PASS|safety_polarity_confirm
+PLAN_ROWS_KEY|S3|pol|PASS|safety_polarity_confirm CONFIRM
+PLAN_QUOTA|S3|pol|PASS
+PLAN_COMMAND_EXISTS|S3|irq|PASS|safety_irq_enable
+PLAN_ROWS_KEY|S3|irq|PASS|safety_irq_enable
+PLAN_QUOTA|S3|irq|PASS
+PLAN_COMMAND_EXISTS|S3|irqafter|PASS|safety_irq_status
+PLAN_ROWS_KEY|S3|irqafter|PASS|safety_irq_status
+PLAN_COMMAND_EXISTS|S3|rest0|PASS|motor_status
+PLAN_ROWS_KEY|S3|rest0|PASS|motor_status
+PLAN_COMMAND_EXISTS|S3|diag0|PASS|diag_status
+PLAN_ROWS_KEY|S3|diag0|PASS|diag_status
+PLAN_COMMAND_EXISTS|S3|cfg0|PASS|config_show
+PLAN_ROWS_KEY|S3|cfg0|PASS|config_show
+PLAN_COMMAND_EXISTS|S3|prof0|PASS|diag_profile
+PLAN_ROWS_KEY|S3|prof0|PASS|diag_profile show@boot
+PLAN_COMMAND_EXISTS|S3|zero|PASS|diag_profile
+PLAN_ROWS_KEY|S3|zero|PASS|diag_profile zero 32
+PLAN_QUOTA|S3|zero|PASS
+PLAN_MOTION_WINDOW|S3|PASS|人工门都在运动之前
+PLAN_COMMAND_EXISTS|S4|rest_before_arm|PASS|motor_status
+PLAN_ROWS_KEY|S4|rest_before_arm|PASS|motor_status
+PLAN_COMMAND_EXISTS|S4|dir0|PASS|motor_dir
+PLAN_ROWS_KEY|S4|dir0|PASS|motor_dir 0
+PLAN_COMMAND_EXISTS|S4|arm|PASS|motor_arm
+PLAN_ROWS_KEY|S4|arm|PASS|motor_arm
+PLAN_COMMAND_EXISTS|S4|target|PASS|motor_target
+PLAN_ROWS_KEY|S4|target|PASS|motor_target 100
+PLAN_COMMAND_EXISTS|S4|start|PASS|motor_start
+PLAN_ROWS_KEY|S4|start|PASS|motor_start
+PLAN_QUOTA|S4|start|PASS
+PLAN_COMMAND_EXISTS|S4|running_proof|PASS|motor_status
+PLAN_ROWS_KEY|S4|running_proof|PASS|motor_status@running
+PLAN_COMMAND_EXISTS|S4|learn|PASS|diag_profile
+PLAN_ROWS_KEY|S4|learn|PASS|diag_profile learn 8 80 120 0
+PLAN_QUOTA|S4|learn|PASS
+PLAN_COMMAND_EXISTS|S4|cruise_observe|PASS|__watch__
+PLAN_MOTION_WINDOW|S4|PASS|人工门都在运动之前
+PLAN_COMMAND_EXISTS|S5|rest_before_tier|PASS|motor_status
+PLAN_ROWS_KEY|S5|rest_before_tier|PASS|motor_status
+PLAN_COMMAND_EXISTS|S5|diag_before_tier|PASS|diag_status
+PLAN_ROWS_KEY|S5|diag_before_tier|PASS|diag_status
+PLAN_COMMAND_EXISTS|S5|tier|PASS|diag_profile
+PLAN_ROWS_KEY|S5|tier|PASS|diag_profile tier 2
+PLAN_COMMAND_EXISTS|S5|commit|PASS|diag_profile
+PLAN_ROWS_KEY|S5|commit|PASS|diag_profile commit
+PLAN_QUOTA|S5|commit|PASS
+PLAN_COMMAND_EXISTS|S5|prof_after_commit|PASS|diag_profile
+PLAN_ROWS_KEY|S5|prof_after_commit|PASS|diag_profile show
+PLAN_COMMAND_EXISTS|S5|save|PASS|config_save
+PLAN_ROWS_KEY|S5|save|PASS|config_save
+PLAN_QUOTA|S5|save|PASS
+PLAN_MOTION_WINDOW|S5|PASS|人工门都在运动之前
+PLAN_RECORD_SPEC|S5|prof_after_commit|PASS
+PLAN_RECORD_SPEC|S5|prof_after_commit|PASS
+PLAN_RECORD_SPEC|S5|commit|PASS
+PLAN_MOTION_WINDOW|S6|PASS|人工门都在运动之前
+PLAN_COMMAND_EXISTS|S7|sys2|PASS|system_status
+PLAN_ROWS_KEY|S7|sys2|PASS|system_status
+PLAN_COMMAND_EXISTS|S7|cfg2boot|PASS|tmc_config_show
+PLAN_ROWS_KEY|S7|cfg2boot|PASS|tmc_config_show@boot
+PLAN_COMMAND_EXISTS|S7|cfgapply2|PASS|tmc_config_apply
+PLAN_ROWS_KEY|S7|cfgapply2|PASS|tmc_config_apply CONFIRM
+PLAN_QUOTA|S7|cfgapply2|PASS
+PLAN_COMMAND_EXISTS|S7|cfg2after|PASS|tmc_config_show
+PLAN_ROWS_KEY|S7|cfg2after|PASS|tmc_config_show
+PLAN_COMMAND_EXISTS|S7|pol2|PASS|safety_polarity_confirm
+PLAN_ROWS_KEY|S7|pol2|PASS|safety_polarity_confirm CONFIRM
+PLAN_QUOTA|S7|pol2|PASS
+PLAN_COMMAND_EXISTS|S7|irq2|PASS|safety_irq_enable
+PLAN_ROWS_KEY|S7|irq2|PASS|safety_irq_enable
+PLAN_QUOTA|S7|irq2|PASS
+PLAN_COMMAND_EXISTS|S7|irq2after|PASS|safety_irq_status
+PLAN_ROWS_KEY|S7|irq2after|PASS|safety_irq_status
+PLAN_COMMAND_EXISTS|S7|cfg2|PASS|config_show
+PLAN_ROWS_KEY|S7|cfg2|PASS|config_show
+PLAN_COMMAND_EXISTS|S7|prof_after_reboot|PASS|diag_profile
+PLAN_ROWS_KEY|S7|prof_after_reboot|PASS|diag_profile show@after_reboot
+PLAN_COMMAND_EXISTS|S7|rest2|PASS|motor_status
+PLAN_ROWS_KEY|S7|rest2|PASS|motor_status
+PLAN_MOTION_WINDOW|S7|PASS|人工门都在运动之前
+PLAN_RECORD_SPEC|S7|prof_after_reboot|PASS
+PLAN_RECORD_SPEC|S7|prof_after_reboot|PASS
+PLAN_COMMAND_EXISTS|S8|diag_before_arm|PASS|diag_status
+PLAN_ROWS_KEY|S8|diag_before_arm|PASS|diag_status
+PLAN_COMMAND_EXISTS|S8|bb_before|PASS|blackbox_status
+PLAN_ROWS_KEY|S8|bb_before|PASS|blackbox_status
+PLAN_COMMAND_EXISTS|S8|rest_before_arm|PASS|motor_status
+PLAN_ROWS_KEY|S8|rest_before_arm|PASS|motor_status
+PLAN_COMMAND_EXISTS|S8|arm_rel|PASS|diag_mode
+PLAN_ROWS_KEY|S8|arm_rel|PASS|diag_mode relative CONFIRM_EXPERIMENTAL
+PLAN_COMMAND_EXISTS|S8|arm|PASS|motor_arm
+PLAN_ROWS_KEY|S8|arm|PASS|motor_arm
+PLAN_COMMAND_EXISTS|S8|target|PASS|motor_target
+PLAN_ROWS_KEY|S8|target|PASS|motor_target 100
+PLAN_COMMAND_EXISTS|S8|start|PASS|motor_start
+PLAN_ROWS_KEY|S8|start|PASS|motor_start
+PLAN_QUOTA|S8|start|PASS
+PLAN_COMMAND_EXISTS|S8|running_proof|PASS|motor_status
+PLAN_ROWS_KEY|S8|running_proof|PASS|motor_status@running
+PLAN_COMMAND_EXISTS|S8|trip_window|PASS|__watch__
+PLAN_MOTION_WINDOW|S8|PASS|人工门都在运动之前
+PLAN_RECORD_SPEC|S8|bb_before|PASS
+PLAN_COMMAND_EXISTS|S9|latch|PASS|diag_status
+PLAN_ROWS_KEY|S9|latch|PASS|diag_status@latch
+PLAN_COMMAND_EXISTS|S9|bb_after|PASS|blackbox_status
+PLAN_ROWS_KEY|S9|bb_after|PASS|blackbox_status@after
+PLAN_COMMAND_EXISTS|S9|newlog|PASS|flash_logstat
+PLAN_ROWS_KEY|S9|newlog|PASS|flash_logstat
+PLAN_COMMAND_EXISTS|S9|latched_disable_proof|PASS|motor_status
+PLAN_ROWS_KEY|S9|latched_disable_proof|PASS|motor_status@latched
+PLAN_MOTION_WINDOW|S9|PASS|人工门都在运动之前
+PLAN_RECORD_SPEC|S9|bb_after|PASS
+PLAN_COMMAND_EXISTS|S10|still_latched|PASS|motor_status
+PLAN_ROWS_KEY|S10|still_latched|PASS|motor_status@latched
+PLAN_COMMAND_EXISTS|S10|arm_refused|PASS|motor_arm
+PLAN_ROWS_KEY|S10|arm_refused|PASS|motor_arm@refused
+PLAN_MOTION_WINDOW|S10|PASS|人工门都在运动之前
+PLAN_COMMAND_EXISTS|S11|latched_before_clear|PASS|safety_status
+PLAN_ROWS_KEY|S11|latched_before_clear|PASS|safety_status
+PLAN_COMMAND_EXISTS|S11|manual_clear|PASS|fault_reset
+PLAN_ROWS_KEY|S11|manual_clear|PASS|fault_reset
+PLAN_COMMAND_EXISTS|S11|selftest_after|PASS|system_selftest
+PLAN_ROWS_KEY|S11|selftest_after|PASS|system_selftest
+PLAN_COMMAND_EXISTS|S11|ready_after|PASS|safety_status
+PLAN_ROWS_KEY|S11|ready_after|PASS|safety_status
+PLAN_COMMAND_EXISTS|S11|still_disabled_after_recovery|PASS|motor_status
+PLAN_ROWS_KEY|S11|still_disabled_after_recovery|PASS|motor_status
+PLAN_MOTION_WINDOW|S11|PASS|人工门都在运动之前
+PLAN_TOOL_ARGV|download|PASS|python -m pyocd flash --pack C:/Keil_v5/ARM/PACK/.Download/NOVOSENSE.N
+PLAN_TOOL_ARGV|readback|PASS|python -m pyocd commander --no-config -t cortex_m -u @UID_FILE -f 1000
+PLAN_TOOL_ARGV|reset|PASS|python -m pyocd reset --method sysresetreq --no-config --no-wait --con
+PLAN_QUOTA_COVERAGE|all|PASS|used=config_save,diag_profile_commit,diag_profile_learn,diag_profile_zero,irq_polarity_prep,motor_run,tmc_config_apply missing=
+PLAN_VALIDATE_SUMMARY|checks=146|fail=0|msh_commands=70|plan=D:\ns800\reports\reviews\phase8-m8-relative-protection-r3\field\plan.json

@@ -1,7 +1,7 @@
 # sha256 * <repo相对路径>(LF, 无 BOM; 本清单不哈希自身字节 —— 一条清单不能给自己的字节作证)
 # 生成方式: 对 reports/firmware/phase8-m8-relative-protection-r3/ 下每个常规文件(排除 SHA256SUMS.txt 与 __pycache__) 直接读磁盘字节算 sha256
-# 条目数=10; 逐条与 Git blob 的复算在提交后由 offline/../host 记录或远端回读程序完成
-f5e4cdaa139676da7caa34abe228eab6f6e9260df04d3d4ea8e1ddd8ca9226ea  reports/firmware/phase8-m8-relative-protection-r3/build_manifest.json
+# 条目数=10; 逐条与 Git blob 的复算由 host/staged_blob_preflight.txt(提交前)与 host/remote_readback.py(推送后, 从远端 blob)完成
+1721a7aa9e07eb4476ed886f4192d872570e2260449803ac50cc7712d83bdde8  reports/firmware/phase8-m8-relative-protection-r3/build_manifest.json
 78846e5eae9f4a47f45b29b38e698db974b31c3c0210443cbff43264c66929fd  reports/firmware/phase8-m8-relative-protection-r3/rt-thread-a0.axf
 12e1f483da5222f66f75bec4247042c44eca4f8e570b04c7dd59e68a47b81cd2  reports/firmware/phase8-m8-relative-protection-r3/rt-thread-a0.map
 dd73599e496e81cbfef1324ba89c5d887f9542f1f10e019fd85765c371ad725a  reports/firmware/phase8-m8-relative-protection-r3/rt-thread-measure-a0.bin

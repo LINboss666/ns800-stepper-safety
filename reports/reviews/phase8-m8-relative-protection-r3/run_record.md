@@ -102,9 +102,21 @@ S_S10(trip, 锁存态 arm 被拒) motor_stop 0.005→0.005 | motor_disarm 0.005�
    - 4 个 notes 是"给了文件没给行号"的锚点（`safety_state.c` / `motor.c` / `safety_thread.c` / `tmc2209.c`）⇒ 全部补到 `file:line`（`:980` / `:1104` / `:385-392` / `:3141 与 :3189`），改完 `problems=0 notes=0`。
    这些改动只动 `_provenance*` / `_about` 元数据，不动任何响应行；为证明"没动判定"，改后重跑了 PS 三入口与三档案 dispatch，并与改动前的运行逐文件对照（`host/offline_run_compare.txt`：缺陷原件 vs 权威运行 410/420 与 338/344 相等，差异只落在 python 派生件与 `rows.json` 副本上）。
 11. **交付归档里的中文是坏的**（本轮最实质的取证缺陷）：`host/field_*_console.txt` 原先是把 PowerShell 进程 stdout 直接重定向得到的。`Start-Process -RedirectStandardOutput` 落盘时 python 按**本机 locale（cp936）**编码 stdout，脚本再用 UTF-8 读回来 ⇒ 运行目录里带中文的那几行本身就是乱码/U+FFFD，PS stdout 的二次重定向只是把同一份坏字节存档。**"能严格 UTF-8 解码"不是判据，"有没有替换符"才是**——旧归档正是严格 UTF-8 却含 U+FFFD，所以此前无人发现。修法两半都写在脚本里：①`Invoke-Py` 显式钉 `PYTHONIOENCODING=utf-8` 并**拒绝任何含 U+FFFD 的 python 输出**（具名 `PYTHON_OUTPUT_NOT_UTF8`）；②`Say` 逐行缓冲，入口收口时由 .NET 按 UTF-8 写 `transcript_console.txt`，`host/` 的三件控制台改为它的字节副本。反向自证：把 `$env:PYTHONIOENCODING` 那一行去掉的仓库外副本（`NEGATIVE-INJECTION R3-ENC`）跑 `-Precheck`，rc=1 且具名命中 `PYTHON_OUTPUT_NOT_UTF8|...first_bad_line=PLAN_MOTION_WINDOW|S0|PASS|<乱码>` —— 门是真的会咬，不是摆设。旧的三件归档**改名保留**为 `host/field_*_console_superseded-cp936capture.txt`，未删除。
-12. **中间两次重跑的运行目录在对照记录之后删除**：为修 §5 第 10/11 条共重跑过 4 轮三入口（`0936xx` 缺陷原件、`1033xx`、`1040xx/1042xx`、`1049xx` 权威）。`1033xx` 与 `1040xx/1042xx` 与权威运行的**逐文件归一对照已先写进 `host/offline_run_compare.txt`**（RunField 344/344 全等；SelfTest 418/420，剩两件是夹具临时目录随机名，另加只有权威版才有的 transcript），且都**从未提交入 Git**（`git ls-files` 为 0），因此删除这 6 个目录不损失任何判定；保留的是缺陷原件 3 个 + 权威 3 个。删除只针对本轮自己生成的 `psrun-*` 目录名，逐目录点名执行。
+12. **中间两次重跑的运行目录在对照记录之后删除**：为修第 10/11 条共重跑过 4 轮三入口（`0936xx` 缺陷原件、`1033xx`、`1040xx/1042xx`、`1049xx` 权威）。`1033xx` 与 `1040xx/1042xx` 与权威运行的**逐文件归一对照已先写进 `host/offline_run_compare.txt`**（RunField 344/344 全等；SelfTest 418/420，剩两件是夹具临时目录随机名，另加只有权威版才有的 transcript），且都**从未提交入 Git**（`git ls-files` 为 0），因此删除这 6 个目录不损失任何判定；保留的是缺陷原件 3 个 + 权威 3 个。删除只针对本轮自己生成的 `psrun-*` 目录名，逐目录点名执行。
 
-## 6. 批准边界
+13. **本轮的回读程序自己在真跑时暴露两处判据缺陷**（这正是"必须真跑一遍清单"的价值，R2-D 是同一类）：
+    - 反向"树里有但清单没登记"沿用 R2 的**候选键**判重，而本轮清单改用仓库相对路径 + 三种基准后，候选键不再是真实路径 ⇒
+      `SCOPE_R3 entries=1594 verified=1594 problems=0` 却同时报 `unlisted_r3=1584`，把每件已验证件都说成未登记。
+      修：反向判定改按**解析后的真实路径**集合（`resolved`）；
+    - `build_manifest.json` 的 `map` 对象没有 `path`，只有 `bytes/sha256/...` ⇒ 回读只能按后缀猜，三条 map 落进 `NO_PATH`
+      （本轮 35 条 NO_PATH 里有 3 条是本轮自己的）。修：生成器给每个 image/map 补显式仓内 `path`，
+      重算后与原 manifest 逐字段比对，**只有这 9 个 `path` 字段新增**，bytes/sha256/宏/Program Size/copy_verification 一字未变；
+    - 另补一条正向能力：同一远端文件被两份清单登记成不同散列 => 具名 `cross_manifest_sha_conflict`，
+      让"plan.json 申报的镜像"与"固件清单"不一致当场炸，而不是等人比对。
+14. **补一次 `-Precheck` 真跑**：`build_manifest.json` 字节变了（新增 `path` 字段），所以清单与 blob 必须重新对齐，
+    运行 `psrun-20261031T112105Z-41180-Precheck`（14 检查 0 失败）归档在
+    `host/field_Precheck_console_after-manifest-path-fix.txt`。已发布的 `104920` 那一次与其归档**保留不动**，不覆盖、不删除。
+
 
 - 本包尚未获得任何硬件批准：`plan.json:status = NOT_AUTHORIZED / NOT_EXECUTED`，`hardware_actions_this_round=[]`，交接写 `M8_R3_OFFLINE_READY / AWAITING_INDEPENDENT_REVIEW`，`safe_for_enable=false`。
 - 不继承 M4/M5/M6/M7/P0/M8-R2 的任何现场额度；本轮不向用户索要例行断电或 SW1 操作。

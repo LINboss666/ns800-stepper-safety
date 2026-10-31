@@ -79,12 +79,14 @@
     "rt-thread.axf": {
      "bytes": 1770804,
      "sha256": "1bcadf76de634ec4c8c76cd88adca68a3233170ec93d395582c64c342e475811",
+     "path": "reports/firmware/phase8-m8-relative-protection-r3/rt-thread.axf",
      "source_path_relative_to_project": "build/rt-thread.axf",
      "identical_to_build_output": true
     },
     "rt-thread.bin": {
      "bytes": 290812,
      "sha256": "7c2618766b64c5eff73ca5652cb74dea28f23f7a57ae52eba517c05ab8fe5443",
+     "path": "reports/firmware/phase8-m8-relative-protection-r3/rt-thread.bin",
      "source_path_relative_to_project": "rtthread.bin",
      "identical_to_build_output": true,
      "produced_by": "After Build - User command #1: fromelf --bin ... --output ..."
@@ -93,6 +95,7 @@
    "map": {
     "bytes": 2106896,
     "sha256": "bee74452daeb1450005119fb9eeacd753554def4786225ca8ae3e3f46b64376d",
+    "path": "reports/firmware/phase8-m8-relative-protection-r3/rt-thread.map",
     "source_path_relative_to_project": "build/rt-thread.map",
     "identical_to_build_output": true
    }
@@ -153,12 +156,14 @@
     "rt-thread-a0.axf": {
      "bytes": 1801224,
      "sha256": "78846e5eae9f4a47f45b29b38e698db974b31c3c0210443cbff43264c66929fd",
+     "path": "reports/firmware/phase8-m8-relative-protection-r3/rt-thread-a0.axf",
      "source_path_relative_to_project": "build/a0/rt-thread-a0.axf",
      "identical_to_build_output": true
     },
     "rt-thread-measure-a0.bin": {
      "bytes": 301068,
      "sha256": "dd73599e496e81cbfef1324ba89c5d887f9542f1f10e019fd85765c371ad725a",
+     "path": "reports/firmware/phase8-m8-relative-protection-r3/rt-thread-measure-a0.bin",
      "source_path_relative_to_project": "build/a0/measure-a0.bin",
      "identical_to_build_output": true,
      "produced_by": "After Build - User command #1: fromelf --bin ... --output ..."
@@ -167,6 +172,7 @@
    "map": {
     "bytes": 2158684,
     "sha256": "12e1f483da5222f66f75bec4247042c44eca4f8e570b04c7dd59e68a47b81cd2",
+    "path": "reports/firmware/phase8-m8-relative-protection-r3/rt-thread-a0.map",
     "source_path_relative_to_project": "build/a0/rt-thread-a0.map",
     "identical_to_build_output": true
    }
@@ -227,12 +233,14 @@
     "rt-thread-motor-m1.axf": {
      "bytes": 1771288,
      "sha256": "0bba8ca74ed8c11e149395efd64c42072fce0b3ced5ab76281210ddc04550963",
+     "path": "reports/firmware/phase8-m8-relative-protection-r3/rt-thread-motor-m1.axf",
      "source_path_relative_to_project": "build/motor_m1/rt-thread-motor-m1.axf",
      "identical_to_build_output": true
     },
     "rt-thread-motor-m1-candidate.bin": {
      "bytes": 290916,
      "sha256": "00608ec93c6a3027d68b44b5317574209fccfb0ba82a9974793d13b54b79e304",
+     "path": "reports/firmware/phase8-m8-relative-protection-r3/rt-thread-motor-m1-candidate.bin",
      "source_path_relative_to_project": "build/motor_m1/rt-thread-motor-m1.bin",
      "identical_to_build_output": true,
      "produced_by": "After Build - User command #1: fromelf --bin ... --output ..."
@@ -241,6 +249,7 @@
    "map": {
     "bytes": 2108456,
     "sha256": "7b0b4eeada3f44d730733bcc37111d73191ebc9af357de2d0a6a886eb99831b6",
+    "path": "reports/firmware/phase8-m8-relative-protection-r3/rt-thread-motor-m1.map",
     "source_path_relative_to_project": "build/motor_m1/rt-thread-motor-m1.map",
     "identical_to_build_output": true
    }

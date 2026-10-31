@@ -1,0 +1,16 @@
+CHECK|PRE_FILES|PASS|执行器/自检/计划/行表/needles 五件齐全
+CHECK|PRE_COMMITS_SHAPE|PASS|
+CHECK|PRE_QUOTA_INTEGERS|PASS|
+CHECK|PRE_IMAGE_RECALC_EQ_PLAN|PASS|bytes=290916 sha=00608ec93c6a3027
+CHECK|PRE_IMAGE_EQ_MANIFEST|PASS|manifest_bytes=290916 manifest_sha=00608ec93c6a3027
+CHECK|PRE_MANIFEST_CODE_COMMIT|PASS|manifest.code_commit=805c29bd73c4ea861c9b9c65f61e946aec9548e3
+CHECK|PRE_COMMIT_EXISTS_software_input_commit|PASS|rev-parse=805c29bd73c4ea861c9b9c65f61e946aec9548e3 want=805c29bd73c4ea861c9b9c65f61e946aec9548e3
+CHECK|PRE_COMMIT_EXISTS_tested_image_build_commit|PASS|rev-parse=805c29bd73c4ea861c9b9c65f61e946aec9548e3 want=805c29bd73c4ea861c9b9c65f61e946aec9548e3
+CHECK|PRE_COMMIT_EXISTS_reviewed_delivery_commit|PASS|rev-parse=5c549f2af0740425c4014f374d064f77ee62d6b4 want=5c549f2af0740425c4014f374d064f77ee62d6b4
+CHECK|PRE_PRODUCT_SHA_EQ_PATCH_OUTPUT|PASS|applications\diag_relative.c sha=059fc7535a550462
+CHECK|PRE_ROWS_PROVENANCE_FILES|PASS|refs=36 missing=0 
+OUT_DIR_TRIED|base=[D:\ns800\reports\reviews\phase8-m8-relative-protection-r3\offline] leaf=[psrun-20261031T112105Z-41180-Precheck]
+CHECK|PRE_STATIC_PORT_DISCIPLINE|PASS|F05_STATIC_PORT_DISCIPLINE|PASS|post_open_attribute_writes=none
+CHECK|PRE_NEEDLES|PASS|NEEDLES|total=40|unproven=0
+CHECK|PRE_VALIDATE_PLAN|PASS|PLAN_VALIDATE_SUMMARY|checks=146|fail=0|msh_commands=70|plan=D:\ns800\reports\reviews\phase8-m8-relative-protection-r3\field\plan.json
+PRECHECK_SUMMARY|checks=14|failures=0
