@@ -1,0 +1,132 @@
+{
+ "round": "field_run_r3field1",
+ "delivery_head_at_run": "1dc42308737e4eb296ff48695d89ae6c95b5636e",
+ "resend_bundle_identity": {
+  "md_sha256": "1cc19b3e3e6b4d508f836b6d3ec29764175a538b80685c47ba1014d09ba344fc",
+  "identical_to_archived_copy": true,
+  "zip_sha256": "4e2bf97eac73bfa37c2a69a7607600390e3a32e8a7a75e04d4d92501b5e287fe",
+  "zip_bytes": 39796
+ },
+ "artifacts": [
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T185843Z-20080-RunField/console_run-real_response_driven.txt",
+   "bytes": 3216,
+   "sha256": "1dc4e3271aad01a5c87c139f6d05c6f37af5ff115af2bea59dd3608ea8b775e1"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T185843Z-20080-RunField/dispatch-run-real-response_driven/action_download/ARGV.json",
+   "bytes": 729,
+   "sha256": "957564e88dddf1eb782dbe916a42551513491d5e65e4fbf5ac3736fdabaf848e"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T185843Z-20080-RunField/dispatch-run-real-response_driven/action_download/rc.txt",
+   "bytes": 3,
+   "sha256": "13bf7b3039c63bf5a50491fa3cfd8eb4e699d1ba1436315aef9cbe5711530354"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T185843Z-20080-RunField/dispatch-run-real-response_driven/action_download/stderr.bin",
+   "bytes": 312,
+   "sha256": "1821aa4f5ebb17f9c949cb1af15042ef13b97dbba9ccc85a620e5fe790dacd3f"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T185843Z-20080-RunField/dispatch-run-real-response_driven/action_download/stdout.bin",
+   "bytes": 176,
+   "sha256": "4f79f4bf0786bb5debce65153500603bc6fc79002e031f6c5e7bd911399b39c5"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T185843Z-20080-RunField/dispatch-run-real-response_driven/action_readback/ARGV.json",
+   "bytes": 918,
+   "sha256": "fdb18b95610d79661b5110915d104d3cbbdf49648d098161b30f12638d0cc8b6"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T185843Z-20080-RunField/dispatch-run-real-response_driven/action_readback/rc.txt",
+   "bytes": 3,
+   "sha256": "f1b2f662800122bed0ff255693df89c4487fbdcf453d3524a42d4ec20c3d9c04"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T185843Z-20080-RunField/dispatch-run-real-response_driven/action_readback/stderr.bin",
+   "bytes": 212,
+   "sha256": "89726e153141d0093c2763becbd2e35641fba63a6401bdf05a924cf99ab482f1"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T185843Z-20080-RunField/dispatch-run-real-response_driven/action_readback/stdout.bin",
+   "bytes": 24,
+   "sha256": "d466e5a820741367d724f60148a858eee421d691005ac6518b721d2aa3e865bc"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T185843Z-20080-RunField/dispatch-run-real-response_driven/dispatch_ledger.jsonl",
+   "bytes": 3111,
+   "sha256": "41641f0083bccb128ee83f72d7bab543fe3bd87aa211d17e89d1367f8f7c642b"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T185843Z-20080-RunField/pyout-20261031T185843Z-20080-01.txt",
+   "bytes": 3207,
+   "sha256": "b16253fdc8096f24084174ad01fe3278750b2ede46fcfbe06bf2b80013d0650e"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T185843Z-20080-RunField/pyout-20261031T185843Z-20080-01.txt.err",
+   "bytes": 0,
+   "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T185843Z-20080-RunField/runfield_summary.json",
+   "bytes": 615,
+   "sha256": "25c637e8ca95c7e6f3856d3c1a7266437c13600c6b0f382ca5a2a0344745d0c5"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T185843Z-20080-RunField/transcript_console.txt",
+   "bytes": 1755,
+   "sha256": "1001a6c3c47cd1883126ea0cee8ce7a32afe266d5a275dfc28aed42bca02e183"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T184556Z-55376-Precheck/precheck_summary.json",
+   "bytes": 299,
+   "sha256": "7e34277d700cb696728b3ede37aa607361e75d87855cf04de2aea605767a4c31"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T184556Z-55376-Precheck/pyout-20261031T184556Z-55376-01.txt",
+   "bytes": 65,
+   "sha256": "d97da7618c8972e9898f92512174d904373d492b71237c4d8640c10645851ae2"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T184556Z-55376-Precheck/pyout-20261031T184556Z-55376-01.txt.err",
+   "bytes": 0,
+   "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T184556Z-55376-Precheck/pyout-20261031T184556Z-55376-02.txt",
+   "bytes": 3563,
+   "sha256": "6cad0e867df90caa7edf238488a9da737e3c9773aea54286bfa3aa2095a18e58"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T184556Z-55376-Precheck/pyout-20261031T184556Z-55376-02.txt.err",
+   "bytes": 0,
+   "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T184556Z-55376-Precheck/pyout-20261031T184556Z-55376-03.txt",
+   "bytes": 8153,
+   "sha256": "8ef0c89bf8ab93602cccaee5d0be58d9f295d2bad034894ffcb3a866911cca84"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T184556Z-55376-Precheck/pyout-20261031T184556Z-55376-03.txt.err",
+   "bytes": 0,
+   "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T184556Z-55376-Precheck/transcript_console.txt",
+   "bytes": 1490,
+   "sha256": "673ba07a77c20278e3d793c402131020fbf2e1176d743dc080d01412fd6b7c3d"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/host/field_run_r3field1.json",
+   "bytes": 9367,
+   "sha256": "d8e22f0bf5b5411e8855cbcf1d9b7bb0a8cea073bc32cdfecba48313dd841790"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/host/field_run_r3field1_rootcause.txt",
+   "bytes": 2161,
+   "sha256": "d5fc8f1f23749e10f16121363358d99ea2419fc587e489e3e99822ab53b91cd2"
+  }
+ ]
+}

@@ -1,0 +1,18 @@
+OUT_DIR_TRIED|base=[D:\ns800\reports\reviews\phase8-m8-relative-protection-r3\offline] leaf=[psrun-20261031T185843Z-20080-RunField]
+PROFILE|response_driven|status=STOP|executed=3|not_run=10|branch=None
+  DISPATCH|stage=S0|status=OK|kind=offline|{"facts": {"image_path": "reports/firmware/phase8-m8-relative-protection-r3/rt-thread-motor-m1-candidate.bin", "image_bytes": 290916, "image_sha256": "00608ec93c6a3027d68b44b5317574209fccfb0ba82a9974793d13b54b79e304", "manifest_target": "rt-thread-motor-m1-candidate", "software_input_commit": "805c29bd73c4ea861c9b9c65f61e946aec9548e3", "tested_image_build_commit": "805c29bd73c4ea861c9b9c65f61e946aec9548e3", "reviewed_delivery_commit": "5c549f2af0740425c4014f374d064f77ee62d6b4", "plan_placeholders": 0, "plan_forbidden_hits": 0, "needles_source_root": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad", "needles_total": 40}}
+  DISPATCH|stage=S1|status=OK|kind=download|{"action": "download"}
+  DISPATCH|stage=S2|status=STOP|kind=|{"code": "ACTION_NONZERO_RC", "detail": "readback rc=1 elapsed=11.4"}
+  DISPATCH|stage=S2|status=NOT_RUN
+  DISPATCH|stage=S3|status=NOT_RUN
+  DISPATCH|stage=S4|status=NOT_RUN
+  DISPATCH|stage=S5|status=NOT_RUN
+  DISPATCH|stage=S6|status=NOT_RUN
+  DISPATCH|stage=S7|status=NOT_RUN
+  DISPATCH|stage=S8|status=NOT_RUN
+  DISPATCH|stage=S9|status=NOT_RUN
+  DISPATCH|stage=S10|status=NOT_RUN
+  DISPATCH|stage=S11|status=NOT_RUN
+CHECK|DISPATCH_response_driven|FAIL|status=STOP rc=1 executed=3 not_run=10 unknown=0 cleanup_err=0 reserve_breach=0 evidence_fail=0 quota_fail=0
+DEVICE_ACTIONS_ATTEMPTED|response_driven| readback:real_tool,download:real_tool
+RUNFIELD_SUMMARY|checks=1|failures=1|transport=real|backend=real|actions_attempted=2

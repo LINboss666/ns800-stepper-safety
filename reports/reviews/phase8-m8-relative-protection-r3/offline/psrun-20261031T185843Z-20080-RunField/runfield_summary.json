@@ -1,0 +1,17 @@
+{
+    "run_id":  "20261031T185843Z-20080",
+    "entry":  "RunField",
+    "transport":  "real",
+    "backend":  "real",
+    "profiles":  "response_driven",
+    "checks":  1,
+    "failures":  [
+                     "DISPATCH_response_driven"
+                 ],
+    "actions_attempted":  [
+                              " readback:real_tool",
+                              "download:real_tool"
+                          ],
+    "actions_attempted_count":  2,
+    "note":  "actions_attempted 来自执行器自己的账(real/manual 后端实际尝试); 离线入口恒为空是事实而非硬编码"
+}

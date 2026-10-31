@@ -1,0 +1,24 @@
+# FIELD-1 决定性原文(全部脱敏后逐字节取自本次 run 目录, 未改动)
+
+## S1 下载 rc=0 (loader 三行齐 => S1 判据通过)
+0002299 I Loading D:\ns800\reports\firmware\phase8-m8-relative-protection-r3\rt-thread-motor-m1.axf [load_cmd]
+0002300 I Erasing... [loader]
+0008619 I Programming... [loader]
+0023790 I Erased 291840 bytes (285 sectors), programmed 291840 bytes (285 pages), identical 0 bytes (0 pages) at 13.26 kB/s [loader]
+
+## S2 回读 rc=1
+argv 里的 savemem token(整串, 反斜杠仍在):
+savemem 0x08000000 0x47064 D:\ns800\reports\reviews\phase8-m8-relative-protection-r3\offline\psrun-20261031T185843Z-20080-RunField\dispatch-run-real-response_driven/readback.bin
+
+stdout:
+Core 0 (None):  Halted
+stderr:
+0011203 C Error: [Errno 2] No such file or directory: 'D:ns800reportsreviewsphase8-m8-relative-protection-r3offlinepsrun-20261031T185843Z-20080-RunFielddispatch-run-real-response_driven/readback.bin' [__main__]
+
+## 整包摘要行
+DISPATCH_SUMMARY|status=STOP|code=|stages_executed=3|stages_not_run=10|quota_left={"approved_reboot": 1, "blackbox_clear": 0, "cleanup_motor_disarm": 3, "cleanup_motor_status": 3, "cleanup_motor_stop": 3, "config_save": 1, "diag_profile_commit": 1, "diag_profile_learn": 1, "diag_profile_zero": 1, "dmm_readings": 0, "download": 0, "explicit_reset": 1, "irq_polarity_prep": 4, "motion_cap_seconds_per_run": 5, "motor_run": 2, "motor_run_seconds_total": 20, "physical_collision": 0, "port_open": 8, "readback": 0, "retry": 0, "tmc_config_apply": 2}|quota_used={"download": 1, "readback": 1}|profile=response_driven|branch=None|actions_attempted=["download:real_tool", "readback:real_tool"]|ledger=D:\ns800\reports\reviews\phase8-m8-relative-protection-r3\offline\psrun-20261031T185843Z-20080-RunField\dispatch-run-real-response_driven\dispatch_ledger.jsonl
+
+## 阶段逐项
+S0|OK|{"facts": {"image_path": "reports/firmware/phase8-m8-relative-protection-r3/rt-thread-motor-m1-candidate.bin", "image_bytes": 290916, "image_sha256": "00608ec93c6a3027d68b44b5317574209fccfb0ba82a99747
+S1|OK|{"action": "download"}
+S2|STOP|{"code": "ACTION_NONZERO_RC", "detail": "readback rc=1 elapsed=11.4"}

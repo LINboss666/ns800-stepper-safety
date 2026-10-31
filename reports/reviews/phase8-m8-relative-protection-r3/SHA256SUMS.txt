@@ -1,6 +1,6 @@
 # sha256 * <repo相对路径>(LF, 无 BOM; 本清单不哈希自身字节 —— 一条清单不能给自己的字节作证)
 # 生成方式: 对 reports/reviews/phase8-m8-relative-protection-r3/ 下每个常规文件(排除 SHA256SUMS.txt、remote_readback.md 与 __pycache__) 直接读磁盘字节算 sha256
-# 条目数=4191; 逐条与 Git blob 的复算由 host/staged_blob_preflight.txt(提交前)与 host/remote_readback.py(推送后, 从远端 blob)完成
+# 条目数=4216; 逐条与 Git blob 的复算由 host/staged_blob_preflight.txt(提交前)与 host/remote_readback.py(推送后, 从远端 blob)完成
 6239911fbd44b814e769e75c531df369c76a04e6a2ba7e4dbe119cb4b30a7b5d  reports/reviews/phase8-m8-relative-protection-r3/build/rc.txt
 278c6c927c4a17d5cd31846c2cf97da7f826c1ba433aebe4f214098c7cdbc866  reports/reviews/phase8-m8-relative-protection-r3/build/rt-thread-measure-a0.log
 9114d6024382982ff45c1683b3063a3c5cb0193a117c67ee188e0c7f912ca697  reports/reviews/phase8-m8-relative-protection-r3/build/rt-thread-motor-m1-candidate.log
@@ -11,7 +11,7 @@ ce4efe0200a037fb7af0e36c25d12f14c7f0750b975cd9efb28b9eae3d8fe864  reports/review
 77102a8bff73cc21dfa4744222ab1130b376224e91cd98711ac1a1c3dc5efffd  reports/reviews/phase8-m8-relative-protection-r3/field/needles.json
 0347230df1f36c94bc5b1e984a347787508d0930ae653125a0494a182e825926  reports/reviews/phase8-m8-relative-protection-r3/field/plan.json
 f21b8ac346dcb68f798c6578726fe8fe7e6d761fcf9e3f4556bbb8e721e727fa  reports/reviews/phase8-m8-relative-protection-r3/field/rows.json
-4933a0891df831f832f85019e0a0ef0ba19b57ec96e661932e7bef7ad484ed93  reports/reviews/phase8-m8-relative-protection-r3/field_candidate_package.md
+012f04c846513e73a4196274d0d30fdad17b1a6f856310da6812f616d07ddbf6  reports/reviews/phase8-m8-relative-protection-r3/field_candidate_package.md
 9439a0bcc25007bcd6116870c634535621b4764c0036cd1184ae714bef564687  reports/reviews/phase8-m8-relative-protection-r3/host/boundaries_baseline_preimage_r3finalfix.txt
 cada980eb5670098ef4a1bd2bb808493c1fe9027f6e193049bc1afaaef7f36b2  reports/reviews/phase8-m8-relative-protection-r3/host/boundaries_candidate_r3finalfix.txt
 cad2ab004a03219b43a6cc62e4ecc91f58120060d3c85736a212a5792514e147  reports/reviews/phase8-m8-relative-protection-r3/host/c_chain_output.derivation.txt
@@ -24,6 +24,9 @@ c905a1892dcd3741487ddbf62f6661f40103dfa34e6ee02146be66d752c31bd8  reports/review
 15dd42dfe8dc9209c01d4e5657b96435b32679046a1aed79b8b0f86c0cfbbd73  reports/reviews/phase8-m8-relative-protection-r3/host/field_Precheck_console_r3closeout.txt
 c637961f52e26a93c1ddc50c599a215dcfd8620e0664e92cf4e6d699f3374a6c  reports/reviews/phase8-m8-relative-protection-r3/host/field_Precheck_console_r3finalfix.txt
 b03abfbefed8bba3a9356820806d8be08ee03bdc6689b4ee3ffbfbbd92998c35  reports/reviews/phase8-m8-relative-protection-r3/host/field_Precheck_console_superseded-cp936capture.txt
+d8e22f0bf5b5411e8855cbcf1d9b7bb0a8cea073bc32cdfecba48313dd841790  reports/reviews/phase8-m8-relative-protection-r3/host/field_run_r3field1.json
+971520b5b5f308d026ad72ebb1125d9899cfa30dcada3908ab991593cde2e5dc  reports/reviews/phase8-m8-relative-protection-r3/host/field_run_r3field1_artifacts.json
+d5fc8f1f23749e10f16121363358d99ea2419fc587e489e3e99822ab53b91cd2  reports/reviews/phase8-m8-relative-protection-r3/host/field_run_r3field1_rootcause.txt
 760bc7749fabf9e9b27b5b5d3e0a8842af405531a1b8f2431455900700b0a79a  reports/reviews/phase8-m8-relative-protection-r3/host/field_RunField_console.txt
 31e6a9d44edc8309d39faeb35b934ffaff8cba1eb6b7e8d9bb48a7d5ae878124  reports/reviews/phase8-m8-relative-protection-r3/host/field_RunField_console_r3closeout.txt
 9e4da8d05d864da5a968030281d4a14b07ed4f7abc754c66699914e617386d13  reports/reviews/phase8-m8-relative-protection-r3/host/field_RunField_console_r3finalfix.txt
@@ -4191,4 +4194,26 @@ cc89cdb9e393f5271ebcca6106a7df186d50210a8a3e1dacde1e0b63423f7109  reports/review
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T175313Z-16908-RunField/pyout-20261031T175313Z-16908-03.txt.err
 2c7e5c9e48a7e562c441623c20a4719efea2310be9b0d7fb904bd96d224f0fa7  reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T175313Z-16908-RunField/runfield_summary.json
 caf8eba16f708d9d687b5e2f80d276812c3a8318cda9ec25305f3133927b2818  reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T175313Z-16908-RunField/transcript_console.txt
-341c11bbe0da69b8aa5c4168e0e43487feadf0bb5b02667777d48e0d26fdf8a1  reports/reviews/phase8-m8-relative-protection-r3/run_record.md
+7e34277d700cb696728b3ede37aa607361e75d87855cf04de2aea605767a4c31  reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T184556Z-55376-Precheck/precheck_summary.json
+d97da7618c8972e9898f92512174d904373d492b71237c4d8640c10645851ae2  reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T184556Z-55376-Precheck/pyout-20261031T184556Z-55376-01.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T184556Z-55376-Precheck/pyout-20261031T184556Z-55376-01.txt.err
+6cad0e867df90caa7edf238488a9da737e3c9773aea54286bfa3aa2095a18e58  reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T184556Z-55376-Precheck/pyout-20261031T184556Z-55376-02.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T184556Z-55376-Precheck/pyout-20261031T184556Z-55376-02.txt.err
+8ef0c89bf8ab93602cccaee5d0be58d9f295d2bad034894ffcb3a866911cca84  reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T184556Z-55376-Precheck/pyout-20261031T184556Z-55376-03.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T184556Z-55376-Precheck/pyout-20261031T184556Z-55376-03.txt.err
+673ba07a77c20278e3d793c402131020fbf2e1176d743dc080d01412fd6b7c3d  reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T184556Z-55376-Precheck/transcript_console.txt
+1dc4e3271aad01a5c87c139f6d05c6f37af5ff115af2bea59dd3608ea8b775e1  reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T185843Z-20080-RunField/console_run-real_response_driven.txt
+957564e88dddf1eb782dbe916a42551513491d5e65e4fbf5ac3736fdabaf848e  reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T185843Z-20080-RunField/dispatch-run-real-response_driven/action_download/ARGV.json
+13bf7b3039c63bf5a50491fa3cfd8eb4e699d1ba1436315aef9cbe5711530354  reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T185843Z-20080-RunField/dispatch-run-real-response_driven/action_download/rc.txt
+1821aa4f5ebb17f9c949cb1af15042ef13b97dbba9ccc85a620e5fe790dacd3f  reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T185843Z-20080-RunField/dispatch-run-real-response_driven/action_download/stderr.bin
+4f79f4bf0786bb5debce65153500603bc6fc79002e031f6c5e7bd911399b39c5  reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T185843Z-20080-RunField/dispatch-run-real-response_driven/action_download/stdout.bin
+fdb18b95610d79661b5110915d104d3cbbdf49648d098161b30f12638d0cc8b6  reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T185843Z-20080-RunField/dispatch-run-real-response_driven/action_readback/ARGV.json
+f1b2f662800122bed0ff255693df89c4487fbdcf453d3524a42d4ec20c3d9c04  reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T185843Z-20080-RunField/dispatch-run-real-response_driven/action_readback/rc.txt
+89726e153141d0093c2763becbd2e35641fba63a6401bdf05a924cf99ab482f1  reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T185843Z-20080-RunField/dispatch-run-real-response_driven/action_readback/stderr.bin
+d466e5a820741367d724f60148a858eee421d691005ac6518b721d2aa3e865bc  reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T185843Z-20080-RunField/dispatch-run-real-response_driven/action_readback/stdout.bin
+41641f0083bccb128ee83f72d7bab543fe3bd87aa211d17e89d1367f8f7c642b  reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T185843Z-20080-RunField/dispatch-run-real-response_driven/dispatch_ledger.jsonl
+b16253fdc8096f24084174ad01fe3278750b2ede46fcfbe06bf2b80013d0650e  reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T185843Z-20080-RunField/pyout-20261031T185843Z-20080-01.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T185843Z-20080-RunField/pyout-20261031T185843Z-20080-01.txt.err
+25c637e8ca95c7e6f3856d3c1a7266437c13600c6b0f382ca5a2a0344745d0c5  reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T185843Z-20080-RunField/runfield_summary.json
+1001a6c3c47cd1883126ea0cee8ce7a32afe266d5a275dfc28aed42bca02e183  reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T185843Z-20080-RunField/transcript_console.txt
+5416c2c24e67f38ee53a3d8be2fbf8c2b14c50ad1f977e42813ec1242dc1779a  reports/reviews/phase8-m8-relative-protection-r3/run_record.md

@@ -202,3 +202,55 @@ S_S10(trip, 锁存态 arm 被拒) motor_stop 0.005→0.005 | motor_disarm 0.005�
 处置: `git rm --cached` + 删磁盘(可从 `.py` 重建), 清单条目数因此不变(规则本就排除),
 在 `remote_readback.md` §7 与这里各留一条原文记录。教训: 目录级 `-f` 之后必须按
 `git diff --cached --name-only | grep __pycache__` 复核, 不能只看顶层目录。
+
+## 8. 现场轮(FIELD-1, 2026-11-01)的首次 real dispatch —— 结果停在 S2
+
+批准范围(操作者原话口径): 绑定交付头 `1dc4230` 与候选 BIN `00608ec9…e304`；下载与定长回读各一次、
+学习起转 ≤15 s、保护观察 ≤5 s、最多两次 start 合计 ≤20 s、IRUN20/100 Hz/DIR0，其余复位/串口/配置/
+清理按 plan；操作者在场才进运动；失败即停业务并做必要清理；不加重试、不主动碰撞、不清日志。
+令牌 `M8-R3-1DC4230-20261101`（两个参数同串，只是本包标识）。UID 由本机历史成功烧录记录只读找回：
+`D:\ns800-m7-p0-20261030T182818\dap_uid_bare.txt`（len=48 / sha256 前 12 `d2f530dbd062`，
+与 `D:\ns800-r1-board`、`D:\ns800-r2-board`、`D:\ns800-board-a` 的 5 件命令记录互证为同一把 DAP），
+原值不入仓库、不入对话，未枚举探针。
+
+执行方式：可见 PowerShell 新窗口（PID 20080，run 目录
+`offline/psrun-20261031T185843Z-20080-RunField`），人工门读该窗口 stdin。启动前只读 Precheck
+14 项 0 失败（`offline/psrun-20261031T184556Z-55376-Precheck`）。
+
+| 阶段 | 实际结果 | 额度 |
+| --- | --- | --- |
+| S0 离线绑定 | OK：按路径重算 BIN 290916 B / `00608ec9…e304` 与 build_manifest 逐字段相等；两提交实存 | — |
+| S1 唯一一次下载 | **rc=0**，24.14 s；`Erasing… [loader]` / `Programming… [loader]` / `Erased 291840 bytes (285 sectors), programmed 291840 bytes (285 pages), identical 0 bytes (0 pages) at 13.26 kB/s` 三条齐 | download 1/1 已用 |
+| S2 唯一一次定长回读 | **STOP `ACTION_NONZERO_RC` rc=1**，11.4 s；`readback.bin` 未生成 | readback 1/1 已用 |
+| S3–S11 | 全部 NOT_RUN | port_open 0/8、explicit_reset 0/1、motor_run 0/2、启动秒 0/20、config_save/apply 0、清理 0、approved_reboot 0/1 |
+
+人工门弹出次数 0；未开口、未复位、未起转、未写配置。因此本轮**既不能记 NO_TRIGGER 也不能记触发**，
+只能记 `NONE_OBSERVED(业务未走到观察窗)`。镜像已写入 Flash，但**在板逐字节一致 = UNPROVEN**
+（回读没落盘），核在工具最后打出的状态是 `Core 0 (None):  Halted`，而计划里的断电重启门 S6 未走到，
+所以"板子是否在跑新固件"记 NOT_ASSESSED，恢复需要操作者断电再上电（我不代替操作者动电源）。
+
+根因（实证）：argv 层这轮是对的 —— 传给 pyOCD 的 token 是完整单串
+`savemem 0x08000000 0x47064 D:\ns800\...\readback.bin`（F2 修正生效：不再被前缀 repo_root；
+长度 `0x47064` = 290916 也对）。缺陷在下一层：**pyOCD commander 把 `-c` 串按 shlex 解析，
+Windows 路径里的反斜杠被当转义吃掉**，于是目标文件变成
+`D:ns800reportsreviewsphase8-m8-relative-protection-r3…readback.bin`，报
+`[Errno 2] No such file or directory`（stderr 原文见 `host/field_run_r3field1_rootcause.txt`）。
+离线工装为什么抓不到：假子进程从不真正解析 `-c` 字符串，FS57/TB05 只核 argv 有没有被改写；
+这是首次真跑才暴露的形状缺陷。
+
+顺带登记一条可观测性缺口：整包因阶段失败而 STOP 时 `DISPATCH_SUMMARY|status=STOP|code=|` 的 code
+是空串，具名 code 只出现在阶段行（`ACTION_NONZERO_RC`）。PS 判据仍按 status/not_run 正确落败
+（`failures=["DISPATCH_response_driven"]`），但摘要行不具名。
+另一条正面事实：`runfield_summary.json` 的 `actions_attempted` 确实是
+`["download:real_tool", "readback:real_tool"]` —— 兑现"真实摘要不得再固定写 hardware_actions=[]"。
+
+本轮**不做**：不发第二次回读、不重下（那是新批准范围）、不动用剩余那一次复位去"救"。
+下一步最小修法（属候选五件之一，需新一轮绑定与批准）：`plan.json` 的 readback argv 把 savemem
+目标路径写成**正斜杠**形式（Windows API 接受，且 `-c` 串内不再有任何可被去转义的反斜杠）。
+板子已经写好，续测只需 1 次回读 + 从 S3 起的剩余额度，不需要第二次下载。
+
+证据：`host/field_run_r3field1.json`（批准绑定/额度/根因/结论标签）、
+`host/field_run_r3field1_rootcause.txt`（决定性原文）、
+`host/field_run_r3field1_artifacts.json`（24 件逐字节身份 + 重发包身份：`.md` 与已归档
+`host/reviewer_ff/README.md` 逐字节相同，说明重发的是同一份任务书，无新增指令；
+zip `4e2bf97e…287fe` / 39796 B）。失败件一律原样保留，不删不改。

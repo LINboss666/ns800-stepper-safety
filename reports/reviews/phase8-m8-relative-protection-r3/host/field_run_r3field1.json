@@ -1,0 +1,224 @@
+{
+ "round": "FIELD-1 M8-R3 现场包整包执行(首次 real dispatch)",
+ "approved_package": {
+  "delivery_head": "1dc42308737e4eb296ff48695d89ae6c95b5636e",
+  "field_files": "五件候选散列(见 host/ff_identity.json), 本轮未改一字节",
+  "core_software_input": "805c29bd73c4ea861c9b9c65f61e946aec9548e3",
+  "bound_image": {
+   "bin": "reports/firmware/phase8-m8-relative-protection-r3/rt-thread-motor-m1-candidate.bin",
+   "bytes": 290916,
+   "sha256": "00608ec93c6a3027d68b44b5317574209fccfb0ba82a9974793d13b54b79e304",
+   "axf_sha256": "0bba8ca74ed8c11e149395efd64c42072fce0b3ced5ab76281210ddc04550963"
+  },
+  "approval_token": {
+   "value": "M8-R3-1DC4230-20261101",
+   "note": "本包标识, 两个参数传同一串; 不替代硬件批准",
+   "both_params": true
+  },
+  "approved_scope_verbatim": "下载和定长回读各一次, 学习起转<=15秒、保护观察<=5秒, 最多两次 start、合计<=20秒, 保持 IRUN20/100Hz/DIR0; 其余复位、串口、配置和清理额度按该 plan; 操作者在场时才进入运动; 失败停止业务并执行必要清理, 不增加重试、主动碰撞或清日志"
+ },
+ "uid_handling": {
+  "private_file_recovered_from": "本机历史成功烧录记录(只读检索)",
+  "path": "D:\\ns800-m7-p0-20261030T182818\\dap_uid_bare.txt",
+  "cross_checked_against": [
+   "D:\\ns800-r1-board\\logs\\dap_uid_private.txt",
+   "D:\\ns800-r2-board\\logs\\dap_uid_private.txt",
+   "D:\\ns800-board-a\\cp2_double_read.sh 等 5 件命令记录"
+  ],
+  "disclosure": {
+   "length": 48,
+   "sha256_12": "d2f530dbd062"
+  },
+  "raw_value_in_repo_or_chat": false,
+  "probes_enumerated": false
+ },
+ "launch": {
+  "method": "Start-Process powershell(可见新窗口), 人工门读该窗口 stdin",
+  "window_pid": 20080,
+  "run_id": "20261031T185843Z-20080",
+  "run_root": "reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T185843Z-20080-RunField",
+  "command": "M8R3Field.ps1 -RunField -Transport real -Backend real -Profile response_driven -Port COM5 -ApprovalToken <令牌> -ExpectedToken <同一令牌> -UidFile <私有件>",
+  "preflight_read_only": {
+   "precheck_entry": "14 项 0 失败 rc=0",
+   "precheck_run_root": "reports/reviews/.../offline/psrun-20261031T184556Z-55376-Precheck"
+  }
+ },
+ "result": {
+  "dispatch_summary_verbatim": "DISPATCH_SUMMARY|status=STOP|code=|stages_executed=3|stages_not_run=10|quota_left={\"approved_reboot\": 1, \"blackbox_clear\": 0, \"cleanup_motor_disarm\": 3, \"cleanup_motor_status\": 3, \"cleanup_motor_stop\": 3, \"config_save\": 1, \"diag_profile_commit\": 1, \"diag_profile_learn\": 1, \"diag_profile_zero\": 1, \"dmm_readings\": 0, \"download\": 0, \"explicit_reset\": 1, \"irq_polarity_prep\": 4, \"motion_cap_seconds_per_run\": 5, \"motor_run\": 2, \"motor_run_seconds_total\": 20, \"physical_collision\": 0, \"port_open\": 8, \"readback\": 0, \"retry\": 0, \"tmc_config_apply\": 2}|quota_used={\"download\": 1, \"readback\": 1}|profile=response_driven|branch=None|actions_attempted=[\"download:real_tool\", \"readback:real_tool\"]|ledger=D:\\ns800\\reports\\reviews\\phase8-m8-relative-protection-r3\\offline\\psrun-20261031T185843Z-20080-RunField\\dispatch-run-real-response_driven\\dispatch_ledger.jsonl",
+  "stages": {
+   "S0": {
+    "status": "OK",
+    "kind": "offline",
+    "detail": "{\"facts\": {\"image_path\": \"reports/firmware/phase8-m8-relative-protection-r3/rt-thread-motor-m1-candidate.bin\", \"image_bytes\": 290916, \"image_sha256\": \"00608ec93c6a3027d68b44b5317574209fccfb0ba82a9974793d13b54b79e304\", \"manifest_target\": \"rt-thread-motor-m1-candidate\", \"software_input_commit\": \"805c2"
+   },
+   "S1": {
+    "status": "OK",
+    "kind": "download",
+    "detail": "{\"action\": \"download\"}"
+   },
+   "S2": {
+    "status": "STOP",
+    "kind": "",
+    "detail": "{\"code\": \"ACTION_NONZERO_RC\", \"detail\": \"readback rc=1 elapsed=11.4\"}"
+   }
+  },
+  "quota_audit": {
+   "approved_reboot": {
+    "declared": 1,
+    "used": 0,
+    "left": 1
+   },
+   "blackbox_clear": {
+    "declared": 0,
+    "used": 0,
+    "left": 0
+   },
+   "cleanup_motor_disarm": {
+    "declared": 3,
+    "used": 0,
+    "left": 3
+   },
+   "cleanup_motor_status": {
+    "declared": 3,
+    "used": 0,
+    "left": 3
+   },
+   "cleanup_motor_stop": {
+    "declared": 3,
+    "used": 0,
+    "left": 3
+   },
+   "config_save": {
+    "declared": 1,
+    "used": 0,
+    "left": 1
+   },
+   "diag_profile_commit": {
+    "declared": 1,
+    "used": 0,
+    "left": 1
+   },
+   "diag_profile_learn": {
+    "declared": 1,
+    "used": 0,
+    "left": 1
+   },
+   "diag_profile_zero": {
+    "declared": 1,
+    "used": 0,
+    "left": 1
+   },
+   "dmm_readings": {
+    "declared": 0,
+    "used": 0,
+    "left": 0
+   },
+   "download": {
+    "declared": 1,
+    "used": 1,
+    "left": 0
+   },
+   "explicit_reset": {
+    "declared": 1,
+    "used": 0,
+    "left": 1
+   },
+   "irq_polarity_prep": {
+    "declared": 4,
+    "used": 0,
+    "left": 4
+   },
+   "motion_cap_seconds_per_run": {
+    "declared": 5,
+    "used": 0,
+    "left": 5
+   },
+   "motor_run": {
+    "declared": 2,
+    "used": 0,
+    "left": 2
+   },
+   "motor_run_seconds_total": {
+    "declared": 20,
+    "used": 0,
+    "left": 20
+   },
+   "physical_collision": {
+    "declared": 0,
+    "used": 0,
+    "left": 0
+   },
+   "port_open": {
+    "declared": 8,
+    "used": 0,
+    "left": 8
+   },
+   "readback": {
+    "declared": 1,
+    "used": 1,
+    "left": 0
+   },
+   "retry": {
+    "declared": 0,
+    "used": 0,
+    "left": 0
+   },
+   "tmc_config_apply": {
+    "declared": 2,
+    "used": 0,
+    "left": 2
+   }
+  },
+  "actions_attempted_by_backend": [
+   "download:real_tool",
+   "readback:real_tool"
+  ],
+  "operator_gates_prompted": 0,
+  "motion_commands_sent": 0,
+  "serial_port_opened": false,
+  "reset_performed": false,
+  "config_written": false,
+  "downloads_this_round": 1,
+  "readbacks_this_round": 1,
+  "retries": 0,
+  "log_cleared": false,
+  "physical_collision_induced": false
+ },
+ "board_side_facts": {
+  "flash_write_succeeded": {
+   "rc": "0",
+   "elapsed_s": 24.14,
+   "loader_expectations_matched": {
+    "Erasing... [loader]": true,
+    "Programming... [loader]": true,
+    "Erased/programmed 摘要行": true
+   },
+   "stderr_verbatim": "0002299 I Loading D:\\ns800\\reports\\firmware\\phase8-m8-relative-protection-r3\\rt-thread-motor-m1.axf [load_cmd]\r\n0002300 I Erasing... [loader]\r\n0008619 I Programming... [loader]\r\n0023790 I Erased 291840 bytes (285 sectors), programmed 291840 bytes (285 pages), identical 0 bytes (0 pages) at 13.26 kB/s [loader]",
+   "sectors": "Erased 291840 bytes (285 sectors), programmed 291840, identical 0"
+  },
+  "on_board_byte_proof": "UNPROVEN —— readback 未产出 readback.bin, 所以不能说候选镜像已逐字节证实在板",
+  "core_state_at_disconnect": {
+   "tool_stdout_verbatim": "Core 0 (None):  Halted",
+   "note": "connect_mode=halt + resume_on_disconnect=false: 这是工具最后打出的状态, 计划里的断电重启门(S6)未走到, 板子是否已在跑新固件=NOT_ASSESSED"
+  },
+  "recovery_requires": "操作者断电再上电(或新一轮批准), 本轮我不代替操作者动电源"
+ },
+ "root_cause": {
+  "failing_command_token_verbatim": "savemem 0x08000000 0x47064 D:\\ns800\\reports\\reviews\\phase8-m8-relative-protection-r3\\offline\\psrun-20261031T185843Z-20080-RunField\\dispatch-run-real-response_driven/readback.bin",
+  "tool_error_verbatim": "0011203 C Error: [Errno 2] No such file or directory: 'D:ns800reportsreviewsphase8-m8-relative-protection-r3offlinepsrun-20261031T185843Z-20080-RunFielddispatch-run-real-response_driven/readback.bin' [__main__]",
+  "reading": "argv 层本轮是对的: -c 后的整条命令串没再被前缀 repo_root(F2 生效), 长度参数 0x47064=290916 也对; 缺陷在下一层 —— pyOCD commander 对 -c 字符串按 shlex 解析, Windows 路径里的反斜杠被当转义吃掉, 目标文件变成 D:ns800reports... 因此 Errno 2 落不下文件, rc=1",
+  "why_offline_missed_it": "离线工装用假子进程(FS57/TB05 只核 argv 不被改写), 从不真正解析 -c 串; 这是第一次真跑才暴露的形状缺陷",
+  "candidate_fix_for_next_round": "plan.json 里 readback argv 的 savemem 目标路径改正斜杠形式(Windows API 接受, 且 -c 串内无可被去转义的反斜杠); 这只动 field/plan.json 一处, 会改其候选散列, 属新一轮绑定; 板子已写好, 续测只需 1 次回读 + 从 S3 起的剩余额度, 不需要第二次下载"
+ },
+ "observations_to_reviewer": {
+  "dispatch_summary_code_empty": "整包因阶段失败而 STOP 时, DISPATCH_SUMMARY 的 code= 是空串(具名 code 只在阶段行 ACTION_NONZERO_RC 里); PS 判据仍按 status/not_run 正确落败, 但摘要行不具名, 属可观测性缺口",
+  "real_summary_not_hardcoded_empty": "本轮 runfield_summary.json 的 actions_attempted 确实是 2 条(download+readback), 兑现了'真实摘要不得再固定写 hardware_actions=[]'"
+ },
+ "conclusion_labels": {
+  "field_package_first_real_run": "STOP_AT_S2_READBACK_RC1",
+  "image_on_board_proven_byte_equal": "NO",
+  "protection_branch_reached": "NO(未开口, 未复位, 未起转)",
+  "anomaly_observed_on_hardware": "NONE_OBSERVED(业务未走到观察窗, 不能记 NO_TRIGGER 也不能记触发)",
+  "hardware_actions_next": "NONE —— 不重下、不补回读、不动用剩余复位, 等新一轮批准"
+ }
+}

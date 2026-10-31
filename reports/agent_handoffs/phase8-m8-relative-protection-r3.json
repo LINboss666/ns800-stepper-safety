@@ -477,5 +477,90 @@
    "reviewer_inputs": "reports/reviews/.../host/reviewer_ff/(12 件 + inputs_identity.md)",
    "reviewer_ff_inputs_not_duplicated": "两份启动件按仓库内同字节来源登记(p0 3381 B = phase8-motor-m7-p0-board/S3_raw_boot.bin.b64 解码; 3757 B = cp3_wire_archive.md 的 base64 段)"
   }
+ },
+ "field_run_r3": {
+  "round": "FIELD-1 首次 real dispatch(绑定 1dc4230)",
+  "approved_by_operator_in_turn": true,
+  "approval_token": "M8-R3-1DC4230-20261101(两个参数同串; 本包标识, 不替代硬件批准)",
+  "uid_recovery": {
+   "mode": "本机历史成功烧录记录只读检索",
+   "path": "D:\\ns800-m7-p0-20261030T182818\\dap_uid_bare.txt",
+   "disclosure": {
+    "length": 48,
+    "sha256_12": "d2f530dbd062"
+   },
+   "raw_value_in_repo_or_chat": false,
+   "probes_enumerated": false
+  },
+  "launch": {
+   "visible_powershell_window": true,
+   "window_pid": 20080,
+   "run_root": "reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-20261031T185843Z-20080-RunField",
+   "preflight_read_only": "Precheck 14/0 rc=0 (psrun-20261031T184556Z-55376-Precheck)"
+  },
+  "result": {
+   "S0": "OK",
+   "S1_download": "rc=0 (285 sectors programmed, 24.14 s)",
+   "S2_readback": "STOP ACTION_NONZERO_RC rc=1 (11.4 s, readback.bin 未生成)",
+   "S3_to_S11": "NOT_RUN",
+   "quota_used": {
+    "download": "1/1",
+    "readback": "1/1"
+   },
+   "quota_untouched": {
+    "port_open": "0/8",
+    "explicit_reset": "0/1",
+    "motor_run": "0/2",
+    "motor_seconds": "0/20",
+    "config_save": "0/1",
+    "tmc_config_apply": "0/2",
+    "cleanup": "0",
+    "approved_reboot": "0/1"
+   },
+   "operator_gates_prompted": 0,
+   "motion_commands_sent": 0,
+   "retries": 0,
+   "log_cleared": false,
+   "collision_induced": false
+  },
+  "claims_kept_honest": {
+   "image_on_board_byte_equal": "UNPROVEN",
+   "protection_branch": "NOT_REACHED(不能记 NO_TRIGGER, 也不能记触发)",
+   "core_state_last_printed": "Core 0 (None):  Halted",
+   "board_running_new_firmware": "NOT_ASSESSED(S6 断电门未走到)"
+  },
+  "root_cause_new_defect": {
+   "where": "field/plan.json 的 readback argv 里 savemem 的目标路径(@RUN_ROOT 展开成 Windows 反斜杠绝对路径)",
+   "what": "pyOCD commander 按 shlex 解析 -c 串, 反斜杠被当转义去掉 => 路径变形 => Errno 2 => rc=1",
+   "f2_status": "F2 本身这轮是对的: -c 命令串未被前缀 repo_root, 长度 0x47064=290916 正确",
+   "why_offline_could_not_catch": "假子进程从不解析 -c 字符串; 73 项与 TB05 只核 argv 未被改写",
+   "minimal_fix": "readback argv 的 savemem 目标改正斜杠形式(单处改动, 会改 plan.json 候选散列 => 新一轮绑定)",
+   "next_round_needs": "1 次定长回读 + S3 起剩余额度; 不需要第二次下载(板已写好)"
+  },
+  "observability_gap_registered": "阶段失败导致整包 STOP 时 DISPATCH_SUMMARY 的 code 为空串(具名 code 只在阶段行)",
+  "positive_fact": "真实摘要的 actions_attempted 确实写了 download+readback 两条, 未再固定写 []",
+  "not_done_this_round": [
+   "第二次下载",
+   "补一次回读",
+   "动用剩余 explicit_reset"
+  ],
+  "evidence": [
+   "host/field_run_r3field1.json",
+   "host/field_run_r3field1_rootcause.txt",
+   "host/field_run_r3field1_artifacts.json",
+   "offline/psrun-20261031T185843Z-20080-RunField/**(原样保留, 失败日志未删改)"
+  ],
+  "resend_bundle": {
+   "md_identical_to_archived_task_book": true,
+   "zip_sha256": "4e2bf97eac73bfa37c2a69a7607600390e3a32e8a7a75e04d4d92501b5e287fe",
+   "reading": "重发的是同一份最终补正任务书, 无新增指令"
+  },
+  "labels": [
+   "M8_R3_FIELD_FIRST_REAL_RUN_STOP_AT_S2",
+   "IMAGE_ON_BOARD_BYTE_EQUAL=UNPROVEN",
+   "PROTECTION_BRANCH_REACHED=NO",
+   "ANOMALY_ON_HARDWARE=NONE_OBSERVED"
+  ],
+  "awaiting": "下一轮批准: 改正斜杠路径后的续测包(只做回读 + S3 起), 或按审核方另行给法"
  }
 }

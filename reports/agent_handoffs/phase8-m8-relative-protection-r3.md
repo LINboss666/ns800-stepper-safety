@@ -165,3 +165,29 @@ PS 5.1 三入口 22/0 + 14/0 + 3/0(`actions_attempted=0`)。原文与身份表�
 **下一步是向用户呈现一份绑定现有 M8 候选散列的完整现场批准**(学习 ≤15 s、保护观察 ≤5 s、
 最多 2 次 start、合计 ≤20 s、IRUN20/100 Hz/DIR0，其余额度按修正后的 plan，
 并新增 S8 那一次只读 `flash_logstat`); 该批准落地之前不连接、不下载、不复位、不起转。
+
+## 9. 现场轮(FIELD-1)对账 —— 首次 real dispatch 停在 S2
+
+批准：绑定 `1dc4230` + 候选 BIN `00608ec9…e304`，令牌 `M8-R3-1DC4230-20261101`(两参同串)。
+UID 由我从本机历史成功烧录记录只读找回并核对(48 位 / `d2f530dbd062`)，原值未入库未进对话。
+启动方式：Agent 拉可见 PowerShell 窗口，操作者只在窗口中答人工门(本轮实际弹出 0 次)。
+
+| 环节 | 结果 | 依据 |
+| --- | --- | --- |
+| S0 绑定 | OK，BIN 290916 B / `00608ec9…` 与 manifest 逐字段相等 | `dispatch_ledger.jsonl` 的 S0_FACTS |
+| S1 下载 | rc=0，loader 三条原文齐(285 sectors programmed) | `action_download/{rc.txt,stderr.bin}` |
+| S2 回读 | **rc=1 → STOP `ACTION_NONZERO_RC`**，`readback.bin` 未生成 | `action_readback/stderr.bin` 原文 |
+| S3–S11 | NOT_RUN；未开口、未复位、未起转、未写配置 | `DISPATCH_SUMMARY` / QUOTA_AUDIT 全表 |
+| 板端事实 | Flash 已写入；**在板逐字节一致 UNPROVEN**；工具末态 `Core 0 (None): Halted`，是否在跑新固件 NOT_ASSESSED | 同上 + `run_record.md` §8 |
+
+根因：pyOCD commander 对 `-c` 串做 shlex 解析，Windows 路径的反斜杠被去转义，落盘路径变成
+`D:ns800reports…readback.bin`。F2 那一层(argv 不被前缀 repo_root)本轮是**对的**；缺陷在它下一层，
+离线假子进程结构上抓不到。最小修正是把 `plan.json` readback argv 里 savemem 的目标路径改正斜杠，
+这会改 plan.json 散列，属新一轮绑定；续测只需 1 次回读 + S3 起剩余额度，不需要第二次下载。
+
+本轮我**没有**做也不会做：第二次下载、补一次回读、动用剩余复位。等下一轮批准。
+
+结论标签(本轮实际，不作通过声明)：
+`M8_R3_FIELD_FIRST_REAL_RUN_STOP_AT_S2` / `IMAGE_ON_BOARD_BYTE_EQUAL=UNPROVEN` /
+`PROTECTION_BRANCH_REACHED=NO` / `ANOMALY_ON_HARDWARE=NONE_OBSERVED`。
+证据见 `host/field_run_r3field1*.json|txt` 与 `offline/psrun-20261031T185843Z-20080-RunField/`。
