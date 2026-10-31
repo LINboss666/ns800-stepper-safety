@@ -142,6 +142,17 @@ static void s_collect(sensor_frame_t *f, sensor_frame_t *base_prev,
         f->step_hz = snap.current_hz;
         f->motor_state = (rt_uint8_t)snap.state;
         f->dir = snap.dir;
+        /* M8-R2 R2-B3: 取成功才推进运动身份; 与 sg/cur/imu 完全同一口径。 */
+        f->motion_ok   = 1;
+        f->motion_seq  = base_prev->motion_seq + 1u;
+        f->motion_tick = f->timestamp;
+    }
+    else
+    {
+        /* 失败: motor_state/step_hz/dir 是基帧继承来的**旧值**, 不能当作本帧证得的
+         * 运动事实(旧代码把外壳帧新就当作运动新 ⇒ 缓存 IDLE 成了无限免保护证据)。
+         * motion_seq/motion_tick 原样继承, motion_ok=0 让消费方明确看到"未知"。 */
+        f->motion_ok = 0;
     }
 
     /* P2-2 → 2026-10-22 数据语义修正: 原始电平 / 活动集合 / 有效集合三者分开。
@@ -318,6 +329,7 @@ static void sensor_selftest(void)
     sensor_frame_t f;
     sensor_frame_t test_prev;           /* 自检专用基帧 */
     rt_uint32_t base_sg_seq, base_cur_seq, base_imu_seq;   /* M8/M8-R1: 身份断言的基值 */
+    rt_uint32_t base_motion_seq;                           /* M8-R2 R2-B3 */
     sensor_frame_t prod_prev_before;
     rt_uint32_t test_seq = 0;
     rt_uint32_t prod_seq_before, prod_seq_after;
@@ -334,6 +346,7 @@ static void sensor_selftest(void)
     base_sg_seq = test_prev.sg_seq;                  /* M8: 断言增量前先取基值 */
     base_cur_seq = test_prev.cur_seq;
     base_imu_seq = test_prev.imu_seq;
+    base_motion_seq = test_prev.motion_seq;
     s_collect(&f, &test_prev, &test_seq);            /* 不碰 s_prev / s_seq */
 
     /* 垃圾 valid 位(0xAB 非零)必须被真实采集结果覆盖。
@@ -395,9 +408,21 @@ static void sensor_selftest(void)
                  (unsigned)base_imu_seq, (unsigned)f.imu_seq, f.fresh_imu); pass = 0; }
     if (!f.valid_imu && f.fresh_imu == 1)
     { rt_kprintf("[SNS-ST] imu fresh without valid\n"); pass = 0; }
+    /* M8-R2 R2-B3: 运动事实同一纪律。取成功才 +1 并盖 tick; 取失败时身份必须
+     * **原样继承**(否则消费方会把"没取到"读成"取到了一次静止")。 */
+    if (f.motion_ok && (f.motion_seq != base_motion_seq + 1u ||
+                        f.motion_tick != f.timestamp))
+    { rt_kprintf("[SNS-ST] motion identity FAIL (motion_seq %u ->%u)\n",
+                 (unsigned)base_motion_seq, (unsigned)f.motion_seq); pass = 0; }
+    if (!f.motion_ok && (f.motion_seq != base_motion_seq ||
+                         f.motion_tick != test_prev.motion_tick))
+    { rt_kprintf("[SNS-ST] motion identity advanced on failed snapshot\n"); pass = 0; }
     rt_kprintf("[SNS-ST] identity base sg=%u cur=%u imu=%u -> now sg=%u cur=%u imu=%u\n",
                (unsigned)base_sg_seq, (unsigned)base_cur_seq, (unsigned)base_imu_seq,
                (unsigned)f.sg_seq, (unsigned)f.cur_seq, (unsigned)f.imu_seq);
+    rt_kprintf("[SNS-ST] motion ok=%d seq=%u->%u tick=%u\n", f.motion_ok,
+               (unsigned)base_motion_seq, (unsigned)f.motion_seq,
+               (unsigned)f.motion_tick);
 
     rt_kprintf("[SNS-ST] frame: imu[v=%d f=%d] cur[v=%d f=%d] sg[v=%d f=%d] id(sg=%u cur=%u imu=%u)\n",
                f.valid_imu, f.fresh_imu, f.valid_current, f.fresh_current,

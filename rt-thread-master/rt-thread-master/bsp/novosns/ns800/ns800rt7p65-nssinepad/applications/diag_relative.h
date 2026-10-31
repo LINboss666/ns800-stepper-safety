@@ -122,6 +122,7 @@ typedef enum
 #define RELCOV_SIG_MISMATCH 3u    /* profile 属于别的驱动配置/采样定义 */
 #define RELCOV_NOFRAME     4u     /* 取不到传感器帧(seq==0 或读失败) */
 #define RELCOV_ENGINE_ERR  5u     /* profile 存在但校验不通过(运行中被改坏) */
+#define RELCOV_MOTION_UNKNOWN 6u  /* M8-R2 R2-B3: 本帧没取到运动快照(或它已过期) */
 
 const char *rel_cov_name(rt_uint8_t c);
 
@@ -191,6 +192,11 @@ typedef struct
     rt_uint8_t  in_window_prev;
     rt_uint8_t  severe_active;
     rt_uint8_t  active_reason;          /* 导致 severe_active 的那次原因(粘住用) */
+    /* M8-R2 R2-A.2: 本次武装的票据由**唯一写者自己**保存。
+     * 旧写法把票据只存在 d_ctl 里、靠控制锁写, 于是摘要锁一失败就等于保护义务
+     * 一起丢; 现在行为侧读这个私有字段(不需要锁), 发布侧把它同步进 d_ctl/d_pub。
+     * 代际切换时随整代证据一起清零。 */
+    rt_uint8_t  rearm_required;
     rel_reason_t verdict;
     rel_latch_t latch;
 } rel_engine_t;
@@ -204,6 +210,11 @@ const char *rel_reason_name(rt_uint8_t r);
 /* 复位: 保留 latch(事故证据不得被"复位计数"抹掉)之外的全部累计。 */
 void rel_engine_reset_counters(rel_engine_t *e);
 void rel_engine_wipe(rel_engine_t *e);
+/* R2-B2: 新一代开始。与 reset_counters 的区别是**这一代的判据证据全部作废**:
+ * 严重状态/活动原因、两级持续与样本数、三源身份与 prev tick、age/out/cov 累计、
+ * latch 与 verdict 一起清, 只保留时间基线(last_now_tick/have_now)与新代际。
+ * 于是"上一代攒出来的异常"不可能被下一代一笔旧帧立刻兑现。 */
+void rel_engine_new_generation(rel_engine_t *e, rt_uint32_t gen);
 
 /* profile 完整性/范围校验。返回 RT_EOK 才可用; why 可为 NULL。 */
 rt_err_t rel_profile_validate(const diag_rprof_t *p, const char **why);
@@ -222,20 +233,33 @@ rt_err_t rel_request_protection(rel_engine_t *e, const rel_step_arg_t *a, rt_uin
 
 /* ---------- 生产上下文(只由 Diagnosis Thread 推进; 测试请用私有上下文) ----------
  *
- * 并发所有权(M8-R1 R3.3)—— rel_prod_* 的字段分两类写者:
+ * 并发所有权(M8-R1 R3.3 + M8-R2 R2-A)—— rel_prod_* 的字段分两类写者:
  *   d_rel_prod(引擎上下文)   : **唯一写者 = Diagnosis Thread**。命令线程永不直接
  *                              擦它; 想开始新一轮武装只 bump 期望代际(d_ctl.gen_want),
- *                              由线程自己在下一步执行 wipe。于是"命令线程擦掉在途
- *                              义务"在结构上不可能发生。
- *   d_ctl / d_incident       : 短临界区(一把互斥量 d_ctl_lock)保护, 临界区内**不**
- *                              取 cfg 锁、不碰 UART/Flash/打印/mdelay。锁顺序固定:
- *                              mot(静止事务) -> ctl, 且 ctl 与 cfg 不同时持有。 */
+ *                              由线程自己在**步进之前**执行整代证据清零。
+ *   d_ctl / d_incident / d_pub: 一把互斥量 d_ctl_lock 保护, 临界区内**不**取 cfg 锁、
+ *                              不碰 UART/Flash/打印/mdelay。锁顺序固定:
+ *                              mot(静止事务) -> ctl, 且 ctl 与 cfg 不同时持有。
+ *
+ * R2-A 的关键更正: "锁已初始化"和"本次真的抢到了"是两件事。
+ *   - 旧写法用同一个 d_ctl_lock_ok 既代表初始化成功又代表可跳过 take,
+ *     于是一次 take 失败 = 这次无锁写 + 以后永远不取锁(单向阀), 还可能让别的
+ *     持有者被跳过 release。
+ *   - 现在所有 take 都必须返回状态: 抢不到就**不复制、不发布、不改代际、不抹首因**,
+ *     也绝不 release 自己没有持有的锁。
+ *   - 读侧要么拿到整份, 要么拿到错误; "标量不会撕裂"不等于"整份一致"。 */
 typedef struct
 {
     rt_uint32_t gen_want;       /* 命令线程 bump: 期望的新代际 */
     rt_uint32_t generation;     /* 线程已完成同步的代际 */
     rt_uint8_t  rearm_required; /* 1 = 本次武装的票据已被真实触发消耗 */
+    rt_uint8_t  mode;           /* R2-B1: 与代际同一临界区提交的诊断模式 */
+    rt_uint8_t  mode_valid;     /* 0 = 还没提交过(读侧不得当作 MONITOR 假定) */
+    rt_uint8_t  rsv;
 } rel_ctl_t;
+
+/* rel_prod_commit() 的 mode 参数: 表示"这次只动代际, 不动已提交模式"。 */
+#define REL_CTL_MODE_KEEP   0xFFu
 
 /* 事故首因的对外的只读快照(供状态行/CLI 打印; 首次原因不得被后续帧覆盖)。 */
 typedef struct
@@ -247,19 +271,34 @@ typedef struct
     rel_latch_t archived;       /* 上一轮事故的首因(归档, 不被本轮覆盖) */
 } rel_incident_t;
 
-void rel_prod_wipe(void);                        /* 全清: 只允许人工清故障时调用 */
-/* d_ctl_lock 的初始化(由 diagnosis_init 调一次; 未初始化时相关读写退化为直接访问,
- * 主机链与自检上下文都不依赖锁的存在也能判定 —— 锁只是真机上的可见性保证)。 */
-void rel_ctl_lock_init(void);
-/* 显式重新武装(命令线程): 先 bump 期望代际, 由线程自己 wipe 并归档旧事故。 */
-void rel_prod_request_rearm(void);
-void rel_prod_get_ctl(rel_ctl_t *out);
-void rel_prod_get_incident(rel_incident_t *out);
-/* acted: 本次调用是否真的执行了保护请求(供调用方在**保护之后**打印首次摘要) */
+/* 初始化专用全清(只能在线程起来之前调用: diagnosis_init/自检起点)。
+ * 运行期不得再用它"顺手清生产上下文" —— 那是唯一写者的职责(R2-A.5)。 */
+void rel_prod_init_wipe(void);
+/* d_ctl_lock 初始化: 返回 mutex_init 的真实结果。失败时 rel_ctl_take() 一律返回
+ * 错误(而不是"当作有锁"), 所有写侧必须因此不动状态。 */
+rt_err_t rel_ctl_init(void);
+rt_bool_t rel_ctl_ready(void);                    /* 只回答"锁是否初始化成功" */
+/* 抢锁: RT_EOK=本次确实持有(随后**必须** rel_ctl_give_held); 未初始化 -RT_EINVAL,
+ * 超时/失败 -RT_EBUSY, 且调用方不得复制/发布/改代际/抹首因。 */
+rt_err_t rel_ctl_take(void);
+void     rel_ctl_give_held(void);
+/* R2-B1: 模式与代际共同的提交协议。命令线程在**仍持有静止门**时调用一次:
+ * 同一临界区内落 d_ctl.mode/mode_valid 与(可选)gen_want++。
+ * 抢不到锁就返回错误, 两个字段都不变 => 不可能出现"模式已启用而代际仍旧"。 */
+rt_err_t rel_prod_commit(rt_uint8_t mode, rt_bool_t bump_gen, rt_uint32_t *gen_out);
+/* 兼容入口: 只 bump 代际、不动已提交模式; 失败时代际完全不变。 */
+rt_err_t rel_prod_request_rearm(void);
+rt_err_t rel_prod_get_ctl(rel_ctl_t *out);
+rt_err_t rel_prod_get_incident(rel_incident_t *out);
+/* acted: 本次调用是否真的执行了保护请求(供调用方在**保护之后**打印首次摘要)。
+ * 步进前若读不到一致的控制状态, 本帧按 RELCOV_LOCK_FAIL 走有界降险,
+ * 绝不带着可疑的旧证据继续宣称有效; 保护义务本身不因摘要锁失败而消失。 */
 rel_reason_t rel_prod_evaluate(const rel_step_arg_t *a, rt_uint8_t mode,
                                   rt_err_t *post_rc, rt_bool_t *acted);
-/* 运行期状态的一次性快照(M8-R1 R4.5: 关键短行的每个字段都必须来自**同一快照**,
- * 不能逐字段跨线程拼, 否则短行里出现"半个新状态 + 半个旧状态"的自相矛盾)。 */
+/* 运行期状态的一次性快照(M8-R1 R4.5 + M8-R2 R2-A.3)。
+ * **写者**在每帧末把整份 rel_state_t 在短临界区里发布; **读者**要么拿到完整的
+ * 一份(带它自己的 snap_seq), 要么拿到错误并且 out 被清零。snap_seq 与当前帧号之差
+ * 就是"这份状态有多旧"的可见证据。 */
 typedef struct
 {
     rt_uint32_t sg_run_ms, sg_strong_run_ms;
@@ -273,10 +312,18 @@ typedef struct
     rt_uint8_t  coverage;             /* 引擎自己复核后的档位 */
     rt_uint8_t  verdict;
     rt_uint8_t  severe_active;
+    rt_uint32_t snap_seq;             /* 发布时的帧号(0 = 还没发布过) */
+    rt_uint32_t pub_fail_cnt;         /* 截至本次发布为止的发布失败次数 */
 } rel_state_t;
 
 rt_bool_t    rel_prod_get_latch(rel_latch_t *out);
-void         rel_prod_get_snapshot(rel_state_t *out);
+/* 唯一写者(Diagnosis Thread)专用的首因读取: 闩锁由本线程写入、落下后不再改写,
+ * 所以这里不需要、也**不允许**借控制锁去"保护"它。跨线程读者一律走
+ * rel_prod_get_latch()/get_incident() —— 那两个是镜像, 要么整份要么明确读不到。
+ * 触发摘要必须在保护之后打印, 而镜像可能正因为取不到锁而缺一份: 只拿镜像打印会把
+ * "保护已经发生、摘要却打成空"当成正常状态。 */
+rt_bool_t    rel_writer_latch(rel_latch_t *out);
+rt_err_t     rel_prod_get_snapshot(rel_state_t *out);
 /* 运行期用现场驱动配置/工况算 live 身份并填入候选 profile 的身份字段(供签名比较)。 */
 void      rel_live_identity(diag_rprof_t *probe);
 /* 上面两者的合成: 当前驱动配置/采样定义的 live 签名(0 表示取不到身份)。

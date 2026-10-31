@@ -370,6 +370,11 @@ rt_err_t motor_get_snapshot(motor_snapshot_t *snap)
     return RT_EOK;
 }
 static int g_static_begin_calls, g_static_end_calls, g_static_begin_busy;
+static size_t g_static_begin_cap_len, g_static_end_cap_len;
+/* R2-B1 的确定接缝: 在**仍然持着静止门的最后一刻**回调一次。用例在这里读"模式与代际
+ * 落定了没有", 而不是靠 usleep 猜窗口 —— 产品若把提交留在释放之后, 这里必然读到旧值。
+ * 一次性(进回调前先摘掉), 回调里不得打印。 */
+static void (*g_static_end_hook)(void);
 /* 真实 motor_calibration_static_begin() 在锁内重查 armed/IDLE/hz=0/target=0/
  * stop_fail/SAFETY_READY/停机协调器空闲/PWM 已关/DRV_ENABLE 低。夹具按同样的
  * **环境事实**回答(取到的是环境状态, 不是产品逻辑), 因此"命令有没有把最终复核
@@ -377,12 +382,19 @@ static int g_static_begin_calls, g_static_end_calls, g_static_begin_busy;
 rt_err_t motor_calibration_static_begin(void)
 {
     g_static_begin_calls++;
+    g_static_begin_cap_len = g_cap_len;
     if (g_static_begin_busy) return -RT_EBUSY;
     if (S.armed || S.mstate != MOTOR_IDLE || S.mhz != 0 ||
         S.safety != SAFETY_READY) return -RT_EPERM;
     return RT_EOK;
 }
-void motor_calibration_static_end(void) { g_static_end_calls++; }
+void motor_calibration_static_end(void)
+{
+    void (*h)(void) = g_static_end_hook;
+    g_static_end_cap_len = g_cap_len;      /* 门内字节数: 与 begin 相等 => 门内没打印 */
+    g_static_end_calls++;
+    if (h != RT_NULL) { g_static_end_hook = RT_NULL; h(); }
+}
 
 safety_state_t safety_state_get(void) { return S.safety; }
 
@@ -493,6 +505,16 @@ static void clear_profile(void) { cfg_take(); memset(&cfg.rprof, 0, sizeof(cfg.r
 
 /* ======================= 世界复位 ======================= */
 
+/* 与生产同一条提交协议改变"已武装模式"(M8-R2 R2-B1/R2-A):
+ * 单写 d_mode 已经不算数 —— rel_prod_evaluate 只认 rel_prod_commit 落下的模式,
+ * 于是"命令线程提交失败却仍然按相对模式判"这种组合在夹具里也造不出来。 */
+static void arm(rt_uint8_t m)
+{
+    if (rel_prod_commit(m, RT_FALSE, RT_NULL) != RT_EOK)
+    { g_pre_bad++; printf("PRE|arm_commit_failed m=%u\n", (unsigned)m); }
+    d_mode = (diag_mode_t)m;
+}
+
 static void world_reset(void)
 {
     src_defaults();
@@ -501,6 +523,7 @@ static void world_reset(void)
     g_post_rc_inject = RT_EOK;
     g_cal_ex_applies = 0;
     g_static_begin_calls = 0; g_static_end_calls = 0; g_static_begin_busy = 0;
+    g_static_begin_cap_len = 0; g_static_end_cap_len = 0; g_static_end_hook = RT_NULL;
     g_mutex_take_fail = 0; g_mutex_take_calls = 0; g_mutex_release_calls = 0;
     g_mutex_init_fail = 0;
     g_enter_critical_calls = 0; g_exit_critical_calls = 0;
@@ -518,6 +541,7 @@ static void world_reset(void)
     memset(&s_prev, 0, sizeof(s_prev));
     s_seq = 0; s_tid = RT_NULL; s_health = SUBSYS_UNINIT;
 
+    /* d_mode 与已提交模式在下面 ctl 初始化里一起落(见 rel_prod_commit) */
     d_mode = DIAG_MODE_MONITOR_ONLY;
     d_relative_confirm_given = RT_FALSE;
     memset(&d_prod, 0, sizeof(d_prod));
@@ -528,6 +552,19 @@ static void world_reset(void)
     memset(&d_cap, 0, sizeof(d_cap));
     memset(&d_pending, 0, sizeof(d_pending));
     d_pending_zero = RT_FALSE; d_pending_learn = RT_FALSE;
+
+    /* M8-R2 R2-A.4: 控制锁**真实创建**。旧 44 例从未调用 diagnosis_init/
+     * rel_ctl_lock_init, 于是所有 rel_prod_* 都在"锁不存在"的分支上空跑,
+     * 失败/互斥/释放配对与快照一致性从来没有一条判据看到过。
+     * 与配置层同一做法: 每例重新初始化, 初始化失败按基础设施故障处理,
+     * 而不是降级成"当作有锁"。 */
+    d_ctl_inited = RT_FALSE;
+    memset(&d_ctl_lock, 0, sizeof(d_ctl_lock));
+    rel_prod_init_wipe();
+    if (rel_ctl_init() != RT_EOK)
+    { printf("PRE|ctl_lock_init_failed\n"); g_pre_bad++; }
+    else if (rel_prod_commit((rt_uint8_t)DIAG_MODE_MONITOR_ONLY, RT_FALSE, RT_NULL) != RT_EOK)
+    { printf("PRE|ctl_commit_failed\n"); g_pre_bad++; }
 
     /* 配置层: 重建锁 + 安全默认(等价于一次干净启动, 不走 Flash) */
     rt_mutex_init(&cfg_lock, "cfg", RT_IPC_FLAG_PRIO);
@@ -549,6 +586,7 @@ struct feed
     rt_uint32_t seq, sg_seq, cur_seq, imu_seq;
     rt_uint32_t t;
     int sg_fresh_every;
+    int motion_freeze;      /* 1 = 运动快照身份**不**跟着帧走(REL49 的过期支专用) */
 };
 
 static void feed_init(rel_engine_t *e, const diag_rprof_t *p, struct feed *f)
@@ -566,6 +604,7 @@ static void feed_init(rel_engine_t *e, const diag_rprof_t *p, struct feed *f)
     f->a.in.motion_known = 1;
     /* 引擎级用例默认按"操作员已显式武装"评估: 覆盖丢失的降险义务只在武装时存在,
      * MONITOR_ONLY 的"没有 profile 也只披露"由 REL04/REL15 在生产入口单独测。 */
+    arm((rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION);   /* 引擎只认已提交模式(R2-B1) */
     f->a.mode = (rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION;
     f->t = 1000u;
     f->seq = 0; f->sg_seq = 0; f->cur_seq = 0; f->imu_seq = 0;
@@ -582,6 +621,10 @@ static rel_reason_t feed_step_imu(struct feed *f, rt_uint16_t sg, rt_uint32_t ra
     f->a.now_tick = f->t;
     f->a.in.seq = ++f->seq;
     f->a.in.timestamp = f->t;
+    /* 运动快照身份与 sg/cur/imu 走同一条纪律(sensor_service.c 只在 motor_get_snapshot
+     * 成功时推进): known=1 的帧, motion_tick 就是本帧时间戳。REL49 的"过期支"用
+     * motion_freeze 挡住这一行, 因为生产者按构造不会自己造出"成功但 tick 很老"。 */
+    if (f->a.in.motion_known && !f->motion_freeze) f->a.in.motion_tick = f->t;
     if (sg_fresh)  { f->a.in.sg_seq  = ++f->sg_seq;  f->a.in.sg_tick  = f->t; f->a.in.sg = sg; }
     if (adc_fresh) { f->a.in.cur_seq = ++f->cur_seq; f->a.in.cur_tick = f->t; f->a.in.cur_raw = raw; }
     if (imu_fresh) { f->a.in.imu_seq = ++f->imu_seq; f->a.in.imu_tick = f->t; f->a.in.vib_mg = vib; }
@@ -935,7 +978,7 @@ static void c_REL12(void)
     world_reset();
     p = make_profile();
     install_profile(&p);
-    d_mode = DIAG_MODE_RELATIVE_PROTECTION;
+    arm((rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION);
     S.sg = (rt_uint16_t)(p.run_sg_min - p.sg_drop_trip - 1);
     S.raw = 2000;                                   /* 电流在带内: 单源 SG 也必须动作 */
     pump(120);
@@ -968,7 +1011,7 @@ static void c_REL13(void)
     world_reset();
     p = make_profile();
     install_profile(&p);
-    d_mode = DIAG_MODE_RELATIVE_PROTECTION;
+    arm((rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION);
     S.sg = (rt_uint16_t)(p.run_sg_min - p.sg_drop_trip - 1);
     pump(120);
     CHECK(g_post_calls == 1, "post=%d", g_post_calls);
@@ -990,7 +1033,7 @@ static void c_REL14(void)
     world_reset();
     p = make_profile();
     install_profile(&p);
-    d_mode = DIAG_MODE_RELATIVE_PROTECTION;
+    arm((rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION);
     S.sg = (rt_uint16_t)(p.run_sg_min - p.sg_drop_trip - 1);
     pump(150);
     CHECK(g_post_calls == 1, "持续严重 150 帧后 post=%d(期望仍为 1)", g_post_calls);
@@ -1008,7 +1051,7 @@ static void c_REL14(void)
     world_reset();
     g_post_rc_inject = -RT_EIO;
     install_profile(&p);
-    d_mode = DIAG_MODE_RELATIVE_PROTECTION;
+    arm((rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION);
     S.sg = (rt_uint16_t)(p.run_sg_min - p.sg_drop_trip - 1);
     pump(120);
     CHECK(rel_prod_get_latch(&l), "post 失败时连 latch 都没有");
@@ -1025,7 +1068,7 @@ static void c_REL15(void)
     world_reset();
     p = make_profile();
     install_profile(&p);
-    d_mode = DIAG_MODE_MONITOR_ONLY;
+    arm((rt_uint8_t)DIAG_MODE_MONITOR_ONLY);
     S.sg = (rt_uint16_t)(p.run_sg_min - p.sg_drop_trip - 1);
     pump(200);
     CHECK(g_post_calls == 0, "MONITOR_ONLY 下 post=%d(必须 0)", g_post_calls);
@@ -1152,7 +1195,7 @@ static void c_REL18(void)
     world_reset();
     p = make_profile();
     install_profile(&p);
-    d_mode = DIAG_MODE_RELATIVE_PROTECTION;
+    arm((rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION);
     S.mstate = MOTOR_ACCEL; S.mhz = 100;
     S.sg = (rt_uint16_t)(p.run_sg_min - p.sg_drop_trip - 1);
     S.raw = p.run_adc_max + p.run_adc_noise + p.adc_dev_trip + 5u;
@@ -1181,7 +1224,7 @@ static void c_REL19(void)
     world_reset();
     p = make_profile();
     install_profile(&p);
-    d_mode = DIAG_MODE_RELATIVE_PROTECTION;
+    arm((rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION);
     S.mstate = MOTOR_CRUISE; S.mhz = 5000u;          /* 窗外速度 */
     pump(10);
     CHECK(d_rel_prod.verdict == REL_REASON_NONE,
@@ -1194,7 +1237,7 @@ static void c_REL19(void)
     /* 方向不在批准集合内也算离窗 */
     world_reset();
     install_profile(&p);                              /* p.dir_mask = 1(只 dir0) */
-    d_mode = DIAG_MODE_RELATIVE_PROTECTION;
+    arm((rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION);
     S.mdir = 1;
     pump(50);
     CHECK(d_rel_prod.verdict == REL_OUT_OF_WINDOW, "未批准方向没被判离窗(%s)",
@@ -1203,7 +1246,7 @@ static void c_REL19(void)
     /* 静止时不得行动 */
     world_reset();
     install_profile(&p);
-    d_mode = DIAG_MODE_RELATIVE_PROTECTION;
+    arm((rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION);
     S.mstate = MOTOR_IDLE; S.armed = 0; S.mhz = 0;
     pump(100);
     CHECK(g_post_calls == 0, "静止时因离窗 post %d 次", g_post_calls);
@@ -1218,25 +1261,34 @@ static void c_REL20(void)
     struct feed f;
     diag_rprof_t p;
     rel_reason_t r = REL_REASON_NONE;
+    rt_uint32_t trip_at = 0u;
     int i;
 
     world_reset();
     p = make_profile();
     feed_init(&e, &p, &f);
-    /* 只喂一次(帧号/时间戳/身份全冻结), 之后每帧重复同一份输入 */
+    /* 一次真实成功把 sg/cur 身份落定; 之后**帧环继续跑**(seq/timestamp/motion_tick 都
+     * 新鲜), 但 SG/ADC 两路的样本身份一个字都不动 —— 真机对应"传感线程活着, 这两路
+     * 读不到新样本"。运动快照若一起冻住, 那是 R2-B3 的覆盖问题(REL49 单独测)。 */
     feed_step(&f, 500, 2000, 1, 1, 1, 1);
-    f.a.in.seq = 55;                                   /* 帧号固定 = 同一帧 */
     for (i = 0; i < 120; ++i)
     {
-        f.t += 10u;                                   /* 只有"现在"在走, 输入一个字都不变 */
+        f.t += 10u;
         f.a.now_tick = f.t;
+        f.a.in.seq = ++f.seq;
+        f.a.in.timestamp = f.t;
+        f.a.in.motion_tick = f.t;              /* 帧是新的: 唯一老的是两路样本 */
         r = rel_engine_step(&e, &f.a);
         if (i < 30) CHECK(r != REL_SENSOR_UNAVAILABLE, "年龄门提前动作(第 %d 帧)", i);
+        if (r == REL_SENSOR_UNAVAILABLE && trip_at == 0u) trip_at = f.seq;
     }
-    CHECK(r == REL_SENSOR_UNAVAILABLE, "同一帧重放 1200ms 后原因=%s(期望 REL_SENSOR_UNAVAILABLE)",
+    CHECK(r == REL_SENSOR_UNAVAILABLE, "样本冻结 1200ms 后原因=%s(期望 REL_SENSOR_UNAVAILABLE)",
           rel_reason_name(r));
     CHECK(e.age_bad_ms >= p.dur_adc_ms, "age_bad_ms=%u < %u", e.age_bad_ms, p.dur_adc_ms);
-    CHECK(e.last_frame_seq == 55, "去重没生效(last_frame_seq=%u)", e.last_frame_seq);
+    /* 触发发生在"帧号一直在前进"的途中: 去重只挡重复帧, 没把新帧也吞掉;
+     * 触发后引擎按首因早退, 帧号因此停在触发那一帧。 */
+    CHECK(trip_at >= 20u && e.last_frame_seq == trip_at - 1u,
+          "新帧没被认出来(触发帧=%u last=%u)", (unsigned)trip_at, (unsigned)e.last_frame_seq);
 }
 
 /* REL21 恢复必须是新证据: ADC 冻结不得被当成"恢复正常" */
@@ -1597,7 +1649,7 @@ static void c_REL27(void)
     memset(&t, 0, sizeof(t));
     t.may_report = RT_TRUE;
     diag_engine_reset(&t);
-    d_mode = DIAG_MODE_ACTIVE_PROTECTION;      /* 只是状态; 开启门禁由 REL17 单独测 */
+    arm((rt_uint8_t)DIAG_MODE_ACTIVE_PROTECTION);      /* 只是状态; 开启门禁由 REL17 单独测 */
     for (i = 0; i < 200; ++i)
     {
         memset(&in, 0, sizeof(in));
@@ -1923,7 +1975,7 @@ static void c_REL22(void)
     world_reset();
     p = make_profile();
     install_profile(&p);
-    d_mode = DIAG_MODE_RELATIVE_PROTECTION;
+    arm((rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION);
     g_tick_hook = r1_hook_sig_break;
     pump(200);
     g_tick_hook = RT_NULL;
@@ -1954,24 +2006,36 @@ static void c_REL33(void)
 {
     diag_rprof_t p;
     rel_latch_t l;
+    rel_state_t st;
 
     world_reset();
     p = make_profile();
     install_profile(&p);
-    d_mode = DIAG_MODE_RELATIVE_PROTECTION;
+    arm((rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION);
     g_tick_hook = r1_hook_lock_sticky;
     pump(120);
     g_tick_hook = RT_NULL;
     CHECK(g_post_calls == 1, "取锁失败后 post=%d(期望 1)", g_post_calls);
+    /* R2-A.1/A.3: 锁取不到期间, 读取侧只能"整份拿到"或"明确拒绝", 不许拼出半份身份;
+     * 保护本身不受影响(上面 post=1 已证)。 */
+    memset(&l, 0xFF, sizeof(l));
+    CHECK(rel_prod_get_latch(&l) == RT_FALSE, "控制锁取不到却读到了首因");
+    memset(&st, 0xFF, sizeof(st));
+    CHECK(rel_prod_get_snapshot(&st) != RT_EOK, "控制锁取不到却读到了快照");
+    CHECK(cap_has("NOT-ACTIVE(config-lock)"), "取锁失败没披露");
+    /* 首因的权威副本在引擎(唯一写者)手里: 锁恢复后镜像必须补得上, 失败次数如实记账。 */
+    g_mutex_take_fail = 0;
+    pump(5);
     CHECK(rel_prod_get_latch(&l) && l.reason == REL_COVERAGE_LOST &&
           l.coverage_at_trip == RELCOV_LOCK_FAIL,
           "身份不对(reason=%s cov=%u)", rel_reason_name(l.reason),
           (unsigned)l.coverage_at_trip);
-    CHECK(cap_has("NOT-ACTIVE(config-lock)"), "取锁失败没披露");
+    CHECK(rel_prod_get_snapshot(&st) == RT_EOK && st.pub_fail_cnt > 0u,
+          "发布失败没计数(pub=%u)", (unsigned)st.pub_fail_cnt);
 
     world_reset();                             /* 有界容错: 110ms 的瞬态不得触发 */
     install_profile(&p);
-    d_mode = DIAG_MODE_RELATIVE_PROTECTION;
+    arm((rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION);
     g_tick_hook = r1_hook_lock_blink;
     pump(120);
     g_tick_hook = RT_NULL;
@@ -1980,7 +2044,7 @@ static void c_REL33(void)
           d_rel_prod.cov_lost_ms);
 
     world_reset();                             /* 已武装但一个 profile 都没有 */
-    d_mode = DIAG_MODE_RELATIVE_PROTECTION;
+    arm((rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION);
     pump(120);
     CHECK(g_post_calls == 1, "武装态无 profile 未降险(post=%d)", g_post_calls);
     CHECK(cap_has("NOT-ACTIVE(no-profile)"), "无 profile 没披露");
@@ -1995,7 +2059,7 @@ static void c_REL34(void)
     world_reset();
     p = make_profile();
     install_profile(&p);
-    d_mode = DIAG_MODE_RELATIVE_PROTECTION;
+    arm((rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION);
     g_stop_sensor = 1;                        /* 从未出过帧 */
     pump(80);
     CHECK(g_post_calls == 1, "持续无帧时 post=%d(期望 1)", g_post_calls);
@@ -2007,7 +2071,7 @@ static void c_REL34(void)
 
     world_reset();                             /* 连运动事实也取不到 */
     install_profile(&p);
-    d_mode = DIAG_MODE_RELATIVE_PROTECTION;
+    arm((rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION);
     g_stop_sensor = 1; g_snap_fail = 1;
     pump(80);
     CHECK(g_post_calls == 1, "无帧且无运动事实时 post=%d(不知道在不在动就不能宣称有效)",
@@ -2016,7 +2080,7 @@ static void c_REL34(void)
 
     world_reset();                             /* 证得静止: 没有需要保护的运动 */
     install_profile(&p);
-    d_mode = DIAG_MODE_RELATIVE_PROTECTION;
+    arm((rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION);
     S.mstate = MOTOR_IDLE; S.armed = 0; S.mhz = 0;
     g_stop_sensor = 1;
     pump(200);
@@ -2035,7 +2099,7 @@ static void c_REL35(void)
     world_reset();
     p = make_profile();
     install_profile(&p);
-    d_mode = DIAG_MODE_RELATIVE_PROTECTION;
+    arm((rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION);
     S.sg = (rt_uint16_t)(p.run_sg_min - p.sg_drop_trip - 1);
     pump(120);
     CHECK(g_post_calls == 1, "第一次事故 post=%d", g_post_calls);
@@ -2084,10 +2148,12 @@ static void c_REL36(void)
     rel_state_t s;
     rel_latch_t l;
     int i;
+    int snap_rc;
 
     world_reset();
     p = make_profile();
     install_profile(&p);
+    arm((rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION);
     memset(&a, 0, sizeof(a));
     a.prof = p;
     a.mode = (rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION;
@@ -2105,9 +2171,11 @@ static void c_REL36(void)
     CHECK(g_post_calls == 1, "NULL 输出参数把保护吞掉了(post=%d)", g_post_calls);
     CHECK(rel_prod_get_latch(&l) && l.reason == REL_COVERAGE_LOST, "首因=%s",
           rel_reason_name(l.reason));
-    rel_prod_get_snapshot(&s);
-    CHECK(s.coverage == RELCOV_ABSENT && s.cov_lost_ms >= 500u,
-          "快照没反映覆盖丢失(cov=%u ms=%u)", (unsigned)s.coverage, (unsigned)s.cov_lost_ms);
+    snap_rc = rel_prod_get_snapshot(&s);
+    CHECK(snap_rc == RT_EOK &&
+          s.coverage == RELCOV_ABSENT && s.cov_lost_ms >= 500u,
+          "快照没反映覆盖丢失(rc=%d cov=%u ms=%u)", (int)snap_rc,
+          (unsigned)s.coverage, (unsigned)s.cov_lost_ms);
 }
 
 /* REL37 事件投递失败仍然先保护、首因与票据都留着(R2.6) */
@@ -2121,7 +2189,7 @@ static void c_REL37(void)
     p = make_profile();
     g_post_rc_inject = -RT_EIO;
     install_profile(&p);
-    d_mode = DIAG_MODE_RELATIVE_PROTECTION;
+    arm((rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION);
     S.sg = (rt_uint16_t)(p.run_sg_min - p.sg_drop_trip - 1);
     pump(200);
     CHECK(g_post_calls == 1, "投递失败后重复投递(%d 次)", g_post_calls);
@@ -2144,7 +2212,7 @@ static void c_REL38(void)
     world_reset();
     p = make_profile();
     install_profile(&p);
-    d_mode = DIAG_MODE_RELATIVE_PROTECTION;
+    arm((rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION);
     cap_reset();
     e = diagnosis_set_mode(DIAG_MODE_MONITOR_ONLY);
     CHECK(e != RT_EOK, "运动中关掉了相对保护(rc=%d)", (int)e);
@@ -2441,7 +2509,7 @@ static void c_REL43(void)
     p.revision = 0xFFFFFFFFu;
     p.signature = rel_profile_signature(&p);
     install_profile(&p);
-    d_mode = DIAG_MODE_RELATIVE_PROTECTION;
+    arm((rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION);
     S.sg = (rt_uint16_t)(p.run_sg_min - p.sg_drop_trip - 1);
     s_prev.sg_seq = 4000000000u; s_prev.cur_seq = 4000000000u;
     s_prev.imu_seq = 4000000000u;
@@ -2464,19 +2532,33 @@ static void c_REL43(void)
     world_reset();                             /* 最长档位名 + 触发摘要三行 */
     p = make_profile();
     install_profile(&p);
-    d_mode = DIAG_MODE_RELATIVE_PROTECTION;
+    arm((rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION);
     g_mutex_take_fail = 1;
     cap_reset();
     pump(70);
     mx = cap_max_line_len();
     CHECK(mx <= 110, "config-lock 档与触发摘要最长 %d 字节(预算 110)", mx);
     CHECK(cap_has("NOT-ACTIVE(config-lock)"), "config-lock 档没披露");
-    CHECK(cap_has("r=REL_COVERAGE_LOST"), "覆盖丢失原因名没导出(最长原因 17B)");
-    CHECK(cap_count("[DIAG] REL TRIP r=") == 1, "触发摘要打成 %d 份",
+    /* R2-A.2: 取锁失败只让"给人读的镜像"待补, 不能让摘要整体消失 —— 保护确实发生了。 */
+    CHECK(cap_count("[DIAG] REL TRIP r=REL_COVERAGE_LOST") == 1, "触发摘要打成 %d 份",
           cap_count("[DIAG] REL TRIP r="));
     CHECK(cap_count("[DIAG] REL TRIP val=") == 1, "触发摘要第二行没跟着出");
     CHECK(cap_count("[DIAG] REL TRIP sg=") == 1, "触发摘要第三行没跟着出");
+    /* 镜像读不到时, 状态行必须具名披露 snap/inc 失败, 而不是拼半份身份(REL43 的 17B
+     * 原因名在下面锁恢复之后才可能出现在状态行里 —— 锁死的时候出现才是说谎)。 */
+    cap_reset();
+    diag_relative_status_lines();
+    CHECK(cap_has("snap=FAIL") && cap_has("inc=FAIL"),
+          "取锁失败没披露读数不可用: [%.120s]", cap_text());
+    CHECK(cap_has("pubfail="), "发布失败次数没导出");
+    CHECK(cap_max_line_len() <= 110, "降级状态行最长 %d 字节(预算 110)", cap_max_line_len());
     g_mutex_take_fail = 0;
+    pump(5);                                   /* 镜像补发一次(REL33 同一条重试) */
+    cap_reset();
+    diag_relative_status_lines();
+    CHECK(cap_has("r=REL_COVERAGE_LOST"), "覆盖丢失原因名没导出(最长原因 17B)");
+    CHECK(cap_has("snap=OK") && cap_has("inc=OK"), "锁恢复后状态行没回到可用读数");
+    CHECK(cap_max_line_len() <= 110, "最长原因名状态行 %d 字节(预算 110)", cap_max_line_len());
 }
 
 /* REL44 碰撞独立保护(R6): 只认新鲜有效 IMU 证据 */
@@ -2539,7 +2621,7 @@ static void c_REL44(void)
 
     world_reset();                             /* 生产入口: 恰好一次真实保护 */
     install_profile(&p);
-    d_mode = DIAG_MODE_RELATIVE_PROTECTION;
+    arm((rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION);
     S.mx = 2000; S.my = 2000; S.mz = 400;      /* 合成幅值约 2857mg > 2500 */
     pump(40);
     CHECK(g_post_calls == 1, "碰撞后 post=%d(期望恰好 1)", g_post_calls);
@@ -2558,13 +2640,328 @@ static void c_REL44(void)
     world_reset();                             /* MONITOR 下只评估不行动 */
     cap_reset();
     install_profile(&p);
-    d_mode = DIAG_MODE_MONITOR_ONLY;
+    arm((rt_uint8_t)DIAG_MODE_MONITOR_ONLY);
     S.mx = 2000; S.my = 2000; S.mz = 400;
     pump(60);
     CHECK(g_post_calls == 0, "MONITOR_ONLY 下碰撞也 post 了(%d)", g_post_calls);
     CHECK(d_rel_prod.verdict == REL_IMPACT, "MONITOR 下读不到假设结果: %s",
           rel_reason_name(d_rel_prod.verdict));
     CHECK(cap_count("[DIAG] REL TRIP r=") == 0, "MONITOR 却打了行动摘要");
+}
+
+/* ======================= M8-R2 新增: 控制层/静止门/代际隔离/运动事实 ======================= */
+
+/* REL45 取锁失败必须真的拒绝: 一个字段都不写、不 release 没持有的锁、错误回到调用方,
+ * 并且下一次仍然**尝试**取锁(失败不等于"以后都不用锁了")。
+ * 对应审核反例 NEW|CTL_LOCK_FAIL_WRITES 与 NEW|CTL_LOCK_FAILURE_PERMANENT_BYPASS。 */
+static void c_REL45(void)
+{
+    rel_ctl_t c;
+    rt_uint32_t gen = 0x5A5A5A5Au;
+    rt_err_t rc;
+    int takes, releases;
+
+    world_reset();                             /* 锁是真的(rel_ctl_init 已建好) */
+    CHECK(rel_ctl_ready() == RT_TRUE, "夹具里控制锁没真的初始化");
+    CHECK(d_ctl.mode_valid == RT_TRUE && d_ctl.gen_want == 0u,
+          "前置被改写(valid=%d gen_want=%u)", (int)d_ctl.mode_valid, (unsigned)d_ctl.gen_want);
+
+    g_mutex_take_fail = 1;
+    takes = g_mutex_take_calls; releases = g_mutex_release_calls;
+    rc = rel_prod_commit((rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION, RT_TRUE, &gen);
+    CHECK(rc != RT_EOK, "取锁失败却返回成功(旧代码先无锁写再旁路)");
+    CHECK(d_ctl.gen_want == 0u && d_ctl.mode_valid == RT_TRUE &&
+          d_ctl.mode == (rt_uint8_t)DIAG_MODE_MONITOR_ONLY,
+          "取锁失败仍然写了字段(gen_want=%u mode=%u valid=%d)",
+          (unsigned)d_ctl.gen_want, (unsigned)d_ctl.mode, (int)d_ctl.mode_valid);
+    CHECK(gen == 0x5A5A5A5Au, "失败路径改了出参(%u)", (unsigned)gen);
+    CHECK(g_mutex_take_calls == takes + 1, "这次根本没去取锁(calls=%d)",
+          g_mutex_take_calls - takes);
+    CHECK(g_mutex_release_calls == releases, "释放了没持有的锁(+%d)",
+          g_mutex_release_calls - releases);
+    CHECK(d_ctl_lock.held == 0, "失败后锁还挂着(held=%d)", (int)d_ctl_lock.held);
+
+    memset(&c, 0xFF, sizeof(c));
+    rc = rel_prod_get_ctl(&c);
+    CHECK(rc != RT_EOK, "取锁失败却把 ctl 交出去了");
+    CHECK(c.gen_want == 0u && c.mode_valid == 0u, "失败时 out 没清零(want=%u valid=%u)",
+          (unsigned)c.gen_want, (int)c.mode_valid);
+
+    rc = rel_prod_request_rearm();
+    CHECK(rc != RT_EOK && d_ctl.gen_want == 0u, "再武装在锁失败时仍然 bump 了代际");
+    g_mutex_take_fail = 0;
+
+    /* R2-A.1 的另一半: 失败**不是**永久旁路 —— 下一次调用必须重新真的取锁。 */
+    takes = g_mutex_take_calls;
+    rc = rel_prod_request_rearm();
+    CHECK(rc == RT_EOK, "锁恢复后仍然拒绝(rc=%d)", (int)rc);
+    CHECK(g_mutex_take_calls > takes, "失败一次之后就绕过锁了(take 没再发生)");
+    CHECK(d_ctl.gen_want == 1u, "代际没前进(gen_want=%u)", (unsigned)d_ctl.gen_want);
+    CHECK(d_ctl_lock.held == 0, "临界区没配对释放(held=%d)", (int)d_ctl_lock.held);
+
+    /* 模式与代际是同一次提交: 失败时两者都不动(上面已证 gen_want=0/mode 不变)。 */
+    g_mutex_take_fail = 1;
+    rc = rel_prod_commit((rt_uint8_t)DIAG_MODE_ACTIVE_PROTECTION, RT_TRUE, RT_NULL);
+    g_mutex_take_fail = 0;
+    CHECK(rc != RT_EOK && d_ctl.mode == (rt_uint8_t)DIAG_MODE_MONITOR_ONLY &&
+          d_ctl.gen_want == 1u, "半个提交(mode=%u gen_want=%u rc=%d)",
+          (unsigned)d_ctl.mode, (unsigned)d_ctl.gen_want, (int)rc);
+}
+
+/* REL46 锁没初始化 => "初始化过没有"与"这次拿到了吗"分开答:
+ * 未初始化时一次 rt_mutex_take 都不许发生, 但保护义务与降险披露照旧(不是静默旁路)。 */
+static void c_REL46(void)
+{
+    diag_rprof_t p;
+    rel_step_arg_t a;
+    rel_state_t s;
+    rel_latch_t l;
+    rt_err_t prc, rc;
+    rt_bool_t acted;
+    int i, takes;
+
+    world_reset();
+    p = make_profile();
+    install_profile(&p);
+    d_ctl_inited = RT_FALSE;                   /* 回到"init 从未成功"的世界 */
+    memset(&d_ctl_lock, 0, sizeof(d_ctl_lock));
+    rel_prod_init_wipe();
+    g_mutex_init_fail = 1;
+    rc = rel_ctl_init();
+    CHECK(rc != RT_EOK, "互斥量初始化失败却被当成成功");
+    CHECK(rel_ctl_ready() == RT_FALSE, "就绪位与初始化结果不一致");
+    takes = g_mutex_take_calls;
+    rc = rel_prod_commit((rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION, RT_TRUE, RT_NULL);
+    CHECK(rc == -RT_EINVAL, "未初始化时应当具名拒绝(rc=%d)", (int)rc);
+    CHECK(g_mutex_take_calls == takes, "未初始化却去 take 了(动过没建好的锁)");
+    CHECK(d_ctl.gen_want == 0u, "未初始化时代际被 bump(gen_want=%u)",
+          (unsigned)d_ctl.gen_want);
+    CHECK(rel_prod_get_snapshot(&s) != RT_EOK, "未初始化却交出了快照");
+
+    /* 关键: 锁不可用**不能**变成"不判据、不保护"。按 MONITOR 提交态评估也不许 post;
+     * 这里以调用方 mode=RELATIVE 复现"未提交过 => 沿用调用方"的合同。 */
+    memset(&a, 0, sizeof(a));
+    a.prof = p;
+    a.mode = (rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION;
+    a.coverage = RELCOV_ABSENT;
+    a.in.motion_known = 1;
+    a.in.motor_state = (rt_uint8_t)MOTOR_CRUISE;
+    for (i = 0; i < 100; ++i)
+    {
+        a.now_tick = 1000u + (rt_uint32_t)i * 10u;
+        a.in.seq = (rt_uint32_t)i + 1u;
+        a.in.timestamp = a.now_tick;
+        (void)rel_prod_evaluate(&a, (rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION, &prc, &acted);
+    }
+    CHECK(g_post_calls == 1, "锁没初始化就把保护也旁路了(post=%d)", g_post_calls);
+    CHECK(rel_writer_latch(&l) && l.coverage_at_trip == RELCOV_LOCK_FAIL,
+          "锁不可用没进首因身份(cov=%u)", (unsigned)l.coverage_at_trip);
+    CHECK(d_pub_fail > 0u, "镜像发布失败没记账(%u)", (unsigned)d_pub_fail);
+
+    g_mutex_init_fail = 0;
+    rc = rel_ctl_init();
+    CHECK(rc == RT_EOK && rel_ctl_ready() == RT_TRUE, "恢复后仍然初始化不了");
+    rc = rel_prod_commit((rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION, RT_TRUE, RT_NULL);
+    CHECK(rc == RT_EOK && d_ctl.gen_want == 1u, "恢复后提交仍然失败(rc=%d gen_want=%u)",
+          (int)rc, (unsigned)d_ctl.gen_want);
+}
+
+/* REL47 静止门内的确定接缝: 模式与代际必须在**释放静止门之前**一起落定, 门内不得打印。
+ * 对应审核反例 NEW|MODE_PUBLISHED_AFTER_STATIC_RELEASE。 */
+static int g_hook_rc, g_hook_mode, g_hook_valid, g_hook_ctl_mode, g_hook_gen, g_hook_held;
+static size_t g_hook_cap_len;
+static void r2_hook_inside_gate(void)
+{
+    rel_ctl_t c;
+    g_hook_rc = (int)rel_prod_get_ctl(&c);
+    g_hook_mode = (int)d_mode;
+    g_hook_valid = (int)c.mode_valid;
+    g_hook_ctl_mode = (int)c.mode;
+    g_hook_gen = (int)c.gen_want;
+    g_hook_held = (int)d_ctl_lock.held;
+    g_hook_cap_len = g_cap_len;
+}
+static void c_REL47(void)
+{
+    diag_rprof_t p;
+    rt_err_t rc;
+
+    world_reset();
+    p = make_profile();
+    install_profile(&p);
+    S.mstate = MOTOR_IDLE; S.armed = 0; S.mhz = 0; S.safety = SAFETY_READY;
+    pump_sensor(2);                            /* 出一帧, 让"源健康"门能判 */
+    cap_reset();
+    g_static_end_hook = r2_hook_inside_gate;
+    diagnosis_take_relative_confirm();
+    rc = diagnosis_set_mode(DIAG_MODE_RELATIVE_PROTECTION);
+    CHECK(rc == RT_EOK, "健康前置下开启相对模式被拒(rc=%d)", (int)rc);
+    /* 门内最后一刻: 模式与代际都已经落定 => 提交发生在释放之前。 */
+    CHECK(g_hook_rc == RT_EOK, "接缝里读不到 ctl(rc=%d)", g_hook_rc);
+    CHECK(g_hook_mode == (int)DIAG_MODE_RELATIVE_PROTECTION && g_hook_valid == 1 &&
+          g_hook_ctl_mode == (int)DIAG_MODE_RELATIVE_PROTECTION,
+          "释放静止门时模式还没落定(d_mode=%d ctl=%d valid=%d)",
+          g_hook_mode, g_hook_ctl_mode, g_hook_valid);
+    CHECK(g_hook_gen == 1, "静止门内代际还没 bump(gen_want=%d)", g_hook_gen);
+    CHECK(g_hook_held == 0, "控制临界区跨在静止事务里还没释放(held=%d)", g_hook_held);
+    /* 门内一个字节的打印都不许有: 串口/Flash 等待不能在持门时发生。 */
+    CHECK(g_static_end_cap_len == g_static_begin_cap_len,
+          "持静止门期间打印了 %u 字节", (unsigned)(g_static_end_cap_len - g_static_begin_cap_len));
+    CHECK(cap_has("armed") || cap_has("RELATIVE"), "释放之后没有披露(打印被留在了门内?)");
+
+    /* 拒绝路径: 静止门被占 => 模式与代际都不动, 首因视图不变, 且没有半份提交。 */
+    world_reset();
+    install_profile(&p);
+    rc = diagnosis_set_mode(DIAG_MODE_RELATIVE_PROTECTION);   /* 没给凭据: 入口就拒 */
+    CHECK(rc != RT_EOK && d_mode == DIAG_MODE_MONITOR_ONLY && d_ctl.gen_want == 0u &&
+          d_ctl.mode == (rt_uint8_t)DIAG_MODE_MONITOR_ONLY,
+          "无凭据却改了状态(rc=%d mode=%d gen_want=%u)", (int)rc, (int)d_mode,
+          (unsigned)d_ctl.gen_want);
+    diagnosis_take_relative_confirm();
+    g_static_begin_busy = 1;                   /* 门拿不到 */
+    rc = diagnosis_set_mode(DIAG_MODE_RELATIVE_PROTECTION);
+    CHECK(rc != RT_EOK && d_mode == DIAG_MODE_MONITOR_ONLY && d_ctl.gen_want == 0u,
+          "静止门被占仍然提交了模式或代际(rc=%d mode=%d gen_want=%u)",
+          (int)rc, (int)d_mode, (unsigned)d_ctl.gen_want);
+    CHECK(d_ctl.mode_valid == RT_TRUE && d_ctl.mode == (rt_uint8_t)DIAG_MODE_MONITOR_ONLY,
+          "被拒后提交态被改成 %u", (unsigned)d_ctl.mode);
+    g_static_begin_busy = 0;
+
+    /* 锁失败路径: 与静止门被占同一道最终门 —— 关闭/切换/开启走同一个提交协议。 */
+    world_reset();
+    install_profile(&p);
+    arm((rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION);
+    S.mstate = MOTOR_IDLE; S.armed = 0; S.mhz = 0;
+    diagnosis_take_relative_confirm();
+    g_mutex_take_fail = 1;
+    rc = diagnosis_set_mode(DIAG_MODE_MONITOR_ONLY);
+    g_mutex_take_fail = 0;
+    CHECK(rc != RT_EOK, "控制锁失败时关保护竟然成功(rc=%d)", (int)rc);
+    CHECK(d_mode == DIAG_MODE_RELATIVE_PROTECTION,
+          "提交失败却先把 d_mode 挪走了(mode=%d)", (int)d_mode);
+    CHECK(d_ctl.mode == (rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION,
+          "提交失败但提交态被改成 %u", (unsigned)d_ctl.mode);
+    CHECK(g_static_begin_calls == 1 && g_static_end_calls == 1,
+          "拒绝路径的门不配对(begin=%d end=%d)", g_static_begin_calls, g_static_end_calls);
+}
+
+/* REL48 新一代必须清掉上一代的全部判据证据(审核反例 REARM_REUSES_OLD_ENGINE_EVIDENCE):
+ * 旧证据不足以让新一代的第一帧立刻触发; 只有新的一整段持续异常才允许再保护。 */
+static void c_REL48(void)
+{
+    diag_rprof_t p;
+    rel_incident_t inc;
+    rel_latch_t l;
+
+    world_reset();
+    p = make_profile();
+    install_profile(&p);
+    arm((rt_uint8_t)DIAG_MODE_MONITOR_ONLY);
+    S.sg = (rt_uint16_t)(p.run_sg_min - p.sg_drop_trip - 1);
+    pump(60);                                  /* MONITOR 下攒出 600ms 级严重证据 */
+    CHECK(g_post_calls == 0, "MONITOR 下就保护了(post=%d)", g_post_calls);
+    CHECK(d_rel_prod.sg_strong_run_ms >= 500u,
+          "前置证据没攒起来(strong=%u)", (unsigned)d_rel_prod.sg_strong_run_ms);
+
+    /* 武装 = 同一静止事务里的"模式 + 新一代"提交: 代际一 bump, 旧证据必须整份作废。 */
+    if (rel_prod_commit((rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION, RT_TRUE, RT_NULL) != RT_EOK)
+    { g_pre_bad++; }
+    d_mode = DIAG_MODE_RELATIVE_PROTECTION;
+    pump(2);                                   /* 新一代的头两帧(20ms) */
+    CHECK(g_post_calls == 0, "新一代第一帧就用了旧证据(post=%d)", g_post_calls);
+    CHECK(d_rel_prod.sg_strong_run_ms < 300u,
+          "新代际里旧判据证据没清零(strong=%u)", (unsigned)d_rel_prod.sg_strong_run_ms);
+    CHECK(d_rel_prod.gen == 1u, "引擎还停在旧代际(gen=%u)", (unsigned)d_rel_prod.gen);
+
+    pump(80);                                  /* 新一代自己攒够一整段 */
+    CHECK(g_post_calls == 1, "新一段持续异常没触发(post=%d)", g_post_calls);
+    CHECK(rel_prod_get_latch(&l) && l.reason == REL_SG_SEVERE, "首因不是 SG 严重");
+    CHECK(rel_prod_get_incident(&inc) == RT_EOK && inc.generation == 1u &&
+          inc.rearm_required == 1u, "事故没绑到新一代(gen=%u rearm=%d)",
+          (unsigned)inc.generation, (int)inc.rearm_required);
+
+    /* 再走一次武装: 旧首因挪进归档、当前首因清空, 新一代不能把旧事故当成本轮的证据。 */
+    if (rel_prod_request_rearm() != RT_EOK) { g_pre_bad++; }
+    d_mode = DIAG_MODE_RELATIVE_PROTECTION;
+    pump(2);
+    CHECK(rel_prod_get_incident(&inc) == RT_EOK && inc.have_current == RT_FALSE &&
+          inc.have_archived == RT_TRUE && inc.generation == 2u,
+          "换代后事故视图不对(cur=%d arch=%d gen=%u)", (int)inc.have_current,
+          (int)inc.have_archived, (unsigned)inc.generation);
+    CHECK(d_rel_prod.latch.latched == 0u && d_rel_prod.rearm_required == 0u,
+          "新一代仍然粘着旧票据(latched=%d rearm=%d)",
+          (int)d_rel_prod.latch.latched, (int)d_rel_prod.rearm_required);
+}
+
+/* REL49 新帧 != 新运动事实(R2-B3, 审核反例 FRAME_FALSE_MOTION_KNOWN):
+ * 外壳帧一直新, 但运动快照取不到/过期时, 缓存的 IDLE 不是"证得静止"。 */
+static void c_REL49(void)
+{
+    diag_rprof_t p;
+    rel_engine_t e;
+    struct feed f;
+    rel_latch_t l;
+    rel_state_t s;
+    rel_reason_t r = REL_REASON_NONE;
+    int i;
+
+    world_reset();
+    p = make_profile();
+    feed_init(&e, &p, &f);                     /* 引擎级: 健康对照 */
+    for (i = 1; i <= 60; ++i) r = feed_step(&f, 500, 2000, 1, 1, 1, 1);
+    CHECK(e.coverage == RELCOV_OK && r == REL_REASON_NONE,
+          "健康对照都不覆盖完好(cov=%u reason=%s)", (unsigned)e.coverage, rel_reason_name(r));
+
+    f.a.in.motion_known = 0;                   /* 帧照旧前进, 运动事实未知 */
+    r = feed_step(&f, 500, 2000, 1, 1, 1, 1);
+    CHECK(e.coverage == RELCOV_MOTION_UNKNOWN,
+          "运动事实未知却仍算覆盖完好(cov=%u)", (unsigned)e.coverage);
+    for (i = 1; i <= 60; ++i) r = feed_step(&f, 500, 2000, 1, 1, 1, 1);
+    CHECK(r == REL_COVERAGE_LOST, "持续运动未知没降险(reason=%s)", rel_reason_name(r));
+
+    world_reset();                             /* 过期支: motion_ok=1 但 tick 老 */
+    feed_init(&e, &p, &f);
+    for (i = 1; i <= 30; ++i) r = feed_step(&f, 500, 2000, 1, 1, 1, 1);
+    CHECK(e.coverage == RELCOV_OK, "前置没进入覆盖完好(cov=%u)", (unsigned)e.coverage);
+    /* 冻住运动身份, 再把 tick 显式改老一份以上(生产者的 known+老 tick 组合只能这样造出来) */
+    f.motion_freeze = 1;
+    f.a.in.motion_tick = f.t - (p.age_frame_ms / 10u + 5u) * 10u;
+    r = feed_step(&f, 500, 2000, 1, 1, 1, 1);
+    CHECK(e.coverage == RELCOV_MOTION_UNKNOWN,
+          "运动快照过期却算新鲜(cov=%u age_lim=%u)", (unsigned)e.coverage,
+          (unsigned)p.age_frame_ms);
+    f.motion_freeze = 0;
+    r = feed_step(&f, 500, 2000, 1, 1, 1, 1);
+    CHECK(e.coverage == RELCOV_OK,
+          "运动快照重新新鲜后档位没回来(cov=%u)", (unsigned)e.coverage);
+
+    world_reset();                             /* 生产入口: 帧一直出, 快照取不到 */
+    install_profile(&p);
+    arm((rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION);
+    S.mstate = MOTOR_IDLE; S.armed = 0; S.mhz = 0;   /* 缓存会一直说"静止" */
+    g_snap_fail = 1;
+    pump(80);
+    diag_relative_status_lines();              /* 档位名与预算一起验(短行是现场唯一可见证据) */
+    g_snap_fail = 0;
+    CHECK(g_post_calls == 1,
+          "运动事实取不到却靠缓存 IDLE 免保护(post=%d)", g_post_calls);
+    CHECK(rel_prod_get_latch(&l) && l.reason == REL_COVERAGE_LOST &&
+          l.coverage_at_trip == RELCOV_MOTION_UNKNOWN,
+          "降险身份不对(reason=%s cov=%u)", rel_reason_name(l.reason),
+          (unsigned)l.coverage_at_trip);
+    CHECK(rel_prod_get_snapshot(&s) == RT_EOK && s.coverage == RELCOV_MOTION_UNKNOWN,
+          "快照没披露运动未知档位(rc=%d cov=%u)", (int)rel_prod_get_snapshot(&s),
+          (unsigned)s.coverage);
+    CHECK(cap_has("cov=MOTION-UNKNOWN"), "未知档位没有具名原因名");
+    CHECK(cap_max_line_len() <= 110, "运动未知一档最长 %d 字节(预算 110)",
+          cap_max_line_len());
+
+    world_reset();                             /* 对照: 快照正常 => 缓存 IDLE 是真静止 */
+    install_profile(&p);
+    arm((rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION);
+    S.mstate = MOTOR_IDLE; S.armed = 0; S.mhz = 0;
+    pump(120);
+    CHECK(g_post_calls == 0, "运动快照正常时误降险(post=%d)", g_post_calls);
 }
 
 /* ======================= main ======================= */
@@ -2615,6 +3012,11 @@ static const struct case_ent TAB[] = {
     { "REL42-low-sg-committable-and-named-reject",     c_REL42 },
     { "REL43-max-value-lines-fit-console",             c_REL43 },
     { "REL44-impact-fresh-evidence-only",              c_REL44 },
+    { "REL45-ctl-take-failure-writes-nothing",         c_REL45 },
+    { "REL46-ctl-uninit-take-and-protect",             c_REL46 },
+    { "REL47-commit-inside-static-gate",               c_REL47 },
+    { "REL48-new-generation-clears-evidence",          c_REL48 },
+    { "REL49-frame-not-same-as-motion-known",          c_REL49 },
 };
 #define NTAB ((int)(sizeof(TAB)/sizeof(TAB[0])))
 

@@ -86,6 +86,12 @@ typedef struct
      * 所以零初始化的输入看起来完全"静止" —— 取帧失败又取不到 motor 快照时, 必须
      * 用这个位说明**不知道**在不在动, 引擎才敢把覆盖丢失算成降险义务。 */
     rt_uint8_t  motion_known;
+    /* M8-R2 R2-B3: 运动事实自己的身份与年龄(与 sg_seq/cur_seq/imu_seq 同口径)。
+     * motion_known=1 只说明"这一帧取到过", 具体是哪一次、多久之前由这两个值给。
+     * 取运动快照失败时它们原样继承旧值 —— 消费方必须看 motion_known, 不能拿
+     * 继承来的 IDLE 当"仍然静止"的证明。 */
+    rt_uint32_t motion_seq;
+    rt_uint32_t motion_tick;
     /* 调用方按**当前**驱动配置+工况+采样定义算出的身份签名(与 profile.signature
      * 比较即知是否还在被批准的那个工况里)。0 = 未提供。 */
     rt_uint32_t live_signature;

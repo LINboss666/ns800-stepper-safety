@@ -76,6 +76,17 @@ typedef struct
     rt_uint32_t sg_tick;
     rt_uint32_t cur_seq;
     rt_uint32_t cur_tick;
+    /* ---- M8-R2 R2-B3: 运动事实自己的身份与年龄(只追加在末尾, RAM 帧内) ----
+     * motor_get_snapshot() 失败时 motor_state/step_hz/dir 是**继承**来的旧值,
+     * 而旧代码把"外壳帧是新的"当成"运动事实是新的" ⇒ 缓存的 IDLE 变成无限的
+     * 免保护证据。现在:
+     *   motion_ok  : 1 = 本帧确实取到了一份运动快照; 0 = 只有继承值, 事实未知。
+     *   motion_seq : 成功取到运动的累计次数(失败帧原样继承, 绝不前进)。
+     *   motion_tick: 那次成功所在帧的 tick, 用于年龄判定。
+     * 与 sg_seq/cur_seq 完全同一口径: 保留值不是新样本。 */
+    rt_uint8_t  motion_ok;
+    rt_uint32_t motion_seq;
+    rt_uint32_t motion_tick;
 } sensor_frame_t;
 
 /* 创建 Sensor Thread(幂等)。 */

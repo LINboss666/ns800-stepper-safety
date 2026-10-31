@@ -8,7 +8,9 @@ reports/reviews/phase8-tmc-uart-rootcause/stress_ms_boot*.bin -text
 reports/firmware/phase8-m8-relative-protection-r1/*.map -text
 reports/firmware/phase8-m8-relative-protection-r1/SHA256SUMS.txt -text
 reports/firmware/phase8-m8-relative-protection-r1/build_manifest.json -text
+reports/reviews/phase8-m8-relative-protection-r1/build/** -text
 reports/reviews/phase8-m8-relative-protection-r1/build/*.log -text
+reports/reviews/phase8-m8-relative-protection-r2/build/** -text
 reports/reviews/phase8-m8-relative-protection-r1/field/offline/** -text
 reports/reviews/phase8-m8-relative-protection-r1/host/*.txt -text
 reports/reviews/phase8-m8-relative-protection-r1/host/*.json -text
@@ -16,3 +18,14 @@ reports/reviews/phase8-m8-relative-protection-r1/SHA256SUMS.txt -text
 reports/reviews/phase8-m8-sg-adc-relative-protection/build/*.log -text
 reports/reviews/phase8-m8-sg-adc-relative-protection/build/rc.txt -text
 reports/reviews/phase8-m8-sg-adc-relative-protection/build/SHA256SUMS_backfill.txt -text
+
+# ===== M8-R2 交付证据(范围: 仅下列 R2 路径; 不做全局 * -text, 不 --renormalize 全仓) =====
+# 理由与 R1 同一: 这些件要能被第三方逐字节复算(CR 字节即证据的一部分)。
+reports/firmware/phase8-m8-relative-protection-r2/*.map -text
+reports/firmware/phase8-m8-relative-protection-r2/SHA256SUMS.txt -text
+reports/firmware/phase8-m8-relative-protection-r2/build_manifest.json -text
+reports/reviews/phase8-m8-relative-protection-r2/build/** -text
+reports/reviews/phase8-m8-relative-protection-r2/field/offline/** -text
+reports/reviews/phase8-m8-relative-protection-r2/host/*.txt -text
+reports/reviews/phase8-m8-relative-protection-r2/host/*.json -text
+reports/reviews/phase8-m8-relative-protection-r2/SHA256SUMS.txt -text

@@ -396,7 +396,17 @@ static void diag_thread_entry(void *param)
             in.imu_seq = f.imu_seq;
             in.imu_tick = f.imu_tick;
             in.dir     = f.dir;
-            in.motion_known = 1;         /* 帧里的运动字段来自成功的 motor 快照 */
+            /* M8-R2 R2-B3: 只有**这一帧自己**取到运动快照才算知道运动事实。
+             * 旧代码对所有有效帧无条件 motion_known=1, 于是 motor_get_snapshot
+             * 一直失败时, 帧里继承的 IDLE 被当成"证得的静止"(FRAME_FALSE_MOTION_KNOWN)。 */
+            in.motion_known = f.motion_ok;
+            in.motion_seq   = f.motion_seq;
+            in.motion_tick  = f.motion_tick;
+            if (!f.motion_ok)
+            {
+                in.motor_state = 0;       /* 未知就别把继承值传给下游 */
+                in.step_hz     = 0;
+            }
         }
         else
         {
@@ -410,6 +420,7 @@ static void diag_thread_entry(void *param)
                 in.motor_state = (rt_uint8_t)ms.state;
                 in.step_hz     = ms.current_hz;
                 in.dir         = ms.dir;
+                in.motion_tick = in.timestamp;   /* 现取现用: 年龄就是这一帧 */
             }
         }
         in.live_signature = rel_live_signature();
@@ -442,9 +453,16 @@ static void diag_thread_entry(void *param)
             /* R2.4: 一次真实触发消耗本次武装的票据。模式当场退回 MONITOR_ONLY 并
              * 明说 REARM_REQUIRED —— 不允许出现"界面仍写 RELATIVE_ACTIVE、引擎却
              * 永久不再发第二次请求"这种自相矛盾(C6 就是这个状态)。
-             * 这是 Safety 降险引起的**内部**安全转换, 不走人工模式门(R3.1)。 */
+             * 这是 Safety 降险引起的**内部**安全转换, 不走人工模式门(R3.1)。
+             * R2-B1: d_mode 与已提交模式一起走提交协议; 提交失败也不能留在
+             * RELATIVE(那是更宽松的一侧), 因此 d_mode 仍然退回, 并显式打印不一致。 */
+            if (rel_prod_commit((rt_uint8_t)DIAG_MODE_MONITOR_ONLY, RT_FALSE, RT_NULL) != RT_EOK)
+                rt_kprintf("[DIAG] REL mode commit FAILED rc; d_mode->MONITOR\n");
             d_mode = DIAG_MODE_MONITOR_ONLY;
-            if (rel_prod_get_latch(&l))
+            /* 本线程就是引擎的唯一写者: 摘要取自己的闩锁, 不依赖镜像是否发布成功。
+             * 控制锁取不到时镜像可能还是空的, 那属于"证据视图待补", 不是"没发生触发"
+             * —— 用镜像打印会让 TRIP 摘要在这里整体消失。 */
+            if (rel_writer_latch(&l))
             {
                 rt_kprintf("[DIAG] REL TRIP r=%s id=%u rev=%u post_rc=%d\n",
                            rel_reason_name(l.reason), (unsigned)l.profile_id,
@@ -496,7 +514,13 @@ rt_err_t diagnosis_init(void)
     d_prod.may_report = RT_TRUE;            /* 生产上下文才允许上报 Safety 事件 */
     diag_engine_reset(&d_prod);
 
-    rel_ctl_lock_init();              /* M8-R1: 事故快照/代际的短临界区 */
+    rel_prod_init_wipe();               /* 线程起来之前: 初始化专用的全清(R2-A.5) */
+    if (rel_ctl_init() != RT_EOK)
+        rt_kprintf("[DIAG] REL ctl lock INIT FAILED - relative claims disabled\n");
+    else if (rel_prod_commit((rt_uint8_t)DIAG_MODE_MONITOR_ONLY, RT_FALSE, RT_NULL) != RT_EOK)
+        rt_kprintf("[DIAG] REL ctl commit FAILED at init\n");
+    /* M8-R1: 事故快照/代际/发布快照共用的短临界区。初始化失败时 rel_ctl_take()
+     * 一律返回错误 => 每帧按 RELCOV_LOCK_FAIL 有界降险, 而不是"当作有锁"。 */
 
     d_tid = rt_thread_create("diag", diag_thread_entry, RT_NULL,
                              1024, 9, 10);  /* prio 9, 100Hz */
@@ -529,6 +553,22 @@ static rt_err_t diag_human_mode_gate(const char *who)
 
 rt_err_t diagnosis_set_mode(diag_mode_t mode)
 {
+    /* R2-B1(复现 MODE_PUBLISHED_AFTER_STATIC_RELEASE): 旧写法在
+     * motor_calibration_static_end() **之后**才改 d_mode / 请求新代际, 于是
+     * "复核通过"与"模式落定"之间存在一个允许交错: 另一个执行者可以在静止门
+     * 释放后、模式提交前 arm/start。现在最终复核与(模式+代际)提交整段落在
+     * 同一次静止事务里, 打印全部移到提交/释放之后。
+     * 入口的 CONFIRM 凭据仍是"用掉即清": 提交失败也不退还(否则一次拒绝就变成
+     * 免凭据重试)。 */
+    diag_rprof_t p;
+    const char *why = RT_NULL;
+    sensor_frame_t fr;
+    rel_incident_t inc;
+    rt_err_t rc = RT_EOK, get = RT_EOK, irc;
+    rt_uint32_t live = 0;
+    rt_bool_t new_gen = RT_FALSE, committed = RT_FALSE;
+    const char *refuse = RT_NULL;
+
     if (mode == d_mode)                    /* 同值请求: 不改状态、不重置引擎 */
     {
         rt_kprintf("[DIAG] mode=%s (unchanged)\n", mode_name(d_mode));
@@ -536,88 +576,98 @@ rt_err_t diagnosis_set_mode(diag_mode_t mode)
     }
     if (diag_human_mode_gate("mode") != RT_EOK) return -RT_EPERM;
 
-    if (mode == DIAG_MODE_ACTIVE_PROTECTION)
+    /* 纯读的前置先做掉(它们不改任何状态, 也不需要持门)。 */
+    if (mode == DIAG_MODE_ACTIVE_PROTECTION &&
+        current_adc_cal_source() != CURRENT_ADC_CAL_MEASURED)
     {
         /* P1-7 / Fix B 标定门禁: 只有实测标定来源才允许 ACTIVE_PROTECTION;
          * 理论默认值(THEORETICAL)不得驱动保护动作。本门与相对模式互不影响。 */
-        if (current_adc_cal_source() != CURRENT_ADC_CAL_MEASURED)
-        {
-            rt_kprintf("[DIAG] ACTIVE REFUSED: calibration source=%d"
-                       " (need MEASURED)\n", current_adc_cal_source());
-            return -RT_EPERM;
-        }
-        diag_reset();
+        rt_kprintf("[DIAG] ACTIVE REFUSED: calibration source=%d"
+                   " (need MEASURED)\n", current_adc_cal_source());
+        return -RT_EPERM;
     }
-    else if (mode == DIAG_MODE_RELATIVE_PROTECTION)
+    if (mode == DIAG_MODE_RELATIVE_PROTECTION && d_relative_confirm_given != RT_TRUE)
     {
-        /* 相对保护的开启门禁。顺序固定, 任一不过 ⇒ 直接返回, **d_mode 保持原值**
-         * (拒绝不得留下"半个相对模式")。CONFIRM 凭据用掉即清, 不存在自动放行。 */
-        diag_rprof_t p;
-        const char *why = RT_NULL;
-        sensor_frame_t fr;
-        rt_err_t rc, get;
-        rt_uint32_t live;
-        rel_incident_t inc;
+        rt_kprintf("[DIAG] RELATIVE REFUSED: needs explicit CONFIRM_EXPERIMENTAL\n");
+        return -RT_EPERM;
+    }
+    if (mode == DIAG_MODE_RELATIVE_PROTECTION) d_relative_confirm_given = RT_FALSE;
 
-        if (d_relative_confirm_given != RT_TRUE)
-        {
-            rt_kprintf("[DIAG] RELATIVE REFUSED: needs explicit CONFIRM_EXPERIMENTAL\n");
-            return -RT_EPERM;
-        }
-        d_relative_confirm_given = RT_FALSE;
+    if (motor_calibration_static_begin() != RT_EOK)
+    {
+        rt_kprintf("[DIAG] mode REFUSED: static txn not granted\n");
+        return -RT_EBUSY;
+    }
 
-        /* M8-R1 C2: 最终资格复核必须发生在**同一个静止事务**里。
-         * motor_calibration_static_begin() 自身重查 armed=0 / IDLE / hz=0 /
-         * SAFETY_READY / 停机协调器空闲 / PWM 已关且输出不活动 / DRV_ENABLE 为低
-         * (即可信禁能) —— 入口另读一份快照替代不了它, 而且 begin 被拒时必须拒绝
-         * 开启(旧实现根本没调过这道门)。 */
-        if (motor_calibration_static_begin() != RT_EOK)
-        {
-            rt_kprintf("[DIAG] RELATIVE REFUSED: static txn not granted\n");
-            return -RT_EBUSY;
-        }
+    /* ---- 以下全部在静止门内 ---- */
+    if (mode == DIAG_MODE_RELATIVE_PROTECTION)
+    {
         rt_memset(&p, 0, sizeof(p));
         get  = project_config_get_rprof(&p);          /* mot -> cfg 顺序, 与 M7 一致 */
         live = rel_live_signature();
-        rc = RT_EOK;
         if (get != RT_EOK)                            rc = -RT_EIO;
         else if (p.magic == 0)                        rc = -RT_EPERM;
         else if (rel_profile_validate(&p, &why) != RT_EOK) rc = -RT_EINVAL;
         else if (p.signature != live)                 rc = -RT_EPERM;
         else if (sensor_service_get_latest(&fr) != RT_EOK || fr.seq == 0 ||
                  !fr.valid_sg || !fr.valid_current)   rc = -RT_EPERM;
-        motor_calibration_static_end();
-        if (rc != RT_EOK)
+        if (rc == RT_EOK)
         {
-            rt_kprintf("[DIAG] RELATIVE REFUSED: rc=%d (%s)\n", (int)rc,
-                       (rc == -RT_EINVAL && why) ? why :
-                       (get != RT_EOK ? "config-lock" :
-                        p.magic == 0 ? "no committed profile" :
-                        p.signature != live ? "sig != live" : "source unhealthy"));
-            return rc;
+            if (get != RT_EOK)              refuse = "config-lock";
+            else if (p.magic == 0)          refuse = "no committed profile";
+            else if (p.signature != live)   refuse = "sig != live";
+            else                            refuse = "source unhealthy";
         }
+        new_gen = RT_TRUE;                    /* 相对保护总是一次新的武装 */
+    }
+    if (rc == RT_EOK && mode == DIAG_MODE_ACTIVE_PROTECTION) diag_reset();
 
+    /* 模式与代际在同一次控制临界区里落; 抢不到锁 => 两者都不动。 */
+    if (rc == RT_EOK)
+    {
+        rc = rel_prod_commit((rt_uint8_t)mode, new_gen, RT_NULL);
+        if (rc != RT_EOK) refuse = "ctl lock failed";
+    }
+    if (rc == RT_EOK)
+    {
+        d_mode    = mode;                   /* 仍持门: 此刻模式与代际已经一起落定 */
+        committed = RT_TRUE;
+    }
+    motor_calibration_static_end();
+
+    /* ---- 提交/释放之后的披露 ---- */
+    if (!committed)
+    {
+        irc = rel_prod_get_incident(&inc);
+        rt_kprintf("[DIAG] mode REFUSED: (%s) rc=%d stay=%s\n",
+                   refuse ? refuse : (rc == -RT_EINVAL && why ? why : "validate"),
+                   (int)rc, mode_name(d_mode));
+        if (rc == -RT_EINVAL && why)
+            rt_kprintf("[DIAG] mode refused reason=%s\n", why);
+        if (irc == RT_EOK && inc.have_current)
+            rt_kprintf("[DIAG] mode kept armed ticket: rearm=%d gen=%u\n",
+                       (int)inc.rearm_required, (unsigned)inc.generation);
+        return rc;
+    }
+    if (mode == DIAG_MODE_RELATIVE_PROTECTION)
+    {
         /* 阈值来源如实披露: 学习生成的裕量从未经过真实异常样本验证。 */
         rt_kprintf("[DIAG] REL thresholds=%s id=%u rev=%u tier=%u\n",
                    (p.flags & RPF_FIELD_VERIFIED) ? "FIELD_VERIFIED" : "FIELD_UNVERIFIED",
                    (unsigned)p.profile_id, (unsigned)p.revision,
                    (unsigned)p.threshold_tier);
-        /* 清事故 latch 只能发生在"操作员显式重新武装"这一刻, 而且必须**先把旧
-         * 原因宣布出来** —— 静默擦掉上一轮首次触发就等于抹掉证据。真正 wipe 引擎
-         * 上下文的是 Diagnosis Thread 自己(见 rel_prod_sync_generation), 命令线程
-         * 只 bump 代际: 这样"命令擦掉在途义务"在结构上不可能(R3.3)。 */
-        rel_prod_get_incident(&inc);
-        if (inc.have_current)
+        /* 清事故 latch 只发生在"操作员显式重新武装"这一刻, 而且必须先把旧原因
+         * 宣布出来 —— 静默擦掉上一轮首次触发就等于抹掉证据(R3.3 的归档规则)。 */
+        if (rel_prod_get_incident(&inc) == RT_EOK && inc.have_current)
             rt_kprintf("[DIAG] REL re-arm prior r=%s id=%u tick=%u post_rc=%d\n",
                        rel_reason_name(inc.current.reason),
                        (unsigned)inc.current.profile_id, (unsigned)inc.current.trig_tick,
                        (int)inc.current.post_rc);
-        rel_prod_request_rearm();
     }
-    d_mode = mode;
     rt_kprintf("[DIAG] mode=%s\n", mode_name(d_mode));
     return RT_EOK;
 }
+
 
 diag_mode_t diagnosis_get_mode(void) { return d_mode; }
 void diagnosis_take_relative_confirm(void) { d_relative_confirm_given = RT_TRUE; }
@@ -692,12 +742,20 @@ void diag_relative_status_lines(void)
     rt_bool_t have;
     rt_uint32_t sig;
 
-    rel_prod_get_snapshot(&s);
+    rt_err_t snap_rc, inc_rc;
+
+    snap_rc = rel_prod_get_snapshot(&s);        /* R2-A.3: 整份或失败, 没有半份 */
+    inc_rc  = rel_prod_get_incident(&inc);
     rt_memset(&p, 0, sizeof(p));       /* 取快照失败时也必须打印确定值, 不能是栈垃圾 */
     have = (project_config_get_rprof(&p) == RT_EOK && p.magic != 0);
     sig = rel_live_signature();
-    rel_prod_get_incident(&inc);
     rel_adc_reach(&p, &rup, &rdn);
+
+    /* 状态行的"这一份是不是同一帧的整份"必须自己说清楚: 读不到控制临界区时
+     * 上面两个结构体都被清零, 只看不打印就会把"没有数据"读成"数据是 0"。 */
+    rt_kprintf("[DIAG] rel snap=%s inc=%s seq=%u pubfail=%u\n",
+               snap_rc == RT_EOK ? "OK" : "FAIL", inc_rc == RT_EOK ? "OK" : "FAIL",
+               (unsigned)s.snap_seq, (unsigned)s.pub_fail_cnt);
 
     rt_kprintf("[DIAG] rel mode=%s prof=%s id=%u rev=%u flg=%04X %s\n",
                mode_name(d_mode), have ? "PRESENT" : "NONE",

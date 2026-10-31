@@ -15,7 +15,7 @@
 #   1) 在任何 rm/mkdir/重定向/编译**之前**先验证工作目录(require_outside_repo);
 #   2) 只删除带本工具哨兵(NS800-HOSTCHAIN-WORK)的目录;
 #   3) ONLY 选择词必须在入口校验: 未知/重复/纯空白一律 rc=4 拒绝且不动任何文件;
-#      未设置或空串 = 默认执行全部 44 例(不是零执行); 汇总只声明实际执行集合,
+#      未设置或空串 = 默认执行全部 49 例(不是零执行); 汇总只声明实际执行集合,
 #      未执行的显式 NOT_RUN;
 #   4) 逐 id 台账必须"恰好出现一次且判 PASS"; 缺席/重复/未登记/SUMMARY 不自洽
 #      = 基础设施故障(4); 编译失败或异常退出(非 0/1/4)也不算检出;
@@ -89,7 +89,12 @@ REL40-config-lock-failure-writes-nothing
 REL41-illegal-context-silent
 REL42-low-sg-committable-and-named-reject
 REL43-max-value-lines-fit-console
-REL44-impact-fresh-evidence-only"
+REL44-impact-fresh-evidence-only
+REL45-ctl-take-failure-writes-nothing
+REL46-ctl-uninit-take-and-protect
+REL47-commit-inside-static-gate
+REL48-new-generation-clears-evidence
+REL49-frame-not-same-as-motion-known"
 ALL_CASES="$(printf '%s' "$ALL_CASES" | tr '\n' ' ')"
 
 note() { printf '%s\n' "$*"; }
@@ -315,7 +320,7 @@ reverse_case() {            # reverse_case <name> <target-file> <old> <new> <期
 
 if [ "$REVERSE" = "1" ]; then
     note ""
-    note "=== 反向验证(4 组具名家族, 仓外一次性副本) ==="
+    note "=== 反向验证(9 组具名家族, 仓外一次性副本) ==="
     # RV1: 去掉"SG 必须是新独立样本"的身份门 —— 旧样本必须被 REL08 检出
     reverse_case RV1_sg_new_sample_identity_gate diag_relative.c \
 '    fresh_sg  = (in->sg_valid  && in->sg_seq  != 0 && in->sg_seq  != e->last_sg_seq);' \
@@ -369,6 +374,22 @@ if [ "$REVERSE" = "1" ]; then
             }' \
 '            /* NEGATIVE-INJECTION RV7: 碰撞独立触发被移除 */' \
         REL44-impact-fresh-evidence-only
+    # RV8(M8-R2 R2-A.1): 控制锁"当作拿到了" —— 去掉拒绝就是 R1 的静默旁路。
+    # REL45/REL46 必须检出(取锁失败仍然写字段、未初始化仍然提锁、读侧交出半份快照)。
+    reverse_case RV8_ctl_lock_silently_bypassed diag_relative.c \
+'rt_err_t rel_ctl_take(void)
+{
+    if (!d_ctl_inited) return -RT_EINVAL;
+    return (rt_mutex_take(&d_ctl_lock, REL_CTL_TAKE_MS) == RT_EOK) ? RT_EOK : -RT_EBUSY;
+}' \
+'/* NEGATIVE-INJECTION RV8: 控制锁被"当作拿到了"(R1 的无锁写 + 永久旁路) */
+rt_err_t rel_ctl_take(void) { return RT_EOK; }' \
+        REL45-ctl-take-failure-writes-nothing REL46-ctl-uninit-take-and-protect
+    # RV9(M8-R2 R2-B2): 新一代不再清旧判据证据 —— REL48 必须检出"新一代第一帧就触发"。
+    reverse_case RV9_new_generation_keeps_old_evidence diag_relative.c \
+'    if (need_wipe) rel_engine_new_generation(&d_rel_prod, g);' \
+'    (void)need_wipe;   /* NEGATIVE-INJECTION RV9: 新一代不再清旧证据 */' \
+        REL48-new-generation-clears-evidence
 fi
 
 note ""

@@ -55,6 +55,7 @@ const char *rel_cov_name(rt_uint8_t c)
     case RELCOV_SIG_MISMATCH:   return "NOT-ACTIVE(sig-mismatch)";
     case RELCOV_NOFRAME:        return "NOT-ACTIVE(no-frame)";
     case RELCOV_ENGINE_ERR:     return "NOT-ACTIVE(profile-rejected)";
+    case RELCOV_MOTION_UNKNOWN: return "MOTION-UNKNOWN";
     default:                    return "NOT-ACTIVE(?)";
     }
 }
@@ -293,6 +294,24 @@ void rel_engine_wipe(rel_engine_t *e)
     rt_memset(e, 0, sizeof(*e));
 }
 
+/* M8-R2 R2-B2: 新一代开始 = **这一代的判据证据整体作废**。
+ * 与 rel_engine_reset_counters() 的区别正是这里要清的东西: 严重状态与活动原因、
+ * 两级持续与样本数、三源身份与 prev tick、age/out/cov 累计、latch 与 verdict。
+ * 只保留时间基线(last_now_tick/have_now, 否则下一帧的 dt 会算出一个假时长)与代际。
+ * 不保留 last_frame_seq/last_*_seq: 保留它们就等于允许"上一代攒完的异常"在新一代
+ * 第一帧被兑现(REARM_REUSES_OLD_ENGINE_EVIDENCE 的根因)。 */
+void rel_engine_new_generation(rel_engine_t *e, rt_uint32_t gen)
+{
+    rt_uint32_t keep_now  = e->last_now_tick;
+    rt_uint8_t  keep_have = e->have_now;
+
+    rt_memset(e, 0, sizeof(*e));
+    e->last_now_tick = keep_now;
+    e->have_now      = keep_have;
+    e->gen           = gen;
+    e->verdict       = REL_REASON_NONE;
+}
+
 static rt_uint8_t ramp_phase(rt_uint8_t st)
 {
     return (st == (rt_uint8_t)MOTOR_ACCEL || st == (rt_uint8_t)MOTOR_DECEL);
@@ -388,6 +407,15 @@ rel_reason_t rel_engine_step(rel_engine_t *e, const rel_step_arg_t *a)
     {
         if (p->magic == 0)                                   cov = RELCOV_ABSENT;
         else if (rel_profile_validate(p, RT_NULL) != RT_EOK) cov = RELCOV_ENGINE_ERR;
+    }
+    /* M8-R2 R2-B3: 外壳帧是新的**不等于**运动事实是新的。运动快照取失败(motion_known=0)
+     * 或它已经过期时, 帧里的 motor_state 只是继承值 —— 拿继承来的 IDLE 当"仍静止"
+     * 就是无限免保护证据。事实未知一律并入有界降险, 不进任何单源判据。 */
+    if (cov == RELCOV_OK)
+    {
+        if (!in->motion_known)                             cov = RELCOV_MOTION_UNKNOWN;
+        else if (diag_rel_tick_diff(now, in->motion_tick) > p->age_frame_ms)
+            cov = RELCOV_MOTION_UNKNOWN;
     }
     e->coverage = cov;
     armed = (a->mode == (rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION);
@@ -699,7 +727,9 @@ rt_err_t rel_request_protection(rel_engine_t *e, const rel_step_arg_t *a, rt_uin
     e->latch.first_sg_tick = a->in.sg_tick;
     e->latch.first_cur_tick = a->in.cur_tick;
     e->latch.first_imu_seq = a->in.imu_seq;
-    e->latch.coverage_at_trip = a->coverage;
+    /* 首因记的是**引擎复核后**的档位, 不是调用方递交的原始档位: R2-B3 之后"外壳帧
+     * 新但运动事实未知"这类降级只有在这里看得见, 记原始值会把降险原因写成 COVERED。 */
+    e->latch.coverage_at_trip = e->coverage;
     switch (e->verdict)
     {
     case REL_SG_SEVERE:
@@ -751,28 +781,279 @@ rt_err_t rel_request_protection(rel_engine_t *e, const rel_step_arg_t *a, rt_uin
 
 /* ---------- 生产上下文 ---------- */
 
-/* 唯一写者纪律见 diag_relative.h 的 rel_prod_* 注释块。 */
-static rel_engine_t d_rel_prod;
-static struct rt_mutex d_ctl_lock;                  /* 只保护下面两个小结构体 */
+/* 唯一写者纪律与"初始化≠持有"的合同见 diag_relative.h 的 rel_prod_* 注释块。 */
+static rel_engine_t   d_rel_prod;
+static struct rt_mutex d_ctl_lock;                  /* 只保护下面三个小结构体 */
 static rel_ctl_t       d_ctl;
 static rel_incident_t  d_incident;
-static rt_bool_t       d_ctl_lock_ok = RT_FALSE;
+static rel_state_t     d_pub;                       /* 写者整份发布, 读者整份取回 */
+static rt_bool_t       d_pub_have   = RT_FALSE;
+static rt_bool_t       d_ctl_inited = RT_FALSE;     /* 只回答"锁初始化成功了吗" */
+static rt_uint32_t     d_pub_fail   = 0;            /* 写者私有: 发布失败次数 */
 
-static void rel_ctl_lock(void)
+#define REL_CTL_TAKE_MS  20
+
+rt_err_t rel_ctl_init(void)                         /* 由 diagnosis_init 调用一次 */
 {
-    if (!d_ctl_lock_ok) return;
-    if (rt_mutex_take(&d_ctl_lock, 20) != RT_EOK) d_ctl_lock_ok = RT_FALSE;  /* fail-closed */
-}
-static void rel_ctl_unlock(void)
-{
-    if (d_ctl_lock_ok) (void)rt_mutex_release(&d_ctl_lock);
+    rt_err_t rc;
+    if (d_ctl_inited) return RT_EOK;
+    rc = rt_mutex_init(&d_ctl_lock, "rel_ctl", RT_IPC_FLAG_PRIO);
+    if (rc == RT_EOK) d_ctl_inited = RT_TRUE;
+    return rc;
 }
 
-void rel_ctl_lock_init(void)                        /* 由 diagnosis_init 调用一次 */
+rt_bool_t rel_ctl_ready(void) { return d_ctl_inited; }
+
+/* R2-A.1: take 必须把结果还给调用方。失败**不再**是"以后都不用取锁",
+ * 也不再是"这一次无锁写"。 */
+rt_err_t rel_ctl_take(void)
 {
-    if (d_ctl_lock_ok) return;
-    if (rt_mutex_init(&d_ctl_lock, "rel_ctl", RT_IPC_FLAG_PRIO) == RT_EOK)
-        d_ctl_lock_ok = RT_TRUE;
+    if (!d_ctl_inited) return -RT_EINVAL;
+    return (rt_mutex_take(&d_ctl_lock, REL_CTL_TAKE_MS) == RT_EOK) ? RT_EOK : -RT_EBUSY;
+}
+
+/* 只允许本次 rel_ctl_take() 返回 RT_EOK 的路径调用: 不 release 自己没持有的锁。 */
+void rel_ctl_give_held(void) { (void)rt_mutex_release(&d_ctl_lock); }
+
+/* 初始化专用全清: 只能在线程起来之前调用(R2-A.5 —— 运行期"顺手清生产上下文"
+ * 不是命令线程的权力, 那是唯一写者的职责)。 */
+void rel_prod_init_wipe(void)
+{
+    rt_memset(&d_ctl, 0, sizeof(d_ctl));
+    rt_memset(&d_incident, 0, sizeof(d_incident));
+    rt_memset(&d_pub, 0, sizeof(d_pub));
+    d_pub_have = RT_FALSE;
+    d_pub_fail = 0;
+    rel_engine_wipe(&d_rel_prod);
+}
+
+/* R2-B1: 模式与代际共同的提交协议。调用方(命令线程)此刻仍持有 motor 静止门;
+ * 抢不到控制锁 => 两个字段一个都不动, 并把错误交回命令方去拒绝这次改模式。 */
+rt_err_t rel_prod_commit(rt_uint8_t mode, rt_bool_t bump_gen, rt_uint32_t *gen_out)
+{
+    rt_err_t rc = rel_ctl_take();
+    if (rc != RT_EOK) return rc;
+    if (mode != (rt_uint8_t)REL_CTL_MODE_KEEP) { d_ctl.mode = mode; d_ctl.mode_valid = RT_TRUE; }
+    if (bump_gen) d_ctl.gen_want++;
+    if (gen_out) *gen_out = d_ctl.gen_want;
+    rel_ctl_give_held();
+    return RT_EOK;
+}
+
+/* 显式重新武装(命令线程): 只 bump 期望代际。失败时代际完全不变。 */
+rt_err_t rel_prod_request_rearm(void)
+{
+    return rel_prod_commit((rt_uint8_t)REL_CTL_MODE_KEEP, RT_TRUE, RT_NULL);
+}
+
+rt_err_t rel_prod_get_ctl(rel_ctl_t *out)
+{
+    rt_err_t rc;
+    if (out == RT_NULL) return -RT_EINVAL;
+    rc = rel_ctl_take();
+    if (rc != RT_EOK) { rt_memset(out, 0, sizeof(*out)); return rc; }
+    *out = d_ctl;
+    rel_ctl_give_held();
+    return RT_EOK;
+}
+
+rt_err_t rel_prod_get_incident(rel_incident_t *out)
+{
+    rt_err_t rc;
+    if (out == RT_NULL) return -RT_EINVAL;
+    rc = rel_ctl_take();
+    if (rc != RT_EOK) { rt_memset(out, 0, sizeof(*out)); return rc; }
+    *out = d_incident;
+    /* rearm_required 住在 d_ctl 里(它是"本次武装的票据"状态, 不是事故内容)。
+     * 快照必须把它一起带出去, 否则消费者读到"有首因但看起来还能再保护" ——
+     * 那正是 C6 那种"界面说还在保护、引擎已不再发票"的镜像错误。 */
+    out->rearm_required = d_ctl.rearm_required;
+    rel_ctl_give_held();
+    return RT_EOK;
+}
+
+rt_bool_t rel_prod_get_latch(rel_latch_t *out)
+{
+    rel_incident_t inc;
+
+    if (out == RT_NULL) return RT_FALSE;
+    if (rel_prod_get_incident(&inc) != RT_EOK) return RT_FALSE;   /* 读不到=不可用, 不猜 */
+    if (!inc.have_current) return RT_FALSE;
+    *out = inc.current;
+    return RT_TRUE;
+}
+
+rt_bool_t rel_writer_latch(rel_latch_t *out)
+{
+    if (out == RT_NULL) return RT_FALSE;
+    if (!d_rel_prod.latch.latched) return RT_FALSE;
+    *out = d_rel_prod.latch;
+    return RT_TRUE;
+}
+
+/* 由写者把引擎状态收成一份完整快照(不取锁: 引擎只有本线程写)。 */
+static void rel_state_collect(const rel_engine_t *e, rel_state_t *s)
+{
+    s->sg_run_ms         = e->sg_run_ms;
+    s->sg_strong_run_ms  = e->sg_strong_run_ms;
+    s->adc_run_ms        = e->adc_run_ms;
+    s->adc_strong_run_ms = e->adc_strong_run_ms;
+    s->fused_run_ms      = e->fused_run_ms;
+    s->ok_run_ms         = e->ok_run_ms;
+    s->imp_run_ms        = e->imp_run_ms;
+    s->age_bad_ms        = e->age_bad_ms;
+    s->out_run_ms        = e->out_run_ms;
+    s->cov_lost_ms       = e->cov_lost_ms;
+    s->sg_new_cnt        = e->sg_new_cnt;
+    s->sg_strong_cnt     = e->sg_strong_cnt;
+    s->adc_new_cnt       = e->adc_new_cnt;
+    s->adc_strong_cnt    = e->adc_strong_cnt;
+    s->ok_new_cnt        = e->ok_new_cnt;
+    s->imp_cnt           = e->imp_cnt;
+    s->last_sg_seq       = e->last_sg_seq;
+    s->last_cur_seq      = e->last_cur_seq;
+    s->last_imu_seq      = e->last_imu_seq;
+    s->imu_usable        = e->imu_usable;
+    s->coverage          = e->coverage;
+    s->verdict           = (rt_uint8_t)e->verdict;
+    s->severe_active     = e->severe_active;
+}
+
+/* R2-A.3: 读者要么拿到**整份**已发布快照(带自己的 snap_seq), 要么拿到错误且
+ * out 被清零。"标量不会撕裂"不等于"整份一致", 所以这里不再逐字段跨线程拼。 */
+rt_err_t rel_prod_get_snapshot(rel_state_t *out)
+{
+    rt_err_t rc;
+    if (out == RT_NULL) return -RT_EINVAL;
+    rc = rel_ctl_take();
+    if (rc != RT_EOK) { rt_memset(out, 0, sizeof(*out)); return rc; }
+    if (!d_pub_have) { rel_ctl_give_held(); rt_memset(out, 0, sizeof(*out)); return -RT_EINVAL; }
+    *out = d_pub;
+    rel_ctl_give_held();
+    return RT_EOK;
+}
+
+static void rel_prod_publish(const rel_step_arg_t *a)
+{
+    rel_state_t s;
+
+    rt_memset(&s, 0, sizeof(s));
+    rel_state_collect(&d_rel_prod, &s);
+    s.snap_seq     = a->in.seq;
+    s.pub_fail_cnt = d_pub_fail;      /* 写者私有计数, 随这一份一起发布 */
+    if (rel_ctl_take() == RT_EOK)
+    {
+        d_pub = s;
+        d_pub_have = RT_TRUE;
+        /* 发布视图与行为视图在这里对齐: 票据的真值在引擎(唯一写者)手里,
+         * d_ctl 只是给人读的副本。 */
+        d_ctl.rearm_required = d_rel_prod.rearm_required;
+        d_ctl.generation     = d_rel_prod.gen;
+        /* R2-A.2: 首因的**权威副本在引擎里**(闩锁一旦落下不可改写), 发布视图只是
+         * 它的镜像。锁当时拿不到 => 这一帧镜像不成, 但下一帧仍会重试: 于是"取锁失败
+         * 期间记录不到首因"不会变成"首因永久丢失"。新一代的 wipe 同时清引擎闩锁,
+         * 所以这里的重试不可能把旧事故冒充成新事故的证据。 */
+        if (d_rel_prod.latch.latched && !d_incident.have_current)
+        {
+            d_incident.current      = d_rel_prod.latch;
+            d_incident.have_current = RT_TRUE;
+            d_incident.generation   = d_rel_prod.gen;
+        }
+        rel_ctl_give_held();
+    }
+    else d_pub_fail++;                /* 只有本线程会加它, 读者只读已发布副本 */
+}
+
+/* 代际同步 + R2-B2 的整代证据清零。返回非 RT_EOK 表示"这一帧拿不到一致的控制
+ * 状态", 调用方必须按覆盖丢失降险, 不能带着可疑的旧证据继续宣称有效。
+ * 清零必须在步进**之前**、由唯一写者自己做: 命令线程只 bump 期望代际, 于是
+ * "命令擦掉在途义务"结构上不可能(R3.3), 而"新一代一笔旧帧立刻触发"也不可能(R2-B2)。 */
+static rt_err_t rel_prod_sync_generation(rt_uint8_t *mode_out, rt_uint8_t *committed_out)
+{
+    rt_uint32_t g;
+    rt_bool_t need_wipe = RT_FALSE;
+    rt_err_t rc = rel_ctl_take();
+
+    if (rc != RT_EOK) return rc;
+    g = d_ctl.gen_want;
+    if (mode_out) *mode_out = d_ctl.mode_valid ? d_ctl.mode : (rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION;
+    if (committed_out) *committed_out = d_ctl.mode_valid ? 1u : 0u;
+    if (g != d_ctl.generation)
+    {
+        if (d_rel_prod.latch.latched)
+        {
+            d_incident.archived = d_rel_prod.latch;   /* 上一轮首因挪进 archived, 不得被本轮覆盖 */
+            d_incident.have_archived = RT_TRUE;
+        }
+        rt_memset(&d_incident.current, 0, sizeof(d_incident.current));
+        d_incident.have_current = RT_FALSE;
+        d_incident.generation   = g;
+        d_ctl.generation        = g;
+        d_ctl.rearm_required    = 0;
+        need_wipe = RT_TRUE;
+    }
+    rel_ctl_give_held();
+    if (need_wipe) rel_engine_new_generation(&d_rel_prod, g);
+    return RT_EOK;
+}
+
+/* 相对判据的唯一生产入口: 同步代际 -> 步进 -> 若 severe 则先保护 -> 发布快照 ->
+ * 返回原因给调用方(调用方只能在保护之后打印)。 */
+rel_reason_t rel_prod_evaluate(const rel_step_arg_t *a, rt_uint8_t mode,
+                               rt_err_t *post_rc, rt_bool_t *acted)
+{
+    rel_step_arg_t ar;
+    rel_reason_t r;
+    rt_err_t rc = RT_EOK;
+    rt_err_t sync;
+    rt_bool_t did = RT_FALSE;
+    rt_uint8_t ctl_mode = mode, ctl_committed = 0;
+
+    sync = rel_prod_sync_generation(&ctl_mode, &ctl_committed);
+    ar = *a;
+    if (sync != RT_EOK)
+    {
+        /* 控制状态读不到: 这一帧不许给出任何单源结论, 走有界降险(RELCOV_LOCK_FAIL)。
+         * 保护义务本身不因此消失 —— 已在途的闩锁仍由引擎粘住。 */
+        ar.coverage = RELCOV_LOCK_FAIL;
+        ar.mode = mode;
+    }
+    else
+    {
+        /* R2-B1: 两个模式视图必须**一致**才允许发生保护动作。
+         *   - 命令线程 commit 失败 => d_ctl.mode 仍是旧值, 而 d_mode 已按拒绝处理:
+         *     不一致 => 不保护(绝不因为"镜像里写着 RELATIVE"就动轴)。
+         *   - 触发后的内部降险 commit 失败 => d_mode 退回 MONITOR 而 d_ctl.mode 还是
+         *     RELATIVE: 不一致 => 同样不动(票据本来也已消耗, 这里是第二道)。
+         * 未提交过(mode_valid=0)时沿用调用方给的值 —— 主机链与初始化前的上下文。 */
+        if (ctl_committed && ctl_mode != mode)
+            mode = (rt_uint8_t)DIAG_MODE_MONITOR_ONLY;
+        ar.mode = mode;
+    }
+
+    r = rel_engine_step(&d_rel_prod, &ar);
+
+    if (rel_reason_is_severe((rt_uint8_t)r))
+    {
+        /* M8-R1 R2.5: 副作用只能由"是否已经锁存/是否相对模式"决定, **绝不**能由
+         * 调用方要不要读输出参数决定 —— 旧写法把整个保护调用挂在
+         * `if (post_rc)` 里, 传 NULL 就等于悄悄放弃保护。
+         * M8-R2 R2-A.2: 票据由引擎私有字段把关(行为侧不依赖控制锁), 摘要发布失败
+         * 也不会让"一次武装只保护一次"这件事变得不可靠。 */
+        if (!d_rel_prod.latch.latched && !d_rel_prod.rearm_required &&
+            mode == (rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION)
+        {
+            d_rel_prod.rearm_required = 1;    /* 先落票据: 这一步不需要任何锁 */
+            rc = rel_request_protection(&d_rel_prod, &ar, mode);
+            did = RT_TRUE;
+            /* 首因镜像与快照在下面的 rel_prod_publish() 里一并发布: 取锁失败只会
+             * 让"这一帧的镜像"推迟, 不会让已经执行的保护或引擎里的首因消失。 */
+        }
+    }
+    rel_prod_publish(&ar);
+    if (post_rc) *post_rc = rc;
+    if (acted)   *acted   = did;
+    return r;
 }
 
 /* 采集上下文(零点/学习): 只由命令线程使用。 */
@@ -790,147 +1071,6 @@ typedef struct
 } rel_cap_t;
 
 static rel_cap_t d_cap;
-
-void rel_prod_wipe(void)
-{
-    rel_ctl_lock();
-    rt_memset(&d_incident, 0, sizeof(d_incident));
-    d_ctl.generation = 0;
-    d_ctl.rearm_required = 0;
-    rel_ctl_unlock();
-    rel_engine_wipe(&d_rel_prod);
-}
-
-/* 显式重新武装(命令线程调用): 只 bump 期望代际。真正 wipe 引擎上下文的是
- * Diagnosis Thread 自己(下一步的 rel_prod_sync), 所以命令线程不可能擦掉一次
- * 在途的保护义务(M8-R1 R3.3 的所有权要求)。 */
-void rel_prod_request_rearm(void)
-{
-    rel_ctl_lock();
-    d_ctl.gen_want++;
-    rel_ctl_unlock();
-}
-
-void rel_prod_get_ctl(rel_ctl_t *out)
-{
-    if (out == RT_NULL) return;
-    rel_ctl_lock();
-    *out = d_ctl;
-    rel_ctl_unlock();
-}
-
-void rel_prod_get_incident(rel_incident_t *out)
-{
-    if (out == RT_NULL) return;
-    rel_ctl_lock();
-    *out = d_incident;
-    /* rearm_required 住在 d_ctl 里(它是"本次武装的票据"状态, 不是事故内容)。
-     * 快照必须把它一起带出去, 否则消费者读到"有首因但看起来还能再保护" ——
-     * 那正是 C6 那种"界面说还在保护、引擎已不再发票"的镜像错误。 */
-    out->rearm_required = d_ctl.rearm_required;
-    rel_ctl_unlock();
-}
-
-rt_bool_t rel_prod_get_latch(rel_latch_t *out)
-{
-    rel_incident_t inc;
-
-    if (out == RT_NULL) return RT_FALSE;
-    rel_prod_get_incident(&inc);
-    if (!inc.have_current) return RT_FALSE;
-    *out = inc.current;
-    return RT_TRUE;
-}
-
-void rel_prod_get_snapshot(rel_state_t *out)
-{
-    if (out == RT_NULL) return;
-    /* 这些字段只由 Diagnosis Thread 写; 读侧最坏读到"上一帧与这一帧的混合",
-     * 打印用的都是无符号标量, 不存在撕裂指针/半条链。真正必须原子的只有
-     * 事故快照(rel_prod_get_incident)与代际(rel_prod_get_ctl), 它们走 d_ctl_lock。 */
-    out->sg_run_ms         = d_rel_prod.sg_run_ms;
-    out->sg_strong_run_ms  = d_rel_prod.sg_strong_run_ms;
-    out->adc_run_ms        = d_rel_prod.adc_run_ms;
-    out->adc_strong_run_ms = d_rel_prod.adc_strong_run_ms;
-    out->fused_run_ms      = d_rel_prod.fused_run_ms;
-    out->ok_run_ms         = d_rel_prod.ok_run_ms;
-    out->imp_run_ms        = d_rel_prod.imp_run_ms;
-    out->age_bad_ms        = d_rel_prod.age_bad_ms;
-    out->out_run_ms        = d_rel_prod.out_run_ms;
-    out->cov_lost_ms       = d_rel_prod.cov_lost_ms;
-    out->sg_new_cnt        = d_rel_prod.sg_new_cnt;
-    out->sg_strong_cnt     = d_rel_prod.sg_strong_cnt;
-    out->adc_new_cnt       = d_rel_prod.adc_new_cnt;
-    out->adc_strong_cnt    = d_rel_prod.adc_strong_cnt;
-    out->ok_new_cnt        = d_rel_prod.ok_new_cnt;
-    out->imp_cnt           = d_rel_prod.imp_cnt;
-    out->last_sg_seq       = d_rel_prod.last_sg_seq;
-    out->last_cur_seq      = d_rel_prod.last_cur_seq;
-    out->last_imu_seq      = d_rel_prod.last_imu_seq;
-    out->imu_usable        = d_rel_prod.imu_usable;
-    out->coverage          = d_rel_prod.coverage;
-    out->verdict           = (rt_uint8_t)d_rel_prod.verdict;
-    out->severe_active     = d_rel_prod.severe_active;
-}
-
-/* 代际同步: 引擎上下文的唯一写者在这里消费命令线程的 re-arm 请求。
- * 归档规则(M8-R1 R2.4): 上一轮事故的首因挪进 archived(不得被本轮覆盖),
- * current 与引擎 latch 清空, generation 取期望值, rearm_required 归零。 */
-static void rel_prod_sync_generation(void)
-{
-    rel_ctl_t c;
-
-    rel_prod_get_ctl(&c);
-    if (c.gen_want == d_rel_prod.gen) return;
-    d_rel_prod.gen = c.gen_want;
-    rel_ctl_lock();
-    d_ctl.generation = c.gen_want;
-    d_ctl.rearm_required = 0;
-    if (d_rel_prod.latch.latched)
-    {
-        d_incident.archived = d_rel_prod.latch;
-        d_incident.have_archived = RT_TRUE;
-    }
-    rt_memset(&d_rel_prod.latch, 0, sizeof(d_rel_prod.latch));
-    d_incident.current = d_rel_prod.latch;
-    d_incident.have_current = RT_FALSE;
-    d_incident.generation = d_ctl.generation;
-    rel_ctl_unlock();
-}
-
-/* 相对判据的唯一生产入口: 步进 -> 若 severe 则先保护 -> 返回原因给调用方打印。 */
-rel_reason_t rel_prod_evaluate(const rel_step_arg_t *a, rt_uint8_t mode,
-                               rt_err_t *post_rc, rt_bool_t *acted)
-{
-    rel_reason_t r;
-    rt_err_t rc = RT_EOK;
-    rt_bool_t did = RT_FALSE;
-
-    rel_prod_sync_generation();
-    r = rel_engine_step(&d_rel_prod, a);
-
-    if (rel_reason_is_severe((rt_uint8_t)r))
-    {
-        /* M8-R1 R2.5: 副作用只能由"是否已经锁存/是否相对模式"决定, **绝不**能由
-         * 调用方要不要读输出参数决定 —— 旧写法把整个保护调用挂在
-         * `if (post_rc)` 里, 传 NULL 就等于悄悄放弃保护。 */
-        if (!d_rel_prod.latch.latched &&
-            mode == (rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION)
-        {
-            rc = rel_request_protection(&d_rel_prod, a, mode);
-            did = RT_TRUE;
-            rel_ctl_lock();
-            d_incident.current = d_rel_prod.latch;
-            d_incident.have_current = RT_TRUE;
-            d_incident.generation = d_ctl.generation;
-            d_ctl.rearm_required = 1;       /* 本次武装的票据已消耗 */
-            rel_ctl_unlock();
-        }
-    }
-    if (post_rc) *post_rc = rc;
-    if (acted)   *acted   = did;
-    return r;
-}
 
 /* ---------- 采集(零点 / 学习) ---------- */
 
