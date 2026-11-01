@@ -180,7 +180,8 @@ PLAN = {
                     "READBACK_MISSING", "READBACK_SHORT", "READBACK_MISMATCH", "PORT_BUSY",
                     "PORT_NOT_CLOSED", "RESET_FAILED", "HARDFAULT_NEEDLE_SEEN", "BOOT_INCOMPLETE",
                     "NO_PROMPT", "QUERY_SHORT_WRITE", "QUERY_TIMEOUT", "QUERY_INCOMPLETE",
-                    "SERIAL_READ_EXCEPTION", "MOTION_FORBIDDEN_REQUESTED"],
+                    "SERIAL_READ_EXCEPTION", "PRIOR_READBACK_NOT_PROVEN", "CONT_TOOL_CARDINALITY",
+                    "MOTION_FORBIDDEN_REQUESTED"],
     "verdict_labels": {
         "CAPTURE_COMPLETE_REVIEW_PENDING": "启动完成+无 HardFault+四条查询三段齐全; "
                                           "diag 栈余量与堆余量**尚未离线判读**, 所以不写 PASS",
@@ -595,21 +596,101 @@ def sim(run_root, emit):
     return 0 if not probs else 1
 
 
+def cont_only_reset(name):
+    """续测入口的硬门: 除 reset 外任何工具名一律拒绝(整包 real() 不在这里可达)。"""
+    if name != "reset":
+        raise AssertionError("cont 只允许 reset, 实际请求 %s" % name)
+
+
+CONT = {
+    "quota": {"port_open": 1, "explicit_reset": 1, "boot_window_s": BOOT_WINDOW_S, "queries": list(QUERIES),
+              "read_ram": 0, "download": 0, "flash_readback": 0, "flash_write": 0, "ram_write": 0,
+              "motor_run": 0, "config_save": 0, "blackbox_clear": 0, "rebuild": 0, "retry": 0},
+    "image_proven_on_board": {
+        "run_root": "reports/reviews/phase8-m8-diag-stack-r1/field/field-20261101T084256Z",
+        "readback_file": "flash_readback.bin", "bytes": 290916,
+        "sha256": "f5c2fd89bbf28255a5b26c9cca495bc0fb1e39d401d0bb7bea19d051221708ce",
+        "proven": "S2 唯一一次回读 rc=0 且与该散列逐字节相同(run_record §12); 复审亦独立复算确认",
+        "note": "续测**不再**下载与回读: 那两项配额已用尽, 镜像身份已证"},
+    "port_open_ledger_before": [
+        {"when_utc": "2026-11-01T08:42Z 前", "what": "COM5 空闲探测(打开后立即关闭)",
+         "counted_as": "port_open 1 —— 复审指出: 探测本身就是开口, 必须入台账"},
+        {"when_utc": "2026-11-01T08:43Z", "what": "崩溃那次 real() 里 make_real_port() 已开口(未关闭即抛异常)",
+         "counted_as": "port_open 2 —— 绑定包内的那一次, 句柄随进程退出释放"},
+    ],
+    "next_open_is": "port_open 3 (正式会话; 不再做任何额外开口探测)",
+}
+
+
+def prior_image_proven(prior_dir):
+    """续测入口的镜像前提: 既往那一次**唯一**回读的原字节必须仍在, 且等于固定接受散列。"""
+    rb = pathlib.Path(prior_dir) / CONT["image_proven_on_board"]["readback_file"]
+    return rb.exists() and sha256_file(rb) == ACCEPTED["image_under_test"]["sha256"]
+
+
+def cont(run_root, uid_file, approve, runner=None, open_port=None, clock=None, prior_run=None):
+    """S3/S4 续测入口: 复用 serial_stage(), **不调用整包 real()**, 工具调用只允许 reset。"""
+    out = {"mode": "cont", "run_root": run_root.as_posix(), "quota": CONT["quota"]}
+    if not approve or not approve.strip():
+        print("REFUSED: 续测同样需要原文授权令牌(--approve '原文'), 空即拒绝")
+        return 2
+    run_root.mkdir(parents=True, exist_ok=True)
+    (run_root / "APPROVAL_TOKEN.verbatim.txt").write_text(approve + "\n", encoding="utf-8", newline="\n")
+    probs = verify_accepted_literals() + verify_products()
+    if probs:
+        return report(stop(out, run_root, "PRODUCT_IDENTITY_MISMATCH", probs))
+    prior = pathlib.Path(prior_run) if prior_run else (ROOT / CONT["image_proven_on_board"]["run_root"])
+    if not prior_image_proven(prior):
+        return report(stop(out, run_root, "PRIOR_READBACK_NOT_PROVEN", str(prior)))
+    out["image_proven_on_board"] = CONT["image_proven_on_board"]
+    if not uid_file or not pathlib.Path(uid_file).exists():
+        return report(stop(out, run_root, "PRE_READ_MISSING_FILE", "UID 文件不在场"))
+    uid = uid_from_file(uid_file)
+    out["uid_disclosure"] = uid_disclosure(uid)
+    argv_reset = expand(PLAN["tools"]["reset"]["argv"], run_root, uid)
+    g = argv_gate("reset", argv_reset, uid, run_root)
+    if g:
+        return report(stop(out, run_root, "PLAN_GATE_REFUSED", g))
+    (run_root / "ARGV.masked.reset.txt").write_text(" ".join(mask(argv_reset, uid)) + "\n",
+                                                    encoding="utf-8", newline="\n")
+    clock = clock or RealClock()
+    called = []
+
+    def only_reset(name, argv):
+        cont_only_reset(name)
+        called.append(name)
+        return (runner or (lambda n, a: run_tool(n, a, run_root)))(name, argv)
+
+    got = serial_stage(run_root, uid, argv_reset, open_port or make_real_port, clock, only_reset, out)
+    got["tools_called"] = called
+    got["port_open_ledger"] = {"before": len(CONT["port_open_ledger_before"]), "this_run": 1,
+                               "next_open_is": CONT["next_open_is"]}
+    if called != ["reset"]:
+        return report(stop(got, run_root, "CONT_TOOL_CARDINALITY", str(called)))
+    result(got, run_root)   # 末次重写: tools_called 与开口台账也必须进得了归档
+    print(json.dumps({k: got.get(k) for k in ("stop_label", "verdict", "boot_bytes", "queries",
+                                              "port_closed", "tools_called")}, ensure_ascii=False))
+    return 0 if got.get("verdict") == "CAPTURE_COMPLETE_REVIEW_PENDING" else 4
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--mode", choices=["sim", "real"], default="sim")
+    ap.add_argument("--mode", choices=["sim", "real", "cont"], default="sim")
     ap.add_argument("--emit-plan", type=pathlib.Path, default=None)
     ap.add_argument("--run-root", type=pathlib.Path, default=None)
     ap.add_argument("--uid-file", default=str(UID_DEFAULT))
     ap.add_argument("--approve", default=None)
     a = ap.parse_args()
     stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
-    run_root = a.run_root or (FIELD / ({"sim": "sim-%s", "real": "field-%s"}[a.mode] % stamp))
+    run_root = a.run_root or (FIELD / ({"sim": "sim-%s", "real": "field-%s",
+                                        "cont": "cont-%s"}[a.mode] % stamp))
     run_root = run_root.resolve()
     run_root.mkdir(parents=True, exist_ok=True)
     (run_root / "MODE.txt").write_text("%s %s\n" % (a.mode, stamp), encoding="utf-8", newline="\n")
     if a.mode == "sim":
         return sim(run_root, a.emit_plan)
+    if a.mode == "cont":
+        return cont(run_root, a.uid_file, a.approve)
     return real(run_root, a.uid_file, a.approve)
 
 

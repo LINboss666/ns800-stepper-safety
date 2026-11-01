@@ -258,6 +258,55 @@ add("D5_e2e_sentinels_recorded_and_port_closed",
 add("D6_e2e_never_writes_raw_uid",
     not any(FAKE_UID.encode() in p.read_bytes() for p in d_root.rglob("*") if p.is_file()))
 
+# ---------------- E 组: S3/S4 续测入口(禁止可达整包 real()) ----------------
+PRIOR = F.ROOT / "reports/reviews/phase8-m8-diag-stack-r1/field/field-20261101T084256Z"
+e_root = SCRATCH / "e_cont"
+e_root.mkdir(parents=True, exist_ok=True)
+e_calls = []
+rc_e = F.cont(e_root, str(uid_file), "E组端到端干跑(零设备)",
+              runner=make_e2e_runner(e_root, e_calls),
+              open_port=lambda: FakePort([BOOT_OK], response={c: healthy_response(c) for c in F.QUERIES}),
+              clock=FakeClock(), prior_run=str(PRIOR))
+res_e = json.loads((e_root / "RESULT.json").read_text(encoding="utf-8"))
+add("E1_cont_rc0_pending_and_only_reset", rc_e == 0 and
+    res_e.get("verdict") == "CAPTURE_COMPLETE_REVIEW_PENDING" and res_e.get("tools_called") == ["reset"],
+    "rc=%s tools=%s verdict=%s" % (rc_e, res_e.get("tools_called"), res_e.get("verdict")))
+add("E2_cont_result_records_port_closed", res_e.get("port_closed") is True,
+    "port_closed=%r (复审要求最终结果必须含端口关闭状态)" % res_e.get("port_closed"))
+add("E3_cont_builds_no_argv_but_reset",
+    sorted(p.name for p in e_root.glob("ARGV.masked.*")) == ["ARGV.masked.reset.txt"])
+add("E4_cont_touches_no_image_or_ram_artifact",
+    not (e_root / "flash_readback.bin").exists() and not (e_root / "A_locals.bin").exists())
+bad_prior = SCRATCH / "e_prior_tampered"
+bad_prior.mkdir(parents=True, exist_ok=True)
+(bad_prior / "flash_readback.bin").write_bytes(b"\xA5" * 290916)
+rc_bad = F.cont(SCRATCH / "e_bad", str(uid_file), "E组反例(零设备)",
+                runner=lambda n, a: {"rc": 0, "stdout": b"", "stderr": b""},
+                open_port=lambda: FakePort([BOOT_OK]), clock=FakeClock(), prior_run=str(bad_prior))
+res_bad = json.loads((SCRATCH / "e_bad" / "RESULT.json").read_text(encoding="utf-8"))
+add("E5_unproven_prior_image_refused", rc_bad == 3 and res_bad.get("stop_label") == "PRIOR_READBACK_NOT_PROVEN",
+    "rc=%s stop=%s" % (rc_bad, res_bad.get("stop_label")))
+refused = []
+for n in ("download", "readback", "read_ram", "flash", "savemem"):
+    try:
+        F.cont_only_reset(n)
+    except AssertionError:
+        refused.append(n)
+F.cont_only_reset("reset")
+add("E6_only_reset_gate_refuses_everything_else", len(refused) == 5 and refused == ["download", "readback",
+                                                                                    "read_ram", "flash",
+                                                                                    "savemem"],
+    str(refused))
+add("E7_cont_quota_declares_zero_write_and_zero_rebuild",
+    F.CONT["quota"]["download"] == 0 and F.CONT["quota"]["flash_readback"] == 0 and
+    F.CONT["quota"]["read_ram"] == 0 and F.CONT["quota"]["motor_run"] == 0 and
+    F.CONT["quota"]["flash_write"] == 0 and F.CONT["quota"]["ram_write"] == 0 and
+    F.CONT["quota"]["rebuild"] == 0 and F.CONT["quota"]["port_open"] == 1 and
+    F.CONT["quota"]["explicit_reset"] == 1 and F.CONT["quota"]["boot_window_s"] == 75)
+add("E8_port_open_ledger_accounts_the_idle_probe",
+    len(F.CONT["port_open_ledger_before"]) == 2 and "3" in F.CONT["next_open_is"] and
+    "空闲探测" in F.CONT["port_open_ledger_before"][0]["what"])
+
 # ---------------- C 组: 元负控(把守门换成永远放行, 判据必须变红) ----------------
 orig_gate, orig_products, orig_read = F.argv_gate, F.verify_products, F.read_until_prompt
 flipped = 0
@@ -324,6 +373,20 @@ try:
 except TypeError as e:
     blew_up = "not callable" in str(e)
 add("C5_metaneg_factory_seam_load_bearing", blew_up, "实例当工厂传下去时 D 组会红, 说明 D1 不是空跑")
+
+# C6: 把"既往回读已证"这道前提换成"永远为真" —— E5 的拒绝必须失效, 说明 E5 靠的是真复算。
+orig_prior = F.prior_image_proven
+F.prior_image_proven = lambda p: True
+try:
+    rc_c6 = F.cont(SCRATCH / "c6_prior", str(uid_file), "C6 元负控(零设备)",
+                   runner=lambda n, a: {"rc": 0, "stdout": b"Core 0 (None):  Halted\n", "stderr": b""},
+                   open_port=lambda: FakePort([BOOT_OK],
+                                               response={c: healthy_response(c) for c in F.QUERIES}),
+                   clock=FakeClock(), prior_run=str(bad_prior))
+finally:
+    F.prior_image_proven = orig_prior
+add("C6_metaneg_prior_image_gate_load_bearing", rc_c6 == 0,
+    "散列比较被架空后, 被篡改的既往回读也能放行 => E5 有牙")
 
 problems = [n for n, ok, _ in CHECKS if not ok]
 lines = ["FIELD_CHECK mode=zero_device_injection (未起 pyocd, 未开真实端口)",

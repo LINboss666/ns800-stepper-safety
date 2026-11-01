@@ -171,6 +171,46 @@
    "detail": ""
   },
   {
+   "name": "E1_cont_rc0_pending_and_only_reset",
+   "ok": true,
+   "detail": "rc=0 tools=['reset'] verdict=CAPTURE_COMPLETE_REVIEW_PENDING"
+  },
+  {
+   "name": "E2_cont_result_records_port_closed",
+   "ok": true,
+   "detail": "port_closed=True (复审要求最终结果必须含端口关闭状态)"
+  },
+  {
+   "name": "E3_cont_builds_no_argv_but_reset",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "E4_cont_touches_no_image_or_ram_artifact",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "E5_unproven_prior_image_refused",
+   "ok": true,
+   "detail": "rc=3 stop=PRIOR_READBACK_NOT_PROVEN"
+  },
+  {
+   "name": "E6_only_reset_gate_refuses_everything_else",
+   "ok": true,
+   "detail": "['download', 'readback', 'read_ram', 'flash', 'savemem']"
+  },
+  {
+   "name": "E7_cont_quota_declares_zero_write_and_zero_rebuild",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "E8_port_open_ledger_accounts_the_idle_probe",
+   "ok": true,
+   "detail": ""
+  },
+  {
    "name": "C1_metaneg_argv_gate_load_bearing",
    "ok": true,
    "detail": "换成永远放行后 UID 路径形态不再被拒"
@@ -194,9 +234,14 @@
    "name": "C5_metaneg_factory_seam_load_bearing",
    "ok": true,
    "detail": "实例当工厂传下去时 D 组会红, 说明 D1 不是空跑"
+  },
+  {
+   "name": "C6_metaneg_prior_image_gate_load_bearing",
+   "ok": true,
+   "detail": "散列比较被架空后, 被篡改的既往回读也能放行 => E5 有牙"
   }
  ],
  "problems": [],
- "scratch_local_only": "D:/ns800_m8r3_scratch/fieldcheck_nsupoxms",
+ "scratch_local_only": "D:/ns800_m8r3_scratch/fieldcheck_yn33d0ce",
  "boot_window_s_declared_real": 75
 }

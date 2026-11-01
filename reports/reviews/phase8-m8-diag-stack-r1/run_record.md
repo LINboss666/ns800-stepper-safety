@@ -243,3 +243,25 @@ rt_timer_init(&(thread->thread_timer), …)` → `timer.c:280 rt_object_init(&(t
 下一小步只要一次追加批准：续测包只做 **S3+S4**（`port_open 1`、`explicit_reset 1`、75 s 启动采集 +
 提示符 + `system_status/ps/free/diag_status`），**零下载、零回读、零电机、零写 Flash**，因为这两项配额
 已经用尽而镜像身份已证。
+
+## 14. S3/S4 续测入口（`--mode cont`，本轮零设备动作）
+
+复审指出一个入口问题：`--mode real` 会重走 RAM 读取/下载/回读，不能拿来续测。故新增 `cont()`：
+**复用同一个 `serial_stage()`，可达工具只有 `reset`**（`cont_only_reset()` 对其它任何工具名抛断言），
+不调用 `real()`、不重新下载/回读、不重编。镜像前提改成可核对的闸：`prior_image_proven()` 复核既往那一次
+唯一回读的原字节仍在且等于固定接受散列，不满足即 `PRIOR_READBACK_NOT_PROVEN` 停。台账写进
+`CONT["port_open_ledger_before"]`：**复审提醒，我之前那次"COM5 空闲检查"本身就是一次真实开口**，
+所以历史上已开 2 次（探测 1 + 崩溃那次 1），续测这次是第 3 次，且不再做任何额外探测。
+
+零设备复核（`host/field_check.py`）：**CHECKS=48 problems=0，元负控 6/6 fired**。新增两组：
+- E 组 8 项 = 续测入口端到端（`tools_called == ["reset"]`、只生成 `ARGV.masked.reset.txt`、
+  不产生 `flash_readback.bin`/`A_locals.bin`、被篡改的既往回读必须拒、非 reset 工具名逐个拒、
+  配额里 download/readback/read_ram/flash_write/ram_write/rebuild 全 0 而 port_open=reset=1、
+  窗口仍 75 s、台账两条 + "next_open_is = 第 3 次"）。
+- C6 元负控 = 把 `prior_image_proven` 换成"永远为真"，E5 的拒绝必须失效 ⇒ 证明它靠的是真复算。
+
+E 组又抓到第 8 项同类问题：`serial_stage()` 的 `finally` 早于 `cont()` 赋 `tools_called` 就写档案，
+所以 `RESULT.json` 里 `tools_called` 是空 ⇒ 续测末次再写一次 `RESULT.json`，`tools_called` 与开口台账进档。
+
+本轮**没有任何设备动作**：板子仍是 §12 的状态（4096 新镜像已在 Flash 且逐字节证得，核心 Halted，从未复位）。
+等"跑续测"这句话，才执行 `--mode cont`。

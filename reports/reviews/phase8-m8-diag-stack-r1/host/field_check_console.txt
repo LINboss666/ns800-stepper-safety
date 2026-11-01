@@ -1,5 +1,5 @@
 FIELD_CHECK mode=zero_device_injection (未起 pyocd, 未开真实端口)
-run_dir(LOCAL_ONLY, 仓外)=D:/ns800_m8r3_scratch/fieldcheck_nsupoxms
+run_dir(LOCAL_ONLY, 仓外)=D:/ns800_m8r3_scratch/fieldcheck_yn33d0ce
 clock=FakeClock(step=0.5s) 说明: 真机 BOOT_WINDOW_S=75 s 未缩短, 只是自检不等真实时间
 OK A1_accepted_literals_agree_with_manifest
 OK A2_good_expanded_argv_accepted
@@ -35,11 +35,20 @@ OK D3_e2e_passes_uid_content_not_path
 OK D4_e2e_savemem_quoted_posix_under_run_root
 OK D5_e2e_sentinels_recorded_and_port_closed
 OK D6_e2e_never_writes_raw_uid
+OK E1_cont_rc0_pending_and_only_reset
+OK E2_cont_result_records_port_closed
+OK E3_cont_builds_no_argv_but_reset
+OK E4_cont_touches_no_image_or_ram_artifact
+OK E5_unproven_prior_image_refused
+OK E6_only_reset_gate_refuses_everything_else
+OK E7_cont_quota_declares_zero_write_and_zero_rebuild
+OK E8_port_open_ledger_accounts_the_idle_probe
 OK C1_metaneg_argv_gate_load_bearing
 OK C2_metaneg_verify_products_load_bearing
 OK C3_metaneg_query_deadline_load_bearing
 OK C4_metaneg_dap_session_count_load_bearing
 OK C5_metaneg_factory_seam_load_bearing
-CHECKS=39 problems=0
-NEG_CONTROLS_FIRED=5/5
+OK C6_metaneg_prior_image_gate_load_bearing
+CHECKS=48 problems=0
+NEG_CONTROLS_FIRED=6/6
 FIELD_CHECK ALL_PASS_WITH_META_NEGATIVES
