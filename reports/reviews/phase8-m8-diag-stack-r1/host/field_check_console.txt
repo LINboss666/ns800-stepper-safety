@@ -1,0 +1,38 @@
+FIELD_CHECK mode=zero_device_injection (未起 pyocd, 未开真实端口)
+run_dir(LOCAL_ONLY, 仓外)=D:/ns800_m8r3_scratch/fieldcheck_g4l5ynf9
+clock=FakeClock(step=0.5s) 说明: 真机 BOOT_WINDOW_S=75 s 未缩短, 只是自检不等真实时间
+OK A1_accepted_literals_agree_with_manifest
+OK A2_good_expanded_argv_accepted
+OK A3_uid_path_form_rejected
+OK A4_savemem_backslash_rejected
+OK A5_savemem_count_not_accepted_rejected
+OK A6_savemem_outside_run_root_rejected
+OK A7_unresolved_placeholder_rejected
+OK A8_tampered_product_rejected
+OK A9_intact_copy_passes_verify_products
+OK A10_dap_sessions_is_4_tool_connections
+OK A11_no_operator_checkpoint_left
+OK A12_plan_has_no_self_computed_hash_binding
+OK B1_healthy_verdict_is_pending_not_pass
+OK B2_healthy_four_queries_with_body
+OK B3_healthy_port_closed
+OK B4_healthy_raw_files_saved
+OK B5_hardfault_needle_stops
+OK B6_hardfault_sends_no_queries
+OK B7_reset_rc1_stops
+OK B8_reset_rc1_sends_nothing_and_closes
+OK B9_boot_incomplete_stops
+OK B10_read_exception_named_stop
+OK B11_partial_boot_bytes_kept
+OK B12_no_prompt_stops
+OK B13_echo_only_not_success
+OK B14_unterminated_query_times_out
+OK B15_short_write_stops
+OK B16_zero_byte_response_not_success
+OK C1_metaneg_argv_gate_load_bearing
+OK C2_metaneg_verify_products_load_bearing
+OK C3_metaneg_query_deadline_load_bearing
+OK C4_metaneg_dap_session_count_load_bearing
+CHECKS=32 problems=0
+NEG_CONTROLS_FIRED=4/4
+FIELD_CHECK ALL_PASS_WITH_META_NEGATIVES

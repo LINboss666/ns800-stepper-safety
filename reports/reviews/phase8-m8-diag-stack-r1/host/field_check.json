@@ -1,0 +1,167 @@
+{
+ "checks": [
+  {
+   "name": "A1_accepted_literals_agree_with_manifest",
+   "ok": true,
+   "detail": "[]"
+  },
+  {
+   "name": "A2_good_expanded_argv_accepted",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "A3_uid_path_form_rejected",
+   "ok": true,
+   "detail": "['readback:backslash_path D:\\\\ns800-m7-p0-20261030T182818\\\\dap_uid_bare.txt', 'readback:uid_arg_not_content(path)']"
+  },
+  {
+   "name": "A4_savemem_backslash_rejected",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "A5_savemem_count_not_accepted_rejected",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "A6_savemem_outside_run_root_rejected",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "A7_unresolved_placeholder_rejected",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "A8_tampered_product_rejected",
+   "ok": true,
+   "detail": "['length reports/firmware/phase8-m8-diag-stack-r1/rt-thread-motor-m1-candidate.bin declared=290916 on_disk=10', 'sha reports/firmware/phase8-m8-diag-stack-r1/rt-thread-motor-m1-candidate.bin accepted=f5c2fd89bbf28255 on_disk=01d448afd9280654']"
+  },
+  {
+   "name": "A9_intact_copy_passes_verify_products",
+   "ok": true,
+   "detail": "[]"
+  },
+  {
+   "name": "A10_dap_sessions_is_4_tool_connections",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "A11_no_operator_checkpoint_left",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "A12_plan_has_no_self_computed_hash_binding",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "B1_healthy_verdict_is_pending_not_pass",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "B2_healthy_four_queries_with_body",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "B3_healthy_port_closed",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "B4_healthy_raw_files_saved",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "B5_hardfault_needle_stops",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "B6_hardfault_sends_no_queries",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "B7_reset_rc1_stops",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "B8_reset_rc1_sends_nothing_and_closes",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "B9_boot_incomplete_stops",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "B10_read_exception_named_stop",
+   "ok": true,
+   "detail": "FAIL_OR_INCOMPLETE"
+  },
+  {
+   "name": "B11_partial_boot_bytes_kept",
+   "ok": true,
+   "detail": "40 B 已落盘"
+  },
+  {
+   "name": "B12_no_prompt_stops",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "B13_echo_only_not_success",
+   "ok": true,
+   "detail": "detail=system_status echo/prompt only"
+  },
+  {
+   "name": "B14_unterminated_query_times_out",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "B15_short_write_stops",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "B16_zero_byte_response_not_success",
+   "ok": true,
+   "detail": "QUERY_TIMEOUT"
+  },
+  {
+   "name": "C1_metaneg_argv_gate_load_bearing",
+   "ok": true,
+   "detail": "换成永远放行后 UID 路径形态不再被拒"
+  },
+  {
+   "name": "C2_metaneg_verify_products_load_bearing",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "C3_metaneg_query_deadline_load_bearing",
+   "ok": true,
+   "detail": "去掉截止/终止符判据后, 永不收尾的响应会被当成查询成功"
+  },
+  {
+   "name": "C4_metaneg_dap_session_count_load_bearing",
+   "ok": true,
+   "detail": "['dap_session_count_mismatch 3']"
+  }
+ ],
+ "problems": [],
+ "scratch_local_only": "D:/ns800_m8r3_scratch/fieldcheck_g4l5ynf9",
+ "boot_window_s_declared_real": 75
+}

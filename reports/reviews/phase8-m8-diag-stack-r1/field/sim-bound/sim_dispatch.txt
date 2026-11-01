@@ -1,16 +1,17 @@
 MODE=sim (零设备动作: 没有 pyocd/Keil/串口调用)
 PLAN_GATE problems=0 []
+ACCEPTED_LITERALS vs reports/firmware/phase8-m8-diag-stack-r1/SHA256SUMS.txt: 逐字相符
 stage S-1 tool=read_ram device_actions=1
-   argv: python -m pyocd commander --no-config --connect attach --no-wait -t cortex_m -f 1000000 -Oauto_unlock=false -Ocache.enable_memory=false -Ocache.read_code_from_elf=false -O connect_mode=attach -O scan_all_aps=false -O resume_on_disconnect=false -u @UID_FILE_MISSING -c status -c savemem 0x200127d8 40 D:\ns800\reports\reviews\phase8-m8-diag-stack-r1\field\sim-bound/A_locals.bin -c savemem 0x20015b28 48 D:\ns800\reports\reviews\phase8-m8-diag-stack-r1\field\sim-bound/B_tcb.bin -c status -c exit
+   argv: python -m pyocd commander --no-config --connect attach --no-wait -t cortex_m -f 1000000 -Oauto_unlock=false -Ocache.enable_memory=false -Ocache.read_code_from_elf=false -O connect_mode=attach -O scan_all_aps=false -O resume_on_disconnect=false -u @UID_FILE_MISSING -c status -c savemem 0x200127d8 40 'D:/ns800/reports/reviews/phase8-m8-diag-stack-r1/field/sim-bound/A_locals.bin' -c savemem 0x20015b28 48 'D:/ns800/reports/reviews/phase8-m8-diag-stack-r1/field/sim-bound/B_tcb.bin' -c status -c exit
 stage S0 tool=None device_actions=0
 stage S1 tool=download device_actions=1
-   argv: python -m pyocd flash --pack C:/Keil_v5/ARM/PACK/.Download/NOVOSENSE.NS800RT7XXX.0.5.3.pack -t ns800rt7p65d_dhqfby2 -u @UID_FILE_MISSING -f 1000000 -Oauto_unlock=false -Ocache.enable_memory=false -Ocache.read_code_from_elf=false -e sector D:\ns800\reports\firmware\phase8-m8-diag-stack-r1\rt-thread-motor-m1.axf
+   argv: python -m pyocd flash --pack C:/Keil_v5/ARM/PACK/.Download/NOVOSENSE.NS800RT7XXX.0.5.3.pack -t ns800rt7p65d_dhqfby2 -u @UID_FILE_MISSING -f 1000000 -Oauto_unlock=false -Ocache.enable_memory=false -Ocache.read_code_from_elf=false -e sector D:/ns800/reports/firmware/phase8-m8-diag-stack-r1/rt-thread-motor-m1.axf
 stage S2 tool=readback device_actions=1
-   argv: python -m pyocd commander --no-config -t cortex_m -u @UID_FILE_MISSING -f 1000000 -O auto_unlock=false -O connect_mode=halt -O resume_on_disconnect=false -O cache.enable_memory=false -O cache.read_code_from_elf=false -O scan_all_aps=false -c status -c savemem 0x08000000 290916 D:\ns800\reports\reviews\phase8-m8-diag-stack-r1\field\sim-bound/flash_readback.bin -c status -c exit
+   argv: python -m pyocd commander --no-config -t cortex_m -u @UID_FILE_MISSING -f 1000000 -O auto_unlock=false -O connect_mode=halt -O resume_on_disconnect=false -O cache.enable_memory=false -O cache.read_code_from_elf=false -O scan_all_aps=false -c status -c savemem 0x08000000 290916 'D:/ns800/reports/reviews/phase8-m8-diag-stack-r1/field/sim-bound/flash_readback.bin' -c status -c exit
 stage S3 tool=reset device_actions=1
    argv: python -m pyocd reset --method sysresetreq --no-config --no-wait --connect attach --core 0 -t cortex_m -u @UID_FILE_MISSING
 stage S4 tool=None device_actions=0
-image_under_test bytes=290916 sha256=f5c2fd89bbf28255a5b26c9cca495bc0fb1e39d401d0bb7bea19d051221708ce
-readback_length=290916 (=0x47064)
+product_files(bytes/sha256) 复核=推迟到 real(S0) : 见 ACCEPTED 常量
+prompt_marker='msh >' boot_window=75s query_window=12s queries=['system_status', 'ps', 'free', 'diag_status']
 needles: {"boot_complete": "[BOOT] Phase-7 runtime bootstrap complete (state=", "stage5_storage_line": "[BOOT] 5 storage ......... ", "stage8_diag_line": "[BOOT] 8 diagnosis ....... ", "fail_hardfault_dump": "hard fault on thread: ", "fail_hardfault_regs": "psr: 0x", "fail_flash_scan_start": "[FLASH] scanning 1 MiB event log..."}
 SIM_TOTAL problems=0

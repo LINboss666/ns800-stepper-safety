@@ -12,16 +12,18 @@ import subprocess
 import sys
 
 ROOT = pathlib.Path("D:/ns800")
-MANIFESTS = [
+FULL_MANIFESTS = [
     "reports/reviews/phase8-m8-diag-stack-r1/SHA256SUMS.txt",
     "reports/firmware/phase8-m8-diag-stack-r1/SHA256SUMS.txt",
     "reports/reviews/phase8-m8-relative-protection-r3/SHA256SUMS.txt",
     "reports/firmware/phase8-m8-relative-protection-r3/SHA256SUMS.txt",
 ]
-BUILD_MANIFESTS = [
-    "reports/firmware/phase8-m8-diag-stack-r1/build_manifest.json",
-    "reports/firmware/phase8-m8-relative-protection-r3/build_manifest.json",
-]
+# 本轮补正按复审口径只核本轮两份清单(往轮 R3 的 5137 条不在本轮重走; 那 5137 条已在 8bf93fb
+# 之后逐 blob 证过 problems=0)。--full 才把 R3 两份再拉进来。
+MANIFESTS = FULL_MANIFESTS[:2] if "--round-only" in sys.argv else FULL_MANIFESTS
+BUILD_MANIFESTS = ["reports/firmware/phase8-m8-diag-stack-r1/build_manifest.json"]
+if "--full" in sys.argv:
+    BUILD_MANIFESTS.append("reports/firmware/phase8-m8-relative-protection-r3/build_manifest.json")
 
 
 def blob(rel):
@@ -65,10 +67,24 @@ for sums in MANIFESTS:
 for bm in BUILD_MANIFESTS:
     d = json.loads((ROOT / bm).read_text(encoding="utf-8"))
     want = []
+
+    def collect(item, key):
+        """两种已登记形态: 本轮 images/maps 是**列表**, R3 是**名字->字典**(且 map 是单个字典)。"""
+        if isinstance(item, dict) and "sha256" in item:
+            want.append((item["sha256"], item.get("name", key), item.get("bytes")))
+        elif isinstance(item, dict):
+            for k, v in item.items():
+                if isinstance(v, dict) and "sha256" in v:
+                    want.append((v["sha256"], k, v.get("bytes")))
+
     for t in d["targets"]:
-        for key in ("images", "maps"):
-            for it in t.get(key, []):
-                want.append((it["sha256"], it["name"], it["bytes"]))
+        for key in ("images", "maps", "image", "map"):
+            v = t.get(key)
+            if isinstance(v, list):
+                for it in v:
+                    collect(it, key)
+            elif isinstance(v, dict):
+                collect(v, key)
         if "log_sha256" in t:
             want.append((t["log_sha256"], t.get("log_archive_path", "log"), t["log_bytes"]))
     probs, ok = [], 0
@@ -80,7 +96,7 @@ for bm in BUILD_MANIFESTS:
         b = blob(rel)
         if b is None:
             probs.append("missing_blob %s" % rel)
-        elif len(b) != n:
+        elif n is not None and len(b) != n:
             probs.append("size_mismatch %s declared=%d blob=%d" % (rel, n, len(b)))
         else:
             ok += 1

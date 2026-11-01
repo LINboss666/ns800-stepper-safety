@@ -135,3 +135,56 @@ diag 栈余量与堆余量 = `ps`/`free` 两个文件**由人读**，不自动�
 且注入模式下 `S3_reset.rc.txt` 内容为 `SKIPPED_INJECTION(零设备: 不碰 DAP)` —— 复位那条 argv 在自检里**没有执行**。
 
 本轮仍然没有设备动作：板子保持 (c)/frame 轮结束时的 Halted，板上镜像仍是 `00608ec9…e304`。
+
+## 11. 现场脚本集中补正 r2（复审 2026-11-01 任务书；本轮设备动作 = 0）
+
+复审用零设备桩实读 `8bf93fb` 的执行器，复现出 5 项会让现场直接失败的问题。我逐项回读源码确认，全部成立：
+
+| # | 缺陷（在 `8bf93fb` 版里） | 我核对到的代码事实 |
+| --- | --- | --- |
+| 1 | `-u` 收到的是**文件路径**而不是 UID 内容 | `main()` 里 `uid = a.uid_file`，`expand()` 直接把路径塞进 `@UID_FILE`；pyocd 按 unique-id 匹配探针，路径永远匹配不到 |
+| 2 | savemem 目标路径是反斜杠形态 | `expand()` 用 `str(run_root)`（WindowsPath→`D:\…`）。本机 pyocd 0.45.1 实测分词：`split_command_line("savemem 0x08000000 290916 D:\\ns800\\a.bin")` → `['savemem','0x08000000','290916','D:','s800\x07.bin']`；单引号+正斜杠形态被正确剥成单个路径 |
+| 3 | 四条查询零字节仍能走到 `PASS` | `_serial_and_capture` 只记 `len(resp)`，`real()` 的判据只有 `boot_complete/hardfault/echo_bytes>0` |
+| 4 | 复位 `rc=1` 照样继续发 5 次写入 | 写了 `S3_reset.rc.txt` 但**没有任何地方读它** |
+| 5 | 读取异常时端口不关、已收字节不存 | `p` 无 try/finally；`S3_boot_capture.bin` 在 75 s 循环**之后**才 `write_bytes`，中途抛异常就整窗丢失 |
+
+补正（只限现有脚本与它生成的 PLAN，不动 C/H、不动工程、不重编）：
+
+1. `uid_from_file()` 读**内容**并 strip；原值只在内存里，公开件只有 `@UID_FILE<redacted len=… sha256_…>`；
+   `argv_gate()` 逐项要求 `-u` 的值 **等于** UID 内容，路径形态具名拒绝 `uid_arg_not_content(path)`。
+2. `@ROOT` 一律 `run_root.as_posix()`，savemem 目标写成 `'…/A_locals.bin'`（单引号）；
+   `SAVEMEM_RE` 只接受"十六进制地址 + 十进制长度 + 单引号 posix 路径且在 run_root 内"，
+   反斜杠/未加引号/越出 run_root/长度不等于接受值 → 各自具名拒绝。
+3. `ACCEPTED` 是**源码常量**（BIN 290916 B / `f5c2fd89…1708ce`，AXF 1771288 B / `fb26d5a0…2ed6ea`），
+   启动时先与已登记的 `reports/firmware/phase8-m8-diag-stack-r1/SHA256SUMS.txt` 逐字对照
+   （`verify_accepted_literals`，常量与清单不符即拒绝——常量不是我编的），再用它复核盘上文件
+   （`verify_products`）；两者都排在任何设备动作之前。原 PLAN 里"现算 sha 再当接受值"的写法作废。
+4. 串口段 `serial_stage()` 统一 try/finally：`capture_window`/`read_until_prompt` 每收到分片立刻
+   `write+flush`（异常时已收到的启动字节仍在盘上），读取异常具名 `SERIAL_READ_EXCEPTION`；
+   复位 `rc≠0` → `RESET_FAILED` 且**一条查询都不发**；HardFault → `HARDFAULT_NEEDLE_SEEN`；
+   启动未完成 → `BOOT_INCOMPLETE`；无提示符 → `NO_PROMPT`。下载前额外要求 A=40 B / B=48 B 精确长度
+   （`PRE_READ_SHORT_FILE`）与 `status` 末次读数为 `Halted`（`CORE_NOT_HALTED`，措辞取自往轮
+   `action_*/stdout.bin` 的 `Core 0 (None):  Halted`）。
+5. 每条查询：单调时钟 `QUERY_WINDOW_S=12` 截止、核对 `write()` 返回全量（`QUERY_SHORT_WRITE`）、
+   要求"命令回显 + 回显之后还有非空白正文 + 以 `msh >` 收尾"三段齐全，缺一段 → `QUERY_TIMEOUT` /
+   `QUERY_INCOMPLETE`；只有回显或空垃圾**不算**查询成功。提示符取自源码而非猜测：
+   `components/finsh/shell.c:93` `_MSH_PROMPT "msh "` 与 `:122` 追加的 `'>'`。
+6. 结果标签只剩 `CAPTURE_COMPLETE_REVIEW_PENDING`（栈/堆余量待离线判读）与 `FAIL_OR_INCOMPLETE`；
+   脚本不再自宣 `PASS`。`quota.dap_sessions` 从 3 改 **4**（RAM 读取/下载/回读/复位 = 4 次工具连接），
+   并删掉 S1 上"回传 rc 由复审批准下一次"的 `operator_checkpoint`（与整包一次批准冲突）。
+
+复核（`host/field_check.py`，零设备：不起 pyocd、不开真实端口；假时钟只服务自检，
+真机 `BOOT_WINDOW_S` 仍是 75 s 未缩短）：**CHECKS=32 problems=0，元负控 4/4 fired**。
+A 组 12 项 = 固定接受值与 argv 形态（含"篡改盘上件必须被拒""完好副本必须过"）；
+B 组 16 项 = 上述每个停点都按同输入触发、健康正控走到 PENDING 且四查询都有正文、异常时端口已关且
+部分启动字节完整留存在盘上；C 组 4 项 = 分别把 `argv_gate`/`verify_products`/查询截止/会话数判据
+换成"永远放行"，对应 A3、A8、B14 的期望**必须翻成失败**（不翻说明判据恒真）。
+
+自伤登记：往轮登记的 `host/staged_preflight_diagstack.txt` 末尾其实是 **traceback**——该脚本假设
+`build_manifest.json` 的 `images/maps` 是列表，而 R3 那份是 **名字→字典**，于是跑到 R3 build_manifest
+就 `TypeError: string indices must be integers`，退出码 1、`STAGED_PREFLIGHT_TOTAL` 那行从未打印。
+我在上一轮回执里把它读成"problems=0"，这是错的：能证明的只是 4 份清单与本轮 build_manifest 逐 blob 相符。
+本轮已修两种形态并加 `--round-only`（按复审口径只重核本轮两份清单，不重走 R3 那 5137 条）。
+
+`field/selftest/**` 保持**修前**那次的原样（含被复审判为不足的 5 项判据），作为这份缺陷清单的现场留证；
+补正后的证明在 `host/field_check_console.txt` / `host/field_check.json`。
