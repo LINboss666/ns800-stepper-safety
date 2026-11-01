@@ -57,3 +57,8 @@ reports/reviews/phase8-m8-diag-stack-r1/field/*.json -text
 # ===== idle 栈轮: 整轮所有文件(计划/日志/镜像/map/清单/raw)一律禁止行尾转换 =====
 reports/firmware/phase8-m8-idle-stack-r4/** -text
 reports/reviews/phase8-m8-idle-stack-r4/** -text
+
+# ===== C-01 交付包(窗口 C 线原件): 原样纳入, 一律禁止行尾转换 =====
+# results_local.json 是 Windows python 写出的原件(CR=452), 其 sha256 绑的就是含 CR 的字节;
+# 交付纪律要求"原样纳入、不覆盖、不重新生成原始结果", 所以 blob 字节必须等于磁盘字节。
+reports/reviews/phase8-m8-parallel-protection-ready/** -text

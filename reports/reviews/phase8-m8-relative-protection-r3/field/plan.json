@@ -1372,7 +1372,7 @@
           "min_frames": 1,
           "must_include": [
             {
-              "event": "9",
+              "event": "5",
               "step_hz": "0"
             }
           ],

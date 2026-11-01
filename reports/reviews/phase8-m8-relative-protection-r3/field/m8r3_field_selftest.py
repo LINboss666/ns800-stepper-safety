@@ -1449,48 +1449,67 @@ def s68_response_driven_branch_and_undetermined_stop(m):
                 res["actions_attempted"]))
 
 
-def s69_new_session_without_frames_is_not_forensics(m):
-    """审核 §2D 第 4 条: 计数增大只是身份前置。帧读不回来(或不是本次新增 session 的帧)
-    => 取证未完成, 不许称新日志读回通过。"""
-    head_idx = {n: i for i, n in enumerate(m.FLASH_DUMP_HEADER.split(","))}
+def _flash_head_idx(m):
+    return {n: i for i, n in enumerate(m.FLASH_DUMP_HEADER.split(","))}
 
-    def edit(g, keep=lambda p: True, set_session=None, append=()):
-        rows_ = [g[0]]
-        for line in g[1:]:
-            p = line.split(",")
-            if len(p) != m.FLASH_DUMP_COLUMNS or not all(x.isdigit() for x in p):
-                continue
-            if not keep(p):
-                continue
-            if set_session is not None:
-                p[head_idx["session"]] = str(set_session)
-            rows_.append(",".join(p))
-        return rows_ + list(append)
 
+def _flash_edit(m, head_idx, g, keep=None, set_col=None, append=()):
+    """按**表头列名**改夹具帧。旧版这里用 `all(x.isdigit())` 筛行, 将含负数列
+    (ax_mg=-23 等)的真实行整行丢掉, 于是 keep=… != "9" 这类突变其实是在"删掉全部帧",
+    四种突变退化成同一种。C-02 要求四路对照各自成立, 所以数字判定必须允许负号。"""
+    rows_ = [g[0]]
+    for line in g[1:]:
+        p = line.split(",")
+        if len(p) != m.FLASH_DUMP_COLUMNS or not all(x.lstrip("-").isdigit() for x in p):
+            continue
+        if keep and not keep(p):
+            continue
+        for name, val in (set_col or {}).items():
+            p[head_idx[name]] = str(val)
+        rows_.append(",".join(p))
+    return rows_ + list(append)
+
+
+def _flash_mutator(m):
     def mutate(fn):
         rows = copy.deepcopy(ROWS)
         fn(rows["commands"]["flash_dump 0 8"])
         return rows
+    return mutate
 
-    no_frames = dispatch(m, "trip", rows=mutate(
-        lambda g: g.__setitem__("trip", edit(g["trip"], keep=lambda p: False))))[0]
-    wrong_session = dispatch(m, "trip", rows=mutate(
-        lambda g: g.__setitem__("trip", edit(g["trip"], set_session=7))))[0]
-    no_post = dispatch(m, "trip", rows=mutate(
-        lambda g: g.__setitem__("trip", edit(g["trip"], keep=lambda p: p[head_idx["event"]] != "9"))))[0]
-    errored = dispatch(m, "trip", rows=mutate(
-        lambda g: g.__setitem__("trip", edit(g["trip"]) + ["slot 9 error -5"])))[0]
-    ok_res, _d = dispatch(m, "trip")
-    out = {}
-    for tag, res in (("no_frames", no_frames), ("wrong_session", wrong_session),
-                     ("no_post_stop", no_post), ("slot_error", errored), ("control", ok_res)):
+
+def s69_new_session_without_frames_is_not_forensics(m):
+    """审核 §2D 第 4 条 + C-02: 停后帧的事件码是 FAULT_MULTI_SOURCE=5(A/safety_state.h:46)。
+    五路变体都必须以**各自的原因**被拒, 只看"这阶段没成功"不够 —— 空帧、错事件码、错 session、
+    缺停后帧、槽读错是五种不同缺陷, 混成一个就无法证明判据分得开它们。"""
+    hi, mutate = _flash_head_idx(m), _flash_mutator(m)
+
+    def go(**kw):
+        return dispatch(m, "trip", rows=mutate(
+            lambda g: g.__setitem__("trip", _flash_edit(m, hi, g["trip"], **kw))))[0]
+
+    variants = {"no_frames": go(keep=lambda p: False),
+                "wrong_session": go(set_col={"session": 7}),
+                "only_event9": go(set_col={"event": 9}),
+                "no_post_frame": go(set_col={"step_hz": 100}),
+                "slot_error": dispatch(m, "trip", rows=mutate(
+                    lambda g: g.__setitem__("trip", _flash_edit(m, hi, g["trip"])
+                                            + ["slot 9 error -5"])))[0]}
+    control, _d = dispatch(m, "trip")
+    want_reason = {"no_frames": "CSV_FRAMES=0", "wrong_session": "SESSION_FRAMES=0",
+                   "only_event9": "NO_FRAME_WITH", "no_post_frame": "NO_FRAME_WITH",
+                   "slot_error": "SLOT_READ_ERRORS"}
+    out, reason_ok = {}, {}
+    for tag, res in list(variants.items()) + [("control", control)]:
         s9 = next((s for s in res["stages"] if s["id"] == "S9"), {"status": "ABSENT"})
         out[tag] = (s9.get("code"), s9.get("success"), s9.get("status"))
-    return (all(out[t][0] == "FLASH_FRAMES_NOT_RECOVERED" and out[t][1] is not True
-                for t in ("no_frames", "wrong_session", "no_post_stop", "slot_error")) and
-            out["control"][2] == "OK" and out["control"][1] is True,
-            " | ".join("%s=%s" % (t, out[t]) for t in
-                       ("control", "no_frames", "wrong_session", "no_post_stop", "slot_error")))
+        if tag != "control":
+            reason_ok[tag] = want_reason[tag] in str(s9.get("detail", ""))
+    return (out["control"][2] == "OK" and out["control"][1] is True and
+            all(out[t][0] == "FLASH_FRAMES_NOT_RECOVERED" and out[t][1] is not True
+                for t in want_reason) and all(reason_ok.values()),
+            " | ".join(["control=%s" % (out["control"],)] +
+                        ["%s=%s reason=%s" % (t, out[t][:2], reason_ok[t]) for t in want_reason]))
 
 
 def s70_negative_flag_gate_removed(m):
@@ -1653,6 +1672,161 @@ def s75_negative_backslash_run_root_removed(m):
     return (not ok, "反斜杠形式回来时 s74 仍然通过 => 判据不足: " + msg)
 
 
+LEARN_ADC68_KEY = "diag_profile learn 8 80 120 0@adc68_over_sample"
+
+
+def _learn_step_in(doc):
+    """从**已交付的计划字节**里取 learn 步骤(不另造一份判据): 自检与现场跑的是同一个 spec。"""
+    found = []
+
+    def walk(node):
+        if isinstance(node, dict):
+            if isinstance(node.get("cmd"), str) and "diag_profile learn" in node["cmd"]:
+                found.append(node)
+            for v in node.values():
+                walk(v)
+        elif isinstance(node, list):
+            for v in node:
+                walk(v)
+    walk(doc)
+    return found
+
+
+def _learn_row(adc_n, sg_n):
+    return ("[DIAG] learn OK adc[2050..2090]n%d nz3 sg[68..75]n%d seq1001..%d"
+            % (adc_n, sg_n, 1000 + adc_n))
+
+
+def s76_learn_must_min_matrix(m):
+    """C-01 待办第 2 条: must_min(各 >=8) 的正反例与元负控**并入本自检**, 不再只是仓外临时夹具。
+    判据来自计划字节; 健康面必须走到 ADC 过量采样(68), 不能只测 8/8 边界。"""
+    plans = [("plan.json", PLAN),
+             ("plan_continuation_s2.json",
+              json.loads((HERE / "plan_continuation_s2.json").read_text(encoding="utf-8-sig")))]
+    adc68 = ROWS["commands"][LEARN_ADC68_KEY]["healthy"][0]
+    led = m.Ledger(out_dir("s76") / "l.jsonl", m.SimClock())
+    cases = [("adc68_sg8", [_learn_row(68, 8)], "OK"),
+             ("adc68_sg8_from_rows_json", [adc68], "OK"),
+             ("boundary_8_8", [_learn_row(8, 8)], "OK"),
+             ("adc8_sg68", [_learn_row(8, 68)], "OK"),
+             ("adc100_sg79", [_learn_row(100, 79)], "OK"),
+             ("adc7_sg8", [_learn_row(7, 8)], "FIELD_VALUE_BELOW_MIN"),
+             ("adc68_sg7", [_learn_row(68, 7)], "FIELD_VALUE_BELOW_MIN"),
+             ("both_7", [_learn_row(7, 7)], "FIELD_VALUE_BELOW_MIN"),
+             ("no_learn_row_at_all", ["[DIAG] zero OK n=32"], "EXPECTATION_NOT_MET"),
+             ("malformed_row", ["[DIAG] learn OK adc[1..2]n8"], "FIELD_NOT_EXACTLY_ONE"),
+             ("duplicate_success", [_learn_row(68, 8), _learn_row(68, 8)], "FIELD_NOT_EXACTLY_ONE"),
+             ("failed_timeout", ["[DIAG] learn FAILED timeout 12000ms"], "BUSINESS_FAILED"),
+             ("not_supported", ["msh: command not supported"], "BUSINESS_FAILED")]
+    mutations = [("min9_rejects_adc8",
+                  lambda s: s["expect_values"][0]["must_min"].__setitem__("adc_n", 9),
+                  [_learn_row(8, 8)], "FIELD_VALUE_BELOW_MIN"),
+                 ("gate_removed_admits_adc7",
+                  lambda s: s["expect_values"][0].__setitem__("must_min", {}),
+                  [_learn_row(7, 8)], "OK"),
+                 ("absent_group_named_reject",
+                  lambda s: s["expect_values"][0].__setitem__("must_min", {"adc_n_nope": 1}),
+                  [_learn_row(68, 8)], "FIELD_VALUE_MISMATCH"),
+                 ("exact8_rejects_adc68",
+                  lambda s: s["expect_values"][0].__setitem__("must", {"adc_n": "8"}),
+                  [_learn_row(68, 8)], "FIELD_VALUE_MISMATCH")]
+    bad, n = [], 0
+    for fname, doc in plans:
+        steps = _learn_step_in(doc)
+        if len(steps) != 1:
+            bad.append("%s:learn 步骤数=%d(要求 1)" % (fname, len(steps)))
+            continue
+        spec = steps[0]["expect_values"][0]
+        if spec.get("must_min") != {"adc_n": 8, "sg_n": 8} or "must" in spec:
+            bad.append("%s:判据不是 must_min{8,8} 且无 must=%s/%s"
+                       % (fname, spec.get("must"), spec.get("must_min")))
+        for name, rows, want in cases:
+            n += 1
+            r = m.assert_step(steps[0], rows, "s76_learn", led, raw=None)
+            got = "OK" if r.get("verdict") == "OK" else r.get("code")
+            if got != want:
+                bad.append("%s/%s want=%s got=%s" % (fname, name, want, got))
+        for name, mutate, rows, want in mutations:
+            n += 1
+            step = copy.deepcopy(steps[0])
+            mutate(step)
+            r = m.assert_step(step, rows, "s76_mut", led, raw=None)
+            got = "OK" if r.get("verdict") == "OK" else r.get("code")
+            if got != want:
+                bad.append("%s/%s want=%s got=%s" % (fname, name, want, got))
+    led.close()
+    return (not bad, "plans=%d cases=%d bad=%s" % (len(plans), n, bad[:4] or "0"))
+
+
+def s77_forensic_event_is_multi_source_five(m):
+    """C-02 的范围核对: 计划与夹具都取 event=5, 而**归档运行输出**里的 9 原样保留(不是全局替换)。"""
+    hi = _flash_head_idx(m)
+    bad = []
+    docs = [("plan.json", PLAN),
+            ("plan_continuation_s2.json",
+             json.loads((HERE / "plan_continuation_s2.json").read_text(encoding="utf-8-sig")))]
+    for fname, doc in docs:
+        for stg in doc["stages"]:
+            for spec in stg.get("require_frames") or []:
+                for need in spec.get("must_include") or []:
+                    if need.get("event") != "5" or need.get("step_hz") != "0":
+                        bad.append("%s/%s=%s" % (fname, stg["id"], need))
+    for line in ROWS["commands"]["flash_dump 0 8"]["trip"][1:]:
+        p = line.split(",")
+        if len(p) == m.FLASH_DUMP_COLUMNS and all(x.lstrip("-").isdigit() for x in p):
+            if p[hi["event"]] != "5":
+                bad.append("rows.json event=%s" % p[hi["event"]])
+    prov = ROWS["commands"]["flash_dump 0 8"].get("_provenance") or {}
+    if prov.get("kind") != "source_shape":
+        bad.append("flash_dump 夹具来源等级=%s(没有板上采集, 必须 source_shape)" % prov.get("kind"))
+    archived = list((HERE.parent / "offline").glob("psrun-*/neg-stagemutate/plan.json"))
+    nine = ('"event": "9"', '"event":"9"')
+    still_nine = [p for p in archived
+                  if any(n in p.read_text(encoding="utf-8") for n in nine)]
+    if archived and not still_nine:
+        bad.append("归档运行输出被一起改掉了(%d 份) => 这不是定向更正" % len(archived))
+    return (not bad, "plans=%d archived_with_9=%d/%d bad=%s" %
+            (len(docs), len(still_nine), len(archived), bad[:4] or "0"))
+
+
+def s78_negative_event_pin_back_to_nine(m):
+    """C-02 修前形态复现: 同一批 event=5 的停后帧, 把判据退回 9 就必须具名拒绝(且原因是
+    NO_FRAME_WITH) —— 这证明"钉 9"会把一次**成功**的保护判成取证未完成。"""
+    mutated_plan = copy.deepcopy(PLAN)
+    hits = 0
+    for stg in mutated_plan["stages"]:
+        for spec in stg.get("require_frames") or []:
+            for need in spec.get("must_include") or []:
+                if need.get("event") == "5":
+                    need["event"] = "9"
+                    hits += 1
+    res = dispatch(m, "trip", plan=mutated_plan)[0]
+    s9 = next((s for s in res["stages"] if s["id"] == "S9"), {"status": "ABSENT"})
+    return (hits == 1 and s9.get("code") == "FLASH_FRAMES_NOT_RECOVERED" and
+            s9.get("success") is not True and "NO_FRAME_WITH" in str(s9.get("detail", "")),
+            "hits=%d s9=%s success=%s detail=%s" %
+            (hits, s9.get("code"), s9.get("success"), str(s9.get("detail"))[:90]))
+
+
+def s79_negative_event_leg_removed(m):
+    """定向检出: 摘掉 event 这一腿(只留 step_hz=0) => "只有 event=9 的停后帧"必须被**放行**,
+    否则 FS77/FS78 的拒绝并不是 event 判据造成的, 因果不成立。"""
+    hi = _flash_head_idx(m)
+    mutated_plan = copy.deepcopy(PLAN)
+    for stg in mutated_plan["stages"]:
+        for spec in stg.get("require_frames") or []:
+            for need in spec.get("must_include") or []:
+                need.pop("event", None)
+    rows = copy.deepcopy(ROWS)
+    grp = rows["commands"]["flash_dump 0 8"]
+    grp["trip"] = _flash_edit(m, hi, grp["trip"], set_col={"event": 9})
+    res = dispatch(m, "trip", plan=mutated_plan, rows=rows)[0]
+    s9 = next((s for s in res["stages"] if s["id"] == "S9"), {"status": "ABSENT"})
+    return (s9.get("status") == "OK" and s9.get("success") is True,
+            "摘掉 event 腿后 event9 停后帧的 S9=%s success=%s(应为放行)" %
+            (s9.get("status"), s9.get("success")))
+
+
 CASES = [
     ("FS01", "提示符识别", s01_prompt_recognized),
     ("FS02", "缺提示符不算完整", s02_missing_prompt_is_not_complete),
@@ -1729,6 +1903,10 @@ CASES = [
     ("FS73", "反向-复位后不消费启动流", s73_negative_boot_drain_removed),
     ("FS74", "回读落盘名不被去转义(shlex 安全)", s74_run_root_inside_commander_c_is_shlex_safe),
     ("FS75", "反向-回读根退回反斜杠形式", s75_negative_backslash_run_root_removed),
+    ("FS76", "learn must_min 各>=8 正反例与元负控入链", s76_learn_must_min_matrix),
+    ("FS77", "停后帧事件码取 5 且不全局替换 9", s77_forensic_event_is_multi_source_five),
+    ("FS78", "判据退回 9 时 event5 帧被具名拒绝", s78_negative_event_pin_back_to_nine),
+    ("FS79", "反向-摘掉 event 腿则 event9 放行", s79_negative_event_leg_removed),
 ]
 
 

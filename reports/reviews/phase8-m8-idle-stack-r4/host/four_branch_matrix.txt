@@ -1,0 +1,10 @@
+R4_MATRIX|ALL_PASS
+V1|PASS|四种组合都跑完且 status=OK: bad=0
+V2|PASS|每场 运动->取证->拒绝->恢复, 且 A 场整体先于 B 场; 偏差=0
+V3|PASS|both_trip 用量 port_open=12 cleanup=5 motor_run=3 申报=12/5 余额负=[] audit=['QUOTA_AUDIT|cleanup_motor_stop|declared=5|used=5|left=0', 'QUOTA_AUDIT|port_open|declared=12|used=12|left=0']
+V4|PASS|按场隔离=True A触发时只留 A 的事故身份=True B触发时只留 B 的=True 键=['bb_session_imu', 'bb_session_sg', 'bb_written_imu', 'bb_written_sg', 'flash_capacity_imu', 'flash_capacity_sg', 'flash_used_before_imu', 'flash_used_before_sg', 'pid_imu', 'pid_sg', 'prev_imu', 'prev_sg', 'trip_cur_imu', 'trip_cur_sg', 'trip_id_imu', 'trip_id_sg', 'trip_imu_imu', 'trip_imu_sg', 'trip_rev_imu', 'trip_rev_sg', 'trip_rule_imu', 'trip_rule_sg', 'trip_sg_imu', 'trip_sg_sg', 'trip_thr_imu', 'trip_thr_sg', 'trip_val_imu', 'trip_val_sg']
+V5|PASS|跳过=['S8', 'S9', 'S10', 'S11'] port_open 实际用量=8(申报 12) S8 目录未建=True 汇总拒绝=[{"scenario": "SG_ADC_controlled_load", "refused_before": "S8", "gates": ["load_means"]}] B 场仍起转=True
+V6|PASS|S8=EVIDENCE_INCOMPLETE/EVIDENCE_INCOMPLETE status=OK disarm=CONFIRMED_DISABLED terminal=KNOWN 清理=['motor_stop', 'motor_disarm', 'motor_status'] 总调度=STOP 原因=["source_sample:PATTERN_NOT_FOUND"]
+V7|PASS|降级注入=TRIP_REWRITTEN_AS_NO_TRIGGER 正常未触发=no_trigger 正常触发=trip
+V8|PASS|四种组合无分支冲突=True 全部 status=OK=True 各场分支(运动/取证/拒绝/恢复)={"both_trip": [["S8", "trip"], ["S9", "trip"], ["S10", "trip"], ["S11", "trip"], ["S8b", "trip"], ["S9b", "trip"], ["S10b", "trip"], ["S11b", "trip"]], "a_trip_b_none": [["S8", "trip"], ["S9", "trip"], ["S10", "trip"], ["S11", "trip"], ["S8b", "no_trigger"]], "a_none_b_trip": [["S8", "no_trigger"], ["S8b", "trip"], ["S9b", "trip"], ["S10b", "trip"], ["S11b", "trip"]], "both_none": [["S8", "no_trigger"], ["S8b", "no_trigger"]]}
+SUMMARY|cases=8|pass=8|fail=0|transport=stub_only|port=NO_DEVICE|device_actions=0|builds=0

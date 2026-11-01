@@ -1,0 +1,453 @@
+{
+  "repo_head": "48204fe37de3da6f8caeeff467256562f11e58e2",
+  "executor_sha256": "1bbf34e2df65d55bbd223e5014206f812ba8066a8db2edee3874fe75aa60aec6",
+  "plans": [
+    {
+      "file": "plan.json",
+      "sha256": "2cfcf66cabacc47a623c0c11d92793757f5805a89c72485b2efac54fbdb5a309",
+      "learn_steps_found": 1,
+      "criteria": [
+        {
+          "path": "$.stages[4].steps[7]",
+          "cmd": "diag_profile learn 8 80 120 0",
+          "must": null,
+          "must_min": {
+            "adc_n": 8,
+            "sg_n": 8
+          },
+          "row_unchanged": true
+        }
+      ],
+      "checks": [
+        {
+          "name": "healthy_adc68_sg8",
+          "expected": "OK",
+          "got": "OK",
+          "verdict": "OK",
+          "detail": {},
+          "ok": true
+        },
+        {
+          "name": "boundary_adc8_sg8",
+          "expected": "OK",
+          "got": "OK",
+          "verdict": "OK",
+          "detail": {},
+          "ok": true
+        },
+        {
+          "name": "boundary_adc8_sg68",
+          "expected": "OK",
+          "got": "OK",
+          "verdict": "OK",
+          "detail": {},
+          "ok": true
+        },
+        {
+          "name": "large_adc100_sg79",
+          "expected": "OK",
+          "got": "OK",
+          "verdict": "OK",
+          "detail": {},
+          "ok": true
+        },
+        {
+          "name": "below_adc7_sg8",
+          "expected": "FIELD_VALUE_BELOW_MIN",
+          "got": "FIELD_VALUE_BELOW_MIN",
+          "verdict": "STOP",
+          "detail": {
+            "below_min": {
+              "adc_n": [
+                "7",
+                8
+              ]
+            }
+          },
+          "ok": true
+        },
+        {
+          "name": "below_adc68_sg7",
+          "expected": "FIELD_VALUE_BELOW_MIN",
+          "got": "FIELD_VALUE_BELOW_MIN",
+          "verdict": "STOP",
+          "detail": {
+            "below_min": {
+              "sg_n": [
+                "7",
+                8
+              ]
+            }
+          },
+          "ok": true
+        },
+        {
+          "name": "below_both_7",
+          "expected": "FIELD_VALUE_BELOW_MIN",
+          "got": "FIELD_VALUE_BELOW_MIN",
+          "verdict": "STOP",
+          "detail": {
+            "below_min": {
+              "adc_n": [
+                "7",
+                8
+              ],
+              "sg_n": [
+                "7",
+                8
+              ]
+            }
+          },
+          "ok": true
+        },
+        {
+          "name": "no_success_row_expectation_layer",
+          "expected": "EXPECTATION_NOT_MET",
+          "got": "EXPECTATION_NOT_MET",
+          "verdict": "STOP",
+          "detail": {
+            "missing": [
+              "[DIAG] learn OK"
+            ]
+          },
+          "ok": true
+        },
+        {
+          "name": "malformed_row_shape_strict",
+          "expected": "FIELD_NOT_EXACTLY_ONE",
+          "got": "FIELD_NOT_EXACTLY_ONE",
+          "verdict": "STOP",
+          "detail": {
+            "count": 0
+          },
+          "ok": true
+        },
+        {
+          "name": "duplicate_success_row",
+          "expected": "FIELD_NOT_EXACTLY_ONE",
+          "got": "FIELD_NOT_EXACTLY_ONE",
+          "verdict": "STOP",
+          "detail": {
+            "count": 2
+          },
+          "ok": true
+        },
+        {
+          "name": "business_failed",
+          "expected": "BUSINESS_FAILED",
+          "got": "BUSINESS_FAILED",
+          "verdict": "STOP",
+          "detail": {
+            "lines": [
+              "[DIAG] learn FAILED timeout 12000ms"
+            ]
+          },
+          "ok": true
+        },
+        {
+          "name": "business_refused",
+          "expected": "BUSINESS_FAILED",
+          "got": "BUSINESS_FAILED",
+          "verdict": "STOP",
+          "detail": {
+            "lines": [
+              "msh: command not supported"
+            ]
+          },
+          "ok": true
+        },
+        {
+          "name": "mutation_min9_rejects_adc8",
+          "expected": "FIELD_VALUE_BELOW_MIN",
+          "got": "FIELD_VALUE_BELOW_MIN",
+          "verdict": "STOP",
+          "detail": {
+            "below_min": {
+              "adc_n": [
+                "8",
+                9
+              ]
+            }
+          },
+          "ok": true
+        },
+        {
+          "name": "mutation_gate_removed_admits_adc7",
+          "expected": "OK",
+          "got": "OK",
+          "verdict": "OK",
+          "detail": {},
+          "ok": true
+        },
+        {
+          "name": "mutation_absent_group_named_reject",
+          "expected": "FIELD_VALUE_MISMATCH",
+          "got": "FIELD_VALUE_MISMATCH",
+          "verdict": "STOP",
+          "detail": {
+            "wrong": {},
+            "absent_groups": [
+              "adc_n_nope"
+            ]
+          },
+          "ok": true
+        },
+        {
+          "name": "regression_exact8_rejects_adc68",
+          "expected": "FIELD_VALUE_MISMATCH",
+          "got": "FIELD_VALUE_MISMATCH",
+          "verdict": "STOP",
+          "detail": {
+            "wrong": {
+              "adc_n": [
+                "68",
+                "8"
+              ]
+            },
+            "absent_groups": []
+          },
+          "ok": true
+        }
+      ]
+    },
+    {
+      "file": "plan_continuation_s2.json",
+      "sha256": "cfeea1deed50ad7b8ac1d1b44612fc2608485db5781bb84e98dd829a28e29ea6",
+      "learn_steps_found": 1,
+      "criteria": [
+        {
+          "path": "$.stages[3].steps[7]",
+          "cmd": "diag_profile learn 8 80 120 0",
+          "must": null,
+          "must_min": {
+            "adc_n": 8,
+            "sg_n": 8
+          },
+          "row_unchanged": true
+        }
+      ],
+      "checks": [
+        {
+          "name": "healthy_adc68_sg8",
+          "expected": "OK",
+          "got": "OK",
+          "verdict": "OK",
+          "detail": {},
+          "ok": true
+        },
+        {
+          "name": "boundary_adc8_sg8",
+          "expected": "OK",
+          "got": "OK",
+          "verdict": "OK",
+          "detail": {},
+          "ok": true
+        },
+        {
+          "name": "boundary_adc8_sg68",
+          "expected": "OK",
+          "got": "OK",
+          "verdict": "OK",
+          "detail": {},
+          "ok": true
+        },
+        {
+          "name": "large_adc100_sg79",
+          "expected": "OK",
+          "got": "OK",
+          "verdict": "OK",
+          "detail": {},
+          "ok": true
+        },
+        {
+          "name": "below_adc7_sg8",
+          "expected": "FIELD_VALUE_BELOW_MIN",
+          "got": "FIELD_VALUE_BELOW_MIN",
+          "verdict": "STOP",
+          "detail": {
+            "below_min": {
+              "adc_n": [
+                "7",
+                8
+              ]
+            }
+          },
+          "ok": true
+        },
+        {
+          "name": "below_adc68_sg7",
+          "expected": "FIELD_VALUE_BELOW_MIN",
+          "got": "FIELD_VALUE_BELOW_MIN",
+          "verdict": "STOP",
+          "detail": {
+            "below_min": {
+              "sg_n": [
+                "7",
+                8
+              ]
+            }
+          },
+          "ok": true
+        },
+        {
+          "name": "below_both_7",
+          "expected": "FIELD_VALUE_BELOW_MIN",
+          "got": "FIELD_VALUE_BELOW_MIN",
+          "verdict": "STOP",
+          "detail": {
+            "below_min": {
+              "adc_n": [
+                "7",
+                8
+              ],
+              "sg_n": [
+                "7",
+                8
+              ]
+            }
+          },
+          "ok": true
+        },
+        {
+          "name": "no_success_row_expectation_layer",
+          "expected": "EXPECTATION_NOT_MET",
+          "got": "EXPECTATION_NOT_MET",
+          "verdict": "STOP",
+          "detail": {
+            "missing": [
+              "[DIAG] learn OK"
+            ]
+          },
+          "ok": true
+        },
+        {
+          "name": "malformed_row_shape_strict",
+          "expected": "FIELD_NOT_EXACTLY_ONE",
+          "got": "FIELD_NOT_EXACTLY_ONE",
+          "verdict": "STOP",
+          "detail": {
+            "count": 0
+          },
+          "ok": true
+        },
+        {
+          "name": "duplicate_success_row",
+          "expected": "FIELD_NOT_EXACTLY_ONE",
+          "got": "FIELD_NOT_EXACTLY_ONE",
+          "verdict": "STOP",
+          "detail": {
+            "count": 2
+          },
+          "ok": true
+        },
+        {
+          "name": "business_failed",
+          "expected": "BUSINESS_FAILED",
+          "got": "BUSINESS_FAILED",
+          "verdict": "STOP",
+          "detail": {
+            "lines": [
+              "[DIAG] learn FAILED timeout 12000ms"
+            ]
+          },
+          "ok": true
+        },
+        {
+          "name": "business_refused",
+          "expected": "BUSINESS_FAILED",
+          "got": "BUSINESS_FAILED",
+          "verdict": "STOP",
+          "detail": {
+            "lines": [
+              "msh: command not supported"
+            ]
+          },
+          "ok": true
+        },
+        {
+          "name": "mutation_min9_rejects_adc8",
+          "expected": "FIELD_VALUE_BELOW_MIN",
+          "got": "FIELD_VALUE_BELOW_MIN",
+          "verdict": "STOP",
+          "detail": {
+            "below_min": {
+              "adc_n": [
+                "8",
+                9
+              ]
+            }
+          },
+          "ok": true
+        },
+        {
+          "name": "mutation_gate_removed_admits_adc7",
+          "expected": "OK",
+          "got": "OK",
+          "verdict": "OK",
+          "detail": {},
+          "ok": true
+        },
+        {
+          "name": "mutation_absent_group_named_reject",
+          "expected": "FIELD_VALUE_MISMATCH",
+          "got": "FIELD_VALUE_MISMATCH",
+          "verdict": "STOP",
+          "detail": {
+            "wrong": {},
+            "absent_groups": [
+              "adc_n_nope"
+            ]
+          },
+          "ok": true
+        },
+        {
+          "name": "regression_exact8_rejects_adc68",
+          "expected": "FIELD_VALUE_MISMATCH",
+          "got": "FIELD_VALUE_MISMATCH",
+          "verdict": "STOP",
+          "detail": {
+            "wrong": {
+              "adc_n": [
+                "68",
+                "8"
+              ]
+            },
+            "absent_groups": []
+          },
+          "ok": true
+        }
+      ]
+    }
+  ],
+  "device_actions": 0,
+  "builds": 0,
+  "baseline_before_fix": [
+    {
+      "file": "plan.json",
+      "must": {
+        "adc_n": "8",
+        "sg_n": "8"
+      },
+      "must_min": null,
+      "adc68_sg8_verdict": "STOP",
+      "adc68_sg8_code": "FIELD_VALUE_MISMATCH",
+      "defect_reproduced": true
+    },
+    {
+      "file": "plan_continuation_s2.json",
+      "must": {
+        "adc_n": "8",
+        "sg_n": "8"
+      },
+      "must_min": null,
+      "adc68_sg8_verdict": "STOP",
+      "adc68_sg8_code": "FIELD_VALUE_MISMATCH",
+      "defect_reproduced": true
+    }
+  ],
+  "summary": {
+    "checks_total": 32,
+    "expectations_met": 32,
+    "all_met": true
+  }
+}

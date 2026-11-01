@@ -20,8 +20,11 @@
   `idle_thread_entry ⇒ rt_defunct_execute ⇒ rt_object_delete ⇒ rt_free ⇒ _heap_lock ⇒ rt_mutex_take ⇒
   _rt_mutex_take ⇒ rt_thread_suspend_to_list ⇒ rt_sched_thread_timer_stop ⇒ rt_timer_stop ⇒ …`
   （逐帧抄本在 `stack_report.txt`，含各函数 own frame：24/24/24/16/16…）。
-- **两数并列，不互相替换**：任务书的"固定帧合计 264 B"像是这条链上前若干帧的部分合计；668 是 armlink 自己算的
-  最深合计。本轮按更保守的 668 取 ⇒ 1024 覆盖 668 并留 356 B；`668` 与 `1024` 都**不**称"已验证上界"。
+- **两数并列，不互相替换**：任务书的"固定帧合计 264 B"是我核过的一条**可达路径的固定帧下界**；668 B 是 armlink
+  自己给的**更深静态合计**。两者口径不同、同时成立，不存在谁推翻谁。本轮按更保守的 668 取配置值 1024，
+  但**不**把 `1024 − 668 = 356 B` 称作"已验证安全余量"——那只是一个算术差，没有任何实测或静态证据说明这 356 B
+  够；`668`、`1024` 也都不称"已验证上界"，1024 是否够用仍是 NOT_VERIFIED（需板上水位或栈填充实测）。
+  勘误：本节早前的写法是"1024 覆盖 668 并留 356 B"，该措辞把算术差说成了余量，已按复审口径改掉。
 - 板上实测的另一路水位并列登记：上一轮续测的 `ps` 里 `tidle0 … 0x00000100 64%` ⇒ 163 B。这只说明那次启动
   没走到 defunct 深链，不说明走不到。
 - ZI-data `84824 → 85592` = **+768 B**，正好等于 1024−256；Code/RO/RW 一字未变 ⇒ 改的是 `.bss` 里的
@@ -121,3 +124,63 @@ A 组 11 项 = idle 证据链与镜像身份；B 组 12 项 = learn 判据矩阵
    并给 `build_manifest.json` 加 `build_inputs`（rtconfig sha256 `1927ed1c…` + `line_79` 原文 +
    `diagnosis.c` 仍为 `e1696ec9…`），让任何人都能用散列复核"这次构建用的是哪一份源"。
    我的 A6 检查当时输出的就是"工作树与 HEAD 差一行"——这个信号本来就该在提交前被读出来，而不是提交后被读到。
+
+## 9. 现场包返修 R2（复审 2026-11-01：5 项包问题 + 2 项登记问题 + C-01 待办；离线，零设备，不重编）
+
+### 9.1 复审的五项，逐条先复现再改
+
+| 项 | 复现到的原始事实 | 改法 |
+| --- | --- | --- |
+| ① 回读仍认旧镜像 | `tools.readback.image` 指向 R3 的 BIN `00608ec9…`，`tools.download.image` 指向 R3 的 AXF `0bba8ca7…`（而它自己的 argv 已经写的是 R4 AXF——同一个对象内部就矛盾）。用**本轮新 BIN 的原字节**跑现存回读判据（`ManualActionBackend.readback`），绑旧镜像时如复审所说立刻 `READBACK_HASH_MISMATCH`，绑新镜像时 `REAL_HASH_EQUAL`（检查 F7） | 两处 image 全部重绑 `dab356c6…`/`0babe9f1…`；`identity_consistency()` 新增为 `validate_plan` 的 `PLAN_IMAGE_IDENTITY_CONSISTENCY`，逐字段核 S0=AXF=回读目标、argv 末参数=AXF 路径、且回读目标不得等于 `board_image_before` |
+| ② 两场顺序与基线 | 旧顺序是 `S8,S8b,S9,S9b,…`（同一分支标签下两场交错），且 `branch`/`active_profile` 是**包级单变量** ⇒ 一场触发、另一场未触发会撞 `RESPONSE_BRANCH_CONFLICT`（2157 行）；两场还把 `bb_session/flash_used_before` 记进**同一批键**，后一场覆盖前一场 | 数组顺序改成 `S8,S9,S10,S11,S8b,S9b,S10b,S11b`（执行器按数组迭代）；分支/档案按 `stages[].scenario` 存（`scenario_branches`/`scenario_profile`，事件与阶段条目都带 scenario）；基线键加链后缀 `_sg`/`_imu`，比较规格、`require_frames.session_key`、`new_log_window.before_key` 一起跟着改 |
+| ③ 额度 | 按真实路径数：serial_session 阶段共 **12** 个 ⇒ `port_open` 10 少报；能建立撤能义务的阶段是 S4、S8、S8b、S10、S10b（`MOTION_OBLIGATION_CMDS` 含 `motor_arm`）⇒ 清理 **5** 组，申报 3 少报；`explicit_reset` 真实只有 S3 一处 ⇒ 申报 2 是多报 | `derive_quota_needs()` 从计划自己推导（阶段 kind、步骤 `quota`/`action`+`quota_name`、义务阶段的三条清理各一），`PLAN_QUOTA_NEED` 逐项对账：`need>declared` 即离线 FAIL。本轮 `port_open 12 / cleanup_* 5 / motor_run 3 / explicit_reset 1 / 25 s 总额` |
+| ④ 首因 | 合同原来只是 `first_cause_contract` 的说明文字；执行器没有"缺证"这一层，只有 trip/no_trigger 两支 | `stages[].first_cause_legs` + `first_cause_verdict()`：同会话的 TRIP 规则/代际、`val=/thr=`、`sg=/cur=/imu=`、本会话 `diag_profile show` 的 id/rev（且等于 S5 提交的 `recorded.id/rev`）、本场事故基线已记录 —— 缺任一条 ⇒ `EVIDENCE_INCOMPLETE`（阶段不成功）；取证会话再要求 LATCH 行的规则/代际等于**本场** TRIP。`response_branch()` 加降级守卫：窗内已见触发针却记 `OBSERVATION_NO_TRIGGER` ⇒ `TRIP_REWRITTEN_AS_NO_TRIGGER` |
+| ⑤ 机械前置 | `load_means` 的 `NOT_PROVIDED` 只在 `prerequisites` 字段里；`gate_load_means` 是人工门，stub 下有申报答案就放行 ⇒ 仍会走到 `motor_arm/motor_start` | 新增包级 `mechanical_prerequisites`（T8 丝杆+标称 300 mm 完整滑台、**尚未连接**、导程待确认、仍缺的三项），带 `blocks_motion: true` 的前置必须出现在起转阶段的 `prerequisite_gates` 上（`PLAN_PREREQUISITE_GATE` 检查这点）；执行器在**开端口之前**跳过整条链并具名 `STAGE_SKIPPED_BY_PREREQUISITE` + 汇总 `PREREQUISITE_REFUSAL`，不扣 `motor_run`、不发 arm/start。示波器/电流钳 `blocks_motion: false`：继续暂缓，不作前置也不新增仪器 |
+
+登记两点：`identity_binding` 不再把 `48204fe` 写成新镜像的构建输入 —— 实测该提交的树里 `rtconfig.h` 是 **256**（`git show 48204fe:…` 的 blob `9fe0efdf…`/8689 B），1024 版第一次入库是 `fe3d9f5`（blob `b66753d6…`/8850 B），tip `58904e1` 未再改它 ⇒ `software_input_commit=58904e1`、`tested_image_build_commit=fe3d9f5`、`build_time_head_commit=48204fe` 三个事实分列。rtconfig 双身份同时进 `build_manifest.json.build_inputs`：本机 CRLF `1927ed1c…`/9304 B 与远端 LF `b66753d6…`/8850 B，`git show tip:` 的 blob 与归一后的工作树字节逐字节相同 ⇒ 只差行尾，不因此重编。
+
+### 9.2 C-01 交付包与 C-02/C-03
+
+`NS800_C01_Delivery_20261101.zip`（sha256 `3eb4c1d3…`）的 4 件按原路径放进
+`reports/reviews/phase8-m8-parallel-protection-ready/`，逐字节比对与 zip 内清单一致（`L1` 表），不覆盖、不重跑、不改脚本内绝对路径。
+它的三条待办本轮全部接走：
+
+1. **C-02 停后帧事件码 9→5**：源码可判 —— 相对保护只投 `EVT_MULTI_FAULT`（`diag_relative.c:725`），
+   `ss_code_for_event()` 映射到 `FAULT_MULTI_SOURCE`（`safety_state.c:309`），`safety_state.h:46` 定义其值 **5u**；
+   `9 = FAULT_SOFT`（`:50`）只由 `EVT_SOFT_FAULT` 产生，而 `safety_trip` 在各场景 `forbidden_commands` 里。
+   范围只点名：R4 计划两处 `require_frames`、仍被引用的 R3 两份计划、两份 `rows.json` 的 16 帧夹具。
+   归档运行输出 `offline/psrun-*/neg-stagemutate/plan.json`（7 份，5 份仍含 event 9）与 M5 软件触发原件一律不动；
+   自检里两条负控证明确实是定向：`FS78` 把判据退回 9 后，同一批 event=5 的帧被 `NO_FRAME_WITH` 具名拒绝（修前形态复现）；
+   `FS79` 摘掉 event 腿后，只有 event=9 的停后帧被放行（证明拒绝来自这条腿）。
+   夹具的 `flash_dump 0 8` 原本**没有 `_provenance`**（全库检索也没有任何板上采集给出 flash_dump 的 CSV 行）⇒ 补
+   `kind=source_shape` 并写明"形状取自 `ns_flash_shell.c:159-161` 的打印，数值合成，不构成实测"。
+2. **must_min 并入已有自检**：R3 自检新增 `FS76`，用两份真实计划字节 + 真实 `assert_step` 跑 34 例
+   （健康 5、拒绝 8、超时/不支持/重复行/畸形行，加 4 个元负控：下限改 9、摘掉 must_min、指向不存在的组、退回精确 8）。
+3. **ADC68/SG8 健康夹具**：两份 `rows.json` 新增键
+   `diag_profile learn 8 80 120 0@adc68_over_sample`（同样标 source_shape），`FS76` 直接吃这条夹具行，健康面不再只落在 8/8 边界。
+
+### 9.3 四种触发组合的定向对照（`host/verify_four_branch_matrix.py`，零设备）
+
+离线分支按链申报（`plan.stub_branches`，`PLAN_STUB_BRANCHES` 校验拼写），因此两场的
+触发/未触发组合能真实跑：`V1` 四种组合全部 `status=OK`；`V2` 每场都是 运动→取证→拒绝→恢复，
+且 SG 场整体先于 IMU 场；`V3` 两场均触发时**实测用量** `port_open=12、cleanup_* =5、motor_run=3`
+（QUOTA_AUDIT 逐条 `used=12/5`，余额非负）；`V4` 事故基线按场隔离，一触发一未触发时只留触发那场的
+`trip_*` 身份；`V5` 交付态（`load_means=NOT_PROVIDED`）下 SG 链四阶段在汇总里一条行都没有、`S_S8` 目录未建、
+实际只用 8 次开口，而 IMU 链照常发出 `motor_start`；`V6` 摘掉源样本行 ⇒
+`code=EVIDENCE_INCOMPLETE` 且 `status` 不是 `OBSERVATION_NO_TRIGGER`，同时 `disarm=CONFIRMED_DISABLED`、
+`terminal=KNOWN`（失败仍先完成必要撤能）；`V7` 降级注入被 `TRIP_REWRITTEN_AS_NO_TRIGGER` 挡住；`V8` 无
+`RESPONSE_BRANCH_CONFLICT`。汇总 8/8，原文 `host/four_branch_matrix.txt`。
+
+### 9.4 本轮自检与仍**未证**的东西
+
+`host/idle_learn_check.py`：**CHECKS=92 problems=0，META_NEGATIVES=6 fired=6**（A–M 组，F/G/H/I/J/K/L/M 是本轮新增）；
+`m8r3_field_selftest.py`：**79/79**（新增 FS76–FS79，负控注入 13）；
+`--validate-plan`：**checks=233 fail=0**；`staged_preflight_batch.py --selfcheck` 仍以 `sha_mismatch` 命中。
+本轮自己抓到并修掉的三处检查器缺陷：`FS69` 的突变用 `all(x.isdigit())` 筛帧，把含负数列的真实行整行丢掉，
+于是"缺停后帧"和"空帧"退化成同一个用例；`A6` 的"差一行"其实是拿未跟踪时 `git show` 返回空凑出来的巧合；
+`identity_consistency` 之外还漏了 argv 末参数与 AXF 路径的一致性（现并入同一条门）。
+仍未证（不得说成通过）：谁写入 `0x00bd80b0`；idle/diag 栈越界与该损坏的因果；1024 是否够；
+`f5c2fd89…` 与新 BIN 的 1831 字节差异未逐字节归因；学习/提交/重启恢复/两路激励的**现场**结论全部未取；
+`protect_ready=NO`、`threshold_validation=NOT_ESTABLISHED`、`rel cov=NOT-ACTIVE` 不因包的绑定而改变。
+本包状态仍是 `BOUND_NOT_EXECUTED`：执行需要复审对 `plan_core_r4.json` + 执行器 + 两份计划/夹具的一次原文批准。
+

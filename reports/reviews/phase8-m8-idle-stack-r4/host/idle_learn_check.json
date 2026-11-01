@@ -28,7 +28,7 @@
   {
    "name": "A6_rtconfig_only_the_idle_line_changed",
    "ok": true,
-   "detail": "[('#define IDLE_THREAD_STACK_SIZE 256', '#define IDLE_THREAD_STACK_SIZE 1024   /* 候选: armlink 调用图 idle_thread_entry ⇒ rt_defunct_execute ⇒ rt_object_delete ⇒ rt_free ⇒ rt_mutex_take… Max Depth=668 B > 旧值 256 B */')]"
+   "detail": "工作树与 HEAD 的 rtconfig 逐行相同(只差行尾); 相对构建时 HEAD(48204fe) 的树恰好差 1 行 = idle 256->1024; 旧写法是拿未跟踪时 git show 返回空来凑出 1 行差, 那是巧合不是检查"
   },
   {
    "name": "A7_diag_4096_source_untouched",
@@ -188,12 +188,12 @@
   {
    "name": "E3_two_independent_excitation_sessions",
    "ok": true,
-   "detail": ""
+   "detail": "两条链各 4 个阶段带 scenario; 两场运动会话有首因合同, 四个取证/运动阶段有可执行四腿"
   },
   {
    "name": "E4_no_software_trip_substitute",
    "ok": true,
-   "detail": ""
+   "detail": "两场运动会话的首因合同都写明禁止用 safety_trip 代替真实越界, 且没有任何步骤发 safety_trip"
   },
   {
    "name": "E5_boot_confirm_asserts_both_stack_sizes",
@@ -203,12 +203,12 @@
   {
    "name": "E6_mechanical_gaps_marked_not_provided",
    "ok": true,
-   "detail": "SG/ADC 受控负载的施加与测量手段"
+   "detail": "SG/ADC 可控负载的施加手段与机械连接"
   },
   {
    "name": "E7_validate_plan_clean",
    "ok": true,
-   "detail": "checks=207 fail=0"
+   "detail": "checks=233 fail=0"
   },
   {
    "name": "E8_quota_declares_no_retry_and_no_blackbox_clear",
@@ -218,12 +218,247 @@
   {
    "name": "E9_stub_dispatch_end_to_end_ok",
    "ok": true,
-   "detail": "整包在 stub+sim 下走完全部有步骤的阶段且配额逐条扣完; 原文存 field/dispatch_stub_healthy.txt"
+   "detail": "交付态(load_means=NOT_PROVIDED)整包干跑: SG 链在开端口前被拒 => 实际只用 8 次开口 / 2 次起转, 其余阶段照常走完且无 NOT_RUN(原文存 field/dispatch_stub_healthy.txt)"
   },
   {
    "name": "E10_dry_run_touched_no_device",
    "ok": true,
    "detail": "干跑里 actions_attempted 为空: 没有一次真实工具调用、没有开口、没有起转(见同文件)"
+  },
+  {
+   "name": "E11_skipped_chain_has_no_session_at_all",
+   "ok": true,
+   "detail": "被前置门拒掉的链在汇总里一条阶段行都没有(不是执行了但失败), 而 IMU 链照常执行"
+  },
+  {
+   "name": "F1_readback_bound_to_this_image",
+   "ok": true,
+   "detail": "回读目标 = 本轮 BIN dab356c6…(290916 B), 与 S0 的 identity_binding.image 逐字段相同"
+  },
+  {
+   "name": "F2_download_bound_to_this_axf",
+   "ok": true,
+   "detail": "下载载荷 = 本轮 AXF 0babe9f1…, 且 argv 最后一个参数就是该路径"
+  },
+  {
+   "name": "F3_no_stale_binding_in_executable_fields",
+   "ok": true,
+   "detail": "只扫会被执行字段(tools 的 argv/command/image/out_file + 每步的 cmd/key): 旧 00608ec9 绑定已全部移除; 散文里作为历史说明提到它是允许的(扫全文会被自己的文字打出假报警)"
+  },
+  {
+   "name": "F4_readback_not_board_image_before",
+   "ok": true,
+   "detail": "回读目标不等于上一轮在板镜像(那只是 board_image_before 的登记事实)"
+  },
+  {
+   "name": "F5_executor_gate_agrees",
+   "ok": true,
+   "detail": "validate_plan 的同一函数离线判定: 一致"
+  },
+  {
+   "name": "F6_meta_negative_gate_fires",
+   "ok": true,
+   "detail": "元负控: 把回读绑回旧 00608ec9… 时 identity_consistency 必须报出 [\"READBACK_TARGET_IMAGE|want=('reports/firmware/phase8-m8-idle-stack-r4/rt-thread-motor-m1-candidate.bin', 290916, 'dab356c69fbf4ca747e838580c16982bd56b53b1367f84b97ab705c2fbd25439')|got=('reports/firmware/phase8-m8-relative-protection-r3/rt-thread-motor-m1-candidate.bin', 290916, '00608ec93c6a3027d68b44b5317574209fccfb0ba82a9974793d13b54b79e304')\"]"
+  },
+  {
+   "name": "F7_real_readback_function_reproduces_then_accepts",
+   "ok": true,
+   "detail": "复审的复现路径: 用**本轮新 BIN 的原字节**跑现有回读判据, 绑旧镜像时 READBACK_HASH_MISMATCH, 绑新镜像时 REAL_HASH_EQUAL"
+  },
+  {
+   "name": "G1_stage_order_two_full_chains",
+   "ok": true,
+   "detail": "执行器按 stages 数组迭代, 所以数组顺序就是执行顺序: S0,S1,S2,S3,S4,S5,S6,S7,S8,S9,S10,S11,S8b,S9b,S10b,S11b"
+  },
+  {
+   "name": "G2_scenario_scopes_declared",
+   "ok": true,
+   "detail": "两条链各自的 scenario 已标(分支与基线的作用域)"
+  },
+  {
+   "name": "G3_incident_baseline_namespaced",
+   "ok": true,
+   "detail": "事故基线按场存: A=['bb_session_sg', 'bb_written_sg', 'flash_used_before_sg', 'flash_capacity_sg'] B=['bb_session_imu', 'bb_written_imu', 'flash_used_before_imu', 'flash_capacity_imu']"
+  },
+  {
+   "name": "G4_consumers_use_same_suffix",
+   "ok": true,
+   "detail": "取证会话的比较对象/新日志窗口基线都指向**本场**的键(不共用同一本基线)"
+  },
+  {
+   "name": "G5_profile_leg_step_present",
+   "ok": true,
+   "detail": "两场运动会话都在自己会话里读一次 diag_profile show(首因的 profile 腿)"
+  },
+  {
+   "name": "G6_validate_chain_lines_pass",
+   "ok": true,
+   "detail": "执行器自己的离线门: 身份/链序/前置门/首因腿全 PASS 且 fail=0"
+  },
+  {
+   "name": "G7_meta_negative_chain_order",
+   "ok": true,
+   "detail": "元负控: 把 S9 搬到它的分支决定点 S8 之前, 链序门必须 FAIL"
+  },
+  {
+   "name": "H1_quota_equals_derived",
+   "ok": true,
+   "detail": "推导={\"approved_reboot\": 1, \"cleanup_motor_disarm\": 5, \"cleanup_motor_status\": 5, \"cleanup_motor_stop\": 5, \"config_save\": 1, \"diag_profile_commit\": 1, \"diag_profile_learn\": 1, \"diag_profile_zero\": 1, \"download\": 1, \"explicit_reset\": 1, \"irq_polarity_prep\": 4, \"motor_run\": 3, \"port_open\": 12, \"readback\": 1, \"tmc_config_apply\": 2} 申报={\"approved_reboot\": 1, \"cleanup_motor_disarm\": 5, \"cleanup_motor_status\": 5, \"cleanup_motor_stop\": 5, \"config_save\": 1, \"diag_profile_commit\": 1, \"diag_profile_learn\": 1, \"diag_profile_zero\": 1, \"download\": 1, \"explicit_reset\": 1, \"irq_polarity_prep\": 4, \"motor_run\": 3, \"port_open\": 12, \"readback\": 1, \"tmc_config_apply\": 2}"
+  },
+  {
+   "name": "H2_twelve_openings_five_cleanup",
+   "ok": true,
+   "detail": "两场均触发的真实路径: 12 次开口 + 5 组必要清理(S4/S8/S8b 起转, S10/S10b 锁存态再 arm)"
+  },
+  {
+   "name": "H3_no_over_declared_reset",
+   "ok": true,
+   "detail": "显式复位真实只有 S3 一处(上一版申报 2 是多报, 本轮按路径改回 1)"
+  },
+  {
+   "name": "H4_meta_negative_quota",
+   "ok": true,
+   "detail": "元负控: 退回申报 10 开口 / 3 清理组时, PLAN_QUOTA_NEED 必须逐项报 FAIL"
+  },
+  {
+   "name": "I1_legs_S8",
+   "ok": true,
+   "detail": "S8 覆盖=['trip_row', 'source_sample', 'profile_identity', 'incident_session'] on_missing=EVIDENCE_INCOMPLETE 腿数=6"
+  },
+  {
+   "name": "I1_legs_S8b",
+   "ok": true,
+   "detail": "S8b 覆盖=['trip_row', 'source_sample', 'profile_identity', 'incident_session'] on_missing=EVIDENCE_INCOMPLETE 腿数=6"
+  },
+  {
+   "name": "I1_legs_S9",
+   "ok": true,
+   "detail": "S9 覆盖=['latch_row', 'source_sample', 'profile_identity', 'incident_session'] on_missing=EVIDENCE_INCOMPLETE 腿数=3"
+  },
+  {
+   "name": "I1_legs_S9b",
+   "ok": true,
+   "detail": "S9b 覆盖=['latch_row', 'source_sample', 'profile_identity', 'incident_session'] on_missing=EVIDENCE_INCOMPLETE 腿数=3"
+  },
+  {
+   "name": "I2_trip_cannot_be_rewritten",
+   "ok": true,
+   "detail": "已观察到的触发被记成到时未触发 => 具名 TRIP_REWRITTEN_AS_NO_TRIGGER(不是 NO_TRIGGER 也不是通过)"
+  },
+  {
+   "name": "I3_missing_leg_named",
+   "ok": true,
+   "detail": "缺源样本行 => ['source_sample:PATTERN_NOT_FOUND'](其余三条腿仍成立, 所以只报这一条)"
+  },
+  {
+   "name": "I4_all_legs_present_passes",
+   "ok": true,
+   "detail": "四腿齐(同次 TRIP/源样本/profile 同代/事故基线已记录) => 无缺腿"
+  },
+  {
+   "name": "I5_wrong_generation_named",
+   "ok": true,
+   "detail": "profile 不是本轮提交的那一代 => 具名不匹配(不能拿旧基线冒充首因): ['profile_identity:NOT_EQUAL_RECORDED(9!=recorded.id=7)', 'trip_row_ties_to_profile:trip_id=7!=pid=9']"
+  },
+  {
+   "name": "J1_load_means_state",
+   "ok": true,
+   "detail": "缺加载手段: 状态 NOT_PROVIDED + blocks_motion + 挂在 S8 的 prerequisite_gates 上"
+  },
+  {
+   "name": "J2_asset_facts_registered",
+   "ok": true,
+   "detail": "现有实物与缺项如实登记: 现有实物: T8 丝杆 + 标称 300 mm 完整导轨滑台 / 电机尚未与滑台连接; 导程待确认(未实测)"
+  },
+  {
+   "name": "J3_instrument_not_a_spinup_gate",
+   "ok": true,
+   "detail": "示波器继续暂缓: 不作为起转前置, 也不新增高精度仪器前置"
+  },
+  {
+   "name": "J4_gate_is_executed_not_prose",
+   "ok": true,
+   "detail": "门在执行器代码里(开端口之前跳过整条链), 不是只在计划的说明字段里"
+  },
+  {
+   "name": "J5_meta_negative_ungated_prerequisite",
+   "ok": true,
+   "detail": "元负控: 把 S8 的门摘掉(只剩说明字段)时, 离线门必须 FAIL"
+  },
+  {
+   "name": "K1_build_input_commits_are_true",
+   "ok": true,
+   "detail": "构建输入登记为 tip(58904e1)与 rtconfig 入库提交(fe3d9f5); 构建时 HEAD(48204fe)单独登记且不再充当输入"
+  },
+  {
+   "name": "K2_software_input_commit_resolvable",
+   "ok": true,
+   "detail": "58904e1 可在仓库里 rev-parse"
+  },
+  {
+   "name": "K2_tested_image_build_commit_resolvable",
+   "ok": true,
+   "detail": "fe3d9f5 可在仓库里 rev-parse"
+  },
+  {
+   "name": "K3_build_head_rtconfig_was_256",
+   "ok": true,
+   "detail": "实测: 48204fe 的树里 rtconfig.h 仍是 256 => 旧登记把该提交当构建输入是错的"
+  },
+  {
+   "name": "K4_rtconfig_dual_identity",
+   "ok": true,
+   "detail": "本机 CRLF 1927ed1c…/9304 B 与远端 LF b66753d6…/8850 B 只差行尾, 后者就是 tip 的 git blob 字节 => 不需因此重编"
+  },
+  {
+   "name": "K5_356_not_called_margin",
+   "ok": true,
+   "detail": "264 与 668 并存且不称 1024-668=356 B 是已验证余量; 轮内两份文件的旧措辞已改"
+  },
+  {
+   "name": "L1_four_originals_byte_identical",
+   "ok": true,
+   "detail": "4 件与 zip 内清单逐字节一致(不覆盖、不重跑): ['C01_DELIVERY_RECEIPT.md', 'SHA256SUMS.txt', 'results_local.json', 'verify_c01.py']"
+  },
+  {
+   "name": "L2_results_local_not_regenerated",
+   "ok": true,
+   "detail": "原始结果件按交付态读回: {'checks_total': 32, 'expectations_met': 32, 'all_met': True}(CR 字节 452, 散列绑的是含 CR 的原字节)"
+  },
+  {
+   "name": "L3_zip_sha_registered",
+   "ok": true,
+   "detail": "交付包本身的 sha256 已登记; 本机复算=True"
+  },
+  {
+   "name": "M1_plans_take_event_five",
+   "ok": true,
+   "detail": "R3 两份 + R4 计划的停后帧判据都取 event=5: ['5']/['5']/['5']"
+  },
+  {
+   "name": "M2_fixtures_are_event_five_and_source_derived",
+   "ok": true,
+   "detail": "夹具帧的 event 列=5 且两组都标 source_shape(全库没有一次板上采集给出 flash_dump CSV 行)"
+  },
+  {
+   "name": "M3_adc68_fixture_present",
+   "ok": true,
+   "detail": "ADC68/SG8 过量采样健康夹具已在两份 rows.json, 且标明是源码派生不是实测"
+  },
+  {
+   "name": "M4_archived_runs_untouched",
+   "ok": true,
+   "detail": "归档运行输出共 7 份, 其中 5 份仍带 event=9(其余是加 require_frames 之前的老快照); 工作树里没有任何 psrun 文件被改动 => 本轮是定向更正而不是全局替换"
+  },
+  {
+   "name": "M5_m5_history_untouched",
+   "ok": true,
+   "detail": "工作树里没有 M5 软件故障原件的改动(event=9 的那批历史证据原样保留); 本轮改动=21 项"
+  },
+  {
+   "name": "M6_event_five_basis_is_source",
+   "ok": true,
+   "detail": "判据出处逐字写在计划里(FAULT_MULTI_SOURCE=5u 的三条源码锚点)"
   }
  ],
  "problems": []

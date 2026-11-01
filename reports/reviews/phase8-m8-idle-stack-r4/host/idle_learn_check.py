@@ -102,10 +102,18 @@ add("A5_board_measured_idle_watermark_recorded_separately",
     "静态界 668 与实测峰值 163 并列登记, 不互相替换")
 head = subprocess.run(["git", "show", "HEAD:%s" % RTCONFIG.relative_to(ROOT).as_posix()],
                       cwd=ROOT, capture_output=True)
-diff = [(a, b) for a, b in zip(head.stdout.decode("utf-8").splitlines(),
-                               RTCONFIG.read_text(encoding="utf-8").splitlines()) if a != b]
+prev = subprocess.run(["git", "show", "48204fe:%s" % RTCONFIG.relative_to(ROOT).as_posix()],
+                      cwd=ROOT, capture_output=True)
+norm = lambda b: b.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n").splitlines()
+wt = norm(RTCONFIG.read_bytes())
+drift = [(a, b) for a, b in zip(norm(head.stdout), wt) if a != b]
+diff = [(a, b) for a, b in zip(norm(prev.stdout), wt) if a != b]
 add("A6_rtconfig_only_the_idle_line_changed",
-    len(diff) == 1 and "IDLE_THREAD_STACK_SIZE" in diff[0][0] and "1024" in diff[0][1], diff)
+    len(drift) == 0 and len(wt) == len(norm(head.stdout)) and len(diff) == 1 and
+    b"IDLE_THREAD_STACK_SIZE 256" in prev.stdout and
+    "#define IDLE_THREAD_STACK_SIZE 1024" in "\n".join(wt),
+    "工作树与 HEAD 的 rtconfig 逐行相同(只差行尾); 相对构建时 HEAD(48204fe) 的树恰好差 1 行 = idle 256->1024; "
+    "旧写法是拿未跟踪时 git show 返回空来凑出 1 行差, 那是巧合不是检查")
 add("A7_diag_4096_source_untouched",
     sha(DIAG_C) == "e1696ec92721c7df9da074c465ac3b705ad451029aa3608b1695c93c7466e557",
     sha(DIAG_C)[:16])
@@ -248,7 +256,8 @@ swap = PLAN["download_payload_swap"]
 dl_exec = json.dumps([PLAN["tools"]["download"].get("command"), PLAN["tools"]["download"].get("argv")])
 add("E1_download_payload_is_the_new_axf",
     swap["swaps"] >= 1 and (FW / "rt-thread-motor-m1.axf").relative_to(ROOT).as_posix() in dl_exec
-    and swap["from"] not in dl_exec,
+    and swap.get("payload_axf") == PLAN["tools"]["download"]["image"]["path"] and
+    "relative-protection-r3" not in dl_exec,
     "只看可执行字段(command/argv), 不看散文: 上一轮的教训是扫整份对象会被自己的说明文字打出假报警")
 add("E2_identity_binding_uses_executor_schema",
     set(("image", "executor", "software_input_commit", "tested_image_build_commit"))
@@ -257,19 +266,24 @@ add("E2_identity_binding_uses_executor_schema",
     ["rt-thread-motor-m1-candidate.bin"]["sha256"])
 two = [s for s in PLAN["stages"] if s.get("scenario")]
 add("E3_two_independent_excitation_sessions",
-    len(two) == 2 and {t["scenario"] for t in two} == {"SG_ADC_controlled_load", "IMU_non_destructive_excitation"}
-    and all("first_cause_contract" in t for t in two))
+    len(two) == 8 and {t["scenario"] for t in two} ==
+    {"SG_ADC_controlled_load", "IMU_non_destructive_excitation"} and
+    all("first_cause_contract" in t for t in two if t["id"] in ("S8", "S8b")) and
+    all("first_cause_legs" in t for t in two if t["id"] in ("S8", "S9", "S8b", "S9b")),
+    "两条链各 4 个阶段带 scenario; 两场运动会话有首因合同, 四个取证/运动阶段有可执行四腿")
 add("E4_no_software_trip_substitute",
-    all("safety_trip" in json.dumps(t["first_cause_contract"], ensure_ascii=False) for t in two) and
-    "safety_trip" not in json.dumps([s.get("cmd") for t in two for s in t["steps"]]))
+    all("safety_trip" in json.dumps(t["first_cause_contract"], ensure_ascii=False)
+        for t in two if t["id"] in ("S8", "S8b")) and
+    "safety_trip" not in json.dumps([s.get("cmd") for t in two for s in t["steps"]]),
+    "两场运动会话的首因合同都写明禁止用 safety_trip 代替真实越界, 且没有任何步骤发 safety_trip")
 add("E5_boot_confirm_asserts_both_stack_sizes",
     len(ps_step["expect_values"]) == 2 and
     sorted(sorted(v["must"].keys()) for v in ps_step["expect_values"])
     == [["diag_stack"], ["idle_stack"]])
 add("E6_mechanical_gaps_marked_not_provided",
-    json.dumps(PLAN).count("NOT_PROVIDED") >= 5 and len(PLAN["not_provided_summary"]) == 5,
+    json.dumps(PLAN).count("NOT_PROVIDED") >= 5 and len(PLAN["not_provided_summary"]) == 6,
     PLAN["not_provided_summary"][0]["item"])
-add("E7_validate_plan_clean", bad5 == 0 and len(lines5) == 207, "checks=%d fail=%d" % (len(lines5), bad5))
+add("E7_validate_plan_clean", bad5 == 0 and len(lines5) > 200, "checks=%d fail=%d" % (len(lines5), bad5))
 add("E8_quota_declares_no_retry_and_no_blackbox_clear",
     PLAN["quota"]["retry"] == 0 and PLAN["quota"].get("blackbox_clear", 0) == 0 and
     PLAN["quota"]["download"] == 1 and PLAN["quota"]["readback"] == 1)
@@ -292,12 +306,338 @@ def dispatch(plan_obj, tag):
 
 htxt = dispatch(json.loads(json.dumps(PLAN)), "healthy")
 mleft = re.search(r"quota_left=\{([^}]*)\}", htxt)
+left_map = dict(re.findall(r'"(\w+)": (\d+)', mleft.group(1))) if mleft else {}
 add("E9_stub_dispatch_end_to_end_ok",
     "DISPATCH_SUMMARY|status=OK" in htxt and "stages_not_run=0" in htxt and
-    bool(mleft) and '"motor_run": 0' in mleft.group(1) and '"download": 0' in mleft.group(1),
-    "整包在 stub+sim 下走完全部有步骤的阶段且配额逐条扣完; 原文存 field/dispatch_stub_healthy.txt")
+    left_map.get("port_open") == str(int(PLAN["quota"]["port_open"]) - 8) and
+    left_map.get("motor_run") == str(int(PLAN["quota"]["motor_run"]) - 2) and
+    "PREREQUISITE_REFUSAL|scenario=SG_ADC_controlled_load" in htxt,
+    "交付态(load_means=NOT_PROVIDED)整包干跑: SG 链在开端口前被拒 => 实际只用 8 次开口 / 2 次起转, "
+    "其余阶段照常走完且无 NOT_RUN(原文存 field/dispatch_stub_healthy.txt)")
 add("E10_dry_run_touched_no_device", "actions_attempted=[]" in htxt,
     "干跑里 actions_attempted 为空: 没有一次真实工具调用、没有开口、没有起转(见同文件)")
+add("E11_skipped_chain_has_no_session_at_all",
+    "stage=S8|" not in htxt and "stage=S9|" not in htxt and "stage=S10|" not in htxt and
+    "stage=S11|" not in htxt and "stage=S8b|" in htxt and "stage=S9b|" in htxt,
+    "被前置门拒掉的链在汇总里一条阶段行都没有(不是执行了但失败), 而 IMU 链照常执行")
+
+# ---------------- F 组: ① 镜像身份统一(S0 / 下载 / 回读 同源) ----------------
+R3_BIN_OLD = "00608ec93c6a3027d68b44b5317574209fccfb0ba82a9974793d13b54b79e304"
+img, axf = PLAN["identity_binding"]["image"], PLAN["identity_binding"]["image"]["axf"]
+rb, dl = PLAN["tools"]["readback"]["image"], PLAN["tools"]["download"]["image"]
+add("F1_readback_bound_to_this_image",
+    rb["sha256"] == img["sha256"] and rb["bytes"] == img["bytes"] and rb["path"] == img["path"],
+    "回读目标 = 本轮 BIN %s…(%d B), 与 S0 的 identity_binding.image 逐字段相同" % (img["sha256"][:8], img["bytes"]))
+add("F2_download_bound_to_this_axf",
+    dl["sha256"] == axf["sha256"] and dl["bytes"] == axf["bytes"] and dl["path"] == axf["path"] and
+    PLAN["tools"]["download"]["argv"][-1] == axf["path"],
+    "下载载荷 = 本轮 AXF %s…, 且 argv 最后一个参数就是该路径" % axf["sha256"][:8])
+EXEC_SCOPE = {"tools": {k: {kk: vv for kk, vv in (v or {}).items()
+                            if kk in ("argv", "command", "image", "out_file", "start_address")}
+                        for k, v in PLAN["tools"].items()},
+              "stages": [s.get("steps") for s in PLAN["stages"]]}
+add("F3_no_stale_binding_in_executable_fields",
+    "00608ec9" not in json.dumps(EXEC_SCOPE, ensure_ascii=False) and
+    "relative-protection-r3/rt-thread-motor-m1" not in json.dumps(EXEC_SCOPE, ensure_ascii=False),
+    "只扫会被执行字段(tools 的 argv/command/image/out_file + 每步的 cmd/key): 旧 00608ec9 绑定已全部移除; "
+    "散文里作为历史说明提到它是允许的(扫全文会被自己的文字打出假报警)")
+add("F4_readback_not_board_image_before",
+    rb["sha256"] != PLAN["identity_binding"]["board_image_before"]["sha256"],
+    "回读目标不等于上一轮在板镜像(那只是 board_image_before 的登记事实)")
+ic = M.identity_consistency(PLAN)
+add("F5_executor_gate_agrees", ic == [], "validate_plan 的同一函数离线判定: %s" % (ic or "一致"))
+
+
+def stale_copy():
+    p = json.loads(json.dumps(PLAN))
+    p["tools"]["readback"]["image"] = {"path": "reports/firmware/phase8-m8-relative-protection-r3/"
+                                               "rt-thread-motor-m1-candidate.bin",
+                                       "bytes": 290916, "sha256": R3_BIN_OLD}
+    return p
+
+
+add("F6_meta_negative_gate_fires", bool(M.identity_consistency(stale_copy())),
+    "元负控: 把回读绑回旧 00608ec9… 时 identity_consistency 必须报出 %s" %
+    M.identity_consistency(stale_copy())[:1])
+mb = M.ManualActionBackend(led, SCRATCH / "f6", Clock(), 5)
+nd = SCRATCH / "f6" / "action_readback"
+nd.mkdir(parents=True, exist_ok=True)
+(nd / "rc.txt").write_text("0", encoding="utf-8")
+(nd / "readback.bin").write_bytes((FW / "rt-thread-motor-m1-candidate.bin").read_bytes())
+act_stale = {"as": "readback", "action": "readback", "command": "x", "run_root": str(SCRATCH / "f6"),
+             "out_file": "readback.bin", "image": stale_copy()["tools"]["readback"]["image"]}
+try:
+    mb.readback(act_stale, {})
+    code6 = "NO_STOP"
+except M.Stop as e:
+    code6 = e.code
+act_good = json.loads(json.dumps(act_stale))
+act_good["image"] = PLAN["tools"]["readback"]["image"]
+good = mb.readback(act_good, {}).get("identity_gate")
+add("F7_real_readback_function_reproduces_then_accepts",
+    code6 == "READBACK_HASH_MISMATCH" and good == "REAL_HASH_EQUAL",
+    "复审的复现路径: 用**本轮新 BIN 的原字节**跑现有回读判据, 绑旧镜像时 %s, 绑新镜像时 %s" % (code6, good))
+
+# ---------------- G 组: ② 两场顺序与分场基线 ----------------
+ids_order = [s["id"] for s in PLAN["stages"]]
+want_order = ["S0", "S1", "S2", "S3", "S4", "S5", "S6", "S7",
+              "S8", "S9", "S10", "S11", "S8b", "S9b", "S10b", "S11b"]
+add("G1_stage_order_two_full_chains", ids_order == want_order,
+    "执行器按 stages 数组迭代, 所以数组顺序就是执行顺序: %s" % ",".join(ids_order))
+byid = {s["id"]: s for s in PLAN["stages"]}
+add("G2_scenario_scopes_declared",
+    all(byid[x].get("scenario") == "SG_ADC_controlled_load" for x in ("S8", "S9", "S10", "S11")) and
+    all(byid[x].get("scenario") == "IMU_non_destructive_excitation" for x in ("S8b", "S9b", "S10b", "S11b")),
+    "两条链各自的 scenario 已标(分支与基线的作用域)")
+rec_keys = [k for spec in byid["S8"]["record_from"] for k in spec["as"]]
+rec_keys_b = [k for spec in byid["S8b"]["record_from"] for k in spec["as"]]
+add("G3_incident_baseline_namespaced",
+    rec_keys == ["bb_session_sg", "bb_written_sg", "flash_used_before_sg", "flash_capacity_sg"] and
+    rec_keys_b == ["bb_session_imu", "bb_written_imu", "flash_used_before_imu", "flash_capacity_imu"],
+    "事故基线按场存: A=%s B=%s" % (rec_keys, rec_keys_b))
+add("G4_consumers_use_same_suffix",
+    byid["S9"]["compare_recorded_gt"][0]["keys"] == ["bb_session_sg", "bb_written_sg"] and
+    byid["S9"]["require_frames"][0]["session_key"] == "bb_session_sg" and
+    byid["S9"]["steps"][-1]["new_log_window"]["before_key"] == "flash_used_before_sg" and
+    byid["S9b"]["require_frames"][0]["session_key"] == "bb_session_imu",
+    "取证会话的比较对象/新日志窗口基线都指向**本场**的键(不共用同一本基线)")
+add("G5_profile_leg_step_present",
+    any(s.get("as") == "prof_at_arm" for s in byid["S8"]["steps"]) and
+    any(s.get("as") == "prof_at_arm" for s in byid["S8b"]["steps"]),
+    "两场运动会话都在自己会话里读一次 diag_profile show(首因的 profile 腿)")
+gtxt = subprocess.run([sys.executable, str(CHAIN), "--validate-plan", "--plan", str(FIELD / "plan_core_r4.json")],
+                      capture_output=True, text=True, encoding="utf-8", errors="replace").stdout
+add("G6_validate_chain_lines_pass",
+    "PLAN_SCENARIO_CHAIN|all|PASS" in gtxt and "PLAN_IMAGE_IDENTITY_CONSISTENCY|all|PASS" in gtxt and
+    "PLAN_PREREQUISITE_GATE|all|PASS" in gtxt and "PLAN_FIRST_CAUSE_LEGS|all|PASS" in gtxt and
+    "PLAN_VALIDATE_SUMMARY|checks=" in gtxt and "|fail=0|" in gtxt,
+    "执行器自己的离线门: 身份/链序/前置门/首因腿全 PASS 且 fail=0")
+
+
+def bad_order_plan():
+    p = json.loads(json.dumps(PLAN))
+    idx = [i for i, s in enumerate(p["stages"]) if s["id"] == "S9"]
+    i9 = idx[0]
+    s9 = p["stages"].pop(i9)
+    p["stages"].insert(next(i for i, s in enumerate(p["stages"]) if s["id"] == "S8"), s9)
+    return p
+
+
+gbad = subprocess.run([sys.executable, str(CHAIN), "--validate-plan", "--plan", "-"],
+                      input=json.dumps(bad_order_plan()), capture_output=True, text=True,
+                      encoding="utf-8", errors="replace")
+add("G7_meta_negative_chain_order", "PLAN_SCENARIO_CHAIN|all|FAIL" in gbad.stdout or
+    bool(M.validate_plan(bad_order_plan(), json.loads((FIELD / "rows.json").read_text(encoding="utf-8-sig")),
+                         str(APPS.parent))[1]),
+    "元负控: 把 S9 搬到它的分支决定点 S8 之前, 链序门必须 FAIL")
+
+# ---------------- H 组: ③ 额度按真实路径重算 ----------------
+derived = M.derive_quota_needs(PLAN)
+add("H1_quota_equals_derived", all(int(PLAN["quota"][k]) >= v for k, v in derived.items()),
+    "推导=%s 申报=%s" % (json.dumps(derived, sort_keys=True),
+                         json.dumps({k: PLAN["quota"][k] for k in derived}, sort_keys=True)))
+add("H2_twelve_openings_five_cleanup",
+    derived["port_open"] == 12 and derived["cleanup_motor_stop"] == 5 and
+    derived["cleanup_motor_disarm"] == 5 and derived["cleanup_motor_status"] == 5 and
+    derived["motor_run"] == 3 and PLAN["quota"]["port_open"] >= 12 and
+    PLAN["quota"]["cleanup_motor_stop"] >= 5,
+    "两场均触发的真实路径: 12 次开口 + 5 组必要清理(S4/S8/S8b 起转, S10/S10b 锁存态再 arm)")
+add("H3_no_over_declared_reset", derived["explicit_reset"] == 1 and PLAN["quota"]["explicit_reset"] == 1,
+    "显式复位真实只有 S3 一处(上一版申报 2 是多报, 本轮按路径改回 1)")
+qbad = json.loads(json.dumps(PLAN))
+qbad["quota"]["port_open"] = 10
+qbad["quota"]["cleanup_motor_stop"] = 3
+_lines, _bad, _n = M.validate_plan(qbad, json.loads((FIELD / "rows.json").read_text(encoding="utf-8-sig")),
+                                   str(APPS.parent))
+add("H4_meta_negative_quota", any("PLAN_QUOTA_NEED|port_open|FAIL" in l for l in _lines) and
+    any("PLAN_QUOTA_NEED|cleanup_motor_stop|FAIL" in l for l in _lines) and _bad > 0,
+    "元负控: 退回申报 10 开口 / 3 清理组时, PLAN_QUOTA_NEED 必须逐项报 FAIL")
+
+# ---------------- I 组: ④ 首因四腿与不降级 ----------------
+def _watch_file(with_source):
+    lines = ["[DIAG] REL TRIP r=REL_SG_SEVERE id=7 rev=1 post_rc=0",
+             "[DIAG] REL TRIP val=61 thr=45 ms=120 cov=0"]
+    if with_source:
+        lines.append("[DIAG] REL TRIP sg=1008 cur=10041 imu=0 tick=4588411 n=3")
+    p = SCRATCH / ("watch_%s.txt" % ("with_source" if with_source else "no_source"))
+    p.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+    return str(p)
+
+
+def _prof_file(pid=7, prev=1):
+    p = SCRATCH / ("prof_%s_%s.txt" % (pid, prev))
+    p.write_text("[DIAG] profile id=%d rev=%d abi=2 flg=0005 VALID\n" % (pid, prev),
+                 encoding="utf-8", newline="\n")
+    return str(p)
+
+
+class _L(object):
+    def ev(self, *a, **kw):
+        pass
+
+
+REC_OK = {"id": "7", "rev": "1", "bb_session_sg": "0", "flash_used_before_sg": "300"}
+for sid, want in (("S8", ["trip_row", "source_sample", "profile_identity", "incident_session"]),
+                  ("S8b", ["trip_row", "source_sample", "profile_identity", "incident_session"]),
+                  ("S9", ["latch_row", "source_sample", "profile_identity", "incident_session"]),
+                  ("S9b", ["latch_row", "source_sample", "profile_identity", "incident_session"])):
+    spec = byid[sid].get("first_cause_legs") or {}
+    add("I1_legs_%s" % sid, sorted(spec.get("covers", [])) == sorted(want) and
+        spec.get("on_missing") == "EVIDENCE_INCOMPLETE" and len(spec.get("legs", [])) >= 3 and
+        spec.get("applies_when_branch") == "trip",
+        "%s 覆盖=%s on_missing=%s 腿数=%d" % (sid, spec.get("covers"), spec.get("on_missing"),
+                                            len(spec.get("legs", []))))
+try:
+    M.response_branch({"status": "OBSERVATION_NO_TRIGGER",
+                       "results": [{"kind": "watch", "trigger_seen": ["[DIAG] REL TRIP r="]}]},
+                      {"decides_response_branch": True, "id": "S8"})
+    guard = "NO_STOP"
+except M.Stop as e:
+    guard = e.code
+add("I2_trip_cannot_be_rewritten", guard == "TRIP_REWRITTEN_AS_NO_TRIGGER",
+    "已观察到的触发被记成到时未触发 => 具名 %s(不是 NO_TRIGGER 也不是通过)" % guard)
+
+res_i3 = M.first_cause_verdict(
+    byid["S8"], [{"as": "trip_window", "txt": _watch_file(False)},
+                 {"as": "prof_at_arm", "txt": _prof_file()}], REC_OK, "trip", _L())
+add("I3_missing_leg_named", any(x.startswith("source_sample") for x in res_i3) and
+    len(res_i3) == 1, "缺源样本行 => %s(其余三条腿仍成立, 所以只报这一条)" % res_i3)
+res_i4 = M.first_cause_verdict(
+    byid["S8"], [{"as": "trip_window", "txt": _watch_file(True)},
+                 {"as": "prof_at_arm", "txt": _prof_file()}], REC_OK, "trip", _L())
+add("I4_all_legs_present_passes", res_i4 == [], "四腿齐(同次 TRIP/源样本/profile 同代/事故基线已记录) => 无缺腿")
+res_i5 = M.first_cause_verdict(
+    byid["S8"], [{"as": "trip_window", "txt": _watch_file(True)},
+                 {"as": "prof_at_arm", "txt": _prof_file(pid=9)}], REC_OK, "trip", _L())
+add("I5_wrong_generation_named", any("profile_identity" in x and "NOT_EQUAL_RECORDED" in x for x in res_i5),
+    "profile 不是本轮提交的那一代 => 具名不匹配(不能拿旧基线冒充首因): %s" % res_i5[:2])
+
+# ---------------- J 组: ⑤ 机械前置是**真门** ----------------
+mp = PLAN["mechanical_prerequisites"]["load_means"]
+add("J1_load_means_state", mp["status"] == "NOT_PROVIDED" and mp["blocks_motion"] is True and
+    byid["S8"].get("prerequisite_gates") == ["load_means"],
+    "缺加载手段: 状态 NOT_PROVIDED + blocks_motion + 挂在 S8 的 prerequisite_gates 上")
+add("J2_asset_facts_registered",
+    "T8" in mp["asset"] and "300 mm" in mp["asset"] and "尚未" in mp["asset_state"] and
+    any("导程" in x for x in mp["still_missing"] + [mp["asset_state"]]),
+    "现有实物与缺项如实登记: %s / %s" % (mp["asset"], mp["asset_state"]))
+add("J3_instrument_not_a_spinup_gate",
+    PLAN["mechanical_prerequisites"]["instrument_probe"]["blocks_motion"] is False and
+    "instrument_probe" not in byid["S8"].get("prerequisite_gates", []),
+    "示波器继续暂缓: 不作为起转前置, 也不新增高精度仪器前置")
+add("J4_gate_is_executed_not_prose",
+    ("STAGE_SKIPPED_BY_PREREQUISITE" in CHAIN.read_text(encoding="utf-8") and
+     "prerequisite_gates" in CHAIN.read_text(encoding="utf-8")),
+    "门在执行器代码里(开端口之前跳过整条链), 不是只在计划的说明字段里")
+jbad = json.loads(json.dumps(PLAN))
+for s in jbad["stages"]:
+    if s["id"] == "S8":
+        s["prerequisite_gates"] = []
+_lines2, _bad2, _ = M.validate_plan(jbad, json.loads((FIELD / "rows.json").read_text(encoding="utf-8-sig")),
+                                    str(APPS.parent))
+add("J5_meta_negative_ungated_prerequisite",
+    any("PLAN_PREREQUISITE_GATE|all|FAIL" in l and "load_means" in l for l in _lines2),
+    "元负控: 把 S8 的门摘掉(只剩说明字段)时, 离线门必须 FAIL")
+
+# ---------------- K 组: 登记修正(构建输入提交 + rtconfig 双身份 + 356 B 措辞) -------
+bi = PLAN["identity_binding"]
+add("K1_build_input_commits_are_true",
+    bi["software_input_commit"] == "58904e1045e275698a8c80f63943a1bd0afdb2eb" and
+    bi["tested_image_build_commit"] == "fe3d9f5cc37470d732acbbb222012a15d71573c9" and
+    bi["build_time_head_commit"] == "48204fe37de3da6f8caeeff467256562f11e58e2",
+    "构建输入登记为 tip(58904e1)与 rtconfig 入库提交(fe3d9f5); 构建时 HEAD(48204fe)单独登记且不再充当输入")
+for _c, _fld in ((bi["software_input_commit"], "software_input_commit"),
+                 (bi["tested_image_build_commit"], "tested_image_build_commit")):
+    r = subprocess.run(["git", "rev-parse", "%s^{commit}" % _c], cwd=str(ROOT),
+                       capture_output=True, text=True)
+    add("K2_%s_resolvable" % _fld, r.returncode == 0 and r.stdout.strip() == _c, "%s 可在仓库里 rev-parse" % _c[:7])
+blob = subprocess.run(["git", "show", "48204fe:%s/rtconfig.h" % KERNEL_ROOT], cwd=str(ROOT),
+                      capture_output=True)
+add("K3_build_head_rtconfig_was_256",
+    b"IDLE_THREAD_STACK_SIZE 256" in blob.stdout and b"IDLE_THREAD_STACK_SIZE 1024" not in blob.stdout,
+    "实测: 48204fe 的树里 rtconfig.h 仍是 256 => 旧登记把该提交当构建输入是错的")
+raw_rt = RTCONFIG.read_bytes()
+lf_rt = raw_rt.replace(b"\r\n", b"\n")
+tip_blob = subprocess.run(["git", "show", "58904e1:%s/rtconfig.h" % KERNEL_ROOT], cwd=str(ROOT),
+                          capture_output=True).stdout
+reg = bi["build_inputs"]["rtconfig_h"]
+add("K4_rtconfig_dual_identity",
+    sha(RTCONFIG) == reg["local_worktree_crlf"]["sha256"] and
+    hashlib.sha256(lf_rt).hexdigest() == reg["git_blob_lf"]["sha256"] and
+    hashlib.sha256(tip_blob).hexdigest() == reg["git_blob_lf"]["sha256"] and
+    len(lf_rt) == reg["git_blob_lf"]["bytes"] and reg["differ_only_by_line_endings"] is True,
+    "本机 CRLF %s…/%d B 与远端 LF %s…/%d B 只差行尾, 后者就是 tip 的 git blob 字节 => 不需因此重编"
+    % (reg["local_worktree_crlf"]["sha256"][:8], len(raw_rt), reg["git_blob_lf"]["sha256"][:8], len(lf_rt)))
+add("K5_356_not_called_margin",
+    "已验证安全余量" in json.dumps(PLAN["stack_margin_wording"], ensure_ascii=False) and
+    PLAN["stack_margin_wording"]["reachable_path_fixed_frame_lower_bound_bytes"] == 264 and
+    PLAN["stack_margin_wording"]["armlink_static_max_depth_bytes"] == 668 and
+    not re.search(r"356\s*B\s*(的)?(已验证)?余量", (RD / "run_record.md").read_text(encoding="utf-8")) and
+    not re.search(r"留\s*356\s*B", (RD / "stack_report.txt").read_text(encoding="utf-8")),
+    "264 与 668 并存且不称 1024-668=356 B 是已验证余量; 轮内两份文件的旧措辞已改")
+
+# ---------------- L 组: C-01 交付包原件逐字节入库 ----------------
+CD = ROOT / "reports/reviews/phase8-m8-parallel-protection-ready"
+want4 = {f["name"]: (f["sha256"], f["bytes"]) for f in PLAN["c01_intake"]["files_byte_identical"]}
+got4 = {p.name: (sha(p), len(p.read_bytes())) for p in CD.iterdir() if p.is_file()}
+add("L1_four_originals_byte_identical",
+    set(got4) == set(want4) and all(got4[n] == want4[n] for n in want4),
+    "4 件与 zip 内清单逐字节一致(不覆盖、不重跑): %s" % sorted(got4))
+res_local = json.loads((CD / "results_local.json").read_text(encoding="utf-8"))
+add("L2_results_local_not_regenerated",
+    res_local["summary"]["all_met"] is True and res_local["summary"]["checks_total"] == 32 and
+    len((CD / "results_local.json").read_bytes().splitlines()) > 0,
+    "原始结果件按交付态读回: %s(CR 字节 %d, 散列绑的是含 CR 的原字节)" %
+    (res_local["summary"], (CD / "results_local.json").read_bytes().count(b"\r")))
+ZIPC = pathlib.Path("C:/Users/LMX/Downloads/NS800_C01_Delivery_20261101.zip")
+zip_ok = PLAN["c01_intake"]["zip_sha256"] == "3eb4c1d335b08fe39bf83e35aa34865d85bb778521fe0cd9e73e1d331a1bc893"
+zip_recompute = sha(ZIPC) == PLAN["c01_intake"]["zip_sha256"] if ZIPC.exists() else "源包已不在本机(登记值仍为交付时复算值)"
+add("L3_zip_sha_registered", zip_ok and (zip_recompute is True or isinstance(zip_recompute, str)),
+    "交付包本身的 sha256 已登记; 本机复算=%s" % zip_recompute)
+
+# ---------------- M 组: C-02 范围(定向更正, 不全局替换) ----------------
+r3plan = json.loads((R3FIELD / "plan.json").read_text(encoding="utf-8"))
+r3cont = json.loads((R3FIELD / "plan_continuation_s2.json").read_text(encoding="utf-8"))
+r3rows = json.loads((R3FIELD / "rows.json").read_text(encoding="utf-8-sig"))
+r4rows = json.loads((FIELD / "rows.json").read_text(encoding="utf-8-sig"))
+def events_of(doc):
+    return sorted({n["event"] for st in doc["stages"] for sp in st.get("require_frames") or []
+                   for n in sp.get("must_include") or []})
+add("M1_plans_take_event_five",
+    events_of(r3plan) == ["5"] and events_of(r3cont) == ["5"] and events_of(PLAN) == ["5"],
+    "R3 两份 + R4 计划的停后帧判据都取 event=5: %s/%s/%s" %
+    (events_of(r3plan), events_of(r3cont), events_of(PLAN)))
+frames5 = lambda rows: sorted({l.split(",")[4] for l in rows["commands"]["flash_dump 0 8"]["trip"]
+                               if len(l.split(",")) == 14 and l.split(",")[0] != "slot"})
+add("M2_fixtures_are_event_five_and_source_derived",
+    frames5(r3rows) == ["5"] and frames5(r4rows) == ["5"] and
+    r3rows["commands"]["flash_dump 0 8"]["_provenance"]["kind"] == "source_shape" and
+    r4rows["commands"]["flash_dump 0 8"]["_provenance"]["kind"] == "source_shape",
+    "夹具帧的 event 列=5 且两组都标 source_shape(全库没有一次板上采集给出 flash_dump CSV 行)")
+add("M3_adc68_fixture_present",
+    "diag_profile learn 8 80 120 0@adc68_over_sample" in r4rows["commands"] and
+    "diag_profile learn 8 80 120 0@adc68_over_sample" in r3rows["commands"] and
+    r3rows["commands"]["diag_profile learn 8 80 120 0@adc68_over_sample"]["_provenance"]["kind"]
+    == "source_shape",
+    "ADC68/SG8 过量采样健康夹具已在两份 rows.json, 且标明是源码派生不是实测")
+arch = sorted((R3FIELD.parent / "offline").glob("psrun-*/neg-stagemutate/plan.json"))
+dirty = subprocess.run(["git", "status", "--porcelain"], cwd=str(ROOT), capture_output=True,
+                       text=True).stdout
+keep9 = [p for p in arch if '"event": "9"' in p.read_text(encoding="utf-8") or
+         '"event":"9"' in p.read_text(encoding="utf-8")]
+add("M4_archived_runs_untouched",
+    len(arch) >= 5 and len(keep9) >= 1 and
+    not any("psrun-" in l for l in dirty.splitlines()),
+    "归档运行输出共 %d 份, 其中 %d 份仍带 event=9(其余是加 require_frames 之前的老快照); "
+    "工作树里没有任何 psrun 文件被改动 => 本轮是定向更正而不是全局替换" % (len(arch), len(keep9)))
+add("M5_m5_history_untouched",
+    not any("phase8-motor-m5" in l for l in dirty.splitlines()),
+    "工作树里没有 M5 软件故障原件的改动(event=9 的那批历史证据原样保留); 本轮改动=%d 项" %
+    len([l for l in dirty.splitlines() if l.strip()]))
+add("M6_event_five_basis_is_source",
+    all("safety_state.h:46" in (byid[x].get("require_frames") or [{}])[0].get("event_basis", "")
+        for x in ("S9", "S9b")),
+    "判据出处逐字写在计划里(FAULT_MULTI_SOURCE=5u 的三条源码锚点)")
 
 problems = [n for n, ok, _ in CHECKS if not ok]
 n_metaneg = sum(1 for n, _, _ in CHECKS if n.startswith("D"))

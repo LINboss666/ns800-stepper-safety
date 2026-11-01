@@ -93,13 +93,29 @@
   "rtconfig_h": {
    "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/rtconfig.h",
    "sha256": "1927ed1c1cc7a1efebca50b910eb735228a926c218b3e39a1daf799b6fe9a65a",
-   "line_79": "#define IDLE_THREAD_STACK_SIZE 1024   /* 候选: armlink 调用图 idle_thread_entry ⇒ rt_defunct_execute ⇒ rt_object_delete ⇒ rt_free ⇒ rt_mutex_take… Max Depth=668 B > 旧值 256 B */"
+   "line_79": "#define IDLE_THREAD_STACK_SIZE 1024   /* 候选: armlink 调用图 idle_thread_entry ⇒ rt_defunct_execute ⇒ rt_object_delete ⇒ rt_free ⇒ rt_mutex_take… Max Depth=668 B > 旧值 256 B */",
+   "bytes_local_crlf": 9304,
+   "sha256_local_crlf": "1927ed1c1cc7a1efebca50b910eb735228a926c218b3e39a1daf799b6fe9a65a",
+   "sha256_git_blob_lf": "b66753d6b50b9bf4ab8b46d4a1500e538513a7c872a3d70e84c551007ab4d209",
+   "bytes_git_blob_lf": 8850,
+   "differ_only_by_line_endings": true,
+   "dual_identity_note": "同一份源的两个字节身份: 工作树 CRLF = sha256 1927ed1c1cc7/9304 B; 远端 git blob(与把 CRLF 归一成 LF 后的工作树字节逐字节相同)= sha256 b66753d6b50b/8850 B。两者只差行尾, 复核方式: git show 58904e1:<该路径> 的 sha256 与 python 归一后的 sha256 相等。不需要因此重编。"
   },
   "diagnosis_c_unchanged": {
    "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diagnosis.c",
    "sha256": "e1696ec92721c7df9da074c465ac3b705ad451029aa3608b1695c93c7466e557",
    "note": "diag 4096 的源文件本轮未动; 与 diag-stack 轮登记值 e1696ec9… 比对"
   },
-  "note": "构建输入的字节身份: 任何人可用这两个 sha256 复核这次构建用的是哪一份源; 本轮只改了 rtconfig 一行"
+  "note": "构建输入的字节身份: 任何人可用这两个 sha256 复核这次构建用的是哪一份源; 本轮只改了 rtconfig 一行",
+  "commit_identity_corrected": {
+   "build_time_head_commit": "48204fe37de3da6f8caeeff467256562f11e58e2",
+   "why_not_the_build_input": "构建时 HEAD 是 48204fe, 但该提交的树里 rtconfig.h 仍是 IDLE_THREAD_STACK_SIZE 256(blob sha256 9fe0efdf9eeb…) —— 1024 那版当时是工作树里未入库的一行。因此 48204fe 不能当新镜像的构建输入登记。",
+   "image_source_input_commit": "58904e1045e275698a8c80f63943a1bd0afdb2eb",
+   "rtconfig_first_tracked_at_1024": "fe3d9f5cc37470d732acbbb222012a15d71573c9",
+   "verified_by": "git ls-tree + git show 逐字节比对(host/idle_learn_check.py 的 A6/K1..K4)"
+  }
+ },
+ "wording_correction": {
+  "idle_stack_margin": "不把 1024-668=356 B 称作已验证安全余量; 264 B(可达路径固定帧下界)与 668 B(armlink 更深静态合计)口径不同且并存, 1024 是否够 = NOT_VERIFIED"
  }
 }

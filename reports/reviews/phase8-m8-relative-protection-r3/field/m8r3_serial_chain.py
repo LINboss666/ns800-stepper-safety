@@ -1541,6 +1541,77 @@ def prove_state_and_flag_constants(app_dir):
                        "motor=%s rpf=%s columns=%d" % (found, bits, FLASH_DUMP_COLUMNS))
 
 
+def derive_quota_needs(plan):
+    """③ 额度从**真实执行路径**推导, 不是拍一个数: 逐阶段按执行器实际会 spend 的名字累加。
+      - port_open: 每个 serial_session 阶段恰好扣 1(exec_session 开口前先 spend)
+      - 步骤级: st["quota"](cmd 步)与 st["quota_name"]/st["action"](action 步)
+      - 阶段级: kind 本身就是工具名的阶段(download/readback/reset)与 operator_gate 的 quota_name
+      - cleanup_*: 每个**可能建立撤能义务**的阶段(含 motor_arm/motor_start cmd)各触发一次三条清理
+    推导值是**下限**: 申报少于推导 => 现场会在某一步 QUOTA_EXHAUSTED/RESERVE_NOT_DECLARED 停,
+    而那一次批准已经花掉了, 所以必须在离线就拒绝。"""
+    need = {}
+    stages = plan["stages"]
+
+    def bump(name, n=1):
+        need[name] = need.get(name, 0) + n
+
+    for stg in stages:
+        kind = stg.get("kind")
+        if kind == "serial_session":
+            bump("port_open")
+        elif kind in ("download", "readback", "reset"):
+            bump(kind)
+        elif kind == "operator_gate":
+            bump(stg.get("quota_name", "approved_reboot"))
+        sets_obligation = False
+        for st in stg.get("steps", []):
+            if st.get("quota"):
+                bump(st["quota"]["name"], int(st["quota"]["n"]))
+            if st.get("action"):
+                bump(st.get("quota_name", st["action"]))
+            if st.get("cmd") in MOTION_OBLIGATION_CMDS:
+                sets_obligation = True
+        if sets_obligation:
+            for cmd in CLEANUP_CMDS:
+                bump("cleanup_" + cmd)
+    return need
+
+
+def identity_consistency(plan):
+    """① S0 / 下载 / 回读**必须指向同一个镜像身份**。这一项是纯离线结构判据:
+    之前就是 readback 仍绑上一轮的 BIN, 用新 BIN 原字节跑真实回读函数立刻 READBACK_HASH_MISMATCH。"""
+    ident = plan.get("identity_binding", {})
+    tools = plan.get("tools", {})
+    img = ident.get("image", {})
+    axf = img.get("axf", {})
+    dl = (tools.get("download") or {}).get("image") or {}
+    rb = (tools.get("readback") or {}).get("image") or {}
+    argv = (tools.get("download") or {}).get("argv") or []
+    bad = []
+    if not img.get("sha256"):
+        bad.append("S0_IMAGE_MISSING")
+    for k, want, got in (
+            ("READBACK_TARGET_IMAGE", (img.get("path"), int(img.get("bytes", 0)), img.get("sha256")),
+             (rb.get("path"), int(rb.get("bytes", 0)) if rb.get("bytes") else None, rb.get("sha256"))),
+            ("DOWNLOAD_PAYLOAD_AXF", (axf.get("path"), int(axf.get("bytes", 0)), axf.get("sha256")),
+             (dl.get("path"), int(dl.get("bytes", 0)) if dl.get("bytes") else None, dl.get("sha256")))):
+        if want != got:
+            bad.append("%s|want=%s|got=%s" % (k, want, got))
+    if argv and axf.get("path") and argv[-1] != axf["path"]:
+        bad.append("DOWNLOAD_ARGV_NOT_AXF_PATH|%s" % argv[-1])
+    before = (ident.get("board_image_before") or {}).get("sha256")
+    if before and rb.get("sha256") == before:
+        bad.append("READBACK_STILL_BOUND_TO_BOARD_IMAGE_BEFORE|%s" % before[:12])
+    return bad
+
+
+def first_cause_leg_coverage(plan, stage):
+    spec = stage.get("first_cause_legs") or {}
+    required = {"trip_row", "source_sample", "profile_identity", "incident_session"}
+    got = set(spec.get("covers", []))
+    return sorted(required - got), spec
+
+
 def validate_plan(plan, rows_doc, app_dir):
     """整包计划的离线门: 逐项返回 "检查名|PASS/FAIL|细节" 行。
     这里只判定**结构可执行性**(命令真实存在、取行取得到、额度申报过、as 唯一、
@@ -1652,6 +1723,90 @@ def validate_plan(plan, rows_doc, app_dir):
     out.append("PLAN_MOTION_CAP_BUDGET|all|%s|caps=%s sum=%d total=%d starts=%d" %
                ("PASS" if ok_t else "FAIL", caps, sum(c for _, c in caps), total, starts))
     if not ok_t:
+        bad += 1
+    # ① 镜像身份: S0/下载/回读三处必须同源(离线就拒绝, 不等现场 READBACK_HASH_MISMATCH)
+    ib = identity_consistency(plan)
+    out.append("PLAN_IMAGE_IDENTITY_CONSISTENCY|all|%s|%s" %
+               ("PASS" if not ib else "FAIL", ";".join(ib) or
+                "S0=download.axf=readback.bin 同源且回读不认旧镜像"))
+    if ib:
+        bad += 1
+    # ③ 额度按真实执行路径推导: 申报 < 推导 就是"这一轮批准会在中途被额度停掉"
+    needs = derive_quota_needs(plan)
+    for name in sorted(set(needs) | set(quota)):
+        want, have = int(needs.get(name, 0)), int(quota.get(name, 0))
+        if want == 0 and have == 0:
+            continue
+        ok_q = have >= want
+        out.append("PLAN_QUOTA_NEED|%s|%s|need=%d declared=%d" % (name, "PASS" if ok_q else "FAIL",
+                                                                  want, have))
+        if not ok_q:
+            bad += 1
+    # ② 场景链: 带 profiles 标签的阶段必须排在自己那条链的分支决定点之后
+    decided = {}
+    chain_bad = []
+    for stg in plan["stages"]:
+        sc = stg.get("scenario") or "__default__"
+        if stg.get("profiles") and sc != "__default__" and not decided.get(sc):
+            chain_bad.append("%s:no_branch_decider_before_it(scenario=%s)" % (stg["id"], sc))
+        if stg.get("decides_response_branch") and sc != "__default__":
+            decided[sc] = stg["id"]
+    out.append("PLAN_SCENARIO_CHAIN|all|%s|%s" %
+               ("PASS" if not chain_bad else "FAIL",
+                ";".join(chain_bad) or "链内分支决定点都在依赖阶段之前: %s" %
+                json.dumps(decided, ensure_ascii=False)))
+    if chain_bad:
+        bad += 1
+    # 离线申报的按链分支: 场景名必须真实存在, 档案取值必须只有三种(拼错会静默不生效)
+    sc_all = {sg.get("scenario") for sg in plan["stages"] if sg.get("scenario")}
+    sb_bad = []
+    for sc, prof in (plan.get("stub_branches") or {}).items():
+        if sc not in sc_all:
+            sb_bad.append("%s:未知场景" % sc)
+        if prof not in ("healthy", "trip", "no_trigger"):
+            sb_bad.append("%s:档案=%s" % (sc, prof))
+    out.append("PLAN_STUB_BRANCHES|all|%s|%s" %
+               ("PASS" if not sb_bad else "FAIL",
+                ";".join(sb_bad) or "申报=%s 场景=%s" %
+                (json.dumps(plan.get("stub_branches") or {}, ensure_ascii=False),
+                 ",".join(sorted(sc_all)))))
+    if sb_bad:
+        bad += 1
+    # ⑤ 机械前置: 申报 blocks_motion 的前置**必须**挂在起转阶段的 prerequisite_gates 上,
+    #    否则它只是说明字段, 执行器不会在起转前拒绝。
+    pre_bad = []
+    for stg in plan["stages"]:
+        has_motion = any(st.get("cmd") in MOTION_OBLIGATION_CMDS for st in stg.get("steps", []))
+        for key, val in (stg.get("prerequisites") or {}).items():
+            if isinstance(val, dict) and val.get("blocks_motion") is True and has_motion:
+                pkg = (plan.get("mechanical_prerequisites") or {}).get(key)
+                if key not in (stg.get("prerequisite_gates") or []):
+                    pre_bad.append("%s:%s=blocks_motion 但未挂 prerequisite_gates" % (stg["id"], key))
+                elif not pkg:
+                    pre_bad.append("%s:%s 没有包级 mechanical_prerequisites 条目" % (stg["id"], key))
+    out.append("PLAN_PREREQUISITE_GATE|all|%s|%s" %
+               ("PASS" if not pre_bad else "FAIL",
+                ";".join(pre_bad) or "起转前真拒绝已接线: %s" %
+                json.dumps({k: v.get("status") for k, v in
+                            (plan.get("mechanical_prerequisites") or {}).items()},
+                           ensure_ascii=False)))
+    if pre_bad:
+        bad += 1
+    # ④ 首因腿: 每条会决定 trip 分支的链都必须覆盖四路取证, 且缺证的具名码是 EVIDENCE_INCOMPLETE
+    fc_bad = []
+    for stg in plan["stages"]:
+        if stg.get("decides_response_branch"):
+            miss, spec = first_cause_leg_coverage(plan, stg)
+            if miss:
+                fc_bad.append("%s:缺腿%s" % (stg["id"], miss))
+            elif spec.get("on_missing") != "EVIDENCE_INCOMPLETE":
+                fc_bad.append("%s:on_missing 不是 EVIDENCE_INCOMPLETE" % stg["id"])
+            elif not spec.get("legs"):
+                fc_bad.append("%s:legs 为空" % stg["id"])
+    out.append("PLAN_FIRST_CAUSE_LEGS|all|%s|%s" %
+               ("PASS" if not fc_bad else "FAIL",
+                ";".join(fc_bad) or "trip 链都有同次 REL TRIP/源样本/profile/新 session 四腿"))
+    if fc_bad:
         bad += 1
     return out, bad, len(names)
 
@@ -2005,11 +2160,75 @@ def response_branch(res, stage):
     到时未触发是常态, 把它当"本次没有事故"来决定事故支线就是拿错的观察点下结论。"""
     if not stage.get("decides_response_branch"):
         return None
+    seen = any(r.get("kind") == "watch" and r.get("trigger_seen") for r in res.get("results", []))
+    if res.get("status") == "OBSERVATION_NO_TRIGGER" and seen:
+        # 同一份观察里已经见过触发针, 却把本次记成"到时未触发" —— 这是把已观察到的触发
+        # 降级, 不是判读分歧。具名停止, 不返回分支。
+        raise Stop("TRIP_REWRITTEN_AS_NO_TRIGGER",
+                   "%s 窗内已见申报的触发针, 但会话终态是 OBSERVATION_NO_TRIGGER" % stage.get("id"))
     if res.get("status") == "OBSERVATION_NO_TRIGGER":
         return "no_trigger"
-    if any(r.get("kind") == "watch" and r.get("trigger_seen") for r in res.get("results", [])):
+    if seen:
         return "trip"
     return None
+
+
+def first_cause_verdict(stage, results, recorded, branch, led):
+    """④ 首因合同(可执行, 不是说明字段): 同一次的 REL TRIP/LATCH 行、profile 身份、源样本值
+    与本轮新日志 session 必须**互相咬合**。缺任何一条腿 => 具名 EVIDENCE_INCOMPLETE。
+
+    只在分支=trip 时评估: 没有触发就没有首因可主张; 而已经观察到的触发也**不许**被改写成
+    NO_TRIGGER(那条降级由 response_branch() 的 TRIP_REWRITTEN_AS_NO_TRIGGER 守)。
+    legs 按声明顺序求值: 后面的 equal_pairs 只能用前面腿已经抓到的字段。"""
+    spec = stage.get("first_cause_legs") or {}
+    if not spec:
+        return []
+    if branch != spec.get("applies_when_branch", "trip"):
+        return []
+    got = dict((r.get("as"), r.get("txt")) for r in results if r.get("txt"))
+    caps, bad = {}, []
+    for leg in spec.get("legs", []):
+        name = leg.get("leg", "?")
+        if leg.get("recorded_keys"):
+            miss = [k for k in leg["recorded_keys"] if recorded.get(k) is None]
+            if miss:
+                bad.append("%s:RECORDED_MISSING(%s)" % (name, ",".join(miss)))
+            continue
+        if leg.get("equal_pairs"):
+            broken = ["%s=%s!=%s=%s" % (a, caps.get(a), b, caps.get(b))
+                      for a, b in leg["equal_pairs"]
+                      if caps.get(a) is None or caps.get(b) is None or caps[a] != caps[b]]
+            if broken:
+                bad.append("%s:%s" % (name, ";".join(broken)))
+            continue
+        txt = got.get(leg["step"])
+        if not txt:
+            bad.append("%s:STEP_TEXT_MISSING(%s)" % (name, leg["step"]))
+            continue
+        m = re.search(leg["regex"], Path(txt).read_text(encoding="utf-8", errors="replace"), re.M)
+        if not m:
+            bad.append("%s:PATTERN_NOT_FOUND" % name)
+            continue
+        d = m.groupdict()
+        for k in leg.get("capture", []):
+            if d.get(k) is None:
+                bad.append("%s:NO_CAPTURE_GROUP(%s)" % (name, k))
+            else:
+                caps[k] = d[k]
+        for fld, key in (leg.get("must_equal_recorded") or {}).items():
+            if caps.get(fld) is None or str(recorded.get(key)) != caps[fld]:
+                bad.append("%s:NOT_EQUAL_RECORDED(%s!=recorded.%s=%s)" %
+                           (name, caps.get(fld), key, recorded.get(key)))
+        # 抓到的值按链存进整包账, 让后面那场自己的取证会话能咬回**同一次**事故
+        for k in leg.get("record_as", []):
+            src = k.rsplit("_", 1)[0]
+            if caps.get(src) is None:
+                bad.append("%s:RECORD_AS_MISSING(%s)" % (name, k))
+            else:
+                recorded[k] = caps[src]
+    led.ev("FIRST_CAUSE_LEGS", **{"stage": stage.get("id"), "branch": branch,
+                                  "captured": caps, "incomplete": bad})
+    return bad
 
 
 def dispatch_refusal(plan, profile, outdir, code):
@@ -2019,7 +2238,8 @@ def dispatch_refusal(plan, profile, outdir, code):
             "not_run": [s["id"] for s in plan["stages"]], "recorded": {},
             "quota_left": dict(plan["quota"]), "quota_used": {},
             "expected_stages": [], "profile": profile, "dir": str(outdir),
-            "branch": None,
+            "branch": None, "scenario_branches": {},
+            "prerequisite_skips": [], "prerequisite_refusals": [],
             "actions_attempted": [],
             "quota_audit": {"undeclared_used": [], "negative_left": [], "lines": []},
             "ledger": str(Path(outdir) / "dispatch_ledger.jsonl")}
@@ -2061,22 +2281,50 @@ def dispatch_plan(plan, transport, backend_name, outdir, clock, profile, port,
     recorded = {}
     stages, done, notrun = plan["stages"], [], []
     # 分支: 离线由档案**声明**; 真实由本次响应**决定**(response_branch), 决定前依赖分支的阶段不许走。
+    # 分支的作用域是**场景链**(stages[].scenario): 两路激励各自决定自己的分支, 一路触发、
+    # 另一路未触发不是矛盾(混合结果照常跑完), 只有**同一条链**给出互相冲突的观察才是矛盾。
     branch = profile if transport == "stub" else None
     active_profile = profile
+    # 离线的分支同样是**按链**给的: plan.stub_branches 可以声明 {场景: 档案}, 让两条链在这一轮
+    # 里各自走 trip / no_trigger。没声明的链退回 --profile。这样"两场均触发/一触发一未触发"
+    # 四种组合都能在零设备的工装上真实跑一遍, 而不是只在文档里声称覆盖。
+    stub_branches = dict(plan.get("stub_branches") or {}) if transport == "stub" else {}
+    scenario_branch, scenario_profile = {}, {}
+    blocked_scenarios, skipped_by_prerequisite = {}, []
     expected_ids = []
     for i, stg in enumerate(stages):
         sid = stg["id"]
+        sc = stg.get("scenario") or "__default__"
         rest = [x["id"] for x in stages[i:]]
+        # ⑤ 机械前置: 缺加载手段时在**起转之前**具名拒绝整条链 —— 不开端口、不扣额度、
+        # 不发任何一条命令(而不是把约束写在 prerequisites 说明字段里照常往下走)。
+        missing_pre = [g for g in stg.get("prerequisite_gates", [])
+                       if (plan.get("mechanical_prerequisites", {}).get(g) or {}).get("status")
+                       != "PROVIDED"]
+        if missing_pre and sc not in blocked_scenarios:
+            blocked_scenarios[sc] = {"stage": sid, "gates": missing_pre}
+        if sc in blocked_scenarios:
+            b = blocked_scenarios[sc]
+            led.ev("STAGE_SKIPPED_BY_PREREQUISITE", stage=sid, scenario=sc,
+                   gates=b["gates"], refused_before=b["stage"],
+                   reason="起转前拒绝: 机械前置未提供(不开口/不扣额度/不发命令)")
+            skipped_by_prerequisite.append(sid)
+            continue
+        br = (stub_branches.get(sc, profile) if transport == "stub"
+              else scenario_branch.get(sc))
+        ap = (stub_branches.get(sc, profile) if transport == "stub"
+              else scenario_profile.get(sc, profile))
         tags = stg.get("profiles")
         if tags:
-            if transport == "real" and branch is None:
+            if transport == "real" and br is None:
                 done.append({"id": sid, "status": "STOP", "code": "RESPONSE_BRANCH_UNDETERMINED",
-                             "detail": "%s 依赖 %s, 但本次响应还没给出分支" % (sid, tags)})
+                             "detail": "%s(scenario=%s) 依赖 %s, 但本次响应还没给出分支"
+                                       % (sid, sc, tags)})
                 notrun = rest
                 break
-            if branch not in tags:
+            if br not in tags:
                 # 档案/分支不参与 = **不在期望序列里**, 因此既不算已执行也不算 NOT_RUN; 台账留具名跳过事件。
-                led.ev("STAGE_SKIPPED_BY_PROFILE", stage=sid, profiles=tags, branch=branch)
+                led.ev("STAGE_SKIPPED_BY_PROFILE", stage=sid, profiles=tags, branch=br, scenario=sc)
                 continue
         expected_ids.append(sid)
         if transport == "stub" and stg["kind"] in ("download", "readback", "reset"):
@@ -2136,9 +2384,9 @@ def dispatch_plan(plan, transport, backend_name, outdir, clock, profile, port,
                     led.ev("CHECKPOINT", stage=sid, note=stg["operator_checkpoint"])
                 continue
             if kind == "serial_session":
-                steps = stage_steps(stg, active_profile)
-                fx = build_session_fixture(stg, table, active_profile)
-                fx["profile"] = active_profile
+                steps = stage_steps(stg, ap)
+                fx = build_session_fixture(stg, table, ap)
+                fx["profile"] = ap
                 # 起转上限**按阶段**传入(R3 复审 §3): 学习 15 s、保护观察 5 s 是两种不同的
                 # 时间合同, 不能都套同一个 5 s; 总额仍由 plan.quota.motor_run_seconds_total 全局审计。
                 cap = int(stg.get("motion_cap_seconds",
@@ -2149,16 +2397,21 @@ def dispatch_plan(plan, transport, backend_name, outdir, clock, profile, port,
                                    motion_cap_seconds=cap,
                                    plan=plan, quota_box=quota_box, used_box=used_box, context=recorded)
                 if transport == "real":
-                    # 分支由**本次响应**决定: 未触发就把事故取证支线留在 NOT_RUN 之外,
-                    # 真实触发就必须走 S9/S10/S11 —— 不许用"先前选了一个夹具档案"把它跳过。
+                    # 分支由**本次响应**决定, 作用域是本阶段所在的场景链: 未触发就把该链的事故
+                    # 取证支线留在 NOT_RUN 之外, 真实触发就必须走该链的 S9/S10/S11 —— 不许用
+                    # "先前选了一个夹具档案"把它跳过。另一条链的分支与本次结果互不推翻。
                     seen = response_branch(res, stg)
                     if seen:
-                        if branch and branch != seen:
+                        prior = scenario_branch.get(sc)
+                        if prior and prior != seen:
                             raise Stop("RESPONSE_BRANCH_CONFLICT",
-                                       "%s=%s 与本次 %s=%s 相冲" % (sid, "prior", branch, seen))
+                                       "%s(scenario=%s) 本次=%s 与该链已有=%s 相冲"
+                                       % (sid, sc, seen, prior))
+                        scenario_branch[sc] = seen
+                        scenario_profile[sc] = seen
                         branch = seen
                         active_profile = seen
-                        led.ev("RESPONSE_BRANCH", stage=sid, branch=seen)
+                        led.ev("RESPONSE_BRANCH", stage=sid, scenario=sc, branch=seen)
                 # 计划可以**申报**某个具名拒绝就是这一阶段的目的(expected_terminal):
                 # 该会话仍然在拒绝处结束(绝不继续 commit/save/start/arm/fault_reset), 危险面
                 # 与不申报时完全一致, 只是不再把"观察到了预期拒绝"当成阶段失败。拒绝的原文与
@@ -2179,8 +2432,12 @@ def dispatch_plan(plan, transport, backend_name, outdir, clock, profile, port,
                 if (not res["success"] and expected_refusal_ok):
                     res = {**res, "success": True, "expected_refusal": res["status"],
                             "refused_lines": res.get("refused")}
+                # 分支决定之后重新取本链的档案: 记录/取证规格里的 when 只按**自己这条链**的
+                # 分支过滤, 不能被另一条链的分支串过去。
+                ap = (stub_branches.get(sc, profile) if transport == "stub"
+                      else scenario_profile.get(sc, profile))
                 try:
-                    record_from_rows(stg, res["results"], recorded, active_profile)
+                    record_from_rows(stg, res["results"], recorded, ap)
                 except Stop as e:
                     # 会话本身已经带着主错(例如 QUOTA_EXHAUSTED)时**不覆盖**它: 记录/比较
                     # 的失败另记 record_code, 否则现场只会看到"比较缺步骤"而看不到真因。
@@ -2197,12 +2454,21 @@ def dispatch_plan(plan, transport, backend_name, outdir, clock, profile, port,
                                "code": res.get("code") or "FLASH_FRAMES_NOT_RECOVERED",
                                "detail": res.get("detail") or json.dumps(fb, ensure_ascii=False)}
                         led.ev("FORENSICS_INCOMPLETE", stage=sid, bad=fb)
+                fb = first_cause_verdict(stg, res["results"], recorded, ap, led)
+                if fb:
+                    # ④ 缺腿 = 取证未完成: 事件确实观察到了, 但"谁引起这次停机"还没咬合。
+                    res = {**res, "success": False, "first_cause": "EVIDENCE_INCOMPLETE",
+                           "code": res.get("code") or "EVIDENCE_INCOMPLETE",
+                           "detail": res.get("detail") or json.dumps(fb, ensure_ascii=False)}
                 done.append({"id": sid, "status": res["status"], "code": res["code"],
+                             "detail": res.get("detail"),
                              "recorded": dict(recorded),
                              "success": res["success"], "disarm": res["disarm"],
                              "terminal": res["terminal"],
+                             "scenario": sc, "branch": ap,
                              "expected_refusal": res.get("expected_refusal"),
                              "forensics": res.get("forensics"),
+                             "first_cause": res.get("first_cause"),
                              "cleanup_errors": res["cleanup_errors"],
                              "obligation": res["obligation"],
                              "dir": res["dir"], "steps": len(res["results"])})
@@ -2216,7 +2482,8 @@ def dispatch_plan(plan, transport, backend_name, outdir, clock, profile, port,
             notrun = rest
             break
     led.ev("DISPATCH_DONE", run=len(done), not_run=notrun, quota_left=quota_box,
-           quota_used=used_box)
+           quota_used=used_box, prerequisite_skips=skipped_by_prerequisite,
+           scenario_branches=scenario_branch)
     # 额度审计: 用了的必须都申报过, 申报的余额不许为负 —— 两者都是"整包共用一本账"
     # 的可核查形式, 比在计划里写一段说明文字强。
     undeclared = sorted(k for k in used_box if k not in plan["quota"])
@@ -2234,7 +2501,12 @@ def dispatch_plan(plan, transport, backend_name, outdir, clock, profile, port,
                             "lines": audit_lines},
             "expected_stages": expected, "recorded": recorded,
             "quota_left": quota_box, "quota_used": used_box, "profile": profile,
-            "branch": branch, "actions_attempted": list(backend.attempts),
+            "branch": branch, "scenario_branches": dict(scenario_branch),
+            "prerequisite_skips": skipped_by_prerequisite,
+            "prerequisite_refusals": [{"scenario": k, "refused_before": v["stage"],
+                                       "gates": v["gates"]}
+                                      for k, v in sorted(blocked_scenarios.items())],
+            "actions_attempted": list(backend.attempts),
             "ledger": str(led_path), "dir": str(out)}
 
 
@@ -2329,12 +2601,20 @@ def main(argv=None):
             print("QUOTA_AUDIT_FAIL|negative_left=%s" % k)
         for sid in res["not_run"]:
             print("DISPATCH|stage=%s|status=NOT_RUN" % sid)
+        for r in res.get("prerequisite_refusals", []):
+            print("PREREQUISITE_REFUSAL|scenario=%s|refused_before=%s|gates=%s|skipped_stages=%s|"
+                  "ports_opened_by_chain=0" %
+                  (r["scenario"], r["refused_before"], ",".join(r["gates"]),
+                   ",".join(res.get("prerequisite_skips", []))))
         print("DISPATCH_SUMMARY|status=%s|code=%s|stages_executed=%d|stages_not_run=%d|"
-              "quota_left=%s|quota_used=%s|profile=%s|branch=%s|actions_attempted=%s|ledger=%s" %
+              "quota_left=%s|quota_used=%s|profile=%s|branch=%s|scenario_branches=%s|"
+              "prerequisite_skips=%s|actions_attempted=%s|ledger=%s" %
               (res["status"], res.get("code", ""), len(res["stages"]), len(res["not_run"]),
                json.dumps(res["quota_left"], sort_keys=True),
                json.dumps(res["quota_used"], sort_keys=True), res["profile"],
-               res.get("branch"), json.dumps(res.get("actions_attempted", [])), res["ledger"]))
+               res.get("branch"), json.dumps(res.get("scenario_branches", {}), sort_keys=True),
+               json.dumps(res.get("prerequisite_skips", [])),
+               json.dumps(res.get("actions_attempted", [])), res["ledger"]))
         return 0 if res["status"] == "OK" else 1
     steps = json.loads(Path(a.steps).read_text(encoding="utf-8-sig"))
     if not isinstance(steps, list):
