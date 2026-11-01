@@ -277,3 +277,38 @@ IMU 冲击演示、停机锁存与人工恢复的**现场**结论一个都没有
 `limit_inputs=DISABLED_BY_CONFIG` 全部照旧。装配就绪的 4 项（松手保持固定、紧固、螺母防转、导向）
 要操作者逐条确认才能把状态写成 `PROVIDED`，我不代填。
 
+## 11. R5 收尾：汇总标签修正 + 现场状态绑定（复审补测一项；不重编、不重跑历史清单、零设备）
+
+复审补测抓到的是一行聚合判定：让 `S9b` 取证失败，整包已经 `STOP`、`flow_complete=false`，
+汇总却仍报 `core_protection_verified=true`。原因在旧写法只看各场声明 —— 声明是**逐场**在各自的
+运动会话结束时写下的，两场都写成了 `VERIFIED`，而失败发生在之后的取证会话里，标签没看整包结果。
+现在按复审给的形状判（`m8r3_serial_chain.py` 的 `dispatch_plan` 末段）：
+
+```python
+core_verified = bool(ok) and bool(claims) and all(v == "VERIFIED" for v in claims.values())
+```
+
+- 反例进现有定向矩阵，成为 `V14`：`S9b` 的锁存回读换成 SG 那组夹具 ⇒ `must_equal_recorded` 咬不住 ⇒
+  `first_cause=EVIDENCE_INCOMPLETE`、整包 `STOP`、`flow_complete=False`，此时
+  `protection_claims` 两场**仍然都是** `VERIFIED`（这正是旧标签出错的地方），而
+  `core_protection_verified=False`；撤能在运动会话 `S8b` 里仍是 `CONFIRMED_DISABLED`，
+  取证会话自己不带电机义务所以是 `NOT_ARMED`。把 `ok` 这一项摘掉，`V14` 必须翻红 —— 这条反例
+  本身就是对该判据的元负控。
+- 计划里 `dispatch_semantics.flow_vs_verification` 写明机器写法，另加 `claims_are_per_stage`：
+  整包结论只看 `core_protection_verified` 与 `flow_complete` 两个标签，必须同时为真才可以说"验过"。
+- 检查器加 `N9`（核执行器源码里的写法与交付态干跑的 `flow=True/core=False` 实测行）。
+
+现场状态绑定（`plan_core_r4.json.field_state_binding`）只登记已经收到的操作者事实与指令，并逐条列出
+**未收到**的确认：紧固、螺母防转、导向、支座松手保持固定、第一次短移动的方向核实。
+因此 `assembly_readiness` 维持 `NOT_CONFIRMED`（所有起转阶段仍被门挡在开端口之前），
+操作者指令"暂不试转"记入 `operator_instructions`，本轮 `approvals_consumed_this_round = 0`；
+空载脱开丝杆那条仍是**备选且未采纳**。这层绑定不产生任何现场结论。
+
+数字（全部在同一份最终字节上重跑）：定向矩阵 **15/15**（V1–V14 + V5b）；
+`idle_learn_check` **CHECKS=105 problems=0**，元负控 6（D 组）+6（R5 组）全部 fire；
+`m8r3_field_selftest` **79/79**；`--validate-plan` **checks=236 fail=0**；
+`staged_preflight_batch` 六份清单 problems=0。
+身份：计划 145308 B，执行器 sha256 `40517501b3be…`/148267 B，两份 `rows.json` 未变
+（51963 / 51944 B）；镜像、AXF、MAP 与 `build_manifest.json` 未动（`dab356c6…`/290916 B、
+`0babe9f1…`/1771288 B），产品 C 源码零改动，构建 0 次、设备动作 0 次。
+

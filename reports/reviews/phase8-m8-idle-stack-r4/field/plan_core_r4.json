@@ -25,8 +25,8 @@
   },
   "executor": {
    "path": "reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py",
-   "bytes": 148016,
-   "sha256": "e39efd9819fee46a925e986bee9672489a1624975e5ebe94ca1dbc99f520be7e",
+   "bytes": 148267,
+   "sha256": "40517501b3bedde928b338d56e4e9d89d1b1e91a32405f2b1ae20f1dd473ed40",
    "changes_in_this_round": [
     "分支与档案按 stages[].scenario 分场(scenario_branches/scenario_profile), 混合结果不再互相推翻",
     "prerequisite_gates: 机械前置未 PROVIDED 的场景链在开端口之前具名跳过(STAGE_SKIPPED_BY_PREREQUISITE / PREREQUISITE_REFUSAL), 不扣额度、不发命令",
@@ -34,7 +34,8 @@
     "response_branch(): 窗内已见触发针却记成 OBSERVATION_NO_TRIGGER => TRIP_REWRITTEN_AS_NO_TRIGGER",
     "validate_plan(): PLAN_IMAGE_IDENTITY_CONSISTENCY / PLAN_QUOTA_NEED / PLAN_SCENARIO_CHAIN / PLAN_STUB_BRANCHES / PLAN_PREREQUISITE_GATE / PLAN_FIRST_CAUSE_LEGS",
     "R5: target_channel_claim() + rel_rule_names()(规则名两头从产品源码取, 造不出来就拒绝) + validate_plan 的 PLAN_SPINUP_GATE_COVERAGE / PLAN_TARGET_CHANNEL;  dispatch 结果新增 protection_claims / core_protection_verified / flow_complete(流程跑完与通道验证分开报), 台账新增 TARGET_CHANNEL / PROTECTION_CLAIMS / PROTECTION_CLAIM_DOWNGRADED 事件",
-    "R5: 机械前置拒绝沿**计划申报的 requires** 传播(S4 被装配门挡下 => S5/S6/S7 一并具名跳过), prerequisite_refusals 增 via_requires",
+    "R5: 机械前置拒绝沿**计划申报的 requires** 传播(S4 被装配门挡下 => S5/S6/S7 一并具名跳过), prerequisite_refusals 增 via_requires 与逐作用域 skipped_stages",
+    "R5: 汇总标签修正 —— core_verified = bool(ok) and bool(claims) and all(==\"VERIFIED\"), 整包 STOP 时不再顶着\"通道已验证\"的标签(反例见 host/verify_four_branch_matrix.py 的 V14)",
     "dispatch 结果新增 scenario_branches / prerequisite_skips / prerequisite_refusals, 阶段条目新增 scenario / branch / detail / first_cause / target_claim / target_why",
     "plan.stub_branches: 离线按链申报分支, 让两场的触发组合能在零设备工装上真实跑四种"
    ],
@@ -2620,13 +2621,14 @@
   "chain_order": "每场先取证(S9)、再锁存态拒绝(S10)、再人工恢复(S11), 全部走完才进入下一场(S8b→S9b→S10b→S11b); 顺序由 stages 数组的物理顺序决定(执行器按数组迭代)",
   "prerequisite_refusal": "机械前置未到位时该链**整条**在开端口之前跳过并具名(不扣额度、不发命令); 汇总行 PREREQUISITE_REFUSAL 与 prerequisite_skips 列出被跳过的阶段, 因此保护已演示绝不成立",
   "no_downgrade": "窗内已见触发针却记成到时未触发 => TRIP_REWRITTEN_AS_NO_TRIGGER(具名停止); 四腿缺一 => EVIDENCE_INCOMPLETE。两者都不是 NO_TRIGGER, 也都不是通过; 而撤能清理在 exec_session 的 finally 里先于这两个判定完成",
-  "flow_vs_verification": "两个字段分开报: flow_complete=计划里的阶段都按期望走完(身份核对、启停、清理、恢复都做了); core_protection_verified=**每一场都是目标传感器通道自己触发并取证齐了**。前者为真不蕴含后者: 别的通道把保护碰响了、或者根本没起转, 都只算流程走完。交付态(装配就绪未确认)必然 core_protection_verified=False",
-  "target_channel": "每场在 stages[].target_channel 里申报自己认哪些规则名(产品 rel_reason_t 里的名字)以及哪一列源样本必须非零。规则名不匹配 => OTHER_SOURCE_TRIGGERED(TARGET_CHANNEL_UNPROVEN); 规则名对但该列为 0 => TARGET_RULE_BUT_SOURCE_FIELD_ZERO。两种都照常撤能、照常取证(含 event=5 停后帧读回), 但 protection_claims 记为未证, 不计入 core_protection_verified"
+  "flow_vs_verification": "两个字段分开报: flow_complete=计划里的阶段都按期望走完(身份核对、启停、清理、恢复都做了); core_protection_verified=**每一场都是目标传感器通道自己触发并取证齐了**。前者为真不蕴含后者: 别的通道把保护碰响了、或者根本没起转, 都只算流程走完。交付态(装配就绪未确认)必然 core_protection_verified=False。机器写法(执行器 dispatch_plan 末段): core_verified = bool(ok) and bool(claims) and all(v == \"VERIFIED\" for v in claims.values()) —— `ok` 是整包成功(无 NOT_RUN、所有阶段 success、顺序与期望一致、额度账目干净), 所以任一会话 STOP(例如取证会话失败)时, 即使两场各自声明都是 VERIFIED, 汇总也不能说已验证 (复审补测到的标签缺陷, 反例见定向矩阵 V14)",
+  "target_channel": "每场在 stages[].target_channel 里申报自己认哪些规则名(产品 rel_reason_t 里的名字)以及哪一列源样本必须非零。规则名不匹配 => OTHER_SOURCE_TRIGGERED(TARGET_CHANNEL_UNPROVEN); 规则名对但该列为 0 => TARGET_RULE_BUT_SOURCE_FIELD_ZERO。两种都照常撤能、照常取证(含 event=5 停后帧读回), 但 protection_claims 记为未证, 不计入 core_protection_verified",
+  "claims_are_per_stage": "protection_claims 是**逐场**的观察, 每场在自己的运动会话结束时写下; 它不判整包。整包的结论只看 core_protection_verified 与 flow_complete 两个标签, 两者必须同时为真才可以说\"这一场一轮都验过\""
  },
  "hardware_actions_this_round": [],
  "offline_only_statement": "本包只在 --mode real + 复审一次原文批准下才产生设备动作; 本轮未连接设备, sim 展开与 validate 均零 pyocd/零串口/零电机。",
  "quota_note_r3_closeout": "R3 收尾 §3 的新离线合同: 学习起转单次上限提案 15 s(N=8、IRUN20/100Hz/方向 0 不变), RELATIVE 保护演示起转仍 5 s, 整包最多两次 start => 时间总额 15+5=20 s。上限**按阶段**传入执行器(S4=15 / S8=5), 并由 --validate-plan 的 PLAN_MOTION_CAP_BUDGET 逐项审计。15 s 不是当前硬件授权, 也不是把旧的 5 秒测试记成通过; 将来一次具体的板级批准必须写明\"学习<=15s、保护观察<=5s\"。",
- "executor_reused": "reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py(sha256 e39efd9819fe…, 完整字节身份见 identity_binding.executor)",
+ "executor_reused": "reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py(sha256 40517501b3be…, 完整字节身份见 identity_binding.executor)",
  "changes_this_round": [
   "① S0/下载/回读统一到本轮新镜像 dab356c6 与新 AXF 0babe9f1; 删除更旧 R3 BIN(00608ec9…)的绑定",
   "② 顺序改为两场各走完整链(S8→S9→S10→S11 → S8b→S9b→S10b→S11b), 分支与事故基线按场存",
@@ -2637,7 +2639,9 @@
   "C-02 停后帧事件码 9 -> 5(FAULT_MULTI_SOURCE), 依据见取证会话的 event_basis; 夹具与 R3 自检由 host/apply_c02_event5_fixtures.py 与 m8r3_field_selftest.py 的 FS69/FS76..FS79 覆盖",
   "语言修正: 不称 1024-668=356 B 为已验证安全余量; 264 B 是可达路径固定帧下界, 668 B 是链接器给出的更深静态链, 两者口径不同且并存",
   "R5-① 目标通道分类: 每场申报 target_channel(规则名必须来自产品 rel_reason_t), IMU 场只认 REL_IMPACT 且 imu 列非零; SG/ADC 场认 REL_SG_SEVERE/REL_ADC_SEVERE/REL_FUSED_SEVERE 且 sg/cur 非零。规则名不对或源样本为 0 => 具名 OTHER_SOURCE_TRIGGERED / TARGET_RULE_BUT_SOURCE_FIELD_ZERO, 撤能取证照做但不计入 core_protection_verified; 观察窗与锁存夹具按场分开(__watch__@imu、diag_status@latch@imu)",
-  "R5-② 机械事实更新 + 起转门覆盖: 改成\"现有 T8 丝杆套件, 标称导程 8 mm; 已按照片装配, 紧固、螺母防转及导向尚待确认\", 新增 assembly_readiness(blocks_motion) 并挂到 S4/S8/S8b/S10/S10b **每一个**起转阶段; 拒绝沿 requires 传播到 S5/S6/S7; 交付态因此零次起转"
+  "R5-② 机械事实更新 + 起转门覆盖: 改成\"现有 T8 丝杆套件, 标称导程 8 mm; 已按照片装配, 紧固、螺母防转及导向尚待确认\", 新增 assembly_readiness(blocks_motion) 并挂到 S4/S8/S8b/S10/S10b **每一个**起转阶段; 拒绝沿 requires 传播到 S5/S6/S7; 交付态因此零次起转",
+  "R5-③ 汇总标签修正(复审补测): core_protection_verified 现在要求 **整包成功** 也成立 (core_verified = bool(ok) and bool(claims) and all(VERIFIED))。此前 S9b 取证失败让整包 STOP、flow_complete=false, 但两场各自声明仍是 VERIFIED => 汇总错误地说已验证。反例进定向矩阵 V14",
+  "R5-④ 现场状态绑定: field_state_binding 逐条登记已收到的操作者事实/指令与**未收到**的确认(紧固、螺母防转、导向、松手保持固定、短移动方向核实), 门因此维持关闭; 本轮消耗现场批准 0 次"
  ],
  "download_payload_swap": {
   "swaps": 1,
@@ -3023,7 +3027,9 @@
  "corrections_from_review_r5": {
   "flow_vs_target_channel": "复审实测: IMU 场喂 REL_SG_SEVERE + imu=0 仍过首因判据, 而且现有 IMU 正控夹具就是这份数据。现在分两层: 流程(flow_complete)与目标通道(core_protection_verified), 后者要求每场抓到**本场规则名**且该通道源样本非零; 其他来源触发仍撤能、仍取证, 但登记为\"其他来源触发/目标通道未证\", 不混算成功",
   "stale_mechanical_facts": "包里的\"完整滑台、尚未连接、导程待确认\"已过期, 按操作者口径改为\"现有 T8 丝杆套件, 标称导程 8 mm; 已按照片装配, 紧固、螺母防转及导向尚待确认\"; 并把装配就绪门放到每个起转阶段之前(S4 学习、S8/S8b 激励、S10/S10b 锁存态再 arm)",
-  "scope_of_this_round": "只改计划、结果分类与对应少量用例; 未改 C、未重编、未重跑历史清单、零设备动作"
+  "scope_of_this_round": "只改计划、结果分类与对应少量用例; 未改 C、未重编、未重跑历史清单、零设备动作",
+  "summary_label_defect": "复审补测: 让 S9b 取证失败, 整包已经 STOP / flow_complete=false, 汇总却仍报 core_protection_verified=true —— 因为旧写法只看各场声明(那时两场都已写成 VERIFIED)。现在按 bool(ok) and bool(claims) and all(==\"VERIFIED\") 判, 反例进 V14: 声明全 VERIFIED 而 core=False; 把 ok 这一项摘掉, V14 必须翻红",
+  "field_state_bound_as_reported": "现场状态只登记操作者已经给出的事实与指令; 未逐条确认的装配项一律留在 not_received 里, assembly_readiness 因此维持 NOT_CONFIRMED, 本轮不申请任何起转批准(操作者指令: 暂不试转)"
  },
  "r3_historical_plans_under_current_executor": {
   "measured_by": "本构建脚本当场调用当前执行器的 validate_plan(数字是复算的, 不是登记来的)",
@@ -3067,5 +3073,45 @@
    "不重跑 R3 轮次的清单",
    "不把 fail 说成 PASS"
   ]
+ },
+ "field_state_binding": {
+  "bound_at": "2026-11-01",
+  "operator_confirmed": [
+   {
+    "fact": "扩展板(ADXL345 在板上)已用绝缘胶带固定在电机上; 电机固定丝杆",
+    "source": "操作者 2026-11-01 现场原话与同批照片",
+    "consequence": "imu_mounting 那条缺失项闭合; 胶带装配的刚度仍未测, 不做精确振动标定"
+   },
+   {
+    "fact": "轴承/底座目前只能手动固定",
+    "source": "同上(原话\"轴承底座只能手动固定\")",
+    "consequence": "assembly_readiness 维持 NOT_CONFIRMED: 松手后能否保持固定未确认 => 所有含 motor_arm/motor_start 的阶段仍被门在起转前挡下"
+   },
+   {
+    "fact": "现有 T8 丝杆套件, 标称导程 8 mm; 已按照片装配",
+    "source": "复审 2026-11-01 转述操作者口径的更新原文(取代此前\"完整滑台/尚未连接/导程待确认\")",
+    "consequence": "紧固、螺母防转、导向三项仍待逐条确认; 8 mm 是**标称**值, 未做实测标定"
+   },
+   {
+    "fact": "滑台起点在左端, 与末端限位留有间隙; 顺时针=向右",
+    "source": "操作者 2026-11-01",
+    "consequence": "方向按第一次被批准的短移动核实后才据此执行; 软件限位输入仍关闭, 不把左侧起点当限位保护"
+   }
+  ],
+  "operator_instructions": [
+   "暂不试转(操作者 2026-11-01) => 本轮不申请、也不消耗任何现场批准",
+   "不通过撞两端限位制造堵转; 不新增回零/全程定位功能; 现场只用中间短行程"
+  ],
+  "not_received": [
+   "紧固已确认",
+   "螺母防转已确认",
+   "导向已确认",
+   "支座/轴承松手后保持固定已确认",
+   "第一次短移动的方向核实结果"
+  ],
+  "fallback_registered_not_selected": "不通电脱开丝杆、保留扩展板固定在电机上、沿此前已验证的空载电机路径完成学习与 IMU 演示; SG/ADC 受控加载继续记为待验证。这是操作者给出的**备选**, 采纳与否由操作者决定, 且它同样要先通过装配就绪门",
+  "approvals_consumed_this_round": 0,
+  "package_status": "BOUND_NOT_EXECUTED",
+  "meaning": "这份绑定只描述\"当前前置到哪一步\", 不构成任何现场结论: 没有一次起转、没有一次触发、没有任何保护功能在现场被验证"
  }
 }

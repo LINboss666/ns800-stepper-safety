@@ -473,7 +473,7 @@
   {
    "name": "M5_m5_history_untouched",
    "ok": true,
-   "detail": "工作树里没有 M5 软件故障原件的改动(event=9 的那批历史证据原样保留); 本轮改动=14 项"
+   "detail": "工作树里没有 M5 软件故障原件的改动(event=9 的那批历史证据原样保留); 本轮改动=7 项"
   },
   {
    "name": "M6_event_five_basis_is_source",
@@ -519,6 +519,11 @@
    "name": "N7_plan_states_boundary",
    "ok": true,
    "detail": "计划自己写明边界: 交付态跳过 SG/ADC 激励链, 整包完成不等于核心保护全部通过(5 条 never_from)"
+  },
+  {
+   "name": "N9_summary_label_requires_whole_run_success",
+   "ok": true,
+   "detail": "汇总标签的机器写法核到执行器源码: core_verified 必须先有整包成功(ok), 再看各场声明; 交付态实测 flow=True/core=False 也在同一次干跑里(行为反例见 host/verify_four_branch_matrix.py 的 V14)"
   }
  ],
  "problems": []

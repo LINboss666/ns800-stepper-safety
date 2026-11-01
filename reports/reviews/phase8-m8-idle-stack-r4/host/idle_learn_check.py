@@ -796,6 +796,14 @@ add("N7_plan_states_boundary",
     "计划自己写明边界: 交付态跳过 SG/ADC 激励链, 整包完成不等于核心保护全部通过(%d 条 never_from)"
     % len(_cb.get("never_from_this_package") or []))
 
+add("N9_summary_label_requires_whole_run_success",
+    "core_verified = bool(ok) and bool(claims) and all(" in CHAIN.read_text(encoding="utf-8") and
+    "FLOW_VS_VERIFICATION|flow_complete=%s|core_protection_verified=%s" in
+    CHAIN.read_text(encoding="utf-8") and
+    "flow_complete=True|core_protection_verified=False" in htxt,
+    "汇总标签的机器写法核到执行器源码: core_verified 必须先有整包成功(ok), 再看各场声明; "
+    "交付态实测 flow=True/core=False 也在同一次干跑里(行为反例见 host/verify_four_branch_matrix.py 的 V14)")
+
 problems = [n for n, ok, _ in CHECKS if not ok]
 n_metaneg = sum(1 for n, _, _ in CHECKS if n.startswith("D"))
 extra_meta = [n for n, ok, _ in CHECKS if "meta_negative" in n]

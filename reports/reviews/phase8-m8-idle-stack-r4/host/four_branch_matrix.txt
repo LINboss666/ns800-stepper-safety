@@ -13,4 +13,5 @@ V10|PASS|IMU 场喂 SG 行(REL_SG_SEVERE, imu=0): 分类=OTHER_SOURCE_TRIGGERED(
 V11|PASS|元负控(规则名对但 imu=0): 分类=TARGET_RULE_BUT_SOURCE_FIELD_ZERO(trip_imu_imu) 原因=规则对了但源样本通道仍是 0, 不能称该通道已验证 core=False => source_nonzero_keys 这道腿确实在判
 V12|PASS|摘掉 target_channel: S8b 分类=None(不再具名拒绝) core=True claims={"SG_ADC_controlled_load": "VERIFIED"} 离线门是否拒绝该计划=True PLAN_TARGET_CHANNEL|all|FAIL|S8b:分支决定点没声明 target_channel
 V13|PASS|发明的规则名被拒=True 摘掉 S4 起转门被拒=True 交付计划两项都 PASS=True(PLAN_SPINUP_GATE_COVERAGE|all|PASS|所有起转/带电阶段都在开端口前检查机械前置 || PLAN_TARGET_CHANNEL|all|PASS|产品枚举=REL_ADC_SEVERE,REL_COVERAGE_LOST,REL_FUSED_SEVERE,REL_IMPACT,)
-SUMMARY|cases=14|pass=14|fail=0|transport=stub_only|port=NO_DEVICE|device_actions=0|builds=0
+V14|PASS|S9b 取证失败: 整包=STOP flow=False S9b=EVIDENCE_INCOMPLETE 而各场声明={"SG_ADC_controlled_load": "VERIFIED", "IMU_non_destructive_excitation": "VERIFIED"}(全 VERIFIED=True) => core=False(必须 False); 撤能在运动会话里已确认=CONFIRMED_DISABLED, 取证会话自己不带电机义务=NOT_ARMED
+SUMMARY|cases=15|pass=15|fail=0|transport=stub_only|port=NO_DEVICE|device_actions=0|builds=0

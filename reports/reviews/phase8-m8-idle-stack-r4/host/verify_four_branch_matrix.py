@@ -20,6 +20,8 @@
   V12 元负控: 摘掉 target_channel 声明后同一份数据不再被拒(证明拒绝来自这个门), 且该突变计划
       被离线 PLAN_TARGET_CHANNEL 拒绝
   V13 离线门: 发明产品枚举外的规则名 / 摘掉某个起转阶段的门 => 都必须具名 FAIL
+  V14 复审补测的汇总标签缺陷: 各场声明全 VERIFIED 但取证会话失败 => 整包 STOP 时
+      core_protection_verified 必须是 False(判据含 ok 一项, 摘掉它本例翻红)
 
 用法: python verify_four_branch_matrix.py [--out 输出目录] ; 结果写 host/four_branch_matrix.txt
 """
@@ -460,6 +462,35 @@ def main():
                  " || ".join(x[:95] for x in good)))
 
     case("V13", v13)
+
+    # -------- V14: 取证失败让整包 STOP 时, 汇总标签不得再说"通道已验证" ----------------
+    def v14():
+        # 复审补测的形状: 两场观察窗都拿到自己通道的触发(claims 全 VERIFIED), 但 S9b 的锁存
+        # 回读与本场 TRIP 规则不同代 => 取证会话失败、整包 STOP。此前 core_protection_verified
+        # 只看 claims, 于是 STOP 的包仍被贴上"已验证"。摘掉 ok 这一项, 本例必须翻红。
+        p = provided_state()
+        for stg in p["stages"]:
+            for st in stg.get("steps", []):
+                if stg["id"] == "S9b" and st.get("as") == "latch":
+                    st["key"] = "diag_status@latch"          # SG 的 REL_SG_SEVERE, 与本场 IMPACT 不同规则
+        d = work / "v14"
+        r = run(m, p, "healthy", "v14", d, {SC_A: "trip", SC_B: "trip"})
+        s9b = next(s for s in r["stages"] if s["id"] == "S9b")
+        s8b = next(s for s in r["stages"] if s["id"] == "S8b")
+        claims_all_verified = bool(r["protection_claims"]) and all(
+            v == "VERIFIED" for v in r["protection_claims"].values())
+        ok = (r["status"] == "STOP" and r["flow_complete"] is False and
+              s9b.get("first_cause") == "EVIDENCE_INCOMPLETE" and
+              claims_all_verified and r["core_protection_verified"] is False and
+              s8b.get("disarm") == "CONFIRMED_DISABLED" and
+              s9b.get("disarm") == "NOT_ARMED")
+        return (ok, "S9b 取证失败: 整包=%s flow=%s S9b=%s 而各场声明=%s(全 VERIFIED=%s) "
+                    "=> core=%s(必须 False); 撤能在运动会话里已确认=%s, 取证会话自己不带电机义务=%s" %
+                (r["status"], r["flow_complete"], s9b.get("first_cause"),
+                 json.dumps(r["protection_claims"], ensure_ascii=False), claims_all_verified,
+                 r["core_protection_verified"], s8b.get("disarm"), s9b.get("disarm")))
+
+    case("V14", v14)
 
     passed = sum(1 for r in RESULTS if r[1])
     lines = ["R4_MATRIX|%s" % ("ALL_PASS" if passed == len(RESULTS) else "HAS_FAIL")]

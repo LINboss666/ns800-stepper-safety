@@ -2623,7 +2623,10 @@ def dispatch_plan(plan, transport, backend_name, outdir, clock, profile, port,
                          if s["id"] in skipped_by_prerequisite and s.get("scenario")})
     for sc in skipped_sc:
         claims[sc] = "SKIPPED_BEFORE_SPIN_UP(PREREQUISITE)"
-    core_verified = bool(claims) and all(v == "VERIFIED" for v in claims.values())
+    # 一次 STOP(例如取证会话失败)的整包不能顶着一个"保护已验证"的汇总标签: 每场各自的
+    # target_claim 可以在失败之前就都拿到 VERIFIED, 但那不改变整包没走完这个事实。
+    core_verified = bool(ok) and bool(claims) and all(
+        v == "VERIFIED" for v in claims.values())
     led.ev("PROTECTION_CLAIMS", claims=claims, core_protection_verified=core_verified,
            flow_complete=bool(ok))
     led.close()

@@ -328,7 +328,9 @@ def fix_identity(plan, ident, tools):
             "protection_claims / core_protection_verified / flow_complete(流程跑完与通道验证分开报), "
             "台账新增 TARGET_CHANNEL / PROTECTION_CLAIMS / PROTECTION_CLAIM_DOWNGRADED 事件",
             "R5: 机械前置拒绝沿**计划申报的 requires** 传播(S4 被装配门挡下 => S5/S6/S7 一并具名跳过), "
-            "prerequisite_refusals 增 via_requires",
+            "prerequisite_refusals 增 via_requires 与逐作用域 skipped_stages",
+            "R5: 汇总标签修正 —— core_verified = bool(ok) and bool(claims) and all(==\"VERIFIED\"), "
+            "整包 STOP 时不再顶着\"通道已验证\"的标签(反例见 host/verify_four_branch_matrix.py 的 V14)",
             "dispatch 结果新增 scenario_branches / prerequisite_skips / prerequisite_refusals, "
             "阶段条目新增 scenario / branch / detail / first_cause / target_claim / target_why",
             "plan.stub_branches: 离线按链申报分支, 让两场的触发组合能在零设备工装上真实跑四种"],
@@ -559,7 +561,15 @@ def fix_prose(plan, ident, needs):
         "两个字段分开报: flow_complete=计划里的阶段都按期望走完(身份核对、启停、清理、恢复都做了); "
         "core_protection_verified=**每一场都是目标传感器通道自己触发并取证齐了**。前者为真不蕴含后者: "
         "别的通道把保护碰响了、或者根本没起转, 都只算流程走完。交付态(装配就绪未确认)必然 "
-        "core_protection_verified=False")
+        "core_protection_verified=False。机器写法(执行器 dispatch_plan 末段): "
+        "core_verified = bool(ok) and bool(claims) and all(v == \"VERIFIED\" for v in claims.values()) "
+        "—— `ok` 是整包成功(无 NOT_RUN、所有阶段 success、顺序与期望一致、额度账目干净), "
+        "所以任一会话 STOP(例如取证会话失败)时, 即使两场各自声明都是 VERIFIED, 汇总也不能说已验证 "
+        "(复审补测到的标签缺陷, 反例见定向矩阵 V14)")
+    dsp["claims_are_per_stage"] = (
+        "protection_claims 是**逐场**的观察, 每场在自己的运动会话结束时写下; 它不判整包。"
+        "整包的结论只看 core_protection_verified 与 flow_complete 两个标签, 两者必须同时为真"
+        "才可以说\"这一场一轮都验过\"")
     dsp["target_channel"] = (
         "每场在 stages[].target_channel 里申报自己认哪些规则名(产品 rel_reason_t 里的名字)以及哪一列"
         "源样本必须非零。规则名不匹配 => OTHER_SOURCE_TRIGGERED(TARGET_CHANNEL_UNPROVEN); 规则名对但"
@@ -612,7 +622,12 @@ def fix_prose(plan, ident, needs):
         "diag_status@latch@imu)",
         "R5-② 机械事实更新 + 起转门覆盖: 改成\"现有 T8 丝杆套件, 标称导程 8 mm; 已按照片装配, 紧固、"
         "螺母防转及导向尚待确认\", 新增 assembly_readiness(blocks_motion) 并挂到 S4/S8/S8b/S10/S10b "
-        "**每一个**起转阶段; 拒绝沿 requires 传播到 S5/S6/S7; 交付态因此零次起转"]
+        "**每一个**起转阶段; 拒绝沿 requires 传播到 S5/S6/S7; 交付态因此零次起转",
+        "R5-③ 汇总标签修正(复审补测): core_protection_verified 现在要求 **整包成功** 也成立 "
+        "(core_verified = bool(ok) and bool(claims) and all(VERIFIED))。此前 S9b 取证失败让整包 STOP、"
+        "flow_complete=false, 但两场各自声明仍是 VERIFIED => 汇总错误地说已验证。反例进定向矩阵 V14",
+        "R5-④ 现场状态绑定: field_state_binding 逐条登记已收到的操作者事实/指令与**未收到**的确认"
+        "(紧固、螺母防转、导向、松手保持固定、短移动方向核实), 门因此维持关闭; 本轮消耗现场批准 0 次"]
     plan["corrections_from_review_r4"] = {
         "package_5": ["回读仍认旧镜像(①)", "两场的取证/拒绝/恢复顺序与分场基线(②)",
                       "额度按真实路径与混合结果覆盖(③)", "首因四腿与不得降级(④)",
@@ -631,7 +646,15 @@ def fix_prose(plan, ident, needs):
             "包里的\"完整滑台、尚未连接、导程待确认\"已过期, 按操作者口径改为\"现有 T8 丝杆套件, "
             "标称导程 8 mm; 已按照片装配, 紧固、螺母防转及导向尚待确认\"; 并把装配就绪门放到每个"
             "起转阶段之前(S4 学习、S8/S8b 激励、S10/S10b 锁存态再 arm)"),
-        "scope_of_this_round": "只改计划、结果分类与对应少量用例; 未改 C、未重编、未重跑历史清单、零设备动作"}
+        "scope_of_this_round": "只改计划、结果分类与对应少量用例; 未改 C、未重编、未重跑历史清单、零设备动作",
+        "summary_label_defect": (
+            "复审补测: 让 S9b 取证失败, 整包已经 STOP / flow_complete=false, 汇总却仍报 "
+            "core_protection_verified=true —— 因为旧写法只看各场声明(那时两场都已写成 VERIFIED)。"
+            "现在按 bool(ok) and bool(claims) and all(==\"VERIFIED\") 判, 反例进 V14: 声明全 VERIFIED "
+            "而 core=False; 把 ok 这一项摘掉, V14 必须翻红"),
+        "field_state_bound_as_reported": (
+            "现场状态只登记操作者已经给出的事实与指令; 未逐条确认的装配项一律留在 not_received 里, "
+            "assembly_readiness 因此维持 NOT_CONFIRMED, 本轮不申请任何起转批准(操作者指令: 暂不试转)")}
     plan["stack_margin_wording"] = {
         "metrics_are_different": True,
         "reachable_path_fixed_frame_lower_bound_bytes": 264,
@@ -728,6 +751,42 @@ def fix_r3_status(plan, chain):
         "not_done_here": ["不修改 R3 计划字节", "不重跑 R3 轮次的清单", "不把 fail 说成 PASS"]}
 
 
+def fix_field_state(plan):
+    """把**当前现场状态**绑进包: 只登记已经收到的原话/口径与它们的后果, 不代操作者确认任何一项。
+    没收到的确认一律列在 not_received, 门因此维持关闭 —— 现场事实由操作者回报决定, 不由我填。"""
+    plan["field_state_binding"] = {
+        "bound_at": "2026-11-01",
+        "operator_confirmed": [
+            {"fact": "扩展板(ADXL345 在板上)已用绝缘胶带固定在电机上; 电机固定丝杆",
+             "source": "操作者 2026-11-01 现场原话与同批照片",
+             "consequence": "imu_mounting 那条缺失项闭合; 胶带装配的刚度仍未测, 不做精确振动标定"},
+            {"fact": "轴承/底座目前只能手动固定",
+             "source": "同上(原话\"轴承底座只能手动固定\")",
+             "consequence": "assembly_readiness 维持 NOT_CONFIRMED: 松手后能否保持固定未确认 => "
+                            "所有含 motor_arm/motor_start 的阶段仍被门在起转前挡下"},
+            {"fact": "现有 T8 丝杆套件, 标称导程 8 mm; 已按照片装配",
+             "source": "复审 2026-11-01 转述操作者口径的更新原文(取代此前\"完整滑台/尚未连接/导程待确认\")",
+             "consequence": "紧固、螺母防转、导向三项仍待逐条确认; 8 mm 是**标称**值, 未做实测标定"},
+            {"fact": "滑台起点在左端, 与末端限位留有间隙; 顺时针=向右",
+             "source": "操作者 2026-11-01",
+             "consequence": "方向按第一次被批准的短移动核实后才据此执行; 软件限位输入仍关闭, "
+                            "不把左侧起点当限位保护"}],
+        "operator_instructions": [
+            "暂不试转(操作者 2026-11-01) => 本轮不申请、也不消耗任何现场批准",
+            "不通过撞两端限位制造堵转; 不新增回零/全程定位功能; 现场只用中间短行程"],
+        "not_received": [
+            "紧固已确认", "螺母防转已确认", "导向已确认",
+            "支座/轴承松手后保持固定已确认", "第一次短移动的方向核实结果"],
+        "fallback_registered_not_selected": (
+            "不通电脱开丝杆、保留扩展板固定在电机上、沿此前已验证的空载电机路径完成学习与 IMU 演示; "
+            "SG/ADC 受控加载继续记为待验证。这是操作者给出的**备选**, 采纳与否由操作者决定, "
+            "且它同样要先通过装配就绪门"),
+        "approvals_consumed_this_round": 0,
+        "package_status": "BOUND_NOT_EXECUTED",
+        "meaning": ("这份绑定只描述\"当前前置到哪一步\", 不构成任何现场结论: 没有一次起转、"
+                    "没有一次触发、没有任何保护功能在现场被验证")}
+
+
 def build(plan, chain):
     ident, tools = plan["identity_binding"], plan["tools"]
     by_id = {s["id"]: s for s in plan["stages"]}
@@ -744,6 +803,7 @@ def build(plan, chain):
     fix_prose(plan, ident, needs)
     fix_fixtures(plan)
     fix_r3_status(plan, chain)
+    fix_field_state(plan)
     plan["download_payload_swap"] = {
         "swaps": 1,
         "payload_axf": AXF_REL,
