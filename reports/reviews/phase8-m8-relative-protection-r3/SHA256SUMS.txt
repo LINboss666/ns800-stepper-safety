@@ -7,7 +7,7 @@
 9114d6024382982ff45c1683b3063a3c5cb0193a117c67ee188e0c7f912ca697  reports/reviews/phase8-m8-relative-protection-r3/build/rt-thread-motor-m1-candidate.log
 2e4e7f20b9e91a561ffe9a25b03fb95aa8f6913baf320ec8b2114ef27f579dfb  reports/reviews/phase8-m8-relative-protection-r3/build/rt-thread.log
 20992c0b079534ffa25a5d9e96a8718067fd1468d92344aff483e3f1843f6220  reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_field_selftest.py
-40517501b3bedde928b338d56e4e9d89d1b1e91a32405f2b1ae20f1dd473ed40  reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py
+6cb58dd73ad109854b41711a7a27f12fb1cdca8b975b38ac12f4e93cb0916886  reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py
 908c0d87b3352ee99839ff1f57381ba4b5a4aded32c56c397ed3bb6ae408ab13  reports/reviews/phase8-m8-relative-protection-r3/field/M8R3Field.ps1
 77102a8bff73cc21dfa4744222ab1130b376224e91cd98711ac1a1c3dc5efffd  reports/reviews/phase8-m8-relative-protection-r3/field/needles.json
 3cf0a7e1afc3e1f8637bf364611cbbcf07883a9eeea02f5ba8a09baeb6d7010a  reports/reviews/phase8-m8-relative-protection-r3/field/plan.json

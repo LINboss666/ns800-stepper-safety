@@ -1,0 +1,4 @@
+0001872 I Loading D:\ns800\reports\firmware\phase8-m8-idle-stack-r4\rt-thread-motor-m1.axf [load_cmd]
+0001873 I Erasing... [loader]
+0008179 I Programming... [loader]
+0023355 I Erased 291840 bytes (285 sectors), programmed 291840 bytes (285 pages), identical 0 bytes (0 pages) at 13.27 kB/s [loader]

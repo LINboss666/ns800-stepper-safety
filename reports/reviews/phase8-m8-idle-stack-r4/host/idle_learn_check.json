@@ -208,7 +208,7 @@
   {
    "name": "E7_validate_plan_clean",
    "ok": true,
-   "detail": "checks=236 fail=0"
+   "detail": "checks=237 fail=0"
   },
   {
    "name": "E8_quota_declares_no_retry_and_no_blackbox_clear",
@@ -483,7 +483,7 @@
   {
    "name": "M5_m5_history_untouched",
    "ok": true,
-   "detail": "工作树里没有 M5 软件故障原件的改动(event=9 的那批历史证据原样保留); 本轮改动=11 项"
+   "detail": "工作树里没有 M5 软件故障原件的改动(event=9 的那批历史证据原样保留); 本轮改动=12 项"
   },
   {
    "name": "M6_event_five_basis_is_source",
@@ -534,6 +534,51 @@
    "name": "N9_summary_label_requires_whole_run_success",
    "ok": true,
    "detail": "汇总标签的机器写法核到执行器源码: core_verified 必须先有整包成功(ok), 再看各场声明; 交付态实测 flow=True/core=False 也在同一次干跑里(行为反例见 host/verify_four_branch_matrix.py 的 V14)"
+  },
+  {
+   "name": "P1_drain_honours_declared_budget",
+   "ok": true,
+   "detail": "申报 20 s 就走满 20 s: 扫描段 8 s 静默之后的启动尾流仍在同一个窗里收到(1101 B), 台账同时自报申报/实耗/是否允许静默早退"
+  },
+  {
+   "name": "P2_retired_quiet_rule_reproduces_field_failure",
+   "ok": true,
+   "detail": "同一份夹具喂给**退役那条规则**的参照实现: 截在 2.0 s、只剩 1027 B(=现场实测的 1027 B), 启动尾流永远进不了下一个窗 => P1 的差别是被测缺陷造成的, 不是夹具碰巧"
+  },
+  {
+   "name": "P3_field_bytes_match_the_stop",
+   "ok": true,
+   "detail": "判读里的关键数字都从归档原件当场复算: 启动流 1027 B 且末行是扫描行 / 首查询 0 B / 回读件 290916 B 与绑定镜像同一散列(未删未改)"
+  },
+  {
+   "name": "P4_meta_negative_short_query_window_fires",
+   "ok": true,
+   "detail": "观测门下界=75 s: 续测包(首查询 75 s + SLACK 3 s)PASS 且整包 fail=0; 只把首查询改回现场那一版(6 s) 就必须翻红 => 这条门量的是窗, 不是摆设(PLAN_BOOT_WINDOW_COVER|all|FAIL|S3:可观测量 9s < 下界 75s)"
+  },
+  {
+   "name": "P5_meta_negative_no_provenance_and_quiet_reintroduced",
+   "ok": true,
+   "detail": "两个绕行口都翻红: 下界没出处=FAIL / 把静默早退重新申报回来(0.2 s)=FAIL"
+  },
+  {
+   "name": "P6_historical_plans_get_NA_not_rewritten",
+   "ok": true,
+   "detail": "R4 包(未申报 observation_bounds)只拿到 NA, 不当成 PASS 也不判红; 它的 fail 数与本组其它用例一致(=0) —— 历史包字节不回改, 新门不追溯"
+  },
+  {
+   "name": "P7_r5c_runs_end_to_end_offline",
+   "ok": true,
+   "detail": "续测包在零设备工装上整包跑通: 执行 10 个阶段(S0,S3,S4,S5,S6,S7,S8b,S9b,S10b,S11b) / 跳过 S8,S9,S10,S11 / quota_used 里没有 download·readback·explicit_reset 任何一项(额度已归零), SG/ADC 链仍在开端口之前被具名拒绝"
+  },
+  {
+   "name": "P8_two_executor_identities_stay_split",
+   "ok": true,
+   "detail": "两份执行器身份分列且都对得上字节: R4 包继续登记它当时真跑过的 40517501b3be…, 续测包登记修好之后的 6cb58dd73ad1…/152324 B; 镜像身份两包同一件(未重编、未覆盖)"
+  },
+  {
+   "name": "P9_stages_and_gates_survive_the_edit",
+   "ok": true,
+   "detail": "改动面核到底: 只删了 S1/S2 与 S3 的复位步; 每个起转阶段的机械门原样(SPIN 阶段集合不变)、load_means 仍未提供、起转额度仍是 3 次 => 没有借修窗之名放宽任何安全约束"
   }
  ],
  "problems": []

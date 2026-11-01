@@ -1,0 +1,96 @@
+R5 现场执行轮 field-20261101T142722Z 的离线判读 —— 由 Agent 生成(非脚本输出); 原始字节同目录, 未删未改
+# 判读对象 = dispatch_ledger.jsonl + readback.bin + S_S3/{ledger.jsonl,01_rst.boot.rx.bin,02_sysboot.rx.bin} + action_*/*
+# 脚本终态: DISPATCH|stage=S3|status=STOP|code=MISSING_RESPONSE_PROMPT|detail="as=sysboot bytes=0"
+#           DISPATCH_SUMMARY|status=STOP|stages_executed=4|stages_not_run=13
+#           FLOW_VS_VERIFICATION|flow_complete=False|core_protection_verified=False
+
+## 0. 执行身份(逐条可回指)
+- 批准对象 = tip `4cb9dac`(装配就绪改 PROVIDED + 启动前实际序列那一版)。本轮**执行用的**三份输入与工作树一致:
+  `git diff HEAD` 对 `field/plan_core_r4.json`(150962 B / blob `8df636073010d608…`)、
+  `field/m8r3_serial_chain.py`(148267 B / `40517501b3bedde9…`)、`field/rows.json` 均为空 => 没有"跑了一份和入库不同的东西"。
+- 模式: `--transport real --backend real --profile response_driven`(不是 stub, 不是 sim)。
+- S0 现场事实(台账 `S0_FACTS`): image 290916 B `dab356c69fbf4ca7…`, manifest target `rt-thread-motor-m1-candidate`,
+  needles_total=40, plan_placeholders=0, plan_forbidden_hits=0,
+  software_input_commit=`58904e1…`, tested_image_build_commit=`fe3d9f5…`。
+
+## 1. 测到的(板上/工具原文, 可逐条回指字节)
+1. **唯一一次下载** rc=0, elapsed 23.687 s, argv_sha256=`922ae5a7…`(sector 擦除 + `--no-config`,
+   载荷是 `rt-thread-motor-m1.axf`); 原始 stdout 176 B / stderr 303 B 在 `action_download/`。
+2. **唯一一次定长回读** rc=0, elapsed 10.672 s, argv_sha256=`a4bcef32…`, `savemem 0x08000000 0x47064`
+   (=290916 B)。产物 `readback.bin` 实测 **290916 B**, sha256 `dab356c69fbf4ca747e838580c16982bd56b53b1367f84b97ab705c2fbd25439`,
+   与计划 `identity_binding.image.sha256` **以及**归档 BIN `reports/firmware/phase8-m8-idle-stack-r4/rt-thread-motor-m1-candidate.bin`
+   的散列完全相同, 且逐字节比较 `readback.bin == 归档 BIN` 为 True。
+   => **本轮新镜像(idle 栈 1024 那一件)已在板, 且是逐字节证明**, 这是本项目第一次证到这一件在板。
+3. **唯一一次显式复位** rc=0, elapsed 1.859 s, argv_sha256=`a00559b1…`(`reset --method sysresetreq`);
+   `action_reset/` 的 stdout/stderr 各 0 B。
+4. **复位后的启动流是真字节, 不是零字节**: `S_S3/01_rst.boot.rx.bin` = **1027 B**
+   (`1947fbaca20a1f04…`), 文本件 `.txt` 1169 B。里面有 banner
+   `5.3.0 build Nov  1 2026 17:23:44`、`[BOOT] Phase-7 runtime bootstrap start`、`[SAFETY] init OK … readback verified`、
+   `[SS] BOOT -> INIT -> SELF_TEST`、`[BOOT] 1..4`、`[FLASH] CS=22 JEDEC=EF 40 17`,
+   **末行**是 `[FLASH] scanning 1 MiB event log...\r\n` —— 流正好断在 stage-5 扫描开始那一行之后。
+   `msh ` 提示符出现在扫描行**之前**(它被并发打印咬穿成 `msh [SAFETY] init OK…` 与后面的 `>[CUR]`),
+   与既往审计检查项 `boot-capture-prompt-before-scan` 同一形状 => shell 曾经活着。
+5. **零电机**(不是靠承诺): 台账 `quota_used` 只有 `download 1 / readback 1 / explicit_reset 1 / port_open 1`;
+   `motor_run` 键**缺席**(0 次消耗); `S_S3/ledger.jsonl` 里没有任何 TX 电机命令, 该阶段 `forbidden_commands`
+   含 `motor_arm/motor_start/safety_trip` 且未被触碰; 清理未触发(没有起转义务)。
+6. 台账时序(session 相对 t_s): 0.016 开口(COM5@115200) → 0.016 复位尝试 → 1.875 复位 rc=0 →
+   **3.875 被动启动窗结束(1027 B, end_reason=BOUNDED_DRAIN)** → **12.891 `RX_DONE bytes=0 prompt_seen=false`**
+   → 12.891 端口关闭。整段观测 = 复位完成后约 **11.0 s**。
+
+## 2. 停在哪、能判定到哪一步
+- 停止点: S3 第 2 步 `system_status`(as=sysboot)。判据要 `=== SYSTEM STATUS ===` +
+  `[Boot] bootstrap-complete=YES`, 而响应窗**一个字节都没收到**(0 B), 所以是协议层停止 `MISSING_RESPONSE_PROMPT`,
+  **不是**数值判据不过, 也不是机械前置拒绝(`prerequisite_skips=[]`, SG/ADC 那场的跳过本轮根本没轮到)。
+- 观测窗与计划申报不一致(**这是执行器侧的事实, 不是板子的事实**):
+  计划 S3 第一步申报 `boot_drain_seconds: 20`, 但 `drain_post_reset_boot()` 有一条静默早退
+  (`elapsed >= min(2.0, window)` 且 `quiet >= 0.2 s` 即 break), 实测把窗口截在 **2.0 s**;
+  第 2 步申报 `seconds: 6`, 执行器加 `SLACK_SECONDS=3` => 实际 **9.016 s**。
+  合计 11.0 s, 与申报的 20 s 被动窗 + 后续查询完全不是一回事。
+- 同板同日的对照(**已入库的既存件, 不是本轮产物**): `phase8-m8-diag-stack-r1/field/cont-20261101T090512Z`
+  用 `boot_window_s: 75` 拿到 3439 B **完整启动到 READY**, 并且四条查询全部回答(提示符探针 7 B)。
+  => "这块板+这条启动路径"在**足够长的窗**里是能走通并应答的, 这一点早已被证过。
+- stage-5 的耗时依据(源码层, 已归档): `host/m8diag_source_audit.txt` §3 —— 按配置值 `NSF_SPI_HZ=1000000u`
+  估 1 MiB 扫描 **≥ 8.5 s**, 且同一节明确自陈"那是吞吐估算, 不是界限"。
+  我们的窗在扫描行之后只看了 9.0 s —— 与该估算的下限**刚好同一量级**, 所以不能宣布"板子卡住"。
+- 但"只是慢、还在推进"也不能宣布成立: 审计 §4 指出扫描每 64 槽(≈133 ms)就 `rt_thread_mdelay(1)` 让出一次,
+  shell(prio 20)理应在毫秒级把 `system_status` 这 13 个字符**回显**出来 —— 与实测 0 回显矛盾。
+- 因此三条解释**并列登记、不择一采信**(编号沿用审计的 H1/H2/H3):
+  | 代号 | 解释 | 本轮字节能否判别 |
+  | --- | --- | --- |
+  | H1 | 主线程停在无界 SPI 自旋里, shell 被饿死 | 不能 |
+  | H2 | 核没在跑(halt / 异常 while(1) / 停在复位后某处) | 不能 |
+  | H3 | 主机→板 RX 方向不通, 板子在正常推进 | 不能(窗太短, 覆盖不到扫描完成点) |
+  本轮把第四支也并列留着: **H4 = 启动仍在推进, 只是超过 11 s** —— 它与 H1/H2/H3 在本轮字节上不可分,
+  而它与"cont 轮 75 s 窗拿满"这一实测事实**完全相容**。
+- 不许从上面推的话, 这里明确不推: 不说"控制台静默已复现故新镜像有害", 也不说"idle 1024 无效/有效"——
+  `ps` 从未发出, **idle 栈在板上的容量没有读到**(镜像身份是逐字节证的, 这是另一级证据, 两者不得混写);
+  不说"保护已验证"(`protect_ready=NO`、`rel cov=NOT-ACTIVE` 本轮一次都没轮到读)。
+
+## 3. 逐场分类与额度(与台账逐行一致)
+| 阶段 | 结果 | 依据 |
+| --- | --- | --- |
+| S0 离线绑定 | 已跑(事实级) | `S0_FACTS` 行 |
+| S1 下载 | OK, 1/1 用尽 | `ACTION name=download rc=0` |
+| S2 定长回读 | OK, 1/1 用尽; **镜像在板已证** | `readback.bin` 逐字节相等 |
+| S3 会话1 | **STOP** `MISSING_RESPONSE_PROMPT` | `S_S3/ledger.jsonl` |
+| S4…S11b(13 个) | 未跑 | `DISPATCH_DONE not_run=[…]`, `run=4` |
+- 汇总标签: `flow_complete=False`, `core_protection_verified=False`, `claims={}`(逐场分类器一次都没被调用)。
+- 一次性额度实耗: download 1/1、readback 1/1、explicit_reset 1/1、port_open 1/12。
+  **剩余**: approved_reboot 1、config_save 1、tmc_config_apply 2、diag_profile_{learn,commit,zero} 各 1、
+  irq_polarity_prep 4、motor_run 3(**一次没动**)、port_open 11。
+- 因此本轮的诚实口径: 学习 / tier+commit+save / 重启恢复 / SG/ADC 激励 / IMU 激励 / 取证 / 锁存态拒绝 /
+  人工恢复的**现场结论全部仍未取**; 已证的只有"这一件镜像在板上"和"下载/回读/复位各一次且 rc=0"。
+
+## 4. 本轮之后要做什么(不在本轮执行, 因批准已含"不重试"且一次性额度已尽)
+1. 观测侧修: 被动启动窗**按申报走满**(静默早退不得静默截断), 并在台账里自报"申报窗/实耗窗";
+   加一条离线结构门: 复位后的**第一次查询**从复位起算的可观测量必须 ≥ 经验上成功过的 75 s
+   (cont 件 `RESULT.json.boot_window_s`), 否则整包在离线就被具名拒绝 —— 今天的包在这条门上就该红。
+2. 续测包: 只用**剩余**额度(零下载、零回读、零显式复位), 开口后先给一条足够长的应答窗;
+   若仍 0 字节, 具名停止并把"计划内人工断电重启(1 次, 额度仍在)"作为操作者门下一步, 不自动复位。
+3. 判别 H1/H2/H3 需要的两条动作(既往审计 §6 已登记, 都要另一次授权): 一次 DAP **只读** status/PC,
+   或一次断电重上电 + 一个足够长的被动窗。
+
+## 5. 本目录里"脚本输出"与"Agent 判读"的边界
+脚本产物(未删未改): `dispatch_ledger.jsonl` `readback.bin` `S_S3/ledger.jsonl`
+`S_S3/01_rst.boot.rx.bin(+.txt)` `S_S3/02_sysboot.rx.bin` `action_download/*` `action_readback/*` `action_reset/*`。
+本文件与 `../run_record.md` §13 是 Agent 的离线判读, 不参与脚本判定; §13 另登记执行器侧缺陷与续测包。

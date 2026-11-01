@@ -1,0 +1,42 @@
+{
+ "argv_masked": [
+  "python",
+  "-m",
+  "pyocd",
+  "commander",
+  "--no-config",
+  "-t",
+  "cortex_m",
+  "-u",
+  "@UID_FILE<redacted len=48 sha256_d2f530dbd062>",
+  "-f",
+  "1000000",
+  "-O",
+  "auto_unlock=false",
+  "-O",
+  "connect_mode=halt",
+  "-O",
+  "resume_on_disconnect=false",
+  "-O",
+  "cache.enable_memory=false",
+  "-O",
+  "cache.read_code_from_elf=false",
+  "-O",
+  "scan_all_aps=false",
+  "-c",
+  "status",
+  "-c",
+  "savemem 0x08000000 0x47064 D:/ns800/reports/reviews/phase8-m8-idle-stack-r4/field/field-20261101T142722Z/readback.bin",
+  "-c",
+  "status",
+  "-c",
+  "exit"
+ ],
+ "argv_sha256_of_private_original": "a4bcef32ee87bd698df60dcedb42e3b51868f191bee9e61671723679d7f25847",
+ "cwd": "D:\\ns800",
+ "uid_disclosure": {
+  "present": true,
+  "length": 48,
+  "sha256_12": "d2f530dbd062"
+ }
+}

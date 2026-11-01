@@ -1026,12 +1026,24 @@ def profile_of(fixture):
 def drain_post_reset_boot(port, st, asname, out, idx, led, results, clock, fixture, transport):
     """Archive passive boot bytes; application readiness is proved by the next query.
     A spontaneous boot prompt is optional. Command-response prompts remain mandatory.
+
+    窗口尺寸(R5 现场轮的修正): 旧实现有一条**未申报**的静默早退(`>=min(2.0,window)` 且静默 0.2 s 即
+    break), 于是申报 20 s 的窗实测 2.0 s 就关了 —— 而 stage-5 的 1 MiB 扫描按配置值估就要 ≥8.5 s
+    (`host/m8diag_source_audit.txt` §3), 启动流被从中间剪断, 后续查询拿到 0 字节。现在申报的预算**走满**,
+    只有两种提前结束: ① 看到正信号 `boot_done_needle`(产品自己的"启动完成"打印)再加一小段尾巴;
+    ② 显式申报了 `boot_quiet_seconds` 才允许按静默早退。结束的**哪一种、申报多少、实耗多少**都进台账。
     """
     window = float(st.get("boot_drain_seconds", 20))
+    needle = st.get("boot_done_needle")
+    needle_b = needle.encode("utf-8") if needle else None
+    grace = float(st.get("boot_done_grace_seconds", 2.0))
+    quiet = st.get("boot_quiet_seconds")
+    quiet = float(quiet) if quiet is not None else None
     t0 = last = clock.monotonic()
     dl = t0 + window
     raw = out / ("%02d_%s.boot.rx.bin" % (idx, asname))
     buf = bytearray()
+    needle_at = None
     if transport == "stub":
         for line in (fixture or {}).get("post_reset_boot", []):
             port.feed((line + "\r\n").encode("utf-8"))
@@ -1047,18 +1059,29 @@ def drain_post_reset_boot(port, st, asname, out, idx, led, results, clock, fixtu
                 if len(buf) > BOOT_CAP:
                     raise Stop("BOOT_BYTE_CAP")
                 check_danger(bytes(buf))
+                if needle_b and needle_at is None and needle_b in bytes(buf):
+                    needle_at = last
             now = clock.monotonic()
-            if now - t0 >= min(2.0, window) and now - last >= 0.2:
+            if needle_at is not None and now - needle_at >= grace:
+                break
+            if quiet is not None and now - t0 >= min(2.0, window) and now - last >= quiet:
                 break
             clock.sleep(min(0.01, max(0.0, dl - now)))
     # Bytes repr is presentation only; do not decode/repair boot text into business facts.
     txt = emit_text(raw, [repr(bytes(buf))])
-    end_reason = "DRAIN_BUDGET_REACHED" if clock.monotonic() >= dl else "BOUNDED_DRAIN"
+    spent = clock.monotonic() - t0
+    end_reason = ("BOOT_DONE_NEEDLE" if needle_at is not None else
+                  "QUIET_BREAK" if (quiet is not None and clock.monotonic() < dl)
+                  else "DRAIN_BUDGET_REACHED")
     results.append({"as": asname + "_boot", "kind": "boot_stream", "rx_bytes": len(buf),
-                    "rx_sha256": sha_of(raw), "txt": txt,
+                    "rx_sha256": sha_of(raw), "txt": txt, "drain_declared_seconds": window,
+                    "drain_spent_seconds": round(spent, 3), "boot_done_needle": needle,
+                    "boot_quiet_seconds": quiet,
                     "readiness": "NOT_ASSESSED_QUERY_REQUIRED", "end_reason": end_reason})
     led.ev("BOOT_STREAM_DRAINED", **{"as": asname, "bytes": len(buf),
-           "raw": str(raw), "end_reason": end_reason, "prompt_required": False})
+           "raw": str(raw), "end_reason": end_reason, "prompt_required": False,
+           "drain_declared_s": window, "drain_spent_s": round(spent, 3),
+           "done_needle": needle, "quiet_break_s": quiet})
 
 
 def command_attempt(port, cmd, st, asname, raw, step_dl, transport, fixture, silent, led, clock,
@@ -1895,6 +1918,45 @@ def validate_plan(plan, rows_doc, app_dir):
                 ";".join(fc_bad) or "trip 链都有同次 REL TRIP/源样本/profile/新 session 四腿"))
     if fc_bad:
         bad += 1
+    # R5 现场轮(field-20261101T142722Z)的观测窗教训: 计划申报的被动启动窗必须**真的走满**, 而且
+    # "从复位/开口到第一条查询"的可观测总量要覆盖经验上成功过的启动窗(cont 轮 75 s 拿满整段启动)。
+    # 未申报 observation_bounds 的历史包只登记 NA, 不回改它们的字节, 也不给红。
+    ob = plan.get("observation_bounds") or {}
+    bmin = ob.get("boot_window_seconds_min")
+    bw_bad, bw_seen = [], []
+    if bmin is None:
+        out.append("PLAN_BOOT_WINDOW_COVER|all|NA|未申报 observation_bounds.boot_window_seconds_min"
+                   "(R5-C 轮新增门; 历史包不回改字节, 因此不判红)")
+    else:
+        if not ob.get("boot_window_provenance"):
+            bw_bad.append("下界没有出处(要回指经验成功过的窗口 + 源码层耗时估算)")
+        for stg in plan["stages"]:
+            if stg.get("kind") != "serial_session":
+                continue
+            steps = stg.get("steps", [])
+            ri = next((i for i, s in enumerate(steps) if s.get("action") == "reset"), None)
+            if ri is None and not stg.get("first_query_is_boot_probe"):
+                continue
+            first = next((s for s in steps[(ri + 1) if ri is not None else 0:] if s.get("cmd")), None)
+            if first is None:
+                bw_bad.append("%s:会话里没有第一条可判定查询" % stg["id"])
+                continue
+            rstep = steps[ri] if ri is not None else {}
+            if rstep.get("boot_quiet_seconds") is not None:
+                bw_bad.append("%s:申报了 boot_quiet_seconds => 静默会把窗重新剪短" % stg["id"])
+            drain = float(rstep.get("boot_drain_seconds", 20)) if ri is not None else 0.0
+            want = float(first.get("seconds", 3))
+            hz = drain + want + SLACK_SECONDS
+            bw_seen.append("%s=%.0f+%0.f+%ds=%.0fs" % (stg["id"], drain, want, SLACK_SECONDS, hz))
+            if hz < float(bmin):
+                bw_bad.append("%s:可观测量 %.0fs < 下界 %ss" % (stg["id"], hz, bmin))
+        if not bw_seen and not bw_bad:
+            bw_bad.append("申报了下界但没有任何会话落在门内(恒真门)")
+        out.append("PLAN_BOOT_WINDOW_COVER|all|%s|%s" %
+                   ("PASS" if not bw_bad else "FAIL",
+                    ";".join(bw_bad) or "下界=%ss, 覆盖: %s" % (bmin, ",".join(bw_seen))))
+        if bw_bad:
+            bad += 1
     return out, bad, len(names)
 
 

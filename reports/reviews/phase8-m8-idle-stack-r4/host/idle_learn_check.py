@@ -838,6 +838,149 @@ add("N9_summary_label_requires_whole_run_success",
     "汇总标签的机器写法核到执行器源码: core_verified 必须先有整包成功(ok), 再看各场声明; "
     "交付态实测 flow=True/core=False 也在同一次干跑里(行为反例见 host/verify_four_branch_matrix.py 的 V14)")
 
+# ---------------- P 组: R5 现场轮(field-20261101T142722Z)的观测窗缺陷复现 + 新门元负控 + 续测包 ----------------
+R5_RUN = FIELD / "field-20261101T142722Z"
+R5C_PATH = FIELD / "plan_core_r5c.json"
+R5C = json.loads(R5C_PATH.read_text(encoding="utf-8"))
+PLAN_STAGES = {s["id"]: s for s in PLAN["stages"]}
+HEAD = (R5_RUN / "S_S3" / "01_rst.boot.rx.bin").read_bytes()          # 现场真实字节, 1027 B
+TAIL = b"[BOOT] 5 storage ....... OK\r\n[BOOT] 11 selftest OK -> state=READY\r\nmsh >\r\n"
+
+
+def _drain(gap, window=20, old_rule=False):
+    """同一份夹具: 启动头立刻到, 之后是 gap 秒的**真空静默**(扫描段的形状), 尾巴才出现。
+    静默用 None 槽建模(FakePort 每读到一格 None 就当场返回空), 所以先前已到的字节不会被"忙期"一起吞掉。"""
+    ck = M.SimClock()
+    lg = M.Ledger(SCRATCH / ("p_ledger_%s_%s_%s.jsonl" % (gap, window, old_rule)), ck,
+                  out_dir=SCRATCH)
+    port = M.FakePort([HEAD] + [None] * int(gap / 0.01) + [TAIL], lg, clock=ck)
+    if old_rule:                                                       # 退役那条规则的参照实现
+        t0 = last = ck.monotonic()
+        buf = bytearray()
+        while ck.monotonic() < t0 + window:
+            c = port.read(512)
+            if c:
+                buf += c
+                last = ck.monotonic()
+            now = ck.monotonic()
+            if now - t0 >= min(2.0, window) and now - last >= 0.2:
+                break
+            ck.sleep(min(0.01, max(0.0, t0 + window - now)))
+        return bytes(buf), round(ck.monotonic() - t0, 3), None
+    res = []
+    d = SCRATCH / ("p_drain_%s_%s" % (gap, window))
+    d.mkdir(parents=True, exist_ok=True)
+    M.drain_post_reset_boot(port, {"as": "rst", "boot_drain_seconds": window}, "rst", d, 1, lg,
+                            res, ck, {}, "real")
+    return bytes((d / "01_rst.boot.rx.bin").read_bytes()), None, res[0]
+
+
+_p_new = _drain(8)
+add("P1_drain_honours_declared_budget",
+    len(_p_new[2]["rx_sha256"] or "") == 64 and _p_new[0][:len(HEAD)] == HEAD and
+    TAIL in _p_new[0] and _p_new[2]["end_reason"] == "DRAIN_BUDGET_REACHED" and
+    float(_p_new[2]["drain_spent_seconds"]) >= 19.9 and
+    int(_p_new[2]["drain_declared_seconds"]) == 20 and _p_new[2]["boot_quiet_seconds"] is None,
+    "申报 20 s 就走满 20 s: 扫描段 8 s 静默之后的启动尾流仍在同一个窗里收到(%d B), "
+    "台账同时自报申报/实耗/是否允许静默早退" % len(_p_new[0]))
+
+_p_old = _drain(8, old_rule=True)
+add("P2_retired_quiet_rule_reproduces_field_failure",
+    _p_old[0] == HEAD and _p_old[1] == 2.0 and len(_p_old[0]) == len(HEAD),
+    "同一份夹具喂给**退役那条规则**的参照实现: 截在 2.0 s、只剩 %d B(=现场实测的 1027 B), "
+    "启动尾流永远进不了下一个窗 => P1 的差别是被测缺陷造成的, 不是夹具碰巧" % len(_p_old[0]))
+add("P3_field_bytes_match_the_stop",
+    len(HEAD) == 1027 and sha(R5_RUN / "S_S3" / "01_rst.boot.rx.bin") ==
+    "1947fbaca20a1f048ed7525c8961d559ae02256e48e1866e9f288e36df36bf95" and
+    HEAD.endswith(b"[FLASH] scanning 1 MiB event log...\r\n") and
+    (R5_RUN / "S_S3" / "02_sysboot.rx.bin").stat().st_size == 0 and
+    sha(R5_RUN / "readback.bin") == PLAN["identity_binding"]["image"]["sha256"] ==
+    R5C["identity_binding"]["image"]["sha256"] and
+    (R5_RUN / "readback.bin").stat().st_size == 290916 == PLAN["identity_binding"]["image"]["bytes"],
+    "判读里的关键数字都从归档原件当场复算: 启动流 1027 B 且末行是扫描行 / 首查询 0 B / "
+    "回读件 290916 B 与绑定镜像同一散列(未删未改)")
+
+
+def _vplan(doc):
+    return M.validate_plan(doc, json.loads((FIELD / "rows.json").read_text(encoding="utf-8-sig")),
+                           str(APPS))
+
+
+_lines_c, _bad_c, _ = _vplan(json.loads(json.dumps(R5C)))
+_cover_c = [l for l in _lines_c if l.startswith("PLAN_BOOT_WINDOW_COVER")]
+_shrink = json.loads(json.dumps(R5C))
+next(s for s in _shrink["stages"] if s["id"] == "S3")["steps"][0]["seconds"] = 6
+_lines_s, _bad_s, _ = _vplan(_shrink)
+_cover_s = [l for l in _lines_s if l.startswith("PLAN_BOOT_WINDOW_COVER")]
+add("P4_meta_negative_short_query_window_fires",
+    len(_cover_c) == 1 and "|PASS|" in _cover_c[0] and _bad_c == 0 and
+    len(_cover_s) == 1 and "|FAIL|" in _cover_s[0] and _bad_s >= 1 and "78s" in _cover_c[0],
+    "观测门下界=75 s: 续测包(首查询 75 s + SLACK 3 s)PASS 且整包 fail=0; 只把首查询改回现场那一版(6 s) "
+    "就必须翻红 => 这条门量的是窗, 不是摆设(%s)" % (_cover_s[0] if _cover_s else "-"))
+
+_noprov = json.loads(json.dumps(R5C))
+_noprov["observation_bounds"]["boot_window_provenance"] = []
+_l1, _b1, _ = _vplan(_noprov)
+_quiet = json.loads(json.dumps(PLAN))
+_quiet["observation_bounds"] = {"boot_window_seconds_min": 75,
+                                 "boot_window_provenance": ["参照 cont 轮 75 s"]}
+next(s for s in _quiet["stages"] if s["id"] == "S3")["steps"][0]["boot_quiet_seconds"] = 0.2
+_l2, _b2, _ = _vplan(_quiet)
+_c1 = [l for l in _l1 if l.startswith("PLAN_BOOT_WINDOW_COVER")]
+_c2 = [l for l in _l2 if l.startswith("PLAN_BOOT_WINDOW_COVER")]
+add("P5_meta_negative_no_provenance_and_quiet_reintroduced",
+    _b1 >= 1 and "出处" in _c1[0] and _b2 >= 1 and "boot_quiet_seconds" in _c2[0] and
+    "|FAIL|" in _c2[0],
+    "两个绕行口都翻红: 下界没出处=%s / 把静默早退重新申报回来(0.2 s)=%s"
+    % (_c1[0].split("|")[2], _c2[0].split("|")[2]))
+
+_lines4, _bad4b, _ = _vplan(json.loads(json.dumps(PLAN)))
+_na4 = [l for l in _lines4 if l.startswith("PLAN_BOOT_WINDOW_COVER")]
+add("P6_historical_plans_get_NA_not_rewritten",
+    len(_na4) == 1 and "|NA|" in _na4[0] and _bad4b == 0,
+    "R4 包(未申报 observation_bounds)只拿到 NA, 不当成 PASS 也不判红; 它的 fail 数与本组其它用例一致"
+    "(=%d) —— 历史包字节不回改, 新门不追溯" % _bad4b)
+
+_txt5c = dispatch(json.loads(json.dumps(R5C)), "r5c_delivery")
+_exec5c = [s.split("|")[1].split("=")[1] for s in _txt5c.splitlines() if s.startswith("DISPATCH|stage=")]
+_skip5c = re.search(r"prerequisite_skips=\[(.*?)\]", _txt5c)
+_skip5c = [x.strip().strip('"') for x in _skip5c.group(1).split(",")] if _skip5c else []
+_fs5c = R5C["field_sequence_before_start"]
+add("P7_r5c_runs_end_to_end_offline",
+    "DISPATCH_SUMMARY|status=OK" in _txt5c and "stages_not_run=0" in _txt5c and
+    _exec5c == _fs5c["expected_executed_stages"] and _skip5c == _fs5c["expected_skipped_stages"] and
+    "PREREQUISITE_REFUSAL|scenario=SG_ADC_controlled_load|refused_before=S8|gates=load_means|"
+    in _txt5c and "download" not in re.search(r"quota_used=\{([^}]*)\}", _txt5c).group(1) and
+    "motor_run" in re.search(r"quota_used=\{([^}]*)\}", _txt5c).group(1),
+    "续测包在零设备工装上整包跑通: 执行 %d 个阶段(%s) / 跳过 %s / quota_used 里没有 download·readback·"
+    "explicit_reset 任何一项(额度已归零), SG/ADC 链仍在开端口之前被具名拒绝"
+    % (len(_exec5c), ",".join(_exec5c), ",".join(_skip5c)))
+
+_disk_sha, _disk_bytes = sha(CHAIN), CHAIN.stat().st_size
+add("P8_two_executor_identities_stay_split",
+    _disk_sha != R5C["continuation_of"]["executor_executed"]["sha256"] and
+    PLAN["identity_binding"]["executor"]["sha256"] ==
+    R5C["continuation_of"]["executor_executed"]["sha256"] and
+    R5C["identity_binding"]["executor"]["sha256"] == _disk_sha and
+    R5C["identity_binding"]["executor"]["bytes"] == _disk_bytes and
+    R5C["identity_binding"]["image"]["sha256"] == PLAN["identity_binding"]["image"]["sha256"],
+    "两份执行器身份分列且都对得上字节: R4 包继续登记它当时真跑过的 %s…, 续测包登记修好之后的 %s…/"
+    "%d B; 镜像身份两包同一件(未重编、未覆盖)"
+    % (R5C["continuation_of"]["executor_executed"]["sha256"][:12], _disk_sha[:12], _disk_bytes))
+
+add("P9_stages_and_gates_survive_the_edit",
+    [s["id"] for s in R5C["stages"]][:1] == ["S0"] and "S1" not in [s["id"] for s in R5C["stages"]]
+    and "S2" not in [s["id"] for s in R5C["stages"]] and
+    next(s for s in R5C["stages"] if s["id"] == "S3").get("reset_after_port_open") is False and
+    all((s.get("prerequisite_gates") == PLAN_STAGES[s["id"]].get("prerequisite_gates"))
+        for s in R5C["stages"] if s["id"] in PLAN_STAGES) and
+    R5C["quota"]["download"] == 0 and R5C["quota"]["readback"] == 0 and
+    R5C["quota"]["explicit_reset"] == 0 and R5C["quota"]["motor_run"] == 3 and
+    R5C["mechanical_prerequisites"]["load_means"]["status"] == "NOT_PROVIDED" and
+    R5C["mechanical_prerequisites"]["assembly_readiness"]["status"] == "PROVIDED",
+    "改动面核到底: 只删了 S1/S2 与 S3 的复位步; 每个起转阶段的机械门原样(SPIN 阶段集合不变)、"
+    "load_means 仍未提供、起转额度仍是 3 次 => 没有借修窗之名放宽任何安全约束")
+
 problems = [n for n, ok, _ in CHECKS if not ok]
 n_metaneg = sum(1 for n, _, _ in CHECKS if n.startswith("D"))
 extra_meta = [n for n, ok, _ in CHECKS if "meta_negative" in n]

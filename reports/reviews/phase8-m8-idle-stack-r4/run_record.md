@@ -344,3 +344,64 @@ core_verified = bool(ok) and bool(claims) and all(v == "VERIFIED" for v in claim
 `build_manifest.json` 全部未动。包状态仍是 `BOUND_NOT_EXECUTED`，本轮消耗现场批准 0 次；
 现场执行等待复审对这份最终绑定的批准。
 
+
+## 13. 现场执行轮 field-20261101T142722Z（real/real/response_driven，批准对象 tip 4cb9dac）
+
+**这一轮第一次真的动了设备**，而且证到了一件以前只有静态证据的事：**本轮新镜像逐字节在板**。
+
+| 项 | 实测 | 依据 |
+| --- | --- | --- |
+| 唯一一次下载 | rc=0，23.687 s，argv_sha256=`922ae5a7…` | `dispatch_ledger.jsonl` + `action_download/` |
+| 唯一一次定长回读 | rc=0，10.672 s，`savemem 0x08000000 0x47064` → **290916 B**，sha256=`dab356c69fbf4ca7…` = 计划绑定值 = 归档 BIN（逐字节比较 True） | `readback.bin` |
+| 唯一一次显式复位 | rc=0，1.859 s，argv_sha256=`a00559b1…` | `S_S3/ledger.jsonl` + `action_reset/` |
+| 复位后的启动流 | **真实 1027 B**（`1947fbaca20a1f04…`），末行 `[FLASH] scanning 1 MiB event log...`；`msh ` 提示符出现在扫描行之前（被并发打印咬穿成 `msh [SAFETY] init OK…` 与后面的 `>`） | `S_S3/01_rst.boot.rx.bin(+.txt)` |
+| 第一条查询 | `system_status`(as=sysboot) **0 字节** → 具名停止 `MISSING_RESPONSE_PROMPT` | `S_S3/02_sysboot.rx.bin`=0 B、台账 `RX_DONE bytes=0` |
+| 电机 | **零次起转**：`motor_run` 键缺席、台账无 `motor_arm/motor_start`、无清理义务 | `quota_used` 只有 download/readback/explicit_reset/port_open 各 1 |
+| 汇总标签 | `flow_complete=False`、`core_protection_verified=False`、`claims={}` | `PROTECTION_CLAIMS` 行 |
+
+台账时序（session 相对秒）：0.016 开口 → 1.875 复位完成 → **3.875 被动窗结束（1027 B）** → **12.891 首查询 0 字节** → 关闭。
+整段观测从复位完成起只有 **约 11.0 s**。
+
+**为什么这不能算板子的结论（本轮自己抓到的一处工具缺陷）**：执行器 `drain_post_reset_boot()` 有一条
+**未申报**的静默早退（`elapsed ≥ min(2.0, window)` 且静默 0.2 s 即 break），于是计划申报的
+`boot_drain_seconds: 20` 实跑 **2.0 s**；首查询申报 6 s + `SLACK_SECONDS=3` = 9.016 s。对照两份既存件：
+`phase8-m8-diag-stack-r1/field/cont-20261101T090512Z/RESULT.json` 的 `boot_window_s=75` 在同板同日拿到
+3439 B **完整启动到 READY + 四条查询全部回答**；`phase8-m8-relative-protection-r3/host/m8diag_source_audit.txt`
+§3 估 stage-5 的 1 MiB 扫描按配置值 **≥8.5 s**（且该文自陈不是界限）。**观测窗比启动本身短**，
+所以"0 字节"只能叫"没观察到"。H1 无界 SPI 自旋 / H2 核没在跑 / H3 主机→板 RX 不通 / H4 只是慢于 11 s
+四条**并列不择一**；`ps` 从未发出，**idle 栈在板容量没读到**（镜像在板是另一级证据，两者不得混写）。
+
+批准的一次性额度已烧掉：download 1/1、readback 1/1、explicit_reset 1/1；剩余 port_open 11、motor_run 3、
+approved_reboot 1、config_save 1、apply 2、diag_profile_* 各 1。学习/提交/重启恢复/两路激励/取证/锁存态拒绝/
+人工恢复的**现场结论全部仍未取**。按"不重试"约束，本轮之后**没有再动任何设备**。
+逐场判读原文：`field/field-20261101T142722Z/OFFLINE_JUDGEMENT.txt`（脚本产物与 Agent 判读的分界写在文末）。
+
+## 14. 观测窗修复 + R5-C 续测包（零设备、不重编、不动已执行包字节）
+
+`host/apply_field_window_fix_r5c.py`（幂等，`--check` 两次同字节）从**已执行的** `plan_core_r4.json` 派生
+`field/plan_core_r5c.json`（156530 B，blob `05a3757139194b56…`）。改的只有观测面：
+
+1. **执行器**：申报的被动窗**走满**（静默早退退役；只有正信号 `boot_done_needle` 或显式申报
+   `boot_quiet_seconds` 才提前结束），`end_reason` 拆成 `BOOT_DONE_NEEDLE/QUIET_BREAK/DRAIN_BUDGET_REACHED`，
+   台账自报 `drain_declared_seconds/drain_spent_seconds/boot_quiet_seconds` —— 下次再不一致就是自曝。
+2. **离线新门 `PLAN_BOOT_WINDOW_COVER`**：计划申报 `observation_bounds.boot_window_seconds_min` 时，
+   每个复位会话或标了 `first_query_is_boot_probe` 的会话，从复位/开口到第一条查询的可观测量
+   （drain + 首查询 `seconds` + SLACK）必须 ≥ 下界；下界没出处、或把静默早退重新申报回来，也判红。
+   未申报下界的历史包只登记 **NA**（不判红、更不当 PASS）。**今天这一版包在这条门上就该红**（29 s < 75 s）。
+3. **续测包**：删 S1/S2 与 S3 的复位步，`download/readback/explicit_reset` 归零（一次性批准已烧掉）；
+   S3 首查询 `6 → 75 s`、阶段总时限 `90 → 300 s`；机械门一个没拆（`load_means` 仍 NOT_PROVIDED，SG/ADC
+   链仍整条被拒），起转额度仍 3 次、学习 15 s / IMU 5 s 不变。
+4. **身份分列**：续测包绑**修好之后**的执行器；已执行的 R4 包继续登记它当时真跑过的 `40517501b3be…`/148267 B
+   （改那份登记等于伪造执行输入）。镜像/AXF/MAP 两包同一件，未重编、未覆盖 `f5c2fd89…`。
+
+重跑（最终字节，全部零设备）：`idle_learn_check` **CHECKS=116 problems=0**，元负控 **6 fired=6 + R5 组 8 fired=8**
+（新增 P4 把首查询改回 6 s 必须翻红、P5 下界无出处/重新申报静默必须翻红）；`m8r3_field_selftest`
+**79/79**（负控注入 13）；定向矩阵 **15/15**；`plan_core_r5c.json` `--validate-plan` **230 项 0 失败**
+（`PLAN_BOOT_WINDOW_COVER|all|PASS|下界=75s, 覆盖: S3=0+75+3s=78s`），交付态 stub 干跑 10 个阶段执行、
+`S8,S9,S10,S11` 具名跳过、`quota_used` 里没有 download/readback/explicit_reset 任何一项。
+关键复现用例 **P2**：同一份夹具（1027 B 头 + 8 s 真空静默 + 启动尾流）喂给**退役那条规则的参照实现**，
+截在 **2.0 s、只剩 1027 B**，与现场一模一样；喂给修好的实现则收满尾流并走满 20 s —— 差别是被测缺陷造成的。
+
+仍未证（不因本轮修复改变）：谁写入 `0x00bd80b0`；idle/diag 栈越界与该损坏的因果；1024 是否够；
+`protect_ready=NO`、`threshold_validation=NOT_ESTABLISHED`、`rel cov=NOT-ACTIVE`；SG/ADC 加载手段。
+R5-C 包状态 = **BOUND_NOT_EXECUTED**：现场续测需要复审对 `plan_core_r5c.json` + 修好的执行器的一次原文批准。

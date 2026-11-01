@@ -1,5 +1,5 @@
 IDLE_LEARN_CHECK mode=offline_only (零设备: 不起 pyocd, 不开串口, 不动 Keil; dispatch 走 stub+sim)
-run_dir(LOCAL_ONLY, 仓外)=D:/ns800_m8r3_scratch/idlecheck_83zz7zmy
+run_dir(LOCAL_ONLY, 仓外)=D:/ns800_m8r3_scratch/idlecheck_zsg8b2su
 OK A1_old_map_idle_stack_is_256
 OK A2_new_map_idle_stack_is_1024
 OK A3_ZI_grew_exactly_768
@@ -107,7 +107,16 @@ OK N6_meta_negative_invented_rule
 OK N8_r3_history_recomputed_same
 OK N7_plan_states_boundary
 OK N9_summary_label_requires_whole_run_success
-CHECKS=107 problems=0
+OK P1_drain_honours_declared_budget
+OK P2_retired_quiet_rule_reproduces_field_failure
+OK P3_field_bytes_match_the_stop
+OK P4_meta_negative_short_query_window_fires
+OK P5_meta_negative_no_provenance_and_quiet_reintroduced
+OK P6_historical_plans_get_NA_not_rewritten
+OK P7_r5c_runs_end_to_end_offline
+OK P8_two_executor_identities_stay_split
+OK P9_stages_and_gates_survive_the_edit
+CHECKS=116 problems=0
 META_NEGATIVES=6 fired=6
-META_NEGATIVES_R5=6(F6_meta_negative_gate_fires,G7_meta_negative_chain_order,H4_meta_negative_quota,J5_meta_negative_ungated_prerequisite,N5_meta_negative_gate_removed,N6_meta_negative_invented_rule) fired=6
+META_NEGATIVES_R5=8(F6_meta_negative_gate_fires,G7_meta_negative_chain_order,H4_meta_negative_quota,J5_meta_negative_ungated_prerequisite,N5_meta_negative_gate_removed,N6_meta_negative_invented_rule,P4_meta_negative_short_query_window_fires,P5_meta_negative_no_provenance_and_quiet_reintroduced) fired=8
 IDLE_LEARN_CHECK ALL_PASS_WITH_META_NEGATIVES
