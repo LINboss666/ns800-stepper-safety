@@ -86,6 +86,16 @@ def fix_stages(plan, by_id):
         "启动本身之前, 才把 0 字节当成了结论")
     s3["first_query_is_boot_probe"] = True
     s3["requires"] = []
+    # 同一个缺陷在 S6 人工断电重启之后还会再咬一次: S7 的第一条查询也只有 6 s, 而重启后是一次**全新启动**
+    # (stage-5 扫描 >=8.5 s, cont 轮要 75 s 窗才拿满)。这里一并放宽, 并标成启动探针交给同一条离线门管。
+    s7 = by_id["S7"]
+    s7["first_query_is_boot_probe"] = True
+    s7["total_deadline_seconds"] = S3_TOTAL_DEADLINE
+    q7 = next(x for x in s7["steps"] if x.get("cmd"))
+    q7["seconds"] = FIRST_QUERY_SECONDS
+    q7["seconds_note"] = (
+        "S6 是**操作者物理断电重上电**, 所以 S7 的第一条查询面对的是又一次冷启动(与 S3 同一判据): "
+        "75 s 是上界, read_until_prompt 到完整提示符就返回; 这一窗仍然 0 字节就只能具名停止")
     s3["continuation_note"] = (
         "续测会话**不复位**: 板上跑的已经是本轮逐字节证过的那件镜像, 显式复位的唯一一次已在 %s 用掉; "
         "核此刻是在跑的状态(R5 轮 1.875 s 完成复位并收到 1027 B 启动流, 之后再没有 attach/halt)。"

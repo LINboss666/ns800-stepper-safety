@@ -1016,7 +1016,7 @@
    "requires": [
     "S6"
    ],
-   "total_deadline_seconds": 90,
+   "total_deadline_seconds": 300,
    "halt_after": false,
    "forbidden_commands": [
     "config_load",
@@ -1052,10 +1052,11 @@
     {
      "cmd": "system_status",
      "as": "sys2",
-     "seconds": 6,
+     "seconds": 75,
      "expect_contains": [
       "=== SYSTEM STATUS ==="
-     ]
+     ],
+     "seconds_note": "S6 是**操作者物理断电重上电**, 所以 S7 的第一条查询面对的是又一次冷启动(与 S3 同一判据): 75 s 是上界, read_until_prompt 到完整提示符就返回; 这一窗仍然 0 字节就只能具名停止"
     },
     {
      "cmd": "tmc_config_show",
@@ -1173,7 +1174,8 @@
      "expect_profile": "AT_REST"
     }
    ],
-   "order": 5
+   "order": 5,
+   "first_query_is_boot_probe": true
   },
   {
    "id": "S8",
