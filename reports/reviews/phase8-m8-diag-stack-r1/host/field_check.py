@@ -208,6 +208,56 @@ add("B16_zero_byte_response_not_success",
     got.get("stop_label") in ("NO_PROMPT", "QUERY_TIMEOUT", "QUERY_INCOMPLETE") and
     got.get("verdict") != "CAPTURE_COMPLETE_REVIEW_PENDING", str(got.get("stop_label")))
 
+# ---------------- D 组: 整条 real() 链路端到端干跑(设备动作全部替换) ----------------
+# 这一组是 2026-11-01 现场半程崩溃的直接补漏: 当时 real() 把 `make_real_port()`(实例)当工厂传下去,
+# serial_stage 里 `open_port()` 对 Serial 实例再调用 => TypeError, 复位一条没发出去, 而 S-1/S1/S2
+# 已经真跑掉了。B 组当时全绿, 因为它只测 serial_stage 本身, 没有把 real() 的接线走一遍。
+def make_e2e_runner(root, calls):
+    def runner(name, argv):
+        calls.append((name, argv))
+        d = root / ("action_" + name)
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "rc.txt").write_text("0\n", encoding="ascii", newline="\n")
+        stdout = b"Novosense NSSinePad DAPLink\nCore 0 (None):  Halted\nCore 0 (None):  Halted\n"
+        if name == "read_ram":
+            (root / "A_locals.bin").write_bytes(bytes.fromhex(
+                "9c80bd00" "f0040020" "b080bd00" "01000000" "00000000"
+                "285b0120" "0020010a" "785b0120" "efbeadde" "db360208"))
+            (root / "B_tcb.bin").write_bytes(b"bblog" + b"\x00" * 43)   # 精确 48 B, name@0 可读
+        if name == "readback":
+            import shutil as _sh
+            _sh.copyfile(str(F.ROOT / F.ACCEPTED["image_under_test"]["rel"]), str(root / "flash_readback.bin"))
+        return {"rc": 0, "stdout": stdout, "stderr": b""}
+    return runner
+
+
+d_root = SCRATCH / "d_e2e"
+d_root.mkdir(parents=True, exist_ok=True)
+uid_file = SCRATCH / "fake_uid.txt"
+uid_file.write_text(FAKE_UID + "\n", encoding="ascii", newline="\n")
+calls = []
+rc = F.real(d_root, str(uid_file), "D组端到端干跑(零设备)", runner=make_e2e_runner(d_root, calls),
+            open_port=lambda: FakePort([BOOT_OK], response={c: healthy_response(c) for c in F.QUERIES}),
+            clock=FakeClock())
+res = json.loads((d_root / "RESULT.json").read_text(encoding="utf-8")) if (d_root / "RESULT.json").exists() else {}
+add("D1_end_to_end_rc_zero_and_pending_verdict", rc == 0 and res.get("verdict") == "CAPTURE_COMPLETE_REVIEW_PENDING",
+    "rc=%s verdict=%s stop=%s" % (rc, res.get("verdict"), res.get("stop_label")))
+add("D2_tool_sequence_is_4_sessions_with_reset_last",
+    [n for n, _ in calls] == ["read_ram", "download", "readback", "reset"], str([n for n, _ in calls]))
+add("D3_e2e_passes_uid_content_not_path",
+    all(a[1][a[1].index("-u") + 1] == FAKE_UID for a in calls if "-u" in a[1]),
+    str([a[1][a[1].index("-u") + 1] for a in calls if "-u" in a[1]])[:80])
+add("D4_e2e_savemem_quoted_posix_under_run_root",
+    all("'" in tok and "\\" not in tok and tok.split("'")[1].startswith(d_root.as_posix())
+        for _n, argv in calls for tok in argv if tok.startswith("savemem")))
+add("D5_e2e_sentinels_recorded_and_port_closed",
+    res.get("A_sentinels", {}).get("node@+0x08") == "0x00bd80b0" and
+    res.get("readback_byte_equal") is True and res.get("port_closed") is True,
+    json.dumps({k: res.get(k) for k in ("A_sentinels", "readback_byte_equal", "port_closed")},
+               ensure_ascii=False))
+add("D6_e2e_never_writes_raw_uid",
+    not any(FAKE_UID.encode() in p.read_bytes() for p in d_root.rglob("*") if p.is_file()))
+
 # ---------------- C 组: 元负控(把守门换成永远放行, 判据必须变红) ----------------
 orig_gate, orig_products, orig_read = F.argv_gate, F.verify_products, F.read_until_prompt
 flipped = 0
@@ -262,6 +312,18 @@ finally:
     F.PLAN["quota"]["dap_sessions"] = saved_quota
 add("C4_metaneg_dap_session_count_load_bearing",
     any("dap_session_count_mismatch" in x for x in gp), str(gp[:3]))
+
+# C5: 复现现场崩溃的那种接线错误本身 —— 传"端口实例"而不是"端口工厂", 必须炸在 open_port() 上。
+d5 = SCRATCH / "c5_wiring"
+d5.mkdir(parents=True, exist_ok=True)
+inst = FakePort([BOOT_OK], response={c: healthy_response(c) for c in F.QUERIES})
+blew_up = False
+try:
+    F.serial_stage(d5, FAKE_UID, ["pyocd", "reset"], inst, FakeClock(),
+                   lambda name, argv: {"rc": 0}, {"mode": "inject"})
+except TypeError as e:
+    blew_up = "not callable" in str(e)
+add("C5_metaneg_factory_seam_load_bearing", blew_up, "实例当工厂传下去时 D 组会红, 说明 D1 不是空跑")
 
 problems = [n for n, ok, _ in CHECKS if not ok]
 lines = ["FIELD_CHECK mode=zero_device_injection (未起 pyocd, 未开真实端口)",

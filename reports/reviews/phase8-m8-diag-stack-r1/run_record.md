@@ -188,3 +188,58 @@ B 组 16 项 = 上述每个停点都按同输入触发、健康正控走到 PEND
 
 `field/selftest/**` 保持**修前**那次的原样（含被复审判为不足的 5 项判据），作为这份缺陷清单的现场留证；
 补正后的证明在 `host/field_check_console.txt` / `host/field_check.json`。
+
+## 12. 半程执行 `field-20261101T084256Z`：S-1/S1/S2 已证，S3/S4 未跑（第 6、7 项自伤）
+
+操作者一次批准（原文存 `APPROVAL_TOKEN.verbatim.txt`）。执行前核对：tip `4272f92`、工作树干净、
+待执行脚本的 Git blob sha256 = `35efccb5…41c815`（与批准同一枚）、UID 文件在场 48 B、COM5 空闲。
+
+实际发生的设备动作（原始件全在该 run 根，未删未改）：
+
+| 段 | 工具 | rc | 证据 | 结果 |
+| --- | --- | --- | --- | --- |
+| S-1 | read_ram | 0 | `action_read_ram/stdout.bin` 两行 `Core 0 (None):  Halted`；`A_locals.bin` 40 B、`B_tcb.bin` 48 B | 长度精确、核心确为 Halted，门禁放行 |
+| S1 | download | 0 | `action_download/stdout.bin` 176 B（进度条两格） | 唯一一次 `-e sector` 下载完成 |
+| S2 | readback | 0 | `flash_readback.bin` = 290916 B，sha256 `f5c2fd89bbf28255a5b26c9cca495bc0fb1e39d401d0bb7bea19d051221708ce` | **与固定接受值逐字节相同 ⇒ 4096 新镜像已在板** |
+| S3/S4 | reset + 串口 | — | 无 | **没有执行**：脚本在 `serial_stage` 之前抛 `TypeError` |
+
+停点原因（我自己的第 6 项缺陷，零设备桩当时没抓到）：`real()` 把 `open_port or make_real_port()`
+——**调用后的 Serial 实例**——当工厂传下去，`serial_stage()` 里再 `open_port()` 就是对实例求调用，
+`TypeError: 'Serial' object is not callable`（完整 traceback 在本轮提交说明与回执里）。它发生在
+`make_real_port()` 已经打开 COM5 之后、`reset` argv 已经拼好但**一条都没发**之前，所以：
+复位 0 次、启动采集 0 B、四条查询 0 条、`RESULT.json` 不存在。COM5 的泄漏句柄随进程退出释放（实测重开成功）。
+
+配额实况（与绑定包对照）：`dap_sessions` 用 3/4（read_ram、download、readback）；`download` **1/1 用尽**；
+`flash_readback` **1/1 用尽**；`port_open` **1/1 用尽**；`explicit_reset` 0/1 未用；`retry 0` ⇒ 我没有自行重试，
+停在原地等下一次批准。零电机、零配置写、零擦除，全程没有发过任何 `writemem/loadmem/erase`。
+
+第 7 项缺陷由本轮新增的 **D 组端到端干跑**抓出：`serial_stage()` 在成功路径上先写 `RESULT.json`，
+`port_closed` 要等 `finally` 才赋值 ⇒ 归档里的 `port_closed` 永远是空。现已把 `RESULT.json` 在 `finally`
+里**末次重写**，句柄是否真关掉才进得了证据。修好之后：`CHECKS=39 problems=0，元负控 5/5 fired`
+（新增 C5 = 把实例当工厂传进去必须炸 `not callable`，证明 D1 不是空跑）。B 组当时全绿而现场仍崩，
+教训是：**接线层没走一遍，就等于没测**——只测被调函数不够，`real()` 的装配也要端到端干跑一次。
+
+## 13. 下载前两条读取的判读（`pre_download_reads_decode.txt`，归属仍未定）
+
+三个哨兵**全部命中**，而且把受害对象钉死了：
+
+- A（0x200127D8，`rt_object_init` 局部槽）：`+0x08 node = 0x00bd80b0`（与既往 `r0`/`BFAR` 同值）、
+  `+0x1c object = 0x20015b78`、`+0x20 = 0xdeadbeef`（栈填充标记原样未被写）、`+0x24 = 0x080236db`。
+  ⇒ 我此前"局部槽已被异常帧覆盖"的判断在此**直接被否掉**，出错瞬间的 `node` 值原封保留。
+- A 的 `+0x14 name = 0x20015b28`、`+0x1b type = 0x0a`。
+- B（0x20015B28）：`name = "bblog"`、`+0x10` 低字节 `type = 0x01 = RT_Object_Class_Thread`
+  （`rtdef.h:332`）、`+0x2c stack_size = 0x400 = 1024`（偏移按 `rtdef.h:851-862` 的字段顺序）。
+  ⇒ 0x20015b28 是 **bblog 线程的 TCB**。
+
+合起来：`object = TCB + 0x50 = thread_timer`（`offsetof(rt_thread, thread_timer)=0x50` 由复审从新 AXF 的
+DWARF 核得），`type=0x0a` 正是 `RT_Object_Class_Timer`（`rtdef.h:341`），入口是 `thread.c:245
+rt_timer_init(&(thread->thread_timer), …)` → `timer.c:280 rt_object_init(&(timer->parent), RT_Object_Class_Timer, name)`。
+⇒ 出错那一行 `object.c:381 node = node->next` 当时遍历的是 **Timer 类的对象链表**，被初始化的对象是
+**bblog 的内置线程定时器**；`node - 0x14 = A+0x00` 又正好等于 `rt_list_entry` 求 object 的算法
+（`offsetof(rt_object, list)=0x14`）。复审上一轮"创建 bblog 内置定时器时撞上已损坏的定时器对象链表"这条
+推断，现在有了字节级支撑，**但仍未定**：谁把 `0x00bd80b0` 写进链表、diag 栈溢出是否就是那次写、
+4096 是否足够、板上重启后会不会再 HardFault。新镜像已在 Flash，核心仍 Halted，从未复位。
+
+下一小步只要一次追加批准：续测包只做 **S3+S4**（`port_open 1`、`explicit_reset 1`、75 s 启动采集 +
+提示符 + `system_status/ps/free/diag_status`），**零下载、零回读、零电机、零写 Flash**，因为这两项配额
+已经用尽而镜像身份已证。

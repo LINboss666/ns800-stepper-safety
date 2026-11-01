@@ -141,6 +141,36 @@
    "detail": "QUERY_TIMEOUT"
   },
   {
+   "name": "D1_end_to_end_rc_zero_and_pending_verdict",
+   "ok": true,
+   "detail": "rc=0 verdict=CAPTURE_COMPLETE_REVIEW_PENDING stop=None"
+  },
+  {
+   "name": "D2_tool_sequence_is_4_sessions_with_reset_last",
+   "ok": true,
+   "detail": "['read_ram', 'download', 'readback', 'reset']"
+  },
+  {
+   "name": "D3_e2e_passes_uid_content_not_path",
+   "ok": true,
+   "detail": "['0700000105d3ff393837554757028533a5a5a5a597969908', '0700000105d3ff393837554757"
+  },
+  {
+   "name": "D4_e2e_savemem_quoted_posix_under_run_root",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "D5_e2e_sentinels_recorded_and_port_closed",
+   "ok": true,
+   "detail": "{\"A_sentinels\": {\"node@+0x08\": \"0x00bd80b0\", \"object@+0x1c\": \"0x20015b78\"}, \"readback_byte_equal\": true, \"port_closed\": true}"
+  },
+  {
+   "name": "D6_e2e_never_writes_raw_uid",
+   "ok": true,
+   "detail": ""
+  },
+  {
    "name": "C1_metaneg_argv_gate_load_bearing",
    "ok": true,
    "detail": "换成永远放行后 UID 路径形态不再被拒"
@@ -159,9 +189,14 @@
    "name": "C4_metaneg_dap_session_count_load_bearing",
    "ok": true,
    "detail": "['dap_session_count_mismatch 3']"
+  },
+  {
+   "name": "C5_metaneg_factory_seam_load_bearing",
+   "ok": true,
+   "detail": "实例当工厂传下去时 D 组会红, 说明 D1 不是空跑"
   }
  ],
  "problems": [],
- "scratch_local_only": "D:/ns800_m8r3_scratch/fieldcheck_g4l5ynf9",
+ "scratch_local_only": "D:/ns800_m8r3_scratch/fieldcheck_nsupoxms",
  "boot_window_s_declared_real": 75
 }

@@ -1,0 +1,55 @@
+# 下载前两条只读 RAM 的离线判读 —— 由 Agent 生成(不是脚本输出), 原始字节同目录 A_locals.bin / B_tcb.bin
+# 采集时间: 2026-11-01T08:42:56Z (run 根 field-20261101T084256Z), 采集时核心 = Halted(action_read_ram/stdout.bin 两行
+# "Core 0 (None):  Halted"), rc=0, 读后未再发任何写或复位。
+
+A_locals.bin  地址 0x200127D8, 40 B, 小端 10 字:
+  +0x00  0x00bd809c
+  +0x04  0x200004f0   # = 类信息对象 (DTCM 区), 对应 rt_object_init 的 information
+  +0x08  0x00bd80b0   # ★ node —— 与既往 BFAR/r0 完全相同(rt_hw_hard_fault_exception 存的 r0)
+  +0x0c  0x00000001
+  +0x10  0x00000000
+  +0x14  0x20015b28   # ★ name 形参 —— 指向 B 项起点(见下), 即字符串 "bblog"
+  +0x18  0x0a012000   # 该字节的第 4 字节(+0x1b) = 0x0a
+  +0x1c  0x20015b78   # ★ object 形参
+  +0x20  0xdeadbeef   # RT-Thread 栈填充标记(thread.c 的 0xdeadbeef 填充), 说明此处从未被写过
+  +0x24  0x080236db   # 保存的返回地址(仅按 flash 代码区判定合法性, 不据此认定调用者)
+
+  三个哨兵全部命中 => "局部槽已被异常帧覆盖"这一旧判断在本轮**直接否掉**; node 值原样保留 = 出错瞬间
+  正在读的链表节点。
+
+B_tcb.bin     地址 0x20015B28, 48 B —— 偏移按 include/rtdef.h:851-862 的字段顺序算(parent=0x1C 起 sp/entry/
+              parameter/stack_addr/stack_size), 小端逐字:
+  +0x00  0x6f6c6262  ┐ name[16] = ASCII "bblog"（rt_object.name 偏移 0, rtdef.h:284）
+  +0x04  0x00000067  ┘
+  +0x08  0x00000000   （name 剩余部分全 0）
+  +0x0c  0x00000000
+  +0x10  0x00000001   # 低字节 = rt_object.type = 0x01 = **RT_Object_Class_Thread**(rtdef.h:332); 次字节 flag=0x00
+  +0x14  0x20015674   # rt_object.list.next
+  +0x18  0x20000434   # rt_object.list.prev
+  +0x1c  0x20015f9c   # sp
+  +0x20  0x08007489   # entry —— Flash 代码区地址(最低位 1 = Thumb), 只按区间判定, 不据此认函数身份
+  +0x24  0x00000000   # parameter = RT_NULL
+  +0x28  0x20015be0   # stack_addr
+  +0x2c  0x00000400   # ★ stack_size = 1024 —— 与既往快照里成对出现的 1024/18/10 一致
+  (0x30 之后未读: 本轮只按绑定包读 48 B)
+
+把 A 与 B 合起来读(每条都注明依据, 不掺假设):
+  1) B 的 type=0x01/Thread + name="bblog" + stack_size=1024 => **0x20015b28 就是 bblog 线程的 TCB**;
+     A 的 object 形参 0x20015b78 = 该 TCB + 0x50，而 offsetof(rt_thread, thread_timer) = 0x50（复审由新 AXF 的
+     DWARF 独立核得，本机第二路证据见本轮 corrections_applied_from_review[1]）。
+     => 正在初始化的对象是 **bblog 线程内置的 thread_timer**。
+  2) A+0x1b 的 0x0a = RT_Object_Class_Timer (include/rtdef.h:341)，与 src/timer.c:280
+     `rt_object_init(&(timer->parent), RT_Object_Class_Timer, name)` 一致；src/thread.c:245
+     `rt_timer_init(&(thread->thread_timer), ...)` 是这条路径的入口。
+     => src/object.c:381 当时遍历的是 **Timer 类的对象链表**，不是 Thread 类。
+     A+0x14 的 name 形参 = 0x20015b28 正是 TCB 的 name 字段地址(与 B+0x00 的 "bblog" 同一处)，与
+     `rt_timer_init(..., thread->parent.name)` 传下来的指针一致。
+  3) node = 0x00bd80b0 与 A+0x00 = 0x00bd809c 都不在任何镜像区间里(RW_ITCM 0x00000000+0x20000、
+     DTCM 0x20000000+0x20000、Flash 0x08000000+0x80000 都不覆盖 0x00bd8000 段)；而
+     0x00bd809c = 0x00bd80b0 - 0x14 恰是 `rt_list_entry(node, …, …)` 求 `object` 的算法
+     (offsetof(rt_object, list)=0x14, 与 object.c:385 及反汇编 `SUBS r0,r0,#0x14` 一致)。
+     => 坏指针**自身**也带着"下一个节点"的结构形状，但它指向的区间不存在 —— 本轮只把**受害对象
+     (bblog.thread_timer)与受害链表(Timer 类对象链表)**钉死，"谁写坏的"仍未定。
+
+仍然未证(不改口径): 谁写坏了 Timer 链表、diag 线程栈溢出是否就是那次写、4096 是否足够、板上是否会重新 HardFault。
+S3/S4(复位+启动采集+查询)本轮**没有执行**，见 run_record.md §12。

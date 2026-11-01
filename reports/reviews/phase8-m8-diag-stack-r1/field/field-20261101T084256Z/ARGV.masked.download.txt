@@ -1,0 +1,1 @@
+python -m pyocd flash --pack C:/Keil_v5/ARM/PACK/.Download/NOVOSENSE.NS800RT7XXX.0.5.3.pack -t ns800rt7p65d_dhqfby2 -u @UID_FILE<redacted len=48 sha256_d2f530dbd062> -f 1000000 -Oauto_unlock=false -Ocache.enable_memory=false -Ocache.read_code_from_elf=false -e sector D:/ns800/reports/firmware/phase8-m8-diag-stack-r1/rt-thread-motor-m1.axf

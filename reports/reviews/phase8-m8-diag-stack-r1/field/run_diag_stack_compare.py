@@ -409,14 +409,19 @@ def read_until_prompt(port, run_root, fname, terminator, seconds, clock):
 
 
 def serial_stage(run_root, uid, argv_reset, open_port, clock, runner, out):
-    """S3+S4: Open -> 复位 -> 启动采集 -> 提示符 -> 四条查询。任何异常都保证关句柄且字节已落盘。"""
-    n = PLAN["needles"]
+    """S3+S4: Open -> 复位 -> 启动采集 -> 提示符 -> 四条查询。任何异常都保证关句柄且字节已落盘。
+
+    RESULT.json 在 finally 里**再写一次**: 判据(含 port_closed)必须在句柄真正关掉之后留档,
+    否则成功路径的 RESULT.json 里 port_closed 永远是空 —— 这是 D 组端到端干跑抓出来的第 7 项。
+    """
     port = open_port()
     try:
-        return _serial_body(port, run_root, argv_reset, clock, runner, out, n)
-    except Exception as e:                                # 补正 4: 读取异常也要具名停止, 且字节已在盘上
-        out["serial_exception"] = "%s: %s" % (type(e).__name__, e)
-        return stop(out, run_root, "SERIAL_READ_EXCEPTION", out["serial_exception"])
+        try:
+            got = _serial_body(port, run_root, argv_reset, clock, runner, out, PLAN["needles"])
+        except Exception as e:                            # 补正 4: 读取异常也要具名停止, 且字节已在盘上
+            out["serial_exception"] = "%s: %s" % (type(e).__name__, e)
+            got = stop(out, run_root, "SERIAL_READ_EXCEPTION", out["serial_exception"])
+        return got
     finally:
         try:
             port.close()
@@ -424,6 +429,7 @@ def serial_stage(run_root, uid, argv_reset, open_port, clock, runner, out):
         except Exception as e:                            # 关闭也失败 => 具名, 不静默
             out["port_closed"] = False
             out["port_close_error"] = "%s: %s" % (type(e).__name__, e)
+        result(out, run_root)
 
 
 def _serial_body(port, run_root, argv_reset, clock, runner, out, n):
@@ -535,7 +541,7 @@ def real(run_root, uid_file, approve, runner=None, open_port=None, clock=None):
     out["readback_byte_equal"] = True
 
     got = serial_stage(run_root, uid, argv["reset"],
-                       open_port or make_real_port(), clock, runner, out)
+                       open_port or make_real_port, clock, runner, out)
     print(json.dumps({k: got.get(k) for k in ("stop_label", "verdict", "boot_bytes", "queries",
                                               "readback_byte_equal", "core_state_before_download")},
                      ensure_ascii=False))

@@ -1,5 +1,5 @@
 FIELD_CHECK mode=zero_device_injection (未起 pyocd, 未开真实端口)
-run_dir(LOCAL_ONLY, 仓外)=D:/ns800_m8r3_scratch/fieldcheck_g4l5ynf9
+run_dir(LOCAL_ONLY, 仓外)=D:/ns800_m8r3_scratch/fieldcheck_nsupoxms
 clock=FakeClock(step=0.5s) 说明: 真机 BOOT_WINDOW_S=75 s 未缩短, 只是自检不等真实时间
 OK A1_accepted_literals_agree_with_manifest
 OK A2_good_expanded_argv_accepted
@@ -29,10 +29,17 @@ OK B13_echo_only_not_success
 OK B14_unterminated_query_times_out
 OK B15_short_write_stops
 OK B16_zero_byte_response_not_success
+OK D1_end_to_end_rc_zero_and_pending_verdict
+OK D2_tool_sequence_is_4_sessions_with_reset_last
+OK D3_e2e_passes_uid_content_not_path
+OK D4_e2e_savemem_quoted_posix_under_run_root
+OK D5_e2e_sentinels_recorded_and_port_closed
+OK D6_e2e_never_writes_raw_uid
 OK C1_metaneg_argv_gate_load_bearing
 OK C2_metaneg_verify_products_load_bearing
 OK C3_metaneg_query_deadline_load_bearing
 OK C4_metaneg_dap_session_count_load_bearing
-CHECKS=32 problems=0
-NEG_CONTROLS_FIRED=4/4
+OK C5_metaneg_factory_seam_load_bearing
+CHECKS=39 problems=0
+NEG_CONTROLS_FIRED=5/5
 FIELD_CHECK ALL_PASS_WITH_META_NEGATIVES
