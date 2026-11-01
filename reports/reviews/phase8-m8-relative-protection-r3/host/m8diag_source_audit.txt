@@ -1,0 +1,154 @@
+M8 现场诊断 · 第 0 条：stage-5(1 MiB 事件日志扫描)这条启动路径**是否存在能永停的条件**
+==========================================================================================
+
+范围与前置（全部为声明过的边界）
+--------------------------------
+- 本轮**零设备动作**：不开串口、不碰 DAP、不复位、不起转、不写配置；**零构建**（不重编，六镜像/三 map
+  不动）；**零产品代码改动**（C/H、Keil 工程、UART/内核/安全宏、Flash schema 一律不改）。
+- 输入身份：审计头 = 本提交所属交付链的 tip（诊断证据轮 `5f45a90` 之后）；被审计的源码是
+  M8 软件输入 `805c29bd73c4ea861c9b9c65f61e946aec9548e3` 所在工作树的**既存件**，本轮只读。
+- 观察输入是**已入库的原字节**，不是复述：M8-S2 的 `S_S3/01_rst.boot.rx.bin`(1027 B)、
+  `S_S3/02_sysboot.rx.bin`(0 B)、诊断轮的 `sess_diag/01_passive60.rx.bin`(0 B)、
+  `sess_diag/02_ver.rx.bin`(0 B)，以及 M5 轮的 `002_version.bin`(154 B)。
+- 可复算等级分两档，全文逐条标注：
+  `TRACKED` = Git 仓库件，审核方可从远端 blob 复算行号与原文；
+  `LOCAL_ONLY` = 被 `ns800rt7p65-nssinepad/.gitignore:16 packages/` 排除的厂商包件，远端**读不到**，
+  所以它的决定性那一段我原样搬进 `host/m8diag_spi_h_excerpt.txt` 并登记了本机 sha256。
+- 本审计的**全部断言都由 `host/m8diag_source_audit_check.py` 机器复算过**（真实输出见
+  `host/m8diag_source_audit_console.txt`）：52 条行引用 + 9 条观察件字节断言 + 3 条元负控，
+  `AUDIT_PROBLEMS=0`。检查器自己先证明"会失败"，才允许它宣布 0。
+
+
+## 1. 判词（只回答被问的那一句）
+
+**存在。** stage-5 这条路上有一个**无界限、不让出、无错误返回**的等待，位于最底层的每字节传输里，
+而且它运行在**主线程优先级(10)**上，足以同时解释三条观察（后续启动行不再出现、60 s 零字节、
+`version` 连回显都没有）。
+
+同时钉住边界，不越界一步：
+- **PROVEN**：这是**源码/设计层**的事实 —— 按上面那份机器断言，逐行可复算。
+- **NOT_PROVEN**：板子此刻**是否**就在这个循环里。本审计没有任何一条观察能把它证成；
+  §6 仍保留三条并存解释，不择一采信。
+
+
+## 2. 链条（逐跳，每跳给 file:line）
+
+| # | 跳 | 位置 | 等级 | 这一跳里实际有什么 |
+| --- | --- | --- | --- | --- |
+| 1 | 用户 main 调启动器 | `applications/main.c:51` | TRACKED | `boot = supervisor_boot();` —— 在 **main 线程**里跑 |
+| 2 | main 线程优先级 | `rtconfig.h:119` | TRACKED | `RT_MAIN_THREAD_PRIORITY 10`（`RT_THREAD_PRIORITY_MAX 32` 在 `:72`） |
+| 3 | 阶段5 入口 | `applications/supervisor.c:461` | TRACKED | `e = ns_storage_init();`，完成行 `:463` 打 `[BOOT] 5 storage ...` |
+| 4 | 打印"扫描中" | `applications/ns_storage.c:147` | TRACKED | `[FLASH] scanning 1 MiB event log...` |
+| 5 | 紧接的扫描 | `applications/ns_storage.c:148` | TRACKED | `e=scan_log();` |
+| 6 | 扫描本体 | `ns_storage.c:63`/`:70`/`:72` | TRACKED | 4096 圈，每圈 `ns_flash_read(NS_LOG_BASE+i*256u, page, 256)`；`NS_LOG_SLOTS=(0x100000/256)` 在 `ns_storage.h:10,15` |
+| 7 | 唯一的让出节奏 | `ns_storage.c:83` | TRACKED | `if((i&63u)==63u) rt_thread_mdelay(1);` —— 每 64 槽让出一次 |
+| 8 | flash 读的前半 | `applications/ns_flash.c:164`/`:87`/`:171` | TRACKED | 取 `flock`(`RT_WAITING_FOREVER`) → `wait_ready(NSF_ERASE_MS)` |
+| 9 | **有界限的那半** | `ns_flash.c:27-42`（`:39` 超时、`:40` `rt_thread_mdelay(1)`） | TRACKED | tick 计数上限 + 每轮让出，注释自己写明"SPI bus is released between polls" |
+| 10 | 页读 | `ns_flash.c:172-177`/`:58` | TRACKED | 256 B 一页 → `read_raw` → `rt_spi_send_then_recv(&spi, c, 4, p, n)` |
+| 11 | SPI 核心层 | `components/drivers/spi/dev_spi_core.c:368`，`:408` 与 `:423` 两次 `ops->xfer` | TRACKED | 发 4 字节命令、再收 n 字节，**逐字节**交给 BSP |
+| 12 | BSP 逐字节循环 | `libraries/HAL_Drivers/drivers/drv_spi.c:203`/`:225`/`:231`/`:244`/`:252` | TRACKED | `while(length){ … SPI_transmitReceive(…); … length--; }` —— 只保证字节数会减完 |
+| 13 | **无界限的那半** | 厂商 `StdDriver/Inc/spi.h:476-484`（循环体 `:479-481`，常量 `SPI_FIFO_RXEMPTY = 0x0000U` 在 `:393`） | **LOCAL_ONLY** | `WRITE_REG(SPDR,data); while (SPRFSR.BIT.RFDN == SPI_FIFO_RXEMPTY) { } return READ_REG(SPDR);` —— 循环体是空的：没有上限、没有让出、没有超时返回 |
+
+链条读下来的分界线很清楚：**"扫描会跑完 4096 圈"和"每圈只读 256 B"这两件事是有界的；
+"每个字节的 RX 标志会置起来"这件事一点界限都没有**，而且全链没有任何一处给它配超时或错误返回。
+一次整轮扫描 = 1 MiB = 1,048,576 个字节 = 同数量的无界等待；只要其中一个字节的 `RFDN`
+永不置起，控制流就永远出不去 `spi.h:479`。
+
+顺带登记同型写法（不作为依据）：同一厂商头 `:911`（等 TX 不满）与 `:933`（等 RX 非空）同样无界，
+但 `drv_spi.c` 只调 `SPI_transmitReceive`，所以它们不在这条路上。
+
+
+## 3. 对上一轮一句必须收回的话
+
+上一轮我说"按配置的 1 MHz 算，仅传输就约 8.5 秒"，并以此暗示"扫描不会真的挂住"。**那是吞吐估算，
+不是界限**，用它来排除"卡在阶段5"是无效的。这里把估算本身也重新交出来，标清它假设了什么：
+1 MiB × 8 bit ÷ `NSF_SPI_HZ = 1000000u`(`ns_flash_config.h:12`，**配置值、非实测**) ≈ 8.39 s，
+加 4096 次 `wait_ready` 各一轮状态读(≈16 µs) ≈ 0.065 s，加 64 次 `mdelay(1)` ≈ 0.064 s
+→ **估算下限 ≈ 8.5 s（若每字节都能完成）**。而 `supervisor.c:460` 的注释"1 MiB log 扫描要数秒"
+是同一条假设的自证，不是测量。
+
+
+## 4. 为什么这条路径的形状刚好对得上三条观察
+
+优先级算术（`rtconfig.h:119/:124`，线程创建处 `safety_thread.c:44/:45`、`ns_storage.c:152`）：
+
+- 自旋发生在 **prio 10（main 线程）**。RT-Thread 抢占式调度下，prio 数字越小越优先，
+  所以 **finsh shell 线程(20) 拿不到 CPU**。shell 的回显是它自己打的
+  （`components/finsh/shell.c:937`，默认开 `:547`），**shell 不被调度 = 不会有回显、不会有回复**。
+  这一条正好对上 `02_ver.rx.bin` = **0 字节**：连 `version` 这 7 个字符的回显都没有。
+- 阶段5 **时刻存在的线程只有三个**（按 `supervisor.c` 的阶段顺序，motor/diag/bblog/ui 分别在
+  阶段 7/8/9/10 才创建，`flog` worker 要到扫描**之后**才 `rt_thread_init`，`ns_storage.c:152`）：
+  main(10)、safety(4)、shell(20)。所以"自旋把谁饿死"这件事在这条路上是**封闭的三选一**，
+  不需要引入任何未创建的线程：唯一被饿死的就是 shell(20)，唯一还能抢占的是 safety(4)，
+  它每 500 ms 从 `rt_event_recv` 超时醒一次(`safety_thread.c:167` + `:45`)，健康空转时不打印。
+  （diag 是 prio 9、`diagnosis.c:526`，但它在阶段 8 才存在，与本窗口无关。）
+- shell 线程确实在更早之前就起来了（`shell.c:1062` 的 `INIT_APP_EXPORT(finsh_system_init)`
+  经 `src/components.c:193` 的 `rt_components_init()` 跑在 main 线程里、用户 `main()` 之前），
+  而且 1027 B 那段流里 `msh ` 提示符**出现在扫描行之前**（检查项 `boot-capture-prompt-before-scan`）
+  —— 也就是说 shell 曾经活着，后来才再也得不到 CPU。
+- 主线程自旋期间仍可被抢占的只有 prio ≤ 9：safety(4) 与（若已进入阶段 8 之后）diag(9)；
+  `flog` worker 的优先级是 `NS_LOG_PRIORITY = (RT_THREAD_PRIORITY_MAX - 3)` = 29
+  （`ns_flash_config.h:21`），低于 shell，更轮不到它。
+- **没有看门狗**：`applications/` 与 `board/` 全树里 `WDT`/`IWDT`/`watchdog` **零命中**（本轮 grep 实查）。
+  这条很重要：若真在自旋，它**不会自己复位恢复**，也**不会出现第二次 banner** —— 而 60 s 被动窗里
+  确实一次 banner 都没有（`01_passive60.rx.bin` = 0 B）。
+- "只是慢、还在正常推进"这一支被**排除**：按 §3 的估算，同一块板在 ≤ ~10 s 内就该打
+  `[BOOT] 5 storage`(`supervisor.c:463`)；而 1027 B 那段流里没有完成行
+  （检查项 `boot-capture-has-no-stage5-done`），后续 60 s 也没有任何字节。60 s ≈ 该估算的 7 倍。
+  并且推进中的扫描每 ~133 ms 就 `mdelay(1)` 让出一次，shell 会在毫秒级把回显打出来 —— 与 0 回显矛盾。
+
+结论只到这里：**这条路径"能"造成观察到的一切形状**，这是源码层事实；它**不**等于"此刻就在造成"。
+
+
+## 5. 触发候选：源码层已排除的 / 仍未排除的
+
+已排除（源码层，且给出依据）：
+- **并发重配置竞争**：`rt_spi_configure` 取总线锁(`dev_spi_core.c:258`)，且 spi1 上应用侧只有
+  `sflash` 一个设备(`ns_flash_config.h:5-6`；IMU 在 spi3，`project_board.h:77`) —— 不存在
+  "别的设备在传输中途把实例重新 configure"这条路。
+- **MISO 悬空/线不良**：全双工下控制器照样移位，`RFDN` 仍会置起，只会读到垃圾字节，**不会卡住**。
+- **DMA 路径把模块关掉**：`SPI_configDMASendAndReceive`(厂商头 `:498` 会 `SPI_disableModule`)
+  在应用代码里**无调用点**（本轮 grep 实查）。
+
+仍未排除（只列机制，不排概率、不下结论）：
+- `SPE` 未置或被清：应用侧唯一 `SPI_disableModule` 在 `drv_spi.c:188`，紧邻 `:198` 的 enable，
+  中间隔 `SPI_setConfig`/`SPI_resetFifo`；这段窗口内若未完成 enable 就进入传输，`RFDN` 永不置起。
+- SPI1 外设时钟/复位在运行期被取走：时钟与复位只在 `ns800_spi_clock_init` 里做，且只经
+  `INIT_BOARD_EXPORT(rt_hw_spi_init)`(`drv_spi.c:329`) 跑一次。
+- 控制器自身未响应（硅/电源/引脚复用态）。**注意约束**：同一段 1027 B 流里，扫描行**之前**
+  有一次成功的 JEDEC 读（`[FLASH] CS=22 JEDEC=EF 40 17`，打印点 `ns_flash.c:141`；
+  检查项 `boot-capture-has-jedec-before-scan`）—— 若这一支是原因，它必须是在扫描**期间**才出现的，
+  而不是从一开始就存在。
+
+
+## 6. 三条并存解释（不择一采信）
+
+| 代号 | 解释 | 能解释的观察 | 判别动作（需另一次授权） |
+| --- | --- | --- | --- |
+| **H1** | 主线程卡在 `spi.h:479` 的自旋里，shell 被饿死 | 后续启动行缺失 / 60 s 零字节 / `version` 零回显 / 无第二次 banner | (b) 一次 DAP 只读 `status`：Running 且 PC 落在 `ns800_spi_xfer`/`SPI_transmitReceive` 地址区间即为直接证据。(a) 断电重上电 + 一个被动窗：新启动若越过 `scanning` 并打出 `[BOOT] 5 storage`，则该实例 H1 被排除 |
+| **H2** | 核没在跑（halt / 无时钟 / 停在复位后某处） | 全部三条 | (b) 同上：`Halted` 且 PC 不在传输路径即偏向 H2。**代价**：attach 本身可能把核 halt（既往实测：一次定长回读后核状态为 `Halted`），所以这一步可能污染它要证的东西 |
+| **H3** | 控制台 RX 方向（主机→板）不通；板子在正常空转 | `version` 零回复、零回显 | (a) 新启动的被动窗能证明 TX 方向与启动推进；RX 方向只能靠"自发提示符 + 人工敲键有回显"或换一条通路，两者都不是本轮范围 |
+
+诚实登记的限制：`version` 那一步的 `port.write()` 只代表**交给 OS 驱动缓冲**，不代表字节到达板的 RX 脚；
+执行器只在写失败/短写时报 `COMMAND_WRITE_FAILED`/`COMMAND_SHORT_WRITE`，本次两者都没出现
+（台账见 `sess_diag/ledger.jsonl`，终态 `MISSING_RESPONSE_PROMPT as=ver bytes=0`）。
+主机→板方向**曾经**在这块板上真实到达过：既存件 `002_version.bin` 以回显的 `version` 开头（检查项
+`historic-echo-proof`）。这是"过去可用"的证据，不是"现在可用"的证据。
+
+
+## 7. 额度与边界（本轮不消耗、不放宽）
+
+本轮零设备动作，因此额度不变：`readback 0/1`、`explicit_reset 0/1`（两者已用满）、
+`download` 申报 1 而用了 0、`motor_run 2/2`、`approved_reboot 1/1`、`port_open` 按每次调用 1。
+审计**不**改变任何判据，也**不**给保护业务登记任何通过：本轮只回答"是否存在能永停的条件"。
+下一切设备动作仍需按 (a)/(b) 另行批准；我不代替操作者动电源，也不自行接起转流程。
+
+
+## 8. 复核方式
+
+```
+python reports/reviews/phase8-m8-relative-protection-r3/host/m8diag_source_audit_check.py
+```
+预期末行 `AUDIT_PROBLEMS=0`，其中 `NEGATIVE_CONTROL fired=3/3`，共 52 条行引用 + 9 条观察断言。
+52 条逐条打印 `TRACKED`/`LOCAL_ONLY`；厂商头身份 `sha256=90c9a1da446b…`、51925 B、1316 行，
+其被引段落原样在 `host/m8diag_spi_h_excerpt.txt`。

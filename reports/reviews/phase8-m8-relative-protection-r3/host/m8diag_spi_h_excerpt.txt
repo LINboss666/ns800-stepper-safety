@@ -1,0 +1,72 @@
+M8 诊断第 0 条(源码审计)的决定性引用件身份与最小摘录
+====================================================
+
+**本件为什么必须单独归档**: 审计链上唯一"界限缺失"的决定性证据在厂商 StdDriver 头 `spi.h` 里,
+而这个文件**不在 Git 仓库内**:
+
+```
+git check-ignore -v rt-thread-master/.../packages/novosns-series-latest/NS800RT7XXX/StdDriver/Inc/spi.h
+-> rt-thread-master/.../ns800rt7p65-nssinepad/.gitignore:16:packages/
+```
+
+所以远端逐 blob 回读**覆盖不到它**, 审核方从 GitHub 也读不到这个文件。本件登记它的**本机身份**,
+并且只摘录**结论所依赖的那一个函数**(9 行) —— 厂商源码本来被仓库有意排除在外, 因此这里不做整段搬运,
+够核即可。同文件另外两处同型写法只给行号、不引原文。
+
+登记的本机身份(审核方若持有同一份厂商包, 可据此确认行号对得上)
+-----------------------------------------------------------------
+```
+本机路径 : D:/ns800/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/
+           packages/novosns-series-latest/NS800RT7XXX/StdDriver/Inc/spi.h
+字节数   : 51925
+行数     : 1316
+sha256   : 90c9a1da446b3a6d0660d9a5b3eb444dae047135ef6c3942c9d399453cfabbaf
+取用方式 : 只读(Read/sed) —— 本轮零写操作、零构建、零设备动作
+可复算级 : LOCAL_ONLY(仓库外件; 换厂商包版本必须重新核对行号)
+```
+
+结论所依赖的那一段(逐字, spi.h:476-484)
+----------------------------------------
+```c
+static inline uint32_t SPI_transmitReceive (SPI_TypeDef *spi, uint32_t data)
+{
+    WRITE_REG(spi->SPDR.WORDVAL, data);
+    while (spi->SPRFSR.BIT.RFDN == SPI_FIFO_RXEMPTY)
+    {
+    }
+
+    return READ_REG(spi->SPDR.WORDVAL);
+}
+```
+
+逐字判读(只说文件里有什么): `:479-481` 的循环体**没有任何语句** —— 没有计数上限、没有
+`rt_tick_get()` 比较、没有让出调用、没有超时返回、没有错误码。它唯一的出口是 `SPRFSR.RFDN`
+变成"非空"。同文件 `:393` 给出 `SPI_FIFO_RXEMPTY = 0x0000U`。
+对照"有界限"的写法可证明这不是我读漏: 应用层 `ns_flash.c:27-42` 的 `wait_ready` 自己就带 tick
+上限与每轮 `rt_thread_mdelay(1)`(见 `ns_flash.c:39/:40`)。
+
+同型但未在这条路上的两处(只给行号)
+-----------------------------------
+- `spi.h:911` —— 等 TX FIFO 不满的空循环(调用者 `SPI_writeDataBlockingFifo`, `drv_spi.c` 不使用它);
+- `spi.h:933` —— 等 RX 非空的空循环(调用者 `SPI_readDataBlockingFifo`, 同上不使用)。
+
+调用它的那一层(仓库内件, 远端可复算, 因此可以原样贴)
+------------------------------------------------------
+`rt-thread-master/rt-thread-master/bsp/novosns/ns800/libraries/HAL_Drivers/drivers/drv_spi.c` (TRACKED)
+
+```c
+    while (length)
+    {
+        if (send_buf)
+        {
+            if (recv_buf)
+            {
+                recv_buf[0] = SPI_transmitReceive(instance, send_buf[0]);   /* :231 */
+```
+```c
+        length--;                                                            /* :252 */
+    }
+```
+
+即 BSP 这一层只保证"字节数会减完"(`:252`), 不保证任何一个字节的传输会完成; 每字节的"等 RX"
+完全交给上面那段无界循环(`drv_spi.c:231`/`:244` 两个调用点)。

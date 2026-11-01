@@ -603,5 +603,100 @@
    "host/field_run_m8s2_artifacts.json",
    "offline/fieldcont-d9ff664-20261031T200214Z-41860/**"
   ]
+ },
+ "diag_serial_run": {
+  "authorization_verbatim_scope": "COM5 只打开一次 -> 被动保存原始字节 60s(不以自发提示符作前置) -> 至多一次只读 version, 缺回复即停不重发 -> 仅当 version 完整返回才发至多一次 system_status; 全程零 DAP/下载/Flash 回读/主动复位/配置写入/电机动作; 结束关口不自动接起转; 复用现有采集路径不写新采集器; 两条查询各 15s 步窗(执行器另有 3s 传输裕量); 本轮只判断收到什么, 不登记保护业务通过",
+  "assembled_by": "审核方口径经操作者转达; 授权原话由操作者在本会话给出",
+  "run_root": "reports/reviews/phase8-m8-relative-protection-r3/offline/diag-com5-20261031T234328Z-48972",
+  "entry_point": "D:/ns800_m8r3_scratch/field_diag_launch.ps1 -> m8r3_serial_chain.py exec-session 既有路径(steps 由 field_diag/steps.json 申报)",
+  "steps_actual": {
+   "port_open": "COM5@115200 一次(transport=real)",
+   "passive60": "rx_bytes=0, 原始件 0 B, sha256=e3b0c442..(空串散列)",
+   "version": "bytes=0 且 prompt_seen=false => 连回显都没有; 按合同停止, 不重发",
+   "system_status": "NOT_SENT(前一步未完整返回)",
+   "close": "PORT_CLOSED; disarm=NOT_ARMED; obligation=false; cleanup_errors=[]",
+   "stop_code": "MISSING_RESPONSE_PROMPT as=ver bytes=0"
+  },
+  "labels": [
+   "M8_DIAG_ONE_SESSION_STOP_AT_VERSION_NO_BYTES",
+   "CONSOLE_INTERACTIVE=NOT_PROVEN",
+   "PROTECTION_BUSINESS_REGISTERED=NO(本轮只判断收到什么)"
+  ],
+  "quota_accounting_note": "台账 quota_left.port_open=7 是本次调用按 plan 重新实例化的结果, 不是跨轮累计; 跨轮只能按每次调用各 1 次开口计数(FIELD-1 0 / M8-S2 1 / 手探 1 / 本轮 1)",
+  "does_not_prove": "板子此刻在跑什么、RX 方向是否可用、扫描是否卡住 —— 三条都未由本窗判定",
+  "evidence": [
+   "offline/diag-com5-20261031T234328Z-48972/sess_diag/ledger.jsonl",
+   "offline/diag-com5-20261031T234328Z-48972/sess_diag/01_passive60.rx.bin",
+   "offline/diag-com5-20261031T234328Z-48972/sess_diag/02_ver.rx.bin",
+   "offline/diag-com5-20261031T234328Z-48972/console_transcript.txt"
+  ],
+  "committed_as": "5f45a90",
+  "failure_artifacts_kept": "全部 0 B 原始件与台账原样入库, 不删不改"
+ },
+ "source_audit_stage5": {
+  "question_asked": "stage-5(1 MiB 事件日志扫描)这条启动路径上是否存在能永停的条件",
+  "round_kind": "零设备动作 / 零构建 / 零产品代码改动(只读源码 + 只读既存观察件)",
+  "verdict": "存在(源码层 PROVEN): 每字节一次、无界限、不让出、无错误返回的 RX 空循环 spi.h:479-481, 位于 prio 10 的 main 线程调用上下文",
+  "proven_source_level": [
+   "链条逐跳 file:line: main.c:51 -> supervisor.c:461/463 -> ns_storage.c:147/148 -> scan_log(:63/:70/:72/:83) -> ns_flash.c:164/:87/:171/:27-42/:58 -> dev_spi_core.c:368/:408/:423 -> drv_spi.c:203/:225/:231/:244/:252 -> spi.h:476-484",
+   "有界限的部分在计数层: wait_ready 带 tick 上限且每轮 mdelay(1); scan_log 4096 圈且每 64 圈让出; BSP 循环 length-- 必减 —— 所以无界限只能出在最底层的字节等待",
+   "优先级算术: RT_MAIN_THREAD_PRIORITY=10(rtconfig.h:119) 独占 => FINSH 20(:124) 得不到 CPU; 回显由 shell 线程自己打(shell.c:937, 默认开 :547)",
+   "阶段5 时刻只有 main(10)/safety(4)/finsh(20) 三个线程(diag 阶段8 才有 diagnosis.c:526; flog 扫描之后才 rt_thread_init ns_storage.c:152, 优先级 ns_flash_config.h:21)",
+   "applications/ 与 board/ 全树无 WDT/IWDT/watchdog 引用 => 真在自旋不会自恢复也不会重复 banner",
+   "并发重配置与总线争用被排除为触发候选: rt_spi_configure 取总线锁(dev_spi_core.c:258), spi1 上应用侧只有 sflash(ns_flash_config.h:5-6), IMU 在 spi3(project_board.h:77)",
+   "MISO 悬空/线不良不会造成停住: 全双工仍移位, RFDN 仍置起, 只会读到垃圾字节"
+  ],
+  "not_proven": "板子此刻是否就在这个循环里。本审计不能、也没有把它证成",
+  "hypotheses_kept_not_chosen": [
+   "H1 主线程卡在 spi.h:479 自旋, shell 被饿死",
+   "H2 核未在跑(halt / 无时钟 / 停在复位后某处)",
+   "H3 主机->板 RX 方向不通, 板子在正常空转"
+  ],
+  "discriminators": {
+   "(a) 断电重上电 + 一个被动窗": "能证新启动是否越过 scanning/[BOOT] 5 storage; 花 port_open 1; 零 DAP; 但不能区分 H3 的 RX 方向",
+   "(b) 一次 DAP 只读 status": "直接给 Running/Halted + PC; PC 落在 ns800_spi_xfer/SPI_transmitReceive 区间即 H1 的直接证据; 代价: attach 本身可能把核 halt(既往实测一次定长回读后核为 Halted), 可能污染它要证的东西"
+  },
+  "retraction": "上一轮'按配置的 1 MHz 算约 8.5 s 必然扫完'是吞吐估算(NSF_SPI_HZ=1000000u 是配置值非实测), 不是界限, 不得用来排除'卡在阶段5'; supervisor.c:460 的注释'要数秒'是同一条假设的自证",
+  "machine_recheck": {
+   "program": "host/m8diag_source_audit_check.py",
+   "console": "host/m8diag_source_audit_console.txt",
+   "cites": 52,
+   "observation_assertions": 9,
+   "negative_control": "fired=3/3",
+   "problems": 0,
+   "why_negative_control": "检查器先证明三种错法都会失败(行号错位/子串不符/文件缺失), 才允许它宣布 0 problems"
+  },
+  "local_only_limitation": "决定性那一段在厂商 StdDriver/Inc/spi.h 里, 被 ns800rt7p65-nssinepad/.gitignore:16(packages/)排除在仓库之外 => 远端逐 blob 回读覆盖不到它; 本机身份 sha256=90c9a1da446b3a6d0660d9a5b3eb444dae047135ef6c3942c9d399453cfabbaf / 51925 B / 1316 行, 被引段落原样搬进 host/m8diag_spi_h_excerpt.txt",
+  "quotas_consumed_this_round": {},
+  "next_step_needs_new_approval": "(a)/(b) 二选一, 均未获批准; 我不代替操作者动电源, 也不自行接起转",
+  "evidence": [
+   "host/m8diag_source_audit.txt",
+   "host/m8diag_source_audit_check.py",
+   "host/m8diag_source_audit_console.txt",
+   "host/m8diag_spi_h_excerpt.txt",
+   "run_record.md §12"
+  ]
+ },
+ "board_proof_amendments": {
+  "why_this_key_exists": "上面的 status / artifact_grades 是 R3 离线轮写的('本轮零设备动作'、'设备侧一切未验证'), 之后三轮现场执行改变了其中一部分。旧字段按 append-only 纪律不改写, 这里单列翻转项, 两级来源并排。",
+  "flipped_to_board_proved": {
+   "download": "FIELD-1 唯一一次下载 rc=0 且 loader 三条原文齐(285 sectors programmed)",
+   "image_on_board_byte_equal": "M8-S2 定长回读 rc=0, readback.bin 290916 B 与候选 00608ec9..e304 逐字节相等(已从 UNPROVEN 翻为 PROVEN)",
+   "explicit_reset": "M8-S2 唯一一次 pyocd reset --method sysresetreq rc=0, 且被动收到 1027 B 原字节",
+   "real_action_backend_paths": "RealActionBackend 的 download/readback/reset 三条已在真工具上跑过(旧 not_verified 里'从未运行'这一条只对写该字段时的状态成立)"
+  },
+  "still_not_proven": [
+   "控制台是否可交互(三轮: 1027 B 后 0 字节 / 60 s 0 字节 / version 0 字节)",
+   "任何保护业务行为: 学习起转 / 触发 / 锁存 / 清故障 / 重启后 Flash 迁移",
+   "启动为何停在事件日志扫描一行(H1/H2/H3 并存)"
+  ],
+  "quota_now": {
+   "readback": "0/1 已用满",
+   "explicit_reset": "0/1 已用满",
+   "download": "申报 1 用了 0",
+   "motor_run": "2/2 未动",
+   "approved_reboot": "1/1 未动",
+   "port_open": "按每次调用 1 次单独计"
+  }
  }
 }

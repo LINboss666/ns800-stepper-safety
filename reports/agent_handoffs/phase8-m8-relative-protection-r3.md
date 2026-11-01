@@ -191,3 +191,57 @@ UID 由我从本机历史成功烧录记录只读找回并核对(48 位 / `d2f53
 `M8_R3_FIELD_FIRST_REAL_RUN_STOP_AT_S2` / `IMAGE_ON_BOARD_BYTE_EQUAL=UNPROVEN` /
 `PROTECTION_BRANCH_REACHED=NO` / `ANOMALY_ON_HARDWARE=NONE_OBSERVED`。
 证据见 `host/field_run_r3field1*.json|txt` 与 `offline/psrun-20261031T185843Z-20080-RunField/`。
+
+## 10. 续测轮(M8-S2)对账 —— 镜像在板已证得，业务仍一步没走到
+
+绑定提交 `d9ff664`，用 `field/plan_continuation_s2.json`(S1 已移除、头部把上一轮那次下载逐文件
+散列绑死)在可见窗口跑唯一一次续测 dispatch，run 根
+`offline/fieldcont-d9ff664-20261031T200214Z-41860`。
+
+| 环节 | 结果 | 依据 |
+| --- | --- | --- |
+| S2 定长回读 | **rc=0**，`readback.bin` 290916 B、sha256 与候选 `00608ec9…e304` **逐字节相等** | `host/field_run_m8s2.json` |
+| S3 串口会话 | 开口 1 次 → 唯一一次 `explicit_reset` rc=0 → 被动收 **1027 B** 原字节 → 首条 `system_status` 步窗内 **0 字节** → `MISSING_RESPONSE_PROMPT` 停止 | 同上 + `run_record.md` §10 |
+| S4–S11 | NOT_RUN；人工门 0 次；无 `motor_start`，义务未建立，无需撤能 | `DISPATCH_SUMMARY` |
+
+翻案与新增：`IMAGE_ON_BOARD_BYTE_EQUAL` 由 UNPROVEN 翻成 **PROVEN**；F6(`-c` 串里反斜杠被 shlex
+去转义)的修正在真工具上生效；新暴露的现场事实是**复位后控制台不回答输入**。
+结论标签：`M8_R3_CONTINUATION_READBACK_PROVEN` / `PROTECTION_BRANCH_REACHED=NO` /
+`ANOMALY_ON_HARDWARE=NONE_OBSERVED` / `console_interactive=未证得`。
+
+## 11. 一次串口诊断(加强版)对账 —— 只回答"收到什么"
+
+授权：COM5 一次，被动 60 s，`version` 与 `system_status` 各至多一次，无复位、无电机动作，
+零 DAP/下载/回读/配置写；复用现有采集路径；本轮不登记保护业务通过。
+run 根 `offline/diag-com5-20261031T234328Z-48972`，台账 `sess_diag/ledger.jsonl`(7 行)。
+
+- 被动 60 s：**rx_bytes=0**(原始件 0 B)；
+- `version` 一次：**0 字节回复，连回显都没有** → 按合同 `MISSING_RESPONSE_PROMPT as=ver bytes=0` 停止；
+- `system_status`：**未发送**(前一步未完整返回)；端口已关，`disarm=NOT_ARMED`，无义务、无清理错误。
+
+本轮没有产出任何"板子在跑什么"的结论；额度按每次调用独立实例化，跨轮开口数只有"3 次(手探1+本轮1
++M8-S2 1)"这一种记法。失败件原样入库(提交 `5f45a90`)，不删不改。
+
+## 12. 第 0 条源码审计对账 —— 永停条件**存在**，板端是否在此**未证**
+
+零设备、零构建、零产品改动。产物四件：`host/m8diag_source_audit.txt`(判词)、
+`host/m8diag_source_audit_check.py`(机器复算)、`host/m8diag_source_audit_console.txt`(真实输出)、
+`host/m8diag_spi_h_excerpt.txt`(**仓库外件的搬运**，因 `ns800rt7p65-nssinepad/.gitignore:16 packages/`
+把厂商 StdDriver 排除在外，远端逐 blob 回读**覆盖不到**它，本机身份
+`sha256=90c9a1da446b…` / 51925 B / 1316 行)。
+
+- **PROVEN(源码层)**：阶段5 之路上有且只有一处无界限、不让出、无错误返回的等待 ——
+  厂商 `spi.h:479-481` 的 `while (SPRFSR.BIT.RFDN == SPI_FIFO_RXEMPTY) {}`，每字节一次，
+  跑在 main 线程(prio 10，`rtconfig.h:119`)，因此饿死 finsh(prio 20，`:124`)；
+  而 `applications/`+`board/` 全树**无看门狗引用**。这三件事合起来与三条观察同形。
+- **有界限的部分也一并核了**：`wait_ready` 带 tick 上限且每轮 `mdelay(1)`(`ns_flash.c:27-42`)、
+  `scan_log` 4096 圈且每 64 圈让出(`ns_storage.c:70/:83`)、BSP 逐字节循环 `length--`(`drv_spi.c:252`) ——
+  所以"卡住"只能发生在最底下那层，不在计数层。
+- **机器可复核**：52 条引用 + 9 条观察件断言 + 3 条元负控 ⇒ `AUDIT_PROBLEMS=0`，
+  检查器先证明"会失败"才允许宣布 0。
+- **仍保留三条并存解释**：H1 卡在该自旋 / H2 核未在跑 / H3 主机→板 RX 方向不通。不择一采信。
+- **收回一句错话**：上一轮"按配置 1 MHz 约 8.5 s 必然扫完"是吞吐估算，不是界限，
+  不能用来排除"卡在阶段5"。
+
+本审计不消耗额度、不放宽任何判据、不登记业务通过。下一步 (a) 断电重上电 + 一个被动窗，或
+(b) 一次 DAP 只读 `status`(代价：attach 本身可能把核 halt)，两者都**待新一轮批准**。

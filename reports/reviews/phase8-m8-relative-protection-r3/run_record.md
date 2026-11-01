@@ -311,3 +311,49 @@ run 根 `offline/fieldcont-d9ff664-20261031T200214Z-41860`。
 
 本轮之后剩余可用额度：`port_open 7/8`、`approved_reboot 1/1`、`motor_run 2/2`、
 `config_save/tmc_config_apply/diag_profile/*` 均未动；**`readback` 与 `explicit_reset` 已用满**。
+
+## 11. 一次串口诊断(加强版单次会话)的实际结果
+
+授权原文口径：COM5 只打开一次 → 先被动保存原始字节 **60 s**(不以"自发出现提示符"作前置) →
+至多一次只读 `version`，缺回复就停、不重发 → 仅当 `version` 完整返回才发至多一次
+`system_status`；全程**零 DAP、零下载、零 Flash 回读、零主动复位、零配置写入、零电机动作**，
+结束关口不自动接起转；复用现有采集路径，不写新采集器；两条查询各 15 s 步窗(执行器另有 3 s 传输裕量)；
+本轮只判断"收到什么"，不登记任何保护业务通过。
+
+执行：可见 PowerShell 窗口(PID 48972)，run 根
+`offline/diag-com5-20261031T234328Z-48972`，台账 7 行 `sess_diag/ledger.jsonl`。
+
+| 步 | 实际 | 依据(台账原文) |
+| --- | --- | --- |
+| 开口 | OK，COM5@115200，一次 | `PORT_OPEN_ATTEMPT` / `PORT_OPEN`(`transport=real`) |
+| 60 s 被动 | **rx_bytes=0**，原始件 0 B(sha `e3b0c442…`) | `WATCH_DONE seconds=60 rx_bytes=0 ended_by_budget=false` |
+| `version` 一次 | **0 字节回复，连回显都没有** → 按合同停止 | `RX_DONE bytes=0 prompt_seen=false` + `SESSION_STOP MISSING_RESPONSE_PROMPT as=ver bytes=0` |
+| `system_status` | **未发送**(前一步未完整返回，合同规定缺回复即停) | 同上，且台账无该步任何记录 |
+| 关口 | 端口已关；`disarm=NOT_ARMED`、`obligation=false`、`cleanup_errors=[]` | 摘要行 `"disarm": "NOT_ARMED", "obligation": false` |
+
+登记的口径差别(不掩盖)：
+- 台账里 `quota_left.port_open=7` 是**本次调用重新按 plan 实例化**的结果，不是跨轮累计。跨轮真实
+  累计只能按"每次调用各 1 次开口"计：FIELD-1 0 次、M8-S2 1 次、单点手探 1 次、本轮 1 次。
+- 摘要里的 `retry: 0` / `physical_collision: 0` / `blackbox_clear: 0` 与 `dmm_readings: 0` 是 plan 的
+  申报额度，本轮**未动用**；`terminal=KNOWN` 指停止原因是具名 code，不是指板端状态已知。
+- 本轮**没有**得到任何关于"板子在跑什么"的结论：`RX_DONE bytes=0` 只说明这 15 s 内该端口没收到字节。
+  失败件(0 B 原始件)一律原样入库，不删不改(提交 `5f45a90`)。
+
+## 12. 第 0 条：stage-5 路径的源码审计(零设备、零构建、零产品改动)
+
+问题只有一个：**这条启动路径上是否存在能永停的条件**。产物：
+`host/m8diag_source_audit.txt`(判词) + `host/m8diag_source_audit_check.py`(机器复算) +
+`host/m8diag_source_audit_console.txt`(真实输出) + `host/m8diag_spi_h_excerpt.txt`(仓库外件的搬运)。
+
+| 判据 | 实际 | 等级 |
+| --- | --- | --- |
+| 引用行逐条核对 | 52 条全部命中(`CITE_TEXT_MISMATCH` 0) | `AUDIT_PROBLEMS=0` |
+| 观察件字节核对 | 9 条全部命中(1027 B 末端正是扫描行、三个 0 B 窗、历史回显件) | 同上 |
+| 检查器元负控 | `NEGATIVE_CONTROL fired=3/3`(错位/错串/缺件三种都会失败) | 同上 |
+
+判词摘要：**存在**一个无界限、不让出、无错误返回的等待(厂商 `spi.h:479-481`，
+`SPI_transmitReceive` 的 RX 空循环)，且它在 main 线程(prio 10)上跑，正好饿死 finsh(prio 20) —— 与
+"扫描行之后再无一个字节、`version` 无回显、60 s 内无第二次 banner"三条观察同形；应用与 board 目录
+**无任何看门狗引用**，所以真在自旋也不会自恢复。同时明确 **NOT_PROVEN**：板子此刻是否就在该循环里，
+§6 保留 H1/H2/H3 三条并存解释，不择一采信。另收回一句上一轮的错话：
+"按 1 MHz 算约 8.5 s 必然扫完"是**吞吐估算**，不是界限，不能用来排除"卡在阶段5"。
