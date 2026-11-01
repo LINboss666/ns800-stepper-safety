@@ -7,10 +7,19 @@
   V2 每场顺序必须是 运动会话 -> 取证 -> 锁存态拒绝 -> 人工恢复, 全部走完才进下一场
   V3 两场均触发时实际用量: 12 次开口 + 5 组必要清理(与 PLAN_QUOTA_NEED 的推导同源)
   V4 事故基线按场隔离: bb_session_sg 与 bb_session_imu 各自记录/各自比较
-  V5 机械缺项(load_means=NOT_PROVIDED, 即本包交付态)在**开端口之前**拒绝整条 SG 链
+  V5  交付态(assembly_readiness=NOT_CONFIRMED 且 load_means=NOT_PROVIDED): 每个起转阶段都在开端口
+      之前被拒(S4/S8/S8b/S10/S10b), 依赖本次学习的 S5/S6/S7 沿 requires 一并跳过 => 零次起转
+  V5b 只缺加载(装配就绪已确认): SG 链跳过, S4 学习与 S8b 激励照常起转(8 开口 / 2 motor_run / 3 组清理)
   V6 缺腿 => EVIDENCE_INCOMPLETE, 不得被写成 NO_TRIGGER; 且失败仍先完成必要撤能
   V7 已观察到的触发若被记成到时未触发 => TRIP_REWRITTEN_AS_NO_TRIGGER(具名拒绝)
   V8 混合结果不得互相推翻: 一条链 trip、另一条 no_trigger 不产生 RESPONSE_BRANCH_CONFLICT
+  V9 两场各吃自己通道的夹具 => claims 双 VERIFIED 且 core_protection_verified=True
+  V10 复审实测反例: IMU 场喂 SG 行(REL_SG_SEVERE, imu=0) => 具名 OTHER_SOURCE_TRIGGERED,
+      但整链仍走完、撤能与取证照做、flow_complete 仍为 True(流程跑完 != 通道验证成功)
+  V11 元负控: 规则名对(REL_IMPACT)但 imu=0 => TARGET_RULE_BUT_SOURCE_FIELD_ZERO
+  V12 元负控: 摘掉 target_channel 声明后同一份数据不再被拒(证明拒绝来自这个门), 且该突变计划
+      被离线 PLAN_TARGET_CHANNEL 拒绝
+  V13 离线门: 发明产品枚举外的规则名 / 摘掉某个起转阶段的门 => 都必须具名 FAIL
 
 用法: python verify_four_branch_matrix.py [--out 输出目录] ; 结果写 host/four_branch_matrix.txt
 """
@@ -27,6 +36,8 @@ ROOT = HERE.parents[3]
 FIELD = ROUND / "field"
 PLAN_PATH = FIELD / "plan_core_r4.json"
 CHAIN = ROOT / "reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py"
+KERNEL_ROOT = "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad"
+APPS = ROOT / KERNEL_ROOT / "applications"
 SC_A, SC_B = "SG_ADC_controlled_load", "IMU_non_destructive_excitation"
 OUT = HERE / "four_branch_matrix.txt"
 
@@ -100,12 +111,21 @@ def main():
     work.mkdir(parents=True, exist_ok=True)
     m = load()
     plan = json.loads(PLAN_PATH.read_text(encoding="utf-8"))
-    provided = copy.deepcopy(plan)
-    provided["mechanical_prerequisites"]["load_means"]["status"] = "PROVIDED"
-    for stg in provided["stages"]:
-        for k, v in (stg.get("prerequisites") or {}).items():
-            if isinstance(v, dict) and v.get("status") == "NOT_PROVIDED" and v.get("blocks_motion"):
+
+    def provided_state(keep=None):
+        """把**会挡起转的**机械前置全部改成 PROVIDED(健康正控面: 操作者逐条确认之后的路径)。
+        keep 里的键保持原状态, 用来单独跑"只缺加载"这一面。"""
+        p = copy.deepcopy(plan)
+        for k, v in p["mechanical_prerequisites"].items():
+            if v.get("blocks_motion") and k not in (keep or ()):
                 v["status"] = "PROVIDED"
+                for stg in p["stages"]:
+                    for kk, vv in (stg.get("prerequisites") or {}).items():
+                        if kk == k and isinstance(vv, dict) and vv.get("blocks_motion"):
+                            vv["status"] = "PROVIDED"
+        return p
+
+    provided = provided_state()
 
     # ---------------- V1/V2/V3/V4: 四种组合(机械前置到位的健康面) --------------
     combos = [("both_trip", {SC_A: "trip", SC_B: "trip"}),
@@ -183,27 +203,66 @@ def main():
     for cid, fn in (("V1", v1), ("V2", v2), ("V3", v3), ("V4", v4)):
         case(cid, fn)
 
-    # ---------------- V5: 机械缺项在起转前拒绝(本包交付态) ----------------------
+    # ---------------- V5: 交付态(装配就绪未确认 + 缺加载)在起转前拒绝全部起转 -------
     gap = run(m, plan, "healthy", "gap", work / "gap", {SC_A: "trip", SC_B: "trip"})
 
     def v5():
-        s8_ids = ids(gap)
         skipped = gap["prerequisite_skips"]
         used = gap["quota_used"]
-        refusals = gap["prerequisite_refusals"]
-        s8_dir_exists = (work / "gap" / "S_S8").exists()
-        tx_b = tx_cmds(ledger(work / "gap", "S_S8b"))
-        ok5 = (skipped == ["S8", "S9", "S10", "S11"] and "S8" not in s8_ids and
-               refusals and refusals[0]["gates"] == ["load_means"] and
-               not s8_dir_exists and int(used.get("port_open", 99)) == 8 and
-               any(t.startswith("motor_start") for t in tx_b))
+        refusals = {r["scenario"]: r for r in gap["prerequisite_refusals"]}
+        spun = []
+        for sid in ("S4", "S8", "S8b", "S10", "S10b"):
+            spun += [t for t in tx_cmds(ledger(work / "gap", "S_%s" % sid))
+                     if t.startswith("motor_arm") or t.startswith("motor_start")]
+        want_skip = ["S4", "S5", "S6", "S7", "S8", "S9", "S10", "S11", "S8b", "S9b", "S10b", "S11b"]
+        ok5 = (skipped == want_skip and
+               set(refusals) >= {SC_A, SC_B, "S4"} and
+               refusals["S4"]["gates"] == ["assembly_readiness"] and
+               refusals[SC_B]["gates"] == ["assembly_readiness"] and
+               refusals[SC_A]["gates"] == ["load_means", "assembly_readiness"] and
+               refusals["S5"]["via_requires"] == ["S4"] and
+               int(used.get("port_open", 99)) == 1 and int(used.get("motor_run", 0)) == 0 and
+               "motor_run" not in used and not spun and
+               all(v == "SKIPPED_BEFORE_SPIN_UP(PREREQUISITE)"
+                   for v in gap["protection_claims"].values()) and
+               gap["core_protection_verified"] is False and gap["flow_complete"] is True)
         return (ok5,
-                "跳过=%s port_open 实际用量=%s(申报 %s) S8 目录未建=%s 汇总拒绝=%s B 场仍起转=%s" %
-                (skipped, used.get("port_open"), plan["quota"]["port_open"], not s8_dir_exists,
-                 json.dumps(refusals, ensure_ascii=False),
-                 any(t.startswith("motor_start") for t in tx_b)))
+                "交付态 跳过=%s 实际用量 port_open=%s motor_run=%s 发过的起转命令=%s "
+                "S5 传播来源=%s 分类=%s flow/core=%s/%s" %
+                (skipped, used.get("port_open"), used.get("motor_run", 0), spun,
+                 refusals["S5"]["via_requires"],
+                 json.dumps(gap["protection_claims"], ensure_ascii=False),
+                 gap["flow_complete"], gap["core_protection_verified"]))
 
     case("V5", v5)
+
+    # -------- V5b: 只缺加载(装配就绪已确认) => SG 链跳, S4 学习与 S8b 仍起转 ----------
+    asm_only = provided_state(keep=("load_means",))
+    asm_gap = run(m, asm_only, "healthy", "asmgap", work / "asmgap", {SC_A: "trip", SC_B: "trip"})
+
+    def v5b():
+        tx_b = tx_cmds(ledger(work / "asmgap", "S_S8b"))
+        tx_4 = tx_cmds(ledger(work / "asmgap", "S_S4"))
+        used = asm_gap["quota_used"]
+        ok = (asm_gap["prerequisite_skips"] == ["S8", "S9", "S10", "S11"] and
+              asm_gap["prerequisite_refusals"][0]["gates"] == ["load_means"] and
+              any(t.startswith("motor_start") for t in tx_b) and
+              any(t.startswith("motor_start") for t in tx_4) and
+              int(used.get("port_open", 99)) == 8 and int(used.get("motor_run", 99)) == 2 and
+              int(used.get("cleanup_motor_stop", 99)) == 3 and
+              asm_gap["protection_claims"][SC_B] == "VERIFIED" and
+              asm_gap["protection_claims"][SC_A] == "SKIPPED_BEFORE_SPIN_UP(PREREQUISITE)" and
+              asm_gap["core_protection_verified"] is False)
+        return (ok, "装配确认/仍缺加载: 跳过=%s port_open=%s motor_run=%s cleanup=%s "
+                    "S4 与 S8b 都起了转=%s/%s 分类=%s core=%s" %
+                (asm_gap["prerequisite_skips"], used.get("port_open"), used.get("motor_run"),
+                 used.get("cleanup_motor_stop"),
+                 any(t.startswith("motor_start") for t in tx_4),
+                 any(t.startswith("motor_start") for t in tx_b),
+                 json.dumps(asm_gap["protection_claims"], ensure_ascii=False),
+                 asm_gap["core_protection_verified"]))
+
+    case("V5b", v5b)
 
     # ---------------- V6: 缺腿 => EVIDENCE_INCOMPLETE, 且先完成必要撤能 ----------
     def leg_variant(drop):
@@ -283,6 +342,124 @@ def main():
                  json.dumps(per_stage, ensure_ascii=False)))
 
     case("V8", v8)
+
+    # -------- V9..V12: "流程跑完"与"目标通道验证成功"分开判(R5 第 1 项) --------------
+    def watch_swap(p, sg_for_imu=True, zero=False):
+        """把 IMU 那场的观察窗/锁存夹具换成 SG 那一组(复审实测的就是这份数据), 或换成
+        REL_IMPACT 但 imu=0 的元负控夹具。"""
+        for stg in p["stages"]:
+            for st in stg.get("steps", []):
+                if st.get("as") == "trip_window" and stg["id"] == "S8b":
+                    st["key"] = "__watch__" if sg_for_imu else (
+                        "__watch__@imu_zero" if zero else "__watch__@imu")
+                if st.get("as") == "latch" and stg["id"] == "S9b":
+                    st["key"] = "diag_status@latch" if sg_for_imu else "diag_status@latch@imu"
+        return p
+
+    def v9():
+        claims = res["both_trip"]["protection_claims"]
+        s8b = next(s for s in res["both_trip"]["stages"] if s["id"] == "S8b")
+        s8 = next(s for s in res["both_trip"]["stages"] if s["id"] == "S8")
+        ok = (claims == {SC_A: "VERIFIED", SC_B: "VERIFIED"} and
+              res["both_trip"]["core_protection_verified"] is True and
+              s8b.get("target_claim") == "VERIFIED" and "REL_IMPACT" in str(s8b.get("target_why")) and
+              s8.get("target_claim") == "VERIFIED")
+        return (ok, "两场各吃自己通道的夹具: claims=%s core=%s S8b=%s(%s) S8=%s(%s)" %
+                (json.dumps(claims, ensure_ascii=False), res["both_trip"]["core_protection_verified"],
+                 s8b.get("target_claim"), s8b.get("target_why"),
+                 s8.get("target_claim"), s8.get("target_why")))
+
+    case("V9", v9)
+
+    def v10():
+        p = watch_swap(provided_state(), sg_for_imu=True)
+        p["stub_branches"] = {SC_A: "trip", SC_B: "trip"}
+        d = work / "v10"
+        r = run(m, p, "healthy", "v10", d, {SC_A: "trip", SC_B: "trip"})
+        s8b = next(s for s in r["stages"] if s["id"] == "S8b")
+        chain_b = chain_seq(r, SC_B)
+        evs = ledger(d, "S_S8b")
+        cleanup = cleanup_cmds(evs)
+        ok = (s8b.get("target_claim") == "OTHER_SOURCE_TRIGGERED(TARGET_CHANNEL_UNPROVEN)" and
+              "REL_SG_SEVERE" in str(s8b.get("target_why")) and
+              r["protection_claims"][SC_B] == "OTHER_SOURCE_TRIGGERED(TARGET_CHANNEL_UNPROVEN)" and
+              r["core_protection_verified"] is False and r["flow_complete"] is True and
+              r["status"] == "OK" and chain_b == ["S8b", "S9b", "S10b", "S11b"] and
+              len(cleanup) >= 2 and
+              s8b.get("first_cause") != "EVIDENCE_INCOMPLETE")
+        return (ok, "IMU 场喂 SG 行(REL_SG_SEVERE, imu=0): 分类=%s 原因=%s 整链仍走完=%s "
+                    "撤能清理=%s flow/core=%s/%s 调度=%s" %
+                (s8b.get("target_claim"), str(s8b.get("target_why"))[:70], chain_b,
+                 cleanup, r["flow_complete"], r["core_protection_verified"], r["status"]))
+
+    case("V10", v10)
+
+    def v11():
+        p = watch_swap(provided_state(), sg_for_imu=False, zero=True)
+        d = work / "v11"
+        r = run(m, p, "healthy", "v11", d, {SC_A: "trip", SC_B: "trip"})
+        s8b = next(s for s in r["stages"] if s["id"] == "S8b")
+        ok = (s8b.get("target_claim") == "TARGET_RULE_BUT_SOURCE_FIELD_ZERO(trip_imu_imu)" and
+              r["core_protection_verified"] is False)
+        return (ok, "元负控(规则名对但 imu=0): 分类=%s 原因=%s core=%s => "
+                    "source_nonzero_keys 这道腿确实在判" %
+                (s8b.get("target_claim"), str(s8b.get("target_why"))[:80],
+                 r["core_protection_verified"]))
+
+    case("V11", v11)
+
+    def v12():
+        # 元负控: 把 S8b 的 target_channel 声明摘掉 => 同一份 SG 数据不再产生"其他来源触发"的
+        # 具名拒绝(IMU 场不申报就没有分类), core_protection_verified 重新变 True。若这一步仍然
+        # 是 False, 说明 V10 的拒绝不是这个门给的(判据不足)。
+        # 这个突变在离线是**非法计划**: validate_plan 的 PLAN_TARGET_CHANNEL 必须拒绝它, 一并核。
+        p = watch_swap(provided_state(), sg_for_imu=True)
+        for stg in p["stages"]:
+            if stg["id"] == "S8b":
+                stg.pop("target_channel")
+        d = work / "v12"
+        r = run(m, p, "healthy", "v12", d, {SC_A: "trip", SC_B: "trip"})
+        s8b = next(s for s in r["stages"] if s["id"] == "S8b")
+        rows_doc = json.loads((FIELD / "rows.json").read_text(encoding="utf-8-sig"))
+        vlines = [l for l in m.validate_plan(p, rows_doc, str(APPS))[0]
+                  if "PLAN_TARGET_CHANNEL" in l]
+        rejected = any("|FAIL|" in l for l in vlines)
+        ok = (s8b.get("target_claim") is None and r["core_protection_verified"] is True and
+              r["protection_claims"] == {SC_A: "VERIFIED"} and rejected)
+        return (ok, "摘掉 target_channel: S8b 分类=%s(不再具名拒绝) core=%s claims=%s "
+                    "离线门是否拒绝该计划=%s %s" %
+                (s8b.get("target_claim"), r["core_protection_verified"],
+                 json.dumps(r["protection_claims"], ensure_ascii=False), rejected,
+                 vlines[0][:120] if vlines else "没有 PLAN_TARGET_CHANNEL 行"))
+
+    case("V12", v12)
+
+    def v13():
+        # 造一个产品里不存在的规则名 => 离线必须拒绝(计划不能自己发明通道名)
+        p = provided_state()
+        for stg in p["stages"]:
+            if stg["id"] == "S8b":
+                stg["target_channel"]["rule_names"] = ["REL_IMU_BANG"]
+        rows_doc = json.loads((FIELD / "rows.json").read_text(encoding="utf-8-sig"))
+        vlines = [l for l in m.validate_plan(p, rows_doc, str(APPS))[0]
+                  if "PLAN_TARGET_CHANNEL" in l]
+        rejected = any("|FAIL|" in l and "REL_IMU_BANG" in l for l in vlines)
+        # 再把某个起转阶段的门摘掉 => PLAN_SPINUP_GATE_COVERAGE 必须拒绝
+        p2 = provided_state()
+        for stg in p2["stages"]:
+            if stg["id"] == "S4":
+                stg["prerequisite_gates"] = []
+        v2lines = [l for l in m.validate_plan(p2, rows_doc, str(APPS))[0]
+                   if "PLAN_SPINUP_GATE_COVERAGE" in l]
+        rejected2 = any("|FAIL|" in l and "S4" in l for l in v2lines)
+        good = [l for l in m.validate_plan(provided_state(), rows_doc, str(APPS))[0]
+                if l.startswith(("PLAN_SPINUP_GATE_COVERAGE", "PLAN_TARGET_CHANNEL"))]
+        ok = rejected and rejected2 and all("|PASS|" in l for l in good)
+        return (ok, "发明的规则名被拒=%s 摘掉 S4 起转门被拒=%s 交付计划两项都 PASS=%s(%s)" %
+                (rejected, rejected2, all("|PASS|" in l for l in good),
+                 " || ".join(x[:95] for x in good)))
+
+    case("V13", v13)
 
     passed = sum(1 for r in RESULTS if r[1])
     lines = ["R4_MATRIX|%s" % ("ALL_PASS" if passed == len(RESULTS) else "HAS_FAIL")]

@@ -203,12 +203,12 @@
   {
    "name": "E6_mechanical_gaps_marked_not_provided",
    "ok": true,
-   "detail": "SG/ADC 可控负载的施加手段与机械连接"
+   "detail": "起转装配就绪(紧固、螺母防转、导向 + 支座松手保持固定)"
   },
   {
    "name": "E7_validate_plan_clean",
    "ok": true,
-   "detail": "checks=233 fail=0"
+   "detail": "checks=236 fail=0"
   },
   {
    "name": "E8_quota_declares_no_retry_and_no_blackbox_clear",
@@ -218,7 +218,7 @@
   {
    "name": "E9_stub_dispatch_end_to_end_ok",
    "ok": true,
-   "detail": "交付态(load_means=NOT_PROVIDED)整包干跑: SG 链在开端口前被拒 => 实际只用 8 次开口 / 2 次起转, 其余阶段照常走完且无 NOT_RUN(原文存 field/dispatch_stub_healthy.txt)"
+   "detail": "交付态(装配未确认+缺加载)整包干跑: 每个起转阶段都在开端口前被拒 => 实际只用 1 次开口(S3)、0 次起转(motor_run 余额仍是 3), 流程判定与通道判定分开报(原文存 field/dispatch_stub_healthy.txt)"
   },
   {
    "name": "E10_dry_run_touched_no_device",
@@ -228,7 +228,12 @@
   {
    "name": "E11_skipped_chain_has_no_session_at_all",
    "ok": true,
-   "detail": "被前置门拒掉的链在汇总里一条阶段行都没有(不是执行了但失败), 而 IMU 链照常执行"
+   "detail": "被机械前置门拒掉的阶段在汇总里一条阶段行都没有(不是执行了但失败), 交付态真正执行的只有 S0..S3"
+  },
+  {
+   "name": "E12_refusal_lines_name_their_own_chain",
+   "ok": true,
+   "detail": "每条拒绝行只列自己作用域被跳过的阶段, 并把沿 requires 传播的来源(via_requires)写出来; 不是把全部阶段糊在一行里"
   },
   {
    "name": "F1_readback_bound_to_this_image",
@@ -363,12 +368,12 @@
   {
    "name": "J1_load_means_state",
    "ok": true,
-   "detail": "缺加载手段: 状态 NOT_PROVIDED + blocks_motion + 挂在 S8 的 prerequisite_gates 上"
+   "detail": "缺加载手段: 状态 NOT_PROVIDED + blocks_motion + 与装配就绪门一起挂在 S8 上"
   },
   {
-   "name": "J2_asset_facts_registered",
+   "name": "J2_asset_facts_updated",
    "ok": true,
-   "detail": "现有实物与缺项如实登记: 现有实物: T8 丝杆 + 标称 300 mm 完整导轨滑台 / 电机尚未与滑台连接; 导程待确认(未实测)"
+   "detail": "机械事实按操作者口径更新: 现有实物: T8 丝杆套件(标称导程 8 mm) + 导轨滑台, 已按照片装配 / 装配已完成但紧固/螺母防转/导向待确认(见 assembly_readiness(执行字段里已无旧的\"完整滑台/尚未连接/导程待确认\"; 只在勘误段引用旧措辞, 故扫描范围限定在机械前置+load_step+缺项汇总, 不扫全文)"
   },
   {
    "name": "J3_instrument_not_a_spinup_gate",
@@ -381,9 +386,24 @@
    "detail": "门在执行器代码里(开端口之前跳过整条链), 不是只在计划的说明字段里"
   },
   {
+   "name": "J6_assembly_gate_covers_every_spinup",
+   "ok": true,
+   "detail": "装配就绪门挂在每一个起转/带电阶段上(复审第 2 项: 只挡 S8 不够): 起转阶段=['S10', 'S10b', 'S4', 'S8', 'S8b']"
+  },
+  {
+   "name": "J7_refusal_propagates_along_requires",
+   "ok": true,
+   "detail": "S4 被挡后, 依赖本次学习的 S5/S6/S7 沿计划申报的 requires 一并具名跳过(不是中途失败): 汇总里的 prerequisite_skips 与 via_requires=S4 都实测到"
+  },
+  {
+   "name": "J8_imu_mounting_fact_closed",
+   "ok": true,
+   "detail": "IMU 固定方式已由操作者确认(绝缘胶带), 不再是缺失项; 但刚度仍未测, 不做精确振动标定"
+  },
+  {
    "name": "J5_meta_negative_ungated_prerequisite",
    "ok": true,
-   "detail": "元负控: 把 S8 的门摘掉(只剩说明字段)时, 离线门必须 FAIL"
+   "detail": "元负控: 把 S8 的门摘掉(只剩说明字段)时, PLAN_PREREQUISITE_GATE 与 PLAN_SPINUP_GATE_COVERAGE 都必须 FAIL: ['PLAN_PREREQUISITE_GATE|all|FAIL|S8:load_means=blocks_motion ', 'PLAN_SPINUP_GATE_COVERAGE|all|FAIL|S8(有 motor_arm/motor_star']"
   },
   {
    "name": "K1_build_input_commits_are_true",
@@ -453,12 +473,52 @@
   {
    "name": "M5_m5_history_untouched",
    "ok": true,
-   "detail": "工作树里没有 M5 软件故障原件的改动(event=9 的那批历史证据原样保留); 本轮改动=21 项"
+   "detail": "工作树里没有 M5 软件故障原件的改动(event=9 的那批历史证据原样保留); 本轮改动=14 项"
   },
   {
    "name": "M6_event_five_basis_is_source",
    "ok": true,
    "detail": "判据出处逐字写在计划里(FAULT_MULTI_SOURCE=5u 的三条源码锚点)"
+  },
+  {
+   "name": "N1_target_channel_declared",
+   "ok": true,
+   "detail": "每场申报自己的目标通道: IMU 只认 REL_IMPACT(imu 列必须非零), SG/ADC 认那三路(sg/cur 非零); 规则名键与源样本键都指向**本场**记录下来的字段"
+  },
+  {
+   "name": "N2_rule_names_exist_in_product",
+   "ok": true,
+   "detail": "申报的规则名逐个来自产品枚举(rel_reason_t 与 verdict_name() 两头一致的 7 个名字), 计划造不出名字: REL_ADC_SEVERE,REL_COVERAGE_LOST,REL_FUSED_SEVERE,REL_IMPACT,REL_OUT_OF_WINDOW,REL_SENSOR_UNAVAILABLE,REL_SG_SEVERE"
+  },
+  {
+   "name": "N3_imu_chain_uses_its_own_fixture",
+   "ok": true,
+   "detail": "IMU 那两场吃的是自己通道的夹具(REL_IMPACT + imu 非零), 且标 source_shape(形状取打印语句、数值合成, 不是板上采集)"
+  },
+  {
+   "name": "N4_other_source_not_counted_as_success",
+   "ok": true,
+   "detail": "复审实测反例(IMU 场喂 REL_SG_SEVERE + imu=0): 具名登记为其他来源触发, 整链仍走完、取证照做, 但 core_protection_verified=False(原文存 field/dispatch_stub_target_sg_in_imu.txt)"
+  },
+  {
+   "name": "N5_meta_negative_gate_removed",
+   "ok": true,
+   "detail": "元负控: 摘掉 S8b 的 target_channel 后同一份 SG 数据不再被具名拒绝(core 翻回 True), 而这份突变计划被离线 PLAN_TARGET_CHANNEL 拒绝 => N4 的判定确实来自这个门(原文存 field/dispatch_stub_target_gate_removed.txt)"
+  },
+  {
+   "name": "N6_meta_negative_invented_rule",
+   "ok": true,
+   "detail": "元负控: 把 IMU 的规则名换成产品里不存在的 REL_IMU_MADE_UP, 离线门必须具名拒绝"
+  },
+  {
+   "name": "N8_r3_history_recomputed_same",
+   "ok": true,
+   "detail": "R3 两份历史计划在当前执行器下的 fail 数是**当场复算**的(登记值=[3, 3]), 不靠记忆; 本轮不回写它们"
+  },
+  {
+   "name": "N7_plan_states_boundary",
+   "ok": true,
+   "detail": "计划自己写明边界: 交付态跳过 SG/ADC 激励链, 整包完成不等于核心保护全部通过(5 条 never_from)"
   }
  ],
  "problems": []

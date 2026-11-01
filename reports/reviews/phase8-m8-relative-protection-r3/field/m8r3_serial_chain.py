@@ -1541,6 +1541,53 @@ def prove_state_and_flag_constants(app_dir):
                        "motor=%s rpf=%s columns=%d" % (found, bits, FLASH_DUMP_COLUMNS))
 
 
+def target_channel_claim(stage, recorded):
+    """把"这一场流程跑完"和"目标传感器通道验证成功"分开判。
+
+    复审实测: 旧版把 IMU 场喂了 SG 的触发数据(`r=REL_SG_SEVERE`、`imu=0`)仍然判通过 —— 规则名
+    与源样本通道都没人对。这里只认计划里申报的**枚举名**(来自 rel_reason_t 与 verdict_name()),
+    并要求该场的源样本字段确实非零; 不匹配就具名成"其他来源触发/目标通道未证", 照常撤能与取证,
+    但绝不计入保护已验证。"""
+    spec = stage.get("target_channel") or {}
+    if not spec:
+        return None, ""
+    rule = recorded.get(spec.get("rule_key", ""))
+    if rule is None:
+        return ("TARGET_UNPROVEN(NO_TRIP_RULE_CAPTURED)",
+                "本场没有抓到 TRIP 规则名(缺 %s)" % spec.get("rule_key"))
+    known = set(spec.get("known_rule_names") or [])
+    if known and rule not in known:
+        return ("TARGET_UNPROVEN(RULE_NOT_IN_PRODUCT_ENUM)", "规则名 %s 不在产品枚举里" % rule)
+    targets = set(spec.get("rule_names") or [])
+    if rule not in targets:
+        return ("OTHER_SOURCE_TRIGGERED(TARGET_CHANNEL_UNPROVEN)",
+                "触发规则=%s, 本场目标通道只认 %s" % (rule, sorted(targets)))
+    zero = [k for k in (spec.get("source_nonzero_keys") or [])
+            if str(recorded.get(k)) in ("0", "None", "")]
+    if zero:
+        return ("TARGET_RULE_BUT_SOURCE_FIELD_ZERO(%s)" % ",".join(zero),
+                "规则对了但源样本通道仍是 0, 不能称该通道已验证")
+    return ("VERIFIED", "规则=%s 且源样本通道非零" % rule)
+
+
+def rel_rule_names(app_dir):
+    """产品里真实存在的相对判定原因名: 从 rel_reason_t 枚举 + verdict_name() 的返回串两头取,
+    两头不一致就报错。计划只能引用这份名单, 不许自己造规则名(复审抓到的正是 IMU 场喂了
+    REL_SG_SEVERE 还算通过)。"""
+    hdr = Path(app_dir) / "diag_relative.h"
+    src = Path(app_dir) / "diag_relative.c"
+    txt_h = hdr.read_text(encoding="utf-8", errors="replace")
+    txt_c = src.read_text(encoding="utf-8", errors="replace")
+    m = re.search(r"typedef\s+enum\s*\{(.*?)\}\s*rel_reason_t\s*;", txt_h, re.S)
+    enum_names = re.findall(r"^\s*(REL_[A-Z_]+)", m.group(1), re.M) if m else []
+    printed = set(re.findall(r"case\s+(REL_[A-Z_]+):\s*return\s+\"\1\";", txt_c))
+    names = {n for n in enum_names if n in printed}
+    if not m or names != set(enum_names) & printed or not names:
+        raise Stop("REL_RULE_NAMES_SOURCE_MISMATCH",
+                   "enum=%s printed=%s" % (sorted(enum_names), sorted(printed)))
+    return names
+
+
 def derive_quota_needs(plan):
     """③ 额度从**真实执行路径**推导, 不是拍一个数: 逐阶段按执行器实际会 spend 的名字累加。
       - port_open: 每个 serial_session 阶段恰好扣 1(exec_session 开口前先 spend)
@@ -1746,10 +1793,12 @@ def validate_plan(plan, rows_doc, app_dir):
     decided = {}
     chain_bad = []
     for stg in plan["stages"]:
-        sc = stg.get("scenario") or "__default__"
-        if stg.get("profiles") and sc != "__default__" and not decided.get(sc):
+        sc = stg.get("scenario")
+        if not sc:
+            continue
+        if stg.get("profiles") and not decided.get(sc):
             chain_bad.append("%s:no_branch_decider_before_it(scenario=%s)" % (stg["id"], sc))
-        if stg.get("decides_response_branch") and sc != "__default__":
+        if stg.get("decides_response_branch"):
             decided[sc] = stg["id"]
     out.append("PLAN_SCENARIO_CHAIN|all|%s|%s" %
                ("PASS" if not chain_bad else "FAIL",
@@ -1791,6 +1840,44 @@ def validate_plan(plan, rows_doc, app_dir):
                             (plan.get("mechanical_prerequisites") or {}).items()},
                            ensure_ascii=False)))
     if pre_bad:
+        bad += 1
+    # ⑤' 每一个**起转/带电**阶段都必须挂机械前置门(复审: 缺项只挡 S8 是不够的, S4 学习与 S8b 也起转)
+    spin_bad = []
+    for stg in plan["stages"]:
+        spins = any(st.get("cmd") in MOTION_OBLIGATION_CMDS for st in stg.get("steps", []))
+        if spins and not (stg.get("prerequisite_gates") or []):
+            spin_bad.append("%s(有 motor_arm/motor_start 但 prerequisite_gates 为空)" % stg["id"])
+    out.append("PLAN_SPINUP_GATE_COVERAGE|all|%s|%s" %
+               ("PASS" if not spin_bad else "FAIL",
+                ";".join(spin_bad) or "所有起转/带电阶段都在开端口前检查机械前置"))
+    if spin_bad:
+        bad += 1
+    # ④' 目标通道声明: 规则名必须是产品枚举里的名字, 且每个分支决定点都必须声明目标通道
+    try:
+        known = rel_rule_names(app_dir)
+    except Stop as e:
+        known = set()
+        out.append("PLAN_TARGET_CHANNEL|all|FAIL|%s" % e.code)
+        bad += 1
+    tc_bad = []
+    for stg in plan["stages"]:
+        spec = stg.get("target_channel")
+        if stg.get("decides_response_branch") and not spec:
+            tc_bad.append("%s:分支决定点没声明 target_channel" % stg["id"])
+            continue
+        if not spec:
+            continue
+        unknown = [x for x in spec.get("rule_names") or [] if x not in known]
+        if unknown:
+            tc_bad.append("%s:规则名不在产品枚举%s" % (stg["id"], unknown))
+        if not spec.get("rule_names"):
+            tc_bad.append("%s:rule_names 为空" % stg["id"])
+        if not spec.get("rule_key"):
+            tc_bad.append("%s:rule_key 未指向记录下来的 TRIP 规则键" % stg["id"])
+    out.append("PLAN_TARGET_CHANNEL|all|%s|%s" %
+               ("PASS" if not tc_bad else "FAIL",
+                ";".join(tc_bad) or "产品枚举=%s" % ",".join(sorted(known))))
+    if tc_bad:
         bad += 1
     # ④ 首因腿: 每条会决定 trip 分支的链都必须覆盖四路取证, 且缺证的具名码是 EVIDENCE_INCOMPLETE
     fc_bad = []
@@ -2239,6 +2326,7 @@ def dispatch_refusal(plan, profile, outdir, code):
             "quota_left": dict(plan["quota"]), "quota_used": {},
             "expected_stages": [], "profile": profile, "dir": str(outdir),
             "branch": None, "scenario_branches": {},
+            "protection_claims": {}, "core_protection_verified": False, "flow_complete": False,
             "prerequisite_skips": [], "prerequisite_refusals": [],
             "actions_attempted": [],
             "quota_audit": {"undeclared_used": [], "negative_left": [], "lines": []},
@@ -2291,10 +2379,12 @@ def dispatch_plan(plan, transport, backend_name, outdir, clock, profile, port,
     stub_branches = dict(plan.get("stub_branches") or {}) if transport == "stub" else {}
     scenario_branch, scenario_profile = {}, {}
     blocked_scenarios, skipped_by_prerequisite = {}, []
+    skipped_by_scope = {}
     expected_ids = []
     for i, stg in enumerate(stages):
         sid = stg["id"]
-        sc = stg.get("scenario") or "__default__"
+        # 没标 scenario 的阶段各自成域: 否则 S4 的前置拒绝会把所有未分场的阶段一起"拉黑"
+        sc = stg.get("scenario") or sid
         rest = [x["id"] for x in stages[i:]]
         # ⑤ 机械前置: 缺加载手段时在**起转之前**具名拒绝整条链 —— 不开端口、不扣额度、
         # 不发任何一条命令(而不是把约束写在 prerequisites 说明字段里照常往下走)。
@@ -2302,12 +2392,25 @@ def dispatch_plan(plan, transport, backend_name, outdir, clock, profile, port,
                        if (plan.get("mechanical_prerequisites", {}).get(g) or {}).get("status")
                        != "PROVIDED"]
         if missing_pre and sc not in blocked_scenarios:
-            blocked_scenarios[sc] = {"stage": sid, "gates": missing_pre}
+            blocked_scenarios[sc] = {"stage": sid, "gates": missing_pre, "via_requires": []}
+        # 前置拒绝**沿 requires 传播**: S4(带起转的学习)被装配就绪门挡下之后, 依赖它本次学习
+        # 结果的 S5 tier/commit/save 不能继续跑 —— 那等于拿一份本轮没有学出来的 profile 去提交,
+        # 现场只会中途失败并把唯一一次批准烧掉。传播只走计划里已申报的 requires, 不猜依赖。
+        if not missing_pre and sc not in blocked_scenarios:
+            up_refused = sorted({mo.group(1) for mo in
+                                 (re.match(r"^(S\d+[a-z]?)", str(rq)) for rq in stg.get("requires", []))
+                                 if mo and mo.group(1) in skipped_by_prerequisite})
+            if up_refused:
+                blocked_scenarios[sc] = {"stage": sid, "via_requires": up_refused,
+                                         "gates": ["requires:%s 已被机械前置跳过" % u for u in up_refused]}
         if sc in blocked_scenarios:
             b = blocked_scenarios[sc]
             led.ev("STAGE_SKIPPED_BY_PREREQUISITE", stage=sid, scenario=sc,
                    gates=b["gates"], refused_before=b["stage"],
-                   reason="起转前拒绝: 机械前置未提供(不开口/不扣额度/不发命令)")
+                   via_requires=b.get("via_requires") or [],
+                   reason=("起转前拒绝: 机械前置未提供(不开口/不扣额度/不发命令)" if not b.get("via_requires")
+                           else "依赖的阶段已被机械前置跳过, 本级继续跑就是在没有本次前置结果的前提下动作"))
+            skipped_by_scope.setdefault(sc, []).append(sid)
             skipped_by_prerequisite.append(sid)
             continue
         br = (stub_branches.get(sc, profile) if transport == "stub"
@@ -2460,6 +2563,19 @@ def dispatch_plan(plan, transport, backend_name, outdir, clock, profile, port,
                     res = {**res, "success": False, "first_cause": "EVIDENCE_INCOMPLETE",
                            "code": res.get("code") or "EVIDENCE_INCOMPLETE",
                            "detail": res.get("detail") or json.dumps(fb, ensure_ascii=False)}
+                if stg.get("target_channel"):
+                    if fb:
+                        tc, tw = "TARGET_UNPROVEN(EVIDENCE_INCOMPLETE)", "四腿缺一, 先不主张通道"
+                    elif ap != "trip":
+                        tc, tw = ("NO_TRIGGER", "本场观察窗到时未触发(不是目标通道已验证)")
+                    else:
+                        tc, tw = target_channel_claim(stg, recorded)
+                    res = {**res, "target_claim": tc, "target_why": tw}
+                    led.ev("TARGET_CHANNEL", stage=sid, scenario=sc, claim=tc, why=tw)
+                    if tc.startswith("OTHER_SOURCE") or tc.startswith("TARGET_RULE_BUT"):
+                        # 别的源触发了: 撤能与取证照做, 但本场不得计成"目标通道已验证"。
+                        # 不把它写成失败(设备侧确实保护了), 也不写成通过 —— 只把声明降级。
+                        led.ev("PROTECTION_CLAIM_DOWNGRADED", stage=sid, scenario=sc, claim=tc)
                 done.append({"id": sid, "status": res["status"], "code": res["code"],
                              "detail": res.get("detail"),
                              "recorded": dict(recorded),
@@ -2469,6 +2585,8 @@ def dispatch_plan(plan, transport, backend_name, outdir, clock, profile, port,
                              "expected_refusal": res.get("expected_refusal"),
                              "forensics": res.get("forensics"),
                              "first_cause": res.get("first_cause"),
+                             "target_claim": res.get("target_claim"),
+                             "target_why": res.get("target_why"),
                              "cleanup_errors": res["cleanup_errors"],
                              "obligation": res["obligation"],
                              "dir": res["dir"], "steps": len(res["results"])})
@@ -2495,6 +2613,19 @@ def dispatch_plan(plan, transport, backend_name, outdir, clock, profile, port,
     ok = (not notrun) and all(d.get("success", True) for d in done) \
         and [d["id"] for d in done] == expected \
         and not undeclared and not negative
+    # "流程跑完"与"目标传感器通道验证成功"是两件事: 后者只在各场抓到**自己那一路**的规则
+    # 且源样本非零时才成立。二者分开报, 免得 status=OK 被读成核心保护全部通过。
+    claims = {}
+    for d in done:
+        if d.get("target_claim"):
+            claims[d.get("scenario") or d["id"]] = d["target_claim"]
+    skipped_sc = sorted({s.get("scenario") for s in plan["stages"]
+                         if s["id"] in skipped_by_prerequisite and s.get("scenario")})
+    for sc in skipped_sc:
+        claims[sc] = "SKIPPED_BEFORE_SPIN_UP(PREREQUISITE)"
+    core_verified = bool(claims) and all(v == "VERIFIED" for v in claims.values())
+    led.ev("PROTECTION_CLAIMS", claims=claims, core_protection_verified=core_verified,
+           flow_complete=bool(ok))
     led.close()
     return {"status": "OK" if ok else "STOP", "stages": done, "not_run": notrun,
             "quota_audit": {"undeclared_used": undeclared, "negative_left": negative,
@@ -2502,9 +2633,13 @@ def dispatch_plan(plan, transport, backend_name, outdir, clock, profile, port,
             "expected_stages": expected, "recorded": recorded,
             "quota_left": quota_box, "quota_used": used_box, "profile": profile,
             "branch": branch, "scenario_branches": dict(scenario_branch),
+            "protection_claims": claims, "core_protection_verified": core_verified,
+            "flow_complete": bool(ok),
             "prerequisite_skips": skipped_by_prerequisite,
             "prerequisite_refusals": [{"scenario": k, "refused_before": v["stage"],
-                                       "gates": v["gates"]}
+                                       "gates": v["gates"],
+                                       "skipped_stages": skipped_by_scope.get(k, []),
+                                       "via_requires": v.get("via_requires") or []}
                                       for k, v in sorted(blocked_scenarios.items())],
             "actions_attempted": list(backend.attempts),
             "ledger": str(led_path), "dir": str(out)}
@@ -2603,9 +2738,16 @@ def main(argv=None):
             print("DISPATCH|stage=%s|status=NOT_RUN" % sid)
         for r in res.get("prerequisite_refusals", []):
             print("PREREQUISITE_REFUSAL|scenario=%s|refused_before=%s|gates=%s|skipped_stages=%s|"
-                  "ports_opened_by_chain=0" %
+                  "via_requires=%s|ports_opened_by_chain=0" %
                   (r["scenario"], r["refused_before"], ",".join(r["gates"]),
-                   ",".join(res.get("prerequisite_skips", []))))
+                   ",".join(r.get("skipped_stages") or []),
+                   ",".join(r.get("via_requires") or []) or "-"))
+        for sc, claim in sorted((res.get("protection_claims") or {}).items()):
+            print("PROTECTION_CLAIM|scenario=%s|claim=%s" % (sc, claim))
+        print("FLOW_VS_VERIFICATION|flow_complete=%s|core_protection_verified=%s|"
+              "含义: flow_complete 只说明申报的阶段都跑完且额度/取证/撤能账目一致; "
+              "core_protection_verified 才说明每一场都是**目标传感器通道**自己触发的" %
+              (res.get("flow_complete"), res.get("core_protection_verified")))
         print("DISPATCH_SUMMARY|status=%s|code=%s|stages_executed=%d|stages_not_run=%d|"
               "quota_left=%s|quota_used=%s|profile=%s|branch=%s|scenario_branches=%s|"
               "prerequisite_skips=%s|actions_attempted=%s|ledger=%s" %

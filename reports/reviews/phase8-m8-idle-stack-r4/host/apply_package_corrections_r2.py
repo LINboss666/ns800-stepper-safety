@@ -10,6 +10,11 @@
   R  登记修正: 不再把 48204fe 写成新镜像的构建输入; rtconfig 登记本机 CRLF/远端 LF 双身份
   C-02 停后帧事件码 9 -> 5(本计划里的两处 require_frames; 夹具与 R3 自检由
       apply_c02_event5_fixtures.py + m8r3_field_selftest.py 负责)
+  R5-① "流程跑完"与"目标传感器通道验证成功"分开: 每场申报 target_channel(IMU 只认 REL_IMPACT 且
+      imu 列非零; SG/ADC 认 REL_SG_SEVERE/REL_ADC_SEVERE/REL_FUSED_SEVERE 且 sg/cur 非零),
+      其他来源触发仍撤能、仍取证, 但登记为未证, 不计入 core_protection_verified
+  R5-② 机械事实更新为"T8 丝杆套件, 标称导程 8 mm; 已按照片装配, 紧固/螺母防转/导向尚待确认",
+      并把 assembly_readiness 门挂到 S4/S8/S8b/S10/S10b 每一个起转阶段(拒绝沿 requires 传播)
 
 幂等: 每次都从当前 plan_core_r4.json 出发重算派生字段(额度/执行器散列/夹具散列), 再跑一遍得同一份字节。
 用法: python apply_package_corrections_r2.py [--check]
@@ -37,6 +42,10 @@ MAP_REL = "reports/firmware/phase8-m8-idle-stack-r4/rt-thread-motor-m1.map"
 
 SC_A, SC_B = "SG_ADC_controlled_load", "IMU_non_destructive_excitation"
 SUF = {SC_A: "sg", SC_B: "imu"}
+# 目标通道各自认哪些产品规则名(取自 A/diag_relative.h 的 rel_reason_t + verdict_name() 的返回串,
+# 由执行器 rel_rule_names() 两头核对)。IMU 那路只有 REL_IMPACT 才算它自己触发。
+SG_RULES = ["REL_SG_SEVERE", "REL_ADC_SEVERE", "REL_FUSED_SEVERE"]
+IMU_RULES = ["REL_IMPACT"]
 ORDER = ["S0", "S1", "S2", "S3", "S4", "S5", "S6", "S7",
          "S8", "S9", "S10", "S11", "S8b", "S9b", "S10b", "S11b"]
 CHAIN_OF = {"S8": SC_A, "S9": SC_A, "S10": SC_A, "S11": SC_A,
@@ -154,35 +163,103 @@ def latch_legs(suffix):
                     "require_frames 判)"}]}
 
 
-def prereq_block():
+def target_channel_block(scenario, suffix, known):
+    """把"流程跑完"与"目标传感器通道验证成功"的分工声明(执行器 target_channel_claim 判)。
+
+    复审实测的缺陷: IMU 场喂 SG 的触发行(r=REL_SG_SEVERE、imu=0)也算通过 —— 因为旧版只查
+    "有没有抓到一次 trip"。这里把每场**认哪些规则名、哪一列源样本必须非零**写进计划, 规则名还
+    必须是产品枚举里的名字(不在枚举里 PLAN_TARGET_CHANNEL 直接离线拒绝)。"""
+    is_imu = scenario == SC_B
     return {
+        "scenario": scenario,
+        "channel": "ADXL345 冲击/振动相对异常(IMU)" if is_imu else "SG2/ADC 电流相对异常",
+        "rule_key": "trip_rule_%s" % suffix,
+        "rule_names": list(IMU_RULES if is_imu else SG_RULES),
+        "source_nonzero_keys": (["trip_imu_imu"] if is_imu else ["trip_sg_sg", "trip_cur_sg"]),
+        "known_rule_names": sorted(known),
+        "positive_control_fixture": ("__watch__@imu(r=REL_IMPACT, imu=3789)" if is_imu
+                                     else "__watch__(r=REL_SG_SEVERE, sg/cur 非零)"),
+        "meta_negative_fixture": ("__watch__@imu_zero(r=REL_IMPACT 但 imu=0) => "
+                                  "TARGET_RULE_BUT_SOURCE_FIELD_ZERO" if is_imu else
+                                  "把本场的观察窗键换成 __watch__@imu(REL_IMPACT) => "
+                                  "OTHER_SOURCE_TRIGGERED"),
+        "other_source_handling": (
+            "规则名不是本场目标通道 => 登记 OTHER_SOURCE_TRIGGERED(TARGET_CHANNEL_UNPROVEN): "
+            "保护确实动作了(照常撤能、照常取证、照常用 event=5 帧读回), 但**这次触发不能算本通道的"
+            "功能验证**, 也不计入 core_protection_verified"
+            if not is_imu else
+            "规则名不是 REL_IMPACT => 同上: 别的手段把保护碰响了不等于 IMU 通道已验证"),
+        "why_source_nonzero": (
+            "imu 列是冲击证据的源样本: 规则名对但 imu 仍是 0, 说明这次判定没有该通道的读数支撑, "
+            "所以只登记规则命中、不登记通道验证" if is_imu else
+            "sg=/cur= 是 SG/ADC 那一路的源样本: 任一列为 0 就说明越界判定没有本通道读数支撑"),
+        "basis": ("规则名来自 A/diag_relative.h 的 rel_reason_t 与 A/diag_relative.c 的 "
+                  "verdict_name()(两头不一致时 rel_rule_names() 报 REL_RULE_NAMES_SOURCE_MISMATCH); "
+                  "三行打印形状来自 A/diagnosis.c:469-475")}
+
+
+def prereq_block():
+    """机械前置(复审 2026-11-01 第 2 项: 事实要更新, 而且**每个起转阶段**都要检查装配就绪)。
+    status 只有 PROVIDED 才放行; 其余值一律在开端口之前具名跳过, 不扣额度、不发命令。
+    本 Agent 不代操作者确认任何一项 —— 状态由操作者现场回报决定。"""
+    return {
+        "assembly_readiness": {
+            "status": "NOT_CONFIRMED",
+            "blocks_motion": True,
+            "asset": "T8 丝杆套件(标称导程 8 mm)的装配就绪 + 支座/电机能否在不手扶时保持固定",
+            "asset_state": ("现有 T8 丝杆套件, 标称导程 8 mm; 已按照片装配, 紧固、螺母防转及导向尚待确认。"
+                            "轴承/底座目前只能手动固定(操作者 2026-11-01 原话), 松手保持固定未确认 => "
+                            "门不放行, 所有含 motor_arm/motor_start 的阶段在起转之前跳过"),
+            "provenance": ("操作者现场回报与照片(2026-11-01): 电机固定丝杆、轴承底座只能手动固定。"
+                           "本 Agent 未实测, 只登记为操作者给出的实物事实, 不构成任何现场结论"),
+            "open_until": ["支座/轴承在松手后保持固定(已由操作者确认)",
+                           "丝杆与电机的连接紧固已确认", "螺母防转已确认", "导向已确认",
+                           "累计运动距离按标称导程 8 mm 与实际细分/脉冲参数核算过"],
+            "gates_stages": "S4(带起转的学习)、S8/S8b(两场激励)、S10/S10b(锁存态再 arm) —— 即计划里"
+                            "每一个含 motor_arm 或 motor_start 的阶段",
+            "propagation": ("S4 被挡之后, requires 里引用本次学习结果的 S5/S6/S7 一并跳过"
+                            "(执行器沿计划申报的 requires 传播拒绝): 没有本轮 learn 就 tier/commit/save, "
+                            "现场只会中途失败并烧掉唯一一次批准"),
+            "would_be_used_by": "S4 巡航学习与 S8/S8b 两场激励的起转前提(也是整个运动路径的前提)",
+            "fallback_registered": ("操作者给出的**备选**(本轮未采纳为默认): 不通电时脱开丝杆, 保留扩展板"
+                                    "固定在电机上, 沿此前已验证的空载电机路径完成学习与 IMU 保护演示; "
+                                    "SG/ADC 受控加载继续明确记为待验证。备选同样要先确认电机+扩展板在松手后"
+                                    "保持固定, 因此也受本门控制")},
         "load_means": {
             "status": "NOT_PROVIDED",
             "blocks_motion": True,
-            "asset": "现有实物: T8 丝杆 + 标称 300 mm 完整导轨滑台",
-            "asset_state": "电机尚未与滑台连接; 导程待确认(未实测)",
-            "provenance": ("复审 2026-11-01 原文 + C-01 交付回执 §5(两处一致)。本 Agent 未实测, "
-                           "因此只登记为操作者/复审给出的实物事实, 不构成任何现场结论"),
-            "constraints": ["现场只用中间短行程", "不得把 300 mm 当有效行程", "不得把 T8 当导程",
+            "asset": "现有实物: T8 丝杆套件(标称导程 8 mm) + 导轨滑台, 已按照片装配",
+            "asset_state": ("装配已完成但紧固/螺母防转/导向待确认(见 assembly_readiness); "
+                            "可从非旋转端操作的**加载作用点与档位/行程**仍未提供"),
+            "provenance": ("操作者 2026-11-01 现场回报 + 复审原文。本 Agent 未实测。导程是**标称**值, "
+                           "未做实测标定"),
+            "constraints": ["现场只用中间短行程", "不得把标称 8 mm 导程当作实测标定值",
+                            "滑台起点在左端且与末端限位留有间隙(操作者口径)",
+                            "顺时针=向右, 须在**第一次被批准的短移动**里现场核实后才按此方向执行",
+                            "软件限位输入仍为 DISABLED_BY_CONFIG, 不得把左侧起点当限位保护",
                             "不新增回零/全程定位功能", "不通过撞两端限位制造堵转",
-                            "导程确认后再按实际细分与脉冲参数核算累计距离与起转时长"],
-            "still_missing": ["电机与滑台的连接方式", "可从非旋转端操作的加载作用点及档位/行程",
-                              "ADXL345(现知在扩展板上)的实际固定方式"],
+                            "不手捏旋转轴、不为凑阈值加危险力"],
+            "still_missing": ["可从非旋转端操作的加载作用点及档位/行程",
+                              "电机与滑台的连接方式(装配照片之外可核的紧固状态)"],
             "gate": ("机械前置门在执行器里生效: 状态不是 PROVIDED 时该场景链在开端口之前就被具名跳过"
                      "(台账 STAGE_SKIPPED_BY_PREREQUISITE + 汇总 PREREQUISITE_REFUSAL 行), 不扣 "
                      "motor_run 额度、不发 motor_arm/motor_start —— 复审第 5 项要求的是这个, 不是说明字段"),
-            "would_be_used_by": "S8 的 SG/ADC 受控负载激励"},
+            "would_be_used_by": "S8/S10 的 SG/ADC 受控负载激励"},
         "instrument_probe": {
             "status": "NOT_PROVIDED",
             "blocks_motion": False,
             "asset": "示波器/电流钳(独立证 STEP 到关断, BUG-008)",
             "asset_state": "继续暂缓(复审本轮口径): 不新增高精度仪器前置, 也不因此卡住起转",
             "consequence": "停机事实只能登记为软件接口已接受, 不构成物理停机证明"},
-        "imu_bracket_rigidity": {
-            "status": "NOT_PROVIDED",
+        "imu_mounting": {
+            "status": "MOUNTED_TAPE_BY_OPERATOR_RIGIDITY_UNMEASURED",
             "blocks_motion": False,
-            "asset": "IMU 支架刚度(实际振动传递路径)",
-            "consequence": "IMU 链只能观察是否触发, 不做阈值标定; 结论上限是本次未证伪"}}
+            "asset": "ADXL345(在扩展板上)的实际固定方式",
+            "asset_state": ("已由操作者确认: 扩展板用绝缘胶带固定在电机上, 电机固定丝杆(2026-11-01)。"
+                            "此前登记的缺失项\"IMU 实际固定方式\"已闭合"),
+            "consequence": ("胶带固定可以按采样结果判定演示是否可行(操作者口径, 厂商提示 PCB 振动可能影响"
+                            "读数), 但**不做精确振动标定**; 结论上限是本次未证伪, 不是刚度已验证"),
+            "not_claimed": ["振动传递路径已知", "IMU 阈值可用", "胶带装配等价于可靠支架"]}}
 
 
 def first_cause_contract(scenario, suffix):
@@ -246,8 +323,14 @@ def fix_identity(plan, ident, tools):
             "response_branch(): 窗内已见触发针却记成 OBSERVATION_NO_TRIGGER => TRIP_REWRITTEN_AS_NO_TRIGGER",
             "validate_plan(): PLAN_IMAGE_IDENTITY_CONSISTENCY / PLAN_QUOTA_NEED / PLAN_SCENARIO_CHAIN / "
             "PLAN_STUB_BRANCHES / PLAN_PREREQUISITE_GATE / PLAN_FIRST_CAUSE_LEGS",
+            "R5: target_channel_claim() + rel_rule_names()(规则名两头从产品源码取, 造不出来就拒绝) + "
+            "validate_plan 的 PLAN_SPINUP_GATE_COVERAGE / PLAN_TARGET_CHANNEL;  dispatch 结果新增 "
+            "protection_claims / core_protection_verified / flow_complete(流程跑完与通道验证分开报), "
+            "台账新增 TARGET_CHANNEL / PROTECTION_CLAIMS / PROTECTION_CLAIM_DOWNGRADED 事件",
+            "R5: 机械前置拒绝沿**计划申报的 requires** 传播(S4 被装配门挡下 => S5/S6/S7 一并具名跳过), "
+            "prerequisite_refusals 增 via_requires",
             "dispatch 结果新增 scenario_branches / prerequisite_skips / prerequisite_refusals, "
-            "阶段条目新增 scenario / branch / detail / first_cause",
+            "阶段条目新增 scenario / branch / detail / first_cause / target_claim / target_why",
             "plan.stub_branches: 离线按链申报分支, 让两场的触发组合能在零设备工装上真实跑四种"],
         "unchanged": "产品 C 源码、镜像与构建产物、下载/回读/复位 argv 语义、既有清理与禁能合同"}
     ident["build_inputs"] = {
@@ -296,7 +379,7 @@ def fix_identity(plan, ident, tools):
                         COMMIT_TIP[:7]))
 
 
-def fix_order_and_chains(plan, by_id):
+def fix_order_and_chains(plan, by_id, known):
     plan["stages"] = [by_id[s] for s in ORDER]
     for i, sid in enumerate(ORDER):
         by_id[sid]["order"] = i
@@ -309,6 +392,27 @@ def fix_order_and_chains(plan, by_id):
     for sid, val in req.items():
         by_id[sid]["requires"] = val
     by_id["S8b"]["requires_before_this_round"] = ["S7_restore_equal(与 S8 并列, 不是接在 S8 之后)"]
+    # ⑤' 装配就绪门要挂在**每一个**起转/带电阶段上(复审第 2 项: 只挡 S8 不够, S4 学习与 S8b 也起转)。
+    SPIN_GATES = {"S4": ["assembly_readiness"],
+                  "S8": ["load_means", "assembly_readiness"],
+                  "S8b": ["assembly_readiness"],
+                  "S10": ["load_means", "assembly_readiness"],
+                  "S10b": ["assembly_readiness"]}
+    spins = sorted({s["id"] for s in plan["stages"]
+                    for st in s.get("steps", []) if st.get("cmd") in ("motor_arm", "motor_start")})
+    if spins != sorted(SPIN_GATES):
+        raise SystemExit("起转阶段集合变了: 计划里含 motor_arm/motor_start 的阶段是 %s, "
+                         "但门只写到 %s —— 先核对再改" % (spins, sorted(SPIN_GATES)))
+    for sid, gates in SPIN_GATES.items():
+        st = by_id[sid]
+        st["prerequisite_gates"] = gates
+        st.setdefault("prerequisites", {})["assembly_readiness"] = \
+            plan["mechanical_prerequisites"]["assembly_readiness"]
+        st["spinup_gate_note"] = (
+            "本阶段会发 %s, 所以在**开端口之前**检查 %s; 任一状态不是 PROVIDED 就具名跳过并记 "
+            "STAGE_SKIPPED_BY_PREREQUISITE(不扣额度、不发命令)" %
+            ("+".join(sorted({x["cmd"] for x in st["steps"] if x.get("cmd") in
+                              ("motor_arm", "motor_start")})), "+".join(gates)))
     for sid in ("S8", "S8b"):
         st, suf = by_id[sid], SUF[by_id[sid]["scenario"]]
         for spec in st.get("record_from", []):
@@ -321,8 +425,15 @@ def fix_order_and_chains(plan, by_id):
                                          "why": "首因的 profile 腿必须来自**同一会话**: 现场若只在 S5 看过, "
                                                 "触发那一代基线就无法与本会话对齐"})
         st["first_cause_legs"] = trip_legs(suf)
-        st["prerequisite_gates"] = ["load_means"] if sid == "S8" else []
         st["first_cause_contract"] = first_cause_contract(by_id[sid]["scenario"], suf)
+        # 观察窗键按场分开: IMU 那场喂 SG 的行(REL_SG_SEVERE + imu=0)是复审抓到的实际缺陷
+        for stp in st["steps"]:
+            if stp.get("as") == "trip_window":
+                stp["key"] = "__watch__@imu" if sid == "S8b" else "__watch__"
+                stp["channel_key_note"] = (
+                    "本场的观察窗夹具是 %s: 规则名与源样本列必须属于**本场目标通道**, "
+                    "否则分类只登记 OTHER_SOURCE_TRIGGERED(目标通道未证)" % stp["key"])
+        st["target_channel"] = target_channel_block(by_id[sid]["scenario"], suf, known)
         st["per_session_baseline_note"] = (
             "本场事故基线用后缀 _%s 独立记录(bb_session_%s / bb_written_%s / flash_used_before_%s), "
             "与另一场不共用键; 分支也按场存(执行器 scenario_branches) => 一场触发另一场未触发不是矛盾"
@@ -340,9 +451,12 @@ def fix_order_and_chains(plan, by_id):
         for step in st.get("steps", []):
             if step.get("new_log_window"):
                 step["new_log_window"]["before_key"] = "flash_used_before_%s" % suf
+            if step.get("as") == "latch":
+                step["key"] = "diag_status@latch@imu" if sid == "S9b" else "diag_status@latch"
         st["first_cause_legs"] = latch_legs(suf)
-    for sid in ("S10", "S11", "S10b", "S11b"):
-        by_id[sid]["prerequisite_gates"] = ["load_means"] if sid == "S10" else []
+    for sid in ("S11", "S11b"):
+        by_id[sid]["prerequisite_gates"] = []
+        by_id[sid]["no_spinup_note"] = "恢复会话内禁止 motor_start(在 forbidden_commands 里), 因此不需要起转门"
     by_id["S10"]["chain_note"] = ("锁存态再 arm 的演示仍属于 SG/ADC 那场: 它依赖**那场**触发后的锁存态, "
                                   "所以排在本场取证之后、下一场开始之前")
     by_id["S10b"]["chain_note"] = "同 S10, 属于 IMU 那场"
@@ -386,38 +500,48 @@ def fix_quota(plan, chain, needs_out):
 
 
 def fix_prose(plan, ident, needs):
-    plan["mechanical_prerequisites"] = prereq_block()
     by_id = {s["id"]: s for s in plan["stages"]}
     by_id["S8"]["prerequisites"]["load_means"] = plan["mechanical_prerequisites"]["load_means"]
     by_id["S8"]["prerequisites"]["instrument"] = plan["mechanical_prerequisites"]["instrument_probe"]
-    by_id["S8b"]["prerequisites"]["bracket_rigidity"] = \
-        plan["mechanical_prerequisites"]["imu_bracket_rigidity"]
+    by_id["S8b"]["prerequisites"]["imu_mounting"] = \
+        plan["mechanical_prerequisites"]["imu_mounting"]
     plan["load_step"] = {
         "verdict": "REFUSED_BEFORE_SPIN_UP_BY_EXECUTOR",
-        "missing": ["电机与滑台的连接方式", "可从非旋转端操作的加载作用点及档位/行程"],
-        "asset_now": "现有 T8 丝杆 + 标称 300 mm 完整导轨滑台; 尚未连接; 导程待确认",
+        "missing": ["可从非旋转端操作的加载作用点及档位/行程",
+                    "装配就绪(紧固/螺母防转/导向 + 支座松手保持固定)尚未确认"],
+        "asset_now": ("现有 T8 丝杆套件, 标称导程 8 mm; 已按照片装配, 紧固、螺母防转及导向尚待确认; "
+                      "轴承/底座目前只能手动固定"),
         "policy": ("不宣称有机械加载方法; 不以允许自然触发代替约束; 不手捏旋转轴、不为凑阈值加危险力、"
                    "不撞两端限位制造堵转"),
-        "gate_now_real": ("S8 的 prerequisite_gates=[load_means] 在执行器里生效: 状态不是 PROVIDED 时整条 "
-                          "SG_ADC 链在开端口之前跳过, 不扣 motor_run, 不发 arm/start —— 复审第 5 项要的就是"
-                          "这个(实际拒绝), 不是说明字段"),
+        "gate_now_real": ("S8/S10 挂 [load_means, assembly_readiness], S4/S8b/S10b 挂 [assembly_readiness]: "
+                          "状态不是 PROVIDED 时该阶段(及其场景链)在开端口之前跳过, 不扣 motor_run, "
+                          "不发 arm/start —— 复审第 2 项要的就是每个起转阶段都挡, 不是只挡 S8"),
+        "consequence_this_round": ("交付态(两项都不是 PROVIDED)下**没有任何一次起转**: S4 学习与两场激励"
+                                   "全部在起转前跳过, 依赖本次学习结果的 S5/S6/S7 沿 requires 一并跳过; "
+                                   "实际用量降到 port_open 1 次(只有 S3)、motor_run 0 次"),
         "instrument_deferred": "示波器/电流钳继续暂缓, 不作为起转前置, 也不新增高精度仪器前置(复审本轮口径)"}
     plan["not_provided_summary"] = [
-        {"item": "SG/ADC 可控负载的施加手段与机械连接", "status": "NOT_PROVIDED",
+        {"item": "起转装配就绪(紧固、螺母防转、导向 + 支座松手保持固定)", "status": "NOT_CONFIRMED",
+         "effect": "S4/S8/S8b/S10/S10b 全部在开端口之前具名跳过 => 交付态零次起转; "
+                   "S5/S6/S7 因依赖本次学习结果一并跳过",
+         "mechanism": "plan.mechanical_prerequisites.assembly_readiness + 各起转阶段 prerequisite_gates + "
+                      "执行器 STAGE_SKIPPED_BY_PREREQUISITE(沿 requires 传播)"},
+        {"item": "SG/ADC 可控负载的施加手段与加载作用点", "status": "NOT_PROVIDED",
          "effect": "整条 SG_ADC_controlled_load 链在开端口之前被具名拒绝(不起转、不开口、不扣额度)",
-         "mechanism": "plan.mechanical_prerequisites.load_means + stages[].prerequisite_gates + "
-                      "执行器 STAGE_SKIPPED_BY_PREREQUISITE"},
+         "mechanism": "plan.mechanical_prerequisites.load_means + stages[].prerequisite_gates"},
         {"item": "示波器/电流钳独立证 STEP 到关断(BUG-008)",
          "status": "NOT_PROVIDED(本轮暂缓, 不作为起转前置, 不新增仪器前置)",
          "effect": "停机事实只能登记为软件接口已接受"},
         {"item": "IRQ 极性实物确认", "status": "hardware-pending(对照表 polarity=not-confirmed)",
          "effect": "protect_ready=NO; 保护链不得称已用真实硬件中断验证"},
-        {"item": "IMU 支架刚度与实际振动传递路径", "status": "NOT_PROVIDED",
-         "effect": "IMU 链只看是否触发, 不做阈值标定"},
+        {"item": "IMU(ADXL345 在扩展板上)的固定方式",
+         "status": "MOUNTED_TAPE_BY_OPERATOR(操作者 2026-11-01 确认), 刚度未测",
+         "effect": "可以做非破坏性冲击/振动演示, 按采样结果判定; 不做精确振动标定, 结论上限是本次未证伪",
+         "closed_this_round": "此前登记的缺失项\"IMU 实际固定方式\"已闭合"},
         {"item": "阈值标定(SG 载荷/转速扫描)", "status": "NOT_ESTABLISHED(对照表)",
          "effect": "任何阈值已定的说法都不成立"},
-        {"item": "T8 滑台导程", "status": "UNCONFIRMED",
-         "effect": "不能核算累计运动距离; 300 mm 不得当有效行程"}]
+        {"item": "T8 导程", "status": "NOMINAL_8MM_UNCALIBRATED",
+         "effect": "标称 8 mm 是套件标称值, 未做实测标定; 不得当作已确认参数核算累计距离"}]
     dsp = plan.setdefault("dispatch_semantics", {})
     dsp["branch_scope"] = ("分支按**场景链**(stages[].scenario)存: scenario_branches/scenario_profile 各自决定, "
                            "真实传输由该链自己的观察窗响应决定(RESPONSE_BRANCH 事件带 scenario), 离线由 "
@@ -431,7 +555,29 @@ def fix_prose(plan, ident, needs):
     dsp["no_downgrade"] = ("窗内已见触发针却记成到时未触发 => TRIP_REWRITTEN_AS_NO_TRIGGER(具名停止); "
                            "四腿缺一 => EVIDENCE_INCOMPLETE。两者都不是 NO_TRIGGER, 也都不是通过; "
                            "而撤能清理在 exec_session 的 finally 里先于这两个判定完成")
+    dsp["flow_vs_verification"] = (
+        "两个字段分开报: flow_complete=计划里的阶段都按期望走完(身份核对、启停、清理、恢复都做了); "
+        "core_protection_verified=**每一场都是目标传感器通道自己触发并取证齐了**。前者为真不蕴含后者: "
+        "别的通道把保护碰响了、或者根本没起转, 都只算流程走完。交付态(装配就绪未确认)必然 "
+        "core_protection_verified=False")
+    dsp["target_channel"] = (
+        "每场在 stages[].target_channel 里申报自己认哪些规则名(产品 rel_reason_t 里的名字)以及哪一列"
+        "源样本必须非零。规则名不匹配 => OTHER_SOURCE_TRIGGERED(TARGET_CHANNEL_UNPROVEN); 规则名对但"
+        "该列为 0 => TARGET_RULE_BUT_SOURCE_FIELD_ZERO。两种都照常撤能、照常取证(含 event=5 停后帧读回), "
+        "但 protection_claims 记为未证, 不计入 core_protection_verified")
     dsp["one_approval"] = dsp.get("one_approval", "")
+    plan["claim_boundaries"] = {
+        "delivered_state_skips": ("本包交付态会跳过 SG/ADC 激励链(加载手段未提供)以及所有起转阶段"
+                                  "(装配就绪未确认)。因此整包完成**不等于**核心保护功能全部通过, "
+                                  "也不等于学习已通过"),
+        "flow_complete_true_means": "期望序列都跑到了各自的终态(含具名跳过), 不表示任何一次现场触发",
+        "core_protection_verified_true_means": ("两场都抓到**本场目标通道**的规则名(REL_SG_SEVERE/"
+                                                "REL_ADC_SEVERE/REL_FUSED_SEVERE 或 REL_IMPACT)、该通道"
+                                                "源样本非零、首因四腿齐、且新 session 读回 event=5 停后帧"),
+        "never_from_this_package": ["阈值的物理标定", "STEP 到关断的物理证明(BUG-008)",
+                                    "IRQ 极性已用实物确认", "栈 1024 足够", "HardFault 根因已闭"],
+        "operator_confirmation_needed": ["装配就绪 4 项逐条确认(本 Agent 不代填)",
+                                         "第一次被批准的短移动里核实\"顺时针=向右\""]}
     plan["first_cause_overall"] = {
         "rule": ("每一路首因都要在同一次运行内四件对齐: 触发规则与代际 -> 源样本与阈值 -> 本轮提交的 profile "
                  "-> 本场新日志 session 与实际停后帧(event=5, step_hz=0)。缺任何一件 => "
@@ -458,7 +604,15 @@ def fix_prose(plan, ident, needs):
         "C-02 停后帧事件码 9 -> 5(FAULT_MULTI_SOURCE), 依据见取证会话的 event_basis; 夹具与 R3 自检由 "
         "host/apply_c02_event5_fixtures.py 与 m8r3_field_selftest.py 的 FS69/FS76..FS79 覆盖",
         "语言修正: 不称 1024-668=356 B 为已验证安全余量; 264 B 是可达路径固定帧下界, 668 B 是链接器给出的"
-        "更深静态链, 两者口径不同且并存"]
+        "更深静态链, 两者口径不同且并存",
+        "R5-① 目标通道分类: 每场申报 target_channel(规则名必须来自产品 rel_reason_t), IMU 场只认 "
+        "REL_IMPACT 且 imu 列非零; SG/ADC 场认 REL_SG_SEVERE/REL_ADC_SEVERE/REL_FUSED_SEVERE 且 sg/cur "
+        "非零。规则名不对或源样本为 0 => 具名 OTHER_SOURCE_TRIGGERED / TARGET_RULE_BUT_SOURCE_FIELD_ZERO, "
+        "撤能取证照做但不计入 core_protection_verified; 观察窗与锁存夹具按场分开(__watch__@imu、"
+        "diag_status@latch@imu)",
+        "R5-② 机械事实更新 + 起转门覆盖: 改成\"现有 T8 丝杆套件, 标称导程 8 mm; 已按照片装配, 紧固、"
+        "螺母防转及导向尚待确认\", 新增 assembly_readiness(blocks_motion) 并挂到 S4/S8/S8b/S10/S10b "
+        "**每一个**起转阶段; 拒绝沿 requires 传播到 S5/S6/S7; 交付态因此零次起转"]
     plan["corrections_from_review_r4"] = {
         "package_5": ["回读仍认旧镜像(①)", "两场的取证/拒绝/恢复顺序与分场基线(②)",
                       "额度按真实路径与混合结果覆盖(③)", "首因四腿与不得降级(④)",
@@ -467,6 +621,17 @@ def fix_prose(plan, ident, needs):
                            "rtconfig 本机 CRLF 1927ed1c… / 远端 LF b66753d6… 双身份"],
         "language_1": "264 B 与 668 B 不冲突; 356 B 不是已验证安全余量",
         "c02_from_c01_receipt": "停后帧事件码由 9(FAULT_SOFT) 更正为 5(FAULT_MULTI_SOURCE)"}
+    plan["corrections_from_review_r5"] = {
+        "flow_vs_target_channel": (
+            "复审实测: IMU 场喂 REL_SG_SEVERE + imu=0 仍过首因判据, 而且现有 IMU 正控夹具就是这份数据。"
+            "现在分两层: 流程(flow_complete)与目标通道(core_protection_verified), 后者要求每场"
+            "抓到**本场规则名**且该通道源样本非零; 其他来源触发仍撤能、仍取证, 但登记为"
+            "\"其他来源触发/目标通道未证\", 不混算成功"),
+        "stale_mechanical_facts": (
+            "包里的\"完整滑台、尚未连接、导程待确认\"已过期, 按操作者口径改为\"现有 T8 丝杆套件, "
+            "标称导程 8 mm; 已按照片装配, 紧固、螺母防转及导向尚待确认\"; 并把装配就绪门放到每个"
+            "起转阶段之前(S4 学习、S8/S8b 激励、S10/S10b 锁存态再 arm)"),
+        "scope_of_this_round": "只改计划、结果分类与对应少量用例; 未改 C、未重编、未重跑历史清单、零设备动作"}
     plan["stack_margin_wording"] = {
         "metrics_are_different": True,
         "reachable_path_fixed_frame_lower_bound_bytes": 264,
@@ -497,6 +662,14 @@ def fix_fixtures(plan):
          "keys_total": len(rows["commands"]),
          "note": ("含本轮两处更正: flash_dump 停后帧 event 9->5 并补 source_shape 来源分级(没有板上采集); "
                   "新增 ADC68/SG8 过量采样健康键。都是夹具, 不构成设备证据")},
+        {"file": "两份 rows.json 的 R5 目标通道键",
+         "keys": ["__watch__@imu(r=REL_IMPACT, imu=3789)", "diag_status@latch@imu(同场锁存视图)",
+                  "__watch__@imu_zero(元负控专用: REL_IMPACT 但 imu=0)"],
+         "added_by": "host/apply_target_channel_fixtures.py",
+         "kind": "source_shape",
+         "note": ("形状来自 A/diagnosis.c:469-475 的 REL TRIP/rel LATCH 三行与 A/diag_relative.h 的 "
+                  "rel_reason_t; 数值全部合成, **没有任何板上采集给出过 REL_IMPACT 的触发行**。"
+                  "IMU 那场原来吃的是 SG 的行(r=REL_SG_SEVERE、imu=0) —— 复审抓到的就是这个")},
         {"file": "reports/reviews/phase8-m8-relative-protection-r3/field/rows.json",
          "bytes": nbytes(R3_ROWS), "sha256": sha(R3_ROWS),
          "source": "同一更正落在仍被引用的 R3 副本",
@@ -526,6 +699,35 @@ def fix_fixtures(plan):
                                   ]}
 
 
+def fix_r3_status(plan, chain):
+    """R5② 把每个起转阶段都挡、R5① 要求声明目标通道之后, **当前执行器**对 R3 那两份历史计划的
+    离线结论变了。它们是已执行轮次的输入, 本轮不重跑也不回写; 但"回不去"这件事必须实测登记,
+    不能靠一句"历史件"带过。数字由这份执行器当场重算, 不是抄来的。"""
+    app = str(ROOT / BSP / "applications")
+    rows_r3 = json.loads(R3_ROWS.read_text(encoding="utf-8"))
+    items = []
+    for fn in ("plan.json", "plan_continuation_s2.json"):
+        path = R3_ROWS.parent / fn
+        p = json.loads(path.read_text(encoding="utf-8"))
+        lines, bad, _n = chain.validate_plan(p, rows_r3, app)
+        names = sorted({l.split("|")[0] for l in lines if "|FAIL|" in l})
+        detail = [l for l in lines if "|FAIL|" in l and l.split("|")[0] in
+                  ("PLAN_SPINUP_GATE_COVERAGE", "PLAN_TARGET_CHANNEL")]
+        items.append({"file": "reports/reviews/phase8-m8-relative-protection-r3/field/" + fn,
+                      "sha256": sha(path), "bytes": nbytes(path),
+                      "checks": len(lines), "fail": bad, "fail_names": names,
+                      "this_rounds_two_gates": [d[:200] for d in detail]})
+    plan["r3_historical_plans_under_current_executor"] = {
+        "measured_by": "本构建脚本当场调用当前执行器的 validate_plan(数字是复算的, 不是登记来的)",
+        "items": items,
+        "meaning": ("R3 的两份计划是在 R5 两项补正**之前**定稿并执行的: 它们没有 assembly_readiness "
+                    "起转门、也没有 target_channel 声明, 所以现在这套执行器会给它们 fail=%d。"
+                    "本轮不重跑这两份计划、也不回写它们(它们绑定着已经发生过的轮次与已入库的原始记录); "
+                    "如果以后要复用, 必须先按同样两项补正并重新绑定, 不能拿旧计划当成“现在这套判据也能跑”。"
+                    % (items[0]["fail"] if items else -1)),
+        "not_done_here": ["不修改 R3 计划字节", "不重跑 R3 轮次的清单", "不把 fail 说成 PASS"]}
+
+
 def build(plan, chain):
     ident, tools = plan["identity_binding"], plan["tools"]
     by_id = {s["id"]: s for s in plan["stages"]}
@@ -533,12 +735,15 @@ def build(plan, chain):
                                                   if x["id"] not in ORDER]
     if off:
         raise SystemExit("阶段集合与目标顺序不一致: %s" % off)
+    known = sorted(chain.rel_rule_names(ROOT / BSP / "applications"))
     fix_identity(plan, ident, tools)
-    fix_order_and_chains(plan, by_id)
+    plan["mechanical_prerequisites"] = prereq_block()   # 门必须先有包级条目, 起转阶段才能挂
+    fix_order_and_chains(plan, by_id, known)
     needs = {}
     fix_quota(plan, chain, needs)
     fix_prose(plan, ident, needs)
     fix_fixtures(plan)
+    fix_r3_status(plan, chain)
     plan["download_payload_swap"] = {
         "swaps": 1,
         "payload_axf": AXF_REL,
@@ -548,20 +753,59 @@ def build(plan, chain):
                    "本包任何执行字段里"}
     plan["stub_branches"] = {SC_A: "trip", SC_B: "trip"}
     plan["verification_matrix_expected"] = {
+        "run_by_host": "host/verify_four_branch_matrix.py(零设备工装, 真实执行器 + 真实计划与夹具)",
+        "prerequisite_states": {
+            "delivery_state": "assembly_readiness=NOT_CONFIRMED 且 load_means=NOT_PROVIDED(本包交付态)",
+            "load_gap_only": "assembly_readiness=PROVIDED, load_means=NOT_PROVIDED",
+            "all_provided": "两项都 PROVIDED(操作者逐条确认之后才允许写进现场单)"},
         "four_branch_combinations": [
             {"stub_branches": {SC_A: "trip", SC_B: "trip"},
+             "prerequisite": "all_provided",
              "executed_chain_stages": ["S8", "S9", "S10", "S11", "S8b", "S9b", "S10b", "S11b"],
              "port_open_used": 12, "cleanup_groups_used": 5,
-             "prerequisite": "load_means=PROVIDED(健康正控: 机械手段到位时的完整路径)"},
-            {"stub_branches": {SC_A: "trip", SC_B: "no_trigger"},
-             "skipped_by_profile": ["S9b", "S10b", "S11b"], "note": "混合结果一: 不矛盾, 照常跑完"},
-            {"stub_branches": {SC_A: "no_trigger", SC_B: "trip"},
-             "skipped_by_profile": ["S9", "S10", "S11"], "note": "混合结果二"},
-            {"stub_branches": {SC_A: "no_trigger", SC_B: "no_trigger"},
+             "protection_claims": {SC_A: "VERIFIED", SC_B: "VERIFIED"},
+             "core_protection_verified": True},
+            {"stub_branches": {SC_A: "trip", SC_B: "no_trigger"}, "prerequisite": "all_provided",
+             "skipped_by_profile": ["S9b", "S10b", "S11b"],
+             "protection_claims": {SC_A: "VERIFIED", SC_B: "NO_TRIGGER"},
+             "core_protection_verified": False,
+             "note": "混合结果一: 不矛盾, 照常跑完; 未触发那条链不称已验证"},
+            {"stub_branches": {SC_A: "no_trigger", SC_B: "trip"}, "prerequisite": "all_provided",
+             "skipped_by_profile": ["S9", "S10", "S11"],
+             "protection_claims": {SC_A: "NO_TRIGGER", SC_B: "VERIFIED"},
+             "core_protection_verified": False, "note": "混合结果二"},
+            {"stub_branches": {SC_A: "no_trigger", SC_B: "no_trigger"}, "prerequisite": "all_provided",
              "skipped_by_profile": ["S9", "S10", "S11", "S9b", "S10b", "S11b"],
+             "core_protection_verified": False,
              "note": "都未触发: 取证链按分支跳过, 不得写成保护已验证"}],
-        "mechanical_gap_case": "load_means=NOT_PROVIDED(即本包交付态) => SG_ADC 整链在开端口之前跳过, "
-                               "port_open 用量降到 8, motor_run 用量 2",
+        "classification_cases": [
+            {"name": "imu_channel_positive", "setup": "S8b 观察窗键 __watch__@imu(REL_IMPACT, imu=3789)",
+             "expect_claim": "VERIFIED"},
+            {"name": "imu_fed_sg_rows", "setup": "把 S8b 的观察窗键换回 __watch__(REL_SG_SEVERE, imu=0)",
+             "expect_claim": "OTHER_SOURCE_TRIGGERED(TARGET_CHANNEL_UNPROVEN)",
+             "expect": ["撤能与取证照做(S9b 仍跑、仍读 event=5 停后帧)",
+                        "core_protection_verified=False", "flow_complete 仍可为真"]},
+            {"name": "imu_rule_ok_but_zero", "setup": "S8b 观察窗键 __watch__@imu_zero"
+                                                       "(REL_IMPACT 但 imu=0)",
+             "expect_claim": "TARGET_RULE_BUT_SOURCE_FIELD_ZERO(trip_imu_imu)",
+             "expect": ["证明 source_nonzero_keys 这道腿在起作用(元负控)"]},
+            {"name": "sg_fed_impact_rows", "setup": "把 S8 的观察窗键换成 __watch__@imu(REL_IMPACT)",
+             "expect_claim": "OTHER_SOURCE_TRIGGERED(TARGET_CHANNEL_UNPROVEN)",
+             "why": "SG 通道不因一次冲击判定而算已验证"},
+            {"name": "gate_removed_still_admits_sg_data",
+             "setup": "摘掉 target_channel_claim 的规则名判定(或删掉 target_channel 声明)",
+             "expect": "IMU 场喂 SG 行重新被判成通过 => 说明判据确实存在(负控必须 fire)"}],
+        "mechanical_gap_cases": [
+            {"name": "load_means=NOT_PROVIDED(只缺加载, 装配已确认)",
+             "expect": "SG_ADC 整链在开端口之前跳过, S4 学习与 S8b 照常起转: port_open 用量 8, "
+                       "motor_run 用量 2(剩 1)"},
+            {"name": "assembly_readiness=NOT_CONFIRMED(本包交付态)",
+             "expect": "S4/S8/S8b/S10/S10b 全部在开端口之前跳过, 且 S5/S6/S7 沿 requires 一并跳过 => "
+                       "port_open 用量 1(只有 S3), motor_run 用量 0, 台账里没有任何 motor_start"},
+            {"name": "两场均缺(交付态实测)",
+             "expect": "prerequisite_skips 覆盖 S4..S11b 全部运动与依赖阶段; "
+                       "prerequisite_refusals 的 gates 分别具名 load_means/assembly_readiness; "
+                       "protection_claims 对被跳过的场记 SKIPPED_BEFORE_SPIN_UP(PREREQUISITE)"}],
         "evidence_incomplete_case": "摘掉任一条腿(如源样本行) => code=EVIDENCE_INCOMPLETE 且 "
                                     "status!=OBSERVATION_NO_TRIGGER, 同时 disarm=CONFIRMED_DISABLED"}
     return needs

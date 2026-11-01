@@ -184,3 +184,96 @@ A 组 11 项 = idle 证据链与镜像身份；B 组 12 项 = learn 判据矩阵
 `protect_ready=NO`、`threshold_validation=NOT_ESTABLISHED`、`rel cov=NOT-ACTIVE` 不因包的绑定而改变。
 本包状态仍是 `BOUND_NOT_EXECUTED`：执行需要复审对 `plan_core_r4.json` + 执行器 + 两份计划/夹具的一次原文批准。
 
+## 10. R5 两项收口（复审 2026-11-01 实测；只改计划、结果分类与对应少量用例；不改 C、不重编、零设备）
+
+### 10.1 修前的字节级复现（不是照抄复审的话）
+
+拿上一版交付 `1101479` 的**已提交字节**读出 IMU 那两场：`S8b.steps[trip_window].key = "__watch__"`、
+`S9b.steps[latch].key = "diag_status@latch"` —— 两个键都是 SG 那一组夹具（`__watch__.trip` 是
+`r=REL_SG_SEVERE … imu=0`），而 `S8b` 既没有 `target_channel` 也没有 `prerequisite_gates`（`[]`）。
+所以"IMU 场吃 SG 的数据还算通过"和"S4/S8b 不受装配门约束"都是包里当时的真实状态，不是描述问题。
+同一件事在修后工装上也复现：把 `S8b.target_channel` 摘掉（回到修前的判定形态），喂 SG 行的 IMU 场
+立刻变成 `core_protection_verified=True`（矩阵 `V12`，原文
+`field/dispatch_stub_target_gate_removed.txt`）—— 说明 ① 的拒绝确实来自这个声明。
+
+### 10.2 ① 流程跑完 与 目标通道验证成功 分开判
+
+- 每场在 `stages[].target_channel` 里申报：`rule_key`（本场记录下来的 TRIP 规则名）、`rule_names`
+  （本场认的规则名）、`source_nonzero_keys`（该通道必须非零的源样本列）、`known_rule_names`
+  （产品枚举全集）。IMU 场 = `REL_IMPACT` + `trip_imu_imu≠0`；SG/ADC 场 = `REL_SG_SEVERE`/
+  `REL_ADC_SEVERE`/`REL_FUSED_SEVERE` + `trip_sg_sg`、`trip_cur_sg` 非零。规则名不是自己写的：
+  `rel_rule_names()` 同时从 `diag_relative.h` 的 `rel_reason_t` 与 `diag_relative.c` 的 `verdict_name()`
+  两头取（实测 7 个：`REL_ADC_SEVERE, REL_COVERAGE_LOST, REL_FUSED_SEVERE, REL_IMPACT,
+  REL_OUT_OF_WINDOW, REL_SENSOR_UNAVAILABLE, REL_SG_SEVERE`），两头不一致直接
+  `REL_RULE_NAMES_SOURCE_MISMATCH`。
+- 执行器 `target_channel_claim()` 给出四种具名结果：`VERIFIED`、
+  `OTHER_SOURCE_TRIGGERED(TARGET_CHANNEL_UNPROVEN)`、`TARGET_RULE_BUT_SOURCE_FIELD_ZERO(键)`、
+  `TARGET_UNPROVEN(…)`；`dispatch` 结果与台账同时带 `protection_claims` /
+  `core_protection_verified` / `flow_complete`，汇总行 `PROTECTION_CLAIM|…` 与
+  `FLOW_VS_VERIFICATION|flow_complete=…|core_protection_verified=…`。**其他来源触发不减少任何动作**：
+  撤能、取证、`event=5` 停后帧读回照做（`V10` 实测整链 4 阶段仍走完、`status=OK`）。
+- 夹具按场分开（`host/apply_target_channel_fixtures.py`，全部标 `kind=source_shape`）：
+  `__watch__@imu`（`r=REL_IMPACT … imu=3789`）、`diag_status@latch@imu`、以及只给元负控用的
+  `__watch__@imu_zero`（规则名对但 `imu=0`）。这些行的**形状**取自 `applications/diagnosis.c:469-475`
+  的三行 `REL TRIP`/`rel LATCH` 打印，数值是合成的 —— 没有任何板上采集给出过 `REL_IMPACT` 的触发行，
+  所以它们只让分类判据有一份形状正确的输入，不构成设备证据。
+- 离线新增两条门：`PLAN_TARGET_CHANNEL`（每个分支决定点必须声明，且规则名必须在产品枚举里）与
+  已有的 `PLAN_FIRST_CAUSE_LEGS` 并存。两条元负控都 fire：`N5` 摘掉声明 → 数据不再被拒但该突变计划被离线拒绝；
+  `N6` 把规则名换成 `REL_IMU_MADE_UP` → 离线具名拒绝。
+
+### 10.3 ② 装配就绪门覆盖**所有**起转阶段，机械事实按现场口径更新
+
+- 事实改为：**现有 T8 丝杆套件，标称导程 8 mm；已按照片装配，紧固、螺母防转及导向尚待确认。**
+  轴承/底座目前只能手动固定（操作者 2026-11-01 原话）。旧的"完整滑台 / 尚未连接 / 导程待确认"三段
+  已从执行字段里消失（`J2` 扫描 `mechanical_prerequisites + load_step + not_provided_summary`，
+  不扫全文，免得把本节的勘误引用当成过期事实）。
+- 新增包级 `assembly_readiness`（`status: NOT_CONFIRMED`，`blocks_motion: true`），挂在
+  **每一个**含 `motor_arm`/`motor_start` 的阶段上：`S4`（带起转的学习）、`S8`/`S10`
+  （`[load_means, assembly_readiness]`）、`S8b`/`S10b`（`[assembly_readiness]`）。
+  `PLAN_SPINUP_GATE_COVERAGE` 逐阶段检查这点，构建脚本另有一道自检：计划里"有起转命令的阶段集合"
+  与"写了门的阶段集合"不一致就直接拒绝生成。
+- 拒绝**沿 requires 传播**：`S4` 被挡后，依赖本次学习结果的 `S5`（tier/commit）、`S6`（重启）、
+  `S7`（恢复复核）一并具名跳过（台账 `STAGE_SKIPPED_BY_PREREQUISITE` + `via_requires=S4`）。
+  这一条不是为了好看：现场若在没有任何一次 `learn` 的前提下继续 `tier/commit/save`，唯一一次批准
+  会在中途失败上烧掉。
+- 因此**交付态实测**（矩阵 `V5`，原文 `field/dispatch_stub_healthy.txt`）：真正执行的只有 `S0 S1 S2 S3`；
+  `S4…S11b` 共 12 个阶段在开端口之前跳过；`port_open` 用量 **1**（申报仍是 12，那是全路径上限）；
+  `motor_run` 用量 **0**（一次 `motor_arm`/`motor_start` 都没发出）；两场的分类都是
+  `SKIPPED_BEFORE_SPIN_UP(PREREQUISITE)`；`flow_complete=True` 而 `core_protection_verified=False`。
+  只缺加载、装配已确认的那一面（`V5b`）：跳过 `S8 S9 S10 S11`，`port_open=8`、`motor_run=2`、
+  清理 3 组，`S4` 与 `S8b` 仍起转，IMU 场 `VERIFIED` 但 `core_protection_verified=False`
+  （因为 SG 那场没跑）。
+- 现场口径一并进包：滑台起点在左端且与末端限位留间隙；顺时针=向右要在**第一次被批准的短移动**里核实；
+  软件限位输入仍 `DISABLED_BY_CONFIG`（不把左侧起点当限位保护、不撞端制造堵转）；
+  IMU 用绝缘胶带固定在电机上（此前的缺失项"ADXL345 实际固定方式"已闭合，但刚度未测，不做精确振动标定）；
+  不通电脱开丝杆、只做空载学习与 IMU 演示的那条路记为**备选且本轮未采纳**，它同样受装配就绪门控制。
+
+### 10.4 R3 的两份历史计划在当前执行器下的结论（当场复算，不回写）
+
+`plan.json` 与 `plan_continuation_s2.json` 现在各得 **fail=3**（`PLAN_SPINUP_GATE_COVERAGE`、
+`PLAN_TARGET_CHANNEL`、`PLAN_FIRST_CAUSE_LEGS`）—— 它们是在这两项补正之前定稿并执行过的。
+本轮**不修改**这两份字节、也不重跑它们绑定的轮次；这个数字由构建脚本当场调用当前执行器复算后写进
+`plan_core_r4.json.r3_historical_plans_under_current_executor`，`N8` 再独立复算一次核对是否相等。
+以后若要复用，必须先按同样两项补正并重新绑定，不能拿旧计划当"现在这套判据也能跑"。
+
+### 10.5 本轮数字
+
+`host/verify_four_branch_matrix.py`：**14/14**（V1–V13 + V5b；四种触发组合、顺序、额度、按场基线、
+缺证撤能、不降级，加本轮新增的分类四例与两条离线负控）。
+`host/idle_learn_check.py`：**CHECKS=104 problems=0**，`META_NEGATIVES=6 fired=6`、
+`META_NEGATIVES_R5=6 fired=6`（新增 N 组 8 条与 J6/J7/J8、E12）。
+`m8r3_field_selftest.py`：**79/79**（负控注入 13，hardware_actions=0）。
+`--validate-plan`：**checks=236 fail=0**（原 233）。
+字节身份：计划 `plan_core_r4.json` 140800 B（原 112003），执行器 `m8r3_serial_chain.py`
+sha256 `e39efd9819fe…`/148016 B，两份 `rows.json` 51963 / 51944 B；
+**镜像与构建产物未动**：BIN `dab356c69fbf…`/290916 B、AXF `0babe9f1…`，产品 C 源码零改动，构建 0 次、设备动作 0 次。
+
+### 10.6 这版交付**不能**声称的事
+
+包状态仍是 `BOUND_NOT_EXECUTED`。交付态没有任何一次起转，因此：学习是否发生、SG/ADC 受控加载、
+IMU 冲击演示、停机锁存与人工恢复的**现场**结论一个都没有；`flow_complete=True` 只说明申报的阶段
+都到了各自的终态（含具名跳过），**不等于核心保护功能全部通过**，也不等于装配/加载前置已满足。
+`protect_ready=NO`、`threshold_validation=NOT_ESTABLISHED`、`rel cov=NOT-ACTIVE`、
+`limit_inputs=DISABLED_BY_CONFIG` 全部照旧。装配就绪的 4 项（松手保持固定、紧固、螺母防转、导向）
+要操作者逐条确认才能把状态写成 `PROVIDED`，我不代填。
+

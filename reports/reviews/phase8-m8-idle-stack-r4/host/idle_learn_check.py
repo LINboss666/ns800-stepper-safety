@@ -229,6 +229,11 @@ add("D5_invented_command_still_rejected",
     any("|FAIL|ps_not_a_command" in l for l in lines6) and bad5 == 0,
     "validate_plan(未突变) fail=%d; 发明命令 fail=%d" % (bad5, bad6))
 nogate = json.loads(json.dumps(PLAN))
+# 机械前置在本轮会把运动阶段整条挡掉, 那会**掩盖**人工门缺答案这个判据; 所以这一例把会挡起转的
+# 前置设成 PROVIDED, 只留"人工门没有答案"这一个缺陷 —— 判据要单独可判, 不能靠别的门替它挡。
+for k, v in nogate["mechanical_prerequisites"].items():
+    if v.get("blocks_motion"):
+        v["status"] = "PROVIDED"
 for st in nogate["stages"]:
     if st.get("id") in ("S8", "S8b"):
         st["manual_answers"] = {}
@@ -281,7 +286,9 @@ add("E5_boot_confirm_asserts_both_stack_sizes",
     sorted(sorted(v["must"].keys()) for v in ps_step["expect_values"])
     == [["diag_stack"], ["idle_stack"]])
 add("E6_mechanical_gaps_marked_not_provided",
-    json.dumps(PLAN).count("NOT_PROVIDED") >= 5 and len(PLAN["not_provided_summary"]) == 6,
+    json.dumps(PLAN).count("NOT_PROVIDED") >= 5 and len(PLAN["not_provided_summary"]) == 7 and
+    any("装配" in x["item"] and x["status"] == "NOT_CONFIRMED" for x in PLAN["not_provided_summary"]) and
+    any("SG/ADC" in x["item"] for x in PLAN["not_provided_summary"]),
     PLAN["not_provided_summary"][0]["item"])
 add("E7_validate_plan_clean", bad5 == 0 and len(lines5) > 200, "checks=%d fail=%d" % (len(lines5), bad5))
 add("E8_quota_declares_no_retry_and_no_blackbox_clear",
@@ -309,17 +316,30 @@ mleft = re.search(r"quota_left=\{([^}]*)\}", htxt)
 left_map = dict(re.findall(r'"(\w+)": (\d+)', mleft.group(1))) if mleft else {}
 add("E9_stub_dispatch_end_to_end_ok",
     "DISPATCH_SUMMARY|status=OK" in htxt and "stages_not_run=0" in htxt and
-    left_map.get("port_open") == str(int(PLAN["quota"]["port_open"]) - 8) and
-    left_map.get("motor_run") == str(int(PLAN["quota"]["motor_run"]) - 2) and
-    "PREREQUISITE_REFUSAL|scenario=SG_ADC_controlled_load" in htxt,
-    "交付态(load_means=NOT_PROVIDED)整包干跑: SG 链在开端口前被拒 => 实际只用 8 次开口 / 2 次起转, "
-    "其余阶段照常走完且无 NOT_RUN(原文存 field/dispatch_stub_healthy.txt)")
+    left_map.get("port_open") == str(int(PLAN["quota"]["port_open"]) - 1) and
+    left_map.get("motor_run") == str(int(PLAN["quota"]["motor_run"])) and
+    "PREREQUISITE_REFUSAL|scenario=SG_ADC_controlled_load|refused_before=S8|gates=load_means,"
+    "assembly_readiness" in htxt and
+    "PREREQUISITE_REFUSAL|scenario=IMU_non_destructive_excitation|refused_before=S8b|"
+    "gates=assembly_readiness" in htxt and
+    "FLOW_VS_VERIFICATION|flow_complete=True|core_protection_verified=False" in htxt,
+    "交付态(装配未确认+缺加载)整包干跑: 每个起转阶段都在开端口前被拒 => 实际只用 1 次开口(S3)、"
+    "0 次起转(motor_run 余额仍是 %s), 流程判定与通道判定分开报(原文存 field/dispatch_stub_healthy.txt)"
+    % PLAN["quota"]["motor_run"])
 add("E10_dry_run_touched_no_device", "actions_attempted=[]" in htxt,
     "干跑里 actions_attempted 为空: 没有一次真实工具调用、没有开口、没有起转(见同文件)")
 add("E11_skipped_chain_has_no_session_at_all",
-    "stage=S8|" not in htxt and "stage=S9|" not in htxt and "stage=S10|" not in htxt and
-    "stage=S11|" not in htxt and "stage=S8b|" in htxt and "stage=S9b|" in htxt,
-    "被前置门拒掉的链在汇总里一条阶段行都没有(不是执行了但失败), 而 IMU 链照常执行")
+    all("stage=%s|" % sid not in htxt for sid in
+        ("S4", "S5", "S6", "S7", "S8", "S8b", "S9", "S9b", "S10", "S10b", "S11", "S11b")) and
+    all("stage=%s|" % sid in htxt for sid in ("S0", "S1", "S2", "S3")),
+    "被机械前置门拒掉的阶段在汇总里一条阶段行都没有(不是执行了但失败), 交付态真正执行的只有 S0..S3")
+add("E12_refusal_lines_name_their_own_chain",
+    "PREREQUISITE_REFUSAL|scenario=SG_ADC_controlled_load|refused_before=S8|gates=load_means,"
+    "assembly_readiness|skipped_stages=S8,S9,S10,S11|" in htxt and
+    "PREREQUISITE_REFUSAL|scenario=S5|refused_before=S5|gates=requires:S4 已被机械前置跳过|"
+    "skipped_stages=S5|via_requires=S4|" in htxt,
+    "每条拒绝行只列自己作用域被跳过的阶段, 并把沿 requires 传播的来源(via_requires)写出来; "
+    "不是把全部阶段糊在一行里")
 
 # ---------------- F 组: ① 镜像身份统一(S0 / 下载 / 回读 同源) ----------------
 R3_BIN_OLD = "00608ec93c6a3027d68b44b5317574209fccfb0ba82a9974793d13b54b79e304"
@@ -428,7 +448,7 @@ gbad = subprocess.run([sys.executable, str(CHAIN), "--validate-plan", "--plan", 
                       encoding="utf-8", errors="replace")
 add("G7_meta_negative_chain_order", "PLAN_SCENARIO_CHAIN|all|FAIL" in gbad.stdout or
     bool(M.validate_plan(bad_order_plan(), json.loads((FIELD / "rows.json").read_text(encoding="utf-8-sig")),
-                         str(APPS.parent))[1]),
+                         str(APPS))[1]),
     "元负控: 把 S9 搬到它的分支决定点 S8 之前, 链序门必须 FAIL")
 
 # ---------------- H 组: ③ 额度按真实路径重算 ----------------
@@ -448,7 +468,7 @@ qbad = json.loads(json.dumps(PLAN))
 qbad["quota"]["port_open"] = 10
 qbad["quota"]["cleanup_motor_stop"] = 3
 _lines, _bad, _n = M.validate_plan(qbad, json.loads((FIELD / "rows.json").read_text(encoding="utf-8-sig")),
-                                   str(APPS.parent))
+                                   str(APPS))
 add("H4_meta_negative_quota", any("PLAN_QUOTA_NEED|port_open|FAIL" in l for l in _lines) and
     any("PLAN_QUOTA_NEED|cleanup_motor_stop|FAIL" in l for l in _lines) and _bad > 0,
     "元负控: 退回申报 10 开口 / 3 清理组时, PLAN_QUOTA_NEED 必须逐项报 FAIL")
@@ -512,15 +532,25 @@ res_i5 = M.first_cause_verdict(
 add("I5_wrong_generation_named", any("profile_identity" in x and "NOT_EQUAL_RECORDED" in x for x in res_i5),
     "profile 不是本轮提交的那一代 => 具名不匹配(不能拿旧基线冒充首因): %s" % res_i5[:2])
 
-# ---------------- J 组: ⑤ 机械前置是**真门** ----------------
+# ---------------- J 组: ⑤+R5② 机械前置是**真门**, 且覆盖每一个起转阶段 ----------
 mp = PLAN["mechanical_prerequisites"]["load_means"]
+am = PLAN["mechanical_prerequisites"]["assembly_readiness"]
+# 扫描范围只限**会执行到现场的机械字段**: 勘误段(corrections_from_review_r5)按审核要求要原样引用
+# 复审的旧措辞, 全文扫描会把自己的勘误当成过期事实(上一轮 K5 就是栽在这里)。
+MECH_TEXT = json.dumps([PLAN["mechanical_prerequisites"], PLAN["load_step"],
+                        PLAN["not_provided_summary"]], ensure_ascii=False)
+SPIN = sorted({s["id"] for s in PLAN["stages"]
+               for st in s.get("steps", []) if st.get("cmd") in ("motor_arm", "motor_start")})
 add("J1_load_means_state", mp["status"] == "NOT_PROVIDED" and mp["blocks_motion"] is True and
-    byid["S8"].get("prerequisite_gates") == ["load_means"],
-    "缺加载手段: 状态 NOT_PROVIDED + blocks_motion + 挂在 S8 的 prerequisite_gates 上")
-add("J2_asset_facts_registered",
-    "T8" in mp["asset"] and "300 mm" in mp["asset"] and "尚未" in mp["asset_state"] and
-    any("导程" in x for x in mp["still_missing"] + [mp["asset_state"]]),
-    "现有实物与缺项如实登记: %s / %s" % (mp["asset"], mp["asset_state"]))
+    byid["S8"].get("prerequisite_gates") == ["load_means", "assembly_readiness"],
+    "缺加载手段: 状态 NOT_PROVIDED + blocks_motion + 与装配就绪门一起挂在 S8 上")
+add("J2_asset_facts_updated",
+    "T8" in mp["asset"] and "8 mm" in mp["asset"] and "装配" in mp["asset_state"] and
+    "待确认" in mp["asset_state"] and
+    not any(x in MECH_TEXT for x in ("300 mm", "尚未连接", "完整导轨滑台", "导程待确认")),
+    "机械事实按操作者口径更新: %s / %s(执行字段里已无旧的\"完整滑台/尚未连接/导程待确认\"; "
+    "只在勘误段引用旧措辞, 故扫描范围限定在机械前置+load_step+缺项汇总, 不扫全文)"
+    % (mp["asset"], mp["asset_state"][:40]))
 add("J3_instrument_not_a_spinup_gate",
     PLAN["mechanical_prerequisites"]["instrument_probe"]["blocks_motion"] is False and
     "instrument_probe" not in byid["S8"].get("prerequisite_gates", []),
@@ -529,15 +559,36 @@ add("J4_gate_is_executed_not_prose",
     ("STAGE_SKIPPED_BY_PREREQUISITE" in CHAIN.read_text(encoding="utf-8") and
      "prerequisite_gates" in CHAIN.read_text(encoding="utf-8")),
     "门在执行器代码里(开端口之前跳过整条链), 不是只在计划的说明字段里")
+add("J6_assembly_gate_covers_every_spinup",
+    am["status"] == "NOT_CONFIRMED" and am["blocks_motion"] is True and
+    SPIN == ["S10", "S10b", "S4", "S8", "S8b"] and
+    all(am["status"] != "PROVIDED" and "assembly_readiness" in
+        (byid[s].get("prerequisite_gates") or []) for s in SPIN),
+    "装配就绪门挂在每一个起转/带电阶段上(复审第 2 项: 只挡 S8 不够): 起转阶段=%s" % SPIN)
+add("J7_refusal_propagates_along_requires",
+    "via_requires" in CHAIN.read_text(encoding="utf-8") and
+    "SKIPPED_BEFORE_SPIN_UP(PREREQUISITE)" in CHAIN.read_text(encoding="utf-8") and
+    bool(re.search(r"prerequisite_skips=\[\"S4\", \"S5\", \"S6\", \"S7\", \"S8\"", htxt)) and
+    "|via_requires=S4|" in htxt,
+    "S4 被挡后, 依赖本次学习的 S5/S6/S7 沿计划申报的 requires 一并具名跳过(不是中途失败): "
+    "汇总里的 prerequisite_skips 与 via_requires=S4 都实测到")
+add("J8_imu_mounting_fact_closed",
+    PLAN["mechanical_prerequisites"]["imu_mounting"]["status"].startswith("MOUNTED_TAPE") and
+    "绝缘胶带" in json.dumps(PLAN["mechanical_prerequisites"], ensure_ascii=False) and
+    not any("ADXL345(现知在扩展板上)的实际固定方式" in json.dumps(x, ensure_ascii=False)
+            for x in PLAN["not_provided_summary"]),
+    "IMU 固定方式已由操作者确认(绝缘胶带), 不再是缺失项; 但刚度仍未测, 不做精确振动标定")
 jbad = json.loads(json.dumps(PLAN))
 for s in jbad["stages"]:
     if s["id"] == "S8":
         s["prerequisite_gates"] = []
 _lines2, _bad2, _ = M.validate_plan(jbad, json.loads((FIELD / "rows.json").read_text(encoding="utf-8-sig")),
-                                    str(APPS.parent))
+                                    str(APPS))
 add("J5_meta_negative_ungated_prerequisite",
-    any("PLAN_PREREQUISITE_GATE|all|FAIL" in l and "load_means" in l for l in _lines2),
-    "元负控: 把 S8 的门摘掉(只剩说明字段)时, 离线门必须 FAIL")
+    any("PLAN_PREREQUISITE_GATE|all|FAIL" in l and "load_means" in l for l in _lines2) and
+    any("PLAN_SPINUP_GATE_COVERAGE|all|FAIL" in l and "S8" in l for l in _lines2),
+    "元负控: 把 S8 的门摘掉(只剩说明字段)时, PLAN_PREREQUISITE_GATE 与 PLAN_SPINUP_GATE_COVERAGE "
+    "都必须 FAIL: %s" % [l[:60] for l in _lines2 if "|FAIL|" in l][:3])
 
 # ---------------- K 组: 登记修正(构建输入提交 + rtconfig 双身份 + 356 B 措辞) -------
 bi = PLAN["identity_binding"]
@@ -639,13 +690,123 @@ add("M6_event_five_basis_is_source",
         for x in ("S9", "S9b")),
     "判据出处逐字写在计划里(FAULT_MULTI_SOURCE=5u 的三条源码锚点)")
 
+# ---------------- N 组: R5① 流程跑完 != 目标传感器通道验证成功 --------------------
+SC_A, SC_B = "SG_ADC_controlled_load", "IMU_non_destructive_excitation"
+RULES_SRC = M.rel_rule_names(str(APPS))
+ROWS4 = json.loads((FIELD / "rows.json").read_text(encoding="utf-8-sig"))["commands"]
+
+
+def provided_copy():
+    p = json.loads(json.dumps(PLAN))
+    for k, v in p["mechanical_prerequisites"].items():
+        if v.get("blocks_motion"):
+            v["status"] = "PROVIDED"
+    p["stub_branches"] = {SC_A: "trip", SC_B: "trip"}
+    return p
+
+
+def retarget_watch(p, watch_key, latch_key):
+    for stg in p["stages"]:
+        for st in stg.get("steps", []):
+            if stg["id"] == "S8b" and st.get("as") == "trip_window":
+                st["key"] = watch_key
+            if stg["id"] == "S9b" and st.get("as") == "latch":
+                st["key"] = latch_key
+    return p
+
+
+def drop_target_channel(p, sid):
+    for stg in p["stages"]:
+        if stg["id"] == sid:
+            stg.pop("target_channel", None)
+    return p
+
+
+def invent_rule(p, name):
+    for stg in p["stages"]:
+        if stg["id"] == "S8b":
+            stg["target_channel"]["rule_names"] = [name]
+    return p
+
+
+tc8, tc8b = byid["S8"]["target_channel"], byid["S8b"]["target_channel"]
+add("N1_target_channel_declared",
+    tc8b["rule_names"] == ["REL_IMPACT"] and
+    set(tc8["rule_names"]) == {"REL_SG_SEVERE", "REL_ADC_SEVERE", "REL_FUSED_SEVERE"} and
+    tc8["rule_key"] == "trip_rule_sg" and tc8b["rule_key"] == "trip_rule_imu" and
+    tc8["source_nonzero_keys"] == ["trip_sg_sg", "trip_cur_sg"] and
+    tc8b["source_nonzero_keys"] == ["trip_imu_imu"],
+    "每场申报自己的目标通道: IMU 只认 REL_IMPACT(imu 列必须非零), SG/ADC 认那三路(sg/cur 非零); "
+    "规则名键与源样本键都指向**本场**记录下来的字段")
+add("N2_rule_names_exist_in_product",
+    all(r in RULES_SRC for r in tc8["rule_names"] + tc8b["rule_names"]) and
+    tc8["known_rule_names"] == sorted(RULES_SRC) == tc8b["known_rule_names"],
+    "申报的规则名逐个来自产品枚举(rel_reason_t 与 verdict_name() 两头一致的 %d 个名字), 计划造不出名字: %s"
+    % (len(RULES_SRC), ",".join(sorted(RULES_SRC))))
+_step_key = lambda sid, asname: next(s.get("key") for s in byid[sid]["steps"] if s.get("as") == asname)
+add("N3_imu_chain_uses_its_own_fixture",
+    _step_key("S8b", "trip_window") == "__watch__@imu" and
+    _step_key("S9b", "latch") == "diag_status@latch@imu" and
+    _step_key("S8", "trip_window") == "__watch__" and
+    _step_key("S9", "latch") == "diag_status@latch" and
+    any("r=REL_IMPACT" in l for l in ROWS4["__watch__@imu"]["trip"]) and
+    any("imu=3789" in l for l in ROWS4["__watch__@imu"]["trip"]) and
+    any("imu=0 " in l for l in ROWS4["__watch__"]["trip"]) and
+    ROWS4["__watch__@imu"]["_provenance"]["kind"] == "source_shape" and
+    ROWS4["diag_status@latch@imu"]["_provenance"]["kind"] == "source_shape",
+    "IMU 那两场吃的是自己通道的夹具(REL_IMPACT + imu 非零), 且标 source_shape(形状取打印语句、"
+    "数值合成, 不是板上采集)")
+ttxt = dispatch(retarget_watch(provided_copy(), "__watch__", "diag_status@latch"), "target_sg_in_imu")
+add("N4_other_source_not_counted_as_success",
+    "PROTECTION_CLAIM|scenario=%s|claim=OTHER_SOURCE_TRIGGERED(TARGET_CHANNEL_UNPROVEN)" % SC_B in ttxt and
+    "PROTECTION_CLAIM|scenario=%s|claim=VERIFIED" % SC_A in ttxt and
+    "core_protection_verified=False" in ttxt and "flow_complete=True" in ttxt and
+    "DISPATCH|stage=S9b|" in ttxt and "DISPATCH_SUMMARY|status=OK" in ttxt,
+    "复审实测反例(IMU 场喂 REL_SG_SEVERE + imu=0): 具名登记为其他来源触发, 整链仍走完、取证照做, "
+    "但 core_protection_verified=False(原文存 field/dispatch_stub_target_sg_in_imu.txt)")
+_off = drop_target_channel(provided_copy(), "S8b")
+ntxt = dispatch(_off, "target_gate_removed")
+_lines3, _, _ = M.validate_plan(_off, json.loads((FIELD / "rows.json").read_text(encoding="utf-8-sig")),
+                                str(APPS))
+add("N5_meta_negative_gate_removed",
+    "claim=OTHER_SOURCE_TRIGGERED" not in ntxt and "core_protection_verified=True" in ntxt and
+    any("PLAN_TARGET_CHANNEL|all|FAIL" in l and "S8b" in l for l in _lines3),
+    "元负控: 摘掉 S8b 的 target_channel 后同一份 SG 数据不再被具名拒绝(core 翻回 True), 而这份突变计划"
+    "被离线 PLAN_TARGET_CHANNEL 拒绝 => N4 的判定确实来自这个门(原文存 "
+    "field/dispatch_stub_target_gate_removed.txt)")
+_p4 = invent_rule(provided_copy(), "REL_IMU_MADE_UP")
+_lines4, _, _ = M.validate_plan(_p4, json.loads((FIELD / "rows.json").read_text(encoding="utf-8-sig")),
+                                str(APPS))
+add("N6_meta_negative_invented_rule",
+    any("PLAN_TARGET_CHANNEL|all|FAIL" in l and "REL_IMU_MADE_UP" in l for l in _lines4),
+    "元负控: 把 IMU 的规则名换成产品里不存在的 REL_IMU_MADE_UP, 离线门必须具名拒绝")
+_cb = PLAN.get("claim_boundaries") or {}
+add("N8_r3_history_recomputed_same",
+    all(x["fail"] == M.validate_plan(json.loads((R3FIELD / pathlib.Path(x["file"]).name).read_text(
+            encoding="utf-8")),
+        json.loads((R3FIELD / "rows.json").read_text(encoding="utf-8")), str(APPS))[1]
+        for x in (PLAN.get("r3_historical_plans_under_current_executor") or {}).get("items", [])) and
+    len(PLAN["r3_historical_plans_under_current_executor"]["items"]) == 2,
+    "R3 两份历史计划在当前执行器下的 fail 数是**当场复算**的(登记值=%s), 不靠记忆; 本轮不回写它们"
+    % [x["fail"] for x in PLAN["r3_historical_plans_under_current_executor"]["items"]])
+add("N7_plan_states_boundary",
+    "不等于" in json.dumps(_cb, ensure_ascii=False) and
+    "跳过" in json.dumps(_cb, ensure_ascii=False) and
+    bool(_cb.get("core_protection_verified_true_means")) and bool(_cb.get("never_from_this_package")),
+    "计划自己写明边界: 交付态跳过 SG/ADC 激励链, 整包完成不等于核心保护全部通过(%d 条 never_from)"
+    % len(_cb.get("never_from_this_package") or []))
+
 problems = [n for n, ok, _ in CHECKS if not ok]
 n_metaneg = sum(1 for n, _, _ in CHECKS if n.startswith("D"))
+extra_meta = [n for n, ok, _ in CHECKS if "meta_negative" in n]
 lines = ["IDLE_LEARN_CHECK mode=offline_only (零设备: 不起 pyocd, 不开串口, 不动 Keil; dispatch 走 stub+sim)",
          "run_dir(LOCAL_ONLY, 仓外)=%s" % SCRATCH.as_posix()]
 lines += [("OK " if ok else "PROBLEM ") + n + ("" if ok else " | " + dt) for n, ok, dt in CHECKS]
 lines.append("CHECKS=%d problems=%d" % (len(CHECKS), len(problems)))
 lines.append("META_NEGATIVES=%d fired=%d" % (n_metaneg, n_metaneg - len([p for p in problems if p.startswith("D")])))
+lines.append("META_NEGATIVES_R5=%d(%s) fired=%d" %
+             (len(extra_meta), ",".join(extra_meta), len(extra_meta) - len([p for p in problems
+                                                                           if p in extra_meta])))
 lines.append("IDLE_LEARN_CHECK %s" % ("PROBLEMS " + json.dumps(problems, ensure_ascii=False) if problems
                                       else "ALL_PASS_WITH_META_NEGATIVES"))
 txt = "\n".join(lines) + "\n"

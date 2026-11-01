@@ -1,5 +1,5 @@
 IDLE_LEARN_CHECK mode=offline_only (零设备: 不起 pyocd, 不开串口, 不动 Keil; dispatch 走 stub+sim)
-run_dir(LOCAL_ONLY, 仓外)=D:/ns800_m8r3_scratch/idlecheck_ez0tinql
+run_dir(LOCAL_ONLY, 仓外)=D:/ns800_m8r3_scratch/idlecheck_bkt85ho3
 OK A1_old_map_idle_stack_is_256
 OK A2_new_map_idle_stack_is_1024
 OK A3_ZI_grew_exactly_768
@@ -46,6 +46,7 @@ OK E8_quota_declares_no_retry_and_no_blackbox_clear
 OK E9_stub_dispatch_end_to_end_ok
 OK E10_dry_run_touched_no_device
 OK E11_skipped_chain_has_no_session_at_all
+OK E12_refusal_lines_name_their_own_chain
 OK F1_readback_bound_to_this_image
 OK F2_download_bound_to_this_axf
 OK F3_no_stale_binding_in_executable_fields
@@ -73,9 +74,12 @@ OK I3_missing_leg_named
 OK I4_all_legs_present_passes
 OK I5_wrong_generation_named
 OK J1_load_means_state
-OK J2_asset_facts_registered
+OK J2_asset_facts_updated
 OK J3_instrument_not_a_spinup_gate
 OK J4_gate_is_executed_not_prose
+OK J6_assembly_gate_covers_every_spinup
+OK J7_refusal_propagates_along_requires
+OK J8_imu_mounting_fact_closed
 OK J5_meta_negative_ungated_prerequisite
 OK K1_build_input_commits_are_true
 OK K2_software_input_commit_resolvable
@@ -92,6 +96,15 @@ OK M3_adc68_fixture_present
 OK M4_archived_runs_untouched
 OK M5_m5_history_untouched
 OK M6_event_five_basis_is_source
-CHECKS=92 problems=0
+OK N1_target_channel_declared
+OK N2_rule_names_exist_in_product
+OK N3_imu_chain_uses_its_own_fixture
+OK N4_other_source_not_counted_as_success
+OK N5_meta_negative_gate_removed
+OK N6_meta_negative_invented_rule
+OK N8_r3_history_recomputed_same
+OK N7_plan_states_boundary
+CHECKS=104 problems=0
 META_NEGATIVES=6 fired=6
+META_NEGATIVES_R5=6(F6_meta_negative_gate_fires,G7_meta_negative_chain_order,H4_meta_negative_quota,J5_meta_negative_ungated_prerequisite,N5_meta_negative_gate_removed,N6_meta_negative_invented_rule) fired=6
 IDLE_LEARN_CHECK ALL_PASS_WITH_META_NEGATIVES
