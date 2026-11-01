@@ -1,6 +1,6 @@
 # sha256 * <repo相对路径>(LF, 无 BOM; 本清单不哈希自身字节 —— 一条清单不能给自己的字节作证)
 # 生成方式: 对 reports/reviews/phase8-m8-relative-protection-r3/ 下每个常规文件(排除 SHA256SUMS.txt、remote_readback.md 与 __pycache__) 直接读磁盘字节算 sha256
-# 条目数=5110; 逐条与 Git blob 的复算由 host/staged_blob_preflight.txt(提交前)与 host/remote_readback.py(推送后, 从远端 blob)完成
+# 条目数=5120; 逐条与 Git blob 的复算由 host/staged_blob_preflight.txt(提交前)与 host/remote_readback.py(推送后, 从远端 blob)完成
 6239911fbd44b814e769e75c531df369c76a04e6a2ba7e4dbe119cb4b30a7b5d  reports/reviews/phase8-m8-relative-protection-r3/build/rc.txt
 278c6c927c4a17d5cd31846c2cf97da7f826c1ba433aebe4f214098c7cdbc866  reports/reviews/phase8-m8-relative-protection-r3/build/rt-thread-measure-a0.log
 9114d6024382982ff45c1683b3063a3c5cb0193a117c67ee188e0c7f912ca697  reports/reviews/phase8-m8-relative-protection-r3/build/rt-thread-motor-m1-candidate.log
@@ -18,6 +18,10 @@ f21b8ac346dcb68f798c6578726fe8fe7e6d761fcf9e3f4556bbb8e721e727fa  reports/review
 cada980eb5670098ef4a1bd2bb808493c1fe9027f6e193049bc1afaaef7f36b2  reports/reviews/phase8-m8-relative-protection-r3/host/boundaries_candidate_r3finalfix.txt
 cad2ab004a03219b43a6cc62e4ecc91f58120060d3c85736a212a5792514e147  reports/reviews/phase8-m8-relative-protection-r3/host/c_chain_output.derivation.txt
 56b59e5e8da8615818463933e1d45afe28851e579aae97e7018d93b01bf5234d  reports/reviews/phase8-m8-relative-protection-r3/host/c_chain_output.txt
+1011b7f2a7e4e5cc9298d3bb5beaa9183d8b8bfd14f5eea2efd38fa134692a89  reports/reviews/phase8-m8-relative-protection-r3/host/dap_halt_check.py
+b5baa9c4c825edb0ccfdb4f6e5955de3656a47360341d2b852cc3b8528794480  reports/reviews/phase8-m8-relative-protection-r3/host/dap_halt_console.txt
+15ffaf2663012f639fa6ad1f45e5940690d972cf1a0dd24e946d6ed873d2fa63  reports/reviews/phase8-m8-relative-protection-r3/host/dap_halt_disasm_window.txt
+e4ab5d3e5ca6f2a1dd75b3ca21b60a35db224de9afbe5a9d19b084fe98eb6a61  reports/reviews/phase8-m8-relative-protection-r3/host/dap_halt_probe.json
 001e87e85c852a358d0c96e205175a3494ab779c6581a42513a50805694b0c7c  reports/reviews/phase8-m8-relative-protection-r3/host/dap_status_probe.json
 33ecac15b6fb3a63bf28ea1a7d597afd4e383a48e655926b6a832d8910b1103c  reports/reviews/phase8-m8-relative-protection-r3/host/encoding_gate_negative_control.txt
 3297edc0f5f917a523668c1fb116f21cab41f8c534980b8500157b4a978cc3ae  reports/reviews/phase8-m8-relative-protection-r3/host/ff_identity.json
@@ -99,6 +103,12 @@ a0dbbcd50590286e33f6ec19c493aa4750803250bc24eb28fce4b74615b5c0e4  reports/review
 0360f306c3599bc102e958fa5a913d984b740c62f29361fa0604c893240043b6  reports/reviews/phase8-m8-relative-protection-r3/host/validate_plan_m8s2.txt
 eaf30b55ed31fa406a8a5a710ca1efff6e9724859795898572946a7d3e8a2ef6  reports/reviews/phase8-m8-relative-protection-r3/host/validate_plan_r3closeout.txt
 0360f306c3599bc102e958fa5a913d984b740c62f29361fa0604c893240043b6  reports/reviews/phase8-m8-relative-protection-r3/host/validate_plan_r3finalfix.txt
+f3e3b125f3401867511113137560953c33a9419c8700b7685f2698cd04f5215f  reports/reviews/phase8-m8-relative-protection-r3/offline/daphalt-20261101T052450Z-22884/action_daphalt/ARGV.json
+13bf7b3039c63bf5a50491fa3cfd8eb4e699d1ba1436315aef9cbe5711530354  reports/reviews/phase8-m8-relative-protection-r3/offline/daphalt-20261101T052450Z-22884/action_daphalt/rc.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  reports/reviews/phase8-m8-relative-protection-r3/offline/daphalt-20261101T052450Z-22884/action_daphalt/stderr.bin
+2b21348c16c2c9fe5dfeec5f9b5a8364109af3ccfbc6b2ef41197ad8d07cb516  reports/reviews/phase8-m8-relative-protection-r3/offline/daphalt-20261101T052450Z-22884/action_daphalt/stdout.bin
+83457a353b9c6c28efba7511d32fb29f7f9c1fae70a1107d7b4309b0a756675b  reports/reviews/phase8-m8-relative-protection-r3/offline/daphalt-20261101T052450Z-22884/ledger.jsonl
+67f23e932ab2d1a2d0dd3e0e237225f653f0bc6c3d3d34ee954d106362885000  reports/reviews/phase8-m8-relative-protection-r3/offline/daphalt-20261101T052450Z-22884/SUMMARY.json
 add2de5308af5ef2d03fc7b2ed926e2a32f158a89212b134a0cb8c0d813b579f  reports/reviews/phase8-m8-relative-protection-r3/offline/dapstatus-20261101T031548Z-9916/action_dapstatus/ARGV.json
 df4e26a04a444901b95afef44e4a96cfae34690fff2ad2c66389c70079cdff2b  reports/reviews/phase8-m8-relative-protection-r3/offline/dapstatus-20261101T031548Z-9916/action_dapstatus/rc.txt
 91baa110e04788da91592f7eb8e665ef1ac2277a438f48702dccf432281cb0aa  reports/reviews/phase8-m8-relative-protection-r3/offline/dapstatus-20261101T031548Z-9916/action_dapstatus/stderr.bin
@@ -5110,4 +5120,4 @@ e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  reports/review
 92cc2d1f6d8ae9668a346fd770fc41c434f848224bf6e16103cc69d22949031d  reports/reviews/phase8-m8-relative-protection-r3/offline/serialprobe-20261031T193341Z-SERIAL1/sess_readonly_sysboot/ledger.jsonl
 a198c2a1c718b71f6971b5f9cdb615c0abf9c48de86071b1e5243974ab27a833  reports/reviews/phase8-m8-relative-protection-r3/offline/serialprobe-20261031T193341Z-SERIAL1/session_result.txt
 4b74d7bafcf7a115b921db196d35394f9d6e2fdc35ced1b67ca3536f5833c65d  reports/reviews/phase8-m8-relative-protection-r3/offline/serialprobe-20261031T193341Z-SERIAL1/steps_sysboot.json
-67d3a848b6583133603340b44d0e47e351b192ad0abaa846228ea069ffb80616  reports/reviews/phase8-m8-relative-protection-r3/run_record.md
+2229156d3c11d183dde5d1189e81517b4ce2d2e33dd03d9bbc95701f817966f4  reports/reviews/phase8-m8-relative-protection-r3/run_record.md

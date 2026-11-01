@@ -394,3 +394,63 @@ USB、COM5 无其他程序占用）。范围：一次 attach + 一次 `status`�
 下载 1、回读 2（1 败 1 成，后者逐字节相等）、显式复位 1、开口 3、本次 attach 1。
 登记件：`host/dap_status_probe.json`；检查器复算输出 `host/m8diag_source_audit_console_after_dap.txt`
 （52 条引用 + 11 条观察断言 + 3 条元负控 ⇒ `AUDIT_PROBLEMS=0`）。
+
+## 14. (c) 一次 halt 定位的实际结果：不是 SPI 自旋，是**硬fault 死循环**
+
+授权：操作者选定 (c)，范围一次 attach、**恰好一次 halt**、读通用/系统寄存器 + `CFSR/HFSR` 等，
+结束保持 Halted；零复位、零 Flash 读写、零 savemem、零串口、零配置写、零电机。选核用 commander
+内建 `core 0`（上一轮已证 `commander` 没有 `--core` 选项）。run 根
+`offline/daphalt-20261101T052450Z-22884`，rc=0，6.469 s，stdout 1205 B，stderr 0 B。
+
+| 采样 | 实测（全部由 `host/dap_halt_check.py` 按原字节断言） |
+| --- | --- |
+| halt 前 | `Core 0 (None):  Running`（与上一轮独立一致） |
+| halt | `Successfully halted device` —— 整场只有这一次 |
+| PC / LR | `pc: 0x0801e8a6` / `lr: 0x08008201` |
+| xPSR / ICSR | `0x61000003` 与 `0x0440f803` —— 两处独立给出 **IPSR/VECTACTIVE = 3 = HardFault** |
+| SP / MSP / PSP | `0x2000d3dc` / `0x2000d3dc` / `0x20012748`，CONTROL=0 |
+| PRIMASK / BASEPRI / FAULTMASK | `1 / 0 / 0` —— 核心级中断被屏蔽 |
+| CFSR / HFSR / DFSR / MMAR / BFAR | `0x00008200` / `0x40000000` / `0x00000001` / `0x00bd80b0` / `0x00bd80b0` |
+| SysTick CSR / RVR / CVR | `0x00010007` / `0x00061a7f` / `0x00014563` |
+
+定位（离线，用**已接受 AXF**，零目标内存读取）：`fromelf -c -a rt-thread-motor-m1.axf` 全文 116682 行，
+解析器只认文本里真实出现过的标签；三段切片入库在 `host/dap_halt_disasm_window.txt`。
+
+- `0x0801e8a6` = `e7fe` = `B .` 自跳转，属 `rt_hw_hard_fault_exception + 398`，源码就是
+  [cpuport.c:460](file:///D:/ns800/rt-thread-master/rt-thread-master/libcpu/arm/cortex-m7/cpuport.c#L460)
+  的 `while (1);`，紧邻其前一行 `:457` 正是 `hard_fault_track();`；
+- `lr` 落在 `bus_fault_track + 232`，该函数在 `0x080081ea` 处 `MOV r0,#0xed38 / MOVT r0,#0xe000`
+  读 `0xE000ED38`（`SCB_BFAR`，`cpuport.c:224`）——即处理程序已走到"打印 BFAR"那一支；
+- 采样时 `r2 = ns800_putc`、`r12 = rt_serial_write`，说明处理程序正在**轮询式往外打印**。
+
+判读（四条实测结论，各自独立）：
+1. **这次采样不在 SPI 的 RX 自旋里**，PC 在硬fault 死循环。`spi.h:479-481` 那条无界等待仍是"源码层存在
+   的设计隐患"，本测量**不**构成"板子卡在那里"的证据；也不能排除它在别的启动实例里发生过（一次采样只给一个瞬间）。
+2. **精确总线错**：`BFSR=0x82` = bit1 `PRECISERR` + bit7 `BFARVALID`，`MFSR=0`、`UFSR=0` —— 只有一种 fault；
+   `HFSR=0x40000000` 只有 `FORCED`（`VECTTBL=0`、`DEBUGEVT=0` ⇒ **不是我们这次 halt 造成的**）。
+   出错访问地址 `BFAR = 0x00bd80b0`，在本芯片上不存在的地址。
+3. **心跳已启动且在数**：SysTick `CSR=0x00010007`（ENABLE|TICKINT|CLKSOURCE，且 `COUNTFLAG=1`）、
+   `RVR=399999` ⇒ 配 `RT_TICK_PER_SECOND=1000` 反推 SysTick 时钟 400 MHz。**"板载心跳尚未启动"这一支被排除。**
+4. **控制台彻底哑的机制**现在有了直接解释：`PRIMASK=1` ⇒ 调度与 UART 接收中断都没人处理，
+   而处理程序自己用轮询打印（`ns800_putc`/`rt_serial_write` 在册）。
+   所以 §13 里并存的 H1/H2/H3 被第四条实测事实替代：不是 SPI 自旋、不是核停了、也不是 RX 方向坏，
+   而是**固件自己进了硬fault 死循环**。
+
+可观测性缺口（登记，不掩盖）：处理程序的 dump 是一次性输出，`cpuport.c:420-436` 会把
+`psr/r00..r12/lr/pc` 全部打出来；它发生在 M8-S2 那次复位后的捕获窗（约 6 s）关闭之后、60 s 被动窗之前，
+所以两头都没收到。当时若把复位后的被动窗开到覆盖"扫描 + 若干秒"，这段 dump 就会成为根因证据。
+
+还差一步才能"针对性修复"：真正的出错位置在**异常栈帧**里（处理程序已把它打印过）。
+切片 1 的 `0x0801e886` 说明帧指针 = `[当前 sp + 0xc] = [0x2000d3e8]`。要取它需要在**已经 halt** 的板上
+再读约 12 个目标 RAM 字（零第二次 halt、零复位、零写入）——这超出本次批准范围（批准只覆盖寄存器与
+`CFSR/HFSR`），所以我停在这里等一次新批准。板子现状：保持 Halted。
+
+## 14.1 勘误（随本轮生效）：`resume_on_disconnect=true` **不是**空操作
+
+§13 里我写了"`-O resume_on_disconnect=true` 因核本就未停而是空操作"，这句**错**。
+`pyocd/coresight/cortex_m.py:413-433`（`disconnect(resume=True)` 分支）在断开时无论核此前是否在跑，
+都会执行 `write32(DHCSR, DBGKEY|0x0000)`（清掉 `C_DEBUGEN`）与 `write32(DEMCR, 0)`（清 `TRCENA`）；
+其中 `self.resume()` 那一步才因"核未 halt"而空转。所以那次探针**确实改过目标状态**（关掉了我方刚启用的
+调试逻辑与 DEMCR）。正确口径：**零显式 halt、零复位，但不是"完全没改变目标状态"**。
+(c) 轮已按此把该选项改为 `false`（本轮要求"结束保持暂停"，断开时不该恢复/清调试）。
+

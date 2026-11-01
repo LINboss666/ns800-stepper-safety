@@ -1,0 +1,100 @@
+{
+ "what": "(c) 一次 halt 定位: 先记初始状态 -> halt 恰好一次 -> 读通用/系统寄存器 + ICSR/SHCSR/CFSR/HFSR/DFSR/MMAR/BFAR + SysTick -> 结束保持 Halted。零复位/零 Flash 读写/零 savemem/零串口/零配置写/零电机。",
+ "authorized_by": "操作者选定 (c), 并给出令牌口径'批准上述一次 halt 定位, 结束保持暂停';实体授权是操作者这一轮的'下一步选（c），暂停一次、读取 PC，直接定位代码'",
+ "run_root": "reports/reviews/phase8-m8-relative-protection-r3/offline/daphalt-20261101T052450Z-22884",
+ "rc": 0,
+ "elapsed_s": 6.469,
+ "stdout_bytes": 1205,
+ "stdout_sha256": "2b21348c16c2c9fe5dfeec5f9b5a8364109af3ccfbc6b2ef41197ad8d07cb516",
+ "stderr_bytes": 0,
+ "argv": "见 run 根 action_daphalt/ARGV.json(UID 脱敏为 len=48 sha256_d2f530dbd062; 原值散列在件内)",
+ "connect": "--connect attach + -O connect_mode=attach; -O resume_on_disconnect=false(本轮已按更正改为 false)",
+ "measured": {
+  "state_before_halt": "Core 0 (None):  Running",
+  "halt_call": "Successfully halted device (本轮唯一一次)",
+  "state_after_halt_and_at_exit": "Core 0 (None):  Halted",
+  "pc": "0x0801e8a6",
+  "lr": "0x08008201",
+  "sp_msp": "0x2000d3dc",
+  "psp": "0x20012748",
+  "xpsr": "0x61000003",
+  "r0_r1_r2_r3": [
+   "0x00000000",
+   "0x00000000",
+   "0x08016da9",
+   "0x00000013"
+  ],
+  "r4_r5_r6": [
+   "0x00000400",
+   "0x00000012",
+   "0x0000000a"
+  ],
+  "r7_to_r12": [
+   "0xdeadbeef",
+   "0xdeadbeef",
+   "0xdeadbeef",
+   "0xdeadbeef",
+   "0xdeadbeef",
+   "0x08021609"
+  ],
+  "control": "0x00000000",
+  "primask": "0x00000001",
+  "basepri": "0x00000000",
+  "faultmask": "0x00000000",
+  "ICSR_0xE000ED04": "0x0440f803",
+  "SHCSR_0xE000ED24": "0x00000000",
+  "CFSR_HFSR_DFSR_MMAR_0xE000ED28_4words": [
+   "0x00008200",
+   "0x40000000",
+   "0x00000001",
+   "0x00bd80b0"
+  ],
+  "BFAR_0xE000ED38": "0x00bd80b0",
+  "SysTick_CSR_RVR_CVR_0xE000E010": [
+   "0x00010007",
+   "0x00061a7f",
+   "0x00014563"
+  ]
+ },
+ "derived_from_measured": {
+  "IPSR": "3 = HardFault(xPSR 低 9 位;ICSR 的 VECTACTIVE 也是 3, 两处独立一致)",
+  "CFSR": "0x00008200 -> BFSR 字节(0xE000ED29)=0x82 = bit1 PRECISERR + bit7 BFARVALID; MFSR=0x00, UFSR=0x0000 => 只有一种 fault: 精确总线错",
+  "HFSR": "0x40000000 = bit30 FORCED(由可配置 fault 升级而来); bit1 VECTTBL=0(不是取向量失败); bit31 DEBUGEVT=0(**不是**我们这次 halt/调试事件造成的硬fault)",
+  "BFAR": "0x00bd80b0 且 BFARVALID=1 => 出错的那次访问落在一个本芯片不存在的地址上",
+  "SysTick": "CSR=0x00010007 -> ENABLE|TICKINT|CLKSOURCE 全开且 COUNTFLAG=1(自上次读以来数到过 0); RVR=0x00061a7f=399999 => 重装值+1 = 400000, 配 RT_TICK_PER_SECOND=1000 反推 SysTick 时钟 = 400 MHz(CLKSOURCE=处理器时钟); CVR=0x14563 在计数中。**因此'板载心跳尚未启动'这一支被排除。**",
+  "primask": "=1 => 核心级中断屏蔽;采样时 r2=ns800_putc、r12=rt_serial_write 落在控制台**输出**路径上,即处理程序在用轮询方式往外打印(不需要中断), 而调度器/UART 收中断被 PRIMASK 屏蔽=> 输入侧彻底无人处理。",
+  "r7_to_r11": "全为 0xdeadbeef(RT-Thread 栈填充毒值)=> 出错上下文几乎没用过被调用者保存寄存器"
+ },
+ "localization": {
+  "pc_symbol": "rt_hw_hard_fault_exception + 398(标签 0x0801e718), 机器码 e7fe = `B .` 自跳转, 前一条 0x0801e8a4 也跳进同一个地址",
+  "source": "libcpu/arm/cortex-m7/cpuport.c:460 `while (1);`(:457 正是紧邻的 hard_fault_track() 调用)",
+  "lr_symbol": "bus_fault_track + 232(标签 0x08008118)—— 即 hard_fault_track 已走到 BFAR 打印分支; 该函数在 0x080081ea 处 MOV r0,#0xed38 / MOVT r0,#0xe000 = 读 0xE000ED38(SCB_BFAR, cpuport.c:224)",
+  "how": "本机 fromelf(C:/Keil_v5/ARM/ARMCLANG/bin/fromelf.exe) -c -a 对**已接受 AXF** reports/firmware/phase8-m8-relative-protection-r3/rt-thread-motor-m1.axf (sha256 见 host/dap_halt_disasm_window.txt)全文反汇编 116682 行, 再由 D:/ns800_m8r3_scratch/resolve_addr.py 只按文本里真实出现的标签解析; 全文是生成物不入仓库, 入库的是三段切片 host/dap_halt_disasm_window.txt",
+  "not_read_from_target": "本轮没有 savemem / 没有读目标 Flash / 没有读目标 RAM"
+ },
+ "verdict": {
+  "H1_spi_unbounded_spin": "这次采样**没有落在**厂商 spi.h:479-481 的 RX 自旋里: PC 在硬fault 处理程序的 while(1)。因此那条无界等待仍是'源码层存在的设计隐患', 本次测量不构成'板子卡在那里'的证据; 也不排除它在此之前的某次启动里发生过(这次只能给一个采样瞬间)。",
+  "actual_mechanism_at_sample": "启动在阶段5 那一行之后因**精确总线错**(访问 0x00bd80b0)升级成硬fault, 处理程序打_complete dump 后进入 while(1); 因 PRIMASK=1, 调度与 UART 收中断都无人处理 => 之后所有窗口的零字节、零回显。",
+  "console_silence_explained": "H1/H2/H3 三条里, 现在被实测支持的是第四条: 既不是 SPI 自旋, 也不是核停了, 也不是 RX 方向坏 —— 是**固件自己进了硬fault 死循环**。H2 排除(采样时 Running), H3 不需要引入。",
+  "one_shot_note": "处理程序的 dump 是一次性输出: 它发生在我们那次复位捕获窗(约 6 s)之后、60 s 被动窗之前, 所以两头都没收到 —— 这是采集窗口的安排问题, 登记为可观测性缺口。"
+ },
+ "machine_recheck": {
+  "program": "host/dap_halt_check.py",
+  "console": "host/dap_halt_console.txt",
+  "tokens": 17,
+  "counts": 3,
+  "source_cites": 9,
+  "negative_control": "fired=3/3",
+  "problems": 0
+ },
+ "board_end_state": "保持 Halted(按批准口径); 要恢复运行需要操作者断电重上电或一次复位/恢复动作, 两者都未获批准, 我不自行做",
+ "still_needed_from_operator": "出错瞬间的 PC/LR 在**异常栈帧**里(处理程序自己 rt_kprintf 过, 见 cpuport.c:436)。切片 1 的 0x0801e886 显示该帧指针 = [当前 sp + 0xc] = [0x2000d3e8]。要拿到根因位置, 需要在已经 halt 的板上再读约 12 个目标 RAM 字(0x2000d3e8 处 1 个字 +帧的 11 个字), 零第二次 halt、零复位、零写。这超出已批准范围(那份批准只覆盖寄存器与 CFSR/HFSR), 所以先要一次新批准。",
+ "evidence": [
+  "host/dap_halt_probe.json",
+  "host/dap_halt_check.py",
+  "host/dap_halt_console.txt",
+  "host/dap_halt_disasm_window.txt",
+  "offline/daphalt-20261101T052450Z-22884/**",
+  "run_record.md §14"
+ ]
+}

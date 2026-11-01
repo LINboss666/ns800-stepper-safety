@@ -267,3 +267,30 @@ run 根 `offline/diag-com5-20261031T234328Z-48972`，台账 `sess_diag/ledger.js
 状态的动作，未获批准）；**H3 未被单独排除但独自解释不了"输出冻结在扫描行"**（TX 在同一会话已收到
 1027 B，越过阶段5 必打 `supervisor.c:463` 完成行）。当前事实合起来与"主线程在不让出的循环里占住
 CPU"一致。登记件 `host/dap_status_probe.json`；计划外只读探针，不消耗申报额度。
+
+## 14. (c) 一次 halt 定位 —— 实测**不是** SPI 自旋，而是硬fault 死循环
+
+`offline/daphalt-20261101T052450Z-22884`：rc=0 / 6.469 s / stdout 1205 B / stderr 0 B；
+halt 前 `Running` → 唯一一次 `Successfully halted device` → 退出时 `Halted`。
+
+- `pc = 0x0801e8a6` = `B .` 自跳转 = `rt_hw_hard_fault_exception + 398` = `cpuport.c:460` 的 `while (1);`
+  （其前一行 `:457` 正是 `hard_fault_track();`）；`lr` 在 `bus_fault_track + 232`（该函数读
+  `0xE000ED38 = SCB_BFAR`）；采样时 `r2/r12` 落在 `ns800_putc` / `rt_serial_write` ⇒ 处理程序在轮询打印。
+- `xPSR=0x61000003` 与 `ICSR=0x0440f803` 独立给出 **IPSR=3 = HardFault**；
+  `CFSR=0x00008200`（`BFSR=0x82` = PRECISERR + BFARVALID，`MFSR=UFSR=0`）；
+  `HFSR=0x40000000`（只有 FORCED；`VECTTBL=0`、`DEBUGEVT=0` ⇒ 不是这次 halt 造成的）；
+  **`BFAR=0x00bd80b0`**；`PRIMASK=1`；SysTick `CSR=0x00010007`、`RVR=399999`、`CVR` 在数
+  ⇒ **"心跳尚未启动"这一支排除**（400 MHz / 1000 Hz）。
+- 因此 §12/§13 并存的 H1(SPI 无界自旋)/H2(核没跑)/H3(RX 不通) 被**第四条实测事实**替代：
+  固件自己进了硬fault 死循环。SPI 那条无界等待仍只是"源码层存在的隐患"，这次测量没证实它被踩到。
+- 定位全程离线：`fromelf -c -a` 对**已接受 AXF**（`rt-thread-motor-m1.axf`，其配对 BIN 就是候选
+  `00608ec9…`）全文反汇编，解析器只认文本里出现过的标签；三段切片入库
+  `host/dap_halt_disasm_window.txt`；零目标内存读取、零 savemem。
+- 机器复算：`host/dap_halt_check.py` ⇒ 17 原字节 token + 3 计数 + 9 条源码行引用 + 3 条元负控，
+  `DAPHALT_PROBLEMS=0`。
+- **勘误（§14.1）**：上一轮"`resume_on_disconnect=true` 是空操作"**说错了** ——
+  `cortex_m.py:413-433` 在断开分支总会 `DHCSR=DBGKEY|0`（清 `C_DEBUGEN`）与 `DEMCR=0`（清 `TRCENA`）。
+  正确口径是"零显式 halt、零复位，但**不是**完全没改变目标状态"。本轮已改为 `false`。
+- 板子现保持 Halted（符合批准口径）。要拿根因位置还差**一次约 12 个目标 RAM 字的只读**
+  （帧指针 = `[0x2000d3e8]`，来自切片 1 的 `0x0801e886`），零第二次 halt、零复位、零写 —— 超出本次批准，
+  等一次新批准。

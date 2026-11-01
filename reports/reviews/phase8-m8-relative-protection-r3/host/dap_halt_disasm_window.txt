@@ -1,0 +1,64 @@
+M8 (c) halt 定位用反汇编切片 —— 由本机 fromelf 全文反汇编截出, 三段各自标出取用范围
+====================================================================================================
+AXF            : reports/firmware/phase8-m8-relative-protection-r3/rt-thread-motor-m1.axf
+AXF bytes      : 1771288
+AXF sha256     : 0bba8ca74ed8c11e149395efd64c42072fce0b3ced5ab76281210ddc04550963
+fromelf        : C:/Keil_v5/ARM/ARMCLANG/bin/fromelf.exe | 
+命令行(逐字)   : "C:/Keil_v5/ARM/ARMCLANG/bin/fromelf.exe" -c -a "D:\ns800\reports\firmware\phase8-m8-relative-protection-r3\rt-thread-motor-m1.axf"   (全文 116682 行, 生成物不入仓库)
+解析器         : D:/ns800_m8r3_scratch/resolve_addr.py (只认反汇编文本里出现过的标签与地址)
+
+--- 切片 1: PC 所在 = rt_hw_hard_fault_exception 尾部(while(1) 自跳转 + 它前面那条 BL) ---
+        0x0801e886:    9803        ..      LDR      r0,[sp,#0xc]
+        0x0801e888:    7800        .x      LDRB     r0,[r0,#0]
+        0x0801e88a:    06c0        ..      LSLS     r0,r0,#27
+        0x0801e88c:    2800        .(      CMP      r0,#0
+        0x0801e88e:    d407        ..      BMI      0x801e8a0 ; rt_hw_hard_fault_exception + 392
+        0x0801e890:    e7ff        ..      B        0x801e892 ; rt_hw_hard_fault_exception + 378
+        0x0801e892:    f6423010    B..0    MOV      r0,#0x2b10
+        0x0801e896:    f6c00004    ....    MOVT     r0,#0x804
+        0x0801e89a:    f000fab1    ....    BL       rt_kprintf ; 0x801ee00
+        0x0801e89e:    e7ff        ..      B        0x801e8a0 ; rt_hw_hard_fault_exception + 392
+        0x0801e8a0:    f7f0fdc6    ....    BL       hard_fault_track ; 0x800f430
+        0x0801e8a4:    e7ff        ..      B        0x801e8a6 ; rt_hw_hard_fault_exception + 398
+        0x0801e8a6:    e7fe        ..      B        0x801e8a6 ; rt_hw_hard_fault_exception + 398
+    rt_hw_interrupt_is_disabled
+        0x0801e8a8:    2000        .       MOVS     r0,#0
+        0x0801e8aa:    4770        pG      BX       lr
+
+--- 切片 2: LR 所在 = bus_fault_track 内部(读 0xE000ED38=SCB_BFAR 后打印的那条分支) ---
+        0x080081e2:    0600        ..      LSLS     r0,r0,#24
+        0x080081e4:    2800        .(      CMP      r0,#0
+        0x080081e6:    d50c        ..      BPL      0x8008202 ; bus_fault_track + 234
+        0x080081e8:    e7ff        ..      B        0x80081ea ; bus_fault_track + 210
+        0x080081ea:    f64e5038    N.8P    MOV      r0,#0xed38
+        0x080081ee:    f2ce0000    ....    MOVT     r0,#0xe000
+        0x080081f2:    6801        .h      LDR      r1,[r0,#0]
+        0x080081f4:    f642304b    B.K0    MOV      r0,#0x2b4b
+        0x080081f8:    f6c00004    ....    MOVT     r0,#0x804
+        0x080081fc:    f016fe00    ....    BL       rt_kprintf ; 0x801ee00
+        0x08008200:    e006        ..      B        0x8008210 ; bus_fault_track + 248
+        0x08008202:    f64160d4    A..`    MOV      r0,#0x1ed4
+        0x08008206:    f6c00004    ....    MOVT     r0,#0x804
+        0x0800820a:    f016fdf9    ....    BL       rt_kprintf ; 0x801ee00
+        0x0800820e:    e7ff        ..      B        0x8008210 ; bus_fault_track + 248
+        0x08008210:    b002        ..      ADD      sp,sp,#8
+
+--- 切片 3: 采样时 r2/r12 的落点(说明这次采样处在控制台的**输出**路径上) ---
+    ns800_putc
+        0x08016da8:    b580        ..      PUSH     {r7,lr}
+        0x08016daa:    b086        ..      SUB      sp,sp,#0x18
+        0x08016dac:    9004        ..      STR      r0,[sp,#0x10]
+        0x08016dae:    f88d100f    ....    STRB     r1,[sp,#0xf]
+        0x08016db2:    9804        ..      LDR      r0,[sp,#0x10]
+
+    rt_serial_write
+        0x08021608:    b580        ..      PUSH     {r7,lr}
+        0x0802160a:    b086        ..      SUB      sp,sp,#0x18
+        0x0802160c:    9004        ..      STR      r0,[sp,#0x10]
+        0x0802160e:    9103        ..      STR      r1,[sp,#0xc]
+        0x08021610:    9202        ..      STR      r2,[sp,#8]
+        0x08021612:    9301        ..      STR      r3,[sp,#4]
+
+判读只依据以上逐字切片: 0x0801e8a6 的机器码 e7fe = B .(自跳转), 前一条 0x0801e8a4 也跳进它;
+它属于标签 rt_hw_hard_fault_exception(0x0801e718) 的 +398 处; 该标签源码尾部是 cpuport.c:460 的
+`while (1);`, 而 :457 正是紧邻的 hard_fault_track() 调用(切片 1 里那条 BL)。

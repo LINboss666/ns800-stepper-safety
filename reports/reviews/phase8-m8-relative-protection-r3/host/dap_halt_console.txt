@@ -1,0 +1,4 @@
+OK  NEGATIVE_CONTROL fired=3/3(A 改 PC 一位/ B 抹掉 PRECISERR/ C 换成不存在的切片文件)
+
+TOKENS=17  COUNTS=3  CITES=9  stdout=1205 B sha256=2b21348c16c2
+DAPHALT_PROBLEMS=0  (0 => 这次 halt 的每个数字与每条源码落点都按本机字节成立)
