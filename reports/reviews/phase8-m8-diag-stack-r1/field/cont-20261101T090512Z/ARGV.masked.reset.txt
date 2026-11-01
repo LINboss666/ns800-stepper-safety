@@ -1,0 +1,1 @@
+python -m pyocd reset --method sysresetreq --no-config --no-wait --connect attach --core 0 -t cortex_m -u @UID_FILE<redacted len=48 sha256_d2f530dbd062>

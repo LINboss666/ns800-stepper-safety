@@ -1,8 +1,23 @@
 # sha256 * <repo相对路径>(LF, 无 BOM; 本清单不哈希自身字节 —— 一条清单不能给自己的字节作证)
 # 生成方式: 对 reports/reviews/phase8-m8-diag-stack-r1/ 下每个常规文件(排除 SHA256SUMS.txt 与 __pycache__) 直接读磁盘字节算 sha256
-# 条目数=50; 与 Git blob 的逐条复算由 host/staged_preflight_diagstack.py(提交前)完成
+# 条目数=65; 与 Git blob 的逐条复算由 host/staged_preflight_diagstack.py(提交前)完成
 f47ab70a68ffb84270802afe09eaf2efd280e8e13115b93a96fa4f1ebdce5417  reports/reviews/phase8-m8-diag-stack-r1/build/rt-thread-motor-m1-candidate.log
 dec52c7723f4af2a41ca1863f9096ae97d411abf2bd20db048ab4d5e360ba374  reports/reviews/phase8-m8-diag-stack-r1/disasm_diff.txt
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  reports/reviews/phase8-m8-diag-stack-r1/field/cont-20261101T090512Z/action_reset/rc.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  reports/reviews/phase8-m8-diag-stack-r1/field/cont-20261101T090512Z/action_reset/stderr.bin
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  reports/reviews/phase8-m8-diag-stack-r1/field/cont-20261101T090512Z/action_reset/stdout.bin
+82a3ef78222daff410e5c914aec6ff476181da34a58cd85c5361e0d15c0bd5c8  reports/reviews/phase8-m8-diag-stack-r1/field/cont-20261101T090512Z/APPROVAL_TOKEN.verbatim.txt
+c4c6b11a37869df8b5997723c664c7b542cd37ef43ed1d4d73b2b6aa1179dacf  reports/reviews/phase8-m8-diag-stack-r1/field/cont-20261101T090512Z/ARGV.masked.reset.txt
+98b93409222c0d8f2437e178ae1f12094f610ff5be81d3147b9771ef99afe498  reports/reviews/phase8-m8-diag-stack-r1/field/cont-20261101T090512Z/MODE.txt
+3998630d78cd306b34034cac3ee7a80b2750bb14603ac675fc2663dbb11b6140  reports/reviews/phase8-m8-diag-stack-r1/field/cont-20261101T090512Z/OFFLINE_JUDGEMENT.txt
+06ff49879629d300a48c07e4dd7d8093e78fb32ed8c55d0e96f9bf5676643a7d  reports/reviews/phase8-m8-diag-stack-r1/field/cont-20261101T090512Z/RESULT.json
+356f3e44e16a60c20af6ee2f16eeb644b93d7fb2dbfc6e7b55f8de43ca62945b  reports/reviews/phase8-m8-diag-stack-r1/field/cont-20261101T090512Z/S3_boot_capture.rx.bin
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  reports/reviews/phase8-m8-diag-stack-r1/field/cont-20261101T090512Z/S3_reset.rc.txt
+78760c95c9203fdbf0c50ddc55010c40817031089cfa22e8cb366638565634f3  reports/reviews/phase8-m8-diag-stack-r1/field/cont-20261101T090512Z/S4_diag_status.rx.bin
+5e17cb10d55d220a0ca1b1c81860b96babc6d38248cee21c9fe963c607de8a5c  reports/reviews/phase8-m8-diag-stack-r1/field/cont-20261101T090512Z/S4_free.rx.bin
+2bd7f17c79e54808aa407861c12aef7ab905ece292307d2e0c672d96c97aa17d  reports/reviews/phase8-m8-diag-stack-r1/field/cont-20261101T090512Z/S4_prompt_probe.rx.bin
+1dfaeb281dd74826050755981c16de1a471001f2b31e869cd67e4f6e60a61dd4  reports/reviews/phase8-m8-diag-stack-r1/field/cont-20261101T090512Z/S4_ps.rx.bin
+38a8b6bf90a7b3f9c533f8934432e1810a80012354a7380f08c3d99592bed5ca  reports/reviews/phase8-m8-diag-stack-r1/field/cont-20261101T090512Z/S4_system_status.rx.bin
 5b54e4bcbea925fad14c98929b21cac3d5e67ac5fe51ab23439ec08bf3fca97b  reports/reviews/phase8-m8-diag-stack-r1/field/field-20261101T084256Z/A_locals.bin
 9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  reports/reviews/phase8-m8-diag-stack-r1/field/field-20261101T084256Z/action_download/rc.txt
 c4797d6fe3cd9f73871e6a444c03161221470c7f46103aac97c49e3a3337a2e7  reports/reviews/phase8-m8-diag-stack-r1/field/field-20261101T084256Z/action_download/stderr.bin
@@ -48,6 +63,6 @@ bf4437edb8ebf71681d992989ed6c4eecd5e6155a388ef51a7c15a4b34915ad4  reports/review
 d0356283c5f59e2c83e7e66bd569aa76de5fb892743eea6a71d7a7958e4a5c4f  reports/reviews/phase8-m8-diag-stack-r1/host/field_check.py
 78964c31624383c480cbfc4ca80965b7a3f4b9f1aaa341faed3e75660757daa7  reports/reviews/phase8-m8-diag-stack-r1/host/field_check_console.txt
 22358e548be59a914a2570f28322fb9902786d9cddabd271d6eb0e2eb273ce0f  reports/reviews/phase8-m8-diag-stack-r1/host/staged_preflight_diagstack.py
-de8cedadc72b56e6486b928f902a1d516ad4a8469c3c6d12ee4ebf6b526bada8  reports/reviews/phase8-m8-diag-stack-r1/host/staged_preflight_diagstack.txt
-976a3fa530d7583074421753038745f17eaaf5336c53144420a0ac5950aff4a9  reports/reviews/phase8-m8-diag-stack-r1/run_record.md
+46a018fd52d3b13e110f1a34b3ba1af50ac85eedd52a4a37eec450f3b0655752  reports/reviews/phase8-m8-diag-stack-r1/host/staged_preflight_diagstack.txt
+0012b94151e63e2ae3ddf619158280e2827f36dbc95f391ad03e2b80d714ffff  reports/reviews/phase8-m8-diag-stack-r1/run_record.md
 b7a1362dc63075158133d18c0c89e85d609ef8d0584b6a64df1a9f23670c279c  reports/reviews/phase8-m8-diag-stack-r1/stack_report.txt

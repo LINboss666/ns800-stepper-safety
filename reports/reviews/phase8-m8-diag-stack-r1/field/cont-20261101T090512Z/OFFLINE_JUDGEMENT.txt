@@ -1,0 +1,41 @@
+# 续测 cont-20261101T090512Z 的离线判读 —— 由 Agent 生成(非脚本输出); 原始字节同目录, 未删未改
+# 判读对象 = S3_boot_capture.rx.bin(3439 B) + S4_{system_status,ps,free,diag_status}.rx.bin
+# 脚本终态: RESULT.json verdict=CAPTURE_COMPLETE_REVIEW_PENDING, tools_called=["reset"], port_closed=true
+
+## 测到的(板上原文, 可逐条回指字节)
+1. 启动走完全程: `[BOOT] 11 startup-selftest OK -> state=READY` 之后出现绑定针脚
+   `[BOOT] Phase-7 runtime bootstrap complete (state=READY)`; 两个 HardFault 针脚
+   (`hard fault on thread: ` / `psr: 0x`) 在 3439 B 里 **0 命中**。
+2. 出事那条路径这次通了: `[DIAG] thread started (prio 9, mode=MONITOR_ONLY)` →
+   `[BOOT] 8 diagnosis ....... OK` → `[BB] blackbox ready (ring=300 cap=450 frames @100Hz, prio 18)` →
+   `[BOOT] 9 blackbox ........ OK`。既往坏现场正是 bblog 的 thread_timer 初始化(`object.c:381`)。
+3. 运行时确认栈已是 4096: `ps` 里 `diag  9  suspend 0x000003cc 0x00001000  28%`
+   —— stack size 0x1000 = 4096(与镜像级、反汇编级证据同一结论)。
+4. **旧栈装不下是实测出来的, 不再只是静态估计**: `max used 28%` × 4096 ≈ **1146 B** > 旧值 1024 B。
+   这条把 §2 的 armlink 静态下界(Max Depth 1580 / 三帧 1064)升级成板上高水位实测证据。
+   对照: `bblog 0x400 60%` ≈ 614 B(仍 1024 未改), `main 0x800 81%`, `tidle0 0x100 64%`。
+5. 堆有余量: `free` = total 32672 / used 20072 / maximum 20072 / available **12600**(≈39% 空闲)。
+   ⇒ diag 多要的 3072 B 已被支付且全部线程创建成功; `used == maximum` 说明此刻还没出现更高分配峰。
+6. 零电机(与本轮"只发 reset"一致, 不是靠承诺): `system_status` = `Motor state=0 cur=0 tgt=0 armed=0
+   drv_en_verified=0`, `arm gate fail mask=0x18 (arm REFUSED)`; `diag_status` = `cnt … 全 0`、
+   `rel latch: none`、`verdict=NORMAL mode=MONITOR_ONLY`。
+7. 交互合同成立: 提示符探针 7 B(`msh >` + CRLF), 四条查询每条都是"回显 + 非空白正文 + 以 msh > 收尾",
+   正文分别 830 / 793 / 49 / 978 B —— 这是本项目第一次拿满四条查询响应(往轮三轮静默)。
+
+## 没测到 / 不许从上面推的东西
+- **因果仍未证**。这次通过可以是"1024→4096 消除了溢出", 也可以只是**堆布局变了**导致溢出不再命中
+  Timer 链表: bblog 的 TCB 地址从坏现场的 0x20015b28 变成 0x20016728, `diag` 的 TCB 是 0x20015660。
+  一次启动分不出这两种解释, 也不许择一采信。
+- **N=1**: 只跑了一次复位、一次 75 s 窗; 没有重复启动, 没有长跑。
+- **4096 不是已验证上界**: 1146 B 只是本次(单样本、MONITOR_ONLY、无告警打印路径)的高水位;
+  更深调用(异常压栈、告警刷屏、profile 载入后的 rel 路径)没进过这个窗口。
+- 坏链表 `0x00bd80b0` 的**写入者仍未定**; 本轮没有取任何新的异常现场(板已正常运行, 没有 HardFault 可取)。
+- 与保护验收无关的在位状态照实登记: `ADC DEGRADED cal=THEORETICAL`、`protect_ready=NO
+  polarity=not-confirmed`、`threshold_validation=NOT_ESTABLISHED`、`rel cov=NOT-ACTIVE(no-profile)
+  lost=64660`、`limit_inputs=DISABLED_BY_CONFIG` ⇒ SG/ADC 相对保护与碰撞保护的现场验收**还没开始**。
+- 只登记不解释: `ps` 的 error 列里除 `tshell`/`tidle0` 外都是 `EINTRPT`。
+
+## 本目录里"脚本输出"与"Agent 判读"的边界
+脚本产物: MODE.txt / APPROVAL_TOKEN.verbatim.txt / ARGV.masked.reset.txt / S3_reset.rc.txt /
+action_reset/* / S3_boot_capture.rx.bin / S4_prompt_probe.rx.bin / S4_{system_status,ps,free,diag_status}.rx.bin /
+RESULT.json。本文件与 run_record.md §15 是 Agent 的离线判读, 不参与脚本判定。

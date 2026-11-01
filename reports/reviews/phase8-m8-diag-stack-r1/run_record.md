@@ -265,3 +265,33 @@ E 组又抓到第 8 项同类问题：`serial_stage()` 的 `finally` 早于 `con
 
 本轮**没有任何设备动作**：板子仍是 §12 的状态（4096 新镜像已在 Flash 且逐字节证得，核心 Halted，从未复位）。
 等"跑续测"这句话，才执行 `--mode cont`。
+
+## 15. 续测 `cont-20261101T090512Z`：启动到 READY、四查询拿满、HardFault 未复现（因果仍未证）
+
+执行前核对：tip `00f5508`、工作树干净、待执行脚本 blob sha256 = `a30537da…c5151`（与批准同一枚）、UID 文件在场。
+**没有做任何开口探测**：第 3 次打开 COM5 就是正式会话本身。设备动作只有一次 `reset`
+（`RESULT.json` 里 `tools_called == ["reset"]`、`S3_reset.rc.txt = 0`、`port_closed = true`）。
+
+测到（逐条回指原文见 `field/cont-20261101T090512Z/OFFLINE_JUDGEMENT.txt`）：
+
+- 3439 B 启动流里出现绑定针脚 `[BOOT] Phase-7 runtime bootstrap complete (state=READY)`，
+  两个 HardFault 针脚 **0 命中**；`[BOOT] 8 diagnosis OK` 与 `[BOOT] 9 blackbox OK` 都过去了 ——
+  既往坏现场正是 bblog 的 `thread_timer` 初始化卡在 `object.c:381`。
+- `ps` 实测：`diag … 0x00001000 28%` ⇒ 栈 4096 已在运行时生效，高水位 ≈ **1146 B > 旧值 1024**。
+  这把 §2 的 armlink 静态下界升级成**板上实测**：旧栈确实装不下。对照 `bblog 0x400 60%` ≈ 614 B。
+- `free`：total 32672 / used 20072 / available **12600**（≈39%）⇒ diag 多要的 3072 B 已支付且全部线程创建成功。
+- 零电机是读出来的不是承诺：`Motor state=0 armed=0`、`arm gate fail mask=0x18 (arm REFUSED)`、
+  `diag_status` 计数全 0、`rel latch: none`、`verdict=NORMAL mode=MONITOR_ONLY`。
+- 交互合同第一次成立：提示符探针 7 B，四条查询正文分别 830 / 793 / 49 / 978 B，每条都"回显+正文+`msh >` 收尾"
+  —— 本项目第一次拿满四条查询（往轮三轮静默）。
+
+不许从这些推的：**因果仍未证**。这次通过既可以是 1024→4096 消除了溢出，也可以只是堆布局变了
+（bblog 的 TCB 从坏现场的 `0x20015b28` 变成 `0x20016728`，`diag` 是 `0x20015660`）使溢出不再命中 Timer 链表；
+单次启动分不出两种解释，不择一采信。且 **N=1**（一次复位、一个 75 s 窗，无重复启动无长跑）、
+4096 仍不是已验证上界（1146 B 只是本次 MONITOR_ONLY、无告警打印路径的高水位）、坏指针写入者仍未定。
+保护验收也没开始：`ADC DEGRADED cal=THEORETICAL`、`protect_ready=NO`、`threshold_validation=NOT_ESTABLISHED`、
+`rel cov=NOT-ACTIVE(no-profile) lost=64660`、`limit_inputs=DISABLED_BY_CONFIG`。
+只登记不解释：`ps` 的 error 列除 `tshell`/`tidle0` 外都是 `EINTRPT`。
+
+脚本终态按约定仍是 `CAPTURE_COMPLETE_REVIEW_PENDING`（不是 PASS）：栈/堆余量的判读由本轮离线完成，
+不并入自动判定。

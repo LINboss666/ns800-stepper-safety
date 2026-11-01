@@ -1,4 +1,4 @@
-MANIFEST reports/reviews/phase8-m8-diag-stack-r1/SHA256SUMS.txt entries=50 problems=0 []
+MANIFEST reports/reviews/phase8-m8-diag-stack-r1/SHA256SUMS.txt entries=65 problems=0 []
 MANIFEST reports/firmware/phase8-m8-diag-stack-r1/SHA256SUMS.txt entries=4 problems=0 []
 BUILD_MANIFEST reports/firmware/phase8-m8-diag-stack-r1/build_manifest.json declared=4 resolved=4 problems=0 []
 STAGED_PREFLIGHT_TOTAL problems=0  (0 => 每个登记件的 Git blob 都与清单逐字节相符)

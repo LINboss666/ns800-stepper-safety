@@ -1,0 +1,69 @@
+{
+ "mode": "cont",
+ "run_root": "D:/ns800/reports/reviews/phase8-m8-diag-stack-r1/field/cont-20261101T090512Z",
+ "quota": {
+  "port_open": 1,
+  "explicit_reset": 1,
+  "boot_window_s": 75,
+  "queries": [
+   "system_status",
+   "ps",
+   "free",
+   "diag_status"
+  ],
+  "read_ram": 0,
+  "download": 0,
+  "flash_readback": 0,
+  "flash_write": 0,
+  "ram_write": 0,
+  "motor_run": 0,
+  "config_save": 0,
+  "blackbox_clear": 0,
+  "rebuild": 0,
+  "retry": 0
+ },
+ "image_proven_on_board": {
+  "run_root": "reports/reviews/phase8-m8-diag-stack-r1/field/field-20261101T084256Z",
+  "readback_file": "flash_readback.bin",
+  "bytes": 290916,
+  "sha256": "f5c2fd89bbf28255a5b26c9cca495bc0fb1e39d401d0bb7bea19d051221708ce",
+  "proven": "S2 唯一一次回读 rc=0 且与该散列逐字节相同(run_record §12); 复审亦独立复算确认",
+  "note": "续测**不再**下载与回读: 那两项配额已用尽, 镜像身份已证"
+ },
+ "uid_disclosure": {
+  "present": true,
+  "length": 48,
+  "sha256_12": "d2f530dbd062"
+ },
+ "boot_bytes": 3439,
+ "prompt_probe_bytes": 7,
+ "queries": {
+  "system_status": {
+   "bytes": 976,
+   "body_nonspace_bytes": 830
+  },
+  "ps": {
+   "bytes": 1185,
+   "body_nonspace_bytes": 793
+  },
+  "free": {
+   "bytes": 83,
+   "body_nonspace_bytes": 49
+  },
+  "diag_status": {
+   "bytes": 1160,
+   "body_nonspace_bytes": 978
+  }
+ },
+ "stop_label": null,
+ "verdict": "CAPTURE_COMPLETE_REVIEW_PENDING",
+ "port_closed": true,
+ "tools_called": [
+  "reset"
+ ],
+ "port_open_ledger": {
+  "before": 2,
+  "this_run": 1,
+  "next_open_is": "port_open 3 (正式会话; 不再做任何额外开口探测)"
+ }
+}
