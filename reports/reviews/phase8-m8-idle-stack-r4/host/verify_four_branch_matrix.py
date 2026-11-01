@@ -205,8 +205,12 @@ def main():
     for cid, fn in (("V1", v1), ("V2", v2), ("V3", v3), ("V4", v4)):
         case(cid, fn)
 
-    # ---------------- V5: 交付态(装配就绪未确认 + 缺加载)在起转前拒绝全部起转 -------
-    gap = run(m, plan, "healthy", "gap", work / "gap", {SC_A: "trip", SC_B: "trip"})
+    # -------- V5: 场景(装配未确认/任何一项回退)在起转前拒绝全部起转 ------------------
+    # 交付态在 2026-11-01 已由操作者逐条确认装配(PROVIDED), 所以这一例**显式构造**旧状态:
+    # 场景要能被反复验证, 不能因为计划状态推进就变成假证据。
+    not_conf = copy.deepcopy(plan)
+    not_conf["mechanical_prerequisites"]["assembly_readiness"]["status"] = "NOT_CONFIRMED"
+    gap = run(m, not_conf, "healthy", "gap", work / "gap", {SC_A: "trip", SC_B: "trip"})
 
     def v5():
         skipped = gap["prerequisite_skips"]
@@ -229,8 +233,8 @@ def main():
                    for v in gap["protection_claims"].values()) and
                gap["core_protection_verified"] is False and gap["flow_complete"] is True)
         return (ok5,
-                "交付态 跳过=%s 实际用量 port_open=%s motor_run=%s 发过的起转命令=%s "
-                "S5 传播来源=%s 分类=%s flow/core=%s/%s" %
+                "装配未确认场景(V5 显式构造) 跳过=%s 实际用量 port_open=%s motor_run=%s "
+                "发过的起转命令=%s S5 传播来源=%s 分类=%s flow/core=%s/%s" %
                 (skipped, used.get("port_open"), used.get("motor_run", 0), spun,
                  refusals["S5"]["via_requires"],
                  json.dumps(gap["protection_claims"], ensure_ascii=False),
@@ -246,7 +250,11 @@ def main():
         tx_b = tx_cmds(ledger(work / "asmgap", "S_S8b"))
         tx_4 = tx_cmds(ledger(work / "asmgap", "S_S4"))
         used = asm_gap["quota_used"]
-        ok = (asm_gap["prerequisite_skips"] == ["S8", "S9", "S10", "S11"] and
+        live = plan["mechanical_prerequisites"]
+        is_delivery = (live["assembly_readiness"]["status"] == "PROVIDED" and
+                       live["load_means"]["status"] != "PROVIDED")
+        ok = (is_delivery and
+              asm_gap["prerequisite_skips"] == ["S8", "S9", "S10", "S11"] and
               asm_gap["prerequisite_refusals"][0]["gates"] == ["load_means"] and
               any(t.startswith("motor_start") for t in tx_b) and
               any(t.startswith("motor_start") for t in tx_4) and
@@ -255,9 +263,10 @@ def main():
               asm_gap["protection_claims"][SC_B] == "VERIFIED" and
               asm_gap["protection_claims"][SC_A] == "SKIPPED_BEFORE_SPIN_UP(PREREQUISITE)" and
               asm_gap["core_protection_verified"] is False)
-        return (ok, "装配确认/仍缺加载: 跳过=%s port_open=%s motor_run=%s cleanup=%s "
-                    "S4 与 S8b 都起了转=%s/%s 分类=%s core=%s" %
-                (asm_gap["prerequisite_skips"], used.get("port_open"), used.get("motor_run"),
+        return (ok, "交付态(装配已确认/仍缺加载; 计划实况=%s): 跳过=%s port_open=%s motor_run=%s "
+                    "cleanup=%s S4 与 S8b 都起了转=%s/%s 分类=%s core=%s" %
+                (json.dumps({k: v["status"] for k, v in live.items()}, ensure_ascii=False),
+                 asm_gap["prerequisite_skips"], used.get("port_open"), used.get("motor_run"),
                  used.get("cleanup_motor_stop"),
                  any(t.startswith("motor_start") for t in tx_4),
                  any(t.startswith("motor_start") for t in tx_b),

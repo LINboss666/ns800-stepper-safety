@@ -287,8 +287,10 @@ add("E5_boot_confirm_asserts_both_stack_sizes",
     == [["diag_stack"], ["idle_stack"]])
 add("E6_mechanical_gaps_marked_not_provided",
     json.dumps(PLAN).count("NOT_PROVIDED") >= 5 and len(PLAN["not_provided_summary"]) == 7 and
-    any("装配" in x["item"] and x["status"] == "NOT_CONFIRMED" for x in PLAN["not_provided_summary"]) and
-    any("SG/ADC" in x["item"] for x in PLAN["not_provided_summary"]),
+    any("装配" in x["item"] and x["status"].startswith("PROVIDED") and x.get("still_open")
+        for x in PLAN["not_provided_summary"]) and
+    any("SG/ADC" in x["item"] and x["status"] == "NOT_PROVIDED"
+        for x in PLAN["not_provided_summary"]),
     PLAN["not_provided_summary"][0]["item"])
 add("E7_validate_plan_clean", bad5 == 0 and len(lines5) > 200, "checks=%d fail=%d" % (len(lines5), bad5))
 add("E8_quota_declares_no_retry_and_no_blackbox_clear",
@@ -316,30 +318,59 @@ mleft = re.search(r"quota_left=\{([^}]*)\}", htxt)
 left_map = dict(re.findall(r'"(\w+)": (\d+)', mleft.group(1))) if mleft else {}
 add("E9_stub_dispatch_end_to_end_ok",
     "DISPATCH_SUMMARY|status=OK" in htxt and "stages_not_run=0" in htxt and
-    left_map.get("port_open") == str(int(PLAN["quota"]["port_open"]) - 1) and
-    left_map.get("motor_run") == str(int(PLAN["quota"]["motor_run"])) and
-    "PREREQUISITE_REFUSAL|scenario=SG_ADC_controlled_load|refused_before=S8|gates=load_means,"
-    "assembly_readiness" in htxt and
-    "PREREQUISITE_REFUSAL|scenario=IMU_non_destructive_excitation|refused_before=S8b|"
-    "gates=assembly_readiness" in htxt and
+    left_map.get("port_open") == str(int(PLAN["quota"]["port_open"]) - 8) and
+    left_map.get("motor_run") == str(int(PLAN["quota"]["motor_run"]) - 2) and
+    "PREREQUISITE_REFUSAL|scenario=SG_ADC_controlled_load|refused_before=S8|gates=load_means|"
+    "skipped_stages=S8,S9,S10,S11|" in htxt and
+    "PREREQUISITE_REFUSAL|scenario=IMU_non_destructive_excitation" not in htxt and
     "FLOW_VS_VERIFICATION|flow_complete=True|core_protection_verified=False" in htxt,
-    "交付态(装配未确认+缺加载)整包干跑: 每个起转阶段都在开端口前被拒 => 实际只用 1 次开口(S3)、"
-    "0 次起转(motor_run 余额仍是 %s), 流程判定与通道判定分开报(原文存 field/dispatch_stub_healthy.txt)"
-    % PLAN["quota"]["motor_run"])
+    "交付态(装配已确认 + 仍缺加载)整包干跑: 只有 SG_ADC 链在开端口前被拒 => 实际用 8 次开口 / "
+    "2 次起转 / 3 组清理, 流程判定与通道判定分开报(SG/ADC 那场没跑, core 必为 False); "
+    "原文存 field/dispatch_stub_healthy.txt")
 add("E10_dry_run_touched_no_device", "actions_attempted=[]" in htxt,
     "干跑里 actions_attempted 为空: 没有一次真实工具调用、没有开口、没有起转(见同文件)")
 add("E11_skipped_chain_has_no_session_at_all",
-    all("stage=%s|" % sid not in htxt for sid in
-        ("S4", "S5", "S6", "S7", "S8", "S8b", "S9", "S9b", "S10", "S10b", "S11", "S11b")) and
-    all("stage=%s|" % sid in htxt for sid in ("S0", "S1", "S2", "S3")),
-    "被机械前置门拒掉的阶段在汇总里一条阶段行都没有(不是执行了但失败), 交付态真正执行的只有 S0..S3")
+    all("stage=%s|" % sid not in htxt for sid in ("S8", "S9", "S10", "S11")) and
+    all("stage=%s|" % sid in htxt for sid in
+        ("S0", "S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8b", "S9b", "S10b", "S11b")),
+    "被机械前置门拒掉的 SG 链在汇总里一条阶段行都没有(不是执行了但失败); "
+    "学习/提交/重启恢复与 IMU 那四阶段照常出现在序列里")
 add("E12_refusal_lines_name_their_own_chain",
-    "PREREQUISITE_REFUSAL|scenario=SG_ADC_controlled_load|refused_before=S8|gates=load_means,"
-    "assembly_readiness|skipped_stages=S8,S9,S10,S11|" in htxt and
-    "PREREQUISITE_REFUSAL|scenario=S5|refused_before=S5|gates=requires:S4 已被机械前置跳过|"
-    "skipped_stages=S5|via_requires=S4|" in htxt,
-    "每条拒绝行只列自己作用域被跳过的阶段, 并把沿 requires 传播的来源(via_requires)写出来; "
-    "不是把全部阶段糊在一行里")
+    "PREREQUISITE_REFUSAL|scenario=SG_ADC_controlled_load|refused_before=S8|gates=load_means|"
+    "skipped_stages=S8,S9,S10,S11|via_requires=-|" in htxt,
+    "拒绝行只列自己作用域被跳过的阶段(SG 链四阶段), 且 gates 只具名真正缺的那一项(load_means): "
+    "装配已确认后不再把 assembly_readiness 也算成缺项")
+_fs = PLAN.get("field_sequence_before_start") or {}
+_m_exec = [s.split("|")[1].split("=")[1] for s in htxt.splitlines() if s.startswith("DISPATCH|stage=")]
+_m_sk = re.search(r"prerequisite_skips=\[(.*?)\]", htxt)
+_m_skip = [x.strip().strip('"') for x in _m_sk.group(1).split(",")] if _m_sk else []
+add("E13_recorded_sequence_matches_real_run",
+    _fs.get("expected_executed_stages") == _m_exec and
+    _fs.get("expected_skipped_stages") == _m_skip and
+    left_map.get("port_open") == str(int(PLAN["quota"]["port_open"]) -
+                                     _fs["expected_usage"]["port_open"]) and
+    left_map.get("motor_run") == str(int(PLAN["quota"]["motor_run"]) -
+                                     _fs["expected_usage"]["motor_run"]) and
+    len(_m_exec) == 12,
+    "启动前记录的实际计划序列与真实干跑逐条一致: 执行 %s / 跳过 %s / 用量 port_open=%s motor_run=%s"
+    % (_m_exec, _m_skip, _fs.get("expected_usage", {}).get("port_open"),
+       _fs.get("expected_usage", {}).get("motor_run")))
+_gap = json.loads(json.dumps(PLAN))
+for k, v in _gap["mechanical_prerequisites"].items():
+    if k == "assembly_readiness":
+        v["status"] = "NOT_CONFIRMED"
+atxt = dispatch(_gap, "assembly_not_confirmed")
+add("E14_assembly_rollback_scenario_still_blocks_every_spinup",
+    bool(re.search(r"prerequisite_skips=\[\"S4\", \"S5\", \"S6\", \"S7\", \"S8\"", atxt)) and
+    "|via_requires=S4|" in atxt and
+    all("stage=%s|" % sid not in atxt for sid in
+        ("S4", "S5", "S7", "S8", "S8b", "S9b", "S10", "S10b")) and
+    "quota_used={\"diag_profile_zero\": 1, \"download\": 1, \"explicit_reset\": 1, "
+    "\"irq_polarity_prep\": 2, \"port_open\": 1" in atxt.replace("'", '"') and
+    "core_protection_verified=False" in atxt,
+    "装配任何一项回退成未确认时, 起转仍被逐个挡下(S4/S8/S8b/S10/S10b + 沿 requires 的 S5/S6/S7), "
+    "port_open 降到 1、零次起转 —— 门没被拆, 只是当前状态放行(原文存 "
+    "field/dispatch_stub_assembly_not_confirmed.txt)")
 
 # ---------------- F 组: ① 镜像身份统一(S0 / 下载 / 回读 同源) ----------------
 R3_BIN_OLD = "00608ec93c6a3027d68b44b5317574209fccfb0ba82a9974793d13b54b79e304"
@@ -545,12 +576,13 @@ add("J1_load_means_state", mp["status"] == "NOT_PROVIDED" and mp["blocks_motion"
     byid["S8"].get("prerequisite_gates") == ["load_means", "assembly_readiness"],
     "缺加载手段: 状态 NOT_PROVIDED + blocks_motion + 与装配就绪门一起挂在 S8 上")
 add("J2_asset_facts_updated",
-    "T8" in mp["asset"] and "8 mm" in mp["asset"] and "装配" in mp["asset_state"] and
-    "待确认" in mp["asset_state"] and
+    "T8" in mp["asset"] and "8 mm" in mp["asset"] and
+    "已由操作者" in mp["asset_state"] and "仍未提供" in mp["asset_state"] and
+    all(x in am["asset_state"] for x in ("松手保持固定", "紧固", "螺母防转", "移动块导向")) and
     not any(x in MECH_TEXT for x in ("300 mm", "尚未连接", "完整导轨滑台", "导程待确认")),
-    "机械事实按操作者口径更新: %s / %s(执行字段里已无旧的\"完整滑台/尚未连接/导程待确认\"; "
-    "只在勘误段引用旧措辞, 故扫描范围限定在机械前置+load_step+缺项汇总, 不扫全文)"
-    % (mp["asset"], mp["asset_state"][:40]))
+    "机械事实跟着现场走: 装配四项按操作者确认写入 %s, 加载作用点仍是 %s(执行字段里已无过期三段; "
+    "旧措辞只出现在勘误/引用段, 故扫描范围限定在机械前置+load_step+缺项汇总)"
+    % (am["status"], "NOT_PROVIDED"))
 add("J3_instrument_not_a_spinup_gate",
     PLAN["mechanical_prerequisites"]["instrument_probe"]["blocks_motion"] is False and
     "instrument_probe" not in byid["S8"].get("prerequisite_gates", []),
@@ -559,19 +591,21 @@ add("J4_gate_is_executed_not_prose",
     ("STAGE_SKIPPED_BY_PREREQUISITE" in CHAIN.read_text(encoding="utf-8") and
      "prerequisite_gates" in CHAIN.read_text(encoding="utf-8")),
     "门在执行器代码里(开端口之前跳过整条链), 不是只在计划的说明字段里")
-add("J6_assembly_gate_covers_every_spinup",
-    am["status"] == "NOT_CONFIRMED" and am["blocks_motion"] is True and
+add("J6_assembly_gate_still_wired_after_confirmation",
+    am["status"] == "PROVIDED" and am["blocks_motion"] is True and
     SPIN == ["S10", "S10b", "S4", "S8", "S8b"] and
-    all(am["status"] != "PROVIDED" and "assembly_readiness" in
-        (byid[s].get("prerequisite_gates") or []) for s in SPIN),
-    "装配就绪门挂在每一个起转/带电阶段上(复审第 2 项: 只挡 S8 不够): 起转阶段=%s" % SPIN)
+    all("assembly_readiness" in (byid[s].get("prerequisite_gates") or []) for s in SPIN) and
+    bool(am.get("confirmed_items")) and len(am["confirmed_items"]) == 4 and
+    any("顺时针=向右" in x for x in am["still_open"]),
+    "操作者确认 4 项后状态改 PROVIDED, 但门仍挂在每一个起转阶段上(放行不等于拆门); "
+    "方向核实与累计距离核算仍列在 still_open: %s" % am["confirmed_items"])
 add("J7_refusal_propagates_along_requires",
     "via_requires" in CHAIN.read_text(encoding="utf-8") and
     "SKIPPED_BEFORE_SPIN_UP(PREREQUISITE)" in CHAIN.read_text(encoding="utf-8") and
-    bool(re.search(r"prerequisite_skips=\[\"S4\", \"S5\", \"S6\", \"S7\", \"S8\"", htxt)) and
-    "|via_requires=S4|" in htxt,
-    "S4 被挡后, 依赖本次学习的 S5/S6/S7 沿计划申报的 requires 一并具名跳过(不是中途失败): "
-    "汇总里的 prerequisite_skips 与 via_requires=S4 都实测到")
+    bool(re.search(r"prerequisite_skips=\[\"S4\", \"S5\", \"S6\", \"S7\", \"S8\"", atxt)) and
+    "|via_requires=S4|" in atxt,
+    "装配未确认场景(E14 的干跑)里, S4 被挡后依赖本次学习结果的 S5/S6/S7 沿计划申报的 requires "
+    "一并具名跳过(不是中途失败); 交付态因 S4 已放行, 该传播不再触发")
 add("J8_imu_mounting_fact_closed",
     PLAN["mechanical_prerequisites"]["imu_mounting"]["status"].startswith("MOUNTED_TAPE") and
     "绝缘胶带" in json.dumps(PLAN["mechanical_prerequisites"], ensure_ascii=False) and

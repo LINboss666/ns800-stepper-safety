@@ -1,5 +1,5 @@
 SELFCHECK(corrupted first entry) problems=1 ['sha_mismatch reports/reviews/phase8-m8-idle-stack-r4/build/rt-thread-motor-m1-candidate.log want=0000000000000000 got=757bac0b55110a7e']  (必须>=1)
-MANIFEST reports/reviews/phase8-m8-idle-stack-r4/SHA256SUMS.txt entries=20 problems=0 []
+MANIFEST reports/reviews/phase8-m8-idle-stack-r4/SHA256SUMS.txt entries=21 problems=0 []
 MANIFEST reports/firmware/phase8-m8-idle-stack-r4/SHA256SUMS.txt entries=4 problems=0 []
 MANIFEST reports/reviews/phase8-m8-diag-stack-r1/SHA256SUMS.txt entries=65 problems=0 []
 MANIFEST reports/firmware/phase8-m8-diag-stack-r1/SHA256SUMS.txt entries=4 problems=0 []

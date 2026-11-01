@@ -312,3 +312,35 @@ core_verified = bool(ok) and bool(claims) and all(v == "VERIFIED" for v in claim
 （51963 / 51944 B）；镜像、AXF、MAP 与 `build_manifest.json` 未动（`dab356c6…`/290916 B、
 `0babe9f1…`/1771288 B），产品 C 源码零改动，构建 0 次、设备动作 0 次。
 
+## 12. 装配就绪确认落地 + 启动前实际计划序列（2026-11-01；不改 C、不重编、零设备）
+
+操作者在审核窗口逐条确认：**支座松手保持固定、连接紧固、螺母防转、移动块导向均无问题**。
+按这条确认把 `assembly_readiness` 改为 `PROVIDED`，四条从 `field_state_binding.not_received` 移除并
+改记为 `operator_confirmed`（原文引用写在 `provenance` 里）。`load_means` 不代填，SG/ADC 加载链继续跳过。
+
+**启动前实际计划序列**（`plan_core_r4.json.field_sequence_before_start`，由构建脚本的
+`blocked_stages()` 从计划数据推导，检查器 `E13` 与真实干跑逐条对账）：
+
+| 序列 | 阶段 | 说明 |
+| --- | --- | --- |
+| 实际执行（12 个） | `S0 S1 S2 S3 S4 S5 S6 S7 S8b S9b S10b S11b` | 下载→回读→启动核对→零点/学习→tier/commit/save→重启恢复→IMU 激励→取证→锁存态拒绝→人工恢复 |
+| 起转前跳过（4 个） | `S8 S9 S10 S11` | `PREREQUISITE_REFUSAL|scenario=SG_ADC_controlled_load|gates=load_means` —— 只具名真正缺的那一项 |
+| 实测用量 | `port_open 8/12`、`motor_run 2/3`、必要清理 3 组 | 起转 2 次（S4 学习、S8b 激励）+ S10b 锁存态再 arm；仍 ≤3 次起转、学习≤15 s、IMU≤5 s |
+| 汇总标签 | `flow_complete=True`、`core_protection_verified=False` | SG/ADC 那场没跑，核心保护不能称全部通过 |
+
+门没有拆：`assembly_readiness` 仍挂在 `S4/S8/S8b/S10/S10b` 每一个起转阶段上（`J6`），
+`PLAN_SPINUP_GATE_COVERAGE` 与 `PLAN_PREREQUISITE_GATE` 仍 PASS；任何一项回退成未确认，该阶段又在
+开端口之前被具名跳过。回退路径不是纸面话：`E14` 用显式场景（把 `assembly_readiness` 设回
+`NOT_CONFIRMED`）真实干跑一次，实测 `prerequisite_skips=S4,S5,S6,S7,S8,…,S11b`、`via_requires=S4`、
+`port_open` 降到 1、台账里零条 `motor_start`（原文 `field/dispatch_stub_assembly_not_confirmed.txt`）。
+定向矩阵的 `V5` 因此改成显式构造该场景，`V5b` 才对应交付态 —— 场景不随计划状态推进而失真。
+
+本轮仍**未收到**的两项：第一次短移动里核实"顺时针=向右"（操作者明确保留）、累计运动距离按标称
+8 mm 与实际细分/脉冲核算。空载脱开丝杆那条备选从未采纳，装配确认后其动因消除，但状态回退时仍受门控制。
+
+重跑（最终字节）：定向矩阵 15/15；`idle_learn_check` **CHECKS=107 problems=0**（新增 E13/E14，
+元负控 6+6 fired）；`--validate-plan` **236 项 0 失败**；`m8r3_field_selftest` 未重跑（执行器字节未变，
+仍是 `40517501b3be…`/148267 B）。计划 150962 B；两份 `rows.json`、镜像、AXF、MAP 与
+`build_manifest.json` 全部未动。包状态仍是 `BOUND_NOT_EXECUTED`，本轮消耗现场批准 0 次；
+现场执行等待复审对这份最终绑定的批准。
+

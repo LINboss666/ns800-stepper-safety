@@ -204,33 +204,37 @@ def prereq_block():
     本 Agent 不代操作者确认任何一项 —— 状态由操作者现场回报决定。"""
     return {
         "assembly_readiness": {
-            "status": "NOT_CONFIRMED",
+            "status": "PROVIDED",
             "blocks_motion": True,
             "asset": "T8 丝杆套件(标称导程 8 mm)的装配就绪 + 支座/电机能否在不手扶时保持固定",
-            "asset_state": ("现有 T8 丝杆套件, 标称导程 8 mm; 已按照片装配, 紧固、螺母防转及导向尚待确认。"
-                            "轴承/底座目前只能手动固定(操作者 2026-11-01 原话), 松手保持固定未确认 => "
-                            "门不放行, 所有含 motor_arm/motor_start 的阶段在起转之前跳过"),
-            "provenance": ("操作者现场回报与照片(2026-11-01): 电机固定丝杆、轴承底座只能手动固定。"
-                           "本 Agent 未实测, 只登记为操作者给出的实物事实, 不构成任何现场结论"),
-            "open_until": ["支座/轴承在松手后保持固定(已由操作者确认)",
-                           "丝杆与电机的连接紧固已确认", "螺母防转已确认", "导向已确认",
-                           "累计运动距离按标称导程 8 mm 与实际细分/脉冲参数核算过"],
-            "gates_stages": "S4(带起转的学习)、S8/S8b(两场激励)、S10/S10b(锁存态再 arm) —— 即计划里"
-                            "每一个含 motor_arm 或 motor_start 的阶段",
-            "propagation": ("S4 被挡之后, requires 里引用本次学习结果的 S5/S6/S7 一并跳过"
-                            "(执行器沿计划申报的 requires 传播拒绝): 没有本轮 learn 就 tier/commit/save, "
-                            "现场只会中途失败并烧掉唯一一次批准"),
+            "asset_state": ("操作者 2026-11-01 在审核窗口逐条确认: 支座松手保持固定、连接紧固、螺母防转、"
+                            "移动块导向均无问题 => 门放行。此前登记的\"已按照片装配, 紧固、螺母防转及导向"
+                            "尚待确认\"已被这条确认取代(不是我自己推断的)"),
+            "provenance": ("操作者现场确认(2026-11-01 审核窗口原文): \"用户已在审核窗口明确确认：支座松手"
+                           "保持固定、连接紧固、螺母防转、移动块导向均无问题。按操作者确认把 "
+                           "assembly_readiness 改为 PROVIDED\"。本 Agent 未实测, 只登记为操作者给出的确认"),
+            "confirmed_items": ["支座/轴承在松手后保持固定", "丝杆与电机的连接紧固",
+                                "螺母防转", "移动块导向"],
+            "still_open": ["第一次短移动里核实\"顺时针=向右\"(操作者口径: 该核实仍保留)",
+                           "累计运动距离尚未按标称导程 8 mm 与实际细分/脉冲参数核算"
+                           "(不属于本轮这四项确认的范围, 仍挂着)"],
+            "gate": ("门仍然挂在**每一个**起转阶段上(S4/S8/S8b/S10/S10b) —— 放行不等于拆门: 状态由操作者"
+                     "确认决定, 任何一项回退成未确认, 该阶段又在开端口之前被具名跳过"),
+            "gates_stages": "S4(带起转的学习)、S8/S8b(两场激励)、S10/S10b(锁存态再 arm)",
+            "propagation": ("S4 被挡后, requires 里引用本次学习结果的 S5/S6/S7 一并跳过(执行器沿计划"
+                            "申报的 requires 传播拒绝)。本轮 S4 已放行, 因此该传播在交付态不再触发 —— "
+                            "它作为机制保留, 由定向矩阵 V5 用显式场景继续验证"),
             "would_be_used_by": "S4 巡航学习与 S8/S8b 两场激励的起转前提(也是整个运动路径的前提)",
-            "fallback_registered": ("操作者给出的**备选**(本轮未采纳为默认): 不通电时脱开丝杆, 保留扩展板"
-                                    "固定在电机上, 沿此前已验证的空载电机路径完成学习与 IMU 保护演示; "
-                                    "SG/ADC 受控加载继续明确记为待验证。备选同样要先确认电机+扩展板在松手后"
-                                    "保持固定, 因此也受本门控制")},
+            "fallback_status": ("此前登记的备选(不通电脱开丝杆、只走空载学习与 IMU 演示)的动因已消除: "
+                                "支座确认可松手保持固定。备选仍未采纳, 也不需要采纳; 若装配状态回退, "
+                                "它重新成为可选项, 且同样受本门控制")},
         "load_means": {
             "status": "NOT_PROVIDED",
             "blocks_motion": True,
             "asset": "现有实物: T8 丝杆套件(标称导程 8 mm) + 导轨滑台, 已按照片装配",
-            "asset_state": ("装配已完成但紧固/螺母防转/导向待确认(见 assembly_readiness); "
-                            "可从非旋转端操作的**加载作用点与档位/行程**仍未提供"),
+            "asset_state": ("装配四项(紧固/螺母防转/导向/支座松手保持固定)已由操作者 2026-11-01 确认; "
+                            "但可从非旋转端操作的**加载作用点与档位/行程**仍未提供 => 本门仍不放行, "
+                            "SG/ADC 受控加载链继续跳过(装配确认不等于加载手段到位, 两件事不互相顶替)"),
             "provenance": ("操作者 2026-11-01 现场回报 + 复审原文。本 Agent 未实测。导程是**标称**值, "
                            "未做实测标定"),
             "constraints": ["现场只用中间短行程", "不得把标称 8 mm 导程当作实测标定值",
@@ -508,29 +512,31 @@ def fix_prose(plan, ident, needs):
     by_id["S8b"]["prerequisites"]["imu_mounting"] = \
         plan["mechanical_prerequisites"]["imu_mounting"]
     plan["load_step"] = {
-        "verdict": "REFUSED_BEFORE_SPIN_UP_BY_EXECUTOR",
-        "missing": ["可从非旋转端操作的加载作用点及档位/行程",
-                    "装配就绪(紧固/螺母防转/导向 + 支座松手保持固定)尚未确认"],
-        "asset_now": ("现有 T8 丝杆套件, 标称导程 8 mm; 已按照片装配, 紧固、螺母防转及导向尚待确认; "
-                      "轴承/底座目前只能手动固定"),
+        "verdict": "SG_ADC_CHAIN_REFUSED_BEFORE_SPIN_UP_BY_EXECUTOR",
+        "missing": ["可从非旋转端操作的加载作用点及档位/行程"],
+        "asset_now": ("现有 T8 丝杆套件, 标称导程 8 mm; 操作者 2026-11-01 确认支座松手保持固定、连接紧固、"
+                      "螺母防转、移动块导向均无问题 => 装配就绪门放行; 加载手段仍未提供, SG/ADC 那场仍跳过"),
         "policy": ("不宣称有机械加载方法; 不以允许自然触发代替约束; 不手捏旋转轴、不为凑阈值加危险力、"
                    "不撞两端限位制造堵转"),
         "gate_now_real": ("S8/S10 挂 [load_means, assembly_readiness], S4/S8b/S10b 挂 [assembly_readiness]: "
-                          "状态不是 PROVIDED 时该阶段(及其场景链)在开端口之前跳过, 不扣 motor_run, "
-                          "不发 arm/start —— 复审第 2 项要的就是每个起转阶段都挡, 不是只挡 S8"),
-        "consequence_this_round": ("交付态(两项都不是 PROVIDED)下**没有任何一次起转**: S4 学习与两场激励"
-                                   "全部在起转前跳过, 依赖本次学习结果的 S5/S6/S7 沿 requires 一并跳过; "
-                                   "实际用量降到 port_open 1 次(只有 S3)、motor_run 0 次"),
+                          "任一状态不是 PROVIDED 时该阶段(及其场景链)在开端口之前跳过, 不扣 motor_run, "
+                          "不发 arm/start。本轮 assembly_readiness=PROVIDED 而 load_means 仍 NOT_PROVIDED "
+                          "=> 只有 SG_ADC 那条链继续被挡, 学习与 IMU 场放行"),
+        "consequence_this_round": ("交付态(装配已确认 + 仍缺加载)实测: 执行 S0-S7 与 S8b-S11b 共 12 个阶段, "
+                                   "跳过 S8/S9/S10/S11; port_open 用量 8、motor_run 用量 2(剩 1)、"
+                                   "必要清理 3 组; 核心保护结论仍不成立(SG/ADC 那场根本没跑)"),
         "instrument_deferred": "示波器/电流钳继续暂缓, 不作为起转前置, 也不新增高精度仪器前置(复审本轮口径)"}
     plan["not_provided_summary"] = [
-        {"item": "起转装配就绪(紧固、螺母防转、导向 + 支座松手保持固定)", "status": "NOT_CONFIRMED",
-         "effect": "S4/S8/S8b/S10/S10b 全部在开端口之前具名跳过 => 交付态零次起转; "
-                   "S5/S6/S7 因依赖本次学习结果一并跳过",
-         "mechanism": "plan.mechanical_prerequisites.assembly_readiness + 各起转阶段 prerequisite_gates + "
-                      "执行器 STAGE_SKIPPED_BY_PREREQUISITE(沿 requires 传播)"},
         {"item": "SG/ADC 可控负载的施加手段与加载作用点", "status": "NOT_PROVIDED",
-         "effect": "整条 SG_ADC_controlled_load 链在开端口之前被具名拒绝(不起转、不开口、不扣额度)",
-         "mechanism": "plan.mechanical_prerequisites.load_means + stages[].prerequisite_gates"},
+         "effect": "整条 SG_ADC_controlled_load 链在开端口之前被具名拒绝(不起转、不开口、不扣额度); "
+                   "操作者口径: load_means 不代填, 该链继续跳过",
+         "mechanism": "plan.mechanical_prerequisites.load_means + stages[].prerequisite_gates + "
+                      "执行器 STAGE_SKIPPED_BY_PREREQUISITE"},
+        {"item": "起转装配就绪(紧固、螺母防转、导向 + 支座松手保持固定)",
+         "status": "PROVIDED(操作者 2026-11-01 审核窗口逐条确认)",
+         "effect": "S4 学习与 S8b/S10b 起转不再被这道门挡下; 门本身仍挂在每个起转阶段上(放行不等于拆门)",
+         "still_open": ["第一次短移动里核实\"顺时针=向右\"",
+                        "累计运动距离未按标称导程 8 mm 与实际细分/脉冲参数核算"]},
         {"item": "示波器/电流钳独立证 STEP 到关断(BUG-008)",
          "status": "NOT_PROVIDED(本轮暂缓, 不作为起转前置, 不新增仪器前置)",
          "effect": "停机事实只能登记为软件接口已接受"},
@@ -577,17 +583,18 @@ def fix_prose(plan, ident, needs):
         "但 protection_claims 记为未证, 不计入 core_protection_verified")
     dsp["one_approval"] = dsp.get("one_approval", "")
     plan["claim_boundaries"] = {
-        "delivered_state_skips": ("本包交付态会跳过 SG/ADC 激励链(加载手段未提供)以及所有起转阶段"
-                                  "(装配就绪未确认)。因此整包完成**不等于**核心保护功能全部通过, "
-                                  "也不等于学习已通过"),
+        "delivered_state_skips": ("本包交付态跳过 SG/ADC 激励链(加载手段仍未提供, 操作者口径: 不代填)。"
+                                  "装配就绪已由操作者 2026-11-01 确认 => S4 学习与 IMU 场放行。"
+                                  "整包完成**不等于**核心保护功能全部通过, 也不等于 SG/ADC 通道已验证"),
         "flow_complete_true_means": "期望序列都跑到了各自的终态(含具名跳过), 不表示任何一次现场触发",
         "core_protection_verified_true_means": ("两场都抓到**本场目标通道**的规则名(REL_SG_SEVERE/"
                                                 "REL_ADC_SEVERE/REL_FUSED_SEVERE 或 REL_IMPACT)、该通道"
-                                                "源样本非零、首因四腿齐、且新 session 读回 event=5 停后帧"),
+                                                "源样本非零、首因四腿齐、且新 session 读回 event=5 停后帧。"
+                                                "SG/ADC 那场被跳过时, 该标签按定义就是 False"),
         "never_from_this_package": ["阈值的物理标定", "STEP 到关断的物理证明(BUG-008)",
                                     "IRQ 极性已用实物确认", "栈 1024 足够", "HardFault 根因已闭"],
-        "operator_confirmation_needed": ["装配就绪 4 项逐条确认(本 Agent 不代填)",
-                                         "第一次被批准的短移动里核实\"顺时针=向右\""]}
+        "operator_confirmation_needed": ["第一次被批准的短移动里核实\"顺时针=向右\"",
+                                         "累计运动距离按标称导程 8 mm 与实际细分/脉冲参数核算"]}
     plan["first_cause_overall"] = {
         "rule": ("每一路首因都要在同一次运行内四件对齐: 触发规则与代际 -> 源样本与阈值 -> 本轮提交的 profile "
                  "-> 本场新日志 session 与实际停后帧(event=5, step_hz=0)。缺任何一件 => "
@@ -627,7 +634,12 @@ def fix_prose(plan, ident, needs):
         "(core_verified = bool(ok) and bool(claims) and all(VERIFIED))。此前 S9b 取证失败让整包 STOP、"
         "flow_complete=false, 但两场各自声明仍是 VERIFIED => 汇总错误地说已验证。反例进定向矩阵 V14",
         "R5-④ 现场状态绑定: field_state_binding 逐条登记已收到的操作者事实/指令与**未收到**的确认"
-        "(紧固、螺母防转、导向、松手保持固定、短移动方向核实), 门因此维持关闭; 本轮消耗现场批准 0 次"]
+        "(紧固、螺母防转、导向、松手保持固定、短移动方向核实), 门因此维持关闭; 本轮消耗现场批准 0 次",
+        "R5-⑤ 装配就绪确认落地(2026-11-01 审核窗口): 操作者逐条确认支座松手保持固定、连接紧固、螺母防转、"
+        "移动块导向均无问题 => assembly_readiness 改 PROVIDED, 四条从 not_received 移除; "
+        "load_means 不代填, SG/ADC 加载链继续跳过。交付态因此从“零次起转”变为“学习+IMU 场起转”",
+        "(port_open 8 / motor_run 2 / 清理 3 组), 并按操作者要求记录启动前实际计划序列 "
+        "field_sequence_before_start"]
     plan["corrections_from_review_r4"] = {
         "package_5": ["回读仍认旧镜像(①)", "两场的取证/拒绝/恢复顺序与分场基线(②)",
                       "额度按真实路径与混合结果覆盖(③)", "首因四腿与不得降级(④)",
@@ -751,40 +763,95 @@ def fix_r3_status(plan, chain):
         "not_done_here": ["不修改 R3 计划字节", "不重跑 R3 轮次的清单", "不把 fail 说成 PASS"]}
 
 
+def blocked_stages(plan):
+    """从计划数据推导"哪些阶段会被机械前置门在开端口之前挡掉" —— 规则与执行器一致:
+    某阶段的 prerequisite_gates 里任一状态不是 PROVIDED => 该阶段所在作用域(scenario 或自身 id)整条挡;
+    之后 requires 引用了被挡阶段的, 一并挡(传播)。检查器 E13 拿这份推导与**真实干跑**输出的
+    prerequisite_skips 对账: 镜像规则一旦与执行器分叉, 那条检查就红, 不会让计划里的期望悄悄漂移。"""
+    scopes = {}
+    for stg in plan["stages"]:
+        scopes.setdefault(stg.get("scenario") or stg["id"], []).append(stg)
+    blocked = {}
+    for sc, stgs in scopes.items():
+        for stg in stgs:
+            miss = [g for g in stg.get("prerequisite_gates", [])
+                    if (plan["mechanical_prerequisites"].get(g) or {}).get("status") != "PROVIDED"]
+            if miss:
+                blocked[sc] = {"stage": stg["id"], "gates": miss}
+                break
+    skipped, changed = [], True
+    while changed:
+        changed = False
+        for stg in plan["stages"]:
+            sid, sc = stg["id"], stg.get("scenario") or stg["id"]
+            if sid in skipped:
+                continue
+            ups = [mo.group(1) for mo in
+                   (re.match(r"^(S\d+[a-z]?)", str(rq)) for rq in stg.get("requires", [])) if mo]
+            if sc in blocked or any(u in skipped for u in ups):
+                skipped.append(sid)
+                changed = True
+    ids = [s["id"] for s in plan["stages"]]
+    return {"skipped_stages": skipped,
+            "executed_stages": [x for x in ids if x not in skipped],
+            "blocked_scopes": {k: v for k, v in sorted(blocked.items())}}
+
+
 def fix_field_state(plan):
     """把**当前现场状态**绑进包: 只登记已经收到的原话/口径与它们的后果, 不代操作者确认任何一项。
     没收到的确认一律列在 not_received, 门因此维持关闭 —— 现场事实由操作者回报决定, 不由我填。"""
+    seq = blocked_stages(plan)
     plan["field_state_binding"] = {
         "bound_at": "2026-11-01",
         "operator_confirmed": [
             {"fact": "扩展板(ADXL345 在板上)已用绝缘胶带固定在电机上; 电机固定丝杆",
              "source": "操作者 2026-11-01 现场原话与同批照片",
              "consequence": "imu_mounting 那条缺失项闭合; 胶带装配的刚度仍未测, 不做精确振动标定"},
-            {"fact": "轴承/底座目前只能手动固定",
-             "source": "同上(原话\"轴承底座只能手动固定\")",
-             "consequence": "assembly_readiness 维持 NOT_CONFIRMED: 松手后能否保持固定未确认 => "
-                            "所有含 motor_arm/motor_start 的阶段仍被门在起转前挡下"},
+            {"fact": "支座松手保持固定、连接紧固、螺母防转、移动块导向均无问题",
+             "source": ("操作者 2026-11-01 在审核窗口的逐条确认(原文: \"用户已在审核窗口明确确认："
+                        "支座松手保持固定、连接紧固、螺母防转、移动块导向均无问题。按操作者确认把 "
+                        "assembly_readiness 改为 PROVIDED\")"),
+             "consequence": "assembly_readiness = PROVIDED => S4 学习与 S8b/S10b 起转放行; "
+                            "此前\"轴承/底座只能手动固定\"这一条已被该确认取代(不是我推断的)"},
             {"fact": "现有 T8 丝杆套件, 标称导程 8 mm; 已按照片装配",
              "source": "复审 2026-11-01 转述操作者口径的更新原文(取代此前\"完整滑台/尚未连接/导程待确认\")",
-             "consequence": "紧固、螺母防转、导向三项仍待逐条确认; 8 mm 是**标称**值, 未做实测标定"},
+             "consequence": "8 mm 是**标称**值, 未做实测标定; 累计距离核算仍挂着"},
             {"fact": "滑台起点在左端, 与末端限位留有间隙; 顺时针=向右",
              "source": "操作者 2026-11-01",
              "consequence": "方向按第一次被批准的短移动核实后才据此执行; 软件限位输入仍关闭, "
-                            "不把左侧起点当限位保护"}],
+                            "不把左侧起点当限位保护"},
+            {"fact": "7363220 的软件修正已获独立接受; 本轮不重跑历史清单、不开纯登记轮",
+             "source": "复审 2026-11-01 本轮指令",
+             "consequence": "本轮只改装配状态、现场绑定与随之变化的期望值; 产品 C 源码与镜像不动"}],
         "operator_instructions": [
-            "暂不试转(操作者 2026-11-01) => 本轮不申请、也不消耗任何现场批准",
-            "不通过撞两端限位制造堵转; 不新增回零/全程定位功能; 现场只用中间短行程"],
+            "load_means 不代填 => SG/ADC 加载链继续跳过; 装配确认不顶替加载手段",
+            "不通过撞两端限位制造堵转; 不新增回零/全程定位功能; 现场只用中间短行程",
+            "启动前记录实际计划序列(见 field_sequence_before_start), 等待本轮硬件固件批准; "
+            "本轮不申请、也不消耗任何现场批准"],
         "not_received": [
-            "紧固已确认", "螺母防转已确认", "导向已确认",
-            "支座/轴承松手后保持固定已确认", "第一次短移动的方向核实结果"],
+            "第一次短移动的方向核实结果(操作者明确: 该核实仍保留)",
+            "累计运动距离按标称导程 8 mm 与实际细分/脉冲参数核算"],
         "fallback_registered_not_selected": (
-            "不通电脱开丝杆、保留扩展板固定在电机上、沿此前已验证的空载电机路径完成学习与 IMU 演示; "
-            "SG/ADC 受控加载继续记为待验证。这是操作者给出的**备选**, 采纳与否由操作者决定, "
-            "且它同样要先通过装配就绪门"),
+            "不通电脱开丝杆、保留扩展板固定在电机上、沿此前已验证的空载电机路径完成学习与 IMU 演示 —— "
+            "操作者此前给出的**备选**, 从未采纳; 装配确认后它的动因已消除, 但若装配状态回退仍受"
+            "assembly_readiness 门控制"),
         "approvals_consumed_this_round": 0,
         "package_status": "BOUND_NOT_EXECUTED",
-        "meaning": ("这份绑定只描述\"当前前置到哪一步\", 不构成任何现场结论: 没有一次起转、"
-                    "没有一次触发、没有任何保护功能在现场被验证")}
+        "meaning": ("这份绑定只描述\"当前前置到哪一步\", 不构成任何现场结论: 学习、两路激励、"
+                    "停机锁存与人工恢复的现场结果一个都还没有")}
+    plan["field_sequence_before_start"] = {
+        "why": ("操作者要求\"启动前记录实际计划序列\": 在装配门放行、加载手段仍缺的当前状态下, "
+                "把真正会执行的阶段序列与用量写清楚, 现场批准对着这份序列给"),
+        "derived_by": "blocked_stages(计划数据) —— 与执行器同一套门规则; 检查器 E13 用真实干跑对账",
+        "expected_executed_stages": seq["executed_stages"],
+        "expected_skipped_stages": seq["skipped_stages"],
+        "blocked_scopes": seq["blocked_scopes"],
+        "expected_usage": {"port_open": 8, "motor_run": 2, "cleanup_groups": 3,
+                           "measured_in": "field/dispatch_stub_healthy.txt(QUOTA_AUDIT 逐条 used=…)"},
+        "motion_caps": {"learn_seconds_max": 15, "sg_adc_seconds_max": 5, "imu_seconds_max": 5,
+                        "spin_ups_max": 3,
+                        "note": "现场提案不变: 学习≤15 s, SG/ADC≤5 s, IMU≤5 s, 最多三次起转"},
+        "not_a_field_result": "序列与用量是**离线干跑**的计划形状, 不是板上跑过; 现场结论一律未取"}
 
 
 def build(plan, chain):
@@ -815,9 +882,13 @@ def build(plan, chain):
     plan["verification_matrix_expected"] = {
         "run_by_host": "host/verify_four_branch_matrix.py(零设备工装, 真实执行器 + 真实计划与夹具)",
         "prerequisite_states": {
-            "delivery_state": "assembly_readiness=NOT_CONFIRMED 且 load_means=NOT_PROVIDED(本包交付态)",
-            "load_gap_only": "assembly_readiness=PROVIDED, load_means=NOT_PROVIDED",
-            "all_provided": "两项都 PROVIDED(操作者逐条确认之后才允许写进现场单)"},
+            "delivery_state": ("assembly_readiness=PROVIDED(操作者 2026-11-01 审核窗口逐条确认) 且 "
+                               "load_means=NOT_PROVIDED —— 即本包当前交付态: 学习与 IMU 场放行, "
+                               "SG/ADC 加载链仍跳过"),
+            "assembly_not_confirmed_scenario": ("assembly_readiness=NOT_CONFIRMED(装配确认之前的状态, "
+                                                "也是任何一项回退时的状态): 由定向矩阵 V5 显式构造, "
+                                                "不再等同于交付态"),
+            "all_provided": "两项都 PROVIDED(需要加载手段也到位, 本轮仍未提供)"},
         "four_branch_combinations": [
             {"stub_branches": {SC_A: "trip", SC_B: "trip"},
              "prerequisite": "all_provided",
@@ -856,16 +927,21 @@ def build(plan, chain):
              "setup": "摘掉 target_channel_claim 的规则名判定(或删掉 target_channel 声明)",
              "expect": "IMU 场喂 SG 行重新被判成通过 => 说明判据确实存在(负控必须 fire)"}],
         "mechanical_gap_cases": [
-            {"name": "load_means=NOT_PROVIDED(只缺加载, 装配已确认)",
-             "expect": "SG_ADC 整链在开端口之前跳过, S4 学习与 S8b 照常起转: port_open 用量 8, "
-                       "motor_run 用量 2(剩 1)"},
-            {"name": "assembly_readiness=NOT_CONFIRMED(本包交付态)",
+            {"name": "交付态: assembly_readiness=PROVIDED + load_means=NOT_PROVIDED",
+             "case": "V5b",
+             "expect": "SG_ADC 整链在开端口之前跳过, S4 学习与 S8b/S10b 照常起转: port_open 用量 8, "
+                       "motor_run 用量 2(剩 1), 必要清理 3 组; claims = "
+                       "{SG_ADC: SKIPPED_BEFORE_SPIN_UP(PREREQUISITE), IMU: VERIFIED}, "
+                       "core_protection_verified=False(SG/ADC 那场没跑) => 整包完成不等于核心全部通过"},
+            {"name": "场景: assembly_readiness=NOT_CONFIRMED(确认之前/任何一项回退时)",
+             "case": "V5",
              "expect": "S4/S8/S8b/S10/S10b 全部在开端口之前跳过, 且 S5/S6/S7 沿 requires 一并跳过 => "
-                       "port_open 用量 1(只有 S3), motor_run 用量 0, 台账里没有任何 motor_start"},
-            {"name": "两场均缺(交付态实测)",
-             "expect": "prerequisite_skips 覆盖 S4..S11b 全部运动与依赖阶段; "
-                       "prerequisite_refusals 的 gates 分别具名 load_means/assembly_readiness; "
-                       "protection_claims 对被跳过的场记 SKIPPED_BEFORE_SPIN_UP(PREREQUISITE)"}],
+                       "port_open 用量 1(只有 S3), motor_run 用量 0, 台账里没有任何 motor_start; "
+                       "两场 claims 都是 SKIPPED_BEFORE_SPIN_UP(PREREQUISITE)"},
+            {"name": "两门都 PROVIDED(本轮不可达: 加载手段仍未提供)",
+             "case": "V1/V2/V3/V9",
+             "expect": "16 阶段全跑, port_open 12 / motor_run 3 / 清理 5 组, 两场 claims 双 VERIFIED, "
+                       "core_protection_verified=True"}],
         "evidence_incomplete_case": "摘掉任一条腿(如源样本行) => code=EVIDENCE_INCOMPLETE 且 "
                                     "status!=OBSERVATION_NO_TRIGGER, 同时 disarm=CONFIRMED_DISABLED"}
     return needs

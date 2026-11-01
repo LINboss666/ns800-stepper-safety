@@ -1,5 +1,5 @@
 IDLE_LEARN_CHECK mode=offline_only (零设备: 不起 pyocd, 不开串口, 不动 Keil; dispatch 走 stub+sim)
-run_dir(LOCAL_ONLY, 仓外)=D:/ns800_m8r3_scratch/idlecheck_s92ks52q
+run_dir(LOCAL_ONLY, 仓外)=D:/ns800_m8r3_scratch/idlecheck_83zz7zmy
 OK A1_old_map_idle_stack_is_256
 OK A2_new_map_idle_stack_is_1024
 OK A3_ZI_grew_exactly_768
@@ -47,6 +47,8 @@ OK E9_stub_dispatch_end_to_end_ok
 OK E10_dry_run_touched_no_device
 OK E11_skipped_chain_has_no_session_at_all
 OK E12_refusal_lines_name_their_own_chain
+OK E13_recorded_sequence_matches_real_run
+OK E14_assembly_rollback_scenario_still_blocks_every_spinup
 OK F1_readback_bound_to_this_image
 OK F2_download_bound_to_this_axf
 OK F3_no_stale_binding_in_executable_fields
@@ -77,7 +79,7 @@ OK J1_load_means_state
 OK J2_asset_facts_updated
 OK J3_instrument_not_a_spinup_gate
 OK J4_gate_is_executed_not_prose
-OK J6_assembly_gate_covers_every_spinup
+OK J6_assembly_gate_still_wired_after_confirmation
 OK J7_refusal_propagates_along_requires
 OK J8_imu_mounting_fact_closed
 OK J5_meta_negative_ungated_prerequisite
@@ -105,7 +107,7 @@ OK N6_meta_negative_invented_rule
 OK N8_r3_history_recomputed_same
 OK N7_plan_states_boundary
 OK N9_summary_label_requires_whole_run_success
-CHECKS=105 problems=0
+CHECKS=107 problems=0
 META_NEGATIVES=6 fired=6
 META_NEGATIVES_R5=6(F6_meta_negative_gate_fires,G7_meta_negative_chain_order,H4_meta_negative_quota,J5_meta_negative_ungated_prerequisite,N5_meta_negative_gate_removed,N6_meta_negative_invented_rule) fired=6
 IDLE_LEARN_CHECK ALL_PASS_WITH_META_NEGATIVES

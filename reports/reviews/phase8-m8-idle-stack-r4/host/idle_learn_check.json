@@ -203,7 +203,7 @@
   {
    "name": "E6_mechanical_gaps_marked_not_provided",
    "ok": true,
-   "detail": "起转装配就绪(紧固、螺母防转、导向 + 支座松手保持固定)"
+   "detail": "SG/ADC 可控负载的施加手段与加载作用点"
   },
   {
    "name": "E7_validate_plan_clean",
@@ -218,7 +218,7 @@
   {
    "name": "E9_stub_dispatch_end_to_end_ok",
    "ok": true,
-   "detail": "交付态(装配未确认+缺加载)整包干跑: 每个起转阶段都在开端口前被拒 => 实际只用 1 次开口(S3)、0 次起转(motor_run 余额仍是 3), 流程判定与通道判定分开报(原文存 field/dispatch_stub_healthy.txt)"
+   "detail": "交付态(装配已确认 + 仍缺加载)整包干跑: 只有 SG_ADC 链在开端口前被拒 => 实际用 8 次开口 / 2 次起转 / 3 组清理, 流程判定与通道判定分开报(SG/ADC 那场没跑, core 必为 False); 原文存 field/dispatch_stub_healthy.txt"
   },
   {
    "name": "E10_dry_run_touched_no_device",
@@ -228,12 +228,22 @@
   {
    "name": "E11_skipped_chain_has_no_session_at_all",
    "ok": true,
-   "detail": "被机械前置门拒掉的阶段在汇总里一条阶段行都没有(不是执行了但失败), 交付态真正执行的只有 S0..S3"
+   "detail": "被机械前置门拒掉的 SG 链在汇总里一条阶段行都没有(不是执行了但失败); 学习/提交/重启恢复与 IMU 那四阶段照常出现在序列里"
   },
   {
    "name": "E12_refusal_lines_name_their_own_chain",
    "ok": true,
-   "detail": "每条拒绝行只列自己作用域被跳过的阶段, 并把沿 requires 传播的来源(via_requires)写出来; 不是把全部阶段糊在一行里"
+   "detail": "拒绝行只列自己作用域被跳过的阶段(SG 链四阶段), 且 gates 只具名真正缺的那一项(load_means): 装配已确认后不再把 assembly_readiness 也算成缺项"
+  },
+  {
+   "name": "E13_recorded_sequence_matches_real_run",
+   "ok": true,
+   "detail": "启动前记录的实际计划序列与真实干跑逐条一致: 执行 ['S0', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8b', 'S9b', 'S10b', 'S11b'] / 跳过 ['S8', 'S9', 'S10', 'S11'] / 用量 port_open=8 motor_run=2"
+  },
+  {
+   "name": "E14_assembly_rollback_scenario_still_blocks_every_spinup",
+   "ok": true,
+   "detail": "装配任何一项回退成未确认时, 起转仍被逐个挡下(S4/S8/S8b/S10/S10b + 沿 requires 的 S5/S6/S7), port_open 降到 1、零次起转 —— 门没被拆, 只是当前状态放行(原文存 field/dispatch_stub_assembly_not_confirmed.txt)"
   },
   {
    "name": "F1_readback_bound_to_this_image",
@@ -373,7 +383,7 @@
   {
    "name": "J2_asset_facts_updated",
    "ok": true,
-   "detail": "机械事实按操作者口径更新: 现有实物: T8 丝杆套件(标称导程 8 mm) + 导轨滑台, 已按照片装配 / 装配已完成但紧固/螺母防转/导向待确认(见 assembly_readiness(执行字段里已无旧的\"完整滑台/尚未连接/导程待确认\"; 只在勘误段引用旧措辞, 故扫描范围限定在机械前置+load_step+缺项汇总, 不扫全文)"
+   "detail": "机械事实跟着现场走: 装配四项按操作者确认写入 PROVIDED, 加载作用点仍是 NOT_PROVIDED(执行字段里已无过期三段; 旧措辞只出现在勘误/引用段, 故扫描范围限定在机械前置+load_step+缺项汇总)"
   },
   {
    "name": "J3_instrument_not_a_spinup_gate",
@@ -386,14 +396,14 @@
    "detail": "门在执行器代码里(开端口之前跳过整条链), 不是只在计划的说明字段里"
   },
   {
-   "name": "J6_assembly_gate_covers_every_spinup",
+   "name": "J6_assembly_gate_still_wired_after_confirmation",
    "ok": true,
-   "detail": "装配就绪门挂在每一个起转/带电阶段上(复审第 2 项: 只挡 S8 不够): 起转阶段=['S10', 'S10b', 'S4', 'S8', 'S8b']"
+   "detail": "操作者确认 4 项后状态改 PROVIDED, 但门仍挂在每一个起转阶段上(放行不等于拆门); 方向核实与累计距离核算仍列在 still_open: ['支座/轴承在松手后保持固定', '丝杆与电机的连接紧固', '螺母防转', '移动块导向']"
   },
   {
    "name": "J7_refusal_propagates_along_requires",
    "ok": true,
-   "detail": "S4 被挡后, 依赖本次学习的 S5/S6/S7 沿计划申报的 requires 一并具名跳过(不是中途失败): 汇总里的 prerequisite_skips 与 via_requires=S4 都实测到"
+   "detail": "装配未确认场景(E14 的干跑)里, S4 被挡后依赖本次学习结果的 S5/S6/S7 沿计划申报的 requires 一并具名跳过(不是中途失败); 交付态因 S4 已放行, 该传播不再触发"
   },
   {
    "name": "J8_imu_mounting_fact_closed",
@@ -473,7 +483,7 @@
   {
    "name": "M5_m5_history_untouched",
    "ok": true,
-   "detail": "工作树里没有 M5 软件故障原件的改动(event=9 的那批历史证据原样保留); 本轮改动=7 项"
+   "detail": "工作树里没有 M5 软件故障原件的改动(event=9 的那批历史证据原样保留); 本轮改动=11 项"
   },
   {
    "name": "M6_event_five_basis_is_source",
