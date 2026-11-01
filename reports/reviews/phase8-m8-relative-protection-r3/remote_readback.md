@@ -125,3 +125,37 @@ reports/reviews/phase8-m8-relative-protection-r3/host/remote_readback.py`
 
 撤出后最终 tip 的逐 blob 回读结果按任务书 §4 第 7 条写进当轮回执, 不再为"记录刚验证过的头"
 继续追加提交。
+
+## 8. 第 0 条源码审计轮的逐 blob 回读(tip `3b3b36e0…`)
+
+命令(逐字, 全新裸库根 `D:/ns800_m8r3_scratch/remotecheck_audit`):
+
+```
+RBI_ROOT=D:/ns800_m8r3_scratch/remotecheck_audit \
+RBI_TIP=3b3b36e0085e741e90f197cbe3d9136f2c27cb39 \
+PYTHONIOENCODING=utf-8 python reports/reviews/phase8-m8-relative-protection-r3/host/remote_readback.py
+```
+
+退出码 0；**只经 git 协议从远端取 blob**，本轮零设备动作、零构建、零产品改动。原文
+`host/remote_readback_console_audit.txt`(7446 B / LF / sha256 前 16 `5e1dc81131fba2c2`，
+56 行；Windows 重定向带来的 56 个 CR 已按既有纪律剥净后再入清单)。
+
+- `remote_tip=3b3b36e0085e741e90f197cbe3d9136f2c27cb39` —— 与本次推送头逐字符相同(绑定生效)。
+- `SCOPE_R3|entries=5106 verified=5106 problems=0` —— 本轮四条清单(评审 SHA256SUMS 5094 条、
+  固件 SHA256SUMS 10 条、`build_manifest.json` 9 件、`field/plan.json` 申报的镜像)解析去重后的
+  5106 件，逐条从**远端字节**复算相符。
+- `REMOTE_READBACK_SUMMARY|…|prior_problems=64|prior_hard=14|no_path=32|unlisted=4531` ——
+  往轮披露项一字未改(64/14/32 与 §1/§7 同形)，不由本轮改写。
+- `of_which_in_r3_paths=5`：两份清单自身、`remote_readback.md`、两份交接件 —— 就是 §7 记下的
+  **既有披露基线**，`__pycache__` 计数 **0**(本轮没有目录级 `git add -f`，八件全部按名相加，
+  提交后仍以 `git diff --cached --name-only | grep -c __pycache__` 复核，结果 0)。
+
+本轮入库相对上一头的增量只有四件审计证据(`host/m8diag_source_audit.txt` 判词、
+`host/m8diag_source_audit_check.py` 机器复算、`host/m8diag_source_audit_console.txt` 真实输出、
+`host/m8diag_spi_h_excerpt.txt` 仓库外厂商头的本机身份与最小摘录)加三处文档追加
+(`run_record.md` §11–§12、交接 MD §10–§12、交接 JSON 追加三键 + 一条板级取证口径更正)。
+**没有**新增判据框架、没有改计划/执行器/产品件 —— 审计本身是只读的。
+
+自我指涉按既有纪律处理，不留含糊：本件 console 由**这次**回读产生，因此它不在 `3b3b36e` 自己的清单里
+(那 5094 条写于它生成之前)，而是进入随后那次"证据归档头"的清单；而归档头自己的回读原文
+按 §7 末条"不为记录刚验证的头无限追加提交"**只进回执与仓外 scratch**，不再落进仓库。

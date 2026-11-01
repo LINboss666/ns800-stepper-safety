@@ -1,6 +1,6 @@
 # sha256 * <repo相对路径>(LF, 无 BOM; 本清单不哈希自身字节 —— 一条清单不能给自己的字节作证)
 # 生成方式: 对 reports/reviews/phase8-m8-relative-protection-r3/ 下每个常规文件(排除 SHA256SUMS.txt、remote_readback.md 与 __pycache__) 直接读磁盘字节算 sha256
-# 条目数=5094; 逐条与 Git blob 的复算由 host/staged_blob_preflight.txt(提交前)与 host/remote_readback.py(推送后, 从远端 blob)完成
+# 条目数=5096; 逐条与 Git blob 的复算由 host/staged_blob_preflight.txt(提交前)与 host/remote_readback.py(推送后, 从远端 blob)完成
 6239911fbd44b814e769e75c531df369c76a04e6a2ba7e4dbe119cb4b30a7b5d  reports/reviews/phase8-m8-relative-protection-r3/build/rc.txt
 278c6c927c4a17d5cd31846c2cf97da7f826c1ba433aebe4f214098c7cdbc866  reports/reviews/phase8-m8-relative-protection-r3/build/rt-thread-measure-a0.log
 9114d6024382982ff45c1683b3063a3c5cb0193a117c67ee188e0c7f912ca697  reports/reviews/phase8-m8-relative-protection-r3/build/rt-thread-motor-m1-candidate.log
@@ -42,7 +42,7 @@ bfca27de010120c8b57b69be81eeff0ac3b74f464a60e295a31bf8893e9063c0  reports/review
 bf7e6aa21057f3923075ab5cd71360a7bae6ec3c11899d5bcb8397df18c1a7d8  reports/reviews/phase8-m8-relative-protection-r3/host/field_SelfTest_console_r3closeout.txt
 8379f79a09e5840de666b1387f84a6733eea8a1769abee64203fb46be6faecf1  reports/reviews/phase8-m8-relative-protection-r3/host/field_SelfTest_console_r3finalfix.txt
 e9a345fed509b63998a39570232ece231e029c720a4d59e874c98497404586ca  reports/reviews/phase8-m8-relative-protection-r3/host/field_SelfTest_console_superseded-cp936capture.txt
-1448fdfb7e5e173ef91da6895390dcf323556d46fd7e800941639187fa4eb610  reports/reviews/phase8-m8-relative-protection-r3/host/m8diag_source_audit.txt
+de86e23687fa44056cabbef9e2218a5c5515dfd5f5ada83d670d54cb8f734996  reports/reviews/phase8-m8-relative-protection-r3/host/m8diag_source_audit.txt
 4c8b08e912ad001bc22478dd63d0f6541c1a98da6ddd06ad2a53dd8e802663e9  reports/reviews/phase8-m8-relative-protection-r3/host/m8diag_source_audit_check.py
 69e914ac104a95e2acfc2f405ca77e57402a8ac003a68c435c9e85a7ed72761f  reports/reviews/phase8-m8-relative-protection-r3/host/m8diag_source_audit_console.txt
 1e83dd2325d47c5f701c9090b681de2eaea7dd44a5d73278d22a26a5cbd3a896  reports/reviews/phase8-m8-relative-protection-r3/host/m8diag_spi_h_excerpt.txt
@@ -62,6 +62,7 @@ af679636c9004231538e7762411707a83ad6235846edd0d2ebbcf36ec060a116  reports/review
 687090583031c38f8247473b20b916e41d0682a3095976bee1229313eac3f4f0  reports/reviews/phase8-m8-relative-protection-r3/host/regression_m8_reverse_console.txt
 fa0c61f7a4a59e44659fd2dd899ee58af735536c5b6ab4dbb0af1618cece7c4d  reports/reviews/phase8-m8-relative-protection-r3/host/remote_readback.py
 f43e2358ccf9772b34f972f571a9c4aaf07095011f7b3f4c4010a15a36fd4077  reports/reviews/phase8-m8-relative-protection-r3/host/remote_readback_console.txt
+5e1dc81131fba2c24c2d8961361ee707befbc4f6e4c151a7650238ff31843bf4  reports/reviews/phase8-m8-relative-protection-r3/host/remote_readback_console_audit.txt
 9aa9317aa14de447131e069f8a814da988ee8db6b5f714955a6b12815724e70d  reports/reviews/phase8-m8-relative-protection-r3/host/remote_readback_console_finaltip.txt
 297f57e41c0f5aab344e295f9b7a428e839fbbabeb08b308e14b742e3f7fe2ec  reports/reviews/phase8-m8-relative-protection-r3/host/remote_readback_console_r3closeout.txt
 1fdd518579ab4e03389ecc5bd14a3b36bf19dcd3109dc439c116832e9fd5988e  reports/reviews/phase8-m8-relative-protection-r3/host/remote_readback_console_r3finalfix.txt
@@ -90,6 +91,7 @@ a2e7588aacad0c69a075b1f6275cac9fac9281b121a75afdef1efdf684d1f52f  reports/review
 f3427da35d94af761725ed6b086412bb8c64d702e731c52c518b0dc1a77cfe56  reports/reviews/phase8-m8-relative-protection-r3/host/selftest_summary_r3closeout.json
 a0dbbcd50590286e33f6ec19c493aa4750803250bc24eb28fce4b74615b5c0e4  reports/reviews/phase8-m8-relative-protection-r3/host/selftest_summary_r3finalfix.json
 53e5340b7f348a800a8714c4e0092d9ac8f62c22323b00979e5ef9eb416b982d  reports/reviews/phase8-m8-relative-protection-r3/host/staged_blob_preflight.txt
+14364735284ac354d72bcc41adee52e89d03053f4571f9bfb6714384e1c18a50  reports/reviews/phase8-m8-relative-protection-r3/host/staged_blob_preflight_audit.txt
 53c02763f9fa39f29810688d67b06e5841127e52750dfdec71680c279a80accb  reports/reviews/phase8-m8-relative-protection-r3/host/staged_blob_preflight_r3finalfix.txt
 1c06516555cc0d80426375470dc0a2547da84aaefc0be7a5b9149ff04837fa43  reports/reviews/phase8-m8-relative-protection-r3/host/validate_plan_continuation_m8s2.txt
 0360f306c3599bc102e958fa5a913d984b740c62f29361fa0604c893240043b6  reports/reviews/phase8-m8-relative-protection-r3/host/validate_plan_m8s2.txt

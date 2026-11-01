@@ -1,0 +1,5 @@
+MANIFEST reports/reviews/phase8-m8-relative-protection-r3/SHA256SUMS.txt entries=5095 problems=0 []
+MANIFEST reports/firmware/phase8-m8-relative-protection-r3/SHA256SUMS.txt entries=10 problems=0 []
+BUILD_MANIFEST reports/firmware/phase8-m8-relative-protection-r3/build_manifest.json resolved=9 problems=0 []
+BUILD_MANIFEST_BLOBS(same items via firmware manifest path) entries=9 problems=0 []
+STAGED_PREFLIGHT_TOTAL problems=0  (0 => 每个登记件的 Git blob 都与清单逐字节相符)
