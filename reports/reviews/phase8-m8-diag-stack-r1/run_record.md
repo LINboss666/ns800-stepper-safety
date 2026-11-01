@@ -101,3 +101,37 @@ python reports/reviews/phase8-m8-diag-stack-r1/host/diag_stack_check.py
   -> CHECKS=37  DIAGSTACK_PROBLEMS=0  NEGATIVE_CONTROL fired=3/3
 ```
 真实输出原样在 `host/diag_stack_console.txt`(41 行，37 条 OK / 0 条 PROBLEM，LF-only)。
+## 10. 板级对照包已绑定（DS-2）—— 等复审一次批准，本轮零设备动作
+
+单一事实来源 = `field/run_diag_stack_compare.py` 里的 `PLAN`；`--emit-plan` 生成 `field/plan.json`（9625 B），
+`--mode sim` 只做 argv 展开与静态门禁（`SIM_TOTAL problems=0`），`--mode selftest` 用**假端口注入**跑判定逻辑，
+`--mode real` 需要含"批准"二字的原文令牌才会走，且当前无人跑过。
+
+三处更正已并入包（不再单开登记轮）：
+1. **M7 扩展帧 = 26 字 = 104 B**（可能另有 4 B 对齐填充）；S16-S31 属软件保存部分，本次 HardFault 入口
+   汇编没有保存它们；栈帧 `psr=0x81000000` 的 bit9=0 ⇒ 无填充 ⇒ **出错前 SP = 0x20012770+104 = 0x200127D8**。
+   我在 §15.1 里写的"104 或 168 都可能"作废，A 项按固定地址读。
+2. `offsetof(rt_thread, thread_timer)=0x50` 复审由新 AXF 的 DWARF 核得；本机第二路独立证据 = 新镜像反汇编里
+   `_rt_event_recv`/`_rt_mq_recv` 等多处 `LDR r0,[sp,#..] / ADDS r0,r0,#0x50` 紧跟 `BL rt_timer_control|rt_timer_start`。
+3. `offsetof(rt_object, name)=0`（`include/rtdef.h:284`，RT_NAME_MAX=16 分支下 name 在最前，type@16/flag@17/list@0x14，
+   与 `SUBS r0,r0,#0x14` 一致）⇒ B 项从 `0x20015B28` 直接解释线程名。
+
+下载前两条只读 RAM：A `savemem 0x200127D8 40`、B `savemem 0x20015B28 48`（都在 RW_RT_HEAD 预留块内，门禁按地址区间核）。
+A 带两个哨兵自定位：`+8 == 0x00bd80b0`（node）与 `+0x1c == 0x20015b78`（object）；命中即证明局部槽未被覆盖。
+
+动作序列（一次批准，零电机）：S-1 两条只读 RAM → S0 离线门禁 → S1 唯一一次下载（新 AXF，`-e sector`）→
+S2 唯一一次 290916 B 回读并与登记 BIN 逐字节比较 → S3 **串口先 Open 后复位**再采集 75 s（原始字节先落盘）→
+S4 先探回显，再 `system_status` / `ps` / `free` / `diag_status`，每条原始响应单独存文件。
+quota：`motor_run 0`、`config_save 0`、`blackbox_clear 0`、`download 1`、`flash_readback 1`、`explicit_reset 1`、
+`port_open 1`、`retry 0`；静态门禁扫的是**会被执行的 argv 与 stage 绑定**（上一版扫整个 PLAN，被自己的
+forbidden 清单打出 9 条假报警，已改）。
+
+判据（不接受自动判的部分明写）：启动完成 = 采集里出现 `[BOOT] Phase-7 runtime bootstrap complete (state=`
+（`supervisor.c:499`）；可交互 = 回显存在且四查询响应非空；无再硬fault = 两个 fail needle 都不出现；
+diag 栈余量与堆余量 = `ps`/`free` 两个文件**由人读**，不自动判 PASS。
+停点标签含 `BOOT_INCOMPLETE` / `NO_ECHO` / `HARDFAULT_NEEDLE_SEEN` / `READBACK_MISMATCH` / `PLAN_GATE_REFUSED`。
+
+零设备自证：`--mode selftest` 5/5 OK（健康流通过、HardFault needle 触发、无回显时不发查询、静默流不算通过），
+且注入模式下 `S3_reset.rc.txt` 内容为 `SKIPPED_INJECTION(零设备: 不碰 DAP)` —— 复位那条 argv 在自检里**没有执行**。
+
+本轮仍然没有设备动作：板子保持 (c)/frame 轮结束时的 Halted，板上镜像仍是 `00608ec9…e304`。

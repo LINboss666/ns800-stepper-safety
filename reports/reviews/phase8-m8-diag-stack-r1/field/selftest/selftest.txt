@@ -1,0 +1,7 @@
+SELFTEST mode=zero_device_injection (未接触真实端口/设备)
+OK ST_healthy_pass
+OK ST_healthy_queries_saved
+OK ST_hardfault_needle_fires
+OK ST_no_echo_stops_before_queries
+OK ST_silent_not_pass
+SELFTEST_PROBLEMS=0

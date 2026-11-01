@@ -952,5 +952,52 @@
  "reviewer_new_clues_r1": {
   "timer_list_inference": "r1=0x20015b78 与 r3=0x20015b28 差 0x50(线程内置定时器偏移); r4/r5/r6=1024/18/10 与 blackbox.c:444-445 的 bblog 创建参数一致 => 指向损坏的定时器对象链表; 本轮登记为有依据的推断, 判定动作是下载前读 0x20015b28 的 name 字段",
   "diag_stack_defect": "复审独立查得并可复算: 见 defect_evidence"
+ },
+ "diag_stack_board_package": {
+  "status": "BOUND_NOT_EXECUTED",
+  "device_actions_this_round": 0,
+  "single_source": "reports/reviews/phase8-m8-diag-stack-r1/field/run_diag_stack_compare.py",
+  "plan": "reports/reviews/phase8-m8-diag-stack-r1/field/plan.json",
+  "sim": "field/sim-bound/sim_dispatch.txt (SIM_TOTAL problems=0)",
+  "selftest": "field/selftest/selftest.txt (SELFTEST_PROBLEMS=0, 假端口注入, 复位 argv 未执行)",
+  "sequence": [
+   "S-1 两条只读 RAM(下载前)",
+   "S0 离线门禁",
+   "S1 一次下载(-e sector 新 AXF)",
+   "S2 290916 B 回读逐字节比较",
+   "S3 串口 Open 后复位 + 75 s 采集",
+   "S4 探回显 + system_status/ps/free/diag_status"
+  ],
+  "pre_download_reads": [
+   {
+    "name": "A_locals",
+    "addr": "0x200127D8",
+    "bytes": 40,
+    "sentinels": "+8=0x00bd80b0(node), +0x1c=0x20015b78(object)"
+   },
+   {
+    "name": "B_tcb",
+    "addr": "0x20015B28",
+    "bytes": 48,
+    "note": "rt_object.name 偏移 0 => 直接读线程名"
+   }
+  ],
+  "quota": {
+   "download": 1,
+   "flash_readback": 1,
+   "explicit_reset": 1,
+   "port_open": 1,
+   "motor_run": 0,
+   "config_save": 0,
+   "blackbox_clear": 0,
+   "retry": 0
+  },
+  "reviewer_corrections_folded": [
+   "M7 扩展帧 26 字=104 B, S16-S31 属软件保存且本入口未保存, 栈帧 psr bit9=0 ⇒ 无填充 ⇒ 出错前 SP=0x200127D8",
+   "offsetof(rt_thread, thread_timer)=0x50 已核(DWARF + 本机反汇编第二路证据)",
+   "offsetof(rt_object, name)=0 (include/rtdef.h:284)"
+  ],
+  "not_auto_judged": "ps/free 的栈与堆余量由人读原文; 只有 boot 完成/无 HardFault/回显/回读一致 由程序判",
+  "board_state": "Halted 未变, 板上仍是 00608ec9…e304"
  }
 }

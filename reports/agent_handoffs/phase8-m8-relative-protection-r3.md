@@ -372,3 +372,14 @@ MAP `fd334a83…ad579`，均 1 次构建、0 Error 0 Warning）。
 
 另：复审纠正、我已撤回的一条见 `run_record.md §15.1`（"局部槽已被异常帧覆盖"不成立，
 扩展帧下出错前 SP 应为 `0x200127D8`，局部槽很可能还在 —— 判定动作已排进板级对照包的 A/B 两项）。
+## 17. DS-2 板级对照包已绑定（等复审一次批准；本轮零设备动作）
+
+绑定物：`reports/reviews/phase8-m8-diag-stack-r1/field/`（`run_diag_stack_compare.py` 为单一事实来源，
+`plan.json` 由 `--emit-plan` 生成，`sim-bound/sim_dispatch.txt` 是零设备展开且 `SIM_TOTAL problems=0`，
+`selftest/selftest.txt` 是假端口注入的 5 项判定自检且 `SELFTEST_PROBLEMS=0`）。
+序列 = 下载前两条只读 RAM(A 局部槽带哨兵自定位 / B 线程名) → 离线门禁 → 一次下载 → 290916 B 回读逐字节比较
+→ 串口先 Open 后复位再采集 75 s → `system_status`/`ps`/`free`/`diag_status` 四条查询，原始字节全部先落盘；
+`motor_run`/`config_save`/`blackbox_clear` 全 0，静态门禁只扫 argv 与 stage 绑定。
+复审三条更正已并入：M7 扩展帧 104 B 且 bit9=0 ⇒ 出错前 SP=0x200127D8；`thread_timer` 偏移 0x50 另有本机
+反汇编第二路独立证据（`ADDS r0,r0,#0x50` + `BL rt_timer_control`）；`rt_object.name` 偏移为 0
+（`include/rtdef.h:284`）⇒ B 从 0x20015B28 直接解释线程名。栈/堆余量不自动判 PASS，`ps`/`free` 原文由人读。

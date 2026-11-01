@@ -51,3 +51,5 @@ reports/reviews/phase8-m8-diag-stack-r1/SHA256SUMS.txt -text
 reports/reviews/phase8-m8-diag-stack-r1/host/*.txt -text
 reports/reviews/phase8-m8-diag-stack-r1/host/*.json -text
 reports/reviews/phase8-m8-diag-stack-r1/*.txt -text
+reports/reviews/phase8-m8-diag-stack-r1/field/** -text
+reports/reviews/phase8-m8-diag-stack-r1/field/*.json -text

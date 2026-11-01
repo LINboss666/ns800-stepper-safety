@@ -1,0 +1,308 @@
+{
+ "package": "M8 diag 栈 4096 板级对照包 R1",
+ "status": "BOUND_NOT_EXECUTED",
+ "numbers_are_proposals_not_authorization": true,
+ "why": "复审已接受 diag 栈 4096 为**修复候选**; 板上要确认: 能完成启动、查询可交互、diag 栈有余量、没有再次 HardFault。故障闭环仍未成立。",
+ "identity_binding": {
+  "board_image_before": {
+   "path": "reports/firmware/phase8-m8-relative-protection-r3/rt-thread-motor-m1-candidate.bin",
+   "bytes": 290916,
+   "sha256": "00608ec93c6a3027d68b44b5317574209fccfb0ba82a9974793d13b54b79e304",
+   "proven_on_board": "已逐字节回读证得(往轮)"
+  },
+  "image_under_test": {
+   "path": "reports/firmware/phase8-m8-diag-stack-r1/rt-thread-motor-m1-candidate.bin",
+   "bytes": 290916,
+   "sha256": "f5c2fd89bbf28255a5b26c9cca495bc0fb1e39d401d0bb7bea19d051221708ce"
+  },
+  "axf_under_test": {
+   "path": "reports/firmware/phase8-m8-diag-stack-r1/rt-thread-motor-m1.axf",
+   "bytes": 1771288,
+   "sha256": "fb26d5a0e866b2c8852c989c98f158d99d0511ffdc6ce4e9b8c8add3372ed6ea"
+  },
+  "software_input_commit": "bd517fe (fix) / 0daf94f (docs) —— 远端逐 blob 回读 5159 条 problems=0",
+  "diag_stack_source": "applications/diagnosis.c:48 DIAG_THREAD_STACK 4096 (armlink Max Depth 1580 B 对照)"
+ },
+ "corrections_applied_from_review": [
+  "M7 硬件浮点扩展帧 = 26 字 = 104 B(可能另有 4 B 对齐填充); S16-S31 属软件保存部分, 本次 HardFault 入口汇编没有保存它们; 保存的 xPSR=0x81000000 的 bit9(对齐标记)=0 => 无填充 => 出错前 SP = 0x20012770+104 = 0x200127D8。我上一轮写的'104 或 168 都可能'作废。",
+  "offsetof(rt_thread, thread_timer) = 0x50: 复审从新 AXF 的 DWARF 核得; 本机第二路独立证据 = 新镜像反汇编里 _rt_event_recv/_rt_mq_recv 等多处 `LDR r0,[sp,#..] / ADDS r0,r0,#0x50` 紧跟 `BL rt_timer_control|rt_timer_start`。=> 不再需要靠现场猜。",
+  "offsetof(rt_object, name) = 0 (不是 4): include/rtdef.h:284 在 RT_NAME_MAX=16 分支下 name 在最前, type@16/flag@17/list@0x14 与反汇编 `SUBS r0,r0,#0x14` 一致; 所以 B 项从 0x20015B28 直接解释线程名。"
+ ],
+ "pre_download_reads": [
+  {
+   "name": "A_locals",
+   "addr": 536946648,
+   "bytes": 40,
+   "why": "rt_object_init 出错前的局部槽(sp+4=information, sp+8=node, sp+0x14=name, sp+0x1b=type, sp+0x1c=object) 与保存的调用者返回地址",
+   "sentinels": {
+    "node@sp+8": "0x00bd80b0",
+    "object@sp+0x1c": "0x20015b78",
+    "type 期望很小(对象类枚举)": "<=11"
+   }
+  },
+  {
+   "name": "B_tcb",
+   "addr": 536959784,
+   "bytes": 48,
+   "why": "推断的 TCB 起点: name[16]@0(RT_NAME_MAX=16, include/rtdef.h:284)、type@16、flag@17、list@0x14、sp/entry/parameter/stack_addr/stack_size",
+   "sentinels": {
+    "name 应是可读线程名": "ascii",
+    "stack_size 若为 bblog 则 1024": "0x400"
+   }
+  }
+ ],
+ "quota": {
+  "dap_attach": 3,
+  "savemem_reads": 3,
+  "explicit_halt": 0,
+  "download": 1,
+  "flash_readback_bytes": 1,
+  "explicit_reset": 1,
+  "port_open": 1,
+  "motor_run": 0,
+  "config_save": 0,
+  "blackbox_clear": 0,
+  "tmc_config_apply": 0,
+  "safety_trip": 0,
+  "retry": 0
+ },
+ "forbidden": [
+  "motor_*",
+  "pwm_test",
+  "config_save",
+  "flash_test",
+  "flash_logclear",
+  "safety_trip",
+  "fault_reset",
+  "diag_mode",
+  "diag_profile *commit*",
+  "任何 Flash 写(下载除外)"
+ ],
+ "tools": {
+  "provenance": "逐字沿用已成功的形态: 下载/回读 = R3 field/plan.json 的 tools.download/readback (P0 与 M8-S2 两次真跑过); 复位 = 同件 tools.reset(显式 --method sysresetreq + attach); 只读 RAM = 本轮 frame/frame2 三次实测的 commander 形态(无 --core, resume_on_disconnect=false)。",
+  "read_ram": {
+   "argv": [
+    "python",
+    "-m",
+    "pyocd",
+    "commander",
+    "--no-config",
+    "--connect",
+    "attach",
+    "--no-wait",
+    "-t",
+    "cortex_m",
+    "-f",
+    "1000000",
+    "-Oauto_unlock=false",
+    "-Ocache.enable_memory=false",
+    "-Ocache.read_code_from_elf=false",
+    "-O",
+    "connect_mode=attach",
+    "-O",
+    "scan_all_aps=false",
+    "-O",
+    "resume_on_disconnect=false",
+    "-u",
+    "@UID_FILE",
+    "-c",
+    "status",
+    "-c",
+    "savemem 0x200127d8 40 @ROOT/A_locals.bin",
+    "-c",
+    "savemem 0x20015b28 48 @ROOT/B_tcb.bin",
+    "-c",
+    "status",
+    "-c",
+    "exit"
+   ],
+   "device_actions": {
+    "attach": 1,
+    "halt": 0,
+    "reset": 0,
+    "ram_write": 0
+   },
+   "leave": "Halted(不断恢复运行)"
+  },
+  "download": {
+   "argv": [
+    "python",
+    "-m",
+    "pyocd",
+    "flash",
+    "--pack",
+    "C:/Keil_v5/ARM/PACK/.Download/NOVOSENSE.NS800RT7XXX.0.5.3.pack",
+    "-t",
+    "ns800rt7p65d_dhqfby2",
+    "-u",
+    "@UID_FILE",
+    "-f",
+    "1000000",
+    "-Oauto_unlock=false",
+    "-Ocache.enable_memory=false",
+    "-Ocache.read_code_from_elf=false",
+    "-e",
+    "sector",
+    "D:\\ns800\\reports\\firmware\\phase8-m8-diag-stack-r1\\rt-thread-motor-m1.axf"
+   ],
+   "device_actions": {
+    "attach": 1,
+    "flash_write": 1
+   }
+  },
+  "readback": {
+   "argv": [
+    "python",
+    "-m",
+    "pyocd",
+    "commander",
+    "--no-config",
+    "-t",
+    "cortex_m",
+    "-u",
+    "@UID_FILE",
+    "-f",
+    "1000000",
+    "-O",
+    "auto_unlock=false",
+    "-O",
+    "connect_mode=halt",
+    "-O",
+    "resume_on_disconnect=false",
+    "-O",
+    "cache.enable_memory=false",
+    "-O",
+    "cache.read_code_from_elf=false",
+    "-O",
+    "scan_all_aps=false",
+    "-c",
+    "status",
+    "-c",
+    "savemem 0x08000000 @IMAGE_BYTES @ROOT/flash_readback.bin",
+    "-c",
+    "status",
+    "-c",
+    "exit"
+   ],
+   "compare_against": "reports/firmware/phase8-m8-diag-stack-r1/rt-thread-motor-m1-candidate.bin",
+   "device_actions": {
+    "attach": 1,
+    "halt_by_connect_mode": 1,
+    "flash_read": 1
+   }
+  },
+  "reset": {
+   "argv": [
+    "python",
+    "-m",
+    "pyocd",
+    "reset",
+    "--method",
+    "sysresetreq",
+    "--no-config",
+    "--no-wait",
+    "--connect",
+    "attach",
+    "--core",
+    "0",
+    "-t",
+    "cortex_m",
+    "-u",
+    "@UID_FILE"
+   ],
+   "ordering": "必须在串口已 Open 之后发出 —— 否则复位期的 [BOOT] 行永远看不到(观测缺失≠没产出)",
+   "device_actions": {
+    "explicit_reset": 1
+   }
+  }
+ },
+ "serial": {
+  "port": "COM5",
+  "baud": 115200,
+  "settings": "8N1, 无流控",
+  "discipline": "端口对象构造时一次给全参数, **打开之后不再赋任何设置属性**(pySerial 在 Windows 上打开后赋值会重设串口并吞字节, R2 已实测并修过)"
+ },
+ "stages": [
+  {
+   "id": "S-1",
+   "title": "下载前两条只读 RAM: A=异常现场局部槽, B=推断的 TCB",
+   "tool": "read_ram",
+   "device_actions": 1,
+   "halt_after": false
+  },
+  {
+   "id": "S0",
+   "title": "离线门禁: 三件产物字节/sha 复算 + UID 文件在场 + argv 展开 + 禁止项静态拒绝",
+   "tool": null,
+   "device_actions": 0,
+   "halt_after": false
+  },
+  {
+   "id": "S1",
+   "title": "唯一一次下载(-e sector, 新 AXF)",
+   "tool": "download",
+   "device_actions": 1,
+   "operator_checkpoint": "回传 rc + 原始 stdout/stderr 全文, 由复审批准下一次(下载不可逆)"
+  },
+  {
+   "id": "S2",
+   "title": "唯一一次定长回读 290916 B 并与登记 BIN 逐字节比较",
+   "tool": "readback",
+   "device_actions": 1,
+   "halt_after": false
+  },
+  {
+   "id": "S3",
+   "title": "串口 Open -> 复位 -> 完整启动采集(窗口 75 s, 覆盖 stage-5 数秒扫描与可能的 HardFault dump)",
+   "tool": "reset",
+   "device_actions": 1,
+   "raw_first": true
+  },
+  {
+   "id": "S4",
+   "title": "交互查询: 先探回显, 再 system_status / ps / free / diag_status",
+   "tool": null,
+   "device_actions": 0,
+   "note": "回显缺失即 NO_ECHO 停, 不猜"
+  }
+ ],
+ "needles": {
+  "boot_complete": "[BOOT] Phase-7 runtime bootstrap complete (state=",
+  "stage5_storage_line": "[BOOT] 5 storage ......... ",
+  "stage8_diag_line": "[BOOT] 8 diagnosis ....... ",
+  "fail_hardfault_dump": "hard fault on thread: ",
+  "fail_hardfault_regs": "psr: 0x",
+  "fail_flash_scan_start": "[FLASH] scanning 1 MiB event log...",
+  "sources": {
+   "boot_complete": "applications/supervisor.c:499",
+   "stage5_storage_line": "applications/supervisor.c:463",
+   "stage8_diag_line": "applications/supervisor.c:482",
+   "fail_hardfault_dump": "libcpu/arm/cortex-m7/cpuport.c:440",
+   "fail_hardfault_regs": "libcpu/arm/cortex-m7/cpuport.c:420",
+   "fail_flash_scan_start": "applications/ns_storage.c:147"
+  }
+ },
+ "pass_criteria": {
+  "boot_completed": "采集里出现 boot_complete 行",
+  "interactive": "msh 回显存在且四条查询各有非空响应",
+  "diag_stack_headroom": "ps 表里 diag 行 stack=4096 且 max used < 4096",
+  "heap_headroom": "free 的 total/used/max 全部可读且 used+max 未贴近 total",
+  "no_hardfault": "两个 fail needle 都不出现",
+  "readback_equal": "S2 的 290916 B 与登记 BIN 逐字节相同",
+  "a_b_reads": "A 命中两个哨兵(node=0x00bd80b0 @+8, object=0x20015b78 @+0x1c) 即证明局部槽未被覆盖; B 的 name 字段给出线程身份, 与 0x50 偏移一起判死'定时器链表'这条推断"
+ },
+ "stop_labels": [
+  "PRE_READ_MISSING_FILE",
+  "PLAN_GATE_REFUSED",
+  "DOWNLOAD_FAILED",
+  "READBACK_MISMATCH",
+  "PORT_BUSY",
+  "RESET_FAILED",
+  "BOOT_INCOMPLETE",
+  "NO_ECHO",
+  "HARDFAULT_NEEDLE_SEEN",
+  "MOTION_FORBIDDEN_REQUESTED"
+ ],
+ "quota_is_executed_not_declared": true,
+ "offline_only_statement": "本文件与 plan.json 由 --emit-plan/--mode sim 生成; 真实设备动作只在带 --approve 原文令牌的 --mode real 下发生, 且必须由复审一次批准。"
+}

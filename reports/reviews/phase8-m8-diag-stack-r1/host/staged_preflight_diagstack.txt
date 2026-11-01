@@ -1,4 +1,4 @@
-MANIFEST reports/reviews/phase8-m8-diag-stack-r1/SHA256SUMS.txt entries=8 problems=0 []
+MANIFEST reports/reviews/phase8-m8-diag-stack-r1/SHA256SUMS.txt entries=27 problems=0 []
 MANIFEST reports/firmware/phase8-m8-diag-stack-r1/SHA256SUMS.txt entries=4 problems=0 []
 MANIFEST reports/reviews/phase8-m8-relative-protection-r3/SHA256SUMS.txt entries=5137 problems=0 []
 MANIFEST reports/firmware/phase8-m8-relative-protection-r3/SHA256SUMS.txt entries=10 problems=0 []
