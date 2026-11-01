@@ -1,0 +1,230 @@
+{
+ "checks": [
+  {
+   "name": "A1_old_map_idle_stack_is_256",
+   "ok": true,
+   "detail": "256"
+  },
+  {
+   "name": "A2_new_map_idle_stack_is_1024",
+   "ok": true,
+   "detail": "1024"
+  },
+  {
+   "name": "A3_ZI_grew_exactly_768",
+   "ok": true,
+   "detail": "85592-84824"
+  },
+  {
+   "name": "A4_callgraph_max_depth_668_exceeds_old_256",
+   "ok": true,
+   "detail": "armlink Max Depth=668 vs 任务书固定帧合计=264"
+  },
+  {
+   "name": "A5_board_measured_idle_watermark_recorded_separately",
+   "ok": true,
+   "detail": "静态界 668 与实测峰值 163 并列登记, 不互相替换"
+  },
+  {
+   "name": "A6_rtconfig_only_the_idle_line_changed",
+   "ok": true,
+   "detail": "[('#define IDLE_THREAD_STACK_SIZE 256', '#define IDLE_THREAD_STACK_SIZE 1024   /* 候选: armlink 调用图 idle_thread_entry ⇒ rt_defunct_execute ⇒ rt_object_delete ⇒ rt_free ⇒ rt_mutex_take… Max Depth=668 B > 旧值 256 B */')]"
+  },
+  {
+   "name": "A7_diag_4096_source_untouched",
+   "ok": true,
+   "detail": "e1696ec92721c7df"
+  },
+  {
+   "name": "A8_accepted_image_not_overwritten",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "A9_registered_hashes_agree_with_disk",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "A10_heap_and_dram_bounds_intact",
+   "ok": true,
+   "detail": "heap=('00008000', '00008000') DTCM used/max=0000d318/0001fc00"
+  },
+  {
+   "name": "A11_build_zero_error_zero_warning",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "B_learn_accepts_8/8",
+   "ok": true,
+   "detail": "8/8 -> {\"verdict\": \"OK\", \"code\": null}"
+  },
+  {
+   "name": "B_learn_accepts_9/8",
+   "ok": true,
+   "detail": "9/8 -> {\"verdict\": \"OK\", \"code\": null}"
+  },
+  {
+   "name": "B_learn_accepts_8/12",
+   "ok": true,
+   "detail": "8/12 -> {\"verdict\": \"OK\", \"code\": null}"
+  },
+  {
+   "name": "B_learn_accepts_32/32 上限不设",
+   "ok": true,
+   "detail": "32/32 上限不设 -> {\"verdict\": \"OK\", \"code\": null}"
+  },
+  {
+   "name": "B_learn_rejects_7/9",
+   "ok": true,
+   "detail": "7/9 -> {\"verdict\": \"STOP\", \"code\": \"FIELD_VALUE_BELOW_MIN\"}"
+  },
+  {
+   "name": "B_reject_reason_is_below_min_7/9",
+   "ok": true,
+   "detail": "FIELD_VALUE_BELOW_MIN"
+  },
+  {
+   "name": "B_learn_rejects_8/7",
+   "ok": true,
+   "detail": "8/7 -> {\"verdict\": \"STOP\", \"code\": \"FIELD_VALUE_BELOW_MIN\"}"
+  },
+  {
+   "name": "B_reject_reason_is_below_min_8/7",
+   "ok": true,
+   "detail": "FIELD_VALUE_BELOW_MIN"
+  },
+  {
+   "name": "B_learn_rejects_0/8",
+   "ok": true,
+   "detail": "0/8 -> {\"verdict\": \"STOP\", \"code\": \"FIELD_VALUE_BELOW_MIN\"}"
+  },
+  {
+   "name": "B_reject_reason_is_below_min_0/8",
+   "ok": true,
+   "detail": "FIELD_VALUE_BELOW_MIN"
+  },
+  {
+   "name": "B_rejects_duplicate_success_line",
+   "ok": true,
+   "detail": "FIELD_NOT_EXACTLY_ONE"
+  },
+  {
+   "name": "B_rejects_no_response_prompt_only",
+   "ok": true,
+   "detail": "只有提示符、没有成功行 => 具名停止(期待行缺失), 不是非空即过"
+  },
+  {
+   "name": "B_rejects_empty_response",
+   "ok": true,
+   "detail": "EXPECTATION_NOT_MET"
+  },
+  {
+   "name": "B_business_failure_layer_still_stops",
+   "ok": true,
+   "detail": "{\"verdict\": \"STOP\", \"code\": \"BUSINESS_FAILED\"}"
+  },
+  {
+   "name": "C1_ps_fixture_lines_contain_both_threads",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "C2_new_image_expectation_passes",
+   "ok": true,
+   "detail": "None"
+  },
+  {
+   "name": "C3_old_image_real_capture_rejected",
+   "ok": true,
+   "detail": "旧镜像 idle=0x100 的板上实录必须被新包拒 => 断言真的在看栈字段"
+  },
+  {
+   "name": "C4_diag_stack_regression_to_1024_rejected",
+   "ok": true,
+   "detail": "FIELD_VALUE_MISMATCH"
+  },
+  {
+   "name": "D1_metaneg_removing_the_floor_lets_7_9_through",
+   "ok": true,
+   "detail": "去掉下限判据后 7/9 被接受 => B 的拒绝靠真判据"
+  },
+  {
+   "name": "D2_metaneg_removing_row_uniqueness_lets_duplicates_through",
+   "ok": true,
+   "detail": "去掉唯一性后重复成功行被接受 => B 的重复行拒绝靠真判据"
+  },
+  {
+   "name": "D3_metaneg_exact_8_would_still_reject_9",
+   "ok": true,
+   "detail": "把判据换回等值 must{8,8} 后 9/8 又被拒 => 证明'恰好 8'确实被删掉了, 不是读错文件"
+  },
+  {
+   "name": "D4_metaneg_dropping_kernel_builtin_scan_breaks_ps",
+   "ok": true,
+   "detail": "去掉内置命令源后 ps 又变成'发明命令' => ps/free 的通过靠那条真实存在的导出"
+  },
+  {
+   "name": "D5_invented_command_still_rejected",
+   "ok": true,
+   "detail": "validate_plan(未突变) fail=0; 发明命令 fail=1"
+  },
+  {
+   "name": "D6_manual_gate_without_answer_stops_before_motion",
+   "ok": true,
+   "detail": "status=STOP motor_run_used=1"
+  },
+  {
+   "name": "E1_download_payload_is_the_new_axf",
+   "ok": true,
+   "detail": "只看可执行字段(command/argv), 不看散文: 上一轮的教训是扫整份对象会被自己的说明文字打出假报警"
+  },
+  {
+   "name": "E2_identity_binding_uses_executor_schema",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "E3_two_independent_excitation_sessions",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "E4_no_software_trip_substitute",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "E5_boot_confirm_asserts_both_stack_sizes",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "E6_mechanical_gaps_marked_not_provided",
+   "ok": true,
+   "detail": "SG/ADC 受控负载的施加与测量手段"
+  },
+  {
+   "name": "E7_validate_plan_clean",
+   "ok": true,
+   "detail": "checks=207 fail=0"
+  },
+  {
+   "name": "E8_quota_declares_no_retry_and_no_blackbox_clear",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "E9_stub_dispatch_end_to_end_ok",
+   "ok": true,
+   "detail": "整包在 stub+sim 下走完全部有步骤的阶段且配额逐条扣完; 原文存 field/dispatch_stub_healthy.txt"
+  },
+  {
+   "name": "E10_dry_run_touched_no_device",
+   "ok": true,
+   "detail": "干跑里 actions_attempted 为空: 没有一次真实工具调用、没有开口、没有起转(见同文件)"
+  }
+ ],
+ "problems": []
+}

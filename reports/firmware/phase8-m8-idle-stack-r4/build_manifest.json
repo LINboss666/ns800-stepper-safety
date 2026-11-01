@@ -1,0 +1,92 @@
+{
+ "round": "phase8-m8-idle-stack-r4",
+ "baseline_commit": "48204fe37de3da6f8caeeff467256562f11e58e2",
+ "action": "Keil Rebuild All x1 (只 rt-thread-motor-m1-candidate; 无下载、无 Flash 读写、无 DAP、无复位、无串口、无起转)",
+ "command": "C:\\Keil_v5\\UV4\\UV4.exe -r project.uvprojx -t rt-thread-motor-m1-candidate -j0 -o D:/ns800/reports/reviews/phase8-m8-idle-stack-r4/build/rt-thread-motor-m1-candidate.log",
+ "uv4_return_code": 0,
+ "build_time_elapsed_line": "Build Time Elapsed:  00:00:10",
+ "program_size": "Code=204762 RO-data=85578 RW-data=2188 ZI-data=85592",
+ "program_size_delta_vs_diagstack_round": "ZI 84824 -> 85592 = +768 B, 正好等于 idle 栈 256->1024 的增量",
+ "error_warning_line": "0 Error(s), 0 Warning(s)",
+ "compiler_line_from_log": "*** Using Compiler 'V6.24', folder: 'C:\\Keil_v5\\ARM\\ARMCLANG\\Bin'",
+ "sources_changed": [
+  {
+   "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/rtconfig.h",
+   "what": "IDLE_THREAD_STACK_SIZE 256 -> 1024 (候选)"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py",
+   "what": "expect_values 新增 must_min 数值下限判据(具名拒绝 FIELD_VALUE_BELOW_MIN)"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/field/plan.json",
+   "what": "learn 步骤 must{adc_n==8,sg_n==8} -> must_min{adc_n>=8,sg_n>=8} + criterion_note"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/field/plan_continuation_s2.json",
+   "what": "同上"
+  }
+ ],
+ "not_overwritten": {
+  "path": "reports/firmware/phase8-m8-diag-stack-r1/rt-thread-motor-m1-candidate.bin",
+  "sha256": "f5c2fd89bbf28255a5b26c9cca495bc0fb1e39d401d0bb7bea19d051221708ce",
+  "statement": "已接受的 f5c2fd89… 镜像原字节未动; 新镜像另存新目录"
+ },
+ "targets": [
+  {
+   "target": "rt-thread-motor-m1-candidate",
+   "uv4_return_code": 0,
+   "error_warning_line": "0 Error(s), 0 Warning(s)",
+   "program_size": "Code=204762 RO-data=85578 RW-data=2188 ZI-data=85592",
+   "log_bytes": 3909,
+   "log_sha256": "757bac0b55110a7ecd11c095c73f5ed23dde3652cee9a90d0bea84754278714a",
+   "log_archive_path": "reports/reviews/phase8-m8-idle-stack-r4/build/rt-thread-motor-m1-candidate.log",
+   "images": {
+    "rt-thread-motor-m1-candidate.bin": {
+     "bytes": 290916,
+     "sha256": "dab356c69fbf4ca747e838580c16982bd56b53b1367f84b97ab705c2fbd25439",
+     "path": "reports/firmware/phase8-m8-idle-stack-r4/rt-thread-motor-m1-candidate.bin",
+     "source_path_relative_to_project": "build/motor_m1/rt-thread-motor-m1.bin",
+     "identical_to_build_output": true
+    },
+    "rt-thread-motor-m1.axf": {
+     "bytes": 1771288,
+     "sha256": "0babe9f1a874230381bc70eae959fd6b8dff41f1182bcdc6bed1fd72736aba8c",
+     "path": "reports/firmware/phase8-m8-idle-stack-r4/rt-thread-motor-m1.axf",
+     "source_path_relative_to_project": "build/motor_m1/rt-thread-motor-m1.axf",
+     "identical_to_build_output": true
+    }
+   },
+   "map": {
+    "bytes": 2108456,
+    "sha256": "b61632249f99a0bbc92dae5da6695b929cba658bae8b74d833243b8a16c275b7",
+    "path": "reports/firmware/phase8-m8-idle-stack-r4/rt-thread-motor-m1.map",
+    "source_path_relative_to_project": "build/motor_m1/rt-thread-motor-m1.map",
+    "identical_to_build_output": true
+   },
+   "map_facts": {
+    "idle_thread_stack": "0x20009de8 Data 1024 (0x400) Zero RW",
+    "RW_RT_HEAD": "Exec 0x20012000 Size 0x8000 Max 0x8000 (堆 32768 B 未动)",
+    "RW_DTCM": "Exec 0x20000400 Size 0x0000d318 Max 0x0001fc00",
+    "ER_IROM1": "Exec 0x08000000 Size 0x00046e24 Max 0x00080000"
+   },
+   "call_graph_source": "build/motor_m1/rt-thread-motor-m1.htm (仓库外构建产物; 关键数字抄进 reports/reviews/phase8-m8-idle-stack-r4/stack_report.txt)",
+   "stack_metrics": {
+    "idle_thread_entry_own_frame": 24,
+    "idle_thread_entry_max_depth": 668,
+    "reviewer_reported_fixed_frames_sum": 264,
+    "board_measured_idle_watermark_bytes_prev_round": 163,
+    "rt_defunct_execute_own_frame": 24,
+    "rt_object_delete_own_frame": 24,
+    "rt_free_own_frame": 16,
+    "diag_thread_entry_max_depth": 1580
+   }
+  }
+ ],
+ "not_proven": [
+  "idle=1024 在板上是否够用未证(未上板, 未取新水位)",
+  "668 是 armlink 静态最深合计, 不是运行时实测, 也不是已验证上界",
+  "新 BIN 与已接受 BIN 差 1831 字节, 未逐字节归因(未证明差异**只**由 .bss 位移引起)",
+  "learn 判据改动只做了零设备矩阵复核, 没在板上跑过真实 learn 输出"
+ ]
+}

@@ -1,0 +1,23 @@
+# idle 栈轮 (phase8-m8-idle-stack-r4) —— armlink Static Call Graph 指标抄本(零设备, 只读构建产物)
+# 来源(仓库外构建产物, 不进库): D:\ns800\rt-thread-master\rt-thread-master\bsp\novosns\ns800\ns800rt7p65-nssinepad/build/motor_m1/rt-thread-motor-m1.htm
+# 提取: 去标签后按函数名锚定 'Stack size N bytes' 与 '[Stack] Max Depth = M Call Chain = ...'
+
+## 关键函数(own_frame=本帧固定字节, max_depth=armlink 沿链最深合计)
+idle_thread_entry      own_frame=24     max_depth=668
+rt_defunct_execute     own_frame=24     max_depth=644
+rt_object_delete       own_frame=24     max_depth=620
+rt_free                own_frame=16     max_depth=596
+rt_mutex_take          own_frame=16     max_depth=564
+diag_thread_entry      own_frame=632    max_depth=1580
+rel_prod_evaluate      own_frame=248    max_depth=948
+rel_engine_step        own_frame=184    max_depth=352
+
+idle 完整调用链: idle_thread_entry ⇒ rt_defunct_execute ⇒ rt_object_delete ⇒ rt_free ⇒ _heap_lock ⇒ rt_mutex_take ⇒ _rt_mutex_take ⇒ rt_thread_suspend_to_list ⇒ rt_sched_thread_timer_stop ⇒ rt_timer_stop ⇒ rt_spin_unlock_irqrestore ⇒ rt_exit_critical_safe ⇒ rt_exit_critical ⇒ rt_schedule ⇒ rt_scheduler_stack_check ⇒ rt_kprintf ⇒ rt_vsnprintf ⇒ print_number ⇒ divide [Calls] >> rt_defunct_execute [Address Reference Count : 1] idle.o(.text.rt_thread_idle_init)
+Maximum Stack Usage(整图) = 2996 bytes + Unknown(Cycles, Untraceable Function Pointers)
+
+## 口径(每条都回指上面的数)
+1) 修复前 IDLE_THREAD_STACK_SIZE=256(idle_thread_stack 在旧 map 里 0x20009de8 Data 256), 而本图给 idle_thread_entry 的 Max Depth=668 => 静态最坏值超出 412 B, 缺陷成立。
+2) 任务书说'固定帧合计 264 B'。同一份调用图我这路读到的是 668 B(armlink 的 Max Depth, 含链上全部帧)。两个数不互相推翻, 是口径不同: 264 像链上前若干帧的部分合计, 668 是 armlink 给的最深合计。本轮按更保守的 668 取 => 1024 覆盖它并留 356 B 余量;**不把 668 或 1024 说成已验证上界**。
+3) 板上实测水位(上一轮 cont-20261101T090512Z 的 ps): tidle0 max used 64%% × 256 = 163 B —— 观测窗内没走到那条深链。这只说明'这次没用到', 不说明'用不到'; 静态界与实测峰值两个数并列登记, 不互相替换。
+4) diag 未动(diagnosis.c 字节不变), 其链 max_depth 见上表; 其余线程栈未改。
+

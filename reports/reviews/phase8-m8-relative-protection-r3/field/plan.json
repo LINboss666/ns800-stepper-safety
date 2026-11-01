@@ -732,10 +732,11 @@
           "expect_values": [
             {
               "row": "^\\[DIAG\\] learn OK adc\\[(?P<alo>\\d+)\\.\\.(?P<ahi>\\d+)\\]n(?P<adc_n>\\d+) nz(?P<nz>\\d+) sg\\[(?P<slo>\\d+)\\.\\.(?P<shi>\\d+)\\]n(?P<sg_n>\\d+) seq(?P<seq_f>\\d+)\\.\\.(?P<seq_l>\\d+)$",
-              "must": {
-                "adc_n": "8",
-                "sg_n": "8"
-              }
+              "must_min": {
+                "adc_n": 8,
+                "sg_n": 8
+              },
+              "criterion_note": "复审 2026-11-01 第2项: learn 接受 ADC 与 SG **独立样本数各 >=8**(产品最小 N=8 就是下限), 删除上一版的等值要求 must{adc_n==8,sg_n==8}(那会把 9/10 个样本的正常结果误判成失败)。保留的拒绝判据: 任一通道 <8 => FIELD_VALUE_BELOW_MIN; 成功行出现多条 => FIELD_NOT_EXACTLY_ONE(ROW_NOT_UNIQUE); 学习超时/无响应 => 本步的 14 s 请求窗仍受阶段 15 s 单调硬截止约束(见 seconds_note 与 blocking_note)。上限不设, 诊断算法与资格门未改。"
             }
           ],
           "unit": "LO/HI 是 STEP 频率 Hz 区间(hz_low/hz_high), 不是 SG 码; hz_nominal 取窗中值=100",

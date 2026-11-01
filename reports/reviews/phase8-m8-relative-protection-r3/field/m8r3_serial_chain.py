@@ -352,6 +352,21 @@ def assert_step(st, rows, asname, led, raw=None):
         loose = {k: g.get(k) for k, v in spec.get("must_not", {}).items()
                  if str(g.get(k)) == str(v)}
         unknown = [k for k in spec.get("must", {}) if k not in g]
+        # must_min: **下限**判据(复审 2026-11-01: learn 接受 ADC/SG 独立样本数各 >=8, 不再有"恰好 8")。
+        # 只做数值下限比较, 不做上限; 非整数/缺组一律具名拒绝 —— 放宽接受面不等于放弃判据。
+        below = {}
+        for k, v in spec.get("must_min", {}).items():
+            if k not in g:
+                unknown.append(k)
+                continue
+            try:
+                if int(str(g[k])) < int(v):
+                    below[k] = (g[k], v)
+            except ValueError:
+                below[k] = (g[k], "NOT_INTEGER")
+        if below:
+            led.ev("VALUE_ASSERT_FAIL", **{"as": asname, "below_min": below})
+            return {"verdict": "STOP", "code": "FIELD_VALUE_BELOW_MIN", "below_min": below}
         if wrong or loose or unknown:
             led.ev("VALUE_ASSERT_FAIL", **{"as": asname, "wrong": wrong, "forbidden_val": loose,
                                            "absent_groups": unknown})
@@ -1457,12 +1472,28 @@ def emit_text(raw_path, lines):
 
 
 # --------------------------------------------------------------------------- 整包调度(R3-C1)
+def _kernel_builtin_cmd_sources(app_dir):
+    """从 applications 往上找含 components/finsh/msh.c 的内核根(最多 8 层)。
+    msh.c 是内置命令的导出处(msh.c:58 help / :74 ps / :93 free / :148 bind), 不在 applications 里;
+    只扫 applications 会把**确实存在**的 ps/free 判成"发明命令"(上一轮板上实测 ps/free 都有应答)。"""
+    p = Path(app_dir).resolve()
+    for _ in range(8):
+        cand = p / "components" / "finsh" / "msh.c"
+        if cand.exists():
+            return [cand]
+        if p.parent == p:
+            break
+        p = p.parent
+    return []
+
+
 def msh_command_names(app_dir):
     """从产品源码里刮出**真实存在的** msh 命令名(MSH_CMD_EXPORT / _ALIAS 的第二参)。
     计划里的每条命令都必须在这张表里: 这是"不发明命令"的机器判据, 不是注释。"""
     names = set()
     pat = re.compile(r"MSH_CMD_EXPORT(?:_ALIAS)?\(\s*([A-Za-z_][0-9A-Za-z_]*)\s*(?:,\s*([A-Za-z_][0-9A-Za-z_]*))?")
-    for f in Path(app_dir).glob("*.c"):
+    sources = list(Path(app_dir).glob("*.c")) + _kernel_builtin_cmd_sources(app_dir)
+    for f in sources:
         for mo in pat.finditer(f.read_text(encoding="utf-8", errors="replace")):
             # MSH_CMD_EXPORT(fn, 描述) => 命令名就是函数名; 只有 _ALIAS 的**第二个**参数才是命令名
             # (finsh.h:101-112)。把 EXPORT 的第二参当命令名会刮出 "print"/"show" 这类描述词。

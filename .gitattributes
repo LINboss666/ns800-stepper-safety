@@ -53,3 +53,7 @@ reports/reviews/phase8-m8-diag-stack-r1/host/*.json -text
 reports/reviews/phase8-m8-diag-stack-r1/*.txt -text
 reports/reviews/phase8-m8-diag-stack-r1/field/** -text
 reports/reviews/phase8-m8-diag-stack-r1/field/*.json -text
+
+# ===== idle 栈轮: 整轮所有文件(计划/日志/镜像/map/清单/raw)一律禁止行尾转换 =====
+reports/firmware/phase8-m8-idle-stack-r4/** -text
+reports/reviews/phase8-m8-idle-stack-r4/** -text

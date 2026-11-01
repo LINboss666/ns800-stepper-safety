@@ -1,0 +1,11 @@
+SELFCHECK(corrupted first entry) problems=1 ['sha_mismatch reports/reviews/phase8-m8-idle-stack-r4/build/rt-thread-motor-m1-candidate.log want=0000000000000000 got=757bac0b55110a7e']  (必须>=1)
+MANIFEST reports/reviews/phase8-m8-idle-stack-r4/SHA256SUMS.txt entries=12 problems=0 []
+MANIFEST reports/firmware/phase8-m8-idle-stack-r4/SHA256SUMS.txt entries=4 problems=0 []
+MANIFEST reports/reviews/phase8-m8-diag-stack-r1/SHA256SUMS.txt entries=65 problems=0 []
+MANIFEST reports/firmware/phase8-m8-diag-stack-r1/SHA256SUMS.txt entries=4 problems=0 []
+MANIFEST reports/reviews/phase8-m8-relative-protection-r3/SHA256SUMS.txt entries=5137 problems=0 []
+MANIFEST reports/firmware/phase8-m8-relative-protection-r3/SHA256SUMS.txt entries=10 problems=0 []
+BUILD_MANIFEST reports/firmware/phase8-m8-idle-stack-r4/build_manifest.json declared=4 resolved=4 problems=0 []
+BUILD_MANIFEST reports/firmware/phase8-m8-diag-stack-r1/build_manifest.json declared=4 resolved=4 problems=0 []
+BUILD_MANIFEST reports/firmware/phase8-m8-relative-protection-r3/build_manifest.json declared=12 resolved=12 problems=0 []
+STAGED_PREFLIGHT_TOTAL problems=0  (0 => 每个登记件的暂存 blob 都与清单逐字节相符)
