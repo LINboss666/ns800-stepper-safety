@@ -1,0 +1,7 @@
+{"kind": "QUOTA_CONSUMED", "left": 11, "n": 1, "name": "port_open", "t_s": 0.0}
+{"baud": 115200, "kind": "PORT_OPEN_ATTEMPT", "port": "COM5", "t_s": 0.032}
+{"kind": "PORT_OPEN", "port": "COM5", "t_s": 0.032, "transport": "real"}
+{"bytes": 975, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "01dde0deb4d8274fcf712dd818a9bd5ddd33ed6f0975d6240780783cf39292aa", "t_s": 0.11, "tail": "b'ending)\\r\\nmsh >\\r\\n'"}
+{"allowed": false, "as": "sysboot", "kind": "BUSINESS_OUTCOME", "lines": ["[Motor] arm gate fail mask=0x8 (arm REFUSED)"], "status_lines_allowed": [], "t_s": 0.125}
+{"code": "BUSINESS_FAILED", "detail": "{\"verdict\": \"STOP\", \"code\": \"BUSINESS_FAILED\", \"lines\": [\"[Motor] arm gate fail mask=0x8 (arm REFUSED)\"]}", "kind": "SESSION_STOP", "t_s": 0.125}
+{"kind": "PORT_CLOSED", "t_s": 0.125}

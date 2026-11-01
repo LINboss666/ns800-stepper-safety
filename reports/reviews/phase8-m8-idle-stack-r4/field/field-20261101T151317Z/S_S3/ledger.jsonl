@@ -1,0 +1,8 @@
+{"kind": "QUOTA_CONSUMED", "left": 11, "n": 1, "name": "port_open", "t_s": 0.0}
+{"baud": 115200, "kind": "PORT_OPEN_ATTEMPT", "port": "COM5", "t_s": 0.031}
+{"kind": "PORT_OPEN", "port": "COM5", "t_s": 0.031, "transport": "real"}
+{"bytes": 983, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "73abf3012386723ec2d5ec70e5b515bfb2cb3285d60c233a27b07e60d47408a7", "t_s": 0.109, "tail": "b'g)\\r\\nmsh >\\r\\nmsh >'"}
+{"allowed": false, "as": "sysboot", "kind": "BUSINESS_OUTCOME", "lines": [], "status_lines_allowed": ["[Motor] arm gate fail mask=0x18 (arm REFUSED)"], "t_s": 0.125}
+{"as": "sysboot", "count": 0, "err": "ROW_NOT_UNIQUE", "kind": "VALUE_ASSERT_FAIL", "row": "^\\[Safety\\] state=(?P<state>\\w+) fault=(?P<fault>\\d+) irq_gate=\\w+ polarity=\\w+ protect_ready=\\w+$", "t_s": 0.125}
+{"code": "FIELD_NOT_EXACTLY_ONE", "detail": "{\"verdict\": \"STOP\", \"code\": \"FIELD_NOT_EXACTLY_ONE\", \"row\": \"^\\\\[Safety\\\\] state=(?P<state>\\\\w+) fault=(?P<fault>\\\\d+) irq_gate=\\\\w+ polarity=\\\\w+ protect_ready=\\\\w+$\", \"count\": 0}", "kind": "SESSION_STOP", "t_s": 0.125}
+{"kind": "PORT_CLOSED", "t_s": 0.125}

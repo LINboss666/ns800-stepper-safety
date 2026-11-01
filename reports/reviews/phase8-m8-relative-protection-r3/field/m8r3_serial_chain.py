@@ -301,6 +301,17 @@ def business_failures(rows):
     return out
 
 
+def status_lines_allow_patterns(st):
+    """只允许"整行锚定"的状态披露行绕过业务失败扫描(见 assert_step)。"""
+    pats = []
+    for p in st.get("status_lines_allow", []):
+        try:
+            pats.append(re.compile(p))
+        except re.error:
+            raise Stop("STATUS_ALLOW_PATTERN_INVALID", "%s:%s" % (st.get("as", "?"), p))
+    return pats
+
+
 def assert_step(st, rows, asname, led, raw=None):
     """把"响应完整"和"业务成功"分开判, 并把结论交给调度层。
 
@@ -312,16 +323,24 @@ def assert_step(st, rows, asname, led, raw=None):
     text = "\n".join(rows)
     if raw is not None:
         check_danger(raw)
+    # 状态披露行(**整行锚定**, 且必须同时被本步 expect 正面要求)不参与"业务失败"扫描: 一条查询的
+    # 响应里可以合法地报告"此刻 arm 会被拒"这种安全态。命令自己被拒仍然走 BUSINESS_FAILED/REFUSED。
+    pats = status_lines_allow_patterns(st)
+    allow_hit = [r.strip() for r in rows
+                 if any(p.fullmatch(r.strip()) for p in pats)] if pats else []
+    rest = [r for r in rows if r.strip() not in allow_hit]
     # 业务层先判: 一条 FAILED/REFUSED/VOIDED 线是**业务结论**, 不能因为"这一步本来还想
     # 看见别的字串"就先把它的具名结果盖掉(内容缺失与业务失败是两个不同层的问题)。
-    bad = business_failures(rows)
+    bad = business_failures(rest)
     allowed = st.get("allowed_outcomes", [])
-    if bad:
+    if bad or allow_hit:
         named = [b for b in bad for a in allowed if a in b]
-        led.ev("BUSINESS_OUTCOME", **{"as": asname, "lines": bad, "allowed": bool(named)})
+        led.ev("BUSINESS_OUTCOME", **{"as": asname, "lines": bad, "allowed": bool(named),
+                                      "status_lines_allowed": allow_hit})
         if named:
             return {"verdict": "REFUSED", "code": "NAMED_REFUSAL", "lines": named}
-        return {"verdict": "STOP", "code": "BUSINESS_FAILED", "lines": bad}
+        if bad:
+            return {"verdict": "STOP", "code": "BUSINESS_FAILED", "lines": bad}
     miss = [n for n in st.get("expect_contains", []) if n not in text]
     if miss:
         led.ev("PROTOCOL_OR_CONTENT_FAIL", **{"as": asname, "missing": miss})
@@ -1917,6 +1936,25 @@ def validate_plan(plan, rows_doc, app_dir):
                ("PASS" if not fc_bad else "FAIL",
                 ";".join(fc_bad) or "trip 链都有同次 REL TRIP/源样本/profile/新 session 四腿"))
     if fc_bad:
+        bad += 1
+    # 状态披露白名单必须是"锚定 + 同时被正面要求", 否则它就是把一个 REFUSED 换成"以后什么都放行"的口子。
+    sa_bad, sa_seen = [], []
+    for stg in plan["stages"]:
+        for st in stg.get("steps", []):
+            for p in st.get("status_lines_allow", []):
+                lit = re.sub(r"\\(.)", r"\1", p.strip("^$"))
+                if not (p.startswith("^") and p.endswith("$")) or ".*" in p:
+                    sa_bad.append("%s/%s:模式未整行锚定或含 .* 通配(%s)" % (stg["id"], st.get("as"), p))
+                elif not any(e in lit for e in st.get("expect_contains", [])):
+                    sa_bad.append("%s/%s:放行的行没有被本步 expect_contains 正面要求(%s)"
+                                  % (stg["id"], st.get("as"), lit))
+                else:
+                    sa_seen.append("%s:%s" % (stg["id"], lit[:28]))
+    out.append("PLAN_STATUS_ALLOW|all|%s|%s" %
+               ("PASS" if not sa_bad else "FAIL",
+                ";".join(sa_bad) or ("白名单都是锚定且被正面要求(要求串必须是该行的前缀)的状态行: %s" % ",".join(sa_seen)
+                                     if sa_seen else "未使用(默认所有 REFUSED 线都算业务失败)")))
+    if sa_bad:
         bad += 1
     # R5 现场轮(field-20261101T142722Z)的观测窗教训: 计划申报的被动启动窗必须**真的走满**, 而且
     # "从复位/开口到第一条查询"的可观测总量要覆盖经验上成功过的启动窗(cont 轮 75 s 拿满整段启动)。

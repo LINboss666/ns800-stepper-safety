@@ -25,8 +25,8 @@
   },
   "executor": {
    "path": "reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py",
-   "bytes": 152324,
-   "sha256": "6cb58dd73ad109854b41711a7a27f12fb1cdca8b975b38ac12f4e93cb0916886",
+   "bytes": 154578,
+   "sha256": "06e5e2830201f6f5c274726a63663914518fe1bde2cb56d6364f54fe3cc09095",
    "changes_in_this_round": [
     "drain_post_reset_boot(): 删掉**未申报**的静默早退(旧: elapsed>=min(2.0,window) 且静默 0.2 s 即 break, 于是申报 20 s 实跑 2.0 s)。现在申报的预算走满, 只有两种提前结束: 看到正信号 boot_done_needle(产品自己的 bootstrap-complete 打印)再加一小段尾巴, 或显式申报了 boot_quiet_seconds",
     "BOOT_STREAM_DRAINED 事件与 boot_stream 结果新增 drain_declared_seconds / drain_spent_seconds / boot_done_needle / boot_quiet_seconds(申报与实耗一起进台账, 下次再不一致就是自曝); end_reason 拆成 BOOT_DONE_NEEDLE / QUIET_BREAK / DRAIN_BUDGET_REACHED(旧值 BOUNDED_DRAIN 退役, 它曾经同时表示两种事)",
@@ -442,7 +442,8 @@
      "seconds": 75,
      "expect_contains": [
       "=== SYSTEM STATUS ===",
-      "[Boot]   bootstrap-complete=YES"
+      "[Boot]   bootstrap-complete=YES",
+      "[Motor] arm gate fail mask="
      ],
      "expect_values": [
       {
@@ -453,13 +454,17 @@
        }
       },
       {
-       "row": "^\\[Safety\\] state=(?P<state>\\w+) fault=(?P<fault>\\d+) irq_gate=\\w+ polarity=\\w+ protect_ready=\\w+$",
+       "row": "^\\[Safety\\] state=(?P<state>\\w+) fault=(?P<fault>\\d+) irq_gate=\\w+ polarity=[\\w-]+ protect_ready=[\\w-]+$",
        "must": {
         "state": "READY",
         "fault": "0"
        }
       }
      ],
+     "status_lines_allow": [
+      "^\\[Motor\\] arm gate fail mask=0x[0-9A-Fa-f]+ \\(arm REFUSED\\)$"
+     ],
+     "status_lines_allow_why": "开机/重启后的默认安全态: 极性与配置未确认前 arm 必须被拒(mask=0x18), 这一行是**状态披露**而不是本条命令被拒。它同时被 expect_contains 正面要求 => 掩码或文案变了就停止, 不是无限放行",
      "seconds_note": "75 s 是**上界不是等待时长**: read_until_prompt 一看到完整提示符就返回, 健康板在毫秒级就答完; 把它拉长的唯一目的是让 stage-5 的 1 MiB 扫描(源码层估算 ≥8.5 s, cont 轮实测用 75 s 窗才拿满) 有机会在同一个窗里把启动尾流 + 回显 + 响应一起交出来。R5 现场轮就是因为 6 s + 3 s 的窗被剪在 启动本身之前, 才把 0 字节当成了结论"
     },
     {
@@ -473,14 +478,14 @@
      ],
      "expect_values": [
       {
-       "row": "^diag\\s+(\\d+)\\s+\\w+\\s+0x[0-9a-fA-F]+\\s+(?P<diag_stack>0x[0-9a-fA-F]+)\\s+(?P<diag_used>\\d+)%",
+       "row": "^diag\\s+(\\d+)\\s+\\w+\\s+0x[0-9a-fA-F]+\\s+(?P<diag_stack>0x[0-9a-fA-F]+)\\s+(?P<diag_used>\\d+)%(?:\\s+\\S+)*$",
        "must": {
         "diag_stack": "0x00001000"
        },
        "note": "diag 行栈必须是 0x1000=4096: 上一轮已在板上实测到这一行, 本轮不得回退"
       },
       {
-       "row": "^tidle0\\s+(\\d+)\\s+\\w+\\s+0x[0-9a-fA-F]+\\s+(?P<idle_stack>0x[0-9a-fA-F]+)\\s+(?P<idle_used>\\d+)%",
+       "row": "^tidle0\\s+(\\d+)\\s+\\w+\\s+0x[0-9a-fA-F]+\\s+(?P<idle_stack>0x[0-9a-fA-F]+)\\s+(?P<idle_used>\\d+)%(?:\\s+\\S+)*$",
        "must": {
         "idle_stack": "0x00000400"
        },
@@ -1054,8 +1059,13 @@
      "as": "sys2",
      "seconds": 75,
      "expect_contains": [
-      "=== SYSTEM STATUS ==="
+      "=== SYSTEM STATUS ===",
+      "[Motor] arm gate fail mask="
      ],
+     "status_lines_allow": [
+      "^\\[Motor\\] arm gate fail mask=0x[0-9A-Fa-f]+ \\(arm REFUSED\\)$"
+     ],
+     "status_lines_allow_why": "开机/重启后的默认安全态: 极性与配置未确认前 arm 必须被拒(mask=0x18), 这一行是**状态披露**而不是本条命令被拒。它同时被 expect_contains 正面要求 => 掩码或文案变了就停止, 不是无限放行",
      "seconds_note": "S6 是**操作者物理断电重上电**, 所以 S7 的第一条查询面对的是又一次冷启动(与 S3 同一判据): 75 s 是上界, read_until_prompt 到完整提示符就返回; 这一窗仍然 0 字节就只能具名停止"
     },
     {
@@ -3184,6 +3194,11 @@
   "executor_side_fix": "申报的 boot_drain_seconds 现在真的走满(旧实现被未申报的静默早退剪短)",
   "not_a_claim": "本下界不证明板子在 75 s 内一定应答; 仍然 0 字节就是具名停止 + 人工断电重启门"
  },
+ "row_pattern_fixes_r5c": {
+  "count": 3,
+  "why": "现场第一次答回来才发现的取行失败: polarity 值含连字符(实测 not-confirmed), ps 的 NN% 之后还有 4 列(left tick/error/tcb addr/usage)。两处都按板上实字改, 证据: field-20261101T151317Z/S_S3/01_sysboot.rx.bin(983 B 完整响应) 与 cont-20261101T090512Z/S4_ps.rx.bin 的真实行",
+  "not_relaxed": "栈大小/取行唯一性/must 值这些判据一个没删, 只是把行尾的列补全"
+ },
  "continuation_of": {
   "approved_tip": "4cb9dac0f2a47beb494a4fb41090cefe8da76075",
   "run_dir": "reports/reviews/phase8-m8-idle-stack-r4/field/field-20261101T142722Z",
@@ -3215,6 +3230,7 @@
   "① 额度: download/readback/explicit_reset 归零并删掉对应设备阶段(一次性批准已烧掉)",
   "② 观测: S3 首查询 6 -> 75 s + first_query_is_boot_probe + 阶段总时限 90 -> 300 s; 执行器按申报走满被动窗",
   "③ 身份: 新执行器散列只绑进本续测包; 已执行的 R4 包保留它当时真正跑过的 40517501b3be…",
+  "④' 判据: system_status 响应里的开机默认安全态行 arm gate fail mask=0x18 (arm REFUSED) 不再被当成 BUSINESS_FAILED(执行器新增**整行锚定**且必须被 expect_contains 正面要求该行的白名单; 掩码值不写死——现场实测同一块板先后给出 0x18 与 0x8, 写死就会把真实状态误判成违规)。离线门 PLAN_STATUS_ALLOW 管住它的形状(必须是前缀要求 + 锚定 + 无 .* 通配)",
   "④ 门: PLAN_BOOT_WINDOW_COVER 把'观测窗短于启动本身'变成离线就红, 不再靠现场去发现",
   "⑤ 登记: R5 现场轮逐场分类见 run_record §13 与 reports/reviews/phase8-m8-idle-stack-r4/field/field-20261101T142722Z/OFFLINE_JUDGEMENT.txt"
  ],

@@ -50,6 +50,23 @@ AUDIT_REF = "reports/reviews/phase8-m8-relative-protection-r3/host/m8diag_source
 BOOT_MIN = 75           # cont 轮实测拿满整段启动所用的窗(RESULT.json 的 boot_window_s)
 FIRST_QUERY_SECONDS = 75
 S3_TOTAL_DEADLINE = 300
+# 现场轮实测: system_status 的响应里带开机默认安全态 `[Motor] arm gate fail mask=0x18 (arm REFUSED)`,
+# 那是"此刻还没 apply/确认极性, 所以 arm 会被拒"的状态披露, 不是我们发的命令被拒。业务失败扫描按
+# REFUSED 关键字把它盖成 BUSINESS_FAILED => 状态查询本身通不过。白名单只在这一行**同时被
+# expect_contains 正面要求**时才生效(执行器 PLAN_STATUS_ALLOW 门), 掩码变成别的值就照原样停。
+ARM_REFUSED_REST = r"^\[Motor\] arm gate fail mask=0x[0-9A-Fa-f]+ \(arm REFUSED\)$"
+ARM_REFUSED_TEXT = "[Motor] arm gate fail mask="
+
+
+def allow_rest_state(step):
+    step.setdefault("expect_contains", [])
+    if ARM_REFUSED_TEXT not in step["expect_contains"]:
+        step["expect_contains"] = step["expect_contains"] + [ARM_REFUSED_TEXT]
+    step["status_lines_allow"] = [ARM_REFUSED_REST]
+    step["status_lines_allow_why"] = (
+        "开机/重启后的默认安全态: 极性与配置未确认前 arm 必须被拒(mask=0x18), 这一行是**状态披露**而不是"
+        "本条命令被拒。它同时被 expect_contains 正面要求 => 掩码或文案变了就停止, 不是无限放行")
+    return step
 
 
 def sha(p):
@@ -78,6 +95,7 @@ def fix_stages(plan, by_id):
     s3["total_deadline_seconds"] = S3_TOTAL_DEADLINE
     first = next(x for x in steps if x.get("cmd"))
     assert first["as"] == "sysboot", "续测的第一条查询必须还是 system_status: %s" % first.get("as")
+    allow_rest_state(first)
     first["seconds"] = FIRST_QUERY_SECONDS
     first["seconds_note"] = (
         "75 s 是**上界不是等待时长**: read_until_prompt 一看到完整提示符就返回, 健康板在毫秒级就答完; "
@@ -92,6 +110,7 @@ def fix_stages(plan, by_id):
     s7["first_query_is_boot_probe"] = True
     s7["total_deadline_seconds"] = S3_TOTAL_DEADLINE
     q7 = next(x for x in s7["steps"] if x.get("cmd"))
+    allow_rest_state(q7)
     q7["seconds"] = FIRST_QUERY_SECONDS
     q7["seconds_note"] = (
         "S6 是**操作者物理断电重上电**, 所以 S7 的第一条查询面对的是又一次冷启动(与 S3 同一判据): "
@@ -215,6 +234,10 @@ def fix_record(plan, r2):
         "② 观测: S3 首查询 6 -> 75 s + first_query_is_boot_probe + 阶段总时限 90 -> 300 s; "
         "执行器按申报走满被动窗",
         "③ 身份: 新执行器散列只绑进本续测包; 已执行的 R4 包保留它当时真正跑过的 40517501b3be…",
+        "④' 判据: system_status 响应里的开机默认安全态行 arm gate fail mask=0x18 (arm REFUSED) "
+        "不再被当成 BUSINESS_FAILED(执行器新增**整行锚定**且必须被 expect_contains 正面要求该行的白名单; "
+        "掩码值不写死——现场实测同一块板先后给出 0x18 与 0x8, 写死就会把真实状态误判成违规)。"
+        "离线门 PLAN_STATUS_ALLOW 管住它的形状(必须是前缀要求 + 锚定 + 无 .* 通配)",
         "④ 门: PLAN_BOOT_WINDOW_COVER 把'观测窗短于启动本身'变成离线就红, 不再靠现场去发现",
         "⑤ 登记: R5 现场轮逐场分类见 run_record §13 与 %s/OFFLINE_JUDGEMENT.txt" % RUN_DIR]
     fs = plan.get("field_sequence_before_start") or {}
@@ -253,6 +276,50 @@ def load_module(path, name):
     return mod
 
 
+
+# 上机第一次真答回来才发现的三处**计划侧正则**缺陷(现场响应是既存事实, 不是推测):
+#  a) polarity=not-confirmed 含连字符, \w+ 匹配不到 => FIELD_NOT_EXACTLY_ONE(实测 count=0);
+#  b) ps 的 diag/tidle0 行在 `NN%` 之后还有 left tick / error / tcb addr / usage 四列, 旧模式以 % 收尾,
+#     锚在行尾就永远取不到行(实字: "diag  9  suspend 0x000003cc 0x00001000  28%  0x0000000a EINTRPT ...");
+#  c) 同一形状在 S3/S7 两个会话里都有, 必须一起改。
+ROW_FIXES = [(r"polarity=\w+ protect_ready=\w+$", r"polarity=[\w-]+ protect_ready=[\w-]+$")]
+# ps 的行以 `NN%` 结束但没有行尾锚, fullmatch 就把后面 4 列(left tick/error/tcb addr/usage)当成多余字符 =>
+# 取不到行(实测 count=0)。补一个**尾列**分组: 只允许"空白 + 非空白"重复, 不放开任何已捕获字段的判据。
+PS_TAIL = r"(?:\s+\S+)*$"
+
+
+def fix_row_patterns(plan):
+    n = 0
+    for stg in plan["stages"]:
+        for st in stg.get("steps", []):
+            for ev in st.get("expect_values", []) or []:
+                row = ev.get("row", "")
+                for old, new in ROW_FIXES:
+                    if old in row:
+                        ev["row"] = row = row.replace(old, new)
+                        n += 1
+                if row.rstrip().endswith("%") and not row.rstrip().endswith("$"):
+                    ev["row"] = row = row.rstrip() + PS_TAIL
+                    n += 1
+            for i, (pat, what) in enumerate(st.get("expect_fields", []) or []):
+                for old, new in ROW_FIXES:
+                    if old in pat:
+                        pat = pat.replace(old, new)
+                        n += 1
+                if pat.rstrip().endswith("%") and not pat.rstrip().endswith("$"):
+                    pat = pat.rstrip() + PS_TAIL
+                    n += 1
+                st["expect_fields"][i] = (pat, what)
+    plan["row_pattern_fixes_r5c"] = {
+        "count": n,
+        "why": ("现场第一次答回来才发现的取行失败: polarity 值含连字符(实测 not-confirmed), "
+                "ps 的 NN% 之后还有 4 列(left tick/error/tcb addr/usage)。两处都按板上实字改, "
+                "证据: field-20261101T151317Z/S_S3/01_sysboot.rx.bin(983 B 完整响应) 与 "
+                "cont-20261101T090512Z/S4_ps.rx.bin 的真实行"),
+        "not_relaxed": "栈大小/取行唯一性/must 值这些判据一个没删, 只是把行尾的列补全"}
+    return plan
+
+
 def build():
     chain = load_chain()
     r2 = load_r2()
@@ -262,6 +329,7 @@ def build():
     fix_identity(plan)
     fix_quota(plan, chain)
     fix_bounds(plan)
+    fix_row_patterns(plan)
     fix_record(plan, r2)
     return plan, chain
 
