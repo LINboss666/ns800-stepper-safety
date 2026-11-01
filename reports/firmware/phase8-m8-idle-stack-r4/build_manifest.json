@@ -88,5 +88,18 @@
   "668 是 armlink 静态最深合计, 不是运行时实测, 也不是已验证上界",
   "新 BIN 与已接受 BIN 差 1831 字节, 未逐字节归因(未证明差异**只**由 .bss 位移引起)",
   "learn 判据改动只做了零设备矩阵复核, 没在板上跑过真实 learn 输出"
- ]
+ ],
+ "build_inputs": {
+  "rtconfig_h": {
+   "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/rtconfig.h",
+   "sha256": "1927ed1c1cc7a1efebca50b910eb735228a926c218b3e39a1daf799b6fe9a65a",
+   "line_79": "#define IDLE_THREAD_STACK_SIZE 1024   /* 候选: armlink 调用图 idle_thread_entry ⇒ rt_defunct_execute ⇒ rt_object_delete ⇒ rt_free ⇒ rt_mutex_take… Max Depth=668 B > 旧值 256 B */"
+  },
+  "diagnosis_c_unchanged": {
+   "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diagnosis.c",
+   "sha256": "e1696ec92721c7df9da074c465ac3b705ad451029aa3608b1695c93c7466e557",
+   "note": "diag 4096 的源文件本轮未动; 与 diag-stack 轮登记值 e1696ec9… 比对"
+  },
+  "note": "构建输入的字节身份: 任何人可用这两个 sha256 复核这次构建用的是哪一份源; 本轮只改了 rtconfig 一行"
+ }
 }

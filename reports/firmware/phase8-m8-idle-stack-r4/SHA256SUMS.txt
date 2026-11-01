@@ -1,7 +1,7 @@
 # sha256 * <仓库相对路径>(LF, 无 BOM; 本清单不哈希自身字节 —— 一条清单不能给自己的字节作证)
 # 生成方式: 对 reports/firmware/phase8-m8-idle-stack-r4/ 下每个常规文件(排除 SHA256SUMS.txt 与 __pycache__) 直接读磁盘字节算 sha256
 # 条目数=4; 与 Git blob 的逐条复算由 host/staged_preflight_batch.py(提交前, 单批流)与推送后的远端逐 blob 回读完成
-c09e0ab69ae06e6e5abf3b54e5965c90581523be73dcb20ae9c0253593111b38  reports/firmware/phase8-m8-idle-stack-r4/build_manifest.json
+afa8e11ffbefc9041c13d13ed2a1a3fe7af8922431c8ab9bee9770e128e6c4d3  reports/firmware/phase8-m8-idle-stack-r4/build_manifest.json
 dab356c69fbf4ca747e838580c16982bd56b53b1367f84b97ab705c2fbd25439  reports/firmware/phase8-m8-idle-stack-r4/rt-thread-motor-m1-candidate.bin
 0babe9f1a874230381bc70eae959fd6b8dff41f1182bcdc6bed1fd72736aba8c  reports/firmware/phase8-m8-idle-stack-r4/rt-thread-motor-m1.axf
 b61632249f99a0bbc92dae5da6695b929cba658bae8b74d833243b8a16c275b7  reports/firmware/phase8-m8-idle-stack-r4/rt-thread-motor-m1.map

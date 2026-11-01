@@ -11,5 +11,5 @@ bc8494ebb77ff95b6e9788f9715082b14c56cabdc116c0139e109446312222c1  reports/review
 39fe44f4258c68edd419ba1a03b9dbc7ae0062eb7c9b11a588475a00c8691df9  reports/reviews/phase8-m8-idle-stack-r4/host/idle_learn_console.txt
 31b4c97fab4c50d189c8634f6bd7d704897481dac6cfeba59e718b2d5056400d  reports/reviews/phase8-m8-idle-stack-r4/host/staged_preflight_batch.py
 2a5a223dea34ac0e0db55a2945f6c2df936bda67e7141f2f69c4bd2dfd0383b0  reports/reviews/phase8-m8-idle-stack-r4/host/staged_preflight_batch.txt
-6c1de38ae619a22920dadd2d2f415831fc0ccc3afad526e1eb41879f3f657fc2  reports/reviews/phase8-m8-idle-stack-r4/run_record.md
+d69de69f1949e5aa7c18e03c0f44d4971057855473b9de6258b512b233f43fe3  reports/reviews/phase8-m8-idle-stack-r4/run_record.md
 31af3d99d179b19ddd7655fcba2ae6255199dc6c1d8d393538b50273fade26f4  reports/reviews/phase8-m8-idle-stack-r4/stack_report.txt

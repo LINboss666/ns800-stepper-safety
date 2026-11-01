@@ -107,3 +107,17 @@ A 组 11 项 = idle 证据链与镜像身份；B 组 12 项 = learn 判据矩阵
 4. 学习/提交/恢复/两路激励的现场结论全部未取（本包 NOT_EXECUTED）。
 5. 下一步：等复审对本包的一次批准（绑 `plan_core_r4.json` 与执行器、rtconfig 的 blob 散列）。批准后按
    S0→S11b 一次整包执行；S8 若受控负载手段仍未到位，就停在 `gate_load_means` 上并如实登记，**不**用软件 trip 顶替。
+
+## 8. 本轮自己抓到的两处（都记进清单与预检，不留到事后）
+
+1. `host/staged_preflight_batch.py` 第一版把 `git cat-file --batch` 的响应头读成 `<sha> <size>`，实际是
+   `<sha> <type> <size>` ⇒ 每条都解析失败成 `missing_blob`，而且 `--selfcheck` 因错误原因"命中"（它报的是
+   missing 而不是 sha 不符）。修好后同一条 selfcheck 报的是 `sha_mismatch want=0000… got=757b…`，
+   才是"比较器会命中"的正确证据。这条正是上一轮教训的复发版：**检查器先要证明自己会以正确的原因失败**。
+2. 第一次提交（`d4c3108`）里**漏了 `rtconfig.h`**：`git status` 显示它 ` M` 未暂存——BSP 目录里的这个头文件被
+   `.gitignore` 的构建目录规则连带忽略，`git add -A <round目录>` 覆盖不到它，必须 `git add -f` 具体路径。
+   后果不是构建错（构建读的是工作树，新 map 的 `idle_thread_stack=1024` 与 ZI +768 B 都证明改动生效），
+   而是"版本里的源码 = 256、构建输入 = 1024"这种**源码与镜像不配对**。补法：`git add -f` 该文件入本次提交，
+   并给 `build_manifest.json` 加 `build_inputs`（rtconfig sha256 `1927ed1c…` + `line_79` 原文 +
+   `diagnosis.c` 仍为 `e1696ec9…`），让任何人都能用散列复核"这次构建用的是哪一份源"。
+   我的 A6 检查当时输出的就是"工作树与 HEAD 差一行"——这个信号本来就该在提交前被读出来，而不是提交后被读到。
