@@ -10,6 +10,7 @@
 任何一条不符就 problems>0 并以退出码 1 结束 —— 本审计不允许"记得是这样"。
 """
 import hashlib
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -142,6 +143,16 @@ def observations():
                 "同一块板的既存真实件 002_version.bin(154 B) 以回显的 version 开头 "
                 "=> 这套固件回显是开的、主机->板 TX 曾真实到达" if old.startswith(b"version\r\n")
                 else repr(old[:24])))
+    # 既往"Halted"到底是谁的痕迹: 计划参数必须机器可判(它决定 DAP 探针该怎么读)
+    plan = json.loads((ROOT / REV / "field/plan.json").read_text(encoding="utf-8"))
+    rb = plan["tools"]["readback"]["argv"]
+    rs = plan["tools"]["reset"]["argv"]
+    out.append(("plan-readback-halts-on-connect", REV + "/field/plan.json",
+                "connect_mode=halt" in rb, "readback argv=%s" % (rb,)))
+    out.append(("plan-reset-uses-attach", REV + "/field/plan.json",
+                ["--connect", "attach"] == rs[rs.index("--connect"):rs.index("--connect") + 2]
+                if "--connect" in rs else False,
+                "reset argv=%s" % (rs,)))
     return out
 
 

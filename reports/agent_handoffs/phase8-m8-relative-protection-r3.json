@@ -698,5 +698,56 @@
    "approved_reboot": "1/1 未动",
    "port_open": "按每次调用 1 次单独计"
   }
+ },
+ "dap_status_probe_b": {
+  "authorized": "操作者选定 (b) 并对现场三项逐条确认(板子自上一轮上电后未断电 / DAP 仍连着板子与 USB / COM5 无其他程序占用)",
+  "scope": "一次 attach + 一次 commander `status`; 零 halt、零复位、零 Flash 读写、零下载、零配置写、零电机动作; 计划外只读探针, 不消耗申报额度",
+  "attempt_1": {
+   "run_root": "offline/dapstatus-20261101T031548Z-9916",
+   "rc": 2,
+   "detail": "unrecognized arguments: --core 0 (commander 无此选项)",
+   "target_contact": "NONE(argparse 层拒绝, 未枚举探针未连调试端口)",
+   "kept": "我方 argv 形状缺陷, 原样入库不删"
+  },
+  "attempt_2": {
+   "run_root": "offline/dapstatus-20261101T031618Z-44304",
+   "rc": 0,
+   "elapsed_s": 2.25,
+   "stdout": "Core 0 (None):  Running",
+   "stdout_sha256": "9e6ca91f24ec9c4ee569eceff8e6561d7ed055b60f97c49e88ae76366dcfdd33",
+   "stderr_sha256": "e3b0c442(0 B)",
+   "argv_sha256_of_private_original": "2743aa538eec2fff3a4e4c0f19b94c07f7644010092ab494acda519722b1fe67",
+   "uid": "既存私有文件原值未入库未进对话; 披露等级 len=48 sha256_12=d2f530dbd062"
+  },
+  "why_this_is_not_a_tool_artifact": [
+   "pyOCD 0.45.1 的 connect_mode 取值 ('halt','pre-reset','under-reset','attach') **默认是 halt** (site-packages/pyocd/core/options.py:56) —— 所以既往 FIELD-1 那条 `Core 0 (None): Halted` 不是板端证据, 而是 field/plan.json:tools.readback.argv 显式传 -O connect_mode=halt 的结果",
+   "本次两遍都传 --connect attach 与 -O connect_mode=attach; pyOCD 0.45.1 没有 status 子命令, 核状态只能经 commander 内建 status(commands/commands.py:104-119), 它读 core.get_state() 不发 halt; 实测文本与该文件 :119 的格式串 f\"Core {i} ({core.node_name}):  {state_desc}\" 逐字符一致(两个空格、node_name 为 None)",
+   "-O resume_on_disconnect=true 因核本就未停而是空操作 => 板子状态未被这次动作改变"
+  ],
+  "verdict": {
+   "H2_core_not_running": "EXCLUDED(仅限这次测量覆盖的那个当下状态)",
+   "H1_stuck_in_unbounded_rx_spin": "STRENGTHENED 但仍 UNPROVEN: 坐实需 halt + 读 PC, 那是会改变板子状态的新动作, 未获批准, 未执行",
+   "H3_host_to_board_rx": "未单独排除, 但**独自**解释不了'输出冻结在扫描行'(同会话 TX 已收到 1027 B; 越过阶段5 必打 supervisor.c:463 完成行)"
+  },
+  "now_established": "核在跑 + 输出停在 [FLASH] scanning 1 MiB event log... + 输入无回显 + 无看门狗复位",
+  "machine_recheck_after_this": {
+   "cites": 52,
+   "observation_assertions": 11,
+   "negative_control": "fired=3/3",
+   "problems": 0,
+   "console": "host/m8diag_source_audit_console_after_dap.txt",
+   "new_assertions": [
+    "plan-readback-halts-on-connect",
+    "plan-reset-uses-attach"
+   ]
+  },
+  "cumulative_device_actions": "下载 1 / 回读 2(1 败 1 成, 后者逐字节相等) / 显式复位 1 / 开口 3 / attach 探针 1",
+  "still_pending_authorization": "(a) 断电重上电 + 一个纯被动窗 —— 用来判这是不是一次会复发的启动停滞; 以及若要把 H1 坐实所需的一次 halt + PC 读取",
+  "evidence": [
+   "host/dap_status_probe.json",
+   "offline/dapstatus-20261101T031548Z-9916/**",
+   "offline/dapstatus-20261101T031618Z-44304/**",
+   "run_record.md §13"
+  ]
  }
 }

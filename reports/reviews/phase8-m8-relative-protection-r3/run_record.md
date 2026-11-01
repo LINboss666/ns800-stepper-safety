@@ -357,3 +357,40 @@ run 根 `offline/fieldcont-d9ff664-20261031T200214Z-41860`。
 **无任何看门狗引用**，所以真在自旋也不会自恢复。同时明确 **NOT_PROVEN**：板子此刻是否就在该循环里，
 §6 保留 H1/H2/H3 三条并存解释，不择一采信。另收回一句上一轮的错话：
 "按 1 MHz 算约 8.5 s 必然扫完"是**吞吐估算**，不是界限，不能用来排除"卡在阶段5"。
+
+## 13. (b) 一次 DAP 只读核状态的实际结果
+
+授权：操作者选定 (b)，并在执行前对现场三项逐条确认（板子自上一轮上电后未断电、DAP 仍连着板子与
+USB、COM5 无其他程序占用）。范围：一次 attach + 一次 `status`，零 halt、零复位、零 Flash 读写、
+零下载、零配置写、零电机动作。
+
+| 次 | 结果 | 是否碰到目标 |
+| --- | --- | --- |
+| 1 `offline/dapstatus-20261101T031548Z-9916` | rc=2，`error: unrecognized arguments: --core 0`（1.6 s） | **没有**：参数在 argparse 层就被拒，未枚举探针、未连调试端口（stderr 只有 usage 两行）。这是我方 argv 形状缺陷（把 `reset` 子命令的 `--core 0` 抄进了 `commander`），原样保留不删 |
+| 2 `offline/dapstatus-20261101T031618Z-44304` | **rc=0，2.25 s**；stdout 25 B = `Core 0 (None):  Running`，stderr 0 B | 是，只读一次核状态 |
+
+为什么这条读数是板子自己的状态、而不是工具留下的痕迹（两处离线核实，已并入检查器机器断言）：
+- pyOCD 0.45.1 的 `connect_mode` 取值 `('halt','pre-reset','under-reset','attach')` 里**默认是 `halt`**
+  （`site-packages/pyocd/core/options.py:56`）。所以既往 FIELD-1 看到的 `Core 0 (None): Halted`
+  **不是板端证据**，而是 `field/plan.json:tools.readback.argv` 显式传 `-O connect_mode=halt` 的结果
+  （检查项 `plan-readback-halts-on-connect`）；本次两遍都传 `--connect attach` + `-O connect_mode=attach`。
+- pyOCD 0.45.1 **没有** `status` 子命令（顶层只有 commander/cmd/erase/load/flash/gdbserver/gdb/json/
+  list/pack/reset/server/rtt/run），核状态只能经 commander 内建 `status`（`commands/commands.py:104-119`，
+  别名 `st`），它读 `core.get_state()`（`:118`）而不发 halt；实测文本与该文件 `:119` 的格式串
+  `f"Core {i} ({core.node_name}):  {state_desc}"` 逐字符一致（两个空格、`node_name` 为 `None`）；
+  `-O resume_on_disconnect=true` 因核本就未停而是空操作。
+
+判读（不越界一步）：
+- **H2（核未在跑）在这次测量覆盖的那个当下状态上被排除**；同时那条既往 `Halted` 观察的机制已定位到工具参数。
+- **H1（卡在该无界自旋）得到加强但仍未证**：坐实它要读 PC，而读 PC 必须 halt + 读寄存器 = 一次会改变
+  板子状态的新动作，未获批准，我没做。
+- **H3（主机→板 RX 不通）未被单独排除，但它自己解释不了"输出冻结在扫描行"**：同一会话 TX 方向已收到
+  1027 B，若启动真越过阶段5，`supervisor.c:463` 的完成行必然出现在 TX 上；而其后三个窗口共 0 字节。
+- 当前成立的事实合起来是：**核在跑 + 输出停在 `[FLASH] scanning 1 MiB event log...` + 输入无回显 +
+  无看门狗复位** —— 与"主线程在一个不让出的循环里占住 CPU"一致，与"核停了"不一致。
+
+额度与纪律：本动作是计划外的只读探针（计划里没有 `status` 这类动作类型），不消耗申报额度；
+第 1 次失败不算"重试设备"，它是我方参数形状缺陷，修正后才是唯一一次对目标的动作。累计真实设备动作：
+下载 1、回读 2（1 败 1 成，后者逐字节相等）、显式复位 1、开口 3、本次 attach 1。
+登记件：`host/dap_status_probe.json`；检查器复算输出 `host/m8diag_source_audit_console_after_dap.txt`
+（52 条引用 + 11 条观察断言 + 3 条元负控 ⇒ `AUDIT_PROBLEMS=0`）。

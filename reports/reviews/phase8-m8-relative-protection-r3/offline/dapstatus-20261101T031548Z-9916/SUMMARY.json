@@ -1,0 +1,21 @@
+{
+ "run_root": "D:\\ns800\\reports\\reviews\\phase8-m8-relative-protection-r3\\offline\\dapstatus-20261101T031548Z-9916",
+ "argv_masked": null,
+ "uid_disclosure": {
+  "present": true,
+  "length": 48,
+  "sha256_12": "d2f530dbd062"
+ },
+ "stamp_utc": "20261101T031548Z",
+ "scope": "1x attach + 1x commander `status`; no halt/reset/flash/download/config-write/motion; single attempt, no retry",
+ "status": "STOP",
+ "code": "ACTION_NONZERO_RC",
+ "detail": "dapstatus rc=2 elapsed=1.6",
+ "stdout.bin_nonempty_lines": 0,
+ "stdout.bin_lines": [],
+ "stderr.bin_nonempty_lines": 2,
+ "stderr.bin_lines": [
+  "usage: __main__.py [-h] [-V] [--help-options]  ...",
+  "__main__.py: error: unrecognized arguments: --core 0"
+ ]
+}

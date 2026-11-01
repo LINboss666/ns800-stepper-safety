@@ -1,0 +1,110 @@
+{
+ "what": "(b) 一次 DAP 只读核状态: attach 模式 + commander 的 `status` 一次。零 halt、零复位、零 Flash 读写、零下载、零配置写、零电机动作。",
+ "authorized_by": "操作者在会话中选定 (b); 执行前另以一项确认问得'三项都满足，可以跑'(板子自上一轮上电后未断电 / DAP 仍连着板子与 USB / COM5 未被其他串口程序占用)",
+ "software_input_commit": "805c29bd73c4ea861c9b9c65f61e946aec9548e3",
+ "delivery_tip_before_probe": "fcc15399727ac03a3acfbf0034c7ec789d81740a",
+ "tool": {
+  "launcher": "python -m pyocd (本机 Python 3.12)",
+  "pyocd_version": "0.45.1",
+  "why_attach": "pyOCD 的 connect_mode 取值 ('halt','pre-reset','under-reset','attach') 里**默认是 halt**(site-packages/pyocd/core/options.py:56)。既往现场轮看到的 `Core 0 (None): Halted` 因此不是板子自身的状态, 而是 field/plan.json 里 readback 显式传了 -O connect_mode=halt 的结果(tools.readback.argv) —— 这正是本次判读必须避开的污染。",
+  "subcommand_note": "pyocd 0.45.1 **没有** `status` 子命令(顶层 choices 只有 commander/cmd/erase/load/flash/gdbserver/gdb/json/list/pack/reset/server/rtt/run); 核状态只能经 commander 内建 `status`(pyocd/commands/commands.py:104-119, 别名 st), 它读 core.get_state()(:118) 而不发 halt; 实测文本与 :119 的格式串 f\"Core {i} ({core.node_name}):  {state_desc}\" 逐字符一致(两个空格, node_name 为 None)。",
+  "commander_has_no_core_option": "attempt 1 的 argv 带了 reset 形态的 `--core 0`, 而 commander 不接受该选项(见其 --help 的 connection 组: -u/-t/-f/-W/-M 与 -H/-N)"
+ },
+ "attempts": [
+  {
+   "id": 1,
+   "run_root": "reports/reviews/phase8-m8-relative-protection-r3/offline/dapstatus-20261101T031548Z-9916",
+   "rc": 2,
+   "elapsed_s": 1.6,
+   "stdout_bytes": 0,
+   "stderr_lines": [
+    "usage: __main__.py [-h] [-V] [--help-options]  ...",
+    "__main__.py: error: unrecognized arguments: --core 0"
+   ],
+   "target_contact": "NONE(参数在 argparse 层就被拒, 未枚举探针也未连接调试端口; stderr 只有 usage 两行, 没有任何探针相关文本)",
+   "argv_sha256_of_private_original": "82f2c0c8f6c50eab...",
+   "kept_because": "这是我自己构造 argv 的形状缺陷(把 reset 子命令的 --core 抄进 commander), 原样保留不删不改"
+  },
+  {
+   "id": 2,
+   "run_root": "reports/reviews/phase8-m8-relative-protection-r3/offline/dapstatus-20261101T031618Z-44304",
+   "rc": 0,
+   "elapsed_s": 2.25,
+   "argv_masked": [
+    "python",
+    "-m",
+    "pyocd",
+    "commander",
+    "--no-config",
+    "--connect",
+    "attach",
+    "--no-wait",
+    "-t",
+    "cortex_m",
+    "-f",
+    "1000000",
+    "-O",
+    "auto_unlock=false",
+    "-O",
+    "connect_mode=attach",
+    "-O",
+    "cache.enable_memory=false",
+    "-O",
+    "cache.read_code_from_elf=false",
+    "-O",
+    "scan_all_aps=false",
+    "-O",
+    "resume_on_disconnect=true",
+    "-u",
+    "@UID_FILE<redacted len=48 sha256_d2f530dbd062>",
+    "-c",
+    "status",
+    "-c",
+    "exit"
+   ],
+   "argv_sha256_of_private_original": "2743aa538eec2fff3a4e4c0f19b94c07f7644010092ab494acda519722b1fe67",
+   "stdout_25B": "Core 0 (None):  Running\\r\\n",
+   "stdout_sha256": "9e6ca91f24ec9c4ee569eceff8e6561d7ed055b60f97c49e88ae76366dcfdd33",
+   "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 (0 B)",
+   "uid_disclosure": {
+    "present": true,
+    "length": 48,
+    "sha256_12": "d2f530dbd062",
+    "source": "既存私有文件 D:\\ns800-m7-p0-20261030T182818\\dap_uid_bare.txt; 原值未入库未进对话"
+   },
+   "state_side_effect": "无: attach 模式不发 halt 也不复位; -O resume_on_disconnect=true 因核本就未停而是空操作"
+  }
+ ],
+ "measurement": "Core 0 (None): Running",
+ "what_this_changes": {
+  "H2_core_not_running": "对**这次测量所覆盖的那个当下状态**被排除: 核在跑(attach 不发 halt, 所以这条读数是板子自身状态, 不是工具留下的痕迹)。",
+  "the_earlier_Halted_observation": "机制已定位到工具参数(plan.json 的 readback 显式 connect_mode=halt), 不再算板端证据。",
+  "H1_stuck_in_the_unbounded_RX_spin": "得到加强但仍**未证**: 要坐实需要 PC 落在 ns800_spi_xfer/SPI_transmitReceive 的地址区间, 而那必须 halt + 读寄存器 = 一次会改变板子状态的新动作。",
+  "H3_host_to_board_RX_path": "仍未单独排除, 但**它自己解释不了**'启动输出冻结在扫描行': 同一会话 TX 方向已收到 1027 B, 若启动真越过阶段5, supervisor.c:463 的完成行必然出现在 TX 上, 而后三个窗口共 0 字节。"
+ },
+ "combined_reading": "现在成立的是: 核在跑 + 启动输出停在 [FLASH] scanning 1 MiB event log... + 输入无回显 + 无看门狗复位。这与'主线程在一个不让出的循环里占住 CPU'一致, 与'核停了'不一致。审计在源码层找到的唯一无界不让出点是厂商 spi.h:479-481。",
+ "still_open": [
+  "PC 实际在哪里(需 halt + 读寄存器, 未获批准)",
+  "这是不复发的单次事件还是每次启动都复现(需 (a) 断电重上电 + 被动窗, 未获批准)",
+  "保护业务本身仍未走到: 学习起转 / 触发 / 锁存 / 清故障 / 重启后读回全部 NOT_RUN"
+ ],
+ "machine_recheck_after_this": {
+  "cites": 52,
+  "observation_assertions": 11,
+  "negative_control": "fired=3/3",
+  "problems": 0,
+  "console": "host/m8diag_source_audit_console_after_dap.txt",
+  "new_assertions": [
+   "plan-readback-halts-on-connect",
+   "plan-reset-uses-attach"
+  ]
+ },
+ "quota_note": "本动作是计划之外的只读探针(计划里没有 status 这种动作类型), 不消耗申报额度; 累计真实设备动作: 下载 1、回读 2(1 败 1 成, 后者逐字节相等)、显式复位 1、开口 3、本次 attach 1。",
+ "no_retry_policy_observed": "attempt 1 失败后没有'再试一次同样的东西': 它是我方 argv 形状缺陷, 修正参数后才是唯一一次对目标的动作。",
+ "raw_evidence_kept_verbatim": "两个 run 根的 stdout.bin/stderr.bin/rc.txt/ARGV.json/ledger.jsonl/SUMMARY.json 全部原样入库, 失败件不删不改。",
+ "evidence": [
+  "offline/dapstatus-20261101T031548Z-9916/**",
+  "offline/dapstatus-20261101T031618Z-44304/**",
+  "run_record.md §13"
+ ]
+}

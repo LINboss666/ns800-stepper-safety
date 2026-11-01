@@ -1,0 +1,69 @@
+OK  main->supervisor_boot            TRACKED    main.c:51
+OK  supervisor->storage              TRACKED    supervisor.c:461
+OK  stage5-done-line                 TRACKED    supervisor.c:463
+OK  storage-init                     TRACKED    ns_storage.c:138
+OK  scan-banner                      TRACKED    ns_storage.c:147
+OK  scan-call                        TRACKED    ns_storage.c:148
+OK  scan-def                         TRACKED    ns_storage.c:63
+OK  scan-loop-bound                  TRACKED    ns_storage.c:70
+OK  scan-per-slot-read               TRACKED    ns_storage.c:72
+OK  scan-yield-cadence               TRACKED    ns_storage.c:83
+OK  log-size                         TRACKED    ns_storage.h:10
+OK  log-slots                        TRACKED    ns_storage.h:15
+OK  main-prio                        TRACKED    rtconfig.h:119
+OK  finsh-prio                       TRACKED    rtconfig.h:124
+OK  prio-max                         TRACKED    rtconfig.h:72
+OK  flash-read-entry                 TRACKED    ns_flash.c:164
+OK  flash-take-lock                  TRACKED    ns_flash.c:87
+OK  flash-wait-ready                 TRACKED    ns_flash.c:171
+OK  flash-wait-yields                TRACKED    ns_flash.c:40
+OK  flash-page-read                  TRACKED    ns_flash.c:175
+OK  flash-read-raw-xfer              TRACKED    ns_flash.c:58
+OK  flash-page-size                  TRACKED    ns_flash_config.h:15
+OK  flash-spi-hz                     TRACKED    ns_flash_config.h:12
+OK  flash-erase-ms                   TRACKED    ns_flash_config.h:17
+OK  flash-jedec-print                TRACKED    ns_flash.c:141
+OK  core-send-then-recv              TRACKED    dev_spi_core.c:368
+OK  core-xfer-call-1                 TRACKED    dev_spi_core.c:408
+OK  core-xfer-call-2                 TRACKED    dev_spi_core.c:423
+OK  core-configure-locks             TRACKED    dev_spi_core.c:258
+OK  bsp-xfer-entry                   TRACKED    drv_spi.c:203
+OK  bsp-byte-loop                    TRACKED    drv_spi.c:225
+OK  bsp-byte-timed                   TRACKED    drv_spi.c:231
+OK  bsp-recv-only                    TRACKED    drv_spi.c:244
+OK  bsp-length-decrement             TRACKED    drv_spi.c:252
+OK  bsp-disable-module               TRACKED    drv_spi.c:188
+OK  bsp-enable-module                TRACKED    drv_spi.c:198
+OK  bsp-clock-once                   TRACKED    drv_spi.c:329
+OK  vendor-rx-spin                   LOCAL_ONLY spi.h:479
+OK  vendor-rx-spin-body-empty        LOCAL_ONLY spi.h:480
+OK  vendor-no-return-before-flag     LOCAL_ONLY spi.h:483
+OK  vendor-rxempty-zero              LOCAL_ONLY spi.h:393
+OK  finsh-echo-default-on            TRACKED    shell.c:547
+OK  finsh-echo-print                 TRACKED    shell.c:937
+OK  finsh-starts-in-components-init  TRACKED    shell.c:1062
+OK  components-init-in-main-thread   TRACKED    components.c:193
+OK  safety-prio                      TRACKED    safety_thread.c:44
+OK  safety-timeout                   TRACKED    safety_thread.c:45
+OK  safety-event-recv                TRACKED    safety_thread.c:167
+OK  diag-created-later               TRACKED    diagnosis.c:526
+OK  flog-worker-after-scan           TRACKED    ns_storage.c:152
+OK  log-prio-macro                   TRACKED    ns_flash_config.h:21
+OK  stage5-comment-seconds           TRACKED    supervisor.c:460
+
+--- 观察件(判据的输入, 同样逐条断言) ---
+OK  boot-capture-len                 01_rst.boot.rx.bin
+OK  boot-capture-ends-at-scan        01_rst.boot.rx.bin
+OK  boot-capture-has-jedec-before-scan 01_rst.boot.rx.bin
+OK  boot-capture-has-no-stage5-done  01_rst.boot.rx.bin
+OK  boot-capture-prompt-before-scan  01_rst.boot.rx.bin
+OK  second-window-zero               02_sysboot.rx.bin
+OK  passive60-zero                   01_passive60.rx.bin
+OK  version-response-zero            02_ver.rx.bin
+OK  historic-echo-proof              002_version.bin
+OK  plan-readback-halts-on-connect   plan.json
+OK  plan-reset-uses-attach           plan.json
+OK  NEGATIVE_CONTROL fired=3/3 reasons=['CITE_MISSING', 'CITE_TEXT_MISMATCH']
+
+CITES=52  VENDOR_HEADER_SHA_LOCAL=90c9a1da446b..(仓库外件, 远端不可复算)
+AUDIT_PROBLEMS=0  (0 => 审计的每一行引用与每一条观察都按本机字节成立)

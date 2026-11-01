@@ -1,0 +1,64 @@
+{
+ "run_root": "D:\\ns800\\reports\\reviews\\phase8-m8-relative-protection-r3\\offline\\dapstatus-20261101T031618Z-44304",
+ "argv_masked": null,
+ "uid_disclosure": {
+  "present": true,
+  "length": 48,
+  "sha256_12": "d2f530dbd062"
+ },
+ "stamp_utc": "20261101T031618Z",
+ "scope": "1x attach + 1x commander `status`; no halt/reset/flash/download/config-write/motion; single attempt, no retry",
+ "rc": 0,
+ "elapsed_s": 2.25,
+ "stdout_bytes": 25,
+ "stderr_bytes": 0,
+ "stdout_sha256": "9e6ca91f24ec9c4ee569eceff8e6561d7ed055b60f97c49e88ae76366dcfdd33",
+ "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+ "argv_archive": {
+  "argv_masked": [
+   "python",
+   "-m",
+   "pyocd",
+   "commander",
+   "--no-config",
+   "--connect",
+   "attach",
+   "--no-wait",
+   "-t",
+   "cortex_m",
+   "-f",
+   "1000000",
+   "-O",
+   "auto_unlock=false",
+   "-O",
+   "connect_mode=attach",
+   "-O",
+   "cache.enable_memory=false",
+   "-O",
+   "cache.read_code_from_elf=false",
+   "-O",
+   "scan_all_aps=false",
+   "-O",
+   "resume_on_disconnect=true",
+   "-u",
+   "@UID_FILE<redacted len=48 sha256_d2f530dbd062>",
+   "-c",
+   "status",
+   "-c",
+   "exit"
+  ],
+  "argv_sha256_of_private_original": "2743aa538eec2fff3a4e4c0f19b94c07f7644010092ab494acda519722b1fe67",
+  "cwd": "D:\\ns800",
+  "uid_disclosure": {
+   "present": true,
+   "length": 48,
+   "sha256_12": "d2f530dbd062"
+  }
+ },
+ "stdout.bin_nonempty_lines": 1,
+ "stdout.bin_lines": [
+  "Core 0 (None):  Running"
+ ],
+ "stderr.bin_nonempty_lines": 0,
+ "stderr.bin_lines": []
+}

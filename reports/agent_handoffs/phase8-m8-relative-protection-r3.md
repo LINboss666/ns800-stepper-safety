@@ -245,3 +245,25 @@ run 根 `offline/diag-com5-20261031T234328Z-48972`，台账 `sess_diag/ledger.js
 
 本审计不消耗额度、不放宽任何判据、不登记业务通过。下一步 (a) 断电重上电 + 一个被动窗，或
 (b) 一次 DAP 只读 `status`(代价：attach 本身可能把核 halt)，两者都**待新一轮批准**。
+
+## 13. (b) 已执行 —— 核状态实测 `Running`，H2 在该状态上被排除
+
+上面那句"待批准"里，**(b) 已由操作者选定并执行完毕**；(a) 仍未获批准。范围一次 attach + 一次
+`status`，零 halt / 零复位 / 零 Flash 读写 / 零下载 / 零配置写 / 零电机动作。现场三项由操作者逐条确认。
+
+| 次 | run 根 | 结果 |
+| --- | --- | --- |
+| 1 | `offline/dapstatus-20261101T031548Z-9916` | rc=2 `unrecognized arguments: --core 0` —— argparse 层就失败，**未接触目标**；我方 argv 形状缺陷，原样保留 |
+| 2 | `offline/dapstatus-20261101T031618Z-44304` | **rc=0 / 2.25 s / stdout 25 B = `Core 0 (None):  Running`**，stderr 0 B |
+
+关键取证点（否则这条读数会被误用）：pyOCD 的 `connect_mode` **默认是 `halt`**，而既往那条
+`Core 0 (None): Halted` 是 `field/plan.json` 里 readback 显式传 `-O connect_mode=halt` 造成的 ——
+机制已定位到工具参数，不再是板端证据；本次必须且确实传了 `attach`，commander 内建 `status`
+（`commands/commands.py:104-119`）只读 `core.get_state()` 不发 halt，且实测文本与该文件 `:119` 的
+格式串 `f"Core {i} ({core.node_name}):  {state_desc}"` 逐字符一致。两条计划参数事实都已做成检查器的机器断言
+（`plan-readback-halts-on-connect` / `plan-reset-uses-attach`）。
+
+判读边界：**H2 在这个当下状态上排除**；**H1 加强但未证**（坐实要 halt 读 PC，属另一次会改变板子
+状态的动作，未获批准）；**H3 未被单独排除但独自解释不了"输出冻结在扫描行"**（TX 在同一会话已收到
+1027 B，越过阶段5 必打 `supervisor.c:463` 完成行）。当前事实合起来与"主线程在不让出的循环里占住
+CPU"一致。登记件 `host/dap_status_probe.json`；计划外只读探针，不消耗申报额度。
