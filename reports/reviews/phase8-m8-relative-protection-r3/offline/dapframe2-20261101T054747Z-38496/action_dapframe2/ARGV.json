@@ -1,0 +1,43 @@
+{
+ "argv_masked": [
+  "python",
+  "-m",
+  "pyocd",
+  "commander",
+  "--no-config",
+  "--connect",
+  "attach",
+  "--no-wait",
+  "-t",
+  "cortex_m",
+  "-f",
+  "1000000",
+  "-O",
+  "auto_unlock=false",
+  "-O",
+  "connect_mode=attach",
+  "-O",
+  "cache.enable_memory=false",
+  "-O",
+  "cache.read_code_from_elf=false",
+  "-O",
+  "scan_all_aps=false",
+  "-O",
+  "resume_on_disconnect=false",
+  "-u",
+  "@UID_FILE<redacted len=48 sha256_d2f530dbd062>",
+  "-c",
+  "status",
+  "-c",
+  "read32 0x20012770 32",
+  "-c",
+  "status"
+ ],
+ "argv_sha256_of_private_original": "6051f5e4483fbf1e0bbcc8ca1dc9569c8a136ac43668fd61521c212a67bdbc99",
+ "cwd": "D:\\ns800",
+ "uid_disclosure": {
+  "present": true,
+  "length": 48,
+  "sha256_12": "d2f530dbd062"
+ }
+}

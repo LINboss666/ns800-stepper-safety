@@ -1,0 +1,29 @@
+{
+ "run_root": "D:\\ns800\\reports\\reviews\\phase8-m8-relative-protection-r3\\offline\\dapframe2-20261101T054747Z-38496",
+ "stamp_utc": "20261101T054747Z",
+ "scope": "1 attach; status before (no halt issued); 32 bytes of target RAM @0x20012770; no reset, no resume, no flash read/write, no RAM write, no serial, no motion; leave HALTED",
+ "commands": [
+  "status",
+  "read32 0x20012770 32",
+  "status"
+ ],
+ "uid_disclosure": {
+  "present": true,
+  "length": 48,
+  "sha256_12": "d2f530dbd062"
+ },
+ "rc": 0,
+ "elapsed_s": 1.891,
+ "stdout_bytes": 188,
+ "stderr_bytes": 0,
+ "stdout_sha256": "ca5d411e2ac14e831321ced90f997176030483cb1eb4e5879d0e9c3f19a7cdac",
+ "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+ "argv_sha256_of_private_original": "6051f5e4483fbf1e0bbcc8ca1dc9569c8a136ac43668fd61521c212a67bdbc99",
+ "stdout.bin_lines": [
+  "Core 0 (None):  Halted",
+  "20012770:  00bd80b0 20015b78 00000001 20015b28    |.... .[x.... .[(|",
+  "20012780:  20015b78 08021d0d 08020096 81000000    | .[x............|",
+  "Core 0 (None):  Halted"
+ ],
+ "stderr.bin_lines": []
+}

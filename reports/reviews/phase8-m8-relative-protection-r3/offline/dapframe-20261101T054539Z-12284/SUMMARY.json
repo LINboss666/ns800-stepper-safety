@@ -1,0 +1,35 @@
+{
+ "run_root": "D:\\ns800\\reports\\reviews\\phase8-m8-relative-protection-r3\\offline\\dapframe-20261101T054539Z-12284",
+ "stamp_utc": "20261101T054539Z",
+ "scope": "1 attach; no new halt (status first); 92 bytes of target RAM (<=96); no reset, no resume, no flash read/write, no RAM write, no serial, no motion; leave HALTED",
+ "commands": [
+  "status",
+  "read32 0x2000d3e8 4",
+  "read32 0x20012718 88",
+  "status"
+ ],
+ "uid_disclosure": {
+  "present": true,
+  "length": 48,
+  "sha256_12": "d2f530dbd062"
+ },
+ "rc": 0,
+ "elapsed_s": 2.219,
+ "stdout_bytes": 518,
+ "stderr_bytes": 0,
+ "stdout_sha256": "32ec174ad6855e493b440590f5914df7418ce5051b1f6e7a24007b8e3ebe49bc",
+ "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+ "argv_sha256_of_private_original": "050cd065b7cb558f80e0806643c4fc1bd6f62244c081ac4ab1af0e7653a0fb7b",
+ "stdout.bin_lines": [
+  "Core 0 (None):  Halted",
+  "2000d3e8:  20012748                               | .'H|",
+  "20012718:  00000000 00000000 00000000 00000000    |................|",
+  "20012728:  00000000 00001770 08016da9 00000032    |.......p..m....2|",
+  "20012738:  08021609 08021d31 080003ec 81000000    |.......1........|",
+  "20012748:  ffffffed ffffffed 00000400 00000012    |................|",
+  "20012758:  0000000a deadbeef deadbeef deadbeef    |................|",
+  "20012768:  deadbeef deadbeef                      |........|",
+  "Core 0 (None):  Halted"
+ ],
+ "stderr.bin_lines": []
+}

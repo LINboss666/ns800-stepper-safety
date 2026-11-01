@@ -1,0 +1,95 @@
+OK A1_token_0 | Core 0 (None):  Halted
+OK A1_token_1 | 2000d3e8:  20012748
+OK A1_token_2 | 20012718:  00000000 00000000 00000000 00000000
+OK A1_token_3 | 20012748:  ffffffed ffffffed 00000400 00000012
+OK A1_token_4 | 20012758:  0000000a deadbeef deadbeef deadbeef
+OK A1_token_5 | 20012768:  deadbeef deadbeef
+OK A2_token_0 | 20012770:  00bd80b0 20015b78 00000001 20015b28
+OK A2_token_1 | 20012780:  20015b78 08021d0d 08020096 81000000
+OK A_no_halt_line | 两轮 stdout 均无 `Successfully halted device`
+OK A_no_reset_line | 两轮 stdout 无 reset 字样
+OK A_Halted_count_frame1 | frame: 2 次(开口确认+收尾)
+OK A_Halted_count_frame2 | frame2: 2 次
+OK A_no_Running_this_rounds | 两轮都没有 Running —— 板子全程保持 Halted
+OK A3_BFAR_line_present | (c) 轮原件里 BFAR 行逐字在
+OK B_ptr_slot_equals_base | [0x2000d3e8]=0x20012748 应=0x20012748
+OK B_hw_frame_at_base_plus_40 | base+40=0x20012770 即第二次读取的起点
+OK B_pc_slot_address | pc 槽地址 0x20012788
+OK B_exc_return | exc_return=0xffffffed
+OK B_flag_equals_exc_return | flag 槽与 exc_return 同值 —— 对应 context_rvds.S:238/240 两条都是 `STMFD r0!, {lr}`
+OK B_exc_return_bit2_PSP | bit2=1 => 出错上下文用 PSP(线程模式)
+OK B_exc_return_bit3_thread | bit3=1 => 返回到线程模式
+OK B_exc_return_bit4_extended | bit4=0 => 扩展帧标记
+OK B_stacked_psr_IPSR_zero | 出错瞬间 IPSR=0 (0=线程模式, 不在任何处理程序里)
+OK B_stacked_psr_thumb | 栈帧 psr=0x81000000 的 T 位=1
+OK B_halttime_psr_is_hardfault | (c) 轮当场 xpsr=0x61000003 的 IPSR=3=HardFault, 与栈帧里 IPSR=0 是两个不同时刻
+OK B_r0_equals_BFAR | 栈帧 r0=0x00bd80b0 == (c) 轮 BFAR=0x00bd80b0
+OK B_r1_is_object_ptr_in_ram | r1=0x20015b78 落在 RW_RT_HEAD 预留块内
+OK B_r4_r11_sequence | r4..r11 实测序列 0x400,0x12,0x0a,deadbeef x5
+OK B_psp_equals_base_after_stub | context_rvds.S:245 `MSRNE psp, r0` 把递减后的基址写回 PSP, 所以 (c) 轮 psp=0x20012748 就是帧基址
+OK B_lr_is_bl_residue_of_atomic_add | 栈帧 lr=0x08021d0d = 0x08021d08 那条 BL 的返回地址(+1 是 Thumb 标记)
+OK B_pc_offset_in_symbol | pc - rt_object_init(0x08020010) = 134, 与切片里 `rt_object_init + 134` 一致
+OK B_obj_from_node_minus_14 | 若把坏 node 当 rt_object, 其地址为 node-0x14=0xbd809c (offsetof(list)=0x14)
+OK B_read_bytes_within_approval | frame=92 B(批准 <=96) frame2=32 B(单独批准 32), 均从登记件里的逐字 commands 复算
+OK C_obj-379-loop-head | object.c:379 -> for (node  = information->object_list.next;
+OK C_obj-381-increment | object.c:381 -> node  = node->next)
+OK C_obj-386-assert | object.c:386 -> RT_ASSERT(obj != object);
+OK C_obj-377-spinlock | object.c:377 -> level = rt_spin_lock_irqsave(&(information->spinlock));
+OK C_obj-355-def | object.c:355 -> void rt_object_init(struct rt_object         *object,
+OK C_cpu-221-cfsr | cpuport.c:221 -> #define SCB_CFSR        (*(volatile const unsigned *)0xE000ED28) /* Configurab
+OK C_cpu-224-bfar | cpuport.c:224 -> #define SCB_BFAR        (*(volatile const unsigned *)0xE000ED38) /* Bus Fault 
+OK C_cpu-460-tail-loop | cpuport.c:460 -> while (1);
+OK C_cpu-398-exception_info | cpuport.c:398 -> struct exception_info
+OK C_cpu-400-exc_return-field | cpuport.c:400 -> rt_uint32_t exc_return;
+OK C_cpu-61-stack_frame | cpuport.c:61 -> struct stack_frame
+OK C_cpu-64-flag-field | cpuport.c:64 -> rt_uint32_t flag;
+OK C_cpu-77-hwframe-field | cpuport.c:77 -> struct exception_stack_frame exception_stack_frame;
+OK C_cpu-51-r0-first | cpuport.c:51 -> rt_uint32_t r0;
+OK C_cpu-58-psr-last | cpuport.c:58 -> rt_uint32_t psr;
+OK C_cpu-169-deadbeef-fill | cpuport.c:169 -> ((rt_uint32_t *)stack_frame)[i] = 0xdeadbeef;
+OK C_asm-231-tst-lr4 | context_rvds.S:231 -> TST     lr, #0x04               ; if(!EXC_RETURN[2])
+OK C_asm-234-mrs-psp | context_rvds.S:234 -> MRSNE   r0, psp                 ; [2]=1 ==> Z=0, get fault context from thread
+OK C_asm-236-stmfd-r4r11 | context_rvds.S:236 -> STMFD   r0!, {r4 - r11}         ; push r4 - r11 register
+OK C_asm-238-stmfd-flag | context_rvds.S:238 -> STMFD   r0!, {lr}               ; push dummy for flag
+OK C_asm-240-stmfd-exc | context_rvds.S:240 -> STMFD   r0!, {lr}               ; push exec_return register
+OK C_asm-245-msr-psp | context_rvds.S:245 -> MSRNE   psp, r0                 ; [2]=1 ==> Z=0, update stack pointer to PSP.
+OK C_sct-27-empty-hole | link.sct:27 -> RW_RT_HEAD 0x20012000 EMPTY 0x8000 {
+OK C_boardh-30-heap-begin | board.h:30 -> #define HEAP_BEGIN      (&Image$$RW_RT_HEAD$$Limit)
+OK C_slice_0x08020010 | 0x08020010:    b580        ..      PUSH     {r7,lr}
+OK C_slice_0x08020094 | 0x08020094:    9802        ..      LDR      r0,[sp,#8]
+OK C_slice_0x08020096 | 0x08020096:    6800        .h      LDR      r0,[r0,#0]
+OK C_slice_0x0802006a | 0x0802006a:    3814        .8      SUBS     r0,r0,#0x14
+OK C_slice_0x08020088 | 0x08020088:    f44f72c1    O..r    MOV      r2,#0x182
+OK C_slice_0x0802008c | 0x0802008c:    f7fdf9b0    ....    BL       rt_assert_handle
+OK C_slice_0x0802004e | 0x0802004e:    f002fb33    ..3.    BL       rt_spin_lock_irq
+OK C_slice_0x080226c4 | 0x080226c4:    f7fbfcbc    ....    BL       rt_enter_critica
+OK C_slice_0x080226d0 | 0x080226d0:    bd80        ..      POP      {r7,pc}
+OK C_slice_0x0801e04e | 0x0801e04e:    f003fe4b    ..K.    BL       rt_soft_atomic_a
+OK C_slice_0x0801e05a | 0x0801e05a:    bd80        ..      POP      {r7,pc}
+OK C_slice_0x08021d08 | 0x08021d08:    f7defb6e    ..n.    BL       rt_hw_interrupt_
+OK C_slice_0x08021d10 | 0x08021d10:    bd80        ..      POP      {r7,pc}
+OK C_slice_0x080460d1 | 0x080460d1 (偏移 0x460d1) -> 'obj != object'
+OK C_slice_0x080460f9 | 0x080460f9 (偏移 0x460f9) -> 'rt_object_init'
+OK C_slice_axf_sha | AXF sha256     : 0bba8ca74ed8c11e149395efd64c42072fce0b3ced5
+OK C_axf_sha_matches_slice_header | 切片头部登记的 AXF sha256 == 现在复算值 (bytes=1771288)
+OK C_onboard_bin_identity_in_slice | 切片登记的候选 BIN 身份 == 现在复算值 (290916 B, sha 00608ec93c6a...) —— 就是已在板上逐字节证得的那枚镜像
+OK E_regions_parsed | map 里解出 5 个执行区: RW_ITCM[0x00000000,+0x20000), ER_IROM1[0x08000000,+0x80000), RW_VT_DTCM[0x20000000,+0x400), RW_DTCM[0x20000400,+0x1fc00), RW_RT_HEAD[0x20012000,+0x8000)
+OK E_bfar_in_no_image_region | 0x00bd80b0 不落在 map 任何一个执行区(ITCM/Flash/DTCM/RT_HEAD)内 => 它不可能是本镜像里任何对象或代码的地址
+OK E_region_RW_ITCM_declared | RW_ITCM exec base=0x00000000 (ITCM 上界 0x00020000) Max=0x20000
+OK E_region_ER_IROM1_declared | ER_IROM1 exec base=0x08000000 (Flash) Max=0x80000
+OK E_region_RW_DTCM_declared | RW_DTCM exec base=0x20000400 (DTCM) Max=0x1fc00
+OK E_region_RW_RT_HEAD_declared | RW_RT_HEAD exec base=0x20012000 (堆预留块) Max=0x8000
+OK D_json_parses | host/dap_frame_probe.json 可解析
+OK D_ram_accounting | frame=92 B(<=96 批准) frame2=32 B(单独批准)
+OK D_argv_no_halt_reset | 两轮 argv 里除 `--connect attach` 外没有 halt/reset 选项
+OK D_argv_resume_false | 两轮都是 `-O resume_on_disconnect=false`(按上一轮更正)
+OK D_uid_only_masked | argv 副本里 UID 只有 `@UID_FILE<redacted len=… sha256_…>` 形态
+OK D_registered_uid_digest_shape | 登记的是 sha256 前 12 位: d2f530dbd062
+OK D_no_uid_leak | 扫描 23 个文件里所有 48 位十六进制串, 与登记摘要(d2f530dbd062)相符的命中: 无
+RAW frame_stdout bytes=518 sha256=32ec174ad6855e493b440590f5914df7418ce5051b1f6e7a24007b8e3ebe49bc
+RAW frame2_stdout bytes=188 sha256=ca5d411e2ac14e831321ced90f997176030483cb1eb4e5879d0e9c3f19a7cdac
+RAW rc_files=0,0 stderr_bytes=0,0
+CITES=24 CHECKS=88
+DAPFRAME_PROBLEMS=0
+NEGATIVE_CONTROL fired=3/3
+

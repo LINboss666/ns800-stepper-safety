@@ -1,0 +1,189 @@
+M8 异常栈帧轮 (frame / frame2) 离线定位切片 —— 全部由本机已接受 AXF 与仓库原文截出, 零目标内存读取
+====================================================================================================
+AXF            : reports/firmware/phase8-m8-relative-protection-r3/rt-thread-motor-m1.axf
+AXF bytes      : 1771288
+AXF sha256     : 0bba8ca74ed8c11e149395efd64c42072fce0b3ced5ab76281210ddc04550963
+全文反汇编     : D:/ns800_m8r3_scratch/axf_dis.txt  (116682 行, sha256 fb9c21fc15e23a7ccae836559f9bc036080d18e2bb704a9d41cfdbdae982f29e; 本轮另存一份到新临时目录并逐字节相同)
+生成命令(逐字) : "C:/Keil_v5/ARM/ARMCLANG/bin/fromelf.exe" -c -a <上面 AXF 绝对路径>
+fromelf 版本   : 无法取 —— `fromelf --version` 报 Q3900U Unrecognized option(本机实测), 故只登记路径与调用形式
+
+--- 切片 A: rt_object_init 头部 + RT_DEBUGING_ASSERT 重复初始化检查循环(含出错那条指令) ---
+        0x08020010:    b580        ..      PUSH     {r7,lr}
+        0x08020012:    b088        ..      SUB      sp,sp,#0x20
+        0x08020014:    9007        ..      STR      r0,[sp,#0x1c]
+        0x08020016:    f88d101b    ....    STRB     r1,[sp,#0x1b]
+        0x0802001a:    9205        ..      STR      r2,[sp,#0x14]
+        0x0802001c:    2000        .       MOVS     r0,#0
+        0x0802001e:    9002        ..      STR      r0,[sp,#8]
+        0x08020020:    f89d001b    ....    LDRB     r0,[sp,#0x1b]
+        0x08020024:    f7ffffa4    ....    BL       rt_object_get_information ; 0x801ff70
+        0x08020028:    9001        ..      STR      r0,[sp,#4]
+        0x0802002a:    9801        ..      LDR      r0,[sp,#4]
+        0x0802002c:    b968        h.      CBNZ     r0,0x802004a ; rt_object_init + 58
+        0x0802002e:    e7ff        ..      B        0x8020030 ; rt_object_init + 32
+        0x08020030:    f246003e    F.>.    MOV      r0,#0x603e
+        0x08020034:    f6c00004    ....    MOVT     r0,#0x804
+        0x08020038:    f24601f9    F...    MOV      r1,#0x60f9
+        0x0802003c:    f6c00104    ....    MOVT     r1,#0x804
+        0x08020040:    f2401273    @.s.    MOV      r2,#0x173
+        0x08020044:    f7fdf9d4    ....    BL       rt_assert_handler ; 0x801d3f0
+        0x08020048:    e7ff        ..      B        0x802004a ; rt_object_init + 58
+        0x0802004a:    9801        ..      LDR      r0,[sp,#4]
+        0x0802004c:    3010        .0      ADDS     r0,r0,#0x10
+        0x0802004e:    f002fb33    ..3.    BL       rt_spin_lock_irqsave ; 0x80226b8
+        0x08020052:    9004        ..      STR      r0,[sp,#0x10]
+        0x08020054:    9801        ..      LDR      r0,[sp,#4]
+        0x08020056:    6840        @h      LDR      r0,[r0,#4]
+        0x08020058:    9002        ..      STR      r0,[sp,#8]
+        0x0802005a:    e7ff        ..      B        0x802005c ; rt_object_init + 76
+        0x0802005c:    9802        ..      LDR      r0,[sp,#8]
+        0x0802005e:    9901        ..      LDR      r1,[sp,#4]
+        0x08020060:    3104        .1      ADDS     r1,#4
+        0x08020062:    4288        .B      CMP      r0,r1
+        0x08020064:    d01a        ..      BEQ      0x802009c ; rt_object_init + 140
+        0x08020066:    e7ff        ..      B        0x8020068 ; rt_object_init + 88
+        0x08020068:    9802        ..      LDR      r0,[sp,#8]
+        0x0802006a:    3814        .8      SUBS     r0,r0,#0x14
+        0x0802006c:    9000        ..      STR      r0,[sp,#0]
+        0x0802006e:    9800        ..      LDR      r0,[sp,#0]
+        0x08020070:    9907        ..      LDR      r1,[sp,#0x1c]
+        0x08020072:    4288        .B      CMP      r0,r1
+        0x08020074:    d10d        ..      BNE      0x8020092 ; rt_object_init + 130
+        0x08020076:    e7ff        ..      B        0x8020078 ; rt_object_init + 104
+        0x08020078:    f24600d1    F...    MOV      r0,#0x60d1
+        0x0802007c:    f6c00004    ....    MOVT     r0,#0x804
+        0x08020080:    f24601f9    F...    MOV      r1,#0x60f9
+        0x08020084:    f6c00104    ....    MOVT     r1,#0x804
+        0x08020088:    f44f72c1    O..r    MOV      r2,#0x182
+        0x0802008c:    f7fdf9b0    ....    BL       rt_assert_handler ; 0x801d3f0
+        0x08020090:    e7ff        ..      B        0x8020092 ; rt_object_init + 130
+        0x08020092:    e7ff        ..      B        0x8020094 ; rt_object_init + 132
+        0x08020094:    9802        ..      LDR      r0,[sp,#8]
+        0x08020096:    6800        .h      LDR      r0,[r0,#0]
+        0x08020098:    9002        ..      STR      r0,[sp,#8]
+        0x0802009a:    e7df        ..      B        0x802005c ; rt_object_init + 76
+        0x0802009c:    9801        ..      LDR      r0,[sp,#4]
+        0x0802009e:    3010        .0      ADDS     r0,r0,#0x10
+        0x080200a0:    9904        ..      LDR      r1,[sp,#0x10]
+        0x080200a2:    f002fb29    ..).    BL       rt_spin_unlock_irqrestore ; 0x80226f8
+        0x080200a6:    f89d001b    ....    LDRB     r0,[sp,#0x1b]
+
+--- 切片 B: rt_spin_lock_irqsave —— 以 POP {r7,pc} 返回, 不还原 LR ---
+        0x080226b8:    b580        ..      PUSH     {r7,lr}
+        0x080226ba:    b082        ..      SUB      sp,sp,#8
+        0x080226bc:    9001        ..      STR      r0,[sp,#4]
+        0x080226be:    f7ddfe8f    ....    BL       rt_hw_interrupt_disable ; 0x80003e0
+        0x080226c2:    9000        ..      STR      r0,[sp,#0]
+        0x080226c4:    f7fbfcbc    ....    BL       rt_enter_critical ; 0x801e040
+        0x080226c8:    e7ff        ..      B        0x80226ca ; rt_spin_lock_irqsave + 18
+        0x080226ca:    e7ff        ..      B        0x80226cc ; rt_spin_lock_irqsave + 20
+        0x080226cc:    9800        ..      LDR      r0,[sp,#0]
+        0x080226ce:    b002        ..      ADD      sp,sp,#8
+        0x080226d0:    bd80        ..      POP      {r7,pc}
+
+--- 切片 C: rt_enter_critical —— 同样 POP {r7,pc} 返回 ---
+        0x0801e040:    b580        ..      PUSH     {r7,lr}
+        0x0801e042:    b082        ..      SUB      sp,sp,#8
+        0x0801e044:    f24a60a0    J..`    MOV      r0,#0xa6a0
+        0x0801e048:    f2c20000    ....    MOVT     r0,#0x2000
+        0x0801e04c:    2101        .!      MOVS     r1,#1
+        0x0801e04e:    f003fe4b    ..K.    BL       rt_soft_atomic_add ; 0x8021ce8
+        0x0801e052:    3001        .0      ADDS     r0,#1
+        0x0801e054:    9001        ..      STR      r0,[sp,#4]
+        0x0801e056:    9801        ..      LDR      r0,[sp,#4]
+        0x0801e058:    b002        ..      ADD      sp,sp,#8
+        0x0801e05a:    bd80        ..      POP      {r7,pc}
+
+--- 切片 D: rt_soft_atomic_add —— 栈帧里 lr=0x08021d0d 就是它 0x08021d08 那条 BL 的返回地址 ---
+        0x08021ce8:    b580        ..      PUSH     {r7,lr}
+        0x08021cea:    b084        ..      SUB      sp,sp,#0x10
+        0x08021cec:    9003        ..      STR      r0,[sp,#0xc]
+        0x08021cee:    9102        ..      STR      r1,[sp,#8]
+        0x08021cf0:    f7defb76    ..v.    BL       rt_hw_interrupt_disable ; 0x80003e0
+        0x08021cf4:    9001        ..      STR      r0,[sp,#4]
+        0x08021cf6:    9803        ..      LDR      r0,[sp,#0xc]
+        0x08021cf8:    6800        .h      LDR      r0,[r0,#0]
+        0x08021cfa:    9000        ..      STR      r0,[sp,#0]
+        0x08021cfc:    9a02        ..      LDR      r2,[sp,#8]
+        0x08021cfe:    9903        ..      LDR      r1,[sp,#0xc]
+        0x08021d00:    6808        .h      LDR      r0,[r1,#0]
+        0x08021d02:    4410        .D      ADD      r0,r0,r2
+        0x08021d04:    6008        .`      STR      r0,[r1,#0]
+        0x08021d06:    9801        ..      LDR      r0,[sp,#4]
+        0x08021d08:    f7defb6e    ..n.    BL       rt_hw_interrupt_enable ; 0x80003e8
+        0x08021d0c:    9800        ..      LDR      r0,[sp,#0]
+        0x08021d0e:    b004        ..      ADD      sp,sp,#0x10
+        0x08021d10:    bd80        ..      POP      {r7,pc}
+
+--- 切片 E: src/object.c:356-390 (rt_object_init 声明与检查循环原文) ---
+      356:                     enum rt_object_class_type type,
+      357:                     const char               *name)
+      358: {
+      359:     rt_base_t level;
+      360:     rt_size_t obj_name_len;
+      361: #ifdef RT_DEBUGING_ASSERT
+      362:     struct rt_list_node *node = RT_NULL;
+      363: #endif /* RT_DEBUGING_ASSERT */
+      364:     struct rt_object_information *information;
+      365: #ifdef RT_USING_MODULE
+      366:     struct rt_dlmodule *module = dlmodule_self();
+      367: #endif /* RT_USING_MODULE */
+      368: 
+      369:     /* get object information */
+      370:     information = rt_object_get_information(type);
+      371:     RT_ASSERT(information != RT_NULL);
+      372: 
+      373: #ifdef RT_DEBUGING_ASSERT
+      374:     /* check object type to avoid re-initialization */
+      375: 
+      376:     /* enter critical */
+      377:     level = rt_spin_lock_irqsave(&(information->spinlock));
+      378:     /* try to find object */
+      379:     for (node  = information->object_list.next;
+      380:             node != &(information->object_list);
+      381:             node  = node->next)
+      382:     {
+      383:         struct rt_object *obj;
+      384: 
+      385:         obj = rt_list_entry(node, struct rt_object, list);
+      386:         RT_ASSERT(obj != object);
+      387:     }
+      388:     /* leave critical */
+      389:     rt_spin_unlock_irqrestore(&(information->spinlock), level);
+      390: #endif /* RT_DEBUGING_ASSERT */
+
+--- 切片 F: libcpu cpuport.c 的 CFSR/HFSR/MMAR/BFAR 宏原文 ---
+      219: }
+      220: 
+      221: #define SCB_CFSR        (*(volatile const unsigned *)0xE000ED28) /* Configurable Fault Status Register */
+      222: #define SCB_HFSR        (*(volatile const unsigned *)0xE000ED2C) /* HardFault Status Register */
+      223: #define SCB_MMAR        (*(volatile const unsigned *)0xE000ED34) /* MemManage Fault Address register */
+      224: #define SCB_BFAR        (*(volatile const unsigned *)0xE000ED38) /* Bus Fault Address Register */
+      225: #define SCB_AIRCR       (*(volatile unsigned long *)0xE000ED0C)  /* Reset control Address Register */
+      226: #define SCB_RESET_VALUE 0x05FA0004                               /* Reset value, write to SCB_AIRCR can reset cpu */
+
+--- 切片 G: rt-thread-motor-m1.map 的 Execution Region 一览(地址合法性判据) ---
+    18504:     Execution Region RW_ITCM (Exec base: 0x00000000, Load base: 0x08046e24, Size: 0x00000000, Max: 0x00020000, ABSOLUTE)
+    18509:     Execution Region ER_IROM1 (Exec base: 0x08000000, Load base: 0x08000000, Size: 0x00046e24, Max: 0x00080000, ABSOLUTE)
+    20918:     Execution Region RW_VT_DTCM (Exec base: 0x20000000, Load base: 0x08046e24, Size: 0x000003cc, Max: 0x00000400, ABSOLUTE, COMPRESSED[0x00000008])
+    20925:     Execution Region RW_DTCM (Exec base: 0x20000400, Load base: 0x08046e2c, Size: 0x0000d018, Max: 0x0001fc00, ABSOLUTE, COMPRESSED[0x00000238])
+    21189:     Execution Region RW_RT_HEAD (Exec base: 0x20012000, Load base: 0x08047064, Size: 0x00008000, Max: 0x00008000, ABSOLUTE)
+
+--- 切片 H: board.h 堆边界定义原文 ---
+       27: #define NS800RT7P65_SRAM_SIZE           (256)
+       29: extern int Image$$RW_RT_HEAD$$Limit;
+       30: #define HEAP_BEGIN      (&Image$$RW_RT_HEAD$$Limit)
+       31: #define HEAP_END        ((uint32_t)&Image$$RW_RT_HEAD$$Limit + 0x8000)
+
+--- 切片 I: link.sct 预留块原文 ---
+       21:   RW_DTCM 0x20000400 0x0001FC00    {  ; 127K DTCM -> fast sram
+       27:   RW_RT_HEAD 0x20012000 EMPTY 0x8000 {
+
+--- 切片 J: 板端在用的候选 BIN 里那几个 assert/print 字符串常量(证明 r0/r1/r2 那组 assert 参数就是它们) ---
+BIN            : rt-thread-motor-m1-candidate.bin (290916 B, sha256 00608ec93c6a3027d68b44b5317574209fccfb0ba82a9974793d13b54b79e304)
+取串规则        : ER_IROM1 的 Exec base == Load base == 0x08000000, 故 文件偏移 = 地址 - 0x08000000
+0x080460d1 (偏移 0x460d1) -> 'obj != object'
+0x080460f9 (偏移 0x460f9) -> 'rt_object_init'
+0x08042b4b (偏移 0x42b4b) -> "b'SCB->BFAR:%08X\\n'"
+0x08042af3 (偏移 0x42af3) -> "b'hard fault on thread: %s\\r\\n\\r\\n'"
+

@@ -294,3 +294,57 @@ halt 前 `Running` → 唯一一次 `Successfully halted device` → 退出时 `
 - 板子现保持 Halted（符合批准口径）。要拿根因位置还差**一次约 12 个目标 RAM 字的只读**
   （帧指针 = `[0x2000d3e8]`，来自切片 1 的 `0x0801e886`），零第二次 halt、零复位、零写 —— 超出本次批准，
   等一次新批准。
+## 15. (frame / frame2) 异常栈帧读取 —— 出错指令定位到 `object.c:381`，但成因仍未定
+
+先记账（随本轮生效的口径修正，原文不删；详见 run_record §14.2）：
+1. **SysTick 在数 ≠ 板载 LED 心跳跑过。** (c) 轮第 3 条"心跳已启动且在数 ⇒ '闪灯代码尚未启动'被排除"**作废**：
+   `COUNTFLAG` 只表示计数器曾数到零，不能证明任何线程被调度。该项回到未决。
+2. **PC 已在 `while(1)` ⇒ 此刻 r2/r12/LR 是残留。** (c) 轮"处理程序正在轮询式往外打印"**作废**，
+   改为"与此前发生过 `rt_kprintf→rt_serial_write→ns800_putc` 相容"。
+3. 我按同一条机制自查后连带降级：`lr` 落在某函数内**只**说明"与该调用链相容"，因为本工程大量函数以
+   `POP {r7,pc}` 收尾，尾返回**不还原 LR**。故 (c) 轮"`lr` 在 `bus_fault_track+232` ⇒ 已走到打印 BFAR 那一支"
+   也一并降级为"相容"。
+4. 我自己的失误：第一次读取的**帧基址预测差 0x28（40 字节）**（按 Handler/MSP 假设算 `0x20012720`，
+   实际线程模式/PSP 是 `0x20012748`），88 B 窗口恰好把硬件寄存器帧留在窗外；由第二次单独批准的 32 B 补上。
+   两次原件都原样入库。
+
+授权与额度（实测）：两条独立批准 —— "一次异常栈帧读取 …… attach、`resume_on_disconnect=false`、先确认仍为
+Halted、不新增 halt、目标 RAM 合计不超过 96 字节 …… 数据矛盾则保留原件、不强行归因、结束保持 Halted"，
+以及"批准再读 32 字节 @0x20012770"。实际 `attach` 2、**`halt` 0**（stdout 里只有 `Core 0 (None):  Halted`
+的开口/收尾各一条，无 `Successfully halted device`）、`reset`/Flash/RAM 写/串口/电机全 0；
+目标 RAM 只读 92 B（批准内）+ 32 B（单独批准）= 124 B。两轮 rc=0、stderr 0 B，板子结束仍 **Halted**。
+
+实测栈帧（`0x20012770..0x2001278c`，逐字在两个 run 根里）：
+`r0=0x00bd80b0  r1=0x20015b78  r2=0x00000001  r3=0x20015b28  r12=0x20015b78  lr=0x08021d0d
+pc=0x08020096  psr=0x81000000`；帧基址 `[0x2000d3e8]=0x20012748`，`exc_return=flag=0xffffffed`，
+`r4..r11=0x400,0x12,0x0a,deadbeef×5`。布局三处独立对上：`cpuport.c:398-400/61-77/51-58` 的字段顺序、
+`context_rvds.S:238/240` 两条都是 `STMFD r0!, {lr}`（所以 flag 与 exc_return 同值）、
+`context_rvds.S:245` `MSRNE psp, r0`（所以 (c) 轮的 `psp` 就是帧基址）。
+
+定位与 BFAR 关系（离线，只用已接受 AXF `0bba8ca7…0963`；切片 `host/dap_frame_disasm_window.txt`）：
+`pc=0x08020096` = `rt_object_init+134` = `6800 LDR r0,[r0,#0]` = **`object.c:381` 的 `node = node->next`**，
+即 `RT_DEBUGING_ASSERT` 下那段防重复初始化的检查循环（`:379-387`；`:386` 是 `RT_ASSERT(obj != object)`）。
+这条 LDR 的基址寄存器就是栈帧 `r0=0x00bd80b0`，与 (c) 轮独立读的 `SCB_BFAR=0x00bd80b0` **逐位相同**，
+PRECISERR 下不回写 r0 —— 复审点名要核的"访问地址与 BFAR 的关系"这里自洽，无矛盾需归因。
+`lr=0x08021d0d` 是 `rt_object_init → rt_spin_lock_irqsave → rt_enter_critical → rt_soft_atomic_add`
+里 `0x08021d08 BL rt_hw_interrupt_enable` 的返回地址（三层都 `POP {r7,pc}` 不还原 LR）：
+它说明 `object.c:377` 的取锁走过，**不说明调用者是谁**。
+出错上下文为线程模式（`EXC_RETURN` bit2/bit3 与栈帧 `psr` 的 `IPSR=0`+`T=1` 两路一致）。
+`0x00bd80b0` 不在 map 任何一个执行区内（ITCM/DTCM/Flash/RW_RT_HEAD 都覆盖不到），
+所以链表里那个 `next` 本身就是个不可能存在的地址。
+
+本轮**没有**得到的东西（不得当作已证）：哪一个对象类的表坏了（`information/type/name` 三个局部槽被异常帧
+原地覆盖）、上一个节点地址、迭代次数（表头坏 vs 第 N 个链接坏给出同一个 pc）、以及坏值由谁写入。
+因此"拿到位置就直接做针对性修复"这一步我**没有**动产品代码：现在能改的只是症状处加检查，
+成因需要一个能指出"哪一类/哪个对象"的新证据（最省的一条是把复位后的串口捕获窗开到覆盖硬fault 那次
+一次性 dump —— `cpuport.c:440-444` 会自己打印 `hard fault on thread: <名字>` 加 `list_thread()`）。
+
+与第 12 节 stage-5 审计的关系：本采样瞬间不在 `spi.h:479-481` 的无界 RX 等待里，源码层的"存在无界且不让出的
+每字节等待"仍成立；板端这一瞬间是固件自己踩了精确总线错。两条结论并列，谁也没推翻谁。
+
+复算：`python reports/reviews/phase8-m8-relative-protection-r3/host/dap_frame_check.py`
+→ `CITES=24 CHECKS=88 DAPFRAME_PROBLEMS=0 NEGATIVE_CONTROL fired=3/3`；
+真实输出 `host/dap_frame_console.txt`（LF-only，88 条 OK / 0 条 PROBLEM）。
+登记件 `host/dap_frame_probe.json`；原件在两个 run 根
+`offline/dapframe-20261101T054539Z-12284`（518 B / sha `32ec174ad685`）与
+`offline/dapframe2-20261101T054747Z-38496`（188 B / sha `ca5d411e2ac1`）。

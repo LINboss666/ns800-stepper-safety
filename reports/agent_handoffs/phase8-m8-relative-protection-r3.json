@@ -856,5 +856,51 @@
   "correct_wording": "零显式 halt、零复位, **但不是**完全没改变目标状态(调试逻辑被我方启用又关闭, DEMCR 被清零)。",
   "fixed_in_this_round": "(c) 轮改用 -O resume_on_disconnect=false, 因为本轮要求结束保持 Halted。",
   "history_policy": "旧节原文不改写, 勘误以本节 + run_record.md §14.1 追加登记。"
- }
+ },
+ "dap_frame_rounds": {
+  "approvals": [
+   "复审批准一次异常栈帧读取(<=96 B 目标 RAM, attach 1 次, 不新增 halt, 结束保持 Halted)",
+   "复审追加批准再读 32 字节 @0x20012770"
+  ],
+  "run_roots": [
+   "reports/reviews/phase8-m8-relative-protection-r3/offline/dapframe-20261101T054539Z-12284",
+   "reports/reviews/phase8-m8-relative-protection-r3/offline/dapframe2-20261101T054747Z-38496"
+  ],
+  "device_actions": {
+   "attach": 2,
+   "halt": 0,
+   "reset": 0,
+   "flash": 0,
+   "ram_write": 0,
+   "serial": 0,
+   "motion": 0
+  },
+  "target_ram_bytes_read_only": {
+   "frame": 92,
+   "frame_limit": 96,
+   "frame2": 32,
+   "total": 124
+  },
+  "board_state_after": "Halted (resume_on_disconnect=false, 未复位未恢复运行)",
+  "faulting_instruction": "0x08020096 = rt_object_init+134 = LDR r0,[r0,#0] = src/object.c:381 `node = node->next`",
+  "bfar_vs_r0": "栈帧 r0=0x00bd80b0 与 (c) 轮 SCB_BFAR=0x00bd80b0 逐位相同, 无矛盾",
+  "lr_residue": "0x08021d0d = rt_soft_atomic_add 内 0x08021d08 那条 BL 的返回地址(三层 POP{r7,pc} 不还原 LR), 不是调用者身份",
+  "not_recoverable": [
+   "出错的是哪一个对象类(information/type/name 槽被异常帧覆盖)",
+   "上一个节点地址",
+   "迭代次数(表头坏 vs 第 N 个链接坏)",
+   "坏值由谁写入"
+  ],
+  "checker": "reports/reviews/phase8-m8-relative-protection-r3/host/dap_frame_check.py",
+  "checker_console": "reports/reviews/phase8-m8-relative-protection-r3/host/dap_frame_console.txt",
+  "slices": "reports/reviews/phase8-m8-relative-protection-r3/host/dap_frame_disasm_window.txt",
+  "registration": "reports/reviews/phase8-m8-relative-protection-r3/host/dap_frame_probe.json",
+  "self_error": "基址预测错 0x28(40 B): 按 Handler/MSP 假设算成 0x20012720, 实际线程模式/PSP 为 0x20012748, 第一次 88 B 窗口把硬件寄存器帧留在窗外; 由第二次单独批准的 32 B 补上, 原件不删不改",
+  "conclusion_for_fix": "定位到的是症状(链表里一个不可能存在的 next), 不是成因; 据此改产品代码会成猜测 —— 需要新证据"
+ },
+ "erratum_halt_round_judgements": [
+  "SysTick 在数(COUNTFLAG/RVR 实测)不能证明板载 LED 心跳线程跑过; '闪灯代码尚未启动'未被排除 —— 见 run_record §14.2",
+  "PC 已在 while(1) 时 r2/r12/LR 是此前调用的残留, 不能写成'此刻正在轮询式打印' —— 见 run_record §14.2",
+  "同机制连带: 单看 LR 只能证'与该调用链相容'; (c) 轮 lr=0x08008201 的'已走到打印 BFAR 那一支'降级为相容而非证明"
+ ]
 }

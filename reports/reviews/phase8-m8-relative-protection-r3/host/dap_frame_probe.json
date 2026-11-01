@@ -1,0 +1,238 @@
+{
+ "round": "M8 异常栈帧读取(frame + frame2) —— 在已 halt 的板上取回异常前 PC/LR/寄存器并离线定位",
+ "board_state_at_start": "Halted (由 (c) 轮遗留; 本轮零新增 halt)",
+ "approvals_verbatim": {
+  "frame": "批准一次异常栈帧读取：已知 DAP连接1次，attach、resume_on_disconnect=false；先确认仍为 Halted，不新增 halt。按已接受 AXF 的反汇编和类型布局，读取 0x2000d3e8 的上下文指针及完整必要异常上下文，目标 RAM 合计不超过96字节，所有地址须在已知 RAM 范围内。取得原始 PC/LR及保存寄存器后，离线定位指令，并核对其访问地址与 BFAR 的关系。数据矛盾则保留原件、不强行归因。结束保持 Halted；不复位、不恢复运行、不读写目标 Flash、不写 RAM或维护缓存、不串口、不操作电机。",
+  "frame2": "批准再读 32 字节 @0x20012770"
+ },
+ "quota_accounting": {
+  "attach": "各 1 次(两次独立批准), 合计 2",
+  "halt_issued": "0 (两次都只做 status 确认 + read32)",
+  "reset": 0,
+  "flash_read_write": 0,
+  "ram_write": 0,
+  "serial": 0,
+  "motion": 0,
+  "target_ram_bytes": {
+   "frame": 92,
+   "frame_limit_approved": 96,
+   "frame2": 32,
+   "frame2_limit_approved": 32,
+   "note": "92 B 落在第一次批准的 <=96 B 内; 第二次 32 B 是单独一条批准, 不是将第一次的额度用超。两轮合计 124 B 目标 RAM, 全部只读。"
+  },
+  "resume_on_disconnect": "false (按上一轮更正: true 会清 DHCSR.C_DEBUGEN 与 DEMCR, 不是空操作)"
+ },
+ "reads": [
+  {
+   "tag": "frame",
+   "run_root_repo_relative": "reviews/phase8-m8-relative-protection-r3/offline/dapframe-20261101T054539Z-12284",
+   "rc_file": "0",
+   "elapsed_s_declared_in_SUMMARY": 2.219,
+   "stdout_bytes": 518,
+   "stdout_sha256": "32ec174ad6855e493b440590f5914df7418ce5051b1f6e7a24007b8e3ebe49bc",
+   "stderr_bytes": 0,
+   "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "stdout_lines": [
+    "Core 0 (None):  Halted",
+    "2000d3e8:  20012748                               | .'H|",
+    "20012718:  00000000 00000000 00000000 00000000    |................|",
+    "20012728:  00000000 00001770 08016da9 00000032    |.......p..m....2|",
+    "20012738:  08021609 08021d31 080003ec 81000000    |.......1........|",
+    "20012748:  ffffffed ffffffed 00000400 00000012    |................|",
+    "20012758:  0000000a deadbeef deadbeef deadbeef    |................|",
+    "20012768:  deadbeef deadbeef                      |........|",
+    "Core 0 (None):  Halted"
+   ],
+   "commands": [
+    "status",
+    "read32 0x2000d3e8 4",
+    "read32 0x20012718 88",
+    "status"
+   ],
+   "target_ram_bytes_read": 92,
+   "ram_read_addresses": [
+    "0x2000d3e8",
+    "0x20012718"
+   ],
+   "argv_masked": [
+    "python",
+    "-m",
+    "pyocd",
+    "commander",
+    "--no-config",
+    "--connect",
+    "attach",
+    "--no-wait",
+    "-t",
+    "cortex_m",
+    "-f",
+    "1000000",
+    "-O",
+    "auto_unlock=false",
+    "-O",
+    "connect_mode=attach",
+    "-O",
+    "cache.enable_memory=false",
+    "-O",
+    "cache.read_code_from_elf=false",
+    "-O",
+    "scan_all_aps=false",
+    "-O",
+    "resume_on_disconnect=false",
+    "-u",
+    "@UID_FILE<redacted len=48 sha256_d2f530dbd062>",
+    "-c",
+    "status",
+    "-c",
+    "read32 0x2000d3e8 4",
+    "-c",
+    "read32 0x20012718 88",
+    "-c",
+    "status"
+   ],
+   "argv_sha256_of_private_original": "050cd065b7cb558f80e0806643c4fc1bd6f62244c081ac4ab1af0e7653a0fb7b",
+   "uid_disclosure": {
+    "present": true,
+    "length": 48,
+    "sha256_12": "d2f530dbd062"
+   },
+   "runner_local_only": "dap_frame_read.py (仓库外 D:/ns800_m8r3_scratch, 与 (b)/(c) 两轮同一口径: 设备动作执行器不进仓库; 逐字 argv 与 commands 已在 run 根的 ARGV.json / SUMMARY.json 里, 可据此复原)",
+   "runner_sha256": "3d88b4cc95deea7d21746be35ca092378fa42ad891916279030ab7eb470d9118"
+  },
+  {
+   "tag": "frame2",
+   "run_root_repo_relative": "reviews/phase8-m8-relative-protection-r3/offline/dapframe2-20261101T054747Z-38496",
+   "rc_file": "0",
+   "elapsed_s_declared_in_SUMMARY": 1.891,
+   "stdout_bytes": 188,
+   "stdout_sha256": "ca5d411e2ac14e831321ced90f997176030483cb1eb4e5879d0e9c3f19a7cdac",
+   "stderr_bytes": 0,
+   "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "stdout_lines": [
+    "Core 0 (None):  Halted",
+    "20012770:  00bd80b0 20015b78 00000001 20015b28    |.... .[x.... .[(|",
+    "20012780:  20015b78 08021d0d 08020096 81000000    | .[x............|",
+    "Core 0 (None):  Halted"
+   ],
+   "commands": [
+    "status",
+    "read32 0x20012770 32",
+    "status"
+   ],
+   "target_ram_bytes_read": 32,
+   "ram_read_addresses": [
+    "0x20012770"
+   ],
+   "argv_masked": [
+    "python",
+    "-m",
+    "pyocd",
+    "commander",
+    "--no-config",
+    "--connect",
+    "attach",
+    "--no-wait",
+    "-t",
+    "cortex_m",
+    "-f",
+    "1000000",
+    "-O",
+    "auto_unlock=false",
+    "-O",
+    "connect_mode=attach",
+    "-O",
+    "cache.enable_memory=false",
+    "-O",
+    "cache.read_code_from_elf=false",
+    "-O",
+    "scan_all_aps=false",
+    "-O",
+    "resume_on_disconnect=false",
+    "-u",
+    "@UID_FILE<redacted len=48 sha256_d2f530dbd062>",
+    "-c",
+    "status",
+    "-c",
+    "read32 0x20012770 32",
+    "-c",
+    "status"
+   ],
+   "argv_sha256_of_private_original": "6051f5e4483fbf1e0bbcc8ca1dc9569c8a136ac43668fd61521c212a67bdbc99",
+   "uid_disclosure": {
+    "present": true,
+    "length": 48,
+    "sha256_12": "d2f530dbd062"
+   },
+   "runner_local_only": "dap_frame_read2.py (仓库外 D:/ns800_m8r3_scratch, 与 (b)/(c) 两轮同一口径: 设备动作执行器不进仓库; 逐字 argv 与 commands 已在 run 根的 ARGV.json / SUMMARY.json 里, 可据此复原)",
+   "runner_sha256": "4141c4410d1260900481d7498d828449685cb6a25aafe9684a295532574f16c8"
+  }
+ ],
+ "layout_derivation": {
+  "source": "libcpu/arm/cortex-m7/cpuport.c 的 struct exception_info/stack_frame + context_rvds.S 的压栈顺序 + 已接受 AXF 反汇编里 rt_hw_hard_fault_exception 的压栈指令",
+  "exception_frame_base": "0x20012748 (= [0x2000d3e8] 读到的指针)",
+  "offsets": {
+   "exc_return@+0": "ffffffed",
+   "flag(dummy FPU 槽)@+4": "ffffffed",
+   "r4..r11@+8..+36": "00000400 00000012 0000000a deadbeef x5",
+   "r0@+40(0x20012770)": "00bd80b0",
+   "r1@+44": "20015b78",
+   "r2@+48": "00000001",
+   "r3@+52": "20015b28",
+   "r12@+56": "20015b78",
+   "lr@+60": "08021d0d",
+   "pc@+64(0x20012788)": "08020096",
+   "psr@+68": "81000000"
+  },
+  "cross_check": "EXC_RETURN=0xffffffed 的低 5 位 = ...1101: bit2=1 用 PSP、bit3=1 线程模式、bit4=0 扩展帧; 栈帧 psr=0x81000000 的 IPSR(bits[8:0])=0 且 T(bit24)=1 —— 两者独立一致: 出错上下文是**线程模式**而非中断/处理程序里; 而 (c) 轮当场读到的 xpsr=0x61000003 的 IPSR=3=HardFault, 是处理程序自己的状态, 不是出错瞬间的状态。",
+  "why_base_was_missed": "frame 轮我按 MSP-fault 预测基址 0x20012720, 于是只读到 0x2001276f, 正好把 +40 起的硬件 8 字寄存器帧留在窗外 —— 见 errata_self[0]。"
+ },
+ "localization_offline": {
+  "axf": "reports/firmware/phase8-m8-relative-protection-r3/rt-thread-motor-m1.axf (bytes 1771288, sha256 0bba8ca74ed8c11e149395efd64c42072fce0b3ced5ab76281210ddc04550963)",
+  "slices_file": "host/dap_frame_disasm_window.txt",
+  "pc": {
+   "value": "0x08020096",
+   "instruction": "6800  LDR r0,[r0,#0]",
+   "symbol": "rt_object_init + 134",
+   "source": "rt-thread-master/rt-thread-master/src/object.c:381 的 `node = node->next`(RT_DEBUGING_ASSERT 下的重复初始化检查循环 object.c:379-387)",
+   "loop_body_addresses": "比较循环条件 0x0802005c / obj=node-0x14 0x0802006a / RT_ASSERT(obj != object) 的 assert 调用 0x0802008c (r2=0x182=386, r1=0x080460f9=\"rt_object_init\") / 循环增量 0x08020094-0x0802009a"
+  },
+  "bfar_relation": "出错访问地址 = r0 本身: 指令 `LDR r0,[r0,#0]` 的基址寄存器就是栈帧里的 r0=0x00bd80b0, 与 (c) 轮独立读到的 SCB_BFAR(0xE000ED38)=0x00bd80b0 逐位相同。精确总线错(PRECISERR)下该 LDR 不回写 r0, 所以 r0  preserved 为出错地址是自洽的。",
+  "lr": "0x08021d0d 不是任何调用者的返回地址: 它是 rt_soft_atomic_add 内 0x08021d08 那条 `BL rt_hw_interrupt_enable` 的返回地址。链路 rt_object_init(0x0802004e BL rt_spin_lock_irqsave) → rt_spin_lock_irqsave(0x080226c4 BL rt_enter_critical) → rt_enter_critical(0x0801e04e BL rt_soft_atomic_add) → rt_soft_atomic_add(0x08021d08 BL ...), 而这三层全部以 `POP {r7,pc}` 返回 —— 返回地址被直接弹进 PC, **不还原 LR**, 所以 LR 一直留着最内层那条 BL 的值。它反过来证明 object.c:377 的 rt_spin_lock_irqsave 确实执行过。",
+  "address_legality": "0x00bd80b0 落在 map 里任何一个执行区之外: ITCM 0x00000000+0x00020000、Flash 0x08000000+0x00080000、DTCM/SRAM 0x20000000 起 —— 它是一个不可能存在的地址, 即链表里的 next 指针本身是坏值。"
+ },
+ "not_recoverable": [
+  "rt_object_init 的局部槽(sp+4=information、sp+0x1b=type、sp+0x14=name)被随后压入的异常帧覆盖(出错时 sp=0x20012770, 异常帧正好压在 0x20012770..0x2001278c), 所以**哪一个对象类**的链表坏了无法从本样本得知。",
+  "上一个节点(被读到 next 的那个对象)的地址同样在被覆盖的 sp+8 槽里, 无法得知。",
+  "无法区分\"表头 information->object_list.next 一开始就是坏值\"与\"走到第 N 个链接才坏\": 两种情况下第一条坏 next 都在同一个 0x08020096 上出错, 样本给不出迭代次数。",
+  "0x00bd80b0 这个值是谁写进去的: 本样本不含任何写入痕迹。"
+ ],
+ "errata_self": [
+  "基址预测错: 按 MSP-fault 假设把 exception_info 基址算成 0x20012720(实际 0x20012748), 于是第一次 88 B 窗口停在 0x2001276f, 把最关键的硬件 8 字寄存器帧留在了窗外; 为此单独申请了第二次 32 B 读取。"
+ ],
+ "errata_from_reviewer": [
+  "SysTick 在数 != 板载 LED 心跳线程跑过: COUNTFLAG 只表示计数器曾数到零, 停在 HardFault 时 LED 所在线程也可能始终没执行到 —— (c) 轮第 3 条判读里\"心跳已启动且在数 ⇒ 闪灯代码尚未启动被排除\"**说过头**, 收回, 见 run_record §14.2。",
+  "PC 已在 while(1) 说明采样时停在处理程序末尾, r2/r12/LR 只是此前打印调用的残留 —— (c) 轮\"采样时正在轮询式往外打印\"这句**说过头**, 改为\"与曾走过打印路径相容\", 见 run_record §14.2。"
+ ],
+ "verdicts": [
+  {
+   "claim": "异常前一条指令 = object.c:381 `node = node->next` 的 LDR, 出错地址 = 当时的 node = r0 = BFAR",
+   "grade": "PROVEN(实测 r0/PC/BFSR/BFAR 四者互洽 + 已接受 AXF 离线定位)"
+  },
+  {
+   "claim": "出错上下文 = 线程模式, 在 rt_object_init 的重复初始化检查循环里",
+   "grade": "PROVEN(EXC_RETURN 与 psr 两路独立一致; 符号与切片 A 逐地址对上)"
+  },
+  {
+   "claim": "object.c:377 的 rt_spin_lock_irqsave 在本次调用中确实执行过",
+   "grade": "DERIVED(切片 B/C/D 的 POP{r7,pc} 尾返回解释了栈帧 LR=0x08021d0d; 该 LR 不能反过来当调用者身份用)"
+  },
+  {
+   "claim": "板子这次\"控制台全哑\"的直接原因是固件进了 HardFault 的 while(1)(PRIMASK=1), 而不是 SPI 自旋",
+   "grade": "本次样本 PROVEN 到\"采样瞬间不在 SPI 循环\"; 至于坏 next 由谁写入 = NOT_PROVEN"
+  },
+  {
+   "claim": "可以据此直接改产品代码修掉根因",
+   "grade": "NOT_PROVEN —— 定位到的是**症状**(链表里一个不可能存在的 next), 写入者身份缺失, 任何改法都会变成猜测; 需要先拿到\"哪一个类/哪个对象\"的证据"
+  }
+ ]
+}
