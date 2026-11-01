@@ -1,0 +1,40 @@
+6c6
+<     File Name: D:/ns800/reports/firmware/phase8-m8-relative-protection-r3/rt-thread-motor-m1.axf
+---
+>     File Name: D:/ns800/reports/firmware/phase8-m8-diag-stack-r1/rt-thread-motor-m1.axf
+20378c20378
+<         0x0800ca26:    f44f6380    O..c    MOV      r3,#0x400
+---
+>         0x0800ca26:    f44f5380    O..S    MOV      r3,#0x1000
+54260c54260
+<         0x080216dc:    f645208c    E..     MOV      r0,#0x5a8c
+---
+>         0x080216dc:    f6452098    E..     MOV      r0,#0x5a98
+54264c54264
+<         0x080216e8:    f6452095    E..     MOV      r0,#0x5a95
+---
+>         0x080216e8:    f645208c    E..     MOV      r0,#0x5a8c
+105196,105199d105195
+<     .L.str.12
+<         0x08045a8c:    353a3631    16:5    DCD    893007409
+<         0x08045a90:    33333a34    4:33    DCD    858995252
+<         0x08045a94:    00          .       DCB    0
+105201,105203c105197,105202
+<         0x08045a95:    4f6374      Oct     DCB    79,99,116
+<         0x08045a98:    20313320     31     DCD    540095264
+<         0x08045a9c:    36323032    2026    DCD    909258802
+---
+>         0x08045a8c:    20766f4e    Nov     DCD    544632654
+>         0x08045a90:    32203120     1 2    DCD    840970528
+>         0x08045a94:    00363230    026.    DCD    3551792
+>     .L.str.12
+>         0x08045a98:    343a3431    14:4    DCD    876229681
+>         0x08045a9c:    38353a39    9:58    DCD    943012409
+107576c107575
+< 0x08045a8c  0x9                                                 array[9] of char
+---
+> 0x08045a98  0x9                                                 array[9] of char
+107579c107578
+< 0x08045a95  0xc                                                 array[12] of char
+---
+> 0x08045a8c  0xc                                                 array[12] of char

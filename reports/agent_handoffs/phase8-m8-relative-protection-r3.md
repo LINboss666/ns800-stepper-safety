@@ -348,3 +348,27 @@ PRECISERR 下不回写 r0 —— 复审点名要核的"访问地址与 BFAR 的�
 登记件 `host/dap_frame_probe.json`；原件在两个 run 根
 `offline/dapframe-20261101T054539Z-12284`（518 B / sha `32ec174ad685`）与
 `offline/dapframe2-20261101T054747Z-38496`（188 B / sha `ca5d411e2ac1`）。
+## 16. diag 栈修复轮（R1, 2026-11-01）—— 已按复审指令改真实代码，零设备动作
+
+指针：本轮全部证据在 `reports/reviews/phase8-m8-diag-stack-r1/`（`run_record.md` + `stack_report.txt`
++ `disasm_diff.txt` + `host/diag_stack_check.py|console.txt` + `build/` 日志），
+镜像在 `reports/firmware/phase8-m8-diag-stack-r1/`（AXF `fb26d5a0…d6ea` / BIN `f5c2fd89…08ce` /
+MAP `fd334a83…ad579`，均 1 次构建、0 Error 0 Warning）。
+
+一句话结论：**diag 线程的栈是确定缺陷** —— armlink 调用图自己给出
+`diag_thread_entry [Stack]Max Depth = 1580 B`（本帧 632 + `rel_prod_evaluate` 248 + `rel_engine_step` 184
+的三帧下界是 1064），而配置是 1024 B；且 `rel_prod_evaluate` 在 `diagnosis.c:446` 是**无条件调用**，
+模式只是实参，MONITOR_ONLY 也走这条路。已把 `diagnosis.c` 的 1024 改为具名 `DIAG_THREAD_STACK 4096`。
+生效证明不靠 Program Size（运行时堆参数不占静态段，四项与 R3 逐字相同），而靠全文反汇编差异：
+唯一代码级差异是 `0x0800ca26 MOV r3,#0x400 → #0x1000`（`diagnosis_init` 里 `rt_thread_create` 的第 4 实参），
+其余只有 `__DATE__/__TIME__` 串。差异行由检查器强制归类，未归类数必须为 0。
+
+堆：32768 B 总容量，线程栈合计 12800 → 15872 B（+3072），未含 TCB 与其它 `rt_malloc`，
+所以这是枚举而非"够用"证明；`diagnosis_init` 在建线程失败时 fail-closed（`-RT_ERROR` + `SUBSYS_FAILED`）。
+
+未证四项照登记：4096 不是已验证上界（镜像级 `2996 + Unknown`）；diag 栈溢出与本次 HardFault 坏 next
+的因果未证；`offsetof(rt_thread, thread_timer)==0x50` 未独立核得；新镜像未在板。
+板子仍是 (c)/frame 轮结束时的 Halted，板上镜像仍是 `00608ec9…e304`。
+
+另：复审纠正、我已撤回的一条见 `run_record.md §15.1`（"局部槽已被异常帧覆盖"不成立，
+扩展帧下出错前 SP 应为 `0x200127D8`，局部槽很可能还在 —— 判定动作已排进板级对照包的 A/B 两项）。

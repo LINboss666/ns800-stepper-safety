@@ -40,3 +40,14 @@ reports/reviews/phase8-m8-relative-protection-r2/*.md -text
 # 该轮全部文件类型(.py/.json/.ps1/.md/日志/raw .rx.bin/镜像/map/清单), 避免同类事后修补。
 reports/firmware/phase8-m8-relative-protection-r3/** -text
 reports/reviews/phase8-m8-relative-protection-r3/** -text
+# ===== M8 diag 栈修复轮 R1 交付证据(范围: 仅下列路径; 不做全局 * -text) =====
+# 理由与 R1/R2 同一: 这些件要能被第三方逐字节复算, CR 字节即证据的一部分
+# (本轮实际抓到: 不加本块时 rt-thread-motor-m1.map 的 blob 比工作树少 21355 B —— autocrlf 剥掉了 CR)。
+reports/firmware/phase8-m8-diag-stack-r1/*.map -text
+reports/firmware/phase8-m8-diag-stack-r1/SHA256SUMS.txt -text
+reports/firmware/phase8-m8-diag-stack-r1/build_manifest.json -text
+reports/reviews/phase8-m8-diag-stack-r1/build/** -text
+reports/reviews/phase8-m8-diag-stack-r1/SHA256SUMS.txt -text
+reports/reviews/phase8-m8-diag-stack-r1/host/*.txt -text
+reports/reviews/phase8-m8-diag-stack-r1/host/*.json -text
+reports/reviews/phase8-m8-diag-stack-r1/*.txt -text

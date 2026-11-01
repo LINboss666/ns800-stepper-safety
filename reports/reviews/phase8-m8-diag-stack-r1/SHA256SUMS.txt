@@ -1,0 +1,11 @@
+# sha256 * <repo相对路径>(LF, 无 BOM; 本清单不哈希自身字节 —— 一条清单不能给自己的字节作证)
+# 生成方式: 对 reports/reviews/phase8-m8-diag-stack-r1/ 下每个常规文件(排除 SHA256SUMS.txt 与 __pycache__) 直接读磁盘字节算 sha256
+# 条目数=8; 与 Git blob 的逐条复算由 host/staged_preflight_diagstack.py(提交前)完成
+f47ab70a68ffb84270802afe09eaf2efd280e8e13115b93a96fa4f1ebdce5417  reports/reviews/phase8-m8-diag-stack-r1/build/rt-thread-motor-m1-candidate.log
+dec52c7723f4af2a41ca1863f9096ae97d411abf2bd20db048ab4d5e360ba374  reports/reviews/phase8-m8-diag-stack-r1/disasm_diff.txt
+189cd9fc5d3a3b4149310334c7d1b109e991d188e7e4f6339c7b0f7edeb939f2  reports/reviews/phase8-m8-diag-stack-r1/host/diag_stack_check.py
+bf4437edb8ebf71681d992989ed6c4eecd5e6155a388ef51a7c15a4b34915ad4  reports/reviews/phase8-m8-diag-stack-r1/host/diag_stack_console.txt
+d251a83ba899db49eb1282d5e26299f3d6a6c345d63b83c509b8cc6a948be7d1  reports/reviews/phase8-m8-diag-stack-r1/host/staged_preflight_diagstack.py
+93a579c2817a4ea0c2bf0cae06968aa8b43363ce504f84d46fd181f200e8a772  reports/reviews/phase8-m8-diag-stack-r1/host/staged_preflight_diagstack.txt
+544f7721694ac8d1c0d85d8ce91fbb99906b552c34e99a2551eff1e35616d1a8  reports/reviews/phase8-m8-diag-stack-r1/run_record.md
+b7a1362dc63075158133d18c0c89e85d609ef8d0584b6a64df1a9f23670c279c  reports/reviews/phase8-m8-diag-stack-r1/stack_report.txt

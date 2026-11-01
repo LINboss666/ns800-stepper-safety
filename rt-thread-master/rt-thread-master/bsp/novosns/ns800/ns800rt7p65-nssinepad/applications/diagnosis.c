@@ -45,6 +45,8 @@
 #include "diagnosis.h"
 #include "diag_relative.h"
 
+#define DIAG_THREAD_STACK   4096   /* entry+rel_prod_evaluate+rel_engine_step 三帧静态下界 1064 B, 旧值 1024 装不下 */
+
 /* ---------- 阈值(Phase 7-C-2: 由 project_config 持久化驱动) ----------
  * dt 每帧从 project_config 同步; 配置非法时 config 层保证为安全默认值。 */
 typedef struct
@@ -523,7 +525,7 @@ rt_err_t diagnosis_init(void)
      * 一律返回错误 => 每帧按 RELCOV_LOCK_FAIL 有界降险, 而不是"当作有锁"。 */
 
     d_tid = rt_thread_create("diag", diag_thread_entry, RT_NULL,
-                             1024, 9, 10);  /* prio 9, 100Hz */
+                             DIAG_THREAD_STACK, 9, 10);  /* prio 9, 100Hz */
     if (d_tid == RT_NULL) { d_health = SUBSYS_FAILED; return -RT_ERROR; }
     rt_thread_startup(d_tid);
 

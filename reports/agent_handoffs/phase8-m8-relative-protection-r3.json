@@ -902,5 +902,55 @@
   "SysTick 在数(COUNTFLAG/RVR 实测)不能证明板载 LED 心跳线程跑过; '闪灯代码尚未启动'未被排除 —— 见 run_record §14.2",
   "PC 已在 while(1) 时 r2/r12/LR 是此前调用的残留, 不能写成'此刻正在轮询式打印' —— 见 run_record §14.2",
   "同机制连带: 单看 LR 只能证'与该调用链相容'; (c) 轮 lr=0x08008201 的'已走到打印 BFAR 那一支'降级为相容而非证明"
- ]
+ ],
+ "diag_stack_fix_round_r1": {
+  "authorization": "复审: 保持板子暂停, 离线最小修复 diag 栈 1024->4096 候选, 核算堆余量; 只构建 motor 对照目标, 交付散列/编译参数/调用链依据; 4096 不称已验证上界; 再绑定一次完整板级对照包由复审一次批准",
+  "device_actions": 0,
+  "board_state": "Halted(未变); 板上仍是 R3 的 00608ec93c6a3027d68b44b5317574209fccfb0ba82a9974793d13b54b79e304",
+  "product_change": "applications/diagnosis.c: 1024 -> DIAG_THREAD_STACK(4096), 3 insertions / 1 deletion",
+  "builds": {
+   "target": "rt-thread-motor-m1-candidate",
+   "count": 1,
+   "uv4_rc": 0,
+   "error_warning": "0 Error(s), 0 Warning(s)",
+   "program_size": "Code=204762 RO-data=85578 RW-data=2188 ZI-data=84824(与 R3 逐字相同)"
+  },
+  "images": {
+   "axf": "fb26d5a0e866b2c8852c989c98f158d99d0511ffdc6ce4e9b8c8add3372ed6ea",
+   "bin": "f5c2fd89bbf28255a5b26c9cca495bc0fb1e39d401d0bb7bea19d051221708ce",
+   "map": "fd334a83da24162ef8512b1537ec5b66cc84deee3e9a281ba70b4af4fb8ad579"
+  },
+  "defect_evidence": {
+   "armlink_own": {
+    "diag_thread_entry": 632,
+    "rel_prod_evaluate": 248,
+    "rel_engine_step": 184
+   },
+   "three_frame_floor": 1064,
+   "armlink_max_depth_diag_thread_entry": 1580,
+   "old_stack": 1024,
+   "monitor_only_also_executes": "diagnosis.c:446 无条件调用 rel_prod_evaluate, 模式只是实参"
+  },
+  "effect_proof": "全文反汇编差异: 唯一代码级差异 0x0800ca26 MOV r3,#0x400 -> #0x1000(diagnosis_init), 其余为 __DATE__/__TIME__ 串; Program Size 四项不变是预期的(运行时堆参数)",
+  "heap": {
+   "total": 32768,
+   "thread_stack_sum_old": 12800,
+   "thread_stack_sum_new": 15872,
+   "delta": 3072,
+   "note": "未含 TCB 与其它 rt_malloc; 是枚举不是'够用'证明"
+  },
+  "not_proven": [
+   "4096 不是已验证上界(镜像级 2996 + Unknown)",
+   "diag 栈溢出与本次坏 next 的因果未证",
+   "offsetof(rt_thread, thread_timer)==0x50 未独立核得",
+   "新镜像未在板"
+  ],
+  "erratum_r3_15_1": "撤回'局部槽已被异常帧覆盖': 扩展帧下出错前 SP=0x200127D8, 局部槽很可能还在; §15 的'取不到'两条降级为'本轮未取'",
+  "next_step_pending_approval": "板级对照包(现场保存/下载/回读/完整启动采集/串口查询/栈观察, 零电机), 内含下载前的两条只读 RAM 判定 A(0x200127D8+40B) 与 B(0x20015b28+48B)",
+  "checker": "reports/reviews/phase8-m8-diag-stack-r1/host/diag_stack_check.py (CHECKS=37 DIAGSTACK_PROBLEMS=0 NEGATIVE_CONTROL fired=3/3)"
+ },
+ "reviewer_new_clues_r1": {
+  "timer_list_inference": "r1=0x20015b78 与 r3=0x20015b28 差 0x50(线程内置定时器偏移); r4/r5/r6=1024/18/10 与 blackbox.c:444-445 的 bblog 创建参数一致 => 指向损坏的定时器对象链表; 本轮登记为有依据的推断, 判定动作是下载前读 0x20015b28 的 name 字段",
+  "diag_stack_defect": "复审独立查得并可复算: 见 defect_evidence"
+ }
 }

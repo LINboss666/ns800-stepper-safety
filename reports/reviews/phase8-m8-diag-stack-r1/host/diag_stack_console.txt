@@ -1,0 +1,41 @@
+OK A_log_0error_0warning | 日志尾部逐字
+OK A_log_program_size | 四项尺寸
+OK A_log_elapsed | 构建耗时行
+OK A_log_diagnosis_compiled_once | compiling diagnosis.c 出现 1 次(必须恰好 1)
+OK A_log_target_is_motor | 链接产物是 motor 目标
+OK A_log_armclang_v624 | 编译器为 ARMCLANG
+OK A_no_download_markers | 日志里没有任何下载/擦除字样(本轮 build only)
+OK B_identity_rt-thread-motor-m1-candidate_bin | rt-thread-motor-m1-candidate.bin bytes=290916 sha=f5c2fd89bbf28255
+OK B_identity_rt-thread-motor-m1_axf | rt-thread-motor-m1.axf bytes=1771288 sha=fb26d5a0e866b2c8
+OK B_identity_rt-thread-motor-m1_map | rt-thread-motor-m1.map bytes=2108456 sha=fd334a83da24162e
+OK B_manifest_program_size_equals_r3 | 与 R3 同目标 Program Size 逐字相同(运行时堆参数不占静态段)
+OK B_log_sha_in_manifest | 构建日志 bytes=3909 sha=f47ab70a68ffb842
+OK B_diagnosis_c_sha_bound | 登记的 diagnosis.c 构建时字节 == 现在工作树字节(sha e1696ec92721c7df)
+OK C_define_at_48 | diagnosis.c:48 -> #define DIAG_THREAD_STACK   4096   /* entry+rel_prod_evaluate+rel_engine_step 
+OK C_create_site_uses_macro | rt_thread_create 实参行 = :528
+OK C_no_bare_1024_in_create | 创建点不再有裸 1024
+OK C_base_blob_had_1024 | e489438a 的旧 blob 确实是 1024 栈
+OK C_base_blob_had_no_macro | 旧 blob 里没有这个宏 => 本轮才是引入点
+OK C_sibling_convention_matched | 命名沿用同目录既有约定(motor/sensor 都有具名栈宏)
+OK D_diff_lines_present | disasm_diff.txt 40 行
+OK D_all_diff_lines_classified | 无法归类的差异行 0 条: []
+OK D_stack_immediate_pair | 成对出现: 0x400(旧) 与 0x1000(新)
+OK D_no_other_code_changed | 除 0x0800ca26 与 __DATE__/__TIME__ 取址行外, 没有任何指令行变化
+OK E_own_frames | armlink 本帧: {'diag_thread_entry': 632, 'rel_prod_evaluate': 248, 'rel_engine_step': 184}
+OK E_max_depths | armlink 累计: {'diag_thread_entry': 1580, 'rel_prod_evaluate': 948, 'rel_engine_step': 352}
+OK E_old_stack_insufficient_both_ways | 三帧下界 1064 > 1024 且 armlink 累计 1580 > 1024
+OK E_new_stack_above_known_depth | 4096 - 1580 = 2516 B 余量(仅对静态已知链而言)
+OK E_image_level_keeps_unknown_flag | 镜像级: Maximum Stack Usage =       2996 bytes + Unknown(Cycles, Untraceable Function Pointers) —— 有 Unknown, 所以静态图不给闭合上界
+OK F_r3_frames_match | R3 已接受 AXF 反汇编算出的本帧: {'diag_thread_entry': 632, 'rel_prod_evaluate': 248, 'rel_engine_step': 184}
+OK F_r3_axf_untouched | R3 的 AXF 未被本轮覆盖(sha 前缀 0bba8ca7)
+OK F_r3_bin_still_onboard_identity | R3 候选 BIN 仍是板上那枚(sha 前缀 00608ec9)
+OK G_heap_total_from_scatter | 堆 = 32768 B(link.sct 预留块 + board.h HEAP_BEGIN/HEAP_END ±0x8000)
+OK G_delta_is_3072 | diag 1024 -> 4096 = +3072 B 堆需求
+OK G_stacks_sum | 六枚线程栈合计 15872 B(旧 12800 B, delta +3072), tshell 取 rtconfig 实值 4096; 未含 TCB 与其它 rt_malloc => 只是枚举, 不是够不够的结论
+OK G_failclosed_path_present | diagnosis_init 在建线程失败时 fail-closed(堆真不够会显式暴露而非静默)
+OK G_no_device_action_roots | 本轮没有 offline/field 执行根 => 零设备动作
+OK G_not_proven_listed | 登记件里明写未证的 4 项: ['4096 不是已验证上界', 'diag 栈溢出与本次 HardFault 坏 next 的因果关系未证', 'offsetof(rt_thread, thread_timer)==0x50 未独立核得', '新镜像未在板']
+CHECKS=37
+DIAGSTACK_PROBLEMS=0
+NEGATIVE_CONTROL fired=3/3
+
