@@ -183,8 +183,13 @@ doc = {
          "result": "executed_bytes_unchanged=True(05bcf96aa7a6bf89) canon_vs_executed=ORDER_ONLY_DELTA"},
         {"cmd": "python …/archive_build_r6a.py / --check", "rc": [0, 0],
          "result": "三件产物与 build 输出逐字节相同; delta Code=+24 RO=+24 RW=0 ZI=0"},
-        {"cmd": "python …/staged_preflight_batch.py --selfcheck / 正式", "rc": [1, 0],
-         "result": "selfcheck 命中 1 条(检查器会命中); 正式 problems=0(全部登记件的暂存 blob 与清单逐字节相符)"},
+        {"cmd": "python …/staged_preflight_batch.py(带 --selfcheck 与不带: 同一条代码路径)",
+         "rc": [0, 0],
+         "result": "两种调用都打印 `SELFCHECK(corrupted first entry) problems=1`(注入错的登记值确实被命中, "
+                   "比较器不恒真)并 `STAGED_PREFLIGHT_TOTAL problems=0`(全部登记件的暂存 blob 与清单逐字节相符); "
+                   "退出码只由真实登记件决定, 注入的那条不计入 —— 且脚本不解析 --selfcheck 参数(argv 未读), "
+                   "所以两次都是 rc=0。上一版交接件把它写成 rc=[1, 0] 是与实现不符的自述, 本轮更正见 "
+                   "known_text_defects_registered"},
         {"cmd": "C:/Keil_v5/UV4/UV4.exe -r project.uvprojx -t rt-thread-motor-m1-candidate -j0 "
                 "-o …/build/rt-thread-motor-r6a.log", "rc": 0,
          "result": "0 Error(s), 0 Warning(s); Program Size: Code=205594 RO-data=85994 "
@@ -239,7 +244,21 @@ doc = {
         "上一轮 a8d9033 提交信息与交接 JSON 里 APPROVAL_LEDGER_ROOT_UNSABLE 拼写有误, 正确名 "
         "APPROVAL_LEDGER_ROOT_UNUSABLE(§7 允许随实质修复登记, 不回改历史)",
         "本轮软件提交 9e2eb9c 正文 R3 段有一处括号排版错(文字, 不影响判据或字节)",
-        "r6a_before_after.txt 入库前做 CRLF->LF 归一(与上一轮 CLI 实证同一处理), 内容未改"],
+        "r6a_before_after.txt 入库前做 CRLF->LF 归一(与上一轮 CLI 实证同一处理), 内容未改",
+        "本交接件在证据提交 b78d9e1 那一版把 staged 预检写成 `rc=[1, 0]`(自称 --selfcheck 那次退 1); "
+        "读了实现后不成立: 注入错的比对在两种调用里都会跑, 其 problems 只打印不进入退出码, 且脚本不读 "
+        "argv 里的 --selfcheck => 实测两次都是 rc=0 且 SELFCHECK 行 problems=1 fired。本轮如实改成本次实测, "
+        "判据行为未改(不让检查器退 1 反而说明它把'检出'与'登记件真不符'分开了)"],
+    "rerun_side_effect_and_repair": {
+        "what": "复跑 r4 离线链 idle_learn_check.py 会把 r4 那轮**已提交**的 8 件产物重写: "
+                "6 件 field/dispatch_stub_*.txt + host/idle_learn_console.txt 只是仓外临时 run_dir "
+                "随机名变化(idlecheck_vanplaae->idlecheck_ecndg11q), 而 host/idle_learn_check.json "
+                "里的'本轮改动=15 项'被改成'10 项' —— 那个数是检查器按当时工作树现数的, 不是 r4 的事实",
+        "action": "本轮把这 8 件 `git checkout --` 还原到提交字节(还原前工作树==HEAD, 所以还原即复跑到"
+                "之前的状态); 上一轮证据不改写",
+        "why_registered": "防复发: 该检查器的输出目录写的是上一轮目录, 复跑即污染; 下一轮复跑前要先看"
+                        "这 8 件的状态位, 或把本轮输出写到本轮目录"
+    },
     "regression_scope": "只复跑受影响项: disarm_ready(正+反)、r3 全量自检、r4 离线链 120 项、"
                         "r5c 计划校验器 --check、宽度检查器、构建归档、派生计划与离线门、"
                         "staged 预检。S2 其余 19 组与历史 5943 条清单未重跑(§7 不要求)。",
@@ -249,6 +268,42 @@ doc = {
         "approval_ledger": "跨进程真实现场账本(%TEMP% 之外的持久位置)仍未在现场用过一次",
         "overall_offline_release": "待 A 复审",
         "preserved_old_findings": STATUSES},
+    "remote_readback": {
+        "push": "origin/feature/m8-sg-adc-relative-protection 由 44e493c 常规 fast-forward 到 b78d9e1"
+                "(两次提交: 9e2eb9c 软件输入 + b78d9e1 证据); 无 rebase/merge/amend/force",
+        "generic_script_rc": 0,
+        "generic_summary": "remote_files=10834 sums_manifests=20 json_manifests=41 "
+                           "declared=6670 verified=6603 | SCOPE_R3 entries=5149 verified=5149 "
+                           "problems=0 | SCOPE_PRIOR problems=72(declared_but_absent=53, "
+                           "suffix_ambiguous=8, hash_mismatch=6, duplicate_conflict=2, "
+                           "cross_manifest_sha_conflict=3)",
+        "round_scoped_script": "reports/reviews/phase8-m8-r6a-offline-rework/host/"
+                               "remote_readback_r6a.py",
+        "round_scoped_summary": "tip=b78d9e11f427 checks=44 fails=0 not_checked=0",
+        "why_a_second_script": "通用回读的 JSON 名单只有 manifest/plan.json/needles.json, 不逐条核 "
+                               "plan_core_r6a.json 与交接 JSON 里申报的执行器/镜像/清单身份; "
+                               "定向件只从 git fetch + cat-file 取字节, 把这两件内部申报的三元组全部"
+                               "重算回远端 blob",
+        "transcripts": ["reports/reviews/phase8-m8-r6a-offline-rework/"
+                        "remote_readback_generic_at_b78d9e1.txt",
+                        "reports/reviews/phase8-m8-r6a-offline-rework/"
+                        "remote_readback_at_b78d9e1.txt"],
+        "prior_scope_residual_explained": [
+            "r6 manifest ↔ motor.c: 那是 R6 构建当时的 blob(3b741233…), R6A 改了 motor.c 后 HEAD 变成 "
+            "7305f3b4… => 历史件登记值与 HEAD 不同, 不是本轮缺陷; 冻结件不回改",
+            "r6a ↔ r6 的 cross_manifest_sha_conflict(motor.c)是同一条的另一面: 本轮 manifest 自己申报的 "
+            "7305f3b4… == 远端 blob(定向件已核)",
+            "r6 / r6a ↔ r4 的 cross_manifest_sha_conflict(rtconfig.h)+ r4 的 hash_mismatch 是上一轮已披露的 "
+            "『R4 manifest 登记磁盘字节 1927ed1c… 而 blob 是 b66753d6…』; R6 起改登记 blob, 本轮两条都等于远端",
+            "其余 declared_but_absent / suffix_ambiguous / duplicate_conflict 与 m7/m5 的三条 hash_mismatch "
+            "都在历史轮次, 数量与上一轮同口径(未新增)"],
+        "frozen_checked_on_remote": "R5-C 计划 05bcf96a…/164851 B、R6 计划 6e0b97f2…/165522 B、"
+                                    "R6 候选 bin d70a9180…/292116 B、在板 bin dab356c6…/290916 B "
+                                    "在远端 tip 上逐条等于登记值",
+        "baseline_executor_checked_on_remote": "1b23719a3c9a…/184093 B 在 44e493c(按 SHA 定点 fetch 后现算), "
+                                               "tip 上的执行器 99d6c960…/209786 B == 候选包登记值",
+        "device_actions": 0,
+        "reads_from": "remote_git_protocol_only"},
     "next_round_is_not_this_package": "现场包要另起: 匹配新镜像 bin/axf/回读长度/下载阶段与具体额度, "
                                       "并按新代码重绑批准; 本包没有做这件事, 也不提供可用于现场的批准",
     "safe_for_enable": False,

@@ -1,0 +1,61 @@
+remote_tip=b78d9e11f4274158000de1a12eb238cb2bfadef4
+remote_files=10834
+
+== 1. 本轮两份清单逐条对远端 blob ==
+OK  |sums/reports/reviews/phase8-m8-r6a-offline-rework/SHA256SUMS.txt|entries=10 mismatch=0
+OK  |sums/reports/firmware/phase8-m8-r6a-offline-rework/SHA256SUMS.txt|entries=4 mismatch=0
+
+== 2. build_manifest 内的镜像与编译输入(只核 blob 那一层) ==
+OK  |manifest.source_input motor.c|rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/motor.c remote=7305f3b4295c…/131191 B vs 申报(manifest.disk_side=f8de36fd0ebc…) 7305f3b4295c…/131191 B
+OK  |manifest.source_input stop_priority.c|rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/stop_priority.c remote=09a2f086e59a…/63128 B vs 申报(manifest.disk_side=99d6c124bcc3…) 09a2f086e59a…/63128 B
+OK  |manifest.source_input tmc2209.c|rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/tmc2209.c remote=214951633ee4…/192031 B vs 申报(manifest.disk_side=214951633ee4…) 214951633ee4…/192031 B
+OK  |manifest.source_input safety_thread.c|rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/safety_thread.c remote=564770faf381…/19716 B vs 申报(manifest.disk_side=564770faf381…) 564770faf381…/19716 B
+OK  |manifest.source_input rtconfig.h|rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/rtconfig.h remote=b66753d6b50b…/8850 B vs 申报(manifest.disk_side=1927ed1c1cc7…) b66753d6b50b…/8850 B
+OK  |manifest.image rt-thread-motor-m1-candidate.bin|reports/firmware/phase8-m8-r6a-offline-rework/rt-thread-motor-m1-candidate.bin remote=5ae4110d14fd…/292164 B vs 申报(manifest) 5ae4110d14fd…/292164 B
+OK  |manifest.image rt-thread-motor-m1.axf|reports/firmware/phase8-m8-r6a-offline-rework/rt-thread-motor-m1.axf remote=581f11551663…/1773648 B vs 申报(manifest) 581f11551663…/1773648 B
+OK  |manifest.image rt-thread-motor-m1.map|reports/firmware/phase8-m8-r6a-offline-rework/rt-thread-motor-m1.map remote=4f58a3eea493…/2110730 B vs 申报(manifest) 4f58a3eea493…/2110730 B
+OK  |manifest.build_log|reports/reviews/phase8-m8-r6a-offline-rework/build/rt-thread-motor-r6a.log remote=e28dbd0af1e8…/3909 B vs 申报(manifest) e28dbd0af1e8…/3909 B
+
+== 3. 候选包内部申报的身份 ==
+OK  |plan.executor|reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py remote=99d6c9600b05…/209786 B vs 申报(plan) 99d6c9600b05…/209786 B
+OK  |plan.image(r4 在板件)|reports/firmware/phase8-m8-idle-stack-r4/rt-thread-motor-m1-candidate.bin remote=dab356c69fbf…/290916 B vs 申报(plan) dab356c69fbf…/290916 B
+OK  |plan.image.axf|reports/firmware/phase8-m8-idle-stack-r4/rt-thread-motor-m1.axf remote=0babe9f1a874…/1771288 B vs 申报(plan) 0babe9f1a874…/1771288 B
+OK  |plan.image.map|reports/firmware/phase8-m8-idle-stack-r4/rt-thread-motor-m1.map remote=b61632249f99…/2108456 B vs 申报(plan) b61632249f99…/2108456 B
+OK  |plan.candidate.bin|reports/firmware/phase8-m8-r6a-offline-rework/rt-thread-motor-m1-candidate.bin remote=5ae4110d14fd…/292164 B vs 申报(plan) 5ae4110d14fd…/292164 B
+OK  |plan.candidate.axf|reports/firmware/phase8-m8-r6a-offline-rework/rt-thread-motor-m1.axf remote=581f11551663…/1773648 B vs 申报(plan) 581f11551663…/1773648 B
+OK  |plan.candidate.map|reports/firmware/phase8-m8-r6a-offline-rework/rt-thread-motor-m1.map remote=4f58a3eea493…/2110730 B vs 申报(plan) 4f58a3eea493…/2110730 B
+OK  |plan.candidate.manifest|reports/firmware/phase8-m8-r6a-offline-rework/build_manifest.json remote=b405df37cb98…/6500 B vs 申报(plan) b405df37cb98…/- B
+OK  |plan.derived_from|reports/reviews/phase8-m8-r6-offline-recovery/field/plan_core_r6.json remote=6e0b97f251a6…/165522 B vs 申报(plan) 6e0b97f251a6…/165522 B
+OK  |plan.r6_candidate_frozen|reports/firmware/phase8-m8-r6-offline-recovery/rt-thread-motor-m1-candidate.bin remote=d70a9180b40c…/292116 B vs 申报(plan) d70a9180b40c…/292116 B
+
+== 4. 交接件申报的产物身份 ==
+OK  |handoff.json.parses|bytes=21452 sha=a1eeee493612…
+OK  |handoff.candidate_image|reports/firmware/phase8-m8-r6a-offline-rework/rt-thread-motor-m1-candidate.bin remote=5ae4110d14fd…/292164 B vs 申报(handoff) 5ae4110d14fd…/292164 B
+OK  |handoff.map|reports/firmware/phase8-m8-r6a-offline-rework/rt-thread-motor-m1.map remote=4f58a3eea493…/2110730 B vs 申报(handoff) 4f58a3eea493…/2110730 B
+OK  |handoff.plan_package|reports/reviews/phase8-m8-r6a-offline-rework/field/plan_core_r6a.json remote=556a044e1957…/169310 B vs 申报(handoff) 556a044e1957…/169310 B
+OK  |handoff.plan_package.executor_registration|reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py remote=99d6c9600b05…/209786 B vs 申报(handoff) 99d6c9600b05…/209786 B
+OK  |handoff.baseline_declared|交接自报基线 EXEC=1b23719a3c9a…/184093 B(第 5 节到远端历史对象核)
+OK  |handoff.build_input[0] motor.c|rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/motor.c remote=7305f3b4295c…/131191 B vs 申报(handoff) 7305f3b4295c…/131191 B
+OK  |handoff.build_input[1] stop_priority.c|rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/stop_priority.c remote=09a2f086e59a…/63128 B vs 申报(handoff) 09a2f086e59a…/63128 B
+OK  |handoff.build_input[2] tmc2209.c|rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/tmc2209.c remote=214951633ee4…/192031 B vs 申报(handoff) 214951633ee4…/192031 B
+OK  |handoff.build_input[3] safety_thread.c|rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/safety_thread.c remote=564770faf381…/19716 B vs 申报(handoff) 564770faf381…/19716 B
+OK  |handoff.build_input[4] rtconfig.h|rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/rtconfig.h remote=b66753d6b50b…/8850 B vs 申报(handoff) b66753d6b50b…/8850 B
+OK  |handoff.keil_build.log|reports/reviews/phase8-m8-r6a-offline-rework/build/rt-thread-motor-r6a.log remote=e28dbd0af1e8…/3909 B vs 申报(handoff) e28dbd0af1e8…/3909 B
+OK  |handoff.no_self_hash|交接 JSON 顶层不自证字节(清单不哈希自身的同一条纪律)
+OK  |handoff.md.present|6373 B
+
+== 5. §7 要求保持冻结的旧件 ==
+OK  |frozen plan_core_r5c.json|remote=05bcf96aa7a6…/164851 B expect=05bcf96aa7a6… (R5-C 已执行那 26 场的计划)
+OK  |frozen plan_core_r6.json|remote=6e0b97f251a6…/165522 B expect=6e0b97f251a6… (R6 离线派生件(本包的源; 由候选包 derived_from 现算比对))
+OK  |frozen rt-thread-motor-m1-candidate.bin|remote=d70a9180b40c…/292116 B expect=d70a9180b40c… (R6 候选镜像归档件)
+OK  |frozen rt-thread-motor-m1-candidate.bin|remote=dab356c69fbf…/290916 B expect=dab356c69fbf… (已逐字节证在板的那件)
+OK  |frozen executor@base_commit|reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py remote=1b23719a3c9a…/184093 B vs 申报(开工核对时的本地对象库) 1b23719a3c9a…/184093 B
+
+== 6. 未改动的历史件仍在远端(存在性抽查) ==
+OK  |exists plan_core_r4.json|150962 B
+OK  |exists plan.json|67782 B
+OK  |exists remote_readback_at_a8d9033.txt|8492 B
+OK  |exists phase8-m8-r6-offline-recovery.json|19037 B
+
+R6A_REMOTE_READBACK_SUMMARY|tip=b78d9e11f427|checks=44|fails=0|not_checked=0
+device_actions=0|serial_ports_opened=0|dap_connections=0|reads_from=remote_git_protocol_only

@@ -215,3 +215,71 @@ idle1024 带载最坏栈余量、现场精确线程交错(NOT_PROVEN)、`0x00bd8
 勘误随本轮实质修复登记:上一轮提交信息 `a8d9033` 与交接件里的
 `APPROVAL_LEDGER_ROOT_UNSABLE` 拼写有误,正确名是 `APPROVAL_LEDGER_ROOT_UNUSABLE`
 (EXEC 现行号见 `open_approval`/`approval_init` 两处);历史提交与已归档 JSON 不回改,只在此声明。
+
+
+## 17.9 提交、推送与独立远端回读(本轮收口)
+
+```text
+push          origin/feature/m8-sg-adc-relative-protection  44e493c..b78d9e1  (两次提交, 常规 fast-forward)
+tip(远端)     b78d9e11f4274158000de1a12eb238cb2bfadef4
+设备动作        0(本节只跑 git fetch / git cat-file / python 主机测试)
+```
+
+通用逐 blob 回读(`phase8-m8-relative-protection-r3/host/remote_readback.py`, rc=0):
+`remote_files=10834`、`sums_manifests=20`、`json_manifests=41`、`declared=6670 verified=6603`;
+**冻结的 r3 范围 `SCOPE_R3|entries=5149 verified=5149 problems=0`**;
+`SCOPE_PRIOR|problems=72`(declared_but_absent=53、suffix_ambiguous=8、hash_mismatch=6、
+duplicate_conflict=2、cross_manifest_sha_conflict=3)。
+
+两份原文都入库: 通用件 `remote_readback_generic_at_b78d9e1.txt`, 定向件
+`remote_readback_at_b78d9e1.txt`。prior 里与本轮有关的四条口径:
+
+| 报告 | 是什么 | 判定 |
+|---|---|---|
+| `hash_mismatch` r6 manifest ↔ `applications/motor.c`(7305f3b4… vs 3b741233…) | R6 那份 manifest 登记的是**它自己构建当时**的 motor.c blob;R6A 又改了 motor.c, HEAD 上的 blob 变成 7305f3b4… | 历史件的登记值, 不是本轮缺陷; 冻结件不回改 |
+| `cross_manifest_sha_conflict` r6a ↔ r6(motor.c) | 同一批 manifest 的同一文件在两轮登记不同值, 正是上一行那条的另一面 | 同上 |
+| `cross_manifest_sha_conflict` r6 / r6a ↔ r4(`rtconfig.h`) | R4 的 manifest 登记的是磁盘字节(1927ed1c…), R6 起改登记 blob(b66753d6…); 本轮已把这条尾巴具名(§16.7) | 上一轮已披露的同一条, 未新增缺陷 |
+| `hash_mismatch` r4 manifest ↔ `rtconfig.h` | 同上: R4 那份的登记口径, 与 HEAD blob 不同 | 已披露, 不动 |
+
+通用回读的 JSON 名单只有 `manifest`/`plan.json`/`needles.json`, **不会**逐条核
+`plan_core_r6a.json` 与交接 JSON 里申报的执行器/镜像身份 => 本轮补一份定向回读
+`host/remote_readback_r6a.py`(只从远端取字节):
+
+```text
+R6A_REMOTE_READBACK_SUMMARY|tip=b78d9e11f427|checks=44|fails=0|not_checked=0
+device_actions=0|serial_ports_opened=0|dap_connections=0|reads_from=remote_git_protocol_only
+```
+
+其中 44 条含: 两份清单 14 条逐条对 blob、manifest 的 5 个编译输入 + 3 个产物 + 构建日志、
+候选包内部申报的执行器/在板镜像/新候选三件/manifest/派生源/R6 候选冻结件、交接 JSON 申报的
+五件编译输入与产物、四件冻结旧件(R5-C 计划 `05bcf96a…`、R6 计划 `6e0b97f2…`、R6 候选 bin
+`d70a9180…`、在板 bin `dab356c6…`)、以及**基线执行器** `1b23719a…/184093 B` 在 44e493c 上
+(按 SHA 定点 fetch 到远端对象后现算, 不是本机断言)。
+
+复跑副作用与恢复(如实登记): 上面那次 `idle_learn_check.py` 会把 **r4 那轮已提交**的 8 件产物重写
+到盘上 —— 6 件 `field/dispatch_stub_*.txt` 与 `host/idle_learn_console.txt` 只是仓外临时 run_dir 的
+随机名变了(`idlecheck_vanplaae` -> `idlecheck_ecndg11q`), 但 `host/idle_learn_check.json` 里
+"本轮改动=15 项"被改成"10 项": 那个数是它按**当时工作树**数的改动项, 不是 r4 那轮的事实。
+本轮不把上一轮的证据改掉: 这 8 件已 `git checkout --` 还原到提交字节(还原前工作树与 HEAD 相同,
+故还原 == 恢复到我复跑之前)。这一条登记的理由是防复发: 复跑该检查器要先看这 8 件有没有被动过,
+下一轮若要把这类输出留在本轮, 应写进本轮目录而不是上一轮目录。
+
+`staged_preflight_batch.py` 在本机工作树上又跑了一次(暂存集合就是本轮收口要提交的那 8 件):
+
+```text
+python …/staged_preflight_batch.py --selfcheck   rc=0
+python …/staged_preflight_batch.py               rc=0
+  SELFCHECK(corrupted first entry) problems=1 ['sha_mismatch …/rt-thread-motor-r6a.log want=0000… got=e28dbd0a…']  (必须>=1)
+  MANIFEST reports/reviews/phase8-m8-r6a-offline-rework/SHA256SUMS.txt entries=13 problems=0 []
+  MANIFEST reports/firmware/phase8-m8-r6a-offline-rework/SHA256SUMS.txt entries=4 problems=0 []
+  STAGED_PREFLIGHT_TOTAL problems=0
+```
+
+读实现后更正一条自述: 该脚本**不读** `--selfcheck`(argv 未使用), 注入错的那条比较两种调用都会跑,
+且它的 problems 只打印、不计入退出码 => 两次实测都是 rc=0。本交接件在 `b78d9e1` 那一版写成
+`rc=[1, 0]` 是不成立的自述, 已按上面的实测改正(判据行为未动, 检查器仍会命中注入值)。
+
+§17.7 里 `cases=114 pass=114` 那一行写在 FS102 缓冲区修正之前; 定稿字节上又跑了一次同一命令,
+`rc=0`、`SUMMARY|cases=114 pass=114 fail=0 executed=114 preserved_r2_identities=25|
+negative_injections=17|hardware_actions=0|transport=stub_only|port=IN_MEMORY` —— 数值未变,
+故 §17.7 不改写, 只在此登记复跑。

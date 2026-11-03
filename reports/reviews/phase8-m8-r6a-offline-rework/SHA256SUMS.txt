@@ -1,6 +1,6 @@
 # sha256 * <仓库相对路径>(LF, 无 BOM; 本清单不哈希自身字节 —— 一条清单不能给自己的字节作证)
 # 生成方式: 对 reports/reviews/phase8-m8-r6a-offline-rework/ 下每个常规文件(排除 SHA256SUMS.txt、remote_readback.md 与 __pycache__) 直接读磁盘字节算 sha256
-# 条目数=10; 与 Git blob 的逐条复算由 host/staged_preflight_batch.py(提交前, 单批流)与推送后的远端逐 blob 回读完成
+# 条目数=13; 与 Git blob 的逐条复算由 host/staged_preflight_batch.py(提交前, 单批流)与推送后的远端逐 blob 回读完成
 # 重新生成: python reports/reviews/phase8-m8-idle-stack-r4/host/make_round_sums.py <本目录>
 e28dbd0af1e8216fcb6a372e89db7392395f9fa6a355a1748e43bbc0cc0d0270  reports/reviews/phase8-m8-r6a-offline-rework/build/rt-thread-motor-r6a.log
 77102a8bff73cc21dfa4744222ab1130b376224e91cd98711ac1a1c3dc5efffd  reports/reviews/phase8-m8-r6a-offline-rework/field/needles.json
@@ -10,5 +10,8 @@ e28dbd0af1e8216fcb6a372e89db7392395f9fa6a355a1748e43bbc0cc0d0270  reports/review
 1f0323968f2c8676ddd89cb70eb303a70efbec1ebaa72e800673f1cc4e9cb9b5  reports/reviews/phase8-m8-r6a-offline-rework/host/derive_plan_r6a.py
 1959e857a5047aa8c13acc456ae9bfa8f34c31dd5518ec98e5ec16e7d80bae1a  reports/reviews/phase8-m8-r6a-offline-rework/host/r6a_before_after.py
 39643c5f5c9935ec61d9b855927b34d389086d7a175c436b520eae7ebddf1c72  reports/reviews/phase8-m8-r6a-offline-rework/host/r6a_before_after.txt
-3b2143b1f2cc783a5174bf0ecb3cf683539ba09b57fc73320c69a5ccc7c19c9f  reports/reviews/phase8-m8-r6a-offline-rework/host/write_handoff_json_r6a.py
-4828d52817f8c071e375e95da195f906f3fc168c70966ac8f93d41d165925b73  reports/reviews/phase8-m8-r6a-offline-rework/run_record.md
+f4c88d20a99de6bb144f68883b0115ec5f12c48eb8559394cf7f14aac439f79d  reports/reviews/phase8-m8-r6a-offline-rework/host/remote_readback_r6a.py
+90327d0849e2e488ea9c8d6a96afe0b4899854e0367d0dd706ed5d2e654644aa  reports/reviews/phase8-m8-r6a-offline-rework/host/write_handoff_json_r6a.py
+d6600574755282cccb8590d4a99e251bce4505be30273109400331ac107d4b44  reports/reviews/phase8-m8-r6a-offline-rework/remote_readback_at_b78d9e1.txt
+5b1f3070e2c7d4807efd35cae1b6382fe6a504c671f067716f5caa51fc836e3a  reports/reviews/phase8-m8-r6a-offline-rework/remote_readback_generic_at_b78d9e1.txt
+5f6a7cf1d9a976e408514693fdc2f665deeb55a95408453d2d9b5aa7d54cc9d1  reports/reviews/phase8-m8-r6a-offline-rework/run_record.md

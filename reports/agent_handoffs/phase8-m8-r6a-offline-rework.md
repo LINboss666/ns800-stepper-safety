@@ -73,3 +73,35 @@ rc=0 `checks=232 fail=0`;`idle_learn_check.py` → rc=0 `CHECKS=120 problems=0`(
    文字缺陷,不影响任何判据或字节;证据提交里如实记这一条。
 3. `r6a_before_after.txt` 入库前做了 CRLF→LF 归一(与上一轮 CLI 实证同一处理),对照的**内容**
    未改;磁盘字节 == blob 字节由本轮 `.gitattributes -text` 保证。
+4. 本交接件在证据提交 `b78d9e1` 那一版把 staged 预检写成 `rc=[1, 0]`(自称 `--selfcheck` 那次退 1)。
+   读了实现: 脚本不解析 `--selfcheck`(argv 未使用),注入错的比对两种调用都会跑,且那条 problems 只打印、
+   不计入退出码 => 实测两次都 rc=0 而 `SELFCHECK … problems=1` fired。已按实测更正,检查器行为未改。
+
+## 7 推送与独立远端回读(§7 交付口径的最后一环)
+
+推送: `origin/feature/m8-sg-adc-relative-protection` 由 `44e493c` 常规 fast-forward 到
+`b78d9e11f4274158000de1a12eb238cb2bfadef4`(软件输入 `9e2eb9c` + 证据 `b78d9e1`, 本轮收口再追加一次
+证据提交; 无 rebase/merge/amend/force, 未新建分支, 未碰冻结引用)。
+
+| 回读 | 入口 | 结果 |
+|---|---|---|
+| 通用逐 blob | `phase8-m8-relative-protection-r3/host/remote_readback.py`(rc=0) | `remote_files=10834 declared=6670 verified=6603`;冻结的 r3 范围 `entries=5149 verified=5149 problems=0`;prior 侧 problems=72(其中 3 条是各轮 manifest 对同一编译输入登记不同值) |
+| **本轮范围**定向 | `phase8-m8-r6a-offline-rework/host/remote_readback_r6a.py` | `tip=b78d9e11f427 checks=44 fails=0 not_checked=0` —— 两份清单 14 条逐条对 blob、manifest 的 5 个编译输入 + 3 件产物 + 构建日志、候选包内申报的执行器/在板镜像/新候选三件/manifest/派生源/R6 候选冻结件、交接件申报的五件编译输入与产物、四件冻结旧件、**以及基线执行器 `1b23719a…/184093 B` 在 `44e493c` 上**(按 SHA 定点 fetch 后现算) |
+
+通用件不解析 `plan_core_r6a.json` 与交接 JSON(它的 JSON 名单只有 `manifest`/`plan.json`/`needles.json`),
+所以候选包**内部申报**的执行器/镜像身份此前没被逐条核过 —— 定向件补的就是这一段;两份原文都入库。
+
+prior 里与本轮有关的四条如实写清,不当成缺陷也不藏:
+R6 那份 manifest 登记的是它自己构建当时的 motor.c blob(`3b741233…`),R6A 改过 motor.c 之后 HEAD 是
+`7305f3b4…` => 历史件的登记值与 HEAD 不同属预期,冻结件不回改;本轮 manifest 自己申报的
+`7305f3b4…/131191 B` 与远端 blob 相等。`rtconfig.h` 那两条是上一轮已具名的 R4 登记口径尾巴
+(R4 记磁盘 `1927ed1c…`,R6 起记 blob `b66753d6…`),R6A 两条也都等于远端。
+
+复跑的副作用与恢复: 那次 r4 离线链(`idle_learn_check.py`,rc=0、`CHECKS=120 problems=0`)把 **r4 那轮
+已提交**的 8 件产物重写了 —— 6 件 `dispatch_stub_*.txt` 与 `idle_learn_console.txt` 只是仓外临时
+run_dir 随机名变了,但 `idle_learn_check.json` 里"本轮改动=15 项"被按当时工作树改成"10 项"。本轮不改写
+上一轮证据:这 8 件已 `git checkout --` 还原到提交字节。登记此条为防复发(该检查器把输出写进上一轮目录)。
+
+复跑确认: §4 里 `cases=114 pass=114` 那一行写在 FS102 缓冲区修正之前,定稿字节上同一命令又跑了一次
+`rc=0`、`cases=114 pass=114 fail=0 executed=114 negative_injections=17 hardware_actions=0`,数值未变。
+本节所有动作仍是 git 协议读取 + 主机测试, **设备动作 0**。
