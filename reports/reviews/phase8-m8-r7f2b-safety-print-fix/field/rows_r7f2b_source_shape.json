@@ -1,7 +1,7 @@
 {
  "_about": {
   "what": "M8-R7F2B 派生干跑夹具: 以 R7F1A 的 rows_startup_b424.json 为底, 只把 commands.safety_status 与 commands.motor_status 换成 A 复审附件里的 source_shape 预测",
-  "base_file": "reports\\reviews\\phase8-m8-r7f1a-minimal-c-patch\\field\\rows_startup_b424.json",
+  "base_file": "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/rows_startup_b424.json",
   "base_bytes": 53635,
   "base_sha256": "916eddaa172e6f30b9a9e327f21f4b9274cca2bab17201c329b32997d286f746",
   "replaced_commands": [
@@ -627,7 +627,7 @@
     "source_sha256": "438ed06e2d35aa5dc224a8deae7d8dad20b68cb315d159f8b9d99309b1c815e2",
     "old_lines_kept_verbatim_in_base_file": true,
     "old_base": {
-     "path": "reports\\reviews\\phase8-m8-r7f1a-minimal-c-patch\\field\\rows_startup_b424.json",
+     "path": "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/rows_startup_b424.json",
      "bytes": 53635,
      "sha256": "916eddaa172e6f30b9a9e327f21f4b9274cca2bab17201c329b32997d286f746",
      "this_command_unchanged_there": true
@@ -870,7 +870,7 @@
     "source_sha256": "438ed06e2d35aa5dc224a8deae7d8dad20b68cb315d159f8b9d99309b1c815e2",
     "old_lines_kept_verbatim_in_base_file": true,
     "old_base": {
-     "path": "reports\\reviews\\phase8-m8-r7f1a-minimal-c-patch\\field\\rows_startup_b424.json",
+     "path": "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/rows_startup_b424.json",
      "bytes": 53635,
      "sha256": "916eddaa172e6f30b9a9e327f21f4b9274cca2bab17201c329b32997d286f746",
      "this_command_unchanged_there": true

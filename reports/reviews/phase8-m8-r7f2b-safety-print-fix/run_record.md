@@ -12,7 +12,7 @@
 | A § | 要求 | 落点 |
 |---|---|---|
 | 1 | 应用 `safety_status_short_lines.patch`,只改 safety_gpio.c 两条打印,应用前 `git apply --check` | 已应用。`--check` rc=0 → 应用后 `git diff --numstat` = 2 增 2 删;blob `b242dfad1fed0c5b5be5869febef6375e2708a8f` → `2055c7496be91830709155a9ffb0720a0b0bdb8d`,与补丁声明的 postimage 一致 |
-| 2 | 用新文件承接下一场 rows,保留旧 b424 文件与所有现场原件;A 的两条命令标 `source_shape` | `reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/rows_r7f2b_source_shape.json`(54299 B)。底稿 = `rows_startup_b424.json`(53635 B, `916eddaa…`)**逐字节未动**;只替换 `commands.safety_status` 与 `commands.motor_status`,A 的行与 `_provenance` 一字未改,另加 `_derivation_r7f2b`(含被替换掉的旧行原文) |
+| 2 | 用新文件承接下一场 rows,保留旧 b424 文件与所有现场原件;A 的两条命令标 `source_shape` | `reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/rows_r7f2b_source_shape.json`(54287 B, `80466bc3a23c60dd2b86a59b91f2e4f8b63d52ac25db49c490cb72c15669daa5`)。底稿 = `rows_startup_b424.json`(53635 B, `916eddaa…`)**逐字节未动**;只替换 `commands.safety_status` 与 `commands.motor_status`,A 的行与 `_provenance` 一字未改,另加 `_derivation_r7f2b`(含被替换掉的旧行原文) |
 | 3 | 把 `motor_status_step_replacement.json` 的 step 放入下一场新计划;**不改执行器** | 已放入草稿计划 S3(见 §4)。执行器仍是 R6C 原件 219491 B `33d3f0af8a4c9c33dcd4e013b395e4ba990a89e384130f9d0ffe50c71b34e8ca`,本轮一次也没改过它 |
 | 4 | 新 rows 不得继续假装 `arm_gate_mask=0x0 ALL-PASS`,要用 0x18 REFUSED + `mot_print_gate_fail(0x18)` 的 gate 明细行 | 新 rows 的 motor_status 是 0x18 REFUSED 并带 gate_reason/gate4..7 全套明细(共 25 行,全部标 `source_shape_predictions_NOT_board_capture`) |
 | 5 | 针对性验证后**只构建一次**既有 Keil 候选目标,交付新 BIN/AXF/MAP + 日志 + manifest;旧 b424 身份与旧批准不套到新镜像 | 见 §3 与 `reports/firmware/phase8-m8-r7f2b-safety-print-fix/build_manifest.json` |
@@ -96,6 +96,18 @@ BIN 比 b424 多 **24 B** = 第二段格式串成为独立常量(自带终止 NU
 上一场把这条行记成「150 B 正文 + LF = 151 B」。按 C 转义展开,源码里的 `\n` 是 2 字节但运行时是 1 字节,
 所以正确口径是 **149 B 正文 + LF = 150 B**(与 A 一致)。越钳位 23 B 与「前 126 B 与源逐字节相等」两条结论不受影响。
 已提交的文件按字节冻结原则不回改,勘误登记在 `build_manifest.json` 与本件。
+
+### 5.2 本轮自纠(第二次提交的内容)
+
+远端逐 blob 回读时发现两件派生件自身的缺陷,当场改掉并重新提交(**不回改第一次提交 `275c37f`**):
+
+- **路径形态**:生成器用 `str(WindowsPath.relative_to(REPO))` 取仓库相对路径,得到的是反斜杠形式
+  (`reports\firmware\…`),那不是合法的仓库路径,换机器或按路径取对象都会错。已全部改为正斜杠形态,
+  新 rows 54299→**54287 B**(`80466bc3…`)、新计划 30293→**30270 B**。
+- **错引用**:计划里把上一场 VM 上电的启动原件写成 `S_S3/01_boot.rx.bin`,目录实名是 `S_S3/01_rst.boot.rx.bin`。
+  已按目录实名更正。这次是"凭记忆写文件名"造成的,教训是引用现场文件必须先列目录。
+
+改后重新跑了 `--validate-plan`(仍是 38 项 / fail=1,同一项 GF2),并重算了两份 SHA256SUMS。
 
 ## 6 原件保护
 

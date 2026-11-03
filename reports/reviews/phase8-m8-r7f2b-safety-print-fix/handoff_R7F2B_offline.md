@@ -1,7 +1,7 @@
 # M8-R7F2B 审核交接:补丁落地 + source_shape 承接件 + 一次构建(离线轮,设备动作 0)
 
 本轮 = A 复审 `NS800_R7F2B_A_Review_and_Print_Fix_20261104.zip`(sha256 `9fad8f1d…b6e1`,基线 `70deff8`)的 5 项离线落地。
-机器可判定版同目录 `handoff_R7F2B_offline.json`(15834 B,`fd552c714a0217b313186b7c7594d8ed27732b0c72ccc2c4cd391f85137cae1b`)。
+机器可判定版同目录 `handoff_R7F2B_offline.json`(16548 B,`55d715c83df1227353ca17aed8fce12b1209987e0f8e0e18a21480a1149f20fb`)。
 
 ## 0 一句话
 
@@ -14,7 +14,7 @@
    `safety_gpio.c` blob `b242dfad…` → `2055c7496be91830709155a9ffb0720a0b0bdb8d`(= 补丁声明的 postimage),
    `git diff --numstat` = 2 增 2 删。磁盘工作树一度被 `git apply` 在 `core.autocrlf=true` 下写成 CRLF,已归一回 LF-only,
    版本化 blob 不受影响。
-2. **新 rows**:`field/rows_r7f2b_source_shape.json`(54299 B,`4c57fd3c…`)。底稿 `rows_startup_b424.json`(53635 B,`916eddaa…`)
+2. **新 rows**:`field/rows_r7f2b_source_shape.json`(54287 B,`80466bc3…`)。底稿 `rows_startup_b424.json`(53635 B,`916eddaa…`)
    与全部现场原件逐字节未动;只替换 `commands.safety_status` / `commands.motor_status`,A 的行与 `_provenance` 一字未改,
    每条附 `_derivation_r7f2b`(含被替换掉的旧行原文 + 底稿 hash)。全件标 `kind = source_shape 预测,不是板级采集`。
 3. **计划承接**:`field/plan_r7f2b_newimage_draft.json` 由已复审计划派生(派生编辑逐条在 `derivation_edits`);
@@ -45,6 +45,9 @@
 - **GF4** 同一枚新镜像仍有 **35 条** >127 B 的带标签格式串(最宽 257 B 的 `[MOT] !! 业务失败…`)。本轮按 A §5 只改指定那一处,未扩改。
 - **GF5** 勘误:上一场写「150 B 正文 + LF = 151 B」,正确是 **149 B 正文 + LF = 150 B**(源码转义 `\n` 被多算一次)。
   越限结论与"前 126 B 逐字节相等"不受影响;已提交件不回改,勘误进 manifest 与本件。
+- **GF6** 本轮**第一次提交**(`275c37f`)的两件派生件自身有缺陷:仓库相对路径被 `str(WindowsPath)` 写成反斜杠形式,
+  且把上一场启动原件名凭记忆写成 `01_boot.rx.bin`(目录实名 `01_rst.boot.rx.bin`)。远端逐 blob 回读抓到,
+  本轮以第二次提交修正(路径全改正斜杠、文件名按实名),`275c37f` 保留不回改;改后重跑 `--validate-plan` 仍是 38 项 / fail=1(同一项 GF2)。
 
 ## 4 下一场(草稿,不是批准)
 

@@ -2,7 +2,7 @@
  "round": "phase8-m8-r7f2b-safety-print-fix",
  "title": "M8-R7F2B: A 复审 5 项离线落地(补丁+source_shape rows+计划承接+一次构建), 设备动作 0",
  "date_local": "2026-11-04",
- "execution_head": "70deff806e8b548dee23afb06a6fcdf20937b015",
+ "execution_head": "275c37f5d5fc4083a5c9e8e23dfd0152f6bdd4a7",
  "execution_head_note": "本字段是**生成本件时**的 HEAD(上一轮提交), 本轮归档提交在它之后 —— 自记提交号会构成循环, 所以不在此声称本轮 commit/hash。",
  "branch": "feature/m8-sg-adc-relative-protection",
  "authored_by": "local agent (LMX 的本地执行)",
@@ -154,13 +154,13 @@
  "artifacts_new_this_round": {
   "rows_source_shape": {
    "path": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/rows_r7f2b_source_shape.json",
-   "bytes": 54299,
-   "sha256": "4c57fd3c7fc9b4c96cf28a76726ac0526f2fbb7f66882e4b40ddab60f6039ec2"
+   "bytes": 54287,
+   "sha256": "80466bc3a23c60dd2b86a59b91f2e4f8b63d52ac25db49c490cb72c15669daa5"
   },
   "draft_plan": {
    "path": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/plan_r7f2b_newimage_draft.json",
-   "bytes": 30293,
-   "sha256": "80c4b7818496ba202b6bc771906cccca2df176ddc67ea03c3f07770e9ff314b8"
+   "bytes": 30270,
+   "sha256": "fe4470535778d4ddcddb74c1b83bca68d988fe0a3554240bb4c84ebc498c8259"
   },
   "build_manifest": {
    "path": "reports/firmware/phase8-m8-r7f2b-safety-print-fix/build_manifest.json",
@@ -205,6 +205,13 @@
    "item": "上一场归档把这条行写成「150 B 正文 + LF = 151 B」",
    "勘正": "运行时展开是 149 B 正文 + LF = 150 B(源码转义 \\n 被多算一次); 越限与「前 126 B 逐字节相等」不受影响",
    "handling": "已提交件按字节冻结不回改, 勘误进 manifest 与本件"
+  },
+  {
+   "id": "GF6",
+   "item": "本轮第一次提交(275c37f)的两件承接件里, 仓库相对路径被写成 Windows 反斜杠形式, 并且把上一场的启动原件名写成了 01_boot.rx.bin(真实名 01_rst.boot.rx.bin)",
+   "root_cause": "生成器用 str(WindowsPath.relative_to(...)) 取相对路径(得到 backslash), 另一处引用现场文件名时凭记忆而没有列目录",
+   "classification": "派生包自身缺陷(可移植路径 + 错引用), 不影响镜像/源码身份",
+   "handling": "本轮以修正提交重算派生: 全部路径改 as_posix(), 现场文件名按目录实名更正; 上一提交 275c37f 保留不回改, 远端逐 blob 回读同时核对 tip 与 tip^"
   }
  ],
  "not_proven": [
@@ -242,13 +249,13 @@
   },
   {
    "path": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/rows_r7f2b_source_shape.json",
-   "bytes": 54299,
-   "sha256": "4c57fd3c7fc9b4c96cf28a76726ac0526f2fbb7f66882e4b40ddab60f6039ec2"
+   "bytes": 54287,
+   "sha256": "80466bc3a23c60dd2b86a59b91f2e4f8b63d52ac25db49c490cb72c15669daa5"
   },
   {
    "path": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/plan_r7f2b_newimage_draft.json",
-   "bytes": 30293,
-   "sha256": "80c4b7818496ba202b6bc771906cccca2df176ddc67ea03c3f07770e9ff314b8"
+   "bytes": 30270,
+   "sha256": "fe4470535778d4ddcddb74c1b83bca68d988fe0a3554240bb4c84ebc498c8259"
   },
   {
    "path": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/validate_plan_offline_draft.txt",

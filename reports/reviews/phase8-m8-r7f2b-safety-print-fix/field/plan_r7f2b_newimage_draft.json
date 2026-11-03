@@ -404,12 +404,12 @@
   "passive_boot": "Existing dangerous-text gate only. Raw boot bytes must be separately reviewed for NUL/UTF8 and specific print completeness; generic dispatch success is not full print acceptance."
  },
  "plan_identity": {
-  "path": "reports\\reviews\\phase8-m8-r7f2b-safety-print-fix\\field\\plan_r7f2b_newimage_draft.json",
-  "derived_from": "reports\\reviews\\phase8-m8-r7f1a-minimal-c-patch\\field\\plan_startup_b424_reviewed.json",
+  "path": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/plan_r7f2b_newimage_draft.json",
+  "derived_from": "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/plan_startup_b424_reviewed.json",
   "rows_file": {
-   "path": "reports\\reviews\\phase8-m8-r7f2b-safety-print-fix\\field\\rows_r7f2b_source_shape.json",
-   "bytes": 54299,
-   "sha256": "4c57fd3c7fc9b4c96cf28a76726ac0526f2fbb7f66882e4b40ddab60f6039ec2"
+   "path": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/rows_r7f2b_source_shape.json",
+   "bytes": 54287,
+   "sha256": "80466bc3a23c60dd2b86a59b91f2e4f8b63d52ac25db49c490cb72c15669daa5"
   }
  },
  "quota": {
@@ -440,7 +440,7 @@
   "software_input_commit": null,
   "tested_image_build_commit": null,
   "build_time_head_commit": null,
-  "note": "本轮构建发生在提交 70deff806e8b548dee23afb06a6fcdf20937b015 **之前**, 编译输入的实际字节由 build_manifest.json 的 source_inputs_compiled_from_disk 登记(compiled_from_disk_*), 不声称某个 commit 的树就是被编译的树。A 复审基线是 70deff806e8b548dee23afb06a6fcdf20937b015。",
+  "note": "本轮构建发生在提交 275c37f5d5fc4083a5c9e8e23dfd0152f6bdd4a7 **之前**, 编译输入的实际字节由 build_manifest.json 的 source_inputs_compiled_from_disk 登记(compiled_from_disk_*), 不声称某个 commit 的树就是被编译的树。A 复审基线是 70deff806e8b548dee23afb06a6fcdf20937b015。",
   "executor": {
    "path": "reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py",
    "bytes": 219491,
@@ -451,10 +451,10 @@
    "path": "reports/firmware/phase8-m8-r7f2b-safety-print-fix/rt-thread-motor-m1-candidate.bin",
    "bytes": 292708,
    "sha256": "502dca5d8c7ebfa794f890a9c03bc258fc9753f57b6a80c2f1e08add69888a7a",
-   "manifest": "reports\\firmware\\phase8-m8-r7f2b-safety-print-fix\\manifest_binding_b502.json",
+   "manifest": "reports/firmware/phase8-m8-r7f2b-safety-print-fix/manifest_binding_b502.json",
    "manifest_bytes": 1207,
    "manifest_sha256": "c8e59b36b0b3543aed744dcae933c4032d921c991c4d9988a98f8d925b50dd4e",
-   "source_build_manifest": "reports\\firmware\\phase8-m8-r7f2b-safety-print-fix\\build_manifest.json",
+   "source_build_manifest": "reports/firmware/phase8-m8-r7f2b-safety-print-fix/build_manifest.json",
    "source_build_manifest_bytes": 12985,
    "source_build_manifest_sha256": "059bebe6419f6093636186ffe3f9a8f1dc90c966b1da6e10f01e44d1062b980d",
    "manifest_target": "rt-thread-motor-m1-candidate",
@@ -474,7 +474,7 @@
    "bytes": 292684,
    "sha256": "b4243886818b6b2cf2e30d10864272225e1b0e66c8435c8a50bb449053e153bf",
    "proven_on_board": "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T161728Z/readback.bin (逐字节回读相等)",
-   "also_observed_running": "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T163850Z/S_S3/01_boot.rx.bin — VM 上电那次只复位+采集, 未再回读, 所以板级**字节**证据仍来自 161728Z",
+   "also_observed_running": "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T163850Z/S_S3/01_rst.boot.rx.bin — VM 上电那次只复位+采集, 未再回读, 所以板级**字节**证据仍来自 161728Z",
    "not_current_power_state": true
   },
   "build_inputs": {
@@ -571,13 +571,13 @@
  },
  "derived_from": {
   "plan": {
-   "path": "reports\\reviews\\phase8-m8-r7f1a-minimal-c-patch\\field\\plan_startup_b424_reviewed.json",
+   "path": "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/plan_startup_b424_reviewed.json",
    "bytes": 23218,
    "sha256": "fa3331862d498bf7aa17966558c535429c4b6696653cb52ea67a3106c0a43d13",
    "status_in_repo": "A_TECHNICALLY_REVIEWED_REQUIRES_NEW_USER_APPROVAL"
   },
   "rows_base": {
-   "path": "reports\\reviews\\phase8-m8-r7f1a-minimal-c-patch\\field\\rows_startup_b424.json",
+   "path": "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/rows_startup_b424.json",
    "sha256": "916eddaa172e6f30b9a9e327f21f4b9274cca2bab17201c329b32997d286f746"
   },
   "review_attachment": {
@@ -619,9 +619,9 @@
   "dmm_readings": 0
  },
  "working_tree_now": {
-  "head": "70deff806e8b548dee23afb06a6fcdf20937b015",
+  "head": "275c37f5d5fc4083a5c9e8e23dfd0152f6bdd4a7",
   "branch": "feature/m8-sg-adc-relative-protection",
-  "porcelain_at_generation": 10
+  "porcelain_at_generation": 1
  },
  "known_checker_findings": {
   "expected_offline_validate_result": "38 项 checks, fail=1; 唯一 FAIL 是 PLAN_MOTION_CAP_BUDGET|all|FAIL|caps=[] sum=0 total=0 starts=0",
