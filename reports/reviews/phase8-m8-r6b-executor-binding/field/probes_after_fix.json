@@ -1,0 +1,165 @@
+{
+  "repo": "D:\\ns800",
+  "output": "C:\\Users\\LMX\\AppData\\Local\\Temp\\a-r6a-probes-kgi87s6y",
+  "device_actions": 0,
+  "serial_ports": 0,
+  "results": [
+    {
+      "probe": "clean-control",
+      "raised": null,
+      "tx": [
+        "motor_start",
+        "motor_stop",
+        "motor_disarm",
+        "motor_status"
+      ],
+      "closed": true,
+      "cleanup_events": [],
+      "result": {
+        "status": "OK",
+        "code": "",
+        "disarm": "CONFIRMED_DISABLED",
+        "success": true,
+        "cleanup_errors": [],
+        "cleanup_overruns": []
+      }
+    },
+    {
+      "probe": "negative-spent-control",
+      "raised": null,
+      "tx": [
+        "motor_start",
+        "motor_stop",
+        "motor_disarm",
+        "motor_status"
+      ],
+      "closed": true,
+      "cleanup_events": [],
+      "result": {
+        "status": "OK",
+        "code": "CLEANUP_RESERVE_EXHAUSTED",
+        "disarm": "CONFIRMED_DISABLED",
+        "success": false,
+        "cleanup_errors": [
+          "APPROVAL_COMMIT_REFUSED_APPROVAL_LEDGER_CORRUPT",
+          "APPROVAL_COMMIT_REFUSED_APPROVAL_LEDGER_CORRUPT"
+        ],
+        "cleanup_overruns": [
+          "cleanup_motor_stop:APPROVAL_LEDGER_CORRUPT_SENT_ANYWAY",
+          "cleanup_motor_disarm:APPROVAL_LEDGER_CORRUPT_SENT_ANYWAY",
+          "cleanup_motor_status:APPROVAL_LEDGER_CORRUPT_SENT_ANYWAY"
+        ]
+      }
+    },
+    {
+      "probe": "pending-name-list",
+      "raised": null,
+      "tx": [
+        "motor_start",
+        "motor_stop",
+        "motor_disarm",
+        "motor_status"
+      ],
+      "closed": true,
+      "cleanup_events": [],
+      "result": {
+        "status": "OK",
+        "code": "CLEANUP_RESERVE_EXHAUSTED",
+        "disarm": "CONFIRMED_DISABLED",
+        "success": false,
+        "cleanup_errors": [
+          "APPROVAL_COMMIT_REFUSED_APPROVAL_LEDGER_CORRUPT",
+          "APPROVAL_COMMIT_REFUSED_APPROVAL_LEDGER_CORRUPT"
+        ],
+        "cleanup_overruns": [
+          "cleanup_motor_stop:APPROVAL_LEDGER_CORRUPT_SENT_ANYWAY",
+          "cleanup_motor_disarm:APPROVAL_LEDGER_CORRUPT_SENT_ANYWAY",
+          "cleanup_motor_status:APPROVAL_LEDGER_CORRUPT_SENT_ANYWAY"
+        ]
+      }
+    },
+    {
+      "probe": "in_memory_plan_differs_from_approved_file",
+      "approved_file_unchanged": true,
+      "approved_download_argv": [
+        "python",
+        "-m",
+        "pyocd",
+        "flash",
+        "--pack",
+        "C:/Keil_v5/ARM/PACK/.Download/NOVOSENSE.NS800RT7XXX.0.5.3.pack",
+        "-t",
+        "ns800rt7p65d_dhqfby2",
+        "-u",
+        "@UID_FILE",
+        "-f",
+        "1000000",
+        "--no-config",
+        "-Oauto_unlock=false",
+        "-Ocache.enable_memory=false",
+        "-Ocache.read_code_from_elf=false",
+        "-e",
+        "sector",
+        "reports/firmware/phase8-m8-relative-protection-r3/rt-thread-motor-m1.axf"
+      ],
+      "memory_backend_calls": [],
+      "status": "REFUSED",
+      "code": "PLAN_NOT_FROM_APPROVED_SNAPSHOT",
+      "stages": [],
+      "spent": null
+    },
+    {
+      "probe": "cli_plan_read_then_hash_interleaving",
+      "rc": 1,
+      "file_restored_before_hash": false,
+      "file_matches_approval": false,
+      "memory_backend_calls": [],
+      "stdout": "C:\\Users\\LMX\\AppData\\Local\\Temp\\a-r6a-probes-kgi87s6y\\cli-read-hash-interleaving\\stdout.txt"
+    },
+    {
+      "probe": "clean_utf8_crosses_512B",
+      "raw_bytes": 554,
+      "bytes": 554,
+      "passed": true
+    },
+    {
+      "probe": "cleanup_utf8_crosses_512B",
+      "matrix": [
+        {
+          "input": "clean",
+          "bytes": 1176,
+          "errors": [],
+          "disable_proven": true,
+          "raw_preserved": true
+        },
+        {
+          "input": "nul",
+          "bytes": 1179,
+          "errors": [
+            "motor_status:NUL_BYTE_IN_RESPONSE"
+          ],
+          "disable_proven": false,
+          "raw_preserved": true
+        },
+        {
+          "input": "illegal_utf8",
+          "bytes": 1179,
+          "errors": [
+            "motor_status:ILLEGAL_BYTES_IN_RESPONSE"
+          ],
+          "disable_proven": false,
+          "raw_preserved": true
+        },
+        {
+          "input": "danger_and_illegal",
+          "bytes": 1188,
+          "errors": [
+            "motor_status:DANGER_TEXT_IN_STREAM"
+          ],
+          "disable_proven": false,
+          "raw_preserved": true
+        }
+      ]
+    }
+  ]
+}

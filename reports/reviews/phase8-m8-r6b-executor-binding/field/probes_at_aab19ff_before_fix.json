@@ -1,0 +1,193 @@
+{
+  "repo": "D:\\ns800",
+  "output": "C:\\Users\\LMX\\AppData\\Local\\Temp\\a-r6a-probes-32797o2h",
+  "device_actions": 0,
+  "serial_ports": 0,
+  "results": [
+    {
+      "probe": "clean-control",
+      "raised": null,
+      "tx": [
+        "motor_start",
+        "motor_stop",
+        "motor_disarm",
+        "motor_status"
+      ],
+      "closed": true,
+      "cleanup_events": [],
+      "result": {
+        "status": "OK",
+        "code": "",
+        "disarm": "CONFIRMED_DISABLED",
+        "success": true,
+        "cleanup_errors": [],
+        "cleanup_overruns": []
+      }
+    },
+    {
+      "probe": "negative-spent-control",
+      "raised": null,
+      "tx": [
+        "motor_start",
+        "motor_stop",
+        "motor_disarm",
+        "motor_status"
+      ],
+      "closed": true,
+      "cleanup_events": [],
+      "result": {
+        "status": "OK",
+        "code": "CLEANUP_RESERVE_EXHAUSTED",
+        "disarm": "CONFIRMED_DISABLED",
+        "success": false,
+        "cleanup_errors": [
+          "APPROVAL_COMMIT_REFUSED_APPROVAL_LEDGER_CORRUPT",
+          "APPROVAL_COMMIT_REFUSED_APPROVAL_LEDGER_CORRUPT"
+        ],
+        "cleanup_overruns": [
+          "cleanup_motor_stop:APPROVAL_LEDGER_CORRUPT_SENT_ANYWAY",
+          "cleanup_motor_disarm:APPROVAL_LEDGER_CORRUPT_SENT_ANYWAY",
+          "cleanup_motor_status:APPROVAL_LEDGER_CORRUPT_SENT_ANYWAY"
+        ]
+      }
+    },
+    {
+      "probe": "pending-name-list",
+      "raised": "TypeError:unhashable type: 'list'",
+      "tx": [
+        "motor_start"
+      ],
+      "closed": false,
+      "cleanup_events": [
+        {
+          "err": "TypeError(\"unhashable type: 'list'\")",
+          "kind": "CLEANUP_FRAME_EXCEPTION",
+          "t_s": 0.0
+        }
+      ],
+      "result": null
+    },
+    {
+      "probe": "in_memory_plan_differs_from_approved_file",
+      "approved_file_unchanged": true,
+      "approved_download_argv": [
+        "python",
+        "-m",
+        "pyocd",
+        "flash",
+        "--pack",
+        "C:/Keil_v5/ARM/PACK/.Download/NOVOSENSE.NS800RT7XXX.0.5.3.pack",
+        "-t",
+        "ns800rt7p65d_dhqfby2",
+        "-u",
+        "@UID_FILE",
+        "-f",
+        "1000000",
+        "--no-config",
+        "-Oauto_unlock=false",
+        "-Ocache.enable_memory=false",
+        "-Ocache.read_code_from_elf=false",
+        "-e",
+        "sector",
+        "reports/firmware/phase8-m8-relative-protection-r3/rt-thread-motor-m1.axf"
+      ],
+      "memory_backend_calls": [
+        {
+          "name": "download",
+          "argv": [
+            "MEMORY_ONLY_UNAPPROVED_ARGUMENTS"
+          ]
+        }
+      ],
+      "status": "OK",
+      "code": null,
+      "stages": [
+        {
+          "id": "S1",
+          "status": "OK",
+          "code": null
+        }
+      ],
+      "spent": {
+        "approved_reboot": 0,
+        "blackbox_clear": 0,
+        "cleanup_motor_disarm": 0,
+        "cleanup_motor_status": 0,
+        "cleanup_motor_stop": 0,
+        "config_save": 0,
+        "diag_profile_commit": 0,
+        "diag_profile_learn": 0,
+        "diag_profile_zero": 0,
+        "dmm_readings": 0,
+        "download": 1,
+        "explicit_reset": 0,
+        "irq_polarity_prep": 0,
+        "motion_cap_seconds_per_run": 0,
+        "motor_run": 0,
+        "motor_run_seconds_total": 0,
+        "physical_collision": 0,
+        "port_open": 0,
+        "readback": 0,
+        "retry": 0,
+        "tmc_config_apply": 0
+      }
+    },
+    {
+      "probe": "cli_plan_read_then_hash_interleaving",
+      "rc": 0,
+      "file_restored_before_hash": true,
+      "file_matches_approval": true,
+      "memory_backend_calls": [
+        [
+          "MEMORY_ONLY_UNAPPROVED_ARGUMENTS"
+        ]
+      ],
+      "stdout": "C:\\Users\\LMX\\AppData\\Local\\Temp\\a-r6a-probes-32797o2h\\cli-read-hash-interleaving\\stdout.txt"
+    },
+    {
+      "probe": "clean_utf8_crosses_512B",
+      "raw_bytes": 554,
+      "bytes": 554,
+      "passed": true
+    },
+    {
+      "probe": "cleanup_utf8_crosses_512B",
+      "matrix": [
+        {
+          "input": "clean",
+          "bytes": 1176,
+          "errors": [],
+          "disable_proven": true,
+          "raw_preserved": true
+        },
+        {
+          "input": "nul",
+          "bytes": 1179,
+          "errors": [
+            "motor_status:NUL_BYTE_IN_RESPONSE"
+          ],
+          "disable_proven": false,
+          "raw_preserved": true
+        },
+        {
+          "input": "illegal_utf8",
+          "bytes": 1179,
+          "errors": [
+            "motor_status:ILLEGAL_BYTES_IN_RESPONSE"
+          ],
+          "disable_proven": false,
+          "raw_preserved": true
+        },
+        {
+          "input": "danger_and_illegal",
+          "bytes": 1188,
+          "errors": [
+            "motor_status:DANGER_TEXT_IN_STREAM"
+          ],
+          "disable_proven": false,
+          "raw_preserved": true
+        }
+      ]
+    }
+  ]
+}

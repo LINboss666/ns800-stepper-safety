@@ -1196,6 +1196,12 @@ def validate_ledger_doc(doc, approval_id, identities, caps):
         if pmiss:
             raise Stop("APPROVAL_LEDGER_CORRUPT", "pending[%d]_missing=%s"
                        % (i, ",".join(pmiss)))
+        if not isinstance(p["name"], str) or not p["name"]:
+            # R6B §4: 类型敏感操作(成员查找 / 下标)之前先验类型。上一版直接
+            # `p["name"] not in have_caps`, 合法 JSON 里的 `name: []` 就抛
+            # TypeError: unhashable type: 'list' —— 普通异常会跳出清理框架,
+            # 必要撤能一条都不发, 端口也不关。结构损坏必须是**具名账本拒绝**。
+            raise Stop("APPROVAL_LEDGER_CORRUPT", "pending[%d]_name_form=%r" % (i, p["name"]))
         if p["name"] not in have_caps:
             raise Stop("APPROVAL_LEDGER_CORRUPT", "pending[%d]_name_unknown=%s" % (i, p["name"]))
         if not is_count(p["n"]) or p["n"] < 1:
@@ -1256,12 +1262,44 @@ def approval_path(root, approval_id):
     return Path(root) / ("approval_%s.json" % safe)
 
 
-def current_identities(plan, plan_path, repo_root):
-    """身份**当场从真实文件算**, 不照抄 JSON 里登记的哈希(那正是复审 §6 指出的"登记≠实际")。"""
+def read_plan_snapshot(path):
+    """R6B §5: **一次**读盘, 同一份原始字节同时给出 plan 的 SHA、解析结果与执行对象。
+
+    旧写法是 `json.loads(read_text())` 先拿对象, 之后 `current_identities()` 再**另读一次**
+    文件算 SHA —— 两次读之间文件被换掉时, 核对的是后来的字节、跑的却是先前的对象
+    (复审的两条负例: 内存 plan 被改 / CLI 读取与哈希之间的替换交错, 未批准的 download argv
+    都能到达真实后端)。快照只有一份 => 后面的 stages/tools/argv/额度/时间窗只能从它推导。
+    """
+    p = Path(path)
+    raw = p.read_bytes()
+    try:
+        doc = json.loads(raw.decode("utf-8-sig"))
+    except UnicodeDecodeError as e:
+        raise Stop("PLAN_SNAPSHOT_UNDECODABLE", "%s|%r" % (str(p), e))
+    except ValueError as e:
+        raise Stop("PLAN_SNAPSHOT_UNPARSEABLE", "%s|%r" % (str(p), e))
+    if not isinstance(doc, dict):
+        raise Stop("PLAN_SNAPSHOT_UNPARSEABLE", "%s|top_level=%s" % (str(p), type(doc).__name__))
+    return {"path": str(p), "bytes": len(raw), "sha256": sha_bytes(raw), "doc": doc}
+
+
+def current_identities(plan, plan_path, repo_root, snapshot=None):
+    """身份**当场从真实文件算**, 不照抄 JSON 里登记的哈希(那正是复审 §6 指出的"登记≠实际")。
+
+    R6B §5: 给了快照时 plan_sha256 就用**快照那份字节**的散列, 不再第二次读盘 —— 并且先确认
+    要执行的这个对象就是快照解析出来的那一份; 不是就具名拒绝, 不替别的对象作保。
+    """
     ids = {"executor_sha256": sha_of(__file__)}
-    pp = Path(plan_path) if plan_path else None
-    if pp and pp.is_file():
-        ids["plan_sha256"] = sha_of(pp)
+    if snapshot is not None:
+        if snapshot.get("doc") is not plan and snapshot.get("doc") != plan:
+            raise Stop("PLAN_SNAPSHOT_NOT_EXECUTED_OBJECT",
+                       "传入的 plan 对象与快照(%s)解析出的不是同一份 => 不用快照哈希给它作证"
+                       % snapshot.get("sha256", "-")[:12])
+        ids["plan_sha256"] = snapshot["sha256"]
+    else:
+        pp = Path(plan_path) if plan_path else None
+        if pp and pp.is_file():
+            ids["plan_sha256"] = sha_of(pp)
     img = (plan.get("identity_binding") or {}).get("image") or {}
     if img.get("path"):
         p = Path(repo_root) / img["path"]
@@ -1554,6 +1592,11 @@ def cleanup(port, led, clock, budget, transport, fixture, feed_hook=None,
                             reservations.append(res)
                     except Stop as e:
                         denied = e.code     # 账本说没了也照发: 见本函数头的"撤能优先于额度"
+                    except Exception as e:
+                        # R6B §4.2: 账本的**普通** Python 异常同样不许离开清理框架 —— 这一条
+                        # 照发, 后面两条必要撤能也照发; 但这是一条具名披露 => 本会话一律不算成功。
+                        # 不是"忽略异常报成功": 披露进 overruns, success 由 overruns 判掉。
+                        denied = "APPROVAL_RESERVE_FRAME_ERROR_%s" % e.__class__.__name__
                 if quota_box[key] <= 0:
                     overruns.append(key + ":RESERVE_EXHAUSTED_SENT_ANYWAY")
                 else:
@@ -2143,25 +2186,40 @@ def exec_session(session_id, steps, outdir, transport, fixture, port_name,
         # 会话结束才把每条预占**确认消耗**(摘 pending + 留痕)。这里绝不做反方向的事:
         # 中途 STOP / 被拒绝 / 业务失败都照样确认, 额度一条都不退 —— 崩溃走不到这一行,
         # 未确认的预占就一直挂在 pending 上并按已消耗计入, 下一次动作看得见。
-        if approval is not None:
-            ok_now = (ret or {}).get("status") in ("OK", "OBSERVATION_NO_TRIGGER")
-            for res in list(reservations):
-                try:
-                    approval.commit(res, ok=ok_now)
-                except Stop as e:
-                    errors.append("APPROVAL_COMMIT_REFUSED_%s" % e.code)
-                    led.ev("APPROVAL_COMMIT_FAILED", tag=res["tag"], code=e.code,
-                           detail=e.detail)
-            del reservations[:]
         try:
-            if port is not None:
-                port.close()
-                led.ev("PORT_CLOSED")
-            else:
-                led.ev("PORT_NEVER_OPENED")
+            if approval is not None:
+                ok_now = (ret or {}).get("status") in ("OK", "OBSERVATION_NO_TRIGGER")
+                for res in list(reservations):
+                    try:
+                        approval.commit(res, ok=ok_now)
+                    except Stop as e:
+                        errors.append("APPROVAL_COMMIT_REFUSED_%s" % e.code)
+                        try:
+                            led.ev("APPROVAL_COMMIT_FAILED", tag=res["tag"], code=e.code,
+                                   detail=e.detail)
+                        except Exception as e2:
+                            # 留痕自己炸了也只多记一条错, 不吃掉后面的确认与关闭
+                            errors.append("APPROVAL_COMMIT_EVIDENCE_%s" % e2.__class__.__name__)
+                    except Exception as e:
+                        # R6B §4.2: 上一版只捕 Stop, 于是坏账引发的 TypeError 直接越过下面的
+                        # port.close()/led.close()(A 的 pending-name-list 探针 closed=False)。
+                        errors.append("APPROVAL_COMMIT_FRAME_ERROR_%s" % e.__class__.__name__)
+                del reservations[:]
         except Exception as e:
-            errors.append("PORT_CLOSE:" + repr(e))
-        led.close()
+            errors.append("APPROVAL_FINALIZATION_FRAME_ERROR_%s:%s"
+                          % (e.__class__.__name__, repr(e)))
+        finally:
+            # R6B §4.3: 账本收尾(确认消耗/存盘)的**任何**错都不许跳过端口与日志的关闭。
+            # 关端口只是交还句柄, **不等于**证得禁能 —— 禁能只由上面清理拿到的新 status 决定。
+            try:
+                if port is not None:
+                    port.close()
+                    led.ev("PORT_CLOSED")
+                else:
+                    led.ev("PORT_NEVER_OPENED")
+            except Exception as e:
+                errors.append("PORT_CLOSE:" + repr(e))
+            led.close()
     if ret is None:
         ret = {"status": "STOP", "code": "NO_PRIMARY", "detail": "循环结束但没有落定状态"}
     elapsed = budget.close()
@@ -3234,7 +3292,8 @@ def dispatch_refusal(plan, profile, outdir, code):
 
 def dispatch_plan(plan, transport, backend_name, outdir, clock, profile, port,
                   repo_root, approval_token=None, expected_token=None, uid_file=None,
-                  plan_dir=None, approval_id=None, approval_root=None, plan_path=None):
+                  plan_dir=None, approval_id=None, approval_root=None, plan_path=None,
+                  plan_snapshot=None):
     """一次批准 -> 从 S0 一直走到**计划里的最后一个阶段**; 成功阶段只记检查点(不为下一阶段
     重新批准、不重新下载), **失败**才终止。
     整包共用同一本额度账(quota_box)与同一个动作后端; 每个串口会话仍各开一次端口。
@@ -3256,6 +3315,21 @@ def dispatch_plan(plan, transport, backend_name, outdir, clock, profile, port,
         # 复审 §4: 真实整包必须从**一份文件**执行 —— "计划/步骤与批准字节一致"这句话
         # 需要一个可重读的字节来源, 内存对象不算。没有 --plan 就没有可核对的东西, 一条不发。
         return dispatch_refusal(plan, profile, outdir, "REAL_DISPATCH_REQUIRES_PLAN_FILE")
+    snap = plan_snapshot
+    if transport == "real":
+        # R6B §5: 真实整包的**执行对象**与**身份哈希**必须来自同一份原始字节。旧版这里
+        # 只把 plan_path 交给 current_identities 另读一次, 于是内存对象可以和被哈希的文件不同。
+        try:
+            snap = snap or read_plan_snapshot(plan_path)
+        except Stop as e:
+            return dispatch_refusal(plan, profile, outdir, e.code)
+        except OSError as e:
+            return dispatch_refusal(plan, profile, outdir, "PLAN_SNAPSHOT_UNREADABLE")
+        if snap["doc"] != plan:
+            # §5.1 内存对象被改(只剩 S1 / download.argv 换掉) 与 §5.2 CLI 在"读取"与"哈希"
+            # 之间被换成另一份文件, 都落在这里: 这一刻 UID 没读、工具没起、端口没开、额度没预占。
+            return dispatch_refusal(plan, profile, outdir, "PLAN_NOT_FROM_APPROVED_SNAPSHOT")
+        plan = snap["doc"]      # 之后 stages/tools/argv/quota/时间窗**只**从这份已核快照推导
     quota_box = dict(plan["quota"])
     used_box = {}
 
@@ -3266,7 +3340,8 @@ def dispatch_plan(plan, transport, backend_name, outdir, clock, profile, port,
     ledger_reservations = []
     try:
         approval = open_approval(transport, Path(approval_root or default_approval_root()),
-                                 approval_id, current_identities(plan, plan_path, repo_root),
+                                 approval_id, current_identities(plan, plan_path, repo_root,
+                                                                  snapshot=snap),
                                  plan["quota"], led, clock)
         if approval is not None:
             snap0 = approval.snapshot()      # 读盘即验身份: 损坏/版本/身份不符都在这一步炸
@@ -3695,25 +3770,38 @@ def main(argv=None):
         print("STUB_REFUSED:fixture_required", file=sys.stderr)
         return 4
     plan_doc = None
+    plan_snap = None
     if a.plan or a.dispatch or a.validate_plan or a.approval_init:
         if not a.plan:
             print("DISPATCH_REFUSED:plan_required", file=sys.stderr)
             return 4
-        plan_doc = json.loads(Path(a.plan).read_text(encoding="utf-8-sig"))
+        # R6B §5: 计划**只读一次盘**, 后面的身份哈希与整包执行对象都从这份快照推导
+        # (旧版是 read_text 拿对象 + current_identities 再读一次算 SHA, 两次读之间换文件即可绕过)
+        try:
+            plan_snap = read_plan_snapshot(a.plan)
+        except Stop as e:
+            print("PLAN_SNAPSHOT_REFUSED:%s|%s" % (e.code, e.detail), file=sys.stderr)
+            return 4
+        except OSError as e:
+            print("PLAN_SNAPSHOT_REFUSED:PLAN_SNAPSHOT_UNREADABLE|%r" % (e,), file=sys.stderr)
+            return 4
+        plan_doc = plan_snap["doc"]
     if a.approval_init:
         if not a.approval_id:
             print("APPROVAL_INIT_REFUSED:approval_id_required", file=sys.stderr)
             return 4
         try:
             p = approval_init(Path(a.approval_root or default_approval_root()), a.approval_id,
-                              current_identities(plan_doc, a.plan, a.repo_root),
+                              current_identities(plan_doc, a.plan, a.repo_root,
+                                                 snapshot=plan_snap),
                               plan_doc["quota"], note="offline --approval-init, no device action")
         except Stop as e:
             print("APPROVAL_INIT_REFUSED:%s|%s" % (e.code, e.detail), file=sys.stderr)
             return 4
         print("APPROVAL_INIT|path=%s|caps=%s|identities=%s" %
               (p, json.dumps(plan_doc["quota"], sort_keys=True),
-               json.dumps(current_identities(plan_doc, a.plan, a.repo_root), sort_keys=True)))
+               json.dumps(current_identities(plan_doc, a.plan, a.repo_root,
+                                             snapshot=plan_snap), sort_keys=True)))
         return 0
     if a.validate_plan:
         app = a.app_dir or str(Path(a.repo_root) / PLAN_APP_REL)
@@ -3732,7 +3820,8 @@ def main(argv=None):
                                 a.port, a.repo_root, a.approval_token, a.expected_token,
                                 a.uid_file, str(Path(a.plan).resolve().parent),
                                 approval_id=a.approval_id or None,
-                                approval_root=a.approval_root or None, plan_path=a.plan)
+                                approval_root=a.approval_root or None, plan_path=a.plan,
+                                plan_snapshot=plan_snap)
         except Stop as e:
             print(json.dumps({"status": "STOP", "code": e.code, "detail": e.detail},
                              ensure_ascii=False))

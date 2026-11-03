@@ -73,3 +73,5 @@ reports/reviews/phase8-m8-r6-offline-recovery/** -text
 # 派生件与对照文本是 LF 原件), 任何一边被转换都会让远端逐 blob 回读报假 hash_mismatch。
 reports/firmware/phase8-m8-r6a-offline-rework/** -text
 reports/reviews/phase8-m8-r6a-offline-rework/** -text
+
+reports/reviews/phase8-m8-r6b-executor-binding/** -text

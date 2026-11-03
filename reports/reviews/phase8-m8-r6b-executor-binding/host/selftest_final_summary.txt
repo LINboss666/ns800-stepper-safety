@@ -1,0 +1,9 @@
+CASE|FS115|PASS|codes=APPROVAL_LEDGER_CORRUPT,APPROVAL_LEDGER_CORRUPT,APPROVAL_LEDGER_CORRUPT,APPROVAL_LEDGER_CORRUPT 元证据(未保护成员查找)=TypeError:unhashable type: 'list';None;TypeError:unhashable type: 'dict';None 详情=pending[0]_name_form=[] | pending[0]_name_form=5 | pending[0]_name_form={} | pending[0]_name_form=''
+CASE|FS116|PASS|raised=None tx=motor_start,motor_stop,motor_disarm,motor_status closed=True 框架异常=0 success=False 披露=cleanup_motor_stop:APPROVAL_LEDGER_CORRUPT_SENT_ANYWAY;cleanup_motor_disarm:APPROVAL_LEDGER_CORRUPT_SENT_ANYWAY;cleanup_motor_status:APPROVAL_LEDGER_CORRUPT_SENT_ANYWAY 坏账仍=[]
+CASE|FS117|PASS|raised=None tx=motor_start,motor_stop,motor_disarm,motor_status closed=True 披露=cleanup_motor_stop:APPROVAL_RESERVE_FRAME_ERROR_RuntimeError_SENT_ANYWAY;cleanup_motor_disarm:APPROVAL_RESERVE_FRAME_ERROR_RuntimeError_SENT_ANYWAY;cleanup_motor_status:APPROVAL_RESERVE_FRAME_ERROR_RuntimeError_SENT_ANYWAY success=False
+CASE|FS118|PASS|raised=None closed=True PORT_CLOSED=True 错误=APPROVAL_COMMIT_FRAME_ERROR_RuntimeError;APPROVAL_COMMIT_FRAME_ERROR_RuntimeError;APPROVAL_COMMIT_FRAME_ERROR_RuntimeError disarm=CONFIRMED_DISABLED success=False
+CASE|FS119|PASS|status=REFUSED code=PLAN_NOT_FROM_APPROVED_SNAPSHOT 后端调用=[] 盘上计划仍=批准那份=True spent=None
+CASE|FS120|PASS|摘门后 后端调用=[['MEMORY_ONLY_UNAPPROVED_ARGUMENTS']] status=OK code=None
+CASE|FS121|PASS|交错发生=[True] rc=1 后端调用=[] 具名拒绝=True 盘上=批准那份=True
+SUMMARY|cases=121 pass=121 fail=0 executed=121 preserved_r2_identities=25|negative_injections=18|hardware_actions=0|transport=stub_only|port=IN_MEMORY
+SELFTEST_WORKDIR|C:\Users\LMX\AppData\Local\Temp\m8r3-field-selftest-e18qpj58

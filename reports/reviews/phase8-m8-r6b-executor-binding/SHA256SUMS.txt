@@ -1,0 +1,16 @@
+# sha256 * <仓库相对路径>(LF, 无 BOM; 本清单不哈希自身字节 —— 一条清单不能给自己的字节作证)
+# 生成方式: 对 reports/reviews/phase8-m8-r6b-executor-binding/ 下每个常规文件(排除 SHA256SUMS.txt、remote_readback.md 与 __pycache__) 直接读磁盘字节算 sha256
+# 条目数=12; 与 Git blob 的逐条复算由 host/staged_preflight_batch.py(提交前, 单批流)与推送后的远端逐 blob 回读完成
+# 重新生成: python reports/reviews/phase8-m8-idle-stack-r4/host/make_round_sums.py <本目录>
+77102a8bff73cc21dfa4744222ab1130b376224e91cd98711ac1a1c3dc5efffd  reports/reviews/phase8-m8-r6b-executor-binding/field/needles.json
+08fd5d522d85f05a1eb8d0c51f339ccd05c18761b85990d6454022d6686069bb  reports/reviews/phase8-m8-r6b-executor-binding/field/plan_core_r6b.json
+0ae4ef7b6925f20163c7cf00c7d1447262f73558547423c6e56f4db8ab139fc0  reports/reviews/phase8-m8-r6b-executor-binding/field/probes_after_fix.json
+27966862e251ca6227b1cdc9cc214296fe210800ffc7cd8a2bceaeb5ed0e5c00  reports/reviews/phase8-m8-r6b-executor-binding/field/probes_at_aab19ff_before_fix.json
+3a08721814c0e05e2e87ac7e43ed75b4e4f537d9671e816973432db3859f00a4  reports/reviews/phase8-m8-r6b-executor-binding/field/rows.json
+a67e8cb3b64a6028ad98eadbb84456de2ff30d2efe54786a15c2e94df4a9f69e  reports/reviews/phase8-m8-r6b-executor-binding/host/derive_matrix.txt
+9a1bc1b5f5b2e32a4315a53050d0a3ebffeaea59377516268e4dc6b4df3c53a2  reports/reviews/phase8-m8-r6b-executor-binding/host/derive_plan_r6b.py
+792b6fb4342ad9e6bdd8a21b91bf826d8b9f2f3cf4296dee0f855b0db2150cf2  reports/reviews/phase8-m8-r6b-executor-binding/host/independent_probes.py
+6666727023484103d592a88400b16b96c3a30d5d7fd6dba936fe259c083f18eb  reports/reviews/phase8-m8-r6b-executor-binding/host/r6b_before_after.py
+98eaffd226f5cf116b0e0d3716fc98fdab6f29de3dd727c8aa7010e0779e2cbb  reports/reviews/phase8-m8-r6b-executor-binding/host/r6b_before_after.txt
+7426f9aed0b004b1e9211cae3471391cba72e4051a09ef3f5c85c3a198e99c44  reports/reviews/phase8-m8-r6b-executor-binding/host/selftest_final_summary.txt
+75b948a536a376d9faa33a4eed919bfcc70970d63b5001f38726c1e1ae96950c  reports/reviews/phase8-m8-r6b-executor-binding/run_record.md

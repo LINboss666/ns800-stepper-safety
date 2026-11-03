@@ -15,8 +15,10 @@ name=CRUISE、manual 排在 arm 之后、packmem 命令串)的几条, 按 R3-B �
 **同一条性质**上 —— 审核要求"不要为夹具改固件输出", 所以这里改的是夹具。
 """
 import builtins
+import contextlib
 import copy
 import importlib.util
+import io
 import json
 import sys
 import tempfile
@@ -2809,6 +2811,291 @@ def s114_negative_split_rows_entry_gate_removed(m):
             (r["disarm"], r["success"], ";".join(r["cleanup_errors"]) or "-"))
 
 
+# ------------------------------------------------- R6B B1: 账本类型损坏与必要撤能/关闭的隔离
+B1_QUOTA = {"port_open": 1, "motor_run": 1, "cleanup_motor_stop": 1,
+            "cleanup_motor_disarm": 1, "cleanup_motor_status": 1}
+
+
+def _b1_session(m, tag, mutate=None, patch=None):
+    """复刻复审 R6B §4 的探针形状: 完整临时账 + 内存端口, 起转发出**之后**再改盘上的账。
+    返回 (结果或None, 逸出的异常repr或None, tx序列, 端口是否关闭, 台账事件)。"""
+    root = out_dir("r6b-" + tag)
+    clock = m.SimClock()
+    ids = full_ids(900 + len(tag))
+    path = m.approval_init(root, tag, ids, dict(B1_QUOTA),
+                           note="R6B B1 临时离线探针, 不产生任何现场批准")
+    led = m.Ledger(root / "approval-events.jsonl", clock, out_dir=root)
+    approval = m.ApprovalLedger(path, tag, ids, dict(B1_QUOTA), led, clock)
+    ports = []
+    old_port = m.FakePort
+
+    class Recorder(old_port):
+        def __init__(self, *a, **k):
+            super(Recorder, self).__init__(*a, **k)
+            ports.append(self)
+
+        def write(self, data):
+            n = super(Recorder, self).write(data)
+            if mutate and data.strip() == b"motor_start":
+                doc = json.loads(Path(path).read_text(encoding="utf-8"))
+                mutate(doc)
+                Path(path).write_text(json.dumps(doc, ensure_ascii=False), encoding="utf-8")
+            return n
+
+    m.FakePort = Recorder
+    saved = {}
+    if patch:
+        patch(m, saved)
+    result, raised = None, None
+    try:
+        result = m.exec_session(tag, [{"cmd": "motor_start", "as": "start", "seconds": 1,
+                                       "quota": {"name": "motor_run", "n": 1},
+                                       "expect_absent": ["REFUSED"]}],
+                                root, "stub", motion_fx({"motor_start": []}), "MEMORY_ONLY",
+                                30, clock, motion_cap_seconds=5, plan={"quota": dict(B1_QUOTA)},
+                                quota_box=dict(B1_QUOTA), approval=approval)
+    except Exception as e:
+        raised = "%s:%s" % (e.__class__.__name__, e)
+    finally:
+        for k, v in saved.items():
+            setattr(v[0], k, v[1])
+        m.FakePort = old_port
+        led.close()
+    evs = [json.loads(s) for s in (Path(root) / tag / "ledger.jsonl").read_text(
+        encoding="utf-8").splitlines()]
+    tx = [e["bytes"].strip() for e in evs if e["kind"] == "TX"]
+    return (result, raised, tx, (ports[0]._closed if ports else None), evs, Path(path))
+
+
+def _must_raise_TypeError(v):
+    """元证据: 未受保护的成员查找对该值**确实**炸普通异常 —— 说明类型门不是空转的装饰。"""
+    try:
+        v in {"apply": 1}
+        return None
+    except TypeError as e:
+        return "TypeError:%s" % e
+
+
+def s115_ledger_type_corruption_is_named_not_python_error(m):
+    """复审 §4 反例1: `pending[i].name` 是 list/int/{}/空串时, 旧版在**类型敏感操作**
+    (成员查找)里直接抛 TypeError。现在一律 APPROVAL_LEDGER_CORRUPT 具名拒绝, 且盘上坏账
+    一字不改(不修复、不清零、不迁移)。"""
+    bad = ([], 5, {}, "")
+    codes, details, hazards = [], [], []
+    for i, v in enumerate(bad):
+        root, path, ids, caps, led, obj = _tmp_ledger(m, "R115%d" % i,
+                                                      caps=dict(B1_QUOTA), reserve=("motor_run",))
+        _mutate_ledger(path, lambda d, v=v: d["pending"][-1].__setitem__("name", v)
+                       if d["pending"] else None)
+        code, err = _codes_of(obj.snapshot)
+        codes.append(code)
+        details.append(getattr(err, "detail", ""))
+        hazards.append(_must_raise_TypeError(v))
+        after = json.loads(Path(path).read_text(encoding="utf-8"))
+        led.close()
+        if code != "APPROVAL_LEDGER_CORRUPT" or "pending[0]_name_form" not in details[-1]:
+            return False, "name=%r 得到 %s/%s" % (v, code, details[-1])
+        if after["pending"][-1]["name"] != v:
+            return False, "坏账被改写了: %r" % (after["pending"][-1],)
+    return (codes == ["APPROVAL_LEDGER_CORRUPT"] * 4 and hazards[0] and hazards[2] and
+            hazards[1] is None and hazards[3] is None,
+            "codes=%s 元证据(未保护成员查找)=%s 详情=%s" %
+            (",".join(codes), ";".join(str(h) for h in hazards),
+             " | ".join(d[:44] for d in details)))
+
+
+def s116_corrupt_ledger_still_runs_all_disarm_and_closes(m):
+    """复审 §4 主反例(端到端): 起转发出后把盘上 pending.name 改成 []。修前: TypeError 逸出,
+    只发 motor_start, 三条必要撤能一条不发, 端口不关。修后与"负数计数"那条对照同形:
+    四条都发、端口关闭、具名拒绝留在账上、整场不是成功。"""
+    r, raised, tx, closed, evs, path = _b1_session(
+        m, "S116", mutate=lambda d: d["pending"][-1].__setitem__("name", []))
+    frame = [e for e in evs if e["kind"] == "CLEANUP_FRAME_EXCEPTION"]
+    ok_tx = ["motor_stop", "motor_disarm", "motor_status"]
+    return (raised is None and r is not None and all(c in tx for c in ok_tx) and
+            closed is True and not frame and r["success"] is False and
+            any("APPROVAL_LEDGER_CORRUPT" in x for x in r["cleanup_overruns"]) and
+            json.loads(path.read_text(encoding="utf-8"))["pending"][-1]["name"] == [],
+            "raised=%s tx=%s closed=%s 框架异常=%d success=%s 披露=%s 坏账仍=%s" %
+            (raised, ",".join(tx), closed, len(frame), r["success"] if r else None,
+             ";".join(r["cleanup_overruns"]) if r else "-",
+             json.loads(path.read_text(encoding="utf-8"))["pending"][-1]["name"]))
+
+
+def s117_reserve_plain_exception_does_not_skip_disarm(m):
+    """复审 §4.2: 预占抛**普通**异常(不是 Stop)时也不许离开清理框架 —— 三条必要撤能照发,
+    端口照关, 但落成 APPROVAL_RESERVE_FRAME_ERROR_* 具名披露, 本会话不算成功。"""
+    def apply_patch(mm, saved):
+        orig = mm.ApprovalLedger.reserve
+
+        def boom(self, name, n=1, kind="business"):
+            if str(name).startswith("cleanup_"):
+                raise RuntimeError("注入: 账本预占层的非 Stop 异常")
+            return orig(self, name, n, kind=kind)
+        saved["reserve"] = (mm.ApprovalLedger, orig)
+        mm.ApprovalLedger.reserve = boom
+    r, raised, tx, closed, evs, _p = _b1_session(m, "S117", patch=apply_patch)
+    return (raised is None and all(c in tx for c in
+                                   ("motor_stop", "motor_disarm", "motor_status")) and
+            closed is True and r["success"] is False and
+            all("APPROVAL_RESERVE_FRAME_ERROR_RuntimeError_SENT_ANYWAY" in x
+                for x in r["cleanup_overruns"]),
+            "raised=%s tx=%s closed=%s 披露=%s success=%s" %
+            (raised, ",".join(tx), closed, ";".join(r["cleanup_overruns"]), r["success"]))
+
+
+def s118_commit_plain_exception_still_closes_port(m):
+    """复审 §4.3: 确认消耗(存盘)炸普通异常时, 端口与日志的关闭不能被跳过。
+    关端口只是交还句柄, **不等于**证得禁能 —— 断言看的是 PORT_CLOSED 事件与 success=False。"""
+    def apply_patch(mm, saved):
+        orig = mm.ApprovalLedger.commit
+
+        def boom(self, res, ok=True):
+            raise RuntimeError("注入: 账本确认层的非 Stop 异常")
+        saved["commit"] = (mm.ApprovalLedger, orig)
+        mm.ApprovalLedger.commit = boom
+    r, raised, tx, closed, evs, _p = _b1_session(m, "S118", patch=apply_patch)
+    kinds = [e["kind"] for e in evs]
+    return (raised is None and closed is True and "PORT_CLOSED" in kinds and
+            "APPROVAL_COMMIT_FRAME_ERROR_RuntimeError" in r["cleanup_errors"] and
+            r["success"] is False and r["disarm"] == "CONFIRMED_DISABLED",
+            "raised=%s closed=%s PORT_CLOSED=%s 错误=%s disarm=%s success=%s" %
+            (raised, closed, "PORT_CLOSED" in kinds, ";".join(r["cleanup_errors"][:3]),
+             r["disarm"], r["success"]))
+
+
+# ------------------------------------------------- R6B B2: 整包执行对象与批准字节同源
+B2_ARGV = "MEMORY_ONLY_UNAPPROVED_ARGUMENTS"
+
+
+def _b2_dispatch(m, tag, snapshot=None, patch_read=None):
+    """复审 §5 的形状: 盘上是批准的那份计划, 内存对象被改成"只剩 S1 + download.argv 换掉"。
+    动作后端换成只记录调用的内存替身(不起子进程、不碰设备)。返回 (结果, 收到的 argv 列表)。"""
+    root = out_dir("r6b-" + tag)
+    approved = json.loads(json.dumps(PLAN))
+    path = Path(root) / "approved-plan.json"
+    path.write_text(json.dumps(approved, ensure_ascii=False), encoding="utf-8")
+    ids = m.current_identities(approved, str(path), str(REPO))
+    m.approval_init(root, tag, ids, approved["quota"],
+                    note="R6B B2 临时离线探针, 不产生任何现场批准")
+    live = json.loads(json.dumps(approved))
+    live["stages"] = [s for s in live["stages"] if s["id"] == "S1"]
+    live["tools"]["download"]["argv"] = [B2_ARGV]
+    calls = []
+
+    class MemoryBackend(m.ActionBackend):
+        kind = "memory-only"
+
+        def __init__(self, *a, **k):
+            self.attempts = []
+
+        def download(self, act, ctx):
+            calls.append(act["argv"])
+            self.note_attempt("download", "IN_MEMORY")
+            return {"rc": 0}
+
+    old = m.RealActionBackend
+    old_snap = getattr(m, "read_plan_snapshot", None)
+    if patch_read:
+        m.read_plan_snapshot = patch_read(path, approved, live, m)
+    m.RealActionBackend = MemoryBackend
+    try:
+        res = m.dispatch_plan(live, "real", "real", Path(root) / "run", m.SimClock(),
+                              m.REAL_PROFILE, "MEMORY_NO_PORT", str(REPO), "TEMP_TEST",
+                              "TEMP_TEST", plan_dir=str(HERE), approval_id=tag,
+                              approval_root=root, plan_path=str(path), plan_snapshot=snapshot)
+    finally:
+        m.RealActionBackend = old
+        if old_snap is not None:
+            m.read_plan_snapshot = old_snap
+    return res, calls, path, approved
+
+
+def s119_memory_plan_not_from_snapshot_reaches_no_backend(m):
+    """复审 §5.1: 批准账绑的是文件那份字节, 调用方却给执行引擎塞了另一份内存对象
+    (阶段被砍、download.argv 换掉)。修前: 未批准的 argv 到达 download 后端并扣 download=1,
+    dispatch=OK。修后: PLAN_NOT_FROM_APPROVED_SNAPSHOT 具名拒绝, 后端零调用, 额度一格不扣。"""
+    res, calls, path, approved = _b2_dispatch(m, "B119")
+    spent = (res.get("approval") or {}).get("spent")
+    return (res["status"] == "REFUSED" and res.get("code") == "PLAN_NOT_FROM_APPROVED_SNAPSHOT"
+            and calls == [] and json.loads(path.read_text(encoding="utf-8")) == approved and
+            (spent is None or spent.get("download", 0) == 0),
+            "status=%s code=%s 后端调用=%s 盘上计划仍=批准那份=%s spent=%s" %
+            (res["status"], res.get("code"), calls,
+             json.loads(path.read_text(encoding="utf-8")) == approved, spent and spent.get("download")))
+
+
+def s120_negative_snapshot_gate_removed(m):
+    """元负控(§7.2.5): 把快照门摘回"两次独立读取"的旧形状(身份用文件的 SHA, 执行对象用内存
+    那份) —— 未批准的 argv 必须**重新到达后端**。这条不亮就说明 s119 的判据是空转的。"""
+    def patch_read(path, approved, live, mm):
+        def fake(p):
+            return {"path": str(p), "bytes": 0, "sha256": mm.sha_of(str(path)), "doc": live}
+        return fake
+    res, calls, _p, _a = _b2_dispatch(m, "B120", patch_read=patch_read)
+    return (calls == [[B2_ARGV]] or calls == [B2_ARGV]) and res["status"] != "REFUSED", \
+        "摘门后 后端调用=%s status=%s code=%s" % (calls, res["status"], res.get("code"))
+
+
+def s121_cli_read_swap_cannot_bypass_identity(m):
+    """复审 §5.2(CLI 可达): 账绑 P 的字节; 计划文件先被换成 Q, 执行器读完后文件再换回 P。
+    修前: 现算的 SHA 是 P(与账相符)而跑的是 Q => rc=0 且未批准 argv 到达后端。
+    修后: 身份哈希与执行对象出自**同一次读盘**的那份字节 => 账本身份不符, 在工具动作前拒绝。"""
+    root = out_dir("r6b-B121")
+    (Path(root) / "rows.json").write_bytes((HERE / "rows.json").read_bytes())
+    approved = json.loads(json.dumps(PLAN))
+    approved_bytes = json.dumps(approved, ensure_ascii=False).encode("utf-8")
+    path = Path(root) / "plan.json"
+    path.write_bytes(approved_bytes)
+    ids = m.current_identities(approved, str(path), str(REPO))
+    m.approval_init(root, "B121", ids, approved["quota"],
+                    note="R6B B2 临时离线探针, 不产生任何现场批准")
+    live = json.loads(json.dumps(approved))
+    live["stages"] = [s for s in live["stages"] if s["id"] == "S1"]
+    live["tools"]["download"]["argv"] = [B2_ARGV]
+    path.write_text(json.dumps(live, ensure_ascii=False), encoding="utf-8")   # 现在是 Q
+    calls, switched = [], []
+    old_read, old_backend = m.Path.read_bytes, m.RealActionBackend
+
+    def interleaved(p, *a, **k):
+        raw = old_read(p, *a, **k)
+        if str(p) == str(path) and not switched:
+            path.write_bytes(approved_bytes)      # 读出 Q 之后、身份核对之前换回 P
+            switched.append(True)
+        return raw
+
+    class MemoryBackend(m.ActionBackend):
+        kind = "memory-only"
+
+        def __init__(self, *a2, **k2):
+            self.attempts = []
+
+        def download(self, act, ctx):
+            calls.append(act["argv"])
+            self.note_attempt("download", "IN_MEMORY")
+            return {"rc": 0}
+
+    m.Path.read_bytes = interleaved
+    m.RealActionBackend = MemoryBackend
+    out = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(out):
+            rc = m.main(["--dispatch", "--transport", "real", "--backend", "real",
+                         "--profile", m.REAL_PROFILE, "--plan", str(path),
+                         "--out", str(Path(root) / "run"), "--repo-root", str(REPO),
+                         "--approval-token", "TEMP_TEST", "--expected-token", "TEMP_TEST",
+                         "--approval-id", "B121", "--approval-root", str(root)])
+    finally:
+        m.Path.read_bytes = old_read
+        m.RealActionBackend = old_backend
+    txt = out.getvalue()
+    refused = "code=APPROVAL_IDENTITY_MISMATCH" in txt or "APPROVAL_IDENTITY_MISMATCH" in txt
+    return (bool(switched) and rc != 0 and calls == [] and refused and path.read_bytes() ==
+            approved_bytes,
+            "交错发生=%s rc=%s 后端调用=%s 具名拒绝=%s 盘上=批准那份=%s" %
+            (switched, rc, calls, refused, path.read_bytes() == approved_bytes))
+
+
 CASES = [
     ("FS01", "提示符识别", s01_prompt_recognized),
     ("FS02", "缺提示符不算完整", s02_missing_prompt_is_not_complete),
@@ -2924,6 +3211,13 @@ CASES = [
     ("FS112", "观察窗损坏不被吞成未触发", s112_watch_window_corruption_not_swallowed),
     ("FS113", "排空残留过危险门后才写", s113_pre_drained_bytes_keep_danger_gate),
     ("FS114", "反向-摘掉split_rows入口门", s114_negative_split_rows_entry_gate_removed),
+    ("FS115", "账本类型损坏具名拒绝不逸出", s115_ledger_type_corruption_is_named_not_python_error),
+    ("FS116", "坏账仍完成三条撤能并关端口", s116_corrupt_ledger_still_runs_all_disarm_and_closes),
+    ("FS117", "预占普通异常不中断清理", s117_reserve_plain_exception_does_not_skip_disarm),
+    ("FS118", "确认普通异常仍关端口与日志", s118_commit_plain_exception_still_closes_port),
+    ("FS119", "内存计划非批准快照拒发", s119_memory_plan_not_from_snapshot_reaches_no_backend),
+    ("FS120", "反向-摘掉快照门", s120_negative_snapshot_gate_removed),
+    ("FS121", "CLI读取换文件被身份门拒", s121_cli_read_swap_cannot_bypass_identity),
 ]
 
 

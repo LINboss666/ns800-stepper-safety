@@ -483,7 +483,7 @@
   {
    "name": "M5_m5_history_untouched",
    "ok": true,
-   "detail": "工作树里没有 M5 软件故障原件的改动(event=9 的那批历史证据原样保留); 本轮改动=15 项"
+   "detail": "工作树里没有 M5 软件故障原件的改动(event=9 的那批历史证据原样保留); 本轮改动=6 项"
   },
   {
    "name": "M6_event_five_basis_is_source",
@@ -573,12 +573,12 @@
   {
    "name": "P13_live_executor_refuses_retired_recovery_declaration",
    "ok": true,
-   "detail": "盘上现执行器(99d6c9600b05…/209786 B)喂同一份 R5-C 包: stage=S3 具名停 RETIRED_RECOVERY_CONTRACT, 整包 STOP 且有阶段未跑; 该轮实发 4 条命令(system_status,ps,tmc_config_show,tmc_config_apply CONFIRM), 申报恢复的那条 apply 与任何武装/起转/提交/保存都没发出去"
+   "detail": "盘上现执行器(84df1306f48e…/215704 B)喂同一份 R5-C 包: stage=S3 具名停 RETIRED_RECOVERY_CONTRACT, 整包 STOP 且有阶段未跑; 该轮实发 4 条命令(system_status,ps,tmc_config_show,tmc_config_apply CONFIRM), 申报恢复的那条 apply 与任何武装/起转/提交/保存都没发出去"
   },
   {
    "name": "P8_frozen_executor_identity_is_blob_verifiable_and_live_package_matches_disk",
    "ok": true,
-   "detail": "冻结件对当时字节可复算: R4 包(40517501b3be…)与 R5C 记的“上一轮真跑过的那份”同一件, R5C 注册值(bb243467cbd8…/162645 B)== git 535459f 里该文件 blob 的实算, 两包镜像仍是同一件(未重编); R6 包注册值(1b23719a3c9a…/184093 B)== git 44e493c 里 blob 的实算(它已被 CLI 证据用过, 同样不回改); 盘上现在是 99d6c9600b05…/209786 B => 只有**最新**候选包 R6A 登记它(99d6c9600b05…) => 三层各自指向自己那一刻的字节"
+   "detail": "冻结件对当时字节可复算: R4 包(40517501b3be…)与 R5C 记的“上一轮真跑过的那份”同一件, R5C 注册值(bb243467cbd8…/162645 B)== git 535459f 里该文件 blob 的实算, 两包镜像仍是同一件(未重编); R6 包注册值(1b23719a3c9a…/184093 B)== git 44e493c 里 blob 的实算(它已被 CLI 证据用过, 同样不回改); R6A 包注册值(99d6c9600b05…/209786 B)== git aab19ff 里 blob 的实算(R6A 的远端回读核过身份, 也不回改); 盘上现在是 84df1306f48e…/215704 B => 只有**最新**候选包 R6B 登记它(84df1306f48e…) => 四层各自指向自己那一刻的字节"
   },
   {
    "name": "P9_stages_and_gates_survive_the_edit",
