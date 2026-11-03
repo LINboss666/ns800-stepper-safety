@@ -1,0 +1,9 @@
+# sha256 * <仓库相对路径>(LF, 无 BOM; 本清单不哈希自身字节 —— 一条清单不能给自己的字节作证)
+# 生成方式: 对 reports/firmware/phase8-m8-r7f1a-minimal-c-patch/ 下每个常规文件(排除 SHA256SUMS.txt、remote_readback.md 与 __pycache__) 直接读磁盘字节算 sha256
+# 条目数=5; 与 Git blob 的逐条复算由 host/staged_preflight_batch.py(提交前, 单批流)与推送后的远端逐 blob 回读完成
+# 重新生成: python reports/reviews/phase8-m8-idle-stack-r4/host/make_round_sums.py <本目录>
+e96e72a8a30ec7995d48a6aa178dfb068aed2d9d857e572a6ae0fdae962cfcd6  reports/firmware/phase8-m8-r7f1a-minimal-c-patch/build_manifest.json
+f97857ab587a8db2b881f1c9dae58e5b723c9b40f4c7f9d4d166f06a8fcd38b1  reports/firmware/phase8-m8-r7f1a-minimal-c-patch/rt-thread-motor-m1-callgraph.htm
+b4243886818b6b2cf2e30d10864272225e1b0e66c8435c8a50bb449053e153bf  reports/firmware/phase8-m8-r7f1a-minimal-c-patch/rt-thread-motor-m1-candidate.bin
+ea4f8dd1f337796fe824cc262b8fc27f13920a7c260d1a27737b065369124d16  reports/firmware/phase8-m8-r7f1a-minimal-c-patch/rt-thread-motor-m1.axf
+757701a509e659fcc00df55309920455badb15434e34867a3bc9f0ec34100f53  reports/firmware/phase8-m8-r7f1a-minimal-c-patch/rt-thread-motor-m1.map

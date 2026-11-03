@@ -1119,7 +1119,8 @@ static rt_err_t tmc_read_reg_obs(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *v
     }
     if (!tmc_ctx_ok_for_wait("read_reg"))
     {
-        if (st) { st->reason = TMC_XFER_BAD_CONTEXT; st->rc = -RT_EBUSY; }
+        if (st) { st->reason = TMC_XFER_BAD_CONTEXT; st->rc = -RT_EBUSY;
+                  st->used = rt_tick_get() - b->start; }
         if (obs) tmc_obs_exit(obs, (const rt_uint8_t *)RT_NULL, 0, b, -RT_EBUSY,
                               TMC_XFER_BAD_CONTEXT, 0u);
         return -RT_EBUSY;
@@ -1142,7 +1143,8 @@ static rt_err_t tmc_read_reg_obs(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *v
         if (motor_get_snapshot(&snap) != RT_EOK || snap.armed ||
             snap.state != MOTOR_IDLE)
         {
-            if (st) { st->reason = TMC_XFER_NO_DEVICE; st->rc = -RT_EIO; }
+            if (st) { st->reason = TMC_XFER_NO_DEVICE; st->rc = -RT_EIO;
+                      st->used = rt_tick_get() - b->start; }
             if (obs) tmc_obs_exit(obs, (const rt_uint8_t *)RT_NULL, 0, b, -RT_EIO,
                                   TMC_XFER_NO_DEVICE, 0u);
             return -RT_EIO;
@@ -1150,7 +1152,8 @@ static rt_err_t tmc_read_reg_obs(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *v
         if (obs) obs->open_state = TMC_OBS_OPENED_NOW;  /* 本次操作真的尝试打开 */
         if (tmc_uart_open() != RT_EOK)
         {
-            if (st) { st->reason = TMC_XFER_NO_DEVICE; st->rc = -RT_ERROR; }
+            if (st) { st->reason = TMC_XFER_NO_DEVICE; st->rc = -RT_ERROR;
+                      st->used = rt_tick_get() - b->start; }
             if (obs)
             {
                 obs->open_state = TMC_OBS_OPEN_FAILED;
@@ -1176,6 +1179,7 @@ static rt_err_t tmc_read_reg_obs(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *v
                        : (e == -RT_ETIMEOUT) ? TMC_XFER_BUDGET_EXHAUSTED
                                              : TMC_XFER_NO_DEVICE;
             st->rc = e;
+            st->used = rt_tick_get() - b->start;
         }
         if (obs)
         {

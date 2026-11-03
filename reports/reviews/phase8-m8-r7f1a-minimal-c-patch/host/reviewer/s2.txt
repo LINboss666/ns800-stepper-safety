@@ -1,0 +1,36 @@
+###### 停机优先 S2 并发/身份链 (基线 adeeedc6f05bf5c9cd0f3b41023b64a53fb134aa) ######
+run_id=20261103T152309Z-6
+SRC_APP=/workspace/scratch/f24247cdf3d6/ns800-r6a-review/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications
+夹具=/workspace/scratch/f24247cdf3d6/ns800-r6a-review/tests/host/sp_conc_main.c (真 pthread 互斥量/线程/窗口内排队 ISR)
+OUT_DIR=/workspace/scratch/f24247cdf3d6/r7f1-c-review/s2
+compiler=gcc (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0
+单组墙钟=60s(死锁守卫)  选择集合=tmc_boot,boot_print,read_obs
+
+=== 变体 target ===
+    台账: 必需=10 唯一出现=10 实际行数=10 SUMMARY(cases=10 pass=10 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=5 唯一出现=5 实际行数=5 SUMMARY(cases=5 pass=5 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=30 唯一出现=30 实际行数=30 SUMMARY(cases=30 pass=30 fail=0 pre_bad=0 skips=0) 自洽=1
+  (ONLY 部分运行: 期望用例改取所选组的必需 id 合计)
+  target 汇总: 组=3 用例=45 PASS=45 FAIL=0 SKIP行=0 pre_bad=0 期望用例=45
+
+=== 变体 host_ovr ===
+    台账: 必需=10 唯一出现=10 实际行数=10 SUMMARY(cases=10 pass=10 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=5 唯一出现=5 实际行数=5 SUMMARY(cases=5 pass=5 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=30 唯一出现=30 实际行数=30 SUMMARY(cases=30 pass=30 fail=0 pre_bad=0 skips=0) 自洽=1
+  (ONLY 部分运行: 期望用例改取所选组的必需 id 合计)
+  host_ovr 汇总: 组=3 用例=45 PASS=45 FAIL=0 SKIP行=0 pre_bad=0 期望用例=45
+
+=== S2 并发/身份矩阵 ===
+target/tmc_boot | OK 必需=10 全部PASS 行数=10 skips=0 pre_bad=0 proc_rc=0
+target/boot_print | OK 必需=5 全部PASS 行数=5 skips=0 pre_bad=0 proc_rc=0
+target/read_obs | OK 必需=30 全部PASS 行数=30 skips=0 pre_bad=0 proc_rc=0
+target | OK 全部 3 组自洽且必需用例真执行判 PASS (用例=45)
+host_ovr/tmc_boot | OK 必需=10 全部PASS 行数=10 skips=0 pre_bad=0 proc_rc=0
+host_ovr/boot_print | OK 必需=5 全部PASS 行数=5 skips=0 pre_bad=0 proc_rc=0
+host_ovr/read_obs | OK 必需=30 全部PASS 行数=30 skips=0 pre_bad=0 proc_rc=0
+host_ovr | OK 全部 3 组自洽且必需用例真执行判 PASS (用例=45)
+
+选择集合=tmc_boot,boot_print,read_obs
+实际执行集合: target=3组 host_ovr=3组 (每组一个独立进程)
+
+S2 RUNNER RESULT: PASS(rc=0) —— **仅所选组**(tmc_boot boot_print read_obs)的必需用例真执行且判 PASS; 未选择的组本轮未执行

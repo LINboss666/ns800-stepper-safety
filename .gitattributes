@@ -90,3 +90,9 @@ reports/reviews/phase8-m8-r7-field-package-5ae/** -text
 # hash_mismatch; 反过来只要有一个文件被转换, manifest 里 compiled_from_disk_* 与在板镜像的绑定就失效。
 reports/firmware/phase8-m8-r7f1-startup-c-fix/** -text
 reports/reviews/phase8-m8-r7f1-startup-c-fix/** -text
+
+# ===== M8-R7F1-A 最小补丁跟修轮: 整轮(构建日志/镜像/map/调用图/manifest/主机链 transcript/A 的复审原件与补丁)一律禁止行尾转换 =====
+# 同 R6/R6A/R7F1 的理由: 本轮声称"原字节可复算"靠 blob == 磁盘字节; A 的补丁原件是 LF、
+# UV4 日志是 CRLF 原件, 任一边被转换都会在逐 blob 复算时报假 hash_mismatch。
+reports/firmware/phase8-m8-r7f1a-minimal-c-patch/** -text
+reports/reviews/phase8-m8-r7f1a-minimal-c-patch/** -text

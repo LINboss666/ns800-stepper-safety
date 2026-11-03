@@ -1,0 +1,17 @@
+LEAF|variant=target|group=tmc_boot|gates=0
+CASE|BTB01-startup-ioin-read-refuses-with-zero-bytes-on-wire-while-background-sg-holds-xfer|PASS|rc=-23(-RT_EBUSY=-23) 取锁=2-0 成功=1-0 到期=1-0 归还=0-0 设备读=1-0(差1=后台flush那一次, 前台0次) 线上字节=0-0 读请求=0-0 value未改写=1
+CASE|BTB02-background-sg-read-itself-completes-after-release-and-returns-lock|PASS|后台 rc=0 sg=0x123 归还增量=1 读请求=1 线上字节=4 写帧=0 (证明确有一笔真实读事务持过锁, 不是夹具造的静态状态)
+CASE|BTB03-same-ioin-read-succeeds-when-no-background-reader-holds-xfer|PASS|rc=0 value=0x21000040 身份=1 取锁=1/1 到期=0 归还=1 读请求=1 线上字节=4 写帧=0 health=1(BTB01 的同一条前台读, 只多了"后台是否持锁"这一个变量)
+[TMC] read_reg REFUSED: 非可等待上下文(无线程对象)
+CASE|BTB04-illegal-context-refuses-with-same-rc-but-zero-lock-attempt|PASS|rc=-23 取锁=0-0(应相等) 设备读=0-0 线上字节=0-0 value未改写=1 日志增量=1(=1: [TMC] read_reg REFUSED)
+CASE|BTB05-ioin-transport-succeeds-but-identity-must-still-fail-required|PASS|rc=0 value=0x22000040 VERSION=0x22 身份判据=0(必须为 0) 读请求=1 写帧=0 => 自检的 PASS 条件不能只看返回码
+CASE|BTB06-per-call-stat-says-lock-busy-with-tx-zero-on-ioin-read|PASS|rc=-23 reason=lock-busy(4) tx=0 rx=0 flush=0 used=20 本次夹具推进=20 tick(必须相等且等满 20) 取锁到期增量=1 线上字节=0 读请求=0
+[TMC] read_reg REFUSED: 非可等待上下文(无线程对象)
+CASE|BTB07-per-call-stat-says-bad-context-not-lock-busy-for-same-rc|PASS|rc=-23 reason=bad-context(2) tx=0 rx=0 used=0 本次夹具推进=0(必须相等且为 0) 取锁次数增量=0 (BTB06 同为 -23 而 reason 不同)
+CASE|BTB08-per-call-stat-puts-failure-in-tx-stage-with-zero-written|PASS|rc=-117 reason=tx-failed(6) tx=0 rx=0 used=20 线上字节=0 (与 -23 那两条的差别: 这笔进了锁、进了发送阶段)
+CASE|BTB09-per-call-stat-puts-failure-in-rx-stage-with-four-tx-echo-only-rx|PASS|rc=-117 reason=rx-timeout-echo(7) tx=4 rx=4 used=103 health=2 (现场若看到这一对才是'发出去了没应答'; BTB06 的 tx=0 不是)
+CASE|BTB10-each-call-owns-its-stat-fail-then-success-do-not-share-last-error|PASS|A(前一笔) rc=-23 reason=lock-busy tx=0 rx=0 / B(本次) rc=0 reason=ok tx=4 rx=8 value=0x21000040 => 成功那笔没有继承失败, 失败那份也没被成功改写
+CASE|BTB11-not-idle-refusal-owns-its-used-field-with-zero-wire-bytes|PASS|rc=-12 reason=no-device(1) tx=0 rx=0 used=0 本次夹具推进=0(必须相等且为 0) 取锁增量=0 读请求增量=0 线上字节增量=0
+[TMC] uart open failed
+CASE|BTB12-uart-open-failure-owns-its-used-field-with-zero-wire-bytes|PASS|rc=-255 reason=no-device(1) tx=0 rx=0 used=0 本次夹具推进=0(必须相等且为 0) open 注入剩余=0 取锁增量=0 线上字节增量=0 (与 BTB11 同 reason 不同 rc)
+SUMMARY|cases=12|pass=12|fail=0|pre_bad=0|skips=0

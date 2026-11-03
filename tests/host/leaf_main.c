@@ -3244,6 +3244,11 @@ static void bto_group(void)
     rt_err_t           e;
     int                rr0, tx0, lk0, lkt0, lkto0, rel0, rd0, lg0;
     subsys_health_t    h0;
+    /* R7F1-A(复审 §1): used 的判据必须是"本次调用期间夹具时钟实际推进的 tick", 不能只打印。
+     * t0/t1 夹住这一次调用, ud = 夹具自己的增量; 三个提前返回分支(BAD_CONTEXT /
+     * NO_DEVICE-静止门 / NO_DEVICE-懒打开失败)与取锁到期分支共用这一对判据。 */
+    rt_tick_t          t0, t1;
+    rt_uint32_t        ud;
 
     /* ============ BTB01 后台 SG 读持锁时, 自检那一次 IOIN 读在上线任何字节前被拒 ==== */
     leaf_state_clear();
@@ -3366,18 +3371,30 @@ static void bto_group(void)
     { leaf_pk_release(); leaf_join_all(); return; }
     memset(&st, 0xA5, sizeof(st));            /* 前态污染: 归因必须整份被本次调用覆写 */
     v = 0xA5A5A5A5u;
+    lkto0 = leaf_mtx_timeouts;
+    t0 = leaf_tick;
     e = tmc2209_read_register_stat(TMC_ADDR_DEFAULT, TMC_REG_IOIN, &v, &st);
+    t1 = leaf_tick;
+    ud = (rt_uint32_t)(t1 - t0);
     CHECK("BTB06-per-call-stat-says-lock-busy-with-tx-zero-on-ioin-read",
           e == -RT_EBUSY && st.rc == e && (int)st.rc == -23 &&
           st.reason == TMC_XFER_LOCK_BUSY &&
           strcmp(tmc2209_xfer_reason_name(st.reason), "lock-busy") == 0 &&
           st.tx_written == 0u && st.rx_bytes == 0u && st.flush_bytes == 0u &&
           leaf_tx_written == tx0 && leaf_read_reqs == rr0 &&
-          v == 0xA5A5A5A5u,
-          fm("rc=%d reason=%s(%d) tx=%u rx=%u flush=%u used=%u 线上字节=%d 读请求=%d",
+          v == 0xA5A5A5A5u &&
+          /* 复审 §1 的突变锚点: 取锁到期这一路以前**不写 used**。包装函数先把局部结构
+           * memset 成 0 再回拷, 所以修前读到的就是 used=0 —— 而夹具本轮真的推进了 20 tick,
+           * 于是这个 0 会被读成"这次没等"。现在 used 必须等于本次推进值并等满 20ms 上限。
+           * 实测两侧: 修前 SRC_APP 快照 used=0 判 FAIL, 修后 used=20 判 PASS。 */
+          leaf_mtx_timeouts == lkto0 + 1 &&
+          st.used == ud && ud == (rt_uint32_t)TMC_BUD_XFER_LOCK_MS,
+          fm("rc=%d reason=%s(%d) tx=%u rx=%u flush=%u used=%u 本次夹具推进=%u tick"
+             "(必须相等且等满 %d) 取锁到期增量=%d 线上字节=%d 读请求=%d",
              (int)st.rc, tmc2209_xfer_reason_name(st.reason), (int)st.reason,
              (unsigned)st.tx_written, (unsigned)st.rx_bytes,
-             (unsigned)st.flush_bytes, (unsigned)st.used,
+             (unsigned)st.flush_bytes, (unsigned)st.used, (unsigned)ud,
+             (int)TMC_BUD_XFER_LOCK_MS, leaf_mtx_timeouts - lkto0,
              leaf_tx_written, leaf_read_reqs));
     leaf_pk_release();
     leaf_join_all();
@@ -3388,17 +3405,28 @@ static void bto_group(void)
     memset(&st, 0xA5, sizeof(st));
     leaf_no_thread = 1;
     v = 0xA5A5A5A5u;
+    lk0 = leaf_mtx_takes;
+    t0 = leaf_tick;
     e = tmc2209_read_register_stat(TMC_ADDR_DEFAULT, TMC_REG_IOIN, &v, &st);
+    t1 = leaf_tick;
+    ud = (rt_uint32_t)(t1 - t0);
     leaf_no_thread = 0;
     CHECK("BTB07-per-call-stat-says-bad-context-not-lock-busy-for-same-rc",
           e == -RT_EBUSY && st.rc == e && (int)st.rc == -23 &&
           st.reason == TMC_XFER_BAD_CONTEXT &&
           strcmp(tmc2209_xfer_reason_name(st.reason), "bad-context") == 0 &&
           st.reason != TMC_XFER_LOCK_BUSY &&      /* 同一个 -23 的两个方向必须可分 */
-          st.tx_written == 0u && v == 0xA5A5A5A5u,
-          fm("rc=%d reason=%s(%d) tx=%u rx=%u (BTB06 同为 -23 而 reason 不同)",
+          st.tx_written == 0u && v == 0xA5A5A5A5u &&
+          leaf_mtx_takes == lk0 &&                /* 这条路连取锁都没发生 */
+          /* 复审 §1: 这条路不等锁, used 的正确值就是 0; 修前/修后这里都是 0(包装函数先把
+           * 局部结构 memset 成 0 再回拷, 0xA5 污染传不进来)。本条的增量是"取锁次数为 0"
+           * 与 reason 可分, used 的突变锚点在 BTB06(同一注入修前 0 -> 修后 20)。 */
+          st.used == ud && ud == 0u,
+          fm("rc=%d reason=%s(%d) tx=%u rx=%u used=%u 本次夹具推进=%u(必须相等且为 0)"
+             " 取锁次数增量=%d (BTB06 同为 -23 而 reason 不同)",
              (int)st.rc, tmc2209_xfer_reason_name(st.reason), (int)st.reason,
-             (unsigned)st.tx_written, (unsigned)st.rx_bytes));
+             (unsigned)st.tx_written, (unsigned)st.rx_bytes,
+             (unsigned)st.used, (unsigned)ud, leaf_mtx_takes - lk0));
 
     /* ============ BTB08 逐调用归因: 发送阶段 => tx-failed, 实际上线 0 字节 ============ */
     leaf_state_clear();
@@ -3470,6 +3498,70 @@ static void bto_group(void)
              (unsigned)sa.tx_written, (unsigned)sa.rx_bytes,
              (int)sb.rc, tmc2209_xfer_reason_name(sb.reason),
              (unsigned)sb.tx_written, (unsigned)sb.rx_bytes, (unsigned)v));
+
+    /* ============ BTB11 静止门拒绝(NO_DEVICE): used 也归本次调用所有 ================== */
+    /* 复审 §1 点名的第 3 个提前返回: tmc_read_reg_obs 在 !tmc_opened 时先问电机静止。
+     * 这里用真实注入(tmc_opened 复位 + 快照非静止), 不碰产品判据本身。 */
+    leaf_state_clear();
+    if (!leaf_pre(leaf_bus_ready(), "BTB11 bus ready")) return;
+    tmc_opened = RT_FALSE;                        /* 逼出懒初始化那一路(真实产品分支) */
+    leaf_motor_idle = RT_FALSE;                   /* armed + 非 IDLE = 拿不到静止证据 */
+    memset(&st, 0xA5, sizeof(st));
+    v = 0xA5A5A5A5u;
+    lk0 = leaf_mtx_takes; rr0 = leaf_read_reqs; tx0 = leaf_tx_written;
+    t0 = leaf_tick;
+    e = tmc2209_read_register_stat(TMC_ADDR_DEFAULT, TMC_REG_IOIN, &v, &st);
+    t1 = leaf_tick;
+    ud = (rt_uint32_t)(t1 - t0);
+    leaf_motor_idle = RT_TRUE;
+    CHECK("BTB11-not-idle-refusal-owns-its-used-field-with-zero-wire-bytes",
+          e == -RT_EIO && st.rc == e && st.reason == TMC_XFER_NO_DEVICE &&
+          strcmp(tmc2209_xfer_reason_name(st.reason), "no-device") == 0 &&
+          st.tx_written == 0u && st.rx_bytes == 0u &&
+          leaf_tx_written == tx0 && leaf_read_reqs == rr0 &&
+          leaf_mtx_takes == lk0 &&                /* 没走到取锁, 更没上线任何字节 */
+          v == 0xA5A5A5A5u &&                     /* 拒绝路径不得改写调用方的 value */
+          /* 复审 §1: 这条路不等锁, used 的正确值就是 0。修前/修后在这里都是 0(包装函数
+           * 先把局部结构 memset 成 0 再回拷, 所以 0xA5 污染传不进来) —— 本条的增量在
+           * "这条分支第一次有了自己的用例身份", 不在 used 上; used 的突变锚点是 BTB06
+           * (修后实测同一注入 used=0 -> 20)。 */
+          st.used == ud && ud == 0u,
+          fm("rc=%d reason=%s(%d) tx=%u rx=%u used=%u 本次夹具推进=%u(必须相等且为 0) "
+             "取锁增量=%d 读请求增量=%d 线上字节增量=%d",
+             (int)st.rc, tmc2209_xfer_reason_name(st.reason), (int)st.reason,
+             (unsigned)st.tx_written, (unsigned)st.rx_bytes,
+             (unsigned)st.used, (unsigned)ud,
+             leaf_mtx_takes - lk0, leaf_read_reqs - rr0, leaf_tx_written - tx0));
+
+    /* ============ BTB12 懒打开失败(NO_DEVICE): 同一个 used 口径, 不同返回码 =========== */
+    /* 复审 §1 点名的第 4 个提前返回: tmc_uart_open() 失败那一路。注入用既有 leaf_open_fails
+     * (rt_device_open 真返回 -RT_ERROR), 不是把返回值抄近路。 */
+    leaf_state_clear();
+    if (!leaf_pre(leaf_bus_ready(), "BTB12 bus ready")) return;
+    tmc_opened = RT_FALSE;
+    leaf_open_fails = 1;                          /* 接下来这一次 rt_device_open 真失败 */
+    memset(&st, 0xA5, sizeof(st));
+    v = 0xA5A5A5A5u;
+    lk0 = leaf_mtx_takes; rr0 = leaf_read_reqs; tx0 = leaf_tx_written;
+    t0 = leaf_tick;
+    e = tmc2209_read_register_stat(TMC_ADDR_DEFAULT, TMC_REG_IOIN, &v, &st);
+    t1 = leaf_tick;
+    ud = (rt_uint32_t)(t1 - t0);
+    CHECK("BTB12-uart-open-failure-owns-its-used-field-with-zero-wire-bytes",
+          e == -RT_ERROR && st.rc == e && st.reason == TMC_XFER_NO_DEVICE &&
+          strcmp(tmc2209_xfer_reason_name(st.reason), "no-device") == 0 &&
+          st.tx_written == 0u && st.rx_bytes == 0u &&
+          leaf_tx_written == tx0 && leaf_read_reqs == rr0 &&
+          leaf_mtx_takes == lk0 &&
+          v == 0xA5A5A5A5u &&
+          st.used == ud && ud == 0u &&
+          leaf_open_fails == 0,                   /* 注入确实被这一次调用消耗掉了 */
+          fm("rc=%d reason=%s(%d) tx=%u rx=%u used=%u 本次夹具推进=%u(必须相等且为 0) "
+             "open 注入剩余=%d 取锁增量=%d 线上字节增量=%d (与 BTB11 同 reason 不同 rc)",
+             (int)st.rc, tmc2209_xfer_reason_name(st.reason), (int)st.reason,
+             (unsigned)st.tx_written, (unsigned)st.rx_bytes,
+             (unsigned)st.used, (unsigned)ud, leaf_open_fails,
+             leaf_mtx_takes - lk0, leaf_tx_written - tx0));
 }
 #endif /* !URO_BASELINE_BYTES */
 

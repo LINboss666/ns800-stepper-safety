@@ -1,0 +1,121 @@
+{
+ "round": "phase8-m8-r7f1a-minimal-c-patch",
+ "title": "R7F1-A 复审跟修轮(main 栈根算错 + used 提前返回漏记), 离线, 设备动作 0",
+ "date": "2026-11-03",
+ "branch": "feature/m8-sg-adc-relative-protection",
+ "baseline_commit": "adeeedc6f05bf5c9cd0f3b41023b64a53fb134aa",
+ "delivery_commit": "<本轮提交后的 git 头; 不为回读自己的头追加收口提交>",
+ "review_source": {
+  "zip_sha256": "4d5f4664c51468ea957f90f10e547653fe32bd987b9ce2ed3a082b798f9b6b1b",
+  "files_archived_under": "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/a_review_*.md 与 host/reviewer/(补丁原件 + A 的修前/修后逐项输出)",
+  "reviewer_verdict": "保留 R7F1 本轮 C 修复, 不退回重做; 只做 §1/§2 两项小改后再构建; 新 BIN e5b51b6b… 构建身份核对通过但**暂不作为下一次上板候选**。"
+ },
+ "changed_this_round": [
+  "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/rtconfig.h",
+  "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/.config",
+  "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/tmc2209.c",
+  "tests/host/leaf_main.c",
+  "tests/host/run_stop_priority_s2.sh"
+ ],
+ "config_sync_note": ".config 的 4096 是操作者本轮单独要求的同步, 不在 A 的补丁内; 同步后 rtconfig.h 与 .config 的 21 个带值项逐条比对, 不一致 0 个。",
+ "device_actions": {
+  "download": 0,
+  "readback": 0,
+  "explicit_reset": 0,
+  "port_open": 0,
+  "apply": 0,
+  "config_save": 0,
+  "arm_or_start_or_learn": 0,
+  "note": "A 复审 §末尾: 两项小修与新候选身份核对完, 再安排一次限定范围的启动现场诊断; 此时无需 arm/start/学习/保存/清日志, 不把旧额度结转。本轮没有动用任何额度, 上一场那批也已用尽。"
+ },
+ "hardware_authorized_by_this_round": false,
+ "new_image_on_board": false,
+ "board_image_still": {
+  "sha256": "e5b51b6b810f215e284ea6317a4b1bef6b3faddc6f1ac9f8947804f261fa5732",
+  "bytes": 292628,
+  "proven_on_board_at": "ed8d7f4 那场的 292164 B 定长回读逐字节相等"
+ },
+ "candidate_for_next_field_run": {
+  "bin": {
+   "bytes": 292684,
+   "sha256": "b4243886818b6b2cf2e30d10864272225e1b0e66c8435c8a50bb449053e153bf"
+  },
+  "axf_sha256": "ea4f8dd1f337796fe824cc262b8fc27f13920a7c260d1a27737b065369124d16",
+  "map_sha256": "757701a509e659fcc00df55309920455badb15434e34867a3bc9f0ec34100f53",
+  "callgraph_sha256": "f97857ab587a8db2b881f1c9dae58e5b723c9b40f4c7f9d4d166f06a8fcd38b1"
+ },
+ "superseded_candidate": {
+  "sha256": "e5b51b6b810f215e284ea6317a4b1bef6b3faddc6f1ac9f8947804f261fa5732",
+  "bytes": 292628,
+  "why": "A 复审: 构建身份核对通过, 但暂不作为下一次上板候选(缺 §1/§2 两项小改)。"
+ },
+ "resource_delta": {
+  "program_size_now": "Program Size: Code=205922 RO-data=86186 RW-data=2192 ZI-data=85596",
+  "program_size_adeeedc": "Program Size: Code=205866 RO-data=86186 RW-data=2192 ZI-data=85596",
+  "delta_bytes": {
+   "Code": 56,
+   "RO-data": 0,
+   "RW-data": 0,
+   "ZI-data": 0
+  },
+  "bin_delta_bytes": 56,
+  "cross_check": "Code 增量 56 B 与 BIN 增量 56 B 相等, RO/RW/ZI 增量为 0 => main 栈 2048->4096 没有落到静态 RAM(堆分配路径, 见 stack 报告 §3)。",
+  "runtime_heap_delta_bytes": 2048,
+  "heap_region_bytes": 32768,
+  "heap_evidence": "components.c:172-177/218-221 (RT_USING_HEAP 路径) + board.h:30-31"
+ },
+ "stack_conclusion": {
+  "root": "main_thread_entry",
+  "max_depth_bytes_before": 2076,
+  "max_depth_bytes_after": 2076,
+  "budget_before": 2048,
+  "budget_after": 4096,
+  "static_margin_after_bytes": 2020,
+  "status": "STATIC_FLOOR_ONLY",
+  "boundary": "armlink Max Depth 是静态下界(不解析函数指针, 不含异常/ISR 帧与上下文保存); 余量 2020 B 不等于不会溢出。修前修后同值(差 0), 未重编基线。",
+  "evidence": "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/build/stack_callgraph_r7f1a.txt"
+ },
+ "verification": {
+  "offline": "PASS",
+  "field": "NOT_EXECUTED",
+  "chains": {
+   "meta_negative_pre_patch": "把 SRC_APP 指到 adeeedc 的 tmc2209.c 快照(仓外)只跑 tmc_boot: rc=1, target/host_ovr 各 12 条里 BTB06 判 FAIL, 明细 used=0 而本次夹具推进=20 => used 断言不是空转。证据 host/r7f1a_btb_prepatch.txt。",
+   "S2_full": "PASS(rc=0), 22 组 x target/host_ovr, target=70 / host_ovr=145 全真执行无 SKIP; tmc_boot 12/12(含新 BTB11/BTB12), read_obs 30/30, boot_print 5/5。证据 host/r7f1a_s2_full.txt + host/tmc_boot_*_out.txt。",
+   "S2_targeted": "PASS(rc=0) 只所选 3 组(tmc_boot/read_obs/boot_print), 用例=47。",
+   "V1V2": "RUNNER RESULT: PASS (rc=0), V1 build=0 run=0 state=RAN, V2 同。",
+   "line_width_check": "LINE_WIDTH_RESULT PASS (bad=0) —— 本轮没有新增/修改任何 rt_kprintf 站点, 扫到的仍是 R7F1 那 15 处; 修前超长原样的元负控未动。",
+   "not_rerun_and_why": "SD/IO/S1/M8 未重跑: 本轮产品改动只落在 tmc2209.c 的 4 个提前返回与两个配置常量, 这三条链不编 tmc2209.c 的真实读函数, 主机链也不读 rtconfig.h; A 复审步骤 2 也只要求受影响的 TMC 链。"
+  }
+ },
+ "corrections_to_previous_round_claims": [
+  "上一轮\"main 栈瓶颈在 supervisor_boot 2020 B / 余量 28 B\"错在漏算 main_thread_entry 与 $Super$$main 两层调用者; 正确根值 2076 B。",
+  "上一轮\"sensor 在 stage 7–11 已半帧进入 SG, 门挡不住在途读\"不适用于冷启动(门在静态初始化即关闭, 先于线程创建); 保留的限制只有运行中 system_selftest 重入不受门约束。",
+  "上一轮\"[MOT] 注: 行 126 B 丢换行\"后半句错: 127 B 格式化容量容得下它加终止 NUL, 发送长度 126, 不产生裸 NUL 也不丢换行; 超 120 B 目标但不是三处截断修复对象。",
+  "旧入库文件按原字节保留不重写(其 SHA256SUMS/manifest 绑的就是那些字节), 更正以本件为准。"
+ ],
+ "next_field_run_must_look_at": [
+  "[SS] [REQ FAIL] TMC2209 IOIN rc=… reason=… 与 tx/rx/flush/used 两行的具体 reason 与阶段字段。",
+  "used 的读法: lock-busy 那一路应接近取锁上限 20 tick; bad-context/静止门/懒打开失败三条不等锁, 应为 0。",
+  "READY/fault=0 是否达成; 未达成按 reason 定分支, 不再等 75 秒。",
+  "[BOOT] 横幅是否逐行照常出来(这是堆里 +2048 B 主线程栈分配成败的唯一现场判据)。",
+  "三处打印族逐条换行收尾、无 NUL、无半截 UTF-8; 若进 READY 则 FAULT_LATCHED/故障收口分支本就不可达, 未出现不等于已验证, 也不得为看它去触发故障。"
+ ],
+ "untouched": [
+  "执行器与批准台账",
+  "阈值 / ACTIVE / 运动授权 / load_means",
+  "RT_CONSOLEBUF_SIZE=128",
+  "上一轮 firmware 归档四件与 manifest",
+  "R6/R6A/R6B/R6C/R7 历史证据",
+  "冻结引用"
+ ],
+ "git_discipline": "一次提交; 无 reset/clean/rebase/force; 不追加自回读收口提交。",
+ "evidence_index": {
+  "build_log": "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/build/rt-thread-motor-r7f1a.log",
+  "stack_report": "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/build/stack_callgraph_r7f1a.txt",
+  "firmware_dir": "reports/firmware/phase8-m8-r7f1a-minimal-c-patch/",
+  "host_dir": "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/host/",
+  "reviewer_dir": "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/host/reviewer/",
+  "run_record": "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/run_record.md",
+  "handoff_md": "reports/agent_handoffs/phase8-m8-r7f1a-minimal-c-patch.md"
+ }
+}

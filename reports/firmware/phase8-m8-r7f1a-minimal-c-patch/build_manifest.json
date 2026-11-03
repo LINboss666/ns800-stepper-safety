@@ -1,0 +1,190 @@
+{
+ "round": "phase8-m8-r7f1a-minimal-c-patch",
+ "date": "2026-11-03",
+ "title": "R7F1-A 复审跟修轮(main 栈根算错 + used 提前返回漏记), 离线, 设备动作 0",
+ "review_source": {
+  "zip_sha256": "4d5f4664c51468ea957f90f10e547653fe32bd987b9ce2ed3a082b798f9b6b1b",
+  "files_archived_under": "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/a_review_*.md 与 host/reviewer/(补丁原件 + A 的修前/修后逐项输出)",
+  "reviewer_verdict": "保留 R7F1 本轮 C 修复, 不退回重做; 只做 §1/§2 两项小改后再构建; 新 BIN e5b51b6b… 构建身份核对通过但**暂不作为下一次上板候选**。"
+ },
+ "baseline_commit": "adeeedc6f05bf5c9cd0f3b41023b64a53fb134aa",
+ "target": "rt-thread-motor-m1-candidate",
+ "action": "Keil Rebuild All x1(只 rt-thread-motor-m1-candidate)。未下载、未 Flash、未碰 DAP、未复位、未开串口、未起转、未 learn/zero、未 config_save。设备动作 0。",
+ "command": "C:\\Keil_v5\\UV4\\UV4.exe -r project.uvprojx -t rt-thread-motor-m1-candidate -j0 -o D:/ns800/reports/reviews/phase8-m8-r7f1a-minimal-c-patch/build/rt-thread-motor-r7f1a.log",
+ "uv4_return_code_observed_this_round": 0,
+ "error_warning_line": "0 Error(s), 0 Warning(s).",
+ "compiler_line_from_log": "*** Using Compiler 'V6.24', folder: 'C:\\Keil_v5\\ARM\\ARMCLANG\\Bin'",
+ "build_time_elapsed_line": "Build Time Elapsed:  00:00:10",
+ "log": {
+  "path": "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/build/rt-thread-motor-r7f1a.log",
+  "bytes": 3909,
+  "sha256": "efc65cab2c75306d7cd832f92031bf6f675fa863ffe650f664f377aff1d11571",
+  "note": "UV4 输出是 CRLF 原件; 本目录在 .gitattributes 里 -text, blob 字节 == 磁盘字节。"
+ },
+ "program_size": "Program Size: Code=205922 RO-data=86186 RW-data=2192 ZI-data=85596",
+ "program_size_vs_previous_round_same_target": {
+  "previous": "Program Size: Code=205866 RO-data=86186 RW-data=2192 ZI-data=85596",
+  "previous_manifest": "reports/firmware/phase8-m8-r7f1-startup-c-fix/build_manifest.json",
+  "delta_bytes": {
+   "Code": 56,
+   "RO-data": 0,
+   "RW-data": 0,
+   "ZI-data": 0
+  },
+  "bin_bytes": 292684,
+  "previous_bin_bytes": 292628,
+  "previous_bin_sha256": "e5b51b6b810f215e284ea6317a4b1bef6b3faddc6f1ac9f8947804f261fa5732",
+  "bin_delta": 56,
+  "cross_check": "Code 增量 56 B 与 BIN 增量 56 B 相等, RO/RW/ZI 增量为 0 => main 栈 2048->4096 没有落到静态 RAM(堆分配路径, 见 stack 报告 §3)。"
+ },
+ "stack_root_correction": {
+  "why": "上一份报告拿 supervisor_boot 子树与重定向入口 main 谈 main 栈余量, 漏了两层调用者; 真实入口链是 main_thread_entry -> $Super$$main -> supervisor_boot (src/components.c:200-204 在 __ARMCC_VERSION 下调 $Super$$main())。",
+  "main_thread_entry_max_depth_bytes": {
+   "before_adeeedc": 2076,
+   "after_this_round": 2076
+  },
+  "budget_bytes": {
+   "before": 2048,
+   "after": 4096
+  },
+  "static_margin_bytes": {
+   "before": -28,
+   "after": 2020
+  },
+  "heap_side_effect": "RT_USING_HEAP 下主线程栈由 rt_thread_create 从堆取 (components.c:172-177 的静态数组本目标不编), 所以运行时堆 +2048 B; 堆区间固定 board.h:30-31 = 0x8000 = 32768 B。堆峰值离线测不到。",
+  "evidence": "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/build/stack_callgraph_r7f1a.txt"
+ },
+ "images": {
+  "bin": {
+   "path": "reports/firmware/phase8-m8-r7f1a-minimal-c-patch/rt-thread-motor-m1-candidate.bin",
+   "bytes": 292684,
+   "sha256": "b4243886818b6b2cf2e30d10864272225e1b0e66c8435c8a50bb449053e153bf",
+   "identical_to_build_output": true
+  },
+  "axf": {
+   "path": "reports/firmware/phase8-m8-r7f1a-minimal-c-patch/rt-thread-motor-m1.axf",
+   "bytes": 1775920,
+   "sha256": "ea4f8dd1f337796fe824cc262b8fc27f13920a7c260d1a27737b065369124d16",
+   "identical_to_build_output": true
+  },
+  "map": {
+   "path": "reports/firmware/phase8-m8-r7f1a-minimal-c-patch/rt-thread-motor-m1.map",
+   "bytes": 2114770,
+   "sha256": "757701a509e659fcc00df55309920455badb15434e34867a3bc9f0ec34100f53",
+   "identical_to_build_output": true
+  },
+  "callgraph_htm": {
+   "path": "reports/firmware/phase8-m8-r7f1a-minimal-c-patch/rt-thread-motor-m1-callgraph.htm",
+   "bytes": 1078228,
+   "sha256": "f97857ab587a8db2b881f1c9dae58e5b723c9b40f4c7f9d4d166f06a8fcd38b1",
+   "identical_to_build_output": true
+  },
+  "archived_copy_check": "四件 identical_to_build_output 均为 true => 入库副本就是构建输出本体。"
+ },
+ "source_inputs_compiled_from_disk": [
+  {
+   "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/rtconfig.h",
+   "compiled_from_disk_bytes": 9304,
+   "compiled_from_disk_sha256": "eeef9d0c0663b087469b94c382a7eb1e643fd8e05053a2724e7ae6b9638419a4",
+   "disk_CR": 454,
+   "disk_LF": 454,
+   "blob": {
+    "blob_sha1": "c934ae63c004addec70818e9965a97f81f3b2073",
+    "blob_bytes": 8850,
+    "blob_sha256": "6fd8625f7094515e4e164035a067769d155ee20c0d1402278daf623c751649c7",
+    "git_hash_object_path_agrees": true
+   },
+   "identity_kind": "blob_after_crlf_filter(disk 多 CR)",
+   "what": "A 复审 §1: RT_MAIN_THREAD_STACK_SIZE 2048 -> 4096(:118)。RT_CONSOLEBUF_SIZE=128 未动。"
+  },
+  {
+   "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/.config",
+   "compiled_from_disk_bytes": 52103,
+   "compiled_from_disk_sha256": "3bfbe3ec36d1b5e5809b9a23a69f9633def365249556aa8bda63866887215fd1",
+   "disk_CR": 1546,
+   "disk_LF": 1546,
+   "blob": {
+    "blob_sha1": "a5b36ed00a9a0747ea48e4b9707dfcf32f5f4b6f",
+    "blob_bytes": 50557,
+    "blob_sha256": "42018d5dc77e81f25227cc99b9a290ef467c97f9b6b8a2917d91b7f51c43ca23",
+    "git_hash_object_path_agrees": true
+   },
+   "identity_kind": "blob_after_crlf_filter(disk 多 CR)",
+   "what": "操作者补充要求(不在 A 补丁内): CONFIG_RT_MAIN_THREAD_STACK_SIZE 2048 -> 4096(.config:194), 与 rtconfig.h 同步, 免得下次 scons/menuconfig 按旧值把 rtconfig.h 生成回 2048。单行替换, CRLF 原样保留, 字节数不变(52103 B); 其余 20 个带值 CONFIG_ 项未动。"
+  },
+  {
+   "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/tmc2209.c",
+   "compiled_from_disk_bytes": 196406,
+   "compiled_from_disk_sha256": "65601326f6fabd60347da542f75aa53c8e4fe795aef3f38be8b61f2a373b8354",
+   "disk_CR": 4080,
+   "disk_LF": 4080,
+   "blob": {
+    "blob_sha1": "a17bfa048374afaf1f2ecf7b615a363fdf4cedef",
+    "blob_bytes": 192326,
+    "blob_sha256": "e76e152e20052391957a2165995c36dc87b13b0ad8c55eaf09e3bf6aca72d20c",
+    "git_hash_object_path_agrees": true
+   },
+   "identity_kind": "blob_after_crlf_filter(disk 多 CR)",
+   "what": "A 复审 §2: tmc_read_reg_obs 的 4 个提前返回(1123 BAD_CONTEXT / 1147 静止门 NO_DEVICE / 1156 懒打开失败 NO_DEVICE / 1182 取锁失败)各补 st->used = rt_tick_get() - b->start; 预算尚未建立就失败的那条(tmc_budget_open 返回假, :1104)不写 used, 不读未初始化起点。不增加等待、不改超时、不改返回码、不吞错误、不引入共享状态。"
+  },
+  {
+   "path": "tests/host/leaf_main.c",
+   "compiled_from_disk_bytes": 184607,
+   "compiled_from_disk_sha256": "d9759281d3852f18678d4f7737974a5ca0c8d564bdaafadfc0ba823aeb1b1e00",
+   "disk_CR": 0,
+   "disk_LF": 3647,
+   "blob": {
+    "blob_sha1": "dd415396ad01570fcecc3a199eb2cb21d7c4c248",
+    "blob_bytes": 184607,
+    "blob_sha256": "d9759281d3852f18678d4f7737974a5ca0c8d564bdaafadfc0ba823aeb1b1e00",
+    "git_hash_object_path_agrees": true
+   },
+   "identity_kind": "disk_equals_blob",
+   "what": "A 复审步骤 1: BTB06 断言 st.used == 本次夹具推进 tick 且 == TMC_BUD_XFER_LOCK_MS(20), 并保留 reason/rc/零字节; 新增 BTB11(静止门)/BTB12(懒打开失败)两条 NO_DEVICE 提前返回的用例身份与耗时同权断言。注释里如实写明\"包装函数 memset 0 再回拷, 所以修前读到的是 0 而不是 0xA5\"。"
+  },
+  {
+   "path": "tests/host/run_stop_priority_s2.sh",
+   "compiled_from_disk_bytes": 55260,
+   "compiled_from_disk_sha256": "bc29911791a35c0b22986411e102cf5e150dde62edac51de6b35bd7750f3412d",
+   "disk_CR": 887,
+   "disk_LF": 887,
+   "blob": {
+    "blob_sha1": "26b138b1febdaf756bf2d86e43b1408cf0a3a3ed",
+    "blob_bytes": 54373,
+    "blob_sha256": "87124287c65380e3033cd07dc99e57197c50b27303f2f75087a2462f0025fae4",
+    "git_hash_object_path_agrees": true
+   },
+   "identity_kind": "blob_after_crlf_filter(disk 多 CR)",
+   "what": "台账: G_tmc_boot_* 追加 BTB11/BTB12; S2_EXPECT_target 68 -> 70, host_ovr 143 -> 145, BTB01..BTB10 的 id 与数量逐字未动。"
+  }
+ ],
+ "host_tests": {
+  "meta_negative_pre_patch": "把 SRC_APP 指到 adeeedc 的 tmc2209.c 快照(仓外)只跑 tmc_boot: rc=1, target/host_ovr 各 12 条里 BTB06 判 FAIL, 明细 used=0 而本次夹具推进=20 => used 断言不是空转。证据 host/r7f1a_btb_prepatch.txt。",
+  "S2_full": "PASS(rc=0), 22 组 x target/host_ovr, target=70 / host_ovr=145 全真执行无 SKIP; tmc_boot 12/12(含新 BTB11/BTB12), read_obs 30/30, boot_print 5/5。证据 host/r7f1a_s2_full.txt + host/tmc_boot_*_out.txt。",
+  "S2_targeted": "PASS(rc=0) 只所选 3 组(tmc_boot/read_obs/boot_print), 用例=47。",
+  "V1V2": "RUNNER RESULT: PASS (rc=0), V1 build=0 run=0 state=RAN, V2 同。",
+  "line_width_check": "LINE_WIDTH_RESULT PASS (bad=0) —— 本轮没有新增/修改任何 rt_kprintf 站点, 扫到的仍是 R7F1 那 15 处; 修前超长原样的元负控未动。",
+  "not_rerun_and_why": "SD/IO/S1/M8 未重跑: 本轮产品改动只落在 tmc2209.c 的 4 个提前返回与两个配置常量, 这三条链不编 tmc2209.c 的真实读函数, 主机链也不读 rtconfig.h; A 复审步骤 2 也只要求受影响的 TMC 链。"
+ },
+ "device_actions_by_this_round": {
+  "download": 0,
+  "readback": 0,
+  "explicit_reset": 0,
+  "port_open": 0,
+  "apply": 0,
+  "config_save": 0,
+  "arm_or_start_or_learn": 0,
+  "note": "A 复审 §末尾: 两项小修与新候选身份核对完, 再安排一次限定范围的启动现场诊断; 此时无需 arm/start/学习/保存/清日志, 不把旧额度结转。本轮没有动用任何额度, 上一场那批也已用尽。"
+ },
+ "new_image_on_board": false,
+ "board_image_still": {
+  "sha256": "e5b51b6b810f215e284ea6317a4b1bef6b3faddc6f1ac9f8947804f261fa5732",
+  "bytes": 292628,
+  "proven_on_board_at": "ed8d7f4 那场的 292164 B 定长回读逐字节相等"
+ },
+ "not_overwritten": {
+  "reports/firmware/phase8-m8-r7f1-startup-c-fix/": "adeeedc 那枚(BIN 292628 B e5b51b6b…)四件与 manifest/SHA256SUMS 全部原样未动; 本轮用新目录重导出。",
+  "reports/firmware/phase8-m8-r6a-offline-rework/": "未动(在板镜像 5ae4110d… 的归档)。"
+ },
+ "working_tree_at_build": "本轮改动在 manifest 生成时未提交; compiled_from_disk_* 就是 Keil 实际编译的字节。blob_* 用 git hash-object --path 现算并与自算值逐条对账(本仓库 core.autocrlf=true, 这些件判为 text, blob = 磁盘去 CR)。"
+}

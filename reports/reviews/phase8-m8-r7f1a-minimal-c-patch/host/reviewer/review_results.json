@@ -1,0 +1,16 @@
+{
+  "reviewed_commit": "adeeedc6f05bf5c9cd0f3b41023b64a53fb134aa",
+  "original_C_tests_pass": 90,
+  "patched_C_tests_pass": 80,
+  "identity_checks": 19,
+  "identity_failures": 0,
+  "SD_independent_execution": "COMPILE_FAILED_WINDOWS_H_UNAVAILABLE_ON_LINUX",
+  "main_thread_entry_static_max_depth": 2076,
+  "main_stack_before": 2048,
+  "main_stack_patch": 4096,
+  "BTB06_used_before": 0,
+  "BTB06_used_after": 20,
+  "device_actions": 0,
+  "Keil_builds_by_A": 0,
+  "new_hardware_authorization": 0
+}

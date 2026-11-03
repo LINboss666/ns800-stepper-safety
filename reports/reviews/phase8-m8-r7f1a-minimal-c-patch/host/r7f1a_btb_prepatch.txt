@@ -1,0 +1,32 @@
+###### 停机优先 S2 并发/身份链 (基线 adeeedc6f05bf5c9cd0f3b41023b64a53fb134aa) ######
+run_id=20261103T153721Z-673
+SRC_APP=/d/ns800_r7f1_scratch/prepatch_app
+夹具=/d/ns800/tests/host/sp_conc_main.c (真 pthread 互斥量/线程/窗口内排队 ISR)
+OUT_DIR=/tmp/ns800-host-chain/s2/20261103T153721Z-673
+compiler=gcc.exe (tdm64-1) 4.9.2
+单组墙钟=60s(死锁守卫)  选择集合=tmc_boot
+
+=== 变体 target ===
+    判 FAIL: CASE|BTB06-per-call-stat-says-lock-busy-with-tx-zero-on-ioin-read|FAIL|rc=-23 reason=lock-busy(4) tx=0 rx=0 flush=0 used=0 本次夹具推进=20 tick(必须相等且等满 20) 取锁到期增量=1 线上字节=0 读请求=0
+    台账: 必需=12 唯一出现=12 实际行数=12 SUMMARY(cases=12 pass=11 fail=1 pre_bad=0 skips=0) 自洽=1
+  target/tmc_boot 有判 FAIL 的用例 => 检出失败
+  (ONLY 部分运行: 期望用例改取所选组的必需 id 合计)
+  target 汇总: 组=1 用例=12 PASS=11 FAIL=1 SKIP行=0 pre_bad=0 期望用例=12
+
+=== 变体 host_ovr ===
+    判 FAIL: CASE|BTB06-per-call-stat-says-lock-busy-with-tx-zero-on-ioin-read|FAIL|rc=-23 reason=lock-busy(4) tx=0 rx=0 flush=0 used=0 本次夹具推进=20 tick(必须相等且等满 20) 取锁到期增量=1 线上字节=0 读请求=0
+    台账: 必需=12 唯一出现=12 实际行数=12 SUMMARY(cases=12 pass=11 fail=1 pre_bad=0 skips=0) 自洽=1
+  host_ovr/tmc_boot 有判 FAIL 的用例 => 检出失败
+  (ONLY 部分运行: 期望用例改取所选组的必需 id 合计)
+  host_ovr 汇总: 组=1 用例=12 PASS=11 FAIL=1 SKIP行=0 pre_bad=0 期望用例=12
+
+=== S2 并发/身份矩阵 ===
+target/tmc_boot | NOT-PASS 判FAIL=1 自报fail=1 proc_rc=1 必需=12/12
+target | 有失败组: tmc_boot
+host_ovr/tmc_boot | NOT-PASS 判FAIL=1 自报fail=1 proc_rc=1 必需=12/12
+host_ovr | 有失败组: tmc_boot
+
+选择集合=tmc_boot
+实际执行集合: target=1组 host_ovr=1组 (每组一个独立进程)
+
+S2 RUNNER RESULT: FAIL (rc=1) —— 存在判 FAIL 的必需用例

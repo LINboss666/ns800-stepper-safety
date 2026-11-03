@@ -185,7 +185,7 @@ S_disarm_ready_host_ovr=""
 #   的真 xfer 锁, 会合点落在"后台取到锁之后的 flush 第一次设备读"(不是墙钟猜交错)。
 #   全部只读 => 与 read_obs 同一口径, **两个变体都真执行**(target 不许整族 SKIP, 出现
 #   任何 SKIP 都算台账不自洽; 也不许为跑本组在 target 里开宏)。
-G_tmc_boot_target="BTB01-startup-ioin-read-refuses-with-zero-bytes-on-wire-while-background-sg-holds-xfer BTB02-background-sg-read-itself-completes-after-release-and-returns-lock BTB03-same-ioin-read-succeeds-when-no-background-reader-holds-xfer BTB04-illegal-context-refuses-with-same-rc-but-zero-lock-attempt BTB05-ioin-transport-succeeds-but-identity-must-still-fail-required BTB06-per-call-stat-says-lock-busy-with-tx-zero-on-ioin-read BTB07-per-call-stat-says-bad-context-not-lock-busy-for-same-rc BTB08-per-call-stat-puts-failure-in-tx-stage-with-zero-written BTB09-per-call-stat-puts-failure-in-rx-stage-with-four-tx-echo-only-rx BTB10-each-call-owns-its-stat-fail-then-success-do-not-share-last-error"
+G_tmc_boot_target="BTB01-startup-ioin-read-refuses-with-zero-bytes-on-wire-while-background-sg-holds-xfer BTB02-background-sg-read-itself-completes-after-release-and-returns-lock BTB03-same-ioin-read-succeeds-when-no-background-reader-holds-xfer BTB04-illegal-context-refuses-with-same-rc-but-zero-lock-attempt BTB05-ioin-transport-succeeds-but-identity-must-still-fail-required BTB06-per-call-stat-says-lock-busy-with-tx-zero-on-ioin-read BTB07-per-call-stat-says-bad-context-not-lock-busy-for-same-rc BTB08-per-call-stat-puts-failure-in-tx-stage-with-zero-written BTB09-per-call-stat-puts-failure-in-rx-stage-with-four-tx-echo-only-rx BTB10-each-call-owns-its-stat-fail-then-success-do-not-share-last-error BTB11-not-idle-refusal-owns-its-used-field-with-zero-wire-bytes BTB12-uart-open-failure-owns-its-used-field-with-zero-wire-bytes"
 G_tmc_boot_host_ovr="$G_tmc_boot_target"
 S_tmc_boot_target=""
 S_tmc_boot_host_ovr=""
@@ -215,8 +215,11 @@ S_boot_print_host_ovr=""
 # R7F1(2026-11-03 任务书 §1+§2): tmc_boot 组 10 条只读观测在**两个变体都真执行**
 # R7F1(同任务书 §2/§4): boot_print 组 5 条(实跑逐条字节量 + 量具元负控)同样两变体真执行
 #   => target 53 + 10 + 5 = 68, host_ovr 128 + 10 + 5 = 143。
-S2_EXPECT_target="${S2_EXPECT_target:-68}"
-S2_EXPECT_host_ovr="${S2_EXPECT_host_ovr:-143}"
+# R7F1-A(2026-11-03 复审 §1): used 漏记这条判据要**被断言**而不是被打印, 同组追加
+#   BTB11(静止门拒绝)与 BTB12(懒打开失败)两条提前返回路径的耗时同权断言
+#   => target 68 + 2 = 70, host_ovr 143 + 2 = 145。BTB01..BTB10 的 id 与数量逐字未动。
+S2_EXPECT_target="${S2_EXPECT_target:-70}"
+S2_EXPECT_host_ovr="${S2_EXPECT_host_ovr:-145}"
 
 VARIANTS="target host_ovr"
 

@@ -1,0 +1,32 @@
+###### 安全数据语义链 (基线 adeeedc6f05bf5c9cd0f3b41023b64a53fb134aa) ######
+SRC_APP=/workspace/scratch/f24247cdf3d6/ns800-r6a-review/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications
+SHIM_DIR=/workspace/scratch/f24247cdf3d6/ns800-r6a-review/tests/host/shim_sd
+OUT_DIR=/workspace/scratch/f24247cdf3d6/r7f1-c-review/sd
+compiler=gcc (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0
+ONLY=<未设置>  选择模式=default  选择集合=off_target on_target
+
+=== 变体 off_target ===
+In file included from /workspace/scratch/f24247cdf3d6/ns800-r6a-review/tests/host/sd_main.c:25:
+/workspace/scratch/f24247cdf3d6/ns800-r6a-review/tests/host/shim_sd/rtthread.h:29:10: fatal error: windows.h: No such file or directory
+   29 | #include <windows.h>
+      |          ^~~~~~~~~~~
+compilation terminated.
+  off_target 编译失败 rc=1 => 不运行二进制(旧产物已删除)
+
+=== 变体 on_target ===
+In file included from /workspace/scratch/f24247cdf3d6/ns800-r6a-review/tests/host/sd_main.c:25:
+/workspace/scratch/f24247cdf3d6/ns800-r6a-review/tests/host/shim_sd/rtthread.h:29:10: fatal error: windows.h: No such file or directory
+   29 | #include <windows.h>
+      |          ^~~~~~~~~~~
+compilation terminated.
+  on_target 编译失败 rc=1 => 不运行二进制(旧产物已删除)
+
+=== 语义链矩阵 ===
+off_target | COMPILE_FAILED rc=1
+on_target | COMPILE_FAILED rc=1
+
+选择集合=off_target on_target (模式=default)
+实际执行集合=<无>
+NOT_RUN: off_target (被选择但未完成执行)
+
+SD RUNNER RESULT: FAIL (rc=1; 1=检出失败, 4=基础设施故障/台账不成立/被选择却未执行) 详见 /workspace/scratch/f24247cdf3d6/r7f1-c-review/sd

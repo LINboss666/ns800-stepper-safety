@@ -1,0 +1,24 @@
+# sha256 * <仓库相对路径>(LF, 无 BOM; 本清单不哈希自身字节 —— 一条清单不能给自己的字节作证)
+# 生成方式: 对 reports/reviews/phase8-m8-r7f1a-minimal-c-patch/ 下每个常规文件(排除 SHA256SUMS.txt、remote_readback.md 与 __pycache__) 直接读磁盘字节算 sha256
+# 条目数=20; 与 Git blob 的逐条复算由 host/staged_preflight_batch.py(提交前, 单批流)与推送后的远端逐 blob 回读完成
+# 重新生成: python reports/reviews/phase8-m8-idle-stack-r4/host/make_round_sums.py <本目录>
+b1d603f4333072796da98b7428c12eb97ba26aa59f8081659eea2799b629ff37  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/a_review_R7F1_A_Review_Minimal_C_Followup.md
+efc65cab2c75306d7cd832f92031bf6f675fa863ffe650f664f377aff1d11571  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/build/rt-thread-motor-r7f1a.log
+52b1803b4dc4d1e6fc1490dc89eda6002b77595b24ed979be5a0c966f6117d2f  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/build/stack_callgraph_r7f1a.txt
+c90d1cf8927ae9e6cde5065412176a0efd4fdae402c9740943f03723f4f49e16  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/host/r7f1a_btb_prepatch.txt
+df108ea6e4b50834054905d06c11a6a946f6b5177ac7308e73945a28f6c77f4d  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/host/r7f1a_lwc.txt
+ab94ed73b6e33473ffe5c73fdf40462cd52e06ef3aa7e37ec5ca0b56c6a107a2  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/host/r7f1a_s2_full.txt
+f94cea963ed02e417db1e22ee830eba5f9c24a8d60b899f570b322fc5d6a7286  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/host/r7f1a_s2_targeted.txt
+005c05331661f02456c211e2a9186253494a6059b75a74322d5fd85d3e19ad8f  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/host/r7f1a_v1v2.txt
+15cc27eee883db7e9fd1fb20c5e8043ee85526ec68cd1c65f7c586d4206cafbf  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/host/reviewer/R7F1_A_minimal_followup.patch
+e3b947146b163f1b23a5769ae045bb265594f58e942fb85f703e473741ff4fe2  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/host/reviewer/review_results.json
+d526ba43a52f70d2a9c6642361cfdeee1dfe4c8f2d34d8cc3dcde3fc03310eb4  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/host/reviewer/s2-patched.txt
+8cab1a98a57effde004917a5749ed319ca0dbd2b706d25f96cfe442a3f99976d  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/host/reviewer/s2-patched_host_ovr_tmc_boot_out.txt
+a09a74fd81c70d60cce5378bb9a659d6a69bdcebbcf2078b214561fa4c3342f3  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/host/reviewer/s2-patched_target_tmc_boot_out.txt
+d9b7f01059a8586e706e279dafa800bde1b3a8f0afd8588ffac424c8764a28bd  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/host/reviewer/s2.txt
+25b7085b19819c7a6674096ef01bb3254c913ae277f20a1ed195e6f6303115ee  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/host/reviewer/s2_host_ovr_tmc_boot_out.txt
+f3c033e883c71fe8b19ca5d98063ac4855610236ce5ea489cdd019a458a13141  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/host/reviewer/s2_target_tmc_boot_out.txt
+fbf178f1603a7147000281eed12cdf69e8e49146d1113d3cea5ac2825f9e85ff  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/host/reviewer/sd.txt
+c79fffdd7bea1ea556468e344bdc5ef36d3749e22edd73daa753f3f1389cab4a  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/host/tmc_boot_host_ovr_out.txt
+f982fa6bc763c58459f5202257c6cb8b7a42897f1b7bf648aa695bdb6385e637  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/host/tmc_boot_target_out.txt
+aace6ec4d0104efc88c61900aba1a7b7ba2dc769ed4f4bc136d52af582ab13ee  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/run_record.md

@@ -1,0 +1,57 @@
+M8-R7F1-A 构建侧栈深核对: 根符号改为 main_thread_entry, 并给修前/修后两份实测差支
+日期 2026-11-03。目标 rt-thread-motor-m1-candidate。本轮只构建, 设备动作 0。
+构建命令: C:/Keil_v5/UV4/UV4.exe -r project.uvprojx -t rt-thread-motor-m1-candidate -j0 -o D:/ns800/reports/reviews/phase8-m8-r7f1a-minimal-c-patch/build/rt-thread-motor-r7f1a.log
+
+[0] 为什么换根(复审 §1 的原话复述, 不是我自己的判断)
+    上一份报告用 supervisor_boot 子树(2020 B)与重定向入口 main(756 B)谈 main 栈余量, 漏掉了
+    两层调用者。真实关系是 main_thread_entry -> $Super$$main -> supervisor_boot, 且
+    src/components.c:200-204 在 __ARMCC_VERSION 下就是调 $Super$$main(); 因此整条 main 线程
+    的静态深度要以 main_thread_entry 为根。本报告同时列两版镜像的同名数, 差支可直接对账。
+
+[1] main 线程真实入口链(本轮镜像)
+    main_thread_entry Max Depth = 2076 B   链: main_thread_entry -> $Super$$main -> supervisor_boot -> project_config_boot -> project_config_load -> ns_params_load -> cfg_select -> ns_flash_read
+    $Super$$main               本轮  2060 B  (修前 2060, 差 +0)
+    supervisor_boot            本轮  2020 B  (修前 2020, 差 +0)
+    safety_startup_selftest    本轮  1220 B  (修前 1220, 差 +0)
+    safety_run_selftest        本轮  1164 B  (修前 1164, 差 +0)
+    sensor_thread_entry        本轮  1332 B  (修前 1332, 差 +0)
+    system_selftest            本轮  1340 B  (修前 1340, 差 +0)
+    main                       本轮   756 B  (修前 756, 差 +0)
+
+[2] 预算判定(RT_MAIN_THREAD_STACK_SIZE 2048 -> 4096)
+    修前: main_thread_entry 2076 B / 预算 2048 B => 静态差值 +28 B(超出预算, 这就是复审 §1 的结论)
+    修后: main_thread_entry 2076 B / 预算 4096 B => 静态差值 -2020 B(预算内, 余量 2020 B)
+    边界照旧: Max Depth 是 armlink 静态下界(不解析函数指针, 不含异常/ISR 帧与上下文保存),
+    所以"余量 2020 B"不是"证明不会溢出", 只是可核对的静态形状。
+
+[3] 4096 这件事落在哪里(资源侧实测, 不是推断)
+    rtconfig.h 有 RT_USING_HEAP(rtconfig.h:103), src/components.c:172-177 的静态数组
+    main_thread_stack[] 在 #ifndef RT_USING_HEAP 里, 本目标不编它; :218-221 走
+    rt_thread_create("main", ..., RT_MAIN_THREAD_STACK_SIZE, ...) => 这段栈来自堆。
+    所以本轮 ZI 增量实测为 0(见 §4), 而**运行时堆占用 +2048 B**:
+      堆区间固定 board.h:30-31 HEAP_BEGIN=&Image$$RW_RT_HEAD$$Limit,
+      HEAP_END=同一个符号 + 0x8000 => 整个堆 32768 B, 主线程栈请求从 2048 变 4096。
+    离线无法测堆峰值, 因此这条只能登记为"下一次现场的可见事实":
+      若堆不够, rt_thread_create 返回 RT_NULL, components.c:221 的 RT_ASSERT 会在
+      [BOOT] 横幅之前就炸掉; 反过来, 只要 [BOOT] 逐行照常出来, 就说明这次分配成了。
+
+[4] 两版 map 的 Object Totals 差分(adeeedc 那枚 -> 本轮)
+    object                         Code       RO       RW       ZI
+    Object Totals                   +56       +0       +0       +0
+    tmc2209.o                       +56       +0       +0       +0
+    components.o                     +0       +0       +0       +0
+    (incl. Padding)                  +0       +0       +0       +0
+    BIN 292628 -> 292684 (+56 B), 等于 Code 增量; RO/RW/ZI 增量均为 0 =>
+    本轮 4 处 used 补记只长代码, main 栈改 4096 一点静态 RAM 都没动(与 §3 的堆路径一致)。
+
+[5] 反汇编核对(证 4 处补记真进了镜像)
+    tmc2209_read_register_stat PROC | |L1.176536| | PUSH     {r4,lr} | SUB      sp,sp,#0x40
+    safety_startup_selftest PROC | |L1.154776| | PUSH     {r4,lr} | SUB      sp,sp,#0x30
+    帧仍是 PUSH + SUB sp,#0x40 / #0x30, 没有因为补记而变大;
+    源码侧 4 个提前返回现在各自写 st->used(站点: tmc2209.c 1123 / 1147 / 1156 / 1182),
+    正常出口 1196 与 1375 原有写法未动。
+
+[6] 本轮没有做的
+    - 没有第二次同版本构建(上面修前数取自 adeeedc 已归档的那份调用图 htm, 未重编)。
+    - 没有任何设备动作; 新镜像 b4243886… 尚未上板。
+    - 没有做全镜像指令级差分, 只核了自检路径的两个帧。

@@ -1,0 +1,127 @@
+LINE_WIDTH mode=离线界限依据 limit=120B (控制台裁剪线 127B) base=ed8d7f4a8
+META|known-too-long|修前 CONFIGURED 一行|worst=378B|复审/现场量得=132B|fired
+META|known-too-long|修前 LIMIT 一行|worst=162B|复审/现场量得=250B|fired
+META|known-too-long|R6 新增的 withheld 一行(修前)|worst=285B|复审/现场量得=237B|fired
+META|known-too-long|R7F1 修前 [MOT] init OK 一行(现场偏移 1192, NUL 前 126 B)|worst=139B|复审/现场量得=126B|fired
+META|known-too-long|R7F1 修前 [SS] STEP: 一行(现场偏移 2142, NUL 前 126 B)|worst=207B|复审/现场量得=126B|fired
+META|known-too-long|R7F1 修前 [SS] ==> FAULT_LATCHED 一行(现场偏移 2269, NUL 前 126 B)|worst=221B|复审/现场量得=126B|fired
+META|known-too-long|R7F1 修前 [SS] !! STEP 关断未确认(同一 if/else 的故障分支; 本轮现场未执行, 离线最宽展开)|worst=326B|复审/现场量得=0B|fired
+LINE|tmc2209.c:2844|57 B|[TMC-CFG] CONFIGURED (各次写入均经 IFCNT 确认)\n
+LINE|tmc2209.c:2845|40 B|[TMC-CFG] GCONF/CHOPCONF 读回一致\n
+LINE|tmc2209.c:2846|51 B|[TMC-CFG] 电流值仍为理论计算, 未实测\n
+LINE|tmc2209.c:2847|60 B|[TMC-CFG] 预算: 已用 4294967295 / 总 4294967295 tic
+LINE|tmc2209.c:2849|45 B|[TMC-CFG] flush=4294967295B TX=4294967295B\n
+LINE|tmc2209.c:2851|93 B|[TMC-CFG] irun=4294967295 ihold=4294967295 dly
+LINE|tmc2209.c:2854|65 B|[TMC-CFG] GCONF 00000000->00000000 CHOPCONF 00
+LINE|tmc2209.c:2856|32 B|[TMC-CFG] op_epoch=4294967295\n
+LINE|tmc2209.c:2829|88 B|[TMC-CFG] !! 晚到的 apply 成功被拒绝提交 (inv_gen 429496
+LINE|tmc2209.c:2831|82 B|[TMC-CFG] op_epoch=4294967295 / 现在=4294967295,
+LINE|tmc2209.c:2834|37 B|[TMC-CFG] 旧成功不刷新健康\n
+LINE|safety_thread.c:374|82 B|[SAFETY] LIMIT inputs config = DISABLED_BY_CON
+LINE|safety_thread.c:376|99 B|[SAFETY] LIMIT OFF => PF.14/PF.15 不解析/不配置/不读/不
+LINE|motor.c:1830|93 B|[MOT] 关闭落位**未提交**: 取不到 ss_lock - 不写 mot 影子, 也不
+LINE|motor.c:1888|101 B|[MOT] 关闭已落位, 但**未授予恢复资格**: 本代禁能侧证据不足 (epoch=42
+LINE|motor.c:1890|79 B|[MOT]  回读许可=000000000000000000 已确认电平=429496729
+LINE|motor.c:1894|67 B|[MOT]  抑制=000000000000000000 停机锁存=000000000000
+LINE|motor.c:1897|65 B|[MOT]  => Safety 保持原状态, 需 fault_reset 人工复核\n
+LINE|safety_state.c:671|72 B|[SS] [REQ FAIL] TMC2209 IOIN rc=-2147483648 re
+LINE|safety_state.c:673|92 B|[SS] [REQ FAIL] TMC2209 IOIN tx=4294967295 rx=
+LINE|motor.c:1062|61 B|[MOT] init OK (enable-path-validated=YES, arm 
+LINE|motor.c:1064|97 B|[MOT] init OK: DRV_ENABLE LOW verified, STEP=a
+LINE|safety_state.c:459|59 B|[SS] STEP: 两条输出路径都没有未确认的关断\n
+LINE|safety_state.c:460|88 B|[SS] STEP: motor=api-accepted(驱动接受关断, 非波形证明) s
+LINE|safety_state.c:462|85 B|[SS] STEP: diag=诊断从未占用该通道 - 仍不等于示波器证明无脉冲\n
+LINE|safety_state.c:468|60 B|[SS] !! STEP 关断**未确认** -> 不谎称输出已停\n
+LINE|safety_state.c:469|118 B|[SS] !! STEP motor=api-accepted(驱动接受关断, 非波形证明)
+LINE|safety_state.c:472|98 B|[SS] !! STEP diag=api-accepted(驱动接受关断, 非波形证明)(
+LINE|safety_state.c:474|96 B|[SS] !! STEP 后续 arm/start/诊断借用/故障清除全部拒绝, 直到人工恢
+LINE|safety_state.c:479|71 B|[SS] ==> FAULT_LATCHED code=4294967295 (DRV_EN
+LINE|safety_state.c:481|84 B|[SS] ==> FAULT_LATCHED ENN feedback=UNEXPECTED
+LINE|safety_state.c:484|66 B|[SS] ==> FAULT_LATCHED motor_rc=-2147483648 di
+LINE|safety_state.c:485|59 B|[SS] ==> 整理身份 epoch=4294967295 events=0xFFFFFF
+CHANGED_SITES|base=ed8d7f4a8|本轮 diff 命中的 rt_kprintf 站点=15
+CHANGE|motor.c:1062|76 B|[MOT] init OK (enable-path-validated=%s, arm
+CHANGE|motor.c:1064|66 B|[MOT] init OK: DRV_ENABLE LOW verified, STEP
+CHANGE|safety_state.c:459|59 B|[SS] STEP: 两条输出路径都没有未确认的关断\n
+CHANGE|safety_state.c:460|61 B|[SS] STEP: motor=%s src=%s\n
+CHANGE|safety_state.c:462|76 B|[SS] STEP: diag=%s - 仍不等于示波器证明无脉冲\n
+CHANGE|safety_state.c:468|60 B|[SS] !! STEP 关断**未确认** -> 不谎称输出已停\n
+CHANGE|safety_state.c:469|106 B|[SS] !! STEP motor=%s(src=%s rc=%d latched=%
+CHANGE|safety_state.c:472|82 B|[SS] !! STEP diag=%s(rc=%d latched=%s)\n
+CHANGE|safety_state.c:474|96 B|[SS] !! STEP 后续 arm/start/诊断借用/故障清除全部拒绝, 直到人
+CHANGE|safety_state.c:479|77 B|[SS] ==> FAULT_LATCHED code=%u (DRV_ENABLE L
+CHANGE|safety_state.c:481|81 B|[SS] ==> FAULT_LATCHED ENN feedback=%s STEP=
+CHANGE|safety_state.c:484|66 B|[SS] ==> FAULT_LATCHED motor_rc=%d diag_rc=%
+CHANGE|safety_state.c:485|59 B|[SS] ==> 整理身份 epoch=%u events=0x%X\n
+CHANGE|safety_state.c:671|72 B|[SS] [REQ FAIL] TMC2209 IOIN rc=%d reason=%s
+CHANGE|safety_state.c:673|92 B|[SS] [REQ FAIL] TMC2209 IOIN tx=%u rx=%u flu
+CHANGE_SCAN_META|fired|命中 15 个站点并逐条判宽
+REPO_SCAN|applications 下字面下界 >120B 的 rt_kprintf 站点=66
+  OVER|diagnosis.c:1037|168B|[SELFTEST-D] 4 PRECONDITION FAIL: synthetic inputs (sg 80/20, cu
+  OVER|diagnosis.c:1145|122B|[SELFTEST-D] 7.isolation: prod last_seq %u -> %u, prod cur_filt 
+  OVER|motor.c:319|161B|[MOT] !! STEP 关断未确认 (rc=%d, src=%s): 输出状态未知; 同一短临界区内已追加抑制并请求许可 L
+  OVER|motor.c:418|146B|[MOT] !! STEP 关断未确认 (rc=%d src=%s): 许可 LOW 裸写已在门内发出(%s) -> 置 FAU
+  OVER|motor.c:530|260B|[MOT] !! 业务失败(原错误=%d src=%s)的处置**整笔放弃**: 本操作那一代 已被更新的一代取代(既不是本次保
+  OVER|motor.c:538|139B|[MOT] 失败支的影子/状态落位**整笔放弃**(proof epoch=%u 已被取代 或已由那一代的整理者做完) - 不动
+  OVER|motor.c:544|124B|[MOT] !! rollback: STEP 关断也未确认 (rc=%d) -> 输出状态未知, 已在同窗追加抑制并锁存待人工
+  OVER|motor.c:547|172B|[MOT] 业务失败已按**受检回滚**处置(src=%s, 保护结果=%s, 原错误=%d, pwm_rc=%d, low=%
+  OVER|motor.c:600|186B|[MOT] DRV GUARD: 本拍影子/状态落位由**这一代的整理者**做 (trip rc=%d, proof epoch
+  OVER|motor.c:606|213B|[MOT] DRV GUARD: 本拍的处置结论**过期丢弃**(op_epoch=%u 既不是当前代, 当前也没有待整理的故障
+  OVER|motor.c:618|204B|[MOT] DRV GUARD: 驱动配置/反馈异常(reason=%d) -> 已请求停 STEP(src=guard)、请求
+  OVER|motor.c:740|130B|[MOT] ramp: 本拍身份已被取代(拍初 epoch=%u / 现在=%u) -> 整拍放弃: 不写 current/st
+  OVER|motor.c:781|122B|[MOT] RUN->READY 未提交 (rc=%d): 本预约快照 epoch=%u / 现在=%u - 不拉状态机, 也不
+  OVER|motor.c:1009|198B|[MOT] init FAILED: %s 未取得 -> 仍已请求许可 LOW (%s, rc=%d); STEP 侧=dev-
+  OVER|motor.c:1037|161B|[MOT] init FAILED: STEP 关断未被驱动接受 (rc=%d) -> 不创建斜坡线程, health=FAIL
+  OVER|motor.c:1066|126B|[MOT]   注: STEP=api-accepted 只说明驱动**接受了关断请求**, 不是示波器证明无脉冲(BUG-00
+  OVER|motor.c:1127|205B|[MOT] arm REFUSED: 驱动配置完整性复核未通过(rc=%d, 本次保护结果=%s, op_epoch=%u / 
+  OVER|motor.c:1257|165B|[MOT] arm FAILED: DRV_ENABLE HIGH not verified (%d) - 受检回滚(换代/抑制
+  OVER|motor.c:1302|130B|[MOT] arm REFUSED: 提交 armed 前预约已失效(新故障/新预约) - 走统一出口归还 txn(不得从这里直
+  OVER|motor.c:1453|148B|[MOT] dir REFUSED: STEP 关断未确认 (stop=%s rc=%d latched=%u diag_off
+  OVER|motor.c:1504|202B|[MOT] dir REFUSED: 写入窗口内复核未通过 (at_rest=%s inhibit=%s latched(mot
+  OVER|motor.c:1611|154B|[MOT] start REFUSED: 芯片配置实值复核未通过(%d) - 可能已断电/复位/重连, 需重新 apply + 
+  OVER|motor.c:1634|130B|[MOT] start REFUSED: ENN feedback 不在使能侧(expected LOW) (err=%d ve
+  OVER|motor.c:1678|129B|[MOT] start REFUSED: 最终提交未成立(rc=%d) - 本命令快照 epoch=%u / 现在=%u; SS
+  OVER|motor.c:1722|173B|[MOT] !! EMERGENCY STOP 的慢整理**整笔放弃**(proof epoch=%u 已被 更新的一代取代或已
+  OVER|motor.c:1729|121B|[MOT] !! EMERGENCY STOP but STEP 关断未确认 (rc=%d): 不能称'输出已停止', 失败已锁
+  OVER|motor.c:1900|142B|[MOT] 慢整理**整笔放弃**: 本次 proof 那一代已被更新的一代取代 (epoch=%u) - 不写新影子, 不动新
+  OVER|motor.c:2066|212B|[MOT] 许可 LOW 回读确认**未提交**(身份失配: epoch=%u 已被更新的一代 请求/人工恢复取代, read_
+  OVER|motor.c:2196|153B|[MOT] STEP diag REFUSED: 使能链未验收且未确认隔离环境 (MOTOR_HARDWARE_ENABLE_P
+  OVER|motor.c:2199|296B|[MOT]   使能链未验收期间, DRV_ENABLE 焊盘 LOW 不能证明 TMC_ENN 已禁能 (历史测量记录过 TM
+  OVER|motor.c:2203|134B|[MOT]   要量 STEP 频率: 先拔出 TMC 模块/断开功率级, 再由操作员翻转 STEP_DIAG_ISOLATED
+  OVER|motor.c:2413|128B|[MOT-GUARD] 纯判定自测: drive_config_ok=%s, gate mask=0x%X, write-gat
+  OVER|motor.c:2442|142B|[MOT-PROBE] integrity=%d (0=OK, -EPERM=未CONFIGURED/快照作废, -EIO=实值
+  OVER|ns_flash_shell.c:19|184B|capacity=8388608 page=256 sector=4096\nparams 000000-00FFFF (A:0
+  OVER|safety_gpio.c:162|152B|[SAFETY] !! safety_drv_enable_write(HIGH) REFUSED: 生产使能必须走 sp_co
+  OVER|safety_gpio.c:248|123B|[SAFETY] DRV_ENABLE readback(poll) want=%d got=%d (try %u) - 如需重
+  OVER|safety_gpio.c:450|151B|[SAFETY] ENN_FEEDBACK(%s = 板上 TMC_ENN) raw=%d resolved=%s [只读输入,
+  OVER|safety_state.c:262|154B|[SS] transition_for REFUSED: %s -> %s (身份 epoch=%u / 现在=%u, inhi
+  OVER|safety_state.c:371|143B|[SS] reconcile: 没有待整理的事实(重复通知或已整理过) code=%u -> 不触发黑匣子、不关断, 也**不补
+  OVER|safety_state.c:383|138B|[SS] 许可 LOW **确认未提交**(身份失配) - 回读本身成功(raw=%d), 但不写进别的一代; 本次对外按未确认
+  OVER|safety_state.c:406|159B|[SS] reconcile **未提交**: 取不到 mot_lock -> 不 ack、不做无锁写; 这一代的整理义务保持 
+  OVER|safety_state.c:427|169B|[SS] reconcile **整笔丢弃**: proof epoch=%u 已被更新的一代取代 (新故障/新预约/已恢复) 
+  OVER|safety_state.c:444|131B|[SS] !! ENN feedback NOT on disabled side (verdict=%s) - 不打印'最终禁
+  OVER|safety_state.c:528|151B|[SS] !! 事件系统未就绪: 已执行短保护, 但慢整理无人消费 (pending=%s) - 状态命令会照实显示, 不打印'
+  OVER|safety_state.c:552|131B|[SS] notify trip done 投递失败(%d): 保护已做(epoch=%u), pending=%s - 慢整理
+  OVER|safety_state.c:788|177B|[SS] fault_reset REFUSED: epoch 已饱和(exhausted) - 人工恢复与新的预约都被禁止, 
+  OVER|safety_state.c:842|145B|[SS] fault_reset REFUSED: ENN feedback not confirmed on the disa
+  OVER|safety_state.c:867|207B|[SS] fault_reset REFUSED: 安全关闭复核失败 (%d) - PWM 关断或许可撤销至少一步未确认(失败优
+  OVER|safety_state.c:889|215B|[SS] fault_reset REFUSED: 复核后的 DRV_ENABLE LOW 回读未确认 (read=%d 提交=
+  OVER|safety_state.c:915|245B|[SS] fault_reset REFUSED: ENN feedback not re-confirmed AFTER 安全
+  OVER|safety_state.c:947|172B|[SS] fault_reset REFUSED: STEP 关断结果无效 (motor=%s src=%s rc=%d lat
+  OVER|safety_state.c:956|128B|[SS] STEP 关断结果有效(Motor 侧=驱动接受关断; 诊断侧=%s) - 仍非波形证明, motor src=%s,
+  OVER|safety_state.c:1009|140B|[SS] ==> MANUAL_CLEAR (重跑自检进 READY 后仍需重新 arm) [本次覆盖的历史关断锁存: moto
+  OVER|safety_state.c:1113|197B|[SS] !! SELF_TEST->READY refused (rc=%d): 自检期间协调层已换代或被抑制 (进入时 ep
+  OVER|sensor_service.c:325|133B|[SNS]      (PC.6=TMC_ENN 反馈, 非急停输入; 禁用字段显示 DISABLED_BY_CONFIG, 活
+  OVER|step_pwm.c:129|135B|[STEP] 未持有输出(%s), 本次无需关断动作 - 不构成一次硬件关断证明; 失败锁存=%s; 不去动 Motor 的预约
+  OVER|step_pwm.c:150|242B|[STEP] !! 关断未确认 (rc=%d src=%s): 输出状态未知, 诊断所有权**不释放**, 已在同一短临界区内追
+  OVER|step_pwm.c:252|144B|[STEP] REFUSED: 诊断句柄与协调层绑定的实例不一致 (diag=%p ch=%d / bound=%p ch=%d
+  OVER|step_pwm.c:265|147B|[STEP] REFUSED: STEP 输出未获许可(使能链未验收/未确认隔离环境) 或 EPWM1 ch0 仍由 Motor
+  OVER|supervisor.c:261|132B|[SELFTEST] 2.arm gate fail mask=0x%X (bit0 enable-path bit1 READ
+  OVER|supervisor.c:333|151B|[SELFTEST] 2g.limit_inputs=%s (HIGH=safe/LOW=trigger when ENABLE
+  OVER|tmc2209.c:2322|131B|[TMC-CFG] !! CRITICAL: 执行器互斥量创建失败(%d) -> 配置写入与复核一律拒绝(-RT_ENOSYS)
+  OVER|tmc2209.c:2532|159B|[TMC-CFG] FAILED at %s (reg=0x%02X err=%d) - 叶锁不可得(%d): 已保护并**作废
+  OVER|tmc2209.c:2546|219B|[TMC-CFG] FAILED at %s (reg=0x%02X err=%d) - 序列已中止, 芯片可能处于部分配置状态
+  OVER|tmc2209.c:3187|122B|[TMC-CFG] live GCONF=%08X i_scale_analog=%u internal_Rsense=%u e
+  OVER|tmc2209.c:3215|210B|写入会改变驱动电流档位, 因此必须显式 CONFIRM, 且编译期门与全部运行态条件同时满足(电机静止未 armed、DRV_E
+SCOPE_NOTE|本轮只修现场实际路径上被字节证实超长的两条(tmc2209 CONFIGURED 132B / safety_thread LIMIT 250B); 其余站点登记不改, 不声称全仓已达标
+LINE_WIDTH_RESULT PASS (bad=0)
