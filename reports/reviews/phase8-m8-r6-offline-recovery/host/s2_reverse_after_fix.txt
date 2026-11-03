@@ -1,0 +1,73 @@
+###### 停机优先 S2 并发/身份链 (基线 535459f84724cdb755af00ee4dea4b3f42c93d45) ######
+run_id=20261103T043703Z-4508
+SRC_APP=D:/ns800/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications
+夹具=/d/ns800/tests/host/sp_conc_main.c (真 pthread 互斥量/线程/窗口内排队 ISR)
+OUT_DIR=/tmp/ns800-host-chain/s2/20261103T043703Z-4508
+compiler=gcc.exe (tdm64-1) 4.9.2
+单组墙钟=60s(死锁守卫)  选择集合=lock,isr,isr_window,off_matrix,off_arm,unknown,identity,diag,recovery,stale,boundary,healthy,target_reject,epwm_leaf,tmc_lock,uart_leaf,budget_leaf,read_obs,cal_static,disarm_ready
+
+=== 对照组: 反向之前必须先跑完整正常链 ===
+    台账: 必需=5 唯一出现=5 实际行数=5 SUMMARY(cases=5 pass=5 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=3 唯一出现=3 实际行数=3 SUMMARY(cases=3 pass=3 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=2 唯一出现=2 实际行数=2 SUMMARY(cases=2 pass=2 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=2 唯一出现=2 实际行数=2 SUMMARY(cases=2 pass=2 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=0 唯一出现=0 实际行数=0 SUMMARY(cases=0 pass=0 fail=0 pre_bad=0 skips=2) 自洽=1
+    台账: 必需=1 唯一出现=1 实际行数=1 SUMMARY(cases=1 pass=1 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=0 唯一出现=0 实际行数=0 SUMMARY(cases=0 pass=0 fail=0 pre_bad=0 skips=3) 自洽=1
+    台账: 必需=0 唯一出现=0 实际行数=0 SUMMARY(cases=0 pass=0 fail=0 pre_bad=0 skips=1) 自洽=1
+    台账: 必需=5 唯一出现=5 实际行数=5 SUMMARY(cases=5 pass=5 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=1 唯一出现=1 实际行数=1 SUMMARY(cases=1 pass=1 fail=0 pre_bad=0 skips=2) 自洽=1
+    台账: 必需=2 唯一出现=2 实际行数=2 SUMMARY(cases=2 pass=2 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=0 唯一出现=0 实际行数=0 SUMMARY(cases=0 pass=0 fail=0 pre_bad=0 skips=2) 自洽=1
+    台账: 必需=2 唯一出现=2 实际行数=2 SUMMARY(cases=2 pass=2 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=0 唯一出现=0 实际行数=0 SUMMARY(cases=0 pass=0 fail=0 pre_bad=0 skips=1) 自洽=1
+    台账: 必需=0 唯一出现=0 实际行数=0 SUMMARY(cases=0 pass=0 fail=0 pre_bad=0 skips=1) 自洽=1
+    台账: 必需=0 唯一出现=0 实际行数=0 SUMMARY(cases=0 pass=0 fail=0 pre_bad=0 skips=1) 自洽=1
+    台账: 必需=0 唯一出现=0 实际行数=0 SUMMARY(cases=0 pass=0 fail=0 pre_bad=0 skips=1) 自洽=1
+    台账: 必需=30 唯一出现=30 实际行数=30 SUMMARY(cases=30 pass=30 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=0 唯一出现=0 实际行数=0 SUMMARY(cases=0 pass=0 fail=0 pre_bad=0 skips=1) 自洽=1
+    台账: 必需=0 唯一出现=0 实际行数=0 SUMMARY(cases=0 pass=0 fail=0 pre_bad=0 skips=1) 自洽=1
+  target 汇总: 组=20 用例=53 PASS=53 FAIL=0 SKIP行=16 pre_bad=0 期望用例=53
+    台账: 必需=5 唯一出现=5 实际行数=5 SUMMARY(cases=5 pass=5 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=3 唯一出现=3 实际行数=3 SUMMARY(cases=3 pass=3 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=2 唯一出现=2 实际行数=2 SUMMARY(cases=2 pass=2 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=2 唯一出现=2 实际行数=2 SUMMARY(cases=2 pass=2 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=2 唯一出现=2 实际行数=2 SUMMARY(cases=2 pass=2 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=1 唯一出现=1 实际行数=1 SUMMARY(cases=1 pass=1 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=7 唯一出现=7 实际行数=7 SUMMARY(cases=7 pass=7 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=4 唯一出现=4 实际行数=4 SUMMARY(cases=4 pass=4 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=5 唯一出现=5 实际行数=5 SUMMARY(cases=5 pass=5 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=3 唯一出现=3 实际行数=3 SUMMARY(cases=3 pass=3 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=2 唯一出现=2 实际行数=2 SUMMARY(cases=2 pass=2 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=5 唯一出现=5 实际行数=5 SUMMARY(cases=5 pass=5 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=0 唯一出现=0 实际行数=0 SUMMARY(cases=0 pass=0 fail=0 pre_bad=0 skips=1) 自洽=1
+    台账: 必需=10 唯一出现=10 实际行数=10 SUMMARY(cases=10 pass=10 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=15 唯一出现=15 实际行数=15 SUMMARY(cases=15 pass=15 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=7 唯一出现=7 实际行数=7 SUMMARY(cases=7 pass=7 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=6 唯一出现=6 实际行数=6 SUMMARY(cases=6 pass=6 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=30 唯一出现=30 实际行数=30 SUMMARY(cases=30 pass=30 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=9 唯一出现=9 实际行数=9 SUMMARY(cases=9 pass=9 fail=0 pre_bad=0 skips=0) 自洽=1
+    台账: 必需=10 唯一出现=10 实际行数=10 SUMMARY(cases=10 pass=10 fail=0 pre_bad=0 skips=0) 自洽=1
+  host_ovr 汇总: 组=20 用例=128 PASS=128 FAIL=0 SKIP行=1 pre_bad=0 期望用例=128
+
+=== S2 反向(8 项家族, 仓外副本; 正常对照已先通过) ===
+  rev_stale_identity_gate: 注入替换 2 处(逐条已核对恰好命中一次)
+  rev_permit_confirm_identity_gate: 注入替换 2 处(逐条已核对恰好命中一次)
+  rev_config_write_token_gate: 注入替换 2 处(逐条已核对恰好命中一次)
+  rev_tx_flush_budget: 注入替换 3 处(逐条已核对恰好命中一次)
+  rev_fail_returns_owner_early: 注入替换 2 处(逐条已核对恰好命中一次)
+  rev_rx_deadline_old_origin: 注入替换 2 处(逐条已核对恰好命中一次)
+  rev_obs_drop_raw_rx_capture: 注入替换 2 处(逐条已核对恰好命中一次)
+  rev_export_drop_prefix_second_chunk: 注入替换 2 处(逐条已核对恰好命中一次)
+
+=== S2 反向汇总 ===
+rev_stale_identity_gate | META-OK 命中 2 个业务失败身份 (variant=host_ovr groups=identity stale 台账自洽 proc_rc=1)
+rev_permit_confirm_identity_gate | META-OK 命中 1 个业务失败身份 (variant=host_ovr groups=identity 台账自洽 proc_rc=1)
+rev_config_write_token_gate | META-OK 命中 1 个业务失败身份 (variant=host_ovr groups=epwm_leaf 台账自洽 proc_rc=1)
+rev_tx_flush_budget | META-OK 命中 2 个业务失败身份 (variant=host_ovr groups=uart_leaf tmc_lock 台账自洽 proc_rc=1)
+rev_fail_returns_owner_early | META-OK 命中 1 个业务失败身份 (variant=host_ovr groups=diag 台账自洽 proc_rc=1)
+rev_rx_deadline_old_origin | META-OK 命中 3 个业务失败身份 (variant=host_ovr groups=read_obs 台账自洽 proc_rc=1)
+rev_obs_drop_raw_rx_capture | META-OK 命中 2 个业务失败身份 (variant=host_ovr groups=read_obs 台账自洽 proc_rc=1)
+rev_export_drop_prefix_second_chunk | META-OK 命中 2 个业务失败身份 (variant=host_ovr groups=read_obs 台账自洽 proc_rc=1)
+S2 REVERSE RESULT: PASS —— 八项注入均命中预登记业务失败身份(rc=1, 台账自洽)
+rev rc=0

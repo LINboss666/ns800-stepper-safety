@@ -1,0 +1,3338 @@
+{
+ "package": "M8 idle 栈 1024 核心现场包 R5-C 续测(零下载/零回读/零显式复位, 观测窗修好之后)",
+ "status": "BOUND_NOT_EXECUTED",
+ "task_id": "phase8-m8-idle-stack-r4",
+ "numbers_are_proposals_not_authorization": true,
+ "identity_binding": {
+  "reviewed_delivery_commit": null,
+  "note": "镜像/AXF/MAP 三件都是本轮构建产物, 逐字节现算并与 build_manifest 相等。构建发生时 git HEAD 是 48204fe, 而**该提交的树里 rtconfig.h 仍是 IDLE=256**(blob 9fe0efdf…/8689 B), 1024 那版是工作树里未入库的一行改动; 这行改动在 fe3d9f5 第一次入库(blob b66753d6…/8850 B), 本轮 tip 58904e1 未再改它 => 本轮镜像的源码输入登记为 tested_image_build_commit=fe3d9f5(rtconfig 入库提交)+ software_input_commit=58904e1(tip, 含 .config 同步), 而不是旧的 48204fe。已接受的 f5c2fd89… 镜像未被覆盖。 || R5-C: 镜像/AXF/MAP 身份与 R4 包同一件(未重编, 未覆盖); 执行器换了身份, 因为观测窗缺陷修在执行器侧; 已在板的镜像由 R4 轮的回读逐字节证过, 本包不再下载/回读。",
+  "image": {
+   "path": "reports/firmware/phase8-m8-idle-stack-r4/rt-thread-motor-m1-candidate.bin",
+   "bytes": 290916,
+   "sha256": "dab356c69fbf4ca747e838580c16982bd56b53b1367f84b97ab705c2fbd25439",
+   "sha256_source": "build_manifest.json targets[rt-thread-motor-m1-candidate].images[rt-thread-motor-m1-candidate.bin]; S0 现场重算并要求逐字节相同",
+   "manifest": "reports/firmware/phase8-m8-idle-stack-r4/build_manifest.json",
+   "axf": {
+    "path": "reports/firmware/phase8-m8-idle-stack-r4/rt-thread-motor-m1.axf",
+    "bytes": 1771288,
+    "sha256": "0babe9f1a874230381bc70eae959fd6b8dff41f1182bcdc6bed1fd72736aba8c"
+   },
+   "map": {
+    "path": "reports/firmware/phase8-m8-idle-stack-r4/rt-thread-motor-m1.map",
+    "bytes": 2108456,
+    "sha256": "b61632249f99a0bbc92dae5da6695b929cba658bae8b74d833243b8a16c275b7"
+   }
+  },
+  "executor": {
+   "path": "D:/ns800/reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py",
+   "bytes": 184093,
+   "sha256": "1b23719a3c9a26569ae15214e01712603f7c31aefe0b6d7c5421c0cafd117aee",
+   "changes_in_this_round": [
+    "read_until_prompt(): 原始字节先落盘 -> check_danger(未解码字节) -> 裸 NUL 计数 => NUL_BYTE_IN_RESPONSE 硬停止; 危险文本优先级高于解码/长度/协议判定",
+    "byte_corruption_recovery 合同退役: 申报即 RETIRED_RECOVERY_CONTRACT 停止; exec_session 不再产生 BYTE_CORRUPT 判决",
+    "validate_plan(): PLAN_BYTE_RECOVERY 改为\"申报即判红\"(不再检查其形状)",
+    "ApprovalLedger + open_approval + --approval-id/--approval-root/--approval-init: 额度**先落盘预占再动作**, 账本按批准身份命名且放在输出目录之外; 缺失/损坏/身份不符 => 真实动作拒绝进入且不自建满额账; 会话结束只确认消耗, 没有退款这条路",
+    "dispatch_plan(): 阶段级工具(download/readback/reset/reboot/人工重启门)同样先预占 (R5-C 的 26 场就是从这条只扣内存账的路把 apply 用到 14/2)",
+    "s0_binding(): S0 当场算 plan/executor/image 三件的实际 sha256 并连批准身份一起记, 不再照抄 JSON 里登记的值"
+   ]
+  },
+  "board_image_before": {
+   "path": "reports/firmware/phase8-m8-diag-stack-r1/rt-thread-motor-m1-candidate.bin",
+   "bytes": 290916,
+   "sha256": "f5c2fd89bbf28255a5b26c9cca495bc0fb1e39d401d0bb7bea19d051221708ce",
+   "proven_on_board": "上一轮 S2 唯一一次回读逐字节证得 (field/field-20261101T084256Z/flash_readback.bin), 板现运行该镜像",
+   "role": "只登记下载之前板上是哪一件(上一轮唯一一次回读逐字节证过); 不得当回读比较对象。旧绑定就是把更旧的 R3 BIN 留在 tools.readback.image 上, 用新镜像原字节跑真实回读函数立刻 READBACK_HASH_MISMATCH —— 本轮由 PLAN_IMAGE_IDENTITY_CONSISTENCY 在离线拒绝"
+  },
+  "accepted_image_not_overwritten": "reports/firmware/phase8-m8-diag-stack-r1/rt-thread-motor-m1-candidate.bin 的 sha256 仍是 f5c2fd89…; 新镜像另存新目录, 未覆盖已接受件",
+  "readback_target_is_this_image": true,
+  "build_inputs": {
+   "note": "镜像的**源码输入字节身份**, 不是哪个提交碰巧是 HEAD。构建时 git HEAD 是 48204fe, 而该提交的树里 rtconfig.h 仍是 IDLE=256(blob 9fe0efdf…, 8689 B); 1024 版第一次进版本库是 fe3d9f5, 本轮 tip 58904e1 未再改这个 blob。所以不能把 48204fe 说成新镜像的构建输入。",
+   "build_time_head_commit": "48204fe37de3da6f8caeeff467256562f11e58e2",
+   "image_source_input_commit": "58904e1045e275698a8c80f63943a1bd0afdb2eb",
+   "image_source_input_commit_reason": "tip 的树里本轮镜像的全部源码输入都已入库且逐字节等于构建输入: rtconfig.h 的 blob 自 fe3d9f5 起未变, diagnosis.c 未动",
+   "rtconfig_h": {
+    "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/rtconfig.h",
+    "local_worktree_crlf": {
+     "sha256": "1927ed1c1cc7a1efebca50b910eb735228a926c218b3e39a1daf799b6fe9a65a",
+     "bytes": 9304
+    },
+    "git_blob_lf": {
+     "sha256": "b66753d6b50b9bf4ab8b46d4a1500e538513a7c872a3d70e84c551007ab4d209",
+     "bytes": 8850
+    },
+    "differ_only_by_line_endings": true,
+    "verified_by": "本机复算两条: 工作树字节 sha256=1927ed1c…/9304 B; 把工作树字节的 CRLF 归一成 LF 后 sha256=b66753d6…/8850 B, 且等于 git show tip:该文件 的 sha256 => 仅行尾不同, 不需要因此重编",
+    "blob_at_build_head": {
+     "commit": "48204fe37de3da6f8caeeff467256562f11e58e2",
+     "idle_thread_stack_size": 256,
+     "meaning": "构建时 HEAD 的树里这个文件还是 256, 这正是旧绑定的来源"
+    },
+    "line_79": "#define IDLE_THREAD_STACK_SIZE 1024   /* 候选: armlink 调用图 idle_thread_entry => rt_defunct_execute => rt_object_delete => rt_free => rt_mutex_take… Max Depth=668 B > 旧值 256 B */"
+   },
+   "diagnosis_c_unchanged": {
+    "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diagnosis.c",
+    "sha256": "e1696ec92721c7df9da074c465ac3b705ad451029aa3608b1695c93c7466e557"
+   },
+   "config_sync": {
+    "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/.config",
+    "commit": "58904e1",
+    "note": "CONFIG_IDLE_THREAD_STACK_SIZE 同步 256->1024(配置源一致性); 本轮未因此重编"
+   },
+   "evidence": "reports/firmware/phase8-m8-idle-stack-r4/build_manifest.json 的 build_inputs + host/idle_learn_check.py 的复算行"
+  },
+  "software_input_commit": "58904e1045e275698a8c80f63943a1bd0afdb2eb",
+  "tested_image_build_commit": "fe3d9f5cc37470d732acbbb222012a15d71573c9",
+  "build_time_head_commit": "48204fe37de3da6f8caeeff467256562f11e58e2"
+ },
+ "rows_file": "rows.json",
+ "needles_file": "reports/reviews/phase8-m8-idle-stack-r4/field/needles.json",
+ "needles_source_root": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad",
+ "needles_source_root_note": "needles.json 的 source 字段是 applications/*.c(相对 BSP 目录), 所以证明根必须是 BSP 目录而不是仓库根: 用仓库根会把 40 条全部判成找不到文件(本轮实测过)。",
+ "quota": {
+  "port_open": 12,
+  "download": 0,
+  "readback": 0,
+  "explicit_reset": 0,
+  "approved_reboot": 1,
+  "motor_run": 3,
+  "motor_run_seconds_total": 25,
+  "motion_cap_seconds_per_run": 5,
+  "config_save": 1,
+  "tmc_config_apply": 2,
+  "irq_polarity_prep": 4,
+  "diag_profile_zero": 1,
+  "diag_profile_learn": 1,
+  "diag_profile_commit": 1,
+  "cleanup_motor_stop": 5,
+  "cleanup_motor_disarm": 5,
+  "cleanup_motor_status": 5,
+  "retry": 0,
+  "physical_collision": 0,
+  "blackbox_clear": 0,
+  "dmm_readings": 0
+ },
+ "quota_is_executed_not_declared": "exec_session 在**发送之前**扣额度; 不足 => QUOTA_EXHAUSTED 且那条命令不会被发出; 计划里没有的动作 => QUOTA_UNDECLINED。整包共用**一本账**: dispatch_plan 建一个 quota_box 并把同一个 dict 交给每个会话与每个动作阶段(不是每个会话从 plan 复制一份), 结束时输出 quota_left/quota_used 与逐键 QUOTA_AUDIT 行, 用了但没申报的键或负余额都会让调度非成功。",
+ "cleanup_reserve_semantics": "清理三条命令各有**独立**预留(cleanup_motor_stop/disarm/status), 在 cleanup() 里逐条扣减并记入同一本账; 某一条的预留耗尽**不会**取消另一条的发送机会(这正是 R2 交付版的缺陷)。预留未申报或耗尽时仍然发送(必要撤能优先于额度), 但会写入 cleanup_overruns 并具名 CLEANUP_RESERVE_EXHAUSTED => 该会话不是成功、调度停止后续阶段。",
+ "approved_reboot_semantics": "重启不是一条可以发的命令: S6 是操作者交付门(operator_gate), approved_reboot=1 只由这道门扣, 交付不成立(MANUAL_GATE_DENIED)就停止后续阶段。计划里若再出现 __approved_reboot__ 步骤会走 action 支并同样扣这笔额度, 但本轮没有任何工具被申报为 reboot => RealActionBackend 收到的 argv 为空会具名失败, 不会静默'重启成功'。",
+ "quota_accounting": {
+  "derived_from_execution_path": {
+   "approved_reboot": 1,
+   "cleanup_motor_disarm": 5,
+   "cleanup_motor_status": 5,
+   "cleanup_motor_stop": 5,
+   "config_save": 1,
+   "diag_profile_commit": 1,
+   "diag_profile_learn": 1,
+   "diag_profile_zero": 1,
+   "download": 1,
+   "explicit_reset": 1,
+   "irq_polarity_prep": 4,
+   "motor_run": 3,
+   "port_open": 12,
+   "readback": 1,
+   "tmc_config_apply": 2
+  },
+  "how_derived": "validate_plan 的 PLAN_QUOTA_NEED 逐项按真实执行路径推导: 每个 serial_session 阶段扣 1 次 port_open; 步骤级 quota / action 的 quota_name / 阶段级 kind 各自累加; 每个含 motor_arm 或 motor_start 的阶段各触发一次三条清理 => cleanup_* 各 5。申报 < 推导 => 离线 FAIL, 不等现场 QUOTA_EXHAUSTED",
+  "both_chains_trip": {
+   "port_open": 12,
+   "cleanup_groups": 5,
+   "motor_run": 3,
+   "note": "12 次开口 = S3,S4,S5,S7,S8,S9,S10,S11,S8b,S9b,S10b,S11b; 5 组必要清理 = S4, S8, S8b(arm+start) 与 S10, S10b(锁存态再 arm, 同样建立撤能义务)"
+  },
+  "mixed_outcomes": "一场触发一场未触发也照常跑完: 未触发那条链的取证/拒绝/恢复按分支跳过并具名 STAGE_SKIPPED_BY_PROFILE, 既不计 NOT_RUN 也不计通过; 触发那条链照常走自己四阶段",
+  "one_ledger": "dispatch_plan 只建一个 quota_box, 两条链共用; 结束逐键 QUOTA_AUDIT + quota_left/quota_used 一起进结果, 用了没申报或余额为负 => 调度非成功",
+  "not_expanded": "retry=0 / physical_collision=0 / blackbox_clear=0 / dmm_readings=0 不许运行中临时抬; 追加就是新的具体批准"
+ },
+ "motion_budget": {
+  "kind": "monotonic hard cap established at the motor_start write attempt",
+  "applies_to": [
+   "blocking write",
+   "read",
+   "watch window",
+   "manual wait",
+   "learn capture",
+   "cleanup sends"
+  ],
+  "cap_seconds": 5,
+  "cleanup_reserve_seconds": 4,
+  "cleanup_window_per_command_seconds": 1.2,
+  "measured_field": "budget_seconds (start attempt -> stop/disarm send), 逐条清理命令另有 CLEANUP_READ 事件的 sent_t/ended_t/window",
+  "not_a_physics_claim": "主机侧截止是调度约束: 串口写入不等于物理停机保证。未证禁能一律 UNKNOWN, 现场操作者保留应急制止(SW1/先关 24 V 再拔 USB)前提。",
+  "motion_window_budget_proof": {
+   "claim": "在 5 s 硬截止内, 起转后的业务步(RUNNING 复核 + learn)能完成, 并且仍留有清理机会。",
+   "facts": [
+    "SENSOR_PERIOD_MS=10(100 Hz), SENSOR_SG_DIV=10 => SG 独立样本 10 Hz (A/sensor_service.c:37-38)",
+    "learn 的最小 N=8 (A/diag_relative.c 'learn args: N=8..32'), 8 个独立 SG 样本 => 约 800 ms",
+    "起转后第一步是同一次会话里的一条 motor_status(RUNNING 复核), 一条命令的响应在板上是 27 行以内、128 B 行裁剪 => 亚 100 ms 量级(M4/M6 采集实测单条 <100 ms)",
+    "清理段另有 4 s 保留, 三条命令各 1.2 s 窗(1.2*3=3.6 <= 4)"
+   ],
+   "arithmetic": "0.1(status) + 0.8(learn 最小) + 余量 >= 4.1 s 仍可用; 观察窗在剩余预算内自然到期(实测 budget_seconds=5.000) => 清理在 t=cap..cap+4 内完成",
+   "measured_this_round": "离线 stub 用 SimClock 计到的 S4/S8 budget_seconds 与三条清理命令的发送/确认时刻记在 run_record 与 dispatch 台账里(不是靠把 seconds 改大)",
+   "worst_case_disclosed": "产品 learn 自带 12 s 超时(> 5 s 硬截止), 而 msh 是单线程: learn 卡住时 motor_stop 不会被处理。该风险不靠放宽上限掩盖, 见 residual_risk。"
+  }
+ },
+ "residual_risk": [
+  "learn 的 12 s 内部超时 > 5 s 运动硬截止: 期间唯一可执行的物理制止手段是操作者的 SW1/断电(本包不假装串口写入能保证停机)。缓解: N 取产品允许最小值 8、学习前先证得 RUNNING、观察窗在剩余预算内到期。",
+  "回读长度绑 @IMAGE_BYTES(= S0 现场重算并与 manifest 相等的字节数): 若批准时换镜像, 计划与镜像散列必须一起重新生成, 不许手改单条参数。",
+  "重启后的 Flash v2->v3 迁移是否真的成立, 本轮只证到代码/离线控制流; 现场必须按 config_show 的 valid/version 与 diag_profile show 的 id/rev 实测。"
+ ],
+ "cleaning_and_terminal": {
+  "path": "motor_stop -> motor_disarm -> motor_status(一次读回全部撤能字段), 每条各 1.2 s 确认窗, 总额 4 s 保留",
+  "confirmed_only_if": "同一份新 motor_status 响应里六个合同字段各恰好一条且: state name ∈ {FAULT, OTHER}、armed=0、cur_hz=0 且 tgt_hz=0、drv_request=LOW 且 pad=0、expected_ENN=HIGH 且 ENN_fb=1、resolved、verdict ∈ {OK, CUT_BY_HARDWARE}、diag_off_confirmed=YES、health=OK",
+  "why_not_idle": "A/motor.c 的 cmd_motor_status 只打印 name=FAULT|OTHER(取 snap.state==MOTOR_FAULT), 永远不会打印 IDLE; 故障锁存后的禁能也必须能证得, 所以判据按 state 数值+其余字段, 不按 IDLE 字串。",
+  "drv_en_request_is_historical": "drv_en_request 是**最近一次确认值**(A/motor.c), 不是当前请求; 当前请求侧必须看 drv_request=LOW pad=0, 仍为 HIGH 一律 UNKNOWN(本轮具名负控 B8 就是这个支)。",
+  "not_spliced_across_responses": "六个字段必须来自同一份响应; 缺/重/冲突一律不可证实 => UNKNOWN, 不跨响应拼字段。",
+  "otherwise": "disarm=UNKNOWN, terminal=UNKNOWN; 主错与清理错分别保留; 证据落盘失败(EVIDENCE_OPEN_FAILED/EVIDENCE_WRITE_FAILED)立即终止业务, 仅必要清理继续。",
+  "gate_on_success": "清理 UNKNOWN、清理错误、预留耗尽、证据失败都令 exec_session.success=False 且 CLI 返回非 0; dispatch_plan 遇非成功立即停止后续阶段(NOT_RUN 明列, 不计入 stages_executed)。"
+ },
+ "prerequisites_after_fresh_flash_or_reboot": {
+  "why": "新烧录/重启后板子不继承 M4/M5/M7 的 CONFIGURED 与 IRQ OPEN; 缺这些前置就没有'保护已就绪'的运动窗口。",
+  "chain": "tmc_config_show(读实际态) -> tmc_config_apply CONFIRM -> tmc_config_show(必须证到 state=CONFIGURED 且 snapshot_valid=1) -> safety_polarity_confirm CONFIRM -> safety_irq_enable -> safety_irq_status(证到 irq gate=OPEN) -> motor_status(AT_REST 档案) -> diag_status/config_show",
+  "each_step_proven_by": "expect_values 对**值**判(不是正则形状): CONFIGURED/snapshot_valid=1/gate=OPEN, 静止支由 disable_contract 的六个合同字段判",
+  "irun_policy": "保持 IRUN20 现值, 不抬流; apply 次数如实计入 quota_used(tmc_config_apply=2: 烧后一次 + 重启后一次)。",
+  "why_unconditional": "R2 计划里的 only_if '探针显示未成立才做' 不是实现(执行器没有分支)。本轮把前置固定为**每次都要重新证明**: 顺序确定、额度确定, 不需要运行时推断。"
+ },
+ "load_step": {
+  "verdict": "SG_ADC_CHAIN_REFUSED_BEFORE_SPIN_UP_BY_EXECUTOR",
+  "missing": [
+   "可从非旋转端操作的加载作用点及档位/行程"
+  ],
+  "asset_now": "现有 T8 丝杆套件, 标称导程 8 mm; 操作者 2026-11-01 确认支座松手保持固定、连接紧固、螺母防转、移动块导向均无问题 => 装配就绪门放行; 加载手段仍未提供, SG/ADC 那场仍跳过",
+  "policy": "不宣称有机械加载方法; 不以允许自然触发代替约束; 不手捏旋转轴、不为凑阈值加危险力、不撞两端限位制造堵转",
+  "gate_now_real": "S8/S10 挂 [load_means, assembly_readiness], S4/S8b/S10b 挂 [assembly_readiness]: 任一状态不是 PROVIDED 时该阶段(及其场景链)在开端口之前跳过, 不扣 motor_run, 不发 arm/start。本轮 assembly_readiness=PROVIDED 而 load_means 仍 NOT_PROVIDED => 只有 SG_ADC 那条链继续被挡, 学习与 IMU 场放行",
+  "consequence_this_round": "交付态(装配已确认 + 仍缺加载)实测: 执行 S0-S7 与 S8b-S11b 共 12 个阶段, 跳过 S8/S9/S10/S11; port_open 用量 8、motor_run 用量 2(剩 1)、必要清理 3 组; 核心保护结论仍不成立(SG/ADC 那场根本没跑)",
+  "instrument_deferred": "示波器/电流钳继续暂缓, 不作为起转前置, 也不新增高精度仪器前置(复审本轮口径)"
+ },
+ "impact_r6_excitation": {
+  "selected": false,
+  "approval": "非破坏性激励必须写成可单独选择的批准范围; 本轮批准里没有这一项。",
+  "default_outcome": "FIELD_NOT_TRIGGERED(不得把'自然未撞'写成物理通过)"
+ },
+ "flash_state_registering": {
+  "absent": "无有效参数块 -> 只允许 defaults, 且不得把 defaults 当成已持久化 profile",
+  "v2": "需要 v2->v3 迁移 -> 迁移只在主机链证过(FIELD_UNVERIFIED); 现场在第一次 config_save 之前不得宣称 profile 已生效",
+  "v3": "直接加载, 仍要 diag_profile show 核对 id/rev 与 signature"
+ },
+ "profile_restore_check_after_reboot": {
+  "implemented_by": "S5 的 record_from(从本轮 commit OK 行与 diag_profile show 行机械抓 id/rev/flags/live sig/match) + S7 的 compare_recorded(重启后重新读 diag_profile show, 逐项与记录比) + S8 的 compare_recorded_gt(事故后的 [BB] session/written 必须**实际增大**)",
+  "must_compare": [
+   "profile id",
+   "revision",
+   "abi/flags",
+   "signature 与 live sig 的 match=YES",
+   "blackbox session 与 written 的本轮增量"
+  ],
+  "stop_codes": [
+   "RECORD_STEP_MISSING",
+   "RECORD_PATTERN_NOT_FOUND",
+   "COMPARE_STEP_MISSING",
+   "COMPARE_PATTERN_NOT_FOUND",
+   "RESTORE_MISMATCH",
+   "COMPARE_GT_STEP_MISSING",
+   "COMPARE_GT_PATTERN_NOT_FOUND",
+   "SESSION_NOT_INCREASED"
+  ],
+  "never_satisfied_by": [
+   "文档里的 must_compare 列表本身",
+   "[DIAG] rel 行首字符串",
+   "fixture 里写的 flash_state",
+   "只读旧 flash_logstat 计数"
+  ]
+ },
+ "c3_protocol_vs_business": {
+  "protocol": [
+   "提示符 msh > / msh /> 必须命中(缺 => MISSING_RESPONSE_PROMPT)",
+   "非法 UTF-8 字节 => ILLEGAL_BYTES_IN_RESPONSE(不得 replace 后收数)",
+   "权威字段必须恰好一条 => FIELD_NOT_EXACTLY_ONE / FIELD_NOT_UNIQUE_<key>",
+   "原始字节先落盘(fsync)后判读; 判读文本 emit_text 真写出(不再是没落盘的 .txt 名字)",
+   "被动观察窗不带提示符是允许的(require_prompt=False), 但只用于无命令的那段时间"
+  ],
+  "business": [
+   "FAILED / REFUSED / VOIDED / 'not supported' 一律业务失败",
+   "拒绝可被正确观察(allowed_outcomes), 但之后不得继续 commit/save/start/arm/fault_reset",
+   "收到完整提示符只代表**命令返回**, 不代表业务成立: motor_start 成功不打印 [MOT](A/motor.c:2487), 运行事实必须由本轮新的 motor_status(RUNNING 档案)证明"
+  ],
+  "row_provenance": "field/rows.json 逐组标注来源: 板上原始采集 / 被 128 字节控制台缓冲截断后按内容拆分 / 源码字面量形状+本轮下发值(无板级采集时)。第 3 类不构成设备证据。"
+ },
+ "corrections_from_review_r3": [
+  "R3-A: A/diag_relative.c 应用复审精确补丁(motion_freshness.patch, 输入 3960fb7e… 输出 059fc753…), 过期 IDLE 不再豁免覆盖丢失; 原 C 链加入 REL50 具名断言(49 身份保留, 50/50)与 RV10 只删年龄项的局部反向。",
+  "R3-B1(部分字节写失败): 义务在 port.write **之前**建立, 写异常/短写同样走一次必要撤能; 未证禁能 UNKNOWN; 主错 COMMAND_WRITE_FAILED 保留。",
+  "R3-B2(写耗时吃掉预算): 硬截止起点在尝试之前, 业务剩余量扣掉写耗时(实测 motor_start 在 t=2.0 写出、motor_stop 在 t=5.0 发出, 而不是 t=7)。",
+  "R3-B3(stop 无应答): 清理改为每条命令各 1.2 s 独立窗且**不中断后续发送**(disarm 仍发出), 主错与清理错分开登记, 该会话 success=False。",
+  "R3-B4(运动窗口内人工门): 计划的静态判据 plan_motion_window_violations() 在**开口之前**拒绝 => PLAN_MANUAL_AFTER_MOTION, 一条命令都不发; 本轮所有 manual 步骤都排在 arm/start 之前。",
+  "R3-B5(禁能判据与真实固件不符): disable_contract() 用同一份响应的六个合同字段(含 cur_hz/tgt_hz、drv_request/pad、diag_off_confirmed), 允许 name=FAULT|OTHER 而不是要求 IDLE; drv_en_request 只按历史值披露; 重复/缺失/冲突/未解析一律 UNKNOWN。expect_fields 之外新增 expect_values(逐值) 与 expect_profile(AT_REST/RUNNING 一致性)。",
+  "R3-C1(整包贯通): dispatch_plan 一次批准从 S0 走到最后一个阶段, 成功阶段只记检查点(不重新批准、不重下载), 失败才停; S0 是真实文件哈希/git 对象/needles 三重绑定(不再是 OFFLINE_BINDING 一行); 额度是整包共用一本账, 开口在发送前扣, DAP-only 阶段不额外开 COM; 正常用量与清理预留分别登记并输出逐键 QUOTA_AUDIT。",
+  "R3-C1b(工具真实化): plan.tools 用本机既存**已成功**的 pyocd 形态逐字绑定(pack/target/选项来自 P0 的 S1/S2 原始日志), download 与 readback 的成功原文按 expect_all/expect_counts 核对(不能只看 rc), 回读定长从 0x08000000 起、交付物是 savemem 明确写出的文件、并与镜像逐字节相等; 三个机械占位(@UID_FILE/@RUN_ROOT/@IMAGE_BYTES)由执行器展开, 展开后仍残留占位 => TOOL_ARGV_UNRESOLVED; 计划里不再有 <CMSIS-Pack>/<bytes> 占位与 pyocd packmem(由 plan_placeholder_scan 在 S0 拒绝)。",
+  "R3-C1c(重启不是命令): S6 改为 operator_gate 交付门并显式扣 approved_reboot=0; 不保留凑接口的空实现路径。",
+  "R3-C2(真固件协议): 两处 apply 改为 tmc_config_apply CONFIRM; motor_start 成功不再要求 [MOT], 由本轮 motor_status 证 RUNNING(先证再起 learn); 学习前先有限轮询证得 CRUISE/稳定窗, 学习与串口阻塞受同一运动预算, 上限内的可完成性用 sensor 分频实算(motion_window_budget_proof)。",
+  "R3-C2b(commit/save 不再被未触发跳掉): 静止期的 tier/commit/show/config_save 移到独立阶段 S5(不与起转共用一个会话), 因此'到时未触发'只结束运动会话本身, 主线仍然走到提交与保存; 重启后 S7 实际比较记录值。",
+  "R3-C2c(成功口径): CLI 返回码只认 success(清理 UNKNOWN/清理错误/预留耗尽/证据失败一律非 0), 不再只看 status=OK/NO_TRIGGER; PS 调度据同一口径停止后续阶段。",
+  "R3-C3(演示目的不缩水): 静止零点 -> 单向巡航学习 -> 正常片段 -> 静止提交保存(S5) -> 一次重启并**实际比较**恢复值(S6/S7) -> 显式 RELATIVE 武装 + 有界观察(S8) -> 真实触发才分岔: S9 事故取证(锁存视图/黑匣子按实际新增 session 判/新日志计数/锁存态仍可证禁能)、S10 锁存态 motor_arm 具名拒绝(申报 expected_terminal=REFUSED, 会话到此结束)、S11 人工恢复(MANUAL_CLEAR + 重跑自检 + 就绪复核, 禁 motor_start)。到时无触发只登记 NO_TRIGGER, S9/S10/S11 用 profiles=[trip] 整体不参与, 不跑假故障恢复。事故链不与运动共用会话: 观察窗跑到 5 s 截止点后, 同会话的后续业务步一律 MOTION_BUDGET_EXHAUSTED(本轮实测到该支, 因此拆会话, 而不是放宽截止点)。"
+ ],
+ "tools": {
+  "provenance": {
+   "why_these_arguments": "逐字取自本机**已经成功**的 P0 记录: reports/reviews/phase8-motor-m7-current-calibration-r2/p0_package.md(命令段) 与 reports/reviews/phase8-motor-m7-p0-board/S1_flash.stderr.txt + S2_readback.stdout.txt(成功原文)。本轮没有为查参数连接或枚举任何设备。",
+   "cli_options_verified_offline": [
+    "python -m pyocd --version => 0.45.1",
+    "python -m pyocd reset --help => -u/--uid, -t/--target, -W/--no-wait, -M/--connect, -m/--method(含 sysresetreq), -c/--core 均存在(原文存 pyocd_reset_help.txt)"
+   ],
+   "uid_handling": "DAP UID 只在 real 分支从既存私有文件读取(48 字符, sha256 前 12 位 d2f530dbd062 已在 M7/P0 记录里登记), 永不打印、永不入库。"
+  },
+  "substitutions": {
+   "@UID_FILE": "既存私有 UID 文件内容(real 后端; 缺 --uid-file => UID_FILE_REQUIRED)",
+   "@RUN_ROOT": "本次 dispatch 的运行根目录(执行器自己的 out)",
+   "@IMAGE_BYTES": "0x%X 形式的镜像长度, 数值 = identity_binding.image.bytes = S0 现场重算并与 manifest 相等的字节数"
+  },
+  "download": {
+   "command": "python -m pyocd flash --pack C:/Keil_v5/ARM/PACK/.Download/NOVOSENSE.NS800RT7XXX.0.5.3.pack -t ns800rt7p65d_dhqfby2 -u @UID_FILE -f 1000000 --no-config -Oauto_unlock=false -Ocache.enable_memory=false -Ocache.read_code_from_elf=false -e sector reports/firmware/phase8-m8-idle-stack-r4/rt-thread-motor-m1.axf",
+   "argv": [
+    "python",
+    "-m",
+    "pyocd",
+    "flash",
+    "--pack",
+    "C:/Keil_v5/ARM/PACK/.Download/NOVOSENSE.NS800RT7XXX.0.5.3.pack",
+    "-t",
+    "ns800rt7p65d_dhqfby2",
+    "-u",
+    "@UID_FILE",
+    "-f",
+    "1000000",
+    "--no-config",
+    "-Oauto_unlock=false",
+    "-Ocache.enable_memory=false",
+    "-Ocache.read_code_from_elf=false",
+    "-e",
+    "sector",
+    "reports/firmware/phase8-m8-idle-stack-r4/rt-thread-motor-m1.axf"
+   ],
+   "image": {
+    "path": "reports/firmware/phase8-m8-idle-stack-r4/rt-thread-motor-m1.axf",
+    "bytes": 1771288,
+    "sha256": "0babe9f1a874230381bc70eae959fd6b8dff41f1182bcdc6bed1fd72736aba8c",
+    "identity_source": "本轮构建产物逐字节复算; validate_plan 的 PLAN_IMAGE_IDENTITY_CONSISTENCY 要求它等于 identity_binding.image.axf, 且 download argv 的最后一个参数就是这个路径"
+   },
+   "expect_all": [
+    "Erasing... [loader]",
+    "Programming... [loader]"
+   ],
+   "expect_counts": {
+    "Erased [0-9]+ bytes \\([0-9]+ sectors\\), programmed [0-9]+ bytes \\([0-9]+ pages\\)": 1
+   },
+   "expectation_basis": "P0 的 S1_flash.stderr.txt 里这三行是 loader 的成功原文(第 1/2 行 + 末行的 Erased/programmed 摘要); 只 rc=0 不算通过。",
+   "no_retry": "额度 1, 失败不重试: 第二次下载是**新的批准范围**。"
+  },
+  "readback": {
+   "command": "python -m pyocd commander --no-config -t cortex_m -u @UID_FILE -f 1000000 -O auto_unlock=false -O connect_mode=halt -O resume_on_disconnect=false -O cache.enable_memory=false -O cache.read_code_from_elf=false -O scan_all_aps=false -c status -c \"savemem 0x08000000 @IMAGE_BYTES @RUN_ROOT/readback.bin\" -c status -c exit",
+   "argv": [
+    "python",
+    "-m",
+    "pyocd",
+    "commander",
+    "--no-config",
+    "-t",
+    "cortex_m",
+    "-u",
+    "@UID_FILE",
+    "-f",
+    "1000000",
+    "-O",
+    "auto_unlock=false",
+    "-O",
+    "connect_mode=halt",
+    "-O",
+    "resume_on_disconnect=false",
+    "-O",
+    "cache.enable_memory=false",
+    "-O",
+    "cache.read_code_from_elf=false",
+    "-O",
+    "scan_all_aps=false",
+    "-c",
+    "status",
+    "-c",
+    "savemem 0x08000000 @IMAGE_BYTES @RUN_ROOT/readback.bin",
+    "-c",
+    "status",
+    "-c",
+    "exit"
+   ],
+   "out_file": "readback.bin",
+   "start_address": "0x08000000",
+   "length_rule": "长度 = 本轮候选 BIN 的字节数(由 @IMAGE_BYTES 机械展开, 与 S0 重算值绑定); 不是任意窗口",
+   "image": {
+    "path": "reports/firmware/phase8-m8-idle-stack-r4/rt-thread-motor-m1-candidate.bin",
+    "bytes": 290916,
+    "sha256": "dab356c69fbf4ca747e838580c16982bd56b53b1367f84b97ab705c2fbd25439",
+    "identity_source": "与 identity_binding.image 同一件(S0 现场重算并与 build_manifest 相等)"
+   },
+   "expect_all": [
+    "Saved "
+   ],
+   "expect_counts": {
+    "Core 0 \\(None\\):  Halted": 2
+   },
+   "expectation_basis": "P0 的 S2_readback.stdout.txt 就是 'Core 0 (None):  Halted' 两条夹一条 'Saved <n> bytes to <path>'; 交付物判据是那个文件的字节数/散列/与镜像逐字节相等(READBACK_BYTE_COUNT / READBACK_HASH_MISMATCH / READBACK_NOT_BYTE_EQUAL_TO_IMAGE), stdout 里的工具文字不参与字节比较。",
+   "no_retry": "额度 1。",
+   "length_note": "长度 = @IMAGE_BYTES = identity_binding.image.bytes; 比较对象就是本轮新镜像。上一轮在板镜像只登记为 identity_binding.board_image_before, 不是回读目标"
+  },
+  "reset": {
+   "command": "python -m pyocd reset --method sysresetreq --no-config --no-wait --connect attach --core 0 -t cortex_m -u @UID_FILE",
+   "argv": [
+    "python",
+    "-m",
+    "pyocd",
+    "reset",
+    "--method",
+    "sysresetreq",
+    "--no-config",
+    "--no-wait",
+    "--connect",
+    "attach",
+    "--core",
+    "0",
+    "-t",
+    "cortex_m",
+    "-u",
+    "@UID_FILE"
+   ],
+   "expect_all": [],
+   "expect_counts": {},
+   "expectation_basis": "P0 采集器用的就是这条显式形态(明确方法与已知 UID), 避免旧裸 'pyocd reset -t cortex_m' 的默认选择/等待; --no-wait 是不等待缺席探针, 不是第二次试连。pyocd 该子命令不产出稳定成功文案, 因此本步只按 rc=0 + 原始 stdout/stderr 落盘判定, 成功与否由后续读取的**状态变化**证明(tmc_config_show 必须落到 UNCONFIGURED 起点)。",
+   "note": "工具内部定位该 UID 的行为不冒称零内部枚举。"
+  }
+ },
+ "stages": [
+  {
+   "id": "S0",
+   "title": "离线绑定: 镜像按路径重算 bytes/sha256 并与 manifest 逐字段相等; 两个提交必须是仓库里的 commit 对象; needles 回 C 源码证明; 计划占位与禁止命令静态拒绝",
+   "kind": "offline",
+   "requires": [],
+   "halt_after": false,
+   "device_actions": 0,
+   "order": 0
+  },
+  {
+   "id": "S3",
+   "title": "会话1: 复位(熔断后) -> 唯一一次启动准位 -> 三条自检行 -> 阶段 -> **栈容量断言(diag 0x1000 / idle 0x400)** -> 前置条件证明(apply CONFIRM + 极性/IRQ) -> 静止零快照",
+   "kind": "serial_session",
+   "requires": [],
+   "total_deadline_seconds": 300,
+   "reset_after_port_open": false,
+   "halt_after": false,
+   "forbidden_commands": [
+    "config_load",
+    "config_default",
+    "blackbox_clear",
+    "flash_logclear",
+    "flash_test",
+    "flash_unlock",
+    "pwm_test",
+    "safety_trip",
+    "motor_start",
+    "motor_arm"
+   ],
+   "boot_bytes": [],
+   "boot_bytes_note": "开口时的 boot_bytes 仍为空(本轮离线不伪造上电横幅); 复位之后的启动流由 post_reset_boot + drain_post_reset_boot 消费, 原字节进 NN_rst.boot.rx.bin。",
+   "manual_answers": {},
+   "steps": [
+    {
+     "cmd": "system_status",
+     "as": "sysboot",
+     "seconds": 75,
+     "expect_contains": [
+      "=== SYSTEM STATUS ===",
+      "[Boot]   bootstrap-complete=YES",
+      "[Motor] arm gate fail mask="
+     ],
+     "expect_values": [
+      {
+       "row": "^\\[Boot\\]   bootstrap-complete=(?P<bc>\\w+) abort-stage=(?P<ab>\\d+)$",
+       "must": {
+        "bc": "YES",
+        "ab": "0"
+       }
+      },
+      {
+       "row": "^\\[Safety\\] state=(?P<state>\\w+) fault=(?P<fault>\\d+) irq_gate=\\w+ polarity=[\\w-]+ protect_ready=[\\w-]+$",
+       "must": {
+        "state": "READY",
+        "fault": "0"
+       }
+      }
+     ],
+     "status_lines_allow": [
+      "^\\[Motor\\] arm gate fail mask=0x[0-9A-Fa-f]+ \\(arm REFUSED\\)$"
+     ],
+     "status_lines_allow_why": "开机/重启后的默认安全态: 极性与配置未确认前 arm 必须被拒(mask=0x18), 这一行是**状态披露**而不是本条命令被拒。它同时被 expect_contains 正面要求 => 掩码或文案变了就停止, 不是无限放行",
+     "seconds_note": "75 s 是**上界不是等待时长**: read_until_prompt 一看到完整提示符就返回, 健康板在毫秒级就答完; 把它拉长的唯一目的是让 stage-5 的 1 MiB 扫描(源码层估算 ≥8.5 s, cont 轮实测用 75 s 窗才拿满) 有机会在同一个窗里把启动尾流 + 回显 + 响应一起交出来。R5 现场轮就是因为 6 s + 3 s 的窗被剪在 启动本身之前, 才把 0 字节当成了结论"
+    },
+    {
+     "cmd": "ps",
+     "as": "ps_after_boot",
+     "key": "ps",
+     "seconds": 6,
+     "expect_contains": [
+      "diag",
+      "tidle0"
+     ],
+     "expect_values": [
+      {
+       "row": "^diag\\s+(\\d+)\\s+\\w+\\s+0x[0-9a-fA-F]+\\s+(?P<diag_stack>0x[0-9a-fA-F]+)\\s+(?P<diag_used>\\d+)%(?:\\s+\\S+)*$",
+       "must": {
+        "diag_stack": "0x00001000"
+       },
+       "note": "diag 行栈必须是 0x1000=4096: 上一轮已在板上实测到这一行, 本轮不得回退"
+      },
+      {
+       "row": "^tidle0\\s+(\\d+)\\s+\\w+\\s+0x[0-9a-fA-F]+\\s+(?P<idle_stack>0x[0-9a-fA-F]+)\\s+(?P<idle_used>\\d+)%(?:\\s+\\S+)*$",
+       "must": {
+        "idle_stack": "0x00000400"
+       },
+       "note": "tidle0 行栈必须是 0x00000400=1024: 这是 idle 修复在板上的**唯一直接证据**; 旧镜像这里是 0x00000100=256"
+      }
+     ],
+     "watermark_collected": "diag_used/idle_used 两列一并存原始响应, 但**不在这里判定够不够** —— 水位是否接近上限属离线判读(与上一轮 CAPTURE_COMPLETE_REVIEW_PENDING 同口径)",
+     "failure_stop": "栈大小不符 => FIELD_VALUE_MISMATCH(等值判据), 直接停: 说明下载的是别的镜像或 rtconfig 未生效"
+    },
+    {
+     "cmd": "tmc_config_show",
+     "as": "cfgboot",
+     "key": "tmc_config_show@boot",
+     "seconds": 4,
+     "expect_contains": [
+      "[TMC-CFG] state=",
+      "[TMC-CFG] planned irun=20"
+     ]
+    },
+    {
+     "cmd": "tmc_config_apply CONFIRM",
+     "as": "cfgapply",
+     "key": "tmc_config_apply CONFIRM",
+     "seconds": 8,
+     "quota": {
+      "name": "tmc_config_apply",
+      "n": 1
+     },
+     "expect_contains": [
+      "[TMC-CFG] CONFIGURED"
+     ]
+    },
+    {
+     "cmd": "tmc_config_show",
+     "as": "cfgafter",
+     "key": "tmc_config_show",
+     "seconds": 4,
+     "expect_values": [
+      {
+       "row": "^\\[TMC-CFG\\] state=(?P<st>\\w+) fail_reg=(?P<fr>\\S+) last_err=(?P<le>-?\\d+) from_integrity=(?P<fi>\\d+) snapshot_valid=(?P<sv>\\d+)$",
+       "must": {
+        "st": "CONFIGURED",
+        "sv": "1",
+        "fr": "0x00"
+       }
+      }
+     ],
+     "expect_values_note": "IRUN20 实值由同一次响应的 planned irun=20 + live CHOPCONF/GCONF 读回共同承担(见 rows.json 的板级原文), 不抬流。"
+    },
+    {
+     "cmd": "safety_polarity_confirm CONFIRM",
+     "as": "pol",
+     "key": "safety_polarity_confirm CONFIRM",
+     "seconds": 4,
+     "quota": {
+      "name": "irq_polarity_prep",
+      "n": 1
+     },
+     "expect_contains": [
+      "[SAFETY] input polarity MARKED VALIDATED",
+      "[SAFETY] NOTE: this is an OPERATOR DECLARATION"
+     ]
+    },
+    {
+     "cmd": "safety_irq_enable",
+     "as": "irq",
+     "seconds": 4,
+     "quota": {
+      "name": "irq_polarity_prep",
+      "n": 1
+     },
+     "expect_contains": [],
+     "expect_absent": [
+      "FAILED",
+      "not supported",
+      "REFUSED"
+     ],
+     "fact_authority": {
+      "moved_from": "transition print [SAFETY] IRQ gate OPEN",
+      "moved_to": "irqafter",
+      "why": "门已 OPEN 时产品不再打印跳变行(实测 31 B 只有回显), 继续要求那行会把**已在目标态**误判成失败; 门状态只认 irqafter 的 `[SAFETY] irq gate = OPEN` 字段(must 不变)",
+      "not_relaxed": "expect_values 的 gate=OPEN 判据一个没删; 命令被拒/失败仍由 expect_absent 当场具名停止"
+     }
+    },
+    {
+     "cmd": "safety_irq_status",
+     "as": "irqafter",
+     "seconds": 3,
+     "expect_values": [
+      {
+       "row": "^\\[SAFETY\\] irq gate\\s+=\\s+(?P<gate>\\w+)",
+       "must": {
+        "gate": "OPEN"
+       }
+      }
+     ]
+    },
+    {
+     "cmd": "motor_status",
+     "as": "rest0",
+     "seconds": 3,
+     "expect_profile": "AT_REST",
+     "expect_contains": [
+      "[MOT] state="
+     ]
+    },
+    {
+     "cmd": "diag_status",
+     "as": "diag0",
+     "seconds": 3,
+     "expect_contains": [
+      "[DIAG] verdict=",
+      "[DIAG] rel cov="
+     ]
+    },
+    {
+     "cmd": "config_show",
+     "as": "cfg0",
+     "seconds": 3,
+     "expect_contains": [
+      "[CFG] valid="
+     ]
+    },
+    {
+     "cmd": "diag_profile show",
+     "as": "prof0",
+     "key": "diag_profile show@boot",
+     "seconds": 3,
+     "expect_contains": [
+      "[DIAG] profile",
+      "[DIAG] live sig="
+     ]
+    },
+    {
+     "cmd": "diag_profile zero 32",
+     "as": "zero",
+     "key": "diag_profile zero 32",
+     "seconds": 6,
+     "quota": {
+      "name": "diag_profile_zero",
+      "n": 1
+     },
+     "expect_contains": [
+      "[DIAG] zero OK"
+     ],
+     "expect_values": [
+      {
+       "row": "^\\[DIAG\\] zero OK n=(?P<n>\\d+) raw (?P<lo>\\d+)\\.\\.(?P<hi>\\d+) mean=(?P<mean>\\d+) \\(cal source untouched\\)$",
+       "must": {
+        "n": "32"
+       }
+      }
+     ]
+    }
+   ],
+   "post_reset_boot": [
+    "msh >"
+   ],
+   "post_reset_boot_provenance": {
+    "kind": "source_shape",
+    "basis": "Historical full boot captures have no final prompt; 002_version.bin is a version command response, not spontaneous boot evidence.",
+    "what_is_not_claimed": "Synthetic post_reset_boot is only a stub input; all real bytes are archived."
+   },
+   "order_note": "Open -> one reset -> bounded passive archive -> one system_status; boot capture is not readiness proof.",
+   "order": 1,
+   "first_query_is_boot_probe": true,
+   "continuation_note": "续测会话**不复位**: 板上跑的已经是本轮逐字节证过的那件镜像, 显式复位的唯一一次已在 reports/reviews/phase8-m8-idle-stack-r4/field/field-20261101T142722Z 用掉; 核此刻是在跑的状态(R5 轮 1.875 s 完成复位并收到 1027 B 启动流, 之后再没有 attach/halt)。若这条 75 s 窗仍然一个字节都没有, 具名停止 MISSING_RESPONSE_PROMPT, 由操作者做一次**计划内人工断电重启**(approved_reboot 仍有 1 次), 不在本包里自动复位"
+  },
+  {
+   "id": "S4",
+   "title": "会话2(唯一一次学习起转): 静止证明 -> dir0 -> arm -> target 100 -> start(硬截止起点) -> 本轮 RUNNING 复核 -> learn N=8 -> 有界观察窗 -> 清理并证禁能",
+   "kind": "serial_session",
+   "requires": [
+    "S3"
+   ],
+   "total_deadline_seconds": 60,
+   "halt_after": false,
+   "forbidden_commands": [
+    "config_load",
+    "config_default",
+    "blackbox_clear",
+    "flash_logclear",
+    "pwm_test",
+    "safety_trip"
+   ],
+   "manual_answers": {
+    "operator_ready_for_bounded_cruise": "yes"
+   },
+   "steps": [
+    {
+     "manual": "operator_ready_for_bounded_cruise",
+     "as": "gate_cruise",
+     "note": "人工门排在**任何 arm/start 之前**(运动窗口内不许阻塞)。"
+    },
+    {
+     "cmd": "motor_status",
+     "as": "rest_before_arm",
+     "seconds": 3,
+     "expect_profile": "AT_REST"
+    },
+    {
+     "cmd": "motor_dir 0",
+     "as": "dir0",
+     "seconds": 3,
+     "expect_contains": [
+      "[MOT] dir=0 (at rest, 全部条件与 DIR 写同窗)"
+     ]
+    },
+    {
+     "cmd": "motor_arm",
+     "as": "arm",
+     "seconds": 4,
+     "expect_contains": [
+      "[MOT] ARMED (drv_en request=HIGH readback verified"
+     ]
+    },
+    {
+     "cmd": "motor_target 100",
+     "as": "target",
+     "seconds": 3,
+     "expect_values": [
+      {
+       "row": "^\\[MOT\\] set target (?P<hz>\\d+) Hz: (?P<res>\\w+)$",
+       "must": {
+        "hz": "100",
+        "res": "OK"
+       }
+      }
+     ]
+    },
+    {
+     "cmd": "motor_start",
+     "as": "start",
+     "seconds": 3,
+     "quota": {
+      "name": "motor_run",
+      "n": 1
+     },
+     "expect_absent": [
+      "REFUSED",
+      "FAILED",
+      "not supported"
+     ],
+     "expect_absent_note": "成功起转**不打印任何 [MOT] 行**(A/motor.c 的 cmd_motor_start 只在失败/拒绝支打印)。完整提示符只代表命令返回; 运行事实由下一步本轮新的 motor_status 证明。"
+    },
+    {
+     "cmd": "motor_status",
+     "as": "running_proof",
+     "key": "motor_status@running",
+     "seconds": 2,
+     "expect_profile": "RUNNING",
+     "expect_values": [
+      {
+       "row": "^\\[MOT\\] cur_hz=(?P<cur>\\d+) tgt_hz=(?P<tgt>\\d+) accel=(?P<ac>\\d+) decel=(?P<de>\\d+) dir=(?P<dir>\\d+)$",
+       "must": {
+        "cur": "100",
+        "tgt": "100",
+        "dir": "0"
+       }
+      },
+      {
+       "row": "^\\[MOT\\] armed=(?P<armed>\\d) drv_en_request=(?P<hist>\\d) health=(?P<health>\\w+)$",
+       "must": {
+        "armed": "1",
+        "health": "OK"
+       }
+      }
+     ],
+     "expect_values_note": "目标频率与方向必须等于本轮下发的 100 Hz/dir=0; 只核行数不算(旧 expect_fields 的形状判据armed=1 也能满足)。",
+     "poll": {
+      "until_seconds": 8,
+      "interval_seconds": 0.5,
+      "retry_codes": [
+       "PROFILE_NOT_RUNNING",
+       "FIELD_VALUE_MISMATCH"
+      ],
+      "why": "起转后**有限轮询**直到证得 state=MOTOR_CRUISE(2) 且 cur/tgt 都落在本次窗口; ACCEL 不是异常, 可以在同一预算内继续等, 到期或不一致就撤能(审核 §2D 第 3 条)。一条立即查询、或只看 tgt>0, 都不算稳定巡航。",
+      "retry_basis": "重试的**充分条件**是数值状态还在 ACCEL/DECEL(ramping_state 从这一次的原字节里重读), 并且失败码在申报集合内; armed=1 而 state=0 这种矛盾字段不满足条件, 会立刻具名拒绝。"
+     },
+     "poll_sequence": [
+      "motor_status@accel",
+      "motor_status@running"
+     ],
+     "poll_sequence_note": "第 1 次读到 MOTOR_ACCEL(爬坡中, 不是异常), 之后读到 MOTOR_CRUISE(2)。序列来自行表里申报过的两组, 执行器不许临时编响应。",
+     "status_lines_allow": [
+      "^\\[MOT\\] arm_gate_mask=0x[0-9A-Fa-f]+ REFUSED$"
+     ],
+     "status_lines_allow_why": "只在断言 RUNNING 的步骤上放行这一行: 运行中安全状态机不在 READY => 门禁披露必然是 REFUSED(0x2=MOT_GATE_NOT_READY)。armed/health/cur_hz/tgt_hz/dir 的硬字段判据一个没删;静止态的 motor_status 不放行(那里 mask 非 0 是真故障, 必须停)"
+    },
+    {
+     "cmd": "diag_profile learn 8 80 120 0",
+     "as": "learn",
+     "key": "diag_profile learn 8 80 120 0",
+     "seconds": 14,
+     "quota": {
+      "name": "diag_profile_learn",
+      "n": 1
+     },
+     "expect_contains": [
+      "[DIAG] learn OK"
+     ],
+     "expect_values": [
+      {
+       "row": "^\\[DIAG\\] learn OK adc\\[(?P<alo>\\d+)\\.\\.(?P<ahi>\\d+)\\]n(?P<adc_n>\\d+) nz(?P<nz>\\d+) sg\\[(?P<slo>\\d+)\\.\\.(?P<shi>\\d+)\\]n(?P<sg_n>\\d+) seq(?P<seq_f>\\d+)\\.\\.(?P<seq_l>\\d+)$",
+       "must_min": {
+        "adc_n": 8,
+        "sg_n": 8
+       },
+       "criterion_note": "复审 2026-11-01 第2项: learn 接受 ADC 与 SG **独立样本数各 >=8**(产品最小 N=8 就是下限), 删除上一版的等值要求 must{adc_n==8,sg_n==8}(那会把 9/10 个样本的正常结果误判成失败)。保留的拒绝判据: 任一通道 <8 => FIELD_VALUE_BELOW_MIN; 成功行出现多条 => FIELD_NOT_EXACTLY_ONE(ROW_NOT_UNIQUE); 学习超时/无响应 => 本步的 14 s 请求窗仍受阶段 15 s 单调硬截止约束(见 seconds_note 与 blocking_note)。上限不设, 诊断算法与资格门未改。"
+      }
+     ],
+     "unit": "LO/HI 是 STEP 频率 Hz 区间(hz_low/hz_high), 不是 SG 码; hz_nominal 取窗中值=100",
+     "basis": "M4 R1-R4 已在板上以 100 Hz 各 5 s 运行通过; N=8 是产品允许的最小值 => SG(10 Hz)下约 800 ms, 在 5 s 硬截止内并仍留清理机会(见 motion_window_budget_proof)",
+     "dir_label": "single_direction_0",
+     "blocking_note": "产品自己的同步等待: diag_relative.c:1318 #define REL_CMD_DEADLINE_MS 12000u, 本次编译实际执行的 learn_block_probe 观察为**命令到 12000 ms 才返回**, 期间单线程 msh 不能处理别的命令。rows.json 给这一组申报 _block_seconds=12.0, 假端口据此让响应排在忙期之后 —— 不再用\"立刻送达的一行 12s timeout 文本\"代替(审核 §3)。",
+     "seconds_note": "学习响应等待要**覆盖产品自己的 12 秒同步等待**再加本次传输余量(审核 §3): 14 s 的请求窗仍受本阶段 15 s 单调硬截止约束 —— business_deadline 取 min(now+14+slack, motor_start 起算的 15 s), 所以到期仍是截止点而不是 14 s。"
+    },
+    {
+     "cmd": "__watch__",
+     "as": "cruise_observe",
+     "key": "__watch__",
+     "seconds": 5,
+     "no_trigger_is_observation": true,
+     "trigger_needles": [
+      "[DIAG] REL TRIP r="
+     ],
+     "note": "观察窗跑到剩余预算的截止点(不因先看见一个提示符提前收); 无触发 => OBSERVATION_NO_TRIGGER 并进入同一清理路径, **不**跳过 S5 的提交与保存(那一步在静止会话里, 不共用本次运动)。"
+    }
+   ],
+   "motion_cap_seconds": 15,
+   "motion_cap_note": "本阶段起转硬截止 = 15 s(学习 15 / 保护观察 5 的分工, 见 quota_note_r3_closeout)。",
+   "order": 2,
+   "prerequisite_gates": [
+    "assembly_readiness"
+   ],
+   "prerequisites": {
+    "assembly_readiness": {
+     "status": "PROVIDED",
+     "blocks_motion": true,
+     "asset": "T8 丝杆套件(标称导程 8 mm)的装配就绪 + 支座/电机能否在不手扶时保持固定",
+     "asset_state": "操作者 2026-11-01 在审核窗口逐条确认: 支座松手保持固定、连接紧固、螺母防转、移动块导向均无问题 => 门放行。此前登记的\"已按照片装配, 紧固、螺母防转及导向尚待确认\"已被这条确认取代(不是我自己推断的)",
+     "provenance": "操作者现场确认(2026-11-01 审核窗口原文): \"用户已在审核窗口明确确认：支座松手保持固定、连接紧固、螺母防转、移动块导向均无问题。按操作者确认把 assembly_readiness 改为 PROVIDED\"。本 Agent 未实测, 只登记为操作者给出的确认",
+     "confirmed_items": [
+      "支座/轴承在松手后保持固定",
+      "丝杆与电机的连接紧固",
+      "螺母防转",
+      "移动块导向"
+     ],
+     "still_open": [
+      "第一次短移动里核实\"顺时针=向右\"(操作者口径: 该核实仍保留)",
+      "累计运动距离尚未按标称导程 8 mm 与实际细分/脉冲参数核算(不属于本轮这四项确认的范围, 仍挂着)"
+     ],
+     "gate": "门仍然挂在**每一个**起转阶段上(S4/S8/S8b/S10/S10b) —— 放行不等于拆门: 状态由操作者确认决定, 任何一项回退成未确认, 该阶段又在开端口之前被具名跳过",
+     "gates_stages": "S4(带起转的学习)、S8/S8b(两场激励)、S10/S10b(锁存态再 arm)",
+     "propagation": "S4 被挡后, requires 里引用本次学习结果的 S5/S6/S7 一并跳过(执行器沿计划申报的 requires 传播拒绝)。本轮 S4 已放行, 因此该传播在交付态不再触发 —— 它作为机制保留, 由定向矩阵 V5 用显式场景继续验证",
+     "would_be_used_by": "S4 巡航学习与 S8/S8b 两场激励的起转前提(也是整个运动路径的前提)",
+     "fallback_status": "此前登记的备选(不通电脱开丝杆、只走空载学习与 IMU 演示)的动因已消除: 支座确认可松手保持固定。备选仍未采纳, 也不需要采纳; 若装配状态回退, 它重新成为可选项, 且同样受本门控制"
+    }
+   },
+   "spinup_gate_note": "本阶段会发 motor_arm+motor_start, 所以在**开端口之前**检查 assembly_readiness; 任一状态不是 PROVIDED 就具名跳过并记 STAGE_SKIPPED_BY_PREREQUISITE(不扣额度、不发命令)"
+  },
+  {
+   "id": "S5",
+   "title": "静止会话(提交与保存主线): 再证静止 -> tier -> commit -> show(抓 id/rev/flags/sig) -> config_save; 同一会话内先交叉核对 commit 行与 show 行",
+   "kind": "serial_session",
+   "requires": [
+    "S4_disarm_confirmed"
+   ],
+   "total_deadline_seconds": 60,
+   "halt_after": false,
+   "forbidden_commands": [
+    "config_load",
+    "config_default",
+    "blackbox_clear",
+    "flash_logclear",
+    "motor_start",
+    "pwm_test",
+    "safety_trip"
+   ],
+   "manual_answers": {},
+   "record_from": [
+    {
+     "step": "prof_after_commit",
+     "regex": "^\\[DIAG\\] profile id=(?P<id>\\d+) rev=(?P<rev>\\d+) abi=(?P<abi>\\d+) flg=(?P<flags>[0-9A-Fa-f]{4})",
+     "as": [
+      "id",
+      "rev",
+      "flags"
+     ]
+    },
+    {
+     "step": "prof_after_commit",
+     "regex": "^\\[DIAG\\] live sig=(?P<sig>\\d+) match=(?P<match>\\w+)",
+     "as": [
+      "sig",
+      "match"
+     ]
+    }
+   ],
+   "compare_recorded": [
+    {
+     "step": "commit",
+     "keys": [
+      "id",
+      "rev",
+      "flags"
+     ],
+     "regex": "^\\[DIAG\\] commit OK id=(?P<id>\\d+) rev=(?P<rev>\\d+) flags=(?P<flags>[0-9A-Fa-f]{4})",
+     "why": "同一次事务里 commit 行与 show 行必须逐值一致(不一致 = RESTORE_MISMATCH, 说明发布与视图不是同一代)"
+    }
+   ],
+   "steps": [
+    {
+     "cmd": "motor_status",
+     "as": "rest_before_tier",
+     "seconds": 3,
+     "expect_profile": "AT_REST"
+    },
+    {
+     "cmd": "diag_status",
+     "as": "diag_before_tier",
+     "seconds": 3,
+     "expect_values": [
+      {
+       "row": "^\\[DIAG\\] verdict=(?P<v>\\w+) mode=(?P<mode>\\w+) health=(?P<h>\\w+)$",
+       "must": {
+        "mode": "MONITOR_ONLY"
+       }
+      }
+     ]
+    },
+    {
+     "cmd": "diag_profile tier 2",
+     "as": "tier",
+     "key": "diag_profile tier 2",
+     "seconds": 3,
+     "expect_contains": [
+      "[DIAG] tier 2:",
+      "(commit to publish)"
+     ]
+    },
+    {
+     "cmd": "diag_profile commit",
+     "as": "commit",
+     "key": "diag_profile commit",
+     "seconds": 4,
+     "quota": {
+      "name": "diag_profile_commit",
+      "n": 1
+     },
+     "expect_contains": [
+      "[DIAG] commit OK",
+      "FIELD_UNVERIFIED"
+     ],
+     "expect_flag_bits": {
+      "row": "^\\[DIAG\\] commit OK id=(?P<id>\\d+) rev=(?P<rev>\\d+) flags=(?P<flags>[0-9A-Fa-f]{4})",
+      "group": "flags",
+      "must_set": [
+       "COMMITTED",
+       "FROM_LEARN"
+      ],
+      "must_clear": [
+       "FIELD_VERIFIED"
+      ],
+      "basis": "diag_relative.h:39-41 的 RPF_COMMITTED(1u<<0)/RPF_FIELD_VERIFIED(1u<<1)/RPF_FROM_LEARN(1u<<2); 本轮是离线学习提交, 现场从未验证过, 所以 FIELD_VERIFIED 必须为 0。旧夹具的 0010 连 COMMITTED 位都没置, 却因为\"两处都印 0010\"被当成一致 —— 按字符串比相等不算资格判定(审核 §2D 第 2 条)。"
+     }
+    },
+    {
+     "cmd": "diag_profile show",
+     "as": "prof_after_commit",
+     "key": "diag_profile show",
+     "seconds": 3,
+     "expect_contains": [
+      "[DIAG] profile id=",
+      "[DIAG] live sig=",
+      "match=YES"
+     ],
+     "expect_values": [
+      {
+       "row": "^\\[DIAG\\] live sig=(?P<sig>\\d+) match=(?P<match>\\w+)",
+       "must": {
+        "match": "YES"
+       },
+       "why": "sig 的**数字**由产品函数按平台输入算出, 不是用户输入值, 因此这里只钉形状与产品自己给出的一致性结论(match=YES); 具体值由 record_from 记进整包账, S7 重启后再逐项比较(审核 §2D 第 1 条)。"
+      }
+     ],
+     "expect_flag_bits": {
+      "row": "^\\[DIAG\\] profile id=(?P<id>\\d+) rev=(?P<rev>\\d+) abi=(?P<abi>\\d+) flg=(?P<flags>[0-9A-Fa-f]{4})\\s+(?P<state>\\w+)",
+      "group": "flags",
+      "must_set": [
+       "COMMITTED",
+       "FROM_LEARN"
+      ],
+      "must_clear": [
+       "FIELD_VERIFIED"
+      ],
+      "basis": "同一位定义用于 show 的 flg 字段; 与 commit 行的 flags 由 compare_recorded 再逐值比一次。"
+     }
+    },
+    {
+     "cmd": "config_save",
+     "as": "save",
+     "seconds": 8,
+     "quota": {
+      "name": "config_save",
+      "n": 1
+     },
+     "expect_values": [
+      {
+       "row": "^\\[CFG\\] save: (?P<r>\\w+)$",
+       "must": {
+        "r": "OK"
+       }
+      }
+     ],
+     "requires": [
+      "commit"
+     ]
+    }
+   ],
+   "order": 3
+  },
+  {
+   "id": "S6",
+   "title": "经批准的一次断电重启(操作者交付门, 不是一条伪命令): 先关 24 V 再拔 USB, 完成后按交付事实进 S7",
+   "kind": "operator_gate",
+   "manual": "operator_power_cycle_done",
+   "manual_answers": {
+    "operator_power_cycle_done": "yes"
+   },
+   "quota_name": "approved_reboot",
+   "requires": [
+    "S5_saved_ok"
+   ],
+   "post_fact_required": [
+    "重启后重新读取 system_status/safety_status/tmc_config_show 证明 CONFIGURED 与 IRQ 就绪(S7 已排入步骤)",
+    "profile 恢复按 S5 记录的 id/rev/flags/live sig 实际比较(S7 的 compare_recorded)"
+   ],
+   "why_not_an_action": "现场重启在这块板上是**断电再上电**, 不存在可以逐字执行的子进程命令; 把它伪装成 reboot 动作会产生'工具有效'的假象。故: 额度申报 0 + 操作者门交付; 交付物在 real 传输下必须由操作者输入确认词, 不读任何夹具。",
+   "order": 4
+  },
+  {
+   "id": "S7",
+   "title": "重启后会话: 前置重新证明(apply CONFIRM + 极性/IRQ) -> 只读核对 -> 与 S5 记录逐项比较(恢复不是声明, 是机械比较)",
+   "kind": "serial_session",
+   "requires": [
+    "S6"
+   ],
+   "total_deadline_seconds": 300,
+   "halt_after": false,
+   "forbidden_commands": [
+    "config_load",
+    "config_default",
+    "blackbox_clear",
+    "flash_logclear",
+    "motor_start",
+    "motor_arm",
+    "pwm_test",
+    "safety_trip"
+   ],
+   "manual_answers": {},
+   "compare_recorded": [
+    {
+     "step": "prof_after_reboot",
+     "keys": [
+      "id",
+      "rev",
+      "flags"
+     ],
+     "regex": "^\\[DIAG\\] profile id=(?P<id>\\d+) rev=(?P<rev>\\d+) abi=(?P<abi>\\d+) flg=(?P<flags>[0-9A-Fa-f]{4})"
+    },
+    {
+     "step": "prof_after_reboot",
+     "keys": [
+      "sig",
+      "match"
+     ],
+     "regex": "^\\[DIAG\\] live sig=(?P<sig>\\d+) match=(?P<match>\\w+)"
+    }
+   ],
+   "steps": [
+    {
+     "cmd": "system_status",
+     "as": "sys2",
+     "seconds": 75,
+     "expect_contains": [
+      "=== SYSTEM STATUS ===",
+      "[Motor] arm gate fail mask="
+     ],
+     "status_lines_allow": [
+      "^\\[Motor\\] arm gate fail mask=0x[0-9A-Fa-f]+ \\(arm REFUSED\\)$"
+     ],
+     "status_lines_allow_why": "开机/重启后的默认安全态: 极性与配置未确认前 arm 必须被拒(mask=0x18), 这一行是**状态披露**而不是本条命令被拒。它同时被 expect_contains 正面要求 => 掩码或文案变了就停止, 不是无限放行",
+     "expect_values": [
+      {
+       "row": "^\\[Boot\\]   bootstrap-complete=(?P<bc>\\w+) abort-stage=(?P<ab>\\d+)$",
+       "must": {
+        "bc": "YES",
+        "ab": "0"
+       }
+      },
+      {
+       "row": "^\\[Safety\\] state=(?P<state>\\w+) fault=(?P<fault>\\d+) irq_gate=\\w+ polarity=[\\w-]+ protect_ready=[\\w-]+$",
+       "must": {
+        "state": "READY",
+        "fault": "0"
+       }
+      }
+     ],
+     "expect_values_note": "与 sysboot 同一组硬字段(照抄计划数据, 不另立判据): 重启后若 bootstrap 没跑完或 Safety 不在 READY/fault 非 0, 这里就当场具名停",
+     "seconds_note": "S6 是**操作者物理断电重上电**, 所以 S7 的第一条查询面对的是又一次冷启动(与 S3 同一判据): 75 s 是上界, read_until_prompt 到完整提示符就返回; 这一窗仍然 0 字节就只能具名停止"
+    },
+    {
+     "cmd": "tmc_config_show",
+     "as": "cfg2boot",
+     "key": "tmc_config_show@boot",
+     "seconds": 4,
+     "expect_contains": [
+      "[TMC-CFG] state="
+     ]
+    },
+    {
+     "cmd": "tmc_config_apply CONFIRM",
+     "as": "cfgapply2",
+     "key": "tmc_config_apply CONFIRM",
+     "seconds": 8,
+     "quota": {
+      "name": "tmc_config_apply",
+      "n": 1
+     },
+     "expect_contains": [
+      "[TMC-CFG] CONFIGURED"
+     ]
+    },
+    {
+     "cmd": "tmc_config_show",
+     "as": "cfg2after",
+     "key": "tmc_config_show",
+     "seconds": 4,
+     "expect_values": [
+      {
+       "row": "^\\[TMC-CFG\\] state=(?P<st>\\w+) fail_reg=(?P<fr>\\S+) last_err=(?P<le>-?\\d+) from_integrity=(?P<fi>\\d+) snapshot_valid=(?P<sv>\\d+)$",
+       "must": {
+        "st": "CONFIGURED",
+        "sv": "1",
+        "fr": "0x00"
+       }
+      }
+     ]
+    },
+    {
+     "cmd": "safety_polarity_confirm CONFIRM",
+     "as": "pol2",
+     "key": "safety_polarity_confirm CONFIRM",
+     "seconds": 4,
+     "quota": {
+      "name": "irq_polarity_prep",
+      "n": 1
+     },
+     "expect_contains": [
+      "[SAFETY] input polarity MARKED VALIDATED"
+     ]
+    },
+    {
+     "cmd": "safety_irq_enable",
+     "as": "irq2",
+     "seconds": 4,
+     "quota": {
+      "name": "irq_polarity_prep",
+      "n": 1
+     },
+     "expect_contains": [],
+     "expect_absent": [
+      "FAILED",
+      "not supported",
+      "REFUSED"
+     ],
+     "fact_authority": {
+      "moved_from": "transition print [SAFETY] IRQ gate OPEN",
+      "moved_to": "irq2after",
+      "why": "门已 OPEN 时产品不再打印跳变行(实测 31 B 只有回显), 继续要求那行会把**已在目标态**误判成失败; 门状态只认 irq2after 的 `[SAFETY] irq gate = OPEN` 字段(must 不变)",
+      "not_relaxed": "expect_values 的 gate=OPEN 判据一个没删; 命令被拒/失败仍由 expect_absent 当场具名停止"
+     }
+    },
+    {
+     "cmd": "safety_irq_status",
+     "as": "irq2after",
+     "seconds": 3,
+     "expect_values": [
+      {
+       "row": "^\\[SAFETY\\] irq gate\\s+=\\s+(?P<gate>\\w+)",
+       "must": {
+        "gate": "OPEN"
+       }
+      }
+     ]
+    },
+    {
+     "cmd": "config_show",
+     "as": "cfg2",
+     "seconds": 3,
+     "expect_values": [
+      {
+       "row": "^\\[CFG\\] valid=(?P<valid>\\w+) version=(?P<ver>\\S+)$",
+       "must": {
+        "valid": "YES"
+       }
+      }
+     ]
+    },
+    {
+     "cmd": "diag_profile show",
+     "as": "prof_after_reboot",
+     "key": "diag_profile show@after_reboot",
+     "seconds": 3,
+     "expect_contains": [
+      "[DIAG] profile id=",
+      "[DIAG] live sig=",
+      "match=YES"
+     ],
+     "expect_values": [
+      {
+       "row": "^\\[DIAG\\] live sig=(?P<sig>\\d+) match=(?P<match>\\w+)",
+       "must": {
+        "match": "YES"
+       },
+       "why": "sig 的**数字**由产品函数按平台输入算出, 不是用户输入值, 因此这里只钉形状与产品自己给出的一致性结论(match=YES); 具体值由 record_from 记进整包账, S7 重启后再逐项比较(审核 §2D 第 1 条)。"
+      }
+     ]
+    },
+    {
+     "cmd": "motor_status",
+     "as": "rest2",
+     "seconds": 3,
+     "expect_profile": "AT_REST"
+    }
+   ],
+   "order": 5,
+   "first_query_is_boot_probe": true
+  },
+  {
+   "id": "S8",
+   "title": "武装相对保护 + 一次 5 s 有界观察: 未触发只登记 NO_TRIGGER; 真实触发才走事故链(锁存/新增日志/故障态 arm 拒绝/人工恢复)",
+   "kind": "serial_session",
+   "requires": [
+    "S7_restore_equal"
+   ],
+   "total_deadline_seconds": 90,
+   "halt_after": false,
+   "forbidden_commands": [
+    "config_load",
+    "config_default",
+    "blackbox_clear",
+    "flash_logclear",
+    "pwm_test"
+   ],
+   "manual_answers": {
+    "operator_ready_for_armed_relative_run": "yes",
+    "operator_confirms_controlled_load_available": "yes"
+   },
+   "record_from": [
+    {
+     "step": "bb_before",
+     "regex": "^\\[BB\\] state=(?P<bb_state_sg>\\d+) session=(?P<bb_session_sg>\\d+) written=(?P<bb_written_sg>\\d+) last_err=(?P<bb_err_sg>\\d+) health=(?P<bb_health_sg>\\w+)$",
+     "as": [
+      "bb_session_sg",
+      "bb_written_sg"
+     ]
+    },
+    {
+     "step": "log_before",
+     "regex": "^slots=(?P<flash_used_before_sg>[0-9]+)/(?P<flash_capacity_sg>[0-9]+) valid=[0-9]+ bad=[0-9]+$",
+     "as": [
+      "flash_used_before_sg",
+      "flash_capacity_sg"
+     ]
+    }
+   ],
+   "steps": [
+    {
+     "manual": "operator_confirms_controlled_load_available",
+     "as": "gate_load_means",
+     "note": "受控负载手段未到位前不起转(见 prerequisites.load_means=NOT_PROVIDED)。这道门在 arm/start 之前; 离线 stub 干跑靠 manual_answers 过门, 所以本包的真判据是'现场执行时操作者必须逐项确认', 不是干跑通过 —— 反例见 host/idle_learn_check.py 的 D 组(去掉 manual_answers 后 dispatch 必须停在 S8 且零运动)。"
+    },
+    {
+     "manual": "operator_ready_for_armed_relative_run",
+     "as": "gate_armed"
+    },
+    {
+     "cmd": "diag_status",
+     "as": "diag_before_arm",
+     "seconds": 3,
+     "expect_contains": [
+      "[DIAG] rel cov="
+     ]
+    },
+    {
+     "cmd": "diag_profile show",
+     "as": "prof_at_arm",
+     "seconds": 3,
+     "expect_contains": [
+      "[DIAG] profile id="
+     ],
+     "why": "首因的 profile 腿必须来自**同一会话**: 现场若只在 S5 看过, 触发那一代基线就无法与本会话对齐"
+    },
+    {
+     "cmd": "blackbox_status",
+     "as": "bb_before",
+     "seconds": 3,
+     "expect_contains": [
+      "[BB] state="
+     ]
+    },
+    {
+     "cmd": "flash_logstat",
+     "as": "log_before",
+     "key": "flash_logstat@before",
+     "seconds": 3,
+     "min_free_log_slots": 300,
+     "expect_contains": [
+      "slots=",
+      "completed="
+     ]
+    },
+    {
+     "cmd": "motor_status",
+     "as": "rest_before_arm",
+     "seconds": 3,
+     "expect_profile": "AT_REST"
+    },
+    {
+     "cmd": "diag_mode relative CONFIRM_EXPERIMENTAL",
+     "as": "arm_rel",
+     "seconds": 3,
+     "key": "diag_mode relative CONFIRM_EXPERIMENTAL",
+     "expect_contains": [
+      "[DIAG] mode=RELATIVE_ACTIVE"
+     ]
+    },
+    {
+     "cmd": "motor_arm",
+     "as": "arm",
+     "seconds": 4,
+     "expect_contains": [
+      "[MOT] ARMED (drv_en request=HIGH"
+     ]
+    },
+    {
+     "cmd": "motor_target 100",
+     "as": "target",
+     "seconds": 3,
+     "expect_values": [
+      {
+       "row": "^\\[MOT\\] set target (?P<hz>\\d+) Hz: (?P<res>\\w+)$",
+       "must": {
+        "hz": "100",
+        "res": "OK"
+       }
+      }
+     ]
+    },
+    {
+     "cmd": "motor_start",
+     "as": "start",
+     "seconds": 3,
+     "quota": {
+      "name": "motor_run",
+      "n": 1
+     },
+     "expect_absent": [
+      "REFUSED",
+      "FAILED",
+      "not supported"
+     ]
+    },
+    {
+     "cmd": "motor_status",
+     "as": "running_proof",
+     "key": "motor_status@running",
+     "seconds": 2,
+     "expect_profile": "RUNNING",
+     "expect_values": [
+      {
+       "row": "^\\[MOT\\] cur_hz=(?P<cur>\\d+) tgt_hz=(?P<tgt>\\d+) accel=(?P<ac>\\d+) decel=(?P<de>\\d+) dir=(?P<dir>\\d+)$",
+       "must": {
+        "cur": "100",
+        "tgt": "100",
+        "dir": "0"
+       }
+      }
+     ],
+     "poll": {
+      "until_seconds": 4,
+      "interval_seconds": 0.5,
+      "retry_codes": [
+       "PROFILE_NOT_RUNNING",
+       "FIELD_VALUE_MISMATCH"
+      ],
+      "why": "起转后**有限轮询**直到证得 state=MOTOR_CRUISE(2) 且 cur/tgt 都落在本次窗口; ACCEL 不是异常, 可以在同一预算内继续等, 到期或不一致就撤能(审核 §2D 第 3 条)。一条立即查询、或只看 tgt>0, 都不算稳定巡航。",
+      "retry_basis": "重试的**充分条件**是数值状态还在 ACCEL/DECEL(ramping_state 从这一次的原字节里重读), 并且失败码在申报集合内; armed=1 而 state=0 这种矛盾字段不满足条件, 会立刻具名拒绝。"
+     },
+     "poll_sequence": [
+      "motor_status@accel",
+      "motor_status@running"
+     ],
+     "poll_sequence_note": "第 1 次读到 MOTOR_ACCEL(爬坡中, 不是异常), 之后读到 MOTOR_CRUISE(2)。序列来自行表里申报过的两组, 执行器不许临时编响应。",
+     "status_lines_allow": [
+      "^\\[MOT\\] arm_gate_mask=0x[0-9A-Fa-f]+ REFUSED$"
+     ],
+     "status_lines_allow_why": "只在断言 RUNNING 的步骤上放行这一行: 运行中安全状态机不在 READY => 门禁披露必然是 REFUSED(0x2=MOT_GATE_NOT_READY)。armed/health/cur_hz/tgt_hz/dir 的硬字段判据一个没删;静止态的 motor_status 不放行(那里 mask 非 0 是真故障, 必须停)"
+    },
+    {
+     "cmd": "__watch__",
+     "as": "trip_window",
+     "key": "__watch__",
+     "seconds": 5,
+     "no_trigger_is_observation": true,
+     "trigger_needles": [
+      "[DIAG] REL TRIP r="
+     ],
+     "watch_profile_note": "档案 trip => rows.json 的 __watch__.trip(真触发形状); 档案 no_trigger/healthy => 空窗(到时未触发)。观察窗把剩余预算跑到截止点是**故意的**: 事故链步骤绝不挤在同一个运动会话里 —— 运动会话只做运动, 事故取证与锁存后的复核各走自己的静止会话(S9/S10), 否则它们必然撞上 MOTION_BUDGET_EXHAUSTED。",
+     "channel_key_note": "本场的观察窗夹具是 __watch__: 规则名与源样本列必须属于**本场目标通道**, 否则分类只登记 OTHER_SOURCE_TRIGGERED(目标通道未证)"
+    }
+   ],
+   "profile_note": {
+    "healthy_and_no_trigger": "观察窗到时无触发 => OBSERVATION_NO_TRIGGER(成功终态) + stop/disarm/证禁能; 不跑任何假故障恢复步骤(S9/S10 用 profiles=[trip] 整体不参与)。",
+    "trip": "看见 [DIAG] REL TRIP => 本会话按预算结束后清理并证禁能; 事故取证在 S9、锁存态 arm 拒绝在 S10。两支持平结论都只到'离线控制流成立', 不写设备 PASS。"
+   },
+   "record_note": "S8 只**记录**事故前的黑匣子基线(bb_before 的 session/written); 增大与否的比较在 S9(bb_after)做 —— 取证会话与运动会话分开, 才不会被 MOTION_BUDGET_EXHAUSTED 挡掉。",
+   "motion_cap_seconds": 5,
+   "motion_cap_note": "本阶段起转硬截止 = 5 s(学习 15 / 保护观察 5 的分工, 见 quota_note_r3_closeout)。",
+   "decides_response_branch": true,
+   "decides_response_branch_note": "真实执行(transport=real)下事故支线由**本阶段的实际响应**决定: 看见申报过的 trigger_needles => trip, 把 S9/S10/S11 排进期望序列; 到时未触发 => no_trigger, 事故支线不参与(既不算已执行也不算 NOT_RUN)。学习会话(S4)的未触发不参与判定 —— 它不是保护观察。",
+   "scenario": "SG_ADC_controlled_load",
+   "first_cause_contract": {
+    "required": "同一次运行里四件必须咬合(执行器按 first_cause_legs 判, 不是说明字段): ① 本会话观察窗内的 [DIAG] REL TRIP r=/id=/rev= 行; ② 同批的 val=/thr= 与 sg=/cur=/imu=(源样本); ③ 本会话 diag_profile show 的 id/rev, 且等于 S5 实际提交的 recorded.id/rev; ④ 本场事故基线 bb_session_sg / flash_used_before_sg 已记录, 并在取证会话严格增大 + 读回到该 session 的实际停后帧(event=5, step_hz=0)",
+    "prohibited": [
+     "用 safety_trip 注入代替真实越界(它在所有场景的 forbidden_commands 里)",
+     "把缺腿的取证写成通过, 或写成 NO_TRIGGER",
+     "跨会话/跨轮拼字段(TRIP 行与 profile 行必须来自同一场同一会话)"
+    ],
+    "if_legs_missing": "EVIDENCE_INCOMPLETE: 事件观察到了, 但谁引起这次停机还没证。阶段不算成功, 而必要撤能照常先完成(cleanup 在 exec_session 的 finally 里, 早于本判定)",
+    "if_not_observed": "观察窗到时未触发 => OBSERVATION_NO_TRIGGER(成功终态), 该链的取证/拒绝/恢复阶段按分支跳过并具名 STAGE_SKIPPED_BY_PROFILE; 这不等于保护已验证",
+    "operator_gate": "加载手段属机械前置: 见 mechanical_prerequisites.load_means。NOT_PROVIDED 时整条链在开端口之前就被拒绝, 人工门的答案不能绕过它",
+    "scenario": "SG_ADC_controlled_load"
+   },
+   "prerequisites": {
+    "profile_ready": "diag_profile show 的 id/rev 与 S5 提交后记录一致(重启后已在 S7 比过)",
+    "mode_ready": "diag_mode relative CONFIRM_EXPERIMENTAL 成功且 diag_status 里 rel mode=RELATIVE_PROTECTION",
+    "load_means": {
+     "status": "NOT_PROVIDED",
+     "blocks_motion": true,
+     "asset": "现有实物: T8 丝杆套件(标称导程 8 mm) + 导轨滑台, 已按照片装配",
+     "asset_state": "装配四项(紧固/螺母防转/导向/支座松手保持固定)已由操作者 2026-11-01 确认; 但可从非旋转端操作的**加载作用点与档位/行程**仍未提供 => 本门仍不放行, SG/ADC 受控加载链继续跳过(装配确认不等于加载手段到位, 两件事不互相顶替)",
+     "provenance": "操作者 2026-11-01 现场回报 + 复审原文。本 Agent 未实测。导程是**标称**值, 未做实测标定",
+     "constraints": [
+      "现场只用中间短行程",
+      "不得把标称 8 mm 导程当作实测标定值",
+      "滑台起点在左端且与末端限位留有间隙(操作者口径)",
+      "顺时针=向右, 须在**第一次被批准的短移动**里现场核实后才按此方向执行",
+      "软件限位输入仍为 DISABLED_BY_CONFIG, 不得把左侧起点当限位保护",
+      "不新增回零/全程定位功能",
+      "不通过撞两端限位制造堵转",
+      "不手捏旋转轴、不为凑阈值加危险力"
+     ],
+     "still_missing": [
+      "可从非旋转端操作的加载作用点及档位/行程",
+      "电机与滑台的连接方式(装配照片之外可核的紧固状态)"
+     ],
+     "gate": "机械前置门在执行器里生效: 状态不是 PROVIDED 时该场景链在开端口之前就被具名跳过(台账 STAGE_SKIPPED_BY_PREREQUISITE + 汇总 PREREQUISITE_REFUSAL 行), 不扣 motor_run 额度、不发 motor_arm/motor_start —— 复审第 5 项要求的是这个, 不是说明字段",
+     "would_be_used_by": "S8/S10 的 SG/ADC 受控负载激励"
+    },
+    "instrument": {
+     "status": "NOT_PROVIDED",
+     "blocks_motion": false,
+     "asset": "示波器/电流钳(独立证 STEP 到关断, BUG-008)",
+     "asset_state": "继续暂缓(复审本轮口径): 不新增高精度仪器前置, 也不因此卡住起转",
+     "consequence": "停机事实只能登记为软件接口已接受, 不构成物理停机证明"
+    },
+    "assembly_readiness": {
+     "status": "PROVIDED",
+     "blocks_motion": true,
+     "asset": "T8 丝杆套件(标称导程 8 mm)的装配就绪 + 支座/电机能否在不手扶时保持固定",
+     "asset_state": "操作者 2026-11-01 在审核窗口逐条确认: 支座松手保持固定、连接紧固、螺母防转、移动块导向均无问题 => 门放行。此前登记的\"已按照片装配, 紧固、螺母防转及导向尚待确认\"已被这条确认取代(不是我自己推断的)",
+     "provenance": "操作者现场确认(2026-11-01 审核窗口原文): \"用户已在审核窗口明确确认：支座松手保持固定、连接紧固、螺母防转、移动块导向均无问题。按操作者确认把 assembly_readiness 改为 PROVIDED\"。本 Agent 未实测, 只登记为操作者给出的确认",
+     "confirmed_items": [
+      "支座/轴承在松手后保持固定",
+      "丝杆与电机的连接紧固",
+      "螺母防转",
+      "移动块导向"
+     ],
+     "still_open": [
+      "第一次短移动里核实\"顺时针=向右\"(操作者口径: 该核实仍保留)",
+      "累计运动距离尚未按标称导程 8 mm 与实际细分/脉冲参数核算(不属于本轮这四项确认的范围, 仍挂着)"
+     ],
+     "gate": "门仍然挂在**每一个**起转阶段上(S4/S8/S8b/S10/S10b) —— 放行不等于拆门: 状态由操作者确认决定, 任何一项回退成未确认, 该阶段又在开端口之前被具名跳过",
+     "gates_stages": "S4(带起转的学习)、S8/S8b(两场激励)、S10/S10b(锁存态再 arm)",
+     "propagation": "S4 被挡后, requires 里引用本次学习结果的 S5/S6/S7 一并跳过(执行器沿计划申报的 requires 传播拒绝)。本轮 S4 已放行, 因此该传播在交付态不再触发 —— 它作为机制保留, 由定向矩阵 V5 用显式场景继续验证",
+     "would_be_used_by": "S4 巡航学习与 S8/S8b 两场激励的起转前提(也是整个运动路径的前提)",
+     "fallback_status": "此前登记的备选(不通电脱开丝杆、只走空载学习与 IMU 演示)的动因已消除: 支座确认可松手保持固定。备选仍未采纳, 也不需要采纳; 若装配状态回退, 它重新成为可选项, 且同样受本门控制"
+    }
+   },
+   "order": 6,
+   "first_cause_legs": {
+    "applies_when_branch": "trip",
+    "covers": [
+     "trip_row",
+     "source_sample",
+     "profile_identity",
+     "incident_session"
+    ],
+    "on_missing": "EVIDENCE_INCOMPLETE",
+    "never_downgrade": "已经观察到的触发不得写成 NO_TRIGGER(降级由 response_branch 的 TRIP_REWRITTEN_AS_NO_TRIGGER 具名拒绝); 缺腿只叫 EVIDENCE_INCOMPLETE, 既不叫 NO_TRIGGER 也不叫通过",
+    "legs": [
+     {
+      "leg": "trip_rule_and_generation",
+      "step": "trip_window",
+      "regex": "^\\[DIAG\\] REL TRIP r=(?P<trip_rule>\\w+) id=(?P<trip_id>\\d+) rev=(?P<trip_rev>\\d+)",
+      "capture": [
+       "trip_rule",
+       "trip_id",
+       "trip_rev"
+      ],
+      "record_as": [
+       "trip_rule_sg",
+       "trip_id_sg",
+       "trip_rev_sg"
+      ]
+     },
+     {
+      "leg": "trip_value_and_threshold",
+      "step": "trip_window",
+      "regex": "^\\[DIAG\\] REL TRIP val=(?P<trip_val>\\d+) thr=(?P<trip_thr>\\d+)",
+      "capture": [
+       "trip_val",
+       "trip_thr"
+      ],
+      "record_as": [
+       "trip_val_sg",
+       "trip_thr_sg"
+      ]
+     },
+     {
+      "leg": "source_sample",
+      "step": "trip_window",
+      "regex": "^\\[DIAG\\] REL TRIP sg=(?P<trip_sg>\\d+) cur=(?P<trip_cur>\\d+) imu=(?P<trip_imu>\\d+)",
+      "capture": [
+       "trip_sg",
+       "trip_cur",
+       "trip_imu"
+      ],
+      "record_as": [
+       "trip_sg_sg",
+       "trip_cur_sg",
+       "trip_imu_sg"
+      ],
+      "why": "源样本值与阈值/持续同批出现, 才谈得上是哪一路越过界; 只有规则名不够"
+     },
+     {
+      "leg": "profile_identity",
+      "step": "prof_at_arm",
+      "regex": "^\\[DIAG\\] profile id=(?P<pid>\\d+) rev=(?P<prev>\\d+) abi=(?P<pabi>\\d+) flg=(?P<pflags>[0-9A-Fa-f]{4})",
+      "capture": [
+       "pid",
+       "prev"
+      ],
+      "must_equal_recorded": {
+       "pid": "id",
+       "prev": "rev"
+      },
+      "record_as": [
+       "pid_sg",
+       "prev_sg"
+      ],
+      "why": "本会话看到的 profile id/rev 必须等于 S5 实际提交的那一代(recorded.id/rev), 否则触发用的不是本轮发布的基线"
+     },
+     {
+      "leg": "trip_row_ties_to_profile",
+      "equal_pairs": [
+       [
+        "trip_id",
+        "pid"
+       ],
+       [
+        "trip_rev",
+        "prev"
+       ]
+      ],
+      "why": "TRIP 行自带的 id/rev 与本会话 show 出来的 profile 同一代(同次关联, 不跨会话拼)"
+     },
+     {
+      "leg": "incident_session_baseline",
+      "recorded_keys": [
+       "bb_session_sg",
+       "flash_used_before_sg"
+      ],
+      "why": "事故前的黑匣子 session 与日志槽位基线必须已记录; 增大与新帧读回由取证会话判"
+     }
+    ],
+    "basis": [
+     "停后帧的 event = FAULT_MULTI_SOURCE = 5u(A/safety_state.h:46, 由 A/safety_state.c:309 的 ss_code_for_event() 从 EVT_MULTI_FAULT 映射; 相对保护只在 A/diag_relative.c:725 投这一个事件)。9=FAULT_SOFT(A/safety_state.h:50)只由 EVT_SOFT_FAULT 产生, 而 safety_trip 在本场景 forbidden_commands 里 => 钉 9 会把一次成功的保护判成 NO_FRAME_WITH(C-02, 来自 C-01 交付回执 §4 待办 1)"
+    ]
+   },
+   "prerequisite_gates": [
+    "load_means",
+    "assembly_readiness"
+   ],
+   "per_session_baseline_note": "本场事故基线用后缀 _sg 独立记录(bb_session_sg / bb_written_sg / flash_used_before_sg), 与另一场不共用键; 分支也按场存(执行器 scenario_branches) => 一场触发另一场未触发不是矛盾",
+   "spinup_gate_note": "本阶段会发 motor_arm+motor_start, 所以在**开端口之前**检查 load_means+assembly_readiness; 任一状态不是 PROVIDED 就具名跳过并记 STAGE_SKIPPED_BY_PREREQUISITE(不扣额度、不发命令)",
+   "target_channel": {
+    "scenario": "SG_ADC_controlled_load",
+    "channel": "SG2/ADC 电流相对异常",
+    "rule_key": "trip_rule_sg",
+    "rule_names": [
+     "REL_SG_SEVERE",
+     "REL_ADC_SEVERE",
+     "REL_FUSED_SEVERE"
+    ],
+    "source_nonzero_keys": [
+     "trip_sg_sg",
+     "trip_cur_sg"
+    ],
+    "known_rule_names": [
+     "REL_ADC_SEVERE",
+     "REL_COVERAGE_LOST",
+     "REL_FUSED_SEVERE",
+     "REL_IMPACT",
+     "REL_OUT_OF_WINDOW",
+     "REL_SENSOR_UNAVAILABLE",
+     "REL_SG_SEVERE"
+    ],
+    "positive_control_fixture": "__watch__(r=REL_SG_SEVERE, sg/cur 非零)",
+    "meta_negative_fixture": "把本场的观察窗键换成 __watch__@imu(REL_IMPACT) => OTHER_SOURCE_TRIGGERED",
+    "other_source_handling": "规则名不是本场目标通道 => 登记 OTHER_SOURCE_TRIGGERED(TARGET_CHANNEL_UNPROVEN): 保护确实动作了(照常撤能、照常取证、照常用 event=5 帧读回), 但**这次触发不能算本通道的功能验证**, 也不计入 core_protection_verified",
+    "why_source_nonzero": "sg=/cur= 是 SG/ADC 那一路的源样本: 任一列为 0 就说明越界判定没有本通道读数支撑",
+    "basis": "规则名来自 A/diag_relative.h 的 rel_reason_t 与 A/diag_relative.c 的 verdict_name()(两头不一致时 rel_rule_names() 报 REL_RULE_NAMES_SOURCE_MISMATCH); 三行打印形状来自 A/diagnosis.c:469-475"
+   }
+  },
+  {
+   "id": "S9",
+   "title": "事故取证会话(仅 trip): 锁存视图 + 按实际新增 session 的黑匣子计数增大 + flash_dump 读回新 session 的实际帧 + 锁存态仍可证得禁能",
+   "kind": "serial_session",
+   "profiles": [
+    "trip"
+   ],
+   "requires": [
+    "S8_branch_resolved"
+   ],
+   "total_deadline_seconds": 60,
+   "halt_after": false,
+   "forbidden_commands": [
+    "config_load",
+    "config_default",
+    "blackbox_clear",
+    "flash_logclear",
+    "motor_start",
+    "motor_arm",
+    "pwm_test",
+    "safety_trip"
+   ],
+   "manual_answers": {},
+   "compare_recorded_gt": [
+    {
+     "step": "bb_after",
+     "keys": [
+      "bb_session_sg",
+      "bb_written_sg"
+     ],
+     "regex": "^\\[BB\\] state=(?P<bb_state_sg>\\d+) session=(?P<bb_session_sg>\\d+) written=(?P<bb_written_sg>\\d+) last_err=(?P<bb_err_sg>\\d+) health=(?P<bb_health_sg>\\w+)$",
+     "why": "M5 口径: 新日志按**本轮实际新增的 session/写入帧**取回(基线在 S8 的 bb_before 记录), 增大不成立就具名停止(SESSION_NOT_INCREASED), 不接受只查旧 logstat 计数"
+    }
+   ],
+   "steps": [
+    {
+     "cmd": "diag_status",
+     "as": "latch",
+     "key": "diag_status@latch",
+     "seconds": 3,
+     "expect_contains": [
+      "[DIAG] rel snap=",
+      "[DIAG] rel LATCH r=",
+      "rearm"
+     ]
+    },
+    {
+     "cmd": "blackbox_status",
+     "as": "bb_after",
+     "key": "blackbox_status@after",
+     "seconds": 3,
+     "expect_contains": [
+      "[BB] flash:"
+     ]
+    },
+    {
+     "cmd": "flash_logstat",
+     "as": "newlog",
+     "seconds": 6,
+     "expect_contains": [
+      "slots=",
+      "queued="
+     ]
+    },
+    {
+     "cmd": "motor_status",
+     "as": "latched_disable_proof",
+     "key": "motor_status@latched",
+     "seconds": 3,
+     "expect_profile": "AT_REST",
+     "note": "故障锁存后的禁能同样必须证得(name=FAULT 允许, 见 cleaning_and_terminal.why_not_idle); 这一步只用同一份响应的六个合同字段判。"
+    },
+    {
+     "cmd": "flash_dump",
+     "as": "frames",
+     "key": "flash_dump 0 8",
+     "seconds": 8,
+     "expect_contains": [
+      "slot,seq,session,time_ms,event,valid,sg,current_ma,ax_mg,ay_mg,az_mg,step_hz,vibration_mg,flags"
+     ],
+     "note": "Runtime first/count select the final at most eight appended slots from pre-trigger used_slots and current committed used_slots; never hardcode slot 0. key is a stub row selector only.",
+     "new_log_window": {
+      "before_key": "flash_used_before_sg",
+      "stats_step": "newlog",
+      "max_frames": 8
+     }
+    }
+   ],
+   "require_frames": [
+    {
+     "step": "frames",
+     "session_key": "bb_session_sg",
+     "min_frames": 1,
+     "must_include": [
+      {
+       "event": "5",
+       "step_hz": "0"
+      }
+     ],
+     "why": "计数增大只是\"本轮确实多写了一笔\"的身份前置(S8 基线 -> S9 严格增大)。取证成立的条件是从**本次新增且提交完整的 session** 读回到实际帧, 并且含停后帧(event=9 且 step_hz=0); 批内出现 slot empty/error 或 [FLASH] flash_dump ERROR 就是产品读槽时 CRC/commit 没过 => FLASH_FRAMES_NOT_RECOVERED, 一律报\"取证未完成\", 不许称新日志读回通过(审核 §2D 第 4 条)。",
+     "event_basis": "停后帧的 event = FAULT_MULTI_SOURCE = 5u(A/safety_state.h:46, 由 A/safety_state.c:309 的 ss_code_for_event() 从 EVT_MULTI_FAULT 映射; 相对保护只在 A/diag_relative.c:725 投这一个事件)。9=FAULT_SOFT(A/safety_state.h:50)只由 EVT_SOFT_FAULT 产生, 而 safety_trip 在本场景 forbidden_commands 里 => 钉 9 会把一次成功的保护判成 NO_FRAME_WITH(C-02, 来自 C-01 交付回执 §4 待办 1)"
+    }
+   ],
+   "order": 7,
+   "scenario": "SG_ADC_controlled_load",
+   "first_cause_legs": {
+    "applies_when_branch": "trip",
+    "covers": [
+     "latch_row",
+     "source_sample",
+     "profile_identity",
+     "incident_session"
+    ],
+    "on_missing": "EVIDENCE_INCOMPLETE",
+    "never_downgrade": "同上: 缺腿 = EVIDENCE_INCOMPLETE, 不是 NO_TRIGGER, 也不是通过。",
+    "legs": [
+     {
+      "leg": "latch_rule_and_generation",
+      "step": "latch",
+      "regex": "^\\[DIAG\\] rel LATCH r=(?P<latch_rule>\\w+) id=(?P<latch_id>\\d+) rev=(?P<latch_rev>\\d+)",
+      "capture": [
+       "latch_rule",
+       "latch_id",
+       "latch_rev"
+      ],
+      "must_equal_recorded": {
+       "latch_rule": "trip_rule_sg",
+       "latch_id": "trip_id_sg",
+       "latch_rev": "trip_rev_sg"
+      },
+      "why": "锁存行的规则/代际必须等于本场观察窗里那次 TRIP(不能拿另一场或上一轮的行拼)"
+     },
+     {
+      "leg": "latch_source_sample",
+      "step": "latch",
+      "regex": "^\\[DIAG\\] rel LATCH sg=(?P<lsg>\\d+) cur=(?P<lcur>\\d+) imu=(?P<limu>\\d+)",
+      "capture": [
+       "lsg",
+       "lcur",
+       "limu"
+      ],
+      "why": "锁存态回读的源样本通道值; 与本场 TRIP 的源样本同路才算同一事故"
+     },
+     {
+      "leg": "incident_session_baseline",
+      "recorded_keys": [
+       "bb_session_sg"
+      ],
+      "why": "本场事故基线 session 必须已在(增大与实际新帧读回由 compare_recorded_gt / require_frames 判)"
+     }
+    ]
+   }
+  },
+  {
+   "id": "S10",
+   "title": "锁存态再武装演示(仅 trip): 静止且已锁存时 motor_arm 必须被具名拒绝, 会话到此结束, 之后没有任何危险步骤",
+   "kind": "serial_session",
+   "profiles": [
+    "trip"
+   ],
+   "requires": [
+    "S9"
+   ],
+   "total_deadline_seconds": 60,
+   "halt_after": false,
+   "expected_terminal": [
+    "REFUSED"
+   ],
+   "forbidden_commands": [
+    "config_load",
+    "config_default",
+    "blackbox_clear",
+    "flash_logclear",
+    "motor_start",
+    "config_save",
+    "pwm_test",
+    "diag_profile commit"
+   ],
+   "manual_answers": {},
+   "steps": [
+    {
+     "cmd": "motor_status",
+     "as": "still_latched",
+     "key": "motor_status@latched",
+     "seconds": 3,
+     "expect_profile": "AT_REST"
+    },
+    {
+     "cmd": "motor_arm",
+     "as": "arm_refused",
+     "seconds": 3,
+     "allowed_outcomes": [
+      "[MOT] arm REFUSED (gates failing)"
+     ],
+     "note": "恢复后**不自动 start**: 本阶段的目的就是看见拒绝并在拒绝处结束(arm 尝试同样建立清理义务 => 清理仍会发 stop/disarm/status)。故意不给 fault_reset/selftest 步骤: R2-C3 规定具名拒绝之后不得继续 commit/save/start/arm/fault_reset, 该规则本轮没有放宽。",
+     "key": "motor_arm@refused"
+    }
+   ],
+   "order": 8,
+   "scenario": "SG_ADC_controlled_load",
+   "prerequisite_gates": [
+    "load_means",
+    "assembly_readiness"
+   ],
+   "chain_note": "锁存态再 arm 的演示仍属于 SG/ADC 那场: 它依赖**那场**触发后的锁存态, 所以排在本场取证之后、下一场开始之前",
+   "prerequisites": {
+    "assembly_readiness": {
+     "status": "PROVIDED",
+     "blocks_motion": true,
+     "asset": "T8 丝杆套件(标称导程 8 mm)的装配就绪 + 支座/电机能否在不手扶时保持固定",
+     "asset_state": "操作者 2026-11-01 在审核窗口逐条确认: 支座松手保持固定、连接紧固、螺母防转、移动块导向均无问题 => 门放行。此前登记的\"已按照片装配, 紧固、螺母防转及导向尚待确认\"已被这条确认取代(不是我自己推断的)",
+     "provenance": "操作者现场确认(2026-11-01 审核窗口原文): \"用户已在审核窗口明确确认：支座松手保持固定、连接紧固、螺母防转、移动块导向均无问题。按操作者确认把 assembly_readiness 改为 PROVIDED\"。本 Agent 未实测, 只登记为操作者给出的确认",
+     "confirmed_items": [
+      "支座/轴承在松手后保持固定",
+      "丝杆与电机的连接紧固",
+      "螺母防转",
+      "移动块导向"
+     ],
+     "still_open": [
+      "第一次短移动里核实\"顺时针=向右\"(操作者口径: 该核实仍保留)",
+      "累计运动距离尚未按标称导程 8 mm 与实际细分/脉冲参数核算(不属于本轮这四项确认的范围, 仍挂着)"
+     ],
+     "gate": "门仍然挂在**每一个**起转阶段上(S4/S8/S8b/S10/S10b) —— 放行不等于拆门: 状态由操作者确认决定, 任何一项回退成未确认, 该阶段又在开端口之前被具名跳过",
+     "gates_stages": "S4(带起转的学习)、S8/S8b(两场激励)、S10/S10b(锁存态再 arm)",
+     "propagation": "S4 被挡后, requires 里引用本次学习结果的 S5/S6/S7 一并跳过(执行器沿计划申报的 requires 传播拒绝)。本轮 S4 已放行, 因此该传播在交付态不再触发 —— 它作为机制保留, 由定向矩阵 V5 用显式场景继续验证",
+     "would_be_used_by": "S4 巡航学习与 S8/S8b 两场激励的起转前提(也是整个运动路径的前提)",
+     "fallback_status": "此前登记的备选(不通电脱开丝杆、只走空载学习与 IMU 演示)的动因已消除: 支座确认可松手保持固定。备选仍未采纳, 也不需要采纳; 若装配状态回退, 它重新成为可选项, 且同样受本门控制"
+    }
+   },
+   "spinup_gate_note": "本阶段会发 motor_arm, 所以在**开端口之前**检查 load_means+assembly_readiness; 任一状态不是 PROVIDED 就具名跳过并记 STAGE_SKIPPED_BY_PREREQUISITE(不扣额度、不发命令)"
+  },
+  {
+   "id": "S11",
+   "title": "人工恢复会话(仅 trip): fault_reset 进 MANUAL_CLEAR + 重跑 system_selftest + 就绪复核; 本会话禁止 motor_start(恢复后不自动起转)",
+   "kind": "serial_session",
+   "profiles": [
+    "trip"
+   ],
+   "requires": [
+    "S10_expected_refusal_recorded"
+   ],
+   "total_deadline_seconds": 90,
+   "halt_after": false,
+   "forbidden_commands": [
+    "config_load",
+    "config_default",
+    "blackbox_clear",
+    "flash_logclear",
+    "motor_start",
+    "motor_arm",
+    "config_save",
+    "pwm_test",
+    "diag_profile commit"
+   ],
+   "manual_answers": {
+    "operator_confirms_manual_recovery": "yes"
+   },
+   "steps": [
+    {
+     "manual": "operator_confirms_manual_recovery",
+     "as": "gate_recovery",
+     "note": "人工恢复本身就是操作者动作: 真传输下必须由人确认(非 stub 绝不读夹具)。"
+    },
+    {
+     "cmd": "safety_status",
+     "as": "latched_before_clear",
+     "seconds": 3,
+     "expect_contains": [
+      "[SAFETY] request="
+     ]
+    },
+    {
+     "cmd": "fault_reset",
+     "as": "manual_clear",
+     "seconds": 8,
+     "expect_contains": [
+      "[SS] ==> MANUAL_CLEAR"
+     ],
+     "note": "C3 的\"人工恢复\"支: 期望是进 MANUAL_CLEAR(重跑自检进 READY 后仍需**重新 arm**), 不是自动恢复运行。该行形状取自产品字面量, 见 rows.json 的 _provenance。"
+    },
+    {
+     "cmd": "system_selftest",
+     "as": "selftest_after",
+     "seconds": 12,
+     "expect_contains": [
+      "[SELFTEST]"
+     ]
+    },
+    {
+     "cmd": "safety_status",
+     "as": "ready_after",
+     "seconds": 3,
+     "expect_contains": [
+      "[SAFETY] request="
+     ]
+    },
+    {
+     "cmd": "motor_status",
+     "as": "still_disabled_after_recovery",
+     "key": "motor_status",
+     "seconds": 3,
+     "expect_profile": "AT_REST",
+     "note": "恢复会话结束时仍然必须证得到禁能 —— 与'恢复后不自动 start'是同一件事的两面。"
+    }
+   ],
+   "order": 9,
+   "scenario": "SG_ADC_controlled_load",
+   "prerequisite_gates": [],
+   "chain_note": "人工恢复只处理本场的锁存, 恢复完即结束该链",
+   "no_spinup_note": "恢复会话内禁止 motor_start(在 forbidden_commands 里), 因此不需要起转门"
+  },
+  {
+   "id": "S8b",
+   "title": "IMU 非破坏激励会话(独立一次起转或静止激励): 静止证明 -> arm -> target -> start(硬截止) -> 运行复核 -> **轻敲/晃动壳体**(操作者手工, 非破坏) -> 有界观察窗 -> 停机并证锁存",
+   "kind": "serial_session",
+   "requires": [
+    "S7_restore_equal"
+   ],
+   "total_deadline_seconds": 90,
+   "halt_after": false,
+   "forbidden_commands": [
+    "config_load",
+    "config_default",
+    "blackbox_clear",
+    "flash_logclear",
+    "pwm_test"
+   ],
+   "manual_answers": {
+    "operator_ready_for_armed_relative_run": "yes",
+    "operator_confirms_non_destructive_imu_excitation_ready": "yes"
+   },
+   "record_from": [
+    {
+     "step": "bb_before",
+     "regex": "^\\[BB\\] state=(?P<bb_state_imu>\\d+) session=(?P<bb_session_imu>\\d+) written=(?P<bb_written_imu>\\d+) last_err=(?P<bb_err_imu>\\d+) health=(?P<bb_health_imu>\\w+)$",
+     "as": [
+      "bb_session_imu",
+      "bb_written_imu"
+     ]
+    },
+    {
+     "step": "log_before",
+     "regex": "^slots=(?P<flash_used_before_imu>[0-9]+)/(?P<flash_capacity_imu>[0-9]+) valid=[0-9]+ bad=[0-9]+$",
+     "as": [
+      "flash_used_before_imu",
+      "flash_capacity_imu"
+     ]
+    }
+   ],
+   "steps": [
+    {
+     "manual": "operator_confirms_non_destructive_imu_excitation_ready",
+     "as": "gate_impact_excitation",
+     "note": "IMU 激励=手工轻敲(非破坏), 由操作者施加并确认时刻; 同样在 arm/start 之前。"
+    },
+    {
+     "manual": "operator_ready_for_armed_relative_run",
+     "as": "gate_armed"
+    },
+    {
+     "cmd": "diag_status",
+     "as": "diag_before_arm",
+     "seconds": 3,
+     "expect_contains": [
+      "[DIAG] rel cov="
+     ]
+    },
+    {
+     "cmd": "diag_profile show",
+     "as": "prof_at_arm",
+     "seconds": 3,
+     "expect_contains": [
+      "[DIAG] profile id="
+     ],
+     "why": "首因的 profile 腿必须来自**同一会话**: 现场若只在 S5 看过, 触发那一代基线就无法与本会话对齐"
+    },
+    {
+     "cmd": "blackbox_status",
+     "as": "bb_before",
+     "seconds": 3,
+     "expect_contains": [
+      "[BB] state="
+     ]
+    },
+    {
+     "cmd": "flash_logstat",
+     "as": "log_before",
+     "key": "flash_logstat@before",
+     "seconds": 3,
+     "min_free_log_slots": 300,
+     "expect_contains": [
+      "slots=",
+      "completed="
+     ]
+    },
+    {
+     "cmd": "motor_status",
+     "as": "rest_before_arm",
+     "seconds": 3,
+     "expect_profile": "AT_REST"
+    },
+    {
+     "cmd": "diag_mode relative CONFIRM_EXPERIMENTAL",
+     "as": "arm_rel",
+     "seconds": 3,
+     "key": "diag_mode relative CONFIRM_EXPERIMENTAL",
+     "expect_contains": [
+      "[DIAG] mode=RELATIVE_ACTIVE"
+     ]
+    },
+    {
+     "cmd": "motor_arm",
+     "as": "arm",
+     "seconds": 4,
+     "expect_contains": [
+      "[MOT] ARMED (drv_en request=HIGH"
+     ]
+    },
+    {
+     "cmd": "motor_target 100",
+     "as": "target",
+     "seconds": 3,
+     "expect_values": [
+      {
+       "row": "^\\[MOT\\] set target (?P<hz>\\d+) Hz: (?P<res>\\w+)$",
+       "must": {
+        "hz": "100",
+        "res": "OK"
+       }
+      }
+     ]
+    },
+    {
+     "cmd": "motor_start",
+     "as": "start",
+     "seconds": 3,
+     "quota": {
+      "name": "motor_run",
+      "n": 1
+     },
+     "expect_absent": [
+      "REFUSED",
+      "FAILED",
+      "not supported"
+     ]
+    },
+    {
+     "cmd": "motor_status",
+     "as": "running_proof",
+     "key": "motor_status@running",
+     "seconds": 2,
+     "expect_profile": "RUNNING",
+     "expect_values": [
+      {
+       "row": "^\\[MOT\\] cur_hz=(?P<cur>\\d+) tgt_hz=(?P<tgt>\\d+) accel=(?P<ac>\\d+) decel=(?P<de>\\d+) dir=(?P<dir>\\d+)$",
+       "must": {
+        "cur": "100",
+        "tgt": "100",
+        "dir": "0"
+       }
+      }
+     ],
+     "poll": {
+      "until_seconds": 4,
+      "interval_seconds": 0.5,
+      "retry_codes": [
+       "PROFILE_NOT_RUNNING",
+       "FIELD_VALUE_MISMATCH"
+      ],
+      "why": "起转后**有限轮询**直到证得 state=MOTOR_CRUISE(2) 且 cur/tgt 都落在本次窗口; ACCEL 不是异常, 可以在同一预算内继续等, 到期或不一致就撤能(审核 §2D 第 3 条)。一条立即查询、或只看 tgt>0, 都不算稳定巡航。",
+      "retry_basis": "重试的**充分条件**是数值状态还在 ACCEL/DECEL(ramping_state 从这一次的原字节里重读), 并且失败码在申报集合内; armed=1 而 state=0 这种矛盾字段不满足条件, 会立刻具名拒绝。"
+     },
+     "poll_sequence": [
+      "motor_status@accel",
+      "motor_status@running"
+     ],
+     "poll_sequence_note": "第 1 次读到 MOTOR_ACCEL(爬坡中, 不是异常), 之后读到 MOTOR_CRUISE(2)。序列来自行表里申报过的两组, 执行器不许临时编响应。",
+     "status_lines_allow": [
+      "^\\[MOT\\] arm_gate_mask=0x[0-9A-Fa-f]+ REFUSED$"
+     ],
+     "status_lines_allow_why": "只在断言 RUNNING 的步骤上放行这一行: 运行中安全状态机不在 READY => 门禁披露必然是 REFUSED(0x2=MOT_GATE_NOT_READY)。armed/health/cur_hz/tgt_hz/dir 的硬字段判据一个没删;静止态的 motor_status 不放行(那里 mask 非 0 是真故障, 必须停)"
+    },
+    {
+     "cmd": "__watch__",
+     "as": "trip_window",
+     "key": "__watch__@imu",
+     "seconds": 5,
+     "no_trigger_is_observation": true,
+     "trigger_needles": [
+      "[DIAG] REL TRIP r="
+     ],
+     "watch_profile_note": "档案 trip => rows.json 的 __watch__.trip(真触发形状); 档案 no_trigger/healthy => 空窗(到时未触发)。观察窗把剩余预算跑到截止点是**故意的**: 事故链步骤绝不挤在同一个运动会话里 —— 运动会话只做运动, 事故取证与锁存后的复核各走自己的静止会话(S9/S10), 否则它们必然撞上 MOTION_BUDGET_EXHAUSTED。",
+     "channel_key_note": "本场的观察窗夹具是 __watch__@imu: 规则名与源样本列必须属于**本场目标通道**, 否则分类只登记 OTHER_SOURCE_TRIGGERED(目标通道未证)"
+    }
+   ],
+   "profile_note": {
+    "healthy_and_no_trigger": "观察窗到时无触发 => OBSERVATION_NO_TRIGGER(成功终态) + stop/disarm/证禁能; 不跑任何假故障恢复步骤(S9/S10 用 profiles=[trip] 整体不参与)。",
+    "trip": "看见 [DIAG] REL TRIP => 本会话按预算结束后清理并证禁能; 事故取证在 S9、锁存态 arm 拒绝在 S10。两支持平结论都只到'离线控制流成立', 不写设备 PASS。"
+   },
+   "record_note": "S8 只**记录**事故前的黑匣子基线(bb_before 的 session/written); 增大与否的比较在 S9(bb_after)做 —— 取证会话与运动会话分开, 才不会被 MOTION_BUDGET_EXHAUSTED 挡掉。",
+   "motion_cap_seconds": 5,
+   "motion_cap_note": "本阶段起转硬截止 = 5 s(学习 15 / 保护观察 5 的分工, 见 quota_note_r3_closeout)。",
+   "decides_response_branch": true,
+   "decides_response_branch_note": "真实执行(transport=real)下事故支线由**本阶段的实际响应**决定: 看见申报过的 trigger_needles => trip, 把 S9/S10/S11 排进期望序列; 到时未触发 => no_trigger, 事故支线不参与(既不算已执行也不算 NOT_RUN)。学习会话(S4)的未触发不参与判定 —— 它不是保护观察。",
+   "scenario": "IMU_non_destructive_excitation",
+   "first_cause_contract": {
+    "required": "同一次运行里四件必须咬合(执行器按 first_cause_legs 判, 不是说明字段): ① 本会话观察窗内的 [DIAG] REL TRIP r=/id=/rev= 行; ② 同批的 val=/thr= 与 sg=/cur=/imu=(源样本); ③ 本会话 diag_profile show 的 id/rev, 且等于 S5 实际提交的 recorded.id/rev; ④ 本场事故基线 bb_session_imu / flash_used_before_imu 已记录, 并在取证会话严格增大 + 读回到该 session 的实际停后帧(event=5, step_hz=0)",
+    "prohibited": [
+     "用 safety_trip 注入代替真实越界(它在所有场景的 forbidden_commands 里)",
+     "把缺腿的取证写成通过, 或写成 NO_TRIGGER",
+     "跨会话/跨轮拼字段(TRIP 行与 profile 行必须来自同一场同一会话)"
+    ],
+    "if_legs_missing": "EVIDENCE_INCOMPLETE: 事件观察到了, 但谁引起这次停机还没证。阶段不算成功, 而必要撤能照常先完成(cleanup 在 exec_session 的 finally 里, 早于本判定)",
+    "if_not_observed": "观察窗到时未触发 => OBSERVATION_NO_TRIGGER(成功终态), 该链的取证/拒绝/恢复阶段按分支跳过并具名 STAGE_SKIPPED_BY_PROFILE; 这不等于保护已验证",
+    "operator_gate": "加载手段属机械前置: 见 mechanical_prerequisites.load_means。NOT_PROVIDED 时整条链在开端口之前就被拒绝, 人工门的答案不能绕过它",
+    "scenario": "IMU_non_destructive_excitation"
+   },
+   "prerequisites": {
+    "mounting": {
+     "status": "PROVEN",
+     "what": "IMU 在位: 启动自检 [SS] [OK] IMU 与 imu_id 读取(往轮已证)"
+    },
+    "excitation_means": {
+     "status": "OPERATOR_MANUAL",
+     "what": "非破坏激励只需手工敲击, 不需要额外机械件; 但敲击强度不可控 => 本会话只主张'是否触发', 不主张阈值标定"
+    },
+    "bracket_rigidity": {
+     "status": "NOT_PROVIDED",
+     "blocks_motion": false,
+     "asset": "IMU 支架刚度(实际振动传递路径)",
+     "consequence": "IMU 链只能观察是否触发, 不做阈值标定; 结论上限是本次未证伪"
+    },
+    "assembly_readiness": {
+     "status": "PROVIDED",
+     "blocks_motion": true,
+     "asset": "T8 丝杆套件(标称导程 8 mm)的装配就绪 + 支座/电机能否在不手扶时保持固定",
+     "asset_state": "操作者 2026-11-01 在审核窗口逐条确认: 支座松手保持固定、连接紧固、螺母防转、移动块导向均无问题 => 门放行。此前登记的\"已按照片装配, 紧固、螺母防转及导向尚待确认\"已被这条确认取代(不是我自己推断的)",
+     "provenance": "操作者现场确认(2026-11-01 审核窗口原文): \"用户已在审核窗口明确确认：支座松手保持固定、连接紧固、螺母防转、移动块导向均无问题。按操作者确认把 assembly_readiness 改为 PROVIDED\"。本 Agent 未实测, 只登记为操作者给出的确认",
+     "confirmed_items": [
+      "支座/轴承在松手后保持固定",
+      "丝杆与电机的连接紧固",
+      "螺母防转",
+      "移动块导向"
+     ],
+     "still_open": [
+      "第一次短移动里核实\"顺时针=向右\"(操作者口径: 该核实仍保留)",
+      "累计运动距离尚未按标称导程 8 mm 与实际细分/脉冲参数核算(不属于本轮这四项确认的范围, 仍挂着)"
+     ],
+     "gate": "门仍然挂在**每一个**起转阶段上(S4/S8/S8b/S10/S10b) —— 放行不等于拆门: 状态由操作者确认决定, 任何一项回退成未确认, 该阶段又在开端口之前被具名跳过",
+     "gates_stages": "S4(带起转的学习)、S8/S8b(两场激励)、S10/S10b(锁存态再 arm)",
+     "propagation": "S4 被挡后, requires 里引用本次学习结果的 S5/S6/S7 一并跳过(执行器沿计划申报的 requires 传播拒绝)。本轮 S4 已放行, 因此该传播在交付态不再触发 —— 它作为机制保留, 由定向矩阵 V5 用显式场景继续验证",
+     "would_be_used_by": "S4 巡航学习与 S8/S8b 两场激励的起转前提(也是整个运动路径的前提)",
+     "fallback_status": "此前登记的备选(不通电脱开丝杆、只走空载学习与 IMU 演示)的动因已消除: 支座确认可松手保持固定。备选仍未采纳, 也不需要采纳; 若装配状态回退, 它重新成为可选项, 且同样受本门控制"
+    },
+    "imu_mounting": {
+     "status": "MOUNTED_TAPE_BY_OPERATOR_RIGIDITY_UNMEASURED",
+     "blocks_motion": false,
+     "asset": "ADXL345(在扩展板上)的实际固定方式",
+     "asset_state": "已由操作者确认: 扩展板用绝缘胶带固定在电机上, 电机固定丝杆(2026-11-01)。此前登记的缺失项\"IMU 实际固定方式\"已闭合",
+     "consequence": "胶带固定可以按采样结果判定演示是否可行(操作者口径, 厂商提示 PCB 振动可能影响读数), 但**不做精确振动标定**; 结论上限是本次未证伪, 不是刚度已验证",
+     "not_claimed": [
+      "振动传递路径已知",
+      "IMU 阈值可用",
+      "胶带装配等价于可靠支架"
+     ]
+    }
+   },
+   "order": 10,
+   "requires_before_this_round": [
+    "S7_restore_equal(与 S8 并列, 不是接在 S8 之后)"
+   ],
+   "first_cause_legs": {
+    "applies_when_branch": "trip",
+    "covers": [
+     "trip_row",
+     "source_sample",
+     "profile_identity",
+     "incident_session"
+    ],
+    "on_missing": "EVIDENCE_INCOMPLETE",
+    "never_downgrade": "已经观察到的触发不得写成 NO_TRIGGER(降级由 response_branch 的 TRIP_REWRITTEN_AS_NO_TRIGGER 具名拒绝); 缺腿只叫 EVIDENCE_INCOMPLETE, 既不叫 NO_TRIGGER 也不叫通过",
+    "legs": [
+     {
+      "leg": "trip_rule_and_generation",
+      "step": "trip_window",
+      "regex": "^\\[DIAG\\] REL TRIP r=(?P<trip_rule>\\w+) id=(?P<trip_id>\\d+) rev=(?P<trip_rev>\\d+)",
+      "capture": [
+       "trip_rule",
+       "trip_id",
+       "trip_rev"
+      ],
+      "record_as": [
+       "trip_rule_imu",
+       "trip_id_imu",
+       "trip_rev_imu"
+      ]
+     },
+     {
+      "leg": "trip_value_and_threshold",
+      "step": "trip_window",
+      "regex": "^\\[DIAG\\] REL TRIP val=(?P<trip_val>\\d+) thr=(?P<trip_thr>\\d+)",
+      "capture": [
+       "trip_val",
+       "trip_thr"
+      ],
+      "record_as": [
+       "trip_val_imu",
+       "trip_thr_imu"
+      ]
+     },
+     {
+      "leg": "source_sample",
+      "step": "trip_window",
+      "regex": "^\\[DIAG\\] REL TRIP sg=(?P<trip_sg>\\d+) cur=(?P<trip_cur>\\d+) imu=(?P<trip_imu>\\d+)",
+      "capture": [
+       "trip_sg",
+       "trip_cur",
+       "trip_imu"
+      ],
+      "record_as": [
+       "trip_sg_imu",
+       "trip_cur_imu",
+       "trip_imu_imu"
+      ],
+      "why": "源样本值与阈值/持续同批出现, 才谈得上是哪一路越过界; 只有规则名不够"
+     },
+     {
+      "leg": "profile_identity",
+      "step": "prof_at_arm",
+      "regex": "^\\[DIAG\\] profile id=(?P<pid>\\d+) rev=(?P<prev>\\d+) abi=(?P<pabi>\\d+) flg=(?P<pflags>[0-9A-Fa-f]{4})",
+      "capture": [
+       "pid",
+       "prev"
+      ],
+      "must_equal_recorded": {
+       "pid": "id",
+       "prev": "rev"
+      },
+      "record_as": [
+       "pid_imu",
+       "prev_imu"
+      ],
+      "why": "本会话看到的 profile id/rev 必须等于 S5 实际提交的那一代(recorded.id/rev), 否则触发用的不是本轮发布的基线"
+     },
+     {
+      "leg": "trip_row_ties_to_profile",
+      "equal_pairs": [
+       [
+        "trip_id",
+        "pid"
+       ],
+       [
+        "trip_rev",
+        "prev"
+       ]
+      ],
+      "why": "TRIP 行自带的 id/rev 与本会话 show 出来的 profile 同一代(同次关联, 不跨会话拼)"
+     },
+     {
+      "leg": "incident_session_baseline",
+      "recorded_keys": [
+       "bb_session_imu",
+       "flash_used_before_imu"
+      ],
+      "why": "事故前的黑匣子 session 与日志槽位基线必须已记录; 增大与新帧读回由取证会话判"
+     }
+    ],
+    "basis": [
+     "停后帧的 event = FAULT_MULTI_SOURCE = 5u(A/safety_state.h:46, 由 A/safety_state.c:309 的 ss_code_for_event() 从 EVT_MULTI_FAULT 映射; 相对保护只在 A/diag_relative.c:725 投这一个事件)。9=FAULT_SOFT(A/safety_state.h:50)只由 EVT_SOFT_FAULT 产生, 而 safety_trip 在本场景 forbidden_commands 里 => 钉 9 会把一次成功的保护判成 NO_FRAME_WITH(C-02, 来自 C-01 交付回执 §4 待办 1)"
+    ]
+   },
+   "prerequisite_gates": [
+    "assembly_readiness"
+   ],
+   "per_session_baseline_note": "本场事故基线用后缀 _imu 独立记录(bb_session_imu / bb_written_imu / flash_used_before_imu), 与另一场不共用键; 分支也按场存(执行器 scenario_branches) => 一场触发另一场未触发不是矛盾",
+   "spinup_gate_note": "本阶段会发 motor_arm+motor_start, 所以在**开端口之前**检查 assembly_readiness; 任一状态不是 PROVIDED 就具名跳过并记 STAGE_SKIPPED_BY_PREREQUISITE(不扣额度、不发命令)",
+   "target_channel": {
+    "scenario": "IMU_non_destructive_excitation",
+    "channel": "ADXL345 冲击/振动相对异常(IMU)",
+    "rule_key": "trip_rule_imu",
+    "rule_names": [
+     "REL_IMPACT"
+    ],
+    "source_nonzero_keys": [
+     "trip_imu_imu"
+    ],
+    "known_rule_names": [
+     "REL_ADC_SEVERE",
+     "REL_COVERAGE_LOST",
+     "REL_FUSED_SEVERE",
+     "REL_IMPACT",
+     "REL_OUT_OF_WINDOW",
+     "REL_SENSOR_UNAVAILABLE",
+     "REL_SG_SEVERE"
+    ],
+    "positive_control_fixture": "__watch__@imu(r=REL_IMPACT, imu=3789)",
+    "meta_negative_fixture": "__watch__@imu_zero(r=REL_IMPACT 但 imu=0) => TARGET_RULE_BUT_SOURCE_FIELD_ZERO",
+    "other_source_handling": "规则名不是 REL_IMPACT => 同上: 别的手段把保护碰响了不等于 IMU 通道已验证",
+    "why_source_nonzero": "imu 列是冲击证据的源样本: 规则名对但 imu 仍是 0, 说明这次判定没有该通道的读数支撑, 所以只登记规则命中、不登记通道验证",
+    "basis": "规则名来自 A/diag_relative.h 的 rel_reason_t 与 A/diag_relative.c 的 verdict_name()(两头不一致时 rel_rule_names() 报 REL_RULE_NAMES_SOURCE_MISMATCH); 三行打印形状来自 A/diagnosis.c:469-475"
+   }
+  },
+  {
+   "id": "S9b",
+   "title": "IMU 会话的新故障取证: 锁存读回 + 真实新增 session 的后向加法核对 + flash_dump 帧 + 锁存态自口",
+   "kind": "serial_session",
+   "profiles": [
+    "trip"
+   ],
+   "requires": [
+    "S8b_branch_resolved"
+   ],
+   "total_deadline_seconds": 60,
+   "halt_after": false,
+   "forbidden_commands": [
+    "config_load",
+    "config_default",
+    "blackbox_clear",
+    "flash_logclear",
+    "motor_start",
+    "motor_arm",
+    "pwm_test",
+    "safety_trip"
+   ],
+   "manual_answers": {},
+   "compare_recorded_gt": [
+    {
+     "step": "bb_after",
+     "keys": [
+      "bb_session_imu",
+      "bb_written_imu"
+     ],
+     "regex": "^\\[BB\\] state=(?P<bb_state_imu>\\d+) session=(?P<bb_session_imu>\\d+) written=(?P<bb_written_imu>\\d+) last_err=(?P<bb_err_imu>\\d+) health=(?P<bb_health_imu>\\w+)$",
+     "why": "M5 口径: 新日志按**本轮实际新增的 session/写入帧**取回(基线在 S8 的 bb_before 记录), 增大不成立就具名停止(SESSION_NOT_INCREASED), 不接受只查旧 logstat 计数"
+    }
+   ],
+   "steps": [
+    {
+     "cmd": "diag_status",
+     "as": "latch",
+     "key": "diag_status@latch@imu",
+     "seconds": 3,
+     "expect_contains": [
+      "[DIAG] rel snap=",
+      "[DIAG] rel LATCH r=",
+      "rearm"
+     ]
+    },
+    {
+     "cmd": "blackbox_status",
+     "as": "bb_after",
+     "key": "blackbox_status@after",
+     "seconds": 3,
+     "expect_contains": [
+      "[BB] flash:"
+     ]
+    },
+    {
+     "cmd": "flash_logstat",
+     "as": "newlog",
+     "seconds": 6,
+     "expect_contains": [
+      "slots=",
+      "queued="
+     ]
+    },
+    {
+     "cmd": "motor_status",
+     "as": "latched_disable_proof",
+     "key": "motor_status@latched",
+     "seconds": 3,
+     "expect_profile": "AT_REST",
+     "note": "故障锁存后的禁能同样必须证得(name=FAULT 允许, 见 cleaning_and_terminal.why_not_idle); 这一步只用同一份响应的六个合同字段判。"
+    },
+    {
+     "cmd": "flash_dump",
+     "as": "frames",
+     "key": "flash_dump 0 8",
+     "seconds": 8,
+     "expect_contains": [
+      "slot,seq,session,time_ms,event,valid,sg,current_ma,ax_mg,ay_mg,az_mg,step_hz,vibration_mg,flags"
+     ],
+     "note": "Runtime first/count select the final at most eight appended slots from pre-trigger used_slots and current committed used_slots; never hardcode slot 0. key is a stub row selector only.",
+     "new_log_window": {
+      "before_key": "flash_used_before_imu",
+      "stats_step": "newlog",
+      "max_frames": 8
+     }
+    }
+   ],
+   "require_frames": [
+    {
+     "step": "frames",
+     "session_key": "bb_session_imu",
+     "min_frames": 1,
+     "must_include": [
+      {
+       "event": "5",
+       "step_hz": "0"
+      }
+     ],
+     "why": "计数增大只是\"本轮确实多写了一笔\"的身份前置(S8 基线 -> S9 严格增大)。取证成立的条件是从**本次新增且提交完整的 session** 读回到实际帧, 并且含停后帧(event=9 且 step_hz=0); 批内出现 slot empty/error 或 [FLASH] flash_dump ERROR 就是产品读槽时 CRC/commit 没过 => FLASH_FRAMES_NOT_RECOVERED, 一律报\"取证未完成\", 不许称新日志读回通过(审核 §2D 第 4 条)。",
+     "event_basis": "停后帧的 event = FAULT_MULTI_SOURCE = 5u(A/safety_state.h:46, 由 A/safety_state.c:309 的 ss_code_for_event() 从 EVT_MULTI_FAULT 映射; 相对保护只在 A/diag_relative.c:725 投这一个事件)。9=FAULT_SOFT(A/safety_state.h:50)只由 EVT_SOFT_FAULT 产生, 而 safety_trip 在本场景 forbidden_commands 里 => 钉 9 会把一次成功的保护判成 NO_FRAME_WITH(C-02, 来自 C-01 交付回执 §4 待办 1)"
+    }
+   ],
+   "order": 11,
+   "scenario": "IMU_non_destructive_excitation",
+   "first_cause_legs": {
+    "applies_when_branch": "trip",
+    "covers": [
+     "latch_row",
+     "source_sample",
+     "profile_identity",
+     "incident_session"
+    ],
+    "on_missing": "EVIDENCE_INCOMPLETE",
+    "never_downgrade": "同上: 缺腿 = EVIDENCE_INCOMPLETE, 不是 NO_TRIGGER, 也不是通过。",
+    "legs": [
+     {
+      "leg": "latch_rule_and_generation",
+      "step": "latch",
+      "regex": "^\\[DIAG\\] rel LATCH r=(?P<latch_rule>\\w+) id=(?P<latch_id>\\d+) rev=(?P<latch_rev>\\d+)",
+      "capture": [
+       "latch_rule",
+       "latch_id",
+       "latch_rev"
+      ],
+      "must_equal_recorded": {
+       "latch_rule": "trip_rule_imu",
+       "latch_id": "trip_id_imu",
+       "latch_rev": "trip_rev_imu"
+      },
+      "why": "锁存行的规则/代际必须等于本场观察窗里那次 TRIP(不能拿另一场或上一轮的行拼)"
+     },
+     {
+      "leg": "latch_source_sample",
+      "step": "latch",
+      "regex": "^\\[DIAG\\] rel LATCH sg=(?P<lsg>\\d+) cur=(?P<lcur>\\d+) imu=(?P<limu>\\d+)",
+      "capture": [
+       "lsg",
+       "lcur",
+       "limu"
+      ],
+      "why": "锁存态回读的源样本通道值; 与本场 TRIP 的源样本同路才算同一事故"
+     },
+     {
+      "leg": "incident_session_baseline",
+      "recorded_keys": [
+       "bb_session_imu"
+      ],
+      "why": "本场事故基线 session 必须已在(增大与实际新帧读回由 compare_recorded_gt / require_frames 判)"
+     }
+    ]
+   }
+  },
+  {
+   "id": "S10b",
+   "title": "锁存态再武装演示(仅 trip): 静止且已锁存时 motor_arm 必须被具名拒绝, 会话到此结束, 之后没有任何危险步骤",
+   "kind": "serial_session",
+   "profiles": [
+    "trip"
+   ],
+   "requires": [
+    "S9b"
+   ],
+   "total_deadline_seconds": 60,
+   "halt_after": false,
+   "expected_terminal": [
+    "REFUSED"
+   ],
+   "forbidden_commands": [
+    "config_load",
+    "config_default",
+    "blackbox_clear",
+    "flash_logclear",
+    "motor_start",
+    "config_save",
+    "pwm_test",
+    "diag_profile commit"
+   ],
+   "manual_answers": {},
+   "steps": [
+    {
+     "cmd": "motor_status",
+     "as": "still_latched",
+     "key": "motor_status@latched",
+     "seconds": 3,
+     "expect_profile": "AT_REST"
+    },
+    {
+     "cmd": "motor_arm",
+     "as": "arm_refused",
+     "seconds": 3,
+     "allowed_outcomes": [
+      "[MOT] arm REFUSED (gates failing)"
+     ],
+     "note": "恢复后**不自动 start**: 本阶段的目的就是看见拒绝并在拒绝处结束(arm 尝试同样建立清理义务 => 清理仍会发 stop/disarm/status)。故意不给 fault_reset/selftest 步骤: R2-C3 规定具名拒绝之后不得继续 commit/save/start/arm/fault_reset, 该规则本轮没有放宽。",
+     "key": "motor_arm@refused"
+    }
+   ],
+   "order": 12,
+   "scenario": "IMU_non_destructive_excitation",
+   "prerequisite_gates": [
+    "assembly_readiness"
+   ],
+   "chain_note": "同 S10, 属于 IMU 那场",
+   "prerequisites": {
+    "assembly_readiness": {
+     "status": "PROVIDED",
+     "blocks_motion": true,
+     "asset": "T8 丝杆套件(标称导程 8 mm)的装配就绪 + 支座/电机能否在不手扶时保持固定",
+     "asset_state": "操作者 2026-11-01 在审核窗口逐条确认: 支座松手保持固定、连接紧固、螺母防转、移动块导向均无问题 => 门放行。此前登记的\"已按照片装配, 紧固、螺母防转及导向尚待确认\"已被这条确认取代(不是我自己推断的)",
+     "provenance": "操作者现场确认(2026-11-01 审核窗口原文): \"用户已在审核窗口明确确认：支座松手保持固定、连接紧固、螺母防转、移动块导向均无问题。按操作者确认把 assembly_readiness 改为 PROVIDED\"。本 Agent 未实测, 只登记为操作者给出的确认",
+     "confirmed_items": [
+      "支座/轴承在松手后保持固定",
+      "丝杆与电机的连接紧固",
+      "螺母防转",
+      "移动块导向"
+     ],
+     "still_open": [
+      "第一次短移动里核实\"顺时针=向右\"(操作者口径: 该核实仍保留)",
+      "累计运动距离尚未按标称导程 8 mm 与实际细分/脉冲参数核算(不属于本轮这四项确认的范围, 仍挂着)"
+     ],
+     "gate": "门仍然挂在**每一个**起转阶段上(S4/S8/S8b/S10/S10b) —— 放行不等于拆门: 状态由操作者确认决定, 任何一项回退成未确认, 该阶段又在开端口之前被具名跳过",
+     "gates_stages": "S4(带起转的学习)、S8/S8b(两场激励)、S10/S10b(锁存态再 arm)",
+     "propagation": "S4 被挡后, requires 里引用本次学习结果的 S5/S6/S7 一并跳过(执行器沿计划申报的 requires 传播拒绝)。本轮 S4 已放行, 因此该传播在交付态不再触发 —— 它作为机制保留, 由定向矩阵 V5 用显式场景继续验证",
+     "would_be_used_by": "S4 巡航学习与 S8/S8b 两场激励的起转前提(也是整个运动路径的前提)",
+     "fallback_status": "此前登记的备选(不通电脱开丝杆、只走空载学习与 IMU 演示)的动因已消除: 支座确认可松手保持固定。备选仍未采纳, 也不需要采纳; 若装配状态回退, 它重新成为可选项, 且同样受本门控制"
+    }
+   },
+   "spinup_gate_note": "本阶段会发 motor_arm, 所以在**开端口之前**检查 assembly_readiness; 任一状态不是 PROVIDED 就具名跳过并记 STAGE_SKIPPED_BY_PREREQUISITE(不扣额度、不发命令)"
+  },
+  {
+   "id": "S11b",
+   "title": "人工恢复会话(仅 trip): fault_reset 进 MANUAL_CLEAR + 重跑 system_selftest + 就绪复核; 本会话禁止 motor_start(恢复后不自动起转)",
+   "kind": "serial_session",
+   "profiles": [
+    "trip"
+   ],
+   "requires": [
+    "S10b_expected_refusal_recorded"
+   ],
+   "total_deadline_seconds": 90,
+   "halt_after": false,
+   "forbidden_commands": [
+    "config_load",
+    "config_default",
+    "blackbox_clear",
+    "flash_logclear",
+    "motor_start",
+    "motor_arm",
+    "config_save",
+    "pwm_test",
+    "diag_profile commit"
+   ],
+   "manual_answers": {
+    "operator_confirms_manual_recovery": "yes"
+   },
+   "steps": [
+    {
+     "manual": "operator_confirms_manual_recovery",
+     "as": "gate_recovery",
+     "note": "人工恢复本身就是操作者动作: 真传输下必须由人确认(非 stub 绝不读夹具)。"
+    },
+    {
+     "cmd": "safety_status",
+     "as": "latched_before_clear",
+     "seconds": 3,
+     "expect_contains": [
+      "[SAFETY] request="
+     ]
+    },
+    {
+     "cmd": "fault_reset",
+     "as": "manual_clear",
+     "seconds": 8,
+     "expect_contains": [
+      "[SS] ==> MANUAL_CLEAR"
+     ],
+     "note": "C3 的\"人工恢复\"支: 期望是进 MANUAL_CLEAR(重跑自检进 READY 后仍需**重新 arm**), 不是自动恢复运行。该行形状取自产品字面量, 见 rows.json 的 _provenance。"
+    },
+    {
+     "cmd": "system_selftest",
+     "as": "selftest_after",
+     "seconds": 12,
+     "expect_contains": [
+      "[SELFTEST]"
+     ]
+    },
+    {
+     "cmd": "safety_status",
+     "as": "ready_after",
+     "seconds": 3,
+     "expect_contains": [
+      "[SAFETY] request="
+     ]
+    },
+    {
+     "cmd": "motor_status",
+     "as": "still_disabled_after_recovery",
+     "key": "motor_status",
+     "seconds": 3,
+     "expect_profile": "AT_REST",
+     "note": "恢复会话结束时仍然必须证得到禁能 —— 与'恢复后不自动 start'是同一件事的两面。"
+    }
+   ],
+   "order": 13,
+   "scenario": "IMU_non_destructive_excitation",
+   "prerequisite_gates": [],
+   "chain_note": "人工恢复只处理本场的锁存, 恢复完即结束该链",
+   "no_spinup_note": "恢复会话内禁止 motor_start(在 forbidden_commands 里), 因此不需要起转门"
+  }
+ ],
+ "dispatch_semantics": {
+  "one_approval": "一次批准(transport=real 时必须 --approval-token 与 --expected-token 相等, 否则 REAL_TRANSPORT_REFUSED 且一条命令都不发) -> 从 S0 连续走到最后一个阶段",
+  "stop_on": "任一阶段非成功(含清理 UNKNOWN、清理错误、预留耗尽、证据失败、额度不符、恢复比较不等、新增 session 未增大) => 停止后续阶段并把它们明列为 NOT_RUN",
+  "success_gate": "status=OK 要求: 无 NOT_RUN、每个已执行阶段 success、已执行阶段序列与按 profiles 过滤后的期望序列**逐个相等**、额度审计无未申报用量且无负余额",
+  "not_counted_as_executed": "NOT_RUN 绝不计入 stages_executed(不能用 stages=8 掩盖停在中途)",
+  "profile_scope": "--profile 只有三个值 healthy|trip|no_trigger, 作用范围**仅限**被动观察窗 __watch__ 的行; 事故链与锁存态用独立阶段(S9/S10/S11)+ 专用行键, 并用 stages[].profiles=[trip] 决定是否参与本轮。",
+  "branch_scope": "分支按**场景链**(stages[].scenario)存: scenario_branches/scenario_profile 各自决定, 真实传输由该链自己的观察窗响应决定(RESPONSE_BRANCH 事件带 scenario), 离线由 plan.stub_branches 申报。同一链给出矛盾观察 => RESPONSE_BRANCH_CONFLICT; 不同链一个触发一个未触发 => 照常继续",
+  "chain_order": "每场先取证(S9)、再锁存态拒绝(S10)、再人工恢复(S11), 全部走完才进入下一场(S8b→S9b→S10b→S11b); 顺序由 stages 数组的物理顺序决定(执行器按数组迭代)",
+  "prerequisite_refusal": "机械前置未到位时该链**整条**在开端口之前跳过并具名(不扣额度、不发命令); 汇总行 PREREQUISITE_REFUSAL 与 prerequisite_skips 列出被跳过的阶段, 因此保护已演示绝不成立",
+  "no_downgrade": "窗内已见触发针却记成到时未触发 => TRIP_REWRITTEN_AS_NO_TRIGGER(具名停止); 四腿缺一 => EVIDENCE_INCOMPLETE。两者都不是 NO_TRIGGER, 也都不是通过; 而撤能清理在 exec_session 的 finally 里先于这两个判定完成",
+  "flow_vs_verification": "两个字段分开报: flow_complete=计划里的阶段都按期望走完(身份核对、启停、清理、恢复都做了); core_protection_verified=**每一场都是目标传感器通道自己触发并取证齐了**。前者为真不蕴含后者: 别的通道把保护碰响了、或者根本没起转, 都只算流程走完。交付态(装配就绪未确认)必然 core_protection_verified=False。机器写法(执行器 dispatch_plan 末段): core_verified = bool(ok) and bool(claims) and all(v == \"VERIFIED\" for v in claims.values()) —— `ok` 是整包成功(无 NOT_RUN、所有阶段 success、顺序与期望一致、额度账目干净), 所以任一会话 STOP(例如取证会话失败)时, 即使两场各自声明都是 VERIFIED, 汇总也不能说已验证 (复审补测到的标签缺陷, 反例见定向矩阵 V14)",
+  "target_channel": "每场在 stages[].target_channel 里申报自己认哪些规则名(产品 rel_reason_t 里的名字)以及哪一列源样本必须非零。规则名不匹配 => OTHER_SOURCE_TRIGGERED(TARGET_CHANNEL_UNPROVEN); 规则名对但该列为 0 => TARGET_RULE_BUT_SOURCE_FIELD_ZERO。两种都照常撤能、照常取证(含 event=5 停后帧读回), 但 protection_claims 记为未证, 不计入 core_protection_verified",
+  "claims_are_per_stage": "protection_claims 是**逐场**的观察, 每场在自己的运动会话结束时写下; 它不判整包。整包的结论只看 core_protection_verified 与 flow_complete 两个标签, 两者必须同时为真才可以说\"这一场一轮都验过\""
+ },
+ "hardware_actions_this_round": [],
+ "offline_only_statement": "本包只在 --mode real + 复审一次原文批准下才产生设备动作; 本轮未连接设备, sim 展开与 validate 均零 pyocd/零串口/零电机。",
+ "quota_note_r3_closeout": "R3 收尾 §3 的新离线合同: 学习起转单次上限提案 15 s(N=8、IRUN20/100Hz/方向 0 不变), RELATIVE 保护演示起转仍 5 s, 整包最多两次 start => 时间总额 15+5=20 s。上限**按阶段**传入执行器(S4=15 / S8=5), 并由 --validate-plan 的 PLAN_MOTION_CAP_BUDGET 逐项审计。15 s 不是当前硬件授权, 也不是把旧的 5 秒测试记成通过; 将来一次具体的板级批准必须写明\"学习<=15s、保护观察<=5s\"。",
+ "executor_reused": "D:/ns800/reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py(sha256 1b23719a3c9a…, 逐字节内容见 identity_binding.executor)",
+ "changes_this_round": [
+  "① S0/下载/回读统一到本轮新镜像 dab356c6 与新 AXF 0babe9f1; 删除更旧 R3 BIN(00608ec9…)的绑定",
+  "② 顺序改为两场各走完整链(S8→S9→S10→S11 → S8b→S9b→S10b→S11b), 分支与事故基线按场存",
+  "③ 额度按真实执行路径重算(port_open 12, 必要清理 5 组), 一本总账, 覆盖四种触发组合",
+  "④ 首因合同变成可执行四腿(first_cause_legs + first_cause_verdict), 缺证 EVIDENCE_INCOMPLETE, 触发不得降级为 NO_TRIGGER",
+  "⑤ 机械前置更新为现有 T8 完整滑台(未连接/导程待确认)并接成起转前的真门; 示波器继续暂缓, 不新增高精度仪器前置",
+  "R 登记: 不再把 48204fe 当新镜像构建输入; rtconfig.h 登记本机 CRLF 1927ed1c… 与远端 LF b66753d6… 双身份(仅行尾不同, 不需重编)",
+  "C-02 停后帧事件码 9 -> 5(FAULT_MULTI_SOURCE), 依据见取证会话的 event_basis; 夹具与 R3 自检由 host/apply_c02_event5_fixtures.py 与 m8r3_field_selftest.py 的 FS69/FS76..FS79 覆盖",
+  "语言修正: 不称 1024-668=356 B 为已验证安全余量; 264 B 是可达路径固定帧下界, 668 B 是链接器给出的更深静态链, 两者口径不同且并存",
+  "R5-① 目标通道分类: 每场申报 target_channel(规则名必须来自产品 rel_reason_t), IMU 场只认 REL_IMPACT 且 imu 列非零; SG/ADC 场认 REL_SG_SEVERE/REL_ADC_SEVERE/REL_FUSED_SEVERE 且 sg/cur 非零。规则名不对或源样本为 0 => 具名 OTHER_SOURCE_TRIGGERED / TARGET_RULE_BUT_SOURCE_FIELD_ZERO, 撤能取证照做但不计入 core_protection_verified; 观察窗与锁存夹具按场分开(__watch__@imu、diag_status@latch@imu)",
+  "R5-② 机械事实更新 + 起转门覆盖: 改成\"现有 T8 丝杆套件, 标称导程 8 mm; 已按照片装配, 紧固、螺母防转及导向尚待确认\", 新增 assembly_readiness(blocks_motion) 并挂到 S4/S8/S8b/S10/S10b **每一个**起转阶段; 拒绝沿 requires 传播到 S5/S6/S7; 交付态因此零次起转",
+  "R5-③ 汇总标签修正(复审补测): core_protection_verified 现在要求 **整包成功** 也成立 (core_verified = bool(ok) and bool(claims) and all(VERIFIED))。此前 S9b 取证失败让整包 STOP、flow_complete=false, 但两场各自声明仍是 VERIFIED => 汇总错误地说已验证。反例进定向矩阵 V14",
+  "R5-④ 现场状态绑定: field_state_binding 逐条登记已收到的操作者事实/指令与**未收到**的确认(紧固、螺母防转、导向、松手保持固定、短移动方向核实), 门因此维持关闭; 本轮消耗现场批准 0 次",
+  "R5-⑤ 装配就绪确认落地(2026-11-01 审核窗口): 操作者逐条确认支座松手保持固定、连接紧固、螺母防转、移动块导向均无问题 => assembly_readiness 改 PROVIDED, 四条从 not_received 移除; load_means 不代填, SG/ADC 加载链继续跳过。交付态因此从“零次起转”变为“学习+IMU 场起转”",
+  "(port_open 8 / motor_run 2 / 清理 3 组), 并按操作者要求记录启动前实际计划序列 field_sequence_before_start"
+ ],
+ "download_payload_swap": {
+  "swaps": 1,
+  "payload_axf": "reports/firmware/phase8-m8-idle-stack-r4/rt-thread-motor-m1.axf",
+  "assertion": "下载 argv 的最后一个参数必须等于 identity_binding.image.axf.path(由 validate_plan 的 PLAN_IMAGE_IDENTITY_CONSISTENCY 判), 载荷就是本轮新 AXF, 不是板上已接受的那一件",
+  "history": "相对 R3 轮换了载荷(同一 Target 名, 源码只差 rtconfig 的一行); 旧件路径与旧散列都不出现在本包任何执行字段里"
+ },
+ "quota_note_r4": "本轮按复审第 3 项**重算**而非沿用申报值: port_open -> 12, cleanup_motor_stop/disarm/status -> 5(每组三条各一), 其余由 derive_quota_needs 推导并与 PLAN_QUOTA_NEED 对账; 申报值仍是上限不是预期用量, 机械缺项时实际用量会更低",
+ "first_cause_overall": {
+  "rule": "每一路首因都要在同一次运行内四件对齐: 触发规则与代际 -> 源样本与阈值 -> 本轮提交的 profile -> 本场新日志 session 与实际停后帧(event=5, step_hz=0)。缺任何一件 => EVIDENCE_INCOMPLETE(具名), 既不降级成 NO_TRIGGER, 也不算通过",
+  "machine_checked_by": "m8r3_serial_chain.first_cause_verdict() + stages[].first_cause_legs",
+  "not_a_substitute": [
+   "safety_trip",
+   "fault_reset 之后自动恢复的装态",
+   "diag_mode 切换本身"
+  ],
+  "manual_recovery": "人工恢复在 S11/S11b: fault_reset MANUAL_CLEAR + system_selftest + 就绪复核; 恢复会话内禁止 motor_start"
+ },
+ "not_provided_summary": [
+  {
+   "item": "SG/ADC 可控负载的施加手段与加载作用点",
+   "status": "NOT_PROVIDED",
+   "effect": "整条 SG_ADC_controlled_load 链在开端口之前被具名拒绝(不起转、不开口、不扣额度); 操作者口径: load_means 不代填, 该链继续跳过",
+   "mechanism": "plan.mechanical_prerequisites.load_means + stages[].prerequisite_gates + 执行器 STAGE_SKIPPED_BY_PREREQUISITE"
+  },
+  {
+   "item": "起转装配就绪(紧固、螺母防转、导向 + 支座松手保持固定)",
+   "status": "PROVIDED(操作者 2026-11-01 审核窗口逐条确认)",
+   "effect": "S4 学习与 S8b/S10b 起转不再被这道门挡下; 门本身仍挂在每个起转阶段上(放行不等于拆门)",
+   "still_open": [
+    "第一次短移动里核实\"顺时针=向右\"",
+    "累计运动距离未按标称导程 8 mm 与实际细分/脉冲参数核算"
+   ]
+  },
+  {
+   "item": "示波器/电流钳独立证 STEP 到关断(BUG-008)",
+   "status": "NOT_PROVIDED(本轮暂缓, 不作为起转前置, 不新增仪器前置)",
+   "effect": "停机事实只能登记为软件接口已接受"
+  },
+  {
+   "item": "IRQ 极性实物确认",
+   "status": "hardware-pending(对照表 polarity=not-confirmed)",
+   "effect": "protect_ready=NO; 保护链不得称已用真实硬件中断验证"
+  },
+  {
+   "item": "IMU(ADXL345 在扩展板上)的固定方式",
+   "status": "MOUNTED_TAPE_BY_OPERATOR(操作者 2026-11-01 确认), 刚度未测",
+   "effect": "可以做非破坏性冲击/振动演示, 按采样结果判定; 不做精确振动标定, 结论上限是本次未证伪",
+   "closed_this_round": "此前登记的缺失项\"IMU 实际固定方式\"已闭合"
+  },
+  {
+   "item": "阈值标定(SG 载荷/转速扫描)",
+   "status": "NOT_ESTABLISHED(对照表)",
+   "effect": "任何阈值已定的说法都不成立"
+  },
+  {
+   "item": "T8 导程",
+   "status": "NOMINAL_8MM_UNCALIBRATED",
+   "effect": "标称 8 mm 是套件标称值, 未做实测标定; 不得当作已确认参数核算累计距离"
+  }
+ ],
+ "fixtures_provenance": [
+  {
+   "file": "reports/reviews/phase8-m8-idle-stack-r4/field/rows.json",
+   "bytes": 51963,
+   "sha256": "3a08721814c0e05e2e87ac7e43ed75b4e4f537d9671e816973432db3859f00a4",
+   "keys_total": 46,
+   "note": "含本轮两处更正: flash_dump 停后帧 event 9->5 并补 source_shape 来源分级(没有板上采集); 新增 ADC68/SG8 过量采样健康键。都是夹具, 不构成设备证据"
+  },
+  {
+   "file": "两份 rows.json 的 R5 目标通道键",
+   "keys": [
+    "__watch__@imu(r=REL_IMPACT, imu=3789)",
+    "diag_status@latch@imu(同场锁存视图)",
+    "__watch__@imu_zero(元负控专用: REL_IMPACT 但 imu=0)"
+   ],
+   "added_by": "host/apply_target_channel_fixtures.py",
+   "kind": "source_shape",
+   "note": "形状来自 A/diagnosis.c:469-475 的 REL TRIP/rel LATCH 三行与 A/diag_relative.h 的 rel_reason_t; 数值全部合成, **没有任何板上采集给出过 REL_IMPACT 的触发行**。IMU 那场原来吃的是 SG 的行(r=REL_SG_SEVERE、imu=0) —— 复审抓到的就是这个"
+  },
+  {
+   "file": "reports/reviews/phase8-m8-relative-protection-r3/field/rows.json",
+   "bytes": 51944,
+   "sha256": "29a6a00810c3e9f4f25c7bcb5b1fb02e9f76ca2e2f99a6f8ff3b1a9b9b17b754",
+   "source": "同一更正落在仍被引用的 R3 副本",
+   "not_changed": "归档运行输出 reports/reviews/phase8-m8-relative-protection-r3/offline/psrun-*/** 与 M5 软件触发原件(event=9)原样保留 => 不是全局替换"
+  },
+  {
+   "file": "reports/reviews/phase8-m8-idle-stack-r4/field/needles.json",
+   "bytes": 8243,
+   "sha256": "77102a8bff73cc21dfa4744222ab1130b376224e91cd98711ac1a1c3dc5efffd",
+   "note": "本轮未改 needles.json"
+  }
+ ],
+ "mechanical_prerequisites": {
+  "assembly_readiness": {
+   "status": "PROVIDED",
+   "blocks_motion": true,
+   "asset": "T8 丝杆套件(标称导程 8 mm)的装配就绪 + 支座/电机能否在不手扶时保持固定",
+   "asset_state": "操作者 2026-11-01 在审核窗口逐条确认: 支座松手保持固定、连接紧固、螺母防转、移动块导向均无问题 => 门放行。此前登记的\"已按照片装配, 紧固、螺母防转及导向尚待确认\"已被这条确认取代(不是我自己推断的)",
+   "provenance": "操作者现场确认(2026-11-01 审核窗口原文): \"用户已在审核窗口明确确认：支座松手保持固定、连接紧固、螺母防转、移动块导向均无问题。按操作者确认把 assembly_readiness 改为 PROVIDED\"。本 Agent 未实测, 只登记为操作者给出的确认",
+   "confirmed_items": [
+    "支座/轴承在松手后保持固定",
+    "丝杆与电机的连接紧固",
+    "螺母防转",
+    "移动块导向"
+   ],
+   "still_open": [
+    "第一次短移动里核实\"顺时针=向右\"(操作者口径: 该核实仍保留)",
+    "累计运动距离尚未按标称导程 8 mm 与实际细分/脉冲参数核算(不属于本轮这四项确认的范围, 仍挂着)"
+   ],
+   "gate": "门仍然挂在**每一个**起转阶段上(S4/S8/S8b/S10/S10b) —— 放行不等于拆门: 状态由操作者确认决定, 任何一项回退成未确认, 该阶段又在开端口之前被具名跳过",
+   "gates_stages": "S4(带起转的学习)、S8/S8b(两场激励)、S10/S10b(锁存态再 arm)",
+   "propagation": "S4 被挡后, requires 里引用本次学习结果的 S5/S6/S7 一并跳过(执行器沿计划申报的 requires 传播拒绝)。本轮 S4 已放行, 因此该传播在交付态不再触发 —— 它作为机制保留, 由定向矩阵 V5 用显式场景继续验证",
+   "would_be_used_by": "S4 巡航学习与 S8/S8b 两场激励的起转前提(也是整个运动路径的前提)",
+   "fallback_status": "此前登记的备选(不通电脱开丝杆、只走空载学习与 IMU 演示)的动因已消除: 支座确认可松手保持固定。备选仍未采纳, 也不需要采纳; 若装配状态回退, 它重新成为可选项, 且同样受本门控制"
+  },
+  "load_means": {
+   "status": "NOT_PROVIDED",
+   "blocks_motion": true,
+   "asset": "现有实物: T8 丝杆套件(标称导程 8 mm) + 导轨滑台, 已按照片装配",
+   "asset_state": "装配四项(紧固/螺母防转/导向/支座松手保持固定)已由操作者 2026-11-01 确认; 但可从非旋转端操作的**加载作用点与档位/行程**仍未提供 => 本门仍不放行, SG/ADC 受控加载链继续跳过(装配确认不等于加载手段到位, 两件事不互相顶替)",
+   "provenance": "操作者 2026-11-01 现场回报 + 复审原文。本 Agent 未实测。导程是**标称**值, 未做实测标定",
+   "constraints": [
+    "现场只用中间短行程",
+    "不得把标称 8 mm 导程当作实测标定值",
+    "滑台起点在左端且与末端限位留有间隙(操作者口径)",
+    "顺时针=向右, 须在**第一次被批准的短移动**里现场核实后才按此方向执行",
+    "软件限位输入仍为 DISABLED_BY_CONFIG, 不得把左侧起点当限位保护",
+    "不新增回零/全程定位功能",
+    "不通过撞两端限位制造堵转",
+    "不手捏旋转轴、不为凑阈值加危险力"
+   ],
+   "still_missing": [
+    "可从非旋转端操作的加载作用点及档位/行程",
+    "电机与滑台的连接方式(装配照片之外可核的紧固状态)"
+   ],
+   "gate": "机械前置门在执行器里生效: 状态不是 PROVIDED 时该场景链在开端口之前就被具名跳过(台账 STAGE_SKIPPED_BY_PREREQUISITE + 汇总 PREREQUISITE_REFUSAL 行), 不扣 motor_run 额度、不发 motor_arm/motor_start —— 复审第 5 项要求的是这个, 不是说明字段",
+   "would_be_used_by": "S8/S10 的 SG/ADC 受控负载激励"
+  },
+  "instrument_probe": {
+   "status": "NOT_PROVIDED",
+   "blocks_motion": false,
+   "asset": "示波器/电流钳(独立证 STEP 到关断, BUG-008)",
+   "asset_state": "继续暂缓(复审本轮口径): 不新增高精度仪器前置, 也不因此卡住起转",
+   "consequence": "停机事实只能登记为软件接口已接受, 不构成物理停机证明"
+  },
+  "imu_mounting": {
+   "status": "MOUNTED_TAPE_BY_OPERATOR_RIGIDITY_UNMEASURED",
+   "blocks_motion": false,
+   "asset": "ADXL345(在扩展板上)的实际固定方式",
+   "asset_state": "已由操作者确认: 扩展板用绝缘胶带固定在电机上, 电机固定丝杆(2026-11-01)。此前登记的缺失项\"IMU 实际固定方式\"已闭合",
+   "consequence": "胶带固定可以按采样结果判定演示是否可行(操作者口径, 厂商提示 PCB 振动可能影响读数), 但**不做精确振动标定**; 结论上限是本次未证伪, 不是刚度已验证",
+   "not_claimed": [
+    "振动传递路径已知",
+    "IMU 阈值可用",
+    "胶带装配等价于可靠支架"
+   ]
+  }
+ },
+ "corrections_from_review_r4": {
+  "package_5": [
+   "回读仍认旧镜像(①)",
+   "两场的取证/拒绝/恢复顺序与分场基线(②)",
+   "额度按真实路径与混合结果覆盖(③)",
+   "首因四腿与不得降级(④)",
+   "机械前置真门 + 示波器暂缓(⑤)"
+  ],
+  "registration_2": [
+   "48204fe 不是新镜像的构建输入(该提交的树里 rtconfig 仍是 256)",
+   "rtconfig 本机 CRLF 1927ed1c… / 远端 LF b66753d6… 双身份"
+  ],
+  "language_1": "264 B 与 668 B 不冲突; 356 B 不是已验证安全余量",
+  "c02_from_c01_receipt": "停后帧事件码由 9(FAULT_SOFT) 更正为 5(FAULT_MULTI_SOURCE)"
+ },
+ "stack_margin_wording": {
+  "metrics_are_different": true,
+  "reachable_path_fixed_frame_lower_bound_bytes": 264,
+  "armlink_static_max_depth_bytes": 668,
+  "configured_idle_stack_bytes": 1024,
+  "not_claimed": [
+   "已验证安全余量(1024-668=356 B 只是算术差, 不是余量的证明)",
+   "1024 已足够(未上板取新水位, 未做栈填充实测)",
+   "668 或 264 是已验证上界(668 是链接器静态最深合计, 264 是可达路径的固定帧下界)"
+  ],
+  "what_is_proven": "静态调用图 idle_thread_entry ⇒ rt_defunct_execute ⇒ rt_object_delete ⇒ rt_free ⇒ rt_mutex_take… 的 Max Depth=668 B > 旧配置 256 B => 旧值不足是已证的; 新镜像 ZI +768 B 与 256->1024 的增量一致 => 改动确实进了这个 Target",
+  "still_open": "1024 是否够 = NOT_VERIFIED(需要板上水位或栈填充实测)"
+ },
+ "device_actions_statement": "本包只是**绑定**: 生成本文件时零设备动作(transport=stub/sim 的离线工装上跑, 假端口, 不下载、不回读、不复位、不起转)。现场执行需要复审对这份续测包 + 修好的执行器的一次原文批准。",
+ "protection_status_still": {
+  "ADC": "DEGRADED cal=THEORETICAL",
+  "protect_ready": "NO",
+  "threshold_validation": "NOT_ESTABLISHED",
+  "rel_cov": "NOT-ACTIVE",
+  "limit_inputs": "DISABLED_BY_CONFIG",
+  "meaning": "本包只准备执行路径; 以上任一项都不因包的绑定而改变, 也不得以离线证明代替现场结论"
+ },
+ "c01_intake": {
+  "dir": "reports/reviews/phase8-m8-parallel-protection-ready",
+  "zip": "NS800_C01_Delivery_20261101.zip",
+  "zip_sha256": "3eb4c1d335b08fe39bf83e35aa34865d85bb778521fe0cd9e73e1d331a1bc893",
+  "files_byte_identical": [
+   {
+    "name": "C01_DELIVERY_RECEIPT.md",
+    "bytes": 6689,
+    "sha256": "3493908113760af0a124c5cc9983385ce05fc421dd56e8fb6b3a850856b4913f"
+   },
+   {
+    "name": "SHA256SUMS.txt",
+    "bytes": 255,
+    "sha256": "1b9c5a92936ebd2d0b607fb61406cf4827d22fce16e334d8b5bf2c38685a0842"
+   },
+   {
+    "name": "results_local.json",
+    "bytes": 11478,
+    "cr_bytes": 452,
+    "sha256": "ecf9466e0e3b097b849936360aff83fbfd1cf7749b73303ff8f03c66bf620fb0"
+   },
+   {
+    "name": "verify_c01.py",
+    "bytes": 6845,
+    "sha256": "ccc3db0a3cc1ff2903822c6d77987d2c32c97f45c529a442994079e2ac1711e2"
+   }
+  ],
+  "policy": "原样纳入, 不覆盖、不重新生成原始结果、不改脚本内绝对路径(回执 §3 已声明复跑需按检出路径改 FIELD/OUT 两行)",
+  "todo_items_taken_over": [
+   "C-02 停后帧事件码(本轮已修, 见各会话 event_basis)",
+   "must_min 并入已有自检(R3 自检 FS76, 34 例含 4 个元负控)",
+   "ADC68/SG8 健康夹具(rows.json 新键, FS76 直接用它)"
+  ]
+ },
+ "stub_branches": {
+  "SG_ADC_controlled_load": "trip",
+  "IMU_non_destructive_excitation": "trip"
+ },
+ "verification_matrix_expected": {
+  "run_by_host": "host/verify_four_branch_matrix.py(零设备工装, 真实执行器 + 真实计划与夹具)",
+  "prerequisite_states": {
+   "delivery_state": "assembly_readiness=PROVIDED(操作者 2026-11-01 审核窗口逐条确认) 且 load_means=NOT_PROVIDED —— 即本包当前交付态: 学习与 IMU 场放行, SG/ADC 加载链仍跳过",
+   "assembly_not_confirmed_scenario": "assembly_readiness=NOT_CONFIRMED(装配确认之前的状态, 也是任何一项回退时的状态): 由定向矩阵 V5 显式构造, 不再等同于交付态",
+   "all_provided": "两项都 PROVIDED(需要加载手段也到位, 本轮仍未提供)"
+  },
+  "four_branch_combinations": [
+   {
+    "stub_branches": {
+     "SG_ADC_controlled_load": "trip",
+     "IMU_non_destructive_excitation": "trip"
+    },
+    "prerequisite": "all_provided",
+    "executed_chain_stages": [
+     "S8",
+     "S9",
+     "S10",
+     "S11",
+     "S8b",
+     "S9b",
+     "S10b",
+     "S11b"
+    ],
+    "port_open_used": 12,
+    "cleanup_groups_used": 5,
+    "protection_claims": {
+     "SG_ADC_controlled_load": "VERIFIED",
+     "IMU_non_destructive_excitation": "VERIFIED"
+    },
+    "core_protection_verified": true
+   },
+   {
+    "stub_branches": {
+     "SG_ADC_controlled_load": "trip",
+     "IMU_non_destructive_excitation": "no_trigger"
+    },
+    "prerequisite": "all_provided",
+    "skipped_by_profile": [
+     "S9b",
+     "S10b",
+     "S11b"
+    ],
+    "protection_claims": {
+     "SG_ADC_controlled_load": "VERIFIED",
+     "IMU_non_destructive_excitation": "NO_TRIGGER"
+    },
+    "core_protection_verified": false,
+    "note": "混合结果一: 不矛盾, 照常跑完; 未触发那条链不称已验证"
+   },
+   {
+    "stub_branches": {
+     "SG_ADC_controlled_load": "no_trigger",
+     "IMU_non_destructive_excitation": "trip"
+    },
+    "prerequisite": "all_provided",
+    "skipped_by_profile": [
+     "S9",
+     "S10",
+     "S11"
+    ],
+    "protection_claims": {
+     "SG_ADC_controlled_load": "NO_TRIGGER",
+     "IMU_non_destructive_excitation": "VERIFIED"
+    },
+    "core_protection_verified": false,
+    "note": "混合结果二"
+   },
+   {
+    "stub_branches": {
+     "SG_ADC_controlled_load": "no_trigger",
+     "IMU_non_destructive_excitation": "no_trigger"
+    },
+    "prerequisite": "all_provided",
+    "skipped_by_profile": [
+     "S9",
+     "S10",
+     "S11",
+     "S9b",
+     "S10b",
+     "S11b"
+    ],
+    "core_protection_verified": false,
+    "note": "都未触发: 取证链按分支跳过, 不得写成保护已验证"
+   }
+  ],
+  "classification_cases": [
+   {
+    "name": "imu_channel_positive",
+    "setup": "S8b 观察窗键 __watch__@imu(REL_IMPACT, imu=3789)",
+    "expect_claim": "VERIFIED"
+   },
+   {
+    "name": "imu_fed_sg_rows",
+    "setup": "把 S8b 的观察窗键换回 __watch__(REL_SG_SEVERE, imu=0)",
+    "expect_claim": "OTHER_SOURCE_TRIGGERED(TARGET_CHANNEL_UNPROVEN)",
+    "expect": [
+     "撤能与取证照做(S9b 仍跑、仍读 event=5 停后帧)",
+     "core_protection_verified=False",
+     "flow_complete 仍可为真"
+    ]
+   },
+   {
+    "name": "imu_rule_ok_but_zero",
+    "setup": "S8b 观察窗键 __watch__@imu_zero(REL_IMPACT 但 imu=0)",
+    "expect_claim": "TARGET_RULE_BUT_SOURCE_FIELD_ZERO(trip_imu_imu)",
+    "expect": [
+     "证明 source_nonzero_keys 这道腿在起作用(元负控)"
+    ]
+   },
+   {
+    "name": "sg_fed_impact_rows",
+    "setup": "把 S8 的观察窗键换成 __watch__@imu(REL_IMPACT)",
+    "expect_claim": "OTHER_SOURCE_TRIGGERED(TARGET_CHANNEL_UNPROVEN)",
+    "why": "SG 通道不因一次冲击判定而算已验证"
+   },
+   {
+    "name": "gate_removed_still_admits_sg_data",
+    "setup": "摘掉 target_channel_claim 的规则名判定(或删掉 target_channel 声明)",
+    "expect": "IMU 场喂 SG 行重新被判成通过 => 说明判据确实存在(负控必须 fire)"
+   }
+  ],
+  "mechanical_gap_cases": [
+   {
+    "name": "交付态: assembly_readiness=PROVIDED + load_means=NOT_PROVIDED",
+    "case": "V5b",
+    "expect": "SG_ADC 整链在开端口之前跳过, S4 学习与 S8b/S10b 照常起转: port_open 用量 8, motor_run 用量 2(剩 1), 必要清理 3 组; claims = {SG_ADC: SKIPPED_BEFORE_SPIN_UP(PREREQUISITE), IMU: VERIFIED}, core_protection_verified=False(SG/ADC 那场没跑) => 整包完成不等于核心全部通过"
+   },
+   {
+    "name": "场景: assembly_readiness=NOT_CONFIRMED(确认之前/任何一项回退时)",
+    "case": "V5",
+    "expect": "S4/S8/S8b/S10/S10b 全部在开端口之前跳过, 且 S5/S6/S7 沿 requires 一并跳过 => port_open 用量 1(只有 S3), motor_run 用量 0, 台账里没有任何 motor_start; 两场 claims 都是 SKIPPED_BEFORE_SPIN_UP(PREREQUISITE)"
+   },
+   {
+    "name": "两门都 PROVIDED(本轮不可达: 加载手段仍未提供)",
+    "case": "V1/V2/V3/V9",
+    "expect": "16 阶段全跑, port_open 12 / motor_run 3 / 清理 5 组, 两场 claims 双 VERIFIED, core_protection_verified=True"
+   }
+  ],
+  "evidence_incomplete_case": "摘掉任一条腿(如源样本行) => code=EVIDENCE_INCOMPLETE 且 status!=OBSERVATION_NO_TRIGGER, 同时 disarm=CONFIRMED_DISABLED"
+ },
+ "claim_boundaries": {
+  "delivered_state_skips": "本包交付态跳过 SG/ADC 激励链(加载手段仍未提供, 操作者口径: 不代填)。装配就绪已由操作者 2026-11-01 确认 => S4 学习与 IMU 场放行。整包完成**不等于**核心保护功能全部通过, 也不等于 SG/ADC 通道已验证",
+  "flow_complete_true_means": "期望序列都跑到了各自的终态(含具名跳过), 不表示任何一次现场触发",
+  "core_protection_verified_true_means": "两场都抓到**本场目标通道**的规则名(REL_SG_SEVERE/REL_ADC_SEVERE/REL_FUSED_SEVERE 或 REL_IMPACT)、该通道源样本非零、首因四腿齐、且新 session 读回 event=5 停后帧。SG/ADC 那场被跳过时, 该标签按定义就是 False",
+  "never_from_this_package": [
+   "阈值的物理标定",
+   "STEP 到关断的物理证明(BUG-008)",
+   "IRQ 极性已用实物确认",
+   "栈 1024 足够",
+   "HardFault 根因已闭"
+  ],
+  "operator_confirmation_needed": [
+   "第一次被批准的短移动里核实\"顺时针=向右\"",
+   "累计运动距离按标称导程 8 mm 与实际细分/脉冲参数核算"
+  ]
+ },
+ "corrections_from_review_r5": {
+  "flow_vs_target_channel": "复审实测: IMU 场喂 REL_SG_SEVERE + imu=0 仍过首因判据, 而且现有 IMU 正控夹具就是这份数据。现在分两层: 流程(flow_complete)与目标通道(core_protection_verified), 后者要求每场抓到**本场规则名**且该通道源样本非零; 其他来源触发仍撤能、仍取证, 但登记为\"其他来源触发/目标通道未证\", 不混算成功",
+  "stale_mechanical_facts": "包里的\"完整滑台、尚未连接、导程待确认\"已过期, 按操作者口径改为\"现有 T8 丝杆套件, 标称导程 8 mm; 已按照片装配, 紧固、螺母防转及导向尚待确认\"; 并把装配就绪门放到每个起转阶段之前(S4 学习、S8/S8b 激励、S10/S10b 锁存态再 arm)",
+  "scope_of_this_round": "只改计划、结果分类与对应少量用例; 未改 C、未重编、未重跑历史清单、零设备动作",
+  "summary_label_defect": "复审补测: 让 S9b 取证失败, 整包已经 STOP / flow_complete=false, 汇总却仍报 core_protection_verified=true —— 因为旧写法只看各场声明(那时两场都已写成 VERIFIED)。现在按 bool(ok) and bool(claims) and all(==\"VERIFIED\") 判, 反例进 V14: 声明全 VERIFIED 而 core=False; 把 ok 这一项摘掉, V14 必须翻红",
+  "field_state_bound_as_reported": "现场状态只登记操作者已经给出的事实与指令; 未逐条确认的装配项一律留在 not_received 里, assembly_readiness 因此维持 NOT_CONFIRMED, 本轮不申请任何起转批准(操作者指令: 暂不试转)"
+ },
+ "r3_historical_plans_under_current_executor": {
+  "measured_by": "本构建脚本当场调用当前执行器的 validate_plan(数字是复算的, 不是登记来的)",
+  "items": [
+   {
+    "file": "reports/reviews/phase8-m8-relative-protection-r3/field/plan.json",
+    "sha256": "3cf0a7e1afc3e1f8637bf364611cbbcf07883a9eeea02f5ba8a09baeb6d7010a",
+    "bytes": 67782,
+    "checks": 178,
+    "fail": 3,
+    "fail_names": [
+     "PLAN_FIRST_CAUSE_LEGS",
+     "PLAN_SPINUP_GATE_COVERAGE",
+     "PLAN_TARGET_CHANNEL"
+    ],
+    "this_rounds_two_gates": [
+     "PLAN_SPINUP_GATE_COVERAGE|all|FAIL|S4(有 motor_arm/motor_start 但 prerequisite_gates 为空);S8(有 motor_arm/motor_start 但 prerequisite_gates 为空);S10(有 motor_arm/motor_start 但 prerequisite_gates 为空)",
+     "PLAN_TARGET_CHANNEL|all|FAIL|S8:分支决定点没声明 target_channel"
+    ]
+   },
+   {
+    "file": "reports/reviews/phase8-m8-relative-protection-r3/field/plan_continuation_s2.json",
+    "sha256": "c3f248be8ee58bc7a2941315e3840443a348e45a564401c093780cd8a13568d4",
+    "bytes": 62437,
+    "checks": 177,
+    "fail": 3,
+    "fail_names": [
+     "PLAN_FIRST_CAUSE_LEGS",
+     "PLAN_SPINUP_GATE_COVERAGE",
+     "PLAN_TARGET_CHANNEL"
+    ],
+    "this_rounds_two_gates": [
+     "PLAN_SPINUP_GATE_COVERAGE|all|FAIL|S4(有 motor_arm/motor_start 但 prerequisite_gates 为空);S8(有 motor_arm/motor_start 但 prerequisite_gates 为空);S10(有 motor_arm/motor_start 但 prerequisite_gates 为空)",
+     "PLAN_TARGET_CHANNEL|all|FAIL|S8:分支决定点没声明 target_channel"
+    ]
+   }
+  ],
+  "meaning": "R3 的两份计划是在 R5 两项补正**之前**定稿并执行的: 它们没有 assembly_readiness 起转门、也没有 target_channel 声明, 所以现在这套执行器会给它们 fail=3。本轮不重跑这两份计划、也不回写它们(它们绑定着已经发生过的轮次与已入库的原始记录); 如果以后要复用, 必须先按同样两项补正并重新绑定, 不能拿旧计划当成“现在这套判据也能跑”。",
+  "not_done_here": [
+   "不修改 R3 计划字节",
+   "不重跑 R3 轮次的清单",
+   "不把 fail 说成 PASS"
+  ]
+ },
+ "field_state_binding": {
+  "bound_at": "2026-11-01",
+  "operator_confirmed": [
+   {
+    "fact": "扩展板(ADXL345 在板上)已用绝缘胶带固定在电机上; 电机固定丝杆",
+    "source": "操作者 2026-11-01 现场原话与同批照片",
+    "consequence": "imu_mounting 那条缺失项闭合; 胶带装配的刚度仍未测, 不做精确振动标定"
+   },
+   {
+    "fact": "支座松手保持固定、连接紧固、螺母防转、移动块导向均无问题",
+    "source": "操作者 2026-11-01 在审核窗口的逐条确认(原文: \"用户已在审核窗口明确确认：支座松手保持固定、连接紧固、螺母防转、移动块导向均无问题。按操作者确认把 assembly_readiness 改为 PROVIDED\")",
+    "consequence": "assembly_readiness = PROVIDED => S4 学习与 S8b/S10b 起转放行; 此前\"轴承/底座只能手动固定\"这一条已被该确认取代(不是我推断的)"
+   },
+   {
+    "fact": "现有 T8 丝杆套件, 标称导程 8 mm; 已按照片装配",
+    "source": "复审 2026-11-01 转述操作者口径的更新原文(取代此前\"完整滑台/尚未连接/导程待确认\")",
+    "consequence": "8 mm 是**标称**值, 未做实测标定; 累计距离核算仍挂着"
+   },
+   {
+    "fact": "滑台起点在左端, 与末端限位留有间隙; 顺时针=向右",
+    "source": "操作者 2026-11-01",
+    "consequence": "方向按第一次被批准的短移动核实后才据此执行; 软件限位输入仍关闭, 不把左侧起点当限位保护"
+   },
+   {
+    "fact": "7363220 的软件修正已获独立接受; 本轮不重跑历史清单、不开纯登记轮",
+    "source": "复审 2026-11-01 本轮指令",
+    "consequence": "本轮只改装配状态、现场绑定与随之变化的期望值; 产品 C 源码与镜像不动"
+   }
+  ],
+  "operator_instructions": [
+   "load_means 不代填 => SG/ADC 加载链继续跳过; 装配确认不顶替加载手段",
+   "不通过撞两端限位制造堵转; 不新增回零/全程定位功能; 现场只用中间短行程",
+   "启动前记录实际计划序列(见 field_sequence_before_start), 等待本轮硬件固件批准; 本轮不申请、也不消耗任何现场批准"
+  ],
+  "not_received": [
+   "第一次短移动的方向核实结果(操作者明确: 该核实仍保留)",
+   "累计运动距离按标称导程 8 mm 与实际细分/脉冲参数核算"
+  ],
+  "fallback_registered_not_selected": "不通电脱开丝杆、保留扩展板固定在电机上、沿此前已验证的空载电机路径完成学习与 IMU 演示 —— 操作者此前给出的**备选**, 从未采纳; 装配确认后它的动因已消除, 但若装配状态回退仍受assembly_readiness 门控制",
+  "approvals_consumed_this_round": 0,
+  "package_status": "BOUND_NOT_EXECUTED",
+  "meaning": "这份绑定只描述\"当前前置到哪一步\", 不构成任何现场结论: 学习、两路激励、停机锁存与人工恢复的现场结果一个都还没有"
+ },
+ "field_sequence_before_start": {
+  "why": "操作者要求\"启动前记录实际计划序列\": 在装配门放行、加载手段仍缺的当前状态下, 把真正会执行的阶段序列与用量写清楚, 现场批准对着这份序列给",
+  "derived_by": "blocked_stages(计划数据) —— 与执行器同一套门规则; 检查器 E13 用真实干跑对账",
+  "expected_executed_stages": [
+   "S0",
+   "S3",
+   "S4",
+   "S5",
+   "S6",
+   "S7",
+   "S8b",
+   "S9b",
+   "S10b",
+   "S11b"
+  ],
+  "expected_skipped_stages": [
+   "S8",
+   "S9",
+   "S10",
+   "S11"
+  ],
+  "blocked_scopes": {
+   "SG_ADC_controlled_load": {
+    "stage": "S8",
+    "gates": [
+     "load_means"
+    ]
+   }
+  },
+  "expected_usage": {
+   "port_open": 8,
+   "motor_run": 2,
+   "cleanup_groups": 3,
+   "measured_in": "field/dispatch_stub_healthy.txt(QUOTA_AUDIT 逐条 used=…)"
+  },
+  "motion_caps": {
+   "learn_seconds_max": 15,
+   "sg_adc_seconds_max": 5,
+   "imu_seconds_max": 5,
+   "spin_ups_max": 3,
+   "note": "现场提案不变: 学习≤15 s, SG/ADC≤5 s, IMU≤5 s, 最多三次起转"
+  },
+  "not_a_field_result": "序列与用量是**离线干跑**的计划形状, 不是板上跑过; 现场结论一律未取",
+  "expected_executed_count": 10,
+  "sequence_basis": "由 r2.blocked_stages() 从计划数据推导(与执行器的门规则同一份实现), 再用真实 stub 干跑的 prerequisite_skips 对账(idle_learn_check 的 P6) —— 不手填序列",
+  "continuation_of_run": "reports/reviews/phase8-m8-idle-stack-r4/field/field-20261101T142722Z",
+  "no_download_readback_reset": "本续测包的设备动作集合里没有 download / readback / explicit_reset(额度 1/1 已在 R5 轮用尽), 第一条设备动作是开一次 COM5 然后直接问 system_status"
+ },
+ "quota_note_r5c": {
+  "zero_because_spent": {
+   "download": "1/1 已用(R5 轮 rc=0, 23.687 s, argv_sha256=922ae5a7…)",
+   "readback": "1/1 已用(R5 轮 rc=0, 290916 B 与绑定镜像逐字节相同 => 镜像在板已证)",
+   "explicit_reset": "1/1 已用(R5 轮 rc=0, 1.859 s, 之后收到 1027 B 启动流)"
+  },
+  "still_available": {
+   "port_open": 12,
+   "motor_run": 3,
+   "motor_run_seconds_total": 25,
+   "motion_cap_seconds_per_run": 5,
+   "approved_reboot": 1,
+   "config_save": 1,
+   "tmc_config_apply": 2,
+   "diag_profile_learn": 1,
+   "diag_profile_commit": 1,
+   "diag_profile_zero": 1,
+   "irq_polarity_prep": 4,
+   "cleanup_motor_stop": 5,
+   "cleanup_motor_disarm": 5,
+   "cleanup_motor_status": 5
+  },
+  "basis": "派生量由执行器 derive_quota_needs() 从**删掉下载/回读/复位之后的真实执行路径**重算, 不是手填; 与 PLAN_QUOTA_NEED 同一口径",
+  "not_relaxed": "起转次数、每次起转硬截止、学习 15 s、IMU 5 s、SG/ADC 加载链跳过、不清日志、不升流升频 —— 全部沿用原批准, 本包只改观测窗"
+ },
+ "observation_bounds": {
+  "boot_window_seconds_min": 75,
+  "why": "这是**观测下界**, 不是对板子的断言: 从复位/开口到第一条查询之间, 主机至少要有这么长时间在听, 才有资格说它观察过启动。低于它而拿不到字节, 结论只能是'没观察到'",
+  "boot_window_provenance": [
+   "经验上拿满: reports/reviews/phase8-m8-diag-stack-r1/field/cont-20261101T090512Z/RESULT.json 的 boot_window_s=75 拿到 3439 B 完整启动(READY)+四条查询全部回答",
+   "源码层耗时: 1 MiB 事件日志扫描按 NSF_SPI_HZ=1000000u 估 >=8.5 s, 且该文自陈是吞吐估算不是界限: reports/reviews/phase8-m8-relative-protection-r3/host/m8diag_source_audit.txt §3",
+   "反例(本包要修的正是这个): reports/reviews/phase8-m8-idle-stack-r4/field/field-20261101T142722Z 的窗只有 2.0 s(被动)+ 9.0 s(首查询), 断在扫描行之后, 实测 MISSING_RESPONSE_PROMPT as=sysboot bytes=0"
+  ],
+  "applies_to": "每个含复位步的 serial_session + 每个标 first_query_is_boot_probe 的 serial_session",
+  "enforced_by": "m8r3_serial_chain.validate_plan() 的 PLAN_BOOT_WINDOW_COVER(离线, 不开端口)",
+  "executor_side_fix": "申报的 boot_drain_seconds 现在真的走满(旧实现被未申报的静默早退剪短)",
+  "not_a_claim": "本下界不证明板子在 75 s 内一定应答; 仍然 0 字节就是具名停止 + 人工断电重启门"
+ },
+ "row_pattern_fixes_r5c": {
+  "count": 4,
+  "why": "现场第一次答回来才发现的取行失败: polarity 值含连字符(实测 not-confirmed), ps 的 NN% 之后还有 4 列(left tick/error/tcb addr/usage)。两处都按板上实字改, 证据: field-20261101T151317Z/S_S3/01_sysboot.rx.bin(983 B 完整响应) 与 cont-20261101T090512Z/S4_ps.rx.bin 的真实行",
+  "not_relaxed": "栈大小/取行唯一性/must 值这些判据一个没删, 只是把行尾的列补全"
+ },
+ "byte_integrity_policy": {
+  "trigger": "ILLEGAL_BYTES_IN_RESPONSE(响应里出现非法 UTF-8 字节序列, 实测为长行尾部的 0x00)",
+  "default": "STOP —— 本包里只有上面两条 apply 步骤申报了重确认, 其余步骤一律照旧停",
+  "observed_on_board": "两次续测同一位置复现: 行 `[TMC-CFG] CONFIGURED (每次写入均经 IFCNT 确认; GCONF/CHOPCONF 读回一致)。电流值仍为理论计算, 未实测。` 共 132 B, 末尾 `。` 的第三字节由 0x82 变成 0x00。与既存 P0 轮登记的长行损坏同族; 机制仍未证(不据症状改产品 C)",
+  "kept_evidence": "原始字节文件与台账事件 EVIDENCE_BYTE_CORRUPTION 全部入库, 未删未改",
+  "conclusion_source": "tmc_config_show 的 expect_values 硬字段(state=CONFIGURED, fail_reg=0x00, snapshot_valid=1) —— 与 apply 的打印无关",
+  "reviewer_note": "如果复审认为这条口子也不该开, 那结论就是本包在 apply 处具名停止, 需要产品侧把那条长行改短到 128 B 以内(改 C + 重编 + 重烧), 那是另一次批准的另一轮"
+ },
+ "irq_fact_authority_r5c": {
+  "observed_in": "reports/reviews/phase8-m8-idle-stack-r4/field/field-20261101T152547Z/S_S3/07_irq.rx.bin (31 B)",
+  "rule": "状态事实一律来自状态回读命令, 不来自动作命令的跳变打印"
+ },
+ "running_gate_status_r5c": {
+  "steps": 3,
+  "observed_in": "reports/reviews/phase8-m8-idle-stack-r4/field/field-20261101T153836Z/S_S4/07_running_proof.poll01.rx.bin",
+  "bit_meaning": "0x2=MOT_GATE_NOT_READY(安全状态机不在 READY), 见 applications/motor.h:89 与 motor.c:2410 的打印点",
+  "not_allowed": "静止态步骤(rest0/rest2/rest_before_arm 等)一律不放行: 那里 mask 非 0 必须停"
+ },
+ "continuation_of": {
+  "approved_tip": "4cb9dac0f2a47beb494a4fb41090cefe8da76075",
+  "run_dir": "reports/reviews/phase8-m8-idle-stack-r4/field/field-20261101T142722Z",
+  "plan_executed": "reports/reviews/phase8-m8-idle-stack-r4/field/plan_core_r4.json",
+  "executor_executed": {
+   "sha256": "40517501b3bedde928b338d56e4e9d89d1b1e91a32405f2b1ae20f1dd473ed40",
+   "bytes": 148267
+  },
+  "proven_by_that_run": [
+   "新镜像在板: readback.bin 290916 B sha256=dab356c69fbf4ca747e838580c16982bd56b53b1367f84b97ab705c2fbd25439, 与 identity_binding.image 及归档 BIN 逐字节相同",
+   "下载/回读/显式复位各恰好一次且 rc=0(一次性额度已尽)",
+   "复位后有**真实启动流** 1027 B(sha256=1947fbaca20a1f048ed7525c8961d559ae02256e48e1866e9f288e36df36bf95), 末行 [FLASH] scanning 1 MiB event log...",
+   "零次起转: motor_run 键缺席, 台账里没有任何 motor_arm/motor_start"
+  ],
+  "where_it_stopped": {
+   "stage": "S3",
+   "code": "MISSING_RESPONSE_PROMPT",
+   "detail": "as=sysboot bytes=0",
+   "observed_horizon_seconds": 11.0,
+   "declared_but_not_honored": "boot_drain_seconds=20 实截为 2.0 s(未申报的静默早退)",
+   "flow_complete": false,
+   "core_protection_verified": false,
+   "claims": {}
+  },
+  "not_claimed": "这一轮没有证伪也没有证实任何东西: H1 无界 SPI 自旋 / H2 核没在跑 / H3 主机到板 RX 不通 / H4 只是启动比 11 s 慢, 四条并列(与 OFFLINE_JUDGEMENT.txt §2 同一口径)。idle 栈在板容量没读到(ps 从未发出)",
+  "sequence_diff": "删 S1/S2 + 删 S3 的复位步; 其余阶段与场景链原样(含 SG/ADC 那场仍被 load_means 拒绝)"
+ },
+ "changes_this_round_r5c": [
+  "① 额度: download/readback/explicit_reset 归零并删掉对应设备阶段(一次性批准已烧掉)",
+  "② 观测: S3 首查询 6 -> 75 s + first_query_is_boot_probe + 阶段总时限 90 -> 300 s; 执行器按申报走满被动窗",
+  "③ 身份: 新执行器散列只绑进本续测包; 已执行的 R4 包保留它当时真正跑过的 40517501b3be…",
+  "④' 判据: system_status 响应里的开机默认安全态行 arm gate fail mask=0x18 (arm REFUSED) 不再被当成 BUSINESS_FAILED(执行器新增**整行锚定**且必须被 expect_contains 正面要求该行的白名单; 掩码值不写死——现场实测同一块板先后给出 0x18 与 0x8, 写死就会把真实状态误判成违规)。离线门 PLAN_STATUS_ALLOW 管住它的形状(必须是前缀要求 + 锚定 + 无 .* 通配)",
+  "④ 门: PLAN_BOOT_WINDOW_COVER 把'观测窗短于启动本身'变成离线就红, 不再靠现场去发现",
+  "⑤ 登记: R5 现场轮逐场分类见 run_record §13 与 reports/reviews/phase8-m8-idle-stack-r4/field/field-20261101T142722Z/OFFLINE_JUDGEMENT.txt"
+ ],
+ "plan_identity": {
+  "path": "reports/reviews/phase8-m8-idle-stack-r4/field/plan_core_r5c.json",
+  "rows_file": {
+   "path": "reports/reviews/phase8-m8-idle-stack-r4/field/rows.json",
+   "bytes": 51963,
+   "sha256": "3a08721814c0e05e2e87ac7e43ed75b4e4f537d9671e816973432db3859f00a4"
+  }
+ },
+ "r6_candidate_image": {
+  "bind_state": "NOT_BOUND_IN_THIS_PACKAGE",
+  "why": "本包是离线派生件, approval.status=REQUIRES_NEW_APPROVAL 且 hardware_actions_authorized_by_this_package=0 => 没有任何一次下载授权, 所以 image_binding 继续指向**已在板逐字节证过**的那件; 新候选镜像只在这里登记身份, 下一个现场包若要烧它必须自己重绑并按新代码另批",
+  "bin_path": "reports/firmware/phase8-m8-r6-offline-recovery/rt-thread-motor-m1-candidate.bin",
+  "bin_bytes": 292116,
+  "bin_sha256": "d70a9180b40c5c6a25f3692bd973ffb0309a1da5db9a2f6e0768300405a9b86b",
+  "axf_path": "reports/firmware/phase8-m8-r6-offline-recovery/rt-thread-motor-m1.axf",
+  "axf_bytes": 1773504,
+  "axf_sha256": "3c113310dc5c70e4e26e51a91a7fd95a6b5a8e1da639cdd3cbb18e79b99a62cf",
+  "built_from": "本轮 R6-7 单目标 Rebuild All(0 Error/0 Warning), 逐字段见 reports/firmware/phase8-m8-r6-offline-recovery/build_manifest.json",
+  "manifest_sha256": "d445170418afae9a3d43ff7162c4e71175af42d2ea2baf57656eafd88989161f"
+ },
+ "approval": {
+  "status": "REQUIRES_NEW_APPROVAL",
+  "prior_token": "4cb9dac0f2a47beb494a4fb41090cefe8da76075",
+  "prior_token_state": "EXHAUSTED_AND_OVERRUN: 该批准下的 26 场把 tmc_config_apply 用到 14/2、irq_polarity_prep 18/4、port_open 32/12、diag_profile_zero 6/1, learn 与两次起转额度已用尽; 换计划文件/换输出目录都不重新发额度",
+  "hardware_actions_authorized_by_this_package": 0,
+  "why": "本轮(R6)是离线修复轮: 产品状态收口与输出完整性已改码, 需要复审按**新代码 + 实际工况 + 操作者设备状态**另给一次具体现场范围后才能执行"
+ },
+ "changes_this_round_r6": [
+  "① 取消 cfgapply/cfgapply2 两处 byte_corruption_recovery(2 处): S3/cfgapply->cfgafter,S7/cfgapply2->cfg2after => 恢复\"字节损坏即停\"",
+  "② 身份: 绑定 R6 执行器 1b23719a3c9a/184093 B; 已执行的 R5-C 计划(05bcf96aa7a6…)与其 26 场原件保持冻结不动",
+  "③ 批准口径: approval.status=REQUIRES_NEW_APPROVAL, 本包不携带任何设备动作授权",
+  "④ 依据的产品改动(不在本包内, 只记口径): motor.c mot_commit_gated 成功关闭同笔提交 Safety RUN->READY; tmc2209.c CONFIGURED 与 safety_thread.c LIMIT 长打印拆到每次调用 ≤120 B",
+  "⑤ 额度控制(R6-6, 复审 §7.4 要的那件缺失件): 新增按**批准身份**命名且放在输出目录之外的持久预占账(先落盘再动作, 崩溃不退款, 双执行者共一本不超 cap, 缺失/损坏/身份不符 => 拒绝进入真实动作且不自建满额账); 撤能预留预约失败仍照发(安全动作优先于额度)并落成具名披露",
+  "⑥ R6-7 单目标构建产物只登记身份(r6_candidate_image, bind_state=NOT_BOUND_IN_THIS_PACKAGE), 本包不烧写、不下载; 要动它必须由下一个现场包重绑并另批"
+ ],
+ "package_status": "R6_DERIVED_NOT_EXECUTED"
+}

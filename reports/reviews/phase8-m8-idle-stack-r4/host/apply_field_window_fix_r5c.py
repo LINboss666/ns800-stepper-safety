@@ -27,6 +27,7 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -47,6 +48,14 @@ BOOT_SHA = "1947fbaca20a1f048ed7525c8961d559ae02256e48e1866e9f288e36df36bf95"
 # 现场 26 场(field-20261101T15*)实际喂进去的那份 plan_core_r5c.json 的字节身份。
 # 它是**执行输入**, 与失败字节同级: 本工具此后只校验它, 不再覆写它。
 EXECUTED_PLAN_SHA = "05bcf96aa7a6bf89291dab9b140253dde74982f7c3907a49a51bb2972d3a3746"
+# R5-C 交付时那份执行器的字节身份(= git 535459f 里该文件的 blob; 现场 26 场真正跑过的就是它)。
+# 生成器**不许**把"今天盘上的采集器"盖进这份冻结包: R6 复审 §6 抓到的正是这类自伤 —— 采集器在
+# 交付之后还会继续改, 而每轮的执行输入只绑定它自己那一轮跑过的字节。--check 另按 git blob 复算,
+# 证明这两个常量不是抄来的。
+DELIVERED_EXECUTOR_COMMIT = "535459f"
+DELIVERED_EXECUTOR_REL = "reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py"
+DELIVERED_EXECUTOR_SHA = "bb243467cbd87264a898b8636e2fbe06741a964b88481d6ebce7e9cb8d6895f2"
+DELIVERED_EXECUTOR_BYTES = 162645
 CONT_REF = "reports/reviews/phase8-m8-diag-stack-r1/field/cont-20261101T090512Z/RESULT.json"
 AUDIT_REF = "reports/reviews/phase8-m8-relative-protection-r3/host/m8diag_source_audit.txt"
 
@@ -206,8 +215,10 @@ def fix_stages(plan, by_id):
 def fix_identity(plan):
     ident = plan["identity_binding"]
     ident["executor"] = {
-        "path": "reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py",
-        "bytes": nbytes(CHAIN), "sha256": sha(CHAIN),
+        "path": DELIVERED_EXECUTOR_REL,
+        # 冻结交付身份, 不是"今天盘上的采集器"(见上面 DELIVERED_EXECUTOR_* 的注释)。
+        # 这里**不加新键**: 规范输出必须与现场实际喂进去的那份字节同构, 否则"顺序差"就会露成语义差。
+        "bytes": DELIVERED_EXECUTOR_BYTES, "sha256": DELIVERED_EXECUTOR_SHA,
         "changes_in_this_round": [
             "drain_post_reset_boot(): 删掉**未申报**的静默早退(旧: elapsed>=min(2.0,window) 且静默 0.2 s "
             "即 break, 于是申报 20 s 实跑 2.0 s)。现在申报的预算走满, 只有两种提前结束: 看到正信号 "
@@ -472,6 +483,12 @@ def main():
                                                    "ns800rt7p65-nssinepad/applications"))
     cover = [l for l in lines if l.startswith("PLAN_BOOT_WINDOW_COVER")]
     print("R5C_VALIDATE|checks=%d|fail=%d|%s" % (len(lines), bad, ";".join(cover)))
+    # 这份冻结包申报了 byte_corruption_recovery, 而该合同在 R6 复审后**退役** => 现门下这一项必然判红。
+    # 允许的失败集合只有"退役的恢复合同"这一项; 多出任何一项都说明包体或门自己坏了, 一律 rc=1。
+    failed = sorted({l.split("|")[0] for l in lines if "|FAIL|" in l})
+    gate_ok = failed in ([], ["PLAN_BYTE_RECOVERY"])
+    print("R5C_GATE|fail=%d|failing=%s|retired_recovery_only=%s"
+          % (bad, ",".join(failed) or "-", gate_ok))
     needs = chain.derive_quota_needs(plan)
     print("R5C_NEEDS|%s" % json.dumps(needs, sort_keys=True))
     if a.check:
@@ -486,10 +503,21 @@ def main():
             rel = "ORDER_ONLY_DELTA"
         else:
             rel = "SEMANTIC_DELTA"
+        # 盖在包里的交付身份必须能被 git 复算 —— 常量抄错就等于伪造"哪份字节跑过这一轮"。
+        g = subprocess.run(["git", "show", "%s:%s" % (DELIVERED_EXECUTOR_COMMIT,
+                                                      DELIVERED_EXECUTOR_REL)],
+                           cwd=str(ROOT), capture_output=True)
+        blob_sha = hashlib.sha256(g.stdout).hexdigest() if g.returncode == 0 else None
+        ident_ok = (g.returncode == 0 and blob_sha == DELIVERED_EXECUTOR_SHA and
+                    len(g.stdout) == DELIVERED_EXECUTOR_BYTES)
+        print("R5C_IDENTITY|stamped=%s/%d B|git_blob@%s=%s/%d B|matches=%s" % (
+            DELIVERED_EXECUTOR_SHA[:16], DELIVERED_EXECUTOR_BYTES, DELIVERED_EXECUTOR_COMMIT,
+            (blob_sha or "-")[:16], len(g.stdout) if g.returncode == 0 else -1, ident_ok))
         print("R5C_CHECK|executed_bytes_unchanged=%s(%s)|canon_vs_executed=%s|canon_bytes=%d|canon_sha=%s"
               % (frozen, disk_sha[:16], rel, len(body.encode("utf-8")),
                  hashlib.sha256(body.encode("utf-8")).hexdigest()[:16]))
-        return 0 if (frozen and rel in ("CANONICAL_EQUALS_EXECUTED", "ORDER_ONLY_DELTA") and bad == 0) else 1
+        return 0 if (frozen and rel in ("CANONICAL_EQUALS_EXECUTED", "ORDER_ONLY_DELTA")
+                     and gate_ok and ident_ok) else 1
     if OUT.exists() and sha(OUT) == EXECUTED_PLAN_SHA:
         print("R5C_REFUSE_WRITE|%s 是现场 26 场实际用过的执行输入(sha %s…), 不允许覆写; "
               "要出新包请用 --emit <新路径>" % (OUT.as_posix(), EXECUTED_PLAN_SHA[:12]))

@@ -297,21 +297,32 @@ add("E7_validate_plan_clean", bad5 == 0 and len(lines5) > 200, "checks=%d fail=%
 add("E8_quota_declares_no_retry_and_no_blackbox_clear",
     PLAN["quota"]["retry"] == 0 and PLAN["quota"].get("blackbox_clear", 0) == 0 and
     PLAN["quota"]["download"] == 1 and PLAN["quota"]["readback"] == 1)
-def dispatch(plan_obj, tag):
-    """把包放进仓外临时目录跑 stub+sim 干跑(rows_file 是相对计划目录解析的)。"""
+def dispatch(plan_obj, tag, chain=None):
+    """把包放进仓外临时目录跑 stub+sim 干跑(rows_file 是相对计划目录解析的)。
+    chain=None 用**盘上现执行器**; 冻结包要配它**当时那版**执行器复跑时用仓外副本(见 R5C_BLOB)。"""
     d = SCRATCH / (tag + "_field")
     d.mkdir(parents=True, exist_ok=True)
     for f in ("rows.json", "needles.json"):
         shutil.copyfile(str(FIELD / f), str(d / f))
     pp = d / "plan.json"
     pp.write_text(json.dumps(plan_obj, ensure_ascii=False, indent=1) + "\n", encoding="utf-8", newline="\n")
-    r = subprocess.run([sys.executable, str(CHAIN), "--dispatch", "--transport", "stub", "--backend", "sim",
+    r = subprocess.run([sys.executable, str(chain or CHAIN), "--dispatch", "--transport", "stub", "--backend", "sim",
                         "--profile", "healthy", "--plan", str(pp), "--repo-root", str(ROOT),
                         "--out", str(SCRATCH / ("dispatch_" + tag))],
                        capture_output=True, text=True, encoding="utf-8", errors="replace")
     txt = (r.stdout or "") + (r.stderr or "")
     (FIELD / ("dispatch_stub_%s.txt" % tag)).write_text(txt, encoding="utf-8", newline="\n")
     return txt
+
+
+def git_blob(commit, rel, dest=None):
+    """从 git 取当时的 blob(只读), 顺手复算散列/字节数; dest 给就把原件写到**仓外**。"""
+    g = subprocess.run(["git", "show", "%s:%s" % (commit, rel)], cwd=str(ROOT), capture_output=True)
+    if g.returncode != 0:
+        raise AssertionError("git blob 取不到: %s:%s" % (commit, rel))
+    if dest is not None:
+        pathlib.Path(dest).write_bytes(g.stdout)
+    return hashlib.sha256(g.stdout).hexdigest(), len(g.stdout)
 
 
 htxt = dispatch(json.loads(json.dumps(PLAN)), "healthy")
@@ -909,15 +920,19 @@ def _vplan(doc):
 
 _lines_c, _bad_c, _ = _vplan(json.loads(json.dumps(R5C)))
 _cover_c = [l for l in _lines_c if l.startswith("PLAN_BOOT_WINDOW_COVER")]
+# 这份冻结包申报了 byte_corruption_recovery, 该合同在 R6 退役 => 现门下**只有这一项**判红。
+# 整包 fail=0 已经不再是对它的正确期望(那等于要求旧例外永远有效); 允许集恰好等于它自己。
+_fail_c = sorted({l.split("|")[0] for l in _lines_c if "|FAIL|" in l})
 _shrink = json.loads(json.dumps(R5C))
 next(s for s in _shrink["stages"] if s["id"] == "S3")["steps"][0]["seconds"] = 6
 _lines_s, _bad_s, _ = _vplan(_shrink)
 _cover_s = [l for l in _lines_s if l.startswith("PLAN_BOOT_WINDOW_COVER")]
 add("P4_meta_negative_short_query_window_fires",
-    len(_cover_c) == 1 and "|PASS|" in _cover_c[0] and _bad_c == 0 and
-    len(_cover_s) == 1 and "|FAIL|" in _cover_s[0] and _bad_s >= 1 and "78s" in _cover_c[0],
-    "观测门下界=75 s: 续测包(首查询 75 s + SLACK 3 s)PASS 且整包 fail=0; 只把首查询改回现场那一版(6 s) "
-    "就必须翻红 => 这条门量的是窗, 不是摆设(%s)" % (_cover_s[0] if _cover_s else "-"))
+    len(_cover_c) == 1 and "|PASS|" in _cover_c[0] and _fail_c == ["PLAN_BYTE_RECOVERY"] and
+    len(_cover_s) == 1 and "|FAIL|" in _cover_s[0] and _bad_s >= 2 and "78s" in _cover_c[0],
+    "观测门下界=75 s: 续测包(首查询 75 s + SLACK 3 s)这一门 PASS 且除已退役的恢复合同外零失败"
+    "(failing=%s); 只把首查询改回现场那一版(6 s) 就必须**再多一项**翻红 => 这条门量的是窗, 不是摆设(%s)"
+    % (",".join(_fail_c), _cover_s[0] if _cover_s else "-"))
 
 _noprov = json.loads(json.dumps(R5C))
 _noprov["observation_bounds"]["boot_window_provenance"] = []
@@ -942,7 +957,13 @@ add("P6_historical_plans_get_NA_not_rewritten",
     "R4 包(未申报 observation_bounds)只拿到 NA, 不当成 PASS 也不判红; 它的 fail 数与本组其它用例一致"
     "(=%d) —— 历史包字节不回改, 新门不追溯" % _bad4b)
 
-_txt5c = dispatch(json.loads(json.dumps(R5C)), "r5c_delivery")
+# R6 复审 §6: 冻结包**复跑**要用它自己当时那版执行器(从 git blob 取到仓外), 不是盘上这份 —— 盘上那份
+# 后来改了判据(退役恢复合同), 用今天的代码去验昨天的包, 得出的"失败"既不是历史也不是回归。
+_R5C_BLOB_COMMIT = "535459f"
+_REL_CHAIN = "reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py"
+_FROZEN_CHAIN = SCRATCH / ("m8r3_serial_chain_at_%s.py" % _R5C_BLOB_COMMIT)
+_blob5c, _blob5c_bytes = git_blob(_R5C_BLOB_COMMIT, _REL_CHAIN, _FROZEN_CHAIN)
+_txt5c = dispatch(json.loads(json.dumps(R5C)), "r5c_delivery", chain=_FROZEN_CHAIN)
 _exec5c = [s.split("|")[1].split("=")[1] for s in _txt5c.splitlines() if s.startswith("DISPATCH|stage=")]
 _skip5c = re.search(r"prerequisite_skips=\[(.*?)\]", _txt5c)
 _skip5c = [x.strip().strip('"') for x in _skip5c.group(1).split(",")] if _skip5c else []
@@ -953,21 +974,62 @@ add("P7_r5c_runs_end_to_end_offline",
     "PREREQUISITE_REFUSAL|scenario=SG_ADC_controlled_load|refused_before=S8|gates=load_means|"
     in _txt5c and "download" not in re.search(r"quota_used=\{([^}]*)\}", _txt5c).group(1) and
     "motor_run" in re.search(r"quota_used=\{([^}]*)\}", _txt5c).group(1),
-    "续测包在零设备工装上整包跑通: 执行 %d 个阶段(%s) / 跳过 %s / quota_used 里没有 download·readback·"
-    "explicit_reset 任何一项(额度已归零), SG/ADC 链仍在开端口之前被具名拒绝"
-    % (len(_exec5c), ",".join(_exec5c), ",".join(_skip5c)))
+    "续测包在它**当时那版**执行器(git %s 的 blob, %s…/%d B, 写到仓外后原样跑)上整包跑通: "
+    "执行 %d 个阶段(%s) / 跳过 %s / quota_used 里没有 download·readback·explicit_reset 任何一项"
+    "(额度已归零), SG/ADC 链仍在开端口之前被具名拒绝"
+    % (_R5C_BLOB_COMMIT, _blob5c[:12], _blob5c_bytes, len(_exec5c), ",".join(_exec5c),
+       ",".join(_skip5c)))
+
+# 同一份包、同一批字节, 换成**盘上现执行器**必须停在退役合同上, 且后面的危险一步都不许再发。
+_txt5c_live = dispatch(json.loads(json.dumps(R5C)), "r5c_delivery_live_chain")
+
+
+def _tx_cmds_of(dispatch_dir):
+    """从各会话自己的台账取**实发命令**(TX 事件记的是写进端口的原始字节), 不看汇总标签。"""
+    got = []
+    for lp in sorted(pathlib.Path(dispatch_dir).glob("S_*/ledger.jsonl")):
+        for line in lp.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                rec = json.loads(line)
+                if rec.get("kind") == "TX":
+                    got.append(rec.get("bytes", "").strip())
+    return got
+
+
+_tx5c_live = _tx_cmds_of(SCRATCH / "dispatch_r5c_delivery_live_chain")
+_stop5c = [s for s in _txt5c_live.splitlines()
+           if "|status=STOP|" in s and "RETIRED_RECOVERY_CONTRACT" in s]
+_DANGEROUS5C = ("motor_arm", "motor_dir", "motor_target", "motor_start",
+                "diag_profile commit", "config_save", "tmc_config apply")
+_sent5c = [c for c in _DANGEROUS5C if any(c in t for t in _tx5c_live)]
+add("P13_live_executor_refuses_retired_recovery_declaration",
+    bool(_stop5c) and "DISPATCH_SUMMARY|status=STOP" in _txt5c_live and
+    "stages_not_run=0" not in _txt5c_live and "tmc_config apply" not in " ".join(_tx5c_live) and
+    _sent5c == [],
+    "盘上现执行器(%s…/%d B)喂同一份 R5-C 包: %s 具名停 RETIRED_RECOVERY_CONTRACT, 整包 STOP 且有阶段"
+    "未跑; 该轮实发 %d 条命令(%s), 申报恢复的那条 apply 与任何武装/起转/提交/保存都没发出去" % (
+        sha(CHAIN)[:12], CHAIN.stat().st_size,
+        (_stop5c[0].split("|")[1] if _stop5c else "没有 STOP 阶段"),
+        len(_tx5c_live), ",".join(_tx5c_live) or "-"))
 
 _disk_sha, _disk_bytes = sha(CHAIN), CHAIN.stat().st_size
-add("P8_two_executor_identities_stay_split",
-    _disk_sha != R5C["continuation_of"]["executor_executed"]["sha256"] and
+_R6_PATH = ROOT / "reports/reviews/phase8-m8-r6-offline-recovery/field/plan_core_r6.json"
+_R6 = json.loads(_R6_PATH.read_text(encoding="utf-8")) if _R6_PATH.exists() else None
+_R6_EXEC = ((_R6 or {}).get("identity_binding", {}).get("executor", {}) or {})
+add("P8_frozen_executor_identity_is_blob_verifiable_and_live_package_matches_disk",
     PLAN["identity_binding"]["executor"]["sha256"] ==
     R5C["continuation_of"]["executor_executed"]["sha256"] and
-    R5C["identity_binding"]["executor"]["sha256"] == _disk_sha and
-    R5C["identity_binding"]["executor"]["bytes"] == _disk_bytes and
-    R5C["identity_binding"]["image"]["sha256"] == PLAN["identity_binding"]["image"]["sha256"],
-    "两份执行器身份分列且都对得上字节: R4 包继续登记它当时真跑过的 %s…, 续测包登记修好之后的 %s…/"
-    "%d B; 镜像身份两包同一件(未重编、未覆盖)"
-    % (R5C["continuation_of"]["executor_executed"]["sha256"][:12], _disk_sha[:12], _disk_bytes))
+    _blob5c == R5C["identity_binding"]["executor"]["sha256"] and
+    _blob5c_bytes == R5C["identity_binding"]["executor"]["bytes"] and
+    R5C["identity_binding"]["image"]["sha256"] == PLAN["identity_binding"]["image"]["sha256"] and
+    bool(_R6) and _R6_EXEC.get("sha256") == _disk_sha and _R6_EXEC.get("bytes") == _disk_bytes and
+    _R6_EXEC.get("sha256") != R5C["identity_binding"]["executor"]["sha256"],
+    "冻结件对当时字节可复算: R4 包(%s…)与 R5C 记的“上一轮真跑过的那份”同一件, "
+    "R5C 注册值(%s…/%s B)== git %s 里该文件 blob 的实算, 两包镜像仍是同一件(未重编); "
+    "盘上现在是 %s…/%s B, 与 R5C 那份已不同 => 只有**新**候选包 R6 登记它(%s…), 冻结件不回改" % (
+        PLAN["identity_binding"]["executor"]["sha256"][:12],
+        R5C["identity_binding"]["executor"]["sha256"][:12], _blob5c_bytes, _R5C_BLOB_COMMIT,
+        _disk_sha[:12], _disk_bytes, _R6_EXEC.get("sha256", "-")[:12]))
 
 add("P9_stages_and_gates_survive_the_edit",
     [s["id"] for s in R5C["stages"]][:1] == ["S0"] and "S1" not in [s["id"] for s in R5C["stages"]]

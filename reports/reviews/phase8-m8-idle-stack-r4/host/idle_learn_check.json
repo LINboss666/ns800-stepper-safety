@@ -483,7 +483,7 @@
   {
    "name": "M5_m5_history_untouched",
    "ok": true,
-   "detail": "工作树里没有 M5 软件故障原件的改动(event=9 的那批历史证据原样保留); 本轮改动=35 项"
+   "detail": "工作树里没有 M5 软件故障原件的改动(event=9 的那批历史证据原样保留); 本轮改动=20 项"
   },
   {
    "name": "M6_event_five_basis_is_source",
@@ -553,7 +553,7 @@
   {
    "name": "P4_meta_negative_short_query_window_fires",
    "ok": true,
-   "detail": "观测门下界=75 s: 续测包(首查询 75 s + SLACK 3 s)PASS 且整包 fail=0; 只把首查询改回现场那一版(6 s) 就必须翻红 => 这条门量的是窗, 不是摆设(PLAN_BOOT_WINDOW_COVER|all|FAIL|S3:可观测量 9s < 下界 75s)"
+   "detail": "观测门下界=75 s: 续测包(首查询 75 s + SLACK 3 s)这一门 PASS 且除已退役的恢复合同外零失败(failing=PLAN_BYTE_RECOVERY); 只把首查询改回现场那一版(6 s) 就必须**再多一项**翻红 => 这条门量的是窗, 不是摆设(PLAN_BOOT_WINDOW_COVER|all|FAIL|S3:可观测量 9s < 下界 75s)"
   },
   {
    "name": "P5_meta_negative_no_provenance_and_quiet_reintroduced",
@@ -568,12 +568,17 @@
   {
    "name": "P7_r5c_runs_end_to_end_offline",
    "ok": true,
-   "detail": "续测包在零设备工装上整包跑通: 执行 10 个阶段(S0,S3,S4,S5,S6,S7,S8b,S9b,S10b,S11b) / 跳过 S8,S9,S10,S11 / quota_used 里没有 download·readback·explicit_reset 任何一项(额度已归零), SG/ADC 链仍在开端口之前被具名拒绝"
+   "detail": "续测包在它**当时那版**执行器(git 535459f 的 blob, bb243467cbd8…/162645 B, 写到仓外后原样跑)上整包跑通: 执行 10 个阶段(S0,S3,S4,S5,S6,S7,S8b,S9b,S10b,S11b) / 跳过 S8,S9,S10,S11 / quota_used 里没有 download·readback·explicit_reset 任何一项(额度已归零), SG/ADC 链仍在开端口之前被具名拒绝"
   },
   {
-   "name": "P8_two_executor_identities_stay_split",
+   "name": "P13_live_executor_refuses_retired_recovery_declaration",
    "ok": true,
-   "detail": "两份执行器身份分列且都对得上字节: R4 包继续登记它当时真跑过的 40517501b3be…, 续测包登记修好之后的 bb243467cbd8…/162645 B; 镜像身份两包同一件(未重编、未覆盖)"
+   "detail": "盘上现执行器(1b23719a3c9a…/184093 B)喂同一份 R5-C 包: stage=S3 具名停 RETIRED_RECOVERY_CONTRACT, 整包 STOP 且有阶段未跑; 该轮实发 4 条命令(system_status,ps,tmc_config_show,tmc_config_apply CONFIRM), 申报恢复的那条 apply 与任何武装/起转/提交/保存都没发出去"
+  },
+  {
+   "name": "P8_frozen_executor_identity_is_blob_verifiable_and_live_package_matches_disk",
+   "ok": true,
+   "detail": "冻结件对当时字节可复算: R4 包(40517501b3be…)与 R5C 记的“上一轮真跑过的那份”同一件, R5C 注册值(bb243467cbd8…/162645 B)== git 535459f 里该文件 blob 的实算, 两包镜像仍是同一件(未重编); 盘上现在是 1b23719a3c9a…/184093 B, 与 R5C 那份已不同 => 只有**新**候选包 R6 登记它(1b23719a3c9a…), 冻结件不回改"
   },
   {
    "name": "P9_stages_and_gates_survive_the_edit",

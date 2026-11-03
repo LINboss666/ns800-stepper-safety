@@ -62,3 +62,8 @@ reports/reviews/phase8-m8-idle-stack-r4/** -text
 # results_local.json 是 Windows python 写出的原件(CR=452), 其 sha256 绑的就是含 CR 的字节;
 # 交付纪律要求"原样纳入、不覆盖、不重新生成原始结果", 所以 blob 字节必须等于磁盘字节。
 reports/reviews/phase8-m8-parallel-protection-ready/** -text
+
+# ===== M8-R6 离线修复轮: 整轮所有文件(派生计划/构建日志/镜像/map/manifest/台账实证)一律禁止行尾转换 =====
+# 本轮的"原字节可复算"声称靠 blob==磁盘字节成立; 派生件与 CLI 实证文本都是 LF 原件, 不许被转换。
+reports/firmware/phase8-m8-r6-offline-recovery/** -text
+reports/reviews/phase8-m8-r6-offline-recovery/** -text

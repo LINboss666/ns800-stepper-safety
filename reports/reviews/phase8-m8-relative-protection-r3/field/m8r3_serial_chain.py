@@ -34,6 +34,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -304,7 +305,13 @@ def read_until_prompt(port, deadline, led, raw_path, clock):
                     raise Stop("EVIDENCE_WRITE_FAILED",
                                "%s:%s bytes=%d" % (raw_path, e.__class__.__name__, len(buf)))
                 if len(buf) > RESPONSE_CAP:
+                    # 危险扫描先于这条上限: 否则一个 20 kB 的告警刷屏会先撞上字节帽,
+                    # 把"板上正在报 HardFault/栈溢出"这件事实降级成"响应太长"。
                     raise Stop("RESPONSE_BYTE_CAP")
+                # R6(复审 §5.2): **原始字节**里的危险标记优先于一切解码/长度/协议判定。
+                # 旧顺序是 解码 -> (判据层才)check_danger, 于是含非法 UTF-8 的响应先抛解码异常,
+                # 再被恢复合同转成"可继续", 同批字节里已经存在的 HardFault 就被遮掉了。
+                check_danger(bytes(buf))
                 if PROMPT_RE.search(ANSI.sub(b"", bytes(buf))):
                     break
             if clock.monotonic() > deadline:
@@ -315,11 +322,15 @@ def read_until_prompt(port, deadline, led, raw_path, clock):
     if nul:
         # 裸 0x00 本身是合法 UTF-8, 所以 decode 门抓不到它 —— 而现场实测两种损坏都见过:
         # 一种是截断的多字节序列(被 ILLEGAL_BYTES 拒), 另一种就是这种裸 NUL(以前静默通过)。
-        # 这里只做**具名披露**(不改判据、不放宽、也不在这里新增停止), 让每条含 NUL 的响应在台账里可见。
         led.ev("NUL_IN_RESPONSE", bytes=nul, first_offset=raw.index(b"\x00"),
                tail=repr(raw[-24:]), meaning="控制台输出通道的字节损坏, 机制未证")
     led.ev("RX_DONE", bytes=len(raw), prompt_seen=bool(PROMPT_RE.search(ANSI.sub(b"", raw))),
            raw_sha256=sha_bytes(raw), tail=repr(raw[-16:]), nul_bytes=nul)
+    if nul:
+        # R6 §5.1: 裸 NUL = 硬失败(复审探针实测到旧版只记事件不拒绝, 让含 NUL 的"干净重确认"通过)。
+        # 原字节已经落盘, 不改一字; 本步响应一律不作数, 也不允许"由后面某步重确认"来放行。
+        raise Stop("NUL_BYTE_IN_RESPONSE", "bytes=%d first_offset=%d raw=%s" %
+                   (nul, raw.index(b"\x00"), raw_path))
     if not PROMPT_RE.search(ANSI.sub(b"", raw)):
         return [], len(raw)                     # 协议不成立: 交给判据层, 绝不当作完整响应
     return split_rows(raw), len(raw)
@@ -865,6 +876,232 @@ class MotionBudget:
         return self.actual
 
 
+class ApprovalLedger:
+    """绑定批准身份的**跨进程**持久预占账(复审 M8-R5C §7.4 要求的那件缺失控制)。
+
+    为什么会存在: R5-C 那 26 场里每场 dispatch 各自持一本内存账, 换输出目录或重开进程就把
+    一次批准的边界清零, 于是 tmc_config_apply 实际用到 14(批准 2)。"结束时再汇总"无法阻止
+    下一次发送, 所以把扣减搬到一个由**批准身份**命名的文件上:
+      * 身份 = 批准令牌 + 计划 sha256 + 执行器 sha256 + 镜像 sha256; 任一变化 => 拒绝沿用同一份账,
+        也**不**自动生成新预算(REQUIRES_NEW_APPROVAL 由调用方另给)。
+      * 发送前先落盘预占再动作: tmp + os.replace 原子换入, 同目录 O_CREAT|O_EXCL 互斥锁;
+      * 崩溃后未确认的预占按**已消耗**处理, 不退款(没有 release 这条路);
+      * 账本缺失 / JSON 损坏 / 身份不符 => 拒绝进入真实动作, 绝不自建一份满额账;
+      * cleanup_* 走独立预留: 业务额度耗尽不得阻挡已经成立义务的撤能(单独记 kind 与前缀)。
+    """
+
+    VERSION = 1
+    LOCK_TRIES = 200
+
+    def __init__(self, path, approval_id, identities, caps, led, clock):
+        self.path = Path(path)
+        self.approval_id = str(approval_id)
+        self.identities = dict(identities or {})
+        self.caps = dict(caps or {})
+        self.led = led
+        self.clock = clock
+        self.state = None
+
+    # ---------------- 内部: 读盘 / 写盘 / 互斥 ----------------
+    def _load_or_create(self):
+        if not self.path.exists():
+            return {"version": self.VERSION, "approval_id": self.approval_id,
+                    "identities": self.identities, "caps": self.caps,
+                    "spent": {}, "pending": [], "writes": 0, "created_by_action": "first_use"}
+        try:
+            doc = json.loads(self.path.read_text(encoding="utf-8"))
+        except (ValueError, OSError) as e:
+            raise Stop("APPROVAL_LEDGER_CORRUPT",
+                       "%s:%s" % (self.path.name, e.__class__.__name__))
+        if doc.get("version") != self.VERSION:
+            raise Stop("APPROVAL_LEDGER_VERSION", "version=%r" % doc.get("version"))
+        if str(doc.get("approval_id")) != self.approval_id:
+            raise Stop("APPROVAL_IDENTITY_MISMATCH",
+                       "账本记的是另一次批准 %s, 本次=%s" % (doc.get("approval_id"), self.approval_id))
+        for k in ("plan_sha256", "executor_sha256", "image_sha256"):
+            want, have = self.identities.get(k), (doc.get("identities") or {}).get(k)
+            if want and have and want != have:
+                raise Stop("APPROVAL_IDENTITY_MISMATCH",
+                           "%s 变了(%s… vs %s…) => 不许沿用同一批准, 也不自动生成新预算"
+                           % (k, have[:10], want[:10]))
+        for k, v in self.caps.items():          # 计划申报更宽也不当既成事实
+            have = (doc.get("caps") or {}).get(k)
+            if have is not None and int(have) != int(v):
+                raise Stop("APPROVAL_IDENTITY_MISMATCH",
+                           "caps[%s] 账本=%s 本次计划=%s" % (k, have, v))
+        return doc
+
+    def _store(self, doc):
+        doc["writes"] = int(doc.get("writes", 0)) + 1
+        tmp = self.path.with_name(self.path.name + ".tmp%d" % os.getpid())
+        try:
+            with open(tmp, "w", encoding="utf-8", newline="\n") as f:
+                json.dump(doc, f, ensure_ascii=False, sort_keys=True, indent=1)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(str(tmp), str(self.path))    # 原子换入: 崩溃只会留下旧账或新账, 不会半截
+            return True
+        except OSError:
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+            return False
+
+    def _lock(self):
+        lk = self.path.with_name(self.path.name + ".lock")
+        for _ in range(self.LOCK_TRIES):
+            try:
+                fd = os.open(str(lk), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            except OSError:
+                self.clock.sleep(0.002)
+                continue
+            os.write(fd, ("%d" % os.getpid()).encode("ascii"))
+            os.close(fd)
+            return lk
+        raise Stop("APPROVAL_LEDGER_LOCKED", str(lk))
+
+    # ---------------- 对外: 预占 / 确认 ----------------
+    def reserve(self, name, n=1, kind="business"):
+        """先落盘再动作。返回预占凭据; 额度不足或身份不符 => 具名停止, 调用方不得发送。"""
+        lk = self._lock()
+        try:
+            doc = self._load_or_create()
+            spent = doc.setdefault("spent", {})
+            used = int(spent.get(name, 0))
+            cap = int((doc.get("caps") or {}).get(name, 0))
+            if name not in (doc.get("caps") or {}):
+                raise Stop("QUOTA_UNDECLINED", name)
+            if used + n > cap:
+                self.led.ev("APPROVAL_REFUSED", approval_id=self.approval_id, name=name,
+                            used=used, want=n, cap=cap, reserve_kind=kind, ledger=str(self.path))
+                raise Stop("APPROVAL_QUOTA_EXHAUSTED",
+                           "%s used=%d want=%d cap=%d kind=%s" % (name, used, n, cap, kind))
+            spent[name] = used + n
+            doc.setdefault("pending", []).append({"id": "%s#%d" % (name, used + n),
+                                                  "name": name, "n": n, "kind": kind})
+            if not self._store(doc):
+                raise Stop("APPROVAL_LEDGER_WRITE_FAILED",
+                           "%s 预占没落成 => 那条命令不发(不退款纪律的另一半)" % name)
+            self.state = doc
+            self.led.ev("APPROVAL_RESERVED", approval_id=self.approval_id, name=name, n=n,
+                        used=used + n, cap=cap, reserve_kind=kind, ledger=str(self.path))
+            return {"name": name, "tag": "%s#%d" % (name, used + n), "kind": kind}
+        finally:
+            try:
+                os.remove(lk)
+            except OSError:
+                pass
+
+    def commit(self, res, ok=True):
+        """只把预占从 pending 里摘掉并留痕; **不退回额度** —— 崩溃/未确认一律按已消耗。"""
+        lk = self._lock()
+        try:
+            doc = self._load_or_create()
+            before = len(doc.get("pending", []))
+            doc["pending"] = [p for p in doc.get("pending", []) if p.get("id") != res["tag"]]
+            self._store(doc)
+            self.state = doc
+            self.led.ev("APPROVAL_COMMITTED", tag=res["tag"], reserve_kind=res["kind"],
+                        outcome="consumed" if ok else "consumed-with-error",
+                        pending_removed=before - len(doc["pending"]))
+        finally:
+            try:
+                os.remove(lk)
+            except OSError:
+                pass
+
+    def snapshot(self):
+        lk = self._lock()
+        try:
+            self.state = self._load_or_create()
+            return {"spent": dict(self.state.get("spent") or {}),
+                    "caps": dict(self.state.get("caps") or {}),
+                    "pending": list(self.state.get("pending") or []),
+                    "writes": self.state.get("writes"), "approval_id": self.approval_id,
+                    "identities": self.state.get("identities")}
+        finally:
+            try:
+                os.remove(lk)
+            except OSError:
+                pass
+
+
+def default_approval_root():
+    """默认账本目录在**仓库与 --out 之外**: 输出目录每轮都换, 用它当账本父目录就等于每轮换一本账。
+    真实现场应当用 --approval-root 指一块可持久化的位置; %TEMP% 被清掉后真实 dispatch 会因
+    APPROVAL_LEDGER_ABSENT 拒绝进入 —— 方向是"拒绝动作", 不是"复活额度"。"""
+    return Path(tempfile.gettempdir()) / "m8r6_approvals"
+
+
+def approval_path(root, approval_id):
+    "账本由**批准身份**命名, 与输出目录无关(复审 §7.4: 批准身份独立于输出目录)。"
+    safe = re.sub(r"[^0-9A-Za-z._-]", "_", str(approval_id))[:80] or "unnamed"
+    return Path(root) / ("approval_%s.json" % safe)
+
+
+def current_identities(plan, plan_path, repo_root):
+    """身份**当场从真实文件算**, 不照抄 JSON 里登记的哈希(那正是复审 §6 指出的"登记≠实际")。"""
+    ids = {"executor_sha256": sha_of(__file__)}
+    pp = Path(plan_path) if plan_path else None
+    if pp and pp.is_file():
+        ids["plan_sha256"] = sha_of(pp)
+    img = (plan.get("identity_binding") or {}).get("image") or {}
+    if img.get("path"):
+        p = Path(repo_root) / img["path"]
+        if p.is_file():
+            ids["image_sha256"] = sha_of(p)
+    return ids
+
+
+def open_approval(transport, root, approval_id, identities, caps, led, clock):
+    """返回 ApprovalLedger(stub 且没给身份 => None, 与旧的单次内存账一致)。
+
+    real 的门在这里, 不在某一步的判据里:
+      * 没有 approval_id => APPROVAL_ID_REQUIRED;
+      * 账本不存在 => APPROVAL_LEDGER_ABSENT —— **绝不自建一份满额账**, 要先离线 --approval-init;
+      * 账本损坏/版本不符/身份不符 => 由 ApprovalLedger 读盘时具名抛出, 同样拒绝进入。
+    """
+    if not approval_id:
+        if transport == "real":
+            raise Stop("APPROVAL_ID_REQUIRED",
+                       "真实执行必须绑定一次批准身份: 额度账要挂在那次批准上, 不挂就不发命令")
+        return None
+    path = approval_path(root, approval_id)
+    if transport == "real" and not path.exists():
+        raise Stop("APPROVAL_LEDGER_ABSENT",
+                   "%s 不存在 => 真实动作不进入(不自建满额账; 先离线 --approval-init 落一份)" % path)
+    if not path.exists():
+        # 离线工装首次使用才建目录: 真实路径绝不允许走到这里(上面已经拒了)。
+        # 不建就等着被误报成 APPROVAL_LEDGER_LOCKED —— 装配层的坑正是这么露出来的。
+        try:
+            Path(root).mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            raise Stop("APPROVAL_LEDGER_ROOT_UNUSABLE",
+                       "%s:%s" % (Path(root), e.__class__.__name__))
+    return ApprovalLedger(path, approval_id, identities, caps, led, clock)
+
+
+def approval_init(root, approval_id, identities, caps, note=""):
+    """离线**显式**开立一本账: 唯一允许"从空开始"的入口, 由人主动调用, 不是执行器顺手建的。
+    已存在就拒绝覆盖 —— 一次批准的边界不能被第二次 init 悄悄重置。"""
+    path = approval_path(root, approval_id)
+    if path.exists():
+        raise Stop("APPROVAL_LEDGER_ALREADY_EXISTS",
+                   "%s 已存在: 换批准身份或按已消耗处理, 不覆盖既有账(覆盖等于退款)" % path)
+    Path(root).mkdir(parents=True, exist_ok=True)
+    doc = {"version": ApprovalLedger.VERSION, "approval_id": str(approval_id),
+           "identities": dict(identities), "caps": dict(caps), "spent": {}, "pending": [],
+           "writes": 0, "created_by_action": "approval_init", "note": note}
+    tmp = path.with_name(path.name + ".tmp%d" % os.getpid())
+    with open(tmp, "w", encoding="utf-8", newline="\n") as f:
+        json.dump(doc, f, ensure_ascii=False, sort_keys=True, indent=1)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(str(tmp), str(path))
+    return path
+
+
 # --------------------------------------------------------------------------- 清理
 # 产品事实: 禁能是否成立由 motor_status 同一份响应里的三条**各自唯一**的行共同说明
 #   [MOT] state=%d name=%s
@@ -1024,12 +1261,15 @@ def disable_contract(rows):
 
 
 def cleanup(port, led, clock, budget, transport, fixture, feed_hook=None,
-            quota_box=None, overruns=None, used_box=None):
+            quota_box=None, overruns=None, used_box=None, approval=None, reservations=None):
     """义务建立后的唯一清理路径(M6 语义 + R3-B 分段窗): motor_stop -> motor_disarm -> motor_status。
     返回 (disarm_state, errors); 本函数**绝不**抛: 主错由调用方保留, 清理失败单独记账。
     三条命令各有自己的确认窗(总保留量分三段), 任何一条没回都**不减少**后面一条的发送机会 ——
     这正是 R2 交付版的缺陷(STOP_RESPONSE_MISSING 里 disarm 从未发出)。
-    禁能成立与否只由**最后这一份新的 motor_status 响应**里的合同字段决定, 不跨响应拼字段。"""
+    禁能成立与否只由**最后这一份新的 motor_status 响应**里的合同字段决定, 不跨响应拼字段。
+
+    带 approval 时撤能预留也在**持久账**上预约(这样"本次批准一共撤了几次能"跨进程可见),
+    但预约失败**不阻止发送**: 撤能优先于额度, 失败只落成具名披露 => 本场一律不算成功。"""
     errors = []
     state = "UNKNOWN"
     if overruns is None:
@@ -1047,14 +1287,26 @@ def cleanup(port, led, clock, budget, transport, fixture, feed_hook=None,
         # 是一条具名披露 => 本会话一律不算成功。
         if quota_box is not None:
             key = "cleanup_" + cmd
+            denied = None
             if key not in quota_box:
                 overruns.append(key + ":RESERVE_NOT_DECLARED")
-            elif quota_box[key] <= 0:
-                overruns.append(key + ":RESERVE_EXHAUSTED_SENT_ANYWAY")
             else:
-                quota_box[key] -= 1
-                if used_box is not None:
-                    used_box[key] = used_box.get(key, 0) + 1
+                if approval is not None:
+                    try:
+                        res = approval.reserve(key, 1, kind="cleanup")
+                        if reservations is not None:
+                            reservations.append(res)
+                    except Stop as e:
+                        denied = e.code     # 账本说没了也照发: 见本函数头的"撤能优先于额度"
+                if quota_box[key] <= 0:
+                    overruns.append(key + ":RESERVE_EXHAUSTED_SENT_ANYWAY")
+                else:
+                    quota_box[key] -= 1
+                    if used_box is not None:
+                        used_box[key] = used_box.get(key, 0) + 1
+                if denied:
+                    overruns.append("%s:%s_SENT_ANYWAY" % (key, denied))
+                    led.ev("CLEANUP_RESERVE_REFUSED_SENT_ANYWAY", key=key, code=denied)
         try:
             rows, raw, sent_t, ended_t, errs = _cleanup_read(port, led, clock, dl, cmd,
                                                              out_dir, feed_hook)
@@ -1183,49 +1435,38 @@ def command_attempt(port, cmd, st, asname, raw, step_dl, transport, fixture, sil
             block = float((fixture.get("block") or {}).get(key, 0) or 0)
             port.feed(("\r\n".join(resp) + "\r\nmsh >").encode("utf-8"), block_seconds=block)
     rec = st.get("byte_corruption_recovery")
-    lines, nbytes = [], 0
-    try:
-        lines, nbytes = read_until_prompt(port, step_dl, led, raw, clock)
-        if pre:
-            # 排走的残留**单独存证**成 NN_<as>.pre.rx.bin。绝不追加到响应文件后面: 那会把已经判读完毕的
-            # 原文改成另一份字节流(实测让 split_rows 在 `msh >\r\nmsh >`+`msh >` 上找不到提示符而误停)。
-            pre_path = Path(str(raw).replace(".rx.bin", ".pre.rx.bin"))
-            try:
-                with open(pre_path, "wb") as f:
-                    f.write(pre)
-                    f.flush()
-                    os.fsync(f.fileno())
-            except OSError as e:
-                raise Stop("EVIDENCE_WRITE_FAILED", "pre:%s" % e.__class__.__name__)
-            led.ev("PRE_CMD_DRAIN_SAVED", raw=str(pre_path), bytes=len(pre), sha256=sha_bytes(pre))
-        if transport != "stub" and cmd != "__watch__" and _is_real_serial_port(port):
-            full = Path(str(raw)).read_bytes()
-            if not has_echo(full, cmd):
-                # 只对**真串口**要求回显: finsh 的 echo 默认开, 命令到达就必然回显。
-                # 反过来不行 —— `motor_start` 成功时产品一个字节都不打(计划里 expect_absent 写明),
-                # 所以"响应为空"本身不是证据; 而现场实测那种 5 B 纯陈旧提示符, 缺的正是回显。
-                # 桩件/内存端口不带回显, 因此不参与这条门(它们不是被测对象)。
-                raise Stop("COMMAND_NOT_ECHOED", "as=%s bytes=%d body_empty=%s tail=%r" %
-                           (asname, nbytes,
-                            not PROMPT_RE.sub(b"", ANSI.sub(b"", full)).strip(), full[-24:]))
-        if not lines:
-            raise Stop("MISSING_RESPONSE_PROMPT", "as=%s bytes=%d" % (asname, nbytes))
-        v = assert_step(st, lines, asname, led, raw=Path(raw).read_bytes())
-    except Stop as e:
-        # 板上长行(>128 B)尾部被写成 NUL 这类字节完整性损坏: 原字节照旧落盘、一个不改, 而这一步的响应
-        # 一律**不作数**。只有该步申报了 byte_corruption_recovery, 且同会话里申报的那一步真的取到干净响应
-        # 并通过自己的判据, 才允许继续; 否则会话末尾 BYTE_CORRUPTION_UNRECONFIRMED 具名停止。
-        if e.code != "ILLEGAL_BYTES_IN_RESPONSE" or not rec:
-            raise
+    if rec:
+        # R6(复审 §5.3): 执行器已经取消"损坏后由后面某步重确认"这条路, 所以这里**不接受**该申报。
+        # 计划层还有 PLAN_BYTE_RECOVERY 会把这种申报判红; 运行时再挡一次, 防止绕过校验直接喂步骤。
+        raise Stop("RETIRED_RECOVERY_CONTRACT",
+                   "as=%s 申报了 byte_corruption_recovery(%s), 但本版执行器一律'字节损坏即停'" %
+                   (asname, rec.get("reconfirmed_by", "")))
+    lines, nbytes = read_until_prompt(port, step_dl, led, raw, clock)
+    if pre:
+        # 排走的残留**单独存证**成 NN_<as>.pre.rx.bin。绝不追加到响应文件后面: 那会把已经判读完毕的
+        # 原文改成另一份字节流(实测让 split_rows 在 `msh >\r\nmsh >`+`msh >` 上找不到提示符而误停)。
+        pre_path = Path(str(raw).replace(".rx.bin", ".pre.rx.bin"))
         try:
-            nbytes = Path(str(raw)).stat().st_size
-        except OSError:
-            nbytes = 0
-        led.ev("EVIDENCE_BYTE_CORRUPTION", **{"as": asname, "detail": e.detail, "raw": str(raw),
-              "rx_bytes": nbytes, "reconfirmed_by": rec.get("reconfirmed_by", ""),
-              "basis": str(rec.get("why", ""))[:160]})
-        v = {"verdict": "BYTE_CORRUPT", "code": "EVIDENCE_BYTE_CORRUPTION", "detail": e.detail,
-             "lines": [], "reconfirmed_by": rec.get("reconfirmed_by", "")}
+            with open(pre_path, "wb") as f:
+                f.write(pre)
+                f.flush()
+                os.fsync(f.fileno())
+        except OSError as e:
+            raise Stop("EVIDENCE_WRITE_FAILED", "pre:%s" % e.__class__.__name__)
+        led.ev("PRE_CMD_DRAIN_SAVED", raw=str(pre_path), bytes=len(pre), sha256=sha_bytes(pre))
+    if transport != "stub" and cmd != "__watch__" and _is_real_serial_port(port):
+        full = Path(str(raw)).read_bytes()
+        if not has_echo(full, cmd):
+            # 只对**真串口**要求回显: finsh 的 echo 默认开, 命令到达就必然回显。
+            # 反过来不行 —— `motor_start` 成功时产品一个字节都不打(计划里 expect_absent 写明),
+            # 所以"响应为空"本身不是证据; 而现场实测那种 5 B 纯陈旧提示符, 缺的正是回显。
+            # 桩件/内存端口不带回显, 因此不参与这条门(它们不是被测对象)。
+            raise Stop("COMMAND_NOT_ECHOED", "as=%s bytes=%d body_empty=%s tail=%r" %
+                       (asname, nbytes,
+                        not PROMPT_RE.sub(b"", ANSI.sub(b"", full)).strip(), full[-24:]))
+    if not lines:
+        raise Stop("MISSING_RESPONSE_PROMPT", "as=%s bytes=%d" % (asname, nbytes))
+    v = assert_step(st, lines, asname, led, raw=Path(raw).read_bytes())
     try:
         txt = emit_text(raw, lines)
     except OSError as e:
@@ -1283,7 +1524,7 @@ def poll_command_step(port, cmd, st, asname, idx, out, step_dl, transport, fixtu
 
 def exec_session(session_id, steps, outdir, transport, fixture, port_name,
                  total_deadline_seconds, clock, backend=None, motion_cap_seconds=None,
-                 plan=None, quota_box=None, used_box=None, context=None):
+                 plan=None, quota_box=None, used_box=None, context=None, approval=None):
     """一个会话 = 一个端口 = 一个写者。
 
     与 R1 交付版的三处实质差别:
@@ -1302,27 +1543,43 @@ def exec_session(session_id, steps, outdir, transport, fixture, port_name,
     if backend is not None:
         backend.led = led            # 动作事件与串口事件同一条台账: 调用序列不能散在两个文件里
     results = []
-    corrupt = []
     errors = []
     primary = None
     disarm_state = "NOT_ARMED"
     obligation = False
     cleanup_overruns = []
+    reservations = []
     used = used_box if used_box is not None else {}
     # 这本账在开口之前就要能用: "试了但没开成"也必须留痕, 所以 spend 定义在 try 之前。
     quota = quota_box if quota_box is not None else (dict(plan["quota"]) if plan else {})
 
     def spend(name, n):
-        "额度是**执行时**扣的, 不是声明的: 超了就具名停止, 且不发送那条命令。"
+        """额度是**执行时**扣的, 不是声明的: 超了就具名停止, 且不发送那条命令。
+
+        给了 approval(批准身份绑定的持久账)时, 扣减先落到那本账上再发送 —— 换一个输出目录、
+        重开一个进程都不会把一次批准的边界清零(R5-C 的 26 场就是这么把 apply 用到 14/2)。"""
         if not plan:
-            return
+            return None
         if name not in quota:
             raise Stop("QUOTA_UNDECLINED", name)      # 计划里没有的动作一律禁止
+        if approval is not None:
+            if quota[name] < n:
+                raise Stop("QUOTA_EXHAUSTED", "in-process %s want=%d left=%d"
+                           % (name, n, quota[name]))
+            kind = "cleanup" if name.startswith("cleanup_") else "business"
+            res = approval.reserve(name, n, kind=kind)
+            reservations.append(res)
+            quota[name] -= n
+            used[name] = used.get(name, 0) + n
+            led.ev("QUOTA_CONSUMED", name=name, n=n, left=quota[name], approval_kind=kind,
+                   approval_used=approval.snapshot()["spent"].get(name))
+            return res
         if quota[name] < n:
             raise Stop("QUOTA_EXHAUSTED", "%s want=%d left=%d" % (name, n, quota[name]))
         quota[name] -= n
         used[name] = used.get(name, 0) + n
         led.ev("QUOTA_CONSUMED", name=name, n=n, left=quota[name])
+        return None
 
     budget = MotionBudget(clock, motion_cap_seconds) if motion_cap_seconds else \
         MotionBudget(clock, total_deadline_seconds)
@@ -1463,27 +1720,19 @@ def exec_session(session_id, steps, outdir, transport, fixture, port_name,
                                  "rx_bytes": nbytes, "rx_sha256": sha_of(raw),
                                  "txt": txt, "selected_log_window": selected_window}, **v))
             if v["verdict"] == "BYTE_CORRUPT":
-                corrupt.append((asname, v.get("reconfirmed_by") or ""))
-                continue
+                # R6 §5.3: 本版执行器**不产生**这个判决(字节损坏一律停)。真出现了就说明有人又把
+                # "损坏后由后面某步重确认"接回运行时 —— 具名拒绝, 不让它作为可继续状态泄漏。
+                raise Stop("RETIRED_RECOVERY_CONTRACT",
+                           "as=%s 产生了 BYTE_CORRUPT 判决, 但恢复合同已退役" % asname)
             if v["verdict"] == "REFUSED":
                 ret = {"status": "REFUSED", "code": v.get("code", ""),
                        "refused": v.get("lines")}
                 break
             if v["verdict"] != "OK":
                 raise Stop(v["code"], json.dumps(v, ensure_ascii=False))
-        if corrupt:
-            ok_as = set(r.get("as") for r in results if r.get("verdict") == "OK")
-            un = ["%s->%s" % (a, rc) for a, rc in corrupt if rc not in ok_as]
-            if un:
-                raise Stop("BYTE_CORRUPTION_UNRECONFIRMED",
-                           "损坏响应不作数, 申报的重确认没通过: %s" % json.dumps(un, ensure_ascii=False))
         if ret is None:
-            led.ev("SESSION_OK", session=session_id, steps=len(results),
-                   byte_corruption_recovered=[{"as": a, "reconfirmed_by": rc}
-                                              for a, rc in corrupt])
+            led.ev("SESSION_OK", session=session_id, steps=len(results))
             ret = {"status": "OK", "code": ""}
-            if corrupt:
-                ret["byte_corruption"] = ["%s->%s" % (a, rc) for a, rc in corrupt]
     except Stop as e:
         primary = e
         ret = {"status": "STOP", "code": e.code, "detail": e.detail}
@@ -1498,13 +1747,27 @@ def exec_session(session_id, steps, outdir, transport, fixture, port_name,
             try:
                 disarm_state, cerr = cleanup(port, led, clock, budget, transport, fixture,
                                              hook, quota_box if plan else None,
-                                             cleanup_overruns, used)
+                                             cleanup_overruns, used,
+                                             approval=approval, reservations=reservations)
                 errors.extend(cerr)          # 清理错独立留账: 主错在 ret, 不能被吞成空成功
             except Exception as e:
                 # 清理框架自己炸了: 禁能一律 UNKNOWN(不猜"应该已经撤了"), 但端口仍要关
                 disarm_state = "UNKNOWN"
                 errors.append("CLEANUP_FRAME_RAISED_%s:%s" % (e.__class__.__name__, repr(e)))
                 led.ev("CLEANUP_FRAME_EXCEPTION", err=repr(e))
+        # 会话结束才把每条预占**确认消耗**(摘 pending + 留痕)。这里绝不做反方向的事:
+        # 中途 STOP / 被拒绝 / 业务失败都照样确认, 额度一条都不退 —— 崩溃走不到这一行,
+        # 未确认的预占就一直挂在 pending 上并按已消耗计入, 下一次动作看得见。
+        if approval is not None:
+            ok_now = (ret or {}).get("status") in ("OK", "OBSERVATION_NO_TRIGGER")
+            for res in list(reservations):
+                try:
+                    approval.commit(res, ok=ok_now)
+                except Stop as e:
+                    errors.append("APPROVAL_COMMIT_REFUSED_%s" % e.code)
+                    led.ev("APPROVAL_COMMIT_FAILED", tag=res["tag"], code=e.code,
+                           detail=e.detail)
+            del reservations[:]
         try:
             if port is not None:
                 port.close()
@@ -2059,31 +2322,19 @@ def validate_plan(plan, rows_doc, app_dir):
                 else:
                     sa_seen.append("%s:%s" % (stg["id"], st.get("as")))
     # 字节损坏口子的唯一形状: 坏响应不作数 + 同会话更靠后的干净步骤**正面**给出同一事实(离线核形状)。
-    br_bad, br_seen = [], []
-    for stg in plan["stages"]:
-        steps = stg.get("steps", [])
-        order = [x.get("as") for x in steps]
-        for x in steps:
-            rec = x.get("byte_corruption_recovery")
-            if not rec:
-                continue
-            rb = rec.get("reconfirmed_by")
-            if not x.get("no_facts_from_corrupted_response"):
-                br_bad.append("%s/%s:没声明 no_facts_from_corrupted_response"
-                              % (stg["id"], x.get("as")))
-            elif rb not in order or order.index(rb) <= order.index(x.get("as")):
-                br_bad.append("%s/%s:reconfirmed_by=%s 不是本会话更靠后的步骤"
-                              % (stg["id"], x.get("as"), rb))
-            else:
-                nxt = steps[order.index(rb)]
-                if not nxt.get("expect_values"):
-                    br_bad.append("%s:重确认步骤没有 expect_values(取不到硬字段)" % rb)
-                else:
-                    br_seen.append("%s->%s" % (x.get("as"), rb))
+    # R6(复审 §5.3): "字节损坏后由同会话更靠后的干净步骤重确认"这条合同**退役** ——
+    # 它当时只核对了"存在更晚的步骤且它有 expect_values", 没有证明那些字段与受损动作逐项等价,
+    # 于是"含 NUL 的响应"可以被后面一条 system_status 洗成 OK。本版执行器一律"字节损坏即停",
+    # 因此计划里再申报这个合同本身就是缺陷: 申报即判红, 不再检查它的形状。
+    br_bad = ["%s/%s:申报了 byte_corruption_recovery(reconfirmed_by=%s), 但该合同已退役 => "
+              "字节损坏必须即停" % (stg["id"], x.get("as"),
+                                    (x.get("byte_corruption_recovery") or {}).get("reconfirmed_by"))
+              for stg in plan["stages"] for x in stg.get("steps", [])
+              if x.get("byte_corruption_recovery")]
     out.append("PLAN_BYTE_RECOVERY|all|%s|%s" %
                ("PASS" if not br_bad else "FAIL",
-                ";".join(br_bad) or ("损坏步骤都有干净步骤正面重确认: %s" % ",".join(br_seen)
-                                      if br_seen else "未使用(任何 ILLEGAL_BYTES 一律停)")))
+                ";".join(br_bad) or "计划未申报任何'损坏后可继续'例外 => 裸 NUL / 非法 UTF-8 / "
+                                     "危险文本一律即停(原字节仍先落盘)"))
     if br_bad:
         bad += 1
     out.append("PLAN_STATUS_ALLOW|all|%s|%s" %
@@ -2393,15 +2644,24 @@ def plan_forbidden_command_hits(plan):
     return hits
 
 
-def s0_binding(plan, repo_root):
+def s0_binding(plan, repo_root, plan_path=None, approval_id=None):
     """S0 是**真实文件与来源绑定**, 不是一行 OFFLINE_BINDING 声明:
     镜像按路径重算 sha256/字节数并与 identity_binding 与 build_manifest 逐字段比;
-    源码提交用 git cat-file 证明该 blob 存在; needles 全部回到 C 源码证明。"""
+    源码提交用 git cat-file 证明该 blob 存在; needles 全部回到 C 源码证明。
+
+    R6 §7.4 补的一条: S0 还要当场算 **plan / 执行器 / 镜像** 三件的实际哈希并连同批准身份一起记,
+    因为"JSON 里登记的哈希"和"这一刻真正被执行的字节"是两回事(R5-C 的 S0 就是照抄登记值,
+    现场跑的却是改过两轮的采集器)。历史 S0 不回填。"""
     root = Path(repo_root)
     ident = plan["identity_binding"]
     img = ident["image"]
     p = root / img["path"]
     facts = {"image_path": img["path"]}
+    facts["approval_id"] = approval_id or "NONE_DECLARED"
+    facts["plan_source"] = str(plan_path) if plan_path else "IN_MEMORY_PLAN_NO_PATH"
+    facts["plan_sha256"] = sha_of(plan_path) if plan_path and Path(plan_path).is_file() else None
+    facts["executor_path"] = str(Path(__file__).resolve())
+    facts["executor_sha256"] = sha_of(__file__)
     if not p.is_file():
         raise Stop("S0_IMAGE_ABSENT", img["path"])
     data = p.read_bytes()
@@ -2571,11 +2831,15 @@ def dispatch_refusal(plan, profile, outdir, code):
 
 def dispatch_plan(plan, transport, backend_name, outdir, clock, profile, port,
                   repo_root, approval_token=None, expected_token=None, uid_file=None,
-                  plan_dir=None):
+                  plan_dir=None, approval_id=None, approval_root=None, plan_path=None):
     """一次批准 -> 从 S0 一直走到**计划里的最后一个阶段**; 成功阶段只记检查点(不为下一阶段
     重新批准、不重新下载), **失败**才终止。
     整包共用同一本额度账(quota_box)与同一个动作后端; 每个串口会话仍各开一次端口。
-    任何会话非成功(含清理 UNKNOWN / 清理错误 / 预留耗尽 / 证据失败)都阻断后续阶段并非零返回。"""
+    任何会话非成功(含清理 UNKNOWN / 清理错误 / 预留耗尽 / 证据失败)都阻断后续阶段并非零返回。
+
+    R6 §7.4: 给了 approval_id 时, 这本 quota_box 背后还挂着一份**以批准身份命名、放在
+    输出目录之外**的持久预占账 —— 换 --out、重开进程都不清零(26 场把 apply 用到 14/2 就是
+    没有这本账)。真实传输没有这本账一律不进入。"""
     code = mode_gate(transport, backend_name, profile)
     if code:
         # 模式账先于一切: 这一刻 UID 没读、工具没起、端口没开, 所以"副作用清单为空"是真空而不是漏记。
@@ -2583,6 +2847,8 @@ def dispatch_plan(plan, transport, backend_name, outdir, clock, profile, port,
     if transport == "real" and (not approval_token or approval_token != expected_token):
         # 批准门也在读私有 UID 之前: 没批准就没有任何一次私有材料的消费。
         return dispatch_refusal(plan, profile, outdir, "REAL_TRANSPORT_REFUSED")
+    if transport == "real" and not approval_id:
+        return dispatch_refusal(plan, profile, outdir, "APPROVAL_ID_REQUIRED")
     quota_box = dict(plan["quota"])
     used_box = {}
 
@@ -2590,6 +2856,32 @@ def dispatch_plan(plan, transport, backend_name, outdir, clock, profile, port,
     out.mkdir(parents=True, exist_ok=True)
     led_path = out / "dispatch_ledger.jsonl"
     led = Ledger(led_path, clock, out_dir=out)
+    ledger_reservations = []
+    try:
+        approval = open_approval(transport, Path(approval_root or default_approval_root()),
+                                 approval_id, current_identities(plan, plan_path, repo_root),
+                                 plan["quota"], led, clock)
+        if approval is not None:
+            snap0 = approval.snapshot()      # 读盘即验身份: 损坏/版本/身份不符都在这一步炸
+            led.ev("APPROVAL_LEDGER_BOUND", path=str(approval.path), approval_id=approval_id,
+                   prior_spent=snap0["spent"], prior_pending=len(snap0["pending"]))
+    except Stop as e:
+        # 账本自己不对劲 => 一条命令都不发。这里绝不"顺手建一本新的"或"退回内存账":
+        # 那等于让一次用尽的批准重新满血, 而本次复审要拦的正是这件事。
+        led.ev("APPROVAL_GATE_REFUSED", code=e.code, detail=e.detail)
+        led.close()
+        return dispatch_refusal(plan, profile, outdir, e.code)
+
+    def reserve_stage(name, n=1, kind="business"):
+        """阶段级动作(download/readback/reset/reboot/人工重启门)在**动工具之前**先落持久预占。
+        quota_box 只活到本次 dispatch 结束, 换 --out 或重开进程就清零 —— R5-C 把 apply 用到
+        14/2 正是从这条路漏的。内存账照旧(顺序与语义都不动), 这本账负责跨进程可见。"""
+        if approval is None:
+            return None
+        res = approval.reserve(name, n, kind=kind)
+        ledger_reservations.append(res)
+        return res
+
     img_bytes = int(plan["identity_binding"]["image"]["bytes"])
     # `@RUN_ROOT` 会被展开进 pyOCD 的 `-c` **命令字符串**里, 而 commander 对该串做 shlex 解析:
     # Windows 的反斜杠在这里是转义符, 会把 D:\ns800\... 咬成 D:ns800...(首次真跑的回读就是这样 rc=1)。
@@ -2671,7 +2963,7 @@ def dispatch_plan(plan, transport, backend_name, outdir, clock, profile, port,
         kind = stg["kind"]
         try:
             if kind == "offline":
-                facts = s0_binding(plan, repo_root)
+                facts = s0_binding(plan, repo_root, plan_path=plan_path, approval_id=approval_id)
                 led.ev("S0_FACTS", **facts)
                 done.append({"id": sid, "status": "OK", "kind": kind, "facts": facts})
                 continue
@@ -2684,6 +2976,7 @@ def dispatch_plan(plan, transport, backend_name, outdir, clock, profile, port,
                 qname = stg.get("quota_name", "approved_reboot")
                 if quota_box.get(qname, 0) < 1:
                     raise Stop("QUOTA_EXHAUSTED", "%s left=%s" % (qname, quota_box.get(qname)))
+                reserve_stage(qname, 1)
                 fx = {"manual": dict(stg.get("manual_answers", {}))}
                 val = read_manual(gate, fx, True, transport=transport)
                 quota_box[qname] -= 1
@@ -2709,6 +3002,7 @@ def dispatch_plan(plan, transport, backend_name, outdir, clock, profile, port,
                     raise Stop("QUOTA_UNDECLINED", name)
                 if quota_box[name] < 1:
                     raise Stop("QUOTA_EXHAUSTED", name)
+                reserve_stage(name, 1)     # 工具起来之前先落账: 崩溃也按已消耗计, 不退款
                 quota_box[name] -= 1
                 used_box[name] = used_box.get(name, 0) + 1
                 payload = {"as": name}
@@ -2734,7 +3028,8 @@ def dispatch_plan(plan, transport, backend_name, outdir, clock, profile, port,
                                    int(stg.get("total_deadline_seconds", 120)), clock,
                                    backend=backend,
                                    motion_cap_seconds=cap,
-                                   plan=plan, quota_box=quota_box, used_box=used_box, context=recorded)
+                                   plan=plan, quota_box=quota_box, used_box=used_box,
+                                   context=recorded, approval=approval)
                 if transport == "real":
                     # 分支由**本次响应**决定, 作用域是本阶段所在的场景链: 未触发就把该链的事故
                     # 取证支线留在 NOT_RUN 之外, 真实触发就必须走该链的 S9/S10/S11 —— 不许用
@@ -2835,6 +3130,22 @@ def dispatch_plan(plan, transport, backend_name, outdir, clock, profile, port,
             done.append({"id": sid, "status": "STOP", "code": e.code, "detail": e.detail})
             notrun = rest
             break
+    # 阶段级预占在整包收尾时确认消耗(会话级由 exec_session 自己收尾)。确认只摘 pending,
+    # **一条额度都不退**: 中途 STOP 的 download/readback 也算用过。
+    approval_end = None
+    commit_failures = []
+    if approval is not None:
+        for res in ledger_reservations:
+            try:
+                approval.commit(res, ok=not notrun)
+            except Stop as e:
+                commit_failures.append("%s:%s" % (res["tag"], e.code))
+                led.ev("APPROVAL_COMMIT_FAILED", tag=res["tag"], code=e.code, detail=e.detail)
+        del ledger_reservations[:]
+        approval_end = approval.snapshot()
+        led.ev("APPROVAL_LEDGER_END", path=str(approval.path), spent=approval_end["spent"],
+               pending=len(approval_end["pending"]), caps=approval_end["caps"],
+               commit_failures=commit_failures)
     led.ev("DISPATCH_DONE", run=len(done), not_run=notrun, quota_left=quota_box,
            quota_used=used_box, prerequisite_skips=skipped_by_prerequisite,
            scenario_branches=scenario_branch)
@@ -2848,7 +3159,7 @@ def dispatch_plan(plan, transport, backend_name, outdir, clock, profile, port,
     expected = expected_ids
     ok = (not notrun) and all(d.get("success", True) for d in done) \
         and [d["id"] for d in done] == expected \
-        and not undeclared and not negative
+        and not undeclared and not negative and not commit_failures
     # "流程跑完"与"目标传感器通道验证成功"是两件事: 后者只在各场抓到**自己那一路**的规则
     # 且源样本非零时才成立。二者分开报, 免得 status=OK 被读成核心保护全部通过。
     claims = {}
@@ -2881,6 +3192,11 @@ def dispatch_plan(plan, transport, backend_name, outdir, clock, profile, port,
                                        "via_requires": v.get("via_requires") or []}
                                       for k, v in sorted(blocked_scenarios.items())],
             "actions_attempted": list(backend.attempts),
+            "approval": (None if approval is None else
+                         {"approval_id": approval_id, "ledger": str(approval.path),
+                          "spent": approval_end["spent"], "pending": len(approval_end["pending"]),
+                          "caps": approval_end["caps"],
+                          "commit_failures": commit_failures}),
             "ledger": str(led_path), "dir": str(out)}
 
 
@@ -2898,6 +3214,13 @@ def main(argv=None):
     ap.add_argument("--plan", help="计划 JSON: 提供后额度在发送前真实扣减(quota)")
     ap.add_argument("--approval-token")
     ap.add_argument("--expected-token")
+    ap.add_argument("--approval-id", default="",
+                    help="批准身份(令牌/审批记录名): 跨进程持久预占账按它命名, 真实执行必填")
+    ap.add_argument("--approval-root", default="",
+                    help="账本目录(默认在 %s, 与 --out 无关); 现场请指一块可持久化的位置" %
+                         default_approval_root())
+    ap.add_argument("--approval-init", action="store_true",
+                    help="离线开立一本新账(唯一的\"从空开始\"入口, 不碰设备; 已存在则拒绝覆盖)")
     ap.add_argument("--check-static-port-discipline", action="store_true")
     ap.add_argument("--prove-needles")
     ap.add_argument("--source-root")
@@ -2932,16 +3255,39 @@ def main(argv=None):
         if not a.approval_token or a.approval_token != a.expected_token:
             print("REAL_TRANSPORT_REFUSED:approval_token_missing_or_mismatch", file=sys.stderr)
             return 4
-    elif not a.dispatch and not a.validate_plan and not a.fixture:
+        # 真实执行还要一个**持久额度账的挂钩**: 只有令牌没有账, 换一次 --out 就换一份额度,
+        # 那正是 R5-C 把 apply 用到 14/2 的路径。没有 approval_id / 没有 plan(额度来源) => 不开口。
+        if not a.approval_id:
+            print("REAL_TRANSPORT_REFUSED:approval_id_required", file=sys.stderr)
+            return 4
+        if not (a.plan or a.dispatch):
+            print("REAL_TRANSPORT_REFUSED:plan_required_for_quota_ledger", file=sys.stderr)
+            return 4
+    elif not a.dispatch and not a.validate_plan and not a.approval_init and not a.fixture:
         # 单会话入口仍需显式夹具; --dispatch 自己按 rows.json 逐阶段装配, 不接受外部夹具
         print("STUB_REFUSED:fixture_required", file=sys.stderr)
         return 4
     plan_doc = None
-    if a.plan or a.dispatch or a.validate_plan:
+    if a.plan or a.dispatch or a.validate_plan or a.approval_init:
         if not a.plan:
             print("DISPATCH_REFUSED:plan_required", file=sys.stderr)
             return 4
         plan_doc = json.loads(Path(a.plan).read_text(encoding="utf-8-sig"))
+    if a.approval_init:
+        if not a.approval_id:
+            print("APPROVAL_INIT_REFUSED:approval_id_required", file=sys.stderr)
+            return 4
+        try:
+            p = approval_init(Path(a.approval_root or default_approval_root()), a.approval_id,
+                              current_identities(plan_doc, a.plan, a.repo_root),
+                              plan_doc["quota"], note="offline --approval-init, no device action")
+        except Stop as e:
+            print("APPROVAL_INIT_REFUSED:%s|%s" % (e.code, e.detail), file=sys.stderr)
+            return 4
+        print("APPROVAL_INIT|path=%s|caps=%s|identities=%s" %
+              (p, json.dumps(plan_doc["quota"], sort_keys=True),
+               json.dumps(current_identities(plan_doc, a.plan, a.repo_root), sort_keys=True)))
+        return 0
     if a.validate_plan:
         app = a.app_dir or str(Path(a.repo_root) / PLAN_APP_REL)
         rows_doc = load_rows(Path(a.plan).resolve().parent /
@@ -2957,7 +3303,9 @@ def main(argv=None):
         try:
             res = dispatch_plan(plan_doc, a.transport, a.backend, a.out, clock, a.profile,
                                 a.port, a.repo_root, a.approval_token, a.expected_token,
-                                a.uid_file, str(Path(a.plan).resolve().parent))
+                                a.uid_file, str(Path(a.plan).resolve().parent),
+                                approval_id=a.approval_id or None,
+                                approval_root=a.approval_root or None, plan_path=a.plan)
         except Stop as e:
             print(json.dumps({"status": "STOP", "code": e.code, "detail": e.detail},
                              ensure_ascii=False))
@@ -2983,6 +3331,11 @@ def main(argv=None):
                    ",".join(r.get("via_requires") or []) or "-"))
         for sc, claim in sorted((res.get("protection_claims") or {}).items()):
             print("PROTECTION_CLAIM|scenario=%s|claim=%s" % (sc, claim))
+        print("APPROVAL_LEDGER|%s" %
+              (json.dumps(res["approval"], ensure_ascii=False, sort_keys=True) if res.get("approval")
+               else "NONE(未绑定批准身份: 额度只活在这一次 dispatch 的内存里; 本轮状态=%s%s)" %
+                    (res["status"],
+                     " code=" + res["code"] if res.get("code") else "")))
         print("FLOW_VS_VERIFICATION|flow_complete=%s|core_protection_verified=%s|"
               "含义: flow_complete 只说明申报的阶段都跑完且额度/取证/撤能账目一致; "
               "core_protection_verified 才说明每一场都是**目标传感器通道**自己触发的" %
@@ -3013,12 +3366,24 @@ def main(argv=None):
         backend = ManualActionBackend(boot_led, led_path.parent, clock, 900)
     else:
         backend = RealActionBackend(boot_led, led_path.parent, clock, 120)
+    # 单会话入口(--steps)也要能挂上同一本持久账: 现场包以外的一次性补测最容易从这里绕开额度。
+    session_approval = None
+    if a.approval_id or a.transport == "real":
+        try:
+            session_approval = open_approval(
+                a.transport, Path(a.approval_root or default_approval_root()), a.approval_id,
+                current_identities(plan_doc or {}, a.plan, a.repo_root),
+                (plan_doc or {}).get("quota") or {}, boot_led, clock)
+        except Stop as e:
+            print("APPROVAL_GATE_REFUSED:%s|%s" % (e.code, e.detail), file=sys.stderr)
+            boot_led.close()
+            return 4
     # boot_led 必须活到会话结束: 动作后端的 ACTION/ACTION_WAITING 事件正是写进它的。
     try:
         res = exec_session(a.session, steps, a.out, a.transport, fixture, a.port,
                            a.total_deadline_seconds, clock, backend=backend,
                            motion_cap_seconds=a.motion_cap_seconds or None,
-                           plan=plan_doc)
+                           plan=plan_doc, approval=session_approval)
     except Stop as e:
         print(json.dumps({"session": a.session, "status": "STOP", "code": e.code,
                           "detail": e.detail, "results": []}, ensure_ascii=False))

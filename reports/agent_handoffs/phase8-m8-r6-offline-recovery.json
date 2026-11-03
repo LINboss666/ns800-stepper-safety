@@ -1,0 +1,192 @@
+{
+ "task": "M8-R6-OFFLINE-RECOVERY",
+ "task_book": "NS800_M8_R5C_Review_and_Offline_Repair_20261103.md (云端 A 独立复审 + 本轮任务书, 由操作者转达)",
+ "task_book_verdict_block_verbatim": [
+  "evidence_archive = ACCEPTED_WITH_PROVENANCE_GAP",
+  "product_verification = INCOMPLETE",
+  "executor_field_release = REWORK",
+  "threshold_validation = NOT_ESTABLISHED",
+  "relative_coverage_active = NOT_ESTABLISHED",
+  "REL_IMPACT = NOT_REACHED",
+  "load_means = NOT_PROVIDED",
+  "learn_old_approval_remaining = 0",
+  "motor_start_old_approval_remaining = 0",
+  "Safety_RUN_after_disarm = PRODUCT_DEFECT_CONFIRMED",
+  "exact_field_interleaving_root_cause = NOT_PROVEN",
+  "next_work = OFFLINE_REPAIR",
+  "new_hardware_actions_authorized_by_this_review = 0"
+ ],
+ "task_book_scope_verbatim_summary": "本轮设备动作全部为0: 不打开串口, 不连接DAP, 不烧录/回读/复位, 不提示用户重上电, 不learn/zero/起转/保存配置。离线编译和主机测试可做; 旧额度不结转。离线交付停点: 推送并给用户一份可复审回执; 后续现场包待A根据新代码、实际工况和操作者设备状态制定; 这份任务没有附带任何硬件额度。",
+ "date_local": "2026-11-03",
+ "status": "M8_R6_OFFLINE_DELIVERED / AWAITING_INDEPENDENT_REVIEW",
+ "safe_for_enable": false,
+ "go_requested": false,
+ "roles": {"executor": "本机 Agent (LMX 的 Qoder)", "reviewer": "云端 A (ChatGPT 侧独立复审)",
+           "hardware_approval": "操作者本人 + 云端 A 的具体现场范围批准; 本轮两者都未给出"},
+ "branch": "feature/m8-sg-adc-relative-protection",
+ "reviewed_base_commit": "535459f84724cdb755af00ee4dea4b3f42c93d45",
+ "code_commit": "6016e819794c3c00edbea77d0f1994c4a87ba281",
+ "software_input_commit": "6016e819794c3c00edbea77d0f1994c4a87ba281",
+ "tested_image_build_commit": "535459f84724cdb755af00ee4dea4b3f42c93d45",
+ "image_source_lineage": ("构建发生在 535459f 之上、改动尚未提交的工作树里(manifest 的 "
+                          "code_commit_at_build / working_tree_at_build 就是这个意思)。把这枚镜像与"
+                          "软件输入提交绑起来的办法不是嘴上说, 而是当场可比: "
+                          "`git diff 6016e81 -- .../applications tests/host` 输出 0 行 => "
+                          "编译输入与 6016e81 记录的四个 .c 与两条主机链逐字节相同"),
+ "dual_identity_note": "code_commit(6016e81)与 tested_image_build_commit(535459f)分列: 前者是本轮改动的软件输入, 后者是构建那一刻 HEAD 的锚点; 两者之间的产品源字节差由 image_source_lineage 的 0 行 diff 证平",
+ "delivery_commits": {"software_input": "6016e819794c3c00edbea77d0f1994c4a87ba281",
+                      "delivery": "本 JSON 所在提交(其父即 software_input); 交付 tip 的完整 SHA 由推送后的远端逐 blob 回读取得并写进回执"},
+ "delivery_head_rule": "证据提交严格在 code_commit 之后顺序追加; 不 rebase/merge/amend/force; 不动冻结引用; 不改 .gitignore(本轮只往 .gitattributes 追加本轮两个目录的 -text 行)。",
+ "frozen_refs_untouched": {"main": true, "tags": true, "other_phase8_branches": true,
+                           "note": "只在个人修复分支追加提交"},
+ "forbidden_git_ops_performed": [],
+ "gitignore_modified": false,
+ "gitattributes_change": "追加两行: reports/firmware/phase8-m8-r6-offline-recovery/** 与 reports/reviews/phase8-m8-r6-offline-recovery/** 一律 -text",
+ "device_actions": [],
+ "device_action_counter": {"ports_opened": 0, "dap_connections": 0, "downloads": 0,
+                           "readbacks": 0, "resets": 0, "power_cycles_asked": 0,
+                           "motor_runs": 0, "learn_or_zero_or_save": 0,
+                           "note": "全部离线: Python stub 传输 + sim/manual 内存后端 + 主机 gcc 夹具; 构建只编译不下载"},
+ "private_material_handling": "未读 UID(真实入口在账本门之前就被拒), 未打印任何 48-hex 板级 UID; CLI 实证里的 uid 参数只在被拒路径上出现且不落盘",
+ "scope_changed_this_round": {
+  "product_c": [
+   "applications/motor.c (mot_commit_gated: 成功关断与 Safety 收口同窗成对提交 + 取锁失败 fail-closed + 旧 drv_en_request 影子同步)",
+   "applications/stop_priority.c (sp_peek_held 补齐 pwm/permit/first_unrecovered 等字段拷贝)",
+   "applications/tmc2209.c (CONFIGURED 与晚到 apply 拒绝提交两处长打印拆到每次调用 <=120B)",
+   "applications/safety_thread.c (LIMIT inputs config 一行拆成两条 <=120B)"
+  ],
+  "host_chain": ["tests/host/run_stop_priority_s2.sh (新组 disarm_ready + host_ovr 期望 118->128)",
+                "tests/host/sp_conc_main.c (dr_run + cases_disarm_ready: C23a/a2/b/c/d/e/f/g/h/h2)"],
+  "executor": ["reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py"],
+  "offline_selftest": ["reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_field_selftest.py (FS80-FS92)"],
+  "tools_repaired": ["reports/reviews/phase8-m8-idle-stack-r4/host/idle_learn_check.py (P8 改冻结↔冻结 + 新 P13)",
+                     "reports/reviews/phase8-m8-idle-stack-r4/host/apply_field_window_fix_r5c.py (交付身份改绑 git blob + 退役合同门披露 + git blob 复算门)"],
+  "not_touched": ["内核 kprintf/HAL", "rtconfig.h", "其它 Target 的构建", "所有已执行历史包与台账字节", "load_means / SG 阈值算法"]
+ },
+ "root_cause": {
+  "safety_run_after_disarm": {
+   "claim_level": "HOST_REPRODUCED_AND_FIXED (未在板)",
+   "cause_1": "mot_commit_gated() 里成功关断的证据与 Safety 收口不是同一笔提交; 收口条件读的是窗口快照里的 pwm/permit 结果",
+   "cause_2": "sp_peek_held() 的字段拷贝列表是半截的 => ready_ok 读未初始化栈内存(曾打出 confirm_epoch=6617296 这种垃圾值)",
+   "pre_fix_failure_repro": "新组 disarm_ready 10 个必需 id 里 5 条 FAIL, 形状 = disarm rc=0 mot.state=0 armed=0 hz=0/0 ss=RUN; 后果条 C23a2 = gate_mask=0x2(MOT_GATE_NOT_READY) arm rc=-8, 与现场残留同形; 原文 host/c23_before_fix.txt",
+   "field_interleaving_still_not_proven": "主机给出的是'能造成同一残留'的一条路径, 不是'现场就是这条路径'的证明; 坏指针 0x00bd80b0 的写入者仍未定位"
+  },
+  "console_truncation": {
+   "claim_level": "MECHANISM_LOCATED_IN_SOURCE_AND_BYTES_PROVEN_ON_HOST",
+   "source": "rt-thread-master/.../src/kservice.c:411-413 (rt_kprintf 单次输出被裁到 RT_CONSOLEBUF_SIZE-1 = 127B)",
+   "field_evidence": "现场两份被裸 NUL 咬坏的响应长度都越过该线(356B 那条已归档)",
+   "is_not": "机制定位不等于该轮丢字节的唯一原因; 只说明这两条打印必然被裁"
+  }
+ },
+ "counterexamples": {
+  "host_c_disarm_ready_group": ["C23d 关断 API 失败 => 不收口", "C23e 许可未确认 => 不收口",
+                                "C23f 旧 disarm/旧归零晚到(代次不符) => 不收口",
+                                "C23g 故障锁存/inhibit => 不收口且不清故障",
+                                "C23h Safety 取锁失败 => 放弃提交并具名打印",
+                                "C23h2 取锁失败后重试成功 => 收口成立, rc 如实报"],
+  "executor_byte_gate": ["FS81 裸 NUL 硬停止且原件逐字节相同", "FS82 危险文本优先于解码失败",
+                         "FS83 申报退役恢复合同即停且后续危险步不发", "FS84 离线门对同一申报判红"],
+  "approval_ledger": ["FS85 换输出目录/重开进程不复活额度", "FS86 最后额度占用后崩溃不退款",
+                      "FS87 双执行者共用一本账不超 cap 且守锁", "FS88 账本缺失/损坏拒绝真实动作且不自动建满额账",
+                      "FS89 令牌/计划/执行器/镜像/cap 任一变更不得沿用同一批准",
+                      "FS90 撤能预留耗尽仍发 motor_stop/disarm/status 并留具名披露"],
+  "meta_negatives": ["FS91 摘掉账本绑定门 => FS85 转失败", "FS92 摘掉 reserve 的 cap 判定 => FS87 转失败(账上真超到 5>3)",
+                     "line_width_check --selfcheck: 两条已知超标样本(378B/162B)必须被判红",
+                     "idle_learn_check 元负控 6/6 + R5 组 9/9 全部 fired"]
+ },
+ "commands_and_exit_codes": [
+  {"cmd": "C:/Keil_v5/UV4/UV4.exe -r project.uvprojx -t rt-thread-motor-m1-candidate -j0 -o D:/ns800/reports/reviews/phase8-m8-r6-offline-recovery/build/rt-thread-motor-r6.log", "rc": 0, "cwd": "bsp/novosns/ns800/ns800rt7p65-nssinepad", "note": "只建需要的 motor 候选一次; 不下载"},
+  {"cmd": "bash tests/host/run_stop_priority_s2.sh", "rc": 0, "archive": "host/s2_disarm_ready_after_fix.txt"},
+  {"cmd": "REVERSE=1 bash tests/host/run_stop_priority_s2.sh", "rc": 0, "archive": "host/s2_reverse_after_fix.txt"},
+  {"cmd": "bash tests/host/run_stop_result_s1.sh", "rc": 0, "archive": "host/s1_after_fix.txt"},
+  {"cmd": "python reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_field_selftest.py", "rc": 0, "summary": "cases=92 pass=92 fail=0 negative_injections=15 hardware_actions=0"},
+  {"cmd": "python reports/reviews/phase8-m8-idle-stack-r4/host/idle_learn_check.py", "rc": 0, "summary": "CHECKS=120 problems=0 META=6/6 META_R5=9/9"},
+  {"cmd": "python reports/reviews/phase8-m8-r6-offline-recovery/host/line_width_check.py --selfcheck", "rc": 0},
+  {"cmd": "python reports/reviews/phase8-m8-r6-offline-recovery/host/line_width_check.py", "rc": 0, "summary": "bad=0; REPO_SCAN >120B =70 登记未修(带 SCOPE_NOTE)"},
+  {"cmd": "python reports/reviews/phase8-m8-r6-offline-recovery/host/derive_plan_r6.py --check", "rc": 0, "summary": "IDEMPOTENT bytes=165522 sha=6e0b97f251a61493 源仍冻结=True"},
+  {"cmd": "python reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py --validate-plan --plan reports/reviews/phase8-m8-r6-offline-recovery/field/plan_core_r6.json --repo-root .", "rc": 0, "summary": "checks=232 fail=0 msh_commands=74"},
+  {"cmd": "python .../m8r3_serial_chain.py --approval-init|--dispatch ... (五步 CLI 台账实证)", "rc": [0, 0, 1, 4, 1], "archive": "host/cli_approval_ledger_demo.txt", "note": "第2步整包 OK; 第3步只换 --out => STOP(APPROVAL_QUOTA_EXHAUSTED tmc_config_apply used=2 want=1 cap=2); 第4步重复 init 被拒; 第5步真实传输无账被拒"}
+ ],
+ "keil_build": {
+  "targets": ["rt-thread-motor-m1-candidate"], "each_target_once": true,
+  "return_code": 0, "error_warning_line": "0 Error(s), 0 Warning(s)",
+  "compiler": "V6.24 (C:\\Keil_v5\\ARM\\ARMCLANG\\Bin)", "build_time_elapsed": "00:00:13",
+  "program_size": "Code=205570 RO-data=85970 RW-data=2188 ZI-data=85592",
+  "delta_vs_previous_round_same_target": {"Code": 808, "RO-data": 392, "RW-data": 0, "ZI-data": 0},
+  "logs": ["reports/reviews/phase8-m8-r6-offline-recovery/build/rt-thread-motor-r6.log"],
+  "note": "Program Size/ZI 增量不是生效证明; 生效证据走主机 C 链的逐用例台账, 板上生效要等下一轮"
+ },
+ "firmware_dir": "reports/firmware/phase8-m8-r6-offline-recovery",
+ "candidate_image": {"path": "reports/firmware/phase8-m8-r6-offline-recovery/rt-thread-motor-m1-candidate.bin",
+                     "bytes": 292116,
+                     "sha256": "d70a9180b40c5c6a25f3692bd973ffb0309a1da5db9a2f6e0768300405a9b86b",
+                     "on_board": false, "read_back": false},
+ "download_payload": {"path": "reports/firmware/phase8-m8-r6-offline-recovery/rt-thread-motor-m1.axf",
+                      "bytes": 1773504,
+                      "sha256": "3c113310dc5c70e4e26e51a91a7fd95a6b5a8e1da639cdd3cbb18e79b99a62cf"},
+ "map": {"path": "reports/firmware/phase8-m8-r6-offline-recovery/rt-thread-motor-m1.map",
+         "bytes": 2110427, "sha256": "40f8e27033678166f1765faad25f984336b191d697b318f915a5b17fba854e84"},
+ "not_overwritten": {"path": "reports/firmware/phase8-m8-idle-stack-r4/rt-thread-motor-m1-candidate.bin",
+                     "sha256": "dab356c69fbf4ca747e838580c16982bd56b53b1367f84b97ab705c2fbd25439",
+                     "statement": "上一轮逐字节证在板的那件保持原字节; 本轮新件写新目录, 且本轮没有下载"},
+ "archive_tool": {"path": "reports/reviews/phase8-m8-r6-offline-recovery/host/archive_build_r6.py",
+                  "identity_source": "当场从磁盘字节算; 拷贝后与 build 输出逐字节比对, 不等就报错不写 manifest",
+                  "manifest": "reports/firmware/phase8-m8-r6-offline-recovery/build_manifest.json",
+                  "manifest_self_hash_policy": "清单(SHA256SUMS.txt)不哈希自身字节; build_manifest 由清单登记, 提交前由 git blob 逐条复算"},
+ "plan_package": {
+  "path": "reports/reviews/phase8-m8-r6-offline-recovery/field/plan_core_r6.json",
+  "bytes": 165522, "sha256_head": "6e0b97f251a61493",
+  "package_status": "R6_DERIVED_NOT_EXECUTED",
+  "approval": {"status": "REQUIRES_NEW_APPROVAL", "prior_token": "4cb9dac0f2a47beb494a4fb41090cefe8da76075",
+               "prior_token_state": "EXHAUSTED_AND_OVERRUN (26 场把 tmc_config_apply 用到 14/2)",
+               "hardware_actions_authorized_by_this_package": 0},
+  "image_binding": "仍指向已在板逐字节证过的 dab356c6…; 本轮新候选镜像只登记在 r6_candidate_image, bind_state=NOT_BOUND_IN_THIS_PACKAGE(本包零下载授权)",
+  "recovery_declarations_removed": ["S3/cfgapply->cfgafter", "S7/cfgapply2->cfgafter2"]
+ },
+ "frozen_artifacts_kept": {
+  "plan_core_r5c.json": "05bcf96aa7a6bf89291dab9b140253dde74982f7c3907a49a51bb2972d3a3746 (未改; 写保护 R5C_REFUSE_WRITE 常驻, 生成器 --check 现在要求 executed_bytes_unchanged=True)",
+  "field_20261101T15_runs": "26 场原件与台账字节未动; 失败字节不删不改",
+  "historical_S0": "不回填新字段(只有本轮新跑的 S0 带 plan/executor/image SHA)",
+  "note_on_retired_contract": "同一份冻结包在现执行器下会具名停在 RETIRED_RECOVERY_CONTRACT —— 这是退役的**预期后果**并被登记成 P13/FS83/FS84, 不是历史包被改写; 要复跑历史包必须用它自己那一版执行器(见 P7 的 git blob 打法)"
+ },
+ "tool_self_defects_found_this_round": [
+  "idle_learn_check P8 曾拿冻结件的执行器哈希去比盘上现字节 => 采集器一改就假红; 改成 冻结↔冻结(git blob 当场复算) + 新候选包对盘上字节",
+  "apply_field_window_fix_r5c.py 曾把**当天**的采集器字节盖进派生包 => 幂等声称被 SEMANTIC_DELTA 证伪; 改成绑定交付时的 git blob 身份并加 matches 门",
+  "derive_plan_r6.py 的 --force 只在 sys.argv 里看, argparse 先拒 => 写保护分支永远走不到; 改成真选项并先验证不带它确实 rc=1",
+  "--approval-init 被'单会话必须有夹具'的门挡住(装配层缺口, 单元用例看不见)",
+  "账本父目录不存在时 O_EXCL 失败被误报成 APPROVAL_LEDGER_LOCKED => 现在先建目录, 建不了具名 APPROVAL_LEDGER_ROOT_UNSABLE",
+  "CLI 实证第一次跑没设 PYTHONIOENCODING, 中文按 cp936 落盘成乱码 => 归档文件重跑并逐字节定为 LF"
+ ],
+ "verification_summary": {
+  "field_selftest": "cases=92 pass=92 fail=0 executed=92 negative_injections=15 hardware_actions=0 transport=stub_only",
+  "idle_learn_check": "CHECKS=120 problems=0 META_NEGATIVES=6 fired=6 META_NEGATIVES_R5=9 fired=9",
+  "host_c": {"s2": "PASS rc=0 (host_ovr 用例=128 PASS=128 FAIL=0; disarm_ready 必需=10 唯一出现=10 pass=10)",
+             "s2_reverse": "PASS rc=0 (八项注入全部命中预登记失败身份, 逐项 rc=1 且台账自洽)",
+             "s1": "PASS rc=0"},
+  "line_width": "--selfcheck rc=0 + 全量 rc=0 bad=0 (>120B 站点 70 处登记未修)",
+  "plan_validation": "checks=232 fail=0 msh_commands=74"
+ },
+ "artifact_grades": {
+  "host_proved": ["disarm 后 Safety 收口的产品修复与其六项反例", "两处 >127B 打印的拆分与宽度判据",
+                  "执行器字节门(NUL/危险文本/退役合同)", "跨 dispatch 批准台账的六项行为与两条元负控",
+                  "派生计划的幂等性与离线门"],
+  "board_proved_this_round": [],
+  "board_proved_in_earlier_rounds": ["idle 栈 1024 与镜像 dab356c6… 逐字节在板(前轮证据, 本轮未重测)"],
+  "synthetic_in_offline_fixtures": ["所有响应字节来源: 板上原始采集件 + rows.json 里逐条标出处的行 + 本轮主机 C 真输出",
+                                    "FS85-FS92 全部用 stub 传输/内存后端"],
+  "not_verified": ["修复在板生效", "SG/ADC 阈值可建立(threshold_validation)", "相对保护覆盖(relative_coverage_active)",
+                   "REL_IMPACT 触发", "现场那次交错的精确序列", "坏指针 0x00bd80b0 的写入者",
+                   "带载最坏栈余量", "真实触发后锁存拒绝与人工恢复闭环"]
+ },
+ "open_items": [
+  "A 需按新代码 + 实际工况 + 操作者设备状态另订现场包(含是否烧 d70a9180… 这枚新候选)",
+  "任何真跑之前必须先离线 --approval-init 落一本绑到**新批准身份**的账(旧批准不结转)",
+  "identity 边界确认: 换 plan/executor/image 任一身份时同一批准会 APPROVAL_IDENTITY_MISMATCH; 合法续接要在批准记录里显式覆盖",
+  "70 处 >120B 打印站点仍在'登记未修'清单里",
+  "SG_HEADROOM_INSUFFICIENT 需要可控负载, 与本轮修复无关但仍是保护验收的硬前提"
+ ],
+ "approval_status": "本轮不请求 GO; safe_for_enable=false; 未申请任何硬件额度; 停点在'推送 + 给用户可复审回执'",
+ "evidence_dir": "reports/reviews/phase8-m8-r6-offline-recovery",
+ "run_record": "reports/reviews/phase8-m8-r6-offline-recovery/run_record.md",
+ "pointer_from_previous_round": "reports/reviews/phase8-m8-idle-stack-r4/run_record.md 第 16 节"
+}

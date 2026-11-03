@@ -14,6 +14,8 @@ import sys
 
 ROOT = pathlib.Path("D:/ns800")
 MANIFESTS = [
+    "reports/reviews/phase8-m8-r6-offline-recovery/SHA256SUMS.txt",
+    "reports/firmware/phase8-m8-r6-offline-recovery/SHA256SUMS.txt",
     "reports/reviews/phase8-m8-idle-stack-r4/SHA256SUMS.txt",
     "reports/firmware/phase8-m8-idle-stack-r4/SHA256SUMS.txt",
     "reports/reviews/phase8-m8-diag-stack-r1/SHA256SUMS.txt",
@@ -22,6 +24,7 @@ MANIFESTS = [
     "reports/firmware/phase8-m8-relative-protection-r3/SHA256SUMS.txt",
 ]
 BUILD_MANIFESTS = [
+    "reports/firmware/phase8-m8-r6-offline-recovery/build_manifest.json",
     "reports/firmware/phase8-m8-idle-stack-r4/build_manifest.json",
     "reports/firmware/phase8-m8-diag-stack-r1/build_manifest.json",
     "reports/firmware/phase8-m8-relative-protection-r3/build_manifest.json",

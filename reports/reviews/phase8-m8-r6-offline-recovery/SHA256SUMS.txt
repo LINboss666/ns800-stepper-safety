@@ -1,0 +1,18 @@
+# sha256 * <仓库相对路径>(LF, 无 BOM; 本清单不哈希自身字节 —— 一条清单不能给自己的字节作证)
+# 生成方式: 对 reports/reviews/phase8-m8-r6-offline-recovery/ 下每个常规文件(排除 SHA256SUMS.txt、remote_readback.md 与 __pycache__) 直接读磁盘字节算 sha256
+# 条目数=14; 与 Git blob 的逐条复算由 host/staged_preflight_batch.py(提交前, 单批流)与推送后的远端逐 blob 回读完成
+# 重新生成: python reports/reviews/phase8-m8-idle-stack-r4/host/make_round_sums.py <本目录>
+104c5fb8f3fc1ae493eee0d40e1ecc4031b5ab8b89f217eb4ba50b330d603735  reports/reviews/phase8-m8-r6-offline-recovery/build/rt-thread-motor-r6.log
+77102a8bff73cc21dfa4744222ab1130b376224e91cd98711ac1a1c3dc5efffd  reports/reviews/phase8-m8-r6-offline-recovery/field/needles.json
+6e0b97f251a61493a10d5d4fe3b3238b84e71214e21c77a40b332c0136785750  reports/reviews/phase8-m8-r6-offline-recovery/field/plan_core_r6.json
+3a08721814c0e05e2e87ac7e43ed75b4e4f537d9671e816973432db3859f00a4  reports/reviews/phase8-m8-r6-offline-recovery/field/rows.json
+3b4588d36a8d002db1838d9fec1840538fdee068d217fee5e2a38f6a380c61af  reports/reviews/phase8-m8-r6-offline-recovery/host/archive_build_r6.py
+04c5d89d62806ffd8d8cf9fae9992f4c42f08dde365497ed088c384b2a59febf  reports/reviews/phase8-m8-r6-offline-recovery/host/c23_before_fix.txt
+aab12663204814c75c0a5a1e7ef297e4776f171ec7ac8b4e9ea26b8b95a9272e  reports/reviews/phase8-m8-r6-offline-recovery/host/cli_approval_ledger_demo.txt
+6e947cd1c9cdce6811da10dbd502e75dcb97c54cf7136c192017a141f2e98408  reports/reviews/phase8-m8-r6-offline-recovery/host/derive_plan_r6.py
+88b37d1b58c277347d45be352a6543ccd422a8495c45e209b4c0e0ccfb0e2225  reports/reviews/phase8-m8-r6-offline-recovery/host/line_width_check.py
+ecb11fba0dc889b9bfae8121abb47e35fbf9ea37fc4a32d147be1ac127bcd084  reports/reviews/phase8-m8-r6-offline-recovery/host/s1_after_fix.txt
+092b66edf4849291af63e364d769e2209a82c1f859d2773c251cb83bed0811cf  reports/reviews/phase8-m8-r6-offline-recovery/host/s2_baseline_535459f.txt
+65a42785208b9c351d470d88d269d51a844e277cc7e13e48f7bc297c4b779e30  reports/reviews/phase8-m8-r6-offline-recovery/host/s2_disarm_ready_after_fix.txt
+ed16f2f32f55815bdbfed0032d856c7c1430e6b635b01fd230334d73f3dd3e32  reports/reviews/phase8-m8-r6-offline-recovery/host/s2_reverse_after_fix.txt
+6719792683dfaf16ec5a6fb0bb3a5dd1e6de9f720cf7728953cabafe4e58aa77  reports/reviews/phase8-m8-r6-offline-recovery/run_record.md

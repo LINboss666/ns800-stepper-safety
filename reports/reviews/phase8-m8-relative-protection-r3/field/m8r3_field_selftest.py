@@ -171,7 +171,7 @@ def run_with_write_hook(m, mode, steps, extra_steps=(), cap=5):
 
 
 def dispatch(m, profile, plan=None, rows=None, root=None, transport="stub", backend="sim",
-             token=None, expected=None):
+             token=None, expected=None, approval_id=None, approval_root=None):
     """整包调度的一次真实执行(只用假端口 + sim 后端)。rows 可以换成变异表, 用来证明
     "恢复比较/新增取证"这两条判据真的会拒绝, 而不是只在文档里写着会拒绝。"""
     d = root or out_dir("dispatch-" + profile)
@@ -183,7 +183,17 @@ def dispatch(m, profile, plan=None, rows=None, root=None, transport="stub", back
     plan_dir = str(HERE) if rows is None else str(Path(d))
     return m.dispatch_plan(p, transport, backend, Path(d) / "run", m.SimClock(), profile,
                            "NO_DEVICE", str(REPO), token, expected, "",
-                           plan_dir=plan_dir), d
+                           plan_dir=plan_dir, approval_id=approval_id,
+                           approval_root=approval_root), d
+
+
+def bind_approval(m, plan, aid, root=None):
+    """给一次 dispatch 绑定批准身份(离线开立持久账, 不碰设备)。返回 (approval_root, id)。
+    真实传输现在**必须**有这本账才允许进入, 所以原先只填令牌的用例都要走这里。"""
+    r = Path(root or out_dir("approvals-" + aid))
+    m.approval_init(r, aid, m.current_identities(plan, None, str(REPO)), plan["quota"],
+                    note="selftest offline bind, no device action")
+    return str(r), aid
 
 
 def tx_stage(res, sid):
@@ -1296,14 +1306,20 @@ def s63_mode_combinations_refused_before_any_action(m):
                     res["actions_attempted"]))
     allowed = [dispatch(m, "healthy", transport="stub", backend="sim")[0]["status"],
                dispatch(m, m.REAL_PROFILE, transport="real", backend="manual",
-                        token="X", expected="X")[0].get("code")]
+                        token="X", expected="X")[0]]
     bad = [x for x in out if not (x[1] == "REFUSED" and x[2] == "MODE_COMBINATION_REFUSED"
                                   and x[3] == [] and x[4] == [])]
+    # R6 §7.4 新门: 真实传输还要求一本**绑定批准身份的持久额度账**。它同样在 UID/工具/端口之前,
+    # 所以"允许的组合"这一刻仍是零副作用; 账本缺失本身由 s88 专门检。
+    rman = allowed[1]
     return (not bad and allowed[0] in ("OK", "STOP") and
-            allowed[1] in ("MODE_COMBINATION_REFUSED", "TOOL_ARGV_UNRESOLVED", "UID_FILE_REQUIRED",
-                           None, "MANUAL_GATE_DENIED", "ACTION_DELIVERABLES_MISSING"),
-            "rejected=%s allowed_stub=%s real_manual=%s" % (
-                [x[0] for x in out], allowed[0], allowed[1]))
+            rman.get("code") in ("MODE_COMBINATION_REFUSED", "TOOL_ARGV_UNRESOLVED",
+                                 "UID_FILE_REQUIRED", None, "MANUAL_GATE_DENIED",
+                                 "ACTION_DELIVERABLES_MISSING", "APPROVAL_ID_REQUIRED") and
+            rman.get("stages") == [] and rman.get("actions_attempted") == [],
+            "rejected=%s allowed_stub=%s real_manual=%s stages=%d attempted=%d" % (
+                [x[0] for x in out], allowed[0], rman.get("code"),
+                len(rman.get("stages", [])), len(rman.get("actions_attempted", []))))
 
 
 def s64_signature_not_hardcoded_but_drift_still_refused(m):
@@ -1435,10 +1451,11 @@ def s68_response_driven_branch_and_undetermined_stop(m):
     saved_tool, saved_port = m.RealActionBackend._run, m.make_real_port
     m.RealActionBackend._run = no_tools
     m.make_real_port = lambda port_name, led: m.FakePort([], led, clock=m.SimClock())
+    aroot, aid = bind_approval(m, late, "S68-BOUND")
     try:
         res = m.dispatch_plan(late, "real", "real", out_dir("s68-real"), m.SimClock(),
                               m.REAL_PROFILE, "MEMORY", str(REPO), "APPR", "APPR", "",
-                              plan_dir=str(HERE))
+                              plan_dir=str(HERE), approval_id=aid, approval_root=aroot)
     finally:
         m.RealActionBackend._run, m.make_real_port = saved_tool, saved_port
     codes = [s.get("code") for s in res["stages"]]
@@ -1637,11 +1654,13 @@ def s74_run_root_inside_commander_c_is_shlex_safe(m):
     uidf = Path(d) / "uid.txt"
     uidf.write_text("U" * 48, encoding="utf-8")
     calls, fake_run = _pyocd_shlex_fake(m, image_bytes)
+    aroot, aid = bind_approval(m, plan, "S74-BOUND")
     saved = m.subprocess.run
     m.subprocess.run = fake_run
     try:
         res = m.dispatch_plan(plan, "real", "real", d, m.SimClock(), m.REAL_PROFILE, "NO_PORT",
-                              str(REPO), "APPR", "APPR", str(uidf), plan_dir=str(HERE))
+                              str(REPO), "APPR", "APPR", str(uidf), plan_dir=str(HERE),
+                              approval_id=aid, approval_root=aroot)
     finally:
         m.subprocess.run = saved
     st = {s["id"]: s for s in res["stages"]}
@@ -1828,6 +1847,310 @@ def s79_negative_event_leg_removed(m):
             (s9.get("status"), s9.get("success")))
 
 
+# ============ R6(2026-11-03 复审 §5/§7.3): 字节完整性硬门 + 退役的"损坏后可继续"合同 ============
+def s80_clean_response_still_passes(m):
+    """正控: 干净响应在新的字节门下照常通过(新门不是"一律拒绝")。"""
+    c = m.SimClock()
+    led = m.Ledger(out_dir("s80") / "l.jsonl", c)
+    body = ok_rows(["[TMC-CFG] state=CONFIGURED fail_reg=0x00 snapshot_valid=1"])
+    p = m.FakePort([body], led)
+    lines, n = m.read_until_prompt(p, 1.0, led, out_dir("s80") / "a.bin", c)
+    v = m.assert_step({"expect_contains": ["[TMC-CFG] state=CONFIGURED"]}, lines, "s80", led)
+    led.close()
+    return (v["verdict"] == "OK" and len(lines) == 1 and n == len(body),
+            "verdict=%s rows=%d bytes=%d" % (v["verdict"], len(lines), n))
+
+
+def s81_bare_nul_hard_stop_bytes_kept(m):
+    """复审探针 2 的形状: 提示符前多一条独立的 `00 CR LF`。
+    旧版只记 NUL_IN_RESPONSE 事件, 整条响应仍判 OK; 现在必须具名硬停止, 且落盘原件一字不改。"""
+    c = m.SimClock()
+    d = out_dir("s81")                                   # out_dir 每次换新目录, 所以台账与原件必须同一个 d
+    led = m.Ledger(d / "l.jsonl", c)
+    body = ok_rows(["[TMC-CFG] state=CONFIGURED snapshot_valid=1"]).replace(
+        b"msh >", b"\x00\r\nmsh >")
+    p = m.FakePort([body], led)
+    path = d / "a.bin"
+    code = ""
+    try:
+        m.read_until_prompt(p, 1.0, led, path, c)
+    except m.Stop as e:
+        code = e.code
+    kept = path.exists() and path.read_bytes() == body
+    led.close()                                       # 先落台账再读事件(台账是缓冲写)
+    evs = [x["kind"] for x in _ledger_events(d / "l.jsonl")]
+    return (code == "NUL_BYTE_IN_RESPONSE" and kept and "NUL_IN_RESPONSE" in evs,
+            "code=%s 原字节逐字节相同=%s 台账含 NUL 事件=%s" % (code or "未停", kept,
+                                                            "NUL_IN_RESPONSE" in evs))
+
+
+def s82_danger_text_beats_decode_failure(m):
+    """复审探针 3 的形状: 同一批原始字节里既有 ASCII `HardFault` 又有非法 UTF-8。
+    旧顺序在解码处先抛, 再被恢复合同转成"可继续"; 现在危险门只看原始字节且排在解码之前。"""
+    c = m.SimClock()
+    led = m.Ledger(out_dir("s82") / "l.jsonl", c)
+    body = b"[11:23:45] HardFault\r\n\xe6\x96\xad\xff\xfe\r\nmsh >"
+    p = m.FakePort([body], led)
+    code = detail = ""
+    try:
+        m.read_until_prompt(p, 1.0, led, out_dir("s82") / "a.bin", c)
+    except m.Stop as e:
+        code, detail = e.code, e.detail
+    led.close()
+    return (code == "DANGER_TEXT_IN_STREAM", "code=%s detail=%s" % (code or "未停", detail))
+
+
+def s83_declared_recovery_refused_and_next_step_not_sent(m):
+    """申报 byte_corruption_recovery 的步骤一律具名拒绝, 且同会话后面的危险动作不再发出。"""
+    fx = motion_fx({"__watch__": ROWS["commands"]["__watch__"]["healthy"],
+                    "motor_start": [],
+                    "tmc_config apply": ["[TMC-CFG] state=CONFIGURED"],
+                    "diag_profile tier 2": ["[DIAG] tier=2"]})
+    steps = [{"cmd": "motor_start", "as": "start", "seconds": 1, "expect_absent": ["REFUSED"]},
+             {"cmd": "tmc_config apply", "as": "cfgapply",
+              "byte_corruption_recovery": {"reconfirmed_by": "cfgafter",
+                                           "no_facts_from_corrupted_response": True}},
+             {"cmd": "diag_profile tier 2", "as": "must_not_run"}]
+    r = m.exec_session("s83", steps, out_dir("s83"), "stub", fx, "NO_DEVICE", 30, m.SimClock(),
+                       motion_cap_seconds=5,
+                       plan={"quota": {"port_open": 1, "motor_run": 1, "retry": 0,
+                                       "cleanup_motor_stop": 1, "cleanup_motor_disarm": 1,
+                                       "cleanup_motor_status": 1}})
+    tx = tx_seq(r)
+    return (r["code"] == "RETIRED_RECOVERY_CONTRACT" and "diag_profile tier 2" not in tx and
+            "motor_stop" in tx and "motor_disarm" in tx and r["success"] is False,
+            "code=%s tx=%s disarm=%s" % (r["code"], ",".join(tx), r["disarm"]))
+
+
+def s84_plan_gate_refuses_recovery_declaration(m):
+    """离线门: 申报该合同的计划判红; 不申报的计划判 PASS 并明确写"未申报任何例外"。"""
+    app = str(Path(HERE).parents[3] / "rt-thread-master/rt-thread-master/bsp/novosns/ns800/"
+              "ns800rt7p65-nssinepad/applications")
+    base = json.loads(json.dumps(PLAN))
+    _l, bad0, _x = m.validate_plan(base, ROWS, app)
+    line0 = [s for s in _l if s.startswith("PLAN_BYTE_RECOVERY")]
+    mut = json.loads(json.dumps(PLAN))
+    stg = next(s for s in mut["stages"] if s.get("steps"))
+    stg["steps"][0]["byte_corruption_recovery"] = {"reconfirmed_by": stg["steps"][-1].get("as"),
+                                                   "no_facts_from_corrupted_response": True}
+    _l2, bad1, _x2 = m.validate_plan(mut, ROWS, app)
+    line1 = [s for s in _l2 if s.startswith("PLAN_BYTE_RECOVERY")]
+    ok0 = bool(line0) and "|PASS|" in line0[0] and "未申报任何" in line0[0]
+    ok1 = bool(line1) and "|FAIL|" in line1[0] and "已退役" in line1[0]
+    return (ok0 and ok1 and bad1 > bad0,
+            "未申报=%s 申报后=%s bad %d->%d" %
+            ((line0[0].split("|")[2] if line0 else "-"),
+             (line1[0].split("|")[2] if line1 else "-"), bad0, bad1))
+
+
+def s85_quota_not_revived_by_new_dir_or_new_process(m):
+    """复审 §7.4 的主控: R5-C 那 26 场每场各持一份**内存**账, 换 --out / 重开进程就等于
+    重新发一份额度(apply 实际用到 14/2)。现在同一批准身份连跑两整包, 第二包必须在
+    **动工具之前**被持久账拒绝, 且账上的消耗是 1 而不是 2、也不是被清零的 0。"""
+    p = copy.deepcopy(PLAN)
+    aroot, aid = bind_approval(m, p, "S85-ONE-APPROVAL")
+    r1, _d1 = dispatch(m, "healthy", plan=p, approval_id=aid, approval_root=aroot)
+    r2, _d2 = dispatch(m, "healthy", plan=p, approval_id=aid, approval_root=aroot)
+    doc = json.loads(Path(m.approval_path(aroot, aid)).read_text(encoding="utf-8"))
+    s1_1 = [x for x in r1["stages"] if x["id"] == "S1"][0]
+    s1_2 = [x for x in r2["stages"] if x["id"] == "S1"][0]
+    return (r1["quota_used"].get("download") == 1 and s1_1["status"] == "OK" and
+            s1_2.get("code") == "APPROVAL_QUOTA_EXHAUSTED" and s1_2["status"] == "STOP" and
+            r2["actions_attempted"] == [] and r2["quota_used"] == {} and
+            doc["spent"].get("download") == 1 and doc["pending"] == [] and
+            str(Path(aroot)) not in str(_d1),
+            "一轮S1=%s download=%s 二轮S1=%s/%s 二轮工具=%d 二轮内存账=%s 账本download=%s "
+            "账本在输出目录之外=%s" % (
+                s1_1["status"], r1["quota_used"].get("download"), s1_2["status"],
+                s1_2.get("code"),
+                len(r2["actions_attempted"]), r2["quota_used"], doc["spent"].get("download"),
+                str(Path(aroot)) not in str(_d1)))
+
+
+def s86_last_unit_reserved_then_crash_is_not_refunded(m):
+    """"占用后崩溃"必须按**已消耗**计: 账本里没有 release 这条路, 未确认的预占只留在 pending。"""
+    root = out_dir("s86")
+    led = m.Ledger(root / "l.jsonl", m.SimClock(), out_dir=root)
+    caps, ids = {"motor_run": 1}, {}
+    path = m.approval_path(root, "S86")
+    a = m.ApprovalLedger(path, "S86", ids, caps, led, m.SimClock())
+    a.reserve("motor_run", 1)               # 占掉最后一格……然后进程在这里死掉(没有 commit)
+    del a                                   # 等价于"崩了": 预占留在盘上的 pending 里
+    b = m.ApprovalLedger(path, "S86", ids, caps, led, m.SimClock())
+    snap = b.snapshot()
+    code = ""
+    try:
+        b.reserve("motor_run", 1)
+    except m.Stop as e:
+        code = e.code
+    led.close()
+    kinds = [x["kind"] for x in _ledger_events(root / "l.jsonl")]
+    return (snap["spent"] == {"motor_run": 1} and len(snap["pending"]) == 1 and
+            code == "APPROVAL_QUOTA_EXHAUSTED" and
+            kinds.count("APPROVAL_RESERVED") == 1 and kinds.count("APPROVAL_REFUSED") == 1,
+            "spent=%s pending=%d 再占=%s 事件=%s" % (
+                snap["spent"], len(snap["pending"]), code or "未停",
+                "R%d/F%d" % (kinds.count("APPROVAL_RESERVED"), kinds.count("APPROVAL_REFUSED"))))
+
+
+def s87_two_executors_on_one_approval_never_exceed_cap(m):
+    """双执行者(两个对象/两个进程)共享同一批准身份: 交替预占的总量不得超过 cap,
+    超出那一次必须具名拒绝; 账本被别的进程锁住时也不许盲写。"""
+    root = out_dir("s87")
+    led = m.Ledger(root / "l.jsonl", m.SimClock(), out_dir=root)
+    caps, ids = {"port_open": 3}, {}
+    path = m.approval_path(root, "S87")
+    a = m.ApprovalLedger(path, "S87", ids, caps, led, m.SimClock())
+    b = m.ApprovalLedger(path, "S87", ids, caps, led, m.SimClock())
+    seq, refused = [], 0
+    for who, t in (("A", a), ("B", b), ("A", a), ("B", b), ("A", a)):
+        try:
+            t.reserve("port_open", 1)
+            seq.append(who + "=ok")
+        except m.Stop as e:
+            refused += 1
+            seq.append("%s=%s" % (who, e.code))
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    lock = path.with_name(path.name + ".lock")
+    lock.write_text("other-pid", encoding="utf-8")
+    locked = ""
+    try:
+        a.snapshot()
+    except m.Stop as e:
+        locked = e.code
+    lock.unlink()
+    led.close()
+    return (doc["spent"] == {"port_open": 3} and refused == 2 and
+            all("APPROVAL_QUOTA_EXHAUSTED" in x for x in seq[3:]) and
+            locked == "APPROVAL_LEDGER_LOCKED",
+            "spent=%s 序列=%s 被锁=%s" % (doc["spent"], ",".join(seq), locked or "未停"))
+
+
+def s88_missing_or_corrupt_ledger_blocks_real_action(m):
+    """台账缺失 / JSON 损坏 => 真实动作一律不进入, 且**绝不自建一份满额账**。
+    这条用的是 transport=real(端口工厂换成内存假口, 不碰设备), 所以拒绝完全是账本引起的。"""
+    root = out_dir("s88")
+    p = copy.deepcopy(PLAN)
+    p["stages"] = [s for s in p["stages"] if s["id"] in ("S0", "S3")]
+    opened = []
+    saved = m.make_real_port
+    m.make_real_port = lambda name, led: (opened.append(name),
+                                          m.FakePort([], led, clock=m.SimClock()))[1]
+    try:
+        miss = m.dispatch_plan(p, "real", "real", out_dir("s88-missing"), m.SimClock(),
+                               m.REAL_PROFILE, "NO_PORT", str(REPO), "APPR", "APPR", "",
+                               plan_dir=str(HERE), approval_id="S88-A", approval_root=str(root))
+        bad_path = m.approval_path(root, "S88-B")
+        bad_path.parent.mkdir(parents=True, exist_ok=True)
+        bad_path.write_text('{"version": 1, "approval_id": "S88-B"', encoding="utf-8")  # 半截 JSON
+        corrupt = m.dispatch_plan(p, "real", "real", out_dir("s88-corrupt"), m.SimClock(),
+                                  m.REAL_PROFILE, "NO_PORT", str(REPO), "APPR", "APPR", "",
+                                  plan_dir=str(HERE), approval_id="S88-B", approval_root=str(root))
+    finally:
+        m.make_real_port = saved
+    rebuilt = m.approval_path(root, "S88-A").exists()
+    return (miss["status"] == "REFUSED" and miss["code"] == "APPROVAL_LEDGER_ABSENT" and
+            corrupt["status"] == "REFUSED" and corrupt["code"] == "APPROVAL_LEDGER_CORRUPT" and
+            miss["stages"] == [] and corrupt["stages"] == [] and opened == [] and
+            miss["actions_attempted"] == [] and not rebuilt,
+            "缺失=%s 损坏=%s 开口=%d 阶段=%d/%d 自建账=%s" % (
+                miss.get("code"), corrupt.get("code"), len(opened),
+                len(miss["stages"]), len(corrupt["stages"]), rebuilt))
+
+
+def s89_changed_identity_cannot_reuse_the_same_approval(m):
+    """批准身份 = 令牌 + 计划 SHA + 执行器 SHA + 镜像 SHA(+ cap)。任一变了都必须具名拒绝沿用,
+    而且不许"顺手"按新身份开一本新预算 —— 那等于同一份授权被悄悄续签。"""
+    root = out_dir("s89")
+    led = m.Ledger(root / "l.jsonl", m.SimClock(), out_dir=root)
+    ids = {"plan_sha256": "1" * 64, "executor_sha256": "2" * 64, "image_sha256": "3" * 64}
+    caps = {"port_open": 5}
+    path = m.approval_path(root, "S89")
+    m.ApprovalLedger(path, "S89", ids, caps, led, m.SimClock()).reserve("port_open", 1)
+    out = {}
+    for tag, kw, cp in (
+            ("执行器换了", dict(ids, executor_sha256="9" * 64), caps),
+            ("计划换了", dict(ids, plan_sha256="8" * 64), caps),
+            ("镜像换了", dict(ids, image_sha256="7" * 64), caps),
+            ("cap 放宽了", ids, dict(caps, port_open=9)),
+            ("令牌换了", ids, caps)):
+        obj = m.ApprovalLedger(path, "OTHER" if tag == "令牌换了" else "S89",
+                               kw, cp, led, m.SimClock())
+        try:
+            obj.snapshot()
+            out[tag] = "未拒"
+        except m.Stop as e:
+            out[tag] = e.code
+    led.close()
+    same = m.ApprovalLedger(path, "S89", ids, caps, led, m.SimClock()).snapshot()
+    return (all(v == "APPROVAL_IDENTITY_MISMATCH" for v in out.values()) and
+            same["spent"] == {"port_open": 1},
+            "%s 原账消耗仍=%s" % (out, same["spent"]))
+
+
+def s90_business_exhausted_but_disarm_still_runs(m):
+    """撤能优先于额度: 三条清理预留**全部**在账上耗尽时, motor_stop/disarm/status 仍要发出,
+    禁能照旧由真响应字段证明; 同时这一场一律不算成功, 且每条拒绝都在两本账上具名留痕。"""
+    root = out_dir("s90")
+    led0 = m.Ledger(root / "l.jsonl", m.SimClock(), out_dir=root)
+    caps = {"port_open": 1, "motor_run": 1, "retry": 0,
+            "cleanup_motor_stop": 1, "cleanup_motor_disarm": 1, "cleanup_motor_status": 1}
+    a = m.ApprovalLedger(m.approval_path(root, "S90"), "S90", {}, caps, led0, m.SimClock())
+    for k in ("cleanup_motor_stop", "cleanup_motor_disarm", "cleanup_motor_status"):
+        a.reserve(k, 1, kind="cleanup")          # 上一场已把撤能预留花光(等价于额度耗尽)
+    fx = motion_fx({"__watch__": ROWS["commands"]["__watch__"]["healthy"], "motor_start": []})
+    try:
+        r = m.exec_session("s90", [{"cmd": "motor_start", "as": "start", "seconds": 1,
+                                    "expect_absent": ["REFUSED"]}], out_dir("s90-run"),
+                           "stub", fx, "NO_DEVICE", 30, m.SimClock(), motion_cap_seconds=5,
+                           plan={"quota": dict(caps)}, quota_box=dict(caps), approval=a)
+    finally:
+        led0.close()                              # 账本事件先落盘再读
+    tx = tx_seq(r)
+    evs = [x["kind"] for x in _ledger_events(root / "l.jsonl")]
+    refused = [x for x in _ledger_events(root / "l.jsonl") if x["kind"] == "APPROVAL_REFUSED"]
+    return (all(c in tx for c in ("motor_stop", "motor_disarm", "motor_status")) and
+            r["disarm"] == "CONFIRMED_DISABLED" and r["success"] is False and
+            len(r["cleanup_overruns"]) == 3 and
+            all("APPROVAL_QUOTA_EXHAUSTED_SENT_ANYWAY" in x for x in r["cleanup_overruns"]) and
+            len(refused) == 3 and "APPROVAL_COMMITTED" in evs,
+            "tx=%s disarm=%s success=%s 披露=%s 账本拒绝=%d 确认消耗=%s" % (
+                ",".join(tx), r["disarm"], r["success"],
+                ";".join(r["cleanup_overruns"]), len(refused), "APPROVAL_COMMITTED" in evs))
+
+
+def s91_negative_ledger_gate_removed(m):
+    """定向检出: 把"绑定持久账"这一步摘掉(等价于退回 R5-C 的每轮内存账), s85 必须**转为失败** ——
+    否则那条 APPROVAL_QUOTA_EXHAUSTED 其实不是账本给的, 这条控制就拦不住越权。"""
+    saved = m.open_approval
+    m.open_approval = lambda *a, **k: None
+    try:
+        ok, detail = s85_quota_not_revived_by_new_dir_or_new_process(m)
+    finally:
+        m.open_approval = saved
+    return (not ok, "摘掉账本门后 s85 判=%s(应为失败) 细节=%s" % (ok, detail))
+
+
+def s92_negative_cap_check_removed(m):
+    """定向检出: 把 reserve 的 cap 判定摘掉(恒放行), s87 必须转为失败, 且账上真的超了 cap ——
+    证明"两个执行者不超额度"是靠这本账, 不是测试自己数出来的。"""
+    saved = m.ApprovalLedger.reserve
+
+    def no_cap(self, name, n=1, kind="business"):
+        doc = self._load_or_create()
+        sp = doc.setdefault("spent", {})
+        sp[name] = int(sp.get(name, 0)) + n
+        self._store(doc)
+        return {"name": name, "tag": "%s#mut" % name, "kind": kind}
+
+    m.ApprovalLedger.reserve = no_cap
+    try:
+        ok, detail = s87_two_executors_on_one_approval_never_exceed_cap(m)
+    finally:
+        m.ApprovalLedger.reserve = saved
+    return (not ok, "摘掉 cap 判定后 s87 判=%s(应为失败) 细节=%s" % (ok, detail))
+
+
 CASES = [
     ("FS01", "提示符识别", s01_prompt_recognized),
     ("FS02", "缺提示符不算完整", s02_missing_prompt_is_not_complete),
@@ -1908,6 +2231,19 @@ CASES = [
     ("FS77", "停后帧事件码取 5 且不全局替换 9", s77_forensic_event_is_multi_source_five),
     ("FS78", "判据退回 9 时 event5 帧被具名拒绝", s78_negative_event_pin_back_to_nine),
     ("FS79", "反向-摘掉 event 腿则 event9 放行", s79_negative_event_leg_removed),
+    ("FS80", "干净响应在字节硬门下仍通过", s80_clean_response_still_passes),
+    ("FS81", "裸NUL硬停止且原件不改", s81_bare_nul_hard_stop_bytes_kept),
+    ("FS82", "危险文本优先于解码失败", s82_danger_text_beats_decode_failure),
+    ("FS83", "恢复合同申报被拒且后续不发", s83_declared_recovery_refused_and_next_step_not_sent),
+    ("FS84", "离线门拒绝恢复合同申报", s84_plan_gate_refuses_recovery_declaration),
+    ("FS85", "换输出目录/重开进程不复活额度", s85_quota_not_revived_by_new_dir_or_new_process),
+    ("FS86", "最后额度占用后崩溃不退款", s86_last_unit_reserved_then_crash_is_not_refunded),
+    ("FS87", "双执行者共用一账不超cap且守锁", s87_two_executors_on_one_approval_never_exceed_cap),
+    ("FS88", "台账缺失/损坏拒绝真实动作", s88_missing_or_corrupt_ledger_blocks_real_action),
+    ("FS89", "身份任一变化不得沿用同一批准", s89_changed_identity_cannot_reuse_the_same_approval),
+    ("FS90", "额度耗尽仍执行撤能并留痕", s90_business_exhausted_but_disarm_still_runs),
+    ("FS91", "反向-摘掉账本绑定门", s91_negative_ledger_gate_removed),
+    ("FS92", "反向-摘掉账本 cap 判定", s92_negative_cap_check_removed),
 ]
 
 

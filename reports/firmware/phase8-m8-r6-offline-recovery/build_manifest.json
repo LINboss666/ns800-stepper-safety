@@ -1,0 +1,104 @@
+{
+ "round": "phase8-m8-r6-offline-recovery",
+ "target": "rt-thread-motor-m1-candidate",
+ "action": "Keil Rebuild All x1(只 rt-thread-motor-m1-candidate); 未下载、未 Flash、未接 DAP、未复位、未开串口、未起转、未 learn/zero/保存配置",
+ "command": "C:\\Keil_v5\\UV4\\UV4.exe -r project.uvprojx -t rt-thread-motor-m1-candidate -j0 -o D:/ns800/reports/reviews/phase8-m8-r6-offline-recovery/build/rt-thread-motor-r6.log",
+ "uv4_return_code_observed_this_round": 0,
+ "uv4_return_code_source": "本轮实际执行时终端打印的 UV4_EXIT=0(命令与退出码逐条记在 run_record 的 R6 节); 本脚本不重跑构建, 只判日志里的 0 Error(s), 0 Warning(s) 与 Program Size 行",
+ "error_warning_line": "0 Error(s), 0 Warning(s)",
+ "compiler_line_from_log": "Using Compiler 'V6.24', folder: 'C:\\Keil_v5\\ARM\\ARMCLANG\\Bin'",
+ "program_size": "Program Size: Code=205570 RO-data=85970 RW-data=2188 ZI-data=85592",
+ "program_size_vs_previous_round_same_target": {
+  "previous": "Code=204762 RO-data=85578 RW-data=2188 ZI-data=85592",
+  "previous_manifest": "reports/firmware/phase8-m8-idle-stack-r4/build_manifest.json",
+  "delta_bytes": {
+   "Code": 808,
+   "RO-data": 392,
+   "RW-data": 0,
+   "ZI-data": 0
+  }
+ },
+ "build_time_elapsed_line": "Build Time Elapsed:  00:00:13",
+ "log_path": "reports/reviews/phase8-m8-r6-offline-recovery/build/rt-thread-motor-r6.log",
+ "log_bytes": 3909,
+ "log_sha256": "104c5fb8f3fc1ae493eee0d40e1ecc4031b5ab8b89f217eb4ba50b330d603735",
+ "source_inputs": [
+  {
+   "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/motor.c",
+   "bytes": 133434,
+   "sha256": "c51693b3df4a78a21fe171fbdc4937fed6a01400ec9c91d4252bcab7a3c20952",
+   "what": "R6-2 mot_commit_gated 成功关闭与 Safety 收口同笔提交"
+  },
+  {
+   "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/stop_priority.c",
+   "bytes": 64672,
+   "sha256": "99d6c124bcc38224760b4ba91f526b4ad5e390139c15630a2b2c44dba08ca390",
+   "what": "R6-2 sp_peek_held 补齐 permit/pwm 等字段拷贝"
+  },
+  {
+   "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/tmc2209.c",
+   "bytes": 192031,
+   "sha256": "214951633ee4b39cd693bfee1274bd618305ddcddea8bf40880c2f27437d77ec",
+   "what": "R6-3 CONFIGURED 与晚到 apply 拒绝提交的长打印拆短"
+  },
+  {
+   "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/safety_thread.c",
+   "bytes": 19716,
+   "sha256": "564770faf381b18aacd11e9196c9ce99af7a2f1f19a6c7702832970b68311246",
+   "what": "R6-3 LIMIT inputs 长打印拆短"
+  },
+  {
+   "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/rtconfig.h",
+   "bytes": 9304,
+   "sha256": "1927ed1c1cc7a1efebca50b910eb735228a926c218b3e39a1daf799b6fe9a65a",
+   "what": "本轮未改(沿上一轮 IDLE_THREAD_STACK_SIZE=1024)"
+  }
+ ],
+ "code_commit_at_build": "535459f84724cdb755af00ee4dea4b3f42c93d45",
+ "working_tree_at_build": "改动尚未提交(本 manifest 记录的正是待提交的那份字节)",
+ "not_overwritten": {
+  "path": "reports/firmware/phase8-m8-idle-stack-r4/rt-thread-motor-m1-candidate.bin",
+  "sha256": "dab356c69fbf4ca747e838580c16982bd56b53b1367f84b97ab705c2fbd25439",
+  "statement": "上一轮已归档且已逐字节证在板的镜像保持原字节; 本轮新件写新目录"
+ },
+ "device_actions_by_this_build": 0,
+ "targets": [
+  {
+   "target": "rt-thread-motor-m1-candidate",
+   "uv4_return_code_observed_this_round": 0,
+   "error_warning_line": "0 Error(s), 0 Warning(s)",
+   "program_size": "Program Size: Code=205570 RO-data=85970 RW-data=2188 ZI-data=85592",
+   "log_bytes": 3909,
+   "log_sha256": "104c5fb8f3fc1ae493eee0d40e1ecc4031b5ab8b89f217eb4ba50b330d603735",
+   "log_archive_path": "reports/reviews/phase8-m8-r6-offline-recovery/build/rt-thread-motor-r6.log",
+   "images": {
+    "rt-thread-motor-m1-candidate.bin": {
+     "bytes": 292116,
+     "sha256": "d70a9180b40c5c6a25f3692bd973ffb0309a1da5db9a2f6e0768300405a9b86b",
+     "path": "reports/firmware/phase8-m8-r6-offline-recovery/rt-thread-motor-m1-candidate.bin",
+     "source_path_relative_to_project": "build/motor_m1/rt-thread-motor-m1.bin",
+     "identical_to_build_output": true
+    },
+    "rt-thread-motor-m1.axf": {
+     "bytes": 1773504,
+     "sha256": "3c113310dc5c70e4e26e51a91a7fd95a6b5a8e1da639cdd3cbb18e79b99a62cf",
+     "path": "reports/firmware/phase8-m8-r6-offline-recovery/rt-thread-motor-m1.axf",
+     "source_path_relative_to_project": "build/motor_m1/rt-thread-motor-m1.axf",
+     "identical_to_build_output": true
+    },
+    "rt-thread-motor-m1.map": {
+     "bytes": 2110427,
+     "sha256": "40f8e27033678166f1765faad25f984336b191d697b318f915a5b17fba854e84",
+     "path": "reports/firmware/phase8-m8-r6-offline-recovery/rt-thread-motor-m1.map",
+     "source_path_relative_to_project": "build/motor_m1/rt-thread-motor-m1.map",
+     "identical_to_build_output": true
+    }
+   },
+   "map": {
+    "bytes": 2110427,
+    "sha256": "40f8e27033678166f1765faad25f984336b191d697b318f915a5b17fba854e84",
+    "path": "reports/firmware/phase8-m8-r6-offline-recovery/rt-thread-motor-m1.map"
+   }
+  }
+ ]
+}

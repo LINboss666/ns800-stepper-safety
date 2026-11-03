@@ -547,3 +547,26 @@ S3 十三步跑绿并在台账记 `SESSION_OK` 共 **5 场**（152301Z、153656Z
 
 现场包状态：`plan_core_r5c.json` = **EXECUTED（26 场，仅串口）**，字节已冻结；
 15.5 的未证清单不因本轮工具修复而改变，SG/ADC 阈值仍待可控制负载 + 复审新额度。
+
+## 16. 指针：R6 离线修复轮（2026-11-03，基线就是本文件的交付提交 535459f）
+
+复审件 `NS800_M8_R5C_Review_and_Offline_Repair_20261103.md` 把本轮判为
+`executor_field_release=REWORK` + `Safety_RUN_after_disarm=PRODUCT_DEFECT_CONFIRMED`，
+并给了 M8-R6-OFFLINE-RECOVERY 任务书。执行记录在新目录，不在本文件续写：
+`reports/reviews/phase8-m8-r6-offline-recovery/run_record.md`（§16.1–§16.6）。
+
+本文件留下的三条，R6 的处理分别是：
+
+- 15.3/15.4 的**产品缺陷（disarm 之后 Safety 停在 RUN）**：R6 用真实产品函数在主机 C 链里复现
+  （修前 5 条 FAIL，`gate_mask=0x2 arm rc=-8` 与现场同形），改了 `mot_commit_gated` 的同窗成对提交
+  与 `sp_peek_held` 的字段缺失。**仍只是主机证明，未在板**。
+- 15.4 的**额度越权（apply 14/2）**：R6 补了复审 §7.4 要的那本按批准身份命名、放在输出目录之外的
+  跨进程持久预占账。本文件 15.4 那张累计表与 `host/round_quota_and_stops.py` 的复算件保持原样，
+  不回改、不重跑。
+- 15.7 埋的两条工具自伤（生成器吃进程种子、S0 缺 plan/executor 哈希字段）：R6 都落了 ——
+  S0 现在当场算 `plan_sha256 / executor_sha256` 并连批准身份一起记；
+  历史 S0 与已归档台账**不回填**（派生的新候选包 `plan_core_r6.json` 才带新字段）。
+
+本文件正文与所有历史原件一字未改；除本指针外，`phase8-m8-idle-stack-r4/**` 的改动只有
+`host/idle_learn_check.py`（P8 判据改写 + 新 P13）与 `host/apply_field_window_fix_r5c.py`
+（交付身份不再吃盘上字节），两者都是**工具**，不是现场证据。
