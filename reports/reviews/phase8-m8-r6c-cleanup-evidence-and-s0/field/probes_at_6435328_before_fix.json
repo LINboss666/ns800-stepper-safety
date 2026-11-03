@@ -1,0 +1,141 @@
+{
+  "device_actions": 0,
+  "serial_ports": 0,
+  "output": "C:\\Users\\LMX\\AppData\\Local\\Temp\\a-r6b-remaining-jp3h325s",
+  "results": [
+    {
+      "probe": "corrupt-control",
+      "injected_events": [],
+      "raised": null,
+      "tx": [
+        "motor_start",
+        "motor_stop",
+        "motor_disarm",
+        "motor_status"
+      ],
+      "closed": true,
+      "frame_errors": [],
+      "result": {
+        "status": "OK",
+        "code": "CLEANUP_RESERVE_EXHAUSTED",
+        "success": false,
+        "disarm": "CONFIRMED_DISABLED",
+        "cleanup_errors": [
+          "APPROVAL_COMMIT_REFUSED_APPROVAL_LEDGER_CORRUPT",
+          "APPROVAL_COMMIT_REFUSED_APPROVAL_LEDGER_CORRUPT"
+        ],
+        "cleanup_overruns": [
+          "cleanup_motor_stop:APPROVAL_LEDGER_CORRUPT_SENT_ANYWAY",
+          "cleanup_motor_disarm:APPROVAL_LEDGER_CORRUPT_SENT_ANYWAY",
+          "cleanup_motor_status:APPROVAL_LEDGER_CORRUPT_SENT_ANYWAY"
+        ]
+      },
+      "raw_evidence_directory": "C:\\Users\\LMX\\AppData\\Local\\Temp\\m8r3-field-selftest-m0jbl680\\r6b-corrupt-control-1"
+    },
+    {
+      "probe": "corrupt-log-failure",
+      "injected_events": [
+        "CLEANUP_RESERVE_REFUSED_SENT_ANYWAY"
+      ],
+      "raised": null,
+      "tx": [
+        "motor_start"
+      ],
+      "closed": true,
+      "frame_errors": [
+        {
+          "err": "OSError('INJECTED: one cleanup bookkeeping write failure')",
+          "kind": "CLEANUP_FRAME_EXCEPTION",
+          "t_s": 0.0
+        }
+      ],
+      "result": {
+        "status": "OK",
+        "code": "CLEANUP_RESERVE_EXHAUSTED",
+        "success": false,
+        "disarm": "UNKNOWN",
+        "cleanup_errors": [
+          "CLEANUP_FRAME_RAISED_OSError:OSError('INJECTED: one cleanup bookkeeping write failure')",
+          "APPROVAL_COMMIT_REFUSED_APPROVAL_LEDGER_CORRUPT",
+          "APPROVAL_COMMIT_REFUSED_APPROVAL_LEDGER_CORRUPT"
+        ],
+        "cleanup_overruns": [
+          "cleanup_motor_stop:APPROVAL_LEDGER_CORRUPT_SENT_ANYWAY"
+        ]
+      },
+      "raw_evidence_directory": "C:\\Users\\LMX\\AppData\\Local\\Temp\\m8r3-field-selftest-m0jbl680\\r6b-corrupt-log-failure-1"
+    },
+    {
+      "probe": "exhausted-control",
+      "injected_events": [],
+      "raised": null,
+      "tx": [
+        "motor_start",
+        "motor_stop",
+        "motor_disarm",
+        "motor_status"
+      ],
+      "closed": true,
+      "frame_errors": [],
+      "result": {
+        "status": "OK",
+        "code": "CLEANUP_RESERVE_EXHAUSTED",
+        "success": false,
+        "disarm": "CONFIRMED_DISABLED",
+        "cleanup_errors": [],
+        "cleanup_overruns": [
+          "cleanup_motor_stop:RESERVE_EXHAUSTED_SENT_ANYWAY",
+          "cleanup_motor_stop:APPROVAL_QUOTA_EXHAUSTED_SENT_ANYWAY",
+          "cleanup_motor_disarm:RESERVE_EXHAUSTED_SENT_ANYWAY",
+          "cleanup_motor_disarm:APPROVAL_QUOTA_EXHAUSTED_SENT_ANYWAY",
+          "cleanup_motor_status:RESERVE_EXHAUSTED_SENT_ANYWAY",
+          "cleanup_motor_status:APPROVAL_QUOTA_EXHAUSTED_SENT_ANYWAY"
+        ]
+      },
+      "raw_evidence_directory": "C:\\Users\\LMX\\AppData\\Local\\Temp\\m8r3-field-selftest-m0jbl680\\r6b-exhausted-control-1"
+    },
+    {
+      "probe": "exhausted-log-failure",
+      "injected_events": [
+        "CLEANUP_RESERVE_REFUSED_SENT_ANYWAY"
+      ],
+      "raised": null,
+      "tx": [
+        "motor_start"
+      ],
+      "closed": true,
+      "frame_errors": [
+        {
+          "err": "OSError('INJECTED: one cleanup bookkeeping write failure')",
+          "kind": "CLEANUP_FRAME_EXCEPTION",
+          "t_s": 0.0
+        }
+      ],
+      "result": {
+        "status": "OK",
+        "code": "CLEANUP_RESERVE_EXHAUSTED",
+        "success": false,
+        "disarm": "UNKNOWN",
+        "cleanup_errors": [
+          "CLEANUP_FRAME_RAISED_OSError:OSError('INJECTED: one cleanup bookkeeping write failure')"
+        ],
+        "cleanup_overruns": [
+          "cleanup_motor_stop:RESERVE_EXHAUSTED_SENT_ANYWAY",
+          "cleanup_motor_stop:APPROVAL_QUOTA_EXHAUSTED_SENT_ANYWAY"
+        ]
+      },
+      "raw_evidence_directory": "C:\\Users\\LMX\\AppData\\Local\\Temp\\m8r3-field-selftest-m0jbl680\\r6b-exhausted-log-failure-1"
+    },
+    {
+      "probe": "s0_record_uses_disk_instead_of_execution_snapshot",
+      "rc": 0,
+      "switched": true,
+      "approved_execution_sha": "23f0fbf8eca1b9a2b06dba822b97df3afaff880b35e8e2ac54a2f2193230a940",
+      "changed_disk_sha": "089514f4fc94dba348cdee73054fe9d52f7ccf0980e7b1f9b0fd98f0d20cc15a",
+      "s0_recorded_plan_sha": "089514f4fc94dba348cdee73054fe9d52f7ccf0980e7b1f9b0fd98f0d20cc15a",
+      "s0_records_execution_snapshot": false,
+      "memory_backend_calls": 1,
+      "stdout": "C:\\Users\\LMX\\AppData\\Local\\Temp\\a-r6b-remaining-jp3h325s\\s0\\stdout.txt"
+    }
+  ]
+}

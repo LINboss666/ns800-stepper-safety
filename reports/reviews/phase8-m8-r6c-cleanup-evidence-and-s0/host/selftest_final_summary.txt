@@ -1,0 +1,7 @@
+CASE|FS122|PASS|raised=None 实际write=motor_start,motor_stop,motor_disarm,motor_status closed=True 框架异常=0 success=False 披露=LEDGER_EVENT_WRITTEN_AFTER_RETRY:CLEANUP_RESERVE_REFUSED_SENT_ANYWAY;APPROVAL_COMMIT_REFUSED_APPROVAL_LEDGER_CORRUPT;APPROVAL_COMMIT_REFUSED_APPROVAL_LEDGER_CORRUPT
+CASE|FS123|PASS|raised=None 实际write=motor_start,motor_stop,motor_disarm,motor_status closed=True 写入失败次数=6 success=False 披露=LEDGER_EVENT_WRITE_FAILED:CLEANUP_RESERVE_REFUSED_SENT_ANYWAY:OSError:OSError('INJECTED: 清理路径上的记账写入失败(第 4 次)');LEDGER_EVENT_WRITE_FAILED:CLEANUP_RESERVE_REFUSED_SENT_ANYWAY:OSError:OSError('INJECTED: 清理路径上的记账写入失败(第 5 次)');LEDGER_EVENT_WRITE_FAILED:CLEANUP_RESERVE_REFUSED_SENT_ANYWAY:OSError:OSError('INJECTED: 清理路径上的记账写入失败(第 6 次)') 框架异常=0
+CASE|FS124|PASS|摘门后 实际write=motor_start 框架异常=1 success=False 披露=CLEANUP_FRAME_RAISED_OSError:OSError('INJECTED: 清理路径上的记账写入失败(第 1 次)');APPROVAL_C
+CASE|FS125|PASS|换文件=False S0记=23f0fbf8eca1… 执行快照=23f0fbf8eca1… disk字段=23f0fbf8eca1… 下载调用=1 code=None
+CASE|FS126|PASS|换文件=True S0=S0_PLAN_DISK_DRIFT 记的身份=None 后端调用=[] spent.download=0 status=STOP
+CASE|FS127|PASS|摘门后 S0记=089514f4fc94… 磁盘Q=089514f4fc94… 执行P=23f0fbf8eca1… 相等=True 后端调用=1
+SUMMARY|cases=127 pass=127 fail=0 executed=127 preserved_r2_identities=25|negative_injections=20|hardware_actions=0|transport=stub_only|port=IN_MEMORY

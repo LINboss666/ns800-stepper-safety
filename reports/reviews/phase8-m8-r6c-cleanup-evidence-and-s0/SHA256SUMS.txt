@@ -1,0 +1,17 @@
+# sha256 * <仓库相对路径>(LF, 无 BOM; 本清单不哈希自身字节 —— 一条清单不能给自己的字节作证)
+# 生成方式: 对 reports/reviews/phase8-m8-r6c-cleanup-evidence-and-s0/ 下每个常规文件(排除 SHA256SUMS.txt、remote_readback.md 与 __pycache__) 直接读磁盘字节算 sha256
+# 条目数=13; 与 Git blob 的逐条复算由 host/staged_preflight_batch.py(提交前, 单批流)与推送后的远端逐 blob 回读完成
+# 重新生成: python reports/reviews/phase8-m8-idle-stack-r4/host/make_round_sums.py <本目录>
+77102a8bff73cc21dfa4744222ab1130b376224e91cd98711ac1a1c3dc5efffd  reports/reviews/phase8-m8-r6c-cleanup-evidence-and-s0/field/needles.json
+408c18ecaf50f62a0620c904011f0c60bea3681087875a2ada64efbae7b6de73  reports/reviews/phase8-m8-r6c-cleanup-evidence-and-s0/field/plan_core_r6c.json
+78a9c65b31ad4fc5af2ae38b6a91584dcd1837e16fcd9347b520082db3468358  reports/reviews/phase8-m8-r6c-cleanup-evidence-and-s0/field/probes_after_fix.json
+cd82c48a70562efd37308c839b12a4b165ff242430be490916e5bbaefe0d402b  reports/reviews/phase8-m8-r6c-cleanup-evidence-and-s0/field/probes_at_6435328_before_fix.json
+3a08721814c0e05e2e87ac7e43ed75b4e4f537d9671e816973432db3859f00a4  reports/reviews/phase8-m8-r6c-cleanup-evidence-and-s0/field/rows.json
+7a221207b581c146c79dd8018daa69647adf9c22bdbb6d80d27ef984665d8c84  reports/reviews/phase8-m8-r6c-cleanup-evidence-and-s0/host/derive_matrix.txt
+612fabec158fde382750038be022d7266bc0c98c813d443a775436a94e9133ab  reports/reviews/phase8-m8-r6c-cleanup-evidence-and-s0/host/derive_plan_r6c.py
+918827114bd014394ea8324ed2c8907da545a8a8fcbe42f046d9f318ce3ac8de  reports/reviews/phase8-m8-r6c-cleanup-evidence-and-s0/host/r6c_before_after.py
+bd576f94e79b12334367f467871f3491177936cbf789de174410fbcd355b2aeb  reports/reviews/phase8-m8-r6c-cleanup-evidence-and-s0/host/r6c_before_after.txt
+9e8b161c72b87dd513f26c870dcc8bf5bf74c1c0039854123ce8a8bd7b308c7b  reports/reviews/phase8-m8-r6c-cleanup-evidence-and-s0/host/remaining_probes.py
+95b0cb13d5180285a8e8d0bec97ec7729139f54ca6f4c022ccd1efc867192fb7  reports/reviews/phase8-m8-r6c-cleanup-evidence-and-s0/host/selftest_final_summary.txt
+058774d27e6938db84a5a2412b14cf0e15074ef809fc45a314a69118643d9eb4  reports/reviews/phase8-m8-r6c-cleanup-evidence-and-s0/host/write_handoff_json_r6c.py
+400d160ddf30d46cd77cd9ebd1d99d3635899e0a1c976b9aed79d9de0059bce3  reports/reviews/phase8-m8-r6c-cleanup-evidence-and-s0/run_record.md

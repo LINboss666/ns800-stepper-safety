@@ -1,0 +1,307 @@
+R6C_BEFORE_AFTER | 基线 blob=64353285e9b3 | 工作树=D:\ns800 | 探针=remaining_probes.py(5424 B)
+  BASE|reports/firmware/phase8-m8-relative-protection-r3/build_manifest.json|12042 B|sha=1721a7aa9e07…|与工作树 同字节
+  BASE|reports/firmware/phase8-m8-relative-protection-r3/rt-thread-motor-m1-candidate.bin|290916 B|sha=00608ec93c6a…|与工作树 同字节
+  BASE|reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_field_selftest.py|180687 B|sha=b41b3fe83d36…|与工作树 **内容已不同(本轮改动)**
+  BASE|reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py|215704 B|sha=84df1306f48e…|与工作树 **内容已不同(本轮改动)**
+  BASE|reports/reviews/phase8-m8-relative-protection-r3/field/needles.json|8243 B|sha=77102a8bff73…|与工作树 同字节
+  BASE|reports/reviews/phase8-m8-relative-protection-r3/field/plan.json|67782 B|sha=3cf0a7e1afc3…|与工作树 同字节
+  BASE|reports/reviews/phase8-m8-relative-protection-r3/field/rows.json|51944 B|sha=29a6a00810c3…|与工作树 同字节
+  BASE|rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/blackbox.c|32644 B|sha=59cc184df0d9…|与工作树 同字节
+  BASE|rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diag_relative.c|80236 B|sha=059fc7535a55…|与工作树 同字节
+  BASE|rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diagnosis.c|54151 B|sha=e1696ec92721…|与工作树 同字节
+  BASE|rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/motor.c|131191 B|sha=7305f3b4295c…|与工作树 仅行尾不同(盘 CRLF/blob LF; git diff 该文件=未变)
+  BASE|rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/ns_flash_shell.c|7802 B|sha=7b1ba35dcbba…|与工作树 同字节
+  BASE|rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/project_config.c|23961 B|sha=24c1f16bd6ab…|与工作树 同字节
+  BASE|rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/safety_gpio.c|24871 B|sha=72e9dc9f5c53…|与工作树 同字节
+  BASE|rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/safety_thread.c|19716 B|sha=564770faf381…|与工作树 同字节
+  BASE|rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/supervisor.c|22486 B|sha=7a547fd35fdd…|与工作树 仅行尾不同(盘 CRLF/blob LF; git diff 该文件=未变)
+  BASE|rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/tmc2209.c|192031 B|sha=214951633ee4…|与工作树 同字节
+OK   |C1a_修前_一次记账写失败吃掉三条必要撤能|tx=motor_start 框架异常=1 disarm=UNKNOWN success=False 首错=CLEANUP_FRAME_RAISED_OSError:OSError('INJECTED: one cleanup 
+OK   |C1a_修后_同输入三条必要撤能都发且端口关闭仍不成功|tx=motor_start,motor_stop,motor_disarm,motor_status closed=True 框架异常=0 success=False disarm=CONFIRMED_DISABLED 披露=LEDGER_EVENT_WRITTEN_AFTER_RETRY:CLEANUP_RESERVE_REFUSED_SENT_ANYWAY;APPROVAL_COMMIT_REFUSED_APPROVAL_LEDGER_CORRUPT;APP
+OK   |C1b_修前_合法账额度耗尽+写失败同样只发一条|tx=motor_start 框架异常=1 disarm=UNKNOWN success=False
+OK   |C1b_修后_同输入三条都发且逐条隔离(不是一句整体吞掉)|tx=motor_start,motor_stop,motor_disarm,motor_status closed=True success=False 披露=cleanup_motor_stop:RESERVE_EXHAUSTED_SENT_ANYWAY;cleanup_motor_stop:APPROVAL_QUOTA_EXHAUSTED_SENT_ANYWAY;cleanup_motor_s
+OK   |C1c_两个正控未回退(日志正常时行为与R6B一致)|坏账正控 tx=motor_start,motor_stop,motor_disarm,motor_status 额度正控 tx=motor_start,motor_stop,motor_disarm,motor_status
+OK   |C2_修前_S0把磁盘换过的Q记成本次执行身份且下载照跑|rc=0 执行P=23f0fbf8eca1… 磁盘Q=089514f4fc94… S0记=089514f4fc94… 后端调用=1
+OK   |C2_修后_同一交错在任何动作之前具名拒绝|rc=1 后端调用=0 拒绝身份S0_PLAN_DISK_DRIFT=True 原文里执行身份=23f0fbf8eca1…
+OK   |C2_修后_基线登记的那两个SHA与本轮执行身份仍可逐字节复算|P=23f0fbf8eca1… Q=089514f4fc94…(修前/修后同一交错输入)
+
+---- 修前(6435328 的 EXEC 字节)原文 ----
+[
+ {
+  "probe": "corrupt-control",
+  "injected_events": [],
+  "raised": null,
+  "tx": [
+   "motor_start",
+   "motor_stop",
+   "motor_disarm",
+   "motor_status"
+  ],
+  "closed": true,
+  "frame_errors": [],
+  "result": {
+   "status": "OK",
+   "code": "CLEANUP_RESERVE_EXHAUSTED",
+   "success": false,
+   "disarm": "CONFIRMED_DISABLED",
+   "cleanup_errors": [
+    "APPROVAL_COMMIT_REFUSED_APPROVAL_LEDGER_CORRUPT",
+    "APPROVAL_COMMIT_REFUSED_APPROVAL_LEDGER_CORRUPT"
+   ],
+   "cleanup_overruns": [
+    "cleanup_motor_stop:APPROVAL_LEDGER_CORRUPT_SENT_ANYWAY",
+    "cleanup_motor_disarm:APPROVAL_LEDGER_CORRUPT_SENT_ANYWAY",
+    "cleanup_motor_status:APPROVAL_LEDGER_CORRUPT_SENT_ANYWAY"
+   ]
+  },
+  "raw_evidence_directory": "C:\\Users\\LMX\\AppData\\Local\\Temp\\m8r3-field-selftest-alicpu03\\r6b-corrupt-control-1"
+ },
+ {
+  "probe": "corrupt-log-failure",
+  "injected_events": [
+   "CLEANUP_RESERVE_REFUSED_SENT_ANYWAY"
+  ],
+  "raised": null,
+  "tx": [
+   "motor_start"
+  ],
+  "closed": true,
+  "frame_errors": [
+   {
+    "err": "OSError('INJECTED: one cleanup bookkeeping write failure')",
+    "kind": "CLEANUP_FRAME_EXCEPTION",
+    "t_s": 0.0
+   }
+  ],
+  "result": {
+   "status": "OK",
+   "code": "CLEANUP_RESERVE_EXHAUSTED",
+   "success": false,
+   "disarm": "UNKNOWN",
+   "cleanup_errors": [
+    "CLEANUP_FRAME_RAISED_OSError:OSError('INJECTED: one cleanup bookkeeping write failure')",
+    "APPROVAL_COMMIT_REFUSED_APPROVAL_LEDGER_CORRUPT",
+    "APPROVAL_COMMIT_REFUSED_APPROVAL_LEDGER_CORRUPT"
+   ],
+   "cleanup_overruns": [
+    "cleanup_motor_stop:APPROVAL_LEDGER_CORRUPT_SENT_ANYWAY"
+   ]
+  },
+  "raw_evidence_directory": "C:\\Users\\LMX\\AppData\\Local\\Temp\\m8r3-field-selftest-alicpu03\\r6b-corrupt-log-failure-1"
+ },
+ {
+  "probe": "exhausted-control",
+  "injected_events": [],
+  "raised": null,
+  "tx": [
+   "motor_start",
+   "motor_stop",
+   "motor_disarm",
+   "motor_status"
+  ],
+  "closed": true,
+  "frame_errors": [],
+  "result": {
+   "status": "OK",
+   "code": "CLEANUP_RESERVE_EXHAUSTED",
+   "success": false,
+   "disarm": "CONFIRMED_DISABLED",
+   "cleanup_errors": [],
+   "cleanup_overruns": [
+    "cleanup_motor_stop:RESERVE_EXHAUSTED_SENT_ANYWAY",
+    "cleanup_motor_stop:APPROVAL_QUOTA_EXHAUSTED_SENT_ANYWAY",
+    "cleanup_motor_disarm:RESERVE_EXHAUSTED_SENT_ANYWAY",
+    "cleanup_motor_disarm:APPROVAL_QUOTA_EXHAUSTED_SENT_ANYWAY",
+    "cleanup_motor_status:RESERVE_EXHAUSTED_SENT_ANYWAY",
+    "cleanup_motor_status:APPROVAL_QUOTA_EXHAUSTED_SENT_ANYWAY"
+   ]
+  },
+  "raw_evidence_directory": "C:\\Users\\LMX\\AppData\\Local\\Temp\\m8r3-field-selftest-alicpu03\\r6b-exhausted-control-1"
+ },
+ {
+  "probe": "exhausted-log-failure",
+  "injected_events": [
+   "CLEANUP_RESERVE_REFUSED_SENT_ANYWAY"
+  ],
+  "raised": null,
+  "tx": [
+   "motor_start"
+  ],
+  "closed": true,
+  "frame_errors": [
+   {
+    "err": "OSError('INJECTED: one cleanup bookkeeping write failure')",
+    "kind": "CLEANUP_FRAME_EXCEPTION",
+    "t_s": 0.0
+   }
+  ],
+  "result": {
+   "status": "OK",
+   "code": "CLEANUP_RESERVE_EXHAUSTED",
+   "success": false,
+   "disarm": "UNKNOWN",
+   "cleanup_errors": [
+    "CLEANUP_FRAME_RAISED_OSError:OSError('INJECTED: one cleanup bookkeeping write failure')"
+   ],
+   "cleanup_overruns": [
+    "cleanup_motor_stop:RESERVE_EXHAUSTED_SENT_ANYWAY",
+    "cleanup_motor_stop:APPROVAL_QUOTA_EXHAUSTED_SENT_ANYWAY"
+   ]
+  },
+  "raw_evidence_directory": "C:\\Users\\LMX\\AppData\\Local\\Temp\\m8r3-field-selftest-alicpu03\\r6b-exhausted-log-failure-1"
+ },
+ {
+  "probe": "s0_record_uses_disk_instead_of_execution_snapshot",
+  "rc": 0,
+  "switched": true,
+  "approved_execution_sha": "23f0fbf8eca1b9a2b06dba822b97df3afaff880b35e8e2ac54a2f2193230a940",
+  "changed_disk_sha": "089514f4fc94dba348cdee73054fe9d52f7ccf0980e7b1f9b0fd98f0d20cc15a",
+  "s0_recorded_plan_sha": "089514f4fc94dba348cdee73054fe9d52f7ccf0980e7b1f9b0fd98f0d20cc15a",
+  "s0_records_execution_snapshot": false,
+  "memory_backend_calls": 1,
+  "stdout": "C:\\Users\\LMX\\AppData\\Local\\Temp\\a-r6b-remaining-73c9676h\\s0\\stdout.txt"
+ }
+]
+
+---- 修后(本轮 EXEC 字节)原文 ----
+[
+ {
+  "probe": "corrupt-control",
+  "injected_events": [],
+  "raised": null,
+  "tx": [
+   "motor_start",
+   "motor_stop",
+   "motor_disarm",
+   "motor_status"
+  ],
+  "closed": true,
+  "frame_errors": [],
+  "result": {
+   "status": "OK",
+   "code": "CLEANUP_RESERVE_EXHAUSTED",
+   "success": false,
+   "disarm": "CONFIRMED_DISABLED",
+   "cleanup_errors": [
+    "APPROVAL_COMMIT_REFUSED_APPROVAL_LEDGER_CORRUPT",
+    "APPROVAL_COMMIT_REFUSED_APPROVAL_LEDGER_CORRUPT"
+   ],
+   "cleanup_overruns": [
+    "cleanup_motor_stop:APPROVAL_LEDGER_CORRUPT_SENT_ANYWAY",
+    "cleanup_motor_disarm:APPROVAL_LEDGER_CORRUPT_SENT_ANYWAY",
+    "cleanup_motor_status:APPROVAL_LEDGER_CORRUPT_SENT_ANYWAY"
+   ]
+  },
+  "raw_evidence_directory": "C:\\Users\\LMX\\AppData\\Local\\Temp\\m8r3-field-selftest-1ajrf4q_\\r6b-corrupt-control-1"
+ },
+ {
+  "probe": "corrupt-log-failure",
+  "injected_events": [
+   "CLEANUP_RESERVE_REFUSED_SENT_ANYWAY"
+  ],
+  "raised": null,
+  "tx": [
+   "motor_start",
+   "motor_stop",
+   "motor_disarm",
+   "motor_status"
+  ],
+  "closed": true,
+  "frame_errors": [],
+  "result": {
+   "status": "OK",
+   "code": "CLEANUP_RESERVE_EXHAUSTED",
+   "success": false,
+   "disarm": "CONFIRMED_DISABLED",
+   "cleanup_errors": [
+    "LEDGER_EVENT_WRITTEN_AFTER_RETRY:CLEANUP_RESERVE_REFUSED_SENT_ANYWAY",
+    "APPROVAL_COMMIT_REFUSED_APPROVAL_LEDGER_CORRUPT",
+    "APPROVAL_COMMIT_REFUSED_APPROVAL_LEDGER_CORRUPT"
+   ],
+   "cleanup_overruns": [
+    "cleanup_motor_stop:APPROVAL_LEDGER_CORRUPT_SENT_ANYWAY",
+    "cleanup_motor_stop:BOOKKEEPING_DEFERRED",
+    "cleanup_motor_disarm:APPROVAL_LEDGER_CORRUPT_SENT_ANYWAY",
+    "cleanup_motor_status:APPROVAL_LEDGER_CORRUPT_SENT_ANYWAY"
+   ]
+  },
+  "raw_evidence_directory": "C:\\Users\\LMX\\AppData\\Local\\Temp\\m8r3-field-selftest-1ajrf4q_\\r6b-corrupt-log-failure-1"
+ },
+ {
+  "probe": "exhausted-control",
+  "injected_events": [],
+  "raised": null,
+  "tx": [
+   "motor_start",
+   "motor_stop",
+   "motor_disarm",
+   "motor_status"
+  ],
+  "closed": true,
+  "frame_errors": [],
+  "result": {
+   "status": "OK",
+   "code": "CLEANUP_RESERVE_EXHAUSTED",
+   "success": false,
+   "disarm": "CONFIRMED_DISABLED",
+   "cleanup_errors": [],
+   "cleanup_overruns": [
+    "cleanup_motor_stop:RESERVE_EXHAUSTED_SENT_ANYWAY",
+    "cleanup_motor_stop:APPROVAL_QUOTA_EXHAUSTED_SENT_ANYWAY",
+    "cleanup_motor_disarm:RESERVE_EXHAUSTED_SENT_ANYWAY",
+    "cleanup_motor_disarm:APPROVAL_QUOTA_EXHAUSTED_SENT_ANYWAY",
+    "cleanup_motor_status:RESERVE_EXHAUSTED_SENT_ANYWAY",
+    "cleanup_motor_status:APPROVAL_QUOTA_EXHAUSTED_SENT_ANYWAY"
+   ]
+  },
+  "raw_evidence_directory": "C:\\Users\\LMX\\AppData\\Local\\Temp\\m8r3-field-selftest-1ajrf4q_\\r6b-exhausted-control-1"
+ },
+ {
+  "probe": "exhausted-log-failure",
+  "injected_events": [
+   "CLEANUP_RESERVE_REFUSED_SENT_ANYWAY"
+  ],
+  "raised": null,
+  "tx": [
+   "motor_start",
+   "motor_stop",
+   "motor_disarm",
+   "motor_status"
+  ],
+  "closed": true,
+  "frame_errors": [],
+  "result": {
+   "status": "OK",
+   "code": "CLEANUP_RESERVE_EXHAUSTED",
+   "success": false,
+   "disarm": "CONFIRMED_DISABLED",
+   "cleanup_errors": [
+    "LEDGER_EVENT_WRITTEN_AFTER_RETRY:CLEANUP_RESERVE_REFUSED_SENT_ANYWAY"
+   ],
+   "cleanup_overruns": [
+    "cleanup_motor_stop:RESERVE_EXHAUSTED_SENT_ANYWAY",
+    "cleanup_motor_stop:APPROVAL_QUOTA_EXHAUSTED_SENT_ANYWAY",
+    "cleanup_motor_stop:BOOKKEEPING_DEFERRED",
+    "cleanup_motor_disarm:RESERVE_EXHAUSTED_SENT_ANYWAY",
+    "cleanup_motor_disarm:APPROVAL_QUOTA_EXHAUSTED_SENT_ANYWAY",
+    "cleanup_motor_status:RESERVE_EXHAUSTED_SENT_ANYWAY",
+    "cleanup_motor_status:APPROVAL_QUOTA_EXHAUSTED_SENT_ANYWAY"
+   ]
+  },
+  "raw_evidence_directory": "C:\\Users\\LMX\\AppData\\Local\\Temp\\m8r3-field-selftest-1ajrf4q_\\r6b-exhausted-log-failure-1"
+ },
+ {
+  "probe": "s0_record_uses_disk_instead_of_execution_snapshot",
+  "rc": 1,
+  "switched": true,
+  "approved_execution_sha": "23f0fbf8eca1b9a2b06dba822b97df3afaff880b35e8e2ac54a2f2193230a940",
+  "changed_disk_sha": "089514f4fc94dba348cdee73054fe9d52f7ccf0980e7b1f9b0fd98f0d20cc15a",
+  "s0_recorded_plan_sha": null,
+  "s0_records_execution_snapshot": false,
+  "memory_backend_calls": 0,
+  "stdout": "C:\\Users\\LMX\\AppData\\Local\\Temp\\a-r6b-remaining-2tmftlph\\s0\\stdout.txt"
+ }
+]
+
+RESULT BEFORE_AFTER_OK (checks=8 fails=0)
+device_actions=0|serial_ports=0|dap=0|downloads=0|flash=0|readback=0|reset=0|learns=0|zeros=0|motor_starts=0(仅内存端口)|config_saves=0|keil_builds=0

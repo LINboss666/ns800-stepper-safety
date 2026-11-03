@@ -1,0 +1,23 @@
+# R6C 派生件的写入语义: 本机按顺序跑的五步, 每步单独记真实退出码(不是转述)
+
+$ python host/derive_plan_r6c.py (无参)   # --check: 已存在且幂等
+rc=0
+R6C_WRITE|D:/ns800/reports/reviews/phase8-m8-r6c-cleanup-evidence-and-s0/field/plan_core_r6c.json|bytes=172306|sha=408c18ecaf50f62a
+
+$ python host/derive_plan_r6c.py (无参)   # 无参: 目标字节与将要写的完全相同 => 重写同值(不是覆盖不同内容)
+rc=0
+R6C_WRITE|D:/ns800/reports/reviews/phase8-m8-r6c-cleanup-evidence-and-s0/field/plan_core_r6c.json|bytes=172306|sha=408c18ecaf50f62a
+
+$ python host/derive_plan_r6c.py (无参)   # 无参: 目标被就地改坏之后必须拒绝写入
+# 先把派生件就地改坏一个字段值: sha 408c18ecaf50f62a… -> c1beb45b483831f1…
+rc=1
+R6C_REFUSE_WRITE|plan_core_r6c.json �Ѵ������ֽڲ�ͬ(sha c1beb45b4838), ����Ĭ����; ��Ҫʱ��ʽ --force
+
+$ python host/derive_plan_r6c.py --force   # --force: 显式覆写(本包派生件从未执行过设备, 才允许这一步)
+rc=0
+R6C_WRITE|D:/ns800/reports/reviews/phase8-m8-r6c-cleanup-evidence-and-s0/field/plan_core_r6c.json|bytes=172306|sha=408c18ecaf50f62a
+
+$ python host/derive_plan_r6c.py --check   # --check: 复原后重新幂等
+rc=0
+R6C_CHECK|IDEMPOTENT|bytes=172306|sha=408c18ecaf50f62a|Դ�Զ���=True
+

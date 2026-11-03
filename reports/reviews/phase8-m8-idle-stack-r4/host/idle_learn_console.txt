@@ -1,5 +1,5 @@
 IDLE_LEARN_CHECK mode=offline_only (零设备: 不起 pyocd, 不开串口, 不动 Keil; dispatch 走 stub+sim)
-run_dir(LOCAL_ONLY, 仓外)=D:/ns800_m8r3_scratch/idlecheck_k3_0cara
+run_dir(LOCAL_ONLY, 仓外)=D:/ns800_m8r3_scratch/idlecheck_dvt_1d53
 OK A1_old_map_idle_stack_is_256
 OK A2_new_map_idle_stack_is_1024
 OK A3_ZI_grew_exactly_768
