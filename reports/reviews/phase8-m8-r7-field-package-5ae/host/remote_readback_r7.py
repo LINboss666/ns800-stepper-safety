@@ -28,8 +28,10 @@ R7 = "reports/reviews/phase8-m8-r7-field-package-5ae"
 R6C = "reports/reviews/phase8-m8-r6c-cleanup-evidence-and-s0"
 R6B = "reports/reviews/phase8-m8-r6b-executor-binding"
 R6A = "reports/reviews/phase8-m8-r6a-offline-rework"
-R6 = "reports/reviews/phase8-m8-r6-offline-recovery"
 R4 = "reports/reviews/phase8-m8-idle-stack-r4"
+FW4 = "reports/firmware/phase8-m8-idle-stack-r4"
+R6 = "reports/reviews/phase8-m8-r6-offline-recovery"
+FW6 = "reports/firmware/phase8-m8-r6-offline-recovery"
 DS = "reports/reviews/phase8-m8-diag-stack-r1"
 R3 = "reports/reviews/phase8-m8-relative-protection-r3"
 R3F = R3 + "/field"
@@ -55,9 +57,9 @@ FROZEN = [
      "408c18ecaf50f62a0620c904011f0c60bea3681087875a2ada64efbae7b6de73", "R6C 交付件(本包的派生源)"),
     (FW6A + "/rt-thread-motor-m1-candidate.bin",
      "5ae4110d14fdbb40f49cc6f0deca474cf6d0b33b3ee9305e83681dbdd4a53825", "R6A 候选镜像(本包要上板的那件)"),
-    (R6 + "/rt-thread-motor-m1-candidate.bin",
+    (FW6 + "/rt-thread-motor-m1-candidate.bin",
      "d70a9180b40c5c6a25f3692bd973ffb0309a1da5db9a2f6e0768300405a9b86b", "R6 候选镜像"),
-    (R4 + "/rt-thread-motor-m1-candidate.bin",
+    (FW4 + "/rt-thread-motor-m1-candidate.bin",
      "dab356c69fbf4ca747e838580c16982bd56b53b1367f84b97ab705c2fbd25439", "最后逐字节证在板的那件"),
     (R4 + "/field/field-20261101T142722Z/readback.bin",
      "dab356c69fbf4ca747e838580c16982bd56b53b1367f84b97ab705c2fbd25439", "那次在板证明的原始回读件"),
@@ -279,7 +281,7 @@ def main():
     print("\n== 4. 要求保持原字节的旧件 ==")
     for path, want, why in FROZEN:
         b = r.blob(tip, path)
-        rec("frozen %s" % os.path.basename(path), (sha(b) == want) and b is not None,
+        rec("frozen %s" % path, (sha(b) == want) and b is not None,
             "remote=%s…/%s B expect=%s… (%s)" % ((sha(b) or "-")[:12], len(b) if b else "-",
                                                 want[:12], why))
 

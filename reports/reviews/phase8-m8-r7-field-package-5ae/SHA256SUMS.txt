@@ -1,6 +1,6 @@
 # sha256 * <仓库相对路径>(LF, 无 BOM; 本清单不哈希自身字节 —— 一条清单不能给自己的字节作证)
 # 生成方式: 对 reports/reviews/phase8-m8-r7-field-package-5ae/ 下每个常规文件(排除 SHA256SUMS.txt、remote_readback.md 与 __pycache__) 直接读磁盘字节算 sha256
-# 条目数=14; 与 Git blob 的逐条复算由 host/staged_preflight_batch.py(提交前, 单批流)与推送后的远端逐 blob 回读完成
+# 条目数=16; 与 Git blob 的逐条复算由 host/staged_preflight_batch.py(提交前, 单批流)与推送后的远端逐 blob 回读完成
 # 重新生成: python reports/reviews/phase8-m8-idle-stack-r4/host/make_round_sums.py <本目录>
 e87dd11ee71bb9052c2f722eced578076283fc08336c6027cfa4110bc39b9737  reports/reviews/phase8-m8-r7-field-package-5ae/field/plan_core_r7.json
 b66e33fced562863e7c8f6ea3333543ecf228016c957253f249a4680616b0ea1  reports/reviews/phase8-m8-r7-field-package-5ae/field/rows.json
@@ -10,9 +10,11 @@ b6e382c8ad9fc9f26835892232be8d382ebca6953c8020f57c61d95d2a0c2f53  reports/review
 522a47c6795c4e789f5cb9e23b0d632662b120d9b5c1beca3552456ae1c935c5  reports/reviews/phase8-m8-r7-field-package-5ae/host/make_rows_r7.py
 f75de2b8d62c06d0b36d0c261dd05e6795677dc36b92eb1df4baadce9c0b0d63  reports/reviews/phase8-m8-r7-field-package-5ae/host/r7_readiness.py
 08e2ef952c46fb02f9062a4d502f7cd43d0336d791a8ebc44a5712a40a0ff3d5  reports/reviews/phase8-m8-r7-field-package-5ae/host/readiness_transcript.txt
-352ab89dd5ada2d4025ee0187db8fdf5ae0d837ed85a93e1c777305cc0527e63  reports/reviews/phase8-m8-r7-field-package-5ae/host/remote_readback_r7.py
+09db93aef1bfffb99e4358a14444d4fe33cfff4c9b24cee208da5debd4372e62  reports/reviews/phase8-m8-r7-field-package-5ae/host/remote_readback_r7.py
 19387402c6ae58d40b0549c18a6fccf3879d31699965284552911e58c483d79b  reports/reviews/phase8-m8-r7-field-package-5ae/host/run_derive_matrix_r7.py
 49b0fd0d027711fecc6957d9e69cc6765b6a4246022a7fdecefe90a262019231  reports/reviews/phase8-m8-r7-field-package-5ae/host/run_transcripts_r7.py
 58de0168c7e1f7fefd95ea26163f39629b5e112aa4d56d1cff5194cd8b68506e  reports/reviews/phase8-m8-r7-field-package-5ae/host/validate_plan_r7.txt
 ad5d7b5727e72f0246e1cdce9dcba9f93b4c4655e1a3d92acb22feb00df6f2ba  reports/reviews/phase8-m8-r7-field-package-5ae/host/write_handoff_json_r7.py
-8b47e9cf9fb4aac958562fa6ea92e427978d97d0944b86fe19c8a4d933ba9789  reports/reviews/phase8-m8-r7-field-package-5ae/run_record.md
+1933e66063d49866a9e858afe284830e9d5bd27305b1e6d3429be1a5652f1e2c  reports/reviews/phase8-m8-r7-field-package-5ae/remote_readback_r7.txt
+614a571117009beb4c47008e6ea476146846073acc4bfdad4f5ca24037ef655c  reports/reviews/phase8-m8-r7-field-package-5ae/remote_readback_r7_first_run_wrong_paths.txt
+9ae1da3d5ec0861177dd07cf22cd4d12d2ca500ee149b0eaa96d4a9becf7a560  reports/reviews/phase8-m8-r7-field-package-5ae/run_record.md

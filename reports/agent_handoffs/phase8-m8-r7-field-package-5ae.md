@@ -111,7 +111,15 @@ approval.hardware_actions_authorized_by_this_package = 0
 换计划文件或换输出目录都不重新发额度。`tmc_config_apply` 单列：它不起转、不通电到绕组，但会写驱动芯片寄存器，
 因此仍需操作者单独批准。
 
-## 8. 保留状态与下一步
+## 8. 保留状态、回读与下一步
+
+交付提交 `ea22ba5`（基线 `f15ba46`，常规 fast-forward push）之后按 Git 协议做了一次**本轮范围**的
+逐 blob 回读：`R7_REMOTE_READBACK_SUMMARY|tip=ea22ba52d675|checks=48|fails=0|not_checked=0`（退出码 0），
+原文入库 `…/remote_readback_r7.txt`。第一次跑同一脚本时报了 2 条 `frozen …BIN` 失败，
+根因是**回读脚本自己**把 R6/R4 的归档 BIN 路径写成 `reports/reviews/...` 而非 `reports/firmware/...`
+（取不到对象，不是仓库字节变了）；那次失败原文未删未改，留在
+`…/remote_readback_r7_first_run_wrong_paths.txt`（`exit_code=1`）。收口头只归档这两份原文、
+它们的清单行、修正后的回读脚本与本 JSON 的 `remote_readback` 字段，不再"回读自己的新回读"。
 
 ```text
 R7_package              = R7_FIELD_CANDIDATE_PREPARED_NOT_EXECUTED

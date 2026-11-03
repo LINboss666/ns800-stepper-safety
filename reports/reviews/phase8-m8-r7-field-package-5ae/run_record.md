@@ -186,7 +186,30 @@ SELF  m8r3_field_selftest.py      192823 B  4abcd162a7d0c20d…   (本轮未重�
 keil_builds 0 | device_actions 0 | serial_ports_opened 0 | dap_connections 0
 ```
 
-## 20.12 停点
+## 20.13 推送与本轮范围的独立远端回读
+
+```text
+交付提交(evidence)   ea22ba5  evidence(m8-r7): 有界现场验证候选包离线定稿(5ae 重绑/无运动链/17 项就绪门); 设备动作 0
+push                 f15ba46..ea22ba5  常规 fast-forward, 无 rebase/merge/amend/force
+远端回读对象          ea22ba5(= A 可以直接 ls-remote/fetch 的那一枚)
+                     R7_REMOTE_READBACK_SUMMARY|tip=ea22ba52d675|checks=48|fails=0|not_checked=0  退出码 0
+收口提交              只归档两份回读原文 + 它们在清单里的行 + 修正后的回读脚本 + 交接 JSON 的 remote_readback 字段
+                     收口头不再另起一轮"回读自己的新回读"
+```
+
+回读覆盖：本轮清单 14 条逐 blob 复算 + R6C/R3/R4/R6B/R6A 与两处 firmware 清单 + 候选包内部申报的
+执行器/镜像三件/下载载荷/回读对象/派生源/下载前在板件身份 + `build_manifest` 的 target 行 +
+交接 JSON 里 21 条 `artifacts_and_identities` + 10 件要求保持原字节的旧件（含两份历史在板回读原件）+
+基线头 `f15ba46` 上 EXEC/SELFTEST/R6C 派生源的"本轮未改" + "未新增构建件"两条。
+
+第一次跑这个回读脚本时报了 2 条 `frozen rt-thread-motor-m1-candidate.bin` 失败，原因是**回读脚本自己**
+把 R6 与 R4 的归档 BIN 路径写成了 `reports/reviews/...` 而不是 `reports/firmware/...`——取不到对象，
+不是仓库里的字节变了。那次失败原文完整保留在同目录
+`remote_readback_r7_first_run_wrong_paths.txt`（6640 B，`exit_code=1`，未删未改），
+修正路径后的第二次运行才是上面归档的 48/0。两条 BIN 的远端字节在本轮两次运行里都由
+`FROZEN` 段的散列约束着（`d70a9180…`、`dab356c6…`），与 A 上一轮 §6 登记的完全一致。
+
+## 20.14 停点
 
 本包是**候选**：现场执行需要操作者对上述 5 个非零额度逐条明确批准（尤其是会写驱动芯片的
 `tmc_config_apply`），并回报现场物理状态（供电、接线、是否允许开 COM5、机械是否静止）。
@@ -199,7 +222,8 @@ hardware_actions_authorized_by_this_package = 0
 motion                = NOT_INCLUDED(load_means=NOT_PROVIDED)
 disarm_closeout       = OUT_OF_SCOPE(需 motor_arm)
 validate_plan         = 47 checks / fail=1(PLAN_MOTION_CAP_BUDGET, 已登记恒红门)
-readiness             = 16/16 OK
+readiness             = 17/17 OK
+remote_readback       = 48 checks / fails=0 / not_checked=0 (对象=交付头 ea22ba5)
 product_field_fix     = NOT_VERIFIED
 safe_for_enable       = false
 next_required_human   = 操作者逐项批准额度 + 回报板态

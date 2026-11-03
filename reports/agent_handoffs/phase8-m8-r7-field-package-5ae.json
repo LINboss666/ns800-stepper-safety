@@ -218,13 +218,13 @@
   },
   "run_record": {
    "path": "reports/reviews/phase8-m8-r7-field-package-5ae/run_record.md",
-   "bytes": 15530,
-   "sha256": "8b47e9cf9fb4aac958562fa6ea92e427978d97d0944b86fe19c8a4d933ba9789"
+   "bytes": 17465,
+   "sha256": "9ae1da3d5ec0861177dd07cf22cd4d12d2ca500ee149b0eaa96d4a9becf7a560"
   },
   "handoff_md": {
    "path": "reports/agent_handoffs/phase8-m8-r7-field-package-5ae.md",
-   "bytes": 9319,
-   "sha256": "607d81afa5d7326f26ff2bdb919cc01923b89c83eae1a5b6955180e1589152d9"
+   "bytes": 10122,
+   "sha256": "b59f979e6c28937bc26448fb1e1f6ad8cd9dcb4f063003374f8e2fdd63ce240b"
   },
   "frozen_derivation_source": {
    "path": "reports/reviews/phase8-m8-r6c-cleanup-evidence-and-s0/field/plan_core_r6c.json",
@@ -320,7 +320,15 @@
   "PLAN_MOTION_CAP_BUDGET 对无起转包的恒红门是否要在执行器侧正式修(本轮只登记不修)",
   "四处登记更正是否都只落在新包、没有回改任何已签收件"
  ],
- "remote_readback": null,
+ "remote_readback": {
+  "transcript": "reports/reviews/phase8-m8-r7-field-package-5ae/remote_readback_r7.txt",
+  "transcript_bytes": 7403,
+  "transcript_sha256": "1933e66063d49866a9e858afe284830e9d5bd27305b1e6d3429be1a5652f1e2c",
+  "tool": "reports/reviews/phase8-m8-r7-field-package-5ae/host/remote_readback_r7.py",
+  "summary_lines_grepped_not_hand_copied": [
+   "R7_REMOTE_READBACK_SUMMARY|tip=ea22ba52d675|checks=48|fails=0|not_checked=0"
+  ]
+ },
  "status_block": [
   "R6C_evidence = ACCEPTED(A 2026-11-03 独立复审, OFFLINE_REVIEW_GO)",
   "R7_package = R7_FIELD_CANDIDATE_PREPARED_NOT_EXECUTED",
@@ -344,6 +352,6 @@
   "keil_builds = 0",
   "next_work = 交 A 复审; 现场执行另需操作者一次明确批准"
  ],
- "generated_while_head": "f15ba464628d282f5d7fca91de79b6f702c54dfa",
+ "generated_while_head": "ea22ba52d675ffc698aedabd5e9ab4db289cdc92",
  "artifacts_and_identities_note": "bytes/sha256 全部在生成时刻从磁盘现算; 本 JSON 不自记自己的哈希(清单不哈希自身是同一条纪律); 远端逐 blob 回读在收口一步补进 remote_readback 字段"
 }
