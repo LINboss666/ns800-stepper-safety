@@ -1554,6 +1554,42 @@ def disable_contract(rows):
     return summary, bad
 
 
+def _ev_or_defer(led, deferred, kind, **kw):
+    """清理框架内的**记账写入**: 写不进去绝不许抛, 只把这份事件原样收进内存清单 `deferred`。
+
+    R6C §4: 上一轮把"预占异常"隔离了, 但紧接着这条披露写入没隔离 —— 一次 `OSError`
+    就让整个 cleanup 退出, 三条必要撤能一条没发(禁能 UNKNOWN)。这里的合同是:
+      * 发送机会**不依赖**日志写得成 —— 记账失败只是把这条事件推到 deferred, 由调用方
+        在尽力发完之后二次落证;
+      * 不吞掉: 二次落证成/败都落成一条具名内存错误(errors 非空 => 本场一律不成功);
+      * 不是"全局忽略 Ledger 错": 只有清理路径上的这几处走本函数, 其余 ledger 写入照旧。
+    """
+    try:
+        led.ev(kind, **kw)
+        return True
+    except Exception as e:
+        deferred.append({"kind": kind, "kw": kw,
+                         "err": "%s:%s" % (e.__class__.__name__, repr(e))})
+        return False
+
+
+def _flush_deferred_ev(led, deferred, errors):
+    """清理末尾的二次落证: 仍然失败也只多一条具名披露, 绝不反过来改变"撤能已发"这个事实。
+
+    两条路径都留错误(non-empty errors => 本场不成功): 迟到写成功记
+    `LEDGER_EVENT_WRITTEN_AFTER_RETRY`, 写不成记 `LEDGER_EVENT_WRITE_FAILED`。
+    """
+    for item in list(deferred):
+        try:
+            led.ev(item["kind"], retry_of_deferred=True, **item["kw"])
+        except Exception as e:
+            errors.append("LEDGER_EVENT_WRITE_FAILED:%s:%s" %
+                          (item["kind"], "%s:%s" % (e.__class__.__name__, repr(e))))
+            continue
+        errors.append("LEDGER_EVENT_WRITTEN_AFTER_RETRY:%s" % item["kind"])
+        deferred.remove(item)
+
+
 def cleanup(port, led, clock, budget, transport, fixture, feed_hook=None,
             quota_box=None, overruns=None, used_box=None, approval=None, reservations=None):
     """义务建立后的唯一清理路径(M6 语义 + R3-B 分段窗): motor_stop -> motor_disarm -> motor_status。
@@ -1566,6 +1602,7 @@ def cleanup(port, led, clock, budget, transport, fixture, feed_hook=None,
     但预约失败**不阻止发送**: 撤能优先于额度, 失败只落成具名披露 => 本场一律不算成功。"""
     errors = []
     state = "UNKNOWN"
+    deferred_ev = []            # R6C §4: 记账写不进去时的事件内存副本(命令照发, 末尾尽力落证)
     if overruns is None:
         overruns = []
     hard = budget.cleanup_deadline()
@@ -1605,7 +1642,11 @@ def cleanup(port, led, clock, budget, transport, fixture, feed_hook=None,
                         used_box[key] = used_box.get(key, 0) + 1
                 if denied:
                     overruns.append("%s:%s_SENT_ANYWAY" % (key, denied))
-                    led.ev("CLEANUP_RESERVE_REFUSED_SENT_ANYWAY", key=key, code=denied)
+                    # R6C §4.1: 这条披露**写在发送之前**, 所以它绝不能成为发送的前提。
+                    # 上一版这里直接 led.ev(...), 一次 OSError 就把后面三条必要撤能全吃掉。
+                    if not _ev_or_defer(led, deferred_ev, "CLEANUP_RESERVE_REFUSED_SENT_ANYWAY",
+                                        key=key, code=denied):
+                        overruns.append("%s:BOOKKEEPING_DEFERRED" % key)
         try:
             rows, raw, sent_t, ended_t, errs = _cleanup_read(port, led, clock, dl, cmd,
                                                              out_dir, feed_hook)
@@ -1616,11 +1657,14 @@ def cleanup(port, led, clock, budget, transport, fixture, feed_hook=None,
         if cmd == "motor_status":
             status_rows = rows
     summary, bad = disable_contract(status_rows)
-    led.ev("DISARM_FIELDS", fields=summary, unproven=" ".join(bad))
+    _ev_or_defer(led, deferred_ev, "DISARM_FIELDS", fields=summary, unproven=" ".join(bad))
     if bad:
         errors.append("DISARM_NOT_CONFIRMED " + " ".join(bad))
     else:
         state = "CONFIRMED_DISABLED"
+    # 三条必要撤能已经发完、禁能判据已经算完, 现在才回头尽力落证。失败也只是多一条披露:
+    # **不**因为"日志写成功"而撤销已发送的事实, 也**不**因为写失败就把本场报成成功。
+    _flush_deferred_ev(led, deferred_ev, errors)
     return state, errors
 # --------------------------------------------------------------------------- 会话
 # ---- R6A R2: 命令 -> 额度键的**集中映射**(复审 §4) ----------------------------------
@@ -3105,14 +3149,19 @@ def plan_forbidden_command_hits(plan):
     return hits
 
 
-def s0_binding(plan, repo_root, plan_path=None, approval_id=None):
+def s0_binding(plan, repo_root, plan_path=None, approval_id=None, snapshot=None):
     """S0 是**真实文件与来源绑定**, 不是一行 OFFLINE_BINDING 声明:
     镜像按路径重算 sha256/字节数并与 identity_binding 与 build_manifest 逐字段比;
     源码提交用 git cat-file 证明该 blob 存在; needles 全部回到 C 源码证明。
 
     R6 §7.4 补的一条: S0 还要当场算 **plan / 执行器 / 镜像** 三件的实际哈希并连同批准身份一起记,
     因为"JSON 里登记的哈希"和"这一刻真正被执行的字节"是两回事(R5-C 的 S0 就是照抄登记值,
-    现场跑的却是改过两轮的采集器)。历史 S0 不回填。"""
+    现场跑的却是改过两轮的采集器)。历史 S0 不回填。
+
+    R6C §5: 这一条当时只做了一半 —— plan 的"实际哈希"仍是**另读一次磁盘**。于是"读出 P →
+    核对 P → 执行 P"之后磁盘被换成 Q, S0 会把 Q 记成本次的 plan_sha256(实际动作仍来自已批准的
+    P, 所以不是 B2 那个未批准 argv 绕过, 但登记身份是假的)。现在 plan_sha256 只认**被执行的那份
+    快照**, 磁盘值另用 `plan_sha256_on_disk` 记录; 两者在执行前就不同 => 具名拒绝, 不留下"记 Q 执行 P"。"""
     root = Path(repo_root)
     ident = plan["identity_binding"]
     img = ident["image"]
@@ -3120,7 +3169,19 @@ def s0_binding(plan, repo_root, plan_path=None, approval_id=None):
     facts = {"image_path": img["path"]}
     facts["approval_id"] = approval_id or "NONE_DECLARED"
     facts["plan_source"] = str(plan_path) if plan_path else "IN_MEMORY_PLAN_NO_PATH"
-    facts["plan_sha256"] = sha_of(plan_path) if plan_path and Path(plan_path).is_file() else None
+    disk_sha = sha_of(plan_path) if plan_path and Path(plan_path).is_file() else None
+    facts["plan_sha256_on_disk"] = disk_sha
+    if snapshot is not None:
+        facts["plan_sha256"] = snapshot["sha256"]
+        facts["plan_snapshot_bytes"] = snapshot.get("bytes")
+        facts["plan_snapshot_path"] = str(snapshot.get("path"))
+        if disk_sha is not None and disk_sha != snapshot["sha256"]:
+            raise Stop("S0_PLAN_DISK_DRIFT",
+                       "execution=%s disk=%s 磁盘在执行前已与被执行的字节不同" %
+                       (snapshot["sha256"][:16], disk_sha[:16]))
+    else:
+        facts["plan_sha256"] = disk_sha
+        facts["plan_snapshot_bytes"] = None
     facts["executor_path"] = str(Path(__file__).resolve())
     facts["executor_sha256"] = sha_of(__file__)
     if not p.is_file():
@@ -3445,7 +3506,8 @@ def dispatch_plan(plan, transport, backend_name, outdir, clock, profile, port,
         kind = stg["kind"]
         try:
             if kind == "offline":
-                facts = s0_binding(plan, repo_root, plan_path=plan_path, approval_id=approval_id)
+                facts = s0_binding(plan, repo_root, plan_path=plan_path, approval_id=approval_id,
+                                   snapshot=snap)
                 led.ev("S0_FACTS", **facts)
                 done.append({"id": sid, "status": "OK", "kind": kind, "facts": facts})
                 continue

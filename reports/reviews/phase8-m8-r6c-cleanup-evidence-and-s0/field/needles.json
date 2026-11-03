@@ -1,0 +1,247 @@
+{
+  "needles": [
+    {
+      "id": "mode_line",
+      "source": "applications/diagnosis.c",
+      "literal": "[DIAG] mode=%s (unchanged)",
+      "needle": "[DIAG] mode="
+    },
+    {
+      "id": "rel_trip_first",
+      "source": "applications/diagnosis.c",
+      "literal": "[DIAG] REL TRIP r=%s id=%u rev=%u post_rc=%d",
+      "needle": "[DIAG] REL TRIP r="
+    },
+    {
+      "id": "rel_trip_val",
+      "source": "applications/diagnosis.c",
+      "literal": "[DIAG] REL TRIP val=%d thr=%d ms=%u cov=%u",
+      "needle": "[DIAG] REL TRIP val="
+    },
+    {
+      "id": "rel_trip_sg",
+      "source": "applications/diagnosis.c",
+      "literal": "[DIAG] REL TRIP sg=%u cur=%u imu=%u tick=%u n=%u",
+      "needle": "[DIAG] REL TRIP sg="
+    },
+    {
+      "id": "rel_ticket_used",
+      "source": "applications/diagnosis.c",
+      "literal": "[DIAG] REL trip ticket used; mode=MONITOR_ONLY rearm required",
+      "needle": "[DIAG] REL trip ticket used; mode=MONITOR_ONLY rearm required"
+    },
+    {
+      "id": "rel_latch",
+      "source": "applications/diagnosis.c",
+      "literal": "[DIAG] rel LATCH r=%s id=%u rev=%u ms=%u post_rc=%d",
+      "needle": "[DIAG] rel LATCH r="
+    },
+    {
+      "id": "rel_cov",
+      "source": "applications/diagnosis.c",
+      "literal": "[DIAG] rel cov=%s lost=%u gen=%u rearm=%d",
+      "needle": "[DIAG] rel cov="
+    },
+    {
+      "id": "rel_snap",
+      "source": "applications/diagnosis.c",
+      "literal": "[DIAG] rel snap=%s inc=%s seq=%u pubfail=%u",
+      "needle": "[DIAG] rel snap="
+    },
+    {
+      "id": "rel_rearm_needed",
+      "source": "applications/diagnosis.c",
+      "literal": "[DIAG] rel re-arm needed: diag_mode relative CONFIRM_EXPERIMENTAL",
+      "needle": "[DIAG] rel re-arm needed: diag_mode relative CONFIRM_EXPERIMENTAL"
+    },
+    {
+      "id": "rel_mode_fail",
+      "source": "applications/diagnosis.c",
+      "literal": "[DIAG] REL mode commit FAILED rc; d_mode->MONITOR",
+      "needle": "[DIAG] REL mode commit FAILED rc; d_mode->MONITOR"
+    },
+    {
+      "id": "mode_refused_txn",
+      "source": "applications/diagnosis.c",
+      "literal": "[DIAG] mode REFUSED: static txn not granted",
+      "needle": "[DIAG] mode REFUSED: static txn not granted"
+    },
+    {
+      "id": "relative_refused_confirm",
+      "source": "applications/diagnosis.c",
+      "literal": "[DIAG] RELATIVE REFUSED: needs explicit CONFIRM_EXPERIMENTAL",
+      "needle": "[DIAG] RELATIVE REFUSED: needs explicit CONFIRM_EXPERIMENTAL"
+    },
+    {
+      "id": "sys_status",
+      "source": "applications/supervisor.c",
+      "literal": "=== SYSTEM STATUS ===",
+      "needle": "SYSTEM STATUS"
+    },
+    {
+      "id": "safety_request_row",
+      "source": "applications/supervisor.c",
+      "literal": "[Safety] request=%s pad=%d expected_ENN=%s ENN_fb=%d(%s) verdict=%s",
+      "needle": "[Safety] request="
+    },
+    {
+      "id": "mot_state",
+      "source": "applications/motor.c",
+      "literal": "[MOT] state=%d name=%s",
+      "needle": "[MOT] state="
+    },
+    {
+      "id": "mot_armed",
+      "source": "applications/motor.c",
+      "literal": "[MOT] armed=%d drv_en_request=%d health=%s",
+      "needle": "[MOT] armed="
+    },
+    {
+      "id": "mot_fb",
+      "source": "applications/motor.c",
+      "literal": "[MOT] expected_ENN=%s ENN_fb=%d %s verdict=%s",
+      "needle": "[MOT] expected_ENN="
+    },
+    {
+      "id": "mot_stop",
+      "source": "applications/motor.c",
+      "literal": "[MOT] stop result=%s src=%s rc=%d latched=%u",
+      "needle": "[MOT] stop result="
+    },
+    {
+      "id": "mot_arm_refused",
+      "source": "applications/motor.c",
+      "literal": "[MOT] PWM 提交被拒",
+      "needle": "[MOT] PWM 提交被拒"
+    },
+    {
+      "id": "cfg_saved",
+      "source": "applications/project_config.c",
+      "literal": "[CFG] save: %s",
+      "needle": "[CFG] save: "
+    },
+    {
+      "id": "tmc_cfg",
+      "source": "applications/tmc2209.c",
+      "literal": "[TMC-CFG] write gate mask=0x%X:",
+      "needle": "[TMC-CFG]"
+    },
+    {
+      "id": "bb_status",
+      "source": "applications/blackbox.c",
+      "literal": "[BB] storage unavailable, session %u dropped (%u frames)",
+      "needle": "[BB]"
+    },
+    {
+      "id": "selftest_start",
+      "source": "applications/supervisor.c",
+      "literal": "[SELFTEST] start (state0=%s)",
+      "needle": "[SELFTEST]"
+    },
+    {
+      "id": "irq_gate_open",
+      "source": "applications/safety_thread.c",
+      "literal": "[SAFETY] IRQ gate OPEN: %d active protection input(s) registered",
+      "needle": "[SAFETY] IRQ gate OPEN"
+    },
+    {
+      "id": "irq_gate_status",
+      "source": "applications/safety_thread.c",
+      "literal": "[SAFETY] irq gate   = %s",
+      "needle": "[SAFETY] irq gate   = "
+    },
+    {
+      "id": "profile_show",
+      "source": "applications/diag_relative.c",
+      "literal": "[DIAG] %s id=%u rev=%u abi=%u flg=%04X %s",
+      "needle": "[DIAG] profile id=",
+      "sub": [
+        "profile"
+      ]
+    },
+    {
+      "id": "profile_live_sig",
+      "source": "applications/diag_relative.c",
+      "literal": "[DIAG] live sig=%u match=%s cred zero=%d learn=%d",
+      "needle": "[DIAG] live sig="
+    },
+    {
+      "id": "tier_applied",
+      "source": "applications/diag_relative.c",
+      "literal": "[DIAG] tier %u: dev=%d/%d drop=%u/%u FIELD_UNVERIFIED (commit to publish)",
+      "needle": "[DIAG] tier "
+    },
+    {
+      "id": "tier_refused",
+      "source": "applications/diag_relative.c",
+      "literal": "[DIAG] tier %u REFUSED: %s",
+      "needle": "[DIAG] tier "
+    },
+    {
+      "id": "zero_ok",
+      "source": "applications/diag_relative.c",
+      "literal": "[DIAG] zero OK n=%u raw %u..%u mean=%u (cal source untouched)",
+      "needle": "[DIAG] zero OK n="
+    },
+    {
+      "id": "zero_refused",
+      "source": "applications/diag_relative.c",
+      "literal": "[DIAG] zero REFUSED: not static+READY (no capture started)",
+      "needle": "[DIAG] zero REFUSED: not static+READY (no capture started)"
+    },
+    {
+      "id": "zero_voided",
+      "source": "applications/diag_relative.c",
+      "literal": "[DIAG] zero VOIDED: motion/arm/proof lost during capture",
+      "needle": "[DIAG] zero VOIDED: motion/arm/proof lost during capture"
+    },
+    {
+      "id": "learn_ok",
+      "source": "applications/diag_relative.c",
+      "literal": "[DIAG] learn OK adc[%u..%u]n%u nz%u sg[%u..%u]n%u seq%u..%u",
+      "needle": "[DIAG] learn OK adc["
+    },
+    {
+      "id": "learn_failed",
+      "source": "applications/diag_relative.c",
+      "literal": "[DIAG] learn FAILED: left the approved window or source lost",
+      "needle": "[DIAG] learn FAILED: left the approved window or source lost"
+    },
+    {
+      "id": "learn_refused_mode",
+      "source": "applications/diag_relative.c",
+      "literal": "[DIAG] learn REFUSED: mode must be MONITOR_ONLY",
+      "needle": "[DIAG] learn REFUSED: mode must be MONITOR_ONLY"
+    },
+    {
+      "id": "commit_ok",
+      "source": "applications/diag_relative.c",
+      "literal": "[DIAG] commit OK id=%u rev=%u flags=%04X FIELD_UNVERIFIED",
+      "needle": "[DIAG] commit OK id="
+    },
+    {
+      "id": "commit_refused",
+      "source": "applications/diag_relative.c",
+      "literal": "[DIAG] commit REFUSED: pending incomplete (zero=%d learn=%d)",
+      "needle": "[DIAG] commit REFUSED: pending incomplete (zero="
+    },
+    {
+      "id": "profile_voided",
+      "source": "applications/diag_relative.c",
+      "literal": "[DIAG] profile voided; mode=%s (fault state and logs untouched)",
+      "needle": "[DIAG] profile voided; mode="
+    },
+    {
+      "id": "fb_verdict_names",
+      "source": "applications/safety_gpio.c",
+      "literal": "\"OK\", \"TRANSITION\", \"CUT_BY_HARDWARE\", \"UNEXPECTED_ENABLE\"",
+      "needle": "CUT_BY_HARDWARE"
+    },
+    {
+      "id": "logstat_slots",
+      "source": "applications/ns_flash_shell.c",
+      "literal": "slots=%u/%u valid=%u bad=%u",
+      "needle": "slots="
+    }
+  ]
+}

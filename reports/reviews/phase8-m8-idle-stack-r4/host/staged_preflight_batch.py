@@ -14,6 +14,7 @@ import sys
 
 ROOT = pathlib.Path("D:/ns800")
 MANIFESTS = [
+    "reports/reviews/phase8-m8-r6c-cleanup-evidence-and-s0/SHA256SUMS.txt",
     "reports/reviews/phase8-m8-r6b-executor-binding/SHA256SUMS.txt",
     "reports/reviews/phase8-m8-r6a-offline-rework/SHA256SUMS.txt",
     "reports/firmware/phase8-m8-r6a-offline-rework/SHA256SUMS.txt",

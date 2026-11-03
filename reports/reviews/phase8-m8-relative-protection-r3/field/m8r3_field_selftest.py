@@ -2812,13 +2812,18 @@ def s114_negative_split_rows_entry_gate_removed(m):
 
 
 # ------------------------------------------------- R6B B1: 账本类型损坏与必要撤能/关闭的隔离
+B1_IO = {}                       # tag -> {"writes": 端口实际 write 列表, "ev_hits": 注入命中的事件}
 B1_QUOTA = {"port_open": 1, "motor_run": 1, "cleanup_motor_stop": 1,
             "cleanup_motor_disarm": 1, "cleanup_motor_status": 1}
 
 
-def _b1_session(m, tag, mutate=None, patch=None):
+def _b1_session(m, tag, mutate=None, patch=None, inject_ev=None):
     """复刻复审 R6B §4 的探针形状: 完整临时账 + 内存端口, 起转发出**之后**再改盘上的账。
-    返回 (结果或None, 逸出的异常repr或None, tx序列, 端口是否关闭, 台账事件)。"""
+    返回 (结果或None, 逸出的异常repr或None, tx序列, 端口是否关闭, 台账事件, 账本路径);
+    另把**端口实际 write 列表**与注入命中次数按 tag 放进 `B1_IO`。
+    R6C §4.4: 那个注册表是必需的 —— 用例会把日志写入本身弄坏, 那时 TX **事件**跟着一起消失,
+    只看事件数量会把"没落证"误读成"没发送"。`inject_ev=(kind, allow)` 让 Ledger.ev 对某类事件
+    按 `allow(已命中次数)` 抛普通 OSError。"""
     root = out_dir("r6b-" + tag)
     clock = m.SimClock()
     ids = full_ids(900 + len(tag))
@@ -2846,6 +2851,18 @@ def _b1_session(m, tag, mutate=None, patch=None):
     saved = {}
     if patch:
         patch(m, saved)
+    ev_hits = []
+    if inject_ev:
+        target, allow = inject_ev
+        saved_ev = m.Ledger.ev
+
+        def broken_ev(self, kind, **kw):
+            if kind == target and allow(len(ev_hits)):
+                ev_hits.append(kind)
+                raise OSError("INJECTED: 清理路径上的记账写入失败(第 %d 次)" % len(ev_hits))
+            return saved_ev(self, kind, **kw)
+        m.Ledger.ev = broken_ev
+        saved["ev"] = (m.Ledger, saved_ev)
     result, raised = None, None
     try:
         result = m.exec_session(tag, [{"cmd": "motor_start", "as": "start", "seconds": 1,
@@ -2864,6 +2881,9 @@ def _b1_session(m, tag, mutate=None, patch=None):
     evs = [json.loads(s) for s in (Path(root) / tag / "ledger.jsonl").read_text(
         encoding="utf-8").splitlines()]
     tx = [e["bytes"].strip() for e in evs if e["kind"] == "TX"]
+    writes = [bytes(w).strip().decode("utf-8", "replace") for w in (ports[0].written or [])] \
+        if ports else []
+    B1_IO[tag] = {"writes": writes, "ev_hits": ev_hits}   # TX 事件会随日志一起消失, 动作看这里
     return (result, raised, tx, (ports[0]._closed if ports else None), evs, Path(path))
 
 
@@ -3096,6 +3116,181 @@ def s121_cli_read_swap_cannot_bypass_identity(m):
             (switched, rc, calls, refused, path.read_bytes() == approved_bytes))
 
 
+# ------------------------------------------------- R6C C1: 清理**发送前**的记账异常隔离
+# 复审 §4: R6B 把预占异常隔离了, 但紧接着那条披露的**日志写入**没隔离。一次 OSError 让
+# 整个 cleanup 退出 => 三条必要撤能一条没发。判据看的是**内存端口的实际 write 列表**:
+# 日志本身被我们弄坏时, TX 事件会跟着一起消失, 数事件会把"没落证"误读成"没发送"。
+C1_EV = "CLEANUP_RESERVE_REFUSED_SENT_ANYWAY"
+C1_DISARM = ["motor_stop", "motor_disarm", "motor_status"]
+
+
+def s122_cleanup_bookkeeping_one_write_failure_still_sends_all(m):
+    """复审 §4 表第2行(坏账)+一次写失败: 三条必要撤能仍必须真的从端口写出去, 端口关闭,
+    本场不成功, 记账失败作为独立内存错误留账并在发完之后补记成功。"""
+    r, raised, tx, closed, evs, _path = _b1_session(
+        m, "S122", mutate=lambda d: d["pending"][-1].__setitem__("name", []),
+        inject_ev=(C1_EV, lambda n: n == 0))
+    io_ = B1_IO["S122"]
+    frame = [e for e in evs if e["kind"] == "CLEANUP_FRAME_EXCEPTION"]
+    return (raised is None and io_["writes"] == ["motor_start"] + C1_DISARM and
+            closed is True and not frame and r["success"] is False and
+            any("LEDGER_EVENT_WRITTEN_AFTER_RETRY:" + C1_EV in x for x in r["cleanup_errors"]),
+            "raised=%s 实际write=%s closed=%s 框架异常=%d success=%s 披露=%s" %
+            (raised, ",".join(io_["writes"]), closed, len(frame), r["success"] if r else None,
+             ";".join(r["cleanup_errors"]) if r else "-"))
+
+
+def s123_cleanup_bookkeeping_persistent_failure_still_sends_all(m):
+    """复审 §4 表第4行(合法完整账、cleanup 额度=0)+**持续**写失败: 与"一次"那行同形 ——
+    三条照发、端口关闭、不成功。这里记账二次落证也失败, 所以留的是 WRITE_FAILED 而不是迟到写成的
+    RETRY; 而且没有 CLEANUP_FRAME_EXCEPTION(隔离是逐条的, 不是一句"整体吞掉")。"""
+    saved = dict(B1_QUOTA)
+    B1_QUOTA.update({k: 0 for k in B1_QUOTA if k.startswith("cleanup_")})
+    try:
+        r, raised, tx, closed, evs, _p = _b1_session(
+            m, "S123", inject_ev=(C1_EV, lambda n: True))
+        io_ = B1_IO["S123"]
+    finally:
+        B1_QUOTA.clear()
+        B1_QUOTA.update(saved)
+    frame = [e for e in evs if e["kind"] == "CLEANUP_FRAME_EXCEPTION"]
+    return (raised is None and io_["writes"] == ["motor_start"] + C1_DISARM and
+            closed is True and not frame and r["success"] is False and
+            len(io_["ev_hits"]) >= 4 and
+            any("LEDGER_EVENT_WRITE_FAILED:" + C1_EV in x for x in r["cleanup_errors"]) and
+            not any("LEDGER_EVENT_WRITTEN_AFTER_RETRY" in x for x in r["cleanup_errors"]),
+            "raised=%s 实际write=%s closed=%s 写入失败次数=%d success=%s 披露=%s 框架异常=%d" %
+            (raised, ",".join(io_["writes"]), closed, len(io_["ev_hits"]),
+             r["success"] if r else None, ";".join(r["cleanup_errors"]) if r else "-",
+             len(frame)))
+
+
+def s124_negative_cleanup_bookkeeping_isolation_removed(m):
+    """元负控(§6.2 第3条): 把 `_ev_or_defer` 摘回"直接 led.ev"的旧形状(不隔离), 同一次写入
+    失败必须**重新**吃掉三条必要撤能 —— 端口实际只写 motor_start 且有 CLEANUP_FRAME_EXCEPTION。
+    这一条不亮, s122/s123 的"三发"判据就是空转的。"""
+    orig = m._ev_or_defer
+    m._ev_or_defer = lambda led, deferred, kind, **kw: led.ev(kind, **kw)
+    try:
+        r, raised, tx, closed, evs, _p = _b1_session(
+            m, "S124", mutate=lambda d: d["pending"][-1].__setitem__("name", []),
+            inject_ev=(C1_EV, lambda n: n == 0))
+        io_ = B1_IO["S124"]
+    finally:
+        m._ev_or_defer = orig
+    frame = [e for e in evs if e["kind"] == "CLEANUP_FRAME_EXCEPTION"]
+    return (io_["writes"] == ["motor_start"] and bool(frame) and (r is None or r["success"] is False),
+            "摘门后 实际write=%s 框架异常=%d success=%s 披露=%s" %
+            (",".join(io_["writes"]), len(frame), r["success"] if r else "无汇总",
+             ";".join(r["cleanup_errors"])[:80] if r else "-"))
+
+
+# ------------------------------------------------- R6C C2: S0 登记用**实际执行**的快照身份
+def _c2_dispatch(m, tag, swap=False, drop_snapshot=False):
+    """复审 §5 的形状: 批准账绑定 P 的字节; 执行器读出 P 之后把磁盘换成 Q(只差一个说明字段)。
+    动作后端是内存替身(不起子进程、不碰设备)。`drop_snapshot` 只给元负控用: 把 S0 的快照参数
+    摘掉, 回到"另读一次磁盘"的旧形状。返回实测到的三件身份 + 实际调用。"""
+    root = out_dir("r6c-" + tag)
+    (Path(root) / "rows.json").write_bytes((HERE / "rows.json").read_bytes())
+    doc = json.loads(json.dumps(PLAN))
+    doc["stages"] = [s for s in doc["stages"] if s["id"] in ("S0", "S1")]
+    p_bytes = json.dumps(doc, ensure_ascii=False).encode("utf-8")
+    q = json.loads(json.dumps(doc))
+    q["task_id"] = "DISK_CHANGED_AFTER_SNAPSHOT"
+    q_bytes = json.dumps(q, ensure_ascii=False).encode("utf-8")
+    path = Path(root) / "plan.json"
+    path.write_bytes(p_bytes)
+    ids = m.current_identities(doc, str(path), str(REPO))
+    m.approval_init(root, tag, ids, doc["quota"], note="R6C C2 临时离线探针, 不产生任何现场批准")
+    calls, switched = [], []
+
+    class MemoryBackend(m.ActionBackend):
+        kind = "memory-only"
+
+        def __init__(self, *a, **k):
+            self.attempts = []
+
+        def download(self, act, ctx):
+            calls.append(act["argv"])
+            self.note_attempt("download", "IN_MEMORY")
+            return {"rc": 0}
+
+    old_read, old_backend, orig_s0 = m.Path.read_bytes, m.RealActionBackend, m.s0_binding
+
+    def read_bytes(p, *a, **k):
+        raw = old_read(p, *a, **k)
+        if swap and str(p) == str(path) and not switched:
+            path.write_bytes(q_bytes)      # 读出 P 之后换文件; 解析/身份/执行都仍用 P
+            switched.append(True)
+        return raw
+
+    def old_shape(plan, repo_root, plan_path=None, approval_id=None, snapshot=None):
+        return orig_s0(plan, repo_root, plan_path=plan_path, approval_id=approval_id)
+
+    if swap:
+        m.Path.read_bytes = read_bytes
+    if drop_snapshot:
+        m.s0_binding = old_shape
+    m.RealActionBackend = MemoryBackend
+    snap = None
+    try:
+        snap = m.read_plan_snapshot(str(path))
+        res = m.dispatch_plan(snap["doc"], "real", "real", Path(root) / "run", m.SimClock(),
+                              m.REAL_PROFILE, "MEMORY_NO_PORT", str(REPO), tag, tag,
+                              plan_dir=str(root), approval_id=tag, approval_root=root,
+                              plan_path=str(path), plan_snapshot=snap)
+    finally:
+        m.Path.read_bytes, m.RealActionBackend, m.s0_binding = old_read, old_backend, orig_s0
+    led_path = Path(root) / "run" / "dispatch_ledger.jsonl"
+    evs = ([json.loads(l) for l in led_path.read_bytes().decode("utf-8").splitlines()]
+           if led_path.exists() else [])
+    facts = [e for e in evs if e["kind"] == "S0_FACTS"]
+    s0 = [x for x in res.get("stages", []) if x.get("id") == "S0"]
+    return {"exec_sha": snap["sha256"], "disk_sha": m.sha_bytes(q_bytes),
+            "clean_sha": m.sha_bytes(p_bytes), "switched": bool(switched),
+            "recorded": facts[0]["plan_sha256"] if facts else None,
+            "recorded_on_disk": facts[0].get("plan_sha256_on_disk") if facts else None,
+            "calls": list(calls), "status": res["status"], "code": res.get("code"),
+            "s0_code": s0[0].get("code") if s0 else None,
+            "spent_download": ((res.get("approval") or {}).get("spent") or {}).get("download")}
+
+
+def s125_s0_records_the_executed_snapshot_identity(m):
+    """正控(§5 修法): 文件没被动过 => S0 记的 plan_sha256 **同时**等于执行快照与磁盘那份的哈希,
+    并且另有一个具名的 disk 字段(观察值, 不覆盖执行身份)。下载照旧执行(合法整包不被新门挡住)。"""
+    o = _c2_dispatch(m, "C125")
+    return (o["switched"] is False and o["recorded"] == o["clean_sha"] == o["exec_sha"] and
+            o["recorded_on_disk"] == o["clean_sha"] and len(o["calls"]) == 1 and
+            o["s0_code"] is None,
+            "换文件=%s S0记=%s… 执行快照=%s… disk字段=%s… 下载调用=%d code=%s" %
+            (o["switched"], (o["recorded"] or "-")[:12], o["exec_sha"][:12],
+             (o["recorded_on_disk"] or "-")[:12], len(o["calls"]), o["s0_code"]))
+
+
+def s126_s0_disk_drift_refuses_before_action(m):
+    """反控(§5 的 P→Q 交错): 已核快照 P 被执行、磁盘在读盘后被换成 Q。修前 S0 把 Q 记成本次
+    执行身份(rc=0 且下载照跑); 现在**任何动作之前**具名拒绝 S0_PLAN_DISK_DRIFT, 下载零调用、
+    download 额度一格不扣, 盘上留下的就是 Q(不悄悄改回、不假装什么都没发生)。"""
+    o = _c2_dispatch(m, "C126", swap=True)
+    return (o["switched"] and o["s0_code"] == "S0_PLAN_DISK_DRIFT" and o["recorded"] is None and
+            o["calls"] == [] and (o["spent_download"] in (0, None)) and o["status"] != "OK",
+            "换文件=%s S0=%s 记的身份=%s 后端调用=%s spent.download=%s status=%s" %
+            (o["switched"], o["s0_code"], o["recorded"], o["calls"], o["spent_download"],
+             o["status"]))
+
+
+def s127_negative_s0_snapshot_identity_removed(m):
+    """元负控(§7.2.5): 把 S0 的快照参数摘掉, 回到"另读一次磁盘"的旧形状 —— 同一交错必须
+    **重新**产出复审 §5 的假身份: S0 记磁盘那份(Q)的哈希而实际执行的是已批准的 P, 且下载照跑
+    一次。这一条不亮, 就说明 s126 的拒绝是空转的。"""
+    o = _c2_dispatch(m, "C127", swap=True, drop_snapshot=True)
+    return (o["recorded"] == o["disk_sha"] and o["recorded"] != o["exec_sha"] and
+            len(o["calls"]) == 1,
+            "摘门后 S0记=%s… 磁盘Q=%s… 执行P=%s… 相等=%s 后端调用=%d" %
+            ((o["recorded"] or "-")[:12], o["disk_sha"][:12], o["exec_sha"][:12],
+             o["recorded"] == o["disk_sha"], len(o["calls"])))
+
+
 CASES = [
     ("FS01", "提示符识别", s01_prompt_recognized),
     ("FS02", "缺提示符不算完整", s02_missing_prompt_is_not_complete),
@@ -3218,6 +3413,12 @@ CASES = [
     ("FS119", "内存计划非批准快照拒发", s119_memory_plan_not_from_snapshot_reaches_no_backend),
     ("FS120", "反向-摘掉快照门", s120_negative_snapshot_gate_removed),
     ("FS121", "CLI读取换文件被身份门拒", s121_cli_read_swap_cannot_bypass_identity),
+    ("FS122", "清理记账一次写失败仍三发撤能", s122_cleanup_bookkeeping_one_write_failure_still_sends_all),
+    ("FS123", "清理记账持续写失败仍三发撤能", s123_cleanup_bookkeeping_persistent_failure_still_sends_all),
+    ("FS124", "反向-摘掉清理记账隔离", s124_negative_cleanup_bookkeeping_isolation_removed),
+    ("FS125", "S0记实际执行快照身份", s125_s0_records_the_executed_snapshot_identity),
+    ("FS126", "S0磁盘漂移在执行前具名拒绝", s126_s0_disk_drift_refuses_before_action),
+    ("FS127", "反向-摘掉S0快照贯通", s127_negative_s0_snapshot_identity_removed),
 ]
 
 
