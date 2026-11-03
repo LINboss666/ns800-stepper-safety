@@ -1877,14 +1877,20 @@ static rt_bool_t mot_commit_gated(const sp_proof_t *pf, rt_bool_t need_pending,
     if (ss_held) safety_lock_give_checked();
     /* 窗口外才打印(短窗口内禁止打印/延时/K5 同一条纪律)。 */
     if (withheld)
-        rt_kprintf("[MOT] 关闭已落位, 但**未授予恢复资格**: 本代禁能侧回读/抑制/锁存证据不足"
-                   " (epoch=%u permit=%s level=%u@%u inhibit=%s latched=%s)"
-                   " - Safety 保持原状态, 需 fault_reset 人工复核\n",
-                   (unsigned)pf->epoch, view.permit.confirmed ? "YES" : "no",
+    {
+        /* R6A §6: 这一条本轮新增的站点自己就超线(格式串 211 B / 最坏 237 B > 120 B),
+         * 按“一次调用一条事实”拆开 —— 字段与“未授予恢复资格”的含义一个不减。 */
+        rt_kprintf("[MOT] 关闭已落位, 但**未授予恢复资格**: 本代禁能侧证据不足 (epoch=%u\n",
+                   (unsigned)pf->epoch);
+        rt_kprintf("[MOT]  回读许可=%s 已确认电平=%u@%u\n",
+                   view.permit.confirmed ? "YES" : "no",
                    (unsigned)view.permit.confirmed_level,
-                   (unsigned)view.permit.confirm_epoch,
+                   (unsigned)view.permit.confirm_epoch);
+        rt_kprintf("[MOT]  抑制=%s 停机锁存=%s\n",
                    view.inhibit ? "YES" : "no",
                    view.motor_stop_latched ? "YES" : "no");
+        rt_kprintf("[MOT]  => Safety 保持原状态, 需 fault_reset 人工复核\n");
+    }
     if (!ok)
         rt_kprintf("[MOT] 慢整理**整笔放弃**: 本次 proof 那一代已被更新的一代取代"
                    " (epoch=%u) - 不写新影子, 不动新预约/新 pending\n",

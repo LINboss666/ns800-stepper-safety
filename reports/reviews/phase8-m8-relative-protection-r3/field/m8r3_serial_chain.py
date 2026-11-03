@@ -226,7 +226,11 @@ def split_rows(raw, command=None, require_prompt=True):
     """去 ANSI、剥提示符、剥回显, 返回行列表; 缺提示符 => 具名协议失败。
 
     require_prompt=False 只给**被动观察窗**用: 那段时间里没有命令、也就没有提示符,
-    板子只是把 [DIAG]/[MOT] 行流出来。命令响应的提示符门绝不因此放宽。"""
+    板子只是把 [DIAG]/[MOT] 行流出来。命令响应的提示符门绝不因此放宽。
+
+    R6A §5: 危险门在**剥之前**的完整原始字节上做 —— 提示符/回显的剥离不能顺手把损坏的
+    一段剪掉(清理路径正是这么漏掉裸 NUL 的)。"""
+    guard_stream_bytes(raw, where="split_rows", evidence="in-memory")
     data = ANSI.sub(b"", raw)
     if require_prompt and not PROMPT_RE.search(data):
         raise Stop("MISSING_RESPONSE_PROMPT", "tail=%r" % data[-16:])
@@ -243,6 +247,51 @@ def check_danger(raw):
     m = DANGER.search(ANSI.sub(b"", raw))
     if m:
         raise Stop("DANGER_TEXT_IN_STREAM", m.group(0).decode("ascii", "replace"))
+
+
+# 复审 M8-R6A §5: 危险门只有 read_until_prompt 一处, 清理与观察窗各走各的解码路径,
+# 于是"裸 NUL 一律硬停"在 cleanup_motor_status 上没生效(裸 NUL 是合法 UTF-8)。
+# 现在三类原始字节缺陷集中在**一个函数**里, 普通响应/清理/观察窗/发送前排空全部复用它。
+STREAM_BYTE_DEFECTS = ("DANGER_TEXT_IN_STREAM", "NUL_BYTE_IN_RESPONSE",
+                       "ILLEGAL_BYTES_IN_RESPONSE")
+
+
+def guard_partial_bytes(raw, led=None, where="", evidence=""):
+    """流**还没读完**时只能做与分块边界无关的两项: 危险文本、裸 NUL。
+    非法 UTF-8 绝不在这里判 —— 一条中文行被 512 B 的读块从中间剪开是正常现象,
+    在半截缓冲上判解码会把好响应误杀(完整字节流的解码门在 guard_stream_bytes 里)。"""
+    m = DANGER.search(ANSI.sub(b"", raw))
+    if m:
+        if led:
+            led.ev("DANGER_BYTES", where=where, evidence=str(evidence),
+                   hit=m.group(0).decode("ascii", "replace"))
+        raise Stop("DANGER_TEXT_IN_STREAM", m.group(0).decode("ascii", "replace"))
+    nul = raw.count(b"\x00")
+    if nul:
+        if led:
+            led.ev("NUL_IN_RESPONSE", where=where, bytes=nul, first_offset=raw.index(b"\x00"),
+                   tail=repr(raw[-24:]), evidence=str(evidence),
+                   meaning="控制台输出通道的字节损坏, 机制未证")
+        raise Stop("NUL_BYTE_IN_RESPONSE",
+                   "bytes=%d first_offset=%d where=%s raw=%s" %
+                   (nul, raw.index(b"\x00"), where, evidence))
+    return raw
+
+
+def guard_stream_bytes(raw, led=None, where="", evidence=""):
+    """顺序固定: ① 危险文本 ② 裸 NUL ③ 非法 UTF-8 —— 都在**未解码的原始字节**上判,
+    命中即具名 Stop。原字节由调用方先行落盘, 这里不删一个字节, 也不 replace 后继续。
+    长度帽与这道门的先后见 read_until_prompt 的循环注释(门先于帽)。"""
+    guard_partial_bytes(raw, led, where=where, evidence=evidence)
+    try:
+        raw.decode("utf-8")
+    except UnicodeDecodeError as e:
+        if led:
+            led.ev("ILLEGAL_BYTES", where=where, evidence=str(evidence),
+                   around=repr(raw[max(0, e.start - 8):e.start + 8]))
+        raise Stop("ILLEGAL_BYTES_IN_RESPONSE", repr(raw[max(0, e.start - 8):e.start + 8]))
+    return raw
+
 
 
 def _is_real_serial_port(port):
@@ -304,14 +353,13 @@ def read_until_prompt(port, deadline, led, raw_path, clock):
                 except OSError as e:
                     raise Stop("EVIDENCE_WRITE_FAILED",
                                "%s:%s bytes=%d" % (raw_path, e.__class__.__name__, len(buf)))
+                # R6(复审 §5.2) + R6A §5: **原始字节**里的危险标记/裸 NUL 先于长度帽与任何
+                # 解码/协议判定 —— 旧写法先撞 20 kB 的帽, 会把"板上正在报 HardFault/栈溢出"
+                # 这件事实降级成"响应太长"。与普通响应/清理/观察窗共用同一个门。
+                guard_partial_bytes(bytes(buf), led, where="read_until_prompt",
+                                    evidence=raw_path)
                 if len(buf) > RESPONSE_CAP:
-                    # 危险扫描先于这条上限: 否则一个 20 kB 的告警刷屏会先撞上字节帽,
-                    # 把"板上正在报 HardFault/栈溢出"这件事实降级成"响应太长"。
                     raise Stop("RESPONSE_BYTE_CAP")
-                # R6(复审 §5.2): **原始字节**里的危险标记优先于一切解码/长度/协议判定。
-                # 旧顺序是 解码 -> (判据层才)check_danger, 于是含非法 UTF-8 的响应先抛解码异常,
-                # 再被恢复合同转成"可继续", 同批字节里已经存在的 HardFault 就被遮掉了。
-                check_danger(bytes(buf))
                 if PROMPT_RE.search(ANSI.sub(b"", bytes(buf))):
                     break
             if clock.monotonic() > deadline:
@@ -888,9 +936,18 @@ class ApprovalLedger:
       * 崩溃后未确认的预占按**已消耗**处理, 不退款(没有 release 这条路);
       * 账本缺失 / JSON 损坏 / 身份不符 => 拒绝进入真实动作, 绝不自建一份满额账;
       * cleanup_* 走独立预留: 业务额度耗尽不得阻挡已经成立义务的撤能(单独记 kind 与前缀)。
+
+    M8-R6A R1(复审 §3)把"创建"和"读取"彻底分开, 因为上一版只在 open_approval 里查了一次
+    exists, 之后每次 reserve/commit/snapshot 还会走 `_load_or_create` 的自动建账分支:
+      * **运行期只严格读取已存在的账**(每次加锁读盘都守), 创建只允许 approval_init;
+      * 缺字段 / 空值 / 错类型一律具名拒绝 —— 不许用 `if want and have` 这种真值比较跳过缺失
+        的 SHA, 不许 `setdefault("spent", {})` 把"结构丢失"当成"从未消耗";
+      * int 只接受真 int(bool/负数/小数/字符串数字都拒), caps 必须与批准记录**精确相符**;
+      * 账本内部一致性(spent<=caps、pending 与 spent 的对应)校验不过就拒绝, **不修好再执行**;
+      * 存盘失败如实传播: commit 不在 `_store` 失败时声称已落成。
     """
 
-    VERSION = 1
+    VERSION = 2                       # R1 严格格式; v1 账本由 APPROVAL_LEDGER_VERSION 具名拒绝
     LOCK_TRIES = 200
 
     def __init__(self, path, approval_id, identities, caps, led, clock):
@@ -902,37 +959,30 @@ class ApprovalLedger:
         self.clock = clock
         self.state = None
 
-    # ---------------- 内部: 读盘 / 写盘 / 互斥 ----------------
-    def _load_or_create(self):
-        if not self.path.exists():
-            return {"version": self.VERSION, "approval_id": self.approval_id,
-                    "identities": self.identities, "caps": self.caps,
-                    "spent": {}, "pending": [], "writes": 0, "created_by_action": "first_use"}
+    # ---------------- 内部: 严格读盘 / 写盘 / 互斥 ----------------
+    def _load(self):
+        """**只读已存在的账**。R6A §3 的反例: 上一版这里是 `_load_or_create`, 文件不见了就返回
+        一份 `spent={}` 的满额结构 —— 于是"绑定后删账本"等于把一次用尽的批准复活。现在:
+        文件缺失 / 读不动 / 不是 JSON 对象 / 缺必需字段 / 类型不对 / 身份或 cap 不符 / 内部不一致
+        全部具名拒绝, 且不补零、不迁移、不修好再继续。"""
         try:
-            doc = json.loads(self.path.read_text(encoding="utf-8"))
-        except (ValueError, OSError) as e:
-            raise Stop("APPROVAL_LEDGER_CORRUPT",
-                       "%s:%s" % (self.path.name, e.__class__.__name__))
-        if doc.get("version") != self.VERSION:
-            raise Stop("APPROVAL_LEDGER_VERSION", "version=%r" % doc.get("version"))
-        if str(doc.get("approval_id")) != self.approval_id:
-            raise Stop("APPROVAL_IDENTITY_MISMATCH",
-                       "账本记的是另一次批准 %s, 本次=%s" % (doc.get("approval_id"), self.approval_id))
-        for k in ("plan_sha256", "executor_sha256", "image_sha256"):
-            want, have = self.identities.get(k), (doc.get("identities") or {}).get(k)
-            if want and have and want != have:
-                raise Stop("APPROVAL_IDENTITY_MISMATCH",
-                           "%s 变了(%s… vs %s…) => 不许沿用同一批准, 也不自动生成新预算"
-                           % (k, have[:10], want[:10]))
-        for k, v in self.caps.items():          # 计划申报更宽也不当既成事实
-            have = (doc.get("caps") or {}).get(k)
-            if have is not None and int(have) != int(v):
-                raise Stop("APPROVAL_IDENTITY_MISMATCH",
-                           "caps[%s] 账本=%s 本次计划=%s" % (k, have, v))
+            raw = self.path.read_bytes()
+        except FileNotFoundError:
+            raise Stop("APPROVAL_LEDGER_ABSENT",
+                       "%s 不存在 => 任何一次预占/确认/快照都不进入(运行期不建账; 创建只走 approval_init)"
+                       % self.path)
+        except OSError as e:
+            raise Stop("APPROVAL_LEDGER_CORRUPT", "%s:%s" % (self.path.name, e.__class__.__name__))
+        try:
+            doc = json.loads(raw.decode("utf-8"))
+        except (ValueError, UnicodeDecodeError) as e:
+            raise Stop("APPROVAL_LEDGER_CORRUPT", "%s:%s" % (self.path.name, e.__class__.__name__))
+        validate_ledger_doc(doc, self.approval_id, self.identities, self.caps)
         return doc
 
     def _store(self, doc):
-        doc["writes"] = int(doc.get("writes", 0)) + 1
+        validate_ledger_doc(doc, self.approval_id, self.identities, self.caps)
+        doc["writes"] = doc["writes"] + 1
         tmp = self.path.with_name(self.path.name + ".tmp%d" % os.getpid())
         try:
             with open(tmp, "w", encoding="utf-8", newline="\n") as f:
@@ -949,82 +999,248 @@ class ApprovalLedger:
             return False
 
     def _lock(self):
-        lk = self.path.with_name(self.path.name + ".lock")
-        for _ in range(self.LOCK_TRIES):
-            try:
-                fd = os.open(str(lk), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-            except OSError:
-                self.clock.sleep(0.002)
-                continue
-            os.write(fd, ("%d" % os.getpid()).encode("ascii"))
-            os.close(fd)
-            return lk
-        raise Stop("APPROVAL_LEDGER_LOCKED", str(lk))
+        return ledger_lock(self.path, self.clock, self.approval_id)
+
+    @staticmethod
+    def _unlock(lk):
+        try:
+            os.remove(lk)
+        except OSError:
+            pass
 
     # ---------------- 对外: 预占 / 确认 ----------------
     def reserve(self, name, n=1, kind="business"):
         """先落盘再动作。返回预占凭据; 额度不足或身份不符 => 具名停止, 调用方不得发送。"""
+        if not isinstance(name, str) or not name:
+            raise Stop("APPROVAL_RESERVE_NAME_INVALID", repr(name)[:40])
+        if not is_count(n) or n < 1:
+            # R6A §3: "int 能转就算合法"会让 0/-1/True/"1"/1.5 都通过旧检查, 于是额度可以被
+            # 一个非正整数的 n 悄悄清零。n 只能是**正整数**, 并且要落得下。
+            raise Stop("APPROVAL_RESERVE_N_INVALID", "n=%r(%s)" % (n, type(n).__name__))
+        if not isinstance(kind, str) or not kind:
+            raise Stop("APPROVAL_RESERVE_KIND_INVALID", repr(kind)[:40])
         lk = self._lock()
         try:
-            doc = self._load_or_create()
-            spent = doc.setdefault("spent", {})
-            used = int(spent.get(name, 0))
-            cap = int((doc.get("caps") or {}).get(name, 0))
-            if name not in (doc.get("caps") or {}):
+            doc = self._load()
+            if name not in doc["caps"]:
                 raise Stop("QUOTA_UNDECLINED", name)
+            cap, used = doc["caps"][name], doc["spent"][name]
             if used + n > cap:
                 self.led.ev("APPROVAL_REFUSED", approval_id=self.approval_id, name=name,
                             used=used, want=n, cap=cap, reserve_kind=kind, ledger=str(self.path))
                 raise Stop("APPROVAL_QUOTA_EXHAUSTED",
                            "%s used=%d want=%d cap=%d kind=%s" % (name, used, n, cap, kind))
-            spent[name] = used + n
-            doc.setdefault("pending", []).append({"id": "%s#%d" % (name, used + n),
-                                                  "name": name, "n": n, "kind": kind})
+            tag = "%s#%d" % (name, used + n)
+            doc["spent"][name] = used + n
+            doc["pending"].append({"id": tag, "name": name, "n": n, "kind": kind})
             if not self._store(doc):
                 raise Stop("APPROVAL_LEDGER_WRITE_FAILED",
                            "%s 预占没落成 => 那条命令不发(不退款纪律的另一半)" % name)
             self.state = doc
             self.led.ev("APPROVAL_RESERVED", approval_id=self.approval_id, name=name, n=n,
                         used=used + n, cap=cap, reserve_kind=kind, ledger=str(self.path))
-            return {"name": name, "tag": "%s#%d" % (name, used + n), "kind": kind}
+            return {"name": name, "tag": tag, "kind": kind}
         finally:
-            try:
-                os.remove(lk)
-            except OSError:
-                pass
+            self._unlock(lk)
 
     def commit(self, res, ok=True):
-        """只把预占从 pending 里摘掉并留痕; **不退回额度** —— 崩溃/未确认一律按已消耗。"""
+        """只把预占从 pending 里摘掉并留痕; **不退回额度** —— 崩溃/未确认一律按已消耗。
+
+        R6A §3 最后一条: 存盘失败必须如实传播。旧版忽略 `_store` 的返回值, 于是"确认没落成"
+        和"确认落成"在事件里长得一样, 而 pending 里还留着那条 —— 账面上看是已消耗(方向安全),
+        但回执会说谎。"""
         lk = self._lock()
         try:
-            doc = self._load_or_create()
-            before = len(doc.get("pending", []))
-            doc["pending"] = [p for p in doc.get("pending", []) if p.get("id") != res["tag"]]
-            self._store(doc)
+            doc = self._load()
+            before = len(doc["pending"])
+            doc["pending"] = [p for p in doc["pending"] if p["id"] != res["tag"]]
+            removed = before - len(doc["pending"])
+            if not self._store(doc):
+                self.led.ev("APPROVAL_COMMIT_FAILED", tag=res["tag"], reserve_kind=res["kind"],
+                            code="APPROVAL_LEDGER_WRITE_FAILED", ledger=str(self.path))
+                raise Stop("APPROVAL_LEDGER_WRITE_FAILED",
+                           "%s 的确认没落成: 预占仍挂在 pending, 按已消耗计(不退款)" % res["tag"])
             self.state = doc
             self.led.ev("APPROVAL_COMMITTED", tag=res["tag"], reserve_kind=res["kind"],
                         outcome="consumed" if ok else "consumed-with-error",
-                        pending_removed=before - len(doc["pending"]))
+                        pending_removed=removed,
+                        missing_tag=(0 if removed else 1))
         finally:
-            try:
-                os.remove(lk)
-            except OSError:
-                pass
+            self._unlock(lk)
 
     def snapshot(self):
         lk = self._lock()
         try:
-            self.state = self._load_or_create()
-            return {"spent": dict(self.state.get("spent") or {}),
-                    "caps": dict(self.state.get("caps") or {}),
-                    "pending": list(self.state.get("pending") or []),
-                    "writes": self.state.get("writes"), "approval_id": self.approval_id,
-                    "identities": self.state.get("identities")}
+            self.state = self._load()
+            return {"spent": dict(self.state["spent"]), "caps": dict(self.state["caps"]),
+                    "pending": list(self.state["pending"]), "writes": self.state["writes"],
+                    "approval_id": self.approval_id, "identities": dict(self.state["identities"])}
         finally:
-            try:
-                os.remove(lk)
-            except OSError:
-                pass
+            self._unlock(lk)
+
+
+# --------------------------------------------------------------------------- R1 严格校验
+APPROVAL_IDENTITY_KEYS = ("plan_sha256", "executor_sha256", "image_sha256")
+LEDGER_REQUIRED_FIELDS = ("version", "approval_id", "identities", "caps", "spent", "pending",
+                          "writes", "created_by_action")
+LEDGER_PENDING_FIELDS = ("id", "name", "n", "kind")
+
+
+def is_count(v):
+    """计数只接受**真正的 int**: bool 是 int 的子类, 所以 `True` 必须单独拒;
+    小数、字符串数字("1")、None 同样不算(reviewer §3: 不接受"int 能转就算合法")。"""
+    return isinstance(v, int) and not isinstance(v, bool)
+
+
+def is_hex_sha(v):
+    return isinstance(v, str) and bool(re.fullmatch(r"[0-9a-f]{64}", v))
+
+
+def validate_caps(caps):
+    """批准记录里的 caps: 非空键名 + 非负 int, 且必须是 object。运行期与 init 共用同一口径。"""
+    if not isinstance(caps, dict):
+        raise Stop("APPROVAL_CAPS_INVALID", "caps=%s" % type(caps).__name__)
+    bad = sorted("%s=%r(%s)" % (k, v, type(v).__name__) for k, v in caps.items()
+                 if not isinstance(k, str) or not k or not is_count(v) or v < 0)
+    if bad:
+        raise Stop("APPROVAL_CAPS_INVALID", ";".join(bad))
+    return caps
+
+
+def validate_ledger_doc(doc, approval_id, identities, caps):
+    """账本的严格读盘校验(复审 M8-R6A §3)。每一项都是**拒绝**, 不是修复:
+
+      | 反例(§3 表)              | 旧版            | 本函数                |
+      | 删 identities.<SHA>      | snapshot 正常   | APPROVAL_LEDGER_CORRUPT |
+      | 删整个 spent(合法 JSON)  | 再预占成功      | APPROVAL_LEDGER_CORRUPT |
+      | spent.apply = -1         | 再预占变 0      | APPROVAL_LEDGER_CORRUPT |
+      | 绑定后账本文件消失        | 自建满额账      | APPROVAL_LEDGER_ABSENT  |
+    """
+    if not isinstance(doc, dict):
+        raise Stop("APPROVAL_LEDGER_CORRUPT", "top_level=%s" % type(doc).__name__)
+    missing = [k for k in LEDGER_REQUIRED_FIELDS if k not in doc]
+    if missing:
+        raise Stop("APPROVAL_LEDGER_CORRUPT", "missing_fields=%s" % ",".join(missing))
+    if doc["version"] != ApprovalLedger.VERSION:
+        # 历史不兼容账具名拒绝; 不自动迁移成"未消费"状态(那等于把花掉的批准重置)。
+        raise Stop("APPROVAL_LEDGER_VERSION",
+                   "version=%r 本执行器要求 %d => 不自动迁移, 请按新身份另批"
+                   % (doc["version"], ApprovalLedger.VERSION))
+    if str(doc["approval_id"]) != str(approval_id):
+        raise Stop("APPROVAL_IDENTITY_MISMATCH",
+                   "账本记的是另一次批准 %s, 本次=%s" % (doc["approval_id"], approval_id))
+    ids = doc["identities"]
+    if not isinstance(ids, dict):
+        raise Stop("APPROVAL_LEDGER_CORRUPT", "identities=%s" % type(ids).__name__)
+    malformed = [k for k in APPROVAL_IDENTITY_KEYS if not is_hex_sha(ids.get(k))]
+    if malformed:
+        raise Stop("APPROVAL_LEDGER_CORRUPT",
+                   "identity_missing_or_malformed=%s(三件 SHA 必须齐全且是 64 位小写十六进制)"
+                   % ",".join(malformed))
+    unknown_ids = sorted(set(ids) - set(APPROVAL_IDENTITY_KEYS))
+    if unknown_ids:
+        raise Stop("APPROVAL_LEDGER_CORRUPT", "identity_unknown_keys=%s" % ",".join(unknown_ids))
+    for k in APPROVAL_IDENTITY_KEYS:
+        want = (identities or {}).get(k)
+        if not is_hex_sha(want):
+            # 旧版是 `if want and have and want != have`: 调用方没算出这一件时**直接跳过**,
+            # 于是"删掉 executor_sha256 / 不给 plan_sha256"都能带着同一本账继续走。
+            raise Stop("APPROVAL_IDENTITY_MISMATCH",
+                       "%s 本次没给出可用身份(%r) => 不许沿用该批准" % (k, want))
+        if want != ids[k]:
+            raise Stop("APPROVAL_IDENTITY_MISMATCH",
+                       "%s 变了(%s… vs %s…) => 不许沿用同一批准, 也不自动生成新预算"
+                       % (k, ids[k][:10], want[:10]))
+    have_caps = doc["caps"]
+    if not isinstance(have_caps, dict):
+        raise Stop("APPROVAL_LEDGER_CORRUPT", "caps=%s" % type(have_caps).__name__)
+    for key in sorted(have_caps):
+        if not isinstance(key, str) or not key or not is_count(have_caps[key]) or \
+                have_caps[key] < 0:
+            raise Stop("APPROVAL_LEDGER_CORRUPT",
+                       "cap_not_count[caps.%s]=%r" % (key, have_caps[key]))
+    if set(have_caps) != set(caps or {}):
+        raise Stop("APPROVAL_IDENTITY_MISMATCH",
+                   "caps 键集合变了: 账本=%s 本次=%s" %
+                   (",".join(sorted(have_caps)), ",".join(sorted(caps or {}))))
+    for key in sorted(have_caps):
+        if have_caps[key] != caps[key]:
+            raise Stop("APPROVAL_IDENTITY_MISMATCH",
+                       "caps[%s] 账本=%d 本次=%s => 计划申报更宽不算既成事实"
+                       % (key, have_caps[key], caps[key]))
+    spent = doc["spent"]
+    if not isinstance(spent, dict):
+        raise Stop("APPROVAL_LEDGER_CORRUPT", "spent=%s" % type(spent).__name__)
+    if set(spent) != set(have_caps):
+        # "缺动作键悄悄当 0" 与 "整个 spent 字段丢失" 都落在这里: 结构丢了就是损坏, 不是没花过。
+        raise Stop("APPROVAL_LEDGER_CORRUPT",
+                   "spent_keys!=caps_keys missing=%s extra=%s" %
+                   (",".join(sorted(set(have_caps) - set(spent))) or "-",
+                    ",".join(sorted(set(spent) - set(have_caps))) or "-"))
+    for key in sorted(spent):
+        if not is_count(spent[key]) or spent[key] < 0:
+            raise Stop("APPROVAL_LEDGER_CORRUPT", "spent_not_count[spent.%s]=%r"
+                       % (key, spent[key]))
+        if spent[key] > have_caps[key]:
+            raise Stop("APPROVAL_LEDGER_CORRUPT",
+                       "spent_exceeds_cap %s=%d>%d => 账本自己不对劲, 拒绝而不是改写"
+                       % (key, spent[key], have_caps[key]))
+    pending = doc["pending"]
+    if not isinstance(pending, list):
+        raise Stop("APPROVAL_LEDGER_CORRUPT", "pending=%s" % type(pending).__name__)
+    seen = []
+    for i, p in enumerate(pending):
+        if not isinstance(p, dict):
+            raise Stop("APPROVAL_LEDGER_CORRUPT", "pending[%d]=%s" % (i, type(p).__name__))
+        pmiss = [f for f in LEDGER_PENDING_FIELDS if f not in p]
+        if pmiss:
+            raise Stop("APPROVAL_LEDGER_CORRUPT", "pending[%d]_missing=%s"
+                       % (i, ",".join(pmiss)))
+        if p["name"] not in have_caps:
+            raise Stop("APPROVAL_LEDGER_CORRUPT", "pending[%d]_name_unknown=%s" % (i, p["name"]))
+        if not is_count(p["n"]) or p["n"] < 1:
+            raise Stop("APPROVAL_LEDGER_CORRUPT", "pending[%d]_n_invalid=%r" % (i, p["n"]))
+        if not isinstance(p["kind"], str) or not p["kind"]:
+            raise Stop("APPROVAL_LEDGER_CORRUPT", "pending[%d]_kind_invalid=%r" % (i, p["kind"]))
+        if not isinstance(p["id"], str) or not re.fullmatch(r"[\w.-]+#\d+", p["id"]):
+            raise Stop("APPROVAL_LEDGER_CORRUPT", "pending[%d]_id_form=%r" % (i, p["id"]))
+        if p["id"] in seen:
+            raise Stop("APPROVAL_LEDGER_CORRUPT", "pending[%d]_id_duplicated=%s" % (i, p["id"]))
+        seen.append(p["id"])
+        seq = int(p["id"].rsplit("#", 1)[1])
+        if not 1 <= seq <= spent[p["name"]]:
+            raise Stop("APPROVAL_LEDGER_CORRUPT",
+                       "pending[%d]_id_beyond_spent %s vs %s=%d" % (i, p["id"], p["name"],
+                                                                     spent[p["name"]]))
+    if not is_count(doc["writes"]) or doc["writes"] < 0:
+        raise Stop("APPROVAL_LEDGER_CORRUPT", "writes_invalid=%r" % (doc["writes"],))
+    return doc
+
+
+def ledger_lock(path, clock, approval_id=""):
+    """同目录 O_CREAT|O_EXCL 互斥锁: 预占/确认/快照/init 都走这一把(创建与消费互斥是 R1 的
+    "双 init 竞争"要的东西 —— 两处用不同锁文件就等于没有锁)。"""
+    lk = Path(path).with_name(Path(path).name + ".lock")
+    for _ in range(ApprovalLedger.LOCK_TRIES):
+        try:
+            fd = os.open(str(lk), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except OSError:
+            clock.sleep(0.002)
+            continue
+        try:
+            os.write(fd, ("%d %s" % (os.getpid(), approval_id)).encode("utf-8", "replace"))
+        finally:
+            os.close(fd)
+        return lk
+    raise Stop("APPROVAL_LEDGER_LOCKED", str(lk))
+
+
+def ledger_unlock(lk):
+    try:
+        os.remove(lk)
+    except OSError:
+        pass
+
 
 
 def default_approval_root():
@@ -1057,49 +1273,80 @@ def current_identities(plan, plan_path, repo_root):
 def open_approval(transport, root, approval_id, identities, caps, led, clock):
     """返回 ApprovalLedger(stub 且没给身份 => None, 与旧的单次内存账一致)。
 
-    real 的门在这里, 不在某一步的判据里:
+    门在这里, 不在某一步的判据里:
       * 没有 approval_id => APPROVAL_ID_REQUIRED;
-      * 账本不存在 => APPROVAL_LEDGER_ABSENT —— **绝不自建一份满额账**, 要先离线 --approval-init;
-      * 账本损坏/版本不符/身份不符 => 由 ApprovalLedger 读盘时具名抛出, 同样拒绝进入。
+      * 账本不存在 => APPROVAL_LEDGER_ABSENT —— **运行期不建账**, 要先离线 --approval-init;
+      * 账本损坏/版本不符/身份不符 => 由 ApprovalLedger 每次读盘时具名拒绝。
+
+    R6A §3: 上一版这里只对 real 查了一次 exists, 之后 reserve/commit/snapshot 仍会走进
+    自动建账分支, 所以"真实路径缺失从不自建满额账"并不成立; 现在 real 与 stub 同一条门,
+    而**每一次**读盘都严格(见 ApprovalLedger._load)。缺目录也不再被顺手 mkdir。
     """
     if not approval_id:
         if transport == "real":
             raise Stop("APPROVAL_ID_REQUIRED",
                        "真实执行必须绑定一次批准身份: 额度账要挂在那次批准上, 不挂就不发命令")
         return None
+    validate_caps(caps)
     path = approval_path(root, approval_id)
-    if transport == "real" and not path.exists():
-        raise Stop("APPROVAL_LEDGER_ABSENT",
-                   "%s 不存在 => 真实动作不进入(不自建满额账; 先离线 --approval-init 落一份)" % path)
     if not path.exists():
-        # 离线工装首次使用才建目录: 真实路径绝不允许走到这里(上面已经拒了)。
-        # 不建就等着被误报成 APPROVAL_LEDGER_LOCKED —— 装配层的坑正是这么露出来的。
-        try:
-            Path(root).mkdir(parents=True, exist_ok=True)
-        except OSError as e:
-            raise Stop("APPROVAL_LEDGER_ROOT_UNUSABLE",
-                       "%s:%s" % (Path(root), e.__class__.__name__))
+        raise Stop("APPROVAL_LEDGER_ABSENT",
+                   "%s 不存在 => 一条命令都不发(不自建满额账; 先离线 --approval-init 落一份)。"
+                   "transport=%s" % (path, transport))
     return ApprovalLedger(path, approval_id, identities, caps, led, clock)
 
 
 def approval_init(root, approval_id, identities, caps, note=""):
-    """离线**显式**开立一本账: 唯一允许"从空开始"的入口, 由人主动调用, 不是执行器顺手建的。
-    已存在就拒绝覆盖 —— 一次批准的边界不能被第二次 init 悄悄重置。"""
+    """离线**显式**开立一本账: 唯一允许"从空开始"的入口, 由人主动调用, 执行器顺手建不出来。
+
+    R6A §3 的三条都在这一函数里:
+      * 身份三件必须齐全(64 位小写十六进制) —— 缺 SHA 的批准根本立不起来;
+      * spent 在 init 时按 caps 的**每一个**动作键预置 0: 于是"缺动作键"在读侧就是结构损坏,
+        而不是"悄悄当 0";
+      * 创建用同一把互斥锁 + O_CREAT|O_EXCL: 没有"exists 检查后再 os.replace"的覆盖窗口,
+        双 init 里只有一个成功, 另一个具名拒绝(覆盖成功的那一次等于退款)。
+    """
+    if not approval_id:
+        raise Stop("APPROVAL_ID_REQUIRED", "--approval-init 需要批准身份(账本按它命名)")
+    validate_caps(caps)
+    missing = [k for k in APPROVAL_IDENTITY_KEYS if not is_hex_sha((identities or {}).get(k))]
+    if missing:
+        raise Stop("APPROVAL_IDENTITIES_INCOMPLETE",
+                   "%s 不是可用的批准身份 => 开立即拒绝(三件 SHA 必须齐全; "
+                   "plan_sha256 要 --plan 指向真实计划字节)" % ",".join(missing))
     path = approval_path(root, approval_id)
-    if path.exists():
-        raise Stop("APPROVAL_LEDGER_ALREADY_EXISTS",
-                   "%s 已存在: 换批准身份或按已消耗处理, 不覆盖既有账(覆盖等于退款)" % path)
-    Path(root).mkdir(parents=True, exist_ok=True)
     doc = {"version": ApprovalLedger.VERSION, "approval_id": str(approval_id),
-           "identities": dict(identities), "caps": dict(caps), "spent": {}, "pending": [],
+           "identities": {k: identities[k] for k in APPROVAL_IDENTITY_KEYS},
+           "caps": dict(caps), "spent": {k: 0 for k in caps}, "pending": [],
            "writes": 0, "created_by_action": "approval_init", "note": note}
-    tmp = path.with_name(path.name + ".tmp%d" % os.getpid())
-    with open(tmp, "w", encoding="utf-8", newline="\n") as f:
-        json.dump(doc, f, ensure_ascii=False, sort_keys=True, indent=1)
-        f.flush()
-        os.fsync(f.fileno())
-    os.replace(str(tmp), str(path))
-    return path
+    validate_ledger_doc(doc, approval_id, identities, caps)
+    try:
+        Path(root).mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        raise Stop("APPROVAL_LEDGER_ROOT_UNUSABLE",
+                   "%s:%s" % (Path(root), e.__class__.__name__))
+    lk = None
+    try:
+        lk = ledger_lock(path, RealClock(), approval_id)
+        if path.exists():
+            raise Stop("APPROVAL_LEDGER_ALREADY_EXISTS",
+                       "%s 已存在: 换批准身份或按已消耗处理, 不覆盖既有账(覆盖等于退款)" % path)
+        fd = os.open(str(path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)   # 独占创建, 不 replace
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
+            json.dump(doc, f, ensure_ascii=False, sort_keys=True, indent=1)
+            f.flush()
+            os.fsync(f.fileno())
+        return path
+    except FileExistsError:
+        raise Stop("APPROVAL_LEDGER_ALREADY_EXISTS",
+                   "%s 已被另一个 init 独占创建 => 本次不覆盖(同名批准只能有一份账)" % path)
+    except OSError as e:
+        raise Stop("APPROVAL_LEDGER_ROOT_UNUSABLE",
+                   "%s:%s" % (path, e.__class__.__name__))
+    finally:
+        if lk:
+            ledger_unlock(lk)
+
 
 
 # --------------------------------------------------------------------------- 清理
@@ -1191,18 +1438,27 @@ def _cleanup_read(port, led, clock, dl, cmd, out_dir, feed_hook=None):
                     break
             clock.sleep(0.01)
     ended_t = clock.monotonic()
+    # R6A §5: 清理路径与普通响应共用同一个原始字节门(危险文本 -> 裸 NUL)。命中不抛出去 ——
+    # 它记成这条清理自己的**证据错误**(一次就够, 不再重复判读), 必要撤能照旧向后走;
+    # 但如果坏的是最后那份 motor_status, rows 就是空 => 禁能一律 UNKNOWN, 整场 success=False
+    # (不许用另一场的干净回包补这一场)。
+    defect = None
     try:
-        check_danger(bytes(buf))
+        guard_partial_bytes(bytes(buf), led, where="cleanup_read", evidence=raw_path)
     except Stop as e:
-        errs.append("%s:DANGER_BYTES_%s" % (cmd, e.code))
+        defect = e.code
+        errs.append("%s:%s" % (cmd, e.code))
     if not bytes(buf).strip():
         errs.append("%s:NO_RESPONSE" % cmd)
         return [], bytes(buf), sent_ok_t, ended_t, errs
-    try:
-        rows = split_rows(bytes(buf), cmd)
-    except Stop as e:
-        errs.append("%s:%s" % (cmd, e.code))
+    if defect:
         rows = []
+    else:
+        try:
+            rows = split_rows(bytes(buf), cmd)
+        except Stop as e:
+            errs.append("%s:%s" % (cmd, e.code))
+            rows = []
     led.ev("CLEANUP_READ", cmd=cmd, bytes=len(buf), raw_sha256=sha_bytes(bytes(buf)),
            sent_t=round(sent_ok_t - led.t0, 3), ended_t=round(ended_t - led.t0, 3),
            window_s=round(dl - sent_ok_t, 3))
@@ -1324,6 +1580,86 @@ def cleanup(port, led, clock, budget, transport, fixture, feed_hook=None,
         state = "CONFIRMED_DISABLED"
     return state, errors
 # --------------------------------------------------------------------------- 会话
+# ---- R6A R2: 命令 -> 额度键的**集中映射**(复审 §4) ----------------------------------
+# 旧版记账依赖步骤自己申报 `st["quota"]`: 不写就不扣, 于是同一执行引擎可以在
+# `tmc_config_apply=0` 的批准下把 `tmc_config_apply CONFIRM` 发出去。映射表把这些命令和
+# 额度键钉在一起, 缺申报/错键/n 不符都在**发送之前**具名拒绝。
+# 只列**会改变设备或持久状态**的命令: 只读查询(motor_status/diag_status/… 与有限轮询)
+# 不在这里 —— 把轮询误计成 apply 重试是复审 §4 明确禁止的另一件事。
+QUOTA_COMMAND_KEYS = (
+    ("tmc_config_apply", "tmc_config_apply"),
+    ("config_save", "config_save"),
+    ("motor_start", "motor_run"),
+    ("safety_polarity_confirm", "irq_polarity_prep"),
+    ("safety_irq_enable", "irq_polarity_prep"),
+    ("diag_profile zero", "diag_profile_zero"),
+    ("diag_profile learn", "diag_profile_learn"),
+    ("diag_profile commit", "diag_profile_commit"),
+    ("blackbox_clear", "blackbox_clear"),
+)
+
+
+def quota_key_for_command(cmd):
+    """命令串(含参数)映射到它必须花的额度键; 不在表里 => None(只读/无额度动作)。"""
+    c = " ".join(str(cmd or "").split())
+    for prefix, key in QUOTA_COMMAND_KEYS:
+        if c == prefix or c.startswith(prefix + " "):
+            return key
+    return None
+
+
+def canonical_steps_sha(steps):
+    """步骤列表的**字节身份**: 排序 + 无空白, 这样"同一批步骤"无论来自哪次 json 解析都同值,
+    而任何字段改动都会变值(exec_session 用它核对实际执行的步骤 == 批准的步骤)。"""
+    return sha_bytes(json.dumps(list(steps), ensure_ascii=False, sort_keys=True,
+                                separators=(",", ":")).encode("utf-8"))
+
+
+def verify_approved_binding(approved, steps, transport):
+    """R6A §4: 真实动作前核对"这一刻要发的步骤"确实来自那份被批准的字节。
+
+    两道都查, 因为它们拦的是两件不同的事:
+      1) **计划文件字节**仍等于批准时登记的 plan_sha256 —— 拦"绑定之后有人改了 --plan 文件";
+      2) **本会话实际步骤**等于从该文件同一阶段重新推导出的步骤 —— 拦"计划没动, 但递进来的
+         步骤被换过/加过"(复审 §4 的 steps-not-bound 反例)。
+    只做第 1 道是不够的: 单会话入口可以拿一份合法批准 + 一份完全不同的 steps 混进去。
+    """
+    if not isinstance(approved, dict):
+        raise Stop("REAL_SESSION_REQUIRES_APPROVED_PACKAGE",
+                   "真实执行只允许经批准的整包 dispatch(复审 §4 的最小修法); "
+                   "单会话任意 --steps 不接(stub 工装入口保留)")
+    for k in ("plan_path", "plan_sha256", "stage", "profile", "steps_sha256"):
+        if not approved.get(k):
+            raise Stop("APPROVED_PACKAGE_INCOMPLETE", "missing=%s" % k)
+    pp = Path(approved["plan_path"])
+    try:
+        raw = pp.read_bytes()
+    except OSError as e:
+        raise Stop("APPROVED_PLAN_UNREADABLE", "%s:%s" % (pp, e.__class__.__name__))
+    if sha_bytes(raw) != approved["plan_sha256"]:
+        raise Stop("PLAN_BYTES_CHANGED_AFTER_APPROVAL",
+                   "%s 现在是 %s…, 批准登记的是 %s… => 一条命令都不发" %
+                   (pp.name, sha_bytes(raw)[:12], approved["plan_sha256"][:12]))
+    try:
+        doc = json.loads(raw.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError) as e:
+        raise Stop("APPROVED_PLAN_UNREADABLE", "%s:%s" % (pp, e.__class__.__name__))
+    stage = [s for s in doc.get("stages", []) if s.get("id") == approved["stage"]]
+    if len(stage) != 1:
+        raise Stop("APPROVED_STAGE_NOT_FOUND",
+                   "stage=%s 在批准的计划字节里出现 %d 次" % (approved["stage"], len(stage)))
+    expected = stage_steps(stage[0], approved["profile"])
+    got = [st for st in steps if not st.get("when") or approved["profile"] in st["when"]]
+    if canonical_steps_sha(expected) != canonical_steps_sha(got):
+        raise Stop("STEPS_NOT_BOUND_TO_APPROVAL",
+                   "as stage=%s 计划里是 %d 步/%s…, 递进来的是 %d 步/%s… => 真实动作不进入" %
+                   (approved["stage"], len(expected), canonical_steps_sha(expected)[:12],
+                    len(got), canonical_steps_sha(got)[:12]))
+    return {"verified": True, "stage": approved["stage"], "transport": transport,
+            "plan_sha256": approved["plan_sha256"], "steps": len(got),
+            "steps_sha256": canonical_steps_sha(got)}
+
+
 def plan_motion_window_violations(steps):
     """R3-B §4 第 4 条: 运动窗口里不许有任何阻塞动作(人工 input、长外部动作)。
     人工确认必须排在 arm/start **之前**; 运行状态由同一轮 motor_status 证明。
@@ -1411,6 +1747,21 @@ def command_attempt(port, cmd, st, asname, raw, step_dl, transport, fixture, sil
     单发步骤与业务轮询走**同一条门**, 所以轮询不会绕过短写、提示符、具名字段这些判据。"""
     data = (cmd + "\r\n").encode("ascii")
     pre = drain_pending(port, led, clock) if transport != "stub" else b""
+    if pre:
+        # R6A §5 最后一条: **发送前排走的残留**也是同一块控制台流上读到的字节。它被另存成
+        # `.pre.rx.bin` 不等于过了危险门 —— 先原样存证, 再在同一条业务 write 之前判危险。
+        # (清理写入仍按已经成立的义务执行, 那条路径在 exec_session 的 finally 里, 不受这里影响。)
+        pre_path = Path(str(raw).replace(".rx.bin", ".pre.rx.bin"))
+        try:
+            with open(pre_path, "wb") as f:
+                f.write(pre)
+                f.flush()
+                os.fsync(f.fileno())
+        except OSError as e:
+            raise Stop("EVIDENCE_WRITE_FAILED", "pre:%s" % e.__class__.__name__)
+        led.ev("PRE_CMD_DRAIN_SAVED", raw=str(pre_path), bytes=len(pre), sha256=sha_bytes(pre),
+               danger_gate="applied_before_write")
+        guard_stream_bytes(pre, led, where="pre_drain", evidence=pre_path)
     try:
         written = port.write(data)
     except (OSError, Stop) as e:
@@ -1442,18 +1793,6 @@ def command_attempt(port, cmd, st, asname, raw, step_dl, transport, fixture, sil
                    "as=%s 申报了 byte_corruption_recovery(%s), 但本版执行器一律'字节损坏即停'" %
                    (asname, rec.get("reconfirmed_by", "")))
     lines, nbytes = read_until_prompt(port, step_dl, led, raw, clock)
-    if pre:
-        # 排走的残留**单独存证**成 NN_<as>.pre.rx.bin。绝不追加到响应文件后面: 那会把已经判读完毕的
-        # 原文改成另一份字节流(实测让 split_rows 在 `msh >\r\nmsh >`+`msh >` 上找不到提示符而误停)。
-        pre_path = Path(str(raw).replace(".rx.bin", ".pre.rx.bin"))
-        try:
-            with open(pre_path, "wb") as f:
-                f.write(pre)
-                f.flush()
-                os.fsync(f.fileno())
-        except OSError as e:
-            raise Stop("EVIDENCE_WRITE_FAILED", "pre:%s" % e.__class__.__name__)
-        led.ev("PRE_CMD_DRAIN_SAVED", raw=str(pre_path), bytes=len(pre), sha256=sha_bytes(pre))
     if transport != "stub" and cmd != "__watch__" and _is_real_serial_port(port):
         full = Path(str(raw)).read_bytes()
         if not has_echo(full, cmd):
@@ -1524,7 +1863,8 @@ def poll_command_step(port, cmd, st, asname, idx, out, step_dl, transport, fixtu
 
 def exec_session(session_id, steps, outdir, transport, fixture, port_name,
                  total_deadline_seconds, clock, backend=None, motion_cap_seconds=None,
-                 plan=None, quota_box=None, used_box=None, context=None, approval=None):
+                 plan=None, quota_box=None, used_box=None, context=None, approval=None,
+                 approved=None):
     """一个会话 = 一个端口 = 一个写者。
 
     与 R1 交付版的三处实质差别:
@@ -1533,15 +1873,32 @@ def exec_session(session_id, steps, outdir, transport, fixture, port_name,
       2) motion_cap_seconds 从 motor_start 的发送尝试起算, 之后所有业务动作受剩余预算
          约束; R1 的 seconds=5 只是那一条响应的 deadline。
       3) finally 不再"只关端口": 先 stop+disarm 并核字段, 未证禁能 => 终态 UNKNOWN。
+
+    M8-R6A R2(复审 §4)再加两条:
+      4) `transport == "real"` 只接受**经批准的整包**(`approved` 由 dispatch 当场构造):
+         任意单会话步骤一律在开口之前具名拒绝; 给了 `approved` 也要两步核对通过才发第一条命令。
+      5) 落在 QUOTA_COMMAND_KEYS 上的命令必须有**对应键、n=1** 的额度申报:
+         缺声明、错键、n 不符都在那条 write 之前拒绝(去掉字段逃不了账)。
     """
     viol = plan_motion_window_violations(steps)
     if viol:
         raise Stop("PLAN_MANUAL_AFTER_MOTION", ",".join(viol))   # 开口之前就拒绝
+    if transport == "real" and approved is None:
+        # 这一步必须在任何端口/工具/账本动作之前: 拒绝的副作用清单要真的是空。
+        raise Stop("REAL_SESSION_REQUIRES_APPROVED_PACKAGE",
+                   "会话 %s: 真实传输只允许经批准的整包 dispatch 进入(复审 §4); "
+                   "任意 --steps 不接, 离线工装请用 transport=stub" % session_id)
+    if transport == "real" and not plan:
+        # 没有计划就没有额度来源: spend() 会整条跳过, 那正是"绕账"的另一半。
+        raise Stop("REAL_SESSION_REQUIRES_PLAN", "真实会话必须带 plan(quota 的唯一定义处)")
+    binding = verify_approved_binding(approved, steps, transport) if approved is not None else None
     out = Path(outdir) / session_id
     out.mkdir(parents=True, exist_ok=True)
     led = Ledger(out / "ledger.jsonl", clock, out_dir=out)
     if backend is not None:
         backend.led = led            # 动作事件与串口事件同一条台账: 调用序列不能散在两个文件里
+    if binding:
+        led.ev("APPROVED_PACKAGE_VERIFIED", **binding)
     results = []
     errors = []
     primary = None
@@ -1560,6 +1917,13 @@ def exec_session(session_id, steps, outdir, transport, fixture, port_name,
         重开一个进程都不会把一次批准的边界清零(R5-C 的 26 场就是这么把 apply 用到 14/2)。"""
         if not plan:
             return None
+        if not isinstance(name, str) or not name:
+            raise Stop("QUOTA_UNDECLINED", repr(name)[:40])
+        if not is_count(n) or n < 1:
+            # 复审 §4: 扣减数本身要合法。旧版把 n 原样交给 int()/内存账, 于是 n=0 是"免费一次",
+            # n=-1 甚至把剩余额度抬高。持久账那边同样拒(APPROVAL_RESERVE_N_INVALID), 这里补的是
+            # 没有批准账的那条路。
+            raise Stop("QUOTA_N_INVALID", "%s n=%r(%s)" % (name, n, type(n).__name__))
         if name not in quota:
             raise Stop("QUOTA_UNDECLINED", name)      # 计划里没有的动作一律禁止
         if approval is not None:
@@ -1645,8 +2009,25 @@ def exec_session(session_id, steps, outdir, transport, fixture, port_name,
                 if r["verdict"] != "OK":
                     raise Stop(r["code"], r.get("detail", ""))
                 continue
-            if st.get("quota"):
-                spend(st["quota"]["name"], int(st["quota"]["n"]))
+            # ---- R6A §4: 命令 -> 额度键的交叉核对, 缺声明/错键/n 不符都在这条 write 之前拒 ----
+            need_key = quota_key_for_command(cmd)
+            declared = st.get("quota")
+            if declared is not None:
+                if not isinstance(declared, dict) or "name" not in declared:
+                    raise Stop("QUOTA_STEP_SHAPE", "as=%s quota=%r" % (asname, declared))
+                qn, qnum = declared["name"], declared.get("n", 1)
+                if need_key and qn != need_key:
+                    raise Stop("QUOTA_KEY_MISMATCH",
+                               "as=%s cmd=%s 属额度键 %s, 步骤申报的是 %s" %
+                               (asname, cmd, need_key, qn))
+                if need_key and (not is_count(qnum) or qnum != 1):
+                    raise Stop("QUOTA_N_MISMATCH",
+                               "as=%s cmd=%s 一条命令一次动作, 申报 n=%r" % (asname, cmd, qnum))
+                spend(qn, qnum)
+            elif need_key:
+                raise Stop("QUOTA_STEP_UNDECLARED",
+                           "as=%s cmd=%s 会改变设备/持久状态, 必须申报额度键 %s(n=1) 才允许发送"
+                           % (asname, cmd, need_key))
             # ---- 业务动作一律受"起转之后的剩余预算"约束 ----
             want = int(st.get("seconds", 3))
             step_dl = budget.business_deadline(want) if (cmd == "__watch__" or budget.armed) \
@@ -1681,6 +2062,10 @@ def exec_session(session_id, steps, outdir, transport, fixture, port_name,
                 try:
                     lines = split_rows(bytes(got), require_prompt=False) if got else []
                 except Stop as e:
+                    if e.code in STREAM_BYTE_DEFECTS:
+                        # R6A §5: 观察窗里的裸 NUL/非法字节/危险文本**不被吞成正常 NO_TRIGGER**。
+                        # 原字节已经逐块落盘(下面 raise 之前不做任何改写), 由会话层转成具名 STOP。
+                        raise
                     lines = []
                     led.ev("PROTOCOL_FAIL", **{"as": asname, "err": e.code})
                 v = assert_step(st, lines, asname, led, raw=bytes(got))
@@ -2022,8 +2407,15 @@ def derive_quota_needs(plan):
             bump(stg.get("quota_name", "approved_reboot"))
         sets_obligation = False
         for st in stg.get("steps", []):
-            if st.get("quota"):
-                bump(st["quota"]["name"], int(st["quota"]["n"]))
+            q = st.get("quota") or {}
+            key = quota_key_for_command(st.get("cmd"))
+            if key:
+                # R6A §4: 命令在映射表上 => **无论有没有申报**都算一次消耗(没申报运行期直接拒),
+                # 这样 PLAN_QUOTA_NEED 的"申报==推导"才不会被"删掉字段"糊过去。
+                bump(key, int(q.get("n", 1)) if is_count(q.get("n", 1)) and q.get("n", 1) > 0
+                     else 1)
+            elif q:
+                bump(q["name"], int(q["n"]))
             if st.get("action"):
                 bump(st.get("quota_name", st["action"]))
             if st.get("cmd") in MOTION_OBLIGATION_CMDS:
@@ -2132,7 +2524,18 @@ def validate_plan(plan, rows_doc, app_dir):
                 if not ok:
                     bad += 1
             q = st.get("quota")
-            if q:
+            need_key = quota_key_for_command(cmd)
+            if need_key:
+                # R6A §4: 离线就把"这条命令必须花哪格额度"钉住。运行期同款判定在 exec_session
+                # 的 write 之前, 两者用的是同一张表 —— 不是两份判据。
+                dn = (q or {}).get("name")
+                n_ = (q or {}).get("n", 1)
+                ok = (dn == need_key and n_ == 1 and is_count(n_) and need_key in quota)
+                out.append("PLAN_QUOTA_MAP|%s|%s|%s|cmd=%s need=%s declared=%s n=%r" %
+                           (sid, asname, "PASS" if ok else "FAIL", cmd, need_key, dn or "-", n_))
+                if not ok:
+                    bad += 1
+            elif q:
                 ok = q["name"] in quota
                 out.append("PLAN_QUOTA|%s|%s|%s" % (sid, asname, "PASS" if ok else "FAIL"))
                 if not ok:
@@ -2849,6 +3252,10 @@ def dispatch_plan(plan, transport, backend_name, outdir, clock, profile, port,
         return dispatch_refusal(plan, profile, outdir, "REAL_TRANSPORT_REFUSED")
     if transport == "real" and not approval_id:
         return dispatch_refusal(plan, profile, outdir, "APPROVAL_ID_REQUIRED")
+    if transport == "real" and not plan_path:
+        # 复审 §4: 真实整包必须从**一份文件**执行 —— "计划/步骤与批准字节一致"这句话
+        # 需要一个可重读的字节来源, 内存对象不算。没有 --plan 就没有可核对的东西, 一条不发。
+        return dispatch_refusal(plan, profile, outdir, "REAL_DISPATCH_REQUIRES_PLAN_FILE")
     quota_box = dict(plan["quota"])
     used_box = {}
 
@@ -3024,12 +3431,24 @@ def dispatch_plan(plan, transport, backend_name, outdir, clock, profile, port,
                 # 时间合同, 不能都套同一个 5 s; 总额仍由 plan.quota.motor_run_seconds_total 全局审计。
                 cap = int(stg.get("motion_cap_seconds",
                                   plan["quota"]["motion_cap_seconds_per_run"]))
+                approved_pkg = None
+                if transport == "real" or approval is not None:
+                    # R6A §4: 真实动作前, 会话自己会再核一次"这些步骤就是那份被批准的字节里的"。
+                    # plan_sha256 取**账本登记值**(= 开账时那三件身份之一), 不是此刻盘上的值 ——
+                    # 盘上变了就该拒, 而不是跟着变。
+                    approved_pkg = {
+                        "plan_path": str(Path(plan_path).resolve()) if plan_path else None,
+                        "plan_sha256": ((approval.identities or {}).get("plan_sha256")
+                                        if approval is not None else
+                                        (sha_of(plan_path) if plan_path else None)),
+                        "stage": sid, "profile": ap, "approval_id": approval_id,
+                        "steps_sha256": canonical_steps_sha(steps)}
                 res = exec_session("S_" + sid, steps, out, transport, fx, port,
                                    int(stg.get("total_deadline_seconds", 120)), clock,
                                    backend=backend,
                                    motion_cap_seconds=cap,
                                    plan=plan, quota_box=quota_box, used_box=used_box,
-                                   context=recorded, approval=approval)
+                                   context=recorded, approval=approval, approved=approved_pkg)
                 if transport == "real":
                     # 分支由**本次响应**决定, 作用域是本阶段所在的场景链: 未触发就把该链的事故
                     # 取证支线留在 NOT_RUN 之外, 真实触发就必须走该链的 S9/S10/S11 —— 不许用
@@ -3260,7 +3679,15 @@ def main(argv=None):
         if not a.approval_id:
             print("REAL_TRANSPORT_REFUSED:approval_id_required", file=sys.stderr)
             return 4
-        if not (a.plan or a.dispatch):
+        if not a.dispatch:
+            # 复审 M8-R6A §4 的最小修法: 真实后端暂时只允许**经批准的整包 dispatch**。
+            # 单会话 --steps 没有"这批步骤属于那份批准"的来源, 留在入口就等于留一条绕账的路。
+            # 离线工装(stub)的单会话入口原样保留 —— 它是夹具测试的入口, 不碰设备。
+            print("REAL_TRANSPORT_REFUSED:single_session_steps_not_approved_package"
+                  "(真实执行只接 --dispatch 整包; 任意 --steps 请用 --transport stub)",
+                  file=sys.stderr)
+            return 4
+        if not a.plan:
             print("REAL_TRANSPORT_REFUSED:plan_required_for_quota_ledger", file=sys.stderr)
             return 4
     elif not a.dispatch and not a.validate_plan and not a.approval_init and not a.fixture:

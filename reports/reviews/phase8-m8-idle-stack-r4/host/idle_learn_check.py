@@ -1016,20 +1016,34 @@ _disk_sha, _disk_bytes = sha(CHAIN), CHAIN.stat().st_size
 _R6_PATH = ROOT / "reports/reviews/phase8-m8-r6-offline-recovery/field/plan_core_r6.json"
 _R6 = json.loads(_R6_PATH.read_text(encoding="utf-8")) if _R6_PATH.exists() else None
 _R6_EXEC = ((_R6 or {}).get("identity_binding", {}).get("executor", {}) or {})
+# R6A: 那份 R6 派生件**已经作为离线 CLI 证据的执行输入用过**, 和 r5c 一样按冻结件处理 ——
+# 于是这条判据也变成"冻结↔冻结": 它登记的执行器 sha 必须等于 git 44e493c 里那份 blob,
+# 而**今天盘上**的执行器只允许被**新的** R6A 包登记。三层(r5c/r6/r6a)各自指向自己那一刻的字节。
+_R6_COMMIT = "44e493c"
+_R6_BLOB_PATH = SCRATCH / ("m8r3_serial_chain_at_%s.py" % _R6_COMMIT)
+_blob6, _blob6_bytes = git_blob(_R6_COMMIT, _REL_CHAIN, _R6_BLOB_PATH)
+_R6A_PATH = ROOT / "reports/reviews/phase8-m8-r6a-offline-rework/field/plan_core_r6a.json"
+_R6A = json.loads(_R6A_PATH.read_text(encoding="utf-8")) if _R6A_PATH.exists() else None
+_R6A_EXEC = ((_R6A or {}).get("identity_binding", {}).get("executor", {}) or {})
 add("P8_frozen_executor_identity_is_blob_verifiable_and_live_package_matches_disk",
     PLAN["identity_binding"]["executor"]["sha256"] ==
     R5C["continuation_of"]["executor_executed"]["sha256"] and
     _blob5c == R5C["identity_binding"]["executor"]["sha256"] and
     _blob5c_bytes == R5C["identity_binding"]["executor"]["bytes"] and
     R5C["identity_binding"]["image"]["sha256"] == PLAN["identity_binding"]["image"]["sha256"] and
-    bool(_R6) and _R6_EXEC.get("sha256") == _disk_sha and _R6_EXEC.get("bytes") == _disk_bytes and
-    _R6_EXEC.get("sha256") != R5C["identity_binding"]["executor"]["sha256"],
+    bool(_R6) and _R6_EXEC.get("sha256") == _blob6 and _R6_EXEC.get("bytes") == _blob6_bytes and
+    _R6_EXEC.get("sha256") != R5C["identity_binding"]["executor"]["sha256"] and
+    bool(_R6A) and _R6A_EXEC.get("sha256") == _disk_sha and
+    _R6A_EXEC.get("bytes") == _disk_bytes and
+    _R6A_EXEC.get("sha256") not in (_blob6, _blob5c),
     "冻结件对当时字节可复算: R4 包(%s…)与 R5C 记的“上一轮真跑过的那份”同一件, "
     "R5C 注册值(%s…/%s B)== git %s 里该文件 blob 的实算, 两包镜像仍是同一件(未重编); "
-    "盘上现在是 %s…/%s B, 与 R5C 那份已不同 => 只有**新**候选包 R6 登记它(%s…), 冻结件不回改" % (
+    "R6 包注册值(%s…/%s B)== git %s 里 blob 的实算(它已被 CLI 证据用过, 同样不回改); "
+    "盘上现在是 %s…/%s B => 只有**最新**候选包 R6A 登记它(%s…) => 三层各自指向自己那一刻的字节" % (
         PLAN["identity_binding"]["executor"]["sha256"][:12],
         R5C["identity_binding"]["executor"]["sha256"][:12], _blob5c_bytes, _R5C_BLOB_COMMIT,
-        _disk_sha[:12], _disk_bytes, _R6_EXEC.get("sha256", "-")[:12]))
+        _R6_EXEC.get("sha256", "-")[:12], _blob6_bytes, _R6_COMMIT,
+        _disk_sha[:12], _disk_bytes, _R6A_EXEC.get("sha256", "-")[:12]))
 
 add("P9_stages_and_gates_survive_the_edit",
     [s["id"] for s in R5C["stages"]][:1] == ["S0"] and "S1" not in [s["id"] for s in R5C["stages"]]

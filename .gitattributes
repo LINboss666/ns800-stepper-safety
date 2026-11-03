@@ -67,3 +67,9 @@ reports/reviews/phase8-m8-parallel-protection-ready/** -text
 # 本轮的"原字节可复算"声称靠 blob==磁盘字节成立; 派生件与 CLI 实证文本都是 LF 原件, 不许被转换。
 reports/firmware/phase8-m8-r6-offline-recovery/** -text
 reports/reviews/phase8-m8-r6-offline-recovery/** -text
+
+# ===== M8-R6A 离线返修轮: 整轮所有文件(派生计划/构建日志/镜像/map/manifest/反例对照)禁止行尾转换 =====
+# 与 R6 同一条理由: 本轮的"原字节可复算"声称靠 blob==磁盘字节成立(构建日志与 UV4 输出是 CRLF 原件,
+# 派生件与对照文本是 LF 原件), 任何一边被转换都会让远端逐 blob 回读报假 hash_mismatch。
+reports/firmware/phase8-m8-r6a-offline-rework/** -text
+reports/reviews/phase8-m8-r6a-offline-rework/** -text

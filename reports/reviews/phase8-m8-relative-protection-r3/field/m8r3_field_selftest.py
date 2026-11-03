@@ -105,10 +105,40 @@ def tx_seq(result):
     return [x["bytes"].strip() for x in _ledger_events(result["ledger"]) if x["kind"] == "TX"]
 
 
+def stamp(m, steps):
+    """R6A §4 之后, 会改变设备/持久状态的命令**必须**带额度申报才允许发出。
+    工装的步骤表也守这条合同: 按执行器**同一张映射表**补上它本该有的申报。
+    已经申报的一律不动(那正是某些用例要测的额度语义)。"""
+    out = []
+    for st in steps:
+        st = dict(st)
+        key = m.quota_key_for_command(st["cmd"]) if st.get("cmd") else None
+        if key and not st.get("quota"):
+            st["quota"] = {"name": key, "n": 1}
+        out.append(st)
+    return out
+
+
+def fx_approved(m, steps, sid="FX", tag="fx"):
+    """给真实传输的工装会话造一份**离线批准件**: 步骤落成真实字节, 由执行器同一套
+    `verify_approved_binding` 逐字段核对。它只活在工作目录里、只配假端口, 不是现场批准,
+    也不给任何硬件额度。"""
+    ss = stamp(m, steps)
+    pfile = Path(out_dir("approved-%s-%s" % (sid, tag))) / "plan.json"
+    pfile.write_text(json.dumps({"quota": dict(BASE_QUOTA),
+                                 "stages": [{"id": sid, "kind": "serial_session",
+                                             "steps": ss}]}, ensure_ascii=False),
+                     encoding="utf-8")
+    return {"plan_path": str(pfile), "plan_sha256": m.sha_of(pfile), "stage": sid,
+            "profile": "healthy", "approval_id": "OFFLINE-FXTURE-NO-DEVICE",
+            "steps_sha256": m.canonical_steps_sha(ss)}
+
+
 BASE_QUOTA = {"port_open": 4, "download": 1, "readback": 1, "explicit_reset": 1,
               "motor_run": 3, "motor_run_seconds_total": 15, "motion_cap_seconds_per_run": 5,
               "config_save": 1, "approved_reboot": 1, "tmc_config_apply": 2,
               "irq_polarity_prep": 4, "retry": 0, "physical_collision": 0,
+              "diag_profile_zero": 1, "diag_profile_learn": 2, "diag_profile_commit": 1,
               "blackbox_clear": 0, "dmm_readings": 0,
               "cleanup_motor_stop": 2, "cleanup_motor_disarm": 2, "cleanup_motor_status": 2}
 
@@ -155,10 +185,22 @@ def run_with_write_hook(m, mode, steps, extra_steps=(), cap=5):
     m.make_real_port = lambda port_name, led: ReactivePort([], led)
     builtins.input = lambda prompt: (clock.sleep(12), "yes")[1]
     plan = {"quota": dict(BASE_QUOTA)}
+    all_steps = stamp(m, list(steps) + list(extra_steps))
+    # R6A §4: 真实传输只接"经批准的整包"。这里的批准件就是本用例自己那份步骤落成的**真实字节**
+    # —— 执行器仍然逐字段核对(改一步骤就会被 STEPS_NOT_BOUND_TO_APPROVAL 拒), 只是这张批准
+    # 只对本工装有效, 不指向任何设备动作。
+    pfile = Path(out_dir("plan-FX-" + mode)) / "plan.json"
+    pfile.write_text(json.dumps({"quota": dict(BASE_QUOTA),
+                                 "stages": [{"id": "FX", "kind": "serial_session",
+                                             "steps": all_steps}]}, ensure_ascii=False),
+                     encoding="utf-8")
+    approved = {"plan_path": str(pfile), "plan_sha256": m.sha_of(pfile), "stage": "FX",
+                "profile": "healthy", "approval_id": "OFFLINE-FX-" + mode,
+                "steps_sha256": m.canonical_steps_sha(all_steps)}
     try:
-        r = m.exec_session("FX", list(steps) + list(extra_steps), out_dir("hook-" + mode),
+        r = m.exec_session("FX", stamp(m, all_steps), out_dir("hook-" + mode),
                            "real", {}, "MEMORY_PORT", 30, clock, motion_cap_seconds=cap,
-                           plan=plan)
+                           plan=plan, approved=approved)
     except m.Stop as e:                             # 开口之前就被计划静态判据拒绝
         r = {"status": "STOP", "code": e.code, "detail": e.detail, "disarm": "NOT_ARMED",
              "terminal": "KNOWN", "success": False, "obligation": False, "cleanup_errors": [],
@@ -171,7 +213,7 @@ def run_with_write_hook(m, mode, steps, extra_steps=(), cap=5):
 
 
 def dispatch(m, profile, plan=None, rows=None, root=None, transport="stub", backend="sim",
-             token=None, expected=None, approval_id=None, approval_root=None):
+             token=None, expected=None, approval_id=None, approval_root=None, plan_path=None):
     """整包调度的一次真实执行(只用假端口 + sim 后端)。rows 可以换成变异表, 用来证明
     "恢复比较/新增取证"这两条判据真的会拒绝, 而不是只在文档里写着会拒绝。"""
     d = root or out_dir("dispatch-" + profile)
@@ -184,16 +226,32 @@ def dispatch(m, profile, plan=None, rows=None, root=None, transport="stub", back
     return m.dispatch_plan(p, transport, backend, Path(d) / "run", m.SimClock(), profile,
                            "NO_DEVICE", str(REPO), token, expected, "",
                            plan_dir=plan_dir, approval_id=approval_id,
-                           approval_root=approval_root), d
+                           approval_root=approval_root, plan_path=plan_path), d
+
+
+def plan_bytes(plan, tag):
+    """把计划落成**真实字节**。R6A §3 要求批准身份三件 SHA 齐全, 而 plan_sha256 只能从
+    "实际要执行的那份文件"算 —— 所以离线开账也必须指向一个真实路径, 不能照抄内存对象。"""
+    p = Path(out_dir("planbytes-" + tag)) / "plan.json"
+    p.write_text(json.dumps(plan, ensure_ascii=False), encoding="utf-8")
+    return str(p)
 
 
 def bind_approval(m, plan, aid, root=None):
-    """给一次 dispatch 绑定批准身份(离线开立持久账, 不碰设备)。返回 (approval_root, id)。
+    """给一次 dispatch 绑定批准身份(离线开立持久账, 不碰设备)。
+    返回 (approval_root, id, plan_path): 三者一起用才算绑对 —— 开账与执行必须指向同一份计划字节。
     真实传输现在**必须**有这本账才允许进入, 所以原先只填令牌的用例都要走这里。"""
     r = Path(root or out_dir("approvals-" + aid))
-    m.approval_init(r, aid, m.current_identities(plan, None, str(REPO)), plan["quota"],
+    pp = plan_bytes(plan, aid)
+    m.approval_init(r, aid, m.current_identities(plan, pp, str(REPO)), plan["quota"],
                     note="selftest offline bind, no device action")
-    return str(r), aid
+    return str(r), aid, pp
+
+
+def full_ids(seed=1):
+    """三件齐全且形状合法的假身份(64 位小写十六进制), 只给离线账用。"""
+    return {"plan_sha256": "%064x" % seed, "executor_sha256": "%064x" % (seed + 1),
+            "image_sha256": "%064x" % (seed + 2)}
 
 
 def tx_stage(res, sid):
@@ -268,8 +326,9 @@ def s06_named_refusal_halts_commit(m):
     fx = {"boot_bytes": [], "responses": {
         "diag_profile commit": [c_line("[DIAG] commit REFUSED")],
         "config_save": ["[CFG] save: OK"]}}
-    r = m.exec_session("s06", steps, out_dir("s06"), "stub", fx, "NO_DEVICE", 30,
-                       m.SimClock(), plan={"quota": {"port_open": 1}})
+    r = m.exec_session("s06", stamp(m, steps), out_dir("s06"), "stub", fx, "NO_DEVICE", 30,
+                       m.SimClock(),
+                       plan={"quota": {"port_open": 1, "diag_profile_commit": 1}})
     sent = tx_seq(r)
     return (r["status"] == "REFUSED" and "config_save" not in sent,
             "status=%s commands=%s" % (r["status"], ",".join(sent)))
@@ -293,7 +352,7 @@ def s08_watch_stop_halts_dangerous_steps(m):
     ]
     fx = motion_fx({"__watch__": ROWS["commands"]["__watch__"]["healthy"],
                     "motor_arm": ARM_OK, "fault_reset": ROWS["commands"]["fault_reset"]["healthy"]})
-    r = m.exec_session("s08", steps, out_dir("s08"), "stub", fx, "NO_DEVICE", 30, m.SimClock(),
+    r = m.exec_session("s08", stamp(m, steps), out_dir("s08"), "stub", fx, "NO_DEVICE", 30, m.SimClock(),
                        motion_cap_seconds=5, plan={"quota": {"port_open": 1}})
     sent = tx_seq(r)
     return ("motor_arm" not in sent and "fault_reset" not in sent and
@@ -315,7 +374,7 @@ def s09_no_trigger_is_observation(m):
     fx = motion_fx({"motor_arm": ARM_OK, "motor_target 100": TARGET_OK, "motor_start": [],
                     "__watch__": ROWS["commands"]["__watch__"]["healthy"],
                     "fault_reset": ROWS["commands"]["fault_reset"]["healthy"]})
-    r = m.exec_session("s09", steps, out_dir("s09"), "stub", fx, "NO_DEVICE", 30, m.SimClock(),
+    r = m.exec_session("s09", stamp(m, steps), out_dir("s09"), "stub", fx, "NO_DEVICE", 30, m.SimClock(),
                        motion_cap_seconds=5, plan={"quota": {"port_open": 1, "motor_run": 2}})
     tx = tx_seq(r)
     return (r["status"] == "OBSERVATION_NO_TRIGGER" and r["success"] is True and
@@ -332,7 +391,7 @@ def s10_five_second_hard_cap(m):
         {"cmd": "motor_stop", "as": "stop"},
     ]
     fx = motion_fx({"motor_start": [], "__watch__": RUNNING_ROWS})
-    r = m.exec_session("s10", steps, out_dir("s10"), "stub", fx, "NO_DEVICE", 60, m.SimClock(),
+    r = m.exec_session("s10", stamp(m, steps), out_dir("s10"), "stub", fx, "NO_DEVICE", 60, m.SimClock(),
                        motion_cap_seconds=5, plan={"quota": {"port_open": 1, "motor_run": 2}})
     tx = [x for x in _ledger_events(r["ledger"]) if x["kind"] == "TX"]
     start = next(x["t_s"] for x in tx if x["bytes"] == "motor_start\r\n")
@@ -347,7 +406,7 @@ def s11_error_after_start_still_disarms(m):
     steps = [{"cmd": "motor_start", "as": "start", "seconds": 5, "expect_absent": ["REFUSED"]},
              {"cmd": "not_in_fixture", "as": "later_failure"}]
     fx = motion_fx({"motor_start": []})
-    r = m.exec_session("s11", steps, out_dir("s11"), "stub", fx, "NO_DEVICE", 30, m.SimClock(),
+    r = m.exec_session("s11", stamp(m, steps), out_dir("s11"), "stub", fx, "NO_DEVICE", 30, m.SimClock(),
                        motion_cap_seconds=5, plan={"quota": {"port_open": 1, "motor_run": 2}})
     tx = tx_seq(r)
     return (r["code"] == "STUB_MISS" and "motor_stop" in tx and "motor_disarm" in tx and
@@ -360,7 +419,7 @@ def s12_unconfirmable_disable_is_unknown(m):
     steps = [{"cmd": "motor_start", "as": "start", "seconds": 5, "expect_absent": ["REFUSED"]},
              {"cmd": "missing_response", "as": "boom"}]
     fx = motion_fx({"motor_start": [], "__no_cleanup__": True})
-    r = m.exec_session("s12", steps, out_dir("s12"), "stub", fx, "NO_DEVICE", 30, m.SimClock(),
+    r = m.exec_session("s12", stamp(m, steps), out_dir("s12"), "stub", fx, "NO_DEVICE", 30, m.SimClock(),
                        motion_cap_seconds=5, plan={"quota": {"port_open": 1, "motor_run": 2}})
     return (r["disarm"] == "UNKNOWN" and r["terminal"] == "UNKNOWN" and
             bool(r["cleanup_errors"]) and r["code"] == "STUB_MISS" and r["success"] is False,
@@ -409,7 +468,7 @@ def s15_denied_manual_runs_no_motion(m):
              {"cmd": "motor_start", "as": "start"}]
     fx = {"boot_bytes": [], "manual": {"cruise_reached": "no"},
           "responses": {"motor_arm": ARM_OK, "motor_start": []}}
-    r = m.exec_session("s15", steps, out_dir("s15"), "stub", fx, "NO_DEVICE", 30, m.SimClock(),
+    r = m.exec_session("s15", stamp(m, steps), out_dir("s15"), "stub", fx, "NO_DEVICE", 30, m.SimClock(),
                        plan={"quota": {"port_open": 1, "motor_run": 1}})
     tx = tx_seq(r)
     return ("motor_start" not in tx and "motor_arm" not in tx and
@@ -431,7 +490,7 @@ def s16_actions_really_dispatched(m):
               "argv": PLAN["tools"]["reset"]["argv"]}]
     led = m.Ledger(out_dir("s16") / "boot.jsonl", m.SimClock())
     be = m.SimActionBackend(led)
-    r = m.exec_session("s16", steps, out_dir("s16"), "stub", {"boot_bytes": [], "responses": {}},
+    r = m.exec_session("s16", stamp(m, steps), out_dir("s16"), "stub", {"boot_bytes": [], "responses": {}},
                        "NO_DEVICE", 30, m.SimClock(), backend=be,
                        plan={"quota": {"port_open": 1, "download": 1, "readback": 1,
                                        "explicit_reset": 1}})
@@ -478,7 +537,7 @@ def s19_silent_port_no_retry(m):
     steps = [{"cmd": "safety_status", "as": "boot", "seconds": 1,
               "expect_contains": ["[SAFETY]"]}]
     fx = {"boot_bytes": [], "inject": {"port_silent": True}}
-    r = m.exec_session("s19", steps, out_dir("s19"), "stub", fx, "NO_DEVICE", 30, m.SimClock(),
+    r = m.exec_session("s19", stamp(m, steps), out_dir("s19"), "stub", fx, "NO_DEVICE", 30, m.SimClock(),
                        plan={"quota": {"port_open": 1}})
     tx = [x for x in _ledger_events(r["ledger"]) if x["kind"] == "TX"]
     return (len(tx) == 1 and r["code"] == "MISSING_RESPONSE_PROMPT",
@@ -504,7 +563,7 @@ def s22_quota_exhausted_refuses_send(m):
              {"cmd": "motor_start", "as": "s2", "seconds": 1, "expect_absent": ["REFUSED"],
               "quota": {"name": "motor_run", "n": 1}}]
     fx = motion_fx({"motor_start": []})
-    r = m.exec_session("s22", steps, out_dir("s22"), "stub", fx, "NO_DEVICE", 30, m.SimClock(),
+    r = m.exec_session("s22", stamp(m, steps), out_dir("s22"), "stub", fx, "NO_DEVICE", 30, m.SimClock(),
                        plan={"quota": {"port_open": 1, "motor_run": 1,
                                        "cleanup_motor_stop": 2, "cleanup_motor_disarm": 2,
                                        "cleanup_motor_status": 2}})
@@ -698,7 +757,7 @@ def s38_parse_text_actually_written(m):
     steps = [{"cmd": "safety_status", "as": "boot", "seconds": 2,
               "expect_contains": ["[SAFETY] ready=YES"]}]
     fx = {"boot_bytes": [], "responses": {"safety_status": SAFETY_OK}}
-    r = m.exec_session("s38", steps, out_dir("s38"), "stub", fx, "NO_DEVICE", 30, m.SimClock(),
+    r = m.exec_session("s38", stamp(m, steps), out_dir("s38"), "stub", fx, "NO_DEVICE", 30, m.SimClock(),
                        plan={"quota": {"port_open": 1}})
     res = r["results"][0]
     txt = Path(res["txt"])
@@ -719,7 +778,7 @@ def s39_evidence_failure_is_named_and_halts(m):
               "expect_contains": ["[SAFETY] ready=YES"]},
              {"cmd": "motor_start", "as": "must_not_run", "seconds": 2}]
     fx = motion_fx({"safety_status": SAFETY_OK, "motor_start": []})
-    r = m.exec_session("s39", steps, d, "stub", fx, "NO_DEVICE", 30, m.SimClock(),
+    r = m.exec_session("s39", stamp(m, steps), d, "stub", fx, "NO_DEVICE", 30, m.SimClock(),
                        plan={"quota": {"port_open": 1, "motor_run": 1,
                                        "cleanup_motor_stop": 1, "cleanup_motor_disarm": 1,
                                        "cleanup_motor_status": 1}})
@@ -746,8 +805,8 @@ def s40_cleanup_reserve_charged_and_disclosed(m):
     led.close()
     # 会话级: 预留申报为 0 时仍然撤能(安全优先), 但必须具名 CLEANUP_RESERVE_EXHAUSTED 且不是成功
     fx2 = motion_fx({"motor_start": []})
-    r = m.exec_session("s40b", [{"cmd": "motor_start", "as": "start", "seconds": 1,
-                                "expect_absent": ["REFUSED"]}], out_dir("s40b"), "stub", fx2,
+    r = m.exec_session("s40b", stamp(m, [{"cmd": "motor_start", "as": "start", "seconds": 1,
+                                "expect_absent": ["REFUSED"]}]), out_dir("s40b"), "stub", fx2,
                        "NO_DEVICE", 30, m.SimClock(), motion_cap_seconds=5,
                        plan={"quota": {"port_open": 1, "motor_run": 1, "retry": 0,
                                         "cleanup_motor_stop": 0, "cleanup_motor_disarm": 0,
@@ -928,9 +987,10 @@ def s50_learn_timeout_keeps_named_stop(m):
              {"cmd": "diag_profile learn 8 80 120 0", "as": "learn", "seconds": 3,
               "expect_contains": ["[DIAG] learn OK"]},
              {"cmd": "diag_profile tier 2", "as": "must_not_run"}]
-    r = m.exec_session("s50", steps, out_dir("s50"), "stub", fx, "NO_DEVICE", 30, m.SimClock(),
+    r = m.exec_session("s50", stamp(m, steps), out_dir("s50"), "stub", fx, "NO_DEVICE", 30, m.SimClock(),
                        motion_cap_seconds=5,
                        plan={"quota": {"port_open": 1, "motor_run": 1, "retry": 0,
+                                       "diag_profile_learn": 1,
                                        "cleanup_motor_stop": 1, "cleanup_motor_disarm": 1,
                                        "cleanup_motor_status": 1}})
     tx = tx_seq(r)
@@ -1023,10 +1083,10 @@ def s56_halted_readback_reset_before_first_query(m):
         m.make_real_port = lambda port_name, led: _halted_port_factory(m, state, clock, boot)(
             [], led, clock=clock)
         try:
-            r = m.exec_session("s56", steps, out_dir("s56"), "real",
+            r = m.exec_session("s56", stamp(m, steps), out_dir("s56"), "real",
                                {"post_reset_boot": stg["post_reset_boot"]}, "MEMORY", 40, clock,
                                backend=Backend(), plan={"quota": {"port_open": 1,
-                                                                  "explicit_reset": 1}})
+                                                                  "explicit_reset": 1}}, approved=fx_approved(m, stamp(m, steps), "s56"))
         finally:
             m.make_real_port = saved
         return r, state
@@ -1197,10 +1257,11 @@ def s59_stop_read_exception_still_disarms(m):
     saved = m.make_real_port
     m.make_real_port = lambda port_name, led: Port([], led, clock=clock)
     try:
-        r = m.exec_session("s59", [{"cmd": "motor_start", "as": "start", "seconds": 2,
-                                    "expect_absent": ["REFUSED"]}], out_dir("s59"), "real", {},
+        r = m.exec_session("s59", stamp(m, [{"cmd": "motor_start", "as": "start", "seconds": 2,
+                                    "expect_absent": ["REFUSED"]}]), out_dir("s59"), "real", {},
                            "MEMORY", 30, clock, motion_cap_seconds=5,
-                           plan={"quota": dict(BASE_QUOTA)})
+                           plan={"quota": dict(BASE_QUOTA)}, approved=fx_approved(m, stamp(m, [{"cmd": "motor_start", "as": "start", "seconds": 2,
+                                    "expect_absent": ["REFUSED"]}]), "s59"))
     except Exception as e:                                     # noqa: BLE001
         r = {"escaped": type(e).__name__}
     finally:
@@ -1231,9 +1292,9 @@ def s60_short_write_is_not_success(m):
     saved = m.make_real_port
     m.make_real_port = lambda port_name, led: Port([], led, clock=clock)
     try:
-        r = m.exec_session("s60", [{"cmd": "motor_start", "as": "start", "seconds": 2}],
+        r = m.exec_session("s60", stamp(m, [{"cmd": "motor_start", "as": "start", "seconds": 2}]),
                            out_dir("s60"), "real", {}, "MEMORY", 30, clock,
-                           motion_cap_seconds=5, plan={"quota": dict(BASE_QUOTA)})
+                           motion_cap_seconds=5, plan={"quota": dict(BASE_QUOTA)}, approved=fx_approved(m, stamp(m, [{"cmd": "motor_start", "as": "start", "seconds": 2}]), "s60"))
     finally:
         m.make_real_port = saved
     return (r["code"] == "COMMAND_SHORT_WRITE" and r["obligation"] is True and
@@ -1256,14 +1317,14 @@ def s61_open_quota_charged_before_attempt(m):
     m.make_real_port = boom
     zero, threw = None, None
     try:
-        zero = m.exec_session("s61z", [{"cmd": "system_status", "as": "q"}], out_dir("s61z"),
+        zero = m.exec_session("s61z", stamp(m, [{"cmd": "system_status", "as": "q"}]), out_dir("s61z"),
                               "real", {}, "COM9", 20, clock,
-                              plan={"quota": {"port_open": 0}})
+                              plan={"quota": {"port_open": 0}}, approved=fx_approved(m, stamp(m, [{"cmd": "system_status", "as": "q"}]), "s61z"))
         zero_attempts = len(attempts)
         q = dict(BASE_QUOTA)
         q["port_open"] = 2
-        threw = m.exec_session("s61t", [{"cmd": "system_status", "as": "q"}], out_dir("s61t"),
-                               "real", {}, "COM9", 20, m.SimClock(), plan={"quota": q})
+        threw = m.exec_session("s61t", stamp(m, [{"cmd": "system_status", "as": "q"}]), out_dir("s61t"),
+                               "real", {}, "COM9", 20, m.SimClock(), plan={"quota": q}, approved=fx_approved(m, stamp(m, [{"cmd": "system_status", "as": "q"}]), "s61t"))
     finally:
         m.make_real_port = saved
     return (zero["code"] == "QUOTA_EXHAUSTED" and zero_attempts == 0 and
@@ -1378,7 +1439,7 @@ def s66_running_needs_numeric_cruise_and_bounded_polling(m):
             st["poll"] = {"until_seconds": 3, "interval_seconds": 0.5,
                           "retry_codes": ["PROFILE_NOT_RUNNING", "FIELD_VALUE_MISMATCH"]}
         steps.append(st)
-        return m.exec_session("s66", steps, out_dir("s66"), "stub", fx, "NO_DEVICE", 60,
+        return m.exec_session("s66", stamp(m, steps), out_dir("s66"), "stub", fx, "NO_DEVICE", 60,
                               m.SimClock(), motion_cap_seconds=cap,
                               plan={"quota": dict(BASE_QUOTA)})
 
@@ -1410,7 +1471,7 @@ def s67_busy_msh_twelve_second_boundary(m):
         steps = [{"cmd": "motor_start", "as": "start", "seconds": 2, "expect_absent": ["REFUSED"]},
                  {"cmd": "diag_profile learn 8 80 120 0", "as": "learn", "seconds": window,
                   "expect_contains": ["[DIAG] learn OK"]}]
-        return m.exec_session("s67", steps, out_dir("s67"), "stub", fx, "NO_DEVICE", 60,
+        return m.exec_session("s67", stamp(m, steps), out_dir("s67"), "stub", fx, "NO_DEVICE", 60,
                               m.SimClock(), motion_cap_seconds=cap, plan={"quota": dict(BASE_QUOTA)})
 
     learns = run(15, 14)
@@ -1451,11 +1512,12 @@ def s68_response_driven_branch_and_undetermined_stop(m):
     saved_tool, saved_port = m.RealActionBackend._run, m.make_real_port
     m.RealActionBackend._run = no_tools
     m.make_real_port = lambda port_name, led: m.FakePort([], led, clock=m.SimClock())
-    aroot, aid = bind_approval(m, late, "S68-BOUND")
+    aroot, aid, appath = bind_approval(m, late, "S68-BOUND")
     try:
         res = m.dispatch_plan(late, "real", "real", out_dir("s68-real"), m.SimClock(),
                               m.REAL_PROFILE, "MEMORY", str(REPO), "APPR", "APPR", "",
-                              plan_dir=str(HERE), approval_id=aid, approval_root=aroot)
+                              plan_dir=str(HERE), approval_id=aid, approval_root=aroot,
+                              plan_path=appath)
     finally:
         m.RealActionBackend._run, m.make_real_port = saved_tool, saved_port
     codes = [s.get("code") for s in res["stages"]]
@@ -1654,13 +1716,13 @@ def s74_run_root_inside_commander_c_is_shlex_safe(m):
     uidf = Path(d) / "uid.txt"
     uidf.write_text("U" * 48, encoding="utf-8")
     calls, fake_run = _pyocd_shlex_fake(m, image_bytes)
-    aroot, aid = bind_approval(m, plan, "S74-BOUND")
+    aroot, aid, appath = bind_approval(m, plan, "S74-BOUND")
     saved = m.subprocess.run
     m.subprocess.run = fake_run
     try:
         res = m.dispatch_plan(plan, "real", "real", d, m.SimClock(), m.REAL_PROFILE, "NO_PORT",
                               str(REPO), "APPR", "APPR", str(uidf), plan_dir=str(HERE),
-                              approval_id=aid, approval_root=aroot)
+                              approval_id=aid, approval_root=aroot, plan_path=appath)
     finally:
         m.subprocess.run = saved
     st = {s["id"]: s for s in res["stages"]}
@@ -1911,9 +1973,10 @@ def s83_declared_recovery_refused_and_next_step_not_sent(m):
               "byte_corruption_recovery": {"reconfirmed_by": "cfgafter",
                                            "no_facts_from_corrupted_response": True}},
              {"cmd": "diag_profile tier 2", "as": "must_not_run"}]
-    r = m.exec_session("s83", steps, out_dir("s83"), "stub", fx, "NO_DEVICE", 30, m.SimClock(),
+    r = m.exec_session("s83", stamp(m, steps), out_dir("s83"), "stub", fx, "NO_DEVICE", 30, m.SimClock(),
                        motion_cap_seconds=5,
                        plan={"quota": {"port_open": 1, "motor_run": 1, "retry": 0,
+                                       "diag_profile_learn": 1,
                                        "cleanup_motor_stop": 1, "cleanup_motor_disarm": 1,
                                        "cleanup_motor_status": 1}})
     tx = tx_seq(r)
@@ -1948,9 +2011,11 @@ def s85_quota_not_revived_by_new_dir_or_new_process(m):
     重新发一份额度(apply 实际用到 14/2)。现在同一批准身份连跑两整包, 第二包必须在
     **动工具之前**被持久账拒绝, 且账上的消耗是 1 而不是 2、也不是被清零的 0。"""
     p = copy.deepcopy(PLAN)
-    aroot, aid = bind_approval(m, p, "S85-ONE-APPROVAL")
-    r1, _d1 = dispatch(m, "healthy", plan=p, approval_id=aid, approval_root=aroot)
-    r2, _d2 = dispatch(m, "healthy", plan=p, approval_id=aid, approval_root=aroot)
+    aroot, aid, appath = bind_approval(m, p, "S85-ONE-APPROVAL")
+    r1, _d1 = dispatch(m, "healthy", plan=p, approval_id=aid, approval_root=aroot,
+                       plan_path=appath)
+    r2, _d2 = dispatch(m, "healthy", plan=p, approval_id=aid, approval_root=aroot,
+                       plan_path=appath)
     doc = json.loads(Path(m.approval_path(aroot, aid)).read_text(encoding="utf-8"))
     s1_1 = [x for x in r1["stages"] if x["id"] == "S1"][0]
     s1_2 = [x for x in r2["stages"] if x["id"] == "S1"][0]
@@ -1968,10 +2033,13 @@ def s85_quota_not_revived_by_new_dir_or_new_process(m):
 
 
 def s86_last_unit_reserved_then_crash_is_not_refunded(m):
-    """"占用后崩溃"必须按**已消耗**计: 账本里没有 release 这条路, 未确认的预占只留在 pending。"""
+    """"占用后崩溃"必须按**已消耗**计: 账本里没有 release 这条路, 未确认的预占只留在 pending。
+
+    R6A §3 之后账本**只能**由 approval_init 建立(运行期读盘一律严格), 所以这里先离线开账。"""
     root = out_dir("s86")
     led = m.Ledger(root / "l.jsonl", m.SimClock(), out_dir=root)
-    caps, ids = {"motor_run": 1}, {}
+    caps, ids = {"motor_run": 1}, full_ids(11)
+    m.approval_init(root, "S86", ids, caps, note="offline s86, no device action")
     path = m.approval_path(root, "S86")
     a = m.ApprovalLedger(path, "S86", ids, caps, led, m.SimClock())
     a.reserve("motor_run", 1)               # 占掉最后一格……然后进程在这里死掉(没有 commit)
@@ -1998,7 +2066,8 @@ def s87_two_executors_on_one_approval_never_exceed_cap(m):
     超出那一次必须具名拒绝; 账本被别的进程锁住时也不许盲写。"""
     root = out_dir("s87")
     led = m.Ledger(root / "l.jsonl", m.SimClock(), out_dir=root)
-    caps, ids = {"port_open": 3}, {}
+    caps, ids = {"port_open": 3}, full_ids(21)
+    m.approval_init(root, "S87", ids, caps, note="offline s87, no device action")
     path = m.approval_path(root, "S87")
     a = m.ApprovalLedger(path, "S87", ids, caps, led, m.SimClock())
     b = m.ApprovalLedger(path, "S87", ids, caps, led, m.SimClock())
@@ -2032,6 +2101,7 @@ def s88_missing_or_corrupt_ledger_blocks_real_action(m):
     root = out_dir("s88")
     p = copy.deepcopy(PLAN)
     p["stages"] = [s for s in p["stages"] if s["id"] in ("S0", "S3")]
+    pp = plan_bytes(p, "S88")          # 真实整包必须有 --plan 字节可核对(R6A §4)
     opened = []
     saved = m.make_real_port
     m.make_real_port = lambda name, led: (opened.append(name),
@@ -2039,13 +2109,15 @@ def s88_missing_or_corrupt_ledger_blocks_real_action(m):
     try:
         miss = m.dispatch_plan(p, "real", "real", out_dir("s88-missing"), m.SimClock(),
                                m.REAL_PROFILE, "NO_PORT", str(REPO), "APPR", "APPR", "",
-                               plan_dir=str(HERE), approval_id="S88-A", approval_root=str(root))
+                               plan_dir=str(HERE), approval_id="S88-A", approval_root=str(root),
+                               plan_path=pp)
         bad_path = m.approval_path(root, "S88-B")
         bad_path.parent.mkdir(parents=True, exist_ok=True)
-        bad_path.write_text('{"version": 1, "approval_id": "S88-B"', encoding="utf-8")  # 半截 JSON
+        bad_path.write_text('{"version": 2, "approval_id": "S88-B"', encoding="utf-8")  # 半截 JSON
         corrupt = m.dispatch_plan(p, "real", "real", out_dir("s88-corrupt"), m.SimClock(),
                                   m.REAL_PROFILE, "NO_PORT", str(REPO), "APPR", "APPR", "",
-                                  plan_dir=str(HERE), approval_id="S88-B", approval_root=str(root))
+                                  plan_dir=str(HERE), approval_id="S88-B", approval_root=str(root),
+                                  plan_path=pp)
     finally:
         m.make_real_port = saved
     rebuilt = m.approval_path(root, "S88-A").exists()
@@ -2066,6 +2138,7 @@ def s89_changed_identity_cannot_reuse_the_same_approval(m):
     ids = {"plan_sha256": "1" * 64, "executor_sha256": "2" * 64, "image_sha256": "3" * 64}
     caps = {"port_open": 5}
     path = m.approval_path(root, "S89")
+    m.approval_init(root, "S89", ids, caps, note="offline s89, no device action")
     m.ApprovalLedger(path, "S89", ids, caps, led, m.SimClock()).reserve("port_open", 1)
     out = {}
     for tag, kw, cp in (
@@ -2095,13 +2168,15 @@ def s90_business_exhausted_but_disarm_still_runs(m):
     led0 = m.Ledger(root / "l.jsonl", m.SimClock(), out_dir=root)
     caps = {"port_open": 1, "motor_run": 1, "retry": 0,
             "cleanup_motor_stop": 1, "cleanup_motor_disarm": 1, "cleanup_motor_status": 1}
-    a = m.ApprovalLedger(m.approval_path(root, "S90"), "S90", {}, caps, led0, m.SimClock())
+    ids = full_ids(31)
+    m.approval_init(root, "S90", ids, caps, note="offline s90, no device action")
+    a = m.ApprovalLedger(m.approval_path(root, "S90"), "S90", ids, caps, led0, m.SimClock())
     for k in ("cleanup_motor_stop", "cleanup_motor_disarm", "cleanup_motor_status"):
         a.reserve(k, 1, kind="cleanup")          # 上一场已把撤能预留花光(等价于额度耗尽)
     fx = motion_fx({"__watch__": ROWS["commands"]["__watch__"]["healthy"], "motor_start": []})
     try:
-        r = m.exec_session("s90", [{"cmd": "motor_start", "as": "start", "seconds": 1,
-                                    "expect_absent": ["REFUSED"]}], out_dir("s90-run"),
+        r = m.exec_session("s90", stamp(m, [{"cmd": "motor_start", "as": "start", "seconds": 1,
+                                    "expect_absent": ["REFUSED"]}]), out_dir("s90-run"),
                            "stub", fx, "NO_DEVICE", 30, m.SimClock(), motion_cap_seconds=5,
                            plan={"quota": dict(caps)}, quota_box=dict(caps), approval=a)
     finally:
@@ -2133,14 +2208,19 @@ def s91_negative_ledger_gate_removed(m):
 
 def s92_negative_cap_check_removed(m):
     """定向检出: 把 reserve 的 cap 判定摘掉(恒放行), s87 必须转为失败, 且账上真的超了 cap ——
-    证明"两个执行者不超额度"是靠这本账, 不是测试自己数出来的。"""
+    证明"两个执行者不超额度"是靠这本账, 不是测试自己数出来的。
+
+    突变体绕开 _load/_store(严格校验也在里面), 否则失败原因会变成"账本损坏"而不是"没守 cap"。"""
     saved = m.ApprovalLedger.reserve
 
     def no_cap(self, name, n=1, kind="business"):
-        doc = self._load_or_create()
-        sp = doc.setdefault("spent", {})
-        sp[name] = int(sp.get(name, 0)) + n
-        self._store(doc)
+        doc = json.loads(self.path.read_text(encoding="utf-8"))
+        doc["spent"][name] = doc["spent"][name] + n
+        doc["pending"].append({"id": "%s#mut%d" % (name, doc["spent"][name]),
+                               "name": name, "n": n, "kind": kind})
+        doc["writes"] = doc["writes"] + 1
+        self.path.write_text(json.dumps(doc, ensure_ascii=False, sort_keys=True, indent=1),
+                             encoding="utf-8")
         return {"name": name, "tag": "%s#mut" % name, "kind": kind}
 
     m.ApprovalLedger.reserve = no_cap
@@ -2149,6 +2229,584 @@ def s92_negative_cap_check_removed(m):
     finally:
         m.ApprovalLedger.reserve = saved
     return (not ok, "摘掉 cap 判定后 s87 判=%s(应为失败) 细节=%s" % (ok, detail))
+
+
+# ----------------------------------------------------------------- R6A R1: 账本严格读取反例
+def _tmp_ledger(m, tag, caps=None, ids=None, reserve=()):
+    """**临时**账(只活在 WORK 里的一次性目录): 离线 init 开账 + 可选预占。
+    绝不产生任何可用于现场的批准身份 —— 复审 §3 最后一句。"""
+    root = out_dir("r1-" + tag)
+    caps = dict(caps or {"apply": 1, "port_open": 1})
+    ids = ids or full_ids(len(tag) + 1)
+    m.approval_init(root, tag, ids, caps, note="offline R6A R1 probe, no device action")
+    path = m.approval_path(root, tag)
+    led = m.Ledger(root / "l.jsonl", m.SimClock(), out_dir=root)
+    obj = m.ApprovalLedger(path, tag, ids, caps, led, m.SimClock())
+    for name in reserve:
+        obj.reserve(name, 1)
+    return root, path, ids, caps, led, obj
+
+
+def _mutate_ledger(path, mutate):
+    """按复审的口径改**账本字节**(保持合法 JSON): 改完立刻读回, 判据看的是拒绝而不是标签。"""
+    doc = json.loads(Path(path).read_text(encoding="utf-8"))
+    mutate(doc)
+    Path(path).write_text(json.dumps(doc, ensure_ascii=False, sort_keys=True, indent=1),
+                          encoding="utf-8")
+    return doc
+
+
+def _codes_of(fn, *a, **k):
+    try:
+        fn(*a, **k)
+        return "未拒", None
+    except Exception as e:                                        # noqa: BLE001
+        return getattr(e, "code", e.__class__.__name__), e
+
+
+def s93_missing_identity_sha_is_refused(m):
+    """反例①: 删掉 identities.executor_sha256(仍是合法 JSON)。旧版 snapshot 正常返回,
+    因为比较写的是 `if want and have and want != have` —— 缺失那侧直接跳过。"""
+    root, path, ids, caps, led, obj = _tmp_ledger(m, "R93")
+    doc = _mutate_ledger(path, lambda d: d["identities"].pop("executor_sha256"))
+    snap_code, _ = _codes_of(obj.snapshot)
+    res_code, _ = _codes_of(obj.reserve, "apply", 1)
+    after = json.loads(path.read_text(encoding="utf-8"))
+    led.close()
+    return (snap_code == "APPROVAL_LEDGER_CORRUPT" and res_code == "APPROVAL_LEDGER_CORRUPT" and
+            "executor_sha256" not in after["identities"] and after["spent"] == doc["spent"] and
+            after["pending"] == [],
+            "snapshot=%s reserve=%s 缺字段仍在=%s spent 没被补=%s pending=%d" %
+            (snap_code, res_code, "executor_sha256" not in after["identities"],
+             after["spent"], len(after["pending"])))
+
+
+def s94_missing_spent_field_is_not_full_quota(m):
+    """反例②: 删掉整个 spent 字段。旧版 `doc.setdefault("spent", {})` 把"结构丢失"当成
+    "从未消耗", 于是重复预占又成功。现在: 缺必需字段 = 账本损坏, 不补零、不重建。"""
+    root, path, ids, caps, led, obj = _tmp_ledger(m, "R94", reserve=("apply",))
+    before = json.loads(path.read_text(encoding="utf-8"))
+    _mutate_ledger(path, lambda d: d.pop("spent"))
+    code, _ = _codes_of(obj.reserve, "apply", 1)
+    after = json.loads(path.read_text(encoding="utf-8"))
+    snap_code, _ = _codes_of(obj.snapshot)
+    led.close()
+    return (code == "APPROVAL_LEDGER_CORRUPT" and snap_code == "APPROVAL_LEDGER_CORRUPT" and
+            "spent" not in after and after["pending"] == before["pending"],
+            "再预占=%s snapshot=%s spent 被补回来了=%s 预占留痕=%d" %
+            (code, snap_code, "spent" in after, len(after["pending"])))
+
+
+def s95_illegal_counts_are_rejected(m):
+    """反例③ + 计数口径: spent.apply = -1 时旧版 `int()` 一转就当合法, 于是再预占变成 0 并
+    发出 apply#0 的凭据。现在负数/小数/字符串数字/bool 全部具名拒绝; reserve 的 n 必须是正整数。"""
+    root, path, ids, caps, led, obj = _tmp_ledger(m, "R95", reserve=("apply",))
+    _mutate_ledger(path, lambda d: d["spent"].__setitem__("apply", -1))
+    code, _ = _codes_of(obj.reserve, "apply", 1)
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    bad_n = {}
+    for tag, n in (("0", 0), ("-1", -1), ("True", True), ("'1'", "1"), ("1.5", 1.5),
+                   ("None", None)):
+        bad_n[tag] = _codes_of(obj.reserve, "port_open", n)[0]
+    init_bad = {}
+    for tag, c in (("bool cap", {"apply": True}), ("负 cap", {"apply": -2}),
+                   ("字符串 cap", {"apply": "3"}), ("小数 cap", {"apply": 1.0})):
+        r2 = out_dir("r95-init")
+        init_bad[tag] = _codes_of(m.approval_init, r2, "R95-%s" % tag, ids, c)[0]
+    led.close()
+    return (code == "APPROVAL_LEDGER_CORRUPT" and doc["spent"]["apply"] == -1 and
+            all(v == "APPROVAL_RESERVE_N_INVALID" for v in bad_n.values()) and
+            all(v == "APPROVAL_CAPS_INVALID" for v in init_bad.values()),
+            "spent=-1 再预占=%s 账本仍是 %s; n 非法=%s; init cap 非法=%s" %
+            (code, doc["spent"]["apply"], bad_n, init_bad))
+
+
+def s96_deleted_ledger_cannot_be_rebuilt(m):
+    """反例④: 已绑定、已耗尽后**删掉账本文件**。旧版每次读盘都走自动建账分支, 于是删文件
+    等于把一次用尽的批准复活成满额; open_approval 只在最开始查了一次 exists。"""
+    root, path, ids, caps, led, obj = _tmp_ledger(m, "R96")
+    res = obj.reserve("apply", 1)
+    obj.commit(res)
+    ex, _ = _codes_of(obj.reserve, "apply", 1)              # 正控: 满额账耗尽 => 具名拒绝
+    path.unlink()
+    code_snap, _ = _codes_of(obj.snapshot)
+    code_res, _ = _codes_of(obj.reserve, "apply", 1)
+    gate_code, _ = _codes_of(m.open_approval, "stub", str(root), "R96", ids, caps, led,
+                             m.SimClock())
+    rebuilt = path.exists()
+    led.close()
+    return (ex == "APPROVAL_QUOTA_EXHAUSTED" and code_snap == "APPROVAL_LEDGER_ABSENT" and
+            code_res == "APPROVAL_LEDGER_ABSENT" and gate_code == "APPROVAL_LEDGER_ABSENT" and
+            not rebuilt,
+            "耗尽正控=%s 删后 snapshot=%s reserve=%s open_approval(stub)=%s 自建满额账=%s" %
+            (ex, code_snap, code_res, gate_code, rebuilt))
+
+
+def s97_incomplete_identity_or_cap_cannot_open_or_reuse(m):
+    """开账侧与读账侧同一口径: 三件 SHA 缺一件/形状不对根本立不起来; 事后删一个 cap 键、
+    带来一套多/少键的 caps、或删掉一个 spent 动作键, 都必须具名拒绝(旧版只比对**双方都有**的键,
+    缺的一侧直接跳过)。"""
+    root = out_dir("r97")
+    ids = full_ids(97)
+    miss = dict(ids)
+    miss.pop("image_sha256")
+    init_code, _ = _codes_of(m.approval_init, root, "R97-A", miss, {"apply": 1})
+    bad_hex = dict(ids, plan_sha256="0" * 63 + "g")
+    fmt_code, _ = _codes_of(m.approval_init, root, "R97-B", bad_hex, {"apply": 1})
+    m.approval_init(root, "R97-C", ids, {"apply": 1, "port_open": 1},
+                    note="offline r97")
+    path = m.approval_path(root, "R97-C")
+    led = m.Ledger(root / "l.jsonl", m.SimClock(), out_dir=root)
+    same_caps = m.ApprovalLedger(path, "R97-C", ids, {"apply": 1, "port_open": 1}, led,
+                                 m.SimClock())
+    less_caps = m.ApprovalLedger(path, "R97-C", ids, {"apply": 1}, led, m.SimClock())
+    more_caps = m.ApprovalLedger(path, "R97-C", ids, {"apply": 1, "port_open": 1, "save": 9},
+                                 led, m.SimClock())
+    ok_code, _ = _codes_of(same_caps.snapshot)
+    less_code, _ = _codes_of(less_caps.snapshot)
+    more_code, _ = _codes_of(more_caps.snapshot)
+    _mutate_ledger(path, lambda d: d["caps"].pop("port_open"))
+    doc_missing_cap, _ = _codes_of(same_caps.snapshot)
+    _mutate_ledger(path, lambda d: d["caps"].__setitem__("port_open", 1))
+    _mutate_ledger(path, lambda d: d["spent"].pop("port_open"))
+    doc_missing_spent, _ = _codes_of(same_caps.snapshot)
+    _mutate_ledger(path, lambda d: d["spent"].__setitem__("port_open", 0))
+    _mutate_ledger(path, lambda d: d["identities"].__setitem__("plan_sha256", "z" * 64))
+    doc_bad_sha, _ = _codes_of(same_caps.snapshot)
+    led.close()
+    return (init_code == "APPROVAL_IDENTITIES_INCOMPLETE" and
+            fmt_code == "APPROVAL_IDENTITIES_INCOMPLETE" and ok_code == "未拒" and
+            less_code == "APPROVAL_IDENTITY_MISMATCH" and
+            more_code == "APPROVAL_IDENTITY_MISMATCH" and
+            doc_missing_cap == "APPROVAL_IDENTITY_MISMATCH" and
+            doc_missing_spent == "APPROVAL_LEDGER_CORRUPT" and
+            doc_bad_sha == "APPROVAL_LEDGER_CORRUPT",
+            "缺SHA开账=%s 非16进制=%s 完整正控=%s caps少键=%s caps多键=%s 账本缺cap=%s "
+            "账本缺spent键=%s 账本SHA畸形=%s" %
+            (init_code, fmt_code, ok_code, less_code, more_code, doc_missing_cap,
+             doc_missing_spent, doc_bad_sha))
+
+
+def s98_two_inits_cannot_both_open_the_same_approval(m):
+    """双 init 竞争: 旧版是 exists 检查 + os.replace, 两次 init 都会"成功", 第二次把已消费的账
+    覆回满额(等于退款)。现在同一把锁 + O_CREAT|O_EXCL: 只有一份账、只有一个赢。"""
+    import threading
+    root = out_dir("r98")
+    ids, caps = full_ids(98), {"apply": 1}
+    res = []
+    barrier = threading.Barrier(3)
+
+    def who():
+        barrier.wait()
+        try:
+            m.approval_init(root, "R98", ids, caps, note="offline r98")
+            res.append("init")
+        except m.Stop as e:
+            res.append(e.code)
+
+    ts = [threading.Thread(target=who) for _ in range(2)]
+    for t in ts:
+        t.start()
+    barrier.wait()
+    for t in ts:
+        t.join(10)
+    docs = sorted(p.name for p in root.glob("approval_R98*.json"))
+    doc = json.loads(m.approval_path(root, "R98").read_text(encoding="utf-8"))
+    led = m.Ledger(root / "l.jsonl", m.SimClock(), out_dir=root)
+    obj = m.ApprovalLedger(m.approval_path(root, "R98"), "R98", ids, caps, led, m.SimClock())
+    obj.reserve("apply", 1)
+    reinit = _codes_of(m.approval_init, root, "R98", ids, caps)[0]
+    after = json.loads(m.approval_path(root, "R98").read_text(encoding="utf-8"))
+    led.close()
+    return (res.count("init") == 1 and res.count("APPROVAL_LEDGER_ALREADY_EXISTS") == 1 and
+            len(docs) == 1 and doc["spent"] == {"apply": 0} and doc["pending"] == [] and
+            reinit == "APPROVAL_LEDGER_ALREADY_EXISTS" and after["spent"] == {"apply": 1},
+            "两次 init=%s 账本份数=%d 开账时 spent=%s 已消费后再 init=%s 消费没被覆掉=%s" %
+            (",".join(res), len(docs), doc["spent"], reinit, after["spent"] == {"apply": 1}))
+
+
+def s99_store_failure_is_not_reported_as_success(m):
+    """存盘失败如实传播: 旧 commit 忽略 `_store` 的返回值, 于是"没落成"也能打出已确认消耗。
+    现在 reserve 与 commit 都在失败时具名停止, 且 pending 留在盘上按已消耗计(不退款)。"""
+    root, path, ids, caps, led, obj = _tmp_ledger(m, "R99")
+    saved_store = m.ApprovalLedger._store
+    try:
+        m.ApprovalLedger._store = lambda self, doc: False
+        res_code, _ = _codes_of(obj.reserve, "apply", 1)
+        doc_after_fail = json.loads(path.read_text(encoding="utf-8"))
+        m.ApprovalLedger._store = saved_store
+        obj.reserve("apply", 1)                          # 正常落成一次, 留下 pending
+        doc = json.loads(path.read_text(encoding="utf-8"))
+        res = {"name": "apply", "tag": doc["pending"][0]["id"], "kind": "business"}
+        m.ApprovalLedger._store = lambda self, d: False
+        commit_code, _ = _codes_of(obj.commit, res, True)
+        still_pending = json.loads(path.read_text(encoding="utf-8"))["pending"]
+        m.ApprovalLedger._store = saved_store
+        obj.commit(res)
+    finally:
+        m.ApprovalLedger._store = saved_store
+    events = [x["kind"] for x in _ledger_events(root / "l.jsonl")]
+    led.close()
+    return (res_code == "APPROVAL_LEDGER_WRITE_FAILED" and
+            commit_code == "APPROVAL_LEDGER_WRITE_FAILED" and
+            doc_after_fail["spent"] == {"apply": 0, "port_open": 0} and
+            doc_after_fail["pending"] == [] and len(still_pending) == 1 and
+            "APPROVAL_COMMIT_FAILED" in events and events.count("APPROVAL_COMMITTED") == 1,
+            "预占存盘失败=%s(账未改=%s) 确认存盘失败=%s(pending 仍=%d) 事件=%s" %
+            (res_code, doc_after_fail["spent"], commit_code, len(still_pending),
+             ",".join(sorted(set(x for x in events if x.startswith("APPROVAL"))))))
+
+
+def s100_historical_ledger_version_is_not_migrated(m):
+    """版本门: v1(上一轮)账本结构上看着完整, 但缺 R1 的严格性 => 具名拒绝, 不当成满额新账,
+    也不悄悄迁移成"已消耗 0"。"""
+    root, path, ids, caps, led, obj = _tmp_ledger(m, "R100", reserve=("apply",))
+    _mutate_ledger(path, lambda d: d.__setitem__("version", 1))
+    code, _ = _codes_of(obj.snapshot)
+    after = json.loads(path.read_text(encoding="utf-8"))
+    led.close()
+    return (code == "APPROVAL_LEDGER_VERSION" and after["version"] == 1 and
+            after["spent"] == {"apply": 1, "port_open": 0},
+            "v1 账本=%s 未被改写(version=%s spent=%s)" %
+            (code, after["version"], after["spent"]))
+
+
+# ----------------------------------------------------------------- R6A R2: 步骤绑定批准 / 额度映射
+R2_QUOTA = {"port_open": 1, "motor_run": 1, "tmc_config_apply": 0, "irq_polarity_prep": 1,
+            "retry": 0, "cleanup_motor_stop": 1, "cleanup_motor_disarm": 1,
+            "cleanup_motor_status": 1}
+
+
+def _r2_session(m, steps, tag, transport="stub", approved=None, quota=None):
+    """跑一条工装会话: 额度表就是本次要测的那份, 端口只有内存假口, 不碰设备。"""
+    fx = motion_fx({"__watch__": ROWS["commands"]["__watch__"]["healthy"], "motor_start": []})
+    caps = dict(quota or R2_QUOTA)
+    qbox = dict(caps)
+    try:
+        return m.exec_session(tag, steps, out_dir("r2-" + tag), transport, fx, "MEMORY", 30,
+                              m.SimClock(), motion_cap_seconds=5,
+                              plan={"quota": dict(caps)}, quota_box=qbox, approved=approved)
+    except m.Stop as e:                       # 开口之前就被门拒: 与审核探针同形
+        return {"status": "STOP", "code": e.code, "detail": e.detail, "results": [],
+                "cleanup_errors": [], "ledger": "", "quota_used": {}, "disarm": "NOT_ARMED"}
+
+
+def s101_real_session_without_approved_package_sends_nothing(m):
+    """复审 §4 的反例入口: 真实传输 + 任意单会话步骤。旧版会**照发** tmc_config_apply
+    (cap=0 也只扣 port_open); 现在开口与第一条 write 都不会发生。"""
+    opened = []
+    saved = m.make_real_port
+    m.make_real_port = lambda name, led: (opened.append(name),
+                                          m.FakePort([], led, clock=m.SimClock()))[1]
+    try:
+        r = _r2_session(m, [{"cmd": "tmc_config_apply CONFIRM", "as": "apply",
+                             "expect_contains": ["[TMC-CFG] CONFIGURED"]}],
+                        "s101", transport="real")
+    finally:
+        m.make_real_port = saved
+    return (r["code"] == "REAL_SESSION_REQUIRES_APPROVED_PACKAGE" and opened == [] and
+            r["quota_used"] == {} and not r.get("ledger"),
+            "code=%s 开口=%d 额度=%s 会话台账=%s(拒绝发生在建会话之前)" %
+            (r["code"], len(opened), r["quota_used"], r.get("ledger") or "-"))
+
+
+def s102_cli_single_session_real_is_refused(m):
+    """CLI 装配层同一条门: --transport real 只有 --dispatch 一条路, 单会话 --steps rc=4 且不产出。"""
+    import io
+    import contextlib
+    d = out_dir("r2-cli")
+    sf = Path(d) / "steps.json"
+    sf.write_text(json.dumps([{"cmd": "tmc_config_apply CONFIRM", "as": "apply",
+                               "quota": {"name": "tmc_config_apply", "n": 1}}]), encoding="utf-8")
+    buf_out, buf_err = io.StringIO(), io.StringIO()
+    argv = ["--transport", "real", "--backend", "real", "--session", "S", "--steps", str(sf),
+            "--out", str(d / "run"), "--approval-token", "T", "--expected-token", "T",
+            "--approval-id", "R2-CLI"]
+    with contextlib.redirect_stdout(buf_out), contextlib.redirect_stderr(buf_err):
+        rc = m.main(argv)
+    err = buf_err.getvalue()
+    ran = (d / "run").exists()
+    # stub 侧是同一条 CLI 的另一半: 夹具入口必须**照常可跑**(它不碰设备), 不能被真实门一起关掉。
+    fxf = Path(d) / "fx.json"
+    fxf.write_text(json.dumps({"boot_bytes": [], "responses": {
+        "tmc_config_apply CONFIRM": ["[TMC-CFG] CONFIGURED"]}}), encoding="utf-8")
+    qf = Path(d) / "plan.json"
+    qf.write_text(json.dumps({"quota": {"port_open": 1, "tmc_config_apply": 1,
+                                        "cleanup_motor_stop": 1, "cleanup_motor_disarm": 1,
+                                        "cleanup_motor_status": 1}}), encoding="utf-8")
+    se = io.StringIO()
+    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(se):
+        stub_rc = m.main(["--transport", "stub", "--backend", "sim", "--session", "S",
+                          "--steps", str(sf), "--out", str(d / "stub"), "--fixture", str(fxf),
+                          "--plan", str(qf)])
+    stub_err = se.getvalue()          # **单独**一个缓冲区: 否则上面那条真实拒绝的文本会混进来
+    stub_tx = [x["bytes"].strip() for x in
+               _ledger_events(d / "stub" / "S" / "ledger.jsonl") if x["kind"] == "TX"]
+    return (rc == 4 and "single_session_steps_not_approved_package" in err and not ran and
+            "tmc_config_apply CONFIRM" in stub_tx and
+            "single_session_steps_not_approved_package" not in stub_err,
+            "real rc=%d msg=%s 有输出目录=%s | stub rc=%d 发过=%s(工装入口仍在)" %
+            (rc, err.strip().splitlines()[-1][:60] if err.strip() else "-", ran, stub_rc,
+             ",".join(stub_tx)))
+
+
+def s103_steps_changed_but_plan_bytes_unchanged(m):
+    """批准件不动、递进来的步骤多一条 apply => STEPS_NOT_BOUND_TO_APPROVAL, 在开口之前。"""
+    steps = [{"cmd": "motor_start", "as": "start", "seconds": 1, "expect_absent": ["REFUSED"]}]
+    approved = fx_approved(m, steps, sid="S103", tag="bound")
+    opened = []
+    saved = m.make_real_port
+    m.make_real_port = lambda name, led: (opened.append(name),
+                                          m.FakePort([], led, clock=m.SimClock()))[1]
+    try:
+        good = m.exec_session("S103-ok", stamp(m, steps), out_dir("r2-s103-ok"), "real",
+                              motion_fx({"motor_start": []}), "MEMORY", 30, m.SimClock(),
+                              motion_cap_seconds=5,
+                              plan={"quota": dict(R2_QUOTA)}, quota_box=dict(R2_QUOTA),
+                              approved=approved)
+        tampered = steps + [{"cmd": "tmc_config_apply CONFIRM", "as": "extra"}]
+        n_before = len(opened)
+        bad = _r2_session(m, stamp(m, tampered), "s103", transport="real", approved=approved)
+    finally:
+        m.make_real_port = saved
+    ev_good = [e["kind"] for e in _ledger_events(good["ledger"])] if good.get("ledger") else []
+    return ("APPROVED_PACKAGE_VERIFIED" in ev_good and
+            bad["code"] == "STEPS_NOT_BOUND_TO_APPROVAL" and len(opened) == n_before and
+            bad["quota_used"] == {},
+            "正控事件=%s 篡改=%s 篡改后开口=%d 额度=%s" %
+            ("VERIFIED" if "APPROVED_PACKAGE_VERIFIED" in ev_good else ",".join(ev_good[:3]),
+             bad["code"], len(opened) - n_before, bad["quota_used"]))
+
+
+def s104_plan_file_edited_after_approval(m):
+    """绑定之后有人改了 --plan 文件 => PLAN_BYTES_CHANGED_AFTER_APPROVAL(不是"跟着新字节走")。"""
+    steps = [{"cmd": "motor_status", "as": "q"}]
+    approved = fx_approved(m, steps, sid="S104", tag="drift")
+    p = Path(approved["plan_path"])
+    doc = json.loads(p.read_text(encoding="utf-8"))
+    doc["stages"][0]["steps"].append({"cmd": "config_save", "as": "extra",
+                                       "quota": {"name": "config_save", "n": 1}})
+    p.write_text(json.dumps(doc, ensure_ascii=False), encoding="utf-8")
+    r = _r2_session(m, steps, "s104", transport="real", approved=approved)
+    return (r["code"] == "PLAN_BYTES_CHANGED_AFTER_APPROVAL" and
+            m.sha_of(p) != approved["plan_sha256"],
+            "code=%s 盘上=%s… 批准=%s…" % (r["code"], m.sha_of(p)[:12],
+                                          approved["plan_sha256"][:12]))
+
+
+def s105_quota_map_refuses_before_send(m):
+    """缺声明 / 错键 / n 不符 三种都在那条 write **之前**具名拒绝, 且额度一分没动。"""
+    cases = {}
+    for tag, st in (("缺声明", {"cmd": "tmc_config_apply CONFIRM", "as": "a"}),
+                    ("错键", {"cmd": "tmc_config_apply CONFIRM", "as": "a",
+                              "quota": {"name": "irq_polarity_prep", "n": 1}}),
+                    ("n不符", {"cmd": "tmc_config_apply CONFIRM", "as": "a",
+                               "quota": {"name": "tmc_config_apply", "n": 2}}),
+                    ("n=0", {"cmd": "config_save", "as": "s",
+                             "quota": {"name": "config_save", "n": 0}}),
+                    ("n负数-未映射", {"cmd": "motor_status", "as": "q",
+                                      "quota": {"name": "port_open", "n": -1}})):
+        r = _r2_session(m, [st], tag, quota={"port_open": 1, "tmc_config_apply": 5,
+                                             "config_save": 5, "irq_polarity_prep": 5,
+                                             "cleanup_motor_stop": 1, "cleanup_motor_disarm": 1,
+                                             "cleanup_motor_status": 1})
+        cases[tag] = (r["code"], ",".join(tx_seq(r)) if r.get("ledger") else "-",
+                      r["quota_used"])
+    return (cases["缺声明"][0] == "QUOTA_STEP_UNDECLARED" and
+            cases["错键"][0] == "QUOTA_KEY_MISMATCH" and
+            cases["n不符"][0] == "QUOTA_N_MISMATCH" and
+            cases["n=0"][0] == "QUOTA_N_MISMATCH" and
+            cases["n负数-未映射"][0] == "QUOTA_N_INVALID" and
+            all("tmc_config_apply CONFIRM" not in c[1] and "config_save" not in c[1]
+                for c in cases.values()) and
+            all(c[2] in ({}, {"port_open": 1}) for c in cases.values()),
+            "; ".join("%s=%s tx=[%s] 额度=%s" % (k, v[0], v[1], v[2]) for k, v in cases.items()))
+
+
+def s106_readonly_polling_is_not_charged_as_apply(m):
+    """只读查询与有限轮询**不**进映射表: 不许把 motor_status 的重试扣成 apply 额度。"""
+    steps = [{"cmd": "motor_start", "as": "start", "seconds": 1, "expect_absent": ["REFUSED"]},
+             {"cmd": "motor_status", "as": "run", "poll": {"codes": ["PROFILE_NOT_RUNNING"],
+                                                            "expect_values": {}}},
+             {"cmd": "diag_status", "as": "d"}]
+    r = _r2_session(m, stamp(m, steps), "s106",
+                    quota={"port_open": 1, "motor_run": 1, "retry": 0, "tmc_config_apply": 0,
+                           "cleanup_motor_stop": 1, "cleanup_motor_disarm": 1,
+                           "cleanup_motor_status": 1})
+    tx = tx_seq(r)
+    return (r["code"] not in ("QUOTA_STEP_UNDECLARED", "QUOTA_KEY_MISMATCH", "QUOTA_UNDECLINED")
+            and "motor_status" in tx and "diag_status" in tx and
+            r["quota_used"].get("motor_run") == 1 and
+            "tmc_config_apply" not in r["quota_used"] and "retry" not in r["quota_used"],
+            "code=%s tx=%s 额度=%s" % (r.get("code"), ",".join(tx), r["quota_used"]))
+
+
+def s107_negative_quota_map_removed(m):
+    """元负控: 摘掉命令->额度键映射(恒返回 None), 复审 §4 的反例就必须**放行**那条 apply ——
+    否则 s105 的拒绝其实来自别的判据, 这条控制拦不住回退。"""
+    saved = m.quota_key_for_command
+    m.quota_key_for_command = lambda cmd: None
+    try:
+        r = _r2_session(m, [{"cmd": "tmc_config_apply CONFIRM", "as": "a"}], "s107",
+                       quota={"port_open": 1, "tmc_config_apply": 5, "cleanup_motor_stop": 1,
+                              "cleanup_motor_disarm": 1, "cleanup_motor_status": 1})
+    finally:
+        m.quota_key_for_command = saved
+    tx = tx_seq(r)
+    return ("tmc_config_apply CONFIRM" in tx and r.get("code") != "QUOTA_STEP_UNDECLARED",
+            "摘表后 tx=%s code=%s(应为已发出)" % (",".join(tx), r.get("code")))
+
+
+def s108_declared_zero_cap_apply_cannot_be_bypassed(m):
+    """复审 §4 的探针形状: cap(tmc_config_apply)=0 且步骤带正确申报 => 在 write 之前拒,
+    端口一次没开(额度先于开口已经扣了 port_open 那一格, 这正是既有纪律)。"""
+    r = _r2_session(m, [{"cmd": "tmc_config_apply CONFIRM", "as": "a",
+                         "quota": {"name": "tmc_config_apply", "n": 1}}], "s108")
+    tx = tx_seq(r)
+    return (r["code"] == "QUOTA_EXHAUSTED" and "tmc_config_apply CONFIRM" not in tx and
+            r["disarm"] in ("CONFIRMED_DISABLED", "NOT_ARMED"),
+            "code=%s tx=%s disarm=%s 额度=%s" % (r["code"], ",".join(tx), r["disarm"],
+                                                 r["quota_used"]))
+
+
+# ------------------------------------------------- R6A R3: 清理/观察窗/排空残留的字节完整性
+R3_QUOTA = {"port_open": 1, "motor_run": 1, "retry": 0,
+            "cleanup_motor_stop": 1, "cleanup_motor_disarm": 1, "cleanup_motor_status": 1}
+
+
+def _r3_run(m, status_rows, tag="s109", watch_rows=None):
+    """业务起转 -> 清理三发, 清理回包按传入的 rows 注入(其余沿用交付的撤能块)。"""
+    extra = {"motor_start": [], "__watch__": ROWS["commands"]["__watch__"]["healthy"],
+             "motor_status": status_rows}
+    if watch_rows is not None:
+        extra["__watch__"] = watch_rows
+    fx = motion_fx(extra)
+    steps = [{"cmd": "motor_start", "as": "start", "seconds": 1, "expect_absent": ["REFUSED"]}]
+    if watch_rows is not None:
+        steps.append({"cmd": "__watch__", "as": "w", "seconds": 1})
+    r = m.exec_session(tag, stamp(m, steps), out_dir("r3-" + tag), "stub", fx, "NO_DEVICE", 30,
+                       m.SimClock(), motion_cap_seconds=5,
+                       plan={"quota": dict(R3_QUOTA)}, quota_box=dict(R3_QUOTA))
+    return r
+
+
+def _surrogate_feed(m):
+    """只让**注入器**能写非法 UTF-8 字节(生产判读路径一行没动): 代理码点按 surrogateescape 编码。"""
+    def hook_of(port, fixture):
+        def hook(cmd):
+            resp = fixture.get("responses", {}).get(cmd)
+            if resp is not None:
+                port.feed(("\r\n".join(resp) + "\r\nmsh >").encode("utf-8", "surrogateescape"))
+        return hook
+    return hook_of
+
+
+def s109_cleanup_status_nul_is_not_proven_disable(m):
+    """复审 §5 的反例: 清理用的 motor_status 回包里多一条独立裸 NUL。旧版 split_rows 只严格解码
+    UTF-8(裸 NUL 合法) => 仍判 CONFIRMED_DISABLED/success=True。现在: 原字节保留、记独立证据错误、
+    必要撤能照发、禁能一律 UNKNOWN、整场不成功。"""
+    r = _r3_run(m, DISARM_ROWS + ["\x00"])
+    raw = (Path(r["dir"]) / "cleanup_motor_status.bin").read_bytes()
+    tx = tx_seq(r)
+    return (raw.count(b"\x00") == 1 and r["disarm"] == "UNKNOWN" and r["success"] is False and
+            any("NUL_BYTE_IN_RESPONSE" in e for e in r["cleanup_errors"]) and
+            all(c in tx for c in ("motor_stop", "motor_disarm", "motor_status")),
+            "NUL数=%d disarm=%s success=%s 清理错=%s tx=%s" %
+            (raw.count(b"\x00"), r["disarm"], r["success"],
+             ";".join(r["cleanup_errors"]), ",".join(tx)))
+
+
+def s110_cleanup_illegal_bytes_named_and_disable_unknown(m):
+    """清理回包里的非法 UTF-8: 具名 ILLEGAL_BYTES_IN_RESPONSE(不是被 replace 掉后继续证明),
+    原字节仍逐字节留在证据文件里。"""
+    saved = m._stub_feed
+    m._stub_feed = _surrogate_feed(m)
+    try:
+        r = _r3_run(m, DISARM_ROWS + ["\udcf8"])
+    finally:
+        m._stub_feed = saved
+    raw = (Path(r["dir"]) / "cleanup_motor_status.bin").read_bytes()
+    return (b"\xf8" in raw and r["disarm"] == "UNKNOWN" and r["success"] is False and
+            any("ILLEGAL_BYTES" in e for e in r["cleanup_errors"]),
+            "原字节含 0xf8=%s disarm=%s success=%s 清理错=%s" %
+            (b"\xf8" in raw, r["disarm"], r["success"], ";".join(r["cleanup_errors"])))
+
+
+def s111_cleanup_danger_beats_illegal_and_bytes_kept(m):
+    """同一份清理回包里既有 HardFault 又有非法字节: 记录的是**危险事实**(§5 要的优先级),
+    且非法字节不许把它降成"可继续的正常结果"。"""
+    saved = m._stub_feed
+    m._stub_feed = _surrogate_feed(m)
+    try:
+        r = _r3_run(m, DISARM_ROWS + ["\udcf8", "HardFault at 0x00bd80b0"])
+    finally:
+        m._stub_feed = saved
+    raw = (Path(r["dir"]) / "cleanup_motor_status.bin").read_bytes()
+    errs = [e for e in r["cleanup_errors"] if "motor_status" in e]
+    return (b"\xf8" in raw and b"HardFault" in raw and
+            errs and errs[0].endswith("DANGER_TEXT_IN_STREAM") and
+            r["disarm"] == "UNKNOWN" and r["success"] is False,
+            "errs=%s disarm=%s success=%s 原字节含危险=%s 含非法=%s" %
+            (";".join(errs), r["disarm"], r["success"], b"HardFault" in raw, b"\xf8" in raw))
+
+
+def s112_watch_window_corruption_not_swallowed(m):
+    """观察窗(被动流)里的裸 NUL 不再被吞成正常 NO_TRIGGER: 会话以具名 STOP 结束。"""
+    r = _r3_run(m, DISARM_ROWS, tag="s112",
+                watch_rows=ROWS["commands"]["__watch__"]["healthy"] + ["\x00"])
+    raw = Path(r["dir"]) / "02_w.rx.bin"
+    return (r["status"] == "STOP" and r["code"] == "NUL_BYTE_IN_RESPONSE" and
+            raw.read_bytes().count(b"\x00") == 1 and r["success"] is False,
+            "code=%s 窗内NUL=%d success=%s" % (r.get("code"),
+                                              raw.read_bytes().count(b"\x00") if raw.exists()
+                                              else -1, r["success"]))
+
+
+def s113_pre_drained_bytes_keep_danger_gate(m):
+    """发送前排走的残留被另存成 .pre.rx.bin, 但**不能因此过了危险门**: 先存证, 再在下一条
+    业务 write 之前停 —— 这一刻端口一次写都没有。"""
+    steps = [{"cmd": "motor_status", "as": "q"}]
+    writes = []
+    saved = m.make_real_port
+
+    class PreLoaded(m.FakePort):
+        def write(self, data):
+            writes.append(data.decode("ascii").strip())
+            return m.FakePort.write(self, data)
+
+    m.make_real_port = lambda name, led: PreLoaded([b"HardFault\r\n"], led, clock=m.SimClock())
+    try:
+        try:
+            r = m.exec_session("s113", stamp(m, steps), out_dir("r3-s113"), "real", {},
+                               "MEMORY", 30, m.SimClock(),
+                               plan={"quota": dict(BASE_QUOTA)}, approved=fx_approved(m, steps,
+                                                                                      sid="s113"))
+        except m.Stop as e:
+            r = {"status": "STOP", "code": e.code, "results": [], "cleanup_errors": [],
+                "ledger": "", "dir": ""}
+    finally:
+        m.make_real_port = saved
+    pres = list(Path(r["dir"]).glob("*.pre.rx.bin")) if r.get("dir") else []
+    kept = bool(pres) and b"HardFault" in pres[0].read_bytes()
+    return (r["code"] == "DANGER_TEXT_IN_STREAM" and writes == [] and kept,
+            "code=%s 业务写=%s 残留存证=%s" % (r["code"], writes, kept))
+
+
+def s114_negative_split_rows_entry_gate_removed(m):
+    """元负控: 摘掉集中式的原始字节门(guard_stream_bytes + guard_partial_bytes, 普通响应/清理/
+    观察窗/排空四条入口共用它), §5 的清理 NUL 反例就必须**重新变成** CONFIRMED_DISABLED 且整场
+    成功 —— 否则那条 UNKNOWN 其实来自别的判据, 这次修的正控没有区分力。"""
+    saved, saved2 = m.guard_stream_bytes, m.guard_partial_bytes
+    m.guard_stream_bytes = lambda raw, *a, **k: raw
+    m.guard_partial_bytes = lambda raw, *a, **k: raw
+    try:
+        r = _r3_run(m, DISARM_ROWS + ["\x00"], tag="s114")
+    finally:
+        m.guard_stream_bytes, m.guard_partial_bytes = saved, saved2
+    return (r["disarm"] == "CONFIRMED_DISABLED" and r["success"] is True and
+            not r["cleanup_errors"],
+            "摘门后 disarm=%s success=%s 清理错=%s(应为正常, 说明判据在门上)" %
+            (r["disarm"], r["success"], ";".join(r["cleanup_errors"]) or "-"))
 
 
 CASES = [
@@ -2244,6 +2902,28 @@ CASES = [
     ("FS90", "额度耗尽仍执行撤能并留痕", s90_business_exhausted_but_disarm_still_runs),
     ("FS91", "反向-摘掉账本绑定门", s91_negative_ledger_gate_removed),
     ("FS92", "反向-摘掉账本 cap 判定", s92_negative_cap_check_removed),
+    ("FS93", "缺身份SHA即拒不真值跳过", s93_missing_identity_sha_is_refused),
+    ("FS94", "缺spent字段不当成满额", s94_missing_spent_field_is_not_full_quota),
+    ("FS95", "非法计数与非法n全部具名拒", s95_illegal_counts_are_rejected),
+    ("FS96", "绑定后删账不重建满额", s96_deleted_ledger_cannot_be_rebuilt),
+    ("FS97", "缺SHA/缺cap开不出也用不了", s97_incomplete_identity_or_cap_cannot_open_or_reuse),
+    ("FS98", "双init竞争只有一份账不退款", s98_two_inits_cannot_both_open_the_same_approval),
+    ("FS99", "存盘失败不谎称已落成", s99_store_failure_is_not_reported_as_success),
+    ("FS100", "历史版本账具名拒绝不迁移", s100_historical_ledger_version_is_not_migrated),
+    ("FS101", "真实单会话无批准件一条不发", s101_real_session_without_approved_package_sends_nothing),
+    ("FS102", "CLI真实单会话入口被拒rc4", s102_cli_single_session_real_is_refused),
+    ("FS103", "改步骤不改计划字节被拒绝", s103_steps_changed_but_plan_bytes_unchanged),
+    ("FS104", "绑定后计划文件漂移拒发", s104_plan_file_edited_after_approval),
+    ("FS105", "缺声明错键n不符写前拒", s105_quota_map_refuses_before_send),
+    ("FS106", "只读轮询不计成apply额度", s106_readonly_polling_is_not_charged_as_apply),
+    ("FS107", "反向-摘掉命令额度映射表", s107_negative_quota_map_removed),
+    ("FS108", "cap为0的apply申报也拒发", s108_declared_zero_cap_apply_cannot_be_bypassed),
+    ("FS109", "清理status裸NUL不证禁能", s109_cleanup_status_nul_is_not_proven_disable),
+    ("FS110", "清理非法字节具名且UNKNOWN", s110_cleanup_illegal_bytes_named_and_disable_unknown),
+    ("FS111", "清理危险优先且原字节保留", s111_cleanup_danger_beats_illegal_and_bytes_kept),
+    ("FS112", "观察窗损坏不被吞成未触发", s112_watch_window_corruption_not_swallowed),
+    ("FS113", "排空残留过危险门后才写", s113_pre_drained_bytes_keep_danger_gate),
+    ("FS114", "反向-摘掉split_rows入口门", s114_negative_split_rows_entry_gate_removed),
 ]
 
 

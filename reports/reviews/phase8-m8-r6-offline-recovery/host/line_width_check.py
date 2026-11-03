@@ -38,6 +38,13 @@ FIXED = [
     ("tmc2209.c", "旧成功不刷新健康", []),
     ("safety_thread.c", "[SAFETY] LIMIT inputs config", ["DISABLED_BY_CONFIG"]),
     ("safety_thread.c", "[SAFETY] LIMIT OFF", []),
+    # R6A §6 补: 上一版这张表只有 tmc2209/safety_thread, 所以 R6 新增在 motor.c 的那条
+    # 错误路径打印根本没被这条 PASS 约束过。现在把它自己拆出来的三条 + R6 的另一条新站点列进来。
+    ("motor.c", "关闭落位**未提交**", []),
+    ("motor.c", "关闭已落位, 但**未授予恢复资格**: 本代禁能侧证据不足", []),
+    ("motor.c", "[MOT]  回读许可=%s 已确认电平=%u@%u", []),
+    ("motor.c", "[MOT]  抑制=%s 停机锁存=%s", []),
+    ("motor.c", "=> Safety 保持原状态", []),
 ]
 # 修前的原件(从现场字节直接量得), 必须被同一把尺判红 —— 元负控的靶子
 KNOWN_TOO_LONG = [
@@ -50,7 +57,63 @@ KNOWN_TOO_LONG = [
     ("修前 LIMIT 一行",
      "[SAFETY] LIMIT inputs config = DISABLED_BY_CONFIG (SAFETY_LIMIT_INPUTS_ENABLED;"
      " OFF => PF.14/PF.15 不解析/不配置/不读/不注册, 也不参与就绪判定)", 250),
+    # R6A §6 的靶子: 这一条是 **R6 自己新增**的错误路径打印, 不在上面两条的历史豁免里。
+    ("R6 新增的 withheld 一行(修前)",
+     "[MOT] 关闭已落位, 但**未授予恢复资格**: 本代禁能侧回读/抑制/锁存证据不足"
+     " (epoch=%u permit=%s level=%u@%u inhibit=%s latched=%s)"
+     " - Safety 保持原状态, 需 fault_reset 人工复核\\n", 237),
 ]
+
+# R6A §6: 只靠手维护的 FIXED 表会漏(上一轮的 PASS 恰恰没约束新增站点)。
+# 这一档从 **git diff 的新增行**里取出本轮真正改动过的 rt_kprintf 站点逐条量, 表漏了也判红。
+# 默认基准 = R6 任务书的基线提交(本轮所有产品改动的起点), 可用 --since 覆盖。
+DEFAULT_SINCE = "535459f84724cdb755af00ee4dea4b3f42c93d45"
+KPFMT = re.compile(r"rt_kprintf\(\s*((?:\"(?:[^\"\\]|\\.)*\"\s*)+)")
+LITSTR = re.compile(r"\"((?:[^\"\\]|\\.)*)\"")
+HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
+
+
+def added_ranges(base, rel_files):
+    """`git diff -U0 base -- <文件>` 的新增行区间(新文件行号)。"""
+    import subprocess
+    out = subprocess.run(["git", "diff", "-U0", base, "--"] + rel_files,
+                         cwd=os.getcwd(), capture_output=True)
+    if out.returncode != 0:
+        raise SystemExit("GIT_DIFF_FAILED:%s" % out.stderr.decode("utf-8", "replace")[:120])
+    ranges, cur = [], None
+    for raw in out.stdout.decode("utf-8", "replace").splitlines():
+        if raw.startswith("+++ b/"):
+            cur = raw[6:]
+            continue
+        m = HUNK.match(raw)
+        if m and cur in rel_files:
+            start, count = int(m.group(1)), int(m.group(2) or 1)
+            ranges.append((cur, start, start + max(count, 1)))
+    return ranges
+
+
+def changed_sites(base):
+    """本轮 diff 里**新增/改动过**的 rt_kprintf 站点: (文件, 行号, 最坏字节, 格式串)。"""
+    rel = ["%s/%s" % (APP.replace(os.sep, "/"), fn) for fn in sorted(os.listdir(APP))
+           if fn.endswith(".c")]
+    hits = []
+    for fn in sorted(os.listdir(APP)):
+        if not fn.endswith(".c"):
+            continue
+        relpath = "%s/%s" % (APP.replace(os.sep, "/"), fn)
+        rows = [r for r in added_ranges(base, rel) if r[0] == relpath]
+        if not rows:
+            continue
+        text = io.open(os.path.join(APP, fn), encoding="utf-8").read()
+        for m in KPFMT.finditer(text):
+            line = text[:m.start()].count("\n") + 1
+            if not any(a <= line < b for _, a, b in rows):
+                continue
+            fmt = "".join(LITSTR.findall(m.group(1)))
+            n, _s = worst(fmt)
+            hits.append((fn, line, n, fmt))
+    return hits
+
 
 
 def worst(fmt, str_tokens=()):
@@ -109,12 +172,15 @@ def scan_sources():
 
 def main():
     selfcheck = "--selfcheck" in sys.argv[1:]
+    base = DEFAULT_SINCE
+    if "--since" in sys.argv[1:]:
+        base = sys.argv[1:][sys.argv[1:].index("--since") + 1]
     bad = []
-    print("LINE_WIDTH mode=离线界限依据 limit=%dB (控制台裁剪线 127B)" % LIMIT)
+    print("LINE_WIDTH mode=离线界限依据 limit=%dB (控制台裁剪线 127B) base=%s" % (LIMIT, base[:9]))
     for label, fmt, measured in KNOWN_TOO_LONG:
         n, _s = worst(fmt)
         hit = n > LIMIT
-        print("%s|known-too-long|%s|worst=%dB|现场量得=%dB|%s" %
+        print("%s|known-too-long|%s|worst=%dB|复审/现场量得=%dB|%s" %
               ("SELFCHECK" if selfcheck else "META", label, n, measured,
                "fired" if hit else "NOT-DETECTED"))
         if selfcheck and not hit:
@@ -138,6 +204,20 @@ def main():
                                     fn, got[0], n, sample[:46]))
         if not ok:
             bad.append("%s:%d=%dB" % (fn, got[0], n))
+    # ---- R6A §6: 本轮新增/改动过的站点逐个量(不依赖手维护的 FIXED 表) ----
+    sites = changed_sites(base)
+    print("CHANGED_SITES|base=%s|本轮 diff 命中的 rt_kprintf 站点=%d" % (base[:9], len(sites)))
+    for fn, line, n, fmt in sites:
+        ok = n <= LIMIT
+        print("CHANGE|%s:%d|%d B|%s" % (fn, line, n, fmt[:44].replace("\n", " ")))
+        if not ok:
+            bad.append("%s:%d=%dB(本轮新增/改动站点)" % (fn, line, n))
+    if not sites:
+        # 空扫描不算通过: 上一轮的 PASS 正是因为这条约束不存在才漏了 motor.c 的新站点。
+        print("CHANGE_SCAN_META|FAIL|命中 0 个站点 => 基准/路径不对, 这条判据没有在管任何事")
+        bad.append("changed-sites 扫描空转(0 命中)")
+    else:
+        print("CHANGE_SCAN_META|fired|命中 %d 个站点并逐条判宽" % len(sites))
     if not selfcheck:
         over = scan_sources()
         print("REPO_SCAN|applications 下字面下界 >%dB 的 rt_kprintf 站点=%d" % (LIMIT, len(over)))
