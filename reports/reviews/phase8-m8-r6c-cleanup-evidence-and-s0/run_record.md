@@ -151,3 +151,51 @@ r5c/r6/r6a/r6b 计划、26 场现场原件与台账、镜像归档件、具名�
 `product_field_fix=NOT_VERIFIED`、真实串口时序与新镜像上板仍未验；
 阈值/ACTIVE 覆盖/REL_IMPACT/`load_means`(NOT_PROVIDED)/idle1024 带载最坏栈余量/
 现场精确线程交错/`0x00bd80b0` 写入者的旧裁定保持；四项装配前提仍 PROVIDED，未重问。
+
+## 19.11 推送与本轮范围的独立远端回读
+
+```text
+推送区间  origin/feature/m8-sg-adc-relative-protection  6435328 之后追加
+          c0f361db5cc02fd087f6f3b404254151411d4a4a(软件输入) + 6e120199a317a55e1ddd83e66ce2137b898c45b5(证据)
+回读对象  证据头 6e120199a317…(远端 ls-remote 同头), 输入只有 git fetch + git cat-file
+脚本      host/remote_readback_r6c.py
+结果      R6C_REMOTE_READBACK_SUMMARY|tip=6e120199a317|checks=35|fails=0|not_checked=0
+          device_actions=0|serial_ports_opened=0|dap_connections=0|keil_builds=0|reads_from=remote_git_protocol_only
+原文      remote_readback_at_6e12019.txt(5399 B, CR=0)
+```
+
+覆盖: 四份清单逐条对远端 blob(r6c 13 / r3 5137 / r4 394 / r6b 16, mismatch=0)、候选模板内部申报的
+执行器/在板镜像三件/派生源(R6B 计划)/R6A 候选 bin/`rebuilt_this_round=false`/`authorized=0`、
+交接 JSON 里**每个带 path+sha256 的条目**逐个重算 + 顶层不自证字节 + 设备动作 0、
+七件冻结旧件(R5C/R6/R6A/R6B 计划 + 5ae/d70/dab 三个 BIN)、**基线头 6435328 上的执行器
+`84df1306…/215704 B`**(按 SHA 定点 fetch 后现算 —— 正是 §19.2 修前那一栏的输入字节)、
+`motor.c`/`supervisor.c` 在 tip 与基线的 blob 逐字节相同(产品 C 未改)、
+软件输入提交里的 EXEC/自检 == 模板与交接登记、"证据提交没有偷改执行器"。
+
+一处口径提醒(防误读): 附录 B 的探针名仍是 `s0_record_uses_disk_instead_of_execution_snapshot`,
+修后这条路**在 S0 就被具名拒绝**, 所以没有 `S0_FACTS` 事件可记 —— JSON 里 `s0_records_execution_snapshot=false`
+在修后表示"没有那条记录"(rc=1、`memory_backend_calls=0`、stdout 里 `S0_PLAN_DISK_DRIFT` 且 detail 同时给出
+execution=P/disk=Q), **不是**"仍在记磁盘那份"。修后的正控在 FS125(文件未变 => 三者同值)。
+
+全仓通用回读(`phase8-m8-relative-protection-r3/host/remote_readback.py`)与上一轮残差口径见
+`remote_readback_generic_at_6e12019.txt`(原文入库, 数字在 §19.12 里给)。
+
+## 19.12 全仓通用回读与残差口径(同一头 6e120199a317)
+
+```text
+remote_tip=6e120199a317a55e1ddd83e66ce2137b898c45b5
+remote_files=10872  sums_manifests=22 comment_lines_skipped=50
+REMOTE_READBACK_SUMMARY|declared=6702|verified=6635|r3_entries=5149|r3_verified=5149|r3_problems=0|
+                        prior_problems=72|prior_hard=19|no_path=39|unlisted=4547
+SCOPE_R3|entries=5149 verified=5149 problems=0
+SCOPE_PRIOR|problems=72|cross_manifest_sha_conflict=3,declared_but_absent=53,duplicate_conflict=2,
+            hash_mismatch=6,suffix_ambiguous=8
+```
+
+- 与 R6B 收口那次(R6B §18.9)比: `declared 6686→6702`、`verified 6619→6635`(各 +16, 正是本轮新增登记件),
+  `unlisted 4544→4547`(+3);**`SCOPE_PRIOR problems=72` 的类别与数量与上一轮完全一致 => 本轮零新增**。
+- 那 72 条是旧轮 manifest 之间的历史口径差(`cross_manifest_sha_conflict=3` 仍是 R6 那份记它自己构建当时的
+  `motor.c` blob、R4 那份记 `rtconfig.h` 的磁盘字节;`declared_but_absent=53`/`suffix_ambiguous=8` 等旧项),
+  本轮没有新增构建件, 因此没有新的 R6C 侧冲突。这是**残差口径**, 不是本轮回归。
+- 两份原文入库: `remote_readback_at_6e12019.txt`(本轮范围 35 项)与
+  `remote_readback_generic_at_6e12019.txt`(全仓)。

@@ -1,6 +1,6 @@
 # sha256 * <仓库相对路径>(LF, 无 BOM; 本清单不哈希自身字节 —— 一条清单不能给自己的字节作证)
 # 生成方式: 对 reports/reviews/phase8-m8-r6c-cleanup-evidence-and-s0/ 下每个常规文件(排除 SHA256SUMS.txt、remote_readback.md 与 __pycache__) 直接读磁盘字节算 sha256
-# 条目数=13; 与 Git blob 的逐条复算由 host/staged_preflight_batch.py(提交前, 单批流)与推送后的远端逐 blob 回读完成
+# 条目数=16; 与 Git blob 的逐条复算由 host/staged_preflight_batch.py(提交前, 单批流)与推送后的远端逐 blob 回读完成
 # 重新生成: python reports/reviews/phase8-m8-idle-stack-r4/host/make_round_sums.py <本目录>
 77102a8bff73cc21dfa4744222ab1130b376224e91cd98711ac1a1c3dc5efffd  reports/reviews/phase8-m8-r6c-cleanup-evidence-and-s0/field/needles.json
 408c18ecaf50f62a0620c904011f0c60bea3681087875a2ada64efbae7b6de73  reports/reviews/phase8-m8-r6c-cleanup-evidence-and-s0/field/plan_core_r6c.json
@@ -12,6 +12,9 @@ cd82c48a70562efd37308c839b12a4b165ff242430be490916e5bbaefe0d402b  reports/review
 918827114bd014394ea8324ed2c8907da545a8a8fcbe42f046d9f318ce3ac8de  reports/reviews/phase8-m8-r6c-cleanup-evidence-and-s0/host/r6c_before_after.py
 bd576f94e79b12334367f467871f3491177936cbf789de174410fbcd355b2aeb  reports/reviews/phase8-m8-r6c-cleanup-evidence-and-s0/host/r6c_before_after.txt
 9e8b161c72b87dd513f26c870dcc8bf5bf74c1c0039854123ce8a8bd7b308c7b  reports/reviews/phase8-m8-r6c-cleanup-evidence-and-s0/host/remaining_probes.py
+e059916289174a4cb4d467f44779b70a0789d999b0f7be66342efd4057852ef6  reports/reviews/phase8-m8-r6c-cleanup-evidence-and-s0/host/remote_readback_r6c.py
 95b0cb13d5180285a8e8d0bec97ec7729139f54ca6f4c022ccd1efc867192fb7  reports/reviews/phase8-m8-r6c-cleanup-evidence-and-s0/host/selftest_final_summary.txt
-058774d27e6938db84a5a2412b14cf0e15074ef809fc45a314a69118643d9eb4  reports/reviews/phase8-m8-r6c-cleanup-evidence-and-s0/host/write_handoff_json_r6c.py
-400d160ddf30d46cd77cd9ebd1d99d3635899e0a1c976b9aed79d9de0059bce3  reports/reviews/phase8-m8-r6c-cleanup-evidence-and-s0/run_record.md
+3756608a8e2f09abe378b239008d506a8de8132ddb521f7f796feb2e804b3cbb  reports/reviews/phase8-m8-r6c-cleanup-evidence-and-s0/host/write_handoff_json_r6c.py
+b3a6b4511a687dffa5ab9532a18ca85de1ef631a589a72df4a85d1df018d7416  reports/reviews/phase8-m8-r6c-cleanup-evidence-and-s0/remote_readback_at_6e12019.txt
+b4897cff7442d9ed2cc104425f582342c49be865655e680c4fdeabfd61b31dda  reports/reviews/phase8-m8-r6c-cleanup-evidence-and-s0/remote_readback_generic_at_6e12019.txt
+ee78bc09fa9db6e3f6ed0b0826857f299fdff4e9940b2ad09a05a41deb1cf989  reports/reviews/phase8-m8-r6c-cleanup-evidence-and-s0/run_record.md

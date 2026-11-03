@@ -33,6 +33,22 @@ def nb(rel):
     return (REPO / rel).stat().st_size
 
 
+def _grep_lines(rel, needles):
+    """从入库的回读原文里取汇总行(不手抄数字): 文件不存在就把 None 交出去, 如实暴露缺口。"""
+    p = REPO / rel
+    if not p.exists():
+        return None
+    out = []
+    for ln in p.read_bytes().decode("utf-8", "replace").splitlines():
+        if any(n in ln for n in needles):
+            out.append(ln.strip())
+    return out
+
+
+ROUND_READBACK = R6C + "/remote_readback_at_6e12019.txt"
+GENERIC_READBACK = R6C + "/remote_readback_generic_at_6e12019.txt"
+
+
 STATUSES = [
     "R6B_evidence = ACCEPTED",
     "B1_original_pending_type_failure = CLOSED_OFFLINE",
@@ -63,7 +79,10 @@ doc = {
     "base_commit": BASE,
     "base_commit_note": "任务书 §2 指定的 A 实际审核头; 开工时本地 HEAD 与之相同且工作树干净, 远端同头",
     "software_input_commit": SOFTWARE,
-    "evidence_commit": "本 JSON 所在提交(在 software_input_commit 之后顺序追加)",
+    "evidence_commit": "6e120199a317a55e1ddd83e66ce2137b898c45b5(修前/修后探针原文、同输入对照、"
+                       "派生清单、交接件首版)",
+    "closure_commit": "本 JSON 所在提交(只补两条远端回读原文、§19.11/§19.12 与本 remote_readback 块 "
+                      "以及跟随数据的清单; 不再改执行器与判据)",
     "delivery_head_rule": "无 rebase/merge/amend/force; 不新建分支; 不碰冻结引用; "
                           "常规 push 后独立逐 blob 回读精确 SHA 即停止, 不为回读自己的新头循环追加提交",
     "roles": "云端 A 出任务书与独立复审; 本地 Qoder 执行; 操作者=人(本文件不含任何硬件批准, "
@@ -244,6 +263,28 @@ doc = {
         "任务书 §5 说 S0 位置'约3108/3123行、调用约3448行': 本次头上实际是 3152/3173/3179 与 3510; "
         "本轮按函数与语义定位, 未按行号盲改",
     ],
+    "remote_readback": {
+        "push": "origin/feature/m8-sg-adc-relative-protection: 6435328 之后顺序追加 "
+                "%s(软件输入) + 6e12019(证据); 本 JSON 所在的是再后面的收口提交(只补回读原文与清单); "
+                "全程常规 fast-forward, 无 rebase/merge/amend/force" % SOFTWARE[:12],
+        "round_scoped_script": R6C + "/host/remote_readback_r6c.py",
+        "round_scoped_summary": _grep_lines(ROUND_READBACK, ["R6C_REMOTE_READBACK_SUMMARY"]),
+        "round_scoped_covers": [
+            "四份清单逐条对远端 blob: r6c / r3 / r4 / r6b, mismatch=0",
+            "候选模板内部申报: 执行器 33d3f0af…/219491 B、在板镜像三件、派生源(R6B 计划)、"
+            "R6A 候选 bin、rebuilt_this_round=false、hardware_actions_authorized=0",
+            "交接 JSON 里每个带 path+sha256 的产物条目(逐个重算) + 顶层不自证字节 + 设备动作 0",
+            "七件冻结旧件: R5C/R6/R6A/R6B 计划与 5ae/d70/dab 三个 BIN",
+            "基线头 6435328 上的执行器 84df1306…/215704 B(按 SHA 定点 fetch 后现算, 正是修前对照的输入)",
+            "产品 C 未改: motor.c 与 supervisor.c 在 tip 与基线 %s 的 blob 逐字节相同" % BASE[:12],
+            "软件输入提交里的 EXEC/自检 == 模板与交接登记; 证据提交未偷改执行器",
+        ],
+        "generic_summary": _grep_lines(GENERIC_READBACK, ["REMOTE_READBACK_SUMMARY", "SCOPE_R3",
+                                                          "SCOPE_PRIOR"]),
+        "transcripts": [ROUND_READBACK, GENERIC_READBACK],
+        "loop_rule": "§6.2: 精确回读后停止 —— 收口提交里放的是对**证据提交头**的回读原文; "
+                     "对收口头本身只再跑一次并把结论写进会话回执, 不再为回读追加提交",
+    },
     "status_block": STATUSES,
 }
 

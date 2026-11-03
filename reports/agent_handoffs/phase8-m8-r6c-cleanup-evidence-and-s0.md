@@ -4,7 +4,8 @@
   R6B 已修好上一轮两个主要反例;本轮只处理 C1 清理发送前的记账异常、C2 S0 执行快照身份)
 - 基线 = 任务书 §2 指定的实际交付头 `64353285e9b34df1c54ccea4011ac555c482e626`
   (开工时本地同头、工作树干净、远端同头)
-- 软件输入提交 = `c0f361db5cc02fd087f6f3b404254151411d4a4a`;证据提交 = 本文件所在提交(其后顺序追加)
+- 软件输入提交 = `c0f361db5cc02fd087f6f3b404254151411d4a4a`;证据提交 = `6e120199a317a55e1ddd83e66ce2137b898c45b5`;
+  本文件随收口提交再更新一次(只补 §8 的推送与远端回读原文与跟随数据的清单, 执行器与判据不再改)
 - 分支 `feature/m8-sg-adc-relative-protection`;未 reset/clean/rebase/amend/force,未新建分支,未碰冻结引用
 - **本轮设备动作全部为 0**(不开串口、不连 DAP、不烧录/回读/复位、不提示重上电、不 learn/zero/起转/save);
   未重编固件(§6.1),`keil_builds=0`;产品 C / 参数 / 算法 / 阈值 / 引脚 / 恢复资格 / 固件归档均未动
@@ -123,4 +124,39 @@ idle1024 带载最坏栈余量、现场精确线程交错(NOT_PROVEN)、`0x00bd8
 
 ## 8 推送与独立远端回读
 
-(本轮收口一步补:推送区间、远端精确 SHA、逐 blob 回读的定向结果与残差口径。)
+```text
+推送区间  6435328 之后顺序追加 c0f361db5cc02fd087f6f3b404254151411d4a4a(软件输入)
+          + 6e120199a317a55e1ddd83e66ce2137b898c45b5(证据); 常规 fast-forward, 无 force/rebase/merge/amend
+回读方式  仓外裸克隆 git fetch --depth=1 + git cat-file blob <tip>:<path> 逐 blob 现算; 历史头按精确 SHA 定点 fetch
+```
+
+本轮范围 `host/remote_readback_r6c.py` 打在证据头 `6e120199a317`(rc=0):
+
+```text
+R6C_REMOTE_READBACK_SUMMARY|tip=6e120199a317|checks=35|fails=0|not_checked=0
+device_actions=0|serial_ports_opened=0|dap_connections=0|keil_builds=0|reads_from=remote_git_protocol_only
+```
+
+35 项覆盖: 四份清单逐条对远端 blob(r6c 13 / r3 5137 / r4 394 / r6b 16,mismatch=0)、候选模板申报的
+执行器/在板镜像三件/派生源(R6B 计划)/R6A 候选 bin/`rebuilt_this_round=false`/`authorized=0`、
+交接 JSON 里**每个带 path+sha256 的条目**逐个重算 + 顶层不自证字节 + 设备动作 0、七件冻结旧件
+(R5C/R6/R6A/R6B 计划 + 5ae/d70/dab 三个 BIN)、**基线头 `6435328` 上的执行器 `84df1306…/215704 B`**
+(定点 fetch 后现算 —— 正是 §1 修前那一栏的输入字节)、`motor.c`/`supervisor.c` 在 tip 与基线的 blob
+逐字节相同(产品 C 未改)、软件输入提交里的 EXEC/自检 == 模板与交接登记、"证据提交未偷改执行器"。
+
+一处口径提醒(防误读): 附录 B 的探针名仍是 `s0_record_uses_disk_instead_of_execution_snapshot`,
+修后这条路**在 S0 就被具名拒绝**, 没有 `S0_FACTS` 事件可记 —— 所以修后 JSON 里
+`s0_records_execution_snapshot=false` 的含义是"没有那条记录"(rc=1、`memory_backend_calls=0`、
+stdout 里 `S0_PLAN_DISK_DRIFT` 且 detail 同时给出 execution=P/disk=Q), **不是**"仍在记磁盘那份"。
+修后的正控在 FS125(文件未变 => 执行身份、快照、磁盘三者同值, 下载照跑)。
+
+全仓通用回读(同一头, rc=0):`remote_files=10872 declared=6702 verified=6635`、
+`SCOPE_R3|entries=5149 verified=5149 problems=0`、
+`SCOPE_PRIOR|problems=72`(cross_manifest_sha_conflict=3、declared_but_absent=53、hash_mismatch=6、
+duplicate_conflict=2、suffix_ambiguous=8)—— 与 R6B 收口那次同类别同数量, **本轮零新增**;
+`declared/verified` 各 +16 就是本轮新增登记件, `unlisted` 4544→4547。那 72 条是旧轮 manifest 之间的
+历史口径差(本轮没有新增构建件, 故没有新的 R6C 侧冲突), 属残差口径而非本轮回归。
+两份原文入库:`remote_readback_at_6e12019.txt`、`remote_readback_generic_at_6e12019.txt`。
+
+§6.2 的停点按字面执行:收口提交里放的是对**证据头**的回读原文;对收口头本身只再跑一次并把结论写进会话
+回执,**不再为"回读这份回读"追加提交**。
