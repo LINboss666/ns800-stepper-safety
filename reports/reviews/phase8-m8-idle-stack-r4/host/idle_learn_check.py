@@ -1038,6 +1038,9 @@ _blob6b, _blob6b_bytes = git_blob(_R6B_COMMIT, _REL_CHAIN, _R6B_BLOB_PATH)
 _R6C_PATH = ROOT / "reports/reviews/phase8-m8-r6c-cleanup-evidence-and-s0/field/plan_core_r6c.json"
 _R6C = json.loads(_R6C_PATH.read_text(encoding="utf-8")) if _R6C_PATH.exists() else None
 _R6C_EXEC = ((_R6C or {}).get("identity_binding", {}).get("executor", {}) or {})
+_R7_PATH = ROOT / "reports/reviews/phase8-m8-r7-field-package-5ae/field/plan_core_r7.json"
+_R7 = json.loads(_R7_PATH.read_text(encoding="utf-8")) if _R7_PATH.exists() else None
+_R7_EXEC = ((_R7 or {}).get("identity_binding", {}).get("executor", {}) or {})
 add("P8_frozen_executor_identity_is_blob_verifiable_and_live_package_matches_disk",
     PLAN["identity_binding"]["executor"]["sha256"] ==
     R5C["continuation_of"]["executor_executed"]["sha256"] and
@@ -1054,19 +1057,25 @@ add("P8_frozen_executor_identity_is_blob_verifiable_and_live_package_matches_dis
     _R6B_EXEC.get("sha256") not in (_blob6a, _blob6, _blob5c) and
     bool(_R6C) and _R6C_EXEC.get("sha256") == _disk_sha and
     _R6C_EXEC.get("bytes") == _disk_bytes and
-    _R6C_EXEC.get("sha256") not in (_blob6b, _blob6a, _blob6, _blob5c),
+    _R6C_EXEC.get("sha256") not in (_blob6b, _blob6a, _blob6, _blob5c) and
+    bool(_R7) and _R7_EXEC.get("sha256") == _disk_sha and
+    _R7_EXEC.get("bytes") == _disk_bytes and
+    _R7_EXEC.get("sha256") == _R6C_EXEC.get("sha256") and
+    _R7_EXEC.get("path") != _R6C_EXEC.get("path"),
     "冻结件对当时字节可复算: R4 包(%s…)与 R5C 记的“上一轮真跑过的那份”同一件, "
     "R5C 注册值(%s…/%s B)== git %s 里该文件 blob 的实算, 两包镜像仍是同一件(未重编); "
     "R6 包注册值(%s…/%s B)== git %s 里 blob 的实算(它已被 CLI 证据用过, 同样不回改); "
     "R6A 包注册值(%s…/%s B)== git %s 里 blob 的实算(R6A 的远端回读核过身份, 也不回改); "
     "R6B 包注册值(%s…/%s B)== git %s 里 blob 的实算(R6B 的交付头, A 的 §3 复算过同一件); "
-    "盘上现在是 %s…/%s B => 只有**最新**候选包 R6C 登记它(%s…) => 五层各自指向自己那一刻的字节" % (
+    "盘上现在是 %s…/%s B => R6C(%s…) 与 R7(%s…) 都登记它(R6C 之后执行器一字未改, R7 是同字节的**新登记**, "
+    "不是把 R6C 那段照抄: R7 把 path 从绝对路径改成了仓内相对 => 六层各自指向自己那一刻的字节)" % (
         PLAN["identity_binding"]["executor"]["sha256"][:12],
         R5C["identity_binding"]["executor"]["sha256"][:12], _blob5c_bytes, _R5C_BLOB_COMMIT,
         _R6_EXEC.get("sha256", "-")[:12], _blob6_bytes, _R6_COMMIT,
         _R6A_EXEC.get("sha256", "-")[:12], _blob6a_bytes, _R6A_COMMIT,
         _R6B_EXEC.get("sha256", "-")[:12], _blob6b_bytes, _R6B_COMMIT,
-        _disk_sha[:12], _disk_bytes, _R6C_EXEC.get("sha256", "-")[:12]))
+        _disk_sha[:12], _disk_bytes, _R6C_EXEC.get("sha256", "-")[:12],
+        _R7_EXEC.get("sha256", "-")[:12]))
 
 add("P9_stages_and_gates_survive_the_edit",
     [s["id"] for s in R5C["stages"]][:1] == ["S0"] and "S1" not in [s["id"] for s in R5C["stages"]]

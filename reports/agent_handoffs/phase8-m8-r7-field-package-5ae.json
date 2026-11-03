@@ -1,0 +1,349 @@
+{
+ "task": "M8-R7-BOUNDED-FIELD-VALIDATION-PACKAGE-5AE",
+ "upstream_review": "NS800_M8_R6C_Independent_Review_OFFLINE_GO_20261103.md(云端 A, 2026-11-03)",
+ "upstream_verdict_verbatim": "接收R6C交付，C1/C2在本轮限定范围内离线收口，裁定OFFLINE_REVIEW_GO。……下一步应转向新镜像的有界现场验证准备，优先验证启动、相关短打印和正常disarm收口。现场执行仍须有匹配新镜像、AXF、回读长度、步骤与具体额度的独立现场包；本文件不提供该包或批准，旧额度不结转。",
+ "how_this_round_was_authorized": "A 的 GO 只给方向(next_work=PREPARE_BOUNDED_FIELD_VALIDATION_PACKAGE), 不发设备额度; 本轮范围由用户在会话内选定为'开 R7 离线准备并入库'。全程 0 设备动作。",
+ "date_local": "2026-11-03",
+ "branch": "feature/m8-sg-adc-relative-protection",
+ "remote": "https://github.com/LINboss666/ns800-stepper-safety",
+ "base_commit": "f15ba464628d282f5d7fca91de79b6f702c54dfa",
+ "base_commit_note": "开工时本地 HEAD == A 签收的 R6C 收口头, 工作树干净; 未新建分支, 未 reset/clean/rebase/amend/force, 冻结引用未动",
+ "image_build_source_input_commit": "44e493cea9bbbc35e18394ca23dd1a8502519448",
+ "image_build_source_input_note": "本包不重编; 5ae4110d…/292164 B 是 R6A 轮那次构建的归档件, 其源码输入登记在该轮的 build_manifest 里",
+ "evidence_commit": "本 JSON 所在提交",
+ "closure_commit": "推送与远端逐 blob 回读所在提交(在其后顺序追加)",
+ "delivery_head_rule": "常规提交/push 后按精确 SHA 独立逐 blob 回读一次即停止; 不为回读自己的新头反复追加提交",
+ "roles": "云端 A 出方向与独立复审; 本地 Qoder 准备候选包; 操作者=人(本件不含任何硬件批准, 也不代替操作者回答现场安全门)",
+ "status": "M8_R7_OFFLINE_CANDIDATE_DELIVERED / AWAITING_INDEPENDENT_REVIEW",
+ "scope_covered": [
+  "① 启动(一次显式复位 + 被动启动窗 + 只读状态查询)",
+  "② 相关短打印([SAFETY] LIMIT 行 / [TMC-CFG] CONFIGURED 三条短行, 逐行宽度与字面量)",
+  "③ 新镜像身份闭环(一次下载 + 一次 292164 B 定长回读逐字节等于归档 BIN)"
+ ],
+ "scope_not_covered": [
+  "正常 disarm 之后的 Safety 收口(需 motor_arm => 被 load_means 门拒)",
+  "[MOT] withheld 四条短行的现场出现(同因)",
+  "SG/ADC 真实加载、阈值生成与有效性、ACTIVE 覆盖、REL_IMPACT、保存恢复与故障恢复闭环",
+  "idle1024 带载最坏栈余量、现场精确线程交错、0x00bd80b0 写入者"
+ ],
+ "why_disarm_closeout_is_excluded": "正常 disarm 之后的 Safety 收口要先 motor_arm; motor_arm/motor_start 属执行器的 MOTION_OBLIGATION_CMDS(m8r3_serial_chain.py:1412), 而包级 mechanical_prerequisites.load_means 仍是 NOT_PROVIDED => 执行器在开端口之前具名拒绝整条链。把运动步骤写进包里再'现场再看'等于制造一条一定会烧掉批准的中途失败, 所以本包不含运动, 也不声称覆盖它。",
+ "package_shape": {
+  "task_id": "phase8-m8-r7-field-package-5ae",
+  "status": "R7_FIELD_CANDIDATE_PREPARED_NOT_EXECUTED",
+  "package_status": "R7_FIELD_CANDIDATE_PREPARED_NOT_EXECUTED",
+  "stages": [
+   {
+    "id": "S0",
+    "kind": "offline",
+    "steps": 0,
+    "requires": null
+   },
+   {
+    "id": "S1",
+    "kind": "download",
+    "steps": 0,
+    "requires": [
+     "S0"
+    ]
+   },
+   {
+    "id": "S2",
+    "kind": "readback",
+    "steps": 0,
+    "requires": [
+     "S1"
+    ]
+   },
+   {
+    "id": "S3",
+    "kind": "serial_session",
+    "steps": 6,
+    "requires": [
+     "S2"
+    ]
+   },
+   {
+    "id": "S4",
+    "kind": "serial_session",
+    "steps": 4,
+    "requires": [
+     "S3"
+    ]
+   }
+  ],
+  "quota_proposal_nonzero": {
+   "port_open": 2,
+   "download": 1,
+   "readback": 1,
+   "explicit_reset": 1,
+   "tmc_config_apply": 1
+  },
+  "quota_zero_because": "motor_run/motor_arm 相关与 learn/config_save/blackbox_clear 全为 0: 本包不含起转(见 mechanical_prerequisites.load_means)也不做学习与保存",
+  "boot_window_arithmetic": "drain 75 + 首条查询 10 + 3s 余量 = 88 >= 下界 75; 未申报 boot_quiet_seconds",
+  "forbidden_commands_per_session": [
+   [
+    "blackbox_clear",
+    "config_save",
+    "diag_profile commit",
+    "diag_profile learn",
+    "motor_arm",
+    "motor_dir",
+    "motor_start",
+    "motor_target",
+    "safety_irq_enable",
+    "safety_polarity_confirm"
+   ],
+   [
+    "blackbox_clear",
+    "config_save",
+    "diag_profile commit",
+    "diag_profile learn",
+    "motor_arm",
+    "motor_dir",
+    "motor_start",
+    "motor_target",
+    "safety_irq_enable",
+    "safety_polarity_confirm"
+   ]
+  ],
+  "readback_image_bytes_hex": "0x47544"
+ },
+ "image_identity": {
+  "bin": {
+   "path": "reports/firmware/phase8-m8-r6a-offline-rework/rt-thread-motor-m1-candidate.bin",
+   "bytes": 292164,
+   "sha256": "5ae4110d14fdbb40f49cc6f0deca474cf6d0b33b3ee9305e83681dbdd4a53825"
+  },
+  "axf": {
+   "path": "reports/firmware/phase8-m8-r6a-offline-rework/rt-thread-motor-m1.axf",
+   "bytes": 1773648,
+   "sha256": "581f1155166374cf96cda1281320dbcfd31968f1bf5a898a6dd0e2a804a52df1"
+  },
+  "map": {
+   "path": "reports/firmware/phase8-m8-r6a-offline-rework/rt-thread-motor-m1.map",
+   "bytes": 2110730,
+   "sha256": "4f58a3eea493d8c532ecceba3d16db1e59750066ec75cede8647197563d412c3"
+  },
+  "manifest": "reports/firmware/phase8-m8-r6a-offline-rework/build_manifest.json",
+  "board_image_before_this_download": {
+   "path": "reports/firmware/phase8-m8-idle-stack-r4/rt-thread-motor-m1-candidate.bin",
+   "bytes": 290916,
+   "sha256": "dab356c69fbf4ca747e838580c16982bd56b53b1367f84b97ab705c2fbd25439"
+  },
+  "not_overwritten_archives": [
+   "5ae4110d…",
+   "d70a9180…",
+   "dab356c6… 三件归档 BIN 一件都不覆盖"
+  ]
+ },
+ "corrections_this_round": [
+  "board_image_before: 模板里的 f5c2fd89… 更正为最新一次逐字节回读证到的 dab356c6…/290916 B (proven_by=field-20261101T142722Z/readback.bin); 旧口径放进 supersedes_in_r6c_template; R6C 原件不回改",
+  "executor.path: 本机绝对路径 D:/ns800/… 改仓内相对路径; bytes/sha256 不变; 原串保留在 path_r6c_template_verbatim",
+  "motion_budget: 赋值行尾逗号把对象静默写成单元素数组 => 派生器现在拒绝任何算成 tuple 的顶层键",
+  "package/task_id/status: 还写着上一轮 'R5-C 续测包' => 改成本轮 phase8-m8-r7-field-package-5ae / R7_FIELD_CANDIDATE_PREPARED_NOT_EXECUTED(执行器不读这三条)",
+  "新增 stage_numbering_and_legacy_fields: 本包 S0–S4 与继承历史字段的旧全包 S0–S11 撞号(旧 S4=巡圈学习要起转, 本包 S4=tmc_config_apply 不起转), 逐块登记为历史口径"
+ ],
+ "transcript_encoding_self_injury_and_fix": "本轮最初用 shell 直接重定向归档证据, Windows 控制台默认 cp936 => 落盘是 GBK 字节, 按 UTF-8 读即乱码, 也与 R6C 那批 UTF-8/LF 证据口径不一致。修法是新增 run_transcripts_r7.py / run_derive_matrix_r7.py: 子进程强制 PYTHONIOENCODING=utf-8, 父进程严格解码(解不出来就失败, 不退回 gbk), 每步记自己的退出码, 整体 LF 写盘; 当前三份文本证据都由这两个脚本重新生成, 乱码原件没有被当作证据留在仓库里。",
+ "commands_and_exit_codes": {
+  "validate_plan": [
+   "PLAN_VALIDATE_SUMMARY|checks=47|fail=1|msh_commands=74|plan=reports/reviews/phase8-m8-r7-field-package-5ae/field/plan_core_r7.json"
+  ],
+  "validate_plan_only_fail": [
+   "PLAN_MOTION_CAP_BUDGET|all|FAIL|caps=[] sum=0 total=0 starts=0"
+  ],
+  "readiness": [
+   "R7_READINESS_SUMMARY|checks=17|fails=0|device_actions=0|serial_ports_opened=0|dap=0|downloads=0|flashes=0|readbacks=0|resets=0|motor_starts=0|keil_builds=0"
+  ],
+  "derive_idempotency_last_line": [
+   "MATCH=True (逐字节相等=True, bytes=102115)"
+  ],
+  "note": "以上数字是从入库原文 grep 出来的, 不是手抄; 退出码记在各原文的头部"
+ },
+ "registered_checker_gap": {
+  "gate": "PLAN_MOTION_CAP_BUDGET",
+  "why_red": "caps 只收 motion_cap_seconds 为真值的阶段(m8r3_serial_chain.py:2678-2679), 通过要求 caps 非空且 sum(caps)<=quota.motor_run_seconds_total(:2683); 本包不起转 => 只能谎报一个非零运动预算才能变绿",
+  "what_was_not_done": "不为了让门变绿改判据, 也不谎报预算",
+  "what_plays_that_role_instead": "host/r7_readiness.py 的 R7-2 三条独立判据(无起转步骤 / 运动与学习额度全 0 / 会话禁令不被步骤命中)"
+ },
+ "artifacts_and_identities": {
+  "plan_package": {
+   "path": "reports/reviews/phase8-m8-r7-field-package-5ae/field/plan_core_r7.json",
+   "bytes": 102115,
+   "sha256": "e87dd11ee71bb9052c2f722eced578076283fc08336c6027cfa4110bc39b9737"
+  },
+  "dryrun_fixture_rows": {
+   "path": "reports/reviews/phase8-m8-r7-field-package-5ae/field/rows.json",
+   "bytes": 49352,
+   "sha256": "b66e33fced562863e7c8f6ea3333543ecf228016c957253f249a4680616b0ea1"
+  },
+  "deriver": {
+   "path": "reports/reviews/phase8-m8-r7-field-package-5ae/host/derive_plan_r7.py",
+   "bytes": 32805,
+   "sha256": "1d7dcc8bf3d23c4047d915795e6f2cc36df395f71d151637183061d567311797"
+  },
+  "fixture_maker": {
+   "path": "reports/reviews/phase8-m8-r7-field-package-5ae/host/make_rows_r7.py",
+   "bytes": 5969,
+   "sha256": "522a47c6795c4e789f5cb9e23b0d632662b120d9b5c1beca3552456ae1c935c5"
+  },
+  "readiness_harness": {
+   "path": "reports/reviews/phase8-m8-r7-field-package-5ae/host/r7_readiness.py",
+   "bytes": 12078,
+   "sha256": "f75de2b8d62c06d0b36d0c261dd05e6795677dc36b92eb1df4baadce9c0b0d63"
+  },
+  "transcript_runner": {
+   "path": "reports/reviews/phase8-m8-r7-field-package-5ae/host/run_transcripts_r7.py",
+   "bytes": 4243,
+   "sha256": "49b0fd0d027711fecc6957d9e69cc6765b6a4246022a7fdecefe90a262019231"
+  },
+  "derive_matrix_runner": {
+   "path": "reports/reviews/phase8-m8-r7-field-package-5ae/host/run_derive_matrix_r7.py",
+   "bytes": 4762,
+   "sha256": "19387402c6ae58d40b0549c18a6fccf3879d31699965284552911e58c483d79b"
+  },
+  "validate_plan_transcript": {
+   "path": "reports/reviews/phase8-m8-r7-field-package-5ae/host/validate_plan_r7.txt",
+   "bytes": 4280,
+   "sha256": "58de0168c7e1f7fefd95ea26163f39629b5e112aa4d56d1cff5194cd8b68506e"
+  },
+  "readiness_transcript": {
+   "path": "reports/reviews/phase8-m8-r7-field-package-5ae/host/readiness_transcript.txt",
+   "bytes": 3219,
+   "sha256": "08e2ef952c46fb02f9062a4d502f7cd43d0336d791a8ebc44a5712a40a0ff3d5"
+  },
+  "derive_write_semantics_matrix": {
+   "path": "reports/reviews/phase8-m8-r7-field-package-5ae/host/derive_matrix.txt",
+   "bytes": 1909,
+   "sha256": "c4f5741638d1d55c53c435cb5b1aff7ec84c78aecb624460d6d4a57c8e75b89f"
+  },
+  "run_record": {
+   "path": "reports/reviews/phase8-m8-r7-field-package-5ae/run_record.md",
+   "bytes": 15530,
+   "sha256": "8b47e9cf9fb4aac958562fa6ea92e427978d97d0944b86fe19c8a4d933ba9789"
+  },
+  "handoff_md": {
+   "path": "reports/agent_handoffs/phase8-m8-r7-field-package-5ae.md",
+   "bytes": 9319,
+   "sha256": "607d81afa5d7326f26ff2bdb919cc01923b89c83eae1a5b6955180e1589152d9"
+  },
+  "frozen_derivation_source": {
+   "path": "reports/reviews/phase8-m8-r6c-cleanup-evidence-and-s0/field/plan_core_r6c.json",
+   "bytes": 172306,
+   "sha256": "408c18ecaf50f62a0620c904011f0c60bea3681087875a2ada64efbae7b6de73"
+  },
+  "executor_reused": {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py",
+   "bytes": 219491,
+   "sha256": "33d3f0af8a4c9c33dcd4e013b395e4ba990a89e384130f9d0ffe50c71b34e8ca"
+  },
+  "selftest_reused": {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_field_selftest.py",
+   "bytes": 192823,
+   "sha256": "4abcd162a7d0c20ded108f5de64fecb8505f460ace3f2f9bcdf7a1048a410f65"
+  },
+  "candidate_image_bin": {
+   "path": "reports/firmware/phase8-m8-r6a-offline-rework/rt-thread-motor-m1-candidate.bin",
+   "bytes": 292164,
+   "sha256": "5ae4110d14fdbb40f49cc6f0deca474cf6d0b33b3ee9305e83681dbdd4a53825"
+  },
+  "candidate_image_axf": {
+   "path": "reports/firmware/phase8-m8-r6a-offline-rework/rt-thread-motor-m1.axf",
+   "bytes": 1773648,
+   "sha256": "581f1155166374cf96cda1281320dbcfd31968f1bf5a898a6dd0e2a804a52df1"
+  },
+  "candidate_image_map": {
+   "path": "reports/firmware/phase8-m8-r6a-offline-rework/rt-thread-motor-m1.map",
+   "bytes": 2110730,
+   "sha256": "4f58a3eea493d8c532ecceba3d16db1e59750066ec75cede8647197563d412c3"
+  },
+  "build_manifest": {
+   "path": "reports/firmware/phase8-m8-r6a-offline-rework/build_manifest.json",
+   "bytes": 6500,
+   "sha256": "b405df37cb983ee09719552eff9c18becc9eb369c6dc0951d6ea4cc5a98a8862"
+  },
+  "proven_on_board_readback": {
+   "path": "reports/reviews/phase8-m8-idle-stack-r4/field/field-20261101T142722Z/readback.bin",
+   "bytes": 290916,
+   "sha256": "dab356c69fbf4ca747e838580c16982bd56b53b1367f84b97ab705c2fbd25439"
+  },
+  "earlier_on_board_readback": {
+   "path": "reports/reviews/phase8-m8-diag-stack-r1/field/field-20261101T084256Z/flash_readback.bin",
+   "bytes": 290916,
+   "sha256": "f5c2fd89bbf28255a5b26c9cca495bc0fb1e39d401d0bb7bea19d051221708ce"
+  }
+ },
+ "unchanged_this_round": {
+  "executor": {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py",
+   "bytes": 219491,
+   "sha256": "33d3f0af8a4c9c33dcd4e013b395e4ba990a89e384130f9d0ffe50c71b34e8ca",
+   "note": "与 R6C 登记同一件; 本轮未改执行器, 也未重跑全量 127 项自检"
+  },
+  "selftest": {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_field_selftest.py",
+   "bytes": 192823,
+   "sha256": "4abcd162a7d0c20ded108f5de64fecb8505f460ace3f2f9bcdf7a1048a410f65"
+  },
+  "product_C_and_firmware": "本轮 0 改动(工作树除新目录外干净); keil_builds=0",
+  "frozen_plans": "R5-C/R6/R6A/R6B/R6C 计划与其镜像登记保持原字节, 不回改"
+ },
+ "approval": {
+  "hardware_actions_authorized_by_this_package": 0,
+  "prior_token": "4cb9dac0f2a47beb494a4fb41090cefe8da76075",
+  "prior_token_state": "EXHAUSTED_AND_NOT_CARRIED(download/readback/explicit_reset 各 1/1 用尽; 换计划文件/换输出目录不重新发额度)",
+  "numbers_are_proposals_not_authorization": true,
+  "what_is_still_needed": "操作者对 5 个非零额度逐条批准(port_open 2 / download 1 / readback 1 / explicit_reset 1 / tmc_config_apply 1, 尤其 apply 会写驱动芯片寄存器), 并回报现场物理状态(供电、接线、是否允许开 COM5、机械是否静止)",
+  "this_file_is_not_an_approval": true
+ },
+ "device_actions": {
+  "serial_ports_opened": 0,
+  "dap_connections": 0,
+  "downloads": 0,
+  "flashes": 0,
+  "readbacks": 0,
+  "resets": 0,
+  "motor_starts": 0,
+  "target_power_cycles": 0,
+  "keil_builds": 0
+ },
+ "private_material_handling": "UID 一律以 @UID_FILE 占位, 未把 48 位十六进制私有机密写进聊天或仓库; 本轮没有产生任何台账/批准令牌",
+ "not_verified_after_this_round": [
+  "SG/ADC 真实加载、阈值生成与有效性、ACTIVE 覆盖、REL_IMPACT、保存恢复与故障恢复闭环",
+  "正常 disarm 之后的 Safety 收口(需 motor_arm)",
+  "idle1024 带载最坏栈余量、现场精确线程交错、0x00bd80b0 写入者(旧裁定保持)",
+  "新镜像 5ae 在板(本包的目的就是去证它, 本轮未上板)"
+ ],
+ "safe_for_enable": false,
+ "review_points_for_A": [
+  "本包是否可以在 load_means=NOT_PROVIDED 下只跑这三条覆盖, 还是应先补加载手段",
+  "tmc_config_apply 单列一次额度是否必要(不 apply 就取不到 5ae 拆短的 CONFIGURED 三条短行)",
+  "PLAN_MOTION_CAP_BUDGET 对无起转包的恒红门是否要在执行器侧正式修(本轮只登记不修)",
+  "四处登记更正是否都只落在新包、没有回改任何已签收件"
+ ],
+ "remote_readback": null,
+ "status_block": [
+  "R6C_evidence = ACCEPTED(A 2026-11-03 独立复审, OFFLINE_REVIEW_GO)",
+  "R7_package = R7_FIELD_CANDIDATE_PREPARED_NOT_EXECUTED",
+  "R7_scope_boot_validation = PREPARED_OFFLINE(未现场执行)",
+  "R7_scope_short_prints = PREPARED_OFFLINE(判据来自产品源码字面量)",
+  "R7_scope_new_image_identity = PREPARED_OFFLINE(下载+定长回读闭环已绑定)",
+  "disarm_closeout = OUT_OF_SCOPE(需 motor_arm; load_means=NOT_PROVIDED)",
+  "load_means = NOT_PROVIDED",
+  "motion = NOT_INCLUDED(整包 0 起转步骤, 运动类额度全 0)",
+  "validate_plan = 47 项 / fail=1(唯一 FAIL 已登记为恒红门)",
+  "readiness = 17/17 OK(含整包 stub 干跑, 0 设备)",
+  "R6A_candidate_image(5ae) = ARCHIVED_NOT_ON_BOARD(本包正是要把它上板)",
+  "R6/d70 与在板 dab356c6 归档 = 原件未动",
+  "executor/selftest = 字节与 R6C 相同(本轮未改执行器)",
+  "product_C_and_firmware_archive = 本轮 0 改动",
+  "product_field_fix = NOT_VERIFIED",
+  "overall_offline_release = 待 A 独立复审(本轮不自签)",
+  "safe_for_enable = false",
+  "new_hardware_authorization = 0",
+  "device_actions_this_round = 0",
+  "keil_builds = 0",
+  "next_work = 交 A 复审; 现场执行另需操作者一次明确批准"
+ ],
+ "generated_while_head": "f15ba464628d282f5d7fca91de79b6f702c54dfa",
+ "artifacts_and_identities_note": "bytes/sha256 全部在生成时刻从磁盘现算; 本 JSON 不自记自己的哈希(清单不哈希自身是同一条纪律); 远端逐 blob 回读在收口一步补进 remote_readback 字段"
+}

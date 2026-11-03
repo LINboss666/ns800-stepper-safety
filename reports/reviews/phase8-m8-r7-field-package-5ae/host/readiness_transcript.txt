@@ -1,0 +1,25 @@
+# readiness_transcript.txt —— 由 host/run_transcripts_r7.py 于本机实跑生成(原文未删改)
+# 说明: 本轮 17 项就绪检查, 含 R7-6 整包 stub 干跑(SimActionBackend + 计数子类, 不开端口)。
+$ C:\Users\LMX\AppData\Local\Programs\Python\Python312\python.exe D:\ns800\reports\reviews\phase8-m8-r7-field-package-5ae\host\r7_readiness.py
+cwd=D:\ns800|python=C:\Users\LMX\AppData\Local\Programs\Python\Python312\python.exe|PYTHONIOENCODING=utf-8
+exit_code=0(本步预期 0; 退出码是子进程自己的, 不是管道末端的)
+OK   |R7-1_bin 磁盘实算相符|reports/firmware/phase8-m8-r6a-offline-rework/rt-thread-motor-m1-candidate.bin 292164 B 5ae4110d14fd…
+OK   |R7-1_axf 磁盘实算相符|reports/firmware/phase8-m8-r6a-offline-rework/rt-thread-motor-m1.axf 1773648 B 581f11551663…
+OK   |R7-1_dl 磁盘实算相符|reports/firmware/phase8-m8-r6a-offline-rework/rt-thread-motor-m1.axf 1773648 B 581f11551663…
+OK   |R7-1_rb 磁盘实算相符|reports/firmware/phase8-m8-r6a-offline-rework/rt-thread-motor-m1-candidate.bin 292164 B 5ae4110d14fd…
+OK   |R7-1 四处同一镜像且不是旧在板件|bin=axf 各自成对, download.argv 末项==axf 路径, sha!=dab356c6…
+OK   |R7-2 没有任何起转/带电步骤|步骤命令=,motor_status,safety_irq_status,safety_status,system_status,tmc_config_apply,tmc_config_show
+OK   |R7-2 运动与学习类额度全 0|motor_run=0 total=0 learn=0 cleanup=0/0/0
+OK   |R7-2 两个会话阶段都挂禁令且步骤不撞禁令|禁令集合命中=无
+OK   |R7-3 复位在首条查询之前 + 被动窗覆盖下界|drain=75 + 首条=10 + 3s = 88 >= 下界 75; 未申报静默=True
+OK   |R7-4 每一块行表都有具名来源|来源分布={'board_capture': 43, 'predicted_from_source': 2}
+OK   |R7-5 每条 needle 都在其登记源码行里|safety_thread.c:374<=80B;safety_thread.c:376,377<=97B;tmc2209.c:2842<=55B;tmc2209.c:2843<=38B;tmc2209.c:2844<=49B
+OK   |R7-5 保守宽度全部 <=120 B|最宽=99 B(含不在本包范围的 withheld 四条)
+OK   |R7-6 stub 整包贯通(0 设备动作)|status=OK 阶段=['S0', 'S1', 'S2', 'S3', 'S4'] 后端调用=['download', 'readback', 'reset'] 未跑=[] 额度剩余={}
+DRYRUN_DIR|C:\Users\LMX\AppData\Local\Temp\ns800-r7-dryrun-d7h5dc4p
+OK   |R7-7 执行器登记是仓内相对路径且磁盘实算相符|reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py 33d3f0af8a4c…/219491 B 绝对路径原样保留=True
+OK   |R7-7 下载前在板件=最新一次逐字节回读的实算身份|readback.bin=dab356c69fbf…/290916 B == board_image_before.sha; 与下载对象(5ae4110d14fd…)不同; 被更正的旧口径 f5c2fd89… 也对得上它那轮回读
+OK   |R7-7 键的形状: 继承是对象的就是对象(tuple 门的外部证明)|motion_budget=dict legacy_blocks 条目=17
+OK   |R7-7 顶层身份字段写的是本轮, 不是上一轮的 R5-C 续测包|task_id=phase8-m8-r7-field-package-5ae status=R7_FIELD_CANDIDATE_PREPARED_NOT_EXECUTED package=M8-R7 有界现场验证候选包(5ae 新镜像上板逐字节…
+
+R7_READINESS_SUMMARY|checks=17|fails=0|device_actions=0|serial_ports_opened=0|dap=0|downloads=0|flashes=0|readbacks=0|resets=0|motor_starts=0|keil_builds=0

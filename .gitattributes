@@ -78,3 +78,7 @@ reports/reviews/phase8-m8-r6b-executor-binding/** -text
 
 # R6C 同一轮同一理由: blob==磁盘字节才允许"逐 blob 复算原字节"的声称(本轮基线侧对照件与探针 JSON 都是 LF 原件)。
 reports/reviews/phase8-m8-r6c-cleanup-evidence-and-s0/** -text
+
+# R7 候选包轮同一理由: blob==磁盘字节才允许"逐 blob 复算原字节"的声称
+# (派生计划/干跑夹具/两份 transcript/derive 语义矩阵都是 LF 原件, 任何一边被转换都会报假 hash_mismatch)。
+reports/reviews/phase8-m8-r7-field-package-5ae/** -text

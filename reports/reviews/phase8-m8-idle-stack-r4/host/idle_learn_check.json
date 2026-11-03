@@ -483,7 +483,7 @@
   {
    "name": "M5_m5_history_untouched",
    "ok": true,
-   "detail": "工作树里没有 M5 软件故障原件的改动(event=9 的那批历史证据原样保留); 本轮改动=6 项"
+   "detail": "工作树里没有 M5 软件故障原件的改动(event=9 的那批历史证据原样保留); 本轮改动=14 项"
   },
   {
    "name": "M6_event_five_basis_is_source",
@@ -578,7 +578,7 @@
   {
    "name": "P8_frozen_executor_identity_is_blob_verifiable_and_live_package_matches_disk",
    "ok": true,
-   "detail": "冻结件对当时字节可复算: R4 包(40517501b3be…)与 R5C 记的“上一轮真跑过的那份”同一件, R5C 注册值(bb243467cbd8…/162645 B)== git 535459f 里该文件 blob 的实算, 两包镜像仍是同一件(未重编); R6 包注册值(1b23719a3c9a…/184093 B)== git 44e493c 里 blob 的实算(它已被 CLI 证据用过, 同样不回改); R6A 包注册值(99d6c9600b05…/209786 B)== git aab19ff 里 blob 的实算(R6A 的远端回读核过身份, 也不回改); R6B 包注册值(84df1306f48e…/215704 B)== git 6435328 里 blob 的实算(R6B 的交付头, A 的 §3 复算过同一件); 盘上现在是 33d3f0af8a4c…/219491 B => 只有**最新**候选包 R6C 登记它(33d3f0af8a4c…) => 五层各自指向自己那一刻的字节"
+   "detail": "冻结件对当时字节可复算: R4 包(40517501b3be…)与 R5C 记的“上一轮真跑过的那份”同一件, R5C 注册值(bb243467cbd8…/162645 B)== git 535459f 里该文件 blob 的实算, 两包镜像仍是同一件(未重编); R6 包注册值(1b23719a3c9a…/184093 B)== git 44e493c 里 blob 的实算(它已被 CLI 证据用过, 同样不回改); R6A 包注册值(99d6c9600b05…/209786 B)== git aab19ff 里 blob 的实算(R6A 的远端回读核过身份, 也不回改); R6B 包注册值(84df1306f48e…/215704 B)== git 6435328 里 blob 的实算(R6B 的交付头, A 的 §3 复算过同一件); 盘上现在是 33d3f0af8a4c…/219491 B => R6C(33d3f0af8a4c…) 与 R7(33d3f0af8a4c…) 都登记它(R6C 之后执行器一字未改, R7 是同字节的**新登记**, 不是把 R6C 那段照抄: R7 把 path 从绝对路径改成了仓内相对 => 六层各自指向自己那一刻的字节)"
   },
   {
    "name": "P9_stages_and_gates_survive_the_edit",

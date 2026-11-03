@@ -1,0 +1,29 @@
+# R7 派生件的写入语义: 本机按顺序跑的五步, 每步单独记**它自己的**退出码(不是转述)
+# 派生件 = field/plan_core_r7.json (102115 B / sha e87dd11ee71bb9052c2f722eced578076283fc08336c6027cfa4110bc39b9737); 冻结源 = plan_core_r6c.json (172306 B / sha 408c18ecaf50f62a0620c904011f0c60bea3681087875a2ada64efbae7b6de73)
+# 落盘口径: 由 host/run_derive_matrix_r7.py 生成, 子进程 print 在 Windows 下的 CRLF 已整体规范化为 LF(只动行尾, 文本与退出码一字未改)
+
+$ python host/derive_plan_r7.py        # 无参: 目标已存在且算出的字节与之完全相同 => 重写同值(不是覆盖不同内容)
+rc=0
+R7_WRITE|reports/reviews/phase8-m8-r7-field-package-5ae/field/plan_core_r7.json|bytes=102115|sha=e87dd11ee71bb905
+
+$ python -c "...把派生件就地改坏: quota.download 1 -> 0..."   # 模拟磁盘漂移/手工编辑
+corrupted sha=6372a7a91857c786dc42f1f6873164de48d3384c664e69eebe66ed7c4ed782b4
+
+$ python host/derive_plan_r7.py        # 无参: 盘上字节与算出的不同 => 必须具名拒绝, 不静默覆盖
+rc=1
+R7_REFUSE_WRITE|plan_core_r7.json 已存在且字节不同(sha 6372a7a91857), 不静默覆盖
+
+$ python host/derive_plan_r7.py --force   # 显式覆写(本包从未执行过设备动作, 才允许这一步)
+rc=0
+R7_WRITE|reports/reviews/phase8-m8-r7-field-package-5ae/field/plan_core_r7.json|bytes=102115|sha=e87dd11ee71bb905
+
+$ python host/derive_plan_r7.py --check   # 复原后重新幂等 + 冻结源校验
+rc=0
+R7_CHECK|IDEMPOTENT|bytes=102115|sha=e87dd11ee71bb905|源仍冻结=True
+
+$ 核身份: 五步之后派生件必须回到动手前的同一件
+before=e87dd11ee71bb9052c2f722eced578076283fc08336c6027cfa4110bc39b9737
+after =e87dd11ee71bb9052c2f722eced578076283fc08336c6027cfa4110bc39b9737
+MATCH=True (逐字节相等=True, bytes=102115)
+
+device_actions=0|serial_ports_opened=0|dap_connections=0|keil_builds=0

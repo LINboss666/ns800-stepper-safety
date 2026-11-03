@@ -3,12 +3,12 @@
 # 条目数=394; 与 Git blob 的逐条复算由 host/staged_preflight_batch.py(提交前, 单批流)与推送后的远端逐 blob 回读完成
 # 重新生成: python reports/reviews/phase8-m8-idle-stack-r4/host/make_round_sums.py <本目录>
 757bac0b55110a7ecd11c095c73f5ed23dde3652cee9a90d0bea84754278714a  reports/reviews/phase8-m8-idle-stack-r4/build/rt-thread-motor-m1-candidate.log
-56e27a4965c9e5e956ee3865acb7ca56fceb1966b2c19b661617408e1ed6c184  reports/reviews/phase8-m8-idle-stack-r4/field/dispatch_stub_assembly_not_confirmed.txt
-796cd5501a65d0a85ace15ed9656c1033a5bf4d9540b74e35b6031f422205dfc  reports/reviews/phase8-m8-idle-stack-r4/field/dispatch_stub_healthy.txt
-e54414ef319160bd7c1ea042f4c7bf6e1370d21f76495b0bbce2332f21dc718d  reports/reviews/phase8-m8-idle-stack-r4/field/dispatch_stub_r5c_delivery.txt
-6a7408fc4f0e1a5d3971078034237707a3938da8bf974a4dee3abc1cc702868c  reports/reviews/phase8-m8-idle-stack-r4/field/dispatch_stub_r5c_delivery_live_chain.txt
-27b4ac3fd5e7d9bde919d3db03d5c441a61ec178431037dbbc8138dac5d4637c  reports/reviews/phase8-m8-idle-stack-r4/field/dispatch_stub_target_gate_removed.txt
-d8b2f49211d00b2d3fc9d19fca121215f4c8188f9cde944d16f3c1db15d9db23  reports/reviews/phase8-m8-idle-stack-r4/field/dispatch_stub_target_sg_in_imu.txt
+314935906a0de3c98f195b8eb927584fcf989905e8dba894588a21053694470c  reports/reviews/phase8-m8-idle-stack-r4/field/dispatch_stub_assembly_not_confirmed.txt
+e555fb4af5a47cd06dd155d2a499b13722adeb32f226582979d36afd19d37b36  reports/reviews/phase8-m8-idle-stack-r4/field/dispatch_stub_healthy.txt
+ca6f67784c0c333b3f6653ca0fe567f55d95876bbd59a79af0eedbff7cbcac7b  reports/reviews/phase8-m8-idle-stack-r4/field/dispatch_stub_r5c_delivery.txt
+5a1fef4d74d2171ff823545bfa683b21da348f6dae9499271d77717b48a80b56  reports/reviews/phase8-m8-idle-stack-r4/field/dispatch_stub_r5c_delivery_live_chain.txt
+dbefa672b0ce89693a3de0da9865ce702696cc797bc8b9784cf98f69595db863  reports/reviews/phase8-m8-idle-stack-r4/field/dispatch_stub_target_gate_removed.txt
+178e2c92fabc0cdfc64bffd607e35a38db0001369b4d663062fc29d7e3441047  reports/reviews/phase8-m8-idle-stack-r4/field/dispatch_stub_target_sg_in_imu.txt
 8369b251b0da4ccaaa24b50869c05f835000dc2d29338212f85a9a3d06dd4ad6  reports/reviews/phase8-m8-idle-stack-r4/field/field-20261101T142722Z/action_download/ARGV.json
 13bf7b3039c63bf5a50491fa3cfd8eb4e699d1ba1436315aef9cbe5711530354  reports/reviews/phase8-m8-idle-stack-r4/field/field-20261101T142722Z/action_download/rc.txt
 e6f7ea10d4204232e9c390364f1f4b26c8c574db89e171c0687d2126680e12e3  reports/reviews/phase8-m8-idle-stack-r4/field/field-20261101T142722Z/action_download/stderr.bin
@@ -384,14 +384,14 @@ a5721fdd56695e3179e0486332807fa5afe4bebb6b651bf6fd6b08eb5bc015d5  reports/review
 a5f9cb97044c14ae1749641303868beae307ddbeb2cffe5f1d49ff97a64b7ce3  reports/reviews/phase8-m8-idle-stack-r4/host/apply_package_corrections_r2.py
 3617e8cf67824298358189d7cc0063836b8eedcaee3747e628ac04d8b4fc2e22  reports/reviews/phase8-m8-idle-stack-r4/host/apply_target_channel_fixtures.py
 f34b672edcc44ed2d8b1ee68e3bca24c16f436e557a779939ca0dec1a09eeb1b  reports/reviews/phase8-m8-idle-stack-r4/host/four_branch_matrix.txt
-34102afeae50167c6fe319e429c67a3d7db125b6d0371e1fcbb4cdce88b72418  reports/reviews/phase8-m8-idle-stack-r4/host/idle_learn_check.json
-619507daacd054f9b759757729acbf014ae091f174d53f23d3d006e56feccef2  reports/reviews/phase8-m8-idle-stack-r4/host/idle_learn_check.py
-79cb19b4b9676507b95013e5f31d0e0cac52e97fcd9e845a8bff6011cb16eb0f  reports/reviews/phase8-m8-idle-stack-r4/host/idle_learn_console.txt
+303d562656ae1dd6a06ac426f882ceea2c7000de4b00d4ba43f09add5ef90ae4  reports/reviews/phase8-m8-idle-stack-r4/host/idle_learn_check.json
+36da0c667ab343fc202c5e96234a8d8a5fc5f3e7aa714d8ce136062d4015e621  reports/reviews/phase8-m8-idle-stack-r4/host/idle_learn_check.py
+8d9b6f3906f40f2d93c3c2c22ca46e3a76b81e856caa81adb5162e766d21e235  reports/reviews/phase8-m8-idle-stack-r4/host/idle_learn_console.txt
 419a5c81170a943f87e6ac7cb4b9cf5c67953779bd2d7e4251a49b7f76cc94c2  reports/reviews/phase8-m8-idle-stack-r4/host/make_round_sums.py
 0d03d613592fb672853c454a414b356745aaebc9e93e9e5b5df8c1537d82b0c1  reports/reviews/phase8-m8-idle-stack-r4/host/r5c_plan_vs_builder_delta.txt
 18c5c88c91b75806f23b3161085ba5dbc5953d7712ea7664fb769fc5ce8d5a56  reports/reviews/phase8-m8-idle-stack-r4/host/round_quota_and_stops.py
 80b915b156bdd15bb57c45d9756239764168070df50a32c5ceedd54662d09613  reports/reviews/phase8-m8-idle-stack-r4/host/round_quota_and_stops.txt
-f5703cf278b1408cb46afddc2ca6ffd522562011f3365f4cb863dbb76c1d8997  reports/reviews/phase8-m8-idle-stack-r4/host/staged_preflight_batch.py
+e89306b263ce8b78a56719b9d0b2fcce9bebecc7d5e836a687778c5c0ccbb074  reports/reviews/phase8-m8-idle-stack-r4/host/staged_preflight_batch.py
 d4fb823c5cfcabb8053d1b88fec80978c97e9a513c0f4409ca20186b02b3e61c  reports/reviews/phase8-m8-idle-stack-r4/host/staged_preflight_batch.txt
 35cfd2108a44b8ac13b17f9ceb449353d996c8abaec0681c44ccfe4ea63ec578  reports/reviews/phase8-m8-idle-stack-r4/host/verify_four_branch_matrix.py
 df0541d807890ab2c07d2a60bc4ebe343ce0a07d0befdd9218968de673fcad71  reports/reviews/phase8-m8-idle-stack-r4/run_record.md

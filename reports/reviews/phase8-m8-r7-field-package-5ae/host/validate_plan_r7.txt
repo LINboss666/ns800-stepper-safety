@@ -1,0 +1,53 @@
+# validate_plan_r7.txt —— 由 host/run_transcripts_r7.py 于本机实跑生成(原文未删改)
+# 说明: 执行器自带的离线计划门(--validate-plan): 命令真实存在/取行取得到/额度申报过/人工门在运动之前。预期且如实保留 fail=1(PLAN_MOTION_CAP_BUDGET 对无起转包是恒红门, 见 plan 的 motion_budget.registered_checker_gap)。
+$ C:\Users\LMX\AppData\Local\Programs\Python\Python312\python.exe D:\ns800\reports\reviews\phase8-m8-relative-protection-r3\field\m8r3_serial_chain.py --validate-plan --plan reports/reviews/phase8-m8-r7-field-package-5ae/field/plan_core_r7.json --repo-root D:\ns800
+cwd=D:\ns800|python=C:\Users\LMX\AppData\Local\Programs\Python\Python312\python.exe|PYTHONIOENCODING=utf-8
+exit_code=1(本步预期 1; 退出码是子进程自己的, 不是管道末端的)
+PLAN_MOTION_WINDOW|S0|PASS|人工门都在运动之前
+PLAN_MOTION_WINDOW|S1|PASS|人工门都在运动之前
+PLAN_MOTION_WINDOW|S2|PASS|人工门都在运动之前
+PLAN_RESET_BEFORE_FIRST_QUERY|S3|PASS|reset@0 first_cmd@1 boot=1
+PLAN_QUOTA|S3|rst|PASS
+PLAN_COMMAND_EXISTS|S3|sysboot|PASS|system_status
+PLAN_ROWS_KEY|S3|sysboot|PASS|system_status
+PLAN_COMMAND_EXISTS|S3|safboot|PASS|safety_status
+PLAN_ROWS_KEY|S3|safboot|PASS|safety_status
+PLAN_COMMAND_EXISTS|S3|irqstat|PASS|safety_irq_status
+PLAN_ROWS_KEY|S3|irqstat|PASS|safety_irq_status
+PLAN_COMMAND_EXISTS|S3|cfgboot|PASS|tmc_config_show
+PLAN_ROWS_KEY|S3|cfgboot|PASS|tmc_config_show@boot
+PLAN_COMMAND_EXISTS|S3|motboot|PASS|motor_status
+PLAN_ROWS_KEY|S3|motboot|PASS|motor_status
+PLAN_MOTION_WINDOW|S3|PASS|人工门都在运动之前
+PLAN_COMMAND_EXISTS|S4|cfgapply|PASS|tmc_config_apply
+PLAN_ROWS_KEY|S4|cfgapply|PASS|tmc_config_apply CONFIRM
+PLAN_QUOTA_MAP|S4|cfgapply|PASS|cmd=tmc_config_apply CONFIRM need=tmc_config_apply declared=tmc_config_apply n=1
+PLAN_COMMAND_EXISTS|S4|cfgafter|PASS|tmc_config_show
+PLAN_ROWS_KEY|S4|cfgafter|PASS|tmc_config_show
+PLAN_COMMAND_EXISTS|S4|sysafter|PASS|system_status
+PLAN_ROWS_KEY|S4|sysafter|PASS|system_status
+PLAN_COMMAND_EXISTS|S4|motafter|PASS|motor_status
+PLAN_ROWS_KEY|S4|motafter|PASS|motor_status
+PLAN_MOTION_WINDOW|S4|PASS|人工门都在运动之前
+PLAN_TOOL_ARGV|download|PASS|python -m pyocd flash --pack C:/Keil_v5/ARM/PACK/.Download/NOVOSENSE.N
+PLAN_TOOL_ARGV|readback|PASS|python -m pyocd commander --no-config -t cortex_m -u @UID_FILE -f 1000
+PLAN_TOOL_ARGV|reset|PASS|python -m pyocd reset --method sysresetreq --no-config --no-wait --con
+PLAN_QUOTA_COVERAGE|all|PASS|used=tmc_config_apply missing=
+PLAN_STATE_AND_FLAG_CONSTANTS|all|PASS|motor={'IDLE': 0, 'ACCEL': 1, 'CRUISE': 2, 'DECEL': 3, 'FAULT': 4} rpf={'COMMITTED': 1, 'FIELD_VERIFIED': 2, 'FROM_LEARN': 4} columns=14
+PLAN_MOTION_CAP_BUDGET|all|FAIL|caps=[] sum=0 total=0 starts=0
+PLAN_IMAGE_IDENTITY_CONSISTENCY|all|PASS|S0=download.axf=readback.bin 同源且回读不认旧镜像
+PLAN_QUOTA_NEED|download|PASS|need=1 declared=1
+PLAN_QUOTA_NEED|explicit_reset|PASS|need=1 declared=1
+PLAN_QUOTA_NEED|port_open|PASS|need=2 declared=2
+PLAN_QUOTA_NEED|readback|PASS|need=1 declared=1
+PLAN_QUOTA_NEED|tmc_config_apply|PASS|need=1 declared=1
+PLAN_SCENARIO_CHAIN|all|PASS|链内分支决定点都在依赖阶段之前: {}
+PLAN_STUB_BRANCHES|all|PASS|申报={} 场景=
+PLAN_PREREQUISITE_GATE|all|PASS|起转前真拒绝已接线: {"assembly_readiness": "PROVIDED", "load_means": "NOT_PROVIDED", "instrument_probe": "NOT_PROVIDED", "imu_mounting": "MOUNTED_TAPE_BY_OPERATOR_RIGIDITY_UNMEASURED"}
+PLAN_SPINUP_GATE_COVERAGE|all|PASS|所有起转/带电阶段都在开端口前检查机械前置
+PLAN_TARGET_CHANNEL|all|PASS|产品枚举=REL_ADC_SEVERE,REL_COVERAGE_LOST,REL_FUSED_SEVERE,REL_IMPACT,REL_OUT_OF_WINDOW,REL_SENSOR_UNAVAILABLE,REL_SG_SEVERE
+PLAN_FIRST_CAUSE_LEGS|all|PASS|trip 链都有同次 REL TRIP/源样本/profile/新 session 四腿
+PLAN_BYTE_RECOVERY|all|PASS|计划未申报任何'损坏后可继续'例外 => 裸 NUL / 非法 UTF-8 / 危险文本一律即停(原字节仍先落盘)
+PLAN_STATUS_ALLOW|all|PASS|未使用(默认所有 REFUSED 线都算业务失败)
+PLAN_BOOT_WINDOW_COVER|all|PASS|下界=75s, 覆盖: S3=75+10+3s=88s
+PLAN_VALIDATE_SUMMARY|checks=47|fail=1|msh_commands=74|plan=reports/reviews/phase8-m8-r7-field-package-5ae/field/plan_core_r7.json
