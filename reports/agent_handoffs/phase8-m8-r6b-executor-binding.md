@@ -98,4 +98,35 @@ field/plan_core_r6b.json  171427 B  08fd5d522d85f05a1eb8d0c51f339ccd05c18761b859
 
 ## 7 推送与独立远端回读
 
-(本轮收口一步补:推送区间、远端精确 SHA、逐 blob 回读的定向结果与残差口径。)
+```text
+推送区间  origin/feature/m8-sg-adc-relative-protection  aab19ff..180cce8   常规 fast-forward, 无 force/rebase
+软件输入  ecfd055e4acb3e99772228aa7087a2ea5b2c190d   (EXEC + 自检 + r4 工具 + r6b 模板/证据)
+证据      180cce894b71cfbe250c0b5e49c34259119f31d9   (对照原文 + 派生清单 + 交接件)
+```
+
+回读方式: 仓外裸克隆 `git fetch --depth=1` 取远端 tip, 再 `git cat-file blob <tip>:<path>` **逐 blob 现算**
+sha256/字节与登记值比对;历史头按精确 SHA 定点 fetch。全部读取只走 git 协议,
+`device_actions=0|serial_ports_opened=0|dap_connections=0|keil_builds=0`。
+
+定向逐 blob 回读 `host/remote_readback_r6b.py` 打在 `180cce8`(rc=0):
+
+```text
+R6B_REMOTE_READBACK_SUMMARY|tip=180cce894b71|checks=28|fails=0|not_checked=0
+```
+
+覆盖 28 项: 四份清单逐条对远端 blob(r6b 13 / r3 5137 / r4 394 / r6a 13, mismatch=0)、候选模板内部申报的
+执行器身份与在板镜像三件、派生源与 R6A 候选、"不重编/零额度"两条声明、交接件申报的三件产物身份与
+"顶层不自证自身字节"、六件冻结旧件(R5-C `05bcf96a…`、R6 `6e0b97f2…`、R6A `556a044e…`、
+`5ae4110d…`/`d70a9180…`/`dab356c6…`)、**基线头 `aab19ff` 上的执行器 `99d6c960…/209786 B`**(按 SHA 定点
+fetch 后现算 —— 正是 §1 修前那一栏的输入字节)、软件输入提交 `ecfd055` 里的 EXEC == 模板登记值,
+以及"证据提交没有偷改执行器"(tip 与该提交的 EXEC 逐字节相同)。
+
+通用全仓回读(`phase8-m8-relative-protection-r3/host/remote_readback.py`, 同一头, rc=0):
+`remote_files=10853 declared=6686 verified=6619`;冻结的 r3 范围 `entries=5149 verified=5149 problems=0`;
+`SCOPE_PRIOR|problems=72`(cross_manifest_sha_conflict=3、declared_but_absent=53、hash_mismatch=6、
+duplicate_conflict=2、suffix_ambiguous=8)—— **与 R6A 收口那次同类别同数量, 本轮零新增**。
+那三条 cross_manifest 仍是旧轮 manifest 之间的登记口径差(R6 那份记它自己构建当时的 `motor.c` blob,
+R4 那份记 `rtconfig.h` 的磁盘字节);本轮没有新增构建件, 所以没有新的 R6B 侧冲突。这是**残差口径**而非本轮回归。
+
+两份原文入库: `remote_readback_at_180cce8.txt`(定向 28 项)与 `remote_readback_generic_at_180cce8.txt`(全仓)。
+§7.3 的停点按字面执行: 回读自己的新头只做一次并把结论写在这里, **不再为"回读这份回读"追加提交**。

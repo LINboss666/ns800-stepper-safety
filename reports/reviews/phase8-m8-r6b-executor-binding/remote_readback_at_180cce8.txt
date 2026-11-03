@@ -1,0 +1,43 @@
+remote_tip=180cce894b71cfbe250c0b5e49c34259119f31d9
+remote_files=10853
+
+== 1. 本轮与受影响轮的清单逐条对远端 blob ==
+OK  |sums/reports/reviews/phase8-m8-r6b-executor-binding/SHA256SUMS.txt|entries=13 mismatch=0
+OK  |sums/reports/reviews/phase8-m8-relative-protection-r3/SHA256SUMS.txt|entries=5137 mismatch=0
+OK  |sums/reports/reviews/phase8-m8-idle-stack-r4/SHA256SUMS.txt|entries=394 mismatch=0
+OK  |sums/reports/reviews/phase8-m8-r6a-offline-rework/SHA256SUMS.txt|entries=13 mismatch=0
+
+== 2. 候选模板内部申报的身份 ==
+OK  |plan.executor|reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py remote=84df1306f48e…/215704 B vs 申报(plan) 84df1306f48e…/215704 B
+OK  |plan.image(在板件)|reports/firmware/phase8-m8-idle-stack-r4/rt-thread-motor-m1-candidate.bin remote=dab356c69fbf…/290916 B vs 申报(plan) dab356c69fbf…/290916 B
+OK  |plan.image.axf|reports/firmware/phase8-m8-idle-stack-r4/rt-thread-motor-m1.axf remote=0babe9f1a874…/1771288 B vs 申报(plan) 0babe9f1a874…/1771288 B
+OK  |plan.image.map|reports/firmware/phase8-m8-idle-stack-r4/rt-thread-motor-m1.map remote=b61632249f99…/2108456 B vs 申报(plan) b61632249f99…/2108456 B
+OK  |plan.derived_from(R6A 冻结源)|reports/reviews/phase8-m8-r6a-offline-rework/field/plan_core_r6a.json remote=556a044e1957…/169310 B vs 申报(plan) 556a044e1957…/169310 B
+OK  |plan.r6a_candidate_frozen|reports/firmware/phase8-m8-r6a-offline-rework/rt-thread-motor-m1-candidate.bin remote=5ae4110d14fd…/292164 B vs 申报(plan) 5ae4110d14fd…/292164 B
+OK  |plan.rebuilt_this_round_false|本轮不重编: False
+OK  |plan.no_hardware_authorization|package_status=R6B_DERIVED_NOT_EXECUTED approval=REQUIRES_NEW_APPROVAL authorized=0
+
+== 3. 交接件申报的产物身份 ==
+OK  |handoff.json.parses|bytes=16295 sha=39f5952e7d7f…
+OK  |handoff.executor|reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py remote=84df1306f48e…/215704 B vs 申报(handoff) 84df1306f48e…/215704 B
+OK  |handoff.selftest_fixture|reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_field_selftest.py remote=b41b3fe83d36…/180687 B vs 申报(handoff) b41b3fe83d36…/180687 B
+OK  |handoff.plan_package|reports/reviews/phase8-m8-r6b-executor-binding/field/plan_core_r6b.json remote=08fd5d522d85…/171427 B vs 申报(handoff) 08fd5d522d85…/171427 B
+OK  |handoff.images_unchanged_declared|未新增构建件的口径写清=否(任务书 §7.1: 不要求再编译); 未新增任何构建件
+OK  |handoff.no_self_hash|交接 JSON 顶层不自证字节(清单不哈希自身的同一条纪律)
+OK  |handoff.md.present|8727 B
+
+== 4. §7.1/复审 §3 要求保持原字节的旧件 ==
+OK  |frozen plan_core_r5c.json|remote=05bcf96aa7a6…/164851 B expect=05bcf96aa7a6… (R5-C 已执行那 26 场的计划)
+OK  |frozen plan_core_r6.json|remote=6e0b97f251a6…/165522 B expect=6e0b97f251a6… (R6 离线派生件)
+OK  |frozen plan_core_r6a.json|remote=556a044e1957…/169310 B expect=556a044e1957… (R6A 交付件(本包的源))
+OK  |frozen rt-thread-motor-m1-candidate.bin|remote=5ae4110d14fd…/292164 B expect=5ae4110d14fd… (R6A 候选镜像(仍未上板))
+OK  |frozen rt-thread-motor-m1-candidate.bin|remote=d70a9180b40c…/292116 B expect=d70a9180b40c… (R6 候选镜像)
+OK  |frozen rt-thread-motor-m1-candidate.bin|remote=dab356c69fbf…/290916 B expect=dab356c69fbf… (已逐字节证在板的那件)
+
+== 5. 基线头 aab19ff 上的执行器身份(定点 fetch 后现算) ==
+OK  |baseline.executor@aab19ff|reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py remote=99d6c9600b05…/209786 B vs 申报(R6A 交付时登记的那份(修前对照的输入)) 99d6c9600b05…/209786 B
+OK  |software_commit 里的 EXEC == 候选模板登记|reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py remote=84df1306f48e…/215704 B vs 申报(plan) 84df1306f48e…/215704 B
+OK  |证据提交未偷改执行器|tip 上的 EXEC 字节与软件输入提交 ecfd055e4acb 里的那份逐字节相同=True
+
+R6B_REMOTE_READBACK_SUMMARY|tip=180cce894b71|checks=28|fails=0|not_checked=0
+device_actions=0|serial_ports_opened=0|dap_connections=0|keil_builds=0|reads_from=remote_git_protocol_only

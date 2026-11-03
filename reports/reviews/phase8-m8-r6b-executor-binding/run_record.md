@@ -172,3 +172,49 @@ idle1024 带载最坏栈余量、现场精确线程交错 NOT_PROVEN、`0x00bd80
 且由内存动作后端替身接收, 从未执行)。临时账本与临时输出目录全在 `%TEMP%` 下的一次性路径里
 (探针 `a-r6a-probes-*`、对照器 `ns800-r6b-ba-*`、自检 `m8r3-field-selftest-*`), 仓库工作树没有
 被这些探针写过; 仓内只留脱敏后的 JSON 原文与断言摘要。
+
+## 18.9 提交、推送与独立远端回读(本轮收口)
+
+```text
+push        origin/feature/m8-sg-adc-relative-protection  aab19ff..180cce8   常规 fast-forward, 无 force/rebase
+软件输入    ecfd055e4acb3e99772228aa7087a2ea5b2c190d      (EXEC + 自检 + r4 工具 + r6b 模板/证据)
+证据        180cce894b71cfbe250c0b5e49c34259119f31d9      (对照原文 + 派生清单 + 交接件)
+设备动作      0(本节只跑 git fetch / git cat-file / 主机测试)
+```
+
+定向逐 blob 回读 `host/remote_readback_r6b.py` 打在 `180cce8`(rc=0):
+
+```text
+R6B_REMOTE_READBACK_SUMMARY|tip=180cce894b71|checks=28|fails=0|not_checked=0
+device_actions=0|serial_ports_opened=0|dap_connections=0|keil_builds=0|reads_from=remote_git_protocol_only
+```
+
+覆盖: 四份清单逐条对远端 blob(r6b 13 / r3 5137 / r4 394 / r6a 13, mismatch=0)、候选模板内部申报的
+执行器/在板镜像三件/派生源/R6A 候选/不重编与零额度声明、交接件申报的三件产物身份与"顶层不自证字节"、
+六件冻结旧件(R5-C `05bcf96a…`、R6 `6e0b97f2…`、R6A `556a044e…`、`5ae4110d…`/`d70a9180…`/`dab356c6…`)、
+**基线头 `aab19ff` 上的执行器 `99d6c960…/209786 B`**(按 SHA 定点 fetch 后现算, 正是 §18.1 修前那一栏的输入)、
+软件输入提交 `ecfd055` 里的 EXEC == 模板登记值, 以及"证据提交没有偷改执行器"(tip 与该提交的 EXEC 逐字节相同)。
+
+通用全仓回读(`phase8-m8-relative-protection-r3/host/remote_readback.py`, rc=0) 同一头上:
+`remote_files=10853 declared=6686 verified=6619`;冻结的 r3 范围 `entries=5149 verified=5149 problems=0`;
+`SCOPE_PRIOR|problems=72`(cross_manifest_sha_conflict=3、declared_but_absent=53、hash_mismatch=6、
+duplicate_conflict=2、suffix_ambiguous=8)—— **与 R6A 收口那次同类别同数量, 本轮零新增**;
+那三条 cross_manifest 仍是旧轮 manifest 之间的登记口径差(R6 那份记它自己构建当时的 motor.c blob;
+R4 那份记 `rtconfig.h` 的磁盘字节), 本轮没有新增构建件, 故没有新的 R6B 侧冲突。
+
+两份原文入库: `remote_readback_at_180cce8.txt`(定向 28 项) 与
+`remote_readback_generic_at_180cce8.txt`(全仓)。回读自己的新头只做一次并在回执里给结论,
+不再为"回读这份回读"继续追加提交。
+
+## 18.10 收口提交前的最后一步(本节即最后一步)
+
+- 交接 MD `§7 推送与独立远端回读` 由占位符改为实测数字(推送区间 `aab19ff..180cce8`、
+  定向 `checks=28 fails=0 not_checked=0`、全仓 `declared=6686 verified=6619`、
+  `SCOPE_R3 problems=0`、`SCOPE_PRIOR problems=72` 与 R6A 同类别同数量 = 残差口径而非本轮回归)。
+- 交接 JSON 追加 `remote_readback` 块后重生成: 18440 B `3075c409f2669846…`, keys=33。
+- 本轮清单跟随数据重算: `SHA256SUMS.txt` 13 → **16 条**(新增 `host/remote_readback_r6b.py` 与两份
+  回读原文), 清单自身不入清单。
+- `staged_preflight_batch.py`(本批 8 件全部 `git add` 之后) → `STAGED_PREFLIGHT_TOTAL problems=0`,
+  r6b 清单 `entries=16 problems=0`;四条 LF、无 BOM 逐文件实测 CR=0。
+- 本步之后只允许**一次**提交与推送, 再对新头跑一次定向回读并把结论只写进会话回执
+  (§7.3: 不为回读自己的新头无限追加提交)。

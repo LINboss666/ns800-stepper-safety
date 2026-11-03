@@ -223,6 +223,27 @@
   "run_record §18.8 草稿里曾有一句自我疑问式的临时措辞(临时目录位置), 已改成实测陈述; 同节保留 A §6 的两条更正口径: '8 件已还原'只描述 R6A 当时的处理, 且 R4 派生输出确有合法更新",
   "本轮没有产品 C 改动, 故 motor.c 的 101 B 最长行与 R6A 一致, 未再改宽口径"
  ],
+ "remote_readback": {
+  "push": "origin/feature/m8-sg-adc-relative-protection 由 aab19ff 常规 fast-forward 到 180cce8(软件输入 ecfd055 + 证据 180cce8; 收口再顺序追加一次证据提交); 无 rebase/merge/amend/force, 未新建分支, 未碰冻结引用",
+  "round_scoped_script": "reports/reviews/phase8-m8-r6b-executor-binding/host/remote_readback_r6b.py",
+  "round_scoped_summary": "tip=180cce894b71 checks=28 fails=0 not_checked=0",
+  "round_scoped_covers": [
+   "四份清单逐条对远端 blob: r6b 13 / r3 5137 / r4 394 / r6a 13, mismatch=0",
+   "候选模板内部申报: 执行器 84df1306…/215704 B、在板镜像三件、派生源(R6A 计划)、R6A 候选 bin、rebuilt_this_round=false、hardware_actions_authorized=0",
+   "交接件申报的 executor/selftest/plan 三件产物身份 + 顶层不自证字节",
+   "六件冻结旧件未被改动: R5-C 05bcf96a…、R6 6e0b97f2…、R6A 556a044e…、5ae4110d…、d70a9180…、dab356c6…",
+   "基线头 aab19ff 上的执行器 99d6c960…/209786 B(按 SHA 定点 fetch 后现算, 即修前对照的输入)",
+   "软件输入提交 ecfd055 里的 EXEC == 模板登记值; 证据提交未偷改执行器(tip 与该提交逐字节相同)"
+  ],
+  "generic_summary_at_same_tip": "remote_files=10853 declared=6686 verified=6619; 冻结的 r3 范围 entries=5149 verified=5149 problems=0; SCOPE_PRIOR problems=72(cross_manifest_sha_conflict=3, declared_but_absent=53, hash_mismatch=6, duplicate_conflict=2, suffix_ambiguous=8) —— 与 R6A 收口那次同类别同数量, 本轮零新增",
+  "prior_scope_residual": "三条 cross_manifest 与 r6 的 motor.c hash_mismatch 仍是旧轮 manifest 之间的登记口径差(各自记自己构建当时的字节); R4 的 rtconfig.h 记的是磁盘那份, R6 起记 blob。本轮未新增构建件, 所以没有 R6B 侧的新冲突; 冻结件不回改",
+  "transcripts": [
+   "reports/reviews/phase8-m8-r6b-executor-binding/remote_readback_at_180cce8.txt",
+   "reports/reviews/phase8-m8-r6b-executor-binding/remote_readback_generic_at_180cce8.txt"
+  ],
+  "device_actions": 0,
+  "reads_from": "remote_git_protocol_only"
+ },
  "status_block": [
   "R6A_evidence = ACCEPTED",
   "R1_approval_ledger_normal_paths = HOST_TARGETED_TESTS_PASSED",
