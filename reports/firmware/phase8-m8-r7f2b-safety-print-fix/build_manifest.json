@@ -1,0 +1,224 @@
+{
+ "round": "phase8-m8-r7f2b-safety-print-fix",
+ "date": "2026-11-04",
+ "title": "A 复审 R7F2B: safety_status 的 ENN_FEEDBACK 长行拆成两条 ≤127 B 短行, 单目标构建一次",
+ "review_source": {
+  "zip": "C:/Users/LMX/Downloads/NS800_R7F2B_A_Review_and_Print_Fix_20261104.zip",
+  "zip_bytes": 13049,
+  "zip_sha256": "9fad8f1d1a917bda350047725562279e5a43f971b7a828254443d8fffc04b6e1",
+  "verdict": "READY 已达成 + 修复 safety_status 截断(离线补丁 + 一次构建, 硬件动作批准 0)",
+  "reviewed_baseline_commit": "70deff806e8b548dee23afb06a6fcdf20937b015",
+  "patch_file": "safety_status_short_lines.patch (1221 B, sha256 8b9f977fb14bdc1b4227f891fa980610d03b4870abddfdd5b9ebebaa7e86c7ca)"
+ },
+ "baseline_commit": "70deff806e8b548dee23afb06a6fcdf20937b015",
+ "target": "rt-thread-motor-m1-candidate",
+ "action": "Keil Rebuild All x1(只 rt-thread-motor-m1-candidate, -r 不是 -f)。未下载、未 Flash、未碰 DAP、未复位、未开串口、未起转、未 learn/zero、未 config_save。设备动作 0。",
+ "command": "C:\\Keil_v5\\UV4\\UV4.exe -r project.uvprojx -t rt-thread-motor-m1-candidate -j0 -o D:/ns800/reports/reviews/phase8-m8-r7f2b-safety-print-fix/build/rt-thread-motor-r7f2b.log",
+ "working_directory": "D:\\ns800\\rt-thread-master\\rt-thread-master\\bsp\\novosns\\ns800\\ns800rt7p65-nssinepad",
+ "uv4_return_code_observed_this_round": 0,
+ "error_warning_line": "0 Error(s), 0 Warning(s).",
+ "compiler_line_from_log": "*** Using Compiler 'V6.24', folder: 'C:\\Keil_v5\\ARM\\ARMCLANG\\Bin'",
+ "build_time_elapsed_line": "Build Time Elapsed:  00:00:10",
+ "log": {
+  "path": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/build/rt-thread-motor-r7f2b.log",
+  "bytes": 3909,
+  "sha256": "31f1b1677c4bbed87aadbc94ecfa88282375c7b2677e465913c4f913a5aae9ca",
+  "note": "UV4 输出是 CRLF 原件; 本目录在 .gitattributes 里判 -text, 所以 blob == 磁盘字节"
+ },
+ "program_size": "Program Size: Code=205930 RO-data=86198 RW-data=2192 ZI-data=85596",
+ "program_size_vs_previous_round_same_target": {
+  "previous": "Program Size: Code=205922 RO-data=86186 RW-data=2192 ZI-data=85596",
+  "previous_manifest": "reports/firmware/phase8-m8-r7f1a-minimal-c-patch/build_manifest.json",
+  "delta_bytes": {
+   "Code": 8,
+   "RO-data": 12,
+   "RW-data": 0,
+   "ZI-data": 0
+  },
+  "bin_bytes": 292708,
+  "previous_bin_bytes": 292684,
+  "previous_bin_sha256": "b4243886818b6b2cf2e30d10864272225e1b0e66c8435c8a50bb449053e153bf",
+  "bin_delta": 24,
+  "why_bin_grew": "一条格式串拆成两条: 第二段成为独立字符串常量(自带终止 NUL 与对齐), RO-data +12 B; 栈/全局没动(RW/ZI 差 0)"
+ },
+ "images": {
+  "bin": {
+   "path": "reports/firmware/phase8-m8-r7f2b-safety-print-fix/rt-thread-motor-m1-candidate.bin",
+   "bytes": 292708,
+   "sha256": "502dca5d8c7ebfa794f890a9c03bc258fc9753f57b6a80c2f1e08add69888a7a",
+   "blob_sha1": "96fc76b623a759d7cf5a66725ffc8c2b8b12c6c5",
+   "disk_CR": 774,
+   "disk_LF": 2448,
+   "blob_bytes": 292708,
+   "blob_sha256": "502dca5d8c7ebfa794f890a9c03bc258fc9753f57b6a80c2f1e08add69888a7a",
+   "blob_form_matched_by_sha1": "disk",
+   "blob_equals_disk_bytes": true,
+   "text_filter_active_on_this_path": false
+  },
+  "axf": {
+   "path": "reports/firmware/phase8-m8-r7f2b-safety-print-fix/rt-thread-motor-m1.axf",
+   "bytes": 1775972,
+   "sha256": "fc567635d98a76cfb5bb32c3df27f611061bdc39887c90fce75da44dac8d86f8",
+   "blob_sha1": "dda278724eafe59250089fcd2af6faeb8c78be16",
+   "disk_CR": 7757,
+   "disk_LF": 10071,
+   "blob_bytes": 1775972,
+   "blob_sha256": "fc567635d98a76cfb5bb32c3df27f611061bdc39887c90fce75da44dac8d86f8",
+   "blob_form_matched_by_sha1": "disk",
+   "blob_equals_disk_bytes": true,
+   "text_filter_active_on_this_path": false
+  },
+  "map": {
+   "path": "reports/firmware/phase8-m8-r7f2b-safety-print-fix/rt-thread-motor-m1.map",
+   "bytes": 2114829,
+   "sha256": "fc33986f3e5928d2724812ebe1be7609230312a38d46d0ca4f87806067c1a0db",
+   "blob_sha1": "51b04798e657a043f5489b4ecf655016ab50da5c",
+   "disk_CR": 21413,
+   "disk_LF": 21413,
+   "blob_bytes": 2114829,
+   "blob_sha256": "fc33986f3e5928d2724812ebe1be7609230312a38d46d0ca4f87806067c1a0db",
+   "blob_form_matched_by_sha1": "disk",
+   "blob_equals_disk_bytes": true,
+   "text_filter_active_on_this_path": false
+  },
+  "callgraph": {
+   "path": "reports/firmware/phase8-m8-r7f2b-safety-print-fix/rt-thread-motor-m1-callgraph.htm",
+   "bytes": 1078228,
+   "sha256": "39134ee1462b0612600a32519870e2c65b90197a43739f43685d1b000e95863c",
+   "blob_sha1": "23cd148ec9de9f0e1de1fdd05fed94eb8df8c015",
+   "disk_CR": 14982,
+   "disk_LF": 14982,
+   "blob_bytes": 1078228,
+   "blob_sha256": "39134ee1462b0612600a32519870e2c65b90197a43739f43685d1b000e95863c",
+   "blob_form_matched_by_sha1": "disk",
+   "blob_equals_disk_bytes": true,
+   "text_filter_active_on_this_path": false
+  }
+ },
+ "images_blob_identity_note": "每条都登记 blob_sha1 / blob_sha256 / blob_bytes 与 text_filter_active_on_this_path, 判据是 git hash-object --path 的 sha1 与我按 git 对象头本地重算的 sha1 是否对上。本轮实测: 未加 .gitattributes 规则前, .map 与 .htm(纯 CRLF 文本)被 autocrlf 判成文本并剥掉 CR, 于是 blob != 磁盘字节; 加 reports/firmware|reviews/phase8-m8-r7f2b-safety-print-fix/** -text 之后四条全部 blob == 磁盘。规则在提交之前生效, 所以入库 blob 就是磁盘原字节, 允许第三方逐 blob 复算。",
+ "change_effect_proved_in_image": {
+  "method": "在两枚 BIN 里按 NUL 分串枚举带标签前缀([SAFETY]/[MOT]/[SS]/[BOOT]/[TMC])的格式串, 数出 >127 B 的条数并定位合并串/两段短串",
+  "old_image_b424": {
+   "tagged_strings": 323,
+   "over_127B": 36,
+   "merged_ENN_form_found": 1,
+   "split_A_form_found": 1,
+   "split_B_form_found": 0,
+   "ENN_format_string_bytes": 147
+  },
+  "new_image": {
+   "tagged_strings": 324,
+   "over_127B": 35,
+   "merged_ENN_form_found": 0,
+   "split_A_form_found": 1,
+   "split_B_form_found": 1,
+   "ENN_format_string_bytes": 61
+  },
+  "reading": "合并形态从镜像里消失、两段短串各自成串、>127 B 的 tagged 串正好少一条(36->35) => 改动确实进了这一版链接产物。格式串长度不等于运行时展开长度, 运行时长度的证据是 host 模型复算(见 host_tests)。",
+  "registered_not_fixed": "同一份镜像里还有 35 条 >127 B 的带标签格式串(例如 257 B 的 `[MOT] !! 业务失败(原错误=%d src=%s)…`)。本轮范围只到 A 指定的这一处, 未顺带扩改; 是否逐条清点请 A 定。"
+ },
+ "source_inputs_compiled_from_disk": [
+  {
+   "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/safety_gpio.c",
+   "compiled_from_disk_bytes": 24883,
+   "compiled_from_disk_sha256": "8d097018acab602141a1a36dfe2b29eedeb619fc03e05965681e0919ffeb9aec",
+   "disk_CR": 0,
+   "disk_LF": 611,
+   "blob": {
+    "blob_sha1": "2055c7496be91830709155a9ffb0720a0b0bdb8d",
+    "blob_bytes": 24883,
+    "blob_sha256": "8d097018acab602141a1a36dfe2b29eedeb619fc03e05965681e0919ffeb9aec",
+    "blob_form_matched_by_sha1": "disk",
+    "git_hash_object_path_agrees": true,
+    "blob_equals_disk_bytes": true
+   },
+   "head_blob_before_patch": "b242dfad1fed0c5b5be5869febef6375e2708a8f",
+   "identity_kind": "disk_equals_blob"
+  }
+ ],
+ "source_input_note": "本轮只改 safety_gpio.c 一个文件的 450-452 行(2 增 2 删)。rtconfig.h/.config/tmc2209.c 与上一场逐字未动, 其身份见 reports/firmware/phase8-m8-r7f1a-minimal-c-patch/build_manifest.json。",
+ "git_apply_hygiene": {
+  "apply_check_before": "rc=0",
+  "postimage_blob_expected_by_patch": "2055c7496be91830709155a9ffb0720a0b0bdb8d",
+  "postimage_blob_actual": "2055c7496be91830709155a9ffb0720a0b0bdb8d",
+  "diff_numstat": "2\t2\t…/safety_gpio.c",
+  "line_ending_note": "git apply 在本仓库 core.autocrlf=true 下把这份工作树文件写成了 CRLF; 该文件原本是 LF-only, 已把磁盘行尾归一回 LF(版本化 blob 不受影响, 仍是补丁声明的 postimage 2055c74…), 于是 git diff 只报 2 增 2 删。"
+ },
+ "host_tests": {
+  "io_behavior_chain": {
+   "script": "tests/host/run_io_behavior.sh",
+   "rc": 0,
+   "verdict": "PASS",
+   "variants": {
+    "off_target": "33 必需用例全 PASS 自报 fail=0 proc_rc=0",
+    "on_target": "35 必需用例全 PASS 自报 fail=0 proc_rc=0",
+    "off_ovr": "46 必需用例全 PASS 自报 fail=0 proc_rc=0",
+    "on_ovr": "48 必需用例全 PASS 自报 fail=0 proc_rc=0",
+    "illegal": "非法宏值按预期编译拒绝 rc=1"
+   },
+   "why_this_chain": "io_main.c 用 #include \"safety_gpio.c\" 真编译被改文件; sp_conc_main.c 那一链不编译 safety_gpio.c, 所以受影响面是这条。"
+  },
+  "needles": {
+   "command": "--prove-needles needles.json(40 条) 对改后源码树",
+   "total": 40,
+   "unproven": 0,
+   "note": "被拆的那条 ENN 文本不在任何 needle 里(在 needles.json 里搜 ENN_FEEDBACK/只读输入 = 0 命中), 所以 needle 链没有被动到"
+  },
+  "console_model_reproduction": {
+   "script": "D:/ns800_r7f1_scratch/repro_enn_model_r7f2b.py",
+   "raw": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/host/enn_model_repro.txt",
+   "compiler": "gcc (tdm64-1) 4.9.2 @ C:/Program Files (x86)/Dev-Cpp/MinGW64/bin/gcc.exe",
+   "before_as_shipped": "rc=3221225477(0xC0000005 访问违例): 本机 msvcrt 的 vsnprintf 在截断时返回 -1, A 的量具把 k=n>127?127:n 直接交给 fwrite((size_t)-1) 就冲过缓冲区。**这条失败原文保留, 不删不改。**",
+   "before_with_c99_stdio": "-D__USE_MINGW_ANSI_STDIO=1 后 bytes=471 nul=1 utf8=不完整 max_line=214, 逐条 CALL 与 A 的登记值一致(含 intended=150 emitted=127 truncated=1) => AGREE",
+   "after": "两种编译口径都 bytes=503 nul=0 utf8=完整 max_line=106, CALL 里 ENN 两行 intended=64/95 truncated=0 => AGREE",
+   "sweep_108": "108 组 request/pad/feedback/resolved/limit 全跑: 修后 0 NUL / 0 越钳位 / 0 半截 UTF-8, 最宽 106 B; 修前 108/108 都有 NUL 且都有 >127 B 的行, 90/108 还出现半截 UTF-8 => 缺陷与实参无关, 修后与实参无关地安全",
+   "extraction_fidelity": "A 的两份提取件与产品 safety_status() 函数体逐行比对: 47 行 vs 47 行, 双向差异 0(修前对 70deff8 的源码, 修后对改后源码)"
+  },
+  "motor_step_fragments": {
+   "script": "D:/ns800_r7f1_scratch/repro_motor_step_r7f2b.py",
+   "raw": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/host/motor_step_repro.txt",
+   "engine": "真实执行器 m8r3_serial_chain.py --dispatch --transport stub --backend sim (不带 --approval-id, 不碰设备)",
+   "original_step_on_known_rows": "STOP / BUSINESS_FAILED(lines=[MOT] arm_gate_mask=0x18 REFUSED) => A 的误拒结论成立",
+   "replacement_step_on_known_rows": "OK",
+   "mutations_all_stop": {
+    "armed1": "FIELD_VALUE_MISMATCH",
+    "request_high": "PROFILE_NOT_AT_REST",
+    "mask_0x1A": "BUSINESS_FAILED",
+    "extra_refusal_line": "BUSINESS_FAILED",
+    "missing_field": "PROFILE_NOT_AT_REST",
+    "duplicate_field": "FIELD_NOT_EXACTLY_ONE",
+    "health_degraded": "FIELD_VALUE_MISMATCH"
+   }
+  },
+  "erratum_registered": "上一场归档里把这条行记成 \"150 B 正文 + LF = 151 B\": 那是把源码里的 转义 `\\n`(2 字节)当成了换行本身。运行时展开是 **149 B 正文 + LF = 150 B**(A 的口径), 越钳位 23 B 的结论与\"前 126 B 与源逐字节相等\"都不受影响。旧文件按字节冻结原则不回改, 勘误记在本件与交接里。"
+ },
+ "device_actions_by_this_round": {
+  "download": 0,
+  "readback": 0,
+  "explicit_reset": 0,
+  "port_open": 0,
+  "apply": 0,
+  "config_save": 0,
+  "arm_or_start_or_learn": 0,
+  "note": "A: 本包硬件动作批准数为 0; 新镜像身份出来后再定实际现场范围"
+ },
+ "new_image_on_board": false,
+ "board_image_still": {
+  "sha256": "b4243886818b6b2cf2e30d10864272225e1b0e66c8435c8a50bb449053e153bf",
+  "bytes": 292684,
+  "proven_by": "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T161728Z/readback.bin"
+ },
+ "not_overwritten": [
+  "reports/firmware/phase8-m8-r7f1-startup-c-fix/**",
+  "reports/firmware/phase8-m8-r7f1a-minimal-c-patch/**",
+  "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T161728Z/**",
+  "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T163850Z/**",
+  "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/rows_startup_b424.json",
+  "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/plan_startup_b424_reviewed.json"
+ ],
+ "working_tree_at_build": {
+  "head": "70deff806e8b548dee23afb06a6fcdf20937b015",
+  "porcelain_lines": 8,
+  "note": "构建时本轮改动未提交(manifest 生成早于提交); compiled_from_disk_* 就是 Keil 实际编译的字节"
+ }
+}

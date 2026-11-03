@@ -447,9 +447,9 @@ static void safety_status(void)
         rt_bool_t  fb_ok = RT_FALSE;
 
         safety_fb_snapshot(&req, &pad, &fb, &fb_ok);
-        rt_kprintf("[SAFETY] ENN_FEEDBACK(%s = 板上 TMC_ENN) raw=%d resolved=%s "
-                   "[只读输入, 非急停感测; HIGH=禁能侧, LOW=未施加禁能(不保证转矩)]\n",
+        rt_kprintf("[SAFETY] ENN_FEEDBACK(%s = 板上 TMC_ENN) raw=%d resolved=%s\n",
                    PIN_NAME_ENN_FEEDBACK, (int)fb, fb_ok ? "YES" : "NO");
+        rt_kprintf("[SAFETY] [只读输入, 非急停感测; HIGH=禁能侧, LOW=未施加禁能(不保证转矩)]\n");
         if (req < 0)
         {
             rt_kprintf("[SAFETY] drive request = NEVER-VERIFIED -> feedback verdict = NO_SAMPLE\n");

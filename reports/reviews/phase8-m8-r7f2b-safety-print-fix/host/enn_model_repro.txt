@@ -1,0 +1,21 @@
+== 1) A's extracted model, compiled and run at this session's values ==
+  before as-shipped rc=3221225477 bytes=9215(+3 CR) nul=4896 utf8=False max_line=9065 lines=4 over127=[9065] | A登记 bytes=471 nul=1 utf8=False max=214 => DISAGREE
+         calls: (stderr 为空)
+  before ansi-stdio rc=0 bytes=471(+5 CR) nul=1 utf8=False max_line=214 lines=5 over127=[214] | A登记 bytes=471 nul=1 utf8=False max=214 => AGREE
+         calls: CALL intended=31 emitted=31 truncated=0 | CALL intended=45 emitted=45 truncated=0 | CALL intended=75 emitted=75 truncated=0 | CALL intended=150 emitted=127 truncated=1 | CALL intended=87 emitted=87 truncated=0 | CALL intended=106 emitted=106 truncated=0
+  after  as-shipped rc=0 bytes=503(+7 CR) nul=0 utf8=True max_line=106 lines=7 over127=[] | A登记 bytes=503 nul=0 utf8=True max=106 => AGREE
+         calls: CALL intended=31 emitted=31 truncated=0 | CALL intended=45 emitted=45 truncated=0 | CALL intended=75 emitted=75 truncated=0 | CALL intended=64 emitted=64 truncated=0 | CALL intended=95 emitted=95 truncated=0 | CALL intended=87 emitted=87 truncated=0 | CALL intended=106 emitted=106 truncated=0
+  after  ansi-stdio rc=0 bytes=503(+7 CR) nul=0 utf8=True max_line=106 lines=7 over127=[] | A登记 bytes=503 nul=0 utf8=True max=106 => AGREE
+         calls: CALL intended=31 emitted=31 truncated=0 | CALL intended=45 emitted=45 truncated=0 | CALL intended=75 emitted=75 truncated=0 | CALL intended=64 emitted=64 truncated=0 | CALL intended=95 emitted=95 truncated=0 | CALL intended=87 emitted=87 truncated=0 | CALL intended=106 emitted=106 truncated=0
+
+== 2) 108-combination sweep (q x pad x fb x resolved x limits) ==
+  combos = 108 (A 登记 108)
+  before runs=108 含NUL=108 UTF-8不完整=90 有行>127B=108 最宽行=216
+  after  runs=108 含NUL=0 UTF-8不完整=0 有行>127B=0 最宽行=106
+
+== 3) extraction fidelity: A's model body vs the product function ==
+  before model_lines=47 product_lines=47 只在模型=0 只在产品=0
+  after  model_lines=47 product_lines=47 只在模型=0 只在产品=0
+
+FAILS=0 []
+report=D:\ns800_r7f1_scratch\enn_model_repro\model_repro.txt

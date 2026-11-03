@@ -1,0 +1,15 @@
+# sha256 * <仓库相对路径>(LF, 无 BOM; 本清单不哈希自身字节 —— 一条清单不能给自己的字节作证)
+# 生成方式: 对 reports/reviews/phase8-m8-r7f2b-safety-print-fix/ 下每个常规文件(排除 SHA256SUMS.txt、remote_readback.md 与 __pycache__) 直接读磁盘字节算 sha256
+# 条目数=11; 与 Git blob 的逐条复算由 host/staged_preflight_batch.py(提交前, 单批流)与推送后的远端逐 blob 回读完成
+# 重新生成: python reports/reviews/phase8-m8-idle-stack-r4/host/make_round_sums.py <本目录>
+31f1b1677c4bbed87aadbc94ecfa88282375c7b2677e465913c4f913a5aae9ca  reports/reviews/phase8-m8-r7f2b-safety-print-fix/build/rt-thread-motor-r7f2b.log
+80c4b7818496ba202b6bc771906cccca2df176ddc67ea03c3f07770e9ff314b8  reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/plan_r7f2b_newimage_draft.json
+4c57fd3c7fc9b4c96cf28a76726ac0526f2fbb7f66882e4b40ddab60f6039ec2  reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/rows_r7f2b_source_shape.json
+2ed6bb20f0c7bd8a378a66eaec651fd0063e9a7ec033160443f772b20d32ea79  reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/validate_plan_offline_draft.txt
+fd552c714a0217b313186b7c7594d8ed27732b0c72ccc2c4cd391f85137cae1b  reports/reviews/phase8-m8-r7f2b-safety-print-fix/handoff_R7F2B_offline.json
+800320be421265ef989bffaa949c6edbe97e3733965e92b6467bb6b6f5bf346f  reports/reviews/phase8-m8-r7f2b-safety-print-fix/handoff_R7F2B_offline.md
+3272e59251a95b51015a0ce602f4434cd72cd5552ed30cbfa7cd291784fc553c  reports/reviews/phase8-m8-r7f2b-safety-print-fix/host/enn_model_repro.txt
+f84abe11f1140f2cb32291decb30a5759437371f6d8958d6112c022d20723cf7  reports/reviews/phase8-m8-r7f2b-safety-print-fix/host/image_strings_r7f2b.txt
+ef4da83b8cd4422428963d684dd3241420824a570fe647188d8340e3ff8538f6  reports/reviews/phase8-m8-r7f2b-safety-print-fix/host/io_chain_r7f2b.txt
+1a4d3ae4c1c39308e08ff28492da1a35ad35ee794fa2abc521a54bd9eb781774  reports/reviews/phase8-m8-r7f2b-safety-print-fix/host/motor_step_repro.txt
+87447d39303f8e12be68452a95f7c429b6db033a601c7932f59b6e3298342f7e  reports/reviews/phase8-m8-r7f2b-safety-print-fix/run_record.md

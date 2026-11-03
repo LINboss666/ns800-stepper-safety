@@ -1,0 +1,13 @@
+case                             status code                     detail
+original_step_known_rows         STOP   BUSINESS_FAILED          {"verdict": "STOP", "code": "BUSINESS_FAILED", "lines": ["[MOT] arm_gate_mask=0x18 REFUSED"]}
+replacement_known_rows           OK                              
+replacement_armed1               STOP   FIELD_VALUE_MISMATCH     {"verdict": "STOP", "code": "FIELD_VALUE_MISMATCH", "wrong": {"armed": ["1", "0"]}, "forbidden_val": {}, "absent_groups": []}
+replacement_request_high         STOP   PROFILE_NOT_AT_REST      {"verdict": "STOP", "code": "PROFILE_NOT_AT_REST", "bad": ["drv_request=HIGH/pad=1"], "fields": {"state_num": 0, "state_name": "OTHER", "armed": 0, "drv_en_requ
+replacement_mask_1a              STOP   BUSINESS_FAILED          {"verdict": "STOP", "code": "BUSINESS_FAILED", "lines": ["[MOT] arm_gate_mask=0x1A REFUSED"]}
+replacement_extra_refusal        STOP   BUSINESS_FAILED          {"verdict": "STOP", "code": "BUSINESS_FAILED", "lines": ["[MOT] motor_start REFUSED: not ready"]}
+replacement_missing_field        STOP   PROFILE_NOT_AT_REST      {"verdict": "STOP", "code": "PROFILE_NOT_AT_REST", "bad": ["FIELD_MISSING_fb"], "fields": null}
+replacement_duplicate_field      STOP   FIELD_NOT_EXACTLY_ONE    {"verdict": "STOP", "code": "FIELD_NOT_EXACTLY_ONE", "row": "^\\[MOT\\] state=(?P<state>\\d+) name=(?P<name>\\w+)$", "count": 2}
+replacement_health_degraded      STOP   FIELD_VALUE_MISMATCH     {"verdict": "STOP", "code": "FIELD_VALUE_MISMATCH", "wrong": {"health": ["DEGRADED", "OK"]}, "forbidden_val": {}, "absent_groups": []}
+
+wrote D:\ns800_r7f1_scratch\motor_step_repro\repro_results.json
+device actions in this script: 0 (transport=stub, backend=sim, no --approval-id)

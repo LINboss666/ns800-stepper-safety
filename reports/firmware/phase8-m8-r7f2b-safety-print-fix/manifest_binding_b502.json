@@ -1,0 +1,33 @@
+{
+ "note": "S0 只认 build_manifest 的 targets[].images 形状; 本轮 manifest 是平铺 images, 这个件只做**已核实字段的入口适配**, 不改原始构建清单, 也不声称新构建。",
+ "source_manifest": {
+  "path": "reports/firmware/phase8-m8-r7f2b-safety-print-fix/build_manifest.json",
+  "bytes": 12985,
+  "sha256": "059bebe6419f6093636186ffe3f9a8f1dc90c966b1da6e10f01e44d1062b980d"
+ },
+ "targets": [
+  {
+   "target": "rt-thread-motor-m1-candidate",
+   "images": {
+    "bin": {
+     "bytes": 292708,
+     "sha256": "502dca5d8c7ebfa794f890a9c03bc258fc9753f57b6a80c2f1e08add69888a7a"
+    },
+    "axf": {
+     "bytes": 1775972,
+     "sha256": "fc567635d98a76cfb5bb32c3df27f611061bdc39887c90fce75da44dac8d86f8"
+    },
+    "map": {
+     "bytes": 2114829,
+     "sha256": "fc33986f3e5928d2724812ebe1be7609230312a38d46d0ca4f87806067c1a0db"
+    },
+    "callgraph": {
+     "bytes": 1078228,
+     "sha256": "39134ee1462b0612600a32519870e2c65b90197a43739f43685d1b000e95863c"
+    }
+   }
+  }
+ ],
+ "target_of_interest": "rt-thread-motor-m1-candidate.bin",
+ "verified_from": "同一轮 build_manifest.json 的 images 段, 逐条由磁盘字节现算(见 manifest)"
+}

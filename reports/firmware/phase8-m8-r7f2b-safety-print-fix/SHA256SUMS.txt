@@ -1,0 +1,10 @@
+# sha256 * <仓库相对路径>(LF, 无 BOM; 本清单不哈希自身字节 —— 一条清单不能给自己的字节作证)
+# 生成方式: 对 reports/firmware/phase8-m8-r7f2b-safety-print-fix/ 下每个常规文件(排除 SHA256SUMS.txt、remote_readback.md 与 __pycache__) 直接读磁盘字节算 sha256
+# 条目数=6; 与 Git blob 的逐条复算由 host/staged_preflight_batch.py(提交前, 单批流)与推送后的远端逐 blob 回读完成
+# 重新生成: python reports/reviews/phase8-m8-idle-stack-r4/host/make_round_sums.py <本目录>
+059bebe6419f6093636186ffe3f9a8f1dc90c966b1da6e10f01e44d1062b980d  reports/firmware/phase8-m8-r7f2b-safety-print-fix/build_manifest.json
+c8e59b36b0b3543aed744dcae933c4032d921c991c4d9988a98f8d925b50dd4e  reports/firmware/phase8-m8-r7f2b-safety-print-fix/manifest_binding_b502.json
+39134ee1462b0612600a32519870e2c65b90197a43739f43685d1b000e95863c  reports/firmware/phase8-m8-r7f2b-safety-print-fix/rt-thread-motor-m1-callgraph.htm
+502dca5d8c7ebfa794f890a9c03bc258fc9753f57b6a80c2f1e08add69888a7a  reports/firmware/phase8-m8-r7f2b-safety-print-fix/rt-thread-motor-m1-candidate.bin
+fc567635d98a76cfb5bb32c3df27f611061bdc39887c90fce75da44dac8d86f8  reports/firmware/phase8-m8-r7f2b-safety-print-fix/rt-thread-motor-m1.axf
+fc33986f3e5928d2724812ebe1be7609230312a38d46d0ca4f87806067c1a0db  reports/firmware/phase8-m8-r7f2b-safety-print-fix/rt-thread-motor-m1.map

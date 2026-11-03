@@ -1,0 +1,325 @@
+{
+ "round": "phase8-m8-r7f2b-safety-print-fix",
+ "title": "M8-R7F2B: A 复审 5 项离线落地(补丁+source_shape rows+计划承接+一次构建), 设备动作 0",
+ "date_local": "2026-11-04",
+ "execution_head": "70deff806e8b548dee23afb06a6fcdf20937b015",
+ "execution_head_note": "本字段是**生成本件时**的 HEAD(上一轮提交), 本轮归档提交在它之后 —— 自记提交号会构成循环, 所以不在此声称本轮 commit/hash。",
+ "branch": "feature/m8-sg-adc-relative-protection",
+ "authored_by": "local agent (LMX 的本地执行)",
+ "review_source": {
+  "zip_sha256": "9fad8f1d1a917bda350047725562279e5a43f971b7a828254443d8fffc04b6e1",
+  "zip_bytes": 13049,
+  "baseline_commit": "70deff806e8b548dee23afb06a6fcdf20937b015",
+  "items": 5
+ },
+ "operator_authorization": {
+  "this_round": "NONE - 本轮没有向操作者索要、也没有得到任何硬件动作批准",
+  "a_review_instruction": "本包只安排离线补丁和一次构建; 硬件动作批准数为 0 (A README §5)",
+  "prior_approvals": "EXHAUSTED_OR_CLOSED_NOT_CARRIED (b424 整包批准 与 VM 上电续测那次都不结转)",
+  "safety_gate": "运动/学习/阈值/保护触发/disarm 试验仍另定范围; 未经操作者本人批准不得执行任何设备动作"
+ },
+ "approval": {
+  "status": "NO_DEVICE_APPROVAL_CREATED_OR_REQUESTED",
+  "hardware_actions_authorized": 0,
+  "draft_plan_status": "AGENT_AUTHORED_DRAFT_DERIVED_FROM_A_REVIEW_NOT_REVIEWED_NO_APPROVAL_REQUIRES_NEW_EXPLICIT_OPERATOR_APPROVAL"
+ },
+ "what_changed_in_product_source": {
+  "file": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/safety_gpio.c",
+  "blob_before_patch": "b242dfad1fed0c5b5be5869febef6375e2708a8f",
+  "blob_after_patch": "2055c7496be91830709155a9ffb0720a0b0bdb8d",
+  "expected_postimage_by_patch": "2055c7496be91830709155a9ffb0720a0b0bdb8d",
+  "numstat": "2 added / 2 deleted",
+  "scope": "只把 safety_status() 的一条 ENN_FEEDBACK 长 rt_kprintf 拆成两条; 未动控制流/驱动配置/安全判据/RT_CONSOLEBUF_SIZE/线程栈",
+  "compiled_from_disk": {
+   "bytes": 24883,
+   "sha256": "8d097018acab602141a1a36dfe2b29eedeb619fc03e05965681e0919ffeb9aec"
+  }
+ },
+ "build": {
+  "target": "rt-thread-motor-m1-candidate",
+  "count": 1,
+  "uv4_rc": 0,
+  "error_warning": "0 Error(s), 0 Warning(s).",
+  "program_size": "Program Size: Code=205930 RO-data=86198 RW-data=2192 ZI-data=85596",
+  "program_size_delta_vs_previous_round": {
+   "Code": 8,
+   "RO-data": 12,
+   "RW-data": 0,
+   "ZI-data": 0
+  },
+  "bin_delta_bytes": 24,
+  "new_image": {
+   "bin": {
+    "bytes": 292708,
+    "sha256": "502dca5d8c7ebfa794f890a9c03bc258fc9753f57b6a80c2f1e08add69888a7a"
+   },
+   "axf": {
+    "bytes": 1775972,
+    "sha256": "fc567635d98a76cfb5bb32c3df27f611061bdc39887c90fce75da44dac8d86f8"
+   },
+   "map": {
+    "bytes": 2114829,
+    "sha256": "fc33986f3e5928d2724812ebe1be7609230312a38d46d0ca4f87806067c1a0db"
+   },
+   "callgraph": {
+    "bytes": 1078228,
+    "sha256": "39134ee1462b0612600a32519870e2c65b90197a43739f43685d1b000e95863c"
+   }
+  },
+  "on_board": false,
+  "board_image_still": {
+   "path": "reports/firmware/phase8-m8-r7f1a-minimal-c-patch/rt-thread-motor-m1-candidate.bin",
+   "bytes": 292684,
+   "sha256": "b4243886818b6b2cf2e30d10864272225e1b0e66c8435c8a50bb449053e153bf",
+   "proven_by": "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T161728Z/readback.bin"
+  }
+ },
+ "offline_gates": {
+  "io_behavior_chain": {
+   "script": "tests/host/run_io_behavior.sh",
+   "rc": 0,
+   "verdict": "PASS",
+   "variants": {
+    "off_target": "33 必需用例全 PASS 自报 fail=0 proc_rc=0",
+    "on_target": "35 必需用例全 PASS 自报 fail=0 proc_rc=0",
+    "off_ovr": "46 必需用例全 PASS 自报 fail=0 proc_rc=0",
+    "on_ovr": "48 必需用例全 PASS 自报 fail=0 proc_rc=0",
+    "illegal": "非法宏值按预期编译拒绝 rc=1"
+   },
+   "why_this_chain": "io_main.c 用 #include \"safety_gpio.c\" 真编译被改文件; sp_conc_main.c 那一链不编译 safety_gpio.c, 所以受影响面是这条。"
+  },
+  "needles": {
+   "command": "--prove-needles needles.json(40 条) 对改后源码树",
+   "total": 40,
+   "unproven": 0,
+   "note": "被拆的那条 ENN 文本不在任何 needle 里(在 needles.json 里搜 ENN_FEEDBACK/只读输入 = 0 命中), 所以 needle 链没有被动到"
+  },
+  "console_model": {
+   "script": "D:/ns800_r7f1_scratch/repro_enn_model_r7f2b.py",
+   "raw": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/host/enn_model_repro.txt",
+   "compiler": "gcc (tdm64-1) 4.9.2 @ C:/Program Files (x86)/Dev-Cpp/MinGW64/bin/gcc.exe",
+   "before_as_shipped": "rc=3221225477(0xC0000005 访问违例): 本机 msvcrt 的 vsnprintf 在截断时返回 -1, A 的量具把 k=n>127?127:n 直接交给 fwrite((size_t)-1) 就冲过缓冲区。**这条失败原文保留, 不删不改。**",
+   "before_with_c99_stdio": "-D__USE_MINGW_ANSI_STDIO=1 后 bytes=471 nul=1 utf8=不完整 max_line=214, 逐条 CALL 与 A 的登记值一致(含 intended=150 emitted=127 truncated=1) => AGREE",
+   "after": "两种编译口径都 bytes=503 nul=0 utf8=完整 max_line=106, CALL 里 ENN 两行 intended=64/95 truncated=0 => AGREE",
+   "sweep_108": "108 组 request/pad/feedback/resolved/limit 全跑: 修后 0 NUL / 0 越钳位 / 0 半截 UTF-8, 最宽 106 B; 修前 108/108 都有 NUL 且都有 >127 B 的行, 90/108 还出现半截 UTF-8 => 缺陷与实参无关, 修后与实参无关地安全",
+   "extraction_fidelity": "A 的两份提取件与产品 safety_status() 函数体逐行比对: 47 行 vs 47 行, 双向差异 0(修前对 70deff8 的源码, 修后对改后源码)"
+  },
+  "motor_step": {
+   "script": "D:/ns800_r7f1_scratch/repro_motor_step_r7f2b.py",
+   "raw": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/host/motor_step_repro.txt",
+   "engine": "真实执行器 m8r3_serial_chain.py --dispatch --transport stub --backend sim (不带 --approval-id, 不碰设备)",
+   "original_step_on_known_rows": "STOP / BUSINESS_FAILED(lines=[MOT] arm_gate_mask=0x18 REFUSED) => A 的误拒结论成立",
+   "replacement_step_on_known_rows": "OK",
+   "mutations_all_stop": {
+    "armed1": "FIELD_VALUE_MISMATCH",
+    "request_high": "PROFILE_NOT_AT_REST",
+    "mask_0x1A": "BUSINESS_FAILED",
+    "extra_refusal_line": "BUSINESS_FAILED",
+    "missing_field": "PROFILE_NOT_AT_REST",
+    "duplicate_field": "FIELD_NOT_EXACTLY_ONE",
+    "health_degraded": "FIELD_VALUE_MISMATCH"
+   }
+  },
+  "validate_plan": {
+   "command": "python reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py --validate-plan --plan reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/plan_r7f2b_newimage_draft.json --repo-root .",
+   "rc": 1,
+   "checks": 38,
+   "fail": 1,
+   "the_only_fail": "PLAN_MOTION_CAP_BUDGET|all|FAIL|caps=[] sum=0 total=0 starts=0",
+   "ruling": "A 在 R7 轮核实: 零运动链的包该检查结构性红, 记 N/A, 不改执行器不塞动作凑绿",
+   "transcript": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/validate_plan_offline_draft.txt"
+  }
+ },
+ "change_effect_proved_in_image": {
+  "method": "在两枚 BIN 里按 NUL 分串枚举带标签前缀([SAFETY]/[MOT]/[SS]/[BOOT]/[TMC])的格式串, 数出 >127 B 的条数并定位合并串/两段短串",
+  "old_image_b424": {
+   "tagged_strings": 323,
+   "over_127B": 36,
+   "merged_ENN_form_found": 1,
+   "split_A_form_found": 1,
+   "split_B_form_found": 0,
+   "ENN_format_string_bytes": 147
+  },
+  "new_image": {
+   "tagged_strings": 324,
+   "over_127B": 35,
+   "merged_ENN_form_found": 0,
+   "split_A_form_found": 1,
+   "split_B_form_found": 1,
+   "ENN_format_string_bytes": 61
+  },
+  "reading": "合并形态从镜像里消失、两段短串各自成串、>127 B 的 tagged 串正好少一条(36->35) => 改动确实进了这一版链接产物。格式串长度不等于运行时展开长度, 运行时长度的证据是 host 模型复算(见 host_tests)。",
+  "registered_not_fixed": "同一份镜像里还有 35 条 >127 B 的带标签格式串(例如 257 B 的 `[MOT] !! 业务失败(原错误=%d src=%s)…`)。本轮范围只到 A 指定的这一处, 未顺带扩改; 是否逐条清点请 A 定。"
+ },
+ "artifacts_new_this_round": {
+  "rows_source_shape": {
+   "path": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/rows_r7f2b_source_shape.json",
+   "bytes": 54299,
+   "sha256": "4c57fd3c7fc9b4c96cf28a76726ac0526f2fbb7f66882e4b40ddab60f6039ec2"
+  },
+  "draft_plan": {
+   "path": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/plan_r7f2b_newimage_draft.json",
+   "bytes": 30293,
+   "sha256": "80c4b7818496ba202b6bc771906cccca2df176ddc67ea03c3f07770e9ff314b8"
+  },
+  "build_manifest": {
+   "path": "reports/firmware/phase8-m8-r7f2b-safety-print-fix/build_manifest.json",
+   "bytes": 12985,
+   "sha256": "059bebe6419f6093636186ffe3f9a8f1dc90c966b1da6e10f01e44d1062b980d"
+  },
+  "manifest_binding_adapter": {
+   "path": "reports/firmware/phase8-m8-r7f2b-safety-print-fix/manifest_binding_b502.json",
+   "bytes": 1207,
+   "sha256": "c8e59b36b0b3543aed744dcae933c4032d921c991c4d9988a98f8d925b50dd4e"
+  },
+  "gitattributes_rules": "新增 reports/firmware|reviews/phase8-m8-r7f2b-safety-print-fix/** -text 两条; 理由与生效时机(必须在提交前)记在 manifest 的 images_blob_identity_note"
+ },
+ "known_failures_and_gaps_registered_verbatim": [
+  {
+   "id": "GF1",
+   "item": "A 的 host_before.c 在本机 MinGW 4.9.2 原样编译后段错误 rc=3221225477",
+   "root_cause": "本机 msvcrt 的 vsnprintf 截断时返回 -1, 模型把 (size_t)-1 交给 fwrite",
+   "classification": "量具的编译器可移植性, 不是被测缺陷; -D__USE_MINGW_ANSI_STDIO=1 后与 A 逐项同值",
+   "handling": "失败原文保留在 host/enn_model_repro.txt, 不删不改"
+  },
+  {
+   "id": "GF2",
+   "item": "离线门唯一 FAIL: PLAN_MOTION_CAP_BUDGET",
+   "classification": "结构性红(A 已裁 N/A)",
+   "handling": "逐字登记, 不加豁免不改执行器"
+  },
+  {
+   "id": "GF3",
+   "item": "safety_irq_status 没有新固件的行形预测",
+   "classification": "A 的替换件只给 safety_status/motor_status",
+   "handling": "草稿计划该步只留 expect_contains=[\"[SAFETY] \"]; 缺口登记在 rows 的 _provenance_r7f2b_gap; 不代编预测"
+  },
+  {
+   "id": "GF4",
+   "item": "同一枚新镜像仍有 35 条 >127 B 的带标签格式串(最宽 257 B)",
+   "classification": "超出 A §5 本轮范围",
+   "handling": "登记不扩改, 请 A 定是否逐条清点"
+  },
+  {
+   "id": "GF5",
+   "item": "上一场归档把这条行写成「150 B 正文 + LF = 151 B」",
+   "勘正": "运行时展开是 149 B 正文 + LF = 150 B(源码转义 \\n 被多算一次); 越限与「前 126 B 逐字节相等」不受影响",
+   "handling": "已提交件按字节冻结不回改, 勘误进 manifest 与本件"
+  }
+ ],
+ "not_proven": [
+  "新镜像 502dca5d… 在板上(本轮 0 次下载/0 次回读)",
+  "新镜像真实串口流里 safety_status 不再截断(host 模型证的是源码展开, 不是 UART 物理时序)",
+  "SG/ADC/IMU 相对保护、正常 disarm 收口、tmc_config_apply/CONFIGURED 短打印验收 — 全部 NOT_RUN",
+  "protect_ready 仍 NO(IRQ 门未在本轮开过)"
+ ],
+ "next_step_for_reviewer": [
+  "定本镜像的实际现场范围(A README §构建后的一次现场目标: 同一会话装启动流+safety_status+motor_status+safety_irq_status)",
+  "若要恢复 CONFIGURED 短打印验收, 需在新包里明确一次配置写入及其判据(不算只读查询, 不沿用旧写入额度)",
+  "裁定 GF4(其余 35 条超长格式串)是否逐条清点",
+  "裁定 GF5 的勘误口径是否要同步到 A 侧记录"
+ ],
+ "evidence_index": [
+  {
+   "path": "reports/firmware/phase8-m8-r7f2b-safety-print-fix/build_manifest.json",
+   "bytes": 12985,
+   "sha256": "059bebe6419f6093636186ffe3f9a8f1dc90c966b1da6e10f01e44d1062b980d"
+  },
+  {
+   "path": "reports/firmware/phase8-m8-r7f2b-safety-print-fix/manifest_binding_b502.json",
+   "bytes": 1207,
+   "sha256": "c8e59b36b0b3543aed744dcae933c4032d921c991c4d9988a98f8d925b50dd4e"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/build/rt-thread-motor-r7f2b.log",
+   "bytes": 3909,
+   "sha256": "31f1b1677c4bbed87aadbc94ecfa88282375c7b2677e465913c4f913a5aae9ca"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/run_record.md",
+   "bytes": 9951,
+   "sha256": "87447d39303f8e12be68452a95f7c429b6db033a601c7932f59b6e3298342f7e"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/rows_r7f2b_source_shape.json",
+   "bytes": 54299,
+   "sha256": "4c57fd3c7fc9b4c96cf28a76726ac0526f2fbb7f66882e4b40ddab60f6039ec2"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/plan_r7f2b_newimage_draft.json",
+   "bytes": 30293,
+   "sha256": "80c4b7818496ba202b6bc771906cccca2df176ddc67ea03c3f07770e9ff314b8"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/validate_plan_offline_draft.txt",
+   "bytes": 2795,
+   "sha256": "2ed6bb20f0c7bd8a378a66eaec651fd0063e9a7ec033160443f772b20d32ea79"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/host/enn_model_repro.txt",
+   "bytes": 2146,
+   "sha256": "3272e59251a95b51015a0ce602f4434cd72cd5552ed30cbfa7cd291784fc553c"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/host/motor_step_repro.txt",
+   "bytes": 1750,
+   "sha256": "1a4d3ae4c1c39308e08ff28492da1a35ad35ee794fa2abc521a54bd9eb781774"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/host/image_strings_r7f2b.txt",
+   "bytes": 1414,
+   "sha256": "f84abe11f1140f2cb32291decb30a5759437371f6d8958d6112c022d20723cf7"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/host/io_chain_r7f2b.txt",
+   "bytes": 1021,
+   "sha256": "ef4da83b8cd4422428963d684dd3241420824a570fe647188d8340e3ff8538f6"
+  },
+  {
+   "path": "reports/firmware/phase8-m8-r7f2b-safety-print-fix/rt-thread-motor-m1-candidate.bin",
+   "bytes": 292708,
+   "sha256": "502dca5d8c7ebfa794f890a9c03bc258fc9753f57b6a80c2f1e08add69888a7a"
+  },
+  {
+   "path": "reports/firmware/phase8-m8-r7f2b-safety-print-fix/rt-thread-motor-m1.axf",
+   "bytes": 1775972,
+   "sha256": "fc567635d98a76cfb5bb32c3df27f611061bdc39887c90fce75da44dac8d86f8"
+  },
+  {
+   "path": "reports/firmware/phase8-m8-r7f2b-safety-print-fix/rt-thread-motor-m1.map",
+   "bytes": 2114829,
+   "sha256": "fc33986f3e5928d2724812ebe1be7609230312a38d46d0ca4f87806067c1a0db"
+  },
+  {
+   "path": "reports/firmware/phase8-m8-r7f2b-safety-print-fix/rt-thread-motor-m1-callgraph.htm",
+   "bytes": 1078228,
+   "sha256": "39134ee1462b0612600a32519870e2c65b90197a43739f43685d1b000e95863c"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/plan_startup_b424_reviewed.json",
+   "bytes": 23218,
+   "sha256": "fa3331862d498bf7aa17966558c535429c4b6696653cb52ea67a3106c0a43d13"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/rows_startup_b424.json",
+   "bytes": 53635,
+   "sha256": "916eddaa172e6f30b9a9e327f21f4b9274cca2bab17201c329b32997d286f746"
+  },
+  {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py",
+   "bytes": 219491,
+   "sha256": "33d3f0af8a4c9c33dcd4e013b395e4ba990a89e384130f9d0ffe50c71b34e8ca"
+  }
+ ],
+ "device_actions_this_round": {
+  "download": 0,
+  "readback": 0,
+  "explicit_reset": 0,
+  "port_open": 0,
+  "apply": 0,
+  "config_save": 0,
+  "arm_or_start_or_learn_or_zero": 0,
+  "dmm_readings": 0,
+  "retry": 0
+ }
+}
