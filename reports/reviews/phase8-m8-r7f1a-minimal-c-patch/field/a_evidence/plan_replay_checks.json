@@ -1,0 +1,20 @@
+[
+  {
+    "case": "final_healthy",
+    "rc": 0,
+    "expected_behavior": true,
+    "summary": "DISPATCH_SUMMARY|status=OK|code=|stages_executed=4|stages_not_run=0"
+  },
+  {
+    "case": "wrong_main_stack",
+    "rc": 1,
+    "expected_behavior": true,
+    "summary": "DISPATCH_SUMMARY|status=STOP|code=|stages_executed=4|stages_not_run=1"
+  },
+  {
+    "case": "fault8",
+    "rc": 1,
+    "expected_behavior": true,
+    "summary": "DISPATCH_SUMMARY|status=STOP|code=|stages_executed=4|stages_not_run=1"
+  }
+]

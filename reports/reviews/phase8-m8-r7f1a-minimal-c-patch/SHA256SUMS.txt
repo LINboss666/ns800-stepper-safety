@@ -1,10 +1,50 @@
 # sha256 * <仓库相对路径>(LF, 无 BOM; 本清单不哈希自身字节 —— 一条清单不能给自己的字节作证)
 # 生成方式: 对 reports/reviews/phase8-m8-r7f1a-minimal-c-patch/ 下每个常规文件(排除 SHA256SUMS.txt、remote_readback.md 与 __pycache__) 直接读磁盘字节算 sha256
-# 条目数=20; 与 Git blob 的逐条复算由 host/staged_preflight_batch.py(提交前, 单批流)与推送后的远端逐 blob 回读完成
+# 条目数=60; 与 Git blob 的逐条复算由 host/staged_preflight_batch.py(提交前, 单批流)与推送后的远端逐 blob 回读完成
 # 重新生成: python reports/reviews/phase8-m8-idle-stack-r4/host/make_round_sums.py <本目录>
 b1d603f4333072796da98b7428c12eb97ba26aa59f8081659eea2799b629ff37  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/a_review_R7F1_A_Review_Minimal_C_Followup.md
+6424a764f5c323ec9d030792c6c5830fa5235064c45045c1a3defbe5cdc08b37  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/a_review_R7F1A_A_GO_and_B424_Startup_Trial.md
 efc65cab2c75306d7cd832f92031bf6f675fa863ffe650f664f377aff1d11571  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/build/rt-thread-motor-r7f1a.log
 52b1803b4dc4d1e6fc1490dc89eda6002b77595b24ed979be5a0c966f6117d2f  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/build/stack_callgraph_r7f1a.txt
+88a1febe6138c62e8199ddc8141255926523bb335fbde2e968a2c2c03f91cd6f  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/a_evidence/fault8.txt
+008baa6b41e67d59bbd9cf4cefd4f6521d5cacd97c7a448425bc9659a84bc43b  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/a_evidence/final_healthy.txt
+63fc38676426c44559443b48e696012358276eadb3a5a38e74423c5c057deea9  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/a_evidence/host_ovr_tmc_boot_out.txt
+b088c0f23788939ce6c3efe1ae38deafcda847598c56bb231e4786d33a1fb75a  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/a_evidence/identity_checks.json
+a45ce4338cf497e84b5c3de30bc9bacce52c235fadb0e102579a1972e2374d03  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/a_evidence/plan_replay_checks.json
+dfbe33f1bb3c3e766c7c24ba35da3da9e14c231bea75106dd0ec7de11ecb8cd5  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/a_evidence/s2.txt
+4cd6a30997fb216b06d4a3255f060b08dbf2be5af0797d7ec0efd940b47059a4  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/a_evidence/target_tmc_boot_out.txt
+b0ed75cd3816bf628f65db77486fda3524c2b8b00b306e461b47932d7cd2ac5a  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/a_evidence/validate_plan.txt
+851fbfd1e6bbcaeac433a349af0baef99ac92af5237809b5f124eece0a79cf20  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/a_evidence/wrong_main_stack.txt
+9eb665d71664ab297bcbbf12aa20c4c480f7538654a9e7725d48a61f2c27603d  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T161728Z/action_download/ARGV.json
+13bf7b3039c63bf5a50491fa3cfd8eb4e699d1ba1436315aef9cbe5711530354  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T161728Z/action_download/rc.txt
+0a8ee801a986c1f7ed6de5863fa90d2aec23fb84c2573283664e46f5afab1496  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T161728Z/action_download/stderr.bin
+4f79f4bf0786bb5debce65153500603bc6fc79002e031f6c5e7bd911399b39c5  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T161728Z/action_download/stdout.bin
+ce9734da5e0afe5fdf2930668d5c77b9dca9d1fd89d7f786bfeae38afb941f9a  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T161728Z/action_readback/ARGV.json
+13bf7b3039c63bf5a50491fa3cfd8eb4e699d1ba1436315aef9cbe5711530354  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T161728Z/action_readback/rc.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T161728Z/action_readback/stderr.bin
+d662bb74ffcc84c13df73e6ece0d0b142d8b854edbb138f8197a54ffa1ab01c8  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T161728Z/action_readback/stdout.bin
+cd6aa34777eb4e638800f2d718c28fd2bdcb08f628f7cb149a50ada80523f8c8  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T161728Z/action_reset/ARGV.json
+13bf7b3039c63bf5a50491fa3cfd8eb4e699d1ba1436315aef9cbe5711530354  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T161728Z/action_reset/rc.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T161728Z/action_reset/stderr.bin
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T161728Z/action_reset/stdout.bin
+c07f62e0b617f5b609d0390dc851b219338437fdc905a0d81ff7d6081787536d  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T161728Z/APPROVAL_TOKEN.verbatim.txt
+3235c07fa424129a4bb43dd4ca901ee4332ac193c513524420ea73a9c5bbb7c5  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T161728Z/dispatch_ledger.jsonl
+e87b02afe4fd023f9e8f13fd76e6444830cc00a01cb519f6f1767fedd5e73895  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T161728Z/dispatch_start.txt
+39e1aac5dc3557951df436b93d5d9ed1d90fa5e444aa95208c30a7d39ccf5dd7  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T161728Z/OFFLINE_JUDGEMENT.txt
+b4243886818b6b2cf2e30d10864272225e1b0e66c8435c8a50bb449053e153bf  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T161728Z/readback.bin
+792e26e56333ba5d0bfa02ecc0b5a2ebe49e01424723a31674033c8fe00bb3bd  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T161728Z/S_S3/01_rst.boot.rx.bin
+70d35c840aa02ac23662ab6fc3d1acd4941d09c79d43e872728f2764ab9cf269  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T161728Z/S_S3/01_rst.boot.rx.bin.txt
+5c46224b86d92d95bb538eb724d9f001b8a8d6f1e7d1f0f84ea7ddfaf78a9796  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T161728Z/S_S3/02_threads.rx.bin
+ce24dac291de730c005cab4f145e3b7289b13d5c06dd795e950aa5d5e91ebfa1  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T161728Z/S_S3/02_threads.rx.bin.txt
+2aef3ec96d30f7f1a4615c1877dd81cdf0ce898d0f96cd3a5972a870ca469346  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T161728Z/S_S3/03_heap.rx.bin
+ddef216fda9ae7324baac61aa8de55c53ec8dfc9d083311a337bf7964120be23  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T161728Z/S_S3/03_heap.rx.bin.txt
+84e7c039c6b73b6da83d875702c96b282cc154a36a13d9af961b7e95f1b34815  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T161728Z/S_S3/04_sysboot.rx.bin
+03dea1af1de5c33b805fc847bcb107e99280f44cb0ee03a02b3b18ff3797f1d1  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T161728Z/S_S3/04_sysboot.rx.bin.txt
+7fce17bb29290c87006b99b81aba8f231de72cfd8230d1578d8ef276e7ca4418  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T161728Z/S_S3/ledger.jsonl
+ea39cf9dee0f547de6cc4fe48ba514ab2a799137412bffc61fd755f7a2e97b75  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T161728Z/stdout_dispatch.txt
+a89d60e22adf929ea3b268ab099a1cfd7cb2fe92abdf265f959c91830b8258d0  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/manifest_binding_b424.json
+fa3331862d498bf7aa17966558c535429c4b6696653cb52ea67a3106c0a43d13  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/plan_startup_b424_reviewed.json
+916eddaa172e6f30b9a9e327f21f4b9274cca2bab17201c329b32997d286f746  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/rows_startup_b424.json
 c90d1cf8927ae9e6cde5065412176a0efd4fdae402c9740943f03723f4f49e16  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/host/r7f1a_btb_prepatch.txt
 df108ea6e4b50834054905d06c11a6a946f6b5177ac7308e73945a28f6c77f4d  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/host/r7f1a_lwc.txt
 ab94ed73b6e33473ffe5c73fdf40462cd52e06ef3aa7e37ec5ca0b56c6a107a2  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/host/r7f1a_s2_full.txt

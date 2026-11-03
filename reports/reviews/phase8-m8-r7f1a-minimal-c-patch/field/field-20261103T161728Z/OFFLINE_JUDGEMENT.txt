@@ -1,0 +1,102 @@
+# M8-R7F2 现场一次启动验证判读（b424 候选 · 真实设备 · 一次批准 · S3 按判据 STOP）
+
+执行时刻：2026-11-04 00:17:28 +0800（UTC 目录名 20261103T161728Z）起，一次 dispatch 走到 STOP。
+工具退出码 **1**（`DISPATCH_SUMMARY|status=STOP`）。批准原文见同目录
+`APPROVAL_TOKEN.verbatim.txt`（操作者本轮原话，未改写）。
+
+## 1. 执行对象与批准身份
+
+```text
+approval_id      M8R7F2-startup-b424-20261103
+ledger           D:\ns800_field_approvals\approval_M8R7F2-startup-b424-20261103.json
+plan_sha256      fa3331862d498bf7aa17966558c535429c4b6696653cb52ea67a3106c0a43d13  (23218 B)
+executor_sha256  33d3f0af8a4c9c33dcd4e013b395e4ba990a89e384130f9d0ffe50c71b34e8ca  (219491 B, R6C 原件未改)
+image_sha256     b4243886818b6b2cf2e30d10864272225e1b0e66c8435c8a50bb449053e153bf  (292684 B)
+S0               APPROVED_PACKAGE_VERIFIED（needles_total=40, placeholders=0, forbidden_hits=0,
+                 software_input_commit=reviewed_delivery_commit=3e6a02c, tested_image_build_commit=adeeedc）
+```
+
+## 2. 逐阶段结果与实耗额度
+
+| 阶段 | 结果 | 依据 |
+|---|---|---|
+| S0 离线绑定 | OK | 上表三件 SHA 与计划内声明逐字相符 |
+| S1 一次 sector 下载 | OK | `action_download/rc.txt=0` |
+| S2 一次定长回读 | OK | `readback.bin` 292684 B，**与归档 BIN 逐字节相等**（两边 sha256 都是 `b4243886…`）→ 本候选首次被证在板 |
+| S3 开口→复位→75 s 启动流→查询 | **STOP `FIELD_VALUE_MISMATCH`** | `state=FAULT_LATCHED`（要 READY）、`fault=8`（要 0） |
+| S4 及以后 | 未执行 | 计划里没有 S4；本包无 apply |
+
+```text
+quota_used  download 1/1   readback 1/1   explicit_reset 1/1   port_open 1/1   其余全部 0/0
+commit_failures=[]   pending=0   cleanup_errors=[]   disarm=NOT_ARMED
+PORT_OPEN t_s=0.031 (COM5 115200)  →  PORT_CLOSED t_s=77.359   （75 s 被动窗申报被走满）
+STOP 之后 safety_status / motor_status 未发出（失败即停，没有为补数据多开口）
+```
+
+一处要如实登记的执行器输出怪癖：`DISPATCH_SUMMARY` 里同一个 `S3` 既以 `status=STOP` 打印、
+又在末尾被列进 `stages_not_run=[S3]`。按采集件（boot/ps/free/system_status 四份，时间戳
+00:18→00:19）与台账判定，串口会话只跑过一次，不是跑了两次或是两笔额度。本轮不改执行器。
+
+## 3. 本场最重要的事实：失败分支换了，而且新字段读得出来
+
+```text
+[SS] [REQ FAIL] TMC2209 IOIN rc=-117 reason=rx-timeout-echo
+[SS] [REQ FAIL] TMC2209 IOIN tx=4 rx=4 flush=0 used=100
+[SS] self-test done: required=FAIL degraded=0x00
+[SS] ==> FAULT_LATCHED code=8 (DRV_ENABLE LOW verified)
+```
+
+- 读到的**不是** `lock-busy`：这笔读已经取到传输锁、真的发了 4 字节、收回来 4 字节是自家回显、
+  在 100 tick（≈100 ms 应答超时）上到期。上一场现场只有一个 `rc=-23`；本场 `rc=-117` 且带阶段计数，
+  所以**这一场与上一场不是同一个原因**，任务书 §2 要的"逐调用可区分"在板上成立。
+- 因此下一处要查的是 TMC UART 的收发通路本身（回显进来了、芯片没应答），而不是继续动启动顺序。
+  本轮不动手，等 A 按这条现场分支出下一步。
+- **不能从这一场得出的结论**：① 单次冷启动样本不能证明锁竞争在任何时序下都不会发生，只能证明
+  这一次它没发生；② 门"生效"的直接可观察量（关闭期不发 SG UART 读）板上没有打印，本场只能给
+  间接证据：`[SS] [OK] IMU`、`[SS] [OK] ADC`、`[SNS] sensor thread started (100Hz, prio 7)` 都在，
+  说明门没有把 IMU/ADC 自检或 sensor 线程一起压掉（这是任务书 §3 的红线）。
+- `[TMC] DEGRADED drive_cfg=UNCONFIGURED`、`[ADC] DEGRADED cal=THEORETICAL`、
+  `[BB] trigger code=8 session=1 pre_n=13 post_eff=100` 与上述判定一致。
+
+## 4. main 栈与堆（复审 §1 的现场判据）
+
+```text
+ps   : main  10  suspend  0x000018c  0x00001000  40%  0x00000003 EINTRPT  0x20012050
+free : total 32672   used 22120   maximum 22120   available 10552
+```
+
+- `main` 线程栈 **0x00001000 = 4096 B**，正面满足"ps 的 main 行必须 0x1000"。
+- `[BOOT]` 横幅逐行出到 `11 startup-selftest FAIL` 与 `Phase-7 runtime bootstrap complete`，
+  且 `ps` 里 main 在位 —— 堆里那次 4096 字节分配成了。堆现值/历史峰值都是 22120/22120、
+  还剩 10552 可用。**这两个数只描述这一次启动的形状，不是"堆够用"的一般性证明。**
+- 注意 `maximum == used`：本次会话里没有再分配过更多堆，所以这不是压力下的余量。
+
+## 5. 三处打印与字节完整性（任务书 §4 的现场验收）
+
+启动流 4100 B：**NUL=0**、strict UTF-8 解码通过、84 个换行、末段为空（即每一条都以换行收尾）。
+按 `\n` 切行后各条长度（不含 CR）：
+
+| 家族 | 现场条数 | 各条字节 |
+|---|---:|---|
+| `[MOT] init OK` | 2 | 58, 94 |
+| `[SS] STEP:` | 3 | 56, 85, 82 |
+| `[SS] ==> FAULT_LATCHED` | 3 + 1（`整理身份`） | 55, 62, 43 + 41 |
+| `[SS] [REQ FAIL] TMC2209 IOIN` | 2 | 59, 55 |
+
+全部 ≤120 B 且完整。整段里**唯一**超 120 B 的行是登记未改的 `[MOT]   注:` 行：内容 125 B、
+加换行 126 B，**没有被截断**（它后面紧跟 `[BOOT] 7 motor-service ... OK`，说明换行没丢）。
+这现场证实了复审 §5 的第二条文字更正：不能把"126 B"读成"已截断"。
+
+**打印覆盖按可达分支说**：本场走的是 required-FAIL → FAULT_LATCHED 这条，所以
+`!! STEP 关断未确认`（成功/故障另一分支）与 READY 路径本来就不会出现；
+未出现不等于这些分支已被现场验证，也不为了看它们去造故障。
+
+## 6. 判定
+
+- 成立：本候选镜像 b424 已在板（逐字节）；启动自检的**具体分支**第一次在现场可读
+  （`rx-timeout-echo` + `tx/rx/flush/used`）；三处打印族现场完整、无 NUL、无截断 UTF-8；
+  main 栈现场 4096 且分配成功；IMU/ADC/Flash 三项自检照旧 OK。
+- 不成立：`READY/fault=0`（本场 `FAULT_LATCHED/fault=8`）；`product_field_fix`；SG/ADC 与 IMU
+  相对保护的现场有效性；带载保护；启动锁竞争被普遍消除。
+- 现场终态：电机未 armed、`DRV_ENABLE` 禁能侧、Safety `FAULT_LATCHED fault=8`、irq_gate=CLOSED、
+  `arm gate fail mask=0x1A`（arm 仍被拒）。四个额度全部用尽，**未重试、未追加动作**。

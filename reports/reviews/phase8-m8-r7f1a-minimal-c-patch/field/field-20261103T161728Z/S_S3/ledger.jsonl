@@ -1,0 +1,15 @@
+{"kind": "APPROVED_PACKAGE_VERIFIED", "plan_sha256": "fa3331862d498bf7aa17966558c535429c4b6696653cb52ea67a3106c0a43d13", "stage": "S3", "steps": 6, "steps_sha256": "f332aa4ecdaf59c9bb67ed070f43c5303860d0e1927a209b327c4a7a1991aca9", "t_s": 0.0, "transport": "real", "verified": true}
+{"approval_kind": "business", "approval_used": 1, "kind": "QUOTA_CONSUMED", "left": 0, "n": 1, "name": "port_open", "t_s": 0.015}
+{"baud": 115200, "kind": "PORT_OPEN_ATTEMPT", "port": "COM5", "t_s": 0.031}
+{"kind": "PORT_OPEN", "port": "COM5", "t_s": 0.031, "transport": "real"}
+{"approval_kind": "business", "approval_used": 1, "kind": "QUOTA_CONSUMED", "left": 0, "n": 1, "name": "explicit_reset", "t_s": 0.047}
+{"argv": ["python", "-m", "pyocd", "reset", "--method", "sysresetreq", "--no-config", "--no-wait", "--connect", "attach", "--core", "0", "-t", "cortex_m", "-u", "@UID_FILE<redacted len=48 sha256_d2f530dbd062>"], "argv_sha256": "a00559b168afc6b16360f9c2c0177cce4a71942d69c40d16902920bd08d5aa40", "backend": "real", "kind": "ACTION_ATTEMPT", "name": "reset", "t_s": 0.047}
+{"backend": "real", "elapsed_s": 2.062, "kind": "ACTION", "name": "reset", "rc": 0, "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "t_s": 2.109}
+{"as": "rst", "bytes": 4100, "done_needle": null, "drain_declared_s": 75.0, "drain_spent_s": 75.0, "end_reason": "DRAIN_BUDGET_REACHED", "kind": "BOOT_STREAM_DRAINED", "prompt_required": false, "quiet_break_s": null, "raw": "reports\\reviews\\phase8-m8-r7f1a-minimal-c-patch\\field\\field-20261103T161728Z\\S_S3\\01_rst.boot.rx.bin", "t_s": 77.109}
+{"bytes": 1192, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "5c46224b86d92d95bb538eb724d9f001b8a8d6f1e7d1f0f84ea7ddfaf78a9796", "t_s": 77.218, "tail": "b'/A\\r\\nmsh >\\r\\nmsh >'"}
+{"bytes": 90, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "2aef3ec96d30f7f1a4615c1877dd81cdf0ce898d0f96cd3a5972a870ca469346", "t_s": 77.234, "tail": "b'52\\r\\nmsh >\\r\\nmsh >'"}
+{"bytes": 998, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "84e7c039c6b73b6da83d875702c96b282cc154a36a13d9af961b7e95f1b34815", "t_s": 77.343, "tail": "b'g)\\r\\nmsh >\\r\\nmsh >'"}
+{"allowed": false, "as": "sysboot", "kind": "BUSINESS_OUTCOME", "lines": [], "status_lines_allowed": ["[Motor] arm gate fail mask=0x1A (arm REFUSED)"], "t_s": 77.343}
+{"absent_groups": [], "as": "sysboot", "forbidden_val": {}, "kind": "VALUE_ASSERT_FAIL", "t_s": 77.343, "wrong": {"fault": ["8", "0"], "state": ["FAULT_LATCHED", "READY"]}}
+{"code": "FIELD_VALUE_MISMATCH", "detail": "{\"verdict\": \"STOP\", \"code\": \"FIELD_VALUE_MISMATCH\", \"wrong\": {\"state\": [\"FAULT_LATCHED\", \"READY\"], \"fault\": [\"8\", \"0\"]}, \"forbidden_val\": {}, \"absent_groups\": []}", "kind": "SESSION_STOP", "t_s": 77.343}
+{"kind": "PORT_CLOSED", "t_s": 77.359}

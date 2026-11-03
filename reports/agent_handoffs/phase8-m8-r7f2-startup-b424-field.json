@@ -1,0 +1,152 @@
+{
+ "round": "phase8-m8-r7f2-startup-b424-field",
+ "title": "M8-R7F2 b424 一次启动现场验证（已执行, S3 按判据 STOP, 额度用尽）",
+ "date_local": "2026-11-04 00:17:28 +0800",
+ "date_utc_dir": "20261103T161728Z",
+ "execution_head": "3e6a02ce62725fc99c6b645d44204dd9c3921c85",
+ "input_package": {
+  "zip_sha256": "743c5f8066df912e31b15feda641cc1a52a3328c27146f47c019ef0202b9b993",
+  "verdict": "R7F1A_C_AND_BUILD_REVIEW = GO_FOR_ONE_BOUNDED_STARTUP_TRIAL"
+ },
+ "approval": {
+  "id": "M8R7F2-startup-b424-20261103",
+  "ledger_path": "D:/ns800_field_approvals/approval_M8R7F2-startup-b424-20261103.json",
+  "caps_nonzero": {
+   "download": 1,
+   "explicit_reset": 1,
+   "port_open": 1,
+   "readback": 1
+  },
+  "spent_nonzero": {
+   "download": 1,
+   "explicit_reset": 1,
+   "port_open": 1,
+   "readback": 1
+  },
+  "pending": 0,
+  "writes": 8,
+  "identities": {
+   "executor_sha256": "33d3f0af8a4c9c33dcd4e013b395e4ba990a89e384130f9d0ffe50c71b34e8ca",
+   "image_sha256": "b4243886818b6b2cf2e30d10864272225e1b0e66c8435c8a50bb449053e153bf",
+   "plan_sha256": "fa3331862d498bf7aa17966558c535429c4b6696653cb52ea67a3106c0a43d13"
+  },
+  "verbatim_token_file": "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T161728Z/APPROVAL_TOKEN.verbatim.txt"
+ },
+ "stages": [
+  {
+   "id": "S0",
+   "status": "OK",
+   "note": "三件 SHA 与计划声明逐字相符; needles=40 placeholders=0 forbidden=0"
+  },
+  {
+   "id": "S1",
+   "status": "OK",
+   "note": "一次 sector 下载, rc=0"
+  },
+  {
+   "id": "S2",
+   "status": "OK",
+   "note": "定长 292684 B 回读与归档 BIN 逐字节相等; 两边 sha256=b4243886818b6b2cf2e30d10864272225e1b0e66c8435c8a50bb449053e153bf"
+  },
+  {
+   "id": "S3",
+   "status": "STOP",
+   "code": "FIELD_VALUE_MISMATCH",
+   "wrong": {
+    "state": [
+     "FAULT_LATCHED",
+     "READY"
+    ],
+    "fault": [
+     "8",
+     "0"
+    ]
+   },
+   "captured": [
+    "boot(75s 被动窗)",
+    "ps",
+    "free",
+    "system_status"
+   ],
+   "not_sent": [
+    "safety_status",
+    "motor_status"
+   ],
+   "port_open_t_s": 0.031,
+   "port_closed_t_s": 77.359
+  },
+  {
+   "id": "S4+",
+   "status": "NONE_IN_PACKAGE"
+  }
+ ],
+ "field_verdict": {
+  "image_on_board_proven": true,
+  "image_bytes": 292684,
+  "image_sha256": "b4243886818b6b2cf2e30d10864272225e1b0e66c8435c8a50bb449053e153bf",
+  "readback_bytes": 292684,
+  "readback_equals_archived_bin": true,
+  "ready_reached": false,
+  "fault_code": 8,
+  "boot_stream": {
+   "bytes": 4100,
+   "NUL_count": 0,
+   "LF_count": 84,
+   "strict_utf8_decode": true,
+   "lines_over_120B": [
+    "[MOT]   注: STEP=api-accepted 只说明驱动**接受了关"
+   ]
+  },
+  "per_call_reason": {
+   "rc": -117,
+   "reason": "rx-timeout-echo",
+   "tx": 4,
+   "rx": 4,
+   "flush": 0,
+   "used": 100
+  },
+  "main_stack_ps": "0x00001000 (=4096)",
+  "heap_free_kb": 10552,
+  "print_lengths": {
+   "mot_init_ok": [
+    58,
+    94
+   ],
+   "ss_step": [
+    56,
+    85,
+    82
+   ],
+   "fault_latched": [
+    55,
+    62,
+    43
+   ],
+   "req_fail_ioin": [
+    59,
+    55
+   ],
+   "note_line_registered_not_fixed": [
+    125
+   ],
+   "identity_line": [
+    41
+   ]
+  }
+ },
+ "not_proven": [
+  "READY/fault=0 未达成(FAULT_LATCHED/fault=8)",
+  "product_field_fix",
+  "SG/ADC 与 IMU 相对保护的现场有效性",
+  "带载保护",
+  "启动锁竞争被普遍消除(单次冷启动只证明这一次没发生)",
+  "READY 路径与 !! STEP 故障分支的现场打印(本场不可达, 未出现≠已验证)"
+ ],
+ "next_step_for_reviewer": "失败分支已从\"忙类拒绝\"变成\"发出去但只收回回显(rx-timeout-echo, tx=4 rx=4 used=100)\"。下一处该查 TMC UART 收发通路本身, 不是继续动启动顺序。本包额度已用尽, 未重试、未追加动作。",
+ "evidence_index": {
+  "field_dir": "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T161728Z/",
+  "a_go": "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/a_review_R7F1A_A_GO_and_B424_Startup_Trial.md",
+  "a_evidence": "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/a_evidence/",
+  "handoff_md": "reports/agent_handoffs/phase8-m8-r7f2-startup-b424-field.md"
+ }
+}

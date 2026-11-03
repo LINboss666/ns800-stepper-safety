@@ -1,0 +1,12 @@
+START 2026-11-04 00:17:28 +0800  (UTC 20261103T161728Z)
+dispatch_rc=1   (DISPATCH_SUMMARY|status=STOP|code= 空; 停止原因在阶段行里: FIELD_VALUE_MISMATCH)
+
+展开命令(UID 只在运行时从私有件读入, 这里不出现其值):
+  python reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py     --dispatch --transport real --backend real --profile response_driven     --plan reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/plan_startup_b424_reviewed.json     --approval-id M8R7F2-startup-b424-20261103     --approval-root D:/ns800_field_approvals     --uid-file D:/ns800-m7-p0-20261030T182818/dap_uid_bare.txt     --out reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T161728Z     --approval-token "<操作者批准原文, 逐字见 APPROVAL_TOKEN.verbatim.txt>" --expected-token "<同左>"
+
+私有件只登记身份不登记值: 台账 argv 里表现为 @UID_FILE<redacted len=48 sha256_d2f530dbd062>。
+
+真实执行前的一次 sim 干跑(故意不带 --approval-id, 所以不接真实账本): rc=0, 四阶段全走,
+quota_used=download1/readback1/explicit_reset1/port_open1, 输出 APPROVAL_LEDGER|NONE(未建真账)。
+该 sim 的输出目录在仓外 TEMP/m8r7f2-sim-20261103T161642Z, 未入库; 当时真实账本仍是
+spent=全 0 / writes=0(已在本机核过)。
