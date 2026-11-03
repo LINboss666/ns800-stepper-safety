@@ -1,0 +1,3 @@
+diag_profile zero 32
+[DIAG] zero OK n=32 raw 2047..2067 mean=2059593 (cal source untouched)
+msh >

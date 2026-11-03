@@ -1,0 +1,7 @@
+{"kind": "QUOTA_CONSUMED", "left": 11, "n": 1, "name": "port_open", "t_s": 0.0}
+{"baud": 115200, "kind": "PORT_OPEN_ATTEMPT", "port": "COM5", "t_s": 0.031}
+{"kind": "PORT_OPEN", "port": "COM5", "t_s": 0.031, "transport": "real"}
+{"bytes": 1, "first_offset": 301, "kind": "NUL_IN_RESPONSE", "meaning": "控制台输出通道的字节损坏, 机制未证", "t_s": 2.328, "tail": "b'e-pending)\\r\\nmsh >\\r\\nmsh >'"}
+{"bytes": 3394, "kind": "RX_DONE", "nul_bytes": 1, "prompt_seen": true, "raw_sha256": "2472b15907a8a843aadbc09260180eb558ee4261e7e6161abf3939903d15d5b0", "t_s": 2.328, "tail": "b'g)\\r\\nmsh >\\r\\nmsh >'"}
+{"code": "ILLEGAL_BYTES_IN_RESPONSE", "detail": "b'\\xe6\\x96\\xad, \\xe9\\x9d\\x9e\\xe6\\x00[MOT] '", "kind": "SESSION_STOP", "t_s": 2.328}
+{"kind": "PORT_CLOSED", "t_s": 2.328}

@@ -1,0 +1,11 @@
+{"kind": "QUOTA_CONSUMED", "left": 11, "n": 1, "name": "port_open", "t_s": 0.0}
+{"baud": 115200, "kind": "PORT_OPEN_ATTEMPT", "port": "COM5", "t_s": 0.015}
+{"kind": "PORT_OPEN", "port": "COM5", "t_s": 0.015, "transport": "real"}
+{"bytes": 980, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "6d1e56bb5515aee393e4c89b4e17c3492a790a248383bc7aec538133a835843e", "t_s": 0.109, "tail": "b'g)\\r\\nmsh >\\r\\nmsh >'"}
+{"allowed": false, "as": "sysboot", "kind": "BUSINESS_OUTCOME", "lines": [], "status_lines_allowed": ["[Motor] arm gate fail mask=0x8 (arm REFUSED)"], "t_s": 0.109}
+{"bytes": 1192, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "b4be5394fd7120bf444397f87701472daca46bcdee0f43a356de7f322e8cf983", "t_s": 0.219, "tail": "b'/A\\r\\nmsh >\\r\\nmsh >'"}
+{"bytes": 985, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "28224e521c11580cd16c0a5dfcfe812e1bb4b516425c8c9379be891b702bec70", "t_s": 0.328, "tail": "b'=5\\r\\nmsh >\\r\\nmsh >'"}
+{"kind": "QUOTA_CONSUMED", "left": 1, "n": 1, "name": "tmc_config_apply", "t_s": 0.328}
+{"bytes": 165, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "58a97b02af9753abc703b768eb2ab34bb205c919cf65dde161215dbcfbdc7965", "t_s": 0.39, "tail": "b'\\x8b\\xe3\\x80\\x00msh >\\r\\nmsh >'"}
+{"code": "ILLEGAL_BYTES_IN_RESPONSE", "detail": "b'\\x9c\\xaa\\xe5\\xae\\x9e\\xe6\\xb5\\x8b\\xe3\\x80\\x00msh >'", "kind": "SESSION_STOP", "t_s": 0.39}
+{"kind": "PORT_CLOSED", "t_s": 0.39}

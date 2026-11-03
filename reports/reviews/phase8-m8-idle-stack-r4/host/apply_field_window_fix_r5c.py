@@ -44,6 +44,9 @@ APPROVED_TIP = "4cb9dac0f2a47beb494a4fb41090cefe8da76075"
 R4_EXECUTOR_SHA = "40517501b3bedde928b338d56e4e9d89d1b1e91a32405f2b1ae20f1dd473ed40"
 READBACK_SHA = "dab356c69fbf4ca747e838580c16982bd56b53b1367f84b97ab705c2fbd25439"
 BOOT_SHA = "1947fbaca20a1f048ed7525c8961d559ae02256e48e1866e9f288e36df36bf95"
+# 现场 26 场(field-20261101T15*)实际喂进去的那份 plan_core_r5c.json 的字节身份。
+# 它是**执行输入**, 与失败字节同级: 本工具此后只校验它, 不再覆写它。
+EXECUTED_PLAN_SHA = "05bcf96aa7a6bf89291dab9b140253dde74982f7c3907a49a51bb2972d3a3746"
 CONT_REF = "reports/reviews/phase8-m8-diag-stack-r1/field/cont-20261101T090512Z/RESULT.json"
 AUDIT_REF = "reports/reviews/phase8-m8-relative-protection-r3/host/m8diag_source_audit.txt"
 
@@ -56,6 +59,7 @@ S3_TOTAL_DEADLINE = 300
 # expect_contains 正面要求**时才生效(执行器 PLAN_STATUS_ALLOW 门), 掩码变成别的值就照原样停。
 ARM_REFUSED_REST = r"^\[Motor\] arm gate fail mask=0x[0-9A-Fa-f]+ \(arm REFUSED\)$"
 ARM_REFUSED_TEXT = "[Motor] arm gate fail mask="
+ARM_GATE_MASK_REFUSED = r"^\[MOT\] arm_gate_mask=0x[0-9A-Fa-f]+ REFUSED$"
 
 
 def allow_rest_state(step):
@@ -82,6 +86,74 @@ def load_chain():
     m = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(m)
     return m
+
+
+APPLY_RECOVERY = {"cfgapply": "cfgafter", "cfgapply2": "cfg2after"}
+
+
+def declare_byte_recovery(plan, by_id):
+    """现场实测: `tmc_config_apply CONFIRM` 的响应里, 产品那条 132 B 中文长行的**最后一个字节**被写成
+    NUL(`未实测。`的 `。`=E3 80 82 => E3 80 00), 两轮 2/2 复现。这是板上输出通道的字节损坏, 不是链接噪声,
+    也不是我这边的读取问题 => 执行器仍然拒绝它。区别只在于: 本步的响应**一个字段都不取**(坏字节原样落盘、
+    台账具名留痕), 而 CONFIGURED 这件事由紧随其后的 `tmc_config_show`(本会话实测 985 B 干净响应, 带
+    state/fail_reg/last_err/snapshot_valid 硬字段)正面给出。形状由执行器的 PLAN_BYTE_RECOVERY 离线门核。"""
+    steps = {x.get("as"): x for sg in plan["stages"] for x in sg.get("steps", [])}
+    for src, dst in APPLY_RECOVERY.items():
+        st = steps[src]
+        st["no_facts_from_corrupted_response"] = True
+        st["byte_corruption_recovery"] = {
+            "reconfirmed_by": dst,
+            "why": ("apply 自己那条 132 B 长行尾部被写坏(实测 NUL), 本步响应一律不作数; 配置是否真的生效"
+                    "只认下一步 tmc_config_show 的 state/fail_reg/last_err/snapshot_valid 硬字段"),
+            "evidence": [
+                "reports/reviews/phase8-m8-idle-stack-r4/field/field-20261101T151533Z/S_S3/04_cfgapply.rx.bin",
+                "reports/reviews/phase8-m8-idle-stack-r4/field/field-20261101T151718Z/S_S3/04_cfgapply.rx.bin"],
+            "not_a_bypass": ("损坏字节不删不改不解码; 若重确认步骤缺失/未通过, 会话以 "
+                            "BYTE_CORRUPTION_UNRECONFIRMED 停止; 其它任何步骤出现同样损坏仍然直接停")}
+    plan["byte_integrity_policy"] = {
+        "trigger": "ILLEGAL_BYTES_IN_RESPONSE(响应里出现非法 UTF-8 字节序列, 实测为长行尾部的 0x00)",
+        "default": "STOP —— 本包里只有上面两条 apply 步骤申报了重确认, 其余步骤一律照旧停",
+        "observed_on_board": ("两次续测同一位置复现: 行 `[TMC-CFG] CONFIGURED (每次写入均经 IFCNT 确认; "
+                              "GCONF/CHOPCONF 读回一致)。电流值仍为理论计算, 未实测。` 共 132 B, 末尾 `。` "
+                              "的第三字节由 0x82 变成 0x00。与既存 P0 轮登记的长行损坏同族; "
+                              "机制仍未证(不据症状改产品 C)"),
+        "kept_evidence": "原始字节文件与台账事件 EVIDENCE_BYTE_CORRUPTION 全部入库, 未删未改",
+        "conclusion_source": "tmc_config_show 的 expect_values 硬字段(state=CONFIGURED, fail_reg=0x00, "
+                             "snapshot_valid=1) —— 与 apply 的打印无关",
+        "reviewer_note": ("如果复审认为这条口子也不该开, 那结论就是本包在 apply 处具名停止, 需要产品侧"
+                          "把那条长行改短到 128 B 以内(改 C + 重编 + 重烧), 那是另一次批准的另一轮")}
+    return plan
+
+
+IRQ_STATE_FACT = {"irq": "irqafter", "irq2": "irq2after"}
+
+
+def move_irq_fact_to_state_read(plan):
+    """现场实测: IRQ 门**已经是 OPEN** 时, `safety_irq_enable` 只回 31 B(回显 + 两个提示符) ——
+    产品的 `[SAFETY] IRQ gate OPEN` 是跳变打印, 不是状态确认。把它当判据就会把"已经处于目标态"
+    误判成失败(152547Z 的 EXPECTATION_NOT_MET missing=[IRQ gate OPEN] 就是这个)。
+    口径改成: 命令步只要求没有被拒/失败, **门是否真的 OPEN 只认随后的 safety_irq_status 字段**
+    (该步已有 must gate=OPEN)。这跟 apply 一样, 是"事实交给状态回读, 不靠 transition 打印"。"""
+    steps = {x.get("as"): x for sg in plan["stages"] for x in sg.get("steps", [])}
+    for src, dst in IRQ_STATE_FACT.items():
+        st = steps[src]
+        needle = "[SAFETY] IRQ gate OPEN"
+        had = needle in (st.get("expect_contains") or [])
+        st["expect_contains"] = [x for x in (st.get("expect_contains") or []) if x != needle]
+        st["expect_absent"] = list(dict.fromkeys((st.get("expect_absent") or []) +
+                                                  ["REFUSED", "FAILED", "not supported"]))
+        st["fact_authority"] = {
+            "moved_from": "transition print %s" % (needle if had else "(无)"),
+            "moved_to": dst,
+            "why": ("门已 OPEN 时产品不再打印跳变行(实测 31 B 只有回显), 继续要求那行会把**已在目标态**"
+                    "误判成失败; 门状态只认 %s 的 `[SAFETY] irq gate = OPEN` 字段(must 不变)" % dst),
+            "not_relaxed": ("expect_values 的 gate=OPEN 判据一个没删; 命令被拒/失败仍由 expect_absent "
+                            "当场具名停止")}
+    plan["irq_fact_authority_r5c"] = {
+        "observed_in": "reports/reviews/phase8-m8-idle-stack-r4/field/field-20261101T152547Z/"
+                       "S_S3/07_irq.rx.bin (31 B)",
+        "rule": "状态事实一律来自状态回读命令, 不来自动作命令的跳变打印"}
+    return plan
 
 
 def fix_stages(plan, by_id):
@@ -111,6 +183,12 @@ def fix_stages(plan, by_id):
     s7["total_deadline_seconds"] = S3_TOTAL_DEADLINE
     q7 = next(x for x in s7["steps"] if x.get("cmd"))
     allow_rest_state(q7)
+    # 重启后的这条 system_status 原来只有 expect_contains(没有硬字段), 于是"豁免状态行"的门把它拦下
+    # 是对的: 冷启动后的第一条查询必须和 S3 的 sysboot 一样正面给出 bootstrap-complete 与 Safety 状态。
+    q7["expect_values"] = json.loads(json.dumps(
+        next(x for x in s3["steps"] if x.get("as") == "sysboot")["expect_values"]))
+    q7["expect_values_note"] = ("与 sysboot 同一组硬字段(照抄计划数据, 不另立判据): 重启后若 bootstrap 没跑完"
+                                "或 Safety 不在 READY/fault 非 0, 这里就当场具名停")
     q7["seconds"] = FIRST_QUERY_SECONDS
     q7["seconds_note"] = (
         "S6 是**操作者物理断电重上电**, 所以 S7 的第一条查询面对的是又一次冷启动(与 S3 同一判据): "
@@ -320,6 +398,36 @@ def fix_row_patterns(plan):
     return plan
 
 
+def allow_running_gate_status(plan):
+    """只对**断言 RUNNING 的那一步**放行 `[MOT] arm_gate_mask=0x… REFUSED` 这行状态披露。
+
+    现场实测(153836Z): arm 成功(`ARMED ... ENN feedback=LOW confirmed`)、start 已发、第一次
+    `motor_status` 给出 `state=1 cur_hz=20 tgt_hz=100 armed=1 health=OK` —— 同时在跑的状态下安全状态机
+    已不在 READY, 于是 motor.c:2410 顺带打的门禁行是 `arm_gate_mask=0x2 REFUSED`(0x2=MOT_GATE_NOT_READY,
+    motor.h:89)。那是"此刻若再 arm 会被拒"的披露, 不是本条查询被拒; 业务扫描按 REFUSED 关键词把它判成
+    失败, 于是学习被中断(清理照常: stop+disarm 均 CONFIRMED)。
+    静止态的 motor_status **不放行**: 那里 mask 非 0 是真问题(如 0x10 未下发驱动参数), 必须继续停。"""
+    n = 0
+    for stg in plan["stages"]:
+        for st in stg.get("steps", []):
+            if st.get("expect_profile") != "RUNNING":
+                continue
+            st["status_lines_allow"] = list(st.get("status_lines_allow", [])) + [ARM_GATE_MASK_REFUSED]
+            st["status_lines_allow_why"] = (
+                "只在断言 RUNNING 的步骤上放行这一行: 运行中安全状态机不在 READY => 门禁披露必然是 "
+                "REFUSED(0x2=MOT_GATE_NOT_READY)。armed/health/cur_hz/tgt_hz/dir 的硬字段判据一个没删;"
+                "静止态的 motor_status 不放行(那里 mask 非 0 是真故障, 必须停)")
+            n += 1
+    plan["running_gate_status_r5c"] = {
+        "steps": n,
+        "observed_in": "reports/reviews/phase8-m8-idle-stack-r4/field/field-20261101T153836Z/S_S4/"
+                       "07_running_proof.poll01.rx.bin",
+        "bit_meaning": "0x2=MOT_GATE_NOT_READY(安全状态机不在 READY), 见 applications/motor.h:89 与 "
+                       "motor.c:2410 的打印点",
+        "not_allowed": "静止态步骤(rest0/rest2/rest_before_arm 等)一律不放行: 那里 mask 非 0 必须停"}
+    return plan
+
+
 def build():
     chain = load_chain()
     r2 = load_r2()
@@ -330,12 +438,27 @@ def build():
     fix_quota(plan, chain)
     fix_bounds(plan)
     fix_row_patterns(plan)
+    declare_byte_recovery(plan, by_id)
+    move_irq_fact_to_state_read(plan)
+    allow_running_gate_status(plan)
     fix_record(plan, r2)
     return plan, chain
 
 
 def dump(doc):
     return json.dumps(doc, ensure_ascii=False, indent=1, sort_keys=False) + "\n"
+
+
+def _norm(o):
+    """只把**纯标量列表**(如 expect_absent 这类按集合语义使用的数组)排序, 含 dict 的列表(步骤序列)保持原序。
+    这样"顺序无关"的字节差被判成 ORDER_ONLY, 而任何真动了步骤顺序/内容的差仍会露成 SEMANTIC_DELTA。"""
+    if isinstance(o, dict):
+        return {k: _norm(v) for k, v in sorted(o.items())}
+    if isinstance(o, list):
+        if all(not isinstance(x, (dict, list)) for x in o):
+            return sorted(o, key=lambda x: json.dumps(x, ensure_ascii=False))
+        return [_norm(x) for x in o]
+    return o
 
 
 def main():
@@ -352,11 +475,25 @@ def main():
     needs = chain.derive_quota_needs(plan)
     print("R5C_NEEDS|%s" % json.dumps(needs, sort_keys=True))
     if a.check:
-        same = OUT.exists() and OUT.read_text(encoding="utf-8-sig") == body
-        print("R5C_CHECK|%s|bytes=%d|sha=%s" % ("IDEMPOTENT" if same else "DIFFERS",
-                                                len(body.encode("utf-8")),
-                                                hashlib.sha256(body.encode("utf-8")).hexdigest()[:16]))
-        return 0 if (same and bad == 0) else 1
+        disk_exists = OUT.exists()
+        disk = OUT.read_text(encoding="utf-8-sig") if disk_exists else ""
+        disk_sha = hashlib.sha256(disk.encode("utf-8")).hexdigest() if disk_exists else "-"
+        # 已执行的那份字节是证据, 永远不许被本工具重写; 这里只做校验与口径报告。
+        frozen = disk_sha == EXECUTED_PLAN_SHA
+        if disk == body:
+            rel = "CANONICAL_EQUALS_EXECUTED"
+        elif _norm(json.loads(disk)) == _norm(json.loads(body)):
+            rel = "ORDER_ONLY_DELTA"
+        else:
+            rel = "SEMANTIC_DELTA"
+        print("R5C_CHECK|executed_bytes_unchanged=%s(%s)|canon_vs_executed=%s|canon_bytes=%d|canon_sha=%s"
+              % (frozen, disk_sha[:16], rel, len(body.encode("utf-8")),
+                 hashlib.sha256(body.encode("utf-8")).hexdigest()[:16]))
+        return 0 if (frozen and rel in ("CANONICAL_EQUALS_EXECUTED", "ORDER_ONLY_DELTA") and bad == 0) else 1
+    if OUT.exists() and sha(OUT) == EXECUTED_PLAN_SHA:
+        print("R5C_REFUSE_WRITE|%s 是现场 26 场实际用过的执行输入(sha %s…), 不允许覆写; "
+              "要出新包请用 --emit <新路径>" % (OUT.as_posix(), EXECUTED_PLAN_SHA[:12]))
+        return 1
     OUT.write_text(body, encoding="utf-8", newline="\n")
     print("R5C_WRITE|%s|bytes=%d|sha=%s" % (OUT.as_posix(), len(body.encode("utf-8")), sha(OUT)[:16]))
     if bad:

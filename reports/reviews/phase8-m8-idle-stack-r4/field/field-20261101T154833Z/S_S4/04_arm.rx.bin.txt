@@ -1,0 +1,3 @@
+motor_arm
+[MOT] ARMED (drv_en request=HIGH readback verified, ENN feedback=LOW confirmed)
+msh >

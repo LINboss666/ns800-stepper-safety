@@ -1,0 +1,12 @@
+# R5-C 已执行计划 vs 生成器当前输出 —— 差异登记（不改已执行字节）
+on-disk(现场 26 场实际喂进去的那份, 原样保留) bytes=164851 sha256=05bcf96aa7a6bf89291dab9b140253dde74982f7c3907a49a51bb2972d3a3746
+
+# 生成器跨进程确定性(修 list(set(...)) 之后, PYTHONHASHSEED 分别取 0/1/7):
+  seed=0 rc=0 R5C_CHECK|executed_bytes_unchanged=True(05bcf96aa7a6bf89)|canon_vs_executed=ORDER_ONLY_DELTA|canon_bytes=164851|canon_sha=326643bd3d20b3b3
+  seed=1 rc=0 R5C_CHECK|executed_bytes_unchanged=True(05bcf96aa7a6bf89)|canon_vs_executed=ORDER_ONLY_DELTA|canon_bytes=164851|canon_sha=326643bd3d20b3b3
+  seed=7 rc=0 R5C_CHECK|executed_bytes_unchanged=True(05bcf96aa7a6bf89)|canon_vs_executed=ORDER_ONLY_DELTA|canon_bytes=164851|canon_sha=326643bd3d20b3b3
+
+根因: 修前第 140 行用 list(set(...)) 生成 expect_absent, set 对 str 的迭代顺序随进程哈希种子变,
+      于是同一份输入两次派生会得到不同字节的包, --check 的"幂等"承诺是假的(实测能同时报 IDEMPOTENT 和 DIFFERS)。
+处置: 改成 dict.fromkeys 保序去重; --check 现在报三件事(已执行字节未被覆写 / 规范输出 vs 已执行的关系 / 规范输出身份);
+      并对已执行那份加写保护(R5C_REFUSE_WRITE)。已执行字节不重写——那是伪造执行输入。

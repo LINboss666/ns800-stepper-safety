@@ -522,7 +522,8 @@ def s24_negative_cleanup_gate(m):
 
 def s25_negative_business_layer(m):
     """定向检出 3: 去掉业务失败层 => 真实 C 的 learn FAILED 又被当成步骤成功。"""
-    mod = _mutant("RV10c", [("    bad = business_failures(rows)",
+    # R5-C: 业务失败扫描的入参改名 rows->rest(整行锚定的状态披露行先被摘出去), 突变锚点跟着走
+    mod = _mutant("RV10c", [("    bad = business_failures(rest)",
                              "    bad = []   # NEGATIVE-INJECTION RV10c")])
     ok, msg = s05_real_c_learn_failure_is_business_stop(mod)
     return (not ok, "去掉业务层后 s05 仍然通过 => 判据不足: " + msg)

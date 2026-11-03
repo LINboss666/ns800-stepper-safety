@@ -1,0 +1,8 @@
+{"kind": "QUOTA_CONSUMED", "left": 11, "n": 1, "name": "port_open", "t_s": 0.0}
+{"baud": 115200, "kind": "PORT_OPEN_ATTEMPT", "port": "COM5", "t_s": 0.015}
+{"kind": "PORT_OPEN", "port": "COM5", "t_s": 0.015, "transport": "real"}
+{"bytes": 973, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "053b4fe922f5c531241ce3c548bd1875fc46a6257cb58325b6e4b23620b75fa3", "t_s": 0.109, "tail": "b'g)\\r\\nmsh >\\r\\nmsh >'"}
+{"allowed": false, "as": "sysboot", "kind": "BUSINESS_OUTCOME", "lines": [], "status_lines_allowed": ["[Motor] arm gate fail mask=0x2 (arm REFUSED)"], "t_s": 0.109}
+{"absent_groups": [], "as": "sysboot", "forbidden_val": {}, "kind": "VALUE_ASSERT_FAIL", "t_s": 0.109, "wrong": {"state": ["RUN", "READY"]}}
+{"code": "FIELD_VALUE_MISMATCH", "detail": "{\"verdict\": \"STOP\", \"code\": \"FIELD_VALUE_MISMATCH\", \"wrong\": {\"state\": [\"RUN\", \"READY\"]}, \"forbidden_val\": {}, \"absent_groups\": []}", "kind": "SESSION_STOP", "t_s": 0.109}
+{"kind": "PORT_CLOSED", "t_s": 0.109}

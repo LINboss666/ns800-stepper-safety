@@ -1,0 +1,3 @@
+motor_target 100
+[MOT] set target 100 Hz: OK
+msh >

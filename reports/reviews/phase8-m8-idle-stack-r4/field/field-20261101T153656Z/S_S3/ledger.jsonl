@@ -1,0 +1,26 @@
+{"kind": "QUOTA_CONSUMED", "left": 11, "n": 1, "name": "port_open", "t_s": 0.0}
+{"baud": 115200, "kind": "PORT_OPEN_ATTEMPT", "port": "COM5", "t_s": 0.016}
+{"kind": "PORT_OPEN", "port": "COM5", "t_s": 0.016, "transport": "real"}
+{"bytes": 1009, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "ce8c2c9d3996ce3d1d06f09b12108f28c95d0fa985469d708ab39e4eb97a5754", "t_s": 0.109, "tail": "b'g)\\r\\nmsh >\\r\\nmsh >'"}
+{"bytes": 1192, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "aaacfe91a8f52c6951bcba195ff8ca086e5cea79f41a563b50ca1f106a9f0f20", "t_s": 0.219, "tail": "b'/A\\r\\nmsh >\\r\\nmsh >'"}
+{"bytes": 985, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "28224e521c11580cd16c0a5dfcfe812e1bb4b516425c8c9379be891b702bec70", "t_s": 0.328, "tail": "b'=5\\r\\nmsh >\\r\\nmsh >'"}
+{"kind": "QUOTA_CONSUMED", "left": 1, "n": 1, "name": "tmc_config_apply", "t_s": 0.344}
+{"bytes": 1, "first_offset": 152, "kind": "NUL_IN_RESPONSE", "meaning": "控制台输出通道的字节损坏, 机制未证", "t_s": 0.391, "tail": "b'\\xe6\\x9c\\xaa\\xe5\\xae\\x9e\\xe6\\xb5\\x8b\\xe3\\x80\\x00msh >\\r\\nmsh >'"}
+{"bytes": 165, "kind": "RX_DONE", "nul_bytes": 1, "prompt_seen": true, "raw_sha256": "58a97b02af9753abc703b768eb2ab34bb205c919cf65dde161215dbcfbdc7965", "t_s": 0.391, "tail": "b'\\x8b\\xe3\\x80\\x00msh >\\r\\nmsh >'"}
+{"as": "cfgapply", "basis": "apply 自己那条 132 B 长行尾部被写坏(实测 NUL), 本步响应一律不作数; 配置是否真的生效只认下一步 tmc_config_show 的 state/fail_reg/last_err/snapshot_valid 硬字段", "detail": "b'\\x9c\\xaa\\xe5\\xae\\x9e\\xe6\\xb5\\x8b\\xe3\\x80\\x00msh >'", "kind": "EVIDENCE_BYTE_CORRUPTION", "raw": "D:\\ns800\\reports\\reviews\\phase8-m8-idle-stack-r4\\field\\field-20261101T153656Z\\S_S3\\04_cfgapply.rx.bin", "reconfirmed_by": "cfgafter", "rx_bytes": 165, "t_s": 0.391}
+{"bytes": 985, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "28224e521c11580cd16c0a5dfcfe812e1bb4b516425c8c9379be891b702bec70", "t_s": 0.484, "tail": "b'=5\\r\\nmsh >\\r\\nmsh >'"}
+{"kind": "QUOTA_CONSUMED", "left": 3, "n": 1, "name": "irq_polarity_prep", "t_s": 0.5}
+{"bytes": 1, "first_offset": 317, "kind": "NUL_IN_RESPONSE", "meaning": "控制台输出通道的字节损坏, 机制未证", "t_s": 0.578, "tail": "b'eady = YES\\r\\nmsh >\\r\\nmsh >'"}
+{"bytes": 892, "kind": "RX_DONE", "nul_bytes": 1, "prompt_seen": true, "raw_sha256": "99484ae736d4d48239b4e4b9687985f947790283c5e8aa1ef0bdfcc3aa1b6914", "t_s": 0.578, "tail": "b'ES\\r\\nmsh >\\r\\nmsh >'"}
+{"kind": "QUOTA_CONSUMED", "left": 2, "n": 1, "name": "irq_polarity_prep", "t_s": 0.578}
+{"bytes": 31, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "b92fadc62937a17e172b70cd5c5015896351adb94ce787f0c96e68ac555cb07a", "t_s": 0.594, "tail": "b'le\\r\\nmsh >\\r\\nmsh >'"}
+{"bytes": 1, "first_offset": 430, "kind": "NUL_IN_RESPONSE", "meaning": "控制台输出通道的字节损坏, 机制未证", "t_s": 0.656, "tail": "b'ered on it\\r\\nmsh >\\r\\nmsh >'"}
+{"bytes": 568, "kind": "RX_DONE", "nul_bytes": 1, "prompt_seen": true, "raw_sha256": "cb9ff8f9be47c1b295b9faa967a4bcb40ecca2371798f6233421d1fb2fa6185f", "t_s": 0.656, "tail": "b'it\\r\\nmsh >\\r\\nmsh >'"}
+{"bytes": 648, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "10807f63f02a6da9796e06f65e6a4e955b8316563e7856291fbf12ae7ace09b7", "t_s": 0.719, "tail": "b'ed\\r\\nmsh >\\r\\nmsh >'"}
+{"bytes": 1172, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "b16ae6769e2c3ebe05b2cedcf16ff0811342c691ec85eb789d026865f903a008", "t_s": 0.828, "tail": "b'ne\\r\\nmsh >\\r\\nmsh >'"}
+{"bytes": 527, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "a51483ad0261860753f653754d4d6e19c5b47cdba420ae36a42227bf6057af74", "t_s": 0.891, "tail": "b'=1\\r\\nmsh >\\r\\nmsh >'"}
+{"bytes": 495, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "b408c603bfb0d334731622457a5b1593d264eaebb5d447dae2296a0a3155c0ee", "t_s": 0.938, "tail": "b'=0\\r\\nmsh >\\r\\nmsh >'"}
+{"kind": "QUOTA_CONSUMED", "left": 0, "n": 1, "name": "diag_profile_zero", "t_s": 0.953}
+{"bytes": 106, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "5b0df98f2adc5fbc8d5df05c30d58031241b98def2ea6c9a1b0995989c0f84bf", "t_s": 1.266, "tail": "b'd)\\r\\nmsh >\\r\\nmsh >'"}
+{"byte_corruption_recovered": [{"as": "cfgapply", "reconfirmed_by": "cfgafter"}], "kind": "SESSION_OK", "session": "S_S3", "steps": 13, "t_s": 1.281}
+{"kind": "PORT_CLOSED", "t_s": 1.281}

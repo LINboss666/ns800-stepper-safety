@@ -11,6 +11,7 @@ E 组 = 现场包结构(载荷已换新 AXF、两路激励各自首因合同、�
 import hashlib
 import importlib.util
 import json
+import os
 import pathlib
 import re
 import shutil
@@ -980,6 +981,72 @@ add("P9_stages_and_gates_survive_the_edit",
     R5C["mechanical_prerequisites"]["assembly_readiness"]["status"] == "PROVIDED",
     "改动面核到底: 只删了 S1/S2 与 S3 的复位步; 每个起转阶段的机械门原样(SPIN 阶段集合不变)、"
     "load_means 仍未提供、起转额度仍是 3 次 => 没有借修窗之名放宽任何安全约束")
+
+# P10/P11: 生成器确定性 + 已执行包字节冻结(本轮现场发现的自伤)
+_B5C = RD / "host" / "apply_field_window_fix_r5c.py"
+_FROZEN_PLAN_SHA = "05bcf96aa7a6bf89291dab9b140253dde74982f7c3907a49a51bb2972d3a3746"
+_exec_body = (RD / "field" / "plan_core_r5c.json").read_text(encoding="utf-8")
+_canon_shas, _frozen_flags, _rcs = [], [], []
+for _seed in ("0", "1", "7"):
+    _env = dict(os.environ)
+    _env["PYTHONHASHSEED"] = _seed
+    _env["PYTHONIOENCODING"] = "utf-8"
+    _p = subprocess.run([sys.executable, str(_B5C), "--check"], capture_output=True,
+                        text=True, encoding="utf-8", errors="replace", env=_env, cwd=str(ROOT))
+    _rcs.append(_p.returncode)
+    _m = re.search(r"canon_sha=([0-9a-f]{16})", _p.stdout or "")
+    _canon_shas.append(_m.group(1) if _m else "-")
+    _frozen_flags.append("executed_bytes_unchanged=True" in (_p.stdout or ""))
+add("P10_builder_output_is_seed_stable",
+    len(set(_canon_shas)) == 1 and "-" not in _canon_shas and all(_frozen_flags) and all(r == 0 for r in _rcs),
+    "同一输入在 PYTHONHASHSEED=0/1/7 三个进程里派生出同一字节(canon_sha=%s), 且每次都报"
+    " executed_bytes_unchanged=True / rc=0 —— 修前第 140 行 list(set(...)) 让 set 对 str 的迭代顺序"
+    "随进程种子变, 同一个包会派生出不同字节的现场输入" % (_canon_shas[0] if _canon_shas else "-"))
+_ref_env = dict(os.environ)
+_ref_env["PYTHONHASHSEED"] = "0"
+_ref_env["PYTHONIOENCODING"] = "utf-8"
+# 这条会真的执行生成器的写盘分支, 所以先仓外备份、跑完无条件回位: 已执行包的字节不许因自检而丢。
+_plan_path = RD / "field" / "plan_core_r5c.json"
+_bak = SCRATCH / "plan_core_r5c.frozen.bak"
+_bak.write_bytes(_plan_path.read_bytes())
+_ref_rc = _ref_out = None
+try:
+    _r = subprocess.run([sys.executable, str(_B5C)], capture_output=True, text=True,
+                        encoding="utf-8", errors="replace", env=_ref_env, cwd=str(ROOT))
+    _ref_rc, _ref_out = _r.returncode, (_r.stdout or "")
+finally:
+    _now = hashlib.sha256(_plan_path.read_bytes()).hexdigest()
+    if _now != _FROZEN_PLAN_SHA:
+        _plan_path.write_bytes(_bak.read_bytes())
+_ref_lines = [x for x in (_ref_out or "").splitlines() if x.startswith("R5C_")]
+add("P11_executed_plan_bytes_are_frozen",
+    hashlib.sha256(_plan_path.read_bytes()).hexdigest() == _FROZEN_PLAN_SHA and
+    _ref_rc == 1 and any(l.startswith("R5C_REFUSE_WRITE") for l in _ref_lines),
+    "现场 26 场实际喂进去的那份 plan_core_r5c.json 仍是 sha %s…/bytes=%d; 直接跑生成器(不带 --check)"
+    "被写保护挡下(rc=%s), 跑完之后字节身份仍等于冻结值 => 执行输入不可被事后重写"
+    % (_FROZEN_PLAN_SHA[:12], len(_exec_body.encode("utf-8")), _ref_rc))
+
+_spec5 = importlib.util.spec_from_file_location("b5c", str(_B5C))
+_m5 = importlib.util.module_from_spec(_spec5)
+_spec5.loader.exec_module(_m5)
+_cplan, _cchain = _m5.build()
+_canon_body = _m5.dump(_cplan)
+
+
+def _classify(a_txt, b_txt):
+    if a_txt == b_txt:
+        return "SAME"
+    return "ORDER_ONLY" if _m5._norm(json.loads(a_txt)) == _m5._norm(json.loads(b_txt)) else "SEMANTIC"
+
+
+_add_doc = json.loads(_canon_body)
+_swap_target = next(s for s in _add_doc["stages"] if s["id"] == "S3")
+_swap_target["steps"][0], _swap_target["steps"][1] = _swap_target["steps"][1], _swap_target["steps"][0]
+add("P12_meta_negative_order_normalization_cannot_launder_step_swap",
+    _classify(_exec_body, _canon_body) == "ORDER_ONLY" and
+    _classify(_exec_body, _m5.dump(_add_doc)) == "SEMANTIC",
+    "元负控: 已执行那份与规范重生成的真实差被正确判成 ORDER_ONLY(只有 expect_absent 的元素顺序), "
+    "而一旦把 S3 的步骤顺序对调, 同一判据必须翻成 SEMANTIC —— 说明这个归一化不是可以洗白任何改动的空子")
 
 problems = [n for n, ok, _ in CHECKS if not ok]
 n_metaneg = sum(1 for n, _, _ in CHECKS if n.startswith("D"))

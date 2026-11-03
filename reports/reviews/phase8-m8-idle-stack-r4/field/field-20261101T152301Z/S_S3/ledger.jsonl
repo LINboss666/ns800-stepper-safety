@@ -1,0 +1,24 @@
+{"kind": "QUOTA_CONSUMED", "left": 11, "n": 1, "name": "port_open", "t_s": 0.0}
+{"baud": 115200, "kind": "PORT_OPEN_ATTEMPT", "port": "COM5", "t_s": 0.032}
+{"kind": "PORT_OPEN", "port": "COM5", "t_s": 0.032, "transport": "real"}
+{"bytes": 980, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "6d1e56bb5515aee393e4c89b4e17c3492a790a248383bc7aec538133a835843e", "t_s": 0.125, "tail": "b'g)\\r\\nmsh >\\r\\nmsh >'"}
+{"allowed": false, "as": "sysboot", "kind": "BUSINESS_OUTCOME", "lines": [], "status_lines_allowed": ["[Motor] arm gate fail mask=0x8 (arm REFUSED)"], "t_s": 0.125}
+{"bytes": 1192, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "e8616e4b6188cee6a51fb4cf30c023b582e117a8498402aa3a2601568c66fd0e", "t_s": 0.235, "tail": "b'/A\\r\\nmsh >\\r\\nmsh >'"}
+{"bytes": 985, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "28224e521c11580cd16c0a5dfcfe812e1bb4b516425c8c9379be891b702bec70", "t_s": 0.329, "tail": "b'=5\\r\\nmsh >\\r\\nmsh >'"}
+{"kind": "QUOTA_CONSUMED", "left": 1, "n": 1, "name": "tmc_config_apply", "t_s": 0.344}
+{"bytes": 165, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "58a97b02af9753abc703b768eb2ab34bb205c919cf65dde161215dbcfbdc7965", "t_s": 0.391, "tail": "b'\\x8b\\xe3\\x80\\x00msh >\\r\\nmsh >'"}
+{"as": "cfgapply", "basis": "apply 自己那条 132 B 长行尾部被写坏(实测 NUL), 本步响应一律不作数; 配置是否真的生效只认下一步 tmc_config_show 的 state/fail_reg/last_err/snapshot_valid 硬字段", "detail": "b'\\x9c\\xaa\\xe5\\xae\\x9e\\xe6\\xb5\\x8b\\xe3\\x80\\x00msh >'", "kind": "EVIDENCE_BYTE_CORRUPTION", "raw": "D:\\ns800\\reports\\reviews\\phase8-m8-idle-stack-r4\\field\\field-20261101T152301Z\\S_S3\\04_cfgapply.rx.bin", "reconfirmed_by": "cfgafter", "rx_bytes": 165, "t_s": 0.391}
+{"bytes": 980, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "8082ec533772d1188e76ccb4bc995e765b229ca0132262a020e78ef4f7dfd3ca", "t_s": 0.485, "tail": "b' MRES=5\\r\\nmsh >\\r\\n'"}
+{"kind": "QUOTA_CONSUMED", "left": 3, "n": 1, "name": "irq_polarity_prep", "t_s": 0.485}
+{"bytes": 920, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "c1dae92671388542ecd47dfa9ee8f2789cccb36ca6d9fbddd5ee7ffb7b95ca72", "t_s": 0.579, "tail": "b'D)\\r\\nmsh >\\r\\nmsh >'"}
+{"kind": "QUOTA_CONSUMED", "left": 2, "n": 1, "name": "irq_polarity_prep", "t_s": 0.579}
+{"bytes": 260, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "63fb369a792c827aa2eeab39c02d8396b967c433a59f82b9fd52edd2dbec48b8", "t_s": 0.61, "tail": "b'CU\\r\\nmsh >\\r\\nmsh >'"}
+{"bytes": 568, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "cb9ff8f9be47c1b295b9faa967a4bcb40ecca2371798f6233421d1fb2fa6185f", "t_s": 0.672, "tail": "b'it\\r\\nmsh >\\r\\nmsh >'"}
+{"bytes": 648, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "10807f63f02a6da9796e06f65e6a4e955b8316563e7856291fbf12ae7ace09b7", "t_s": 0.75, "tail": "b'ed\\r\\nmsh >\\r\\nmsh >'"}
+{"bytes": 1169, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "fb20ff7c3a1e18ba290cd6dd58b0baa8027fbf028961f1b3387f19993e35f3e3", "t_s": 0.86, "tail": "b'ne\\r\\nmsh >\\r\\nmsh >'"}
+{"bytes": 527, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "a51483ad0261860753f653754d4d6e19c5b47cdba420ae36a42227bf6057af74", "t_s": 0.922, "tail": "b'=1\\r\\nmsh >\\r\\nmsh >'"}
+{"bytes": 132, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "f5a3d174cda5e794261d19d6a9028bc5a5d3e835c7e3f0e2c5564ad0fd29018e", "t_s": 0.938, "tail": "b'=0\\r\\nmsh >\\r\\nmsh >'"}
+{"kind": "QUOTA_CONSUMED", "left": 0, "n": 1, "name": "diag_profile_zero", "t_s": 0.938}
+{"bytes": 106, "kind": "RX_DONE", "prompt_seen": true, "raw_sha256": "9d0c26c6c7f9780a41ee0ea99ec897d8b0f5c676824779bd989a858c5b475b9f", "t_s": 1.266, "tail": "b'd)\\r\\nmsh >\\r\\nmsh >'"}
+{"byte_corruption_recovered": [{"as": "cfgapply", "reconfirmed_by": "cfgafter"}], "kind": "SESSION_OK", "session": "S_S3", "steps": 13, "t_s": 1.282}
+{"kind": "PORT_CLOSED", "t_s": 1.282}

@@ -1,0 +1,25 @@
+diag_status
+[DIAG] verdict=NORMAL mode=MONITOR_ONLY health=OK
+[DIAG] adc_cal_source=THEORETICAL (NOT a measured current)
+[DIAG] threshold_validation=NOT_ESTABLISHED (SG load/speed applicability unverified)
+[DIAG] mode=MONITOR_ONLY; vibration includes ~1g gravity baseline
+[DIAG] sg_filt=0 delta=0 cur_filt=16 mA delta=0 mA
+[DIAG] vib rms=1004 peak=1011 mg band=-1
+[DIAG] cnt sg<warn=0 sg<stall=0 cur>warn=0 cur>stall=0 impact=0 bad=0 clean=0
+[DIAG] rel snap=OK inc=OK seq=160733 pubfail=0
+[DIAG] rel mode=MONITOR_ONLY prof=NONE id=0 rev=0 flg=0000 FIELD_UNVERIFIED
+[DIAG] rel cov=NOT-ACTIVE(no-profile) lost=1639490 gen=0 rearm=0
+[DIAG] rel win hz=0[0..0] dir=0 ph=0
+[DIAG] rel tmc=0/0/0/0 mst=0 def=0 tier=0
+[DIAG] rel sig live=3653476419 prof=0 match=NO
+[DIAG] rel band adc[0..0]n0 nz0 sg[0..0]n0
+[DIAG] rel thr dev=0/0 drop=0/0 reach=4095/0
+[DIAG] rel dur=0/0/0 rec=0 mns=0
+[DIAG] rel age lim sg=0 frm=0 imu=0 imp=0/0/0
+[DIAG] rel sg warn=0/0 strong=0/0
+[DIAG] rel adc warn=0/0 strong=0/0
+[DIAG] rel fus=0 ok=0 imp=0/0
+[DIAG] rel bad age=0 out=0 cov=1639490 imu_use=0
+[DIAG] rel last sg=0 cur=0 imu=0 rsn=NONE
+[DIAG] rel latch: none
+msh >

@@ -25,8 +25,8 @@
   },
   "executor": {
    "path": "reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py",
-   "bytes": 154578,
-   "sha256": "06e5e2830201f6f5c274726a63663914518fe1bde2cb56d6364f54fe3cc09095",
+   "bytes": 162645,
+   "sha256": "bb243467cbd87264a898b8636e2fbe06741a964b88481d6ebce7e9cb8d6895f2",
    "changes_in_this_round": [
     "drain_post_reset_boot(): 删掉**未申报**的静默早退(旧: elapsed>=min(2.0,window) 且静默 0.2 s 即 break, 于是申报 20 s 实跑 2.0 s)。现在申报的预算走满, 只有两种提前结束: 看到正信号 boot_done_needle(产品自己的 bootstrap-complete 打印)再加一小段尾巴, 或显式申报了 boot_quiet_seconds",
     "BOOT_STREAM_DRAINED 事件与 boot_stream 结果新增 drain_declared_seconds / drain_spent_seconds / boot_done_needle / boot_quiet_seconds(申报与实耗一起进台账, 下次再不一致就是自曝); end_reason 拆成 BOOT_DONE_NEEDLE / QUIET_BREAK / DRAIN_BUDGET_REACHED(旧值 BOUNDED_DRAIN 退役, 它曾经同时表示两种事)",
@@ -516,7 +516,17 @@
      },
      "expect_contains": [
       "[TMC-CFG] CONFIGURED"
-     ]
+     ],
+     "no_facts_from_corrupted_response": true,
+     "byte_corruption_recovery": {
+      "reconfirmed_by": "cfgafter",
+      "why": "apply 自己那条 132 B 长行尾部被写坏(实测 NUL), 本步响应一律不作数; 配置是否真的生效只认下一步 tmc_config_show 的 state/fail_reg/last_err/snapshot_valid 硬字段",
+      "evidence": [
+       "reports/reviews/phase8-m8-idle-stack-r4/field/field-20261101T151533Z/S_S3/04_cfgapply.rx.bin",
+       "reports/reviews/phase8-m8-idle-stack-r4/field/field-20261101T151718Z/S_S3/04_cfgapply.rx.bin"
+      ],
+      "not_a_bypass": "损坏字节不删不改不解码; 若重确认步骤缺失/未通过, 会话以 BYTE_CORRUPTION_UNRECONFIRMED 停止; 其它任何步骤出现同样损坏仍然直接停"
+     }
     },
     {
      "cmd": "tmc_config_show",
@@ -557,9 +567,18 @@
       "name": "irq_polarity_prep",
       "n": 1
      },
-     "expect_contains": [
-      "[SAFETY] IRQ gate OPEN"
-     ]
+     "expect_contains": [],
+     "expect_absent": [
+      "FAILED",
+      "not supported",
+      "REFUSED"
+     ],
+     "fact_authority": {
+      "moved_from": "transition print [SAFETY] IRQ gate OPEN",
+      "moved_to": "irqafter",
+      "why": "门已 OPEN 时产品不再打印跳变行(实测 31 B 只有回显), 继续要求那行会把**已在目标态**误判成失败; 门状态只认 irqafter 的 `[SAFETY] irq gate = OPEN` 字段(must 不变)",
+      "not_relaxed": "expect_values 的 gate=OPEN 判据一个没删; 命令被拒/失败仍由 expect_absent 当场具名停止"
+     }
     },
     {
      "cmd": "safety_irq_status",
@@ -760,7 +779,11 @@
       "motor_status@accel",
       "motor_status@running"
      ],
-     "poll_sequence_note": "第 1 次读到 MOTOR_ACCEL(爬坡中, 不是异常), 之后读到 MOTOR_CRUISE(2)。序列来自行表里申报过的两组, 执行器不许临时编响应。"
+     "poll_sequence_note": "第 1 次读到 MOTOR_ACCEL(爬坡中, 不是异常), 之后读到 MOTOR_CRUISE(2)。序列来自行表里申报过的两组, 执行器不许临时编响应。",
+     "status_lines_allow": [
+      "^\\[MOT\\] arm_gate_mask=0x[0-9A-Fa-f]+ REFUSED$"
+     ],
+     "status_lines_allow_why": "只在断言 RUNNING 的步骤上放行这一行: 运行中安全状态机不在 READY => 门禁披露必然是 REFUSED(0x2=MOT_GATE_NOT_READY)。armed/health/cur_hz/tgt_hz/dir 的硬字段判据一个没删;静止态的 motor_status 不放行(那里 mask 非 0 是真故障, 必须停)"
     },
     {
      "cmd": "diag_profile learn 8 80 120 0",
@@ -1066,6 +1089,23 @@
       "^\\[Motor\\] arm gate fail mask=0x[0-9A-Fa-f]+ \\(arm REFUSED\\)$"
      ],
      "status_lines_allow_why": "开机/重启后的默认安全态: 极性与配置未确认前 arm 必须被拒(mask=0x18), 这一行是**状态披露**而不是本条命令被拒。它同时被 expect_contains 正面要求 => 掩码或文案变了就停止, 不是无限放行",
+     "expect_values": [
+      {
+       "row": "^\\[Boot\\]   bootstrap-complete=(?P<bc>\\w+) abort-stage=(?P<ab>\\d+)$",
+       "must": {
+        "bc": "YES",
+        "ab": "0"
+       }
+      },
+      {
+       "row": "^\\[Safety\\] state=(?P<state>\\w+) fault=(?P<fault>\\d+) irq_gate=\\w+ polarity=[\\w-]+ protect_ready=[\\w-]+$",
+       "must": {
+        "state": "READY",
+        "fault": "0"
+       }
+      }
+     ],
+     "expect_values_note": "与 sysboot 同一组硬字段(照抄计划数据, 不另立判据): 重启后若 bootstrap 没跑完或 Safety 不在 READY/fault 非 0, 这里就当场具名停",
      "seconds_note": "S6 是**操作者物理断电重上电**, 所以 S7 的第一条查询面对的是又一次冷启动(与 S3 同一判据): 75 s 是上界, read_until_prompt 到完整提示符就返回; 这一窗仍然 0 字节就只能具名停止"
     },
     {
@@ -1088,7 +1128,17 @@
      },
      "expect_contains": [
       "[TMC-CFG] CONFIGURED"
-     ]
+     ],
+     "no_facts_from_corrupted_response": true,
+     "byte_corruption_recovery": {
+      "reconfirmed_by": "cfg2after",
+      "why": "apply 自己那条 132 B 长行尾部被写坏(实测 NUL), 本步响应一律不作数; 配置是否真的生效只认下一步 tmc_config_show 的 state/fail_reg/last_err/snapshot_valid 硬字段",
+      "evidence": [
+       "reports/reviews/phase8-m8-idle-stack-r4/field/field-20261101T151533Z/S_S3/04_cfgapply.rx.bin",
+       "reports/reviews/phase8-m8-idle-stack-r4/field/field-20261101T151718Z/S_S3/04_cfgapply.rx.bin"
+      ],
+      "not_a_bypass": "损坏字节不删不改不解码; 若重确认步骤缺失/未通过, 会话以 BYTE_CORRUPTION_UNRECONFIRMED 停止; 其它任何步骤出现同样损坏仍然直接停"
+     }
     },
     {
      "cmd": "tmc_config_show",
@@ -1127,9 +1177,18 @@
       "name": "irq_polarity_prep",
       "n": 1
      },
-     "expect_contains": [
-      "[SAFETY] IRQ gate OPEN"
-     ]
+     "expect_contains": [],
+     "expect_absent": [
+      "FAILED",
+      "not supported",
+      "REFUSED"
+     ],
+     "fact_authority": {
+      "moved_from": "transition print [SAFETY] IRQ gate OPEN",
+      "moved_to": "irq2after",
+      "why": "门已 OPEN 时产品不再打印跳变行(实测 31 B 只有回显), 继续要求那行会把**已在目标态**误判成失败; 门状态只认 irq2after 的 `[SAFETY] irq gate = OPEN` 字段(must 不变)",
+      "not_relaxed": "expect_values 的 gate=OPEN 判据一个没删; 命令被拒/失败仍由 expect_absent 当场具名停止"
+     }
     },
     {
      "cmd": "safety_irq_status",
@@ -1352,7 +1411,11 @@
       "motor_status@accel",
       "motor_status@running"
      ],
-     "poll_sequence_note": "第 1 次读到 MOTOR_ACCEL(爬坡中, 不是异常), 之后读到 MOTOR_CRUISE(2)。序列来自行表里申报过的两组, 执行器不许临时编响应。"
+     "poll_sequence_note": "第 1 次读到 MOTOR_ACCEL(爬坡中, 不是异常), 之后读到 MOTOR_CRUISE(2)。序列来自行表里申报过的两组, 执行器不许临时编响应。",
+     "status_lines_allow": [
+      "^\\[MOT\\] arm_gate_mask=0x[0-9A-Fa-f]+ REFUSED$"
+     ],
+     "status_lines_allow_why": "只在断言 RUNNING 的步骤上放行这一行: 运行中安全状态机不在 READY => 门禁披露必然是 REFUSED(0x2=MOT_GATE_NOT_READY)。armed/health/cur_hz/tgt_hz/dir 的硬字段判据一个没删;静止态的 motor_status 不放行(那里 mask 非 0 是真故障, 必须停)"
     },
     {
      "cmd": "__watch__",
@@ -2057,7 +2120,11 @@
       "motor_status@accel",
       "motor_status@running"
      ],
-     "poll_sequence_note": "第 1 次读到 MOTOR_ACCEL(爬坡中, 不是异常), 之后读到 MOTOR_CRUISE(2)。序列来自行表里申报过的两组, 执行器不许临时编响应。"
+     "poll_sequence_note": "第 1 次读到 MOTOR_ACCEL(爬坡中, 不是异常), 之后读到 MOTOR_CRUISE(2)。序列来自行表里申报过的两组, 执行器不许临时编响应。",
+     "status_lines_allow": [
+      "^\\[MOT\\] arm_gate_mask=0x[0-9A-Fa-f]+ REFUSED$"
+     ],
+     "status_lines_allow_why": "只在断言 RUNNING 的步骤上放行这一行: 运行中安全状态机不在 READY => 门禁披露必然是 REFUSED(0x2=MOT_GATE_NOT_READY)。armed/health/cur_hz/tgt_hz/dir 的硬字段判据一个没删;静止态的 motor_status 不放行(那里 mask 非 0 是真故障, 必须停)"
     },
     {
      "cmd": "__watch__",
@@ -3195,9 +3262,27 @@
   "not_a_claim": "本下界不证明板子在 75 s 内一定应答; 仍然 0 字节就是具名停止 + 人工断电重启门"
  },
  "row_pattern_fixes_r5c": {
-  "count": 3,
+  "count": 4,
   "why": "现场第一次答回来才发现的取行失败: polarity 值含连字符(实测 not-confirmed), ps 的 NN% 之后还有 4 列(left tick/error/tcb addr/usage)。两处都按板上实字改, 证据: field-20261101T151317Z/S_S3/01_sysboot.rx.bin(983 B 完整响应) 与 cont-20261101T090512Z/S4_ps.rx.bin 的真实行",
   "not_relaxed": "栈大小/取行唯一性/must 值这些判据一个没删, 只是把行尾的列补全"
+ },
+ "byte_integrity_policy": {
+  "trigger": "ILLEGAL_BYTES_IN_RESPONSE(响应里出现非法 UTF-8 字节序列, 实测为长行尾部的 0x00)",
+  "default": "STOP —— 本包里只有上面两条 apply 步骤申报了重确认, 其余步骤一律照旧停",
+  "observed_on_board": "两次续测同一位置复现: 行 `[TMC-CFG] CONFIGURED (每次写入均经 IFCNT 确认; GCONF/CHOPCONF 读回一致)。电流值仍为理论计算, 未实测。` 共 132 B, 末尾 `。` 的第三字节由 0x82 变成 0x00。与既存 P0 轮登记的长行损坏同族; 机制仍未证(不据症状改产品 C)",
+  "kept_evidence": "原始字节文件与台账事件 EVIDENCE_BYTE_CORRUPTION 全部入库, 未删未改",
+  "conclusion_source": "tmc_config_show 的 expect_values 硬字段(state=CONFIGURED, fail_reg=0x00, snapshot_valid=1) —— 与 apply 的打印无关",
+  "reviewer_note": "如果复审认为这条口子也不该开, 那结论就是本包在 apply 处具名停止, 需要产品侧把那条长行改短到 128 B 以内(改 C + 重编 + 重烧), 那是另一次批准的另一轮"
+ },
+ "irq_fact_authority_r5c": {
+  "observed_in": "reports/reviews/phase8-m8-idle-stack-r4/field/field-20261101T152547Z/S_S3/07_irq.rx.bin (31 B)",
+  "rule": "状态事实一律来自状态回读命令, 不来自动作命令的跳变打印"
+ },
+ "running_gate_status_r5c": {
+  "steps": 3,
+  "observed_in": "reports/reviews/phase8-m8-idle-stack-r4/field/field-20261101T153836Z/S_S4/07_running_proof.poll01.rx.bin",
+  "bit_meaning": "0x2=MOT_GATE_NOT_READY(安全状态机不在 READY), 见 applications/motor.h:89 与 motor.c:2410 的打印点",
+  "not_allowed": "静止态步骤(rest0/rest2/rest_before_arm 等)一律不放行: 那里 mask 非 0 必须停"
  },
  "continuation_of": {
   "approved_tip": "4cb9dac0f2a47beb494a4fb41090cefe8da76075",

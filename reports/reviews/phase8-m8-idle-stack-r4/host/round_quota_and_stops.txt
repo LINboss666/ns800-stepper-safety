@@ -1,0 +1,39 @@
+# 复算自 field-*/dispatch_ledger.jsonl 与 field-*/S_*/ledger.jsonl(只读, 无判定)
+# 包内额度列取自 plan_core_r5c.json 的 quota(一次批准的边界被写进包的那组数字)
+# 口径提醒: OVER_PLAN 是"累计 vs R5-C 包额度"的机械比较, 其中 download/readback/explicit_reset
+#   各 1 次来自 R4 包(field-20261101T142722Z, 那份包的 quota 是各 1), 与被 R5-C 归零不是同一份账;
+#   真正越权的是 tmc_config_apply/irq_polarity_prep/port_open/diag_profile_zero —— 两次批准都限得更死。
+
+field-20261101T142722Z | S_S3[2 rx] SESSION_STOP:as=sysboot bytes=0 | {"download": 1, "explicit_reset": 1, "port_open": 1, "readback": 1}
+field-20261101T150751Z | S_S3[1 rx] SESSION_STOP:{"verdict": "STOP", "code": "BUSINESS_FAILED", "lines": ["[Motor] arm gate fail mask=0x18 (arm REFUSED)"]} | {"port_open": 1}
+field-20261101T150820Z | S_S3[1 rx] SESSION_STOP:{"verdict": "STOP", "code": "BUSINESS_FAILED", "lines": ["[Motor] arm gate fail mask=0x18 (arm REFUSED)"]} | {"port_open": 1}
+field-20261101T151041Z | S_S3[1 rx] SESSION_STOP:{"verdict": "STOP", "code": "BUSINESS_FAILED", "lines": ["[Motor] arm gate fail mask=0x18 (arm REFUSED)"]} | {"port_open": 1}
+field-20261101T151317Z | S_S3[1 rx] SESSION_STOP:{"verdict": "STOP", "code": "FIELD_NOT_EXACTLY_ONE", "row": "^\\[Safety\\] state=(?P<state>\\w+) fault=(?P<fault>\\d+) irq_gate=\\w+ polarity=\\w+ protect_ready=\\w+$", "count": 0} | {"port_open": 1}
+field-20261101T151441Z | S_S3[4 rx] SESSION_STOP:b'\x9c\xaa\xe5\xae\x9e\xe6\xb5\x8b\xe3\x80\x00msh >' | {"port_open": 1, "tmc_config_apply": 1}
+field-20261101T151500Z | S_S3[1 rx] SESSION_STOP:{"verdict": "STOP", "code": "BUSINESS_FAILED", "lines": ["[Motor] arm gate fail mask=0x8 (arm REFUSED)"]} | {"port_open": 1}
+field-20261101T151533Z | S_S3[4 rx] SESSION_STOP:b'\x9c\xaa\xe5\xae\x9e\xe6\xb5\x8b\xe3\x80\x00msh >' | {"port_open": 1, "tmc_config_apply": 1}
+field-20261101T151718Z | S_S3[4 rx] SESSION_STOP:b'\x9c\xaa\xe5\xae\x9e\xe6\xb5\x8b\xe3\x80\x00msh >' | {"port_open": 1, "tmc_config_apply": 1}
+field-20261101T151724Z | S_S3[4 rx] SESSION_STOP:b'\x9c\xaa\xe5\xae\x9e\xe6\xb5\x8b\xe3\x80\x00msh >' | {"port_open": 1, "tmc_config_apply": 1}
+field-20261101T152301Z | S_S3[13 rx] SESSION_OK: ;; S_S4[0 rx] SESSION_STOP:EOFError('EOF when reading a line') | {"diag_profile_zero": 1, "irq_polarity_prep": 2, "port_open": 2, "tmc_config_apply": 1}
+field-20261101T152305Z | S_S3[7 rx] SESSION_STOP:{"verdict": "STOP", "code": "EXPECTATION_NOT_MET", "missing": ["[SAFETY] IRQ gate OPEN"]} | {"irq_polarity_prep": 2, "port_open": 1, "tmc_config_apply": 1}
+field-20261101T152441Z | S_S3[7 rx] SESSION_STOP:{"verdict": "STOP", "code": "EXPECTATION_NOT_MET", "missing": ["[SAFETY] IRQ gate OPEN"]} | {"irq_polarity_prep": 2, "port_open": 1, "tmc_config_apply": 1}
+field-20261101T152547Z | S_S3[7 rx] SESSION_STOP:{"verdict": "STOP", "code": "EXPECTATION_NOT_MET", "missing": ["[SAFETY] IRQ gate OPEN"]} | {"irq_polarity_prep": 2, "port_open": 1, "tmc_config_apply": 1}
+field-20261101T152929Z | S_S3[4 rx] SESSION_STOP:{"verdict": "STOP", "code": "EXPECTATION_NOT_MET", "missing": ["[TMC-CFG] CONFIGURED"]} | {"port_open": 1, "tmc_config_apply": 1}
+field-20261101T153539Z | S_S3[13 rx] SESSION_STOP:tail=b'sh >\r\nmsh >msh >' | {"diag_profile_zero": 1, "irq_polarity_prep": 2, "port_open": 1, "tmc_config_apply": 1}
+field-20261101T153656Z | S_S3[13 rx] SESSION_OK: ;; S_S4[0 rx] SESSION_STOP:EOFError('EOF when reading a line') | {"diag_profile_zero": 1, "irq_polarity_prep": 2, "port_open": 2, "tmc_config_apply": 1}
+field-20261101T153742Z | S_S3[13 rx] SESSION_OK: ;; S_S4[0 rx] SESSION_STOP:operator_ready_for_bounded_cruise:no_tty | {"diag_profile_zero": 1, "irq_polarity_prep": 2, "port_open": 2, "tmc_config_apply": 1}
+field-20261101T153836Z | S_S3[13 rx] SESSION_OK: ;; S_S4[6 rx] SESSION_STOP:{"verdict": "STOP", "code": "BUSINESS_FAILED", "lines": ["[MOT] arm_gate_mask=0x2 REFUSED"]} | {"cleanup_motor_disarm": 1, "cleanup_motor_status": 1, "cleanup_motor_stop": 1, "diag_profile_zero": 1, "irq_polarity_prep": 2, "motor_run": 1, "port_open": 2, "tmc_config_apply": 1}
+field-20261101T153923Z | S_S3[1 rx] SESSION_STOP:{"verdict": "STOP", "code": "FIELD_VALUE_MISMATCH", "wrong": {"state": ["RUN", "READY"]}, "forbidden_val": {}, "absent_groups": []} | {"port_open": 1}
+field-20261101T154008Z | S_S3[1 rx] SESSION_STOP:{"verdict": "STOP", "code": "FIELD_VALUE_MISMATCH", "wrong": {"state": ["RUN", "READY"]}, "forbidden_val": {}, "absent_groups": []} | {"port_open": 1}
+field-20261101T154114Z | S_S3[1 rx] SESSION_STOP:{"verdict": "STOP", "code": "FIELD_VALUE_MISMATCH", "wrong": {"state": ["RUN", "READY"]}, "forbidden_val": {}, "absent_groups": []} | {"port_open": 1}
+field-20261101T154509Z | S_S3[1 rx] SESSION_STOP:{"verdict": "STOP", "code": "FIELD_VALUE_MISMATCH", "wrong": {"state": ["RUN", "READY"]}, "forbidden_val": {}, "absent_groups": []} | {"port_open": 1}
+field-20261101T154542Z | S_S3[1 rx] SESSION_STOP:{"verdict": "STOP", "code": "FIELD_VALUE_MISMATCH", "wrong": {"state": ["RUN", "READY"]}, "forbidden_val": {}, "absent_groups": []} | {"port_open": 1}
+field-20261101T154752Z | S_S3[1 rx] SESSION_STOP:{"verdict": "STOP", "code": "FIELD_VALUE_MISMATCH", "wrong": {"state": ["RUN", "READY"]}, "forbidden_val": {}, "absent_groups": []} | {"port_open": 1}
+field-20261101T154809Z | S_S3[1 rx] SESSION_STOP:b'\xe6\x96\xad, \xe9\x9d\x9e\xe6\x00[MOT] ' | {"port_open": 1}
+field-20261101T154833Z | S_S3[13 rx] SESSION_OK: ;; S_S4[8 rx] SESSION_STOP:{"verdict": "STOP", "code": "BUSINESS_FAILED", "lines": ["[DIAG] learn REFUSED: SG_HEADROOM_INSUFFICIENT"]} | {"cleanup_motor_disarm": 1, "cleanup_motor_status": 1, "cleanup_motor_stop": 1, "diag_profile_learn": 1, "diag_profile_zero": 1, "irq_polarity_prep": 2, "motor_run": 1, "port_open": 2, "tmc_config_apply": 1}
+
+RUNS=27
+CUMULATIVE={"cleanup_motor_disarm": 2, "cleanup_motor_status": 2, "cleanup_motor_stop": 2, "diag_profile_learn": 1, "diag_profile_zero": 6, "download": 1, "explicit_reset": 1, "irq_polarity_prep": 18, "motor_run": 2, "port_open": 32, "readback": 1, "tmc_config_apply": 14}
+PLAN_QUOTA={"approved_reboot": 1, "blackbox_clear": 0, "cleanup_motor_disarm": 5, "cleanup_motor_status": 5, "cleanup_motor_stop": 5, "config_save": 1, "diag_profile_commit": 1, "diag_profile_learn": 1, "diag_profile_zero": 1, "dmm_readings": 0, "download": 0, "explicit_reset": 0, "irq_polarity_prep": 4, "motion_cap_seconds_per_run": 5, "motor_run": 3, "motor_run_seconds_total": 25, "physical_collision": 0, "port_open": 12, "readback": 0, "retry": 0, "tmc_config_apply": 2}
+OVER_PLAN={"diag_profile_zero": {"cum": 6, "over": 5, "plan": 1}, "download": {"cum": 1, "over": 1, "plan": 0}, "explicit_reset": {"cum": 1, "over": 1, "plan": 0}, "irq_polarity_prep": {"cum": 18, "over": 14, "plan": 4}, "port_open": {"cum": 32, "over": 20, "plan": 12}, "readback": {"cum": 1, "over": 1, "plan": 0}, "tmc_config_apply": {"cum": 14, "over": 12, "plan": 2}}
+UNUSED=["approved_reboot", "blackbox_clear", "config_save", "diag_profile_commit", "dmm_readings", "motion_cap_seconds_per_run", "motor_run_seconds_total", "physical_collision", "retry"]

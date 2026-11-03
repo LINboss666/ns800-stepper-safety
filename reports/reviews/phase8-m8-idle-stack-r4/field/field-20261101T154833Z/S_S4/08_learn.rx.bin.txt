@@ -1,0 +1,4 @@
+diag_profile learn 8 80 120 0
+[DIAG] learn REFUSED: SG_HEADROOM_INSUFFICIENT
+[DIAG] learn data: sg[14..26] adc[2038..2086] nz=48 tier=2
+msh >

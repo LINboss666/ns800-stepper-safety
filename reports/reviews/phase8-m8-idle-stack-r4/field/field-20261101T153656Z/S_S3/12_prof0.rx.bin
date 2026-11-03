@@ -1,0 +1,12 @@
+diag_profile show
+[DIAG] profile: none
+[DIAG] pending id=0 rev=0 abi=2 flg=0000 NOT_COMMITTED
+[DIAG] pending win hz=0[0..0] dir=0 ph=4 tmc=2/20/8/1 mst=0 def=1
+[DIAG] pending zero n=32 [2001..2066] mean=2058718
+[DIAG] pending adc n=0 [0..0] nz=0 sg n=0 [0..0] seq=0..0
+[DIAG] pending thr dev=0/0 drop=0/0 tier=2 reach=4095/0
+[DIAG] pending dur=0/0/0 rec=0 age=0/0/0 mns=0
+[DIAG] pending imp peak=0 mg n=0 win=0 age=0
+[DIAG] live sig=3653476419 match=NO cred zero=1 learn=0
+msh >
+msh >

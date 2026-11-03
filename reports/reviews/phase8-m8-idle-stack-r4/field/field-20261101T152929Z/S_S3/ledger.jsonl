@@ -1,0 +1,11 @@
+{"kind": "QUOTA_CONSUMED", "left": 11, "n": 1, "name": "port_open", "t_s": 0.0}
+{"baud": 115200, "kind": "PORT_OPEN_ATTEMPT", "port": "COM5", "t_s": 0.015}
+{"kind": "PORT_OPEN", "port": "COM5", "t_s": 0.015, "transport": "real"}
+{"bytes": 1009, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "ce8c2c9d3996ce3d1d06f09b12108f28c95d0fa985469d708ab39e4eb97a5754", "t_s": 0.109, "tail": "b'g)\\r\\nmsh >\\r\\nmsh >'"}
+{"bytes": 1192, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "4f00ce83f24840739454202af39669f23957d9baceb9b0cf3d580bab276042cb", "t_s": 0.234, "tail": "b'/A\\r\\nmsh >\\r\\nmsh >'"}
+{"bytes": 980, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "8082ec533772d1188e76ccb4bc995e765b229ca0132262a020e78ef4f7dfd3ca", "t_s": 0.328, "tail": "b' MRES=5\\r\\nmsh >\\r\\n'"}
+{"kind": "QUOTA_CONSUMED", "left": 1, "n": 1, "name": "tmc_config_apply", "t_s": 0.328}
+{"bytes": 5, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "43c13a5a4a0be881203be6677f4c64f4c2a2e2096c74b936e4222d774039f1a2", "t_s": 0.328, "tail": "b'msh >'"}
+{"as": "cfgapply", "kind": "PROTOCOL_OR_CONTENT_FAIL", "missing": ["[TMC-CFG] CONFIGURED"], "t_s": 0.328}
+{"code": "EXPECTATION_NOT_MET", "detail": "{\"verdict\": \"STOP\", \"code\": \"EXPECTATION_NOT_MET\", \"missing\": [\"[TMC-CFG] CONFIGURED\"]}", "kind": "SESSION_STOP", "t_s": 0.344}
+{"kind": "PORT_CLOSED", "t_s": 0.344}

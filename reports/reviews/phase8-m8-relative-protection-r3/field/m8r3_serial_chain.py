@@ -51,6 +51,10 @@ DANGER = re.compile(rb"stack is close|stack overflow|SYSTEM_HALT|HardFault|BusFa
 # 业务失败的具名标记: 产品里这几条线一律由 rt_kprintf 打出(见 needles.json 的 source 字段),
 # 出现即说明这一步没有成立, 与"响应是否完整"无关。
 BUSINESS_FAILURE = (b"FAILED", b"REFUSED", b"VOIDED", b"not supported")
+# 只有"查询类"命令的响应里, 才允许出现"此刻若做某动作会被拒"这种**状态披露**; 动作命令本身被拒
+# (motor_arm/motor_start/learn/apply/…) 一律照旧具名停止, 不得用白名单盖掉。
+STATUS_QUERY_CMDS = ("system_status", "motor_status", "safety_irq_status", "tmc_config_show",
+                     "diag_status", "config_show", "diag_profile", "free", "ps", "safety_status")
 YES_TOKENS = ("yes", "y", "true", "1", "confirmed")
 
 
@@ -240,6 +244,40 @@ def check_danger(raw):
         raise Stop("DANGER_TEXT_IN_STREAM", m.group(0).decode("ascii", "replace"))
 
 
+def _is_real_serial_port(port):
+    """回显门只对**真串口**生效: 假端口/内存端口不是被测对象, 也不建模 finsh 的 echo。"""
+    try:
+        import serial
+    except ImportError:
+        return False
+    return isinstance(port, serial.Serial)
+
+
+def has_echo(raw, cmd):
+    """本条命令是否真的被板子回显过(提示符可有可无, 与 split_rows 剥回显的口径一致)。"""
+    return bool(re.search(rb"(?:msh\s*(?:>|/>)\s*)?" + re.escape(cmd.encode("ascii")) +
+                          rb"\r(?:\n)?", raw))
+
+
+def drain_pending(port, led, clock, limit=64):
+    """发命令**之前**把缓冲里的残留读干净。
+
+    为什么要这一步: 上一条响应之后板上往往还会再打一个 `msh >`, 它留在 OS 接收缓冲里; 下一条命令一发送,
+    读循环先撞到的就是这个**陈旧提示符**, 于是把 5 个字节当成整条响应返回(现场实测 `04_cfgapply.rx.bin`
+    就是 5 B 且连回显都没有)。残留不丢: 原样交给调用方并入本步的证据文件, 并在台账具名披露。
+    """
+    buf = bytearray()
+    for _ in range(limit):
+        chunk = port.read(512)
+        if not chunk:
+            break
+        buf += chunk
+        clock.sleep(0.002)
+    if buf:
+        led.ev("PRE_CMD_DRAIN", bytes=len(buf), tail=repr(bytes(buf)[-24:]))
+    return bytes(buf)
+
+
 def read_until_prompt(port, deadline, led, raw_path, clock):
     """读到提示符为止; 原始字节先落盘再判读。
 
@@ -273,8 +311,15 @@ def read_until_prompt(port, deadline, led, raw_path, clock):
                 break
             clock.sleep(0.005)
     raw = bytes(buf)
+    nul = raw.count(b"\x00")
+    if nul:
+        # 裸 0x00 本身是合法 UTF-8, 所以 decode 门抓不到它 —— 而现场实测两种损坏都见过:
+        # 一种是截断的多字节序列(被 ILLEGAL_BYTES 拒), 另一种就是这种裸 NUL(以前静默通过)。
+        # 这里只做**具名披露**(不改判据、不放宽、也不在这里新增停止), 让每条含 NUL 的响应在台账里可见。
+        led.ev("NUL_IN_RESPONSE", bytes=nul, first_offset=raw.index(b"\x00"),
+               tail=repr(raw[-24:]), meaning="控制台输出通道的字节损坏, 机制未证")
     led.ev("RX_DONE", bytes=len(raw), prompt_seen=bool(PROMPT_RE.search(ANSI.sub(b"", raw))),
-           raw_sha256=sha_bytes(raw), tail=repr(raw[-16:]))
+           raw_sha256=sha_bytes(raw), tail=repr(raw[-16:]), nul_bytes=nul)
     if not PROMPT_RE.search(ANSI.sub(b"", raw)):
         return [], len(raw)                     # 协议不成立: 交给判据层, 绝不当作完整响应
     return split_rows(raw), len(raw)
@@ -488,7 +533,12 @@ def read_manual(name, fixture, allow_prompt, transport="real"):
         if not allow_prompt:
             raise Stop("MANUAL_INPUT_REQUIRED", name)
         OPERATOR_CALLS["n"] += 1
-        got = input("OPERATOR CONFIRM [%s] (yes/no): " % name).strip()
+        try:
+            got = input("OPERATOR CONFIRM [%s] (yes/no): " % name).strip()
+        except EOFError:
+            # 没有终端可用(非交互调用) => 具名"无人应答", 绝不退化成 UNEXPECTED_EXCEPTION,
+            # 也不得当成"操作者说不": 答案根本没被问到人。
+            raise Stop("MANUAL_INPUT_UNANSWERED", "%s:no_tty" % name)
     if str(got).strip().lower() not in YES_TOKENS:
         raise Stop("MANUAL_GATE_DENIED", "%s=%s" % (name, got))
     return str(got)
@@ -1108,6 +1158,7 @@ def command_attempt(port, cmd, st, asname, raw, step_dl, transport, fixture, sil
     """一次"发送 -> 取回完整响应 -> 判据 -> 原字节/文本落盘"的最小单元。
     单发步骤与业务轮询走**同一条门**, 所以轮询不会绕过短写、提示符、具名字段这些判据。"""
     data = (cmd + "\r\n").encode("ascii")
+    pre = drain_pending(port, led, clock) if transport != "stub" else b""
     try:
         written = port.write(data)
     except (OSError, Stop) as e:
@@ -1131,10 +1182,50 @@ def command_attempt(port, cmd, st, asname, raw, step_dl, transport, fixture, sil
             # 同步命令会把单线程 msh 占住: 响应只在忙期结束后才可见(审核 §3 "忙 msh")。
             block = float((fixture.get("block") or {}).get(key, 0) or 0)
             port.feed(("\r\n".join(resp) + "\r\nmsh >").encode("utf-8"), block_seconds=block)
-    lines, nbytes = read_until_prompt(port, step_dl, led, raw, clock)
-    if not lines:
-        raise Stop("MISSING_RESPONSE_PROMPT", "as=%s bytes=%d" % (asname, nbytes))
-    v = assert_step(st, lines, asname, led, raw=Path(raw).read_bytes())
+    rec = st.get("byte_corruption_recovery")
+    lines, nbytes = [], 0
+    try:
+        lines, nbytes = read_until_prompt(port, step_dl, led, raw, clock)
+        if pre:
+            # 排走的残留**单独存证**成 NN_<as>.pre.rx.bin。绝不追加到响应文件后面: 那会把已经判读完毕的
+            # 原文改成另一份字节流(实测让 split_rows 在 `msh >\r\nmsh >`+`msh >` 上找不到提示符而误停)。
+            pre_path = Path(str(raw).replace(".rx.bin", ".pre.rx.bin"))
+            try:
+                with open(pre_path, "wb") as f:
+                    f.write(pre)
+                    f.flush()
+                    os.fsync(f.fileno())
+            except OSError as e:
+                raise Stop("EVIDENCE_WRITE_FAILED", "pre:%s" % e.__class__.__name__)
+            led.ev("PRE_CMD_DRAIN_SAVED", raw=str(pre_path), bytes=len(pre), sha256=sha_bytes(pre))
+        if transport != "stub" and cmd != "__watch__" and _is_real_serial_port(port):
+            full = Path(str(raw)).read_bytes()
+            if not has_echo(full, cmd):
+                # 只对**真串口**要求回显: finsh 的 echo 默认开, 命令到达就必然回显。
+                # 反过来不行 —— `motor_start` 成功时产品一个字节都不打(计划里 expect_absent 写明),
+                # 所以"响应为空"本身不是证据; 而现场实测那种 5 B 纯陈旧提示符, 缺的正是回显。
+                # 桩件/内存端口不带回显, 因此不参与这条门(它们不是被测对象)。
+                raise Stop("COMMAND_NOT_ECHOED", "as=%s bytes=%d body_empty=%s tail=%r" %
+                           (asname, nbytes,
+                            not PROMPT_RE.sub(b"", ANSI.sub(b"", full)).strip(), full[-24:]))
+        if not lines:
+            raise Stop("MISSING_RESPONSE_PROMPT", "as=%s bytes=%d" % (asname, nbytes))
+        v = assert_step(st, lines, asname, led, raw=Path(raw).read_bytes())
+    except Stop as e:
+        # 板上长行(>128 B)尾部被写成 NUL 这类字节完整性损坏: 原字节照旧落盘、一个不改, 而这一步的响应
+        # 一律**不作数**。只有该步申报了 byte_corruption_recovery, 且同会话里申报的那一步真的取到干净响应
+        # 并通过自己的判据, 才允许继续; 否则会话末尾 BYTE_CORRUPTION_UNRECONFIRMED 具名停止。
+        if e.code != "ILLEGAL_BYTES_IN_RESPONSE" or not rec:
+            raise
+        try:
+            nbytes = Path(str(raw)).stat().st_size
+        except OSError:
+            nbytes = 0
+        led.ev("EVIDENCE_BYTE_CORRUPTION", **{"as": asname, "detail": e.detail, "raw": str(raw),
+              "rx_bytes": nbytes, "reconfirmed_by": rec.get("reconfirmed_by", ""),
+              "basis": str(rec.get("why", ""))[:160]})
+        v = {"verdict": "BYTE_CORRUPT", "code": "EVIDENCE_BYTE_CORRUPTION", "detail": e.detail,
+             "lines": [], "reconfirmed_by": rec.get("reconfirmed_by", "")}
     try:
         txt = emit_text(raw, lines)
     except OSError as e:
@@ -1211,6 +1302,7 @@ def exec_session(session_id, steps, outdir, transport, fixture, port_name,
     if backend is not None:
         backend.led = led            # 动作事件与串口事件同一条台账: 调用序列不能散在两个文件里
     results = []
+    corrupt = []
     errors = []
     primary = None
     disarm_state = "NOT_ARMED"
@@ -1370,15 +1462,28 @@ def exec_session(session_id, steps, outdir, transport, fixture, port_name,
             results.append(dict({"as": asname, "kind": "command", "cmd": cmd,
                                  "rx_bytes": nbytes, "rx_sha256": sha_of(raw),
                                  "txt": txt, "selected_log_window": selected_window}, **v))
+            if v["verdict"] == "BYTE_CORRUPT":
+                corrupt.append((asname, v.get("reconfirmed_by") or ""))
+                continue
             if v["verdict"] == "REFUSED":
                 ret = {"status": "REFUSED", "code": v.get("code", ""),
                        "refused": v.get("lines")}
                 break
             if v["verdict"] != "OK":
                 raise Stop(v["code"], json.dumps(v, ensure_ascii=False))
+        if corrupt:
+            ok_as = set(r.get("as") for r in results if r.get("verdict") == "OK")
+            un = ["%s->%s" % (a, rc) for a, rc in corrupt if rc not in ok_as]
+            if un:
+                raise Stop("BYTE_CORRUPTION_UNRECONFIRMED",
+                           "损坏响应不作数, 申报的重确认没通过: %s" % json.dumps(un, ensure_ascii=False))
         if ret is None:
-            led.ev("SESSION_OK", session=session_id, steps=len(results))
+            led.ev("SESSION_OK", session=session_id, steps=len(results),
+                   byte_corruption_recovered=[{"as": a, "reconfirmed_by": rc}
+                                              for a, rc in corrupt])
             ret = {"status": "OK", "code": ""}
+            if corrupt:
+                ret["byte_corruption"] = ["%s->%s" % (a, rc) for a, rc in corrupt]
     except Stop as e:
         primary = e
         ret = {"status": "STOP", "code": e.code, "detail": e.detail}
@@ -1942,14 +2047,45 @@ def validate_plan(plan, rows_doc, app_dir):
     for stg in plan["stages"]:
         for st in stg.get("steps", []):
             for p in st.get("status_lines_allow", []):
-                lit = re.sub(r"\\(.)", r"\1", p.strip("^$"))
+                head = (st.get("cmd") or "").split(" ")[0]
                 if not (p.startswith("^") and p.endswith("$")) or ".*" in p:
                     sa_bad.append("%s/%s:模式未整行锚定或含 .* 通配(%s)" % (stg["id"], st.get("as"), p))
-                elif not any(e in lit for e in st.get("expect_contains", [])):
-                    sa_bad.append("%s/%s:放行的行没有被本步 expect_contains 正面要求(%s)"
-                                  % (stg["id"], st.get("as"), lit))
+                elif head not in STATUS_QUERY_CMDS and st.get("expect_profile") != "RUNNING":
+                    sa_bad.append("%s/%s:豁免只给**状态查询步**(cmd=%s 不是查询, 也没断言 RUNNING)"
+                                  % (stg["id"], st.get("as"), head or "无 cmd"))
+                elif not st.get("expect_values"):
+                    sa_bad.append("%s/%s:豁免步骤没有 expect_values 硬字段判据"
+                                  % (stg["id"], st.get("as")))
                 else:
-                    sa_seen.append("%s:%s" % (stg["id"], lit[:28]))
+                    sa_seen.append("%s:%s" % (stg["id"], st.get("as")))
+    # 字节损坏口子的唯一形状: 坏响应不作数 + 同会话更靠后的干净步骤**正面**给出同一事实(离线核形状)。
+    br_bad, br_seen = [], []
+    for stg in plan["stages"]:
+        steps = stg.get("steps", [])
+        order = [x.get("as") for x in steps]
+        for x in steps:
+            rec = x.get("byte_corruption_recovery")
+            if not rec:
+                continue
+            rb = rec.get("reconfirmed_by")
+            if not x.get("no_facts_from_corrupted_response"):
+                br_bad.append("%s/%s:没声明 no_facts_from_corrupted_response"
+                              % (stg["id"], x.get("as")))
+            elif rb not in order or order.index(rb) <= order.index(x.get("as")):
+                br_bad.append("%s/%s:reconfirmed_by=%s 不是本会话更靠后的步骤"
+                              % (stg["id"], x.get("as"), rb))
+            else:
+                nxt = steps[order.index(rb)]
+                if not nxt.get("expect_values"):
+                    br_bad.append("%s:重确认步骤没有 expect_values(取不到硬字段)" % rb)
+                else:
+                    br_seen.append("%s->%s" % (x.get("as"), rb))
+    out.append("PLAN_BYTE_RECOVERY|all|%s|%s" %
+               ("PASS" if not br_bad else "FAIL",
+                ";".join(br_bad) or ("损坏步骤都有干净步骤正面重确认: %s" % ",".join(br_seen)
+                                      if br_seen else "未使用(任何 ILLEGAL_BYTES 一律停)")))
+    if br_bad:
+        bad += 1
     out.append("PLAN_STATUS_ALLOW|all|%s|%s" %
                ("PASS" if not sa_bad else "FAIL",
                 ";".join(sa_bad) or ("白名单都是锚定且被正面要求(要求串必须是该行的前缀)的状态行: %s" % ",".join(sa_seen)

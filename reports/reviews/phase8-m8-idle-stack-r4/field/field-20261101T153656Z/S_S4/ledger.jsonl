@@ -1,0 +1,5 @@
+{"kind": "QUOTA_CONSUMED", "left": 10, "n": 1, "name": "port_open", "t_s": 0.0}
+{"baud": 115200, "kind": "PORT_OPEN_ATTEMPT", "port": "COM5", "t_s": 0.0}
+{"kind": "PORT_OPEN", "port": "COM5", "t_s": 0.0, "transport": "real"}
+{"code": "UNEXPECTED_EXCEPTION", "detail": "EOFError('EOF when reading a line')", "kind": "SESSION_STOP", "t_s": 0.0}
+{"kind": "PORT_CLOSED", "t_s": 0.0}
