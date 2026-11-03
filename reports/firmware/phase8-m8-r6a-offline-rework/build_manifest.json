@@ -1,0 +1,122 @@
+{
+ "round": "phase8-m8-r6a-offline-rework",
+ "target": "rt-thread-motor-m1-candidate",
+ "action": "Keil Rebuild All x1(只 rt-thread-motor-m1-candidate); 未下载、未 Flash、未接 DAP、未复位、未开串口、未起转、未 learn/zero/保存配置",
+ "command": "C:\\Keil_v5\\UV4\\UV4.exe -r project.uvprojx -t rt-thread-motor-m1-candidate -j0 -o D:/ns800/reports/reviews/phase8-m8-r6a-offline-rework/build/rt-thread-motor-r6a.log",
+ "uv4_return_code_observed_this_round": 0,
+ "uv4_return_code_source": "本轮实际执行时终端打印的 UV4_EXIT=0(命令与退出码记在 run_record 的 R6A 节); 本脚本不重跑构建, 只判日志里的 0 Error(s), 0 Warning(s) 与 Program Size 行",
+ "error_warning_line": "0 Error(s), 0 Warning(s)",
+ "compiler_line_from_log": "Using Compiler 'V6.24', folder: 'C:\\Keil_v5\\ARM\\ARMCLANG\\Bin'",
+ "program_size": "Program Size: Code=205594 RO-data=85994 RW-data=2188 ZI-data=85592",
+ "program_size_vs_previous_round_same_target": {
+  "previous": "Program Size: Code=205570 RO-data=85970 RW-data=2188 ZI-data=85592",
+  "previous_manifest": "reports/firmware/phase8-m8-r6-offline-recovery/build_manifest.json",
+  "delta_bytes": {
+   "Code": 24,
+   "RO-data": 24,
+   "RW-data": 0,
+   "ZI-data": 0
+  }
+ },
+ "build_time_elapsed_line": "Build Time Elapsed:  00:00:09",
+ "log_path": "reports/reviews/phase8-m8-r6a-offline-rework/build/rt-thread-motor-r6a.log",
+ "log_bytes": 3909,
+ "log_sha256": "e28dbd0af1e8216fcb6a372e89db7392395f9fa6a355a1748e43bbc0cc0d0270",
+ "source_inputs": [
+  {
+   "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/motor.c",
+   "bytes": 131191,
+   "sha256": "7305f3b4295ce3d632c95798de516724f6b9bb609519616d1c4c9eb474e7cf50",
+   "compiled_from_disk_bytes": 133752,
+   "compiled_from_disk_bytes_sha256": "f8de36fd0ebc86e1e169958ac4d158c26515f89bc1650ec84f158803832bd515",
+   "identity_kind": "blob_after_crlf_filter(disk 多 CR, 差 2561 B)",
+   "what": "R6A-R4 mot_commit_gated(): withheld(未授予恢复资格)那条本轮新增打印拆成 4 次调用 (字面 211 B / 最坏 237 B => 每条 <=120 B)"
+  },
+  {
+   "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/stop_priority.c",
+   "bytes": 63128,
+   "sha256": "09a2f086e59af03f5a52a3f6ef82dea85845f433ec08129156f68ce1c93976ac",
+   "compiled_from_disk_bytes": 64672,
+   "compiled_from_disk_bytes_sha256": "99d6c124bcc38224760b4ba91f526b4ad5e390139c15630a2b2c44dba08ca390",
+   "identity_kind": "blob_after_crlf_filter(disk 多 CR, 差 1544 B)",
+   "what": "本轮未改(沿用 R6 的 sp_peek_held 字段补齐)"
+  },
+  {
+   "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/tmc2209.c",
+   "bytes": 192031,
+   "sha256": "214951633ee4b39cd693bfee1274bd618305ddcddea8bf40880c2f27437d77ec",
+   "compiled_from_disk_bytes": 192031,
+   "compiled_from_disk_bytes_sha256": "214951633ee4b39cd693bfee1274bd618305ddcddea8bf40880c2f27437d77ec",
+   "identity_kind": "disk_equals_blob",
+   "what": "本轮未改(沿用 R6 的长打印拆分)"
+  },
+  {
+   "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/safety_thread.c",
+   "bytes": 19716,
+   "sha256": "564770faf381b18aacd11e9196c9ce99af7a2f1f19a6c7702832970b68311246",
+   "compiled_from_disk_bytes": 19716,
+   "compiled_from_disk_bytes_sha256": "564770faf381b18aacd11e9196c9ce99af7a2f1f19a6c7702832970b68311246",
+   "identity_kind": "disk_equals_blob",
+   "what": "本轮未改(沿用 R6 的 LIMIT 拆分)"
+  },
+  {
+   "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/rtconfig.h",
+   "bytes": 8850,
+   "sha256": "b66753d6b50b9bf4ab8b46d4a1500e538513a7c872a3d70e84c551007ab4d209",
+   "compiled_from_disk_bytes": 9304,
+   "compiled_from_disk_bytes_sha256": "1927ed1c1cc7a1efebca50b910eb735228a926c218b3e39a1daf799b6fe9a65a",
+   "identity_kind": "blob_after_crlf_filter(disk 多 CR, 差 454 B)",
+   "what": "本轮未改(沿上一轮 IDLE_THREAD_STACK_SIZE=1024)"
+  }
+ ],
+ "code_commit_at_build": "44e493cea9bbbc35e18394ca23dd1a8502519448",
+ "working_tree_at_build": "改动尚未提交(本 manifest 记录的正是待提交的那份字节)",
+ "not_overwritten": {
+  "path": "reports/firmware/phase8-m8-r6-offline-recovery/rt-thread-motor-m1-candidate.bin",
+  "bytes": 292116,
+  "sha256": "d70a9180b40c5c6a25f3692bd973ffb0309a1da5db9a2f6e0768300405a9b86b",
+  "statement": "R6 那件 d70a9180… 已归档的镜像保持原字节, 本轮新件写新目录; 板上实际在板的仍是更早逐字节证过的 dab356c6…(新件**没有**上板)",
+  "recomputed_now_matches_archive": true
+ },
+ "new_image_on_board": false,
+ "device_actions_by_this_build": 0,
+ "targets": [
+  {
+   "target": "rt-thread-motor-m1-candidate",
+   "uv4_return_code_observed_this_round": 0,
+   "error_warning_line": "0 Error(s), 0 Warning(s)",
+   "program_size": "Program Size: Code=205594 RO-data=85994 RW-data=2188 ZI-data=85592",
+   "log_bytes": 3909,
+   "log_sha256": "e28dbd0af1e8216fcb6a372e89db7392395f9fa6a355a1748e43bbc0cc0d0270",
+   "log_archive_path": "reports/reviews/phase8-m8-r6a-offline-rework/build/rt-thread-motor-r6a.log",
+   "images": {
+    "rt-thread-motor-m1-candidate.bin": {
+     "bytes": 292164,
+     "sha256": "5ae4110d14fdbb40f49cc6f0deca474cf6d0b33b3ee9305e83681dbdd4a53825",
+     "path": "reports/firmware/phase8-m8-r6a-offline-rework/rt-thread-motor-m1-candidate.bin",
+     "source_path_relative_to_project": "build/motor_m1/rt-thread-motor-m1.bin",
+     "identical_to_build_output": true
+    },
+    "rt-thread-motor-m1.axf": {
+     "bytes": 1773648,
+     "sha256": "581f1155166374cf96cda1281320dbcfd31968f1bf5a898a6dd0e2a804a52df1",
+     "path": "reports/firmware/phase8-m8-r6a-offline-rework/rt-thread-motor-m1.axf",
+     "source_path_relative_to_project": "build/motor_m1/rt-thread-motor-m1.axf",
+     "identical_to_build_output": true
+    },
+    "rt-thread-motor-m1.map": {
+     "bytes": 2110730,
+     "sha256": "4f58a3eea493d8c532ecceba3d16db1e59750066ec75cede8647197563d412c3",
+     "path": "reports/firmware/phase8-m8-r6a-offline-rework/rt-thread-motor-m1.map",
+     "source_path_relative_to_project": "build/motor_m1/rt-thread-motor-m1.map",
+     "identical_to_build_output": true
+    }
+   },
+   "map": {
+    "bytes": 2110730,
+    "sha256": "4f58a3eea493d8c532ecceba3d16db1e59750066ec75cede8647197563d412c3",
+    "path": "reports/firmware/phase8-m8-r6a-offline-rework/rt-thread-motor-m1.map"
+   }
+  }
+ ]
+}

@@ -1,0 +1,8 @@
+# sha256 * <仓库相对路径>(LF, 无 BOM; 本清单不哈希自身字节 —— 一条清单不能给自己的字节作证)
+# 生成方式: 对 reports/firmware/phase8-m8-r6a-offline-rework/ 下每个常规文件(排除 SHA256SUMS.txt、remote_readback.md 与 __pycache__) 直接读磁盘字节算 sha256
+# 条目数=4; 与 Git blob 的逐条复算由 host/staged_preflight_batch.py(提交前, 单批流)与推送后的远端逐 blob 回读完成
+# 重新生成: python reports/reviews/phase8-m8-idle-stack-r4/host/make_round_sums.py <本目录>
+b405df37cb983ee09719552eff9c18becc9eb369c6dc0951d6ea4cc5a98a8862  reports/firmware/phase8-m8-r6a-offline-rework/build_manifest.json
+5ae4110d14fdbb40f49cc6f0deca474cf6d0b33b3ee9305e83681dbdd4a53825  reports/firmware/phase8-m8-r6a-offline-rework/rt-thread-motor-m1-candidate.bin
+581f1155166374cf96cda1281320dbcfd31968f1bf5a898a6dd0e2a804a52df1  reports/firmware/phase8-m8-r6a-offline-rework/rt-thread-motor-m1.axf
+4f58a3eea493d8c532ecceba3d16db1e59750066ec75cede8647197563d412c3  reports/firmware/phase8-m8-r6a-offline-rework/rt-thread-motor-m1.map

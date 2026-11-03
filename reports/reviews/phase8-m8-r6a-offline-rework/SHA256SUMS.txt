@@ -1,0 +1,14 @@
+# sha256 * <仓库相对路径>(LF, 无 BOM; 本清单不哈希自身字节 —— 一条清单不能给自己的字节作证)
+# 生成方式: 对 reports/reviews/phase8-m8-r6a-offline-rework/ 下每个常规文件(排除 SHA256SUMS.txt、remote_readback.md 与 __pycache__) 直接读磁盘字节算 sha256
+# 条目数=10; 与 Git blob 的逐条复算由 host/staged_preflight_batch.py(提交前, 单批流)与推送后的远端逐 blob 回读完成
+# 重新生成: python reports/reviews/phase8-m8-idle-stack-r4/host/make_round_sums.py <本目录>
+e28dbd0af1e8216fcb6a372e89db7392395f9fa6a355a1748e43bbc0cc0d0270  reports/reviews/phase8-m8-r6a-offline-rework/build/rt-thread-motor-r6a.log
+77102a8bff73cc21dfa4744222ab1130b376224e91cd98711ac1a1c3dc5efffd  reports/reviews/phase8-m8-r6a-offline-rework/field/needles.json
+556a044e195705d1c27949c1393f60c23ac1e1af01cfa555581350ee69d732c2  reports/reviews/phase8-m8-r6a-offline-rework/field/plan_core_r6a.json
+3a08721814c0e05e2e87ac7e43ed75b4e4f537d9671e816973432db3859f00a4  reports/reviews/phase8-m8-r6a-offline-rework/field/rows.json
+1a0047abd12fb7474151ef1894180c101305ff6c8b905d7202793b96601efae3  reports/reviews/phase8-m8-r6a-offline-rework/host/archive_build_r6a.py
+1f0323968f2c8676ddd89cb70eb303a70efbec1ebaa72e800673f1cc4e9cb9b5  reports/reviews/phase8-m8-r6a-offline-rework/host/derive_plan_r6a.py
+1959e857a5047aa8c13acc456ae9bfa8f34c31dd5518ec98e5ec16e7d80bae1a  reports/reviews/phase8-m8-r6a-offline-rework/host/r6a_before_after.py
+39643c5f5c9935ec61d9b855927b34d389086d7a175c436b520eae7ebddf1c72  reports/reviews/phase8-m8-r6a-offline-rework/host/r6a_before_after.txt
+3b2143b1f2cc783a5174bf0ecb3cf683539ba09b57fc73320c69a5ccc7c19c9f  reports/reviews/phase8-m8-r6a-offline-rework/host/write_handoff_json_r6a.py
+4828d52817f8c071e375e95da195f906f3fc168c70966ac8f93d41d165925b73  reports/reviews/phase8-m8-r6a-offline-rework/run_record.md

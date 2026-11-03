@@ -1,0 +1,43 @@
+R6A_BEFORE_AFTER 基线头=44e493cea9bbbc35e18394ca23dd1a8502519448 执行器 blob=184093 B sha=1b23719a3c9a2656…
+修后执行器 = 209786 B sha=99d6c9600b05d610… (reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py)
+
+[R1①删 identities.executor_sha256]
+  修前: {"again": "REFUSED_APPROVAL_QUOTA_EXHAUSTED", "file_present": true, "first": "reserved+committed spent={'apply': 1}", "init": "OK", "snapshot": "OK spent={'apply': 1}"}
+  修后: {"again": "REFUSED_APPROVAL_LEDGER_CORRUPT", "file_present": true, "first": "reserved+committed spent={'apply': 1}", "init": "OK", "snapshot": "REFUSED_APPROVAL_LEDGER_CORRUPT"}
+  判定: 修后 again 符合(具名拒绝)
+
+[R1②删整个 spent 字段]
+  修前: {"again": "ALLOWED tag=apply#1 spent={'apply': 1}", "file_present": true, "first": "reserved+committed spent={'apply': 1}", "init": "OK", "snapshot": "OK spent={}"}
+  修后: {"again": "REFUSED_APPROVAL_LEDGER_CORRUPT", "file_present": true, "first": "reserved+committed spent={'apply': 1}", "init": "OK", "snapshot": "REFUSED_APPROVAL_LEDGER_CORRUPT"}
+  判定: 修后 again 符合(具名拒绝)
+
+[R1③spent.apply=-1]
+  修前: {"again": "ALLOWED tag=apply#0 spent={'apply': 0}", "file_present": true, "first": "reserved+committed spent={'apply': 1}", "init": "OK", "snapshot": "OK spent={'apply': -1}"}
+  修后: {"again": "REFUSED_APPROVAL_LEDGER_CORRUPT", "file_present": true, "first": "reserved+committed spent={'apply': 1}", "init": "OK", "snapshot": "REFUSED_APPROVAL_LEDGER_CORRUPT"}
+  判定: 修后 again 符合(具名拒绝)
+
+[R1④绑定并耗尽后删账本文件]
+  修前: {"after_delete": "ALLOWED tag=apply#1 新账 spent={'apply': 1}", "exhausted": "APPROVAL_QUOTA_EXHAUSTED"}
+  修后: {"after_delete": "REFUSED_APPROVAL_LEDGER_ABSENT 文件重建=False", "exhausted": "APPROVAL_QUOTA_EXHAUSTED"}
+  判定: 修后 after_delete 符合(具名拒绝)
+
+[R2 真实单会话步骤未绑定批准(cap apply=0, 步骤不声明 quota)]
+  修前: {"code": "MISSING_RESPONSE_PROMPT", "disarm": "NOT_ARMED", "ports_opened": 1, "quota_used": {"port_open": 1}, "status": "STOP", "success": false, "tx": ["tmc_config_apply CONFIRM"]}
+  修后: {"ports_opened": 0, "raised": "REAL_SESSION_REQUIRES_APPROVED_PACKAGE", "tx": []}
+  判定: 修后 符合(开口 0 次、一条未发)
+
+[R2b CLI 单会话 --steps + --transport real 的真实退出码]
+  修前: {"rc": 4, "run_dir_created": true, "stderr_last": "APPROVAL_GATE_REFUSED:APPROVAL_LEDGER_ABSENT|C:\\Users\\LMX\\AppData\\Local\\Temp\\m8r6a-before-after-"}
+  修后: {"rc": 4, "run_dir_created": false, "stderr_last": "REAL_TRANSPORT_REFUSED:single_session_steps_not_approved_package(真实执行只接 --dispatch 整包; 任意 --step"}
+  判定: 修后 rc=4 符合(装配层就拒, 不建输出目录)
+
+[R3 清理用的 motor_status 回包里多一条独立裸 NUL]
+  修前: {"cleanup_errors": [], "disarm": "CONFIRMED_DISABLED", "nul_in_evidence": 1, "status": "STOP", "success": false}
+  修后: {"cleanup_errors": ["motor_status:NUL_BYTE_IN_RESPONSE", "DISARM_NOT_CONFIRMED FIELD_MISSING_state FIELD_MISSING_hz FIELD_MISSING_armed FIELD_MISSING_drvreq FIELD_MISSING_fb FIELD_MISSING_off"], "disarm": "UNKNOWN", "nul_in_evidence": 1, "status": "STOP", "success": false}
+  判定: 修后 符合(禁能 UNKNOWN、原字节保留、独立证据错误)
+
+[R4 motor.c 本轮新增错误打印的最坏字节(同一把尺 host/line_width_check.py)]
+  修前(基线 44e493c 的 motor.c): 该分支 rt_kprintf 调用数=1, 最长一条最坏展开 285 B (门槛 120 B, 控制台裁剪线 127 B) => 超限
+  修后(盘上 motor.c): 该分支 rt_kprintf 调用数=4, 最长一条最坏展开 101 B (门槛 120 B, 控制台裁剪线 127 B) => 达标
+
+RESULT BEFORE_AFTER_OK (fails=0)

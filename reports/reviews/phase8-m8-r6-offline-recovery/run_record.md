@@ -237,3 +237,14 @@ Build Time Elapsed:  00:00:13
    `plan_core_r6.json` 是派生候选，从未执行。
 7. 本轮**没有**任何新硬件授权。下一个现场包要由 A 按新代码、实际工况和操作者设备状态另订，
    并且第一次跑之前必须先离线 `--approval-init` 落一本绑到新批准身份的账。
+
+## 16.7 后续轮指针(不改写本轮任何结论)
+
+本轮(R6)交付经云端 A 独立复审裁定为**整体 REWORK、继续停在离线**: R6 的证据接收、disarm 正常收口
+的主机证据、普通命令/退役合同的复查都通过; 必修项是那四条**执行控制与输出**问题(账本严格性、
+执行输入绑定批准、清理回包裸 NUL、本轮新增错误打印宽度)。它们的返修在
+`reports/reviews/phase8-m8-r6a-offline-rework/`(run_record §17.0–§17.8)与
+`reports/agent_handoffs/phase8-m8-r6a-offline-rework.md/.json`, 软件提交 `9e2eb9c`。
+本节只是指针: 本轮的 16.0–16.6 结论文字未做任何修改; `host/line_width_check.py` 按 §6 要求扩展了
+CHANGED_SITES(故本轮派生清单 SHA256SUMS.txt 同步重算, 清单跟随数据), 本轮的
+`field/plan_core_r6.json`、CLI 实证文本与归档镜像三件字节一律未动。
