@@ -14,7 +14,7 @@
  "closure_commit": "推送与远端逐 blob 回读所在提交(在其后顺序追加)",
  "delivery_head_rule": "常规提交/push 后按精确 SHA 独立逐 blob 回读一次即停止; 不为回读自己的新头反复追加提交",
  "roles": "云端 A 出方向与独立复审; 本地 Qoder 准备候选包; 操作者=人(本件不含任何硬件批准, 也不代替操作者回答现场安全门)",
- "status": "M8_R7_OFFLINE_CANDIDATE_DELIVERED / AWAITING_INDEPENDENT_REVIEW",
+ "status": "M8_R7_OFFLINE_CANDIDATE_DELIVERED + R7_F1_FIELD_RUN_EXECUTED_STOPPED_AT_S3 / AWAITING_INDEPENDENT_REVIEW_OF_FIELD_BYTES",
  "scope_covered": [
   "① 启动(一次显式复位 + 被动启动窗 + 只读状态查询)",
   "② 相关短打印([SAFETY] LIMIT 行 / [TMC-CFG] CONFIGURED 三条短行, 逐行宽度与字面量)",
@@ -218,13 +218,13 @@
   },
   "run_record": {
    "path": "reports/reviews/phase8-m8-r7-field-package-5ae/run_record.md",
-   "bytes": 17465,
-   "sha256": "9ae1da3d5ec0861177dd07cf22cd4d12d2ca500ee149b0eaa96d4a9becf7a560"
+   "bytes": 22580,
+   "sha256": "bb811a71a57d67bddd3947c1702dd9ec6e6678121dd0db8c724c05aecc94cccd"
   },
   "handoff_md": {
    "path": "reports/agent_handoffs/phase8-m8-r7-field-package-5ae.md",
-   "bytes": 10122,
-   "sha256": "b59f979e6c28937bc26448fb1e1f6ad8cd9dcb4f063003374f8e2fdd63ce240b"
+   "bytes": 12821,
+   "sha256": "f2c0790d686718639ebfb533a2c7edc9c3dcf2c526e27af37d8f181844554b4f"
   },
   "frozen_derivation_source": {
    "path": "reports/reviews/phase8-m8-r6c-cleanup-evidence-and-s0/field/plan_core_r6c.json",
@@ -270,6 +270,71 @@
    "path": "reports/reviews/phase8-m8-diag-stack-r1/field/field-20261101T084256Z/flash_readback.bin",
    "bytes": 290916,
    "sha256": "f5c2fd89bbf28255a5b26c9cca495bc0fb1e39d401d0bb7bea19d051221708ce"
+  },
+  "approval_token_verbatim": {
+   "path": "reports/reviews/phase8-m8-r7-field-package-5ae/field/field-20261103T132348Z/APPROVAL_TOKEN.verbatim.txt",
+   "bytes": 184,
+   "sha256": "19de8ce27fb80051f506d6e2cc549c75790e8be3138ddbcc50db086157487f8a"
+  },
+  "dispatch_stdout": {
+   "path": "reports/reviews/phase8-m8-r7-field-package-5ae/field/field-20261103T132348Z/stdout_dispatch.txt",
+   "bytes": 5641,
+   "sha256": "ec4c8f2dd706dda29f4fab2a5afd6183d1e9b2483506d6e9bb5648fde6bd93c5"
+  },
+  "dispatch_ledger": {
+   "path": "reports/reviews/phase8-m8-r7-field-package-5ae/field/field-20261103T132348Z/dispatch_ledger.jsonl",
+   "bytes": 7522,
+   "sha256": "74100e3fced7e0b95bfb69908c83ccdffef87cfbf612717cf6956b1b2bc14a57"
+  },
+  "session_ledger_S3": {
+   "path": "reports/reviews/phase8-m8-r7-field-package-5ae/field/field-20261103T132348Z/S_S3/ledger.jsonl",
+   "bytes": 2542,
+   "sha256": "ac25fe28cf278ee7ce097b90684f624d56d090ccf815192a2b4a5cdaf86ca341"
+  },
+  "boot_stream_raw": {
+   "path": "reports/reviews/phase8-m8-r7-field-package-5ae/field/field-20261103T132348Z/S_S3/01_rst.boot.rx.bin",
+   "bytes": 3810,
+   "sha256": "4f1c0d6d54ca8a449463a1017f86f3b715b4ca3a6d208355bd57770a2e01693b"
+  },
+  "sysboot_response_raw": {
+   "path": "reports/reviews/phase8-m8-r7-field-package-5ae/field/field-20261103T132348Z/S_S3/02_sysboot.rx.bin",
+   "bytes": 992,
+   "sha256": "20e9a7ccbd16e0caa9b7fdc3c73bfa37da993047dd82c2d37ee58b46e1ad1abd"
+  },
+  "field_readback_bin": {
+   "path": "reports/reviews/phase8-m8-r7-field-package-5ae/field/field-20261103T132348Z/readback.bin",
+   "bytes": 292164,
+   "sha256": "5ae4110d14fdbb40f49cc6f0deca474cf6d0b33b3ee9305e83681dbdd4a53825"
+  },
+  "rc_download": {
+   "path": "reports/reviews/phase8-m8-r7-field-package-5ae/field/field-20261103T132348Z/action_download/rc.txt",
+   "bytes": 3,
+   "sha256": "13bf7b3039c63bf5a50491fa3cfd8eb4e699d1ba1436315aef9cbe5711530354"
+  },
+  "rc_readback": {
+   "path": "reports/reviews/phase8-m8-r7-field-package-5ae/field/field-20261103T132348Z/action_readback/rc.txt",
+   "bytes": 3,
+   "sha256": "13bf7b3039c63bf5a50491fa3cfd8eb4e699d1ba1436315aef9cbe5711530354"
+  },
+  "rc_reset": {
+   "path": "reports/reviews/phase8-m8-r7-field-package-5ae/field/field-20261103T132348Z/action_reset/rc.txt",
+   "bytes": 3,
+   "sha256": "13bf7b3039c63bf5a50491fa3cfd8eb4e699d1ba1436315aef9cbe5711530354"
+  },
+  "field_judgement": {
+   "path": "reports/reviews/phase8-m8-r7-field-package-5ae/field/field-20261103T132348Z/OFFLINE_JUDGEMENT.txt",
+   "bytes": 9453,
+   "sha256": "28ef1a5c5103f2caa265ce1b06b291f305193e4fded48748dddec28162128075"
+  },
+  "a_review_document": {
+   "path": "reports/reviews/phase8-m8-r7-field-package-5ae/a_review_NS800_M8_R7_Boot_Print_Package_20261103.md",
+   "bytes": 8286,
+   "sha256": "30ae7c0a4d98aae1a95ca8d343c90d7c01e922c844265d757a8f77d92e8ed634"
+  },
+  "a_reviewed_plan": {
+   "path": "reports/reviews/phase8-m8-r7-field-package-5ae/field/plan_core_r7_reviewed.json",
+   "bytes": 108021,
+   "sha256": "fea903b4f9530cab6d6bec16d2a4beb1b85901e441e18c9872831f121c645c16"
   }
  },
  "unchanged_this_round": {
@@ -292,33 +357,133 @@
   "prior_token": "4cb9dac0f2a47beb494a4fb41090cefe8da76075",
   "prior_token_state": "EXHAUSTED_AND_NOT_CARRIED(download/readback/explicit_reset 各 1/1 用尽; 换计划文件/换输出目录不重新发额度)",
   "numbers_are_proposals_not_authorization": true,
-  "what_is_still_needed": "操作者对 5 个非零额度逐条批准(port_open 2 / download 1 / readback 1 / explicit_reset 1 / tmc_config_apply 1, 尤其 apply 会写驱动芯片寄存器), 并回报现场物理状态(供电、接线、是否允许开 COM5、机械是否静止)",
+  "what_is_still_needed": "F1 之前的批准已由操作者那条原话给出并记在仓外持久账; 现在需要的是A 对现场真实字节的复审。要继续动设备(断电/上电、fault_reset 人工恢复复核、重跑到 READY、或用掉剩下的 1 次 port_open 与 1 次 apply)都需操作者另发一次批准; 本件不代替操作者回答现场安全门",
   "this_file_is_not_an_approval": true
  },
+ "field_execution": {
+  "approved_by": "操作者 2026-11-03 一次整包批准(原文逐字在 approval_token_verbatim 指到的文件里)",
+  "approval_id": "M8R7F1-reviewed-bootprint-20261103",
+  "approval_ledger_root": "D:/ns800_field_approvals (仓外持久账, 换 --out/重开进程不清零)",
+  "executed_plan_bytes_are": "A 的校正版 plan_core_r7_reviewed.json(fea903b4…) 原字节; 未重跑派生器, 未改任何字节来登记批准",
+  "command": "python m8r3_serial_chain.py --dispatch --transport real --backend real --profile response_driven --plan <reviewed> --repo-root D:/ns800 --approval-id <id> --approval-root D:/ns800_field_approvals --approval-token=<原文> --expected-token=<同一原文> --uid-file <既存私有 UID 文件> --port COM5 --out reports/reviews/phase8-m8-r7-field-package-5ae/field/field-20261103T132348Z",
+  "tool_exit_code": 1,
+  "stage_lines_grepped": [
+   "DISPATCH|stage=S0|status=OK|kind=offline|{\"facts\": {\"image_path\": \"reports/firmware/phase8-m8-r6a-offline-rework/rt-thread-motor-m1-candidate.bin\", \"approval_id\": \"M8R7F1-reviewed-bootprint-20261103\", \"plan_source\": \"reports/reviews/phase8-m8-r7-field-package-5ae/field/plan_core_r7_reviewed.json\", \"plan_sha256_on_disk\": \"fea903b4f9530cab6d6bec16d2a4beb1b85901e441e18c9872831f121c645c16\", \"plan_sha256\": \"fea903b4f9530cab6d6bec16d2a4beb1b85901e441e18c9872831f121c645c16\", \"plan_snapshot_bytes\": 108021, \"plan_snapshot_path\": \"reports\\\\reviews\\\\phase8-m8-r7-field-package-5ae\\\\field\\\\plan_core_r7_reviewed.json\", \"executor_path\": \"D:\\\\ns800\\\\reports\\\\reviews\\\\phase8-m8-relative-protection-r3\\\\field\\\\m8r3_serial_chain.py\", \"executor_sha256\": \"33d3f0af8a4c9c33dcd4e013b395e4ba990a89e384130f9d0ffe50c71b34e8ca\", \"image_bytes\": 292164, \"image_sha256\": \"5ae4110d14fdbb40f49cc6f0deca474cf6d0b33b3ee9305e83681dbdd4a53825\", \"manifest_target\": \"rt-thread-motor-m1-candidate\", \"software_input_commit\": \"9e2eb9cfe26688ae8ae57ece248fcf089433b7e1\", \"tested_image_build_commit\": \"44e493cea9bbbc35e18394ca23dd1a8502519448\", \"reviewed_delivery_commit\": \"0df9937abb4831c8c0fd6734a2e45c9fbdf5aca0\", \"plan_placeholders\": 0, \"plan_forbidden_hits\": 0, \"needles_source_root\": \"rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad\", \"needles_total\": 40}}",
+   "DISPATCH|stage=S1|status=OK|kind=download|{\"action\": \"download\"}",
+   "DISPATCH|stage=S2|status=OK|kind=readback|{\"action\": \"readback\"}",
+   "DISPATCH|stage=S3|status=STOP|kind=|{\"code\": \"FIELD_VALUE_MISMATCH\", \"detail\": \"{\\\"verdict\\\": \\\"STOP\\\", \\\"code\\\": \\\"FIELD_VALUE_MISMATCH\\\", \\\"wrong\\\": {\\\"state\\\": [\\\"FAULT_LATCHED\\\", \\\"READY\\\"], \\\"fault\\\": [\\\"8\\\", \\\"0\\\"]}, \\\"forbidden_val\\\": {}, \\\"absent_groups\\\": []}\", \"recorded\": {}, \"success\": false, \"disarm\": \"NOT_ARMED\", \"terminal\": \"KNOWN\", \"scenario\": \"S3\", \"branch\": \"response_driven\", \"expected_refusal\": null, \"forensics\": null, \"first_cause\": null, \"target_claim\": null, \"target_why\": null, \"cleanup_errors\": [], \"obligation\": false, \"dir\": \"reports\\\\reviews\\\\phase8-m8-r7-field-package-5ae\\\\field\\\\field-20261103T132348Z\\\\S_S3\", \"steps\": 3}",
+   "DISPATCH|stage=S3|status=NOT_RUN",
+   "DISPATCH|stage=S4|status=NOT_RUN"
+  ],
+  "stop_detail_grepped_from_session_ledger": [
+   "{\"kind\": \"APPROVED_PACKAGE_VERIFIED\", \"plan_sha256\": \"fea903b4f9530cab6d6bec16d2a4beb1b85901e441e18c9872831f121c645c16\", \"stage\": \"S3\", \"steps\": 6, \"steps_sha256\": \"e420992f5ce9271aadc1df5a017b6fd2f29ea273b178ba9de31e953bbfb74e91\", \"t_s\": 0.0, \"transport\": \"real\", \"verified\": true}",
+   "{\"as\": \"rst\", \"bytes\": 3810, \"done_needle\": null, \"drain_declared_s\": 75.0, \"drain_spent_s\": 75.0, \"end_reason\": \"DRAIN_BUDGET_REACHED\", \"kind\": \"BOOT_STREAM_DRAINED\", \"prompt_required\": false, \"quiet_break_s\": null, \"raw\": \"reports\\\\reviews\\\\phase8-m8-r7-field-package-5ae\\\\field\\\\field-20261103T132348Z\\\\S_S3\\\\01_rst.boot.rx.bin\", \"t_s\": 76.781}",
+   "{\"bytes\": 992, \"kind\": \"RX_DONE\", \"nul_bytes\": 0, \"prompt_seen\": true, \"raw_sha256\": \"20e9a7ccbd16e0caa9b7fdc3c73bfa37da993047dd82c2d37ee58b46e1ad1abd\", \"t_s\": 76.859, \"tail\": \"b'pending)\\\\r\\\\nmsh >\\\\r'\"}",
+   "{\"absent_groups\": [], \"as\": \"sysboot\", \"forbidden_val\": {}, \"kind\": \"VALUE_ASSERT_FAIL\", \"t_s\": 76.875, \"wrong\": {\"fault\": [\"8\", \"0\"], \"state\": [\"FAULT_LATCHED\", \"READY\"]}}",
+   "{\"code\": \"FIELD_VALUE_MISMATCH\", \"detail\": \"{\\\"verdict\\\": \\\"STOP\\\", \\\"code\\\": \\\"FIELD_VALUE_MISMATCH\\\", \\\"wrong\\\": {\\\"state\\\": [\\\"FAULT_LATCHED\\\", \\\"READY\\\"], \\\"fault\\\": [\\\"8\\\", \\\"0\\\"]}, \\\"forbidden_val\\\": {}, \\\"absent_groups\\\": []}\", \"kind\": \"SESSION_STOP\", \"t_s\": 76.875}",
+   "{\"kind\": \"PORT_CLOSED\", \"t_s\": 76.891}"
+  ],
+  "quota_audit_grepped": [],
+  "summary_grepped": [
+   "APPROVAL_LEDGER|{\"approval_id\": \"M8R7F1-reviewed-bootprint-20261103\", \"caps\": {\"approved_reboot\": 0, \"blackbox_clear\": 0, \"cleanup_motor_disarm\": 0, \"cleanup_motor_status\": 0, \"cleanup_motor_stop\": 0, \"config_save\": 0, \"diag_profile_commit\": 0, \"diag_profile_learn\": 0, \"diag_profile_zero\": 0, \"dmm_readings\": 0, \"download\": 1, \"explicit_reset\": 1, \"irq_polarity_prep\": 0, \"motion_cap_seconds_per_run\": 0, \"motor_run\": 0, \"motor_run_seconds_total\": 0, \"physical_collision\": 0, \"port_open\": 2, \"readback\": 1, \"retry\": 0, \"tmc_config_apply\": 1}, \"commit_failures\": [], \"ledger\": \"D:\\\\ns800_field_approvals\\\\approval_M8R7F1-reviewed-bootprint-20261103.json\", \"pending\": 0, \"spent\": {\"approved_reboot\": 0, \"blackbox_clear\": 0, \"cleanup_motor_disarm\": 0, \"cleanup_motor_status\": 0, \"cleanup_motor_stop\": 0, \"config_save\": 0, \"diag_profile_commit\": 0, \"diag_profile_learn\": 0, \"diag_profile_zero\": 0, \"dmm_readings\": 0, \"download\": 1, \"explicit_reset\": 1, \"irq_polarity_prep\": 0, \"motion_cap_seconds_per_run\": 0, \"motor_run\": 0, \"motor_run_seconds_total\": 0, \"physical_collision\": 0, \"port_open\": 1, \"readback\": 1, \"retry\": 0, \"tmc_config_apply\": 0}}",
+   "DISPATCH_SUMMARY|status=STOP|code=|stages_executed=4|stages_not_run=2|quota_left={\"approved_reboot\": 0, \"blackbox_clear\": 0, \"cleanup_motor_disarm\": 0, \"cleanup_motor_status\": 0, \"cleanup_motor_stop\": 0, \"config_save\": 0, \"diag_profile_commit\": 0, \"diag_profile_learn\": 0, \"diag_profile_zero\": 0, \"dmm_readings\": 0, \"download\": 0, \"explicit_reset\": 0, \"irq_polarity_prep\": 0, \"motion_cap_seconds_per_run\": 0, \"motor_run\": 0, \"motor_run_seconds_total\": 0, \"physical_collision\": 0, \"port_open\": 1, \"readback\": 0, \"retry\": 0, \"tmc_config_apply\": 1}|quota_used={\"download\": 1, \"explicit_reset\": 1, \"port_open\": 1, \"readback\": 1}|profile=response_driven|branch=None|scenario_branches={}|prerequisite_skips=[]|actions_attempted=[\"download:real_tool\", \"readback:real_tool\", \"reset:real_tool\"]|ledger=reports\\reviews\\phase8-m8-r7-field-package-5ae\\field\\field-20261103T132348Z\\dispatch_ledger.jsonl"
+  ],
+  "image_on_board_byte_exact": {
+   "bytes": 292164,
+   "equal_to_archived_bin": true,
+   "sha256": "5ae4110d14fdbb40f49cc6f0deca474cf6d0b33b3ee9305e83681dbdd4a53825"
+  },
+  "line_and_byte_facts_recomputed_from_raw": {
+   "sysboot_response": {
+    "bytes": 992,
+    "sha256": "20e9a7ccbd16e0caa9b7fdc3c73bfa37da993047dd82c2d37ee58b46e1ad1abd",
+    "segments": 21,
+    "longest_segment_bytes": 120,
+    "segments_over_120B": 0,
+    "nul_bytes": 0,
+    "nul_offsets": [],
+    "utf8_valid": true
+   },
+   "passive_boot_stream": {
+    "bytes": 3810,
+    "sha256": "4f1c0d6d54ca8a449463a1017f86f3b715b4ca3a6d208355bd57770a2e01693b",
+    "segments": 75,
+    "longest_segment_bytes": 305,
+    "segments_over_120B": 2,
+    "nul_bytes": 3,
+    "nul_offsets": [
+     1318,
+     2268,
+     2395
+    ],
+    "utf8_valid": false,
+    "utf8_first_bad_offset": 1317
+   }
+  },
+  "judgement_status_tags_grepped": [
+   "- **不成立**：`product_field_fix` 不宣布；启动是否\"正常\"未通过——新镜像启动后进入",
+   "R7_F1_field_run          = EXECUTED_ONCE_STOPPED_AT_S3   (工具退出码 1)",
+   "new_image_5ae_on_board   = PROVEN_BYTE_EXACT   (292164 B, readback.bin == 归档 BIN)",
+   "boot_to_READY            = FAILED_IN_FIELD     (state=FAULT_LATCHED fault=8, 生产者=启动自检 required FAIL)",
+   "TMC_IOIN_selftest_read   = rc=-23 (归因未定: 丢帧/总线占用/时序 都未排除)",
+   "short_print_target_lines = NOT_REACHED / NOT_VERIFIED (safety_irq_status 与 [TMC-CFG] CONFIGURED 三条)",
+   "line_width_observed      = 命令响应 0/21 行超 120B ; 启动流 2/75 分段超 120B + 3 裸 NUL + 非法 UTF-8",
+   "executor_coverage_gap    = REGISTERED (被动启动流无 NUL/UTF-8 门; 本轮不修)",
+   "motion                   = NONE_SENT (motor_* 额度 0 且未尝试)",
+   "board_output_state       = DISABLED_PROVEN_AT_RUN_TIME (pad LOW + ENN 禁能侧 + armed=0)",
+   "product_field_fix        = NOT_VERIFIED",
+   "safe_for_enable          = false",
+   "quota_this_package       = 已消耗(download/readback/reset 各 1/1) 余 port_open 1 / apply 1, 不结转",
+   "device_actions_this_round  = download 1, readback 1, reset 1, port_open 1;  无运动/无保存/无清日志/无重试"
+  ],
+  "not_verified_after_this_run": [
+   "启动到 READY(本场 FAIL: FAULT_LATCHED / fault=8 = FAULT_SELF_TEST, safety_state.h:48)",
+   "[SAFETY] LIMIT 两条与 [TMC-CFG] CONFIGURED 三条(safety_irq_status 与整个 S4 未到达)",
+   "正常 RUN→disarm 收口 / SG/ADC 真实加载 / 阈值 / ACTIVE / REL_IMPACT / 保存恢复 / 故障恢复闭环",
+   "TMC IOIN rc=-23 的根因(丢帧 / 总线未就绪 / 时序 均未排除; 不据症状改产品码)"
+  ],
+  "did_not_do": [
+   "不重跑整包",
+   "不增加任何一次动作",
+   "不改判据/计划/执行器",
+   "不用剩下的 1 次 port_open 与 1 次 tmc_config_apply 顺手再看",
+   "不清黑匣子",
+   "不保存配置",
+   "不起转",
+   "不复活旧 4cb9dac0 批准"
+  ]
+ },
+ "device_actions_note": "两条时间线分开记账: (a) 候选包准备轮 = 全程 0 设备动作(下面的 keil_builds=0 也属于这一轮); (b) R7-F1 现场轮 = 操作者一次整包批准后真实执行, 到 S3 STOP。下面这组数字是 **F1 之后**的实耗, 由仓外持久批准账与 dispatch 原文现算/摘录, 不是准备轮的 0。",
  "device_actions": {
-  "serial_ports_opened": 0,
-  "dap_connections": 0,
-  "downloads": 0,
-  "flashes": 0,
-  "readbacks": 0,
-  "resets": 0,
+  "serial_ports_opened": 1,
+  "pyocd_tool_invocations": 3,
+  "downloads": 1,
+  "flashes": 1,
+  "readbacks": 1,
+  "resets": 1,
   "motor_starts": 0,
+  "motor_arms": 0,
+  "tmc_config_apply": 0,
+  "config_save": 0,
+  "blackbox_clear": 0,
   "target_power_cycles": 0,
   "keil_builds": 0
  },
- "private_material_handling": "UID 一律以 @UID_FILE 占位, 未把 48 位十六进制私有机密写进聊天或仓库; 本轮没有产生任何台账/批准令牌",
+ "private_material_handling": "UID 一律以 @UID_FILE 占位入库(执行器自己脱敏成 @UID_FILE<redacted len=48 sha256_…>), 未把 48 位十六进制私有机密写进聊天或仓库; 现场轮复用的是本机既有私有 UID 文件(与上一轮真实 dispatch 登记的那一枚同一件, 也等于当前实际连着的探针), 未枚举新设备; 新批准身份 M8R7F1-… 的持久账在仓外",
  "not_verified_after_this_round": [
   "SG/ADC 真实加载、阈值生成与有效性、ACTIVE 覆盖、REL_IMPACT、保存恢复与故障恢复闭环",
-  "正常 disarm 之后的 Safety 收口(需 motor_arm)",
+  "正常 RUN→disarm 之后的 Safety 收口(本包不含运动, 且 A 纠正了我对 load_means 的口径)",
   "idle1024 带载最坏栈余量、现场精确线程交错、0x00bd80b0 写入者(旧裁定保持)",
-  "新镜像 5ae 在板(本包的目的就是去证它, 本轮未上板)"
+  "启动是否到 READY —— 现场结果是 FAIL 到 FAULT_LATCHED/8, 不是未测; 但'修好了'也不成立",
+  "[SAFETY] LIMIT 两条与 [TMC-CFG] CONFIGURED 三条短打印(步骤未到达)"
  ],
  "safe_for_enable": false,
  "review_points_for_A": [
-  "本包是否可以在 load_means=NOT_PROVIDED 下只跑这三条覆盖, 还是应先补加载手段",
-  "tmc_config_apply 单列一次额度是否必要(不 apply 就取不到 5ae 拆短的 CONFIGURED 三条短行)",
+  "现场首错(state=FAULT_LATCHED/fault=8, 生产者=[SS] [REQ FAIL] TMC2209 IOIN read rc=-23)怎么归因: 丢帧 / 总线未就绪 / 自检时序 三条机制本轮都没排除, 也没有据此改产品码",
+  "启动被动流里 2 个 >120 B 分段与 3 个裸 NUL: 需要的是产品侧输出串流判据, 还是执行器把 NUL/UTF-8 门也盖到启动流上(本轮只登记, 两边都没动)",
+  "校正版判据在真实回包上的表现: 白名单与连字符取值按预期放行, 停因落在真值不符 —— 请复核这条是否足以说明'误拒'已修, 而本场 STOP 是产品事实",
   "PLAN_MOTION_CAP_BUDGET 对无起转包的恒红门是否要在执行器侧正式修(本轮只登记不修)",
-  "四处登记更正是否都只落在新包、没有回改任何已签收件"
+  "额度剩 1 次 port_open 与 1 次 apply: 下一场是续测还是先修 rc=-23, 由 A 与操作者定"
  ],
  "remote_readback": {
   "transcript": "reports/reviews/phase8-m8-r7-field-package-5ae/remote_readback_r7.txt",
@@ -331,27 +496,33 @@
  },
  "status_block": [
   "R6C_evidence = ACCEPTED(A 2026-11-03 独立复审, OFFLINE_REVIEW_GO)",
-  "R7_package = R7_FIELD_CANDIDATE_PREPARED_NOT_EXECUTED",
-  "R7_scope_boot_validation = PREPARED_OFFLINE(未现场执行)",
-  "R7_scope_short_prints = PREPARED_OFFLINE(判据来自产品源码字面量)",
-  "R7_scope_new_image_identity = PREPARED_OFFLINE(下载+定长回读闭环已绑定)",
-  "disarm_closeout = OUT_OF_SCOPE(需 motor_arm; load_means=NOT_PROVIDED)",
+  "R7_package_offline_prep = R7_FIELD_CANDIDATE_PREPARED_NOT_EXECUTED(准备轮 0 设备动作)",
+  "R7_original_plan_field_use = DO_NOT_EXECUTE_AS_SUBMITTED(A 复审判: 原状态判据会把正常启动回包误拒, 且构建来源混入旧 dab 登记)",
+  "R7_F1_field_run = EXECUTED_ONCE_STOPPED_AT_S3(工具退出码 1; 执行对象是 A 校正版原字节)",
+  "new_image_5ae_on_board = PROVEN_BYTE_EXACT(292164 B, readback.bin 与归档 BIN 逐字节相等)",
+  "boot_to_READY = FAILED_IN_FIELD(state=FAULT_LATCHED fault=8=FAULT_SELF_TEST, safety_state.h:48; 生产者=[SS] [REQ FAIL] TMC2209 IOIN read rc=-23)",
+  "A_corrections_effective_in_field = CONFIRMED(arm-gate 披露行走白名单, polarity=not-confirmed 被接受; 停因是真值不符而不是误拒)",
+  "short_print_target_lines = NOT_REACHED / NOT_VERIFIED(safety_irq_status 与 S4 三条 CONFIGURED 未到达)",
+  "line_width_field_fact = 单条响应 0/21 行超 120B 且无 NUL; 启动被动流 2/75 分段超 120B + 3 裸 NUL + 整体非法 UTF-8(并发打印互相咬, 不择一归因)",
+  "executor_coverage_gap = REGISTERED(被动启动流只过危险文本门, 不过 NUL/UTF-8 门; 本轮不修)",
+  "motion = NONE_SENT(motor_*/learn/zero/commit/config_save/blackbox_clear 额度 0 且未尝试)",
+  "disarm_closeout = NOT_ATTEMPTED(本包无运动; A 并纠正了'load_means 必然阻断普通 disarm'这一口径)",
   "load_means = NOT_PROVIDED",
-  "motion = NOT_INCLUDED(整包 0 起转步骤, 运动类额度全 0)",
-  "validate_plan = 47 项 / fail=1(唯一 FAIL 已登记为恒红门)",
+  "validate_plan_on_reviewed_bytes = 47 项 / fail=1(唯一 FAIL 仍是 PLAN_MOTION_CAP_BUDGET 恒红门)",
   "readiness = 17/17 OK(含整包 stub 干跑, 0 设备)",
-  "R6A_candidate_image(5ae) = ARCHIVED_NOT_ON_BOARD(本包正是要把它上板)",
-  "R6/d70 与在板 dab356c6 归档 = 原件未动",
-  "executor/selftest = 字节与 R6C 相同(本轮未改执行器)",
-  "product_C_and_firmware_archive = 本轮 0 改动",
+  "R6A_candidate_image_5ae = ON_BOARD_AND_BYTE_PROVEN(不再是'仅归档'; 旧 d70/dab 归档未覆盖)",
+  "executor/selftest = 字节与 R6C 相同(现场轮也没改执行器)",
+  "product_C_and_firmware_archive = 本轮 0 改动; keil_builds=0",
+  "quota_after_F1 = download 1/1, readback 1/1, explicit_reset 1/1, port_open 1/2, apply 0/1; 不结转也不重跑",
+  "board_state_at_run_time = 输出禁能已证(pad LOW + ENN 禁能侧 + armed=0) 且 Safety FAULT_LATCHED; 断电/上电或 fault_reset 人工恢复需操作者另批",
   "product_field_fix = NOT_VERIFIED",
-  "overall_offline_release = 待 A 独立复审(本轮不自签)",
+  "overall_release = 待 A 按现场真实字节复审(本轮不自签)",
   "safe_for_enable = false",
-  "new_hardware_authorization = 0",
-  "device_actions_this_round = 0",
+  "new_hardware_authorization = 0(本件不发批准; F1 的批准=操作者那条原话, 记在仓外持久账)",
+  "device_actions_offline_prep = 0 | device_actions_F1 = download 1 / readback 1 / reset 1 / port_open 1",
   "keil_builds = 0",
-  "next_work = 交 A 复审; 现场执行另需操作者一次明确批准"
+  "next_work = 交 A 复审现场原件; 在那之前不再动设备"
  ],
- "generated_while_head": "ea22ba52d675ffc698aedabd5e9ab4db289cdc92",
+ "generated_while_head": "0df9937abb4831c8c0fd6734a2e45c9fbdf5aca0",
  "artifacts_and_identities_note": "bytes/sha256 全部在生成时刻从磁盘现算; 本 JSON 不自记自己的哈希(清单不哈希自身是同一条纪律); 远端逐 blob 回读在收口一步补进 remote_readback 字段"
 }

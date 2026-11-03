@@ -228,3 +228,64 @@ product_field_fix     = NOT_VERIFIED
 safe_for_enable       = false
 next_required_human   = 操作者逐项批准额度 + 回报板态
 ```
+
+## 20.15 A 的复审校正版与本包的关系
+
+操作者把 A 的独立候选包（`NS800_M8_R7_A_Reviewed_Boot_Print_Package_20261103.zip`，7 件）转来，
+A 的裁定是 `original_R7_plan = DO_NOT_EXECUTE_AS_SUBMITTED`、`A_reviewed_candidate =
+READY_FOR_ONE_OPERATOR_PACKAGE_APPROVAL`。本轮**原字节接收**，不重跑派生器、不改写它：
+
+```text
+plan_core_r7_reviewed.json  108021 B  fea903b4f9530cab6d6bec16d2a4beb1b85901e441e18c9872831f121c645c16
+                                     -> 复制到 field/, 与原 plan_core_r7.json 并存(原件未动)
+A 的审查记录 MD              8286 B  30ae7c0a4d98aae1…  -> 逐字入库 a_review_NS800_M8_R7_Boot_Print_Package_20261103.md
+reviewed_identities.json     1328 B  76c6f4dca1bb7a46…   reviewed_readiness.txt  2640 B  43a2e5c04785c59f…
+reviewed_results.json        2351 B  a8556de7ed71c969…   reviewed_validate_plan.txt 3375 B  89559a32fbda5708…
+SHA256SUMS.txt(ZIP 内)        574 B  9b89fbaa5412b047…   —— 七件全部与 A 上表逐字相符(本机现算)
+```
+
+A 指出的两条实质缺陷都在**校正版**里解决：① 原 R7 的 `system_status` 判据会把"动作被拒"的披露行
+当成业务失败、且 `polarity=\w+` 不接受真实的 `not-confirmed`，正常启动回包会被误拒；
+② 新镜像的构建来源混入了旧 dab 登记。另有一条口径纠正：**"缺加载手段必然阻断普通 disarm"是我写错的**
+—— EXEC 是按阶段的 `prerequisite_gates` 查具体前置，不会把 `load_means` 自动挂到每次
+`motor_arm/motor_start`；本包不含运动仍然是范围选择，不是被那道门逼出来的。这条我认。
+
+## 20.16 R7-F1 现场整包执行（一次批准，跑到 S3 STOP）
+
+操作者批准原文见 `field/field-20261103T132348Z/APPROVAL_TOKEN.verbatim.txt`（79 字，未改写）。
+新批准身份 `M8R7F1-reviewed-bootprint-20261103` 由 `--approval-init` 离线开立，账本
+`D:\ns800_field_approvals\approval_M8R7F1-reviewed-bootprint-20261103.json` 绑定的三件 SHA 就是
+A 的固定表（计划 `fea903b4…` / 执行器 `33d3f0af…` / 镜像 `5ae4110d…`）。真实整包一条命令走完：
+`--dispatch --transport real --backend real --profile response_driven`（21:23:58 +0800 起，工具退出码 1）。
+
+```text
+S0 OK  绑定核对通过(APPROVED_PACKAGE_VERIFIED, steps=6, steps_sha256=e420992f5ce9…)
+S1 OK  一次 sector 下载 5ae 的 AXF           action_download rc=0
+S2 OK  一次定长 292164 B 回读                 readback.bin == 归档 BIN 逐字节相等=True   ← 新镜像已在板
+S3 STOP FIELD_VALUE_MISMATCH                  wrong: state=FAULT_LATCHED(要 READY) fault=8(要 0)
+S4 未执行                                     tmc_config_apply 0/1
+实耗 download 1/1 readback 1/1 explicit_reset 1/1 port_open 1/2  其余全 0; commit_failures=[] pending=0
+不发任何运动义务命令(motor_* 额度 0); cleanup_errors=[]; disarm=NOT_ARMED; PORT_CLOSED 正常收口
+```
+
+判读全文在 `field/field-20261103T132348Z/OFFLINE_JUDGEMENT.txt`，其中三条要点：
+
+1. **成立**：5ae 这枚镜像第一次被逐字节证明在板（292164 B，散列与归档件相同）。
+   **不成立**：`product_field_fix`、"启动到 READY"、两组目标短打印（`safety_irq_status` 与 S4 的
+   `[TMC-CFG] CONFIGURED` 三条都未到达）—— 全是 NOT_VERIFIED，不换算成通过。
+2. **失败是产品事实，判据没冤枉它**：启动被动流里 `[SS] [REQ FAIL] TMC2209 IOIN read rc=-23` →
+   `self-test done: required=FAIL` → `[BOOT] 11 startup-selftest FAIL -> state=FAULT_LATCHED`，
+   `fault=8` 就是产品自己的 `FAULT_SELF_TEST`（`applications/safety_state.h:48`）。
+   A 校正的两处当场可见：`[Motor] arm gate fail mask=0x1A (arm REFUSED)` 走白名单放行、
+   `polarity=not-confirmed` 被接受，停因落在真值不符上 —— 这条只有现场字节能说明。
+   rc=-23 的根因**不猜**（丢帧 / 总线未就绪 / 时序都未排除），也不据症状改产品码。
+3. **行宽与并发**：单次响应侧干净（`system_status` 992 B、21 行、最长 120 B、超 120 B 为 0 行、
+   无裸 NUL、UTF-8 完整）；启动被动流 3810 B 里 75 个分段有 **2 个 252 B / 305 B** 且 **3 个裸 NUL**
+   （偏移 1318/2268/2395）、整体 UTF-8 解码异常（首错 1317），形态是一条分段里咬着 2～3 次不同打印。
+   顺带登记执行器覆盖面：命令响应有"危险文本→裸 NUL→非法 UTF-8"三级硬门，被动启动流只调
+   `check_danger()`，所以这些 NUL 没成为具名失败 —— 属判据设计问题，本轮不自行收紧也不放宽。
+
+停在这里：不重跑整包、不加任何一次动作、不改判据/计划/执行器、不用剩下那次 `port_open` 与
+`tmc_config_apply` 去"顺手再看"。板最后可读证据是停在安全态（DRV_ENABLE pad LOW 已证、request=LOW、
+pad=0、ENN 在禁能侧、armed=0、arm gate 拒绝、UI SAFE-OFF）同时 Safety `FAULT_LATCHED fault=8`；
+断电/上电或 `fault_reset` 人工恢复复核要操作者另发批准。

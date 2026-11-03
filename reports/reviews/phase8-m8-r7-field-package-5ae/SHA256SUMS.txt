@@ -1,8 +1,33 @@
 # sha256 * <仓库相对路径>(LF, 无 BOM; 本清单不哈希自身字节 —— 一条清单不能给自己的字节作证)
 # 生成方式: 对 reports/reviews/phase8-m8-r7-field-package-5ae/ 下每个常规文件(排除 SHA256SUMS.txt、remote_readback.md 与 __pycache__) 直接读磁盘字节算 sha256
-# 条目数=16; 与 Git blob 的逐条复算由 host/staged_preflight_batch.py(提交前, 单批流)与推送后的远端逐 blob 回读完成
+# 条目数=41; 与 Git blob 的逐条复算由 host/staged_preflight_batch.py(提交前, 单批流)与推送后的远端逐 blob 回读完成
 # 重新生成: python reports/reviews/phase8-m8-idle-stack-r4/host/make_round_sums.py <本目录>
+30ae7c0a4d98aae1a95ca8d343c90d7c01e922c844265d757a8f77d92e8ed634  reports/reviews/phase8-m8-r7-field-package-5ae/a_review_NS800_M8_R7_Boot_Print_Package_20261103.md
+cee78d0b2033ddb3c06143932d23585002887ad41edd3fb190d011362c34c63a  reports/reviews/phase8-m8-r7-field-package-5ae/field/field-20261103T132348Z/action_download/ARGV.json
+13bf7b3039c63bf5a50491fa3cfd8eb4e699d1ba1436315aef9cbe5711530354  reports/reviews/phase8-m8-r7-field-package-5ae/field/field-20261103T132348Z/action_download/rc.txt
+a2b3288d5e1155c3348a4d7516b9093da3847943e90e7a3e38faf406c9b07f38  reports/reviews/phase8-m8-r7-field-package-5ae/field/field-20261103T132348Z/action_download/stderr.bin
+4f79f4bf0786bb5debce65153500603bc6fc79002e031f6c5e7bd911399b39c5  reports/reviews/phase8-m8-r7-field-package-5ae/field/field-20261103T132348Z/action_download/stdout.bin
+8e3fcfc2b7be18eda50ba7f44a51fe56fb4586ed8f8b212a33de71db7845ab0b  reports/reviews/phase8-m8-r7-field-package-5ae/field/field-20261103T132348Z/action_readback/ARGV.json
+13bf7b3039c63bf5a50491fa3cfd8eb4e699d1ba1436315aef9cbe5711530354  reports/reviews/phase8-m8-r7-field-package-5ae/field/field-20261103T132348Z/action_readback/rc.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  reports/reviews/phase8-m8-r7-field-package-5ae/field/field-20261103T132348Z/action_readback/stderr.bin
+e5c6445327832a467d690400d5af59066d6bcfa22c9d7a4d86eb39fc87f73796  reports/reviews/phase8-m8-r7-field-package-5ae/field/field-20261103T132348Z/action_readback/stdout.bin
+cd6aa34777eb4e638800f2d718c28fd2bdcb08f628f7cb149a50ada80523f8c8  reports/reviews/phase8-m8-r7-field-package-5ae/field/field-20261103T132348Z/action_reset/ARGV.json
+13bf7b3039c63bf5a50491fa3cfd8eb4e699d1ba1436315aef9cbe5711530354  reports/reviews/phase8-m8-r7-field-package-5ae/field/field-20261103T132348Z/action_reset/rc.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  reports/reviews/phase8-m8-r7-field-package-5ae/field/field-20261103T132348Z/action_reset/stderr.bin
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  reports/reviews/phase8-m8-r7-field-package-5ae/field/field-20261103T132348Z/action_reset/stdout.bin
+19de8ce27fb80051f506d6e2cc549c75790e8be3138ddbcc50db086157487f8a  reports/reviews/phase8-m8-r7-field-package-5ae/field/field-20261103T132348Z/APPROVAL_TOKEN.verbatim.txt
+74100e3fced7e0b95bfb69908c83ccdffef87cfbf612717cf6956b1b2bc14a57  reports/reviews/phase8-m8-r7-field-package-5ae/field/field-20261103T132348Z/dispatch_ledger.jsonl
+ddebef04e9fc1ad88481c4ae2f4969638eb706604719e006f3ee7347861deab9  reports/reviews/phase8-m8-r7-field-package-5ae/field/field-20261103T132348Z/dispatch_start.txt
+28ef1a5c5103f2caa265ce1b06b291f305193e4fded48748dddec28162128075  reports/reviews/phase8-m8-r7-field-package-5ae/field/field-20261103T132348Z/OFFLINE_JUDGEMENT.txt
+5ae4110d14fdbb40f49cc6f0deca474cf6d0b33b3ee9305e83681dbdd4a53825  reports/reviews/phase8-m8-r7-field-package-5ae/field/field-20261103T132348Z/readback.bin
+4f1c0d6d54ca8a449463a1017f86f3b715b4ca3a6d208355bd57770a2e01693b  reports/reviews/phase8-m8-r7-field-package-5ae/field/field-20261103T132348Z/S_S3/01_rst.boot.rx.bin
+9154daed329b1bfb4b5cb1ed37de436a350c41327ee5325a54c1a6812b11160c  reports/reviews/phase8-m8-r7-field-package-5ae/field/field-20261103T132348Z/S_S3/01_rst.boot.rx.bin.txt
+20e9a7ccbd16e0caa9b7fdc3c73bfa37da993047dd82c2d37ee58b46e1ad1abd  reports/reviews/phase8-m8-r7-field-package-5ae/field/field-20261103T132348Z/S_S3/02_sysboot.rx.bin
+396538bdc5254a21b07c24c0e3dc946b0b74bdc6927576ba35024ab28143a251  reports/reviews/phase8-m8-r7-field-package-5ae/field/field-20261103T132348Z/S_S3/02_sysboot.rx.bin.txt
+ac25fe28cf278ee7ce097b90684f624d56d090ccf815192a2b4a5cdaf86ca341  reports/reviews/phase8-m8-r7-field-package-5ae/field/field-20261103T132348Z/S_S3/ledger.jsonl
+ec4c8f2dd706dda29f4fab2a5afd6183d1e9b2483506d6e9bb5648fde6bd93c5  reports/reviews/phase8-m8-r7-field-package-5ae/field/field-20261103T132348Z/stdout_dispatch.txt
 e87dd11ee71bb9052c2f722eced578076283fc08336c6027cfa4110bc39b9737  reports/reviews/phase8-m8-r7-field-package-5ae/field/plan_core_r7.json
+fea903b4f9530cab6d6bec16d2a4beb1b85901e441e18c9872831f121c645c16  reports/reviews/phase8-m8-r7-field-package-5ae/field/plan_core_r7_reviewed.json
 b66e33fced562863e7c8f6ea3333543ecf228016c957253f249a4680616b0ea1  reports/reviews/phase8-m8-r7-field-package-5ae/field/rows.json
 c4f5741638d1d55c53c435cb5b1aff7ec84c78aecb624460d6d4a57c8e75b89f  reports/reviews/phase8-m8-r7-field-package-5ae/host/derive_matrix.txt
 1d7dcc8bf3d23c4047d915795e6f2cc36df395f71d151637183061d567311797  reports/reviews/phase8-m8-r7-field-package-5ae/host/derive_plan_r7.py
@@ -14,7 +39,7 @@ f75de2b8d62c06d0b36d0c261dd05e6795677dc36b92eb1df4baadce9c0b0d63  reports/review
 19387402c6ae58d40b0549c18a6fccf3879d31699965284552911e58c483d79b  reports/reviews/phase8-m8-r7-field-package-5ae/host/run_derive_matrix_r7.py
 49b0fd0d027711fecc6957d9e69cc6765b6a4246022a7fdecefe90a262019231  reports/reviews/phase8-m8-r7-field-package-5ae/host/run_transcripts_r7.py
 58de0168c7e1f7fefd95ea26163f39629b5e112aa4d56d1cff5194cd8b68506e  reports/reviews/phase8-m8-r7-field-package-5ae/host/validate_plan_r7.txt
-ad5d7b5727e72f0246e1cdce9dcba9f93b4c4655e1a3d92acb22feb00df6f2ba  reports/reviews/phase8-m8-r7-field-package-5ae/host/write_handoff_json_r7.py
+f03238dc638b414bf3d9577ae81eddc00bf69801923c7d656219736f3f77228f  reports/reviews/phase8-m8-r7-field-package-5ae/host/write_handoff_json_r7.py
 1933e66063d49866a9e858afe284830e9d5bd27305b1e6d3429be1a5652f1e2c  reports/reviews/phase8-m8-r7-field-package-5ae/remote_readback_r7.txt
 614a571117009beb4c47008e6ea476146846073acc4bfdad4f5ca24037ef655c  reports/reviews/phase8-m8-r7-field-package-5ae/remote_readback_r7_first_run_wrong_paths.txt
-9ae1da3d5ec0861177dd07cf22cd4d12d2ca500ee149b0eaa96d4a9becf7a560  reports/reviews/phase8-m8-r7-field-package-5ae/run_record.md
+bb811a71a57d67bddd3947c1702dd9ec6e6678121dd0db8c724c05aecc94cccd  reports/reviews/phase8-m8-r7-field-package-5ae/run_record.md

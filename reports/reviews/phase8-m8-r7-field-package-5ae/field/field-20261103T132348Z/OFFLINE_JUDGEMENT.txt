@@ -1,0 +1,129 @@
+# M8-R7-F1 现场整包执行判读（校正版候选 · 真实设备 · 一次批准 · 中途 STOP）
+
+执行时刻：2026-11-03 21:23:58 +0800 起，一次 dispatch 走到 STOP。
+工具退出码 **1**（`DISPATCH_SUMMARY|status=STOP`）。批准原文见同目录
+`APPROVAL_TOKEN.verbatim.txt`（操作者本轮原话，未改写）。
+
+## 1. 执行对象与批准身份（三件 SHA 与 A 固定表逐字相符）
+
+```text
+approval_id      M8R7F1-reviewed-bootprint-20261103   （新账，与旧 4cb9dac0… 无关）
+ledger           D:\ns800_field_approvals\approval_M8R7F1-reviewed-bootprint-20261103.json
+plan_sha256      fea903b4f9530cab6d6bec16d2a4beb1b85901e441e18c9872831f121c645c16  (108021 B)
+executor_sha256  33d3f0af8a4c9c33dcd4e013b395e4ba990a89e384130f9d0ffe50c71b34e8ca  (219491 B, R6C 原件未改)
+image_sha256     5ae4110d14fdbb40f49cc6f0deca474cf6d0b33b3ee9305e83681dbdd4a53825  (292164 B)
+S0 现场核对      APPROVED_PACKAGE_VERIFIED steps_sha256=e420992f5ce9271a… steps=6   （无漂移、无身份不符）
+```
+
+## 2. 逐阶段结果与实耗额度
+
+| 阶段 | 结果 | 依据 |
+|---|---|---|
+| S0 绑定 | **OK** | `S0_FACTS` 三件 SHA 与账本身份一致 |
+| S1 下载 5ae 的 AXF | **OK** | `action_download/rc.txt=0`，download 1/1 |
+| S2 定长 292164 B 回读 | **OK** | `readback.bin` 292164 B / `5ae4110d14fdbb40…`，与归档 BIN **逐字节相等=True**；readback 1/1 |
+| S3 复位 + 75 s 被动窗 + 只读查询 | **STOP `FIELD_VALUE_MISMATCH`** | `reset rc=0`（explicit_reset 1/1）；`BOOT_STREAM_DRAINED bytes=3810 drain_spent_s=75.0 end_reason=DRAIN_BUDGET_REACHED`；`VALUE_ASSERT_FAIL wrong={"state":["FAULT_LATCHED","READY"],"fault":["8","0"]}` |
+| S4 一次 `tmc_config_apply` | **未执行** | 上一场 STOP 阻断；tmc_config_apply 0/1 |
+
+```text
+QUOTA 实耗/剩余（批准账本 APPROVAL_LEDGER_END 与 SUMMARY 一致, commit_failures=[], pending=0）
+download 1/1 余0 | readback 1/1 余0 | explicit_reset 1/1 余0 | port_open 1/2 余1 | tmc_config_apply 0/1 余1
+其余全部 0/0（motor_* / learn / zero / commit / config_save / blackbox_clear / approved_reboot /
+cleanup_* / retry / dmm_readings / irq_polarity_prep / physical_collision）
+actions_attempted = ["download:real_tool","readback:real_tool","reset:real_tool"]   一次不多
+```
+
+**没有任何运动义务命令被发出**（`motor_arm`/`motor_start` 额度为 0 且未被尝试）；会话以
+`PORT_CLOSED` 正常收口，`cleanup_errors=[]`，`disarm=NOT_ARMED`（从未武装）。
+
+## 3. 本场成立的一件事，和它没有证明的另一件事
+
+- **成立**：5ae 这枚镜像第一次被**逐字节证明在板**（292164 B、散列与归档 BIN 相同、逐字节相等）。
+  这条是 S2 的原始字节证明，独立于后面 S3 的失败。
+- **不成立**：`product_field_fix` 不宣布；启动是否"正常"未通过——新镜像启动后进入
+  `FAULT_LATCHED`，因此 A §1 的"启动"这一条在本次现场**没有得到通过证据**（但拿到了失败事实本身）。
+
+## 4. 失败事实与产品侧读法（只读已抓到的字节，未再动设备）
+
+启动被动流（`S_S3/01_rst.boot.rx.bin`，3810 B，sha256 `4f1c0d6d54ca8a44…`）里的顺序：
+
+```text
+[SS] [REQ OK] GPIO / PWM device / DRV_ENABLE=LOW (write+readback verified) / ENN feedback = disabled side
+[SS] [REQ FAIL] TMC2209 IOIN read rc=-23
+[SS] [OK] IMU / ADC / Flash (JEDEC EF 40 17)
+[SS] self-test done: required=FAIL degraded=0x00
+[BOOT] 11 startup-selftest FAIL -> state=FAULT_LATCHED
+[MAIN] boot complete but state=FAULT_LATCHED fault=8 (degraded/latched - NOT ready)
+[BB] trigger code=8 session=1 pre_n=1 post_eff=100 ; [BB] session 1 written (101 frames), last_err=0
+```
+
+`fault=8` 就是产品自己的 `FAULT_SELF_TEST`（`applications/safety_state.h:48`），生产者正是那条
+required 项失败：`[SS] [REQ FAIL] TMC2209 IOIN read rc=-23`。本轮**不猜根因**：同一份流里
+`[TMC] DEGRADED drive_cfg=UNCONFIGURED`、`[SNS] sensor thread started (100Hz)`、`>CUR … health=DEGRADED`
+都在，rc=-23 与既有 RT-Thread 错误码表里的 -EBUSY 同数值——"读不到"与"总线还没让人读"两种机制
+都还没被排除，需要下一轮用只读手段区分。归因待定，不据症状改产品代码。
+
+安全侧字段（同一份流里 `=== SYSTEM STATUS ===` 的原文）都是"停在安全态"的证据：
+`[Safety] gpio_ready=YES thread=OK drv_en_pad_low=YES`、
+`[Safety] request=LOW pad=0 expected_ENN=HIGH ENN_fb=1(resolved) verdict=OK`、
+`[Motor] state=4 cur=0 tgt=0 armed=0 drv_en_verified=0 health=OK`、
+`[Motor] arm gate fail mask=0x1A (arm REFUSED)`、`[TMC] runtime write gate mask=0x3A`、
+`[UI] led/buzzer output=SAFE-OFF`。这些不等于"示波器证明无脉冲"，产品自己的措辞也是 api-accepted。
+
+## 5. A 的校正在这一次现场起了作用（可核对的两点）
+
+1. 白名单生效：`BUSINESS_OUTCOME allowed=false, status_lines_allowed=["[Motor] arm gate fail mask=0x1A (arm REFUSED)"]`
+   —— 那条披露行被放行，停因而不是"动作被拒"误判；A 指出的"原 R7 会把正常启动回包误拒"这条
+   在本场表现为**没有**误拒。
+2. 连字符取值可用：`[Safety] … polarity=not-confirmed …` 被接受（原 `\w+` 会拒绝），
+   停因落在真正的值不符上：`state=FAULT_LATCHED≠READY`、`fault=8≠0`。
+   即校正版把"误拒"与"真失败"分开了——这条只能由这次真实字节说明，不能由离线判据说明。
+
+## 6. 短打印：本包目标行未到达，行宽事实按抓到什么说什么
+
+- `[SAFETY] LIMIT inputs config =` / `[SAFETY] LIMIT OFF => …` 所在的 `safety_irq_status` 步骤**没跑到**
+  （S3 在第 2 步 sysboot 就停）；`[TMC-CFG] CONFIGURED …` 三条所在的 S4 整段未跑。
+  这两组判据现场状态仍是 **NOT_VERIFIED**，不算通过也不算失败。
+- 本次真实字节能说的行宽事实：
+  * `system_status` 单条响应（`S_S3/02_sysboot.rx.bin` 992 B，无裸 NUL，UTF-8 完整）：21 行，
+    **最长 120 B，超 120 B 的行 0 条**。
+  * 启动被动流（多线程并发打印）：75 个分段里 **2 个分段超过 120 B（252 B / 305 B）**，
+    其形态是同一条分段里咬着 2～3 次不同的打印（分段 29 含两次 `[MOT]`，分段 48 含三次 `[SS]`），
+    并且整流有 **3 个裸 NUL**（偏移 1318 / 2268 / 2395）、整体 **UTF-8 解码异常**（首错偏移 1317）。
+    也就是说：单次 printf 拆到 <=120 B 并不能保证**流里的行** <=120 B——并发期间会互相咬，
+    这与既有的控制台 128 B 裁剪观察一致，但本轮不再补测、不择一归因。
+- 登记执行器覆盖缺口（本轮不修）：命令响应路径有"危险文本 → 裸 NUL → 非法 UTF-8"三级硬门
+  （`RX_DONE` 里 `nul_bytes=0` 即此门），而被动启动流只调 `check_danger()`（`m8r3_serial_chain.py:1804`
+  附近），**不判 NUL/UTF-8**，所以本场的 3 个 NUL 没有成为具名失败。启动流里出现这种字节
+  是否应当 STOP，属于判据设计问题，交给 A 定；本轮既不放宽也不擅自收紧。
+
+## 7. 停点：本轮到此为止，没有"再来一次"
+
+- 未做（按纪律，也按批准边界）：不重跑整包、不增加任何一次动作、不改判据/计划/执行器、
+  不用剩下的 1 次 port_open 与 1 次 tmc_config_apply 去"顺手再看"、不清黑匣子、不保存配置、不起转。
+- 板留态：最后一次可读证据显示输出停在安全态（DRV_ENABLE pad LOW 已证、request=LOW、pad=0、
+  ENN 反馈在禁能侧、motor armed=0、arm gate 拒绝、UI SAFE-OFF），同时 Safety 处于
+  `FAULT_LATCHED fault=8`。**这是执行当时的证据，不是对当前是否仍上电的断言。**
+  是否要断电/上电或走 `fault_reset` 人工恢复复核，由操作者决定；需要新一次批准。
+- 额度：本包的 download/readback/explicit_reset 各 1/1 已用尽，port_open 余 1、tmc_config_apply 余 1；
+  这本账已按实耗记死，换 --out 或重开进程都不会清零，也不结转给下一份计划。
+
+## 8. 状态标签
+
+```text
+R7_F1_field_run          = EXECUTED_ONCE_STOPPED_AT_S3   (工具退出码 1)
+new_image_5ae_on_board   = PROVEN_BYTE_EXACT   (292164 B, readback.bin == 归档 BIN)
+boot_to_READY            = FAILED_IN_FIELD     (state=FAULT_LATCHED fault=8, 生产者=启动自检 required FAIL)
+TMC_IOIN_selftest_read   = rc=-23 (归因未定: 丢帧/总线占用/时序 都未排除)
+short_print_target_lines = NOT_REACHED / NOT_VERIFIED (safety_irq_status 与 [TMC-CFG] CONFIGURED 三条)
+line_width_observed      = 命令响应 0/21 行超 120B ; 启动流 2/75 分段超 120B + 3 裸 NUL + 非法 UTF-8
+executor_coverage_gap    = REGISTERED (被动启动流无 NUL/UTF-8 门; 本轮不修)
+motion                   = NONE_SENT (motor_* 额度 0 且未尝试)
+board_output_state       = DISABLED_PROVEN_AT_RUN_TIME (pad LOW + ENN 禁能侧 + armed=0)
+product_field_fix        = NOT_VERIFIED
+safe_for_enable          = false
+quota_this_package       = 已消耗(download/readback/reset 各 1/1) 余 port_open 1 / apply 1, 不结转
+new_hardware_authorization = 0 (本判读文件不发批准)
+device_actions_this_round  = download 1, readback 1, reset 1, port_open 1;  无运动/无保存/无清日志/无重试
+next_work                = 交 A 按真实字节复审; 在那之前不再动设备
+```

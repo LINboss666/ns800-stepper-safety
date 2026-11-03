@@ -7,6 +7,9 @@
   * 顶层不放本件自己的哈希(一条清单不能给自己的字节作证);
   * 门与自检的数字**从入库原文里 grep 出来**, 不手抄; 原文不存在就把 None 交出去, 如实暴露缺口;
   * 远端逐 blob 回读结果在收口一步补进来(回读原文先入库), 不在这里预写。
+
+R7-F1 之后本件多了一个 `field_execution` 块: 现场一轮的原文摘录 + 从原始字节**现算**的行宽/NUL/UTF-8
+事实, 且 `device_actions` 改成 F1 实耗(准备轮的 0 由 `device_actions_note` 单独留着, 两条时间线不混写)。
 """
 import hashlib
 import json
@@ -59,6 +62,29 @@ ARTIFACTS = [
     ("earlier_on_board_readback", DSF + "/field-20261101T084256Z/flash_readback.bin"),
 ]
 
+# ---- R7-F1 现场执行轮(操作者一次整包批准)新增的输入与原件 ------------------------------
+A_REVIEW_MD = R7 + "/a_review_NS800_M8_R7_Boot_Print_Package_20261103.md"
+REVIEWED_PLAN = R7 + "/field/plan_core_r7_reviewed.json"
+FIELD = R7 + "/field/field-20261103T132348Z"
+FIELD_ARTIFACTS = [
+    ("approval_token_verbatim", FIELD + "/APPROVAL_TOKEN.verbatim.txt"),
+    ("dispatch_stdout", FIELD + "/stdout_dispatch.txt"),
+    ("dispatch_ledger", FIELD + "/dispatch_ledger.jsonl"),
+    ("session_ledger_S3", FIELD + "/S_S3/ledger.jsonl"),
+    ("boot_stream_raw", FIELD + "/S_S3/01_rst.boot.rx.bin"),
+    ("sysboot_response_raw", FIELD + "/S_S3/02_sysboot.rx.bin"),
+    ("field_readback_bin", FIELD + "/readback.bin"),
+    ("rc_download", FIELD + "/action_download/rc.txt"),
+    ("rc_readback", FIELD + "/action_readback/rc.txt"),
+    ("rc_reset", FIELD + "/action_reset/rc.txt"),
+    ("field_judgement", FIELD + "/OFFLINE_JUDGEMENT.txt"),
+    ("a_review_document", A_REVIEW_MD),
+    ("a_reviewed_plan", REVIEWED_PLAN),
+]
+for _k, _p in FIELD_ARTIFACTS:
+    if (REPO / _p).exists():
+        ARTIFACTS.append((_k, _p))
+
 
 def sha(rel):
     return hashlib.sha256((REPO / rel).read_bytes()).hexdigest()
@@ -100,27 +126,111 @@ def readback_block():
 
 STATUSES = [
     "R6C_evidence = ACCEPTED(A 2026-11-03 独立复审, OFFLINE_REVIEW_GO)",
-    "R7_package = R7_FIELD_CANDIDATE_PREPARED_NOT_EXECUTED",
-    "R7_scope_boot_validation = PREPARED_OFFLINE(未现场执行)",
-    "R7_scope_short_prints = PREPARED_OFFLINE(判据来自产品源码字面量)",
-    "R7_scope_new_image_identity = PREPARED_OFFLINE(下载+定长回读闭环已绑定)",
-    "disarm_closeout = OUT_OF_SCOPE(需 motor_arm; load_means=NOT_PROVIDED)",
+    "R7_package_offline_prep = R7_FIELD_CANDIDATE_PREPARED_NOT_EXECUTED(准备轮 0 设备动作)",
+    "R7_original_plan_field_use = DO_NOT_EXECUTE_AS_SUBMITTED"
+    "(A 复审判: 原状态判据会把正常启动回包误拒, 且构建来源混入旧 dab 登记)",
+    "R7_F1_field_run = EXECUTED_ONCE_STOPPED_AT_S3(工具退出码 1; 执行对象是 A 校正版原字节)",
+    "new_image_5ae_on_board = PROVEN_BYTE_EXACT(292164 B, readback.bin 与归档 BIN 逐字节相等)",
+    "boot_to_READY = FAILED_IN_FIELD(state=FAULT_LATCHED fault=8=FAULT_SELF_TEST, safety_state.h:48; "
+    "生产者=[SS] [REQ FAIL] TMC2209 IOIN read rc=-23)",
+    "A_corrections_effective_in_field = CONFIRMED(arm-gate 披露行走白名单, polarity=not-confirmed 被接受; "
+    "停因是真值不符而不是误拒)",
+    "short_print_target_lines = NOT_REACHED / NOT_VERIFIED(safety_irq_status 与 S4 三条 CONFIGURED 未到达)",
+    "line_width_field_fact = 单条响应 0/21 行超 120B 且无 NUL; 启动被动流 2/75 分段超 120B + 3 裸 NUL + "
+    "整体非法 UTF-8(并发打印互相咬, 不择一归因)",
+    "executor_coverage_gap = REGISTERED(被动启动流只过危险文本门, 不过 NUL/UTF-8 门; 本轮不修)",
+    "motion = NONE_SENT(motor_*/learn/zero/commit/config_save/blackbox_clear 额度 0 且未尝试)",
+    "disarm_closeout = NOT_ATTEMPTED(本包无运动; A 并纠正了'load_means 必然阻断普通 disarm'这一口径)",
     "load_means = NOT_PROVIDED",
-    "motion = NOT_INCLUDED(整包 0 起转步骤, 运动类额度全 0)",
-    "validate_plan = 47 项 / fail=1(唯一 FAIL 已登记为恒红门)",
+    "validate_plan_on_reviewed_bytes = 47 项 / fail=1(唯一 FAIL 仍是 PLAN_MOTION_CAP_BUDGET 恒红门)",
     "readiness = 17/17 OK(含整包 stub 干跑, 0 设备)",
-    "R6A_candidate_image(5ae) = ARCHIVED_NOT_ON_BOARD(本包正是要把它上板)",
-    "R6/d70 与在板 dab356c6 归档 = 原件未动",
-    "executor/selftest = 字节与 R6C 相同(本轮未改执行器)",
-    "product_C_and_firmware_archive = 本轮 0 改动",
+    "R6A_candidate_image_5ae = ON_BOARD_AND_BYTE_PROVEN(不再是'仅归档'; 旧 d70/dab 归档未覆盖)",
+    "executor/selftest = 字节与 R6C 相同(现场轮也没改执行器)",
+    "product_C_and_firmware_archive = 本轮 0 改动; keil_builds=0",
+    "quota_after_F1 = download 1/1, readback 1/1, explicit_reset 1/1, port_open 1/2, apply 0/1; "
+    "不结转也不重跑",
+    "board_state_at_run_time = 输出禁能已证(pad LOW + ENN 禁能侧 + armed=0) 且 Safety FAULT_LATCHED; "
+    "断电/上电或 fault_reset 人工恢复需操作者另批",
     "product_field_fix = NOT_VERIFIED",
-    "overall_offline_release = 待 A 独立复审(本轮不自签)",
+    "overall_release = 待 A 按现场真实字节复审(本轮不自签)",
     "safe_for_enable = false",
-    "new_hardware_authorization = 0",
-    "device_actions_this_round = 0",
+    "new_hardware_authorization = 0(本件不发批准; F1 的批准=操作者那条原话, 记在仓外持久账)",
+    "device_actions_offline_prep = 0 | device_actions_F1 = download 1 / readback 1 / reset 1 / port_open 1",
     "keil_builds = 0",
-    "next_work = 交 A 复审; 现场执行另需操作者一次明确批准",
+    "next_work = 交 A 复审现场原件; 在那之前不再动设备",
 ]
+
+def line_stats(rel):
+    """从**原始字节**现算行宽/NUL/UTF-8 事实(不抄任何自述数字)。"""
+    import re
+    raw = (REPO / rel).read_bytes()
+    parts = re.split(b"\r\n|\n", raw)
+    widths = [len(p) for p in parts]
+    try:
+        raw.decode("utf-8")
+        u = {"utf8_valid": True}
+    except UnicodeDecodeError as e:
+        u = {"utf8_valid": False, "utf8_first_bad_offset": e.start}
+    return dict(bytes=len(raw), sha256=sha(rel), segments=len(parts),
+                longest_segment_bytes=max(widths) if widths else 0,
+                segments_over_120B=sum(1 for w in widths if w > 120),
+                nul_bytes=raw.count(b"\x00"),
+                nul_offsets=[i for i, c in enumerate(raw) if c == 0][:8], **u)
+
+
+def field_exec_block():
+    if not (REPO / (FIELD + "/OFFLINE_JUDGEMENT.txt")).exists():
+        return None
+    stages = grep(FIELD + "/stdout_dispatch.txt", ["DISPATCH|stage="]) or []
+    summ = grep(FIELD + "/stdout_dispatch.txt", ["DISPATCH_SUMMARY|", "APPROVAL_LEDGER|"]) or []
+    qa = [l for l in (grep(FIELD + "/stdout_dispatch.txt", ["^QUOTA_AUDIT|download",
+                                                            "^QUOTA_AUDIT|readback",
+                                                            "^QUOTA_AUDIT|explicit_reset",
+                                                            "^QUOTA_AUDIT|port_open",
+                                                            "^QUOTA_AUDIT|tmc_config_apply"]) or [])]
+    stop = grep(FIELD + "/S_S3/ledger.jsonl", ["VALUE_ASSERT_FAIL", "SESSION_STOP",
+                                               "BOOT_STREAM_DRAINED", "RX_DONE",
+                                               "APPROVED_PACKAGE_VERIFIED", "PORT_CLOSED"]) or []
+    tags = grep(FIELD + "/OFFLINE_JUDGEMENT.txt", ["R7_F1_field_run", "new_image_5ae_on_board",
+                                                   "boot_to_READY", "TMC_IOIN_selftest_read",
+                                                   "short_print_target_lines", "line_width_observed",
+                                                   "executor_coverage_gap", "motion",
+                                                   "board_output_state", "product_field_fix",
+                                                   "safe_for_enable", "quota_this_package",
+                                                   "device_actions_this_round"]) or []
+    rb = (REPO / (FIELD + "/readback.bin")).read_bytes()
+    arch = (REPO / (FW6A + "/rt-thread-motor-m1-candidate.bin")).read_bytes()
+    return {
+        "approved_by": "操作者 2026-11-03 一次整包批准(原文逐字在 approval_token_verbatim 指到的文件里)",
+        "approval_id": "M8R7F1-reviewed-bootprint-20261103",
+        "approval_ledger_root": "D:/ns800_field_approvals (仓外持久账, 换 --out/重开进程不清零)",
+        "executed_plan_bytes_are": "A 的校正版 plan_core_r7_reviewed.json(fea903b4…) 原字节; "
+                                   "未重跑派生器, 未改任何字节来登记批准",
+        "command": "python m8r3_serial_chain.py --dispatch --transport real --backend real "
+                   "--profile response_driven --plan <reviewed> --repo-root D:/ns800 "
+                   "--approval-id <id> --approval-root D:/ns800_field_approvals "
+                   "--approval-token=<原文> --expected-token=<同一原文> --uid-file <既存私有 UID 文件> "
+                   "--port COM5 --out " + FIELD,
+        "tool_exit_code": 1,
+        "stage_lines_grepped": stages,
+        "stop_detail_grepped_from_session_ledger": stop,
+        "quota_audit_grepped": qa,
+        "summary_grepped": summ,
+        "image_on_board_byte_exact": {"bytes": len(rb), "equal_to_archived_bin": rb == arch,
+                                      "sha256": hashlib.sha256(rb).hexdigest()},
+        "line_and_byte_facts_recomputed_from_raw": {
+            "sysboot_response": line_stats(FIELD + "/S_S3/02_sysboot.rx.bin"),
+            "passive_boot_stream": line_stats(FIELD + "/S_S3/01_rst.boot.rx.bin")},
+        "judgement_status_tags_grepped": tags,
+        "not_verified_after_this_run": [
+            "启动到 READY(本场 FAIL: FAULT_LATCHED / fault=8 = FAULT_SELF_TEST, safety_state.h:48)",
+            "[SAFETY] LIMIT 两条与 [TMC-CFG] CONFIGURED 三条(safety_irq_status 与整个 S4 未到达)",
+            "正常 RUN→disarm 收口 / SG/ADC 真实加载 / 阈值 / ACTIVE / REL_IMPACT / 保存恢复 / 故障恢复闭环",
+            "TMC IOIN rc=-23 的根因(丢帧 / 总线未就绪 / 时序 均未排除; 不据症状改产品码)"],
+        "did_not_do": ["不重跑整包", "不增加任何一次动作", "不改判据/计划/执行器",
+                        "不用剩下的 1 次 port_open 与 1 次 tmc_config_apply 顺手再看",
+                        "不清黑匣子", "不保存配置", "不起转", "不复活旧 4cb9dac0 批准"]}
+
 
 doc = {
     "task": "M8-R7-BOUNDED-FIELD-VALIDATION-PACKAGE-5AE",
@@ -148,7 +258,8 @@ doc = {
                           "不为回读自己的新头反复追加提交",
     "roles": "云端 A 出方向与独立复审; 本地 Qoder 准备候选包; 操作者=人(本件不含任何硬件批准, "
              "也不代替操作者回答现场安全门)",
-    "status": "M8_R7_OFFLINE_CANDIDATE_DELIVERED / AWAITING_INDEPENDENT_REVIEW",
+    "status": "M8_R7_OFFLINE_CANDIDATE_DELIVERED + R7_F1_FIELD_RUN_EXECUTED_STOPPED_AT_S3 "
+              "/ AWAITING_INDEPENDENT_REVIEW_OF_FIELD_BYTES",
 
     "scope_covered": plan["scope_this_package"]["covers"],
     "scope_not_covered": plan["scope_this_package"]["does_not_cover"],
@@ -229,27 +340,42 @@ doc = {
         "prior_token_state": "EXHAUSTED_AND_NOT_CARRIED(download/readback/explicit_reset 各 1/1 用尽; "
                              "换计划文件/换输出目录不重新发额度)",
         "numbers_are_proposals_not_authorization": True,
-        "what_is_still_needed": "操作者对 5 个非零额度逐条批准(port_open 2 / download 1 / readback 1 / "
-                                "explicit_reset 1 / tmc_config_apply 1, 尤其 apply 会写驱动芯片寄存器), "
-                                "并回报现场物理状态(供电、接线、是否允许开 COM5、机械是否静止)",
+        "what_is_still_needed": "F1 之前的批准已由操作者那条原话给出并记在仓外持久账; 现在需要的是"
+                                "A 对现场真实字节的复审。要继续动设备(断电/上电、fault_reset 人工恢复复核、"
+                                "重跑到 READY、或用掉剩下的 1 次 port_open 与 1 次 apply)都需操作者另发一次批准; "
+                                "本件不代替操作者回答现场安全门",
         "this_file_is_not_an_approval": True},
 
-    "device_actions": {"serial_ports_opened": 0, "dap_connections": 0, "downloads": 0, "flashes": 0,
-                       "readbacks": 0, "resets": 0, "motor_starts": 0, "target_power_cycles": 0,
-                       "keil_builds": 0},
-    "private_material_handling": "UID 一律以 @UID_FILE 占位, 未把 48 位十六进制私有机密写进聊天或仓库; "
-                                 "本轮没有产生任何台账/批准令牌",
+    "field_execution": field_exec_block(),
+    "device_actions_note": (
+        "两条时间线分开记账: (a) 候选包准备轮 = 全程 0 设备动作(下面的 keil_builds=0 也属于这一轮); "
+        "(b) R7-F1 现场轮 = 操作者一次整包批准后真实执行, 到 S3 STOP。下面这组数字是 **F1 之后**的实耗, "
+        "由仓外持久批准账与 dispatch 原文现算/摘录, 不是准备轮的 0。"),
+    "device_actions": {"serial_ports_opened": 1, "pyocd_tool_invocations": 3,
+                       "downloads": 1, "flashes": 1,
+                       "readbacks": 1, "resets": 1, "motor_starts": 0, "motor_arms": 0,
+                       "tmc_config_apply": 0, "config_save": 0, "blackbox_clear": 0,
+                       "target_power_cycles": 0, "keil_builds": 0},
+    "private_material_handling": "UID 一律以 @UID_FILE 占位入库(执行器自己脱敏成 "
+                                 "@UID_FILE<redacted len=48 sha256_…>), 未把 48 位十六进制私有机密写进聊天或仓库; "
+                                 "现场轮复用的是本机既有私有 UID 文件(与上一轮真实 dispatch 登记的那一枚同一件, "
+                                 "也等于当前实际连着的探针), 未枚举新设备; 新批准身份 M8R7F1-… 的持久账在仓外",
     "not_verified_after_this_round": [
         "SG/ADC 真实加载、阈值生成与有效性、ACTIVE 覆盖、REL_IMPACT、保存恢复与故障恢复闭环",
-        "正常 disarm 之后的 Safety 收口(需 motor_arm)",
+        "正常 RUN→disarm 之后的 Safety 收口(本包不含运动, 且 A 纠正了我对 load_means 的口径)",
         "idle1024 带载最坏栈余量、现场精确线程交错、0x00bd80b0 写入者(旧裁定保持)",
-        "新镜像 5ae 在板(本包的目的就是去证它, 本轮未上板)"],
+        "启动是否到 READY —— 现场结果是 FAIL 到 FAULT_LATCHED/8, 不是未测; 但'修好了'也不成立",
+        "[SAFETY] LIMIT 两条与 [TMC-CFG] CONFIGURED 三条短打印(步骤未到达)"],
     "safe_for_enable": False,
     "review_points_for_A": [
-        "本包是否可以在 load_means=NOT_PROVIDED 下只跑这三条覆盖, 还是应先补加载手段",
-        "tmc_config_apply 单列一次额度是否必要(不 apply 就取不到 5ae 拆短的 CONFIGURED 三条短行)",
+        "现场首错(state=FAULT_LATCHED/fault=8, 生产者=[SS] [REQ FAIL] TMC2209 IOIN read rc=-23)怎么归因: "
+        "丢帧 / 总线未就绪 / 自检时序 三条机制本轮都没排除, 也没有据此改产品码",
+        "启动被动流里 2 个 >120 B 分段与 3 个裸 NUL: 需要的是产品侧输出串流判据, 还是执行器把 "
+        "NUL/UTF-8 门也盖到启动流上(本轮只登记, 两边都没动)",
+        "校正版判据在真实回包上的表现: 白名单与连字符取值按预期放行, 停因落在真值不符 —— 请复核这条"
+        "是否足以说明'误拒'已修, 而本场 STOP 是产品事实",
         "PLAN_MOTION_CAP_BUDGET 对无起转包的恒红门是否要在执行器侧正式修(本轮只登记不修)",
-        "四处登记更正是否都只落在新包、没有回改任何已签收件"],
+        "额度剩 1 次 port_open 与 1 次 apply: 下一场是续测还是先修 rc=-23, 由 A 与操作者定"],
     "remote_readback": readback_block(),
     "status_block": STATUSES,
 }
@@ -268,7 +394,8 @@ def main():
           (OUT.relative_to(REPO).as_posix(), nb("reports/agent_handoffs/phase8-m8-r7-field-package-5ae.json"),
            sha("reports/agent_handoffs/phase8-m8-r7-field-package-5ae.json")[:16], len(doc),
            doc["remote_readback"]))
-    print("device_actions=0|keil_builds=0")
+    print("device_actions_offline_prep=0 | device_actions_F1=download 1 / readback 1 / reset 1 / "
+          "port_open 1 | keil_builds=0")
     return 0
 
 

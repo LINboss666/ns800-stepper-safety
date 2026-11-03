@@ -138,3 +138,35 @@ new_hardware_authorization = 0
 下一步是把这份候选包交给 A 独立复审；现场执行另需**一次由操作者明确发出的批准**，内容至少包括：
 5 个非零额度的逐项放行 + 现场物理状态回报（供电、接线、是否允许开 COM5、机械是否静止）。
 本轮没有执行任何串口/DAP/烧录/回读/复位/运动，也没有修改任何冻结件。
+
+## 9. R7-F1 现场整包执行（操作者一次批准，跑到 S3 STOP）
+
+A 的独立校正版候选（`plan_core_r7_reviewed.json` 108021 B / `fea903b4f9530cab…`）按原字节接收后，
+操作者发出一次整包批准（原文见 `field/field-20261103T132348Z/APPROVAL_TOKEN.verbatim.txt`）。
+新批准身份 `M8R7F1-reviewed-bootprint-20261103` 的持久账绑定
+计划 `fea903b4…` / 执行器 `33d3f0af…`（R6C 原件未改）/ 镜像 `5ae4110d…` 三件 SHA，
+一条 `--dispatch --transport real --backend real --profile response_driven` 走完，工具退出码 **1**。
+
+```text
+S0 OK | S1 OK(一次下载, rc=0) | S2 OK(readback.bin 292164 B 与归档 BIN 逐字节相等=True)
+S3 STOP FIELD_VALUE_MISMATCH  wrong={"state":["FAULT_LATCHED","READY"], "fault":["8","0"]}
+S4 未执行(tmc_config_apply 0/1)
+实耗 download 1/1, readback 1/1, explicit_reset 1/1, port_open 1/2; 运动/学习/保存/清日志额度 0 且未尝试
+cleanup_errors=[] ; disarm=NOT_ARMED ; PORT_CLOSED 正常收口 ; commit_failures=[] pending=0
+```
+
+- **本次唯一成立的现场证明**：5ae 新镜像**逐字节在板**（此前它只是归档件）。
+- **本次的失败是产品事实**：启动自检 required 项 `[SS] [REQ FAIL] TMC2209 IOIN read rc=-23` →
+  `required=FAIL` → `FAULT_LATCHED code=8`（`safety_state.h:48` = `FAULT_SELF_TEST`）。
+  判据没有误拒：A 校正的 `arm gate fail mask` 白名单与 `polarity=not-confirmed` 都按预期放行，
+  停因是真值不符。rc=-23 根因未定，不据症状改产品代码。
+- **未到达因而仍未验**：`safety_irq_status` 的 `[SAFETY] LIMIT …` 两条、S4 的 `[TMC-CFG] CONFIGURED …`
+  三条；"启动到 READY"；`product_field_fix`；disarm 收口。
+- **行宽现场事实（两条分开说）**：单条响应 21 行最长 120 B、0 行超 120 B、无 NUL；
+  启动被动流 75 分段里 2 个 252 B / 305 B，含 3 个裸 NUL（1318/2268/2395）与整体非法 UTF-8（首错 1317），
+  一条分段里咬着 2–3 次并发打印。同时登记：被动启动流只过危险文本门，不过 NUL/UTF-8 门。
+- **板最后可读状态（执行当时）**：输出停在安全态 —— DRV_ENABLE pad LOW 已证、request=LOW、pad=0、
+  ENN 在禁能侧 verdict=OK、`[Motor] armed=0`、arm gate REFUSED、UI SAFE-OFF；Safety 处于
+  `FAULT_LATCHED fault=8`。断电/上电或 `fault_reset` 人工恢复复核需操作者另发批准。
+- 纪律：不重跑整包、不加次数、不改判据/计划/执行器，剩下 1 次 `port_open` 与 1 次 `tmc_config_apply`
+  不用来"顺手再看"。全部原件（含首错与原始字节）已入本目录，交 A 按真实字节复审。
