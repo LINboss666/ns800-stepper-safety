@@ -200,6 +200,14 @@ Build Time Elapsed:  00:00:13
 上一轮已归档且已逐字节证在板的 `dab356c6…` 原件**没被覆盖**；新件写新目录。
 **这枚新镜像没有进板、没有回读、没有板上任何一条证据** —— 它只是编译产物身份。
 
+编译输入登记成**双身份**（`host/archive_build_r6.py` 的 `_source_inputs()`）：`sha256`/`bytes` 取
+仓库 blob（远端逐 blob 回读比的就是这两个字段），`compiled_from_disk_bytes*` 记编译器当场真读到的
+磁盘字节。两者不等的唯一原因是行尾过滤器：`applications/*.c` 与 `rtconfig.h` 不在 `.gitattributes`
+的 `-text` 名单里，autocrlf 把 CRLF 折成 LF —— 实测 `motor.c` 差 2555 B、`stop_priority.c` 差 1544 B、
+`rtconfig.h` 差 454 B，而本轮新写的 `tmc2209.c`/`safety_thread.c` 磁盘即 LF 故两份相同。
+上一轮 r4 的 manifest 只登记磁盘那份，远端回读因此把 `rtconfig.h` 报成 `hash_mismatch`；
+本轮不再留同一条尾巴（r4 那份属历史 manifest，不回改，只在此说明）。
+
 ## 16.5 本轮数字（都在最终字节上跑）
 
 | 项 | 结果 |

@@ -72,7 +72,12 @@
 差（对上一轮同一 Target）：**Code +808 / RO +392 / RW 0 / ZI 0**。
 新件归档在 `reports/firmware/phase8-m8-r6-offline-recovery/`（BIN `d70a9180…`/292116 B、
 AXF `3c113310…`/1773504 B、map `40f8e270…`/2110427 B；manifest 由 `host/archive_build_r6.py`
-当场算并做拷贝后逐字节比对）。上一轮已逐字节证在板的 `dab356c6…` 未被覆盖。
+当场算并做拷贝后逐字节比对）。编译输入登记成**双身份**：`sha256`/`bytes` 是仓库 blob（远端逐 blob
+回读比的就是这两个），`compiled_from_disk_bytes*` 是编译器当场读到的磁盘字节；两者之差只来自
+autocrlf（motor.c 2555 B / stop_priority.c 1544 B / rtconfig.h 454 B 的 CR 被折掉，
+本轮新写的 tmc2209.c 与 safety_thread.c 磁盘即 LF 故相同）。上一轮 r4 manifest 只登记磁盘那份，
+远端回读就把 rtconfig.h 报成 hash_mismatch —— 本轮不再留这条尾巴，r4 那份历史件不回改。
+上一轮已逐字节证在板的 `dab356c6…` 未被覆盖。
 
 ## 6. 本轮汇总数字
 

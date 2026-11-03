@@ -25,36 +25,51 @@
  "source_inputs": [
   {
    "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/motor.c",
-   "bytes": 133434,
-   "sha256": "c51693b3df4a78a21fe171fbdc4937fed6a01400ec9c91d4252bcab7a3c20952",
+   "bytes": 130879,
+   "sha256": "3b741233b174ca052d8fff526d283ed30ae1b44bf19b749c4f3ea6fdcd1280e5",
+   "compiled_from_disk_bytes": 133434,
+   "compiled_from_disk_bytes_sha256": "c51693b3df4a78a21fe171fbdc4937fed6a01400ec9c91d4252bcab7a3c20952",
+   "identity_kind": "blob_after_crlf_filter(disk 多 CR, 差 2555 B)",
    "what": "R6-2 mot_commit_gated 成功关闭与 Safety 收口同笔提交"
   },
   {
    "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/stop_priority.c",
-   "bytes": 64672,
-   "sha256": "99d6c124bcc38224760b4ba91f526b4ad5e390139c15630a2b2c44dba08ca390",
+   "bytes": 63128,
+   "sha256": "09a2f086e59af03f5a52a3f6ef82dea85845f433ec08129156f68ce1c93976ac",
+   "compiled_from_disk_bytes": 64672,
+   "compiled_from_disk_bytes_sha256": "99d6c124bcc38224760b4ba91f526b4ad5e390139c15630a2b2c44dba08ca390",
+   "identity_kind": "blob_after_crlf_filter(disk 多 CR, 差 1544 B)",
    "what": "R6-2 sp_peek_held 补齐 permit/pwm 等字段拷贝"
   },
   {
    "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/tmc2209.c",
    "bytes": 192031,
    "sha256": "214951633ee4b39cd693bfee1274bd618305ddcddea8bf40880c2f27437d77ec",
+   "compiled_from_disk_bytes": 192031,
+   "compiled_from_disk_bytes_sha256": "214951633ee4b39cd693bfee1274bd618305ddcddea8bf40880c2f27437d77ec",
+   "identity_kind": "disk_equals_blob",
    "what": "R6-3 CONFIGURED 与晚到 apply 拒绝提交的长打印拆短"
   },
   {
    "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/safety_thread.c",
    "bytes": 19716,
    "sha256": "564770faf381b18aacd11e9196c9ce99af7a2f1f19a6c7702832970b68311246",
+   "compiled_from_disk_bytes": 19716,
+   "compiled_from_disk_bytes_sha256": "564770faf381b18aacd11e9196c9ce99af7a2f1f19a6c7702832970b68311246",
+   "identity_kind": "disk_equals_blob",
    "what": "R6-3 LIMIT inputs 长打印拆短"
   },
   {
    "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/rtconfig.h",
-   "bytes": 9304,
-   "sha256": "1927ed1c1cc7a1efebca50b910eb735228a926c218b3e39a1daf799b6fe9a65a",
+   "bytes": 8850,
+   "sha256": "b66753d6b50b9bf4ab8b46d4a1500e538513a7c872a3d70e84c551007ab4d209",
+   "compiled_from_disk_bytes": 9304,
+   "compiled_from_disk_bytes_sha256": "1927ed1c1cc7a1efebca50b910eb735228a926c218b3e39a1daf799b6fe9a65a",
+   "identity_kind": "blob_after_crlf_filter(disk 多 CR, 差 454 B)",
    "what": "本轮未改(沿上一轮 IDLE_THREAD_STACK_SIZE=1024)"
   }
  ],
- "code_commit_at_build": "535459f84724cdb755af00ee4dea4b3f42c93d45",
+ "code_commit_at_build": "a8d90336af8a94f0906d1c677606b11b1174d48a",
  "working_tree_at_build": "改动尚未提交(本 manifest 记录的正是待提交的那份字节)",
  "not_overwritten": {
   "path": "reports/firmware/phase8-m8-idle-stack-r4/rt-thread-motor-m1-candidate.bin",

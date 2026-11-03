@@ -45,6 +45,47 @@ def sha(p):
     return hashlib.sha256(Path(p).read_bytes()).hexdigest()
 
 
+def blob_of(rel):
+    """工作树文件**经 git 过滤器后**进对象库的那份字节 (blob 字节, blob 散列)。"""
+    h = subprocess.run(["git", "hash-object", "-w", "--path", rel, "--", rel],
+                       cwd=str(ROOT), capture_output=True, text=True)
+    if h.returncode != 0:
+        return None
+    b = subprocess.run(["git", "cat-file", "blob", h.stdout.strip()], cwd=str(ROOT),
+                       capture_output=True)
+    return b.stdout if b.returncode == 0 else None
+
+
+def blob_sha256(rel):
+    data = blob_of(rel)
+    return hashlib.sha256(data).hexdigest() if data is not None else None
+
+
+def _source_inputs():
+    """编译输入的**双身份**: `sha256`/`bytes` 一律取仓库 blob(远端逐 blob 回读就是比这两个字段),
+    另附 `compiled_from_disk_*` 记编译器当场真读到的磁盘字节。两者不等的唯一原因是行尾过滤器:
+    applications/*.c 与 rtconfig.h 不在 .gitattributes 的 -text 名单里, autocrlf 会把 CRLF 折成 LF。
+    上一轮 r4 的 manifest 只登记了磁盘那份, 于是远端回读把 rtconfig.h 报成 hash_mismatch ——
+    本轮不再留同一条尾巴。"""
+    out = []
+    for rel, what in SOURCES:
+        p = ROOT / rel
+        disk = p.read_bytes()
+        bb = blob_of(rel)
+        same = bb is not None and bb == disk
+        out.append({"path": rel,
+                    "bytes": len(bb) if bb is not None else len(disk),
+                    "sha256": (hashlib.sha256(bb).hexdigest() if bb is not None
+                               else hashlib.sha256(disk).hexdigest()),
+                    "compiled_from_disk_bytes": len(disk),
+                    "compiled_from_disk_bytes_sha256": hashlib.sha256(disk).hexdigest(),
+                    "identity_kind": ("disk_equals_blob" if same else
+                                      "blob_after_crlf_filter(disk 多 CR, 差 %d B)"
+                                      % (len(disk) - (len(bb) if bb else len(disk)))),
+                    "what": what})
+    return out
+
+
 def nbytes(p):
     return Path(p).stat().st_size
 
@@ -97,8 +138,7 @@ def main():
                                             l.startswith("Build Time Elapsed")), "-"),
            "log_path": LOG.relative_to(ROOT).as_posix(),
            "log_bytes": nbytes(LOG), "log_sha256": sha(LOG),
-           "source_inputs": [{"path": p, "bytes": nbytes(ROOT / p), "sha256": sha(ROOT / p),
-                              "what": w} for p, w in SOURCES],
+           "source_inputs": _source_inputs(),
            "code_commit_at_build": subprocess.run(["git", "rev-parse", "HEAD"], cwd=str(ROOT),
                                                   capture_output=True, text=True).stdout.strip(),
            "working_tree_at_build": "改动尚未提交(本 manifest 记录的正是待提交的那份字节)",
