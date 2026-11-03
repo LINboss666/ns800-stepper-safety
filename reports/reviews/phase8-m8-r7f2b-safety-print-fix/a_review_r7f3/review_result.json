@@ -1,0 +1,164 @@
+{
+  "artifacts": [
+    {
+      "kind": "bin",
+      "path": "reports/firmware/phase8-m8-r7f2b-safety-print-fix/rt-thread-motor-m1-candidate.bin",
+      "bytes": 292708,
+      "sha256": "502dca5d8c7ebfa794f890a9c03bc258fc9753f57b6a80c2f1e08add69888a7a"
+    },
+    {
+      "kind": "axf",
+      "path": "reports/firmware/phase8-m8-r7f2b-safety-print-fix/rt-thread-motor-m1.axf",
+      "bytes": 1775972,
+      "sha256": "fc567635d98a76cfb5bb32c3df27f611061bdc39887c90fce75da44dac8d86f8"
+    },
+    {
+      "kind": "map",
+      "path": "reports/firmware/phase8-m8-r7f2b-safety-print-fix/rt-thread-motor-m1.map",
+      "bytes": 2114829,
+      "sha256": "fc33986f3e5928d2724812ebe1be7609230312a38d46d0ca4f87806067c1a0db"
+    },
+    {
+      "kind": "callgraph",
+      "path": "reports/firmware/phase8-m8-r7f2b-safety-print-fix/rt-thread-motor-m1-callgraph.htm",
+      "bytes": 1078228,
+      "sha256": "39134ee1462b0612600a32519870e2c65b90197a43739f43685d1b000e95863c"
+    }
+  ],
+  "elf_BIN_load_segments_equal": [
+    {
+      "load_address": "0x8000000",
+      "bytes": 292708
+    }
+  ],
+  "source_patch_exact_postimage": true,
+  "main_stack_config": 4096,
+  "irq_source_model": {
+    "call_bytes": [
+      43,
+      72,
+      26,
+      40,
+      31,
+      59,
+      80,
+      97,
+      124
+    ],
+    "nul": 0,
+    "strict_utf8": true,
+    "scope": "READY, gate CLOSED, polarity NOT confirmed, limits OFF, DIAG raw=0, ENN raw=HIGH. Source-shape only; no hardware proof."
+  },
+  "draft_S0_blocker": {
+    "code": "S0_IMAGE_NOT_IN_MANIFEST",
+    "detail": "reports/firmware/phase8-m8-r7f2b-safety-print-fix/rt-thread-motor-m1-candidate.bin"
+  },
+  "draft_S0_next_blocker": {
+    "code": "S0_COMMIT_NOT_IN_REPO",
+    "detail": "software_input_commit=None"
+  },
+  "final_S0": {
+    "image_path": "reports/firmware/phase8-m8-r7f2b-safety-print-fix/rt-thread-motor-m1-candidate.bin",
+    "approval_id": "NONE_DECLARED",
+    "plan_source": "/workspace/scratch/f24247cdf3d6/r7f2b-go/repo/reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/plan_r7f3_b502_reviewed.json",
+    "plan_sha256_on_disk": "080c22973c7eb3e780a31d9466f636c458c66668d87eae64f744ecfe6c02f956",
+    "plan_sha256": "080c22973c7eb3e780a31d9466f636c458c66668d87eae64f744ecfe6c02f956",
+    "plan_snapshot_bytes": 36356,
+    "plan_snapshot_path": "/workspace/scratch/f24247cdf3d6/r7f2b-go/repo/reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/plan_r7f3_b502_reviewed.json",
+    "executor_path": "/workspace/scratch/f24247cdf3d6/r7f2b-go/repo/reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py",
+    "executor_sha256": "33d3f0af8a4c9c33dcd4e013b395e4ba990a89e384130f9d0ffe50c71b34e8ca",
+    "image_bytes": 292708,
+    "image_sha256": "502dca5d8c7ebfa794f890a9c03bc258fc9753f57b6a80c2f1e08add69888a7a",
+    "manifest_target": "rt-thread-motor-m1-candidate",
+    "software_input_commit": "99414c7a57d8987033de3de48469a8f4779b87a5",
+    "tested_image_build_commit": "70deff806e8b548dee23afb06a6fcdf20937b015",
+    "reviewed_delivery_commit": "99414c7a57d8987033de3de48469a8f4779b87a5",
+    "plan_placeholders": 0,
+    "plan_forbidden_hits": 0,
+    "needles_source_root": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad",
+    "needles_total": 40
+  },
+  "validate_plan": {
+    "checks": 38,
+    "fail_count": 1,
+    "fail_lines": [
+      "PLAN_MOTION_CAP_BUDGET|all|FAIL|caps=[] sum=0 total=0 starts=0"
+    ]
+  },
+  "step_replays": [
+    {
+      "case": "ps positive",
+      "verdict": "OK"
+    },
+    {
+      "case": "free positive",
+      "verdict": "OK"
+    },
+    {
+      "case": "system_status positive",
+      "verdict": "OK"
+    },
+    {
+      "case": "safety_status positive",
+      "verdict": "OK"
+    },
+    {
+      "case": "motor_status positive",
+      "verdict": "OK"
+    },
+    {
+      "case": "safety_irq_status positive",
+      "verdict": "OK"
+    },
+    {
+      "case": "missing split tail",
+      "verdict": "STOP",
+      "code": "EXPECTATION_NOT_MET"
+    },
+    {
+      "case": "bad ENN sample",
+      "verdict": "STOP",
+      "code": "FIELD_VALUE_MISMATCH"
+    },
+    {
+      "case": "duplicate ENN line",
+      "verdict": "STOP",
+      "code": "FIELD_NOT_EXACTLY_ONE"
+    },
+    {
+      "case": "missing LIMIT tail",
+      "verdict": "STOP",
+      "code": "EXPECTATION_NOT_MET"
+    },
+    {
+      "case": "unexpected IRQ open",
+      "verdict": "STOP",
+      "code": "FIELD_NOT_EXACTLY_ONE"
+    },
+    {
+      "case": "extra command refusal",
+      "verdict": "STOP",
+      "code": "BUSINESS_FAILED"
+    },
+    {
+      "case": "motor armed",
+      "verdict": "STOP",
+      "code": "FIELD_VALUE_MISMATCH"
+    },
+    {
+      "case": "unexpected arm mask",
+      "verdict": "STOP",
+      "code": "BUSINESS_FAILED"
+    },
+    {
+      "case": "startup fault",
+      "verdict": "STOP",
+      "code": "FIELD_VALUE_MISMATCH"
+    },
+    {
+      "case": "main stack reverted",
+      "verdict": "STOP",
+      "code": "FIELD_VALUE_MISMATCH"
+    }
+  ]
+}

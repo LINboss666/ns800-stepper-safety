@@ -1,0 +1,35 @@
+zip C:\Users\LMX\Downloads\NS800_R7F3_A_GO_B502_Startup_Print_20261104.zip
+  bytes=41287 sha256=1699735a5693d7c758e2f0a1798b3307281c6fd2134b3dfe07f41c24f9c4747a
+  包内 SHA256SUMS.txt 条目=10
+  IDENTITY.json                                                                            2210 3921e16d8fa546d6 OK
+  README_A_GO.md                                                                           5193 5a3f510f105023c8 OK
+  SHA256SUMS.txt                                                                           1117 6908472a0dea1c7b SKIP(清单不哈希自身字节)
+  a_review/full_stub_dispatch_ledger.jsonl                                                 2559 37c18065f659b6c4 OK
+  a_review/irq_source_extract.c                                                            3556 1198e3c0fd5b9a26 OK
+  a_review/irq_source_extract.calls.txt                                                     254 5a641e7f3cfccda1 OK
+  a_review/review_result.json                                                              4969 427c00c69eb54fbd OK
+  a_review/validate_plan.txt                                                               2610 cc6144a37f13e06b OK
+  reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/manifest_binding_r7f3_b502_reviewed.json     1141 1ecf54c400146814 OK
+  reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/plan_r7f3_b502_reviewed.json     36356 080c22973c7eb3e7 OK
+  reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/rows_r7f3_b502_reviewed.json     55694 bbfb4b570257ee7c OK
+  包内自洽=全部 OK (清单逐条 vs zip 实读字节)
+
+== 落位到仓库的三份 field 件(zip 内字节 == 仓库磁盘字节, 逐字节比) ==
+  plan              plan_r7f3_b502_reviewed.json bytes=36356/36356 sha=080c22973c7eb3e7 OK(zip 内字节 == 磁盘 == IDENTITY)
+  rows              rows_r7f3_b502_reviewed.json bytes=55694/55694 sha=bbfb4b570257ee7c OK(zip 内字节 == 磁盘 == IDENTITY)
+  manifest_adapter  manifest_binding_r7f3_b502_reviewed.json bytes=1141/1141 sha=1ecf54c400146814 OK(zip 内字节 == 磁盘 == IDENTITY)
+
+== 包内 a_review 原件的落位(逐字节复制, 未改写) ==
+  IDENTITY.json                          2210 OK 逐字节相同
+  SHA256SUMS.txt                         1117 OK 逐字节相同
+  review_result.json                     4969 OK 逐字节相同
+  full_stub_dispatch_ledger.jsonl        2559 OK 逐字节相同
+  irq_source_extract.c                   3556 OK 逐字节相同
+  irq_source_extract.calls.txt            254 OK 逐字节相同
+  validate_plan.txt                      2610 OK 逐字节相同
+  README_A_GO.md -> a_review_R7F3_A_GO_B502_Startup_Print.md     5193 OK 逐字节相同
+
+== 边界说明 ==
+  review_result.json 里的 final_S0.plan_source / plan_snapshot_path / executor_path 是 A 侧沙箱绝对路径
+  (/workspace/scratch/...), 只说明 A 在哪台环境跑的, 不构成本机路径 claim; 本机复算见 offline/*.txt。
+  A 的 validate_plan.txt 与本机重跑件逐字节前缀相同(本机多末行 PLAN_VALIDATE_SUMMARY), 见两份件对照。

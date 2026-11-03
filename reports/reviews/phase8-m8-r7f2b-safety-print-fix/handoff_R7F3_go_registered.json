@@ -1,0 +1,229 @@
+{
+ "round": "phase8-m8-r7f2b-safety-print-fix / R7F3 登记轮",
+ "title": "A 技术签收 b502 定发包并直接修好草稿的两处 S0 阻断; 本机独立复算一致, 停在操作者批准门",
+ "date_local": "2026-11-04",
+ "review_baseline_commit": "99414c7a57d8987033de3de48469a8f4779b87a5",
+ "input_package": {
+  "zip": "C:\\Users\\LMX\\Downloads\\NS800_R7F3_A_GO_B502_Startup_Print_20261104.zip",
+  "bytes": 41287,
+  "sha256": "1699735a5693d7c758e2f0a1798b3307281c6fd2134b3dfe07f41c24f9c4747a",
+  "entries": 11,
+  "inner_manifest": {
+   "entries": 10,
+   "self_consistent": "全部 OK(清单不哈希自身)",
+   "transcript": {
+    "path": "offline/package_integrity.txt",
+    "bytes": 3093,
+    "sha256": "0c2f5651f4ead9326381912cf27fdabe7a8db976d15c1a23e3633544d6b39fa0"
+   }
+  }
+ },
+ "a_verdict": {
+  "verbatim_status_line": "状态：技术签收通过，等待操作者对本固定包的一次明确批准。此文件本身不是硬件批准。",
+  "usable_image": "502dca5d8c7ebfa794f890a9c03bc258fc9753f57b6a80c2f1e08add69888a7a / 292708 B BIN",
+  "no_further_work": "无需再修改产品 C、执行器或重新构建",
+  "offline_only": "这些是离线技术验证。新镜像尚未上板，真实打印修复是否生效要由本场原始串口字节证明。"
+ },
+ "local_independent_recomputation": {
+  "identity_three_way": "A IDENTITY.json / 本轮 build_manifest.json / 磁盘实读 三方一致(bin/axf/map)",
+  "elf_vs_bin": "AXF 只有一个 PT_LOAD, p_paddr=0x08000000 p_filesz=292708, 段内字节与 BIN 逐字节相同(sha256 同值)",
+  "source_postimage": "工作树 safety_gpio.c 的 git blob sha1 = 2055c7496be9…(= 补丁 postimage), 改前形态 b242dfad1fed… 在 tip~2 上仍在",
+  "main_stack": "rtconfig.h `#define RT_MAIN_THREAD_STACK_SIZE 4096` + .config `CONFIG_RT_MAIN_THREAD_STACK_SIZE=4096`, 两件与上一轮登记的编译输入逐字节相同(本轮未再动)",
+  "validate_plan": {
+   "command": "python reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py --validate-plan --plan field/plan_r7f3_b502_reviewed.json --repo-root .",
+   "rc": 1,
+   "checks": 38,
+   "fail": 1,
+   "the_only_fail": "PLAN_MOTION_CAP_BUDGET|all|FAIL|caps=[] sum=0 total=0 starts=0",
+   "vs_a_transcript": "本机 39 行的前 38 行与 A 的 validate_plan.txt 逐字节相同; 本机多出末行 PLAN_VALIDATE_SUMMARY(汇总行, 非判据差异)",
+   "transcript": {
+    "path": "offline/r7f3_validate_reviewed.txt",
+    "bytes": 2793,
+    "sha256": "e58103ecae5015e1501a32b2f7a8c2df015f361dc425e57c8e2cb32212da122e"
+   }
+  },
+  "dispatch_stub_sim": {
+   "command": "python reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py --dispatch --plan field/plan_r7f3_b502_reviewed.json --transport stub --backend sim --repo-root . (不带 --approval-id)",
+   "rc": 0,
+   "status": "OK",
+   "stages_executed": 4,
+   "stages_not_run": 0,
+   "quota_used_in_memory": {
+    "download": 1,
+    "explicit_reset": 1,
+    "port_open": 1,
+    "readback": 1
+   },
+   "actions_attempted": [],
+   "approval_ledger": "NONE(未绑定批准身份 => 没有消耗任何真实批准, 也没有创建设备动作)",
+   "flow_vs_verification": "flow_complete=True 只说明阶段跑完且额度/取证账目一致; core_protection_verified=False",
+   "transcript": {
+    "path": "offline/dispatch_reviewed_sim.txt",
+    "bytes": 4163,
+    "sha256": "23dc920c01200d56cee702894e6cc9c6595f928d26c3e11645f9acf946f2359a"
+   }
+  },
+  "executor_untouched": {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py",
+   "bytes": 219491,
+   "sha256": "33d3f0af8a4c9c33dcd4e013b395e4ba990a89e384130f9d0ffe50c71b34e8ca"
+  }
+ },
+ "a_fixed_two_defects_in_my_derived_artifacts": {
+  "reproduced_locally_on_unmodified_executor": [
+   {
+    "order": 1,
+    "code": "S0_IMAGE_NOT_IN_MANIFEST",
+    "detail": "reports/firmware/phase8-m8-r7f2b-safety-print-fix/rt-thread-motor-m1-candidate.bin",
+    "root_cause": "我这轮的 S0 适配清单 targets[].images 用了 build_manifest 的字典键 bin/axf/map/callgraph, 而执行器按**实际归档文件名**查找",
+    "transcript": {
+     "path": "offline/dispatch_draft_sim_S0_IMAGE_NOT_IN_MANIFEST.txt",
+     "bytes": 2535,
+     "sha256": "efc503a464d48e0550d30311d42eeafe01f265ecd33c074bfb2aab3acd3e2604"
+    }
+   },
+   {
+    "order": 2,
+    "code": "S0_COMMIT_NOT_IN_REPO",
+    "detail": "software_input_commit=None",
+    "root_cause": "我把四个提交字段直接置 None(想让身份可核), 但执行器 S0 要求它是仓库里存在的提交; 只修键名的探针件因此撞上第二处",
+    "probe": "仓外探针: 只把 images 的键换成真实文件名, 提交字段仍为 None => 命中 S0_COMMIT_NOT_IN_REPO",
+    "transcript": {
+     "path": "offline/dispatch_probe_adapter_only_S0_COMMIT_NOT_IN_REPO.txt",
+     "bytes": 2477,
+     "sha256": "a1e211452a764fc7933ebb0561526112351c85e0fa0431738854c1667091938e"
+    }
+   }
+  ],
+  "a_side_fix": {
+   "new_adapter_keys": [
+    "rt-thread-motor-m1-candidate.bin",
+    "rt-thread-motor-m1.axf",
+    "rt-thread-motor-m1.map",
+    "rt-thread-motor-m1-callgraph.htm"
+   ],
+   "commits_now": {
+    "reviewed_delivery_commit": "99414c7a57d8987033de3de48469a8f4779b87a5",
+    "software_input_commit": "99414c7a57d8987033de3de48469a8f4779b87a5",
+    "tested_image_build_commit": "70deff806e8b548dee23afb06a6fcdf20937b015",
+    "build_time_head_commit": "70deff806e8b548dee23afb06a6fcdf20937b015"
+   },
+   "honest_note": "A 明确: 交付源码 = 99414c7, 实际构建时 HEAD = 70deff8 且当时补丁尚未提交; 没有声称 70deff8 的树含补丁, 确切编译字节仍以 build_manifest 的 compiled_from_disk 为准",
+   "original_build_manifest_untouched": "059bebe6419f6093636186ffe3f9a8f1dc90c966b1da6e10f01e44d1062b980d"
+  },
+  "my_registration": "GF7: 两处都是我本轮派生件的缺陷(键名形态 + 提交字段留空), 不是 A 的判据太严; 旧草稿/旧适配件按冻结原则不回改, 修正由 A 的新名字件承接。"
+ },
+ "reviewed_field_files_archived": [
+  {
+   "path": "field/plan_r7f3_b502_reviewed.json",
+   "bytes": 36356,
+   "sha256": "080c22973c7eb3e780a31d9466f636c458c66668d87eae64f744ecfe6c02f956"
+  },
+  {
+   "path": "field/rows_r7f3_b502_reviewed.json",
+   "bytes": 55694,
+   "sha256": "bbfb4b570257ee7c5cd9e2d96da36cb8b10a989aae4f6fa6cfc2c47fa4fe6b17"
+  },
+  {
+   "path": "field/manifest_binding_r7f3_b502_reviewed.json",
+   "bytes": 1141,
+   "sha256": "1ecf54c40014681482f75935f8d61a8b95aa2946c6ed1aa8149d7221ea493484"
+  }
+ ],
+ "a_review_originals_archived": [
+  {
+   "path": "a_review_R7F3_A_GO_B502_Startup_Print.md",
+   "bytes": 5193,
+   "sha256": "5a3f510f105023c809821fa96fc650018aa7ce553bca701dfa5e1d7b663bd9d4"
+  },
+  {
+   "path": "a_review_r7f3/IDENTITY.json",
+   "bytes": 2210,
+   "sha256": "3921e16d8fa546d663b4f32c2d92e0e4f1bb21d2cdf3b8610b6729d2b04d90f6"
+  },
+  {
+   "path": "a_review_r7f3/SHA256SUMS.txt",
+   "bytes": 1117,
+   "sha256": "6908472a0dea1c7b2db421baf76e59f9e4ea784aaa4b45076a46d43b96e3335f"
+  },
+  {
+   "path": "a_review_r7f3/review_result.json",
+   "bytes": 4969,
+   "sha256": "427c00c69eb54fbd166154c8c0703ff8e1b15de6f12f9db6ca76dd99797db330"
+  },
+  {
+   "path": "a_review_r7f3/full_stub_dispatch_ledger.jsonl",
+   "bytes": 2559,
+   "sha256": "37c18065f659b6c4d437e53753445b4d6c48765a23dff6322d060debbe9fb90e"
+  },
+  {
+   "path": "a_review_r7f3/irq_source_extract.c",
+   "bytes": 3556,
+   "sha256": "1198e3c0fd5b9a2667fac22e75faeac43de78c2056640fa16eff549d237ae070"
+  },
+  {
+   "path": "a_review_r7f3/irq_source_extract.calls.txt",
+   "bytes": 254,
+   "sha256": "5a641e7f3cfccda18159af203f6e9d8cfcf2c47ea1ce83d1229a4a0d325ab177"
+  },
+  {
+   "path": "a_review_r7f3/validate_plan.txt",
+   "bytes": 2610,
+   "sha256": "cc6144a37f13e06b6f04ab216fc65285cbe227a0ed15f15c05dc9614ed449d94"
+  }
+ ],
+ "gap_from_previous_round_now_closed": {
+  "GF3_safety_irq_status_rows": "A 用实际 C 函数提取件(irq_source_extract.c)生成了 source_shape 行与判据; ENN 说明行在正常已解析输入下 124 B(含源 LF)可完整输出, A 也明说这不是全仓都在 120 B 内",
+  "replaced_my_minimal_placeholder": true,
+  "still": "仍是 source_shape, 不是板级证据"
+ },
+ "errata_accepted_by_a": [
+  "GF1 MinGW 4.9.2 旧 host_before.c 可移植性(需 -D__USE_MINGW_ANSI_STDIO=1), 不是产品缺陷, 本包不要求重跑",
+  "GF5 149 B 正文 + LF = 150 B"
+ ],
+ "still_registered_not_fixed": {
+  "GF4": "新镜像内其余 35 条 >127 B 带标签格式串保持缺陷登记; A 的口径: 本次限定路径已检查, 不为清空全仓清单推迟这枚候选, 进入下一阶段前优先处理该阶段会执行及其故障收口涉及的长打印, 不声称全仓打印通过"
+ },
+ "fixed_scope_after_approval": {
+  "approval_id": "M8R7F3-b502-startup-print-20261104",
+  "limits": {
+   "download(指定 AXF)": 1,
+   "readback(0x08000000 定长 292708 B, 与指定 BIN 逐字节比较)": 1,
+   "explicit_reset": 1,
+   "COM5 开口(一个连续会话)": 1,
+   "tmc_config_apply/其他写入/arm/start/运动/学习/零点/保存/开 IRQ/极性确认/清日志/重试/额外复位": 0
+  },
+  "session_order": "开口后复位一次 -> 完整被动采集 75 s -> ps -> free -> system_status -> safety_status -> motor_status -> safety_irq_status",
+  "on_failure": "失败即停, 保留首错并关闭端口, 不为补采后续命令再开口",
+  "human_precheck_by_operator": "执行前现场人员核对 VM 当前供电仍在、装配及接线未发生未说明的变化(沿用已有确认, 不再等 A 盖另一轮章)",
+  "must_obtain": [
+   "新镜像逐字节在板",
+   "启动 READY/fault=0",
+   "main 栈 4096",
+   "实际堆统计",
+   "safety_status 的 ENN 两条完整短行",
+   "motor_status 静止/未武装/当前禁能合同",
+   "safety_irq_status 两条 LIMIT 短行与默认关闭状态"
+  ],
+  "passive_boot_gate_note": "命令响应走严格危险文本/NUL/UTF-8 门; 被动启动流在执行器里**只有危险文本门**, 所以现场结束后必须独立检查其 NUL、严格 UTF-8 与完整行尾 —— 不能凭 DISPATCH_SUMMARY OK 宣布打印验收通过",
+  "allowed_not_motion": "本场允许 READY 且 protect_ready=NO; 这不构成可运动结论。SG/ADC/IMU 保护、正常 disarm 收口、真实带载最坏栈、CONFIGURED 短打印仍不在本场范围"
+ },
+ "device_actions_this_round": {
+  "download": 0,
+  "readback": 0,
+  "explicit_reset": 0,
+  "port_open": 0,
+  "apply": 0,
+  "config_save": 0,
+  "arm_or_start_or_learn_or_zero": 0,
+  "dmm_readings": 0,
+  "retry": 0,
+  "note": "本轮全部离线; 未创建批准身份, 未 dispatch 真实设备"
+ },
+ "stop_point": {
+  "state": "STOPPED_AT_OPERATOR_APPROVAL_GATE",
+  "why": "A 的 README 第 4 行自己写明这是技术签收, 不是硬件批准; 现场安全门只能由操作者本人回答",
+  "what_is_needed_now": "操作者对这枚固定包的一次明确批准(逐字同意范围/上限/会话顺序即可执行); A 已规定批准后我直接按包内相对路径落位的三份件 + IDENTITY 身份, 用这次新批准在既有持久账登记并 dispatch 一次, 不再要求第二轮准备件, 也不重复向操作者确认同一范围",
+  "if_scope_or_bytes_change": "包中字节或范围要改, 就不再是本次批准对象(需重新签)"
+ }
+}

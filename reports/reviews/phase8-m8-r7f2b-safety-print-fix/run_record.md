@@ -124,3 +124,28 @@ BIN 比 b424 多 **24 B** = 第二段格式串成为独立常量(自带终止 NU
 - **未证**:新镜像在板上(0 次下载)、新镜像的 safety_status 真流不再截断(需下一场同一会话的原始字节)、
   SG/ADC/IMU 相对保护、正常 disarm 收口 —— 全部 NOT_RUN。
 - 本轮**不**等于任何现场验收。
+
+## 8 R7F3 登记(A 技术签收 b502 定发包,设备动作仍为 0)
+
+A 复审 `NS800_R7F3_A_GO_B502_Startup_Print_20261104.zip`(41287 B,`1699735a…747a`,技术复审基线 `99414c7`)
+把本镜像的现场范围定稿,并**直接修好了我派生件的两处 S0 阻断**(记为 GF7):S0 适配件的 `targets[].images` 键
+必须是实际归档文件名(我写成了 build_manifest 的字典键 `bin/axf/map/callgraph`),四个提交字段必须是仓库里真实存在的提交
+(我上一轮把值留成 `null`)。两处都在**未改动的执行器**上复现:草稿计划 STOP 于 `S0_IMAGE_NOT_IN_MANIFEST`,
+只修键名的仓外探针接着 STOP 于 `S0_COMMIT_NOT_IN_REPO`;原文进 `offline/`。
+
+本机独立复算与 A 逐项一致:bin/axf/map 三方(A `IDENTITY.json` / `build_manifest.json` / 磁盘)同值;
+AXF 的唯一 PT_LOAD `p_paddr=0x08000000 p_filesz=292708` 与 BIN **逐字节相同**(段 sha256 = `502dca5d…`);
+`safety_gpio.c` == postimage `2055c749…`;main 栈两处配置仍是 4096 且与上一轮登记的编译输入逐字节相同;
+`--validate-plan` 38 项 / fail=1(仍是 GF2 那一项),本机前 38 行与 A 的 `validate_plan.txt` 逐字节相同;
+`--dispatch --transport stub --backend sim`(不带 `--approval-id`)跑通 4 阶段,`quota_used` 四项各 1、
+`actions_attempted=[]`、`APPROVAL_LEDGER|NONE`。执行器仍是 R6C 原件 `33d3f0af…`,未改。
+
+上一轮的 GF3(`safety_irq_status` 无新固件行形预测)由 A 用实际 C 函数提取件关闭(ENN 说明行在正常已解析输入下
+124 B 含源 LF,可完整输出;仍属 source_shape)。GF1/GF5 A 已接受且不要求重跑旧量具;GF4(其余 35 条超长带标签格式串)
+继续保持缺陷登记。原始构建清单未被 A 改动(`059bebe6…` 现算仍在),旧草稿/旧适配件/现场原件一律不回改。
+
+**停点**:A README 第 4 行原文「技术签收通过,等待操作者对本固定包的一次明确批准。此文件本身不是硬件批准」。
+批准后按 A 的规定:用已落位的三份件 + 新批准身份 `M8R7F3-b502-startup-print-20261104` 在既有持久账登记并 dispatch 一次
+(下载 1 / 定长回读 1 = 292708 B / 显式复位 1 / COM5 开口 1,其余全 0,失败即停不重试),不再交准备轮、不重复确认同一范围。
+本轮**没有**创建批准身份、**没有**碰设备;现场安全门不由我代答、转述或自填。
+

@@ -1,0 +1,762 @@
+{
+  "tools": {
+    "provenance": {
+      "why_these_arguments": "逐字取自本机**已经成功**的 P0 记录: reports/reviews/phase8-motor-m7-current-calibration-r2/p0_package.md(命令段) 与 reports/reviews/phase8-motor-m7-p0-board/S1_flash.stderr.txt + S2_readback.stdout.txt(成功原文)。本轮没有为查参数连接或枚举任何设备。",
+      "cli_options_verified_offline": [
+        "python -m pyocd --version => 0.45.1",
+        "python -m pyocd reset --help => -u/--uid, -t/--target, -W/--no-wait, -M/--connect, -m/--method(含 sysresetreq), -c/--core 均存在(原文存 pyocd_reset_help.txt)"
+      ],
+      "uid_handling": "DAP UID 只在 real 分支从既存私有文件读取(48 字符, sha256 前 12 位 d2f530dbd062 已在 M7/P0 记录里登记), 永不打印、永不入库。"
+    },
+    "substitutions": {
+      "@UID_FILE": "既存私有 UID 文件内容(real 后端; 缺 --uid-file => UID_FILE_REQUIRED)",
+      "@RUN_ROOT": "本次 dispatch 的运行根目录(执行器自己的 out)",
+      "@IMAGE_BYTES": "0x%X 形式的镜像长度, 数值 = identity_binding.image.bytes = S0 现场重算并与 manifest 相等的字节数"
+    },
+    "download": {
+      "command": "python -m pyocd flash --pack C:/Keil_v5/ARM/PACK/.Download/NOVOSENSE.NS800RT7XXX.0.5.3.pack -t ns800rt7p65d_dhqfby2 -u @UID_FILE -f 1000000 --no-config -Oauto_unlock=false -Ocache.enable_memory=false -Ocache.read_code_from_elf=false -e sector reports/firmware/phase8-m8-r7f2b-safety-print-fix/rt-thread-motor-m1.axf",
+      "argv": [
+        "python",
+        "-m",
+        "pyocd",
+        "flash",
+        "--pack",
+        "C:/Keil_v5/ARM/PACK/.Download/NOVOSENSE.NS800RT7XXX.0.5.3.pack",
+        "-t",
+        "ns800rt7p65d_dhqfby2",
+        "-u",
+        "@UID_FILE",
+        "-f",
+        "1000000",
+        "--no-config",
+        "-Oauto_unlock=false",
+        "-Ocache.enable_memory=false",
+        "-Ocache.read_code_from_elf=false",
+        "-e",
+        "sector",
+        "reports/firmware/phase8-m8-r7f2b-safety-print-fix/rt-thread-motor-m1.axf"
+      ],
+      "image": {
+        "path": "reports/firmware/phase8-m8-r7f2b-safety-print-fix/rt-thread-motor-m1.axf",
+        "bytes": 1775972,
+        "sha256": "fc567635d98a76cfb5bb32c3df27f611061bdc39887c90fce75da44dac8d86f8"
+      },
+      "expect_all": [
+        "Erasing... [loader]",
+        "Programming... [loader]"
+      ],
+      "expect_counts": {
+        "Erased [0-9]+ bytes \\([0-9]+ sectors\\), programmed [0-9]+ bytes \\([0-9]+ pages\\)": 1
+      },
+      "expectation_basis": "P0 的 S1_flash.stderr.txt 里这三行是 loader 的成功原文(第 1/2 行 + 末行的 Erased/programmed 摘要); 只 rc=0 不算通过。",
+      "no_retry": "额度 1, 失败不重试: 第二次下载是**新的批准范围**。",
+      "payload_note": "Only the R7F2B AXF fc567635, paired byte-for-byte with the 292708 BIN 502dca5d. 旧 ea4f8dd1/b4243886 身份不得套到本镜像。"
+    },
+    "readback": {
+      "command": "python -m pyocd commander --no-config -t cortex_m -u @UID_FILE -f 1000000 -O auto_unlock=false -O connect_mode=halt -O resume_on_disconnect=false -O cache.enable_memory=false -O cache.read_code_from_elf=false -O scan_all_aps=false -c status -c \"savemem 0x08000000 @IMAGE_BYTES @RUN_ROOT/readback.bin\" -c status -c exit",
+      "argv": [
+        "python",
+        "-m",
+        "pyocd",
+        "commander",
+        "--no-config",
+        "-t",
+        "cortex_m",
+        "-u",
+        "@UID_FILE",
+        "-f",
+        "1000000",
+        "-O",
+        "auto_unlock=false",
+        "-O",
+        "connect_mode=halt",
+        "-O",
+        "resume_on_disconnect=false",
+        "-O",
+        "cache.enable_memory=false",
+        "-O",
+        "cache.read_code_from_elf=false",
+        "-O",
+        "scan_all_aps=false",
+        "-c",
+        "status",
+        "-c",
+        "savemem 0x08000000 @IMAGE_BYTES @RUN_ROOT/readback.bin",
+        "-c",
+        "status",
+        "-c",
+        "exit"
+      ],
+      "out_file": "readback.bin",
+      "start_address": "0x08000000",
+      "length_rule": "长度 = 本轮候选 BIN 的字节数(由 @IMAGE_BYTES 机械展开, 与 S0 重算值绑定); 不是任意窗口",
+      "image": {
+        "path": "reports/firmware/phase8-m8-r7f2b-safety-print-fix/rt-thread-motor-m1-candidate.bin",
+        "bytes": 292708,
+        "sha256": "502dca5d8c7ebfa794f890a9c03bc258fc9753f57b6a80c2f1e08add69888a7a"
+      },
+      "expect_all": [
+        "Saved "
+      ],
+      "expect_counts": {
+        "Core 0 \\(None\\):  Halted": 2
+      },
+      "expectation_basis": "P0 的 S2_readback.stdout.txt 就是 'Core 0 (None):  Halted' 两条夹一条 'Saved <n> bytes to <path>'; 交付物判据是那个文件的字节数/散列/与镜像逐字节相等(READBACK_BYTE_COUNT / READBACK_HASH_MISMATCH / READBACK_NOT_BYTE_EQUAL_TO_IMAGE), stdout 里的工具文字不参与字节比较。",
+      "no_retry": "额度 1; 第二次回读属于**新的批准范围**。",
+      "length_note": "Exactly 292708 bytes, equal to the R7F2B BIN; no retry."
+    },
+    "reset": {
+      "command": "python -m pyocd reset --method sysresetreq --no-config --no-wait --connect attach --core 0 -t cortex_m -u @UID_FILE",
+      "argv": [
+        "python",
+        "-m",
+        "pyocd",
+        "reset",
+        "--method",
+        "sysresetreq",
+        "--no-config",
+        "--no-wait",
+        "--connect",
+        "attach",
+        "--core",
+        "0",
+        "-t",
+        "cortex_m",
+        "-u",
+        "@UID_FILE"
+      ],
+      "expect_all": [],
+      "expect_counts": {},
+      "expectation_basis": "This action records rc=0 and raw tool output. Actual startup is checked by the passive boot capture, ps/free, and system_status READY/fault0 predicates; no apply or forced recovery is included.",
+      "note": "工具内部定位该 UID 的行为不冒称零内部枚举。"
+    }
+  },
+  "observation_bounds": {
+    "boot_window_seconds_min": 75,
+    "why": "这是**观测下界**, 不是对板子的断言: 从复位/开口到第一条查询之间, 主机至少要有这么长时间在听, 才有资格说它观察过启动。低于它而拿不到字节, 结论只能是'没观察到'",
+    "boot_window_provenance": [
+      "经验上拿满: reports/reviews/phase8-m8-diag-stack-r1/field/cont-20261101T090512Z/RESULT.json 的 boot_window_s=75 拿到 3439 B 完整启动(READY)+四条查询全部回答",
+      "源码层耗时: 1 MiB 事件日志扫描按 NSF_SPI_HZ=1000000u 估 >=8.5 s, 且该文自陈是吞吐估算不是界限: reports/reviews/phase8-m8-relative-protection-r3/host/m8diag_source_audit.txt §3",
+      "反例(本包要修的正是这个): reports/reviews/phase8-m8-idle-stack-r4/field/field-20261101T142722Z 的窗只有 2.0 s(被动)+ 9.0 s(首查询), 断在扫描行之后, 实测 MISSING_RESPONSE_PROMPT as=sysboot bytes=0"
+    ],
+    "applies_to": "每个含复位步的 serial_session + 每个标 first_query_is_boot_probe 的 serial_session",
+    "enforced_by": "m8r3_serial_chain.validate_plan() 的 PLAN_BOOT_WINDOW_COVER(离线, 不开端口)",
+    "executor_side_fix": "申报的 boot_drain_seconds 现在真的走满(旧实现被未申报的静默早退剪短)",
+    "not_a_claim": "本下界不证明板子在 75 s 内一定应答; 仍然 0 字节就是具名停止 + 人工断电重启门"
+  },
+  "motion_budget": {
+    "starts": 0,
+    "seconds_total": 0,
+    "per_stage_cap": "无(本包没有任何起转步骤)",
+    "registered_checker_gap": "A已核实：PLAN_MOTION_CAP_BUDGET要求caps非空，对本固定无motor_arm/motor_start且运动/学习/清理额度全0的候选判N/A。其余计划检查必须通过；不得给无运动包填假预算。本说明不适用于任何未来含运动/武装动作的计划。执行器字节不改。"
+  },
+  "package": "M8-R7F3-b502-startup-print-REVIEWED",
+  "status": "A_TECHNICALLY_REVIEWED_REQUIRES_NEW_OPERATOR_APPROVAL",
+  "task_id": "M8R7F3-b502-startup-print-20261104",
+  "numbers_are_proposals_not_authorization": true,
+  "rows_file": "rows_r7f3_b502_reviewed.json",
+  "needles_file": "reports/reviews/phase8-m8-idle-stack-r4/field/needles.json",
+  "needles_source_root": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad",
+  "stages": [
+    {
+      "id": "S0",
+      "kind": "offline",
+      "title": "真实文件与来源绑定(镜像/AXF/map/manifest/needles/提交)",
+      "steps": []
+    },
+    {
+      "id": "S1",
+      "kind": "download",
+      "requires": [
+        "S0"
+      ],
+      "title": "One sector download of b502 candidate AXF",
+      "steps": []
+    },
+    {
+      "id": "S2",
+      "kind": "readback",
+      "requires": [
+        "S1"
+      ],
+      "title": "One exact 292708-byte readback compared byte-for-byte with b502 BIN",
+      "steps": []
+    },
+    {
+      "id": "S3",
+      "kind": "serial_session",
+      "requires": [
+        "S2"
+      ],
+      "port": "COM5",
+      "total_deadline_seconds": 180,
+      "reset_after_port_open": true,
+      "halt_after": false,
+      "first_query_is_boot_probe": true,
+      "post_reset_boot": [
+        "msh >"
+      ],
+      "boot_bytes": [
+        "[BOOT] offline fixture only: no device connected",
+        "[MOT] init OK (enable-path-validated=YES, arm gate ACTIVE)",
+        "[MOT] init OK: DRV_ENABLE LOW verified, STEP=api-accepted",
+        "msh >"
+      ],
+      "post_reset_boot_provenance": "r3 现场包与 R5-C 续测包同形状(EXEC 的 PLAN_RESET_BEFORE_FIRST_QUERY 要求 reset 在第一条查询之前且会话申报 post_reset_boot); 被动窗 75 s + 首条查询 10 s 覆盖 observation_bounds.boot_window_seconds_min",
+      "forbidden_commands": [
+        "motor_arm",
+        "motor_start",
+        "diag_profile learn",
+        "diag_profile commit",
+        "config_save",
+        "blackbox_clear",
+        "safety_irq_enable",
+        "safety_polarity_confirm",
+        "motor_dir",
+        "motor_target"
+      ],
+      "title": "One reset, 75-second passive boot capture, read-only ps/free/system_status/safety_status/motor_status/safety_irq_status",
+      "steps": [
+        {
+          "action": "reset",
+          "as": "rst",
+          "quota_name": "explicit_reset",
+          "command": "python -m pyocd reset --method sysresetreq --no-config --no-wait --connect attach --core 0 -t cortex_m -u @UID_FILE",
+          "argv": [
+            "python",
+            "-m",
+            "pyocd",
+            "reset",
+            "--method",
+            "sysresetreq",
+            "--no-config",
+            "--no-wait",
+            "--connect",
+            "attach",
+            "--core",
+            "0",
+            "-t",
+            "cortex_m",
+            "-u",
+            "@UID_FILE"
+          ],
+          "boot_drain_seconds": 75,
+          "boot_drain_note": "被动启动流采集75s并原样归档，不申报静默早退。既有启动流危险文本门保留；原始启动流还需现场后独立核查。命令响应按既有严格字节门判读，不把离线夹具当作实机启动证据。"
+        },
+        {
+          "cmd": "ps",
+          "as": "threads",
+          "seconds": 6,
+          "expect_contains": [
+            "stack size",
+            "main"
+          ],
+          "expect_values": [
+            {
+              "row": "^main\\s+\\d+\\s+\\w+\\s+0x[0-9A-Fa-f]+\\s+0x(?P<size>[0-9A-Fa-f]+)\\s+.+$",
+              "must": {
+                "size": "00001000"
+              }
+            }
+          ],
+          "note": "Read actual main thread stack_size=4096. Max-used is a snapshot/high-water mark, not proof of worst-load margin."
+        },
+        {
+          "cmd": "free",
+          "as": "heap",
+          "seconds": 6,
+          "expect_contains": [
+            "total    :",
+            "used     :",
+            "maximum  :",
+            "available:"
+          ],
+          "note": "Read-only heap snapshot; record real values without a fabricated free-memory threshold."
+        },
+        {
+          "cmd": "system_status",
+          "as": "sysboot",
+          "seconds": 10,
+          "expect_contains": [
+            "=== SYSTEM STATUS ===",
+            "[Boot]   bootstrap-complete=YES",
+            "[Motor] arm gate fail mask="
+          ],
+          "expect_values": [
+            {
+              "row": "^\\[Boot\\]   bootstrap-complete=(?P<bc>\\w+) abort-stage=(?P<ab>\\d+)$",
+              "must": {
+                "bc": "YES",
+                "ab": "0"
+              }
+            },
+            {
+              "row": "^\\[Safety\\] state=(?P<state>\\w+) fault=(?P<fault>\\d+) irq_gate=\\w+ polarity=[\\w-]+ protect_ready=[\\w-]+$",
+              "must": {
+                "state": "READY",
+                "fault": "0"
+              }
+            },
+            {
+              "row": "^\\[Safety\\] request=(?P<req>\\w+) pad=(?P<pad>-?\\d+) expected_ENN=(?P<exp>\\w+) ENN_fb=(?P<fb>\\d+)\\((?P<resolved>\\w+)\\) verdict=(?P<verdict>\\w+)$",
+              "must": {
+                "req": "LOW",
+                "pad": "0",
+                "exp": "HIGH",
+                "fb": "1",
+                "resolved": "resolved",
+                "verdict": "OK"
+              }
+            },
+            {
+              "row": "^\\[Motor\\] state=(?P<state>\\d+) cur=(?P<cur>\\d+) tgt=(?P<tgt>\\d+) armed=(?P<armed>\\d+) drv_en_verified=\\d+ health=(?P<health>\\w+)$",
+              "must": {
+                "state": "0",
+                "cur": "0",
+                "tgt": "0",
+                "armed": "0",
+                "health": "OK"
+              }
+            }
+          ],
+          "status_lines_allow": [
+            "^\\[Motor\\] arm gate fail mask=0x[0-9A-Fa-f]+ \\(arm REFUSED\\)$"
+          ],
+          "status_lines_allow_why": "复用已验证的整行状态披露白名单；只放行本次只读system_status报告的arm gate行，动作命令被拒仍停止。READY/fault0、Motor静止未武装、实时LOW/ENN禁能反馈均为硬断言。"
+        },
+        {
+          "cmd": "safety_status",
+          "as": "safboot",
+          "seconds": 6,
+          "expect_contains": [
+            "[SAFETY] ENN_FEEDBACK(PC.6 = 板上 TMC_ENN)",
+            "[SAFETY] [只读输入, 非急停感测; HIGH=禁能侧, LOW=未施加禁能(不保证转矩)]"
+          ],
+          "note": "Require both complete split lines plus live disable feedback. Strict NUL/UTF8 gates unchanged. New-image evidence comes from raw hardware bytes, not this fixture.",
+          "expect_values": [
+            {
+              "row": "^\\[SAFETY\\] ready=(?P<ready>\\w+) first_err=(?P<err>-?\\d+)$",
+              "must": {
+                "ready": "YES",
+                "err": "0"
+              }
+            },
+            {
+              "row": "^\\[SAFETY\\] ENN_FEEDBACK\\(PC\\.6 = 板上 TMC_ENN\\) raw=(?P<raw>-?\\d+) resolved=(?P<resolved>\\w+)$",
+              "must": {
+                "raw": "1",
+                "resolved": "YES"
+              }
+            },
+            {
+              "row": "^\\[SAFETY\\] request=(?P<req>\\S+) pad=(?P<pad>-?\\d+) expected_FB=(?P<exp>\\w+) FB=(?P<fb>-?\\d+) -> verdict=(?P<v>\\w+)$",
+              "must": {
+                "req": "DISABLE(LOW)",
+                "pad": "0",
+                "exp": "HIGH",
+                "fb": "1",
+                "v": "OK"
+              }
+            }
+          ]
+        },
+        {
+          "cmd": "motor_status",
+          "as": "motboot",
+          "seconds": 6,
+          "expect_contains": [
+            "[MOT] state=",
+            "[MOT] arm_gate_mask=0x18 REFUSED"
+          ],
+          "note": "Read-only query for the next no-motion boot test. Exact 0x18 matches the VM-powered READY/UNCONFIGURED baseline; any changed mask stops for review. Not a ready-for-motion assertion.",
+          "expect_profile": "AT_REST",
+          "status_lines_allow": [
+            "^\\[MOT\\] arm_gate_mask=0x18 REFUSED$"
+          ],
+          "status_lines_allow_why": "Only this known read-only arm-gate disclosure, with unique state=0/armed=0/health=OK and the existing AT_REST live-disable contract. Commands refused remain failures.",
+          "expect_values": [
+            {
+              "row": "^\\[MOT\\] state=(?P<state>\\d+) name=(?P<name>\\w+)$",
+              "must": {
+                "state": "0",
+                "name": "OTHER"
+              }
+            },
+            {
+              "row": "^\\[MOT\\] armed=(?P<armed>\\d+) drv_en_request=(?P<req>-?\\d+) health=(?P<health>\\w+)$",
+              "must": {
+                "armed": "0",
+                "req": "0",
+                "health": "OK"
+              }
+            }
+          ],
+          "_derivation_r7f2b": {
+            "source": "motor_status_step_replacement.json 的 step 段(A 复审附件, 逐字承接)",
+            "source_bytes": 1447,
+            "source_sha256": "1d1c999668de76c024af95d2e3d092b6bdac2ae019b26d37a3b34fbdf97f1a74",
+            "a_verification_reproduced_locally": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/host/motor_step_repro.txt — 用**未改动**的执行器回放: 原步骤对已知 0x18 REFUSED 报 STOP/BUSINESS_FAILED, 本片段报 OK, 7 项突变仍各自具名停止",
+            "not_modified": [
+              "执行器源码",
+              "批准台账",
+              "其他步骤"
+            ]
+          }
+        },
+        {
+          "cmd": "safety_irq_status",
+          "as": "irqboot",
+          "seconds": 6,
+          "expect_contains": [
+            "[SAFETY] LIMIT inputs config = DISABLED_BY_CONFIG (SAFETY_LIMIT_INPUTS_ENABLED)",
+            "[SAFETY] LIMIT OFF => PF.14/PF.15 不解析/不配置/不读/不注册, 也不参与就绪判定"
+          ],
+          "note": "Read-only; assert the known CLOSED/unconfirmed baseline, both R6 LIMIT short lines, and GPIO/thread health. This does not validate the physical protection chain or authorize opening the gate.",
+          "expect_values": [
+            {
+              "row": "^\\[SAFETY\\] irq gate   = (?P<gate>CLOSED) \\(polled only\\)$",
+              "must": {
+                "gate": "CLOSED"
+              }
+            },
+            {
+              "row": "^\\[SAFETY\\] polarity   = (?P<pol>NOT confirmed) \\(HARDWARE-PENDING unless CONFIRMed\\)$",
+              "must": {
+                "pol": "NOT confirmed"
+              }
+            },
+            {
+              "row": "^\\[SAFETY\\] gpio_ready = (?P<gpio>\\w+)$",
+              "must": {
+                "gpio": "YES"
+              }
+            },
+            {
+              "row": "^\\[SAFETY\\] thread     = (?P<thread>\\w+) health=(?P<health>\\w+)$",
+              "must": {
+                "thread": "running",
+                "health": "OK"
+              }
+            },
+            {
+              "row": "^\\[SAFETY\\] protection_ready = (?P<pr>\\w+)$",
+              "must": {
+                "pr": "NO"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "hardware_actions_this_round": [],
+  "approval": {
+    "status": "REQUIRES_NEW_EXPLICIT_OPERATOR_APPROVAL_FOR_THIS_FIXED_PLAN",
+    "hardware_actions_authorized_by_this_package": 0,
+    "proposed_new_approval_id": "M8R7F3-b502-startup-print-20261104",
+    "prior_approvals": "EXHAUSTED_OR_CLOSED_NOT_CARRIED (含 b424 整包批准与 VM 上电续测那次)",
+    "what_is_needed": "一份针对**本镜像(502dca5d BIN / fc567635 AXF)**的一次性整包批准: 下载 1、定长回读 1(292708 B)、显式复位 1、COM5 开口 1; apply/config_save/运动/学习/零点/阈值/清日志/重试全 0, 失败即停不重试。A 明确: 本包批准数为 0, 不在镜像身份出来前索要批准 => 本件只是草稿, 不创建任何批准身份。",
+    "not_requested_here": "tmc_config_apply/CONFIGURED 短打印验收: A §构建后的一次现场目标 说那是需要在新包里明确加入一次配置写入及其判据的**另一件事**, 不算只读查询, 也不得沿用旧写入额度 => 本草稿不含它。"
+  },
+  "scope_this_package": "Download b502 AXF once, exact 292708-byte readback once, one COM5 session containing one explicit reset, 75 s passive capture and ps/free/system_status/safety_status/motor_status/safety_irq_status. All writes, apply, arm/start, learning, save, recovery, log clear, retries and additional resets zero. Verify READY/fault0 and repaired short prints; no claim of protection readiness.",
+  "byte_integrity_policy": {
+    "command_responses": "Existing strict dangerous-text/NUL/UTF8 gates unchanged.",
+    "passive_boot": "Existing dangerous-text gate only. Raw boot bytes must be separately reviewed for NUL/UTF8 and specific print completeness; generic dispatch success is not full print acceptance."
+  },
+  "plan_identity": {
+    "path": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/plan_r7f3_b502_reviewed.json",
+    "derived_from": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/plan_r7f2b_newimage_draft.json",
+    "rows_file": {
+      "path": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/rows_r7f3_b502_reviewed.json",
+      "bytes": 55694,
+      "sha256": "bbfb4b570257ee7c5cd9e2d96da36cb8b10a989aae4f6fa6cfc2c47fa4fe6b17"
+    }
+  },
+  "quota": {
+    "port_open": 1,
+    "download": 1,
+    "readback": 1,
+    "explicit_reset": 1,
+    "tmc_config_apply": 0,
+    "approved_reboot": 0,
+    "config_save": 0,
+    "irq_polarity_prep": 0,
+    "diag_profile_zero": 0,
+    "diag_profile_learn": 0,
+    "diag_profile_commit": 0,
+    "motor_run": 0,
+    "motor_run_seconds_total": 0,
+    "motion_cap_seconds_per_run": 0,
+    "cleanup_motor_stop": 0,
+    "cleanup_motor_disarm": 0,
+    "cleanup_motor_status": 0,
+    "retry": 0,
+    "physical_collision": 0,
+    "blackbox_clear": 0,
+    "dmm_readings": 0
+  },
+  "identity_binding": {
+    "reviewed_delivery_commit": "99414c7a57d8987033de3de48469a8f4779b87a5",
+    "software_input_commit": "99414c7a57d8987033de3de48469a8f4779b87a5",
+    "tested_image_build_commit": "70deff806e8b548dee23afb06a6fcdf20937b015",
+    "build_time_head_commit": "70deff806e8b548dee23afb06a6fcdf20937b015",
+    "note": "software_input_commit is the delivered source tree whose safety_gpio postimage and unchanged product inputs were verified. Legacy tested_image_build_commit names the ACTUAL HEAD at build time (70deff8); the patch was uncommitted then. It does NOT claim that 70deff8 already contained the patch or that the image has been field-tested. Exact compiled safety_gpio bytes are in the new build manifest; inherited unchanged inputs remain in build_inputs.",
+    "executor": {
+      "path": "reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py",
+      "bytes": 219491,
+      "sha256": "33d3f0af8a4c9c33dcd4e013b395e4ba990a89e384130f9d0ffe50c71b34e8ca",
+      "note": "A §3: 不改执行器。本件用的仍是 R6C 原件(逐字节未动)。"
+    },
+    "image": {
+      "path": "reports/firmware/phase8-m8-r7f2b-safety-print-fix/rt-thread-motor-m1-candidate.bin",
+      "bytes": 292708,
+      "sha256": "502dca5d8c7ebfa794f890a9c03bc258fc9753f57b6a80c2f1e08add69888a7a",
+      "manifest": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/manifest_binding_r7f3_b502_reviewed.json",
+      "manifest_bytes": 1141,
+      "manifest_sha256": "1ecf54c40014681482f75935f8d61a8b95aa2946c6ed1aa8149d7221ea493484",
+      "source_build_manifest": "reports/firmware/phase8-m8-r7f2b-safety-print-fix/build_manifest.json",
+      "source_build_manifest_bytes": 12985,
+      "source_build_manifest_sha256": "059bebe6419f6093636186ffe3f9a8f1dc90c966b1da6e10f01e44d1062b980d",
+      "manifest_target": "rt-thread-motor-m1-candidate",
+      "axf": {
+        "path": "reports/firmware/phase8-m8-r7f2b-safety-print-fix/rt-thread-motor-m1.axf",
+        "bytes": 1775972,
+        "sha256": "fc567635d98a76cfb5bb32c3df27f611061bdc39887c90fce75da44dac8d86f8"
+      },
+      "map": {
+        "path": "reports/firmware/phase8-m8-r7f2b-safety-print-fix/rt-thread-motor-m1.map",
+        "bytes": 2114829,
+        "sha256": "fc33986f3e5928d2724812ebe1be7609230312a38d46d0ca4f87806067c1a0db"
+      }
+    },
+    "board_image_before": {
+      "path": "reports/firmware/phase8-m8-r7f1a-minimal-c-patch/rt-thread-motor-m1-candidate.bin",
+      "bytes": 292684,
+      "sha256": "b4243886818b6b2cf2e30d10864272225e1b0e66c8435c8a50bb449053e153bf",
+      "proven_on_board": "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T161728Z/readback.bin (逐字节回读相等)",
+      "also_observed_running": "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T163850Z/S_S3/01_rst.boot.rx.bin — VM 上电那次只复位+采集, 未再回读, 所以板级**字节**证据仍来自 161728Z",
+      "not_current_power_state": true
+    },
+    "build_inputs": {
+      "manifest": "reports/firmware/phase8-m8-r7f1a-minimal-c-patch/build_manifest.json",
+      "manifest_sha256": "e96e72a8a30ec7995d48a6aa178dfb068aed2d9d857e572a6ae0fdae962cfcd6",
+      "source_inputs": [
+        {
+          "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/rtconfig.h",
+          "compiled_from_disk_bytes": 9304,
+          "compiled_from_disk_sha256": "eeef9d0c0663b087469b94c382a7eb1e643fd8e05053a2724e7ae6b9638419a4",
+          "disk_CR": 454,
+          "disk_LF": 454,
+          "blob": {
+            "blob_sha1": "c934ae63c004addec70818e9965a97f81f3b2073",
+            "blob_bytes": 8850,
+            "blob_sha256": "6fd8625f7094515e4e164035a067769d155ee20c0d1402278daf623c751649c7",
+            "git_hash_object_path_agrees": true
+          },
+          "identity_kind": "blob_after_crlf_filter(disk 多 CR)",
+          "what": "A 复审 §1: RT_MAIN_THREAD_STACK_SIZE 2048 -> 4096(:118)。RT_CONSOLEBUF_SIZE=128 未动。"
+        },
+        {
+          "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/.config",
+          "compiled_from_disk_bytes": 52103,
+          "compiled_from_disk_sha256": "3bfbe3ec36d1b5e5809b9a23a69f9633def365249556aa8bda63866887215fd1",
+          "disk_CR": 1546,
+          "disk_LF": 1546,
+          "blob": {
+            "blob_sha1": "a5b36ed00a9a0747ea48e4b9707dfcf32f5f4b6f",
+            "blob_bytes": 50557,
+            "blob_sha256": "42018d5dc77e81f25227cc99b9a290ef467c97f9b6b8a2917d91b7f51c43ca23",
+            "git_hash_object_path_agrees": true
+          },
+          "identity_kind": "blob_after_crlf_filter(disk 多 CR)",
+          "what": "操作者补充要求(不在 A 补丁内): CONFIG_RT_MAIN_THREAD_STACK_SIZE 2048 -> 4096(.config:194), 与 rtconfig.h 同步, 免得下次 scons/menuconfig 按旧值把 rtconfig.h 生成回 2048。单行替换, CRLF 原样保留, 字节数不变(52103 B); 其余 20 个带值 CONFIG_ 项未动。"
+        },
+        {
+          "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/tmc2209.c",
+          "compiled_from_disk_bytes": 196406,
+          "compiled_from_disk_sha256": "65601326f6fabd60347da542f75aa53c8e4fe795aef3f38be8b61f2a373b8354",
+          "disk_CR": 4080,
+          "disk_LF": 4080,
+          "blob": {
+            "blob_sha1": "a17bfa048374afaf1f2ecf7b615a363fdf4cedef",
+            "blob_bytes": 192326,
+            "blob_sha256": "e76e152e20052391957a2165995c36dc87b13b0ad8c55eaf09e3bf6aca72d20c",
+            "git_hash_object_path_agrees": true
+          },
+          "identity_kind": "blob_after_crlf_filter(disk 多 CR)",
+          "what": "A 复审 §2: tmc_read_reg_obs 的 4 个提前返回(1123 BAD_CONTEXT / 1147 静止门 NO_DEVICE / 1156 懒打开失败 NO_DEVICE / 1182 取锁失败)各补 st->used = rt_tick_get() - b->start; 预算尚未建立就失败的那条(tmc_budget_open 返回假, :1104)不写 used, 不读未初始化起点。不增加等待、不改超时、不改返回码、不吞错误、不引入共享状态。"
+        },
+        {
+          "path": "tests/host/leaf_main.c",
+          "compiled_from_disk_bytes": 184607,
+          "compiled_from_disk_sha256": "d9759281d3852f18678d4f7737974a5ca0c8d564bdaafadfc0ba823aeb1b1e00",
+          "disk_CR": 0,
+          "disk_LF": 3647,
+          "blob": {
+            "blob_sha1": "dd415396ad01570fcecc3a199eb2cb21d7c4c248",
+            "blob_bytes": 184607,
+            "blob_sha256": "d9759281d3852f18678d4f7737974a5ca0c8d564bdaafadfc0ba823aeb1b1e00",
+            "git_hash_object_path_agrees": true
+          },
+          "identity_kind": "disk_equals_blob",
+          "what": "A 复审步骤 1: BTB06 断言 st.used == 本次夹具推进 tick 且 == TMC_BUD_XFER_LOCK_MS(20), 并保留 reason/rc/零字节; 新增 BTB11(静止门)/BTB12(懒打开失败)两条 NO_DEVICE 提前返回的用例身份与耗时同权断言。注释里如实写明\"包装函数 memset 0 再回拷, 所以修前读到的是 0 而不是 0xA5\"。"
+        },
+        {
+          "path": "tests/host/run_stop_priority_s2.sh",
+          "compiled_from_disk_bytes": 55260,
+          "compiled_from_disk_sha256": "bc29911791a35c0b22986411e102cf5e150dde62edac51de6b35bd7750f3412d",
+          "disk_CR": 887,
+          "disk_LF": 887,
+          "blob": {
+            "blob_sha1": "26b138b1febdaf756bf2d86e43b1408cf0a3a3ed",
+            "blob_bytes": 54373,
+            "blob_sha256": "87124287c65380e3033cd07dc99e57197c50b27303f2f75087a2462f0025fae4",
+            "git_hash_object_path_agrees": true
+          },
+          "identity_kind": "blob_after_crlf_filter(disk 多 CR)",
+          "what": "台账: G_tmc_boot_* 追加 BTB11/BTB12; S2_EXPECT_target 68 -> 70, host_ovr 143 -> 145, BTB01..BTB10 的 id 与数量逐字未动。"
+        }
+      ]
+    },
+    "readback_target_is_this_image": true,
+    "identity_handoff_from_previous_round": {
+      "previous_bin": {
+        "path": "reports/firmware/phase8-m8-r7f1a-minimal-c-patch/rt-thread-motor-m1-candidate.bin",
+        "bytes": 292684,
+        "sha256": "b4243886818b6b2cf2e30d10864272225e1b0e66c8435c8a50bb449053e153bf"
+      },
+      "not_reusable_for_new_image": "旧 b424 的批准与剩余额度**不结转**; 本计划的 1/1/1/1 只是提案, 需要操作者对本镜像另批一次。",
+      "source_inputs_still_valid": "rtconfig.h / .config / tmc2209.c 与上一场逐字未动, 其 blob 身份见 reports/firmware/phase8-m8-r7f1a-minimal-c-patch/build_manifest.json; 本轮只叠加 safety_gpio.c 一处(2 增 2 删)。"
+    },
+    "new_compiled_input_manifest": {
+      "path": "reports/firmware/phase8-m8-r7f2b-safety-print-fix/build_manifest.json",
+      "sha256": "059bebe6419f6093636186ffe3f9a8f1dc90c966b1da6e10f01e44d1062b980d",
+      "source_inputs": [
+        {
+          "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/safety_gpio.c",
+          "compiled_from_disk_bytes": 24883,
+          "compiled_from_disk_sha256": "8d097018acab602141a1a36dfe2b29eedeb619fc03e05965681e0919ffeb9aec",
+          "disk_CR": 0,
+          "disk_LF": 611,
+          "blob": {
+            "blob_sha1": "2055c7496be91830709155a9ffb0720a0b0bdb8d",
+            "blob_bytes": 24883,
+            "blob_sha256": "8d097018acab602141a1a36dfe2b29eedeb619fc03e05965681e0919ffeb9aec",
+            "blob_form_matched_by_sha1": "disk",
+            "git_hash_object_path_agrees": true,
+            "blob_equals_disk_bytes": true
+          },
+          "head_blob_before_patch": "b242dfad1fed0c5b5be5869febef6375e2708a8f",
+          "identity_kind": "disk_equals_blob"
+        }
+      ]
+    }
+  },
+  "derived_from": {
+    "plan": {
+      "path": "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/plan_startup_b424_reviewed.json",
+      "bytes": 23218,
+      "sha256": "fa3331862d498bf7aa17966558c535429c4b6696653cb52ea67a3106c0a43d13",
+      "status_in_repo": "A_TECHNICALLY_REVIEWED_REQUIRES_NEW_USER_APPROVAL"
+    },
+    "rows_base": {
+      "path": "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/rows_startup_b424.json",
+      "sha256": "916eddaa172e6f30b9a9e327f21f4b9274cca2bab17201c329b32997d286f746"
+    },
+    "review_attachment": {
+      "zip_sha256": "9fad8f1d1a917bda350047725562279e5a43f971b7a828254443d8fffc04b6e1",
+      "items_applied": [
+        "§1 补丁(已应用到源码并计入构建)",
+        "§2 新 rows(本件)",
+        "§3 motor_status step(本件 S3)",
+        "§4 0x18 REFUSED 而非 0x0 ALL-PASS(本件 rows)",
+        "§5 一次构建(已完成, 见 build_manifest)"
+      ]
+    },
+    "unchanged_from_base": [
+      "tools.* 的 argv 结构(只换镜像路径/长度/散列)",
+      "observation_bounds(被动窗下界 75 s 与其四条来源)",
+      "motion_budget 与 registered_checker_gap(A 已裁定无运动链的包 PLAN_MOTION_CAP_BUDGET 记 N/A)",
+      "S0/S1/S2 的阶段顺序与 requires",
+      "S3 的 port/total_deadline_seconds/reset_after_port_open/first_query_is_boot_probe/post_reset_boot/forbidden_commands",
+      "byte_integrity_policy",
+      "ps/free/system_status 三条步骤逐字未动"
+    ]
+  },
+  "hardware_actions_proposed": {
+    "download": 1,
+    "readback": 1,
+    "explicit_reset": 1,
+    "port_open": 1,
+    "tmc_config_apply": 0,
+    "apply": 0,
+    "config_save": 0,
+    "motor_arm": 0,
+    "motor_start": 0,
+    "motor_run_seconds_total": 0,
+    "diag_profile_learn": 0,
+    "diag_profile_zero": 0,
+    "diag_profile_commit": 0,
+    "retry": 0,
+    "blackbox_clear": 0,
+    "dmm_readings": 0
+  },
+  "working_tree_now": {
+    "reviewed_commit": "99414c7a57d8987033de3de48469a8f4779b87a5",
+    "note": "Agent-authored draft metadata superseded by this review; hardware approval is still absent."
+  },
+  "known_checker_findings": {
+    "expected_offline_validate_result": "38 项 checks, fail=1; 唯一 FAIL 是 PLAN_MOTION_CAP_BUDGET|all|FAIL|caps=[] sum=0 total=0 starts=0",
+    "why_still_red": "该检查要求 caps 非空, 而本包按 A §5 不含任何起转/学习/阈值/保护触发步骤 => 结构性红。A 已在 R7 轮核实并裁定这类零运动链包记 N/A, 不改执行器、不为凑绿塞入动作。",
+    "registration_unchanged": "motion_budget.registered_checker_gap 逐字沿用已复审计划, 未新造豁免。",
+    "transcript": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/validate_plan_offline_draft.txt"
+  },
+  "derivation_edits": [
+    {
+      "path": "package/status/task_id",
+      "why": "派生件不得冒充已复审计划; A 明确说本包硬件动作批准数为 0。"
+    },
+    {
+      "path": "rows_file",
+      "why": "换成新派生 rows(safety_status/motor_status = A 的 source_shape 预测)。"
+    },
+    {
+      "path": "tools.download",
+      "why": "A §5: 旧 b424 身份不套新镜像; 下载件必须是本轮构建出来的 AXF。"
+    },
+    {
+      "path": "tools.readback",
+      "why": "回读长度 = 新 BIN 的字节数(292708, 比 b424 多 24 B), 由 @IMAGE_BYTES 机械展开。"
+    },
+    {
+      "path": "tools.readback.length_rule",
+      "why": "未改: 仍是「长度 = 本轮候选 BIN 字节数」, 不是任意窗口。"
+    },
+    {
+      "path": "identity_binding",
+      "why": "整段重绑到新镜像; board_image_before 改成「已在板上逐字节证过的 b424」。"
+    },
+    {
+      "path": "quota/approval",
+      "why": "额度是提案; 批准数 0 与 A §5 「本包硬件动作批准数为 0」一致。"
+    },
+    {
+      "path": "stages[3].steps[motor_status]",
+      "why": "A §3 的替换片段; 不改执行器。"
+    },
+    {
+      "path": "stages[3].steps[+safety_irq_status]",
+      "why": "A README「构建后的一次现场目标」: 四条输出同会话。判据刻意保持最小, 因为本轮没有它的行形预测。"
+    }
+  ],
+  "derivation_edits_count": 9,
+  "review_fixes": [
+    "Fixed S0 adapter image keys to actual filenames instead of bin/axf/map. Original build manifest unchanged.",
+    "Filled null S0 commit identities with explicit build-time-vs-delivered-source semantics; no fake compiled tree claim.",
+    "Corrected old b424/292684 stage titles.",
+    "safety_status now requires both complete repaired print lines and exact live-disable fields.",
+    "safety_irq_status now has source-derived fixture and baseline hard predicates including both LIMIT short lines.",
+    "Replays unchanged ps/free/system_status against previous real VM-on captures; labels retained as old-image evidence.",
+    "No executor/C/firmware modification or scope/quotas expansion."
+  ]
+}

@@ -1,0 +1,18 @@
+== 1) 四件产物三方对账(A IDENTITY / build_manifest / 磁盘实读) ==
+bin             bytes=292708 A=292708 manifest=292708  sha=502dca5d8c7ebfa7  三方一致
+axf             bytes=1775972 A=1775972 manifest=1775972  sha=fc567635d98a76cf  三方一致
+map             bytes=2114829 A=2114829 manifest=2114829  sha=fc33986f3e5928d2  三方一致
+== 2) AXF 的 Flash 装载段 vs BIN 逐字节 ==
+ELF class=32 PT_LOAD 段数=1
+  p_vaddr=0x8000000 p_paddr=0x8000000 filesz=292708 memsz=379920 -> 与 BIN(292708) 逐字节相同
+  段内 sha256=502dca5d8c7ebfa7 BIN sha256=502dca5d8c7ebfa7
+== 3) 改后源码 == 补丁 postimage ==
+  磁盘 24883 B, git blob sha1=2055c7496be9  manifest.postimage=2055c7496be9  manifest.preimage=b242dfad1fed
+  工作树==postimage: True / A 包 IDENTITY 也声明同值: True
+== 4) main 线程栈仍 4096 ==
+  rtconfig.h   ['#define RT_MAIN_THREAD_STACK_SIZE 4096']
+  .config      ['CONFIG_RT_MAIN_THREAD_STACK_SIZE=4096']
+  与上一轮登记的编译输入逐字节比较 rtconfig.h   相同(未再动) (blob c934ae63c004)
+  与上一轮登记的编译输入逐字节比较 .config      相同(未再动) (blob a5b36ed00a9a)
+== 5) A 的 validate_plan.txt 与本机重跑逐行比对 ==
+  本机行数=39 A 行数=38 前缀相同行数=38 差异行=0
