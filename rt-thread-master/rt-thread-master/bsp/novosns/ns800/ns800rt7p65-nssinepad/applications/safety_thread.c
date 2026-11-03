@@ -367,9 +367,14 @@ static void st_print_inputs(void)
                        rt_pin_read(pin) == st_inputs[i].safe_level ? "[safe]" : "[!!ACTIVE!!]");
     }
 
-    rt_kprintf("[SAFETY] LIMIT inputs config = %s (SAFETY_LIMIT_INPUTS_ENABLED;"
-               " OFF => PF.14/PF.15 不解析/不配置/不读/不注册, 也不参与就绪判定)\n",
+    /* R6(2026-11-03 任务书 §7.3): 这一条在板上实测 **250 B**, 超过 rt_kprintf 的
+     * 控制台缓冲上限(kservice.c:411 静默裁到 RT_CONSOLEBUF_SIZE-1=127 B), 尾部整段丢失,
+     * 而现场那两条含裸 NUL 的响应(06_pol 915 B 偏移 317 / 08_irqafter 568 B 偏移 430)
+     * 正是走过这条输出的会话。改成两条各自 ≤120 B 的短行: 语义一字未减, 只是分行。 */
+    rt_kprintf("[SAFETY] LIMIT inputs config = %s (SAFETY_LIMIT_INPUTS_ENABLED)\n",
                safety_limit_inputs_enabled() ? "ENABLED" : "DISABLED_BY_CONFIG");
+    rt_kprintf("[SAFETY] LIMIT OFF => PF.14/PF.15 不解析/不配置/不读/不注册,"
+               " 也不参与就绪判定\n");
     {
         rt_base_t fb = safety_pin(PIN_NAME_ENN_FEEDBACK);
 

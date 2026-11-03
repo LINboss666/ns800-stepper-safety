@@ -64,7 +64,7 @@ GROUP_TIMEOUT="${S2_GROUP_TIMEOUT:-60}"
 # URO(2026-10-27 §6.1): read_obs 也跑**同一个叶子二进制**, 但它是只读通信观测, 不取
 #   写入门禁 => 在 target 与 host_ovr **两个变体都真执行**(不许整族 SKIP, 也不许为了
 #   跑本组在 target 里偷偷开宏)。旧四组的 target 整族 SKIP 保持原样、身份不变。
-S2_GROUPS="lock isr isr_window off_matrix off_arm unknown identity diag recovery stale boundary healthy target_reject epwm_leaf tmc_lock uart_leaf budget_leaf read_obs cal_static"
+S2_GROUPS="lock isr isr_window off_matrix off_arm unknown identity diag recovery stale boundary healthy target_reject epwm_leaf tmc_lock uart_leaf budget_leaf read_obs cal_static disarm_ready"
 LEAF_GROUPS=" epwm_leaf tmc_lock uart_leaf budget_leaf read_obs "
 
 # 每组每变体**必需**(必须真执行且判 PASS)的用例 id; 名称与夹具里的 CASE id 逐字一致。
@@ -170,6 +170,15 @@ G_cal_static_host_ovr="C22a-idle-grant-works C22b-cal-tx-blocks-diag-reservation
 S_cal_static_target="C22"
 S_cal_static_host_ovr=""
 
+# C23* = R6(2026-11-03 任务书 §7.2): 一次**成功的 disarm** 必须把 Safety 从 RUN 收口到 READY
+#   (现场 153923Z: Motor state=0/armed=0 但 [Safety] 仍 RUN => arm 门 0x2 永久拒绝)。
+#   前提是"真的能 arm/start 进 RUN" => target 变体(四宏 FALSE)整族按声明 SKIP, host_ovr 真执行 10 条:
+#   正例 4(C23a/a2/b/c) + 反例 6(C23d/e/f/g/h/h2: 关断失败、许可未确认、旧代晚到、故障锁存、取锁失败)。
+G_disarm_ready_target=""
+G_disarm_ready_host_ovr="C23a-disarm-from-run-commits-ready C23a2-rearm-allowed-after-run-disarm C23b-disarm-before-zero-commits-ready C23c-normal-zero-then-disarm-keeps-ready C23d-off-fail-no-ready-no-latch-clear C23e-permit-low-unconfirmed-no-ready C23f-stale-disarm-cannot-ready-new-run C23g-latched-fault-disarm-no-ready C23h-ss-lock-error-abandons-commit C23h2-retry-after-lock-ok-commits-ready"
+S_disarm_ready_target="C23"
+S_disarm_ready_host_ovr=""
+
 # 变体期望的用例总数(全开时): 少一组/少一个 id 都不算通过。
 # CP5 §4: recovery 组的 C14 拆成 C14a/C14b 两个**确定接缝** => 22->23 / 40->41。
 # CP5 §5: target 的叶子四组贡献 0 个 CASE(整族 SKIP) => 23 不变;
@@ -179,8 +188,10 @@ S_cal_static_host_ovr=""
 # URO §6.1: read_obs 在两个变体都真执行 24 条 => target 23+24=47, host_ovr 79+24=103。
 # URO-R1 §7: 同组再加 6 条导出侧用例 => target 47+6=53, host_ovr 103+6=109。
 # 旧的 23/79 与 URO 的 24 条合同没被改动(各组身份与数量逐字保留), 新用例**另计**。
+# R6(2026-11-03 §7.2): disarm_ready 组在 host_ovr 真执行 10 条(正例 4 + 反例 6), target 整族 SKIP
+#   => target 53 不变, host_ovr 118 + 10 = 128。
 S2_EXPECT_target="${S2_EXPECT_target:-53}"
-S2_EXPECT_host_ovr="${S2_EXPECT_host_ovr:-118}"
+S2_EXPECT_host_ovr="${S2_EXPECT_host_ovr:-128}"
 
 VARIANTS="target host_ovr"
 

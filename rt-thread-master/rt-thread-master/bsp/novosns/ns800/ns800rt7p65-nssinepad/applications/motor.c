@@ -1803,12 +1803,33 @@ void motor_fault_fields_held(void)
 static rt_bool_t mot_commit_gated(const sp_proof_t *pf, rt_bool_t need_pending,
                                   rt_uint8_t state_after)
 {
-    rt_base_t l;
-    rt_bool_t ok = RT_FALSE;
+    rt_base_t   l;
+    rt_bool_t   ok = RT_FALSE;
+    rt_bool_t   ss_held = RT_FALSE;
+    rt_bool_t   withheld = RT_FALSE;
+    sp_snapshot_t view;
+    /* R6(2026-11-03 任务书 §7.2): 只有"正常关闭"这一支(MOTOR_IDLE, 唯一调用点是
+     * motor_disarm 成功路径)需要把 Safety 一起收口; 故障/TRIP/回滚仍只落 mot.*。 */
+    rt_bool_t   close_clean = (state_after == (rt_uint8_t)MOTOR_IDLE) ? RT_TRUE : RT_FALSE;
 
+    rt_memset(&view, 0, sizeof(view));
     if (pf == RT_NULL || !pf->valid) return RT_FALSE;
+    /* 正常关闭 = mot 影子 + Safety RUN->READY 的**同一笔**提交, 所以按既有锁序
+     * ss_lock -> mot_lock -> 一个短窗口(与 mot_commit_zero_ready / mot_commit_run_start
+     * 同一条, 不引入从 mot 等 ss 的反序)。取不到 ss_lock 就整笔放弃: 宁可不收口,
+     * 也不写半笔(现场缺陷的形状正是"motor 落了 IDLE, 状态机留在 RUN")。 */
+    if (close_clean)
+    {
+        if (safety_lock_take_checked() != RT_EOK)
+        {
+            rt_kprintf("[MOT] 关闭落位**未提交**: 取不到 ss_lock - 不写 mot 影子, 也不动状态机\n");
+            return RT_FALSE;
+        }
+        ss_held = RT_TRUE;
+    }
     if (motor_lock_take_checked() != RT_EOK)
     {
+        if (ss_held) safety_lock_give_checked();
         rt_kprintf("[MOT] 慢整理**未提交**: 取不到 mot_lock(互斥量不可用) -"
                    " 不做无锁写, 也不 ack\n");
         return RT_FALSE;
@@ -1817,16 +1838,53 @@ static rt_bool_t mot_commit_gated(const sp_proof_t *pf, rt_bool_t need_pending,
     if (need_pending ? sp_reconcile_gate_held(pf->epoch)
                     : sp_op_current_held(pf->epoch))
     {
-        motor_shadow_from_proof_held(pf);
-        mot_res_clear();
-        mot.armed      = 0;
-        mot.current_hz = 0;
-        mot.target_hz  = 0;
-        mot.state      = state_after;
-        ok = RT_TRUE;
+        sp_snapshot_t c;
+        rt_bool_t     ready_ok = RT_FALSE;
+
+        /* "关断确认成功"的完整证据 = 本次这一代的 STEP 关断被接受 **且** 禁能侧回读
+         * 确认到 LOW(证据全部绑 epoch)。inhibit/锁存/换代任一在 => 不授予恢复资格。 */
+        sp_peek_held(&c);
+        view = c;
+        if (close_clean)
+            ready_ok = (c.pwm.result == MOT_STOP_API_ACCEPTED &&
+                        c.pwm.epoch == pf->epoch &&
+                        c.permit.confirmed == RT_TRUE &&
+                        c.permit.confirmed_level == 0u &&
+                        c.permit.confirm_epoch == pf->epoch &&
+                        c.inhibit == RT_FALSE && c.exhausted == RT_FALSE &&
+                        c.motor_stop_latched == RT_FALSE) ? RT_TRUE : RT_FALSE;
+        withheld = (close_clean && !ready_ok) ? RT_TRUE : RT_FALSE;
+
+        if (!close_clean || !ready_ok ||
+            safety_transition_held(pf->epoch, SAFETY_READY) == RT_EOK)
+        {
+            motor_shadow_from_proof_held(pf);
+            mot_res_clear();
+            mot.armed      = 0;
+            mot.current_hz = 0;
+            mot.target_hz  = 0;
+            mot.state      = state_after;
+            /* R6 §7.2 末段: 禁能侧**写+回读确认成功**属于本代事实, 就把影子电平同步到 LOW,
+             * 使 motor_status 的 drv_en_request 与同次 "pad=0/ENN OK" 一致(现场那条
+             * drv_en_request=1 与 pad=0 并存会被误读成"没禁能")。ready_ok 为假时**不动**
+             * 该影子: 它的语义始终是"最近一次写+回读确认成功的电平", 未确认就不是 LOW。 */
+            if (ready_ok) mot.drv_en_request = 0u;
+            ok = RT_TRUE;
+        }
     }
     sp_win_end(l);
     motor_lock_give_checked();
+    if (ss_held) safety_lock_give_checked();
+    /* 窗口外才打印(短窗口内禁止打印/延时/K5 同一条纪律)。 */
+    if (withheld)
+        rt_kprintf("[MOT] 关闭已落位, 但**未授予恢复资格**: 本代禁能侧回读/抑制/锁存证据不足"
+                   " (epoch=%u permit=%s level=%u@%u inhibit=%s latched=%s)"
+                   " - Safety 保持原状态, 需 fault_reset 人工复核\n",
+                   (unsigned)pf->epoch, view.permit.confirmed ? "YES" : "no",
+                   (unsigned)view.permit.confirmed_level,
+                   (unsigned)view.permit.confirm_epoch,
+                   view.inhibit ? "YES" : "no",
+                   view.motor_stop_latched ? "YES" : "no");
     if (!ok)
         rt_kprintf("[MOT] 慢整理**整笔放弃**: 本次 proof 那一代已被更新的一代取代"
                    " (epoch=%u) - 不写新影子, 不动新预约/新 pending\n",

@@ -2822,25 +2822,36 @@ static rt_err_t tmc_cfg_apply_ctx(tmc_cfg_ctx_t *ctx, const tmc_drv_config_t *c)
         {
             ret = tmc_cfg_fail_ctx(ctx, &op, 0, -RT_EPERM, "apply-stale-success",
                                    RT_FALSE, b);
-            rt_kprintf("[TMC-CFG] !! 晚到的 apply 成功被拒绝提交"
-                       " (inv_gen %u -> %u, op_epoch=%u / 现在=%u, 剩余预算=%u tick)"
-                       " - 旧成功不刷新健康\n",
-                       inv0, tmc_cfg_view_inv_gen(ctx),
+            /* R6 §7.3 同一条尺: 这条原来一次调用最宽 186 B(>127 B 裁剪线), 同属本次
+             * apply 路径, 一并拆短; 字段与语义不变。 */
+            rt_kprintf("[TMC-CFG] !! 晚到的 apply 成功被拒绝提交 (inv_gen %u -> %u)\n",
+                       inv0, tmc_cfg_view_inv_gen(ctx));
+            rt_kprintf("[TMC-CFG] op_epoch=%u / 现在=%u, 剩余预算=%u tick\n",
                        (unsigned)(ctx == &tmc_cfg_prod ? op.epoch : 0u),
                        (unsigned)sp_epoch(), (unsigned)tmc_remaining(b));
+            rt_kprintf("[TMC-CFG] 旧成功不刷新健康\n");
             goto out;
         }
     }
-    rt_kprintf("[TMC-CFG] CONFIGURED (各次写入均经 IFCNT 确认; GCONF/CHOPCONF"
-               " 读回一致)。电流值仍为理论计算, 未实测。"
-               " [本次预算: 已用 %u tick / 总 %u tick, flush=%uB, TX=%uB;"
-               " irun=%u ihold=%u dly=%u tpd=%u vsense=%u GCONF %08X->%08X"
-               " CHOPCONF %08X->%08X op_epoch=%u]\n",
-               (unsigned)(rt_tick_get() - b->start), (unsigned)b->total,
-               (unsigned)st.flush_bytes, (unsigned)st.tx_written,
+    /* R6(2026-11-03 任务书 §7.3): 这一条在板上实测 **132 B**(同一会话 04_cfgapply 的
+     * 响应在偏移 152 处出现裸 NUL), 已越过控制台 127 B 裁剪线 —— 拆成多条短行。
+     * 拆分口径不是"在长调用里多插换行", 而是**每个 rt_kprintf 调用**按
+     * "UTF-8 字节 + 数字最宽展开(%u=4294967295, %08X=8) + 换行"逐一复算都 ≤120 B,
+     * 依据与元负控见 reports/reviews/phase8-m8-r6-offline-recovery/host/line_width_check.py。
+     * 字段一个没删: 结论 / 电流口径 / 预算 / 参数 / 寄存器读回。 */
+    rt_kprintf("[TMC-CFG] CONFIGURED (各次写入均经 IFCNT 确认)\n");
+    rt_kprintf("[TMC-CFG] GCONF/CHOPCONF 读回一致\n");
+    rt_kprintf("[TMC-CFG] 电流值仍为理论计算, 未实测\n");
+    rt_kprintf("[TMC-CFG] 预算: 已用 %u / 总 %u tick\n",
+               (unsigned)(rt_tick_get() - b->start), (unsigned)b->total);
+    rt_kprintf("[TMC-CFG] flush=%uB TX=%uB\n",
+               (unsigned)st.flush_bytes, (unsigned)st.tx_written);
+    rt_kprintf("[TMC-CFG] irun=%u ihold=%u dly=%u tpd=%u vsense=%u\n",
                (unsigned)c->irun, (unsigned)c->ihold, (unsigned)c->ihold_delay,
-               (unsigned)c->tpowerdown, (unsigned)c->vsense,
-               (unsigned)gconf, (unsigned)new_g, (unsigned)chop, (unsigned)new_c,
+               (unsigned)c->tpowerdown, (unsigned)c->vsense);
+    rt_kprintf("[TMC-CFG] GCONF %08X->%08X CHOPCONF %08X->%08X\n",
+               (unsigned)gconf, (unsigned)new_g, (unsigned)chop, (unsigned)new_c);
+    rt_kprintf("[TMC-CFG] op_epoch=%u\n",
                (unsigned)(ctx == &tmc_cfg_prod ? op.epoch : 0u));
     ret = RT_EOK;
 

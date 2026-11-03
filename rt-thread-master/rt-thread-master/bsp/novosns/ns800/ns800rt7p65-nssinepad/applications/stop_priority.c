@@ -604,6 +604,23 @@ void sp_peek_held(sp_snapshot_t *out)
     out->pending_epoch          = sp.pending_epoch;
     out->first_fault_code       = sp.first_fault_code;
     out->reason_events          = sp.reason_events;
+    /* R6(2026-11-03): 这份复制原先**止于 reason_events** —— pwm / diag_pwm / permit /
+     * last_trip_epoch / 四个计数 / 两个 first_*_unrecovered 都没抄, 于是窗口内按
+     * "完整快照"读 c.pwm.epoch 或 c.permit.confirm_epoch 的调用方拿到的是**未初始化栈值**
+     * (本机实测读到过 6617296 这种指针对). 现有读者只用了标量位, 所以一直没暴露。
+     * 这里补齐成与 sp_get() 同一组字段, 不改任何既有读者的行为。 */
+    out->trips                  = sp.trips;
+    out->merged                 = sp.merged;
+    out->stale_dropped          = sp.stale_dropped;
+    out->advance_failed         = sp.advance_failed;
+    out->pwm                    = sp.pwm;
+    out->diag_pwm               = sp.diag_pwm;
+    out->last_trip_epoch        = sp.last_trip_epoch;
+    out->permit                 = sp.permit;
+    out->first_unrecovered      = sp.first_unrecovered;
+    out->first_unrecovered_valid = sp.first_unrecovered_valid;
+    out->first_permit_unrecovered = sp.first_permit_unrecovered;
+    out->first_permit_valid     = sp.first_permit_valid;
 }
 
 rt_bool_t sp_owner_is(sp_owner_t o)

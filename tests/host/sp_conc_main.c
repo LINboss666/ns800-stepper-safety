@@ -2295,6 +2295,214 @@ static void cases_healthy(void)
     (void)motor_disarm();
 }
 
+/* =====================================================================
+ * R6(2026-11-03 任务书 §7.2): 一次**成功的 disarm** 必须把 Safety 从 RUN 收口到 READY。
+ * 现场证据(reports/reviews/phase8-m8-idle-stack-r4/field/field-20261101T153923Z/
+ * S_S3/01_sysboot.rx.bin): 同一份回包里同时有
+ *   [Safety] state=RUN ... protect_ready=YES   /   [Motor] state=0 armed=0
+ *   [Motor] arm gate fail mask=0x2 (arm REFUSED)
+ * => 停机与禁能都做了, 状态机却留在 RUN, 于是 MOT_GATE_NOT_READY 永久拒绝 arm,
+ *    现场只能靠人工断电恢复。源码侧可达缺口: mot_commit_gated()(motor.c:1803)
+ *    只写 mot.*, 从不写 ss_state; 而 ramp 在 mot.state==IDLE 时提前 return
+ *    (motor.c:786-792), 未 armed 分支也明确不改 Safety。
+ * 下面全部走真实 motor_arm/motor_start/motor_stop/motor_disarm/motor_ramp_tick,
+ * 不另写简化状态机。C23a..C23c 是"该收口"的正例(修前判 FAIL),
+ * C23d..C23h 是"不许乱收口"的反例(修前修后都必须 PASS, 防止把门改成无条件 READY)。
+ * ===================================================================== */
+static int dr_run(void)
+{
+    sp_snapshot_t s;
+    motor_snapshot_t m;
+
+    if (motor_arm() != RT_EOK) return 0;
+    if (motor_set_target_hz(900) != RT_EOK) return 0;
+    if (motor_start() != RT_EOK) return 0;
+    ramp_until_zero(6);
+    m = snap_now();
+    sp_get(&s);
+    return (s.phase == SP_RUNNING && m.current_hz > 0 &&
+            safety_state_get() == SAFETY_RUN) ? 1 : 0;
+}
+
+static void cases_disarm_ready(void)
+{
+    sp_snapshot_t s;
+    motor_snapshot_t m;
+    sp_proof_t pf;
+    sp_token_t oldtok;
+    rt_uint32_t old_ep;
+    rt_uint32_t gate;
+    rt_err_t rearm;
+    rt_err_t e;
+    rt_bool_t committed;
+
+    if (!gates_open())
+    {
+        SKIPV("C23", "target 变体宏全 FALSE, 无法 arm/start, RUN->READY 收口不可达");
+        return;
+    }
+
+    /* ---- C23a: RUN 中直接 disarm(现场清理就是这个形状: 没有先发 stop) ---- */
+    wire_and_boot();
+    if (!pre_ok("C23a run", dr_run())) return;
+    e = motor_disarm();
+    m = snap_now();
+    sp_get(&s);
+    CHECK("C23a-disarm-from-run-commits-ready",
+          e == RT_EOK && m.state == MOTOR_IDLE && m.armed == 0 &&
+          m.current_hz == 0 && m.target_hz == 0 &&
+          safety_state_get() == SAFETY_READY && pad_level == PIN_LOW &&
+          s.permit.confirmed == RT_TRUE && s.inhibit == RT_FALSE,
+          fm("disarm rc=%d mot.state=%d armed=%d hz=%u/%u ss=%s pad=%d"
+             " permit conf=%s lvl=%u we=%u ce=%u | pwm res=%s ep=%u | c ep=%u phase=%s"
+             " inhibit=%s latched=%s pending_ep=%u meta_pend=%s",
+             (int)e, (int)m.state, (int)m.armed,
+             (unsigned)m.current_hz, (unsigned)m.target_hz,
+             safety_state_name(safety_state_get()), (int)pad_level,
+             s.permit.confirmed ? "YES" : "no", (unsigned)s.permit.request_level,
+             (unsigned)s.permit.write_epoch, (unsigned)s.permit.confirm_epoch,
+             mot_stop_result_name(s.pwm.result), (unsigned)s.pwm.epoch,
+             (unsigned)s.epoch, sp_phase_name(s.phase),
+             s.inhibit ? "YES" : "no", s.motor_stop_latched ? "YES" : "no",
+             (unsigned)s.pending_epoch, s.metadata_pending ? "YES" : "no"));
+
+    /* ---- C23a2: 收口之后必须能再次 arm(现场 0x2 永久拒绝就是这条过不去) ---- */
+    gate = motor_get_gate_fail_mask();
+    rearm = motor_arm();
+    CHECK("C23a2-rearm-allowed-after-run-disarm",
+          (gate & MOT_GATE_NOT_READY) == 0u && rearm == RT_EOK,
+          fm("gate_mask=0x%X arm rc=%d ss=%s", (unsigned)gate, (int)rearm,
+             safety_state_name(safety_state_get())));
+    (void)motor_disarm();
+
+    /* ---- C23b: stop 刚发出(斜坡未归零)就 disarm, 之后再跑若干拍 ---- */
+    wire_and_boot();
+    if (!pre_ok("C23b run", dr_run())) return;
+    (void)motor_stop();
+    m = snap_now();
+    if (!pre_ok("C23b still ramping", m.current_hz > 0 && m.target_hz == 0)) return;
+    e = motor_disarm();
+    ramp_until_zero(40);
+    m = snap_now();
+    sp_get(&s);
+    CHECK("C23b-disarm-before-zero-commits-ready",
+          e == RT_EOK && m.state == MOTOR_IDLE && m.armed == 0 && m.current_hz == 0 &&
+          safety_state_get() == SAFETY_READY && s.phase != SP_RUNNING,
+          fm("disarm rc=%d mot.state=%d armed=%d hz=%u ss=%s phase=%s",
+             (int)e, (int)m.state, (int)m.armed, (unsigned)m.current_hz,
+             safety_state_name(safety_state_get()), sp_phase_name(s.phase)));
+
+    /* ---- C23c: 正常归零后再 disarm(既有行为回归, 修前就应 PASS 且不许变差) ---- */
+    wire_and_boot();
+    if (!pre_ok("C23c run", dr_run())) return;
+    (void)motor_stop();
+    ramp_until_zero(80);
+    if (!pre_ok("C23c zero-ready", safety_state_get() == SAFETY_READY)) return;
+    e = motor_disarm();
+    m = snap_now();
+    gate = motor_get_gate_fail_mask();
+    rearm = motor_arm();
+    CHECK("C23c-normal-zero-then-disarm-keeps-ready",
+          e == RT_EOK && m.state == MOTOR_IDLE && m.armed == 0 &&
+          safety_state_get() == SAFETY_READY && rearm == RT_EOK,
+          fm("disarm rc=%d mot.state=%d ss=%s rearm rc=%d", (int)e, (int)m.state,
+             safety_state_name(safety_state_get()), (int)rearm));
+    (void)motor_disarm();
+
+    /* ---- C23d 反例: STEP 关断失败 => 落 FAULT, 不得清故障, 不得写 READY ---- */
+    wire_and_boot();
+    if (!pre_ok("C23d run", dr_run())) return;
+    ps_sim_pwm_disable_seq(1, -RT_ERROR);
+    e = motor_disarm();
+    m = snap_now();
+    sp_get(&s);
+    CHECK("C23d-off-fail-no-ready-no-latch-clear",
+          m.state == MOTOR_FAULT && m.stop_fail_latched == 1 &&
+          safety_state_get() != SAFETY_READY && s.inhibit == RT_TRUE,
+          fm("disarm rc=%d mot.state=%d latched=%u ss=%s inhibit=%s",
+             (int)e, (int)m.state, (unsigned)m.stop_fail_latched,
+             safety_state_name(safety_state_get()), s.inhibit ? "YES" : "no"));
+    ps_sim_pwm_set_rc(RT_EOK, RT_EOK, RT_EOK);
+    trip_and_reset();
+
+    /* ---- C23e 反例: 许可 LOW 未确认(焊盘卡 HIGH) => 不授予重新 arm 资格 ---- */
+    wire_and_boot();
+    if (!pre_ok("C23e run", dr_run())) return;
+    ps_sim_set_pad_stuck(1);
+    e = motor_disarm();
+    ps_sim_set_pad_stuck(0);
+    sp_get(&s);
+    CHECK("C23e-permit-low-unconfirmed-no-ready",
+          safety_state_get() != SAFETY_READY &&
+          (s.permit.confirmed != RT_TRUE || s.permit.confirmed_level != 0u) &&
+          (motor_get_gate_fail_mask() & MOT_GATE_NOT_READY) != 0u,
+          fm("disarm rc=%d ss=%s permit conf=%s level=%u gate=0x%X", (int)e,
+             safety_state_name(safety_state_get()), s.permit.confirmed ? "YES" : "no",
+             (unsigned)s.permit.confirmed_level, (unsigned)motor_get_gate_fail_mask()));
+    trip_and_reset();
+
+    /* ---- C23f 反例: 旧一代 disarm 的落位晚到, 不得把新 owner 的 RUN 改成 READY ---- */
+    wire_and_boot();
+    if (!pre_ok("C23f arm", motor_arm() == RT_EOK)) return;
+    oldtok = mot_res;
+    old_ep = oldtok.epoch;
+    rt_memset(&pf, 0, sizeof(pf));
+    (void)sp_off_attempt_for(old_ep, SP_MOTOR, MOT_STOP_SRC_DISARM,
+                             FAULT_SOFT, EVT_SOFT_FAULT, 1, &pf);
+    (void)motor_disarm();
+    if (!pre_ok("C23f new run", dr_run())) return;   /* 新一代已经在 RUN */
+    committed = motor_commit_off(&pf, MOT_COMMIT_DISARM);
+    m = snap_now();
+    CHECK("C23f-stale-disarm-cannot-ready-new-run",
+          committed == RT_FALSE && safety_state_get() == SAFETY_RUN &&
+          m.state != MOTOR_IDLE && mot.armed == 1,
+          fm("旧代 commit 返回=%s ss=%s mot.state=%d armed=%d",
+             committed ? "TRUE" : "FALSE", safety_state_name(safety_state_get()),
+             (int)m.state, (int)mot.armed));
+    (void)motor_disarm();
+
+    /* ---- C23g 反例: 已锁存故障时 disarm 不得把 Safety 拉回 READY ---- */
+    wire_and_boot();
+    if (!pre_ok("C23g run", dr_run())) return;
+    rt_memset(&pf, 0, sizeof(pf));
+    (void)sp_trip_fast(FAULT_SOFT, EVT_SOFT_FAULT, MOT_STOP_SRC_ESTOP, &pf);
+    (void)safety_reconcile_trip(FAULT_SOFT, EVT_SOFT_FAULT);
+    e = motor_disarm();
+    sp_get(&s);
+    CHECK("C23g-latched-fault-disarm-no-ready",
+          safety_state_get() != SAFETY_READY && s.inhibit == RT_TRUE &&
+          (motor_get_gate_fail_mask() & MOT_GATE_NOT_READY) != 0u,
+          fm("disarm rc=%d ss=%s inhibit=%s gate=0x%X", (int)e,
+             safety_state_name(safety_state_get()), s.inhibit ? "YES" : "no",
+             (unsigned)motor_get_gate_fail_mask()));
+    trip_and_reset();
+
+    /* ---- C23h 反例: 取不到 ss_lock 就整笔放弃(不写半笔), 恢复后可正常收口 ---- */
+    wire_and_boot();
+    if (!pre_ok("C23h run", dr_run())) return;
+    s2_set_lock_fail("ss");
+    e = motor_disarm();
+    m = snap_now();
+    CHECK("C23h-ss-lock-error-abandons-commit",
+          safety_state_get() == SAFETY_RUN && m.state != MOTOR_IDLE &&
+          m.armed == 0 && s2_lock_fail_hits > 0,
+          fm("disarm rc=%d ss=%s mot.state=%d armed=%d 取锁失败次数=%d", (int)e,
+             safety_state_name(safety_state_get()), (int)m.state, (int)m.armed,
+             s2_lock_fail_hits));
+    s2_lock_fail_clear();
+    e = motor_disarm();
+    m = snap_now();
+    rearm = motor_arm();
+    /* 重试那条 disarm 可能带回 -RT_EAGAIN(预约已在第一次尝试里撤销, 没有东西再可禁),
+     * 这**不是**没收口: 判据只看"状态机与影子最终一致 + 恢复资格重新可用"。 */
+    CHECK("C23h2-retry-after-lock-ok-commits-ready",
+          m.state == MOTOR_IDLE && safety_state_get() == SAFETY_READY &&
+          rearm == RT_EOK,
+          fm("重试 disarm rc=%d mot.state=%d armed=%d ss=%s rearm rc=%d",
+             (int)e, (int)m.state, (int)m.armed,
+             safety_state_name(safety_state_get()), (int)rearm));
+}
+
 /* 目标宏全 FALSE: 开启方向必须被拒, 关闭方向始终可用 */
 static void cases_target_reject(void)
 {
@@ -2570,7 +2778,7 @@ static const struct s2_grp grps[] = {
     { "diag", cases_diag },            { "recovery", cases_recovery },
     { "stale", cases_stale },          { "boundary", cases_boundary },
     { "healthy", cases_healthy },      { "target_reject", cases_target_reject },
-    { "cal_static", cases_cal_static },
+    { "cal_static", cases_cal_static }, { "disarm_ready", cases_disarm_ready },
 };
 
 /* 每组**一个独立进程**: 生产静态量(sp 的 exhausted/inhibit、SS 状态、历史锁存)在同一
