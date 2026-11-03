@@ -1,0 +1,249 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""生成 M8-R6B 的审核交接回执 JSON(给云端 A / 操作者)。
+
+纪律: 所有 bytes/sha256 都是**当场从磁盘算**的(抄不进任何自述值); 顶层不放本件自己的哈希
+(一条清单不能给自己的字节作证); 远端回读结果在收口一步补进去, 不在这里预写。
+"""
+import hashlib
+import json
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+ROUND = HERE.parent
+REPO = ROUND.parents[2]
+OUT = REPO / "reports/agent_handoffs/phase8-m8-r6b-executor-binding.json"
+R6B = "reports/reviews/phase8-m8-r6b-executor-binding"
+R6A = "reports/reviews/phase8-m8-r6a-offline-rework"
+R3F = "reports/reviews/phase8-m8-relative-protection-r3/field"
+FW6A = "reports/firmware/phase8-m8-r6a-offline-rework"
+
+EXEC = R3F + "/m8r3_serial_chain.py"
+SELFTEST = R3F + "/m8r3_field_selftest.py"
+PLAN = R6B + "/field/plan_core_r6b.json"
+
+BASE = "aab19ff5093e177946ce957fbf2bd506e1f63ce5"
+SOFTWARE = "ecfd055e4acb3e99772228aa7087a2ea5b2c190d"
+
+
+def sha(rel):
+    return hashlib.sha256((REPO / rel).read_bytes()).hexdigest()
+
+
+def nb(rel):
+    return (REPO / rel).stat().st_size
+
+
+STATUSES = [
+    "R6A_evidence = ACCEPTED",
+    "R1_approval_ledger_normal_paths = HOST_TARGETED_TESTS_PASSED",
+    "R1_cleanup_exception_isolation = REWORK_DONE_OFFLINE(R6B)",
+    "R2_single_real_session_gate = HOST_TARGETED_TESTS_PASSED",
+    "R2_full_dispatch_snapshot_binding = REWORK_DONE_OFFLINE(R6B)",
+    "R3_cleanup_byte_integrity = ACCEPTED_OFFLINE(不等于真实串口已验)",
+    "R4_new_error_print_width = ACCEPTED_OFFLINE(新镜像仍未上板)",
+    "R6A_candidate_image = ARCHIVED_NOT_ON_BOARD",
+    "disarm_normal_close = HOST_TARGETED_TESTS_PASSED",
+    "product_field_fix = NOT_VERIFIED",
+    "overall_offline_release = REWORK(本轮两条修完待 A 复审)",
+    "safe_for_enable = false",
+    "new_hardware_authorization = 0",
+    "device_actions_this_round = 0",
+    "A_device_actions(本轮未重跑) = 0",
+    "next_work = R6B 复审; 后续现场包本轮不制定",
+]
+
+doc = {
+    "task": "M8-R6B-EXECUTOR-EXCEPTION-AND-BINDING",
+    "task_book": "NS800_M8_R6A_Review_REWORK_and_R6B_Task_20261103.md",
+    "task_book_verdict_verbatim":
+        "**整体仍为 REWORK，继续离线。接收 R6A 已完成的修复与产物证据；新增两个已复现阻断："
+        "损坏账本的类型异常会跳过必要撤能/端口关闭，以及整包实际执行对象未与批准的同一份原始字节绑定。"
+        "下一轮只集中修这两处执行器问题。**",
+    "date_local": "2026-11-03",
+    "branch": "feature/m8-sg-adc-relative-protection",
+    "remote": "https://github.com/LINboss666/ns800-stepper-safety",
+    "base_commit": BASE,
+    "base_commit_note": "任务书 §2 指定的实际交付头(= A 本次 ls-remote/fetch 的那一枚); "
+                        "开工时本地 HEAD 与之相同且工作树干净, 远端也同头",
+    "software_input_commit": SOFTWARE,
+    "evidence_commit": "本 JSON 所在提交(在 software_input_commit 之后顺序追加)",
+    "delivery_head_rule": "无 rebase/merge/amend/force; 不新建分支; 不碰冻结引用; "
+                          "常规 push 后独立逐 blob 回读精确 SHA 即停止",
+    "roles": "云端 A 出任务书与独立复审; 本地 Qoder 执行; 操作者=人(本文件不含任何硬件批准, "
+             "也不代替操作者回答现场安全门)",
+    "status": "M8_R6B_OFFLINE_DELIVERED / AWAITING_INDEPENDENT_REVIEW",
+
+    "scope_changed_this_round": {
+        "executor_B1": [
+            "validate_ledger_doc(): `pending[i].name` 在**成员查找之前**先验非空 str => "
+            "合法 JSON 里的 `name: []` 落 APPROVAL_LEDGER_CORRUPT|pending[i]_name_form, 不再漏成 "
+            "TypeError: unhashable type(旧版那一行就是 §4 那条反例的根因)",
+            "cleanup(): 撤能预占除 Stop 外也捕普通异常 => APPROVAL_RESERVE_FRAME_ERROR_<类型>_SENT_ANYWAY "
+            "具名披露后继续发送, 后续两条必要撤能不再被吃掉; '本函数绝不抛' 的合同由此成立",
+            "exec_session() finally: 确认消耗按条捕 Stop/普通异常, 整段账本收尾在 try/except/finally 内, "
+            "port.close()/led.close() 移到 finally => 账本错不再跳过句柄关闭; 留痕本身炸了也只多记一条"],
+        "executor_B2": [
+            "read_plan_snapshot(path): 一次 read_bytes, 同一份字节同时给 sha256 + json 解析; "
+            "解析失败具名 PLAN_SNAPSHOT_UNDECODABLE/UNPARSEABLE",
+            "current_identities(plan, path, repo, snapshot=None): 有快照就用那份字节的哈希并先要求 "
+            "snapshot.doc == plan, 否则 PLAN_SNAPSHOT_NOT_EXECUTED_OBJECT",
+            "dispatch_plan(..., plan_snapshot=None): real 传输先取快照 => 内存对象≠快照即 "
+            "PLAN_NOT_FROM_APPROVED_SNAPSHOT(此刻 UID 未读、工具未起、端口未开、额度未预占); "
+            "核对通过后执行对象换成快照那份, stages/tools/argv/quota/时间窗只从它推导",
+            "main(): --plan 改为单次读盘得快照, 同一快照供 --approval-init/--validate-plan/--dispatch 使用"],
+        "unchanged_by_design": [
+            "真实单会话仍只接经批准的整包(CLI --steps 真实路径 rc=4)",
+            "QUOTA_COMMAND_KEYS 集中映射与发送前拒绝(缺申报/错键/n 不符); 只读轮询不占动作额度",
+            "R3 原始字节门(危险文本 -> 裸 NUL -> 非法 UTF-8, 先于长度帽)与本轮新增判据无冲突, 未放宽",
+            "账本运行期不建账、VERSION=2 版本门、init 的 O_CREAT|O_EXCL 独占、不退消费",
+            "产品 C / 算法 / 阈值 / 速度 / 电流 / 引脚 / 锁存恢复资格: 一律未动, 也**未重编固件**"]},
+
+    "counterexamples_before_after": {
+        "source": "%s/host/r6b_before_after.txt(8 项判定原文) + field/probes_at_aab19ff_before_fix.json "
+                  "与 field/probes_after_fix.json(A 附录 B 的 7 条完整 JSON)" % R6B,
+        "before_run_on": "修前一栏打在 git aab19ff 里取出的执行器字节(209786 B, sha256 99d6c960…)上; "
+                         "修后一栏打在本轮盘上那份(见 artifacts_and_identities.executor)",
+        "rows": [
+            {"input": "干净账(正控)",
+             "before": "tx=motor_start,motor_stop,motor_disarm,motor_status; CONFIRMED_DISABLED; "
+                       "success=True; 端口关闭",
+             "after": "同上未变(修后正控仍成立)"},
+            {"input": "spent.motor_run=-1(已覆盖的拒绝路径对照)",
+             "before": "四条 tx 都在; code=CLEANUP_RESERVE_EXHAUSTED; success=False; 三条 SENT_ANYWAY 披露",
+             "after": "同上未变"},
+            {"input": "**pending[-1].name=[]**(§4 主反例)",
+             "before": "raised=TypeError:unhashable type: 'list'; tx 只有 motor_start; closed=False; "
+                       "CLEANUP_FRAME_EXCEPTION×1; result=null",
+             "after": "raised=None; 四条 tx 都在(含三条必要撤能); closed=True; 无框架异常; "
+                      "success=False; 三条 APPROVAL_LEDGER_CORRUPT_SENT_ANYWAY; 盘上坏账未被修复"},
+            {"input": "**内存对象≠批准文件**(§5.1)",
+             "before": "status=OK; 后端收到 MEMORY_ONLY_UNAPPROVED_ARGUMENTS; spent.download=1; "
+                       "盘上计划未变",
+             "after": "status=REFUSED code=PLAN_NOT_FROM_APPROVED_SNAPSHOT; 后端零调用; download 未扣"},
+            {"input": "**CLI 读取与哈希之间换文件**(§5.2)",
+             "before": "rc=0; 未批准 argv 到达后端; 磁盘文件字节仍等于批准那份",
+             "after": "rc=1; 后端零调用; 拒绝身份=APPROVAL_IDENTITY_MISMATCH(从 stdout 原文读, "
+                      "不用'非零'当结论)。注: 附录 B 把交错安排在 read_text 上, 修后读盘是 read_bytes, "
+                      "故该处未被触发; 在真实读盘接口上安排同一交错的判据是自愈合 FS121"}]},
+
+    "new_negative_controls": {
+        "FS120_meta_negative_snapshot_gate":
+            "把快照门摘回'两次独立读取'的旧形状(身份用文件 SHA, 执行对象用内存那份) => 未批准 argv "
+            "必须**重新到达后端**; 实测到达, 说明 FS119 的'零调用'断言真长在这扇门上",
+        "FS115_meta_evidence":
+            "对 `[]`/`{}` 这类不可哈希值, 未受保护的成员查找确实抛 TypeError(类型门不是空转); "
+            "`5`/`""` 不抛但仍按非字符串键拒绝"},
+
+    "regression_scope": "只跑受影响项(任务书 §7.2.4): 自检 121 条(含 FS80–FS114 那 35 项作针对段)、"
+                        "r6b 修前/修后对照、r4 离线链 120 项、R6A 六组对照、判宽检查器两模式、"
+                        "派生器 write/refuse/force/check 矩阵、staged 预检。未重跑: 全仓历史数千条清单、"
+                        "S2 其余 19 组、固件链与镜像构建(无产品 C 改动)。",
+
+    "commands_and_exit_codes": [
+        {"cmd": "python %s/independent_probes.py <仓库根>(在 aab19ff 字节上)" % R6B, "rc": 0,
+         "result": "7 条探针全采集; 三条 §4/§5 反例逐条复现 A 的附录 A(见 "
+                   "field/probes_at_aab19ff_before_fix.json)。rc=0 只表示采集完成, 不是产品通过"},
+        {"cmd": "python %s/host/r6b_before_after.py" % R6B, "rc": 0,
+         "result": "RESULT BEFORE_AFTER_OK (checks=8 fails=0)"},
+        {"cmd": "python %s/m8r3_field_selftest.py" % R3F, "rc": 0,
+         "result": "cases=121 pass=121 fail=0 executed=121 negative_injections=18 "
+                   "hardware_actions=0 transport=stub_only port=IN_MEMORY"},
+        {"cmd": "python %s --validate-plan --plan %s" % (EXEC, PLAN), "rc": 0,
+         "result": "checks=232 fail=0 msh_commands=74; 75 s 观测下界 S3/S7=78 s; 无字节恢复例外"},
+        {"cmd": "python %s/host/derive_plan_r6b.py(写/改坏后重跑/--force/--check)" % R6B,
+         "rc": [0, 1, 0, 0],
+         "result": "R6B_WRITE → R6B_REFUSE_WRITE(字节不同不静默覆盖) → --force 复原 → IDEMPOTENT"},
+        {"cmd": "python reports/reviews/phase8-m8-idle-stack-r4/host/idle_learn_check.py", "rc": 0,
+         "result": "CHECKS=120 problems=0; 元负控 6/6 + 9/9 fired; P8 执行器身份改成四层 "
+                   "r5c/r6/r6a/r6b 逐层对 blob"},
+        {"cmd": "python %s/host/r6a_before_after.py" % R6A, "rc": 0,
+         "result": "RESULT BEFORE_AFTER_OK (fails=0) —— R6A 六组反例在修后执行器上未回退"},
+        {"cmd": "python …/line_width_check.py 与 --selfcheck", "rc": [0, 0],
+         "result": "LINE_WIDTH_RESULT PASS (bad=0); CHANGE_SCAN_META fired 命中 18 站点(本轮无产品 C "
+                   "改动, 站点集与 R6A 相同); known-too-long 三条全 fired"},
+        {"cmd": "python …/staged_preflight_batch.py(提交前)", "rc": 0,
+         "result": "SELFCHECK(corrupted first entry) problems=1 fired(注入值会被命中); "
+                   "真实登记件 problems=0(r6b 12 条 / r6a 13 条 / 固件 r6a 4 条 / r4 / r3 全相符)"},
+        {"cmd": "git -c http.proxy=… push origin feature/m8-sg-adc-relative-protection", "rc": 0,
+         "result": "常规 fast-forward; 精确 SHA 由远端逐 blob 回读给出(见 remote_readback, 收口一步补)"}],
+
+    "artifacts_and_identities": {
+        "executor": {"path": EXEC, "bytes": nb(EXEC), "sha256": sha(EXEC),
+                     "previous_registration": "99d6c9600b05…/209786 B 留在 R6A 的派生件里(冻结不回改), "
+                                              "基线 blob 身份在远端逐 blob 回读里核过"},
+        "selftest_fixture": {"path": SELFTEST, "bytes": nb(SELFTEST), "sha256": sha(SELFTEST)},
+        "plan_package": {"path": PLAN, "bytes": nb(PLAN), "sha256": sha(PLAN),
+                         "package_status": "R6B_DERIVED_NOT_EXECUTED",
+                         "hardware_actions_authorized": 0,
+                         "derived_from": "%s/field/plan_core_r6a.json 的冻结字节 "
+                                         "556a044e195705d1…(sha 不符即拒绝派生)" % R6A,
+                         "image_binding_still_points_at":
+                             "dab356c69fbf4ca747e838580c16982bd56b53b1367f84b97ab705c2fbd25439",
+                         "offline_gate": "checks=232 fail=0"},
+        "images_unchanged_this_round": {
+            "r6a_candidate_bin": "%s/rt-thread-motor-m1-candidate.bin 292164 B "
+                                 "5ae4110d14fdbb40f49cc6f0deca474cf6d0b33b3ee9305e83681dbdd4a53825" % FW6A,
+            "rebuilt": "否(任务书 §7.1: 不要求再编译); 未新增任何构建件",
+            "on_board": "dab356c6…/290916 B 仍是已逐字节证在板的那件",
+            "r6_candidate": "d70a9180…/292116 B 原样保留"}},
+
+    "frozen_artifacts_kept": [
+        "R5-C 计划 05bcf96a…/164851 B、R6 计划 6e0b97f2…/165522 B、R6A 计划 556a044e…/169310 B "
+        "与 26 场现场原件/台账、四件镜像归档件: 本轮未改一个字节",
+        "旧轮登记值不回改: 执行器身份变化只由**新的** R6B 派生件登记(P8 判据改成四层)",
+        "本轮唯一动过的上一轮文件是**工具与其派生输出**: idle_learn_check.py 的 P8 判据(实现四层) + "
+        "它复跑写出的 dispatch_stub/idle_learn_*(差异只有 run_dir 随机名、执行器身份 99d6c960→84df1306、"
+        "'本轮改动=N 项'这个按当时工作树现数的字段); 按 A §6 的口径保留合法派生更新并逐条写清"],
+
+    "derived_manifests_regenerated_because_tools_changed": [
+        "%s/SHA256SUMS.txt(entries=12)" % R6B,
+        "reports/reviews/phase8-m8-relative-protection-r3/SHA256SUMS.txt(entries=5137)",
+        "reports/reviews/phase8-m8-idle-stack-r4/SHA256SUMS.txt(entries=394)"],
+
+    "device_actions": [],
+    "device_action_counter": {"ports_opened": 0, "dap_connections": 0, "downloads": 0, "flashings": 0,
+                              "readbacks": 0, "resets": 0, "power_cycle_requests": 0, "learns": 0,
+                              "zeros": 0, "motor_starts": 0, "config_saves": 0,
+                              "keil_builds": 0, "commits_pushed_at_generation": 0},
+    "private_material_handling": "未读 UID; 未打印任何 48-hex 私有 UID(探针里的 `-u @UID_FILE` 只是占位串, "
+                                 "由内存动作后端接收, 从未执行); 临时账本与输出全在 %TEMP% 下一次性目录, "
+                                 "仓库工作树未被探针写过",
+    "new_ledger_created_for_field": "无 —— 任务书 §7.1: 不因为修了执行器就创建一个可用的新现场批准; "
+                                    "所有 approval_init 都是临时目录里的一次性账",
+    "not_verified_after_this_round": {
+        "product_field_fix": "修后的账本门与绑定门都只有主机/内存端口证据; 产品侧仍是 R6A 那一条 motor.c "
+                             "打印拆分, 未上板",
+        "new_image_on_board": "5ae4110d… 仍未烧录、未回读、未复位(本轮也没重编)",
+        "real_serial_transport": "真实串口下的读块切分/告警刷屏时序仍未验; 512 B 剪行只在完整字节流上判",
+        "approval_ledger_cross_process_field": "跨进程真实现场账本仍未在现场用过一次",
+        "overall_offline_release": "待 A 复审",
+        "preserved_old_findings": STATUSES},
+    "next_round_is_not_this_package": "现场包要另起(任务书 §7.3: 后续现场包暂不制定): 匹配新镜像 "
+                                      "bin/axf/回读长度/下载阶段与具体额度, 并按新代码重绑批准; "
+                                      "本包不携带任何硬件额度, 也不能靠换 approval-id 变成新固件现场包",
+    "safe_for_enable": False,
+    "go_requested": False,
+    "review_points_for_A": [
+        "B1 的隔离边界: 现在只把'预占/确认'两处按条隔离; 台账留痕 led.ev 自身炸(磁盘满等)只在 commit "
+        "留痕那一处加了兜底, 其余 ev 未包 —— 是否要求所有 ev 调用都进隔离层",
+        "B2 的快照门只在 transport==real 生效; sim/stub 与直连 dispatch 的离线工装仍走原路径(不传 "
+        "snapshot 时行为与 R6A 一致)。若要求离线工装也强制同源, 会牵动现有 121 条里多条夹具的形状",
+        "换文件交错的判据分工: A 附录 B 那套(read_text 上安排)现在实测走的是身份不符这条路, "
+        "read_bytes 上安排同一交错的判据在自检 FS121; 两条都断言'后端零调用'",
+        "plan 里 r6b_image_note.rebuilt_this_round=false: 若要按新执行器之外再动产品 C, 需要一次新的构建 "
+        "与一次新的现场批准, 本轮没有替它预做任何绑定"],
+    "known_text_defects_registered": [
+        "run_record §18.8 草稿里曾有一句自我疑问式的临时措辞(临时目录位置), 已改成实测陈述; "
+        "同节保留 A §6 的两条更正口径: '8 件已还原'只描述 R6A 当时的处理, 且 R4 派生输出确有合法更新",
+        "本轮没有产品 C 改动, 故 motor.c 的 101 B 最长行与 R6A 一致, 未再改宽口径"],
+    "status_block": STATUSES,
+}
+
+body = json.dumps(doc, ensure_ascii=False, indent=1) + "\n"
+OUT.write_bytes(body.encode("utf-8"))
+back = json.loads(OUT.read_bytes().decode("utf-8"))
+assert back["artifacts_and_identities"]["executor"]["sha256"] == sha(EXEC), "自算身份必须与盘上一致"
+print("R6B_HANDOFF_JSON|%s|bytes=%d|sha=%s|keys=%d" %
+      (OUT.relative_to(REPO).as_posix(), nb("reports/agent_handoffs/phase8-m8-r6b-executor-binding.json"),
+       hashlib.sha256(OUT.read_bytes()).hexdigest()[:16], len(back)))
