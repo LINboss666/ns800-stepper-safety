@@ -73,6 +73,7 @@ static int       leaf_pad_high_now(void);
 void             leaf_rx_release_due(void);
 static void      leaf_pk_check(void);
 static void      leaf_pk_reset(void);
+static void      leaf_flush_pk_fire(void);
 static void      leaf_asm_feed(rt_uint8_t b);
 static void      leaf_rx_push(const rt_uint8_t *p, int n);
 
@@ -329,6 +330,9 @@ static void leaf_chip_boot(void)
 static int leaf_dev_present = 1;
 static int leaf_dev_open_calls, leaf_dev_ctrl_calls, leaf_dev_read_calls;
 static int leaf_rx_drip;                  /* 注入: 线路持续吐字节(每次读推进 1ms) */
+/* R7F1(任务书 §1): 1 = 下一次"发请求之前的 flush 读"处会合一次(单发, 见 §8b)。
+ * 默认 0 => 旧组(read_obs/C10/C16/C17/C18)的设备读路径逐字不变。 */
+static int leaf_flush_pk_armed;
 
 rt_device_t rt_device_find(const char *name)
 {
@@ -352,6 +356,10 @@ rt_size_t rt_device_read(rt_device_t dev, rt_off_t pos, void *buffer, rt_size_t 
 
     (void)dev; (void)pos;
     leaf_dev_read_calls++;
+    /* R7F1(任务书 §1): 布防时, 后台那笔读在**取到 xfer 锁之后的 flush 阶段**停在这里等
+     * 放行。此刻锁确实被一笔真实的生产读事务持有, 而且线上一个字节都还没出去。
+     * 未布防(所有旧组)时这里什么都不做, 读的字节数与计数逐字不变。 */
+    if (leaf_flush_pk_armed && leaf_tx_written == 0) leaf_flush_pk_fire();
     if (leaf_tx_written == 0)
     {
         /* 还没发出任何字节 => 这一次读属于"发请求之前的排空(flush)"阶段 */
@@ -934,6 +942,7 @@ static void leaf_pk_reset(void)
 {
     pthread_mutex_lock(&leaf_pk_m);
     leaf_pk_arrived = 0; leaf_pk_go = 0; leaf_pk_arm = 0;
+    leaf_flush_pk_armed = 0;
     pthread_mutex_unlock(&leaf_pk_m);
 }
 static int leaf_pk_wait_arrived(int ms)
@@ -959,6 +968,21 @@ static void leaf_pk_release(void)
     pthread_mutex_lock(&leaf_pk_m);
     leaf_pk_go = 1;
     pthread_cond_broadcast(&leaf_pk_c);
+    pthread_mutex_unlock(&leaf_pk_m);
+}
+
+/* R7F1 §1: flush 阶段的一次性会合。生产侧一次读的顺序是
+ * 取 xfer 锁 → flush → TX → RX(tmc2209.c 的 tmc_xfer_take / tmc_read_reg_core),
+ * 所以"后台确实持锁且尚未上线字节"这一状态只能在 flush 的那次设备读里取。
+ * 单发: 命中后自动撤防, 由主线程 leaf_pk_release() 放行后台继续跑完整笔读。
+ * ⚠ 不用墙钟猜交错 —— 观察点落在被保护操作发生的那一刻本身。 */
+static void leaf_flush_pk_fire(void)
+{
+    leaf_flush_pk_armed = 0;
+    pthread_mutex_lock(&leaf_pk_m);
+    leaf_pk_arrived = 1;
+    pthread_cond_broadcast(&leaf_pk_c);
+    while (!leaf_pk_go) pthread_cond_wait(&leaf_pk_c, &leaf_pk_m);
     pthread_mutex_unlock(&leaf_pk_m);
 }
 
@@ -3187,6 +3211,268 @@ static void uro_group(void)
 }
 #endif /* URO_BASELINE_BYTES */
 
+#ifndef URO_BASELINE_BYTES
+/* ===================================================================== */
+/* 14b. R7F1(任务书 §1/§2): 启动期两条 TMC 读取的先后关系与逐调用归因(BTB01..10) */
+/* --------------------------------------------------------------------- */
+/* 两个入口与现场那一次**逐字同一个**, 不复制被测函数体:
+ *   后台 = tmc2209_read_sg_result()          (sensor_service.c:128, 启动首帧就走这条)
+ *   前台 = tmc2209_read_register(IOIN, &v)   (safety_state.c:643 的 required 自检)
+ * 两笔读共用 tmc2209.c 的真 xfer 锁; 前台取锁上限 TMC_BUD_XFER_LOCK_MS=20ms, 拿不到
+ * 回 -RT_EBUSY(本平台码表 = -23, 见 kerrno.h POSIX 分支 + ERROR_BASE_NO=7)。
+ * 会合点是生产事务"取到锁之后、flush 阶段的第一次设备读"(§8b 的 leaf_flush_pk_fire),
+ * 不是墙钟猜测: 那一刻后台**确实持锁**且线上一个字节都还没出去。
+ * ⚠ 测试边界(如实登记, 不外推): 本组用真 pthread 复现"另一笔读持锁"这一状态, 不复现
+ *   RT-Thread 的优先级抢占(sensor prio 7 抢占 main prio 10 可能落在帧内, 是另一条独立
+ *   风险, 本组不证明它, 也不据此否认它); 没有连接设备, 没有任何 UART/电机动作。
+ */
+static volatile int bto_bg_rc;
+static rt_uint16_t  bto_bg_sg;
+
+/* 后台线程入口: 调**生产 API**(与 sensor 线程同一入口), 不抄被测实现。 */
+static void bto_bg_sg_read(void *arg)
+{
+    (void)arg;
+    bto_bg_sg = 0xFFFFu;
+    bto_bg_rc = (int)tmc2209_read_sg_result(&bto_bg_sg);
+}
+
+static void bto_group(void)
+{
+    tmc_xfer_stat_t    st, sa, sb;
+    rt_uint32_t        v;
+    rt_err_t           e;
+    int                rr0, tx0, lk0, lkt0, lkto0, rel0, rd0, lg0;
+    subsys_health_t    h0;
+
+    /* ============ BTB01 后台 SG 读持锁时, 自检那一次 IOIN 读在上线任何字节前被拒 ==== */
+    leaf_state_clear();
+    if (!leaf_pre(leaf_bus_ready(), "BTB01 bus ready")) return;
+    leaf_chip[TMC_REG_SG_RESULT] = 0x00000123u;   /* 让后台那笔读有真实值可发布 */
+    bto_bg_rc = 999; bto_bg_sg = 0xFFFFu;
+    rr0 = leaf_read_reqs; tx0 = leaf_tx_written;
+    lk0 = leaf_mtx_takes; lkt0 = leaf_mtx_taken;
+    lkto0 = leaf_mtx_timeouts; rel0 = leaf_mtx_releases;
+    rd0 = leaf_dev_read_calls; lg0 = leaf_log_total;
+    leaf_flush_pk_armed = 1;
+    if (!leaf_pre(leaf_spawn(bto_bg_sg_read, RT_NULL) == 0, "BTB01 后台 SG 读线程")) return;
+    if (!seq_or_timeout("BTB01 后台读已进入 xfer 锁内的 flush 阶段",
+                        leaf_pk_wait_arrived(5000)))
+    {
+        leaf_pk_release(); leaf_join_all(); return;
+    }
+    if (!leaf_pre(leaf_mtx_taken == lkt0 + 1 && leaf_mtx_releases == rel0,
+                  "BTB01 前提: 后台确实独自持有 xfer 锁"))
+    { leaf_pk_release(); leaf_join_all(); return; }
+    v = 0xA5A5A5A5u;
+    e = tmc2209_read_register(TMC_ADDR_DEFAULT, TMC_REG_IOIN, &v);
+    CHECK("BTB01-startup-ioin-read-refuses-with-zero-bytes-on-wire-while-background-sg-holds-xfer",
+          e == -RT_EBUSY && (int)e == -23 &&
+          leaf_mtx_takes == lk0 + 2 &&            /* 后台 1 次 + 前台 1 次 */
+          leaf_mtx_taken == lkt0 + 1 &&           /* 只有后台拿到, 前台一次都没拿到 */
+          leaf_mtx_timeouts == lkto0 + 1 &&       /* 前台的 20ms 有界等待**真的到期** */
+          leaf_mtx_releases == rel0 &&            /* 没拿到锁的那一笔绝不归还 */
+          leaf_dev_read_calls == rd0 + 1 &&       /* 只有后台 flush 那一次; 前台一步都没进 */
+          leaf_tx_written == tx0 &&               /* 线上字节一个没多 => 不是丢帧/不是无应答 */
+          leaf_read_reqs == rr0 && v == 0xA5A5A5A5u,   /* 拒绝不发布任何值 */
+          fm("rc=%d(-RT_EBUSY=-23) 取锁=%d-%d 成功=%d-%d 到期=%d-%d 归还=%d-%d "
+             "设备读=%d-%d(差1=后台flush那一次, 前台0次) 线上字节=%d-%d 读请求=%d-%d value未改写=%d",
+             (int)e, leaf_mtx_takes, lk0, leaf_mtx_taken, lkt0,
+             leaf_mtx_timeouts, lkto0, leaf_mtx_releases, rel0,
+             leaf_dev_read_calls, rd0, leaf_tx_written, tx0,
+             leaf_read_reqs, rr0, (int)(v == 0xA5A5A5A5u)));
+    leaf_pk_release();
+    leaf_join_all();
+    CHECK("BTB02-background-sg-read-itself-completes-after-release-and-returns-lock",
+          bto_bg_rc == RT_EOK && bto_bg_sg == 0x123u &&
+          leaf_mtx_releases == rel0 + 1 &&        /* 只有真持有者归还, 一次 */
+          leaf_read_reqs == rr0 + 1 && leaf_tx_written == tx0 + 4 &&
+          leaf_write_frames == 0,                 /* 全程零 WRITE 帧 */
+          fm("后台 rc=%d sg=0x%03X 归还增量=%d 读请求=%d 线上字节=%d 写帧=%d "
+             "(证明确有一笔真实读事务持过锁, 不是夹具造的静态状态)",
+             (int)bto_bg_rc, (unsigned)bto_bg_sg, leaf_mtx_releases - rel0,
+             leaf_read_reqs, leaf_tx_written, leaf_write_frames));
+
+    /* ============ BTB03 同一输入、无后台竞争 => 自检那次读真的读通 ================= */
+    leaf_state_clear();
+    if (!leaf_pre(leaf_bus_ready(), "BTB03 bus ready")) return;
+    rr0 = leaf_read_reqs; tx0 = leaf_tx_written;
+    lk0 = leaf_mtx_takes; lkt0 = leaf_mtx_taken;
+    lkto0 = leaf_mtx_timeouts; rel0 = leaf_mtx_releases;
+    h0 = tmc2209_get_health();
+    v = 0u;
+    e = tmc2209_read_register(TMC_ADDR_DEFAULT, TMC_REG_IOIN, &v);
+    CHECK("BTB03-same-ioin-read-succeeds-when-no-background-reader-holds-xfer",
+          e == RT_EOK && v == 0x21000040u &&
+          leaf_mtx_takes == lk0 + 1 && leaf_mtx_taken == lkt0 + 1 &&
+          leaf_mtx_timeouts == lkto0 && leaf_mtx_releases == rel0 + 1 &&
+          leaf_read_reqs == rr0 + 1 && leaf_tx_written == tx0 + 4 &&
+          leaf_write_frames == 0 && tmc2209_ioin_is_identity(v) == RT_TRUE &&
+          h0 == SUBSYS_OK && tmc2209_get_health() == SUBSYS_OK,
+          fm("rc=%d value=0x%08X 身份=%d 取锁=%d/%d 到期=%d 归还=%d 读请求=%d "
+             "线上字节=%d 写帧=%d health=%d(BTB01 的同一条前台读, 只多了"
+             "\"后台是否持锁\"这一个变量)",
+             (int)e, (unsigned)v, (int)tmc2209_ioin_is_identity(v),
+             leaf_mtx_taken - lkt0, leaf_mtx_takes - lk0,
+             leaf_mtx_timeouts - lkto0, leaf_mtx_releases - rel0,
+             leaf_read_reqs - rr0, leaf_tx_written - tx0, leaf_write_frames,
+             (int)tmc2209_get_health()));
+
+    /* ============ BTB04 非法上下文: **同一个 -23**, 但一步都不取锁 ================= */
+    leaf_state_clear();
+    if (!leaf_pre(leaf_bus_ready(), "BTB04 bus ready")) return;
+    rr0 = leaf_read_reqs; tx0 = leaf_tx_written;
+    lk0 = leaf_mtx_takes; rd0 = leaf_dev_read_calls; lg0 = leaf_log_total;
+    v = 0xA5A5A5A5u;
+    leaf_no_thread = 1;                           /* URO21 的同一注入: 无线程对象 */
+    e = tmc2209_read_register(TMC_ADDR_DEFAULT, TMC_REG_IOIN, &v);
+    leaf_no_thread = 0;
+    CHECK("BTB04-illegal-context-refuses-with-same-rc-but-zero-lock-attempt",
+          e == -RT_EBUSY && (int)e == -23 &&
+          leaf_mtx_takes == lk0 &&                /* 与 BTB01 的区别就在这一项 */
+          leaf_dev_read_calls == rd0 && leaf_tx_written == tx0 &&
+          leaf_read_reqs == rr0 && v == 0xA5A5A5A5u &&
+          leaf_log_total == lg0 + 1,              /* 产品侧那条 REFUSED 打印恰好一次 */
+          fm("rc=%d 取锁=%d-%d(应相等) 设备读=%d-%d 线上字节=%d-%d value未改写=%d "
+             "日志增量=%d(=1: [TMC] read_reg REFUSED)",
+             (int)e, leaf_mtx_takes, lk0, leaf_dev_read_calls, rd0,
+             leaf_tx_written, tx0, (int)(v == 0xA5A5A5A5u), leaf_log_total - lg0));
+
+    /* ============ BTB05 读到值但身份不符: 传输成功, required 判据必须落 =========== */
+    leaf_state_clear();
+    if (!leaf_pre(leaf_bus_ready(), "BTB05 bus ready")) return;
+    leaf_chip[TMC_REG_IOIN] = 0x22000040u;        /* VERSION=0x22: 不是 TMC2209 */
+    rr0 = leaf_read_reqs;
+    v = 0u;
+    e = tmc2209_read_register(TMC_ADDR_DEFAULT, TMC_REG_IOIN, &v);
+    CHECK("BTB05-ioin-transport-succeeds-but-identity-must-still-fail-required",
+          e == RT_EOK && v == 0x22000040u &&
+          tmc2209_ioin_is_identity(v) == RT_FALSE &&
+          leaf_read_reqs == rr0 + 1 && leaf_write_frames == 0,
+          fm("rc=%d value=0x%08X VERSION=0x%02X 身份判据=%d(必须为 0) "
+             "读请求=%d 写帧=%d => 自检的 PASS 条件不能只看返回码",
+             (int)e, (unsigned)v, (unsigned)((v >> 24) & 0xFFu),
+             (int)tmc2209_ioin_is_identity(v), leaf_read_reqs, leaf_write_frames));
+
+    /* ============ BTB06 逐调用归因(任务书 §2): 竞争拒绝 => lock-busy, 且零字节 ======== */
+    leaf_state_clear();
+    if (!leaf_pre(leaf_bus_ready(), "BTB06 bus ready")) return;
+    bto_bg_rc = 999;
+    rr0 = leaf_read_reqs; tx0 = leaf_tx_written;
+    leaf_flush_pk_armed = 1;
+    if (!leaf_pre(leaf_spawn(bto_bg_sg_read, RT_NULL) == 0, "BTB06 后台 SG 读线程")) return;
+    if (!seq_or_timeout("BTB06 后台读已进入 xfer 锁内的 flush 阶段",
+                        leaf_pk_wait_arrived(5000)))
+    { leaf_pk_release(); leaf_join_all(); return; }
+    memset(&st, 0xA5, sizeof(st));            /* 前态污染: 归因必须整份被本次调用覆写 */
+    v = 0xA5A5A5A5u;
+    e = tmc2209_read_register_stat(TMC_ADDR_DEFAULT, TMC_REG_IOIN, &v, &st);
+    CHECK("BTB06-per-call-stat-says-lock-busy-with-tx-zero-on-ioin-read",
+          e == -RT_EBUSY && st.rc == e && (int)st.rc == -23 &&
+          st.reason == TMC_XFER_LOCK_BUSY &&
+          strcmp(tmc2209_xfer_reason_name(st.reason), "lock-busy") == 0 &&
+          st.tx_written == 0u && st.rx_bytes == 0u && st.flush_bytes == 0u &&
+          leaf_tx_written == tx0 && leaf_read_reqs == rr0 &&
+          v == 0xA5A5A5A5u,
+          fm("rc=%d reason=%s(%d) tx=%u rx=%u flush=%u used=%u 线上字节=%d 读请求=%d",
+             (int)st.rc, tmc2209_xfer_reason_name(st.reason), (int)st.reason,
+             (unsigned)st.tx_written, (unsigned)st.rx_bytes,
+             (unsigned)st.flush_bytes, (unsigned)st.used,
+             leaf_tx_written, leaf_read_reqs));
+    leaf_pk_release();
+    leaf_join_all();
+
+    /* ============ BTB07 逐调用归因: 非法上下文 => bad-context(与 lock-busy 可分) ====== */
+    leaf_state_clear();
+    if (!leaf_pre(leaf_bus_ready(), "BTB07 bus ready")) return;
+    memset(&st, 0xA5, sizeof(st));
+    leaf_no_thread = 1;
+    v = 0xA5A5A5A5u;
+    e = tmc2209_read_register_stat(TMC_ADDR_DEFAULT, TMC_REG_IOIN, &v, &st);
+    leaf_no_thread = 0;
+    CHECK("BTB07-per-call-stat-says-bad-context-not-lock-busy-for-same-rc",
+          e == -RT_EBUSY && st.rc == e && (int)st.rc == -23 &&
+          st.reason == TMC_XFER_BAD_CONTEXT &&
+          strcmp(tmc2209_xfer_reason_name(st.reason), "bad-context") == 0 &&
+          st.reason != TMC_XFER_LOCK_BUSY &&      /* 同一个 -23 的两个方向必须可分 */
+          st.tx_written == 0u && v == 0xA5A5A5A5u,
+          fm("rc=%d reason=%s(%d) tx=%u rx=%u (BTB06 同为 -23 而 reason 不同)",
+             (int)st.rc, tmc2209_xfer_reason_name(st.reason), (int)st.reason,
+             (unsigned)st.tx_written, (unsigned)st.rx_bytes));
+
+    /* ============ BTB08 逐调用归因: 发送阶段 => tx-failed, 实际上线 0 字节 ============ */
+    leaf_state_clear();
+    if (!leaf_pre(leaf_bus_ready(), "BTB08 bus ready")) return;
+    (void)uro_input(0, 0u, 1u);
+    leaf_tx_allowed = 0;                          /* TDRE 永不回起(与 URO08 同一注入) */
+    leaf_uart_regs.STAT.WORDVAL &= ~LEAF_TDRE;
+    memset(&st, 0xA5, sizeof(st));
+    v = 0xA5A5A5A5u;
+    e = tmc2209_read_register_stat(TMC_ADDR_DEFAULT, TMC_REG_IOIN, &v, &st);
+    leaf_tx_allowed = 1 << 20;
+    CHECK("BTB08-per-call-stat-puts-failure-in-tx-stage-with-zero-written",
+          e == -RT_ETIMEOUT && st.rc == e &&
+          st.reason == TMC_XFER_TX_FAILED &&
+          st.tx_written == 0u && st.rx_bytes == 0u &&
+          leaf_tx_written == 0 && v == 0xA5A5A5A5u,
+          fm("rc=%d reason=%s(%d) tx=%u rx=%u used=%u 线上字节=%d "
+             "(与 -23 那两条的差别: 这笔进了锁、进了发送阶段)",
+             (int)st.rc, tmc2209_xfer_reason_name(st.reason), (int)st.reason,
+             (unsigned)st.tx_written, (unsigned)st.rx_bytes, (unsigned)st.used,
+             leaf_tx_written));
+
+    /* ============ BTB09 逐调用归因: 接收阶段 => 4 字节上线 + 只有回声 ================= */
+    leaf_state_clear();
+    if (!leaf_pre(leaf_bus_ready(), "BTB09 bus ready")) return;
+    (void)uro_input(1, 0u, 1u);                   /* 单线回显开, 芯片不应答 */
+    leaf_chip_enabled = 0;
+    memset(&st, 0xA5, sizeof(st));
+    v = 0xA5A5A5A5u;
+    e = tmc2209_read_register_stat(TMC_ADDR_DEFAULT, TMC_REG_IOIN, &v, &st);
+    CHECK("BTB09-per-call-stat-puts-failure-in-rx-stage-with-four-tx-echo-only-rx",
+          e == -RT_ETIMEOUT && st.rc == e &&
+          st.reason == TMC_XFER_RX_TIMEOUT_ECHO &&
+          st.tx_written == 4u && st.rx_bytes == 4u &&
+          leaf_tx_written == 4 && leaf_read_reqs == 1 &&
+          tmc2209_get_health() == SUBSYS_DEGRADED && v == 0xA5A5A5A5u,
+          fm("rc=%d reason=%s(%d) tx=%u rx=%u used=%u health=%d "
+             "(现场若看到这一对才是'发出去了没应答'; BTB06 的 tx=0 不是)",
+             (int)st.rc, tmc2209_xfer_reason_name(st.reason), (int)st.reason,
+             (unsigned)st.tx_written, (unsigned)st.rx_bytes, (unsigned)st.used,
+             (int)tmc2209_get_health()));
+
+    /* ============ BTB10 归因是**本次调用私有**的, 不是共享的"最后一次错误" ============ */
+    leaf_state_clear();
+    if (!leaf_pre(leaf_bus_ready(), "BTB10 bus ready")) return;
+    memset(&sa, 0xA5, sizeof(sa));
+    memset(&sb, 0x5A, sizeof(sb));
+    bto_bg_rc = 999;
+    leaf_flush_pk_armed = 1;
+    if (!leaf_pre(leaf_spawn(bto_bg_sg_read, RT_NULL) == 0, "BTB10 后台 SG 读线程")) return;
+    if (!seq_or_timeout("BTB10 后台读已进入 xfer 锁内的 flush 阶段",
+                        leaf_pk_wait_arrived(5000)))
+    { leaf_pk_release(); leaf_join_all(); return; }
+    v = 0u;
+    (void)tmc2209_read_register_stat(TMC_ADDR_DEFAULT, TMC_REG_IOIN, &v, &sa);
+    leaf_pk_release();
+    leaf_join_all();                              /* 让锁归还, 再走第二笔 */
+    v = 0u;
+    e = tmc2209_read_register_stat(TMC_ADDR_DEFAULT, TMC_REG_IOIN, &v, &sb);
+    CHECK("BTB10-each-call-owns-its-stat-fail-then-success-do-not-share-last-error",
+          sa.rc == -RT_EBUSY && sa.reason == TMC_XFER_LOCK_BUSY && sa.tx_written == 0u &&
+          e == RT_EOK && sb.rc == RT_EOK && sb.reason == TMC_XFER_OK &&
+          sb.tx_written == 4u && sb.rx_bytes == 8u && v == 0x21000040u &&
+          sa.reason == TMC_XFER_LOCK_BUSY && sa.rc == -RT_EBUSY &&
+          memcmp(&sa, &sb, sizeof(sa)) != 0,
+          fm("A(前一笔) rc=%d reason=%s tx=%u rx=%u / B(本次) rc=%d reason=%s tx=%u "
+             "rx=%u value=0x%08X => 成功那笔没有继承失败, 失败那份也没被成功改写",
+             (int)sa.rc, tmc2209_xfer_reason_name(sa.reason),
+             (unsigned)sa.tx_written, (unsigned)sa.rx_bytes,
+             (int)sb.rc, tmc2209_xfer_reason_name(sb.reason),
+             (unsigned)sb.tx_written, (unsigned)sb.rx_bytes, (unsigned)v));
+}
+#endif /* !URO_BASELINE_BYTES */
+
 /* ===================================================================== */
 /* 15. 组入口                                                             */
 /* ===================================================================== */
@@ -3226,6 +3512,17 @@ int main(int argc, char **argv)
         summary();
         return g_pre ? 2 : (g_fail ? 1 : 0);
     }
+
+#ifndef URO_BASELINE_BYTES
+    /* R7F1 任务书 §1: tmc_boot 也只读(不取写入门禁) => 与 read_obs 同一口径, 在 target
+     * 与 host_ovr **两个变体都真执行**, 不许整族 SKIP, 也不许为跑它在本组偷偷开宏。 */
+    if (rt_strcmp(group, "tmc_boot") == 0)
+    {
+        bto_group();
+        summary();
+        return g_pre ? 2 : (g_fail ? 1 : 0);
+    }
+#endif
 
     if (!gated)
     {

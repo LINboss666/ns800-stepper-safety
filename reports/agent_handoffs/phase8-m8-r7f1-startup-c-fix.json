@@ -1,0 +1,159 @@
+{
+ "round": "phase8-m8-r7f1-startup-c-fix",
+ "title": "M8-R7F1 S3 现场失败复审与产品 C 修复(离线, 设备动作 0)",
+ "date": "2026-11-03",
+ "branch": "feature/m8-sg-adc-relative-protection",
+ "baseline_commit": "ed8d7f4a895ac95e0339bfc7c5eeae72f322c0a6",
+ "delivery_commit": "<本轮提交后由 git 头给出, 见 SHA256SUMS 与 push 回执>",
+ "task_book": "NS800_R7F1_A_Startup_C_Fix_20261103.md(云端 A), §6 单目标构建",
+ "task_book_items_completed": {
+  "1_boot_order_and_failure_branch_tests_on_real_c": "BTB01-BTB10(真实 tmc2209.c + 真实 UART 传输 + 真 pthread) + BPT01-BPT05(真实 safety_state/motor/step_pwm 走查) + SD13a/b/c(真实 sensor_service.c)",
+  "2_per_call_failure_reason": "任务书 §2: 把 tmc_xfer_stat_t(48 B)/reason 枚举与逐调用带状态的读接口 tmc2209_read_register_stat() 提到公共头; 没有把 188 B 的完整观测数组搬进接口。",
+  "3_minimal_startup_order_fix": "SG 分频分支加 && !s_sg_startup_gated(默认 1=关闭); 关闭期的帧沿用既有\"非分频帧\"语义(fresh_sg=0, 值与 valid_sg 继承基帧, sg_seq/sg_tick 不推进), 不新增第三种状态, 也不把失败冒充成读到 0。 | stage 11 safety_startup_selftest() 返回之后、[BOOT] 11 打印之前释放门一次 (PASS 与 FAIL 都释放, 不永久禁用 SG)。",
+  "4_split_three_proven_truncated_prints": "任务书 §2/§3: 启动自检必需项④的 IOIN 读改用带状态接口, 失败时先打印 rc+reason 一行、再打印 tx/rx/flush/used 一行(均在传输锁释放后的普通线程上下文); 真读失败/身份不符仍判 required 失败。任务书 §4: STEP 与 ==> FAULT_LATCHED 两族长打印拆成完整短行(成功分支 3 条、故障分支 4 条、锁存 4 条)。 | 任务书 §4: [MOT] init OK 一行拆成两行(使能路径校验 / DRV_ENABLE LOW + STEP 身份)。",
+  "5_affected_chains_only": {
+   "S2": "PASS (rc=0), 22 组 x target/host_ovr, target=68 / host_ovr=143 必需用例真执行; 含新组 tmc_boot(BTB01-10)与 boot_print(BPT01-05)。",
+   "SD": "PASS (rc=0), off_target 25 / on_target 24, 含 SD13a/b/c 门三例。",
+   "IO": "PASS (rc=0) 4 变体。",
+   "S1": "PASS (rc=0) target+host_ovr。",
+   "M8": "PASS(主机链, 离线; 现场项未验证)。",
+   "V1/V2": "RUNNER RESULT: PASS (rc=0)。",
+   "read_obs(既有)": "30/30 两个编译变体(本轮未改判据, 只作对照)。",
+   "line_width_check": "LINE_WIDTH_RESULT PASS (bad=0); --selfcheck 亦 PASS(4 条修前超长原样命中, 无 NOT-DETECTED)。",
+   "transcripts": "reports/reviews/phase8-m8-r7f1-startup-c-fix/host/ (含 iterations/ 里的中途失败原文)"
+  },
+  "6_single_target_build_once": {
+   "command": "C:\\Keil_v5\\UV4\\UV4.exe -r project.uvprojx -t rt-thread-motor-m1-candidate -j0 -o D:/ns800/reports/reviews/phase8-m8-r7f1-startup-c-fix/build/rt-thread-motor-r7f1.log",
+   "uv4_return_code": 0,
+   "error_warning_line": "0 Error(s), 0 Warning(s).",
+   "program_size": "Program Size: Code=205866 RO-data=86186 RW-data=2192 ZI-data=85596",
+   "images": {
+    "bin": {
+     "path": "reports/firmware/phase8-m8-r7f1-startup-c-fix/rt-thread-motor-m1-candidate.bin",
+     "bytes": 292628,
+     "sha256": "e5b51b6b810f215e284ea6317a4b1bef6b3faddc6f1ac9f8947804f261fa5732",
+     "identical_to_build_output": true
+    },
+    "axf": {
+     "path": "reports/firmware/phase8-m8-r7f1-startup-c-fix/rt-thread-motor-m1.axf",
+     "bytes": 1775784,
+     "sha256": "96bfe5cdbed9d4c773c96a3e190e5dda819ae2f38340e5f1c17750975b5986eb",
+     "identical_to_build_output": true
+    },
+    "map": {
+     "path": "reports/firmware/phase8-m8-r7f1-startup-c-fix/rt-thread-motor-m1.map",
+     "bytes": 2114770,
+     "sha256": "6138de0593df9a18c5902b7e5014918f8db2aa02fdf5bad516d4aef94efb0194",
+     "identical_to_build_output": true
+    },
+    "callgraph_htm": {
+     "path": "reports/firmware/phase8-m8-r7f1-startup-c-fix/rt-thread-motor-m1-callgraph.htm",
+     "bytes": 1078228,
+     "sha256": "c8d0f4e961c7c2a526551be219f59d4c3b9709f9e55ef447b09b9d4fbc8edf8b",
+     "identical_to_build_output": true,
+     "why": "Max Depth 只存在于 armlink 调用图 htm, 不入库则下一节数字不可复算。"
+    }
+   }
+  }
+ },
+ "device_actions": {
+  "download": 0,
+  "readback": 0,
+  "explicit_reset": 0,
+  "port_open": 0,
+  "apply": 0,
+  "config_save": 0,
+  "arm_or_start_or_learn": 0,
+  "note": "任务书 §6/§当前现场: 上一轮批准的 download/readback/reset 额度已用尽, 本轮不新增任何设备动作; 候选出来后要由 A 依据这枚具体固件身份另行安排一次有上限的启动诊断。",
+  "quota_state": "上一场(操作者一次整包批准)的 download/readback/explicit_reset 已用尽; 剩余 port_open/apply 不构成新一轮完整验证额度; 本轮未使用任何额度。"
+ },
+ "hardware_authorized_by_this_round": false,
+ "new_image_on_board": false,
+ "board_image_still": {
+  "sha256": "5ae4110d14fdbb40f49cc6f0deca474cf6d0b33b3ee9305e83681dbdd4a53825",
+  "bytes": 292164,
+  "proven_on_board_at": "ed8d7f4(M8-R7-F1 那场的 292164 B 定长回读逐字节相等)"
+ },
+ "resource_delta": {
+  "program_size_now": "Program Size: Code=205866 RO-data=86186 RW-data=2192 ZI-data=85596",
+  "program_size_r6a": "Program Size: Code=205594 RO-data=85994 RW-data=2188 ZI-data=85592",
+  "delta_bytes": {
+   "Code": 272,
+   "RO-data": 192,
+   "RW-data": 4,
+   "ZI-data": 4
+  },
+  "bin_delta_bytes": 464,
+  "attribution": [
+   "RW+4 唯一来源是 sensor_service.o 的 .data.s_sg_startup_gated(map 0x2000073c, Data 4 B, RW)。",
+   "ZI+4 落在 \"(incl. Padding)\" 行: 链接器填充, 没有任何具名 .bss 目标变化。",
+   "RO+177(safety_state.o)=新增/拆短的字符串字面量; BIN 里已能原样检索到 \"[SS] [REQ FAIL] TMC2209 IOIN rc=%d reason=%s\"、\"... tx=%u rx=%u flush=%u used=%u\"、\"[SS] STEP: motor=%s src=%s\"、\"[MOT] init OK: DRV_ENABLE LOW verified, STEP=%s\"。"
+  ]
+ },
+ "stack_depth_static_lower_bound": {
+  "evidence": "reports/reviews/phase8-m8-r7f1-startup-c-fix/build/stack_callgraph_r7f1.txt",
+  "max_depth_bytes_static_lower_bound": {
+   "safety_startup_selftest": 1220,
+   "safety_run_selftest": 1164,
+   "tmc2209_read_register_stat": 1076,
+   "supervisor_boot": 2020,
+   "sensor_thread_entry": 1332,
+   "system_selftest": 1340,
+   "main": 756
+  },
+  "main_thread_stack_budget_bytes": 2048,
+  "readings": [
+   "自检路径 1220 B 的最深链已经穿过新增的 tmc2209_read_register_stat, 48 B 逐调用状态已在数内; 反汇编帧 = PUSH {r4,lr} + SUB sp,sp,#0x30 = 56 B。",
+   "main 栈上的瓶颈是 supervisor_boot 子树的 SPI/配置加载线(2020 B, 静态余量 28 B), 它不经过本轮改的 IOIN 读; 本轮没有第二次构建, 所以没有该数字的修前对照, \"本轮未使其变差\"只由\"该行代码一行未改\"支撑, 不由实测差分支撑。",
+   "Max Depth 是 armlink 静态下界(解析不了函数指针, 也不含异常/ISR 帧), 不得当上界用。"
+  ]
+ },
+ "verification_status": {
+  "offline": "PASS",
+  "field": "NOT_EXECUTED",
+  "wording_rule": "本轮一切结论只到\"主机 C 链 + 离线镜像构建\"这一层, 不得写成现场通过。"
+ },
+ "proven_offline": [
+  "启动竞争的形状可在真实产品函数上复现并判据: BTB01 rc=-23 且线上 0 B、设备读请求 0 次; BTB03 同一笔前台读在后台不抢锁时成功(同负载 A/B)。",
+  "逐调用身份可区分: BTB06 lock-busy(tx=0) / BTB07 bad-context(同为 -23 但 reason 不同) / BTB08 tx-failed / BTB09 rx-timeout-echo(tx=4) / BTB10 两次调用互不继承。",
+  "SG 启动门语义: SD13a 关闭期 25 帧 SG UART 调用=0 且 imu/adc/snap 各自照跑 25; SD13b 关闭帧沿用\"非分频帧\"语义(valid_sg/sg_seq 继承, fresh=0); SD13c release 后恢复分频读。",
+  "三处截断打印已拆短并双向验证: 静态(line_width_check 15 站点带真实 UTF-8 实参, 4 条修前原样做元负控) + 动态(BPT01-04 逐行量宽, BPT05 证明裁剪模型会命中)。"
+ ],
+ "not_proven": [
+  "现场 IOIN 那一次到底落在哪个 reason —— 要下一次开机看新的两行才能定; 本轮 0 设备动作。",
+  "门释放后真实板上的先后关系(RT-Thread 调度在板上是否按夹具假设那样让 sensor 抢在 stage 11 之前)—— 夹具证的是\"若后台先持锁则前台必 -23 且 0 字节\", 不是\"板上确实如此发生过\"。",
+  "msh system_selftest 重入不受门约束(头文件注释里已登记), 该路径未覆盖。",
+  "sensor 线程在 stage 7 之后、stage 11 之前若已在半帧中途, 门只能挡住\"下一次分频读\", 已经在途的那一笔仍可能持锁 —— 本轮未处理, 下一轮看现场 reason 即可判定它是否发生。",
+  "阈值、ACTIVE、运动授权、带载保护、IMU/SG 相对判定的现场有效性: 全部未验证, 本轮一律未触碰。"
+ ],
+ "test_boundaries_disclosed": [
+  "注入落在真实产品函数(tmc2209.c / safety_state.c / sensor_service.c / motor.c / step_pwm.c), UART 与 TMC 芯片侧是既有假总线夹具; 没有新搭通用仿真环境, 也没有用 Python 假回复宣称 MCU 已修好。",
+  "夹具证的是\"后台若先持传输锁, 前台必需读必得 -23 且线上 0 字节\", 不是\"板上确实这样发生过\"。",
+  "RT-Thread 真实调度(sensor 优先级 7 抢占 main 优先级 10)在主机链上由 pthread 近似, 不等于板上时序。",
+  "msh system_selftest 重入不受启动门约束, 该路径未覆盖(已在 sensor_service.h 注释登记)。",
+  "门只挡下一次分频读; stage 7 之后已在途的那一笔不受影响, 本轮未处理。"
+ ],
+ "next_field_run_must_look_at": [
+  "新增两行 [SS] [REQ FAIL] TMC2209 IOIN rc=… reason=… / tx=… rx=… flush=… used=… 的具体 reason 与阶段字段。",
+  "READY/fault=0 是否达成; 未达成则按 reason 定分支, 不再等 75 秒。",
+  "三处打印族是否逐条以换行收尾、无 NUL、无半截 UTF-8。",
+  "绑定对象只能是 BIN 292628 B e5b51b6b… / AXF 96bfe5cd… / MAP 6138de05…, 不是上一场的 5ae4110d…。"
+ ],
+ "forbidden_things_untouched": [
+  "执行器与批准台账(未修改, 未绕过本场失败)",
+  "阈值与 ACTIVE 与运动授权",
+  "load_means",
+  "RT_CONSOLEBUF_SIZE / RT_MAIN_THREAD_STACK_SIZE / 任何栈常量",
+  "历史证据目录(R6/R6A/R6B/R6C/R7 全部原样)",
+  "冻结引用"
+ ],
+ "git_discipline": "无 reset/clean/rebase/force; 保持既有用户改动; 本轮一次提交, 不为回读自己的新头追加收口提交。",
+ "evidence_index": {
+  "build_log": "reports/reviews/phase8-m8-r7f1-startup-c-fix/build/rt-thread-motor-r7f1.log",
+  "stack_report": "reports/reviews/phase8-m8-r7f1-startup-c-fix/build/stack_callgraph_r7f1.txt",
+  "firmware_dir": "reports/firmware/phase8-m8-r7f1-startup-c-fix/",
+  "host_dir": "reports/reviews/phase8-m8-r7f1-startup-c-fix/host/",
+  "run_record": "reports/reviews/phase8-m8-r7f1-startup-c-fix/run_record.md",
+  "handoff_md": "reports/agent_handoffs/phase8-m8-r7f1-startup-c-fix.md"
+ }
+}

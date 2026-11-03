@@ -64,8 +64,8 @@ GROUP_TIMEOUT="${S2_GROUP_TIMEOUT:-60}"
 # URO(2026-10-27 §6.1): read_obs 也跑**同一个叶子二进制**, 但它是只读通信观测, 不取
 #   写入门禁 => 在 target 与 host_ovr **两个变体都真执行**(不许整族 SKIP, 也不许为了
 #   跑本组在 target 里偷偷开宏)。旧四组的 target 整族 SKIP 保持原样、身份不变。
-S2_GROUPS="lock isr isr_window off_matrix off_arm unknown identity diag recovery stale boundary healthy target_reject epwm_leaf tmc_lock uart_leaf budget_leaf read_obs cal_static disarm_ready"
-LEAF_GROUPS=" epwm_leaf tmc_lock uart_leaf budget_leaf read_obs "
+S2_GROUPS="lock isr isr_window off_matrix off_arm unknown identity diag recovery stale boundary healthy target_reject epwm_leaf tmc_lock uart_leaf budget_leaf read_obs cal_static disarm_ready tmc_boot boot_print"
+LEAF_GROUPS=" epwm_leaf tmc_lock uart_leaf budget_leaf read_obs tmc_boot "
 
 # 每组每变体**必需**(必须真执行且判 PASS)的用例 id; 名称与夹具里的 CASE id 逐字一致。
 G_lock_target="C01-fast-before-lock-then-wait C01b-commits-after-release-no-second-close C01c-ss-lock-error-no-ack C02-mot-lock-held-then-commits C02b-mot-lock-error-no-place"
@@ -179,6 +179,28 @@ G_disarm_ready_host_ovr="C23a-disarm-from-run-commits-ready C23a2-rearm-allowed-
 S_disarm_ready_target="C23"
 S_disarm_ready_host_ovr=""
 
+# BTB* = R7F1(2026-11-03 任务书 §1): 启动期**两条** TMC 读取的先后关系与失败分支。
+#   后台走 sensor_service.c:128 的同一个生产入口 tmc2209_read_sg_result(), 前台走
+#   safety_state.c:643 的同一个生产入口 tmc2209_read_register(IOIN); 两笔读共用 tmc2209.c
+#   的真 xfer 锁, 会合点落在"后台取到锁之后的 flush 第一次设备读"(不是墙钟猜交错)。
+#   全部只读 => 与 read_obs 同一口径, **两个变体都真执行**(target 不许整族 SKIP, 出现
+#   任何 SKIP 都算台账不自洽; 也不许为跑本组在 target 里开宏)。
+G_tmc_boot_target="BTB01-startup-ioin-read-refuses-with-zero-bytes-on-wire-while-background-sg-holds-xfer BTB02-background-sg-read-itself-completes-after-release-and-returns-lock BTB03-same-ioin-read-succeeds-when-no-background-reader-holds-xfer BTB04-illegal-context-refuses-with-same-rc-but-zero-lock-attempt BTB05-ioin-transport-succeeds-but-identity-must-still-fail-required BTB06-per-call-stat-says-lock-busy-with-tx-zero-on-ioin-read BTB07-per-call-stat-says-bad-context-not-lock-busy-for-same-rc BTB08-per-call-stat-puts-failure-in-tx-stage-with-zero-written BTB09-per-call-stat-puts-failure-in-rx-stage-with-four-tx-echo-only-rx BTB10-each-call-owns-its-stat-fail-then-success-do-not-share-last-error"
+G_tmc_boot_host_ovr="$G_tmc_boot_target"
+S_tmc_boot_target=""
+S_tmc_boot_host_ovr=""
+
+# BPT* = R7F1(2026-11-03 任务书 §2/§4): 现场被 127 字节那一刀切掉的三条启动打印拆短之后,
+#   用**实跑发出的那一条**(不是格式串长度)逐条量: <=120 B / 无 lost 字节 / 未把缓冲区尾
+#   NUL 当数据发出 / 末尾就是换行 / 截断处无半截 UTF-8。三处的成功分支与故障分支都跑到,
+#   外加 §2 新加的自检归因两行。BPT05 是量具自身的元负控: 三条已知超长的夹具样本必须
+#   被抓住 —— 不先证明这把尺会命中, 就不许拿 BPT01..04 的 PASS 宣布"拆干净了"。
+#   全部只读、不需要四宏为 1 => 两个变体都真执行(不许整族 SKIP)。
+G_boot_print_target="BPT01-mot-init-ok-splits-into-two-lines-each-within-console-limit BPT02-ss-step-success-branch-and-fault-latched-all-short-complete-lines BPT03-ss-step-unconfirmed-fault-branch-splits-into-four-complete-lines BPT04-selftest-ioin-failure-prints-per-call-reason-as-two-short-lines BPT05-console-cutter-model-fires-on-known-too-long-lines"
+G_boot_print_host_ovr="$G_boot_print_target"
+S_boot_print_target=""
+S_boot_print_host_ovr=""
+
 # 变体期望的用例总数(全开时): 少一组/少一个 id 都不算通过。
 # CP5 §4: recovery 组的 C14 拆成 C14a/C14b 两个**确定接缝** => 22->23 / 40->41。
 # CP5 §5: target 的叶子四组贡献 0 个 CASE(整族 SKIP) => 23 不变;
@@ -190,8 +212,11 @@ S_disarm_ready_host_ovr=""
 # 旧的 23/79 与 URO 的 24 条合同没被改动(各组身份与数量逐字保留), 新用例**另计**。
 # R6(2026-11-03 §7.2): disarm_ready 组在 host_ovr 真执行 10 条(正例 4 + 反例 6), target 整族 SKIP
 #   => target 53 不变, host_ovr 118 + 10 = 128。
-S2_EXPECT_target="${S2_EXPECT_target:-53}"
-S2_EXPECT_host_ovr="${S2_EXPECT_host_ovr:-128}"
+# R7F1(2026-11-03 任务书 §1+§2): tmc_boot 组 10 条只读观测在**两个变体都真执行**
+# R7F1(同任务书 §2/§4): boot_print 组 5 条(实跑逐条字节量 + 量具元负控)同样两变体真执行
+#   => target 53 + 10 + 5 = 68, host_ovr 128 + 10 + 5 = 143。
+S2_EXPECT_target="${S2_EXPECT_target:-68}"
+S2_EXPECT_host_ovr="${S2_EXPECT_host_ovr:-143}"
 
 VARIANTS="target host_ovr"
 

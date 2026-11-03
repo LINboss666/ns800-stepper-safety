@@ -1,0 +1,38 @@
+# sha256 * <仓库相对路径>(LF, 无 BOM; 本清单不哈希自身字节 —— 一条清单不能给自己的字节作证)
+# 生成方式: 对 reports/reviews/phase8-m8-r7f1-startup-c-fix/ 下每个常规文件(排除 SHA256SUMS.txt、remote_readback.md 与 __pycache__) 直接读磁盘字节算 sha256
+# 条目数=34; 与 Git blob 的逐条复算由 host/staged_preflight_batch.py(提交前, 单批流)与推送后的远端逐 blob 回读完成
+# 重新生成: python reports/reviews/phase8-m8-idle-stack-r4/host/make_round_sums.py <本目录>
+18a074dfbe330f7cf893623f95e09f13445b82f924fa5b6ac322065b8615c905  reports/reviews/phase8-m8-r7f1-startup-c-fix/build/rt-thread-motor-r7f1.log
+e49466a5bb5ca3cadb2b28c77e238fd803de6f32f9b4ed818eaed127b18b767a  reports/reviews/phase8-m8-r7f1-startup-c-fix/build/stack_callgraph_r7f1.txt
+b6e452cbd4c3c288adf1cc0d826864f231bf191920bbb56a33705d8a23dcefbd  reports/reviews/phase8-m8-r7f1-startup-c-fix/host/conc_boot_print_host_ovr.txt
+2286aaaaf31d66b2796467810eb87734530a8e3d00fc6d9d46d8d6062de84eda  reports/reviews/phase8-m8-r7f1-startup-c-fix/host/conc_boot_print_target.txt
+79c28db4aba7137ddccc85ca8323bb0a4188dc20159bda64a89db5dcdcc400de  reports/reviews/phase8-m8-r7f1-startup-c-fix/host/io_after.txt
+82e9e45e0aee1611081f8bb11679287fdecbfdd4eb51ab0f21ee21b49fda5cdc  reports/reviews/phase8-m8-r7f1-startup-c-fix/host/iterations/lwc_run.txt
+d034f95a699563344f913b1d5cd70edd5697762e89731068729d6a3bb4bc11ac  reports/reviews/phase8-m8-r7f1-startup-c-fix/host/iterations/lwc_selfcheck.txt
+4612df66f4e8666ad4c0f4628ec454aa3fcb858b7dc6dcbe310a28a6e97b08d0  reports/reviews/phase8-m8-r7f1-startup-c-fix/host/iterations/m8_v1.txt
+2f9b918a29378ad885160930fe93767ac5d276e18e85c59a1ee9b780577d1eb1  reports/reviews/phase8-m8-r7f1-startup-c-fix/host/iterations/s2_bpt_v2.txt
+b8194ef301cf46aa4203de4a94885fe71dea000f71517d05faf45cb43ede7d08  reports/reviews/phase8-m8-r7f1-startup-c-fix/host/iterations/s2_bpt_v3.txt
+91689c9fc59fb306e1e1e08abed5ad990688262420ed520de7a09a4b912e94ab  reports/reviews/phase8-m8-r7f1-startup-c-fix/host/iterations/s2_bpt_v4.txt
+591294dffd06f0133ae18595b62228e13b22b6d6b2c42cc19f1451ed298eab39  reports/reviews/phase8-m8-r7f1-startup-c-fix/host/iterations/s2_bpt_v5.txt
+3a9acc4585c0d4aec74fa43b29940ddb6c2189175a31853beea032ca2a12b694  reports/reviews/phase8-m8-r7f1-startup-c-fix/host/iterations/s2_bpt_v6.txt
+591c82a005c4b7267d13d0a5fa7dd24b702f5deb71adc8914fe98eddf4f1f6c1  reports/reviews/phase8-m8-r7f1-startup-c-fix/host/iterations/s2_bpt_v7.txt
+e96c96136e93aebf27f52d1488a53a991864908e6bf16462bd094fdf5a63fee4  reports/reviews/phase8-m8-r7f1-startup-c-fix/host/iterations/s2_bpt_v8.txt
+650e7af6579e245b3779384eec8b40c2564c24acf3654ec0d1d89ff0bceb20a7  reports/reviews/phase8-m8-r7f1-startup-c-fix/host/iterations/s2_btb_v1.txt
+a45f1244f2c0df992061943d38c24df8bbe69dbc24e6907bc4894c7f0154457b  reports/reviews/phase8-m8-r7f1-startup-c-fix/host/iterations/s2_btb_v2.txt
+c4c1c4808df3c13409de4a1243eccb9da71fc7b7dbe372c9c2bf13d8deb54f79  reports/reviews/phase8-m8-r7f1-startup-c-fix/host/iterations/s2_btb_v3.txt
+89963c6ba99a69532ac5aaaefecc957687cdf816d37479491376c852479ec62e  reports/reviews/phase8-m8-r7f1-startup-c-fix/host/iterations/s2_full_v1.txt
+3dd57dd7eb3a64a74d7872d353b63c95b1a61d47df31e9f2217b56a158a4fe3b  reports/reviews/phase8-m8-r7f1-startup-c-fix/host/iterations/sd_v1.txt
+d76ffb70fd68a5e07c82d60fdd5316257b430f8474919d67189ecf799116059d  reports/reviews/phase8-m8-r7f1-startup-c-fix/host/leaf_tmc_boot_host_ovr.txt
+dde1d4d2aefb146e886bfdba87f636587502e1d7622cdbd448c898da9258a560  reports/reviews/phase8-m8-r7f1-startup-c-fix/host/leaf_tmc_boot_target.txt
+9f0c8ebfdac7c3a478793372a039bbb3711ace5fcbea6390448ca2f2d94ec296  reports/reviews/phase8-m8-r7f1-startup-c-fix/host/line_width_after.txt
+1aa396979a4d1b743d8932fa87c3a1b6de12214d4eb8ad7ac2d08302cdb9452e  reports/reviews/phase8-m8-r7f1-startup-c-fix/host/line_width_check.py
+45938ebe1a05bd2b158546f0144b472280fcbdcf364041efad34acfe234554c4  reports/reviews/phase8-m8-r7f1-startup-c-fix/host/line_width_selfcheck.txt
+61e1ed6a9b04f80c8133e6b3cd184b6b01eda8d22b6481483a9e3945c5833b0b  reports/reviews/phase8-m8-r7f1-startup-c-fix/host/m8_after.txt
+d3d696e147bd7c8dfe7ecfd74b2c324b819978bd90e9df877547493c9090e16d  reports/reviews/phase8-m8-r7f1-startup-c-fix/host/s1_after.txt
+43f23a45086461761e95217ebb4165771ac26f1ce4effa883cab087238adb0fe  reports/reviews/phase8-m8-r7f1-startup-c-fix/host/s2_full_after.txt
+9db68d6758ae428cd4cda10332132661cf867778e4ce018d23dfe3037ed40995  reports/reviews/phase8-m8-r7f1-startup-c-fix/host/s2_readobs_existing_chain.txt
+22796c1238327b37d19d6d4af7a7ede1acad178c42202681fefdd3fb520da90b  reports/reviews/phase8-m8-r7f1-startup-c-fix/host/sd_after.txt
+bb6a1a29e8874b28358aaf1731d5553f1f4ca0c0e3017b69e09deb378c1713f4  reports/reviews/phase8-m8-r7f1-startup-c-fix/host/sd_off_target_out.txt
+37ee800fdb89abfb8d87917cc546483372c31edb67d32d61d85ffcb20dc774d5  reports/reviews/phase8-m8-r7f1-startup-c-fix/host/sd_on_target_out.txt
+75f253ddad34696beb663d6bc58b683c804ebdaedb2ec718863044cfbe787293  reports/reviews/phase8-m8-r7f1-startup-c-fix/host/v1v2_after.txt
+e846ca4e3682895ffc25d9bedeaaa0d396cfb1eddd25572492ae7a3b849a263a  reports/reviews/phase8-m8-r7f1-startup-c-fix/run_record.md

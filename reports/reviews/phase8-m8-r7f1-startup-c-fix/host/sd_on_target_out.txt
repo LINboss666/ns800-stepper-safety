@@ -1,0 +1,56 @@
+VARIANT|limit_inputs=ON active_mask=0F schema=1
+[SNS] sensor thread started (100Hz, prio 7)
+[BB] blackbox ready (ring=300 cap=450 frames @100Hz, prio 18)
+CASE|SD13a-startup-gate-closed-silences-only-the-sg-uart-read|PASS|默认门=1 关闭期 25 帧: SG uart 调用=0(必须 0) imu=25 adc=25 snap=25 fresh_sg=0 sg_seq=0 / imu_seq=25 cur_seq=25 motion_seq=25
+CASE|SD13b-gate-closed-frame-inherits-valid-sg-without-claiming-fresh|PASS|关闭期第二帧: valid_sg=1 sg_result=512 fresh_sg=0 sg_seq=7(继承 7) uart 调用=0
+CASE|SD13c-release-after-stage-11-resumes-the-divided-sg-read|PASS|release 后门=0 再 21 帧(0/10/20 命中): SG uart 调用增量=3(必须 3) sg_seq=3 valid_sg=1 fresh_sg=1 sg_result=777
+CASE|SD02-on-all-four-active-limit-low-still-valid|PASS|active=0F valid=0F group=1 lim_min=0 res=1 rd=1
+[SNS] frame seq=1 tick=44140265
+[SNS] imu  [VALID] ax=12 ay=-34 az=998 vib=998 mg
+[SNS] curr [VALID] raw=2048 ema=4321 ma=512 cal_source=THEORETICAL(default)  (NOT measured)
+[SNS] sg   [VALID] SG_RESULT=777
+[SNS] mot  state=4 step_hz=0 dir=0
+[SNS] safe active=0F valid=0F group=ALL-READ
+[SNS]      enn_fb=1[VALID] | lim_min=0[VALID] | lim_max=1[VALID] | diag=1[VALID]
+[SNS]      (PC.6=TMC_ENN 反馈, 非急停输入; 禁用字段显示 DISABLED_BY_CONFIG, 活动但无样本显示 INVALID_NO_SAMPLE)
+CASE|SD02b-on-output-trigger-state-is-valid|PASS|ON 变体输出: OK
+CASE|SD03-parse-fail-clears-only-that-valid-bit|PASS|适用活动源=4 个, 违规判定数=0 (首个失败源索引=-1)
+CASE|SD04-illegal-reading-never-becomes-valid-high|PASS|注入(源,非法值)组合=12, 被判有效/被写脏的次数=0
+CASE|SD05-dirty-baseframe-does-not-pollute|PASS|脏基帧后 active=0F valid=07 group=0 (基帧曾是 FF/FF)
+CASE|SD05c-recovery-makes-source-valid-again|PASS|失败后重新读到即恢复有效: OK
+CASE|SD06-private-context-isolated-and-divider-kept|PASS|live seq 25->25, prev 变化=0, 私有 seq=25, uart sg 调用=6
+CASE|SD06b-valid-fresh-division-semantics-kept|PASS|非分频帧 sg[v=1 f=0] imu[v=1 f=1] cur[v=1 f=1]
+CASE|SD07-same-source-frame-propagates|PASS|flags=1734F700 active=0F valid=07 schema=V1 diag_state=1
+CASE|SD07b-no-recompute-at-write-time|PASS|捕获帧不变: valid=07 (DIAG 仍 INVALID)
+CASE|SD08-flags-position-vector-against-independent-expectation|PASS|flags=1F34FB07 期望=1F34FB07
+CASE|SD08b-legacy-valid-and-event-fields-unchanged|PASS|valid=1F (STEP 未被借用作安全输入), session=0
+CASE|SD08c-pre-post-event-responsibility-kept|PASS|pre event=0 / post event=11 且 flags[7:0]=11: OK
+CASE|SD09-schema-dispatch-by-record-not-by-board|PASS|版本判定: legacy=1 unknown=2 v1=0
+[BB] dump last 10 of used=2:
+[BB] slot=1 ses=9 t=0 ev=0 valid=08 flags=E0340507 sg=0 ma=0 vib=0 hz=0
+[BB]      sai_schema=UNKNOWN_SCHEMA raw_flags=E0340507 —— 不按新定义解释, 不称其为已确认的急停/ENN 状态
+[BB] slot=0 ses=9 t=0 ev=0 valid=08 flags=00340507 sg=0 ma=0 vib=0 hz=0
+[BB]      sai_schema=LEGACY_UNVERSIONED raw_flags=00340507 —— 不按新定义解释, 不称其为已确认的急停/ENN 状态
+[BB] dump done (2 shown)
+CASE|SD09b-dump-keeps-legacy-raw-uninterpreted|PASS|dump 文本: legacy=1 unknown=1 未被补解释=1
+[SNS] frame seq=1 tick=44140265
+[SNS] imu  [VALID] ax=12 ay=-34 az=998 vib=998 mg
+[SNS] curr [VALID] raw=2048 ema=4321 ma=512 cal_source=THEORETICAL(default)  (NOT measured)
+[SNS] sg   [VALID] SG_RESULT=777
+[SNS] mot  state=4 step_hz=0 dir=0
+[SNS] safe active=0F valid=07 group=INCOMPLETE
+[SNS]      enn_fb=1[VALID] | lim_min=1[VALID] | lim_max=1[VALID] | diag=0[INVALID_NO_SAMPLE]
+[SNS]      (PC.6=TMC_ENN 反馈, 非急停输入; 禁用字段显示 DISABLED_BY_CONFIG, 活动但无样本显示 INVALID_NO_SAMPLE)
+CASE|SD10a-snapshot-distinguishes-valid-invalid-disabled|PASS|snapshot: enn/diag/限位三态齐备且无急停虚构 = OK
+[BB] dump last 10 of used=2:
+[BB] slot=1 ses=0 t=0 ev=0 valid=00 flags=00340507 sg=0 ma=0 vib=0 hz=0
+[BB]      sai_schema=LEGACY_UNVERSIONED raw_flags=00340507 —— 不按新定义解释, 不称其为已确认的急停/ENN 状态
+[BB] slot=0 ses=0 t=0 ev=5 valid=08 flags=1700F505 sg=0 ma=0 vib=0 hz=0
+[BB]      sai_schema=V1 active=0F valid=07 enn_fb=1[VALID] lim_min=0[VALID] lim_max=1[VALID] diag=0[INVALID_NO_SAMPLE] (禁用或无样本的电平位不代表测量结果)
+[BB] dump done (2 shown)
+CASE|SD10b-dump-shows-version-and-per-channel-readability|PASS|dump: V1 与旧格式并存且逐路标注可读性 = OK
+CASE|SD12-cal-source-same-snapshot|PASS|frame_src=2 live_src=1
+CASE|SD11a-no-gpio-write-in-sampling-or-conversion|PASS|gpio writes=0 mode=0 attach=0 (必须全 0)
+CASE|SD11b-uart-only-the-divided-sg-read|PASS|sg UART 读=3 (25 帧, 分频 10 ⇒ 3 次; 无写入口可用)
+CASE|SD11c-layout-and-storage-offsets-unchanged|PASS|sizeof(ns_fault_sample_t)=48 offsetof(flags)=44 sizeof(bb_frame_t)=48 sizeof(sensor_frame_t)=92
+SUMMARY|cases=24 pass=24 fail=0

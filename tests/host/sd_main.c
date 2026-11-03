@@ -394,6 +394,82 @@ static int active_of(const sensor_frame_t *f) { return (int)f->sai_active; }
 
 /* ======================= 用例 ======================= */
 
+/* ---------- SD13: R7F1(任务书 §3) 启动期 SG 门 ----------
+ * 被测本体是 applications/sensor_service.c 里真实的 s_collect() 与那条门静态;
+ * 下面的假服务只提供**计数**(g_imu/g_adc/g_uart_sg/g_snap), 所以"门只压 SG 这一路
+ * UART 读, 别的路照采"是可判定的, 不是自总结。
+ * ⚠ 本用例必须**最先跑**: "门是关着的"是生产的**默认值**, 只有进程刚起来那一刻才是
+ *   真实的默认态; 用例结尾把门打开, 后面 12 组用例按原有期望逐字不变地跑。 */
+static void sd13_sg_startup_gate(void)
+{
+    sensor_frame_t f, prev;
+    rt_uint32_t seq = 0;
+    int i, closed_gate, calls_closed, imu_closed, adc_closed, snap_closed;
+    int calls_open;
+    int ok;
+    char d[256];
+
+    reset_all();
+    closed_gate = (sensor_service_sg_startup_gated() == RT_TRUE) ? 1 : 0;
+    rt_memset(&prev, 0, sizeof(prev));
+    rt_memset(&f, 0, sizeof(f));
+    seq = 0;
+    for (i = 0; i < 25; ++i) s_collect(&f, &prev, &seq);
+    calls_closed = g_uart_sg_calls;
+    imu_closed = g_imu_calls; adc_closed = g_adc_calls; snap_closed = g_snap_calls;
+    ok = closed_gate && calls_closed == 0 &&
+         /* 其余三路照常每帧一次 => 没有"停掉全部传感器", IMU/ADC 自检路径不受影响 */
+         imu_closed == 25 && adc_closed == 25 && snap_closed == 25 &&
+         /* 关闭期间的帧语义 == 既有"非分频帧": fresh_sg=0, 值与 valid 继承, 身份不推进 */
+         f.fresh_sg == 0 && f.sg_seq == 0u && f.valid_sg == 0 &&
+         /* 其他源的每帧身份照旧推进(证明只有 SG 这一路被门住) */
+         f.imu_seq == 25u && f.cur_seq == 25u && f.motion_seq == 25u;
+    snprintf(d, sizeof(d),
+             "默认门=%d 关闭期 25 帧: SG uart 调用=%d(必须 0) imu=%d adc=%d snap=%d"
+             " fresh_sg=%d sg_seq=%u / imu_seq=%u cur_seq=%u motion_seq=%u",
+             closed_gate, calls_closed, imu_closed, adc_closed, snap_closed,
+             f.fresh_sg, (unsigned)f.sg_seq,
+             (unsigned)f.imu_seq, (unsigned)f.cur_seq, (unsigned)f.motion_seq);
+    check("SD13a-startup-gate-closed-silences-only-the-sg-uart-read", ok, d);
+
+    /* SD13b: 门关闭期间 valid_sg 的**继承**不被清掉(基帧里已有过一次成功读的形状)。
+     * 这是既有"非分频帧"分支的语义: 保留值仍算有效, 但不算本帧新采。 */
+    reset_all();
+    rt_memset(&prev, 0, sizeof(prev));
+    seq = 9;                                    /* 下一次 s_collect 正好落在分频点 */
+    s_collect(&f, &prev, &seq);                 /* 门还关着: seq 变 10 */
+    prev.valid_sg = 1; prev.sg_result = 512; prev.sg_seq = 7;
+    s_collect(&f, &prev, &seq);                 /* seq=10 => 命中分频点, 但仍被门住 */
+    ok = (f.valid_sg == 1 && f.sg_result == 512 && f.fresh_sg == 0 && f.sg_seq == 7u &&
+          g_uart_sg_calls == 0);
+    snprintf(d, sizeof(d),
+             "关闭期第二帧: valid_sg=%d sg_result=%u fresh_sg=%d sg_seq=%u(继承 7)"
+             " uart 调用=%d",
+             f.valid_sg, (unsigned)f.sg_result, f.fresh_sg,
+             (unsigned)f.sg_seq, g_uart_sg_calls);
+    check("SD13b-gate-closed-frame-inherits-valid-sg-without-claiming-fresh", ok, d);
+
+    /* SD13c: supervisor 在 stage 11 之后调用 release => 分频节拍照旧恢复。
+     * 从 seq=0 起跑 21 帧: 命中分频点的是 0/10/20 三次, 且**最后一帧正好落在分频点**
+     * (fresh_sg 才会是 1 —— 非分频帧按既有语义 fresh_sg=0, 那不是本用例要证的)。 */
+    reset_all();
+    sensor_service_sg_startup_release();
+    closed_gate = (sensor_service_sg_startup_gated() == RT_TRUE) ? 1 : 0;
+    calls_open = g_uart_sg_calls;
+    rt_memset(&prev, 0, sizeof(prev));
+    rt_memset(&f, 0, sizeof(f));
+    seq = 0;
+    for (i = 0; i < 21; ++i) s_collect(&f, &prev, &seq);
+    ok = !closed_gate && (g_uart_sg_calls - calls_open) == 3 &&
+         f.sg_seq == 3u && f.valid_sg == 1 && f.fresh_sg == 1;
+    snprintf(d, sizeof(d),
+             "release 后门=%d 再 21 帧(0/10/20 命中): SG uart 调用增量=%d(必须 3)"
+             " sg_seq=%u valid_sg=%d fresh_sg=%d sg_result=%u",
+             closed_gate, g_uart_sg_calls - calls_open,
+             (unsigned)f.sg_seq, f.valid_sg, f.fresh_sg, (unsigned)f.sg_result);
+    check("SD13c-release-after-stage-11-resumes-the-divided-sg-read", ok, d);
+}
+
 static void sd01_off(void)
 {
     sensor_frame_t f, prev;
@@ -933,6 +1009,10 @@ int main(void)
            "OFF",
 #endif
            (unsigned)SAI_ACTIVE_MASK, (unsigned)BBFL_SCHEMA_CURRENT);
+
+    /* R7F1 §3: 启动期 SG 门最先跑 —— 它要用生产的**默认关闭态**, 并在结尾把门打开,
+     * 让下面 12 组用例按各自原有的期望逐字不变地跑。 */
+    sd13_sg_startup_gate();
 
 #if SAFETY_LIMIT_INPUTS_ENABLED == RT_TRUE
     sd02_on();                       /* ON 变体专属(证明限位触发态仍是有效样本) */

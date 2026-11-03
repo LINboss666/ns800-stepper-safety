@@ -1,0 +1,59 @@
+LINE_WIDTH mode=离线界限依据 limit=120B (控制台裁剪线 127B) base=ed8d7f4a8
+SELFCHECK|known-too-long|修前 CONFIGURED 一行|worst=378B|复审/现场量得=132B|fired
+SELFCHECK|known-too-long|修前 LIMIT 一行|worst=162B|复审/现场量得=250B|fired
+SELFCHECK|known-too-long|R6 新增的 withheld 一行(修前)|worst=285B|复审/现场量得=237B|fired
+SELFCHECK|known-too-long|R7F1 修前 [MOT] init OK 一行(现场偏移 1192, NUL 前 126 B)|worst=139B|复审/现场量得=126B|fired
+SELFCHECK|known-too-long|R7F1 修前 [SS] STEP: 一行(现场偏移 2142, NUL 前 126 B)|worst=207B|复审/现场量得=126B|fired
+SELFCHECK|known-too-long|R7F1 修前 [SS] ==> FAULT_LATCHED 一行(现场偏移 2269, NUL 前 126 B)|worst=221B|复审/现场量得=126B|fired
+SELFCHECK|known-too-long|R7F1 修前 [SS] !! STEP 关断未确认(同一 if/else 的故障分支; 本轮现场未执行, 离线最宽展开)|worst=326B|复审/现场量得=0B|fired
+SELFCHECK-LINE|tmc2209.c:2840|57 B|[TMC-CFG] CONFIGURED (各次写入均经 IFCNT 确认)\n
+SELFCHECK-LINE|tmc2209.c:2841|40 B|[TMC-CFG] GCONF/CHOPCONF 读回一致\n
+SELFCHECK-LINE|tmc2209.c:2842|51 B|[TMC-CFG] 电流值仍为理论计算, 未实测\n
+SELFCHECK-LINE|tmc2209.c:2843|60 B|[TMC-CFG] 预算: 已用 4294967295 / 总 4294967295 tic
+SELFCHECK-LINE|tmc2209.c:2845|45 B|[TMC-CFG] flush=4294967295B TX=4294967295B\n
+SELFCHECK-LINE|tmc2209.c:2847|93 B|[TMC-CFG] irun=4294967295 ihold=4294967295 dly
+SELFCHECK-LINE|tmc2209.c:2850|65 B|[TMC-CFG] GCONF 00000000->00000000 CHOPCONF 00
+SELFCHECK-LINE|tmc2209.c:2852|32 B|[TMC-CFG] op_epoch=4294967295\n
+SELFCHECK-LINE|tmc2209.c:2825|88 B|[TMC-CFG] !! 晚到的 apply 成功被拒绝提交 (inv_gen 429496
+SELFCHECK-LINE|tmc2209.c:2827|82 B|[TMC-CFG] op_epoch=4294967295 / 现在=4294967295,
+SELFCHECK-LINE|tmc2209.c:2830|37 B|[TMC-CFG] 旧成功不刷新健康\n
+SELFCHECK-LINE|safety_thread.c:374|82 B|[SAFETY] LIMIT inputs config = DISABLED_BY_CON
+SELFCHECK-LINE|safety_thread.c:376|99 B|[SAFETY] LIMIT OFF => PF.14/PF.15 不解析/不配置/不读/不
+SELFCHECK-LINE|motor.c:1830|93 B|[MOT] 关闭落位**未提交**: 取不到 ss_lock - 不写 mot 影子, 也不
+SELFCHECK-LINE|motor.c:1888|101 B|[MOT] 关闭已落位, 但**未授予恢复资格**: 本代禁能侧证据不足 (epoch=42
+SELFCHECK-LINE|motor.c:1890|79 B|[MOT]  回读许可=000000000000000000 已确认电平=429496729
+SELFCHECK-LINE|motor.c:1894|67 B|[MOT]  抑制=000000000000000000 停机锁存=000000000000
+SELFCHECK-LINE|motor.c:1897|65 B|[MOT]  => Safety 保持原状态, 需 fault_reset 人工复核\n
+SELFCHECK-LINE|safety_state.c:671|72 B|[SS] [REQ FAIL] TMC2209 IOIN rc=-2147483648 re
+SELFCHECK-LINE|safety_state.c:673|92 B|[SS] [REQ FAIL] TMC2209 IOIN tx=4294967295 rx=
+SELFCHECK-LINE|motor.c:1062|61 B|[MOT] init OK (enable-path-validated=YES, arm 
+SELFCHECK-LINE|motor.c:1064|97 B|[MOT] init OK: DRV_ENABLE LOW verified, STEP=a
+SELFCHECK-LINE|safety_state.c:459|59 B|[SS] STEP: 两条输出路径都没有未确认的关断\n
+SELFCHECK-LINE|safety_state.c:460|88 B|[SS] STEP: motor=api-accepted(驱动接受关断, 非波形证明) s
+SELFCHECK-LINE|safety_state.c:462|85 B|[SS] STEP: diag=诊断从未占用该通道 - 仍不等于示波器证明无脉冲\n
+SELFCHECK-LINE|safety_state.c:468|60 B|[SS] !! STEP 关断**未确认** -> 不谎称输出已停\n
+SELFCHECK-LINE|safety_state.c:469|118 B|[SS] !! STEP motor=api-accepted(驱动接受关断, 非波形证明)
+SELFCHECK-LINE|safety_state.c:472|98 B|[SS] !! STEP diag=api-accepted(驱动接受关断, 非波形证明)(
+SELFCHECK-LINE|safety_state.c:474|96 B|[SS] !! STEP 后续 arm/start/诊断借用/故障清除全部拒绝, 直到人工恢
+SELFCHECK-LINE|safety_state.c:479|71 B|[SS] ==> FAULT_LATCHED code=4294967295 (DRV_EN
+SELFCHECK-LINE|safety_state.c:481|84 B|[SS] ==> FAULT_LATCHED ENN feedback=UNEXPECTED
+SELFCHECK-LINE|safety_state.c:484|66 B|[SS] ==> FAULT_LATCHED motor_rc=-2147483648 di
+SELFCHECK-LINE|safety_state.c:485|59 B|[SS] ==> 整理身份 epoch=4294967295 events=0xFFFFFF
+CHANGED_SITES|base=ed8d7f4a8|本轮 diff 命中的 rt_kprintf 站点=15
+CHANGE|motor.c:1062|76 B|[MOT] init OK (enable-path-validated=%s, arm
+CHANGE|motor.c:1064|66 B|[MOT] init OK: DRV_ENABLE LOW verified, STEP
+CHANGE|safety_state.c:459|59 B|[SS] STEP: 两条输出路径都没有未确认的关断\n
+CHANGE|safety_state.c:460|61 B|[SS] STEP: motor=%s src=%s\n
+CHANGE|safety_state.c:462|76 B|[SS] STEP: diag=%s - 仍不等于示波器证明无脉冲\n
+CHANGE|safety_state.c:468|60 B|[SS] !! STEP 关断**未确认** -> 不谎称输出已停\n
+CHANGE|safety_state.c:469|106 B|[SS] !! STEP motor=%s(src=%s rc=%d latched=%
+CHANGE|safety_state.c:472|82 B|[SS] !! STEP diag=%s(rc=%d latched=%s)\n
+CHANGE|safety_state.c:474|96 B|[SS] !! STEP 后续 arm/start/诊断借用/故障清除全部拒绝, 直到人
+CHANGE|safety_state.c:479|77 B|[SS] ==> FAULT_LATCHED code=%u (DRV_ENABLE L
+CHANGE|safety_state.c:481|81 B|[SS] ==> FAULT_LATCHED ENN feedback=%s STEP=
+CHANGE|safety_state.c:484|66 B|[SS] ==> FAULT_LATCHED motor_rc=%d diag_rc=%
+CHANGE|safety_state.c:485|59 B|[SS] ==> 整理身份 epoch=%u events=0x%X\n
+CHANGE|safety_state.c:671|72 B|[SS] [REQ FAIL] TMC2209 IOIN rc=%d reason=%s
+CHANGE|safety_state.c:673|92 B|[SS] [REQ FAIL] TMC2209 IOIN tx=%u rx=%u flu
+CHANGE_SCAN_META|fired|命中 15 个站点并逐条判宽
+LINE_WIDTH_RESULT PASS (bad=0)

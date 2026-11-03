@@ -1,0 +1,306 @@
+{
+ "round": "phase8-m8-r7f1-startup-c-fix",
+ "date": "2026-11-03",
+ "task_book": "NS800_R7F1_A_Startup_C_Fix_20261103.md(云端 A), §6 单目标构建",
+ "baseline_commit": "ed8d7f4a895ac95e0339bfc7c5eeae72f322c0a6",
+ "target": "rt-thread-motor-m1-candidate",
+ "action": "Keil Rebuild All x1(只 rt-thread-motor-m1-candidate)。未下载、未 Flash、未碰 DAP、未复位、未开串口、未起转、未 learn/zero、未 config_save。设备动作 0。",
+ "command": "C:\\Keil_v5\\UV4\\UV4.exe -r project.uvprojx -t rt-thread-motor-m1-candidate -j0 -o D:/ns800/reports/reviews/phase8-m8-r7f1-startup-c-fix/build/rt-thread-motor-r7f1.log",
+ "uv4_return_code_observed_this_round": 0,
+ "uv4_return_code_how_observed": "本轮执行时终端原样打印 UV4_EXIT=0; 构建日志本身另行判 0 Error(s), 0 Warning(s)。",
+ "error_warning_line": "0 Error(s), 0 Warning(s).",
+ "compiler_line_from_log": "*** Using Compiler 'V6.24', folder: 'C:\\Keil_v5\\ARM\\ARMCLANG\\Bin'",
+ "build_time_elapsed_line": "Build Time Elapsed:  00:00:12",
+ "log": {
+  "path": "reports/reviews/phase8-m8-r7f1-startup-c-fix/build/rt-thread-motor-r7f1.log",
+  "bytes": 3909,
+  "sha256": "18a074dfbe330f7cf893623f95e09f13445b82f924fa5b6ac322065b8615c905",
+  "note": "UV4 输出是 CRLF 原件; 本轮该目录在 .gitattributes 里 -text, blob 字节 == 磁盘字节。"
+ },
+ "program_size": "Program Size: Code=205866 RO-data=86186 RW-data=2192 ZI-data=85596",
+ "program_size_vs_previous_round_same_target": {
+  "previous": "Program Size: Code=205594 RO-data=85994 RW-data=2188 ZI-data=85592",
+  "previous_manifest": "reports/firmware/phase8-m8-r6a-offline-rework/build_manifest.json",
+  "delta_bytes": {
+   "Code": 272,
+   "RO-data": 192,
+   "RW-data": 4,
+   "ZI-data": 4
+  },
+  "bin_bytes": 292628,
+  "previous_bin_bytes": 292164,
+  "previous_bin_sha256": "5ae4110d14fdbb40f49cc6f0deca474cf6d0b33b3ee9305e83681dbdd4a53825",
+  "bin_delta": 464,
+  "cross_check": "Code+RO 增量 464 B 与 BIN 增量逐字节相等 => 增的都是镜像内容, 不是 RAM。"
+ },
+ "resource_delta_attribution": {
+  "method": "两版 armlink map 的 \"Object Totals / (incl. Padding)\" 表逐目标差分 (对照件 = R6A 归档 map, sha256=4f58a3eea493d8c532ecceba3d16db1e59750066ec75cede8647197563d412c3), 详见 build/stack_callgraph_r7f1.txt §4。",
+  "per_object_delta": {
+   "Object Totals": {
+    "Code": 272,
+    "RO": 192,
+    "RW": 4,
+    "ZI": 4
+   },
+   "tmc2209.o": {
+    "Code": 132,
+    "RO": 0,
+    "RW": 0,
+    "ZI": 0
+   },
+   "safety_state.o": {
+    "Code": 88,
+    "RO": 177,
+    "RW": 0,
+    "ZI": 0
+   },
+   "sensor_service.o": {
+    "Code": 28,
+    "RO": 0,
+    "RW": 4,
+    "ZI": 0
+   },
+   "motor.o": {
+    "Code": 16,
+    "RO": 15,
+    "RW": 0,
+    "ZI": 0
+   },
+   "supervisor.o": {
+    "Code": 4,
+    "RO": 0,
+    "RW": 0,
+    "ZI": 0
+   },
+   "(incl. Padding)": {
+    "Code": 4,
+    "RO": 0,
+    "RW": 0,
+    "ZI": 4
+   }
+  },
+  "attribution": [
+   "RW+4 唯一来源是 sensor_service.o 的 .data.s_sg_startup_gated(map 0x2000073c, Data 4 B, RW)。",
+   "ZI+4 落在 \"(incl. Padding)\" 行: 链接器填充, 没有任何具名 .bss 目标变化。",
+   "RO+177(safety_state.o)=新增/拆短的字符串字面量; BIN 里已能原样检索到 \"[SS] [REQ FAIL] TMC2209 IOIN rc=%d reason=%s\"、\"... tx=%u rx=%u flush=%u used=%u\"、\"[SS] STEP: motor=%s src=%s\"、\"[MOT] init OK: DRV_ENABLE LOW verified, STEP=%s\"。"
+  ]
+ },
+ "compile_parameters_read_from_project": {
+  "how": "本轮构建前直接读 project.uvprojx 里该 <Target> 段的原始 XML 值(未做语义翻译)。",
+  "OutputName": "rt-thread-motor-m1",
+  "OutputDirectory": ".\\build\\motor_m1\\",
+  "ScatterFile": ".\\board\\linker_scripts\\link.sct",
+  "Cads_Optim": 1,
+  "Cads_v6Lang": 3,
+  "Cads_MiscControls": "-Wno-tautological-constant-out-of-range-compare",
+  "Define": "SYSCLK_USE_PLL, __CLK_TCK=RT_TICK_PER_SECOND, DUAL_CORE_ENABLE=0, USE_HAL_DRIVER, SYSCLK_SOURCE_USE_HXTL, __RTTHREAD__, NS800RT7P65X, __STDC_LIMIT_MACROS, RT_USING_LIBC, RT_USING_ARMLIBC, PLLCLK_SOURCE_USE_HXTL, NS800_TARGET_MEASUREMENT_A0=0, MOTOR_HARDWARE_ENABLE_PATH_VALIDATED=1, TMC_DRIVE_CONFIG_HW_VALIDATED=1, STEP_DIAG_ISOLATED_ENV_CONFIRMED=0, SAFETY_LIMIT_INPUTS_ENABLED=0",
+  "BeforeMake": "RunUserProg1=0 / RunUserProg2=0(无前置用户程序)",
+  "AfterMake": "RunUserProg1=1: fromelf --bin !L --output .\\build\\motor_m1\\rt-thread-motor-m1.bin; RunUserProg2=0",
+  "rtconfig_h": {
+   "RT_CONSOLEBUF_SIZE": 128,
+   "RT_MAIN_THREAD_STACK_SIZE": 2048,
+   "note": "两个常量本轮均未改(rtconfig.h:107 / :118)。"
+  }
+ },
+ "images": {
+  "bin": {
+   "path": "reports/firmware/phase8-m8-r7f1-startup-c-fix/rt-thread-motor-m1-candidate.bin",
+   "bytes": 292628,
+   "sha256": "e5b51b6b810f215e284ea6317a4b1bef6b3faddc6f1ac9f8947804f261fa5732",
+   "identical_to_build_output": true
+  },
+  "axf": {
+   "path": "reports/firmware/phase8-m8-r7f1-startup-c-fix/rt-thread-motor-m1.axf",
+   "bytes": 1775784,
+   "sha256": "96bfe5cdbed9d4c773c96a3e190e5dda819ae2f38340e5f1c17750975b5986eb",
+   "identical_to_build_output": true
+  },
+  "map": {
+   "path": "reports/firmware/phase8-m8-r7f1-startup-c-fix/rt-thread-motor-m1.map",
+   "bytes": 2114770,
+   "sha256": "6138de0593df9a18c5902b7e5014918f8db2aa02fdf5bad516d4aef94efb0194",
+   "identical_to_build_output": true
+  },
+  "callgraph_htm": {
+   "path": "reports/firmware/phase8-m8-r7f1-startup-c-fix/rt-thread-motor-m1-callgraph.htm",
+   "bytes": 1078228,
+   "sha256": "c8d0f4e961c7c2a526551be219f59d4c3b9709f9e55ef447b09b9d4fbc8edf8b",
+   "identical_to_build_output": true,
+   "why": "Max Depth 只存在于 armlink 调用图 htm, 不入库则下一节数字不可复算。"
+  },
+  "archived_copy_check": "identical_to_build_output 四件均为 true => 入库副本就是本轮构建输出本体, 没有中间复制或重排。"
+ },
+ "stack_callgraph_check": {
+  "evidence": "reports/reviews/phase8-m8-r7f1-startup-c-fix/build/stack_callgraph_r7f1.txt",
+  "max_depth_bytes_static_lower_bound": {
+   "safety_startup_selftest": 1220,
+   "safety_run_selftest": 1164,
+   "tmc2209_read_register_stat": 1076,
+   "supervisor_boot": 2020,
+   "sensor_thread_entry": 1332,
+   "system_selftest": 1340,
+   "main": 756
+  },
+  "main_thread_stack_budget_bytes": 2048,
+  "readings": [
+   "自检路径 1220 B 的最深链已经穿过新增的 tmc2209_read_register_stat, 48 B 逐调用状态已在数内; 反汇编帧 = PUSH {r4,lr} + SUB sp,sp,#0x30 = 56 B。",
+   "main 栈上的瓶颈是 supervisor_boot 子树的 SPI/配置加载线(2020 B, 静态余量 28 B), 它不经过本轮改的 IOIN 读; 本轮没有第二次构建, 所以没有该数字的修前对照, \"本轮未使其变差\"只由\"该行代码一行未改\"支撑, 不由实测差分支撑。",
+   "Max Depth 是 armlink 静态下界(解析不了函数指针, 也不含异常/ISR 帧), 不得当上界用。"
+  ]
+ },
+ "source_inputs_compiled_from_disk": [
+  {
+   "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/tmc2209.h",
+   "compiled_from_disk_bytes": 21388,
+   "compiled_from_disk_sha256": "461c24fb17492e8b383a7a6f475874a70af22a037d064162c47f3b7666576e78",
+   "disk_CR": 0,
+   "disk_LF": 335,
+   "blob": {
+    "blob_sha1": "013dd926bdecd7a636410e455f5ecfbb45d5748d",
+    "blob_bytes": 21388,
+    "blob_sha256": "461c24fb17492e8b383a7a6f475874a70af22a037d064162c47f3b7666576e78",
+    "git_hash_object_path_agrees": true,
+    "git_hash_object_path_value": "013dd926bdecd7a636410e455f5ecfbb45d5748d"
+   },
+   "identity_kind": "disk_equals_blob",
+   "what": "任务书 §2: 把 tmc_xfer_stat_t(48 B)/reason 枚举与逐调用带状态的读接口 tmc2209_read_register_stat() 提到公共头; 没有把 188 B 的完整观测数组搬进接口。"
+  },
+  {
+   "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/tmc2209.c",
+   "compiled_from_disk_bytes": 192104,
+   "compiled_from_disk_sha256": "5e5478c6b2cf994df470cc6405b1053ba8ce6004d7e77d98e4cdb568e4d98bd4",
+   "disk_CR": 0,
+   "disk_LF": 4076,
+   "blob": {
+    "blob_sha1": "83eff2b0f7a0d8784442800c2aba953f849365a6",
+    "blob_bytes": 192104,
+    "blob_sha256": "5e5478c6b2cf994df470cc6405b1053ba8ce6004d7e77d98e4cdb568e4d98bd4",
+    "git_hash_object_path_agrees": true,
+    "git_hash_object_path_value": "83eff2b0f7a0d8784442800c2aba953f849365a6"
+   },
+   "identity_kind": "disk_equals_blob",
+   "what": "新增 tmc2209_read_register_stat()(内部 memset 局部 48 B 状态后转调既有 tmc_read_reg, 出口仍走 tmc_health_after_xfer); 原 tmc2209_read_register() 变成传 RT_NULL 的薄封装, 其它调用方行为不变; tmc_xfer_reason_name -> tmc2209_xfer_reason_name。"
+  },
+  {
+   "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/safety_state.c",
+   "compiled_from_disk_bytes": 57122,
+   "compiled_from_disk_sha256": "832d84b631cccb20776e09e976f661c5fe980be648714558e1f7f9483857e44a",
+   "disk_CR": 0,
+   "disk_LF": 1129,
+   "blob": {
+    "blob_sha1": "c268694651f299f0817d36925cdde12a47493f83",
+    "blob_bytes": 57122,
+    "blob_sha256": "832d84b631cccb20776e09e976f661c5fe980be648714558e1f7f9483857e44a",
+    "git_hash_object_path_agrees": true,
+    "git_hash_object_path_value": "c268694651f299f0817d36925cdde12a47493f83"
+   },
+   "identity_kind": "disk_equals_blob",
+   "what": "任务书 §2/§3: 启动自检必需项④的 IOIN 读改用带状态接口, 失败时先打印 rc+reason 一行、再打印 tx/rx/flush/used 一行(均在传输锁释放后的普通线程上下文); 真读失败/身份不符仍判 required 失败。任务书 §4: STEP 与 ==> FAULT_LATCHED 两族长打印拆成完整短行(成功分支 3 条、故障分支 4 条、锁存 4 条)。"
+  },
+  {
+   "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/sensor_service.h",
+   "compiled_from_disk_bytes": 7450,
+   "compiled_from_disk_sha256": "1f0c8db7401586b586ea8b7433eea80114e94f495f6d095ed818e06230423cb4",
+   "disk_CR": 0,
+   "disk_LF": 122,
+   "blob": {
+    "blob_sha1": "d28a3b98d9d49292f2a729daf60e4ba52a0a9296",
+    "blob_bytes": 7450,
+    "blob_sha256": "1f0c8db7401586b586ea8b7433eea80114e94f495f6d095ed818e06230423cb4",
+    "git_hash_object_path_agrees": true,
+    "git_hash_object_path_value": "d28a3b98d9d49292f2a729daf60e4ba52a0a9296"
+   },
+   "identity_kind": "disk_equals_blob",
+   "what": "任务书 §3: 新增 SG 启动门 API sensor_service_sg_startup_release() / sensor_service_sg_startup_gated(), 注释写明只约束 stage 7~11 这段窗口、不停其它传感器、门释放与自检结果无关、msh system_selftest 重入不在覆盖范围。"
+  },
+  {
+   "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/sensor_service.c",
+   "compiled_from_disk_bytes": 23419,
+   "compiled_from_disk_sha256": "aca092d133b903e29ae8790712c1c76f26de0d3281e48c39e62f07f73998702e",
+   "disk_CR": 0,
+   "disk_LF": 477,
+   "blob": {
+    "blob_sha1": "9bf359b83e16a2cec110660342131e4d7c607d0b",
+    "blob_bytes": 23419,
+    "blob_sha256": "aca092d133b903e29ae8790712c1c76f26de0d3281e48c39e62f07f73998702e",
+    "git_hash_object_path_agrees": true,
+    "git_hash_object_path_value": "9bf359b83e16a2cec110660342131e4d7c607d0b"
+   },
+   "identity_kind": "disk_equals_blob",
+   "what": "SG 分频分支加 && !s_sg_startup_gated(默认 1=关闭); 关闭期的帧沿用既有\"非分频帧\"语义(fresh_sg=0, 值与 valid_sg 继承基帧, sg_seq/sg_tick 不推进), 不新增第三种状态, 也不把失败冒充成读到 0。"
+  },
+  {
+   "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/supervisor.c",
+   "compiled_from_disk_bytes": 23419,
+   "compiled_from_disk_sha256": "d72b0a0927415f57772cb4b9214554804d8e81980993936b79cd1056e4a10bac",
+   "disk_CR": 507,
+   "disk_LF": 507,
+   "blob": {
+    "blob_sha1": "2e2eca5e893dccd6da3bc084ace254c0d5ab12d8",
+    "blob_bytes": 22912,
+    "blob_sha256": "a9cc9275a364fb6965f84022aae295c1ed8d3d0436e9a1e390765c9d8e34c824",
+    "git_hash_object_path_agrees": true,
+    "git_hash_object_path_value": "2e2eca5e893dccd6da3bc084ace254c0d5ab12d8"
+   },
+   "identity_kind": "blob_after_crlf_filter(disk 多 CR)",
+   "what": "stage 11 safety_startup_selftest() 返回之后、[BOOT] 11 打印之前释放门一次 (PASS 与 FAIL 都释放, 不永久禁用 SG)。"
+  },
+  {
+   "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/motor.c",
+   "compiled_from_disk_bytes": 134298,
+   "compiled_from_disk_sha256": "d7a919f60248d6227ddd704b7697f0f691b19467decef6f39733a92fb7410e13",
+   "disk_CR": 2566,
+   "disk_LF": 2566,
+   "blob": {
+    "blob_sha1": "33b8193379a5195976bbaa229ef36c7892ad754c",
+    "blob_bytes": 131732,
+    "blob_sha256": "497cc7f25154d4d45f7963d83fc3b502f66ca73a050535235b5fb82f7c4e8e85",
+    "git_hash_object_path_agrees": true,
+    "git_hash_object_path_value": "33b8193379a5195976bbaa229ef36c7892ad754c"
+   },
+   "identity_kind": "blob_after_crlf_filter(disk 多 CR)",
+   "what": "任务书 §4: [MOT] init OK 一行拆成两行(使能路径校验 / DRV_ENABLE LOW + STEP 身份)。"
+  }
+ ],
+ "host_test_chains_all_before_this_build": {
+  "S2": "PASS (rc=0), 22 组 x target/host_ovr, target=68 / host_ovr=143 必需用例真执行; 含新组 tmc_boot(BTB01-10)与 boot_print(BPT01-05)。",
+  "SD": "PASS (rc=0), off_target 25 / on_target 24, 含 SD13a/b/c 门三例。",
+  "IO": "PASS (rc=0) 4 变体。",
+  "S1": "PASS (rc=0) target+host_ovr。",
+  "M8": "PASS(主机链, 离线; 现场项未验证)。",
+  "V1/V2": "RUNNER RESULT: PASS (rc=0)。",
+  "read_obs(既有)": "30/30 两个编译变体(本轮未改判据, 只作对照)。",
+  "line_width_check": "LINE_WIDTH_RESULT PASS (bad=0); --selfcheck 亦 PASS(4 条修前超长原样命中, 无 NOT-DETECTED)。",
+  "transcripts": "reports/reviews/phase8-m8-r7f1-startup-c-fix/host/ (含 iterations/ 里的中途失败原文)"
+ },
+ "new_image_on_board": false,
+ "device_actions_by_this_build": {
+  "download": 0,
+  "readback": 0,
+  "explicit_reset": 0,
+  "port_open": 0,
+  "apply": 0,
+  "config_save": 0,
+  "arm_or_start_or_learn": 0,
+  "note": "任务书 §6/§当前现场: 上一轮批准的 download/readback/reset 额度已用尽, 本轮不新增任何设备动作; 候选出来后要由 A 依据这枚具体固件身份另行安排一次有上限的启动诊断。"
+ },
+ "not_overwritten": {
+  "reports/firmware/phase8-m8-r6a-offline-rework/": "原三件(在板镜像 BIN 292164 B sha256=5ae4110d14fdbb40f49cc6f0deca474cf6d0b33b3ee9305e83681dbdd4a53825 等)未动。",
+  "reports/firmware/phase8-m8-r6-offline-recovery/": "未动。",
+  "board": "板上仍是 5ae4110d… 那枚; 本轮没下载, 所以新 BIN e5b51b6b… 目前只存在于归档, 未在任何硬件上验证过。"
+ },
+ "proven_this_round_offline": [
+  "启动竞争的形状可在真实产品函数上复现并判据: BTB01 rc=-23 且线上 0 B、设备读请求 0 次; BTB03 同一笔前台读在后台不抢锁时成功(同负载 A/B)。",
+  "逐调用身份可区分: BTB06 lock-busy(tx=0) / BTB07 bad-context(同为 -23 但 reason 不同) / BTB08 tx-failed / BTB09 rx-timeout-echo(tx=4) / BTB10 两次调用互不继承。",
+  "SG 启动门语义: SD13a 关闭期 25 帧 SG UART 调用=0 且 imu/adc/snap 各自照跑 25; SD13b 关闭帧沿用\"非分频帧\"语义(valid_sg/sg_seq 继承, fresh=0); SD13c release 后恢复分频读。",
+  "三处截断打印已拆短并双向验证: 静态(line_width_check 15 站点带真实 UTF-8 实参, 4 条修前原样做元负控) + 动态(BPT01-04 逐行量宽, BPT05 证明裁剪模型会命中)。"
+ ],
+ "not_proven": [
+  "现场 IOIN 那一次到底落在哪个 reason —— 要下一次开机看新的两行才能定; 本轮 0 设备动作。",
+  "门释放后真实板上的先后关系(RT-Thread 调度在板上是否按夹具假设那样让 sensor 抢在 stage 11 之前)—— 夹具证的是\"若后台先持锁则前台必 -23 且 0 字节\", 不是\"板上确实如此发生过\"。",
+  "msh system_selftest 重入不受门约束(头文件注释里已登记), 该路径未覆盖。",
+  "sensor 线程在 stage 7 之后、stage 11 之前若已在半帧中途, 门只能挡住\"下一次分频读\", 已经在途的那一笔仍可能持锁 —— 本轮未处理, 下一轮看现场 reason 即可判定它是否发生。",
+  "阈值、ACTIVE、运动授权、带载保护、IMU/SG 相对判定的现场有效性: 全部未验证, 本轮一律未触碰。"
+ ],
+ "working_tree_at_build": "本轮 C 修复只在工作树, manifest 生成时未提交; 上面 compiled_from_disk_* 就是 Keil 实际编译的字节。blob_* 用 git hash-object --path 现算(本仓库 core.autocrlf=true, .c/.h 判为 text, 所以 blob 字节 = 磁盘去掉 CR)。"
+}

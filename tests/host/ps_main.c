@@ -449,6 +449,29 @@ subsys_health_t     tmc2209_get_health(void)       { return f_tmc_health; }
 rt_err_t  tmc2209_init(void) { return RT_EOK; }
 rt_err_t  tmc2209_read_register(rt_uint8_t a, rt_uint8_t r, rt_uint32_t *v)
 { (void)a; fake_bus_reads++; if (v) *v = 0x12340000u | r; return RT_EOK; }
+/* R7F1(任务书 §2): 本链是假总线, 没有 flush/TX/RX 阶段可言 => **不伪造**归因。
+ * 成功报 ok; 失败只交出返回码, reason 用夹具哨兵值, 名字表打成 "not-modelled(fake-bus)"。
+ * 阶段级归因由真实传输层那条链证明(tests/host/leaf_main.c 的 tmc_boot / read_obs 组)。 */
+#define TMC_FAKE_REASON_NOT_MODELLED ((tmc_xfer_reason_t)0xFE)
+const char *tmc2209_xfer_reason_name(tmc_xfer_reason_t r)
+{
+    if (r == TMC_XFER_OK) return "ok";
+    if (r == TMC_FAKE_REASON_NOT_MODELLED) return "not-modelled(fake-bus)";
+    return "?";
+}
+rt_err_t  tmc2209_read_register_stat(rt_uint8_t a, rt_uint8_t r, rt_uint32_t *v,
+                                     tmc_xfer_stat_t *out)
+{
+    rt_err_t e = tmc2209_read_register(a, r, v);
+
+    if (out)
+    {
+        rt_memset(out, 0, sizeof(*out));
+        out->rc = e;
+        out->reason = (e == RT_EOK) ? TMC_XFER_OK : TMC_FAKE_REASON_NOT_MODELLED;
+    }
+    return e;
+}
 rt_err_t  tmc2209_cfg_txn_begin(void) { cfg_txn_begins++; return RT_EOK; }
 void      tmc2209_cfg_txn_end(void)   { cfg_txn_ends++; }
 /* CP4 K3(§5.3): 生产侧现在有"带调用方原身份 + 本次结果摘要"的复核版本。

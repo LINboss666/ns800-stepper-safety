@@ -42,6 +42,11 @@ static sensor_frame_t s_prev;               /* 生产基帧(零初始化=全 val
 static rt_uint32_t s_seq = 0;               /* 生产帧序号(兼 SG 分频相位) */
 static rt_thread_t s_tid = RT_NULL;
 static subsys_health_t s_health = SUBSYS_UNINIT;
+/* R7F1(任务书 §3): 启动期 SG 门, 判据与边界写在 sensor_service.h。
+ * 默认**关着**(线程一创建就生效), 由 supervisor 在 stage 11 自检返回后打开一次;
+ * 之后 sensor_service_init() 再被调用(幂等重启)也不会把它关回去 —— 那段启动期
+ * 已经过去了, 没有第二次 required IOIN 自检在等它让路。 */
+static rt_bool_t s_sg_startup_gated = RT_TRUE;
 
 /* 整数平方根(Newton), 用于振动幅值 */
 static rt_uint32_t s_isqrt(rt_uint32_t n)
@@ -121,8 +126,11 @@ static void s_collect(sensor_frame_t *f, sensor_frame_t *base_prev,
     else { f->valid_current = 0; f->fresh_current = 0; }
     /* 失败分支: cur_seq/cur_tick 原样继承基帧 —— 保留值不得被当成新样本。 */
 
-    /* TMC SG_RESULT: 10Hz 分频 */
-    if ((*seq % SENSOR_SG_DIV) == 0)
+    /* TMC SG_RESULT: 10Hz 分频。
+     * R7F1(任务书 §3): 启动期门关闭时**这一路不发 UART 读**, 走下面既有的"非分频帧"
+     * 分支(fresh_sg=0, 值与 valid_sg 继承基帧, sg_seq/sg_tick 不推进) —— 语义与"这一帧
+     * 本来就没轮到 SG"完全一致, 不新增第三种状态, 也不把失败冒充成读到 0。 */
+    if (!s_sg_startup_gated && (*seq % SENSOR_SG_DIV) == 0)
     {
         rt_uint16_t sg = 0;
         e = tmc2209_read_sg_result(&sg);
@@ -204,6 +212,12 @@ static void sensor_thread_entry(void *param)
 }
 
 /* ---------- 正式 API (sensor_service.h) ---------- */
+
+/* R7F1(任务书 §3): 启动期 SG 门的两个出口。release 只由 supervisor 在 stage 11 之后
+ * 调用一次(自检 PASS/FAIL 都放行); gated() 是给状态命令与主机用例做的只读观察,
+ * 不产生任何副作用。 */
+void sensor_service_sg_startup_release(void) { s_sg_startup_gated = RT_FALSE; }
+rt_bool_t sensor_service_sg_startup_gated(void) { return s_sg_startup_gated; }
 
 rt_err_t sensor_service_init(void)
 {

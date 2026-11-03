@@ -3145,6 +3145,12 @@ int main(int argc, char **argv)
            (unsigned)sizeof(sensor_frame_t), (unsigned)sizeof(diag_input_t),
            (unsigned)sizeof(project_config_v2_t));
 
+    /* R7F1(任务书 §3): 本链测的是**运行中**的 SG/ADC 样本身份与相对判定, 前提就是
+     * supervisor 已经过了 stage 11。启动期 SG 门(sg_seq 只有真读成功才推进)默认是关的,
+     * 所以这里按 stage 11 之后的事实把门打开一次; 门本身的行为由 SD13a/b/c 在
+     * run_safety_data_semantics.sh 那条链上判(那里同样是真实 sensor_service.c)。 */
+    sensor_service_sg_startup_release();
+
     if (only != RT_NULL && only[0] != 0)
     {
         for (i = 0; i < NTAB; ++i)

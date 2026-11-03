@@ -1,0 +1,62 @@
+###### 停机优先 S2 并发/身份链 (基线 ed8d7f4a895ac95e0339bfc7c5eeae72f322c0a6) ######
+run_id=20261103T144706Z-424
+SRC_APP=D:/ns800/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications
+夹具=/d/ns800/tests/host/sp_conc_main.c (真 pthread 互斥量/线程/窗口内排队 ISR)
+OUT_DIR=/d/ns800_r7f1_scratch/s2/20261103T144706Z-424
+compiler=gcc.exe (tdm64-1) 4.9.2
+单组墙钟=60s(死锁守卫)  选择集合=boot_print
+
+=== 变体 target ===
+                                            ^
+D:/ns800/tests/host/sp_conc_main.c:2961:9: error: missing terminating ' character
+         dst[i] = (bpt_line[idx].text[i] == '
+         ^
+D:/ns800/tests/host/sp_conc_main.c:2962:1: warning: multi-character character constant [-Wmultichar]
+ ') ? '@' : bpt_line[idx].text[i];
+ ^
+D:/ns800/tests/host/sp_conc_main.c:2962:7: error: stray '@' in program
+ ') ? '@' : bpt_line[idx].text[i];
+       ^
+D:/ns800/tests/host/sp_conc_main.c:2962:8: warning: missing terminating ' character
+ ') ? '@' : bpt_line[idx].text[i];
+        ^
+D:/ns800/tests/host/sp_conc_main.c:2962:1: error: missing terminating ' character
+ ') ? '@' : bpt_line[idx].text[i];
+ ^
+D:/ns800/tests/host/sp_conc_main.c: In function 'cases_boot_print':
+D:/ns800/tests/host/sp_conc_main.c:3043:5: warning: implicit declaration of function 'bpt_copy' [-Wimplicit-function-declaration]
+     bpt_copy(i2, t2, sizeof(t2));
+     ^
+  target 编译失败 rc=1 => 不运行二进制(旧产物已删除)
+
+=== 变体 host_ovr ===
+                                            ^
+D:/ns800/tests/host/sp_conc_main.c:2961:9: error: missing terminating ' character
+         dst[i] = (bpt_line[idx].text[i] == '
+         ^
+D:/ns800/tests/host/sp_conc_main.c:2962:1: warning: multi-character character constant [-Wmultichar]
+ ') ? '@' : bpt_line[idx].text[i];
+ ^
+D:/ns800/tests/host/sp_conc_main.c:2962:7: error: stray '@' in program
+ ') ? '@' : bpt_line[idx].text[i];
+       ^
+D:/ns800/tests/host/sp_conc_main.c:2962:8: warning: missing terminating ' character
+ ') ? '@' : bpt_line[idx].text[i];
+        ^
+D:/ns800/tests/host/sp_conc_main.c:2962:1: error: missing terminating ' character
+ ') ? '@' : bpt_line[idx].text[i];
+ ^
+D:/ns800/tests/host/sp_conc_main.c: In function 'cases_boot_print':
+D:/ns800/tests/host/sp_conc_main.c:3043:5: warning: implicit declaration of function 'bpt_copy' [-Wimplicit-function-declaration]
+     bpt_copy(i2, t2, sizeof(t2));
+     ^
+  host_ovr 编译失败 rc=1 => 不运行二进制(旧产物已删除)
+
+=== S2 并发/身份矩阵 ===
+target | COMPILE_FAILED rc=1
+host_ovr | COMPILE_FAILED rc=1
+
+选择集合=boot_print
+实际执行集合: target=0组 host_ovr=0组 (每组一个独立进程)
+
+S2 RUNNER RESULT: INFRA-FAIL (rc=4) —— 构建/台账/前置/超时未成立, 不得称已验证

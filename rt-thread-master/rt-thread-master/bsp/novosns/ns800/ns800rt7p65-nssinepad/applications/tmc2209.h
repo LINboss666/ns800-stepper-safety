@@ -32,6 +32,55 @@
 #define TMC_REG_IHOLD_IRUN 0x10
 #define TMC_REG_SG_RESULT 0x41
 
+/* ---------- R7F1(2026-11-03 任务书 §2): 单次传输的逐调用归因 ----------
+ * 这两型原本私在 tmc2209.c 里; 启动自检那一次 IOIN 读现场只留下 rc=-23, 而 -23 在
+ * 本平台码表(POSIX 分支 + ERROR_BASE_NO=7)下同时来自"非法上下文""取锁失败""底层写入口
+ * 自守上下文"三处, 光看码值分不了方向。结构化原因早就存在(§10.4 的"底层只返回结构化
+ * 错误, 打印在外层"), 缺的只是把它交到**那一次调用**的调用者手上。
+ * 公开的是**既有实现里的同一型**, 不新建第二套枚举; 观测数组 tmc_read_observation_t
+ * (实测 188 B)仍然私有 —— 启动线程栈只有 RT_MAIN_THREAD_STACK_SIZE(2048 B), 自检那一笔
+ * 只需要下面这 48 B 的一份, 调用者自己持有, 不进共享槽。 */
+typedef enum
+{
+    TMC_XFER_OK = 0,
+    TMC_XFER_NO_DEVICE,       /* 未取得设备句柄 / 未打开 */
+    TMC_XFER_BAD_CONTEXT,     /* ISR 或已关中断上下文: 一律拒绝 */
+    TMC_XFER_BUDGET_EXHAUSTED,/* 总预算已耗尽(不重开、不映射成成功) */
+    TMC_XFER_LOCK_BUSY,       /* 本层没拿到锁 => 也绝不 release */
+    TMC_XFER_RX_FLOOD,        /* flush 超过字节/时间双上限: 不能称输入已清空 */
+    TMC_XFER_TX_FAILED,       /* 预算内没写完(部分发送如实报 written) */
+    TMC_XFER_RX_TIMEOUT_ECHO, /* 只有自身回声, 没有应答头 */
+    TMC_XFER_RX_TIMEOUT_PART, /* 有应答头但不完整 */
+    TMC_XFER_RX_CRC,          /* CRC/帧解析错误 */
+    TMC_XFER_NOT_ARRIVED,     /* IFCNT 没有 +1: 芯片没接受这一帧(内容对也不算到达) */
+    TMC_XFER_STALE            /* 操作身份已过期(晚到结果不发布) */
+} tmc_xfer_reason_t;
+
+/* 一次传输的可判定观测: 原始 rc 与原因、实际字节数分列, 不互相替代。 */
+typedef struct
+{
+    rt_err_t           rc;
+    tmc_xfer_reason_t  reason;
+    rt_size_t          tx_written;
+    rt_size_t          rx_bytes;
+    rt_size_t          flush_bytes;
+    rt_tick_t          used;
+    /* R4(2026-10-23 CP3 §6.1): IFCNT 不符的细节也**只记账不打印** —— 打印要排在
+     * 那次短保护之后(控制台逐字符忙等, 每字符 ≤BSP_NS800_UART_TX_TIMEOUT)。 */
+    rt_uint8_t         ifcnt_before;
+    rt_uint8_t         ifcnt_after;
+    rt_bool_t          ifcnt_checked;
+} tmc_xfer_stat_t;
+
+/* 原因名的公开入口(与 tmc_uart_probe 逐笔打印用的是同一张表)。 */
+const char *tmc2209_xfer_reason_name(tmc_xfer_reason_t r);
+
+/* 与 tmc2209_read_register() 同一条读路径, 但把**这一次调用自己的**归因交给调用者:
+ * out 非 NULL 时, 无论成功失败都按本次调用整体覆写(不是"最后一次错误"的共享槽)。
+ * out==NULL 与 tmc2209_read_register() 逐字等价。health 语义两者也一致。 */
+rt_err_t tmc2209_read_register_stat(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *value,
+                                    tmc_xfer_stat_t *out);
+
 /* 幂等初始化: 打开 uart2(115200 8N1)。RT_EOK = 链路层就绪。
  * 注意: 链路就绪 ≠ 芯片在位。在位/身份用只读手段核实 —— MSH 命令 tmc_scan
  * (READ IOIN 逐地址)或 tmc_uart_probe(F2d 起严格只读, 持配置事务锁读 IOIN/GSTAT/

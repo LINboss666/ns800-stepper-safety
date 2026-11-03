@@ -492,6 +492,11 @@ rt_err_t supervisor_boot(void)
 
     /* ---- 11 启动自检 + 最终 READY 决策(唯一进 READY 的入口) ---- */
     e = safety_startup_selftest();
+    /* R7F1(2026-11-03 任务书 §3): 自检这一次已经跑完(不管 PASS/FAIL) => 打开启动期 SG 门。
+     * 放在 stage 7 起的 sensor 线程与 stage 11 那次 required IOIN 读**之间**是唯一需要
+     * 让路的窗口; 自检失败也放行, 否则 SG 会被永久禁掉, 后台保护输入就没了。
+     * 门的判据与边界写在 sensor_service.h。 */
+    sensor_service_sg_startup_release();
     rt_kprintf("[BOOT] 11 startup-selftest %s -> state=%s\r\n", boot_res(e),
                safety_state_name(safety_state_get()));
 

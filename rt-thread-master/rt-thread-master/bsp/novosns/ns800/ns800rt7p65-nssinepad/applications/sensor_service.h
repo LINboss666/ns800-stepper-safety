@@ -92,6 +92,27 @@ typedef struct
 /* 创建 Sensor Thread(幂等)。 */
 rt_err_t sensor_service_init(void);
 
+/* ---------- R7F1(2026-11-03 任务书 §3): 启动期 SG 门 ----------
+ * 事实(supervisor.c / sensor_service.c / tmc2209.c 三处对齐读过):
+ *   stage 7 就 rt_thread_startup 起 "sensor"(prio 7), 而 required 自检在 stage 11;
+ *   s_seq 从 0 起, 所以**首帧**就命中 SG 分频(seq 对 SENSOR_SG_DIV 取模为 0);
+ *   后台 SG 读走 tmc2209_read_sg_result(), 与自检那一次 IOIN 读共用同一把
+ *   tmc_xfer_lock, 而自检那次取锁只等 TMC_BUD_XFER_LOCK_MS(=20ms)就拿不到 =>
+ *   回 -RT_EBUSY(-23), required 失败并锁存 FAULT_SELF_TEST —— 2026-11-03 现场 S3
+ *   留下的正是这个形状。
+ * 本门只压"到 stage 11 返回为止"这一段:
+ *   - 只让 SG 这一路的 UART 读不发; IMU / ADC / 限位与 ENN 反馈 / 运动快照每帧照采
+ *     —— 自检的 IMU/ADC 分支与保护输入都不经过这一路, 不被本门影响;
+ *   - 门由 supervisor 在 stage 11 **返回之后**打开, 自检 PASS 还是 FAIL 都打开,
+ *     所以 SG 不是被永久禁用;
+ *   - 门关闭期间那一帧走的是既有"非分频帧"语义: fresh_sg=0, sg_result/valid_sg 继承
+ *     基帧, sg_seq/sg_tick 不推进(M8 的身份口径: 只有真读成功才推进)。
+ * ⚠ 本门不覆盖 msh system_selftest(supervisor.c:403)重跑自检那一类**运行中**的再入:
+ *   那时门早已打开, 后台 SG 仍可能与那次读竞争。那是既有行为, 本轮不改, 由 §2 的逐调用
+ *   归因在现场区分(取锁失败 tx_written=0 / 链路无应答 tx_written=4)。 */
+void      sensor_service_sg_startup_release(void);   /* 打开门: 允许 SG 分频读 */
+rt_bool_t sensor_service_sg_startup_gated(void);     /* 只读观察: 门当前是否还关着 */
+
 /* 拷贝最新一帧(内部临界区)。 */
 rt_err_t sensor_service_get_latest(sensor_frame_t *out);
 

@@ -1,0 +1,30 @@
+###### 停机优先 S2 并发/身份链 (基线 ed8d7f4a895ac95e0339bfc7c5eeae72f322c0a6) ######
+run_id=20261103T144027Z-1016
+SRC_APP=D:/ns800/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications
+夹具=/d/ns800/tests/host/sp_conc_main.c (真 pthread 互斥量/线程/窗口内排队 ISR)
+OUT_DIR=/d/ns800_r7f1_scratch/s2/20261103T144027Z-1016
+compiler=gcc.exe (tdm64-1) 4.9.2
+单组墙钟=60s(死锁守卫)  选择集合=boot_print
+
+=== 变体 target ===
+  ⚠ target 构建有输出(视为警告/提示, 见 target_build.txt):
+      D:/ns800/tests/host/sp_conc_main.c: In function 'cases_boot_print':
+      D:/ns800/tests/host/sp_conc_main.c:2935:41: warning: unused variable 'j2' [-Wunused-variable]
+           int i1, i2, i3, i4, i5, i6, i7, j1, j2;
+                                               ^
+
+=== 变体 host_ovr ===
+  ⚠ host_ovr 构建有输出(视为警告/提示, 见 host_ovr_build.txt):
+      D:/ns800/tests/host/sp_conc_main.c: In function 'cases_boot_print':
+      D:/ns800/tests/host/sp_conc_main.c:2935:41: warning: unused variable 'j2' [-Wunused-variable]
+           int i1, i2, i3, i4, i5, i6, i7, j1, j2;
+                                               ^
+
+=== S2 并发/身份矩阵 ===
+target | INFRA-FAIL 构建不干净(要求 0 warning)
+host_ovr | INFRA-FAIL 构建不干净(要求 0 warning)
+
+选择集合=boot_print
+实际执行集合: target=0组 host_ovr=0组 (每组一个独立进程)
+
+S2 RUNNER RESULT: INFRA-FAIL (rc=4) —— 构建/台账/前置/超时未成立, 不得称已验证

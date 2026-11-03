@@ -78,6 +78,125 @@ static int s_isr_nest;                  /* 显式注入"调用点本身在 ISR �
 void s2_seq_set(int bit);
 static void s2_run_hook(const char *where);
 
+/* ---- R7F1(2026-11-03 任务书 §4): 逐次 rt_kprintf 的控制台字节量具 ----------------
+ * 复刻 kservice.c:410-416 那一刀(现场那三条超长打印正是被它切的):
+ *   length = rt_vsnprintf(rt_log_buf, sizeof(rt_log_buf) - 1, fmt, args);
+ *   if (length > RT_CONSOLEBUF_SIZE - 1) length = RT_CONSOLEBUF_SIZE - 1;
+ *   _kputs(rt_log_buf, length);
+ * rt_log_buf 是 RT_CONSOLEBUF_SIZE(=128, rtconfig.h:107) 的静态缓冲, 所以**内容**最多
+ * 落 126 字节, 交给 _kputs 的第 127 个字节是缓冲区自己的 NUL 终止符, 末尾换行连同后半句
+ * 一起丢 —— 2026-11-03 现场 S_S3/01_rst.boot.rx.bin 里三条打印的 NUL 前长度实测都是
+ * 126 字节, 与这把尺逐字吻合。
+ * 判据按任务书取 120 字节(留 7 字节余量给 CRLF 与设备侧换行处理)。
+ * ⚠ 这是**夹具侧对内核输出路径的复刻**, 不是板上量到的字节; 板上原件在上一轮已归档。 */
+#define BPT_CONSOLEBUF   128            /* rtconfig.h:107 的 RT_CONSOLEBUF_SIZE */
+#define BPT_KERNEL_MAX   (BPT_CONSOLEBUF - 1)   /* 127: _kputs 拿到的字节数上限 */
+#define BPT_CONTENT_MAX  (BPT_CONSOLEBUF - 2)   /* 126: 缓冲区装得下的内容字节 */
+#define BPT_LIMIT        120            /* 任务书 §4 的门槛 */
+#define BPT_MAX_LINES    128            /* 一整个 wire_and_boot + 一次停机的行数有余量 */
+#define BPT_LINE_MAX     200
+
+struct bpt_rec {
+    int  would_be;        /* 这一次调用"本该有"的字节数(不含 NUL) */
+    int  content;         /* 真能落进控制台缓冲的内容字节 = min(would_be, 126) */
+    int  emitted;         /* 交给 _kputs 的字节数 = min(would_be, 127) */
+    int  lost;            /* 被这一刀丢掉的字节数(末尾换行在里面) */
+    int  nul_emitted;     /* 截断时缓冲区尾的 NUL 被当成数据一起发出 */
+    int  tail_nl;         /* 落到控制台的最后一个字节是不是 '\n' */
+    int  utf_split;       /* 截断处把一个多字节序列切成半截 */
+    int  text_fit;        /* 夹具文本槽放得下(0 => 不许据 text 做判据) */
+    char text[BPT_LINE_MAX];
+};
+static struct bpt_rec bpt_line[BPT_MAX_LINES];
+static int bpt_n, bpt_dropped;          /* 窗口放不下 => 计数; 用例必须看到它恒 0 */
+
+static void bpt_reset(void) { bpt_n = 0; bpt_dropped = 0; }
+
+static void bpt_record(int would_be, const char *txt)
+{
+    struct bpt_rec *r;
+    int i, content;
+
+    if (bpt_n >= BPT_MAX_LINES) { bpt_dropped++; return; }
+    r = &bpt_line[bpt_n++];
+    content = (would_be > BPT_CONTENT_MAX) ? BPT_CONTENT_MAX : would_be;
+    r->would_be    = would_be;
+    r->content     = content;
+    r->emitted     = (would_be > BPT_KERNEL_MAX) ? BPT_KERNEL_MAX : would_be;
+    r->lost        = would_be - r->emitted;
+    r->nul_emitted = (would_be > BPT_CONTENT_MAX) ? 1 : 0;
+    r->tail_nl     = (content > 0 && txt[content - 1] == '\n') ? 1 : 0;
+    r->utf_split   = 0;
+    r->text_fit    = (would_be < BPT_LINE_MAX) ? 1 : 0;
+    r->text[0]     = '\0';
+    if (r->text_fit)
+    {
+        memcpy(r->text, txt, (size_t)would_be);
+        r->text[would_be] = '\0';
+    }
+    if (content < would_be && content > 0)
+    {
+        /* 从截断点往回找这个序列的首字节, 看它能不能在落地的那 content 个字节里走完 */
+        for (i = 1; i <= 4 && i <= content; ++i)
+        {
+            unsigned char c = (unsigned char)txt[content - i];
+
+            if ((c & 0x80u) == 0u) break;                 /* ASCII 结尾: 边界干净 */
+            if ((c & 0xC0u) != 0xC0u) continue;           /* 续字节: 继续往回 */
+            {
+                int need = ((c & 0xE0u) == 0xC0u) ? 2
+                           : ((c & 0xF0u) == 0xE0u) ? 3 : 4;
+                if (i < need) r->utf_split = 1;           /* 序列没走完整就被切 */
+            }
+            break;
+        }
+    }
+}
+
+/* 在**本窗口**里按整行内容找一条记录。每个用例都先 bpt_reset(), 窗口就是这一次触发
+ * 打出来的那几行, 所以按内容找不会和别的行混。找不到返回 -1。 */
+static int bpt_find(const char *needle)
+{
+    int i;
+
+    for (i = 0; i < bpt_n; ++i)
+        if (bpt_line[i].text_fit && strstr(bpt_line[i].text, needle) != RT_NULL)
+            return i;
+    return -1;
+}
+/* 窗口里的每一条(不只是被点名的那一条)都不许超门槛; 顺带交回最宽的那条的长度。
+ * bpt_dropped!=0 表示窗口装不下 => 样本不全, 这条判据直接不成立(不许静默丢)。 */
+static int bpt_all_within_limit(int *worst_out)
+{
+    int i, worst = 0, ok = 1;
+
+    for (i = 0; i < bpt_n; ++i)
+    {
+        if (bpt_line[i].would_be > worst) worst = bpt_line[i].would_be;
+        if (bpt_line[i].would_be > BPT_LIMIT) ok = 0;
+    }
+    if (worst_out) *worst_out = worst;
+    return ok && bpt_dropped == 0 && bpt_n > 0;
+}
+
+/* 台账是**按行**解析的, 所以把被点名行的原文放进 detail 之前必须把其中的换行换成 '@'
+ * (否则一条 CASE 会被劈成两行, 判据反而看不见真正的失败项)。4 个轮换缓冲: 同一次
+ * fm 里最多用两三个, 不会自相覆盖。 */
+static const char *bpt_flat(int idx)
+{
+    static char out[4][BPT_LINE_MAX];
+    static int slot;
+    char *p;
+    int i;
+
+    p = out[slot++ & 3];
+    if (idx < 0 || idx >= bpt_n || !bpt_line[idx].text_fit) { p[0] = '\0'; return "-"; }
+    for (i = 0; i < BPT_LINE_MAX - 1 && bpt_line[idx].text[i] != '\0'; ++i)
+        p[i] = (bpt_line[idx].text[i] == '\n') ? '@' : bpt_line[idx].text[i];
+    p[i] = '\0';
+    return p;
+}
+
 static void ps_kprintf(const char *fmt, ...)
 {
     /* 控制台在目标上是逐字符忙等(每字符 ≤BSP_NS800_UART_TX_TIMEOUT=6000ms), 属于
@@ -86,13 +205,18 @@ static void ps_kprintf(const char *fmt, ...)
     if (s2_tls_nest || s_isr_nest) s2_logs_in_isr++;
     va_list ap;
     char tmp[1024];
+    int would;
     int n;
 
     va_start(ap, fmt);
-    vsnprintf(tmp, sizeof(tmp), fmt, ap);
+    would = vsnprintf(tmp, sizeof(tmp), fmt, ap);
     va_end(ap);
     fputs(tmp, stdout);
     n = (int)strlen(tmp);
+    /* 夹具自己的 tmp 只有 1024 B: 真超到那儿就按哨兵值记(text_fit 会判 0, 用例不得
+     * 拿被夹断的文本做判据), 同时这个长度本身已经远超门槛, 用例必然判红。 */
+    if (would < 0 || would >= (int)sizeof(tmp)) would = (int)sizeof(tmp) - 1;
+    bpt_record(would, tmp);
     if (ps_cap_len + n >= PS_CAP_SIZE)
     {
         int keep = PS_CAP_SIZE / 2;
@@ -657,13 +781,43 @@ rt_bool_t tmc2209_drive_config_ok_for_arm(void) { return f_cfg_ok; }
 tmc_drv_cfg_state_t tmc2209_get_config_state(void) { return f_cfg_state; }
 subsys_health_t     tmc2209_get_health(void)       { return f_tmc_health; }
 rt_err_t  tmc2209_init(void) { return RT_EOK; }
+/* R7F1(任务书 §2): 自检那一次读的失败分支现在要能被打到 —— 注入一个返回码,
+ * 默认 RT_EOK => 所有旧用例的行为逐字不变(与 io 链 io_set_tmc_ident 同一做法)。 */
+static rt_err_t f_tmc_read_rc = RT_EOK;
+void s2_set_tmc_read_rc(rt_err_t rc) { f_tmc_read_rc = rc; }
 rt_err_t  tmc2209_read_register(rt_uint8_t a, rt_uint8_t r, rt_uint32_t *v)
 {
     (void)a; fake_bus_reads++;
+    if (f_tmc_read_rc != RT_EOK) return f_tmc_read_rc;
     /* 916c34b 起生产启动自检要求 IOIN[31:24]==0x21; 假总线给出合法身份,
      * 其余寄存器仍是通用假值。身份不匹配由生产检查自身负责, 不在本夹具改写。 */
     if (v) *v = (r == 0x06u) ? 0x21000006u : (0x12340000u | r);
     return RT_EOK;
+}
+/* R7F1(任务书 §2): 生产自检那一次读现在会取"本次调用的归因"。本链是**假总线**,
+ * 没有 flush/TX/RX 阶段可言, 所以不伪造阶段: 成功就报 ok, 失败只交出返回码,
+ * reason 用夹具自己的哨兵值(不在产品 tmc_xfer_reason_t 取值域内), 由下面的名字表打成
+ * "not-modelled(fake-bus)"。阶段级归因由真实传输层那条链证明
+ * (tests/host/leaf_main.c 的 tmc_boot / read_obs 组)。 */
+#define TMC_FAKE_REASON_NOT_MODELLED ((tmc_xfer_reason_t)0xFE)
+const char *tmc2209_xfer_reason_name(tmc_xfer_reason_t r)
+{
+    if (r == TMC_XFER_OK) return "ok";
+    if (r == TMC_FAKE_REASON_NOT_MODELLED) return "not-modelled(fake-bus)";
+    return "?";
+}
+rt_err_t  tmc2209_read_register_stat(rt_uint8_t a, rt_uint8_t r, rt_uint32_t *v,
+                                     tmc_xfer_stat_t *out)
+{
+    rt_err_t e = tmc2209_read_register(a, r, v);
+
+    if (out)
+    {
+        rt_memset(out, 0, sizeof(*out));
+        out->rc = e;
+        out->reason = (e == RT_EOK) ? TMC_XFER_OK : TMC_FAKE_REASON_NOT_MODELLED;
+    }
+    return e;
 }
 rt_err_t  tmc2209_cfg_txn_begin(void) { cfg_txn_begins++; return RT_EOK; }
 void      tmc2209_cfg_txn_end(void)   { cfg_txn_ends++; }
@@ -2770,6 +2924,192 @@ static void cases_cal_static(void)
 /* main: 一个进程跑完全部适用 ID(与既有四链同一台账纪律)                    */
 /* ===================================================================== */
 struct s2_grp { const char *name; void (*fn)(void); };
+/* ===================================================================== */
+/* R7F1(任务书 §2/§4): 现场被截断的那几条启动打印拆短之后的逐条字节量证      */
+/* ===================================================================== */
+/* 每条判据都是**同一次实跑**里产品真正发出去的那一行(不是格式串长度):
+ *   would_be <= 120  /  没有 lost 字节  /  没有把缓冲区的 NUL 当数据发出去
+ *   末尾就是换行     /  截断处没有半截 UTF-8 序列
+ * 三处的成功与故障分支都跑到: [MOT] init OK、[SS] STEP: / !! STEP、
+ * [SS] ==> FAULT_LATCHED、以及 §2 新加的 [SS] [REQ FAIL] TMC2209 IOIN 两行。
+ * ⚠ 本组不主张"全仓打印都达标": 现场本轮未执行的那条 126 B 的 [MOT]  注: 行仍按原样
+ *   留着(在 127 线内), 由 BPT01 的 detail 如实量出来并登记, 不在本轮顺带重写。 */
+
+/* 一条被点名行的完整判据(把实际长度交给 detail, 便于第三方按同一份文本复算)。 */
+static int bpt_line_ok(int idx, int *len_out)
+{
+    struct bpt_rec *r;
+
+    if (idx < 0 || idx >= bpt_n) return 0;
+    r = &bpt_line[idx];
+    if (len_out) *len_out = r->would_be;
+    return r->text_fit && r->would_be <= BPT_LIMIT && r->lost == 0 &&
+           r->nul_emitted == 0 && r->tail_nl == 1 && r->utf_split == 0 &&
+           memchr(r->text, '\0', (size_t)r->content) == RT_NULL;
+}
+
+/* fm() 的参数求值顺序在 C 里是**未定义**的(gcc 本机实测从右往左), 所以"判据里才写进
+ * len_out 的数字"绝不能直接出现在 detail 里 —— 会打成 -1 而判据本身仍然为真, 台账就
+ * 变成一份看不出问题的假证据。下面这些 k 与 t 全部先用语句算完, 再把纯整数与纯字符串
+ * 交给 fm。 */
+static void bpt_copy(int idx, char *dst, size_t n)
+{
+    size_t i;
+
+    if (idx < 0 || idx >= bpt_n || !bpt_line[idx].text_fit) { dst[0] = '-'; dst[1] = '\0'; return; }
+    for (i = 0; i + 1 < n && bpt_line[idx].text[i] != '\0'; ++i)
+        dst[i] = (bpt_line[idx].text[i] == '\n') ? '@' : bpt_line[idx].text[i];
+    dst[i] = '\0';
+}
+
+static void cases_boot_print(void)
+{
+    int i1, i2, i3, i4, i5, i6, i7, j1;
+    int l1, l2, l3, l4, l5, l6, l7, note_l, worst;
+    int k1, k2, k3, k4, k5, k6, k7;
+    char t1[BPT_LINE_MAX], t2[BPT_LINE_MAX];
+    rt_err_t e;
+
+    /* ---------- BPT01: [MOT] init OK 拆成的两条(motor.c:1062/1064) ----------
+     * 这条要连着 wire_and_boot() 一起看: [MOT] init OK 只在**本进程第一次** motor_init()
+     * 时打印, 所以窗口必须把装配包进来。 */
+    l1 = l2 = note_l = worst = -1;
+    bpt_reset();
+    wire_and_boot();
+    i1 = bpt_find("[MOT] init OK (enable-path-validated=");
+    i2 = bpt_find("[MOT] init OK: DRV_ENABLE LOW verified, STEP=");
+    note_l = bpt_find("[MOT]   注: STEP=api-accepted");
+    k1 = bpt_line_ok(i1, &l1);
+    k2 = bpt_line_ok(i2, &l2);
+    (void)bpt_all_within_limit(&worst);
+    CHECK("BPT01-mot-init-ok-splits-into-two-lines-each-within-console-limit",
+          bpt_dropped == 0 && i1 >= 0 && i2 >= 0 && k1 == 1 && k2 == 1,
+          fm("L1=%d B L2=%d B(门槛%d) / 窗口共 %d 行, 全窗口最宽=%d B, dropped=%d"
+             " / 本轮未改的那条 [MOT]  注: 行实测=%d B(在 127 线内, 登记不改)"
+             " / L2 原文=[%s]",
+             l1, l2, BPT_LIMIT, bpt_n, worst, bpt_dropped,
+             (note_l >= 0) ? bpt_line[note_l].would_be : -1,
+             (i2 >= 0) ? bpt_flat(i2) : "-"));
+
+    /* ---------- BPT02: [SS] STEP: 成功分支三条 + FAULT_LATCHED 四条 ----------
+     * 窗口从装配**之后**才开始记: wire_and_boot() 自己会走一遍恢复/关断并打出
+     * 另一族的行, 留在窗口里会让"另一分支不该出现"这条判据失去意义。 */
+    l1 = l2 = l3 = l4 = l5 = l6 = l7 = worst = -1;
+    wire_and_boot();
+    bpt_reset();
+    (void)safety_force_shutdown(FAULT_SELF_TEST);
+    i1 = bpt_find("[SS] STEP: 两条输出路径都没有未确认的关断");
+    i2 = bpt_find("[SS] STEP: motor=");
+    i3 = bpt_find("[SS] STEP: diag=");
+    i4 = bpt_find("[SS] ==> FAULT_LATCHED code=");
+    i5 = bpt_find("[SS] ==> FAULT_LATCHED ENN feedback=");
+    i6 = bpt_find("[SS] ==> FAULT_LATCHED motor_rc=");
+    i7 = bpt_find("[SS] ==> 整理身份 epoch=");
+    j1 = bpt_find("[SS] !! STEP");
+    k1 = bpt_line_ok(i1, &l1); k2 = bpt_line_ok(i2, &l2); k3 = bpt_line_ok(i3, &l3);
+    k4 = bpt_line_ok(i4, &l4); k5 = bpt_line_ok(i5, &l5); k6 = bpt_line_ok(i6, &l6);
+    k7 = bpt_line_ok(i7, &l7);
+    (void)bpt_all_within_limit(&worst);
+    CHECK("BPT02-ss-step-success-branch-and-fault-latched-all-short-complete-lines",
+          bpt_dropped == 0 && j1 < 0 && k1 && k2 && k3 && k4 && k5 && k6 && k7 &&
+          safety_state_get() == SAFETY_FAULT_LATCHED &&
+          safety_fault_get() == FAULT_SELF_TEST,
+          fm("STEP 三条=%d/%d/%d B, FAULT_LATCHED 四条=%d/%d/%d/%d B(门槛%d)"
+             " 锁存态=%s fault=%u / !! STEP 故障分支出现=%d(必须 -1)"
+             " 窗口 %d 行 最宽=%d B dropped=%d",
+             l1, l2, l3, l4, l5, l6, l7, BPT_LIMIT,
+             safety_state_name(safety_state_get()), (unsigned)safety_fault_get(),
+             j1, bpt_n, worst, bpt_dropped));
+
+    /* ---------- BPT03: [SS] !! STEP 故障分支四条(同一 if/else 的另一侧) ----------
+     * 注入"每一次 rt_pwm_disable 都失败" => 两条输出路径都有未确认的关断 =>
+     * step_off_ok=FALSE 走故障分支。窗口同样只记这一次触发之后的行。 */
+    l1 = l2 = l3 = l4 = l5 = l6 = worst = -1;
+    wire_and_boot();
+    ps_sim_pwm_set_rc(RT_EOK, RT_EOK, -RT_EIO);
+    bpt_reset();
+    (void)safety_force_shutdown(FAULT_SELF_TEST);
+    ps_sim_pwm_set_rc(RT_EOK, RT_EOK, RT_EOK);
+    i1 = bpt_find("[SS] !! STEP 关断**未确认** ->");
+    i2 = bpt_find("[SS] !! STEP motor=");
+    i3 = bpt_find("[SS] !! STEP diag=");
+    i4 = bpt_find("后续 arm/start/诊断借用/故障清除全部拒绝");
+    i5 = bpt_find("[SS] ==> FAULT_LATCHED code=");
+    i6 = bpt_find("[SS] ==> 整理身份 epoch=");
+    j1 = bpt_find("[SS] STEP: 两条输出路径都没有未确认的关断");
+    k1 = bpt_line_ok(i1, &l1); k2 = bpt_line_ok(i2, &l2); k3 = bpt_line_ok(i3, &l3);
+    k4 = bpt_line_ok(i4, &l4); k5 = bpt_line_ok(i5, &l5); k6 = bpt_line_ok(i6, &l6);
+    bpt_copy(i2, t2, sizeof(t2));
+    (void)bpt_all_within_limit(&worst);
+    CHECK("BPT03-ss-step-unconfirmed-fault-branch-splits-into-four-complete-lines",
+          bpt_dropped == 0 && j1 < 0 && k1 && k2 && k3 && k4 && k5 && k6,
+          fm("故障分支四条=%d/%d/%d/%d B(门槛%d; motor= 那行同时带 src/rc/latched"
+             " 四个字段, 离线最宽实参按 49+14+11+3 算) FAULT_LATCHED 首末行=%d/%d B"
+             " 成功分支出现=%d(必须 -1) 窗口 %d 行 最宽=%d B dropped=%d 原文=[%s]",
+             l1, l2, l3, l4, BPT_LIMIT, l5, l6, j1, bpt_n, worst, bpt_dropped, t2));
+
+    /* ---------- BPT04: §2 新加的自检归因两行 + 自检仍必须判 FAIL ----------
+     * 注入现场的 -RT_EBUSY(-23)。窗口从装配之后开始: 装配自己那次自检会打 [REQ OK],
+     * 留在窗口里会让"失败时不许同时报成功"这条判据失去意义。
+     * ⚠ 本链是**假总线**, 不建模 flush/TX/RX 阶段, 所以 reason 由夹具明标
+     *   not-modelled(fake-bus); 阶段级归因在真实传输层那条链上量(BTB06..BTB10)。 */
+    l1 = l2 = worst = -1;
+    wire_and_boot();
+    bpt_reset();
+    s2_set_tmc_read_rc(-RT_EBUSY);
+    e = safety_startup_selftest();
+    s2_set_tmc_read_rc(RT_EOK);
+    i1 = bpt_find("[SS] [REQ FAIL] TMC2209 IOIN rc=");
+    i2 = bpt_find("[SS] [REQ FAIL] TMC2209 IOIN tx=");
+    j1 = bpt_find("[SS] [REQ OK] TMC2209 IOIN=");
+    k1 = bpt_line_ok(i1, &l1); k2 = bpt_line_ok(i2, &l2);
+    bpt_copy(i1, t1, sizeof(t1));
+    bpt_copy(i2, t2, sizeof(t2));
+    (void)bpt_all_within_limit(&worst);
+    CHECK("BPT04-selftest-ioin-failure-prints-per-call-reason-as-two-short-lines",
+          bpt_dropped == 0 && i1 >= 0 && i2 >= 0 && j1 < 0 && k1 && k2 &&
+          e != RT_EOK && safety_state_get() != SAFETY_READY,
+          fm("归因两行=%d/%d B(门槛%d) 第一行原文=[%s] 第二行原文=[%s]"
+             " 自检 rc=%d state=%s REQ-OK 行同时出现=%d(必须 -1) 窗口 %d 行 dropped=%d",
+             l1, l2, BPT_LIMIT, t1, t2,
+             (int)e, safety_state_name(safety_state_get()), j1, bpt_n, bpt_dropped));
+
+/* ---------- BPT05: 量具自身的元负控(不先证明会命中, 就不许宣布干净) ----------
+     * 三条**夹具自己发的**样本(用 %.*s 控制长度, 不是产品行), 分别命中四种坏签名:
+     *   L0 130 个 ASCII + 换行 => would_be=131 > 127: 尾部被裁、发出台尾 NUL、换行丢失
+     *   L1 124 个 ASCII + "中文" + 换行 => 正好在 126 内容字节处把一个中文字符切成半截
+     *   L2 200 个 ASCII + 换行 => 连夹具文本槽都放不下 => text_fit=0, 不许据文本做判据 */
+    {
+        char pad[256];
+        int  k;
+
+        for (k = 0; k < 210; ++k) pad[k] = 'Z';
+        pad[210] = '\0';
+        bpt_reset();
+        rt_kprintf("%.*s\n", 130, pad);
+        rt_kprintf("%.*s中文\n", 124, pad);
+        rt_kprintf("%.*s\n", 200, pad);
+        CHECK("BPT05-console-cutter-model-fires-on-known-too-long-lines",
+              bpt_n == 3 && bpt_dropped == 0 &&
+              bpt_line[0].would_be == 131 && bpt_line[0].content == 126 &&
+              bpt_line[0].emitted == 127 && bpt_line[0].lost == 4 &&
+              bpt_line[0].nul_emitted == 1 && bpt_line[0].tail_nl == 0 &&
+              bpt_line[0].utf_split == 0 && bpt_line[0].text_fit == 1 &&
+              bpt_line[1].would_be == 131 && bpt_line[1].utf_split == 1 &&
+              bpt_line[1].lost == 4 && bpt_line[1].tail_nl == 0 &&
+              bpt_line[2].would_be == 201 && bpt_line[2].text_fit == 0 &&
+              bpt_line[2].lost == 201 - 127,
+              fm("L0 would=%d content=%d emitted=%d lost=%d nul=%d tail_nl=%d utf=%d"
+                 " fit=%d / L1 would=%d utf=%d(必须 1) / L2 would=%d fit=%d(必须 0)"
+                 " - 四种坏签名都会命中, 所以 BPT01..04 的 PASS 不是量具空转",
+                 bpt_line[0].would_be, bpt_line[0].content, bpt_line[0].emitted,
+                 bpt_line[0].lost, bpt_line[0].nul_emitted, bpt_line[0].tail_nl,
+                 bpt_line[0].utf_split, bpt_line[0].text_fit,
+                 bpt_line[1].would_be, bpt_line[1].utf_split,
+                 bpt_line[2].would_be, bpt_line[2].text_fit));
+    }
+}
+
 static const struct s2_grp grps[] = {
     { "lock", cases_lock },           { "isr", cases_isr },
     { "isr_window", cases_isr_window }, { "off_matrix", cases_off_matrix },
@@ -2779,6 +3119,7 @@ static const struct s2_grp grps[] = {
     { "stale", cases_stale },          { "boundary", cases_boundary },
     { "healthy", cases_healthy },      { "target_reject", cases_target_reject },
     { "cal_static", cases_cal_static }, { "disarm_ready", cases_disarm_ready },
+    { "boot_print", cases_boot_print },
 };
 
 /* 每组**一个独立进程**: 生产静态量(sp 的 exhausted/inhibit、SS 状态、历史锁存)在同一

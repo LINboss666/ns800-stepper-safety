@@ -1,0 +1,34 @@
+###### 停机优先 S2 并发/身份链 (基线 ed8d7f4a895ac95e0339bfc7c5eeae72f322c0a6) ######
+run_id=20261103T144056Z-500
+SRC_APP=D:/ns800/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications
+夹具=/d/ns800/tests/host/sp_conc_main.c (真 pthread 互斥量/线程/窗口内排队 ISR)
+OUT_DIR=/d/ns800_r7f1_scratch/s2/20261103T144056Z-500
+compiler=gcc.exe (tdm64-1) 4.9.2
+单组墙钟=60s(死锁守卫)  选择集合=boot_print
+
+=== 变体 target ===
+    判 FAIL: CASE|BPT03-ss-step-unconfirmed-fault-branch-splits-into-four-complete-lines|FAIL|故障分支四条=57/86/83/56 B(门槛120; motor= 那行同时带 src/rc/latched 四个字段, 最宽实参按 49+14+11+3 算) FAULT_LATCHED 首末行=63/44 B 成功分支出现=0(必须 -1) 窗口 33 行 dropped=0 原文(第2行)=[SS] !! STEP motor=api-failed(output-UNKNOWN)(src=emergency-stop rc=-12 latched=YES)
+    判 FAIL: CASE|BPT04-selftest-ioin-failure-prints-per-call-reason-as-two-short-lines|FAIL|归因两行=57/86 B(门槛120) 第一行原文=[[SS] [REQ FAIL] TMC2209 IOIN rc=-23 reason=not-modelled(fake-bus)
+    台账: 必需=5 唯一出现=5 实际行数=5 SUMMARY(cases=5 pass=3 fail=2 pre_bad=0 skips=0) 自洽=1
+  target/boot_print 有判 FAIL 的用例 => 检出失败
+  (ONLY 部分运行: 期望用例改取所选组的必需 id 合计)
+  target 汇总: 组=1 用例=5 PASS=3 FAIL=2 SKIP行=0 pre_bad=0 期望用例=5
+
+=== 变体 host_ovr ===
+    判 FAIL: CASE|BPT03-ss-step-unconfirmed-fault-branch-splits-into-four-complete-lines|FAIL|故障分支四条=57/86/83/56 B(门槛120; motor= 那行同时带 src/rc/latched 四个字段, 最宽实参按 49+14+11+3 算) FAULT_LATCHED 首末行=63/44 B 成功分支出现=0(必须 -1) 窗口 33 行 dropped=0 原文(第2行)=[SS] !! STEP motor=api-failed(output-UNKNOWN)(src=emergency-stop rc=-12 latched=YES)
+    判 FAIL: CASE|BPT04-selftest-ioin-failure-prints-per-call-reason-as-two-short-lines|FAIL|归因两行=57/86 B(门槛120) 第一行原文=[[SS] [REQ FAIL] TMC2209 IOIN rc=-23 reason=not-modelled(fake-bus)
+    台账: 必需=5 唯一出现=5 实际行数=5 SUMMARY(cases=5 pass=3 fail=2 pre_bad=0 skips=0) 自洽=1
+  host_ovr/boot_print 有判 FAIL 的用例 => 检出失败
+  (ONLY 部分运行: 期望用例改取所选组的必需 id 合计)
+  host_ovr 汇总: 组=1 用例=5 PASS=3 FAIL=2 SKIP行=0 pre_bad=0 期望用例=5
+
+=== S2 并发/身份矩阵 ===
+target/boot_print | NOT-PASS 判FAIL=2 自报fail=2 proc_rc=1 必需=5/5
+target | 有失败组: boot_print
+host_ovr/boot_print | NOT-PASS 判FAIL=2 自报fail=2 proc_rc=1 必需=5/5
+host_ovr | 有失败组: boot_print
+
+选择集合=boot_print
+实际执行集合: target=1组 host_ovr=1组 (每组一个独立进程)
+
+S2 RUNNER RESULT: FAIL (rc=1) —— 存在判 FAIL 的必需用例

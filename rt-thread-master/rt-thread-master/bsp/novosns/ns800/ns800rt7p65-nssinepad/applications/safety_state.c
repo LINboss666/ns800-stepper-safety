@@ -448,25 +448,42 @@ static rt_err_t ss_reconcile_once(rt_uint32_t fallback_code)
     step_pwm_get_stop_state(&d_res, &d_rc, &d_lat);
     step_off_ok = (mot_stop_result_is_off(m_res) && step_pwm_off_confirmed())
                       ? RT_TRUE : RT_FALSE;
+    /* R7F1(2026-11-03 任务书 §4): 下面这一对(if/else 是同一件事的两个分支)在
+     * S_S3/01_rst.boot.rx.bin 里从偏移 2142 起被截到 126 个内容字节 + NUL, 换行丢失。
+     * 成功分支现场证过截断; 故障分支按同一条尺算出 334 B(最宽实参:
+     * "api-accepted(驱动接受关断, 非波形证明)"=49 B、"emergency-stop"=14 B、
+     * "诊断从未占用该通道"=27 B), 留着它等于给这条链留一个"故障时才截断"的新缺陷,
+     * 所以两个分支一起拆。文字与字段值一字未改, 只分行, 每次调用都 <=120 B。 */
     if (step_off_ok)
-        rt_kprintf("[SS] STEP: 两条输出路径都没有未确认的关断"
-                   " (motor=%s src=%s / diag=%s) - 仍不等于示波器证明无脉冲\n",
-                   mot_stop_result_name(m_res), mot_stop_src_name(m_src),
+    {
+        rt_kprintf("[SS] STEP: 两条输出路径都没有未确认的关断\n");
+        rt_kprintf("[SS] STEP: motor=%s src=%s\n",
+                   mot_stop_result_name(m_res), mot_stop_src_name(m_src));
+        rt_kprintf("[SS] STEP: diag=%s - 仍不等于示波器证明无脉冲\n",
                    d_res == MOT_STOP_NOT_ATTEMPTED ? "诊断从未占用该通道"
                                                    : "驱动已接受关断");
+    }
     else
-        rt_kprintf("[SS] !! STEP 关断**未确认**: motor=%s(src=%s rc=%d latched=%s)"
-                   " diag=%s(rc=%d latched=%s) -> 不谎称输出已停,"
-                   " 后续 arm/start/诊断借用/故障清除全部拒绝, 直到人工恢复复核\n",
+    {
+        rt_kprintf("[SS] !! STEP 关断**未确认** -> 不谎称输出已停\n");
+        rt_kprintf("[SS] !! STEP motor=%s(src=%s rc=%d latched=%s)\n",
                    mot_stop_result_name(m_res), mot_stop_src_name(m_src), (int)m_rc,
-                   m_lat ? "YES" : "no", mot_stop_result_name(d_res), (int)d_rc,
-                   d_lat ? "YES" : "no");
-    rt_kprintf("[SS] ==> FAULT_LATCHED code=%u (DRV_ENABLE LOW %s, ENN feedback %s,"
-               " STEP %s, motor_rc=%d diag_rc=%d, 整理身份 epoch=%u, events=0x%X)\n",
-               pcode,
-               pad_low ? "verified" : "UNVERIFIED!!", safety_fb_verdict_name(fb_v),
-               step_off_ok ? "off-confirmed(api)" : "NOT-confirmed(unknown)",
-               (int)pe, (int)ge, (unsigned)proof.epoch, (unsigned)events);
+                   m_lat ? "YES" : "no");
+        rt_kprintf("[SS] !! STEP diag=%s(rc=%d latched=%s)\n",
+                   mot_stop_result_name(d_res), (int)d_rc, d_lat ? "YES" : "no");
+        rt_kprintf("[SS] !! STEP 后续 arm/start/诊断借用/故障清除全部拒绝,"
+                   " 直到人工恢复复核\n");
+    }
+    /* R7F1 同上: 这一条现场从偏移 2269 起同样截到 126 B(算出 209 B)。拆成四条短行,
+     * code= 与锁存码留在同一行, 错误值(motor_rc/diag_rc)与整理身份一个都不丢。 */
+    rt_kprintf("[SS] ==> FAULT_LATCHED code=%u (DRV_ENABLE LOW %s)\n",
+               pcode, pad_low ? "verified" : "UNVERIFIED!!");
+    rt_kprintf("[SS] ==> FAULT_LATCHED ENN feedback=%s STEP=%s\n",
+               safety_fb_verdict_name(fb_v),
+               step_off_ok ? "off-confirmed(api)" : "NOT-confirmed(unknown)");
+    rt_kprintf("[SS] ==> FAULT_LATCHED motor_rc=%d diag_rc=%d\n", (int)pe, (int)ge);
+    rt_kprintf("[SS] ==> 整理身份 epoch=%u events=0x%X\n",
+               (unsigned)proof.epoch, (unsigned)events);
     return RT_EOK;
 }
 
@@ -627,7 +644,12 @@ rt_err_t safety_run_selftest(void)
 
     /* ---- required ④ TMC2209 链路(初始化 + IOIN 读 + VERSION 身份) ----
      * 三条失败分开打印; 只有 init 成功 + 读成功 + IOIN[31:24]==0x21 才算通过。
-     * 不匹配时只报实际 IOIN/rc, 不写寄存器“修身份”, 也不宣称芯片损坏。 */
+     * 不匹配时只报实际 IOIN/rc, 不写寄存器“修身份”, 也不宣称芯片损坏。
+     * R7F1(2026-11-03 任务书 §2): 读失败那一条改为**逐调用归因**, 因为本平台码表下
+     *   -23 同时来自"非法上下文拒绝""取 xfer 锁失败""底层写入口自守上下文"三处,
+     *   光看 rc 分不出方向(2026-11-03 现场 S3 就是只留了 rc=-23)。tx/rx 字节数才是
+     *   "还没发出请求"与"发出去了没有应答"的分界。两行都是短打印, 都在读调用**返回
+     *   之后**(那时 xfer 锁已归还)、且在本线程上下文里。 */
     {
         rt_err_t e_init = tmc2209_init();
         rt_err_t e_read = RT_EOK;
@@ -640,10 +662,17 @@ rt_err_t safety_run_selftest(void)
         }
         else
         {
-            e_read = tmc2209_read_register(TMC_ADDR_DEFAULT, TMC_REG_IOIN, &ioin);
+            tmc_xfer_stat_t rd_st;
+
+            e_read = tmc2209_read_register_stat(TMC_ADDR_DEFAULT, TMC_REG_IOIN,
+                                                &ioin, &rd_st);
             if (e_read != RT_EOK)
             {
-                rt_kprintf("[SS] [REQ FAIL] TMC2209 IOIN read rc=%d\n", (int)e_read);
+                rt_kprintf("[SS] [REQ FAIL] TMC2209 IOIN rc=%d reason=%s\n",
+                           (int)e_read, tmc2209_xfer_reason_name(rd_st.reason));
+                rt_kprintf("[SS] [REQ FAIL] TMC2209 IOIN tx=%u rx=%u flush=%u used=%u\n",
+                           (unsigned)rd_st.tx_written, (unsigned)rd_st.rx_bytes,
+                           (unsigned)rd_st.flush_bytes, (unsigned)rd_st.used);
                 required_fail = -RT_ERROR;
             }
             else if (!tmc2209_ioin_is_identity(ioin))

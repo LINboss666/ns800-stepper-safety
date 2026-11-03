@@ -1054,9 +1054,14 @@ rt_err_t motor_init(void)
     rt_thread_startup(mot_tid);
 
     mot.health = SUBSYS_OK;
-    rt_kprintf("[MOT] init OK (enable-path-validated=%s, arm gate ACTIVE,"
-               " DRV_ENABLE LOW verified, STEP=%s)\n",
-               MOTOR_HARDWARE_ENABLE_PATH_VALIDATED ? "YES" : "NO",
+    /* R7F1(2026-11-03 任务书 §4): 这一条在 S_S3/01_rst.boot.rx.bin 里从偏移 1192 起
+     * 只落了 126 个内容字节就被控制台那一刀截了(rtconfig.h 的 RT_CONSOLEBUF_SIZE=128,
+     * kservice.c:410-416 把 length 裁到 127 再交给 _kputs), 换行连同后半句一起丢。
+     * 拆成两条短打印; STEP= 的最宽实参是 "api-accepted(驱动接受关断, 非波形证明)"
+     * = 49 个 UTF-8 字节, 按它算两条都在 120 B 以内。文字与字段一字未改, 只分行。 */
+    rt_kprintf("[MOT] init OK (enable-path-validated=%s, arm gate ACTIVE)\n",
+               MOTOR_HARDWARE_ENABLE_PATH_VALIDATED ? "YES" : "NO");
+    rt_kprintf("[MOT] init OK: DRV_ENABLE LOW verified, STEP=%s\n",
                mot_stop_result_name(mot.stop_result));
     rt_kprintf("[MOT]   注: STEP=api-accepted 只说明驱动**接受了关断请求**,"
                " 不是示波器证明无脉冲(BUG-008 仍未验收)\n");

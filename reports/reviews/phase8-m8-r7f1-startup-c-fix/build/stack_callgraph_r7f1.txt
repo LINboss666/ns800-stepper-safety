@@ -1,0 +1,78 @@
+M8-R7F1 构建侧栈深核对: armlink 调用图 + fromelf 反汇编 + 两版 map 逐目标差分
+日期 2026-11-03。目标 rt-thread-motor-m1-candidate。本轮只构建, 设备动作 0。
+
+[输入件身份]
+  调用图 htm(本轮) : 1078228 B  sha256=c8d0f4e961c7c2a526551be219f59d4c3b9709f9e55ef447b09b9d4fbc8edf8b
+  入库副本          : reports/firmware/phase8-m8-r7f1-startup-c-fix/rt-thread-motor-m1-callgraph.htm
+  本轮 map          : sha256=6138de0593df9a18c5902b7e5014918f8db2aa02fdf5bad516d4aef94efb0194
+  对照 map(R6A)     : sha256=4f58a3eea493d8c532ecceba3d16db1e59750066ec75cede8647197563d412c3
+  反汇编全文        : fromelf --disassemble 派生, 放在仓外临时件, 不入库(2 个帧只用得到前几行)
+
+[1] armlink 调用图 Max Depth(单位 B)
+    口径: 每个符号是"以它自己为根"的子树累计深度, 不含调用它的祖先帧;
+          armlink 解析不了函数指针, 所以这些数是**静态下界**, 不是上界, 也不含异常/ISR 帧。
+  main                           Max Depth =   756 B   最深前 6 跳: main -> rtthread_startup -> rt_application_init -> rt_thread_create -> rt_object_allocate -> rt_malloc
+  supervisor_boot                Max Depth =  2020 B   最深前 6 跳: supervisor_boot -> project_config_boot -> project_config_load -> ns_params_load -> cfg_select -> ns_flash_read
+  safety_startup_selftest        Max Depth =  1220 B   最深前 6 跳: safety_startup_selftest -> safety_run_selftest -> tmc2209_read_register_stat -> tmc_read_reg -> tmc_read_reg_obs -> motor_get_snapshot
+  safety_run_selftest            Max Depth =  1164 B   最深前 6 跳: safety_run_selftest -> tmc2209_read_register_stat -> tmc_read_reg -> tmc_read_reg_obs -> motor_get_snapshot -> mot_lock_take
+  tmc2209_read_register_stat     Max Depth =  1076 B   最深前 6 跳: tmc2209_read_register_stat -> tmc_read_reg -> tmc_read_reg_obs -> motor_get_snapshot -> mot_lock_take -> rt_mutex_take
+  tmc2209_read_register          Max Depth =  1092 B   最深前 6 跳: tmc2209_read_register -> tmc2209_read_register_stat -> tmc_read_reg -> tmc_read_reg_obs -> motor_get_snapshot -> mot_lock_take
+  tmc_read_reg                   Max Depth =  1004 B   最深前 6 跳: tmc_read_reg -> tmc_read_reg_obs -> motor_get_snapshot -> mot_lock_take -> rt_mutex_take -> _rt_mutex_take
+  sensor_thread_entry            Max Depth =  1332 B   最深前 6 跳: sensor_thread_entry -> s_collect -> tmc2209_read_sg_result -> tmc2209_read_register -> tmc2209_read_register_stat -> tmc_read_reg
+  system_selftest                Max Depth =  1340 B   最深前 6 跳: system_selftest -> system_status -> tmc2209_get_write_gate_mask -> tmc_cfg_gate_prod -> motor_get_snapshot -> mot_lock_take
+  motor_init                     Max Depth =   900 B   最深前 6 跳: motor_init -> rt_thread_create -> rt_object_allocate -> rt_malloc -> _heap_lock -> rt_mutex_take
+  tmc2209_init                   Max Depth =   604 B   最深前 6 跳: tmc2209_init -> tmc_cfg_prod_sync -> tmc_cfg_ctx_init -> rt_mutex_detach -> _mutex_before_delete_detach -> rt_susp_list_resume_all
+
+[2] 启动/自检线程(main 线程)上的判定
+  rtconfig.h:118  #define RT_MAIN_THREAD_STACK_SIZE 2048   (本轮未改)
+  rtconfig.h:107  #define RT_CONSOLEBUF_SIZE 128            (本轮未改, 任务书 §4 禁止放大)
+  safety_startup_selftest 子树 = 1220 B, 对 2048 B main 栈的静态余量 = 828 B。
+    该子树的最深路径已经穿过本轮新增的 tmc2209_read_register_stat, 也就是说新增的逐调用归因帧
+    已经算在这个数里, 不是"改完没算"。
+  supervisor_boot 子树 = 2020 B; 最深路径是 project_config_boot -> ns_params_load -> ns_flash_read
+    -> rt_spi_send_then_recv -> rt_mutex_take 这条 SPI/配置加载线, 不经过本次改的 IOIN 自检读。
+    2020 B 落在 2048 B main 栈上, 静态余量只有 28 B。
+    边界(必须如实): 任务书 §6 只允许构建一次, 本轮没有再构建一枚基线镜像去做同一个数的对照,
+    所以"本轮没让 main 栈变紧"这句只能靠"SPI 线一行未改 + 自检线 1220 B 与它无关"支撑,
+    不能靠实测差分支撑。登记为下一轮可见事实: main 栈瓶颈在 SPI 配置加载线, 不在 IOIN 读线。
+
+[3] fromelf 反汇编帧大小(证新帧真进了镜像, 没被优化掉)
+  safety_startup_selftest PROC
+        |L1.154776|
+        PUSH     {r4,lr}
+  tmc2209_read_register_stat PROC
+        |L1.176536|
+        PUSH     {r4,lr}
+  读法: safety_startup_selftest = PUSH {r4,lr}(8 B) + SUB sp,sp,#0x30(48 B) = 56 B 帧;
+        0x30 = 48 B 正是任务书 §2 要的小型逐调用状态 tmc_xfer_stat_t; 完整观测数组
+        tmc_read_observation_t 是 188 B, 没有被搬到启动线程栈上。
+        tmc2209_read_register_stat = PUSH {r4,lr} + SUB sp,sp,#0x40 = 72 B 帧。
+
+[4] 两版 map 的 Object Totals 差分 —— 资源变化归因
+  object                             Code         RO         RW         ZI
+  Object Totals                      +272       +192         +4         +4
+  tmc2209.o                          +132         +0         +0         +0
+  safety_state.o                      +88       +177         +0         +0
+  sensor_service.o                    +28         +0         +4         +0
+  motor.o                             +16        +15         +0         +0
+  supervisor.o                         +4         +0         +0         +0
+  (incl. Padding)                      +4         +0         +0         +4
+  对账: Code+272 与 RO+192 合计 464 B, 与 BIN 292164 -> 292628 的增量 464 B 逐字节相符;
+        RW+4 = sensor_service.o 的 .data.s_sg_startup_gated(map 0x2000073c, Data 4 B, RW);
+        ZI+4 = "(incl. Padding)" 行, 链接器填充, 没有任何具名 .bss 目标变化(逐目标 ZI 差分均为 0)。
+
+[5] 新代码/新数据确实进了这枚镜像(map 符号表与引用边)
+  新增 API 代码段:        0x0802b198   0x0802b198   0x00000094   Code   RO         1036    .text.tmc2209_read_register_stat  tmc2209.o
+  reason 名字表:        0x0802b428   0x0802b428   0x000000c6   Code   RO         1026    .text.tmc2209_xfer_reason_name  tmc2209.o
+  SG 启动门释放入口:        0x08026dd8   0x08026dd8   0x0000000e   Code   RO          815    .text.sensor_service_sg_startup_release  sensor_service.o
+  门变量:               0x2000073c   COMPRESSED   0x00000004   Data   RW          847    .data.s_sg_startup_gated  sensor_service.o
+  自检真走新 API:         safety_state.o(.text.safety_run_selftest) refers to tmc2209.o(.text.tmc2209_read_register_stat) for tmc2209_read_register_stat
+  门在采样真路上:           sensor_service.o(.text.s_collect) refers to sensor_service.o(.data.s_sg_startup_gated) for s_sg_startup_gated
+  如实登记: 只读取门状态的访问器 sensor_service_sg_startup_gated() 在本目标内无人调用,
+            被链接器整段移除(map: Removing sensor_service.o(.text.sensor_service_sg_startup_gated), 12 bytes)。
+            门本身仍生效——生效的是 s_collect 直接读 s_sg_startup_gated 那条边, 上面已列。
+
+[6] 本轮没有做的(边界)
+  - 没有第二次构建, 因此没有 R6A 侧的同一批 Max Depth 数(见 §2 边界条)。
+  - 没有下载/回读/复位/任何串口动作: 任务书 §6 之外一律不动设备。
+  - 反汇编里只核了自检路径的两个帧, 没有做全镜像指令级差分。

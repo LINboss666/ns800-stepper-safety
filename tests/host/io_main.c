@@ -528,6 +528,32 @@ rt_err_t tmc2209_read_register(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *val
     return RT_EOK;
 }
 
+/* R7F1(任务书 §2): 生产自检那一次读现在要"本次调用的归因"。本链是假总线, 用例注入的
+ * 是**返回码**(IO11b 注 -RT_ETIMEOUT), 没有 flush/TX/RX 阶段可言 => 不伪造阶段:
+ * 成功报 ok, 失败交出注入的那个原始码, reason 用夹具哨兵值, 由名字表打成
+ * "not-modelled(fake-bus)"。阶段级归因由真实传输层那条链证明
+ * (tests/host/leaf_main.c 的 tmc_boot / read_obs 组)。 */
+#define TMC_FAKE_REASON_NOT_MODELLED ((tmc_xfer_reason_t)0xFE)
+const char *tmc2209_xfer_reason_name(tmc_xfer_reason_t r)
+{
+    if (r == TMC_XFER_OK) return "ok";
+    if (r == TMC_FAKE_REASON_NOT_MODELLED) return "not-modelled(fake-bus)";
+    return "?";
+}
+rt_err_t tmc2209_read_register_stat(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *val,
+                                    tmc_xfer_stat_t *out)
+{
+    rt_err_t e = tmc2209_read_register(addr, reg, val);
+
+    if (out)
+    {
+        rt_memset(out, 0, sizeof(*out));
+        out->rc = e;
+        out->reason = (e == RT_EOK) ? TMC_XFER_OK : TMC_FAKE_REASON_NOT_MODELLED;
+    }
+    return e;
+}
+
 rt_err_t tmc2209_cfg_txn_begin(void) { io_cfg_txn_begins++; return RT_EOK; }
 void     tmc2209_cfg_txn_end(void)   { io_cfg_txn_ends++; }
 

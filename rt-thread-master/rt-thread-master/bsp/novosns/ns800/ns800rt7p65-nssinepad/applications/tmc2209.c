@@ -78,38 +78,10 @@ typedef struct
     rt_tick_t total;
 } tmc_budget_t;
 
-/* 结构化失败原因(§10.4: 底层只返回无打印的结构化错误, 打印在保护之后的外层)。 */
-typedef enum
-{
-    TMC_XFER_OK = 0,
-    TMC_XFER_NO_DEVICE,       /* 未取得设备句柄 / 未打开 */
-    TMC_XFER_BAD_CONTEXT,     /* ISR 或已关中断上下文: 一律拒绝 */
-    TMC_XFER_BUDGET_EXHAUSTED,/* 总预算已耗尽(不重开、不映射成成功) */
-    TMC_XFER_LOCK_BUSY,       /* 本层没拿到锁 => 也绝不 release */
-    TMC_XFER_RX_FLOOD,        /* flush 超过字节/时间双上限: 不能称输入已清空 */
-    TMC_XFER_TX_FAILED,       /* 预算内没写完(部分发送如实报 written) */
-    TMC_XFER_RX_TIMEOUT_ECHO, /* 只有自身回声, 没有应答头 */
-    TMC_XFER_RX_TIMEOUT_PART, /* 有应答头但不完整 */
-    TMC_XFER_RX_CRC,          /* CRC/帧解析错误 */
-    TMC_XFER_NOT_ARRIVED,     /* IFCNT 没有 +1: 芯片没接受这一帧(内容对也不算到达) */
-    TMC_XFER_STALE            /* 操作身份已过期(晚到结果不发布) */
-} tmc_xfer_reason_t;
-
-/* 一次传输的可判定观测: 原始 rc 与原因、实际字节数分列, 不互相替代。 */
-typedef struct
-{
-    rt_err_t           rc;
-    tmc_xfer_reason_t  reason;
-    rt_size_t          tx_written;
-    rt_size_t          rx_bytes;
-    rt_size_t          flush_bytes;
-    rt_tick_t          used;
-    /* R4(2026-10-23 CP3 §6.1): IFCNT 不符的细节也**只记账不打印** —— 打印要排在
-     * 那次短保护之后(控制台逐字符忙等, 每字符 ≤BSP_NS800_UART_TX_TIMEOUT)。 */
-    rt_uint8_t         ifcnt_before;
-    rt_uint8_t         ifcnt_after;
-    rt_bool_t          ifcnt_checked;
-} tmc_xfer_stat_t;
+/* 结构化失败原因(§10.4: 底层只返回无打印的结构化错误, 打印在保护之后的外层)。
+ * R7F1(任务书 §2): tmc_xfer_reason_t 与 tmc_xfer_stat_t 连同 tmc2209_xfer_reason_name()
+ * 一起搬到 tmc2209.h —— 启动自检那一次读要拿到**本次调用**的归因, 而这两型本就是
+ * 实现对外承诺的观测形状。观测数组 tmc_read_observation_t 继续留在本文件(见 §5 段)。 */
 
 /* ---------- URO(2026-10-27 任务书 §5): 单次读事务的分阶段观测对象 ----------
  * 可选、调用者私有: 只有显式传入 observation 的调用(现在是 tmc_uart_probe)才收集字节与
@@ -389,7 +361,7 @@ static rt_bool_t tmc_ctx_ok_for_wait(const char *who)
     return RT_FALSE;
 }
 
-static const char *tmc_xfer_reason_name(tmc_xfer_reason_t r)
+const char *tmc2209_xfer_reason_name(tmc_xfer_reason_t r)
 {
     switch (r)
     {
@@ -1264,8 +1236,34 @@ rt_err_t tmc2209_init(void)
 
 rt_err_t tmc2209_read_register(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *value)
 {
-    rt_err_t e = tmc_read_reg(addr, reg, value, RT_NULL, RT_NULL);
+    return tmc2209_read_register_stat(addr, reg, value, RT_NULL);
+}
 
+/* R7F1(任务书 §2): 把**这一次调用自己的**归因交给调用者。
+ *  - 归因写在调用者给的 out 里, 不在本文件建"最后一次 UART 结果"的共享槽;
+ *  - 先在本地整份清零、跑完再一次性交给 out => 调用者不会看到新旧字段拼成的半态;
+ *  - 本地那份是既有 tmc_xfer_stat_t(实测 48 B), 不是 188 B 的观测数组 —— 启动自检跑在
+ *    main 线程上, 那边只有 RT_MAIN_THREAD_STACK_SIZE(2048 B);
+ *  - out==NULL 与改动前的 tmc2209_read_register() 走**同一条** tmc_read_reg, 逐字等价,
+ *    health 联动也同一份(不新增第二套返回路径)。
+ * 打印由调用者在返回之后做: 本函数返回时 xfer 锁已经归还(见 tmc_xfer_give 在
+ * tmc_read_reg_obs 的取锁/归还配对), 因此调用点的 rt_kprintf 天然落在锁外与线程上下文里。 */
+rt_err_t tmc2209_read_register_stat(rt_uint8_t addr, rt_uint8_t reg, rt_uint32_t *value,
+                                    tmc_xfer_stat_t *out)
+{
+    tmc_xfer_stat_t local;
+    rt_err_t        e;
+
+    if (out == RT_NULL)
+    {
+        e = tmc_read_reg(addr, reg, value, RT_NULL, RT_NULL);
+    }
+    else
+    {
+        rt_memset(&local, 0, sizeof(local));
+        e = tmc_read_reg(addr, reg, value, RT_NULL, &local);
+        *out = local;
+    }
     tmc_health_after_xfer(e);
     return e;
 }
@@ -1578,7 +1576,7 @@ static void tmc_probe_dump(int *errs, const tmc_read_observation_t *o)
     {
         rt_snprintf(rcs, sizeof(rcs), "%d", (int)o->rc);
         rsn = (o->result == TMC_OBS_SUCCESS) ? "ok"
-            : tmc_xfer_reason_name((tmc_xfer_reason_t)o->reason);
+            : tmc2209_xfer_reason_name((tmc_xfer_reason_t)o->reason);
         rt_snprintf(rns, sizeof(rns), "%s", rsn);
     }
     TMC_PROBE_EMIT(errs, line, "[TMRO] reg=%02X result=%s rc=%s reason=%s\n",
