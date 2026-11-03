@@ -1,0 +1,15 @@
+{"kind": "APPROVED_PACKAGE_VERIFIED", "plan_sha256": "4404cfd1a043e7b4653aeabe7d27feb3e73a74b5c6b34f564e8e454ad4171a3a", "stage": "S3", "steps": 6, "steps_sha256": "f332aa4ecdaf59c9bb67ed070f43c5303860d0e1927a209b327c4a7a1991aca9", "t_s": 0.0, "transport": "real", "verified": true}
+{"approval_kind": "business", "approval_used": 1, "kind": "QUOTA_CONSUMED", "left": 0, "n": 1, "name": "port_open", "t_s": 0.0}
+{"baud": 115200, "kind": "PORT_OPEN_ATTEMPT", "port": "COM5", "t_s": 0.031}
+{"kind": "PORT_OPEN", "port": "COM5", "t_s": 0.031, "transport": "real"}
+{"approval_kind": "business", "approval_used": 1, "kind": "QUOTA_CONSUMED", "left": 0, "n": 1, "name": "explicit_reset", "t_s": 0.047}
+{"argv": ["python", "-m", "pyocd", "reset", "--method", "sysresetreq", "--no-config", "--no-wait", "--connect", "attach", "--core", "0", "-t", "cortex_m", "-u", "@UID_FILE<redacted len=48 sha256_d2f530dbd062>"], "argv_sha256": "a00559b168afc6b16360f9c2c0177cce4a71942d69c40d16902920bd08d5aa40", "backend": "real", "kind": "ACTION_ATTEMPT", "name": "reset", "t_s": 0.047}
+{"backend": "real", "elapsed_s": 2.312, "kind": "ACTION", "name": "reset", "rc": 0, "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "t_s": 2.359}
+{"as": "rst", "bytes": 3468, "done_needle": null, "drain_declared_s": 75.0, "drain_spent_s": 75.0, "end_reason": "DRAIN_BUDGET_REACHED", "kind": "BOOT_STREAM_DRAINED", "prompt_required": false, "quiet_break_s": null, "raw": "reports\\reviews\\phase8-m8-r7f1a-minimal-c-patch\\field\\field-20261103T163850Z\\S_S3\\01_rst.boot.rx.bin", "t_s": 77.359}
+{"bytes": 1192, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "2f0db7bf5e9c01044d5c65f6dd592157ac7247230987a523bf615adc3f7e70a9", "t_s": 77.468, "tail": "b'/A\\r\\nmsh >\\r\\nmsh >'"}
+{"bytes": 90, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "2aef3ec96d30f7f1a4615c1877dd81cdf0ce898d0f96cd3a5972a870ca469346", "t_s": 77.5, "tail": "b'52\\r\\nmsh >\\r\\nmsh >'"}
+{"bytes": 983, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "73abf3012386723ec2d5ec70e5b515bfb2cb3285d60c233a27b07e60d47408a7", "t_s": 77.593, "tail": "b'g)\\r\\nmsh >\\r\\nmsh >'"}
+{"allowed": false, "as": "sysboot", "kind": "BUSINESS_OUTCOME", "lines": [], "status_lines_allowed": ["[Motor] arm gate fail mask=0x18 (arm REFUSED)"], "t_s": 77.593}
+{"bytes": 1, "evidence": "reports\\reviews\\phase8-m8-r7f1a-minimal-c-patch\\field\\field-20261103T163850Z\\S_S3\\05_safboot.rx.bin", "first_offset": 295, "kind": "NUL_IN_RESPONSE", "meaning": "控制台输出通道的字节损坏, 机制未证", "t_s": 77.64, "tail": "b'LE(LOW) pad=0 expected_F'", "where": "read_until_prompt"}
+{"code": "NUL_BYTE_IN_RESPONSE", "detail": "bytes=1 first_offset=295 where=read_until_prompt raw=reports\\reviews\\phase8-m8-r7f1a-minimal-c-patch\\field\\field-20261103T163850Z\\S_S3\\05_safboot.rx.bin", "kind": "SESSION_STOP", "t_s": 77.64}
+{"kind": "PORT_CLOSED", "t_s": 77.64}

@@ -1,0 +1,105 @@
+safety_status 第 4 行截断 + 裸 NUL 的字节定位(离线，只读归档件与源码)
+日期: 2026-11-04。本场设备动作: 0(本文件全部是已入库原始字节的离线复算)。
+
+1) 首错(逐字来自执行器回执与 S_S3/ledger.jsonl)
+   NUL_BYTE_IN_RESPONSE | bytes=1 first_offset=295 where=read_until_prompt
+   raw=reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T163850Z/S_S3/05_safboot.rx.bin
+   该 342 B 响应原样保留，未删未改；会话在此即停，第 6 步 motor_status 记 NOT_RUN。
+
+2) 该行的真实长度(由产品源格式串 + 本场实测值展开)
+   源: applications/safety_gpio.c:450-452(两段相邻字符串字面量拼接)
+       PIN_NAME_ENN_FEEDBACK = "PC.6"  (applications/project_board.h:36)
+   本场实测值: raw=1, resolved=YES
+   展开后: 内容 150 B + LF = 151 B(UTF-8; 该行含中文注释)
+   控制台容量: rtconfig.h:107 RT_CONSOLEBUF_SIZE = 128
+   钳位: src/kservice.c:409-415 -> rt_vsnprintf(buf, 128-1, ...) 后 length>127 一律取 127
+   ⇒ 只发 127 B: 正文 126 B + 第 127 个字节是 NUL(0x00)，且丢掉该行自己的 CRLF，
+     下一行 [SAFETY] request=... 紧接在 NUL 之后(捕获里确无 CRLF)。
+   核对: 捕获的前 126 B 与源格式串逐字节展开的前 126 B **完全相等**(逐字节比较通过)。
+   NUL 前一个字节 = 0xE7，是"禁"字三字节序列的首字节 ⇒ 在多字节字符中间被切断，
+     因此整份响应按 UTF-8 解码在偏移 294 失败(扫描里记 utf8=FAIL@294)。
+
+3) 不是本场引入的回归(三条独立依据)
+   a. git blame -L 448,453 实证: 第 450/451/452 行(含中文注释的那两行字面量)全部归属
+      c8d9719f "feat: IO70/PC.6 改为 TMC_ENN 状态反馈 + 限位改宏控可选(默认关闭)"，日期 2026-10-21。
+      该文件之后被 dca6932 / 6726fa6 改过，但**这三行没有变**(blame 仍指 c8d9719f)。
+      本场的 C 改动只动 rtconfig.h/.config/tmc2209.c(见 build_manifest 的 5 项输入)，不含 safety_gpio.c。
+   b. 同一形状在**更早的真实板捕获**里已经存在:
+      reports/reviews/phase8-motor-chain-dev/m3/irq.bin.b64(解码 3532 B)的 ENN_FEEDBACK 行
+      同样是"126 B 正文 + 紧跟一个 0x00 + 下一行 [SAFETY] request=DISABLE(LOW) ..."，
+      整段流里 4 个 NUL。⇒ 现场行为跨场复现，不是偶发咬行。
+   c. 之前没被判红的原因不是"板子变好/变坏"，而是两条门与顺序:
+      - 裸 NUL / 非法 UTF-8 硬失败门是执行器 R6-4 才加的(M8-R6 轮)，M3 那一场没有这道门；
+      - 上一场(VM 未上电)在 system_status 就按 FIELD_VALUE_MISMATCH 停了，
+        根本没走到 safety_status，所以这一行第一次在严格门下真实判定就是本场。
+
+4) 离线夹具侧的对应缺口(登记，不掩盖)
+   field/rows_startup_b424.json 里 commands.safety_status.healthy 的这条 ENN 行是
+   **125 B 的"截断但没有 NUL"**版本；其 _provenance 已如实写明来源是
+   "第 4/5 行在原始字节里是同一条被 128 字节截断的连续流(ENN_FEEDBACK 行尾被截, 紧接 request= 行头),
+    按内容拆分保留截断处"(kind=board_capture_split, file=phase8-motor-chain-dev/m3/irq.bin.b64)。
+   ⇒ 离线 sim 对 safety_status 这一步绿，**不能**当作该行的真实字节已验收；
+     它连 NUL 都没有建模。本场是唯一给出真实字节的场。
+
+5) 可修的下一件事(本场不改码、不重烧、不动额度)
+   把这一条 150 B 的行按既有 R6C/R7 的做法拆成两条各自 ≤127 B 的短行(职责说明与实值分开)，
+   与已经拆过的 CONFIGURED/MOT 家族同口径；并同步 rows 夹具的真实字节。
+   这只动打印，不动判定逻辑；是否做由下一轮任务书定。
+
+6) 复算入口(全部离线，可重跑)
+   python D:/ns800_r7f1_scratch/measure_safboot_line.py      # 源展开长度 vs 捕获前缀逐字节核对
+   python D:/ns800_r7f1_scratch/integrity_scan.py <目录>      # NUL / UTF-8 / 行长扫描
+   python D:/ns800_r7f1_scratch/check_m3_irq_enn.py          # M3 历史真实捕获同形状复现
+   python D:/ns800_r7f1_scratch/scan_enn_history.py          # 全仓 .rx.bin 里该行的历史形状普查
+
+7) 复算原文(逐字归档)
+
+----- measure_safboot_line.py -----
+safety_gpio.c: bytes=24871 CR=0 LF=611 split_on='\n' lines=612
+  450:         rt_kprintf("[SAFETY] ENN_FEEDBACK(%s = 板上 TMC_ENN) raw=%d resolved=%s "
+  451:                    "[只读输入, 非急停感测; HIGH=禁能侧, LOW=未施加禁能(不保证转矩)]\n",
+  452:                    PIN_NAME_ENN_FEEDBACK, (int)fb, fb_ok ? "YES" : "NO");
+
+concatenated format = 101 code points, 149 UTF-8 bytes (before substitutions)
+PIN_NAME_ENN_FEEDBACK macro value = PC.6 (macro matched=False)
+
+as printed on this board (raw=1, resolved=YES):
+  total bytes = 151 (content without the trailing LF = 150)
+
+captured 05_safboot.rx.bin (342 B):
+  content bytes emitted before the NUL = 126, first NUL at stream offset 295
+  byte just before the NUL = 0xe7 => cut inside a multi-byte character
+  next print follows the NUL with no CRLF: '[SAFETY] request=DISABLE(LOW) pad=0 expec'
+  captured prefix == source-derived line prefix (first 126 B)? True
+
+----- check_m3_irq_enn.py (历史真实捕获) -----
+reports/reviews/phase8-motor-chain-dev/m3/irq.bin.b64  b64_bytes=4774 decoded=3532
+  NUL in decoded stream = 4
+  ENN_FEEDBACK at offset 3222
+  line(first 10..CRLF) bytes=199  NUL inside=1
+  raw repr = b'ENN_FEEDBACK(PC.6 = \xe6\x9d\xbf\xe4\xb8\x8a TMC_ENN) raw=1 resolved=YES [\xe5\x8f\xaa\xe8\xaf\xbb\xe8\xbe\x93\xe5\x85\xa5, \xe9\x9d\x9e\xe6\x80\xa5\xe5\x81\x9c\xe6\x84\x9f\xe6\xb5\x8b; HIGH=\xe7\xa6\x81\xe8\x83\xbd\xe4\xbe\xa7, LOW=\xe6\x9c\xaa\xe6\x96\xbd\xe5\x8a\xa0\xe7\x00[SAFETY] request=DISABLE(LOW) pad=0 expected_FB=HIGH FB=1 -> verdict=OK'
+  bytes from line start to that NUL = 117
+  after NUL next 60 B = b'[SAFETY] request=DISABLE(LOW) pad=0 expected_FB=HIGH FB=1 ->'
+
+----- scan_enn_history.py 摘要 -----
+files=25
+path                                                                                                 NUL  ENNline
+reports/reviews\phase8-m8-r7f1a-minimal-c-patch\field\field-20261103T163850Z\S_S3\05_safboot.rx.bin    1  len= 173 nul_in_line=1
+(其余 24 项均为 phase8-m8-relative-protection-r3/offline/psrun-* 的桩/模拟输出，不是真实板件；它们的 ENN 行是 125 B 无 NUL 版本)
+
+----- rows_startup_b424.json 的 safety_status/_provenance 原文 -----
+{
+ "kind": "board_capture_split",
+ "file": "reports/reviews/phase8-motor-chain-dev/m3/irq.bin.b64",
+ "lines": "100-104 (解码后)",
+ "note": "第 4/5 行在原始字节里是同一条被 128 字节截断的连续流(EN_FEEDBACK 行尾被截, 紧接 request= 行头), 按内容拆分保留截断处; 拆出的 request 行与 m4/final_console.txt:65 完全一致",
+ "copied_from": "r3 field/rows.json:safety_status"
+}
+
+----- git blame -L 448,453 safety_gpio.c -----
+c8d9719f (LMX 2026-10-21 448) 
+c8d9719f (LMX 2026-10-21 449)         safety_fb_snapshot(&req, &pad, &fb, &fb_ok);
+c8d9719f (LMX 2026-10-21 450)         rt_kprintf("[SAFETY] ENN_FEEDBACK(%s = 板上 TMC_ENN) raw=%d resolved=%s "
+c8d9719f (LMX 2026-10-21 451)                    "[只读输入, 非急停感测; HIGH=禁能侧, LOW=未施加禁能(不保证转矩)]\n",
+c8d9719f (LMX 2026-10-21 452)                    PIN_NAME_ENN_FEEDBACK, (int)fb, fb_ok ? "YES" : "NO");
+c8d9719f (LMX 2026-10-21 453)         if (req < 0)

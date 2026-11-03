@@ -1,0 +1,274 @@
+{
+ "round": "phase8-m8-r7f2b-vm-powered-restart-field",
+ "title": "M8-R7F2b VM 上电一次启动续测（已执行；S3 按字节门 STOP；agent 自拟包，无 A 复核章）",
+ "date_local": "2026-11-04 00:38:50 +0800",
+ "date_utc_dir": "20261103T163850Z",
+ "execution_head": "0fe28aa (上一场证据头；本轮工作树在开跑前干净)",
+ "authored_by": "local agent",
+ "review_stamp": "NONE (A 签的是上一场那份 4 额度整包; 本续测包未经 A 复核)",
+ "operator_authorization": {
+  "verbatim_file": "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T163850Z/APPROVAL_TOKEN.verbatim.txt",
+  "sentences": [
+   "我授权你再重新跑一次 TMC不工作是因为我没有给VM供电",
+   "VM 已上电，接线无其它变化"
+  ],
+  "token_bytes": 109,
+  "token_sha256": "8d9de276600ec2c951997ec90232f2a82130db21a8561aba63f7f97d0fe37b3f",
+  "physical_fact_from_operator": "VM(TMC 电机供电)已上电；接线无其它变化"
+ },
+ "approval": {
+  "id": "M8R7F2b-vm-powered-restart-20261104",
+  "ledger_path": "D:\\ns800_field_approvals\\approval_M8R7F2b-vm-powered-restart-20261104.json",
+  "caps_nonzero": {
+   "explicit_reset": 1,
+   "port_open": 1
+  },
+  "spent_nonzero": {
+   "explicit_reset": 1,
+   "port_open": 1
+  },
+  "pending": 0,
+  "writes": 4,
+  "commit_failures": [],
+  "identities": {
+   "executor_sha256": "33d3f0af8a4c9c33dcd4e013b395e4ba990a89e384130f9d0ffe50c71b34e8ca",
+   "image_sha256": "b4243886818b6b2cf2e30d10864272225e1b0e66c8435c8a50bb449053e153bf",
+   "plan_sha256": "4404cfd1a043e7b4653aeabe7d27feb3e73a74b5c6b34f564e8e454ad4171a3a"
+  },
+  "prior_ledgers_untouched": {
+   "M8R7F1-reviewed-bootprint-20261103": "spent 4/4, writes 8 (本场未读写)",
+   "M8R7F2-startup-b424-20261103": "spent 4/4, writes 8 (本场未读写)"
+  }
+ },
+ "plan_derivation": {
+  "from_reviewed": {
+   "path": "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/plan_startup_b424_reviewed.json",
+   "bytes": 23218,
+   "sha256": "fa3331862d498bf7aa17966558c535429c4b6696653cb52ea67a3106c0a43d13",
+   "original_rewritten_this_round": false
+  },
+  "this_plan": {
+   "path": "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/plan_startup_b424_vm_restart_agent.json",
+   "bytes": 26940,
+   "sha256": "4404cfd1a043e7b4653aeabe7d27feb3e73a74b5c6b34f564e8e454ad4171a3a"
+  },
+  "changed": [
+   "stages: 删 S1(download)/S2(readback); S3.requires ['S2'] -> ['S0']",
+   "quota.download 1->0, quota.readback 1->0",
+   "package/task_id/status/scope/approval/plan_identity.path 改写为本场身份",
+   "新增 continuation_derivation 与 identity_binding.continuation_on_board_proven 旁字段"
+  ],
+  "kept_verbatim": [
+   "tools.{download,readback,reset}.argv",
+   "S3 的 6 个步骤与全部判据",
+   "rows_file/needles/observation_bounds/motion_budget/byte_integrity_policy",
+   "identity_binding 的继承值(含 board_image_before=5ae, 未改)"
+  ],
+  "why_tools_kept_without_stages": "PLAN_TOOL_ARGV 与 PLAN_IMAGE_IDENTITY_CONSISTENCY 要求三件 argv 存在且同源; 本轮回话不引用 download/readback 且额度 0, 运行期真发会先撞 QUOTA_UNDECLINED/QUOTA_EXHAUSTED"
+ },
+ "offline_gates": {
+  "validate_plan": {
+   "checks": 32,
+   "pass": 31,
+   "fail": 1,
+   "only_red": "PLAN_MOTION_CAP_BUDGET|caps=[] sum=0 total=0 starts=0",
+   "ruling": "沿用 A 的固定无运动包 N/A 裁定; 不声明 32/32; 含 arm/start 的包不得援引",
+   "raw": "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T163850Z/validate_plan_offline.txt"
+  },
+  "sim_dry_run": {
+   "rc": 0,
+   "transport": "stub",
+   "backend": "sim",
+   "profile": "healthy",
+   "approval_id": null,
+   "ledger_line": "APPROVAL_LEDGER|NONE",
+   "quota_used": {
+    "explicit_reset": 1,
+    "port_open": 1
+   },
+   "outdir": "D:/ns800_r7f1_scratch/sim-cont-b424-vm-20261103T163657Z (仓外, 不入库)"
+  },
+  "device_actions_before_real_run": 0
+ },
+ "stages": [
+  {
+   "id": "S0",
+   "kind": "offline",
+   "status": "OK",
+   "facts": {
+    "image_bytes": 292684,
+    "image_sha256_prefix": "b4243886",
+    "needles_total": 40,
+    "placeholders": 0,
+    "forbidden_hits": 0,
+    "plan_sha256_matches_disk": true,
+    "software_input_commit": "3e6a02c",
+    "tested_image_build_commit": "adeeedc"
+   }
+  },
+  {
+   "id": "S3",
+   "kind": "serial_session",
+   "status": "STOP",
+   "stop_code": "NUL_BYTE_IN_RESPONSE",
+   "stop_detail": "bytes=1 first_offset=295 where=read_until_prompt raw=reports\\reviews\\phase8-m8-r7f1a-minimal-c-patch\\field\\field-20261103T163850Z\\S_S3\\05_safboot.rx.bin",
+   "steps_run": 5,
+   "steps": 6,
+   "not_run": [
+    "motor_status"
+   ],
+   "not_run_basis": {
+    "captures_present": [
+     "01_rst.boot.rx.bin",
+     "02_threads.rx.bin",
+     "03_heap.rx.bin",
+     "04_sysboot.rx.bin",
+     "05_safboot.rx.bin"
+    ],
+    "capture_count": 5,
+    "step_count_in_plan": 6,
+    "note": "第 1 份是被动启动流(01_rst.boot)，其余 4 份对应 4 条查询; 计划里 5 条查询(ps/free/system_status/safety_status/motor_status) 只取到前 4 条，没有 06_ 捕获 => motor_status 未发"
+   },
+   "session_events_order": [
+    "PORT_OPEN_ATTEMPT",
+    "PORT_OPEN(COM5)",
+    "ACTION reset rc=0",
+    "BOOT_STREAM_DRAINED 3468 B",
+    "RX_DONE 1192/90/983",
+    "sysboot BUSINESS_OUTCOME",
+    "NUL_IN_RESPONSE",
+    "SESSION_STOP",
+    "PORT_CLOSED"
+   ]
+  }
+ ],
+ "field_verdict": {
+  "image_on_board_proven_by_previous_session": true,
+  "image_reflash_this_round": false,
+  "image_readback_this_round": false,
+  "image_bytes": 292684,
+  "image_sha256": "b4243886818b6b2cf2e30d10864272225e1b0e66c8435c8a50bb449053e153bf",
+  "ready_reached": true,
+  "fault_code": 0,
+  "tmc_ioin_read": {
+   "print_line": "[SS] [REQ OK] TMC2209 IOIN=0x21000041 VERSION=0x21",
+   "sole_source_path": "applications/safety_state.c:683-686 (else 分支)",
+   "predicate": "applications/tmc2209.h:93-96 (ioin>>24)&0xFF==0x21",
+   "ioin_value": "0x21000041",
+   "read_rc": "RT_EOK (由该打印的唯一路径反推)",
+   "reason_field_printed": false,
+   "reason_note": "成功路径不打印 reason/tx/rx/flush/used(safety_state.c:671-675 只在失败分支), 所以本场没有 reason=ok 字样可引用",
+   "cross_session_value_match": "历史真实读值 0x21000041 / 0x210002C1 高字节同为 0x21"
+  },
+  "selftest": {
+   "required": "PASS",
+   "degraded": "0x00",
+   "state_after": "READY",
+   "imu": "OK",
+   "adc": "OK",
+   "flash": "OK (JEDEC EF 40 17)",
+   "tmc_health_line": "[TMC] OK drive_cfg=UNCONFIGURED"
+  },
+  "boot_stream_this": {
+   "bytes": 3468,
+   "nul": 0,
+   "utf8": "OK",
+   "crlf_lines": 76,
+   "longest_line_bytes": 125,
+   "lines_over_127": []
+  },
+  "boot_stream_previous_vm_off": {
+   "bytes": 4100,
+   "nul": 0,
+   "utf8": "OK",
+   "crlf_lines": 85,
+   "longest_line_bytes": 125,
+   "lines_over_127": []
+  },
+  "boot_stream_diff": {
+   "only_prev_lines": 22,
+   "only_this_lines": 13,
+   "common_lines": 58,
+   "raw": "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T163850Z/boot_stream_diff_vs_prev_session.txt"
+  },
+  "main_stack_ps": "0x00001000 (=4096), max used 40%",
+  "heap_free": {
+   "total": 32672,
+   "used": 22120,
+   "maximum": 22120,
+   "available": 10552,
+   "identical_to_previous_session": true
+  },
+  "system_status_hard_assertions_passed": 4,
+  "unchanged_existing_facts": [
+   "protect_ready=NO",
+   "polarity=not-confirmed",
+   "arm gate fail mask=0x18",
+   "ADC DEGRADED cal=THEORETICAL"
+  ],
+  "first_error": {
+   "code": "NUL_BYTE_IN_RESPONSE",
+   "raw_capture_bytes": 342,
+   "nul_count": 1,
+   "first_nul_offset": 295,
+   "utf8": "FAIL@294",
+   "offending_line": "[SAFETY] ENN_FEEDBACK(PC.6 = 板上 TMC_ENN) raw=1 resolved=YES [只读输入, 非急停感测; HIGH=禁能侧, LOW=未施加禁能(不保证转矩)]",
+   "source_lines": "applications/safety_gpio.c:450-452",
+   "expanded_content_bytes": 150,
+   "console_capacity_bytes": 127,
+   "emitted_shape": "126 B 正文 + 1 B NUL, 且丢掉本行 CRLF",
+   "prefix_equals_source_expansion_first_126_bytes": true,
+   "blame": "c8d9719f (2026-10-21); 本场/上场均未改 safety_gpio.c",
+   "historical_same_shape": "reports/reviews/phase8-motor-chain-dev/m3/irq.bin.b64 解码流",
+   "fixture_gap": "rows_startup_b424.json 的 safety_status/healthy 这条是 125 B 无 NUL 版本, 离线 sim 不建模该 NUL",
+   "analysis_file": "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T163850Z/safboot_truncation_analysis.txt"
+  }
+ },
+ "quota": {
+  "declared": {
+   "explicit_reset": 1,
+   "port_open": 1
+  },
+  "spent": {
+   "explicit_reset": 1,
+   "port_open": 1
+  },
+  "zero_keys_count": 19,
+  "actions_attempted": [
+   "reset:real_tool"
+  ],
+  "retry": 0
+ },
+ "not_proven": [
+  "motor_status 响应(本场 NOT_RUN, 额度已尽, 未补测)",
+  "SG/ADC 阈值建立、diag_profile learn/commit、相对保护的目标通道触发(protect_ready=NO 未变)",
+  "IMU(REL_IMPACT)通道现场触发",
+  "TMC 写到达凭证(IFCNT+1)",
+  "VM 供电线路本身的直接测量(dmm_readings=0; 本场只证'与操作者解释一致')",
+  "实测最坏栈余量(ps 40% 是本次启动的高水位快照)"
+ ],
+ "next_step_for_reviewer": "唯一的新现场事实: VM 上电后启动自检的 IOIN 读成功(应答+CRC+身份判据), 上一场的 rx-timeout-echo 失败分支不再出现; 但 safety_status 有一条 150 B 的打印被 127 B 控制台钳位截断并吐裸 NUL(与 M3 历史同形状, blame 到 c8d9719f), 严格字节门因此即停。请 A 定: 是否按既有口径拆短 safety_gpio.c:450-452 并同步 rows 夹具真实字节, 以及 motor_status/学习链要不要另开一场新批准。",
+ "stale_comment_registered_not_edited": "tmc2209.c:1250 仍写 RT_MAIN_THREAD_STACK_SIZE(2048 B), 3e6a02c 起实际 4096; 本轮范围是现场执行, 未改产品文本",
+ "board_final_state": {
+  "image": "b424 (未重烧/未回读)",
+  "state": "READY fault=0",
+  "armed": 0,
+  "drv_enable": "LOW",
+  "request": "LOW",
+  "core_halted": false,
+  "com5": "closed"
+ },
+ "evidence_index": {
+  "field_dir": "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T163850Z/",
+  "previous_session_dir": "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T161728Z/",
+  "handoff_md": "reports/agent_handoffs/phase8-m8-r7f2b-vm-powered-restart-field.md",
+  "this_plan": "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/plan_startup_b424_vm_restart_agent.json"
+ },
+ "device_actions_this_round": {
+  "download": 0,
+  "readback": 0,
+  "explicit_reset": 1,
+  "port_open": 1,
+  "all_other": 0
+ }
+}

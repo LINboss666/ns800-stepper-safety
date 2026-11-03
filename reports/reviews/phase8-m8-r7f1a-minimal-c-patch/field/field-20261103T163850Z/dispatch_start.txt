@@ -1,0 +1,36 @@
+START 2026-11-04 00:38:50 +0800  (UTC 20261103T163850Z)
+dispatch_rc=1   (DISPATCH_SUMMARY|status=STOP；停止原因在阶段行里: NUL_BYTE_IN_RESPONSE，见 S_S3/ledger.jsonl)
+
+本场 = 同一枚 b424 镜像、操作者给 VM(电机供电)上电之后的一次启动续测。
+计划是本地 agent 自拟的续测包(无 A 复核章): 只保留 S0(离线绑定) + S3(一次复位 + 75 s 启动流 + 只读查询),
+S1 下载与 S2 回读整段删除(上一场 292684 B 定长回读已逐字节证在板), S3.requires 由 ['S2'] 改为 ['S0']。
+
+展开命令(UID 只在运行时从私有件读入, 这里不出现其值; 批准令牌逐字见 APPROVAL_TOKEN.verbatim.txt):
+  python reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py \
+    --dispatch --transport real --backend real --profile response_driven \
+    --plan reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/plan_startup_b424_vm_restart_agent.json \
+    --approval-id M8R7F2b-vm-powered-restart-20261104 \
+    --approval-root D:/ns800_field_approvals \
+    --uid-file D:/ns800-m7-p0-20261030T182818/dap_uid_bare.txt \
+    --out reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T163850Z \
+    --approval-token "<操作者两条原话按 LF 连接, 109 B, sha256 8d9de276...>" \
+    --expected-token "<同上, 逐字相同>"
+
+私有件只登记身份不登记值: 台账 argv 里表现为 @UID_FILE<redacted len=48 sha256_d2f530dbd062>。
+
+真实执行前的离线门(设备动作 0):
+  1) --validate-plan(对新计划字节): checks=32 fail=1 rc=1, 唯一红项 PLAN_MOTION_CAP_BUDGET|caps=[]
+     sum=0 total=0 starts=0 —— 沿用 A 的固定"无运动包 N/A"裁定, 不说成 32/32 全绿。原文见
+     validate_plan_offline.txt。
+  2) sim 干跑 transport=stub backend=sim profile=healthy, **故意不带 --approval-id**: rc=0,
+     两阶段全走, quota_used=explicit_reset1/port_open1, APPROVAL_LEDGER|NONE(未接真实账本)。
+     输出目录在仓外 D:/ns800_r7f1_scratch/sim-cont-b424-vm-20261103T163657Z, 不入库。
+  3) --approval-init 开立本场新账本(三件身份齐全): caps 里 download=0/readback=0/
+     explicit_reset=1/port_open=1, 其余全 0。上一场账本 M8R7F2-startup-b424-20261103 保持
+     spent 4/4、pending 0、writes 8, 未被读写。
+
+计划字节: 26940 B, sha256 4404cfd1a043e7b4653aeabe7d27feb3e73a74b5c6b34f564e8e454ad4171a3a
+(派生自 A 的已审定原件 plan_startup_b424_reviewed.json, 23218 B, sha256 fa3331862d...；
+ 原件本场未改写, 派生差异逐项写在计划里的 continuation_derivation 段)
+执行器: 219491 B, 33d3f0af8a4c9c33dcd4e013b395e4ba990a89e384130f9d0ffe50c71b34e8ca (R6C 原件, 未改)
+镜像:   292684 B, b4243886818b6b2cf2e30d10864272225e1b0e66c8435c8a50bb449053e153bf

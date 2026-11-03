@@ -1,0 +1,43 @@
+THIS(VM on)    bytes=3468 NUL=0 lines=72
+PREV(VM off)   bytes=4100 NUL=0 lines=81
+
+lines only in PREV (VM off) = 22:
+  - [SS] [REQ FAIL] TMC2209 IOIN rc=-117 reason=rx-timeout-echo
+  - [SS] [REQ FAIL] TMC2209 IOIN tx=4 rx=4 flush=0 used=100
+  - [SS] self-test done: required=FAIL degraded=0x00
+  - [SS] STEP: 两条输出路径都没有未确认的关断
+  - [SS] STEP: motor=api-accepted(驱动接受关断, 非波形证明) src=emergency-stop
+  - [SS] STEP: diag=诊断从未占用该通道 - 仍不等于示波器证明无脉冲
+  - [SS] ==> FAULT_LATCHED code=8 (DRV_ENABLE LOW verified)
+  - [SS] ==> FAULT_LATCHED ENN feedback=OK STEP=off-confirmed(api)
+  - [SS] ==> FAULT_LATCHED motor_rc=0 diag_rc=0
+  - [SS] ==> 整理身份 epoch=1 events=0x40
+  - [SS] state=FAULT_LATCHED fault_code=8 degraded=0x00
+  - [BOOT] 11 startup-selftest FAIL -> state=FAULT_LATCHED
+  - [BOOT] Phase-7 runtime bootstrap complete (state=FAULT_LATCHED)
+  - [Safety] state=FAULT_LATCHED fault=8 irq_gate=CLOSED polarity=not-confirmed protect_ready=NO
+  - [Motor] state=4 cur=0 tgt=0 armed=0 drv_en_verified=0 health=OK
+  - [Motor] arm gate fail mask=0x1A (arm REFUSED)
+  - [TMC]    runtime write gate mask=0x3A (0=运行态条件全通, 编译期门未翻转前仍然一位不写)
+  - [TMC]    DEGRADED drive_cfg=UNCONFIGURED
+  - [MAIN] boot complete but state=FAULT_LATCHED fault=8 (degraded/latched - NOT ready)
+  - [MAIN] motor arm gate fail mask=0x1A (MOTOR_HARDWARE_ENABLE_PATH_VALIDATED=YES)
+  - [BB] trigger code=8 session=1 pre_n=13 post_eff=100
+  - [BB] session 1 written (113 frames), last_err=0
+
+lines only in THIS (VM on) = 13:
+  + [SS] [REQ OK] TMC2209 IOIN=0x21000041 VERSION=0x21
+  + [SS] self-test done: required=PASS degraded=0x00
+  + [SS] SELF_TEST -> READY (identity epoch=0)
+  + [SS] state=READY fault_code=0 degraded=0x00
+  + [BOOT] 11 startup-selftest OK -> state=READY
+  + [BOOT] Phase-7 runtime bootstrap complete (state=READY)
+  + [Safety] state=READY fault=0 irq_gate=CLOSED polarity=not-confirmed protect_ready=NO
+  + [Motor] state=0 cur=0 tgt=0 armed=0 drv_en_verified=0 health=OK
+  + [Motor] arm gate fail mask=0x18 (arm REFUSED)
+  + [TMC]    runtime write gate mask=0x0 (0=运行态条件全通, 编译期门未翻转前仍然一位不写)
+  + [TMC]    OK drive_cfg=UNCONFIGURED
+  + [MAIN] boot complete: READY (motion still gate-locked)
+  + [MAIN] motor arm gate fail mask=0x18 (MOTOR_HARDWARE_ENABLE_PATH_VALIDATED=YES)
+
+common lines = 58

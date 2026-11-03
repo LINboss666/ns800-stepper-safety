@@ -1,6 +1,6 @@
 # sha256 * <仓库相对路径>(LF, 无 BOM; 本清单不哈希自身字节 —— 一条清单不能给自己的字节作证)
 # 生成方式: 对 reports/reviews/phase8-m8-r7f1a-minimal-c-patch/ 下每个常规文件(排除 SHA256SUMS.txt、remote_readback.md 与 __pycache__) 直接读磁盘字节算 sha256
-# 条目数=60; 与 Git blob 的逐条复算由 host/staged_preflight_batch.py(提交前, 单批流)与推送后的远端逐 blob 回读完成
+# 条目数=84; 与 Git blob 的逐条复算由 host/staged_preflight_batch.py(提交前, 单批流)与推送后的远端逐 blob 回读完成
 # 重新生成: python reports/reviews/phase8-m8-idle-stack-r4/host/make_round_sums.py <本目录>
 b1d603f4333072796da98b7428c12eb97ba26aa59f8081659eea2799b629ff37  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/a_review_R7F1_A_Review_Minimal_C_Followup.md
 6424a764f5c323ec9d030792c6c5830fa5235064c45045c1a3defbe5cdc08b37  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/a_review_R7F1A_A_GO_and_B424_Startup_Trial.md
@@ -42,8 +42,32 @@ ddef216fda9ae7324baac61aa8de55c53ec8dfc9d083311a337bf7964120be23  reports/review
 03dea1af1de5c33b805fc847bcb107e99280f44cb0ee03a02b3b18ff3797f1d1  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T161728Z/S_S3/04_sysboot.rx.bin.txt
 7fce17bb29290c87006b99b81aba8f231de72cfd8230d1578d8ef276e7ca4418  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T161728Z/S_S3/ledger.jsonl
 ea39cf9dee0f547de6cc4fe48ba514ab2a799137412bffc61fd755f7a2e97b75  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T161728Z/stdout_dispatch.txt
+cd6aa34777eb4e638800f2d718c28fd2bdcb08f628f7cb149a50ada80523f8c8  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T163850Z/action_reset/ARGV.json
+13bf7b3039c63bf5a50491fa3cfd8eb4e699d1ba1436315aef9cbe5711530354  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T163850Z/action_reset/rc.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T163850Z/action_reset/stderr.bin
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T163850Z/action_reset/stdout.bin
+5d5c9394ce3f81ab534a0611e2cd2f265ec0687866acac3b885b1a79194b52b5  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T163850Z/APPROVAL_TOKEN.verbatim.txt
+99975da5d7679a06414088e1b6c2cb5b24a46921b65778b53fb1169bbd85296f  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T163850Z/boot_stream_diff_vs_prev_session.txt
+c860333f09ad1a2878a26af54df032b312456115d8d1039f5f442d5da45f9688  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T163850Z/byte_integrity_scan.txt
+3ba327374a57413352f313edb106a76c627f681a6562aa3f1f82c2a38991342b  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T163850Z/dispatch_ledger.jsonl
+cd62c2fef416275c8a14a220a9b5652c49d5f0ec0737dfdcfd6ca14da74642ea  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T163850Z/dispatch_start.txt
+7a90949a486623153d7bf1e1b018feabb476452713adfb1c112c6963bc8f016a  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T163850Z/OFFLINE_JUDGEMENT.txt
+1abec6c00a016d99e9b73051d583d695dbcc6f0421f7d47b3c90f3b23a030ce3  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T163850Z/S_S3/01_rst.boot.rx.bin
+cb23892ab6e4a2971617827c053038d0d74999ed3263950862c52950145340d2  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T163850Z/S_S3/01_rst.boot.rx.bin.txt
+2f0db7bf5e9c01044d5c65f6dd592157ac7247230987a523bf615adc3f7e70a9  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T163850Z/S_S3/02_threads.rx.bin
+639c2dd019f3dcd3bcc427870db1d7562ba18a537f60d4c3af6f735ef271a4b2  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T163850Z/S_S3/02_threads.rx.bin.txt
+2aef3ec96d30f7f1a4615c1877dd81cdf0ce898d0f96cd3a5972a870ca469346  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T163850Z/S_S3/03_heap.rx.bin
+ddef216fda9ae7324baac61aa8de55c53ec8dfc9d083311a337bf7964120be23  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T163850Z/S_S3/03_heap.rx.bin.txt
+73abf3012386723ec2d5ec70e5b515bfb2cb3285d60c233a27b07e60d47408a7  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T163850Z/S_S3/04_sysboot.rx.bin
+38a8b6bf90a7b3f9c533f8934432e1810a80012354a7380f08c3d99592bed5ca  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T163850Z/S_S3/04_sysboot.rx.bin.txt
+f9579f8be1f0827f5e8ef96093cfdec0bd8da63b02f17cdf79c38b86a78ee165  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T163850Z/S_S3/05_safboot.rx.bin
+dd4cd4dc20debb6468b2b6e6e4da6913801e1609f7f87526cbc8b524e7827fd5  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T163850Z/S_S3/ledger.jsonl
+38eaff49e95e3a718a30a167d22311cbe7f0b225eae23b46fcc8329262e3ca48  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T163850Z/safboot_truncation_analysis.txt
+7f7b86d4335d2398cfcc53f811e066c740643f3d925c9c5d760b9739c10a3051  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T163850Z/stdout_dispatch.txt
+771fd798c699f433e6d64b35391e7296dce1bf85763e740c0c53e05d1786e839  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T163850Z/validate_plan_offline.txt
 a89d60e22adf929ea3b268ab099a1cfd7cb2fe92abdf265f959c91830b8258d0  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/manifest_binding_b424.json
 fa3331862d498bf7aa17966558c535429c4b6696653cb52ea67a3106c0a43d13  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/plan_startup_b424_reviewed.json
+4404cfd1a043e7b4653aeabe7d27feb3e73a74b5c6b34f564e8e454ad4171a3a  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/plan_startup_b424_vm_restart_agent.json
 916eddaa172e6f30b9a9e327f21f4b9274cca2bab17201c329b32997d286f746  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/rows_startup_b424.json
 c90d1cf8927ae9e6cde5065412176a0efd4fdae402c9740943f03723f4f49e16  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/host/r7f1a_btb_prepatch.txt
 df108ea6e4b50834054905d06c11a6a946f6b5177ac7308e73945a28f6c77f4d  reports/reviews/phase8-m8-r7f1a-minimal-c-patch/host/r7f1a_lwc.txt

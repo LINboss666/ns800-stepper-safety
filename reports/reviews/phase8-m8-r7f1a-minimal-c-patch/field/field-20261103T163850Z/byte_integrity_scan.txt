@@ -1,0 +1,13 @@
+# 本场(field-20261103T163850Z, VM 已上电)全部 .rx.bin 原字节完整性扫描
+# 判据: 裸 NUL 计数 / UTF-8 解码 / 按 CRLF 拆行后最长行字节数 / 是否超过 RT_CONSOLEBUF_SIZE-1=127
+S_S3/01_rst.boot.rx.bin                      bytes= 3468 NUL=0 utf8=OK        lines=76 longest=125 over127=none
+S_S3/02_threads.rx.bin                       bytes= 1192 NUL=0 utf8=OK        lines=15 longest= 96 over127=none
+S_S3/03_heap.rx.bin                          bytes=   90 NUL=0 utf8=OK        lines= 7 longest= 16 over127=none
+S_S3/04_sysboot.rx.bin                       bytes=  983 NUL=0 utf8=OK        lines=22 longest=120 over127=none
+S_S3/05_safboot.rx.bin                       bytes=  342 NUL=1 utf8=FAIL@294  lines= 5 longest=173 over127=[(4, 173)]
+
+# 对照: 上一场(field-20261103T161728Z, VM 未上电, 同一 b424 镜像) 的 S_S3
+01_rst.boot.rx.bin                           bytes= 4100 NUL=0 utf8=OK        lines=85 longest=125 over127=none
+02_threads.rx.bin                            bytes= 1192 NUL=0 utf8=OK        lines=15 longest= 96 over127=none
+03_heap.rx.bin                               bytes=   90 NUL=0 utf8=OK        lines= 7 longest= 16 over127=none
+04_sysboot.rx.bin                            bytes=  998 NUL=0 utf8=OK        lines=22 longest=120 over127=none

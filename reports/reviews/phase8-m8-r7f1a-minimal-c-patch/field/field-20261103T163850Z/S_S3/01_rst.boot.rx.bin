@@ -1,0 +1,75 @@
+
+ \ | /
+- RT -     Thread Operating System
+ / | \     5.3.0 build Nov  3 2026 23:43:40
+ 2006 - 2024 Copyright by RT-Thread team
+
+========================================
+  NS800 stepper safety system startup
+  stages: 1 safe-hw / 2 safety-state / 3 safety-thread /
+          4 hw-svc / 5 storage / 6 config / 7 motor+sensor /
+          8 diag / 9 blackbox / 10 ui / 11 selftest->READY
+========================================
+
+[BOOT] Phase-7 runtime bootstrap start
+msh [SAFETY] init OK - MCU_DRV_ENABLE=LOW(readback verified), 输出安全态已建立
+[BOOT] 1 safe-gpio ....... OK
+[SS] state machine inited (event+lock), BOOT->INIT->SELF_TEST
+[SS] BOOT -> INIT
+[SS] INIT -> SELF_TEST
+[BOOT] 2 safety-state .... OK
+[SAFETY] thread started (prio 4, IRQ gate CLOSED)
+[BOOT] 3 safety-thread ... OK
+>[CUR] adc0 ch15 enabled, cal_source=0, health=DEGRADED
+[BOOT] 4 hw-services ... tmc=OK imu=OK adc=OK (re-checked at stage 11)
+[FLASH] CS=22 JEDEC=EF 40 17
+[FLASH] scanning 1 MiB event log...
+[BOOT] 5 storage ......... OK
+[CFG] loaded OK (version 0x00010003 cal_source=1 profile=NONE [migrated-from-0x00010002])
+[BOOT] 6 project-config .. OK valid=YES
+[MOT] init OK (enable-path-validated=YES, arm gate ACTIVE)
+[MOT] init OK: DRV_ENABLE LOW verified, STEP=api-accepted(驱动接受关断, 非波形证明)
+[MOT]   注: STEP=api-accepted 只说明驱动**接受了关断请求**, 不是示波器证明无脉冲(BUG-008 仍未验收)
+[BOOT] 7 motor-service ... OK health=OK
+[SNS] sensor thread started (100Hz, prio 7)
+[BOOT] 7 sensor-service .. OK
+[DIAG] thread started (prio 9, mode=MONITOR_ONLY)
+[BOOT] 8 diagnosis ....... OK
+[BB] blackbox ready (ring=300 cap=450 frames @100Hz, prio 18)
+[BOOT] 9 blackbox ........ OK
+[BOOT] 10 ui-manager ..... started (output=SAFE-OFF)
+[SS] self-test start
+[SS] [REQ OK] GPIO
+[SS] [REQ OK] PWM device
+[SS] [REQ OK] DRV_ENABLE=LOW (write+readback verified)
+[SS] [REQ OK] ENN feedback = disabled side (PC.6=H6-5/TMC_ENN)
+[SS] [REQ OK] TMC2209 IOIN=0x21000041 VERSION=0x21
+[SS] [OK] IMU
+[SS] [OK] ADC
+[SS] [OK] Flash (JEDEC EF 40 17)
+[SS] self-test done: required=PASS degraded=0x00
+[SS] SELF_TEST -> READY (identity epoch=0)
+[SS] state=READY fault_code=0 degraded=0x00
+[BOOT] 11 startup-selftest OK -> state=READY
+[BOOT] Phase-7 runtime bootstrap complete (state=READY)
+=== SYSTEM STATUS ===
+[Boot]   bootstrap-complete=YES abort-stage=0
+[Safety] state=READY fault=0 irq_gate=CLOSED polarity=not-confirmed protect_ready=NO
+[Safety] gpio_ready=YES thread=OK drv_en_pad_low=YES
+[Safety] request=LOW pad=0 expected_ENN=HIGH ENN_fb=1(resolved) verdict=OK
+[Safety] limit_inputs=DISABLED_BY_CONFIG (HIGH=safe/LOW=trigger when ENABLED); e-stop=hardware-only, no MCU e-stop input
+[Motor] state=0 cur=0 tgt=0 armed=0 drv_en_verified=0 health=OK
+[Motor] arm gate fail mask=0x18 (arm REFUSED)
+[TMC]    runtime write gate mask=0x0 (0=运行态条件全通, 编译期门未翻转前仍然一位不写)
+[Sensor] thread=OK
+[TMC]    OK drive_cfg=UNCONFIGURED
+[IMU]    OK
+[ADC]    DEGRADED cal=THEORETICAL
+[Flash]  storage bring-up=OK (spi1)
+[Storage] OK (ns_params/log)
+[Config] OK valid=YES cal_source=1
+[Diag]   OK verdict=0 mode=MONITOR_ONLY
+[Blackbox] OK
+[UI]     led/buzzer output=SAFE-OFF (polarity hardware-pending)
+[MAIN] boot complete: READY (motion still gate-locked)
+[MAIN] motor arm gate fail mask=0x18 (MOTOR_HARDWARE_ENABLE_PATH_VALIDATED=YES)

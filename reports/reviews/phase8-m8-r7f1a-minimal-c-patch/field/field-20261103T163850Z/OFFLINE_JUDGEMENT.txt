@@ -1,0 +1,137 @@
+# M8-R7F2b 现场续测判读（同一枚 b424 · VM 已上电 · 一次复位 + 一个 COM5 会话 · S3 按字节门 STOP）
+
+执行时刻：2026-11-04 00:38:50 +0800（UTC 目录名 20261103T163850Z），一次 dispatch 走到 STOP。
+工具退出码 **1**（`DISPATCH_SUMMARY|status=STOP`，停止码在阶段行里：`NUL_BYTE_IN_RESPONSE`）。
+批准原文见同目录 `APPROVAL_TOKEN.verbatim.txt`（操作者两条原话逐字，未改写）。
+
+**本场计划与额度是本地 agent 自拟的续测包，没有云端 A 的复核章。** 上一场批准
+（M8R7F2-startup-b424-20261103）已 4/4 用尽并关闭，不结转；本场是新批准身份、新账本。
+
+## 1. 执行对象与批准身份
+
+```text
+approval_id      M8R7F2b-vm-powered-restart-20261104
+ledger           D:\ns800_field_approvals\approval_M8R7F2b-vm-powered-restart-20261104.json
+plan_sha256      4404cfd1a043e7b4653aeabe7d27feb3e73a74b5c6b34f564e8e454ad4171a3a  (26940 B)
+                 —— 派生自 A 的已审定原件 fa3331862d498bf7(23218 B)，原件本场未改写
+executor_sha256  33d3f0af8a4c9c33dcd4e013b395e4ba990a89e384130f9d0ffe50c71b34e8ca  (219491 B, R6C 原件未改)
+image_sha256     b4243886818b6b2cf2e30d10864272225e1b0e66c8435c8a50bb449053e153bf  (292684 B)
+S0               OK：三件 SHA 与计划声明逐字相符；needles_total=40、placeholders=0、forbidden_hits=0；
+                 software_input_commit=reviewed_delivery_commit=3e6a02c，tested_image_build_commit=adeeedc
+```
+
+## 2. 额度：申报 = 实耗
+
+```text
+download 0/0    readback 0/0    explicit_reset 1/1    port_open 1/1    其余 21 键全部 0/0
+账本终态 spent={'explicit_reset':1,'port_open':1} pending=0 writes=4
+上一场两本账未被读写(M8R7F1 与 M8R7F2 仍 spent 4/4、writes 8)。
+actions_attempted=["reset:real_tool"]  —— 唯一一次碰设备的工具调用就是那一次复位。
+```
+
+## 3. 本场要答的问题：答上了
+
+启动流里出现 `[SS] [REQ OK] TMC2209 IOIN=0x21000041 VERSION=0x21`。这条打印在产品里只有**一条**路径
+（safety_state.c:683-686）：`tmc2209_init()==RT_EOK` → `tmc2209_read_register_stat(IOIN)==RT_EOK` →
+`tmc2209_ioin_is_identity(ioin)` 为真。也就是说这一次读**拿到了 CRC 校验通过的应答**并且身份判据通过。
+
+与上一场（同一枚镜像、VM 未上电）的逐行 A/B（`boot_stream_diff_vs_prev_session.txt`）：
+
+```text
+只在 VM-off 场出现(22 行): [REQ FAIL] rc=-117 reason=rx-timeout-echo / tx=4 rx=4 flush=0 used=100、
+  self-test done: required=FAIL、==> FAULT_LATCHED code=8、state=FAULT_LATCHED fault=8、
+  [Motor] state=4、[TMC] DEGRADED、write gate mask=0x3A、arm mask=0x1A、
+  [BB] trigger code=8 session=1 / session 1 written (113 frames)
+只在 VM-on 场出现(13 行): 上面的 IOIN OK 行、required=PASS、SELF_TEST -> READY (identity epoch=0)、
+  state=READY fault_code=0、[BOOT] 11 startup-selftest OK -> state=READY、[Safety] state=READY fault=0、
+  [Motor] state=0、[TMC] OK、write gate mask=0x0、arm mask=0x18、[MAIN] boot complete: READY
+两场相同 58 行。变量只有一个：操作者给 VM 上了电(接线无其它变化，操作者口径)。
+```
+
+诚实边界（四条，不许越过）：
+
+- **成功路径不打印 reason**。`reason/tx/rx/flush/used` 只在失败分支打印（safety_state.c:671-675），
+  所以本场看不到 `reason=ok` 字样是设计如此，不是漏采，也不能拿"没有 reason 打印"当"归因字段失效"。
+- `[BOOT] 4 hw-services ... tmc=OK` 只是 `tmc2209_init()`（开 UART + 建两把配置锁，tmc2209.c:1223-1239），
+  **不含任何寄存器应答**；能证明应答的是 stage 11 那条 IOIN 行。
+- IOIN 身份判据是本项目自己的 `tmc2209.h:93-96`：`(ioin>>24)&0xFF == 0x21`。本场值 0x21000041 满足；
+  该字段位置本轮**没有**对照厂商手册复核（只按产品判据陈述）。跨场一致性旁证：历史真实读值
+  `0x21000041`（TMC UART 根因轮 300/300 读，`reports/agent_handoffs/phase8-tmc-uart-rootcause.md:18-20,43`）
+  与 `0x210002C1`（M7-R1 等场次）高字节同为 0x21。
+- 本场 `dmm_readings=0`，没有测任何供电电压。结论只能是"**与操作者给出的解释一致的现场证据**"，
+  不是"VM 供电线路本身已被直接测量证明"。
+
+## 4. 只读查询的真实值（原字节在 S_S3/，此处只登记读到的数）
+
+```text
+ps            main 行 stack size=0x00001000(=4096)，max used 40%，status=suspend，error=EINTRPT
+              （其余线程原值登记：sensor 0x1000 24% / motor 0x800 34% / diag 0x1000 29% /
+                safety 0x400 34% / bblog 0x400 62% / ui 0x200 46% / tshell 0x1000 16% / flog 0x1000 6%）
+              error 列的语义本轮不解释，只如实登记。
+free          total 32672 / used 22120 / maximum 22120 / available 10552   —— 与上一场**逐字相同**
+              ⇒ main 栈 4096 从堆分配这件事在板上兑现(RT_USING_HEAP)，但不据此推最坏栈余量。
+system_status 四条硬断言全过（因此步骤 04 判 OK）：
+              bootstrap-complete=YES abort-stage=0 / Safety state=READY fault=0 /
+              request=LOW pad=0 expected_ENN=HIGH ENN_fb=1(resolved) verdict=OK /
+              Motor state=0 cur=0 tgt=0 armed=0 health=OK
+              仍未变的既有事实：protect_ready=NO、polarity=not-confirmed、arm gate fail mask=0x18、
+              ADC DEGRADED cal=THEORETICAL、[TMC] OK drive_cfg=UNCONFIGURED。
+```
+
+## 5. 首错：safety_status 的裸 NUL ⇒ 会话即停，第 6 步 NOT_RUN
+
+```text
+NUL_BYTE_IN_RESPONSE | bytes=1 first_offset=295 where=read_until_prompt
+raw=.../field-20261103T163850Z/S_S3/05_safboot.rx.bin   (342 B，原样保留，未删未改)
+S_S3/ledger.jsonl: PORT_OPEN_ATTEMPT → PORT_OPEN(COM5) → 复位 ACTION rc=0 → BOOT_STREAM_DRAINED 3468 B
+                   → RX_DONE 1192/90/983 → sysboot BUSINESS_OUTCOME → NUL_IN_RESPONSE → SESSION_STOP → PORT_CLOSED
+第 6 步 motor_status = NOT_RUN。本场**不补测**（额度已尽、不重试、不动"剩下的额度"）。
+```
+
+机制与来历见同目录 `safboot_truncation_analysis.txt`，要点三条：
+
+1. 该行按源格式串（safety_gpio.c:450-452）加本场实测值展开是 **150 B 正文**（+LF=151 B），
+   超过 `RT_CONSOLEBUF_SIZE-1 = 127`；kservice.c:409-415 把发出长度钳到 127，于是发 **126 B 正文 + 1 个 NUL**
+   并丢掉本行 CRLF。捕获的前 126 B 与源展开**逐字节相等**（已核）。
+2. **不是本场引入的回归**：`git blame` 实证这三行是 c8d9719f（2026-10-21）；同一形状在 M3 的真实板捕获
+   （`reports/reviews/phase8-motor-chain-dev/m3/irq.bin.b64` 解码流）里就有；本场 C 改动不含 safety_gpio.c。
+3. 之前没判红的原因不是板子变了：裸 NUL / 非法 UTF-8 硬失败门是执行器 R6-4 才加的，而上一场在
+   system_status 就按 `FIELD_VALUE_MISMATCH` 停了，根本没走到 safety_status。**这一行第一次在严格门下
+   真实判定就是本场。** 顺带登记夹具缺口：`rows_startup_b424.json` 里这条是"截断但没有 NUL"的 125 B 版本
+   （其 `_provenance` 自己写明了来源与拆分），所以离线 sim 对这一步的绿**不代表**真实字节。
+
+## 6. 判据没有放宽的地方
+
+- `--validate-plan`：32 项 = 31 PASS + 1 FAIL。唯一红项 `PLAN_MOTION_CAP_BUDGET|caps=[] sum=0 total=0 starts=0`，
+  沿用 A 对"无运动包"的固定 N/A 裁定；**不说成 32/32 全绿**，含 arm/start 的未来包不能援引此裁定。
+- 危险文本 / 裸 NUL / 非法 UTF-8 门原样生效；失败字节不删不改；端口按既有规则关闭。
+- 真实执行前只做了一次 sim 干跑（stub+sim+healthy，故意不带 `--approval-id`，rc=0，
+  `APPROVAL_LEDGER|NONE`），没有用单会话入口绕账。
+- 上一场的失败回执与首错原样保留；没有为"补一条 motor_status"再开口。
+
+## 7. 分级结论
+
+现场已证（本场，b424 在板 + VM 上电）：
+- 启动自检那一次 TMC IOIN 读**成功返回并身份判据通过**；自检 `required=PASS degraded=0x00`，
+  `SELF_TEST -> READY`，`fault_code=0`；
+- main 线程栈 4096 在 `ps` 里正面读到（`0x00001000`），堆四项实数在案；
+- 已拆短的打印家族继续完整：启动流 NUL=0、UTF-8 有效、最长行 125 B（含 LF 126 B 的 [MOT] 注行未截断）；
+  system_status 最长 120 B。
+
+现场未证 / 本场没做：
+- `motor_status` 响应（NOT_RUN）；
+- SG 阈值建立、学习、提交、SG/ADC/IMU 目标通道触发保护（本场 0 运动、0 写、`protect_ready=NO` 未变）；
+- TMC 写到达凭证（IFCNT+1）；供电线路的直接电压测量。
+
+现场新缺陷 1 条（产品打印宽度，safety_gpio.c:450-452）：该行 150 B > 127 ⇒ 截断并吐裸 NUL，
+使严格字节门即停。修法就是按既有 R6C/R7 口径把它拆成两条 ≤127 B 的短行并同步 rows 夹具真实字节；
+**本场不改码、不重烧、不动额度**，是否做由下一轮任务书定。
+
+另登记一条注释过期（不改）：tmc2209.c:1250 仍写 `RT_MAIN_THREAD_STACK_SIZE(2048 B)`，
+3e6a02c 起实际是 4096。本轮范围是现场执行，不在这里动产品文本。
+
+## 8. 留给下一场的板子状态
+
+镜像仍是 b424（上一场逐字节证在板；本场未重烧、未回读）；复位后正常跑到 READY；
+DRV_ENABLE LOW、request LOW、armed=0、未起转；`halt_after=false` 故本场没有把核停在 halt；
+COM5 已关闭。下一场若要 motor_status / 学习 / 起转，都需要**新的明确批准**，不得援引本包或上一场的额度。
