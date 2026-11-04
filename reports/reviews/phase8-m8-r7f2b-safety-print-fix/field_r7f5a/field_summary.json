@@ -1,0 +1,134 @@
+{
+  "round": "M8R7F5A-field",
+  "checks": 27,
+  "fails": 0,
+  "fail_names": [],
+  "pending": [
+    {
+      "item": "operator_power_down_after_dispatch",
+      "state": "PENDING_OPERATOR_REPORT",
+      "note": "任务书第 69 行要求收口切断 VM+MCU; stop_capture 已于 2026-11-04T10:11:05.632902+00:00 完成, 断电尾段不在这 28.02 s 内, 但断电动作与其时刻要由操作者回报后才登记, 不代填。"
+    }
+  ],
+  "serial_verdict": "SERIAL_16_STEP_STATIC_IRQ_TRIAL_OK",
+  "instrument_verdict": "CAPTURE_VALID_BUT_NON_DISCRIMINATING",
+  "combined_verdict": "PARTIAL_NOT_STITCHED",
+  "forbidden_claims_still_blocked": [
+    "PHYSICAL_POLARITY_VERIFIED",
+    "DIAG_TRIGGER_VERIFIED",
+    "STEP_PHYSICALLY_STOPPED_BY_LOG_ALONE",
+    "CORE_PROTECTION_VERIFIED"
+  ],
+  "polarity_measured": false,
+  "core_protection_verified": false,
+  "channel_mapping": "CHANNEL_MAPPING_UNRESOLVED",
+  "la": {
+    "columns": 8,
+    "span_s": 28.01664,
+    "per_channel": {
+      "Channel 0": {
+        "initial": "0",
+        "final": "0",
+        "distinct": [
+          "0"
+        ],
+        "transitions": 0
+      },
+      "Channel 1": {
+        "initial": "1",
+        "final": "1",
+        "distinct": [
+          "1"
+        ],
+        "transitions": 0
+      },
+      "Channel 2": {
+        "initial": "1",
+        "final": "1",
+        "distinct": [
+          "1"
+        ],
+        "transitions": 0
+      },
+      "Channel 3": {
+        "initial": "1",
+        "final": "1",
+        "distinct": [
+          "1"
+        ],
+        "transitions": 0
+      },
+      "Channel 4": {
+        "initial": "1",
+        "final": "1",
+        "distinct": [
+          "1"
+        ],
+        "transitions": 0
+      },
+      "Channel 5": {
+        "initial": "1",
+        "final": "1",
+        "distinct": [
+          "1"
+        ],
+        "transitions": 0
+      },
+      "Channel 6": {
+        "initial": "1",
+        "final": "1",
+        "distinct": [
+          "1"
+        ],
+        "transitions": 0
+      },
+      "Channel 7": {
+        "initial": "1",
+        "final": "1",
+        "distinct": [
+          "1"
+        ],
+        "transitions": 0
+      }
+    },
+    "start_utc": "2026-11-04T10:10:37.480095+00:00",
+    "stop_utc": "2026-11-04T10:11:05.632902+00:00",
+    "capture_id": 8,
+    "sample_rate": 1000000,
+    "buffer_requested_mb": 512,
+    "native_bytes": 3014,
+    "native_sha256": "ce6ce2079b8ec03df59690928744c3c1b06e95a7d8c1b0c5048feebdd13c863c",
+    "csv_bytes": 196,
+    "csv_sha256": "7ab2321a014e21eb96c78cc4fbf25c4d763c0eaf3c33400bd144659161255dbf"
+  },
+  "session": {
+    "first_rx_utc": "2026-11-04T10:10:46.819028",
+    "last_rx_utc": "2026-11-04T10:10:53.945147",
+    "quota_used": {
+      "irq_polarity_prep": 2,
+      "port_open": 1,
+      "safety_irq_disable": 1,
+      "tmc_config_apply": 1
+    },
+    "responses": 16
+  },
+  "device_actions": {
+    "serial_dispatch": 1,
+    "port_open": 1,
+    "tmc_config_apply": 1,
+    "irq_polarity_prep": 2,
+    "safety_irq_disable": 1,
+    "logic_capture_session": 1,
+    "logic_start": 1,
+    "logic_stop": 1,
+    "native_save": 1,
+    "csv_export": 1,
+    "arm": 0,
+    "start": 0,
+    "motion": 0,
+    "download": 0,
+    "readback": 0,
+    "reset": 0,
+    "retry": 0
+  }
+}

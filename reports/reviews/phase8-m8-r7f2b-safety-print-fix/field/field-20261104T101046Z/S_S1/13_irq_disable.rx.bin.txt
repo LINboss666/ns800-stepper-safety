@@ -1,0 +1,4 @@
+safety_irq_disable
+[SAFETY] detach: PA.3 detached (0)
+[SAFETY] IRQ gate CLOSED - 活动安全输入(1 路)无软件响应路径
+msh >

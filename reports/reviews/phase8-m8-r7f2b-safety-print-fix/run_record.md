@@ -335,3 +335,44 @@ Legacy Logic 1.x API。(2) 任务书第 58 行"不要先做试采消耗一次机
 
 推送实况登记(不删不改): 第一次 `git push` 被远端以 `! [remote rejected] ... (Internal Server Error)` 拒绝,
 `git ls-remote` 证实远端仍指 `db3c781`、本地 `531f255` 是其直接子提交 => 纯快进, 重试一次即成功, 未做任何历史操作。
+
+## 14 R7F5A 现场执行（一次 8 路采集 + 原 16 步串口链；A 补充修订五条随轮落实）
+
+批准身份 `M8R7F5A-b502-la-two-channel-static-20261104` 由未改动执行器 `--approval-init` 离线开立，
+令牌取 `capture_scope.operator_authorization_verbatim` **逐字节**（82 B `f2e062a59afc460e…`，A 补充第 5 条，不拼接不询问）。
+开账前先只读复核旧盲测账：`spent` 全 0、`pending` 空 => 走"新身份执行一次"这一支。
+执行根 `field/field-20261104T101046Z/`。
+
+顺序照任务书第 66–69 行：MCP `start_capture`（`captureId=8`，D0–D7 全开、1 MS/s、手动模式、
+请求 `bufferSizeMegabytes=512`；接口只回 captureId，**不回实际接受值**）→ 原计划
+`--dispatch --transport real --backend real --profile response_driven` 一次 → 关端口后 `stop_capture`。
+
+**串口层 `SERIAL_16_STEP_STATIC_IRQ_TRIAL_OK`（判读 27 项 fail=0，`field_r7f5a/FIELD_JUDGEMENT.txt`）**：
+`status=OK`、`stages_executed=2`、16 份响应原文齐；实耗 `port_open 1 / apply 1 / irq_polarity_prep 2 / irq_disable 1`，
+其余 18 项 0，无重试。门链按字节复现 `mask 0x18→0x8→0x0→0x8`、`irq gate CLOSED→OPEN→CLOSED`、
+`polarity NOT confirmed→operator CONFIRMED`、`protection_ready NO→YES→NO`（全是软件状态位）。
+固件自报同场原文：`TMC_DIAG pin=3 raw=0 safe=0 irq=RISING [safe]`、`PC.6(ENN_FB) pin=ok raw=HIGH`。
+命令身份不靠台账标签（阶段台账根本不写 `cmd` 字段，已具名登记），改用响应首行回显：15 条与计划同序，
+**无 `motor_arm`/`motor_start`**，全程无 `armed=1`。零裸 NUL、严格 UTF-8、会话末 `t_s=7.344 s` < 90 s。
+第 10 步被动观察 0 字节：只说明窗口内无产出，不构成"没触发"的证明。
+
+**仪器层 `CAPTURE_VALID_BUT_NON_DISCRIMINATING`**：采集窗 28.0166 s 完整包住会话
+（起 `10:10:37.465` < 首响应写入 `10:10:46.819`；末响应 `10:10:53.945` < 止 `10:11:05.482`），
+8 路**全程零跳变**。决定性一条：本轮电平模式 `0,1,1,1,1,1,1,1` 与探头未接时的浮空基线**逐列相同**，
+所以这批字节既与"接线正确且全程静默"一致，也与"探头未接触/无共地"一致——电平层无法区分这两者。
+通道映射未由现场读得，按 A 补充第 2 条标 `CHANNEL_MAPPING_UNRESOLVED`，不靠"预期一低一高"反推信号身份。
+原生件 `la_capture_id8.sal` 3014 B、数字 CSV `la_digital_raw.csv` 196 B（散列见 `field_summary.json`）。
+
+自伤如实登记：第一次 `save_capture` 我传 `directory`，接口具名拒绝 `should have required property 'filepath'`
+（原文 `la_save_first_attempt_error.json` 未删）；改用 `filepath` 对**同一次已采完的会话**重存成功——
+是采集之后的保存动作，不是重采，不消耗采集额度。
+
+A 补充五条落实对账（原文逐字录入 `a_review_r7f5a/SUPPLEMENT_A_R7F5A.md`，含我的录入补记）：
+输入范围按商家页 0–5 V 接受且等级锁在"厂商页声称＋实测特征吻合"（转录与原件散列见
+`la_local_r7f5a/vendor_spec_transcription.txt`；截图含账号级界面，不入公开仓库）；8 路全开、映射不反推；
+1 MS/s＋显式 512 MB、本机内存 33.3 GB/空闲 14.4 GB、MB 未等同样点数、覆盖性事后验证；
+执行前的断电→上电登记为前置供电调整、结束断电为允许的收口动作；令牌用 capture_scope 原文。
+
+结论**不拼成全过**：`STATIC_IRQ_TRIAL_WITH_DIAG_ENN_CAPTURE_PASS` 不使用。
+`polarity_measured=false`、`core_protection_verified=false` 保持，四条禁用声称仍全部禁止。
+待操作者回报：收口切断 VM+MCU 的时刻与观察到的掉电表现（`PENDING_OPERATOR_REPORT`，我不代填）。

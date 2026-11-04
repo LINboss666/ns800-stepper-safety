@@ -1,0 +1,23 @@
+{
+  "tool": "export_raw_data_csv",
+  "args": {
+    "captureId": 8,
+    "directory": "D:\\ns800_r7f1_scratch\\r7f5a_field\\csv",
+    "analogDownsampleRatio": 1,
+    "iso8601Timestamp": true
+  },
+  "utc": "2026-11-04T10:11:06.332968+00:00",
+  "response": {
+    "jsonrpc": "2.0",
+    "id": 2,
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{}"
+        }
+      ],
+      "structuredContent": {}
+    }
+  }
+}

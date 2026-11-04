@@ -1,0 +1,29 @@
+{
+  "tool": "get_devices",
+  "args": {
+    "includeSimulationDevices": false
+  },
+  "utc": "2026-11-04T10:10:37.123076+00:00",
+  "response": {
+    "jsonrpc": "2.0",
+    "id": 2,
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"devices\": [{\"deviceId\": \"MASKED\", \"deviceType\": \"Logic\", \"isSimulation\": false}]}"
+        }
+      ],
+      "structuredContent": {
+        "devices": [
+          {
+            "deviceId": "MASKED_SHA12:42055f5a3c56",
+            "deviceType": "Logic",
+            "isSimulation": false
+          }
+        ]
+      }
+    }
+  },
+  "masking_note": "分析仪序列号不入公开仓库; 原文留在仓外 la_devices 记录"
+}

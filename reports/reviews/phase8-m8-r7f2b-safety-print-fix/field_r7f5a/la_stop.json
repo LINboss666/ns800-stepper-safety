@@ -1,0 +1,20 @@
+{
+  "tool": "stop_capture",
+  "args": {
+    "captureId": 8
+  },
+  "utc": "2026-11-04T10:11:05.632902+00:00",
+  "response": {
+    "jsonrpc": "2.0",
+    "id": 2,
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{}"
+        }
+      ],
+      "structuredContent": {}
+    }
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "tool": "start_capture",
+  "args": {
+    "deviceId": "MASKED_SHA12:42055f5a3c56",
+    "logicDeviceConfiguration": {
+      "logicChannels": {
+        "digitalChannels": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ]
+      },
+      "digitalSampleRate": 1000000
+    },
+    "captureConfiguration": {
+      "manualCaptureMode": {},
+      "bufferSizeMegabytes": 512
+    }
+  },
+  "utc": "2026-11-04T10:10:37.480095+00:00",
+  "response": {
+    "jsonrpc": "2.0",
+    "id": 2,
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"captureId\":8}"
+        }
+      ],
+      "structuredContent": {
+        "captureId": 8
+      }
+    }
+  },
+  "masking_note": "本件由仓外 la_start.json 复制而来, 唯一改动是把 args.deviceId 换成 sha256 前 12 位; 响应体与 UTC 时刻未动。原文仍在仓外 D:/ns800_r7f1_scratch/r7f5a_field/la_start.json"
+}

@@ -1,0 +1,21 @@
+{
+  "tool": "save_capture",
+  "args": {
+    "captureId": 8,
+    "filepath": "D:/ns800_r7f1_scratch/r7f5a_field/native/capture_id8.sal"
+  },
+  "utc": "2026-11-04T10:12:02.276465+00:00",
+  "response": {
+    "jsonrpc": "2.0",
+    "id": 2,
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{}"
+        }
+      ],
+      "structuredContent": {}
+    }
+  }
+}

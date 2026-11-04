@@ -1,0 +1,28 @@
+PASS   LA_CHANNELS_ALL_EIGHT_ENABLED | 8
+PASS   LA_ZERO_TRANSITIONS_ON_EVERY_CHANNEL | {'Channel 0': 0, 'Channel 1': 0, 'Channel 2': 0, 'Channel 3': 0, 'Channel 4': 0, 'Channel 5': 0, 'Channel 6': 0, 'Channel 7': 0}
+PASS   LA_SPAN_COVERS_SERIAL_SESSION | 28.0166 s
+PASS   LA_NATIVE_SAVED | 3014 B
+PASS   LA_SAVE_FIRST_ATTEMPT_ERROR_KEPT | 保存参数用错的具名错误原文留档, 未删
+PASS   LA_LEVEL_PATTERN | 低=['Channel 0'] 高=7
+PASS   LA_PATTERN_IDENTICAL_TO_UNCONNECTED_BASELINE | 未接基线=01111111 本轮=01111111 => 电平层无法区分'接线正确且静默'与'探头未接触/无共地'
+PASS   LA_NO_EDGE_MEANS_NO_TRIGGER_OBSERVED | 本轮不产生任何触发/极性边沿证据; 禁用声称照旧生效
+PASS   SERIAL_16_RESPONSES | 16
+PASS   SERIAL_NO_BARE_NUL | {}
+PASS   SERIAL_STRICT_UTF8 | []
+PASS   MASK_CHAIN_18_8_0_8 | 0x18@['01_sys_pre.rx.bin', '02_mot_pre.rx.bin'] 0x8@['04_sys_cfg.rx.bin', '15_sys_closed.rx.bin'] 0x0@['01_sys_pre.rx.bin', '04_sys_cfg.rx.bin', '11_sys_open.rx.bin', '15_sys_closed.rx.bin']
+PASS   IRQ_GATE_CLOSED_OPEN_CLOSED | CLOSED@['06_irq_pre.rx.bin', '14_irq_closed.rx.bin'] OPEN@['09_irq_open.rx.bin']
+PASS   POLARITY_FLAG_ONLY | 置位前/后置位后的软件标志
+PASS   PROTECTION_READY_CHAIN | NO@['06_irq_pre.rx.bin', '07_pol_trial_flag.rx.bin', '14_irq_closed.rx.bin'] YES@['09_irq_open.rx.bin']
+PASS   CONFIG_APPLIED_ONCE | ['03_cfg_apply.rx.bin']
+PASS   DIAG_RAW_ZERO_RISING | 固件自报 DIAG raw=0 safe=0 RISING
+PASS   ENN_FB_RAW_HIGH_DISCLOSED | 固件自报 ENN 反馈 raw=HIGH(禁能侧)
+PASS   NEVER_ARMED_NO_FREQUENCY | armed=1 命中=none
+PASS   STAGE_LEDGER_CARRIES_NO_CMD_FIELD | 台账 kinds=['APPROVED_PACKAGE_VERIFIED', 'BUSINESS_OUTCOME', 'PORT_CLOSED', 'PORT_OPEN', 'PORT_OPEN_ATTEMPT', 'QUOTA_CONSUMED', 'RX_DONE', 'SESSION_OK', 'WATCH_DONE']; 命令身份改用响应首行回显承担
+PASS   ECHO_ORDER_EQUALS_PLAN_ORDER | 回显 15 条 与计划 15 步(去 __watch__)同序=True
+PASS   NO_ARM_START_SENT | 实际发送=['system_status', 'motor_status', 'tmc_config_apply CONFIRM', 'system_status', 'motor_status', 'safety_irq_status', 'safety_polarity_confirm CONFIRM', 'safety_irq_enable', 'safety_irq_status', 'system_status', 'motor_status', 'safety_irq_disable', 'safety_irq_status', 'system_status', 'safety_status']
+PASS   QUOTA_USED_EXACTLY_AS_APPROVED | {'irq_polarity_prep': 2, 'port_open': 1, 'safety_irq_disable': 1, 'tmc_config_apply': 1}
+PASS   PASSIVE_WATCH_ZERO_BYTES_DISCLOSED | 被动观察 0 字节: 只说明窗口内无产出, 不构成'没触发'的证明
+PASS   SESSION_WITHIN_DECLARED_DEADLINE | 会话末 t_s=7.344 s < 申报 90 s
+PASS   ALIGN_CAPTURE_START_BEFORE_FIRST_RESPONSE | 采集起 2026-11-04T10:10:37.465229700+00:00 / 首个响应写入 2026-11-04T10:10:46.819028
+PASS   ALIGN_CAPTURE_STOP_AFTER_LAST_RESPONSE | 末响应写入 2026-11-04T10:10:53.945147 < 采集止 2026-11-04T10:11:05.481869700+00:00
+TOTAL=27 FAILS=0

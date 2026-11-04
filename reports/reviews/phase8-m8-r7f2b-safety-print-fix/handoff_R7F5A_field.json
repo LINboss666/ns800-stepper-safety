@@ -1,0 +1,185 @@
+{
+  "round": "M8R7F5A-field",
+  "verdict_split": {
+    "serial": "SERIAL_16_STEP_STATIC_IRQ_TRIAL_OK",
+    "instrument": "CAPTURE_VALID_BUT_NON_DISCRIMINATING",
+    "combined": "PARTIAL_NOT_STITCHED"
+  },
+  "approval": {
+    "id": "M8R7F5A-b502-la-two-channel-static-20261104",
+    "token_bytes": 82,
+    "token_sha256": "f2e062a59afc460e5052be1f8f8a5effce87439a58825ce0617ec60908cc987d",
+    "token_source": "capture_scope.operator_authorization_verbatim (逐字节)",
+    "ledger_spent": {
+      "irq_polarity_prep": 2,
+      "port_open": 1,
+      "safety_irq_disable": 1,
+      "tmc_config_apply": 1
+    },
+    "ledger_pending": [],
+    "old_blind_ledger_still_unspent": true
+  },
+  "execution_root": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T101046Z",
+  "judgement": {
+    "checks": 27,
+    "fails": 0,
+    "path": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field_r7f5a/FIELD_JUDGEMENT.txt"
+  },
+  "serial_facts": {
+    "steps": 16,
+    "responses": 16,
+    "mask_chain": [
+      "0x18",
+      "0x8",
+      "0x0",
+      "0x8"
+    ],
+    "irq_gate": [
+      "CLOSED",
+      "OPEN",
+      "CLOSED"
+    ],
+    "firmware_self_report": {
+      "TMC_DIAG": "pin=3 raw=0 safe=0 irq=RISING [safe]",
+      "ENN_FB": "PC.6(ENN_FB) pin=ok raw=HIGH"
+    },
+    "arm_or_start_sent": false,
+    "armed_one": false,
+    "session_t_s": 7.344,
+    "declared_deadline_s": 90,
+    "passive_watch_bytes": 0
+  },
+  "instrument_facts": {
+    "columns": 8,
+    "span_s": 28.01664,
+    "per_channel": {
+      "Channel 0": {
+        "initial": "0",
+        "final": "0",
+        "distinct": [
+          "0"
+        ],
+        "transitions": 0
+      },
+      "Channel 1": {
+        "initial": "1",
+        "final": "1",
+        "distinct": [
+          "1"
+        ],
+        "transitions": 0
+      },
+      "Channel 2": {
+        "initial": "1",
+        "final": "1",
+        "distinct": [
+          "1"
+        ],
+        "transitions": 0
+      },
+      "Channel 3": {
+        "initial": "1",
+        "final": "1",
+        "distinct": [
+          "1"
+        ],
+        "transitions": 0
+      },
+      "Channel 4": {
+        "initial": "1",
+        "final": "1",
+        "distinct": [
+          "1"
+        ],
+        "transitions": 0
+      },
+      "Channel 5": {
+        "initial": "1",
+        "final": "1",
+        "distinct": [
+          "1"
+        ],
+        "transitions": 0
+      },
+      "Channel 6": {
+        "initial": "1",
+        "final": "1",
+        "distinct": [
+          "1"
+        ],
+        "transitions": 0
+      },
+      "Channel 7": {
+        "initial": "1",
+        "final": "1",
+        "distinct": [
+          "1"
+        ],
+        "transitions": 0
+      }
+    },
+    "start_utc": "2026-11-04T10:10:37.480095+00:00",
+    "stop_utc": "2026-11-04T10:11:05.632902+00:00",
+    "capture_id": 8,
+    "sample_rate": 1000000,
+    "buffer_requested_mb": 512,
+    "native_bytes": 3014,
+    "native_sha256": "ce6ce2079b8ec03df59690928744c3c1b06e95a7d8c1b0c5048feebdd13c863c",
+    "csv_bytes": 196,
+    "csv_sha256": "7ab2321a014e21eb96c78cc4fbf25c4d763c0eaf3c33400bd144659161255dbf"
+  },
+  "instrument_caveat": "电平模式与探头未接的浮空基线逐列相同 => 无法区分'接线正确且静默'与'未接触/无共地'",
+  "channel_mapping": "CHANNEL_MAPPING_UNRESOLVED",
+  "self_error_registered": "save_capture 首次参数用错(directory 而非 filepath)的具名拒绝原文留档; 对同一已采会话重存, 非重采",
+  "alignment": {
+    "capture_start": "2026-11-04T10:10:37.480095+00:00",
+    "first_rx_write": "2026-11-04T10:10:46.819028",
+    "last_rx_write": "2026-11-04T10:10:53.945147",
+    "capture_stop": "2026-11-04T10:11:05.632902+00:00"
+  },
+  "pending": [
+    {
+      "item": "operator_power_down_after_dispatch",
+      "state": "PENDING_OPERATOR_REPORT",
+      "note": "任务书第 69 行要求收口切断 VM+MCU; stop_capture 已于 2026-11-04T10:11:05.632902+00:00 完成, 断电尾段不在这 28.02 s 内, 但断电动作与其时刻要由操作者回报后才登记, 不代填。"
+    }
+  ],
+  "boundaries": {
+    "polarity_measured": false,
+    "core_protection_verified": false,
+    "forbidden_claims_still_blocked": [
+      "PHYSICAL_POLARITY_VERIFIED",
+      "DIAG_TRIGGER_VERIFIED",
+      "STEP_PHYSICALLY_STOPPED_BY_LOG_ALONE",
+      "CORE_PROTECTION_VERIFIED"
+    ],
+    "full_pass_name_used": false
+  },
+  "device_actions": {
+    "serial_dispatch": 1,
+    "port_open": 1,
+    "tmc_config_apply": 1,
+    "irq_polarity_prep": 2,
+    "safety_irq_disable": 1,
+    "logic_capture_session": 1,
+    "logic_start": 1,
+    "logic_stop": 1,
+    "native_save": 1,
+    "csv_export": 1,
+    "arm": 0,
+    "start": 0,
+    "motion": 0,
+    "download": 0,
+    "readback": 0,
+    "reset": 0,
+    "retry": 0
+  },
+  "unchanged_inputs": {
+    "plan_sha256": "ee3b26513fc7a572daff0c5c26124a9a0f7fbfa20632bd7088fb84d9d0ca4402",
+    "executor_sha256": "33d3f0af8a4c9c33dcd4e013b395e4ba990a89e384130f9d0ffe50c71b34e8ca",
+    "image_sha256": "502dca5d8c7ebfa794f890a9c03bc258fc9753f57b6a80c2f1e08add69888a7a",
+    "product_source_changed": false,
+    "executor_changed": false
+  },
+  "supplement_by_A": "5 条, 落实见 handoff §4; 原文 a_review_r7f5a/SUPPLEMENT_A_R7F5A.md"
+}
