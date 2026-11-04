@@ -1,0 +1,21 @@
+FETCH|rc=0|
+REMOTE_TIP|531f255661b1b226c01f216a7b4d5d21ff35dfa9
+TIP_MATCHES_LOCAL|PASS|expected=531f255661b1b226c01f216a7b4d5d21ff35dfa9
+SUMS_LIST|reports/reviews/phase8-m8-r7f2b-safety-print-fix|条目=172 (清单自身不在此列)
+SUMS_RECHECK|entries=172 ok=172 mismatch=0 not_checked=0
+SELFCHECK_SUMS|一个故意写错的登记值必须被判不符: FIRED
+PLACE|plan_r7f5_b502_blind_irq_static.json|remote=ee3b26513fc7 declared=ee3b26513fc7 bytes=49994/49994 PASS
+PLACE|rows_r7f5_b502_blind_irq_static.json|remote=4f094de3331e declared=4f094de3331e bytes=22289/22289 PASS
+SCOPE_ID|executor 远端=33d3f0af8a4c 任务书=33d3f0af8a4c PASS
+SCOPE_ID|image 远端=502dca5d8c7e 292708 B PASS
+EMBED_CLAIM|任务书=b326cd8543ee 60623 B 上一轮登记=b326cd8543ee 60623 B 一致=True PASS
+JSON_CLAIM|判据 total=56 fails=0 步骤摘要=4a80dcb6dd43028c 设备动作=0
+JSON_CLAIM|旧账 spent非零=0 pending=0 身份等于磁盘=True 分支=USE_NEW_APPROVAL_ID
+JSON_CLAIM|被放宽的零额度=0 重述 irq_polarity_prep=[2, 2]
+JSON_CLAIM|浮空采集 远端=66c4f7fb89f3 196 B 回执=66c4f7fb89f3 标签=CONTROL_PATH_SMOKE PASS
+JSON_CLAIM|OPEN 前置=3 项 ['hardware_input_rating', 'acquisition_capacity_100Ms', 'probe_label_to_gui_channel_mapping']
+DIFF|新增=26 改动=2
+  允许改动集=2 越界改动=0 []
+  新增件越界=0 []
+PRESERVE|比对=24 相同=24 被改=0 取不到=0
+SELFCHECK|.gitattributes 差异期望=False 实测=False: FIRED
