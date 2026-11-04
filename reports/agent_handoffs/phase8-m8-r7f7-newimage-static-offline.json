@@ -1,0 +1,213 @@
+{
+  "round": "M8-R7F7 离线核对轮（A 的新版上板＋真实异步作业包）",
+  "date_local": "2026-11-05",
+  "repo_tip_at_start": "7a08f9d56e69c66b93695cb201a7a3ecefe2b91a",
+  "branch": "feature/m8-r7d1-async-learn-offline",
+  "task_package": {
+    "zip_basename": "NS800_R7F7_NewImage_Real_Async_Job_Task_20261105.zip",
+    "zip_bytes": 312901,
+    "zip_sha256": "15bf813bbd62ee7fcbc263f2c31c1a92f71a42f6e084498c0fa4f568d1076b62",
+    "zip_kept": "仓外(操作者 Downloads 目录), 不入库",
+    "files_in_zip": 29,
+    "manifest_entries": 28,
+    "manifest_excludes_self": true,
+    "all_entry_hashes_match_disk": true,
+    "placed_at": "reports/reviews/phase8-m8-r7f7-newimage-static/",
+    "gitattributes_rule": "reports/reviews/phase8-m8-r7f7-newimage-static/** -text"
+  },
+  "operator_input_this_round": "只有附件转交, 没有执行指令",
+  "execution_approval": {
+    "status": "NOT_GRANTED_THIS_TURN",
+    "field_approval_id_planned": "M8R7F7-2369-async-job-static-20261105",
+    "field_ledger_opened": false,
+    "evidence": "核准根目录下 *M8R7F7-2369-async-job-static* 匹配 0 件 (FIELD_APPROVAL_LEDGER_ABSENT|PASS)",
+    "old_ledgers": "R7F6 等旧账只读, 不结转额度, 不写旧账",
+    "what_would_be_needed": "操作者对本包的一条真实执行指令; 收到后按 A §2 额度开新账并一次跑完, 不重烧不补测不重试"
+  },
+  "device_actions_this_round": {
+    "download": 0,
+    "readback": 0,
+    "com5_port_open": 0,
+    "dispatch": 0,
+    "explicit_reset": 0,
+    "diag_profile_zero": 0,
+    "diag_profile_learn": 0,
+    "logic_analyzer_start": 0,
+    "pyocd_or_keil_or_serial_invoked": false
+  },
+  "image_identity": {
+    "bin_bytes": 297452,
+    "bin_sha256": "23691e8d8aa8c1d3ed6e6eff4b5c51fe27dd3a9169841406ecc627c0e807e963",
+    "axf_bytes": 1790048,
+    "axf_sha256": "0f421595ac940863c4d38a2791f31bc8811fc3b8fa40062782f2ac7505c317f6",
+    "four_party_consistent": ["A_IDENTITY.json", "A_manifest_binding_r7f7_2369.json", "build_manifest.json", "disk"],
+    "axf_pt_load": {
+      "elf": "ELF32 小端",
+      "ptload_count": 1,
+      "p_paddr": "0x08000000",
+      "filesz": 297452,
+      "memsz_gt_filesz": true,
+      "segment_sha_equals_bin_sha": true,
+      "note": "memsz 含 RAM 里的 RW/ZI; 定长回读只覆盖 flash 段"
+    },
+    "board_image_before_execution": "NOT_ON_BOARD",
+    "b502_history_only_sha": "502dca5d8c7ebfa794f890a9c03bc258fc9753f57b6a80c2f1e08add69888a7a",
+    "build_round_device_actions": 0,
+    "build_head": "e1d7f3d90415fdf30344ed95a08065c1373fab01",
+    "accepted_source_commit": "00718b49e65546aa0bae84006059011d68284c4a"
+  },
+  "source_identity": {
+    "frozen_10_c_files": "包内冻结 == 00718b4 的 blob == 工作树(按行尾归一), 三方逐字节一致",
+    "worktree_crlf_files": ["motor.c", "supervisor.c", "tmc2209.c"],
+    "worktree_crlf_meaning": "git attr=text 检出转换, 内容与 LF blob 等价; 不参与镜像身份",
+    "source_bindings_5_on_tip": "sha256+bytes+git blob id 全等(含 diag_relative.h 与 project_config.h)",
+    "product_tree_sha1": "32470c7ed44ef6ef5f762490a5416912a336cdd9",
+    "product_tree_resolved_as": "提交里的 rt-thread-master 子树对象号, 在 00718b4 与 7a08f9d 上是同一对象",
+    "non_reports_changes_00718b4_to_tip": [".gitattributes"],
+    "executor": {
+      "path": "reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py",
+      "sha256": "33d3f0af8a4c9c33dcd4e013b395e4ba990a89e384130f9d0ffe50c71b34e8ca",
+      "modified_this_round": false,
+      "witness_copy_equals_repo": true
+    }
+  },
+  "offline_recomputation": {
+    "tool": "reports/reviews/phase8-m8-r7f7-newimage-static/tools/r7f7_offline_checks.py",
+    "predicates": 109,
+    "fail": 0,
+    "log": "reports/reviews/phase8-m8-r7f7-newimage-static/proof/offline_preflight_r7f7.txt",
+    "validate_plan": {
+      "lines_local": 58,
+      "checks": 57,
+      "fail": 1,
+      "msh_commands": 74,
+      "only_raw_fail": "PLAN_MOTION_CAP_BUDGET",
+      "name_and_verdict_identical_to_A": true,
+      "only_difference": "末行 plan= 路径(A 在自己沙箱)"
+    },
+    "stub_rerun": {
+      "transport_backend": "stub+sim",
+      "stages": "S0-S3 全 OK",
+      "s3_steps": 16,
+      "s3_disarm": "NOT_ARMED",
+      "quota_used": {"download": 1, "readback": 1, "port_open": 1, "explicit_reset": 1, "diag_profile_zero": 1, "diag_profile_learn": 1},
+      "zero_quota_consumed": 0,
+      "s0_facts_equal_except_paths": true,
+      "needles_total": 41,
+      "ledger_note": "每次运行用带 RUNID 的新仓外台账; 复用旧账会被 APPROVAL_LEDGER_ALREADY_EXISTS / 二次 dispatch 拒绝(设计如此)"
+    },
+    "needles": {
+      "total": 41,
+      "unproven_on_frozen": 0,
+      "also_hit_live_product_worktree": true,
+      "old_sync_learn_needles_replaced": true
+    },
+    "host_c_model": {
+      "recompiled_locally": true,
+      "compiler": "gcc (tdm64-1) 4.9.2",
+      "build_rc": 0,
+      "run_rc": 0,
+      "output_sha_after_cRLF_normalize": "fc8747c7fdcbfae55ab6a4e46570171a3f6d3cf1ae6bca006d1f5d6edb7b6440",
+      "byte_equal_to_A_stdout": true,
+      "cr_delta_equals_line_count": 29,
+      "frames": ["job_initial", "zero", "job_zero", "learn_start", "job_failed"],
+      "host_state": "id=1 state=4 owner=0 zero=1 learn=0 active=0",
+      "state4_resolved_from_enum": "rel_job_state_t 隐式递增 => REL_JOB_FAILED=4",
+      "owner0_resolved_from_enum": "REL_CAP_FREE=0",
+      "warning_count_local_vs_A": "0 vs 1 (-Wmisleading-indentation 需 GCC>=6, 编译器版本差异, 不读成更干净)",
+      "is_host_model_only": true
+    }
+  },
+  "plan_semantics_checked_by_me": {
+    "steps": 15,
+    "commands": 13,
+    "reset_steps": 1,
+    "passive_watch_seconds": 1,
+    "command_order_equals_taskbook_table": true,
+    "forbidden_commands_declared": 17,
+    "forbidden_commands_present_in_plan": 0,
+    "forbidden_gate_fires_on_injected_motor_start": true,
+    "boot_window_seconds": 75,
+    "command_windows_seconds": 91,
+    "session_total_seconds": 166,
+    "declared_deadline_seconds": 210,
+    "learn_step_requires_STARTED_id1_and_forbids_REFUSED_FAILED": true,
+    "terminal_locked_to_FAILED_WINDOW_BROKEN_owner0_cred1_0": true,
+    "status_allow_lines": 5,
+    "status_allow_all_anchored_and_required": true,
+    "failed_word_allowance_only_at": ["job_failed"]
+  },
+  "operator_power_policy": {
+    "taskbook_clause": "已上电就保持供电, 正常收口保持禁能供电, 不再要求额外断电或报告收口断电时刻",
+    "plan_fields": {
+      "normal_end_powerdown": 0,
+      "additional_powercycles": 0,
+      "initial_power_establish_max": 1,
+      "if_already_powered": "No action; do not power-cycle for this task."
+    },
+    "keeps_emergency_priority": "操作者硬件禁能优先于保持供电口径",
+    "no_usb_inference_of_power_state": true,
+    "provenance": "操作者 R7F6 收口时的「我希望默认不断电」经我作为变更请求转交, A 在本轮采纳",
+    "r7f6_labels_rewritten": false
+  },
+  "boundaries_kept": {
+    "polarity_measured": false,
+    "core_protection_verified": false,
+    "effective_learning_completion_verified": false,
+    "job_active_cancel_verified": false,
+    "field_result": "NOT_RUN",
+    "instrument_identifier_disclosure": "按操作者决定暂缓, 未标成已修复, Git 历史未动",
+    "r7f5a_pending_operator_report": "保持, 不为关待办连接设备",
+    "not_verified": [
+      "正常巡航下采样进度与 DONE 有效基线",
+      "活动作业取消与取消竞争",
+      "commit/config_save",
+      "SG/ADC/IMU 真实保护触发与恢复",
+      "实际 STEP/ENN 动态时延",
+      "带载最坏栈"
+    ]
+  },
+  "self_injuries_registered": [
+    "仓库根路径 parents[3] 写错(应 [4]), 首次运行 FileNotFoundError",
+    "清单条目期望写 29, 实际 28(清单不含自身), 把 zip 文件数与清单条数混为一谈",
+    "会话预算先手算 162 s 写进判据, 实算 166 s: 算术错的判据会把正确计划钉成失败",
+    "PASS/FAIL 用固定下标 [2], 步骤级行判定在第 4 段 => 假红(同写法用于泄漏扫描就会漏报)",
+    "\"%s\" % 3 元组 => TypeError",
+    "str 正则搜 bytes => TypeError",
+    "通用 token= 模式命中执行器形参名 approval_token= => 撤销模式并登记理由, 未改包件字节",
+    "通用盘符 X:/ 模式命中 A 包里合法的 C:/Keil_v5 工具链路径 => 放弃该模式并登记取舍, 不靠删命中装干净",
+    "掩码先短后长把仓外目录掩成 <REPO>_r7f1_scratch, 读起来像在仓库里 => 先长后短并重跑全部证据",
+    "泄漏自证样本被旧赋值覆盖致 2/3 命中 => must-FIRE 设计有效的那次报警",
+    "REL_JOB_FAILED 无显式 =N, 正则取不到 => 改按 C 隐式序号从 enum 头部推算",
+    "gcc 版本差异使 warning 计数不同, 未读成构建更干净, 用 rel_main.c:351 原文锚点证夹具同源",
+    "stub 复跑撞 APPROVAL_LEDGER_ALREADY_EXISTS(rc=4)与二次 dispatch(rc=1) => 台账按设计拒绝重复消耗, 工具改用 RUNID 新账",
+    "同类复发: 我新写的提交前置检查器自带路径字面量样本, 连它自己的模式定义行都满足自己的判据, 被本轮泄漏扫描抓到两处 => 运行时 chr(92) 拼装才干净; 检查器自证必须每轮真跑",
+    "把该写进 run_record 的补句误编辑进交接 md 的 §5, 删掉一行后按原文恢复 => 改文档的 Edit 也要核对目标文件与范围",
+    "dap_uid_bare.txt 的机器本地默认路径我差点当隐私问题: 它不含用户名/UID 明文(工具只打印长度 48), 真问题是换机器失效, 故保留为可覆盖的 --uid-file 默认值"
+  ],
+  "deliverables": {
+    "round_dir": "reports/reviews/phase8-m8-r7f7-newimage-static/",
+    "package_originals": 29,
+    "local_evidence": [
+      "proof/validate_plan_local.txt",
+      "proof/stub_init_local.txt",
+      "proof/stub_dispatch_local.txt",
+      "proof/needles_local.txt",
+      "proof/host_probe_local_lf.txt",
+      "proof/host_build_local.stderr.txt",
+      "proof/host_probe_cmd_local.txt",
+      "proof/offline_preflight_r7f7.txt"
+    ],
+    "docs": [
+      "OFFLINE_REVIEW.md",
+      "reports/reviews/phase8-m8-r7f2b-safety-print-fix/run_record.md §20",
+      "reports/agent_handoffs/phase8-m8-r7f7-newimage-static-offline.md/.json"
+    ],
+    "masks": "证据里 <REPO>/<SCRATCH>/<GCC>/<PY>/<RUNID> 由工具统一替换; 包件原件字节未改"
+  },
+  "push_and_readback": {
+    "convention": "提交→代理推送→远端逐 blob 回读; 回读报告写在仓外 D:/ns800_r7f7_readback/remote_readback_r7f7.txt, 不入清单(避免自引用循环)",
+    "tool": "reports/reviews/phase8-m8-r7f7-newimage-static/tools/r7f7_remote_readback.py",
+    "figures_not_self_recorded": true
+  }
+}

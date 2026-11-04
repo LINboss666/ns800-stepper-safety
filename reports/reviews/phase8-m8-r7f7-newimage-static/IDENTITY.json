@@ -1,0 +1,115 @@
+{
+  "task_id": "M8R7F7-2369-async-job-static-20261105",
+  "date": "2026-11-05",
+  "status": "A_FIXED_SCOPE_GO_FOR_CURRENT_NEXT_ROUND_REQUEST",
+  "operator_request_verbatim": "这个命名问题不太重要直接过吧 开启下一轮",
+  "operator_scope_correction_verbatim": "这里不是说验证异步学习的实际表现 为什么又不创建学习作业",
+  "plan": {
+    "path": "field/plan_r7f7_2369_static.json",
+    "bytes": 39257,
+    "sha256": "1de974bf2828819f9b71d8d99a490432a8af08e0ce6613fc4691e0262feb0486"
+  },
+  "rows": {
+    "path": "field/rows_r7f7_2369_static.json",
+    "bytes": 16249,
+    "sha256": "5fee4060f4bde537865f62293c446f798d9724a24c5f406c07bd76f7a8873db9"
+  },
+  "executor": {
+    "path": "signed_inputs/m8r3_serial_chain.py",
+    "bytes": 219491,
+    "sha256": "33d3f0af8a4c9c33dcd4e013b395e4ba990a89e384130f9d0ffe50c71b34e8ca"
+  },
+  "image": {
+    "path": "reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/rt-thread-motor-m1-candidate.bin",
+    "bytes": 297452,
+    "sha256": "23691e8d8aa8c1d3ed6e6eff4b5c51fe27dd3a9169841406ecc627c0e807e963",
+    "axf_bytes": 1790048,
+    "axf_sha256": "0f421595ac940863c4d38a2791f31bc8811fc3b8fa40062782f2ac7505c317f6",
+    "AXF_flash_equal_BIN": true,
+    "before_execution": "NOT_ON_BOARD"
+  },
+  "development_tip": "7a08f9d56e69c66b93695cb201a7a3ecefe2b91a",
+  "accepted_source_commit": "00718b49e65546aa0bae84006059011d68284c4a",
+  "product_tree_sha1": "32470c7ed44ef6ef5f762490a5416912a336cdd9",
+  "product_tree_equal_to_accepted": true,
+  "source_bindings": [
+    {
+      "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diag_relative.c",
+      "bytes": 109262,
+      "sha256": "a95ab79363a2b383f6dc7db3fa0146954bb72692c12540427a2075233b9944e8",
+      "git_blob": "94a6b7894c1a4c5bf8770ec69f37888a9828eb0e"
+    },
+    {
+      "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diag_relative.h",
+      "bytes": 25522,
+      "sha256": "27b42031b934ff92dcc6daa4faca31a65cee3782dda489d428f26264c7738303",
+      "git_blob": "b36f086ec01ad61206220cff3f2657b82a9d38bb"
+    },
+    {
+      "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diagnosis.c",
+      "bytes": 54696,
+      "sha256": "4b69151e140b3a80dee4ff211aa935d51cf6e9de2611f6474b38f35a3836d281",
+      "git_blob": "2cf560955fc670cd5af15de04b652d9c1c7355ab"
+    },
+    {
+      "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/project_config.c",
+      "bytes": 25390,
+      "sha256": "f6b2440f5b9d90fb23ddcc90a2caced56e74fbffa6542ff8326329bdf026be33",
+      "git_blob": "f07ee4e0fa3d57359692c0369cea3eb33cd03fc0"
+    },
+    {
+      "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/project_config.h",
+      "bytes": 6028,
+      "sha256": "e0cecd0c89bbf4786375e1644146d2b84bf3a9ad8066e8ebc89536edc8046fb8",
+      "git_blob": "5151dd4ff907916ab34186cb5aa515e7d13c6ef5"
+    }
+  ],
+  "offline_proof": {
+    "actual_product_C_host_model": "zero succeeds, STARTED id1, FAILED/WINDOW_BROKEN, owner FREE, zero1 learn0 active0",
+    "stub_dispatch": "OK",
+    "stub_stages_executed": 4,
+    "stub_command_count": 13,
+    "stub_positive_quota_used": {
+      "port_open": 1,
+      "download": 1,
+      "readback": 1,
+      "explicit_reset": 1,
+      "diag_profile_zero": 1,
+      "diag_profile_learn": 1
+    },
+    "validate_raw_summary": "57 checks / 1 raw FAIL PLAN_MOTION_CAP_BUDGET / A disposition N/A",
+    "real_device_actions_by_A": 0
+  },
+  "field_result": "NOT_RUN",
+  "scope_boundaries": {
+    "LA_start": 0,
+    "probe_rewiring": 0,
+    "accepted_learn_jobs": 1,
+    "learn_request_attempts": 1,
+    "zero": 1,
+    "learn_cancel": 0,
+    "commit": 0,
+    "save": 0,
+    "core_protection_verified": false,
+    "polarity_measured": false,
+    "effective_learning_completion_verified": false,
+    "archive_identifier_issue": "Known disclosure deferred by current user request, not falsely marked fixed.",
+    "expected_job_terminal": "FAILED/WINDOW_BROKEN",
+    "expected_collector_owner_after_terminal": "FREE",
+    "zero_credential_after": 1,
+    "learn_credential_after": 0,
+    "learn_successful_DONE_baseline": false,
+    "job_active_cancel_verified": false,
+    "startup_raw_bytes": "Original executor performs inherited passive dangerous-text gate. Independent post-run NUL/UTF8/completeness judgement is required; overall OK alone is not boot-byte acceptance."
+  },
+  "operator_power_policy": {
+    "reported_current_state": "Powered on according to latest 7a08f9d handoff; read actual local operator state if changed.",
+    "initial_power_establish_max": 1,
+    "if_already_powered": "No action; do not power-cycle for this task.",
+    "if_currently_off": "Operator may establish VM stable then MCU power once.",
+    "additional_powercycles": 0,
+    "normal_end_powerdown": 0,
+    "normal_end_state": "Keep powered, disabled, not armed, IRQ closed.",
+    "unexpected_enable_or_motion": "Stop trial; operator hardware disable takes priority over normal keep-powered closeout."
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "kind": "A_LIGHTWEIGHT_S0_BINDING_NOT_NEW_BUILD_OR_FIELD_PROOF",
+  "source_build_manifest": "reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/build_manifest.json",
+  "source_build_manifest_sha256": "b172a279b75ce96220fded885459642a614408fa8319d660ab69c7113a75dc27",
+  "accepted_source_commit": "00718b49e65546aa0bae84006059011d68284c4a",
+  "actual_build_time_HEAD": "e1d7f3d90415fdf30344ed95a08065c1373fab01",
+  "targets": [
+    {
+      "target": "rt-thread-motor-m1-candidate",
+      "images": {
+        "rt-thread-motor-m1-candidate.bin": {
+          "bytes": 297452,
+          "sha256": "23691e8d8aa8c1d3ed6e6eff4b5c51fe27dd3a9169841406ecc627c0e807e963"
+        },
+        "rt-thread-motor-m1.axf": {
+          "bytes": 1790048,
+          "sha256": "0f421595ac940863c4d38a2791f31bc8811fc3b8fa40062782f2ac7505c317f6"
+        },
+        "rt-thread-motor-m1.map": {
+          "bytes": 2148432,
+          "sha256": "e2d8d081958c84bb7f760bd5011a4b0ce962bb5dc8b6c0dff1cc9084efc0872b"
+        },
+        "rt-thread-motor-m1-callgraph.htm": {
+          "bytes": 1101259,
+          "sha256": "a7090b6eed89f32a0abf4c7ec395cb1a421b909f1c25c436b64f302a02ff0c34"
+        }
+      }
+    }
+  ]
+}

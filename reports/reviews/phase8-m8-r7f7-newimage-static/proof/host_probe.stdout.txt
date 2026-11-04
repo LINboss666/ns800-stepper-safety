@@ -1,0 +1,29 @@
+[DIAG] job id=0 st=IDLE why=IDLE owner=0 cred=0/0
+[DIAG] job n=0/0 want=0 win=0..0 dir=0
+FRAME_BEGIN|job_initial
+[DIAG] job id=0 st=IDLE why=IDLE owner=0 cred=0/0
+[DIAG] job n=0/0 want=0 win=0..0 dir=0
+FRAME_END|job_initial
+[DIAG] zero OK n=32 raw 1660..1660 mean=1660000 (cal source untouched)
+FRAME_BEGIN|zero
+[DIAG] zero OK n=32 raw 1660..1660 mean=1660000 (cal source untouched)
+FRAME_END|zero
+[DIAG] job id=0 st=IDLE why=IDLE owner=0 cred=1/0
+[DIAG] job n=0/0 want=0 win=0..0 dir=0
+FRAME_BEGIN|job_zero
+[DIAG] job id=0 st=IDLE why=IDLE owner=0 cred=1/0
+[DIAG] job n=0/0 want=0 win=0..0 dir=0
+FRAME_END|job_zero
+[DIAG] learn STARTED id=1 n=8 win=450..550 dir=0
+[DIAG] learn async: query 'learn_status'; NOT learn OK yet FIELD_UNVERIFIED
+FRAME_BEGIN|learn_start
+[DIAG] learn STARTED id=1 n=8 win=450..550 dir=0
+[DIAG] learn async: query 'learn_status'; NOT learn OK yet FIELD_UNVERIFIED
+FRAME_END|learn_start
+[DIAG] job id=1 st=FAILED why=WINDOW_BROKEN owner=0 cred=1/0
+[DIAG] job n=0/0 want=8 win=450..550 dir=0
+FRAME_BEGIN|job_failed
+[DIAG] job id=1 st=FAILED why=WINDOW_BROKEN owner=0 cred=1/0
+[DIAG] job n=0/0 want=8 win=450..550 dir=0
+FRAME_END|job_failed
+HOST_STATE|id=1 state=4 owner=0 zero=1 learn=0 active=0

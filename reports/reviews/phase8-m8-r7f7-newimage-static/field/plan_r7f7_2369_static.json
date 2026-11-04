@@ -1,0 +1,964 @@
+{
+  "package": "M8-R7F7-2369-REAL-ASYNC-JOB-STATIC",
+  "status": "A_FIXED_SCOPE_USER_REQUESTED_NEXT_ROUND",
+  "task_id": "M8R7F7-2369-async-job-static-20261105",
+  "numbers_are_proposals_not_authorization": false,
+  "rows_file": "rows_r7f7_2369_static.json",
+  "needles_file": "reports/reviews/phase8-m8-r7f7-newimage-static/field/needles_newimage.json",
+  "needles_source_root": "reports/reviews/phase8-m8-r7f7-newimage-static/frozen_newimage_source",
+  "tools": {
+    "provenance": {
+      "why_these_arguments": "逐字取自本机**已经成功**的 P0 记录: reports/reviews/phase8-motor-m7-current-calibration-r2/p0_package.md(命令段) 与 reports/reviews/phase8-motor-m7-p0-board/S1_flash.stderr.txt + S2_readback.stdout.txt(成功原文)。本轮没有为查参数连接或枚举任何设备。",
+      "cli_options_verified_offline": [
+        "python -m pyocd --version => 0.45.1",
+        "python -m pyocd reset --help => -u/--uid, -t/--target, -W/--no-wait, -M/--connect, -m/--method(含 sysresetreq), -c/--core 均存在(原文存 pyocd_reset_help.txt)"
+      ],
+      "uid_handling": "Existing private UID file only; locally compare normalized content with current OS-reported connected DAP identifier before tools; do not print/store UID or blindly enforce an old narrative hash. No device enumeration through pyocd for preparation."
+    },
+    "substitutions": {
+      "@UID_FILE": "既存私有 UID 文件内容(real 后端; 缺 --uid-file => UID_FILE_REQUIRED)",
+      "@RUN_ROOT": "本次 dispatch 的运行根目录(执行器自己的 out)",
+      "@IMAGE_BYTES": "0x%X 形式的镜像长度, 数值 = identity_binding.image.bytes = S0 现场重算并与 manifest 相等的字节数"
+    },
+    "download": {
+      "command": "python -m pyocd flash --pack C:/Keil_v5/ARM/PACK/.Download/NOVOSENSE.NS800RT7XXX.0.5.3.pack -t ns800rt7p65d_dhqfby2 -u @UID_FILE -f 1000000 --no-config -Oauto_unlock=false -Ocache.enable_memory=false -Ocache.read_code_from_elf=false -e sector reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/rt-thread-motor-m1.axf",
+      "argv": [
+        "python",
+        "-m",
+        "pyocd",
+        "flash",
+        "--pack",
+        "C:/Keil_v5/ARM/PACK/.Download/NOVOSENSE.NS800RT7XXX.0.5.3.pack",
+        "-t",
+        "ns800rt7p65d_dhqfby2",
+        "-u",
+        "@UID_FILE",
+        "-f",
+        "1000000",
+        "--no-config",
+        "-Oauto_unlock=false",
+        "-Ocache.enable_memory=false",
+        "-Ocache.read_code_from_elf=false",
+        "-e",
+        "sector",
+        "reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/rt-thread-motor-m1.axf"
+      ],
+      "image": {
+        "path": "reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/rt-thread-motor-m1.axf",
+        "bytes": 1790048,
+        "sha256": "0f421595ac940863c4d38a2791f31bc8811fc3b8fa40062782f2ac7505c317f6"
+      },
+      "expect_all": [
+        "Erasing... [loader]",
+        "Programming... [loader]"
+      ],
+      "expect_counts": {
+        "Erased [0-9]+ bytes \\([0-9]+ sectors\\), programmed [0-9]+ bytes \\([0-9]+ pages\\)": 1
+      },
+      "expectation_basis": "P0 的 S1_flash.stderr.txt 里这三行是 loader 的成功原文(第 1/2 行 + 末行的 Erased/programmed 摘要); 只 rc=0 不算通过。",
+      "no_retry": "额度 1, 失败不重试: 第二次下载是**新的批准范围**。",
+      "payload_note": "Only the accepted 23691e8d BIN / 0f421595 AXF pair; no other image or fallback."
+    },
+    "readback": {
+      "command": "python -m pyocd commander --no-config -t cortex_m -u @UID_FILE -f 1000000 -O auto_unlock=false -O connect_mode=halt -O resume_on_disconnect=false -O cache.enable_memory=false -O cache.read_code_from_elf=false -O scan_all_aps=false -c status -c \"savemem 0x08000000 @IMAGE_BYTES @RUN_ROOT/readback.bin\" -c status -c exit",
+      "argv": [
+        "python",
+        "-m",
+        "pyocd",
+        "commander",
+        "--no-config",
+        "-t",
+        "cortex_m",
+        "-u",
+        "@UID_FILE",
+        "-f",
+        "1000000",
+        "-O",
+        "auto_unlock=false",
+        "-O",
+        "connect_mode=halt",
+        "-O",
+        "resume_on_disconnect=false",
+        "-O",
+        "cache.enable_memory=false",
+        "-O",
+        "cache.read_code_from_elf=false",
+        "-O",
+        "scan_all_aps=false",
+        "-c",
+        "status",
+        "-c",
+        "savemem 0x08000000 @IMAGE_BYTES @RUN_ROOT/readback.bin",
+        "-c",
+        "status",
+        "-c",
+        "exit"
+      ],
+      "out_file": "readback.bin",
+      "start_address": "0x08000000",
+      "length_rule": "长度 = 本轮候选 BIN 的字节数(由 @IMAGE_BYTES 机械展开, 与 S0 重算值绑定); 不是任意窗口",
+      "image": {
+        "path": "reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/rt-thread-motor-m1-candidate.bin",
+        "bytes": 297452,
+        "sha256": "23691e8d8aa8c1d3ed6e6eff4b5c51fe27dd3a9169841406ecc627c0e807e963"
+      },
+      "expect_all": [
+        "Saved "
+      ],
+      "expect_counts": {
+        "Core 0 \\(None\\):  Halted": 2
+      },
+      "expectation_basis": "P0 的 S2_readback.stdout.txt 就是 'Core 0 (None):  Halted' 两条夹一条 'Saved <n> bytes to <path>'; 交付物判据是那个文件的字节数/散列/与镜像逐字节相等(READBACK_BYTE_COUNT / READBACK_HASH_MISMATCH / READBACK_NOT_BYTE_EQUAL_TO_IMAGE), stdout 里的工具文字不参与字节比较。",
+      "no_retry": "额度 1; 第二次回读属于**新的批准范围**。",
+      "length_note": "Exactly 297452 bytes; compare byte-for-byte to 23691e8d BIN; no retry."
+    },
+    "reset": {
+      "command": "python -m pyocd reset --method sysresetreq --no-config --no-wait --connect attach --core 0 -t cortex_m -u @UID_FILE",
+      "argv": [
+        "python",
+        "-m",
+        "pyocd",
+        "reset",
+        "--method",
+        "sysresetreq",
+        "--no-config",
+        "--no-wait",
+        "--connect",
+        "attach",
+        "--core",
+        "0",
+        "-t",
+        "cortex_m",
+        "-u",
+        "@UID_FILE"
+      ],
+      "expect_all": [],
+      "expect_counts": {},
+      "expectation_basis": "This action records rc=0 and raw tool output. Actual startup is checked by the passive boot capture, ps/free, and system_status READY/fault0 predicates; no apply or forced recovery is included.",
+      "note": "工具内部定位该 UID 的行为不冒称零内部枚举。"
+    }
+  },
+  "observation_bounds": {
+    "boot_window_seconds_min": 75,
+    "why": "这是**观测下界**, 不是对板子的断言: 从复位/开口到第一条查询之间, 主机至少要有这么长时间在听, 才有资格说它观察过启动。低于它而拿不到字节, 结论只能是'没观察到'",
+    "boot_window_provenance": [
+      "经验上拿满: reports/reviews/phase8-m8-diag-stack-r1/field/cont-20261101T090512Z/RESULT.json 的 boot_window_s=75 拿到 3439 B 完整启动(READY)+四条查询全部回答",
+      "源码层耗时: 1 MiB 事件日志扫描按 NSF_SPI_HZ=1000000u 估 >=8.5 s, 且该文自陈是吞吐估算不是界限: reports/reviews/phase8-m8-relative-protection-r3/host/m8diag_source_audit.txt §3",
+      "反例(本包要修的正是这个): reports/reviews/phase8-m8-idle-stack-r4/field/field-20261101T142722Z 的窗只有 2.0 s(被动)+ 9.0 s(首查询), 断在扫描行之后, 实测 MISSING_RESPONSE_PROMPT as=sysboot bytes=0"
+    ],
+    "applies_to": "每个含复位步的 serial_session + 每个标 first_query_is_boot_probe 的 serial_session",
+    "enforced_by": "m8r3_serial_chain.validate_plan() 的 PLAN_BOOT_WINDOW_COVER(离线, 不开端口)",
+    "executor_side_fix": "申报的 boot_drain_seconds 现在真的走满(旧实现被未申报的静默早退剪短)",
+    "not_a_claim": "本下界不证明板子在 75 s 内一定应答; 仍然 0 字节就是具名停止 + 人工断电重启门"
+  },
+  "motion_budget": {
+    "starts": 0,
+    "seconds_total": 0,
+    "registered_checker_gap": "Empty motion chain is N/A for existing PLAN_MOTION_CAP_BUDGET; retain raw FAIL."
+  },
+  "stages": [
+    {
+      "id": "S0",
+      "kind": "offline",
+      "title": "Bind accepted 23691e8d image and exact inputs"
+    },
+    {
+      "id": "S1",
+      "kind": "download",
+      "requires": [
+        "S0"
+      ],
+      "title": "One accepted AXF download"
+    },
+    {
+      "id": "S2",
+      "kind": "readback",
+      "requires": [
+        "S1"
+      ],
+      "title": "One 297452-byte exact readback equals accepted BIN"
+    },
+    {
+      "id": "S3",
+      "kind": "serial_session",
+      "requires": [
+        "S2"
+      ],
+      "port": "COM5",
+      "total_deadline_seconds": 210,
+      "reset_after_port_open": true,
+      "halt_after": false,
+      "first_query_is_boot_probe": true,
+      "post_reset_boot": [
+        "",
+        " \\ | /",
+        "- RT -     Thread Operating System",
+        " / | \\     5.3.0 build Nov  4 2026 01:35:43",
+        " 2006 - 2024 Copyright by RT-Thread team",
+        "",
+        "",
+        "========================================",
+        "",
+        "  NS800 stepper safety system startup",
+        "",
+        "  stages: 1 safe-hw / 2 safety-state / 3 safety-thread /",
+        "",
+        "          4 hw-svc / 5 storage / 6 config / 7 motor+sensor /",
+        "",
+        "          8 diag / 9 blackbox / 10 ui / 11 selftest->READY",
+        "",
+        "========================================",
+        "",
+        "",
+        "",
+        "[BOOT] Phase-7 runtime bootstrap start",
+        "",
+        "msh [SAFETY] init OK - MCU_DRV_ENABLE=LOW(readback verified), 输出安全态已建立",
+        "[BOOT] 1 safe-gpio ....... OK",
+        "",
+        "[SS] state machine inited (event+lock), BOOT->INIT->SELF_TEST",
+        "[SS] BOOT -> INIT",
+        "[SS] INIT -> SELF_TEST",
+        "[BOOT] 2 safety-state .... OK",
+        "",
+        "[SAFETY] thread started (prio 4, IRQ gate CLOSED)",
+        "[BOOT] 3 safety-thread ... OK",
+        "",
+        ">[CUR] adc0 ch15 enabled, cal_source=0, health=DEGRADED",
+        "[BOOT] 4 hw-services ... tmc=OK imu=OK adc=OK (re-checked at stage 11)",
+        "",
+        "[FLASH] CS=22 JEDEC=EF 40 17",
+        "[FLASH] scanning 1 MiB event log...",
+        "[BOOT] 5 storage ......... OK",
+        "",
+        "[CFG] loaded OK (version 0x00010003 cal_source=1 profile=NONE [migrated-from-0x00010002])",
+        "[BOOT] 6 project-config .. OK valid=YES",
+        "",
+        "[MOT] init OK (enable-path-validated=YES, arm gate ACTIVE)",
+        "[MOT] init OK: DRV_ENABLE LOW verified, STEP=api-accepted(驱动接受关断, 非波形证明)",
+        "[MOT]   注: STEP=api-accepted 只说明驱动**接受了关断请求**, 不是示波器证明无脉冲(BUG-008 仍未验收)",
+        "[BOOT] 7 motor-service ... OK health=OK",
+        "",
+        "[SNS] sensor thread started (100Hz, prio 7)",
+        "[BOOT] 7 sensor-service .. OK",
+        "",
+        "[DIAG] thread started (prio 9, mode=MONITOR_ONLY)",
+        "[BOOT] 8 diagnosis ....... OK",
+        "",
+        "[BB] blackbox ready (ring=300 cap=450 frames @100Hz, prio 18)",
+        "[BOOT] 9 blackbox ........ OK",
+        "",
+        "[BOOT] 10 ui-manager ..... started (output=SAFE-OFF)",
+        "",
+        "[SS] self-test start",
+        "[SS] [REQ OK] GPIO",
+        "[SS] [REQ OK] PWM device",
+        "[SS] [REQ OK] DRV_ENABLE=LOW (write+readback verified)",
+        "[SS] [REQ OK] ENN feedback = disabled side (PC.6=H6-5/TMC_ENN)",
+        "[SS] [REQ OK] TMC2209 IOIN=0x21000041 VERSION=0x21",
+        "[SS] [OK] IMU",
+        "[SS] [OK] ADC",
+        "[SS] [OK] Flash (JEDEC EF 40 17)",
+        "[SS] self-test done: required=PASS degraded=0x00",
+        "[SS] SELF_TEST -> READY (identity epoch=0)",
+        "[SS] state=READY fault_code=0 degraded=0x00",
+        "[BOOT] 11 startup-selftest OK -> state=READY",
+        "",
+        "[BOOT] Phase-7 runtime bootstrap complete (state=READY)",
+        "",
+        "=== SYSTEM STATUS ===",
+        "[Boot]   bootstrap-complete=YES abort-stage=0",
+        "[Safety] state=READY fault=0 irq_gate=CLOSED polarity=not-confirmed protect_ready=NO",
+        "[Safety] gpio_ready=YES thread=OK drv_en_pad_low=YES",
+        "[Safety] request=LOW pad=0 expected_ENN=HIGH ENN_fb=1(resolved) verdict=OK",
+        "[Safety] limit_inputs=DISABLED_BY_CONFIG (HIGH=safe/LOW=trigger when ENABLED); e-stop=hardware-only, no MCU e-stop input",
+        "[Motor] state=0 cur=0 tgt=0 armed=0 drv_en_verified=0 health=OK",
+        "[Motor] arm gate fail mask=0x18 (arm REFUSED)",
+        "[TMC]    runtime write gate mask=0x0 (0=运行态条件全通, 编译期门未翻转前仍然一位不写)",
+        "[Sensor] thread=OK",
+        "[TMC]    OK drive_cfg=UNCONFIGURED",
+        "[IMU]    OK",
+        "[ADC]    DEGRADED cal=THEORETICAL",
+        "[Flash]  storage bring-up=OK (spi1)",
+        "[Storage] OK (ns_params/log)",
+        "[Config] OK valid=YES cal_source=1",
+        "[Diag]   OK verdict=0 mode=MONITOR_ONLY",
+        "[Blackbox] OK",
+        "[UI]     led/buzzer output=SAFE-OFF (polarity hardware-pending)",
+        "[MAIN] boot complete: READY (motion still gate-locked)",
+        "[MAIN] motor arm gate fail mask=0x18 (MOTOR_HARDWARE_ENABLE_PATH_VALIDATED=YES)"
+      ],
+      "boot_bytes": [],
+      "post_reset_boot_provenance": "Archived b502 boot replay ONLY for stub parsing; not evidence of this new image. Real execution captures raw 75 s after explicit reset.",
+      "forbidden_commands": [
+        "motor_arm",
+        "motor_start",
+        "motor_disarm",
+        "motor_stop",
+        "motor_dir",
+        "motor_target",
+        "tmc_config_apply",
+        "safety_polarity_confirm",
+        "safety_irq_enable",
+        "safety_irq_disable",
+        "diag_profile commit",
+        "diag_profile tier",
+        "diag_profile clear",
+        "diag_profile learn_cancel",
+        "config_save",
+        "blackbox_clear",
+        "fault_reset"
+      ],
+      "title": "New image startup plus a real async job, expected failed-window terminal and resource release",
+      "steps": [
+        {
+          "action": "reset",
+          "as": "rst",
+          "quota_name": "explicit_reset",
+          "command": "python -m pyocd reset --method sysresetreq --no-config --no-wait --connect attach --core 0 -t cortex_m -u @UID_FILE",
+          "argv": [
+            "python",
+            "-m",
+            "pyocd",
+            "reset",
+            "--method",
+            "sysresetreq",
+            "--no-config",
+            "--no-wait",
+            "--connect",
+            "attach",
+            "--core",
+            "0",
+            "-t",
+            "cortex_m",
+            "-u",
+            "@UID_FILE"
+          ],
+          "boot_drain_seconds": 75,
+          "boot_drain_note": "被动启动流采集75s并原样归档，不申报静默早退。既有启动流危险文本门保留；原始启动流还需现场后独立核查。命令响应按既有严格字节门判读，不把离线夹具当作实机启动证据。"
+        },
+        {
+          "cmd": "ps",
+          "as": "threads",
+          "seconds": 6,
+          "expect_contains": [
+            "stack size",
+            "main"
+          ],
+          "expect_values": [
+            {
+              "row": "^main\\s+\\d+\\s+\\w+\\s+0x[0-9A-Fa-f]+\\s+0x(?P<size>[0-9A-Fa-f]+)\\s+.+$",
+              "must": {
+                "size": "00001000"
+              }
+            },
+            {
+              "row": "^diag\\s+\\d+\\s+\\w+\\s+0x[0-9A-Fa-f]+\\s+0x(?P<size>[0-9A-Fa-f]+)\\s+.+$",
+              "must": {
+                "size": "00001000"
+              }
+            },
+            {
+              "row": "^tshell\\s+\\d+\\s+\\w+\\s+0x[0-9A-Fa-f]+\\s+0x(?P<size>[0-9A-Fa-f]+)\\s+.+$",
+              "must": {
+                "size": "00001000"
+              }
+            }
+          ],
+          "note": "Read actual main thread stack_size=4096. Max-used is a snapshot/high-water mark, not proof of worst-load margin."
+        },
+        {
+          "cmd": "free",
+          "as": "heap",
+          "seconds": 6,
+          "expect_contains": [
+            "total    :",
+            "used     :",
+            "maximum  :",
+            "available:"
+          ],
+          "note": "Read-only heap snapshot; record real values without a fabricated free-memory threshold."
+        },
+        {
+          "cmd": "system_status",
+          "as": "sys_initial",
+          "seconds": 10,
+          "expect_contains": [
+            "=== SYSTEM STATUS ===",
+            "[Boot]   bootstrap-complete=YES",
+            "[Motor] arm gate fail mask=0x18 (arm REFUSED)"
+          ],
+          "expect_values": [
+            {
+              "row": "^\\[Boot\\]   bootstrap-complete=(?P<bc>\\w+) abort-stage=(?P<ab>\\d+)$",
+              "must": {
+                "bc": "YES",
+                "ab": "0"
+              }
+            },
+            {
+              "row": "^\\[Safety\\] state=(?P<state>\\w+) fault=(?P<fault>\\d+) irq_gate=\\w+ polarity=[\\w-]+ protect_ready=[\\w-]+$",
+              "must": {
+                "state": "READY",
+                "fault": "0"
+              }
+            },
+            {
+              "row": "^\\[Safety\\] request=(?P<req>\\w+) pad=(?P<pad>-?\\d+) expected_ENN=(?P<exp>\\w+) ENN_fb=(?P<fb>\\d+)\\((?P<resolved>\\w+)\\) verdict=(?P<verdict>\\w+)$",
+              "must": {
+                "req": "LOW",
+                "pad": "0",
+                "exp": "HIGH",
+                "fb": "1",
+                "resolved": "resolved",
+                "verdict": "OK"
+              }
+            },
+            {
+              "row": "^\\[Motor\\] state=(?P<state>\\d+) cur=(?P<cur>\\d+) tgt=(?P<tgt>\\d+) armed=(?P<armed>\\d+) drv_en_verified=\\d+ health=(?P<health>\\w+)$",
+              "must": {
+                "state": "0",
+                "cur": "0",
+                "tgt": "0",
+                "armed": "0",
+                "health": "OK"
+              }
+            },
+            {
+              "row": "^\\[TMC\\]\\s+(?P<health>\\w+) drive_cfg=(?P<cfg>\\w+)$",
+              "must": {
+                "health": "OK",
+                "cfg": "UNCONFIGURED"
+              }
+            },
+            {
+              "row": "^\\[TMC\\]\\s+runtime write gate mask=0x(?P<mask>[0-9A-Fa-f]+) .+$",
+              "must": {
+                "mask": "0"
+              }
+            },
+            {
+              "row": "^\\[Safety\\] state=(?P<state>\\w+) fault=(?P<fault>\\d+) irq_gate=(?P<irq>\\w+) polarity=(?P<pol>[\\w-]+) protect_ready=(?P<ready>\\w+)$",
+              "must": {
+                "state": "READY",
+                "fault": "0",
+                "irq": "CLOSED",
+                "pol": "not-confirmed",
+                "ready": "NO"
+              }
+            }
+          ],
+          "status_lines_allow": [
+            "^\\[Motor\\] arm gate fail mask=0x18 \\(arm REFUSED\\)$"
+          ],
+          "status_lines_allow_why": "复用已验证的整行状态披露白名单；只放行本次只读system_status报告的arm gate行，动作命令被拒仍停止。READY/fault0、Motor静止未武装、实时LOW/ENN禁能反馈均为硬断言。",
+          "key": "system_status@initial",
+          "note": "Fresh read-only baseline/confirmation. Closed protection gate is expected; no enable authorization."
+        },
+        {
+          "cmd": "safety_status",
+          "as": "safety_static",
+          "seconds": 6,
+          "expect_contains": [
+            "[SAFETY] ENN_FEEDBACK(PC.6 = 板上 TMC_ENN)",
+            "[SAFETY] [只读输入, 非急停感测; HIGH=禁能侧, LOW=未施加禁能(不保证转矩)]"
+          ],
+          "note": "Require both complete split lines plus live disable feedback. Strict NUL/UTF8 gates unchanged. New-image evidence comes from raw hardware bytes, not this fixture.",
+          "expect_values": [
+            {
+              "row": "^\\[SAFETY\\] ready=(?P<ready>\\w+) first_err=(?P<err>-?\\d+)$",
+              "must": {
+                "ready": "YES",
+                "err": "0"
+              }
+            },
+            {
+              "row": "^\\[SAFETY\\] ENN_FEEDBACK\\(PC\\.6 = 板上 TMC_ENN\\) raw=(?P<raw>-?\\d+) resolved=(?P<resolved>\\w+)$",
+              "must": {
+                "raw": "1",
+                "resolved": "YES"
+              }
+            },
+            {
+              "row": "^\\[SAFETY\\] request=(?P<req>\\S+) pad=(?P<pad>-?\\d+) expected_FB=(?P<exp>\\w+) FB=(?P<fb>-?\\d+) -> verdict=(?P<v>\\w+)$",
+              "must": {
+                "req": "DISABLE(LOW)",
+                "pad": "0",
+                "exp": "HIGH",
+                "fb": "1",
+                "v": "OK"
+              }
+            }
+          ],
+          "key": "safety_status@static"
+        },
+        {
+          "cmd": "motor_status",
+          "as": "mot_static",
+          "seconds": 6,
+          "expect_contains": [
+            "[MOT] state=",
+            "[MOT] arm_gate_mask=0x18 REFUSED"
+          ],
+          "note": "Read-only current-disable verification. AT_REST contract and unique idle/armed/health/frequency assertions; only exact expected arm-gate disclosure may contain REFUSED.",
+          "expect_profile": "AT_REST",
+          "status_lines_allow": [
+            "^\\[MOT\\] arm_gate_mask=0x18 REFUSED$"
+          ],
+          "status_lines_allow_why": "Only this known read-only arm-gate disclosure, with unique state=0/armed=0/health=OK and the existing AT_REST live-disable contract. Commands refused remain failures.",
+          "expect_values": [
+            {
+              "row": "^\\[MOT\\] state=(?P<state>\\d+) name=(?P<name>\\w+)$",
+              "must": {
+                "state": "0",
+                "name": "OTHER"
+              }
+            },
+            {
+              "row": "^\\[MOT\\] armed=(?P<armed>\\d+) drv_en_request=(?P<req>-?\\d+) health=(?P<health>\\w+)$",
+              "must": {
+                "armed": "0",
+                "req": "0",
+                "health": "OK"
+              }
+            },
+            {
+              "row": "^\\[MOT\\] cur_hz=(?P<cur>\\d+) tgt_hz=(?P<tgt>\\d+) accel=\\d+ decel=\\d+ dir=\\d+$",
+              "must": {
+                "cur": "0",
+                "tgt": "0"
+              }
+            }
+          ],
+          "key": "motor_status@static"
+        },
+        {
+          "cmd": "safety_irq_status",
+          "as": "irq_static",
+          "key": "safety_irq_status@static",
+          "seconds": 5,
+          "expect_fields": [
+            [
+              "^\\[SAFETY\\] irq gate   = CLOSED\\ \\(polled\\ only\\)$",
+              "irq-gate"
+            ],
+            [
+              "^\\[SAFETY\\] polarity   = NOT\\ confirmed \\(HARDWARE-PENDING unless CONFIRMed\\)$",
+              "software-flag-only"
+            ],
+            [
+              "^\\[SAFETY\\] protection_ready = NO$",
+              "software-readiness"
+            ]
+          ],
+          "expect_contains": [
+            "[SAFETY] gpio_ready = YES",
+            "[SAFETY] thread     = running health=OK",
+            "[SAFETY] LIMIT inputs config = DISABLED_BY_CONFIG (SAFETY_LIMIT_INPUTS_ENABLED)",
+            "[SAFETY] PC.6(ENN_FB) pin=ok raw=HIGH = TMC_ENN feedback (HIGH=disabled side). NOT an e-stop input, no IRQ registered on it"
+          ],
+          "expect_values": [
+            {
+              "row": "^\\[SAFETY\\] TMC_DIAG\\s+pin=(?P<pin>\\d+) raw=(?P<raw>\\d+) safe=(?P<safe>\\d+) irq=(?P<irq>\\w+) \\[safe\\]$",
+              "must": {
+                "pin": "3",
+                "raw": "0",
+                "safe": "0",
+                "irq": "RISING"
+              }
+            }
+          ]
+        },
+        {
+          "cmd": "diag_profile learn_status",
+          "as": "job_initial",
+          "key": "diag_profile learn_status@job_initial",
+          "seconds": 5,
+          "expect_contains": [
+            "[DIAG] job id=0 st=IDLE why=IDLE owner=0 cred=0/0",
+            "[DIAG] job n=0/0 want=0 win=0..0 dir=0"
+          ],
+          "expect_values": [
+            {
+              "row": "^\\[DIAG\\] job id=(?P<id>\\d+) st=(?P<st>\\w+) why=(?P<why>\\w+) owner=(?P<owner>\\d+) cred=(?P<zero>\\d+)/(?P<learn>\\d+)$",
+              "must": {
+                "id": "0",
+                "st": "IDLE",
+                "why": "IDLE",
+                "owner": "0",
+                "zero": "0",
+                "learn": "0"
+              }
+            }
+          ],
+          "expect_absent": [
+            "STARTED",
+            "RUNNING",
+            "CANCEL_PENDING",
+            "DEFERRED",
+            "job data",
+            "job DONE"
+          ]
+        },
+        {
+          "cmd": "diag_profile zero 32",
+          "as": "zero_static",
+          "key": "diag_profile zero 32@static",
+          "seconds": 15,
+          "quota": {
+            "name": "diag_profile_zero",
+            "n": 1
+          },
+          "expect_fields": [
+            [
+              "^\\[DIAG\\] zero OK n=32 raw \\d+\\.\\.\\d+ mean=\\d+ \\(cal source untouched\\)$",
+              "32 distinct ADC zero frames"
+            ]
+          ],
+          "expect_absent": [
+            "FAILED",
+            "REFUSED",
+            "VOIDED",
+            "DEFERRED"
+          ],
+          "note": "One actual static zero-profile collection; no ADC service calibration or persistent save."
+        },
+        {
+          "cmd": "diag_profile learn_status",
+          "as": "job_zero",
+          "key": "diag_profile learn_status@job_zero",
+          "seconds": 5,
+          "expect_contains": [
+            "[DIAG] job id=0 st=IDLE why=IDLE owner=0 cred=1/0",
+            "[DIAG] job n=0/0 want=0 win=0..0 dir=0"
+          ],
+          "expect_values": [
+            {
+              "row": "^\\[DIAG\\] job id=(?P<id>\\d+) st=(?P<st>\\w+) why=(?P<why>\\w+) owner=(?P<owner>\\d+) cred=(?P<zero>\\d+)/(?P<learn>\\d+)$",
+              "must": {
+                "id": "0",
+                "st": "IDLE",
+                "why": "IDLE",
+                "owner": "0",
+                "zero": "1",
+                "learn": "0"
+              }
+            }
+          ],
+          "expect_absent": [
+            "STARTED",
+            "RUNNING",
+            "CANCEL_PENDING",
+            "DEFERRED",
+            "job data",
+            "job DONE"
+          ]
+        },
+        {
+          "cmd": "diag_profile learn 8 450 550 0",
+          "as": "learn_start",
+          "key": "diag_profile learn 8 450 550 0@start",
+          "seconds": 5,
+          "quota": {
+            "name": "diag_profile_learn",
+            "n": 1
+          },
+          "expect_contains": [
+            "[DIAG] learn STARTED id=1 n=8 win=450..550 dir=0",
+            "[DIAG] learn async: query 'learn_status'; NOT learn OK yet FIELD_UNVERIFIED"
+          ],
+          "expect_values": [
+            {
+              "row": "^\\[DIAG\\] learn STARTED id=(?P<id>\\d+) n=(?P<n>\\d+) win=(?P<lo>\\d+)\\.\\.(?P<hi>\\d+) dir=(?P<dir>\\d+)$",
+              "must": {
+                "id": "1",
+                "n": "8",
+                "lo": "450",
+                "hi": "550",
+                "dir": "0"
+              }
+            }
+          ],
+          "expect_absent": [
+            "REFUSED",
+            "FAILED"
+          ],
+          "note": "Must actually accept and create job 1. STARTED is not successful learning. Motor remains idle/unarmed."
+        },
+        {
+          "cmd": "__watch__",
+          "as": "job_advance_window",
+          "key": "__watch__",
+          "seconds": 1,
+          "watch_rows": [],
+          "note": "One passive second allows Diagnosis Thread to consume new input and terminate the incompatible idle window. No new command or motion."
+        },
+        {
+          "cmd": "diag_profile learn_status",
+          "as": "job_failed",
+          "key": "diag_profile learn_status@job_failed",
+          "seconds": 5,
+          "expect_contains": [
+            "[DIAG] job id=1 st=FAILED why=WINDOW_BROKEN owner=0 cred=1/0",
+            "[DIAG] job n=0/0 want=8 win=450..550 dir=0"
+          ],
+          "expect_values": [
+            {
+              "row": "^\\[DIAG\\] job id=(?P<id>\\d+) st=(?P<st>\\w+) why=(?P<why>\\w+) owner=(?P<owner>\\d+) cred=(?P<zero>\\d+)/(?P<learn>\\d+)$",
+              "must": {
+                "id": "1",
+                "st": "FAILED",
+                "why": "WINDOW_BROKEN",
+                "owner": "0",
+                "zero": "1",
+                "learn": "0"
+              }
+            }
+          ],
+          "expect_absent": [
+            "STARTED",
+            "RUNNING",
+            "CANCEL_PENDING",
+            "DEFERRED",
+            "job data",
+            "job DONE"
+          ],
+          "status_lines_allow": [
+            "^\\[DIAG\\]\\ job\\ id=1\\ st=FAILED\\ why=WINDOW_BROKEN\\ owner=0\\ cred=1/0$"
+          ],
+          "status_lines_allow_why": "Read-only disclosure of the intentionally tested out-of-window job terminal. Exact job id=1 FAILED/WINDOW_BROKEN, owner FREE, zero/learn=1/0. Other failures and all action-command failures still STOP."
+        },
+        {
+          "cmd": "system_status",
+          "as": "sys_final",
+          "seconds": 10,
+          "expect_contains": [
+            "=== SYSTEM STATUS ===",
+            "[Boot]   bootstrap-complete=YES",
+            "[Motor] arm gate fail mask=0x18 (arm REFUSED)"
+          ],
+          "expect_values": [
+            {
+              "row": "^\\[Boot\\]   bootstrap-complete=(?P<bc>\\w+) abort-stage=(?P<ab>\\d+)$",
+              "must": {
+                "bc": "YES",
+                "ab": "0"
+              }
+            },
+            {
+              "row": "^\\[Safety\\] state=(?P<state>\\w+) fault=(?P<fault>\\d+) irq_gate=\\w+ polarity=[\\w-]+ protect_ready=[\\w-]+$",
+              "must": {
+                "state": "READY",
+                "fault": "0"
+              }
+            },
+            {
+              "row": "^\\[Safety\\] request=(?P<req>\\w+) pad=(?P<pad>-?\\d+) expected_ENN=(?P<exp>\\w+) ENN_fb=(?P<fb>\\d+)\\((?P<resolved>\\w+)\\) verdict=(?P<verdict>\\w+)$",
+              "must": {
+                "req": "LOW",
+                "pad": "0",
+                "exp": "HIGH",
+                "fb": "1",
+                "resolved": "resolved",
+                "verdict": "OK"
+              }
+            },
+            {
+              "row": "^\\[Motor\\] state=(?P<state>\\d+) cur=(?P<cur>\\d+) tgt=(?P<tgt>\\d+) armed=(?P<armed>\\d+) drv_en_verified=\\d+ health=(?P<health>\\w+)$",
+              "must": {
+                "state": "0",
+                "cur": "0",
+                "tgt": "0",
+                "armed": "0",
+                "health": "OK"
+              }
+            },
+            {
+              "row": "^\\[TMC\\]\\s+(?P<health>\\w+) drive_cfg=(?P<cfg>\\w+)$",
+              "must": {
+                "health": "OK",
+                "cfg": "UNCONFIGURED"
+              }
+            },
+            {
+              "row": "^\\[TMC\\]\\s+runtime write gate mask=0x(?P<mask>[0-9A-Fa-f]+) .+$",
+              "must": {
+                "mask": "0"
+              }
+            },
+            {
+              "row": "^\\[Safety\\] state=(?P<state>\\w+) fault=(?P<fault>\\d+) irq_gate=(?P<irq>\\w+) polarity=(?P<pol>[\\w-]+) protect_ready=(?P<ready>\\w+)$",
+              "must": {
+                "state": "READY",
+                "fault": "0",
+                "irq": "CLOSED",
+                "pol": "not-confirmed",
+                "ready": "NO"
+              }
+            }
+          ],
+          "status_lines_allow": [
+            "^\\[Motor\\] arm gate fail mask=0x18 \\(arm REFUSED\\)$"
+          ],
+          "status_lines_allow_why": "复用已验证的整行状态披露白名单；只放行本次只读system_status报告的arm gate行，动作命令被拒仍停止。READY/fault0、Motor静止未武装、实时LOW/ENN禁能反馈均为硬断言。",
+          "key": "system_status@final",
+          "note": "Fresh read-only baseline/confirmation. Closed protection gate is expected; no enable authorization."
+        },
+        {
+          "cmd": "motor_status",
+          "as": "mot_final",
+          "seconds": 6,
+          "expect_contains": [
+            "[MOT] state=",
+            "[MOT] arm_gate_mask=0x18 REFUSED"
+          ],
+          "note": "Read-only current-disable verification. AT_REST contract and unique idle/armed/health/frequency assertions; only exact expected arm-gate disclosure may contain REFUSED.",
+          "expect_profile": "AT_REST",
+          "status_lines_allow": [
+            "^\\[MOT\\] arm_gate_mask=0x18 REFUSED$"
+          ],
+          "status_lines_allow_why": "Only this known read-only arm-gate disclosure, with unique state=0/armed=0/health=OK and the existing AT_REST live-disable contract. Commands refused remain failures.",
+          "expect_values": [
+            {
+              "row": "^\\[MOT\\] state=(?P<state>\\d+) name=(?P<name>\\w+)$",
+              "must": {
+                "state": "0",
+                "name": "OTHER"
+              }
+            },
+            {
+              "row": "^\\[MOT\\] armed=(?P<armed>\\d+) drv_en_request=(?P<req>-?\\d+) health=(?P<health>\\w+)$",
+              "must": {
+                "armed": "0",
+                "req": "0",
+                "health": "OK"
+              }
+            },
+            {
+              "row": "^\\[MOT\\] cur_hz=(?P<cur>\\d+) tgt_hz=(?P<tgt>\\d+) accel=\\d+ decel=\\d+ dir=\\d+$",
+              "must": {
+                "cur": "0",
+                "tgt": "0"
+              }
+            }
+          ],
+          "key": "motor_status@final"
+        }
+      ]
+    }
+  ],
+  "quota": {
+    "port_open": 1,
+    "download": 1,
+    "readback": 1,
+    "explicit_reset": 1,
+    "tmc_config_apply": 0,
+    "approved_reboot": 0,
+    "config_save": 0,
+    "irq_polarity_prep": 0,
+    "diag_profile_zero": 1,
+    "diag_profile_learn": 1,
+    "diag_profile_commit": 0,
+    "motor_run": 0,
+    "motor_run_seconds_total": 0,
+    "motion_cap_seconds_per_run": 0,
+    "cleanup_motor_stop": 0,
+    "cleanup_motor_disarm": 0,
+    "cleanup_motor_status": 0,
+    "retry": 0,
+    "physical_collision": 0,
+    "blackbox_clear": 0,
+    "dmm_readings": 0
+  },
+  "approval": {
+    "status": "A_FIXED_GO_WITH_CURRENT_OPERATOR_NEXT_ROUND_REQUEST",
+    "operator_request_verbatim": "这个命名问题不太重要直接过吧 开启下一轮",
+    "proposed_new_approval_id": "M8R7F7-2369-async-job-static-20261105",
+    "prior_approvals": "Closed; do not reuse or write old ledgers.",
+    "scope_correction_verbatim": "这里不是说验证异步学习的实际表现 为什么又不创建学习作业"
+  },
+  "scope_this_package": "New-image download/readback/reset/port once; 75 s boot capture; static zero32 once; actually create async learn job once, observe FAILED/WINDOW_BROKEN and released owner while motor stays idle; no successful DONE-baseline or motion claim.",
+  "byte_integrity_policy": {
+    "command_responses": "Existing strict dangerous-text/NUL/UTF8 gates unchanged.",
+    "passive_boot": "Existing dangerous-text gate only. Raw boot bytes must be separately reviewed for NUL/UTF8 and specific print completeness; generic dispatch success is not full print acceptance."
+  },
+  "plan_identity": {
+    "path": "reports/reviews/phase8-m8-r7f7-newimage-static/field/plan_r7f7_2369_static.json",
+    "rows_file": {
+      "path": "reports/reviews/phase8-m8-r7f7-newimage-static/field/rows_r7f7_2369_static.json",
+      "bytes": 16249,
+      "sha256": "5fee4060f4bde537865f62293c446f798d9724a24c5f406c07bd76f7a8873db9"
+    }
+  },
+  "identity_binding": {
+    "reviewed_delivery_commit": "00718b49e65546aa0bae84006059011d68284c4a",
+    "software_input_commit": "00718b49e65546aa0bae84006059011d68284c4a",
+    "tested_image_build_commit": "e1d7f3d90415fdf30344ed95a08065c1373fab01",
+    "legacy_build_commit_field_note": "Actual HEAD during build, not field-tested status; compiled uncommitted postimages were delivered and accepted at 00718b4.",
+    "executor": {
+      "path": "reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py",
+      "bytes": 219491,
+      "sha256": "33d3f0af8a4c9c33dcd4e013b395e4ba990a89e384130f9d0ffe50c71b34e8ca",
+      "note": "A §3: 不改执行器。本件用的仍是 R6C 原件(逐字节未动)。"
+    },
+    "image": {
+      "path": "reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/rt-thread-motor-m1-candidate.bin",
+      "bytes": 297452,
+      "sha256": "23691e8d8aa8c1d3ed6e6eff4b5c51fe27dd3a9169841406ecc627c0e807e963",
+      "manifest": "reports/reviews/phase8-m8-r7f7-newimage-static/field/manifest_binding_r7f7_2369.json",
+      "manifest_bytes": 1187,
+      "manifest_sha256": "a252fd74c496de14cc2f64f4cf5c26654b94c3edf8e053208425ebbf1ae52ce5",
+      "source_build_manifest": "reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/build_manifest.json",
+      "source_build_manifest_sha256": "b172a279b75ce96220fded885459642a614408fa8319d660ab69c7113a75dc27",
+      "axf": {
+        "path": "reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/rt-thread-motor-m1.axf",
+        "bytes": 1790048,
+        "sha256": "0f421595ac940863c4d38a2791f31bc8811fc3b8fa40062782f2ac7505c317f6"
+      },
+      "map": {
+        "path": "reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/rt-thread-motor-m1.map",
+        "bytes": 2148432,
+        "sha256": "e2d8d081958c84bb7f760bd5011a4b0ce962bb5dc8b6c0dff1cc9084efc0872b"
+      }
+    },
+    "board_image_before": {
+      "sha256": "502dca5d8c7ebfa794f890a9c03bc258fc9753f57b6a80c2f1e08add69888a7a",
+      "kind": "Historical proof only; new programming replaces this current-image assumption."
+    }
+  },
+  "working_tree_now": {
+    "reviewed_commit": "7a08f9d56e69c66b93695cb201a7a3ecefe2b91a"
+  },
+  "hardware_actions_this_round": 0,
+  "operator_power_policy": {
+    "reported_current_state": "Powered on according to latest 7a08f9d handoff; read actual local operator state if changed.",
+    "initial_power_establish_max": 1,
+    "if_already_powered": "No action; do not power-cycle for this task.",
+    "if_currently_off": "Operator may establish VM stable then MCU power once.",
+    "additional_powercycles": 0,
+    "normal_end_powerdown": 0,
+    "normal_end_state": "Keep powered, disabled, not armed, IRQ closed.",
+    "unexpected_enable_or_motion": "Stop trial; operator hardware disable takes priority over normal keep-powered closeout."
+  },
+  "scope_boundaries": {
+    "LA_start": 0,
+    "probe_rewiring": 0,
+    "accepted_learn_jobs": 1,
+    "learn_request_attempts": 1,
+    "zero": 1,
+    "learn_cancel": 0,
+    "commit": 0,
+    "save": 0,
+    "core_protection_verified": false,
+    "polarity_measured": false,
+    "effective_learning_completion_verified": false,
+    "archive_identifier_issue": "Known disclosure deferred by current user request, not falsely marked fixed.",
+    "expected_job_terminal": "FAILED/WINDOW_BROKEN",
+    "expected_collector_owner_after_terminal": "FREE",
+    "zero_credential_after": 1,
+    "learn_credential_after": 0,
+    "learn_successful_DONE_baseline": false,
+    "job_active_cancel_verified": false,
+    "startup_raw_bytes": "Original executor performs inherited passive dangerous-text gate. Independent post-run NUL/UTF8/completeness judgement is required; overall OK alone is not boot-byte acceptance."
+  }
+}

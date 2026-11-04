@@ -1,0 +1,624 @@
+/*
+ * project_config.c - 运行时配置持久化 (Phase 7-C, Fix B 加固)
+ *
+ * load 校验: magic + version + 每字段范围(含标定来源)。任一失败 → 安全默认值
+ * + DEGRADED(config invalid), 绝不使用半解析数据。
+ *
+ * Fix B:
+ *   - B1 标定来源真正持久化: defaults 显式置 THEORETICAL(而不是 memset 出来的
+ *     NONE); 来源纳入范围校验; 下发一律走 current_adc_set_calibration_ex() 并
+ *     带上来源, 因此保存为 MEASURED 的标定重启后仍是 MEASURED(旧实现固定走
+ *     set_calibration() → 每次 load 都被降级成 THEORETICAL)。
+ *   - B1 并发: 所有读写 cfg/cfg_valid/cfg_health 的路径统一在 cfg_lock 内完成;
+ *     Flash IO 一律在锁外(save 先在锁内取一致副本, load 先读进局部变量再进锁)。
+ *     目的: Diagnosis(prio 9)与 Blackbox(prio 18)每 10ms 取快照时不会读到
+ *     半套配置, 也不会把半套配置写进 Flash。
+ *
+ * 默认阈值为工程占位(未做真实电机标定), 标定流程属实验阶段(HARDWARE-PENDING)。
+ */
+
+#include <rtthread.h>
+#include <float.h>
+#include "project_config.h"
+#include "app_health.h"
+#include "ns_storage.h"
+#include "current_adc.h"
+#include "ns_storage.h"
+#include "diag_relative.h"
+
+/* M8: 旧 0x00010002 的**精确**布局镜像, 只用于按字段迁移。字段次序/类型必须与
+ * f1aa2e8 的 project_config_t 完全一致 —— 用断言钉住尺寸, 不靠注释。 */
+typedef struct
+{
+    rt_uint32_t magic;
+    rt_uint32_t version;
+    float cur_offset_mv;
+    float cur_gain_v_per_a;
+    rt_uint8_t cur_cal_source;
+    rt_uint32_t band_hz[2];
+    rt_int32_t  sg_warn[3];
+    rt_int32_t  sg_stall[3];
+    float cur_warn_ma[3];
+    float cur_stall_ma[3];
+    rt_uint32_t vib_impact_mg;
+    rt_uint32_t persist_warn;
+    rt_uint32_t persist_stall;
+    rt_uint32_t impact_frames;
+    rt_uint32_t hysteresis_frames;
+    rt_uint32_t pre_fault_ms;
+    rt_uint32_t post_fault_ms;
+} project_config_v2_t;
+
+/* GCC 与 ARMCLANG 的实际尺寸在交付时按真实构建记录(交接 evidence); 这里只保证
+ * 两个编译器都必须满足的硬界。 */
+typedef char cfg_assert_v2_size[(sizeof(project_config_v2_t) <= 112) ? 1 : -1];
+typedef char cfg_assert_new_size[(sizeof(project_config_t) <= NS_PARAM_MAX) ? 1 : -1];
+typedef char cfg_assert_param_cap[(NS_PARAM_MAX <= 224) ? 1 : -1];
+
+static project_config_t cfg;
+static rt_bool_t cfg_migrated_v2 = RT_FALSE;     /* 本次启动是否由 v2 迁移而来 */
+static rt_bool_t cfg_valid = RT_FALSE;      /* 加载/设置是否通过校验 */
+static subsys_health_t cfg_health = SUBSYS_UNINIT;
+static struct rt_mutex cfg_lock;            /* P1-7 + Fix B: 保护全部 cfg 访问 */
+static rt_bool_t cfg_lock_ok = RT_FALSE;
+
+static void cfg_take(void)    { if (cfg_lock_ok) rt_mutex_take(&cfg_lock, RT_WAITING_FOREVER); }
+static void cfg_release(void) { if (cfg_lock_ok) rt_mutex_release(&cfg_lock); }
+
+/* M7R1-B(2026-10-29 独立复审): cfg_take() 把 rt_mutex_take 的返回码丢掉了, 于是
+ * "锁根本没拿到"在调用方看来越跟"拿到了"一样。标定发布路径不能这样: 它一次要写
+ * ADC 运行时的 offset/gain/source/version 四个字段外加 cfg 工作集, 无锁并发写会留下
+ * 半套系数, 而 Sensor 那一侧读到的就是半套。
+ * 这里只给**本次新增的标定发布**用一条有返回码的窄路径: 锁不可用或 take 失败一律
+ * 返回错误, 调用方一个字段都不改, 更不调用 release(未持有就 release 是 UB)。
+ * 旧的 set/load/default 维持既有 cfg_take() 语义不动 —— 复审 §6.1 要求不借此重构
+ * 全部旧业务锁; 这一条已作为范围外观察记进交接。 */
+static rt_err_t cfg_take_checked(void)
+{
+    if (!cfg_lock_ok) return -RT_EIO;         /* 互斥量没建起来 = 不敢发布 */
+    return rt_mutex_take(&cfg_lock, RT_WAITING_FOREVER);
+}
+
+/* ---------- 默认值 ---------- */
+
+/* 无锁内部实现: 只允许已持有 cfg_lock 的调用者使用 */
+static void cfg_fill_defaults_nolock(void)
+{
+    rt_memset(&cfg, 0, sizeof(cfg));      /* 含 rprof: magic 0 = 没有 profile */
+    cfg_migrated_v2 = RT_FALSE;
+    cfg.magic  = PROJ_CFG_MAGIC;
+    cfg.version = PROJ_CFG_VERSION;
+
+    cfg.cur_offset_mv     = 1650.0f;      /* 理论默认, 标定后覆盖 */
+    cfg.cur_gain_v_per_a  = 0.6f;
+    /* Fix B: 默认值必须自称 THEORETICAL, 不能是 memset 出来的 NONE(0)。
+     * NONE 的语义是"没有可用标定", 而这里确实有一组理论换算系数。 */
+    cfg.cur_cal_source    = (rt_uint8_t)CURRENT_ADC_CAL_THEORETICAL;
+
+    cfg.band_hz[0] = 200;  cfg.band_hz[1] = 1000;
+
+    cfg.sg_warn[0] =  30;  cfg.sg_warn[1] = 100;  cfg.sg_warn[2] = 200;
+    cfg.sg_stall[0] = 15;  cfg.sg_stall[1] =  50; cfg.sg_stall[2] = 100;
+
+    cfg.cur_warn_ma[0]  = 300.f; cfg.cur_warn_ma[1]  =  500.f; cfg.cur_warn_ma[2]  =  800.f;
+    cfg.cur_stall_ma[0] = 800.f; cfg.cur_stall_ma[1] = 1200.f; cfg.cur_stall_ma[2] = 1500.f;
+
+    cfg.vib_impact_mg = 2500;
+
+    cfg.persist_warn       = 50;    /* 0.5s @100Hz */
+    cfg.persist_stall      = 100;   /* 1.0s */
+    cfg.impact_frames      = 2;
+    cfg.hysteresis_frames  = 100;   /* 1.0s */
+
+    cfg.pre_fault_ms  = 2000;       /* 黑匣子窗口(默认 2s/1s) */
+    cfg.post_fault_ms = 1000;
+}
+
+void project_config_defaults(void)
+{
+    /* M8-R1 R3.8: 连"回默认"也是一次发布 —— 没有锁就什么都不写。 */
+    if (cfg_take_checked() != RT_EOK)
+    {
+        rt_kprintf("[CFG] defaults REFUSED: config lock unavailable\n");
+        return;
+    }
+    cfg_fill_defaults_nolock();
+    cfg_valid  = RT_FALSE;          /* 未经加载/显式设定 = 按降级处理 */
+    cfg_health = SUBSYS_DEGRADED;
+    cfg_release();
+}
+
+/* ---------- 范围校验 ---------- */
+
+static rt_bool_t config_in_range(const project_config_t *c)
+{
+    int i;
+
+    if (c->magic != PROJ_CFG_MAGIC) return RT_FALSE;
+    /* 版本由调用方按 v2/v3 分别判定; 这里只判字段域。 */
+    /* Fix B: 标定来源纳入校验。NONE(0) 视为非法 → 回退安全默认(THEORETICAL),
+     * 避免出现"配置说自己是 THEORETICAL 之外的第三种状态却无人解释"的历史数据。 */
+    if (c->cur_cal_source < (rt_uint8_t)CURRENT_ADC_CAL_THEORETICAL ||
+        c->cur_cal_source > (rt_uint8_t)CURRENT_ADC_CAL_MEASURED)
+        return RT_FALSE;
+    if (!(c->cur_gain_v_per_a == c->cur_gain_v_per_a) ||
+        c->cur_gain_v_per_a < -FLT_MAX || c->cur_gain_v_per_a > FLT_MAX ||
+        c->cur_gain_v_per_a < CURRENT_ADC_GAIN_MIN_V_PER_A ||
+        c->cur_gain_v_per_a > CURRENT_ADC_GAIN_MAX_V_PER_A)
+        return RT_FALSE;
+    if (!(c->cur_offset_mv == c->cur_offset_mv) ||
+        c->cur_offset_mv < -FLT_MAX || c->cur_offset_mv > FLT_MAX ||
+        c->cur_offset_mv < 0.0f || c->cur_offset_mv > 3300.0f)
+        return RT_FALSE;
+    if (c->band_hz[0] < 1 || c->band_hz[0] >= c->band_hz[1] ||
+        c->band_hz[1] > 20000)
+        return RT_FALSE;
+    for (i = 0; i < 3; ++i)
+    {
+        if (c->sg_warn[i] <= c->sg_stall[i] || c->sg_stall[i] < 0 ||
+            c->sg_warn[i] > 1023)
+            return RT_FALSE;
+        if (c->cur_warn_ma[i] <= 0.0f || c->cur_warn_ma[i] >= c->cur_stall_ma[i] ||
+            c->cur_stall_ma[i] > 3000.0f)
+            return RT_FALSE;
+    }
+    if (c->vib_impact_mg < 1200 || c->vib_impact_mg > 8000)   /* 必须明显高于 1g 基线 */
+        return RT_FALSE;
+    if (c->persist_warn < 1 || c->persist_warn > 1000 ||
+        c->persist_stall < 1 || c->persist_stall > 2000 ||
+        c->persist_stall < c->persist_warn ||
+        c->impact_frames < 1 || c->impact_frames > 100 ||
+        c->hysteresis_frames < 1 || c->hysteresis_frames > 2000)
+        return RT_FALSE;
+    if (c->pre_fault_ms < 100 || c->pre_fault_ms > 3000 ||
+        c->post_fault_ms < 100 || c->post_fault_ms > 1500)
+        return RT_FALSE;   /* 与 blackbox 静态缓冲容量一致(300/150 帧) */
+    /* M8 profile: magic==0 表示"没有 profile"(合法, 相对模式此时不可用);
+     * 非 0 必须是完整且自洽的一套阈值, 半套一律拒绝。 */
+    if (c->rprof.magic != 0 && rel_profile_validate(&c->rprof, RT_NULL) != RT_EOK)
+        return RT_FALSE;
+    return RT_TRUE;
+}
+
+/* v2 blob -> v3: 逐字段搬移。绝不做结构体整体拷贝(源是旧布局);
+ * 新 profile 显式置无效, 不把旧系数当成"相对学习已完成"。 */
+static void cfg_migrate_v2(const project_config_v2_t *v2, project_config_t *out)
+{
+    out->magic            = PROJ_CFG_MAGIC;
+    out->version          = PROJ_CFG_VERSION;
+    out->cur_offset_mv    = v2->cur_offset_mv;
+    out->cur_gain_v_per_a = v2->cur_gain_v_per_a;
+    out->cur_cal_source   = v2->cur_cal_source;
+    out->band_hz[0]       = v2->band_hz[0];
+    out->band_hz[1]       = v2->band_hz[1];
+    rt_memcpy(out->sg_warn,        v2->sg_warn,        sizeof(out->sg_warn));
+    rt_memcpy(out->sg_stall,       v2->sg_stall,       sizeof(out->sg_stall));
+    rt_memcpy(out->cur_warn_ma,    v2->cur_warn_ma,    sizeof(out->cur_warn_ma));
+    rt_memcpy(out->cur_stall_ma,   v2->cur_stall_ma,   sizeof(out->cur_stall_ma));
+    out->vib_impact_mg    = v2->vib_impact_mg;
+    out->persist_warn     = v2->persist_warn;
+    out->persist_stall    = v2->persist_stall;
+    out->impact_frames    = v2->impact_frames;
+    out->hysteresis_frames = v2->hysteresis_frames;
+    out->pre_fault_ms     = v2->pre_fault_ms;
+    out->post_fault_ms    = v2->post_fault_ms;
+    rt_memset(&out->rprof, 0, sizeof(out->rprof));    /* 无 profile: 相对保护不可用 */
+}
+
+/* 把一份*显式副本*的标定下发到 current_adc(带来源, 不读全局 cfg → 调用方
+ * 可在锁外安全使用)。只有合法标定才下发。 */
+static rt_err_t cfg_apply_from(const project_config_t *src)
+{
+    if (!(src->cur_gain_v_per_a == src->cur_gain_v_per_a) ||
+        src->cur_gain_v_per_a < -FLT_MAX || src->cur_gain_v_per_a > FLT_MAX ||
+        src->cur_gain_v_per_a < CURRENT_ADC_GAIN_MIN_V_PER_A ||
+        src->cur_gain_v_per_a > CURRENT_ADC_GAIN_MAX_V_PER_A)
+        return -RT_EINVAL;
+    if (!(src->cur_offset_mv == src->cur_offset_mv) ||
+        src->cur_offset_mv < -FLT_MAX || src->cur_offset_mv > FLT_MAX ||
+        src->cur_offset_mv < 0.0f || src->cur_offset_mv > 3300.0f)
+        return -RT_EINVAL;
+    if (src->cur_cal_source < (rt_uint8_t)CURRENT_ADC_CAL_THEORETICAL ||
+        src->cur_cal_source > (rt_uint8_t)CURRENT_ADC_CAL_MEASURED)
+        return -RT_EINVAL;
+    /* Fix B: 必须用 _ex 带上来源, 否则 MEASURED 会被无条件降级成 THEORETICAL */
+    return current_adc_set_calibration_ex(src->cur_offset_mv,
+                                          src->cur_gain_v_per_a,
+                                          (current_adc_cal_source_t)src->cur_cal_source);
+}
+
+/* ---------- 正式 API (project_config.h) ---------- */
+
+/* M8-R1 R3.8(复现 C3): profile 会经过的每一条 get/set/save/load/migration/default 路径
+ * 都必须处理"取锁失败"。三条硬规则:
+ *   - 没拿到锁就**不复制、不发布、不写 Flash**;
+ *   - 不 release 自己没获得的锁(未持有就 release 是 UB, 旧 cfg_take() 语义恰好会
+ *     在失败路径上走到 release);
+ *   - Flash I/O 只在拿到一致快照之后、且在锁**外**进行。
+ * 旧的 cfg_take()/cfg_release() 只保留给单字读(is_valid/health/migrated)那种
+ * "读到旧值也不构成副作用"的场合。 */
+rt_err_t project_config_get_snapshot(project_config_t *out)
+{
+    if (out == RT_NULL) return -RT_EINVAL;
+    if (cfg_take_checked() != RT_EOK) return -RT_EIO;   /* 没拿到锁: 不出快照 */
+    *out = cfg;                        /* P1-7: 原子快照 */
+    cfg_release();
+    return RT_EOK;
+}
+
+rt_bool_t project_config_is_valid(void)
+{
+    rt_bool_t v;
+    cfg_take();
+    v = cfg_valid;
+    cfg_release();
+    return v;
+}
+
+subsys_health_t project_config_get_health(void)
+{
+    subsys_health_t h;
+    cfg_take();
+    h = cfg_valid ? SUBSYS_OK : SUBSYS_DEGRADED;
+    cfg_release();
+    return h;
+}
+
+rt_err_t project_config_set(const project_config_t *c)
+{
+    project_config_t tmp;
+    rt_err_t e;
+
+    if (c == RT_NULL) return -RT_EINVAL;
+    if (!config_in_range(c)) return -RT_EINVAL;   /* 非法整套: 不改现有配置 */
+    tmp = *c;
+
+    /* cal 更新不做 I/O: 与 cfg 发布同锁完成, 防止旧发布晚到覆盖新系数。
+     * M8-R1 R3.8: 取锁失败 ⇒ 一个字段都不改, 也不 release。 */
+    e = cfg_take_checked();
+    if (e != RT_EOK) return e;
+    e = cfg_apply_from(&tmp);
+    if (e == RT_EOK)
+    {
+        cfg = tmp;
+        cfg_valid  = RT_TRUE;
+        cfg_health = SUBSYS_OK;
+    }
+    cfg_release();
+    return e;
+}
+
+rt_err_t project_config_set_calibration(float offset_mv, float gain_v_per_a,
+                                        rt_uint8_t source)
+{
+    project_config_t tmp;
+    rt_err_t e;
+
+    if (source != (rt_uint8_t)CURRENT_ADC_CAL_THEORETICAL &&
+        source != (rt_uint8_t)CURRENT_ADC_CAL_MEASURED)
+        return -RT_EINVAL;
+    if (!(offset_mv == offset_mv) || offset_mv < -FLT_MAX || offset_mv > FLT_MAX ||
+        offset_mv < 0.0f || offset_mv > 3300.0f)
+        return -RT_EINVAL;
+    if (!(gain_v_per_a == gain_v_per_a) || gain_v_per_a < -FLT_MAX ||
+        gain_v_per_a > FLT_MAX ||
+        gain_v_per_a < CURRENT_ADC_GAIN_MIN_V_PER_A ||
+        gain_v_per_a > CURRENT_ADC_GAIN_MAX_V_PER_A)
+        return -RT_EINVAL;
+
+    e = cfg_take_checked();
+    if (e != RT_EOK) return e;    /* 没取得锁: 一个字段都不改, 也不 release */
+    tmp = cfg;
+    tmp.cur_offset_mv = offset_mv;
+    tmp.cur_gain_v_per_a = gain_v_per_a;
+    tmp.cur_cal_source = source;
+    e = cfg_apply_from(&tmp);
+    if (e == RT_EOK)
+    {
+        cfg.cur_offset_mv = offset_mv;
+        cfg.cur_gain_v_per_a = gain_v_per_a;
+        cfg.cur_cal_source = source;
+    }
+    cfg_release();
+    return e;
+}
+
+rt_err_t project_config_save(void)
+{
+    project_config_t snap;
+
+    /* Fix B: 先在锁内取一致副本, 再在锁外做 Flash IO —— 既不会把半套配置
+     * 写进 Flash, 也不会让 Flash 擦写(毫秒级)阻塞 cfg_lock 的持有者。
+     * M8-R1 C3: 这条路径原来用的是**无返回码的 cfg_take()** —— 取锁失败时照样
+     * `snap = cfg` 往下写 Flash, 并且 release 了一把根本没获得的锁(实测 rc=0、
+     * saved=1、releases=2)。现在: 没拿到锁 = 不出快照 = 不发 Flash 写。 */
+    if (cfg_take_checked() != RT_EOK) return -RT_EIO;
+    snap = cfg;
+    cfg_release();
+
+    /* ns_params_save: 双副本+CRC, ≤224B; struct ~104B, 预留扩展 */
+    return ns_params_save(&snap, sizeof(snap));
+}
+
+rt_err_t project_config_load(void)
+{
+    project_config_t tmp, applied;
+    project_config_v2_t v2;
+    rt_size_t len = 0;
+    rt_bool_t ok, migrated = RT_FALSE;
+    rt_err_t e, apply_e = RT_EOK;
+
+    /* Flash IO 完全在锁外: 先读进局部变量。
+     * M8: 允许两种长度 —— 当前 v3(整结构) 与历史 v2(旧 104B 布局)。
+     * v2 走逐字段迁移, 新 profile 置无效; 其它长度/版本一律安全默认。 */
+    e = ns_params_load(&tmp, sizeof(tmp), &len);
+    if (e == RT_EOK && len == sizeof(project_config_t) &&
+        tmp.magic == PROJ_CFG_MAGIC && tmp.version == PROJ_CFG_VERSION &&
+        config_in_range(&tmp))
+    {
+        ok = RT_TRUE;
+    }
+    else
+    {
+        rt_size_t l2 = 0;
+        e = ns_params_load(&v2, sizeof(v2), &l2);
+        /* 先按 v2 自己的字段判身份, 再把**迁移后的完整 v3 副本**送进范围校验。
+         * 绝不把 v2 指针强转成 v3 去读 rprof —— 那会读到对象之外的字节。 */
+        ok = (e == RT_EOK) && (l2 == sizeof(v2)) &&
+             (v2.magic == PROJ_CFG_MAGIC) && (v2.version == PROJ_CFG_VERSION_V2);
+        if (ok)
+        {
+            cfg_migrate_v2(&v2, &tmp);
+            ok = config_in_range(&tmp);
+            if (ok) migrated = RT_TRUE;
+        }
+        else
+        {
+            /* 两条路都不成立: 回安全默认(来源=THEORETICAL), 不残留 RAM 里的 MEASURED。 */
+            len = l2;
+            ok = RT_FALSE;
+        }
+    }
+
+    /* M8-R1 R3.8: 发布(load 与 v2→v3 migration 走的同一段)必须有锁。取不到锁就
+     * **什么都不改**直接返回 —— 运行期消费者(Diagnosis 的覆盖档)会把"拿不到
+     * profile"如实算成一次降险义务, 而不是拿一份半新半旧的旧工作集继续跑。 */
+    if (cfg_take_checked() != RT_EOK) return -RT_EIO;
+    if (ok)
+    {
+        apply_e = cfg_apply_from(&tmp);
+        if (apply_e == RT_EOK)
+        {
+            cfg = tmp;
+            cfg_valid  = RT_TRUE;
+            cfg_health = SUBSYS_OK;
+            cfg_migrated_v2 = migrated;
+        }
+        else
+        {
+            cfg_fill_defaults_nolock();
+            cfg_valid  = RT_FALSE;
+            cfg_health = SUBSYS_DEGRADED;
+            cfg_migrated_v2 = RT_FALSE;
+            (void)cfg_apply_from(&cfg);
+            ok = RT_FALSE;
+        }
+    }
+    else
+    {
+        cfg_fill_defaults_nolock();
+        cfg_valid  = RT_FALSE;
+        cfg_health = SUBSYS_DEGRADED;
+        cfg_migrated_v2 = RT_FALSE;
+        (void)cfg_apply_from(&cfg);
+    }
+    applied = cfg;
+    cfg_release();
+
+    if (!ok)
+    {
+        if (e != RT_EOK)
+            rt_kprintf("[CFG] load failed (%d) -> safe defaults (THEORETICAL)\n", e);
+        else if (apply_e != RT_EOK)
+            rt_kprintf("[CFG] loaded config rejected by cal check (%d) -> safe defaults\n", apply_e);
+        else
+            rt_kprintf("[CFG] load validation FAILED (magic/version/len/range/cal-source)"
+                       " -> safe defaults\n");
+        return (e != RT_EOK) ? e : -RT_EINVAL;
+    }
+
+    rt_kprintf("[CFG] loaded OK (version 0x%08X cal_source=%u profile=%s%s)\n",
+               applied.version, applied.cur_cal_source,
+               applied.rprof.magic == DIAG_RPROF_MAGIC ? "PRESENT" : "NONE",
+               migrated ? " [migrated-from-0x00010002]" : "");
+    return RT_EOK;
+}
+
+rt_bool_t project_config_migrated_from_v2(void)
+{
+    rt_bool_t v;
+    cfg_take();
+    v = cfg_migrated_v2;
+    cfg_release();
+    return v;
+}
+
+/* ---------- M8: 相对 profile 的一致读写(全部走有返回码的锁路径) ---------- */
+
+rt_err_t project_config_get_rprof(diag_rprof_t *out)
+{
+    if (out == RT_NULL) return -RT_EINVAL;
+    if (cfg_take_checked() != RT_EOK) return -RT_EIO;    /* 没拿到锁: 不读、不 release */
+    *out = cfg.rprof;
+    cfg_release();
+    return RT_EOK;
+}
+
+/* 整套候选先校验再一次性发布; 任一非法 ⇒ 一个字段都不改。 */
+rt_err_t project_config_set_rprof(const diag_rprof_t *cand)
+{
+    project_config_t tmp;
+    diag_rprof_t p;
+    rt_err_t e;
+
+    if (cand == RT_NULL) return -RT_EINVAL;
+    p = *cand;
+    if (rel_profile_validate(&p, RT_NULL) != RT_EOK) return -RT_EINVAL;
+
+    e = cfg_take_checked();
+    if (e != RT_EOK) return e;
+    tmp = cfg;
+    tmp.rprof = p;
+    if (!config_in_range(&tmp)) { cfg_release(); return -RT_EINVAL; }
+    cfg.rprof = p;
+    /* 只发布 rprof: **不得**顺手把 cfg_valid/cfg_health 改成"整套配置已可信"。
+     * 加载失败后的安全默认仍然是 DEGRADED, 写进一个 profile 不改变这件事;
+     * 否则 project_config_is_valid() 会说谎, 而它是其它消费者的判据。 */
+    cfg_release();
+    return RT_EOK;
+}
+
+/* 作废 profile: 不动其他字段、不清故障、不清日志; 调用方须已确认静止。 */
+rt_err_t project_config_clear_rprof(void)
+{
+    rt_err_t e = cfg_take_checked();
+    if (e != RT_EOK) return e;
+    rt_memset(&cfg.rprof, 0, sizeof(cfg.rprof));
+    cfg_release();
+    return RT_EOK;
+}
+
+/* ARD4b(A 复审续): "可失败的取锁"与"持锁后不可失败的写入"分开, 让调用方能在改任何
+ * 共享状态之前把所需锁一次拿齐。合同见 project_config.h 上方注释。
+ * begin: 校验全在副本上做; 拒绝时放锁返回, cfg 一个字节没改。成功时**保持持锁**。
+ * publish_locked: 只做一次赋值 —— 它不取锁、不校验、不做 Flash I/O, 因此没有可失败的
+ * 步骤; 校验与范围检查都已经在 begin 里对同一份内容做过, 这里重复校验只会把"两步之间
+ * 可能失败"重新引回来。参数不再判空: 调用方传的就是刚通过 begin 的那一份, 判空后静默
+ * 返回反而会把"什么都没发布"伪装成成功。 */
+rt_err_t project_config_rprof_begin(const diag_rprof_t *p)
+{
+    project_config_t tmp;
+    rt_err_t e;
+
+    if (p == RT_NULL) return -RT_EINVAL;
+    if (rel_profile_validate(p, RT_NULL) != RT_EOK) return -RT_EINVAL;
+    e = cfg_take_checked();
+    if (e != RT_EOK) return e;                      /* 没拿到锁: 未持锁, 状态未改 */
+    tmp = cfg;
+    tmp.rprof = *p;
+    if (!config_in_range(&tmp)) { cfg_release(); return -RT_EINVAL; }
+    return RT_EOK;                                  /* 持锁返回, 调用方必须成对 end */
+}
+
+void project_config_rprof_publish_locked(const diag_rprof_t *p)
+{
+    cfg.rprof = *p;
+}
+
+void project_config_rprof_end(void) { cfg_release(); }
+
+/* ---------- MSH: config_show / config_default / config_save / config_load ---------- */
+
+/* D3: 本项目的 rt_kprintf 走 RT-Thread 自带 vsprintf, 不支持浮点 —— 真机上
+ * "%.1f/%.3f" 被原样打印成 "%f", 标定系数从来没能显示过。这里按定点放大后
+ * 拆成整数部分+小数部分打印, 不打开全局 float printf。
+ * 四舍五入(远离 0); 负号单独打, 小数部分取幅值, 避免 "-0.-5" 这类输出。 */
+static rt_int32_t cfg_round_scaled(float v, rt_int32_t mult)
+{
+    float a = v * (float)mult;
+    return (a >= 0.0f) ? (rt_int32_t)(a + 0.5f) : (rt_int32_t)(a - 0.5f);
+}
+
+static void config_show(void)
+{
+    project_config_t s;
+    int i;
+
+    if (project_config_get_snapshot(&s) != RT_EOK)
+    { rt_kprintf("[CFG] snapshot failed\n"); return; }
+
+    rt_kprintf("[CFG] valid=%s version=0x%08X\n",
+               project_config_is_valid() ? "YES" : "NO(safe defaults)", s.version);
+    {
+        rt_int32_t o = cfg_round_scaled(s.cur_offset_mv, 10);      /* 0.1 mV */
+        rt_int32_t g = cfg_round_scaled(s.cur_gain_v_per_a, 1000);  /* mV/A   */
+
+        rt_kprintf("[CFG] cal: offset=%s%d.%d mV gain=%s%d.%03d V/A source=%s(%u)\n",
+                   o < 0 ? "-" : "", (int)(o / 10), (int)(o < 0 ? -o % 10 : o % 10),
+                   g < 0 ? "-" : "", (int)(g / 1000),
+                   (int)(g < 0 ? -g % 1000 : g % 1000),
+                   s.cur_cal_source == CURRENT_ADC_CAL_MEASURED ? "MEASURED" :
+                   s.cur_cal_source == CURRENT_ADC_CAL_THEORETICAL ? "THEORETICAL" : "NONE",
+                   (unsigned)s.cur_cal_source);
+    }
+    rt_kprintf("[CFG] bands: %u / %u Hz\n", s.band_hz[0], s.band_hz[1]);
+    for (i = 0; i < 3; ++i)
+        rt_kprintf("[CFG] band%d: sg_warn=%d sg_stall=%d cur_warn=%d mA cur_stall=%d mA\n",
+                   i, s.sg_warn[i], s.sg_stall[i],
+                   (int)s.cur_warn_ma[i], (int)s.cur_stall_ma[i]);
+    rt_kprintf("[CFG] vib_impact=%u mg\n", s.vib_impact_mg);
+    rt_kprintf("[CFG] persist warn=%u stall=%u impact=%u hyst=%u frames\n",
+               s.persist_warn, s.persist_stall, s.impact_frames, s.hysteresis_frames);
+    rt_kprintf("[CFG] blackbox pre=%u ms post=%u ms\n", s.pre_fault_ms, s.post_fault_ms);
+    rt_kprintf("[CFG] adc runtime cal_source=%d\n", (int)current_adc_cal_source());
+}
+MSH_CMD_EXPORT(config_show, show runtime configuration);
+
+static void config_default(void)
+{
+    if (cfg_take_checked() != RT_EOK)        /* M8-R1 R3.8: 无锁不发布 */
+    {
+        rt_kprintf("[CFG] default REFUSED: config lock unavailable\n");
+        return;
+    }
+    cfg_fill_defaults_nolock();
+    cfg_valid  = RT_TRUE;    /* 操作员显式选定默认值作为工作集 */
+    cfg_health = SUBSYS_OK;
+    (void)cfg_apply_from(&cfg);
+    cfg_release();
+
+    rt_kprintf("[CFG] defaults restored (RAM; use config_save to persist)\n");
+}
+MSH_CMD_EXPORT(config_default, restore safe default configuration in RAM);
+
+static void config_save(void)
+{
+    rt_err_t e = project_config_save();
+    rt_kprintf("[CFG] save: %s\n", e == RT_EOK ? "OK" : "FAILED");
+}
+MSH_CMD_EXPORT(config_save, persist current configuration to flash);
+
+static void config_load(void)
+{
+    project_config_load();
+}
+MSH_CMD_EXPORT(config_load, load configuration from flash with validation);
+
+/* ---------- 初始化 ---------- */
+
+rt_err_t project_config_boot(void)
+{
+    if (cfg_lock_ok) return RT_EOK;    /* P1-8: 幂等 */
+
+    if (rt_mutex_init(&cfg_lock, "cfg", RT_IPC_FLAG_PRIO) != RT_EOK)
+        return -RT_ERROR;
+    cfg_lock_ok = RT_TRUE;
+
+    project_config_defaults();         /* 安全默认(含 THEORETICAL 来源) */
+
+    /* P1-5: 显式保证 ns_storage_init 先于 config load / blackbox logging,
+     * 不依赖偶然的 INIT_APP 链接顺序; 失败 → 安全默认 + DEGRADED */
+    if (ns_storage_init() != RT_EOK)
+    {
+        rt_kprintf("[CFG] storage init FAILED -> safe defaults, DEGRADED\n");
+        if (cfg_take_checked() == RT_EOK)   /* M8-R1 R3.8: 无锁不改 ADC 运行时系数 */
+        {
+            (void)cfg_apply_from(&cfg);    /* 显式回 THEORETICAL */
+            cfg_release();
+        }
+        return RT_EOK;
+    }
+
+    project_config_load();          /* 失败→默认+DEGRADED, 成功→OK */
+    return RT_EOK;
+}

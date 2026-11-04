@@ -1,0 +1,66 @@
+{
+  "origin_commit": "00718b49e65546aa0bae84006059011d68284c4a",
+  "purpose": "Console literal provenance only; do not copy into product sources",
+  "files": [
+    {
+      "path": "applications/blackbox.c",
+      "repo_path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/blackbox.c",
+      "bytes": 32644,
+      "sha256": "59cc184df0d96eec8bb8cc760d4a5e8b00a3a8d30442afaef86fe756de9e2ceb"
+    },
+    {
+      "path": "applications/diag_relative.c",
+      "repo_path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diag_relative.c",
+      "bytes": 109262,
+      "sha256": "a95ab79363a2b383f6dc7db3fa0146954bb72692c12540427a2075233b9944e8"
+    },
+    {
+      "path": "applications/diagnosis.c",
+      "repo_path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diagnosis.c",
+      "bytes": 54696,
+      "sha256": "4b69151e140b3a80dee4ff211aa935d51cf6e9de2611f6474b38f35a3836d281"
+    },
+    {
+      "path": "applications/motor.c",
+      "repo_path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/motor.c",
+      "bytes": 131732,
+      "sha256": "497cc7f25154d4d45f7963d83fc3b502f66ca73a050535235b5fb82f7c4e8e85"
+    },
+    {
+      "path": "applications/ns_flash_shell.c",
+      "repo_path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/ns_flash_shell.c",
+      "bytes": 7802,
+      "sha256": "7b1ba35dcbbaef329a39a11c183388475ffb835b5b766a115e76ff96beb9c920"
+    },
+    {
+      "path": "applications/project_config.c",
+      "repo_path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/project_config.c",
+      "bytes": 25390,
+      "sha256": "f6b2440f5b9d90fb23ddcc90a2caced56e74fbffa6542ff8326329bdf026be33"
+    },
+    {
+      "path": "applications/safety_gpio.c",
+      "repo_path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/safety_gpio.c",
+      "bytes": 24883,
+      "sha256": "8d097018acab602141a1a36dfe2b29eedeb619fc03e05965681e0919ffeb9aec"
+    },
+    {
+      "path": "applications/safety_thread.c",
+      "repo_path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/safety_thread.c",
+      "bytes": 19716,
+      "sha256": "564770faf381b18aacd11e9196c9ce99af7a2f1f19a6c7702832970b68311246"
+    },
+    {
+      "path": "applications/supervisor.c",
+      "repo_path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/supervisor.c",
+      "bytes": 22912,
+      "sha256": "a9cc9275a364fb6965f84022aae295c1ed8d3d0436e9a1e390765c9d8e34c824"
+    },
+    {
+      "path": "applications/tmc2209.c",
+      "repo_path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/tmc2209.c",
+      "bytes": 192326,
+      "sha256": "e76e152e20052391957a2165995c36dc87b13b0ad8c55eaf09e3bf6aca72d20c"
+    }
+  ]
+}

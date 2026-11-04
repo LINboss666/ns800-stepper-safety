@@ -1,0 +1,63 @@
+{
+  "scope": "REAL_ASYNC_JOB_CREATION_AND_EXPECTED_FAILED_WINDOW_TERMINAL; NO_MOTION",
+  "required_checks": [
+    {
+      "id": "IMAGE_BYTE_EQUAL",
+      "required": "Exactly 297452-byte readback equals 23691e8d BIN; no difference"
+    },
+    {
+      "id": "BOOT_BYTES",
+      "required": "75 s raw capture; UTF8 valid/NUL0; READY/fault0; IOIN success; required PASS/degraded0; no FAULT_LATCHED/REQ FAIL"
+    },
+    {
+      "id": "STACKS",
+      "required": "main/diag/tshell each 4096; high-water not worst-load proof"
+    },
+    {
+      "id": "HEAP",
+      "required": "Record new values; unique nonnegative numbers, maximum>=used, total=used+available; no old quartet equality required"
+    },
+    {
+      "id": "INITIAL_JOB",
+      "required": "id0 IDLE owner0 cred0/0"
+    },
+    {
+      "id": "ZERO32",
+      "required": "Real zero OK n32; no persistent calibration write"
+    },
+    {
+      "id": "ZERO_CREDENTIAL",
+      "required": "id0 IDLE owner0 cred1/0"
+    },
+    {
+      "id": "REAL_JOB_ACCEPTANCE",
+      "required": "STARTED id1 n8 win450..550 dir0; no refusal; no fake success"
+    },
+    {
+      "id": "REAL_JOB_TERMINAL",
+      "required": "id1 FAILED why WINDOW_BROKEN owner0 cred1/0; no active owner and no DONE; exactly permitted read-only status disclosure"
+    },
+    {
+      "id": "FINAL_SAFE_STATE",
+      "required": "READY/fault0, idle, unarmed, frequency0, requestLOW/pad0/ENNHIGH, IRQ CLOSED, protection_ready NO, drive_cfg UNCONFIGURED"
+    },
+    {
+      "id": "BUDGET",
+      "required": "Only six positive quota entries, at most one each; pending0; no retry, no LA Start, no arm/start/apply/IRQ/persist"
+    },
+    {
+      "id": "CLOSEOUT",
+      "required": "Close COM; normal end keeps powered and disabled; no extra power cycle or RAM cleanup commands"
+    }
+  ],
+  "not_verified": [
+    "successful learned DONE baseline at cruise",
+    "active cancellation or cancellation race",
+    "commit/config_save",
+    "SG/ADC/IMU physical protection triggers/recovery",
+    "physical polarity",
+    "loaded worst-case stack"
+  ],
+  "A_real_device_actions": 0,
+  "field_result": "NOT_RUN"
+}

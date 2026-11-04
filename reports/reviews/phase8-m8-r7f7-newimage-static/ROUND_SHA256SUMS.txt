@@ -1,0 +1,46 @@
+# sha256 * <仓库相对路径>(LF, 无 BOM; 本清单不哈希自身字节 —— 一条清单不能给自己的字节作证)
+# 生成方式: 对 reports/reviews/phase8-m8-r7f7-newimage-static/ 下每个常规文件(**含 A 包自带的 SHA256SUMS.txt 原件**, 只按完整相对路径排除本清单自身与 __pycache__)直接读磁盘字节算 sha256
+# 条目数=42; 与 Git blob 的逐条复算由 tools/r7f7_staged_preflight.py(提交前)与推送后的远端逐 blob 回读完成
+# 重新生成: python reports/reviews/phase8-m8-r7f7-newimage-static/tools/r7f7_make_sums.py --repo <仓库根>
+3cb13cfe4bb389fe771815ed037c7223b98527c4026950ded9c6b96883dc1af4  reports/reviews/phase8-m8-r7f7-newimage-static/ACCEPTANCE.json
+7c93e68299203596a2e52c5335e8fecbc2e31dc6fd7eeb590b718f62a88df798  reports/reviews/phase8-m8-r7f7-newimage-static/approval_token.txt
+a252fd74c496de14cc2f64f4cf5c26654b94c3edf8e053208425ebbf1ae52ce5  reports/reviews/phase8-m8-r7f7-newimage-static/field/manifest_binding_r7f7_2369.json
+3ebc8edc100d25d1a3dc6070715754d3a087b67672af5fbb25ad6525cb6e7558  reports/reviews/phase8-m8-r7f7-newimage-static/field/needles_newimage.json
+1de974bf2828819f9b71d8d99a490432a8af08e0ce6613fc4691e0262feb0486  reports/reviews/phase8-m8-r7f7-newimage-static/field/plan_r7f7_2369_static.json
+5fee4060f4bde537865f62293c446f798d9724a24c5f406c07bd76f7a8873db9  reports/reviews/phase8-m8-r7f7-newimage-static/field/rows_r7f7_2369_static.json
+59cc184df0d96eec8bb8cc760d4a5e8b00a3a8d30442afaef86fe756de9e2ceb  reports/reviews/phase8-m8-r7f7-newimage-static/frozen_newimage_source/applications/blackbox.c
+a95ab79363a2b383f6dc7db3fa0146954bb72692c12540427a2075233b9944e8  reports/reviews/phase8-m8-r7f7-newimage-static/frozen_newimage_source/applications/diag_relative.c
+4b69151e140b3a80dee4ff211aa935d51cf6e9de2611f6474b38f35a3836d281  reports/reviews/phase8-m8-r7f7-newimage-static/frozen_newimage_source/applications/diagnosis.c
+497cc7f25154d4d45f7963d83fc3b502f66ca73a050535235b5fb82f7c4e8e85  reports/reviews/phase8-m8-r7f7-newimage-static/frozen_newimage_source/applications/motor.c
+7b1ba35dcbbaef329a39a11c183388475ffb835b5b766a115e76ff96beb9c920  reports/reviews/phase8-m8-r7f7-newimage-static/frozen_newimage_source/applications/ns_flash_shell.c
+f6b2440f5b9d90fb23ddcc90a2caced56e74fbffa6542ff8326329bdf026be33  reports/reviews/phase8-m8-r7f7-newimage-static/frozen_newimage_source/applications/project_config.c
+8d097018acab602141a1a36dfe2b29eedeb619fc03e05965681e0919ffeb9aec  reports/reviews/phase8-m8-r7f7-newimage-static/frozen_newimage_source/applications/safety_gpio.c
+564770faf381b18aacd11e9196c9ce99af7a2f1f19a6c7702832970b68311246  reports/reviews/phase8-m8-r7f7-newimage-static/frozen_newimage_source/applications/safety_thread.c
+a9cc9275a364fb6965f84022aae295c1ed8d3d0436e9a1e390765c9d8e34c824  reports/reviews/phase8-m8-r7f7-newimage-static/frozen_newimage_source/applications/supervisor.c
+e76e152e20052391957a2165995c36dc87b13b0ad8c55eaf09e3bf6aca72d20c  reports/reviews/phase8-m8-r7f7-newimage-static/frozen_newimage_source/applications/tmc2209.c
+edb6f690324a56067e715852deb443542a7663766118aafc89b161e93d16ff9a  reports/reviews/phase8-m8-r7f7-newimage-static/FROZEN_SOURCE.json
+6118ecf37365d3e3b880aae117b532bf90e7c065a17746d6aae3ac6ea5437e2f  reports/reviews/phase8-m8-r7f7-newimage-static/IDENTITY.json
+19ce0cf2a93e2120e6e6f97ebcb941b65b61e619a1723e09262e3e2db3bc2bf9  reports/reviews/phase8-m8-r7f7-newimage-static/OFFLINE_REVIEW.md
+b31b935ea827d6b8dddd233599da5228636518067c6f7e61292ea4c5ab7f466a  reports/reviews/phase8-m8-r7f7-newimage-static/proof/host_build.stderr.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  reports/reviews/phase8-m8-r7f7-newimage-static/proof/host_build.stdout.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  reports/reviews/phase8-m8-r7f7-newimage-static/proof/host_build_local.stderr.txt
+29eece63e628ae3611dd060834b2cda093bbd306c865b15d0299650dea0d1740  reports/reviews/phase8-m8-r7f7-newimage-static/proof/host_probe.c
+fc8747c7fdcbfae55ab6a4e46570171a3f6d3cf1ae6bca006d1f5d6edb7b6440  reports/reviews/phase8-m8-r7f7-newimage-static/proof/host_probe.stdout.txt
+ac6388594e9db0005ae78473670df8081fbcd321121e41198c63b63d2e248ef5  reports/reviews/phase8-m8-r7f7-newimage-static/proof/host_probe_cmd_local.txt
+fc8747c7fdcbfae55ab6a4e46570171a3f6d3cf1ae6bca006d1f5d6edb7b6440  reports/reviews/phase8-m8-r7f7-newimage-static/proof/host_probe_local_lf.txt
+d7bca8683fe09cf9e1c0dd2e0199c743997f31c7549413cace71f0436e89b8f8  reports/reviews/phase8-m8-r7f7-newimage-static/proof/needles_local.txt
+165df48156aa3338ee4be00e120efcd78bbb152e713f110a4c00cb16e211ca1b  reports/reviews/phase8-m8-r7f7-newimage-static/proof/offline_preflight_r7f7.txt
+ff4e16ba84e49111c4facad874853a3235b9521b182219784644dc28e2b4c5ea  reports/reviews/phase8-m8-r7f7-newimage-static/proof/stub_dispatch.txt
+1e6d9f16c97ba7ea20bcc367f74fb05188847c40dbf9ca2a7812f71e2a41d0a2  reports/reviews/phase8-m8-r7f7-newimage-static/proof/stub_dispatch_local.txt
+25549a377bd9a1fcfc6110aaa77ea8a763ada68f8f60a6c849e465c8b2f70ad7  reports/reviews/phase8-m8-r7f7-newimage-static/proof/stub_init.txt
+a694a6d426d820aa8ebf6534f1beb3210acad20240853b255f2b81a0b1ae72f3  reports/reviews/phase8-m8-r7f7-newimage-static/proof/stub_init_local.txt
+167ce415ee9221426df004c150db1d7c74ed343232503b25049e31cfcb14e704  reports/reviews/phase8-m8-r7f7-newimage-static/proof/validate_plan.txt
+4299aa3a0d2cee4ca79bdaf970a4391db03f6dc1559866651848e4eb1e7d324e  reports/reviews/phase8-m8-r7f7-newimage-static/proof/validate_plan_local.txt
+ca603ce5d427654a3d03cad53d2e64a6b3846a39f0671727bac18757fd5eafc2  reports/reviews/phase8-m8-r7f7-newimage-static/README.txt
+85dc72fbfe3718c1913455d221f51c0e0c8a1677dedb2e76c7ba7f1205ee2d54  reports/reviews/phase8-m8-r7f7-newimage-static/SHA256SUMS.txt
+33d3f0af8a4c9c33dcd4e013b395e4ba990a89e384130f9d0ffe50c71b34e8ca  reports/reviews/phase8-m8-r7f7-newimage-static/signed_inputs/m8r3_serial_chain.py
+bfb7b4a94f1857ecce67990ffe361e519be0d4dbb46aff04e5853d7b90660a1d  reports/reviews/phase8-m8-r7f7-newimage-static/TASK_R7F7_NEWIMAGE_REAL_JOB.md
+af2c09bcfccce3c9a6ea21114688d92f713af1900755da37fb972330229cafa4  reports/reviews/phase8-m8-r7f7-newimage-static/tools/r7f7_make_sums.py
+9a7c43b3af347708be0cb951df5b366dd98f3d1f97524c8ed0531ecabb900856  reports/reviews/phase8-m8-r7f7-newimage-static/tools/r7f7_offline_checks.py
+52a1ae458810b26e25672657677fff3f901d69dbc801d26b779e10b0c7523f99  reports/reviews/phase8-m8-r7f7-newimage-static/tools/r7f7_remote_readback.py
+ede290d3c1a756e2b0899dbbe12b63bc8f37a046d19ef1b4781067a6388c9a1a  reports/reviews/phase8-m8-r7f7-newimage-static/tools/r7f7_staged_preflight.py

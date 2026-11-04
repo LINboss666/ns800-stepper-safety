@@ -1,0 +1,114 @@
+PKG_ENTRIES_28_PLUS_SELF|PASS|清单列 28 件且不含自身(zip 内共 29 件 = 28 + SHA256SUMS.txt; 与 R7F6 同一形状)
+PKG_SHA_ALL_OK|PASS|磁盘==清单, 不符=0 []
+PKG_GATE_FIRES_ON_CORRUPTION|PASS|追加 1 字节后同一判据不再放行(会命中)
+PKG_ZIP|INFO|整包 bytes=312901 sha256=15bf813bbd62ee7fcbc263f2c31c1a92f71a42f6e084498c0fa4f568d1076b62 (原件留在仓外不入库)
+IDENTITY_PLAN_BYTES|PASS|声称=39257 磁盘=39257
+IDENTITY_PLAN_SHA|PASS|1de974bf2828819f
+IDENTITY_ROWS_BYTES|PASS|声称=16249 磁盘=16249
+IDENTITY_ROWS_SHA|PASS|5fee4060f4bde537
+IDENTITY_EXECUTOR_BYTES|PASS|声称=219491 磁盘=219491
+IDENTITY_EXECUTOR_SHA|PASS|33d3f0af8a4c9c33
+IDENTITY_IMAGE_BIN|PASS|297452 B / 23691e8d 磁盘实读一致
+IDENTITY_IMAGE_AXF|PASS|1790048 B / 0f421595
+EXECUTOR_IS_REPO_ORIGINAL|PASS|仓内执行器散列未变且与包内见证副本逐字节相同(本轮不改执行器)
+IDENTITY_TIP_IS_DEV_BASELINE|PASS|开发基线 7a08f9d == 本机 HEAD
+ACCEPTANCE_CHECKS_12|PASS|12 项必需判据 / A 设备动作 0 / field_result=NOT_RUN
+NOT_VERIFIED_KEPT|PASS|6 项仍未证原样保留, polarity/core 两个 false 未被降级或升级
+IMG_BIN_EQ_MANIFEST|PASS|297452 B sha=23691e8d8aa8
+IMG_AXF_EQ_MANIFEST|PASS|1790048 B sha=0f421595ac94
+IMG_MAP_EQ_MANIFEST|PASS|2148432 B sha=e2d8d081958c
+IMG_CALLGRAPH_EQ_MANIFEST|PASS|1101259 B sha=a7090b6eed89
+IMG_BIN_FOUR_PARTY_CONSISTENT|PASS|A IDENTITY / 派生绑定 / 真实构建 manifest / 磁盘 四方同一
+IMG_BINDING_CITES_REAL_MANIFEST|PASS|派生绑定引的 b172a279 == 磁盘真实构建清单
+IMG_BINDING_IS_NOT_A_NEW_BUILD|PASS|kind=A_LIGHTWEIGHT_S0_BINDING_NOT_NEW_BUILD_OR_FIELD_PROOF(自陈非新构建)
+IMG_BUILD_HEAD_CONSISTENT|PASS|构建时 HEAD=e1d7f3d 三处登记一致; 签收源码提交 00718b4 是交付件所在提交
+IMG_BUILD_ROUND_DEVICE_0|PASS|该镜像构建轮设备动作 0
+IMG_PROGRAM_SIZE_RECORDED|PASS|Program Size: Code=209490 RO-data=87378 RW-data=2196 ZI-data=85944
+IMG_B502_HISTORICAL_ONLY|PASS|新版执行前 NOT_ON_BOARD; b502(502dca5d) 只作历史证明, 下载后不再当作当前在板身份
+AXF_ELF32_LE|PASS|ELF32 小端
+AXF_PTLOAD_ONE|PASS|e_phnum=1, PT_LOAD 段=1
+AXF_FLASH_PADDR_0x08000000|PASS|p_paddr=0x08000000
+AXF_FILESZ_EQ_BIN|PASS|filesz=297452 BIN=297452
+AXF_SEGMENT_BYTE_EQUAL_BIN|PASS|段 sha=23691e8d8aa8c1d3 == BIN sha=23691e8d8aa8c1d3
+AXF_MEMSZ_ABOVE_FILESZ_IS_RAM|PASS|memsz=385008(含 ZI/RW 映像) > filesz=297452; 回读判据只覆盖 flash 段
+AXF_GATE_FIRES_ON_CORRUPTION|PASS|把 flash 段中间 1 字节取反后同一逐字节判据不再放行(会命中)
+SRC_PRODUCT_TREE_EQUAL_ACCEPTED_TO_TIP|PASS|rt-thread-master 树在 00718b4 与 7a08f9d 上都是 32470c7ed44e(与 IDENTITY.product_tree_sha1 同值)
+SRC_PRODUCT_TREE_GATE_FIRES|PASS|散列改 1 位后不再命中(会命中)
+SRC_FROZEN_EQ_BLOB_EQ_WORKTREE_ALL10|PASS|10 件 .c 的『包内冻结 / 00718b4 的 blob / 工作树(按行尾归一)』三方逐字节一致, 不符=0 []
+SRC_WORKTREE_CRLF_ONLY_LINE_ENDING_DISCLOSED|PASS|工作树里这 3 件是 CRLF(git attr=text + autocrlf 检出转换), blob 与包内冻结都是 LF; 内容等价, 但登记为行尾差异不是 0 差异: ['motor.c', 'supervisor.c', 'tmc2209.c']
+SRC_FROZEN_GATE_FIRES|PASS|把 motor.c 字节反转后同一判据命中(会命中)
+SRC_SOURCE_BINDINGS_5_ON_TIP|PASS|5 件(含 diag_relative.h / project_config.h)在 tip 上 sha+bytes+git blob id 全等, 不符=0 []
+SRC_PRODUCT_UNCHANGED_ACCEPTED_TO_TIP|PASS|两提交之间非 reports/ 只有 .gitattributes(行尾规则); 产品与主机源码 0 改动 ['.gitattributes']
+VP_LINES_58|PASS|本机=58 A 包=58
+VP_NAME_AND_VERDICT_IDENTICAL_TO_A|PASS|58 行的判定名与 PASS/FAIL 逐行相同, 差异=0
+VP_ONLY_PLAN_PATH_DIFFERS|PASS|58 行里唯一不同是末行 plan= 路径(A 在自己沙箱) -> 判据文本同源
+VP_SINGLE_RAW_FAIL_IS_MOTION_CAP|PASS|原始 FAIL=['PLAN_MOTION_CAP_BUDGET']; A 按空运动包裁为 N/A 并保留原 FAIL, 未改执行器也未填假运动额度
+VP_SUMMARY_57_1_74|PASS|checks/fail/msh=('57', '1', '74')
+VP_REPLAY_MATCHES_ON_A_TEXT_TOO|PASS|同一判据在 A 原文上也得到唯一 FAIL=['PLAN_MOTION_CAP_BUDGET']
+STUB_INIT_RC0|PASS|rc=0 
+STUB_INIT_CAPS_EQ_A|PASS|21 项额度与 A 沙箱完全一致
+STUB_INIT_CAPS_EQ_TASKTABLE|PASS|额度也==我按任务书 §2 抄的期望表(6 项为 1, 其余 15 项为 0)
+STUB_INIT_IDENTITIES_EQ_A|PASS|executor/plan/image 三散列与 A 一致: {"executor_sha256": "33d3f0af8a4c9c33dcd4e013b395e4ba990a89e384130f9d0ffe50c71b34e8ca", "image_sha256": "23691e8d8aa8c1d
+STUB_DISPATCH_RC0|PASS|rc=0 
+STUB_ALL_FOUR_STAGES_OK|PASS|S0 离线绑定 -> S1 下载 -> S2 回读 -> S3 会话 全 OK(夹具, 无设备)
+STUB_QUOTA_USED_SIX_POSITIVES|PASS|quota_used={'diag_profile_learn': 1, 'diag_profile_zero': 1, 'download': 1, 'explicit_reset': 1, 'port_open': 1, 'readback': 1}
+STUB_NO_ZERO_QUOTA_CONSUMED|PASS|任务书里 0 额度的动作一次也没被消耗
+STUB_S0_FACTS_EQ_A_EXCEPT_PATHS|PASS|只差键=[]
+STUB_S0_NEEDLES_41|PASS|S0 自报 needles_total=41
+STUB_S0_IMAGE_PLAN_IDENTITY|PASS|S0 现场重算的镜像/计划/执行器身份与声称一致
+STUB_S3_STEPS_16|PASS|S3 steps=16 disarm=NOT_ARMED(15 计划步骤+1 装配) 且未撤能动作
+NEEDLES_FROZEN_41_UNPROVEN_0|PASS|NEEDLES|total=41|unproven=0
+NEEDLES_FILE_HAS_41|PASS|needles 条数=41, 声明来源提交=00718b4
+NEEDLES_ALSO_HIT_LIVE_PRODUCT_SOURCE|PASS|41 条字面量在产品工作树源码里同样逐条命中(冻结件不是唯一来源), 缺=[]
+NEEDLES_LIVE_GATE_FIRES|PASS|不存在的字面量确实判不命中(会命中)
+NEEDLES_OLD_SYNC_LEARN_NEEDLES_ABSENT|PASS|旧同步 learn 的两条 OK/FAILED needle 已被异步接口字面量替代(残留=[])
+PLAN_STEPS_15_13CMDS_1RESET_1WATCH|PASS|15 步 = 1 复位 + 13 命令 + 1 被动观察(与任务书 §5 的口径一致)
+PLAN_COMMAND_ORDER_EQ_TASKTABLE|PASS|13 条命令顺序: ps > free > system_status > safety_status > motor_status > safety_irq_status > diag_profile learn_status > diag_profile zero 32 > diag_profile learn_status > diag_profile learn 8 450 550 0 > diag_profile learn_status > system_status > motor_status
+PLAN_WATCH_ONE_SECOND_NO_COMMAND|PASS|被动窗 1 s 且不带任何命令
+PLAN_RESET_ONE_WITH_75S_DRAIN|PASS|唯一复位步申报并走满 75 s
+PLAN_BOOT_FLOOR_DECLARED_AND_ENFORCED|PASS|75 s 是观测下界且被离线覆盖门强制(本机重跑同判 PASS)
+PLAN_SESSION_WITHIN_DEADLINE|PASS|75 s 启动窗 + 14 个观测/命令窗 91 s = 166 s <= 申报总上限 210 s(余 44 s)
+PLAN_QUOTA_EQ_TASKTABLE|PASS|计划额度表与任务书 §2 逐项相同(21 项)
+PLAN_NO_FORBIDDEN_SENT|PASS|17 条禁用命令都没出现在计划命令/argv 里, 命中=[]
+PLAN_FORBIDDEN_GATE_FIRES|PASS|注入 motor_start 后同一判据命中(会命中)
+PLAN_FORBIDDEN_COVERS_MOTION_AND_PERSIST|PASS|起转/apply/极性/IRQ/commit/tier/clear/cancel/保存/清日志/故障复位都在禁用清单里
+PLAN_LEARN_MUST_BE_ACCEPTED|PASS|受理是硬判据: STARTED id=1 n=8 win=450..550 dir=0, 同步骤明禁 REFUSED/FAILED
+PLAN_TERMINAL_LOCKED_TO_EXPECTED_FAILURE|PASS|终态锁死 id=1 FAILED/WINDOW_BROKEN owner=FREE cred=1/0; DONE/RUNNING/STARTED 都是失败
+PLAN_ZERO_32_IS_REAL_ACTION|PASS|zero 32 扣自己那 1 份额度, 且不得以 FAILED/REFUSED 通过
+PLAN_WHITELIST_ANCHORED_AND_REQUIRED|PASS|5 条白名单全部整行锚定, 且逐条等于同步骤被正面要求的 expect_contains 文本
+PLAN_WHITELIST_LIST|INFO|[["sys_initial", "^\\[Motor\\] arm gate fail mask=0x18 \\(arm REFUSED\\)$"], ["mot_static", "^\\[MOT\\] arm_gate_mask=0x18 REFUSED$"], ["job_failed", "^\\[DIAG\\]\\ job\\ id=1\\ st=FAILED\\ why=WINDOW_BROKEN\\ owner=0\\ cred=1/0$"], ["sys_final", "^\\[Motor\\] arm gate fail mask=0x18 \\(arm REFUSED\\)$"], ["mot_final", "^\\[MOT\\] arm_gate_mask=0x18 REFUSED$"]]
+PLAN_FAILGATE_NOT_GLOBAL_OPEN|PASS|失败词放行只这一处(job_failed), 其余 FAILED/REFUSED 仍首错即停
+PLAN_HARDWARE_ACTIONS_0_AND_PORT_COM5|PASS|离线包自陈设备动作 0; COM5 / 开口后复位 / 不 halt
+PLAN_POST_RESET_BOOT_IS_FIXTURE_TEXT|PASS|S3 的 post_reset_boot 只是 b502 归档文本供 stub 解析, A 明写不是新镜像证据
+PLAN_POWER_POLICY_MATCHES_OPERATOR_PREFERENCE|PASS|本轮采纳『已通电就保持供电, 收口不要求断电, 额外断上电 0』(与我转给 A 的口径变更一致)
+PLAN_POWER_POLICY_KEEPS_EMERGENCY_PATH|PASS|异常使能/运动时操作者硬件禁能优先, 保持供电口径不挡紧急处置
+PLAN_POWER_POLICY_NO_USB_INFERENCE|PASS|通电状态以现场实报为准, 不由 USB 枚举推断
+ROWS_KEYS_COVER_PLAN|PASS|计划里 12 个 key 都能在 rows 取到(rows 命令共 17)
+ROWS_DECLARED_HOST_MODEL_NOT_FIELD|PASS|rows 自陈为 host 模型来源: {"kind": "OLD_FIELD_REPLAY_PLUS_ACTUAL_PRODUCT_C_HOST_MODEL_NOT_NEW_BOARD_EVIDENCE", "host_model_source": "proof/host_probe.c and host_probe.stdout.tx
+ROWS_CONTAIN_FORBIDDEN_ONLY_AS_REHEARSAL|PASS|rows 里有禁用命令的夹具行, 但计划一条也没发(禁用判据看的是计划命令)
+HOST_BUILD_RC0|PASS|rc=0
+HOST_BUILD_COMPILER|INFO|gcc.exe (tdm64-1) 4.9.2
+HOST_BUILD_LINE351_ANCHOR|PASS|A 日志指向 rel_main.c:351; 本机同文件该行原文一致 -> 夹具同源。warning 本机=0 A=1 (差异是编译器版本: -Wmisleading-indentation 需 GCC>=6, 本机 4.9.2 不发)
+HOST_RUN_RC0_PROBE_ASSERTS|PASS|rc=0 表示探针自己的判据成立: id=1 & state=REL_JOB_FAILED & owner=REL_CAP_FREE & zero & !learn & !active
+HOST_OUTPUT_BYTE_EQUAL_TO_A_AFTER_CRLF_NORMALIZE|PASS|本机 LF 归一后 sha=fc8747c7fdcbfae5 == A 包 stdout sha=fc8747c7fdcbfae5
+HOST_CRLF_DIFF_IS_CARRIAGE_ONLY|PASS|字节差 29 == 行数 => 只是行尾差, 不是内容差
+HOST_FRAME_ORDER|PASS|帧顺序=['job_initial', 'zero', 'job_zero', 'learn_start', 'job_failed']
+HOST_STATE_VALUES|PASS|HOST_STATE|id=1 state=4 owner=0 zero=1 learn=0 active=0
+HOST_STATE_4_IS_REL_JOB_FAILED_ENUM|PASS|按 C 隐式枚举从 rel_job_state_t 头部推算 REL_JOB_FAILED=4(与 host 行的 state=4 同一身份)
+HOST_OWNER_0_IS_REL_CAP_FREE|PASS|REL_CAP_FREE=0(枚举序号回产品头文件推算, 不是照抄 host 行的 0)
+HOST_GATE_FIRES_ON_TAMPERED_OUTPUT|PASS|把 why 改成别的身份后逐字节判据命中(会命中)
+BOUNDARIES_MATCH_TASKBOOK|PASS|额度/期望终态/未证项与任务书 §2 §5 §6 一致
+BOUNDARIES_IDENTIFIER_ISSUE_NOT_MARKED_FIXED|PASS|Known disclosure deferred by current user request, not falsely marked fixed.
+IDENTITY_OFFLINE_PROOF_FIELDS|PASS|A 自报的离线证据字段(0 设备 / 4 阶段 / 13 命令 / 6 项正额度)与本机重跑一致
+IDENTITY_STATUS_AND_FIELD_RESULT|PASS|本轮 A 侧 field_result=NOT_RUN
+LEAK_SCOPE_DECISION|INFO|三类路径/UID 模式 + 用户名明文(来自环境变量=<set>); 通用盘符模式按上述理由放弃
+LEAK_SCAN入库件命中为_0|PASS|扫 43 件(含本轮即将入库的日志原文), 命中=0 []
+LEAK_SCAN_GATE_FIRES|PASS|对合成样本 3/3 条模式命中(会命中才允许宣布干净)
+ROUND_TOUCHES_NO_PRODUCT_OR_HOST_CODE|PASS|本轮工作树改动 5 项, 全部在 reports/ 与 .gitattributes 里
+OLD_EVIDENCE_UNTOUCHED|PASS|旧证据/旧账 0 改动(只允许 run_record.md 追加与本目录), 越界=[]
+RUN_RECORD_IS_APPEND_ONLY|PASS|run_record.md 的 HEAD 版本是新版本的**严格前缀** => 旧 §1-§19 一个字节都没被改, 只追加 §20
+OLD_SECTIONS_STILL_ONE_EACH|PASS|§16/§17/§18/§19 各仍出现一次, §20 新增一次; 异常=[]
+FIELD_APPROVAL_LEDGER_ABSENT|PASS|扫 2 个核准根目录, 现场批准身份 M8R7F7-2369-... 无账本(本轮未开): []
+PRIVATE_DAP_UID_FILE_PRESENT_AND_NOT_COMMITTED|PASS|私有 UID 文件在位(长度 48, 值不打印不入库); 本轮入库件里搜不到该明文 => 现场轮的前置件可用
+NO_REAL_TRANSPORT_NO_DEVICE_TOOLS|PASS|本工具只用 python+git+gcc 与 stub/sim; 未起 real 传输, 未调 pyOCD/Keil/分析仪
+R7F7_OFFLINE_SUMMARY|判据=109|FAIL=0|none

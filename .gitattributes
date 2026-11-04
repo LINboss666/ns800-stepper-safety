@@ -136,3 +136,7 @@ reports/reviews/phase8-m8-r7d1-ard4b-acceptance/** -text
 # M8-R7F6 现场包(纯只读采集): 本目录里 A 的原件与其 signed_inputs 见证副本必须按原字节入库
 # (执行器与仓库原件逐字节相同是判据), 禁止行尾转换; 规则先于任何暂存生效。
 reports/reviews/phase8-m8-r7f6-la-path-static/** -text
+
+# M8-R7F7 新版上板+真实异步作业包: A 的 28 件原件(含 signed_inputs 见证副本与 frozen 源)必须按原字节入库,
+# 冻结源散列与 00718b4 的 blob 相等是判据 => 禁止任何行尾转换。本轮新增的 *_local.txt 也已按同一规则入库。
+reports/reviews/phase8-m8-r7f7-newimage-static/** -text

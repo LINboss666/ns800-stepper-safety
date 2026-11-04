@@ -1,0 +1,1161 @@
+/*
+ * diagnosis.c - 多源异常诊断引擎 (Phase 7-C, Fix E 引擎上下文化)
+ *
+ * 节拍 100Hz(prio 9 线程, 消费 sensor_service 最新帧)。
+ * 引擎核心 diag_engine_step(ctx, in) 为纯状态推进, 不依赖全局可写状态。
+ *
+ * Fix E(测试隔离): 生产引擎与 diag_selftest 以前共用全局 ds / d_severe_latched,
+ *   而 Diagnosis Thread(prio 9) 一直在跑 —— 自检的合成输入会被真实 sensor 帧
+ *   从中间插入, 断言结果不确定; 更糟的是 ACTIVE 模式下自检喂出的
+ *   STALL_CONFIRMED 会经由共享的 severe_latched 真的 post EVT_MULTI_FAULT。
+ *   现在: 生产用 d_prod 上下文; 自检用栈上的独立上下文, 且 may_report=FALSE,
+ *   因此自检从结构上不可能改动生产状态、也不可能发出真实 Safety 事件。
+ *   public diag_step()/diag_reset()/diag_get_features() 保留为生产上下文的包装,
+ *   外部调用者(API 契约)不变。
+ *
+ * 阈值 dt 仍是单一全局: 它由 project_config 派生(只读判定依据), 不是引擎状态;
+ *   自检刻意使用"当前生效阈值", 这样测的是真配置下的判据逻辑。
+ *
+ * 阈值(由 project_config 持久化驱动):
+ *   SG_RESULT(datasheet): 数值越低=负载越高, 低于带阈值=负载抬升, 更低=堵转特征
+ *   速度分带: <200Hz 低速 / 200~1000Hz 中速 / >1000Hz 高速
+ *   电流: 高于带阈值 warn/stall
+ *   振动: 幅值含 ~1g 重力基线, 超过 impact 阈值且短持续 = IMPACT
+ *
+ * 反误报纪律(全部落实在引擎内):
+ *   单 sample 不判 severe; SG 阈值按速度分带; 无效数据冻结特征只累计 bad;
+ *   加减速/静止相位抑制 SG 与电流堵转判据; CONFIRMED 需 SG+电流多源一致;
+ *   恢复需连续干净帧(hysteresis); 同一源帧序号只处理一次(引擎内去重)。
+ *
+ * 模式: MONITOR_ONLY 默认; ACTIVE_PROTECTION 需电流标定来源为 MEASURED 才允许
+ *       开启, severe 边沿 → safety_post_event(EVT_MULTI_FAULT) 交 Safety 处理
+ *       (引擎不直接操作 Flash, 硬件 ESTOP/LIMIT/DIAG 不经过本引擎)。
+ */
+
+#include <rtthread.h>
+#include <rtdevice.h>
+#include "project_board.h"
+#include "safety_gpio.h"
+#include "app_health.h"
+#include "sensor_service.h"
+#include "motor.h"
+#include "safety_state.h"
+#include "current_adc.h"
+#include "project_config.h"
+#include "diagnosis.h"
+#include "diag_relative.h"
+
+#define DIAG_THREAD_STACK   4096   /* entry+rel_prod_evaluate+rel_engine_step 三帧静态下界 1064 B, 旧值 1024 装不下 */
+
+/* ---------- 阈值(Phase 7-C-2: 由 project_config 持久化驱动) ----------
+ * dt 每帧从 project_config 同步; 配置非法时 config 层保证为安全默认值。 */
+typedef struct
+{
+    rt_uint32_t band_hz[2];
+    rt_int32_t  sg_warn[3], sg_stall[3];
+    float       cur_warn_ma[3], cur_stall_ma[3];
+    rt_uint32_t vib_impact_mg;
+    rt_uint32_t persist_warn;
+    rt_uint32_t persist_stall;
+    rt_uint32_t impact_frames;
+    rt_uint32_t hysteresis_frames;
+} diag_thresholds_t;
+
+static diag_thresholds_t dt;
+
+static void diag_sync_config(void)
+{
+    project_config_t cs;
+    if (project_config_get_snapshot(&cs) != RT_EOK) return;
+    const project_config_t *c = &cs;
+
+    dt.band_hz[0] = c->band_hz[0];  dt.band_hz[1] = c->band_hz[1];
+    rt_memcpy(dt.sg_warn,  c->sg_warn,  sizeof(dt.sg_warn));
+    rt_memcpy(dt.sg_stall, c->sg_stall, sizeof(dt.sg_stall));
+    rt_memcpy(dt.cur_warn_ma,  c->cur_warn_ma,  sizeof(dt.cur_warn_ma));
+    rt_memcpy(dt.cur_stall_ma, c->cur_stall_ma, sizeof(dt.cur_stall_ma));
+    dt.vib_impact_mg    = c->vib_impact_mg;
+    dt.persist_warn     = c->persist_warn;
+    dt.persist_stall    = c->persist_stall;
+    dt.impact_frames    = c->impact_frames;
+    dt.hysteresis_frames = c->hysteresis_frames;
+}
+
+/* ---------- 引擎状态(可实例化, 无隐藏全局依赖) ---------- */
+#define DIAG_VIB_WIN 16
+
+typedef struct
+{
+    float sg_filt, cur_filt;             /* EMA 平滑 */
+    float sg_delta, cur_delta;           /* 滤波值帧间差 */
+    rt_uint32_t vib_win[DIAG_VIB_WIN];   /* 振动幅值滑窗(含重力基线) */
+    rt_uint8_t  vib_idx;
+    float vib_rms, vib_peak;
+    rt_int32_t speed_band;               /* 0/1/2, -1=stopped */
+    rt_uint32_t sg_below_warn_cnt, sg_below_stall_cnt;
+    rt_uint32_t cur_above_warn_cnt, cur_above_stall_cnt;
+    rt_uint32_t vib_impact_cnt;
+    rt_uint32_t sensor_bad_cnt;
+    rt_uint32_t clean_cnt;               /* 滞回恢复计数 */
+    rt_uint32_t last_seq;                /* Fix B: 已消费的源帧序号(引擎内去重) */
+    diag_verdict_t verdict;
+} diag_state_t;
+
+/* Fix E: 引擎上下文 = 状态 + 上报属性 */
+typedef struct
+{
+    diag_state_t st;
+    rt_bool_t    severe_latched;      /* severe 事件只发上升沿 */
+    rt_bool_t    may_report;          /* 仅生产上下文允许 post 真实 Safety 事件 */
+} diag_engine_t;
+
+static diag_engine_t d_prod;          /* 生产: 只由 Diagnosis Thread 推进 */
+static diag_mode_t d_mode = DIAG_MODE_MONITOR_ONLY;
+static rt_thread_t d_tid = RT_NULL;
+static subsys_health_t d_health = SUBSYS_UNINIT;
+
+/* M8: "diag_mode relative CONFIRM_EXPERIMENTAL" 的一次性凭据。仅在本文件内
+ * 由 CLI 置位, set_mode 用掉即清 —— 不给任何不显式确认的自动放行路径。 */
+static rt_bool_t d_relative_confirm_given = RT_FALSE;
+
+static const char *mode_name(diag_mode_t m)
+{
+    switch (m)
+    {
+    case DIAG_MODE_MONITOR_ONLY:          return "MONITOR_ONLY";
+    case DIAG_MODE_ACTIVE_PROTECTION:     return "ACTIVE_PROTECTION";
+    case DIAG_MODE_RELATIVE_PROTECTION:   return "RELATIVE_ACTIVE";
+    default:                              return "?";
+    }
+}
+
+/* 整数平方根(Newton) */
+static rt_uint32_t d_isqrt(rt_uint32_t n)
+{
+    rt_uint32_t x = n, y = 1;
+    if (n == 0) return 0;
+    while (x > y) { x = (x + y) / 2; y = n / x; }
+    return x;
+}
+
+static rt_uint32_t d_isqrt64(rt_uint64_t n)   /* P1-14: 64bit 版本 */
+{
+    rt_uint64_t x = n, y = 1;
+    if (n == 0) return 0;
+    while (x > y) { x = (x + y) / 2; y = n / x; }
+    return (rt_uint32_t)x;
+}
+
+rt_uint32_t diag_vib_magnitude(rt_int16_t mg_x, rt_int16_t mg_y, rt_int16_t mg_z)
+{
+    rt_int64_t x = mg_x, y = mg_y, z = mg_z;   /* P1-14: 64bit 中间量 */
+    return d_isqrt64((rt_uint64_t)(x * x + y * y + z * z));
+}
+
+static const char *verdict_name(diag_verdict_t v)
+{
+    switch (v)
+    {
+    case DIAG_NORMAL:         return "NORMAL";
+    case DIAG_LOAD_WARNING:   return "LOAD_WARNING";
+    case DIAG_IMPACT:         return "IMPACT";
+    case DIAG_OVERLOAD:       return "OVERLOAD";
+    case DIAG_STALL_SUSPECT:  return "STALL_SUSPECT";
+    case DIAG_STALL_CONFIRMED:return "STALL_CONFIRMED";
+    case DIAG_SENSOR_FAULT:   return "SENSOR_FAULT";
+    default:                  return "?";
+    }
+}
+
+/* ---------- 引擎核心(纯上下文操作) ---------- */
+
+static void diag_engine_reset(diag_engine_t *e)
+{
+    rt_bool_t report = e->may_report;    /* 复位不改"能否上报"这一属性 */
+
+    rt_memset(e, 0, sizeof(*e));         /* 含 last_seq / 全部计数器 / verdict */
+    e->may_report = report;
+    e->st.speed_band = -1;
+    e->st.verdict = DIAG_NORMAL;
+}
+
+static rt_int32_t band_of(rt_uint32_t hz)
+{
+    if (hz == 0) return -1;
+    if (hz < dt.band_hz[0]) return 0;
+    if (hz < dt.band_hz[1]) return 1;
+    return 2;
+}
+
+/* severe 边沿上报: 只有生产上下文(may_report)才允许动真实安全事件。
+ * diag_selftest 的上下文 may_report=FALSE ⇒ 合成输入永远不可能触发停机。 */
+static void diag_report_severe(diag_engine_t *e, diag_verdict_t v)
+{
+    rt_err_t rc;
+
+    if (d_mode != DIAG_MODE_ACTIVE_PROTECTION) return;
+    if (!e->may_report) return;
+    if (!e->severe_latched)
+    {
+        /* M8-PRE-3: 原来是**先打印后保护**。打印走的是控制台(阻塞且慢), 保护是同步
+         * 短停机 —— 顺序反过来就等于把最该早发生的事排在最晚。与相对模式同一条
+         * 纪律: 先 safety_post_event(), 摘要只在保护动作之后打印。
+         * 文本保持原样(M6 现场证据按它检索), 只追加原始返回码。 */
+        e->severe_latched = RT_TRUE;
+        rc = safety_post_event(EVT_MULTI_FAULT);   /* 引擎不直接操作 Flash */
+        rt_kprintf("[DIAG] ACTIVE: severe %s -> post EVT_MULTI_FAULT post_rc=%d\n",
+                   verdict_name(v), rc);
+    }
+}
+
+static diag_verdict_t diag_engine_step(diag_engine_t *e, const diag_input_t *in)
+{
+    rt_int32_t band;
+    rt_uint8_t cruise;
+    diag_state_t *ds = &e->st;
+
+    /* ---- Fix B: 同帧去重放进引擎(P1-5 的真正落点) ----
+     * 旧实现只在 Diagnosis Thread 里判重, 于是 diag_selftest 直接调引擎时
+     * 根本测不到这一层; 而且线程用 continue 跳过了循环尾部的 mdelay, 造成
+     * prio 9 忙等。现在: 重复 seq 不推进任何特征/计数器/persistence, 直接返回
+     * 当前判定; seq==0 视为"调用方未提供序号"(如合成注入), 不做去重。 */
+    if (in->seq != 0 && in->seq == ds->last_seq)
+        return ds->verdict;
+    if (in->seq != 0) ds->last_seq = in->seq;
+
+    /* ---- sensor missing: 冻结特征, 只累计 bad(禁止当 0 参与判据) ---- */
+    if (!in->sg_valid || !in->cur_valid || !in->imu_valid)
+    {
+        ds->sensor_bad_cnt++;
+        ds->clean_cnt = 0;
+        if (ds->sensor_bad_cnt >= dt.persist_warn)
+            ds->verdict = DIAG_SENSOR_FAULT;
+        return ds->verdict;
+    }
+    ds->sensor_bad_cnt = 0;
+
+    /* ---- 特征: EMA 滤波 + Δ(P1-6: 保存旧值再更新, Δ 才是真实帧间变化) ---- */
+    {
+        float old_sg  = ds->sg_filt;
+        float old_cur = ds->cur_filt;
+        ds->sg_filt  += ((float)in->sg        - ds->sg_filt)  * 0.2f;
+        ds->cur_filt += (in->current_ma       - ds->cur_filt) * 0.2f;
+        ds->sg_delta  = ds->sg_filt  - old_sg;
+        ds->cur_delta = ds->cur_filt - old_cur;
+    }
+
+    /* ---- 振动滑窗: RMS + peak ---- */
+    ds->vib_win[ds->vib_idx] = (rt_uint32_t)(in->vib_mg < 0 ? 0 : in->vib_mg);
+    ds->vib_idx = (rt_uint8_t)((ds->vib_idx + 1) % DIAG_VIB_WIN);
+    {
+        rt_uint32_t i, peak = 0;
+        rt_uint64_t acc = 0;                 /* P1-14: 64bit 防平方溢出 */
+        for (i = 0; i < DIAG_VIB_WIN; ++i)
+        {
+            rt_uint64_t s2 = (rt_uint64_t)ds->vib_win[i] * ds->vib_win[i];
+            acc += s2;
+            if (ds->vib_win[i] > peak) peak = ds->vib_win[i];
+        }
+        ds->vib_rms  = (float)d_isqrt64(acc / DIAG_VIB_WIN);
+        ds->vib_peak = (float)peak;
+    }
+
+    /* ---- 速度分带 + 巡航相位 ---- */
+    ds->speed_band = band = band_of(in->step_hz);
+    cruise = (in->motor_state == (rt_uint8_t)MOTOR_CRUISE && in->step_hz > 0);
+
+    /* ---- persistence 计数 ----
+     * SG/电流堵转判据仅在 CRUISE 有效: 斜坡期 SG 漂移、电流自然高; 静止无 BEMF */
+    if (cruise && band >= 0)
+    {
+        if (ds->sg_filt < (float)dt.sg_warn[band]) ds->sg_below_warn_cnt++;
+        else if (ds->sg_below_warn_cnt) ds->sg_below_warn_cnt--;
+        if (ds->sg_filt < (float)dt.sg_stall[band]) ds->sg_below_stall_cnt++;
+        else if (ds->sg_below_stall_cnt) ds->sg_below_stall_cnt--;
+
+        if (ds->cur_filt > dt.cur_warn_ma[band]) ds->cur_above_warn_cnt++;
+        else if (ds->cur_above_warn_cnt) ds->cur_above_warn_cnt--;
+        if (ds->cur_filt > dt.cur_stall_ma[band]) ds->cur_above_stall_cnt++;
+        else if (ds->cur_above_stall_cnt) ds->cur_above_stall_cnt--;
+    }
+    else
+    {
+        if (ds->sg_below_warn_cnt) ds->sg_below_warn_cnt--;
+        if (ds->sg_below_stall_cnt) ds->sg_below_stall_cnt--;
+        if (ds->cur_above_warn_cnt) ds->cur_above_warn_cnt--;
+        if (ds->cur_above_stall_cnt) ds->cur_above_stall_cnt--;
+    }
+
+    /* ---- IMPACT 计数 ---- */
+    if (ds->vib_peak >= (float)dt.vib_impact_mg) ds->vib_impact_cnt++;
+    else if (ds->vib_impact_cnt) ds->vib_impact_cnt--;
+
+    /* ---- 判定(优先级: sensor > severe > warn; 单 sample 永不 severe) ---- */
+    if (ds->sensor_bad_cnt >= dt.persist_warn)
+    {
+        ds->verdict = DIAG_SENSOR_FAULT;
+    }
+    else if (ds->sg_below_stall_cnt >= dt.persist_stall &&
+             ds->cur_above_warn_cnt  >= dt.persist_warn)
+    {
+        /* 多源一致: SG 崩 + 电流升, 双计数同时满足才 CONFIRMED */
+        ds->verdict = DIAG_STALL_CONFIRMED;
+    }
+    else if (ds->cur_above_stall_cnt >= dt.persist_stall)
+    {
+        ds->verdict = DIAG_OVERLOAD;
+    }
+    else if (ds->vib_impact_cnt >= dt.impact_frames)
+    {
+        ds->verdict = DIAG_IMPACT;
+    }
+    else if (ds->sg_below_warn_cnt >= dt.persist_warn && cruise)
+    {
+        ds->verdict = DIAG_STALL_SUSPECT;
+    }
+    else if (ds->cur_above_warn_cnt >= dt.persist_warn)
+    {
+        ds->verdict = DIAG_LOAD_WARNING;
+    }
+    else
+    {
+        /* hysteresis: 非 NORMAL 状态需要连续干净帧才回落(IMPACT 除外, 短事件) */
+        if (ds->verdict != DIAG_NORMAL && ds->verdict != DIAG_IMPACT)
+        {
+            ds->clean_cnt++;
+            if (ds->clean_cnt < dt.hysteresis_frames)
+                return ds->verdict;
+        }
+        ds->clean_cnt = 0;
+        ds->verdict = DIAG_NORMAL;
+    }
+
+    /* severe 边沿上报 */
+    if (ds->verdict == DIAG_STALL_CONFIRMED || ds->verdict == DIAG_OVERLOAD)
+        diag_report_severe(e, ds->verdict);
+    else
+        e->severe_latched = RT_FALSE;
+
+    return ds->verdict;
+}
+
+/* ---------- 线程: 消费最新 sensor_frame ----------
+ * Fix B: 循环尾部无条件 mdelay(10)。旧实现用 "if (f.seq == d_last_seq) continue;"
+ * 跳过 mdelay, 在同帧未更新时会把 prio 9 线程变成忙等, 饿死 prio >= 9 的
+ * bblog(18)/ui(20)/tshell(20)。同帧去重现在由引擎负责。
+ *
+ * M8-R1 取代 M8 的"三个非 OK 覆盖态一律不步进", 落成两条相反方向的纪律:
+ *   1) **先保护, 后披露**。失去判据覆盖(profile 丢/签名漂移/取锁失败/取不到帧)
+ *      不是一条"这一步可以跳过"的信息 —— 已显式 RELATIVE 武装时它是一条有界的
+ *      降险义务, 由引擎判 REL_COVERAGE_LOST 并走同一条 Safety 短保护。所有状态
+ *      打印都排在 rel_prod_evaluate() 之后(B2/B3 的复现点正是这个次序)。
+ *   2) **取不到帧也要推进监督**。旧写法在 get_latest 失败/seq==0 时直接 continue,
+ *      于是"帧流停了"这个状态永远不会累积成失效; 现在用当前 tick + 能取到的运动
+ *      事实照样步进一步(coverage=NOFRAME), 运动事实也取不到时 motion_known=0,
+ *      引擎不因此宣称覆盖有效(R2.2)。
+ * 覆盖状态只在**变化**时打印一次(100Hz 线程每帧打印会把真正的触发摘要埋掉,
+ * 本板已有 stack-watermark 刷屏导致采集器不可用的先例)。 */
+static void diag_thread_entry(void *param)
+{
+    sensor_frame_t f;
+    diag_input_t in;
+    diag_rprof_t prof;
+    rt_uint8_t cov_shown = 0xFFu;      /* 0xFF = 尚未打印过任何覆盖状态 */
+    rt_uint8_t cov = RELCOV_OK;
+
+    (void)param;
+
+    while (1)
+    {
+        rt_bool_t acted = RT_FALSE;
+        rt_err_t post_rc = RT_EOK;
+        rt_err_t ge;
+        rt_uint8_t have_frame;
+        rel_step_arg_t a;
+
+        diag_sync_config();              /* 阈值跟随持久化配置(每帧同步) */
+        have_frame = (sensor_service_get_latest(&f) == RT_EOK && f.seq != 0);
+
+        rt_memset(&in, 0, sizeof(in));
+        if (have_frame)
+        {
+            in.seq         = f.seq;
+            in.timestamp   = f.timestamp;
+            in.sg_valid    = f.valid_sg;
+            in.sg          = f.sg_result;
+            in.cur_valid   = f.valid_current;
+            in.current_ma  = f.current_ma;
+            in.imu_valid   = f.valid_imu;
+            in.vib_mg      = f.vib_mg;
+            in.motor_state = f.motor_state;
+            in.step_hz     = f.step_hz;
+            /* M8: 源样本身份与 live 签名。年龄/独立样本判定全靠这几个值。 */
+            in.sg_seq  = f.sg_seq;
+            in.sg_tick = f.sg_tick;
+            in.cur_seq = f.cur_seq;
+            in.cur_tick = f.cur_tick;
+            in.cur_raw = f.current_raw;
+            in.imu_seq = f.imu_seq;
+            in.imu_tick = f.imu_tick;
+            in.dir     = f.dir;
+            /* M8-R2 R2-B3: 只有**这一帧自己**取到运动快照才算知道运动事实。
+             * 旧代码对所有有效帧无条件 motion_known=1, 于是 motor_get_snapshot
+             * 一直失败时, 帧里继承的 IDLE 被当成"证得的静止"(FRAME_FALSE_MOTION_KNOWN)。 */
+            in.motion_known = f.motion_ok;
+            in.motion_seq   = f.motion_seq;
+            in.motion_tick  = f.motion_tick;
+            if (!f.motion_ok)
+            {
+                in.motor_state = 0;       /* 未知就别把继承值传给下游 */
+                in.step_hz     = 0;
+            }
+        }
+        else
+        {
+            /* 没有帧: 用当前时刻与**能取到的**运动事实推进失效监督。 */
+            motor_snapshot_t ms;
+
+            in.timestamp = rt_tick_get();
+            in.motion_known = (motor_get_snapshot(&ms) == RT_EOK) ? 1u : 0u;
+            if (in.motion_known)
+            {
+                in.motor_state = (rt_uint8_t)ms.state;
+                in.step_hz     = ms.current_hz;
+                in.dir         = ms.dir;
+                in.motion_tick = in.timestamp;   /* 现取现用: 年龄就是这一帧 */
+            }
+        }
+        in.live_signature = rel_live_signature();
+
+        diag_engine_step(&d_prod, &in);     /* 重复 seq 由引擎直接返回当前判定 */
+
+        rt_memset(&prof, 0, sizeof(prof));
+        ge = project_config_get_rprof(&prof);
+        if (!have_frame)                         cov = RELCOV_NOFRAME;
+        else if (ge != RT_EOK)                   cov = RELCOV_LOCK_FAIL;
+        else if (prof.magic == 0)                cov = RELCOV_ABSENT;
+        else if (prof.signature != in.live_signature) cov = RELCOV_SIG_MISMATCH;
+        else                                     cov = RELCOV_OK;
+
+        rt_memset(&a, 0, sizeof(a));
+        a.in       = in;
+        a.prof     = prof;
+        a.now_tick = rt_tick_get();
+        a.coverage = cov;
+        a.mode     = (rt_uint8_t)d_mode;
+        /* 即使 MONITOR_ONLY 也步进: 让 diag_status 能给出"若启用会怎样"的实时状态,
+         * 但真实 post 只在 RELATIVE_PROTECTION 内发生(rel_prod_evaluate 内部判)。 */
+        (void)rel_prod_evaluate(&a, (rt_uint8_t)d_mode, &post_rc, &acted);
+
+        /* M8-R7D1: 后台学习任务就在这里推进(每拍一次, 不 sleep、不打印)。
+         * 位置是刻意的: 保护义务(rel_prod_evaluate)排在前, 披露打印排在后, 学习推进
+         * 只是第三件事 —— 它拿不到 ctx 锁就这一拍什么都不做, 因此不可能把保护或
+         * 首因摘要挤到自己后面。取消/12s 超时/签名漂移都由这一步就地处理,
+         * 不需要等到下一枚新 SG/ADC 样本。 */
+        rel_job_advance(&in, have_frame, (rt_uint8_t)d_mode);
+
+        /* ---- 以下全是"保护之后"的披露 ---- */
+        if (acted)
+        {
+            rel_latch_t l;
+
+            /* R2.4: 一次真实触发消耗本次武装的票据。模式当场退回 MONITOR_ONLY 并
+             * 明说 REARM_REQUIRED —— 不允许出现"界面仍写 RELATIVE_ACTIVE、引擎却
+             * 永久不再发第二次请求"这种自相矛盾(C6 就是这个状态)。
+             * 这是 Safety 降险引起的**内部**安全转换, 不走人工模式门(R3.1)。
+             * R2-B1: d_mode 与已提交模式一起走提交协议; 提交失败也不能留在
+             * RELATIVE(那是更宽松的一侧), 因此 d_mode 仍然退回, 并显式打印不一致。 */
+            if (rel_prod_commit((rt_uint8_t)DIAG_MODE_MONITOR_ONLY, RT_FALSE, RT_NULL) != RT_EOK)
+                rt_kprintf("[DIAG] REL mode commit FAILED rc; d_mode->MONITOR\n");
+            d_mode = DIAG_MODE_MONITOR_ONLY;
+            /* 本线程就是引擎的唯一写者: 摘要取自己的闩锁, 不依赖镜像是否发布成功。
+             * 控制锁取不到时镜像可能还是空的, 那属于"证据视图待补", 不是"没发生触发"
+             * —— 用镜像打印会让 TRIP 摘要在这里整体消失。 */
+            if (rel_writer_latch(&l))
+            {
+                rt_kprintf("[DIAG] REL TRIP r=%s id=%u rev=%u post_rc=%d\n",
+                           rel_reason_name(l.reason), (unsigned)l.profile_id,
+                           (unsigned)l.revision, (int)l.post_rc);
+                rt_kprintf("[DIAG] REL TRIP val=%d thr=%d ms=%u cov=%u\n",
+                           (int)l.value_raw, (int)l.threshold_raw,
+                           (unsigned)l.persisted_ms, (unsigned)l.coverage_at_trip);
+                rt_kprintf("[DIAG] REL TRIP sg=%u cur=%u imu=%u tick=%u n=%u\n",
+                           (unsigned)l.first_sg_seq, (unsigned)l.first_cur_seq,
+                           (unsigned)l.first_imu_seq, (unsigned)l.trig_tick,
+                           (unsigned)l.severe_cnt);
+            }
+            rt_kprintf("[DIAG] REL trip ticket used; mode=MONITOR_ONLY rearm required\n");
+        }
+
+        if ((rt_uint8_t)cov != cov_shown)
+        {
+            cov_shown = (rt_uint8_t)cov;
+            /* 只有真的开了相对保护, "不再覆盖"才是操作员必须立刻知道的事;
+             * MONITOR_ONLY 下同一状态由 diag_status 按需查看, 不占串口。 */
+            if (d_mode == DIAG_MODE_RELATIVE_PROTECTION)
+                rt_kprintf("[DIAG] REL coverage=%s id=%u rev=%u live=%u prof=%u\n",
+                           rel_cov_name(cov), (unsigned)prof.profile_id,
+                           (unsigned)prof.revision, (unsigned)in.live_signature,
+                           (unsigned)prof.signature);
+        }
+        rt_thread_mdelay(10);               /* 100Hz */
+    }
+}
+
+/* ---------- 正式 API (diagnosis.h) ----------
+ * 生产上下文的薄包装: 外部契约不变, 但内部所有可写状态都在 d_prod 里。 */
+
+void diag_reset(void) { diag_engine_reset(&d_prod); }
+
+void diag_relative_status_lines(void);   /* 前向声明(diag_status 之后定义) */
+
+diag_verdict_t diag_step(const diag_input_t *in)
+{
+    return diag_engine_step(&d_prod, in);
+}
+
+rt_err_t diagnosis_init(void)
+{
+    if (d_tid != RT_NULL) return RT_EOK;    /* 幂等 */
+
+    diag_sync_config();                     /* 初始阈值来自持久化配置 */
+    rt_memset(&d_prod, 0, sizeof(d_prod));
+    d_prod.may_report = RT_TRUE;            /* 生产上下文才允许上报 Safety 事件 */
+    diag_engine_reset(&d_prod);
+
+    rel_prod_init_wipe();               /* 线程起来之前: 初始化专用的全清(R2-A.5) */
+    if (rel_ctl_init() != RT_EOK)
+        rt_kprintf("[DIAG] REL ctl lock INIT FAILED - relative claims disabled\n");
+    else if (rel_prod_commit((rt_uint8_t)DIAG_MODE_MONITOR_ONLY, RT_FALSE, RT_NULL) != RT_EOK)
+        rt_kprintf("[DIAG] REL ctl commit FAILED at init\n");
+    /* M8-R1: 事故快照/代际/发布快照共用的短临界区。初始化失败时 rel_ctl_take()
+     * 一律返回错误 => 每帧按 RELCOV_LOCK_FAIL 有界降险, 而不是"当作有锁"。 */
+
+    d_tid = rt_thread_create("diag", diag_thread_entry, RT_NULL,
+                             DIAG_THREAD_STACK, 9, 10);  /* prio 9, 100Hz */
+    if (d_tid == RT_NULL) { d_health = SUBSYS_FAILED; return -RT_ERROR; }
+    rt_thread_startup(d_tid);
+
+    d_health = SUBSYS_OK;
+    rt_kprintf("[DIAG] thread started (prio 9, mode=%s)\n",
+               d_mode == DIAG_MODE_MONITOR_ONLY ? "MONITOR_ONLY" : "ACTIVE");
+    return RT_EOK;
+}
+
+/* 人工模式门(M8-R1 R3.1 / 复现 C1): 任何**实际发生的**模式改变都必须先证得静止+
+ * 可信禁能。"关保护"同样是模式改变 —— CRUISE 中把 RELATIVE 关掉, 正在转的轴会
+ * 瞬间失去判据而不产生任何降险, 这与"开启不得在运动中"是同一条理由。
+ * Safety 降险引起的内部退回(diag_thread_entry 里那次)不走本门, 否则一次真实触发
+ * 之后连降级本身都做不了。 */
+static rt_err_t diag_human_mode_gate(const char *who)
+{
+    motor_snapshot_t ms;
+
+    if (motor_get_snapshot(&ms) != RT_EOK ||
+        ms.state != MOTOR_IDLE || ms.armed != 0 ||
+        ms.current_hz != 0 || ms.target_hz != 0)
+    { rt_kprintf("[DIAG] %s REFUSED: mode change needs static/idle\n", who); return -RT_EPERM; }
+    if (safety_state_get() != SAFETY_READY)
+    { rt_kprintf("[DIAG] %s REFUSED: safety not READY\n", who); return -RT_EPERM; }
+    return RT_EOK;
+}
+
+rt_err_t diagnosis_set_mode(diag_mode_t mode)
+{
+    /* R2-B1(复现 MODE_PUBLISHED_AFTER_STATIC_RELEASE): 旧写法在
+     * motor_calibration_static_end() **之后**才改 d_mode / 请求新代际, 于是
+     * "复核通过"与"模式落定"之间存在一个允许交错: 另一个执行者可以在静止门
+     * 释放后、模式提交前 arm/start。现在最终复核与(模式+代际)提交整段落在
+     * 同一次静止事务里, 打印全部移到提交/释放之后。
+     * 入口的 CONFIRM 凭据仍是"用掉即清": 提交失败也不退还(否则一次拒绝就变成
+     * 免凭据重试)。 */
+    diag_rprof_t p;
+    const char *why = RT_NULL;
+    sensor_frame_t fr;
+    rel_incident_t inc;
+    rt_err_t rc = RT_EOK, get = RT_EOK, irc;
+    rt_uint32_t live = 0;
+    rt_bool_t new_gen = RT_FALSE, committed = RT_FALSE;
+    const char *refuse = RT_NULL;
+
+    if (mode == d_mode)                    /* 同值请求: 不改状态、不重置引擎 */
+    {
+        rt_kprintf("[DIAG] mode=%s (unchanged)\n", mode_name(d_mode));
+        return RT_EOK;
+    }
+    if (diag_human_mode_gate("mode") != RT_EOK) return -RT_EPERM;
+
+    /* 纯读的前置先做掉(它们不改任何状态, 也不需要持门)。 */
+    if (mode == DIAG_MODE_ACTIVE_PROTECTION &&
+        current_adc_cal_source() != CURRENT_ADC_CAL_MEASURED)
+    {
+        /* P1-7 / Fix B 标定门禁: 只有实测标定来源才允许 ACTIVE_PROTECTION;
+         * 理论默认值(THEORETICAL)不得驱动保护动作。本门与相对模式互不影响。 */
+        rt_kprintf("[DIAG] ACTIVE REFUSED: calibration source=%d"
+                   " (need MEASURED)\n", current_adc_cal_source());
+        return -RT_EPERM;
+    }
+    if (mode == DIAG_MODE_RELATIVE_PROTECTION && d_relative_confirm_given != RT_TRUE)
+    {
+        rt_kprintf("[DIAG] RELATIVE REFUSED: needs explicit CONFIRM_EXPERIMENTAL\n");
+        return -RT_EPERM;
+    }
+    if (mode == DIAG_MODE_RELATIVE_PROTECTION) d_relative_confirm_given = RT_FALSE;
+
+    if (motor_calibration_static_begin() != RT_EOK)
+    {
+        rt_kprintf("[DIAG] mode REFUSED: static txn not granted\n");
+        return -RT_EBUSY;
+    }
+
+    /* ---- 以下全部在静止门内 ---- */
+    if (mode == DIAG_MODE_RELATIVE_PROTECTION)
+    {
+        rt_memset(&p, 0, sizeof(p));
+        get  = project_config_get_rprof(&p);          /* mot -> cfg 顺序, 与 M7 一致 */
+        live = rel_live_signature();
+        if (get != RT_EOK)                            rc = -RT_EIO;
+        else if (p.magic == 0)                        rc = -RT_EPERM;
+        else if (rel_profile_validate(&p, &why) != RT_EOK) rc = -RT_EINVAL;
+        else if (p.signature != live)                 rc = -RT_EPERM;
+        else if (sensor_service_get_latest(&fr) != RT_EOK || fr.seq == 0 ||
+                 !fr.valid_sg || !fr.valid_current)   rc = -RT_EPERM;
+        if (rc == RT_EOK)
+        {
+            if (get != RT_EOK)              refuse = "config-lock";
+            else if (p.magic == 0)          refuse = "no committed profile";
+            else if (p.signature != live)   refuse = "sig != live";
+            else                            refuse = "source unhealthy";
+        }
+        new_gen = RT_TRUE;                    /* 相对保护总是一次新的武装 */
+    }
+    if (rc == RT_EOK && mode == DIAG_MODE_ACTIVE_PROTECTION) diag_reset();
+
+    /* 模式与代际在同一次控制临界区里落; 抢不到锁 => 两者都不动。 */
+    if (rc == RT_EOK)
+    {
+        rc = rel_prod_commit((rt_uint8_t)mode, new_gen, RT_NULL);
+        if (rc != RT_EOK) refuse = "ctl lock failed";
+    }
+    if (rc == RT_EOK)
+    {
+        d_mode    = mode;                   /* 仍持门: 此刻模式与代际已经一起落定 */
+        committed = RT_TRUE;
+    }
+    motor_calibration_static_end();
+
+    /* ---- 提交/释放之后的披露 ---- */
+    if (!committed)
+    {
+        irc = rel_prod_get_incident(&inc);
+        rt_kprintf("[DIAG] mode REFUSED: (%s) rc=%d stay=%s\n",
+                   refuse ? refuse : (rc == -RT_EINVAL && why ? why : "validate"),
+                   (int)rc, mode_name(d_mode));
+        if (rc == -RT_EINVAL && why)
+            rt_kprintf("[DIAG] mode refused reason=%s\n", why);
+        if (irc == RT_EOK && inc.have_current)
+            rt_kprintf("[DIAG] mode kept armed ticket: rearm=%d gen=%u\n",
+                       (int)inc.rearm_required, (unsigned)inc.generation);
+        return rc;
+    }
+    if (mode == DIAG_MODE_RELATIVE_PROTECTION)
+    {
+        /* 阈值来源如实披露: 学习生成的裕量从未经过真实异常样本验证。 */
+        rt_kprintf("[DIAG] REL thresholds=%s id=%u rev=%u tier=%u\n",
+                   (p.flags & RPF_FIELD_VERIFIED) ? "FIELD_VERIFIED" : "FIELD_UNVERIFIED",
+                   (unsigned)p.profile_id, (unsigned)p.revision,
+                   (unsigned)p.threshold_tier);
+        /* 清事故 latch 只发生在"操作员显式重新武装"这一刻, 而且必须先把旧原因
+         * 宣布出来 —— 静默擦掉上一轮首次触发就等于抹掉证据(R3.3 的归档规则)。 */
+        if (rel_prod_get_incident(&inc) == RT_EOK && inc.have_current)
+            rt_kprintf("[DIAG] REL re-arm prior r=%s id=%u tick=%u post_rc=%d\n",
+                       rel_reason_name(inc.current.reason),
+                       (unsigned)inc.current.profile_id, (unsigned)inc.current.trig_tick,
+                       (int)inc.current.post_rc);
+    }
+    rt_kprintf("[DIAG] mode=%s\n", mode_name(d_mode));
+    return RT_EOK;
+}
+
+
+diag_mode_t diagnosis_get_mode(void) { return d_mode; }
+void diagnosis_take_relative_confirm(void) { d_relative_confirm_given = RT_TRUE; }
+diag_verdict_t diagnosis_get_verdict(void) { return d_prod.st.verdict; }
+
+static void diag_engine_get_features(const diag_engine_t *e, float *sg_filt,
+                                     float *sg_delta, float *cur_filt,
+                                     float *cur_delta)
+{
+    if (sg_filt)  *sg_filt  = e->st.sg_filt;
+    if (sg_delta) *sg_delta = e->st.sg_delta;
+    if (cur_filt) *cur_filt = e->st.cur_filt;
+    if (cur_delta) *cur_delta = e->st.cur_delta;
+}
+
+void diag_get_features(float *sg_filt, float *sg_delta,
+                       float *cur_filt, float *cur_delta)
+{
+    diag_engine_get_features(&d_prod, sg_filt, sg_delta, cur_filt, cur_delta);
+}
+subsys_health_t diagnosis_get_health(void) { return d_health; }
+
+/* ---------- MSH ---------- */
+
+static void diag_status(void)
+{
+    rt_kprintf("[DIAG] verdict=%s mode=%s health=%s\n",
+               verdict_name(d_prod.st.verdict), mode_name(d_mode),
+               subsys_health_name(d_health));
+    {
+        current_adc_cal_source_t src = current_adc_cal_source();
+
+        rt_kprintf("[DIAG] adc_cal_source=%s%s\n",
+                   src == CURRENT_ADC_CAL_MEASURED ? "MEASURED" :
+                   src == CURRENT_ADC_CAL_THEORETICAL ? "THEORETICAL" : "NONE",
+                   src == CURRENT_ADC_CAL_MEASURED ? "" :
+                   " (NOT a measured current)");
+    }
+    rt_kprintf("[DIAG] threshold_validation=NOT_ESTABLISHED"
+               " (SG load/speed applicability unverified)\n");
+    rt_kprintf("[DIAG] mode=%s; vibration includes ~1g gravity baseline\n",
+               mode_name(d_mode));
+    rt_kprintf("[DIAG] sg_filt=%d delta=%d cur_filt=%d mA delta=%d mA\n",
+               (int)d_prod.st.sg_filt, (int)d_prod.st.sg_delta,
+               (int)d_prod.st.cur_filt, (int)d_prod.st.cur_delta);
+    rt_kprintf("[DIAG] vib rms=%d peak=%d mg band=%d\n",
+               (int)d_prod.st.vib_rms, (int)d_prod.st.vib_peak,
+               d_prod.st.speed_band);
+    rt_kprintf("[DIAG] cnt sg<warn=%u sg<stall=%u cur>warn=%u cur>stall=%u"
+               " impact=%u bad=%u clean=%u\n",
+               d_prod.st.sg_below_warn_cnt, d_prod.st.sg_below_stall_cnt,
+               d_prod.st.cur_above_warn_cnt, d_prod.st.cur_above_stall_cnt,
+               d_prod.st.vib_impact_cnt, d_prod.st.sensor_bad_cnt,
+               d_prod.st.clean_cnt);
+    diag_relative_status_lines();
+}
+
+/* M8-R1 R4.5 相对保护状态行: 每个字段都来自**同一批快照**(引擎快照 + profile 快照 +
+ * 事故快照各一次), 并且每行都按"合法 u32 最大值 / 最长原因名 / 负错误码"算过宽度,
+ * 目标 <=110 字节。
+ *
+ * 为什么要按最坏值算: 本板 RT-Thread 控制台缓冲是 128B(rt_kprintf 会剪到约 126B
+ * 并漏掉结尾 NUL), M8 交付的实测最长行是 141B —— 也就是说现场看到的"最后一列"
+ * 可能根本不是固件想说的内容。这里不加 RT_CONSOLEBUF_SIZE、不加全局打印大锁、
+ * 不动 UART 叶子, 只把行拆短。 */
+void diag_relative_status_lines(void)
+{
+    diag_rprof_t p;
+    rel_state_t s;
+    rel_incident_t inc;
+    rt_uint32_t rup = 0, rdn = 0;
+    rt_bool_t have;
+    rt_uint32_t sig;
+
+    rt_err_t snap_rc, inc_rc;
+
+    snap_rc = rel_prod_get_snapshot(&s);        /* R2-A.3: 整份或失败, 没有半份 */
+    inc_rc  = rel_prod_get_incident(&inc);
+    rt_memset(&p, 0, sizeof(p));       /* 取快照失败时也必须打印确定值, 不能是栈垃圾 */
+    have = (project_config_get_rprof(&p) == RT_EOK && p.magic != 0);
+    sig = rel_live_signature();
+    rel_adc_reach(&p, &rup, &rdn);
+
+    /* 状态行的"这一份是不是同一帧的整份"必须自己说清楚: 读不到控制临界区时
+     * 上面两个结构体都被清零, 只看不打印就会把"没有数据"读成"数据是 0"。 */
+    rt_kprintf("[DIAG] rel snap=%s inc=%s seq=%u pubfail=%u\n",
+               snap_rc == RT_EOK ? "OK" : "FAIL", inc_rc == RT_EOK ? "OK" : "FAIL",
+               (unsigned)s.snap_seq, (unsigned)s.pub_fail_cnt);
+
+    rt_kprintf("[DIAG] rel mode=%s prof=%s id=%u rev=%u flg=%04X %s\n",
+               mode_name(d_mode), have ? "PRESENT" : "NONE",
+               (unsigned)p.profile_id, (unsigned)p.revision, (unsigned)p.flags,
+               (have && (p.flags & RPF_FIELD_VERIFIED)) ? "FIELD_VERIFIED"
+                                                       : "FIELD_UNVERIFIED");
+    rt_kprintf("[DIAG] rel cov=%s lost=%u gen=%u rearm=%d\n",
+               rel_cov_name(s.coverage), (unsigned)s.cov_lost_ms,
+               (unsigned)inc.generation, (int)inc.rearm_required);
+    rt_kprintf("[DIAG] rel win hz=%u[%u..%u] dir=%u ph=%u\n",
+               (unsigned)p.hz_nominal, (unsigned)p.hz_low, (unsigned)p.hz_high,
+               (unsigned)p.dir_mask, (unsigned)p.phase_mask);
+    rt_kprintf("[DIAG] rel tmc=%u/%u/%u/%u mst=%u def=%u tier=%u\n",
+               (unsigned)p.tmc_cfg_state, (unsigned)p.tmc_irun, (unsigned)p.tmc_ihold,
+               (unsigned)p.tmc_vsense, (unsigned)p.mstep_source,
+               (unsigned)p.sampling_def, (unsigned)p.threshold_tier);
+    rt_kprintf("[DIAG] rel sig live=%u prof=%u match=%s\n",
+               (unsigned)sig, (unsigned)p.signature,
+               (have && p.signature == sig) ? "YES" : "NO");
+    rt_kprintf("[DIAG] rel band adc[%u..%u]n%u nz%u sg[%u..%u]n%u\n",
+               (unsigned)p.run_adc_min, (unsigned)p.run_adc_max,
+               (unsigned)p.run_adc_n, (unsigned)p.run_adc_noise,
+               (unsigned)p.run_sg_min, (unsigned)p.run_sg_max, (unsigned)p.run_sg_n);
+    rt_kprintf("[DIAG] rel thr dev=%d/%d drop=%u/%u reach=%u/%u\n",
+               (int)p.adc_dev_warn, (int)p.adc_dev_trip,
+               (unsigned)p.sg_drop_warn, (unsigned)p.sg_drop_trip,
+               (unsigned)rup, (unsigned)rdn);
+    rt_kprintf("[DIAG] rel dur=%u/%u/%u rec=%u mns=%u\n",
+               (unsigned)p.dur_sg_ms, (unsigned)p.dur_adc_ms, (unsigned)p.dur_fused_ms,
+               (unsigned)p.dur_recover_ms, (unsigned)p.min_new_sg);
+    rt_kprintf("[DIAG] rel age lim sg=%u frm=%u imu=%u imp=%u/%u/%u\n",
+               (unsigned)p.age_sg_ms, (unsigned)p.age_frame_ms, (unsigned)p.age_imu_ms,
+               (unsigned)p.impact_peak_mg, (unsigned)p.impact_new_min,
+               (unsigned)p.dur_impact_ms);
+    /* warn 与 strong 两级分别导出: 严重判据借 warn 的时间是 A1/A2 的复现点,
+     * 现场必须能看见"这一级自己攒了多少"。 */
+    rt_kprintf("[DIAG] rel sg warn=%u/%u strong=%u/%u\n",
+               (unsigned)s.sg_run_ms, (unsigned)s.sg_new_cnt,
+               (unsigned)s.sg_strong_run_ms, (unsigned)s.sg_strong_cnt);
+    rt_kprintf("[DIAG] rel adc warn=%u/%u strong=%u/%u\n",
+               (unsigned)s.adc_run_ms, (unsigned)s.adc_new_cnt,
+               (unsigned)s.adc_strong_run_ms, (unsigned)s.adc_strong_cnt);
+    rt_kprintf("[DIAG] rel fus=%u ok=%u imp=%u/%u\n",
+               (unsigned)s.fused_run_ms, (unsigned)s.ok_run_ms,
+               (unsigned)s.imp_run_ms, (unsigned)s.imp_cnt);
+    rt_kprintf("[DIAG] rel bad age=%u out=%u cov=%u imu_use=%u\n",
+               (unsigned)s.age_bad_ms, (unsigned)s.out_run_ms,
+               (unsigned)s.cov_lost_ms, (unsigned)s.imu_usable);
+    rt_kprintf("[DIAG] rel last sg=%u cur=%u imu=%u rsn=%s\n",
+               (unsigned)s.last_sg_seq, (unsigned)s.last_cur_seq,
+               (unsigned)s.last_imu_seq, rel_reason_name(s.verdict));
+    if (inc.have_current)
+    {
+        rt_kprintf("[DIAG] rel LATCH r=%s id=%u rev=%u ms=%u post_rc=%d\n",
+                   rel_reason_name(inc.current.reason), (unsigned)inc.current.profile_id,
+                   (unsigned)inc.current.revision, (unsigned)inc.current.persisted_ms,
+                   (int)inc.current.post_rc);
+        rt_kprintf("[DIAG] rel LATCH val=%d thr=%u n=%u cov=%u tick=%u\n",
+                   (int)inc.current.value_raw, (unsigned)inc.current.threshold_raw,
+                   (unsigned)inc.current.severe_cnt, (unsigned)inc.current.coverage_at_trip,
+                   (unsigned)inc.current.trig_tick);
+        rt_kprintf("[DIAG] rel LATCH sg=%u cur=%u imu=%u\n",
+                   (unsigned)inc.current.first_sg_seq, (unsigned)inc.current.first_cur_seq,
+                   (unsigned)inc.current.first_imu_seq);
+        /* 首次原因不可覆盖, 因此同一次武装内**不会**再触发新的保护请求。
+         * 这一点必须显式说出来, 否则操作员看到 coverage=COVERED 会以为还在防护。 */
+        if (inc.rearm_required)
+            rt_kprintf("[DIAG] rel re-arm needed: diag_mode relative CONFIRM_EXPERIMENTAL\n");
+    }
+    else
+        rt_kprintf("[DIAG] rel latch: none\n");
+    if (inc.have_archived)
+        rt_kprintf("[DIAG] rel ARCHIVED r=%s id=%u tick=%u post_rc=%d\n",
+                   rel_reason_name(inc.archived.reason), (unsigned)inc.archived.profile_id,
+                   (unsigned)inc.archived.trig_tick, (int)inc.archived.post_rc);
+}
+
+MSH_CMD_EXPORT(diag_status, show diagnosis engine features and verdict);
+
+static void diag_mode(int argc, char **argv)
+{
+    if (argc < 2 || argc > 3)
+    {
+        rt_kprintf("usage: diag_mode monitor|active|relative [CONFIRM_EXPERIMENTAL]\n");
+        rt_kprintf("current: %s\n", mode_name(d_mode));
+        return;
+    }
+    if (argc == 3 && rt_strcmp(argv[1], "relative") != 0)
+    { rt_kprintf("CONFIRM_EXPERIMENTAL applies only to 'relative'\n"); return; }
+
+    if (rt_strcmp(argv[1], "monitor") == 0)
+        (void)diagnosis_set_mode(DIAG_MODE_MONITOR_ONLY);
+    else if (rt_strcmp(argv[1], "active") == 0)
+        (void)diagnosis_set_mode(DIAG_MODE_ACTIVE_PROTECTION);
+    else if (rt_strcmp(argv[1], "relative") == 0)
+    {
+        if (argc == 3 && rt_strcmp(argv[2], "CONFIRM_EXPERIMENTAL") == 0)
+            diagnosis_take_relative_confirm();
+        else if (argc == 3)
+        { rt_kprintf("unknown confirmation token\n"); return; }
+        (void)diagnosis_set_mode(DIAG_MODE_RELATIVE_PROTECTION);
+    }
+    else
+        rt_kprintf("unknown mode\n");
+}
+MSH_CMD_EXPORT(diag_mode, switch diagnosis mode: monitor|active|relative [CONFIRM_EXPERIMENTAL]);
+
+/* ---------- diag_selftest: 确定性合成输入(非硬件验证) ----------
+ * Fix E: 全部场景跑在栈上的独立上下文 t 上:
+ *   - 不触碰生产 d_prod ⇒ prio 9 线程的真实帧流与自检互不干扰, 断言可复现;
+ *   - t.may_report = RT_FALSE ⇒ 即使此刻系统处于 ACTIVE_PROTECTION,
+ *     自检喂出的 STALL_CONFIRMED / OVERLOAD 也绝不可能 post EVT_MULTI_FAULT。
+ *   判据/特征一律经 ctx 版 helper 读, 不再用 public 的生产包装。 */
+
+static rt_uint32_t s_feed_seq = 0;
+
+static void s_feed(diag_engine_t *e, rt_uint16_t sg, float ma, rt_int16_t vib,
+                   rt_uint8_t mstate, rt_uint32_t hz)
+{
+    diag_input_t in;
+    in.seq = ++s_feed_seq;
+    in.timestamp = 0;
+    in.sg_valid = 1; in.sg = sg;
+    in.cur_valid = 1; in.current_ma = ma;
+    in.imu_valid = 1; in.vib_mg = vib;
+    in.motor_state = mstate; in.step_hz = hz;
+    diag_engine_step(e, &in);
+}
+
+static void s_feed_missing(diag_engine_t *e)
+{
+    diag_input_t in;
+    in.seq = ++s_feed_seq;
+    in.timestamp = 0;
+    in.sg_valid = 0; in.sg = 0;
+    in.cur_valid = 0; in.current_ma = 0;
+    in.imu_valid = 0; in.vib_mg = 0;
+    in.motor_state = (rt_uint8_t)MOTOR_CRUISE; in.step_hz = 500;
+    diag_engine_step(e, &in);
+}
+
+/* D4: 测试预算必须由引擎自身的模型推出来, 不能拍脑袋写死帧数。
+ *
+ * EMA 是 x += (target-x)*0.2, 即每帧残差 *0.8。要把滤波值推过任意阈值判据
+ * (最坏余量按 1 个单位算), 需要的帧数 n 满足 0.8^n <= 1/|初值差|。
+ * 0.8^64 ≈ 6.4e-7, 即 64 帧足以让 |初值差| 高达 ~1.6e6 的量收敛到 1 个单位
+ * 以内 —— 本项目合成输入的最大跨度(SG<=1023, 电流数千 mA)远小于它。 */
+#define DIAG_EMA_SETTLE_FRAMES 64
+
+/* 振动脉冲的恢复上界: vib_peak 是 DIAG_VIB_WIN 窗口的最大值, 尖峰要先完整
+ * 滑出窗口(= 窗口长度帧)才会停止抬高 vib_impact_cnt; 之后该计数每帧只减 1,
+ * 要从峰值减到 impact_frames 以下才算解除。窗口期内它一直在加, 峰值上界为
+ * spike_frames + 窗口长度, 所以总上界如下(另加 EMA 余量, 循环命中即停)。 */
+static rt_uint32_t s_impact_recovery_bound(rt_uint32_t spike_frames)
+{
+    return DIAG_VIB_WIN + spike_frames + dt.impact_frames +
+           DIAG_EMA_SETTLE_FRAMES;
+}
+
+static void diag_selftest(void)
+{
+    diag_engine_t t;                 /* 独立测试上下文(不进生产状态) */
+    diag_verdict_t v;
+    rt_uint32_t prod_seq_before, prod_seq_after;
+    float prod_cur_before, prod_cur_after;
+    int pass = 1, i;
+
+    /* 快照生产上下文, 结尾证明自检全程没有改动它 */
+    prod_seq_before = d_prod.st.last_seq;
+    prod_cur_before = d_prod.st.cur_filt;
+
+    rt_memset(&t, 0, sizeof(t));
+    t.may_report = RT_FALSE;         /* 关键: 自检永不上报真实 Safety 事件 */
+    diag_engine_reset(&t);
+
+    rt_kprintf("[SELFTEST-D] synthetic injection on an ISOLATED engine context\n");
+    rt_kprintf("[SELFTEST-D] (production engine untouched, may_report=FALSE)\n");
+
+    /* 场景0: NORMAL —— 中速巡航健康值 */
+    for (i = 0; i < 150; ++i)
+        s_feed(&t, 500, 150.0f, 1000, (int)MOTOR_CRUISE, 500);
+    v = t.st.verdict;
+    rt_kprintf("[SELFTEST-D] 0.normal: %s\n", verdict_name(v));
+    if (v != DIAG_NORMAL) pass = 0;
+
+    /* 场景1: 单 sample 不判 severe —— 一帧 stall 特征后立即恢复 */
+    s_feed(&t, 30, 100.0f, 1000, (int)MOTOR_CRUISE, 500);
+    v = t.st.verdict;
+    rt_kprintf("[SELFTEST-D] 1.single-sample-no-severe: %s\n", verdict_name(v));
+    if (v == DIAG_STALL_CONFIRMED || v == DIAG_OVERLOAD) pass = 0;
+
+    /* 场景2: IMPACT —— 尖峰短持续, 之后必须自动回 NORMAL。
+     * D4: 旧实现喂 5 个干净帧就断言 NORMAL —— 但 vib_peak 是 16 点滑窗的
+     * 最大值, 尖峰还在窗口里时 peak 始终超阈值, 该断言在正确代码上必挂。
+     * 改成"喂到 NORMAL 为止, 但必须在数学上界之内"。 */
+    diag_engine_reset(&t);
+    for (i = 0; i < 50; ++i) s_feed(&t, 500, 150.0f, 1000, (int)MOTOR_CRUISE, 500);
+    s_feed(&t, 500, 150.0f, 3000, (int)MOTOR_CRUISE, 500);
+    s_feed(&t, 500, 150.0f, 3000, (int)MOTOR_CRUISE, 500);
+    v = t.st.verdict;
+    rt_kprintf("[SELFTEST-D] 2.impact: %s\n", verdict_name(v));
+    if (v != DIAG_IMPACT) pass = 0;
+    {
+        rt_uint32_t bound = s_impact_recovery_bound(2), used = 0;
+
+        while (used < bound)
+        {
+            s_feed(&t, 500, 150.0f, 1000, (int)MOTOR_CRUISE, 500);
+            used++;
+            if (t.st.verdict == DIAG_NORMAL) break;
+        }
+        v = t.st.verdict;
+        rt_kprintf("[SELFTEST-D] 2.impact-recovery: %s after %u clean frames"
+                   " (bound=%u, win=%d, impact_frames=%u)\n",
+                   verdict_name(v), used, bound, (int)DIAG_VIB_WIN,
+                   dt.impact_frames);
+        if (v != DIAG_NORMAL) pass = 0;
+    }
+
+    /* 场景3: 慢过载 LOAD_WARNING —— 电流超 warn 持续 */
+    diag_engine_reset(&t);
+    for (i = 0; i < 80; ++i) s_feed(&t, 500, 150.0f, 1000, (int)MOTOR_CRUISE, 500);
+    for (i = 0; i < 80; ++i) s_feed(&t, 400, 600.0f, 1000, (int)MOTOR_CRUISE, 500);
+    v = t.st.verdict;
+    rt_kprintf("[SELFTEST-D] 3.slow-overload: %s\n", verdict_name(v));
+    if (v != DIAG_LOAD_WARNING) pass = 0;
+
+    /* 场景3b(P1-6 重写): Δ 真实性 = 稳定基线 → 单帧阶跃 → 立即断言幅度与符号。
+     * 旧实现是在 80 帧高值"已经收敛之后"才检查 cur_delta>0: float32 在 600 附近
+     * 的 ULP 约 6e-5, 约 67 帧后 EMA 步进小于半 ULP 而完全停住, Δ 恒等于 0.0f,
+     * 该断言必然失败且无法证明 Δ 计算正确 —— 属假测试。 */
+    {
+        float sgf, sgd, cf, cd, base_cd;
+
+        diag_engine_reset(&t);
+        for (i = 0; i < 60; ++i) s_feed(&t, 500, 150.0f, 1000, (int)MOTOR_CRUISE, 500);
+        diag_engine_get_features(&t, &sgf, &sgd, &cf, &base_cd);  /* 基线 */
+        if (base_cd >= 1.0f || base_cd <= -1.0f)
+        { rt_kprintf("[SELFTEST-D] 3b baseline not stable (d=%d)\n", (int)base_cd);
+          pass = 0; }
+        s_feed(&t, 500, 600.0f, 1000, (int)MOTOR_CRUISE, 500);   /* 单帧上升阶跃 */
+        diag_engine_get_features(&t, &sgf, &sgd, &cf, &cd);
+        rt_kprintf("[SELFTEST-D] 3b.rise-delta: base=%d then %d (expect ~+90)\n",
+                   (int)base_cd, (int)cd);
+        if (cd < 50.0f)
+        { rt_kprintf("[SELFTEST-D] 3b rise FAIL\n"); pass = 0; }
+
+        diag_engine_reset(&t);
+        for (i = 0; i < 60; ++i) s_feed(&t, 500, 900.0f, 1000, (int)MOTOR_CRUISE, 500);
+        s_feed(&t, 500, 200.0f, 1000, (int)MOTOR_CRUISE, 500);   /* 单帧下降阶跃 */
+        diag_engine_get_features(&t, &sgf, &sgd, &cf, &cd);
+        rt_kprintf("[SELFTEST-D] 3b.fall-delta: %d (expect ~-140)\n", (int)cd);
+        if (cd > -50.0f)
+        { rt_kprintf("[SELFTEST-D] 3b fall FAIL\n"); pass = 0; }
+    }
+
+    /* 场景4: 堵转 —— SG 崩 + 电流升, 先 SUSPECT 后 CONFIRMED(persistence)。
+     * D4: 旧预算(60 帧 / 80 帧)小于"EMA 收敛 + persistence"的实际需要 ——
+     * sg_filt 从 500 收敛到 80 要 ~14 帧才跨过 sg_warn, 剩下的帧数不够
+     * persist_warn; CONFIRMED 更是要 persist_stall=100 帧的连续条件, 80 帧
+     * 预算数学上不可能达成。现在预算 = 保守收敛帧数 + 配置里的 persistence
+     * + 余量, 阈值本身一个都不改。 */
+    diag_engine_reset(&t);
+    for (i = 0; i < 50; ++i) s_feed(&t, 500, 150.0f, 1000, (int)MOTOR_CRUISE, 500);
+    {
+        rt_uint32_t n_suspect, n_confirm;
+        rt_uint32_t i2;
+
+        /* 前置条件: 合成输入必须真的落在 band1(500Hz) 的两级阈值之间 ——
+         * 80 在 sg_stall 与 sg_warn 之间(只触发 SUSPECT), 20 低于 sg_stall
+         * (触发 CONFIRMED), 600 在电流 warn 与 stall 之间(不判 OVERLOAD)。
+         * 若阈值被改成不满足这些关系, 本用例就没有意义: 直接判失败, 不静默放过。 */
+        if (!(dt.sg_stall[1] < 80 && 80 < dt.sg_warn[1]) ||
+            !(20 < dt.sg_stall[1]) ||
+            !(dt.cur_warn_ma[1] < 600.0f && 600.0f < dt.cur_stall_ma[1]))
+        {
+            rt_kprintf("[SELFTEST-D] 4 PRECONDITION FAIL: synthetic inputs"
+                       " (sg 80/20, cur 600) do not fit band1 thresholds"
+                       " (sg_warn=%d sg_stall=%d cur_warn=%d cur_stall=%d)"
+                       " - test invalid\n",
+                       dt.sg_warn[1], dt.sg_stall[1],
+                       (int)dt.cur_warn_ma[1], (int)dt.cur_stall_ma[1]);
+            pass = 0;
+        }
+
+        n_suspect = DIAG_EMA_SETTLE_FRAMES + dt.persist_warn + 16;
+        n_confirm = DIAG_EMA_SETTLE_FRAMES + dt.persist_stall + 16;
+        rt_kprintf("[SELFTEST-D] 4 budgets: suspect=%u confirm=%u frames"
+                   " (settle=%d warn=%u stall=%u)\n",
+                   n_suspect, n_confirm, DIAG_EMA_SETTLE_FRAMES,
+                   dt.persist_warn, dt.persist_stall);
+
+        for (i2 = 0; i2 < n_suspect; ++i2)
+            s_feed(&t, 80, 600.0f, 1000, (int)MOTOR_CRUISE, 500);
+        v = t.st.verdict;
+        rt_kprintf("[SELFTEST-D] 4.stall-suspect: %s\n", verdict_name(v));
+        if (v != DIAG_STALL_SUSPECT) pass = 0;
+
+        for (i2 = 0; i2 < n_confirm; ++i2)
+            s_feed(&t, 20, 900.0f, 1000, (int)MOTOR_CRUISE, 500);
+        v = t.st.verdict;
+        rt_kprintf("[SELFTEST-D] 4.stall-confirmed: %s\n", verdict_name(v));
+        if (v != DIAG_STALL_CONFIRMED) pass = 0;
+    }
+    /* ACTIVE 模式下的停机隔离只能靠 may_report 保证, 这里顺带确认本上下文
+     * 从未被允许上报(自检结束时 severe_latched 允许为真, 但不得 post 事件) */
+    rt_kprintf("[SELFTEST-D] 4.may_report=%d (must be 0)\n", (int)t.may_report);
+    if (t.may_report) pass = 0;
+
+    /* 场景4b: hysteresis —— 条件消失后保持一段(不立即 NORMAL) */
+    s_feed(&t, 500, 150.0f, 1000, (int)MOTOR_CRUISE, 500);
+    v = t.st.verdict;
+    rt_kprintf("[SELFTEST-D] 4b.hysteresis-hold: %s\n", verdict_name(v));
+    if (v == DIAG_NORMAL) { rt_kprintf("[SELFTEST-D] 4b FAIL\n"); pass = 0; }
+
+    /* 场景4c(P1-5 重写): 同帧去重 —— 测的是引擎里真正的去重层。
+     * 旧实现只断言"不 CONFIRMED", 而去重当时写在线程里, 引擎根本看不到
+     * seq, 于是 100 次同 seq 调用会正常累计 persistence 并判成 CONFIRMED ——
+     * 该用例在正确代码上必挂。现在额外要求: 首帧之后的 99 次重复调用
+     * 完全不得改变滤波值(一次算术都不做)。 */
+    diag_engine_reset(&t);
+    for (i = 0; i < 60; ++i) s_feed(&t, 500, 150.0f, 1000, (int)MOTOR_CRUISE, 500);
+    {
+        diag_input_t dup;
+        float sgf1, sgd1, cf1, cd1, sgf2, sgd2, cf2, cd2;
+
+        dup.seq = 90210; dup.timestamp = 0;
+        dup.sg_valid = 1; dup.sg = 20;              /* stall 特征 */
+        dup.cur_valid = 1; dup.current_ma = 900.0f;
+        dup.imu_valid = 1; dup.vib_mg = 1000;
+        dup.motor_state = (rt_uint8_t)MOTOR_CRUISE; dup.step_hz = 500;
+
+        diag_engine_step(&t, &dup);                 /* 第 1 次: 正常消费 */
+        diag_engine_get_features(&t, &sgf1, &sgd1, &cf1, &cd1);
+        for (i = 0; i < 99; ++i) diag_engine_step(&t, &dup);  /* 同 seq 再喂 99 次 */
+        diag_engine_get_features(&t, &sgf2, &sgd2, &cf2, &cd2);
+
+        rt_kprintf("[SELFTEST-D] 4c.dedup: cur_filt %d vs %d (must be identical)\n",
+                   (int)cf1, (int)cf2);
+        if (cf1 != cf2 || sgf1 != sgf2 || cd1 != cd2)
+        { rt_kprintf("[SELFTEST-D] 4c FAIL: duplicate frame was re-processed\n");
+          pass = 0; }
+
+        v = t.st.verdict;
+        rt_kprintf("[SELFTEST-D] 4c.dedup verdict: %s (expect not CONFIRMED)\n",
+                   verdict_name(v));
+        if (v == DIAG_STALL_CONFIRMED)
+        { rt_kprintf("[SELFTEST-D] 4c FAIL: persistence accumulated on one frame\n");
+          pass = 0; }
+
+        /* 对照: 每帧换新 seq 必须立刻重新被处理并累计到 CONFIRMED
+         * (证明去重不是"永远不干活") */
+        for (i = 0; i < 150; ++i)
+        { dup.seq = (rt_uint32_t)(90211 + i); diag_engine_step(&t, &dup); }
+        v = t.st.verdict;
+        rt_kprintf("[SELFTEST-D] 4c.control new-seq verdict: %s (expect CONFIRMED)\n",
+                   verdict_name(v));
+        if (v != DIAG_STALL_CONFIRMED)
+        { rt_kprintf("[SELFTEST-D] 4c control FAIL: engine stopped consuming\n");
+          pass = 0; }
+    }
+
+    /* 场景5: sensor missing —— 不当 0, 持续后 SENSOR_FAULT */
+    diag_engine_reset(&t);
+    for (i = 0; i < 50; ++i) s_feed(&t, 500, 150.0f, 1000, (int)MOTOR_CRUISE, 500);
+    for (i = 0; i < 80; ++i) s_feed_missing(&t);
+    v = t.st.verdict;
+    rt_kprintf("[SELFTEST-D] 5.sensor-missing: %s\n", verdict_name(v));
+    if (v != DIAG_SENSOR_FAULT) pass = 0;
+
+    /* 场景6: ACCEL 相位抑制 —— 斜坡期 SG 低不判堵转 */
+    diag_engine_reset(&t);
+    for (i = 0; i < 120; ++i)
+        s_feed(&t, 20, 900.0f, 1000, (int)MOTOR_ACCEL, 300);
+    v = t.st.verdict;
+    rt_kprintf("[SELFTEST-D] 6.accel-inhibit: %s\n", verdict_name(v));
+    if (v == DIAG_STALL_SUSPECT || v == DIAG_STALL_CONFIRMED) pass = 0;
+
+    /* Fix E 的隔离断言: 生产上下文的前后指纹必须一致。
+     * (Diagnosis Thread 自己会继续推进, 所以这里比较的是"自检有没有直接写它":
+     *  自检期间真实帧到达会让 last_seq 变 —— 因此只在生产线程未创建/未消费到
+     *  新帧时才是强判据; 这里退化为信息输出 + 有界判据, 不做不可靠的强断言。) */
+    prod_seq_after = d_prod.st.last_seq;
+    prod_cur_after = d_prod.st.cur_filt;
+    rt_kprintf("[SELFTEST-D] 7.isolation: prod last_seq %u -> %u, prod cur_filt"
+               " %d -> %d (selftest wrote neither; thread may advance)\n",
+               prod_seq_before, prod_seq_after,
+               (int)prod_cur_before, (int)prod_cur_after);
+    rt_kprintf("[SELFTEST-D] 7.isolation: selftest used a private context"
+               " (sizeof=%u B), may_report=0\n", (unsigned)sizeof(t));
+
+    rt_kprintf("[SELFTEST-D] %s\n", pass ? "ALL PASS" : "FAILED");
+}
+MSH_CMD_EXPORT(diag_selftest, deterministic synthetic-input diagnosis selftest);

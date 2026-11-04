@@ -781,3 +781,56 @@ WebUSB: CMSIS-DAP / Saleae Logic 全部仍 Status=OK 枚举，两次之间 USB �
 任务书采纳才生效；我不替 A 改判据，也**不回改**本轮已登记的事实与标签（R7F6 仍按原条款记
 `OVER_CAP_POWERDOWN` / `OVER_CAP_ADDITIONAL_POWERUP` / `CLOSEOUT_POWERED_DOWN_EXPECTATION_NOT_ACHIEVED`）。
 顺带提请 A 定范围时一并考虑两点：下一轮"已上电"前置条件将常态成立；板端将长时间带电。
+
+## 20 M8-R7F7 离线核对轮（A 的"新版上板＋真实异步作业"包；设备动作 0，停在批准门）
+
+2026-11-05 03:35 操作者转交附件 `NS800_R7F7_NewImage_Real_Async_Job_Task_20261105.zip`
+（312901 B，SHA256 `15bf813bbd62ee7fcbc263f2c31c1a92f71a42f6e084498c0fa4f568d1076b62`），
+**本轮只有附件、没有执行指令**。包内容是一次 flash 下载 + 一次定长回读 + 一次 COM5 会话
+（开口/复位/`zero 32`/`learn 8 450 550 0` 各 1，明令"必须真实受理为 1 个作业，只看到 IDLE 或 REFUSED 不算通过"），
+这些全是设备动作。按既有纪律：离线能算的全部算完并入档，**不开现场账、不下载、不回读、不开串口**，
+把决定权交回操作者。（对照：R7F6 那一轮操作者说了「按此包执行」，所以我一次跑完。）
+
+判据工具 `phase8-m8-r7f7-newimage-static/tools/r7f7_offline_checks.py`：**109 条判据，FAIL=0**，
+原文 `proof/offline_preflight_r7f7.txt`。核心复算（都不采信包内文本自报，回到本机实读）：
+
+- 包 28 件清单逐条磁盘散列相符（清单不含自身，zip 内 29 个文件）；镜像 BIN/AXF/map/callgraph
+  在 A IDENTITY / A 派生绑定 / 真实 build_manifest / 磁盘 **四方一致**。
+- **AXF 的 PT_LOAD（`p_paddr=0x08000000`, `filesz=297452`）逐字节 == BIN**，段 sha == `23691e8d…`；
+  `memsz > filesz` 是 RAM 里的 RW/ZI，回读只比 flash 段。
+- 源码：包内 10 件 frozen `.c` == `00718b4` 的 blob == 工作树（按行尾归一）；`source_bindings` 5 件
+  （含两个 `.h`）在 tip 上 sha+bytes+**git blob id** 全等；`product_tree_sha1=32470c7e…` 我按"目录树"没找到，
+  实读确认它是 `rt-thread-master` 子树对象号且在 `00718b4`/`7a08f9d` 上同一对象 → A 的相等声明成立。
+  `00718b4..7a08f9d` 非 `reports/` 改动只有 `.gitattributes` → 产品与主机源码 0 改动。
+- 执行器未动（`33d3f0af…`，仓内件与包内见证副本逐字节相同）；本机重跑 `--validate-plan` 得
+  **58 行 checks=57 fail=1 msh_commands=74**，与 A 原文判定名+PASS/FAIL **逐行相同**，唯一差异是末行
+  `plan=` 路径；唯一原始 FAIL 仍是 `PLAN_MOTION_CAP_BUDGET`（A 保留原 FAIL，未改执行器、未填假额度）。
+- 本机重跑 `--approval-init` 与 `stub+sim` 整包：caps 21 项、identities 3 散列与 A 一致；S0–S3 全 OK；
+  `quota_used` 恰为 6 项正额度各 1、15 项 0 额度 0 消耗；S0 facts 除路径/身份名外与 A 全等；needles_total=41。
+- **41 条 needle 不只命中冻结件，也逐条命中产品工作树源码**；旧同步 learn 的 OK/FAILED 两条确已被异步字面量替代。
+- A 的 host C 探针 `host_probe.c` 在本机用仓库自己的 `shim_rel`+产品目录**重新编译并运行**：
+  rc=0，输出 **逐字节等于** A 的 stdout（CRLF 归一后 sha `fc8747c7…` 相同，字节差恰好等于行数 29）；
+  `state=4` 的身份回 `diag_relative.h` 按 C 隐式递增推算 = `REL_JOB_FAILED`，`owner=0` = `REL_CAP_FREE`。
+- 计划语义我另算的：15 步=1 复位+13 命令+1 被动观察；13 条命令顺序同 §5 表；17 条禁用命令零出现
+  （注入 `motor_start` 会被抓）；75 s 窗+91 s 命令窗=**166 s ≤ 210 s**；`learn` 硬要求 `STARTED id=1`
+  且明禁 REFUSED/FAILED；终态锁死 `id=1 FAILED/WINDOW_BROKEN owner=0 cred=1/0` 且明禁 DONE/RUNNING/STARTED；
+  失败词白名单 5 条全锚定且只 `job_failed` 一处含 FAILED（未全局放行）。
+
+**供电口径被 A 采纳**：任务书 §3 与计划 `operator_power_policy` 写明"已上电就保持供电、收口不再要求断电、
+`normal_end_powerdown=0`、`additional_powercycles=0`、必要时建立供电至多 1 次"，即操作者
+「我希望默认不断电」这条变更请求在本轮生效；同时保留"通电状态以现场实报为准、异常使能时操作者硬件禁能优先"。
+R7F6 已登记事实与三个超额度标签**不回改**。
+
+自伤 16 项（详见 `OFFLINE_REVIEW.md` §7），值得留的三条：① 我把会话预算先手算成 162 s 就写进判据，
+实算 166 s——**算术错的判据会把正确的计划钉成失败**；② 取 PASS/FAIL 用固定下标，步骤级行的判定在第 4 段，
+造成假红；同一写法若用在泄漏扫描上就会漏报；③ 掩码顺序先短后长，把仓外 `D:/ns800_r7f1_scratch`
+掩成 `<REPO>_r7f1_scratch`，读起来像证据在仓库里。另两条口径取舍如实登记：通用 `token=` 模式命中的是
+执行器形参名、通用 `X:/` 模式命中的是 A 包里合法的 `C:/Keil_v5` 工具链路径，我**撤销模式并写明理由**，
+没有改包件字节。第 14 项是同类复发：我新写的提交前置检查器自己带了路径字面量样本，连它自己的模式定义行
+都满足自己的判据，被本轮泄漏扫描抓到两处（改成运行时用 `chr(92)` 拼装才干净）——检查器自证必须每轮真跑。
+第 16 项是我把本该写进本文件的补句误编辑进了交接 md 的 §5，删掉了一行，随即按原文恢复；
+说明"改文档"也要有范围核对，不能凭手感连续 Edit。
+
+现场账本仍未开：核准根目录下 `*M8R7F7-2369-async-job-static*` 匹配 0 件（`FIELD_APPROVAL_LEDGER_ABSENT|PASS`）。
+本轮交付：A 包 28+1 件原件、6 件本机复算证据、1 件判据工具、`OFFLINE_REVIEW.md`、本节的 §20。
+产品代码、固件、其他轮次证据 0 改动。

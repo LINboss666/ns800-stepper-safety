@@ -1,0 +1,1 @@
+<GCC> -std=gnu11 -Wall -Wextra -Wno-unused-function -Wno-unused-parameter -DREVIEW_HOST_MAIN="<REPO>/tests/host/rel_main.c" -I <REPO>/tests/host/shim_rel -I <REPO>/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications <SCRATCH>/host/host_probe.c -o <SCRATCH>/host/probe.exe
