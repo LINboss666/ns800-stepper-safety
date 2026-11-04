@@ -376,3 +376,19 @@ A 补充五条落实对账（原文逐字录入 `a_review_r7f5a/SUPPLEMENT_A_R7F
 结论**不拼成全过**：`STATIC_IRQ_TRIAL_WITH_DIAG_ENN_CAPTURE_PASS` 不使用。
 `polarity_measured=false`、`core_protection_verified=false` 保持，四条禁用声称仍全部禁止。
 待操作者回报：收口切断 VM+MCU 的时刻与观察到的掉电表现（`PENDING_OPERATOR_REPORT`，我不代填）。
+
+### 14.1 回读自伤与跟修（设备动作 0）
+
+`034e2ff` 推送后的远端逐 blob 回读：**228 条中 mismatch=1** —— `run_record.md`
+登记值 `221d24aa…`，远端 blob 与磁盘都是 `cd9b3408…`（`blob==disk=True`）。
+
+根因是我自己的操作顺序，不是仓库内容坏掉：改完标签拼写错误（`SERIAL_16_STEP_STATIC_STATIC_…`
+多写一个 STATIC）之后只 `git add` 了 `run_record.md`，**没有重算清单**——清单里那条还是改前的字节散列。
+后果：那次提交里的清单对这一件作了过期声称；内容本身三方一致，坏的只是"登记值"这一路。
+
+跟修：重算 `SHA256SUMS.txt` → 暂存 → 预检（登记==暂存 blob==磁盘，problems=0，两类自检 FIRED）
+→ 一次提交推送 → 再跑逐 blob 回读。回读报告自身不再入库（任务书第 86 行：不为把回读报告再入库形成循环），
+原文留在仓外 `D:/r7f5a_rb_field/remote_readback_r7f5a.txt`。
+
+推送实况（不删不改）：`034e2ff` 那次连续两次被远端 `Internal Server Error` 拒，
+每次都先 `ls-remote` 证远端仍是前 tip 且本地是其直接子提交（纯快进）再重试，第三次成功，负载仅 50873 B。
