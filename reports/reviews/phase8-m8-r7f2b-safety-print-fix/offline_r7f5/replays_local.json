@@ -1,0 +1,193 @@
+[
+  {
+    "case": "positive",
+    "status": "OK",
+    "stages": [
+      {
+        "id": "S0",
+        "status": "OK",
+        "code": null
+      },
+      {
+        "id": "S1",
+        "status": "OK",
+        "code": ""
+      }
+    ],
+    "quota_used": {
+      "port_open": 1,
+      "tmc_config_apply": 1,
+      "irq_polarity_prep": 2,
+      "safety_irq_disable": 1
+    },
+    "ledger_rows": 44,
+    "motion_cmds_in_ledger": [],
+    "dispatch_txt_sha256": "341a093406ae2257db5e4c40040561f8b9c4f488eba6ed88ad719f76b99bdfbe"
+  },
+  {
+    "case": "pre_fault",
+    "status": "STOP",
+    "stages": [
+      {
+        "id": "S0",
+        "status": "OK",
+        "code": null
+      },
+      {
+        "id": "S1",
+        "status": "STOP",
+        "code": "FIELD_VALUE_MISMATCH"
+      }
+    ],
+    "quota_used": {
+      "port_open": 1
+    },
+    "ledger_rows": 8,
+    "motion_cmds_in_ledger": [],
+    "dispatch_txt_sha256": "480c1b3b303b67a36872f868110c15d1d640db0a0e4bfe7b474de5e8111f6be0"
+  },
+  {
+    "case": "diag_already_active",
+    "status": "STOP",
+    "stages": [
+      {
+        "id": "S0",
+        "status": "OK",
+        "code": null
+      },
+      {
+        "id": "S1",
+        "status": "STOP",
+        "code": "FIELD_NOT_EXACTLY_ONE"
+      }
+    ],
+    "quota_used": {
+      "port_open": 1,
+      "tmc_config_apply": 1
+    },
+    "ledger_rows": 22,
+    "motion_cmds_in_ledger": [],
+    "dispatch_txt_sha256": "583771c7ededff99f353dffe5540e5467d546a1b8a999261f1b35f6a272ca814"
+  },
+  {
+    "case": "enable_refused",
+    "status": "STOP",
+    "stages": [
+      {
+        "id": "S0",
+        "status": "OK",
+        "code": null
+      },
+      {
+        "id": "S1",
+        "status": "STOP",
+        "code": "BUSINESS_FAILED"
+      }
+    ],
+    "quota_used": {
+      "port_open": 1,
+      "tmc_config_apply": 1,
+      "irq_polarity_prep": 2
+    },
+    "ledger_rows": 28,
+    "motion_cmds_in_ledger": [],
+    "dispatch_txt_sha256": "6927136ad460e3a4b373232418cd93c24cf3430689081fea3788c78b6030b3fd"
+  },
+  {
+    "case": "enable_nul",
+    "status": "STOP",
+    "stages": [
+      {
+        "id": "S0",
+        "status": "OK",
+        "code": null
+      },
+      {
+        "id": "S1",
+        "status": "STOP",
+        "code": "NUL_BYTE_IN_RESPONSE"
+      }
+    ],
+    "quota_used": {
+      "port_open": 1,
+      "tmc_config_apply": 1,
+      "irq_polarity_prep": 2
+    },
+    "ledger_rows": 27,
+    "motion_cmds_in_ledger": [],
+    "dispatch_txt_sha256": "caa2a3a4f6f57996599190fca6c38e42b20cbe32e2d6a7f24d861eba75139b99"
+  },
+  {
+    "case": "open_not_ready",
+    "status": "STOP",
+    "stages": [
+      {
+        "id": "S0",
+        "status": "OK",
+        "code": null
+      },
+      {
+        "id": "S1",
+        "status": "STOP",
+        "code": "FIELD_NOT_EXACTLY_ONE"
+      }
+    ],
+    "quota_used": {
+      "port_open": 1,
+      "tmc_config_apply": 1,
+      "irq_polarity_prep": 2
+    },
+    "ledger_rows": 30,
+    "motion_cmds_in_ledger": [],
+    "dispatch_txt_sha256": "47ea0ee87911f726da2d2d4feacd9dc2e6d982a1f2c6d1a75e84afb877c565e4"
+  },
+  {
+    "case": "open_output_high",
+    "status": "STOP",
+    "stages": [
+      {
+        "id": "S0",
+        "status": "OK",
+        "code": null
+      },
+      {
+        "id": "S1",
+        "status": "STOP",
+        "code": "FIELD_VALUE_MISMATCH"
+      }
+    ],
+    "quota_used": {
+      "port_open": 1,
+      "tmc_config_apply": 1,
+      "irq_polarity_prep": 2
+    },
+    "ledger_rows": 33,
+    "motion_cmds_in_ledger": [],
+    "dispatch_txt_sha256": "b4dcd11dab9cbc95614bb7b15c24b8dd644f12c86973a9be53a68c29b91c5d3e"
+  },
+  {
+    "case": "disable_bad_rc",
+    "status": "STOP",
+    "stages": [
+      {
+        "id": "S0",
+        "status": "OK",
+        "code": null
+      },
+      {
+        "id": "S1",
+        "status": "STOP",
+        "code": "FIELD_NOT_EXACTLY_ONE"
+      }
+    ],
+    "quota_used": {
+      "port_open": 1,
+      "tmc_config_apply": 1,
+      "irq_polarity_prep": 2,
+      "safety_irq_disable": 1
+    },
+    "ledger_rows": 38,
+    "motion_cmds_in_ledger": [],
+    "dispatch_txt_sha256": "61daf142f424a077c0b0c0604eaa1725900734b159f5c6931eb9d0bdfe946625"
+  }
+]

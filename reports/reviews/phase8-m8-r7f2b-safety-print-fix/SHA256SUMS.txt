@@ -1,6 +1,6 @@
 # sha256 * <仓库相对路径>(LF, 无 BOM; 本清单不哈希自身字节 —— 一条清单不能给自己的字节作证)
 # 生成方式: 对 reports/reviews/phase8-m8-r7f2b-safety-print-fix/ 下每个常规文件(排除 SHA256SUMS.txt、remote_readback.md 与 __pycache__) 直接读磁盘字节算 sha256
-# 条目数=102; 与 Git blob 的逐条复算由 host/staged_preflight_batch.py(提交前, 单批流)与推送后的远端逐 blob 回读完成
+# 条目数=147; 与 Git blob 的逐条复算由 host/staged_preflight_batch.py(提交前, 单批流)与推送后的远端逐 blob 回读完成
 # 重新生成: python reports/reviews/phase8-m8-idle-stack-r4/host/make_round_sums.py <本目录>
 37c18065f659b6c4d437e53753445b4d6c48765a23dff6322d060debbe9fb90e  reports/reviews/phase8-m8-r7f2b-safety-print-fix/a_review_r7f3/full_stub_dispatch_ledger.jsonl
 3921e16d8fa546d663b4f32c2d92e0e4f1bb21d2cdf3b8610b6729d2b04d90f6  reports/reviews/phase8-m8-r7f2b-safety-print-fix/a_review_r7f3/IDENTITY.json
@@ -14,6 +14,36 @@ dd35c61b14d9f0c11185f53d91b990cd5d935bfcf96b6e946051b52a8c82e7be  reports/review
 0cc0f81c03d17092c9d64d2d719ea189fbe7c2cb6e94802528293dc289a50a7c  reports/reviews/phase8-m8-r7f2b-safety-print-fix/a_review_r7f4/review_result.json
 4b600682bba70c6634e3b8513c9ca7e76e7b101f6c0f03349472937f0479dde6  reports/reviews/phase8-m8-r7f2b-safety-print-fix/a_review_r7f4/validate_plan.txt
 70ea05c2ceae6adad775eae30a90a37edc305fb8fce0e20b9a2805a0a6d83fc1  reports/reviews/phase8-m8-r7f2b-safety-print-fix/a_review_R7F4_A_GO_CONFIGURED.md
+fb2ec3cab763fa5cab390ebf5e322532d804e108c0be5d708d4af5514eb5f983  reports/reviews/phase8-m8-r7f2b-safety-print-fix/a_review_r7f5/IDENTITY.json
+4a1ee800139f130d900e51577ab9a728f59106736110d0b688fbcd056155a021  reports/reviews/phase8-m8-r7f2b-safety-print-fix/a_review_r7f5/offline_checks/prepare.py
+8903b47feb4c86b4761c8789cabf0149a0d6b5594cdadc1e405d28f2be5dc975  reports/reviews/phase8-m8-r7f2b-safety-print-fix/a_review_r7f5/offline_checks/source_print_check.py
+a3ab8219c49bccffe48f3f3c6583fc0d868c623e5430cbade795e8d4bd7aad8a  reports/reviews/phase8-m8-r7f2b-safety-print-fix/a_review_r7f5/README_A_R7F5_BLIND_STATIC.md
+7d0038061d8cd583258d7ed605cebf5cbafe0803a8dbae67b1dae98e18c5483b  reports/reviews/phase8-m8-r7f2b-safety-print-fix/a_review_r7f5/replays/diag_already_active.dispatch.txt
+b0a1fc98205e730204c0f38f9b4697b49aeaa64f4cc479e00369792d210e3948  reports/reviews/phase8-m8-r7f2b-safety-print-fix/a_review_r7f5/replays/disable_bad_rc.dispatch.txt
+144532086d6988297781428934ea122e248af54f871fe655b0c223dbec6f2897  reports/reviews/phase8-m8-r7f2b-safety-print-fix/a_review_r7f5/replays/enable_nul.dispatch.txt
+2dabc51c91e5ce13d1369562fb78017b76f4deb5ef14b43677f87e6ac16893f9  reports/reviews/phase8-m8-r7f2b-safety-print-fix/a_review_r7f5/replays/enable_refused.dispatch.txt
+f6586aeff5051f41399115f5fd7a6da3f4957c3dafd450960e76799cf97bb57e  reports/reviews/phase8-m8-r7f2b-safety-print-fix/a_review_r7f5/replays/open_not_ready.dispatch.txt
+2962f4d7cf13aec860da372cbb72e3358f625c65b66b645312c28f825653e376  reports/reviews/phase8-m8-r7f2b-safety-print-fix/a_review_r7f5/replays/open_output_high.dispatch.txt
+57e618b40dfee2935ad116d5ea285d3f108158f8af075ca6cd64c9b41bb8472c  reports/reviews/phase8-m8-r7f2b-safety-print-fix/a_review_r7f5/replays/positive.dispatch.txt
+83e7d759e67e43fa0dadca47cb09d300a19d443caf9502c621daf048db4d3690  reports/reviews/phase8-m8-r7f2b-safety-print-fix/a_review_r7f5/replays/pre_fault.dispatch.txt
+c58f896400a5ca20810aa6682a928ef0245ae94551e6bd92622d7677dc9840f0  reports/reviews/phase8-m8-r7f2b-safety-print-fix/a_review_r7f5/review_result.json
+d828fc0c12bacdcbb46c3123aa29bd274f9c178febe51f50a9282edf9934e0cb  reports/reviews/phase8-m8-r7f2b-safety-print-fix/a_review_r7f5/source_prints/closed.calls.txt
+e47c05f9934ea4ca0367784a08060e5986dae66bf0af2b1ad078e325e0cc992a  reports/reviews/phase8-m8-r7f2b-safety-print-fix/a_review_r7f5/source_prints/closed.stdout.bin
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  reports/reviews/phase8-m8-r7f2b-safety-print-fix/a_review_r7f5/source_prints/compile.stderr.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  reports/reviews/phase8-m8-r7f2b-safety-print-fix/a_review_r7f5/source_prints/compile.stdout.txt
+082d9f8f022ae3d7a7cd910ee0c644ab10566821152d527f89289860b14f2d65  reports/reviews/phase8-m8-r7f2b-safety-print-fix/a_review_r7f5/source_prints/disable.calls.txt
+f29b0f54e1115bff02031f19cae91048cab01d4c0430d3236f2ca360ef38b7dc  reports/reviews/phase8-m8-r7f2b-safety-print-fix/a_review_r7f5/source_prints/disable.stdout.bin
+68b4816b589c2903e700d648b6c759290ccbca290a8701acf0d6457236b4a192  reports/reviews/phase8-m8-r7f2b-safety-print-fix/a_review_r7f5/source_prints/enable.calls.txt
+e5dd565179c0f7181db37c56d3f0792cf2304485b35855336fd4cb0dedc03606  reports/reviews/phase8-m8-r7f2b-safety-print-fix/a_review_r7f5/source_prints/enable.stdout.bin
+9c671868bb1c02647025f0dba1ccb27468bb32900c14257ef3d885eb1a4d62d3  reports/reviews/phase8-m8-r7f2b-safety-print-fix/a_review_r7f5/source_prints/extracted_source.c
+f50cedc310049021efa9f3d310098f987746c5434ea1a73b9ab0db90eccc8197  reports/reviews/phase8-m8-r7f2b-safety-print-fix/a_review_r7f5/source_prints/open.calls.txt
+323bde72464c7945b5ded49233d7091642f91a2cea083d9b501a001d141fb465  reports/reviews/phase8-m8-r7f2b-safety-print-fix/a_review_r7f5/source_prints/open.stdout.bin
+e3124b6e0f42cc6bb91457fab8b6f54d0da8ea41ea8adc320f223f656c21d2f1  reports/reviews/phase8-m8-r7f2b-safety-print-fix/a_review_r7f5/source_prints/pol.calls.txt
+2b2c1ed295e4c14001d74981d72d6aaeee55c2d13eb3d1e3e97bca41b11a047d  reports/reviews/phase8-m8-r7f2b-safety-print-fix/a_review_r7f5/source_prints/pol.stdout.bin
+5a641e7f3cfccda18159af203f6e9d8cfcf2c47ea1ce83d1229a4a0d325ab177  reports/reviews/phase8-m8-r7f2b-safety-print-fix/a_review_r7f5/source_prints/pre.calls.txt
+96b741228352bdfe07c25ab061b8656f175aaae1950681fb23b01c256d3a4104  reports/reviews/phase8-m8-r7f2b-safety-print-fix/a_review_r7f5/source_prints/pre.stdout.bin
+8ee46791bde410cb93c3bd949f4427aa3b1d1b4a026e36c0298e0fdcf4360b70  reports/reviews/phase8-m8-r7f2b-safety-print-fix/a_review_r7f5/source_prints/result.json
+a2990bb16e8d5129c2d14b5cad634853bf71d364482ac05b16b635c381e9314c  reports/reviews/phase8-m8-r7f2b-safety-print-fix/a_review_r7f5/validate_plan.txt
 31f1b1677c4bbed87aadbc94ecfa88282375c7b2677e465913c4f913a5aae9ca  reports/reviews/phase8-m8-r7f2b-safety-print-fix/build/rt-thread-motor-r7f2b.log
 b3fe7b78220006216a86dc744d416ae21f0a314b8720b427fc1d8ce49f46459f  reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T001348Z/dispatch_stderr.raw
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T001348Z/dispatch_stdout.raw
@@ -74,9 +104,11 @@ d2933a30ad86a437df84197cf91f2c30cfd7566b594ed3b23ff24b28b88dc950  reports/review
 fe4470535778d4ddcddb74c1b83bca68d988fe0a3554240bb4c84ebc498c8259  reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/plan_r7f2b_newimage_draft.json
 080c22973c7eb3e780a31d9466f636c458c66668d87eae64f744ecfe6c02f956  reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/plan_r7f3_b502_reviewed.json
 0b6e1eb8a8c69b7f6b14a8f2a1e8662564caa4c56c17a5cd77fbad1368e74f11  reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/plan_r7f4_b502_configured_reviewed.json
+ee3b26513fc7a572daff0c5c26124a9a0f7fbfa20632bd7088fb84d9d0ca4402  reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/plan_r7f5_b502_blind_irq_static.json
 80466bc3a23c60dd2b86a59b91f2e4f8b63d52ac25db49c490cb72c15669daa5  reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/rows_r7f2b_source_shape.json
 bbfb4b570257ee7c5cd9e2d96da36cb8b10a989aae4f6fa6cfc2c47fa4fe6b17  reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/rows_r7f3_b502_reviewed.json
 64e8a86876395ad7e1232e5bc049d06893ee09d2c292975714a5fc29d61ea46c  reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/rows_r7f4_b502_configured.json
+4f094de3331ef594fe7b43f72dbddd342f3924ada2c8d414d3d9b7293b485475  reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/rows_r7f5_b502_blind_irq_static.json
 2ed6bb20f0c7bd8a378a66eaec651fd0063e9a7ec033160443f772b20d32ea79  reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/validate_plan_offline_draft.txt
 55d715c83df1227353ca17aed8fce12b1209987e0f8e0e18a21480a1149f20fb  reports/reviews/phase8-m8-r7f2b-safety-print-fix/handoff_R7F2B_offline.json
 ff11ec63c5263adc5c719c50bd772a650c9dfa1c25641ceafb3184a63b61eefa  reports/reviews/phase8-m8-r7f2b-safety-print-fix/handoff_R7F2B_offline.md
@@ -88,6 +120,8 @@ d212ebfa5cbc33cd97b6c8ac893701c068966e194e03cc1b3919a1853d008b13  reports/review
 d6c905c5038949af36b56941284851d4381609d9c6f67fd724b11806c95396cc  reports/reviews/phase8-m8-r7f2b-safety-print-fix/handoff_R7F4_field.md
 32cde9015dc108b9ed4bd3234711d2df6a7c1699743c6747c885d5d93e86478f  reports/reviews/phase8-m8-r7f2b-safety-print-fix/handoff_R7F4_registered.json
 cde53654bb9ad14a4f99b9889ea9f765289cad2c55af9c8f0b59d82d919801f0  reports/reviews/phase8-m8-r7f2b-safety-print-fix/handoff_R7F4_registered.md
+59bd517c090a8900e46bd2fd711ffbed3f0c7314e2e42df4d763cfdbfcca63ec  reports/reviews/phase8-m8-r7f2b-safety-print-fix/handoff_R7F5_registered.json
+c46bc88b76932e6862b786d666d2ad1476afe18d84bd0649bd793aa851c84a6c  reports/reviews/phase8-m8-r7f2b-safety-print-fix/handoff_R7F5_registered.md
 3272e59251a95b51015a0ce602f4434cd72cd5552ed30cbfa7cd291784fc553c  reports/reviews/phase8-m8-r7f2b-safety-print-fix/host/enn_model_repro.txt
 f84abe11f1140f2cb32291decb30a5759437371f6d8958d6112c022d20723cf7  reports/reviews/phase8-m8-r7f2b-safety-print-fix/host/image_strings_r7f2b.txt
 ef4da83b8cd4422428963d684dd3241420824a570fe647188d8340e3ff8538f6  reports/reviews/phase8-m8-r7f2b-safety-print-fix/host/io_chain_r7f2b.txt
@@ -103,4 +137,15 @@ c1a979c99d918fc380ff7fec28b6a11664ec56e85a2d4309d1fdf8f2e0682573  reports/review
 e58103ecae5015e1501a32b2f7a8c2df015f361dc425e57c8e2cb32212da122e  reports/reviews/phase8-m8-r7f2b-safety-print-fix/offline/r7f3_validate_reviewed.txt
 26dc14863e7806948cc8dc803b111d7f656472b06ee19535b49dc89706b1e173  reports/reviews/phase8-m8-r7f2b-safety-print-fix/offline/r7f4_configured_line_bounds.txt
 da4cfd3a617fdc961ff5e348238d7dcc77d050ada21c4b446fabdc2b210d9ed6  reports/reviews/phase8-m8-r7f2b-safety-print-fix/offline/validate_plan_r7f4_local.txt
-c70cd1d8c7fd26f6ee8bb07975cb28021e6fe07b548adec6757c1c256520650f  reports/reviews/phase8-m8-r7f2b-safety-print-fix/run_record.md
+2d6eac351b0db36448e3c6840d9f2bf7562d0ced583ff7b5f996ca4d82739511  reports/reviews/phase8-m8-r7f2b-safety-print-fix/offline_r7f5/host_shape_recompile.json
+97bb4ca348bc846b450b7bc2a9f0d6cb012ca59cbe5dd7bdfd9090e081a0a76e  reports/reviews/phase8-m8-r7f2b-safety-print-fix/offline_r7f5/line_lengths.json
+5b4a6d5169ffbeff1d10ce8d4b371fcf01fd8fffbdb04dbf1bd8b5c9dd76f464  reports/reviews/phase8-m8-r7f2b-safety-print-fix/offline_r7f5/replays_local.json
+e6070352d30cde532e1c85dd2e5422ebbfd9ad50c32643c39f6aa3327cce7bc4  reports/reviews/phase8-m8-r7f2b-safety-print-fix/offline_r7f5/rows_real_capture_check.json
+39acdae855b32f5fb54171d8b043d515971cc7074554be3e74c6c08beb5156fe  reports/reviews/phase8-m8-r7f2b-safety-print-fix/offline_r7f5/source_string_probes.json
+fdd8fc2c83e8de26ec77b90902d455a7e75fc5c3f0189c8bbd70ea6847b59e70  reports/reviews/phase8-m8-r7f2b-safety-print-fix/offline_r7f5/summary.json
+7b51cbae4b5e117d5aa4bb3396e61e4428d3fce66c79d8185e13ea722ac134b9  reports/reviews/phase8-m8-r7f2b-safety-print-fix/offline_r7f5/validate_plan_local.txt
+3ff30a64ce2d328ed6c1769124ae919865ee90c083804703e180f35eaf6bf14d  reports/reviews/phase8-m8-r7f2b-safety-print-fix/run_record.md
+224fbb493f63ebedaa1ba1e228a56dea31ce2f600af964d7c41e45cdf0a78223  reports/reviews/phase8-m8-r7f2b-safety-print-fix/tools/gen_handoff_r7f5_registered.py
+daa2f0a30bab22f9b782cf5e089c371f3a16f25c2dcd074630e6563e5deeab64  reports/reviews/phase8-m8-r7f2b-safety-print-fix/tools/r7f5_registered_checks.py
+aafed001319786e22c6153e661fde6e2461be1d391a65c5b66b4a361f5dcde9c  reports/reviews/phase8-m8-r7f2b-safety-print-fix/tools/r7f5_remote_readback.py
+d6800ef1ae56d38eb1e8e3d19cc792a16b8a32a62b42d76c8cf38f4ffddb14a6  reports/reviews/phase8-m8-r7f2b-safety-print-fix/tools/r7f5_staged_preflight.py

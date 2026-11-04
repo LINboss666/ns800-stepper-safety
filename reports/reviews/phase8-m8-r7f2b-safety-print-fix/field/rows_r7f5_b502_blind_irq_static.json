@@ -1,0 +1,469 @@
+{
+  "_about": {
+    "kind": "PREVIOUS_FIELD_REPLAY_AND_SOURCE_SHAPE_NOT_NEW_FIELD_EVIDENCE",
+    "reviewed_delivery_commit": "0cd64587739cca41a22903e075b6fe37b17c765b",
+    "scope": "One static IRQ trial with motor permit LOW throughout. No arm/start/physical input injection.",
+    "polarity_measured": false,
+    "polarity_confirmation_semantics": "Trial-only software flag override explicitly disclosed; source output is preserved verbatim and is NOT evidence of physical polarity measurement."
+  },
+  "commands": {
+    "system_status@pre": {
+      "healthy": [
+        "system_status",
+        "=== SYSTEM STATUS ===",
+        "[Boot]   bootstrap-complete=YES abort-stage=0",
+        "[Safety] state=READY fault=0 irq_gate=CLOSED polarity=not-confirmed protect_ready=NO",
+        "[Safety] gpio_ready=YES thread=OK drv_en_pad_low=YES",
+        "[Safety] request=LOW pad=0 expected_ENN=HIGH ENN_fb=1(resolved) verdict=OK",
+        "[Safety] limit_inputs=DISABLED_BY_CONFIG (HIGH=safe/LOW=trigger when ENABLED); e-stop=hardware-only, no MCU e-stop input",
+        "[Motor] state=0 cur=0 tgt=0 armed=0 drv_en_verified=0 health=OK",
+        "[Motor] arm gate fail mask=0x18 (arm REFUSED)",
+        "[TMC]    runtime write gate mask=0x0 (0=运行态条件全通, 编译期门未翻转前仍然一位不写)",
+        "[Sensor] thread=OK",
+        "[TMC]    OK drive_cfg=UNCONFIGURED",
+        "[IMU]    OK",
+        "[ADC]    DEGRADED cal=THEORETICAL",
+        "[Flash]  storage bring-up=OK (spi1)",
+        "[Storage] OK (ns_params/log)",
+        "[Config] OK valid=YES cal_source=1",
+        "[Diag]   OK verdict=0 mode=MONITOR_ONLY",
+        "[Blackbox] OK",
+        "[UI]     led/buzzer output=SAFE-OFF (polarity hardware-pending)"
+      ],
+      "_provenance": {
+        "kind": "actual_previous_field_capture_NOT_current_trial",
+        "source": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T015928Z/S_S1/01_sys_pre.rx.bin"
+      }
+    },
+    "motor_status@pre": {
+      "healthy": [
+        "motor_status",
+        "[MOT] state=0 name=OTHER",
+        "[MOT] cur_hz=0 tgt_hz=0 accel=2000 decel=2000 dir=0",
+        "[MOT] armed=0 drv_en_request=0 health=OK",
+        "[MOT] guard stops=0 reason=0",
+        "[MOT] guard reason map: 0=none 1=cfg-lost 2=integrity 3=txn-busy 4=enn-fb",
+        "[MOT] stop result=api-accepted(驱动接受关断, 非波形证明) src=init rc=0 latched=0",
+        "[MOT] diag_off_confirmed=YES",
+        "[MOT] arm_gate_mask=0x18 REFUSED",
+        "[MOT] arm_gate_mask=0x18",
+        "[MOT] gate_reason=protection-not-ready",
+        "[MOT] gate_reason=drive-config-not-applied",
+        "[MOT] gate4 irq_gate=CLOSED polarity=not-confirmed",
+        "[MOT] gate4 gpio_ready=YES",
+        "[MOT] gate5 tmc_drive_cfg=UNCONFIGURED",
+        "[MOT] gate6 request_basis=DISABLED",
+        "[MOT] gate6 enn_verdict=OK",
+        "[MOT] gate7 motor_stop=api-accepted(驱动接受关断, 非波形证明) src=init rc=0",
+        "[MOT] gate7 latched=no diag_off=YES",
+        "[MOT] note: current_hz=0 is a command value, not stop proof",
+        "[MOT] drv_request=LOW pad=0",
+        "[MOT] expected_ENN=HIGH ENN_fb=1 resolved verdict=OK",
+        "[MOT] limit_inputs=DISABLED_BY_CONFIG",
+        "[MOT] step_diag=GRANTED",
+        "[MOT] tmc_write_gate=0x0",
+        "[MOT] note: state/cur/tgt=0 does not prove physical STEP stopped",
+        "msh >"
+      ],
+      "_provenance": {
+        "kind": "actual_previous_field_capture_NOT_current_trial",
+        "source": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T015928Z/S_S1/02_mot_pre.rx.bin"
+      }
+    },
+    "tmc_config_apply CONFIRM": {
+      "healthy": [
+        "tmc_config_apply CONFIRM",
+        "[TMC-CFG] CONFIGURED (各次写入均经 IFCNT 确认)",
+        "[TMC-CFG] GCONF/CHOPCONF 读回一致",
+        "[TMC-CFG] 电流值仍为理论计算, 未实测",
+        "[TMC-CFG] 预算: 已用 50 / 总 1500 tick",
+        "[TMC-CFG] flush=0B TX=4B",
+        "[TMC-CFG] irun=20 ihold=8 dly=4 tpd=8 vsense=1",
+        "[TMC-CFG] GCONF 00000101->00000141 CHOPCONF 15010053->15030053",
+        "[TMC-CFG] op_epoch=0",
+        "msh >"
+      ],
+      "_provenance": {
+        "kind": "actual_previous_field_capture_NOT_current_trial",
+        "source": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T015928Z/S_S1/03_cfg_apply.rx.bin"
+      }
+    },
+    "system_status@cfg": {
+      "healthy": [
+        "system_status",
+        "=== SYSTEM STATUS ===",
+        "[Boot]   bootstrap-complete=YES abort-stage=0",
+        "[Safety] state=READY fault=0 irq_gate=CLOSED polarity=not-confirmed protect_ready=NO",
+        "[Safety] gpio_ready=YES thread=OK drv_en_pad_low=YES",
+        "[Safety] request=LOW pad=0 expected_ENN=HIGH ENN_fb=1(resolved) verdict=OK",
+        "[Safety] limit_inputs=DISABLED_BY_CONFIG (HIGH=safe/LOW=trigger when ENABLED); e-stop=hardware-only, no MCU e-stop input",
+        "[Motor] state=0 cur=0 tgt=0 armed=0 drv_en_verified=0 health=OK",
+        "[Motor] arm gate fail mask=0x8 (arm REFUSED)",
+        "[TMC]    runtime write gate mask=0x0 (0=运行态条件全通, 编译期门未翻转前仍然一位不写)",
+        "[Sensor] thread=OK",
+        "[TMC]    OK drive_cfg=CONFIGURED",
+        "[IMU]    OK",
+        "[ADC]    DEGRADED cal=THEORETICAL",
+        "[Flash]  storage bring-up=OK (spi1)",
+        "[Storage] OK (ns_params/log)",
+        "[Config] OK valid=YES cal_source=1",
+        "[Diag]   OK verdict=0 mode=MONITOR_ONLY",
+        "[Blackbox] OK",
+        "[UI]     led/buzzer output=SAFE-OFF (polarity hardware-pending)",
+        "msh >"
+      ],
+      "_provenance": {
+        "kind": "actual_previous_field_capture_NOT_current_trial",
+        "source": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T015928Z/S_S1/04_sys_post.rx.bin"
+      }
+    },
+    "motor_status@cfg": {
+      "healthy": [
+        "motor_status",
+        "[MOT] state=0 name=OTHER",
+        "[MOT] cur_hz=0 tgt_hz=0 accel=2000 decel=2000 dir=0",
+        "[MOT] armed=0 drv_en_request=0 health=OK",
+        "[MOT] guard stops=0 reason=0",
+        "[MOT] guard reason map: 0=none 1=cfg-lost 2=integrity 3=txn-busy 4=enn-fb",
+        "[MOT] stop result=api-accepted(驱动接受关断, 非波形证明) src=init rc=0 latched=0",
+        "[MOT] diag_off_confirmed=YES",
+        "[MOT] arm_gate_mask=0x8 REFUSED",
+        "[MOT] arm_gate_mask=0x8",
+        "[MOT] gate_reason=protection-not-ready",
+        "[MOT] gate4 irq_gate=CLOSED polarity=not-confirmed",
+        "[MOT] gate4 gpio_ready=YES",
+        "[MOT] gate5 tmc_drive_cfg=CONFIGURED",
+        "[MOT] gate6 request_basis=DISABLED",
+        "[MOT] gate6 enn_verdict=OK",
+        "[MOT] gate7 motor_stop=api-accepted(驱动接受关断, 非波形证明) src=init rc=0",
+        "[MOT] gate7 latched=no diag_off=YES",
+        "[MOT] note: current_hz=0 is a command value, not stop proof",
+        "[MOT] drv_request=LOW pad=0",
+        "[MOT] expected_ENN=HIGH ENN_fb=1 resolved verdict=OK",
+        "[MOT] limit_inputs=DISABLED_BY_CONFIG",
+        "[MOT] step_diag=GRANTED",
+        "[MOT] tmc_write_gate=0x0",
+        "[MOT] note: state/cur/tgt=0 does not prove physical STEP stopped",
+        "msh >"
+      ],
+      "_provenance": {
+        "kind": "actual_previous_field_capture_NOT_current_trial",
+        "source": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T015928Z/S_S1/05_mot_post.rx.bin"
+      }
+    },
+    "safety_status": {
+      "healthy": [
+        "safety_status",
+        "[SAFETY] ready=YES first_err=0",
+        "[SAFETY] MCU_DRV_ENABLE = 0 (禁止(安全))",
+        "[SAFETY] DRV_ENABLE last write+readback verified = 0 (-1 = never verified)",
+        "[SAFETY] ENN_FEEDBACK(PC.6 = 板上 TMC_ENN) raw=1 resolved=YES",
+        "[SAFETY] [只读输入, 非急停感测; HIGH=禁能侧, LOW=未施加禁能(不保证转矩)]",
+        "[SAFETY] request=DISABLE(LOW) pad=0 expected_FB=HIGH FB=1 -> verdict=OK",
+        "[SAFETY] LIMIT inputs = DISABLED_BY_CONFIG (限位实现保留, 不解析/不配置/不读/不注册 IRQ)",
+        "msh >"
+      ],
+      "_provenance": {
+        "kind": "actual_previous_field_capture_NOT_current_trial",
+        "source": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T015928Z/S_S1/06_safety_post.rx.bin"
+      }
+    },
+    "safety_irq_status@pre": {
+      "healthy": [
+        "safety_irq_status",
+        "[SAFETY] irq gate   = CLOSED (polled only)",
+        "[SAFETY] polarity   = NOT confirmed (HARDWARE-PENDING unless CONFIRMed)",
+        "[SAFETY] gpio_ready = YES",
+        "[SAFETY] thread     = running health=OK",
+        "[SAFETY] protection_ready = NO",
+        "[SAFETY] TMC_DIAG     pin=3 raw=0 safe=0 irq=RISING [safe]",
+        "[SAFETY] LIMIT inputs config = DISABLED_BY_CONFIG (SAFETY_LIMIT_INPUTS_ENABLED)",
+        "[SAFETY] LIMIT OFF => PF.14/PF.15 不解析/不配置/不读/不注册, 也不参与就绪判定",
+        "[SAFETY] PC.6(ENN_FB) pin=ok raw=HIGH = TMC_ENN feedback (HIGH=disabled side). NOT an e-stop input, no IRQ registered on it",
+        "msh >"
+      ],
+      "_provenance": {
+        "kind": "actual_previous_field_capture_NOT_current_trial",
+        "source": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T001444Z/S_S3/07_irqboot.rx.bin"
+      }
+    },
+    "safety_polarity_confirm CONFIRM": {
+      "healthy": [
+        "[SAFETY] current raw levels of the ACTIVE protection inputs (operator must have MEASURED these):",
+        "[SAFETY] TMC_DIAG     pin=3 raw=0 safe=0 irq=RISING [safe]",
+        "[SAFETY] LIMIT inputs config = DISABLED_BY_CONFIG (SAFETY_LIMIT_INPUTS_ENABLED)",
+        "[SAFETY] LIMIT OFF => PF.14/PF.15 不解析/不配置/不读/不注册, 也不参与就绪判定",
+        "[SAFETY] PC.6(ENN_FB) pin=ok raw=HIGH = TMC_ENN feedback (HIGH=disabled side). NOT an e-stop input, no IRQ registered on it",
+        "[SAFETY] NOTE: this is an OPERATOR DECLARATION. Software does NOT",
+        "[SAFETY]       verify wiring. Status stays HARDWARE-PENDING for the",
+        "[SAFETY]       hardware chain; only the polarity flag changes here.",
+        "[SAFETY]       User-confirmed wire names / gate replacement are NOT a",
+        "[SAFETY]       measurement and never set this flag by themselves.",
+        "[SAFETY] input polarity MARKED VALIDATED (operator confirm)",
+        "[SAFETY] protection_ready = NO (IRQ gate still CLOSED)"
+      ],
+      "_provenance": {
+        "kind": "source_shape_NOT_field_evidence",
+        "source": [
+          "applications/safety_thread.c",
+          "applications/supervisor.c",
+          "applications/motor.c"
+        ]
+      }
+    },
+    "safety_irq_enable": {
+      "healthy": [
+        "[SAFETY] IRQ gate OPEN: 1 active protection input(s) registered (limits: falling edge / HIGH=safe; diag: rising)",
+        "[SAFETY] PC.6 = TMC_ENN feedback input, NOT an IRQ source; board e-stop cuts the chain in hardware, never via MCU"
+      ],
+      "_provenance": {
+        "kind": "source_shape_NOT_field_evidence",
+        "source": [
+          "applications/safety_thread.c",
+          "applications/supervisor.c",
+          "applications/motor.c"
+        ]
+      }
+    },
+    "safety_irq_disable": {
+      "healthy": [
+        "[SAFETY] detach: PA.3 detached (0)",
+        "[SAFETY] IRQ gate CLOSED - 活动安全输入(1 路)无软件响应路径"
+      ],
+      "_provenance": {
+        "kind": "source_shape_NOT_field_evidence",
+        "source": [
+          "applications/safety_thread.c",
+          "applications/supervisor.c",
+          "applications/motor.c"
+        ]
+      }
+    },
+    "safety_irq_status@open": {
+      "healthy": [
+        "safety_irq_status",
+        "[SAFETY] irq gate   = OPEN (EXTI registered)",
+        "[SAFETY] polarity   = operator CONFIRMED (HARDWARE-PENDING unless CONFIRMed)",
+        "[SAFETY] gpio_ready = YES",
+        "[SAFETY] thread     = running health=OK",
+        "[SAFETY] protection_ready = YES",
+        "[SAFETY] TMC_DIAG     pin=3 raw=0 safe=0 irq=RISING [safe]",
+        "[SAFETY] LIMIT inputs config = DISABLED_BY_CONFIG (SAFETY_LIMIT_INPUTS_ENABLED)",
+        "[SAFETY] LIMIT OFF => PF.14/PF.15 不解析/不配置/不读/不注册, 也不参与就绪判定",
+        "[SAFETY] PC.6(ENN_FB) pin=ok raw=HIGH = TMC_ENN feedback (HIGH=disabled side). NOT an e-stop input, no IRQ registered on it",
+        "msh >"
+      ],
+      "_provenance": {
+        "kind": "source_shape_NOT_field_evidence",
+        "source": [
+          "applications/safety_thread.c",
+          "applications/supervisor.c",
+          "applications/motor.c"
+        ]
+      }
+    },
+    "safety_irq_status@closed": {
+      "healthy": [
+        "safety_irq_status",
+        "[SAFETY] irq gate   = CLOSED (polled only)",
+        "[SAFETY] polarity   = operator CONFIRMED (HARDWARE-PENDING unless CONFIRMed)",
+        "[SAFETY] gpio_ready = YES",
+        "[SAFETY] thread     = running health=OK",
+        "[SAFETY] protection_ready = NO",
+        "[SAFETY] TMC_DIAG     pin=3 raw=0 safe=0 irq=RISING [safe]",
+        "[SAFETY] LIMIT inputs config = DISABLED_BY_CONFIG (SAFETY_LIMIT_INPUTS_ENABLED)",
+        "[SAFETY] LIMIT OFF => PF.14/PF.15 不解析/不配置/不读/不注册, 也不参与就绪判定",
+        "[SAFETY] PC.6(ENN_FB) pin=ok raw=HIGH = TMC_ENN feedback (HIGH=disabled side). NOT an e-stop input, no IRQ registered on it",
+        "msh >"
+      ],
+      "_provenance": {
+        "kind": "source_shape_NOT_field_evidence",
+        "source": [
+          "applications/safety_thread.c",
+          "applications/supervisor.c",
+          "applications/motor.c"
+        ]
+      }
+    },
+    "system_status@open": {
+      "healthy": [
+        "system_status",
+        "=== SYSTEM STATUS ===",
+        "[Boot]   bootstrap-complete=YES abort-stage=0",
+        "[Safety] state=READY fault=0 irq_gate=OPEN polarity=CONFIRMED protect_ready=YES",
+        "[Safety] gpio_ready=YES thread=OK drv_en_pad_low=YES",
+        "[Safety] request=LOW pad=0 expected_ENN=HIGH ENN_fb=1(resolved) verdict=OK",
+        "[Safety] limit_inputs=DISABLED_BY_CONFIG (HIGH=safe/LOW=trigger when ENABLED); e-stop=hardware-only, no MCU e-stop input",
+        "[Motor] state=0 cur=0 tgt=0 armed=0 drv_en_verified=0 health=OK",
+        "[Motor] arm gate fail mask=0x0 (all gate conditions pass (incl. ENN feedback))",
+        "[TMC]    runtime write gate mask=0x0 (0=运行态条件全通, 编译期门未翻转前仍然一位不写)",
+        "[Sensor] thread=OK",
+        "[TMC]    OK drive_cfg=CONFIGURED",
+        "[IMU]    OK",
+        "[ADC]    DEGRADED cal=THEORETICAL",
+        "[Flash]  storage bring-up=OK (spi1)",
+        "[Storage] OK (ns_params/log)",
+        "[Config] OK valid=YES cal_source=1",
+        "[Diag]   OK verdict=0 mode=MONITOR_ONLY",
+        "[Blackbox] OK",
+        "[UI]     led/buzzer output=SAFE-OFF (polarity hardware-pending)",
+        "msh >"
+      ],
+      "_provenance": {
+        "kind": "source_shape_NOT_field_evidence",
+        "source": [
+          "applications/safety_thread.c",
+          "applications/supervisor.c",
+          "applications/motor.c"
+        ]
+      }
+    },
+    "motor_status@open": {
+      "healthy": [
+        "motor_status",
+        "[MOT] state=0 name=OTHER",
+        "[MOT] cur_hz=0 tgt_hz=0 accel=2000 decel=2000 dir=0",
+        "[MOT] armed=0 drv_en_request=0 health=OK",
+        "[MOT] guard stops=0 reason=0",
+        "[MOT] guard reason map: 0=none 1=cfg-lost 2=integrity 3=txn-busy 4=enn-fb",
+        "[MOT] stop result=api-accepted(驱动接受关断, 非波形证明) src=init rc=0 latched=0",
+        "[MOT] diag_off_confirmed=YES",
+        "[MOT] arm_gate_mask=0x0 ALL-PASS",
+        "[MOT] gate7 motor_stop=api-accepted(驱动接受关断, 非波形证明) src=init rc=0",
+        "[MOT] gate7 latched=no diag_off=YES",
+        "[MOT] note: current_hz=0 is a command value, not stop proof",
+        "[MOT] drv_request=LOW pad=0",
+        "[MOT] expected_ENN=HIGH ENN_fb=1 resolved verdict=OK",
+        "[MOT] limit_inputs=DISABLED_BY_CONFIG",
+        "[MOT] step_diag=GRANTED",
+        "[MOT] tmc_write_gate=0x0",
+        "[MOT] note: state/cur/tgt=0 does not prove physical STEP stopped",
+        "msh >"
+      ],
+      "_provenance": {
+        "kind": "source_shape_NOT_field_evidence",
+        "source": [
+          "applications/safety_thread.c",
+          "applications/supervisor.c",
+          "applications/motor.c"
+        ]
+      }
+    },
+    "system_status@closed": {
+      "healthy": [
+        "system_status",
+        "=== SYSTEM STATUS ===",
+        "[Boot]   bootstrap-complete=YES abort-stage=0",
+        "[Safety] state=READY fault=0 irq_gate=CLOSED polarity=CONFIRMED protect_ready=NO",
+        "[Safety] gpio_ready=YES thread=OK drv_en_pad_low=YES",
+        "[Safety] request=LOW pad=0 expected_ENN=HIGH ENN_fb=1(resolved) verdict=OK",
+        "[Safety] limit_inputs=DISABLED_BY_CONFIG (HIGH=safe/LOW=trigger when ENABLED); e-stop=hardware-only, no MCU e-stop input",
+        "[Motor] state=0 cur=0 tgt=0 armed=0 drv_en_verified=0 health=OK",
+        "[Motor] arm gate fail mask=0x8 (arm REFUSED)",
+        "[TMC]    runtime write gate mask=0x0 (0=运行态条件全通, 编译期门未翻转前仍然一位不写)",
+        "[Sensor] thread=OK",
+        "[TMC]    OK drive_cfg=CONFIGURED",
+        "[IMU]    OK",
+        "[ADC]    DEGRADED cal=THEORETICAL",
+        "[Flash]  storage bring-up=OK (spi1)",
+        "[Storage] OK (ns_params/log)",
+        "[Config] OK valid=YES cal_source=1",
+        "[Diag]   OK verdict=0 mode=MONITOR_ONLY",
+        "[Blackbox] OK",
+        "[UI]     led/buzzer output=SAFE-OFF (polarity hardware-pending)",
+        "msh >"
+      ],
+      "_provenance": {
+        "kind": "source_shape_NOT_field_evidence",
+        "source": [
+          "applications/safety_thread.c",
+          "applications/supervisor.c",
+          "applications/motor.c"
+        ]
+      }
+    },
+    "__watch__": {
+      "healthy": [],
+      "_provenance": {
+        "kind": "source_shape_silent_window_NOT_field_evidence",
+        "source": "No injection or expected trip; observe bounded quiet interval only."
+      }
+    },
+    "motor_stop": {
+      "healthy": [
+        "[MOT] stop requested: target_hz=0 (软件命令值), STEP 实际关断结果看 stop_result(当前=cmd-0hz-unconfirmed)"
+      ],
+      "_provenance": {
+        "kind": "board_capture",
+        "file": "reports/reviews/phase8-motor-chain-dev/dir-closure/dir0b_console.txt",
+        "lines": "51",
+        "copied_from": "r3 field/rows.json:motor_stop"
+      },
+      "_unused_in_this_plan": "Original stub builder requires cleanup fixtures even without arm/start. Cleanup quotas remain zero and no obligation is established."
+    },
+    "motor_disarm": {
+      "healthy": [
+        "[MOT] DISARM (动作已做: STEP api-accepted(驱动接受关断, 非波形证明) / 许可 LOW verified / ENN feedback=OK)"
+      ],
+      "_provenance": {
+        "kind": "board_capture",
+        "file": "reports/reviews/phase8-motor-chain-dev/dir-closure/dir0b_console.txt",
+        "lines": "55",
+        "copied_from": "r3 field/rows.json:motor_disarm"
+      },
+      "_unused_in_this_plan": "Original stub builder requires cleanup fixtures even without arm/start. Cleanup quotas remain zero and no obligation is established."
+    },
+    "motor_status": {
+      "healthy": [
+        "[MOT] state=0 name=OTHER",
+        "[MOT] cur_hz=0 tgt_hz=0 accel=2000 decel=2000 dir=0",
+        "[MOT] armed=0 drv_en_request=0 health=OK",
+        "[MOT] guard stops=0 reason=0",
+        "[MOT] guard reason map: 0=none 1=cfg-lost 2=integrity 3=txn-busy 4=enn-fb",
+        "[MOT] stop result=api-accepted(驱动接受关断, 非波形证明) src=init rc=0 latched=0",
+        "[MOT] diag_off_confirmed=YES",
+        "[MOT] arm_gate_mask=0x18 REFUSED",
+        "[MOT] arm_gate_mask=0x18",
+        "[MOT] gate_reason=protection-not-ready",
+        "[MOT] gate_reason=drive-config-not-applied",
+        "[MOT] gate4 irq_gate=CLOSED polarity=not-confirmed",
+        "[MOT] gate4 gpio_ready=YES",
+        "[MOT] gate5 tmc_drive_cfg=UNCONFIGURED",
+        "[MOT] gate6 request_basis=DISABLED",
+        "[MOT] gate6 enn_verdict=OK",
+        "[MOT] gate7 motor_stop=api-accepted(驱动接受关断, 非波形证明) src=init rc=0",
+        "[MOT] gate7 latched=no diag_off=YES",
+        "[MOT] note: current_hz=0 is a command value, not stop proof",
+        "[MOT] drv_request=LOW pad=0",
+        "[MOT] expected_ENN=HIGH ENN_fb=1 resolved verdict=OK",
+        "[MOT] limit_inputs=DISABLED_BY_CONFIG",
+        "[MOT] step_diag=GRANTED",
+        "[MOT] tmc_write_gate=0x0",
+        "[MOT] note: state/cur/tgt=0 does not prove physical STEP stopped"
+      ],
+      "_provenance": {
+        "kind": "source_shape_predictions_NOT_board_capture",
+        "files": [
+          "applications/motor.c:cmd_motor_status",
+          "applications/motor.c:mot_print_gate_fail"
+        ],
+        "note": "Baseline READY/UNCONFIGURED arm mask=0x18 from 20261103T163850Z system_status. Existing motor fixture supplies remaining predicted values; stop source init is a fixture assumption, not a new observation. Actual field motor_status remains NOT_RUN."
+      },
+      "_derivation_r7f2b": {
+        "replaced_at": "2026-11-04",
+        "source_file": "a_r7f2b_review/rows_safety_status_replacement.json (A 复审附件, 逐字承接)",
+        "source_bytes": 3311,
+        "source_sha256": "438ed06e2d35aa5dc224a8deae7d8dad20b68cb315d159f8b9d99309b1c815e2",
+        "old_lines_kept_verbatim_in_base_file": true,
+        "old_base": {
+          "path": "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/rows_startup_b424.json",
+          "bytes": 53635,
+          "sha256": "916eddaa172e6f30b9a9e327f21f4b9274cca2bab17201c329b32997d286f746",
+          "this_command_unchanged_there": true
+        },
+        "kind_warning": "source_shape = 新固件输出**预测**, 不是现场实测; 在下一场真实查询取到整块字节之前, 本条不构成任何板级证据"
+      },
+      "_unused_in_this_plan": "Original stub builder requires cleanup fixtures even without arm/start. Cleanup quotas remain zero and no obligation is established."
+    }
+  }
+}

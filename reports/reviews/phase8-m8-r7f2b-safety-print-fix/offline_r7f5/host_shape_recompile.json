@@ -1,0 +1,108 @@
+{
+  "cc": "C:/Program Files (x86)/Dev-Cpp/MinGW64/bin/gcc.exe",
+  "compile_rc": 0,
+  "compile_stderr": "",
+  "cases": [
+    {
+      "case": "pre",
+      "rc": 0,
+      "bytes": 581,
+      "sha256": "a76cdd7a5df7996812b6720c820c3bb6f49a6717a756d46ba4da627f22d2737c",
+      "nul": 0,
+      "cr_in_local_run": 9,
+      "cr_in_A_file": 0,
+      "raw_equal_to_A_stdout": false,
+      "equal_to_A_stdout_after_lf_normalize": true,
+      "local_payload_lines": 9,
+      "delivered_rows_excluded_from_compare": [
+        "safety_irq_status",
+        "msh >"
+      ],
+      "payload_equal_to_delivered_safety_rows": true,
+      "max_call_bytes": 124
+    },
+    {
+      "case": "pol",
+      "rc": 0,
+      "bytes": 922,
+      "sha256": "394b158df928a5351c0770e9cb1434d72af1ed048ce0444426d16d77e61d8b1e",
+      "nul": 0,
+      "cr_in_local_run": 12,
+      "cr_in_A_file": 0,
+      "raw_equal_to_A_stdout": false,
+      "equal_to_A_stdout_after_lf_normalize": true,
+      "local_payload_lines": 12,
+      "delivered_rows_excluded_from_compare": [],
+      "payload_equal_to_delivered_safety_rows": true,
+      "max_call_bytes": 124
+    },
+    {
+      "case": "enable",
+      "rc": 0,
+      "bytes": 229,
+      "sha256": "06de11e69ba7698168ead54670163451e856ec61eb0d08b1a6419970392ed05f",
+      "nul": 0,
+      "cr_in_local_run": 2,
+      "cr_in_A_file": 0,
+      "raw_equal_to_A_stdout": false,
+      "equal_to_A_stdout_after_lf_normalize": true,
+      "local_payload_lines": 2,
+      "delivered_rows_excluded_from_compare": [],
+      "payload_equal_to_delivered_safety_rows": true,
+      "max_call_bytes": 114
+    },
+    {
+      "case": "open",
+      "rc": 0,
+      "bytes": 589,
+      "sha256": "e3903a3e85d5480d21de60d0377b38fdb715f5f0ef7f29c5140beb43bceab996",
+      "nul": 0,
+      "cr_in_local_run": 9,
+      "cr_in_A_file": 0,
+      "raw_equal_to_A_stdout": false,
+      "equal_to_A_stdout_after_lf_normalize": true,
+      "local_payload_lines": 9,
+      "delivered_rows_excluded_from_compare": [
+        "safety_irq_status",
+        "msh >"
+      ],
+      "payload_equal_to_delivered_safety_rows": true,
+      "max_call_bytes": 124
+    },
+    {
+      "case": "disable",
+      "rc": 0,
+      "bytes": 111,
+      "sha256": "fe3096095bfb513691638d7fbdd9da7953e70011c46525dd18538404077447a2",
+      "nul": 0,
+      "cr_in_local_run": 2,
+      "cr_in_A_file": 0,
+      "raw_equal_to_A_stdout": false,
+      "equal_to_A_stdout_after_lf_normalize": true,
+      "local_payload_lines": 2,
+      "delivered_rows_excluded_from_compare": [],
+      "payload_equal_to_delivered_safety_rows": true,
+      "max_call_bytes": 74
+    },
+    {
+      "case": "closed",
+      "rc": 0,
+      "bytes": 586,
+      "sha256": "514903c15ae55414a8468d27301f1150a4b6cbfdf9ccfbd8197d273838e6bb24",
+      "nul": 0,
+      "cr_in_local_run": 9,
+      "cr_in_A_file": 0,
+      "raw_equal_to_A_stdout": false,
+      "equal_to_A_stdout_after_lf_normalize": true,
+      "local_payload_lines": 9,
+      "delivered_rows_excluded_from_compare": [
+        "safety_irq_status",
+        "msh >"
+      ],
+      "payload_equal_to_delivered_safety_rows": true,
+      "max_call_bytes": 124
+    }
+  ],
+  "compare_basis": "host 桩只打印负载行; 交付 rows 的 safety_irq_status@* 还含命令回显与行末 `msh >` 提示符(那两条来自真实串口捕获)。因此逐行比对只取 [SAFETY] 开头的负载行, 被排除的行原样登记在 delivered_rows_excluded_from_compare, 不做静默过滤。",
+  "line_endings_note": "本机重跑的 stdout 带 CRLF, A 的落盘件是 LF: A 在 Linux 工作区跑, 本机是 Windows, C 运行库对 stdout 文本模式做了行尾转换。差异只在行尾(归一后逐字节相同), 不是形状分歧。"
+}

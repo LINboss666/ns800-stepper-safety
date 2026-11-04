@@ -1,0 +1,12 @@
+CALL intended=97 emitted=97
+CALL intended=59 emitted=59
+CALL intended=80 emitted=80
+CALL intended=97 emitted=97
+CALL intended=124 emitted=124
+CALL intended=66 emitted=66
+CALL intended=68 emitted=68
+CALL intended=68 emitted=68
+CALL intended=70 emitted=70
+CALL intended=66 emitted=66
+CALL intended=60 emitted=60
+CALL intended=55 emitted=55

@@ -1,0 +1,60 @@
+{
+  "scope": "Extracted production print/control code with host GPIO/IRQ/ready stubs. Output-shape verification only, NOT hardware response, IRQ delivery, timing, or protection proof.",
+  "cases": [
+    {
+      "case": "pre",
+      "rows": 9,
+      "all_rows_exact": true,
+      "bytes": 572,
+      "sha256": "96b741228352bdfe07c25ab061b8656f175aaae1950681fb23b01c256d3a4104",
+      "max_call_bytes_including_LF": 124,
+      "nul": 0
+    },
+    {
+      "case": "pol",
+      "rows": 12,
+      "all_rows_exact": true,
+      "bytes": 910,
+      "sha256": "2b2c1ed295e4c14001d74981d72d6aaeee55c2d13eb3d1e3e97bca41b11a047d",
+      "max_call_bytes_including_LF": 124,
+      "nul": 0
+    },
+    {
+      "case": "enable",
+      "rows": 2,
+      "all_rows_exact": true,
+      "bytes": 227,
+      "sha256": "e5dd565179c0f7181db37c56d3f0792cf2304485b35855336fd4cb0dedc03606",
+      "max_call_bytes_including_LF": 114,
+      "nul": 0
+    },
+    {
+      "case": "open",
+      "rows": 9,
+      "all_rows_exact": true,
+      "bytes": 580,
+      "sha256": "323bde72464c7945b5ded49233d7091642f91a2cea083d9b501a001d141fb465",
+      "max_call_bytes_including_LF": 124,
+      "nul": 0
+    },
+    {
+      "case": "disable",
+      "rows": 2,
+      "all_rows_exact": true,
+      "bytes": 109,
+      "sha256": "f29b0f54e1115bff02031f19cae91048cab01d4c0430d3236f2ca360ef38b7dc",
+      "max_call_bytes_including_LF": 74,
+      "nul": 0
+    },
+    {
+      "case": "closed",
+      "rows": 9,
+      "all_rows_exact": true,
+      "bytes": 577,
+      "sha256": "e47c05f9934ea4ca0367784a08060e5986dae66bf0af2b1ad078e325e0cc992a",
+      "max_call_bytes_including_LF": 124,
+      "nul": 0
+    }
+  ],
+  "supervisor_flag_spelling_source_checked": "CONFIRMED (uppercase)"
+}

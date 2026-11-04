@@ -1,0 +1,212 @@
+{
+  "round": "R7F5-D",
+  "verdict": "R7F5_STATIC_IRQ_PACKAGE_ACCEPTED_FOR_FIELD_EXECUTION_PENDING_APPROVAL",
+  "reviewed_package": {
+    "zip": "NS800_R7F5_Blind_IRQ_Static_Trial_20261104.zip",
+    "bytes": 60623,
+    "sha256": "b326cd8543eec1db232ec5781c03b7fae721eeaf1ef6af6640bc97321a789a2c",
+    "entries": 33,
+    "inner_manifest_all_ok": true,
+    "inner_manifest_excludes_itself": true
+  },
+  "baseline": {
+    "head_at_registration": "0cd64587739cca41a22903e075b6fe37b17c765b",
+    "reviewed_delivery_commit_in_plan": "0cd64587739cca41a22903e075b6fe37b17c765b",
+    "head_equals_reviewed_commit": true,
+    "product_source_changed_since_0d8239f": false,
+    "executor_modified": false,
+    "firmware_modified": false,
+    "prior_round_field_bytes_modified": false
+  },
+  "package_identity_recomputed_by_me": {
+    "executor_sha256": "33d3f0af8a4c9c33dcd4e013b395e4ba990a89e384130f9d0ffe50c71b34e8ca",
+    "image_sha256": "502dca5d8c7ebfa794f890a9c03bc258fc9753f57b6a80c2f1e08add69888a7a",
+    "image_bytes": 292708,
+    "software_input_commit_exists": true,
+    "tested_image_build_commit_exists": true
+  },
+  "placed_files": [
+    {
+      "path": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/plan_r7f5_b502_blind_irq_static.json",
+      "bytes": 49994,
+      "sha256": "ee3b26513fc7a572daff0c5c26124a9a0f7fbfa20632bd7088fb84d9d0ca4402",
+      "declared_bytes": 49994,
+      "declared_sha256": "ee3b26513fc7a572daff0c5c26124a9a0f7fbfa20632bd7088fb84d9d0ca4402",
+      "match": true
+    },
+    {
+      "path": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/rows_r7f5_b502_blind_irq_static.json",
+      "bytes": 22289,
+      "sha256": "4f094de3331ef594fe7b43f72dbddd342f3924ada2c8d414d3d9b7293b485475",
+      "declared_bytes": 22289,
+      "declared_sha256": "4f094de3331ef594fe7b43f72dbddd342f3924ada2c8d414d3d9b7293b485475",
+      "match": true
+    }
+  ],
+  "steps_digest": {
+    "recomputed_by_me": "4a80dcb6dd43028c6f526298463cba3d71bc312a379db5b152a4db52359b7eb0",
+    "declared_by_A": "4a80dcb6dd43028c6f526298463cba3d71bc312a379db5b152a4db52359b7eb0",
+    "match": true
+  },
+  "offline_validation": {
+    "checks": 57,
+    "fail": 1,
+    "fail_line": "PLAN_MOTION_CAP_BUDGET|all|FAIL|caps=[] sum=0 total=0 starts=0",
+    "registered_as": "N/A(本包固定零 arm/start/learn; 不填假运动预算, 不改检查器)",
+    "not_claimed_all_green": true,
+    "my_output_line_by_line_equals_A": true
+  },
+  "s0_binding": {
+    "fields_compared": "除绝对路径外全部",
+    "match": true,
+    "needles_total": 40,
+    "plan_placeholders": 0,
+    "plan_forbidden_hits": 0
+  },
+  "replays": {
+    "cases": 8,
+    "positive_status": "OK",
+    "negative_statuses": [
+      "STOP",
+      "STOP",
+      "STOP",
+      "STOP",
+      "STOP",
+      "STOP",
+      "STOP"
+    ],
+    "positive_quota_used": {
+      "port_open": 1,
+      "tmc_config_apply": 1,
+      "irq_polarity_prep": 2,
+      "safety_irq_disable": 1
+    },
+    "arm_or_start_sent_in_any_ledger": false,
+    "pre_fault_apply_consumed": false,
+    "diag_active_prep_consumed": false,
+    "agree_with_A": true
+  },
+  "rows_provenance": {
+    "real_previous_capture_entries": 7,
+    "real_entries_equal_archive_bytes": true,
+    "real_entries_nul_count": 0,
+    "prediction_entries_not_field_evidence": 12
+  },
+  "host_shape": {
+    "compiler": "C:/Program Files (x86)/Dev-Cpp/MinGW64/bin/gcc.exe",
+    "compile_rc": 0,
+    "cases": 6,
+    "stdout_equal_to_A_after_lf_normalize": true,
+    "raw_stdout_equal_to_A": false,
+    "line_ending_note": "本机重跑的 stdout 带 CRLF, A 的落盘件是 LF: A 在 Linux 工作区跑, 本机是 Windows, C 运行库对 stdout 文本模式做了行尾转换。差异只在行尾(归一后逐字节相同), 不是形状分歧。",
+    "compare_basis": "host 桩只打印负载行; 交付 rows 的 safety_irq_status@* 还含命令回显与行末 `msh >` 提示符(那两条来自真实串口捕获)。因此逐行比对只取 [SAFETY] 开头的负载行, 被排除的行原样登记在 delivered_rows_excluded_from_compare, 不做静默过滤。",
+    "max_single_call_bytes": 124,
+    "nul": 0,
+    "scope_limit": "只证形状与流程, 不证中断交付/板端时序/物理极性"
+  },
+  "quota_and_caps": {
+    "declared_quota": {
+      "port_open": 1,
+      "download": 0,
+      "readback": 0,
+      "explicit_reset": 0,
+      "tmc_config_apply": 1,
+      "approved_reboot": 0,
+      "config_save": 0,
+      "irq_polarity_prep": 2,
+      "diag_profile_zero": 0,
+      "diag_profile_learn": 0,
+      "diag_profile_commit": 0,
+      "motor_run": 0,
+      "motor_run_seconds_total": 0,
+      "motion_cap_seconds_per_run": 0,
+      "cleanup_motor_stop": 0,
+      "cleanup_motor_disarm": 0,
+      "cleanup_motor_status": 0,
+      "retry": 0,
+      "physical_collision": 0,
+      "blackbox_clear": 0,
+      "dmm_readings": 0,
+      "safety_irq_disable": 1
+    },
+    "summed_from_steps": {
+      "tmc_config_apply": 1,
+      "irq_polarity_prep": 2,
+      "safety_irq_disable": 1
+    },
+    "declared_equals_summed_for_command_quotas": true,
+    "zero_actions_kept_zero": {
+      "download": 0,
+      "readback": 0,
+      "explicit_reset": 0,
+      "approved_reboot": 0,
+      "config_save": 0,
+      "diag_profile_zero": 0,
+      "diag_profile_learn": 0,
+      "diag_profile_commit": 0,
+      "motor_run": 0,
+      "motor_run_seconds_total": 0,
+      "motion_cap_seconds_per_run": 0,
+      "cleanup_motor_stop": 0,
+      "cleanup_motor_disarm": 0,
+      "cleanup_motor_status": 0,
+      "retry": 0,
+      "physical_collision": 0,
+      "blackbox_clear": 0,
+      "dmm_readings": 0
+    },
+    "forbidden_commands": [
+      "motor_arm",
+      "motor_start",
+      "motor_disarm",
+      "motor_stop",
+      "motor_dir",
+      "motor_target",
+      "diag_profile learn",
+      "diag_profile commit",
+      "diag_profile zero",
+      "config_save",
+      "blackbox_clear",
+      "fault_reset"
+    ],
+    "forbidden_present_as_steps": 0,
+    "total_deadline_seconds": 90,
+    "operator_power_cycle_pairs_max": 1
+  },
+  "trial_exception": {
+    "polarity_measured": false,
+    "trial_only_software_flag_override": true,
+    "basis": "User requests one blind trial after explicitly reporting DIAG unmeasured; limit exception to static IRQ registration with motor disabled.",
+    "software_output_is_not_physical_evidence": true,
+    "core_protection_verified": false,
+    "end_condition": "Operator powers down both VM and MCU after port closure, whether trial succeeds or fails; flag is volatile and no clear-flag command is invented.",
+    "forbidden_claims": [
+      "PHYSICAL_POLARITY_VERIFIED",
+      "DIAG_TRIGGER_VERIFIED",
+      "STEP_PHYSICALLY_STOPPED_BY_LOG_ALONE",
+      "CORE_PROTECTION_VERIFIED"
+    ]
+  },
+  "device_actions_this_round": 0,
+  "approval_gate": {
+    "status": "STOPPED_AT_APPROVAL_GATE",
+    "proposed_approval_id": "M8R7F5-b502-blind-irq-static-20261104",
+    "prior_approvals_carry_forward": false,
+    "needs_from_operator": [
+      "按该固定范围批准一次执行(令牌必须用操作者本次真实原话, 不得代填)",
+      "现场事实: MCU 与 VM 当前是否断电、接线/装配是否与上次一致、DAPLink/COM5 是否已恢复在位",
+      "确认接受 polarity_measured=false 的临时软件标志置位例外, 以及结束后切断 VM+MCU 供电"
+    ]
+  },
+  "not_verified_after_this_round": [
+    "DIAG 物理极性与两态电平",
+    "实际保护触发与恢复",
+    "SG/ADC/IMU 通道",
+    "arm/disarm 与运动",
+    "带载最坏栈",
+    "中断是否真被投递(本轮只静态注册与关门)"
+  ],
+  "checks_total": 24,
+  "checks_fails": 0,
+  "scope": "离线登记轮: 只读三份交付件与仓库原件, 真实仓库未改产品码/执行器/固件; 设备动作 0; 复算全部在未改动的原执行器与本机 C 编译器上进行。"
+}

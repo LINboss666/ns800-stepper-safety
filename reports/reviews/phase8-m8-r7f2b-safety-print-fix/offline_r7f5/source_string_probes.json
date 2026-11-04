@@ -1,0 +1,17 @@
+{
+  "probes": [
+    "(operator must have MEASURED these)",
+    "this is an OPERATOR DECLARATION. Software does NOT",
+    "input polarity MARKED VALIDATED (operator confirm)",
+    "NO (IRQ gate still CLOSED)",
+    "IRQ gate OPEN: %d active protection input(s) registered",
+    "detached (%d)",
+    "OPEN (EXTI registered)",
+    "CLOSED (polled only)",
+    "operator CONFIRMED",
+    "NOT confirmed",
+    "活动安全输入(%d 路)无软件响应路径"
+  ],
+  "missing": [],
+  "source": "applications/safety_thread.c"
+}

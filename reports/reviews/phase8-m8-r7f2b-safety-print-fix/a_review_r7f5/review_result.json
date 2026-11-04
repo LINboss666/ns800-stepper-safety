@@ -1,0 +1,229 @@
+{
+  "reviewed_commit": "0cd64587739cca41a22903e075b6fe37b17c765b",
+  "product_source_unchanged_since_0d8239f": true,
+  "hardware_actions_performed_by_A": 0,
+  "polarity_measured": false,
+  "canonical_steps_sha256": "4a80dcb6dd43028c6f526298463cba3d71bc312a379db5b152a4db52359b7eb0",
+  "S0": {
+    "image_path": "reports/firmware/phase8-m8-r7f2b-safety-print-fix/rt-thread-motor-m1-candidate.bin",
+    "approval_id": "NONE_DECLARED",
+    "plan_source": "/workspace/scratch/f24247cdf3d6/r7f5-blind-static/repo/reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/plan_r7f5_b502_blind_irq_static.json",
+    "plan_sha256_on_disk": "ee3b26513fc7a572daff0c5c26124a9a0f7fbfa20632bd7088fb84d9d0ca4402",
+    "plan_sha256": "ee3b26513fc7a572daff0c5c26124a9a0f7fbfa20632bd7088fb84d9d0ca4402",
+    "plan_snapshot_bytes": 49994,
+    "plan_snapshot_path": "/workspace/scratch/f24247cdf3d6/r7f5-blind-static/repo/reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/plan_r7f5_b502_blind_irq_static.json",
+    "executor_path": "/workspace/scratch/f24247cdf3d6/r7f5-blind-static/repo/reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py",
+    "executor_sha256": "33d3f0af8a4c9c33dcd4e013b395e4ba990a89e384130f9d0ffe50c71b34e8ca",
+    "image_bytes": 292708,
+    "image_sha256": "502dca5d8c7ebfa794f890a9c03bc258fc9753f57b6a80c2f1e08add69888a7a",
+    "manifest_target": "rt-thread-motor-m1-candidate",
+    "software_input_commit": "99414c7a57d8987033de3de48469a8f4779b87a5",
+    "tested_image_build_commit": "70deff806e8b548dee23afb06a6fcdf20937b015",
+    "reviewed_delivery_commit": "0cd64587739cca41a22903e075b6fe37b17c765b",
+    "plan_placeholders": 0,
+    "plan_forbidden_hits": 0,
+    "needles_source_root": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad",
+    "needles_total": 40
+  },
+  "validation": {
+    "checks": 57,
+    "fail": 1,
+    "known_NA": [
+      "PLAN_MOTION_CAP_BUDGET|all|FAIL|caps=[] sum=0 total=0 starts=0"
+    ],
+    "not_claimed_all_green": true
+  },
+  "new_source_shape_line_lengths_including_LF": {
+    "safety_polarity_confirm CONFIRM": [
+      97,
+      59,
+      80,
+      97,
+      124,
+      66,
+      68,
+      68,
+      70,
+      66,
+      60,
+      55
+    ],
+    "safety_irq_enable": [
+      113,
+      114
+    ],
+    "safety_irq_disable": [
+      35,
+      74
+    ]
+  },
+  "full_original_executor_replays": [
+    {
+      "case": "positive",
+      "status": "OK",
+      "stages": [
+        {
+          "id": "S0",
+          "status": "OK",
+          "code": null
+        },
+        {
+          "id": "S1",
+          "status": "OK",
+          "code": ""
+        }
+      ],
+      "quota_used": {
+        "port_open": 1,
+        "tmc_config_apply": 1,
+        "irq_polarity_prep": 2,
+        "safety_irq_disable": 1
+      }
+    },
+    {
+      "case": "pre_fault",
+      "status": "STOP",
+      "stages": [
+        {
+          "id": "S0",
+          "status": "OK",
+          "code": null
+        },
+        {
+          "id": "S1",
+          "status": "STOP",
+          "code": "FIELD_VALUE_MISMATCH"
+        }
+      ],
+      "quota_used": {
+        "port_open": 1
+      }
+    },
+    {
+      "case": "diag_already_active",
+      "status": "STOP",
+      "stages": [
+        {
+          "id": "S0",
+          "status": "OK",
+          "code": null
+        },
+        {
+          "id": "S1",
+          "status": "STOP",
+          "code": "FIELD_NOT_EXACTLY_ONE"
+        }
+      ],
+      "quota_used": {
+        "port_open": 1,
+        "tmc_config_apply": 1
+      }
+    },
+    {
+      "case": "enable_refused",
+      "status": "STOP",
+      "stages": [
+        {
+          "id": "S0",
+          "status": "OK",
+          "code": null
+        },
+        {
+          "id": "S1",
+          "status": "STOP",
+          "code": "BUSINESS_FAILED"
+        }
+      ],
+      "quota_used": {
+        "port_open": 1,
+        "tmc_config_apply": 1,
+        "irq_polarity_prep": 2
+      }
+    },
+    {
+      "case": "enable_nul",
+      "status": "STOP",
+      "stages": [
+        {
+          "id": "S0",
+          "status": "OK",
+          "code": null
+        },
+        {
+          "id": "S1",
+          "status": "STOP",
+          "code": "NUL_BYTE_IN_RESPONSE"
+        }
+      ],
+      "quota_used": {
+        "port_open": 1,
+        "tmc_config_apply": 1,
+        "irq_polarity_prep": 2
+      }
+    },
+    {
+      "case": "open_not_ready",
+      "status": "STOP",
+      "stages": [
+        {
+          "id": "S0",
+          "status": "OK",
+          "code": null
+        },
+        {
+          "id": "S1",
+          "status": "STOP",
+          "code": "FIELD_NOT_EXACTLY_ONE"
+        }
+      ],
+      "quota_used": {
+        "port_open": 1,
+        "tmc_config_apply": 1,
+        "irq_polarity_prep": 2
+      }
+    },
+    {
+      "case": "open_output_high",
+      "status": "STOP",
+      "stages": [
+        {
+          "id": "S0",
+          "status": "OK",
+          "code": null
+        },
+        {
+          "id": "S1",
+          "status": "STOP",
+          "code": "FIELD_VALUE_MISMATCH"
+        }
+      ],
+      "quota_used": {
+        "port_open": 1,
+        "tmc_config_apply": 1,
+        "irq_polarity_prep": 2
+      }
+    },
+    {
+      "case": "disable_bad_rc",
+      "status": "STOP",
+      "stages": [
+        {
+          "id": "S0",
+          "status": "OK",
+          "code": null
+        },
+        {
+          "id": "S1",
+          "status": "STOP",
+          "code": "FIELD_NOT_EXACTLY_ONE"
+        }
+      ],
+      "quota_used": {
+        "port_open": 1,
+        "tmc_config_apply": 1,
+        "irq_polarity_prep": 2,
+        "safety_irq_disable": 1
+      }
+    }
+  ]
+}

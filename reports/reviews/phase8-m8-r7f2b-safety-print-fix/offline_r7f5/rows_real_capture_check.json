@@ -1,0 +1,51 @@
+[
+  {
+    "key": "system_status@pre",
+    "source": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T015928Z/S_S1/01_sys_pre.rx.bin",
+    "bytes": 978,
+    "nul": 0,
+    "rows_equal_archive": true
+  },
+  {
+    "key": "motor_status@pre",
+    "source": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T015928Z/S_S1/02_mot_pre.rx.bin",
+    "bytes": 1128,
+    "nul": 0,
+    "rows_equal_archive": true
+  },
+  {
+    "key": "tmc_config_apply CONFIRM",
+    "source": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T015928Z/S_S1/03_cfg_apply.rx.bin",
+    "bytes": 388,
+    "nul": 0,
+    "rows_equal_archive": true
+  },
+  {
+    "key": "system_status@cfg",
+    "source": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T015928Z/S_S1/04_sys_post.rx.bin",
+    "bytes": 980,
+    "nul": 0,
+    "rows_equal_archive": true
+  },
+  {
+    "key": "motor_status@cfg",
+    "source": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T015928Z/S_S1/05_mot_post.rx.bin",
+    "bytes": 1080,
+    "nul": 0,
+    "rows_equal_archive": true
+  },
+  {
+    "key": "safety_status",
+    "source": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T015928Z/S_S1/06_safety_post.rx.bin",
+    "bytes": 522,
+    "nul": 0,
+    "rows_equal_archive": true
+  },
+  {
+    "key": "safety_irq_status@pre",
+    "source": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T001444Z/S_S3/07_irqboot.rx.bin",
+    "bytes": 612,
+    "nul": 0,
+    "rows_equal_archive": true
+  }
+]

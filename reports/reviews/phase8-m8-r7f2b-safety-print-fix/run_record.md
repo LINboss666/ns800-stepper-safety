@@ -253,3 +253,41 @@ GCONF/CHOPCONF 前后值只记录(`00000101->00000141` / `15010053->15030053`,�
 板端:驱动 CONFIGURED、未武装、频率 0、请求 LOW、焊盘 LOW、ENN 在禁能侧、保护门与 IRQ 未动、未起转,VM 供电保持,端口正常关闭。
 **额度已用尽**:本包 port_open 1/1、apply 1/1,旧批准与剩余额度不结转;下一场(极性/IRQ、短动作、学习与目标通道触发)要 A 重新出包并对新范围再批一次。
 
+## 12 R7F5 登记(A 出"盲测一次静态 IRQ"包;设备动作仍为 0)
+
+被审件 `NS800_R7F5_Blind_IRQ_Static_Trial_20261104.zip` 60623 B `b326cd8543eec1db…`,33 条目,内层清单 32/32 OK 且不含自身。
+基线 `0cd6458`(= 计划里的 `reviewed_delivery_commit`,登记时 HEAD 与之相等);落位两件按相对路径放入 `field/`:
+plan `ee3b2651…` 49994 B、rows `4f094de3…` 22289 B,散列与 `IDENTITY.json` 逐字节相同。
+
+我这边独立复算 24 项全 PASS(`offline_r7f5/`,fails=0),关键几条:
+
+- 步骤摘要用未改执行器重算 `4a80dcb6dd43028c…` == A 声明;S0 绑定除路径外逐字段一致(`needles_total=40`、
+  `plan_placeholders=0`、`plan_forbidden_hits=0`);`validate_plan` 57 项 fail=1,我的 57 行输出与 A 落盘件逐行相同。
+- 唯一 FAIL 是 `PLAN_MOTION_CAP_BUDGET`(要求非空运动上限)。本包固定零 arm/start/learn,按 **N/A** 登记:
+  不填假运动预算,也不改检查器把它抹掉,更不写成全绿。
+- 8 个整包回放(正常 1 + 反例 7)状态/阶段/额度实耗逐例与 A 一致;正常场景只消耗四项;
+  故障前置没发 apply;DIAG 已活动没置标志没开门;台账里没有任何 `motor_arm`/`motor_start`。
+- rows 的 7 条"真实旧回包"用 `split_rows` 重切仓库归档原件后逐行相等、零 NUL;其余 12 条是 source_shape 预测,
+  分类登记,不充当本轮现场证据。
+- A 的 host 桩我用本机 gcc(`Dev-Cpp/MinGW64`,参数同 A)重编重跑六组:归一行尾后逐字节相同,
+  原始字节**不等**(A 在 Linux 跑,stdout 是 LF;本机 Windows C 运行库写 CRLF)。
+  逐行比对只取 `[SAFETY]` 负载行,因为交付 rows 的 `safety_irq_status@*` 另含命令回显与行末 `msh >`
+  (来自真实串口捕获)——被排除的行原样登记,不静默过滤。形状证据只证形状与流程,不证中断交付/时序/物理极性。
+
+本包固定例外(照计划原样登记,不扩大):`polarity_measured=false`、`trial_only_software_flag_override=true`、
+`core_protection_verified=false`。`safety_polarity_confirm CONFIRM` 只置 RAM 标志;源码那两条
+`operator must have MEASURED` / `MARKED VALIDATED` 保留。**风险点如实写明**:第 10–11 步 `mask=0x0 ALL-PASS`
+意味着固件此刻会**接受** arm/start——挡住它的是步骤清单与 `forbidden_commands`(S0 级结构门),不是固件自身拒绝;
+收口后由操作者切断 VM+MCU 供电清掉易失标志。
+
+停点:**等操作者本人批准**(新身份 `M8R7F5-b502-blind-irq-static-20261104`,旧批准与剩余额度不结转,
+令牌必须用本次真实原话),并回报 MCU/VM 供电状态、接线是否沿用、**DAPLink/COM5 是否已恢复在位**
+(上一轮诊断时探针不在位)。批准前不跑 `--approval-init`,不跑 dispatch。
+
+提交前预检(`tools/r7f5_staged_preflight.py`):清单 146 条 登记值==暂存 blob==磁盘字节(problems=0),
+两类自检均 FIRED。泄漏扫描按本轮暂存集判(47 件命中 0);另如实登记 2 条**历史**命中——
+`offline/package_integrity.txt` 与 `offline/package_integrity_r7f4.txt` 首行当年记了交付 zip 的本机绝对路径
+(含用户名目录),那是已推送的冻结件,本轮不回改、也不让它们 retroactively 判红;后续新轮只记文件名与散列。
+
+
+

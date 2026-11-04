@@ -1,0 +1,20 @@
+{
+  "reviewed_delivery_commit": "0cd64587739cca41a22903e075b6fe37b17c765b",
+  "firmware_sha256": "502dca5d8c7ebfa794f890a9c03bc258fc9753f57b6a80c2f1e08add69888a7a",
+  "executor_sha256": "33d3f0af8a4c9c33dcd4e013b395e4ba990a89e384130f9d0ffe50c71b34e8ca",
+  "hardware_actions_performed_by_A": 0,
+  "polarity_measured": false,
+  "scope": "STATIC_IRQ_ONLY_NO_ARM_START",
+  "files": [
+    {
+      "path": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/plan_r7f5_b502_blind_irq_static.json",
+      "bytes": 49994,
+      "sha256": "ee3b26513fc7a572daff0c5c26124a9a0f7fbfa20632bd7088fb84d9d0ca4402"
+    },
+    {
+      "path": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/rows_r7f5_b502_blind_irq_static.json",
+      "bytes": 22289,
+      "sha256": "4f094de3331ef594fe7b43f72dbddd342f3924ada2c8d414d3d9b7293b485475"
+    }
+  ]
+}
