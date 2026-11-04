@@ -168,5 +168,30 @@
     "followup_commit_note": "回读工具本身在追加提交里入库(清单须登记它), 追加提交后再跑一次同样回读, 报告仍留仓外, 循环就此终止",
     "commit_message_typo_registered": "主提交信息把工具名打成 r7f6_staged_preight(漏一个 f), 实际文件是 tools/r7f6_staged_preflight.py; 已发布提交不改写, 以 run_record §19 自伤第 11 条为准"
   },
-  "pending_operator": "收口断电: 采集与端口均已关闭, 请操作者切断 VM 与 MCU 最多 1 次且不再上电; 记录实际时刻或'未观察', 不倒填 R7F5A 收口时间"
+  "power_down_closeout": {
+    "operator_reports_verbatim": ["断电了刚才", "51分我又重新断电了一次", "每次断电之后我都会重新上电"],
+    "reported_event_times_local": ["2026-11-05 02:50 前后(未报精确时刻)", "2026-11-05 02:51(操作者自述, 分钟级采信)", "补充说明本机落盘 02:54:48"],
+    "reported_powerdown_count": 2,
+    "cap_normal_end_powerdown_max": 1,
+    "cap_accounting": "OVER_CAP_POWERDOWN(2>1) 且 OVER_CAP_ADDITIONAL_POWERUP(>=1>0): 操作者确认每次断电后都会重新上电, 故两次切断之间确有上电; 两项都如实登记为超上限, 不改写成'一次'也不写成'没上电'",
+    "repower_between_cuts": "YES(操作者申报的习惯性说明; 不再是 UNKNOWN)",
+    "current_board_power_state": "CURRENT_STATE_NOT_CONFIRMED (操作者未明说现在是否仍通电; 核实需动设备, 本轮额度已用完, 未去核实)",
+    "agent_device_actions_between_reports": 0,
+    "host_side_readonly_observations": [
+      {"local": "2026-11-05 02:50:50.475+08:00", "COM5_enumerated": true,
+       "cmsis_dap_enumerated": true, "saleae_enumerated": true},
+      {"local": "2026-11-05 02:52:38.492+08:00", "COM5_enumerated": true,
+       "cmsis_dap_enumerated": true, "saleae_enumerated": true,
+       "dap_uid_registered_as": "长度 48 + sha12 掩码 586cb3f3ac73 (原文不入仓)"}
+    ],
+    "usb_topology_change_between_observations": "无",
+    "interpretation": "探针(DAPLink/CMSIS-DAP)由 PC 的 USB 供电, 与板端 VM/MCU 不是同一电源域; 两次只读枚举都显示 USB 侧仍在, 所以这条观察既不能证实也不能证伪 MCU/VM 已断电 => MCU_POWER_STATE_NOT_HOST_OBSERVABLE; 任务书要求计入的正是'USB 路径未断'这条事实",
+    "labels": ["POWER_DOWN_OPERATOR_REPORTED_x2", "OVER_CAP_POWERDOWN_2_GT_1",
+               "OVER_CAP_ADDITIONAL_POWERUP_GE_1_GT_0", "HOST_SIDE_USB_STILL_ENUMERATED",
+               "MCU_POWER_STATE_NOT_HOST_OBSERVABLE", "CURRENT_STATE_NOT_CONFIRMED"],
+    "effect_on_results": "无: 全部现场数据在 02:20:42-02:21:25 已采集保存导出并归档, 断电发生在测量之后",
+    "evidence_file": "reports/reviews/phase8-m8-r7f6-la-path-static/POWERDOWN_REPORT.txt",
+    "r7f5a_pending_kept": "R7F5A 的物理断电仍是 PENDING_OPERATOR_REPORT, 这两次断电不回填那一轮",
+    "no_repower": "任务书要求'不再上电'; 操作者自述习惯是断后再上电, 已按申报登记为超上限。本轮不再自行核实当前通电态, 也不追加任何设备动作; 续测需要 A 的新包与操作者的新批准"
+  }
 }

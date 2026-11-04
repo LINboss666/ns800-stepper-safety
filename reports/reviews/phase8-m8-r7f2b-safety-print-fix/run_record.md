@@ -755,3 +755,20 @@ executor/image/plan 三件散列与 `IDENTITY.json` 全等、22 项额度与 pla
 两份清单自身的远端 blob == 磁盘。回读报告留仓外 `D:/ns800_r7f6_readback/remote_readback_r7f6.txt`
 （避免"清单登记自己的回读件"这种自引用）。回读工具本身在清单重算后的追加提交里入库，
 追加提交后再跑一次同样的回读，报告同样留仓外。
+（追加提交 `7a82147` 上的第二次回读实测：两条清单合计 **305 条**，`ok=305 mismatch=0 not_checked=0`，
+A 包 30 件与 zip 逐字节相等，5 件冻结件 blob 全等，§16–§19 各命中 1 次，两份清单远端 blob == 磁盘，fails=0。）
+
+**收口断电（操作者现场动作，登记两次报断）**：操作者先报「断电了刚才」（02:50 前后，未报精确时刻），
+随后又报「51分我又重新断电了一次」（自述 02:51，分钟级采信）。任务书 §2 的收口断电上限是 **1 次**，
+现场申报到的是 **2 次** ⇒ 如实登记 `OVER_CAP_OPERATOR_REPORTED`，不粉饰成"一次"；随后操作者补充
+「每次断电之后我都会重新上电」（本机落盘时刻 02:54:48）⇒ 两次之间确实发生过重新上电，
+因此同时构成 `OVER_CAP_ADDITIONAL_POWERUP(>=1 > 0)`，不再是 UNKNOWN；但"现在板子是否仍在上电"
+操作者没有明说 ⇒ `CURRENT_STATE_NOT_CONFIRMED`，等其确认，不替他假定。我在两次报断之间没有执行任何设备动作，本轮动作计数不变。
+主机侧只读枚举两次（02:50:50 与 02:52:38，未开 COM、未访问 DAP、未动板子）：COM5 与 CMSIS-DAP v2 /
+WebUSB: CMSIS-DAP / Saleae Logic 全部仍 Status=OK 枚举，两次之间 USB 拓扑无变化 ⇒ 探针由 PC 的 USB 供电，
+与板端 VM/MCU 不是同一电源域，所以这条观察既不能证实也不能证伪 MCU 已断电，标签
+`MCU_POWER_STATE_NOT_HOST_OBSERVABLE`；按任务书"DAP/USB 供电也计入 MCU 是否真正断电的现场判断"，
+计入的就是"USB 路径未断"这条事实本身。私有 DAP UID（48 位十六进制）不入任何入库件，
+只记长度 48 与 sha12 掩码 `586cb3f3ac73`。全部现场数据在 02:20:42–02:21:25 已采集并归档，
+断电发生在测量之后，不影响任何判读结论。R7F5A 的 `PENDING_OPERATOR_REPORT` 不回填。
+详见 `reports/reviews/phase8-m8-r7f6-la-path-static/POWERDOWN_REPORT.txt`。
