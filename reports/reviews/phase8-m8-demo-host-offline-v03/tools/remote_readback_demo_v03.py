@@ -42,9 +42,9 @@ def main() -> int:
     expect_tip = os.environ.get("RBI_TIP", "")
     root.mkdir(parents=True, exist_ok=True)
 
-    def run(args, cwd):
+    def run(args, cwd=None):
         p = subprocess.run(["git", "-c", "core.autocrlf=false"] + PROXY + args,
-                           cwd=str(cwd), capture_output=True)
+                           cwd=str(cwd or root), capture_output=True)
         return p.returncode, p.stdout, p.stderr
 
     bare = root / "remote.bare.git"
@@ -157,7 +157,7 @@ def main() -> int:
     note("SELFCHECK|.gitattributes tip vs tip^ 必须不同: %s" % ("FIRED" if fired else "**NOT-FIRED(比较器失效)**"))
     fails.append("" if fired else "SELFCHECK_NOT_FIRED")
 
-    fails = [f for f in fails if f]
+    fails[:] = [f for f in fails if f]
     (root / "remote_readback_demo_v03.txt").write_text("\n".join(out) + "\n", encoding="utf-8")
     note("SUMMARY|fails=%d|%s|report=%s" % (len(fails), fails[:8], root / "remote_readback_demo_v03.txt"))
     return 1 if fails else 0
