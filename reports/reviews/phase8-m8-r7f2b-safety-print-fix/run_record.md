@@ -762,8 +762,10 @@ A 包 30 件与 zip 逐字节相等，5 件冻结件 blob 全等，§16–§19 �
 随后又报「51分我又重新断电了一次」（自述 02:51，分钟级采信）。任务书 §2 的收口断电上限是 **1 次**，
 现场申报到的是 **2 次** ⇒ 如实登记 `OVER_CAP_OPERATOR_REPORTED`，不粉饰成"一次"；随后操作者补充
 「每次断电之后我都会重新上电」（本机落盘时刻 02:54:48）⇒ 两次之间确实发生过重新上电，
-因此同时构成 `OVER_CAP_ADDITIONAL_POWERUP(>=1 > 0)`，不再是 UNKNOWN；但"现在板子是否仍在上电"
-操作者没有明说 ⇒ `CURRENT_STATE_NOT_CONFIRMED`，等其确认，不替他假定。我在两次报断之间没有执行任何设备动作，本轮动作计数不变。
+因此同时构成 `OVER_CAP_ADDITIONAL_POWERUP(>=1 > 0)`，不再是 UNKNOWN；操作者随后确认
+「还通着电」（本机落盘 02:57:08）⇒ 本轮收口终态 = `POWERED_ON_OPERATOR_CONFIRMED`，
+任务书"不再上电/停在断电态"的收口预期**未达成**（`CLOSEOUT_POWERED_DOWN_EXPECTATION_NOT_ACHIEVED`），
+如实登记，不粉饰也不指责。我在两次报断之间没有执行任何设备动作，本轮动作计数不变。
 主机侧只读枚举两次（02:50:50 与 02:52:38，未开 COM、未访问 DAP、未动板子）：COM5 与 CMSIS-DAP v2 /
 WebUSB: CMSIS-DAP / Saleae Logic 全部仍 Status=OK 枚举，两次之间 USB 拓扑无变化 ⇒ 探针由 PC 的 USB 供电，
 与板端 VM/MCU 不是同一电源域，所以这条观察既不能证实也不能证伪 MCU 已断电，标签
