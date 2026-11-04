@@ -30,13 +30,15 @@ A 把 cfg 与 ctx 两个故障同时装上，命中"配置写失败 **且** 回�
 新增三条窄路径（A 明确允许动 commit 的直接配置事务依赖）：
 
 ```c
-rt_err_t project_config_rprof_begin(const diag_rprof_t *p);           /* 唯一会失败的一步 */
+rt_err_t project_config_rprof_begin(const diag_rprof_t *p);  /* 会失败: 判空+validate(锁外) -> 取 cfg 锁 -> 锁内 config_in_range */
 void     project_config_rprof_publish_locked(const diag_rprof_t *p);  /* 只赋值 */
 void     project_config_rprof_end(void);                              /* 只放锁 */
 ```
 
-`begin()` 在取锁之前完成全套校验（`rel_profile_validate` + 用临时副本过 `config_in_range`），
-取锁失败时既不持锁也不改共享状态；成功即持 cfg 返回，调用方必须成对 `end()`。
+`begin()`（`project_config.c:503-510`）先判空并做 `rel_profile_validate`（锁外），再取 cfg 锁，
+**在锁内**复制当前 cfg、替换临时 rprof、跑 `config_in_range`；任一路径失败都不持锁、不改共享状态
+（范围不过会先 `cfg_release()`）。成功即持 cfg 返回，调用方必须成对 `end()`。
+begin 成功不等于整条 commit 成功——其后 `rel_ctx_take()` 仍可能失败。
 commit 变成：
 
 ```
@@ -52,7 +54,7 @@ rel_ctx_take() 失败 -> rprof_end(); REFUSED(ctx-lock-commit)   共享状态一
 | 结果 | 配置 | 候选 | 凭据 | 锁 |
 |---|---|---|---|---|
 | `REFUSED` | 与调用前逐字节相同 | 与调用前逐字节相同 | 不变 | 都不持 |
-| `OK` | 与候选 **memcmp 相等**（A16 ① 直接逐字节比） | 同上 | learn 作废 | 已归还 |
+| `OK` | 与候选 **memcmp 相等**（A16 ① 直接逐字节比） | 同上 | **zero/learn 两枚均保持原值**（提交点传 `-1/-1`） | 已归还 |
 
 锁序 `mot(跨命令持有) → cfg → rel_ctx` 未变；`rel_ctx` 仍是叶锁（临界区内只有赋值）；
 持 cfg 期间只多了一次有界等待（`REL_CTX_TAKE_MS=20ms`）加两次赋值；
@@ -126,3 +128,17 @@ rel_ctx_take() 失败 -> rprof_end(); REFUSED(ctx-lock-commit)   共享状态一
 R7F5A 物理断电回报仍 `PENDING_OPERATOR_REPORT`（未代填、未为关闭它接设备）；
 演示端 V0.3、旧包、旧现场原件、旧批准账本未动；本轮不构成任何硬件授权。
 未使用 merge / rebase / force-push / reset / clean。
+
+## 8. 勘误与签收（2026-11-05）
+
+A 的签收包 `NS800_R7D1_ARD4B_Acceptance_00718b4_20261105.zip`（24196 B，sha256 `49681a0f…fa97f`）
+判定 `ACCEPT_OFFLINE_WITH_DOCUMENTATION_ERRATA`：ARD1–ARD4 全部收口，`blocking_product_findings=0`，
+本次设备动作 0，A 未重跑 ARM/Keil 构建。本文件原有两处口径不准，已按源码改写并在此留痕：
+① 完整配置的 `config_in_range` 复核在 **cfg 锁内**执行（旧文写成"取锁之前完成全套校验"，
+并把 begin 称作"最后一个可失败步骤"）；② commit 成功后 **zero/learn 两枚凭据都保持原值**
+（旧文写成"learn 作废"）。正确总口径：全部校验与所有可能失败的取锁都在两份共享状态写入之前完成。
+`project_config.h:82-83` 的接口注释有同一处顺序漂移，属产品文件文字，改它需要重新构建，
+A 明确不为此开返修/构建轮，因此点名登记、留到下一次合法触产品源码的轮次随构建一起修。
+详情与逐字原文：`reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/implementation_contract.md` §8、
+`reports/reviews/phase8-m8-r7d1-ard4b-acceptance/errata.md`。签收范围不含真实硬件效果，
+`23691e8d…`/`165d8bdc…`/`df7584c3…` 仍全部 NOT_ON_BOARD，新硬件授权 = false。

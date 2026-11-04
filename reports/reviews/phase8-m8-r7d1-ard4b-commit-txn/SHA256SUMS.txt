@@ -13,7 +13,7 @@ b771e16fcdb49c253bb9b6a8322c41c91a2719325f55368e8c7100977b16a1a6  reports/review
 e737e63548c349bfb27d95f4eb11cfe7397774d82e60998265491fd039e8c3c3  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/host/probe_four_before_after.txt
 a998c2d5bd91fee88924ed37b47b3580312e70292e8a70b07666532ca7180f70  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/host/reverse_meta_lines.txt
 da6e541e8c86e3c0bcb64a99f3349cd3865e02f53035dd995f2a5299c2cd8b49  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/host/reverse_run_full.txt
-0c4550af9420193a66f04467305a1bb0c7c8cb1a47ad5290b3c79220c2ca7552  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/implementation_contract.md
+f607b7043a3ad4e53bf85d3e112bd3a01d79c7ce1da43326c25f56a6f87d6455  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/implementation_contract.md
 ec1556b39cb1ab4f48fe89af6da364e4a4b5472bf0deb7ad32050363094298ba  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/offline/checks.txt
 84c65a5181204a746c8332b68420d86a3256b4c78fbe933d236a42def1292c56  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/offline/summary.json
 5e58820c1bdc3ae5b5a9ea2ab1462a86e3a08eb50a95650a1ad2d161dd87209a  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/A_REVIEW_R7D1_e1d7f3d_ARD4_FOLLOWUP.md

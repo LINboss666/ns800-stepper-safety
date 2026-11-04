@@ -1,0 +1,110 @@
+{
+ "round": "phase8-m8-r7d1-ard4b-acceptance",
+ "title": "M8-R7D1 ARD4b 签收轮: A 判 ACCEPT_OFFLINE_WITH_DOCUMENTATION_ERRATA(ARD1-ARD4 全部收口) + 两处文档勘误同步; 设备动作 0, 未改产品, 未重构建",
+ "date_local": "2026-11-05",
+ "authored_by": "local agent",
+ "kind": "documentation-and-evidence-only (no product edit, no rebuild, no device action)",
+ "accepted_package": {
+  "basename": "NS800_R7D1_ARD4B_Acceptance_00718b4_20261105.zip",
+  "bytes": 24196,
+  "sha256": "49681a0f8dc92fff5b55c49a67afa09c37fbaae5b4a516bc17e87cd9fe8fa97f",
+  "inner_manifest_entries": 19,
+  "zip_member_count": 20,
+  "inner_manifest_excludes_self": true,
+  "inner_manifest_recomputed": "19/19",
+  "originals_archived_under": "reports/reviews/phase8-m8-r7d1-ard4b-acceptance/reviewer_originals/",
+  "originals_verbatim_vs_zip": true,
+  "a_self_manifest_20th_member_verbatim": true
+ },
+ "accepted_review": {
+  "review_commit": "00718b49e65546aa0bae84006059011d68284c4a",
+  "parent_commit": "e1d7f3d90415fdf30344ed95a08065c1373fab01",
+  "verdict": "ACCEPT_OFFLINE_WITH_DOCUMENTATION_ERRATA",
+  "blocking_product_findings": 0,
+  "closed_findings": [
+   "ARD1",
+   "ARD2",
+   "ARD3",
+   "ARD4"
+  ],
+  "scope_of_acceptance": "离线代码与文档; 不含真实硬件效果",
+  "a_independent_rerun": {
+   "original_four_probes": "4/4 PASS rc=0",
+   "compound_probe": "PASS rc=0; refused=1 no_rollback=0 pending_changed=0 creds_kept=1 ctx_takes=3 cfg_steps=3",
+   "compound_ctx_fault_arm_reached": false,
+   "equivalent_ctx_coverage": "原四探针第 4 条 + A16 已有配置/空配置两组",
+   "full_chain": "66/66 runner rc=0",
+   "reverse": "20/20 META-OK, 20 条 INJECTED",
+   "images_blob_identity_vs_manifest": true,
+   "axf_flash_segment_equal_bin": true,
+   "kprintf_literal_sequence_vs_parent_unchanged": true,
+   "hardware_actions": 0,
+   "arm_compiler_rerun_by_A": false,
+   "all_271_remote_entries_replayed_by_A": false
+  }
+ },
+ "changed_files_this_round": {
+  "product": [],
+  "host_chain": [],
+  "firmware_artifacts": [],
+  "docs_and_evidence": [
+   "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/implementation_contract.md(§2 代码块/§2.2/新增 §8)",
+   "reports/agent_handoffs/phase8-m8-r7d1-ard4b-commit-txn.md(§2/新增 §8)",
+   "reports/agent_handoffs/phase8-m8-r7d1-ard4b-commit-txn.json(三处字段 + 新增 acceptance 块)",
+   "reports/reviews/phase8-m8-r7d1-ard4b-acceptance/**(A 原件 20 件 + errata.md + proof + tools)",
+   "reports/reviews/phase8-m8-r7f2b-safety-print-fix/run_record.md(新增 §18; §16/§17 原文未删)",
+   ".gitattributes(两个新目录 -text)",
+   "两份 SHA256SUMS.txt 重算"
+  ]
+ },
+ "errata_applied": [
+  {
+   "id": "E1_validation_vs_lock_order",
+   "wrong_text_verbatim": "begin() 的三步里**只有取锁会失败**; 校验(rel_profile_validate + 用临时副本过 config_in_range)全部在取锁之前完成 … /* 校验 + 取 cfg 锁: 本轮最后一个可失败步骤 */",
+   "source_of_truth": "project_config.c:503-510 (判空与 rel_profile_validate 在锁外; cfg_take_checked 之后在锁内做 tmp=config; tmp.rprof=*p; config_in_range(&tmp); 不过则 cfg_release 后返回)",
+   "correct_wording": "全部校验与所有可能失败的取锁都在两份共享状态写入之前完成; begin 成功后 rel_ctx_take 仍会失败",
+   "safety_property_changed": false
+  },
+  {
+   "id": "E2_credentials_after_ok",
+   "wrong_text_verbatim": "结果表 OK 行: learn 作废、zero 保持",
+   "source_of_truth": "diag_relative.c:2215 提交点调 rel_pending_publish_locked(&cand, -1, -1); 函数在 :1468, 对 -1 不写旗标; learn 凭据作废发生在 :1647(新学习受理)",
+   "correct_wording": "OK 时 zero/learn 两枚凭据都保持原值, 配置与候选同版; 不引入成功后额外作废的新合同",
+   "safety_property_changed": false
+  }
+ ],
+ "deferred_this_round": {
+  "product_comment_drift": {
+   "file": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/project_config.h",
+   "lines": "82-83",
+   "issue": "把 config_in_range 描述为在取 cfg 锁之前(与 E1 同源)",
+   "why_not_fixed": "改产品文件的注释要求重新编译镜像, A 明确不为此开返修/构建轮",
+   "evidence_bytes_unchanged": "PRODUCT_HEADER_BYTES_UNCHANGED_SINCE_TIP = PASS; 签收候选 BIN 仍是 23691e8d…"
+  }
+ },
+ "offline_checks": {
+  "tool": "reports/reviews/phase8-m8-r7d1-ard4b-acceptance/tools/r7d2a_acceptance_checks.py",
+  "artifacts": [
+   "proof/acceptance_checks.txt",
+   "proof/acceptance_summary.json"
+  ],
+  "total": 51,
+  "fail": 0,
+  "note": "proof/acceptance_checks.txt 末行 TOTAL=51 FAIL=0; 判据覆盖包身份、A 原件逐字节、A 的 7 件绑定在签收 tip 上复算且 blob==磁盘、A 声称结果的本地复算、A 包内 proof 自洽、三版镜像未变、AXF==BIN 本地复算、产品与主机 0 改动、旧句已从三份文档正文消失、run_record §18 且 §16/§17 未删、泄漏扫描自证命中"
+ },
+ "boundaries_kept": {
+  "hardware_actions_this_round": 0,
+  "no_rebuild": true,
+  "on_board": "历史 b502 / 502dca5d8c7ebfa794f890a9c03bc258fc9753f57b6a80c2f1e08add69888a7a(本轮未复核)",
+  "images_not_on_board": [
+   "23691e8d…(签收候选)",
+   "165d8bdc…(e1d7f3d)",
+   "df7584c3…(4d50310)"
+  ],
+  "polarity_measured": false,
+  "core_protection_verified": false,
+  "R7F5A_physical_poweroff": "PENDING_OPERATOR_REPORT",
+  "new_hardware_authorization": false,
+  "next_step_ownership": "回现场后的新版上板范围由操作者与 A 另行定稿, 不结转旧额度"
+ }
+}

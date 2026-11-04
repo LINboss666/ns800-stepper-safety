@@ -590,3 +590,66 @@ BIN 字节数（297476 / 297452），残差 0；ER_IROM1 两份 map 相减 −28
 `polarity_measured=false`、`core_protection_verified=false` 保持，四条禁用声称继续禁止；
 R7F5A 物理断电回报仍 `PENDING_OPERATOR_REPORT`（未代填、未为关闭它接设备）；
 演示端 V0.3、旧包、旧现场原件与旧批准账未动；本轮不构成任何硬件授权。
+
+## 18 M8-R7D1 ARD4b 签收轮（A 判定 ACCEPT_OFFLINE_WITH_DOCUMENTATION_ERRATA；两处文字勘误；设备动作 0、未重构建）
+
+签收件 `NS800_R7D1_ARD4B_Acceptance_00718b4_20261105.zip`（24196 B，sha256 `49681a0f…fa97f`；
+内层清单 19 条逐条复算 19/19、zip 共 20 个成员、清单不含自身；20 件 A 原件按原路径入
+`reports/reviews/phase8-m8-r7d1-ard4b-acceptance/reviewer_originals/` 并逐字节相同）。
+`verdict=ACCEPT_OFFLINE_WITH_DOCUMENTATION_ERRATA`，`blocking_product_findings=0`，
+`closed_findings=[ARD1,ARD2,ARD3,ARD4]`，受审 tip `00718b4`（= 本地 HEAD 与已推送远端 tip），
+A 侧 `review_product_edits=0`、`hardware_actions=0`、`arm_compiler_rerun_by_A=false`、
+`all_271_remote_entries_replayed_by_A=false`（A 明确没重放我方 271 条远端回读，只核了自己看的清单）。
+A 独立重跑：原版四探针 4/4 PASS、复合探针 PASS（`refused=1 no_rollback=0 pending_changed=0
+creds_kept=1 ctx_takes=3 cfg_steps=3`，与我方归档 OBS 行一字不差）、全链 66/66、反向 20/20
+META-OK、BIN/AXF/MAP/调用图 blob 身份与 manifest 一致、AXF Flash 段逐字节等于 BIN。
+
+**A 也独立认定**复合探针的 ctx 臂本轮未命中（`ctx_fault_arm_reached=false`，等价覆盖=四探针第 4 条
++ A16 两世界），与 §17 的如实登记一致。签收范围只覆盖离线代码与文档，不含真实硬件效果；
+`23691e8d…`/`165d8bdc…`/`df7584c3…` 全部保持 NOT_ON_BOARD，板端仍只承认历史 `b502 / 502dca5d…`；
+`polarity_measured=false`、`core_protection_verified=false`、R7F5A 断电 `PENDING_OPERATOR_REPORT`
+不变；本轮不构成任何硬件授权，回现场后的新版上板范围另行定稿、不结转旧额度。
+
+**两处文档勘误（本轮只改文字，产品与主机 5 件字节一字未动，未重新构建）**，逐字原文与源码证据见
+`reports/reviews/phase8-m8-r7d1-ard4b-acceptance/errata.md`：
+
+1. 校验与取锁顺序。§17 与 `implementation_contract.md` §2/§2.2 原话（作废，此处保留以便对账）：
+   「`begin()` 的三步里**只有取锁会失败**; 校验(`rel_profile_validate` + 用临时副本过
+   `config_in_range`)全部在取锁之前完成」与注释「本轮最后一个可失败步骤」。实际
+   `project_config.c:503-510`：判空与 `rel_profile_validate` 在锁外，`cfg_take_checked()` 之后才
+   在**锁内** `tmp = cfg; tmp.rprof = *p; if (!config_in_range(&tmp)) { cfg_release(); return -RT_EINVAL; }`；
+   且 begin 成功后 `rel_ctx_take()` 仍会失败。正确总口径：**全部校验与所有可能失败的取锁都在两份
+   共享状态写入之前完成**；范围复核留在 cfg 锁内是当前实现，不搬到无锁读 `cfg`（那会变成数据竞争）。
+2. commit 成功后的凭据。原话（作废）：结果表 `OK` 行「learn 作废、zero 保持」。实际提交点调
+   `rel_pending_publish_locked(&cand, -1, -1)`（`diag_relative.c:2215`；函数 `:1468` 对 `-1` 不写旗标）
+   ⇒ **zero/learn 两枚凭据都保持原值**；作废 learn 凭据发生在 learn 受理成立那一刻（`:1647`，上一轮
+   ARD4 的既有行为）。本轮不引入"成功后额外作废凭据"的新需求。
+
+已改写：`implementation_contract.md` §2 代码块/§2.2 合同段 + 新增 §8 勘误节（逐字保留旧句作对照）；
+`phase8-m8-r7d1-ard4b-commit-txn.md` §2 与新增 §8；同名 JSON 的 `fix_oneliner`/`commit_point`/
+`fallible_steps_before_commit_point`/`result_contract.OK` + 新增 `acceptance` 块。**§17 本体不改写**
+（其中两处旧口径以本节为勘误依据，原文保留）。
+
+**同源但本轮不修的一处**：`project_config.h:82-83` 的接口注释同样把 `config_in_range` 写在
+"然后取 cfg 锁"之前。它是产品文件里的文字，改它需要重新编译，而 A 明确「不为此再开产品返修或
+构建轮」；因此点名登记、留到下一次合法触产品源码的轮次随该轮构建一起修。签收候选 BIN 的磁盘字节
+仍是 `23691e8d8aa8c1d3…`，`project_config.h` 磁盘字节与签收 tip 的 blob 相同（判据
+`PRODUCT_HEADER_BYTES_UNCHANGED_SINCE_TIP`）。
+
+**本轮独立复算**：`tools/r7d2a_acceptance_checks.py` → `proof/acceptance_checks.txt`
+（判据含：包身份、A 原件逐字节、探针输入与上一份 A 包同字节、A 的 7 件绑定在 tip 上复算且 tip blob
+== 磁盘、A 声称的 66/66 与 20/20 从我方归档原文复算、A 包内 proof 三件自洽、三版旧镜像 sha 未变、
+AXF Flash 段 == BIN 本地复算、产品与主机路径 0 改动、旧句在三份文档正文中已消失、run_record §18
+且 §16/§17 未删、泄漏扫描先自证会命中）。
+
+**自伤与工具侧问题（照实）**：
+1. 我自己的老毛病又犯了一次：四探针判定最初用 `count('|FAIL')`，把 A 输出里的
+   `REVIEW|FAILED_ZERO_RECOVERS_COLLECTOR_AFTER_LOCK_FAULT|PASS` 当成 FAIL 命中（子串吃掉计数）。
+   改成按整行 `^REVIEW\|\w+\|(PASS|FAIL)$` 取判定行后为 4 条全 PASS。
+2. 复合探针的 reproducer 比对目标写错一轮：它来自 ARD4 续修包（`ard4b-commit-txn`），我却先拿去和
+   ard-rework 那包里"根本没有的文件"比，结果 False；改为按件分源（四探针比 ard-rework、复合比
+   ard4b-commit-txn）后 4/4 同字节。
+3. A 的 `image_identity_review.json` 结构不是我猜的 `BIN_sha256/flash_segments`，而是
+   `images.bin.sha256` 与 `segments[].equal_bin`（一次取键失败暴露我把上一包的结构当作了通用形）。
+4. 判据"旧句已消失"最初与"勘误节按设计逐字保留旧句"自相矛盾（我自己造的假红）；改为只在正文部分
+   搜索（`(?m)^## 8[ .]` 之前），既保住可复算的对照，又不让对照本身把判据钉死。

@@ -33,24 +33,26 @@ REVIEW|REFUSED_COMMIT_PRESERVES_ALL_STATE_ON_ROLLBACK_LOCK_FAILURE|FAIL   (run_r
 提交点(commit point)定义为下面这一对内存写, 它们在**两把锁都已到手**之后发生:
 
 ```
-fin = project_config_rprof_begin(&cand);   /* 校验 + 取 cfg 锁: 本轮最后一个可失败步骤 */
-if (fin != RT_EOK) -> REFUSED(cfg-lock-commit)   共享状态一字未动
-if (rel_ctx_take() != RT_EOK)                    /* 有界等待 REL_CTX_TAKE_MS=20ms */
+fin = project_config_rprof_begin(&cand);   /* 判空 + rel_profile_validate -> 取 cfg 锁 -> 锁内副本过 config_in_range */
+if (fin != RT_EOK) -> REFUSED(cfg-lock-commit)   共享状态一字未动(范围拒绝在 cfg 锁内判, 判不过先放锁再返回)
+if (rel_ctx_take() != RT_EOK)                    /* 有界等待 REL_CTX_TAKE_MS=20ms; begin 之后仍可能失败 */
     { project_config_rprof_end(); -> REFUSED(ctx-lock-commit) }   共享状态一字未动
-rel_pending_publish_locked(&cand, -1, -1);   /* 提交点 1: 已在 ctx 内, 只做赋值 */
+rel_pending_publish_locked(&cand, -1, -1);   /* 提交点 1: 已在 ctx 内, 只做赋值(-1/-1 = 两枚凭据旗标不动) */
 project_config_rprof_publish_locked(&cand);  /* 提交点 2: 已在 cfg 内, 只做赋值 */
 rel_ctx_give_held();  project_config_rprof_end();
 ```
 
 **没有第三步, 也没有回滚。** 两个提交写都不取锁、不校验、不做 I/O, 因此不可能失败,
-也就不需要"靠另一次可能失败的取锁来撤销"。
+也就不需要"靠另一次可能失败的取锁来撤销"。正确口径是**全部校验与所有可能失败的取锁都在
+两份共享状态写入之前完成**(不是"begin 是最后一个可失败步骤"—— begin 成功后 ctx 取锁仍会失败,
+见 §8 勘误)。
 
 结果合同收敛到 A 要求的两种:
 
 | 结果 | 配置(RAM profile) | 候选 d_pending | learn/zero 凭据 | 两把锁 |
 |---|---|---|---|---|
 | `REFUSED` | 与调用前逐字节相同 | 与调用前逐字节相同 | 不变 | 不持锁(拒后 `held==0`) |
-| `OK` | 与候选 **memcmp 相等** | 同上 | learn 作废、zero 保持 | 已归还 |
+| `OK` | 与候选 **memcmp 相等** | 同上 | **两枚均保持原值**(提交点传 `-1/-1`, 不改旗标) | 已归还 |
 
 `OK` 那一行的"配置与候选完整一致"由主机链 A16 ① 直接逐字节比 `cfg == d_pending`,
 不是从打印推断。
@@ -89,11 +91,14 @@ void     project_config_rprof_publish_locked(const diag_rprof_t *p);  /* 不会�
 void     project_config_rprof_end(void);                       /* 不会失败: 归还 cfg 锁 */
 ```
 
-合同:
-- `begin()` 的三步里**只有取锁会失败**; 校验(`rel_profile_validate` + 用临时副本过
-  `config_in_range`)全部在取锁之前完成, 失败时既不持锁也不改共享状态。
+合同(以 `project_config.c:498` 的实际顺序为准):
+- `begin()` 有**两处**可失败: 先判空并做 `rel_profile_validate`(锁外), 再取 cfg 锁;
+  取到锁之后在**锁内**复制当前 cfg、替换临时 rprof、跑 `config_in_range`, 范围不过就
+  `cfg_release()` 后返回 `-RT_EINVAL`。任一路径返回错误时都不持锁、不改共享状态。
+  完整配置的范围复核放在 cfg 锁内是当前实现, 不应为迁就旧文字搬到无锁读 cfg。
 - `begin()` 成功即**持 cfg 返回**, 调用方必须成对 `end()`; 这条约定写在头文件注释里,
-  并且 A16 ⑥ 的"拒绝后不得仍持锁"断言把它钉在测试里。
+  并且 A16 ⑥ 的"拒绝后不得仍持锁"断言把它钉在测试里。begin 成功**不等于**整条 commit 成功:
+  其后 `rel_ctx_take()` 仍会失败, 那一支显式 `end()` 归还锁后拒绝。
 - `publish_locked()` 不校验、不取锁, 因此不存在失败路径; 它只能在 `begin()` 成功后调用。
 - `config_in_range(&tmp)` 用"现有配置 + 新 rprof"的合成分做范围复核, 避免把新阈值
   单独放进整套约束里误判(其它字段仍是旧值)。
@@ -152,3 +157,20 @@ REVIEW|REFUSED_COMMIT_PRESERVES_ALL_STATE_ON_ROLLBACK_LOCK_FAILURE|PASS   (run_r
   R7F5A 的物理断电回报仍是 `PENDING_OPERATOR_REPORT`。
 - armlink 的调用图数字是静态下界(不含异常/ISR 帧, 解析不了函数指针), 只用于两版比较,
   不是现场最坏栈实测。
+
+## 8. 勘误（2026-11-05 A 签收轮 `ACCEPT_OFFLINE_WITH_DOCUMENTATION_ERRATA` 指出的两处）
+
+A 的签收包 `NS800_R7D1_ARD4B_Acceptance_00718b4_20261105.zip`（24196 B，sha256
+`49681a0f8dc92fff5b55c49a67afa09c37fbaae5b4a516bc17e87cd9fe8fa97f`）判定 ARD4 收口、
+`blocking_product_findings=0`，同时给出两组**文档**勘误（不要求产品返修、不要求重构建）。
+本文件原本的两句话已在上面就地改写为与源码一致的口径，原文在此逐字保留：
+
+| # | 原文（已作废） | 实际源码 | 现在的口径 |
+|---|---|---|---|
+| 1 | 「`begin()` 的三步里**只有取锁会失败**; 校验(`rel_profile_validate` + 用临时副本过 `config_in_range`)全部在取锁之前完成」；代码注释「校验 + 取 cfg 锁: 本轮最后一个可失败步骤」 | `project_config.c:503-510`：判空与 `rel_profile_validate` 在锁外；`cfg_take_checked()` 之后才 `tmp = cfg; tmp.rprof = *p; if (!config_in_range(&tmp)) { cfg_release(); return -RT_EINVAL; }` | 全部校验与所有可能失败的取锁都在**两份共享状态写入之前**完成；范围复核在 cfg 锁内做，拒绝前先放锁；begin 成功后 ctx 取锁仍可能失败 |
+| 2 | 结果表 `OK` 行「learn 作废、zero 保持」 | `diag_relative.c:2215` 提交点调 `rel_pending_publish_locked(&cand, -1, -1)`，`-1` 表示两个凭据旗标都不写 | `OK` 时 zero/learn 两枚凭据**都保持原值**，配置与候选同版（本轮不引入"成功后作废凭据"的新合同） |
+
+还有一条同源漂移**本轮不修**：`project_config.h:82-83` 的接口注释同样把
+`config_in_range` 写在"然后取 cfg 锁"之前。它是产品文件里的文字，改它就要重新构建镜像，
+而 A 明确「不为此再开产品返修或构建轮」；因此这里点名登记、留到下一次合法触产品源码的轮次
+随构建一起修，本轮镜像 `23691e8d…` 的字节保持不变。

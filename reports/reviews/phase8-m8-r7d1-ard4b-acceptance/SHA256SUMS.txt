@@ -1,0 +1,27 @@
+# sha256 * <仓库相对路径>(LF, 无 BOM; 本清单不哈希自身字节 —— 一条清单不能给自己的字节作证)
+# 生成方式: 对 reports/reviews/phase8-m8-r7d1-ard4b-acceptance/ 下每个常规文件(排除 SHA256SUMS.txt、remote_readback.md 与 __pycache__) 直接读磁盘字节算 sha256
+# 条目数=23; 与 Git blob 的逐条复算由 host/staged_preflight_batch.py(提交前, 单批流)与推送后的远端逐 blob 回读完成
+# 重新生成: python reports/reviews/phase8-m8-idle-stack-r4/host/make_round_sums.py <本目录>
+4bbf11f5dd8c0e8257e6afa03fa1e375ae9d066ff843caf56359025da995bc03  reports/reviews/phase8-m8-r7d1-ard4b-acceptance/errata.md
+5b7758976b4bcaa571adb41ff1be85df83f810cf5c526b653b1a01e2f67bac8c  reports/reviews/phase8-m8-r7d1-ard4b-acceptance/proof/acceptance_checks.txt
+a0185545e40baa4e552aaee220f0a21ffae7398fc263fa6108e017336ae198b6  reports/reviews/phase8-m8-r7d1-ard4b-acceptance/proof/acceptance_summary.json
+35befec5adec49eefb4361f1ab5cdbdb05cf6fc67ff340bc91e0454ebf0494c6  reports/reviews/phase8-m8-r7d1-ard4b-acceptance/reviewer_originals/A_ACCEPTANCE_R7D1_ARD4B_00718b4.md
+c6587c7d9cdbd080141c62fd2fce76a032af92514b8daf4d040a5923ab0bcea6  reports/reviews/phase8-m8-r7d1-ard4b-acceptance/reviewer_originals/IDENTITY.json
+5d6a3ae75bb1129731ebfc960963d0bae3a0f3a89545b7ca38b4aad13e955c36  reports/reviews/phase8-m8-r7d1-ard4b-acceptance/reviewer_originals/proof/compound_probe/build.stderr.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  reports/reviews/phase8-m8-r7d1-ard4b-acceptance/reviewer_originals/proof/compound_probe/build.stdout.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  reports/reviews/phase8-m8-r7d1-ard4b-acceptance/reviewer_originals/proof/compound_probe/probe.stderr.txt
+5352e14e3c1994f8e99acbecd4eec70a8f77091bd69328320dac5f45b9ee3007  reports/reviews/phase8-m8-r7d1-ard4b-acceptance/reviewer_originals/proof/compound_probe/probe.stdout.txt
+d708bd6adfd01c14bfecb75e00c7e3966330ad9a57ebc4dd69dd4fee8891fbb2  reports/reviews/phase8-m8-r7d1-ard4b-acceptance/reviewer_originals/proof/compound_probe/result.json
+6cbb9c12a8370d088385167b8a73e40ef39baa64a4b3c9f4a67d7a84c5695efc  reports/reviews/phase8-m8-r7d1-ard4b-acceptance/reviewer_originals/proof/full_chain.log
+d85329bced3178e0ded5efe61a25d768813e0fece080ed17d8bbf2cbc7099a85  reports/reviews/phase8-m8-r7d1-ard4b-acceptance/reviewer_originals/proof/image_identity_review.json
+dc15a9d28d2f8cafc2cee70ba66978d4399dfae7acf3cb7258ac41ac30d25699  reports/reviews/phase8-m8-r7d1-ard4b-acceptance/reviewer_originals/proof/manifest_checks.json
+907b45e22a832757ff85b4a0cba6330208832d9c024fd73e6c3d22b9f33f17c9  reports/reviews/phase8-m8-r7d1-ard4b-acceptance/reviewer_originals/proof/original_four/build.stderr.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  reports/reviews/phase8-m8-r7d1-ard4b-acceptance/reviewer_originals/proof/original_four/build.stdout.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  reports/reviews/phase8-m8-r7d1-ard4b-acceptance/reviewer_originals/proof/original_four/probe.stderr.txt
+7e3a7091f1dbda9c6a7e37875f790492ccd9db7c38a8e9bb7bca9c4c7636cb80  reports/reviews/phase8-m8-r7d1-ard4b-acceptance/reviewer_originals/proof/original_four/probe.stdout.txt
+8d3b8b708645533b226d61f768d3b61232b00315812fe7ac4d03643eaa17963a  reports/reviews/phase8-m8-r7d1-ard4b-acceptance/reviewer_originals/proof/original_four/result.json
+8667e2001d754d605cc9cfbf43e4d750d4c972f12385990cbac4d77faafb3763  reports/reviews/phase8-m8-r7d1-ard4b-acceptance/reviewer_originals/reproducer/compound/commit_rollback_probe.c
+7c491391e350146fed1799fc7db3ed4e898f8ff5cf4e7fbd791bdcdcba57ead5  reports/reviews/phase8-m8-r7d1-ard4b-acceptance/reviewer_originals/reproducer/compound/run_commit_rollback_probe.py
+c4dcf1e78cdaed35013cb5851c303a64c96ff83ebad441784a66a27e7b22626a  reports/reviews/phase8-m8-r7d1-ard4b-acceptance/reviewer_originals/reproducer/original_four/review_probes.c
+b03c0eca3d927169f428eeee4261ef0847ac507110ca8c8203a88c098768b79b  reports/reviews/phase8-m8-r7d1-ard4b-acceptance/reviewer_originals/reproducer/original_four/run_review_probes.py
+8c8c324e87b1c8bf62ef065db7afda4bdac22fdf051762d4d55bd4415150e314  reports/reviews/phase8-m8-r7d1-ard4b-acceptance/tools/r7d2a_acceptance_checks.py

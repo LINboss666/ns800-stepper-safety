@@ -1,0 +1,28 @@
+{
+  "compatibility": "Linux portability: empty windows.h for an unused include only. No RTOS, mutex, clock or product behavior replaced.",
+  "build_rc": 0,
+  "argv": [
+    "/usr/bin/gcc",
+    "-std=gnu11",
+    "-Wall",
+    "-Wextra",
+    "-Wno-unused-function",
+    "-Wno-unused-parameter",
+    "-I",
+    "/workspace/scratch/f24247cdf3d6/r7d1-ard4b-review/checks/compound_probe/compat_include",
+    "-I",
+    "/workspace/scratch/f24247cdf3d6/r7d1-ard4b-review/repo/tests/host/shim_rel",
+    "-I",
+    "/workspace/scratch/f24247cdf3d6/r7d1-ard4b-review/repo/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications",
+    "-DREVIEW_HOST_MAIN=\"/workspace/scratch/f24247cdf3d6/r7d1-ard4b-review/repo/tests/host/rel_main.c\"",
+    "/workspace/scratch/f24247cdf3d6/r7d1-fix-review/package/reproducer/commit_rollback_probe.c",
+    "-o",
+    "/workspace/scratch/f24247cdf3d6/r7d1-ard4b-review/checks/compound_probe/commit_rollback_probe"
+  ],
+  "hardware_actions": 0,
+  "run_rc": 0,
+  "assertion_lines": [
+    "OBS|COMMIT_CFG_AND_ROLLBACK_FAULT|refused=1 no_rollback=0 cfg_changed=0 pending_changed=0 creds_kept=1 cfg_id=1 pending_id=1 ctx_takes=3 cfg_steps=3",
+    "REVIEW|REFUSED_COMMIT_PRESERVES_ALL_STATE_ON_ROLLBACK_LOCK_FAILURE|PASS"
+  ]
+}

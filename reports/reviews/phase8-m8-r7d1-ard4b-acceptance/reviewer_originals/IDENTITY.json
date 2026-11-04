@@ -1,0 +1,188 @@
+{
+  "review_date": "2026-11-05",
+  "review_commit": "00718b49e65546aa0bae84006059011d68284c4a",
+  "parent_commit": "e1d7f3d90415fdf30344ed95a08065c1373fab01",
+  "reviewer_worktree_status": "",
+  "verdict": "ACCEPT_OFFLINE_WITH_DOCUMENTATION_ERRATA",
+  "blocking_product_findings": 0,
+  "closed_findings": [
+    "ARD1",
+    "ARD2",
+    "ARD3",
+    "ARD4"
+  ],
+  "source_bindings": [
+    {
+      "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diag_relative.c",
+      "bytes": 109262,
+      "sha256": "a95ab79363a2b383f6dc7db3fa0146954bb72692c12540427a2075233b9944e8",
+      "git_blob": "94a6b7894c1a4c5bf8770ec69f37888a9828eb0e"
+    },
+    {
+      "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diag_relative.h",
+      "bytes": 25522,
+      "sha256": "27b42031b934ff92dcc6daa4faca31a65cee3782dda489d428f26264c7738303",
+      "git_blob": "b36f086ec01ad61206220cff3f2657b82a9d38bb"
+    },
+    {
+      "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diagnosis.c",
+      "bytes": 54696,
+      "sha256": "4b69151e140b3a80dee4ff211aa935d51cf6e9de2611f6474b38f35a3836d281",
+      "git_blob": "2cf560955fc670cd5af15de04b652d9c1c7355ab"
+    },
+    {
+      "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/project_config.c",
+      "bytes": 25390,
+      "sha256": "f6b2440f5b9d90fb23ddcc90a2caced56e74fbffa6542ff8326329bdf026be33",
+      "git_blob": "f07ee4e0fa3d57359692c0369cea3eb33cd03fc0"
+    },
+    {
+      "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/project_config.h",
+      "bytes": 6028,
+      "sha256": "e0cecd0c89bbf4786375e1644146d2b84bf3a9ad8066e8ebc89536edc8046fb8",
+      "git_blob": "5151dd4ff907916ab34186cb5aa515e7d13c6ef5"
+    },
+    {
+      "path": "tests/host/rel_main.c",
+      "bytes": 209668,
+      "sha256": "d168d908df536c6dc13eed0e4bb8f5d7c99eaf6935a0427b6ea2e6c604f7cccf",
+      "git_blob": "9812d9937035d4184a1cc27aa2871994b4039151"
+    },
+    {
+      "path": "tests/host/run_diag_relative_m8.sh",
+      "bytes": 28037,
+      "sha256": "9c0b9770b7037f66868ca7967a1f2445f0c7d0ac15b3fcaebb560676f48b999f",
+      "git_blob": "14f6cc0466a3ee80ca5c19716bc362985405823c"
+    }
+  ],
+  "reviewer_probe_input_bindings": [
+    {
+      "file": "original_four/review_probes.c",
+      "sha256": "c4dcf1e78cdaed35013cb5851c303a64c96ff83ebad441784a66a27e7b22626a",
+      "archived_A_original_equal": true
+    },
+    {
+      "file": "original_four/run_review_probes.py",
+      "sha256": "b03c0eca3d927169f428eeee4261ef0847ac507110ca8c8203a88c098768b79b",
+      "archived_A_original_equal": true
+    },
+    {
+      "file": "compound/commit_rollback_probe.c",
+      "sha256": "8667e2001d754d605cc9cfbf43e4d750d4c972f12385990cbac4d77faafb3763",
+      "archived_A_original_equal": true
+    },
+    {
+      "file": "compound/run_commit_rollback_probe.py",
+      "sha256": "7c491391e350146fed1799fc7db3ed4e898f8ff5cf4e7fbd791bdcdcba57ead5",
+      "archived_A_original_equal": true
+    }
+  ],
+  "results": {
+    "original_four": {
+      "checks": 4,
+      "pass": 4,
+      "rc": 0
+    },
+    "compound_probe": {
+      "pass": true,
+      "rc": 0,
+      "ctx_fault_arm_reached": false,
+      "cfg_fault_arm_reached": true,
+      "equivalent_ctx_fault_coverage": "original four #4 and A16 existing/empty configurations"
+    },
+    "full_chain": {
+      "cases_pass": 66,
+      "reverse_meta_ok": 20,
+      "INJECTED_lines": 20,
+      "runner_rc": 0
+    },
+    "checked_manifests": [
+      {
+        "path": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/SHA256SUMS.txt",
+        "entries": 38,
+        "mismatches": 0
+      },
+      {
+        "path": "reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/SHA256SUMS.txt",
+        "entries": 5,
+        "mismatches": 0
+      }
+    ]
+  },
+  "changed_paths": [
+    ".gitattributes",
+    "reports/agent_handoffs/phase8-m8-r7d1-ard4b-commit-txn.json",
+    "reports/agent_handoffs/phase8-m8-r7d1-ard4b-commit-txn.md",
+    "reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/SHA256SUMS.txt",
+    "reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/build_manifest.json",
+    "reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/rt-thread-motor-m1-callgraph.htm",
+    "reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/rt-thread-motor-m1-candidate.bin",
+    "reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/rt-thread-motor-m1.axf",
+    "reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/rt-thread-motor-m1.map",
+    "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/SHA256SUMS.txt",
+    "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/build/build_r7d2.log",
+    "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/build/resource_stack_r7d2.txt",
+    "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/case_mapping.md",
+    "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/host/case_ledger.txt",
+    "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/host/normal_chain_build.txt",
+    "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/host/normal_chain_out.txt",
+    "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/host/normal_chain_warning_count.txt",
+    "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/host/probe_compound_before_after.txt",
+    "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/host/probe_four_before_after.txt",
+    "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/host/reverse_meta_lines.txt",
+    "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/host/reverse_run_full.txt",
+    "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/implementation_contract.md",
+    "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/offline/checks.txt",
+    "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/offline/summary.json",
+    "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/A_REVIEW_R7D1_e1d7f3d_ARD4_FOLLOWUP.md",
+    "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/FIX_SCOPE.json",
+    "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/IDENTITY.json",
+    "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/SHA256SUMS.txt",
+    "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/proof/a_original_four/build.stderr.txt",
+    "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/proof/a_original_four/build.stdout.txt",
+    "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/proof/a_original_four/probe.stderr.txt",
+    "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/proof/a_original_four/probe.stdout.txt",
+    "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/proof/a_original_four/result.json",
+    "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/proof/compound_probe/build.stderr.txt",
+    "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/proof/compound_probe/build.stdout.txt",
+    "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/proof/compound_probe/probe.stderr.txt",
+    "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/proof/compound_probe/probe.stdout.txt",
+    "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/proof/compound_probe/result.json",
+    "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/proof/full_chain.log",
+    "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/proof/image_identity_review.json",
+    "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/reproducer/commit_rollback_probe.c",
+    "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/reproducer/original_four/review_probes.c",
+    "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/reproducer/original_four/run_review_probes.py",
+    "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/reproducer/run_commit_rollback_probe.py",
+    "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/tools/r7d2_make_host_artifacts.py",
+    "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/tools/r7d2_make_manifest.py",
+    "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/tools/r7d2_offline_checks.py",
+    "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/tools/r7d2_resource_report.py",
+    "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/tools/r7d2_staged_preflight.py",
+    "reports/reviews/phase8-m8-r7f2b-safety-print-fix/SHA256SUMS.txt",
+    "reports/reviews/phase8-m8-r7f2b-safety-print-fix/run_record.md",
+    "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diag_relative.c",
+    "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/project_config.c",
+    "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/project_config.h",
+    "tests/host/rel_main.c",
+    "tests/host/run_diag_relative_m8.sh"
+  ],
+  "outside_allowed_scope": [],
+  "review_product_edits": 0,
+  "hardware_actions": 0,
+  "arm_compiler_rerun_by_A": false,
+  "all_271_remote_entries_replayed_by_A": false,
+  "documentation_errata": [
+    "Profile validation precedes cfg acquisition; full config range check executes under cfg; ctx acquisition is still fallible after begin succeeds.",
+    "Successful commit preserves both zero and learn credentials; documentation saying learn is invalidated is incorrect."
+  ],
+  "field_boundaries": {
+    "candidate_sha256": "23691e8d8aa8c1d3ed6e6eff4b5c51fe27dd3a9169841406ecc627c0e807e963",
+    "candidate": "NOT_ON_BOARD",
+    "on_board_proof": "historical b502 / 502dca5d",
+    "polarity_measured": false,
+    "core_protection_verified": false,
+    "R7F5A_physical_poweroff": "PENDING_OPERATOR_REPORT",
+    "new_hardware_authorization": false
+  }
+}

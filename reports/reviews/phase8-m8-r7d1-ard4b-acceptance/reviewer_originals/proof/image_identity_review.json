@@ -1,0 +1,39 @@
+{
+  "images": {
+    "bin": {
+      "bytes": 297452,
+      "sha256": "23691e8d8aa8c1d3ed6e6eff4b5c51fe27dd3a9169841406ecc627c0e807e963",
+      "matches_manifest": true
+    },
+    "axf": {
+      "bytes": 1790048,
+      "sha256": "0f421595ac940863c4d38a2791f31bc8811fc3b8fa40062782f2ac7505c317f6",
+      "matches_manifest": true
+    },
+    "map": {
+      "bytes": 2148432,
+      "sha256": "e2d8d081958c84bb7f760bd5011a4b0ce962bb5dc8b6c0dff1cc9084efc0872b",
+      "matches_manifest": true
+    },
+    "callgraph": {
+      "bytes": 1101259,
+      "sha256": "a7090b6eed89f32a0abf4c7ec395cb1a421b909f1c25c436b64f302a02ff0c34",
+      "matches_manifest": true
+    }
+  },
+  "Flash_segment_byte_equal_to_BIN": true,
+  "segments": [
+    {
+      "offset": 56,
+      "vaddr": 134217728,
+      "filesz": 297452,
+      "memsz": 385008,
+      "equal_bin": true
+    }
+  ],
+  "build_log_identity_matches_manifest": true,
+  "build_log_zero_errors_zero_warnings": true,
+  "kprintf_literal_sequence_unchanged_vs_parent": true,
+  "arm_compiler_rerun_by_A": false,
+  "hardware_actions": 0
+}

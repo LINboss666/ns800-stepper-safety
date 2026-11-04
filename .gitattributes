@@ -128,3 +128,7 @@ reports/reviews/phase8-m8-r7d1-ard-rework/** -text
 # 与主机链/反向链 transcript。规则同样必须在任何暂存之前生效。
 reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/** -text
 reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/** -text
+
+# 同一理由适用于 M8-R7D1 ARD4b 签收轮(纯文档/证据): 本轮入库的是 A 签收包 20 件原件(其 sha256 只在
+# 字节不变时可复算)、勘误与判据文本(内含 CR 的 Windows 日志原文摘录)。规则必须在任何暂存之前生效。
+reports/reviews/phase8-m8-r7d1-ard4b-acceptance/** -text

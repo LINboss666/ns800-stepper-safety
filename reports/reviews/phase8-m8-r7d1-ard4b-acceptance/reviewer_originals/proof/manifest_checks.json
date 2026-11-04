@@ -1,0 +1,274 @@
+[
+  {
+    "manifest": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/SHA256SUMS.txt",
+    "entries": 38,
+    "mismatches": 0,
+    "rows": [
+      {
+        "path": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/build/build_r7d2.log",
+        "bytes": 3909,
+        "sha256": "a5b827f47ca08c4f3de98894038e9d90f9d9e60264eb7d320d692b61c4969d3e",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/build/resource_stack_r7d2.txt",
+        "bytes": 19662,
+        "sha256": "9c0610a0f228ca9a9bd579f5477a6cf141ce1fc61057f1a454951a6b3bf8c39e",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/case_mapping.md",
+        "bytes": 8682,
+        "sha256": "ab921e0c6bdd4a749da8431c42e9f95be952112ccd8802786862febd1e8e64fb",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/host/case_ledger.txt",
+        "bytes": 4298,
+        "sha256": "f6ebea96fee8656f606d2db940cfd5ddf70b32a1e0b77e142f31e5a104abadd1",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/host/normal_chain_build.txt",
+        "bytes": 249,
+        "sha256": "1849fba8ae7436cf5e8e39c0a3750d9a3a0449209cc0a5afc575f102368f937a",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/host/normal_chain_out.txt",
+        "bytes": 4176,
+        "sha256": "58c44093223657477320e6ea6f3fe01c3bb6519b2f535556283b952fa8945bbf",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/host/normal_chain_warning_count.txt",
+        "bytes": 2,
+        "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/host/probe_compound_before_after.txt",
+        "bytes": 3386,
+        "sha256": "b771e16fcdb49c253bb9b6a8322c41c91a2719325f55368e8c7100977b16a1a6",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/host/probe_four_before_after.txt",
+        "bytes": 4905,
+        "sha256": "e737e63548c349bfb27d95f4eb11cfe7397774d82e60998265491fd039e8c3c3",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/host/reverse_meta_lines.txt",
+        "bytes": 2217,
+        "sha256": "a998c2d5bd91fee88924ed37b47b3580312e70292e8a70b07666532ca7180f70",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/host/reverse_run_full.txt",
+        "bytes": 11652,
+        "sha256": "da6e541e8c86e3c0bcb64a99f3349cd3865e02f53035dd995f2a5299c2cd8b49",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/implementation_contract.md",
+        "bytes": 9280,
+        "sha256": "0c4550af9420193a66f04467305a1bb0c7c8cb1a47ad5290b3c79220c2ca7552",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/offline/checks.txt",
+        "bytes": 11105,
+        "sha256": "ec1556b39cb1ab4f48fe89af6da364e4a4b5472bf0deb7ad32050363094298ba",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/offline/summary.json",
+        "bytes": 25800,
+        "sha256": "84c65a5181204a746c8332b68420d86a3256b4c78fbe933d236a42def1292c56",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/A_REVIEW_R7D1_e1d7f3d_ARD4_FOLLOWUP.md",
+        "bytes": 6782,
+        "sha256": "5e58820c1bdc3ae5b5a9ea2ab1462a86e3a08eb50a95650a1ad2d161dd87209a",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/FIX_SCOPE.json",
+        "bytes": 1441,
+        "sha256": "5e139d51dc20080d992aad85faa92441f87421224f61abe49f789579cbf689e7",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/IDENTITY.json",
+        "bytes": 3281,
+        "sha256": "76241ab29a16446e9c792784b2360bbce141cc5fc354f44696061f930b099cdd",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/proof/a_original_four/build.stderr.txt",
+        "bytes": 750,
+        "sha256": "87e9b9299d2a32647cdc06522909c2678e94889cecc86d0eda2b11985269a3cc",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/proof/a_original_four/build.stdout.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/proof/a_original_four/probe.stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/proof/a_original_four/probe.stdout.txt",
+        "bytes": 1331,
+        "sha256": "b5bd1131eb9c6e80ac6069c533c04635c0c28f4bfab94b07974279031321a94d",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/proof/a_original_four/result.json",
+        "bytes": 1734,
+        "sha256": "81fb568947041ce02cdc65dc261d03e11f954656d38dca0500abb9b81263a9f0",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/proof/compound_probe/build.stderr.txt",
+        "bytes": 750,
+        "sha256": "fc5d9a115bc4e54ba18c6c94fccd5018ffe3dab62487631cbf73697993aa6f64",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/proof/compound_probe/build.stdout.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/proof/compound_probe/probe.stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/proof/compound_probe/probe.stdout.txt",
+        "bytes": 594,
+        "sha256": "dddda17014dd39d4af2a4a3c22c5a551109fdced53b9432ab2cfc6f3a76d4828",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/proof/compound_probe/result.json",
+        "bytes": 1275,
+        "sha256": "542335d7e8d25a8183f7e96ea4b9c6305addad82735fae2504cde6b0ea003350",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/proof/full_chain.log",
+        "bytes": 11343,
+        "sha256": "2ed14d303d78f1b662bc9469bfddfcbda5086c6d75ff9827c6e6ed919c471bfe",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/proof/image_identity_review.json",
+        "bytes": 471,
+        "sha256": "bb1665ff0a2d2743456e9ca4586979c9a6490d835a44b76c005664b58b7827d8",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/reproducer/commit_rollback_probe.c",
+        "bytes": 2243,
+        "sha256": "8667e2001d754d605cc9cfbf43e4d750d4c972f12385990cbac4d77faafb3763",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/reproducer/original_four/review_probes.c",
+        "bytes": 4717,
+        "sha256": "c4dcf1e78cdaed35013cb5851c303a64c96ff83ebad441784a66a27e7b22626a",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/reproducer/original_four/run_review_probes.py",
+        "bytes": 2911,
+        "sha256": "b03c0eca3d927169f428eeee4261ef0847ac507110ca8c8203a88c098768b79b",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/reproducer/run_commit_rollback_probe.py",
+        "bytes": 2928,
+        "sha256": "7c491391e350146fed1799fc7db3ed4e898f8ff5cf4e7fbd791bdcdcba57ead5",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/tools/r7d2_make_host_artifacts.py",
+        "bytes": 10844,
+        "sha256": "60805334195b6e3c5ec748a39cc88ff4dc2802e9daffdd47db337497e8499553",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/tools/r7d2_make_manifest.py",
+        "bytes": 13227,
+        "sha256": "ddaafeff182c3342b9e6e244cb7ce8edaee5a7756a9ffcc39af9f3ea2c54ca18",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/tools/r7d2_offline_checks.py",
+        "bytes": 48445,
+        "sha256": "4bf895113775a68c552356ec8ab1da5f061f679c90f678fc25831175eebffb73",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/tools/r7d2_resource_report.py",
+        "bytes": 23323,
+        "sha256": "06730cf9a53a18742b96ae48cf7e13a40a43a9dde1fa40deb63240c996ddfced",
+        "match": true
+      },
+      {
+        "path": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/tools/r7d2_staged_preflight.py",
+        "bytes": 5760,
+        "sha256": "6ca26908b1d00fe2ea0f6581fe67c82864149e7f5836ca0f00d6dba99d8d9839",
+        "match": true
+      }
+    ]
+  },
+  {
+    "manifest": "reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/SHA256SUMS.txt",
+    "entries": 5,
+    "mismatches": 0,
+    "rows": [
+      {
+        "path": "reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/build_manifest.json",
+        "bytes": 8423,
+        "sha256": "b172a279b75ce96220fded885459642a614408fa8319d660ab69c7113a75dc27",
+        "match": true
+      },
+      {
+        "path": "reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/rt-thread-motor-m1-callgraph.htm",
+        "bytes": 1101259,
+        "sha256": "a7090b6eed89f32a0abf4c7ec395cb1a421b909f1c25c436b64f302a02ff0c34",
+        "match": true
+      },
+      {
+        "path": "reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/rt-thread-motor-m1-candidate.bin",
+        "bytes": 297452,
+        "sha256": "23691e8d8aa8c1d3ed6e6eff4b5c51fe27dd3a9169841406ecc627c0e807e963",
+        "match": true
+      },
+      {
+        "path": "reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/rt-thread-motor-m1.axf",
+        "bytes": 1790048,
+        "sha256": "0f421595ac940863c4d38a2791f31bc8811fc3b8fa40062782f2ac7505c317f6",
+        "match": true
+      },
+      {
+        "path": "reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/rt-thread-motor-m1.map",
+        "bytes": 2148432,
+        "sha256": "e2d8d081958c84bb7f760bd5011a4b0ce962bb5dc8b6c0dff1cc9084efc0872b",
+        "match": true
+      }
+    ]
+  }
+]

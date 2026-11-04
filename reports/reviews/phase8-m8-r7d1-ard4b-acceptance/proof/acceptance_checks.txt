@@ -1,0 +1,54 @@
+# A 签收轮(纯文档/证据)离线独立复算: 设备动作 0, 未改产品, 未重构建
+# 包: NS800_R7D1_ARD4B_Acceptance_00718b4_20261105.zip 24196 B sha256=49681a0f8dc92fff5b55c49a67afa09c37fbaae5b4a516bc17e87cd9fe8fa97f
+PASS ZIP_PRESENT NS800_R7D1_ARD4B_Acceptance_00718b4_20261105.zip
+PASS ZIP_BYTES bytes=24196 期望=24196
+PASS ZIP_SHA256 49681a0f8dc92fff5b55c49a67afa09c37fbaae5b4a516bc17e87cd9fe8fa97f
+PASS MANIFEST_ENTRY_COUNT 19 条(1 件正文 + 1 件 IDENTITY + 11 件 proof + 4 件 reproducer + 2 件 A 自己的清单行)
+PASS ZIP_MEMBER_COUNT zip 成员=20 = 19 条登记 + SHA256SUMS.txt 自身
+PASS MANIFEST_EXCLUDES_SELF 清单不含自身
+PASS MANIFEST_ALL_MATCH 19/19
+PASS VERDICT_ACCEPT_WITH_ERRATA verdict=ACCEPT_OFFLINE_WITH_DOCUMENTATION_ERRATA blocking=0 closed=['ARD1', 'ARD2', 'ARD3', 'ARD4']
+PASS REVIEW_COMMIT_IS_PUSHED_TIP review=00718b49e parent=e1d7f3d90
+PASS HEAD_IS_ACCEPTED_TIP HEAD=00718b49e 签收 tip=00718b49e
+PASS A_EDITS_AND_ACTIONS_ZERO 产品改动=0 设备动作=0 A 重跑 arm=False A 重放我方 271 条=False
+PASS A_OUTSIDE_SCOPE_EMPTY []
+PASS A_FIELD_BOUNDARIES_KEPT candidate=23691e8d.. on_board=historical b502 / 502dca5d polarity=False core=False R7F5A=PENDING_OPERATOR_REPORT 新授权=False
+PASS A_ACCEPTS_COMPOUND_LIMITATION A 也独立认定复合探针 ctx 臂未命中, 等价覆盖=四探针第 4 条 + A16 两世界
+PASS REVIEWER_ORIGINALS_VERBATIM 19 件与 zip 内字节逐字节相同
+PASS A_SELF_MANIFEST_VERBATIM A 自己的清单(第 20 个成员)1929 B sha=2589bc1e44c3 逐字节相同
+PASS PROBE_INPUTS_SAME_IDENTITY_AS_PRIOR_A_PACKAGE review_probes.c 与上一份 A 包同字节=True(4717 B);run_review_probes.py 与上一份 A 包同字节=True(2911 B);commit_rollback_probe.c 与上一份 A 包同字节=True(2243 B);run_commit_rollback_probe.py 与上一份 A 包同字节=True(2928 B)
+PASS PROBE_INPUT_SHA_original_four/review_probes original_four/review_probes.c=c4dcf1e78cda
+PASS PROBE_INPUT_SHA_original_four/run_review_probes original_four/run_review_probes.py=b03c0eca3d92
+PASS PROBE_INPUT_SHA_compound/commit_rollback_probe compound/commit_rollback_probe.c=8667e2001d75
+PASS PROBE_INPUT_SHA_compound/run_commit_rollback_probe compound/run_commit_rollback_probe.py=7c491391e350
+PASS A_SOURCE_BINDINGS_RECOMPUTED_AT_TIP 7 件绑定在 00718b49e 上逐件复算 blob sha1/字节/sha256(坏 0)
+PASS TIP_BLOBS_EQUAL_DISK A 复算用的那 7 件与本机磁盘字节相同(未提交任何产品改动的前提)
+PASS OUR_CHAIN_66_MATCHES_A_CLAIM SUMMARY|cases=66 pass=66 fail=0 pre_bad=0 executed=66
+PASS OUR_REVERSE_20_MATCHES_A_CLAIM 我方判定行=20 INJECTED=20; A 登记 meta_ok=20 injected=20
+PASS FOUR_PROBES_BOTH_VERSIONS_SAY_ALL_PASS A 侧判定行=4 全 PASS; 我方归档件里基线+本轮共 8 行全 PASS, 且两边 REVIEW 身份集合相同
+PASS COMPOUND_OBS_IDENTICAL_BETWEEN_A_AND_US A 与我方对同一次修后观察一字不差: OBS|COMMIT_CFG_AND_ROLLBACK_FAULT|refused=1 no_rollback=0 cfg_changed=0 pending_changed=0 creds_
+PASS COMPOUND_A_CLAIMS_MATCH_OBS_FIELDS OBS|COMMIT_CFG_AND_ROLLBACK_FAULT|refused=1 no_rollback=0 cfg_changed=0 pending_changed=0 creds_kept=1 cfg_id=
+PASS A_FULL_CHAIN_LOG_SELF_CONSISTENT A 侧日志: 66/66 行存在, META-OK 判定行=20, INJECTED=20
+PASS A_IMAGE_CLAIMS_MATCH_OUR_ARCHIVE A 登记的 BIN/AXF/MAP/调用图四件 bytes+sha256 与我方 manifest 与磁盘全一致(BIN=23691e8d8aa8 297452 B)
+PASS A_CLAIMS_AXF_EQUAL_BIN_AND_WE_RECOMPUTE A 侧 Flash 段==BIN 为真(1 段); 本工具下一判据独立复算
+PASS A_MANIFEST_CHECKS_COVER_OUR_TWO_LISTS A 的 manifest_checks.json 11226 B, 点名本轮两份清单=True
+PASS CANDIDATE_IMAGE_BYTES_UNCHANGED 签收候选 BIN 仍是 23691e8d8aa8.. (297452 B)
+PASS AXF_FLASH_SEGMENT_EQUAL_BIN_RECOMPUTED span=297452 bin=297452
+PASS PREVIOUS_IMAGE_UNCHANGED 上一版(e1d7f3d)仍是 165d8bdc..
+PASS OLDER_IMAGE_UNCHANGED 再上一版(4d50310)仍是 df7584c3..
+PASS BUILD_LOG_STILL_ZERO_ERROR_ZERO_WARNING 本轮不重构建: 沿用已签收那一版日志的 0E/0W 结果行
+PASS NO_PRODUCT_OR_HOST_CHANGE_THIS_ROUND 相对签收 tip 00718b4: 产品与主机链路径被改动数=0(必须 0)
+PASS SCOPE_DOCS_AND_EVIDENCE_ONLY 改动 30 件, 全部在文档/证据白名单内
+PASS TOUCHED_DOC_01_implementation_contract_md reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/implementation_contract.md
+PASS TOUCHED_DOC_02_phase8-m8-r7d1-ard4b-commit-txn_md reports/agent_handoffs/phase8-m8-r7d1-ard4b-commit-txn.md
+PASS TOUCHED_DOC_03_phase8-m8-r7d1-ard4b-commit-txn_json reports/agent_handoffs/phase8-m8-r7d1-ard4b-commit-txn.json
+PASS TOUCHED_DOC_04_run_record_md reports/reviews/phase8-m8-r7f2b-safety-print-fix/run_record.md
+PASS OLD_WRONG_SENTENCES_GONE 八处旧句在三份文档的正文里都已不再出现(§8 勘误节按设计保留原文对照, 另有 reports/reviews/phase8-m8-r7d1-ard4b-acceptance/errata.md 逐字登记)
+PASS NEW_WIRING_STATED_WITH_CODE_EVIDENCE 新口径都点名了源码位置(begin 的锁内范围复核 + 提交点 -1/-1)
+PASS CREDENTIAL_ROW_CONSISTENT_WITH_CALL 合同里写明的调用参数就是 -1/-1(两枚旗标都不写)
+PASS PRODUCT_COMMENT_DRIFT_REGISTERED_NOT_FIXED 产品注释仍写"都在副本上算 …… 然后取 cfg 锁"(本轮不改产品), 已在 errata.md 点名登记
+PASS PRODUCT_HEADER_BYTES_UNCHANGED_SINCE_TIP project_config.h 的磁盘字节与签收 tip 上的 blob 相同 => 镜像仍是被签收那一版
+PASS RUN_RECORD_SECTION_18_WITH_17_AND_16_KEPT §18 已追加; §17/§16 原文未删(§17 的两处旧口径以 §18 的逐字对照更正, 不覆写)
+PASS LEAK_SCANNER_FIRED_ON_SYNTHETIC 三条模式各自在合成样本上命中(判据不是空转)
+PASS NO_LOCAL_PATH_LEAK_IN_THIS_ROUND 本轮改动件(30)里没有本机用户目录/用户名
+TOTAL=51 FAIL=0 fails=-

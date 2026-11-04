@@ -13,13 +13,24 @@
   "inner_manifest_recomputed": "19/19",
   "fix_id": "R7D1_ARD4_FOLLOWUP_e1d7f3d",
   "verdict": "CHANGES_REQUIRED",
-  "finding_ids": ["ARD4"],
-  "finding_priorities": ["P2"],
+  "finding_ids": [
+   "ARD4"
+  ],
+  "finding_priorities": [
+   "P2"
+  ],
   "finding_location": "diag_relative.c:2195-2209",
-  "closed_without_reopening": ["ARD1", "ARD2", "ARD3"],
+  "closed_without_reopening": [
+   "ARD1",
+   "ARD2",
+   "ARD3"
+  ],
   "hardware_actions_cap": 0,
   "authorization_verbatim": "Continue original offline authorization. No new registration or approval round.",
-  "product_scope_verbatim": ["diag_relative.c", "direct configuration transaction dependencies if needed"],
+  "product_scope_verbatim": [
+   "diag_relative.c",
+   "direct configuration transaction dependencies if needed"
+  ],
   "originals_archived_under": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/",
   "originals_verbatim_vs_zip": true
  },
@@ -29,11 +40,23 @@
   "head_at_build_equals_reviewed": true,
   "branch": "feature/m8-r7d1-async-learn-offline",
   "a_declared_existing": {
-   "host_pass": 66, "reverse_meta_ok": 19, "runner_rc": 0,
-   "original_four": {"checks": 4, "pass": 4, "run_rc": 0},
-   "ard4_compound": {"run_rc": 1, "REFUSED": true, "configuration_changed": false,
-                     "pending_changed": true, "credentials_kept": true,
-                     "configuration_id": 1, "pending_id": 2}
+   "host_pass": 66,
+   "reverse_meta_ok": 19,
+   "runner_rc": 0,
+   "original_four": {
+    "checks": 4,
+    "pass": 4,
+    "run_rc": 0
+   },
+   "ard4_compound": {
+    "run_rc": 1,
+    "REFUSED": true,
+    "configuration_changed": false,
+    "pending_changed": true,
+    "credentials_kept": true,
+    "configuration_id": 1,
+    "pending_id": 2
+   }
   },
   "a_source_bindings_recomputed_at_reviewed_commit": 7,
   "a_source_bindings_where_disk_differs": 5,
@@ -54,8 +77,8 @@
    "defect": "配置发布失败 + 回滚取 ctx 失败这一组合下, 命令报 REFUSED 但候选已是新版、配置仍是旧版、两份凭据都有效(半份发布)",
    "shape_before": "refused=1 no_rollback=1 cfg_changed=0 pending_changed=1 creds_kept=1 cfg_id=1 pending_id=2 ctx_takes=5 cfg_steps=3 (run_rc=1 FAIL)",
    "shape_after": "refused=1 no_rollback=0 cfg_changed=0 pending_changed=0 creds_kept=1 cfg_id=1 pending_id=1 ctx_takes=3 cfg_steps=3 (run_rc=0 PASS)",
-   "fix_oneliner": "把提交点改为'两把锁都到手之后只做不会失败的赋值': 新增 project_config_rprof_begin/publish_locked/end 三条窄路径, commit 依次 begin(校验+取 cfg, 本轮最后一个可失败步骤) -> rel_ctx_take -> rel_pending_publish_locked + project_config_rprof_publish_locked -> 放锁; 回滚路径与 prev 局部副本整体删除",
-   "commit_point": "rel_pending_publish_locked(&cand,-1,-1) 与 project_config_rprof_publish_locked(&cand) 这一对赋值; 二者都不取锁、不校验、不做 I/O, 因此不存在失败路径",
+   "fix_oneliner": "把提交点改为'两把锁都到手之后只做不会失败的赋值': 新增 project_config_rprof_begin/publish_locked/end 三条窄路径(begin 先判空+rel_profile_validate 再取 cfg 锁, 并在锁内用临时副本过 config_in_range, 范围不过先放锁再返回; commit 依次 begin -> rel_ctx_take -> 两份赋值 -> 放锁); 回滚路径与 prev 局部副本整体删除",
+   "commit_point": "rel_pending_publish_locked(&cand,-1,-1) 与 project_config_rprof_publish_locked(&cand) 这一对赋值; 二者都不取锁、不校验、不做 I/O, 因此不存在失败路径; -1/-1 表示两枚凭据旗标都不写",
    "lock_order": "mot(motor_calibration_static_begin..end 跨整条命令持有) -> cfg(project_config 内部) -> rel_ctx(叶锁, REL_CTX_TAKE_MS=20ms 有界等待); 反向嵌套一个都没新增",
    "leaf_lock_kept": "rel_ctx 临界区内只有赋值(rel_pending_publish_locked), 不调 motor/cfg/Flash/UART/mdelay/print",
    "while_holding_cfg": "一次有界的 ctx 取锁(最坏 20ms)+ 两次结构体赋值; 无 UART/sleep/Flash; ctx 失败时显式 project_config_rprof_end() 归还自己刚拿的 cfg 锁",
@@ -63,7 +86,7 @@
    "no_unbounded_retry_no_force_unlock_no_swallow": true,
    "result_contract": {
     "REFUSED": "配置、候选、learn/zero 凭据与调用前逐字节相同, 且两把锁都不再持有",
-    "OK": "配置与候选 memcmp 相等(A16 ① 逐字节比, 不从打印推断)"
+    "OK": "配置与候选 memcmp 相等(A16 ① 逐字节比, 不从打印推断); zero/learn 两枚凭据保持原值(提交点传 -1/-1, 不改成'成功后作废凭据'的新合同)"
    },
    "legacy_api_kept": "project_config_set_rprof() 未动(config_load 与其他主机用例仍在用)",
    "case": "A16-commit-refused-keeps-config-and-candidate(checks 35 -> 37, 不新增编号)",
@@ -75,37 +98,77 @@
     "5": "空配置世界(magic==0)重跑 ②③, 然后同一条 commit 真提交成功且 profile_id==1 且两份逐字节相同"
    },
    "refusal_flag_bits": "0 未命中目标拒绝身份 / 1 未按 REFUSED 披露 / 2 意外 OK / 3 配置被改 / 4 候选被改 / 5 凭据被动 / 6 拒绝后仍持锁 / 7 夹具读不到配置",
-   "negatives": ["RDV9_commit_config_before_publish(改写: 配置发布提到 ctx 取锁之前)",
-                 "RDV10_commit_swallow_ctx_take_failure(新增: 吞掉提交点 ctx 取锁失败继续发布)"],
-   "disclosed_probe_limitation": "A 的复合探针同时装 cfg(第 cfg_steps 次)与 ctx(第 5 次)两个故障; 修后 commit 只取 ctx 3 次且 cfg 先失败, 回滚这一步已不存在, 因此 ctx 那一臂打不到。该件的 PASS 只覆盖'cfg 失败时三份状态未动'。等价故障点由两处承担: 原版四探针第 4 条(ctx 第 4 次失败, 此时 cfg 已持锁; 同一注入仍 refused=1 cfg_changed=0, 拒绝身份由 ctx-lock-publish/-12 变 ctx-lock-commit/-117)与 A16 的 ②/⑤ 段。"
+   "negatives": [
+    "RDV9_commit_config_before_publish(改写: 配置发布提到 ctx 取锁之前)",
+    "RDV10_commit_swallow_ctx_take_failure(新增: 吞掉提交点 ctx 取锁失败继续发布)"
+   ],
+   "disclosed_probe_limitation": "A 的复合探针同时装 cfg(第 cfg_steps 次)与 ctx(第 5 次)两个故障; 修后 commit 只取 ctx 3 次且 cfg 先失败, 回滚这一步已不存在, 因此 ctx 那一臂打不到。该件的 PASS 只覆盖'cfg 失败时三份状态未动'。等价故障点由两处承担: 原版四探针第 4 条(ctx 第 4 次失败, 此时 cfg 已持锁; 同一注入仍 refused=1 cfg_changed=0, 拒绝身份由 ctx-lock-publish/-12 变 ctx-lock-commit/-117)与 A16 的 ②/⑤ 段。",
+   "fallible_steps_before_commit_point": "begin 内: 判空 / rel_profile_validate(锁外) + cfg 取锁 + 锁内 config_in_range; begin 之后: rel_ctx_take(有界 20ms)。口径是'全部校验与所有可能失败的取锁都在两份共享状态写入之前完成', 不是'begin 是最后一个可失败步骤'"
   }
  },
  "host_chain": {
   "compiler": "gcc.exe (tdm64-1) 4.9.2 (C:/Program Files (x86)/Dev-Cpp/MinGW64/bin)",
-  "normal": {"build_rc": 0, "warnings": 0, "cases": 66, "pass": 66, "fail": 0, "pre_bad": 0, "executed": 66},
-  "prior_cases_kept": 66, "prior_cases_lost": 0, "new_case_ids": 0,
-  "case_checks_grew": [["A16-commit-refused-keeps-config-and-candidate", 2]],
+  "normal": {
+   "build_rc": 0,
+   "warnings": 0,
+   "cases": 66,
+   "pass": 66,
+   "fail": 0,
+   "pre_bad": 0,
+   "executed": 66
+  },
+  "prior_cases_kept": 66,
+  "prior_cases_lost": 0,
+  "new_case_ids": 0,
+  "case_checks_grew": [
+   [
+    "A16-commit-refused-keeps-config-and-candidate",
+    2
+   ]
+  ],
   "case_checks_shrunk": [],
-  "reverse": {"families": 20, "meta_ok_lines": 20, "injected_lines": 20, "meta_fail": 0,
-              "counting_note": "判定行按 '| META-OK' 取 = 20; 子串计数 = 21(正文也含该词), 已加一条判据固定这个差异",
-              "new_family": "RDV10_commit_swallow_ctx_take_failure",
-              "rewritten_family": "RDV9_commit_config_before_publish"},
-  "probes_original_four": {"at_e1d7f3d": "checks=4 failures=0", "this_round": "checks=4 failures=0",
-                           "ard123_observations_identical": true,
-                           "commit_probe_refusal_identity": "ctx-lock-commit rc=-117(旧 ctx-lock-publish rc=-12)"},
-  "probe_compound": {"pre_run_rc": 1, "pre_verdict": "FAIL", "post_run_rc": 0, "post_verdict": "PASS",
-                     "reproducer_unchanged": true, "hardware_actions": 0}
+  "reverse": {
+   "families": 20,
+   "meta_ok_lines": 20,
+   "injected_lines": 20,
+   "meta_fail": 0,
+   "counting_note": "判定行按 '| META-OK' 取 = 20; 子串计数 = 21(正文也含该词), 已加一条判据固定这个差异",
+   "new_family": "RDV10_commit_swallow_ctx_take_failure",
+   "rewritten_family": "RDV9_commit_config_before_publish"
+  },
+  "probes_original_four": {
+   "at_e1d7f3d": "checks=4 failures=0",
+   "this_round": "checks=4 failures=0",
+   "ard123_observations_identical": true,
+   "commit_probe_refusal_identity": "ctx-lock-commit rc=-117(旧 ctx-lock-publish rc=-12)"
+  },
+  "probe_compound": {
+   "pre_run_rc": 1,
+   "pre_verdict": "FAIL",
+   "post_run_rc": 0,
+   "post_verdict": "PASS",
+   "reproducer_unchanged": true,
+   "hardware_actions": 0
+  }
  },
  "printf_budget": {
   "added_or_changed_kprintf_formats": 0,
   "method_change": "上一轮对不认识的实参按 26 B 兜底, 只覆盖本轮触及的调用点; 本轮把宽度改为当场从 diag_relative.h + project_config.h 解出的 144 个成员类型折算(同名取最大值, 只高估不低估), 覆盖面扩到整份文件",
   "unresolved_args": 0,
-  "why_assignments": 31, "why_value_set_kinds": ["字面量", "REL_JOB_WHY_* 宏", "转发", "三元默认"],
-  "why_widest_bytes": 25, "why_widest_bound_from_prior_round": 25,
+  "why_assignments": 31,
+  "why_value_set_kinds": [
+   "字面量",
+   "REL_JOB_WHY_* 宏",
+   "转发",
+   "三元默认"
+  ],
+  "why_widest_bytes": 25,
+  "why_widest_bound_from_prior_round": 25,
   "commit_path_widest_bytes_incl_LF": 80,
   "file_widest_bytes_incl_LF": 109,
   "budget_bytes": 120,
-  "bare_nul": 0, "strict_utf8": true,
+  "bare_nul": 0,
+  "strict_utf8": true,
   "learn_status_main_line_unwidened": true
  },
  "build": {
@@ -115,37 +178,92 @@
   "result_line": "\".\\build\\motor_m1\\rt-thread-motor-m1.axf\" - 0 Error(s), 0 Warning(s).",
   "compiler": "V6.24",
   "program_size": "Program Size: Code=209490 RO-data=87378 RW-data=2196 ZI-data=85944",
-  "program_size_delta_vs_reviewed": {"Code": 16, "RO-data": -44, "RW-data": 0, "ZI-data": 0},
+  "program_size_delta_vs_reviewed": {
+   "Code": 16,
+   "RO-data": -44,
+   "RW-data": 0,
+   "ZI-data": 0
+  },
   "aftermake": "fromelf --bin .\\build\\motor_m1\\rt-thread-motor-m1.axf --output .\\build\\motor_m1\\rt-thread-motor-m1.bin",
   "images": {
-   "bin": {"bytes": 297452, "sha256": "23691e8d8aa8c1d3ed6e6eff4b5c51fe27dd3a9169841406ecc627c0e807e963"},
-   "axf": {"bytes": 1790048, "sha256": "0f421595ac940863c4d38a2791f31bc8811fc3b8fa40062782f2ac7505c317f6"},
-   "map": {"bytes": 2148432, "sha256": "e2d8d081958c84bb7f760bd5011a4b0ce962bb5dc8b6c0dff1cc9084efc0872b"},
-   "callgraph": {"bytes": 1101259, "sha256": "a7090b6eed89f32a0abf4c7ec395cb1a421b909f1c25c436b64f302a02ff0c34"}
+   "bin": {
+    "bytes": 297452,
+    "sha256": "23691e8d8aa8c1d3ed6e6eff4b5c51fe27dd3a9169841406ecc627c0e807e963"
+   },
+   "axf": {
+    "bytes": 1790048,
+    "sha256": "0f421595ac940863c4d38a2791f31bc8811fc3b8fa40062782f2ac7505c317f6"
+   },
+   "map": {
+    "bytes": 2148432,
+    "sha256": "e2d8d081958c84bb7f760bd5011a4b0ce962bb5dc8b6c0dff1cc9084efc0872b"
+   },
+   "callgraph": {
+    "bytes": 1101259,
+    "sha256": "a7090b6eed89f32a0abf4c7ec395cb1a421b909f1c25c436b64f302a02ff0c34"
+   }
   },
   "archive_dir": "reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/(新目录, 旧镜像与旧证据未覆盖)",
   "bin_delta_vs_reviewed_bytes": -24,
   "reconciliation": "ER_IROM1 -28(两份 map 相减独立复算 == Code+RO+RW 增量 -28), RW_VT_DTCM 压缩载荷 0, 对齐空隙 -4, RW_DTCM 压缩载荷 +8 => -24 == BIN 增量, 残差 0; 两版各自'三段+空隙'精确等于该版 BIN 字节数(297476 / 297452)",
-  "per_object": {"nonzero_diff_set": ["diag_relative.o", "project_config.o"],
-                 "diag_relative.o": {"Code": 8, "RO": -42, "RW": 0, "ZI": 0},
-                 "project_config.o": {"Code": 2, "RO": 0, "RW": 0, "ZI": 0},
-                 "identical_other_rows": "109 行 .o + 49 行库成员逐字段相同",
-                 "sum_check": "-32 + (incl. Padding) 第 2 行 +4 = -28 == Program Size 增量"},
+  "per_object": {
+   "nonzero_diff_set": [
+    "diag_relative.o",
+    "project_config.o"
+   ],
+   "diag_relative.o": {
+    "Code": 8,
+    "RO": -42,
+    "RW": 0,
+    "ZI": 0
+   },
+   "project_config.o": {
+    "Code": 2,
+    "RO": 0,
+    "RW": 0,
+    "ZI": 0
+   },
+   "identical_other_rows": "109 行 .o + 49 行库成员逐字段相同",
+   "sum_check": "-32 + (incl. Padding) 第 2 行 +4 = -28 == Program Size 增量"
+  },
   "axf_flash_segment_equal_bin": true,
   "stack": {
-   "rel_cmd_commit_frame": [608, 496],
-   "rel_cmd_commit_subtree": [1556, 1404],
-   "deepest_command_root": {"reviewed": "rel_cmd_commit 1556", "this_round": "rel_cmd_clear 1460"},
+   "rel_cmd_commit_frame": [
+    608,
+    496
+   ],
+   "rel_cmd_commit_subtree": [
+    1556,
+    1404
+   ],
+   "deepest_command_root": {
+    "reviewed": "rel_cmd_commit 1556",
+    "this_round": "rel_cmd_clear 1460"
+   },
    "subtree_grew_roots": "无",
    "marginal_note": "上一轮为回滚新增的 diag_rprof_t 局部副本(map 同类型 116 B)与 project_config_set_rprof -> cfg_take_checked 子树(948 B)一并消失, 本轮把上一轮登记的栈成本收回",
-   "constants_unchanged": {"DIAG_THREAD_STACK": "4096", "FINSH_THREAD_STACK_SIZE": "4096",
-                           "REL_CMD_DEADLINE_MS": "12000"},
-   "diag_thread": {"frame_delta": 0, "subtree_delta": 0, "deepest_chain_identical": true},
+   "constants_unchanged": {
+    "DIAG_THREAD_STACK": "4096",
+    "FINSH_THREAD_STACK_SIZE": "4096",
+    "REL_CMD_DEADLINE_MS": "12000"
+   },
+   "diag_thread": {
+    "frame_delta": 0,
+    "subtree_delta": 0,
+    "deepest_chain_identical": true
+   },
    "caveat": "armlink 数是静态下界(不含异常/ISR 帧, 解析不了函数指针), 只用于两版比较, 不是现场最坏栈实测"
   }
  },
- "offline_checks": {"tool": "tools/r7d2_offline_checks.py", "total": 113, "fail": 0,
-                    "artifacts": ["offline/checks.txt", "offline/summary.json"]},
+ "offline_checks": {
+  "tool": "tools/r7d2_offline_checks.py",
+  "total": 113,
+  "fail": 0,
+  "artifacts": [
+   "offline/checks.txt",
+   "offline/summary.json"
+  ]
+ },
  "documentation": {
   "implementation_contract": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/implementation_contract.md",
   "case_mapping": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/case_mapping.md",
@@ -174,5 +292,58 @@
   "不主张任何现场/板上结论: 本轮 0 次设备动作, 新镜像未上板。",
   "不主张 Flash 持久化正确: config_save 是操作者的显式动作, 本契约只覆盖 RAM 侧两份发布的一致性。",
   "不主张栈实测安全: 调用图数字是 armlink 静态下界, 仅用于两版比较。"
- ]
+ ],
+ "acceptance": {
+  "by": "A (云端复审)",
+  "date_local": "2026-11-05",
+  "package": {
+   "basename": "NS800_R7D1_ARD4B_Acceptance_00718b4_20261105.zip",
+   "bytes": 24196,
+   "sha256": "49681a0f8dc92fff5b55c49a67afa09c37fbaae5b4a516bc17e87cd9fe8fa97f",
+   "inner_manifest_entries": 19,
+   "zip_member_count": 20
+  },
+  "verdict": "ACCEPT_OFFLINE_WITH_DOCUMENTATION_ERRATA",
+  "blocking_product_findings": 0,
+  "closed_findings": [
+   "ARD1",
+   "ARD2",
+   "ARD3",
+   "ARD4"
+  ],
+  "review_commit": "00718b49e65546aa0bae84006059011d68284c4a",
+  "a_rerun_results": {
+   "original_four": "4/4 PASS rc=0",
+   "compound_probe": "PASS rc=0(三份状态未变)",
+   "full_chain": "66/66 runner rc=0",
+   "reverse": "20/20 META-OK, 20 INJECTED",
+   "axf_flash_segment_equal_bin": true,
+   "images_blob_sha_size_match_manifest": true,
+   "hardware_actions": 0,
+   "arm_compiler_rerun_by_A": false,
+   "all_271_remote_entries_replayed_by_A": false
+  },
+  "documentation_errata": [
+   "校验与取锁顺序: config_in_range 在 cfg 锁内执行; begin 不是最后一个可失败步骤(ctx 取锁在其后仍会失败)",
+   "commit 成功后 zero/learn 两枚凭据都保持原值(旧文写\"learn 作废\"是错的)"
+  ],
+  "errata_synced_in": [
+   "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/implementation_contract.md §2/§2.2/§8",
+   "reports/agent_handoffs/phase8-m8-r7d1-ard4b-commit-txn.md §2/§8",
+   "reports/agent_handoffs/phase8-m8-r7d1-ard4b-commit-txn.json",
+   "reports/reviews/phase8-m8-r7d1-ard4b-acceptance/errata.md",
+   "reports/reviews/phase8-m8-r7f2b-safety-print-fix/run_record.md §18"
+  ],
+  "deferred_text_drift_not_fixed": {
+   "file": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/project_config.h",
+   "lines": "82-83",
+   "what": "接口注释把 config_in_range 写在\"然后取 cfg 锁\"之前(与 §8 勘误 #1 同源)",
+   "why_not_fixed": "产品文件的文字改动会要求重新构建镜像, A 明确不为此开返修/构建轮; 登记后留到下一次合法触产品源码的轮次随构建一起修",
+   "image_bytes_unchanged": true
+  },
+  "no_product_change_this_round": true,
+  "no_new_build_this_round": true,
+  "hardware_actions": 0,
+  "scope_note": "签收只覆盖离线代码与文档; 不含真实硬件效果; 回现场后的新版上板范围另行定稿, 不结转旧额度"
+ }
 }
