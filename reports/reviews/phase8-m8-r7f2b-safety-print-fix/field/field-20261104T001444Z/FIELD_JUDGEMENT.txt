@@ -1,0 +1,116 @@
+== 0) 归档件身份(本轮现场产生的每个字节文件) ==
+  action_download/ARGV.json                          729 B sha256=8add5339009ea0da
+  action_download/rc.txt                               3 B sha256=13bf7b3039c63bf5
+  action_download/stderr.bin                         312 B sha256=c8085a9542f1857f
+  action_download/stdout.bin                         176 B sha256=4f79f4bf0786bb5d
+  action_readback/ARGV.json                          860 B sha256=8922fcb247ecc6d4
+  action_readback/rc.txt                               3 B sha256=13bf7b3039c63bf5
+  action_readback/stderr.bin                           0 B sha256=e3b0c44298fc1c14
+  action_readback/stdout.bin                         171 B sha256=b5d9ef7b68b46bf9
+  action_reset/ARGV.json                             497 B sha256=cd6aa34777eb4e63
+  action_reset/rc.txt                                  3 B sha256=13bf7b3039c63bf5
+  action_reset/stderr.bin                              0 B sha256=e3b0c44298fc1c14
+  action_reset/stdout.bin                              0 B sha256=e3b0c44298fc1c14
+  dispatch_ledger.jsonl                             7496 B sha256=c427221105983281
+  dispatch_stderr.raw                                  0 B sha256=e3b0c44298fc1c14
+  dispatch_stdout.raw                               5396 B sha256=dfd4d3846709af14
+  FIELD_JUDGEMENT.txt                               8703 B sha256=1ee68aab533edbdd
+  readback.bin                                    292708 B sha256=502dca5d8c7ebfa7
+  S_S3/01_rst.boot.rx.bin                           3468 B sha256=9e4ce2c9dd116171
+  S_S3/01_rst.boot.rx.bin.txt                       4248 B sha256=7dd723d0fda50c24
+  S_S3/02_threads.rx.bin                            1192 B sha256=e772b05db7205638
+  S_S3/02_threads.rx.bin.txt                        1185 B sha256=da1c94effcd3fbbf
+  S_S3/03_heap.rx.bin                                 90 B sha256=2aef3ec96d30f7f1
+  S_S3/03_heap.rx.bin.txt                             83 B sha256=ddef216fda9ae732
+  S_S3/04_sysboot.rx.bin                             983 B sha256=73abf3012386723e
+  S_S3/04_sysboot.rx.bin.txt                         976 B sha256=38a8b6bf90a7b3f9
+  S_S3/05_safboot.rx.bin                             522 B sha256=00cea3467e9b9549
+  S_S3/05_safboot.rx.bin.txt                         515 B sha256=0d7c3e226251466a
+  S_S3/06_motboot.rx.bin                            1128 B sha256=f0550d3131642cd0
+  S_S3/06_motboot.rx.bin.txt                        1121 B sha256=fcd210a1b752c111
+  S_S3/07_irqboot.rx.bin                             612 B sha256=25bef65c2b365d5c
+  S_S3/07_irqboot.rx.bin.txt                         605 B sha256=f40d0df0faf59a90
+  S_S3/ledger.jsonl                                 3369 B sha256=ce1f3083b99ef40f
+  stdout_dispatch.txt                               5520 B sha256=a662313c498a6ec2
+== 1) 新镜像逐字节在板 ==
+PASS 回读长度 == 候选 BIN 长度                                          292708 == 292708
+PASS 回读 sha256 == 候选 BIN sha256                                 502dca5d8c7ebfa794f890a9c03bc258fc9753f57b6a80c2f1e08add69888a7a
+PASS 逐字节比较无首个差异位置                                               first_diff=None
+== 2) 启动流(被动 75 s 窗, 72 行) ==
+PASS 流内无裸 NUL                                                   NUL=0
+PASS 整流严格 UTF-8 可解码                                             
+PASS 末行以换行收尾(没有截尾半行)                                            tail=b')\r\n'
+PASS 无 [REQ FAIL] / reason=rx-timeout-echo                      命中行=[]
+PASS TMC2209 IOIN 有应答且身份位=0x21                                  [SS] [REQ OK] TMC2209 IOIN=0x21000041 VERSION=0x21
+PASS 自检 PASS + SELF_TEST -> READY                               ['          8 diag / 9 blackbox / 10 ui / 11 selftest->READY\r', '[SS] SELF_TEST -> READY (identity epoch=0)']
+PASS fault_code=0 且无 FAULT_LATCHED                              ['[SS] state=READY fault_code=0 degraded=0x00', '[Safety] state=READY fault=0 irq_gate=CLOSED polarity=not-confirmed protect_ready=NO']
+PASS 最长行(含 LF) <= 127                                           worst=126 B
+== 3) safety_status(10 行)—— 本轮修复的主判据 ==
+    [14 B] safety_status
+    [31 B] [SAFETY] ready=YES first_err=0
+    [45 B] [SAFETY] MCU_DRV_ENABLE = 0 (禁止(安全))
+    [75 B] [SAFETY] DRV_ENABLE last write+readback verified = 0 (-1 = never verified)
+    [64 B] [SAFETY] ENN_FEEDBACK(PC.6 = 板上 TMC_ENN) raw=1 resolved=YES
+    [95 B] [SAFETY] [只读输入, 非急停感测; HIGH=禁能侧, LOW=未施加禁能(不保证转矩)]
+    [72 B] [SAFETY] request=DISABLE(LOW) pad=0 expected_FB=HIGH FB=1 -> verdict=OK
+    [106 B] [SAFETY] LIMIT inputs = DISABLED_BY_CONFIG (限位实现保留, 不解析/不配置/不读/不注册 IRQ)
+    [ 6 B] msh >
+    [ 6 B] msh >
+PASS ENN 拆行后是**两条独立完整行**                                        ENN 行=1 说明行=1
+PASS ENN 行含 raw= 与 resolved= 且以 N 结尾未截断                         
+PASS 说明行完整(与 A 预测行逐字节相等, 未截断)                                   尾 14 字节 现场='=未施加禁能(不保证转矩)]' 预测='=未施加禁能(不保证转矩)]'
+PASS 响应内无裸 NUL / 严格 UTF-8                                       
+PASS LIMIT 行在 safety_status 里存在                                 [SAFETY] LIMIT inputs = DISABLED_BY_CONFIG (限位实现保留, 不解析/不配置/不读/不注册 IRQ
+== 4) motor_status(28 行)—— 静止/未武装/当前禁能合同 ==
+    motor_status
+    [MOT] state=0 name=OTHER
+    [MOT] cur_hz=0 tgt_hz=0 accel=2000 decel=2000 dir=0
+    [MOT] armed=0 drv_en_request=0 health=OK
+    [MOT] guard stops=0 reason=0
+    [MOT] guard reason map: 0=none 1=cfg-lost 2=integrity 3=txn-busy 4=enn-fb
+PASS state=0 name=OTHER 恰好一行                                    
+PASS armed=0 drv_en_request=0 health=OK                         
+PASS cur_hz=0 且 tgt_hz=0                                        
+PASS arm_gate_mask=0x18 REFUSED(A 的只读披露, 非 ALL-PASS)            ['[MOT] arm_gate_mask=0x18 REFUSED', '[MOT] arm_gate_mask=0x18']
+PASS gate 明细行按 mot_print_gate_fail 形状出现                         gate_reason 行数=2
+PASS 无额外业务失败(FAILED/VOIDED/not supported)                       
+== 5) safety_irq_status(12 行)—— A 新补的 source_shape 对照 ==
+    [18 B] safety_irq_status
+    [43 B] [SAFETY] irq gate   = CLOSED (polled only)
+    [72 B] [SAFETY] polarity   = NOT confirmed (HARDWARE-PENDING unless CONFIRMed)
+    [26 B] [SAFETY] gpio_ready = YES
+    [40 B] [SAFETY] thread     = running health=OK
+    [31 B] [SAFETY] protection_ready = NO
+    [59 B] [SAFETY] TMC_DIAG     pin=3 raw=0 safe=0 irq=RISING [safe]
+    [80 B] [SAFETY] LIMIT inputs config = DISABLED_BY_CONFIG (SAFETY_LIMIT_INPUTS_ENABLED)
+    [97 B] [SAFETY] LIMIT OFF => PF.14/PF.15 不解析/不配置/不读/不注册, 也不参与就绪判定
+    [124 B] [SAFETY] PC.6(ENN_FB) pin=ok raw=HIGH = TMC_ENN feedback (HIGH=disabled side). NOT an e-stop input, 
+    [ 6 B] msh >
+    [ 6 B] msh >
+PASS 两条 LIMIT 短行都在(拆行后的形状)                                      
+PASS irq gate = CLOSED(本场没开 IRQ)                                
+PASS protection_ready = NO 与 READY 并存被允许(不构成可运动结论)              
+PASS 最长行(含 LF) <= 127                                           worst=124 B
+== 6) ps / free ==
+    main 行原文: ['main              10  suspend 0x0000018c 0x00001000     40%   0x00000001 EINTRPT 0x20012050  N/A']
+PASS ps 里 main 线程栈容量 == 4096(十进制)                               解析出的栈容量=[4096]; ps 的栈列是十六进制(0x1000), 不是十进制 4096
+    free: ['free', 'total    : 32672', 'used     : 22120', 'maximum  : 22120']
+PASS free 取到实际堆统计(total/used/max 都有)                            7 行含数字
+== 7) 与 A 的 source_shape 预测逐行对照(预测≠实测) ==
+  safety_status      预测7 实抓10 相同7 仅预测0 仅现场3
+      仅现场: safety_status
+      仅现场: msh >
+      仅现场: msh >
+  motor_status       预测25 实抓28 相同25 仅预测0 仅现场3
+      仅现场: motor_status
+      仅现场: msh >
+      仅现场: msh >
+  safety_irq_status  预测9 实抓12 相同9 仅预测0 仅现场3
+      仅现场: safety_irq_status
+      仅现场: msh >
+      仅现场: msh >
+== 8) 额度与台账(现场真实消耗) ==
+  spent 非零项 = {"download": 1, "explicit_reset": 1, "port_open": 1, "readback": 1}
+  pending=0 writes=8 identities.plan_sha256=080c22973c7e image_sha256=502dca5d8c7e
+
+TOTAL checks=28 fail=0

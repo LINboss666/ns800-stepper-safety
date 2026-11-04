@@ -149,3 +149,31 @@ AXF 的唯一 PT_LOAD `p_paddr=0x08000000 p_filesz=292708` 与 BIN **逐字节�
 (下载 1 / 定长回读 1 = 292708 B / 显式复位 1 / COM5 开口 1,其余全 0,失败即停不重试),不再交准备轮、不重复确认同一范围。
 本轮**没有**创建批准身份、**没有**碰设备;现场安全门不由我代答、转述或自填。
 
+## 9 R7F3 现场执行(操作者批准后,一次整包)
+
+批准:操作者对本固定包选答「批准，按该范围执行一次」并回报「已核对：供电在、接线无未说明变化」;
+两条答复逐字拼成令牌(94 B,`0150b36c…`;其中「（推荐）」是我选项标签自带后缀,未替其删改)。
+批准身份 `M8R7F3-b502-startup-print-20261104` 由未改动执行器 `--approval-init` 离线开立,身份三件
+plan `080c2297…` / image `502dca5d…` / executor `33d3f0af…`。
+
+执行根 `field/field-20261104T001444Z/`,`--dispatch --transport real --backend real --profile response_driven`
+一次跑完 S0→S3:`DISPATCH_SUMMARY status=OK`、4 阶段全执行、台账 `writes=8 pending=0`,
+真实消耗 **download 1 / readback 1 / explicit_reset 1 / port_open 1**,其余全 0,无重试。
+
+取得的项(A §本场必须取得 逐项;28 条判据 fail=0,原文 `FIELD_JUDGEMENT.txt`):
+回读 292708 B 与 BIN **逐字节相等**(新镜像在板);`[SS] state=READY fault_code=0` + `SELF_TEST -> READY`,
+无 `FAULT_LATCHED` 无 `[REQ FAIL]`;`[REQ OK] TMC2209 IOIN=0x21000041 VERSION=0x21`;
+ps `main … 0x00001000` = 4096;free `total 32672 / used 22120 / maximum 22120`;
+**safety_status 522 B / 10 行 / 0 裸 NUL / 严格 UTF-8**,ENN 两条短行 64 B 与 95 B(含 LF)且与 A 预测行逐字节相等
+—— 上一场同一命令是 342 B 且偏移 295 有一个裸 NUL;启动流 3468 B / 76 行 / 0 NUL / 最长 126 B;
+motor_status 静止/未武装/当前禁能合同 + `arm_gate_mask=0x18 REFUSED` + gate 明细;safety_irq_status 两条 LIMIT 短行、
+`irq gate = CLOSED`、`protection_ready = NO`、最长 124 B(= A 预测值)。三条查询的预测行 7/7、25/25、9/9 全中。
+
+工具侧失败原文(均未触设备,台账 `spent={} writes=0`):我的包装器两次 Python 写法错误、一次漏传
+`--profile response_driven` 被 `REAL_PROFILE_NOT_RESPONSE_DRIVEN` 具名拒绝(该拒绝根 `field-20261104T001348Z/` 一并入档);
+另第一版判读脚本两条错谓词造成 2 条假 FAIL,修正后重判 28/28 —— **现场字节未变,变的是我的判据写法**。
+
+未证不扩大:SG/ADC/IMU 保护、正常 disarm 收口、带载最坏栈、CONFIGURED 短打印、其余 35 条超长格式串;
+`core_protection_verified=False`。板端:VM 供电保持、显式复位后自由运行、未起转、对 Flash 只写过那一次 sector 下载。
+
+

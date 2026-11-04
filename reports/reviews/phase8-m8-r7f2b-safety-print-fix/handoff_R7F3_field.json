@@ -1,0 +1,317 @@
+{
+ "round": "phase8-m8-r7f2b-safety-print-fix / R7F3 现场轮",
+ "title": "b502 一次整包现场执行: 新镜像逐字节在板 + ENN 两条短行完整 + 六条查询全通过",
+ "date_local": "2026-11-04",
+ "git_head_at_generation": "f9bbe69c92cb28b225bf39269151916719935382",
+ "approved_package": {
+  "approval_id": "M8R7F3-b502-startup-print-20261104",
+  "plan": {
+   "path": "D:/ns800/reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/plan_r7f3_b502_reviewed.json",
+   "bytes": 36356,
+   "sha256": "080c22973c7eb3e780a31d9466f636c458c66668d87eae64f744ecfe6c02f956"
+  },
+  "rows": {
+   "path": "D:/ns800/reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/rows_r7f3_b502_reviewed.json",
+   "bytes": 55694,
+   "sha256": "bbfb4b570257ee7c5cd9e2d96da36cb8b10a989aae4f6fa6cfc2c47fa4fe6b17"
+  },
+  "manifest_adapter": {
+   "path": "D:/ns800/reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/manifest_binding_r7f3_b502_reviewed.json",
+   "bytes": 1141,
+   "sha256": "1ecf54c40014681482f75935f8d61a8b95aa2946c6ed1aa8149d7221ea493484"
+  },
+  "executor_unchanged": {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py",
+   "bytes": 219491,
+   "sha256": "33d3f0af8a4c9c33dcd4e013b395e4ba990a89e384130f9d0ffe50c71b34e8ca"
+  },
+  "operator_verbatim": [
+   "批准，按该范围执行一次（推荐）",
+   "已核对：供电在、接线无未说明变化"
+  ],
+  "verbatim_note": "令牌 = 上面两行按顺序拼接(94 B, sha256 0150b36c…)。其中「（推荐）」是本地 agent 选项标签自带的后缀, 操作者选择时未删; 令牌不含私有 UID, 也不入库到聊天文本。",
+  "ledger": {
+   "path": "D:\\ns800_field_approvals\\approval_M8R7F3-b502-startup-print-20261104.json",
+   "spent_nonzero": {
+    "download": 1,
+    "explicit_reset": 1,
+    "port_open": 1,
+    "readback": 1
+   },
+   "pending": 0,
+   "writes": 8,
+   "identities": {
+    "executor_sha256": "33d3f0af8a4c9c33dcd4e013b395e4ba990a89e384130f9d0ffe50c71b34e8ca",
+    "image_sha256": "502dca5d8c7ebfa794f890a9c03bc258fc9753f57b6a80c2f1e08add69888a7a",
+    "plan_sha256": "080c22973c7eb3e780a31d9466f636c458c66668d87eae64f744ecfe6c02f956"
+   }
+  }
+ },
+ "device_actions_actual": {
+  "download": 1,
+  "readback": 1,
+  "explicit_reset": 1,
+  "port_open": 1,
+  "tmc_config_apply": 0,
+  "config_save": 0,
+  "motor_arm_start_or_run": 0,
+  "diag_profile_zero_or_learn_or_commit": 0,
+  "blackbox_clear": 0,
+  "retry": 0,
+  "dmm_readings": 0,
+  "dispatch_summary_verbatim": "DISPATCH_SUMMARY|status=OK|code=|stages_executed=4|stages_not_run=0|quota_left={\"approved_reboot\": 0, \"blackbox_clear\": 0, \"cleanup_motor_disarm\": 0, \"cleanup_motor_status\": 0, \"cleanup_motor_stop\": 0, \"config_save\": 0, \"diag_profile_commit\": 0, \"diag_profile_learn\": 0, \"diag_profile_zero\": 0, \"dmm_readings\": 0, \"download\": 0, \"explicit_reset\": 0, \"irq_polarity_prep\": 0, \"motion_cap_seconds_per_run\": 0, \"motor_run\": 0, \"motor_run_seconds_total\": 0, \"physical_collision\": 0, \"port_open\": 0, \"readback\": 0, \"retry\": 0, \"tmc_config_apply\": 0}|quota_used={\"download\": 1, \"explicit_reset\": 1, \"port_open\": 1, \"readback\": 1}|profile=response_driven|branch=None|scenario_branches={}|prerequisite_skips=[]|actions_attempted=[\"download:real_tool\", \"readback:real_tool\", \"reset:real_tool\"]|ledger=D:\\ns800\\reports\\reviews\\phase8-m8-r7f2b-safety-print-fix\\field\\field-20261104T001444Z\\dispatch_ledger.jsonl",
+  "stages": "S0 离线绑定 -> S1 下载 -> S2 定长回读 -> S3 复位+75s 被动窗+六条只读查询, 4 阶段全执行"
+ },
+ "field_results": {
+  "new_image_on_board_byte_proven": {
+   "readback_bytes": 292708,
+   "readback_sha256": "502dca5d8c7ebfa794f890a9c03bc258fc9753f57b6a80c2f1e08add69888a7a",
+   "candidate_bin_sha256": "502dca5d8c7ebfa794f890a9c03bc258fc9753f57b6a80c2f1e08add69888a7a",
+   "byte_equal": true,
+   "first_diff_index": null
+  },
+  "boot_stream": {
+   "bytes": 3468,
+   "lines": 72,
+   "NUL": 0,
+   "strict_utf8": true,
+   "longest_line_incl_lf": 126,
+   "ioin": [
+    "[SS] [REQ OK] TMC2209 IOIN=0x21000041 VERSION=0x21"
+   ],
+   "req_fail_present": false,
+   "ready_and_fault": [
+    "[SS] state=READY fault_code=0 degraded=0x00"
+   ],
+   "fault_latched_present": false
+  },
+  "safety_status": {
+   "bytes": 522,
+   "lines": 10,
+   "NUL": 0,
+   "enn_line": [
+    "[SAFETY] ENN_FEEDBACK(PC.6 = 板上 TMC_ENN) raw=1 resolved=YES"
+   ],
+   "enn_tail_line": [
+    "[SAFETY] [只读输入, 非急停感测; HIGH=禁能侧, LOW=未施加禁能(不保证转矩)]"
+   ],
+   "byte_len_incl_lf": [
+    64,
+    95
+   ],
+   "matches_host_model_prediction": "64 B / 95 B(含源 LF)——与 host 模型一致",
+   "previous_round_same_command": {
+    "bytes": 342,
+    "NUL_at": 295,
+    "note": "上一场 342 B 且偏移 295 有裸 NUL(被 127 钳位裁尾)"
+   }
+  },
+  "motor_status_at_rest": {
+   "lines": 28,
+   "arm_gate_mask_lines": [
+    "[MOT] arm_gate_mask=0x18 REFUSED",
+    "[MOT] arm_gate_mask=0x18"
+   ],
+   "state_line": [
+    "[MOT] state=0 name=OTHER"
+   ],
+   "armed_line": [
+    "[MOT] armed=0 drv_en_request=0 health=OK"
+   ]
+  },
+  "safety_irq_status": {
+   "lines": 12,
+   "limit_lines": [
+    "[SAFETY] LIMIT inputs config = DISABLED_BY_CONFIG (SAFETY_LIMIT_INPUTS_ENABLED)",
+    "[SAFETY] LIMIT OFF => PF.14/PF.15 不解析/不配置/不读/不注册, 也不参与就绪判定"
+   ],
+   "gate_line": [
+    "[SAFETY] irq gate   = CLOSED (polled only)"
+   ],
+   "protection_ready_line": [
+    "[SAFETY] protection_ready = NO"
+   ],
+   "enn_note_line_len_incl_lf": 124,
+   "a_predicted_max_line_bytes": 124
+  },
+  "ps_main_stack": {
+   "row_verbatim": "main              10  suspend 0x0000018c 0x00001000     40%   0x00000001 EINTRPT 0x20012050  N/A",
+   "stack_field": "0x00001000",
+   "stack_bytes_decimal": 4096,
+   "main_used_pct_field": [
+    "40%"
+   ],
+   "reading": "main 线程栈容量 4096 已在板上读到(上一场同款读数, 未回退)"
+  },
+  "heap": {
+   "rows": [
+    "free",
+    "total    : 32672",
+    "used     : 22120",
+    "maximum  : 22120",
+    "available: 10552",
+    "msh >",
+    "msh >"
+   ]
+  }
+ },
+ "prediction_vs_field": {
+  "method": "与 A 的 rows_r7f3_b502_reviewed.json 的 healthy 行逐行取等(命令回显行与 msh 提示符不计入预测)",
+  "safety_status": {
+   "predicted": 7,
+   "field_lines": 10,
+   "identical": 7,
+   "only_prediction": 0
+  },
+  "motor_status": {
+   "predicted": 25,
+   "field_lines": 28,
+   "identical": 25,
+   "only_prediction": 0
+  },
+  "safety_irq_status": {
+   "predicted": 9,
+   "field_lines": 12,
+   "identical": 9,
+   "only_prediction": 0
+  },
+  "reading": "三条只读查询的**全部预测行**都在真实响应里逐字节出现; 现场多出的只是命令回显与两次提示符"
+ },
+ "judgement": {
+  "transcript": {
+   "path": "D:/ns800/reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T001444Z/FIELD_JUDGEMENT.txt",
+   "bytes": 8825,
+   "sha256": "998ae548c7b1330714e7070273a6d16e25ecc322b361c990b12ba5a89315bdc3"
+  },
+  "checks": 28,
+  "fail": 0,
+  "note": "两条 FAIL 曾出现在第一版判读脚本里, 都是我自己的谓词写错(说明行结尾断成 ')'; ps 栈列按十进制 4096 找), 与现场无关; 谓词修正后重判为 28/28 PASS。"
+ },
+ "tool_side_failures_registered_verbatim": [
+  {
+   "attempt": 1,
+   "what": "包装器 bytes 字面量含中文 -> SyntaxError, 未到 subprocess",
+   "device_actions": 0,
+   "ledger": "spent={} writes=0"
+  },
+  {
+   "attempt": 2,
+   "what": "str(WindowsPath / str % STAMP) 优先级写错 -> TypeError, 未到 subprocess",
+   "device_actions": 0,
+   "ledger": "spent={} writes=0"
+  },
+  {
+   "attempt": 3,
+   "what": "漏传 --profile response_driven -> 执行器 REAL_PROFILE_NOT_RESPONSE_DRIVEN 具名拒绝",
+   "device_actions": 0,
+   "refusal_stderr": {
+    "path": "D:/ns800/reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T001348Z/dispatch_stderr.raw",
+    "bytes": 78,
+    "sha256": "b3fe7b78220006216a86dc744d416ae21f0a314b8720b427fc1d8ce49f46459f"
+   },
+   "note": "拒绝发生在模式门, 在读私有 UID 与起任何工具之前"
+  },
+  {
+   "attempt": 4,
+   "what": "带 --profile response_driven 的正式执行 => OK(本件记录的即这一次)",
+   "device_actions": 4
+  }
+ ],
+ "not_proven_by_this_round": [
+  "SG/ADC/IMU 相对保护(本场没学习/没阈值/没触发) —— protect_ready=NO 原样保留",
+  "正常 disarm 收口(本场没 arm/没 start)",
+  "真实带载最坏栈深(main 只读到 40% 占用, 空载静止)",
+  "tmc_config_apply 之后的 CONFIGURED 短打印(A: 那是另加一次配置写入的另一件事)",
+  "镜像内其余 35 条 >127 B 带标签格式串(GF4 继续登记)"
+ ],
+ "board_final_state": {
+  "power": "VM 供电保持(操作者本场核对)",
+  "reset": "显式复位后自由运行(msh 提示符可用)",
+  "motion": "未起转(arm/start 0 次)",
+  "writes_to_flash": "1 次 sector 下载 + 1 次定长回读(读)"
+ },
+ "next_step_for_reviewer": [
+  "本场四项'必须取得'是否判为达成(逐字节在板 / READY+fault0 / 栈 4096 / 堆统计 + 三条只读合同)",
+  "下一阶段范围: 是否进入带写入的 CONFIGURED 短打印验收, 或直接排 SG/ADC 学习+触发链",
+  "GF4 其余 35 条超长格式串的处置时点"
+ ],
+ "evidence_index": [
+  {
+   "path": "D:/ns800/reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T001444Z/readback.bin",
+   "bytes": 292708,
+   "sha256": "502dca5d8c7ebfa794f890a9c03bc258fc9753f57b6a80c2f1e08add69888a7a"
+  },
+  {
+   "path": "D:/ns800/reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T001444Z/S_S3/01_rst.boot.rx.bin",
+   "bytes": 3468,
+   "sha256": "9e4ce2c9dd1161717bf15803ceebb4cb43fe25767e61f8f78a301841b314dff5"
+  },
+  {
+   "path": "D:/ns800/reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T001444Z/S_S3/02_threads.rx.bin",
+   "bytes": 1192,
+   "sha256": "e772b05db72056382c48ec0c799a0cbf59ef30a5574e7f421aad557d5a464055"
+  },
+  {
+   "path": "D:/ns800/reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T001444Z/S_S3/03_heap.rx.bin",
+   "bytes": 90,
+   "sha256": "2aef3ec96d30f7f1a4615c1877dd81cdf0ce898d0f96cd3a5972a870ca469346"
+  },
+  {
+   "path": "D:/ns800/reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T001444Z/S_S3/04_sysboot.rx.bin",
+   "bytes": 983,
+   "sha256": "73abf3012386723ec2d5ec70e5b515bfb2cb3285d60c233a27b07e60d47408a7"
+  },
+  {
+   "path": "D:/ns800/reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T001444Z/S_S3/05_safboot.rx.bin",
+   "bytes": 522,
+   "sha256": "00cea3467e9b9549f2e326182aecaff435337494d79479f03cdf361b0a317b38"
+  },
+  {
+   "path": "D:/ns800/reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T001444Z/S_S3/06_motboot.rx.bin",
+   "bytes": 1128,
+   "sha256": "f0550d3131642cd02408c88adc67f6fcb064a27ccba6ceec9c60b82e9cf0c3b5"
+  },
+  {
+   "path": "D:/ns800/reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T001444Z/S_S3/07_irqboot.rx.bin",
+   "bytes": 612,
+   "sha256": "25bef65c2b365d5c42e13312de36e7ed1c890194d06684b70646eeccf76b4352"
+  },
+  {
+   "path": "D:/ns800/reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T001444Z/dispatch_ledger.jsonl",
+   "bytes": 7496,
+   "sha256": "c4272211059832814889a6cd1f6d5716d74c457d6366643f2ceae81d11f14346"
+  },
+  {
+   "path": "D:/ns800/reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T001444Z/S_S3/ledger.jsonl",
+   "bytes": 3369,
+   "sha256": "ce1f3083b99ef40f1d1511b6d3199e478f92961b727a5925027a76f98628eeb0"
+  },
+  {
+   "path": "D:/ns800/reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T001444Z/dispatch_stdout.raw",
+   "bytes": 5396,
+   "sha256": "dfd4d3846709af1452799cd38d8aab30559f37c51c481c49a2efa7370a4e74a9"
+  },
+  {
+   "path": "D:/ns800/reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T001444Z/FIELD_JUDGEMENT.txt",
+   "bytes": 8825,
+   "sha256": "998ae548c7b1330714e7070273a6d16e25ecc322b361c990b12ba5a89315bdc3"
+  },
+  {
+   "path": "reports/firmware/phase8-m8-r7f2b-safety-print-fix/rt-thread-motor-m1-candidate.bin",
+   "bytes": 292708,
+   "sha256": "502dca5d8c7ebfa794f890a9c03bc258fc9753f57b6a80c2f1e08add69888a7a"
+  },
+  {
+   "path": "reports/firmware/phase8-m8-r7f2b-safety-print-fix/rt-thread-motor-m1.axf",
+   "bytes": 1775972,
+   "sha256": "fc567635d98a76cfb5bb32c3df27f611061bdc39887c90fce75da44dac8d86f8"
+  }
+ ],
+ "prior_rounds_preserved": [
+  "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T161728Z/**",
+  "reports/reviews/phase8-m8-r7f1a-minimal-c-patch/field/field-20261103T163850Z/**",
+  "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/plan_r7f2b_newimage_draft.json",
+  "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/rows_r7f2b_source_shape.json",
+  "reports/firmware/phase8-m8-r7f2b-safety-print-fix/manifest_binding_b502.json"
+ ]
+}

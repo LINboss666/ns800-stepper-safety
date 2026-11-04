@@ -1,0 +1,42 @@
+{
+ "argv_masked": [
+  "python",
+  "-m",
+  "pyocd",
+  "commander",
+  "--no-config",
+  "-t",
+  "cortex_m",
+  "-u",
+  "@UID_FILE<redacted len=48 sha256_d2f530dbd062>",
+  "-f",
+  "1000000",
+  "-O",
+  "auto_unlock=false",
+  "-O",
+  "connect_mode=halt",
+  "-O",
+  "resume_on_disconnect=false",
+  "-O",
+  "cache.enable_memory=false",
+  "-O",
+  "cache.read_code_from_elf=false",
+  "-O",
+  "scan_all_aps=false",
+  "-c",
+  "status",
+  "-c",
+  "savemem 0x08000000 0x47764 D:/ns800/reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T001444Z/readback.bin",
+  "-c",
+  "status",
+  "-c",
+  "exit"
+ ],
+ "argv_sha256_of_private_original": "bae34b9b50869d770693cc2dce0cbc72b228140eb592362c922bafb8a561e568",
+ "cwd": "D:\\ns800",
+ "uid_disclosure": {
+  "present": true,
+  "length": 48,
+  "sha256_12": "d2f530dbd062"
+ }
+}

@@ -1,0 +1,33 @@
+=== rc=0 ===
+--- stdout (raw text as captured) ---
+DISPATCH|stage=S0|status=OK|kind=offline|{"facts": {"image_path": "reports/firmware/phase8-m8-r7f2b-safety-print-fix/rt-thread-motor-m1-candidate.bin", "approval_id": "M8R7F3-b502-startup-print-20261104", "plan_source": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/plan_r7f3_b502_reviewed.json", "plan_sha256_on_disk": "080c22973c7eb3e780a31d9466f636c458c66668d87eae64f744ecfe6c02f956", "plan_sha256": "080c22973c7eb3e780a31d9466f636c458c66668d87eae64f744ecfe6c02f956", "plan_snapshot_bytes": 36356, "plan_snapshot_path": "reports\\reviews\\phase8-m8-r7f2b-safety-print-fix\\field\\plan_r7f3_b502_reviewed.json", "executor_path": "D:\\ns800\\reports\\reviews\\phase8-m8-relative-protection-r3\\field\\m8r3_serial_chain.py", "executor_sha256": "33d3f0af8a4c9c33dcd4e013b395e4ba990a89e384130f9d0ffe50c71b34e8ca", "image_bytes": 292708, "image_sha256": "502dca5d8c7ebfa794f890a9c03bc258fc9753f57b6a80c2f1e08add69888a7a", "manifest_target": "rt-thread-motor-m1-candidate", "software_input_commit": "99414c7a57d8987033de3de48469a8f4779b87a5", "tested_image_build_commit": "70deff806e8b548dee23afb06a6fcdf20937b015", "reviewed_delivery_commit": "99414c7a57d8987033de3de48469a8f4779b87a5", "plan_placeholders": 0, "plan_forbidden_hits": 0, "needles_source_root": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad", "needles_total": 40}}
+DISPATCH|stage=S1|status=OK|kind=download|{"action": "download"}
+DISPATCH|stage=S2|status=OK|kind=readback|{"action": "readback"}
+DISPATCH|stage=S3|status=OK|kind=|{"code": "", "detail": null, "recorded": {}, "success": true, "disarm": "NOT_ARMED", "terminal": "KNOWN", "scenario": "S3", "branch": "response_driven", "expected_refusal": null, "forensics": null, "first_cause": null, "target_claim": null, "target_why": null, "cleanup_errors": [], "obligation": false, "dir": "D:\\ns800\\reports\\reviews\\phase8-m8-r7f2b-safety-print-fix\\field\\field-20261104T001444Z\\S_S3", "steps": 8}
+QUOTA_AUDIT|approved_reboot|declared=0|used=0|left=0
+QUOTA_AUDIT|blackbox_clear|declared=0|used=0|left=0
+QUOTA_AUDIT|cleanup_motor_disarm|declared=0|used=0|left=0
+QUOTA_AUDIT|cleanup_motor_status|declared=0|used=0|left=0
+QUOTA_AUDIT|cleanup_motor_stop|declared=0|used=0|left=0
+QUOTA_AUDIT|config_save|declared=0|used=0|left=0
+QUOTA_AUDIT|diag_profile_commit|declared=0|used=0|left=0
+QUOTA_AUDIT|diag_profile_learn|declared=0|used=0|left=0
+QUOTA_AUDIT|diag_profile_zero|declared=0|used=0|left=0
+QUOTA_AUDIT|dmm_readings|declared=0|used=0|left=0
+QUOTA_AUDIT|download|declared=1|used=1|left=0
+QUOTA_AUDIT|explicit_reset|declared=1|used=1|left=0
+QUOTA_AUDIT|irq_polarity_prep|declared=0|used=0|left=0
+QUOTA_AUDIT|motion_cap_seconds_per_run|declared=0|used=0|left=0
+QUOTA_AUDIT|motor_run|declared=0|used=0|left=0
+QUOTA_AUDIT|motor_run_seconds_total|declared=0|used=0|left=0
+QUOTA_AUDIT|physical_collision|declared=0|used=0|left=0
+QUOTA_AUDIT|port_open|declared=1|used=1|left=0
+QUOTA_AUDIT|readback|declared=1|used=1|left=0
+QUOTA_AUDIT|retry|declared=0|used=0|left=0
+QUOTA_AUDIT|tmc_config_apply|declared=0|used=0|left=0
+APPROVAL_LEDGER|{"approval_id": "M8R7F3-b502-startup-print-20261104", "caps": {"approved_reboot": 0, "blackbox_clear": 0, "cleanup_motor_disarm": 0, "cleanup_motor_status": 0, "cleanup_motor_stop": 0, "config_save": 0, "diag_profile_commit": 0, "diag_profile_learn": 0, "diag_profile_zero": 0, "dmm_readings": 0, "download": 1, "explicit_reset": 1, "irq_polarity_prep": 0, "motion_cap_seconds_per_run": 0, "motor_run": 0, "motor_run_seconds_total": 0, "physical_collision": 0, "port_open": 1, "readback": 1, "retry": 0, "tmc_config_apply": 0}, "commit_failures": [], "ledger": "D:\\ns800_field_approvals\\approval_M8R7F3-b502-startup-print-20261104.json", "pending": 0, "spent": {"approved_reboot": 0, "blackbox_clear": 0, "cleanup_motor_disarm": 0, "cleanup_motor_status": 0, "cleanup_motor_stop": 0, "config_save": 0, "diag_profile_commit": 0, "diag_profile_learn": 0, "diag_profile_zero": 0, "dmm_readings": 0, "download": 1, "explicit_reset": 1, "irq_polarity_prep": 0, "motion_cap_seconds_per_run": 0, "motor_run": 0, "motor_run_seconds_total": 0, "physical_collision": 0, "port_open": 1, "readback": 1, "retry": 0, "tmc_config_apply": 0}}
+FLOW_VS_VERIFICATION|flow_complete=True|core_protection_verified=False|含义: flow_complete 只说明申报的阶段都跑完且额度/取证/撤能账目一致; core_protection_verified 才说明每一场都是**目标传感器通道**自己触发的
+DISPATCH_SUMMARY|status=OK|code=|stages_executed=4|stages_not_run=0|quota_left={"approved_reboot": 0, "blackbox_clear": 0, "cleanup_motor_disarm": 0, "cleanup_motor_status": 0, "cleanup_motor_stop": 0, "config_save": 0, "diag_profile_commit": 0, "diag_profile_learn": 0, "diag_profile_zero": 0, "dmm_readings": 0, "download": 0, "explicit_reset": 0, "irq_polarity_prep": 0, "motion_cap_seconds_per_run": 0, "motor_run": 0, "motor_run_seconds_total": 0, "physical_collision": 0, "port_open": 0, "readback": 0, "retry": 0, "tmc_config_apply": 0}|quota_used={"download": 1, "explicit_reset": 1, "port_open": 1, "readback": 1}|profile=response_driven|branch=None|scenario_branches={}|prerequisite_skips=[]|actions_attempted=["download:real_tool", "readback:real_tool", "reset:real_tool"]|ledger=D:\ns800\reports\reviews\phase8-m8-r7f2b-safety-print-fix\field\field-20261104T001444Z\dispatch_ledger.jsonl
+
+--- stderr (raw text as captured) ---
+
