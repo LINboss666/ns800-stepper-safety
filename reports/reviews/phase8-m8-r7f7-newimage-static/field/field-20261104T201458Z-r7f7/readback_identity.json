@@ -1,0 +1,8 @@
+{
+ "readback_bytes": 297452,
+ "readback_sha256": "23691e8d8aa8c1d3ed6e6eff4b5c51fe27dd3a9169841406ecc627c0e807e963",
+ "accepted_bin_bytes": 297452,
+ "accepted_bin_sha256": "23691e8d8aa8c1d3ed6e6eff4b5c51fe27dd3a9169841406ecc627c0e807e963",
+ "byte_equal": true,
+ "note": "整份回读二进制按 idle-stack-r4 的先例一并入库(readback.bin)"
+}

@@ -87,8 +87,9 @@ def main() -> int:
     if scanner_dirty:
         print("PREFLIGHT_REFUSED|扫描器自己就是泄漏源 => 先修脚本, 不带着它宣布干净")
         return 2
-    LEAKS = [(RE48, "48位十六进制(疑似 DAP UID)"), (REUSER, "用户主目录路径片段"),
-             (REAPP, "AppData 路径片段"), (re.compile(re.escape(uid)), "私有 DAP UID 明文(从仓外原件构造)")]
+    LEAKS = [(RE48, "48位十六进制(疑似 DAP UID, 不分大小写)"), (REUSER, "用户主目录路径片段"),
+             (REAPP, "AppData 路径片段"), (re.compile(re.escape(uid)), "私有 DAP UID 明文(从仓外原件构造)"),
+             (re.compile(re.escape(uid.upper())), "私有 DAP UID 明文的大写形态(OS 观察到的复合序列号用大写)")]
 
     staged = subprocess.run(["git", "diff", "--cached", "--name-only", "--diff-filter=ACMR"],
                             cwd=str(repo), capture_output=True).stdout.decode("utf-8").split("\n")
@@ -107,10 +108,11 @@ def main() -> int:
         probes = [(RE48, b"zz" + b"0123456789abcdef" * 3 + b"zz"),
                   (REUSER, b"C:" + B + b"Users" + B + b"someone"),
                   (REAPP, b"D:" + B + b"AppData" + B + b"Roaming"),
-                  (re.compile(re.escape(uid)), b"prefix-" + uid + b"-suffix")]
+                  (re.compile(re.escape(uid)), b"prefix-" + uid + b"-suffix"),
+                  (re.compile(re.escape(uid.upper())), b"prefix-" + uid.upper() + b"-suffix")]
         fired = [bool(p.search(s)) for p, s in probes]
         false_fire = RE48.search(b"0" * 64) is not None
-        print("SELFCHECK_LEAK|四类样例命中=%s 64位sha不误判为48位=%s" % (fired, not false_fire))
+        print("SELFCHECK_LEAK|五类样例命中=%s 64位sha不误判为48位=%s" % (fired, not false_fire))
         if not all(fired) or false_fire:
             print("PREFLIGHT_REFUSED|泄漏判据不可用(有不命中的, 或把 sha 当 UID) => 宣布干净不作数")
             return 2

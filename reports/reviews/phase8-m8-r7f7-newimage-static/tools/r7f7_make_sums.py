@@ -54,7 +54,7 @@ def main() -> int:
           "与 __pycache__)直接读磁盘字节算 sha256" % R7F7)
     write(root, root / R7F2B, "SHA256SUMS.txt",
           "沿用该目录既有规则: 按**文件名**排除 SHA256SUMS.txt(含 a_review_r7f*/ 四份 A 包子清单)与 "
-          "remote_readback.md; 本轮只因 run_record.md 追加 §20 而重算, 条目集合不变",
+          "remote_readback.md; 本轮只因 run_record.md 追加 §20/§21 而重算, 条目集合不变",
           exclude_names=("SHA256SUMS.txt", "remote_readback.md"))
     return 0
 

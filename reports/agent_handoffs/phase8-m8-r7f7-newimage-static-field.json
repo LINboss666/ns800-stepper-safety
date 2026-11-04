@@ -1,0 +1,299 @@
+{
+ "round": "M8-R7F7 现场轮（A 的新版上板＋真实异步作业包，已批准并一次执行）",
+ "date_local": "2026-11-05",
+ "repo_tip_at_start": "62d4c91120743ab0c83cea28624c2cc3f6941646",
+ "dev_base_offline_round": "55c3f3f + 62d4c91 (离线核对轮, 设备动作 0)",
+ "branch": "feature/m8-r7d1-async-learn-offline",
+ "approval_id": "M8R7F7-2369-async-job-static-20261105",
+ "operator_exec_approval": {
+  "verbatim": "这一轮没问题就直接批准你执行",
+  "given_at_local": "2026-11-05 04:14",
+  "recorded_in": "field/field-20261104T201458Z-r7f7/run_log.txt 第 2 行",
+  "token_bytes": 58,
+  "token_sha12": "7c93e6829920",
+  "token_source": "包内 approval_token.txt 原样(不拼接不改写)",
+  "old_ledgers": "R7F6 等旧账只读, 不结转额度, 未写旧账",
+  "offline_precondition": "§20 离线核对轮 109 条判据 FAIL=0 已先复算 A 的每项声称"
+ },
+ "device_actions_this_round": {
+  "download": 1,
+  "readback_fixed_length": 1,
+  "com5_port_open": 1,
+  "explicit_reset": 1,
+  "diag_profile_zero_32": 1,
+  "diag_profile_learn_8_450_550_0": 1,
+  "dispatch_invocations": 1,
+  "arm_start_apply_irq_polarity_motion": 0,
+  "learn_cancel_tier_commit_clear_config_save_retry": 0,
+  "logic_analyzer_start": 0,
+  "retry_or_reprompt": 0,
+  "first_error_stop_triggered": false
+ },
+ "quota_ledger": {
+  "positive_keys_each_once": [
+   "diag_profile_learn",
+   "diag_profile_zero",
+   "download",
+   "explicit_reset",
+   "port_open",
+   "readback"
+  ],
+  "spent": {
+   "approved_reboot": 0,
+   "blackbox_clear": 0,
+   "cleanup_motor_disarm": 0,
+   "cleanup_motor_status": 0,
+   "cleanup_motor_stop": 0,
+   "config_save": 0,
+   "diag_profile_commit": 0,
+   "diag_profile_learn": 1,
+   "diag_profile_zero": 1,
+   "dmm_readings": 0,
+   "download": 1,
+   "explicit_reset": 1,
+   "irq_polarity_prep": 0,
+   "motion_cap_seconds_per_run": 0,
+   "motor_run": 0,
+   "motor_run_seconds_total": 0,
+   "physical_collision": 0,
+   "port_open": 1,
+   "readback": 1,
+   "retry": 0,
+   "tmc_config_apply": 0
+  },
+  "pending": 0,
+  "reserved_rows": 6,
+  "committed_rows": 6,
+  "ledger_rows": 21,
+  "caps_keys": 21,
+  "negative_control": "构造 n=2 的重复预约会被这条计数式判据抓到 (QUOTA_DUPLICATE_DETECT_FIRES)"
+ },
+ "dispatch": {
+  "rc": 0,
+  "elapsed_wall_s": 117.2,
+  "plan_total_deadline_s": 210,
+  "within_deadline": true,
+  "session_steps_planned": 15,
+  "session_ok_result_records": 16,
+  "steps_count_diff_explained": "执行器把启动流采集单独记一条结果 (m8r3_serial_chain.py:1820 kind=boot_stream), 15 计划步骤 + 1 启动流记录 = 16; 口径已核, 不是矛盾"
+ },
+ "image_identity_on_board": {
+  "readback_bytes": 297452,
+  "readback_sha256": "23691e8d8aa8c1d3ed6e6eff4b5c51fe27dd3a9169841406ecc627c0e807e963",
+  "accepted_bin_sha256": "23691e8d8aa8c1d3ed6e6eff4b5c51fe27dd3a9169841406ecc627c0e807e963",
+  "byte_equal_to_accepted_bin": true,
+  "proof_form": "整文件逐字节相等(不是只 hash 相等, 不是任意窗口)",
+  "gates_fire_on": [
+   "中间 1 字节取反",
+   "少 1 字节(任意窗口)"
+  ],
+  "download_side_evidence": {
+   "erased_programmed_bytes": 297984,
+   "sectors": 291,
+   "note": "扇区对齐的整片编程量 >= 镜像 297452 B, 只作下载发生的旁证"
+  },
+  "payload": "唯一载荷 = 被签收 AXF 0f421595…; 未回烧 b502, 未换其他候选",
+  "board_image_after_round": "ON_BOARD_PROVEN_BYTE_EXACT",
+  "b502_status": "历史证明保留, 不再作为当前在板身份",
+  "build_banner_observed": "5.3.0 build Nov  5 2026 00:35:48 (旁证, 不承担在板身份)",
+  "instrument_id_disclosure": "按 A §1 仍暂缓; 本轮未启动分析仪, 未产生新的原生捕获文件"
+ },
+ "session_timeline": {
+  "port_open_t_s": 0.047,
+  "port_attempt": 1,
+  "port_success": 1,
+  "port_close_t_s": 81.828,
+  "reset_rc": 0,
+  "reset_elapsed_s": 1.625,
+  "reset_stdout_stderr_bytes": 0,
+  "boot_drain": {
+   "declared_s": 75.0,
+   "spent_s": 75.0,
+   "end_reason": "DRAIN_BUDGET_REACHED",
+   "bytes": 3468
+  },
+  "first_query_t_s": 76.813,
+  "last_query_t_s": 81.797,
+  "watch": {
+   "t_s": 81.578,
+   "rx_bytes": 0,
+   "seconds": 1,
+   "ended_by_budget": false
+  },
+  "watch_gap_registered": "learn 响应 77.563 → WATCH_DONE 81.578 实测 4.015 s, 期间未发任何命令; 后台自行判越窗失败, 不是补发命令催出来的"
+ },
+ "command_chain_13": {
+  "order_matches_taskbook_section5": true,
+  "assert_step_recomputed_with_repo_executor": true,
+  "echo_present_in_raw_before_strip": true,
+  "strict_utf8_all": true,
+  "bare_nul_all": 0,
+  "pre_cmd_drain_saved_separately": [
+   "07_irq_static.pre.rx.bin (7 B, 尾 \\r\\nmsh >)",
+   "14_sys_final.pre.rx.bin (5 B, msh >)"
+  ],
+  "forbidden_commands_sent": 0,
+  "wire_time_feasible_at_115200_8N1": true
+ },
+ "business_outcomes": {
+  "job_initial": "id=0 st=IDLE owner=0 cred=0/0",
+  "zero_32": "[DIAG] zero OK n=32 raw 2055..2065 mean=2060437 (cal source untouched)",
+  "cred_after_zero": "id=0 st=IDLE owner=0 cred=1/0",
+  "learn_accepted": "[DIAG] learn STARTED id=1 n=8 win=450..550 dir=0",
+  "async_disclosure": "[DIAG] learn async: query 'learn_status'; NOT learn OK yet FIELD_UNVERIFIED",
+  "terminal": "[DIAG] job id=1 st=FAILED why=WINDOW_BROKEN owner=0 cred=1/0",
+  "collector_released_not_done": "[DIAG] job n=0/0 want=8 win=450..550 dir=0 + owner=0",
+  "failure_word_scope": "FAILED/WINDOW_BROKEN 只在 job_failed 一处按整行+id/owner/凭据白名单放行; 其他 REFUSED 是静止态 arm gate 0x18 的正常拒绝(allowed=false)",
+  "evidence": "proof/field_business_outcomes.json"
+ },
+ "static_state": {
+  "ps_stacks": {
+   "main": 4096,
+   "diag": 4096,
+   "tshell": 4096
+  },
+  "ps_high_water_pct": {
+   "main": 40,
+   "diag": 28,
+   "tshell": 16
+  },
+  "ps_caveat": "空载静止高水位, 不证带载最坏栈",
+  "free": {
+   "total": 32672,
+   "used": 22120,
+   "maximum": 22120,
+   "available": 10552
+  },
+  "free_checks": [
+   "total == used + available",
+   "maximum >= used",
+   "非负且可解析",
+   "本场新四项, 不沿用 b502 旧值"
+  ],
+  "motor_quiet_both_times": "未武装 / 频率 0 / 请求禁能 / ENN HIGH / arm gate 0x18 REFUSED",
+  "safety_state_both_times": "READY / fault=0 / IRQ CLOSED / 极性未确认 / protect_ready NO / drive_cfg UNCONFIGURED",
+  "boot_stream": {
+   "bytes": 3468,
+   "CR": 97,
+   "LF": 75,
+   "longest_line_bytes": 126,
+   "facts": [
+    "IOIN 成功 VERSION=0x21",
+    "BOOT->INIT->SELF_TEST->READY",
+    "required=PASS degraded=0x00",
+    "state READY fault_code 0",
+    "Phase-7 runtime bootstrap complete",
+    "无 FAULT_LATCHED",
+    "无 [REQ FAIL]"
+   ]
+  }
+ },
+ "conclusions_allowed": [
+  "新镜像逐字节在板",
+  "启动静态状态通过",
+  "静止 zero 通过",
+  "异步作业真实受理(STARTED id=1)及越窗失败收口(FAILED/WINDOW_BROKEN + owner 释放 + 未 DONE)通过"
+ ],
+ "still_unproven": [
+  "正常巡航下采样进度与 DONE 有效基线",
+  "活动作业取消与取消竞争",
+  "commit / config_save 与重启恢复",
+  "SG/ADC/IMU 真实保护触发与恢复",
+  "实际 STEP/ENN 动态时延",
+  "带载最坏栈"
+ ],
+ "labels_kept": {
+  "polarity_measured": false,
+  "core_protection_verified": false,
+  "flow_complete_meaning": "只说明申报阶段跑完且额度/取证/撤能账目一致"
+ },
+ "closeout_power_state": {
+  "com_port_closed": true,
+  "vm_powered": "保持供电(操作者『默认不断电』口径, A §3 采纳)",
+  "mcu_powered": "保持供电",
+  "powerdown_requested_this_round": false,
+  "armed": false,
+  "drive_enabled": false,
+  "irq_gate": "CLOSED",
+  "ram_left_as_is": "候选零点与失败作业记录留在 RAM; 未为清理它们复位/断电/clear/config_save",
+  "no_usb_inference_of_power_state": true
+ },
+ "field_judgement": {
+  "tool": "reports/reviews/phase8-m8-r7f7-newimage-static/tools/r7f7_field_judgement.py",
+  "predicates": 99,
+  "fail": 0,
+  "log": "reports/reviews/phase8-m8-r7f7-newimage-static/proof/field_judgement_r7f7.txt",
+  "must_fire_negatives": 10,
+  "negative_names": [
+   "IMAGE_GATE_FIRES_ON_ONE_BYTE_FLIP",
+   "IMAGE_GATE_FIRES_ON_SHORT_WINDOW",
+   "NUL_GATE_FIRES_ON_INJECTED_ZERO",
+   "PROMPT_GATE_FIRES_WITHOUT_PROMPT",
+   "ECHO_GATE_FIRES_ON_WRONG_COMMAND",
+   "FORBIDDEN_GATE_FIRES",
+   "QUOTA_DUPLICATE_DETECT_FIRES",
+   "BOOT_DRAIN_SELFCHECK_FIRES",
+   "ARCHIVE_MANIFEST_SELFCHECK_FIRES",
+   "ARCHIVE_PRIVACY_GATE_FIRES"
+  ],
+  "narrative": "reports/reviews/phase8-m8-r7f7-newimage-static/FIELD_JUDGEMENT.md"
+ },
+ "archive": {
+  "dir": "reports/reviews/phase8-m8-r7f7-newimage-static/field/field-20261104T201458Z-r7f7/",
+  "files_on_disk": 53,
+  "manifest_files": 53,
+  "manifest_equals_disk": true,
+  "includes_readback_bin": true,
+  "includes_both_ledgers": true,
+  "board_capture_bytes_not_mutated": true,
+  "privacy": {
+   "uid_plaintext_archived": false,
+   "disclosure_form": "len 48 + sha256_12"
+  }
+ },
+ "self_injuries_registered": [
+  "补丁脚本把 b\\r\\n 写成真实 CR/LF, 判读工具源码语法坏掉(Read 行视图 != python newline='' 切分)",
+  "第一版判读 3 处判据设计错(ASSERT_STEP 扫全部台账行/回显判据用剥完后的行/启动捕获 .boot 命名)",
+  "归档清单手工累加漏 3 件(readback.bin, readback_identity.json, dispatch_ledger.jsonl) — 改 walk + 负控",
+  "跨阶段台账 dispatch_ledger.jsonl 第一版未归档, 与 idle-stack-r4 先例不符",
+  "隐私判据第一版是恒真比较(把 UID 拼进被检数据) — 改合成脏样本 5/5 命中",
+  "泄漏模式字面量第三次差点复发(AppData/Users 直写进检查器) — 改运行时 bytes([92])/bytes([47]) 拼装",
+  "类型混用: uid 是 str 而被检数据是 bytes, pat in data 直接 TypeError"
+ ],
+ "residual_disclosed_not_fixed": {
+  "what": "仓外 scratch 路径以 JSON 转义形态留在 3 件工具元数据(dispatch.stdout.txt/dispatch_ledger.jsonl/ledger.jsonl)",
+  "why_not_masked": "台账是执行器原输出; 为『装干净』反掩改台账字节比留着更糟。掩码只覆盖单反斜杠形态(<RUNROOT>), 与既往轮次一致",
+  "identity_bearing_forms_in_archive": 0
+ },
+ "boundaries_kept": {
+  "product_and_host_code_changes": 0,
+  "executor_modified": false,
+  "taskbook_package_originals_modified": 0,
+  "old_round_evidence_and_ledgers_modified": 0,
+  "b502_reflash": false,
+  "failure_bytes_deleted": 0,
+  "git_history_rewritten": false
+ },
+ "deliverables": {
+  "archive_files": 53,
+  "proof": [
+   "proof/field_judgement_r7f7.txt",
+   "proof/field_business_outcomes.json"
+  ],
+  "docs": [
+   "FIELD_JUDGEMENT.md",
+   "reports/reviews/phase8-m8-r7f2b-safety-print-fix/run_record.md §21",
+   "reports/agent_handoffs/phase8-m8-r7f7-newimage-static-field.md/.json"
+  ],
+  "tools_changed_this_round": [
+   "tools/r7f7_field_judgement.py",
+   "tools/r7f7_staged_preflight.py (新增 UID 大写形态专用模式, 五类样例自检全命中)"
+  ],
+  "manifest": "ROUND_SHA256SUMS.txt 重算(含新增归档件)"
+ },
+ "push_and_readback": {
+  "convention": "提交→代理推送→远端逐 blob 回读; 回读报告写在仓外 D:/ns800_r7f7_readback/, 不入清单(避免自引用循环)",
+  "tool": "reports/reviews/phase8-m8-r7f7-newimage-static/tools/r7f7_remote_readback.py",
+  "figures_not_self_recorded": true
+ }
+}

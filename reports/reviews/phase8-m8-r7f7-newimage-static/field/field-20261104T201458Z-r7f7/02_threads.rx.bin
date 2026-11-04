@@ -1,0 +1,15 @@
+ps
+thread           pri  status      sp     stack size max used left tick   error  tcb addr   usage
+---------------- ---  ------- ---------- ----------  ------  ---------- ------- ---------- -----
+ui                20  suspend 0x000000ec 0x00000200     46%   0x0000000a EINTRPT 0x200173f0  N/A
+bblog             18  suspend 0x000001cc 0x00000400     63%   0x0000000a EINTRPT 0x20016f28  N/A
+diag               9  suspend 0x000003d4 0x00001000     28%   0x0000000a EINTRPT 0x20015e60  N/A
+sensor             7  suspend 0x000001c4 0x00001000     24%   0x0000000a EINTRPT 0x20014d98  N/A
+motor              8  suspend 0x000000dc 0x00000800     34%   0x0000000a EINTRPT 0x200144d0  N/A
+flog              29  suspend 0x00000114 0x00001000      6%   0x0000000a EINTRPT 0x2000b7cc  N/A
+safety             4  suspend 0x000000f0 0x00000400     37%   0x0000000a EINTRPT 0x2000b0fc  N/A
+tshell            20  running 0x0000028c 0x00001000     16%   0x00000008 OK      0x20013348  N/A
+tidle0            31  ready   0x0000005c 0x00000400     16%   0x00000018 OK      0x20009ea4  N/A
+main              10  suspend 0x0000018c 0x00001000     40%   0x00000010 EINTRPT 0x20012050  N/A
+msh >
+msh >

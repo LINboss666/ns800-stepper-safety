@@ -1,0 +1,47 @@
+[
+ {
+  "kind": "BUSINESS_OUTCOME",
+  "as": "sys_initial",
+  "lines": [],
+  "allowed": false,
+  "status_lines_allowed": [
+   "[Motor] arm gate fail mask=0x18 (arm REFUSED)"
+  ]
+ },
+ {
+  "kind": "BUSINESS_OUTCOME",
+  "as": "mot_static",
+  "lines": [],
+  "allowed": false,
+  "status_lines_allowed": [
+   "[MOT] arm_gate_mask=0x18 REFUSED"
+  ]
+ },
+ {
+  "kind": "BUSINESS_OUTCOME",
+  "as": "job_failed",
+  "lines": [],
+  "allowed": false,
+  "status_lines_allowed": [
+   "[DIAG] job id=1 st=FAILED why=WINDOW_BROKEN owner=0 cred=1/0"
+  ]
+ },
+ {
+  "kind": "BUSINESS_OUTCOME",
+  "as": "sys_final",
+  "lines": [],
+  "allowed": false,
+  "status_lines_allowed": [
+   "[Motor] arm gate fail mask=0x18 (arm REFUSED)"
+  ]
+ },
+ {
+  "kind": "BUSINESS_OUTCOME",
+  "as": "mot_final",
+  "lines": [],
+  "allowed": false,
+  "status_lines_allowed": [
+   "[MOT] arm_gate_mask=0x18 REFUSED"
+  ]
+ }
+]

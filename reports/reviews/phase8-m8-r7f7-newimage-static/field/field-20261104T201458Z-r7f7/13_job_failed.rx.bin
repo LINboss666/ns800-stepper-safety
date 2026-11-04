@@ -1,0 +1,4 @@
+diag_profile learn_status
+[DIAG] job id=1 st=FAILED why=WINDOW_BROKEN owner=0 cred=1/0
+[DIAG] job n=0/0 want=8 win=450..550 dir=0
+msh >

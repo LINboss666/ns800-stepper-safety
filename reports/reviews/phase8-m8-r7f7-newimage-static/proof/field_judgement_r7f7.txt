@@ -1,0 +1,110 @@
+FIELD_DISPATCH_RC0|PASS|rc=0
+FIELD_SESSION_WITHIN_DECLARED_DEADLINE|PASS|实测墙钟 117.2 s <= 计划 total_deadline 210 s(且这含下载/回读, 不只是串口会话)
+OPERATOR_APPROVAL_RECORDED|PASS|执行批准=操作者本轮原话(逐字入 run_log); 令牌字节用包内 approval_token.txt 原样 58 B
+IMAGE_READBACK_EXACT_LENGTH|PASS|回读 297452 B, 期望 297452
+IMAGE_READBACK_SHA_EQ_CLAIMED|PASS|23691e8d8aa8c1d3
+IMAGE_READBACK_BYTE_EQUAL_TO_ACCEPTED_BIN|PASS|整文件逐字节相等(不是只 hash 相等, 也不是任意窗口)
+IMAGE_GATE_FIRES_ON_ONE_BYTE_FLIP|PASS|把回读中间 1 字节取反后同一判据命中(会命中才允许宣布在板)
+IMAGE_GATE_FIRES_ON_SHORT_WINDOW|PASS|少 1 字节(任意窗口)也不被接受
+DL_RC0|PASS|rc=0
+DL_LOADER_LINE[Erasing... []|PASS|出现 1 次
+DL_LOADER_LINE[Programming.]|PASS|出现 1 次
+DL_ERASED_PROGRAMMED_SUMMARY_ONCE|PASS|命中=1
+DL_PROGRAMMED_GE_BIN_IS_NOT_BYTE_PROOF|PASS|erase=program=297984 B(291 扇区/291 页) >= 镜像 297452 B: 扇区对齐的整片编程量, 只作下载发生的旁证; 在板身份只由 IMAGE_READBACK_BYTE_EQUAL_TO_ACCEPTED_BIN 承担
+DL_PAYLOAD_IS_ACCEPTED_AXF_ONLY|PASS|唯一载荷 = 被签收 AXF(0f421595); 未回烧 b502, 未换其他镜像
+RB_RC0|PASS|rc=0
+RB_SAVED_LINE|PASS|工具自报 Saved 297452 bytes
+RB_HALTED_TWICE|PASS|Halted 行数=2(P0 成功原文的形状)
+RESET_RC0_ONCE|PASS|唯一一次显式复位 rc=0, stdout 0 B
+ASSERT_STEP[threads]|PASS|{"verdict": "OK", "asserted": true}
+ASSERT_STEP[heap]|PASS|{"verdict": "OK", "asserted": true}
+ASSERT_STEP[sys_initial]|PASS|{"verdict": "OK", "asserted": true}
+ASSERT_STEP[safety_static]|PASS|{"verdict": "OK", "asserted": true}
+ASSERT_STEP[mot_static]|PASS|{"verdict": "OK", "asserted": true}
+ASSERT_STEP[irq_static]|PASS|{"verdict": "OK", "asserted": true}
+ASSERT_STEP[job_initial]|PASS|{"verdict": "OK", "asserted": true}
+ASSERT_STEP[zero_static]|PASS|{"verdict": "OK", "asserted": true}
+ASSERT_STEP[job_zero]|PASS|{"verdict": "OK", "asserted": true}
+ASSERT_STEP[learn_start]|PASS|{"verdict": "OK", "asserted": true}
+WATCH_ONE_SECOND_PASSIVE_ZERO_BYTES|PASS|被动 1 s 窗捕获 0 B(该窗设计上不发命令)
+ASSERT_STEP[job_failed]|PASS|{"verdict": "OK", "asserted": true}
+ASSERT_STEP[sys_final]|PASS|{"verdict": "OK", "asserted": true}
+ASSERT_STEP[mot_final]|PASS|{"verdict": "OK", "asserted": true}
+ASSERT_STEP_RECOMPUTED_ALL_13_OK|PASS|13 条命令的判据用仓库原执行器函数在归档字节上复算, 全 OK
+RX_DONE_COUNT_13|PASS|RX_DONE=13
+RX_ALL_PROMPT_SEEN_AND_NO_NUL|PASS|13 份全部 prompt_seen=True 且 nul_bytes=0
+NUL_GATE_FIRES_ON_INJECTED_ZERO|PASS|注入裸 NUL => 具名异常 True
+PROMPT_GATE_FIRES_WITHOUT_PROMPT|PASS|无提示符的流被 split_rows 具名拒绝
+ECHO_GATE_FIRES_ON_WRONG_COMMAND|PASS|用错命令名时回显剥不掉: 首行='ps', 而按真实命令名剥完首行='thread           pri'
+ECHO_PRESENT_AND_EQUALS_PLAN_CMD|PASS|13 条原始响应的开头就是所发命令的板端回显(split_rows 已剥掉它, 所以这里查的是剥之前的字节)
+RX_BYTES_ARE_WIRE_TIME_FEASIBLE|PASS|每份响应的字节数按 115200 8N1 的下界耗时都在该步申报秒数内: [('threads', 1192, 0.103, 6), ('heap', 90, 0.008, 6), ('sys_initial', 983, 0.085, 10), ('safety_static', 522, 0.045, 6)]
+SERIAL_STRICT_UTF8_ALL|PASS|非严格 UTF-8 的响应=[]
+SERIAL_NO_BARE_NUL_ALL|PASS|含裸 NUL 的响应=[]
+SERIAL_FILE_ORDER_EQUALS_PLAN|PASS|15 个按序号落盘的原始件与计划 15 步一一对应(另有 2 个 .pre 排走件单列)
+PRE_CMD_DRAIN_KEPT_OUT_OF_RESPONSES|PASS|开口后残留提示符被单独排走另存(['07_irq_static.pre.rx.bin', '14_sys_final.pre.rx.bin']), 没有回填进对应步骤的响应字节里
+NO_FORBIDDEN_COMMAND_SENT|PASS|13 条实发命令里没有任何禁用命令: ps || free || system_status || safety_status || motor_status || safety_irq_status || diag_profile learn_status || diag_p
+FORBIDDEN_GATE_FIRES|PASS|注入 motor_start 后门命中(会命中)
+PORT_OPENED_EXACTLY_ONCE|PASS|开口尝试 1 / 成功 1 / 关闭 1
+DISPATCH_LEDGER_SIX_POSITIVES_ONCE|PASS|预约/提交各 6 次 = 六项正额度各 1, 无第 7 次
+QUOTA_DUPLICATE_DETECT_FIRES|PASS|构造一次 n=2 的重复预约能被这条计数式判据抓到(会命中)
+LEDGER_PENDING_ZERO|PASS|pending=['0']
+LEDGER_SPOKEN_APPROVAL_ID|PASS|本轮唯一新批准身份(旧 R7F6 等账本未写)
+PS_MAIN_4096|PASS|main stack size=4096
+PS_DIAG_4096|PASS|diag=4096
+PS_TSHELL_4096|PASS|tshell=4096
+PS_HIGH_WATER|INFO|高水位不是带载最坏栈的证明: diag               9  suspend 0x000003d4 0x00001000     28%   0x0000000a EINTRPT 0x20015e60  N/A ; tshell            20  running 0x0000028c 0x00001000     16%   0x00000008 OK      0x20013348  N/A ; main              10  suspend 0x0000018c 0x00001000     40%   0x00000010 EINTRPT 0x20012050  N/A
+HEAP_FOUR_FIELDS_PARSED|PASS|{"total": 32672, "used": 22120, "maximum": 22120, "available": 10552}
+HEAP_TOTAL_EQUALS_USED_PLUS_AVAILABLE|PASS|32672 == 22120 + 10552
+HEAP_MAX_GE_USED_NONNEG|PASS|maximum=22120 used=22120
+HEAP_NOT_REUSING_B502_QUARTET|PASS|登记的是本场新四项, 不沿用旧值也不设编造阈值
+JOB_INITIAL_IDLE_CRED_0_0|PASS|[DIAG] job id=0 st=IDLE why=IDLE owner=0 cred=0/0
+ZERO32_REAL_FRAMES|PASS|[DIAG] zero OK n=32 raw 2055..2065 mean=2060437 (cal source untouched)
+msh >
+ZERO32_RAW_NOT_FROZEN|PASS|32 帧的原始范围 2055..2065 非单一常数(不等于'传感器活着', 只说明采到 32 个不同帧的边界)
+ZERO_NO_PERSISTENT_WRITE|PASS|=32 raw 2055..2065 mean=2060437 (cal source untouched)
+msh >
+ZERO_CREDENTIAL_1_0|PASS|[DIAG] job id=0 st=IDLE why=IDLE owner=0 cred=1/0
+REAL_JOB_ACCEPTED_STARTED_ID1|PASS|[DIAG] learn STARTED id=1 n=8 win=450..550 dir=0
+ASYNC_DISCLOSURE_LINE_PRESENT|PASS|[DIAG] learn async: query 'learn_status'; NOT learn OK yet FIELD_UNVERIFIED
+REAL_JOB_TERMINAL_FAILED_WINDOW_BROKEN|PASS|[DIAG] job id=1 st=FAILED why=WINDOW_BROKEN owner=0 cred=1/0
+TERMINAL_RELEASED_COLLECTOR_NOT_DONE|PASS|owner 释放 + 未 DONE + want=8 保留; [DIAG] job n=0/0 want=8 win=450..550 dir=0
+STATE_sys_initial_READY_FAULT0|PASS|READY/fault0 + IRQ CLOSED + 极性未确认 + 保护未就绪 + drive_cfg UNCONFIGURED
+STATE_sys_final_READY_FAULT0|PASS|READY/fault0 + IRQ CLOSED + 极性未确认 + 保护未就绪 + drive_cfg UNCONFIGURED
+MOTOR_QUIET[mot_static]|PASS|静止/未武装/请求禁能/arm 被拒
+MOTOR_NO_WAVEFORM_OVERCLAIM[mot_static]|PASS|固件自己声明 stop 结果是 API 接受而非波形证明(BUG-008 未验收)
+MOTOR_QUIET[mot_final]|PASS|静止/未武装/请求禁能/arm 被拒
+MOTOR_NO_WAVEFORM_OVERCLAIM[mot_final]|PASS|固件自己声明 stop 结果是 API 接受而非波形证明(BUG-008 未验收)
+SAFETY_ENN_DISABLED_SIDE_LIVE|PASS|[SAFETY] ready=YES first_err=0
+IRQ_CLOSED_PIN3_SAFE|PASS|[SAFETY] irq gate   = CLOSED (polled only)
+SYS_TWICE_IDENTICAL|INFO|两次 system_status 响应字节相同=True sha=73abf3012386(板子静止的旁证, 不是'重复发送'的证据; 发送次数由 PORT/QUOTA 判据管)
+MOTOR_TWO_RESPONSES_DIFF|INFO|两次 motor_status 的不同行(14 sys_final/15 mot_final 比 06 多 7 B): ["msh >"]
+BOOT_NONEMPTY_75S|PASS|捕获 3468 B
+BOOT_STRICT_UTF8|PASS|严格解码 OK
+BOOT_NO_BARE_NUL|PASS|裸 NUL=0
+BOOT_IOIN_SUCCESS|PASS|IOIN 读成功且 VERSION=0x21
+BOOT_SELFTEST_TO_READY|PASS|BOOT->INIT->SELF_TEST->READY 链完整
+BOOT_REQUIRED_PASS_DEGRADED_0|PASS|required=PASS degraded=0x00
+BOOT_STATE_READY_FAULT0|PASS|终态 READY
+BOOT_PHASE_COMPLETE|PASS|Phase-7 runtime bootstrap complete
+BOOT_NO_FAULT_LATCHED_OR_REQFAIL|PASS|无 FAULT_LATCHED / [REQ FAIL]
+BOOT_BANNER_IS_NOT_B502_FIXTURE|PASS|捕获到的横幅='5.3.0 build Nov  5 2026 00:35:48' ; 计划里那张贴图是 b502 的 '5.3.0 build Nov  4 2026 01:35:43'(仅夹具) => 横幅与新版构建时刻一致, 但它只是旁证, 在板身份由回读逐字节相等承担
+BOOT_LINE_WIDTHS|INFO|正文/行尾/总字节分别登记: total=3468 CR=97 LF=75 最长行=126(终端视觉换行不能证明未截断)
+BOOT_LONG_LINES_PRESENT_NOT_TRUSTED_AS_TRUNCATED|PASS|有 >120 B 的行: 启动流不走命令响应的 128 B 裁剪门判读, 完整字节验收由本节独立判读承担
+BOOT_DRAIN_DECLARED_EQUAL_SPENT_75|PASS|申报 75.0 s 实耗 75.0 s, 结束原因=DRAIN_BUDGET_REACHED(不是静默早退), 捕获 3468 B 与归档一致
+BOOT_DRAIN_SELFCHECK_FIRES|PASS|把实耗改成 2.0 s(旧缺陷形状)同一判据即不成立(会命中)
+BOOT_WINDOW_COVERS_FIRST_QUERY|PASS|首条查询在开口后 76.813 s 出现 => 75 s 观测下界真的走满了(不是静默早退)
+WATCH_AFTER_LEARN_BEFORE_TERMINAL|PASS|被动窗 t_s=81.578 落在 learn 响应 77.563 与终态查询 81.594 之间, 窗内 0 字节且无命令
+WATCH_GAP_REGISTERED|INFO|learn 响应到 WATCH_DONE 实测 4.015 s(申报窗 1 s, ended_by_budget=False): 差值是执行器自身步间歇, 期间未发任何命令 => 后台是在这段里自行判越窗失败的, 不是我补发命令催出来的
+NO_UID_OR_TOKEN_PLAINTEXT_IN_EVIDENCE|PASS|命中=[]
+UID_DISCLOSURE_FORM|INFO|只登记长度 48 + sha256 前 12(小写形式 d2f530dbd062 / 大写形式 586cb3f3ac73); 与 OS 观察到的复合设备序列号掩码对应关系见 run_log
+FIELD_ROUND_TOUCHES_NO_PRODUCT_CODE|PASS|产品与主机链改动=0 件
+ARCHIVE_MANIFEST_EQUALS_DISK_SET|PASS|清单按落盘后 walk 实有 53 件生成(不再手工累加): 磁盘=53 清单=53
+ARCHIVE_MANIFEST_SELFCHECK_FIRES|PASS|漏掉 readback.bin(第一版手工累加的缺陷形状: 手工 50 件 vs 磁盘 53 件, 差额=['dispatch_ledger.jsonl', 'readback.bin', 'readback_identity.json'])时同一比较即不成立
+ARCHIVE_HAS_READBACK_BIN_BYTE_EXACT|PASS|回读二进制 297452 B 已按 idle-stack-r4 先例入库且与判读用的那份逐字节相同
+DISPATCH_LEDGER_ARCHIVED_BYTE_EXACT|PASS|跨阶段台账(21 行 = 6 预约 + 6 提交 + 动作/绑定/S0/收口)按原字节入库, 第一版判读工具漏了它
+BOARD_CAPTURE_BYTES_NOT_MUTATED|PASS|17 份板端原始捕获(15 步响应 + 2 份开口后残留 .pre)与执行器落盘逐字节相同: 判读只读, 不重写证据
+ARCHIVE_HAS_NO_IDENTITY_BEARING_FORM|PASS|整包 53 件里 UID 明文(两种大小写)/用户主目录片段/漫游数据目录片段 命中={}
+ARCHIVE_PRIVACY_GATE_FIRES|PASS|同一组模式在合成脏样本上命中 5/5(不命中就无权宣布干净; 不是拿被检数据自己拼进来的恒真比较)
+ARCHIVE_LOCAL_SCRATCH_FORM_REGISTERED|INFO|非身份性的仓外 scratch 路径以 JSON 转义形态保留在 ['dispatch.stdout.txt', 'dispatch_ledger.jsonl', 'ledger.jsonl']; 我没有为装干净去改工具台账字节
+R7F7_FIELD_SUMMARY|判据=99|FAIL=0|none
+ARCHIVED_TO|reports/reviews/phase8-m8-r7f7-newimage-static/field/field-20261104T201458Z-r7f7

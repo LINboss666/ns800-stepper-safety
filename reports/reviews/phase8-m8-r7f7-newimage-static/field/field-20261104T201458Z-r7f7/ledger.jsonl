@@ -1,0 +1,35 @@
+{"kind": "APPROVED_PACKAGE_VERIFIED", "plan_sha256": "1de974bf2828819f9b71d8d99a490432a8af08e0ce6613fc4691e0262feb0486", "stage": "S3", "steps": 15, "steps_sha256": "d75d59ba06e8e12b32bb6c789f32734e0f44a07044d4cabfe3fcbd08297283ea", "t_s": 0.0, "transport": "real", "verified": true}
+{"approval_kind": "business", "approval_used": 1, "kind": "QUOTA_CONSUMED", "left": 0, "n": 1, "name": "port_open", "t_s": 0.016}
+{"baud": 115200, "kind": "PORT_OPEN_ATTEMPT", "port": "COM5", "t_s": 0.047}
+{"kind": "PORT_OPEN", "port": "COM5", "t_s": 0.047, "transport": "real"}
+{"approval_kind": "business", "approval_used": 1, "kind": "QUOTA_CONSUMED", "left": 0, "n": 1, "name": "explicit_reset", "t_s": 0.047}
+{"argv": ["python", "-m", "pyocd", "reset", "--method", "sysresetreq", "--no-config", "--no-wait", "--connect", "attach", "--core", "0", "-t", "cortex_m", "-u", "@UID_FILE<redacted len=48 sha256_d2f530dbd062>"], "argv_sha256": "a00559b168afc6b16360f9c2c0177cce4a71942d69c40d16902920bd08d5aa40", "backend": "real", "kind": "ACTION_ATTEMPT", "name": "reset", "t_s": 0.063}
+{"backend": "real", "elapsed_s": 1.625, "kind": "ACTION", "name": "reset", "rc": 0, "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "t_s": 1.688}
+{"as": "rst", "bytes": 3468, "done_needle": null, "drain_declared_s": 75.0, "drain_spent_s": 75.0, "end_reason": "DRAIN_BUDGET_REACHED", "kind": "BOOT_STREAM_DRAINED", "prompt_required": false, "quiet_break_s": null, "raw": "D:\\ns800_r7f1_scratch\\r7f7_field\\run-20261104T201458Z\\dispatch\\S_S3\\01_rst.boot.rx.bin", "t_s": 76.703}
+{"bytes": 1192, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "a6995e75b3dbb3ca0b3b0f0679c00ea1add4d808417d8e17eaa8204672d2065c", "t_s": 76.813, "tail": "b'/A\\r\\nmsh >\\r\\nmsh >'"}
+{"bytes": 90, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "2aef3ec96d30f7f1a4615c1877dd81cdf0ce898d0f96cd3a5972a870ca469346", "t_s": 76.828, "tail": "b'52\\r\\nmsh >\\r\\nmsh >'"}
+{"bytes": 983, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "73abf3012386723ec2d5ec70e5b515bfb2cb3285d60c233a27b07e60d47408a7", "t_s": 76.922, "tail": "b'g)\\r\\nmsh >\\r\\nmsh >'"}
+{"allowed": false, "as": "sys_initial", "kind": "BUSINESS_OUTCOME", "lines": [], "status_lines_allowed": ["[Motor] arm gate fail mask=0x18 (arm REFUSED)"], "t_s": 76.922}
+{"bytes": 522, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "00cea3467e9b9549f2e326182aecaff435337494d79479f03cdf361b0a317b38", "t_s": 76.985, "tail": "b'Q)\\r\\nmsh >\\r\\nmsh >'"}
+{"bytes": 1121, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "fcd210a1b752c1114fd60b4cfd93bede29dedf4c87bc2b87f2e667f4f180a00e", "t_s": 77.094, "tail": "b'P stopped\\r\\nmsh >'"}
+{"allowed": false, "as": "mot_static", "kind": "BUSINESS_OUTCOME", "lines": [], "status_lines_allowed": ["[MOT] arm_gate_mask=0x18 REFUSED"], "t_s": 77.094}
+{"bytes": 7, "kind": "PRE_CMD_DRAIN", "t_s": 77.094, "tail": "b'\\r\\nmsh >'"}
+{"bytes": 7, "danger_gate": "applied_before_write", "kind": "PRE_CMD_DRAIN_SAVED", "raw": "D:\\ns800_r7f1_scratch\\r7f7_field\\run-20261104T201458Z\\dispatch\\S_S3\\07_irq_static.pre.rx.bin", "sha256": "2bd7f17c79e54808aa407861c12aef7ab905ece292307d2e0c672d96c97aa17d", "t_s": 77.094}
+{"bytes": 612, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "25bef65c2b365d5c42e13312de36e7ed1c890194d06684b70646eeccf76b4352", "t_s": 77.156, "tail": "b'it\\r\\nmsh >\\r\\nmsh >'"}
+{"bytes": 130, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "acd145c616a2c0e438f986722b047ab673cb168df167a4aa3bcbe667aeb7bfdf", "t_s": 77.172, "tail": "b'=0\\r\\nmsh >\\r\\nmsh >'"}
+{"approval_kind": "business", "approval_used": 1, "kind": "QUOTA_CONSUMED", "left": 0, "n": 1, "name": "diag_profile_zero", "t_s": 77.188}
+{"bytes": 106, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "93778f6118e45c9ecd781d9b29d1bcc8f90855385b324ade84d45a0d3a70ef51", "t_s": 77.516, "tail": "b'd)\\r\\nmsh >\\r\\nmsh >'"}
+{"bytes": 130, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "bc364034616beffa749beb73961ec53ade4b9a2092d6e69a36a37bb1552d58d5", "t_s": 77.531, "tail": "b'=0\\r\\nmsh >\\r\\nmsh >'"}
+{"approval_kind": "business", "approval_used": 1, "kind": "QUOTA_CONSUMED", "left": 0, "n": 1, "name": "diag_profile_learn", "t_s": 77.547}
+{"bytes": 171, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "8f44ff1c235ea7a3f75e7e162bf09d617326337cc6c04e14abdcad26daf82d1a", "t_s": 77.563, "tail": "b'ED\\r\\nmsh >\\r\\nmsh >'"}
+{"ended_by_budget": false, "kind": "WATCH_DONE", "rx_bytes": 0, "seconds": 1, "t_s": 81.578}
+{"bytes": 140, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "0a4e1606acd19f9d80f3accd93403971d7dd70f336760d914fa5ffc4d60ac39c", "t_s": 81.594, "tail": "b'0 dir=0\\r\\nmsh >\\r\\n'"}
+{"allowed": false, "as": "job_failed", "kind": "BUSINESS_OUTCOME", "lines": [], "status_lines_allowed": ["[DIAG] job id=1 st=FAILED why=WINDOW_BROKEN owner=0 cred=1/0"], "t_s": 81.594}
+{"bytes": 5, "kind": "PRE_CMD_DRAIN", "t_s": 81.594, "tail": "b'msh >'"}
+{"bytes": 5, "danger_gate": "applied_before_write", "kind": "PRE_CMD_DRAIN_SAVED", "raw": "D:\\ns800_r7f1_scratch\\r7f7_field\\run-20261104T201458Z\\dispatch\\S_S3\\14_sys_final.pre.rx.bin", "sha256": "43c13a5a4a0be881203be6677f4c64f4c2a2e2096c74b936e4222d774039f1a2", "t_s": 81.594}
+{"bytes": 983, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "73abf3012386723ec2d5ec70e5b515bfb2cb3285d60c233a27b07e60d47408a7", "t_s": 81.688, "tail": "b'g)\\r\\nmsh >\\r\\nmsh >'"}
+{"allowed": false, "as": "sys_final", "kind": "BUSINESS_OUTCOME", "lines": [], "status_lines_allowed": ["[Motor] arm gate fail mask=0x18 (arm REFUSED)"], "t_s": 81.703}
+{"bytes": 1128, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "f0550d3131642cd02408c88adc67f6fcb064a27ccba6ceec9c60b82e9cf0c3b5", "t_s": 81.797, "tail": "b'ed\\r\\nmsh >\\r\\nmsh >'"}
+{"allowed": false, "as": "mot_final", "kind": "BUSINESS_OUTCOME", "lines": [], "status_lines_allowed": ["[MOT] arm_gate_mask=0x18 REFUSED"], "t_s": 81.813}
+{"kind": "SESSION_OK", "session": "S_S3", "steps": 16, "t_s": 81.813}
+{"kind": "PORT_CLOSED", "t_s": 81.828}

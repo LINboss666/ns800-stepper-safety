@@ -1,0 +1,4 @@
+0001706 I Loading <REPO>\reports\firmware\phase8-m8-r7d1-ard4b-commit-txn\rt-thread-motor-m1.axf [load_cmd]
+0001707 I Erasing... [loader]
+0008138 I Programming... [loader]
+0023626 I Erased 297984 bytes (291 sectors), programmed 297984 bytes (291 pages), identical 0 bytes (0 pages) at 13.28 kB/s [loader]

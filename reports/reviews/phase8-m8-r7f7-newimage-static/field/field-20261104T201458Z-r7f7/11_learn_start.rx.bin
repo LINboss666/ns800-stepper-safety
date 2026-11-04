@@ -1,0 +1,5 @@
+diag_profile learn 8 450 550 0
+[DIAG] learn STARTED id=1 n=8 win=450..550 dir=0
+[DIAG] learn async: query 'learn_status'; NOT learn OK yet FIELD_UNVERIFIED
+msh >
+msh >

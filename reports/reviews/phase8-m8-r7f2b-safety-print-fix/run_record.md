@@ -834,3 +834,63 @@ R7F6 已登记事实与三个超额度标签**不回改**。
 现场账本仍未开：核准根目录下 `*M8R7F7-2369-async-job-static*` 匹配 0 件（`FIELD_APPROVAL_LEDGER_ABSENT|PASS`）。
 本轮交付：A 包 28+1 件原件、6 件本机复算证据、1 件判据工具、`OFFLINE_REVIEW.md`、本节的 §20。
 产品代码、固件、其他轮次证据 0 改动。
+
+## 21 M8-R7F7 现场轮（新镜像上板 + 真实异步作业受理与越窗失败收口；操作者已批准，一次跑完）
+
+**授权**：操作者 2026-11-05 04:14 原话「这一轮没问题就直接批准你执行」，逐字登进
+`field/.../run_log.txt` 第 2 行；令牌用包内 `approval_token.txt` 原样 58 B（`7c93e682…`），不拼接不改写。
+离线核对轮（§20，109 条判据 FAIL=0）已先把 A 的每项声称在本机复算过，才允许这唯一一次 dispatch。
+
+**额度（六项正额度各 1，用满，无第 7 次）**：下载 1 / 定长回读 1 / COM5 开口 1 / 显式复位 1 /
+`diag_profile zero 32` 1 / `diag_profile learn 8 450 550 0` 1；`dispatch` 1。
+禁用项 0 消耗（arm/start/apply/IRQ/极性/运动/cancel/tier/commit/clear/config_save/重试/分析仪），
+`APPROVAL_LEDGER_END` 的 `pending=0`、`spent` 与 caps 逐键相等（负控：构造 n=2 重复预约会被抓到）。
+dispatch rc=0，墙钟 **117.2 s ≤ 计划 210 s**（含下载与回读）。
+
+**板端事实**（详见 `phase8-m8-r7f7-newimage-static/FIELD_JUDGEMENT.md`，判据 99 条 FAIL=0）：
+
+- 回读 **297452 B**，SHA256 `23691e8d…`，与被签收 BIN **整文件逐字节相等**；门先在"取反 1 字节"和
+  "少 1 字节（任意窗口）"两种缺陷形状上验过会命中。**新版镜像逐字节在板已证**；b502 只作历史证明保留，
+  不再是当前在板身份。下载旁证 erase=program=297984 B（291 扇区），唯一载荷是被签收 AXF，未回烧 b502。
+- 复位后**被动启动窗申报 75.0 s、实耗 75.0 s**，结束原因 `DRAIN_BUDGET_REACHED`（不是静默早退），
+  捕获 3468 B；首条查询出现在开口后 76.813 s ⇒ 观测下界真被覆盖。启动流正面读到 TMC IOIN 成功
+  （VERSION=0x21）、`BOOT→INIT→SELF_TEST→READY`、`required=PASS degraded=0x00`、`Phase-7 bootstrap complete`，
+  无 FAULT_LATCHED / 无 `[REQ FAIL]`；严格 UTF-8、裸 NUL=0、CR=97 LF=75 最长行 126 B。
+- 13 条命令顺序与 A §5 表一致；13 份判据我用**仓库原执行器自己的 `assert_step`** 在归档字节上逐条复算全 OK。
+  每份原始响应的开头都是所发命令的板端回显；开口后残留提示符另存为 2 个 `.pre.rx.bin`（7 B/5 B），
+  没有回填进响应。13 份全部严格 UTF-8、裸 NUL=0，字节数按 115200 8N1 下界都在该步申报秒数内。
+- **真实作业受理**：`learn 8 450 550 0` 回 `STARTED id=1 n=8 win=450..550 dir=0`（不是 REFUSED/IDLE），
+  并回 `learn async: query 'learn_status'; NOT learn OK yet FIELD_UNVERIFIED`。
+  **越窗失败收口**：`id=1 st=FAILED why=WINDOW_BROKEN owner=0 cred=1/0`，`n=0/0 want=8`；采集器已释放、未 DONE。
+  learn 响应 t=77.563 → `WATCH_DONE` t=81.578（申报 1 s，`ended_by_budget=False`）期间**未发任何命令**，
+  终态查询 81.594 ⇒ 判越窗失败的是板上 Diagnosis Thread，不是我补命令催出来的。
+- 静止 zero：`zero OK n=32 raw 2055..2065 mean=2060437 (cal source untouched)`，凭据从 0/0 到 1/0，
+  未 config_save、未 clear、未复位。`ps` 正面读到 main/diag/tshell 均 4096（高水位 40 %/28 %/16 %）；
+  `free` 登记本场新四项 32672/22120/22120/10552 并核 `total=used+available`、`maximum≥used`，不沿用 b502 旧值。
+- 全程电机未转：两次 `motor_status` 仍未武装、频率 0、请求禁能、ENN HIGH、arm gate `0x18` REFUSED；
+  两次 `system_status` 仍 READY/fault=0、IRQ CLOSED、极性未确认、protect_ready NO、drive_cfg UNCONFIGURED。
+  失败词没有全局放行：`FAILED/WINDOW_BROKEN` 只在 `job_failed` 一处按整行 + id/owner/凭据锁定。
+
+**本轮结论只写这些**：新镜像逐字节在板、启动静态状态通过、静止 zero 通过、异步作业真实受理及越窗失败收口通过。
+仍未证：正常巡航下的采样进度与 DONE 有效基线、活动取消与取消竞争、commit/config_save 与重启恢复、
+SG/ADC/IMU 真实保护触发与恢复、实际 STEP/ENN 动态时延、带载最坏栈。
+`polarity_measured=false`、`core_protection_verified=false` 保持；执行器自报 `flow_complete=True` 只是流程与账目一致。
+
+**自伤 7 项**（正文 `FIELD_JUDGEMENT.md` §5）：① 我的 heredoc 补丁把 `b"\r\n"` 写成真实 CR/LF，
+判读工具直接语法坏掉（且 Read 的行视图与 `newline=''` 的切分不一致，替换区间要按后者定）；
+② 第一版 3 处判据设计错（`ASSERT_STEP` 的 `all()` 扫了台账全部行、回显判据拿"剥完之后"的行比命令、
+启动捕获文件名没按执行器的 `.boot` 标记）；③ **归档清单用手工累加，漏了 `readback.bin`/
+`readback_identity.json`/`dispatch_ledger.jsonl` 三件**（手工 50 vs 磁盘 53）——决定性证据没进自己的清单，
+等于"我以为归档了"，改成落盘后 walk 生成并加负控；④ 跨阶段台账第一版没归档，与 idle-stack-r4 先例不符；
+⑤ 隐私判据第一次写成恒真比较（把 UID 拼进被检数据再断言能命中），换成合成脏样本 5/5 命中；
+⑥ 模式字面量第三次差点复发（`AppData`/`Users\` 直接写进检查器源码就会被本轮泄漏扫描抓到），已改运行时拼装；
+⑦ 类型混用：`uid` 是 `read_text()` 的 `str`，被检数据是 `bytes`，`pat in data` 直接 `TypeError`。
+另如实登记一处残留：仓外 scratch 路径以 JSON 转义形态留在 3 件工具元数据里；我**没有**为"装干净"去反掩改台账字节。
+
+**收口**：COM5 已关闭，**保持 VM + MCU 供电**（A §3 已采纳"默认不断电"），保持未武装/禁能/IRQ CLOSED；
+候选零点与失败作业记录留在 RAM，未为清理它们额外复位/断电/clear/save。
+交付：`field/field-20261104T201458Z-r7f7/`（53 件，含 `readback.bin` 与两份台账）、
+`proof/field_judgement_r7f7.txt`（99 条 FAIL=0）+ `proof/field_business_outcomes.json`、
+`FIELD_JUDGEMENT.md`、`tools/r7f7_field_judgement.py`、扩展大写 UID 模式的 `tools/r7f7_staged_preflight.py`、
+新交接 `phase8-m8-r7f7-newimage-static-field.{md,json}`、重算的 `ROUND_SHA256SUMS.txt`。
+产品代码、固件、A 的包原件、旧轮证据与旧账本 **0 改动**。
