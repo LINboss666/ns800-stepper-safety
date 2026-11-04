@@ -1,0 +1,212 @@
+{
+ "round": "phase8-m8-r7f2b-safety-print-fix / R7F4 现场轮",
+ "title": "A 定稿的 CONFIGURED 续测包一次真实执行: 开口1 + tmc_config_apply CONFIRM 1, 其余全 0",
+ "date_local": "2026-11-04",
+ "head_at_generation": "759597fd6f953fd06970791899f03b9a3003ed02",
+ "approval": {
+  "approval_id": "M8R7F4-b502-configured-20261104",
+  "granted_by": "操作者本人对本固定包的明确批准选项 + 现场前置核对答复(逐字拼接为令牌)",
+  "token_bytes": 82,
+  "token_sha256": "98588b801fa523023f0cf3b4d29fae1d8e886ba9c10769de46446d696974ba30",
+  "ledger_file": "D:\\ns800_field_approvals\\approval_M8R7F4-b502-configured-20261104.json",
+  "ledger_caps_nonzero": {
+   "port_open": 1,
+   "tmc_config_apply": 1
+  },
+  "ledger_spent_final": {
+   "port_open": 1,
+   "tmc_config_apply": 1
+  },
+  "ledger_pending": [],
+  "ledger_writes_field": 4,
+  "ledger_writes_meaning": "台账落盘次数(_store 次数), 不是寄存器写次数; 寄存器写次数不来自这个字段",
+  "identities": {
+   "executor_sha256": "33d3f0af8a4c9c33dcd4e013b395e4ba990a89e384130f9d0ffe50c71b34e8ca",
+   "image_sha256": "502dca5d8c7ebfa794f890a9c03bc258fc9753f57b6a80c2f1e08add69888a7a",
+   "plan_sha256": "0b6e1eb8a8c69b7f6b14a8f2a1e8662564caa4c56c17a5cd77fbad1368e74f11"
+  }
+ },
+ "package_identity": {
+  "plan": {
+   "path": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/plan_r7f4_b502_configured_reviewed.json",
+   "bytes": 33012,
+   "sha256": "0b6e1eb8a8c69b7f6b14a8f2a1e8662564caa4c56c17a5cd77fbad1368e74f11"
+  },
+  "executor_unchanged": {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py",
+   "bytes": 219491,
+   "sha256": "33d3f0af8a4c9c33dcd4e013b395e4ba990a89e384130f9d0ffe50c71b34e8ca"
+  },
+  "steps_sha256_executed": "11d42060d97de6b671e7c6e2910d3547176dd550b21e13af23cdb6982c827046",
+  "steps_sha256_recomputed_by_me": "11d42060d97de6b671e7c6e2910d3547176dd550b21e13af23cdb6982c827046",
+  "steps_sha256_equal": true,
+  "package_verification_event": {
+   "kind": "APPROVED_PACKAGE_VERIFIED",
+   "plan_sha256": "0b6e1eb8a8c69b7f6b14a8f2a1e8662564caa4c56c17a5cd77fbad1368e74f11",
+   "stage": "S1",
+   "steps": 6,
+   "steps_sha256": "11d42060d97de6b671e7c6e2910d3547176dd550b21e13af23cdb6982c827046",
+   "t_s": 0.0,
+   "transport": "real",
+   "verified": true
+  }
+ },
+ "command": "--dispatch --transport real --backend real --profile response_driven --plan <本包计划> --approval-id M8R7F4-b502-configured-20261104 --approval-root D:/ns800_field_approvals --approval-token=<与 --expected-token 同一个本次批准令牌>",
+ "uid_file_used": false,
+ "uid_note": "本场不调用 DAP(无下载/回读/复位), 按计划不读 UID 文件; 执行器的 @UID_FILE 只在 argv 模板出现时才需要",
+ "dispatch": {
+  "rc": 0,
+  "summary_line": "DISPATCH_SUMMARY|status=OK|code=|stages_executed=2|stages_not_run=0|quota_left={\"approved_reboot\": 0, \"blackbox_clear\": 0, \"cleanup_motor_disarm\": 0, \"cleanup_motor_status\": 0, \"cleanup_motor_stop\": 0, \"config_save\": 0, \"diag_profile_commit\": 0, \"diag_profile_learn\": 0, \"diag_profile_zero\": 0, \"dmm_readings\": 0, \"download\": 0, \"explicit_reset\": 0, \"irq_polarity_prep\": 0, \"motion_cap_seconds_per_run\": 0, \"motor_run\": 0, \"motor_run_seconds_total\": 0, \"physical_collision\": 0, \"port_open\": 0, \"readback\": 0, \"retry\": 0, \"tmc_config_apply\": 0}|quota_used={\"port_open\": 1, \"tmc_config_apply\": 1}|profile=response_driven|branch=None|scenario_branches={}|prerequisite_skips=[]|actions_attempted=[]|ledger=D:\\ns800\\reports\\reviews\\phase8-m8-r7f2b-safety-print-fix\\field\\field-20261104T015928Z\\dispatch_ledger.jsonl",
+  "flow_line": "FLOW_VS_VERIFICATION|flow_complete=True|core_protection_verified=False|����: flow_complete ֻ˵���걨�Ľ׶ζ������Ҷ��/ȡ֤/������Ŀһ��; core_protection_verified ��˵��ÿһ������**Ŀ�괫����ͨ��**�Լ�������",
+  "run_dir": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T015928Z"
+ },
+ "device_actions_actual": {
+  "port_open": 1,
+  "tmc_config_apply": 1,
+  "download": 0,
+  "readback": 0,
+  "explicit_reset": 0,
+  "approved_reboot": 0,
+  "config_save": 0,
+  "irq_polarity_prep": 0,
+  "arm_or_start": 0,
+  "motor_run": 0,
+  "learn_or_zero_or_commit": 0,
+  "blackbox_clear": 0,
+  "retry": 0,
+  "dmm_readings": 0
+ },
+ "session": {
+  "hard_deadline_seconds": 90,
+  "no_boot_window_this_round": true,
+  "observed_last_event_t_s": 0.61,
+  "order": [
+   "system_status",
+   "motor_status",
+   "tmc_config_apply CONFIRM",
+   "system_status",
+   "motor_status",
+   "safety_status"
+  ],
+  "stale_prompt_handling": "开话后先排走上一轮残留的 5 B 'msh >' 提示符, 由执行器单独存为 02_mot_pre.pre.rx.bin 并登记 sha, 未追加进任何响应原文"
+ },
+ "responses": [
+  {
+   "file": "01_sys_pre.rx.bin",
+   "label": "前置 system_status",
+   "bytes": 978,
+   "sha256": "dc2a1c9d0c15be76941a42a5a6f3e5b791f2aa0d0ed00639d643664df2c0a8ee",
+   "content_lines": 19,
+   "longest_line_bytes": 120,
+   "nul": 0,
+   "utf8_strict": true
+  },
+  {
+   "file": "02_mot_pre.rx.bin",
+   "label": "前置 motor_status",
+   "bytes": 1128,
+   "sha256": "f0550d3131642cd02408c88adc67f6fcb064a27ccba6ceec9c60b82e9cf0c3b5",
+   "content_lines": 25,
+   "longest_line_bytes": 91,
+   "nul": 0,
+   "utf8_strict": true
+  },
+  {
+   "file": "03_cfg_apply.rx.bin",
+   "label": "一次 tmc_config_apply CONFIRM",
+   "bytes": 388,
+   "sha256": "4629dc51c4a068294fdb7e1d83472eef4c48d8569a77a0b28890592b8b4944ed",
+   "content_lines": 8,
+   "longest_line_bytes": 62,
+   "nul": 0,
+   "utf8_strict": true
+  },
+  {
+   "file": "04_sys_post.rx.bin",
+   "label": "写后 system_status",
+   "bytes": 980,
+   "sha256": "6d1e56bb5515aee393e4c89b4e17c3492a790a248383bc7aec538133a835843e",
+   "content_lines": 19,
+   "longest_line_bytes": 120,
+   "nul": 0,
+   "utf8_strict": true
+  },
+  {
+   "file": "05_mot_post.rx.bin",
+   "label": "写后 motor_status",
+   "bytes": 1080,
+   "sha256": "fa69aa5cf5a11917ee3b00f06e2822ee66979c1aae576f3f1eb4a0bd85ff2215",
+   "content_lines": 24,
+   "longest_line_bytes": 91,
+   "nul": 0,
+   "utf8_strict": true
+  },
+  {
+   "file": "06_safety_post.rx.bin",
+   "label": "收口 safety_status",
+   "bytes": 522,
+   "sha256": "00cea3467e9b9549f2e326182aecaff435337494d79479f03cdf361b0a317b38",
+   "content_lines": 7,
+   "longest_line_bytes": 105,
+   "nul": 0,
+   "utf8_strict": true
+  }
+ ],
+ "judgement": {
+  "transcript": {
+   "path": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T015928Z/FIELD_JUDGEMENT.txt",
+   "bytes": 12470,
+   "sha256": "9d92515bf99ee7f3801b01bf5a2b12749475528bf425ae90d2982f29b6e838e5"
+  },
+  "summary_line": "TOTAL 包内判据=77 fail=0 ; 附加对照(预测行表逐字节, 非包内判据)=5 fail=0",
+  "comparison_lines": [
+   "== system_status@pre 对照: 预测 21 行 / 逐字节命中 21 / 未命中 0 / 实际多出的非结构行 0",
+   "== motor_status@pre 对照: 预测 27 行 / 逐字节命中 27 / 未命中 0 / 实际多出的非结构行 0",
+   "== apply 对照(示例值也列入, 见下条 provenance): 预测 8 行 / 逐字节命中 6 / 未命中 2 / 实际多出的非结构行 2",
+   "PASS [包内判据] apply 八条行内除这两条示例值外逐字节命中, 且没有任何标签外的多余行  <- 缺=['[TMC-CFG] 预算: 已用 300 / 总 1500 tick', '[TMC-CFG] flush=0B TX=32B'] 多=['[TMC-CFG] 预算: 已用 50 / 总 1500 tick', '[TMC-CFG] flush=0B TX=4B']",
+   "== system_status@post 对照: 预测 21 行 / 逐字节命中 21 / 未命中 0 / 实际多出的非结构行 0",
+   "== motor_status@post 对照: 预测 26 行 / 逐字节命中 26 / 未命中 0 / 实际多出的非结构行 0",
+   "== safety_status 对照: 预测 9 行 / 逐字节命中 9 / 未命中 0 / 实际多出的非结构行 0"
+  ]
+ },
+ "field_observations": {
+  "drive_cfg_before": "UNCONFIGURED",
+  "drive_cfg_after": "CONFIGURED",
+  "arm_gate_mask_before_hex": "0x18",
+  "arm_gate_mask_after_hex": "0x8",
+  "gate5_after": "tmc_drive_cfg=CONFIGURED",
+  "refusal_kept_after_write": "gate_reason=protection-not-ready(唯一一条)",
+  "protect_ready_after": "NO(与 CONFIGURED 同时成立, 是 A 的预期结果)",
+  "irq_gate_after": "CLOSED",
+  "polarity_after": "not-confirmed",
+  "runtime_write_gate": "0x0(前置与写后都读到)",
+  "safety_disable_state_after": "MCU_DRV_ENABLE=0 / request=DISABLE(LOW) pad=0 / ENN_fb=1 verdict=OK",
+  "motor_after": "state=0 name=OTHER armed=0 cur_hz=0 tgt_hz=0 health=OK",
+  "apply_static_lines_byte_equal_to_prediction": 6,
+  "apply_comparison_line_from_transcript": "== apply 对照(示例值也列入, 见下条 provenance): 预测 8 行 / 逐字节命中 6 / 未命中 2 / 实际多出的非结构行 2",
+  "apply_lines_not_asserted": [
+   "预算: 已用 50 / 总 1500 tick",
+   "flush=0B TX=4B"
+  ],
+  "apply_lines_not_asserted_reason": "A 的 provenance 把时延/TX/寄存器示例/epoch 明确标为示例值, 不当断言",
+  "planned_params_printed": "irun=20 ihold=8 dly=4 tpd=8 vsense=1",
+  "ihold_irun_derived_hex": "0x00041408",
+  "tpowerdown_derived_hex": "0x00000008",
+  "register_before_after": "GCONF 00000101->00000141 CHOPCONF 15010053->15030053(差异位 0x40 / 0x20000, 本场未解码)",
+  "current_measured": false
+ },
+ "not_proven": [
+  "电流/转矩实测值(打印明写仍是理论计算, 本场没用万用表)",
+  "SG/ADC/IMU 相对保护的功能命中(需下一场学习 + 目标通道触发)",
+  "正常 disarm 收口与带载最坏栈",
+  "镜像内其余 35 条 >127 B 带标签格式串",
+  "IRQ 开路与极性确认(本场额度 0, 未做)",
+  "GCONF/CHOPCONF 差异位的语义(只记录了前后值)"
+ ],
+ "board_state_after": "驱动 CONFIGURED / 电机未武装 / 频率 0 / MCU 请求 LOW / 焊盘 LOW / ENN 反馈在禁能侧 / 保护门与 IRQ 未动 / 未起转; VM 供电保持, 端口正常关闭(PORT_CLOSED 1 条)",
+ "stop_point": {
+  "state": "APPROVED_PACKAGE_EXECUTED_ONCE",
+  "reason": "固定包额度已用尽(port_open 1/1, tmc_config_apply 1/1), 旧批准与剩余额度不结转",
+  "next": "下一场要 A 重新出包(极性/IRQ 就绪或短动作或学习/目标通道触发)并对新范围批一次"
+ }
+}

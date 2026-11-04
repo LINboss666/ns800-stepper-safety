@@ -221,3 +221,35 @@ SG/ADC/IMU、带载最坏栈或正常 disarm 已过现场验证"。下一场定�
 现场安全门不由我代答、转述或自填。批准后按 A 的规定:落位件 + 新台账 + `--dispatch --transport real --backend real
 --profile response_driven` 一次,不再交准备轮、不重复确认同一范围。
 
+## 11 R7F4 现场执行(操作者批准后,一次整包)
+
+批准:操作者对本固定包选答「批准，按该范围执行一次」并回报「已核对：供电在、接线无未说明变化」;
+两条逐字答复拼成令牌(82 B,`98588b80…`)。批准身份 `M8R7F4-b502-configured-20261104` 由未改动执行器 `--approval-init`
+离线开立(三件身份 plan `0b6e1eb8…` / image `502dca5d…` / executor `33d3f0af…`),开账 `spent` 全 0。
+
+执行根 `field/field-20261104T015928Z/`,`--dispatch --transport real --backend real --profile response_driven` 一次:
+`DISPATCH_SUMMARY status=OK`、`stages_executed=2`,真实消耗 **port_open 1 / tmc_config_apply 1**,其余全 0,无重试;
+本场不调用 DAP 故未读 UID 文件;会话末事件 `t_s=0.610 s` < 90 s 硬截止(本场无启动窗,不申报启动观测窗)。
+
+取得的项(包内判据 77 条 fail=0,原文 `FIELD_JUDGEMENT.txt`):
+一次真实配置成功 —— `[TMC-CFG] CONFIGURED (各次写入均经 IFCNT 确认)`,响应内无 `REFUSED`;**八条 `[TMC-CFG]` 完整短行全在**,
+响应 388 B / 8 内容行 / 最长 62 B / 0 裸 NUL / 严格 UTF-8;打印参数 `irun=20 ihold=8 dly=4 tpd=8 vsense=1` 与计划一致
+(换算 `IHOLD_IRUN=0x00041408`、`TPOWERDOWN=0x00000008`;这两个寄存器本场未单独读回打印,电流未测——打印原文自写"仍为理论计算")。
+`drive_cfg` `UNCONFIGURED`→`CONFIGURED`、`gate5=CONFIGURED`、`arm_gate_mask` `0x18`→`0x8` 且唯一保留的拒绝是
+`gate_reason=protection-not-ready`;`CONFIGURED` 与 `protect_ready=NO` 同时成立(A 预告的预期结果,不为变绿去开 IRQ/确认极性)。
+写后仍禁能:`runtime write gate mask=0x0`、`request=LOW pad=0 ENN_fb=1 verdict=OK`、`MCU_DRV_ENABLE = 0 (禁止(安全))`、
+`armed=0 cur_hz=0 tgt_hz=0`、`irq_gate=CLOSED polarity=not-confirmed`。六条响应 NUL 全 0、UTF-8 全完整、最长行 120/91/62/120/91/105 B。
+GCONF/CHOPCONF 前后值只记录(`00000101->00000141` / `15010053->15030053`,差异位 `0x40`/`0x20000`),**语义本场未解码**。
+
+步骤身份不靠标签:用执行器自己的 `stage_steps + canonical_steps_sha` 从仓库计划重算 `11d42060d97de6b6…`,与现场台账
+`steps_sha256` 相同;六份响应原文首行回显(从字节读)也与计划六步同序。上一场那三条工具侧教训本轮已避免:令牌从文件逐字节读并
+以 argv 传入(不经 shell 代码页)、路径用字符串拼接、`--profile response_driven` 显式带上。
+附加对照 5 条(预测行表逐字节,非包内判据)也 0 不符:`21/21`、`27/27`、`21/21`、`26/26`、`9/9`;apply 里 6 条命中,
+未命中的 2 条正是 A 的 provenance 标为示例值的时延(`50/1500 tick`,预测 300)与 TX(`TX=4B`,预测 32B)——未当断言也未算失败。
+陈旧提示符 5 B `msh >` 由执行器单独存为 `02_mot_pre.pre.rx.bin` 并登记散列,未追加进响应原文。
+
+未证不扩大:电流/转矩实测、SG/ADC/IMU 相对保护命中、正常 disarm 收口、带载最坏栈、其余 35 条超长格式串、IRQ 开路与极性确认;
+执行器自报 `core_protection_verified=False`(`flow_complete=True` 只说申报阶段跑完)。台账 `writes=4` 是落盘次数,不是寄存器写次数。
+板端:驱动 CONFIGURED、未武装、频率 0、请求 LOW、焊盘 LOW、ENN 在禁能侧、保护门与 IRQ 未动、未起转,VM 供电保持,端口正常关闭。
+**额度已用尽**:本包 port_open 1/1、apply 1/1,旧批准与剩余额度不结转;下一场(极性/IRQ、短动作、学习与目标通道触发)要 A 重新出包并对新范围再批一次。
+

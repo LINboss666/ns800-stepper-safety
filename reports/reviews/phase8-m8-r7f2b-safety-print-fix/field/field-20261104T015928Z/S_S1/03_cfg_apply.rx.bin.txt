@@ -1,0 +1,10 @@
+tmc_config_apply CONFIRM
+[TMC-CFG] CONFIGURED (各次写入均经 IFCNT 确认)
+[TMC-CFG] GCONF/CHOPCONF 读回一致
+[TMC-CFG] 电流值仍为理论计算, 未实测
+[TMC-CFG] 预算: 已用 50 / 总 1500 tick
+[TMC-CFG] flush=0B TX=4B
+[TMC-CFG] irun=20 ihold=8 dly=4 tpd=8 vsense=1
+[TMC-CFG] GCONF 00000101->00000141 CHOPCONF 15010053->15030053
+[TMC-CFG] op_epoch=0
+msh >

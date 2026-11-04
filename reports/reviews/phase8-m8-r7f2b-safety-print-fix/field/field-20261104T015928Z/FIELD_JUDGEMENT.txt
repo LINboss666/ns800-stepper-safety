@@ -1,0 +1,124 @@
+RUN_DIR=D:\ns800\reports\reviews\phase8-m8-r7f2b-safety-print-fix\field\field-20261104T015928Z
+== 0) 六条响应的字节完整性(每步都判) ==
+   sys_pre     bytes=978   内容行=19  最长行=120  NUL=0 CR=21 LF=21 严格UTF8=True
+PASS [包内判据] sys_pre 响应无裸 NUL  <- NUL=0
+PASS [包内判据] sys_pre 严格 UTF-8 完整
+PASS [包内判据] sys_pre 每条内容行 <=126 B(控制台 127 上限)  <- 最长 120 B
+   mot_pre     bytes=1128  内容行=25  最长行=91   NUL=0 CR=27 LF=27 严格UTF8=True
+PASS [包内判据] mot_pre 响应无裸 NUL  <- NUL=0
+PASS [包内判据] mot_pre 严格 UTF-8 完整
+PASS [包内判据] mot_pre 每条内容行 <=126 B(控制台 127 上限)  <- 最长 91 B
+   apply       bytes=388   内容行=8   最长行=62   NUL=0 CR=10 LF=10 严格UTF8=True
+PASS [包内判据] apply 响应无裸 NUL  <- NUL=0
+PASS [包内判据] apply 严格 UTF-8 完整
+PASS [包内判据] apply 每条内容行 <=126 B(控制台 127 上限)  <- 最长 62 B
+   sys_post    bytes=980   内容行=19  最长行=120  NUL=0 CR=21 LF=21 严格UTF8=True
+PASS [包内判据] sys_post 响应无裸 NUL  <- NUL=0
+PASS [包内判据] sys_post 严格 UTF-8 完整
+PASS [包内判据] sys_post 每条内容行 <=126 B(控制台 127 上限)  <- 最长 120 B
+   mot_post    bytes=1080  内容行=24  最长行=91   NUL=0 CR=26 LF=26 严格UTF8=True
+PASS [包内判据] mot_post 响应无裸 NUL  <- NUL=0
+PASS [包内判据] mot_post 严格 UTF-8 完整
+PASS [包内判据] mot_post 每条内容行 <=126 B(控制台 127 上限)  <- 最长 91 B
+   safety_post bytes=522   内容行=7   最长行=105  NUL=0 CR=9 LF=9 严格UTF8=True
+PASS [包内判据] safety_post 响应无裸 NUL  <- NUL=0
+PASS [包内判据] safety_post 严格 UTF-8 完整
+PASS [包内判据] safety_post 每条内容行 <=126 B(控制台 127 上限)  <- 最长 105 B
+== 1) 前置 system_status ==
+PASS [包内判据] state=READY fault=0
+PASS [包内判据] TMC OK 且 drive_cfg=UNCONFIGURED
+PASS [包内判据] runtime write gate mask=0x0
+PASS [包内判据] 请求 LOW / 焊盘 0 / ENN 反馈在禁能侧
+PASS [包内判据] drv_en_pad_low=YES 且 irq_gate=CLOSED / protect_ready=NO
+PASS [包内判据] arm gate fail mask=0x18 (arm REFUSED)
+== system_status@pre 对照: 预测 21 行 / 逐字节命中 21 / 未命中 0 / 实际多出的非结构行 0
+PASS [附加对照] 前置 system_status 与预测行表逐字节全同(21/21)  <- 缺=[] 多=[]
+== 2) 前置 motor_status(当前禁能合同) ==
+PASS [包内判据] IDLE(state=0) 且 name=OTHER
+PASS [包内判据] armed=0 drv_en_request=0 health=OK
+PASS [包内判据] cur_hz=0 tgt_hz=0
+PASS [包内判据] arm_gate_mask=0x18 REFUSED(已知整行披露放行)
+PASS [包内判据] gate5 tmc_drive_cfg=UNCONFIGURED
+PASS [包内判据] drv_request=LOW pad=0
+PASS [包内判据] step_diag=GRANTED 且 tmc_write_gate=0x0
+== motor_status@pre 对照: 预测 27 行 / 逐字节命中 27 / 未命中 0 / 实际多出的非结构行 0
+PASS [附加对照] 前置 motor_status 与预测行表逐字节全同(27/27)  <- 缺=[] 多=[]
+== 3) 一次 tmc_config_apply CONFIRM ==
+PASS [包内判据] 八条 [TMC-CFG] 完整短行都在  <- 实得 8 条
+PASS [包内判据] CONFIGURED 行存在且不是 REFUSED
+PASS [包内判据] 计划参数十进制逐字相符 irun=20 ihold=8 dly=4 tpd=8 vsense=1
+PASS [包内判据] GCONF/CHOPCONF 读回一致行存在并抓到前后值  <- GCONF 00000101->00000141 CHOPCONF 15010053->15030053
+   GCONF 0x00000101->0x00000141 (差异位 0x00000040) CHOPCONF 0x15010053->0x15030053 (差异位 0x00020000)
+   注: 差异位含义本场未解码, 不作为结论; A 也只要求读回一致这一行。
+   由打印参数推算 IHOLD_IRUN=0x00041408 (计划 0x00041408) TPOWERDOWN=0x00000008 (计划 0x00000008)
+PASS [包内判据] 打印参数换算出的 IHOLD_IRUN 与计划十六进制一致  <- 0x00041408
+PASS [包内判据] TPOWERDOWN 十进制 tpd=8 与计划 0x00000008 一致
+== apply 对照(示例值也列入, 见下条 provenance): 预测 8 行 / 逐字节命中 6 / 未命中 2 / 实际多出的非结构行 2
+   预测未出现: '[TMC-CFG] 预算: 已用 300 / 总 1500 tick'
+   预测未出现: '[TMC-CFG] flush=0B TX=32B'
+   实际未预测: '[TMC-CFG] 预算: 已用 50 / 总 1500 tick'
+   实际未预测: '[TMC-CFG] flush=0B TX=4B'
+   A 的 provenance: {"kind": "source_shape_NOT_field_evidence", "file": "applications/tmc2209.c:2844-2861", "note": "Static planned parameters are source constants. Timing, TX/flush, register examples, epoch are illustrative values only. Four register writes/IFCNT checks are internal firmware operations within ONE appl
+PASS [包内判据] apply 里未命中的预测行只限 A 声明为示例值的时延/TX 两条  <- 未命中=['[TMC-CFG] 预算: 已用 300 / 总 1500 tick', '[TMC-CFG] flush=0B TX=32B']
+PASS [包内判据] apply 八条行内除这两条示例值外逐字节命中, 且没有任何标签外的多余行  <- 缺=['[TMC-CFG] 预算: 已用 300 / 总 1500 tick', '[TMC-CFG] flush=0B TX=32B'] 多=['[TMC-CFG] 预算: 已用 50 / 总 1500 tick', '[TMC-CFG] flush=0B TX=4B']
+== 4) 写后 system_status ==
+PASS [包内判据] 仍 READY/fault=0
+PASS [包内判据] TMC OK 且 drive_cfg=CONFIGURED
+PASS [包内判据] runtime write gate 仍 0x0
+PASS [包内判据] 写后仍禁能一致(请求 LOW/焊盘 0/ENN 反馈)
+PASS [包内判据] arm gate fail mask 从 0x18 降到 0x8
+PASS [包内判据] protect_ready 仍为 NO(允许与 CONFIGURED 并存)
+== system_status@post 对照: 预测 21 行 / 逐字节命中 21 / 未命中 0 / 实际多出的非结构行 0
+PASS [附加对照] 写后 system_status 与预测行表逐字节全同(21/21)  <- 缺=[] 多=[]
+== 5) 写后 motor_status ==
+PASS [包内判据] 仍 IDLE / armed=0 / 频率为零 / health=OK
+PASS [包内判据] arm_gate_mask=0x8 REFUSED(保护未就绪这一条拒绝保留)
+PASS [包内判据] gate5 tmc_drive_cfg=CONFIGURED
+PASS [包内判据] gate_reason 只剩 protection-not-ready  <- gate_reason 行=1
+PASS [包内判据] 写后仍当前禁能(drv_request=LOW pad=0, ENN_fb=1 verdict=OK)
+== motor_status@post 对照: 预测 26 行 / 逐字节命中 26 / 未命中 0 / 实际多出的非结构行 0
+PASS [附加对照] 写后 motor_status 与预测行表逐字节全同(26/26)  <- 缺=[] 多=[]
+== 6) 收口 safety_status ==
+PASS [包内判据] ready=YES first_err=0
+PASS [包内判据] MCU_DRV_ENABLE = 0 (禁止(安全))
+PASS [包内判据] request=DISABLE(LOW) 且 verdict=OK
+PASS [包内判据] 只读输入说明行完整且与预测逐字节相同  <- 实际行=['[SAFETY] [只读输入, 非急停感测; HIGH=禁能侧, LOW=未施加禁能(不保证转矩)]'] 预测行=['[SAFETY] [只读输入, 非急停感测; HIGH=禁能侧, LOW=未施加禁能(不保证转矩)]']
+== safety_status 对照: 预测 9 行 / 逐字节命中 9 / 未命中 0 / 实际多出的非结构行 0
+PASS [附加对照] 收口 safety_status 与预测行表逐字节全同(9/9)  <- 缺=[] 多=[]
+== 7) 台账: 额度与动作次数 ==
+   QUOTA_AUDIT(执行器自报): {"approved_reboot": [0, 0, 0], "blackbox_clear": [0, 0, 0], "cleanup_motor_disarm": [0, 0, 0], "cleanup_motor_status": [0, 0, 0], "cleanup_motor_stop": [0, 0, 0], "config_save": [0, 0, 0], "diag_profile_commit": [0, 0, 0], "diag_profile_learn": [0, 0, 0], "diag_profile_zero": [0, 0, 0], "dmm_readings": [0, 0, 0], "download": [0, 0, 0], "explicit_reset": [0, 0, 0], "irq_polarity_prep": [0, 0, 0], "motion_cap_seconds_per_run": [0, 0, 0], "motor_run": [0, 0, 0], "motor_run_seconds_total": [0, 0, 0], "physical_collision": [0, 0, 0], "port_open": [1, 1, 0], "readback": [0, 0, 0], "retry": [0, 0, 0], "tmc_config_apply": [1, 1, 0]}
+PASS [包内判据] 申报额度只有 port_open=1 与 tmc_config_apply=1  <- {'port_open': 1, 'tmc_config_apply': 1}
+PASS [包内判据] 实际消耗与申报一致(各 1 次, 无剩余额度)  <- (1, 1, 0)
+PASS [包内判据] 其余每一项 declared=0 且 used=0  <- {}
+   阶段台账 QUOTA_CONSUMED: [('port_open', 1, 0), ('tmc_config_apply', 1, 0)]
+PASS [包内判据] 阶段台账里被消耗的只有 port_open 与 tmc_config_apply  <- [('port_open', 1, 0), ('tmc_config_apply', 1, 0)]
+PASS [包内判据] port_open 与 tmc_config_apply 各恰 1 次  <- [('port_open', 1, 0), ('tmc_config_apply', 1, 0)]
+PASS [包内判据] 开口尝试恰 1 次(一个连续会话)  <- 1 次
+PASS [包内判据] 六条响应都被收到且台账记 nul_bytes=0  <- 6 条, nul=[0, 0, 0, 0, 0, 0]
+   两级台账 kind 全集: ['APPROVAL_COMMITTED', 'APPROVAL_LEDGER_BOUND', 'APPROVAL_LEDGER_END', 'APPROVAL_RESERVED', 'APPROVED_PACKAGE_VERIFIED', 'BUSINESS_OUTCOME', 'DISPATCH_DONE', 'PORT_CLOSED', 'PORT_OPEN', 'PORT_OPEN_ATTEMPT', 'PRE_CMD_DRAIN', 'PRE_CMD_DRAIN_SAVED', 'PROTECTION_CLAIMS', 'QUOTA_CONSUMED', 'RX_DONE', 'S0_FACTS', 'SESSION_OK']
+   TX 类事件=0 条(执行器不单独记发送事件, 只记 RX_DONE/BUSINESS_OUTCOME; 这条只是披露我看到的)
+   BUSINESS_OUTCOME 别名=['sys_pre', 'mot_pre', 'sys_post', 'mot_post']; SESSION_OK=[{"kind": "SESSION_OK", "session": "S_S1", "steps": 6, "t_s": 0.61}]
+   我按仓库里的计划重算 steps_sha256=11d42060d97de6b671e7c6e2910d3547176dd550b21e13af23cdb6982c827046 ; 现场台账记=11d42060d97de6b671e7c6e2910d3547176dd550b21e13af23cdb6982c827046
+PASS [包内判据] 现场执行的步骤摘要 == 我从计划重算的步骤摘要  <- 11d42060d97de6b671e7c6e2910d3547176dd550b21e13af23cdb6982c827046 vs 11d42060d97de6b671e7c6e2910d3547176dd550b21e13af23cdb6982c827046
+   计划声明的步骤命令序=['system_status', 'motor_status', 'tmc_config_apply CONFIRM', 'system_status', 'motor_status', 'safety_status']
+PASS [包内判据] 步骤序就是 A 定的六步(前置两条 → apply → 后置两条 → safety_status)  <- ['system_status', 'motor_status', 'tmc_config_apply CONFIRM', 'system_status', 'motor_status', 'safety_status']
+   六份响应原文首行(回显)按文件序=['system_status', 'motor_status', 'tmc_config_apply CONFIRM', 'system_status', 'motor_status', 'safety_status']
+PASS [包内判据] 每份响应原文的自报命令与计划同序一致(从字节读出, 不是从台账标签读出)  <- ['system_status', 'motor_status', 'tmc_config_apply CONFIRM', 'system_status', 'motor_status', 'safety_status'] vs ['system_status', 'motor_status', 'tmc_config_apply CONFIRM', 'system_status', 'motor_status', 'safety_status']
+PASS [包内判据] SESSION_OK 步数=6  <- [6]
+PASS [包内判据] 端口正常关闭(PORT_CLOSED 恰 1 条)
+   陈旧提示符处置(上一轮残留 5 B 'msh >'): [{"bytes": 5, "danger_gate": "applied_before_write", "kind": "PRE_CMD_DRAIN_SAVED", "raw": "D:\\ns800\\reports\\reviews\\phase8-m8-r7f2b-safety-print-fix\\field\\field-20261104T015928Z\\S_S1\\02_mot_pre.pre.rx.bin", "sha256": "43c13a5a4a0be881203be6677f4c64f4c2a2e2096c74b936e4222d774039f1a2", "t_s":
+PASS [包内判据] 残留单独另存且未混进任何响应原文  <- 02_mot_pre.pre.rx.bin bytes=5
+PASS [包内判据] 每条响应原文的首行仍是本条命令回显(没被上一轮提示符顶掉)
+PASS [包内判据] 台账里没有下载/回读/复位/起转/保存类事件(按上面全集判, 不是按我猜的名字判)  <- []
+PASS [包内判据] retry 未被消耗  <- []
+PASS [包内判据] 会话时长 < 90 s 硬截止  <- 阶段台账末尾 t_s=0.610 s
+PASS [包内判据] 批准身份绑定 + S0 三件身份 = A 的 IDENTITY  <- ['M8R7F4-b502-configured-20261104', 6]
+PASS [包内判据] 固定包身份校验通过且步骤数=6  <- [{'kind': 'APPROVED_PACKAGE_VERIFIED', 'plan_sha256': '0b6e1eb8a8c69b7f6b14a8f2a1e8662564caa4c56c17a5cd77fbad1368e74f11', 'stage': 'S1', 'steps': 6, 'steps_sha2
+   持久账本终态: spent={"port_open": 1, "tmc_config_apply": 1} writes=4 pending=[]
+PASS [包内判据] 持久账本终态只记 port_open/tmc_config_apply 各 1, 无 pending  <- {'port_open': 1, 'tmc_config_apply': 1}
+== 8) 收口态(未武装/禁能/保护门未开) ==
+PASS [包内判据] 最终仍是禁能侧: 三条响应一致给出 request LOW / pad 0 / ENN_fb=1
+PASS [包内判据] 本场没有开 IRQ / 没有做极性确认(irq_gate=CLOSED, polarity=not-confirmed)
+PASS [包内判据] 黑盒/日志/配置保存类命令未发出(响应里无相关标签)
+
+TOTAL 包内判据=77 fail=0 ; 附加对照(预测行表逐字节, 非包内判据)=5 fail=0
