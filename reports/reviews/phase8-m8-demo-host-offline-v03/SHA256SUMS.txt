@@ -1,6 +1,6 @@
 # sha256 * <仓库相对路径>(LF, 无 BOM; 本清单不哈希自身字节 —— 一条清单不能给自己的字节作证)
 # 生成方式: 对 reports/reviews/phase8-m8-demo-host-offline-v03/ 下每个常规文件(排除 SHA256SUMS.txt、remote_readback.md 与 __pycache__) 直接读磁盘字节算 sha256
-# 条目数=26; 与 Git blob 的逐条复算由 host/staged_preflight_batch.py(提交前, 单批流)与推送后的远端逐 blob 回读完成
+# 条目数=27; 与 Git blob 的逐条复算由 host/staged_preflight_batch.py(提交前, 单批流)与推送后的远端逐 blob 回读完成
 # 重新生成: python reports/reviews/phase8-m8-idle-stack-r4/host/make_round_sums.py <本目录>
 c0a30d879ff4e8df9c993e307d888dabfd6b97d9dd77e04d9b4fe923ce89c866  reports/reviews/phase8-m8-demo-host-offline-v03/gui/frame3_0x18.json
 3c3c33da7499ccf46ef86ad670c6e226511e49b8fc1117e657ef9529ffac1f49  reports/reviews/phase8-m8-demo-host-offline-v03/gui/frame3_0x18.png
@@ -20,6 +20,7 @@ dd81695b64154c194c617101fc0b385a2b048c25c7fb68346bc959237fe845d7  reports/review
 5340d65e777ff178d160790cfa334b95e8895d3eff8694194e46fba41527424a  reports/reviews/phase8-m8-demo-host-offline-v03/host/patched_pkg_check.json
 9578574c41aa380fc23a843296069d1e6c07102306f7affb8d3df7110a76f895  reports/reviews/phase8-m8-demo-host-offline-v03/host/repo_check.json
 2c58bf51295b9349ba399d8ad8ceb85c2a25b21e49f4ab02488ae6c3ad8c1a76  reports/reviews/phase8-m8-demo-host-offline-v03/host/summary.json
+507d6495dfc56f429fee1f435783e225d1b923ed29c88c98e1b75d2c1b1db421  reports/reviews/phase8-m8-demo-host-offline-v03/remote_readback_at_801fb18.txt
 15ac764a8ab3fbd80c5d4c9441fe44df06b4f817c201bbe73235f05fc232fef8  reports/reviews/phase8-m8-demo-host-offline-v03/run_record.md
 cff9367e1194c643b2c6da1b5690f8b5e055a8133fc089222657b261992b70ae  reports/reviews/phase8-m8-demo-host-offline-v03/tools/demo_gui_probe.py
 575476beded8e80e9100544472eafd3167f958b551ca5a93a5e82ba0f1d036a8  reports/reviews/phase8-m8-demo-host-offline-v03/tools/demo_gui_shot.ps1

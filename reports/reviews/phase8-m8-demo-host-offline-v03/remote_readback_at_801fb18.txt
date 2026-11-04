@@ -1,0 +1,18 @@
+FETCH|rc=0|
+REMOTE_TIP|801fb1811bba65cfa03d5fd1fc61bb77fe2f603f
+TIP_MATCHES_LOCAL|PASS|expected=801fb1811bba65cfa03d5fd1fc61bb77fe2f603f
+SUMS_LIST|reports/reviews/phase8-m8-demo-host-offline-v03|条目=26 (清单自身不在此列)
+SUMS_RECHECK|entries=26 ok=26 mismatch=0 not_checked=0
+SELFCHECK_SUMS|一个故意写错的登记值必须被判不符: FIRED
+--- 回执 JSON 自证(远端 blob)
+  写前帧 PASS registered=f0550d313164 remote=f0550d313164
+  第 3 帧原始回包页 PASS remote=f0550d313164
+  第 6 帧原始回包页 PASS remote=fa69aa5cf5a1
+  判据 total=21 fails=0 / 反例 6 例 rc 全对=6
+--- tip^ -> tip 差异(远端对象比较)
+DIFF|新增=0 改动=2
+  允许改动集=2 越界改动=0 []
+  新增件越界=0 []
+--- 原件保护(tip vs tip^ 内容逐字节)
+PRESERVE|比对=8 相同=8 被改=0 取不到=0
+SELFCHECK|.gitattributes tip vs tip^ 差异期望=False 实测=False: FIRED
