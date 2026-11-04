@@ -1,0 +1,93 @@
+{
+  "review_date": "2026-11-05",
+  "review_commit": "e1d7f3d90415fdf30344ed95a08065c1373fab01",
+  "parent_commit": "4d503103cf3f1eb6f5113b10cc8683954d510ac6",
+  "reviewer_worktree_status": "",
+  "source_bindings": [
+    {
+      "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diag_relative.c",
+      "bytes": 108354,
+      "sha256": "e162d35737ead191728a13ed585e3d35fff8a43cc88acba30b256010f438ee76",
+      "git_blob": "ef746e060f5063b38472e6bf5958dfc012ff9304"
+    },
+    {
+      "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diag_relative.h",
+      "bytes": 25522,
+      "sha256": "27b42031b934ff92dcc6daa4faca31a65cee3782dda489d428f26264c7738303",
+      "git_blob": "b36f086ec01ad61206220cff3f2657b82a9d38bb"
+    },
+    {
+      "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diagnosis.c",
+      "bytes": 54696,
+      "sha256": "4b69151e140b3a80dee4ff211aa935d51cf6e9de2611f6474b38f35a3836d281",
+      "git_blob": "2cf560955fc670cd5af15de04b652d9c1c7355ab"
+    },
+    {
+      "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/project_config.c",
+      "bytes": 23961,
+      "sha256": "24c1f16bd6abf1d6b260599ef5bde147a394fda4a7fedb2ffb9e65ed022a66ae",
+      "git_blob": "242ddbe6fb5bc112590c8479cc76e8c216e09580"
+    },
+    {
+      "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/project_config.h",
+      "bytes": 4775,
+      "sha256": "6ab66e7f96de99bad153c2b26ec1464e4564e41d0f4897fa753f8e68fd09d063",
+      "git_blob": "cd61a8a007fb853504bf67e0bef12a78e714b037"
+    },
+    {
+      "path": "tests/host/rel_main.c",
+      "bytes": 207003,
+      "sha256": "5707b5e4b9918dcf88ff55b59541f6b27460ad537a66f9764c91420eee39722f",
+      "git_blob": "ff88e3c07412fca24e26803d10f315e66c8a75c9"
+    },
+    {
+      "path": "tests/host/run_diag_relative_m8.sh",
+      "bytes": 26705,
+      "sha256": "d7e621f4610890bca09aba9ea22d011d2f093307e4f1e1cd1a24b3546fdb1b78",
+      "git_blob": "b1f6e30d5902eb32e284a5f6005b9d4ff9656bef"
+    }
+  ],
+  "original_probe_inputs": [
+    {
+      "file": "review_probes.c",
+      "sha256": "c4dcf1e78cdaed35013cb5851c303a64c96ff83ebad441784a66a27e7b22626a",
+      "archived_reviewer_original_equal": true
+    },
+    {
+      "file": "run_review_probes.py",
+      "sha256": "b03c0eca3d927169f428eeee4261ef0847ac507110ca8c8203a88c098768b79b",
+      "archived_reviewer_original_equal": true
+    }
+  ],
+  "results": {
+    "original_four": {
+      "checks": 4,
+      "pass": 4,
+      "run_rc": 0
+    },
+    "existing_chain": {
+      "cases_pass": 66,
+      "reverse_meta_ok": 19,
+      "runner_rc": 0
+    },
+    "ARD4_compound_failure": {
+      "run_rc": 1,
+      "REFUSED": true,
+      "configuration_changed": false,
+      "pending_changed": true,
+      "credentials_kept": true,
+      "configuration_id": 1,
+      "pending_id": 2
+    }
+  },
+  "verdict": "CHANGES_REQUIRED",
+  "closed_findings": [
+    "ARD1",
+    "ARD2",
+    "ARD3"
+  ],
+  "remaining_finding": "ARD4: cfg publication failure plus rollback ctx acquisition failure",
+  "product_edits_by_A": 0,
+  "hardware_actions": 0,
+  "arm_compiler_rerun_by_A": false
+}

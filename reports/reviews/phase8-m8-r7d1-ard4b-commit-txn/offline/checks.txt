@@ -1,0 +1,115 @@
+PASS ZIP_PRESENT NS800_R7D1_ARD4_Followup_e1d7f3d_20261105.zip
+PASS ZIP_BYTES bytes=21347 期望=21347
+PASS ZIP_SHA256 411ccf2d7ca72af4784c903225828d4a00973a68a27f633d15792a2b42c1d02c
+PASS MANIFEST_ENTRY_COUNT 19 条(3 件正文 + 12 件 proof + 4 件 reproducer)
+PASS MANIFEST_FILE_COUNT zip 内 20 个成员 = 19 条登记 + SHA256SUMS.txt 自身
+PASS MANIFEST_EXCLUDES_SELF 清单不含自身
+PASS MANIFEST_ALL_MATCH 19/19
+PASS VERDICT_CHANGES_REQUIRED base=e1d7f3d result=CHANGES_REQUIRED
+PASS SINGLE_FINDING_ARD4_P2 ARD4/P2
+PASS FINDING_LOCATION_RESOLVES diag_relative.c:2195-2209
+PASS CLOSED_NOT_REOPENED scope=['ARD1', 'ARD2', 'ARD3'] identity=['ARD1', 'ARD2', 'ARD3']
+PASS HW_CAP_ZERO scope=0 identity=0
+PASS NO_NEW_APPROVAL_ROUND 'Continue original offline authorization. No new registration or approval round.'
+PASS PRESERVE_ON_BOARD_IDENTITY 'historical b502 / 502dca5d'
+PASS PRESERVE_NEW_IMAGES_NOT_ON_BOARD df7584c3=NOT_ON_BOARD 165d8bdc=NOT_ON_BOARD
+PASS PRESERVE_CLAIMS_FALSE polarity=False core=False
+PASS PRESERVE_R7F5A_PENDING PENDING_OPERATOR_REPORT
+PASS PRODUCT_SCOPE_AUTHORIZED A 明确允许动 commit 的直接配置事务依赖 => 本轮动 project_config.c/.h 在授权内
+PASS HEAD_IS_REVIEWED_COMMIT HEAD=e1d7f3d90 被审=e1d7f3d90
+PASS IDENTITY_REVIEW_COMMIT review=e1d7f3d parent=4d50310
+PASS IDENTITY_BINDINGS_COUNT 7 件
+PASS A_SOURCE_BINDINGS_RECOMPUTED ok=7 bad=0(在 e1d7f3d 上逐件复算 blob sha1/字节/sha256)
+PASS DISK_VS_BLOB_RECORDED 磁盘已不同于被审提交的件=5 => ['diag_relative.c', 'project_config.c', 'project_config.h', 'rel_main.c', 'run_diag_relative_m8.sh'](应当是产品 3 + 主机 2; diag_relative.h 与 diagnosis.c 未改)
+PASS UNCHANGED_BOUNDINGS_EXPLICIT 仍与被审提交逐字节相同的登记件=['diag_relative.h', 'diagnosis.c']
+PASS A_EXISTING_CASES_66 {'cases_pass': 66, 'reverse_meta_ok': 19, 'runner_rc': 0}
+PASS A_EXISTING_REVERSE_19 19
+PASS A_ORIGINAL_FOUR_PASS_AT_BASE {'checks': 4, 'pass': 4, 'run_rc': 0}
+PASS A_COMPOUND_FAIL_RC1 {'run_rc': 1, 'REFUSED': True, 'configuration_changed': False, 'pending_changed': True, 'credentials_kept': True, 'configuration_id': 1, 'pending_id': 2}
+PASS REVIEWER_ORIGINALS_VERBATIM 19 件 A 的原件与 zip 内字节逐字节相同(未改审核人材料)
+PASS REVIEWER_SELF_MANIFEST_VERBATIM A 的 SHA256SUMS.txt 与 zip 内字节相同(1913 B, sha256=5d4aed469d279b23) —— 它进本轮清单会被"清单不哈希自身"的规则一起排除, 因此这条由本判据承担
+PASS PRE_FIX_REPRO_MATCHES_A_LINE_BY_LINE A 包内 OBS 行 refused=1 no_rollback=1 cfg_changed=0 pe; 我修前复现的 OBS 行 refused=1 no_rollback=1 cfg_changed=0 pe; 逐项对照里含该行=True
+PASS A_PRODUCT_EDITS_ZERO A 自己没改产品码也没重跑 arm 编译器 => 修前 FAIL 只能由我的复现来固定
+PASS SCOPE_NO_STRAY_FILES changed=8 untracked=45
+PASS TOUCHED_diag_relative.c diag_relative.c
+PASS TOUCHED_project_config.c project_config.c
+PASS TOUCHED_project_config.h project_config.h
+PASS TOUCHED_rel_main.c rel_main.c
+PASS TOUCHED_run_diag_relative_m8.sh run_diag_relative_m8.sh
+PASS NOT_TOUCHED_diag_relative.h ARD1-ARD3 不重开 => diag_relative.h 本轮一字未动
+PASS NOT_TOUCHED_diagnosis.c ARD1-ARD3 不重开 => diagnosis.c 本轮一字未动
+PASS NOT_TOUCHED_motor.c ARD1-ARD3 不重开 => motor.c 本轮一字未动
+PASS NOT_TOUCHED_sensor_service.c ARD1-ARD3 不重开 => sensor_service.c 本轮一字未动
+PASS PRODUCT_SCOPE_EXACTLY_THREE 产品侧改动面恰好 3 件: diag_relative.c + project_config.c/.h
+PASS OLD_EVIDENCE_AND_IMAGES_UNTOUCHED 上一轮(4d50310 复审轮)与被审轮的证据目录、两版旧镜像目录里的文件一个都没改
+PASS NORMAL_66_ALL_PASS SUMMARY|cases=66 pass=66 fail=0 pre_bad=0 executed=66
+PASS HOST_BUILD_RC0_WARNINGS0 build_rc=0 warnings=0
+PASS PRIOR_66_CASES_KEPT 上一轮台账 66 例, 本轮丢了 0 例[]
+PASS NO_NEW_CASE_ID_THIS_ROUND 本轮按 A 的要求并入既有 A16, 不新增用例编号; 新增的=[]
+PASS CASE_CHECKS_NEVER_SHRINK checks 变少的例=[](一条断言都没删) 变多的例=[('A16-commit-refused-keeps-config-and-candidate', 2)]
+PASS A16_CHECKS_GREW A16 的 checks 12 -> 14
+PASS REVERSE_FAMILY_COUNT_20 20 族(上一轮 19 + 本轮新增 RDV10)
+PASS REVERSE_NEW_FAMILY_RDV10 RDV10_commit_swallow_ctx_take_failure
+PASS REVERSE_RDV9_RENAMED_NOT_REUSED RDV9 名字沿用上一轮(家族身份不变), 注入体换成新顺序的等价缺陷
+PASS REVERSE_META_OK_20_LINES 判定行(带 | META-OK)= 20
+PASS REVERSE_META_OK_COUNT_NOT_SUBSTRING_TRAP 子串计数=21 而判定行=20: 正文里也出现这个词, 判据按行取
+PASS REVERSE_NO_META_FAIL 没有 META-FAIL/其他 META 状态
+PASS REVERSE_EACH_COMPILED_AND_RAN INJECTED 行=20(编译失败或没跑到就不会有这行)
+PASS REVERSE_RAN_ON_FINAL_BYTES 反向链尾部总结果行与 RDV10 在同一次运行里
+PASS NEGATIVE_INJECTION_GATE_IN_RUNNER run_diag_relative_m8.sh 里 reverse_case 有一条 grep -q "NEGATIVE-INJECTION" 硬门(缺标记就报错退出)
+PASS NEGATIVE_INJECTION_MARKERS_EXACTLY_PER_FAMILY 脚本内具名标记 20 个, 去重后 20 个(应当一一对应 20 个家族)
+PASS FOUR_POST_RC0 本轮四探针 run_rc=0
+PASS FOUR_FAILURES_ZERO_BOTH 基线块与本轮块各自内部都有 REVIEW_SUMMARY failures=0(A 合同在两侧都成立)
+PASS ARD123_BEHAVIOUR_UNCHANGED_ON_PROBES ARD1/ARD2/ARD3 三条探针的 6 个观察量本轮与 e1d7f3d 完全相同(必要回归未越界)
+PASS PROBE4_EQUIVALENT_FAULT_POINT_STILL_FIRES 本轮该块内 refused=1 cfg_changed=0, 拒绝身份只有 ctx-lock-commit(旧身份 ctx-lock-publish 在本轮的探针输出里已经不存在 => 顺序真的换了, 不是只改了报文)
+PASS COMPOUND_refused refused          修前 1 -> 修后 1
+PASS COMPOUND_no_rollback no_rollback      修前 1 -> 修后 0
+PASS COMPOUND_cfg_changed cfg_changed      修前 0 -> 修后 0
+PASS COMPOUND_pending_changed pending_changed  修前 1 -> 修后 0
+PASS COMPOUND_creds_kept creds_kept       修前 1 -> 修后 1
+PASS COMPOUND_cfg_id cfg_id           修前 1 -> 修后 1
+PASS COMPOUND_pending_id pending_id       修前 2 -> 修后 1
+PASS COMPOUND_ctx_takes ctx_takes        修前 5 -> 修后 3
+PASS COMPOUND_PRE_FAIL_POST_PASS 修前 run_rc=1 FAIL, 修后 run_rc=0 PASS
+PASS COMPOUND_CTX_ARM_INERT_DISCLOSED 本轮把"回滚取 ctx 失败"这一臂打不到的事实与替代取证(A16 ②/⑤ + 四探针第 4 条)写在同一件里
+PASS OLD_ROLLBACK_WHY_LITERALS_GONE 三条与"回滚"绑在一起的 why 字面量已从源码消失(回滚不再存在)
+PASS NEW_COMMIT_WHY_LITERALS_PRESENT cfg-lock-commit,ctx-lock-commit
+PASS WHY_VALUE_SET_CLOSED why 赋值 31 处: 字面量 18 个 + 宏 1 个(REL_JOB_WHY_RUN) + 转发/三元 9 处(三元默认值 IDLE,UNSPECIFIED); 未识别右值=无; 集合内最长 25 B(上一轮确立的上界 25 B)
+PASS ADDED_KPRINTF_FORMATS_AS_EXPECTED 0 个新增/改动的 rt_kprintf 格式串(A 允许改内部取锁顺序, 本轮不改报文形状; why 字面量最长 25 B 仍 <= 上一轮上界 25 B)
+PASS FIELD_TABLE_DERIVED_FROM_HEADERS 两份头文件里当场解出 144 个成员 -> 十进制位宽上界(未识别类型=无); 抽样 hz_nominal=10 dir_mask=3 run_adc_min=5 adc_dev_warn=6 learn_sg_seq_first=10 left_ms=11
+PASS COMMIT_PATH_PRINTS_COVERED rel_cmd_commit 内 5 个 rt_kprintf 调用点全部逐个折算(不是空判)
+PASS COMMIT_PRINTS_WITHIN_120 commit 路径最宽一次=80 B 预算=120 B(含源 LF)
+PASS COMMIT_PRINT_BOUND_NOT_VACUOUS 最宽一次只有 80 B => 折算表大概没生效
+PASS COMMIT_REFUSED_LINE_FITS_WIDEST_WHY 按本轮 why 全集最宽 25 B(上一轮已确立的上界 25 B)折算该条 = 67 B <= 120 B
+PASS PRINT_ARGS_ALL_RESOLVED 折算表没有对任何实参取默认 26 B 兜底(未识别实参=[]) —— 每个宽度都能回到源码类型或字面量
+PASS ALL_DIAG_RELATIVE_PRINTS_WITHIN_120 diag_relative.c 全部调用点按类型化实参折算后最宽 109 B, 没有一条超 120 B(含源 LF)
+PASS NO_BARE_NUL_IN_FORMATS 63 条格式串里没有裸 NUL
+PASS FORMATS_STRICT_UTF8 逐条严格 UTF-8 解码通过
+PASS LEARN_STATUS_MAIN_LINE_UNWIDENED 上一轮已证的 learn_status 主行格式串本轮保持原样(未被改宽也未被删)
+PASS MANIFEST_ROUND phase8-m8-r7d1-ard4b-commit-txn
+PASS MANIFEST_BASELINE_IS_REVIEWED baseline=e1d7f3d head_is_baseline=True
+PASS MANIFEST_REVIEWED_ZIP_MATCHES_PACKAGE manifest 登记的被审包身份(字节/散列/内层清单条数) == 本次实算
+PASS MANIFEST_IMAGES_MATCH_DISK 4 件(BIN/AXF/MAP/调用图)逐字节复算相同
+PASS AXF_FLASH_SEGMENT_EQUAL_BIN span=297452 bin=297452
+PASS AXF_FLASH_EQUAL_BIN_ON_REVIEWED 被审提交那一版同一工具复算: span=297476 bin=297476
+PASS REVIEWED_IMAGE_UNCHANGED e1d7f3d 那一版镜像仍是 165d8bdc..
+PASS OLDER_IMAGE_UNCHANGED 4d50310 那一版镜像仍是 df7584c3..
+PASS MANIFEST_PROGRAM_SIZE_FROM_LOG Program Size: Code=209490 RO-data=87378 RW-data=2196 ZI-data=85944
+PASS LOG_ZERO_ERROR_ZERO_WARNING 结果行逐字取日志
+PASS DELTA_RECOMPUTED_FROM_TWO_LOGS Code+16 RO-44 RW+0 ZI+0(两份日志当场相减, 与 manifest 登记相同)
+PASS BIN_DELTA_RECOMPUTED BIN 297476 -> 297452 = -24
+PASS ER_IROM1_DELTA_MATCHES_CODE_RO_RW 两份 map 的 ER_IROM1 296896 -> 296868 = -28, 与 Code+RO+RW 增量 -28 同向且相等
+PASS ROM_VS_BIN_GAP_EXPLAINED_IN_REPORT Code+RO+RW=-28 而 BIN=-24, 差 +4 由装载段构成(对齐空隙)解释, 资源报告里两条等式各自成立
+PASS RESOURCE_REPORT_JUDGEMENTS_ALL_TRUE {"axf_flash_segment_equal_bin_both_images": true, "bin_composition_residual_zero": true, "nonzero_object_diff_set_exact": true, "program_size_reconciliation": true, "library_member_rows_identical": true}
+PASS NONZERO_OBJECT_DIFF_IS_TWO 逐对象差分只出现在 diag_relative.o 与 project_config.o(与产品改动面一致)
+PASS COMMIT_STACK_COST_RETURNED rel_cmd_commit 帧 608->496 子树 1556->1404; 子树变高的命令根=无(本轮把上一轮为回滚新增的成本收回, 没有靠加大栈或延长 deadline 绕过)
+PASS STACK_AND_DEADLINE_CONSTANTS_UNCHANGED {"DIAG_THREAD_STACK": ["4096", "4096"], "FINSH_THREAD_STACK_SIZE": ["4096", "4096"], "REL_CMD_DEADLINE_MS": ["12000", "12000"]}
+PASS ONLY_ONE_BUILD_THIS_ROUND 日志里 Rebuild target 行 = 1
+PASS NO_DOWNLOAD_STEP_IN_LOG AfterMake 只有 1 条且是 fromelf --bin: fromelf --bin .\build\motor_m1\rt-thread-motor-m1.axf --outp(日志里"flash"字样只出现在 compiling ns_flash.c 这类源文件名上, 不是下载动作)
+PASS DOC_implementation_contract implementation_contract.md 存在且非空壳(9280 B)
+PASS DOC_case_mapping case_mapping.md 存在且非空壳(8682 B)
+PASS RUN_RECORD_SECTION_17 reports/reviews/phase8-m8-r7f2b-safety-print-fix/run_record.md 里有第 17 节且点名本轮(§16 及更早的节原文未删)
+PASS RUN_RECORD_KEPT_16 上一轮与上上轮的节仍在
+PASS LEAK_SCANNER_FIRED_ON_SYNTHETIC 三条模式各自在合成样本上命中(判据不是空转)
+PASS NO_LOCAL_PATH_LEAK 本轮交付文件里无本机用户目录/用户名
+TOTAL=114 FAIL=0 fails=-

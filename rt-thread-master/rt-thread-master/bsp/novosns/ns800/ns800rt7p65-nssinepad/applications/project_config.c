@@ -488,6 +488,35 @@ rt_err_t project_config_clear_rprof(void)
     return RT_EOK;
 }
 
+/* ARD4b(A 复审续): "可失败的取锁"与"持锁后不可失败的写入"分开, 让调用方能在改任何
+ * 共享状态之前把所需锁一次拿齐。合同见 project_config.h 上方注释。
+ * begin: 校验全在副本上做; 拒绝时放锁返回, cfg 一个字节没改。成功时**保持持锁**。
+ * publish_locked: 只做一次赋值 —— 它不取锁、不校验、不做 Flash I/O, 因此没有可失败的
+ * 步骤; 校验与范围检查都已经在 begin 里对同一份内容做过, 这里重复校验只会把"两步之间
+ * 可能失败"重新引回来。参数不再判空: 调用方传的就是刚通过 begin 的那一份, 判空后静默
+ * 返回反而会把"什么都没发布"伪装成成功。 */
+rt_err_t project_config_rprof_begin(const diag_rprof_t *p)
+{
+    project_config_t tmp;
+    rt_err_t e;
+
+    if (p == RT_NULL) return -RT_EINVAL;
+    if (rel_profile_validate(p, RT_NULL) != RT_EOK) return -RT_EINVAL;
+    e = cfg_take_checked();
+    if (e != RT_EOK) return e;                      /* 没拿到锁: 未持锁, 状态未改 */
+    tmp = cfg;
+    tmp.rprof = *p;
+    if (!config_in_range(&tmp)) { cfg_release(); return -RT_EINVAL; }
+    return RT_EOK;                                  /* 持锁返回, 调用方必须成对 end */
+}
+
+void project_config_rprof_publish_locked(const diag_rprof_t *p)
+{
+    cfg.rprof = *p;
+}
+
+void project_config_rprof_end(void) { cfg_release(); }
+
 /* ---------- MSH: config_show / config_default / config_save / config_load ---------- */
 
 /* D3: 本项目的 rt_kprintf 走 RT-Thread 自带 vsprintf, 不支持浮点 —— 真机上

@@ -501,3 +501,92 @@ armlink 的数是静态下界且解析不了 msh 的函数指针，故不给 she
 `polarity_measured=false`、`core_protection_verified=false` 保持，四条禁用声称继续禁止；
 R7F5A 物理断电回报仍 `PENDING_OPERATOR_REPORT`（未代填、未为关闭它接设备）；
 演示端 V0.3、旧包、旧现场原件与旧批准账未动；本轮不构成任何硬件授权。
+
+## 17 M8-R7D1 ARD4b 续修轮（A 复审把 ARD4 判回 CHANGES_REQUIRED；设备动作 0）
+
+被审件 `NS800_R7D1_ARD4_Followup_e1d7f3d_20261105.zip`（21347 B，sha256 `411ccf2d…d02c`，
+内层清单 19 条逐条复算 19/19、zip 内 20 个成员、清单不含自身），`FIX_SCOPE.id=R7D1_ARD4_FOLLOWUP_e1d7f3d`，
+唯一 finding 是 **ARD4 / P2 / CHANGES_REQUIRED**，位置 `diag_relative.c:2195-2209`；
+`closed_without_reopening=[ARD1,ARD2,ARD3]`，`hardware_actions_cap=0`，
+授权原文「Continue original offline authorization. No new registration or approval round.」。
+基线 = 被审提交 `e1d7f3d`（构建与判据时 HEAD 即它，`HEAD_IS_REVIEWED_COMMIT` PASS）。
+A 登记的 7 件源码绑定在 `e1d7f3d` 上逐件复算 blob sha1/字节/sha256 全对；磁盘与被审提交不同的
+恰是 5 件（产品 3：`diag_relative.c` `project_config.c` `project_config.h`；主机 2：`rel_main.c`
+`run_diag_relative_m8.sh`），`diag_relative.h` 与 `diagnosis.c` 逐字节仍相同 —— ARD1–ARD3 没被重开。
+A 的 19 件包内原件按原路径入 `reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/`，
+逐件与 zip 内字节相同（判据 `REVIEWER_ORIGINALS_VERBATIM`），未改写。
+
+**缺陷与改法**：被审版是"发布候选 → 写配置 → 失败再回滚候选"，回滚自己也要一次可能失败的 ctx 取锁，
+于是"配置写失败 + 回滚取锁失败"这一组合留下 `候选=新版 / 配置=旧版 / 两份凭据都还在` 的半份发布
+（A 的探针原文 `no_rollback=1 pending_changed=1 creds_kept=1 cfg_id=1 pending_id=2 ctx_takes=5`，
+`run_rc=1`；我在 `e1d7f3d` 的仓外副本上用同一份 reproducer 逐字复现，OBS 行与包内原文一字不差）。
+本轮按 A 的路线把**提交点**换成"两把锁都到手之后只做不会失败的赋值"：新增
+`project_config_rprof_begin()/publish_locked()/end()` 三条窄路径（`begin` 里完成全套校验与 cfg 取锁，
+是本轮最后一个可失败步骤），commit 依次 `begin → rel_ctx_take → 两份赋值 → 放锁`；
+ctx 拿不到就归还自己刚拿的 cfg 锁并按 `-RT_ETIMEOUT` 具名拒绝。**回滚路径整体消失**，
+不再需要"靠另一次可能失败的取锁来撤销"。结果合同只剩两种：`REFUSED` 时配置/候选/凭据逐字节不变
+且不持锁；`OK` 时配置与候选 memcmp 相等（A16 ① 直接逐字节比，不从打印推断）。
+锁序 `mot(跨命令持有) → cfg → ctx` 不变，`rel_ctx` 仍是叶锁（`rel_pending_publish_locked` 内只有赋值），
+没有无界重试、没有强行解锁、没有吞错误；持 cfg 期间只多了一次有界等待（`REL_CTX_TAKE_MS=20ms`）。
+既有 `project_config_set_rprof()` 保留未动（别的用例与路径仍在用）。
+
+**验证**：正常链 `build_rc=0 warnings=0`、`cases=66 pass=66 fail=0 executed=66`（上一轮 66 例一条未丢、
+本轮不新增编号，checks 只增：A16 35→37，其余逐例相同）；反向链 **20 族**全 META-OK（原 19 族一条未删，
+新增 `RDV10_commit_swallow_ctx_take_failure`；`RDV9` 沿用原名换注入体；每族都有 `INJECTED` 行即副本
+确实编译并真执行，期望命中 A16）；A 的原版四探针未改脚本，`e1d7f3d` 与本轮都是 4/4 PASS，
+ARD1/ARD2/ARD3 那三条的 6 个观察量逐项相同（必要回归未越界）；第 4 条在同一注入下拒绝身份由
+`ctx-lock-publish/-12` 变为 `ctx-lock-commit/-117` 且仍 `refused=1 cfg_changed=0`。
+**如实登记**：A 的复合探针把 cfg 与 ctx 两个故障同时装上，修后 commit 只取 ctx 3 次且 cfg 先失败，
+**ctx 那一臂已经打不到**（`ctx_takes 5→3`）—— 它的 PASS 只证明"cfg 失败时三份状态未动"，
+"配置已写成而 ctx 发布失败"这一组合在新设计里不可能发生；等价故障点由 A16 ②/⑤ 与四探针第 4 条承担。
+离线判据 `TOTAL=113 FAIL=0`。
+
+**打印预算换了口径并扩了覆盖面**：本轮新增/改动的 rt_kprintf 格式串 0 个（报文形状未动），
+但被审版三条与回滚绑在一起的 why 字面量消失、新增两条。上一轮的宽度表对不认识的实参一律按 26 B
+兜底，所以只能覆盖"本轮触及的调用点"；本轮把宽度改成当场从 `diag_relative.h` + `project_config.h`
+解出的 144 个成员类型折算（同名字段取最大值，只会高估），覆盖面因此扩到整份 `diag_relative.c`：
+`commit` 路径最宽一次 80 B、全文件最宽 109 B，均含源 LF 且 ≤120 B；没有任何实参落到兜底
+（`PRINT_ARGS_ALL_RESOLVED`），why 的 31 处赋值右值闭合成 4 类、集合最长 25 B（上一轮上界）；
+无裸 NUL、逐条严格 UTF-8；`learn_status` 主行未被改宽。
+
+**构建**（一次，`UV4 -r` 单目标 rt-thread-motor-m1-candidate，未加 `-f`）：rc=0，
+`0 Error(s), 0 Warning(s)`，V6.24，`Code=209490 RO=87378 RW=2196 ZI=85944`；
+新 BIN 297452 B `23691e8d…`，AXF 1790048 B `0f421595…`，MAP `e2d8d081…`，调用图 `a7090b6e…`，
+全部归档到**新目录** `reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/`。
+被审那一版镜像仍是 `165d8bdc…`、上一轮那版仍是 `df7584c3…`（`REVIEWED_IMAGE_UNCHANGED` /
+`OLDER_IMAGE_UNCHANGED`），A 的失败原文与两版旧证据一字未动（`OLD_EVIDENCE_AND_IMAGES_UNTOUCHED`）。
+资源侧：`Code+RO+RW` 增量 −28 而 BIN 增量 −24，差 +4 由装载段构成解释（ER_IROM1 −28、
+RW_VT_DTCM 压缩载荷 0、对齐空隙 −4、RW_DTCM 压缩载荷 +8），两版各自"三段+空隙"精确等于该版
+BIN 字节数（297476 / 297452），残差 0；ER_IROM1 两份 map 相减 −28 与 Code+RO+RW 同向相等（独立复算）。
+逐对象非零差分只有 `diag_relative.o`（Code+8 RO−42）与 `project_config.o`（Code+2），其余 109 行 .o
+与 49 行库成员逐字段相同；对账 −32 + (incl. Padding) 第 2 行 +4 = −28。AXF 的 Flash 装载段与 BIN
+逐字节相等（两版都用仓外 ELF32 程序头工具先在被审件上复现"相等"再跑本轮件）。
+栈：`rel_cmd_commit` 帧 608→496、子树 1556→1404 —— 上一轮为回滚新增的 `diag_rprof_t` 局部副本
+（map 同类型 116 B）与 `project_config_set_rprof → cfg_take_checked` 那条子树（948 B）一起消失，
+命令线程可见最深根回到 `rel_cmd_clear`（1460，余量 2636 B），**没有任何子树变高**；
+`DIAG_THREAD_STACK=4096`、`FINSH_THREAD_STACK_SIZE=4096`、`REL_CMD_DEADLINE_MS=12000`
+三份值与基线 blob 相同（没有靠加大栈或延长超时绕过）；Diag 线程帧与子树 +0、最深线逐字未变。
+
+**自伤与工具侧问题（照实）**：
+1. A16 ④（锚点特异性）第一次跑成 FAIL：做"挪后一步"这次运行前没把 `g_ctx_take_calls` 清零，
+   夹具的失败条件是"第 N 次之后"，于是第一条 take 就超阈值，得到一条无关的
+   `commit REFUSED: ctx lock`。这条恰好证明该段不是恒绿；加清零并在注释里写明理由后 66/66。
+2. 派生自上一轮的资源报告初版仍按"非零差分只有 `diag_relative.o`"判定，本轮 `project_config.o`
+   也改了 → 判据与对账两处 FAIL；改成两对象集合 + 通用对账（含链接器 padding 行）后重跑，
+   第一版错误输出被正确一版覆盖，未入库。
+3. 派生的 manifest 工具初版带着上一轮的过期叙述（`+476/+472` 的对账话、`build_r7d1r.log`、
+   `resource_stack_r7d1r.txt`、以 `209178/87242/85936` 为基线的增量）；且把 `REL_CMD_DEADLINE_MS`
+   当成在 `diag_relative.h`、把 `rtconfig.h` 当成在 `applications/`（实为 BSP 根，运行即
+   FileNotFoundError）。现全部改成当场派生：增量取两份日志相减、被审 Program Size 取上一轮
+   manifest、栈/时间常量磁盘值与被审基线 blob 各取一次比对、调用图数字与三处判据行从资源报告
+   逐字摘（锚点找不到就抛，不允许手抄）。
+4. 打印折算的兜底宽度会把既有 `show` 行误报成超预算（实测 4 条），根因是不认识实参按 26 B 猜；
+   换成按头文件类型折之后同一批行实际 ≤109 B。这是判据口径的修正，不是产品变宽，也未因此改任何打印。
+5. `META-OK` 子串计数 21 与判定行计数 20 不一致（正文里也出现这个词）；判据改按行取，
+   并另加一条"两种计数确实不相等"的判据防止以后退回子串数。
+
+**边界**：本轮 0 次下载/回读/复位/开串口/枚举 DAP/逻辑分析仪/arm/start/运动/真实学习/写配置/供断电；
+板上仍只承认历史 `b502 / 502dca5d…`，`23691e8d…` 与 `165d8bdc…`、`df7584c3…` 均 NOT_ON_BOARD；
+`polarity_measured=false`、`core_protection_verified=false` 保持，四条禁用声称继续禁止；
+R7F5A 物理断电回报仍 `PENDING_OPERATOR_REPORT`（未代填、未为关闭它接设备）；
+演示端 V0.3、旧包、旧现场原件与旧批准账未动；本轮不构成任何硬件授权。

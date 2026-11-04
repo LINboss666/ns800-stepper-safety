@@ -1462,14 +1462,22 @@ static rt_err_t rel_pending_read(diag_rprof_t *cand, rt_bool_t *zero, rt_bool_t 
 
 /* set_zero / set_learn: -1 保持原值, 0 置 FALSE, 1 置 TRUE; cand==RT_NULL 表示
  * 本次只动凭据不动候选。失败(取锁不到)时一个字段都不改。 */
+/* ARD4b(A 复审续): 持 rel_ctx 时的发布本体。它**不取锁**, 所以没有可失败的步骤 ——
+ * 只允许已经在 rel_ctx 临界区内的调用者使用(rel_pending_write 与 commit 的提交点)。
+ * 与 rel_pending_write 共用同一段赋值, 避免出现两份会各自漂移的"发布"定义。 */
+static void rel_pending_publish_locked(const diag_rprof_t *cand, int set_zero, int set_learn)
+{
+    if (cand) d_pending = *cand;
+    if (set_zero  >= 0) d_pending_zero  = set_zero  ? RT_TRUE : RT_FALSE;
+    if (set_learn >= 0) d_pending_learn = set_learn ? RT_TRUE : RT_FALSE;
+}
+
 static rt_err_t rel_pending_write(const diag_rprof_t *cand, int set_zero, int set_learn)
 {
     rt_err_t rc = rel_ctx_take();
 
     if (rc != RT_EOK) return rc;
-    if (cand) d_pending = *cand;
-    if (set_zero  >= 0) d_pending_zero  = set_zero  ? RT_TRUE : RT_FALSE;
-    if (set_learn >= 0) d_pending_learn = set_learn ? RT_TRUE : RT_FALSE;
+    rel_pending_publish_locked(cand, set_zero, set_learn);
     rel_ctx_give_held();
     return RT_EOK;
 }
@@ -2134,7 +2142,7 @@ static void rel_cmd_tier(rt_uint32_t tier)
 static void rel_cmd_commit(void)
 {
     const char *why = "?";
-    diag_rprof_t cand, cur, prev;
+    diag_rprof_t cand, cur;
     rt_bool_t    pz = RT_FALSE, pl = RT_FALSE;
     rt_uint32_t live;
     rt_bool_t src_ok;
@@ -2159,7 +2167,6 @@ static void rel_cmd_commit(void)
     if (!rel_sources_present())  { fin = -RT_EPERM; why = "source-unhealthy"; goto out; }
     if (rel_pending_read(&cand, RT_NULL, RT_NULL) != RT_EOK)
     { fin = -RT_EIO; why = "ctx-lock"; goto out; }
-    prev = cand;                  /* ARD4: 回滚用的"发布前那份候选"(下面字段会被改写) */
     cand.magic = DIAG_RPROF_MAGIC;
     cand.abi   = DIAG_RPROF_ABI;
     cand.flags = (rt_uint16_t)((cand.flags & ~RPF_FIELD_VERIFIED) | RPF_COMMITTED | RPF_FROM_LEARN);
@@ -2187,21 +2194,29 @@ static void rel_cmd_commit(void)
     if (cand.signature != live)
     { fin = -RT_EPERM; why = "drive-config-drifted"; goto out; }
     if (rel_profile_validate(&cand, &why) != RT_EOK) { fin = -RT_EINVAL; goto out; }
-    /* ARD4(A 复审): 顺序必须是"先发布候选, 再写配置"。旧写法先 project_config_set_rprof
-     * 再发布, 于是发布失败时 RAM 配置已经换成了这一版阈值 —— 而保护判据读的就是配置,
-     * 这等于把"命令报了 REFUSED"变成"配置已经生效"。反过来排, 发布失败时配置一字未动;
-     * 只有配置写失败才需要回滚候选, 且回滚结果一定如实披露。
-     * 两步之间不能合并成一个临界区: 叶锁 rel_ctx 里不允许调 cfg(锁序只允许 mot/cfg -> ctx)。 */
-    if (rel_pending_write(&cand, -1, -1) != RT_EOK)
-    { fin = -RT_EIO; why = "ctx-lock-publish"; goto out; }   /* 配置未动: 整次 commit 什么都没改 */
-    fin = project_config_set_rprof(&cand);
-    if (fin != RT_EOK)
+    /* ARD4b(A 复审续 e1d7f3d): 提交点之后的两份内存发布**不得再有可失败步骤**。
+     * 上一版是"发布候选 -> 写配置 -> 失败再回滚候选", 于是回滚自己也要一次可能失败的
+     * ctx 取锁: 那次取锁失败时命令报 REFUSED, 候选却已经换成新版而配置还是旧版(A 的
+     * 组合反例: cfg_id=1 pending_id=2), 就是半份发布。
+     * 现在改成: 按既有锁序 mot(已持) -> cfg -> ctx 把可失败的取锁**全部做完**, 两把锁都
+     * 到手之后才一次落定两份内存发布 —— 这两次写不取锁、不校验、不做 I/O, 因而不会失败,
+     * 也就不需要"靠另一次可能失败的取锁来撤销"。
+     * 任一步取锁失败都发生在改动共享状态之前: 配置、候选、凭据全保持调用前的值。
+     * 边界: rel_ctx 仍是叶锁(其内只做赋值), cfg 锁在持有期间只做一次有界等待(最坏
+     * REL_CTX_TAKE_MS)加两次结构体写入; 全程不碰 UART / sleep / Flash。 */
+    fin = project_config_rprof_begin(&cand);
+    if (fin != RT_EOK) { fin = -RT_EIO; why = "cfg-lock-commit"; goto out; }
+    if (rel_ctx_take() != RT_EOK)
     {
-        if (rel_pending_write(&prev, -1, -1) == RT_EOK) why = "config-write-rolled-back";
-        else { why = "config-write-no-rollback"; }        /* 候选=新版而配置=旧版: 必须显式说出来 */
-        fin = -RT_EIO;
+        project_config_rprof_end();               /* 放掉自己刚拿的 cfg 锁, 不碰别人的 */
+        fin = -RT_ETIMEOUT; why = "ctx-lock-commit";
         goto out;
     }
+    rel_pending_publish_locked(&cand, -1, -1);     /* 不会失败 */
+    project_config_rprof_publish_locked(&cand);   /* 不会失败 */
+    rel_ctx_give_held();
+    project_config_rprof_end();
+    fin = RT_EOK;
 
 out:
     rel_txn_close();

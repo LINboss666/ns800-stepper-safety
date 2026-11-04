@@ -1,0 +1,42 @@
+# sha256 * <仓库相对路径>(LF, 无 BOM; 本清单不哈希自身字节 —— 一条清单不能给自己的字节作证)
+# 生成方式: 对 reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/ 下每个常规文件(排除 SHA256SUMS.txt、remote_readback.md 与 __pycache__) 直接读磁盘字节算 sha256
+# 条目数=38; 与 Git blob 的逐条复算由 host/staged_preflight_batch.py(提交前, 单批流)与推送后的远端逐 blob 回读完成
+# 重新生成: python reports/reviews/phase8-m8-idle-stack-r4/host/make_round_sums.py <本目录>
+a5b827f47ca08c4f3de98894038e9d90f9d9e60264eb7d320d692b61c4969d3e  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/build/build_r7d2.log
+9c0610a0f228ca9a9bd579f5477a6cf141ce1fc61057f1a454951a6b3bf8c39e  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/build/resource_stack_r7d2.txt
+ab921e0c6bdd4a749da8431c42e9f95be952112ccd8802786862febd1e8e64fb  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/case_mapping.md
+f6ebea96fee8656f606d2db940cfd5ddf70b32a1e0b77e142f31e5a104abadd1  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/host/case_ledger.txt
+1849fba8ae7436cf5e8e39c0a3750d9a3a0449209cc0a5afc575f102368f937a  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/host/normal_chain_build.txt
+58c44093223657477320e6ea6f3fe01c3bb6519b2f535556283b952fa8945bbf  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/host/normal_chain_out.txt
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/host/normal_chain_warning_count.txt
+b771e16fcdb49c253bb9b6a8322c41c91a2719325f55368e8c7100977b16a1a6  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/host/probe_compound_before_after.txt
+e737e63548c349bfb27d95f4eb11cfe7397774d82e60998265491fd039e8c3c3  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/host/probe_four_before_after.txt
+a998c2d5bd91fee88924ed37b47b3580312e70292e8a70b07666532ca7180f70  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/host/reverse_meta_lines.txt
+da6e541e8c86e3c0bcb64a99f3349cd3865e02f53035dd995f2a5299c2cd8b49  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/host/reverse_run_full.txt
+0c4550af9420193a66f04467305a1bb0c7c8cb1a47ad5290b3c79220c2ca7552  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/implementation_contract.md
+ec1556b39cb1ab4f48fe89af6da364e4a4b5472bf0deb7ad32050363094298ba  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/offline/checks.txt
+84c65a5181204a746c8332b68420d86a3256b4c78fbe933d236a42def1292c56  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/offline/summary.json
+5e58820c1bdc3ae5b5a9ea2ab1462a86e3a08eb50a95650a1ad2d161dd87209a  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/A_REVIEW_R7D1_e1d7f3d_ARD4_FOLLOWUP.md
+5e139d51dc20080d992aad85faa92441f87421224f61abe49f789579cbf689e7  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/FIX_SCOPE.json
+76241ab29a16446e9c792784b2360bbce141cc5fc354f44696061f930b099cdd  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/IDENTITY.json
+87e9b9299d2a32647cdc06522909c2678e94889cecc86d0eda2b11985269a3cc  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/proof/a_original_four/build.stderr.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/proof/a_original_four/build.stdout.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/proof/a_original_four/probe.stderr.txt
+b5bd1131eb9c6e80ac6069c533c04635c0c28f4bfab94b07974279031321a94d  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/proof/a_original_four/probe.stdout.txt
+81fb568947041ce02cdc65dc261d03e11f954656d38dca0500abb9b81263a9f0  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/proof/a_original_four/result.json
+fc5d9a115bc4e54ba18c6c94fccd5018ffe3dab62487631cbf73697993aa6f64  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/proof/compound_probe/build.stderr.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/proof/compound_probe/build.stdout.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/proof/compound_probe/probe.stderr.txt
+dddda17014dd39d4af2a4a3c22c5a551109fdced53b9432ab2cfc6f3a76d4828  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/proof/compound_probe/probe.stdout.txt
+542335d7e8d25a8183f7e96ea4b9c6305addad82735fae2504cde6b0ea003350  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/proof/compound_probe/result.json
+2ed14d303d78f1b662bc9469bfddfcbda5086c6d75ff9827c6e6ed919c471bfe  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/proof/full_chain.log
+bb1665ff0a2d2743456e9ca4586979c9a6490d835a44b76c005664b58b7827d8  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/proof/image_identity_review.json
+8667e2001d754d605cc9cfbf43e4d750d4c972f12385990cbac4d77faafb3763  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/reproducer/commit_rollback_probe.c
+c4dcf1e78cdaed35013cb5851c303a64c96ff83ebad441784a66a27e7b22626a  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/reproducer/original_four/review_probes.c
+b03c0eca3d927169f428eeee4261ef0847ac507110ca8c8203a88c098768b79b  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/reproducer/original_four/run_review_probes.py
+7c491391e350146fed1799fc7db3ed4e898f8ff5cf4e7fbd791bdcdcba57ead5  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/reviewer_originals/reproducer/run_commit_rollback_probe.py
+60805334195b6e3c5ec748a39cc88ff4dc2802e9daffdd47db337497e8499553  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/tools/r7d2_make_host_artifacts.py
+ddaafeff182c3342b9e6e244cb7ce8edaee5a7756a9ffcc39af9f3ea2c54ca18  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/tools/r7d2_make_manifest.py
+4bf895113775a68c552356ec8ab1da5f061f679c90f678fc25831175eebffb73  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/tools/r7d2_offline_checks.py
+06730cf9a53a18742b96ae48cf7e13a40a43a9dde1fa40deb63240c996ddfced  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/tools/r7d2_resource_report.py
+6ca26908b1d00fe2ea0f6581fe67c82864149e7f5836ca0f00d6dba99d8d9839  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/tools/r7d2_staged_preflight.py

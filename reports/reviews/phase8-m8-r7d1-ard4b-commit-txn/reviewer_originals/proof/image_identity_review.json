@@ -1,0 +1,18 @@
+{
+  "BIN_bytes": 297476,
+  "BIN_sha256": "165d8bdc708b042125d99db88f56a62ddca635d30202e80abe96c148e35bc478",
+  "AXF_bytes": 1789320,
+  "AXF_sha256": "dc14525982056958136fd1ebbf60b6e1e1d6ade6f31d94a89474ed4f72e8fc87",
+  "flash_segments": [
+    {
+      "file_offset": 56,
+      "vaddr": 134217728,
+      "paddr": 134217728,
+      "filesz": 297476,
+      "memsz": 385040,
+      "byte_equal_bin": true
+    }
+  ],
+  "arm_compiler_rerun_by_A": false,
+  "hardware_actions": 0
+}

@@ -75,6 +75,22 @@ rt_err_t project_config_set(const project_config_t *cfg);
 rt_err_t project_config_set_rprof(const diag_rprof_t *p);
 rt_err_t project_config_get_rprof(diag_rprof_t *out);
 rt_err_t project_config_clear_rprof(void);
+
+/* M8-R7D1 ARD4b(A 复审续 e1d7f3d): 给"提交点之后不得再失败"的调用方(现在是 diag_profile
+ * commit)一条拆开发布的窄路径。三步里**只有 begin 会失败**, 而 begin 失败时共享状态一个
+ * 字节都没改, 也不留锁:
+ *   begin(p)          : 校验(rel_profile_validate + 整套 config_in_range, 都在副本上算),
+ *                       然后取 cfg 锁; 返回 RT_EOK 时**锁处于持有状态**, 返回错误时未持锁。
+ *   publish_locked(p) : 只在持锁期间做一次结构体赋值, 不取锁、不校验、不做 I/O => 不会失败。
+ *   end()             : 只放 cfg 锁。
+ * 锁序与边界: 调用方可以已持 motor 静止事务锁(mot->cfg 是本文件既有方向 —— commit 早就在
+ * 事务内调 get/set_rprof); begin 成功后再取更内层的 rel_ctx 仍是 cfg->ctx, 与"rel_ctx 是叶锁"
+ * 一致。取锁等待口径沿用本文件既有的 cfg_take_checked(), 本轮既没放宽也没改它。
+ * 用这三个函数的人必须成对调用 begin/end, 且只在 begin 成功后写。 */
+rt_err_t project_config_rprof_begin(const diag_rprof_t *p);
+void     project_config_rprof_publish_locked(const diag_rprof_t *p);
+void     project_config_rprof_end(void);
+
 /* 迁移标记: 本次启动是否从 0x00010002 迁移而来(只读, 供状态行如实显示)。 */
 rt_bool_t project_config_migrated_from_v2(void);
 

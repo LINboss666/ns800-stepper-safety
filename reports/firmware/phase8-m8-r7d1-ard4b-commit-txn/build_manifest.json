@@ -1,0 +1,148 @@
+{
+ "round": "phase8-m8-r7d1-ard4b-commit-txn",
+ "date": "2026-11-05",
+ "title": "M8-R7D1 ARD4b 续修轮: commit 提交点两阶段化(拒绝无副作用) + 单目标构建一次(设备动作 0)",
+ "review_source": {
+  "zip_basename": "NS800_R7D1_ARD4_Followup_e1d7f3d_20261105.zip",
+  "zip_bytes": 21347,
+  "zip_sha256": "411ccf2d7ca72af4784c903225828d4a00973a68a27f633d15792a2b42c1d02c",
+  "verdict": "CHANGES_REQUIRED(仅 ARD4 阻断; ARD1-ARD3 已收口不再重开)",
+  "reviewed_commit": "e1d7f3d90415fdf30344ed95a08065c1373fab01",
+  "fix_id": "R7D1_ARD4_FOLLOWUP_e1d7f3d",
+  "hardware_actions_cap": 0,
+  "new_approval_required_for_offline_fix": false,
+  "inner_manifest_entries": 19
+ },
+ "baseline_commit": "e1d7f3d90415fdf30344ed95a08065c1373fab01",
+ "baseline_is_head_at_build": true,
+ "head_at_build": "e1d7f3d90415fdf30344ed95a08065c1373fab01",
+ "diff_scope_vs_baseline": {
+  "git_rc": 0,
+  "untracked_rc": 0,
+  "product_files": [
+   "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diag_relative.c",
+   "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/project_config.c",
+   "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/project_config.h"
+  ],
+  "host_chain_files": [
+   "tests/host/rel_main.c",
+   "tests/host/run_diag_relative_m8.sh"
+  ],
+  "evidence_or_docs_count": 26
+ },
+ "target": "rt-thread-motor-m1-candidate",
+ "action": "Keil Rebuild All x1(只 rt-thread-motor-m1-candidate, -r 全量重建, 未加 -f)。未下载、未 Flash、未连 DAP、未复位、未开串口、未起转、未 learn/zero、未 config_save、未启动逻辑分析仪。设备动作 0。",
+ "command": "C:\\Keil_v5\\UV4\\UV4.exe -r project.uvprojx -t rt-thread-motor-m1-candidate -j0 -o D:/ns800/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/build_r7d2.log",
+ "working_directory": "D:\\ns800\\rt-thread-master\\rt-thread-master\\bsp\\novosns\\ns800\\ns800rt7p65-nssinepad",
+ "uv4_return_code_observed_this_round": 0,
+ "error_warning_line": "\".\\build\\motor_m1\\rt-thread-motor-m1.axf\" - 0 Error(s), 0 Warning(s)",
+ "compiler_line_from_log": "*** Using Compiler 'V6.24', folder: 'C:\\Keil_v5\\ARM\\ARMCLANG\\Bin'",
+ "build_time_elapsed_line": "Build Time Elapsed:  00:00:09",
+ "program_size": "Program Size: Code=209490 RO-data=87378 RW-data=2196 ZI-data=85944",
+ "build_hooks_read_only_checked": {
+  "BeforeMake": "RunUserProg1=0(未启用任何前置程序)",
+  "AfterMake": "After Build - User command #1: fromelf --bin .\\build\\motor_m1\\rt-thread-motor-m1.axf --output .\\build\\motor_m1\\rt-thread-motor-m1.bin",
+  "conclusion": "构建过程里没有下载/调试/串口动作; 日志原件同时留在构建目录(被 .gitignore 的 *.log 规则排除)与仓内 reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/build/。"
+ },
+ "log": {
+  "path": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/build/build_r7d2.log",
+  "bytes": 3909,
+  "sha256": "a5b827f47ca08c4f3de98894038e9d90f9d9e60264eb7d320d692b61c4969d3e",
+  "disk_CR": 144,
+  "disk_LF": 144
+ },
+ "program_size_vs_reviewed_image": {
+  "reviewed_image_manifest": "reports/firmware/phase8-m8-r7d1-ard-rework/build_manifest.json",
+  "reviewed_program_size": "Program Size: Code=209474 RO-data=87422 RW-data=2196 ZI-data=85944",
+  "reviewed_bin_sha256": "165d8bdc708b042125d99db88f56a62ddca635d30202e80abe96c148e35bc478",
+  "reviewed_bin_bytes": 297476,
+  "delta_bytes": {
+   "Code": 16,
+   "RO-data": -44,
+   "RW-data": 0,
+   "ZI-data": 0
+  },
+  "bin_bytes": 297452,
+  "bin_delta": -24,
+  "reconciliation": "口径与上一轮相同(不沿用\"Code+RO+RW 增量 == BIN 增量\"这条并不恒成立的等式): Code+RO+RW 增量 -28, BIN 增量 -24, 差 +4 B, 由装载段的构成解释 —— ER_IROM1 296896->296868(-28), RW_VT_DTCM 压缩载荷 8->8(0), 对齐空隙 4->0(-4), RW_DTCM 压缩载荷 568->576(+8) => 合计 -24 == BIN 增量, 残差 0。两版各自的\"三段+空隙\"等式都成立(297476 / 297452), 所以不存在内容丢失的余地; RAM 侧 RW+ZI 增量 +0(本轮没有新增静态, 反而删掉了 commit 里的 diag_rprof_t 局部副本 prev)。",
+  "resource_report": "reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/build/resource_stack_r7d2.txt",
+  "per_object_delta": "diag_relative.o Code+8 RO-42 RW+0 ZI+0; project_config.o Code+2 RO+0 RW+0 ZI+0; 其余 109 行 .o 与 49 行库成员(成员名+段+尺寸+类型)逐字段相同; Library Totals 全 0; 对账 -32 + (incl. Padding) 第 2 行 +4 = -28 == Program Size 增量。",
+  "axf_flash_segment_equal_bin": true,
+  "judgement_lines_transcribed_from_resource_report": {
+   "axf_flash_segment_equal_bin_both_images": true,
+   "bin_composition_residual_zero": true,
+   "nonzero_object_diff_set_exact": true,
+   "program_size_reconciliation": true,
+   "library_member_rows_identical": true
+  },
+  "axf_check_method": "仓外工具按 ELF32 程序头取 Flash 段(vaddr 在 0x08000000..0x08100000)拼成镜像, 与归档 BIN 逐字节比; 同一工具先在被审件上复现\"相等\"再跑本轮件。"
+ },
+ "images": {
+  "bin": {
+   "path": "reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/rt-thread-motor-m1-candidate.bin",
+   "bytes": 297452,
+   "sha256": "23691e8d8aa8c1d3ed6e6eff4b5c51fe27dd3a9169841406ecc627c0e807e963"
+  },
+  "axf": {
+   "path": "reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/rt-thread-motor-m1.axf",
+   "bytes": 1790048,
+   "sha256": "0f421595ac940863c4d38a2791f31bc8811fc3b8fa40062782f2ac7505c317f6"
+  },
+  "map": {
+   "path": "reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/rt-thread-motor-m1.map",
+   "bytes": 2148432,
+   "sha256": "e2d8d081958c84bb7f760bd5011a4b0ce962bb5dc8b6c0dff1cc9084efc0872b"
+  },
+  "callgraph": {
+   "path": "reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/rt-thread-motor-m1-callgraph.htm",
+   "bytes": 1101259,
+   "sha256": "a7090b6eed89f32a0abf4c7ec395cb1a421b909f1c25c436b64f302a02ff0c34"
+  }
+ },
+ "stack_cost_from_call_graph": {
+  "units": "B; armlink 口径, 静态下界(不含异常/ISR 帧, 解析不了函数指针), 只用于两版比较, 不是现场最坏栈实测",
+  "rel_cmd_commit": {
+   "reviewed_frame": 608,
+   "reviewed_subtree": 1556,
+   "this_frame": 496,
+   "this_subtree": 1404
+  },
+  "why": "上一轮为了回滚新增的 diag_rprof_t 局部副本 prev 与那条 project_config_set_rprof 调用链(其 cfg_take_checked -> rt_mutex_take 子树 948)一并消失; 命令线程可见的最深根由 rel_cmd_commit(1556) 变回 rel_cmd_clear(1460)。",
+  "deepest_command_root_change_line": "最深根: 被审 rel_cmd_commit(1556) -> 本轮 rel_cmd_clear(1460) => 命令线程里可见的最深线变化 -96 B",
+  "no_subtree_grew": "子树变高的命令根: 无",
+  "stack_constants_unchanged": {
+   "DIAG_THREAD_STACK": {
+    "value_on_disk": "4096",
+    "value_at_reviewed_baseline": "4096",
+    "unchanged_vs_baseline": true,
+    "file": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diagnosis.c",
+    "line_on_disk": 48,
+    "file_in_this_round_diff": false
+   },
+   "FINSH_THREAD_STACK_SIZE": {
+    "value_on_disk": "4096",
+    "value_at_reviewed_baseline": "4096",
+    "unchanged_vs_baseline": true,
+    "file": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/rtconfig.h",
+    "line_on_disk": 125,
+    "file_in_this_round_diff": false
+   },
+   "REL_CMD_DEADLINE_MS": {
+    "value_on_disk": "12000",
+    "value_at_reviewed_baseline": "12000",
+    "unchanged_vs_baseline": true,
+    "file": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diag_relative.c",
+    "line_on_disk": 1337,
+    "file_in_this_round_diff": true
+   }
+  }
+ },
+ "image_states": {
+  "this_round_candidate": "NOT_ON_BOARD(本轮 0 次下载/回读/复位) sha256=23691e8d8aa8c1d3ed6e6eff4b5c51fe27dd3a9169841406ecc627c0e807e963",
+  "previous_round_image_165d8bdc": "NOT_ON_BOARD(登记于上一轮 e1d7f3d, 未上板; 本轮作为被审件对照)",
+  "r7d1_image_df7584c3": "NOT_ON_BOARD(登记于 4d50310, 未上板)",
+  "on_board": "b502 / 502dca5d8c7ebfa794f890a9c03bc258fc9753f57b6a80c2f1e08add69888a7a (历史逐字节回读证明, 本轮未改)"
+ },
+ "hardware_actions_this_round": 0,
+ "authorization": "本件不构成任何硬件授权; polarity_measured=false, core_protection_verified=false 保持; R7F5A 物理断电回报仍 PENDING_OPERATOR_REPORT。"
+}

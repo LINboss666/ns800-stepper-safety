@@ -337,7 +337,7 @@ reverse_case() {            # reverse_case <name> <target-file> <old> <new> <期
 
 if [ "$REVERSE" = "1" ]; then
     note ""
-    note "=== 反向验证(14 组具名家族, 仓外一次性副本) ==="
+    note "=== 反向验证(具名家族逐组, 仓外一次性副本; 组数见本段末尾) ==="
     # RV1: 去掉"SG 必须是新独立样本"的身份门 —— 旧样本必须被 REL08 检出
     reverse_case RV1_sg_new_sample_identity_gate diag_relative.c \
 '    fresh_sg  = (in->sg_valid  && in->sg_seq  != 0 && in->sg_seq  != e->last_sg_seq);' \
@@ -492,16 +492,44 @@ rt_err_t rel_ctl_take(void) { return RT_EOK; }' \
     if (rel_txn_open("clear") != RT_EOK) return;' \
         A15-refused-clear-keeps-pending-and-creds
 
-    # RDV9(返修 ARD4): 退回基线形状"先写 RAM 配置, 再发布候选" —— A16 必须检出
-    # "REFUSED 但配置已经生效"。
+    # RDV9(ARD4/ARD4b): 把配置的内存发布挪到提交点取锁**之前** —— 退回"半份发布"的形状。
+    # 破坏的不变量: 拒绝之前共享状态不能已经落地。A16 的②③⑤段(提交点 ctx 取锁失败)必须检出。
     reverse_case RDV9_commit_config_before_publish diag_relative.c \
-'    if (rel_pending_write(&cand, -1, -1) != RT_EOK)
-    { fin = -RT_EIO; why = "ctx-lock-publish"; goto out; }   /* 配置未动: 整次 commit 什么都没改 */
-    fin = project_config_set_rprof(&cand);' \
-'    fin = project_config_set_rprof(&cand);   /* NEGATIVE-INJECTION RDV9: 先写配置再发布候选 */
-    if (rel_pending_write(&cand, -1, -1) != RT_EOK)
-    { fin = -RT_EIO; why = "ctx-lock-publish"; goto out; }' \
+'    if (rel_ctx_take() != RT_EOK)
+    {
+        project_config_rprof_end();               /* 放掉自己刚拿的 cfg 锁, 不碰别人的 */
+        fin = -RT_ETIMEOUT; why = "ctx-lock-commit";
+        goto out;
+    }
+    rel_pending_publish_locked(&cand, -1, -1);     /* 不会失败 */
+    project_config_rprof_publish_locked(&cand);   /* 不会失败 */' \
+'    project_config_rprof_publish_locked(&cand);   /* NEGATIVE-INJECTION RDV9: 配置先落地, 候选发布仍可能失败 */
+    if (rel_ctx_take() != RT_EOK)
+    {
+        project_config_rprof_end();
+        fin = -RT_ETIMEOUT; why = "ctx-lock-commit";
+        goto out;
+    }
+    rel_pending_publish_locked(&cand, -1, -1);' \
         A16-commit-refused-keeps-config-and-candidate
+
+    # RDV10(ARD4b): 吞掉提交点上的 ctx 取锁失败, 照样把两份状态发布出去。
+    # 破坏的不变量: 拿不齐锁就必须拒绝(不许用"继续走"凑成 OK)。A16 的②段必须检出既没拒绝又改了状态。
+    reverse_case RDV10_commit_swallow_ctx_take_failure diag_relative.c \
+'    if (rel_ctx_take() != RT_EOK)
+    {
+        project_config_rprof_end();               /* 放掉自己刚拿的 cfg 锁, 不碰别人的 */
+        fin = -RT_ETIMEOUT; why = "ctx-lock-commit";
+        goto out;
+    }' \
+'    (void)rel_ctx_take();   /* NEGATIVE-INJECTION RDV10: 取锁失败也继续发布(吞错误) */' \
+        A16-commit-refused-keeps-config-and-candidate
+
+    fam_n=0
+    for m in ${EXECUTED[@]+"${EXECUTED[@]}"}; do
+        case "$m" in reverse:*) fam_n=$((fam_n + 1));; esac
+    done
+    note "  家族组数=$fam_n(每组一条判定行; META-OK 计数在上一行块里, 二者必须相等)"
 fi
 
 note ""

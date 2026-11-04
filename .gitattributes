@@ -122,3 +122,9 @@ reports/reviews/phase8-m8-r7d1-async-learn-offline/** -text
 # A 复审包原件(其 hash 只在字节不变时可复算)与主机链 transcript。规则同样必须在任何暂存之前生效。
 reports/firmware/phase8-m8-r7d1-ard-rework/** -text
 reports/reviews/phase8-m8-r7d1-ard-rework/** -text
+
+# 同一理由适用于 M8-R7D1 ARD4b 续修轮(提交点两阶段化): 本轮交付 BIN/AXF/MAP/调用图 htm/
+# Windows 版 UV4 日志(内含 CR)、A 续修包 19 件原件(其 sha256 与 zip 内逐条复算只在字节不变时成立)
+# 与主机链/反向链 transcript。规则同样必须在任何暂存之前生效。
+reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/** -text
+reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/** -text

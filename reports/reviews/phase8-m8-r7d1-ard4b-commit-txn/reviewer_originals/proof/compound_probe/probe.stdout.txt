@@ -1,0 +1,8 @@
+[DIAG] zero OK n=32 raw 1660..1660 mean=1660000 (cal source untouched)
+[DIAG] learn STARTED id=1 n=8 win=450..550 dir=0
+[DIAG] learn async: query 'learn_status'; NOT learn OK yet FIELD_UNVERIFIED
+[DIAG] commit OK id=1 rev=1 flags=0005 FIELD_UNVERIFIED
+[DIAG] commit next: config_save to persist, then arm explicitly
+[DIAG] commit REFUSED: (config-write-no-rollback) rc=-12
+OBS|COMMIT_CFG_AND_ROLLBACK_FAULT|refused=1 no_rollback=1 cfg_changed=0 pending_changed=1 creds_kept=1 cfg_id=1 pending_id=2 ctx_takes=5 cfg_steps=3
+REVIEW|REFUSED_COMMIT_PRESERVES_ALL_STATE_ON_ROLLBACK_LOCK_FAILURE|FAIL

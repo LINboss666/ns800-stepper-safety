@@ -1,0 +1,160 @@
+M8-R7D1 ARD4b(提交点两阶段化)构建侧资源核对: armlink 调用图 + 两版 map 逐对象差分 + AXF/BIN 装载段逐字节
+日期 2026-11-05。目标 rt-thread-motor-m1-candidate。返修只构建一次, 设备动作 0(不烧录/不回读/不复位/
+  不开串口/不动逻辑分析仪/不 arm/start/不运动/不做现场学习/不写配置/不供断电)。
+
+[0] 输入件身份(本机磁盘字节; 提交前预检与推送后远端回读还会各复算一次)
+  返修 BIN                         297452 B  sha256=23691e8d8aa8c1d3ed6e6eff4b5c51fe27dd3a9169841406ecc627c0e807e963  reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/rt-thread-motor-m1-candidate.bin
+  返修 AXF                        1790048 B  sha256=0f421595ac940863c4d38a2791f31bc8811fc3b8fa40062782f2ac7505c317f6  reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/rt-thread-motor-m1.axf
+  返修 MAP                        2148432 B  sha256=e2d8d081958c84bb7f760bd5011a4b0ce962bb5dc8b6c0dff1cc9084efc0872b  reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/rt-thread-motor-m1.map
+  返修调用图                         1101259 B  sha256=a7090b6eed89f32a0abf4c7ec395cb1a421b909f1c25c436b64f302a02ff0c34  reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/rt-thread-motor-m1-callgraph.htm
+  返修 UV4 日志                        3909 B  sha256=a5b827f47ca08c4f3de98894038e9d90f9d9e60264eb7d320d692b61c4969d3e  reports/reviews/phase8-m8-r7d1-ard4b-commit-txn/build/build_r7d2.log
+  被审件 BIN(4d50310, 冻结)           297476 B  sha256=165d8bdc708b042125d99db88f56a62ddca635d30202e80abe96c148e35bc478  reports/firmware/phase8-m8-r7d1-ard-rework/rt-thread-motor-m1-candidate.bin
+  被审件 AXF                       1789320 B  sha256=dc14525982056958136fd1ebbf60b6e1e1d6ade6f31d94a89474ed4f72e8fc87  reports/firmware/phase8-m8-r7d1-ard-rework/rt-thread-motor-m1.axf
+  被审件 MAP                       2144643 B  sha256=8229cf757f6c6e9196575cbd9945ff916155a7088da17bd4b796c165849a58ad  reports/firmware/phase8-m8-r7d1-ard-rework/rt-thread-motor-m1.map
+  被审件调用图                        1099033 B  sha256=16b87c974997db66a70e591b4ae36ca743b08c99b639f49583cf7a73653f6e40  reports/firmware/phase8-m8-r7d1-ard-rework/rt-thread-motor-m1-callgraph.htm
+  被审件 UV4 日志                       3909 B  sha256=8c11efe5c6b8f15d3863af419b00e24870299c2874daf1077106fe124db6b111  reports/reviews/phase8-m8-r7d1-ard-rework/build/build_r7d1r.log
+  归档件==构建目录原件: BIN True, AXF True(逐字节)
+
+[1] 编译参数与结果行(逐字取自两份日志)
+  返修 编译器行: *** Using Compiler 'V6.24', folder: 'C:\Keil_v5\ARM\ARMCLANG\Bin'
+  返修 目标行  : Rebuild target 'rt-thread-motor-m1-candidate'
+  返修 Program Size: Program Size: Code=209490 RO-data=87378 RW-data=2196 ZI-data=85944
+  返修 结果行  : ".\build\motor_m1\rt-thread-motor-m1.axf" - 0 Error(s), 0 Warning(s).
+  返修 用时    : Build Time Elapsed:  00:00:09
+  被审 编译器行: *** Using Compiler 'V6.24', folder: 'C:\Keil_v5\ARM\ARMCLANG\Bin'
+  被审 目标行  : Rebuild target 'rt-thread-motor-m1-candidate'
+  被审 Program Size: Program Size: Code=209474 RO-data=87422 RW-data=2196 ZI-data=85944
+  被审 结果行  : ".\build\motor_m1\rt-thread-motor-m1.axf" - 0 Error(s), 0 Warning(s).
+  被审 用时    : Build Time Elapsed:  00:00:10
+  返修 AfterMake 用户命令(逐字): After Build - User command #1: fromelf --bin .\build\motor_m1\rt-thread-motor-m1.axf --output .\build\motor_m1\rt-thread-motor-m1.bin
+    => 只 fromelf --bin, 无下载/调试/串口动作。
+  增量(armlink 口径, 返修 - 被审): Code=+16 RO=-44 RW=+0 ZI=+0
+    即 ROM 侧(Code+RO+RW) -28, RAM 侧(RW+ZI) +0
+
+[2] AXF 的 Flash 装载段 == BIN(独立复算, 不靠 fromelf 的产出路径自证)
+  被审件 段数=1(Flash 内 1) lo=08000000 hi=08048A04 span=297476 空洞=0 BINSIZE=297476 逐字节相等=True
+  返修件 段数=1(Flash 内 1) lo=08000000 hi=080489EC span=297452 空洞=0 BINSIZE=297452 逐字节相等=True
+  BIN 增量 = -24 B
+
+[3] BIN 的构成与增量对账(逐字节复算; 上一轮"Code+RO+RW==BIN 增量"这条等式本轮不再成立, 换算法)
+  被审件 执行区(装载地址落在 Flash 的那些):
+    RW_ITCM      load=080487C0 size=0x0(0) attr=ABSOLUTE
+    ER_IROM1     load=08000000 size=0x487C0(296896) attr=ABSOLUTE
+    RW_VT_DTCM   load=080487C0 size=0x3CC(972) attr=ABSOLUTE, COMPRESSED[0x00000008]
+    RW_DTCM      load=080487CC size=0xD480(54400) attr=ABSOLUTE, COMPRESSED[0x00000238]
+    RW_RT_HEAD   load=08048A04 size=0x8000(32768) attr=ABSOLUTE
+  返修件 执行区(装载地址落在 Flash 的那些):
+    RW_ITCM      load=080487A4 size=0x0(0) attr=ABSOLUTE
+    ER_IROM1     load=08000000 size=0x487A4(296868) attr=ABSOLUTE
+    RW_VT_DTCM   load=080487A4 size=0x3CC(972) attr=ABSOLUTE, COMPRESSED[0x00000008]
+    RW_DTCM      load=080487AC size=0xD480(54400) attr=ABSOLUTE, COMPRESSED[0x00000240]
+    RW_RT_HEAD   load=080489EC size=0x8000(32768) attr=ABSOLUTE
+  被审件: ER_IROM1 296896 + RW_VT_DTCM 压缩载荷 8 + 对齐空隙 4 + RW_DTCM 压缩载荷 568 = 297476
+        实测 BIN = 297476  =>  构成等式 成立(RW_ITCM size=0 与 RW_RT_HEAD 无初始化, 都不占装载字节)
+  返修件: ER_IROM1 296868 + RW_VT_DTCM 压缩载荷 8 + 对齐空隙 0 + RW_DTCM 压缩载荷 576 = 297452
+        实测 BIN = 297452  =>  构成等式 成立(RW_ITCM size=0 与 RW_RT_HEAD 无初始化, 都不占装载字节)
+  增量: ER_IROM1 -28, RW_VT_DTCM +0, 对齐空隙 -4, RW_DTCM 压缩载荷 +8 => 合计 -24
+  BIN 实际增量 -24; 残差 +0 => 判据 PASS
+  与 armlink 汇总行的关系: Code+RO+RW 增量 -28, BIN 增量 -24, 差 -4 B
+    差额完全由装载段的**构成**解释: RW_DTCM 压缩载荷 +8 与对齐空隙 -4(压缩载荷是初始化镜像压缩后的字节数, 与未压缩 size 0xD480->0xD480(+0) 不同向是正常的)。
+    ZI 增量 +0; 两版各自的"三段+空隙"等式都成立(见上), 所以这里没有"内容丢失"的余地。
+
+[4] 逐对象差分(只列非零; 其余全部为 0)
+  小计行(元组顺序 Code/inc.data/RO/RW/ZI)与它们的增量:
+    ELF Image Totals (compressed)  被审=(209474, 784, 87422, 576, 85944) 返修=(209490, 784, 87378, 584, 85944) 差=[16, 0, -44, 8, 0]
+    Grand Totals                   被审=(209474, 784, 87422, 2196, 85944) 返修=(209490, 784, 87378, 2196, 85944) 差=[16, 0, -44, 0, 0]
+    Library Totals                 被审=(4382, 116, 134, 8, 0) 返修=(4382, 116, 134, 8, 0) 差=[0, 0, 0, 0, 0]
+    Object Totals                  被审=(205092, 668, 87288, 2188, 85944) 返修=(205108, 668, 87244, 2188, 85944) 差=[16, 0, -44, 0, 0]
+    ROM Totals                     被审=(209474, 784, 87422, 576, 0) 返修=(209490, 784, 87378, 584, 0) 差=[16, 0, -44, 8, 0]
+  diag_relative.o                被审=(18038, 30, 4496, 4, 1170) 返修=(18046, 30, 4454, 4, 1170) 差 Code+8 RO-42 RW+0 ZI+0
+  project_config.o               被审=(4116, 64, 1150, 0, 293) 返修=(4118, 64, 1150, 0, 293) 差 Code+2 RO+0 RW+0 ZI+0
+  (incl. Padding) 行(元组顺序 Code/inc.data/RO/RW/ZI): 被审 3 行, 返修 3 行
+    第 1 行 被审=(0, 0, 48, 0, 32768) 返修=(0, 0, 48, 0, 32768) 差=[0, 0, 0, 0, 0]
+    第 2 行 被审=(3620, 8, 8, 0, 77) 返修=(3626, 8, 6, 0, 77) 差=[6, 0, -2, 0, 0]
+    第 3 行 被审=(8, 0, 1, 0, 0) 返修=(8, 0, 1, 0, 0) 差=[0, 0, 0, 0, 0]
+  对照表规模: 对象 111 个, 库成员行 0 个; 非零差分 2 行(应只出现在改动过的对象上)
+  口径澄清(本轮重算时发现, 也纠正上一轮的措辞): component-sizes 表里 111 行全是 .o, 没有 lib 成员行;
+    库成员(如 mc_w.l(entry.o))在 map 的更靠前段落单独列出, 不在这张表里 —— 上一轮把它写成
+    "39 个库成员行"是同一张表的口径, 这次改成按整份 map 比对库成员行的成员名/段/尺寸:
+    库成员行(成员名+段+尺寸+类型, 地址会变所以不参与比较): 被审 49, 返修 49; 集合相同: PASS
+  判据 非零差分集合恰好 == ['diag_relative.o', 'project_config.o']: PASS  实际=['diag_relative.o', 'project_config.o']
+  对象 diag_relative.o 的 Code+RO+RW 增量 = -34
+  对象 project_config.o 的 Code+RO+RW 增量 = +2
+  对账: 改动对象合计 -32 + 符号表区 (incl. Padding) 第 2 行 +4 = -28; 全图 Program Size 增量 -28 => PASS
+          => component-sizes 表里其余 109 行(.o)逐字段相同。
+  相关静态(取自两版 map 符号表; 本轮没有新增静态, 上一轮的 d_zero_cleanup 仍在): 
+    d_zero_cleanup   被审=(536911280, 'Data', 1, 'diag_relative.o(.bss.d_zero_cleanup)') 返修=(536911280, 'Data', 1, 'diag_relative.o(.bss.d_zero_cleanup)')
+    d_job            被审=(536910436, 'Data', 276, 'diag_relative.o(.bss.d_job)') 返修=(536910436, 'Data', 276, 'diag_relative.o(.bss.d_job)')
+    d_cap_owner      被审=(536910168, 'Data', 1, 'diag_relative.o(.bss.d_cap_owner)') 返修=(536910168, 'Data', 1, 'diag_relative.o(.bss.d_cap_owner)')
+    d_ctx_lock       被审=(536910252, 'Data', 60, 'diag_relative.o(.bss.d_ctx_lock)') 返修=(536910252, 'Data', 60, 'diag_relative.o(.bss.d_ctx_lock)')
+    d_job_next_id    被审=(536872512, 'Data', 4, 'diag_relative.o(.data.d_job_next_id)') 返修=(536872512, 'Data', 4, 'diag_relative.o(.data.d_job_next_id)')
+    d_cap            被审=(536909952, 'Data', 216, 'diag_relative.o(.bss.d_cap)') 返修=(536909952, 'Data', 216, 'diag_relative.o(.bss.d_cap)')
+    d_pending        被审=(536910716, 'Data', 116, 'diag_relative.o(.bss.d_pending)') 返修=(536910716, 'Data', 116, 'diag_relative.o(.bss.d_pending)')
+
+[5] armlink 调用图(单位 B; 每个符号的数是"以它自己为根"的子树累计, 不含祖先帧;
+    armlink 解析不了函数指针, 所以是静态下界, 不含异常/ISR 帧 —— 只能用于比较, 不是现场最坏栈)
+  符号                             被审 帧/子树          返修 帧/子树          差
+  diag_thread_entry                640 /   1588     640 /   1588   +0 / +0
+  rel_cmd_zero                     376 /   1284     376 /   1284   +0 / +0
+  rel_zero_capture_close            16 /    604      16 /    604   +0 / +0
+  rel_job_advance                   48 /    636      48 /    636   +0 / +0
+  rel_job_status                    24 /    612      24 /    612   +0 / +0
+  rel_cmd_learn_status             216 /    828     216 /    828   +0 / +0
+  rel_cmd_learn_cancel             184 /    804     184 /    804   +0 / +0
+  rel_cmd_commit                   608 /   1556     496 /   1404   -112 / -152
+  rel_pending_publish_locked      None /   None      24 /     24   +24 / +24
+  project_config_rprof_begin      None /   None     248 /    828   +248 / +828
+  project_config_rprof_publish_locked  None /   None      16 /     16   +16 / +16
+  project_config_rprof_end        None /   None       8 /    508   +8 / +508
+  rel_cmd_clear                    144 /   1460     144 /   1460   +0 / +0
+  rel_ctx_gate                      32 /    620      32 /    620   +0 / +0
+  rel_pending_write                 32 /    620      32 /    620   +0 / +0
+  rel_pending_read                  32 /    620      32 /    620   +0 / +0
+  rel_zero_capture_open             24 /    612      24 /    612   +0 / +0
+  rel_cap_abort                      8 /     40       8 /     40   +0 / +0
+  motor_calibration_static_begin   272 /    852     272 /    852   +0 / +0
+  motor_calibration_static_end       8 /    508       8 /    508   +0 / +0
+  project_config_set_rprof         368 /    948    None /   None   -368 / -948
+  project_config_clear_rprof        24 /    604      24 /    604   +0 / +0
+  返修件最深链(逐字):
+    diag_thread_entry        depth=1588   chain=diag_thread_entry => rel_prod_evaluate => rel_prod_publish => rel_ctl_take => rt_mutex_take => _rt_mutex_take => rt_thread_suspend_to_list => rt_sched_thread_timer_stop => rt_timer_stop => rt_spin_unlock_irqrestore => rt_exit_critical_safe => rt_exit_critical => rt_schedule => rt_scheduler_stack_check => rt_kprintf => rt_vsnprintf => print_number => divide
+    rel_cmd_zero             depth=1284   chain=rel_cmd_zero => rel_static_and_ready => motor_get_snapshot => mot_lock_take => rt_mutex_take => _rt_mutex_take => rt_thread_suspend_to_list => rt_sched_thread_timer_stop => rt_timer_stop => rt_spin_unlock_irqrestore => rt_exit_critical_safe => rt_exit_critical => rt_schedule => rt_scheduler_stack_check => rt_kprintf => rt_vsnprintf => print_number => divide
+    rel_zero_capture_close   depth=604    chain=rel_zero_capture_close => rel_ctx_take => rel_ctx_take_tmo => rt_mutex_take => _rt_mutex_take => rt_thread_suspend_to_list => rt_sched_thread_timer_stop => rt_timer_stop => rt_spin_unlock_irqrestore => rt_exit_critical_safe => rt_exit_critical => rt_schedule => rt_scheduler_stack_check => rt_kprintf => rt_vsnprintf => print_number => divide
+    rel_job_advance          depth=636    chain=rel_job_advance => rel_ctx_try => rel_ctx_take_tmo => rt_mutex_take => _rt_mutex_take => rt_thread_suspend_to_list => rt_sched_thread_timer_stop => rt_timer_stop => rt_spin_unlock_irqrestore => rt_exit_critical_safe => rt_exit_critical => rt_schedule => rt_scheduler_stack_check => rt_kprintf => rt_vsnprintf => print_number => divide
+    rel_cmd_commit           depth=1404   chain=rel_cmd_commit => rel_static_and_ready => motor_get_snapshot => mot_lock_take => rt_mutex_take => _rt_mutex_take => rt_thread_suspend_to_list => rt_sched_thread_timer_stop => rt_timer_stop => rt_spin_unlock_irqrestore => rt_exit_critical_safe => rt_exit_critical => rt_schedule => rt_scheduler_stack_check => rt_kprintf => rt_vsnprintf => print_number => divide
+    rel_cmd_clear            depth=1460   chain=rel_cmd_clear => diagnosis_set_mode => diag_human_mode_gate => motor_get_snapshot => mot_lock_take => rt_mutex_take => _rt_mutex_take => rt_thread_suspend_to_list => rt_sched_thread_timer_stop => rt_timer_stop => rt_spin_unlock_irqrestore => rt_exit_critical_safe => rt_exit_critical => rt_schedule => rt_scheduler_stack_check => rt_kprintf => rt_vsnprintf => print_number => divide
+    rel_cmd_learn_status     depth=828    chain=rel_cmd_learn_status => rel_job_status => rel_ctx_take => rel_ctx_take_tmo => rt_mutex_take => _rt_mutex_take => rt_thread_suspend_to_list => rt_sched_thread_timer_stop => rt_timer_stop => rt_spin_unlock_irqrestore => rt_exit_critical_safe => rt_exit_critical => rt_schedule => rt_scheduler_stack_check => rt_kprintf => rt_vsnprintf => print_number => divide
+    rel_job_status           depth=612    chain=rel_job_status => rel_ctx_take => rel_ctx_take_tmo => rt_mutex_take => _rt_mutex_take => rt_thread_suspend_to_list => rt_sched_thread_timer_stop => rt_timer_stop => rt_spin_unlock_irqrestore => rt_exit_critical_safe => rt_exit_critical => rt_schedule => rt_scheduler_stack_check => rt_kprintf => rt_vsnprintf => print_number => divide
+  被审件同一符号的链(对照):
+    diag_thread_entry        depth=1588   chain=diag_thread_entry => rel_prod_evaluate => rel_prod_publish => rel_ctl_take => rt_mutex_take => _rt_mutex_take => rt_thread_suspend_to_list => rt_sched_thread_timer_stop => rt_timer_stop => rt_spin_unlock_irqrestore => rt_exit_critical_safe => rt_exit_critical => rt_schedule => rt_scheduler_stack_check => rt_kprintf => rt_vsnprintf => print_number => divide
+    rel_cmd_zero             depth=1284   chain=rel_cmd_zero => rel_static_and_ready => motor_get_snapshot => mot_lock_take => rt_mutex_take => _rt_mutex_take => rt_thread_suspend_to_list => rt_sched_thread_timer_stop => rt_timer_stop => rt_spin_unlock_irqrestore => rt_exit_critical_safe => rt_exit_critical => rt_schedule => rt_scheduler_stack_check => rt_kprintf => rt_vsnprintf => print_number => divide
+    rel_job_advance          depth=636    chain=rel_job_advance => rel_ctx_try => rel_ctx_take_tmo => rt_mutex_take => _rt_mutex_take => rt_thread_suspend_to_list => rt_sched_thread_timer_stop => rt_timer_stop => rt_spin_unlock_irqrestore => rt_exit_critical_safe => rt_exit_critical => rt_schedule => rt_scheduler_stack_check => rt_kprintf => rt_vsnprintf => print_number => divide
+    rel_cmd_commit           depth=1556   chain=rel_cmd_commit => project_config_set_rprof => cfg_take_checked => rt_mutex_take => _rt_mutex_take => rt_thread_suspend_to_list => rt_sched_thread_timer_stop => rt_timer_stop => rt_spin_unlock_irqrestore => rt_exit_critical_safe => rt_exit_critical => rt_schedule => rt_scheduler_stack_check => rt_kprintf => rt_vsnprintf => print_number => divide
+    rel_cmd_clear            depth=1460   chain=rel_cmd_clear => diagnosis_set_mode => diag_human_mode_gate => motor_get_snapshot => mot_lock_take => rt_mutex_take => _rt_mutex_take => rt_thread_suspend_to_list => rt_sched_thread_timer_stop => rt_timer_stop => rt_spin_unlock_irqrestore => rt_exit_critical_safe => rt_exit_critical => rt_schedule => rt_scheduler_stack_check => rt_kprintf => rt_vsnprintf => print_number => divide
+  栈配置未动: diagnosis.c 的 DIAG_THREAD_STACK 与 rtconfig.h 的 FINSH_THREAD_STACK_SIZE 见 [6]
+
+  判读(只用"同一目标两版相减", 不当现场最坏栈实测):
+  A) Diagnosis Thread: 帧 +0, 子树 +0; 栈 4096 未改 => 静态下界余量 2508 B(被审 2508 B)。
+     最深线未变的判据: 返修链头与被审链头逐字相同 => True
+  B) 命令线程(msh 入口调到的这些命令, 栈 FINSH 4096 未改): 子树最深的是哪一个、多少:
+     rel_cmd_zero           子树 1284 -> 1284 (+0)  余量 4096-1284 = 2812 B
+     rel_cmd_commit         子树 1556 -> 1404 (-152)  余量 4096-1404 = 2692 B
+     rel_cmd_clear          子树 1460 -> 1460 (+0)  余量 4096-1460 = 2636 B
+     rel_cmd_learn          子树 1084 -> 1084 (+0)  余量 4096-1084 = 3012 B
+     rel_cmd_learn_status   子树 828 -> 828 (+0)  余量 4096-828 = 3268 B
+     rel_cmd_learn_cancel   子树 804 -> 804 (+0)  余量 4096-804 = 3292 B
+     最深根: 被审 rel_cmd_commit(1556) -> 本轮 rel_cmd_clear(1460) => 命令线程里可见的最深线变化 -96 B
+     子树变高的命令根: 无
+     子树变矮的命令根: [('rel_cmd_commit', -152)]
+     ARD4b 的直接效果(如实, 不写成等式): rel_cmd_commit 帧 -112、子树 -152(1556 -> 1404)。
+       被审那一版为了回滚多了一个 diag_rprof_t 局部副本 prev(map 里同类型对象 d_pending = 116 B),
+       本轮把提交点换成"两把锁都拿到之后只做赋值", 撤销路径与那份副本一起消失 => 上一轮登记的新增栈成本本轮收回。
+       本轮余量: 4096-1404 = 2692 B; 栈常量与 deadline 一字未动(见 [6])。
+     调用图里新出现的符号: ['rel_pending_publish_locked', 'project_config_rprof_begin', 'project_config_rprof_publish_locked', 'project_config_rprof_end'](本轮预期: rel_pending_publish_locked 与 project_config 的三个发布函数)
+     调用图里消失的符号: ['project_config_set_rprof'](预期: 无 —— 撤销路径不再有独立函数, 但回滚本来就是内联调用)
+
+[6] 两个栈常量本轮未改(逐字取自产品源码)
+  rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diagnosis.c:48: #define DIAG_THREAD_STACK   4096   /* entry+rel_prod_evaluate+rel_engine_step 三帧静态下界 1064 B, 旧值 1024 装不下 */
+  rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diagnosis.c:535: DIAG_THREAD_STACK, 9, 10);  /* prio 9, 100Hz */
+  rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/rtconfig.h:125: #define FINSH_THREAD_STACK_SIZE 4096
+  本轮 diff 未触及这两个文件(git diff --name-only 见 offline/checks.txt 的 SCOPE 判据)。

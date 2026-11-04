@@ -4160,64 +4160,103 @@ static void c_A15(void)
     CHECK(d_pending_zero == RT_FALSE && d_pending_learn == RT_FALSE, "成功 clear 之后凭据还在");
 }
 
-/* A16(ARD4): commit 的结果必须与事务完整性一致 —— REFUSED 就什么都没动, OK 就配置与候选同版。
- * 两段注入各打一条失败路径: ①候选发布取不到 ctx ②配置发布本身失败(要求回滚已发布的候选)。
- * "配置发布是一次 commit 里最后一次 cfg 取锁"这个事实不写死次数: 先用一次干净 commit 量出来。 */
+/* A16(ARD4 + ARD4b): commit 只有两种合法结果 —— REFUSED 时配置/候选/凭据与调用前逐字节相同,
+ * OK 时配置与候选同版。ARD4b 的要害是**组合**故障: 配置发布可失败, 而上一版用来撤销的那次 ctx
+ * 取锁同样可失败, 撤销失败就留下"候选新版 + 配置旧版"的半份发布。新设计里撤销这条路整个不存在
+ * (两把可失败的锁都在改动状态之前拿齐), 所以这里验的是等价故障点: 提交点上的 ctx 取锁失败、
+ * 以及提交点上的 cfg 取锁失败, 两个世界各测一遍(已有有效配置 / 初始配置为空)。
+ * 注入序号不写死: 先用一次干净 commit 量出这条命令实际取了几次 cfg / ctx 锁, 再按量到的最后一步打。
+ * flags 位: 0=没命中目标分支(要的身份没出现) 1=没按 REFUSED 披露 2=意外报 OK
+ *            3=配置变了 4=候选变了 5=凭据丢了 6=拒绝之后还持着锁 7=前置读不到配置 */
+static int a16_refusal(int cfg_fail_at, int ctx_fail_at, const char *want_why, int *ctx_takes_out)
+{
+    diag_rprof_t c0, c1, p0;
+    int f = 0, zb, lb;
+
+    if (project_config_get_rprof(&c0) != RT_EOK) return (1 << 7);
+    p0 = d_pending;
+    zb = (int)d_pending_zero; lb = (int)d_pending_learn;
+    g_ctx_take_calls = 0; g_cfg_take_calls = 0;
+    g_cfg_take_fail_after = cfg_fail_at;
+    g_ctx_take_fail_after = ctx_fail_at;
+    cap_reset();
+    do_cmd(cmd_commit);
+    g_cfg_take_fail_after = -1;
+    g_ctx_take_fail_after = -1;
+    if (ctx_takes_out) *ctx_takes_out = g_ctx_take_calls;
+    memset(&c1, 0, sizeof(c1));
+    if (!cap_has(want_why))                              f |= (1 << 0);
+    if (!cap_has("commit REFUSED"))                      f |= (1 << 1);
+    if (cap_has("commit OK"))                            f |= (1 << 2);
+    if (project_config_get_rprof(&c1) != RT_EOK)         f |= (1 << 7);
+    else if (memcmp(&c0, &c1, sizeof(c0)) != 0)          f |= (1 << 3);
+    if (memcmp(&p0, &d_pending, sizeof(p0)) != 0)        f |= (1 << 4);
+    if ((int)d_pending_zero != zb || (int)d_pending_learn != lb) f |= (1 << 5);
+    if (cfg_lock.held || d_ctx_lock.held)                f |= (1 << 6);
+    return f;
+}
+
 static void c_A16(void)
 {
-    diag_rprof_t before, after, pend_before;
-    int zb, lb, refused, cfg_changed, pend_changed, creds_kept, base, steps;
+    diag_rprof_t cfg_after;
+    int ctx_steps, cfg_steps, f, takes;
 
     prep_zero_cruise();
     CHECK(learn_run(400) == REL_JOB_DONE && d_pending_learn == RT_TRUE, "前置: 没有可提交的候选");
     S.mstate = MOTOR_IDLE; S.armed = 0; S.mhz = 0;
-    CHECK(project_config_get_rprof(&before) == RT_EOK, "前置: 读不到已提交 profile");
-    pend_before = d_pending;
-    zb = (int)d_pending_zero; lb = (int)d_pending_learn;
+    CHECK(project_config_get_rprof(&cfg_after) == RT_EOK && cfg_after.magic == 0,
+          "前置: 起始配置不该已有 profile");
 
-    /* ① 让这条命令里的第 4 次 ctx 取锁失败(修复前后落在哪一步都算, 结论只看状态) */
+    /* ① 干净一轮: 量取锁次数, 并证 OK 时配置与候选逐字节同版 */
+    g_ctx_take_calls = 0; g_cfg_take_calls = 0;
+    cap_reset();
+    do_cmd(cmd_commit);
+    ctx_steps = g_ctx_take_calls; cfg_steps = g_cfg_take_calls;
+    CHECK(cap_has("commit OK"), "干净世界里的 commit 没成功: [%.90s]", cap_text());
+    CHECK(ctx_steps >= 2 && cfg_steps >= 2, "取锁次数少到定位不了提交点(ctx=%d cfg=%d)",
+          ctx_steps, cfg_steps);
+    CHECK(project_config_get_rprof(&cfg_after) == RT_EOK &&
+          cfg_after.magic == DIAG_RPROF_MAGIC &&
+          memcmp(&cfg_after, &d_pending, sizeof(cfg_after)) == 0,
+          "commit OK 之后配置与候选不一致");
+
+    /* ② 已有有效配置: 提交点上的 ctx 取锁失败(旧设计里同一次失败会让回滚也拿不到锁) */
+    f = a16_refusal(-1, ctx_steps - 1, "commit REFUSED: (ctx-lock-commit)", &takes);
+    CHECK(f == 0, "已有配置下提交点 ctx 取锁失败却没保持原状: flags=%02X ctx_takes=%d", f, takes);
+    /* ③ 同一世界: 提交点上的 cfg 取锁失败(旧设计里这一步失败会留下半份发布) */
+    f = a16_refusal(cfg_steps - 1, -1, "commit REFUSED: (cfg-lock-commit)", &takes);
+    CHECK(f == 0, "已有配置下 cfg 取锁失败却没保持原状: flags=%02X", f);
+    /* ④ 锚点特异性: 把 ctx 注入挪到"这条命令取不到的序号"上, 结果必须是正常 OK ——
+     *    否则上面两条的"命中"可能来自更早的取锁, 判据就成了恒红。
+     *    计数必须清零再比: 夹具的失败条件是"第 N 次之后", 不清零会接着上一次的计数走,
+     *    第一条 take 就超阈值 => 得到一条无关的 "commit REFUSED: ctx lock"(本轮第一次跑就是这样)。 */
     g_ctx_take_calls = 0;
-    g_ctx_take_fail_after = 3;
+    g_ctx_take_fail_after = ctx_steps;
     cap_reset();
     do_cmd(cmd_commit);
     g_ctx_take_fail_after = -1;
-    memset(&after, 0, sizeof(after));
-    CHECK(project_config_get_rprof(&after) == RT_EOK, "①回读已提交 profile 失败");
-    refused = cap_has("commit REFUSED");
-    cfg_changed = memcmp(&before, &after, sizeof(before)) != 0;
-    pend_changed = memcmp(&pend_before, &d_pending, sizeof(pend_before)) != 0;
-    creds_kept = ((int)d_pending_zero == zb && (int)d_pending_learn == lb);
-    CHECK(refused && !cfg_changed && !pend_changed && creds_kept,
-          "发布取锁失败时 REFUSED 却已经改了状态: refused=%d cfg_changed=%d pend_changed=%d creds=%d",
-          refused, cfg_changed, pend_changed, creds_kept);
-    CHECK(!cap_has("commit OK"), "同一次 commit 既 REFUSED 又 OK");
+    CHECK(cap_has("commit OK") && !cap_has("commit REFUSED"),
+          "锚点不特异: 挪后一步仍改变了结果: [%.120s]", cap_text());
 
-    /* ② 干净的一轮: 顺带量出这条命令一共取了几次 cfg 锁, 并证 OK 时配置与候选同版 */
-    base = g_cfg_take_calls;
+    /* ⑤ 初始配置为空的世界: 两条故障各测一遍, 然后拒绝不能把命令废掉 */
+    prep_zero_cruise();
+    CHECK(learn_run(400) == REL_JOB_DONE && d_pending_learn == RT_TRUE,
+          "前置(空配置世界): 没学到候选");
+    S.mstate = MOTOR_IDLE; S.armed = 0; S.mhz = 0;
+    CHECK(project_config_get_rprof(&cfg_after) == RT_EOK && cfg_after.magic == 0,
+          "前置: 第二个世界的配置不空");
+    f = a16_refusal(-1, ctx_steps - 1, "commit REFUSED: (ctx-lock-commit)", &takes);
+    CHECK(f == 0, "空配置下提交点 ctx 取锁失败却没保持原状(magic 应仍为 0): flags=%02X", f);
+    f = a16_refusal(cfg_steps - 1, -1, "commit REFUSED: (cfg-lock-commit)", &takes);
+    CHECK(f == 0, "空配置下 cfg 取锁失败却没保持原状: flags=%02X", f);
     cap_reset();
     do_cmd(cmd_commit);
-    steps = g_cfg_take_calls - base;
-    CHECK(cap_has("commit OK"), "干净世界里的 commit 没成功: [%.90s]", cap_text());
-    CHECK(steps >= 1, "这条 commit 一次 cfg 锁都没取(注入无法定位)");
-    memset(&after, 0, sizeof(after));
-    CHECK(project_config_get_rprof(&after) == RT_EOK &&
-          after.magic == DIAG_RPROF_MAGIC &&
-          memcmp(&after, &d_pending, sizeof(after)) == 0, "commit OK 之后配置与候选不一致");
-
-    /* ③ 只把最后一次 cfg 取锁(= 配置发布)打坏: 已发布的候选必须退回, 且如实披露 */
-    before = after;
-    pend_before = d_pending;
-    g_cfg_take_calls = base;
-    g_cfg_take_fail_after = base + steps - 1;
-    cap_reset();
-    do_cmd(cmd_commit);
-    g_cfg_take_fail_after = -1;
-    CHECK(cap_has("commit REFUSED"), "配置写失败却没按失败披露: [%.90s]", cap_text());
-    CHECK(cap_has("config-write-rolled-back"), "配置写失败没走回滚披露: [%.110s]", cap_text());
-    memset(&after, 0, sizeof(after));
-    CHECK(project_config_get_rprof(&after) == RT_EOK &&
-          memcmp(&before, &after, sizeof(before)) == 0, "配置写失败却留下了新配置");
-    CHECK(memcmp(&pend_before, &d_pending, sizeof(pend_before)) == 0, "回滚没把候选退回原值");
+    CHECK(cap_has("commit OK"), "两条拒绝之后同一条 commit 提交不了: [%.90s]", cap_text());
+    CHECK(project_config_get_rprof(&cfg_after) == RT_EOK &&
+          cfg_after.magic == DIAG_RPROF_MAGIC && cfg_after.profile_id == 1u &&
+          memcmp(&cfg_after, &d_pending, sizeof(cfg_after)) == 0,
+          "空配置世界第一笔提交的结果不对(id=%u magic=%08X)",
+          (unsigned)cfg_after.profile_id, (unsigned)cfg_after.magic);
 }
 
 static const struct case_ent TAB[] = {

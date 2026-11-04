@@ -1,0 +1,39 @@
+{
+  "id": "R7D1_ARD4_FOLLOWUP_e1d7f3d",
+  "base_commit": "e1d7f3d90415fdf30344ed95a08065c1373fab01",
+  "finding": {
+    "id": "ARD4",
+    "priority": "P2",
+    "result": "CHANGES_REQUIRED",
+    "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diag_relative.c",
+    "line_start": 2195,
+    "line_end": 2209
+  },
+  "authorization": "Continue original offline authorization. No new registration or approval round.",
+  "product_scope": [
+    "diag_relative.c",
+    "direct configuration transaction dependencies if needed"
+  ],
+  "hardware_actions_cap": 0,
+  "acceptance": [
+    "REFUSED preserves configuration, candidate and credentials byte-for-byte",
+    "OK publishes matching complete configuration and candidate",
+    "cfg-write failure with rollback unavailable covered in regression and effective negative control",
+    "retain original four probes, existing 66 cases and 19 reverse families business meaning",
+    "bounded waits, leaf lock order, print budget unchanged",
+    "offline build and remote blob readback; preserve all old failure evidence"
+  ],
+  "closed_without_reopening": [
+    "ARD1",
+    "ARD2",
+    "ARD3"
+  ],
+  "field_boundaries": {
+    "on_board": "historical b502 / 502dca5d",
+    "df7584c3": "NOT_ON_BOARD",
+    "165d8bdc": "NOT_ON_BOARD",
+    "polarity_measured": false,
+    "core_protection_verified": false,
+    "R7F5A_poweroff": "PENDING_OPERATOR_REPORT"
+  }
+}

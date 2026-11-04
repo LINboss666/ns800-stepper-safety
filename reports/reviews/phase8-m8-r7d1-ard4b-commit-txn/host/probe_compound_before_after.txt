@@ -1,0 +1,47 @@
+# A 续修包的复合故障探针(commit_rollback_probe.c)——修前必须 FAIL, 修后核验不变量
+# 输入同一份: C:\r7d1r2_rev\reproducer\commit_rollback_probe.c(本轮未改), 同一 gcc, 同一台机器。
+# 修前 = 在被审件 e1d7f3d 的逐字节副本上跑; 修后 = 在本轮定稿工作树上跑。
+# 编译器: C:/Program Files (x86)/Dev-Cpp/MinGW64/bin\gcc.exe
+
+## 修前(e1d7f3d) run_rc=1 build_rc=0 hardware_actions=0
+[DIAG] zero OK n=32 raw 1660..1660 mean=1660000 (cal source untouched)
+[DIAG] learn STARTED id=1 n=8 win=450..550 dir=0
+[DIAG] learn async: query 'learn_status'; NOT learn OK yet FIELD_UNVERIFIED
+[DIAG] commit OK id=1 rev=1 flags=0005 FIELD_UNVERIFIED
+[DIAG] commit next: config_save to persist, then arm explicitly
+[DIAG] commit REFUSED: (config-write-no-rollback) rc=-12
+OBS|COMMIT_CFG_AND_ROLLBACK_FAULT|refused=1 no_rollback=1 cfg_changed=0 pending_changed=1 creds_kept=1 cfg_id=1 pending_id=2 ctx_takes=5 cfg_steps=3
+REVIEW|REFUSED_COMMIT_PRESERVES_ALL_STATE_ON_ROLLBACK_LOCK_FAILURE|FAIL
+
+## 修后(ARD4b 定稿工作树) run_rc=0 build_rc=0 hardware_actions=0
+[DIAG] zero OK n=32 raw 1660..1660 mean=1660000 (cal source untouched)
+[DIAG] learn STARTED id=1 n=8 win=450..550 dir=0
+[DIAG] learn async: query 'learn_status'; NOT learn OK yet FIELD_UNVERIFIED
+[DIAG] commit OK id=1 rev=1 flags=0005 FIELD_UNVERIFIED
+[DIAG] commit next: config_save to persist, then arm explicitly
+[DIAG] commit REFUSED: (cfg-lock-commit) rc=-12
+OBS|COMMIT_CFG_AND_ROLLBACK_FAULT|refused=1 no_rollback=0 cfg_changed=0 pending_changed=0 creds_kept=1 cfg_id=1 pending_id=1 ctx_takes=3 cfg_steps=3
+REVIEW|REFUSED_COMMIT_PRESERVES_ALL_STATE_ON_ROLLBACK_LOCK_FAILURE|PASS
+
+## 逐项对照(OBS|COMMIT_CFG_AND_ROLLBACK_FAULT)
+  refused          修前 1 -> 修后 1
+  no_rollback      修前 1 -> 修后 0
+  cfg_changed      修前 0 -> 修后 0
+  pending_changed  修前 1 -> 修后 0
+  creds_kept       修前 1 -> 修后 1
+  cfg_id           修前 1 -> 修后 1
+  pending_id       修前 2 -> 修后 1
+  ctx_takes        修前 5 -> 修后 3
+  cfg_steps        修前 3 -> 修后 3
+  REVIEW 修前 FAIL -> 修后 PASS
+  拒绝身份: 修前 [DIAG] commit OK id=1 rev=1 flags=0005 FIELD_UNVERIFIED | [DIAG] commit next: config_save to persist, then arm explicitly | [DIAG] commit REFUSED: (config-write-no-rollback) rc=-12
+            修后 [DIAG] commit OK id=1 rev=1 flags=0005 FIELD_UNVERIFIED | [DIAG] commit next: config_save to persist, then arm explicitly | [DIAG] commit REFUSED: (cfg-lock-commit) rc=-12
+
+## 如实登记: 复合探针的 ctx 那一臂在本轮打不到(不是"变好了"的证据)
+  探针把两个故障同时装上去: cfg 第 (cfg_steps-1) 次之后失败 + ctx 第 5 次失败。
+  修前 commit 会取 ctx 5 次(第 5 次就是回滚), 两个臂都命中 => no_rollback=1。
+  修后 commit 只取 ctx 3 次且 cfg 先失败, 回滚这一步在设计上已经不存在,
+  所以 ctx 臂不再可能命中 => 本件的 PASS 只证明"cfg 失败时三份状态未动",
+  不证明"配置写成而 ctx 发布失败"这一组合(它已不可能发生)。等价故障点由两处承担:
+    1) 原版四探针第 4 条(ctx 第 4 次失败, 此时 cfg 已持锁): 见 host/probe_four_before_after.txt;
+    2) 主机链 A16 的 ②/⑤ 段(cfg 已持锁 + 发布取 ctx 失败 => REFUSED, 配置/候选/凭据/锁全回到调用前)。

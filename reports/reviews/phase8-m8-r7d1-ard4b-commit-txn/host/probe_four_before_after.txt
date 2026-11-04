@@ -1,0 +1,74 @@
+# A 原版四探针(review_probes.c, 直接编入产品 C)——本轮在定稿工作树上复跑
+# 对照基线 = 上一轮归档件 host/probe_before_after.txt 的"修后"块, 那一次跑的正是被审件 e1d7f3d;
+# 两边同一份 A 的原版 reproducer(C:\r7d1_rev\reproducer\review_probes.c)、同一台机器、同一 gcc,
+# 只有产品三件与工作树夹具不同。编译器: C:/Program Files (x86)/Dev-Cpp/MinGW64/bin\gcc.exe
+# 本轮 run_rc=0 build_rc=0 hardware_actions=0
+
+## 基线(e1d7f3d, 上一轮归档件逐字摘录)
+修后(本轮返修候选) run_rc=0
+OBS|NULL_STATUS|rc=-5 ctx_held=0 takes=0 releases=0
+REVIEW|NULL_STATUS_DOES_NOT_LEAK_LOCK|PASS
+[DIAG] zero cleanup DEFERRED: ctx lock (owner stays BY_ZERO)
+[DIAG] zero FAILED: ctx lock on invalidate
+OBS|ZERO_FAILED_EXIT|owner=1 active=1 ctx_takes=4
+[DIAG] zero OK n=32 raw 2000..2000 mean=2000000 (cal source untouched)
+OBS|ZERO_RETRY_AFTER_FAULT_CLEARED|owner=0 active=0 zero_cred=1 busy=0
+REVIEW|FAILED_ZERO_RECOVERS_COLLECTOR_AFTER_LOCK_FAULT|PASS
+[DIAG] zero OK n=32 raw 1660..1660 mean=1660000 (cal source untouched)
+[DIAG] learn STARTED id=1 n=8 win=450..550 dir=0
+[DIAG] learn async: query 'learn_status'; NOT learn OK yet FIELD_UNVERIFIED
+[DIAG] clear REFUSED: static txn rc=-8 (idle+trusted-disable not proven)
+OBS|CLEAR_STATIC_REFUSED|refused=1 zero_cred=1 learn_cred=1 pending_changed=0
+REVIEW|REFUSED_CLEAR_PRESERVES_PENDING_AND_CREDENTIALS|PASS
+[DIAG] zero OK n=32 raw 1660..1660 mean=1660000 (cal source untouched)
+[DIAG] learn STARTED id=1 n=8 win=450..550 dir=0
+[DIAG] learn async: query 'learn_status'; NOT learn OK yet FIELD_UNVERIFIED
+[DIAG] commit REFUSED: (ctx-lock-publish) rc=-12
+OBS|COMMIT_POSTWRITE_CTX_FAULT|refused=1 cfg_before_magic=00000000 cfg_after_magic=00000000 cfg_changed=0 ctx_takes=4
+REVIEW|COMMIT_OUTCOME_MATCHES_COMPLETE_TRANSACTION|PASS
+REVIEW_SUMMARY|checks=4|failures=0|hardware_actions=0
+
+## 本轮(ARD4b 定稿工作树)
+OBS|NULL_STATUS|rc=-5 ctx_held=0 takes=0 releases=0
+REVIEW|NULL_STATUS_DOES_NOT_LEAK_LOCK|PASS
+[DIAG] zero cleanup DEFERRED: ctx lock (owner stays BY_ZERO)
+[DIAG] zero FAILED: ctx lock on invalidate
+OBS|ZERO_FAILED_EXIT|owner=1 active=1 ctx_takes=4
+[DIAG] zero OK n=32 raw 2000..2000 mean=2000000 (cal source untouched)
+OBS|ZERO_RETRY_AFTER_FAULT_CLEARED|owner=0 active=0 zero_cred=1 busy=0
+REVIEW|FAILED_ZERO_RECOVERS_COLLECTOR_AFTER_LOCK_FAULT|PASS
+[DIAG] zero OK n=32 raw 1660..1660 mean=1660000 (cal source untouched)
+[DIAG] learn STARTED id=1 n=8 win=450..550 dir=0
+[DIAG] learn async: query 'learn_status'; NOT learn OK yet FIELD_UNVERIFIED
+[DIAG] clear REFUSED: static txn rc=-8 (idle+trusted-disable not proven)
+OBS|CLEAR_STATIC_REFUSED|refused=1 zero_cred=1 learn_cred=1 pending_changed=0
+REVIEW|REFUSED_CLEAR_PRESERVES_PENDING_AND_CREDENTIALS|PASS
+[DIAG] zero OK n=32 raw 1660..1660 mean=1660000 (cal source untouched)
+[DIAG] learn STARTED id=1 n=8 win=450..550 dir=0
+[DIAG] learn async: query 'learn_status'; NOT learn OK yet FIELD_UNVERIFIED
+[DIAG] commit REFUSED: (ctx-lock-commit) rc=-117
+OBS|COMMIT_POSTWRITE_CTX_FAULT|refused=1 cfg_before_magic=00000000 cfg_after_magic=00000000 cfg_changed=0 ctx_takes=4
+REVIEW|COMMIT_OUTCOME_MATCHES_COMPLETE_TRANSACTION|PASS
+REVIEW_SUMMARY|checks=4|failures=0|hardware_actions=0
+
+## 逐条对照(只列会变的观察值与拒绝身份)
+  NULL_STATUS                 ctx_held         e1d7f3d 0 -> 本轮 0
+  NULL_STATUS                 takes            e1d7f3d 0 -> 本轮 0
+  NULL_STATUS                 releases         e1d7f3d 0 -> 本轮 0
+  ZERO_FAILED_EXIT            ctx_takes        e1d7f3d 4 -> 本轮 4
+  ZERO_RETRY_AFTER_FAULT_CLEARED owner            e1d7f3d 0 -> 本轮 0
+  ZERO_RETRY_AFTER_FAULT_CLEARED busy             e1d7f3d 0 -> 本轮 0
+  CLEAR_STATIC_REFUSED        pending_changed  e1d7f3d 0 -> 本轮 0
+  CLEAR_STATIC_REFUSED        zero_cred        e1d7f3d 1 -> 本轮 1
+  CLEAR_STATIC_REFUSED        learn_cred       e1d7f3d 1 -> 本轮 1
+  COMMIT_POSTWRITE_CTX_FAULT  cfg_changed      e1d7f3d 0 -> 本轮 0
+  COMMIT_POSTWRITE_CTX_FAULT  ctx_takes        e1d7f3d 4 -> 本轮 4
+  COMMIT_POSTWRITE_CTX_FAULT  refused          e1d7f3d 1 -> 本轮 1
+  四条 REVIEW: e1d7f3d PASS/PASS/PASS/PASS -> 本轮 PASS/PASS/PASS/PASS
+  REVIEW_SUMMARY: REVIEW_SUMMARY|checks=4|failures=0|hardware_actions=0 -> REVIEW_SUMMARY|checks=4|failures=0|hardware_actions=0
+
+## 第 4 条(commit 事务)的拒绝身份变化 —— 这是本轮设计变化的直接后果, 不是锚点失效
+  e1d7f3d 的 [DIAG] commit 行: [DIAG] commit REFUSED: (ctx-lock-publish) rc=-12
+  本轮的     [DIAG] commit 行: [DIAG] commit REFUSED: (ctx-lock-commit) rc=-117
+  同一注入(ctx 第 4 次取锁失败)现在命中的是"配置已持锁、发布前取 ctx 失败"这个等价故障点;
+  它仍然产生 refused=1 且 cfg_changed=0(不是绕过), 拒绝身份由 ctx-lock-publish/-12 变成 ctx-lock-commit/-117。
