@@ -117,7 +117,7 @@ def main() -> int:
             hj["negative_controls"]["per_case_lines_rc_matches_expected"]))
     fails.append("" if hj["checks_fails"] == 0 else "CHECKS_FAILS")
 
-    # 3) tip^ -> tip 差异必须恰好是本轮新增 + .gitattributes 一条改动
+    # 3) tip^ -> tip 差异必须恰好是本轮新增 + 声明过的改动件
     note("--- tip^ -> tip 差异(远端对象比较)")
     rc, so, _ = run(["diff", "--name-status", parent, tip], bare)
     added, changed = [], []
@@ -125,8 +125,10 @@ def main() -> int:
         parts = line.split("\t")
         (added if parts[0] == "A" else changed).append(parts[-1])
     note("DIFF|新增=%d 改动=%d" % (len(added), len(changed)))
-    stray = [p for p in changed if p != ".gitattributes"]
-    note("  越界改动=%d %s" % (len(stray), stray[:5]))
+    # 首提交: 允许改动只有 .gitattributes; 收口跟修提交: 用 RBI_ALLOW_CHANGED 显式声明允许改动集
+    allow_changed = set(p for p in os.environ.get("RBI_ALLOW_CHANGED", ".gitattributes").split(",") if p)
+    stray = [p for p in changed if p not in allow_changed]
+    note("  允许改动集=%d 越界改动=%d %s" % (len(allow_changed), len(stray), stray[:5]))
     fails.extend(["UNEXPECTED_MODIFY|" + p for p in stray])
     stray_new = [p for p in added if not p.startswith(ROUND + "/")]
     note("  新增件越界=%d %s" % (len(stray_new), stray_new[:5]))
@@ -153,8 +155,11 @@ def main() -> int:
             note("  %-40s **被改动**" % path.split("/")[-1])
     note("PRESERVE|比对=%d 相同=%d 被改=%d 取不到=%d" % (len(pres), same, diff_, absent))
     a, c = at(".gitattributes"), at(".gitattributes", parent)
-    fired = a is not None and c is not None and a != c
-    note("SELFCHECK|.gitattributes tip vs tip^ 必须不同: %s" % ("FIRED" if fired else "**NOT-FIRED(比较器失效)**"))
+    want_diff = os.environ.get("RBI_GITATTR_DIFF", "1") == "1"
+    got_diff = a is not None and c is not None and a != c
+    fired = got_diff == want_diff
+    note("SELFCHECK|.gitattributes tip vs tip^ 差异期望=%s 实测=%s: %s"
+         % (want_diff, got_diff, "FIRED" if fired else "**不符(本轮不该动 .gitattributes)**"))
     fails.append("" if fired else "SELFCHECK_NOT_FIRED")
 
     fails[:] = [f for f in fails if f]
