@@ -1,0 +1,26 @@
+zip C:\Users\LMX\Downloads\NS800_R7F4_A_GO_B502_CONFIGURED_20261104.zip
+  bytes=36146 sha256=337cb3058ee27e8de96299ceffe672eca0a293f759b87f554c94ac27b83a0b6a
+  内件=8 包内清单条目=7
+
+  IDENTITY.json                                                                            1562 dd35c61b14d9f0c1 OK
+  README_A_R7F4.md                                                                         6199 70ea05c2ceae6ada OK
+  SHA256SUMS.txt                                                                            765 c6a741c7e9229650 SKIP(清单不哈希自身字节)
+  a_review/positive_full_dispatch.txt                                                      4795 71ab80bade80ee4e OK
+  a_review/review_result.json                                                              6706 0cc0f81c03d17092 OK
+  a_review/validate_plan.txt                                                               2634 4b600682bba70c66 OK
+  reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/plan_r7f4_b502_configured_reviewed.json    33012 0b6e1eb8a8c69b7f OK
+  reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/rows_r7f4_b502_configured.json    60116 64e8a86876395ad7 OK
+  包内自洽=全部 OK(SHA256SUMS.txt 不哈希自身)
+
+== 落位件: zip 内字节 == 仓库磁盘字节 == IDENTITY.json ==
+
+  plan_r7f4_b502_configured_reviewed.json  OK bytes=33012/33012 sha=0b6e1eb8a8c69b7f 
+  rows_r7f4_b502_configured.json           OK bytes=60116/60116 sha=64e8a86876395ad7 
+  executor                                 OK bytes=219491/219491 sha=33d3f0af8a4c9c33
+  bin                                      OK bytes=292708/292708 sha=502dca5d8c7ebfa7
+  IDENTITY.json                            OK 逐字节相同 bytes=1562
+  SHA256SUMS.txt                           OK 逐字节相同 bytes=765
+  review_result.json                       OK 逐字节相同 bytes=6706
+  positive_full_dispatch.txt               OK 逐字节相同 bytes=4795
+  validate_plan.txt                        OK 逐字节相同 bytes=2634
+  README_A_R7F4.md -> a_review_R7F4_A_GO_CONFIGURED.md OK 逐字节相同 bytes=6199

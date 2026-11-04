@@ -1,0 +1,234 @@
+{
+  "reviewed_commit": "0a75e318f67f75beae7e42eade7d0c4a5a9dddea",
+  "new_image_byte_equal_in_board_readback": true,
+  "raw_integrity": {
+    "01_rst.boot.rx.bin": {
+      "bytes": 3468,
+      "nul": 0,
+      "strict_utf8": true,
+      "sha256": "9e4ce2c9dd1161717bf15803ceebb4cb43fe25767e61f8f78a301841b314dff5"
+    },
+    "02_threads.rx.bin": {
+      "bytes": 1192,
+      "nul": 0,
+      "strict_utf8": true,
+      "sha256": "e772b05db72056382c48ec0c799a0cbf59ef30a5574e7f421aad557d5a464055"
+    },
+    "03_heap.rx.bin": {
+      "bytes": 90,
+      "nul": 0,
+      "strict_utf8": true,
+      "sha256": "2aef3ec96d30f7f1a4615c1877dd81cdf0ce898d0f96cd3a5972a870ca469346"
+    },
+    "04_sysboot.rx.bin": {
+      "bytes": 983,
+      "nul": 0,
+      "strict_utf8": true,
+      "sha256": "73abf3012386723ec2d5ec70e5b515bfb2cb3285d60c233a27b07e60d47408a7"
+    },
+    "05_safboot.rx.bin": {
+      "bytes": 522,
+      "nul": 0,
+      "strict_utf8": true,
+      "sha256": "00cea3467e9b9549f2e326182aecaff435337494d79479f03cdf361b0a317b38"
+    },
+    "06_motboot.rx.bin": {
+      "bytes": 1128,
+      "nul": 0,
+      "strict_utf8": true,
+      "sha256": "f0550d3131642cd02408c88adc67f6fcb064a27ccba6ceec9c60b82e9cf0c3b5"
+    },
+    "07_irqboot.rx.bin": {
+      "bytes": 612,
+      "nul": 0,
+      "strict_utf8": true,
+      "sha256": "25bef65c2b365d5c42e13312de36e7ed1c890194d06684b70646eeccf76b4352"
+    }
+  },
+  "predictions_matched_field": {
+    "safety_status": {
+      "predicted": 7,
+      "matched": 7
+    },
+    "motor_status": {
+      "predicted": 25,
+      "matched": 25
+    },
+    "safety_irq_status": {
+      "predicted": 9,
+      "matched": 9
+    }
+  },
+  "previous_trial_accepted": "BOOT_READY_AND_TARGET_SHORT_PRINTS_VERIFIED_ON_502D; protection remains unverified.",
+  "planned_config": {
+    "irun": 20,
+    "ihold": 8,
+    "ihold_delay": 4,
+    "tpowerdown": 8,
+    "vsense": 1,
+    "mstep_reg_select": 0,
+    "mres": 0,
+    "IHOLD_IRUN": "0x00041408",
+    "TPOWERDOWN": "0x00000008",
+    "current_claim": "theoretical only, not measured"
+  },
+  "configured_eight_print_bounds": [
+    {
+      "format": "[TMC-CFG] CONFIGURED (各次写入均经 IFCNT 确认)\n",
+      "max_bytes_including_LF": 55
+    },
+    {
+      "format": "[TMC-CFG] GCONF/CHOPCONF 读回一致\n",
+      "max_bytes_including_LF": 38
+    },
+    {
+      "format": "[TMC-CFG] 电流值仍为理论计算, 未实测\n",
+      "max_bytes_including_LF": 49
+    },
+    {
+      "format": "[TMC-CFG] 预算: 已用 %u / 总 %u tick\n",
+      "max_bytes_including_LF": 58
+    },
+    {
+      "format": "[TMC-CFG] flush=%uB TX=%uB\n",
+      "max_bytes_including_LF": 43
+    },
+    {
+      "format": "[TMC-CFG] irun=%u ihold=%u dly=%u tpd=%u vsense=%u\n",
+      "max_bytes_including_LF": 91
+    },
+    {
+      "format": "[TMC-CFG] GCONF %08X->%08X CHOPCONF %08X->%08X\n",
+      "max_bytes_including_LF": 63
+    },
+    {
+      "format": "[TMC-CFG] op_epoch=%u\n",
+      "max_bytes_including_LF": 30
+    }
+  ],
+  "next_plan_S0": {
+    "image_path": "reports/firmware/phase8-m8-r7f2b-safety-print-fix/rt-thread-motor-m1-candidate.bin",
+    "approval_id": "NONE_DECLARED",
+    "plan_source": "/workspace/scratch/f24247cdf3d6/r7f3-field-review/repo/reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/plan_r7f4_b502_configured_reviewed.json",
+    "plan_sha256_on_disk": "0b6e1eb8a8c69b7f6b14a8f2a1e8662564caa4c56c17a5cd77fbad1368e74f11",
+    "plan_sha256": "0b6e1eb8a8c69b7f6b14a8f2a1e8662564caa4c56c17a5cd77fbad1368e74f11",
+    "plan_snapshot_bytes": 33012,
+    "plan_snapshot_path": "/workspace/scratch/f24247cdf3d6/r7f3-field-review/repo/reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/plan_r7f4_b502_configured_reviewed.json",
+    "executor_path": "/workspace/scratch/f24247cdf3d6/r7f3-field-review/repo/reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py",
+    "executor_sha256": "33d3f0af8a4c9c33dcd4e013b395e4ba990a89e384130f9d0ffe50c71b34e8ca",
+    "image_bytes": 292708,
+    "image_sha256": "502dca5d8c7ebfa794f890a9c03bc258fc9753f57b6a80c2f1e08add69888a7a",
+    "manifest_target": "rt-thread-motor-m1-candidate",
+    "software_input_commit": "99414c7a57d8987033de3de48469a8f4779b87a5",
+    "tested_image_build_commit": "70deff806e8b548dee23afb06a6fcdf20937b015",
+    "reviewed_delivery_commit": "0a75e318f67f75beae7e42eade7d0c4a5a9dddea",
+    "plan_placeholders": 0,
+    "plan_forbidden_hits": 0,
+    "needles_source_root": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad",
+    "needles_total": 40
+  },
+  "next_plan_validation": {
+    "checks": 33,
+    "fail_count": 1,
+    "fail_lines": [
+      "PLAN_MOTION_CAP_BUDGET|all|FAIL|caps=[] sum=0 total=0 starts=0"
+    ]
+  },
+  "full_dispatch_replays": [
+    {
+      "case": "positive",
+      "status": "OK",
+      "code": null,
+      "quota_used": {
+        "port_open": 1,
+        "tmc_config_apply": 1
+      }
+    },
+    {
+      "case": "pre_fault",
+      "status": "STOP",
+      "code": "FIELD_VALUE_MISMATCH",
+      "quota_used": {
+        "port_open": 1
+      }
+    },
+    {
+      "case": "pre_already_configured",
+      "status": "STOP",
+      "code": "FIELD_VALUE_MISMATCH",
+      "quota_used": {
+        "port_open": 1
+      }
+    },
+    {
+      "case": "pre_wrong_feedback",
+      "status": "STOP",
+      "code": "FIELD_VALUE_MISMATCH",
+      "quota_used": {
+        "port_open": 1
+      }
+    },
+    {
+      "case": "pre_not_idle",
+      "status": "STOP",
+      "code": "FIELD_VALUE_MISMATCH",
+      "quota_used": {
+        "port_open": 1
+      }
+    },
+    {
+      "case": "apply_refused",
+      "status": "STOP",
+      "code": "BUSINESS_FAILED",
+      "quota_used": {
+        "port_open": 1,
+        "tmc_config_apply": 1
+      }
+    },
+    {
+      "case": "apply_missing_tail",
+      "status": "STOP",
+      "code": "FIELD_NOT_EXACTLY_ONE",
+      "quota_used": {
+        "port_open": 1,
+        "tmc_config_apply": 1
+      }
+    },
+    {
+      "case": "apply_wrong_parameters",
+      "status": "STOP",
+      "code": "FIELD_VALUE_MISMATCH",
+      "quota_used": {
+        "port_open": 1,
+        "tmc_config_apply": 1
+      }
+    },
+    {
+      "case": "apply_nul",
+      "status": "STOP",
+      "code": "NUL_BYTE_IN_RESPONSE",
+      "quota_used": {
+        "port_open": 1,
+        "tmc_config_apply": 1
+      }
+    },
+    {
+      "case": "post_not_configured",
+      "status": "STOP",
+      "code": "FIELD_VALUE_MISMATCH",
+      "quota_used": {
+        "port_open": 1,
+        "tmc_config_apply": 1
+      }
+    },
+    {
+      "case": "post_enable_request",
+      "status": "STOP",
+      "code": "PROFILE_NOT_AT_REST",
+      "quota_used": {
+        "port_open": 1,
+        "tmc_config_apply": 1
+      }
+    }
+  ]
+}

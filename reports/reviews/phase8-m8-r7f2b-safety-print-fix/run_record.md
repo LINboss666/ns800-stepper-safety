@@ -176,4 +176,48 @@ motor_status 静止/未武装/当前禁能合同 + `arm_gate_mask=0x18 REFUSED` 
 未证不扩大:SG/ADC/IMU 保护、正常 disarm 收口、带载最坏栈、CONFIGURED 短打印、其余 35 条超长格式串;
 `core_protection_verified=False`。板端:VM 供电保持、显式复位后自由运行、未起转、对 Flash 只写过那一次 sector 下载。
 
+## 10 R7F4 登记(A 签收 R7F3 + 定稿 CONFIGURED 一次 apply;设备动作仍为 0)
+
+输入: `NS800_R7F4_A_GO_B502_CONFIGURED_20261104.zip`(36146 B,`337cb3058ee2…`;8 内件 + 包内清单自洽,清单不哈希自身)。
+四方身份 **A 登记 = IDENTITY.json = 磁盘** 三方一致: plan 33012 B `0b6e1eb8a8c6…` / rows 60116 B `64e8a8687639…` /
+执行器 219491 B `33d3f0af8a4c…`(R6C 原件,本轮一字未改) / BIN 292708 B `502dca5d8c7e…`。
+两份 field 件按包内相对路径落位且 zip 内字节 == 落位字节; `a_review/` 5 件与 README 逐字节相同
+(`offline/package_integrity_r7f4.txt`)。
+(A 的包内清单 `a_review_r7f4/SHA256SUMS.txt` 765 B `c6a741c7e922…` 按本轮清单的**按文件名排除**规则不进 `SHA256SUMS.txt`
+ —— 与上一场 `a_review_r7f3/SHA256SUMS.txt` 1117 B 同一口径; 两者的磁盘 sha256 逐条记在 `handoff_R7F4_registered.json`
+ 的 `reviewed_files_archived` 里, 第三方可按清单头写明的那条排除规则原样复算。)
+
+A 的结论: **R7F3 的启动与指定短打印验收通过,可以收口**; 并自限"不代表全部 35 条长格式串已修复,也不代表
+SG/ADC/IMU、带载最坏栈或正常 disarm 已过现场验证"。下一场定为一次 **CONFIGURED 验收**(一次 `tmc_config_apply CONFIRM`),
+沿用已逐字节证在板的 b502,**不重新编译、不下载、不回读、不复位**。
+
+本机独立复算(全部在未改动执行器上,`offline/` 原文):
+- `--validate-plan` = **33 checks / fail=1**,唯一 FAIL 仍是 `PLAN_MOTION_CAP_BUDGET`(A 按零 arm/start 包登记 N/A);
+  `PLAN_BOOT_WINDOW_COVER` = **NA**(本场无启动,不申报 75 s 窗)。与包内 `a_review/validate_plan.txt` 同源。
+- 一次 stub/sim 正例(不带 `--approval-id`): rc=0、`stages_executed=2`、`port_open declared=1 used=1`、
+  `tmc_config_apply declared=1 used=1`、`APPROVAL_LEDGER NONE` —— 没消耗任何真实批准,也没起设备工具。
+- 6 个负例(只在仓外的夹具副本上定向改写): `pre_fault`/`pre_not_idle`/`pre_already_configured` →
+  `STOP / FIELD_VALUE_MISMATCH` 且 **apply_used=0**; `apply_refused` → `BUSINESS_FAILED`、`apply_nul` →
+  `NUL_BYTE_IN_RESPONSE`、`post_not_configured` → `FIELD_VALUE_MISMATCH`,三者 **apply_used 恰为 1**(不重试)。
+  **6/6 与 A 登记的码一致** —— A 的两条安全声称(前置不满足不烧 apply、进 apply 后不重试)独立复现。
+- CONFIGURED 八条预测行(已代入具体值)实测最长 **63 B 含 LF**,远低于 A 声称的 120 B 界限。
+
+我自己这一轮的**两处口径修正**(都不触碰 A 原件,也不触碰上一场现场字节):
+1. 包内 `SHA256SUMS.txt` 自己那一行我先标成"不符"——它按规则不哈希自身,已在档中正名为 `SKIP(清单不哈希自身字节)`,其余 7 条 OK。
+2. 第一版 `handoff_R7F4_registered.json` 把负例一致数写成 `10`(场景仍写 6,自相矛盾): 裸 `neg.count("MATCH")` 被
+   `FIELD_VALUE_MISMATCH` 里的子串 `MATCH` 吃掉 4 次。改为只数行尾 ` MATCH` 得 **6**,与转录 `负例复跑: 场景=6 与 A 登记一致=6 不符=0`
+   对齐,并加了"子串计数必须大于行尾计数"的自检——码名一旦不再含 `MATCH`,该判据会当场报错而不是静默失真。
+   负例复跑结果与 `offline/negative_repro_r7f4.txt` 字节未变(`5e6d286107bc…`,979 B),改的只是我自己的计数。
+
+固定范围(批准后,A 已定稿,详见 `handoff_R7F4_registered.md` §2): 批准身份 `M8R7F4-b502-configured-20261104`;
+**COM5 开口 1 次(一个连续会话)+ `tmc_config_apply CONFIRM` 1 次**,下载/回读/复位/arm/start/运动/学习/零点/提交/保存/
+清日志/开 IRQ/极性确认/重试/其他写入全 **0**;会话硬截止 90 s,本场无启动窗。一次 apply 是一次命令事务(内部四寄存器写 + 逐次 IFCNT),
+不记成四次 apply。顺序 `system_status`→`motor_status`→apply 一次→`system_status`→`motor_status`→`safety_status`;
+写后预期 `gate5=CONFIGURED`、`arm_gate_mask` 由 `0x18` 降到 `0x8`(保护未就绪那一条拒绝**保留**),
+`CONFIGURED` 与 `protect_ready=NO` 可同时成立;计划参数 irun 20 / ihold 8 / ihold_delay 4 / tpowerdown 8 / vsense 1,
+`IHOLD_IRUN=0x00041408`、`TPOWERDOWN=0x00000008`(理论值,本场不测电流或转矩)。
+
+**停点**:A README 原文「本包当前硬件批准数为 0」。所以本轮**未创建批准身份、未开口、未发 apply**,设备动作全 0;
+现场安全门不由我代答、转述或自填。批准后按 A 的规定:落位件 + 新台账 + `--dispatch --transport real --backend real
+--profile response_driven` 一次,不再交准备轮、不重复确认同一范围。
 

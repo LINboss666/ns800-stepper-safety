@@ -1,0 +1,12 @@
+A 的 apply 预测行(= 最宽数字已代入的具体形态), 8 条:
+   55 B(含 LF)  [TMC-CFG] CONFIGURED (各次写入均经 IFCNT 确认)
+   38 B(含 LF)  [TMC-CFG] GCONF/CHOPCONF 读回一致
+   49 B(含 LF)  [TMC-CFG] 电流值仍为理论计算, 未实测
+   45 B(含 LF)  [TMC-CFG] 预算: 已用 300 / 总 1500 tick
+   26 B(含 LF)  [TMC-CFG] flush=0B TX=32B
+   47 B(含 LF)  [TMC-CFG] irun=20 ihold=8 dly=4 tpd=8 vsense=1
+   63 B(含 LF)  [TMC-CFG] GCONF 00000101->00000141 CHOPCONF 15010053->15030053
+   21 B(含 LF)  [TMC-CFG] op_epoch=0
+最宽 = 63 B; <=120 ? 是 ; <=127(钳位) ? 是
+注: 我先前那次"最宽展开"粗上界算错了(把每个 %u/%d 一次替换成 6 个 8 位十六进制词),
+    那不是产品的任何界限; 正确的可复核口径是上面这组**已代入具体值**的预测行长度。

@@ -1,0 +1,9 @@
+pre_fault              OK    status=STOP  code=FIELD_VALUE_MISMATCH   apply_used=0(期望0) port_open=1(期望<=1) MATCH
+pre_not_idle           OK    status=STOP  code=FIELD_VALUE_MISMATCH   apply_used=0(期望0) port_open=1(期望<=1) MATCH
+pre_already_configured OK    status=STOP  code=FIELD_VALUE_MISMATCH   apply_used=0(期望0) port_open=1(期望<=1) MATCH
+apply_refused          OK    status=STOP  code=BUSINESS_FAILED        apply_used=1(期望1) port_open=1(期望<=1) MATCH
+apply_nul              OK    status=STOP  code=NUL_BYTE_IN_RESPONSE   apply_used=1(期望1) port_open=1(期望<=1) MATCH
+post_not_configured    OK    status=STOP  code=FIELD_VALUE_MISMATCH   apply_used=1(期望1) port_open=1(期望<=1) MATCH
+负例复跑: 场景=6 与 A 登记一致=6 不符=0
+注: apply_nul 场景把 NUL 注进**夹具响应**里, 用来证明执行器的裸 NUL 硬门在 apply 响应上同样生效;
+    它不是产品输出, 也不构成任何产品侧结论。

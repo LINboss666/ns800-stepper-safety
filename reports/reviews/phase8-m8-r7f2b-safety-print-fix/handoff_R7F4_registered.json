@@ -1,0 +1,223 @@
+{
+ "round": "phase8-m8-r7f2b-safety-print-fix / R7F4 登记轮",
+ "title": "A 签收 R7F3 + 定稿 CONFIGURED 一次 apply 续测包; 本机离线复算一致; 设备动作 0",
+ "date_local": "2026-11-04",
+ "head_at_generation": "0a75e318f67f75beae7e42eade7d0c4a5a9dddea",
+ "input_package": {
+  "zip": "C:\\Users\\LMX\\Downloads\\NS800_R7F4_A_GO_B502_CONFIGURED_20261104.zip",
+  "bytes": 36146,
+  "sha256": "337cb3058ee27e8de96299ceffe672eca0a293f759b87f554c94ac27b83a0b6a",
+  "integrity_transcript": {
+   "path": "offline/package_integrity_r7f4.txt",
+   "bytes": 2111,
+   "sha256": "c1a979c99d918fc380ff7fec28b6a11664ec56e85a2d4309d1fdf8f2e0682573"
+  }
+ },
+ "a_verdict": {
+  "r7f3_status": "启动与指定短打印验收通过, 可以收口",
+  "limits": "不代表全部 35 条长格式串已修复, 不代表 SG/ADC/IMU、带载最坏栈或正常 disarm 已过现场验证",
+  "next": "先做一次 CONFIGURED 验收, 再进入学习和目标通道触发",
+  "no_rebuild": "沿用已逐字节证在板的 b502; 无需重新编译、下载、回读或复位",
+  "verbatim_not_approval": "本包当前硬件批准数为 0"
+ },
+ "reviewed_files_archived": [
+  {
+   "path": "field/plan_r7f4_b502_configured_reviewed.json",
+   "bytes": 33012,
+   "sha256": "0b6e1eb8a8c69b7f6b14a8f2a1e8662564caa4c56c17a5cd77fbad1368e74f11"
+  },
+  {
+   "path": "field/rows_r7f4_b502_configured.json",
+   "bytes": 60116,
+   "sha256": "64e8a86876395ad7e1232e5bc049d06893ee09d2c292975714a5fc29d61ea46c"
+  },
+  {
+   "path": "a_review_R7F4_A_GO_CONFIGURED.md",
+   "bytes": 6199,
+   "sha256": "70ea05c2ceae6adad775eae30a90a37edc305fb8fce0e20b9a2805a0a6d83fc1"
+  },
+  {
+   "path": "a_review_r7f4/IDENTITY.json",
+   "bytes": 1562,
+   "sha256": "dd35c61b14d9f0c11185f53d91b990cd5d935bfcf96b6e946051b52a8c82e7be"
+  },
+  {
+   "path": "a_review_r7f4/SHA256SUMS.txt",
+   "bytes": 765,
+   "sha256": "c6a741c7e92296506792a7aded06801ea44ebb189f2a127b6a3bc276a7b86477"
+  },
+  {
+   "path": "a_review_r7f4/review_result.json",
+   "bytes": 6706,
+   "sha256": "0cc0f81c03d17092c9d64d2d719ea189fbe7c2cb6e94802528293dc289a50a7c"
+  },
+  {
+   "path": "a_review_r7f4/positive_full_dispatch.txt",
+   "bytes": 4795,
+   "sha256": "71ab80bade80ee4e152b93adc7a327f4a1c159e1433ea7d2c66ff46d04d30a41"
+  },
+  {
+   "path": "a_review_r7f4/validate_plan.txt",
+   "bytes": 2634,
+   "sha256": "4b600682bba70c6634e3b8513c9ca7e76e7b101f6c0f03349472937f0479dde6"
+  }
+ ],
+ "identity_confirmed": {
+  "plan": {
+   "path": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/plan_r7f4_b502_configured_reviewed.json",
+   "bytes": 33012,
+   "sha256": "0b6e1eb8a8c69b7f6b14a8f2a1e8662564caa4c56c17a5cd77fbad1368e74f11"
+  },
+  "rows": {
+   "path": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/rows_r7f4_b502_configured.json",
+   "bytes": 60116,
+   "sha256": "64e8a86876395ad7e1232e5bc049d06893ee09d2c292975714a5fc29d61ea46c"
+  },
+  "executor": {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py",
+   "bytes": 219491,
+   "sha256": "33d3f0af8a4c9c33dcd4e013b395e4ba990a89e384130f9d0ffe50c71b34e8ca"
+  },
+  "bin": {
+   "path": "reports/firmware/phase8-m8-r7f2b-safety-print-fix/rt-thread-motor-m1-candidate.bin",
+   "bytes": 292708,
+   "sha256": "502dca5d8c7ebfa794f890a9c03bc258fc9753f57b6a80c2f1e08add69888a7a"
+  }
+ },
+ "local_offline_recomputation": {
+  "executor_unchanged": {
+   "path": "reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py",
+   "sha256": "33d3f0af8a4c9c33dcd4e013b395e4ba990a89e384130f9d0ffe50c71b34e8ca"
+  },
+  "validate_plan": {
+   "line_count": 34,
+   "summary": "PLAN_VALIDATE_SUMMARY|checks=33|fail=1|msh_commands=74|plan=reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/plan_r7f4_b502_configured_reviewed.json",
+   "boot_window_gate_line": "PLAN_BOOT_WINDOW_COVER|all|NA|未申报 observation_bounds.boot_window_seconds_min(R5-C 轮新增门; 历史包不回改字节, 因此不判红)",
+   "transcript": {
+    "path": "offline/validate_plan_r7f4_local.txt",
+    "bytes": 2823,
+    "sha256": "da4cfd3a617fdc961ff5e348238d7dcc77d050ada21c4b446fabdc2b210d9ed6"
+   }
+  },
+  "positive_stub_sim_dispatch": {
+   "rc": 0,
+   "summary": "DISPATCH_SUMMARY|status=OK|code=|stages_executed=2|stages_not_run=0|quota_left={\"approved_reboot\": 0, \"blackbox_clear\": 0, \"cleanup_motor_disarm\": 0, \"cleanup_motor_status\": 0, \"cleanup_motor_stop\": 0, \"config_save\": 0, \"diag_profile_commit\": 0, \"diag_profile_learn\": 0, \"diag_profile_zero\": 0, \"dmm_readings\": 0, \"download\": 0, \"explicit_reset\": 0, \"irq_polarity_prep\": 0, \"motion_cap_seconds_per_run\": 0, \"motor_run\": 0, \"motor_run_seconds_total\": 0, \"physical_collision\": 0, \"port_open\": 0, \"readback\": 0, \"retry\": 0, \"tmc_config_apply\": 0}|quota_used={\"port_open\": 1, \"tmc_config_apply\": 1}|profile=healthy|branch=healthy|scenario_branches={}|prerequisite_skips=[]|actions_attempted=[]|ledger=D:\\ns800_r7f1_scratch\\r7f4_sim\\dispatch_ledger.jsonl",
+   "quota_lines": [
+    "QUOTA_AUDIT|port_open|declared=1|used=1|left=0",
+    "QUOTA_AUDIT|tmc_config_apply|declared=1|used=1|left=0"
+   ],
+   "approval_ledger": "NONE(未绑定批准身份 => 没消耗任何真实批准, 也没起设备工具)",
+   "transcript": {
+    "path": "offline/dispatch_r7f4_stub_sim.txt",
+    "bytes": 4011,
+    "sha256": "e3b96f37dde680b349ac52f860a7700aa5b49a764e3ea623dd0675539212deac"
+   }
+  },
+  "negative_reproduced": {
+   "cases": 6,
+   "matching_a_matrix": 6,
+   "mismatch": 0,
+   "per_case_lines": [
+    "pre_fault              OK    status=STOP  code=FIELD_VALUE_MISMATCH   apply_used=0(期望0) port_open=1(期望<=1) MATCH",
+    "pre_not_idle           OK    status=STOP  code=FIELD_VALUE_MISMATCH   apply_used=0(期望0) port_open=1(期望<=1) MATCH",
+    "pre_already_configured OK    status=STOP  code=FIELD_VALUE_MISMATCH   apply_used=0(期望0) port_open=1(期望<=1) MATCH",
+    "apply_refused          OK    status=STOP  code=BUSINESS_FAILED        apply_used=1(期望1) port_open=1(期望<=1) MATCH",
+    "apply_nul              OK    status=STOP  code=NUL_BYTE_IN_RESPONSE   apply_used=1(期望1) port_open=1(期望<=1) MATCH",
+    "post_not_configured    OK    status=STOP  code=FIELD_VALUE_MISMATCH   apply_used=1(期望1) port_open=1(期望<=1) MATCH"
+   ],
+   "summary_line": "负例复跑: 场景=6 与 A 登记一致=6 不符=0",
+   "counting_basis": "逐例判定只数行尾 ' MATCH'; 我先用的 neg.count(\"MATCH\") 被 FIELD_VALUE_MISMATCH 的子串吃掉, 得到 10 而不是 6, 已改口径 (改的只是我自己的计数, 复跑结果与转录字节未变)",
+   "naive_substring_count_rejected": 10,
+   "collision_selfcheck_fired": true,
+   "apply_zero_on_precondition_failures": true,
+   "apply_exactly_one_after_entered": true,
+   "how": "只在仓外的 rows 副本上做定向改写(计划/执行器/仓库内 rows 一字未动)",
+   "transcript": {
+    "path": "offline/negative_repro_r7f4.txt",
+    "bytes": 979,
+    "sha256": "5e6d286107bc2c49f3db31252580851c486fbaec0a1f20b801b280465ee92ae3"
+   }
+  },
+  "configured_line_bounds": {
+   "widest_predicted_line_incl_lf": 63,
+   "limit_claimed_by_a": 120,
+   "note": "我先用的『最宽展开』粗上界把每个 %u/%d 一次换成 6 个 8 位十六进制词, 得到的 407 B 之类不是任何界限; 正确口径是已代入具体值的 8 条预测行",
+   "transcript": {
+    "path": "offline/r7f4_configured_line_bounds.txt",
+    "bytes": 832,
+    "sha256": "26dc14863e7806948cc8dc803b111d7f656472b06ee19535b49dc89706b1e173"
+   }
+  }
+ },
+ "label_correction_in_my_own_transcript": "包内 SHA256SUMS.txt 自己那一行我先标成『不符』, 实际按规则不哈希自身; 已正名为 SKIP(清单不哈希自身字节), 其余 7 条 OK。改动只在我自己生成的清单文本里, 未触碰 A 的任何原件字节。",
+ "fixed_scope_after_approval": {
+  "approval_id": "M8R7F4-b502-configured-20261104",
+  "limits": {
+   "port_open": 1,
+   "tmc_config_apply": 1,
+   "download": 0,
+   "readback": 0,
+   "explicit_reset": 0,
+   "approved_reboot": 0,
+   "config_save": 0,
+   "irq_polarity_prep": 0,
+   "diag_profile_zero": 0,
+   "diag_profile_learn": 0,
+   "diag_profile_commit": 0,
+   "motor_run": 0,
+   "cleanup_*": 0,
+   "retry": 0,
+   "blackbox_clear": 0,
+   "dmm_readings": 0
+  },
+  "session_order": [
+   "system_status",
+   "motor_status",
+   "tmc_config_apply CONFIRM",
+   "system_status",
+   "motor_status",
+   "safety_status"
+  ],
+  "hard_deadline_seconds": 90,
+  "one_apply_is_one_transaction": "内部 GCONF/CHOPCONF/IHOLD_IRUN/TPOWERDOWN 四写不记成四次 apply",
+  "expected_after_write": "gate5=CONFIGURED; arm_gate_mask 0x18 -> 0x8; 保护未就绪这一条拒绝保留; protect_ready 仍可为 NO",
+  "planned_params": {
+   "irun": 20,
+   "ihold": 8,
+   "ihold_delay": 4,
+   "tpowerdown": 8,
+   "vsense": 1,
+   "IHOLD_IRUN": "0x00041408",
+   "TPOWERDOWN": "0x00000008",
+   "current": "理论值, 本场不测电流/转矩"
+  },
+  "stop_rules": [
+   "前置不满足不得发 apply(只消耗已尝试的开口额度)",
+   "apply 一旦发出, 无论成功/失败/响应不完整都不再第二次下发",
+   "失败即停、保留原始字节、正常关闭端口, 不为补采另开口"
+  ],
+  "command_form": "--dispatch --transport real --backend real --profile response_driven --plan <本包计划> --approval-id M8R7F4-b502-configured-20261104 --approval-root D:/ns800_field_approvals --approval-token=<本次批准令牌> (本场不调用 DAP, 不读 UID 文件)"
+ },
+ "device_actions_this_round": {
+  "port_open": 0,
+  "tmc_config_apply": 0,
+  "download": 0,
+  "readback": 0,
+  "explicit_reset": 0,
+  "config_save": 0,
+  "arm_or_start": 0,
+  "learn_or_zero_or_commit": 0,
+  "retry": 0,
+  "dmm_readings": 0
+ },
+ "not_proven": [
+  "一次真实配置成功与八条 CONFIGURED 输出完整(要下一场真实串口字节)",
+  "写后仍禁能(需实际 system_status/motor_status/safety_status 响应)",
+  "SG/ADC/IMU 相对保护、正常 disarm 收口、带载最坏栈",
+  "镜像内其余 35 条 >127 B 带标签格式串(GF4 继续登记)"
+ ],
+ "stop_point": {
+  "state": "STOPPED_AT_OPERATOR_APPROVAL_GATE",
+  "needed": "操作者本人对 §fixed_scope 的一次明确批准; 批准后按 A 规定直接开新台账并 dispatch 一次"
+ }
+}
