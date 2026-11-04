@@ -1,0 +1,57 @@
+{
+  "review_commit": "4d503103cf3f1eb6f5113b10cc8683954d510ac6",
+  "review_branch": "feature/m8-r7d1-async-learn-offline",
+  "reviewer_worktree_status": "",
+  "source_bindings": [
+    {
+      "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diag_relative.c",
+      "bytes": 103684,
+      "sha256": "f2c7089b3d5a21479a5936bab5bf3855616380bb6f96fc538921b979ccac125d",
+      "git_blob": "f5f75b10144ebe257d392bf2cfabd76e2be2ce63"
+    },
+    {
+      "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diag_relative.h",
+      "bytes": 25422,
+      "sha256": "aa23399bc2154e552803f4e0bfdd2b0a09ada79464aa26d71df6f21e02284689",
+      "git_blob": "d18231a668c789a49363d046edc356f4a2cef09d"
+    },
+    {
+      "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diagnosis.c",
+      "bytes": 54696,
+      "sha256": "4b69151e140b3a80dee4ff211aa935d51cf6e9de2611f6474b38f35a3836d281",
+      "git_blob": "2cf560955fc670cd5af15de04b652d9c1c7355ab"
+    },
+    {
+      "path": "tests/host/rel_main.c",
+      "bytes": 196003,
+      "sha256": "8e2f5acf7c4caa987b580b46e1414aabc758d5aaeabd5a060fe3a253de8b7c92",
+      "git_blob": "291b1e6add9ce58c0cc9ee7876fc104c7cc6feab"
+    },
+    {
+      "path": "tests/host/run_diag_relative_m8.sh",
+      "bytes": 23744,
+      "sha256": "afbd3ae9ee7e6cdc662a83c72d617f6d4677208a2c9902d579d2510c4b36ebb4",
+      "git_blob": "e58758ff83b41c7d6db9a3273bf26160fcaf2f81"
+    }
+  ],
+  "clear_control_source_commit": "0cd64587739cca41a22903e075b6fe37b17c765b",
+  "field_software_baseline_commit": "7885aea606a50f1c34723dbfa9b8c0c4341326de",
+  "control_vs_field_application_and_host_changes": [],
+  "review_hardware_actions": 0,
+  "review_product_edits": 0,
+  "arm_compiler_rerun_by_A": false,
+  "review_runner": "GCC host; archived mocks; Linux empty windows.h for unused include",
+  "verdict": "CHANGES_REQUIRED",
+  "existing_host_cases": {
+    "pass": 62,
+    "fail": 0
+  },
+  "existing_reverse_groups": {
+    "meta_ok": 14
+  },
+  "additional_review_checks": {
+    "checks": 4,
+    "fail": 4,
+    "run_rc": 1
+  }
+}

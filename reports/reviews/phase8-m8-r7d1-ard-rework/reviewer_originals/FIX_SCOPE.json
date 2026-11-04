@@ -1,0 +1,37 @@
+{
+  "id": "R7D1_A_REVIEW_4d50310_FIX",
+  "verdict": "CHANGES_REQUIRED",
+  "authorization": "Continue original offline implementation scope; no hardware authorization",
+  "findings": [
+    {
+      "id": "ARD1_NULL_STATUS_LOCK_LEAK",
+      "priority": "P2",
+      "required": "fix and add regression to existing host chain"
+    },
+    {
+      "id": "ARD2_ZERO_CLEANUP_ORPHAN",
+      "priority": "P2",
+      "required": "fix and add regression to existing host chain"
+    },
+    {
+      "id": "ARD3_REFUSED_CLEAR_MUTATES_PENDING",
+      "priority": "P2",
+      "required": "fix and add regression to existing host chain"
+    },
+    {
+      "id": "ARD4_REFUSED_COMMIT_WRITES_RAM_PROFILE",
+      "priority": "P2",
+      "required": "fix and add regression to existing host chain"
+    }
+  ],
+  "hardware_actions_cap": 0,
+  "new_approval_required_for_offline_fix": false,
+  "preserve": {
+    "old_source_and_failure_evidence": true,
+    "on_board_identity": "b502 / 502dca5d8c7ebfa794f890a9c03bc258fc9753f57b6a80c2f1e08add69888a7a",
+    "new_images": "NOT_ON_BOARD",
+    "polarity_measured": false,
+    "core_protection_verified": false,
+    "R7F5A_physical_poweroff": "PENDING_OPERATOR_REPORT"
+  }
+}

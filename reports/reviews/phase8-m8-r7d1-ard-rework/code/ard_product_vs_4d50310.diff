@@ -1,0 +1,234 @@
+diff --git a/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diag_relative.c b/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diag_relative.c
+index f5f75b1..ef746e0 100644
+--- a/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diag_relative.c
++++ b/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diag_relative.c
+@@ -1397,6 +1397,7 @@ static struct rt_mutex d_ctx_lock;
+ static rt_bool_t       d_ctx_inited   = RT_FALSE;
+ static rt_uint8_t      d_cap_owner    = (rt_uint8_t)REL_CAP_FREE;
+ static rel_job_t       d_job;
++static rt_uint8_t      d_zero_cleanup;  /* ARD2: zero 退出清理没拿到锁时立旗, 等后台推进者收口 */
+ static rt_uint32_t     d_job_next_id  = 1u;   /* 0 保留给"还没有过任务" */
+ 
+ static rt_err_t rel_ctx_lock_init(void)
+@@ -1496,12 +1497,29 @@ static rt_err_t rel_zero_capture_open(rt_uint32_t want, const diag_rprof_t *base
+     return RT_EOK;
+ }
+ 
+-static void rel_zero_capture_close(void)
+-{
+-    if (rel_ctx_take() != RT_EOK) return;    /* 拿不到锁: 本任务的下一次推进/重开仍会拒绝, 不会双写 */
+-    rel_cap_abort();
+-    d_cap_owner = (rt_uint8_t)REL_CAP_FREE;
+-    rel_ctx_give_held();
++/* ARD2(A 复审): 拿不到锁**不能**静默返回。旧写法留下的是"归属永久滞留":
++ * rel_job_advance 只认领 BY_JOB, 替 zero 收不了口, 于是 d_cap_owner 一直是 BY_ZERO 而
++ * d_cap.active 一直是 1, 后续每条 zero 都只会报 capture busy。
++ * 改法是有界的延迟清理: 立一面明确的旗(d_zero_cleanup), 由有周期保证的推进者
++ * (Diagnosis Thread 每拍的 rel_job_advance)在锁恢复后的那一拍真正 abort 并归还归属。
++ * 三条纪律: 不空转等锁(本函数一次有界取锁就返回)、不强行解别人的锁、
++ * 也不"抹掉 owner 却留着活动采集器" —— 归还之前 owner 仍是 BY_ZERO, 第二个采集者一律拿不到。
++ * 本函数**不打印**: zero 的五个出口里有一条(发布失败收口)是在静止事务内调它的,
++ * 而静止事务成功时一直持有电机锁(motor.c:2097 motor_calibration_static_begin 取锁,
++ * :2140 motor_calibration_static_end 放锁), 在锁里走 UART 会把电机锁按字符时间按住,
++ * 那就是叶锁纪律的破口。所以这里只回报"是否留了未收口的清理", 披露由调用方在放锁之后做。 */
++static rt_bool_t rel_zero_capture_close(void)
++{
++    if (rel_ctx_take() == RT_EOK)
++    {
++        rel_cap_abort();
++        d_cap_owner = (rt_uint8_t)REL_CAP_FREE;
++        d_zero_cleanup = 0u;
++        rel_ctx_give_held();
++        return RT_FALSE;
++    }
++    d_zero_cleanup = 1u;
++    return RT_TRUE;
+ }
+ 
+ /* ---------- 学习任务状态机 ---------- */
+@@ -1518,6 +1536,7 @@ static void rel_job_view_fill(rel_job_view_t *v)
+     v->hz_hi     = d_job.hz_hi;
+     v->why       = d_job.why ? d_job.why : "IDLE";
+     v->cap_owner = d_cap_owner;
++    v->cleanup_pending = d_zero_cleanup;
+     v->zero_cred = d_pending_zero ? 1u : 0u;
+     v->learn_cred = d_pending_learn ? 1u : 0u;
+     v->got_adc   = d_job.got_adc;
+@@ -1537,9 +1556,14 @@ static void rel_job_view_fill(rel_job_view_t *v)
+ 
+ rt_err_t rel_job_status(rel_job_view_t *v)
+ {
+-    rt_err_t rc = rel_ctx_take();
++    rt_err_t rc;
+ 
++    /* ARD1(A 复审): 非法参数必须在看得到锁之前就被拒绝。旧写法先 rel_ctx_take()
++     * 再判 v==NULL, 于是"取锁成功 + 参数非法"这条路上锁没人放, 而 rel_ctx 是把
++     * 采集器归属与作业终态都锁在后面的那把叶锁 —— 泄一次就等于让后续所有
++     * 受理/推进/取消永久拿不到上下文。 */
+     if (v == RT_NULL) return -RT_EINVAL;
++    rc = rel_ctx_take();
+     rt_memset(v, 0, sizeof(*v));
+     if (rc != RT_EOK) { v->why = "CTX-LOCK"; return rc; }
+     rel_job_view_fill(v);
+@@ -1664,6 +1688,19 @@ void rel_job_advance(const diag_input_t *in, rt_uint8_t have_frame, rt_uint8_t m
+     rt_err_t      feed, fin;
+ 
+     if (rel_ctx_try() != RT_EOK) return;    /* 有人持锁: 这一拍什么都不做, 下一拍再来 */
++
++    /* ARD2 的推进者就是这里: zero 的退出清理曾经拿不到锁时立的旗, 在锁恢复后的
++     * 这一拍收掉。只处理 BY_ZERO(命令线程那时已经离开 zero 函数, 不会再碰 d_cap),
++     * 不碰 BY_JOB 归属; 这里不打印, 也不取第二把锁。 */
++    if (d_zero_cleanup != 0u && d_cap_owner == (rt_uint8_t)REL_CAP_BY_ZERO)
++    {
++        rel_cap_abort();
++        d_cap_owner = (rt_uint8_t)REL_CAP_FREE;
++        d_zero_cleanup = 0u;
++        rel_ctx_give_held();
++        return;
++    }
++
+     if (d_cap_owner != (rt_uint8_t)REL_CAP_BY_JOB || !d_cap.active ||
+         (d_job.state != (rt_uint8_t)REL_JOB_RUNNING &&
+          d_job.state != (rt_uint8_t)REL_JOB_CANCEL_PENDING))
+@@ -1864,6 +1901,7 @@ static void rel_cmd_zero(rt_uint32_t n_req)
+     rt_uint32_t deadline, seen = 0;
+     const char *why = RT_NULL;
+     rt_err_t e, fin;
++    rt_bool_t deferred = RT_FALSE;
+ 
+     if (!rel_static_and_ready())
+     {
+@@ -1892,7 +1930,7 @@ static void rel_cmd_zero(rt_uint32_t n_req)
+     if (e != RT_EOK) { rel_accept_refused("zero", e); return; }
+     if (rel_pending_write(RT_NULL, 0, 0) != RT_EOK)
+     {
+-        rel_zero_capture_close();
++        if (rel_zero_capture_close() == RT_TRUE) rt_kprintf("[DIAG] zero cleanup DEFERRED: ctx lock (owner stays BY_ZERO)\n");
+         rt_kprintf("[DIAG] zero FAILED: ctx lock on invalidate\n");
+         return;
+     }
+@@ -1904,7 +1942,7 @@ static void rel_cmd_zero(rt_uint32_t n_req)
+         /* 采集期间同样要静止/禁能: 中途起转或失去证明 ⇒ 本次候选立即作废(C5)。 */
+         if (!rel_static_and_ready())
+         {
+-            rel_zero_capture_close();
++            if (rel_zero_capture_close() == RT_TRUE) rt_kprintf("[DIAG] zero cleanup DEFERRED: ctx lock (owner stays BY_ZERO)\n");
+             rt_kprintf("[DIAG] zero VOIDED: motion/arm/proof lost during capture\n");
+             return;
+         }
+@@ -1915,20 +1953,26 @@ static void rel_cmd_zero(rt_uint32_t n_req)
+     }
+     if (!rel_cap_done())
+     {
+-        rel_zero_capture_close();
++        if (rel_zero_capture_close() == RT_TRUE) rt_kprintf("[DIAG] zero cleanup DEFERRED: ctx lock (owner stays BY_ZERO)\n");
+         rt_kprintf("[DIAG] zero FAILED: 12s timeout, need %u distinct valid ADC frames\n",
+                    (unsigned)n_req);
+         return;
+     }
+     /* 完成时: 在同一静止事务里做最终资格复核, 通过才发布候选。 */
+     e = rel_txn_open("zero");
+-    if (e != RT_EOK) { rel_zero_capture_close(); return; }
++    if (e != RT_EOK)
++    {   /* begin 失败时不持电机锁(只有成功那条路才留 guard), 这里打印是安全的 */
++        if (rel_zero_capture_close() == RT_TRUE) rt_kprintf("[DIAG] zero cleanup DEFERRED: ctx lock (owner stays BY_ZERO)\n");
++        return;
++    }
+     fin = rel_cap_finish(&cand, &why);
+     /* 发布不了就等于失败: 不能一边写"zero OK"一边让凭据停在旧值上。 */
+     if (fin == RT_EOK && rel_pending_write(&cand, 1, -1) != RT_EOK)
+     { fin = -RT_EIO; why = "ctx-lock"; }
+-    rel_zero_capture_close();
++    deferred = rel_zero_capture_close();
+     rel_txn_close();
++    /* 披露排在放锁之后: 这条出口是在静止事务里(电机锁仍被持有)调清理的。 */
++    if (deferred == RT_TRUE) rt_kprintf("[DIAG] zero cleanup DEFERRED: ctx lock (owner stays BY_ZERO)\n");
+     if (fin != RT_EOK)
+     { rt_kprintf("[DIAG] zero FAILED: %s\n", why ? why : "accumulator rejected"); return; }
+     rt_kprintf("[DIAG] zero OK n=%u raw %u..%u mean=%u (cal source untouched)\n",
+@@ -1990,6 +2034,11 @@ static void rel_cmd_learn_status(void)
+     rt_kprintf("[DIAG] job id=%u st=%s why=%s owner=%u cred=%d/%d\n",
+                (unsigned)v.job_id, rel_job_state_name(v.state), v.why,
+                (unsigned)v.cap_owner, (int)v.zero_cred, (int)v.learn_cred);
++    /* ARD2 的"明确状态"单独一行, 且只在真有未收口清理时出现: 把 cleanup=%u 塞进主行会把
++     * 该行的最宽实参展开推到 139 B, 越过本轮任务书 §6 的 120 B/次预算(上一轮主行是 120 B)。 */
++    if (v.cleanup_pending != 0u)
++        rt_kprintf("[DIAG] job zero-cleanup DEFERRED: diag thread will free owner=%u\n",
++                   (unsigned)v.cap_owner);
+     rt_kprintf("[DIAG] job n=%u/%u want=%u win=%u..%u dir=%u\n",
+                (unsigned)v.got_adc, (unsigned)v.got_sg, (unsigned)v.want,
+                (unsigned)v.hz_lo, (unsigned)v.hz_hi, (unsigned)v.dir);
+@@ -2085,7 +2134,7 @@ static void rel_cmd_tier(rt_uint32_t tier)
+ static void rel_cmd_commit(void)
+ {
+     const char *why = "?";
+-    diag_rprof_t cand, cur;
++    diag_rprof_t cand, cur, prev;
+     rt_bool_t    pz = RT_FALSE, pl = RT_FALSE;
+     rt_uint32_t live;
+     rt_bool_t src_ok;
+@@ -2110,6 +2159,7 @@ static void rel_cmd_commit(void)
+     if (!rel_sources_present())  { fin = -RT_EPERM; why = "source-unhealthy"; goto out; }
+     if (rel_pending_read(&cand, RT_NULL, RT_NULL) != RT_EOK)
+     { fin = -RT_EIO; why = "ctx-lock"; goto out; }
++    prev = cand;                  /* ARD4: 回滚用的"发布前那份候选"(下面字段会被改写) */
+     cand.magic = DIAG_RPROF_MAGIC;
+     cand.abi   = DIAG_RPROF_ABI;
+     cand.flags = (rt_uint16_t)((cand.flags & ~RPF_FIELD_VERIFIED) | RPF_COMMITTED | RPF_FROM_LEARN);
+@@ -2137,10 +2187,21 @@ static void rel_cmd_commit(void)
+     if (cand.signature != live)
+     { fin = -RT_EPERM; why = "drive-config-drifted"; goto out; }
+     if (rel_profile_validate(&cand, &why) != RT_EOK) { fin = -RT_EINVAL; goto out; }
++    /* ARD4(A 复审): 顺序必须是"先发布候选, 再写配置"。旧写法先 project_config_set_rprof
++     * 再发布, 于是发布失败时 RAM 配置已经换成了这一版阈值 —— 而保护判据读的就是配置,
++     * 这等于把"命令报了 REFUSED"变成"配置已经生效"。反过来排, 发布失败时配置一字未动;
++     * 只有配置写失败才需要回滚候选, 且回滚结果一定如实披露。
++     * 两步之间不能合并成一个临界区: 叶锁 rel_ctx 里不允许调 cfg(锁序只允许 mot/cfg -> ctx)。 */
++    if (rel_pending_write(&cand, -1, -1) != RT_EOK)
++    { fin = -RT_EIO; why = "ctx-lock-publish"; goto out; }   /* 配置未动: 整次 commit 什么都没改 */
+     fin = project_config_set_rprof(&cand);
+-    /* 配置写成功了但候选发布不了 => 整次 commit 按失败披露, 不报 OK。 */
+-    if (fin == RT_EOK && rel_pending_write(&cand, -1, -1) != RT_EOK)
+-    { fin = -RT_EIO; why = "ctx-lock-publish"; }
++    if (fin != RT_EOK)
++    {
++        if (rel_pending_write(&prev, -1, -1) == RT_EOK) why = "config-write-rolled-back";
++        else { why = "config-write-no-rollback"; }        /* 候选=新版而配置=旧版: 必须显式说出来 */
++        fin = -RT_EIO;
++        goto out;
++    }
+ 
+ out:
+     rel_txn_close();
+@@ -2159,12 +2220,15 @@ static void rel_cmd_clear(rt_bool_t confirmed)
+     if (!confirmed)
+     { rt_kprintf("[DIAG] clear needs: diag_profile clear CONFIRM\n"); return; }
+     if (!rel_ctx_gate("clear")) return;
+-    /* 先作废候选与凭据再动配置: 拿不到锁就整个 clear 不做(而不是配置清了、候选
+-     * 还留着); 作废之后即使后面失败, commit 也只会走向更保守的一侧。 */
++    /* ARD3(A 复审): 静止事务的拒绝必须先落到, 才能产生任何副作用。旧写法先擦候选与
++     * 凭据再开静止事务, 于是一条明确被拒绝的 clear 也把 pending 抹了、两个凭据也清零了
++     * (基线 0cd6458 的同一场景是"候选不变 + 凭据 1/1") —— 这是本轮自己引进的回归。
++     * 作废仍然排在配置清理之前(那才是保守的一侧: 凭据没了, commit 就再也提交不了),
++     * 但必须在所有门禁都过了之后。 */
++    if (rel_txn_open("clear") != RT_EOK) return;
+     rt_memset(&blank, 0, sizeof(blank));
+     if (rel_pending_write(&blank, 0, 0) != RT_EOK)
+-    { rt_kprintf("[DIAG] clear REFUSED: ctx lock (profile kept)\n"); return; }
+-    if (rel_txn_open("clear") != RT_EOK) return;
++    { rel_txn_close(); rt_kprintf("[DIAG] clear REFUSED: ctx lock (profile kept)\n"); return; }
+     fin = project_config_clear_rprof();
+     rel_txn_close();
+     if (fin != RT_EOK)
+diff --git a/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diag_relative.h b/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diag_relative.h
+index d18231a..b36f086 100644
+--- a/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diag_relative.h
++++ b/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diag_relative.h
+@@ -373,6 +373,7 @@ typedef struct
+     rt_uint32_t   job_id;
+     rt_uint8_t    state;         /* rel_job_state_t */
+     rt_uint8_t    cap_owner;     /* rel_cap_owner_t */
++    rt_uint8_t    cleanup_pending;   /* ARD2: zero 的退出清理是否还在等后台推进者 */
+     rt_uint8_t    want, dir;
+     rt_uint32_t   hz_lo, hz_hi;
+     rt_uint32_t   got_adc, got_sg;   /* 已计入的**独立**样本数(不是轮询次数) */

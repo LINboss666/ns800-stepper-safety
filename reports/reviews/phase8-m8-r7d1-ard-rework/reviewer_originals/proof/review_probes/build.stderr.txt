@@ -1,0 +1,8 @@
+In file included from /workspace/scratch/f24247cdf3d6/r7d1-independent-review/checks/review_probes.c:7:
+/workspace/scratch/f24247cdf3d6/r7d1-independent-review/repo/tests/host/rel_main.c: In function ‘adxl345_read_mg’:
+/workspace/scratch/f24247cdf3d6/r7d1-independent-review/repo/tests/host/rel_main.c:341:5: warning: this ‘if’ clause does not guard... [-Wmisleading-indentation]
+  341 |     if (x) *x = S.mx; if (y) *y = S.my; if (z) *z = S.mz;
+      |     ^~
+/workspace/scratch/f24247cdf3d6/r7d1-independent-review/repo/tests/host/rel_main.c:341:23: note: ...this statement, but the latter is misleadingly indented as if it were guarded by the ‘if’
+  341 |     if (x) *x = S.mx; if (y) *y = S.my; if (z) *z = S.mz;
+      |                       ^~

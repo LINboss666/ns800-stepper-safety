@@ -1,0 +1,88 @@
+{
+ "round": "phase8-m8-r7d1-ard-rework",
+ "date": "2026-11-04",
+ "title": "M8-R7D1 返修轮(ARD1-ARD4): 四条错误路径缺陷离线修复 + 回归与负控 + 单目标构建一次(设备动作 0)",
+ "review_source": {
+  "zip_basename": "NS800_R7D1_A_Review_Changes_Required_4d50310_20261104.zip",
+  "zip_bytes": 19634,
+  "zip_sha256": "d9090f964ed0242f012e40e15ed40f427a3234f72572c88e9468288fb2ce9b8d",
+  "verdict": "CHANGES_REQUIRED(四项 P2, 全在错误路径)",
+  "reviewed_commit": "4d503103cf3f1eb6f5113b10cc8683954d510ac6",
+  "fix_id": "R7D1_A_REVIEW_4d50310_FIX",
+  "hardware_actions_cap": 0,
+  "new_approval_required_for_offline_fix": false,
+  "inner_manifest_entries": 17
+ },
+ "baseline_commit": "4d503103cf3f1eb6f5113b10cc8683954d510ac6",
+ "baseline_is_head_at_build": true,
+ "head_at_build": "4d503103cf3f1eb6f5113b10cc8683954d510ac6",
+ "target": "rt-thread-motor-m1-candidate",
+ "action": "Keil Rebuild All x1(只 rt-thread-motor-m1-candidate, -r 全量重建, 未加 -f)。未下载、未 Flash、未连 DAP、未复位、未开串口、未起转、未 learn/zero、未 config_save、未启动逻辑分析仪。设备动作 0。",
+ "command": "C:\\Keil_v5\\UV4\\UV4.exe -r project.uvprojx -t rt-thread-motor-m1-candidate -j0 -o D:/ns800/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/build_r7d1r.log",
+ "working_directory": "D:\\ns800\\rt-thread-master\\rt-thread-master\\bsp\\novosns\\ns800\\ns800rt7p65-nssinepad",
+ "uv4_return_code_observed_this_round": 0,
+ "error_warning_line": "\".\\build\\motor_m1\\rt-thread-motor-m1.axf\" - 0 Error(s), 0 Warning(s)",
+ "compiler_line_from_log": "*** Using Compiler 'V6.24', folder: 'C:\\Keil_v5\\ARM\\ARMCLANG\\Bin'",
+ "build_time_elapsed_line": "Build Time Elapsed:  00:00:10",
+ "program_size": "Program Size: Code=209474 RO-data=87422 RW-data=2196 ZI-data=85944",
+ "build_hooks_read_only_checked": {
+  "BeforeMake": "RunUserProg1=0(未启用任何前置程序)",
+  "AfterMake": "After Build - User command #1: fromelf --bin .\\build\\motor_m1\\rt-thread-motor-m1.axf --output .\\build\\motor_m1\\rt-thread-motor-m1.bin",
+  "conclusion": "构建过程里没有下载/调试/串口动作; 日志原件同时留在构建目录(被 .gitignore 的 *.log 规则排除)与仓内 reports/reviews/phase8-m8-r7d1-ard-rework/build/。"
+ },
+ "log": {
+  "path": "reports/reviews/phase8-m8-r7d1-ard-rework/build/build_r7d1r.log",
+  "bytes": 3909,
+  "sha256": "8c11efe5c6b8f15d3863af419b00e24870299c2874daf1077106fe124db6b111",
+  "disk_CR": 144,
+  "disk_LF": 144
+ },
+ "program_size_vs_reviewed_image": {
+  "reviewed_image_manifest": "reports/firmware/phase8-m8-r7d1-async-learn-offline/build_manifest.json",
+  "reviewed_program_size": "Code=209178 RO-data=87242 RW-data=2196 ZI-data=85936",
+  "reviewed_bin_sha256": "df7584c3df2e682d07564ee70f05ecc7b608052a7fa739fb0c21b4f942b15c2b",
+  "reviewed_bin_bytes": 297004,
+  "delta_bytes": {
+   "Code": 296,
+   "RO-data": 180,
+   "RW-data": 0,
+   "ZI-data": 8
+  },
+  "bin_bytes": 297476,
+  "bin_delta": 472,
+  "reconciliation": "本轮 **不再** 沿用上一轮\"Code+RO+RW 增量 == BIN 增量\"这条等式: 实测 Code+RO+RW 增量 +476, BIN 增量 +472。差额由装载段构成变化解释(全部取自两版 map 的执行区表): ER_IROM1 296420->296896(+476), RW_VT_DTCM 压缩载荷 8->8(0), 对齐空隙 0->4(+4), RW_DTCM 压缩载荷 576->568(-8) => +472 == BIN 增量; 两版各自\"三段+空隙\"相加都精确等于该版 BIN 字节数(297004 / 297476), 残差 0。RW_DTCM 未压缩尺寸 0xD478->0xD480(+8) 与 ZI 增量 +8 一致; 变小的是**压缩后**载荷。",
+  "resource_report": "reports/reviews/phase8-m8-r7d1-ard-rework/build/resource_stack_r7d1r.txt",
+  "per_object_delta": "diag_relative.o Code+310 RO+178 RW+0 ZI+1; 其余 110 行 .o 与 49 行库成员 (成员名+段+尺寸+类型)逐字段相同; Library Totals 全 0。",
+  "axf_flash_segment_equal_bin": true,
+  "axf_check_method": "仓外工具按 ELF32 程序头取 Flash 段(vaddr 在 0x08000000..0x08100000)拼成镜像, 与归档 BIN 逐字节比; 同一工具先在被审件上复现\"相等\"再跑本轮件。"
+ },
+ "images": {
+  "bin": {
+   "path": "reports/firmware/phase8-m8-r7d1-ard-rework/rt-thread-motor-m1-candidate.bin",
+   "bytes": 297476,
+   "sha256": "165d8bdc708b042125d99db88f56a62ddca635d30202e80abe96c148e35bc478"
+  },
+  "axf": {
+   "path": "reports/firmware/phase8-m8-r7d1-ard-rework/rt-thread-motor-m1.axf",
+   "bytes": 1789320,
+   "sha256": "dc14525982056958136fd1ebbf60b6e1e1d6ade6f31d94a89474ed4f72e8fc87"
+  },
+  "map": {
+   "path": "reports/firmware/phase8-m8-r7d1-ard-rework/rt-thread-motor-m1.map",
+   "bytes": 2144643,
+   "sha256": "8229cf757f6c6e9196575cbd9945ff916155a7088da17bd4b796c165849a58ad"
+  },
+  "callgraph": {
+   "path": "reports/firmware/phase8-m8-r7d1-ard-rework/rt-thread-motor-m1-callgraph.htm",
+   "bytes": 1099033,
+   "sha256": "16b87c974997db66a70e591b4ae36ca743b08c99b639f49583cf7a73653f6e40"
+  }
+ },
+ "image_states": {
+  "this_round_candidate": "NOT_ON_BOARD(本轮 0 次下载/回读/复位)",
+  "reviewed_r7d1_image_df7584c3": "NOT_ON_BOARD(登记于上一轮, 未上板)",
+  "on_board": "b502 / 502dca5d8c7ebfa794f890a9c03bc258fc9753f57b6a80c2f1e08add69888a7a (历史逐字节回读证明, 本轮未改)"
+ },
+ "hardware_actions_this_round": 0,
+ "authorization": "本件不构成任何硬件授权; polarity_measured=false, core_protection_verified=false 保持; R7F5A 物理断电回报仍 PENDING_OPERATOR_REPORT。"
+}

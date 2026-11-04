@@ -1,0 +1,36 @@
+{
+  "compatibility": "Linux portability: empty windows.h for an unused include only. No RTOS, mutex, clock or product behavior replaced.",
+  "build_rc": 0,
+  "argv": [
+    "/usr/bin/gcc",
+    "-std=gnu11",
+    "-Wall",
+    "-Wextra",
+    "-Wno-unused-function",
+    "-Wno-unused-parameter",
+    "-I",
+    "/workspace/scratch/f24247cdf3d6/r7d1-independent-review/checks/review_release_evidence/compat_include",
+    "-I",
+    "/workspace/scratch/f24247cdf3d6/r7d1-independent-review/repo/tests/host/shim_rel",
+    "-I",
+    "/workspace/scratch/f24247cdf3d6/r7d1-independent-review/repo/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications",
+    "-DREVIEW_HOST_MAIN=\"/workspace/scratch/f24247cdf3d6/r7d1-independent-review/repo/tests/host/rel_main.c\"",
+    "/workspace/scratch/f24247cdf3d6/r7d1-independent-review/checks/review_probes.c",
+    "-o",
+    "/workspace/scratch/f24247cdf3d6/r7d1-independent-review/checks/review_release_evidence/review_probes"
+  ],
+  "hardware_actions": 0,
+  "run_rc": 1,
+  "assertion_lines": [
+    "OBS|NULL_STATUS|rc=-5 ctx_held=1 takes=1 releases=0",
+    "REVIEW|NULL_STATUS_DOES_NOT_LEAK_LOCK|FAIL",
+    "OBS|ZERO_FAILED_EXIT|owner=1 active=1 ctx_takes=4",
+    "OBS|ZERO_RETRY_AFTER_FAULT_CLEARED|owner=1 active=1 zero_cred=0 busy=1",
+    "REVIEW|FAILED_ZERO_RECOVERS_COLLECTOR_AFTER_LOCK_FAULT|FAIL",
+    "OBS|CLEAR_STATIC_REFUSED|refused=1 zero_cred=0 learn_cred=0 pending_changed=1",
+    "REVIEW|REFUSED_CLEAR_PRESERVES_PENDING_AND_CREDENTIALS|FAIL",
+    "OBS|COMMIT_POSTWRITE_CTX_FAULT|refused=1 cfg_before_magic=00000000 cfg_after_magic=4E535250 cfg_changed=1 ctx_takes=4",
+    "REVIEW|COMMIT_OUTCOME_MATCHES_COMPLETE_TRANSACTION|FAIL",
+    "REVIEW_SUMMARY|checks=4|failures=4|hardware_actions=0"
+  ]
+}

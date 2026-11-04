@@ -373,6 +373,7 @@ typedef struct
     rt_uint32_t   job_id;
     rt_uint8_t    state;         /* rel_job_state_t */
     rt_uint8_t    cap_owner;     /* rel_cap_owner_t */
+    rt_uint8_t    cleanup_pending;   /* ARD2: zero 的退出清理是否还在等后台推进者 */
     rt_uint8_t    want, dir;
     rt_uint32_t   hz_lo, hz_hi;
     rt_uint32_t   got_adc, got_sg;   /* 已计入的**独立**样本数(不是轮询次数) */

@@ -117,3 +117,8 @@ reports/reviews/phase8-m8-demo-host-offline-v03/** -text
 # 这两条规则必须在**任何暂存之前**生效。
 reports/firmware/phase8-m8-r7d1-async-learn-offline/** -text
 reports/reviews/phase8-m8-r7d1-async-learn-offline/** -text
+
+# 同一理由适用于 M8-R7D1 返修轮(ARD1-ARD4): 本轮交付 BIN/AXF/MAP/调用图 htm/UV4 日志(Windows 原件, 内含 CR)、
+# A 复审包原件(其 hash 只在字节不变时可复算)与主机链 transcript。规则同样必须在任何暂存之前生效。
+reports/firmware/phase8-m8-r7d1-ard-rework/** -text
+reports/reviews/phase8-m8-r7d1-ard-rework/** -text

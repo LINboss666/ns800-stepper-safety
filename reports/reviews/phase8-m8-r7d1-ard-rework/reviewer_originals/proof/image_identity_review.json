@@ -1,0 +1,9 @@
+{
+  "BIN_bytes": 297004,
+  "BIN_sha256": "df7584c3df2e682d07564ee70f05ecc7b608052a7fa739fb0c21b4f942b15c2b",
+  "AXF_bytes": 1788432,
+  "AXF_sha256": "59c286d9b9bae9cbfe5ac7b353634ccc308abed502b8c3544a3744baef560611",
+  "Flash_segment_byte_equal_to_BIN": true,
+  "arm_compiler_rerun_by_A": false,
+  "hardware_actions": 0
+}

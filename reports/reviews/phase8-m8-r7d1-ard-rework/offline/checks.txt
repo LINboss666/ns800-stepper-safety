@@ -1,0 +1,65 @@
+PASS ZIP_PRESENT NS800_R7D1_A_Review_Changes_Required_4d50310_20261104.zip
+PASS ZIP_BYTES bytes=19634 期望=19634
+PASS ZIP_SHA256 d9090f964ed0242f012e40e15ed40f427a3234f72572c88e9468288fb2ce9b8d
+PASS MANIFEST_ENTRY_COUNT 18 条(3 件正文 + 12 件 proof + 3 件 reproducer)
+PASS MANIFEST_EXCLUDES_SELF 清单不含自身
+PASS MANIFEST_ALL_MATCH 18/18
+PASS VERDICT_CHANGES_REQUIRED CHANGES_REQUIRED
+PASS FINDINGS_IDS_EXACT ARD1_NULL_STATUS_LOCK_LEAK,ARD2_ZERO_CLEANUP_ORPHAN,ARD3_REFUSED_CLEAR_MUTATES_PENDING,ARD4_REFUSED_COMMIT_WRITES_RAM_PROFILE
+PASS FINDINGS_ALL_P2 P2,P2,P2,P2
+PASS HW_CAP_ZERO 0
+PASS NO_NEW_APPROVAL_NEEDED False
+PASS PRESERVE_ON_BOARD_IDENTITY b502 / 502dca5d8c7ebfa794f890a9c03bc258fc9753f57b6a80c2f1e08add69888a7a
+PASS PRESERVE_NEW_IMAGES_NOT_ON_BOARD NOT_ON_BOARD
+PASS PRESERVE_CLAIMS_FALSE polarity=False core=False
+PASS PRESERVE_R7F5A_PENDING PENDING_OPERATOR_REPORT
+PASS HEAD_IS_REVIEWED_COMMIT HEAD=4d503103c 被审=4d503103c
+PASS IDENTITY_REVIEW_COMMIT 4d503103c
+PASS IDENTITY_BINDINGS_COUNT 5 件
+PASS A_SOURCE_BINDINGS_RECOMPUTED ok=5 bad=0(在 4d50310 上逐件复算 blob sha1/字节/sha256)
+PASS DISK_VS_BLOB_RECORDED 磁盘已不同于被审提交的件=4(应为 4: 产品 2 + 主机 2; diagnosis.c 未改) => ['diag_relative.c', 'diag_relative.h', 'rel_main.c', 'run_diag_relative_m8.sh']
+PASS A_EXISTING_CASES_62 {'pass': 62, 'fail': 0}
+PASS A_EXISTING_REVERSE_14 {'meta_ok': 14}
+PASS A_EXTRA_CHECKS_4_FAIL_4 {'checks': 4, 'fail': 4, 'run_rc': 1}
+PASS A_PROBE_ORIGINAL_4FAIL 包内原文 REVIEW 判定行 FAIL=4, failures 行存在=True
+PASS SCOPE_NO_STRAY_FILES changed=6 untracked=46
+PASS TOUCHED_diag_relative.c diag_relative.c
+PASS TOUCHED_diag_relative.h diag_relative.h
+PASS TOUCHED_rel_main.c rel_main.c
+PASS TOUCHED_run_diag_relative_m8.sh run_diag_relative_m8.sh
+PASS NOT_TOUCHED_diagnosis.c A 的四项都不需要动 diagnosis.c(它是上一轮 rel_job_advance 的挂点)
+PASS PRODUCT_SCOPE_MINIMAL ok
+PASS NORMAL_66_ALL_PASS SUMMARY|cases=66 pass=66 fail=0 pre_bad=0 executed=66
+PASS HOST_BUILD_RC0_WARNINGS0 build_rc=0 warnings=0
+PASS PRIOR_62_CASES_KEPT 上一轮台账 62 例, 本轮丢了 0 例
+PASS FOUR_NEW_CASES_ADDED A13-null-status-rejected-without-lock-leak,A14-zero-cleanup-deferred-then-recovered,A15-refused-clear-keeps-pending-and-creds,A16-commit-refused-keeps-config-and-candidate
+PASS REVERSE_FAMILY_COUNT_19 19 族(原 14 + 新 5)
+PASS REVERSE_NEW_FAMILIES RDV1_cancel_branch_short_circuited,RDV2_timeout_only_advances_with_frames,RDV3_start_waits_for_samples_again,RDV4_credential_cleared_before_refusal,RDV5_null_check_after_take,RDV6_zero_close_silent_no_arm,RDV7_advancer_ignores_zero_flag,RDV8_clear_blanks_before_gate,RDV9_commit_config_before_publish
+PASS REVERSE_META_OK_19 META-OK 行数=19
+PASS REVERSE_NO_META_FAIL 没有 META-FAIL/其他 META 状态
+PASS REVERSE_EACH_COMPILED_AND_RAN INJECTED 行=19(编译失败或没跑到就不会有这行)
+PASS REVERSE_RAN_ON_FINAL_BYTES 反向链尾部总结果行(与 66 例同一次运行)
+PASS PROBE_PRE_4FAIL 修前 REVIEW_SUMMARY failures=4
+PASS PROBE_POST_0FAIL 修后 REVIEW_SUMMARY failures=0
+PASS PROBE_DIRECTION_ctx_held NULL_STATUS            ctx_held: 修前 1 -> 修后 0
+PASS PROBE_DIRECTION_owner ZERO_RETRY_AFTER_FAULT_CLEARED owner: 修前 1 -> 修后 0
+PASS PROBE_DIRECTION_pending_changed CLEAR_STATIC_REFUSED   pending_changed: 修前 1 -> 修后 0
+PASS PROBE_DIRECTION_cfg_changed COMMIT_POSTWRITE_CTX_FAULT cfg_changed: 修前 1 -> 修后 0
+PASS TOUCHED_KPRINTF_FOUND 3 个新增/改动的 rt_kprintf 字面形态: [DIAG] clear REFUSED: ctx lock | [DIAG] job zero-cleanup DEFERR | [DIAG] zero cleanup DEFERRED: 
+PASS EVERY_TOUCHED_PRINT_HAS_ARGS 3 个格式行都取到了实参(折算不是按格式串空算)
+PASS TOUCHED_PRINTS_WITHIN_120 最宽一次=74 B 预算=120 B(含 LF) 覆盖 3 个调用
+PASS PRINT_BOUND_NOT_VACUOUS 最宽一次只有 74 B => 折算表大概没生效
+PASS NO_BARE_NUL_IN_NEW_FORMATS 3 条格式串里没有裸 NUL
+PASS NEW_FORMATS_STRICT_UTF8 逐条严格 UTF-8 解码通过
+PASS LEARN_STATUS_MAIN_LINE_UNWIDENED learn_status 主行格式串保持不变(cleanup 走单独一条短行); 实参取到=6 个
+PASS MANIFEST_ROUND phase8-m8-r7d1-ard-rework
+PASS MANIFEST_BASELINE_IS_REVIEWED baseline=4d50310 head_is_baseline=True
+PASS MANIFEST_REVIEWED_ZIP_MATCHES_PACKAGE manifest 登记的被审包身份 == 本次实算
+PASS MANIFEST_IMAGES_MATCH_DISK 4 件(BIN/AXF/MAP/调用图)逐字节复算相同
+PASS AXF_FLASH_SEGMENT_EQUAL_BIN span=297476 bin=297476
+PASS AXF_FLASH_EQUAL_BIN_ON_REVIEWED 被审件同一工具复算: span=297004 bin=297004
+PASS REVIEWED_IMAGE_UNCHANGED 被审提交那一版镜像仍是 df7584c3..
+PASS LOG_LINE_COUNT_MATCH 日志字节数与磁盘一致(3909), CR=144 LF=144
+PASS LEAK_SCANNER_FIRED_ON_SYNTHETIC 三条模式各自在合成样本上命中(判据不是空转)
+PASS NO_LOCAL_PATH_LEAK 本轮交付文件里无本机用户目录/用户名
+TOTAL=64 FAIL=0 fails=-

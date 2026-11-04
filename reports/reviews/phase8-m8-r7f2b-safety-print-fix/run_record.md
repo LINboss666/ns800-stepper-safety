@@ -438,3 +438,66 @@ RDV4 拒绝前先烧凭据→A10）。
 `polarity_measured=false`、`core_protection_verified=false` 保持，四条禁用声称继续禁止；旧 field 计划/rows/
 b502 证据/历史回包按原件保留，本轮未为"假装兼容"去改它们。第 14 节末的 R7F5A 物理断电仍是
 `PENDING_OPERATOR_REPORT`，本轮没有靠接设备去关闭它。
+
+## 16 M8-R7D1 返修轮（A 复审 CHANGES_REQUIRED 四项 P2；设备动作 0）
+
+被审件 `NS800_R7D1_A_Review_Changes_Required_4d50310_20261104.zip`（19634 B，sha256 `d9090f96…9b8d`，
+内层清单 18 条逐条复算 18/18 且不含自身），`FIX_SCOPE.id=R7D1_A_REVIEW_4d50310_FIX`，
+`verdict=CHANGES_REQUIRED`，四条 P2（ARD1–ARD4），`hardware_actions_cap=0`，
+`new_approval_required_for_offline_fix=false`。基线 = 被审提交 `4d50310`（构建与判据时 HEAD 即它，
+`HEAD_IS_REVIEWED_COMMIT` PASS）。按任务书第 5 行把实现、验收、归档合为一次交付，未开登记轮、未向操作者等批准。
+A 的 19 件包内原件（含 `proof/` 的四条 FAIL 原文与 `reproducer/`）按原路径入
+`reports/reviews/phase8-m8-r7d1-ard-rework/reviewer_originals/`，未改写。
+
+**四项各自的前后结果**（前 = 本机在 `4d50310` 的仓外逐字节副本上跑 A 的原版探针；该副本 5 件输入的
+sha256 与 A 的 `IDENTITY.json` 逐件相同；后 = 本轮定稿工作树，同一台机器同一 gcc 4.9.2）：
+
+| 项 | 修前 | 修后 | 改法一句话 |
+|---|---|---|---|
+| ARD1 | `rc=-5 ctx_held=1 takes=1 releases=0` | `rc=-5 ctx_held=0 takes=0 releases=0` | NULL 检查前移到取锁之前，拒绝路径不碰锁（因此没有可泄漏的东西，也不需要"测试重置锁"） |
+| ARD2 | `owner=1 active=1`，故障消失后再 zero 仍 `busy=1` | `owner=0 active=0 zero_cred=1 busy=0` | 有界延迟清理：`d_zero_cleanup` 旗可查 + `rel_job_advance` 内只服务 BY_ZERO 的收口分支；旗未灭时第二个采集者仍被拒 |
+| ARD3 | `refused=1 zero_cred=0 learn_cred=0 pending_changed=1` | `refused=1 zero_cred=1 learn_cred=1 pending_changed=0` | 静止事务门禁前置于任何 clear 副作用；作废失败先放锁再打印 |
+| ARD4 | `refused=1 cfg_changed=1`（magic `00000000`→`4E535250`，RAM 非 Flash） | `refused=1 cfg_changed=0` | commit 先发布候选再写配置；配置写失败回滚候选并具名披露 rolled-back / no-rollback |
+
+**锁序与清理归属**（A 第 76 行要求点名）：`rel_ctx` 仍是叶锁，临界区内不调 motor/cfg/Flash/UART/mdelay/print；
+嵌套方向只有 mot/cfg→ctx。ARD2 的归属归还由 Diagnosis Thread 的 `rel_job_advance()` 单点完成（命令线程只立旗），
+`rel_zero_capture_close()` 改为只回报状态不打印 —— 因为 zero 的"发布失败"出口是在静止事务内调它的，
+而 `motor_calibration_static_begin()`（motor.c:2097）成功时持续持有电机锁到 `..._end()`（motor.c:2140），
+把披露打印留在清理函数里等于在持锁期间走 UART。ARD4 的两步（发布候选 / 写配置）不能并成一个临界区：
+在 `rel_ctx` 里调 cfg 会把嵌套方向翻成 ctx→cfg，本轮因此只换顺序、不调配置事务接口。
+
+**验证**：正常链 `build_rc=0 warnings=0`、`cases=66 pass=66 fail=0 executed=66`（上一轮 62 例一条未删，
+新增 A13–A16）；反向链 19 族全 META-OK（原 14 族一条未删，新增 RDV5–RDV9，每族都有 `INJECTED` 行
+即副本编译成功且真执行，期望失败身份恰是新增那四条用例）；A 的原版探针脚本未改，修前 4/4 FAIL、修后 4/4 PASS；
+离线判据 `TOTAL=64 FAIL=0`；本轮新增/改动的 3 个 rt_kprintf 格式最宽一次 74 B（含源 LF，预算 120 B），
+`learn_status` 主行未被改宽，无裸 NUL、严格 UTF-8。
+
+**构建**（一次，`UV4 -r` 单目标）：rc=0，`0 Error(s), 0 Warning(s)`，V6.24，
+`Code=209474 RO=87422 RW=2196 ZI=85944`；新 BIN 297476 B `165d8bdc…`，AXF 1789320 B `dc145259…`，
+MAP `8229cf75…`，调用图 `16b87c97…`，全部归档到**新目录** `reports/firmware/phase8-m8-r7d1-ard-rework/`。
+被审那一版镜像在磁盘上仍是 `df7584c3…`（判据 `REVIEWED_IMAGE_UNCHANGED`），A 的失败原文与旧证据一字未动。
+资源对账换了算法并如实登记：`Code+RO+RW` 增量 +476 而 BIN 增量 +472，差额由装载段构成解释到残差 0
+（ER_IROM1 +476、RW_VT_DTCM 压缩载荷 0、对齐空隙 +4、RW_DTCM **压缩后**载荷 −8；两版各自
+"三段+空隙"精确等于该版 BIN 字节数）；上一轮"Code+RO+RW 增量 == BIN 增量"这条等式本轮不成立，没有沿用旧措辞。
+逐对象差分只有 `diag_relative.o`（Code +310 RO +178 RW 0 ZI +1），其余 110 行 .o 与 49 行库成员逐字段相同；
+新增静态 `d_zero_cleanup` = 1 B 取自 map 符号表。栈：diag 线程帧与子树 +0（最深线逐字未变，余量 2508 B）；
+命令线程 `rel_cmd_commit` 因 ARD4 的回滚副本（`diag_rprof_t`，map 实测 116 B）帧 +112、子树 1444→1556，
+**成为新的可见最深线**（余量 2540 B）—— 本轮新增成本如实登记，未靠加大栈或延长超时换绿；
+armlink 的数是静态下界且解析不了 msh 的函数指针，故不给 shell 栈总数。
+
+**自伤与工具侧问题（照实）**：
+1. ARD2 第一版把披露打印放在清理函数里（= 上述锁内 UART 破口），读 motor.c 持锁区间后自查发现，同轮换法修掉，
+   修在构建之前，最终构建字节里没有那一处。
+2. 修前基线第一次跑成 4/4 **PASS**：先把 5 个 blob 写进仓外副本、再 `cp -r` 整个 applications，
+   拷贝把三件产品文件覆盖成修后版本。当场按"与 A 登记矛盾"识别，重新 `git show 4d50310:path` 写回并逐件
+   sha256 对账后才重跑，得到与 A 一字不差的 4/4 FAIL；错误一次的输出目录被正确那次覆盖，未留可误用中间件。
+3. 资源报告工具初版把 armlink 的小计行（`ELF Image Totals (compressed)` 等）当对象行比较，误报"非零差分 2 行"；
+   排除小计行后判据才真正只允许 `diag_relative.o`。同一工具沿用了上一轮"39 个库成员行"的说法，
+   实测 component-sizes 表 111 行全是 .o、库成员行在 map 更靠前的段落 —— 本轮改成按整份 map 比库成员
+   （成员名+段+尺寸+类型，49 行相同）。上一轮那句措辞口径不准，在此登记更正，旧报告原文不改。
+4. 后台反向链任务被提前报了一次 completed（日志只到 RDV2），未拿截断日志当结果，等真跑完重读全文才登记 19/19。
+
+**边界**：板上仍只承认历史 `b502 / 502dca5d…`；`df7584c3…` 与 `165d8bdc…` 均 NOT_ON_BOARD；
+`polarity_measured=false`、`core_protection_verified=false` 保持，四条禁用声称继续禁止；
+R7F5A 物理断电回报仍 `PENDING_OPERATOR_REPORT`（未代填、未为关闭它接设备）；
+演示端 V0.3、旧包、旧现场原件与旧批准账未动；本轮不构成任何硬件授权。

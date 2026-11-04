@@ -1,0 +1,344 @@
+diff --git a/tests/host/rel_main.c b/tests/host/rel_main.c
+index 291b1e6..ff88e3c 100644
+--- a/tests/host/rel_main.c
++++ b/tests/host/rel_main.c
+@@ -210,8 +210,12 @@ static int g_mutex_release_calls;
+ static int g_ctx_take_fail_after = -1;
+ static int g_ctx_take_calls;
+ /* 只让名为 "cfg" 的锁取失败: 用来单判 config 写失败支路(全局 take_fail 会先把
+- * R7D1 的 ctx 门拒掉, 那条支路就走不到了)。 */
++ * R7D1 的 ctx 门拒掉, 那条支路就走不到了)。
++ * A16 需要的是"同一条命令里前面几次 cfg 取锁都要成, 只让第 3 次(project_config_set_rprof)
++ * 失败", 所以再给一个按次计数的口: -1=关, >=0=只让第 N 次之后的 cfg take 失败。 */
+ static int g_cfg_take_fail;
++static int g_cfg_take_calls;
++static int g_cfg_take_fail_after = -1;
+ 
+ rt_err_t rt_mutex_init(struct rt_mutex *m, const char *name, rt_uint8_t flag)
+ {
+@@ -233,7 +237,13 @@ rt_err_t rt_mutex_take(struct rt_mutex *m, rt_int32_t time)
+         if (g_ctx_take_fail_after >= 0 && g_ctx_take_calls > g_ctx_take_fail_after)
+             return -RT_EINTR;
+     }
+-    if (g_cfg_take_fail && strcmp((const char *)m->name, "cfg") == 0) return -RT_EINTR;
++    if (strcmp((const char *)m->name, "cfg") == 0)
++    {
++        g_cfg_take_calls++;
++        if (g_cfg_take_fail) return -RT_EINTR;
++        if (g_cfg_take_fail_after >= 0 && g_cfg_take_calls > g_cfg_take_fail_after)
++            return -RT_EINTR;
++    }
+     if (!m->initialized) return -RT_EINVAL;
+     m->held = 1;
+     return RT_EOK;
+@@ -555,6 +565,7 @@ static void world_reset(void)
+     g_static_begin_cap_len = 0; g_static_end_cap_len = 0; g_static_end_hook = RT_NULL;
+     g_mutex_take_fail = 0; g_mutex_take_calls = 0; g_mutex_release_calls = 0;
+     g_ctx_take_fail_after = -1; g_ctx_take_calls = 0; g_cfg_take_fail = 0;
++    g_cfg_take_calls = 0; g_cfg_take_fail_after = -1;
+     g_mutex_init_fail = 0;
+     g_enter_critical_calls = 0; g_exit_critical_calls = 0;
+     g_thread_create_calls = 0;
+@@ -588,6 +599,7 @@ static void world_reset(void)
+     d_job.why = "IDLE";
+     d_cap_owner = (rt_uint8_t)REL_CAP_FREE;
+     d_job_next_id = 1u;
++    d_zero_cleanup = 0u;            /* ARD2 的延迟清理旗: 不重置会把上一例的旗带进下一例 */
+ 
+     /* M8-R2 R2-A.4: 控制锁**真实创建**。旧 44 例从未调用 diagnosis_init/
+      * rel_ctl_lock_init, 于是所有 rel_prod_* 都在"锁不存在"的分支上空跑,
+@@ -3416,9 +3428,19 @@ static void c_A04(void)
+     /* 先让这一份任务终结: 后面 clear / 无凭据 / 模式不符三段各自判自己的路径 */
+     CHECK(job_wait(400) == (int)REL_JOB_DONE, "前置任务没终结: st=%d",
+           (int)job_snap().state);
+-    /* 没有零点凭据时: 明确拒绝且不建任务 */
++    /* 没有零点凭据时: 明确拒绝且不建任务。
++     * R7D1 返修(ARD3)之后 clear 必须先过静止事务门, 巡航态下它整条被拒、连配置都不碰,
++     * 所以 clear 不再能当"只清凭据"的开关用。这里只顺手再证一次拒绝的无害性, 落凭据用
++     * 夹具既有写法(本例后面几段同样这么落 d_pending_zero); clear 自己的成功路径由 A15 专判,
++     * 免得把"已提交 profile 被这套拒绝/受理序列改动"这件事混进本例的最后一条判据。 */
++    cap_reset();
+     do_cmd(cmd_clear);
+-    CHECK(d_pending_zero == RT_FALSE, "前置 clear 没清掉零点凭据");
++    CHECK(cap_has("clear REFUSED: static txn"), "巡航态的 clear 没被静止门拒绝: [%.90s]",
++          cap_text());
++    CHECK(d_pending_zero == RT_TRUE && d_pending_learn == RT_TRUE,
++          "被拒绝的 clear 动了凭据: zero=%d learn=%d",
++          (int)d_pending_zero, (int)d_pending_learn);
++    d_pending_zero = RT_FALSE;
+     cap_reset();
+     do_cmd(cmd_learn);
+     CHECK(cap_has("run 'diag_profile zero N' first"), "无零点凭据时没具名拒绝: [%.90s]",
+@@ -3889,6 +3911,7 @@ static void c_A12(void)
+         "learn REFUSED: ctx not ready",
+         "learn args: N=8..32",
+         "job id=999999999 st=CANCEL_PENDING why=CANCEL_REQUESTED owner=2 cred=1/1",
++        "job zero-cleanup DEFERRED: diag thread will free owner=1",
+         "job n=4294967295/4294967295 want=32 win=20000..20000 dir=1",
+         "job left=2000000000ms of 12000ms software budget",
+         "job data adc[65535..65535]n65535 nz65535 sg[65535..65535]n65535 seq4294967295..4294967295",
+@@ -3970,6 +3993,12 @@ static void c_A12(void)
+     do_cmd(cmd_learn_cancel);                   /* NOT-CANCELLED: already CANCELLED */
+     d_job.job_id = 1u;                          /* 陈旧 id 去取消别人的任务 */
+     do_cmd(cmd_learn_cancel);                   /* no such job ... current=1 */
++    /* ARD2 的延迟清理披露行: 让它在**最宽 owner 取值**下也走一遍(长度判据要覆盖每条新行) */
++    d_zero_cleanup = 1u;
++    d_cap_owner = (rt_uint8_t)REL_CAP_BY_ZERO;
++    do_cmd(cmd_learn_status);                   /* + job zero-cleanup DEFERRED 那一行 */
++    d_zero_cleanup = 0u;
++    d_cap_owner = (rt_uint8_t)REL_CAP_FREE;
+ 
+     /* 3) 锁失败与后台未就绪两条拒绝身份 */
+     g_mutex_take_fail = 1;
+@@ -4025,6 +4054,172 @@ static void c_A12(void)
+     CHECK(cap_all_ascii() == 1, "捕获区间里出现了非 ASCII 字节(UTF-8 完整性不成立)");
+ }
+ 
++
++/* ======================= M8-R7D1 返修组 A13..A16(A 复审四项) =======================
++ *
++ * 这四例逐条对应 A 在 NS800_R7D1_A_Review_Changes_Required_4d50310 里登记的 ARD1..ARD4。
++ * 判据一律是"业务后果": 锁有没有留在手上、采集器归属有没有滞留、被拒绝的命令有没有
++ * 暗改状态、REFUSED 的 commit 是否真的什么都没动。不去钉死修复后的取锁次序(那会把
++ * 实现细节当成合同), 而是用实际状态 + 披露文本判定。
++ * 仍然只是离线主机模型: 不构成板端抢占并发、真实停机时延或物理保护的证据。 */
++
++/* A13(ARD1): NULL 快照在取锁之前就被拒绝; 之后查询/推进/取消仍然可用。 */
++static void c_A13(void)
++{
++    rel_job_view_t v;
++    rt_err_t rc;
++    int rel_before, takes_before;
++
++    world_reset();
++    rel_before = g_mutex_release_calls;
++    takes_before = g_ctx_take_calls;
++    rc = rel_job_status(RT_NULL);
++    CHECK(rc == -RT_EINVAL, "NULL 快照没被具名拒绝: rc=%d", (int)rc);
++    CHECK(d_ctx_lock.held == 0u, "非法参数之后叶锁还挂着(held=%u)", (unsigned)d_ctx_lock.held);
++    CHECK(g_mutex_release_calls == rel_before,
++          "非法参数的拒绝路径放锁 %d 次(应为 0: 它根本没拿过锁)",
++          g_mutex_release_calls - rel_before);
++    CHECK(g_ctx_take_calls == takes_before,
++          "非法参数之前已经取了 %d 次 ctx 锁(拒绝必须排在取锁之前)",
++          g_ctx_take_calls - takes_before);
++    /* 拒绝不能把后面的人一起锁死: 合法查询、受理、推进、取消都要走得通 */
++    memset(&v, 0, sizeof(v));
++    CHECK(rel_job_status(&v) == RT_EOK, "NULL 拒绝把后续合法查询也锁死了");
++    prep_zero_cruise();
++    do_cmd(cmd_learn);
++    CHECK(job_active(), "NULL 拒绝之后 learn 受理不成立: [%.90s]", cap_text());
++    g_cancel_id = job_snap().job_id;
++    do_cmd(cmd_learn_cancel);
++    CHECK(job_wait(50) == REL_JOB_CANCELLED, "NULL 拒绝之后取消走不通: st=%d",
++          (int)job_snap().state);
++    g_cancel_id = 0u;
++}
++
++/* A14(ARD2): zero 的退出清理拿不到锁时必须有明确状态 + 真实推进者, 且归还之前不交给第二个采集者。 */
++static void c_A14(void)
++{
++    world_reset();
++    S.mstate = MOTOR_IDLE; S.armed = 0; S.mhz = 0; S.raw = 1660;
++    /* 第 1/2 次取锁(pending 快照、采集器受理)成功, 第 3 次起(作废凭据、退出清理)全部超时 */
++    g_ctx_take_fail_after = 2;
++    cap_reset();
++    do_cmd(cmd_zero);
++    CHECK(cap_has("zero FAILED: ctx lock on invalidate"), "作废失败没披露: [%.90s]", cap_text());
++    CHECK(cap_has("zero cleanup DEFERRED"), "清理被推迟却没说出来: [%.90s]", cap_text());
++    CHECK(d_cap_owner == (rt_uint8_t)REL_CAP_BY_ZERO && d_cap.active != 0u,
++          "清理没拿到锁时归属不该被抹掉: owner=%u active=%u",
++          (unsigned)d_cap_owner, (unsigned)d_cap.active);
++    /* 旗子还立着的时候, 查询本身要能读得到它 —— 但读得到要先把瞬时锁故障撤掉 */
++    g_ctx_take_fail_after = -1;
++    CHECK(job_snap().cleanup_pending == 1u, "延迟清理没有可查的明确状态: cleanup=%u",
++          (unsigned)job_snap().cleanup_pending);
++    cap_reset();
++    do_cmd(cmd_learn_status);
++    CHECK(cap_has("job zero-cleanup DEFERRED"), "延迟清理在状态查询里没有披露: [%.90s]",
++          cap_text());
++    /* 推进者还没跑: 这时候第二个采集者仍然进不来(不偷别人的锁, 也不抹 owner) */
++    cap_reset();
++    do_cmd(cmd_zero);
++    CHECK(cap_has("capture busy"), "清理未完成却放进了第二个采集者: [%.90s]", cap_text());
++    /* 真正的收口靠 Diagnosis Thread 的一拍(rel_job_advance), 不是夹具重置 */
++    pump(3);
++    CHECK(d_cap_owner == (rt_uint8_t)REL_CAP_FREE && d_cap.active == 0u,
++          "有界延迟清理没被推进者收口: owner=%u active=%u",
++          (unsigned)d_cap_owner, (unsigned)d_cap.active);
++    CHECK(job_snap().cleanup_pending == 0u, "收口之后旗子还立着");
++    cap_reset();
++    do_cmd(cmd_zero);
++    CHECK(d_pending_zero == RT_TRUE, "故障消失后 zero 仍采不到: [%.90s]", cap_text());
++    CHECK(!cap_has("capture busy"), "恢复之后仍报 busy: [%.90s]", cap_text());
++}
++
++/* A15(ARD3): 被静止门拒绝的 clear 一个字都不能改; 门禁消失后同一条命令仍要真的清干净。 */
++static void c_A15(void)
++{
++    diag_rprof_t before;
++    int zb, lb;
++
++    prep_zero_cruise();
++    CHECK(learn_run(400) == REL_JOB_DONE && d_pending_learn == RT_TRUE, "前置: 没学到候选");
++    before = d_pending;
++    zb = (int)d_pending_zero; lb = (int)d_pending_learn;
++    g_static_begin_busy = 1;                  /* 还在 armed+cruise: 静止事务必须拒绝 */
++    cap_reset();
++    do_cmd(cmd_clear);
++    g_static_begin_busy = 0;
++    CHECK(cap_has("clear REFUSED: static txn"), "静止门没拒绝 clear: [%.90s]", cap_text());
++    CHECK(memcmp(&before, &d_pending, sizeof(before)) == 0, "被拒绝的 clear 改写了候选");
++    CHECK((int)d_pending_zero == zb && (int)d_pending_learn == lb,
++          "被拒绝的 clear 把凭据清了: zero=%d learn=%d(应当仍是 1/1)",
++          (int)d_pending_zero, (int)d_pending_learn);
++    /* 拒绝不是把命令废掉: 静止之后同一条 clear 应当成功并真的清零 */
++    S.mstate = MOTOR_IDLE; S.armed = 0; S.mhz = 0;
++    cap_reset();
++    do_cmd(cmd_clear);
++    CHECK(cap_has("profile voided"), "静止之后的 clear 没成功: [%.90s]", cap_text());
++    CHECK(d_pending_zero == RT_FALSE && d_pending_learn == RT_FALSE, "成功 clear 之后凭据还在");
++}
++
++/* A16(ARD4): commit 的结果必须与事务完整性一致 —— REFUSED 就什么都没动, OK 就配置与候选同版。
++ * 两段注入各打一条失败路径: ①候选发布取不到 ctx ②配置发布本身失败(要求回滚已发布的候选)。
++ * "配置发布是一次 commit 里最后一次 cfg 取锁"这个事实不写死次数: 先用一次干净 commit 量出来。 */
++static void c_A16(void)
++{
++    diag_rprof_t before, after, pend_before;
++    int zb, lb, refused, cfg_changed, pend_changed, creds_kept, base, steps;
++
++    prep_zero_cruise();
++    CHECK(learn_run(400) == REL_JOB_DONE && d_pending_learn == RT_TRUE, "前置: 没有可提交的候选");
++    S.mstate = MOTOR_IDLE; S.armed = 0; S.mhz = 0;
++    CHECK(project_config_get_rprof(&before) == RT_EOK, "前置: 读不到已提交 profile");
++    pend_before = d_pending;
++    zb = (int)d_pending_zero; lb = (int)d_pending_learn;
++
++    /* ① 让这条命令里的第 4 次 ctx 取锁失败(修复前后落在哪一步都算, 结论只看状态) */
++    g_ctx_take_calls = 0;
++    g_ctx_take_fail_after = 3;
++    cap_reset();
++    do_cmd(cmd_commit);
++    g_ctx_take_fail_after = -1;
++    memset(&after, 0, sizeof(after));
++    CHECK(project_config_get_rprof(&after) == RT_EOK, "①回读已提交 profile 失败");
++    refused = cap_has("commit REFUSED");
++    cfg_changed = memcmp(&before, &after, sizeof(before)) != 0;
++    pend_changed = memcmp(&pend_before, &d_pending, sizeof(pend_before)) != 0;
++    creds_kept = ((int)d_pending_zero == zb && (int)d_pending_learn == lb);
++    CHECK(refused && !cfg_changed && !pend_changed && creds_kept,
++          "发布取锁失败时 REFUSED 却已经改了状态: refused=%d cfg_changed=%d pend_changed=%d creds=%d",
++          refused, cfg_changed, pend_changed, creds_kept);
++    CHECK(!cap_has("commit OK"), "同一次 commit 既 REFUSED 又 OK");
++
++    /* ② 干净的一轮: 顺带量出这条命令一共取了几次 cfg 锁, 并证 OK 时配置与候选同版 */
++    base = g_cfg_take_calls;
++    cap_reset();
++    do_cmd(cmd_commit);
++    steps = g_cfg_take_calls - base;
++    CHECK(cap_has("commit OK"), "干净世界里的 commit 没成功: [%.90s]", cap_text());
++    CHECK(steps >= 1, "这条 commit 一次 cfg 锁都没取(注入无法定位)");
++    memset(&after, 0, sizeof(after));
++    CHECK(project_config_get_rprof(&after) == RT_EOK &&
++          after.magic == DIAG_RPROF_MAGIC &&
++          memcmp(&after, &d_pending, sizeof(after)) == 0, "commit OK 之后配置与候选不一致");
++
++    /* ③ 只把最后一次 cfg 取锁(= 配置发布)打坏: 已发布的候选必须退回, 且如实披露 */
++    before = after;
++    pend_before = d_pending;
++    g_cfg_take_calls = base;
++    g_cfg_take_fail_after = base + steps - 1;
++    cap_reset();
++    do_cmd(cmd_commit);
++    g_cfg_take_fail_after = -1;
++    CHECK(cap_has("commit REFUSED"), "配置写失败却没按失败披露: [%.90s]", cap_text());
++    CHECK(cap_has("config-write-rolled-back"), "配置写失败没走回滚披露: [%.110s]", cap_text());
++    memset(&after, 0, sizeof(after));
++    CHECK(project_config_get_rprof(&after) == RT_EOK &&
++          memcmp(&before, &after, sizeof(before)) == 0, "配置写失败却留下了新配置");
++    CHECK(memcmp(&pend_before, &d_pending, sizeof(pend_before)) == 0, "回滚没把候选退回原值");
++}
++
+ static const struct case_ent TAB[] = {
+     { "REL01-frame-identity-advances-only-on-success", c_REL01 },
+     { "REL02-sg-read-fail-freezes-identity",           c_REL02 },
+@@ -4088,6 +4283,10 @@ static const struct case_ent TAB[] = {
+     { "A10-failed-relearn-invalidates-credential",     c_A10 },
+     { "A11-mutator-exclusion-and-lock-context-failures", c_A11 },
+     { "A12-bounded-calls-utf8-no-nul",                 c_A12 },
++    { "A13-null-status-rejected-without-lock-leak",     c_A13 },
++    { "A14-zero-cleanup-deferred-then-recovered",       c_A14 },
++    { "A15-refused-clear-keeps-pending-and-creds",      c_A15 },
++    { "A16-commit-refused-keeps-config-and-candidate",  c_A16 },
+ };
+ #define NTAB ((int)(sizeof(TAB)/sizeof(TAB[0])))
+ 
+diff --git a/tests/host/run_diag_relative_m8.sh b/tests/host/run_diag_relative_m8.sh
+index e58758f..b1f6e30 100644
+--- a/tests/host/run_diag_relative_m8.sh
++++ b/tests/host/run_diag_relative_m8.sh
+@@ -107,7 +107,11 @@ A08-timeout-advances-without-frames-and-wrap
+ A09-motion-mode-signature-change-aborts
+ A10-failed-relearn-invalidates-credential
+ A11-mutator-exclusion-and-lock-context-failures
+-A12-bounded-calls-utf8-no-nul"
++A12-bounded-calls-utf8-no-nul
++A13-null-status-rejected-without-lock-leak
++A14-zero-cleanup-deferred-then-recovered
++A15-refused-clear-keeps-pending-and-creds
++A16-commit-refused-keeps-config-and-candidate"
+ ALL_CASES="$(printf '%s' "$ALL_CASES" | tr '\n' ' ')"
+ 
+ note() { printf '%s\n' "$*"; }
+@@ -454,6 +458,50 @@ rt_err_t rel_ctl_take(void) { return RT_EOK; }' \
+     {
+         /* 本轮只允许单向基线(R3.6): 两个方向要各自学一次、各存一版。' \
+         A10-failed-relearn-invalidates-credential
++
++    # RDV5(返修 ARD1): NULL 检查挪回取锁**之后** —— A13 必须检出"非法参数泄一层叶锁"。
++    reverse_case RDV5_null_check_after_take diag_relative.c \
++'    if (v == RT_NULL) return -RT_EINVAL;
++    rc = rel_ctx_take();' \
++'    rc = rel_ctx_take();
++    if (v == RT_NULL) return -RT_EINVAL;   /* NEGATIVE-INJECTION RDV5: 非法参数在取锁之后才拒(泄锁) */' \
++        A13-null-status-rejected-without-lock-leak
++
++    # RDV6(返修 ARD2): 拿不到锁又变成"静默返回、不留旗也不披露" —— A14 必须检出归属滞留。
++    reverse_case RDV6_zero_close_silent_no_arm diag_relative.c \
++'    d_zero_cleanup = 1u;' \
++'    /* NEGATIVE-INJECTION RDV6: 清理拿不到锁就静默返回(基线的滞留形状: 不留旗也不披露) */
++    return RT_FALSE;' \
++        A14-zero-cleanup-deferred-then-recovered
++
++    # RDV7(返修 ARD2 的另一半): 旗子留了, 但推进者不认领 —— "有界延迟清理"退化成永久滞留。
++    reverse_case RDV7_advancer_ignores_zero_flag diag_relative.c \
++'    if (d_zero_cleanup != 0u && d_cap_owner == (rt_uint8_t)REL_CAP_BY_ZERO)' \
++'    if (0u && d_cap_owner == (rt_uint8_t)REL_CAP_BY_ZERO)   /* NEGATIVE-INJECTION RDV7: 推进者不认领 zero 的延迟清理 */' \
++        A14-zero-cleanup-deferred-then-recovered
++
++    # RDV8(返修 ARD3): 擦候选/凭据挪回静止门**之前** —— A15 必须检出"被拒绝的 clear 暗改状态"。
++    reverse_case RDV8_clear_blanks_before_gate diag_relative.c \
++'    if (rel_txn_open("clear") != RT_EOK) return;
++    rt_memset(&blank, 0, sizeof(blank));
++    if (rel_pending_write(&blank, 0, 0) != RT_EOK)
++    { rel_txn_close(); rt_kprintf("[DIAG] clear REFUSED: ctx lock (profile kept)\n"); return; }' \
++'    rt_memset(&blank, 0, sizeof(blank));   /* NEGATIVE-INJECTION RDV8: 静止门之前就先擦候选与凭据 */
++    if (rel_pending_write(&blank, 0, 0) != RT_EOK)
++    { rt_kprintf("[DIAG] clear REFUSED: ctx lock (profile kept)\n"); return; }
++    if (rel_txn_open("clear") != RT_EOK) return;' \
++        A15-refused-clear-keeps-pending-and-creds
++
++    # RDV9(返修 ARD4): 退回基线形状"先写 RAM 配置, 再发布候选" —— A16 必须检出
++    # "REFUSED 但配置已经生效"。
++    reverse_case RDV9_commit_config_before_publish diag_relative.c \
++'    if (rel_pending_write(&cand, -1, -1) != RT_EOK)
++    { fin = -RT_EIO; why = "ctx-lock-publish"; goto out; }   /* 配置未动: 整次 commit 什么都没改 */
++    fin = project_config_set_rprof(&cand);' \
++'    fin = project_config_set_rprof(&cand);   /* NEGATIVE-INJECTION RDV9: 先写配置再发布候选 */
++    if (rel_pending_write(&cand, -1, -1) != RT_EOK)
++    { fin = -RT_EIO; why = "ctx-lock-publish"; goto out; }' \
++        A16-commit-refused-keeps-config-and-candidate
+ fi
+ 
+ note ""

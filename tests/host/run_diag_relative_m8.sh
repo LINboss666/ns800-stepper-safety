@@ -107,7 +107,11 @@ A08-timeout-advances-without-frames-and-wrap
 A09-motion-mode-signature-change-aborts
 A10-failed-relearn-invalidates-credential
 A11-mutator-exclusion-and-lock-context-failures
-A12-bounded-calls-utf8-no-nul"
+A12-bounded-calls-utf8-no-nul
+A13-null-status-rejected-without-lock-leak
+A14-zero-cleanup-deferred-then-recovered
+A15-refused-clear-keeps-pending-and-creds
+A16-commit-refused-keeps-config-and-candidate"
 ALL_CASES="$(printf '%s' "$ALL_CASES" | tr '\n' ' ')"
 
 note() { printf '%s\n' "$*"; }
@@ -454,6 +458,50 @@ rt_err_t rel_ctl_take(void) { return RT_EOK; }' \
     {
         /* 本轮只允许单向基线(R3.6): 两个方向要各自学一次、各存一版。' \
         A10-failed-relearn-invalidates-credential
+
+    # RDV5(返修 ARD1): NULL 检查挪回取锁**之后** —— A13 必须检出"非法参数泄一层叶锁"。
+    reverse_case RDV5_null_check_after_take diag_relative.c \
+'    if (v == RT_NULL) return -RT_EINVAL;
+    rc = rel_ctx_take();' \
+'    rc = rel_ctx_take();
+    if (v == RT_NULL) return -RT_EINVAL;   /* NEGATIVE-INJECTION RDV5: 非法参数在取锁之后才拒(泄锁) */' \
+        A13-null-status-rejected-without-lock-leak
+
+    # RDV6(返修 ARD2): 拿不到锁又变成"静默返回、不留旗也不披露" —— A14 必须检出归属滞留。
+    reverse_case RDV6_zero_close_silent_no_arm diag_relative.c \
+'    d_zero_cleanup = 1u;' \
+'    /* NEGATIVE-INJECTION RDV6: 清理拿不到锁就静默返回(基线的滞留形状: 不留旗也不披露) */
+    return RT_FALSE;' \
+        A14-zero-cleanup-deferred-then-recovered
+
+    # RDV7(返修 ARD2 的另一半): 旗子留了, 但推进者不认领 —— "有界延迟清理"退化成永久滞留。
+    reverse_case RDV7_advancer_ignores_zero_flag diag_relative.c \
+'    if (d_zero_cleanup != 0u && d_cap_owner == (rt_uint8_t)REL_CAP_BY_ZERO)' \
+'    if (0u && d_cap_owner == (rt_uint8_t)REL_CAP_BY_ZERO)   /* NEGATIVE-INJECTION RDV7: 推进者不认领 zero 的延迟清理 */' \
+        A14-zero-cleanup-deferred-then-recovered
+
+    # RDV8(返修 ARD3): 擦候选/凭据挪回静止门**之前** —— A15 必须检出"被拒绝的 clear 暗改状态"。
+    reverse_case RDV8_clear_blanks_before_gate diag_relative.c \
+'    if (rel_txn_open("clear") != RT_EOK) return;
+    rt_memset(&blank, 0, sizeof(blank));
+    if (rel_pending_write(&blank, 0, 0) != RT_EOK)
+    { rel_txn_close(); rt_kprintf("[DIAG] clear REFUSED: ctx lock (profile kept)\n"); return; }' \
+'    rt_memset(&blank, 0, sizeof(blank));   /* NEGATIVE-INJECTION RDV8: 静止门之前就先擦候选与凭据 */
+    if (rel_pending_write(&blank, 0, 0) != RT_EOK)
+    { rt_kprintf("[DIAG] clear REFUSED: ctx lock (profile kept)\n"); return; }
+    if (rel_txn_open("clear") != RT_EOK) return;' \
+        A15-refused-clear-keeps-pending-and-creds
+
+    # RDV9(返修 ARD4): 退回基线形状"先写 RAM 配置, 再发布候选" —— A16 必须检出
+    # "REFUSED 但配置已经生效"。
+    reverse_case RDV9_commit_config_before_publish diag_relative.c \
+'    if (rel_pending_write(&cand, -1, -1) != RT_EOK)
+    { fin = -RT_EIO; why = "ctx-lock-publish"; goto out; }   /* 配置未动: 整次 commit 什么都没改 */
+    fin = project_config_set_rprof(&cand);' \
+'    fin = project_config_set_rprof(&cand);   /* NEGATIVE-INJECTION RDV9: 先写配置再发布候选 */
+    if (rel_pending_write(&cand, -1, -1) != RT_EOK)
+    { fin = -RT_EIO; why = "ctx-lock-publish"; goto out; }' \
+        A16-commit-refused-keeps-config-and-candidate
 fi
 
 note ""

@@ -1,0 +1,43 @@
+# sha256 * <仓库相对路径>(LF, 无 BOM; 本清单不哈希自身字节 —— 一条清单不能给自己的字节作证)
+# 生成方式: 对 reports/reviews/phase8-m8-r7d1-ard-rework/ 下每个常规文件(排除 SHA256SUMS.txt、remote_readback.md 与 __pycache__) 直接读磁盘字节算 sha256
+# 条目数=39; 与 Git blob 的逐条复算由 host/staged_preflight_batch.py(提交前, 单批流)与推送后的远端逐 blob 回读完成
+# 重新生成: python reports/reviews/phase8-m8-idle-stack-r4/host/make_round_sums.py <本目录>
+8c11efe5c6b8f15d3863af419b00e24870299c2874daf1077106fe124db6b111  reports/reviews/phase8-m8-r7d1-ard-rework/build/build_r7d1r.log
+a65a64c23ccdf0d8fdbd90fb8e1235ad6c0118908d488951eebd38392852d46b  reports/reviews/phase8-m8-r7d1-ard-rework/build/resource_stack_r7d1r.txt
+a69aa29ffffad4466787c986cfa9b3153c84526fe283567c4467c4e8b6a6573f  reports/reviews/phase8-m8-r7d1-ard-rework/case_mapping.md
+952ad9eaa26886cd1200d0b475ef3d58637f24c289eaf5c0b43c3d1f29bb0c1a  reports/reviews/phase8-m8-r7d1-ard-rework/code/ard_host_vs_4d50310.diff
+73ff161eea62d4c7869606dcbb3f301f7bf7b68c30a6d620864df281c2e1b130  reports/reviews/phase8-m8-r7d1-ard-rework/code/ard_product_vs_4d50310.diff
+9ef7556b1cdd60d5ddf2f1903f16e32b9ed286f7bad9d153d44b22f0cff77f04  reports/reviews/phase8-m8-r7d1-ard-rework/code/before_after_identity.txt
+fb7065a3526bfbbdfa773ea750cfb6982c858b1b0e2a7fcb577bf0b26f9423f5  reports/reviews/phase8-m8-r7d1-ard-rework/host/case_ledger.txt
+cf1f1511f32a0a7b992e0b31dd45274cd16a657233820fedeafe43316435ef06  reports/reviews/phase8-m8-r7d1-ard-rework/host/normal_chain_build.txt
+a6d45cdb9624f832c704f4ba2c4eba3cbe4da4535326460b040487f80269e5e7  reports/reviews/phase8-m8-r7d1-ard-rework/host/normal_chain_out.txt
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  reports/reviews/phase8-m8-r7d1-ard-rework/host/normal_chain_warning_count.txt
+a5c31945e5bf48402e27bfeeb1d0c3539c5b7209a2d91ec212f52f14b566298d  reports/reviews/phase8-m8-r7d1-ard-rework/host/probe_before_after.txt
+b998efe5083bb94f0dcb17f65410d8cfa3fa6ae69ade9a242f13279e33389470  reports/reviews/phase8-m8-r7d1-ard-rework/host/reverse_meta_lines.txt
+60681bfe0e0273086410a12e508542c05b6232133cbb5276f352cb2dc61a331e  reports/reviews/phase8-m8-r7d1-ard-rework/host/reverse_run_full.txt
+8a5c03f8136c2679c75cb99296e977ca90633c0c4b4ca4f6c0168efaf6ecfa63  reports/reviews/phase8-m8-r7d1-ard-rework/implementation_contract.md
+405020796a7e8d8622b2b3d8f2fceb4fb1354876a6a67d85b8a0dec9b9ccc0f6  reports/reviews/phase8-m8-r7d1-ard-rework/offline/checks.txt
+efd708af825a839c4fe39758ab63af227f78a4f047ccb5dd026585357b7ef7c7  reports/reviews/phase8-m8-r7d1-ard-rework/offline/summary.json
+7be45a7d421ced29ac6255e81c5681fe22dbde11b56fe123b984394d18fc72d3  reports/reviews/phase8-m8-r7d1-ard-rework/reviewer_originals/A_REVIEW_R7D1_CHANGES_REQUIRED.md
+2bd842b932477f1164c3149816fc1715a2ce0f1362ee3854f9616ecf22537a7d  reports/reviews/phase8-m8-r7d1-ard-rework/reviewer_originals/FIX_SCOPE.json
+8a9e72931737596e5fe73ec7cd1c8b752dd7622b42f76c875c21734e8f553c70  reports/reviews/phase8-m8-r7d1-ard-rework/reviewer_originals/IDENTITY.json
+f97dd0b1e191bb04f75691af5f0fa11a188ea11b53addaa0d6960fde9b12a169  reports/reviews/phase8-m8-r7d1-ard-rework/reviewer_originals/proof/clear_control_baseline_7885.build.txt
+54d8ff380da56c2e100f20e284b1c77c8c8e4d8fd36a51549f1b2e9d75b56c32  reports/reviews/phase8-m8-r7d1-ard-rework/reviewer_originals/proof/clear_control_baseline_7885.out.txt
+da1bbb85570052fd9a712d29cbd342a23244ec0bb93a3640746845b53220dbca  reports/reviews/phase8-m8-r7d1-ard-rework/reviewer_originals/proof/clear_control_candidate_4d50310.build.txt
+2bead92d4342e8767673a89564f4669ca1e0552b29237a4f25e3a3522d341c5e  reports/reviews/phase8-m8-r7d1-ard-rework/reviewer_originals/proof/clear_control_candidate_4d50310.out.txt
+045bfb6b73d71741452949eb9ae10672ddb8b9881574f3b0fa108b3b5cd73356  reports/reviews/phase8-m8-r7d1-ard-rework/reviewer_originals/proof/image_identity_review.json
+9f7725f82b69f1715f8b60f23d8dc4a04f826960c1d13243785b2177a1e431df  reports/reviews/phase8-m8-r7d1-ard-rework/reviewer_originals/proof/initial_linux_missing_windows_header.txt
+7d298d16ea5a5e25215757e4be8d5d5b573d07680410f4dd27f69e83ef6e99a3  reports/reviews/phase8-m8-r7d1-ard-rework/reviewer_originals/proof/original_replay.log
+119a762cacec727c97d15e3c29bf0741d40ed409d4b349219a00eb6c512c0531  reports/reviews/phase8-m8-r7d1-ard-rework/reviewer_originals/proof/review_probes/build.stderr.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  reports/reviews/phase8-m8-r7d1-ard-rework/reviewer_originals/proof/review_probes/build.stdout.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  reports/reviews/phase8-m8-r7d1-ard-rework/reviewer_originals/proof/review_probes/probe.stderr.txt
+1f860a734959cb883a8ba832f237e86f270c9e007b9963599378acdf0f30b4f9  reports/reviews/phase8-m8-r7d1-ard-rework/reviewer_originals/proof/review_probes/probe.stdout.txt
+26f0b370a574ffc3a1f5825cc4a56e0a89fb8b447613356de3597e870646f253  reports/reviews/phase8-m8-r7d1-ard-rework/reviewer_originals/proof/review_probes/result.json
+4bfd50e3850fa575465bddf364fba8b2fb4be157b900e6d55f6c88132eb81385  reports/reviews/phase8-m8-r7d1-ard-rework/reviewer_originals/reproducer/clear_control.c
+c4dcf1e78cdaed35013cb5851c303a64c96ff83ebad441784a66a27e7b22626a  reports/reviews/phase8-m8-r7d1-ard-rework/reviewer_originals/reproducer/review_probes.c
+b03c0eca3d927169f428eeee4261ef0847ac507110ca8c8203a88c098768b79b  reports/reviews/phase8-m8-r7d1-ard-rework/reviewer_originals/reproducer/run_review_probes.py
+062dfb5fc5c2530690f91b9cfa0b0a2c873e892bf7ac28d0b1cdbf1e27ecc239  reports/reviews/phase8-m8-r7d1-ard-rework/tools/r7d1r_make_host_artifacts.py
+94ffebbbbe04323faa2bf2e33ed883b532cfe7540bb45de8570a1475efabc636  reports/reviews/phase8-m8-r7d1-ard-rework/tools/r7d1r_make_manifest.py
+881d8d37537728159a90573bb779f1ca93287858123a84b423ca90e215a370e3  reports/reviews/phase8-m8-r7d1-ard-rework/tools/r7d1r_offline_checks.py
+ab7d834c7b51c2533a427f67345e843eb7fda6a480e0ec19352b75686640380a  reports/reviews/phase8-m8-r7d1-ard-rework/tools/r7d1r_resource_report.py
+d6800ef1ae56d38eb1e8e3d19cc792a16b8a32a62b42d76c8cf38f4ffddb14a6  reports/reviews/phase8-m8-r7d1-ard-rework/tools/r7d1r_staged_preflight.py

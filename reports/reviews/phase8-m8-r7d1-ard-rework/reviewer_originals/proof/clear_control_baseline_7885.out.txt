@@ -1,0 +1,5 @@
+[DIAG] zero OK n=32 raw 1660..1660 mean=1660000 (cal source untouched)
+[DIAG] learn OK adc[2000..2000]n68 nz0 sg[500..500]n8 seq4..11
+[DIAG] learn thr tier=2 dev=64/128 drop=16/32 FIELD_UNVERIFIED
+[DIAG] clear REFUSED: static txn rc=-8 (idle+trusted-disable not proven)
+CLEAR_CONTROL|refused=1|pending_changed=0|zero_cred=1|learn_cred=1

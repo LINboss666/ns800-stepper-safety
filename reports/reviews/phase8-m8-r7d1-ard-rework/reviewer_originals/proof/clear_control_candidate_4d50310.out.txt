@@ -1,0 +1,5 @@
+[DIAG] zero OK n=32 raw 1660..1660 mean=1660000 (cal source untouched)
+[DIAG] learn STARTED id=1 n=8 win=450..550 dir=0
+[DIAG] learn async: query 'learn_status'; NOT learn OK yet FIELD_UNVERIFIED
+[DIAG] clear REFUSED: static txn rc=-8 (idle+trusted-disable not proven)
+CLEAR_CONTROL|refused=1|pending_changed=1|zero_cred=0|learn_cred=0

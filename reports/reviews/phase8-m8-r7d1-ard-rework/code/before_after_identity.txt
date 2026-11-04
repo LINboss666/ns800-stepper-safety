@@ -1,0 +1,17 @@
+# 返修轮四个改动件 + 一个未动件的前后字节身份
+# before = Git blob 4d50310:path 的原始字节; after = 本轮工作树磁盘字节(尚未提交, 提交后由清单与远端回读再各核一次)
+rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diag_relative.c
+  before     103684 B sha256=f2c7089b3d5a21479a5936bab5bf3855616380bb6f96fc538921b979ccac125d
+  after      108354 B sha256=e162d35737ead191728a13ed585e3d35fff8a43cc88acba30b256010f438ee76  逐字节相同=False
+rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diag_relative.h
+  before      25422 B sha256=aa23399bc2154e552803f4e0bfdd2b0a09ada79464aa26d71df6f21e02284689
+  after       25522 B sha256=27b42031b934ff92dcc6daa4faca31a65cee3782dda489d428f26264c7738303  逐字节相同=False
+tests/host/rel_main.c
+  before     196003 B sha256=8e2f5acf7c4caa987b580b46e1414aabc758d5aaeabd5a060fe3a253de8b7c92
+  after      207003 B sha256=5707b5e4b9918dcf88ff55b59541f6b27460ad537a66f9764c91420eee39722f  逐字节相同=False
+tests/host/run_diag_relative_m8.sh
+  before      23744 B sha256=afbd3ae9ee7e6cdc662a83c72d617f6d4677208a2c9902d579d2510c4b36ebb4
+  after       26705 B sha256=d7e621f4610890bca09aba9ea22d011d2f093307e4f1e1cd1a24b3546fdb1b78  逐字节相同=False
+rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diagnosis.c
+  before      54696 B sha256=4b69151e140b3a80dee4ff211aa935d51cf6e9de2611f6474b38f35a3836d281
+  after       54696 B sha256=4b69151e140b3a80dee4ff211aa935d51cf6e9de2611f6474b38f35a3836d281  逐字节相同=True

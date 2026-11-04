@@ -1,0 +1,6 @@
+compiler=gcc.exe (tdm64-1) 4.9.2
+src_app=D:/ns800/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications
+out_dir=/tmp/ns800-host-chain/m8/20261104T152941Z-944
+selected=66 mode=default
+build_rc=0 warnings=0
+proc_rc=0

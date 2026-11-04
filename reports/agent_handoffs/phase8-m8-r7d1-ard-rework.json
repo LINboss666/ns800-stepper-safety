@@ -1,0 +1,189 @@
+{
+ "round": "phase8-m8-r7d1-ard-rework",
+ "title": "M8-R7D1 返修轮(ARD1-ARD4 错误路径): 四条离线修复 + 4 例回归 + 5 族负控 + 单目标构建一次(设备动作 0; 两版新镜像 NOT_ON_BOARD)",
+ "date_local": "2026-11-04",
+ "authored_by": "local agent",
+ "review_package": {
+  "basename": "NS800_R7D1_A_Review_Changes_Required_4d50310_20261104.zip",
+  "bytes": 19634,
+  "sha256": "d9090f964ed0242f012e40e15ed40f427a3234f72572c88e9468288fb2ce9b8d",
+  "inner_manifest_entries": 18,
+  "inner_manifest_excludes_self": true,
+  "fix_id": "R7D1_A_REVIEW_4d50310_FIX",
+  "verdict": "CHANGES_REQUIRED",
+  "finding_ids": ["ARD1_NULL_STATUS_LOCK_LEAK", "ARD2_ZERO_CLEANUP_ORPHAN",
+                  "ARD3_REFUSED_CLEAR_MUTATES_PENDING", "ARD4_REFUSED_COMMIT_WRITES_RAM_PROFILE"],
+  "finding_priorities": ["P2", "P2", "P2", "P2"],
+  "hardware_actions_cap": 0,
+  "new_approval_required_for_offline_fix": false,
+  "originals_archived_under": "reports/reviews/phase8-m8-r7d1-ard-rework/reviewer_originals/"
+ },
+ "baseline": {
+  "reviewed_commit": "4d503103cf3f1eb6f5113b10cc8683954d510ac6",
+  "head_at_build_equals_reviewed": true,
+  "branch": "feature/m8-r7d1-async-learn-offline",
+  "a_declared_existing": {"host_pass": 62, "reverse_meta_ok": 14, "extra_checks": 4, "extra_fail": 4},
+  "a_source_bindings_recomputed_at_reviewed_commit": 5,
+  "diagnosis_c_untouched_this_round": true
+ },
+ "changed_files": [
+  "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diag_relative.c",
+  "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diag_relative.h",
+  "tests/host/rel_main.c",
+  "tests/host/run_diag_relative_m8.sh"
+ ],
+ "findings_resolution": {
+  "ARD1": {
+   "shape_before": "rc=-5 ctx_held=1 takes=1 releases=0",
+   "shape_after": "rc=-5 ctx_held=0 takes=0 releases=0",
+   "fix": "NULL 参数检查前移到 rel_ctx_take() 之前(拒绝路径不碰锁, 因此没有可泄漏的东西)",
+   "case": "A13-null-status-rejected-without-lock-leak",
+   "negatives": ["RDV5_null_check_after_take"]
+  },
+  "ARD2": {
+   "shape_before": "zero 退出 owner=BY_ZERO active=1; 故障消失后再 zero 仍 capture busy(owner 1 active 1)",
+   "shape_after": "owner=0 active=0 zero_cred=1 busy=0(推进者收口后同一条 zero 真采到)",
+   "fix": "有界延迟清理: d_zero_cleanup 旗(可查: rel_job_view_t.cleanup_pending + learn_status 独立短行) + rel_job_advance 内只服务 BY_ZERO 的收口分支; 五个出口都过这条路径; 清理函数改为回报状态且**不打印**, 披露移到放锁之后(静止事务持电机锁 motor.c:2097..2140)",
+   "exclusivity": "旗未灭时 rel_zero_capture_open 仍按 owner!=FREE 拒绝第二个采集者",
+   "case": "A14-zero-cleanup-deferred-then-recovered",
+   "negatives": ["RDV6_zero_close_silent_no_arm", "RDV7_advancer_ignores_zero_flag"]
+  },
+  "ARD3": {
+   "shape_before": "refused=1 zero_cred=0 learn_cred=0 pending_changed=1",
+   "shape_after": "refused=1 zero_cred=1 learn_cred=1 pending_changed=0",
+   "fix": "rel_txn_open(\"clear\") 前置于任何副作用; 作废失败先 rel_txn_close() 再打印",
+   "config_clear_failure_semantics": "先擦候选/凭据再 project_config_clear_rprof(); 擦成功而配置清理失败 => 'clear FAILED rc=... (pending voided)', 状态为候选已作废+配置未变(commit 只会更不可能成功); 擦失败 => 整个 clear 不做",
+   "case": "A15-refused-clear-keeps-pending-and-creds",
+   "negatives": ["RDV8_clear_blanks_before_gate"]
+  },
+  "ARD4": {
+   "shape_before": "commit REFUSED 但 cfg magic 00000000->4E535250(RAM, 非 Flash)",
+   "shape_after": "refused=1 cfg_changed=0(magic 仍 00000000)",
+   "fix": "先 rel_pending_write 发布候选, 后 project_config_set_rprof; 发布失败则配置未动; 配置写失败则用新增局部 prev 回滚并具名披露 config-write-rolled-back / config-write-no-rollback; OK 路径配置与候选同一份(逐字节比对)",
+   "lock_order_kept": "rel_ctx 仍是叶锁(其内不调 cfg/UART/Flash/sleep); 嵌套方向只 mot/cfg->ctx; 未调整配置事务接口",
+   "cost_registered": "命令线程新增 116 B 局部副本(diag_rprof_t), rel_cmd_commit 帧 +112, 子树 1444->1556, FINSH 4096 未改, 余量 2540 B",
+   "case": "A16-commit-refused-keeps-config-and-candidate",
+   "negatives": ["RDV9_commit_config_before_publish"]
+  }
+ },
+ "host_chain": {
+  "compiler": "gcc.exe (tdm64-1) 4.9.2",
+  "build_rc": 0, "warnings": 0, "proc_rc": 0,
+  "cases": 66, "pass": 66, "fail": 0, "executed": 66,
+  "prior_62_cases_kept": true,
+  "new_cases": ["A13-null-status-rejected-without-lock-leak",
+                "A14-zero-cleanup-deferred-then-recovered",
+                "A15-refused-clear-keeps-pending-and-creds",
+                "A16-commit-refused-keeps-config-and-candidate"],
+  "raw": "reports/reviews/phase8-m8-r7d1-ard-rework/host/normal_chain_out.txt"
+ },
+ "negative_controls": {
+  "families": 19, "meta_ok": 19, "meta_fail": 0,
+  "prior_14_kept": true,
+  "new_families": ["RDV5_null_check_after_take", "RDV6_zero_close_silent_no_arm",
+                   "RDV7_advancer_ignores_zero_flag", "RDV8_clear_blanks_before_gate",
+                   "RDV9_commit_config_before_publish"],
+  "injection_really_hit": "每族都有 INJECTED 行(副本编译成功且执行), 期望失败身份分别是新增的 A13/A14/A15/A16",
+  "anchor_adjustment": "RDV6 的注入文本随签名 void->rt_bool_t 改为 return RT_FALSE;, 锚点与业务触发意图不变",
+  "raw": "reports/reviews/phase8-m8-r7d1-ard-rework/host/reverse_run_full.txt"
+ },
+ "reviewer_probes": {
+  "script": "A 的原版 reproducer/run_review_probes.py, 未改",
+  "before": {"root": "4d50310 的仓外逐字节副本(5 件输入 sha256 与 A 的 IDENTITY.json 相同)",
+             "summary": "REVIEW_SUMMARY|checks=4|failures=4|hardware_actions=0", "run_rc": 1},
+  "after": {"root": "本轮定稿工作树",
+            "summary": "REVIEW_SUMMARY|checks=4|failures=0|hardware_actions=0", "run_rc": 0},
+  "directions": {"ctx_held": "1->0", "owner": "1->0", "pending_changed": "1->0", "cfg_changed": "1->0"},
+  "toolchain_note": "本机 gcc 4.9.2(tdm64) vs A 的 gcc 14.2(Debian); A 那条 Linux 记录带 1 条 misleading-indentation 警告(旧夹具 adxl345_read_mg), 本轮不称对方为 0 警告, 也不据此否定对方",
+  "raw": "reports/reviews/phase8-m8-r7d1-ard-rework/host/probe_before_after.txt"
+ },
+ "print_bounds": {
+  "budget_bytes_per_call_including_LF": 120,
+  "touched_formats_this_round": 3,
+  "worst_case_bytes": 74,
+  "learn_status_main_line_unwidened": true,
+  "bare_nul": 0,
+  "utf8_strict": true,
+  "detail": "offline/summary.json 的 printf_worst_case_bytes_including_LF"
+ },
+ "offline_checks": {"tool": "tools/r7d1r_offline_checks.py", "total": 64, "fail": 0,
+                    "outputs": ["offline/checks.txt", "offline/summary.json"]},
+ "build": {
+  "target": "rt-thread-motor-m1-candidate",
+  "command": "C:\\Keil_v5\\UV4\\UV4.exe -r project.uvprojx -t rt-thread-motor-m1-candidate -j0 -o D:/ns800/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/build_r7d1r.log",
+  "uv4_rc": 0, "result_line": "0 Error(s), 0 Warning(s).",
+  "compiler": "*** Using Compiler 'V6.24', folder: 'C:\\Keil_v5\\ARM\\ARMCLANG\\Bin'",
+  "program_size": "Code=209474 RO-data=87422 RW-data=2196 ZI-data=85944",
+  "runs_this_round": 1,
+  "aftermake_hook": "fromelf --bin .\\build\\motor_m1\\rt-thread-motor-m1.axf --output .\\build\\motor_m1\\rt-thread-motor-m1.bin",
+  "bin": {"bytes": 297476, "sha256": "165d8bdc708b042125d99db88f56a62ddca635d30202e80abe96c148e35bc478"},
+  "axf": {"bytes": 1789320, "sha256": "dc14525982056958136fd1ebbf60b6e1e1d6ade6f31d94a89474ed4f72e8fc87"},
+  "map": {"bytes": 2144643, "sha256": "8229cf757f6c6e9196575cbd9945ff916155a7088da17bd4b796c165849a58ad"},
+  "callgraph": {"bytes": 1099033, "sha256": "16b87c974997db66a70e591b4ae36ca743b08c99b639f49583cf7a73653f6e40"},
+  "axf_flash_segment_equal_bin": true,
+  "reviewed_image_preserved": {"bin_sha256": "df7584c3df2e682d07564ee70f05ecc7b608052a7fa739fb0c21b4f942b15c2b",
+                               "unchanged_on_disk": true}
+ },
+ "resource_delta": {
+  "vs_reviewed_build": {"Code": 296, "RO-data": 180, "RW-data": 0, "ZI-data": 8},
+  "bin_delta": 472,
+  "bin_reconciliation": "ER_IROM1 +476 / RW_VT_DTCM 压缩载荷 0 / 对齐空隙 +4 / RW_DTCM 压缩载荷 -8 = +472; 两版三段+空隙各自精确等于该版 BIN 字节数(297004 / 297476), 残差 0",
+  "per_object": "只有 diag_relative.o 变化(Code +310 RO +178 RW 0 ZI +1); 其余 110 行 .o 与 49 行库成员逐字段相同; Library Totals 全 0; diag_relative.o(+488) 与符号表 (incl. Padding) 行(-12) 相加 == +476",
+  "new_static": "d_zero_cleanup = 1 B(map 符号表 .bss.d_zero_cleanup)",
+  "stack": {"diag_thread_entry": "帧 640->640, 子树 1588->1588, 最深链逐字相同, 余量 2508 B",
+            "rel_cmd_commit": "帧 496->608(+112), 子树 1444->1556 —— 本轮新增成本, 来自 ARD4 回滚所需的 116 B 局部副本; 命令线程可见最深线由 rel_cmd_clear(1460) 换成 rel_cmd_commit(1556), 余量 2540 B",
+            "rel_cmd_zero": "帧 368->376(+8), 子树 1276->1284",
+            "constants_untouched": ["DIAG_THREAD_STACK 4096", "FINSH_THREAD_STACK_SIZE 4096",
+                                    "REL_CMD_DEADLINE_MS 12000", "REL_CTX_TAKE_MS 20"]},
+  "report": "reports/reviews/phase8-m8-r7d1-ard-rework/build/resource_stack_r7d1r.txt",
+  "limits": "armlink 调用图的数是静态下界(解析不了 msh 的函数指针, 不含异常/ISR 帧); 不给 shell 栈总数; 不当现场最坏栈实测"
+ },
+ "device_actions_this_round": 0,
+ "device_actions_detail": "不开 COM/其他串口; 不枚举或连接 DAP; 不烧录; 不回读; 不复位; 不向板端发查询; 不启动逻辑分析仪; 不 arm/start/运动; 不做真实学习; 不写配置; 不保存配置; 不清日志; 不供断电。host 的 learn/zero 仅是内存模型调用。",
+ "image_on_board": "b502 / 502dca5d8c7ebfa794f890a9c03bc258fc9753f57b6a80c2f1e08add69888a7a(历史逐字节回读证明, 未改)",
+ "new_images_status": "R7D1 df7584c3... 与本轮 165d8bdc... 均 NOT_ON_BOARD",
+ "pending_operator_report": "M8-R7F5A 物理断电回报仍为 PENDING_OPERATOR_REPORT; 本轮未代填、未为关闭它接设备",
+ "boundaries_unchanged": {
+  "polarity_measured": false,
+  "core_protection_verified": false,
+  "forbidden_claims_still_forbidden": 4,
+  "demo_host_v03_unchanged": true,
+  "old_field_originals_and_approval_ledgers_unchanged": true,
+  "hardware_authorization_granted_by_this_round": false
+ },
+ "self_injury_registered": [
+  "ARD2 第一版把披露打印放在清理函数内, 而发布失败出口在静止事务(持电机锁)内调用它 => 同轮改成'只回报状态、由出口在放锁后打印', 修在构建之前",
+  "修前基线复现第一次因 cp -r 覆盖顺序跑成 4/4 PASS; 重新以 git show 写回 4d50310 五件并逐件 sha256 对账后重跑得到 4/4 FAIL",
+  "资源报告工具初版把 armlink 小计行当对象行比较(误报'非零差分 2 行'), 并沿用了上一轮'39 个库成员行'的口径; 已按整份 map 重定义比较, 旧报告原文不改, 在此登记更正",
+  "后台反向链任务被提前报 completed(日志只到 RDV2); 未拿截断日志当结果, 等真跑完重读全文才登记 19/19"
+ ],
+ "deliverables_index": {
+  "review_dir": "reports/reviews/phase8-m8-r7d1-ard-rework/",
+  "firmware_dir": "reports/firmware/phase8-m8-r7d1-ard-rework/",
+  "docs": ["implementation_contract.md", "case_mapping.md"],
+  "code": ["code/ard_product_vs_4d50310.diff", "code/ard_host_vs_4d50310.diff",
+           "code/before_after_identity.txt"],
+  "host": ["host/normal_chain_out.txt", "host/case_ledger.txt", "host/normal_chain_build.txt",
+           "host/normal_chain_warning_count.txt", "host/reverse_run_full.txt",
+           "host/reverse_meta_lines.txt", "host/probe_before_after.txt"],
+  "build": ["build/build_r7d1r.log", "build/resource_stack_r7d1r.txt"],
+  "offline": ["offline/checks.txt", "offline/summary.json"],
+  "tools": ["tools/r7d1r_offline_checks.py", "tools/r7d1r_resource_report.py",
+            "tools/r7d1r_make_manifest.py", "tools/r7d1r_make_host_artifacts.py",
+            "tools/r7d1r_staged_preflight.py"],
+  "reviewer_originals": "reports/reviews/phase8-m8-r7d1-ard-rework/reviewer_originals/(A 包 19 件原件)"
+ },
+ "next_round_gap": [
+  "ARD2 的明确状态目前走独立短行; 若要求并入主行, 主行最宽展开 139 B 会越 120 B 预算, 需 A 裁口径",
+  "ARD4 回滚失败时只披露 config-write-no-rollback, 不做二次重试; 是否要显式重刷候选请 A 定",
+  "命令线程可见最深线被顶高 96 B(1556/4096); 若不可接受, 备选是复用已有缓冲而非新增 116 B 局部(会重新引入并发问题)",
+  "现场侧仍未推进: 板上是 b502, SG/ADC+IMU 相对保护的现场证明还没拿到"
+ ],
+ "git_hygiene": {
+  "no_merge_rebase_force_reset_clean": true,
+  "commit_author_identity": "237816241+LINboss666@users.noreply.github.com(不改 git config)",
+  "push_proxy": "127.0.0.1:7892",
+  "privacy_gate": "本轮两目录 -text 规则 + 清单逐条复算 + 暂存集泄漏扫描(含会命中的自检)"
+ },
+ "readback": "提交推送后按既有清单从远端逐 blob 回读; 本轮末次回读报告按任务书第 76 行留仓外, 不再形成自引用提交"
+}
