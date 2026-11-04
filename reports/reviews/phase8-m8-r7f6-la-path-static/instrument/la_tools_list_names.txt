@@ -1,0 +1,16 @@
+tools/list 只读拉取, 工具名=15
+get_devices
+start_capture
+stop_capture
+wait_capture
+load_capture
+save_capture
+close_capture
+add_analyzer
+remove_analyzer
+add_high_level_analyzer
+remove_high_level_analyzer
+export_raw_data_csv
+export_raw_data_binary
+export_data_table_csv
+legacy_export_analyzer

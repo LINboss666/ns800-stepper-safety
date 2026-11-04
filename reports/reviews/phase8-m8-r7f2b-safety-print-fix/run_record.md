@@ -653,3 +653,93 @@ AXF Flash 段 == BIN 本地复算、产品与主机路径 0 改动、旧句在�
    `images.bin.sha256` 与 `segments[].equal_bin`（一次取键失败暴露我把上一包的结构当作了通用形）。
 4. 判据"旧句已消失"最初与"勘误节按设计逐字保留旧句"自相矛盾（我自己造的假红）；改为只在正文部分
    搜索（`(?m)^## 8[ .]` 之前），既保住可复算的对照，又不让对照本身把判据钉死。
+
+## 19 M8-R7F6 现场轮（A 定稿的 b502 被动采集 + 五条只读查询；操作者已批准并执行）
+
+任务书：`reports/reviews/phase8-m8-r7f6-la-path-static/TASK_R7F6_PASSIVE_READONLY.md`
+（原件 zip `NS800_R7F6_B502_Passive_Readonly_Task_20261105.zip`，303880 B，
+sha256 `6179c093b13566db25af620e4bd05093103e834ff655ebc4c27422f7e2f58dc6`）。
+批准身份 `M8R7F6-b502-la-path-static-20261105`；批准令牌 = 操作者要求执行本包的真实原话
+`按此包执行`（15 B，sha256 `ffeff4d3ad68…dd106641`，原文留仓外 `C:/m8r_approvals/token_r7f6.txt`）。
+`operator_context.txt` 只是编写请求，未当批准使用；旧账/旧回执一字未改，新账 spent 从 0 起。
+
+**设备动作计数（本轮实际发生）**：COM5 开口 1、dispatch 1、逻辑分析仪 Start 1 / Stop 1、
+原生保存 1、数字 CSV 导出 1。下载 0、回读 0、DAP 访问 0、复位 0、额外上电 0、apply 0、
+极性确认 0、IRQ 开/关 0、arm/start/运动 0、zero/learn/commit/配置保存/清日志 0、现场重试 0、
+拆探头/参考电平/注入/DMM 0。主机侧另有一次"启动 Logic 2 程序"（见自伤第 2 条）。
+
+**现场顺序与实测量（本机 +08:00）**：
+02:20:42.526 Start → `captureId=1`（42.667 回执）；采集实际起点 42.657835（原生 meta）；
+02:20:43.545 dispatch → 端口开 43.591 → 五条只读查询 → 端口关 44.013（会话 t_s 0.046…0.468 s，
+硬截止 45 s 未触及）；44.373 dispatch rc=0；02:20:44.498 Stop 同一 captureId；
+**Start→Stop 总窗 1.98 s ≤ 60 s**；02:21:19 原生保存、02:21:25 CSV 导出（各一次成功，无失败原文需留）。
+
+**串口层**：5 份响应原字节入库（983/1128/612/522/983 B），裸 NUL=0、严格 UTF-8 通过、危险文本门通过，
+每份首行是命令回显且与计划同序；未改执行器的 `split_rows + assert_step`（含 `expect_profile=AT_REST`）
+对归档字节重算 5/5 verdict=OK；任务书 §4.B 的 12 项关键预期逐条命中（bootstrap-complete=YES、
+READY/fault=0、irq_gate=CLOSED、polarity=not-confirmed、protect_ready=NO、drive_cfg=UNCONFIGURED、
+arm mask=0x18 REFUSED、state/cur/tgt/armed=0、request=LOW pad=0、expected_ENN=HIGH ENN_fb=1、
+TMC_DIAG pin=3 raw=0 safe=0 RISING）；两次 `system_status` 原始字节散列相同（`73abf301…`）。
+账本：`spent={port_open:1}` 其余 21 项 0、`pending=[]`、`commit_failures` 键缺席（本轮无清理义务）、
+executor/image/plan 三件散列与 `IDENTITY.json` 全等、22 项额度与 plan.quota 全等。
+
+**仪器层**：设备 `isSimulation=false`；8 路数字通道全开、`digitalSampleRate=1000000`、
+`manualCaptureMode`（原生 meta 记 `captureMode=FreeRun`、`digitalTriggerTime=-1`）；
+请求 `bufferSizeMegabytes=512`，接口只回 captureId ⇒ 登记"请求 512 MB / 实际容量未回执"，
+不写"已证明容纳 512 MB"，MB 不折算样点数。CSV 真实表头 `Time [s],Channel 0…Channel 7`，
+2 行数据，8 路全程零跳变，电平 `01111111`（Ch0 低，Ch1-7 高）。
+覆盖：采集 42.657…44.378 完整包住会话 43.545…44.373 ⇒ 不判 `COVERAGE_INCOMPLETE`，未重采。
+通道身份：GUI 行标签与导出列名都只是 `Channel 0…7`，无信号名 ⇒ `CHANNEL_MAPPING_UNRESOLVED`
+（操作者"CH0=DIAG/CH1=ENN"保持申报级，未按界面核实，也不靠一低一高反推）。
+
+**接线解释**：本轮电平图样与上一场**已接线**的 R7F5A 完全相同，也与更早**探头未接**的浮空基线完全相同，
+所以电平层无法区分"接线正确且静止"与"未接触/无共地"；本轮零运动零注入零参考电平切换 ⇒ 无事件对照，
+不宣布目标接触通路已被电气证明，也不判操作者接错。共地/接触未观察 ⇒ UNKNOWN。
+输入范围依据仍只沿用上一轮归档的商家声明 0–5 V，用于现有 3.3 V 接法，不升级为实测耐压。
+
+**边界保持**：`polarity_measured=false`、`core_protection_verified=false`；真实 DIAG 故障边沿、
+停 STEP、保护触发与恢复全部未验证；板上仍是历史 b502 `502dca5d…`（本轮 0 下载 0 回读，
+新镜像 `23691e8d…`/`165d8bdc…`/`df7584c3…` 继续 NOT_ON_BOARD）；R7F5A 的物理断电仍是
+`PENDING_OPERATOR_REPORT`，本轮不靠接设备关闭；产品源码、主机链、旧执行器、旧 plan/rows、
+旧镜像与旧证据件全部未改（`PRODUCT_CLEAN` 判据 0 件改动）。
+
+**判读与工具**：`tools/r7f6_preflight.py`（包落位 30/30 逐字节、清单 29 条、身份五件、
+冻结源 10 件三方全等、tip 与冻结件差 6 件、VALIDATE_PLAN 唯一原始 FAIL 保留、10 项 scope guard、
+台账根与 HEAD 绑定）与 `tools/r7f6_field_judgement.py`（49 条判据 FAIL=0，含 6 项 must-FIRE 自检）
+都从**已入库字节**独立复算；`tools/r7f6_field_archive.py` 负责脱敏入库（deviceId/序列号/令牌）。
+
+**自伤与工具侧问题（照实）**：
+1. 落位核对第一次报 `与 zip 逐字节不符=1 ['SHA256SUMS.txt']`。实况不是字节不符，而是包内清单这一件
+   **根本没被复制进仓库目录**（30 件只落了 29 件）；补齐后 30/30 逐字节相等。教训：报"不符"之前
+   要先分开"缺失"与"内容不同"两种情况。
+2. 分析仪控制通道一开始不可用：Logic 2 未运行，`10530/10430` 都无监听。按纪律这只证明**通道未就绪**，
+   不证明仪器不存在（USB 侧 `Saleae Logic USB Logic Analyzer` 枚举 Status=OK）。我启动了本机已安装的
+   Logic 2（主机软件动作，不占设备额度；启动后界面仍是 `Session 0` 空时间轴，未产生采集会话），
+   5 s 后 `10530` 就绪。这一步任务书没写，如实登记。
+3. 判读工具第一次跑出 **13 条 FAIL**，全部是我自己的工具缺陷而非现场问题：
+   `split_rows(command=…)` 传了 bytes 而非 str；锚定正则没先剥 CRLF；会话台账的键名是 `kind` 而我读 `ev`。
+   修正后同输入重算 49/49 PASS。
+4. 顺带修掉两个**会假绿**的判据：`RX_BYTES_ARE_WIRE_TIME_FEASIBLE` 在事件列表为空时空真通过，
+   已加 `len(wire)==5` 前置；`dropped_response_count` 自检原本写成恒真表达式，改成用同一个 `five()`
+   判定函数分别跑"少一份"与"齐五份"。
+5. 前置工具第一次把 `VALIDATE_PLAN` 的 FAIL 行取成第 2 个字段（打印 `['all']`），改为第 1 个字段，
+   现在如实显示唯一原始 FAIL 是 `PLAN_MOTION_CAP_BUDGET`（本零运动范围裁为 N/A，原文保留，未改执行器）。
+6. 归档第一次漏了 `field_run_summary.json`（时间线），补进清单后重跑归档，判据文件随之重算一次。
+7. **隐私新发现（历史暴露）**：上一轮已公开的 `field_r7f5a/la_capture_id8.sal` 的 `meta.json` 里带着
+   同一台仪器的 20 位十进制序列号 —— 本轮才查出。冻结件不回改、不删除；本轮起原生件一律另存
+   "只替换该字段"的脱敏副本并登记原字节/原散列（`instrument/SAL_MASKING_NOTE.txt`），未脱敏原件留仓外。
+   `instrument_manifest.json.privacy.known_historical_leak` 已写明，等 A/操作者定夺是否另行处置。
+8. 离线预跑（stub+sim）刻意**不带 `--approval-id`**：`open_approval` 对 stub 也查同一本账，
+   带着新身份预跑会把新账的额度扣掉；不带身份时执行器返回 `APPROVAL_LEDGER|NONE`，新账保持 spent=0。
+9. 脱敏第一版只做"键级"替换（`deviceId` 这个键），漏掉了**字符串里**的同一标识：接口回执
+   `content[].text` 内嵌的 JSON 原文与时间线 `start.args.deviceId` 仍是明文。暂存预检的泄漏扫描
+   抓到 4 处命中（含扫描器自身把明文写成了判据字面量的自命中），随后：归档工具改成键级+字符串级
+   双替换并加"入库件残留明文=0"硬门；扫描器改成**不硬编码明文**，改从仓外原件读出后构造判据，
+   并自检"扫描器自身不得含任何被扫值"。重跑后 `LEAK_SCAN 命中=0`、`SCRUB_RESIDUE=0`。
+10. 清单口径差别：本轮目录里 A 包自带的 `SHA256SUMS.txt` 是**原件**，必须被登记，所以本轮清单取名
+    `ROUND_SHA256SUMS.txt` 并按"只排除清单自身"计数（76 条）；r7f2b 目录沿用既有"按文件名排除
+    SHA256SUMS.txt"的规则（228 条，条目集合与 HEAD 相比 0 增 0 减，只有 run_record.md 的登记值变化）。
+    两种规则写在同一份生成工具里并各自注明理由，避免下一轮误把其中一个当通用规则。
+
+**收口待办**：采集与端口均已关闭。按任务书 §4.C，收口时由操作者切断 VM＋MCU 最多 1 次且不再上电；
+时刻与观察结果等回报后登记，没观察就写"未观察"，不倒填 R7F5A 的收口时间。

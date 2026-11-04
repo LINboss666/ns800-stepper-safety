@@ -1,0 +1,193 @@
+{
+  "task_id": "M8R7F6-b502-la-path-static-20261105",
+  "run_root_out_of_repo": "D:/ns800_r7f1_scratch/r7f6_field",
+  "run_id": "run-20261104T182042Z",
+  "files": [
+    {
+      "path": "reports/reviews/phase8-m8-r7f6-la-path-static/field_run/run-20261104T182042Z/S_S1/01_sys_initial.rx.bin",
+      "bytes": 983,
+      "sha256": "73abf3012386723ec2d5ec70e5b515bfb2cb3285d60c233a27b07e60d47408a7"
+    },
+    {
+      "path": "reports/reviews/phase8-m8-r7f6-la-path-static/field_run/run-20261104T182042Z/S_S1/01_sys_initial.rx.bin.txt",
+      "bytes": 976,
+      "sha256": "38a8b6bf90a7b3f9c533f8934432e1810a80012354a7380f08c3d99592bed5ca"
+    },
+    {
+      "path": "reports/reviews/phase8-m8-r7f6-la-path-static/field_run/run-20261104T182042Z/S_S1/02_mot_static.rx.bin",
+      "bytes": 1128,
+      "sha256": "f0550d3131642cd02408c88adc67f6fcb064a27ccba6ceec9c60b82e9cf0c3b5"
+    },
+    {
+      "path": "reports/reviews/phase8-m8-r7f6-la-path-static/field_run/run-20261104T182042Z/S_S1/02_mot_static.rx.bin.txt",
+      "bytes": 1121,
+      "sha256": "fcd210a1b752c1114fd60b4cfd93bede29dedf4c87bc2b87f2e667f4f180a00e"
+    },
+    {
+      "path": "reports/reviews/phase8-m8-r7f6-la-path-static/field_run/run-20261104T182042Z/S_S1/03_irq_static.rx.bin",
+      "bytes": 612,
+      "sha256": "25bef65c2b365d5c42e13312de36e7ed1c890194d06684b70646eeccf76b4352"
+    },
+    {
+      "path": "reports/reviews/phase8-m8-r7f6-la-path-static/field_run/run-20261104T182042Z/S_S1/03_irq_static.rx.bin.txt",
+      "bytes": 605,
+      "sha256": "f40d0df0faf59a904c98905e07124f4c4cc4cade10370208a73a823ae41cf37a"
+    },
+    {
+      "path": "reports/reviews/phase8-m8-r7f6-la-path-static/field_run/run-20261104T182042Z/S_S1/04_safety_static.rx.bin",
+      "bytes": 522,
+      "sha256": "00cea3467e9b9549f2e326182aecaff435337494d79479f03cdf361b0a317b38"
+    },
+    {
+      "path": "reports/reviews/phase8-m8-r7f6-la-path-static/field_run/run-20261104T182042Z/S_S1/04_safety_static.rx.bin.txt",
+      "bytes": 515,
+      "sha256": "0d7c3e226251466a3324aea3a5defc4ed7dff4b58d18a9d429a5a6652dea2c44"
+    },
+    {
+      "path": "reports/reviews/phase8-m8-r7f6-la-path-static/field_run/run-20261104T182042Z/S_S1/05_sys_final.rx.bin",
+      "bytes": 983,
+      "sha256": "73abf3012386723ec2d5ec70e5b515bfb2cb3285d60c233a27b07e60d47408a7"
+    },
+    {
+      "path": "reports/reviews/phase8-m8-r7f6-la-path-static/field_run/run-20261104T182042Z/S_S1/05_sys_final.rx.bin.txt",
+      "bytes": 976,
+      "sha256": "38a8b6bf90a7b3f9c533f8934432e1810a80012354a7380f08c3d99592bed5ca"
+    },
+    {
+      "path": "reports/reviews/phase8-m8-r7f6-la-path-static/field_run/run-20261104T182042Z/S_S1/ledger.jsonl",
+      "bytes": 2190,
+      "sha256": "cf4bbfa3dac42978fbe0780c3a36248ba910428788c942482e738c5428c8fbc4"
+    },
+    {
+      "path": "reports/reviews/phase8-m8-r7f6-la-path-static/field_run/run-20261104T182042Z/dispatch.stdout.txt",
+      "bytes": 5215,
+      "sha256": "5270662405c38a858280b5140172899c854a6f703d3aacd49245bdca9251b761"
+    },
+    {
+      "path": "reports/reviews/phase8-m8-r7f6-la-path-static/field_run/run-20261104T182042Z/dispatch.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "reports/reviews/phase8-m8-r7f6-la-path-static/field_run/run-20261104T182042Z/dispatch_ledger.jsonl",
+      "bytes": 4405,
+      "sha256": "e2eb000637d622972a7791a6a609088ccbafbb025d9f9a7b8943baa4cb2047e9"
+    },
+    {
+      "path": "reports/reviews/phase8-m8-r7f6-la-path-static/field_run/run-20261104T182042Z/dispatch.meta.json",
+      "bytes": 1328,
+      "sha256": "2170b99123618d902d5e291efb6814799a0775ac1de6f3428d3c23bd5892ab25"
+    },
+    {
+      "path": "reports/reviews/phase8-m8-r7f6-la-path-static/field_init/init.stdout.txt",
+      "bytes": 848,
+      "sha256": "8b080f297221f40b5dade4c178447742de6a4787854dafe44d1088daaa487b56"
+    },
+    {
+      "path": "reports/reviews/phase8-m8-r7f6-la-path-static/field_init/init.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "reports/reviews/phase8-m8-r7f6-la-path-static/field_init/init.meta.json",
+      "bytes": 921,
+      "sha256": "0b4c9f36562a109ee1f3fe6aba2bd1620492a01955f49b2eeff89b71078e5cd8"
+    },
+    {
+      "path": "reports/reviews/phase8-m8-r7f6-la-path-static/instrument/la_start.json",
+      "bytes": 1076,
+      "sha256": "05388dcfcad926e26ea081b753a128a11f1bb26f7cd116c2a715b0ac31d941ce"
+    },
+    {
+      "path": "reports/reviews/phase8-m8-r7f6-la-path-static/instrument/la_stop.json",
+      "bytes": 651,
+      "sha256": "7a542546bfe660000565b4ccd1fbd629279ad1d2d92452a1bc95399edcd8ba41"
+    },
+    {
+      "path": "reports/reviews/phase8-m8-r7f6-la-path-static/instrument/la_save.json",
+      "bytes": 726,
+      "sha256": "6ba286532bfc12c05f3a9ec4aaa9867f7beaca922afbec32142efe1d1721e3e3"
+    },
+    {
+      "path": "reports/reviews/phase8-m8-r7f6-la-path-static/instrument/la_export.json",
+      "bytes": 779,
+      "sha256": "e9f3422469f307a3d250508b682a90f16e890d4d423052ea95d1e1d460240e73"
+    },
+    {
+      "path": "reports/reviews/phase8-m8-r7f6-la-path-static/instrument/la_devices_masked.json",
+      "bytes": 670,
+      "sha256": "a1210acb9a449851e2a8f635c83f401043261cdb95a82147032e776a85a5b4eb"
+    },
+    {
+      "path": "reports/reviews/phase8-m8-r7f6-la-path-static/instrument/la_tools_list_names.txt",
+      "bytes": 298,
+      "sha256": "4219d8885c05094b8349c450a9e12a4c029e6f00f8d2fa814bf7f1e25540b195"
+    },
+    {
+      "path": "reports/reviews/phase8-m8-r7f6-la-path-static/instrument/capture_id1_sanitized.sal",
+      "bytes": 2912,
+      "sha256": "496b843619309102deed8acdd5102e13fb39e1f136669a20ef4201c4904da11e"
+    },
+    {
+      "path": "reports/reviews/phase8-m8-r7f6-la-path-static/instrument/digital.csv",
+      "bytes": 196,
+      "sha256": "7f5e3fedb9d1afbb7fb8f4f665dd66c4a408e2765d56cf944faba47123bdd0c2"
+    },
+    {
+      "path": "reports/reviews/phase8-m8-r7f6-la-path-static/instrument/SAL_MASKING_NOTE.txt",
+      "bytes": 421,
+      "sha256": "fb16946f1e04aafb8dcc8925aee2c4c537f82f8f9837ac9beb6fe74a80110b3b"
+    },
+    {
+      "path": "reports/reviews/phase8-m8-r7f6-la-path-static/instrument/la_window_before_start.png",
+      "bytes": 115958,
+      "sha256": "9a8b854d222a4004eb9c9fc72cfe600118489116df0b2fa98c95515d9abb6264"
+    },
+    {
+      "path": "reports/reviews/phase8-m8-r7f6-la-path-static/instrument/la_window_running.png",
+      "bytes": 50968,
+      "sha256": "f7ee23e5ff05d7941fa2f8a0bed3cc778bd90d5c2d0ce2395be70df16097cd91"
+    },
+    {
+      "path": "reports/reviews/phase8-m8-r7f6-la-path-static/instrument/capture_meta_extract.json",
+      "bytes": 2060,
+      "sha256": "cb891048d4366151c003d79515146e1a7538645029f0ab972d406beb1dbc0310"
+    },
+    {
+      "path": "reports/reviews/phase8-m8-r7f6-la-path-static/field_run/run-20261104T182042Z/field_run_summary.json",
+      "bytes": 3030,
+      "sha256": "d3a2eeb23e747e1820a4b682b7de574442c52e5df7ddac9ebacf96ff3657e79b"
+    },
+    {
+      "path": "reports/reviews/phase8-m8-r7f6-la-path-static/proof/preflight_r7f6.txt",
+      "bytes": 2289,
+      "sha256": "c567bf7df71ea2b2b21b05dd41b3e654d0e3b3734d0d5e273c6a303327df56d6"
+    },
+    {
+      "path": "reports/reviews/phase8-m8-r7f6-la-path-static/proof/rehearsal_stub.stdout.txt",
+      "bytes": 4088,
+      "sha256": "d8eb8a222b6479f57687a2939eaeb6307ca55c37f533dc9a8c714442a4dc8c4d"
+    },
+    {
+      "path": "reports/reviews/phase8-m8-r7f6-la-path-static/proof/rehearsal_stub.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "reports/reviews/phase8-m8-r7f6-la-path-static/proof/REHEARSAL_NOTE.txt",
+      "bytes": 272,
+      "sha256": "d7d80e4ffde06a4fd58dcfef79fed19e0cde24c223c377b7d349069e8f01db6c"
+    },
+    {
+      "path": "reports/reviews/phase8-m8-r7f6-la-path-static/ledgers/approval_M8R7F6-b502-la-path-static-20261105.json",
+      "bytes": 1570,
+      "sha256": "6d24d0b441d0086fdc71cb6253a7b0e4fad24c292cc35d2bc6ea964f2113c9b7"
+    }
+  ],
+  "privacy": {
+    "la_deviceId_hex16": "masked in every committed copy",
+    "la_serial_numeric": "masked in .sal copy; original kept out of repo",
+    "approval_token": "argv masked; only bytes+sha registered",
+    "known_historical_leak": "上一轮 R7F5A 入库的 field_r7f5a/la_capture_id8.sal 的 meta.json 含同一台仪器的 20 位十进制序列号(本轮才发现, 冻结件不回改)"
+  }
+}

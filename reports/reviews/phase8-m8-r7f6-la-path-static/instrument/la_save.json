@@ -1,0 +1,23 @@
+{
+  "tool": "save_capture",
+  "args": {
+    "captureId": 1,
+    "filepath": "D:/ns800_r7f1_scratch/r7f6_field/native/capture_id1.sal"
+  },
+  "local": "2026-11-05T02:21:19.336419+08:00",
+  "utc": "2026-11-04T18:21:19.336419+00:00",
+  "response": {
+    "jsonrpc": "2.0",
+    "id": 2,
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{}"
+        }
+      ],
+      "structuredContent": {}
+    }
+  },
+  "masking_note": "args.deviceId 以及**任何字符串里**出现的仪器标识(含接口回执 content[].text 内嵌的 JSON 原文)已换成 sha256 前 12 位掩码; 其余字段与原始回执逐字未动。未脱敏原件留在仓外 D:/ns800_r7f1_scratch/r7f6_field/la_save.json"
+}

@@ -1,0 +1,27 @@
+DISPATCH|stage=S0|status=OK|kind=offline|{"facts": {"image_path": "reports/firmware/phase8-m8-r7f2b-safety-print-fix/rt-thread-motor-m1-candidate.bin", "approval_id": "A_OFFLINE_STUB_R7F6_RELEASE", "plan_source": "/workspace/scratch/f24247cdf3d6/r7f6-task/package/field/plan_r7f6_b502_readonly.json", "plan_sha256_on_disk": "72e2d4eedddea301ec369754042015a5a1db0800fcb9f30f052e399bcab18f1e", "plan_sha256": "72e2d4eedddea301ec369754042015a5a1db0800fcb9f30f052e399bcab18f1e", "plan_snapshot_bytes": 32033, "plan_snapshot_path": "/workspace/scratch/f24247cdf3d6/r7f6-task/package/field/plan_r7f6_b502_readonly.json", "executor_path": "/workspace/scratch/f24247cdf3d6/r7f6-task/package/signed_inputs/m8r3_serial_chain.py", "executor_sha256": "33d3f0af8a4c9c33dcd4e013b395e4ba990a89e384130f9d0ffe50c71b34e8ca", "image_bytes": 292708, "image_sha256": "502dca5d8c7ebfa794f890a9c03bc258fc9753f57b6a80c2f1e08add69888a7a", "manifest_target": "rt-thread-motor-m1-candidate", "software_input_commit": "99414c7a57d8987033de3de48469a8f4779b87a5", "tested_image_build_commit": "70deff806e8b548dee23afb06a6fcdf20937b015", "reviewed_delivery_commit": "0cd64587739cca41a22903e075b6fe37b17c765b", "plan_placeholders": 0, "plan_forbidden_hits": 0, "needles_source_root": "reports/reviews/phase8-m8-r7f6-la-path-static/frozen_b502_source", "needles_total": 40}}
+DISPATCH|stage=S1|status=OK|kind=|{"code": "", "detail": null, "recorded": {}, "success": true, "disarm": "NOT_ARMED", "terminal": "KNOWN", "scenario": "S1", "branch": "healthy", "expected_refusal": null, "forensics": null, "first_cause": null, "target_claim": null, "target_why": null, "cleanup_errors": [], "obligation": false, "dir": "/workspace/scratch/f24247cdf3d6/r7f6-task/stub_release/S_S1", "steps": 5}
+QUOTA_AUDIT|approved_reboot|declared=0|used=0|left=0
+QUOTA_AUDIT|blackbox_clear|declared=0|used=0|left=0
+QUOTA_AUDIT|cleanup_motor_disarm|declared=0|used=0|left=0
+QUOTA_AUDIT|cleanup_motor_status|declared=0|used=0|left=0
+QUOTA_AUDIT|cleanup_motor_stop|declared=0|used=0|left=0
+QUOTA_AUDIT|config_save|declared=0|used=0|left=0
+QUOTA_AUDIT|diag_profile_commit|declared=0|used=0|left=0
+QUOTA_AUDIT|diag_profile_learn|declared=0|used=0|left=0
+QUOTA_AUDIT|diag_profile_zero|declared=0|used=0|left=0
+QUOTA_AUDIT|dmm_readings|declared=0|used=0|left=0
+QUOTA_AUDIT|download|declared=0|used=0|left=0
+QUOTA_AUDIT|explicit_reset|declared=0|used=0|left=0
+QUOTA_AUDIT|irq_polarity_prep|declared=0|used=0|left=0
+QUOTA_AUDIT|motion_cap_seconds_per_run|declared=0|used=0|left=0
+QUOTA_AUDIT|motor_run|declared=0|used=0|left=0
+QUOTA_AUDIT|motor_run_seconds_total|declared=0|used=0|left=0
+QUOTA_AUDIT|physical_collision|declared=0|used=0|left=0
+QUOTA_AUDIT|port_open|declared=1|used=1|left=0
+QUOTA_AUDIT|readback|declared=0|used=0|left=0
+QUOTA_AUDIT|retry|declared=0|used=0|left=0
+QUOTA_AUDIT|safety_irq_disable|declared=0|used=0|left=0
+QUOTA_AUDIT|tmc_config_apply|declared=0|used=0|left=0
+APPROVAL_LEDGER|{"approval_id": "A_OFFLINE_STUB_R7F6_RELEASE", "caps": {"approved_reboot": 0, "blackbox_clear": 0, "cleanup_motor_disarm": 0, "cleanup_motor_status": 0, "cleanup_motor_stop": 0, "config_save": 0, "diag_profile_commit": 0, "diag_profile_learn": 0, "diag_profile_zero": 0, "dmm_readings": 0, "download": 0, "explicit_reset": 0, "irq_polarity_prep": 0, "motion_cap_seconds_per_run": 0, "motor_run": 0, "motor_run_seconds_total": 0, "physical_collision": 0, "port_open": 1, "readback": 0, "retry": 0, "safety_irq_disable": 0, "tmc_config_apply": 0}, "commit_failures": [], "ledger": "/workspace/scratch/f24247cdf3d6/r7f6-task/offline_ledger/approval_A_OFFLINE_STUB_R7F6_RELEASE.json", "pending": 0, "spent": {"approved_reboot": 0, "blackbox_clear": 0, "cleanup_motor_disarm": 0, "cleanup_motor_status": 0, "cleanup_motor_stop": 0, "config_save": 0, "diag_profile_commit": 0, "diag_profile_learn": 0, "diag_profile_zero": 0, "dmm_readings": 0, "download": 0, "explicit_reset": 0, "irq_polarity_prep": 0, "motion_cap_seconds_per_run": 0, "motor_run": 0, "motor_run_seconds_total": 0, "physical_collision": 0, "port_open": 1, "readback": 0, "retry": 0, "safety_irq_disable": 0, "tmc_config_apply": 0}}
+FLOW_VS_VERIFICATION|flow_complete=True|core_protection_verified=False|含义: flow_complete 只说明申报的阶段都跑完且额度/取证/撤能账目一致; core_protection_verified 才说明每一场都是**目标传感器通道**自己触发的
+DISPATCH_SUMMARY|status=OK|code=|stages_executed=2|stages_not_run=0|quota_left={"approved_reboot": 0, "blackbox_clear": 0, "cleanup_motor_disarm": 0, "cleanup_motor_status": 0, "cleanup_motor_stop": 0, "config_save": 0, "diag_profile_commit": 0, "diag_profile_learn": 0, "diag_profile_zero": 0, "dmm_readings": 0, "download": 0, "explicit_reset": 0, "irq_polarity_prep": 0, "motion_cap_seconds_per_run": 0, "motor_run": 0, "motor_run_seconds_total": 0, "physical_collision": 0, "port_open": 0, "readback": 0, "retry": 0, "safety_irq_disable": 0, "tmc_config_apply": 0}|quota_used={"port_open": 1}|profile=healthy|branch=healthy|scenario_branches={}|prerequisite_skips=[]|actions_attempted=[]|ledger=/workspace/scratch/f24247cdf3d6/r7f6-task/stub_release/dispatch_ledger.jsonl

@@ -1,0 +1,14 @@
+{"kind": "APPROVED_PACKAGE_VERIFIED", "plan_sha256": "269389a72c1137f1fe5f0c946153c152c39ef6004a00a4a0336f1438088a685d", "stage": "S1", "steps": 5, "steps_sha256": "435b7f43e6497079cfa19b533ded0a284ce3be4d4b6bf25d88043598133b0d36", "t_s": 0.0, "transport": "real", "verified": true}
+{"approval_kind": "business", "approval_used": 1, "kind": "QUOTA_CONSUMED", "left": 0, "n": 1, "name": "port_open", "t_s": 0.015}
+{"baud": 115200, "kind": "PORT_OPEN_ATTEMPT", "port": "COM5", "t_s": 0.031}
+{"kind": "PORT_OPEN", "port": "COM5", "t_s": 0.046, "transport": "real"}
+{"bytes": 983, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "73abf3012386723ec2d5ec70e5b515bfb2cb3285d60c233a27b07e60d47408a7", "t_s": 0.125, "tail": "b'g)\\r\\nmsh >\\r\\nmsh >'"}
+{"allowed": false, "as": "sys_initial", "kind": "BUSINESS_OUTCOME", "lines": [], "status_lines_allowed": ["[Motor] arm gate fail mask=0x18 (arm REFUSED)"], "t_s": 0.14}
+{"bytes": 1128, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "f0550d3131642cd02408c88adc67f6fcb064a27ccba6ceec9c60b82e9cf0c3b5", "t_s": 0.25, "tail": "b'ed\\r\\nmsh >\\r\\nmsh >'"}
+{"allowed": false, "as": "mot_static", "kind": "BUSINESS_OUTCOME", "lines": [], "status_lines_allowed": ["[MOT] arm_gate_mask=0x18 REFUSED"], "t_s": 0.25}
+{"bytes": 612, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "25bef65c2b365d5c42e13312de36e7ed1c890194d06684b70646eeccf76b4352", "t_s": 0.312, "tail": "b'it\\r\\nmsh >\\r\\nmsh >'"}
+{"bytes": 522, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "00cea3467e9b9549f2e326182aecaff435337494d79479f03cdf361b0a317b38", "t_s": 0.375, "tail": "b'Q)\\r\\nmsh >\\r\\nmsh >'"}
+{"bytes": 983, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "73abf3012386723ec2d5ec70e5b515bfb2cb3285d60c233a27b07e60d47408a7", "t_s": 0.468, "tail": "b'g)\\r\\nmsh >\\r\\nmsh >'"}
+{"allowed": false, "as": "sys_final", "kind": "BUSINESS_OUTCOME", "lines": [], "status_lines_allowed": ["[Motor] arm gate fail mask=0x18 (arm REFUSED)"], "t_s": 0.468}
+{"kind": "SESSION_OK", "session": "S_S1", "steps": 5, "t_s": 0.468}
+{"kind": "PORT_CLOSED", "t_s": 0.468}

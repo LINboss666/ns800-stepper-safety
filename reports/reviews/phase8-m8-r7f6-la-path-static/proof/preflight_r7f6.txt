@@ -1,0 +1,22 @@
+ZIP|NS800_R7F6_B502_Passive_Readonly_Task_20261105.zip|bytes=303880 sha256=6179c093b13566db25af620e4bd05093103e834ff655ebc4c27422f7e2f58dc6
+PLACE|包内文件=30 目录内文件(含本轮自产件)=31 包件逐字节不符=0 []
+SELFCHECK_MANIFEST|首条登记值故意改错必须被判不符: fired=True ['FROZEN_SOURCE.json']
+MANIFEST|条目=29 不符=0 []
+ID_INPUT|plan|reports/reviews/phase8-m8-r7f6-la-path-static/field/plan_r7f6_b502_readonly.json bytes=32235/32235 sha=269389a72c11/269389a72c11 PASS
+SELFCHECK_ID|同一条比较改错后 fired=True
+ID_INPUT|rows|reports/reviews/phase8-m8-r7f6-la-path-static/field/rows_r7f6_b502_readonly.json bytes=11167/11167 sha=2889a02e5329/2889a02e5329 PASS
+ID_INPUT|executor_pkg|reports/reviews/phase8-m8-r7f6-la-path-static/signed_inputs/m8r3_serial_chain.py bytes=219491/219491 sha=33d3f0af8a4c/33d3f0af8a4c PASS
+ID_INPUT|executor_repo|reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py bytes=219491/219491 sha=33d3f0af8a4c/33d3f0af8a4c PASS
+ID_INPUT|image_b502|reports/firmware/phase8-m8-r7f2b-safety-print-fix/rt-thread-motor-m1-candidate.bin bytes=292708/292708 sha=502dca5d8c7e/502dca5d8c7e PASS
+EXECUTOR_COPY|包内见证副本==仓库原件 True
+FROZEN_NEEDLES|reports/reviews/phase8-m8-idle-stack-r4/field/needles.json @0cd64587 bytes=8243 sha=77102a8bff73 登记=77102a8bff73 PASS
+FROZEN_SRC|文件=10 包字节==登记==0cd64587 的 blob 失败=0 []
+SELFCHECK_FROZEN|首件登记值故意改错必须被判不符: fired=True ['frozen_b502_source/applications/blackbox.c']
+TIP_VS_FROZEN|当前 tip(4e533c3f5) 工作树与冻结件不同=6 件 ['diag_relative.c', 'diagnosis.c', 'motor.c', 'project_config.c', 'supervisor.c', 'tmc2209.c']
+TIP_VS_FROZEN|判定: tip 含未上板 R7D1, 板上仍是 b502 502dca5d; S0 打印来源只用冻结快照, 不回灌产品目录
+VALIDATE_PLAN|行=30 原始 FAIL=['PLAN_MOTION_CAP_BUDGET'] (任务书要求保留这一条 FAIL 并裁为 N/A)
+SCOPE_GUARDS|核 10 条 与任务书不符=0 []
+CAPTURE_SCOPE|source_tip=4e533c3f5 firmware=502dca5d A_hardware_actions=0 总窗=60 s 串口硬截止=45 s 请求缓冲=512 MB(不折算样点数)
+CAPTURE_SCOPE|source_tip==当前 HEAD True
+PRODUCT_CLEAN|产品与主机链目录待提交改动=0 件
+PREFLIGHT_SUMMARY|fails=0 []

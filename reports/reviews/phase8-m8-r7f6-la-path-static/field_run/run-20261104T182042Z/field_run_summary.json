@@ -1,0 +1,108 @@
+{
+  "token_bytes": 15,
+  "token_sha256": "ffeff4d3ad685955daf7ee4f331ab2eabd4606abf3e41a9b056058f7dd106641",
+  "run_root": "D:\\ns800_r7f1_scratch\\r7f6_field\\run-20261104T182042Z",
+  "approval_id": "M8R7F6-b502-la-path-static-20261105",
+  "start": {
+    "args": {
+      "deviceId": "MASKED_SHA12:42055f5a3c56",
+      "logicDeviceConfiguration": {
+        "logicChannels": {
+          "digitalChannels": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ]
+        },
+        "digitalSampleRate": 1000000
+      },
+      "captureConfiguration": {
+        "manualCaptureMode": {},
+        "bufferSizeMegabytes": 512
+      }
+    },
+    "captureId": 1,
+    "raw": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"captureId\":1}"
+        }
+      ],
+      "structuredContent": {
+        "captureId": 1
+      }
+    }
+  },
+  "ui_probe_stdout": "CANDIDATE|1972482|Logic 2 [Logic - Connected] [Session 1]\r\nRECT|2576 x 1408\r\nSAVED|D:\\ns800_r7f1_scratch\\r7f6_field\\la_window_running.png|PrintWindow=True|title=Logic 2 [Logic - Connected] [Session 1]",
+  "dispatch": {
+    "rc": 0,
+    "timed_out": false,
+    "run_root": "D:\\ns800_r7f1_scratch\\r7f6_field\\run-20261104T182042Z"
+  },
+  "stop": {
+    "rc": 0,
+    "capture_window_s": 1.98,
+    "window_within_60s": true
+  },
+  "outcome": "FIELD_SEQUENCE_DONE",
+  "timeline": [
+    {
+      "tag": "A1_START_REQUESTED",
+      "local": "2026-11-05T02:20:42.525963+08:00",
+      "monotonic": 143860.14
+    },
+    {
+      "tag": "A2_START_RESULT",
+      "local": "2026-11-05T02:20:42.676839+08:00",
+      "monotonic": 143860.296,
+      "isError": null,
+      "captureId": 1,
+      "elapsed_s": 0.16
+    },
+    {
+      "tag": "A3_UI_PROBE",
+      "local": "2026-11-05T02:20:43.545134+08:00",
+      "monotonic": 143861.171,
+      "rc": 0,
+      "out": "CANDIDATE|1972482|Logic 2 [Logic - Connected] [Session 1]\r\nRECT|2576 x 1408\r\nSAVED|D:\\ns800_r7f1_scratch\\r7f6_field\\la_window_running.png|PrintWindow=True|title=Logic 2 [Logic - Connected] [Session 1]"
+    },
+    {
+      "tag": "B1_DISPATCH_REQUESTED",
+      "local": "2026-11-05T02:20:43.545134+08:00",
+      "monotonic": 143861.171,
+      "guard_s": 55,
+      "elapsed_before_dispatch_s": 1.03
+    },
+    {
+      "tag": "B2_DISPATCH_DONE",
+      "local": "2026-11-05T02:20:44.373295+08:00",
+      "monotonic": 143862.0,
+      "rc": 0,
+      "timed_out": false,
+      "elapsed_s": 1.86,
+      "stdout_bytes": 5215,
+      "stderr_bytes": 0
+    },
+    {
+      "tag": "C1_STOP_REQUESTED",
+      "local": "2026-11-05T02:20:44.375728+08:00",
+      "monotonic": 143862.0,
+      "captureId": 1,
+      "window_s_so_far": 1.86
+    },
+    {
+      "tag": "C2_STOP_DONE",
+      "local": "2026-11-05T02:20:44.498712+08:00",
+      "monotonic": 143862.125,
+      "rc": 0,
+      "capture_window_s": 1.98
+    }
+  ],
+  "masking_note": "start.args.deviceId 等字符串里的仪器标识已换 sha12 掩码; 时刻与回执原文未动"
+}

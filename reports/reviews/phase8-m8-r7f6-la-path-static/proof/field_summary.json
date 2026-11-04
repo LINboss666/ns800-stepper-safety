@@ -1,0 +1,236 @@
+{
+  "task_id": "M8R7F6-b502-la-path-static-20261105",
+  "run_id": "run-20261104T182042Z",
+  "checks": {
+    "FIELD_RUN_ARCHIVED_ONCE": {
+      "verdict": "PASS",
+      "detail": "['run-20261104T182042Z']"
+    },
+    "SERIAL_FIVE_RESPONSE_BYTES": {
+      "verdict": "PASS",
+      "detail": "['01_sys_initial.rx.bin', '02_mot_static.rx.bin', '03_irq_static.rx.bin', '04_safety_static.rx.bin', '05_sys_final.rx.bin']"
+    },
+    "SERIAL_FILE_ORDER_EQUALS_PLAN": {
+      "verdict": "PASS",
+      "detail": "文件=['sys_initial', 'mot_static', 'irq_static', 'safety_static', 'sys_final'] 计划=['sys_initial', 'mot_static', 'irq_static', 'safety_static', 'sys_final']"
+    },
+    "SERIAL_NO_BARE_NUL": {
+      "verdict": "PASS",
+      "detail": "[]"
+    },
+    "SERIAL_STRICT_UTF8": {
+      "verdict": "PASS",
+      "detail": "[]"
+    },
+    "SERIAL_SPLIT_AND_DANGER_GATE_CLEAN": {
+      "verdict": "PASS",
+      "detail": "[]"
+    },
+    "SERIAL_ECHO_FIRST_LINE_EQUALS_PLAN_CMD": {
+      "verdict": "PASS",
+      "detail": "[]"
+    },
+    "ASSERT_STEP_RECOMPUTED_ALL_OK": {
+      "verdict": "PASS",
+      "detail": "[('01_sys_initial.rx.bin', 'OK'), ('02_mot_static.rx.bin', 'OK'), ('03_irq_static.rx.bin', 'OK'), ('04_safety_static.rx.bin', 'OK'), ('05_sys_final.rx.bin', 'OK')]"
+    },
+    "POSITIVE_bootstrap_complete_YES": {
+      "verdict": "PASS",
+      "detail": "['01_sys_initial.rx.bin', '05_sys_final.rx.bin']"
+    },
+    "POSITIVE_READY_fault0_irqCLOSED_polNO_readyNO": {
+      "verdict": "PASS",
+      "detail": "['01_sys_initial.rx.bin', '05_sys_final.rx.bin']"
+    },
+    "POSITIVE_tmc_UNCONFIGURED": {
+      "verdict": "PASS",
+      "detail": "['01_sys_initial.rx.bin', '02_mot_static.rx.bin', '05_sys_final.rx.bin']"
+    },
+    "POSITIVE_arm_mask_0x18": {
+      "verdict": "PASS",
+      "detail": "['01_sys_initial.rx.bin', '05_sys_final.rx.bin']"
+    },
+    "POSITIVE_motor_rest_zero": {
+      "verdict": "PASS",
+      "detail": "['01_sys_initial.rx.bin', '05_sys_final.rx.bin']"
+    },
+    "POSITIVE_request_LOW_ENN_HIGH": {
+      "verdict": "PASS",
+      "detail": "['01_sys_initial.rx.bin', '05_sys_final.rx.bin']"
+    },
+    "POSITIVE_safety_status_request_basis": {
+      "verdict": "PASS",
+      "detail": "['04_safety_static.rx.bin']"
+    },
+    "POSITIVE_diag_pin_idle": {
+      "verdict": "PASS",
+      "detail": "['03_irq_static.rx.bin']"
+    },
+    "POSITIVE_irq_gate_row": {
+      "verdict": "PASS",
+      "detail": "['03_irq_static.rx.bin']"
+    },
+    "POSITIVE_protection_ready_NO": {
+      "verdict": "PASS",
+      "detail": "['03_irq_static.rx.bin']"
+    },
+    "POSITIVE_polarity_not_confirmed_row": {
+      "verdict": "PASS",
+      "detail": "['03_irq_static.rx.bin']"
+    },
+    "POSITIVE_mot_arm_gate_refused": {
+      "verdict": "PASS",
+      "detail": "['02_mot_static.rx.bin']"
+    },
+    "NO_FORBIDDEN_COMMAND_SENT": {
+      "verdict": "PASS",
+      "detail": "禁做清单=16 条 实发=['system_status', 'motor_status', 'safety_irq_status', 'safety_status', 'system_status'] 命中=[]"
+    },
+    "PORT_OPENED_EXACTLY_ONCE": {
+      "verdict": "PASS",
+      "detail": "attempt=1 open=1 close=1"
+    },
+    "RX_DONE_COUNT_FIVE": {
+      "verdict": "PASS",
+      "detail": "5"
+    },
+    "SESSION_WITHIN_DECLARED_DEADLINE": {
+      "verdict": "PASS",
+      "detail": "会话末 t_s=0.468 s < 申报 45 s"
+    },
+    "RX_BYTES_ARE_WIRE_TIME_FEASIBLE": {
+      "verdict": "PASS",
+      "detail": "['sys_initial 983B 线时下界0.085s 实测0.079s OK', 'mot_static 1128B 线时下界0.098s 实测0.125s OK', 'irq_static 612B 线时下界0.053s 实测0.062s OK', 'safety_static 522B 线时下界0.045s 实测0.063s OK', 'sys_final 983B 线时下界0.085s 实测0.093s OK']"
+    },
+    "LEDGER_SPENT_PORT_OPEN_ONLY": {
+      "verdict": "PASS",
+      "detail": "非零项={'port_open': 1}"
+    },
+    "LEDGER_PENDING_AND_COMMIT_ZERO": {
+      "verdict": "PASS",
+      "detail": "pending=[] commit_failures=键缺席"
+    },
+    "LEDGER_IDENTITIES_MATCH_PACKAGE": {
+      "verdict": "PASS",
+      "detail": "{'executor_sha256': '33d3f0af8a4c9c33dcd4e013b395e4ba990a89e384130f9d0ffe50c71b34e8ca', 'image_sha256': '502dca5d8c7ebfa794f890a9c03bc258fc9753f57b6a80c2f1e08add69888a7a', 'plan_sha256': '269389a72c1137f1fe5f0c946153c152c39ef6004a00a4a0336f1438088a685d'}"
+    },
+    "LEDGER_CAPS_EQUALS_PLAN_QUOTA": {
+      "verdict": "PASS",
+      "detail": "22 项额度全等"
+    },
+    "SELFCHECK_JUDGEMENT_FIRES": {
+      "verdict": "PASS",
+      "detail": "[('expectation_flip', True), ('nul_injection', True), ('business_failure_line', True), ('dropped_response_count', True)]"
+    },
+    "LA_START_RETURNED_REAL_CAPTUREID": {
+      "verdict": "PASS",
+      "detail": "captureId=1"
+    },
+    "LA_START_ARGS_ARE_PACKAGE_SPEC": {
+      "verdict": "PASS",
+      "detail": "{'deviceId': 'MASKED_SHA12:42055f5a3c56', 'logicDeviceConfiguration': {'logicChannels': {'digitalChannels': [0, 1, 2, 3, 4, 5, 6, 7]}, 'digitalSampleRate': 1000000}, 'captureConfiguration': {'manualCaptureMode': {}, 'bufferSizeMegabytes': 512}}"
+    },
+    "LA_REQUEST_VS_RECEIPT": {
+      "verdict": "INFO",
+      "detail": "请求 512 MB; 接口回执只有 captureId=1, 未回实际容量 => 不写'已证明容纳 512 MB', MB 也不折算成已保留样点数"
+    },
+    "LA_ALL_CALLS_SAME_CAPTUREID": {
+      "verdict": "PASS",
+      "detail": "stop=1 save=1 export=1"
+    },
+    "LA_ONE_START_ONE_STOP_IN_TIMELINE": {
+      "verdict": "PASS",
+      "detail": "A1=1 C1=1 且 Start/Stop 同一 id"
+    },
+    "LA_SAVE_USED_FILEPATH_NOT_DIRECTORY": {
+      "verdict": "PASS",
+      "detail": "save args=['captureId', 'filepath'] export args=['analogDownsampleRatio', 'captureId', 'directory', 'iso8601Timestamp']"
+    },
+    "LA_DEVICE_IS_REAL_NOT_SIMULATED": {
+      "verdict": "PASS",
+      "detail": "{'deviceId': 'MASKED_SHA12:42055f5a3c56', 'deviceType': 'Logic', 'isSimulation': False}"
+    },
+    "LA_DEVICEID_MASKED_IN_REPO": {
+      "verdict": "PASS",
+      "detail": "MASKED_SHA12:42055f5a3c56"
+    },
+    "LA_CSV_HEADER_IS_TIME_PLUS_EIGHT_CHANNELS": {
+      "verdict": "PASS",
+      "detail": "['Time [s]', 'Channel 0', 'Channel 1', 'Channel 2', 'Channel 3', 'Channel 4', 'Channel 5', 'Channel 6', 'Channel 7']"
+    },
+    "LA_CSV_COLUMN_NAMES_ARE_GENERIC": {
+      "verdict": "INFO",
+      "detail": "导出列名是 Channel 0..7(无信号名) => 列与 DIAG/ENN 的对应不能从导出本身得出"
+    },
+    "LA_ZERO_TRANSITIONS_ON_EVERY_CHANNEL": {
+      "verdict": "PASS",
+      "detail": "{'Channel 0': 0, 'Channel 1': 0, 'Channel 2': 0, 'Channel 3': 0, 'Channel 4': 0, 'Channel 5': 0, 'Channel 6': 0, 'Channel 7': 0}"
+    },
+    "LA_LEVEL_PATTERN_BOTH_LEVELS_PRESENT": {
+      "verdict": "PASS",
+      "detail": "低=['Channel 0'] 高=['Channel 1', 'Channel 2', 'Channel 3', 'Channel 4', 'Channel 5', 'Channel 6', 'Channel 7'] 全程=01111111"
+    },
+    "LA_EIGHT_CHANNELS_AND_RATE_RECORDED_IN_NATIVE_META": {
+      "verdict": "PASS",
+      "detail": "enabled=8 登记采样率=1000000 (登记值, 不是独立测量)"
+    },
+    "LA_MODE_FREERUN_NO_TRIGGER_EVENT": {
+      "verdict": "PASS",
+      "detail": "captureMode=FreeRun 登记 bufferSizeMb=512 digitalTriggerTime=-1"
+    },
+    "LA_NATIVE_AND_CSV_ONE_SUCCESS_EACH": {
+      "verdict": "PASS",
+      "detail": "原生=2912 B CSV 数据行=2"
+    },
+    "LA_SPAN_COVERS_SERIAL_SESSION": {
+      "verdict": "PASS",
+      "detail": "采集 2026-11-04T18:20:42.657001+00:00..2026-11-04T18:20:44.378155+00:00 / 串口会话 2026-11-04T18:20:43.545134+00:00..2026-11-04T18:20:44.373295+00:00 (同一台主机时钟)"
+    },
+    "LA_WINDOW_WITHIN_60S": {
+      "verdict": "PASS",
+      "detail": "Start->Stop=1.98 s <= 60 s; outcome=FIELD_SEQUENCE_DONE"
+    },
+    "LA_DISPATCH_NOT_TIMED_OUT": {
+      "verdict": "PASS",
+      "detail": "rc=0 timed_out=False"
+    },
+    "SELFCHECK_COVERAGE_GATE_FIRES": {
+      "verdict": "PASS",
+      "detail": "[('coverage_shifted_session', True), ('coverage_truncated_start', True)]"
+    },
+    "LA_PATTERN_MATCHES_PREV_CONNECTED_FIELD": {
+      "verdict": "PASS",
+      "detail": "本轮=01111111 上一场(已接线 R7F5A)=01111111"
+    },
+    "LA_PATTERN_MATCHES_UNCONNECTED_BASELINE": {
+      "verdict": "PASS",
+      "detail": "本轮=01111111 探头未接基线=01111111 => 电平层无法区分'接线正确且静默'与'未接触/无共地'"
+    },
+    "WIRING_INTERPRETATION_BOUNDARY": {
+      "verdict": "INFO",
+      "detail": "本轮零运动/零注入/零参考电平切换, 没有事件对照 => 不宣布目标接触通路已被电气证明, 也不判操作者接错"
+    },
+    "CHANNEL_MAPPING_STATUS": {
+      "verdict": "INFO",
+      "detail": "GUI 行标签与导出列名均为 Channel 0..7(无信号名); 操作者暂定 CH0=DIAG/CH1=ENN 仍是申报级 => CHANNEL_MAPPING_UNRESOLVED"
+    },
+    "GND_STATUS": {
+      "verdict": "INFO",
+      "detail": "共地/接触本轮未观察 => UNKNOWN(不写成 PASS, 也不因此扩大动作)"
+    },
+    "NOT_ON_BOARD_NEW_IMAGES": {
+      "verdict": "INFO",
+      "detail": "板上仍是历史 b502 502dca5d(本轮未下载/未回读/未复位); 23691e8d/165d8bdc/df7584c3 保持 NOT_ON_BOARD"
+    },
+    "CLAIMS_KEPT_FALSE": {
+      "verdict": "INFO",
+      "detail": "polarity_measured=false core_protection_verified=false; 真实 DIAG 故障边沿/停 STEP/保护触发/恢复全部未验证"
+    },
+    "DEVICE_ACTIONS_THIS_ROUND": {
+      "verdict": "INFO",
+      "detail": "COM5 开口=1 dispatch=1 LA Start=1 Stop=1 原生保存=1 CSV 导出=1; 下载/回读/DAP/复位/额外上电/apply/arm/start/运动/zero/learn/commit/配置保存/清日志/重试=0"
+    }
+  },
+  "fails": [],
+  "total_predicates": 49
+}

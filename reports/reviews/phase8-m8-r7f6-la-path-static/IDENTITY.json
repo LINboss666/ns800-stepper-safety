@@ -1,0 +1,66 @@
+{
+  "task_id": "M8R7F6-b502-la-path-static-20261105",
+  "date": "2026-11-05",
+  "scope": "PASSIVE_CAPTURE_AND_FIVE_READONLY_QUERIES",
+  "status": "A_SCOPE_FINAL_OPERATOR_EXECUTION_INSTRUCTION_BINDS_NEW_APPROVAL",
+  "operator_channel_correction_status": "PROVISIONAL: software CH0 DIAG / CH1 final ENN; physical labels CH1/CH2 unchanged",
+  "inputs": {
+    "plan": {
+      "path": "field/plan_r7f6_b502_readonly.json",
+      "bytes": 32235,
+      "sha256": "269389a72c1137f1fe5f0c946153c152c39ef6004a00a4a0336f1438088a685d"
+    },
+    "rows": {
+      "path": "field/rows_r7f6_b502_readonly.json",
+      "bytes": 11167,
+      "sha256": "2889a02e53291a61e08621b1c8bb0e773e44cebba9cd256f0a4b991855ff9928"
+    },
+    "executor": {
+      "package_path": "signed_inputs/m8r3_serial_chain.py",
+      "repo_path": "reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py",
+      "bytes": 219491,
+      "sha256": "33d3f0af8a4c9c33dcd4e013b395e4ba990a89e384130f9d0ffe50c71b34e8ca"
+    },
+    "image": {
+      "repo_path": "reports/firmware/phase8-m8-r7f2b-safety-print-fix/rt-thread-motor-m1-candidate.bin",
+      "bytes": 292708,
+      "sha256": "502dca5d8c7ebfa794f890a9c03bc258fc9753f57b6a80c2f1e08add69888a7a"
+    }
+  },
+  "offline_results": {
+    "validate_plan_raw_fail": 1,
+    "raw_fail_id": "PLAN_MOTION_CAP_BUDGET",
+    "A_scope_disposition": "N/A for this zero-motion package; raw FAIL retained",
+    "stub_dispatch_transport": "stub",
+    "stub_dispatch_backend": "sim",
+    "stub_dispatch_profile": "healthy",
+    "stub_dispatch_status": "OK",
+    "serial_stage_commands": [
+      "system_status",
+      "motor_status",
+      "safety_irq_status",
+      "safety_status",
+      "system_status"
+    ],
+    "S0_and_S1_completed": true,
+    "frozen_source_origin_commit": "0cd64587739cca41a22903e075b6fe37b17c765b",
+    "frozen_source_files": 10,
+    "original_needles_unchanged": 40,
+    "real_device_actions_by_A": 0
+  },
+  "scope_guards": {
+    "serial_port_open_cap": 1,
+    "instrument_capture_start_cap": 1,
+    "no_probe_removal_test": true,
+    "no_reference_level_test": true,
+    "no_target_injection": true,
+    "no_apply_or_irq_change": true,
+    "no_motion": true,
+    "no_new_firmware_download": true,
+    "no_added_powerup_or_reset": true,
+    "new_approval_not_inferred_from_task_writing_context": true
+  },
+  "field_results": "NOT_RUN",
+  "polarity_measured": false,
+  "core_protection_verified": false
+}

@@ -1,0 +1,3 @@
+本目录两份 rehearsal_stub.* 是 A 定稿计划在本机的**离线预跑**(transport=stub backend=sim profile=healthy),
+作用是确认参数与路径可用, 不产生任何硬件结果, 也不占本轮任何额度。
+真实现场件在 field_run/ 与 instrument/。

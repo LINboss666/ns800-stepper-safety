@@ -1,0 +1,58 @@
+PASS  FIELD_RUN_ARCHIVED_ONCE                        ['run-20261104T182042Z']
+PASS  SERIAL_FIVE_RESPONSE_BYTES                     ['01_sys_initial.rx.bin', '02_mot_static.rx.bin', '03_irq_static.rx.bin', '04_safety_static.rx.bin', '05_sys_final.rx.bin']
+PASS  SERIAL_FILE_ORDER_EQUALS_PLAN                  文件=['sys_initial', 'mot_static', 'irq_static', 'safety_static', 'sys_final'] 计划=['sys_initial', 'mot_static', 'irq_static', 'safety_static', 'sys_final']
+PASS  SERIAL_NO_BARE_NUL                             []
+PASS  SERIAL_STRICT_UTF8                             []
+PASS  SERIAL_SPLIT_AND_DANGER_GATE_CLEAN             []
+PASS  SERIAL_ECHO_FIRST_LINE_EQUALS_PLAN_CMD         []
+PASS  ASSERT_STEP_RECOMPUTED_ALL_OK                  [('01_sys_initial.rx.bin', 'OK'), ('02_mot_static.rx.bin', 'OK'), ('03_irq_static.rx.bin', 'OK'), ('04_safety_static.rx.bin', 'OK'), ('05_sys_final.rx.bin', 'OK')]
+PASS  POSITIVE_bootstrap_complete_YES                ['01_sys_initial.rx.bin', '05_sys_final.rx.bin']
+PASS  POSITIVE_READY_fault0_irqCLOSED_polNO_readyNO  ['01_sys_initial.rx.bin', '05_sys_final.rx.bin']
+PASS  POSITIVE_tmc_UNCONFIGURED                      ['01_sys_initial.rx.bin', '02_mot_static.rx.bin', '05_sys_final.rx.bin']
+PASS  POSITIVE_arm_mask_0x18                         ['01_sys_initial.rx.bin', '05_sys_final.rx.bin']
+PASS  POSITIVE_motor_rest_zero                       ['01_sys_initial.rx.bin', '05_sys_final.rx.bin']
+PASS  POSITIVE_request_LOW_ENN_HIGH                  ['01_sys_initial.rx.bin', '05_sys_final.rx.bin']
+PASS  POSITIVE_safety_status_request_basis           ['04_safety_static.rx.bin']
+PASS  POSITIVE_diag_pin_idle                         ['03_irq_static.rx.bin']
+PASS  POSITIVE_irq_gate_row                          ['03_irq_static.rx.bin']
+PASS  POSITIVE_protection_ready_NO                   ['03_irq_static.rx.bin']
+PASS  POSITIVE_polarity_not_confirmed_row            ['03_irq_static.rx.bin']
+PASS  POSITIVE_mot_arm_gate_refused                  ['02_mot_static.rx.bin']
+PASS  NO_FORBIDDEN_COMMAND_SENT                      禁做清单=16 条 实发=['system_status', 'motor_status', 'safety_irq_status', 'safety_status', 'system_status'] 命中=[]
+PASS  PORT_OPENED_EXACTLY_ONCE                       attempt=1 open=1 close=1
+PASS  RX_DONE_COUNT_FIVE                             5
+PASS  SESSION_WITHIN_DECLARED_DEADLINE               会话末 t_s=0.468 s < 申报 45 s
+PASS  RX_BYTES_ARE_WIRE_TIME_FEASIBLE                ['sys_initial 983B 线时下界0.085s 实测0.079s OK', 'mot_static 1128B 线时下界0.098s 实测0.125s OK', 'irq_static 612B 线时下界0.053s 实测0.062s OK', 'safety_static 522B 线时下界0.045s 实测0.063s OK', 'sys_final 983B 线时下界0.085s 实测0.093s OK']
+PASS  LEDGER_SPENT_PORT_OPEN_ONLY                    非零项={'port_open': 1}
+PASS  LEDGER_PENDING_AND_COMMIT_ZERO                 pending=[] commit_failures=键缺席
+PASS  LEDGER_IDENTITIES_MATCH_PACKAGE                {'executor_sha256': '33d3f0af8a4c9c33dcd4e013b395e4ba990a89e384130f9d0ffe50c71b34e8ca', 'image_sha256': '502dca5d8c7ebfa794f890a9c03bc258fc9753f57b6a80c2f1e08add69888a7a', 'plan_sha256': '269389a72c1137f1fe5f0c946153c152c39ef6004a00a4a0336f1438088a685d'}
+PASS  LEDGER_CAPS_EQUALS_PLAN_QUOTA                  22 项额度全等
+PASS  SELFCHECK_JUDGEMENT_FIRES                      [('expectation_flip', True), ('nul_injection', True), ('business_failure_line', True), ('dropped_response_count', True)]
+PASS  LA_START_RETURNED_REAL_CAPTUREID               captureId=1
+PASS  LA_START_ARGS_ARE_PACKAGE_SPEC                 {'deviceId': 'MASKED_SHA12:42055f5a3c56', 'logicDeviceConfiguration': {'logicChannels': {'digitalChannels': [0, 1, 2, 3, 4, 5, 6, 7]}, 'digitalSampleRate': 1000000}, 'captureConfiguration': {'manualCaptureMode': {}, 'bufferSizeMegabytes': 512}}
+INFO  LA_REQUEST_VS_RECEIPT                          请求 512 MB; 接口回执只有 captureId=1, 未回实际容量 => 不写'已证明容纳 512 MB', MB 也不折算成已保留样点数
+PASS  LA_ALL_CALLS_SAME_CAPTUREID                    stop=1 save=1 export=1
+PASS  LA_ONE_START_ONE_STOP_IN_TIMELINE              A1=1 C1=1 且 Start/Stop 同一 id
+PASS  LA_SAVE_USED_FILEPATH_NOT_DIRECTORY            save args=['captureId', 'filepath'] export args=['analogDownsampleRatio', 'captureId', 'directory', 'iso8601Timestamp']
+PASS  LA_DEVICE_IS_REAL_NOT_SIMULATED                {'deviceId': 'MASKED_SHA12:42055f5a3c56', 'deviceType': 'Logic', 'isSimulation': False}
+PASS  LA_DEVICEID_MASKED_IN_REPO                     MASKED_SHA12:42055f5a3c56
+PASS  LA_CSV_HEADER_IS_TIME_PLUS_EIGHT_CHANNELS      ['Time [s]', 'Channel 0', 'Channel 1', 'Channel 2', 'Channel 3', 'Channel 4', 'Channel 5', 'Channel 6', 'Channel 7']
+INFO  LA_CSV_COLUMN_NAMES_ARE_GENERIC                导出列名是 Channel 0..7(无信号名) => 列与 DIAG/ENN 的对应不能从导出本身得出
+PASS  LA_ZERO_TRANSITIONS_ON_EVERY_CHANNEL           {'Channel 0': 0, 'Channel 1': 0, 'Channel 2': 0, 'Channel 3': 0, 'Channel 4': 0, 'Channel 5': 0, 'Channel 6': 0, 'Channel 7': 0}
+PASS  LA_LEVEL_PATTERN_BOTH_LEVELS_PRESENT           低=['Channel 0'] 高=['Channel 1', 'Channel 2', 'Channel 3', 'Channel 4', 'Channel 5', 'Channel 6', 'Channel 7'] 全程=01111111
+PASS  LA_EIGHT_CHANNELS_AND_RATE_RECORDED_IN_NATIVE_META enabled=8 登记采样率=1000000 (登记值, 不是独立测量)
+PASS  LA_MODE_FREERUN_NO_TRIGGER_EVENT               captureMode=FreeRun 登记 bufferSizeMb=512 digitalTriggerTime=-1
+PASS  LA_NATIVE_AND_CSV_ONE_SUCCESS_EACH             原生=2912 B CSV 数据行=2
+PASS  LA_SPAN_COVERS_SERIAL_SESSION                  采集 2026-11-04T18:20:42.657001+00:00..2026-11-04T18:20:44.378155+00:00 / 串口会话 2026-11-04T18:20:43.545134+00:00..2026-11-04T18:20:44.373295+00:00 (同一台主机时钟)
+PASS  LA_WINDOW_WITHIN_60S                           Start->Stop=1.98 s <= 60 s; outcome=FIELD_SEQUENCE_DONE
+PASS  LA_DISPATCH_NOT_TIMED_OUT                      rc=0 timed_out=False
+PASS  SELFCHECK_COVERAGE_GATE_FIRES                  [('coverage_shifted_session', True), ('coverage_truncated_start', True)]
+PASS  LA_PATTERN_MATCHES_PREV_CONNECTED_FIELD        本轮=01111111 上一场(已接线 R7F5A)=01111111
+PASS  LA_PATTERN_MATCHES_UNCONNECTED_BASELINE        本轮=01111111 探头未接基线=01111111 => 电平层无法区分'接线正确且静默'与'未接触/无共地'
+INFO  WIRING_INTERPRETATION_BOUNDARY                 本轮零运动/零注入/零参考电平切换, 没有事件对照 => 不宣布目标接触通路已被电气证明, 也不判操作者接错
+INFO  CHANNEL_MAPPING_STATUS                         GUI 行标签与导出列名均为 Channel 0..7(无信号名); 操作者暂定 CH0=DIAG/CH1=ENN 仍是申报级 => CHANNEL_MAPPING_UNRESOLVED
+INFO  GND_STATUS                                     共地/接触本轮未观察 => UNKNOWN(不写成 PASS, 也不因此扩大动作)
+INFO  NOT_ON_BOARD_NEW_IMAGES                        板上仍是历史 b502 502dca5d(本轮未下载/未回读/未复位); 23691e8d/165d8bdc/df7584c3 保持 NOT_ON_BOARD
+INFO  CLAIMS_KEPT_FALSE                              polarity_measured=false core_protection_verified=false; 真实 DIAG 故障边沿/停 STEP/保护触发/恢复全部未验证
+INFO  DEVICE_ACTIONS_THIS_ROUND                      COM5 开口=1 dispatch=1 LA Start=1 Stop=1 原生保存=1 CSV 导出=1; 下载/回读/DAP/复位/额外上电/apply/arm/start/运动/zero/learn/commit/配置保存/清日志/重试=0
+TOTAL=49 FAIL=0 []

@@ -1,0 +1,94 @@
+{
+  "name": "Session 1",
+  "captureStartTime": {
+    "unixTimeMilliseconds": 1793816442657,
+    "fractionalMilliseconds": 0.8355
+  },
+  "captureSettings": {
+    "bufferSizeMb": 512,
+    "timerModeSettings": {
+      "stopAfterSeconds": 1
+    },
+    "commonCaptureSettings": {
+      "trimAfterCapture": false,
+      "trimTimeSeconds": 0
+    },
+    "triggerSettings": {
+      "eventChannel": {
+        "category": "legacy",
+        "type": "Digital",
+        "deviceChannel": 0
+      },
+      "triggerSourceGeneration": 0,
+      "scopeEventType": "Rising",
+      "scopeThreshold": 1,
+      "scopeHysteresisPercentage": 0.02,
+      "digitalEventType": "Rising",
+      "digitalLinkedChannels": [],
+      "digitalLegacyPostTriggerBufferSeconds": 1,
+      "mode": "Auto",
+      "holdOffSeconds": 0.001,
+      "pulseDuration": {
+        "min": 0.001,
+        "max": 0.01
+      },
+      "realTriggerTimeoutViewRatio": 4,
+      "minRealTriggerTimeoutSeconds": 1,
+      "autoTriggerTimeoutViewRatio": 2
+    },
+    "captureMode": "FreeRun",
+    "captureTriggerType": "Signal"
+  },
+  "legacySettings": {
+    "enabledChannels": [
+      {
+        "type": "Digital",
+        "index": 0
+      },
+      {
+        "type": "Digital",
+        "index": 1
+      },
+      {
+        "type": "Digital",
+        "index": 2
+      },
+      {
+        "type": "Digital",
+        "index": 3
+      },
+      {
+        "type": "Digital",
+        "index": 4
+      },
+      {
+        "type": "Digital",
+        "index": 5
+      },
+      {
+        "type": "Digital",
+        "index": 6
+      },
+      {
+        "type": "Digital",
+        "index": 7
+      }
+    ],
+    "sampleRate": {
+      "digital": 1000000
+    },
+    "glitchFilter": {
+      "enabled": false,
+      "channels": []
+    }
+  },
+  "digitalTriggerTime": -1,
+  "timeManager": {
+    "t0": {
+      "type": "startOfCapture"
+    }
+  },
+  "legacyDevice_isSimulation": false,
+  "legacyDevice_name": "Logic",
+  "note": "captureSettings/legacySettings 为原生文件内**已登记的设置**, 不是物理缓冲或采样率的独立测量"
+}

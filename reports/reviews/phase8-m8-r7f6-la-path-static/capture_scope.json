@@ -1,0 +1,82 @@
+{
+  "task_id": "M8R7F6-b502-la-path-static-20261105",
+  "scope": "PASSIVE_ONLY_KEEP_EXISTING_WIRING",
+  "operator_power_state_verbatim": "VM 和 MCU我已经重新上电 在现场",
+  "source_tip": "4e533c3f54bfa54d395f0ea8f9cfa0abc6820022",
+  "firmware_sha256": "502dca5d8c7ebfa794f890a9c03bc258fc9753f57b6a80c2f1e08add69888a7a",
+  "A_hardware_actions": 0,
+  "instrument_caps": {
+    "capture_session": 1,
+    "start_total": 1,
+    "stop_total": 1,
+    "native_save_success_total": 1,
+    "csv_export_success_total": 1,
+    "recapture_retry": 0
+  },
+  "operator_caps": {
+    "probe_removal_or_reference_relocation": 0,
+    "target_signal_forcing": 0,
+    "additional_powerup": 0,
+    "additional_reset": 0,
+    "normal_end_powerdown_max": 1
+  },
+  "sample_settings": {
+    "enabled_digital_channels": "All actual 8 digital channels, record actual labels/IDs",
+    "samples_per_second": 1000000,
+    "requested_buffer_megabytes": 512,
+    "mode": "manual immediate; no trigger",
+    "capture_max_seconds": 60,
+    "serial_hard_deadline_seconds": 45,
+    "buffer_MB_is_not_a_proven_sample_count": true
+  },
+  "channel_map": {
+    "physical_CH1_label": {
+      "signal": "DIAG",
+      "MCU_pin": "PA.3",
+      "connector": "J4-15",
+      "GUI_channel_proposed_by_operator": "CH0",
+      "GUI_mapping_status": "PROVISIONAL_NOT_YET_OBSERVED"
+    },
+    "physical_CH2_label": {
+      "signal": "final TMC_ENN",
+      "expansion_connector": "H6-5",
+      "MCU_feedback_pin": "PC.6",
+      "MCU_connector": "J4-40",
+      "GUI_channel_proposed_by_operator": "CH1",
+      "GUI_mapping_status": "PROVISIONAL_NOT_YET_OBSERVED"
+    },
+    "CSV_columns": "Read exact exported headers, actual channel IDs and 1-based column positions; time column is separate. Do not derive identity from expected low/high levels.",
+    "GND": "Record existing common signal-ground connection from actual observation/operator report; no rewiring required by this package."
+  },
+  "channel_mapping_unknown_does_not_block_passive_all_channel_capture": true,
+  "gnd_unknown_does_not_become_pass": true,
+  "input_rating_basis": "Prior archived vendor declaration 0-5 V, for existing 3.3 V DIAG/ENN hookup only; not inferred from software version, not a measured or datasheet-qualified rating.",
+  "instrument_trigger": "Start and confirm RUNNING before one serial dispatch; stop after port closure or first error. Verify retained data truly covers serial session.",
+  "forbidden": [
+    "reference-level positive control",
+    "GND/3V3 toggling test",
+    "disconnecting probes for channel identification",
+    "signal injection onto DIAG or ENN",
+    "driver apply",
+    "software polarity confirmation",
+    "IRQ enable/disable",
+    "DAP access",
+    "download",
+    "readback",
+    "reset",
+    "arm/start/motion",
+    "learning/zero/commit/config_save",
+    "retry"
+  ],
+  "measurement_boundaries": {
+    "voltage_measured": false,
+    "polarity_measured": false,
+    "physical_DIAG_alarm_trigger_verified": false,
+    "core_protection_verified": false,
+    "boot_stream_captured": false,
+    "current_firmware_newly_readback": false
+  },
+  "interpretation": "Capture plus serial status are separate findings. Static traces can remain non-discriminating about contact/common ground; channel labels alone do not electrically prove target contact. Do not call unchanged traces wiring failure.",
+  "operator_task_request_verbatim": "我要更正一下再软件里可能就是CH0DIAG CH1最终 ENN 然后你继续编写任务书",
+  "execution_approval": "Use actual operator instruction to execute this fixed package; old approvals do not carry over; task-writing request is recorded only as context."
+}

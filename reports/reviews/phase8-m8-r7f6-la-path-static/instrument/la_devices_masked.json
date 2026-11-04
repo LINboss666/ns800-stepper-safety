@@ -1,0 +1,29 @@
+{
+  "tool": "get_devices",
+  "args": {
+    "includeSimulationDevices": false
+  },
+  "local": "2026-11-05T02:16:19.271991+08:00",
+  "utc": "2026-11-04T18:16:19.271991+00:00",
+  "response": {
+    "jsonrpc": "2.0",
+    "id": 2,
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"devices\":[{\"deviceId\":\"MASKED_SHA12:42055f5a3c56\",\"deviceType\":\"Logic\",\"isSimulation\":false}]}"
+        }
+      ],
+      "structuredContent": {
+        "devices": [
+          {
+            "deviceId": "MASKED_SHA12:42055f5a3c56",
+            "deviceType": "Logic",
+            "isSimulation": false
+          }
+        ]
+      }
+    }
+  }
+}

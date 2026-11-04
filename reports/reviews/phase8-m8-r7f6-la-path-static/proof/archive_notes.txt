@@ -1,0 +1,15 @@
+ARCHIVE_RUN|run-20261104T182042Z
+SCRUB_SECRETS|两类明文标识长度=16/20 (值不入仓不硬编码), 逐字符串替换为 sha12 掩码
+MASK_SCRUB|dispatch.meta 字符串级命中=0
+MASK_ARGV_TOKEN|替换=2 处 token_bytes=15 token_sha=ffeff4d3ad68
+MASK_DEVICEID|start key级=1 字符串级=0
+MASK_DEVICEID|stop key级=0 字符串级=0
+MASK_DEVICEID|save key级=0 字符串级=0
+MASK_DEVICEID|export key级=0 字符串级=0
+MASK_DEVICEID|devices key级+字符串级合计=2
+SAL_SANITIZE|非 meta 条目逐字节不变=True (条目=9)
+SAL_SANITIZE|meta.json legacyDevice.deviceId 替换=1 原字节=3011 原 sha=53682302b4eadb01f9a1162c223c60c02f0c019ac0fa03e1fb77b4e0fe731292 脱敏字节=2912 脱敏 sha=496b843619309102deed8acdd5102e13fb39e1f136669a20ef4201c4904da11e
+ARCHIVE_TIMELINE|field_run_summary.json 事件=7 掩码替换=1
+SCRUB_RESIDUE|入库件仍含明文标识=0 []
+ARCHIVE_FILES|37 件入库
+ARCHIVE_FAILS|0 []

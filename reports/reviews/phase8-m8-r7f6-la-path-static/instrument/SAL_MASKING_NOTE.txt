@@ -1,0 +1,3 @@
+capture_id1_sanitized.sal 是把原生件的 meta.json 里 legacyDevice.deviceId(20 位十进制仪器序列号) 换成 sha12 掩码后**重建的 zip**; 其余 8 个 digital-*.bin 与 trigger-store.bin 条目逐字节未动(工具已核)。
+原生未脱敏件留在仓外: D:/ns800_r7f1_scratch/r7f6_field/native/capture_id1.sal
+原字节=3011 原 sha256=53682302b4eadb01f9a1162c223c60c02f0c019ac0fa03e1fb77b4e0fe731292
