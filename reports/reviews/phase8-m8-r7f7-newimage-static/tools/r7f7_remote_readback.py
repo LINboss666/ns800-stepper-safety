@@ -36,7 +36,9 @@ FROZEN_FILES = [APP + "/" + n for n in ("blackbox.c", "diag_relative.c", "diagno
     "reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py",
     "reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/rt-thread-motor-m1-candidate.bin",
     "reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/rt-thread-motor-m1.axf",
-    R7F6 + "/FIELD_JUDGEMENT.md", R7F6 + "/POWERDOWN_REPORT.txt", R7F2B + "/run_record.md"]
+    R7F6 + "/FIELD_JUDGEMENT.md", R7F6 + "/POWERDOWN_REPORT.txt"]
+# 注: r7f2b/run_record.md **不在冻结清单里** —— 本轮刻意给它追加 §20。它的"只追加不改旧"由
+# RUN_RECORD_SECTION(§16..§20 各一次)与离线轮的 RUN_RECORD_IS_APPEND_ONLY(HEAD 版是新版的严格前缀)承担。
 out, fails = [], []
 
 

@@ -11,7 +11,7 @@ IDENTITY_EXECUTOR_SHA|PASS|33d3f0af8a4c9c33
 IDENTITY_IMAGE_BIN|PASS|297452 B / 23691e8d 磁盘实读一致
 IDENTITY_IMAGE_AXF|PASS|1790048 B / 0f421595
 EXECUTOR_IS_REPO_ORIGINAL|PASS|仓内执行器散列未变且与包内见证副本逐字节相同(本轮不改执行器)
-IDENTITY_TIP_IS_DEV_BASELINE|PASS|开发基线 7a08f9d == 本机 HEAD
+IDENTITY_TIP_IS_DEV_BASELINE|PASS|A 声明的开发基线 7a08f9d 是本轮起点且为当前 HEAD 的祖先/自身(当前 HEAD=55c3f3f)
 ACCEPTANCE_CHECKS_12|PASS|12 项必需判据 / A 设备动作 0 / field_result=NOT_RUN
 NOT_VERIFIED_KEPT|PASS|6 项仍未证原样保留, polarity/core 两个 false 未被降级或升级
 IMG_BIN_EQ_MANIFEST|PASS|297452 B sha=23691e8d8aa8
@@ -102,11 +102,11 @@ BOUNDARIES_IDENTIFIER_ISSUE_NOT_MARKED_FIXED|PASS|Known disclosure deferred by c
 IDENTITY_OFFLINE_PROOF_FIELDS|PASS|A 自报的离线证据字段(0 设备 / 4 阶段 / 13 命令 / 6 项正额度)与本机重跑一致
 IDENTITY_STATUS_AND_FIELD_RESULT|PASS|本轮 A 侧 field_result=NOT_RUN
 LEAK_SCOPE_DECISION|INFO|三类路径/UID 模式 + 用户名明文(来自环境变量=<set>); 通用盘符模式按上述理由放弃
-LEAK_SCAN入库件命中为_0|PASS|扫 43 件(含本轮即将入库的日志原文), 命中=0 []
+LEAK_SCAN入库件命中为_0|PASS|扫 44 件(含本轮即将入库的日志原文), 命中=0 []
 LEAK_SCAN_GATE_FIRES|PASS|对合成样本 3/3 条模式命中(会命中才允许宣布干净)
-ROUND_TOUCHES_NO_PRODUCT_OR_HOST_CODE|PASS|本轮工作树改动 5 项, 全部在 reports/ 与 .gitattributes 里
+ROUND_TOUCHES_NO_PRODUCT_OR_HOST_CODE|PASS|本轮工作树改动 7 项, 全部在 reports/ 与 .gitattributes 里
 OLD_EVIDENCE_UNTOUCHED|PASS|旧证据/旧账 0 改动(只允许 run_record.md 追加与本目录), 越界=[]
-RUN_RECORD_IS_APPEND_ONLY|PASS|run_record.md 的 HEAD 版本是新版本的**严格前缀** => 旧 §1-§19 一个字节都没被改, 只追加 §20
+RUN_RECORD_IS_APPEND_ONLY|PASS|7a08f9d(本轮起点)版本的 run_record.md 是当前磁盘版的**严格前缀** => 旧 §1-§19 一个字节没被改
 OLD_SECTIONS_STILL_ONE_EACH|PASS|§16/§17/§18/§19 各仍出现一次, §20 新增一次; 异常=[]
 FIELD_APPROVAL_LEDGER_ABSENT|PASS|扫 2 个核准根目录, 现场批准身份 M8R7F7-2369-... 无账本(本轮未开): []
 PRIVATE_DAP_UID_FILE_PRESENT_AND_NOT_COMMITTED|PASS|私有 UID 文件在位(长度 48, 值不打印不入库); 本轮入库件里搜不到该明文 => 现场轮的前置件可用

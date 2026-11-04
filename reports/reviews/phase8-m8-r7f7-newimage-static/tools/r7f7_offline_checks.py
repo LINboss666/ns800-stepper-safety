@@ -186,8 +186,13 @@ note("IDENTITY_IMAGE_AXF", ident["image"]["axf_sha256"] == AXF_SHA and
 note("EXECUTOR_IS_REPO_ORIGINAL", sha(read(EXECUTOR)) == EXEC_SHA and
      read(EXECUTOR) == read("reports/reviews/phase8-m8-r7f7-newimage-static/signed_inputs/m8r3_serial_chain.py"),
      "仓内执行器散列未变且与包内见证副本逐字节相同(本轮不改执行器)")
-note("IDENTITY_TIP_IS_DEV_BASELINE", ident["development_tip"] == TIP and
-     git(["rev-parse", "HEAD"])[1].strip() == TIP, "开发基线 %s == 本机 HEAD" % TIP[:7])
+head_now = git(["rev-parse", "HEAD"])[1].strip()
+# A 的 development_tip 指的是**包被切出来时的基线**, 不是"必须等于本机 HEAD": 本轮我自己也会提交,
+# HEAD 前进是正常的。判据因此核两件事: 声称值 == 本轮起点常量, 且该起点是当前 HEAD 的祖先或本身。
+is_anc = subprocess.run(["git", "-C", str(REPO), "merge-base", "--is-ancestor", TIP, "HEAD"]).returncode == 0
+note("IDENTITY_TIP_IS_DEV_BASELINE",
+     ident["development_tip"] == TIP and is_anc,
+     "A 声明的开发基线 %s 是本轮起点且为当前 HEAD 的祖先/自身(当前 HEAD=%s)" % (TIP[:7], head_now[:7]))
 note("ACCEPTANCE_CHECKS_12", len(acc["required_checks"]) == 12 and
      acc["A_real_device_actions"] == 0 and acc["field_result"] == "NOT_RUN",
      "12 项必需判据 / A 设备动作 0 / field_result=NOT_RUN")
@@ -654,10 +659,12 @@ note("ROUND_TOUCHES_NO_PRODUCT_OR_HOST_CODE",
 out_of_scope = [t for t in touched if not any(t.startswith(p) for p in ALLOWED_TOUCH)]
 note("OLD_EVIDENCE_UNTOUCHED", not out_of_scope,
      "旧证据/旧账 0 改动(只允许 run_record.md 追加与本目录), 越界=%s" % out_of_scope[:6])
-old_rr = git(["show", "HEAD:%s" % (R7F2B_REL + "/run_record.md")], binary=True)[1]
+# 基线用**本轮开始时的 tip**(常量 TIP=7a08f9d), 不是 HEAD: 要证的是"旧 §1-§19 没被改",
+# 而本轮自己新写的 §20 允许在本轮内迭代(例如把自伤条数从 16 更正到 17), 那不该把判据钉红。
+old_rr = git(["show", "%s:%s" % (TIP, R7F2B_REL + "/run_record.md")], binary=True)[1]
 new_rr = (REPO / R7F2B_REL / "run_record.md").read_bytes()
 note("RUN_RECORD_IS_APPEND_ONLY", old_rr and new_rr.startswith(old_rr) and len(new_rr) > len(old_rr),
-     "run_record.md 的 HEAD 版本是新版本的**严格前缀** => 旧 §1-§19 一个字节都没被改, 只追加 §20")
+     "%s(本轮起点)版本的 run_record.md 是当前磁盘版的**严格前缀** => 旧 §1-§19 一个字节没被改" % TIP[:7])
 miss_sec = [s for s in ("## 16", "## 17", "## 18", "## 19")
             if old_rr.count(("\n" + s).encode()) != 1 or new_rr.count(("\n" + s).encode()) != 1]
 note("OLD_SECTIONS_STILL_ONE_EACH", not miss_sec and new_rr.count(b"\n## 20") == 1,
