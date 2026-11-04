@@ -38,7 +38,7 @@ FROZEN_FILES = [APP + "/" + n for n in ("blackbox.c", "diag_relative.c", "diagno
     "reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/rt-thread-motor-m1.axf",
     R7F6 + "/FIELD_JUDGEMENT.md", R7F6 + "/POWERDOWN_REPORT.txt"]
 # 注: r7f2b/run_record.md **不在冻结清单里** —— 本轮刻意给它追加 §20。它的"只追加不改旧"由
-# RUN_RECORD_SECTION(§16..§20 各一次)与离线轮的 RUN_RECORD_IS_APPEND_ONLY(HEAD 版是新版的严格前缀)承担。
+# RUN_RECORD_SECTION(§16..§21 各一次)与离线轮的 RUN_RECORD_IS_APPEND_ONLY(HEAD 版是新版的严格前缀)承担。
 out, fails = [], []
 
 
@@ -192,9 +192,9 @@ def main() -> int:
         if not (m and m.group(1) == "32470c7ed44ef6ef5f762490a5416912a336cdd9"):
             fails.append("REMOTE_PRODUCT_TREE")
 
-        # run_record: §20 已入库, §16-§19 原文仍在且各一次
+        # run_record: §21(现场轮)已入库, §16-§20 原文仍在且各一次
         rr = (b.get("%s:%s/run_record.md" % (tip, R7F2B)) or b"").decode("utf-8", "replace")
-        for sec in ("## 16", "## 17", "## 18", "## 19", "## 20"):
+        for sec in ("## 16", "## 17", "## 18", "## 19", "## 20", "## 21"):
             hit = rr.count("\n" + sec)
             note("RUN_RECORD_SECTION|%s|命中=%d %s" % (sec, hit, "PASS" if hit == 1 else "FAIL"))
             if hit != 1:
