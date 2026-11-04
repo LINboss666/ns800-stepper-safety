@@ -894,3 +894,5 @@ SG/ADC/IMU 真实保护触发与恢复、实际 STEP/ENN 动态时延、带载�
 `FIELD_JUDGEMENT.md`、`tools/r7f7_field_judgement.py`、扩展大写 UID 模式的 `tools/r7f7_staged_preflight.py`、
 新交接 `phase8-m8-r7f7-newimage-static-field.{md,json}`、重算的 `ROUND_SHA256SUMS.txt`。
 产品代码、固件、A 的包原件、旧轮证据与旧账本 **0 改动**。
+
+**§21 追加（同轮，只追加不改上文）**：上面写的「自伤 7 项」在本节入库后又被远端回读抓到 1 项，现登记为第 ⑧ 项：`r7f7_remote_readback.py` 的 `RUN_RECORD_SECTION` 把段计数检查写死成 §16..§20，本节 §21 落在门外面——内容虽然由逐 blob 哈希承担，但「各段恰好一次」这道门没管到它，覆盖声称过宽。补到 §21 后另一次提交、重算清单并重跑回读：远端 tip 上 406 条 blob（本轮 100 + R7F6 78 + r7f2b 228）全相符，A 包原件 29 件与 zip 相符，BIN/AXF/执行器散列相符，产品子树 `32470c7e…` 相符，§16..§21 各恰好一次，fails=0。设备动作仍为 0，上文与旧提交不回改；本节的判据原文与归档字节未因此改动（`field_judgement_r7f7.txt` 仍是 99 条 FAIL=0）。

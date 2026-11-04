@@ -65,7 +65,7 @@ config_save、重试、分析仪）。台账 `APPROVAL_LEDGER_END`：`pending=0`
 保持未武装、禁能、IRQ CLOSED。候选零点与失败作业记录留在 RAM，未为清理它们额外复位/断电/clear/save。
 仪表标识披露仍按 A §1 暂缓，本轮未启动分析仪、未产生新的原生捕获文件。
 
-## 6. 判读与工具自伤 7 项（正文 §5 全列）
+## 6. 判读与工具自伤 8 项（正文 §5 全列）
 
 ① 我的 heredoc 补丁把 `b"\r\n"` 写成真实 CR/LF，判读工具源码直接语法坏掉——
 `Read` 的行视图与 python `newline=''` 的切分不一致，替换区间要按后者定；
@@ -75,7 +75,10 @@ config_save、重试、分析仪）。台账 `APPROVAL_LEDGER_END`：`pending=0`
 等于"我以为归档了"；改成落盘后 walk 生成 + 负控；④ 跨阶段台账第一版没归档，与 idle-stack-r4 先例不符；
 ⑤ 隐私判据第一次写成恒真比较（把 UID 拼进被检数据再断言命中），换成合成脏样本 5/5 命中；
 ⑥ 泄漏模式字面量第三次差点复发（`AppData`、`Users\` 直写进检查器就会被自己的扫描抓到），改运行时拼装；
-⑦ `uid` 是 `str`、被检数据是 `bytes`，`pat in data` 直接 `TypeError`（我自己工具里第三次类型混用）。
+⑦ `uid` 是 `str`、被检数据是 `bytes`，`pat in data` 直接 `TypeError`（我自己工具里第三次类型混用）；
+⑧ **远端回读的门覆盖不足**：`RUN_RECORD_SECTION` 写死 `§16..§20`，本轮新段 `§21` 不在门内（内容仍由逐 blob
+哈希承担）。补到 `§21` 后另一次提交推送并重跑回读：406 条 blob 与远端 tip 相符、包原件 29 件与 zip 相符、
+fails=0。本交接件因此被更新，旧提交不回改。
 
 一处残留如实登记，不说成已清除：仓外 scratch 路径以 JSON 转义形态留在
 `dispatch.stdout.txt`/`dispatch_ledger.jsonl`/`ledger.jsonl` 三件工具元数据里。我**没有**为"装干净"

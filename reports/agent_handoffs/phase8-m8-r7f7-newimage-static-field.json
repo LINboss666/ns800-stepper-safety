@@ -258,7 +258,8 @@
   "跨阶段台账 dispatch_ledger.jsonl 第一版未归档, 与 idle-stack-r4 先例不符",
   "隐私判据第一版是恒真比较(把 UID 拼进被检数据) — 改合成脏样本 5/5 命中",
   "泄漏模式字面量第三次差点复发(AppData/Users 直写进检查器) — 改运行时 bytes([92])/bytes([47]) 拼装",
-  "类型混用: uid 是 str 而被检数据是 bytes, pat in data 直接 TypeError"
+  "类型混用: uid 是 str 而被检数据是 bytes, pat in data 直接 TypeError",
+  "远端回读的 run_record 段检查写死成 §16..§20, 本轮新追加的 §21 不在门内(内容仍由逐 blob 哈希承担); 补到 §21 后另一次提交推送重算清单与回读"
  ],
  "residual_disclosed_not_fixed": {
   "what": "仓外 scratch 路径以 JSON 转义形态留在 3 件工具元数据(dispatch.stdout.txt/dispatch_ledger.jsonl/ledger.jsonl)",
@@ -294,6 +295,13 @@
  "push_and_readback": {
   "convention": "提交→代理推送→远端逐 blob 回读; 回读报告写在仓外 D:/ns800_r7f7_readback/, 不入清单(避免自引用循环)",
   "tool": "reports/reviews/phase8-m8-r7f7-newimage-static/tools/r7f7_remote_readback.py",
+  "commits_this_round": "本轮已推 2 次(证据提交 + 回读门覆盖补到 §21); 本文件若再随下一提交改动, 计数不在这里自记",
+  "commit_reasons": [
+   "现场轮证据 + 判读 + 交接",
+   "回读工具的 run_record 段覆盖补到 §21(上一版只钉 §16..§20)"
+  ],
+  "fast_forward_proved_before_each_push": true,
+  "final_readback": "逐 blob 406 条(本轮清单 100 + R7F6 78 + r7f2b 228)全部与远端 tip 相符, 包原件 29 件与 zip 相符, BIN/AXF/执行器散列相符, 产品子树 32470c7e… 相符, fails=0",
   "figures_not_self_recorded": true
  }
 }
