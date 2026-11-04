@@ -1,0 +1,183 @@
+{
+ "round": "M8-R7F8 草案离线核对轮（A 的保护闭环任务书草案 + 操作者四项补充；设备动作 0）",
+ "date_local": "2026-11-05",
+ "repo_tip_at_start": "4984ee966e3f87ab9573c8f716e971696d068023",
+ "branch": "feature/m8-r7d1-async-learn-offline",
+ "inputs": {
+  "draft_original": {
+   "file": "reports/reviews/phase8-m8-r7f8-closed-loop-draft/A_DRAFT_ORIGINAL.md",
+   "bytes": 24780,
+   "sha256": "b572c1928f60148ea2e512d552fc45ceba9c41226924c9e1dde37d79ddfe9053",
+   "status_declared_in_file": "DRAFT_NOT_AUTHORIZED, 硬件批准额度全部 0",
+   "received_from": "操作者转交 A 的任务书草案(单文件, 无 zip/无 SHA256SUMS)"
+  },
+  "operator_supplement": {
+   "items": 4,
+   "instruction_verbatim": "补充并更正已下发的 R7F8 任务书，请合并到现有文件继续，不另开纯登记轮",
+   "merged_into": "同一份任务书就地修订(保留 §9 修订记录), 未另开平行任务书"
+  }
+ },
+ "merge_result": {
+  "merged_file": "reports/reviews/phase8-m8-r7f8-closed-loop-draft/R7F8_DRAFT_MERGED.md",
+  "merged_bytes": 31807,
+  "merged_sha256": "270383c12b1cc3994e6fbd21c7ce982025fe77cbd00440d3a7393d5db42cb81b",
+  "original_bytes_untouched": true,
+  "live_copy_location": "操作者侧 Downloads 目录里的同名任务书(本机绝对路径与用户名不入仓库; 逐字节对账由 tools/r7f8_remote_readback.py 用环境变量 RBI_ORIG 现场读那份字节完成)",
+  "placed_sections": {
+   "item1_rated_current": "§1 表新增行 + §1.2 第 1 条 + §3 电气栏(额定电流不再列缺项)",
+   "item2_history_basis": "§1 表新增行 + §1.2 第 2 条 + §3 机械/运行工况栏",
+   "item3_start_order": "§1.2 第 3 条 + §4.3 约束条 + §5 P2 第 1 步整体替换",
+   "item4_handover": "§1.2 第 4 条",
+   "quota_statement": "§7 表前新增声明(不增加既有动作额度) + §9 修订记录新增一行"
+  },
+  "quotas_still_zero": true
+ },
+ "device_actions_this_round": {
+  "serial_port_open": 0,
+  "dispatch": 0,
+  "download": 0,
+  "readback": 0,
+  "explicit_reset": 0,
+  "any_motor_command_arm_start_stop_disarm": 0,
+  "any_diag_profile_write_command": 0,
+  "logic_analyzer": 0,
+  "keil_build": 0,
+  "pyocd_invoked": false,
+  "approval_ledger_opened": false,
+  "ledger_probe": "核准根目录下 *R7F8* 匹配 0 件 => 本轮未消耗任何硬件额度"
+ },
+ "handover_fact_check_against_r7f7_archive": {
+  "round_manifest_entries": 100,
+  "package_originals": 29,
+  "field_archive_entries": 53,
+  "readback_byte_equal_to_accepted_bin": true,
+  "boot_capture_bytes": 3468,
+  "drain_declared_vs_spent_s": "75.0/75.0(DRAIN_BUDGET_REACHED)",
+  "learn_response_t_s": 77.563,
+  "terminal_query_t_s": 81.594,
+  "commands_in_open_interval": 0,
+  "enn_feedback_verdict_lines_present": true,
+  "ram_left_id1_failed_window_broken": true,
+  "b_predicates": "99 条 FAIL=0, 其中 10 条必须会命中的负控",
+  "not_endorsed_by_me": "草案称 A 独立复核 23 项 FAIL=0 —— A 侧运行, 我仓库内无其原始输出, 只登记为 A 自报"
+ },
+ "draft_items_needing_change": [
+  {
+   "n": 1,
+   "where": "§4.2 末段",
+   "claim": "加减速例外只抑制 SG/负载判据",
+   "reality": "diag_relative.c:491-497 在 ACCEL/DECEL 时 reset 计数并 return, 而冲击判定在 :595-610 ⇒ 连 REL_IMPACT 一起被抑制; 且 :493 的源码注释与代码不一致",
+   "consequence": "P4 的 IMU 刺激必须落在 CRUISE 段; 无刺激正常段要能证明当时确在 CRUISE"
+  },
+  {
+   "n": 2,
+   "where": "§4.2 ADC 行",
+   "claim": "达到持续时间及新 ADC 数量要求",
+   "reality": "diag_relative.c:643 硬编码 adc_strong_cnt >= 2u(融合 :651 同样 2u); SG 才用 p->min_new_sg",
+   "consequence": "定稿不得把 ADC 新样本数写成可调参数"
+  },
+  {
+   "n": 3,
+   "where": "§4.2 表最后两行",
+   "claim": "源失效/覆盖异常是另定范围的独立降险路径",
+   "reality": "diag_relative.c:65-69 把 7 个原因全列为 severe, 统一走 :725 safety_post_event(EVT_MULTI_FAULT) 并共用 :1061 的一枚一次性票据",
+   "consequence": "任一原因先触发即吃票 ⇒ 三场刺激每场都要 diag_mode relative CONFIRM_EXPERIMENTAL 重建代次"
+  },
+  {
+   "n": 4,
+   "where": "§4.3 末条",
+   "claim": "恢复计数需要独立新样本与两个源的正常证据, 属 fault_reset 复核门",
+   "reality": "safety_state.c 的 fault_reset 无任何样本计数; 该判据在 diag_relative.c:384-385 且要求 ok_src_seen==3u(ADC+SG+IMU 三源)",
+   "consequence": "P5 的恢复验收要分两层: fault_reset 的门(电平/pad/停脉冲复核) 与引擎票据解除条件(需重进 relative)"
+  },
+  {
+   "n": 5,
+   "where": "§4.1/§5 P2",
+   "claim": "学习在 MONITOR_ONLY 下进行",
+   "reality": "写法正确, 但判据要钉字面量: diag_relative.c:2016 learn REFUSED: mode must be MONITOR_ONLY, 且 :1725 每拍复核",
+   "consequence": "预期拒绝白名单按整行锚定, 不接受被改写成非 ACTIVE 即可"
+  }
+ ],
+ "executor_capability_answer_for_section8_prereq2": {
+  "expressible_as_is": [
+   "tmc_config_apply CONFIRM",
+   "diag_profile zero N",
+   "diag_profile learn N LO HI DIR",
+   "diag_profile commit",
+   "diag_mode relative CONFIRM_EXPERIMENTAL",
+   "motor_dir/target/arm/start/stop/disarm",
+   "fault_reset",
+   "learn_cancel <ID>(无额度键, 只读步骤)"
+  ],
+  "structural_gaps": [
+   {
+    "gap": "有界轮询 learn_status 到 DONE",
+    "evidence": "m8r3_serial_chain.py:1939 重试要求响应含 [MOT] state= 且属 ACCEL/DECEL",
+    "needed_offline_work": "新增非运动类轮询合同(until_seconds/interval_seconds/具名 retry code) + 反例"
+   },
+   {
+    "gap": "JOB_ID 从真实回包取值再发给 learn_cancel",
+    "evidence": ":2083 cmd 静态取自 plan; 全执行器唯一动态命令拼接是 flash_dump(:3004), record_from 只喂日志窗口",
+    "needed_offline_work": "捕获组到命令文本的受控替换 + 反例(不许现场拆错误门)"
+   },
+   {
+    "gap": "stop 与 disarm 分开收口",
+    "evidence": ":1413 固定清理三条 motor_stop→motor_disarm→motor_status",
+    "needed_offline_work": "收口形状可申报, 或明确接受重复撤能并披露"
+   },
+   {
+    "gap": "arm 自身的独立通电截止",
+    "evidence": "运动预算只在 motor_start 起算(:2177 置 start_attempt; 步内截止 :2120)",
+    "needed_offline_work": "定稿给 arm→start 间隔上限并加判据"
+   }
+  ],
+  "quota_map": "QUOTA_COMMAND_KEYS 共 9 条前缀 / 8 个不同键; learn_cancel/motor_stop/disarm/fault_reset 不在表内",
+  "analyzer": "tools 后端只认 download/readback/reset/reboot ⇒ 分析仪不能与串口同一次 dispatch 编排(草案 §7 分开计数正确)",
+  "closeout_reserve_semantics": ":1638 RESERVE_EXHAUSTED_SENT_ANYWAY ⇒ 额度用尽仍发收口, 草案 §7 的预留要按这条真实语义写"
+ },
+ "parameters_still_needed_from_operator": [
+  "DIR 与目标 STEP HZ、学习窗 LO/HI、加减速、每段硬截止与总运行预算",
+  "N_CANCEL 与 N_DONE(8..32 内)、N_ZERO(32..256 内)的具体值",
+  "SG/ADC/IMU 各自可控可解除可重复的刺激方法、上限、时长、次数",
+  "允许行程/转角、限位现状、人员隔离、可直接操作的硬件禁能手段位置",
+  "运动保护门禁依据(极性证据/受控试验、IRQ 范围、独立停机条件)",
+  "仪器采样率/通道/保留长度/导出方法与时钟对齐",
+  "负载/传动/行程相较历史空载台架有无变化的现场核对结论"
+ ],
+ "source_fixed_bounds": {
+  "learn_N": "8..32(diag_relative.c:2297)",
+  "zero_N": "32..256(:2290)",
+  "LO_HI": "1..20000 且 LO<=HI(:2297-2299)",
+  "DIR": "0|1",
+  "cmd_deadline_ms": "12000 编译期常量(:1337)",
+  "thread_tick_ms": 10,
+  "shell_ctx_wait_ms": 20,
+  "impact_peak_default_mg": 2500,
+  "impact_new_min_default": 2,
+  "dur_impact_ms_default": 100,
+  "age_imu_ms_default": 100
+ },
+ "judgement": {
+  "tool": "reports/reviews/phase8-m8-r7f8-closed-loop-draft/tools/r7f8_draft_checks.py",
+  "predicate_log": "reports/reviews/phase8-m8-r7f8-closed-loop-draft/proof/r7f8_draft_checks.txt",
+  "predicates": 116,
+  "fail": 0,
+  "summary_line": "R7F8_DRAFT_SUMMARY|判据=116|FAIL=0|none",
+  "must_fire_negative_controls": 3,
+  "narrative": "reports/reviews/phase8-m8-r7f8-closed-loop-draft/DRAFT_REVIEW.md"
+ },
+ "boundaries_kept": {
+  "product_code_changes": 0,
+  "firmware_rebuilt": 0,
+  "executor_modified": false,
+  "r7f7_archive_bytes_modified": 0,
+  "old_round_evidence_modified": 0,
+  "no_execution_offered": true,
+  "draft_still_unauthorized": true
+ },
+ "next_step_owners": {
+  "A_or_operator": "对 5 处口径做决定并填入 §3 待定参数",
+  "me_offline_only": "两条结构性缺口的执行器适配 + 反例(需要一句去做适配的授权; 我不会顺手动板)",
+  "after_that": "把 §5 变成可 dispatch 的 plan/rows/needles, 离线 validate-plan + stub 整包, 再停在一次明确批准前"
+ }
+}
