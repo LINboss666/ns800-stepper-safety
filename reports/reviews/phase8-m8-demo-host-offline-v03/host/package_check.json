@@ -1,0 +1,33 @@
+{
+  "data_integrity": "PASS",
+  "frames": 7,
+  "data_integrity_scope": "PACKAGE_CONSISTENCY_ONLY",
+  "archive_sources": {
+    "status": "SKIPPED_NO_REPOSITORY",
+    "matched_frames": 0,
+    "reason": "Only package consistency was checked; use --repo-root to compare archived files."
+  },
+  "parser_controls": "PASS",
+  "final_historical_snapshot": {
+    "safety": "READY",
+    "fault": "0",
+    "driver": "CONFIGURED",
+    "protection": "NO",
+    "irq": "CLOSED",
+    "armed": "0",
+    "current_hz": "0",
+    "target_hz": "0",
+    "request": "LOW",
+    "pad": "0",
+    "enn": "1",
+    "feedback": "OK",
+    "arm_mask": "0x8",
+    "params": "IRUN 20 · IHOLD 8 · DLY 4 · TPD 8 · VSENSE 1",
+    "seen": [
+      "configured_summary",
+      "system"
+    ]
+  },
+  "hardware_actions": 0,
+  "desktop_gui_started": false
+}

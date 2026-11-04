@@ -1,0 +1,12 @@
+[
+  {
+    "path": "verification/gui/motor_post.jpg",
+    "bytes": 113847,
+    "sha256": "aba8f1c277b487caba9b3c0829d77ed2c2c766c4611728d3679300f8480abce6"
+  },
+  {
+    "path": "verification/gui/motor_pre.jpg",
+    "bytes": 112696,
+    "sha256": "f0e4d5d1af7a780cc3f03f6683feeb88463184b7fde90da6f10fc2a8b5239dc4"
+  }
+]

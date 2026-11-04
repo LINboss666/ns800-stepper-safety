@@ -1,0 +1,11 @@
+状态中性篡改选点: 偏移=26 行='[MOT] state=0 name=OTHER'  0 -> 1
+== 反例复跑(V0.3) ==
+repo_missing_root                rc=1(期望1) MATCH archive=None 首行错误=检查失败：[WinError 2] 系统找不到指定的文件。: 'D:\\ns800_r7f1_scratch\\v03_review_box\\neg\\does_not_exist'
+archive_file_missing             rc=1(期望1) MATCH archive=None 首行错误=检查失败：[WinError 2] 系统找不到指定的文件。: 'D:\\ns800_r7f1_scratch\\v03_review_box\\neg\\missing_one\\reports\\reviews\\phase8-m8-r7f2b-safety-print-fix\\field\\field-20261
+one_byte_changed                 rc=1(期望1) MATCH archive=None 首行错误=检查失败：归档原件与回放文本不相等：reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T015928Z/S_S1/02_mot_pre.rx.bin；首个差异位置 0
+self_consistent_tamper_vs_repo   rc=1(期望1) MATCH archive=None 首行错误=检查失败：归档原件与回放文本不相等：reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T015928Z/S_S1/02_mot_pre.rx.bin；首个差异位置 26
+tampered_pkg_only_blind          rc=0(期望0) MATCH archive=SKIPPED_NO_REPOSITORY 首行错误=-
+malformed_source_paths           rc=1(期望1) MATCH archive=None 首行错误=检查失败：来源路径必须为规范的仓库根相对路径 reports/...：reviews/x.rx.bin
+反例复跑: 场景=6 与声称一致=6 不符=0
+注: tampered_pkg_only_blind 期望 rc=0 —— 被篡改的包只查包内时应当通过, 用来证明拦截确实来自外部归档原件比对, 不是包内自证。
+注: 篡改选点由 pick_neutral_edit 现场挑出, 并用应用自己的 Snapshot.update 逐行证过状态中性。

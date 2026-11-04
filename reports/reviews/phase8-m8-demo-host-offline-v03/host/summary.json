@@ -1,0 +1,132 @@
+{
+  "identity": [
+    {
+      "role": "V0_3",
+      "name": "NS800_Demo_Offline_V0_3.zip",
+      "bytes": 179861,
+      "sha256": "b1e257cc7edfd10838b98120f938c974f4c3a63eb002b926f2401f10638a8113"
+    },
+    {
+      "role": "V0_2",
+      "name": "NS800_Demo_Offline_V0_2.zip",
+      "bytes": 402497,
+      "sha256": "426ebca8962457774617bb3768cff10af1bd1d6dd827e3c7905521e580d9ab5b"
+    },
+    {
+      "role": "V0_1",
+      "name": "NS800_Demo_Offline_V0_1.zip",
+      "bytes": 11445,
+      "sha256": "ba6b63a2f201150844c97b0c480a6ebfb26ac89887cbd4f707e26dcfbea135e5"
+    }
+  ],
+  "checks": [
+    {
+      "name": "三份 zip 身份已按磁盘字节登记",
+      "verdict": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "V0.3 解包条目数 == 内层清单条目数+1(清单自身)",
+      "verdict": "PASS",
+      "detail": "entries=11"
+    },
+    {
+      "name": "V0.3 内层 SHA256SUMS 逐条重算全对",
+      "verdict": "PASS",
+      "detail": "10/10"
+    },
+    {
+      "name": "清单未把自身写进清单",
+      "verdict": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "包内自检 --check 退出码 0 且 7 帧",
+      "verdict": "PASS",
+      "detail": "rc=0 frames=7"
+    },
+    {
+      "name": "无 --repo-root 时明确 SKIPPED_NO_REPOSITORY(不降为跳过式假通过)",
+      "verdict": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "仓库比对 PASS 且 matched_frames=7",
+      "verdict": "PASS",
+      "detail": "rc=0 status=PASS matched=7"
+    },
+    {
+      "name": "七份仓库原件磁盘字节 == 包内内嵌原文(逐字节)",
+      "verdict": "PASS",
+      "detail": "7/7"
+    },
+    {
+      "name": "帧顺序与 R7F4 现场执行顺序一致",
+      "verdict": "PASS",
+      "detail": "['启动自检', '配置前状态', '写前电机状态', '配置命令回包', '配置后状态', '写后电机状态', '安全反馈']"
+    },
+    {
+      "name": "关闭 autocrlf 后: 被补丁三件逐字节 == 完整版",
+      "verdict": "PASS",
+      "detail": "[('demo.py', True), ('README.md', True), ('data/replay.json', True)]"
+    },
+    {
+      "name": "未进补丁的 run_demo.bat 同样逐字节 == 完整版",
+      "verdict": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "SHA256SUMS.txt 在补丁路线下仍是 V0.2 清单(预期不等)",
+      "verdict": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "系统默认 autocrlf=true 时确有行尾改写(仅行尾不同, 内容一致)",
+      "verdict": "PASS",
+      "detail": "[('demo.py', 437, 0), ('README.md', 68, 0), ('data/replay.json', 73, 0)]"
+    },
+    {
+      "name": "补丁路线产出的包同样通过 --check(7 帧)",
+      "verdict": "PASS",
+      "detail": "rc=0 frames=7"
+    },
+    {
+      "name": "补丁后 V0.2 清单只对三件过期(补丁未更新清单, 属已知口径)",
+      "verdict": "PASS",
+      "detail": "['README.md', 'data/replay.json', 'demo.py']"
+    },
+    {
+      "name": "反例落盘存在且逐例判定齐全",
+      "verdict": "PASS",
+      "detail": "反例复跑: 场景=6 与声称一致=6 不符=0"
+    },
+    {
+      "name": "反例复跑与声称一致(不符=0)",
+      "verdict": "PASS",
+      "detail": "反例复跑: 场景=6 与声称一致=6 不符=0"
+    },
+    {
+      "name": "反例落盘无异常回溯(Traceback 不出现)",
+      "verdict": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "导入面仅标准库+tkinter, 无 serial/socket/subprocess/os/ctypes",
+      "verdict": "PASS",
+      "detail": "['__future__', 'argparse', 'dataclasses', 'hashlib', 'json', 'pathlib', 're', 'sys', 'tkinter']"
+    },
+    {
+      "name": "AST 里不存在对禁用模块的名字或属性引用(设备动作面为空)",
+      "verdict": "PASS",
+      "detail": "[]"
+    },
+    {
+      "name": "A 包内两张写前/写后截图存在且身份已登记",
+      "verdict": "PASS",
+      "detail": "['verification/gui/motor_post.jpg', 'verification/gui/motor_pre.jpg']"
+    }
+  ],
+  "fails": 0,
+  "total": 21,
+  "scope": "离线复核: 只读三份 zip、解包副本与 D:/ns800 归档原件; 未连接设备, 设备动作 0; 仓库比对只证磁盘字节, 不证 Git HEAD, 也不证当前板端状态。"
+}

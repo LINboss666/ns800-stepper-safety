@@ -1,0 +1,30 @@
+# sha256 * <仓库相对路径>(LF, 无 BOM; 本清单不哈希自身字节 —— 一条清单不能给自己的字节作证)
+# 生成方式: 对 reports/reviews/phase8-m8-demo-host-offline-v03/ 下每个常规文件(排除 SHA256SUMS.txt、remote_readback.md 与 __pycache__) 直接读磁盘字节算 sha256
+# 条目数=26; 与 Git blob 的逐条复算由 host/staged_preflight_batch.py(提交前, 单批流)与推送后的远端逐 blob 回读完成
+# 重新生成: python reports/reviews/phase8-m8-idle-stack-r4/host/make_round_sums.py <本目录>
+c0a30d879ff4e8df9c993e307d888dabfd6b97d9dd77e04d9b4fe923ce89c866  reports/reviews/phase8-m8-demo-host-offline-v03/gui/frame3_0x18.json
+3c3c33da7499ccf46ef86ad670c6e226511e49b8fc1117e657ef9529ffac1f49  reports/reviews/phase8-m8-demo-host-offline-v03/gui/frame3_0x18.png
+82599c65c67008f1f1a1e1d8ec4294ce1d4f1dee11ae8ad3e63b028592f1de74  reports/reviews/phase8-m8-demo-host-offline-v03/gui/frame6_0x8.json
+9cf2444dbcb51c386c7dc64c60b4f80e04fd855d1c46fd09e97cb4ba916920bb  reports/reviews/phase8-m8-demo-host-offline-v03/gui/frame6_0x8.png
+a4dc1fee5ca02c110ec26011b6a5cb9b3d15167bae9930e4920e1cc9ce9570d6  reports/reviews/phase8-m8-demo-host-offline-v03/gui/README.txt
+5ccb3b60b8b0a187495509161ed7d138092f2ff62d178df8f54de7dcada910a2  reports/reviews/phase8-m8-demo-host-offline-v03/handoff_DEMO_V03_review.json
+31cb15d9acd9ea34e15085d9eb702b4291b4a63c454fd6c99fb4fc162fac352d  reports/reviews/phase8-m8-demo-host-offline-v03/handoff_DEMO_V03_review.md
+4e7fdfe9934783c8859691871a28ca0d237194cb815c8cd4fa299df06aa150f7  reports/reviews/phase8-m8-demo-host-offline-v03/host/archive_recompute.json
+29d3389a2d11ab0306fc69ad47c825dfe2438373f0bc3d5f896d1cc04679adb1  reports/reviews/phase8-m8-demo-host-offline-v03/host/author_gui_identity.txt
+60b28bf38acf13fad4698c06f4c1537a4037d4c057fddbfed6ef42b9e48061f6  reports/reviews/phase8-m8-demo-host-offline-v03/host/imports_audit.txt
+04b1f96465863fbe7206eb36bdbc0307369e6f705aff529968757e0927ae46ec  reports/reviews/phase8-m8-demo-host-offline-v03/host/manifest_recompute.txt
+dd81695b64154c194c617101fc0b385a2b048c25c7fb68346bc959237fe845d7  reports/reviews/phase8-m8-demo-host-offline-v03/host/negative_controls.txt
+5340d65e777ff178d160790cfa334b95e8895d3eff8694194e46fba41527424a  reports/reviews/phase8-m8-demo-host-offline-v03/host/package_check.json
+7578de13c4893573dcf2c2983d25a3531764e4ed9d91761f77fb310dbae8147e  reports/reviews/phase8-m8-demo-host-offline-v03/host/patch_roundtrip.json
+58e9f98481d24dd0787cd7df56dbe25d196e549357b1e677e97ab6e78bd66de7  reports/reviews/phase8-m8-demo-host-offline-v03/host/patched_manifest_staleness.txt
+5340d65e777ff178d160790cfa334b95e8895d3eff8694194e46fba41527424a  reports/reviews/phase8-m8-demo-host-offline-v03/host/patched_pkg_check.json
+9578574c41aa380fc23a843296069d1e6c07102306f7affb8d3df7110a76f895  reports/reviews/phase8-m8-demo-host-offline-v03/host/repo_check.json
+2c58bf51295b9349ba399d8ad8ceb85c2a25b21e49f4ab02488ae6c3ad8c1a76  reports/reviews/phase8-m8-demo-host-offline-v03/host/summary.json
+15ac764a8ab3fbd80c5d4c9441fe44df06b4f817c201bbe73235f05fc232fef8  reports/reviews/phase8-m8-demo-host-offline-v03/run_record.md
+cff9367e1194c643b2c6da1b5690f8b5e055a8133fc089222657b261992b70ae  reports/reviews/phase8-m8-demo-host-offline-v03/tools/demo_gui_probe.py
+575476beded8e80e9100544472eafd3167f958b551ca5a93a5e82ba0f1d036a8  reports/reviews/phase8-m8-demo-host-offline-v03/tools/demo_gui_shot.ps1
+e977bd1009b3f8521150a4523d80a2601faada84dca49f1833945749570f0016  reports/reviews/phase8-m8-demo-host-offline-v03/tools/demo_negative_controls.py
+be5d98c85c9f7ed0b18cbdd4498f76f9bacabcddb69a2de6027f1b1c42ec0753  reports/reviews/phase8-m8-demo-host-offline-v03/tools/demo_review_checks.py
+134c2e20958220f93ce07d2966fd399aa1a497e8b9d8d78905d5d9d7796e5421  reports/reviews/phase8-m8-demo-host-offline-v03/tools/gen_handoff_demo_v03.py
+88eeaf08b6511660b52b66bea8d6486fcbf018302fceed8ac7dcffe4d4d940d2  reports/reviews/phase8-m8-demo-host-offline-v03/tools/remote_readback_demo_v03.py
+4c1ef77ba5e6aacd87023030895e00a232ba8466a768f3b799aba836a613c846  reports/reviews/phase8-m8-demo-host-offline-v03/tools/round_preflight_demo_v03.py

@@ -1,0 +1,127 @@
+{
+  "patch_bytes": 15266,
+  "patch_sha256": "1e00c26bc50e656518f2164004bc1bba79ceacf6a530f1b12ecfc75681ea9b60",
+  "patched_files": [
+    "README.md",
+    "data/replay.json",
+    "demo.py"
+  ],
+  "runs": [
+    {
+      "label": "autocrlf_off",
+      "git_cmd": "git -c core.autocrlf=false apply -p1 D:\\ns800_r7f1_scratch\\v03_review_box\\V0_3\\NS800_Demo_Offline_V0_3\\upgrade_v02_to_v03.patch",
+      "apply_rc": 0,
+      "apply_stderr": "",
+      "files": [
+        {
+          "path": "demo.py",
+          "in_patch": true,
+          "bytes_applied": 21212,
+          "bytes_v03": 21212,
+          "byte_equal": true,
+          "cr_in_applied": 0,
+          "cr_in_v03": 0,
+          "equal_after_lf_normalize": true
+        },
+        {
+          "path": "README.md",
+          "in_patch": true,
+          "bytes_applied": 3880,
+          "bytes_v03": 3880,
+          "byte_equal": true,
+          "cr_in_applied": 0,
+          "cr_in_v03": 0,
+          "equal_after_lf_normalize": true
+        },
+        {
+          "path": "data/replay.json",
+          "in_patch": true,
+          "bytes_applied": 12225,
+          "bytes_v03": 12225,
+          "byte_equal": true,
+          "cr_in_applied": 0,
+          "cr_in_v03": 0,
+          "equal_after_lf_normalize": true
+        },
+        {
+          "path": "run_demo.bat",
+          "in_patch": false,
+          "bytes_applied": 137,
+          "bytes_v03": 137,
+          "byte_equal": true,
+          "cr_in_applied": 9,
+          "cr_in_v03": 9,
+          "equal_after_lf_normalize": false
+        },
+        {
+          "path": "SHA256SUMS.txt",
+          "in_patch": false,
+          "bytes_applied": 1844,
+          "bytes_v03": 882,
+          "byte_equal": false,
+          "cr_in_applied": 0,
+          "cr_in_v03": 0,
+          "equal_after_lf_normalize": false
+        }
+      ]
+    },
+    {
+      "label": "system_default",
+      "git_cmd": "git apply -p1 D:\\ns800_r7f1_scratch\\v03_review_box\\V0_3\\NS800_Demo_Offline_V0_3\\upgrade_v02_to_v03.patch",
+      "apply_rc": 0,
+      "apply_stderr": "",
+      "files": [
+        {
+          "path": "demo.py",
+          "in_patch": true,
+          "bytes_applied": 21649,
+          "bytes_v03": 21212,
+          "byte_equal": false,
+          "cr_in_applied": 437,
+          "cr_in_v03": 0,
+          "equal_after_lf_normalize": true
+        },
+        {
+          "path": "README.md",
+          "in_patch": true,
+          "bytes_applied": 3948,
+          "bytes_v03": 3880,
+          "byte_equal": false,
+          "cr_in_applied": 68,
+          "cr_in_v03": 0,
+          "equal_after_lf_normalize": true
+        },
+        {
+          "path": "data/replay.json",
+          "in_patch": true,
+          "bytes_applied": 12298,
+          "bytes_v03": 12225,
+          "byte_equal": false,
+          "cr_in_applied": 73,
+          "cr_in_v03": 0,
+          "equal_after_lf_normalize": true
+        },
+        {
+          "path": "run_demo.bat",
+          "in_patch": false,
+          "bytes_applied": 137,
+          "bytes_v03": 137,
+          "byte_equal": true,
+          "cr_in_applied": 9,
+          "cr_in_v03": 9,
+          "equal_after_lf_normalize": false
+        },
+        {
+          "path": "SHA256SUMS.txt",
+          "in_patch": false,
+          "bytes_applied": 1844,
+          "bytes_v03": 882,
+          "byte_equal": false,
+          "cr_in_applied": 0,
+          "cr_in_v03": 0,
+          "equal_after_lf_normalize": false
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,117 @@
+{
+  "package": "D:\\ns800_r7f1_scratch\\v03_review_box\\V0_3\\NS800_Demo_Offline_V0_3",
+  "geometry": "1180x820",
+  "target_frame": 6,
+  "buttons": [
+    {
+      "text": "播放全部记录",
+      "bbox": [
+        24,
+        716,
+        148,
+        767
+      ],
+      "inside_client": true,
+      "state": "normal"
+    },
+    {
+      "text": "暂停回放",
+      "bbox": [
+        158,
+        716,
+        256,
+        767
+      ],
+      "inside_client": true,
+      "state": "normal"
+    },
+    {
+      "text": "下一步记录",
+      "bbox": [
+        266,
+        716,
+        377,
+        767
+      ],
+      "inside_client": true,
+      "state": "normal"
+    },
+    {
+      "text": "回到启动记录",
+      "bbox": [
+        387,
+        716,
+        511,
+        767
+      ],
+      "inside_client": true,
+      "state": "normal"
+    }
+  ],
+  "future_buttons": [
+    {
+      "text": "启动电机 · 待联调",
+      "state": "disabled"
+    },
+    {
+      "text": "保护触发 · 待验证",
+      "state": "disabled"
+    },
+    {
+      "text": "故障恢复 · 待验证",
+      "state": "disabled"
+    }
+  ],
+  "string_vars": [
+    "NS800  /  丝杆驱动与异常保护",
+    "竞赛演示端 V0.3     历史实机数据回放 · 未连接设备",
+    "当前为离线回放：按钮只切换记录，不连接 COM / DAP，不向电机发送指令。\n数据来自 R7F3 启动和 R7F4 配置两个历史场次；不是当前实时状态。",
+    "系统状态",
+    "READY",
+    "驱动配置",
+    "已配置",
+    "当前回放中的输出",
+    "禁能一致",
+    "保护准备",
+    "尚未就绪",
+    "演示流程",
+    "01  启动自检",
+    "02  配置前状态",
+    "03  写前电机状态",
+    "04  配置命令回包",
+    "05  配置后状态",
+    "06  写后电机状态",
+    "07  安全反馈",
+    "后续联调：\n极性 / IRQ → 正常 arm / disarm\n→ 学习 → 目标通道保护触发",
+    "写后电机状态",
+    "配置完成后的真实 motor_status：仍静止禁能，arm 门降为 0x8。",
+    "当前频率  0 Hz      目标频率  0 Hz      武装  0\n请求  LOW      焊盘  0      ENN  1      反馈  OK\n故障码  0      IRQ  CLOSED      arm 门  0x8",
+    "固件设置值：IRUN 20 · IHOLD 8 · DLY 4 · TPD 8 · VSENSE 1  （电流未实测）",
+    "SG、电流、振动曲线：等待动态采样联调\n保护触发 / 正常 disarm / 带载最坏栈：仍待现场验证",
+    "历史 R7F4  ·  第 6/7 步  ·  1080 B  ·  SHA256 fa69aa5cf5a1…  ·  当前未连接设备"
+  ],
+  "raw_text": {
+    "chars": 1036,
+    "sha256": "fa69aa5cf5a11917ee3b00f06e2822ee66979c1aae576f3f1eb4a0bd85ff2215",
+    "head": "motor_status\r\n[MOT] state=0 name=OTHER\r\n[MOT] cur_hz=0 tgt_hz=0 accel=2000 decel=2000 dir=0\r\n[MOT] armed=0 drv_en_request=0 health=OK\r\n[MOT] guard stops=0 reason=0\r\n[MOT] guard reason map: 0=none 1=cf"
+  },
+  "tabs": [
+    "状态与操作",
+    "原始回包"
+  ],
+  "client": [
+    1180,
+    820
+  ],
+  "verdict": {
+    "all_control_buttons_inside": true,
+    "source_line_present": true,
+    "source_line": "历史 R7F4  ·  第 6/7 步  ·  1080 B  ·  SHA256 fa69aa5cf5a1…  ·  当前未连接设备",
+    "facts_block_arm_gate": "当前频率  0 Hz      目标频率  0 Hz      武装  0 | 请求  LOW      焊盘  0      ENN  1      反馈  OK | 故障码  0      IRQ  CLOSED      arm 门  0x8",
+    "arm_gate_mentions_all": [
+      "配置完成后的真实 motor_status：仍静止禁能，arm 门降为 0x8。",
+      "当前频率  0 Hz      目标频率  0 Hz      武装  0 | 请求  LOW      焊盘  0      ENN  1      反馈  OK | 故障码  0      IRQ  CLOSED      arm 门  0x8"
+    ],
+    "param_line": "固件设置值：IRUN 20 · IHOLD 8 · DLY 4 · TPD 8 · VSENSE 1  （电流未实测）"
+  }
+}

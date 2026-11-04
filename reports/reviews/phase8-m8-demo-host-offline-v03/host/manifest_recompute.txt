@@ -1,0 +1,11 @@
+# V0.3 包内 SHA256SUMS.txt 逐条重算(清单不哈希自身)
+OK  ed4beb8b028eb2ec6d51e829deff8a71e458df5fc3c2398b774aff20d88e41d6  README.md
+OK  c205c440916280ed3ed749646b3536f7945407c33da2c41fab70e1f9187b8b7a  data/replay.json
+OK  7b7c45d76210d678453717ccea2fe612f0d416a3851c62339f822f9e383062ca  demo.py
+OK  5b52ca6e09c4d4c64dcd0e031a336e72c267b9cda3ba92c56c23c0bb12465c89  run_demo.bat
+OK  1e00c26bc50e656518f2164004bc1bba79ceacf6a530f1b12ecfc75681ea9b60  upgrade_v02_to_v03.patch
+OK  aba8f1c277b487caba9b3c0829d77ed2c2c766c4611728d3679300f8480abce6  verification/gui/motor_post.jpg
+OK  f0e4d5d1af7a780cc3f03f6683feeb88463184b7fde90da6f10fc2a8b5239dc4  verification/gui/motor_pre.jpg
+OK  010bdfa7e9f78e6ad199e8f0392039abfe6da18d2ad19e2fd12871d45f9a8573  verification/package_check.json
+OK  aa40813e267395611dfb381dfca4e0e0032d3ef5d2b03d941a7c84671e7a1c9f  verification/repo_check.json
+OK  bb088610c5bb392acdfe0b530dfd63708327e84ac95fd2ac5be6e982a9f6a750  verification/result.json

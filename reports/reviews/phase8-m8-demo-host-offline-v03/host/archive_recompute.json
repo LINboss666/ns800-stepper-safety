@@ -1,0 +1,72 @@
+[
+  {
+    "source_path": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T001444Z/S_S3/01_rst.boot.rx.bin",
+    "title": "启动自检",
+    "disk_bytes": 3468,
+    "disk_sha256": "9e4ce2c9dd1161717bf15803ceebb4cb43fe25767e61f8f78a301841b314dff5",
+    "embedded_bytes": 3468,
+    "embedded_sha256": "9e4ce2c9dd1161717bf15803ceebb4cb43fe25767e61f8f78a301841b314dff5",
+    "embedded_text_equal": true,
+    "equal": true
+  },
+  {
+    "source_path": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T015928Z/S_S1/01_sys_pre.rx.bin",
+    "title": "配置前状态",
+    "disk_bytes": 978,
+    "disk_sha256": "dc2a1c9d0c15be76941a42a5a6f3e5b791f2aa0d0ed00639d643664df2c0a8ee",
+    "embedded_bytes": 978,
+    "embedded_sha256": "dc2a1c9d0c15be76941a42a5a6f3e5b791f2aa0d0ed00639d643664df2c0a8ee",
+    "embedded_text_equal": true,
+    "equal": true
+  },
+  {
+    "source_path": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T015928Z/S_S1/02_mot_pre.rx.bin",
+    "title": "写前电机状态",
+    "disk_bytes": 1128,
+    "disk_sha256": "f0550d3131642cd02408c88adc67f6fcb064a27ccba6ceec9c60b82e9cf0c3b5",
+    "embedded_bytes": 1128,
+    "embedded_sha256": "f0550d3131642cd02408c88adc67f6fcb064a27ccba6ceec9c60b82e9cf0c3b5",
+    "embedded_text_equal": true,
+    "equal": true
+  },
+  {
+    "source_path": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T015928Z/S_S1/03_cfg_apply.rx.bin",
+    "title": "配置命令回包",
+    "disk_bytes": 388,
+    "disk_sha256": "4629dc51c4a068294fdb7e1d83472eef4c48d8569a77a0b28890592b8b4944ed",
+    "embedded_bytes": 388,
+    "embedded_sha256": "4629dc51c4a068294fdb7e1d83472eef4c48d8569a77a0b28890592b8b4944ed",
+    "embedded_text_equal": true,
+    "equal": true
+  },
+  {
+    "source_path": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T015928Z/S_S1/04_sys_post.rx.bin",
+    "title": "配置后状态",
+    "disk_bytes": 980,
+    "disk_sha256": "6d1e56bb5515aee393e4c89b4e17c3492a790a248383bc7aec538133a835843e",
+    "embedded_bytes": 980,
+    "embedded_sha256": "6d1e56bb5515aee393e4c89b4e17c3492a790a248383bc7aec538133a835843e",
+    "embedded_text_equal": true,
+    "equal": true
+  },
+  {
+    "source_path": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T015928Z/S_S1/05_mot_post.rx.bin",
+    "title": "写后电机状态",
+    "disk_bytes": 1080,
+    "disk_sha256": "fa69aa5cf5a11917ee3b00f06e2822ee66979c1aae576f3f1eb4a0bd85ff2215",
+    "embedded_bytes": 1080,
+    "embedded_sha256": "fa69aa5cf5a11917ee3b00f06e2822ee66979c1aae576f3f1eb4a0bd85ff2215",
+    "embedded_text_equal": true,
+    "equal": true
+  },
+  {
+    "source_path": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T015928Z/S_S1/06_safety_post.rx.bin",
+    "title": "安全反馈",
+    "disk_bytes": 522,
+    "disk_sha256": "00cea3467e9b9549f2e326182aecaff435337494d79479f03cdf361b0a317b38",
+    "embedded_bytes": 522,
+    "embedded_sha256": "00cea3467e9b9549f2e326182aecaff435337494d79479f03cdf361b0a317b38",
+    "embedded_text_equal": true,
+    "equal": true
+  }
+]

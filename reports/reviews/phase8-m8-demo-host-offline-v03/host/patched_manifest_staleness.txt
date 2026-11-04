@@ -1,0 +1,21 @@
+# 关闭 autocrlf 应用补丁后, 用包内 V0.2 清单复核补丁后的树: 不符项即清单过期项
+MISMATCH  README.md
+MISMATCH  data/replay.json
+MISMATCH  demo.py
+OK  run_demo.bat
+OK  upgrade_v01_to_v02.patch
+OK  verification/archive_file_missing.txt
+OK  verification/archive_mismatch.txt
+OK  verification/base_identity.json
+OK  verification/check_result.json
+OK  verification/gui/default.jpg
+OK  verification/gui/minimum.jpg
+OK  verification/gui/raw.jpg
+OK  verification/gui/step02.jpg
+OK  verification/gui/step06.jpg
+OK  verification/gui_result.json
+OK  verification/package_only.txt
+OK  verification/patch_roundtrip.txt
+OK  verification/repo_auto.txt
+OK  verification/repo_exact.txt
+OK  verification/repo_missing.txt

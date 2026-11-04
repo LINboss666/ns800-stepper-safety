@@ -1,0 +1,8 @@
+# demo.py 设备动作面判据(只看 AST; 全文禁词只作旁证)
+
+imports: ['__future__', 'argparse', 'dataclasses', 'hashlib', 'json', 'pathlib', 're', 'sys', 'tkinter']
+banned_in_imports(AST): []
+banned_names_or_attrs(AST): []
+banned_in_raw_text(旁证): ['serial', 'subprocess']
+全文禁词命中 ['serial', 'subprocess'] 全部落在模块文档串那句声明里: 'No serial, DAP, subprocess, device connection or outgoing command implementation.'
+hardware_actions: 无串口/DAP/子进程入口, 设备动作 0

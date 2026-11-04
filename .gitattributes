@@ -103,3 +103,9 @@ reports/reviews/phase8-m8-r7f1a-minimal-c-patch/** -text
 # 这两条规则必须在提交**之前**生效, 否则入库 blob 已经是剥 CR 的形态, 事后加规则也救不回字节。
 reports/firmware/phase8-m8-r7f2b-safety-print-fix/** -text
 reports/reviews/phase8-m8-r7f2b-safety-print-fix/** -text
+
+# ===== 竞赛演示端 V0.3 复审轮: 整轮所有件(证据 JSON/文本/取证脚本/截图/清单)一律禁止行尾转换 =====
+# 同一理由: 本轮"原字节可复算"靠 blob == 磁盘字节成立。Python 直写的 JSON/TXT 是 LF 原件,
+# demo_gui_shot.ps1 与两张 PNG 是 Windows/位图原件(含 CR 或二进制), 任何一边被转换都会在
+# 逐 blob 复算与远端回读时报假 hash_mismatch。
+reports/reviews/phase8-m8-demo-host-offline-v03/** -text

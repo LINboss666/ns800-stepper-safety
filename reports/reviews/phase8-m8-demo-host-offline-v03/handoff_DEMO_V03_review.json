@@ -1,0 +1,271 @@
+{
+  "round": "DEMO-V03-review",
+  "verdict": "DEMO_HOST_V03_ACCEPTED_CLOSEOUT",
+  "reviewed_package": [
+    {
+      "role": "V0_3",
+      "name": "NS800_Demo_Offline_V0_3.zip",
+      "bytes": 179861,
+      "sha256": "b1e257cc7edfd10838b98120f938c974f4c3a63eb002b926f2401f10638a8113"
+    },
+    {
+      "role": "V0_2",
+      "name": "NS800_Demo_Offline_V0_2.zip",
+      "bytes": 402497,
+      "sha256": "426ebca8962457774617bb3768cff10af1bd1d6dd827e3c7905521e580d9ab5b"
+    },
+    {
+      "role": "V0_1",
+      "name": "NS800_Demo_Offline_V0_1.zip",
+      "bytes": 11445,
+      "sha256": "ba6b63a2f201150844c97b0c480a6ebfb26ac89887cbd4f707e26dcfbea135e5"
+    }
+  ],
+  "reviewed_patch": {
+    "file": "upgrade_v02_to_v03.patch",
+    "bytes": 15266,
+    "sha256": "1e00c26bc50e656518f2164004bc1bba79ceacf6a530f1b12ecfc75681ea9b60",
+    "files_changed_by_patch": [
+      "README.md",
+      "data/replay.json",
+      "demo.py"
+    ]
+  },
+  "baseline": {
+    "repository": "D:\\ns800",
+    "head_at_review": "0d8239f",
+    "firmware_changed_this_round": false,
+    "prior_packages_changed": false,
+    "note": "本轮只新增本复审目录; 固件、旧包与归档原件均未改(提交前预检逐条对账)"
+  },
+  "manifest": {
+    "entries_recomputed_all_ok": true,
+    "manifest_excludes_itself": true,
+    "source": "host/manifest_recompute.txt"
+  },
+  "claim_1_autocrlf_patch": {
+    "verdict": "CONFIRMED_WITH_WORDING_CORRECTION",
+    "readme_gives": "git -c core.autocrlf=false apply --check/--apply",
+    "four_files_byte_equal_after_off": {
+      "demo.py": {
+        "byte_equal": true,
+        "in_patch": true,
+        "cr": 0,
+        "bytes": 21212
+      },
+      "README.md": {
+        "byte_equal": true,
+        "in_patch": true,
+        "cr": 0,
+        "bytes": 3880
+      },
+      "data/replay.json": {
+        "byte_equal": true,
+        "in_patch": true,
+        "cr": 0,
+        "bytes": 12225
+      },
+      "run_demo.bat": {
+        "byte_equal": true,
+        "in_patch": false,
+        "cr": 9,
+        "bytes": 137
+      }
+    },
+    "fourth_file_is_unchanged_run_demo_bat_not_SHA256SUMS": true,
+    "sha256sums_txt_after_off": false,
+    "control_system_default_only_line_endings_differ": {
+      "demo.py": {
+        "byte_equal": false,
+        "in_patch": true,
+        "cr": 437,
+        "bytes": 21649
+      },
+      "README.md": {
+        "byte_equal": false,
+        "in_patch": true,
+        "cr": 68,
+        "bytes": 3948
+      },
+      "data/replay.json": {
+        "byte_equal": false,
+        "in_patch": true,
+        "cr": 73,
+        "bytes": 12298
+      },
+      "run_demo.bat": {
+        "byte_equal": true,
+        "in_patch": false,
+        "cr": 9,
+        "bytes": 137
+      }
+    },
+    "control_cr_counts": {
+      "demo.py": [
+        437,
+        0
+      ],
+      "README.md": [
+        68,
+        0
+      ],
+      "data/replay.json": [
+        73,
+        0
+      ]
+    },
+    "patched_tree_self_check": 7,
+    "stale_manifest_entries_after_patch": [
+      "demo.py",
+      "README.md",
+      "data/replay.json"
+    ],
+    "program_rework_required": false,
+    "wording_correction": "上一轮把第四件说成 SHA256SUMS.txt; 正确为未进补丁的 run_demo.bat"
+  },
+  "claim_2_seven_frames": {
+    "verdict": "CONFIRMED",
+    "package_check": {
+      "frames": 7,
+      "archive_sources": "SKIPPED_NO_REPOSITORY"
+    },
+    "repo_check": {
+      "status": "PASS",
+      "matched_frames": 7
+    },
+    "independent_disk_recompute_equal": 7,
+    "frame_order": [
+      "启动自检",
+      "配置前状态",
+      "写前电机状态",
+      "配置命令回包",
+      "配置后状态",
+      "写后电机状态",
+      "安全反馈"
+    ],
+    "new_frame_source": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T015928Z/S_S1/02_mot_pre.rx.bin",
+    "new_frame_sha256": "f0550d3131642cd02408c88adc67f6fcb064a27ccba6ceec9c60b82e9cf0c3b5"
+  },
+  "claim_3_desktop_0x18_0x8": {
+    "verdict": "CONFIRMED",
+    "author_screenshots": [
+      {
+        "path": "verification/gui/motor_post.jpg",
+        "bytes": 113847,
+        "sha256": "aba8f1c277b487caba9b3c0829d77ed2c2c766c4611728d3679300f8480abce6"
+      },
+      {
+        "path": "verification/gui/motor_pre.jpg",
+        "bytes": 112696,
+        "sha256": "f0e4d5d1af7a780cc3f03f6683feeb88463184b7fde90da6f10fc2a8b5239dc4"
+      }
+    ],
+    "local_frames": [
+      {
+        "frame": 3,
+        "label": "写前 0x18",
+        "client": [
+          1180,
+          820
+        ],
+        "arm_gate_facts_block": "当前频率  0 Hz      目标频率  0 Hz      武装  0 | 请求  LOW      焊盘  0      ENN  1      反馈  OK | 故障码  0      IRQ  CLOSED      arm 门  0x18",
+        "param_line": "本段记录未提供驱动参数；回放配置回包后显示。",
+        "source_line": "历史 R7F4  ·  第 3/7 步  ·  1128 B  ·  SHA256 f0550d313164…  ·  当前未连接设备",
+        "all_control_buttons_inside": true,
+        "raw_tab_sha256": "f0550d3131642cd02408c88adc67f6fcb064a27ccba6ceec9c60b82e9cf0c3b5",
+        "raw_tab_chars": 1084,
+        "raw_tab_equals_archive_original": true,
+        "archive_original": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T015928Z/S_S1/02_mot_pre.rx.bin",
+        "archive_original_bytes": 1128
+      },
+      {
+        "frame": 6,
+        "label": "写后 0x8",
+        "client": [
+          1180,
+          820
+        ],
+        "arm_gate_facts_block": "当前频率  0 Hz      目标频率  0 Hz      武装  0 | 请求  LOW      焊盘  0      ENN  1      反馈  OK | 故障码  0      IRQ  CLOSED      arm 门  0x8",
+        "param_line": "固件设置值：IRUN 20 · IHOLD 8 · DLY 4 · TPD 8 · VSENSE 1  （电流未实测）",
+        "source_line": "历史 R7F4  ·  第 6/7 步  ·  1080 B  ·  SHA256 fa69aa5cf5a1…  ·  当前未连接设备",
+        "all_control_buttons_inside": true,
+        "raw_tab_sha256": "fa69aa5cf5a11917ee3b00f06e2822ee66979c1aae576f3f1eb4a0bd85ff2215",
+        "raw_tab_chars": 1036,
+        "raw_tab_equals_archive_original": true,
+        "archive_original": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/field-20261104T015928Z/S_S1/05_mot_post.rx.bin",
+        "archive_original_bytes": 1080
+      }
+    ]
+  },
+  "negative_controls": {
+    "per_case_lines": 6,
+    "per_case_lines_rc_matches_expected": 6,
+    "per_case_lines_label_matched": 6,
+    "declared_cases": 6,
+    "declared_matching": 6,
+    "declared_mismatch": 0,
+    "summary_line": "反例复跑: 场景=6 与声称一致=6 不符=0",
+    "cases": [
+      {
+        "case": "repo_missing_root",
+        "rc": 1,
+        "expected_rc": 1,
+        "app_label": "MATCH"
+      },
+      {
+        "case": "archive_file_missing",
+        "rc": 1,
+        "expected_rc": 1,
+        "app_label": "MATCH"
+      },
+      {
+        "case": "one_byte_changed",
+        "rc": 1,
+        "expected_rc": 1,
+        "app_label": "MATCH"
+      },
+      {
+        "case": "self_consistent_tamper_vs_repo",
+        "rc": 1,
+        "expected_rc": 1,
+        "app_label": "MATCH"
+      },
+      {
+        "case": "tampered_pkg_only_blind",
+        "rc": 0,
+        "expected_rc": 0,
+        "app_label": "MATCH"
+      },
+      {
+        "case": "malformed_source_paths",
+        "rc": 1,
+        "expected_rc": 1,
+        "app_label": "MATCH"
+      }
+    ],
+    "naive_substring_count": 6,
+    "counting_rule": "逐例判据由我按 rc 与期望 rc 重算, 不采信行里的 MATCH 字样; 裸 count(\"MATCH\") 只登记不用(会被子串顶高)"
+  },
+  "device_surface": {
+    "banned_imports_in_ast": [],
+    "banned_names_in_ast": [],
+    "imports": "见 host/imports_audit.txt",
+    "hardware_actions": 0
+  },
+  "not_verified": [
+    "其他 DPI / 字体 / 系统缩放组合下的界面布局",
+    "Git HEAD 一致性(--repo-root 只比磁盘字节)",
+    "当前板端实时状态",
+    "SG/电流/振动动态曲线、真实运动、保护触发、正常 disarm、带载最坏栈"
+  ],
+  "my_tooling_corrections": [
+    "PrintWindow 截客户区会整体下移约 29 px, 上一轮据此的\"来源行被裁\"结论作废",
+    "只 update_idletasks 时控件未映射, winfo_rootx/y 返 0, 会把按钮全算成在客户区外; 改为测量前 update()",
+    "GUI 文本改由脚本按 UTF-8+LF 直写, 不经 cp936 控制台, 避免乱码 dump",
+    "反例篡改点不再硬编码字段, 改为现场扫描状态中性行并按绝对偏移落点",
+    "禁词扫描改为只看 AST(名字/属性), 全文命中仅作旁证: 文档串里\"没有串口\"这句本身会命中"
+  ],
+  "checks_total": 21,
+  "checks_fails": 0,
+  "scope": "离线复核 + 本机一次真实 Tk 启动; 只读三份 zip、解包副本与仓库归档原件; 本轮未连接设备, 设备动作 0; 板端固件、原始归档与执行器均未改。"
+}
