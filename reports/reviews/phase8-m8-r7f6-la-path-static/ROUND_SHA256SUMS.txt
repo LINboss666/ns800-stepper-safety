@@ -9,7 +9,7 @@
 0b4c9f36562a109ee1f3fe6aba2bd1620492a01955f49b2eeff89b71078e5cd8  reports/reviews/phase8-m8-r7f6-la-path-static/field_init/init.meta.json
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  reports/reviews/phase8-m8-r7f6-la-path-static/field_init/init.stderr.txt
 8b080f297221f40b5dade4c178447742de6a4787854dafe44d1088daaa487b56  reports/reviews/phase8-m8-r7f6-la-path-static/field_init/init.stdout.txt
-55489fa0da9949a41bb505b50a871bd56788b8775c60f920f32fdd7bdbb3c7ac  reports/reviews/phase8-m8-r7f6-la-path-static/FIELD_JUDGEMENT.md
+64786b509f3a5d24ce11d212d5b01ed8aab8f16587b27a76da5405710c12c15f  reports/reviews/phase8-m8-r7f6-la-path-static/FIELD_JUDGEMENT.md
 2170b99123618d902d5e291efb6814799a0775ac1de6f3428d3c23bd5892ab25  reports/reviews/phase8-m8-r7f6-la-path-static/field_run/run-20261104T182042Z/dispatch.meta.json
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  reports/reviews/phase8-m8-r7f6-la-path-static/field_run/run-20261104T182042Z/dispatch.stderr.txt
 5270662405c38a858280b5140172899c854a6f703d3aacd49245bdca9251b761  reports/reviews/phase8-m8-r7f6-la-path-static/field_run/run-20261104T182042Z/dispatch.stdout.txt
@@ -53,7 +53,7 @@ fb16946f1e04aafb8dcc8925aee2c4c537f82f8f9837ac9beb6fe74a80110b3b  reports/review
 41016ae8fe6ec296b5acbe5cbb88724a41c42155361a42fb8ed21c0b379dda26  reports/reviews/phase8-m8-r7f6-la-path-static/instrument_manifest.json
 6d24d0b441d0086fdc71cb6253a7b0e4fad24c292cc35d2bc6ea964f2113c9b7  reports/reviews/phase8-m8-r7f6-la-path-static/ledgers/approval_M8R7F6-b502-la-path-static-20261105.json
 a96098d47772e2b84027ddafdf4c3fc66f2cbf136a1b650827461f511d4f3238  reports/reviews/phase8-m8-r7f6-la-path-static/operator_context.txt
-17e66965023e0b873e45672721dcd91fa8847ce88d36720d6ec6c5e41f6ee1c4  reports/reviews/phase8-m8-r7f6-la-path-static/POWERDOWN_REPORT.txt
+d835c2407b23c2973abc5f60b482bc6028fcb5b3556d8451e13b350633dac387  reports/reviews/phase8-m8-r7f6-la-path-static/POWERDOWN_REPORT.txt
 9b914ca1e35b222de63c99339ee5071ba175870923f4ec58b1e8b912b5106d2a  reports/reviews/phase8-m8-r7f6-la-path-static/proof/archive_notes.txt
 649899885e6bd769df0d8aec276077e2d0d4f533068a80a8cd0fe9274e48c9b0  reports/reviews/phase8-m8-r7f6-la-path-static/proof/field_judgement.txt
 9c374401dc0ae62a94cb150318dca35c81f76e4356220941c99c7ae48e6cc089  reports/reviews/phase8-m8-r7f6-la-path-static/proof/field_summary.json

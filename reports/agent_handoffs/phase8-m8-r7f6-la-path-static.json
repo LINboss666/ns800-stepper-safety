@@ -197,6 +197,14 @@
     "effect_on_results": "无: 全部现场数据在 02:20:42-02:21:25 已采集保存导出并归档, 断电发生在测量之后",
     "evidence_file": "reports/reviews/phase8-m8-r7f6-la-path-static/POWERDOWN_REPORT.txt",
     "r7f5a_pending_kept": "R7F5A 的物理断电仍是 PENDING_OPERATOR_REPORT, 这两次断电不回填那一轮",
-    "no_repower": "任务书要求'不再上电'; 操作者自述习惯是断后再上电, 已按申报登记为超上限。本轮不再自行核实当前通电态, 也不追加任何设备动作; 续测需要 A 的新包与操作者的新批准"
+    "no_repower": "任务书要求'不再上电'; 操作者自述习惯是断后再上电, 已按申报登记为超上限。本轮不再自行核实当前通电态, 也不追加任何设备动作; 续测需要 A 的新包与操作者的新批准",
+    "operator_closeout_preference_request": {
+      "verbatim": "我希望默认不断电",
+      "recorded_local": "2026-11-05 03:00:01 +08:00",
+      "adopted_as": "今后现场轮的操作者默认口径: 收口不再要求切断 VM+MCU, 默认保持通电; 我不再向操作者索要断电动作或时刻",
+      "authority_boundary": "条款在 A 的任务书里(本轮 §2/§4.C), 属 A 的固定范围; 这句是**口径变更请求**, 需 A 在后续任务书采纳才生效, 我不替 A 改判据",
+      "this_round_not_rewritten": "R7F6 已登记事实与标签不回改, 仍按原条款记 OVER_CAP_POWERDOWN / OVER_CAP_ADDITIONAL_POWERUP / CLOSEOUT_POWERED_DOWN_EXPECTATION_NOT_ACHIEVED",
+      "side_effects_for_A_to_consider": ["下一轮'已上电'前置条件常态成立", "板端将长时间带电, 定范围时要一并考虑带电时长与安全边界"]
+    }
   }
 }

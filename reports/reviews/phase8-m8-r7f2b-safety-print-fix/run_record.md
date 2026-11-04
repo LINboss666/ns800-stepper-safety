@@ -774,3 +774,10 @@ WebUSB: CMSIS-DAP / Saleae Logic 全部仍 Status=OK 枚举，两次之间 USB �
 只记长度 48 与 sha12 掩码 `586cb3f3ac73`。全部现场数据在 02:20:42–02:21:25 已采集并归档，
 断电发生在测量之后，不影响任何判读结论。R7F5A 的 `PENDING_OPERATOR_REPORT` 不回填。
 详见 `reports/reviews/phase8-m8-r7f6-la-path-static/POWERDOWN_REPORT.txt`。
+
+操作者随后给出今后口径（本机落盘 03:00:01）：「我希望默认不断电」。采信为**今后现场轮的操作者默认
+口径**——收口不再要求切断 VM＋MCU，默认保持通电，我也不再向操作者索要断电动作或时刻。边界说清楚：
+这一条写在 A 的任务书里（本轮 §2/§4.C），属 A 定的固定范围，所以这句是**口径变更请求**，要 A 在后续
+任务书采纳才生效；我不替 A 改判据，也**不回改**本轮已登记的事实与标签（R7F6 仍按原条款记
+`OVER_CAP_POWERDOWN` / `OVER_CAP_ADDITIONAL_POWERUP` / `CLOSEOUT_POWERED_DOWN_EXPECTATION_NOT_ACHIEVED`）。
+顺带提请 A 定范围时一并考虑两点：下一轮"已上电"前置条件将常态成立；板端将长时间带电。
