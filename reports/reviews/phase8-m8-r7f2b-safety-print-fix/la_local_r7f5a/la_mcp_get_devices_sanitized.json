@@ -1,0 +1,11 @@
+{
+  "devices": [
+    {
+      "deviceId_masked": "SHA12:42055f5a3c56",
+      "deviceId_len": 16,
+      "deviceType": "Logic",
+      "isSimulation": false
+    }
+  ],
+  "masking_note": "探头机序列号不入公开仓库, 只留 sha256 前 12 位与长度; 原文仍在 C:/r7f5_la"
+}

@@ -1,0 +1,98 @@
+{
+  "task_id": "M8R7F5A-b502-la-two-channel-static-20261104",
+  "operator_authorization_verbatim": "DIAG是IO3吧 没错的话可以给agent下发任务验证了我已经接好线了",
+  "approval_scope": "Replace pending blind-only field execution with one unchanged 16-step serial trial accompanied by one two-channel passive capture. No repeat if prior device ledger has any spend/pending.",
+  "source_binding": {
+    "reviewed_delivery_commit": "0cd64587739cca41a22903e075b6fe37b17c765b",
+    "firmware_sha256": "502dca5d8c7ebfa794f890a9c03bc258fc9753f57b6a80c2f1e08add69888a7a",
+    "executor_sha256": "33d3f0af8a4c9c33dcd4e013b395e4ba990a89e384130f9d0ffe50c71b34e8ca",
+    "hardware_actions_performed_by_A": 0,
+    "polarity_measured": false,
+    "scope": "STATIC_IRQ_ONLY_NO_ARM_START",
+    "files": [
+      {
+        "path": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/plan_r7f5_b502_blind_irq_static.json",
+        "bytes": 49994,
+        "sha256": "ee3b26513fc7a572daff0c5c26124a9a0f7fbfa20632bd7088fb84d9d0ca4402"
+      },
+      {
+        "path": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/rows_r7f5_b502_blind_irq_static.json",
+        "bytes": 22289,
+        "sha256": "4f094de3331ef594fe7b43f72dbddd342f3924ada2c8d414d3d9b7293b485475"
+      }
+    ]
+  },
+  "original_zip": {
+    "path": "original_R7F5.zip",
+    "bytes": 60623,
+    "sha256": "b326cd8543eec1db232ec5781c03b7fae721eeaf1ef6af6640bc97321a789a2c"
+  },
+  "base_serial_plan_bytes_unchanged": true,
+  "instrument_scope_overrides_only_original_instrument_actions_zero": true,
+  "instrument_budget_is_external_not_enforced_by_serial_executor": true,
+  "channel_map": {
+    "operator_CH1": {
+      "signal": "TMC_DIAG",
+      "MCU_pin": "PA.3",
+      "GPIO": 3,
+      "connector": "J4-15"
+    },
+    "operator_CH2": {
+      "signal": "TMC_ENN",
+      "expansion_connector": "H6-5",
+      "MCU_feedback_pin": "PC.6",
+      "GPIO": 70,
+      "MCU_connector": "J4-40"
+    },
+    "GND": "common signal ground",
+    "gui_channel_indices": "READ_FROM_ACTUAL_DEVICE_MAPPING_NOT_GUESSED"
+  },
+  "caps": {
+    "serial_dispatch": 1,
+    "port_open": 1,
+    "tmc_config_apply": 1,
+    "safety_polarity_confirm_trial_only": 1,
+    "safety_irq_enable": 1,
+    "safety_irq_disable": 1,
+    "logic_capture_session": 1,
+    "logic_start": 1,
+    "logic_stop_max": 1,
+    "native_capture_save": 1,
+    "raw_digital_csv_export": 1,
+    "operator_powerup_powerdown_pair_max": 1,
+    "motor_arm": 0,
+    "motor_start": 0,
+    "motion": 0,
+    "reset": 0,
+    "download": 0,
+    "readback": 0,
+    "learning": 0,
+    "signal_injection": 0,
+    "retries": 0
+  },
+  "acquisition_target": {
+    "digital_channels": 2,
+    "preferred_sample_rate_samples_per_second": 1000000,
+    "capacity_samples_at_preferred_rate_min": 100000000,
+    "trigger": "none; continuous immediate acquisition",
+    "actual_settings": "record from actual GUI; do not claim unsupported settings",
+    "external_operator_cutoff_seconds": 90,
+    "scope": "stable-powered overlap with one serial session; transitions during power-off reported separately"
+  },
+  "preflight_required": [
+    "prior ledger unspent and pending empty",
+    "file identities exact",
+    "physical input voltage compatibility from actual hardware documentation",
+    "probe labels to GUI mapping",
+    "one acquisition can cover the serial session"
+  ],
+  "measurement_claims_before_execution": {
+    "normal_static_logic_measured": false,
+    "physical_alarm_transition_verified": false,
+    "voltage_measured": false,
+    "polarity_measured": false,
+    "core_protection_verified": false
+  },
+  "A_hardware_actions": 0,
+  "result": "NOT_RUN"
+}

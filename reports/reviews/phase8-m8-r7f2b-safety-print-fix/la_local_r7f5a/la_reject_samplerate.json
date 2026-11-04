@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "[INVALID_REQUEST] Invalid supplied sample rate. Allowed sample rates with channel configuration: {\"digital\":24000000,\"isAnalogDownsampled\":false}, {\"digital\":16000000,\"isAnalogDownsampled\":false}, {\"digital\":12000000,\"isAnalogDownsampled\":false}, {\"digital\":8000000,\"isAnalogDownsampled\":false}, {\"digital\":4000000,\"isAnalogDownsampled\":false}, {\"digital\":2000000,\"isAnalogDownsampled\":false}, {\"digital\":1000000,\"isAnalogDownsampled\":false}, {\"digital\":500000,\"isAnalogDownsampled\":false}, {\"digital\":250000,\"isAnalogDownsampled\":false}, {\"digital\":200000,\"isAnalogDownsampled\":false}, {\"digital\":100000,\"isAnalogDownsampled\":false}, {\"digital\":50000,\"isAnalogDownsampled\":false}, {\"digital\":25000,\"isAnalogDownsampled\":false}"
+      }
+    ],
+    "isError": true
+  }
+}

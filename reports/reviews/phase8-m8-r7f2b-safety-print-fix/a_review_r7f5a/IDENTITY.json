@@ -1,0 +1,16 @@
+{
+  "package": "NS800_R7F5A_LA_DIAG_ENN_Task_20261104.zip",
+  "bytes": 66179,
+  "sha256": "575a46cefc7614239d51b78fc290134af07e98b818fb5e0da1d74591db094677",
+  "received_via": "operator relay of reviewer A attachment",
+  "entries_in_zip": 5,
+  "prepared_by_A_hardware_actions": 0,
+  "round": "M8-R7F5A-LA-TWO-CHANNEL-STATIC",
+  "archived_here": [
+    "IDENTITY.json",
+    "SHA256SUMS.txt",
+    "TASK_R7F5A_LA_TWO_CHANNEL.md",
+    "capture_scope.json",
+    "offline_binding_check.json"
+  ]
+}

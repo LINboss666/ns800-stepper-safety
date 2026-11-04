@@ -1,0 +1,23 @@
+{
+  "A_hardware_actions": 0,
+  "source_DIAG_mapping_verified": {
+    "define": "PIN_NAME_TMC_DIAG \"PA.3\"",
+    "GPIO": 3,
+    "connector": "J4-15"
+  },
+  "source_ENN_mapping_verified": {
+    "define": "PIN_NAME_ENN_FEEDBACK \"PC.6\"",
+    "GPIO": 70,
+    "connector": "J4-40",
+    "expansion": "H6-5"
+  },
+  "base_zip_hash_ok": true,
+  "base_plan_and_rows_bytes_hashes_ok": true,
+  "base_serial_steps": 16,
+  "base_serial_has_arm_start": false,
+  "new_executable_code": false,
+  "new_serial_plan": false,
+  "new_scope": "one passive two-channel capture external to unchanged original serial executor",
+  "old_ledger_current_state": "REQUIRES_READ_ONLY_LOCAL_CHECK; NOT_ASSUMED_UNSPENT",
+  "hardware_input_rating": "REQUIRES_ACTUAL_HARDWARE_DOCUMENTATION; NOT_INFERRED_FROM_LOGIC_1.2.17_OR_USB_ID"
+}

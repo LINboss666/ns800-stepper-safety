@@ -1,0 +1,58 @@
+PLAN_MOTION_WINDOW|S0|PASS|人工门都在运动之前
+PLAN_COMMAND_EXISTS|S1|sys_pre|PASS|system_status
+PLAN_ROWS_KEY|S1|sys_pre|PASS|system_status@pre
+PLAN_COMMAND_EXISTS|S1|mot_pre|PASS|motor_status
+PLAN_ROWS_KEY|S1|mot_pre|PASS|motor_status@pre
+PLAN_COMMAND_EXISTS|S1|cfg_apply|PASS|tmc_config_apply
+PLAN_ROWS_KEY|S1|cfg_apply|PASS|tmc_config_apply CONFIRM
+PLAN_QUOTA_MAP|S1|cfg_apply|PASS|cmd=tmc_config_apply CONFIRM need=tmc_config_apply declared=tmc_config_apply n=1
+PLAN_COMMAND_EXISTS|S1|sys_cfg|PASS|system_status
+PLAN_ROWS_KEY|S1|sys_cfg|PASS|system_status@cfg
+PLAN_COMMAND_EXISTS|S1|mot_cfg|PASS|motor_status
+PLAN_ROWS_KEY|S1|mot_cfg|PASS|motor_status@cfg
+PLAN_COMMAND_EXISTS|S1|irq_pre|PASS|safety_irq_status
+PLAN_ROWS_KEY|S1|irq_pre|PASS|safety_irq_status@pre
+PLAN_COMMAND_EXISTS|S1|pol_trial_flag|PASS|safety_polarity_confirm
+PLAN_ROWS_KEY|S1|pol_trial_flag|PASS|safety_polarity_confirm CONFIRM
+PLAN_QUOTA_MAP|S1|pol_trial_flag|PASS|cmd=safety_polarity_confirm CONFIRM need=irq_polarity_prep declared=irq_polarity_prep n=1
+PLAN_COMMAND_EXISTS|S1|irq_enable|PASS|safety_irq_enable
+PLAN_ROWS_KEY|S1|irq_enable|PASS|safety_irq_enable
+PLAN_QUOTA_MAP|S1|irq_enable|PASS|cmd=safety_irq_enable need=irq_polarity_prep declared=irq_polarity_prep n=1
+PLAN_COMMAND_EXISTS|S1|irq_open|PASS|safety_irq_status
+PLAN_ROWS_KEY|S1|irq_open|PASS|safety_irq_status@open
+PLAN_COMMAND_EXISTS|S1|quiet_observation|PASS|__watch__
+PLAN_COMMAND_EXISTS|S1|sys_open|PASS|system_status
+PLAN_ROWS_KEY|S1|sys_open|PASS|system_status@open
+PLAN_COMMAND_EXISTS|S1|mot_open|PASS|motor_status
+PLAN_ROWS_KEY|S1|mot_open|PASS|motor_status@open
+PLAN_COMMAND_EXISTS|S1|irq_disable|PASS|safety_irq_disable
+PLAN_ROWS_KEY|S1|irq_disable|PASS|safety_irq_disable
+PLAN_QUOTA|S1|irq_disable|PASS
+PLAN_COMMAND_EXISTS|S1|irq_closed|PASS|safety_irq_status
+PLAN_ROWS_KEY|S1|irq_closed|PASS|safety_irq_status@closed
+PLAN_COMMAND_EXISTS|S1|sys_closed|PASS|system_status
+PLAN_ROWS_KEY|S1|sys_closed|PASS|system_status@closed
+PLAN_COMMAND_EXISTS|S1|safety_post|PASS|safety_status
+PLAN_ROWS_KEY|S1|safety_post|PASS|safety_status
+PLAN_MOTION_WINDOW|S1|PASS|人工门都在运动之前
+PLAN_TOOL_ARGV|download|PASS|python -m pyocd flash --pack C:/Keil_v5/ARM/PACK/.Download/NOVOSENSE.N
+PLAN_TOOL_ARGV|readback|PASS|python -m pyocd commander --no-config -t cortex_m -u @UID_FILE -f 1000
+PLAN_TOOL_ARGV|reset|PASS|python -m pyocd reset --method sysresetreq --no-config --no-wait --con
+PLAN_QUOTA_COVERAGE|all|PASS|used=irq_polarity_prep,safety_irq_disable,tmc_config_apply missing=
+PLAN_STATE_AND_FLAG_CONSTANTS|all|PASS|motor={'IDLE': 0, 'ACCEL': 1, 'CRUISE': 2, 'DECEL': 3, 'FAULT': 4} rpf={'COMMITTED': 1, 'FIELD_VERIFIED': 2, 'FROM_LEARN': 4} columns=14
+PLAN_MOTION_CAP_BUDGET|all|FAIL|caps=[] sum=0 total=0 starts=0
+PLAN_IMAGE_IDENTITY_CONSISTENCY|all|PASS|S0=download.axf=readback.bin 同源且回读不认旧镜像
+PLAN_QUOTA_NEED|irq_polarity_prep|PASS|need=2 declared=2
+PLAN_QUOTA_NEED|port_open|PASS|need=1 declared=1
+PLAN_QUOTA_NEED|safety_irq_disable|PASS|need=1 declared=1
+PLAN_QUOTA_NEED|tmc_config_apply|PASS|need=1 declared=1
+PLAN_SCENARIO_CHAIN|all|PASS|链内分支决定点都在依赖阶段之前: {}
+PLAN_STUB_BRANCHES|all|PASS|申报={} 场景=
+PLAN_PREREQUISITE_GATE|all|PASS|起转前真拒绝已接线: {}
+PLAN_SPINUP_GATE_COVERAGE|all|PASS|所有起转/带电阶段都在开端口前检查机械前置
+PLAN_TARGET_CHANNEL|all|PASS|产品枚举=REL_ADC_SEVERE,REL_COVERAGE_LOST,REL_FUSED_SEVERE,REL_IMPACT,REL_OUT_OF_WINDOW,REL_SENSOR_UNAVAILABLE,REL_SG_SEVERE
+PLAN_FIRST_CAUSE_LEGS|all|PASS|trip 链都有同次 REL TRIP/源样本/profile/新 session 四腿
+PLAN_BYTE_RECOVERY|all|PASS|计划未申报任何'损坏后可继续'例外 => 裸 NUL / 非法 UTF-8 / 危险文本一律即停(原字节仍先落盘)
+PLAN_STATUS_ALLOW|all|PASS|白名单都是锚定且被正面要求(要求串必须是该行的前缀)的状态行: S1:sys_pre,S1:mot_pre,S1:sys_cfg,S1:mot_cfg,S1:sys_closed
+PLAN_BOOT_WINDOW_COVER|all|NA|未申报 observation_bounds.boot_window_seconds_min(R5-C 轮新增门; 历史包不回改字节, 因此不判红)
+PLAN_VALIDATE_SUMMARY|checks=57|fail=1|msh_commands=74|plan=D:\ns800\reports\reviews\phase8-m8-r7f2b-safety-print-fix\field\plan_r7f5_b502_blind_irq_static.json

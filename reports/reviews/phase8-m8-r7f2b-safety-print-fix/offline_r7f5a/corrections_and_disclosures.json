@@ -1,0 +1,17 @@
+{
+  "items": [
+    {
+      "claim": "我在 2026-11-04 说过 'Logic 1.2.17 完全没有远程/脚本 API'",
+      "status": "OVERREACH_WITHDRAWN",
+      "what_was_actually_measured": "当时本机: 127.0.0.1:10429/10430 无监听; 安装目录 C:\\Program Files\\Saleae Inc 只有 Qt 运行件与 Analyzers, 没有 Logic 2 的 resources/bin; 本机 pyusb 1.3.1 的 libusb1/libusb0 后端均 NOT_LOADED。",
+      "corrected_by": "TASK_R7F5A_LA_TWO_CHANNEL.md 第 61 行(Legacy Logic 1.x API 确实存在)",
+      "consequence": "'端口没监听'只能说明该通道当时未就绪, 不能推出'没有 API'。本轮不需要为它开新服务。"
+    },
+    {
+      "claim": "我在本轮之前做过一次 1 秒采集(captureId=3, 25 kS/s, 探头未接)",
+      "status": "DISCLOSED_PRE_EXISTING",
+      "scope_note": "该采集发生在本任务书之前, 属操作者要求的'试试能否控制仪器', 标 CONTROL_PATH_SMOKE; 不占本轮 logic_capture_session=1 的额度, 也不作为任何电平证据。",
+      "conflict_with_task_book": "任务书第 58 行要求不要先做试采消耗机会; 事实是试采已在本包下达前发生, 本轮的正式采集仍是第一次带接线的采集。"
+    }
+  ]
+}

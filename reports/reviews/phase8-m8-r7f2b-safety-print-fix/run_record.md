@@ -289,5 +289,42 @@ plan `ee3b2651…` 49994 B、rows `4f094de3…` 22289 B,散列与 `IDENTITY.json
 `offline/package_integrity.txt` 与 `offline/package_integrity_r7f4.txt` 首行当年记了交付 zip 的本机绝对路径
 (含用户名目录),那是已推送的冻结件,本轮不回改、也不让它们 retroactively 判红;后续新轮只记文件名与散列。
 
+## 13 R7F5A 登记(A 补两路 LA 采集范围;设备动作 0)
+
+被审件 `NS800_R7F5A_LA_DIAG_ENN_Task_20261104.zip` 66179 B `575a46cefc761423…`,5 条目;内层清单 4 条
+**4/4 逐字节相同**且不含自身。嵌入的 `original_R7F5.zip` 60623 B `b326cd85…` 与 §12 已登记的 R7F5 原件身份相同
+(按任务书第 28 行:解在仓库外,只把两份 field JSON 按声明路径入仓——那两件上一轮已放,本轮只复算不重放)。
+基线 `0cd6458` = 计划 `reviewed_delivery_commit`;登记时 HEAD 与它之间改动**全在 `reports/` 内**,
+产品源码/固件/执行器零改动。四件执行输入实算 4/4 与声明相同。
+
+**旧账只读核查(任务书第 23–26 行的分支门)**:`approval_M8R7F5-b502-blind-irq-static-20261104.json`
+`version=2`、`spent` 全 0、`pending` 空;用**未改动执行器**的 `validate_ledger_doc` 以当场重算的三件身份传入不拒绝、
+把 plan 身份改成 64 个 0 再传则具名拒绝(即"账有效"由执行器自己的校验器给出,不是手写比较)
+=> 走**新身份** `M8R7F5A-b502-la-two-channel-static-20261104`,旧批准按任务书标为被替代,随后不得再跑旧盲测。
+
+离线判据 **56 项 PASS,fails=0**(`offline_r7f5a/`):步骤摘要重算 `4a80dcb6…` 与上一轮同(本包不改串口计划);
+16 步无 `motor_arm`/`motor_start` 且 `forbidden_commands` 覆盖;`--validate-plan` 仍 `checks=57 fail=1`,
+唯一 FAIL 是 `PLAN_MOTION_CAP_BUDGET`,按 §12 口径登记 N/A。额度对照:`port_open/apply/irq_disable` 同名同值;
+计划的 `irq_polarity_prep=2` 在补充范围被拆成 `polarity_confirm 1 + irq_enable 1` 重述(相加=2);
+**计划为 0 的动作没有任何一项被放宽成正数**。仪器额度由外层记录,串口执行器不扣减也不强制——不谎称原子联动。
+
+LA 侧本机实测(`la_local_r7f5a/`,含两条**具名拒绝原文**):Logic 2 `2.4.48` 的 MCP `127.0.0.1:10530` 可用
+(15 个工具;10430 当时无监听,本轮未依赖);不支持可调输入阈值电压;数字采样率只接受 25 kS/s–24 MS/s 共 13 档
+(任务书希望的 1 MS/s 在档内);两条拒绝都在参数校验期返回 `isError=true` 且**不返回 captureId**(未建采集会话);
+**导出侧通道筛选不生效**(请求 1 列实得 8 列)=> CSV 列号与信号的对应必须现场核。
+`la_smoke_capture_digital.csv` 是探头未接的 1 秒定长采集(`D0` 全程 0、`D1–D7` 全程 1、无状态变化),
+属浮空态,标 `CONTROL_PATH_SMOKE`,不作电平证据;它发生在本任务书下达前,不占本轮 `logic_capture_session=1`。
+
+两条更正照单登记:(1) 我上轮说"Logic 1.2.17 完全没有远程/脚本 API"是**过度推断,已撤回**——
+当时实测到的只是端口无监听、安装目录无 Logic 2 资源、pyusb 无 libusb 后端;任务书第 61 行指出官方确有
+Legacy Logic 1.x API。(2) 任务书第 58 行"不要先做试采消耗一次机会"与本机事实存在时间差,如实登记不解释成已满足。
+
+**三项前置未闭合**(照 `preflight_required` 登记为 OPEN,不写 PASS):分析仪通道实物输入耐压资料 /
+≥100 M samples 实际缓冲容量 / 探头印字 CH1-CH2 与软件通道号(及 CSV 列号)对应。
+另:步骤 0 期望 `mask=0x18` 要求 `MOT_GATE_NO_DRV_CONFIG` 成立(驱动配置 UNCONFIGURED),
+板子若还带着上一场的电,第一条状态检查就会成为首错——该现场事实由操作者回报,我不代答。
+停点:不跑 `--approval-init`,不跑 dispatch,不 Start 采集;固件/执行器/归档原件未改。
+
+
 
 

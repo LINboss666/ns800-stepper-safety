@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "[INVALID_REQUEST] Digital threshold \"3.3\" requested, but the requested device does not support a configurable threshold voltage."
+      }
+    ],
+    "isError": true
+  }
+}

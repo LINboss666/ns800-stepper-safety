@@ -1,0 +1,36 @@
+{
+  "round": "M8-R7F5A-registration",
+  "checks": 56,
+  "fails": 0,
+  "fail_names": [],
+  "device_actions_this_round": 0,
+  "steps_digest": "4a80dcb6dd43028c6f526298463cba3d71bc312a379db5b152a4db52359b7eb0",
+  "old_ledger_state": "UNSPENT_NO_PENDING",
+  "new_approval_id_proposed": "M8R7F5A-b502-la-two-channel-static-20261104",
+  "preflight_open_items": [
+    "hardware_input_rating",
+    "acquisition_capacity_100Ms",
+    "probe_label_to_gui_channel_mapping"
+  ],
+  "la_facts": {
+    "tools": 15,
+    "allowed_rates": [
+      "24000000",
+      "16000000",
+      "12000000",
+      "8000000",
+      "4000000",
+      "2000000",
+      "1000000",
+      "500000",
+      "250000",
+      "200000",
+      "100000",
+      "50000",
+      "25000"
+    ],
+    "threshold_configurable": false,
+    "export_columns": 8,
+    "smoke_levels": "D0=0 D1-D7=1 flat (probes unconnected)"
+  }
+}

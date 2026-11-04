@@ -1,0 +1,26 @@
+{
+  "items": [
+    {
+      "item": "hardware_input_rating",
+      "required_by": "capture_scope.preflight_required[3] + offline_binding_check.hardware_input_rating",
+      "state": "OPEN",
+      "reason": "本机没有该分析仪的实物输入耐压资料; 不得由 Logic 版本或 USB VID/PID 推定。需要型号规格页(通道输入电压范围/是否 5V 容许/最大绝对电压)。",
+      "blocks": "上电、Start、开 COM 之前"
+    },
+    {
+      "item": "acquisition_capacity_100Ms",
+      "required_by": "capture_scope.acquisition_target.capacity_samples_at_preferred_rate_min",
+      "state": "OPEN",
+      "reason": "1 MS/s 在设备允许档位内(已证), 但 ≥100 M samples 的缓冲容量要从实际 GUI 读; 本轮尚未在 GUI 里核过时长上限。",
+      "blocks": "Start 之前"
+    },
+    {
+      "item": "probe_label_to_gui_channel_mapping",
+      "required_by": "capture_scope.channel_map.gui_channel_indices",
+      "state": "OPEN",
+      "reason": "操作者印字 CH1/CH2 与软件通道号(可能 0 基)的对应必须现场读, 不能凭第一路猜。另: 导出侧通道筛选不生效(已实测), 所以 CSV 列号与通道的对应也要现场核。",
+      "blocks": "判读之前"
+    }
+  ],
+  "count": 3
+}

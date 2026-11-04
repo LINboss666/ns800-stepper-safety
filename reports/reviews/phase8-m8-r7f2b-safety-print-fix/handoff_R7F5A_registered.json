@@ -1,0 +1,156 @@
+{
+  "round": "M8-R7F5A-registration",
+  "verdict": "R7F5A_TWO_CHANNEL_PACKAGE_ACCEPTED_FOR_FIELD_EXECUTION_PENDING_APPROVAL_AND_PREFLIGHT",
+  "reviewed_package": {
+    "zip": "NS800_R7F5A_LA_DIAG_ENN_Task_20261104.zip",
+    "bytes": 66179,
+    "sha256": "575a46cefc7614239d51b78fc290134af07e98b818fb5e0da1d74591db094677",
+    "entries": 5,
+    "inner_manifest_entries": 4,
+    "inner_manifest_mismatch": 0,
+    "inner_manifest_hashes_itself": false
+  },
+  "embedded_original_r7f5": {
+    "bytes": 60623,
+    "sha256": "b326cd8543eec1db232ec5781c03b7fae721eeaf1ef6af6640bc97321a789a2c",
+    "equals_prior_round_record": true
+  },
+  "baseline": {
+    "reviewed_delivery_commit": "0cd64587739cca41a22903e075b6fe37b17c765b",
+    "head_at_registration": "db3c781bc2887bd7c5aa0742fedfa4c7c35e55e1",
+    "diff_files": 48,
+    "diff_outside_reports": 0
+  },
+  "old_ledger_read_only": {
+    "approval_id": "M8R7F5-b502-blind-irq-static-20261104",
+    "version": 2,
+    "spent_nonzero": {},
+    "pending": [],
+    "identities_equal_current_disk_bytes": true,
+    "executor_validate_ledger_doc_accepted": true,
+    "negative_control_corrupted_identity": "REFUSED",
+    "branch_taken": "USE_NEW_APPROVAL_ID"
+  },
+  "new_approval_id": "M8R7F5A-b502-la-two-channel-static-20261104",
+  "operator_authorization_verbatim_quoted_by_A": "DIAG是IO3吧 没错的话可以给agent下发任务验证了我已经接好线了",
+  "offline_checks": {
+    "total": 56,
+    "fails": 0,
+    "steps_digest": "4a80dcb6dd43028c6f526298463cba3d71bc312a379db5b152a4db52359b7eb0",
+    "validate_plan": "checks=57 fail=1 (PLAN_MOTION_CAP_BUDGET, N/A)",
+    "base_serial_steps": 16,
+    "arm_start_in_plan": false
+  },
+  "quota_cross_map": {
+    "same_named": {
+      "port_open": [
+        1,
+        1
+      ],
+      "tmc_config_apply": [
+        1,
+        1
+      ],
+      "safety_irq_disable": [
+        1,
+        1
+      ]
+    },
+    "re_expressed": {
+      "irq_polarity_prep": [
+        2,
+        2
+      ]
+    },
+    "instrument_external_to_executor": [
+      "logic_capture_session",
+      "logic_start",
+      "logic_stop_max",
+      "native_capture_save",
+      "raw_digital_csv_export"
+    ],
+    "zero_actions_widened_by_supplement": 0
+  },
+  "la_local_facts": {
+    "tools": 15,
+    "allowed_rates": [
+      "24000000",
+      "16000000",
+      "12000000",
+      "8000000",
+      "4000000",
+      "2000000",
+      "1000000",
+      "500000",
+      "250000",
+      "200000",
+      "100000",
+      "50000",
+      "25000"
+    ],
+    "threshold_configurable": false,
+    "export_columns": 8,
+    "smoke_levels": "D0=0 D1-D7=1 flat (probes unconnected)"
+  },
+  "la_smoke_capture": {
+    "label": "CONTROL_PATH_SMOKE",
+    "probes_connected": false,
+    "levels": "D0=0 全程, D1-D7=1 全程, 无状态变化",
+    "counts_against_this_round_capture_budget": false,
+    "occurred_before_task_book": true,
+    "csv_sha256": "66c4f7fb89f36e8030336200cca08475110a38206d893d80bacc899e6021cb40",
+    "csv_bytes": 196
+  },
+  "preflight_open_items": [
+    "hardware_input_rating",
+    "acquisition_capacity_100Ms",
+    "probe_label_to_gui_channel_mapping"
+  ],
+  "boundaries_kept": {
+    "polarity_measured": false,
+    "core_protection_verified": false,
+    "measurement_claims_before_execution": {
+      "normal_static_logic_measured": false,
+      "physical_alarm_transition_verified": false,
+      "voltage_measured": false,
+      "polarity_measured": false,
+      "core_protection_verified": false
+    },
+    "forbidden_claims": [
+      "PHYSICAL_POLARITY_VERIFIED",
+      "DIAG_TRIGGER_VERIFIED",
+      "STEP_PHYSICALLY_STOPPED_BY_LOG_ALONE",
+      "CORE_PROTECTION_VERIFIED"
+    ]
+  },
+  "corrections_to_my_prior_round": [
+    {
+      "claim": "Logic 1.2.17 完全没有远程/脚本 API",
+      "status": "WITHDRAWN_OVERREACH",
+      "actually_measured": "10429/10430 当时无监听; Saleae Inc 目录无 Logic 2 资源; pyusb libusb 后端 NOT_LOADED",
+      "corrected_by": "TASK_R7F5A_LA_TWO_CHANNEL.md:61 (Legacy Logic 1.x API 确实存在)"
+    },
+    {
+      "claim": "任务书第 58 行「不要先做试采」",
+      "status": "TIME_ORDER_DISCLOSED",
+      "fact": "试采在本任务书下达前已发生, 不占本轮额度, 不解释成已满足"
+    }
+  ],
+  "device_actions_this_round": 0,
+  "hardware_actions_performed_by_A": 0,
+  "not_verified_after_this_round": [
+    "DIAG 报警态与物理极性两态",
+    "实际故障触发与恢复",
+    "中断是否真被投递",
+    "ENN 与禁能请求在故障下的关系",
+    "SG/ADC/IMU 通道",
+    "arm/disarm 与运动",
+    "带载最坏栈",
+    "分析仪输入耐压(资料缺项)",
+    "采集容量能否覆盖整场(未从 GUI 核)",
+    "探头印字与软件通道号对应"
+  ],
+  "checks_total": 56,
+  "checks_fails": 0,
+  "scope": "登记与离线复算; 未开口/未 Start/未发命令; 旧证据、固件、演示包、执行器原件未动"
+}

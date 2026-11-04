@@ -1,0 +1,284 @@
+{
+  "checks": [
+    {
+      "name": "ZIP_BYTES_66179",
+      "result": "PASS",
+      "detail": "66179"
+    },
+    {
+      "name": "ZIP_SHA_STABLE",
+      "result": "PASS",
+      "detail": "575a46cefc761423"
+    },
+    {
+      "name": "INNER_SUMS_ALL_OK",
+      "result": "PASS",
+      "detail": "ok=4/4"
+    },
+    {
+      "name": "INNER_SUMS_EXCLUDE_SELF",
+      "result": "PASS",
+      "detail": "清单不哈希自身"
+    },
+    {
+      "name": "EMBEDDED_R7F5_ZIP_MATCHES_CLAIM",
+      "result": "PASS",
+      "detail": "b326cd8543eec1db"
+    },
+    {
+      "name": "EMBEDDED_R7F5_ZIP_MATCHES_ARCHIVED_RECORD",
+      "result": "PASS",
+      "detail": "旧登记 60623 B b326cd8543eec1db"
+    },
+    {
+      "name": "PLACED_PLAN_ROWS_MATCH",
+      "result": "PASS",
+      "detail": "plan_r7f5_b502_blind_irq_static.json=ee3b26513fc7; rows_r7f5_b502_blind_irq_static.json=4f094de3331e"
+    },
+    {
+      "name": "EXECUTOR_UNCHANGED",
+      "result": "PASS",
+      "detail": "33d3f0af8a4c9c33"
+    },
+    {
+      "name": "IMAGE_UNCHANGED",
+      "result": "PASS",
+      "detail": "502dca5d8c7ebfa7"
+    },
+    {
+      "name": "NO_NEW_FIRMWARE_OR_EXECUTOR",
+      "result": "PASS",
+      "detail": "A 自报无新码/新计划, 由上面两项独立承担"
+    },
+    {
+      "name": "BASELINE_COMMIT_EXISTS",
+      "result": "PASS",
+      "detail": "0cd64587739c"
+    },
+    {
+      "name": "HEAD_DESCENDS_BASELINE",
+      "result": "PASS",
+      "detail": "0=是"
+    },
+    {
+      "name": "DIFF_FROM_BASELINE_REPORTS_ONLY",
+      "result": "PASS",
+      "detail": "越界=[] 总数=48"
+    },
+    {
+      "name": "OLD_LEDGER_VALID_BOUND_TO_CURRENT_BYTES",
+      "result": "PASS",
+      "detail": "validate_ledger_doc 未拒绝"
+    },
+    {
+      "name": "OLD_LEDGER_UNSPENT",
+      "result": "PASS",
+      "detail": "非零=none"
+    },
+    {
+      "name": "OLD_LEDGER_NO_PENDING",
+      "result": "PASS",
+      "detail": "[]"
+    },
+    {
+      "name": "OLD_LEDGER_APPROVAL_ID",
+      "result": "PASS",
+      "detail": "M8R7F5-b502-blind-irq-static-20261104"
+    },
+    {
+      "name": "OLD_LEDGER_IDENTITIES_EQUAL_CURRENT",
+      "result": "PASS",
+      "detail": "{\"executor_sha256\": \"33d3f0af8a4c\", \"image_sha256\": \"502dca5d8c7e\", \"plan_sha256\": \"ee3b26513fc7\"}"
+    },
+    {
+      "name": "SELFCHECK_LEDGER_GATE_FIRED",
+      "result": "PASS",
+      "detail": "改身份后应拒绝: APPROVAL_IDENTITY_MISMATCH"
+    },
+    {
+      "name": "PLAN_SNAPSHOT_SHA_IS_CLAIM",
+      "result": "PASS",
+      "detail": "ee3b26513fc7a572"
+    },
+    {
+      "name": "BASE_SERIAL_STEPS_16",
+      "result": "PASS",
+      "detail": "16"
+    },
+    {
+      "name": "NO_ARM_START_IN_PLAN",
+      "result": "PASS",
+      "detail": " cmds=16"
+    },
+    {
+      "name": "FORBIDDEN_LIST_COVERS_ARM_START",
+      "result": "PASS",
+      "detail": "12"
+    },
+    {
+      "name": "STEPS_DIGEST_EQUALS_PRIOR_ROUND",
+      "result": "PASS",
+      "detail": "4a80dcb6dd43028c"
+    },
+    {
+      "name": "EVERY_STEP_QUOTA_NAME_IS_DECLARED",
+      "result": "PASS",
+      "detail": "步骤用到=['irq_polarity_prep', 'safety_irq_disable', 'tmc_config_apply'] 声明=22 项"
+    },
+    {
+      "name": "DECLARED_CAPS_COVER_SUMMED_STEP_QUOTAS",
+      "result": "PASS",
+      "detail": "[{\"tmc_config_apply\": 1, \"irq_polarity_prep\": 2, \"safety_irq_disable\": 1}, {\"tmc_config_apply\": 1, \"irq_polarity_prep\": 2, \"safety_irq_disable\": 1}]"
+    },
+    {
+      "name": "LEDGER_CAPS_AND_SPENT_KEYS_EQUAL_PLAN_QUOTA",
+      "result": "PASS",
+      "detail": "caps=22 spent=22 quota=22"
+    },
+    {
+      "name": "ZERO_CAPS_COVER_FORBIDDEN_ACTIONS",
+      "result": "PASS",
+      "detail": "[]"
+    },
+    {
+      "name": "VALIDATE_PLAN_57_FAIL1",
+      "result": "PASS",
+      "detail": "PLAN_VALIDATE_SUMMARY|checks=57|fail=1|msh_commands=74|plan=D:\\ns800\\reports\\reviews\\phase8-m8-r7f2b-safety-print-fix\\field\\plan_r7f5_b502_blind_irq_static.json"
+    },
+    {
+      "name": "THE_ONLY_FAIL_IS_MOTION_CAP_BUDGET",
+      "result": "PASS",
+      "detail": "PLAN_MOTION_CAP_BUDGET|all|FAIL|caps=[] sum=0 total=0 starts=0"
+    },
+    {
+      "name": "CAPS_MAP_TO_PLAN_QUOTA",
+      "result": "PASS",
+      "detail": "{}"
+    },
+    {
+      "name": "INSTRUMENT_BUDGET_IS_EXTERNAL_NOT_ENFORCED",
+      "result": "PASS",
+      "detail": "串口执行器不扣仪器额度, 不谎称原子联动"
+    },
+    {
+      "name": "CAPS_DO_NOT_WIDEN_ANY_ZERO_ACTION",
+      "result": "PASS",
+      "detail": "计划为 0 但补充范围给了正数的动作=none"
+    },
+    {
+      "name": "ABSENT_NONZERO_QUOTA_KEYS_REEXPRESSED_EXACTLY",
+      "result": "PASS",
+      "detail": "缺席且非 0 的只有 irq_polarity_prep=2, 由 polarity_confirm1+irq_enable1 重述"
+    },
+    {
+      "name": "CAPS_DECLARES_SERIAL_ENFORCED_KEYS",
+      "result": "PASS",
+      "detail": "执行器真实扣减的三项都在补充范围里重述"
+    },
+    {
+      "name": "ZERO_FORBIDDEN_CLAIM_LIST_KEPT",
+      "result": "PASS",
+      "detail": "四项禁用声称原样保留"
+    },
+    {
+      "name": "CLAIMS_BEFORE_EXEC_ALL_FALSE",
+      "result": "PASS",
+      "detail": "{\"normal_static_logic_measured\": false, \"physical_alarm_transition_verified\": false, \"voltage_measured\": false, \"polarity_measured\": false, \"core_protection_verified\": false}"
+    },
+    {
+      "name": "LA_MCP_TOOLS_15",
+      "result": "PASS",
+      "detail": "15"
+    },
+    {
+      "name": "LA_TOOL_PRESENT_start_capture",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "LA_TOOL_PRESENT_stop_capture",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "LA_TOOL_PRESENT_wait_capture",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "LA_TOOL_PRESENT_export_raw_data_csv",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "LA_TOOL_PRESENT_save_capture",
+      "result": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "LA_REJECTIONS_CREATED_NO_CAPTURE_SESSION",
+      "result": "PASS",
+      "detail": "两条具名拒绝都在参数校验期返回, 未建采集会话"
+    },
+    {
+      "name": "LA_THRESHOLD_NOT_CONFIGURABLE",
+      "result": "PASS",
+      "detail": "具名拒绝原文留档"
+    },
+    {
+      "name": "LA_1MS_PER_SECOND_IS_SUPPORTED",
+      "result": "PASS",
+      "detail": "档位=24000000,16000000,12000000…"
+    },
+    {
+      "name": "LA_MIN_RATE_25K_MAX_24M",
+      "result": "PASS",
+      "detail": "25000..24000000"
+    },
+    {
+      "name": "LA_SMOKE_EXPORT_GIVES_ALL_8_COLUMNS",
+      "result": "PASS",
+      "detail": "请求 1 列, 实得 8 列 => 导出侧筛选不生效"
+    },
+    {
+      "name": "LA_SMOKE_LEVELS_FLAT_FLOATING",
+      "result": "PASS",
+      "detail": "每路全程不变; 探头未接 => 浮空, 不作测量证据"
+    },
+    {
+      "name": "LA_SMOKE_D0_LOW_OTHERS_HIGH",
+      "result": "PASS",
+      "detail": "D0=0, D1-D7=1"
+    },
+    {
+      "name": "LA_SMOKE_HAS_TWO_STATE_ROWS",
+      "result": "PASS",
+      "detail": "首行=初始态, 末行=停止时刻"
+    },
+    {
+      "name": "PREFLIGHT_GAPS_REGISTERED_AS_OPEN",
+      "result": "PASS",
+      "detail": "三项未闭合, 不写 PASS"
+    },
+    {
+      "name": "CORRECTIONS_REGISTERED",
+      "result": "PASS",
+      "detail": "2 条"
+    },
+    {
+      "name": "SELFCHECK_LEAK_PATTERNS_FIRED",
+      "result": "PASS",
+      "detail": "命中 3/3"
+    },
+    {
+      "name": "SELFCHECK_SHA_NOT_FLAGGED_AS_UID",
+      "result": "PASS",
+      "detail": "64 位 sha 不得被当成 48 位 UID"
+    },
+    {
+      "name": "SELFCHECK_PLACED_SHA_CORRUPTION_FIRED",
+      "result": "PASS",
+      "detail": "对照: 真实散列与声明前缀一致"
+    }
+  ]
+}

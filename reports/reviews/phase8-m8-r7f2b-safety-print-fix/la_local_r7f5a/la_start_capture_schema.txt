@@ -1,0 +1,93 @@
+REQUIRED None
+--- captureConfiguration ---
+{
+ "description": "Capture timing mode. Provide exactly one of: manualCaptureMode, timedCaptureMode, or digitalCaptureMode. If omitted, defaults to manual.",
+ "type": "object",
+ "properties": {
+  "bufferSizeMegabytes": {
+   "description": "Memory buffer size in MB",
+   "type": "number"
+  },
+  "manualCaptureMode": {
+   "description": "Capture until manually stopped via stop_capture",
+   "type": "object",
+   "properties": {
+    "trimDataSeconds": {
+     "description": "Keep only the last N seconds of data",
+     "type": "number"
+    }
+   }
+  },
+  "timedCaptureMode": {
+   "description": "Capture for a fixed duration then stop automatically",
+   "type": "object",
+   "properties": {
+    "durationSeconds": {
+     "description": "Capture duration in seconds",
+     "type": "number"
+    },
+    "trimDataSeconds": {
+     "description": "Keep only the last N seconds of data",
+     "type": "number"
+    }
+   }
+  },
+  "digitalCaptureMode": {
+   "description": "Capture with a digital trigger (Logic analyzers only)",
+   "type": "object",
+   "properties": {
+    "triggerType": {
+     "description": "Trigger type: 1=rising, 2=falling, 3=pulse_high, 4=pulse_low (0=unspecified)",
+     "type": "number"
+    },
+    "afterTriggerSeconds": {
+     "description": "Seconds to capture after trigger fires",
+     "type": "number"
+    },
+    "trimDataSeconds": {
+     "description": "Keep only the last N seconds of data",
+     "type": "number"
+    },
+    "triggerChannelIndex": {
+     "description": "Digital channel index to trigger on",
+     "type": "number"
+    },
+    "minPulseWidthSeconds": {
+     "description": "Minimum pulse width for pulse triggers",
+     "type": "number"
+    },
+    "maxPulseWidthSeconds": {
+     "description": "Maximum pulse width for pulse triggers",
+     "type": "number"
+    },
+    "linkedChannels": {
+     "description": "Additional channel states required for trigger",
+     "type": "array",
+     "items": {
+      "$ref": "#/definitions/LinkedChannel"
+     }
+    }
+   }
+  }
+ }
+}
+--- defs keys ---
+['GetDevicesArgs', 'StartCaptureArgs', 'GlitchFilter', 'LinkedChannel', 'StopCaptureArgs', 'WaitCaptureArgs', 'LoadCaptureArgs', 'SaveCaptureArgs', 'CloseCaptureArgs', 'AnalyzerSettingValue', 'AnalyzerSettings', 'AddAnalyzerArgs', 'RemoveAnalyzerArgs', 'HlaSettingValue', 'HlaSettings', 'AddHighLevelAnalyzerArgs', 'RemoveHighLevelAnalyzerArgs', 'ExportRawDataCsvArgs', 'ExportRawDataBinaryArgs', 'AnalyzerExportConfig', 'ExportDataTableCsvArgs', 'LegacyExportAnalyzerArgs', 'McpArgsMap']
+== GlitchFilter ==
+{
+ "type": "object",
+ "properties": {
+  "channelIndex": {
+   "description": "Digital channel index",
+   "type": "number"
+  },
+  "pulseWidthSeconds": {
+   "description": "Minimum pulse width in seconds",
+   "type": "number"
+  }
+ },
+ "required": [
+  "channelIndex",
+  "pulseWidthSeconds"
+ ]
+}
