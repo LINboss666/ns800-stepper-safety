@@ -1,0 +1,9 @@
+# sha256 * <仓库相对路径>(LF, 无 BOM; 本清单不哈希自身字节 —— 一条清单不能给自己的字节作证)
+# 生成方式: 对 reports/firmware/phase8-m8-r7d1-async-learn-offline/ 下每个常规文件(排除 SHA256SUMS.txt、remote_readback.md 与 __pycache__) 直接读磁盘字节算 sha256
+# 条目数=5; 与 Git blob 的逐条复算由 host/staged_preflight_batch.py(提交前, 单批流)与推送后的远端逐 blob 回读完成
+# 重新生成: python reports/reviews/phase8-m8-idle-stack-r4/host/make_round_sums.py <本目录>
+f57c4e5cff43021f105540c8973d451b961846f7729599a5573190edc2dd6e00  reports/firmware/phase8-m8-r7d1-async-learn-offline/build_manifest.json
+340e780e7c5c32cba70925057d8d4a8f45bef06590e2e0b43f283eab9129d3ba  reports/firmware/phase8-m8-r7d1-async-learn-offline/rt-thread-motor-m1-callgraph.htm
+df7584c3df2e682d07564ee70f05ecc7b608052a7fa739fb0c21b4f942b15c2b  reports/firmware/phase8-m8-r7d1-async-learn-offline/rt-thread-motor-m1-candidate.bin
+59c286d9b9bae9cbfe5ac7b353634ccc308abed502b8c3544a3744baef560611  reports/firmware/phase8-m8-r7d1-async-learn-offline/rt-thread-motor-m1.axf
+fe422fffa82e1905b399de0681db2374ca92d1eb061f6a84d7a5b74ef0ff3d14  reports/firmware/phase8-m8-r7d1-async-learn-offline/rt-thread-motor-m1.map

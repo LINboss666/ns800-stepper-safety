@@ -47,6 +47,10 @@ typedef long     rt_base_t;
 typedef size_t   rt_size_t;
 typedef uint32_t rt_tick_t;
 
+/* rtconfig.h 的节拍率: 本夹具必须与产品同一值, 因为 diag_relative.c 的
+ * REL_MS_TO_TICK(ms) 用它把 12000ms 的采集预算折成 tick。改这里等于改时间模型。 */
+#define RT_TICK_PER_SECOND 1000
+
 #define RT_NULL            NULL
 #define RT_TRUE            1
 #define RT_FALSE           0

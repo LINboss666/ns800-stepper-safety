@@ -1,0 +1,122 @@
+/* A12 本轮新增/改动的打印逐调用限长 120B(含 LF), 且无裸 NUL、UTF-8 完整 */
+static void c_A12(void)
+{
+    static const char *needles[] = {
+        "learn STARTED id=999999999 n=32 win=20000..20000 dir=1",
+        "learn async: query",
+        "learn REFUSED: capture busy (job or zero owns it)",
+        "learn REFUSED: ctx lock",
+        "learn REFUSED: ctx not ready",
+        "learn args: N=8..32",
+        "job id=999999999 st=CANCEL_PENDING why=CANCEL_REQUESTED owner=2 cred=1/1",
+        "job n=4294967295/4294967295 want=32 win=20000..20000 dir=1",
+        "job left=2000000000ms of 12000ms software budget",
+        "job data adc[65535..65535]n65535 nz65535 sg[65535..65535]n65535 seq4294967295..4294967295",
+        "job thr tier=3 dev=-32768/-32768 drop=65535/65535 FIELD_UNVERIFIED",
+        "job DONE result; cred zero=1 learn=1 commit is separate",
+        "learn_status REFUSED: ctx lock (no half snapshot)",
+        "learn_status REFUSED: ctx not ready (no half snapshot)",
+        "cancel id=999999999 REQUESTED st=CANCEL_PENDING (motor untouched)",
+        "cancel id=999999999 NOT-CANCELLED: already CANCELLED why=CANCELLED",
+        "cancel REFUSED: no such job id=999999999 current=1",
+        "cancel REFUSED: job ctx not initialized",
+        "zero REFUSED: capture busy (job or zero owns it)",
+        "zero FAILED: ctx lock on invalidate",
+        "usage: diag_profile show|zero N|learn N LO HI DIR|tier T|commit|clear CONFIRM|learn_status|learn_cancel ID",
+        NULL
+    };
+    int k, miss = 0, mx;
+
+    /* 同一段捕获贯穿全部分支: cap_max_line_len() 取的是**累计**最长行, 针也对针
+     * 只在最后扯一次, 避免"每段各自看一眼"漏掉跨段的长行。 */
+    world_reset();
+    cap_reset();
+
+    /* 1) 受理 / 重复受理 / 参数拒绝 / usage: 参数与 id 都推到合法上界 */
+    S.mstate = MOTOR_IDLE; S.armed = 0; S.mhz = 0; S.raw = 1660;
+    do_cmd(cmd_zero);
+    CHECK(d_pending_zero == RT_TRUE, "1) 前置零点没成功: [%.80s]", cap_text());
+    S.mstate = MOTOR_CRUISE; S.armed = 1; S.mhz = 500; S.raw = 2000; S.sg = 500;
+    pump_sensor(2);
+    d_job_next_id = 999999999u;                 /* CLI 十进制解析器能输入的最大 id */
+    do_cmd(cmd_learn_max);                      /* STARTED + async 披露行 */
+    S.mstate = MOTOR_IDLE; S.armed = 0; S.mhz = 0;
+    do_cmd(cmd_learn);                          /* learn 的 busy 拒绝行 */
+    do_cmd(cmd_zero);                           /* zero 的 busy 拒绝行 */
+    do_cmd(cmd_learn_bad_n);                    /* 参数行 */
+    {
+        char *av[] = { "diag_profile", "bogus" };
+        diag_profile(2, av);                    /* usage 行(本轮扩了两个子命令) */
+    }
+
+    /* 2) 取消的三种答复 + learn_status 的全部分支 */
+    g_cancel_id = 999999999u;
+    do_cmd(cmd_learn_cancel);                   /* REQUESTED st=CANCEL_PENDING */
+    /* 把快照字段推到**声明类型**的十进制上界: 只为长度界限, 不声称这些运行值可达 */
+    d_job.got_adc = 4294967295u; d_job.got_sg = 4294967295u;
+    d_job.want = 32u; d_job.dir = 1u;
+    d_job.hz_lo = 20000u; d_job.hz_hi = 20000u;
+    d_job.why = "CANCEL_REQUESTED";             /* 最长的活动态原因 */
+    d_job.deadline = g_now + 2000000000u;
+    d_cap_owner = (rt_uint8_t)REL_CAP_BY_JOB;
+    d_pending_zero = RT_TRUE; d_pending_learn = RT_TRUE;
+    memset(&d_job.out, 0, sizeof(d_job.out));
+    d_job.out.run_adc_min = 65535u; d_job.out.run_adc_max = 65535u;
+    d_job.out.run_adc_n = 65535u;   d_job.out.run_adc_noise = 65535u;
+    d_job.out.run_sg_min = 65535u;  d_job.out.run_sg_max = 65535u;
+    d_job.out.run_sg_n = 65535u;
+    d_job.out.learn_sg_seq_first = 4294967295u;
+    d_job.out.learn_sg_seq_last = 4294967295u;
+    d_job.out.threshold_tier = 3u;
+    d_job.out.adc_dev_warn = -32768; d_job.out.adc_dev_trip = -32768;
+    d_job.out.sg_drop_warn = 65535u; d_job.out.sg_drop_trip = 65535u;
+    d_job.data_valid = 1u;
+    do_cmd(cmd_learn_status);                   /* st=CANCEL_PENDING 那一组(含 left 行) */
+    d_job.state = (rt_uint8_t)REL_JOB_DONE;
+    d_job.out_valid = 1u;
+    d_cap_owner = (rt_uint8_t)REL_CAP_FREE;
+    do_cmd(cmd_learn_status);                   /* thr + result 那一组 */
+    d_job.state = (rt_uint8_t)REL_JOB_CANCELLED;
+    d_job.why = "CANCELLED";
+    do_cmd(cmd_learn_cancel);                   /* NOT-CANCELLED: already CANCELLED */
+    d_job.job_id = 1u;                          /* 陈旧 id 去取消别人的任务 */
+    do_cmd(cmd_learn_cancel);                   /* no such job ... current=1 */
+
+    /* 3) 锁失败与后台未就绪两条拒绝身份 */
+    g_mutex_take_fail = 1;
+    do_cmd(cmd_learn);
+    do_cmd(cmd_learn_status);
+    g_mutex_take_fail = 0;
+    d_ctx_inited = RT_FALSE;
+    do_cmd(cmd_learn);
+    do_cmd(cmd_learn_status);
+    do_cmd(cmd_learn_cancel);
+    d_ctx_inited = RT_TRUE;
+
+    /* 4) zero 的"拿到采集器之后才撞锁"支路(第 3 次 take 失败) */
+    world_reset();
+    S.mstate = MOTOR_IDLE; S.armed = 0; S.mhz = 0; S.raw = 1660;
+    do_cmd(cmd_zero);
+    CHECK(d_pending_zero == RT_TRUE, "4) 前置零点没成功: [%.80s]", cap_text());
+    g_mutex_take_fail_after = 2;
+    do_cmd(cmd_zero);
+    g_mutex_take_fail_after = -1;
+    CHECK(cap_has("zero FAILED: ctx lock on invalidate"),
+          "4) 中途撞锁支路没走到: [%.120s]", cap_text());
+    /* 这条支路里连 close 也拿不到锁, 所有权留在 BY_ZERO: 如实复位夹具状态 */
+    d_cap_owner = (rt_uint8_t)REL_CAP_FREE;
+    memset(&d_cap, 0, sizeof(d_cap));
+
+    /* 5) 判据: 逐调用长度(含源 LF)、无裸 NUL、每条结论行必须真出现过 */
+    mx = cap_max_line_len();
+    CHECK(mx + 1 <= 120, "本轮打印里最长一次调用 %d B(含 LF %d B)超过 120 B 预算",
+          mx, mx + 1);
+    CHECK(g_cap_truncated == 0, "捕获里出现裸 NUL(vsnprintf 计数与实际长度不一致)");
+    for (k = 0; needles[k] != NULL; ++k)
+    {
+        if (!cap_has(needles[k])) { miss++; printf("    缺结论行: %s\n", needles[k]); }
+    }
+    CHECK(miss == 0, "驱动过的结论行有 %d 条没出现(长度判据不能空转)", miss);
+    CHECK(cap_all_ascii() == 1, "捕获区间里出现了非 ASCII 字节(UTF-8 完整性不成立)");
+}
+

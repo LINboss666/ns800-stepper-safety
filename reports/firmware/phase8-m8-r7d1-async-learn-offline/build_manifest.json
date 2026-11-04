@@ -1,0 +1,387 @@
+{
+ "round": "phase8-m8-r7d1-async-learn-offline",
+ "date": "2026-11-04",
+ "title": "M8-R7D1 离线异步学习轮: diag_profile learn 改为受理即返回+后台推进, 单目标构建一次(设备动作 0)",
+ "review_source": {
+  "zip_basename": "NS800_R7D1_Offline_Async_Learn_Task_20261104.zip",
+  "zip_bytes": 13467,
+  "zip_sha256": "b35e0a2e16a680ff90a37d2edb1de9da6c85adbc8011ccea33c5354e37922c5c",
+  "verdict": "GO_OFFLINE_IMPLEMENTATION_ONLY - 实现/主机验收/离线构建合为本轮交付, 不再单开登记轮",
+  "reviewed_baseline_commit": "7885aea606a50f1c34723dbfa9b8c0c4341326de",
+  "inner_manifest": "SHA256SUMS.txt(包内清单, 不哈希自身; 离线判据工具逐条复算 3/3 通过)",
+  "task_id": "M8R7D1-offline-async-learn-20261104",
+  "task_book_lines": 175
+ },
+ "baseline_commit": "7885aea606a50f1c34723dbfa9b8c0c4341326de",
+ "baseline_is_head_at_build": true,
+ "target": "rt-thread-motor-m1-candidate",
+ "action": "Keil Rebuild All x1(只 rt-thread-motor-m1-candidate, -r 全量重编, 未用 -f)。未下载、未 Flash、未接 DAP、未复位、未开串口、未起转、未 learn/zero、未 config_save、未启动逻辑分析仪。设备动作 0。",
+ "command": "C:\\Keil_v5\\UV4\\UV4.exe -r project.uvprojx -t rt-thread-motor-m1-candidate -j0 -o D:/ns800/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/build_r7d1.log",
+ "working_directory": "D:\\ns800\\rt-thread-master\\rt-thread-master\\bsp\\novosns\\ns800\\ns800rt7p65-nssinepad",
+ "uv4_return_code_observed_this_round": 0,
+ "error_warning_line": "0 Error(s), 0 Warning(s).",
+ "compiler_line_from_log": "*** Using Compiler 'V6.24', folder: 'C:\\Keil_v5\\ARM\\ARMCLANG\\Bin'",
+ "build_time_elapsed_line": "Build Time Elapsed:  00:00:14",
+ "program_size": "Program Size: Code=209178 RO-data=87242 RW-data=2196 ZI-data=85936",
+ "build_hooks_read_only_checked": {
+  "BeforeMake": "RunUserProg1=0(未启用任何前置程序)",
+  "AfterMake": "fromelf --bin .\\build\\motor_m1\\rt-thread-motor-m1.axf --output .\\build\\motor_m1\\rt-thread-motor-m1.bin",
+  "conclusion": "构建钩子里没有下载/调试/串口动作; 日志原文见 reports/reviews/phase8-m8-r7d1-async-learn-offline/build/build_r7d1.log"
+ },
+ "log": {
+  "path": "reports/reviews/phase8-m8-r7d1-async-learn-offline/build/build_r7d1.log",
+  "bytes": 3909,
+  "sha256": "b2aa70b45588e63d56bd6791cd06096f0e21161f11dcb74c3c30c5f4c3867274",
+  "disk_CR": 144,
+  "disk_LF": 144
+ },
+ "program_size_vs_baseline_image_on_board": {
+  "baseline_manifest": "reports/firmware/phase8-m8-r7f2b-safety-print-fix/build_manifest.json",
+  "baseline_program_size": "Program Size: Code=205930 RO-data=86198 RW-data=2192 ZI-data=85596",
+  "baseline_bin_sha256": "502dca5d8c7ebfa794f890a9c03bc258fc9753f57b6a80c2f1e08add69888a7a",
+  "delta_bytes": {
+   "Code": 3248,
+   "RO-data": 1044,
+   "RW-data": 4,
+   "ZI-data": 340
+  },
+  "bin_bytes": 297004,
+  "baseline_bin_bytes": 292708,
+  "bin_delta": 4296,
+  "reconciliation": "Code+RO+RW 增量 = 3248+1044+4 = 4296 = BIN 增量 4296(逐字节相符); 全局 RAM(RW+ZI)净增 344 B",
+  "resource_report": "reports/reviews/phase8-m8-r7d1-async-learn-offline/build/stack_resource_r7d1.txt"
+ },
+ "images": {
+  "bin": {
+   "path": "reports/firmware/phase8-m8-r7d1-async-learn-offline/rt-thread-motor-m1-candidate.bin",
+   "bytes": 297004,
+   "sha256": "df7584c3df2e682d07564ee70f05ecc7b608052a7fa739fb0c21b4f942b15c2b",
+   "disk_CR": 754,
+   "disk_LF": 2447
+  },
+  "axf": {
+   "path": "reports/firmware/phase8-m8-r7d1-async-learn-offline/rt-thread-motor-m1.axf",
+   "bytes": 1788432,
+   "sha256": "59c286d9b9bae9cbfe5ac7b353634ccc308abed502b8c3544a3744baef560611",
+   "disk_CR": 7785,
+   "disk_LF": 10010
+  },
+  "map": {
+   "path": "reports/firmware/phase8-m8-r7d1-async-learn-offline/rt-thread-motor-m1.map",
+   "bytes": 2143326,
+   "sha256": "fe422fffa82e1905b399de0681db2374ca92d1eb061f6a84d7a5b74ef0ff3d14",
+   "disk_CR": 21684,
+   "disk_LF": 21684
+  },
+  "callgraph_htm": {
+   "path": "reports/firmware/phase8-m8-r7d1-async-learn-offline/rt-thread-motor-m1-callgraph.htm",
+   "bytes": 1098807,
+   "sha256": "340e780e7c5c32cba70925057d8d4a8f45bef06590e2e0b43f283eab9129d3ba",
+   "disk_CR": 15236,
+   "disk_LF": 15236
+  }
+ },
+ "images_blob_identity": {
+  "bin": {
+   "disk_bytes": 297004,
+   "disk_sha256": "df7584c3df2e682d07564ee70f05ecc7b608052a7fa739fb0c21b4f942b15c2b",
+   "predicted_blob": {
+    "blob_sha1": "347ec8d922d7db01ce52a8410f82b4c26dea8cf2",
+    "blob_bytes": 297004,
+    "note": "按 -text 规则预测; 权威核对=提交前 staged 预检 与 推送后远端逐 blob 回读"
+   },
+   "disk_equals_predicted_blob_bytes": true
+  },
+  "axf": {
+   "disk_bytes": 1788432,
+   "disk_sha256": "59c286d9b9bae9cbfe5ac7b353634ccc308abed502b8c3544a3744baef560611",
+   "predicted_blob": {
+    "blob_sha1": "27f6003921099613b001e73320f632b48bae942e",
+    "blob_bytes": 1788432,
+    "note": "按 -text 规则预测; 权威核对=提交前 staged 预检 与 推送后远端逐 blob 回读"
+   },
+   "disk_equals_predicted_blob_bytes": true
+  },
+  "map": {
+   "disk_bytes": 2143326,
+   "disk_sha256": "fe422fffa82e1905b399de0681db2374ca92d1eb061f6a84d7a5b74ef0ff3d14",
+   "predicted_blob": {
+    "blob_sha1": "8e77055e6547a413d22502a8ff6cddd1e7f4d540",
+    "blob_bytes": 2143326,
+    "note": "按 -text 规则预测; 权威核对=提交前 staged 预检 与 推送后远端逐 blob 回读"
+   },
+   "disk_equals_predicted_blob_bytes": true
+  },
+  "callgraph_htm": {
+   "disk_bytes": 1098807,
+   "disk_sha256": "340e780e7c5c32cba70925057d8d4a8f45bef06590e2e0b43f283eab9129d3ba",
+   "predicted_blob": {
+    "blob_sha1": "48bf444b95daf7d9e54c2ec38ac4804b15dccdf6",
+    "blob_bytes": 1098807,
+    "note": "按 -text 规则预测; 权威核对=提交前 staged 预检 与 推送后远端逐 blob 回读"
+   },
+   "disk_equals_predicted_blob_bytes": true
+  }
+ },
+ "text_filter_on_this_round_paths": {
+  "git_check_attr_output": "reports/firmware/phase8-m8-r7d1-async-learn-offline/rt-thread-motor-m1-candidate.bin: text: unset",
+  "meaning": "-text => 不剥 CR, 磁盘字节即 blob 字节(本轮 .gitattributes 已先加两条规则)"
+ },
+ "source_inputs_compiled_from_disk": {
+  "diag_relative.c": {
+   "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diag_relative.c",
+   "disk_bytes": 103684,
+   "disk_sha256": "f2c7089b3d5a21479a5936bab5bf3855616380bb6f96fc538921b979ccac125d",
+   "disk_CR": 0,
+   "baseline_head_blob": {
+    "blob_sha1": "f93d81d1939451a0dee80e79224d8dbaca61d8ed",
+    "blob_bytes": 80236,
+    "blob_sha256": "059fc7535a550462c8c1c10039d5efdc419842811eadcf7ad8f2711bff541ce5"
+   },
+   "note": "disk 是本轮改动后的字节; baseline_head_blob 是任务书声明的已审基线(7885aea)同一文件",
+   "will_be_blob": {
+    "sha1": "f5f75b10144ebe257d392bf2cfabd76e2be2ce63",
+    "bytes": 103684,
+    "bytes_equal_to_disk": true,
+    "git_check_attr": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diag_relative.c: text: set",
+    "sha256": "f2c7089b3d5a21479a5936bab5bf3855616380bb6f96fc538921b979ccac125d",
+    "note": "磁盘即 LF 原件且 text=unset, 所以 blob 字节 == 磁盘字节"
+   }
+  },
+  "diag_relative.h": {
+   "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diag_relative.h",
+   "disk_bytes": 25422,
+   "disk_sha256": "aa23399bc2154e552803f4e0bfdd2b0a09ada79464aa26d71df6f21e02284689",
+   "disk_CR": 0,
+   "baseline_head_blob": {
+    "blob_sha1": "45b4042ff2c49369f25183d629460f54a44a9b1a",
+    "blob_bytes": 21838,
+    "blob_sha256": "4f100c16dc392419415c1a02fa1a8c8478d15964bf56d46f1eef64334fd8924e"
+   },
+   "note": "disk 是本轮改动后的字节; baseline_head_blob 是任务书声明的已审基线(7885aea)同一文件",
+   "will_be_blob": {
+    "sha1": "d18231a668c789a49363d046edc356f4a2cef09d",
+    "bytes": 25422,
+    "bytes_equal_to_disk": true,
+    "git_check_attr": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diag_relative.h: text: set",
+    "sha256": "aa23399bc2154e552803f4e0bfdd2b0a09ada79464aa26d71df6f21e02284689",
+    "note": "磁盘即 LF 原件且 text=unset, 所以 blob 字节 == 磁盘字节"
+   }
+  },
+  "diagnosis.c": {
+   "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diagnosis.c",
+   "disk_bytes": 54696,
+   "disk_sha256": "4b69151e140b3a80dee4ff211aa935d51cf6e9de2611f6474b38f35a3836d281",
+   "disk_CR": 0,
+   "baseline_head_blob": {
+    "blob_sha1": "3ea39bbd098be3633ea3c400a9a49667d7a4d102",
+    "blob_bytes": 54151,
+    "blob_sha256": "e1696ec92721c7df9da074c465ac3b705ad451029aa3608b1695c93c7466e557"
+   },
+   "note": "disk 是本轮改动后的字节; baseline_head_blob 是任务书声明的已审基线(7885aea)同一文件",
+   "will_be_blob": {
+    "sha1": "2cf560955fc670cd5af15de04b652d9c1c7355ab",
+    "bytes": 54696,
+    "bytes_equal_to_disk": true,
+    "git_check_attr": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diagnosis.c: text: set",
+    "sha256": "4b69151e140b3a80dee4ff211aa935d51cf6e9de2611f6474b38f35a3836d281",
+    "note": "磁盘即 LF 原件且 text=unset, 所以 blob 字节 == 磁盘字节"
+   }
+  },
+  "rel_main.c": {
+   "path": "tests/host/rel_main.c",
+   "disk_bytes": 196003,
+   "disk_sha256": "8e2f5acf7c4caa987b580b46e1414aabc758d5aaeabd5a060fe3a253de8b7c92",
+   "disk_CR": 0,
+   "baseline_head_blob": {
+    "blob_sha1": "11bda09340ba2475497b61b482d1b03cb54437e0",
+    "blob_bytes": 148596,
+    "blob_sha256": "85dfbb3f97d0f53cc91facac0a20c70383c7142a5261ba0935ed882cb9ebc2a9"
+   },
+   "note": "disk 是本轮改动后的字节; baseline_head_blob 是任务书声明的已审基线(7885aea)同一文件",
+   "will_be_blob": {
+    "sha1": "291b1e6add9ce58c0cc9ee7876fc104c7cc6feab",
+    "bytes": 196003,
+    "bytes_equal_to_disk": true,
+    "git_check_attr": "tests/host/rel_main.c: text: unspecified",
+    "sha256": "8e2f5acf7c4caa987b580b46e1414aabc758d5aaeabd5a060fe3a253de8b7c92",
+    "note": "磁盘即 LF 原件且 text=unset, 所以 blob 字节 == 磁盘字节"
+   }
+  },
+  "run_diag_relative_m8.sh": {
+   "path": "tests/host/run_diag_relative_m8.sh",
+   "disk_bytes": 23744,
+   "disk_sha256": "afbd3ae9ee7e6cdc662a83c72d617f6d4677208a2c9902d579d2510c4b36ebb4",
+   "disk_CR": 0,
+   "baseline_head_blob": {
+    "blob_sha1": "781b443d57ae0cad6384d1afa9aaa86c6bdcddf1",
+    "blob_bytes": 20142,
+    "blob_sha256": "9765d15f27e64844e0ac265bbc105e6215b1e7a8c377b60e4b6e6426f043378c"
+   },
+   "note": "disk 是本轮改动后的字节; baseline_head_blob 是任务书声明的已审基线(7885aea)同一文件",
+   "will_be_blob": {
+    "sha1": "e58758ff83b41c7d6db9a3273bf26160fcaf2f81",
+    "bytes": 23744,
+    "bytes_equal_to_disk": true,
+    "git_check_attr": "tests/host/run_diag_relative_m8.sh: text: unspecified",
+    "sha256": "afbd3ae9ee7e6cdc662a83c72d617f6d4677208a2c9902d579d2510c4b36ebb4",
+    "note": "磁盘即 LF 原件且 text=unset, 所以 blob 字节 == 磁盘字节"
+   }
+  },
+  "rtthread.h": {
+   "path": "tests/host/shim_rel/rtthread.h",
+   "disk_bytes": 5178,
+   "disk_sha256": "b91bd867765487e9cb8e79970589cdf81b530fa4174205b878f3b4dc0359ff9e",
+   "disk_CR": 0,
+   "baseline_head_blob": {
+    "blob_sha1": "69597264cdfa1448ab156d301bf6fb08f55e5860",
+    "blob_bytes": 4949,
+    "blob_sha256": "bd24efb5df58cfc928de6021e1ce1af319ebc2361c9dd1f7f769d131bd5adda5"
+   },
+   "note": "disk 是本轮改动后的字节; baseline_head_blob 是任务书声明的已审基线(7885aea)同一文件",
+   "will_be_blob": {
+    "sha1": "c925ba4621926e9209d06c95bf141e2f0dafc4b4",
+    "bytes": 5178,
+    "bytes_equal_to_disk": true,
+    "git_check_attr": "tests/host/shim_rel/rtthread.h: text: unspecified",
+    "sha256": "b91bd867765487e9cb8e79970589cdf81b530fa4174205b878f3b4dc0359ff9e",
+    "note": "磁盘即 LF 原件且 text=unset, 所以 blob 字节 == 磁盘字节"
+   }
+  }
+ },
+ "static_ram_added": {
+  "symbols_from_this_round_map": {
+   "d_job .bss": 276,
+   "d_ctx_lock .bss": 60,
+   "d_cap_owner .bss": 1,
+   "d_job_next_id .data": 4
+  },
+  "sum_bytes": 341,
+  "matches_object_delta": "diag_relative.o 的 ZI+RW 增量 = +341/+4",
+  "no_new_thread": true,
+  "no_new_malloc": true,
+  "stack_constants_untouched": {
+   "DIAG_THREAD_STACK": "4096 (diagnosis.c:48)",
+   "FINSH_THREAD_STACK_SIZE": "4096 (rtconfig.h)",
+   "RT_MAIN_THREAD_STACK_SIZE": "4096 (rtconfig.h)",
+   "rtconfig_diff_lines_vs_baseline": 0
+  },
+  "deadline_budget_untouched": "REL_CMD_DEADLINE_MS=12000(任务书 §5 的预算, 未为规避问题而延长)"
+ },
+ "call_graph_evidence": {
+  "diag_thread_entry": {
+   "base_frame_depth": [
+    632,
+    1580
+   ],
+   "new_frame_depth": [
+    640,
+    1588
+   ],
+   "children_added": [
+    "rel_job_advance"
+   ],
+   "children_removed": []
+  },
+  "rel_cmd_learn": {
+   "base_frame_depth": [
+    296,
+    836
+   ],
+   "new_frame_depth": [
+    168,
+    1084
+   ],
+   "children_removed": [
+    "rt_thread_mdelay",
+    "rel_cap_start",
+    "rel_cap_feed",
+    "rel_cap_done",
+    "rel_cap_finish",
+    "rel_cap_abort",
+    "rel_frame_to_input",
+    "rt_tick_get",
+    "rt_memset"
+   ],
+   "children_added": [
+    "rel_job_start",
+    "rel_pending_read",
+    "rel_lock_why",
+    "rel_accept_refused"
+   ],
+   "meaning": "镜像侧控制流证实 learn 命令线程不再等待/采集(任务书 §2 第一条)"
+  },
+  "thread_stack_note": "armlink 解析不了 msh 的函数指针表, finsh_thread_entry 子树两版都是 628 恰说明它没把命令处理函数算进去; 所以本轮只给每条命令各自的子树数, 不把它们与 shell 帧手加成一个总数。"
+ },
+ "host_tests": {
+  "runner": "tests/host/run_diag_relative_m8.sh",
+  "compiler": "gcc.exe (tdm64-1) 4.9.2, 命令行 -Wall -Wextra",
+  "normal_chain": "cases=62 pass=62 fail=0 pre_bad=0 executed=62, build_rc=0 warnings=0, proc_rc=0",
+  "normal_output": {
+   "path": "reports/reviews/phase8-m8-r7d1-async-learn-offline/host/normal_chain_out.txt",
+   "bytes": 37600,
+   "sha256": "3715042a6e520596902d563542ce6542ea5860b60edae454eb7c4cd28f6030e6",
+   "disk_CR": 654,
+   "disk_LF": 654
+  },
+  "reverse_controls": "14/14 META-OK: RV1-RV10(既有) + RDV1-RDV4(本轮四项) 每个都在副本上落地一次并在实跑中命中期望失败身份, proc_rc 全为 1",
+  "reverse_output": {
+   "path": "reports/reviews/phase8-m8-r7d1-async-learn-offline/host/reverse_run_full.txt",
+   "bytes": 9536,
+   "sha256": "d2bfcdc880f1c572dfa7cd98c67fb7de38bc0e9a81b7a8ece901a6b035d02618",
+   "disk_CR": 14,
+   "disk_LF": 134
+  },
+  "final_label": "M8 RELATIVE RESULT: PASS(主机链, 离线; 现场项未验证)",
+  "a12_print_bounds": {
+   "path": "reports/reviews/phase8-m8-r7d1-async-learn-offline/host/a12_print_bounds.txt",
+   "bytes": 6302,
+   "sha256": "9dc2b0482b48124c5cab25aef17adf9813d90b3d4dfea19395321271d8b7198c",
+   "disk_CR": 0,
+   "disk_LF": 122
+  }
+ },
+ "offline_checks": {
+  "tool": "reports/reviews/phase8-m8-r7d1-async-learn-offline/tools/r7d1_offline_checks.py",
+  "result": "TOTAL=31 FAIL=0",
+  "checks": {
+   "path": "reports/reviews/phase8-m8-r7d1-async-learn-offline/offline/checks.txt",
+   "bytes": 2012,
+   "sha256": "25c58ed5b616154feb724fc852f1657c3783984db4067aa0cc0f400830bcdf9c",
+   "disk_CR": 0,
+   "disk_LF": 32
+  },
+  "summary": {
+   "path": "reports/reviews/phase8-m8-r7d1-async-learn-offline/offline/summary.json",
+   "bytes": 12700,
+   "sha256": "361af8139ae3d151b1e50d0444c1426fec502e5e107ac555af3da06845b694c2",
+   "disk_CR": 0,
+   "disk_LF": 389
+  },
+  "print_budget": "每次调用最宽 120 B(含源 LF), 覆盖 29 个新增/改动 rt_kprintf 调用"
+ },
+ "device_actions_by_this_round": 0,
+ "new_image_on_board": "NOT_ON_BOARD - 本轮未下载/未回读/未复位, 板上镜像身份不因本轮构建而改变",
+ "board_image_still": "历史 b502 证明(502dca5d...)=上一轮逐字节回读过的在板镜像; 本轮新 BIN df7584c3... 与它不同, 只是离线候选",
+ "not_overwritten": [
+  "reports/firmware/phase8-m8-r7f2b-safety-print-fix/**(在板镜像与其 manifest 只读引用)"
+ ],
+ "boundaries_unchanged": {
+  "polarity_measured": false,
+  "core_protection_verified": false,
+  "field_verification_of_async_learn": "NOT_DONE(本轮全部为离线主机模型+离线构建)",
+  "forbidden_claims_still_forbidden": [
+   "静态 IRQ 极性已实测",
+   "核心保护已现场验证",
+   "异步学习已在板上跑通",
+   "新镜像在板"
+  ]
+ },
+ "git_apply_hygiene": {
+  "no_merge_rebase_force_reset_clean": true,
+  "frozen_refs_untouched": true,
+  "failure_bytes_kept": "本轮无失败原件需保留; 运行/判读原文未删改",
+  "last_readback_report_stays_outside_repo": true
+ },
+ "source_identity_note": "will_be_blob 由 git hash-object --path 在本机实算(应用该路径的 attributes), 它是暂存后会得到的 blob 的预测身份; 权威核对仍是提交前的 staged 预检与推送后的远端逐 blob 回读。 另: 三个 BSP 源文件的 text 属性是 set(本仓库既有规则), 本轮磁盘字节是 LF(CR=0)所以 clean 方向不改字节; 但 checkout 方向 autocrlf 可能把行尾写成 CRLF, 因此\"签出字节==blob\"不在本轮声称范围内, 只有 disk==blob 被核过。"
+}

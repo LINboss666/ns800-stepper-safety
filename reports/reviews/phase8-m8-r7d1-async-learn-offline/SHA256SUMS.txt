@@ -1,0 +1,20 @@
+# sha256 * <仓库相对路径>(LF, 无 BOM; 本清单不哈希自身字节 —— 一条清单不能给自己的字节作证)
+# 生成方式: 对 reports/reviews/phase8-m8-r7d1-async-learn-offline/ 下每个常规文件(排除 SHA256SUMS.txt、remote_readback.md 与 __pycache__) 直接读磁盘字节算 sha256
+# 条目数=16; 与 Git blob 的逐条复算由 host/staged_preflight_batch.py(提交前, 单批流)与推送后的远端逐 blob 回读完成
+# 重新生成: python reports/reviews/phase8-m8-idle-stack-r4/host/make_round_sums.py <本目录>
+b2aa70b45588e63d56bd6791cd06096f0e21161f11dcb74c3c30c5f4c3867274  reports/reviews/phase8-m8-r7d1-async-learn-offline/build/build_r7d1.log
+ef5cf22b7076d5620d16b11c0ee4bec1d426f19d5005aacfa9e11a0ceff47c2e  reports/reviews/phase8-m8-r7d1-async-learn-offline/build/stack_resource_r7d1.txt
+157bcb66f12007b6f24cac5acb8ef9b957e4e6cebb7c4150bbbdfa188fa5c1a6  reports/reviews/phase8-m8-r7d1-async-learn-offline/case_mapping.md
+8e341fe0be313f3bc94a4d4d79287d32a38b9b04385cd90bd0bf6db6ebde35fd  reports/reviews/phase8-m8-r7d1-async-learn-offline/code/host_chain_diff_vs_7885aea.diff
+86532877fa65996c23551891c5ec8271b857b008a6406d9e254ee21801ae025c  reports/reviews/phase8-m8-r7d1-async-learn-offline/code/product_diff_vs_7885aea.diff
+9dc2b0482b48124c5cab25aef17adf9813d90b3d4dfea19395321271d8b7198c  reports/reviews/phase8-m8-r7d1-async-learn-offline/host/a12_print_bounds.txt
+28dc70bbfd63176d6cab171242034d08622d062ebd4c60ac2e16a43b8977ce94  reports/reviews/phase8-m8-r7d1-async-learn-offline/host/case_ledger.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  reports/reviews/phase8-m8-r7d1-async-learn-offline/host/normal_chain_build.txt
+3715042a6e520596902d563542ce6542ea5860b60edae454eb7c4cd28f6030e6  reports/reviews/phase8-m8-r7d1-async-learn-offline/host/normal_chain_out.txt
+9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  reports/reviews/phase8-m8-r7d1-async-learn-offline/host/normal_chain_warning_count.txt
+d2bfcdc880f1c572dfa7cd98c67fb7de38bc0e9a81b7a8ece901a6b035d02618  reports/reviews/phase8-m8-r7d1-async-learn-offline/host/reverse_run_full.txt
+5013f4b6e9b133ded5a13e4777ff6259e8a85708a7b1e5867e116ae7334d6e3d  reports/reviews/phase8-m8-r7d1-async-learn-offline/implementation_contract.md
+25c58ed5b616154feb724fc852f1657c3783984db4067aa0cc0f400830bcdf9c  reports/reviews/phase8-m8-r7d1-async-learn-offline/offline/checks.txt
+361af8139ae3d151b1e50d0444c1426fec502e5e107ac555af3da06845b694c2  reports/reviews/phase8-m8-r7d1-async-learn-offline/offline/summary.json
+bb2cf7c6d382dace3c1b6f4f5e133b9a9b95ed35fccc866377b9bee07ce34946  reports/reviews/phase8-m8-r7d1-async-learn-offline/tools/r7d1_offline_checks.py
+d6800ef1ae56d38eb1e8e3d19cc792a16b8a32a62b42d76c8cf38f4ffddb14a6  reports/reviews/phase8-m8-r7d1-async-learn-offline/tools/r7d1_staged_preflight.py

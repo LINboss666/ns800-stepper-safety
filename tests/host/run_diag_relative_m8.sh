@@ -15,7 +15,7 @@
 #   1) 在任何 rm/mkdir/重定向/编译**之前**先验证工作目录(require_outside_repo);
 #   2) 只删除带本工具哨兵(NS800-HOSTCHAIN-WORK)的目录;
 #   3) ONLY 选择词必须在入口校验: 未知/重复/纯空白一律 rc=4 拒绝且不动任何文件;
-#      未设置或空串 = 默认执行全部 50 例(不是零执行); 汇总只声明实际执行集合,
+#      未设置或空串 = 默认执行全部 62 例(50 例既有 + R7D1 新增 A01..A12; 不是零执行); 汇总只声明实际执行集合,
 #      未执行的显式 NOT_RUN;
 #   4) 逐 id 台账必须"恰好出现一次且判 PASS"; 缺席/重复/未登记/SUMMARY 不自洽
 #      = 基础设施故障(4); 编译失败或异常退出(非 0/1/4)也不算检出;
@@ -95,7 +95,19 @@ REL46-ctl-uninit-take-and-protect
 REL47-commit-inside-static-gate
 REL48-new-generation-clears-evidence
 REL49-frame-not-same-as-motion-known
-REL50-stale-idle-not-static-exemption"
+REL50-stale-idle-not-static-exemption
+A01-start-returns-without-sample-wait
+A02-independent-samples-publish-candidate
+A03-consistent-read-only-status
+A04-strict-reject-and-busy-before-side-effects
+A05-cancel-terminates-without-new-frames
+A06-cancel-versus-completion-linearized
+A07-stale-id-and-quiescence-guard
+A08-timeout-advances-without-frames-and-wrap
+A09-motion-mode-signature-change-aborts
+A10-failed-relearn-invalidates-credential
+A11-mutator-exclusion-and-lock-context-failures
+A12-bounded-calls-utf8-no-nul"
 ALL_CASES="$(printf '%s' "$ALL_CASES" | tr '\n' ' ')"
 
 note() { printf '%s\n' "$*"; }
@@ -321,7 +333,7 @@ reverse_case() {            # reverse_case <name> <target-file> <old> <new> <期
 
 if [ "$REVERSE" = "1" ]; then
     note ""
-    note "=== 反向验证(10 组具名家族, 仓外一次性副本) ==="
+    note "=== 反向验证(14 组具名家族, 仓外一次性副本) ==="
     # RV1: 去掉"SG 必须是新独立样本"的身份门 —— 旧样本必须被 REL08 检出
     reverse_case RV1_sg_new_sample_identity_gate diag_relative.c \
 '    fresh_sg  = (in->sg_valid  && in->sg_seq  != 0 && in->sg_seq  != e->last_sg_seq);' \
@@ -360,11 +372,13 @@ if [ "$REVERSE" = "1" ]; then
         REL22-coverage-loss-protects-first REL33-lock-fail-bounded-degrade \
         REL34-no-frame-still-supervises REL36-null-outparams-still-protects
     # RV6: 失败的重学保留旧 learn 凭据(C4) —— REL39 必须检出
+    # RV6(M8-R7D1 重锚): 旧锚点是同步 learn 的"入口先作废凭据", 现在这句话搬进了
+    # rel_job_start 的受理临界区 —— 对等缺陷 = 受理时不再作废旧 learn 资格,
+    # 于是失败/被拒的重学还能拿旧资格提交。REL39 与 A10 两头都得检出。
     reverse_case RV6_failed_relearn_keeps_credential diag_relative.c \
-'    cand = d_pending;                    /* 私有候选: 从已验证的零点接着攒 */
-    d_pending_learn = RT_FALSE;          /* 先作废这次尝试的凭据(C4) */' \
-'    cand = d_pending;   /* NEGATIVE-INJECTION RV6: 入口不再作废本次尝试的 learn 凭据 */' \
-        REL39-zero-static-and-failed-relearn
+'    d_pending_learn = RT_FALSE;       /* 新学习受理: 旧 learn 成功凭据立即失效 */' \
+'    /* NEGATIVE-INJECTION RV6: 受理不再作废旧 learn 凭据(失败重学仍能拿旧资格提交) */' \
+        REL39-zero-static-and-failed-relearn A10-failed-relearn-invalidates-credential
     # RV7(R6 范围): 去掉碰撞的独立触发 —— REL44 必须检出
     reverse_case RV7_impact_independent_trip_removed diag_relative.c \
 '            if (e->imp_cnt >= p->impact_new_min)
@@ -398,6 +412,48 @@ rt_err_t rel_ctl_take(void) { return RT_EOK; }' \
                      diag_rel_tick_diff(now, in->motion_tick) <= motion_age_limit);' \
 '    motion_trusted = in->motion_known;   /* NEGATIVE-INJECTION RV10: 过期事实仍被当现在的静止 */' \
         REL50-stale-idle-not-static-exemption REL49-frame-not-same-as-motion-known
+
+    # RDV1(M8-R7D1): 把"取消优先"这一支短路掉 —— 已取消的任务必须还能发布成功,
+    # A05(取消在一次推进内终结)与 A06(取消先受理就不能翻成 DONE)都要检出。
+    reverse_case RDV1_cancel_branch_short_circuited diag_relative.c \
+'    if (d_job.state == (rt_uint8_t)REL_JOB_CANCEL_PENDING)
+    { rel_job_term_locked((rt_uint8_t)REL_JOB_CANCELLED, "CANCELLED"); rel_ctx_give_held(); return; }' \
+'    if (d_job.state == (rt_uint8_t)REL_JOB_CANCEL_PENDING && d_job.want == 0u)   /* NEGATIVE-INJECTION RDV1: 取消判定被短路, 取消后仍能采集并发布 */
+    { rel_job_term_locked((rt_uint8_t)REL_JOB_CANCELLED, "CANCELLED"); rel_ctx_give_held(); return; }' \
+        A05-cancel-terminates-without-new-frames A06-cancel-versus-completion-linearized
+
+    # RDV2(M8-R7D1): 超时判定只在有新帧时才做 —— 无帧/源冻结的世界里任务永不终结,
+    # A08 的两段(停帧超时 + 真一帧都没出过的超时)都必须检出。
+    reverse_case RDV2_timeout_only_advances_with_frames diag_relative.c \
+'    if ((rt_int32_t)(d_job.deadline - rt_tick_get()) <= 0)' \
+'    if (have_frame && (rt_int32_t)(d_job.deadline - rt_tick_get()) <= 0)   /* NEGATIVE-INJECTION RDV2: 无帧时不推进总超时 */' \
+        A08-timeout-advances-without-frames-and-wrap
+
+    # RDV3(M8-R7D1): 受理路径又回到"等样本直到 deadline"的基线形状 —— A01 的
+    # "零次等待 + 时钟不前进"两条必须检出(不是编译错误, 是业务断言失败)。
+    reverse_case RDV3_start_waits_for_samples_again diag_relative.c \
+'    rt_kprintf("[DIAG] learn STARTED id=%u n=%u win=%u..%u dir=%u\n",' \
+'    {
+        rel_job_view_t wv;
+        (void)rel_job_status(&wv);
+        while (wv.state == (rt_uint8_t)REL_JOB_RUNNING &&
+               (rt_int32_t)(d_job.deadline - rt_tick_get()) > 0)
+        { rt_thread_mdelay(5); (void)rel_job_status(&wv); }
+    }   /* NEGATIVE-INJECTION RDV3: 受理又回到等样本(基线的同步阻塞形状) */
+    rt_kprintf("[DIAG] learn STARTED id=%u n=%u win=%u..%u dir=%u\n",' \
+        A01-start-returns-without-sample-wait
+
+    # RDV4(M8-R7D1): 作废旧 learn 资格挪回**入口**(即基线那个"被拒绝的命令也烧资格"
+    # 的缺陷) —— A10 的 1b"模式门拒绝的重学不能先清凭据"必须检出。
+    reverse_case RDV4_credential_cleared_before_refusal diag_relative.c \
+'    if (dir > 1u)
+    {
+        /* 本轮只允许单向基线(R3.6): 两个方向要各自学一次、各存一版。' \
+'    d_pending_learn = RT_FALSE;   /* NEGATIVE-INJECTION RDV4: 入口就作废旧 learn 资格 */
+    if (dir > 1u)
+    {
+        /* 本轮只允许单向基线(R3.6): 两个方向要各自学一次、各存一版。' \
+        A10-failed-relearn-invalidates-credential
 fi
 
 note ""

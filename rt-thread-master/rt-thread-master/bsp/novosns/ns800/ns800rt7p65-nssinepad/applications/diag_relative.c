@@ -801,10 +801,17 @@ static rt_uint32_t     d_pub_fail   = 0;            /* 写者私有: 发布失�
 
 #define REL_CTL_TAKE_MS  20
 
+/* M8-R7D1: 候选/采集/任务上下文的叶锁。定义在采集层之后(它要操作 d_cap 与
+ * d_pending), 但与控制锁**同一次初始化** —— 不存在"控制锁有、任务锁没有"的半套
+ * 启动状态。 */
+static rt_err_t rel_ctx_lock_init(void);
+
 rt_err_t rel_ctl_init(void)                         /* 由 diagnosis_init 调用一次 */
 {
     rt_err_t rc;
     if (d_ctl_inited) return RT_EOK;
+    rc = rel_ctx_lock_init();
+    if (rc != RT_EOK) return rc;                    /* 任务锁起不来 => 整体 fail-closed */
     rc = rt_mutex_init(&d_ctl_lock, "rel_ctl", RT_IPC_FLAG_PRIO);
     if (rc == RT_EOK) d_ctl_inited = RT_TRUE;
     return rc;
@@ -1064,7 +1071,11 @@ rel_reason_t rel_prod_evaluate(const rel_step_arg_t *a, rt_uint8_t mode,
     return r;
 }
 
-/* 采集上下文(零点/学习): 只由命令线程使用。 */
+/* 采集上下文(零点/学习)。
+ * M8-R1 时代它"只由命令线程使用"; M8-R7D1 起学习采集改由 Diagnosis Thread 推进,
+ * 所以这句话已经不再成立 —— 现在的规则是**独占所有者**而不是"单线程":
+ * d_cap 只允许在当前所有者(d_cap_owner: FREE / BY_ZERO / BY_JOB)之下被触碰, owner
+ * 的改与 rel_cap_start/abort 都在上下文锁的同一临界区里完成(见本文件 R7D1 节)。 */
 typedef struct
 {
     rt_uint8_t  active;
@@ -1288,16 +1299,19 @@ rt_err_t rel_cap_finish(diag_rprof_t *out, const char **why)
  *   diag_profile show
  *   diag_profile zero N              N=32..256  静止且可信禁能, 采 N 个**不同**有效 ADC 帧
  *   diag_profile learn N LO HI DIR   N=8..32 DIR=0|1  指定巡航窗内采 N 个独立 SG + N 个 ADC
+ *   diag_profile learn_status        只读: 当前/最近学习任务的一致快照
+ *   diag_profile learn_cancel JOB_ID 只取消匹配的活动任务(不等后台收尾, 不碰电机)
  *   diag_profile tier T              T=1..3   用已存正常统计按档重算 warn/trip(只改候选)
  *   diag_profile commit              静止事务内一次性发布整套候选
  *   diag_profile clear CONFIRM       静止作废 profile, 回 MONITOR_ONLY
  *
- * 事务纪律(M8-R1 R3, 逐条对应被复现的反例):
+ * 事务纪律(M8-R1 R3, 逐条对应被复现的反例; M8-R7D1 的改动标 R7D1):
  *   - 每个入口**先**查合法线程上下文(ISR / PRIMASK 屏蔽窗口 / 无线程对象一律静默拒绝,
  *     连参数错误都不打印), 再解析参数、再取锁 —— 沿用 current_cal.c 的同一惯例(R3.7)。
- *   - zero/learn 都在**私有候选**上工作, 并在入口立刻作废这次尝试的成功凭据; 只有
+ *   - zero/learn 都在**私有候选**上工作, 并在受理成立时作废这次尝试的成功凭据; 只有
  *     完整成功才发布 pending。失败的重学因此不能复用上一轮的 learn 资格, 更不能把
- *     新窗口套在旧统计上(C4)。
+ *     新窗口套在旧统计上(C4)。R7D1: 作废点挪到"采集器所有权真的拿到"之后 ——
+ *     被拒绝的命令不得烧掉旧资格。
  *   - zero 的静止/禁能资格在采集期间**每帧**复核, 完成时再在同一个静止事务里复核
  *     一次; 中途 arm/运动/失去证明就立即 abort 本次候选, 不会把运动 raw 吸进零点(C5)。
  *   - commit/tier/clear 的最终资格复核全部发生在 motor_calibration_static_begin()
@@ -1306,8 +1320,13 @@ rt_err_t rel_cap_finish(diag_rprof_t *out, const char **why)
  *     复核**(C2 的旧实现就是用分离快照代替了这道门)。
  *   - learn 只在 MONITOR_ONLY 下进行, 且只允许单向基线(本轮 DIR=2 具名拒绝 ——
  *     只采一个方向却宣称双向基线, 是第二条假证据链)。
- *   - 等待只用 rt_thread_mdelay + 12s 总 deadline; 全程不跨 UART/Flash/打印/等待采样
- *     持 mot_lock 或 cfg_lock; 打印一律放在静止事务关闭之后。
+ *   - zero **保持同步**: 命令线程内 mdelay 轮询 + 12s 总 deadline(R7D1 不改这条)。
+ *     learn 改为受理后返回(R7D1), 采集与终结由 Diagnosis Thread 推进, 12s 总预算
+ *     与"只认真样本"的口径不变; 因此"完成时机"与旧同步版不同 —— 受理打印的
+ *     STARTED 不等于 learn OK, 成功与否以 learn_status 的终态与凭据为准。
+ *   - 全程不跨 UART/Flash/打印/等待采样持 mot_lock 或 cfg_lock; 打印一律放在静止
+ *     事务关闭之后。R7D1 的 ctx 锁是叶锁(临界区内不取任何其他锁、不做任何 IO /
+ *     sleep / 打印), 所以"持有 mot 或 cfg 时取 ctx"是单向可达, 反向不存在。
  * 参数严格解析: 非纯数字、越界、多余参数一律拒绝且**不产生任何配置副作用**。
  */
 
@@ -1323,6 +1342,380 @@ static rt_bool_t rel_ctx_ok(void)
 {
     return (rt_interrupt_get_nest() == 0 && !sp_intr_masked() &&
             rt_thread_self() != RT_NULL) ? RT_TRUE : RT_FALSE;
+}
+
+/* ================= M8-R7D1: 异步、可取消的学习任务 =================
+ *
+ * 为什么要有这一层: 旧 rel_cmd_learn 在**命令线程**里 mdelay 轮询到 12s deadline,
+ * 这 12 秒内同一 shell 不能再受理任何命令。现在 learn 只做"受理", 采集由
+ * Diagnosis Thread 已有的 100Hz 循环推进(diagnosis.c 在 rel_prod_evaluate **之后**
+ * 调 rel_job_advance —— 保护义务永远排在学习推进之前)。
+ *
+ * 所有权与锁序(必须与 diag_relative.h 的注释一起读):
+ *   - d_ctx_lock 是**叶锁**: 临界区内只做纯计算与结构体拷贝, 不调 motor / config /
+ *     Flash / UART / sleep / 打印, 也不取任何其他锁。因此方向是单向的 —— 持有
+ *     mot(静止事务)或 cfg 期间**可以**取 ctx(与既有 mot -> cfg 顺序相容), 反过来
+ *     不存在"持 ctx 再等 mot/cfg"的路径, 所以没有环。
+ *   - 单一写者: 只有 Diagnosis Thread 的 rel_job_advance 能把任务从
+ *     RUNNING / CANCEL_PENDING 搬到终态。shell 线程只做两件与此有关的事 ——
+ *     在终态/IDLE 且采集器空闲时受理新任务, 以及置取消(CANCEL_PENDING)。
+ *   - 所有 take 都有界(shell 20ms, 后台推进用非阻塞 try), 没有任何路径用
+ *     RT_WAITING_FOREVER 等对方退出; 失败时一个字段都不改, 由调用方具名打印。
+ *   - 临界区内部**直接**读写 d_pending / d_cap / d_job, 绝不再调用 rel_pending_*
+ *     或 rel_job_* —— 这把锁不可重入, 嵌套 take 就是自锁。
+ *
+ * 时间模型: 采集总预算仍是 REL_CMD_DEADLINE_MS(12000ms), 只在软件层成立;
+ * 真机 UART 响应时间与某个物理毫秒上限在本轮没有上板, 不做任何承诺。
+ */
+
+#define REL_CTX_TAKE_MS   20u
+#define REL_JOB_WHY_RUN   "RUNNING"
+
+/* ms -> tick 只在这一处换算。rtconfig.h 里 RT_TICK_PER_SECOND==1000, 于是
+ * 12000ms == 12000 tick; 不相等时仍按 ms*TPS/1000 折算, 而不是让这个常数悄悄
+ * 变成另一个物理时长。 */
+#define REL_MS_TO_TICK(ms) ((rt_uint32_t)(((rt_uint64_t)(ms) * (rt_uint64_t)RT_TICK_PER_SECOND) / 1000ull))
+
+typedef struct
+{
+    rt_uint32_t    job_id;
+    rt_uint8_t     state;           /* rel_job_state_t */
+    rt_uint8_t     want, dir;
+    rt_uint32_t    hz_lo, hz_hi;
+    rt_uint32_t    deadline;        /* 绝对 tick(有符号差判到期, 容忍回绕) */
+    rt_uint32_t    sig;             /* 受理时的 live 驱动签名 */
+    rt_uint32_t    last_frame_seq;  /* 与旧命令线程 seen 同语义: 只有新帧才喂 */
+    diag_rprof_t   cand;            /* 私有候选(不指向命令栈/argv) */
+    diag_rprof_t   out;             /* rel_cap_finish 写出的统计: 成功时是发布出去的整份候选 */
+    rt_uint32_t    got_adc, got_sg; /* 每次成功喂帧后镜像的独立样本数(终结后仍可披露进度) */
+    rt_uint8_t     out_valid;       /* 1 = out 是 DONE 发布出去的候选 */
+    rt_uint8_t     data_valid;      /* 1 = out 里至少有本次采集的统计(失败终结也要给依据) */
+    const char    *why;             /* 只指向本文件里的静态字面量 */
+} rel_job_t;
+
+static struct rt_mutex d_ctx_lock;
+static rt_bool_t       d_ctx_inited   = RT_FALSE;
+static rt_uint8_t      d_cap_owner    = (rt_uint8_t)REL_CAP_FREE;
+static rel_job_t       d_job;
+static rt_uint32_t     d_job_next_id  = 1u;   /* 0 保留给"还没有过任务" */
+
+static rt_err_t rel_ctx_lock_init(void)
+{
+    rt_err_t rc;
+
+    if (d_ctx_inited) return RT_EOK;
+    rt_memset(&d_job, 0, sizeof(d_job));
+    d_job.why = "IDLE";
+    d_cap_owner = (rt_uint8_t)REL_CAP_FREE;
+    d_job_next_id = 1u;
+    rc = rt_mutex_init(&d_ctx_lock, "rel_ctx", RT_IPC_FLAG_PRIO);
+    if (rc == RT_EOK) d_ctx_inited = RT_TRUE;
+    return rc;
+}
+
+const char *rel_job_state_name(rt_uint8_t st)
+{
+    switch (st)
+    {
+    case REL_JOB_RUNNING:        return "RUNNING";
+    case REL_JOB_CANCEL_PENDING: return "CANCEL_PENDING";
+    case REL_JOB_DONE:           return "DONE";
+    case REL_JOB_FAILED:         return "FAILED";
+    case REL_JOB_CANCELLED:      return "CANCELLED";
+    case REL_JOB_TIMEOUT:        return "TIMEOUT";
+    default:                     return "IDLE";
+    }
+}
+
+/* 叶锁: shell 路径用有界等待, 后台推进用非阻塞(不让学习层拖住保护循环)。
+ * 错误码分工是刻意的: -RT_EINVAL = 后台未就绪, -RT_ETIMEOUT = 有界等待内没拿到锁,
+ * 而 -RT_EBUSY 留给"采集器/任务正被占用"这个**业务**拒绝。三者混成一个码的话,
+ * learn_status 与 zero 的拒绝身份就会说谎。 */
+static rt_err_t rel_ctx_take_tmo(rt_int32_t tmo)
+{
+    if (!d_ctx_inited) return -RT_EINVAL;
+    return (rt_mutex_take(&d_ctx_lock, tmo) == RT_EOK) ? RT_EOK : -RT_ETIMEOUT;
+}
+static rt_err_t rel_ctx_take(void)  { return rel_ctx_take_tmo((rt_int32_t)REL_CTX_TAKE_MS); }
+static rt_err_t rel_ctx_try(void)   { return rel_ctx_take_tmo(RT_WAITING_NO); }
+/* 只允许本次 take 成功的路径调用: 不 release 自己没持有的锁。 */
+static void rel_ctx_give_held(void) { (void)rt_mutex_release(&d_ctx_lock); }
+
+/* ---------- 候选上下文(d_pending + 两个凭据位)的一致性读写 ---------- */
+
+/* 失败时 *cand 清零、两个凭据按"没有"回报: 调用方不得拿半份快照继续。 */
+static rt_err_t rel_pending_read(diag_rprof_t *cand, rt_bool_t *zero, rt_bool_t *learn)
+{
+    rt_err_t rc = rel_ctx_take();
+
+    if (cand) rt_memset(cand, 0, sizeof(*cand));
+    if (zero)  *zero  = RT_FALSE;
+    if (learn) *learn = RT_FALSE;
+    if (rc != RT_EOK) return rc;
+    if (cand) *cand = d_pending;
+    if (zero)  *zero  = d_pending_zero;
+    if (learn) *learn = d_pending_learn;
+    rel_ctx_give_held();
+    return RT_EOK;
+}
+
+/* set_zero / set_learn: -1 保持原值, 0 置 FALSE, 1 置 TRUE; cand==RT_NULL 表示
+ * 本次只动凭据不动候选。失败(取锁不到)时一个字段都不改。 */
+static rt_err_t rel_pending_write(const diag_rprof_t *cand, int set_zero, int set_learn)
+{
+    rt_err_t rc = rel_ctx_take();
+
+    if (rc != RT_EOK) return rc;
+    if (cand) d_pending = *cand;
+    if (set_zero  >= 0) d_pending_zero  = set_zero  ? RT_TRUE : RT_FALSE;
+    if (set_learn >= 0) d_pending_learn = set_learn ? RT_TRUE : RT_FALSE;
+    rel_ctx_give_held();
+    return RT_EOK;
+}
+
+/* 快照读不到的身份: "后台未就绪"与"有界等待内没拿到锁"是两件事, 不能都打成 lock。 */
+static const char *rel_lock_why(rt_err_t rc)
+{
+    return (rc == -RT_EINVAL) ? "ctx not ready" : "ctx lock";
+}
+
+/* ---------- 采集上下文所有权 ---------- */
+
+/* 零点采集的受理: 检查 owner 与 rel_cap_start 在同一临界区里完成。返回非 EOK 时
+ * owner、d_cap、凭据全部保持原样 —— 这就是"被拒绝的命令不产生副作用"。 */
+static rt_err_t rel_zero_capture_open(rt_uint32_t want, const diag_rprof_t *base)
+{
+    rt_err_t rc = rel_ctx_take();
+
+    if (rc != RT_EOK) return rc;
+    if (d_cap_owner != (rt_uint8_t)REL_CAP_FREE) { rel_ctx_give_held(); return -RT_EBUSY; }
+    if (rel_cap_start((rt_uint8_t)REL_CAP_ZERO, want, base) != RT_EOK)
+    { rel_ctx_give_held(); return -RT_EBUSY; }
+    d_cap_owner = (rt_uint8_t)REL_CAP_BY_ZERO;
+    rel_ctx_give_held();
+    return RT_EOK;
+}
+
+static void rel_zero_capture_close(void)
+{
+    if (rel_ctx_take() != RT_EOK) return;    /* 拿不到锁: 本任务的下一次推进/重开仍会拒绝, 不会双写 */
+    rel_cap_abort();
+    d_cap_owner = (rt_uint8_t)REL_CAP_FREE;
+    rel_ctx_give_held();
+}
+
+/* ---------- 学习任务状态机 ---------- */
+
+/* 快照填充(调用方持锁)。 */
+static void rel_job_view_fill(rel_job_view_t *v)
+{
+    rt_memset(v, 0, sizeof(*v));
+    v->job_id    = d_job.job_id;
+    v->state     = d_job.state;
+    v->want      = d_job.want;
+    v->dir       = d_job.dir;
+    v->hz_lo     = d_job.hz_lo;
+    v->hz_hi     = d_job.hz_hi;
+    v->why       = d_job.why ? d_job.why : "IDLE";
+    v->cap_owner = d_cap_owner;
+    v->zero_cred = d_pending_zero ? 1u : 0u;
+    v->learn_cred = d_pending_learn ? 1u : 0u;
+    v->got_adc   = d_job.got_adc;
+    v->got_sg    = d_job.got_sg;
+    if (d_job.state == (rt_uint8_t)REL_JOB_RUNNING ||
+        d_job.state == (rt_uint8_t)REL_JOB_CANCEL_PENDING)
+        v->left_ms = (rt_int32_t)(d_job.deadline - rt_tick_get());
+    else
+        v->left_ms = -1;        /* 终态没有"还剩多久"可言: 打成 0 会被读成"刚好到期" */
+    if (d_job.data_valid)
+    {
+        v->cand = d_job.out;
+        v->has_data = 1u;
+    }
+    if (d_job.out_valid) v->cand_valid = 1u;
+}
+
+rt_err_t rel_job_status(rel_job_view_t *v)
+{
+    rt_err_t rc = rel_ctx_take();
+
+    if (v == RT_NULL) return -RT_EINVAL;
+    rt_memset(v, 0, sizeof(*v));
+    if (rc != RT_EOK) { v->why = "CTX-LOCK"; return rc; }
+    rel_job_view_fill(v);
+    rel_ctx_give_held();
+    return RT_EOK;
+}
+
+/* 候选改写入口的统一门(副作用之前), 三种拒绝各有可分辨的身份:
+ *   ctx not ready —— 叶锁从未初始化成功(后台未就绪)
+ *   ctx lock      —— 有人持锁, 有界等待内拿不到
+ *   busy          —— 活动学习任务或零点采集占着上下文
+ * 打印一律在放锁之后, 所以这把门不会把 UART 带进临界区。 */
+static rt_bool_t rel_ctx_gate(const char *who)
+{
+    rt_bool_t busy;
+    rt_err_t  rc;
+
+    if (!d_ctx_inited)
+    { rt_kprintf("[DIAG] %s REFUSED: ctx not ready\n", who); return RT_FALSE; }
+    rc = rel_ctx_take();
+    if (rc == -RT_EINVAL)
+    { rt_kprintf("[DIAG] %s REFUSED: ctx not ready\n", who); return RT_FALSE; }
+    if (rc != RT_EOK)
+    { rt_kprintf("[DIAG] %s REFUSED: ctx lock\n", who); return RT_FALSE; }
+    busy = (d_cap_owner != (rt_uint8_t)REL_CAP_FREE ||
+            d_job.state == (rt_uint8_t)REL_JOB_RUNNING ||
+            d_job.state == (rt_uint8_t)REL_JOB_CANCEL_PENDING) ? RT_TRUE : RT_FALSE;
+    rel_ctx_give_held();
+    if (busy)
+    { rt_kprintf("[DIAG] %s REFUSED: learn job or capture active\n", who); return RT_FALSE; }
+    return RT_TRUE;
+}
+
+rt_err_t rel_job_start(const diag_rprof_t *base, rt_uint32_t want, rt_uint32_t hz_lo,
+                       rt_uint32_t hz_hi, rt_uint32_t dir, rt_uint32_t *id_out)
+{
+    rel_job_t  nj;
+    rt_err_t   rc;
+
+    if (base == RT_NULL || id_out == RT_NULL) return -RT_EINVAL;
+    *id_out = 0;
+    if (want < 8u || want > 256u) return -RT_EINVAL;   /* 与 rel_cap_start 同一口径 */
+
+    rc = rel_ctx_take();
+    if (rc != RT_EOK) return rc;
+    if (d_cap_owner != (rt_uint8_t)REL_CAP_FREE ||
+        d_job.state == (rt_uint8_t)REL_JOB_RUNNING ||
+        d_job.state == (rt_uint8_t)REL_JOB_CANCEL_PENDING)
+    { rel_ctx_give_held(); return -RT_EBUSY; }
+
+    /* 先在局部把新任务装好, 唯一可能失败的 rel_cap_start 一旦失败就直接退出:
+     * 旧 learn 是"先清凭据再发现采集器忙", 于是一条被拒绝的命令也把上一轮的
+     * learn 资格烧掉了。这里反过来 —— 受理成立才作废旧资格。 */
+    rt_memset(&nj, 0, sizeof(nj));
+    nj.job_id   = d_job_next_id;
+    nj.state    = (rt_uint8_t)REL_JOB_RUNNING;
+    nj.want     = (rt_uint8_t)want;
+    nj.dir      = (rt_uint8_t)dir;
+    nj.hz_lo    = hz_lo;
+    nj.hz_hi    = hz_hi;
+    nj.sig      = base->signature;
+    nj.deadline = rt_tick_get() + REL_MS_TO_TICK(REL_CMD_DEADLINE_MS);
+    nj.cand     = *base;
+    nj.why      = REL_JOB_WHY_RUN;
+
+    if (rel_cap_start((rt_uint8_t)REL_CAP_LEARN, want, base) != RT_EOK)
+    { rel_ctx_give_held(); return -RT_EBUSY; }
+
+    d_job = nj;
+    d_cap_owner = (rt_uint8_t)REL_CAP_BY_JOB;
+    /* id 的上界与 CLI 的 9 位十进制解析器一致: 发出去的每一个 id 都打得出取消。 */
+    d_job_next_id = (d_job_next_id >= 999999999u) ? 1u : d_job_next_id + 1u;
+    d_pending_learn = RT_FALSE;       /* 新学习受理: 旧 learn 成功凭据立即失效 */
+    rel_ctx_give_held();
+    *id_out = nj.job_id;
+    return RT_EOK;
+}
+
+int rel_job_cancel(rt_uint32_t job_id, rel_job_view_t *v)
+{
+    int         out;
+    rt_err_t    rc = rel_ctx_take();
+
+    if (v) rt_memset(v, 0, sizeof(*v));
+    if (rc == -RT_EINVAL) return REL_CANCEL_NOINIT;
+    if (rc != RT_EOK)     return REL_CANCEL_LOCKFAIL;
+
+    if (job_id == 0u || d_job.job_id != job_id ||
+        (d_job.state != (rt_uint8_t)REL_JOB_RUNNING &&
+         d_job.state != (rt_uint8_t)REL_JOB_CANCEL_PENDING))
+    {
+        /* 不匹配的 id 不能取消任何任务; 已经终结的任务也不能被说成"取消成功"
+         * —— 它已经完成, 候选已经发布, 那是两回事。 */
+        out = (job_id != 0u && d_job.job_id == job_id) ? REL_CANCEL_TERMINAL
+                                                       : REL_CANCEL_NOJOB;
+    }
+    else
+    {
+        d_job.state = (rt_uint8_t)REL_JOB_CANCEL_PENDING;
+        d_job.why   = "CANCEL_REQUESTED";
+        out = REL_CANCEL_OK;          /* 幂等: 已经在收尾的任务再收到 cancel 仍是 OK */
+    }
+    if (v) rel_job_view_fill(v);
+    rel_ctx_give_held();
+    return out;
+}
+
+/* 终态转换(唯一写者; 调用方必须持锁, 且 state 已是 RUNNING/CANCEL_PENDING)。
+ * 顺序是"先拆采集器并归还 owner, 再落终态": 反过来会留下"终态已可见但 d_cap
+ * 还占着"的组合, 而那正是"刚答应取消就允许新任务复用旧推进在用的采集器"的入口。 */
+static void rel_job_term_locked(rt_uint8_t st, const char *why)
+{
+    rel_cap_abort();
+    d_cap_owner = (rt_uint8_t)REL_CAP_FREE;
+    d_job.state = st;
+    d_job.why   = why ? why : "UNSPECIFIED";
+}
+
+void rel_job_advance(const diag_input_t *in, rt_uint8_t have_frame, rt_uint8_t mode)
+{
+    const char   *why = RT_NULL;
+    rt_err_t      feed, fin;
+
+    if (rel_ctx_try() != RT_EOK) return;    /* 有人持锁: 这一拍什么都不做, 下一拍再来 */
+    if (d_cap_owner != (rt_uint8_t)REL_CAP_BY_JOB || !d_cap.active ||
+        (d_job.state != (rt_uint8_t)REL_JOB_RUNNING &&
+         d_job.state != (rt_uint8_t)REL_JOB_CANCEL_PENDING))
+    { rel_ctx_give_held(); return; }
+
+    /* 1) 取消优先: 下一拍就终结, 不等 12s, 也不再发布候选。 */
+    if (d_job.state == (rt_uint8_t)REL_JOB_CANCEL_PENDING)
+    { rel_job_term_locked((rt_uint8_t)REL_JOB_CANCELLED, "CANCELLED"); rel_ctx_give_held(); return; }
+
+    /* 2) 资格复核**每拍**都做(不能等下一枚新样本): 模式不再是受理时的 MONITOR_ONLY、
+     *    驱动签名漂移, 都是明确的终结条件。 */
+    if (in == RT_NULL)
+    { rel_job_term_locked((rt_uint8_t)REL_JOB_FAILED, "INPUT-ABSENT"); rel_ctx_give_held(); return; }
+    if (mode != (rt_uint8_t)DIAG_MODE_MONITOR_ONLY)
+    { rel_job_term_locked((rt_uint8_t)REL_JOB_FAILED, "MODE_CHANGED"); rel_ctx_give_held(); return; }
+    if (d_job.sig != 0u && in->live_signature != 0u && d_job.sig != in->live_signature)
+    { rel_job_term_locked((rt_uint8_t)REL_JOB_FAILED, "SIG_CHANGED"); rel_ctx_give_held(); return; }
+
+    /* 3) 有界总超时: 无帧、重复帧、源冻结都照样走到这里(TIMEOUT), 不发布候选。 */
+    if ((rt_int32_t)(d_job.deadline - rt_tick_get()) <= 0)
+    { rel_job_term_locked((rt_uint8_t)REL_JOB_TIMEOUT, "DEADLINE"); rel_ctx_give_held(); return; }
+
+    /* 4) 只有**新帧**才喂 —— 与旧命令线程 rel_frame_to_input 的 seen 语义逐字一致,
+     *    窗口/方向/阶段/速度四条件复核本来就发生在每枚新样本上; 重复旧帧既凑不
+     *    够样本(rel_cap_feed 按 sg_seq/cur_seq 去重), 也不该反复重开窗口判定。 */
+    if (have_frame && in->seq != 0u && in->seq != d_job.last_frame_seq)
+    {
+        d_job.last_frame_seq = in->seq;
+        feed = rel_cap_feed(in);
+        /* 进度镜像: 采集器在终结时就被拆掉了, 但 learn_status 仍要能披露"跑到哪儿"。 */
+        d_job.got_adc = d_cap.adc.n;
+        d_job.got_sg  = d_cap.sg.n;
+        if (feed != RT_EOK)
+        { rel_job_term_locked((rt_uint8_t)REL_JOB_FAILED, "WINDOW_BROKEN"); rel_ctx_give_held(); return; }
+        if (rel_cap_done())
+        {
+            /* 生成到 d_job.out 这个**静态槽**里, 不在 Diagnosis Thread 的栈上再开一份
+             * diag_rprof_t(4KB 栈的本模块历史教训)。读写都持 ctx 锁, 所以读者要么看到
+             * 上一份完整结果, 要么因 out_valid=0 而什么都读不到。 */
+            fin = rel_cap_finish(&d_job.out, &why);
+            d_job.data_valid = 1u;   /* 成不成功,out 里都是这一轮真正采到的统计 */
+            if (fin != RT_EOK)
+            { rel_job_term_locked((rt_uint8_t)REL_JOB_FAILED, why); rel_ctx_give_held(); return; }
+            /* 整份发布: 候选 + learn 凭据 + 任务结果都在同一临界区里落, 因此
+             * "读到 DONE 却读不到候选"这种组合不存在; 失败路径一个字段都不写。 */
+            d_pending = d_job.out;
+            d_pending_learn = RT_TRUE;
+            d_job.out_valid = 1u;
+            rel_job_term_locked((rt_uint8_t)REL_JOB_DONE, "COMPLETE");
+        }
+    }
+    rel_ctx_give_held();
 }
 
 /* 严格十进制解析: 只允许 1..9 位数字, 且落在 [lo, hi]。 */
@@ -1449,10 +1842,25 @@ static void rel_show_one(const char *tag, const diag_rprof_t *p)
                (unsigned)p->dur_impact_ms, (unsigned)p->age_imu_ms);
 }
 
+/* 受理类调用(zero/learn)的拒绝身份: "采集器被占" / "后台未就绪" / "有界等待内没拿到
+ * 锁"三种各有各的文本, 合并成一句"忙"就等于让拒绝行说不清自己拒了什么。 */
+static void rel_accept_refused(const char *who, rt_err_t rc)
+{
+    if (rc == -RT_EBUSY)
+        rt_kprintf("[DIAG] %s REFUSED: capture busy (job or zero owns it)\n", who);
+    else if (rc == -RT_EINVAL)
+        rt_kprintf("[DIAG] %s REFUSED: ctx not ready\n", who);
+    else
+        rt_kprintf("[DIAG] %s REFUSED: ctx lock rc=%d\n", who, (int)rc);
+}
+
+/* 零点采集仍然**同步**(任务书 unchanged_contracts: zero remains synchronous and
+ * static-gated)。本轮只改两处: 候选上下文的读写走叶锁, 以及"作废凭据"挪到采集器
+ * 真的拿到之后。等待、静止复核、最终事务核验一律保持原样。 */
 static void rel_cmd_zero(rt_uint32_t n_req)
 {
     diag_input_t in;
-    diag_rprof_t cand;
+    diag_rprof_t cand, base;
     rt_uint32_t deadline, seen = 0;
     const char *why = RT_NULL;
     rt_err_t e, fin;
@@ -1462,36 +1870,41 @@ static void rel_cmd_zero(rt_uint32_t n_req)
         rt_kprintf("[DIAG] zero REFUSED: not static+READY (no capture started)\n");
         return;
     }
-    /* 私有候选: 本次尝试在它上面攒, 成功才发布(R3.5)。入口先作废这次尝试的凭据 ——
-     * "zero 后直接 commit"必须带着 learn=FALSE 被拒, 失败重学也不能拿旧 learn 资格
-     * 去发布新窗口(C4)。 */
+    /* 私有候选: 本次尝试在它上面攒, 成功才发布(R3.5)。 */
+    e = rel_pending_read(&base, RT_NULL, RT_NULL);
+    if (e != RT_EOK)
+    { rt_kprintf("[DIAG] zero REFUSED: %s (nothing cleared)\n", rel_lock_why(e)); return; }
     rt_memset(&cand, 0, sizeof(cand));
     rel_live_identity(&cand);
     cand.phase_mask     = RPPH_CRUISE;
     cand.dir_mask       = 0u;            /* 方向由 learn 明确给出, 零点不猜 */
     cand.sampling_def   = DIAG_RPROF_SAMPLING_DEF;
-    cand.threshold_tier = d_pending.threshold_tier ? d_pending.threshold_tier
-                                                   : REL_TIER_DEFAULT;
-    d_pending_learn = RT_FALSE;
-    d_pending_zero  = RT_FALSE;
+    cand.threshold_tier = base.threshold_tier ? base.threshold_tier
+                                              : REL_TIER_DEFAULT;
     /* 签名此刻就能算(只覆盖驱动配置/采样定义身份, 不含速度窗): 有了它, 学习阶段
      * 才有"是否还在被批准的工况里"的判据 —— rel_cap_feed 的窗口检查在
      * base.signature==0 时是**关闭**的, 不在这里算就等于没有门禁。 */
     cand.signature = rel_profile_signature(&cand);
-    if (rel_cap_start((rt_uint8_t)REL_CAP_ZERO, n_req, &cand) != RT_EOK)
+    /* R7D1 顺序修正: 采集器所有权与 rel_cap_start 在同一个临界区里原子拿到,
+     * **拿到了**才作废凭据。旧写法先清凭据再发现 BUSY, 于是一条被拒绝的 zero
+     * 也把上一轮的 learn 资格烧掉了(任务书 §5.2 明令禁止的那个方向)。 */
+    e = rel_zero_capture_open(n_req, &cand);
+    if (e != RT_EOK) { rel_accept_refused("zero", e); return; }
+    if (rel_pending_write(RT_NULL, 0, 0) != RT_EOK)
     {
-        rt_kprintf("[DIAG] zero REFUSED: another capture is active\n");
+        rel_zero_capture_close();
+        rt_kprintf("[DIAG] zero FAILED: ctx lock on invalidate\n");
         return;
     }
 
-    deadline = rt_tick_get() + REL_CMD_DEADLINE_MS;
+    deadline = rt_tick_get() + REL_MS_TO_TICK(REL_CMD_DEADLINE_MS);
     rt_memset(&in, 0, sizeof(in));
     for (;;)
     {
         /* 采集期间同样要静止/禁能: 中途起转或失去证明 ⇒ 本次候选立即作废(C5)。 */
         if (!rel_static_and_ready())
         {
-            rel_cap_abort();
+            rel_zero_capture_close();
             rt_kprintf("[DIAG] zero VOIDED: motion/arm/proof lost during capture\n");
             return;
         }
@@ -1502,36 +1915,37 @@ static void rel_cmd_zero(rt_uint32_t n_req)
     }
     if (!rel_cap_done())
     {
-        rel_cap_abort();
+        rel_zero_capture_close();
         rt_kprintf("[DIAG] zero FAILED: 12s timeout, need %u distinct valid ADC frames\n",
                    (unsigned)n_req);
         return;
     }
     /* 完成时: 在同一静止事务里做最终资格复核, 通过才发布候选。 */
     e = rel_txn_open("zero");
-    if (e != RT_EOK) { rel_cap_abort(); return; }
+    if (e != RT_EOK) { rel_zero_capture_close(); return; }
     fin = rel_cap_finish(&cand, &why);
-    if (fin == RT_EOK)
-    {
-        d_pending = cand;
-        d_pending_zero = RT_TRUE;
-    }
-    rel_cap_abort();
+    /* 发布不了就等于失败: 不能一边写"zero OK"一边让凭据停在旧值上。 */
+    if (fin == RT_EOK && rel_pending_write(&cand, 1, -1) != RT_EOK)
+    { fin = -RT_EIO; why = "ctx-lock"; }
+    rel_zero_capture_close();
     rel_txn_close();
     if (fin != RT_EOK)
     { rt_kprintf("[DIAG] zero FAILED: %s\n", why ? why : "accumulator rejected"); return; }
     rt_kprintf("[DIAG] zero OK n=%u raw %u..%u mean=%u (cal source untouched)\n",
-               (unsigned)d_pending.zero_n, (unsigned)d_pending.zero_min,
-               (unsigned)d_pending.zero_max, (unsigned)d_pending.zero_mean_x1000);
+               (unsigned)cand.zero_n, (unsigned)cand.zero_min,
+               (unsigned)cand.zero_max, (unsigned)cand.zero_mean_x1000);
 }
 
+/* R7D1: learn 只做**受理**。采集、超时、取消与候选发布都在 Diagnosis Thread 的
+ * rel_job_advance 里完成, 命令线程不 sleep 等样本, 因此同一 shell 在学习期间还能
+ * 继续受理 learn_status / learn_cancel 与既有 motor_stop / motor_disarm。
+ * STARTED 只代表"这一轮被受理", 不等于 learn OK。 */
 static void rel_cmd_learn(rt_uint32_t n_req, rt_uint32_t lo, rt_uint32_t hi, rt_uint32_t dir)
 {
-    diag_input_t in;
     diag_rprof_t cand;
-    rt_uint32_t deadline, seen = 0;
-    const char *why = RT_NULL;
-    rt_err_t feed, fin;
+    rt_bool_t    pz = RT_FALSE;
+    rt_uint32_t  id = 0;
+    rt_err_t     rc;
 
     if (dir > 1u)
     {
@@ -1540,92 +1954,114 @@ static void rel_cmd_learn(rt_uint32_t n_req, rt_uint32_t lo, rt_uint32_t hi, rt_
         rt_kprintf("[DIAG] learn REFUSED: DIR=2 not supported this round (learn 0 or 1)\n");
         return;
     }
-    if (!d_pending_zero)
+    rc = rel_pending_read(&cand, &pz, RT_NULL);
+    if (rc != RT_EOK)
+    { rt_kprintf("[DIAG] learn REFUSED: %s\n", rel_lock_why(rc)); return; }
+    if (!pz)
     { rt_kprintf("[DIAG] learn REFUSED: run 'diag_profile zero N' first\n"); return; }
     /* 学习期间保护必须是关着的: 否则"正在学习的判据"与"正在保护的判据"是两套状态,
      * 而操作员看到的只有一个 mode。 */
     if (diagnosis_get_mode() != DIAG_MODE_MONITOR_ONLY)
     { rt_kprintf("[DIAG] learn REFUSED: mode must be MONITOR_ONLY\n"); return; }
 
-    cand = d_pending;                    /* 私有候选: 从已验证的零点接着攒 */
-    d_pending_learn = RT_FALSE;          /* 先作废这次尝试的凭据(C4) */
-    cand.hz_low     = lo;
-    cand.hz_high    = hi;
-    cand.dir_mask   = (rt_uint32_t)(1u << dir);
-    cand.signature  = rel_profile_signature(&cand);
-    if (rel_cap_start((rt_uint8_t)REL_CAP_LEARN, n_req, &cand) != RT_EOK)
-    { rt_kprintf("[DIAG] learn REFUSED: another capture is active\n"); return; }
+    /* 私有候选从已验证的零点快照接着攒; 参数只在这一份拷贝上改, 受理失败时
+     * d_pending 与两个凭据一个字段都不动。 */
+    cand.hz_low    = lo;
+    cand.hz_high   = hi;
+    cand.dir_mask  = (rt_uint32_t)(1u << dir);
+    cand.signature = rel_profile_signature(&cand);
+    rc = rel_job_start(&cand, n_req, lo, hi, dir, &id);
+    if (rc != RT_EOK) { rel_accept_refused("learn", rc); return; }
 
-    deadline = rt_tick_get() + REL_CMD_DEADLINE_MS;
-    rt_memset(&in, 0, sizeof(in));
-    for (;;)
+    rt_kprintf("[DIAG] learn STARTED id=%u n=%u win=%u..%u dir=%u\n",
+               (unsigned)id, (unsigned)n_req, (unsigned)lo, (unsigned)hi, (unsigned)dir);
+    rt_kprintf("[DIAG] learn async: query 'learn_status'; NOT learn OK yet FIELD_UNVERIFIED\n");
+}
+
+/* 只读一致快照(§5.2: 查询不消费结果, 也不推进学习)。 */
+static void rel_cmd_learn_status(void)
+{
+    rel_job_view_t v;
+    rt_err_t       rc;
+
+    rc = rel_job_status(&v);
+    if (rc != RT_EOK)
+    { rt_kprintf("[DIAG] learn_status REFUSED: %s (no half snapshot)\n", rel_lock_why(rc)); return; }
+    rt_kprintf("[DIAG] job id=%u st=%s why=%s owner=%u cred=%d/%d\n",
+               (unsigned)v.job_id, rel_job_state_name(v.state), v.why,
+               (unsigned)v.cap_owner, (int)v.zero_cred, (int)v.learn_cred);
+    rt_kprintf("[DIAG] job n=%u/%u want=%u win=%u..%u dir=%u\n",
+               (unsigned)v.got_adc, (unsigned)v.got_sg, (unsigned)v.want,
+               (unsigned)v.hz_lo, (unsigned)v.hz_hi, (unsigned)v.dir);
+    if (v.left_ms >= 0)
+        rt_kprintf("[DIAG] job left=%dms of %ums software budget\n",
+                   (int)v.left_ms, (unsigned)REL_CMD_DEADLINE_MS);
+    if (v.has_data)
     {
-        if (rel_frame_to_input(&in, &seen))
-        {
-            feed = rel_cap_feed(&in);
-            if (feed != RT_EOK)
-            {
-                rel_cap_abort();
-                rt_kprintf("[DIAG] learn FAILED: left the approved window or source lost\n");
-                rt_kprintf("[DIAG] learn last: st=%d hz=%u dir=%u sig=%u sg_seq=%u\n",
-                           (int)in.motor_state, (unsigned)in.step_hz, (unsigned)in.dir,
-                           (unsigned)in.live_signature, (unsigned)in.sg_seq);
-                return;
-            }
-        }
-        if (rel_cap_done()) break;
-        if ((rt_int32_t)(deadline - rt_tick_get()) <= 0) break;
-        rt_thread_mdelay(5);
+        /* 失败终结同样要给数据依据(旧同步版就是在拒绝行里带 sg[..]), 不因为改成
+         * 异步就把"为什么分不开"的证据丢掉。 */
+        rt_kprintf("[DIAG] job data adc[%u..%u]n%u nz%u sg[%u..%u]n%u seq%u..%u\n",
+                   (unsigned)v.cand.run_adc_min, (unsigned)v.cand.run_adc_max,
+                   (unsigned)v.cand.run_adc_n, (unsigned)v.cand.run_adc_noise,
+                   (unsigned)v.cand.run_sg_min, (unsigned)v.cand.run_sg_max,
+                   (unsigned)v.cand.run_sg_n,
+                   (unsigned)v.cand.learn_sg_seq_first,
+                   (unsigned)v.cand.learn_sg_seq_last);
     }
-    if (!rel_cap_done())
+    if (v.state == (rt_uint8_t)REL_JOB_DONE && v.cand_valid)
     {
-        rel_cap_abort();
-        rt_kprintf("[DIAG] learn FAILED: 12s timeout, need %u independent SG and ADC samples\n",
-                   (unsigned)n_req);
-        return;
+        rt_kprintf("[DIAG] job thr tier=%u dev=%d/%d drop=%u/%u FIELD_UNVERIFIED\n",
+                   (unsigned)v.cand.threshold_tier, (int)v.cand.adc_dev_warn,
+                   (int)v.cand.adc_dev_trip, (unsigned)v.cand.sg_drop_warn,
+                   (unsigned)v.cand.sg_drop_trip);
+        rt_kprintf("[DIAG] job DONE result; cred zero=%d learn=%d commit is separate\n",
+                   (int)v.zero_cred, (int)v.learn_cred);
     }
-    fin = rel_cap_finish(&cand, &why);
-    rel_cap_abort();
-    if (fin != RT_EOK)
-    {
-        rt_kprintf("[DIAG] learn REFUSED: %s\n", why ? why : "accumulator");
-        rt_kprintf("[DIAG] learn data: sg[%u..%u] adc[%u..%u] nz=%u tier=%u\n",
-                   (unsigned)cand.run_sg_min, (unsigned)cand.run_sg_max,
-                   (unsigned)cand.run_adc_min, (unsigned)cand.run_adc_max,
-                   (unsigned)cand.run_adc_noise, (unsigned)cand.threshold_tier);
-        return;
-    }
-    d_pending = cand;
-    d_pending_learn = RT_TRUE;
-    rt_kprintf("[DIAG] learn OK adc[%u..%u]n%u nz%u sg[%u..%u]n%u seq%u..%u\n",
-               (unsigned)d_pending.run_adc_min, (unsigned)d_pending.run_adc_max,
-               (unsigned)d_pending.run_adc_n, (unsigned)d_pending.run_adc_noise,
-               (unsigned)d_pending.run_sg_min, (unsigned)d_pending.run_sg_max,
-               (unsigned)d_pending.run_sg_n,
-               (unsigned)d_pending.learn_sg_seq_first,
-               (unsigned)d_pending.learn_sg_seq_last);
-    rt_kprintf("[DIAG] learn thr tier=%u dev=%d/%d drop=%u/%u FIELD_UNVERIFIED\n",
-               (unsigned)d_pending.threshold_tier, (int)d_pending.adc_dev_warn,
-               (int)d_pending.adc_dev_trip, (unsigned)d_pending.sg_drop_warn,
-               (unsigned)d_pending.sg_drop_trip);
+}
+
+/* 只受理取消, 不等后台收尾, 也不碰电机: 停止/禁能另有正式接口。 */
+static void rel_cmd_learn_cancel(rt_uint32_t id)
+{
+    rel_job_view_t v;
+    int r = rel_job_cancel(id, &v);
+
+    if (r == REL_CANCEL_OK)
+        rt_kprintf("[DIAG] cancel id=%u REQUESTED st=%s (motor untouched)\n",
+                   (unsigned)id, rel_job_state_name(v.state));
+    else if (r == REL_CANCEL_TERMINAL)
+        rt_kprintf("[DIAG] cancel id=%u NOT-CANCELLED: already %s why=%s\n",
+                   (unsigned)id, rel_job_state_name(v.state), v.why);
+    else if (r == REL_CANCEL_NOJOB)
+        rt_kprintf("[DIAG] cancel REFUSED: no such job id=%u current=%u\n",
+                   (unsigned)id, (unsigned)v.job_id);
+    else if (r == REL_CANCEL_LOCKFAIL)
+        rt_kprintf("[DIAG] cancel REFUSED: ctx lock (nothing changed)\n");
+    else
+        rt_kprintf("[DIAG] cancel REFUSED: job ctx not initialized\n");
 }
 
 /* 按档重算候选阈值(M8-R1 R4.1/R4.4): 只用**已存的正常统计**, 不引入新数据源、
- * 不加新配置框架; 静止事务内改, 失败一个字段都不动。 */
+ * 不加新配置框架; 静止事务内改, 失败一个字段都不动。
+ * R7D1: 活动学习任务占着候选上下文时, 在**任何副作用之前** BUSY 拒绝。 */
 static void rel_cmd_tier(rt_uint32_t tier)
 {
     diag_rprof_t cand;
-    const char *why = RT_NULL;
-    rt_uint32_t rup = 0, rdn = 0;
-    rt_err_t e;
+    rt_bool_t    pz = RT_FALSE, pl = RT_FALSE;
+    const char  *why = RT_NULL;
+    rt_uint32_t  rup = 0, rdn = 0;
+    rt_err_t     e;
 
-    if (!d_pending_zero || !d_pending_learn)
+    if (!rel_ctx_gate("tier")) return;
+    if (rel_pending_read(&cand, &pz, &pl) != RT_EOK)
+    { rt_kprintf("[DIAG] tier REFUSED: ctx lock\n"); return; }
+    if (!pz || !pl)
     { rt_kprintf("[DIAG] tier REFUSED: pending incomplete (zero=%d learn=%d)\n",
-                 (int)d_pending_zero, (int)d_pending_learn); return; }
+                 (int)pz, (int)pl); return; }
     if (rel_txn_open("tier") != RT_EOK) return;
-    cand = d_pending;
     e = rel_profile_gen_thresholds(&cand, (rt_uint8_t)tier, &why);
-    if (e == RT_EOK) d_pending = cand;
+    /* 事务内发布(允许 mot -> ctx 的嵌套方向): 失败时一个字段都不动。 */
+    if (e == RT_EOK && rel_pending_write(&cand, -1, -1) != RT_EOK)
+    { e = -RT_EIO; why = "ctx-lock"; }
     rel_txn_close();
 
     rel_adc_reach(&cand, &rup, &rdn);
@@ -1639,23 +2075,29 @@ static void rel_cmd_tier(rt_uint32_t tier)
         return;
     }
     rt_kprintf("[DIAG] tier %u: dev=%d/%d drop=%u/%u FIELD_UNVERIFIED (commit to publish)\n",
-               (unsigned)tier, (int)d_pending.adc_dev_warn, (int)d_pending.adc_dev_trip,
-               (unsigned)d_pending.sg_drop_warn, (unsigned)d_pending.sg_drop_trip);
+               (unsigned)tier, (int)cand.adc_dev_warn, (int)cand.adc_dev_trip,
+               (unsigned)cand.sg_drop_warn, (unsigned)cand.sg_drop_trip);
 }
 
-/* 提交借用既有静止事务门做**最终**资格复核; 校验不过 ⇒ 一个字段都不写。 */
+/* 提交借用既有静止事务门做**最终**资格复核; 校验不过 ⇒ 一个字段都不写。
+ * R7D1: 活动学习/零点采集期间在副作用之前 BUSY 拒绝(不能一边提交一边等后台
+ * 把整份候选换掉)。 */
 static void rel_cmd_commit(void)
 {
     const char *why = "?";
     diag_rprof_t cand, cur;
+    rt_bool_t    pz = RT_FALSE, pl = RT_FALSE;
     rt_uint32_t live;
     rt_bool_t src_ok;
     rt_err_t fin;
 
-    if (!d_pending_zero || !d_pending_learn)
+    if (!rel_ctx_gate("commit")) return;
+    if (rel_pending_read(&cand, &pz, &pl) != RT_EOK)
+    { rt_kprintf("[DIAG] commit REFUSED: ctx lock\n"); return; }
+    if (!pz || !pl)
     {
         rt_kprintf("[DIAG] commit REFUSED: pending incomplete (zero=%d learn=%d)\n",
-                   (int)d_pending_zero, (int)d_pending_learn);
+                   (int)pz, (int)pl);
         return;
     }
     if (rel_txn_open("commit") != RT_EOK) return;
@@ -1666,7 +2108,8 @@ static void rel_cmd_commit(void)
     if (fin != RT_EOK) { fin = -RT_EIO; why = "config-lock"; goto out; }
     if (!rel_static_and_ready()) { fin = -RT_EPERM; why = "not-static"; goto out; }
     if (!rel_sources_present())  { fin = -RT_EPERM; why = "source-unhealthy"; goto out; }
-    cand = d_pending;
+    if (rel_pending_read(&cand, RT_NULL, RT_NULL) != RT_EOK)
+    { fin = -RT_EIO; why = "ctx-lock"; goto out; }
     cand.magic = DIAG_RPROF_MAGIC;
     cand.abi   = DIAG_RPROF_ABI;
     cand.flags = (rt_uint16_t)((cand.flags & ~RPF_FIELD_VERIFIED) | RPF_COMMITTED | RPF_FROM_LEARN);
@@ -1695,7 +2138,9 @@ static void rel_cmd_commit(void)
     { fin = -RT_EPERM; why = "drive-config-drifted"; goto out; }
     if (rel_profile_validate(&cand, &why) != RT_EOK) { fin = -RT_EINVAL; goto out; }
     fin = project_config_set_rprof(&cand);
-    if (fin == RT_EOK) d_pending = cand;
+    /* 配置写成功了但候选发布不了 => 整次 commit 按失败披露, 不报 OK。 */
+    if (fin == RT_EOK && rel_pending_write(&cand, -1, -1) != RT_EOK)
+    { fin = -RT_EIO; why = "ctx-lock-publish"; }
 
 out:
     rel_txn_close();
@@ -1708,18 +2153,23 @@ out:
 
 static void rel_cmd_clear(rt_bool_t confirmed)
 {
+    diag_rprof_t blank;
     rt_err_t e, fin;
 
     if (!confirmed)
     { rt_kprintf("[DIAG] clear needs: diag_profile clear CONFIRM\n"); return; }
+    if (!rel_ctx_gate("clear")) return;
+    /* 先作废候选与凭据再动配置: 拿不到锁就整个 clear 不做(而不是配置清了、候选
+     * 还留着); 作废之后即使后面失败, commit 也只会走向更保守的一侧。 */
+    rt_memset(&blank, 0, sizeof(blank));
+    if (rel_pending_write(&blank, 0, 0) != RT_EOK)
+    { rt_kprintf("[DIAG] clear REFUSED: ctx lock (profile kept)\n"); return; }
     if (rel_txn_open("clear") != RT_EOK) return;
     fin = project_config_clear_rprof();
     rel_txn_close();
-    if (fin != RT_EOK) { rt_kprintf("[DIAG] clear FAILED rc=%d\n", (int)fin); return; }
+    if (fin != RT_EOK)
+    { rt_kprintf("[DIAG] clear FAILED rc=%d (pending voided)\n", (int)fin); return; }
 
-    d_pending_zero = RT_FALSE;
-    d_pending_learn = RT_FALSE;
-    rt_memset(&d_pending, 0, sizeof(d_pending));
     /* 关保护也是"人工模式改变": 走同一道运动门(静止事务刚刚证得静止, 这里必定过)。 */
     e = diagnosis_set_mode(DIAG_MODE_MONITOR_ONLY);
     rt_kprintf("[DIAG] profile voided; mode=%s (fault state and logs untouched)\n",
@@ -1728,7 +2178,9 @@ static void rel_cmd_clear(rt_bool_t confirmed)
 
 static void diag_profile(int argc, char **argv)
 {
-    diag_rprof_t live;
+    diag_rprof_t live, pend;
+    rt_bool_t    pz = RT_FALSE, pl = RT_FALSE;
+    rt_err_t     rc;
     rt_uint32_t n, lo, hi, dir;
 
     /* R3.7: 上下文检查在**任何**参数解析、取锁与打印之前 —— 非法上下文静默拒绝,
@@ -1739,15 +2191,19 @@ static void diag_profile(int argc, char **argv)
     {
         rt_uint32_t sig = rel_live_signature();
 
-        live = d_pending;
+        /* R7D1: 候选与两个凭据位取自**同一临界区**, 不逐字段跨线程拼。 */
+        rc = rel_pending_read(&pend, &pz, &pl);
+        if (rc != RT_EOK)
+        { rt_kprintf("[DIAG] show REFUSED: %s (no half snapshot)\n", rel_lock_why(rc)); return; }
+        live = pend;
         if (project_config_get_rprof(&live) != RT_EOK)
         { rt_kprintf("[DIAG] show: config lock failed\n"); return; }
         rel_show_one("profile", &live);
-        rel_show_one("pending", &d_pending);
+        rel_show_one("pending", &pend);
         rt_kprintf("[DIAG] live sig=%u match=%s cred zero=%d learn=%d\n",
                    (unsigned)sig,
                    (live.magic && live.signature == sig) ? "YES" : "NO",
-                   (int)d_pending_zero, (int)d_pending_learn);
+                   (int)pz, (int)pl);
         return;
     }
     if (argc == 3 && rt_strcmp(argv[1], "zero") == 0)
@@ -1766,6 +2222,16 @@ static void diag_profile(int argc, char **argv)
         rel_cmd_learn(n, lo, hi, dir);
         return;
     }
+    if (argc == 2 && rt_strcmp(argv[1], "learn_status") == 0)
+    { rel_cmd_learn_status(); return; }
+    if (argc == 3 && rt_strcmp(argv[1], "learn_cancel") == 0)
+    {
+        /* rel_parse_u32 只吃 1..9 位十进制: id 的上界与它对齐(见 rel_job_start)。 */
+        if (!rel_parse_u32(argv[2], 1, 999999999u, &n))
+        { rt_kprintf("[DIAG] learn_cancel JOB_ID must be 1..999999999\n"); return; }
+        rel_cmd_learn_cancel(n);
+        return;
+    }
     if (argc == 3 && rt_strcmp(argv[1], "tier") == 0)
     {
         if (!rel_parse_u32(argv[2], 1, 3, &n))
@@ -1778,6 +2244,6 @@ static void diag_profile(int argc, char **argv)
     if (argc == 3 && rt_strcmp(argv[1], "clear") == 0)
     { rel_cmd_clear(rt_strcmp(argv[2], "CONFIRM") == 0); return; }
 
-    rt_kprintf("usage: diag_profile show|zero N|learn N LO HI DIR|tier T|commit|clear CONFIRM\n");
+    rt_kprintf("usage: diag_profile show|zero N|learn N LO HI DIR|tier T|commit|clear CONFIRM|learn_status|learn_cancel ID\n");
 }
 MSH_CMD_EXPORT(diag_profile, relative protection profile show/zero/learn/tier/commit/clear);

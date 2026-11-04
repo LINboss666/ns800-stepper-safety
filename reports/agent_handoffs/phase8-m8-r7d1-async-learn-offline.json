@@ -1,0 +1,340 @@
+{
+ "round": "phase8-m8-r7d1-async-learn-offline",
+ "title": "M8-R7D1 离线异步学习轮(实现+主机验收+离线构建一次交付; 设备动作 0; 新镜像 NOT_ON_BOARD; 交 A 复审)",
+ "date_local": "2026-11-04",
+ "authored_by": "local agent",
+ "task_book": {
+  "basename": "NS800_R7D1_Offline_Async_Learn_Task_20261104.zip",
+  "bytes": 13467,
+  "sha256": "b35e0a2e16a680ff90a37d2edb1de9da6c85adbc8011ccea33c5354e37922c5c",
+  "lines": 175,
+  "status": "GO_OFFLINE_IMPLEMENTATION_ONLY",
+  "single_delivery_no_registration_round": true,
+  "hardware_caps_all_zero": true
+ },
+ "baseline": {
+  "reviewed_commit": "7885aea606a50f1c34723dbfa9b8c0c4341326de",
+  "head_at_build_equals_baseline": true,
+  "branch_work": "feature/m8-r7d1-async-learn-offline",
+  "baseline_chain_before_change": "cases=50 pass=50 fail=0 pre_bad=0 executed=50 build_rc=0 warnings=0 proc_rc=0",
+  "baseline_blob_identities_recomputed": "offline/checks.txt BASELINE_INPUT_COUNT/BASELINE_BLOBS ok=14 bad=0"
+ },
+ "changed_files": {
+  "product": [
+   "applications/diag_relative.h",
+   "applications/diag_relative.c",
+   "applications/diagnosis.c"
+  ],
+  "verification_chain": [
+   "tests/host/rel_main.c",
+   "tests/host/run_diag_relative_m8.sh",
+   "tests/host/shim_rel/rtthread.h"
+  ],
+  "count_total": 6,
+  "diff_files": [
+   {
+    "path": "reports/reviews/phase8-m8-r7d1-async-learn-offline/code/product_diff_vs_7885aea.diff",
+    "bytes": 51183,
+    "sha256": "86532877fa65996c23551891c5ec8271b857b008a6406d9e254ee21801ae025c"
+   },
+   {
+    "path": "reports/reviews/phase8-m8-r7d1-async-learn-offline/code/host_chain_diff_vs_7885aea.diff",
+    "bytes": 65358,
+    "sha256": "8e341fe0be313f3bc94a4d4d79287d32a38b9b04385cd90bd0bf6db6ebde35fd"
+   }
+  ],
+  "product_diff_stat": "+656/-117 行(含上下文头, 以 diff 文件字节为准)",
+  "out_of_scope_edits": "无: 未改 rtconfig.h(与基线 0 行差异)、未改 profile ABI/阈值公式/保护门/stop_priority"
+ },
+ "host_chain": {
+  "runner": "tests/host/run_diag_relative_m8.sh",
+  "compiler": "gcc.exe (tdm64-1) 4.9.2 -Wall -Wextra",
+  "summary_line": "SUMMARY|cases=62 pass=62 fail=0 pre_bad=0 executed=62",
+  "build_rc": 0,
+  "warnings": 0,
+  "proc_rc": 0,
+  "final_label": "M8 RELATIVE RESULT: PASS(主机链, 离线; 现场项未验证)",
+  "raw_output": {
+   "path": "reports/reviews/phase8-m8-r7d1-async-learn-offline/host/normal_chain_out.txt",
+   "bytes": 37600,
+   "sha256": "3715042a6e520596902d563542ce6542ea5860b60edae454eb7c4cd28f6030e6"
+  },
+  "case_ledger": {
+   "path": "reports/reviews/phase8-m8-r7d1-async-learn-offline/host/case_ledger.txt",
+   "bytes": 4730,
+   "sha256": "28dc70bbfd63176d6cab171242034d08622d062ebd4c60ac2e16a43b8977ce94"
+  },
+  "preservation_of_original_50": {
+   "ids_removed": 0,
+   "ids_added": 12,
+   "cases_with_changed_assertion_count": {
+    "REL25": [
+     41,
+     44
+    ],
+    "REL39": [
+     11,
+     15
+    ],
+    "REL42": [
+     31,
+     35
+    ]
+   },
+   "other_47_check_counts_identical": true,
+   "method": "两轮 (id -> checks) 机器比对, 见 case_mapping.md §1"
+  },
+  "new_group_a_to_assertions": {
+   "path": "reports/reviews/phase8-m8-r7d1-async-learn-offline/case_mapping.md",
+   "bytes": 11725,
+   "sha256": "157bcb66f12007b6f24cac5acb8ef9b957e4e6cebb7c4150bbbdfa188fa5c1a6"
+  }
+ },
+ "negative_controls": {
+  "families": 14,
+  "meta_ok": 14,
+  "normal_rc_expected": 0,
+  "reverse_proc_rc": 1,
+  "pre_existing": [
+   "RV1_sg_new_sample_identity_gate",
+   "RV2_adc_relative_severe_branch",
+   "RV3_relative_mode_profile_qualification",
+   "RV4_severe_borrows_warn_duration",
+   "RV5_coverage_loss_protects_nothing",
+   "RV6_failed_relearn_keeps_credential",
+   "RV7_impact_independent_trip_removed",
+   "RV8_ctl_lock_silently_bypassed",
+   "RV9_new_generation_keeps_old_evidence",
+   "RV10_motion_age_dropped_from_trust"
+  ],
+  "this_round": {
+   "RDV1_cancel_branch_short_circuited": "A05 + A06(取消后仍发布这一类退回)",
+   "RDV2_timeout_only_advances_with_frames": "A08(无帧时不推进超时)",
+   "RDV3_start_waits_for_samples_again": "A01(start 又回到等待样本)",
+   "RDV4_credential_cleared_before_refusal": "A10(被拒绝的受理先烧旧凭据)"
+  },
+  "rv6_anchor_repointed": "旧锚点随同步 learn 删除而 ANCHOR-COUNT=0(原文未删), 现钉 d_pending_learn=RT_FALSE 受理行, 期望身份扩为 REL39+A10",
+  "raw_output": {
+   "path": "reports/reviews/phase8-m8-r7d1-async-learn-offline/host/reverse_run_full.txt",
+   "bytes": 9536,
+   "sha256": "d2bfcdc880f1c572dfa7cd98c67fb7de38bc0e9a81b7a8ece901a6b035d02618"
+  }
+ },
+ "print_bounds": {
+  "budget_bytes_including_source_LF": 120,
+  "touched_calls_covered": 29,
+  "worst_case_bytes": 120,
+  "offline_tool": {
+   "path": "reports/reviews/phase8-m8-r7d1-async-learn-offline/tools/r7d1_offline_checks.py",
+   "bytes": 16823,
+   "sha256": "bb2cf7c6d382dace3c1b6f4f5e133b9a9b95ed35fccc866377b9bee07ce34946"
+  },
+  "offline_result": "TOTAL=31 FAIL=0",
+  "non_vacuity_self_check": "PRINT_BOUND_NOT_VACUOUS 与 A12_BUDGET_MATCHES_TOOL_BUDGET 同时 PASS",
+  "host_measured": {
+   "path": "reports/reviews/phase8-m8-r7d1-async-learn-offline/host/a12_print_bounds.txt",
+   "bytes": 6302,
+   "sha256": "9dc2b0482b48124c5cab25aef17adf9813d90b3d4dfea19395321271d8b7198c"
+  },
+  "legacy_35_long_lines": "未因此轮关闭, 未触及条目保留待办"
+ },
+ "build": {
+  "target": "rt-thread-motor-m1-candidate",
+  "command": "C:\\Keil_v5\\UV4\\UV4.exe -r project.uvprojx -t rt-thread-motor-m1-candidate -j0 -o D:/ns800/rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/build_r7d1.log",
+  "uv4_rc": 0,
+  "error_warning": "0 Error(s), 0 Warning(s).",
+  "compiler": "*** Using Compiler 'V6.24', folder: 'C:\\Keil_v5\\ARM\\ARMCLANG\\Bin'",
+  "program_size": "Program Size: Code=209178 RO-data=87242 RW-data=2196 ZI-data=85936",
+  "build_hooks": {
+   "BeforeMake": "RunUserProg1=0(未启用任何前置程序)",
+   "AfterMake": "fromelf --bin .\\build\\motor_m1\\rt-thread-motor-m1.axf --output .\\build\\motor_m1\\rt-thread-motor-m1.bin",
+   "conclusion": "构建钩子里没有下载/调试/串口动作; 日志原文见 reports/reviews/phase8-m8-r7d1-async-learn-offline/build/build_r7d1.log"
+  },
+  "log": {
+   "path": "reports/reviews/phase8-m8-r7d1-async-learn-offline/build/build_r7d1.log",
+   "bytes": 3909,
+   "sha256": "b2aa70b45588e63d56bd6791cd06096f0e21161f11dcb74c3c30c5f4c3867274"
+  },
+  "images": {
+   "bin": {
+    "bytes": 297004,
+    "sha256": "df7584c3df2e682d07564ee70f05ecc7b608052a7fa739fb0c21b4f942b15c2b"
+   },
+   "axf": {
+    "bytes": 1788432,
+    "sha256": "59c286d9b9bae9cbfe5ac7b353634ccc308abed502b8c3544a3744baef560611"
+   },
+   "map": {
+    "bytes": 2143326,
+    "sha256": "fe422fffa82e1905b399de0681db2374ca92d1eb061f6a84d7a5b74ef0ff3d14"
+   },
+   "callgraph_htm": {
+    "bytes": 1098807,
+    "sha256": "340e780e7c5c32cba70925057d8d4a8f45bef06590e2e0b43f283eab9129d3ba"
+   }
+  },
+  "manifest": {
+   "path": "reports/firmware/phase8-m8-r7d1-async-learn-offline/build_manifest.json",
+   "bytes": 17278,
+   "sha256": "f57c4e5cff43021f105540c8973d451b961846f7729599a5573190edc2dd6e00"
+  },
+  "single_build_this_round": true
+ },
+ "resource_delta": {
+  "vs_baseline_bin_bytes": [
+   292708,
+   297004
+  ],
+  "bin_delta": 4296,
+  "program_size_delta": {
+   "Code": 3248,
+   "RO-data": 1044,
+   "RW-data": 4,
+   "ZI-data": 340
+  },
+  "reconciliation": "Code+RO+RW 增量 = 3248+1044+4 = 4296 = BIN 增量 4296(逐字节相符); 全局 RAM(RW+ZI)净增 344 B",
+  "static_ram_new_bytes": 341,
+  "static_ram_symbols": {
+   "d_job .bss": 276,
+   "d_ctx_lock .bss": 60,
+   "d_cap_owner .bss": 1,
+   "d_job_next_id .data": 4
+  },
+  "call_graph": {
+   "diag_thread_entry": {
+    "base_frame_depth": [
+     632,
+     1580
+    ],
+    "new_frame_depth": [
+     640,
+     1588
+    ],
+    "children_added": [
+     "rel_job_advance"
+    ],
+    "children_removed": []
+   },
+   "rel_cmd_learn": {
+    "base_frame_depth": [
+     296,
+     836
+    ],
+    "new_frame_depth": [
+     168,
+     1084
+    ],
+    "children_removed": [
+     "rt_thread_mdelay",
+     "rel_cap_start",
+     "rel_cap_feed",
+     "rel_cap_done",
+     "rel_cap_finish",
+     "rel_cap_abort",
+     "rel_frame_to_input",
+     "rt_tick_get",
+     "rt_memset"
+    ],
+    "children_added": [
+     "rel_job_start",
+     "rel_pending_read",
+     "rel_lock_why",
+     "rel_accept_refused"
+    ],
+    "meaning": "镜像侧控制流证实 learn 命令线程不再等待/采集(任务书 §2 第一条)"
+   },
+   "thread_stack_note": "armlink 解析不了 msh 的函数指针表, finsh_thread_entry 子树两版都是 628 恰说明它没把命令处理函数算进去; 所以本轮只给每条命令各自的子树数, 不把它们与 shell 帧手加成一个总数。"
+  },
+  "stack_constants_untouched": {
+   "DIAG_THREAD_STACK": "4096 (diagnosis.c:48)",
+   "FINSH_THREAD_STACK_SIZE": "4096 (rtconfig.h)",
+   "RT_MAIN_THREAD_STACK_SIZE": "4096 (rtconfig.h)",
+   "rtconfig_diff_lines_vs_baseline": 0
+  },
+  "deadline_untouched": "REL_CMD_DEADLINE_MS=12000(任务书 §5 的预算, 未为规避问题而延长)",
+  "report": {
+   "path": "reports/reviews/phase8-m8-r7d1-async-learn-offline/build/stack_resource_r7d1.txt",
+   "bytes": 13441,
+   "sha256": "ef5cf22b7076d5620d16b11c0ee4bec1d426f19d5005aacfa9e11a0ceff47c2e"
+  },
+  "limits": "armlink 静态下界, 不含异常/ISR 帧, 解析不了 msh 函数指针; 不是现场最坏栈实测"
+ },
+ "device_actions_this_round": 0,
+ "device_actions_detail": {
+  "com_port_open": 0,
+  "dap_enum_or_connect": 0,
+  "flash_download": 0,
+  "readback": 0,
+  "reset": 0,
+  "board_query": 0,
+  "logic_analyzer_start": 0,
+  "motor_arm": 0,
+  "motor_start": 0,
+  "motion": 0,
+  "real_learn": 0,
+  "config_save": 0,
+  "power_cycle": 0
+ },
+ "image_on_board": {
+  "new_image": "NOT_ON_BOARD",
+  "board_still": "历史 b502 证明 sha256=502dca5d8c7ebfa794f890a9c03bc258fc9753f57b6a80c2f1e08add69888a7a",
+  "new_image_sha256": "df7584c3df2e682d07564ee70f05ecc7b608052a7fa739fb0c21b4f942b15c2b",
+  "note": "本轮构建不改变在板身份; 两者不同, 不构成任何\"新镜像在板\"的证据"
+ },
+ "pending_operator_report": {
+  "r7f5a_power_down": "PENDING_OPERATOR_REPORT — 保持原状, 本轮未连接任何设备去关闭它"
+ },
+ "next_round_gap": "新命令合同(受理即返回 + learn_status/learn_cancel)要求现场学习计划重排; 旧 field 计划/rows/b502 证据/历史回包按原件保留, 本轮未为兼容而改",
+ "boundaries_unchanged": {
+  "polarity_measured": false,
+  "core_protection_verified": false,
+  "field_verification_of_async_learn": "NOT_DONE(本轮全部为离线主机模型+离线构建)",
+  "forbidden_claims_still_forbidden": [
+   "静态 IRQ 极性已实测",
+   "核心保护已现场验证",
+   "异步学习已在板上跑通",
+   "新镜像在板"
+  ]
+ },
+ "deliverables_index": {
+  "review_dir": "reports/reviews/phase8-m8-r7d1-async-learn-offline",
+  "firmware_dir": "reports/firmware/phase8-m8-r7d1-async-learn-offline",
+  "files": [
+   {
+    "path": "reports/reviews/phase8-m8-r7d1-async-learn-offline/implementation_contract.md",
+    "bytes": 9371,
+    "sha256": "5013f4b6e9b133ded5a13e4777ff6259e8a85708a7b1e5867e116ae7334d6e3d"
+   },
+   {
+    "path": "reports/reviews/phase8-m8-r7d1-async-learn-offline/case_mapping.md",
+    "bytes": 11725,
+    "sha256": "157bcb66f12007b6f24cac5acb8ef9b957e4e6cebb7c4150bbbdfa188fa5c1a6"
+   },
+   {
+    "path": "reports/reviews/phase8-m8-r7d1-async-learn-offline/offline/checks.txt",
+    "bytes": 2012,
+    "sha256": "25c58ed5b616154feb724fc852f1657c3783984db4067aa0cc0f400830bcdf9c"
+   },
+   {
+    "path": "reports/reviews/phase8-m8-r7d1-async-learn-offline/offline/summary.json",
+    "bytes": 12700,
+    "sha256": "361af8139ae3d151b1e50d0444c1426fec502e5e107ac555af3da06845b694c2"
+   },
+   {
+    "path": "reports/reviews/phase8-m8-r7d1-async-learn-offline/host/normal_chain_warning_count.txt",
+    "bytes": 2,
+    "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+   }
+  ]
+ },
+ "git_hygiene": {
+  "no_merge_rebase_force_reset_clean": true,
+  "frozen_refs_untouched": true,
+  "failure_bytes_kept": "本轮无失败原件需保留; 运行/判读原文未删改",
+  "last_readback_report_stays_outside_repo": true
+ },
+ "readback": {
+  "required_by_task_book_line_10": "推送工作分支后对交付文件做一次必要回读; 末轮回读原文可留仓外并在回执注明",
+  "last_readback_report_in_repo": false
+ }
+}

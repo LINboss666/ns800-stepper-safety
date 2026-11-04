@@ -59,6 +59,9 @@
 #define CAP_BUF 65536
 static char   g_cap[CAP_BUF];
 static size_t g_cap_len;
+/* 裸 NUL 检测: vsnprintf 报的字节数与 strlen 不一致, 只可能发生在输出里含 0x00 时
+ * (0x00 是合法 UTF-8, 解码门抓不到它, 必须显式比计数)。 */
+static int    g_cap_truncated;
 
 int rel_kprintf(const char *fmt, ...)
 {
@@ -73,10 +76,11 @@ int rel_kprintf(const char *fmt, ...)
     if (n < 0) return 0;
     fputs(tmp, stdout);
     l = strlen(tmp);
+    if (n != (int)l) g_cap_truncated = 1;      /* 输出里出现过裸 0x00 */
     if (g_cap_len + l + 1u < CAP_BUF) { memcpy(g_cap + g_cap_len, tmp, l); g_cap_len += l; g_cap[g_cap_len] = 0; }
     return n;
 }
-void rel_capture_reset(void) { g_cap[0] = 0; g_cap_len = 0; }
+void rel_capture_reset(void) { g_cap[0] = 0; g_cap_len = 0; g_cap_truncated = 0; }
 const char *rel_capture_text(void) { return g_cap; }
 
 static void cap_reset(void) { rel_capture_reset(); }
@@ -100,6 +104,15 @@ static int cap_max_line_len(void)
     }
     if (cur > best) best = cur;
     return best;
+}
+/* 捕获区间内是否全是 ASCII(ASCII 是 UTF-8 的真子集, 因此这一步同时证明
+ * "无残缺多字节序列"; 裸 NUL 由 g_cap_truncated 单独判, 因为 strlen 会在它那里停下)。 */
+static int cap_all_ascii(void)
+{
+    size_t i;
+    for (i = 0; i < g_cap_len; ++i)
+        if ((unsigned char)g_cap[i] >= 0x80u || g_cap[i] == 0) return 0;
+    return 1;
 }
 
 /* ======================= 虚拟时钟 + 协作式线程驱动 ======================= */
@@ -190,6 +203,15 @@ static int g_mutex_init_fail;
 static int g_mutex_take_fail;
 static int g_mutex_take_calls;
 static int g_mutex_release_calls;
+/* -1 = 关闭; >=0 = 只让**第 N 次之后**的 take 失败, 用来精确打中"拿到了采集器之后
+ * 才在凭据写入上撞锁"这种中途失败支路(g_mutex_take_fail 会把第一步就拒掉)。
+ * 计数只针对 R7D1 的 rel_ctx 这把锁: 同一条命令里 cfg/ctl 锁也会 take, 混着数就
+ * 无法确定"第 3 次"落在哪一行代码上。 */
+static int g_ctx_take_fail_after = -1;
+static int g_ctx_take_calls;
+/* 只让名为 "cfg" 的锁取失败: 用来单判 config 写失败支路(全局 take_fail 会先把
+ * R7D1 的 ctx 门拒掉, 那条支路就走不到了)。 */
+static int g_cfg_take_fail;
 
 rt_err_t rt_mutex_init(struct rt_mutex *m, const char *name, rt_uint8_t flag)
 {
@@ -205,6 +227,13 @@ rt_err_t rt_mutex_take(struct rt_mutex *m, rt_int32_t time)
     (void)time;
     g_mutex_take_calls++;
     if (g_mutex_take_fail) return -RT_EINTR;
+    if (strcmp((const char *)m->name, "rel_ctx") == 0)
+    {
+        g_ctx_take_calls++;
+        if (g_ctx_take_fail_after >= 0 && g_ctx_take_calls > g_ctx_take_fail_after)
+            return -RT_EINTR;
+    }
+    if (g_cfg_take_fail && strcmp((const char *)m->name, "cfg") == 0) return -RT_EINTR;
     if (!m->initialized) return -RT_EINVAL;
     m->held = 1;
     return RT_EOK;
@@ -525,6 +554,7 @@ static void world_reset(void)
     g_static_begin_calls = 0; g_static_end_calls = 0; g_static_begin_busy = 0;
     g_static_begin_cap_len = 0; g_static_end_cap_len = 0; g_static_end_hook = RT_NULL;
     g_mutex_take_fail = 0; g_mutex_take_calls = 0; g_mutex_release_calls = 0;
+    g_ctx_take_fail_after = -1; g_ctx_take_calls = 0; g_cfg_take_fail = 0;
     g_mutex_init_fail = 0;
     g_enter_critical_calls = 0; g_exit_critical_calls = 0;
     g_thread_create_calls = 0;
@@ -552,6 +582,12 @@ static void world_reset(void)
     memset(&d_cap, 0, sizeof(d_cap));
     memset(&d_pending, 0, sizeof(d_pending));
     d_pending_zero = RT_FALSE; d_pending_learn = RT_FALSE;
+    /* M8-R7D1: 任务层与采集所有权同样是**每例重建**的运行状态。不重置会让上一例
+     * 留在 RUNNING 的任务把下一例的 zero 全部 BUSY 拒绝——那不是被测行为, 是夹具泄漏。 */
+    memset(&d_job, 0, sizeof(d_job));
+    d_job.why = "IDLE";
+    d_cap_owner = (rt_uint8_t)REL_CAP_FREE;
+    d_job_next_id = 1u;
 
     /* M8-R2 R2-A.4: 控制锁**真实创建**。旧 44 例从未调用 diagnosis_init/
      * rel_ctl_lock_init, 于是所有 rel_prod_* 都在"锁不存在"的分支上空跑,
@@ -560,6 +596,10 @@ static void world_reset(void)
      * 而不是降级成"当作有锁"。 */
     d_ctl_inited = RT_FALSE;
     memset(&d_ctl_lock, 0, sizeof(d_ctl_lock));
+    /* R7D1 的任务/候选叶锁与控制锁同一次初始化(rel_ctl_init 内部), 这里把"还没初始化"
+     * 的状态也一并复位, 否则 rel_ctx_take 会跨例复用一把夹具里从未真正存在过的锁。 */
+    d_ctx_inited = RT_FALSE;
+    memset(&d_ctx_lock, 0, sizeof(d_ctx_lock));
     rel_prod_init_wipe();
     if (rel_ctl_init() != RT_EOK)
     { printf("PRE|ctl_lock_init_failed\n"); g_pre_bad++; }
@@ -1472,17 +1512,90 @@ static void cmd_clear(void *p)  { char *av[] = { "diag_profile", "clear", "CONFI
  * 而只有在该 role 下调度器才会一边推进虚拟时钟一边泵 sensor 帧。 */
 static void do_cmd(void (*fn)(void *)) { run_thread(ROLE_MAIN, fn, RT_NULL, 0); }
 
-static void pump_break_window(int n)
+static int g_break_at_tick;
+static void hook_break_window(int tick)
 {
-    if (n == 20) { S.mstate = MOTOR_IDLE; S.armed = 0; S.mhz = 0; }   /* 学习中途离开工况 */
+    if (g_break_at_tick && tick == g_break_at_tick)
+    { S.mstate = MOTOR_IDLE; S.armed = 0; S.mhz = 0; }   /* 离开被批准的巡航工况 */
 }
+static void hook_flip_dir(int tick)
+{
+    if (g_break_at_tick && tick == g_break_at_tick)
+        S.mdir = 1u;                                     /* 学到一半换了方向 */
+}
+
+/* ======================= M8-R7D1: 异步任务的夹具侧推进 =======================
+ *
+ * 产品命令线程不再等样本, 于是"等学习任务跑完"这件事挪到夹具里: job_wait 每次驱动
+ * 一帧**真实**的 diag_thread_entry(也就是真实 rel_job_advance), 直到任务进终态或
+ * 预算用尽。返回负数 = 预算内没终结 / 快照读不到, 用例必须按失败处理, 不能当成
+ * "还没轮到"而放过。
+ * 这套协作式推进证明的是状态机与交错顺序, 不是板端抢占并发, 也不是真实时延。 */
+static int job_wait(int max_ticks)
+{
+    rel_job_view_t v;
+    int i;
+
+    for (i = 0; i < max_ticks; ++i)
+    {
+        pump(1);
+        memset(&v, 0, sizeof(v));
+        if (rel_job_status(&v) != RT_EOK) return -3;
+        if (v.state != (rt_uint8_t)REL_JOB_RUNNING &&
+            v.state != (rt_uint8_t)REL_JOB_CANCEL_PENDING) return (int)v.state;
+    }
+    return -1;
+}
+
+static rel_job_view_t job_snap(void)
+{
+    rel_job_view_t v;
+
+    memset(&v, 0, sizeof(v));
+    (void)rel_job_status(&v);
+    return v;
+}
+
+/* 有没有"活动中的任务": 终态历史会一直保留 job_id, 所以不能拿 job_id==0 当"没有任务"。 */
+static int job_active(void)
+{
+    rel_job_view_t v = job_snap();
+
+    return (v.state == (rt_uint8_t)REL_JOB_RUNNING ||
+            v.state == (rt_uint8_t)REL_JOB_CANCEL_PENDING) ? 1 : 0;
+}
+
+/* 受理 + 推进到终态, 返回终态。用例仍各自断言凭据、样本数与已发布 profile。 */
+static int learn_run(int max_ticks)
+{
+    do_cmd(cmd_learn);
+    return job_wait(max_ticks);
+}
+
+static void cmd_learn_status(void *p)
+{
+    char *av[] = { "diag_profile", "learn_status" };
+    (void)p;
+    diag_profile(2, av);
+}
+
+static rt_uint32_t g_cancel_id = 1u;
+static void cmd_learn_cancel(void *p)
+{
+    char idbuf[12];
+    char *av[3];
+
+    (void)p;
+    snprintf(idbuf, sizeof(idbuf), "%u", (unsigned)g_cancel_id);
+    av[0] = "diag_profile"; av[1] = "learn_cancel"; av[2] = idbuf;
+    diag_profile(3, av);
+}
+
 static void cmd_learn_window_break(void *p)
 {
     char *av[] = { "diag_profile", "learn", "8", "450", "550", "0" };
     (void)p;
-    g_pump_hook = pump_break_window; g_pump_n = 0; g_cmd_pump = 1;
     diag_profile(6, av);
-    g_cmd_pump = 0; g_pump_hook = RT_NULL;
 }
 
 /* REL25 zero→learn→commit→clear 全流程(真实采集链 + 真实命令循环) */
@@ -1521,7 +1634,8 @@ static void c_REL25(void)
     S.mstate = MOTOR_CRUISE; S.armed = 1; S.mhz = 500;
     S.raw = 2000; S.sg = 500;
     pump_sensor(2);
-    do_cmd(cmd_learn);
+    CHECK(learn_run(400) == REL_JOB_DONE, "后台学习没在预算内 DONE: st=%d",
+          (int)job_snap().state);
     CHECK(d_pending_learn == RT_TRUE, "学习没产出 pending: [%.90s]", cap_text());
     CHECK(d_pending.run_adc_n >= 8 && d_pending.run_sg_n >= 8, "样本数 adc=%u sg=%u",
           d_pending.run_adc_n, d_pending.run_sg_n);
@@ -1570,10 +1684,18 @@ static void c_REL25(void)
     S.mstate = MOTOR_CRUISE; S.armed = 1; S.mhz = 500;
     cap_reset();
     pump_sensor(2);
+    /* R7D1: 帧流由 Diagnosis Thread 的推进带进来, 所以"学习中途离窗"改在 diag 节拍里注入。 */
+    g_break_at_tick = 20;
+    g_tick_hook = hook_break_window;
     do_cmd(cmd_learn_window_break);
-    CHECK(cap_has("learn FAILED"), "离窗学习没有具名失败: [%.90s]", cap_text());
+    CHECK(job_wait(400) == REL_JOB_FAILED, "离窗学习没在预算内终结: st=%d",
+          (int)job_snap().state);
+    g_tick_hook = RT_NULL;
+    CHECK(strcmp(job_snap().why, "WINDOW_BROKEN") == 0, "离窗终结原因不是 WINDOW_BROKEN: [%s]",
+          job_snap().why);
     CHECK(d_pending_learn == RT_FALSE, "失败的学习却置了 pending");
-    CHECK(d_cap.active == 0, "失败后采集状态机没回收");
+    CHECK(d_cap.active == 0 && d_cap_owner == (rt_uint8_t)REL_CAP_FREE,
+          "失败后采集状态机/所有权没回收(owner=%u)", (unsigned)d_cap_owner);
     CHECK(project_config_get_rprof(&back) == RT_EOK && back.magic == saved.magic &&
           back.profile_id == saved.profile_id, "失败的学习动了已发布 profile");
 
@@ -1584,6 +1706,8 @@ static void c_REL25(void)
     S.mstate = MOTOR_CRUISE; S.armed = 1; S.mhz = 500; S.raw = 2000;
     pump_sensor(2);
     do_cmd(cmd_learn);
+    CHECK(job_wait(400) == REL_JOB_DONE, "前置: 漂移前的学习没 DONE st=%d",
+          (int)job_snap().state);
     S.mstate = MOTOR_IDLE; S.armed = 0; S.mhz = 0;
     S.planned.irun = 27;
     cap_reset();
@@ -2269,13 +2393,19 @@ static void c_REL39(void)
     CHECK(d_pending_zero == RT_TRUE, "前置零点没成功: [%.80s]", cap_text());
     S.mstate = MOTOR_CRUISE; S.armed = 1; S.mhz = 500; S.raw = 2000; S.sg = 500;
     pump_sensor(2);
-    do_cmd(cmd_learn);
-    CHECK(d_pending_learn == RT_TRUE, "前置学习没成功: [%.80s]", cap_text());
+    CHECK(learn_run(400) == REL_JOB_DONE, "前置学习没成功: [%.80s]", cap_text());
+    CHECK(d_pending_learn == RT_TRUE, "前置学习没产出凭据: [%.80s]", cap_text());
     S.mstate = MOTOR_IDLE; S.armed = 0; S.mhz = 0;
     cap_reset();
     do_cmd(cmd_learn_far_window);
-    CHECK(cap_has("learn FAILED") || cap_has("learn REFUSED"),
-          "离窗重学没具名失败: [%.90s]", cap_text());
+    /* R7D1: 离窗重学的失败发生在后台推进里; 结论行由 learn_status 从快照打印。 */
+    CHECK(job_wait(400) == REL_JOB_FAILED, "离窗重学没在预算内终结: st=%d",
+          (int)job_snap().state);
+    CHECK(strcmp(job_snap().why, "WINDOW_BROKEN") == 0,
+          "离窗重学的终结原因不是 WINDOW_BROKEN: [%s]", job_snap().why);
+    do_cmd(cmd_learn_status);
+    CHECK(cap_has("st=FAILED") && cap_has("why=WINDOW_BROKEN"),
+          "learn_status 没把失败终态与原因打出来: [%.90s]", cap_text());
     CHECK(d_pending_learn == RT_FALSE, "失败的重学却保留了旧 learn 凭据");
     cap_reset();
     do_cmd(cmd_commit);
@@ -2294,6 +2424,8 @@ static void c_REL39(void)
     S.mstate = MOTOR_CRUISE; S.armed = 1; S.mhz = 500; S.raw = 2000; S.sg = 500;
     pump_sensor(2);
     do_cmd(cmd_learn_far_window);
+    CHECK(job_wait(400) == REL_JOB_FAILED, "已发布 profile 前置: 失败学习没终结 st=%d",
+          (int)job_snap().state);
     project_config_get_rprof(&back);
     CHECK(back.magic == DIAG_RPROF_MAGIC && back.profile_id == good.profile_id &&
           back.hz_low == good.hz_low, "失败的学习改了已发布 profile(id=%u lo=%u)",
@@ -2397,8 +2529,9 @@ static void c_REL42(void)
     do_cmd(cmd_zero);
     S.mstate = MOTOR_CRUISE; S.armed = 1; S.mhz = 500; S.raw = 2000; S.sg = 64;
     pump_sensor(2);
-    do_cmd(cmd_learn);
-    CHECK(d_pending_learn == RT_TRUE, "稳定低 SG 学不出候选: [%.90s]", cap_text());
+    CHECK(learn_run(400) == REL_JOB_DONE, "稳定低 SG 学不出候选: st=%d [%.90s]",
+          (int)job_snap().state, cap_text());
+    CHECK(d_pending_learn == RT_TRUE, "稳定低 SG 没产出凭据: [%.90s]", cap_text());
     CHECK(d_pending.run_sg_min == 64u, "基线=%u(期望 64)", (unsigned)d_pending.run_sg_min);
     CHECK(d_pending.sg_drop_trip <= d_pending.run_sg_min,
           "生成的 trip=%u 仍大于码域上限 %u", (unsigned)d_pending.sg_drop_trip,
@@ -2429,8 +2562,9 @@ static void c_REL42(void)
     S.mstate = MOTOR_CRUISE; S.armed = 1; S.mhz = 500; S.raw = 2000;
     g_sg_hook = r1_sg_646872;
     pump_sensor(2);
-    do_cmd(cmd_learn);
-    CHECK(d_pending_learn == RT_TRUE, "小幅正常波动学不出: [%.90s]", cap_text());
+    CHECK(learn_run(400) == REL_JOB_DONE, "小幅正常波动学不出: st=%d [%.90s]",
+          (int)job_snap().state, cap_text());
+    CHECK(d_pending_learn == RT_TRUE, "小幅正常波动没产出凭据: [%.90s]", cap_text());
     CHECK(d_pending.run_sg_min == 64u && d_pending.run_sg_max == 72u,
           "波动带 [%u..%u]", (unsigned)d_pending.run_sg_min, (unsigned)d_pending.run_sg_max);
     CHECK(d_pending.sg_drop_warn > (rt_uint16_t)(d_pending.run_sg_max - d_pending.run_sg_min),
@@ -2445,7 +2579,10 @@ static void c_REL42(void)
     pump_sensor(2);
     cap_reset();
     do_cmd(cmd_learn);
-    CHECK(cap_has("learn REFUSED: SG_HEADROOM_INSUFFICIENT"),
+    CHECK(job_wait(400) == REL_JOB_FAILED, "近零基线竟然学出了候选: st=%d",
+          (int)job_snap().state);
+    do_cmd(cmd_learn_status);
+    CHECK(cap_has("why=SG_HEADROOM_INSUFFICIENT"),
           "近零基线没被具名拒绝: [%.120s]", cap_text());
     CHECK(cap_has("sg[1..1]"), "拒绝行没带数据依据: [%.120s]", cap_text());
     CHECK(d_pending_learn == RT_FALSE, "被拒绝的候选却置了凭据");
@@ -2458,7 +2595,10 @@ static void c_REL42(void)
     pump_sensor(2);
     cap_reset();
     do_cmd(cmd_learn);
-    CHECK(cap_has("learn REFUSED"), "噪声过大的工况没被拒绝: [%.120s]", cap_text());
+    CHECK(job_wait(400) == REL_JOB_FAILED, "噪声过大的工况没被拒绝: st=%d",
+          (int)job_snap().state);
+    do_cmd(cmd_learn_status);
+    CHECK(cap_has("st=FAILED"), "拒绝的终态没打出来: [%.120s]", cap_text());
     CHECK(cap_has("SG_HEADROOM_INSUFFICIENT"), "拒绝原因没具名: [%.120s]", cap_text());
     g_sg_hook = RT_NULL;
 
@@ -3081,6 +3221,810 @@ static void c_REL50(void)
 /* ======================= main ======================= */
 
 struct case_ent { const char *id; void (*fn)(void); };
+/* ======================= M8-R7D1 新验收组 A01..A12 =======================
+ *
+ * 这一组判的是**异步合同本身**: 受理不等待、后台按拍推进、取消与完成的先后可线性化、
+ * 陈旧 id 影响不了新任务、超时不缩短、互斥在副作用之前、打印有界。
+ * 全部在离线协作式调度与虚拟 tick 模型里执行真实产品 C —— 据此不能宣称板端抢占
+ * 并发、真实 UART 响应时间或物理保护已验证(motor 在本链是桩, 见 rel_main.c 头部)。
+ */
+
+static void cmd_show(void *p)         { char *av[] = { "diag_profile", "show" }; (void)p; diag_profile(2, av); }
+static void cmd_learn_bad_n(void *p)  { char *av[] = { "diag_profile", "learn", "7", "450", "550", "0" }; (void)p; diag_profile(6, av); }
+static void cmd_learn_inv_win(void *p){ char *av[] = { "diag_profile", "learn", "8", "600", "500", "0" }; (void)p; diag_profile(6, av); }
+static void cmd_learn_dir3(void *p)   { char *av[] = { "diag_profile", "learn", "8", "450", "550", "3" }; (void)p; diag_profile(6, av); }
+static void cmd_learn_max(void *p)    { char *av[] = { "diag_profile", "learn", "32", "20000", "20000", "1" }; (void)p; diag_profile(6, av); }
+static void cmd_cancel_bad(void *p)   { char *av[] = { "diag_profile", "learn_cancel", "abc" }; (void)p; diag_profile(3, av); }
+static void cmd_tier2(void *p)        { char *av[] = { "diag_profile", "tier", "2" }; (void)p; diag_profile(3, av); }
+
+/* 前置到"零点已成立 + 巡航在窗内", 但**不**受理学习。 */
+static void prep_zero_cruise(void)
+{
+    world_reset();
+    S.mstate = MOTOR_IDLE; S.armed = 0; S.mhz = 0; S.raw = 1660;
+    do_cmd(cmd_zero);
+    if (d_pending_zero != RT_TRUE) { g_pre_bad++; printf("PRE|zero_prep_failed\n"); }
+    S.mstate = MOTOR_CRUISE; S.armed = 1; S.mhz = 500; S.raw = 2000; S.sg = 500;
+    pump_sensor(2);
+}
+
+/* A01 受理立即返回: 不消耗等待、不推进时钟, STARTED 不等于 learn OK */
+static void c_A01(void)
+{
+    rel_job_view_t v;
+    rt_tick_t t0;
+
+    prep_zero_cruise();
+    cap_reset();
+    g_mdelay_calls = 0;
+    t0 = g_now;
+    do_cmd(cmd_learn);
+    CHECK(cap_has("learn STARTED id=1 n=8 win=450..550 dir=0"),
+          "受理后没有 STARTED/任务号/参数行: [%.120s]", cap_text());
+    CHECK(!cap_has("job thr tier=") && !cap_has("job DONE"),
+          "受理路径就打出了完成态候选/阈值行: [%.120s]", cap_text());
+    CHECK(cap_has("NOT learn OK yet"), "受理行没有披露'还不算成功': [%.90s]", cap_text());
+    CHECK(cap_has("FIELD_UNVERIFIED"), "受理行丢了 FIELD_UNVERIFIED 口径");
+    CHECK(g_mdelay_calls == 0, "受理里发生了 %ld 次等待(异步合同要求 0)", g_mdelay_calls);
+    CHECK(g_now == t0, "受理把虚拟时钟推了 %u tick(说明在等采样)", (unsigned)(g_now - t0));
+    CHECK(d_pending_learn == RT_FALSE, "受理却置了 learn 凭据");
+    v = job_snap();
+    CHECK(v.state == (rt_uint8_t)REL_JOB_RUNNING && v.job_id == 1u && v.want == 8u,
+          "受理后 job_id=%u state=%s want=%u", (unsigned)v.job_id,
+          rel_job_state_name(v.state), (unsigned)v.want);
+    CHECK(d_cap.active == 1u && d_cap_owner == (rt_uint8_t)REL_CAP_BY_JOB,
+          "采集器没被任务接管(active=%u owner=%u)", (unsigned)d_cap.active,
+          (unsigned)d_cap_owner);
+    CHECK(v.left_ms == (rt_int32_t)REL_CMD_DEADLINE_MS, "余量=%d(期望 %u ms)",
+          (int)v.left_ms, (unsigned)REL_CMD_DEADLINE_MS);
+
+    /* 同一 shell 随后就能受理别的命令(不被 12s 等待堵住)。
+     * 把世界摆回静止, 好让 zero 走到"采集器被占"这一支, 而不是先被静止门拒掉。
+     * 这一段不泵 diag 节拍, 所以任务仍停在 RUNNING —— 判的正是活动期间的行为。 */
+    S.mstate = MOTOR_IDLE; S.armed = 0; S.mhz = 0;
+    cap_reset();
+    do_cmd(cmd_learn_status);
+    CHECK(cap_has("st=RUNNING"), "学习期间 learn_status 没答复: [%.90s]", cap_text());
+    cap_reset();
+    do_cmd(cmd_zero);
+    CHECK(cap_has("zero REFUSED: capture busy"),
+          "zero 没在副作用之前 BUSY 拒绝: [%.90s]", cap_text());
+    CHECK(d_pending_zero == RT_TRUE, "被拒绝的 zero 却清了零点凭据");
+    cap_reset();
+    do_cmd(cmd_commit);
+    CHECK(cap_has("commit REFUSED: learn job or capture active"),
+          "commit 没被 BUSY 门挡住: [%.90s]", cap_text());
+    CHECK(g_mdelay_calls == 0, "拒绝路径发生了等待(%ld)", g_mdelay_calls);
+}
+
+/* A02 只有独立样本攒够才发布整份候选, 原口径(样本数/出处/签名/阈值/FIELD_UNVERIFIED)保持 */
+static void c_A02(void)
+{
+    rel_job_view_t v;
+
+    prep_zero_cruise();
+    CHECK(learn_run(400) == (int)REL_JOB_DONE, "学习没 DONE: st=%d", (int)job_snap().state);
+    v = job_snap();
+    CHECK(v.state == (rt_uint8_t)REL_JOB_DONE && v.cand_valid == 1u,
+          "DONE 却没读到整份候选(cand_valid=%u)", (unsigned)v.cand_valid);
+    CHECK(v.got_adc >= 8u && v.got_sg >= 8u, "独立样本数 adc=%u sg=%u",
+          (unsigned)v.got_adc, (unsigned)v.got_sg);
+    /* SG 比 ADC 慢一个数量级: 轮询次数/外壳帧数不可能把 SG 凑够, 这条把"凑数"钉死 */
+    CHECK(v.got_sg <= v.got_adc, "SG 样本数(%u)超过 ADC(%u)与采样比矛盾",
+          (unsigned)v.got_sg, (unsigned)v.got_adc);
+    CHECK(v.cand.run_adc_n == v.got_adc && v.cand.run_sg_n == v.got_sg,
+          "发布候选里的样本数(%u/%u)与任务进度(%u/%u)不一致",
+          (unsigned)v.cand.run_adc_n, (unsigned)v.cand.run_sg_n,
+          (unsigned)v.got_adc, (unsigned)v.got_sg);
+    CHECK(v.cand.learn_sg_seq_first != 0u &&
+          v.cand.learn_sg_seq_last >= v.cand.learn_sg_seq_first,
+          "出处区间不成立(%u..%u)", (unsigned)v.cand.learn_sg_seq_first,
+          (unsigned)v.cand.learn_sg_seq_last);
+    CHECK(v.cand.magic == DIAG_RPROF_MAGIC && v.cand.abi == DIAG_RPROF_ABI,
+          "发布的候选没带 magic/abi");
+    CHECK(v.cand.signature == rel_live_signature(), "候选签名与 live 身份脱钩");
+    CHECK(v.cand.threshold_tier >= 1u && v.cand.threshold_tier <= 3u,
+          "档位越界(%u)", (unsigned)v.cand.threshold_tier);
+    CHECK(v.cand.sg_drop_warn < v.cand.sg_drop_trip, "SG 层次没张开");
+    CHECK((v.cand.flags & RPF_FIELD_VERIFIED) == 0u, "学习产物自称 FIELD_VERIFIED");
+    CHECK((v.cand.flags & RPF_COMMITTED) == 0u, "未 commit 的候选自称 COMMITTED");
+    CHECK(d_pending_learn == RT_TRUE && d_pending_zero == RT_TRUE, "凭据没随发布更新");
+    /* DONE 之后资源必须已经归还 */
+    CHECK(d_cap.active == 0u && d_cap_owner == (rt_uint8_t)REL_CAP_FREE,
+          "DONE 后采集器/所有权没回收(owner=%u)", (unsigned)d_cap_owner);
+    CHECK(v.cap_owner == (rt_uint8_t)REL_CAP_FREE, "快照里的所有权=%u",
+          (unsigned)v.cap_owner);
+}
+
+/* A03 learn_status 给一致快照, 读状态不改变进度与凭据 */
+static void c_A03(void)
+{
+    rel_job_view_t a, b;
+    rt_uint32_t sg_before;
+
+    prep_zero_cruise();
+    do_cmd(cmd_learn);
+    a = job_snap();
+    sg_before = a.got_sg;
+    cap_reset();
+    do_cmd(cmd_learn_status);
+    do_cmd(cmd_learn_status);
+    b = job_snap();
+    CHECK(cap_count("[DIAG] job id=") == 2, "两次查询应当各打一组状态行: [%.90s]", cap_text());
+    CHECK(cap_has("st=RUNNING") && cap_has("owner=2"),
+          "活动任务的状态行不完整: [%.120s]", cap_text());
+    CHECK(cap_has("cred=1/0"), "状态行的凭据披露不对: [%.120s]", cap_text());
+    /* 同一拍上没推进后台: 两份快照必须逐字节相同(不是"看起来差不多") */
+    CHECK(memcmp(&a, &b, sizeof(a)) == 0, "同拍两次快照不一致(left=%d/%d 进度=%u/%u)",
+          (int)a.left_ms, (int)b.left_ms, (unsigned)a.got_sg, (unsigned)b.got_sg);
+    CHECK(d_pending_learn == RT_FALSE && d_pending_zero == RT_TRUE,
+          "读状态改了凭据(zero=%d learn=%d)", (int)d_pending_zero, (int)d_pending_learn);
+    CHECK(d_cap.sg.n == sg_before, "读状态推进了采集进度(%u->%u)",
+          (unsigned)sg_before, (unsigned)d_cap.sg.n);
+    CHECK(d_cap.active == 1u, "读状态把采集器弄掉了");
+    /* 推进之后进度才动: 证明上面那份"不变"不是因为快照本来就不更新 */
+    pump(40);
+    b = job_snap();
+    CHECK(b.got_sg >= sg_before && b.state == (rt_uint8_t)REL_JOB_RUNNING,
+          "推进 40 拍后 state=%s sg=%u", rel_job_state_name(b.state), (unsigned)b.got_sg);
+}
+
+/* A04 严格参数与 BUSY 拒绝都发生在副作用之前: 活动任务/已提交 profile 不被改写 */
+static void c_A04(void)
+{
+    diag_rprof_t p, back;
+    rel_job_view_t v;
+
+    prep_zero_cruise();
+    p = make_profile();
+    install_profile(&p);
+    project_config_get_rprof(&back);
+    CHECK(back.magic == DIAG_RPROF_MAGIC, "前置: 已发布 profile 没装上");
+
+    cap_reset();
+    do_cmd(cmd_learn_bad_n);
+    CHECK(cap_has("learn args:"), "N=7 没走参数拒绝: [%.90s]", cap_text());
+    do_cmd(cmd_learn_inv_win);
+    CHECK(cap_has("learn args:"), "LO>HI 没走参数拒绝");
+    do_cmd(cmd_learn_dir3);
+    CHECK(cap_has("learn args:"), "DIR=3 没走严格参数拒绝");
+    CHECK(!job_active() && d_cap_owner == (rt_uint8_t)REL_CAP_FREE &&
+          d_cap.active == 0u, "非法参数竟然创建了活动任务或采集器");
+    CHECK(d_pending_zero == RT_TRUE && d_pending_learn == RT_FALSE,
+          "非法参数动了两级凭据");
+    CHECK(d_job_next_id == 1u, "被拒绝的 start 消耗了任务号(%u)", (unsigned)d_job_next_id);
+    do_cmd(cmd_cancel_bad);
+    CHECK(cap_has("learn_cancel JOB_ID must be"), "非数字 JOB_ID 没被拒");
+    CHECK(job_snap().job_id == 0u, "非法 cancel 参数却改了任务状态");
+
+    /* 重复 start: 不覆盖活动任务, 不建第二个采集器 */
+    do_cmd(cmd_learn);
+    v = job_snap();
+    CHECK(v.state == (rt_uint8_t)REL_JOB_RUNNING && v.job_id == 1u, "前置受理失败");
+    cap_reset();
+    do_cmd(cmd_learn);
+    CHECK(cap_has("learn REFUSED: capture busy"),
+          "重复 start 没被拒: [%.90s]", cap_text());
+    {
+        rel_job_view_t w = job_snap();
+        CHECK(w.job_id == v.job_id && w.want == v.want && w.hz_lo == v.hz_lo &&
+              w.hz_hi == v.hz_hi, "重复 start 覆盖了活动任务参数");
+        CHECK(d_cap.sg.n == v.got_sg, "重复 start 重置了活动采集器");
+    }
+    CHECK(d_job_next_id == 2u, "被拒绝的重复 start 又消耗了任务号(%u)",
+          (unsigned)d_job_next_id);
+    /* 先让这一份任务终结: 后面 clear / 无凭据 / 模式不符三段各自判自己的路径 */
+    CHECK(job_wait(400) == (int)REL_JOB_DONE, "前置任务没终结: st=%d",
+          (int)job_snap().state);
+    /* 没有零点凭据时: 明确拒绝且不建任务 */
+    do_cmd(cmd_clear);
+    CHECK(d_pending_zero == RT_FALSE, "前置 clear 没清掉零点凭据");
+    cap_reset();
+    do_cmd(cmd_learn);
+    CHECK(cap_has("run 'diag_profile zero N' first"), "无零点凭据时没具名拒绝: [%.90s]",
+          cap_text());
+    CHECK(!job_active() && d_cap_owner == (rt_uint8_t)REL_CAP_FREE && d_cap.active == 0u,
+          "被拒绝的 learn 留下了活动任务或采集器");
+    /* 模式不符: 受理之前就拒, 不改已发布 profile */
+    d_pending_zero = RT_TRUE;
+    arm((rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION);
+    cap_reset();
+    do_cmd(cmd_learn);
+    CHECK(cap_has("mode must be MONITOR_ONLY"), "模式门没拒: [%.90s]", cap_text());
+    CHECK(!job_active() && d_cap_owner == (rt_uint8_t)REL_CAP_FREE && d_cap.active == 0u,
+          "模式不符的 learn 仍然受理了");
+    arm((rt_uint8_t)DIAG_MODE_MONITOR_ONLY);
+    S.mstate = MOTOR_IDLE; S.armed = 0; S.mhz = 0; S.raw = 1660;
+    d_pending_zero = RT_FALSE;
+    do_cmd(cmd_zero);                    /* 重新攒一个干净的零点前置 */
+    CHECK(d_pending_zero == RT_TRUE, "恢复零点凭据失败: [%.80s]", cap_text());
+    S.mstate = MOTOR_CRUISE; S.armed = 1; S.mhz = 500; S.raw = 2000; S.sg = 500;
+    pump_sensor(2);
+    CHECK(learn_run(400) == (int)REL_JOB_DONE, "收尾前置学习没 DONE: st=%d",
+          (int)job_snap().state);
+    project_config_get_rprof(&back);
+    CHECK(back.magic == DIAG_RPROF_MAGIC && back.profile_id == p.profile_id &&
+          back.hz_low == p.hz_low && back.sg_drop_trip == p.sg_drop_trip,
+          "这一组拒绝/受理把已提交 profile 改了(id=%u lo=%u trip=%u)",
+          (unsigned)back.profile_id, (unsigned)back.hz_low, (unsigned)back.sg_drop_trip);
+}
+
+/* A05 匹配的 cancel 在一次可执行推进里终结; 没有新帧也能取消; 终结后资源可再用 */
+static void c_A05(void)
+{
+    rel_job_view_t v;
+    int st;
+
+    prep_zero_cruise();
+    do_cmd(cmd_learn);
+    v = job_snap();
+    CHECK(v.state == (rt_uint8_t)REL_JOB_RUNNING, "前置受理失败: st=%s",
+          rel_job_state_name(v.state));
+    g_stop_sensor = 1;                   /* 从这里起一帧新样本都没有 */
+    g_mdelay_calls = 0;
+    cap_reset();
+    g_cancel_id = v.job_id;
+    do_cmd(cmd_learn_cancel);
+    CHECK(cap_has("cancel id=1 REQUESTED st=CANCEL_PENDING"),
+          "取消的答复不对: [%.120s]", cap_text());
+    CHECK(cap_has("motor untouched"), "取消答复没披露它不碰电机");
+    CHECK(g_mdelay_calls == 0, "取消答复等了 %ld 次(合同要求不等后台收尾)", g_mdelay_calls);
+    CHECK(job_snap().cap_owner == (rt_uint8_t)REL_CAP_BY_JOB,
+          "刚答应取消就把采集器放开了");
+    st = job_wait(1);                    /* 一次可执行推进 */
+    CHECK(st == (int)REL_JOB_CANCELLED, "一次推进后没终结: st=%d", st);
+    v = job_snap();
+    CHECK(strcmp(v.why, "CANCELLED") == 0, "终结原因=%s", v.why);
+    CHECK(d_cap.active == 0u && d_cap_owner == (rt_uint8_t)REL_CAP_FREE,
+          "取消后资源没释放");
+    CHECK(d_pending_learn == RT_FALSE, "取消的任务置了 learn 凭据");
+    /* 终结结果保留: 再查仍然是 CANCELLED */
+    cap_reset();
+    do_cmd(cmd_learn_status);
+    CHECK(cap_has("st=CANCELLED"), "终态没保留: [%.90s]", cap_text());
+    /* 资源可再次使用 */
+    g_stop_sensor = 0;
+    do_cmd(cmd_learn);
+    v = job_snap();
+    CHECK(v.state == (rt_uint8_t)REL_JOB_RUNNING && v.job_id == 2u,
+          "重开的新任务 id=%u st=%s", (unsigned)v.job_id, rel_job_state_name(v.state));
+    CHECK(d_cap.adc.n == 0u && d_cap.sg.n == 0u, "重开的采集器带着上一轮的样本");
+}
+
+/* A06 取消与完成的两种交错都线性化: 终态只出现一次 */
+static void c_A06(void)
+{
+    diag_rprof_t saved;
+    rel_job_view_t v;
+    rt_bool_t saved_learn;
+
+    /* 交错 A: 取消先被受理 => 完成不能再把终态翻成 DONE */
+    prep_zero_cruise();
+    do_cmd(cmd_learn);
+    g_cancel_id = 1u;
+    do_cmd(cmd_learn_cancel);
+    CHECK(job_wait(400) == (int)REL_JOB_CANCELLED, "A: 终态不是 CANCELLED st=%d",
+          (int)job_snap().state);
+    pump(60);                            /* 本可以攒够样本的节拍 */
+    v = job_snap();
+    CHECK(v.state == (rt_uint8_t)REL_JOB_CANCELLED, "A: 取消后又变成 %s",
+          rel_job_state_name(v.state));
+    CHECK(d_pending_learn == RT_FALSE, "A: 取消的任务仍然发布了 learn 凭据");
+    CHECK(v.cand_valid == 0u, "A: 取消的任务却给出了已发布候选");
+
+    /* 交错 B: 完成先发生 => 取消必须明说"已终结", 不能删掉完成的候选 */
+    prep_zero_cruise();
+    do_cmd(cmd_learn);
+    CHECK(job_wait(400) == (int)REL_JOB_DONE, "B: 前置完成失败 st=%d", (int)job_snap().state);
+    saved_learn = d_pending_learn;
+    saved = d_pending;
+    cap_reset();
+    g_cancel_id = 1u;
+    do_cmd(cmd_learn_cancel);
+    CHECK(cap_has("NOT-CANCELLED: already DONE"),
+          "B: 完成后的取消没承认已终结: [%.120s]", cap_text());
+    CHECK(!cap_has("REQUESTED"), "B: 完成后的取消谎称受理成功");
+    CHECK(d_pending_learn == saved_learn && memcmp(&d_pending, &saved, sizeof(saved)) == 0,
+          "B: 取消删掉了已完成的候选/凭据");
+    v = job_snap();
+    CHECK(v.state == (rt_uint8_t)REL_JOB_DONE && v.cand_valid == 1u, "B: 终态被推翻");
+    pump(60);
+    CHECK(job_snap().state == (rt_uint8_t)REL_JOB_DONE, "B: 后续推进把终态改了");
+}
+
+/* A07 陈旧 job_id 与旧在途推进影响不了新任务; 退出确认之前不复用采集器 */
+static void c_A07(void)
+{
+    rel_job_view_t v;
+
+    prep_zero_cruise();
+    do_cmd(cmd_learn);                   /* id=1 */
+    g_cancel_id = 1u;
+    do_cmd(cmd_learn_cancel);            /* CANCEL_PENDING, 后台还没确认退出 */
+    cap_reset();
+    do_cmd(cmd_learn);
+    CHECK(cap_has("learn REFUSED: capture busy"),
+          "旧推进未确认退出就允许复用采集器: [%.90s]", cap_text());
+    v = job_snap();
+    CHECK(v.state == (rt_uint8_t)REL_JOB_CANCEL_PENDING && v.job_id == 1u,
+          "被拒绝的重开把任务搬到了 st=%s id=%u", rel_job_state_name(v.state),
+          (unsigned)v.job_id);
+    CHECK(job_wait(400) == (int)REL_JOB_CANCELLED, "旧任务没在推进里确认退出");
+    do_cmd(cmd_learn);
+    v = job_snap();
+    CHECK(v.job_id == 2u && v.state == (rt_uint8_t)REL_JOB_RUNNING,
+          "新任务 id=%u st=%s", (unsigned)v.job_id, rel_job_state_name(v.state));
+    /* 陈旧 id 不得取消新任务 */
+    cap_reset();
+    g_cancel_id = 1u;
+    do_cmd(cmd_learn_cancel);
+    CHECK(cap_has("no such job id=1 current=2"),
+          "陈旧 id 的答复不含拒绝身份: [%.120s]", cap_text());
+    CHECK(job_snap().state == (rt_uint8_t)REL_JOB_RUNNING, "陈旧 job_id 取消了新任务");
+    /* 再取消一次陈旧 id 也不得改写终态历史 */
+    g_cancel_id = 0u;
+    cap_reset();
+    do_cmd(cmd_learn_cancel);
+    CHECK(cap_has("learn_cancel JOB_ID must be"), "JOB_ID=0 没被严格参数解析拒掉");
+    CHECK(job_snap().state == (rt_uint8_t)REL_JOB_RUNNING, "JOB_ID=0 的拒绝却改了任务");
+    /* 新任务照常完成, 且从干净的采集器起步 */
+    CHECK(d_cap.adc.n == 0u && d_cap.sg.n == 0u, "新任务复用了旧累加器");
+    CHECK(job_wait(400) == (int)REL_JOB_DONE, "新任务没能完成 st=%d",
+          (int)job_snap().state);
+    v = job_snap();
+    CHECK(v.cand_valid == 1u && v.got_sg >= 8u && d_pending_learn == RT_TRUE,
+          "新任务的发布不完整(sg=%u learn=%d cand=%u)", (unsigned)v.got_sg,
+          (int)d_pending_learn, (unsigned)v.cand_valid);
+}
+
+/* A08 无帧仍然推进总超时(含 tick 回绕); 超时不发布候选也不缩短预算 */
+static void c_A08(void)
+{
+    rel_job_view_t v;
+    rt_tick_t t0;
+
+    CHECK(REL_CMD_DEADLINE_MS == 12000u, "总预算被改成了 %u ms", (unsigned)REL_CMD_DEADLINE_MS);
+    CHECK(REL_MS_TO_TICK(REL_CMD_DEADLINE_MS) == 12000u,
+          "ms->tick 折出来是 %u(应为 12000)", (unsigned)REL_MS_TO_TICK(REL_CMD_DEADLINE_MS));
+
+    prep_zero_cruise();
+    do_cmd(cmd_learn);
+    t0 = g_now;
+    g_stop_sensor = 1;                   /* 采不到任何新样本 */
+    CHECK(job_wait((int)(REL_CMD_DEADLINE_MS / 10u) + 10) == (int)REL_JOB_TIMEOUT,
+          "无帧时没走到 TIMEOUT: st=%d", (int)job_snap().state);
+    v = job_snap();
+    CHECK(strcmp(v.why, "DEADLINE") == 0, "超时原因=%s", v.why);
+    CHECK((rt_uint32_t)(g_now - t0) >= REL_CMD_DEADLINE_MS,
+          "超时提前了: 只走了 %u ms", (unsigned)(g_now - t0));
+    CHECK(v.got_adc <= 1u, "无新帧却攒到 adc=%u(旧帧在凑数)", (unsigned)v.got_adc);
+    CHECK(v.cand_valid == 0u && d_pending_learn == RT_FALSE, "超时却发布了候选/凭据");
+    CHECK(d_cap.active == 0u && d_cap_owner == (rt_uint8_t)REL_CAP_FREE,
+          "超时后资源没释放");
+
+    /* 2b) 真一帧都没出过的世界(与 world_reset 同一形态): 超时仍然必须推进 */
+    world_reset();
+    S.mstate = MOTOR_IDLE; S.armed = 0; S.mhz = 0; S.raw = 1660;
+    do_cmd(cmd_zero);
+    CHECK(d_pending_zero == RT_TRUE, "2b) 前置零点没成功: [%.80s]", cap_text());
+    S.mstate = MOTOR_CRUISE; S.armed = 1; S.mhz = 500; S.raw = 2000; S.sg = 500;
+    pump_sensor(2);
+    do_cmd(cmd_learn);
+    g_stop_sensor = 1;
+    memset(&s_frame, 0, sizeof(s_frame)); memset(&s_prev, 0, sizeof(s_prev));
+    s_seq = 0;                               /* sensor 服务一帧都没交出来 */
+    CHECK(job_wait((int)(REL_CMD_DEADLINE_MS / 10u) + 10) == (int)REL_JOB_TIMEOUT,
+          "2b) 从没出过帧时超时没推进: st=%d", (int)job_snap().state);
+    CHECK(job_snap().got_adc == 0u, "2b) 无帧世界却攒到样本 adc=%u",
+          (unsigned)job_snap().got_adc);
+
+    /* 2c) tick 回绕: 到期判定必须跟着有符号差走, 不能把"还剩一点"当成"已过" */
+    g_stop_sensor = 1;
+    g_now = 0xFFFFFFF0u;
+    do_cmd(cmd_learn);
+    v = job_snap();
+    CHECK(v.state == (rt_uint8_t)REL_JOB_RUNNING && v.job_id == 2u,
+          "回绕前的受理失败(id=%u st=%s)", (unsigned)v.job_id, rel_job_state_name(v.state));
+    CHECK(v.left_ms == (rt_int32_t)REL_CMD_DEADLINE_MS, "回绕前余量=%d", (int)v.left_ms);
+    g_now = 5u;                          /* 跨过 0, 仍在预算内 */
+    pump(1);
+    CHECK(job_snap().state == (rt_uint8_t)REL_JOB_RUNNING,
+          "跨回绕把还没到期的任务判成超时了");
+    g_now = REL_CMD_DEADLINE_MS + 16u;   /* 已经走过 deadline */
+    pump(1);
+    v = job_snap();
+    CHECK(v.state == (rt_uint8_t)REL_JOB_TIMEOUT, "跨回绕后到期没被判出: st=%s",
+          rel_job_state_name(v.state));
+    g_stop_sensor = 0;
+}
+
+/* A09 停止/disarm/故障/离窗/方向或签名改变都终结活动任务; 旧帧不补成成功 */
+static void c_A09(void)
+{
+    rel_job_view_t v;
+
+    /* a) 学习中途停机(运动离开巡航) */
+    prep_zero_cruise();
+    g_break_at_tick = 15;
+    g_tick_hook = hook_break_window;
+    do_cmd(cmd_learn);
+    CHECK(job_wait(400) == (int)REL_JOB_FAILED, "a) 停机没终结任务: st=%d",
+          (int)job_snap().state);
+    v = job_snap();
+    CHECK(strcmp(v.why, "WINDOW_BROKEN") == 0, "a) 原因=%s", v.why);
+    CHECK(d_pending_learn == RT_FALSE, "a) 停机后的旧帧补成了成功");
+    CHECK(v.got_sg < 8u || v.cand_valid == 0u, "a) 停机之后仍发布了完整候选");
+    g_tick_hook = RT_NULL;
+
+    /* b) 方向改变 */
+    prep_zero_cruise();
+    g_break_at_tick = 15;
+    g_tick_hook = hook_flip_dir;
+    do_cmd(cmd_learn);
+    CHECK(job_wait(400) == (int)REL_JOB_FAILED, "b) 换向没终结任务");
+    CHECK(strcmp(job_snap().why, "WINDOW_BROKEN") == 0, "b) 原因=%s", job_snap().why);
+    g_tick_hook = RT_NULL;
+
+    /* c) 驱动签名漂移: 一帧新样本都没有, 也必须在下一拍终结 */
+    prep_zero_cruise();
+    do_cmd(cmd_learn);
+    g_stop_sensor = 1;
+    S.planned.irun = 27;
+    pump(1);
+    v = job_snap();
+    CHECK(v.state == (rt_uint8_t)REL_JOB_FAILED && strcmp(v.why, "SIG_CHANGED") == 0,
+          "c) 签名漂移没被就地终结: st=%s why=%s", rel_job_state_name(v.state), v.why);
+    S.planned.irun = 20;
+    g_stop_sensor = 0;
+
+    /* d) 诊断模式被改走: 不允许"边保护边学习" */
+    prep_zero_cruise();
+    do_cmd(cmd_learn);
+    arm((rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION);
+    pump(1);
+    v = job_snap();
+    CHECK(v.state == (rt_uint8_t)REL_JOB_FAILED && strcmp(v.why, "MODE_CHANGED") == 0,
+          "d) 模式改了却没终结: st=%s why=%s", rel_job_state_name(v.state), v.why);
+    arm((rt_uint8_t)DIAG_MODE_MONITOR_ONLY);
+
+    /* e) 同一 shell 不需要先等学习: 停止/禁能命令的入口在本链是桩, 这里能证的是
+     *    "受理后 shell 立刻可继续受理命令", 真实 motor_stop/motor_disarm 行为
+     *    不由本用例宣称(见交付的边界登记)。 */
+    prep_zero_cruise();
+    g_mdelay_calls = 0;
+    do_cmd(cmd_learn);
+    g_cancel_id = job_snap().job_id;
+    do_cmd(cmd_learn_status);
+    do_cmd(cmd_learn_cancel);
+    CHECK(g_mdelay_calls == 0, "受理+查询+取消合计等待 %ld 次", g_mdelay_calls);
+    CHECK(job_wait(1) == (int)REL_JOB_CANCELLED, "取消没在一次推进内收尾");
+}
+
+/* A10 失败重学/取消/超时都不复用旧 learn 资格; 完整成功后的 commit 仍走原静止事务 */
+static void c_A10(void)
+{
+    diag_rprof_t saved, back;
+
+    /* 1) 完整成功 => 显式 commit(静止事务门内) */
+    prep_zero_cruise();
+    CHECK(learn_run(400) == (int)REL_JOB_DONE, "1) 前置学习没成功");
+    S.mstate = MOTOR_IDLE; S.armed = 0; S.mhz = 0;
+    cap_reset();
+    do_cmd(cmd_commit);
+    CHECK(cap_has("commit OK"), "1) 完整成功之后 commit 没走通: [%.90s]", cap_text());
+    project_config_get_rprof(&back);
+    CHECK(back.magic == DIAG_RPROF_MAGIC && (back.flags & RPF_COMMITTED) != 0u,
+          "1) commit 没发布整套");
+    CHECK(g_static_begin_calls == g_static_end_calls && g_static_begin_calls >= 1,
+          "1) 静止事务门不配对(%d/%d)", g_static_begin_calls, g_static_end_calls);
+
+    /* 1b) 已经有 learn 资格时, 一条**被拒绝**的重学不能先烧掉它: 作废只发生在受理成立时 */
+    arm((rt_uint8_t)DIAG_MODE_RELATIVE_PROTECTION);
+    cap_reset();
+    do_cmd(cmd_learn);
+    CHECK(cap_has("mode must be MONITOR_ONLY"), "1b) 模式门没拒: [%.90s]", cap_text());
+    CHECK(d_pending_learn == RT_TRUE, "1b) 被拒绝的重学先把旧 learn 资格烧掉了");
+    CHECK(!job_active() && d_cap_owner == (rt_uint8_t)REL_CAP_FREE,
+          "1b) 被拒绝的重学却建了任务或占了采集器");
+    arm((rt_uint8_t)DIAG_MODE_MONITOR_ONLY);
+
+    /* 1c) 受理**成立**那一刻就得作废旧 learn 资格(§5.2): 任务还在跑的时候不得留着
+     *     上一轮的资格, 否则"重学失败 + 旧资格"就能提交一个没人学过的新窗口。 */
+    do_cmd(cmd_learn);
+    CHECK(job_active(), "1c) 受理没建任务: st=%s", rel_job_state_name(job_snap().state));
+    CHECK(d_pending_learn == RT_FALSE, "1c) 受理新学习之后旧 learn 资格还留着");
+    job_wait(400);
+
+    /* 2) 失败重学: 旧 learn 资格作废, 不能据此提交新窗口 */
+    saved = back;
+    S.mstate = MOTOR_IDLE; S.armed = 0; S.mhz = 0; S.raw = 1660;
+    do_cmd(cmd_zero);
+    S.mstate = MOTOR_CRUISE; S.armed = 1; S.mhz = 500; S.raw = 2000;
+    pump_sensor(2);
+    do_cmd(cmd_learn_far_window);
+    CHECK(job_wait(400) == (int)REL_JOB_FAILED, "2) 离窗重学没失败");
+    CHECK(d_pending_learn == RT_FALSE, "2) 失败重学保留了旧 learn 资格");
+    cap_reset();
+    do_cmd(cmd_commit);
+    CHECK(cap_has("commit REFUSED"), "2) 失败重学之后竟然提交了: [%.90s]", cap_text());
+    project_config_get_rprof(&back);
+    CHECK(back.profile_id == saved.profile_id && back.hz_low == saved.hz_low &&
+          back.sg_drop_trip == saved.sg_drop_trip, "2) 失败的尝试改了已提交 profile");
+
+    /* 3) 取消与超时同样不能翻出 learn 资格 */
+    prep_zero_cruise();
+    do_cmd(cmd_learn);
+    g_cancel_id = job_snap().job_id;
+    do_cmd(cmd_learn_cancel);
+    job_wait(2);
+    CHECK(d_pending_learn == RT_FALSE, "3) 取消后 learn 凭据却是活的");
+    cap_reset();
+    do_cmd(cmd_commit);
+    CHECK(cap_has("commit REFUSED: pending incomplete"), "3) 取消后 commit 没按缺凭据拒绝");
+    g_stop_sensor = 1;
+    do_cmd(cmd_learn);
+    CHECK(job_wait((int)(REL_CMD_DEADLINE_MS / 10u) + 10) == (int)REL_JOB_TIMEOUT,
+          "3) 超时前置失败");
+    CHECK(d_pending_learn == RT_FALSE, "3) 超时后 learn 凭据却是活的");
+    cap_reset();
+    do_cmd(cmd_commit);
+    CHECK(cap_has("commit REFUSED: pending incomplete"), "3) 超时后 commit 没按缺凭据拒绝");
+    g_stop_sensor = 0;
+}
+
+/* A11 活动学习与 zero/tier/commit/clear 互斥; 锁失败/未就绪不出现半写与错误解锁 */
+static void c_A11(void)
+{
+    diag_rprof_t p;
+
+    /* 1) 互斥: 四个改写入口都在副作用之前拒绝 */
+    prep_zero_cruise();
+    do_cmd(cmd_learn);
+    /* 把世界摆回静止, 好让 zero 走到"采集器被占"这一支而不是先被静止门拒掉。
+     * 这一段不泵 diag 节拍, 所以任务仍然停在 RUNNING —— 判的正是活动期间的互斥。 */
+    S.mstate = MOTOR_IDLE; S.armed = 0; S.mhz = 0;
+    cap_reset(); do_cmd(cmd_zero);
+    CHECK(cap_has("zero REFUSED: capture busy"), "zero 没被互斥门挡住: [%.90s]", cap_text());
+    CHECK(d_pending_zero == RT_TRUE, "1) 被拒的 zero 清了零点凭据");
+    cap_reset(); do_cmd(cmd_tier2);
+    CHECK(cap_has("tier REFUSED: learn job or capture active"),
+          "tier 没被互斥门挡住: [%.90s]", cap_text());
+    cap_reset(); do_cmd(cmd_commit);
+    CHECK(cap_has("commit REFUSED: learn job or capture active"),
+          "commit 没被互斥门挡住: [%.90s]", cap_text());
+    cap_reset(); do_cmd(cmd_clear);
+    CHECK(cap_has("clear REFUSED: learn job or capture active"),
+          "clear 没被互斥门挡住: [%.90s]", cap_text());
+    CHECK(d_pending_zero == RT_TRUE && d_pending_learn == RT_FALSE,
+          "1) 互斥拒绝之后凭据被改动(zero=%d learn=%d)",
+          (int)d_pending_zero, (int)d_pending_learn);
+    project_config_get_rprof(&p);
+    CHECK(p.magic == 0u, "1) 被拒的 clear 竟然作废了 profile");
+    /* show 与 learn_status 读到的凭据必须来自同一份状态 */
+    cap_reset();
+    do_cmd(cmd_show);
+    do_cmd(cmd_learn_status);
+    CHECK(cap_has("cred zero=1 learn=0"), "1) show 的凭据快照不对: [%.120s]", cap_text());
+    CHECK(cap_has("cred=1/0"), "1) learn_status 的凭据快照与 show 不一致: [%.120s]",
+          cap_text());
+
+    /* 让 1) 的任务先终结(静止世界里走到 WINDOW_BROKEN), 再单独判锁失败支路 */
+    job_wait(400);
+    d_pending_zero = RT_TRUE; d_pending_learn = RT_FALSE;
+    g_mutex_take_fail = 1;
+    g_mutex_release_calls = 0;
+    cap_reset();
+    do_cmd(cmd_learn);
+    CHECK(cap_has("learn REFUSED: ctx lock"), "2) 锁失败时 learn 没具名拒绝: [%.90s]", cap_text());
+    do_cmd(cmd_zero);
+    CHECK(cap_has("zero REFUSED: ctx lock (nothing cleared)"),
+          "2) 锁失败时 zero 的拒绝身份不对: [%.90s]", cap_text());
+    CHECK(d_pending_zero == RT_TRUE && d_pending_learn == RT_FALSE,
+          "2) 锁失败却动了凭据(zero=%d learn=%d)", (int)d_pending_zero, (int)d_pending_learn);
+    CHECK(d_cap.active == 0u && d_cap_owner == (rt_uint8_t)REL_CAP_FREE,
+          "2) 锁失败却拿到了采集器");
+    do_cmd(cmd_tier2);
+    CHECK(cap_has("tier REFUSED: ctx lock"), "2) tier 的锁失败身份不对: [%.90s]", cap_text());
+    do_cmd(cmd_commit);
+    CHECK(cap_has("commit REFUSED: ctx lock"), "2) commit 的锁失败身份不对: [%.90s]", cap_text());
+    do_cmd(cmd_clear);
+    CHECK(cap_has("clear REFUSED: ctx lock"), "2) clear 的锁失败身份不对: [%.90s]", cap_text());
+    cap_reset();
+    do_cmd(cmd_learn_status);
+    CHECK(cap_has("learn_status REFUSED: ctx lock (no half snapshot)"),
+          "2) 状态查询没拒绝");
+    CHECK(job_snap().why != RT_NULL && job_snap().job_id == 0u,
+          "2) 锁失败时快照被拼出半份");
+    g_cancel_id = 1u;
+    cap_reset();
+    do_cmd(cmd_learn_cancel);
+    CHECK(cap_has("cancel REFUSED: ctx lock (nothing changed)"), "2) 取消没拒绝");
+    CHECK(g_mutex_release_calls == 0, "2) 拒绝路径释放了没持有的锁(%d)",
+          g_mutex_release_calls);
+    g_mutex_take_fail = 0;
+
+    /* 3) 后台未就绪: 受理/查询/取消各自给出"未初始化"的身份, 且都不建任务 */
+    d_ctx_inited = RT_FALSE;
+    cap_reset();
+    do_cmd(cmd_learn);
+    CHECK(cap_has("learn REFUSED: ctx not ready"), "3) 未就绪时 learn 没说未就绪: [%.90s]",
+          cap_text());
+    do_cmd(cmd_zero);
+    CHECK(cap_has("zero REFUSED: ctx not ready (nothing cleared)"),
+          "3) 未就绪时 zero 的拒绝身份不对");
+    do_cmd(cmd_tier2);
+    CHECK(cap_has("tier REFUSED: ctx not ready"), "3) 未就绪时 tier 没说未就绪");
+    cap_reset();
+    do_cmd(cmd_learn_status);
+    CHECK(cap_has("learn_status REFUSED: ctx not ready"), "3) 未就绪时状态查询身份不对");
+    cap_reset();
+    g_cancel_id = 1u;
+    do_cmd(cmd_learn_cancel);
+    CHECK(cap_has("cancel REFUSED: job ctx not initialized"), "3) 未就绪时取消身份不对");
+    CHECK(d_job.state != (rt_uint8_t)REL_JOB_RUNNING && d_cap.active == 0u &&
+          d_cap_owner == (rt_uint8_t)REL_CAP_FREE,
+          "3) 未就绪路径留下了活动任务或采集器(st=%u owner=%u)",
+          (unsigned)d_job.state, (unsigned)d_cap_owner);
+    d_ctx_inited = RT_TRUE;
+
+    /* 4) 非法上下文仍然整体静默(R3.7 保持): 学习层不得成为第二条打印路径 */
+    prep_zero_cruise();
+    cap_reset();
+    g_isr_nest = 1;
+    do_cmd(cmd_learn);
+    g_isr_nest = 0;
+    CHECK(cap_text()[0] == 0, "4) ISR 上下文里学习命令打印了: [%.80s]", cap_text());
+    CHECK(job_snap().job_id == 0u && d_cap_owner == (rt_uint8_t)REL_CAP_FREE,
+          "4) 非法上下文却受理了任务");
+}
+
+/* A12 本轮新增/改动的打印逐调用限长 120B(含 LF), 且无裸 NUL、UTF-8 完整 */
+static void c_A12(void)
+{
+    static const char *needles[] = {
+        "learn STARTED id=999999999 n=32 win=20000..20000 dir=1",
+        "learn async: query",
+        "learn REFUSED: capture busy (job or zero owns it)",
+        "learn REFUSED: ctx lock",
+        "learn REFUSED: ctx not ready",
+        "learn args: N=8..32",
+        "job id=999999999 st=CANCEL_PENDING why=CANCEL_REQUESTED owner=2 cred=1/1",
+        "job n=4294967295/4294967295 want=32 win=20000..20000 dir=1",
+        "job left=2000000000ms of 12000ms software budget",
+        "job data adc[65535..65535]n65535 nz65535 sg[65535..65535]n65535 seq4294967295..4294967295",
+        "job thr tier=3 dev=-32768/-32768 drop=65535/65535 FIELD_UNVERIFIED",
+        "job DONE result; cred zero=1 learn=1 commit is separate",
+        "learn_status REFUSED: ctx lock (no half snapshot)",
+        "learn_status REFUSED: ctx not ready (no half snapshot)",
+        "cancel id=999999999 REQUESTED st=CANCEL_PENDING (motor untouched)",
+        "cancel id=999999999 NOT-CANCELLED: already CANCELLED why=CANCELLED",
+        "cancel REFUSED: no such job id=999999999 current=1",
+        "cancel REFUSED: job ctx not initialized",
+        "zero REFUSED: capture busy (job or zero owns it)",
+        "zero FAILED: ctx lock on invalidate",
+        "zero REFUSED: ctx not ready (nothing cleared)",
+        "tier REFUSED: ctx lock",
+        "tier REFUSED: ctx not ready",
+        "commit REFUSED: ctx lock",
+        "clear REFUSED: ctx lock (profile kept)",
+        "clear FAILED rc=",
+        "show REFUSED: ctx lock (no half snapshot)",
+        "learn_status REFUSED: ctx not ready (no half snapshot)",
+        "learn_cancel JOB_ID must be 1..999999999",
+        "usage: diag_profile show|zero N|learn N LO HI DIR|tier T|commit|clear CONFIRM|learn_status|learn_cancel ID",
+        NULL
+    };
+    int k, miss = 0, mx;
+
+    /* 同一段捕获贯穿全部分支: cap_max_line_len() 取的是**累计**最长行, 针也对针
+     * 只在最后扯一次, 避免"每段各自看一眼"漏掉跨段的长行。 */
+    world_reset();
+    cap_reset();
+
+    /* 1) 受理 / 重复受理 / 参数拒绝 / usage: 参数与 id 都推到合法上界 */
+    S.mstate = MOTOR_IDLE; S.armed = 0; S.mhz = 0; S.raw = 1660;
+    do_cmd(cmd_zero);
+    CHECK(d_pending_zero == RT_TRUE, "1) 前置零点没成功: [%.80s]", cap_text());
+    S.mstate = MOTOR_CRUISE; S.armed = 1; S.mhz = 500; S.raw = 2000; S.sg = 500;
+    pump_sensor(2);
+    d_job_next_id = 999999999u;                 /* CLI 十进制解析器能输入的最大 id */
+    do_cmd(cmd_learn_max);                      /* STARTED + async 披露行 */
+    S.mstate = MOTOR_IDLE; S.armed = 0; S.mhz = 0;
+    do_cmd(cmd_learn);                          /* learn 的 busy 拒绝行 */
+    do_cmd(cmd_zero);                           /* zero 的 busy 拒绝行 */
+    do_cmd(cmd_learn_bad_n);                    /* 参数行 */
+    {
+        char *av[] = { "diag_profile", "bogus" };
+        diag_profile(2, av);                    /* usage 行(本轮扩了两个子命令) */
+    }
+
+    /* 2) 取消的三种答复 + learn_status 的全部分支 */
+    g_cancel_id = 999999999u;
+    do_cmd(cmd_learn_cancel);                   /* REQUESTED st=CANCEL_PENDING */
+    /* 把快照字段推到**声明类型**的十进制上界: 只为长度界限, 不声称这些运行值可达 */
+    d_job.got_adc = 4294967295u; d_job.got_sg = 4294967295u;
+    d_job.want = 32u; d_job.dir = 1u;
+    d_job.hz_lo = 20000u; d_job.hz_hi = 20000u;
+    d_job.why = "CANCEL_REQUESTED";             /* 最长的活动态原因 */
+    d_job.deadline = g_now + 2000000000u;
+    d_cap_owner = (rt_uint8_t)REL_CAP_BY_JOB;
+    d_pending_zero = RT_TRUE; d_pending_learn = RT_TRUE;
+    memset(&d_job.out, 0, sizeof(d_job.out));
+    d_job.out.run_adc_min = 65535u; d_job.out.run_adc_max = 65535u;
+    d_job.out.run_adc_n = 65535u;   d_job.out.run_adc_noise = 65535u;
+    d_job.out.run_sg_min = 65535u;  d_job.out.run_sg_max = 65535u;
+    d_job.out.run_sg_n = 65535u;
+    d_job.out.learn_sg_seq_first = 4294967295u;
+    d_job.out.learn_sg_seq_last = 4294967295u;
+    d_job.out.threshold_tier = 3u;
+    d_job.out.adc_dev_warn = -32768; d_job.out.adc_dev_trip = -32768;
+    d_job.out.sg_drop_warn = 65535u; d_job.out.sg_drop_trip = 65535u;
+    d_job.data_valid = 1u;
+    do_cmd(cmd_learn_status);                   /* st=CANCEL_PENDING 那一组(含 left 行) */
+    d_job.state = (rt_uint8_t)REL_JOB_DONE;
+    d_job.out_valid = 1u;
+    d_cap_owner = (rt_uint8_t)REL_CAP_FREE;
+    do_cmd(cmd_learn_status);                   /* thr + result 那一组 */
+    d_job.state = (rt_uint8_t)REL_JOB_CANCELLED;
+    d_job.why = "CANCELLED";
+    do_cmd(cmd_learn_cancel);                   /* NOT-CANCELLED: already CANCELLED */
+    d_job.job_id = 1u;                          /* 陈旧 id 去取消别人的任务 */
+    do_cmd(cmd_learn_cancel);                   /* no such job ... current=1 */
+
+    /* 3) 锁失败与后台未就绪两条拒绝身份 */
+    g_mutex_take_fail = 1;
+    do_cmd(cmd_learn);
+    do_cmd(cmd_learn_status);
+    do_cmd(cmd_tier2);
+    do_cmd(cmd_commit);
+    do_cmd(cmd_clear);
+    do_cmd(cmd_show);
+    do_cmd(cmd_zero);
+    g_mutex_take_fail = 0;
+    /* 门过了、写入时才撞锁: 这条是"不发布半份状态"的另一种身份 */
+    g_ctx_take_calls = 0; g_ctx_take_fail_after = 1;   /* 第 1 次=门(过), 第 2 次=作废写入(失败) */
+    do_cmd(cmd_clear);
+    g_ctx_take_fail_after = -1;
+    g_cfg_take_fail = 1;
+    do_cmd(cmd_clear);                        /* 配置写失败: clear FAILED rc=... */
+    g_cfg_take_fail = 0;
+    d_ctx_inited = RT_FALSE;
+    do_cmd(cmd_learn);
+    do_cmd(cmd_learn_status);
+    do_cmd(cmd_tier2);
+    do_cmd(cmd_zero);
+    do_cmd(cmd_learn_cancel);
+    d_ctx_inited = RT_TRUE;
+    do_cmd(cmd_cancel_bad);                   /* 非数字 JOB_ID */
+
+    /* 4) zero 的"拿到采集器之后才撞锁"支路(第 3 次 take 失败) */
+    world_reset();
+    S.mstate = MOTOR_IDLE; S.armed = 0; S.mhz = 0; S.raw = 1660;
+    do_cmd(cmd_zero);
+    CHECK(d_pending_zero == RT_TRUE, "4) 前置零点没成功: [%.80s]", cap_text());
+    g_ctx_take_calls = 0;
+    g_ctx_take_fail_after = 2;        /* 1=读快照 2=拿采集器 3=作废凭据 */
+    do_cmd(cmd_zero);
+    g_ctx_take_fail_after = -1;
+    CHECK(cap_has("zero FAILED: ctx lock on invalidate"),
+          "4) 中途撞锁支路没走到: [%.120s]", cap_text());
+    /* 这条支路里连 close 也拿不到锁, 所有权留在 BY_ZERO: 如实复位夹具状态 */
+    d_cap_owner = (rt_uint8_t)REL_CAP_FREE;
+    memset(&d_cap, 0, sizeof(d_cap));
+
+    /* 5) 判据: 逐调用长度(含源 LF)、无裸 NUL、每条结论行必须真出现过 */
+    mx = cap_max_line_len();
+    CHECK(mx + 1 <= 120, "本轮打印里最长一次调用 %d B(含 LF %d B)超过 120 B 预算",
+          mx, mx + 1);
+    CHECK(g_cap_truncated == 0, "捕获里出现裸 NUL(vsnprintf 计数与实际长度不一致)");
+    for (k = 0; needles[k] != NULL; ++k)
+    {
+        if (!cap_has(needles[k])) { miss++; printf("    缺结论行: %s\n", needles[k]); }
+    }
+    CHECK(miss == 0, "驱动过的结论行有 %d 条没出现(长度判据不能空转)", miss);
+    CHECK(cap_all_ascii() == 1, "捕获区间里出现了非 ASCII 字节(UTF-8 完整性不成立)");
+}
+
 static const struct case_ent TAB[] = {
     { "REL01-frame-identity-advances-only-on-success", c_REL01 },
     { "REL02-sg-read-fail-freezes-identity",           c_REL02 },
@@ -3132,6 +4076,18 @@ static const struct case_ent TAB[] = {
     { "REL48-new-generation-clears-evidence",          c_REL48 },
     { "REL49-frame-not-same-as-motion-known",          c_REL49 },
     { "REL50-stale-idle-not-static-exemption",         c_REL50 },
+    { "A01-start-returns-without-sample-wait",         c_A01 },
+    { "A02-independent-samples-publish-candidate",     c_A02 },
+    { "A03-consistent-read-only-status",               c_A03 },
+    { "A04-strict-reject-and-busy-before-side-effects", c_A04 },
+    { "A05-cancel-terminates-without-new-frames",      c_A05 },
+    { "A06-cancel-versus-completion-linearized",       c_A06 },
+    { "A07-stale-id-and-quiescence-guard",             c_A07 },
+    { "A08-timeout-advances-without-frames-and-wrap",  c_A08 },
+    { "A09-motion-mode-signature-change-aborts",       c_A09 },
+    { "A10-failed-relearn-invalidates-credential",     c_A10 },
+    { "A11-mutator-exclusion-and-lock-context-failures", c_A11 },
+    { "A12-bounded-calls-utf8-no-nul",                 c_A12 },
 };
 #define NTAB ((int)(sizeof(TAB)/sizeof(TAB[0])))
 

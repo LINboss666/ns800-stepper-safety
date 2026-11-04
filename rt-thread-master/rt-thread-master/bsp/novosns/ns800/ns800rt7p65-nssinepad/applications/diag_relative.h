@@ -338,6 +338,72 @@ rt_bool_t rel_cap_done(void);
 rt_err_t  rel_cap_finish(diag_rprof_t *out, const char **why);  /* 分不开就具名拒绝 */
 void      rel_cap_abort(void);
 
+/* ---------- M8-R7D1: 异步、可取消的学习任务 ----------
+ *
+ * 合同(与任务书 §4 逐条对应):
+ *   - `diag_profile learn` 受理即返回; 采集由 Diagnosis Thread 已有的 100Hz 循环
+ *     推进(rel_job_advance), 保护义务永远排在学习推进之前。
+ *   - 状态只有下面七个值。终态保留到**下一次任务被正式受理**为止, 查询不消费结果。
+ *   - why 只指向产品源文件里的静态字面量(有限集合), 不指向命令栈/argv。
+ *   - 本层证明的是软件状态机与交错顺序; 板端真实时延与物理停机仍未验证。
+ */
+typedef enum
+{
+    REL_JOB_IDLE = 0,
+    REL_JOB_RUNNING,
+    REL_JOB_CANCEL_PENDING,
+    REL_JOB_DONE,
+    REL_JOB_FAILED,
+    REL_JOB_CANCELLED,
+    REL_JOB_TIMEOUT
+} rel_job_state_t;
+
+/* d_cap 的唯一所有者。owner 只在上下文锁内改, 且"置 owner"与"rel_cap_start"在
+ * 同一临界区完成 —— 所以零点采集与后台学习不可能同时碰累加器, 不需要第二把锁。 */
+typedef enum
+{
+    REL_CAP_FREE = 0,
+    REL_CAP_BY_ZERO,
+    REL_CAP_BY_JOB
+} rel_cap_owner_t;
+
+/* learn_status 的一致性快照: 要么整份拿到, 要么明确失败并且 out 被清零。 */
+typedef struct
+{
+    rt_uint32_t   job_id;
+    rt_uint8_t    state;         /* rel_job_state_t */
+    rt_uint8_t    cap_owner;     /* rel_cap_owner_t */
+    rt_uint8_t    want, dir;
+    rt_uint32_t   hz_lo, hz_hi;
+    rt_uint32_t   got_adc, got_sg;   /* 已计入的**独立**样本数(不是轮询次数) */
+    rt_int32_t    left_ms;           /* 活动任务的有界余量; 终态恒 0 */
+    const char   *why;               /* 静态字面量 */
+    rt_uint8_t    zero_cred, learn_cred; /* 同一临界区里读到的凭据位(clear 之后不会假称还在) */
+    diag_rprof_t  cand;              /* cand_valid=1 时是 DONE 发布出去的整份候选 */
+    rt_uint8_t    cand_valid;
+    rt_uint8_t    has_data;          /* 1 = cand 里有本次采集到的统计(失败终结也带依据) */
+} rel_job_view_t;
+
+/* rel_job_cancel 的结论。不用 errno: 本项目的平台错误码与 POSIX 教材值不同,
+ * 把"取消"的四种结果编成显式枚举比 -RT_* 更不容易被读错。 */
+#define REL_CANCEL_OK        0   /* 已受理: 该任务此后不能再发布成功结果 */
+#define REL_CANCEL_NOJOB     1   /* job_id 与当前/最近任务不匹配, 什么都没改 */
+#define REL_CANCEL_TERMINAL  2   /* 已经终结(v 给终态), 没有谎称取消成功 */
+#define REL_CANCEL_LOCKFAIL  3   /* 有人持锁: 什么都没改 */
+#define REL_CANCEL_NOINIT    4   /* 上下文锁未初始化: 后台未就绪 */
+
+/* 受理新任务(命令线程调用)。资格检查与副作用在同一临界区内完成: 返回非 RT_EOK
+ * 时 d_job / d_cap / 凭据一个字段都没动。*id_out 带回新 job_id(失败时为 0)。 */
+rt_err_t rel_job_start(const diag_rprof_t *base, rt_uint32_t want, rt_uint32_t hz_lo,
+                       rt_uint32_t hz_hi, rt_uint32_t dir, rt_uint32_t *id_out);
+/* 只置取消旗/状态并回结论, **不等**后台收尾, 也不碰电机(停止/禁能另有正式接口)。 */
+int      rel_job_cancel(rt_uint32_t job_id, rel_job_view_t *v);
+rt_err_t rel_job_status(rel_job_view_t *v);
+/* 唯一写者(Diagnosis Thread)每拍调用一次: 不打印、不 sleep、不改模式、不写 Flash。
+ * mode 由调用方传入, 免得在叶锁临界区里再去取控制锁。 */
+void     rel_job_advance(const diag_input_t *in, rt_uint8_t have_frame, rt_uint8_t mode);
+const char *rel_job_state_name(rt_uint8_t st);
+
 /* M8-R1 R4: 按档从**已存正常统计**重算 warn/trip(不引入新数据源)。
  * 返回非 RT_EOK 时一个字段都不改, why 给出具名原因与数据由调用方打印。 */
 rt_err_t rel_profile_gen_thresholds(diag_rprof_t *p, rt_uint8_t tier, const char **why);

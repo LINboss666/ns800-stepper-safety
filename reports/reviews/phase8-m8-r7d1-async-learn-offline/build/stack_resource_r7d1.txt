@@ -1,0 +1,141 @@
+M8-R7D1 构建侧资源核对: armlink 调用图 + fromelf 反汇编帧 + 两版 map 逐对象差分
+日期 2026-11-04。目标 rt-thread-motor-m1-candidate。本轮只构建一次, 设备动作 0(不烧录/不回读/
+不复位/不开串口/不启动逻辑分析仪/不 arm/start/运动/学习/写配置/供断电)。
+
+[输入件身份](全部为本机磁盘字节, 逐条 sha256; 与 Git blob 的复算在提交前预检与推送后远端回读各做一次)
+  本轮 BIN          297004 B  sha256=df7584c3df2e682d07564ee70f05ecc7b608052a7fa739fb0c21b4f942b15c2b
+  本轮 AXF         1788432 B  sha256=59c286d9b9bae9cbfe5ac7b353634ccc308abed502b8c3544a3744baef560611
+  本轮 MAP         2143326 B  sha256=fe422fffa82e1905b399de0681db2374ca92d1eb061f6a84d7a5b74ef0ff3d14
+  本轮调用图 htm    1098807 B  sha256=340e780e7c5c32cba70925057d8d4a8f45bef06590e2e0b43f283eab9129d3ba
+  本轮 UV4 日志       3909 B  sha256=b2aa70b45588e63d56bd6791cd06096f0e21161f11dcb74c3c30c5f4c3867274
+  对照件(在板 b502) BIN 292708 B sha256=502dca5d8c7ebfa794f890a9c03bc258fc9753f57b6a80c2f1e08add69888a7a
+    来自 reports/firmware/phase8-m8-r7f2b-safety-print-fix/(其 manifest 已逐字节证明该镜像在板),
+    其 AXF/MAP/调用图同目录, 本轮只读引用, 未改写。
+  编译器行(取自本轮日志): *** Using Compiler 'V6.24', folder: 'C:\Keil_v5\ARM\ARMCLANG\Bin'
+  结果行             : ".\build\motor_m1\rt-thread-motor-m1.axf" - 0 Error(s), 0 Warning(s).
+
+[1] armlink 调用图的 Max Depth(单位 B)
+    口径(必须先读这段再引用下面的数): 每个符号的数是"以它自己为根"的子树累计深度, 不含调用它的
+      祖先帧; armlink 解析不了函数指针, 所以这些数是**静态下界**, 不是上界, 也不含异常/ISR 帧。
+      因此下面每一行都只能用于"本轮改动有没有让某条线变紧"的比较, 不能当成现场最坏栈实测。
+
+    符号                        基线(b502)      本轮(R7D1)     差      本轮最深前 5 跳(节选)
+    diag_thread_entry          632 / 1580      640 / 1588     +8      => rel_prod_evaluate => rel_prod_publish
+                                                                             => rel_ctl_take => rt_mutex_take
+    rel_prod_evaluate          248 /  948      248 /  948      0      (未改)
+    rel_cap_finish              40 /  168       40 /  168      0      (未改)
+    rel_profile_gen_thresholds  80 /  128       80 /  128      0      (未改)
+    rel_cmd_learn             296 /  836      168 / 1084    +248      => rel_job_start => rel_ctx_take
+                                                                             => rel_ctx_take_tmo => rt_mutex_take
+    rel_cmd_zero              256 / 1164      368 / 1276    +112      => rel_static_and_ready => motor_get_snapshot
+                                                                             => mot_lock_take => rt_mutex_take
+    rel_job_advance             — /   —        48 /  636      新增     => rel_ctx_try => rel_ctx_take_tmo
+                                                                             => rt_mutex_take => _rt_mutex_take
+    rel_job_start               — /   —       328 /  916      新增     (同上, 子树内含 rel_cap_start)
+    rel_job_status              — /   —        24 /  612      新增
+    rel_cmd_learn_status        — /   —       208 /  820      新增     => rel_job_status => rel_ctx_take => …
+    rel_cmd_learn_cancel        — /   —       184 /  804      新增
+    rel_ctx_gate                — /   —        32 /  620      新增
+    rel_zero_capture_open       — /   —        24 /  612      新增(其子树并入 rel_cmd_zero 的 1276)
+    rel_zero_capture_close      — /   —         8 /  596      新增
+    rel_pending_read            — /   —        32 /  620      新增(= rel_ctx_gate 同深: 都是取锁线)
+    rel_accept_refused          — /   —        16 /  268      新增(只打印, 不取锁)
+
+    三条判读:
+    a) diag 线程(rel_job_advance 的新增宿主): 帧 632→640(+8), 子树 1580→1588(+8)。
+       栈配置 diagnosis.c:48 `#define DIAG_THREAD_STACK 4096`(本轮未改), 静态余量 4096-1588 = 2508 B。
+       注意最深路径**不是**新增的 rel_job_advance(它 636), 而是 rel_prod_evaluate → rel_prod_publish
+       → rel_ctl_take → rt_mutex_take → 调度器 → rt_scheduler_stack_check → rt_kprintf 这条既有线;
+       也就是说 +8 B 全部来自 diag_thread_entry 自己的帧, 不是新调用线把上限顶上去了。
+       rel_job_advance 的 636 里同样含 rt_mutex_take 那条调度器打印线, 不是它自己的活。
+       帧这 +8 B 的来源只能说到这一层: diagnosis.c 本轮的唯一改动是一行调用
+       (diagnosis.c:450-456, rel_job_advance(&in, have_frame, d_mode)), 没有新增任何局部变量;
+       编译器为把这三个实参落地多占了一格, 而 armlink/fromelf 只给到"帧总大小"这一层, 不再给出
+       是哪个槽 —— 所以这里登记为"实参/溢出槽增长", 不写成"新增了局部"。
+    b) shell/命令线程(rel_cmd_* 的宿主): FINSH_THREAD_STACK_SIZE 4096(rtconfig.h, 本轮未改)。
+       rel_cmd_learn 子树 +248 B 是**方向明确的一次换线**: 基线的最深跳是 rt_thread_mdelay(同步采集
+       循环里的 20 ms 等待), 本轮 learn 不再等待, 最深跳换成 rel_job_start → rel_ctx_take →
+       rt_mutex_take —— _rt_mutex_take → rt_thread_suspend_to_list 这一跳比 _thread_sleep 那一跳深。
+       同时它的**自身帧反而小了**(296→168): 同步循环期的 rel_cap_*/rel_frame_to_input 全不在这条线上。
+       可核对的拆分(把两件事分开, 不混成一个"+248"): 最深子树深度 = 子树总深 - 自身帧,
+         基线 836-296 = 540(mdelay 线), 本轮 1084-168 = 916 —— 916 恰等于本轮 rel_job_start 自己的
+         Max Depth, 说明 learn 的最深线就是它新受理作业那条; 净增 248 = 子树 +376 与自身帧 -128 之和。
+       判据: 1084(learn)/1276(zero) 两条都小于 4096; 但 1276 不是"shell 栈总共用 1276"——
+       armlink 不能把 msh_exec → 函数指针表里的命令处理函数连起来(finsh_thread_entry 的子树本轮仍是
+       628, 与基线相同, 恰恰证明它没算命令处理函数), 所以"命令处理函数子树 + 分发点之上的 shell 帧"
+       这个和没有工具支撑, 本轮不写成一个总数, 只登记两条子树各自的数与这个缺口。
+    c) rel_cmd_zero +112 B: zero 仍是同步命令(任务书 §3 只要求 learn 异步)。它的帧 256→368 与子树
+       1164→1276 **增量相同(都 +112)**, 且两版最深线一字不差都是
+       rel_static_and_ready → motor_get_snapshot → mot_lock_take → rt_mutex_take… —— 所以这 112 B
+       全部是 rel_cmd_zero 自己的局部, 不是任何被调用线加深。源码侧对得上: 现在函数开头是
+       `diag_rprof_t cand, base;`(diag_relative.c:1863), 比基线多一份整份快照 base, 而一份
+       diag_rprof_t 在本轮 map 里量得 116 B(.bss.d_pending 即为此类型, Data=116); 116 与 +112 的
+       4 B 差是槽位重用/对齐, 不是另一份对象。
+
+[2] fromelf 反汇编帧大小(证新帧真进了镜像, 没被优化掉)
+    取法: fromelf --disassemble 本轮 AXF(仓外临时件, 3590490 B, 不入库 —— 只用得到几个 PROC 头),
+    与调用图的 Stack size 逐条对照:
+      diag_thread_entry   PROC: PUSH {r7,lr} + SUB sp,sp,#0x278  = 8 + 632 = 640 B   == 调用图 640
+      rel_cmd_learn       PROC: PUSH {r4,lr} + SUB sp,sp,#0xa0   = 8 + 160 = 168 B   == 调用图 168
+      rel_cmd_learn_cancel PROC: PUSH {r7,lr} + SUB sp,sp,#0xb0  = 8 + 176 = 184 B   == 调用图 184
+      rel_job_advance     PROC: PUSH {r7,lr} + SUB sp,sp,#0x28   = 8 + 40  = 48 B    == 调用图 48
+      rel_job_start       PROC: PUSH {r7,lr} + SUB sp,sp,#0x140  = 8 + 320 = 328 B   == 调用图 328
+      rel_cmd_zero        PROC: PUSH {r7,lr} + SUB sp,sp,#0x168  = 8 + 360 = 368 B   == 调用图 368
+    rel_cmd_learn_status 调用图为 208(PUSH {r4-r7,lr}=20 + 0xbc=188); 反汇编里 PUSH 的行是寄存器
+    范围写法, 按上面那条口径手算同为 208, 两处一致。
+    rel_zero_capture_open/close、rel_pending_read、rel_accept_refused 四个叶子本轮只取调用图的帧数
+    (24/8/32/16), 没有逐个再走一遍反汇编 —— 它们都不是判定线, 登记到哪一层就说到哪一层。
+
+[3] 链接器调用图的**子树成员**差分(镜像侧合同改动的直接证据, 不是源码目测)
+    rel_cmd_learn 的子级:
+      消失: rt_thread_mdelay, rel_cap_start, rel_cap_feed, rel_cap_done, rel_cap_finish,
+            rel_cap_abort, rel_frame_to_input, rt_tick_get, rt_memset, __aeabi_memcpy4
+      新增: rel_job_start, rel_pending_read, rel_lock_why, rel_accept_refused
+      => "learn 命令线程里不再有等待/采集/收尾"这件事在镜像的控制流图里成立, 而不是只在我写的 C 里成立。
+    diag_thread_entry 的子级: 只新增 rel_job_advance, 一个未消失。
+      => 后台推进点确实挂在诊断线程上, 且没有挤掉任何既有子调用。
+
+[4] 两版 map 的逐对象差分 —— 资源变化归因
+    本轮相对基线的 Object Totals 增量: Code +3248  RO Data +1044  RW Data +4  ZI Data +340
+      (逐对象表只列 70 个 .o 行, 其和与 Object Totals 之间差的正是下面两条"含"行, 所以先把它们钉死:
+       ZI 85936 = 逐对象 53098 + 填充 70 + 生成区 32768; 其中"(incl. Generated)"两版一字不差
+       (RO 48 / ZI 32768 = 链接器生成的堆区), 也就是说本轮没有动堆区大小。)
+      diag_relative.o        Code +3138  RO +1047  RW +4   ZI +341   (本轮全部产品改动所在文件)
+      diagnosis.o            Code   +18  RO    +0  RW +0   ZI   +0   (一行 rel_job_advance 调用)
+      其余 68 个 .o 与 39 个库成员行: 四项全为 0(逐行核过, 不是假设)
+      链接器填充/对齐 (incl. Padding 行)  Code +92  RO -3  ZI -1
+      对账: 3138+18+92 = 3248; 1047+0-3 = 1044; 4+0 = 4; 341+0-1 = 340 —— 四项逐一对上总量。
+      填充行原文(两版各取一行, 单位同上 Code/RO/RW/ZI):
+        本轮  3634  8  6  0  70   1359188 (incl. Padding)
+        基线  3542  8  9  0  71   1352516 (incl. Padding)
+      即 +92/-3/-1 是链接器对齐填充的挪动, 不是第三处代码变化; "(incl. Generated)"行两版相同
+      (RO 48 / ZI 32768 = 链接器生成的堆区), 所以 ZI 总量 85936 = 逐对象 53098 + 填充 70 + 堆区 32768,
+      本轮没有改堆区、也没有改任何段的长度声明。
+    镜像体积对账: Code+RO+RW 增量 = 3248+1044+4 = 4296 B, 与 BIN 292708 → 297004 的增量 4296 B
+      逐字节相符(所以体积增长全部是代码+常量+已写全局, 没有隐藏的堆或额外分配)。
+    新增静态 RAM(逐项取自本轮 map 的符号表, 单位 B):
+      .bss.d_job           276   (任务槽: 状态机 + 两份 diag_rprof_t(cand/out) + 计数与 why)
+      .bss.d_ctx_lock       60   (新的叶互斥量本体, struct rt_mutex)
+      .bss.d_cap_owner       1   (FREE/BY_ZERO/BY_JOB 归属)
+      .data.d_job_next_id    4   (作业号计数器, 初值 1 所以进 .data —— 这就是 RW +4)
+      合计 341 B, 与 diag_relative.o 的 ZI+RW 增量(+341/+4)一致; 全局 RAM(RW+ZI)净增 344 B。
+    d_job 的 276 B 可以再拆一层(用同一份 map 里量到的 diag_rprof_t = 116 B 反推布局):
+      两份 profile(候选 cand + 成果 out) = 232 B, 其余 12 个字段(job_id/state/want/dir/hz_lo/hz_hi/
+      deadline/sig/last_frame_seq/got_adc/got_sg/out_valid/data_valid/why)按 4 字节对齐累加 44 B,
+      232 + 44 = 276 —— 与符号表给的 276 相同, 所以"任务槽里确实常驻两份 profile"是量出来的,
+      不是我按字段猜的。同一份 276 B 也解释了 rel_job_start 为什么有 328 B 帧: 受理时在 shell 线程
+      栈上先构造一个局部 rel_job_t, 校验通过才整体搬进 d_job(这是"拒绝则什么都不改"那条合同
+      [A04]的代价, 登记在此, 不写成免费)。
+    明确没有的事: 没有新增线程、没有新增 rt_malloc/静态大数组、没有为"避开栈问题"而放大任何栈
+      常量(DIAG_THREAD_STACK 4096 与 FINSH_THREAD_STACK_SIZE 4096 都是上一轮的值, 本轮未改),
+      也没有延长任何超时来掩盖问题(REL_CMD_DEADLINE_MS 12000 是任务书 §5 定的预算)。
+
+[5] 边界与未闭合项(不许被上面的数盖过去)
+    - 本节全部数是**离线静态估计**。现场最坏栈、现场是否真的按 100 Hz 走到 rel_job_advance、
+      以及 learn 作业在真板上的实际完成/超时时刻: 本轮 0 次设备动作, 一律未测, 不得写成已验证。
+    - shell 侧"命令处理函数子树 + 分发点之上的帧"之和缺工具支撑(见 [1]b 末), 本轮登记为方法缺口,
+      不用手加两个数冒充一个总数。
+    - 新镜像 NOT_ON_BOARD: 板上仍是历史 b502 证明(502dca5d…), 本轮没有下载/回读/复位, 两者不构成
+      任何"新镜像在板"的证据。
+    - polarity_measured=false、core_protection_verified=false 与四条禁用声称保持不变; 本轮是
+      命令合同与并发合同的重述, 没有给任何保护判据新增现场证据。

@@ -392,3 +392,49 @@ A 补充五条落实对账（原文逐字录入 `a_review_r7f5a/SUPPLEMENT_A_R7F
 
 推送实况（不删不改）：`034e2ff` 那次连续两次被远端 `Internal Server Error` 拒，
 每次都先 `ls-remote` 证远端仍是前 tip 且本地是其直接子提交（纯快进）再重试，第三次成功，负载仅 50873 B。
+
+## 15 M8-R7D1 离线异步学习轮（产品 C 改动 + 主机验收 + 离线构建一次交付；设备动作 0）
+
+任务书 `NS800_R7D1_Offline_Async_Learn_Task_20261104.zip`（13467 B，sha256 `b35e0a2e…2c5c`，175 行），
+状态 `GO_OFFLINE_IMPLEMENTATION_ONLY`。基线 = 已审 tip `7885aea`（构建时 HEAD 即它，`HEAD_IS_BASELINE` PASS）。
+本轮按任务书第 10 节把**实现、测试、归档合为一次交付**：没有先交一份"登记轮"，也没有向操作者等下一次批准。
+
+**改了什么**（六文件，产品三个）：`diag_relative.h` 给出七态作业合同、采集器归属枚举与整份快照类型；
+`diag_relative.c` 落 `d_job`（276 B 静态）+ 新叶锁 `d_ctx_lock`（"rel_ctx"）+ `d_cap_owner`，`learn` 改为
+受理即返回，新增 `learn_status` / `learn_cancel JOB_ID`；`diagnosis.c` 只加一行
+`rel_job_advance(&in, have_frame, d_mode)`，排在 `rel_prod_evaluate()` 之后、所有披露打印之前。
+验证链三个文件（`rel_main.c`、`run_diag_relative_m8.sh`、`shim_rel/rtthread.h` 补 `RT_TICK_PER_SECOND 1000`）。
+产品 diff +656/−117，逐字节见 `reports/reviews/phase8-m8-r7d1-async-learn-offline/code/`。
+
+**测到什么**：修前基线 `cases=50 pass=50`；实现后 `SUMMARY|cases=62 pass=62 fail=0 pre_bad=0 executed=62`、
+`build_rc=0 warnings=0`（`-Wall -Wextra`）、判定行 `M8 RELATIVE RESULT: PASS(主机链, 离线; 现场项未验证)`。
+原 50 例一条未删：机器比对 `(id → checks)` 显示 47 例逐例相同，受异步合同影响的 3 例只增
+（REL25 41→44、REL39 11→15、REL42 31→35）。负控 **14/14 META-OK**（RV1–RV10 全族仍命中，
+本轮新增 RDV1 取消后仍发布→A05/A06、RDV2 无帧不推进超时→A08、RDV3 start 又回到等样本→A01、
+RDV4 拒绝前先烧凭据→A10）。
+
+**本轮踩到并如实登记的两处自伤**（失败原文保留在 `host/reverse_run_full.txt` 与工具输出，未删不改）：
+① RV6 的反向锚点原本钉在同步 learn 的那一行清凭据代码上，改成异步后该行不存在，第一次跑报
+`INFRA-FAIL 注入未落地/锚点不唯一 (ANCHOR-COUNT=0)`；这不是"负控没用了"，是锚点漂移，按等价缺陷
+重钉到 `d_pending_learn = RT_FALSE;` 受理行并把期望身份扩为 REL39 + A10。
+② 夹具的 `world_reset()` 起初没清 `d_job/d_cap_owner`，于是前一例遗留的 RUNNING 作业让后续每一条 `zero`
+都打 `capture busy`——那是夹具污染而非产品行为，按每例复位修正。
+
+**打印限长**（任务书 §6）双路：离线工具按实参最宽合法展开逐调用折算（29 个调用，最宽 120 B 含源 LF；
+`PRINT_BOUND_NOT_VACUOUS` 保证折算失效时会报警，不是空判），主机链 A12 用同一 120 B 预算实测，
+含裸 NUL 与严格 UTF-8。离线判据 `TOTAL=31 FAIL=0`。
+
+**构建与资源**：`UV4 -r … -t rt-thread-motor-m1-candidate` 一次，rc=0、`0 Error(s), 0 Warning(s)`、V6.24、
+`Code=209178 RO=87242 RW=2196 ZI=85936`；构建前后处理脚本只读核对过（AfterMake 仅 `fromelf --bin`，
+无下载/调试/串口）。镜像增量 4296 B 与 Code+RO+RW 增量逐字节相符；新增静态 RAM 341 B 逐项取自 map
+符号表（`d_job` 276 + `d_ctx_lock` 60 + `d_cap_owner` 1 + `d_job_next_id` 4）。`diag_thread_entry` 帧
+632→640、子树 1580→1588，最深路径仍是既有的 `rel_prod_evaluate→…→rt_kprintf` 那条，不是新推手顶上去的；
+命令侧 `learn` 836→1084（最深线由 `rt_thread_mdelay` 换成 ctx 取锁，自身帧反而 296→168）。
+线程栈 4096 一字未改，**没有**靠增大栈或延长超时规避问题。全部数是 armlink 静态下界，不含异常/ISR 帧，
+且链接器解析不了 msh 的函数指针表（`finsh_thread_entry` 两版同 628 恰证明命令处理函数不在其内），
+所以本轮不给"shell 栈总共用多少"这种手加出来的总数。
+
+**边界**：设备动作 0；新镜像 `NOT_ON_BOARD`（BIN sha `df7584c3…`），板上仍是历史 b502 证明（`502dca5d…`）；
+`polarity_measured=false`、`core_protection_verified=false` 保持，四条禁用声称继续禁止；旧 field 计划/rows/
+b502 证据/历史回包按原件保留，本轮未为"假装兼容"去改它们。第 14 节末的 R7F5A 物理断电仍是
+`PENDING_OPERATOR_REPORT`，本轮没有靠接设备去关闭它。

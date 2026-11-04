@@ -1,0 +1,389 @@
+{
+ "task_id": "M8R7D1-offline-async-learn-20261104",
+ "baseline_commit": "7885aea606a50f1c34723dbfa9b8c0c4341326de",
+ "zip_bytes": 13467,
+ "zip_sha256": "b35e0a2e16a680ff90a37d2edb1de9da6c85adbc8011ccea33c5354e37922c5c",
+ "zip_basename": "NS800_R7D1_Offline_Async_Learn_Task_20261104.zip",
+ "checks": [
+  {
+   "id": "ZIP_PRESENT",
+   "ok": true,
+   "detail": "NS800_R7D1_Offline_Async_Learn_Task_20261104.zip"
+  },
+  {
+   "id": "ZIP_BYTES",
+   "ok": true,
+   "detail": "bytes=13467"
+  },
+  {
+   "id": "ZIP_SHA256",
+   "ok": true,
+   "detail": "b35e0a2e16a680ff90a37d2edb1de9da6c85adbc8011ccea33c5354e37922c5c"
+  },
+  {
+   "id": "INNER_HAS_MANIFEST",
+   "ok": true,
+   "detail": "ACCEPTANCE_R7D1.json,BASELINE_AND_IDENTITY.json,SHA256SUMS.txt,TASK_R7D1_OFFLINE_ASYNC_LEARN.md"
+  },
+  {
+   "id": "MANIFEST_ENTRY_COUNT",
+   "ok": true,
+   "detail": "3 条"
+  },
+  {
+   "id": "MANIFEST_EXCLUDES_SELF",
+   "ok": true,
+   "detail": "ACCEPTANCE_R7D1.json,BASELINE_AND_IDENTITY.json,TASK_R7D1_OFFLINE_ASYNC_LEARN.md"
+  },
+  {
+   "id": "MANIFEST_ALL_MATCH",
+   "ok": true,
+   "detail": "3/3"
+  },
+  {
+   "id": "STATUS_GO_OFFLINE_ONLY",
+   "ok": true,
+   "detail": "GO_OFFLINE_IMPLEMENTATION_ONLY"
+  },
+  {
+   "id": "CAPS_ALL_ZERO",
+   "ok": true,
+   "detail": "{\"port_open\": 0, \"device_query\": 0, \"dap_connection\": 0, \"download\": 0, \"readback\": 0, \"reset\": 0, \"logic_capture\": 0, \"motor_arm\": 0, \"motor_start\": 0, \"motion\": 0, \"real_learning\": 0, \"config_write\": 0, \"power_cycle\": 0}"
+  },
+  {
+   "id": "PRINTF_BUDGET_120",
+   "ok": true,
+   "detail": "120"
+  },
+  {
+   "id": "DEADLINE_12000",
+   "ok": true,
+   "detail": "12000"
+  },
+  {
+   "id": "JOB_STATES_7",
+   "ok": true,
+   "detail": "IDLE,RUNNING,CANCEL_PENDING,DONE,FAILED,CANCELLED,TIMEOUT"
+  },
+  {
+   "id": "TASK_HAS_176_LINES",
+   "ok": true,
+   "detail": "175 行"
+  },
+  {
+   "id": "HEAD_IS_BASELINE",
+   "ok": true,
+   "detail": "HEAD=7885aea606a50f1c34723dbfa9b8c0c4341326de baseline=7885aea606a50f1c34723dbfa9b8c0c4341326de"
+  },
+  {
+   "id": "BASELINE_INPUT_COUNT",
+   "ok": true,
+   "detail": "14 件"
+  },
+  {
+   "id": "BASELINE_BLOBS",
+   "ok": true,
+   "detail": "ok=14 bad=0"
+  },
+  {
+   "id": "BLOB_VS_DISK_RECORDED",
+   "ok": true,
+   "detail": "每件都单独记磁盘==blob"
+  },
+  {
+   "id": "SCOPE_NO_STRAY_FILES",
+   "ok": true,
+   "detail": "changed=6 untracked=1"
+  },
+  {
+   "id": "TOUCHED_diag_relative.c",
+   "ok": true,
+   "detail": "diag_relative.c"
+  },
+  {
+   "id": "TOUCHED_diag_relative.h",
+   "ok": true,
+   "detail": "diag_relative.h"
+  },
+  {
+   "id": "TOUCHED_diagnosis.c",
+   "ok": true,
+   "detail": "diagnosis.c"
+  },
+  {
+   "id": "TOUCHED_rel_main.c",
+   "ok": true,
+   "detail": "rel_main.c"
+  },
+  {
+   "id": "TOUCHED_run_diag_relative_m8.sh",
+   "ok": true,
+   "detail": "run_diag_relative_m8.sh"
+  },
+  {
+   "id": "PRODUCT_SCOPE_MINIMAL",
+   "ok": true,
+   "detail": "ok"
+  },
+  {
+   "id": "TOUCHED_KPRINTF_FOUND",
+   "ok": true,
+   "detail": "29 个新增/改动的 rt_kprintf 字面形态"
+  },
+  {
+   "id": "EVERY_TOUCHED_PRINT_HAS_ARGS",
+   "ok": true,
+   "detail": "29 个格式行都取到了实参(折算不是按格式串空算)"
+  },
+  {
+   "id": "TOUCHED_PRINTS_WITHIN_120",
+   "ok": true,
+   "detail": "最宽一次=120 B 预算=120 B(含 LF) 覆盖 29 个调用"
+  },
+  {
+   "id": "PRINT_BOUND_NOT_VACUOUS",
+   "ok": true,
+   "detail": "最宽一次只有 120 B => 折算表大概没生效"
+  },
+  {
+   "id": "A12_NEEDLES_PRESENT",
+   "ok": true,
+   "detail": "30 条"
+  },
+  {
+   "id": "A12_BUDGET_MATCHES_TOOL_BUDGET",
+   "ok": true,
+   "detail": "A12 侧断言的是同一 120B(含 LF)预算"
+  },
+  {
+   "id": "NO_LOCAL_PATH_LEAK",
+   "ok": true,
+   "detail": "本轮交付文件里无本机路径"
+  }
+ ],
+ "blob_rows": [
+  {
+   "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diag_relative.c",
+   "blob_sha1_ok": true,
+   "blob_bytes": 80236,
+   "declared_bytes": 80236,
+   "blob_sha256_ok": true,
+   "disk_equals_blob": false,
+   "disk_bytes": 103684,
+   "disk_sha256": "f2c7089b3d5a21479a5936bab5bf3855616380bb6f96fc538921b979ccac125d"
+  },
+  {
+   "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diag_relative.h",
+   "blob_sha1_ok": true,
+   "blob_bytes": 21838,
+   "declared_bytes": 21838,
+   "blob_sha256_ok": true,
+   "disk_equals_blob": false,
+   "disk_bytes": 25422,
+   "disk_sha256": "aa23399bc2154e552803f4e0bfdd2b0a09ada79464aa26d71df6f21e02284689"
+  },
+  {
+   "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diagnosis.c",
+   "blob_sha1_ok": true,
+   "blob_bytes": 54151,
+   "declared_bytes": 54151,
+   "blob_sha256_ok": true,
+   "disk_equals_blob": false,
+   "disk_bytes": 54696,
+   "disk_sha256": "4b69151e140b3a80dee4ff211aa935d51cf6e9de2611f6474b38f35a3836d281"
+  },
+  {
+   "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diagnosis.h",
+   "blob_sha1_ok": true,
+   "blob_bytes": 6605,
+   "declared_bytes": 6605,
+   "blob_sha256_ok": true,
+   "disk_equals_blob": true,
+   "disk_bytes": 6605,
+   "disk_sha256": "3135929b4749ad01441c96a1c0d6200990feb33a6162dc5eff629e66ae22c4a1"
+  },
+  {
+   "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/sensor_service.c",
+   "blob_sha1_ok": true,
+   "blob_bytes": 23419,
+   "declared_bytes": 23419,
+   "blob_sha256_ok": true,
+   "disk_equals_blob": true,
+   "disk_bytes": 23419,
+   "disk_sha256": "aca092d133b903e29ae8790712c1c76f26de0d3281e48c39e62f07f73998702e"
+  },
+  {
+   "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/sensor_service.h",
+   "blob_sha1_ok": true,
+   "blob_bytes": 7450,
+   "declared_bytes": 7450,
+   "blob_sha256_ok": true,
+   "disk_equals_blob": true,
+   "disk_bytes": 7450,
+   "disk_sha256": "1f0c8db7401586b586ea8b7433eea80114e94f495f6d095ed818e06230423cb4"
+  },
+  {
+   "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/project_config.c",
+   "blob_sha1_ok": true,
+   "blob_bytes": 23961,
+   "declared_bytes": 23961,
+   "blob_sha256_ok": true,
+   "disk_equals_blob": true,
+   "disk_bytes": 23961,
+   "disk_sha256": "24c1f16bd6abf1d6b260599ef5bde147a394fda4a7fedb2ffb9e65ed022a66ae"
+  },
+  {
+   "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/project_config.h",
+   "blob_sha1_ok": true,
+   "blob_bytes": 4775,
+   "declared_bytes": 4775,
+   "blob_sha256_ok": true,
+   "disk_equals_blob": true,
+   "disk_bytes": 4775,
+   "disk_sha256": "6ab66e7f96de99bad153c2b26ec1464e4564e41d0f4897fa753f8e68fd09d063"
+  },
+  {
+   "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/motor.c",
+   "blob_sha1_ok": true,
+   "blob_bytes": 131732,
+   "declared_bytes": 131732,
+   "blob_sha256_ok": true,
+   "disk_equals_blob": false,
+   "disk_bytes": 134298,
+   "disk_sha256": "d7a919f60248d6227ddd704b7697f0f691b19467decef6f39733a92fb7410e13"
+  },
+  {
+   "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/stop_priority.c",
+   "blob_sha1_ok": true,
+   "blob_bytes": 63128,
+   "declared_bytes": 63128,
+   "blob_sha256_ok": true,
+   "disk_equals_blob": false,
+   "disk_bytes": 64672,
+   "disk_sha256": "99d6c124bcc38224760b4ba91f526b4ad5e390139c15630a2b2c44dba08ca390"
+  },
+  {
+   "path": "tests/host/rel_main.c",
+   "blob_sha1_ok": true,
+   "blob_bytes": 148596,
+   "declared_bytes": 148596,
+   "blob_sha256_ok": true,
+   "disk_equals_blob": false,
+   "disk_bytes": 196003,
+   "disk_sha256": "8e2f5acf7c4caa987b580b46e1414aabc758d5aaeabd5a060fe3a253de8b7c92"
+  },
+  {
+   "path": "tests/host/run_diag_relative_m8.sh",
+   "blob_sha1_ok": true,
+   "blob_bytes": 20142,
+   "declared_bytes": 20142,
+   "blob_sha256_ok": true,
+   "disk_equals_blob": false,
+   "disk_bytes": 23744,
+   "disk_sha256": "afbd3ae9ee7e6cdc662a83c72d617f6d4677208a2c9902d579d2510c4b36ebb4"
+  },
+  {
+   "path": "tests/host/run_stop_result_s1.sh",
+   "blob_sha1_ok": true,
+   "blob_bytes": 25483,
+   "declared_bytes": 25483,
+   "blob_sha256_ok": true,
+   "disk_equals_blob": false,
+   "disk_bytes": 25963,
+   "disk_sha256": "5ffccc686320912f1271663e79dbdb0aab5e6e7f39bb89a3fb3d6874df2fbb70"
+  },
+  {
+   "path": "tests/host/run_stop_priority_s2.sh",
+   "blob_sha1_ok": true,
+   "blob_bytes": 54373,
+   "declared_bytes": 54373,
+   "blob_sha256_ok": true,
+   "disk_equals_blob": false,
+   "disk_bytes": 55260,
+   "disk_sha256": "bc29911791a35c0b22986411e102cf5e150dde62edac51de6b35bd7750f3412d"
+  }
+ ],
+ "changed": [
+  "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diag_relative.c",
+  "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diag_relative.h",
+  "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diagnosis.c",
+  "tests/host/rel_main.c",
+  "tests/host/run_diag_relative_m8.sh",
+  "tests/host/shim_rel/rtthread.h"
+ ],
+ "untracked": [
+  "reports/reviews/phase8-m8-r7d1-async-learn-offline/tools/r7d1_offline_checks.py"
+ ],
+ "printf_worst_case_bytes_including_LF": {
+  "[DIAG] %s REFUSED: capture busy (job or zero owns it)\\n": 59,
+  "[DIAG] %s REFUSED: ctx lock rc=%d\\n": 48,
+  "[DIAG] %s REFUSED: ctx lock\\n": 33,
+  "[DIAG] %s REFUSED: ctx not ready\\n": 38,
+  "[DIAG] %s REFUSED: learn job or capture active\\n": 52,
+  "[DIAG] cancel REFUSED: ctx lock (nothing changed)\\n": 51,
+  "[DIAG] cancel REFUSED: job ctx not initialized\\n": 48,
+  "[DIAG] cancel REFUSED: no such job id=%u current=%u\\n": 69,
+  "[DIAG] cancel id=%u NOT-CANCELLED: already %s why=%s\\n": 97,
+  "[DIAG] cancel id=%u REQUESTED st=%s (motor untouched)\\n": 75,
+  "[DIAG] clear FAILED rc=%d (pending voided)\\n": 53,
+  "[DIAG] clear REFUSED: ctx lock (profile kept)\\n": 47,
+  "[DIAG] commit REFUSED: ctx lock\\n": 33,
+  "[DIAG] job DONE result; cred zero=%d learn=%d commit is separate\\n": 84,
+  "[DIAG] job data adc[%u..%u]n%u nz%u sg[%u..%u]n%u seq%u..%u\\n": 98,
+  "[DIAG] job id=%u st=%s why=%s owner=%u cred=%d/%d\\n": 120,
+  "[DIAG] job left=%dms of %ums software budget\\n": 63,
+  "[DIAG] job n=%u/%u want=%u win=%u..%u dir=%u\\n": 80,
+  "[DIAG] job thr tier=%u dev=%d/%d drop=%u/%u FIELD_UNVERIFIED\\n": 89,
+  "[DIAG] learn REFUSED: %s\\n": 37,
+  "[DIAG] learn STARTED id=%u n=%u win=%u..%u dir=%u\\n": 84,
+  "[DIAG] learn async: query 'learn_status'; NOT learn OK yet FIELD_UNVERIFIED\\n": 77,
+  "[DIAG] learn_cancel JOB_ID must be 1..999999999\\n": 49,
+  "[DIAG] learn_status REFUSED: %s (no half snapshot)\\n": 63,
+  "[DIAG] show REFUSED: %s (no half snapshot)\\n": 55,
+  "[DIAG] tier REFUSED: ctx lock\\n": 31,
+  "[DIAG] zero FAILED: ctx lock on invalidate\\n": 44,
+  "[DIAG] zero REFUSED: %s (nothing cleared)\\n": 54,
+  "usage: diag_profile show|zero N|learn N LO HI DIR|tier T|commit|clear CONFIRM|learn_status|learn_cancel ID\\n": 108
+ },
+ "printf_width_table": {
+  "%s": 26,
+  "%u": 10,
+  "%d": 11,
+  "%x/%X": 8
+ },
+ "a12_needles": [
+  "learn STARTED id=999999999 n=32 win=20000..20000 dir=1",
+  "learn async: query",
+  "learn REFUSED: capture busy (job or zero owns it)",
+  "learn REFUSED: ctx lock",
+  "learn REFUSED: ctx not ready",
+  "learn args: N=8..32",
+  "job id=999999999 st=CANCEL_PENDING why=CANCEL_REQUESTED owner=2 cred=1/1",
+  "job n=4294967295/4294967295 want=32 win=20000..20000 dir=1",
+  "job left=2000000000ms of 12000ms software budget",
+  "job data adc[65535..65535]n65535 nz65535 sg[65535..65535]n65535 seq4294967295..4294967295",
+  "job thr tier=3 dev=-32768/-32768 drop=65535/65535 FIELD_UNVERIFIED",
+  "job DONE result; cred zero=1 learn=1 commit is separate",
+  "learn_status REFUSED: ctx lock (no half snapshot)",
+  "learn_status REFUSED: ctx not ready (no half snapshot)",
+  "cancel id=999999999 REQUESTED st=CANCEL_PENDING (motor untouched)",
+  "cancel id=999999999 NOT-CANCELLED: already CANCELLED why=CANCELLED",
+  "cancel REFUSED: no such job id=999999999 current=1",
+  "cancel REFUSED: job ctx not initialized",
+  "zero REFUSED: capture busy (job or zero owns it)",
+  "zero FAILED: ctx lock on invalidate",
+  "zero REFUSED: ctx not ready (nothing cleared)",
+  "tier REFUSED: ctx lock",
+  "tier REFUSED: ctx not ready",
+  "commit REFUSED: ctx lock",
+  "clear REFUSED: ctx lock (profile kept)",
+  "clear FAILED rc=",
+  "show REFUSED: ctx lock (no half snapshot)",
+  "learn_status REFUSED: ctx not ready (no half snapshot)",
+  "learn_cancel JOB_ID must be 1..999999999",
+  "usage: diag_profile show|zero N|learn N LO HI DIR|tier T|commit|clear CONFIRM|learn_status|learn_cancel ID"
+ ],
+ "total": 31,
+ "fail": 0,
+ "fail_ids": []
+}

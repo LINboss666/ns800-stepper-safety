@@ -447,6 +447,13 @@ static void diag_thread_entry(void *param)
          * 但真实 post 只在 RELATIVE_PROTECTION 内发生(rel_prod_evaluate 内部判)。 */
         (void)rel_prod_evaluate(&a, (rt_uint8_t)d_mode, &post_rc, &acted);
 
+        /* M8-R7D1: 后台学习任务就在这里推进(每拍一次, 不 sleep、不打印)。
+         * 位置是刻意的: 保护义务(rel_prod_evaluate)排在前, 披露打印排在后, 学习推进
+         * 只是第三件事 —— 它拿不到 ctx 锁就这一拍什么都不做, 因此不可能把保护或
+         * 首因摘要挤到自己后面。取消/12s 超时/签名漂移都由这一步就地处理,
+         * 不需要等到下一枚新 SG/ADC 样本。 */
+        rel_job_advance(&in, have_frame, (rt_uint8_t)d_mode);
+
         /* ---- 以下全是"保护之后"的披露 ---- */
         if (acted)
         {

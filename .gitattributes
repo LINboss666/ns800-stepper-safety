@@ -109,3 +109,11 @@ reports/reviews/phase8-m8-r7f2b-safety-print-fix/** -text
 # demo_gui_shot.ps1 与两张 PNG 是 Windows/位图原件(含 CR 或二进制), 任何一边被转换都会在
 # 逐 blob 复算与远端回读时报假 hash_mismatch。
 reports/reviews/phase8-m8-demo-host-offline-v03/** -text
+
+# ===== M8-R7D1 离线异步学习轮: 整轮所有件一律禁止行尾转换 =====
+# 同一理由: 本轮交付 BIN/AXF/MAP/调用图 htm/UV4 日志(Windows 原件, 内含 CR)与主机链 transcript,
+# "原字节可复算"靠 blob == 磁盘字节成立; 只要有一件被 core.autocrlf 剥掉 CR, 逐 blob 复算与远端回读
+# 就会报假 hash_mismatch, manifest 里 source_inputs_compiled_from_disk 与镜像身份的绑定随之失效。
+# 这两条规则必须在**任何暂存之前**生效。
+reports/firmware/phase8-m8-r7d1-async-learn-offline/** -text
+reports/reviews/phase8-m8-r7d1-async-learn-offline/** -text
