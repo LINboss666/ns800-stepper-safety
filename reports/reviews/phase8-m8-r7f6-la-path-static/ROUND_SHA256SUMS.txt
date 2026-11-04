@@ -1,6 +1,6 @@
 # sha256 * <仓库相对路径>(LF, 无 BOM; 本清单不哈希自身字节 —— 一条清单不能给自己的字节作证)
 # 生成方式: 对 reports/reviews/phase8-m8-r7f6-la-path-static/ 下每个常规文件(**含 A 包自带的 SHA256SUMS.txt 原件**, 只排除本清单自身与 __pycache__) 直接读磁盘字节算 sha256; 本目录没有嵌套清单, 所以不按文件名排除
-# 条目数=76; 与 Git blob 的逐条复算由 tools/r7f6_staged_preflight.py(提交前)与推送后的远端逐 blob 回读完成
+# 条目数=77; 与 Git blob 的逐条复算由 tools/r7f6_staged_preflight.py(提交前)与推送后的远端逐 blob 回读完成
 # 重新生成: python reports/reviews/phase8-m8-r7f6-la-path-static/tools/r7f6_make_sums.py --repo <仓库根>
 1f4384ba5ceb9f2f0e4495d4375a2a69a57738ac182551a8d5569a236571a9a2  reports/reviews/phase8-m8-r7f6-la-path-static/capture_scope.json
 77102a8bff73cc21dfa4744222ab1130b376224e91cd98711ac1a1c3dc5efffd  reports/reviews/phase8-m8-r7f6-la-path-static/field/needles_b502.json
@@ -9,7 +9,7 @@
 0b4c9f36562a109ee1f3fe6aba2bd1620492a01955f49b2eeff89b71078e5cd8  reports/reviews/phase8-m8-r7f6-la-path-static/field_init/init.meta.json
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  reports/reviews/phase8-m8-r7f6-la-path-static/field_init/init.stderr.txt
 8b080f297221f40b5dade4c178447742de6a4787854dafe44d1088daaa487b56  reports/reviews/phase8-m8-r7f6-la-path-static/field_init/init.stdout.txt
-254e5c59d8bc9187fdf70d0a243fcae58b247bb103add8c6617667ff32d15731  reports/reviews/phase8-m8-r7f6-la-path-static/FIELD_JUDGEMENT.md
+1be2b126a609266795527d8b3d6a13843e32ec824489ae402371f3a242138ea2  reports/reviews/phase8-m8-r7f6-la-path-static/FIELD_JUDGEMENT.md
 2170b99123618d902d5e291efb6814799a0775ac1de6f3428d3c23bd5892ab25  reports/reviews/phase8-m8-r7f6-la-path-static/field_run/run-20261104T182042Z/dispatch.meta.json
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  reports/reviews/phase8-m8-r7f6-la-path-static/field_run/run-20261104T182042Z/dispatch.stderr.txt
 5270662405c38a858280b5140172899c854a6f703d3aacd49245bdca9251b761  reports/reviews/phase8-m8-r7f6-la-path-static/field_run/run-20261104T182042Z/dispatch.stdout.txt
@@ -76,5 +76,6 @@ cddbfd73d00994290a2747d2857ae50d67ac4c816b54d503e979d642ea08e73e  reports/review
 f201b4d2dadcc67b0decc211b448418620dfe90e73434f5becdd869286b76299  reports/reviews/phase8-m8-r7f6-la-path-static/tools/r7f6_field_judgement.py
 dbe69c1429fd927253eef17e11154d6056915139bcfa6401ce6171784329a754  reports/reviews/phase8-m8-r7f6-la-path-static/tools/r7f6_make_sums.py
 c45ada5330518a4aaaa2d14bed3e8dddfe90645653982df2c7286264cdb752f2  reports/reviews/phase8-m8-r7f6-la-path-static/tools/r7f6_preflight.py
+7f57c68171118c9d825a74717bb0e91201cc149e95178b2e8900228ae1427551  reports/reviews/phase8-m8-r7f6-la-path-static/tools/r7f6_remote_readback.py
 c643a664de46cf99439f0b30cd375ac4f072fdde6c59f5fb4bb11f3f95c22f73  reports/reviews/phase8-m8-r7f6-la-path-static/tools/r7f6_staged_preflight.py
 cdb74b23ca2b1f493f868ce54181c2a76e7a92f035e74615392e7422d90890af  reports/reviews/phase8-m8-r7f6-la-path-static/VALIDATE_PLAN.txt

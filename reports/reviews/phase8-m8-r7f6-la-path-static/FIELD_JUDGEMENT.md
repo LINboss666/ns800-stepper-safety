@@ -119,3 +119,10 @@ R7F5A 的物理断电仍是 `PENDING_OPERATOR_REPORT`，本轮不靠接设备关
 DAP/USB 供电也计入"MCU 是否真正断电"的现场判断。本轮登记的实际动作计数：
 COM5 开口 1、dispatch 1、LA Start 1、Stop 1、原生保存 1、CSV 导出 1；其余全部 0。
 断电时刻与观察结果等操作者回报后登记；没观察就写"未观察"，不倒填 R7F5A 的收口时间。
+
+推送与远端回读：主提交 `d6bbab8`（父 `4e533c3`）快进推送一次成功。`tools/r7f6_remote_readback.py`
+在 `d6bbab8` 上逐 blob 复算两条清单合计 **304 条 = ok 304 / mismatch 0 / not_checked 0**；
+A 包 30 件在远端与 zip 逐字节相等；旧执行器、b502 BIN、R7F5A handoff/CSV/原生 .sal 共 5 件
+在 tip 与 `4e533c3` 上 blob 全等（未动）；run_record §16/§17/§18/§19 各命中 1 次；
+两份清单自身的远端 blob == 磁盘。回读报告留仓外，避免"清单登记自己的回读件"这种自引用；
+回读工具本身随追加提交入库，追加提交后再跑一次同样回读并同样留仓外。

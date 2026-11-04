@@ -151,5 +151,22 @@
     "run_record_section": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/run_record.md#19",
     "out_of_repo_originals": "D:/ns800_r7f1_scratch/r7f6_field/ (未脱敏原生 .sal、CSV、调用原文、run_field.py/la.py/shot.ps1)"
   },
+  "push_and_readback": {
+    "main_commit": "d6bbab8ed0bc5feb74cbeecba7fe4e7acc4a682a",
+    "parent": "4e533c3f54bfa54d395f0ea8f9cfa0abc6820022",
+    "branch": "feature/m8-r7d1-async-learn-offline",
+    "push": "快进推送一次成功, 无远端 500 重试",
+    "readback_tool": "reports/reviews/phase8-m8-r7f6-la-path-static/tools/r7f6_remote_readback.py",
+    "readback_at_main_commit": {"entries_checked": 304, "ok": 304, "mismatch": 0, "not_checked": 0,
+                                 "package_originals_vs_zip": "30 件远端 blob == zip 字节, 不符 0",
+                                 "frozen_unchanged": ["旧执行器 33d3f0af", "b502 BIN 502dca5d",
+                                                       "handoff_R7F5A_field.json", "R7F5A CSV", "R7F5A 原生 .sal"],
+                                 "run_record_sections": "§16/§17/§18/§19 各命中 1 次",
+                                 "manifest_blobs_equal_disk": true,
+                                 "selfcheck": "两条清单首条登记值改成 0*64 均被判不符(FIRED)"},
+    "readback_report_out_of_repo": "D:/ns800_r7f6_readback/remote_readback_r7f6.txt",
+    "followup_commit_note": "回读工具本身在追加提交里入库(清单须登记它), 追加提交后再跑一次同样回读, 报告仍留仓外, 循环就此终止",
+    "commit_message_typo_registered": "主提交信息把工具名打成 r7f6_staged_preight(漏一个 f), 实际文件是 tools/r7f6_staged_preflight.py; 已发布提交不改写, 以 run_record §19 自伤第 11 条为准"
+  },
   "pending_operator": "收口断电: 采集与端口均已关闭, 请操作者切断 VM 与 MCU 最多 1 次且不再上电; 记录实际时刻或'未观察', 不倒填 R7F5A 收口时间"
 }

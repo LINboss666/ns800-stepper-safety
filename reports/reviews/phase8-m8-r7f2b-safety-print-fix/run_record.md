@@ -740,6 +740,18 @@ executor/image/plan 三件散列与 `IDENTITY.json` 全等、22 项额度与 pla
     `ROUND_SHA256SUMS.txt` 并按"只排除清单自身"计数（76 条）；r7f2b 目录沿用既有"按文件名排除
     SHA256SUMS.txt"的规则（228 条，条目集合与 HEAD 相比 0 增 0 减，只有 run_record.md 的登记值变化）。
     两种规则写在同一份生成工具里并各自注明理由，避免下一轮误把其中一个当通用规则。
+11. 主提交 `d6bbab8` 的提交信息里把工具名打成 `r7f6_staged_preight`（漏了一个 `f`），实际文件是
+    `tools/r7f6_staged_preflight.py`。提交信息已发布，不改写历史；正确名字以本条与清单为准。
+    （同一毛病上一轮也犯过一次，属我自己在长文本里漏字符，不是文件问题。）
 
 **收口待办**：采集与端口均已关闭。按任务书 §4.C，收口时由操作者切断 VM＋MCU 最多 1 次且不再上电；
 时刻与观察结果等回报后登记，没观察就写"未观察"，不倒填 R7F5A 的收口时间。
+
+**推送与远端逐 blob 回读**：主提交 `d6bbab8`（父 `4e533c3`，快进推送一次成功，无 500 重试）。
+`tools/r7f6_remote_readback.py` 在 `d6bbab8` 上回读：两条清单合计 **304 条**远端 blob 复算
+`ok=304 mismatch=0 not_checked=0`；A 包 30 件在远端与 zip 逐字节相等；
+5 件冻结件（旧执行器 `33d3f0af`、b502 BIN `502dca5d`、R7F5A handoff json、R7F5A CSV、R7F5A 原生 .sal）
+在 tip 与 `4e533c3` 两个提交上 blob 全等；run_record §16/§17/§18/§19 各命中 1 次；
+两份清单自身的远端 blob == 磁盘。回读报告留仓外 `D:/ns800_r7f6_readback/remote_readback_r7f6.txt`
+（避免"清单登记自己的回读件"这种自引用）。回读工具本身在清单重算后的追加提交里入库，
+追加提交后再跑一次同样的回读，报告同样留仓外。
