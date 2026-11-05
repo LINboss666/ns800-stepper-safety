@@ -257,9 +257,16 @@ def plan_doc(repo):
             "means": "FakePort 与本行表就是这个合成流程唯一的加载/激励手段, 不涉及真实机械",
             "not_board_evidence": True}},
         "motion_budget": {
-            "per_run_cap": "运动截止从 motor_start 发送尝试起算(motor_run_seconds_total=20)",
+            "per_run_cap": "运动截止从 motor_start 发送尝试起算(motor_run_seconds_total=62)",
             "energize_cap": "通电截止从 motor_arm 发送尝试起算(arm_energize_deadline_seconds=30), "
-                            "早于 start 也要受它管"},
+                            "早于 start 也要受它管",
+            # F6(A 的补充审核)之后, 计划门把业务时间按**互不重叠**三段核到 cap/总窗里:
+            # 这份合成夹具的起转后步骤申报合计 31 s(含每步 SLACK 则 61 s), 所以夹具的 cap
+            # 必须容得下它, 否则整包流程序被静态门判红而到不了最后一条查询。
+            # 现场轮的 cap 不是这个数(任务书 §4 固定 start 起 12 s), 由 real 计划的静态门
+            # 单独判; 夹具放宽不放宽现场边界。
+            "fixture_cap_why": "62 s 只为让夹具自己的申报窗口排得下(静态三段门), "
+                               "不代表现场运动上限"},
         "tools": {"sim_backend": "SimActionBackend 只在内存里记账, 不调用任何外部进程",
                   "provenance": {"why": "本轮要求 backend=sim/transport=stub: "
                                         "不开 COM、不导入 pyserial 真后端、不启动 Logic、"
@@ -268,8 +275,8 @@ def plan_doc(repo):
                   "tmc_config_apply": 0, "approved_reboot": 0, "config_save": 0,
                   "irq_polarity_prep": 0, "diag_profile_zero": 0,
                   "diag_profile_learn": 2, "diag_profile_learn_cancel": 1,
-                  "diag_profile_commit": 0, "motor_run": 1, "motor_run_seconds_total": 20,
-                  "motion_cap_seconds_per_run": 20,
+                  "diag_profile_commit": 0, "motor_run": 1, "motor_run_seconds_total": 62,
+                  "motion_cap_seconds_per_run": 62,
                   "cleanup_motor_stop": 1, "cleanup_motor_disarm": 1, "cleanup_motor_status": 1,
                   "retry": 0, "physical_collision": 0, "blackbox_clear": 0, "dmm_readings": 0},
         "approval": {"note": "临时账只建在仓外 --work 目录, 绑定这份合成计划与派生件字节"},
@@ -278,7 +285,7 @@ def plan_doc(repo):
             "title": "取消试验 + DONE 试验 + 固定清理(全合成, 0 设备)",
             "port": "STUB_PORT_NOT_A_COM",
             "arm_energize_deadline_seconds": 30,
-            "motion_cap_seconds": 20,
+            "motion_cap_seconds": 62,
             "prerequisite_gates": ["stub_feed_only"],
             "total_deadline_seconds": 120,
             "steps": steps()}]}

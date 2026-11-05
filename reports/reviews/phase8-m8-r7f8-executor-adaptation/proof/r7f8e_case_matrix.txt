@@ -1,4 +1,4 @@
-身份_派生件含四项适配的符号|PASS|278068 B sha=c7fe3896e829… 缺=[]
+身份_派生件含四项适配的符号|PASS|289452 B sha=043d5bdd179c… 缺=[]
 身份_旧执行器未被动过|PASS|实读 219491 B sha=33d3f0af8a4c9c33…
 身份_A包绑定按Git blob复算|PASS|IDENTITY.json 的 8 条 source_bindings 与 HEAD blob 逐条相符; motor.c 盘上 134298 B(CRLF 检出) / blob 131732 B = A 登记值, CR 数 2566 = 行数
 B1_两枚非1的不同ID各自正确受理与取消|PASS|组=身份与绑定 rc=0 code=

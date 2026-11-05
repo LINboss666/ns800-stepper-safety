@@ -981,6 +981,82 @@ class EnergizeBudget(object):
         return self.actual
 
 
+def business_segments(steps, cap=None, reserve=None, total=None, slack=SLACK_SECONDS):
+    """F6: 一次会话的业务时间按**互不重叠**的三段拆开, 并给出与执行器同一条 min() 的窗口上界。
+
+    分段点不靠人眼猜, 用执行器自己的计时点:
+      pre       —— motor_start 的写入尝试之前(MotionBudget.t0 还没置位, 不受运动 cap 夹);
+      in_motion —— 从 motor_start 尝试到第一次 motor_stop/motor_disarm;
+      post_stop —— 停机/禁能之后直到业务循环结束。
+    cap 为什么只加一次: MotionBudget.t0 一旦在 motor_start **写之前**置位就**不清**(正常 stop
+    也不清, 见 EnergizeBudget 上方那段注释), 于是 business_deadline() 把 in_motion 与 post_stop
+    的每一步都夹在 t0+cap 之内 —— 那两段吃的是**同一段**时间, 再各自加一遍 cap 就是重复计时。
+    单步窗口用执行器同一表达式 `poll.until_seconds or seconds`; `*_bound` 每步再加一次 SLACK
+    (执行器 step_dl = now + want + SLACK_SECONDS), 所以"包含余量的总窗"是逐步计的, 既没漏算
+    余量, 也没把 38 步的容差折成整场一次。`sim` 用执行器那条 min() 逐步推进, 给出"会话夹/
+    cap 夹第一次让某一步在写之前就没时间"的那一步 —— 这是最坏情况下的**业务尾巴能跑到哪**。
+    """
+    SPIN_UP = ("motor_start",)
+    STOP_DOWN = ("motor_stop", "motor_disarm")
+
+    def _c(s):
+        return str(s.get("cmd", "")).split(" ")[0]
+
+    def _w(s):
+        p = s.get("poll") or {}
+        return float(p.get("until_seconds") or s.get("seconds") or 0)
+
+    have = [(i, s) for i, s in enumerate(steps) if isinstance(s, dict) and s.get("cmd")]
+    i_spin = next((i for i, s in have if _c(s) in SPIN_UP), None)
+    i_stop = next((i for i, s in have if i_spin is not None and i >= i_spin and
+                   _c(s) in STOP_DOWN), None)
+    seg = {"pre": [], "in_motion": [], "post_stop": []}
+    for i, s in have:
+        if i_spin is None or i < i_spin:
+            seg["pre"].append(s)
+        elif i_stop is None or i < i_stop:
+            seg["in_motion"].append(s)
+        else:
+            seg["post_stop"].append(s)
+    out = {"spin_up_index": i_spin, "stop_index": i_stop}
+    for k in ("pre", "in_motion", "post_stop"):
+        out[k + "_steps"] = len(seg[k])
+        out[k + "_declared"] = round(sum(_w(s) for s in seg[k]), 3)
+        out[k + "_bound"] = round(sum(_w(s) + float(slack) for s in seg[k]), 3)
+    # 没有 motor_start 的会话(纯只读/只开 IRQ)不进运动 cap: window 段就是 0, 全部内容
+    # 都在 pre 里按申报窗口计。cap 缺省同样如此。
+    out["window_seconds"] = float(cap) if (i_spin is not None and cap is not None) else 0.0
+    out["worst_declared"] = round(out["pre_declared"] + out["window_seconds"], 3)
+    out["worst_bound"] = round(out["pre_bound"] + max(out["window_seconds"],
+                                                     out["in_motion_bound"] +
+                                                     out["post_stop_bound"]), 3)
+    out["after_spin_declared"] = round(out["in_motion_declared"] + out["post_stop_declared"], 3)
+    out["after_spin_bound"] = round(out["in_motion_bound"] + out["post_stop_bound"], 3)
+    out["business_budget_seconds"] = (round(float(total) - float(reserve), 3)
+                                      if total is not None and reserve is not None else None)
+    # 逐步仿真: 与 exec_session 里 step_dl 那条 min() 同一顺序、同一常数。
+    t = 0.0
+    t_spin = None
+    first_refused = None
+    for i, s in have:
+        dl = t + _w(s) + float(slack)
+        if t_spin is not None and cap is not None:
+            dl = min(dl, t_spin + float(cap))
+        if out["business_budget_seconds"] is not None:
+            dl = min(dl, out["business_budget_seconds"])
+        if first_refused is None and dl <= t:
+            first_refused = {"index": i, "as": s.get("as") or ("step%02d" % (i + 1)),
+                             "cmd": str(s.get("cmd", ""))[:40], "t_s": round(t, 3),
+                             "want_seconds": _w(s), "slack_seconds": float(slack),
+                             "cap_or_budget_ceiling_s": round(dl, 3)}
+        if i == i_spin:
+            t_spin = t
+        t = dl
+    out["sim_end_seconds"] = round(t, 3)
+    out["first_step_refused_before_write"] = first_refused
+    return out
+
+
 class ApprovalLedger:
     """绑定批准身份的**跨进程**持久预占账(复审 M8-R5C §7.4 要求的那件缺失控制)。
 
@@ -1474,6 +1550,15 @@ IRQ_TAIL_CMDS = ("safety_irq_disable", "safety_irq_status")
 # 产品闭合态那一条来自 safety_thread.c:306 的 `IRQ gate CLOSED - 活动安全输入…无软件响应路径`
 # (大写 CLOSED; 修前我这正则写的是小写 closed, 那样**永远匹配不上**, 尾部就成了恒红)。
 IRQ_TAIL_ROW = r"^\[SAFETY\] IRQ gate CLOSED"
+# F5e: 同一个"门已关"事实在产品里有**两条不同的打印**, 各自只跟在自己的命令后面:
+#   safety_thread.c:306  st_irq_detach_all() => "[SAFETY] IRQ gate CLOSED - 活动安全输入(N 路)..."
+#                        (safety_irq_disable 自己打的)
+#   safety_thread.c:388  safety_irq_status()  => "[SAFETY] irq gate   = CLOSED (polled only)"
+#                        (尾部第二条状态回读打的)
+# 修前只在 status 的回包上认第一条, 于是整包程序(先 disable 再 status)永远判
+# IRQ_TAIL_NOT_CLOSED。两行都收进集合, 但 disable 那一步单独要求 :306(不许拿 status 顶掉
+# "disable 确实动手了"这条证据)。
+IRQ_TAIL_CLOSED_ROWS = (IRQ_TAIL_ROW, r"^\[SAFETY\] irq gate\s+= CLOSED\b")
 CLEANUP_WINDOW_SECONDS = 1.2   # 每条清理命令自己的确认窗(五条互不抢占)
 
 # 运动状态枚举与提交位都来自产品源码, 不是本轮自造的名字:
@@ -1855,8 +1940,11 @@ def cleanup(port, led, clock, budget, transport, fixture, feed_hook=None,
                 errors.append("IRQ_TAIL_RAISED_%s:%s" % (cmd, e.__class__.__name__))
                 continue
             errors.extend("IRQ_TAIL_" + x for x in terrs)
-            if cmd == "safety_irq_status" and not any(
+            if cmd == "safety_irq_disable" and not any(
                     re.match(IRQ_TAIL_ROW, r) for r in trows if r):
+                errors.append("IRQ_TAIL_DISABLE_NO_DETACH_LINE")
+            if cmd == "safety_irq_status" and not any(
+                    re.match(x, r) for r in trows if r for x in IRQ_TAIL_CLOSED_ROWS):
                 errors.append("IRQ_TAIL_NOT_CLOSED")
                 led.ev("IRQ_TAIL_STATE", closed=False, rows=len(trows))
             elif cmd == "safety_irq_status":
@@ -2064,7 +2152,13 @@ def command_attempt(port, cmd, st, asname, raw, step_dl, transport, fixture, sil
             pass                        # 注入: 板子不回话 => 只能靠截止时间具名停止
         else:
             key = st.get("key") or cmd
-            seq = (fixture.get("sequence") or {}).get(key)
+            # F6d: 序列只在**这一步自己申报了轮询**时才生效。修前只要 fixture 里存在这个键的序列,
+            # 任何同键的非轮询步骤(整包 §5 行 10 的"取消后仍巡航"查询就撞上)都会取到序列的**第一份**
+            # (ACCEL), 于是那一步在自己的单次尝试里读到爬坡行 => PROFILE_NOT_RUNNING。序列是"这一
+            # 步轮询期间的可见状态轨迹"的申报, 不是按命令键给全场发牌; 只影响离线注入形状,
+            # 现场真串口不查这张表。
+            seq = ((fixture.get("sequence") or {}).get(key)
+                   if (st.get("poll") or st.get("poll_sequence")) else None)
             if seq:                     # 轮询用**申报过的**响应序列(如先 ACCEL 后 CRUISE), 越界取最后一份
                 resp = seq[min(attempt, len(seq)) - 1]
             else:
@@ -3606,32 +3700,84 @@ def validate_plan(plan, rows_doc, app_dir):
                 bad_r.append("motion_cap=%s + 预留=%s > 本阶段总窗=%s(预留排不进会话)"
                              % (mc, rs, td))
         # F5c: 只看 cap+reserve<=total 不够 —— 起转**之前**已经消耗的步骤时间同样吃会话预算。
-        # 这里按获批步骤自己申报的窗口求最坏情况(轮询取 until_seconds, 每条再加 SLACK 余量),
-        # 与 cap、reserve 一起必须住在本阶段总窗之内。只读阶段(无义务来源命令)不受这条约束。
+        # F6(A 的补充审核项)修掉这里原来的**重复计时**: 上一版把**全部**步骤的申报窗口累加成
+        # 一个"起转前耗时", 后面又补一整条 motion_cap —— 起转后那些步骤同一段时间被算了两次。
+        # 现在按执行器自己的计时点分三段(见 business_segments 的 docstring), cap 只进一次;
+        # 并且"申报窗口"和"每步再加 SLACK 的最坏上界"分开各判一条, 余量既不漏算也不折成一次。
         steps_r = sg.get("steps", [])
         may_ob = [i for i, s in enumerate(steps_r) if isinstance(s, dict)
                   and str(s.get("cmd", "")).split(" ")[0] in
                   ("motor_arm", "motor_start", "safety_irq_enable")]
-        pre = 0.0
-        for s in steps_r:
-            if not isinstance(s, dict) or not s.get("cmd"):
-                continue
-            w = ((s.get("poll") or {}).get("until_seconds") or s.get("seconds") or 0)
-            pre += float(w) + SLACK_SECONDS
-        if may_ob and td is not None and pre + (mc or 0.0) + (rs or 0.0) > td:
-            bad_r.append("业务最坏合计=%s + cap=%s + 预留=%s > 总窗=%s"
-                         "(起转前还要吃掉 %s 秒, 收口实际拿不到预留)"
-                         % (round(pre, 3), mc, rs, td, round(pre, 3)))
-        ok_split = not (may_ob and td is not None and pre + (mc or 0.0) + (rs or 0.0) > td)
+        bs = business_segments(steps_r, cap=mc, reserve=rs, total=td)
+        bad_s = []
+        if may_ob and td is not None and rs is not None:
+            if bs["worst_declared"] + rs > td + 1e-9:
+                bad_s.append("三段互不重叠合计(申报窗, cap 只算一次)=%s + 预留=%s > 总窗=%s"
+                             % (bs["worst_declared"], rs, td))
+            if bs["spin_up_index"] is not None and mc is not None and \
+                    bs["after_spin_declared"] > mc + 1e-9:
+                bad_s.append("起转后申报内容=%s(运动窗内 %s + 停机后 %s) > cap=%s"
+                             "=> 执行器不会在 stop 清 t0, 这些步骤同被 t0+cap 夹住, 计划自己排不下"
+                             % (bs["after_spin_declared"], bs["in_motion_declared"],
+                                bs["post_stop_declared"], mc))
+        bad_w = []
+        if may_ob and bs["business_budget_seconds"] is not None:
+            fr = bs["first_step_refused_before_write"]
+            if fr is not None:
+                bad_w.append("每步都慢到 SLACK=%s 上限时, 第 %d 步(%s)在写之前就没有时间"
+                             "(已用 %s s, 上限 %s s); 总窗=%s 预留=%s"
+                             % (bs.get("slack_seconds", SLACK_SECONDS), fr["index"] + 1,
+                                fr["as"], fr["t_s"], fr["cap_or_budget_ceiling_s"], td, rs))
+        # 计划自己申报的三段镜像必须与这里现算的**同一套数**一致(A 的要求: 检查器与执行器
+        # 使用同一值)。没申报镜像的历史包不判红 —— 它们字节冻结, 只登记 NA。
+        decl = (plan.get("motion_budget") or {}).get("business_segments")
+        mirror = "NA(计划未申报 motion_budget.business_segments)"
+        if decl:
+            keys = ("spin_up_index", "stop_index", "pre_steps", "in_motion_steps",
+                    "post_stop_steps", "pre_declared", "pre_bound", "in_motion_declared",
+                    "in_motion_bound", "post_stop_declared", "post_stop_bound",
+                    "worst_declared", "worst_bound", "after_spin_declared",
+                    "after_spin_bound", "window_seconds", "business_budget_seconds")
+            drift = []
+            for k in keys:
+                if k not in decl:
+                    drift.append("%s=缺失" % k)
+                elif isinstance(decl[k], (int, float)) and isinstance(bs[k], (int, float)):
+                    if abs(float(decl[k]) - float(bs[k])) > 1e-6:
+                        drift.append("%s=%s!=%s" % (k, decl[k], bs[k]))
+                elif decl[k] != bs[k]:
+                    drift.append("%s=%r!=%r" % (k, decl[k], bs[k]))
+            mirror = ("一致(17 项)" if not drift else "漂移: " + ",".join(drift[:6]))
+            if drift:
+                bad_s.append("计划申报的三段镜像与执行器现算不符 => %s" % ",".join(drift[:3]))
         out.append("PLAN_CLEANUP_RESERVE|%s|%s|reserve=%s floor=%.1f total=%s cap=%s%s" %
                    (sg["id"], "PASS" if not bad_r else "FAIL", rs, floor_r, td, mc,
                     "" if not bad_r else "|" + ";".join(bad_r)))
-        # 同一条缺陷只进一个计数(上面已经计过), 这一行专门把"起转前已消耗多少"摊开给人看。
-        out.append("PLAN_BUSINESS_RESERVE_SPLIT|%s|%s|may_obligate=%s first@%s "
-                   "business_worst=%s cap=%s reserve=%s total=%s" %
-                   (sg["id"], "PASS" if ok_split else "FAIL(与 PLAN_CLEANUP_RESERVE 同一条)",
-                    bool(may_ob), may_ob[:1], round(pre, 3), mc, rs, td))
         if bad_r:
+            bad += 1
+        out.append("PLAN_BUSINESS_RESERVE_SPLIT|%s|%s|may_obligate=%s spin@%s stop@%s "
+                   "pre=%s/%s(%d步) in_motion=%s/%s(%d步) post_stop=%s/%s(%d步) "
+                   "cap=%s reserve=%s total=%s worst=%s after_spin=%s mirror=%s%s" %
+                   (sg["id"], "PASS" if not bad_s else "FAIL", bool(may_ob),
+                    bs["spin_up_index"], bs["stop_index"],
+                    bs["pre_declared"], bs["pre_bound"], bs["pre_steps"],
+                    bs["in_motion_declared"], bs["in_motion_bound"], bs["in_motion_steps"],
+                    bs["post_stop_declared"], bs["post_stop_bound"], bs["post_stop_steps"],
+                    mc, rs, td, bs["worst_declared"], bs["after_spin_declared"], mirror,
+                    "" if not bad_s else "|" + ";".join(bad_s)))
+        if bad_s:
+            bad += 1
+        # 最坏情况那条单独成门: 它不改运行时(收口预留始终由 business_abs_dl 硬夹保护),
+        # 只回答"计划里的业务尾巴在最坏到达下跑到第几步" —— 红了就是**取证完整性**风险,
+        # 不是撤能风险, 两者必须分开写, 不许混成一条"看起来更严"的判据。
+        out.append("PLAN_BUSINESS_WORST_CASE_FIT|%s|%s|worst_bound=%s budget=%s sim_end=%s "
+                   "first_refused=%s%s" %
+                   (sg["id"], "PASS" if not bad_w else "FAIL", bs["worst_bound"],
+                    bs["business_budget_seconds"], bs["sim_end_seconds"],
+                    json.dumps(bs["first_step_refused_before_write"], ensure_ascii=False)
+                    if bs["first_step_refused_before_write"] else "NONE",
+                    "" if not bad_w else "|" + ";".join(bad_w)))
+        if bad_w:
             bad += 1
     # ① 镜像身份: S0/下载/回读三处必须同源(离线就拒绝, 不等现场 READBACK_HASH_MISMATCH)
     ib = identity_consistency(plan)
@@ -4047,6 +4193,13 @@ def build_session_fixture(stage, table, profile):
     # 自己发的, 不是阶段步骤 —— 少一份响应就会变成"清理查不到东西"的假 NO_RESPONSE。
     for cmd in CLEANUP_CMDS:
         if cmd not in responses:
+            responses[cmd] = rows_for(table, cmd, profile)
+    # F6c: F5b 的 IRQ 尾部两条和上面三条一样是**执行器自己发的**, 不是阶段步骤。修前这里只给
+    # CLEANUP_CMDS 兜底, 于是整包 stub 里 safety_irq_disable/safety_irq_status 永远无行可喂 =>
+    # 本轮最想要的那条"整包跑到 IRQ 尾部并且确认 CLOSED"在离线**判不了**(只能在矩阵里手搓夹具)。
+    # 只在行表确实带了这个键时才注入: 历史包的行表没有这两个键, 它们的字节行为一丁点都不变。
+    for cmd in IRQ_TAIL_CMDS:
+        if cmd not in responses and cmd in (table.get("commands") or {}):
             responses[cmd] = rows_for(table, cmd, profile)
     return {"boot_bytes": list(stage.get("boot_bytes", [])), "responses": responses,
             "sequence": sequence, "block": block,
@@ -4622,7 +4775,16 @@ def dispatch_plan(plan, transport, backend_name, outdir, clock, profile, port,
                              "recorded": dict(recorded),
                              "success": res["success"], "disarm": res["disarm"],
                              "terminal": res["terminal"],
+                             # F6b: 整包 dispatch 才是现场轮真正走的那条路。上一版这里只搬
+                             # status/code/disarm/terminal, 把 F5b/F5c 新加的**预留与夹短回执字段**
+                             # 留在了会话结果里 —— 现场 stdout 看不到"这 7 秒到底留没留住",
+                             # 离线门也只能判成 code=None(工具的 parse 缺陷之外还有一层数据缺陷)。
                              "scenario": sc, "branch": ap,
+                             "cleanup_reserve_seconds": res.get("cleanup_reserve_seconds"),
+                             "cleanup_hard_deadline": res.get("cleanup_hard_deadline"),
+                             "session_abs_deadline": res.get("session_abs_deadline"),
+                             "business_abs_deadline": res.get("business_abs_deadline"),
+                             "cleanup_reserved": res.get("cleanup_reserved"),
                              "expected_refusal": res.get("expected_refusal"),
                              "forensics": res.get("forensics"),
                              "first_cause": res.get("first_cause"),

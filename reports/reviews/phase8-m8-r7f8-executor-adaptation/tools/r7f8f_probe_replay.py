@@ -71,7 +71,7 @@ def cases():
     m = M
     IRQ_ON = ["[SAFETY] IRQ gate OPEN: 1 active protection input(s) registered"]
     IRQ_OFF = ["[SAFETY] IRQ gate CLOSED - 活动安全输入(0 路)无软件响应路径"]
-    IRQ_STILL = ["[SAFETY] IRQ gate stays CLOSED"]
+    IRQ_STILL = ["[SAFETY] IRQ gate CLOSED - 活动安全输入(1 路)无软件响应路径"]  # F5e: disable 走 :306 detach 行(ST_INPUT_N=1, 限位四宏 RT_FALSE), 不是 :290 的 attach 失败行
     R, FB, RB = "REPAIRED", "F5B_BEFORE", "R7F8F_BEFORE"
     C = []
     # ①A 的 P8 意图: 合同在禁能侧(expected_ENN=HIGH / ENN_fb=1)绝不能当巡航通过。

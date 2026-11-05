@@ -22,8 +22,9 @@ DRAFT_DIR = "reports/reviews/phase8-m8-r7f8-closed-loop-draft"
 MERGED_REL = DRAFT_DIR + "/R7F8_DRAFT_MERGED.md"
 ORIG_REL = DRAFT_DIR + "/A_DRAFT_ORIGINAL.md"
 ERRATA_REL = "reports/reviews/phase8-m8-r7f8-executor-adaptation/ERRATA_R7F8E.md"
-OLD_MERGED_BYTES = 31807
-OLD_MERGED_SHA12 = "270383c12b1c"
+# R7F8F 轮: 上一版合并件是 §20.15/commit 0ba5035 落下的 36273 B(含 R7F8E 的勘误段)。
+OLD_MERGED_BYTES = 36273
+OLD_MERGED_SHA12 = "e9a5253de024"
 OLD_ORIG_BYTES = 24780
 OLD_ORIG_SHA12 = "b572c1928f60"
 

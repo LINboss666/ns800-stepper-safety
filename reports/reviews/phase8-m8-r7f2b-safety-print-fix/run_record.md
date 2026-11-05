@@ -1057,3 +1057,119 @@ E4 通电截止与固定清理对账（`EnergizeBudget` 在 `motor_arm` 写入�
 产品代码、固件、执行器原件、R7F7 归档字节、旧轮证据与旧账本 **0 改动**；本轮不构建固件、不开现场账、
 不 dispatch。仍待：A/操作者复审这份适配（含 T3/T4 两处附带修正是否接受），以及 R7F8 现场轮的
 刺激方法、速度窗、各段时限与真实动作预算定稿 + 单独的现场批准。设备按上一轮约定保持通电收口。
+
+
+## 24 M8-R7F8F 返修+整包轮（A 包 NS800_R7F8F_Repair_And_Field_20261105；设备动作 0，停在静态预算待 A 定口径）
+
+被审件与冻结输入（一字节未动）：派生执行器修前件 `4c962170…`（245730 B，R7F8E 那份）、
+更早的冻结旧件 `33d3f0af…`（219491 B）、产品树 `32470c7e…`（对应已签收 `00718b49…`）、
+在板镜像 `23691e8d…`（297452 B）。本轮**不构建、不下载、不回读、不复位、不动分析仪、
+不断送电**；每次 dispatch 都是 `--transport stub --backend sim` 的 FakePort，批准账只建在
+仓外工作目录。离线门台账里 5 条 PORT_OPEN 全部 `transport=stub` 且 `port` 字段为空
+（`NO_REAL_PORT_IN_ANY_LEDGER`），所以"本轮没有设备动作"是机器核过的，不是自述。
+
+### 24.1 修后派生件身份
+
+`tools/m8r3_serial_chain_r7f8.py` = 289452 B / sha256 `043d5bdd179c61ea87c8b9f2e095a851560a59ffe656aa7331ff8b43d7e23832`
+/ 5100 行 / 51 条精确整串替换；配方 `tools/r7f8f_build_executor.py`，unified diff
+`patches/r7f8f_executor.patch`（67742 B，sha `c6c9f60367db…`）。`--verify` 在仓外重建后与
+仓库产物逐字节相等（VERIFY|PASS）。
+
+本轮在 §2 F1~F5 之外，按操作者与 A 的三轮实测补了 F5b/F5c/F6/F5e/F6b~F6d：
+
+| 项 | 补的是什么 | 判它的地方 |
+| --- | --- | --- |
+| F5b① | 尝试过 `safety_irq_enable` 本身就建立尾部义务，与电机义务分列（真实序列是先开 IRQ 再 arm） | 矩阵 H10 + 重放 I4 + 整包 FIRST_ERROR|learn_no_started_row |
+| F5b② | 收口预留取申报值 7 s（五条各 1.2 s 窗），排不下就在**开口之前**具名拒；夹短时打 `CLEANUP_RESERVE_SHORT_BY_SESSION_DEADLINE` | 矩阵 H11/H12 + 台账 `CLEANUP_ENTERED` 之后的条数/跨度判据 |
+| F5c | 业务绝对截止 = 总截止 − 预留（`may_obligate` 时），读/轮询/等待/写前检查同受它管 | 矩阵 H13/H14 + 突变 X6/X7 + 重放 I7 |
+| F6 | 静态预算按**互不重叠**三段算（起转前 / 运动窗内 / 停机后），cap 只加一次；申报镜像与执行器现算逐字段比对 | 计划门 PLAN_BUSINESS_RESERVE_SPLIT + 整包门 NO_DOUBLE_COUNT / MIRROR_SAME_VALUE + 元负控 META_* |
+| F5e | IRQ 尾部的 CLOSED 证据按产品**两条真行**认：disable 打 :306 detach 行，status 打 :388 `irq gate   = CLOSED`；两行不再互相顶 | 矩阵 H5/H6/H10/H14 + 整包 STUB_NORMAL_TAIL_SENT |
+| F6b/F6c/F6d | 整包 dispatch 把 F5b/F5c 的回执字段带出来；stub 装配给 IRQ 尾部补行；申报过的响应序列只归轮询那一步用 | 整包门 STUB_NORMAL_* + FIRST_ERROR|* |
+
+### 24.2 四族判据与整包离线门（现在的数）
+
+- 反例矩阵 `proof/r7f8e_case_matrix.txt`：**98 条判据 / FAIL=0**（含元负控 X1~X7 与"故意写错的
+  预期必须被判红"的自证）。
+- stub 整包 `proof/r7f8e_stub_package.txt`：**29 / FAIL=0**。
+- 无回归 `proof/r7f8e_no_regression.txt`：**9 / FAIL=0**；同一份 R7F7 定稿计划上，旧件 57 项
+  fail=1、派生件 65 项 fail=1，**旧判据一条都没被洗掉**，唯一既有 FAIL 仍是
+  `PLAN_MOTION_CAP_BUDGET`（空运动链的既有检查器缺口，草案轮已登记）。
+- 三版本重放 `proof/r7f8f_probe_replay.txt`：**21 件 × 3 侧 / FAIL=0**（同一输入分别喂修后 /
+  F5b 修前 / F5c 修前，按各件应有行为申报）。
+- 最终离线门 `proof/offline_gate.json` + `proof/r7f8f_offline_gate.txt`：**39 条判据 / FAIL=2**，
+  两条红的名字固定是 `PLAN_POST_SPIN_CONTENT_FITS_CAP` 与 `PLAN_WORST_CASE_TAIL_FITS_SESSION`；
+  `overall` 因此是 FAIL，不写 PASS。validate-plan 自身：checks=144 / fail=2（就是这两条）。
+- 夹具逐项变更 `proof/r7f8f_fixture_changes.md|.json`：基线 42d7f7d 的判据名 65/27/8 一条不少
+  （removed=0），新增 33/2/1 条逐条带人写理由，同名判据无结论翻转，problems=0。
+
+### 24.3 现场包（已作者化，未获批准，未执行）
+
+`field/plan_r7f8f_2369_real.json`（28090 B，sha `66ca8a15…`）+ `field/rows_r7f8f_real.json`
+（8168 B，sha `4022306d…`），由 `tools/r7f8f_make_real_package.py` 产出：一个 COM5 会话、38 步、
+§4 的四个固定数（cap 12 / arm 18 / 总 90 / 预留 7）逐字段核对；download/readback/reset/reboot/
+config_save/clear/retry/物理刺激额度全 0；`polarity_measured=false`、`core_protection_verified=false`
+保持原值。镜像摘要由工具当场从盘上原字节重算（`IMAGE_SHA_COMES_FROM_DISK_BYTES`），不是手抄。
+拿不到逐字打印形状的查询（tmc_config_apply/show、diag_status、diag_profile show/commit、ps/free）
+只断言"命令回显 + 拿到完整回包"，这些步骤列在计划的 `field_assertion_gaps` 与
+`_about.unverified_shapes` 里 —— 宁缺勿造。机械前置门在现场原件里保持
+`DECLARED_BY_OPERATOR_AT_APPROVAL`，计划不许自证（`FIELD_PLAN_PREREQ_NOT_SELF_CERTIFIED`）。
+
+### 24.4 三段算术算出来的两条真红（交 A 定口径，本轮不自行选择）
+
+1. **起转后内容排不进 §4 的 cap**：三段是 起转前 19 步（申报窗 34 s）/ 运动窗内 9 步（11 s）/
+   停机后 10 步（12 s）。执行器在 `motor_start` 写入尝试时置 `MotionBudget.t0` 且**正常 stop 不
+   清**，所以 §5 行 12 之后（含 13 disarm、14 commit、15 ps+free）同被 `t0+12 s` 夹住；而起转后
+   申报内容是 23 s。要么放宽 cap（同时动 §6 的 motor_run_seconds_total=12），要么认可"已确认零
+   速后解除运动 cap"的运行时语义改动，要么把 §5 行 14/15 挪到下一会话。三条都不在本轮自行决定
+   的范围里。
+2. **每步都慢到 SLACK=3 s 上限时的最坏情况**：起转前 19 步合计 91 s 已超业务预算 83 s（90−7），
+   逐步仿真里第 19 步（`motor_target 300`）会在写之前被 `STEP_DEADLINE_BEFORE_WRITE` 拒。这条是
+   **取证完整性**风险，不是撤能风险：收口预留由 `business_abs_dl` 硬夹保护，与运行结果无关；
+   申报窗口本身合得下（worst 46 s + 预留 7 s ≤ 90 s）。消红只有减步或放宽总窗两条路，A 已明写
+   不许放宽 90 s，本轮也不自行减 §5 的步骤。
+
+两条都写进了计划自己的 `static_budget_open_items`（带数字与三条候选出路），所以审核者在计划字节
+里就能看到红在哪，不用翻工具输出。
+
+### 24.5 本轮自伤（照单登记，不改写历史）
+
+1. 整包离线门最初用 `--rows` 覆盖行表 —— CLI 没这个选项，argparse rc=2，八条行为判据一起变成
+   "没有回执"。改成把每例的 plan.json/rows.json 写进本例目录（执行器只认 `plan.rows_file`，
+   相对计划文件解析）。
+2. 改完之后仍然八条全 `code=None`：`--dispatch` 的最后一行不是 JSON，阶段结果在
+   `DISPATCH|stage=S1|status=…|kind=…|<json>` 的第 4 段里。上一版的 `last_json(stdout)` 永远取到
+   空 dict —— 这是工具缺陷，被审件当时已经跑完了整场。
+3. 整包 dispatch 的阶段回执**不带** F5b/F5c 的预留/夹短字段（只在会话结果里），所以现场那一条
+   路（dispatch）看不到"7 秒到底留没留住"；已由 F6b 把四个字段搬进阶段载荷。
+4. `build_session_fixture` 只给电机三条兜底喂行，IRQ 尾部两条没有来源 => 整包 stub 永远判不到
+   "尾部发出去并确认 CLOSED"；F6c 补成"行表带这个键才注入"，历史包字节行为不变。
+5. 申报过的响应序列被按**命令键**取用，导致同键的非轮询步骤（§5 行 10）读到序列第一份 ACCEL 行
+   而当场停止；F6d 限定只有申报了 poll 的步骤才用序列。
+6. 现场包的爬坡行是我用 `MOT_CRUISE[0].replace("CRUISE","ACCEL")` 拼的，得到
+   `state=2 name=ACCEL` —— 名字改了、数值没改，ramping 门按数值判"还在爬坡"就看不到 ACCEL。
+   已按 `motor.h` 的枚举（ACCEL=1）逐字重写。
+7. `safety_irq_disable` 的行我填成 `:290` 的 "IRQ gate stays CLOSED"（attach 失败回滚路径），
+   产品实际走 `:306` 的 detach 行；`IRQ_CLOSED` 常量里路数也写成 0，而 `st_inputs[]` 在
+   `SAFETY_LIMIT_INPUTS_ENABLED=RT_FALSE`（project_board.h:51）下只剩 TMC_DIAG 一路 => 1 路。
+   矩阵与重放的同一处夹具一并改正。
+8. 取消场没申报 `job_contract.phase`，默认 "done" 不允许 CANCELLED，整包程序在第 26 步
+   `JOB_CONTRACT_VIOLATED` 停 —— 计划作者化时的漏项，已补 `post_cancel`。
+9. 一次编辑把离线门里 `FIELD_PLAN_PREREQ_NOT_SELF_CERTIFIED` 的参数行删掉（语法坏），另一次把
+   变更表工具里的三元表达式连同引号一起改掉（打印出乱码字面量）。两处都在本轮内修好并重跑。
+10. 我自己的畸形行表突变（删掉整个 `healthy` 分支）让执行器在**开端口之前**抛裸 KeyError 带
+    traceback 退出。这是继承自冻结件的既有行为，任务书没列这项，本轮不改语义，只在整包门里登记
+    成 `ROWS_BRANCH_MISSING_KNOWN_GAP`（保留 rc=1 与 traceback 原文），交 A 定要不要单开一轮。
+
+### 24.6 口径更正两件
+
+- 远端回读覆盖失败那一次的**首次失败原文未留存**（被第二次运行的输出覆盖了同一个文件）。
+  本轮起每次输出写独立文件，不补造旧记录。
+- A 包的清单口径：任务书 zip 内登记 13 件，其中 `SHA256SUMS.txt` 自身不含在清单里，所以
+  "清单列出的其余 12 件"才是可比对集合。早先我曾把这一族数成 23 件（把包外 proof 与 tools 也算
+  进去），该误算原因已登记；A 的原清单未回改。
+
+### 24.7 停点
+
+工具关键修复已验证（四族判据 + 整包门 + 逐项变更表全绿，除两条已点名的静态预算红）。
+**完整现场包尚未就绪，还不能称为现场验收通过**：上机前需要先有 A 对 §24.4 两条的口径答复。
+设备动作为 0；一次现场批准仍未取得（未取得就不发任何现场命令）。

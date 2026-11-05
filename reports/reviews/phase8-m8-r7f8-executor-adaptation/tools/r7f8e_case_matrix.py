@@ -671,7 +671,7 @@ def cases():
     # 若两处共用 "motor_status" 就会把巡航那份喂给清理 => 禁能一律 UNKNOWN(夹具错, 不是被审件的错)。
     def irq_fx(off_rows):
         return fx(responses={"motor_arm": ARM_OK, "safety_irq_enable": IRQ_ON,
-                             "safety_irq_disable": ["[SAFETY] IRQ gate stays CLOSED"],
+                             "safety_irq_disable": ["[SAFETY] IRQ gate CLOSED - 活动安全输入(1 路)无软件响应路径"],
                              "safety_irq_status": off_rows,
                              "motor_status_running": MOT_CRUISE,
                              "motor_status": STATUS_DISABLED,
@@ -694,7 +694,7 @@ def cases():
            expect_contains=["DISARM (动作已做"]),
        st_("ms", "motor_status", key="motor_status", seconds=3, expect_contains=["state="])],
       fx(responses={"motor_arm": ARM_OK, "safety_irq_enable": IRQ_ON,
-                    "safety_irq_disable": ["[SAFETY] IRQ gate stays CLOSED"],
+                    "safety_irq_disable": ["[SAFETY] IRQ gate CLOSED - 活动安全输入(1 路)无软件响应路径"],
                     "safety_irq_status": IRQ_BAD, "motor_disarm": DISARM_OK,
                     "motor_status": STATUS_DISABLED, "motor_stop": STOP_OK}),
       dict(code="CLEANUP_ERRORS", disarm="CONFIRMED_DISABLED", success_false=True,
@@ -708,7 +708,7 @@ def cases():
        st_("ms", "motor_status", key="motor_status", seconds=3, expect_contains=["state="])],
       fx(responses={"motor_arm": ARM_OK, "motor_disarm": DISARM_OK,
                     "motor_status": STATUS_DISABLED, "motor_stop": STOP_OK,
-                    "safety_irq_disable": ["[SAFETY] IRQ gate stays CLOSED"],
+                    "safety_irq_disable": ["[SAFETY] IRQ gate CLOSED - 活动安全输入(1 路)无软件响应路径"],
                     "safety_irq_status": IRQ_OFF}),
       dict(code="", cleanup_tx_none=["safety_irq_disable", "safety_irq_status"]),
       extra=["--arm-energize-deadline-seconds", "20"])
@@ -746,7 +746,7 @@ def cases():
       # 清理五条的响应**一律不配**: 电机那三条本来就不该发(发了就会多一条 NO_RESPONSE 错),
       # 尾部两条配了才证"照发且读到了 CLOSED"。
       fx(responses={"safety_irq_enable": IRQ_ON, "motor_status_running": STATUS_DISABLED,
-                    "safety_irq_disable": ["[SAFETY] IRQ gate stays CLOSED"],
+                    "safety_irq_disable": ["[SAFETY] IRQ gate CLOSED - 活动安全输入(1 路)无软件响应路径"],
                     "safety_irq_status": IRQ_OFF}),
       dict(code="PROFILE_NOT_RUNNING", obligation=False, success_false=True,
            disarm="NOT_ARMED", status="STOP",
@@ -792,7 +792,7 @@ def cases():
        st_("irq", "safety_irq_enable", key="safety_irq_enable", seconds=2,
            expect_contains=["IRQ"], quota={"name": "irq_polarity_prep", "n": 1})],
       fx(responses={"motor_arm": ARM_OK, "safety_irq_enable": IRQ_ON,
-                    "safety_irq_disable": ["[SAFETY] IRQ gate stays CLOSED"],
+                    "safety_irq_disable": ["[SAFETY] IRQ gate CLOSED - 活动安全输入(1 路)无软件响应路径"],
                     "safety_irq_status": IRQ_OFF, "motor_stop": STOP_OK,
                     "motor_disarm": DISARM_OK, "motor_status": STATUS_DISABLED}),
       dict(code="CLEANUP_RESERVE_CANNOT_COVER_ALL_SENDS", obligation=False,

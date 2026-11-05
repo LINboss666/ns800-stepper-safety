@@ -1,0 +1,40 @@
+INPUTS_IN_PLACE|PASS|五件齐全; 执行器=043d5bdd179c… plan=66ca8a152ede… rows=4022306df3ad…
+PRE_EXECUTOR_BYTES_FROZEN|PASS|修前件仍为 245730 B / 4c962170b2357eef…(一字节未动)
+FROZEN_OLD_EXECUTOR_UNCHANGED|PASS|冻结旧件实读 219491 B sha=33d3f0af8a4c9c33…(派生件逐字节从它/它的后继派生, 旧件本身一字节未动)
+BOARD_IMAGE_IDENTITY_STILL_23691E8D|PASS|§4 的在板镜像原件仍是 297452 B / 23691e8d…(本轮不下载/不回读, 身份只作参照)
+IMAGE_SHA_COMES_FROM_DISK_BYTES|PASS|计划里写的镜像摘要 == 本工具当场对盘上原字节算出的摘要(不是手抄)
+PRODUCT_SOURCE_UNCHANGED|PASS|applications/ 与 HEAD 一致(暂存区外也无改动); 计 45 个登记条目
+VALIDATE_PLAN_RAN|PASS|PLAN_VALIDATE_SUMMARY|checks=144|fail=2|msh_commands=74|plan=D:\ns800\reports\reviews\phase8-m8-r7f8-executor-adaptation\field\plan_r7f8f_2369_real.json; FAIL 行=2
+VALIDATE_PLAN_FAIL_SET_EXACTLY_AS_REGISTERED|PASS|实开=['PLAN_BUSINESS_RESERVE_SPLIT:S1', 'PLAN_BUSINESS_WORST_CASE_FIT:S1'] 登记=['PLAN_BUSINESS_RESERVE_SPLIT:S1', 'PLAN_BUSINESS_WORST_CASE_FIT:S1'] | 原文: PLAN_BUSINESS_RESERVE_SPLIT|S1|FAIL|may_obligate=True spin@19 stop@28 pre=34.0/91.0(19步) in_motion=11.0/38.0(9步) post_stop=12.0/42.0(10步) cap=12.0 res ;; PLAN_BUSINESS_WORST_CASE_FIT|S1|FAIL|worst_bound=171.0 budget=83.0 sim_end=83.0 first_refused={"index": 18, "as": "target", "cmd": "motor_target 300",
+GATE_PRESENT|PLAN_CLEANUP_RESERVE|PASS|出现在 validate-plan 输出里
+GATE_PRESENT|PLAN_BUSINESS_RESERVE_SPLIT|PASS|出现在 validate-plan 输出里
+GATE_PRESENT|PLAN_BUSINESS_WORST_CASE_FIT|PASS|出现在 validate-plan 输出里
+GATE_PRESENT|PLAN_MOTION_CAP_BUDGET|PASS|出现在 validate-plan 输出里
+GATE_PRESENT|PLAN_QUOTA_NEED|PASS|出现在 validate-plan 输出里
+GATE_PRESENT|PLAN_IMAGE_IDENTITY_CONSISTENCY|PASS|出现在 validate-plan 输出里
+GATE_PRESENT|PLAN_SPINUP_GATE_COVERAGE|PASS|出现在 validate-plan 输出里
+GATE_PRESENT|R7F8E_ARM_ENERGIZE|PASS|出现在 validate-plan 输出里
+PLAN_RESERVE_ARITHMETIC|PASS|PLAN_CLEANUP_RESERVE|S1|PASS|reserve=7.0 floor=6.0 total=90.0 cap=12.0
+PLAN_BUSINESS_SEGMENTS_NO_DOUBLE_COUNT|PASS|三段步数 19+9+10==38(不重不漏) worst=46.0==pre_declared 34.0 + cap 12.0(cap 只加一次) after_spin=23.0
+PLAN_BUSINESS_MIRROR_SAME_VALUE|PASS|计划申报镜像与执行器现算逐字段比对=有 | 这一行取 validate-plan 原文: PLAN_BUSINESS_RESERVE_SPLIT|S1|FAIL|may_obligate=True spin@19 stop@28 pre=34.0/91.0(19步) in_motion=11.0/38.0(9步) post_stop=12.0/42.0(10步) cap=12.0 reserve=7.0 total=90.0 worst=46.0 after_spin=23.0 mirror=一致(17 项)|起转后申报内容=23.0(运动窗内 11.0 + 停机后 12.0) > cap=12.0=> 执行器不会在 stop 清 t0, 这些步骤同被 t0+cap 夹住, 计划自
+PLAN_POST_SPIN_CONTENT_FITS_CAP|FAIL|§4 固定 cap=12.0 s, 而起转后申报内容=23.0 s(运动窗内 11.0 + 停机后 12.0)。执行器在 motor_start 写入尝试时置 t0 且**正常 stop 不清**, 所以 §5 行 12 之后的 disarm/commit/ps/free 同被 t0+cap 夹住 => 这一条要 A 定口径(放宽 cap / 认可零速确认后解除运动 cap / 把行 14-15 挪到下一会话), 本轮不自行选择
+PLAN_WORST_CASE_TAIL_FITS_SESSION|FAIL|每步都慢到 SLACK 上限时的最坏情况(与执行器同一条 min() 逐步仿真): PLAN_BUSINESS_WORST_CASE_FIT|S1|FAIL|worst_bound=171.0 budget=83.0 sim_end=83.0 first_refused={"index": 18, "as": "target", "cmd": "motor_target 300", "t_s": 83.0, "want_seconds": 2.0, "slack_seconds": 3.0, "cap_or_budget_ceiling_s": 83.0}|每步都慢到 SLACK=3 上限时, 第 19 步(target)在写之前就没有时间(已用 83.0 s, 上限 83.0 s); 总窗=90.0 预留=7.0
+META_MIRROR_DRIFT_NAMED|PASS|把计划镜像的 worst_declared 加 5 s 后执行器的判读=PLAN_BUSINESS_RESERVE_SPLIT|S1|FAIL|may_obligate=True spin@19 stop@28 pre=34.0/91.0(19步) in_motion=11.0/38.0(9步) post_stop=12.0/42.0(10步) cap=12.0 reserve=7.0 total=90.0 worst=46.0 after_spin=23.0 mirror=漂移: worst_declared=51.0!=46.0|起转后申报内容=23.0(运动窗内 11.0 + 停
+META_MUTATION_ANCHOR_HIT|PASS|突变锚点(business_segments 里 worst_declared 那一行)在派生件里恰好命中一次
+META_DOUBLE_COUNT_COMES_BACK_GOES_RED|PASS|把停机后那段重新加进 worst_declared(=修前的双算形状)后, 现场计划判读=PLAN_BUSINESS_RESERVE_SPLIT|S1|FAIL|may_obligate=True spin@19 stop@28 pre=34.0/91.0(19步) in_motion=11.0/38.0(9步) post_stop=12.0/42.0(10步) cap=12.0 reserve=7.0 total=90.0 worst=58.0 after_spin=23.0 mirror=漂移: worst_declared=46.0!=58.0|起转后申报内容=23.0(运动窗内 11.0 + 停机后 12.0) > cap=12.0=> 执行器不会在 stop 清 t0, 
+FIELD_PLAN_PREREQ_NOT_SELF_CERTIFIED|PASS|现场原件里 mechanical_prerequisites 的状态={"bench_continuity": "DECLARED_BY_OPERATOR_AT_APPROVAL"}(等操作者口头确认, 计划不许自证; 离线 dispatch 副本另置 PROVIDED 只为让行为判据有东西可判)
+NO_DEVICE_ACTIONS_DECLARED|PASS|download/readback/reset/reboot/config_save/clear/retry/dmm/物理刺激额度全 0
+MOTION_AND_ENERGIZE_DEADLINES|PASS|§4 固定值未动: cap=12 arm=18 total=90 reserve=7; 三段互不重叠的最坏业务(起转前申报 34.0 + cap 12)=46.0 s, 预留 7 s 由执行器 business_abs_dl=83 s 硬夹保住
+FIELD_FLAGS_STAY_FALSE|PASS|polarity_measured / core_protection_verified 仍是 false(未动硬件)
+STUB_NORMAL_DISPATCH_SUCCEEDS|PASS|rc=0 stage_status=OK success=True code= disarm=CONFIRMED_DISABLED terminal=KNOWN 结果条数=40(申报步骤 38; 轮询的多次尝试也各计一条) | ile=healthy|branch=healthy|scenario_branches={}|prerequisite_skips=[]|actions_attempted=[]|ledger=D:\ns800_r7f8f_offline\gate13\normal\run\dispatch_ledger.jsonl
+STUB_NORMAL_TAIL_SENT|PASS|收口段(CLEANUP_ENTERED 之后)实发=['motor_stop', 'motor_disarm', 'motor_status', 'safety_irq_disable', 'safety_irq_status'] 五条各一次且顺序固定=True
+STUB_NORMAL_RESERVE_AND_CLAMP_FIELDS|PASS|整包 dispatch 的阶段回执里 reserve=7.0 reserved=True session_abs=90.0 business_abs=83.0 cleanup_hard=19.0
+FIRST_ERROR|tail_silent|PASS|code=CLEANUP_ERRORS disarm=CONFIRMED_DISABLED terminal=KNOWN 收口TX=['motor_status', 'safety_irq_status', 'safety_irq_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_stop', 'motor_status', 'motor_disarm', 'motor_status', 'motor_stop', 'motor_disarm', 'motor_status', 'safety_irq_disable', 'safety_irq_status'] errors=IRQ_TAIL_DISABLE_NO_DETACH_LINE IRQ_TAIL_NOT_CLOSED
+FIRST_ERROR|learn_no_started_row|PASS|code=EXPECTATION_NOT_MET disarm=CONFIRMED_DISABLED terminal=KNOWN 收口TX=['motor_status', 'safety_irq_status', 'safety_irq_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_stop', 'motor_disarm', 'motor_status', 'safety_irq_disable', 'safety_irq_status'] errors=
+FIRST_ERROR|irq_before_arm_fails|PASS|code=EXPECTATION_NOT_MET disarm=CONFIRMED_DISABLED terminal=KNOWN 收口TX=['motor_status', 'safety_irq_status', 'safety_irq_status', 'motor_status', 'motor_status', 'motor_status', 'motor_stop', 'motor_disarm', 'motor_status', 'safety_irq_disable', 'safety_irq_status'] errors=
+FIRST_ERROR|reserve_too_small|PASS|code=CLEANUP_RESERVE_CANNOT_COVER_ALL_SENDS disarm=NOT_ARMED terminal=KNOWN 收口TX=[] errors=
+FIRST_ERROR|session_too_short|PASS|code=STEP_DEADLINE_BEFORE_WRITE disarm=NOT_ARMED terminal=KNOWN 收口TX=[] errors=
+ROWS_BRANCH_MISSING_KNOWN_GAP|PASS|畸形行表(healthy 分支整个缺席)在开端口之前裸 KeyError 退出: rc=1 台账无 TX; traceback 末行=KeyError: 'healthy'
+NO_REAL_PORT_IN_ANY_LEDGER|PASS|台账里 5 条 PORT_OPEN 全是 transport=stub 且 port 字段为空(真开过 COM5 必然留下口名)
+NO_HARDWARE_ACTIONS_THIS_ROUND|PASS|全部 dispatch 走 transport=stub/backend=sim 的 FakePort; 未开 COM5, 未导入 pyserial 真后端, 未跑 pyOCD/Keil/Logic, 批准账只建在仓外 --work
+R7F8F_OFFLINE_GATE_SUMMARY|判据=39|FAIL=2|PLAN_POST_SPIN_CONTENT_FITS_CAP,PLAN_WORST_CASE_TAIL_FITS_SESSION
