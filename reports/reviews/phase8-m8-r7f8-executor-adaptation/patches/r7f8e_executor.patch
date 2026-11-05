@@ -1,0 +1,681 @@
+--- a/reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py
++++ b/reports/reviews/phase8-m8-r7f8-executor-adaptation/tools/m8r3_serial_chain_r7f8.py
+@@ -1,6 +1,6 @@
+ #!/usr/bin/env python3
+ # -*- coding: utf-8 -*-
+-"""M8-R3 现场候选包的会话执行器(单一写者 / 原始字节先落盘 / 起转即硬截止 / 动作后端可注入)。
++"""M8-R7F8E 派生执行器(离线适配候选, 逐字节派生自 33d3f0af8a4c9c33 的 M8-R3; 旧文件未动) 现场候选包的会话执行器(单一写者 / 原始字节先落盘 / 起转即硬截止 / 动作后端可注入)。
+ 
+ 本轮离线: 只有 transport="stub" 与 backend="sim" 被真正跑过(真端口/真工具分支从未执行,
+ hardware_actions=[])。real/manual 分支的存在是为了让 RunField 在拿到批准后**真的做事**。
+@@ -254,6 +254,10 @@
+ # 现在三类原始字节缺陷集中在**一个函数**里, 普通响应/清理/观察窗/发送前排空全部复用它。
+ STREAM_BYTE_DEFECTS = ("DANGER_TEXT_IN_STREAM", "NUL_BYTE_IN_RESPONSE",
+                        "ILLEGAL_BYTES_IN_RESPONSE")
++# 状态行豁免的白名单原本只看命令首词, 而 `diag_profile` 下既有只读查询也有写动作;
++# 把首词放进 STATUS_QUERY_CMDS 会让 learn/zero/commit 的 REFUSED 线也能被洗成"安全态披露"。
++# 因此这里按**完整命令**放行两条真只读查询, 不放宽首词面。
++READONLY_QUERY_CMDS = ("diag_profile learn_status", "diag_profile show")
+ 
+ 
+ def guard_partial_bytes(raw, led=None, where="", evidence=""):
+@@ -924,6 +928,46 @@
+         return self.actual
+ 
+ 
++class EnergizeBudget(object):
++    """E4: 从 motor_arm 的**写入尝试之前**起算的通电保持截止, 到成功收到 motor_disarm 为止。
++
++    与 MotionBudget 分列且互不替换: 那一条从 motor_start 起算, 只管"转多久"; 这一条管"线圈带电最多
++    待多久", 所以 arm 后不起转、只查询、只等待同样在约束内, 正常 stop 而仍 armed 也不清除义务。
++    到期时执行器不假装能替产品断电: 它在下一条业务命令写之前具名停止, 撤能仍走既有固定清理三条;
++    成功 disarm 才把计时停住。主机软件截止不是物理实时停机保证(人工禁能仍是独立手段)。
++    """
++
++    def __init__(self, clock, cap_seconds):
++        self.clock = clock
++        self.cap = float(cap_seconds) if cap_seconds else None
++        self.t0 = None
++        self.actual = None
++
++    @property
++    def armed(self):
++        return self.cap is not None and self.t0 is not None and self.actual is None
++
++    def start_attempt(self):
++        if self.cap is not None and self.t0 is None:
++            self.t0 = self.clock.monotonic()
++
++    def deadline(self):
++        return self.t0 + self.cap
++
++    def remaining(self):
++        if not self.armed:
++            return None
++        return self.cap - (self.clock.monotonic() - self.t0)
++
++    def expired(self):
++        return self.armed and self.clock.monotonic() >= self.deadline()
++
++    def close(self):
++        if self.t0 is not None and self.actual is None:
++            self.actual = self.clock.monotonic() - self.t0
++        return self.actual
++
++
+ class ApprovalLedger:
+     """绑定批准身份的**跨进程**持久预占账(复审 M8-R5C §7.4 要求的那件缺失控制)。
+ 
+@@ -1683,6 +1727,9 @@
+     ("diag_profile learn", "diag_profile_learn"),
+     ("diag_profile commit", "diag_profile_commit"),
+     ("blackbox_clear", "blackbox_clear"),
++    # E3: diag_profile learn_cancel <ID> 改作业状态(rel_job_cancel 置 CANCEL_PENDING), 不是只读查询。
++    # 旧映射漏列属工具覆盖缺口, 不能据此免记账(任务书 §2 learn_cancel 裁定)。
++    ("diag_profile learn_cancel", "diag_profile_learn_cancel"),
+ )
+ 
+ 
+@@ -1912,8 +1959,189 @@
+     return int(hits[0].group(1)) if len(hits) == 1 else None
+ 
+ 
++POLL_GATE_MOTOR = "motor_ramping"
++POLL_GATE_ROW = "in_progress_row"
++MOTOR_RAMPING_STATES = (MOTOR_STATE_ENUM["ACCEL"], MOTOR_STATE_ENUM["DECEL"])
++
++
++def poll_gate_of(p):
++    """没申报 in_progress => 沿用旧的 [MOT] state 门(R7F7 语义逐字节不变); 申报了 => 改用
++    "响应里那一行的状态字段是否仍在申报的进行中集合里"。E1 要的就是这个分离: learn_status
++    一行都不带 [MOT] state=, 旧门会把"还没到 DONE"直接判成不一致而当场停。"""
++    spec = p.get("in_progress")
++    if not spec:
++        return POLL_GATE_MOTOR, None, None
++    return POLL_GATE_ROW, spec["row"], tuple(spec["states"])
++
++
++def poll_observe(gate, in_row, in_states, txt):
++    """返回(观测到的进行中值, 该行命名组)。判不出/不在集合里 => 第一项 None => 立刻具名停止。
++    行缺失、同形行出现多条、值在集合外(DONE/FAILED/CANCELLED/TIMEOUT/IDLE)都算"不在进行中" ——
++    轮询绝不把一个业务终态等成窗口耗尽(那会把"失败了"报成"只是没等到")。"""
++    if gate == POLL_GATE_MOTOR:
++        s = ramping_state(txt)
++        return (s if s in MOTOR_RAMPING_STATES else None), {}
++    try:
++        rows = Path(str(txt)).read_text(encoding="utf-8", errors="replace").splitlines()
++    except OSError:
++        return None, {}
++    hits = [h for h in (re.match(in_row, r) for r in rows if r) if h]
++    if len(hits) != 1:
++        return None, {}
++    g = hits[0].groupdict()
++    val = g.get("st")
++    return (val if val in in_states else None), g
++
++
++# -------------------------------------------------- E2: 命名作业绑定(不是通用模板系统)
++JOB_ID_MIN = 1
++JOB_ID_MAX = 999999999      # 产品: "learn_cancel JOB_ID must be 1..999999999"(diag_relative.c)
++JOB_ROW_STARTED = (r"^\[DIAG\] learn STARTED id=(?P<job_id>[0-9]+) n=(?P<n>[0-9]+) "
++                   r"win=(?P<lo>[0-9]+)\.\.(?P<hi>[0-9]+) dir=(?P<dir>[0-9]+)$")
++JOB_REF_RE = re.compile(r"^@([a-z][a-z0-9_]{0,31})$")
++CANCEL_PREFIX_TOKENS = ("diag_profile", "learn_cancel")
++CANCEL_ROWS = (
++    ("REQUESTED", r"^\[DIAG\] cancel id=(?P<id>[0-9]+) REQUESTED st=(?P<st>[A-Z_]+)"),
++    ("ALREADY_TERMINAL", r"^\[DIAG\] cancel id=(?P<id>[0-9]+) NOT-CANCELLED: already "
++                         r"(?P<st>[A-Z_]+) why=(?P<why>\S+)"),
++)
++
++
++def _rows_of(txt_path):
++    try:
++        return Path(str(txt_path)).read_text(encoding="utf-8", errors="replace").splitlines()
++    except OSError:
++        raise Stop("JOB_BIND_TEXT_MISSING", str(txt_path))
++
++
++def bind_job_id(st, txt, raw, bindings, led, asname):
++    """E2: 把**这一步自己**的完整响应里唯一整行的 STARTED 绑成命名作业 ID。
++    先过原字节门与步骤判据(调用点在 verdict OK 之后), 再发布绑定; 参数(n/lo/hi/dir)必须与
++    计划里申报的一致 —— 否则"取消的是另一枚作业"这种错绑会在写之前被拒。"""
++    spec = st.get("job_bind")
++    if not spec:
++        return
++    name = spec["name"]
++    row = spec.get("row", JOB_ROW_STARTED)
++    hits = [m for m in (re.match(row, r) for r in _rows_of(txt)) if m]
++    if len(hits) != 1:
++        raise Stop("JOB_BIND_NOT_UNIQUE",
++                   "as=%s name=%s STARTED 行命中=%d" % (asname, name, len(hits)))
++    g = hits[0].groupdict()
++    if "job_id" not in g:
++        raise Stop("JOB_BIND_GROUP_MISSING", "as=%s name=%s 正则里没有组 job_id" % (asname, name))
++    try:
++        jid = int(g["job_id"])
++    except ValueError:
++        raise Stop("JOB_ID_UNPARSEABLE", "as=%s raw=%r" % (asname, g["job_id"]))
++    if not JOB_ID_MIN <= jid <= JOB_ID_MAX:
++        raise Stop("JOB_ID_OUT_OF_RANGE",
++                   "as=%s id=%d 不在 %d..%d(0 或越界一律拒绝, 不默认 1)" %
++                   (asname, jid, JOB_ID_MIN, JOB_ID_MAX))
++    bad = {k: (g.get(k), v) for k, v in (spec.get("params") or {}).items()
++           if str(g.get(k)) != str(v)}
++    if bad:
++        raise Stop("JOB_PARAMS_MISMATCH",
++                   "as=%s name=%s 受理参数与计划申报不符 %s" % (asname, name, bad))
++    if name in bindings and bindings[name]["job_id"] != jid:
++        raise Stop("JOB_BIND_DUPLICATE",
++                   "name=%s 已绑到 %s(来自 %s), 本步又要绑成 %d => 不覆盖" %
++                   (name, bindings[name]["job_id"], bindings[name]["from_step"], jid))
++    bindings[name] = {"job_id": jid, "from_step": asname, "row": hits[0].string.strip(),
++                      "rx_sha256": sha_of(raw), "params": dict(g)}
++    led.ev("JOB_ID_BOUND", name=name, job_id=jid, source_step=asname,
++           rx_sha256=sha_of(raw), row=bindings[name]["row"])
++
++
++def resolve_job_cmd(st, cmd, bindings, asname):
++    """E2: 只接受固定参数位 `diag_profile learn_cancel @<绑定名>`; 其他任何形态都不生成。
++    没有 eval/exec/format/shell 展开, 也不从日志、旧会话或 IDLE 状态里捞 ID。"""
++    ref = st.get("job_cmd")
++    toks = cmd.split()
++    if ref is None:
++        if any(JOB_REF_RE.match(t) for t in toks):
++            raise Stop("JOB_REF_NOT_DECLARED",
++                       "as=%s cmd=%s 里有 @引用但没有 job_cmd 声明, 不发送" % (asname, cmd))
++        if cmd.split(" ")[0] == "diag_profile" and len(toks) > 1 and toks[1] == "learn_cancel":
++            raise Stop("CANCEL_NEEDS_JOB_REF",
++                       "as=%s cmd=%s 取消必须走 @绑定(不接受字面 ID, 避免把旧作业当本轮)" %
++                       (asname, cmd))
++        return cmd, None
++    if tuple(toks[:2]) != CANCEL_PREFIX_TOKENS or len(toks) != 3 or not JOB_REF_RE.match(toks[2]):
++        raise Stop("JOB_CMD_SHAPE",
++                   "as=%s cmd=%s 不符合固定形式 `diag_profile learn_cancel @<绑定名>`" % (asname, cmd))
++    name = JOB_REF_RE.match(toks[2]).group(1)
++    if name != ref:
++        raise Stop("JOB_CMD_NAME_MISMATCH",
++                   "as=%s 位置引用 @%s 与步骤申报的 job_cmd=%s 不一致" % (asname, name, ref))
++    if name not in bindings:
++        raise Stop("JOB_UNBOUND",
++                   "as=%s 绑定 %s 还没有来自 STARTED 的 ID => 一条命令都不发" % (asname, name))
++    b = bindings[name]
++    out = "%s %s %d" % (CANCEL_PREFIX_TOKENS[0], CANCEL_PREFIX_TOKENS[1], b["job_id"])
++    return out, {"binding": name, "job_id": b["job_id"], "source_step": b["from_step"],
++                "source_rx_sha256": b["rx_sha256"], "sent": out}
++
++
++def check_job_expect(st, txt, bindings, asname):
++    """E2: 同一作业的状态断言行(`id` 组)必须等于绑定的那枚 ID —— 禁止把旧 DONE/旧 FAILED 当本轮结果。"""
++    for spec in st.get("expect_values", []):
++        name = spec.get("job_binding")
++        if not name:
++            continue
++        if name not in bindings:
++            raise Stop("JOB_UNBOUND", "as=%s 状态断言引用未绑定的 %s" % (asname, name))
++        hits = [m for m in (re.match(spec["row"], r) for r in _rows_of(txt)) if m]
++        if len(hits) != 1:
++            raise Stop("JOB_ASSERT_ROW_NOT_UNIQUE",
++                       "as=%s 命中=%d row=%s" % (asname, len(hits), spec["row"]))
++        g = hits[0].groupdict()
++        if "id" not in g:
++            raise Stop("JOB_ASSERT_GROUP_MISSING", "as=%s 行里没有组 id" % asname)
++        if int(g["id"]) != bindings[name]["job_id"]:
++            raise Stop("JOB_ID_MISMATCH",
++                       "as=%s 行 id=%s 但本轮绑定=%s(来自 %s) => 不是同一枚作业" %
++                       (asname, g["id"], bindings[name]["job_id"], bindings[name]["from_step"]))
++
++
++def enforce_cancel_contract(st, txt, bindings, led, asname, verdict="OK"):
++    """E1/E2: 取消只接受 `cancel id=<绑定ID> REQUESTED`。已终态(NOT-CANCELLED: already DONE)
++    一律登记成"未捕获活动取消"并当场具名停止 —— allowed_outcomes 之类的事后豁免不能把它
++    洗成取消成功。调用点在通用判据**之前**: 否则这条事实会被降级成 EXPECTATION_NOT_MET。
++    verdict 非 OK 时不补 CANCEL_RESULT_UNPARSED(REFUSED/BUSINESS_FAILED 由业务层给准确身份)。"""
++    if not st.get("job_cmd"):
++        return
++    name = st["job_cmd"]
++    want = bindings[name]["job_id"]
++    rows = _rows_of(txt)
++    for row_kind, pat in CANCEL_ROWS:
++        hits = [m for m in (re.match(pat, r) for r in rows) if m]
++        if not hits:
++            continue
++        if len(hits) != 1:
++            raise Stop("CANCEL_ROW_NOT_UNIQUE",
++                       "as=%s %s 命中=%d" % (asname, row_kind, len(hits)))
++        g = hits[0].groupdict()
++        # 台账字段名不能叫 kind: Ledger.ev(kind, **kw) 的首个位置参数就叫 kind,
++        # 传 kind=... 会当场 TypeError(本轮第一版正是这样炸在取消步上)。
++        led.ev("CANCEL_RESULT", row=row_kind, id=int(g["id"]), st=g.get("st", ""),
++               binding=name, expected_id=want)
++        if row_kind == "ALREADY_TERMINAL":
++            raise Stop("CANCEL_NOT_CAPTURED",
++                       "as=%s id=%s 作业已是 %s(why=%s) => 未捕获活动取消, 不算取消成功, "
++                       "也不自动再开一枚" % (asname, g["id"], g["st"], g.get("why", "")))
++        if int(g["id"]) != want:
++            raise Stop("CANCEL_ID_MISMATCH",
++                       "as=%s 回包 id=%s 与本轮绑定 %s 不符" % (asname, g["id"], want))
++        return
++    if verdict != "OK":
++        return
++    raise Stop("CANCEL_RESULT_UNPARSED",
++               "as=%s 取消响应里没有可判定的受理/未捕获行(REFUSED 线在业务层已先停)" % asname)
++
++
+ def poll_command_step(port, cmd, st, asname, idx, out, step_dl, transport, fixture, silent,
+-                      led, clock, budget, results):
++                      led, clock, budget, results, bindings=None):
+     """起转后的**有限轮询**(审核 §2D 第 3 条): 一条立即查询或 tgt>0 都不算稳定巡航。
+     只在申报的 retry_codes 里重试(ACCEL 不是异常 => 同一预算内继续等), 窗口到期或不一致就
+     具名停止并交由同一条清理路径撤能。"""
+@@ -1921,7 +2149,9 @@
+     window = float(p.get("until_seconds", 3))
+     interval = float(p.get("interval_seconds", 0.5))
+     codes = tuple(p.get("retry_codes", ["PROFILE_NOT_RUNNING"]))
+-    ramping = {MOTOR_STATE_ENUM["ACCEL"], MOTOR_STATE_ENUM["DECEL"]}
++    gate, in_row, in_states = poll_gate_of(p)
++    max_attempts = p.get("max_attempts")
++    bindings = bindings if bindings is not None else {}
+     until = min(clock.monotonic() + window, step_dl)
+     n = 0
+     while True:
+@@ -1930,28 +2160,50 @@
+         v, nbytes, txt = command_attempt(port, cmd, st, "%s#%d" % (asname, n), raw, until,
+                                          transport, fixture, silent, led, clock, attempt=n)
+         results.append(dict({"as": asname, "kind": "command_poll", "cmd": cmd, "attempt": n,
++                             "poll_gate": gate,
+                              "rx_bytes": nbytes, "rx_sha256": sha_of(raw), "txt": txt}, **v))
+         if v["verdict"] == "OK":
+-            led.ev("POLL_OK", **{"as": asname, "attempts": n,
++            check_job_expect(st, txt, bindings, asname)
++            led.ev("POLL_OK", **{"as": asname, "attempts": n, "poll_gate": gate,
+                                  "elapsed_s": round(clock.monotonic() - led.t0, 3)})
+-            return v
+-        state = ramping_state(txt)
+-        if not (v["verdict"] == "STOP" and v.get("code") in codes and state in ramping):
+-            raise Stop(v["code"], json.dumps(v, ensure_ascii=False))
++            return v, txt
++        state, groups = poll_observe(gate, in_row, in_states, txt)
++        jbn = p.get("job_binding")
++        if jbn and groups.get("id") is not None:
++            if jbn not in bindings:
++                raise Stop("JOB_UNBOUND", "as=%s poll 引用未绑定的 %s" % (asname, jbn))
++            if int(groups["id"]) != bindings[jbn]["job_id"]:
++                # 首份坏响应就停: 别人家的作业行不能等成"本轮还没到 DONE"。
++                raise Stop("POLL_JOB_MISMATCH", json.dumps(
++                    {"as": asname, "row_id": groups["id"],
++                     "bound_id": bindings[jbn]["job_id"],
++                     "bound_from": bindings[jbn]["from_step"], "attempt": n},
++                    ensure_ascii=False))
++        if not (v["verdict"] == "STOP" and v.get("code") in codes and state is not None):
++            raise Stop(v["code"], json.dumps(dict(v, poll_gate=gate, observed=state),
++                                              ensure_ascii=False))
++        if max_attempts and n >= int(max_attempts):
++            # E1: 上限同时受次数与时间窗约束; 次数到是另一种结束, 不借口"窗口还没到"继续发。
++            raise Stop("POLL_ATTEMPTS_EXHAUSTED", json.dumps(
++                {"as": asname, "attempts": n, "max_attempts": int(max_attempts),
++                 "last": v.get("code"), "state": state, "poll_gate": gate},
++                ensure_ascii=False))
+         if clock.monotonic() + interval >= until or (budget.armed and
+                                                     budget.business_deadline(0) <= clock.monotonic()):
+             raise Stop("POLL_WINDOW_EXPIRED", json.dumps(
+                 {"as": asname, "attempts": n, "last": v.get("code"), "state": state,
++                 "poll_gate": gate, "in_progress_states": list(in_states or []),
+                  "bad": v.get("bad", []), "window_s": window}, ensure_ascii=False))
+         led.ev("POLL_RETRY", **{"as": asname, "attempt": n, "code": v.get("code"),
+-                                "state": state, "waiting_s": interval})
++                                "state": state, "poll_gate": gate, "waiting_s": interval,
++                                "rx_sha256": sha_of(raw)})
+         clock.sleep(interval)
+ 
+ 
+ def exec_session(session_id, steps, outdir, transport, fixture, port_name,
+                  total_deadline_seconds, clock, backend=None, motion_cap_seconds=None,
+                  plan=None, quota_box=None, used_box=None, context=None, approval=None,
+-                 approved=None):
++                 approved=None, energize_cap_seconds=None):
+     """一个会话 = 一个端口 = 一个写者。
+ 
+     与 R1 交付版的三处实质差别:
+@@ -2032,6 +2284,8 @@
+         led.ev("QUOTA_CONSUMED", name=name, n=n, left=quota[name])
+         return None
+ 
++    bindings = {}
++    energize = EnergizeBudget(clock, energize_cap_seconds)
+     budget = MotionBudget(clock, motion_cap_seconds) if motion_cap_seconds else \
+         MotionBudget(clock, total_deadline_seconds)
+     silent = bool(fixture.get("inject", {}).get("port_silent"))
+@@ -2060,6 +2314,12 @@
+             if clock.monotonic() - led.t0 > total_deadline_seconds:
+                 raise Stop("TOTAL_DEADLINE_EXCEEDED", "%ds" % total_deadline_seconds)
+             asname = st.get("as") or ("step%02d" % idx)
++            if energize.expired():
++                # 通电截止到了: 连这一步都不尝试(不是"发完再补"), 清理仍由 finally 走。
++                raise Stop("ARM_ENERGIZE_DEADLINE_EXCEEDED", json.dumps(
++                    {"as": asname, "cap_seconds": energize.cap,
++                     "elapsed_s": round(clock.monotonic() - energize.t0, 3),
++                     "checked_before_write": True}, ensure_ascii=False))
+             raw = out / ("%02d_%s.rx.bin" % (idx, asname))
+             if "manual" in st:
+                 val = read_manual(st["manual"], fixture, True, transport=transport)
+@@ -2085,6 +2345,10 @@
+             if st.get("new_log_window"):
+                 cmd, selected_window = select_new_log_window(st["new_log_window"], results, context)
+                 led.ev("NEW_LOG_WINDOW", **selected_window)
++            cmd, job_prov = resolve_job_cmd(st, cmd, bindings, asname)
++            if job_prov:
++                # 派生命令只进台账与实际发送, 不回写获批的 plan(批准绑定的是计划字节+生成规则)。
++                led.ev("JOB_CMD_RESOLVED", **job_prov)
+             if cmd == "__approved_reboot__":
+                 spend("approved_reboot", 1)
+                 r = run_action({"action": "reboot", "as": asname,
+@@ -2120,6 +2384,14 @@
+             step_dl = budget.business_deadline(want) if (cmd == "__watch__" or budget.armed) \
+                 else min(clock.monotonic() + want + SLACK_SECONDS,
+                          clock.monotonic() + total_deadline_seconds)
++            if energize.armed:
++                # 申报的等待窗要兑现, 但取会话/通电/运动三者最早的那个截止, 不在 read 或 sleep 里放宽。
++                step_dl = min(step_dl, energize.deadline())
++                if energize.expired():
++                    raise Stop("ARM_ENERGIZE_DEADLINE_EXCEEDED", json.dumps(
++                        {"as": asname, "want_seconds": want, "cap_seconds": energize.cap,
++                         "elapsed_s": round(clock.monotonic() - energize.t0, 3)},
++                        ensure_ascii=False))
+             if budget.armed and step_dl <= clock.monotonic():
+                 raise Stop("MOTION_BUDGET_EXHAUSTED", "as=%s want=%ds" % (asname, want))
+             if cmd == "__watch__":
+@@ -2179,18 +2451,33 @@
+                 obligation = True
+                 if cmd == "motor_start":
+                     budget.start_attempt()
++                if cmd == "motor_arm":
++                    # E4: arm 时限缺失/为 0 就在**真实写之前**具名拒绝, 不允许"arm 了但没人管通电时长"。
++                    if energize.cap is None:
++                        raise Stop("ARM_ENERGIZE_DEADLINE_UNDECLARED",
++                                   "as=%s 阶段没申报 arm_energize_deadline_seconds => 不发 motor_arm" %
++                                   asname)
++                    energize.start_attempt()
++                    led.ev("ENERGIZE_OBLIGATION_SET", cap_seconds=energize.cap,
++                           t_s=round(clock.monotonic() - led.t0, 3))
+                 led.ev("OBLIGATION_SET", cmd=cmd, t_s=round(clock.monotonic() - led.t0, 3),
+                        cap_seconds=budget.cap)
+             if st.get("poll"):
+                 # 有限轮询取证(只在申报的重试码内等): 到期/不一致 => 撤能由 finally 统一走
+-                poll_command_step(port, cmd, st, asname, idx, out, step_dl, transport, fixture,
+-                                  silent, led, clock, budget, results)
++                _polled, polled_txt = poll_command_step(
++                    port, cmd, st, asname, idx, out, step_dl, transport, fixture,
++                    silent, led, clock, budget, results, bindings)
+                 continue
+             v, nbytes, txt = command_attempt(port, cmd, st, asname, raw, step_dl, transport,
+                                              fixture, silent, led, clock)
+             results.append(dict({"as": asname, "kind": "command", "cmd": cmd,
+                                  "rx_bytes": nbytes, "rx_sha256": sha_of(raw),
+                                  "txt": txt, "selected_log_window": selected_window}, **v))
++            if st.get("job_cmd"):
++                # 取消合同排在**通用判据之前**: "已终态"必须登记成未捕获活动取消(E1),
++                # 不能被 expect_contains 的 EXPECTATION_NOT_MET 掩盖掉身份; 而业务失败线
++                # (REFUSED/FAILED)仍由下面的 verdict 门给出准确码。
++                enforce_cancel_contract(st, txt, bindings, led, asname, v["verdict"])
+             if v["verdict"] == "BYTE_CORRUPT":
+                 # R6 §5.3: 本版执行器**不产生**这个判决(字节损坏一律停)。真出现了就说明有人又把
+                 # "损坏后由后面某步重确认"接回运行时 —— 具名拒绝, 不让它作为可继续状态泄漏。
+@@ -2202,6 +2489,12 @@
+                 break
+             if v["verdict"] != "OK":
+                 raise Stop(v["code"], json.dumps(v, ensure_ascii=False))
++            # 到这里这条命令是**判据通过**的: 才允许绑定 ID、核对同作业断言, 也才允许认定撤能成立。
++            bind_job_id(st, txt, raw, bindings, led, asname)
++            check_job_expect(st, txt, bindings, asname)
++            if cmd == "motor_disarm" and energize.armed:
++                led.ev("ENERGIZE_DEADLINE_CLOSED", actual_s=round(energize.close(), 3),
++                       cap_seconds=energize.cap)
+         if ret is None:
+             led.ev("SESSION_OK", session=session_id, steps=len(results))
+             ret = {"status": "OK", "code": ""}
+@@ -2218,7 +2511,7 @@
+             hook = _stub_feed(port, fixture) if transport == "stub" else None
+             try:
+                 disarm_state, cerr = cleanup(port, led, clock, budget, transport, fixture,
+-                                             hook, quota_box if plan else None,
++                                             hook, quota if plan else None,
+                                              cleanup_overruns, used,
+                                              approval=approval, reservations=reservations)
+                 errors.extend(cerr)          # 清理错独立留账: 主错在 ret, 不能被吞成空成功
+@@ -2286,6 +2579,9 @@
+                 "obligation": obligated, "success": success,
+                 "cleanup_errors": errors, "cleanup_overruns": cleanup_overruns,
+                 "budget_seconds": elapsed,
++                "energize_cap_seconds": energize.cap,
++                "energize_seconds_actual": energize.close(),
++                "job_bindings": {k: v["job_id"] for k, v in bindings.items()},
+                 "quota_left": quota, "quota_used": used, "dir": str(out),
+                 "ledger": str(out / "ledger.jsonl"), "terminal": terminal})
+     return ret
+@@ -2561,6 +2857,171 @@
+     required = {"trip_row", "source_sample", "profile_identity", "incident_session"}
+     got = set(spec.get("covers", []))
+     return sorted(required - got), spec
++
++
++R7F8E_JOB_ROW_GROUP = "st"
++R7F8E_CANCEL_CMD = "diag_profile learn_cancel"
++
++
++def job_state_names_from_source(app_dir):
++    """合法作业状态名只认产品源码 rel_job_state_name 的 case 表(注释与文档不算依据)。"""
++    p = Path(str(app_dir)) / "diag_relative.c"
++    src = p.read_text(encoding="utf-8", errors="replace")
++    if "rel_job_state_name" not in src:
++        raise Stop("R7F8E_JOB_STATE_SOURCE_MISSING", str(p))
++    body = src.split("rel_job_state_name", 1)[1]
++    body = body[:body.index("\n}")] if "\n}" in body else body
++    got = sorted(set(re.findall(r'return "([A-Z_]+)";', body)))
++    if not got:
++        raise Stop("R7F8E_JOB_STATE_SOURCE_EMPTY", str(p))
++    return got
++
++
++def validate_r7f8e(plan, rows_doc, app_dir):
++    """E1~E4 的离线门: 全部是"结构上就发不出去/等不到/记不上账"的拒绝, 不判定任何设备结论。"""
++    out, fails = [], []
++
++    def gate(name, sid, ok, detail):
++        out.append("%s|%s|%s|%s" % (name, sid, "PASS" if ok else "FAIL", detail))
++        if not ok:
++            fails.append(name)
++
++    names = msh_command_names(app_dir)
++    legal = job_state_names_from_source(app_dir)
++    pairs = list(QUOTA_COMMAND_KEYS)
++    keys = sorted({k for _p, k in pairs})
++    cancel_pair = (R7F8E_CANCEL_CMD, "diag_profile_learn_cancel")
++    gate("R7F8E_QUOTA_TABLE", "all",
++         len(pairs) == 10 and len(keys) == 9 and cancel_pair in pairs,
++         "pairs=%d keys=%d 取消键=%s" % (len(pairs), len(keys), cancel_pair in pairs))
++    ghost = [p for p, _k in pairs if p.split(" ")[0] not in names]
++    gate("R7F8E_QUOTA_PREFIX_REAL", "all", not ghost,
++         "产品里不存在的前缀=%s(写错会静默永不命中, 于是动作被当成只读)" % ghost)
++    gate("R7F8E_LEARN_STATUS_READONLY", "all",
++         quota_key_for_command("diag_profile learn_status") is None
++         and quota_key_for_command(R7F8E_CANCEL_CMD + " 17") == "diag_profile_learn_cancel",
++         "learn_status 不得算 learn/cancel; learn 请求与取消分别计数")
++    gate("R7F8E_JOB_STATE_NAMES", "all", "RUNNING" in legal and "DONE" in legal,
++         "源码 rel_job_state_name 状态名=%s" % ",".join(legal))
++    for stg in plan["stages"]:
++        sid = stg["id"]
++        steps = stg.get("steps", [])
++        seen_as = [st.get("as") for st in steps]
++        bound = {}
++        for st in steps:
++            for spec in st.get("expect_values", []):
++                jb = spec.get("job_binding")
++                if jb and jb not in bound:
++                    gate("R7F8E_JOB_REF_SPEC", sid, False,
++                         "%s 引用未绑定的 %s(绑定必须由更早步骤的 job_bind 产生)"
++                         % (st.get("as"), jb))
++            if not st.get("job_bind"):
++                continue
++            b = st["job_bind"]
++            nm = b.get("name")
++            bad = []
++            if not nm or not re.fullmatch(r"[a-z][a-z0-9_]{0,31}", str(nm)):
++                bad.append("绑定名不合法(%r)" % (nm,))
++            if seen_as.count(st.get("as")) != 1:
++                bad.append("as 在本阶段不唯一")
++            try:
++                rgx = re.compile(b.get("row", JOB_ROW_STARTED))
++                if "job_id" not in (rgx.groupindex or {}):
++                    bad.append("正则缺组 job_id")
++            except re.error as e:
++                bad.append("STARTED 正则不可编译:%s" % e)
++            for k, v in (b.get("params") or {}).items():
++                if not is_count(v) or v < 0:
++                    bad.append("参数 %s=%r 非非负整数" % (k, v))
++            if nm in bound:
++                bad.append("同一阶段里绑定名重复")
++            gate("R7F8E_JOB_BIND_SPEC", sid, not bad,
++                 ("%s name=%s" % (st.get("as"), nm)) + ("" if not bad else "|" + ";".join(bad)))
++            if not bad:
++                bound[nm] = st.get("as")
++        for st in steps:
++            asname = st.get("as") or "?"
++            cmd = st.get("cmd", "")
++            toks = cmd.split()
++            p = st.get("poll") or {}
++            if p:
++                bad = []
++                if quota_key_for_command(cmd) is not None:
++                    bad.append("被轮询的 cmd=%s 是修改状态的动作 => 轮询只能发预声明的只读查询" % cmd)
++                if st.get("job_bind"):
++                    bad.append("job_bind 与 poll 不能同步(STARTED 行只在这一步自己的响应里绑定)")
++                if "max_attempts" in p and (not is_count(p["max_attempts"]) or p["max_attempts"] < 1):
++                    bad.append("max_attempts=%r" % (p["max_attempts"],))
++                for f in ("until_seconds", "interval_seconds"):
++                    if f in p and (not isinstance(p[f], (int, float)) or p[f] <= 0):
++                        bad.append("%s=%r" % (f, p[f]))
++                if p.get("in_progress"):
++                    spec = p["in_progress"]
++                    try:
++                        rgx = re.compile(spec["row"])
++                        if R7F8E_JOB_ROW_GROUP not in (rgx.groupindex or {}):
++                            bad.append("缺组 %s" % R7F8E_JOB_ROW_GROUP)
++                    except (re.error, KeyError, TypeError) as e:
++                        bad.append("行正则不可用:%s" % e.__class__.__name__)
++                    states = list(spec.get("states") or [])
++                    if not states:
++                        bad.append("states 为空(空集合等于永不重试, 窗口形同不存在)")
++                    unknown = [x for x in states if x not in legal]
++                    if unknown:
++                        bad.append("状态不在源码集合里:%s" % unknown)
++                    if not p.get("retry_codes"):
++                        bad.append("retry_codes 为空")
++                    if not p.get("job_binding"):
++                        bad.append("in_progress 轮询必须声明 job_binding: 不绑就是"
++                                   "把别人家的终态等成本轮的结果")
++                    for spec2 in st.get("expect_values", []):
++                        if spec2.get("job_binding") and \
++                                spec2["job_binding"] != p.get("job_binding"):
++                            bad.append("一条轮询只允许引用同一枚作业: expect_values=%s "
++                                       "poll=%s" % (spec2["job_binding"],
++                                                    p.get("job_binding")))
++                gate("R7F8E_POLL_SPEC", sid, not bad, "%s%s" % (asname, "" if not bad else "|" + ";".join(bad)))
++                if p.get("job_binding") and p["job_binding"] not in bound:
++                    gate("R7F8E_JOB_REF_SPEC", sid, False,
++                         "%s poll 引用未绑定的 %s" % (asname, p["job_binding"]))
++            if st.get("job_cmd"):
++                bad = []
++                if tuple(toks[:2]) != CANCEL_PREFIX_TOKENS or len(toks) != 3:
++                    bad.append("cmd=%s 不是固定形式 diag_profile learn_cancel @<绑定名>" % cmd)
++                else:
++                    m = JOB_REF_RE.match(toks[2])
++                    if not m:
++                        bad.append("参数位不是 @引用: %s" % toks[2])
++                    elif m.group(1) != st["job_cmd"]:
++                        bad.append("位置引用 @%s 与 job_cmd=%s 不一致" % (m.group(1), st["job_cmd"]))
++                    elif m.group(1) not in bound:
++                        bad.append("绑定 %s 没有由更早步骤的 job_bind 产生" % m.group(1))
++                    elif bound[m.group(1)] and seen_as.index(bound[m.group(1)]) >= seen_as.index(asname):
++                        bad.append("来源步骤 %s 不在本步之前" % bound[m.group(1)])
++                gate("R7F8E_JOB_REF_SPEC", sid, not bad, "%s%s" % (asname, "" if not bad else "|" + ";".join(bad)))
++        arms = [i for i, st in enumerate(steps) if st.get("cmd") == "motor_arm"]
++        disarms = [i for i, st in enumerate(steps) if st.get("cmd") == "motor_disarm"]
++        cap = stg.get("arm_energize_deadline_seconds")
++        if arms:
++            bad = []
++            if not is_count(cap) or cap <= 0:
++                bad.append("未申报正整数 arm_energize_deadline_seconds(=%r)" % (cap,))
++            else:
++                total = int(stg.get("total_deadline_seconds", 0) or 0)
++                if total and cap > total:
++                    bad.append("截止 %s 超过本阶段总窗 %s(到不了)" % (cap, total))
++            if disarms and max(disarms) < min(arms):
++                bad.append("阶段内的 disarm 排在 arm 之前")
++            gate("R7F8E_ARM_ENERGIZE", sid, not bad,
++                 "arm@%s cap=%s disarm@%s%s" % (arms, cap, disarms,
++                                                "" if not bad else "|" + ";".join(bad)))
++        elif cap:
++            gate("R7F8E_ARM_ENERGIZE", sid, False, "申报了 arm 通电截止却没有 motor_arm 步(死条款)")
++    for f in sorted(set(fails)):
++        out.append("R7F8E_GATE_SUMMARY|all|FAIL|%s" % f)
++    if not fails:
++        out.append("R7F8E_GATE_SUMMARY|all|PASS|fails=0")
++    return out, len(fails)
+ 
+ 
+ def validate_plan(plan, rows_doc, app_dir):
+@@ -2659,7 +3120,7 @@
+         ok = bool(t) and isinstance(t.get("argv"), list) and t["argv"] and \
+             not plan_placeholder_scan({name: t})
+         out.append("PLAN_TOOL_ARGV|%s|%s|%s" % (name, "PASS" if ok else "FAIL",
+-                                                " ".join(t.get("argv", []))[:70]))
++                                                " ".join((t or {}).get("argv", []))[:70]))
+         if not ok:
+             bad += 1
+     undeclared = sorted({q["name"] for sg in plan["stages"] for q in [st.get("quota")
+@@ -2818,7 +3279,9 @@
+                 head = (st.get("cmd") or "").split(" ")[0]
+                 if not (p.startswith("^") and p.endswith("$")) or ".*" in p:
+                     sa_bad.append("%s/%s:模式未整行锚定或含 .* 通配(%s)" % (stg["id"], st.get("as"), p))
+-                elif head not in STATUS_QUERY_CMDS and st.get("expect_profile") != "RUNNING":
++                elif (head not in STATUS_QUERY_CMDS and
++                      " ".join((st.get("cmd") or "").split()) not in READONLY_QUERY_CMDS and
++                      st.get("expect_profile") != "RUNNING"):
+                     sa_bad.append("%s/%s:豁免只给**状态查询步**(cmd=%s 不是查询, 也没断言 RUNNING)"
+                                   % (stg["id"], st.get("as"), head or "无 cmd"))
+                 elif not st.get("expect_values"):
+@@ -2887,6 +3350,9 @@
+                     ";".join(bw_bad) or "下界=%ss, 覆盖: %s" % (bmin, ",".join(bw_seen))))
+         if bw_bad:
+             bad += 1
++    e_out, e_bad = validate_r7f8e(plan, rows_doc, app_dir)
++    out.extend(e_out)
++    bad += e_bad
+     return out, bad, len(names)
+ 
+ 
+@@ -3584,6 +4050,7 @@
+                                    int(stg.get("total_deadline_seconds", 120)), clock,
+                                    backend=backend,
+                                    motion_cap_seconds=cap,
++                                   energize_cap_seconds=stg.get("arm_energize_deadline_seconds"),
+                                    plan=plan, quota_box=quota_box, used_box=used_box,
+                                    context=recorded, approval=approval, approved=approved_pkg)
+                 if transport == "real":
+@@ -3767,6 +4234,8 @@
+     ap.add_argument("--port", default="COM5")
+     ap.add_argument("--total-deadline-seconds", type=int, default=120)
+     ap.add_argument("--motion-cap-seconds", type=int, default=0)
++    ap.add_argument("--arm-energize-deadline-seconds", type=int, default=0,
++                    help="E4: motor_arm 之后的通电保持截止(单会话工装入口; 整包按阶段申报)")
+     ap.add_argument("--plan", help="计划 JSON: 提供后额度在发送前真实扣减(quota)")
+     ap.add_argument("--approval-token")
+     ap.add_argument("--expected-token")
+@@ -3961,6 +4430,7 @@
+         res = exec_session(a.session, steps, a.out, a.transport, fixture, a.port,
+                            a.total_deadline_seconds, clock, backend=backend,
+                            motion_cap_seconds=a.motion_cap_seconds or None,
++                           energize_cap_seconds=a.arm_energize_deadline_seconds or None,
+                            plan=plan_doc, approval=session_approval)
+     except Stop as e:
+         print(json.dumps({"session": a.session, "status": "STOP", "code": e.code,

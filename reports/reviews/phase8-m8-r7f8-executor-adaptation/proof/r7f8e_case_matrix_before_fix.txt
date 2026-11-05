@@ -1,0 +1,65 @@
+身份_派生件含四项适配的符号|PASS|244430 B sha=147043f9d99e… 缺=[]
+身份_旧执行器未被动过|PASS|实读 219491 B sha=33d3f0af8a4c9c33…
+身份_A包绑定按Git blob复算|PASS|IDENTITY.json 的 8 条 source_bindings 与 HEAD blob 逐条相符; motor.c 盘上 134298 B(CRLF 检出) / blob 131732 B = A 登记值, CR 数 2566 = 行数
+B1_两枚非1的不同ID各自正确受理与取消|FAIL|组=身份与绑定 rc=1 code=UNEXPECTED_EXCEPTION | code=UNEXPECTED_EXCEPTION 期望=;未实际发出 diag_profile learn_cancel 73(实发=['diag_profile learn 8 450 550 0', 'diag_profile learn_cancel 17']);diag_profile learn 8 450 550 0 实发 1 次要求 2;绑定={'b1': 17} 期望={'b1': 17, 'b2': 73}
+B2_缺STARTED就拒绝绑定|PASS|组=身份与绑定 rc=1 code=BUSINESS_FAILED
+B3_重复STARTED行拒绝绑定|PASS|组=身份与绑定 rc=1 code=JOB_BIND_NOT_UNIQUE
+B4_ID为0越界拒绝|PASS|组=身份与绑定 rc=1 code=JOB_ID_OUT_OF_RANGE
+B5_ID带命令字符拒绝|PASS|组=身份与绑定 rc=1 code=JOB_BIND_NOT_UNIQUE
+B6_跨作业错绑(回包id与绑定不符)|FAIL|组=身份与绑定 rc=1 code=UNEXPECTED_EXCEPTION | code=UNEXPECTED_EXCEPTION 期望=CANCEL_ID_MISMATCH
+B7_未定义引用在写前拒绝|PASS|组=身份与绑定 rc=1 code=JOB_UNBOUND
+B8_取消写死字面ID被拒(不接受固定1)|PASS|组=身份与绑定 rc=1 code=CANCEL_NEEDS_JOB_REF
+B9_非取消命令里出现@引用不发|PASS|组=身份与绑定 rc=1 code=JOB_REF_NOT_DECLARED
+D1_RUNNING两次后DONE正例(凭据/归属/样本都核)|PASS|组=正常DONE rc=0 code=
+D2_owner不是FREE立即拒|PASS|组=正常DONE rc=1 code=FIELD_VALUE_MISMATCH
+D3_缺零点凭据立即拒|PASS|组=正常DONE rc=1 code=FIELD_VALUE_MISMATCH
+D4_样本数不足不当成功|PASS|组=正常DONE rc=1 code=FIELD_VALUE_BELOW_MIN
+D5_旧ID的DONE不当本轮结果|FAIL|组=正常DONE rc=1 code=JOB_ID_MISMATCH | code=JOB_ID_MISMATCH 期望=POLL_JOB_MISMATCH
+C1_STARTED→REQUESTED→CANCELLED同一作业|FAIL|组=活动取消 rc=1 code=UNEXPECTED_EXCEPTION | code=UNEXPECTED_EXCEPTION 期望=
+C2_已DONE后取消算未捕获活动取消|FAIL|组=活动取消 rc=1 code=EXPECTATION_NOT_MET | code=EXPECTATION_NOT_MET 期望=CANCEL_NOT_CAPTURED
+C2b_具名拒绝仍不算成功且不自动再开作业|FAIL|组=活动取消 rc=1 code=EXPECTATION_NOT_MET | code=EXPECTATION_NOT_MET 期望=NAMED_REFUSAL;status=STOP 期望=REFUSED
+T1_FAILED按业务失败立即收口|PASS|组=异常终态 rc=1 code=BUSINESS_FAILED
+T2_TIMEOUT不在进行中集合立即收口|PASS|组=异常终态 rc=1 code=FIELD_VALUE_MISMATCH
+T3_不该出现的CANCELLED不当DONE|PASS|组=异常终态 rc=1 code=FIELD_VALUE_MISMATCH
+P1_时间窗到期具名结束|PASS|组=轮询边界 rc=1 code=POLL_WINDOW_EXPIRED
+P2_次数上限具名结束(窗口更长也停)|PASS|组=轮询边界 rc=1 code=POLL_ATTEMPTS_EXHAUSTED
+P3_矛盾字段(无[MOT]状态行)在旧运动门里立刻停|PASS|组=轮询边界 rc=1 code=PROFILE_FIELDS_UNREADABLE
+P3b_旧运动巡航轮询仍等到CRUISE(回归)|FAIL|组=轮询边界 rc=1 code=CLEANUP_UNCONFIRMED | code=CLEANUP_UNCONFIRMED 期望=
+P4_裸NUL首份坏响应即停|PASS|组=轮询边界 rc=1 code=NUL_BYTE_IN_RESPONSE
+P5_轮询首份坏字节响应即收口不重试|PASS|组=轮询边界 rc=1 code=NUL_BYTE_IN_RESPONSE
+P6_危险文本首份坏响应即停|PASS|组=轮询边界 rc=1 code=DANGER_TEXT_IN_STREAM
+P7_板子不回话按截止停并进清理|PASS|组=轮询边界 rc=1 code=MISSING_RESPONSE_PROMPT
+Q1_取消未申报额度不发|FAIL|组=额度 rc=1 code=JOB_UNBOUND | code=JOB_UNBOUND 期望=QUOTA_STEP_UNDECLARED
+Q2_取消错额度键不发|FAIL|组=额度 rc=1 code=JOB_UNBOUND | code=JOB_UNBOUND 期望=QUOTA_KEY_MISMATCH
+Q3_n不为1不发|FAIL|组=额度 rc=1 code=JOB_UNBOUND | code=JOB_UNBOUND 期望=QUOTA_N_MISMATCH
+Q4_额度为0先拒(缺省不自动升级)|FAIL|组=额度 rc=1 code=QUOTA_UNDECLINED | code=QUOTA_UNDECLINED 期望=QUOTA_EXHAUSTED
+Q5_learn_status不扣learn与cancel|PASS|组=额度 rc=0 code=
+Q6_已终态的取消仍消耗一次不退额|FAIL|组=额度 rc=1 code=EXPECTATION_NOT_MET | code=EXPECTATION_NOT_MET 期望=CANCEL_NOT_CAPTURED
+E1_arm后只等待不start也受通电截止|PASS|组=通电与运动 rc=1 code=ARM_ENERGIZE_DEADLINE_EXCEEDED
+E2_未申报arm时限在写前拒|PASS|组=通电与运动 rc=1 code=ARM_ENERGIZE_DEADLINE_UNDECLARED
+E3_正常stop后仍armed不清通电义务|PASS|组=通电与运动 rc=1 code=ARM_ENERGIZE_DEADLINE_EXCEEDED
+E4_start运动截止与arm通电截止各自独立|PASS|组=通电与运动 rc=1 code=POLL_WINDOW_EXPIRED
+E5_disarm成功后通电计时停住(不被误伤)|PASS|组=通电与运动 rc=0 code=
+L1_业务stop/disarm与固定三条分别记账|FAIL|组=清理 rc=0 code= | motor_stop 实发 1 次要求 2;motor_disarm 实发 1 次要求 2
+L2_丢stop回包仍继续disarm与状态取证|FAIL|组=清理 rc=1 code=CLEANUP_ERRORS | code=CLEANUP_ERRORS 期望=
+L3_清理预留耗尽仍撤能但本场不OK|FAIL|组=清理 rc=0 code= | success=True 要求 False;清理超额披露=[] 要求>=1
+L4_无arm/start的静态段不发清理|PASS|组=清理 rc=0 code=
+M1_MONITOR_ONLY拒绝在成功场景是STOP|PASS|组=首因与拒绝 rc=1 code=BUSINESS_FAILED
+M2_同一行只在专门负控里作具名拒绝|PASS|组=首因与拒绝 rc=1 code=NAMED_REFUSAL
+X1_把JOB_ID固定成1|PASS|摘门后 code=UNEXPECTED_EXCEPTION(原门检出=JOB_UNBOUND)
+X2_把任何终态当成功|PASS|摘门后 code=FIELD_VALUE_MISMATCH(原门检出=None); 复跑 P1_时间窗到期具名结束 code=FIELD_VALUE_MISMATCH
+X3_移除取消额度行|PASS|摘门后 code=JOB_UNBOUND(原门检出=QUOTA_STEP_UNDECLARED)
+X4_把arm截止改回start起算|FAIL|摘门后 code=ARM_ENERGIZE_DEADLINE_EXCEEDED(原门检出=ARM_ENERGIZE_DEADLINE_EXCEEDED)
+R1_非法UTF8经会话读路径具名停止且原字节留证|PASS|code=ILLEGAL_BYTES_IN_RESPONSE rx.bin=23 B 与注入 23 B 逐字节相等=True
+R2_裸NUL经会话读路径具名停止且原字节留证|FAIL|code=NUL_BYTE_IN_RESPONSE(裸 NUL 是合法 UTF-8, 只有显式 count(0) 门能抓)
+R3_危险文本先于解码判定(门顺序固定)|PASS|两种缺陷同批出现时 code=DANGER_TEXT_IN_STREAM 要求 DANGER_TEXT_IN_STREAM
+R4_多字节中文跨读块不误杀(回归)|PASS|code= 注入=609 B 读块=3 段 行1='[INFO] 安安安安安安安安安安安安安安安安安'
+I1_绑定后改plan字节被拒|PASS|code=PLAN_BYTES_CHANGED_AFTER_APPROVAL
+I2_偷换步骤被拒|PASS|code=PLAN_BYTES_CHANGED_AFTER_APPROVAL
+I3_换执行器身份被拒|PASS|code=APPROVAL_IDENTITY_MISMATCH
+I4_派生命令不回写获批步骤|FAIL|steps_sha 不变; 台账与实发记录派生命令: ['diag_profile learn 8 450 550 0', 'diag_profile learn_cancel 17']
+M3_七原因共用一次票据(源码锚点)|PASS|源码侧同一出口/票据的字样在位; 票据消耗顺序的行为级证据仍待现场(本轮不声称)
+M4_旧F7遗留FAILED只作只读披露|PASS|豁免按完整命令放行两条真只读查询, 不放宽 diag_profile 首词面
+自证_故意写错的预期必须被判红|PASS|judge() 对同一份真实输出报了 4 条不符 => 整张矩阵的绿不是恒真
+本轮无设备动作|PASS|全部 stub/sim 子进程与在进程内门函数; 未开串口/pyOCD/Keil/分析仪, 未建真实批准账
+R7F8E_MATRIX_SUMMARY|判据=64|FAIL=18|B1_两枚非1的不同ID各自正确受理与取消,B6_跨作业错绑(回包id与绑定不符),D5_旧ID的DONE不当本轮结果,C1_STARTED→REQUESTED→CANCELLED同一作业,C2_已DONE后取消算未捕获活动取消,C2b_具名拒绝仍不算成功且不自动再开作业,P3b_旧运动巡航轮询仍等到CRUISE(回归),Q1_取消未申报额度不发,Q2_取消错额度键不发,Q3_n不为1不发,Q4_额度为0先拒(缺省不自动升级),Q6_已终态的取消仍消耗一次不退额,L1_业务stop/disarm与固定三条分别记账,L2_丢stop回包仍继续disarm与状态取证,L3_清理预留耗尽仍撤能但本场不OK,X4_把arm截止改回start起算,R2_裸NUL经会话读路径具名停止且原字节留证,I4_派生命令不回写获批步骤

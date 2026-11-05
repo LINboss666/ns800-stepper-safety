@@ -1,0 +1,304 @@
+{
+ "package": "M8-R7F8E-STUB-ONLY",
+ "status": "STUB_ONLY_SYNTHETIC_TOOL_VALIDATION",
+ "task_id": "M8R7F8E-offline-executor-adaptation-20261105",
+ "numbers_are_proposals_not_authorization": true,
+ "hardware_actions_this_round": 0,
+ "rows_file": "rows_r7f8e.json",
+ "scope_this_package": "只验工具适配本身: 异步作业的有界轮询、按 STARTED 绑定的动态 JOB_ID、取消的显式额度、arm 之后的通电截止与固定清理对账。不是现场计划, 不授权任何设备动作, 也不构成对下一轮硬件的批准。",
+ "scope_boundaries": {
+  "not_a_real_go": "端口写的是占位符 STUB_PORT, 任何 real 分支都会在任何开口之前具名拒绝",
+  "job_id_not_fixed": "计划里只有 @cancel_job / @done_job 两个引用; 实际数字来自那一步的 STARTED 行(合成 17/73), 派生命令与 ID 来源都进台账",
+  "rows_are_synthetic": "rows_r7f8e*.json 的 _about.kind 明确标 SYNTHETIC_STUB_ROWS_NOT_BOARD_EVIDENCE; 形状取自产品打印语句, 值不是板端实测",
+  "image_reference_only": "identity_binding.image 只是字节身份参照, 本轮不读板也不烧板"
+ },
+ "identity_binding": {
+  "image": {
+   "path": "reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/rt-thread-motor-m1-candidate.bin",
+   "bytes": 297452,
+   "sha256": "23691e8d8aa8c1d3ed6e6eff4b5c51fe27dd3a9169841406ecc627c0e807e963",
+   "note": "R7F7 已签收在板镜像的字节身份参照(本文件当场重算相符); 本轮 0 次读取/写入板端, 也没有下载或回读动作"
+  },
+  "executor": {
+   "path": "reports/reviews/phase8-m8-r7f8-executor-adaptation/tools/m8r3_serial_chain_r7f8.py",
+   "old_executor_sha256": "33d3f0af8a4c9c33dcd4e013b395e4ba990a89e384130f9d0ffe50c71b34e8ca",
+   "note": "派生件身份当场由 current_identities 从运行中的文件算, 不冒用旧 33d3f0af 摘要"
+  }
+ },
+ "byte_integrity_policy": "所有产物按磁盘原字节算 sha256; 清单不哈希自身",
+ "operator_power_policy": "本轮不断电也不上电: 没有任何设备在回路里",
+ "mechanical_prerequisites": {
+  "stub_feed_only": {
+   "status": "PROVIDED",
+   "means": "FakePort 与本行表就是这个合成流程唯一的加载/激励手段, 不涉及真实机械",
+   "not_board_evidence": true
+  }
+ },
+ "motion_budget": {
+  "per_run_cap": "运动截止从 motor_start 发送尝试起算(motor_run_seconds_total=20)",
+  "energize_cap": "通电截止从 motor_arm 发送尝试起算(arm_energize_deadline_seconds=30), 早于 start 也要受它管"
+ },
+ "tools": {
+  "sim_backend": "SimActionBackend 只在内存里记账, 不调用任何外部进程",
+  "provenance": {
+   "why": "本轮要求 backend=sim/transport=stub: 不开 COM、不导入 pyserial 真后端、不启动 Logic、不跑 pyOCD/Keil"
+  }
+ },
+ "quota": {
+  "port_open": 1,
+  "download": 0,
+  "readback": 0,
+  "explicit_reset": 0,
+  "tmc_config_apply": 0,
+  "approved_reboot": 0,
+  "config_save": 0,
+  "irq_polarity_prep": 0,
+  "diag_profile_zero": 0,
+  "diag_profile_learn": 2,
+  "diag_profile_learn_cancel": 1,
+  "diag_profile_commit": 0,
+  "motor_run": 1,
+  "motor_run_seconds_total": 20,
+  "motion_cap_seconds_per_run": 20,
+  "cleanup_motor_stop": 1,
+  "cleanup_motor_disarm": 1,
+  "cleanup_motor_status": 1,
+  "retry": 0,
+  "physical_collision": 0,
+  "blackbox_clear": 0,
+  "dmm_readings": 0
+ },
+ "approval": {
+  "note": "临时账只建在仓外 --work 目录, 绑定这份合成计划与派生件字节"
+ },
+ "stages": [
+  {
+   "id": "S1",
+   "kind": "serial_session",
+   "scenario": "stub_only",
+   "title": "取消试验 + DONE 试验 + 固定清理(全合成, 0 设备)",
+   "port": "STUB_PORT_NOT_A_COM",
+   "arm_energize_deadline_seconds": 30,
+   "motion_cap_seconds": 20,
+   "prerequisite_gates": [
+    "stub_feed_only"
+   ],
+   "total_deadline_seconds": 120,
+   "steps": [
+    {
+     "as": "baseline",
+     "cmd": "motor_status",
+     "key": "status_static",
+     "seconds": 3,
+     "expect_contains": [
+      "state=0"
+     ]
+    },
+    {
+     "as": "dir",
+     "cmd": "motor_dir 0",
+     "key": "motor_dir",
+     "seconds": 2,
+     "expect_contains": [
+      "dir=0"
+     ]
+    },
+    {
+     "as": "arm",
+     "cmd": "motor_arm",
+     "seconds": 3,
+     "expect_contains": [
+      "armed=1"
+     ]
+    },
+    {
+     "as": "target",
+     "cmd": "motor_target 100",
+     "key": "motor_target",
+     "seconds": 2,
+     "expect_contains": [
+      "target=100"
+     ]
+    },
+    {
+     "as": "start",
+     "cmd": "motor_start",
+     "seconds": 2,
+     "expect_absent": [
+      "REFUSED"
+     ],
+     "quota": {
+      "name": "motor_run",
+      "n": 1
+     }
+    },
+    {
+     "as": "cruise",
+     "cmd": "motor_status",
+     "key": "status_cruise",
+     "seconds": 4,
+     "expect_profile": "RUNNING",
+     "poll": {
+      "until_seconds": 4.0,
+      "interval_seconds": 0.5,
+      "retry_codes": [
+       "PROFILE_NOT_RUNNING"
+      ]
+     },
+     "poll_sequence": [
+      "status_accel",
+      "status_cruise"
+     ]
+    },
+    {
+     "as": "learn_cancel_job",
+     "cmd": "diag_profile learn 8 450 550 0",
+     "key": "learn_cancel_trial",
+     "seconds": 3,
+     "expect_contains": [
+      "STARTED"
+     ],
+     "quota": {
+      "name": "diag_profile_learn",
+      "n": 1
+     },
+     "job_bind": {
+      "name": "cancel_job",
+      "params": {
+       "n": 8,
+       "lo": 450,
+       "hi": 550,
+       "dir": 0
+      }
+     }
+    },
+    {
+     "as": "cancel",
+     "cmd": "diag_profile learn_cancel @cancel_job",
+     "key": "cancel_cmd",
+     "seconds": 3,
+     "job_cmd": "cancel_job",
+     "expect_contains": [
+      "REQUESTED"
+     ],
+     "quota": {
+      "name": "diag_profile_learn_cancel",
+      "n": 1
+     }
+    },
+    {
+     "as": "cancel_state",
+     "cmd": "diag_profile learn_status",
+     "key": "ls_cancelled",
+     "seconds": 3,
+     "expect_values": [
+      {
+       "row": "^\\[DIAG\\] job id=(?P<id>[0-9]+) st=(?P<st>[A-Z_]+) why=(?P<why>[A-Z_]+) owner=(?P<owner>[0-9]+) cred=(?P<cred>[0-9]/[0-9])$",
+       "must": {
+        "st": "CANCELLED",
+        "owner": "0"
+       },
+       "job_binding": "cancel_job"
+      }
+     ]
+    },
+    {
+     "as": "learn_done_job",
+     "cmd": "diag_profile learn 8 450 550 0",
+     "key": "learn_done_trial",
+     "seconds": 3,
+     "expect_contains": [
+      "STARTED"
+     ],
+     "quota": {
+      "name": "diag_profile_learn",
+      "n": 1
+     },
+     "job_bind": {
+      "name": "done_job",
+      "params": {
+       "n": 8,
+       "lo": 450,
+       "hi": 550,
+       "dir": 0
+      }
+     }
+    },
+    {
+     "as": "wait_done",
+     "cmd": "diag_profile learn_status",
+     "key": "ls_done",
+     "seconds": 4,
+     "poll": {
+      "until_seconds": 1.5,
+      "interval_seconds": 0.5,
+      "retry_codes": [
+       "FIELD_VALUE_MISMATCH",
+       "PROFILE_NOT_RUNNING"
+      ],
+      "in_progress": {
+       "row": "^\\[DIAG\\] job id=(?P<id>[0-9]+) st=(?P<st>[A-Z_]+) why=(?P<why>[A-Z_]+) owner=(?P<owner>[0-9]+) cred=(?P<cred>[0-9]/[0-9])$",
+       "states": [
+        "RUNNING",
+        "CANCEL_PENDING"
+       ]
+      },
+      "job_binding": "done_job",
+      "max_attempts": 400
+     },
+     "poll_sequence": [
+      "ls_running",
+      "ls_running2",
+      "ls_done"
+     ],
+     "expect_values": [
+      {
+       "row": "^\\[DIAG\\] job id=(?P<id>[0-9]+) st=(?P<st>[A-Z_]+) why=(?P<why>[A-Z_]+) owner=(?P<owner>[0-9]+) cred=(?P<cred>[0-9]/[0-9])$",
+       "must": {
+        "st": "DONE",
+        "owner": "0",
+        "cred": "1/1"
+       },
+       "job_binding": "done_job"
+      },
+      {
+       "row": "^\\[DIAG\\] job n=(?P<adc>[0-9]+)/(?P<sg>[0-9]+) want=(?P<want>[0-9]+) win=(?P<lo>[0-9]+)\\.\\.(?P<hi>[0-9]+) dir=(?P<dir>[0-9]+)$",
+       "must": {
+        "want": 8
+       },
+       "must_min": {
+        "adc": 8,
+        "sg": 8
+       }
+      }
+     ]
+    },
+    {
+     "as": "stop",
+     "cmd": "motor_stop",
+     "seconds": 3,
+     "expect_contains": [
+      "stop requested"
+     ]
+    },
+    {
+     "as": "disarm",
+     "cmd": "motor_disarm",
+     "seconds": 3,
+     "expect_contains": [
+      "DISARM"
+     ]
+    },
+    {
+     "as": "final",
+     "cmd": "motor_status",
+     "key": "motor_status",
+     "seconds": 3,
+     "expect_contains": [
+      "armed=0"
+     ]
+    }
+   ]
+  }
+ ]
+}

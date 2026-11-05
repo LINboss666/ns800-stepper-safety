@@ -1,0 +1,6 @@
+In file included from /workspace/scratch/f24247cdf3d6/r7f7-task/repo/tests/host/rel_main.c:30,
+                 from /workspace/scratch/f24247cdf3d6/r7f8-adaptation-review/package/proof/recovery_ramp_probe.c:2:
+/workspace/scratch/f24247cdf3d6/r7f7-task/repo/tests/host/shim_rel/rtthread.h:34:10: fatal error: windows.h: No such file or directory
+   34 | #include <windows.h>
+      |          ^~~~~~~~~~~
+compilation terminated.

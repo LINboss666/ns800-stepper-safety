@@ -141,3 +141,6 @@ reports/reviews/phase8-m8-r7f6-la-path-static/** -text
 # 冻结源散列与 00718b4 的 blob 相等是判据 => 禁止任何行尾转换。本轮新增的 *_local.txt 也已按同一规则入库。
 reports/reviews/phase8-m8-r7f7-newimage-static/** -text
 reports/reviews/phase8-m8-r7f8-closed-loop-draft/** -text
+# R7F8E 执行器离线适配轮: 派生件/补丁/清单/合成计划与行表都以"盘上原字节 == 远端 blob 字节"为判据,
+# core.autocrlf=true 下任何行尾转换都会让 ROUND_SHA256SUMS 与远端逐 blob 复算对不上 => 整目录禁转换。
+reports/reviews/phase8-m8-r7f8-executor-adaptation/** -text

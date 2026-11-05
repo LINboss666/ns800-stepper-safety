@@ -1,0 +1,141 @@
+输入在位|PASS|四件齐全; 计划=1de974bf2828819f 行表=5fee4060f4bde537
+两侧都跑完并给出汇总|PASS|旧 checks=57 fail=1 / 新 checks=62 fail=1
+旧判据一条都没被洗掉|PASS|消失=0 条
+新增行全部是本轮适配自己的门|PASS|新增=5 条, 其中不是 R7F8E_ 形状的=0 条
+新增门条数与计数一致|PASS|旧 57 + 新增 5 = 新 62
+既有失败集合未变|PASS|两侧 fail 计数 1 vs 1; 唯一既有 FAIL 是 PLAN_MOTION_CAP_BUDGET(空运动链的既有检查器缺口, R7F8 草案轮已登记)
+派生件身份已重登记(不冒用旧摘要)|PASS|旧 219491 B sha=33d3f0af8a4c9c33 / 新 245730 B sha=4c962170b2357eef
+本轮无设备动作|PASS|两次 --validate-plan 都是纯静态读; 未开端口、未建批准账、未 dispatch
+
+== 旧执行器输出原文(58 行) ==
+PLAN_MOTION_WINDOW|S0|PASS|人工门都在运动之前
+PLAN_MOTION_WINDOW|S1|PASS|人工门都在运动之前
+PLAN_MOTION_WINDOW|S2|PASS|人工门都在运动之前
+PLAN_RESET_BEFORE_FIRST_QUERY|S3|PASS|reset@0 first_cmd@1 boot=97
+PLAN_QUOTA|S3|rst|PASS
+PLAN_COMMAND_EXISTS|S3|threads|PASS|ps
+PLAN_ROWS_KEY|S3|threads|PASS|ps
+PLAN_COMMAND_EXISTS|S3|heap|PASS|free
+PLAN_ROWS_KEY|S3|heap|PASS|free
+PLAN_COMMAND_EXISTS|S3|sys_initial|PASS|system_status
+PLAN_ROWS_KEY|S3|sys_initial|PASS|system_status@initial
+PLAN_COMMAND_EXISTS|S3|safety_static|PASS|safety_status
+PLAN_ROWS_KEY|S3|safety_static|PASS|safety_status@static
+PLAN_COMMAND_EXISTS|S3|mot_static|PASS|motor_status
+PLAN_ROWS_KEY|S3|mot_static|PASS|motor_status@static
+PLAN_COMMAND_EXISTS|S3|irq_static|PASS|safety_irq_status
+PLAN_ROWS_KEY|S3|irq_static|PASS|safety_irq_status@static
+PLAN_COMMAND_EXISTS|S3|job_initial|PASS|diag_profile
+PLAN_ROWS_KEY|S3|job_initial|PASS|diag_profile learn_status@job_initial
+PLAN_COMMAND_EXISTS|S3|zero_static|PASS|diag_profile
+PLAN_ROWS_KEY|S3|zero_static|PASS|diag_profile zero 32@static
+PLAN_QUOTA_MAP|S3|zero_static|PASS|cmd=diag_profile zero 32 need=diag_profile_zero declared=diag_profile_zero n=1
+PLAN_COMMAND_EXISTS|S3|job_zero|PASS|diag_profile
+PLAN_ROWS_KEY|S3|job_zero|PASS|diag_profile learn_status@job_zero
+PLAN_COMMAND_EXISTS|S3|learn_start|PASS|diag_profile
+PLAN_ROWS_KEY|S3|learn_start|PASS|diag_profile learn 8 450 550 0@start
+PLAN_QUOTA_MAP|S3|learn_start|PASS|cmd=diag_profile learn 8 450 550 0 need=diag_profile_learn declared=diag_profile_learn n=1
+PLAN_COMMAND_EXISTS|S3|job_advance_window|PASS|__watch__
+PLAN_COMMAND_EXISTS|S3|job_failed|PASS|diag_profile
+PLAN_ROWS_KEY|S3|job_failed|PASS|diag_profile learn_status@job_failed
+PLAN_COMMAND_EXISTS|S3|sys_final|PASS|system_status
+PLAN_ROWS_KEY|S3|sys_final|PASS|system_status@final
+PLAN_COMMAND_EXISTS|S3|mot_final|PASS|motor_status
+PLAN_ROWS_KEY|S3|mot_final|PASS|motor_status@final
+PLAN_MOTION_WINDOW|S3|PASS|人工门都在运动之前
+PLAN_TOOL_ARGV|download|PASS|python -m pyocd flash --pack C:/Keil_v5/ARM/PACK/.Download/NOVOSENSE.N
+PLAN_TOOL_ARGV|readback|PASS|python -m pyocd commander --no-config -t cortex_m -u @UID_FILE -f 1000
+PLAN_TOOL_ARGV|reset|PASS|python -m pyocd reset --method sysresetreq --no-config --no-wait --con
+PLAN_QUOTA_COVERAGE|all|PASS|used=diag_profile_learn,diag_profile_zero missing=
+PLAN_STATE_AND_FLAG_CONSTANTS|all|PASS|motor={'IDLE': 0, 'ACCEL': 1, 'CRUISE': 2, 'DECEL': 3, 'FAULT': 4} rpf={'COMMITTED': 1, 'FIELD_VERIFIED': 2, 'FROM_LEARN': 4} columns=14
+PLAN_MOTION_CAP_BUDGET|all|FAIL|caps=[] sum=0 total=0 starts=0
+PLAN_IMAGE_IDENTITY_CONSISTENCY|all|PASS|S0=download.axf=readback.bin 同源且回读不认旧镜像
+PLAN_QUOTA_NEED|diag_profile_learn|PASS|need=1 declared=1
+PLAN_QUOTA_NEED|diag_profile_zero|PASS|need=1 declared=1
+PLAN_QUOTA_NEED|download|PASS|need=1 declared=1
+PLAN_QUOTA_NEED|explicit_reset|PASS|need=1 declared=1
+PLAN_QUOTA_NEED|port_open|PASS|need=1 declared=1
+PLAN_QUOTA_NEED|readback|PASS|need=1 declared=1
+PLAN_SCENARIO_CHAIN|all|PASS|链内分支决定点都在依赖阶段之前: {}
+PLAN_STUB_BRANCHES|all|PASS|申报={} 场景=
+PLAN_PREREQUISITE_GATE|all|PASS|起转前真拒绝已接线: {}
+PLAN_SPINUP_GATE_COVERAGE|all|PASS|所有起转/带电阶段都在开端口前检查机械前置
+PLAN_TARGET_CHANNEL|all|PASS|产品枚举=REL_ADC_SEVERE,REL_COVERAGE_LOST,REL_FUSED_SEVERE,REL_IMPACT,REL_OUT_OF_WINDOW,REL_SENSOR_UNAVAILABLE,REL_SG_SEVERE
+PLAN_FIRST_CAUSE_LEGS|all|PASS|trip 链都有同次 REL TRIP/源样本/profile/新 session 四腿
+PLAN_BYTE_RECOVERY|all|PASS|计划未申报任何'损坏后可继续'例外 => 裸 NUL / 非法 UTF-8 / 危险文本一律即停(原字节仍先落盘)
+PLAN_STATUS_ALLOW|all|PASS|白名单都是锚定且被正面要求(要求串必须是该行的前缀)的状态行: S3:sys_initial,S3:mot_static,S3:job_failed,S3:sys_final,S3:mot_final
+PLAN_BOOT_WINDOW_COVER|all|PASS|下界=75s, 覆盖: S3=75+6+3s=84s
+PLAN_VALIDATE_SUMMARY|checks=57|fail=1|msh_commands=74|plan=D:\ns800\reports\reviews\phase8-m8-r7f7-newimage-static\field\plan_r7f7_2369_static.json
+
+== 派生件输出原文(63 行) ==
+PLAN_MOTION_WINDOW|S0|PASS|人工门都在运动之前
+PLAN_MOTION_WINDOW|S1|PASS|人工门都在运动之前
+PLAN_MOTION_WINDOW|S2|PASS|人工门都在运动之前
+PLAN_RESET_BEFORE_FIRST_QUERY|S3|PASS|reset@0 first_cmd@1 boot=97
+PLAN_QUOTA|S3|rst|PASS
+PLAN_COMMAND_EXISTS|S3|threads|PASS|ps
+PLAN_ROWS_KEY|S3|threads|PASS|ps
+PLAN_COMMAND_EXISTS|S3|heap|PASS|free
+PLAN_ROWS_KEY|S3|heap|PASS|free
+PLAN_COMMAND_EXISTS|S3|sys_initial|PASS|system_status
+PLAN_ROWS_KEY|S3|sys_initial|PASS|system_status@initial
+PLAN_COMMAND_EXISTS|S3|safety_static|PASS|safety_status
+PLAN_ROWS_KEY|S3|safety_static|PASS|safety_status@static
+PLAN_COMMAND_EXISTS|S3|mot_static|PASS|motor_status
+PLAN_ROWS_KEY|S3|mot_static|PASS|motor_status@static
+PLAN_COMMAND_EXISTS|S3|irq_static|PASS|safety_irq_status
+PLAN_ROWS_KEY|S3|irq_static|PASS|safety_irq_status@static
+PLAN_COMMAND_EXISTS|S3|job_initial|PASS|diag_profile
+PLAN_ROWS_KEY|S3|job_initial|PASS|diag_profile learn_status@job_initial
+PLAN_COMMAND_EXISTS|S3|zero_static|PASS|diag_profile
+PLAN_ROWS_KEY|S3|zero_static|PASS|diag_profile zero 32@static
+PLAN_QUOTA_MAP|S3|zero_static|PASS|cmd=diag_profile zero 32 need=diag_profile_zero declared=diag_profile_zero n=1
+PLAN_COMMAND_EXISTS|S3|job_zero|PASS|diag_profile
+PLAN_ROWS_KEY|S3|job_zero|PASS|diag_profile learn_status@job_zero
+PLAN_COMMAND_EXISTS|S3|learn_start|PASS|diag_profile
+PLAN_ROWS_KEY|S3|learn_start|PASS|diag_profile learn 8 450 550 0@start
+PLAN_QUOTA_MAP|S3|learn_start|PASS|cmd=diag_profile learn 8 450 550 0 need=diag_profile_learn declared=diag_profile_learn n=1
+PLAN_COMMAND_EXISTS|S3|job_advance_window|PASS|__watch__
+PLAN_COMMAND_EXISTS|S3|job_failed|PASS|diag_profile
+PLAN_ROWS_KEY|S3|job_failed|PASS|diag_profile learn_status@job_failed
+PLAN_COMMAND_EXISTS|S3|sys_final|PASS|system_status
+PLAN_ROWS_KEY|S3|sys_final|PASS|system_status@final
+PLAN_COMMAND_EXISTS|S3|mot_final|PASS|motor_status
+PLAN_ROWS_KEY|S3|mot_final|PASS|motor_status@final
+PLAN_MOTION_WINDOW|S3|PASS|人工门都在运动之前
+PLAN_TOOL_ARGV|download|PASS|python -m pyocd flash --pack C:/Keil_v5/ARM/PACK/.Download/NOVOSENSE.N
+PLAN_TOOL_ARGV|readback|PASS|python -m pyocd commander --no-config -t cortex_m -u @UID_FILE -f 1000
+PLAN_TOOL_ARGV|reset|PASS|python -m pyocd reset --method sysresetreq --no-config --no-wait --con
+PLAN_QUOTA_COVERAGE|all|PASS|used=diag_profile_learn,diag_profile_zero missing=
+PLAN_STATE_AND_FLAG_CONSTANTS|all|PASS|motor={'IDLE': 0, 'ACCEL': 1, 'CRUISE': 2, 'DECEL': 3, 'FAULT': 4} rpf={'COMMITTED': 1, 'FIELD_VERIFIED': 2, 'FROM_LEARN': 4} columns=14
+PLAN_MOTION_CAP_BUDGET|all|FAIL|caps=[] sum=0 total=0 starts=0
+PLAN_IMAGE_IDENTITY_CONSISTENCY|all|PASS|S0=download.axf=readback.bin 同源且回读不认旧镜像
+PLAN_QUOTA_NEED|diag_profile_learn|PASS|need=1 declared=1
+PLAN_QUOTA_NEED|diag_profile_zero|PASS|need=1 declared=1
+PLAN_QUOTA_NEED|download|PASS|need=1 declared=1
+PLAN_QUOTA_NEED|explicit_reset|PASS|need=1 declared=1
+PLAN_QUOTA_NEED|port_open|PASS|need=1 declared=1
+PLAN_QUOTA_NEED|readback|PASS|need=1 declared=1
+PLAN_SCENARIO_CHAIN|all|PASS|链内分支决定点都在依赖阶段之前: {}
+PLAN_STUB_BRANCHES|all|PASS|申报={} 场景=
+PLAN_PREREQUISITE_GATE|all|PASS|起转前真拒绝已接线: {}
+PLAN_SPINUP_GATE_COVERAGE|all|PASS|所有起转/带电阶段都在开端口前检查机械前置
+PLAN_TARGET_CHANNEL|all|PASS|产品枚举=REL_ADC_SEVERE,REL_COVERAGE_LOST,REL_FUSED_SEVERE,REL_IMPACT,REL_OUT_OF_WINDOW,REL_SENSOR_UNAVAILABLE,REL_SG_SEVERE
+PLAN_FIRST_CAUSE_LEGS|all|PASS|trip 链都有同次 REL TRIP/源样本/profile/新 session 四腿
+PLAN_BYTE_RECOVERY|all|PASS|计划未申报任何'损坏后可继续'例外 => 裸 NUL / 非法 UTF-8 / 危险文本一律即停(原字节仍先落盘)
+PLAN_STATUS_ALLOW|all|PASS|白名单都是锚定且被正面要求(要求串必须是该行的前缀)的状态行: S3:sys_initial,S3:mot_static,S3:job_failed,S3:sys_final,S3:mot_final
+PLAN_BOOT_WINDOW_COVER|all|PASS|下界=75s, 覆盖: S3=75+6+3s=84s
+R7F8E_QUOTA_TABLE|all|PASS|pairs=10 keys=9 取消键=True
+R7F8E_QUOTA_PREFIX_REAL|all|PASS|产品里不存在的前缀=[](写错会静默永不命中, 于是动作被当成只读)
+R7F8E_LEARN_STATUS_READONLY|all|PASS|learn_status 不得算 learn/cancel; learn 请求与取消分别计数
+R7F8E_JOB_STATE_NAMES|all|PASS|源码 rel_job_state_name 状态名=CANCELLED,CANCEL_PENDING,DONE,FAILED,IDLE,RUNNING,TIMEOUT
+R7F8E_GATE_SUMMARY|all|PASS|fails=0
+PLAN_VALIDATE_SUMMARY|checks=62|fail=1|msh_commands=74|plan=D:\ns800\reports\reviews\phase8-m8-r7f7-newimage-static\field\plan_r7f7_2369_static.json
+
+== 新增行逐条 ==
+R7F8E_QUOTA_TABLE|all|PASS|pairs=10 keys=9 取消键=True
+R7F8E_QUOTA_PREFIX_REAL|all|PASS|产品里不存在的前缀=[](写错会静默永不命中, 于是动作被当成只读)
+R7F8E_LEARN_STATUS_READONLY|all|PASS|learn_status 不得算 learn/cancel; learn 请求与取消分别计数
+R7F8E_JOB_STATE_NAMES|all|PASS|源码 rel_job_state_name 状态名=CANCELLED,CANCEL_PENDING,DONE,FAILED,IDLE,RUNNING,TIMEOUT
+R7F8E_GATE_SUMMARY|all|PASS|fails=0
+R7F8E_NOREG_SUMMARY|判据=8|FAIL=0|none

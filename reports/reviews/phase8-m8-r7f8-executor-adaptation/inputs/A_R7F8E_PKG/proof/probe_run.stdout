@@ -1,0 +1,5 @@
+OBS|two_source_recovery|seen=3|imu_seq=0|imu_usable=0|severe=0|latch=1|rearm=1|reason=NONE
+OBS|single_source_not_recovered|seen=1|severe=1|reason=REL_SENSOR_UNAVAILABLE
+OBS|ramp_impact_suppressed|reason=NONE|impact_count=0|severe=0
+OBS|cruise_impact_positive_control|reason=REL_IMPACT|impact_count=2|severe=1
+SUMMARY|cases=4|failures=0|hardware_actions=0

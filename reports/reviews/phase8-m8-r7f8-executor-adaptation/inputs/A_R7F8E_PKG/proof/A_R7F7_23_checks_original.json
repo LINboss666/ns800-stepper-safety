@@ -1,0 +1,235 @@
+{
+  "reviewed_commit": "4984ee966e3f87ab9573c8f716e971696d068023",
+  "checks": [
+    {
+      "name": "REMOTE_ROUND_SUMS",
+      "pass": true,
+      "detail": {
+        "entries": 100,
+        "bad": []
+      }
+    },
+    {
+      "name": "A_PACKAGE_ORIGINALS_UNCHANGED",
+      "pass": true,
+      "detail": {
+        "files": 29,
+        "bad": []
+      }
+    },
+    {
+      "name": "EXACT_ACCEPTED_IMAGE_ON_BOARD",
+      "pass": true,
+      "detail": {
+        "bytes": 297452,
+        "sha256": "23691e8d8aa8c1d3ed6e6eff4b5c51fe27dd3a9169841406ecc627c0e807e963"
+      }
+    },
+    {
+      "name": "ACCEPTED_AXF_LOAD_EQ_BIN",
+      "pass": true,
+      "detail": {
+        "load_segments": 1,
+        "axf_sha256": "0f421595ac940863c4d38a2791f31bc8811fc3b8fa40062782f2ac7505c317f6"
+      }
+    },
+    {
+      "name": "PRODUCT_TREE_UNCHANGED",
+      "pass": true,
+      "detail": {
+        "tree": "32470c7ed44ef6ef5f762490a5416912a336cdd9"
+      }
+    },
+    {
+      "name": "FIELD_INVENTORY_EXACT",
+      "pass": true,
+      "detail": {
+        "listed_files_excluding_manifest": 53
+      }
+    },
+    {
+      "name": "PLAN_AND_EXECUTOR_IDENTITY",
+      "pass": true,
+      "detail": "Original signed inputs, no executor edits"
+    },
+    {
+      "name": "CANONICAL_STEP_IDENTITY",
+      "pass": true,
+      "detail": {
+        "steps": 15
+      }
+    },
+    {
+      "name": "ORIGINAL_EXECUTOR_REPLAY",
+      "pass": true,
+      "detail": [
+        [
+          "threads",
+          "OK"
+        ],
+        [
+          "heap",
+          "OK"
+        ],
+        [
+          "sys_initial",
+          "OK"
+        ],
+        [
+          "safety_static",
+          "OK"
+        ],
+        [
+          "mot_static",
+          "OK"
+        ],
+        [
+          "irq_static",
+          "OK"
+        ],
+        [
+          "job_initial",
+          "OK"
+        ],
+        [
+          "zero_static",
+          "OK"
+        ],
+        [
+          "job_zero",
+          "OK"
+        ],
+        [
+          "learn_start",
+          "OK"
+        ],
+        [
+          "job_failed",
+          "OK"
+        ],
+        [
+          "sys_final",
+          "OK"
+        ],
+        [
+          "mot_final",
+          "OK"
+        ]
+      ]
+    },
+    {
+      "name": "RAW_UTF8_NO_NUL",
+      "pass": true,
+      "detail": {
+        "files": 15
+      }
+    },
+    {
+      "name": "RAW_COMMAND_ORDER",
+      "pass": true,
+      "detail": {
+        "commands": [
+          "ps",
+          "free",
+          "system_status",
+          "safety_status",
+          "motor_status",
+          "safety_irq_status",
+          "diag_profile learn_status",
+          "diag_profile zero 32",
+          "diag_profile learn_status",
+          "diag_profile learn 8 450 550 0",
+          "diag_profile learn_status",
+          "system_status",
+          "motor_status"
+        ]
+      }
+    },
+    {
+      "name": "RX_HASHES_AND_LENGTHS",
+      "pass": true,
+      "detail": {
+        "responses": 13
+      }
+    },
+    {
+      "name": "BOOT_READY_SELFTEST_IOIN",
+      "pass": true,
+      "detail": {
+        "bytes": 3468
+      }
+    },
+    {
+      "name": "PASSIVE_BOOT_WINDOW",
+      "pass": true,
+      "detail": {
+        "seconds": 75.0
+      }
+    },
+    {
+      "name": "JOB_ZERO_START_TERMINAL",
+      "pass": true,
+      "detail": "Actual accepted job; expected static-window failure; owner FREE"
+    },
+    {
+      "name": "PASSIVE_NO_COMMAND_INTERVAL",
+      "pass": true,
+      "detail": {
+        "learn_response_t": 77.563,
+        "watch_done_t": 81.578,
+        "terminal_observed_t": 81.594,
+        "note": "Observation bounds, not measured internal termination latency"
+      }
+    },
+    {
+      "name": "FINAL_STATIC_CONTRACT",
+      "pass": true,
+      "detail": "Software/status evidence only; no physical STEP waveform acquired"
+    },
+    {
+      "name": "SYSTEM_STATE_UNCHANGED",
+      "pass": true,
+      "detail": {
+        "bytes": 983
+      }
+    },
+    {
+      "name": "EXACT_APPROVAL_SPEND",
+      "pass": true,
+      "detail": {
+        "positive": {
+          "diag_profile_learn": 1,
+          "diag_profile_zero": 1,
+          "download": 1,
+          "explicit_reset": 1,
+          "port_open": 1,
+          "readback": 1
+        }
+      }
+    },
+    {
+      "name": "SIX_RESERVATIONS_AND_COMMITS",
+      "pass": true,
+      "detail": "No seventh reservation in recorded dispatch ledger"
+    },
+    {
+      "name": "PORT_ONCE_AND_CLOSED",
+      "pass": true,
+      "detail": {
+        "closed_t": 81.828
+      }
+    },
+    {
+      "name": "CLAIMS_NOT_ESCALATED",
+      "pass": true,
+      "detail": "No successful learning or physical protection claim"
+    },
+    {
+      "name": "B_RECORDED_JUDGEMENT",
+      "pass": true,
+      "detail": "Recorded 99 PASS; this reviewer separately replayed the core raw evidence, not all B negative controls"
+    }
+  ],
+  "total": 23,
+  "failures": 0
+}

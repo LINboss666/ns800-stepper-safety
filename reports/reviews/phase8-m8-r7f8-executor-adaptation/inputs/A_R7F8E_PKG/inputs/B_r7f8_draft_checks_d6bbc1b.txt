@@ -1,0 +1,117 @@
+DRAFT_BYTES_SHA|PASS|草案原件 24780 B sha256=b572c1928f60148e…
+DRAFT_LF_ONLY|PASS|CR=0 LF=239 行数=240
+DRAFT_AUTHORIZED_FLAG_IS_ZERO|PASS|草案自标未授权 + 额度全 0 => 本轮 0 设备动作, 不建账本, 不生成可 dispatch 计划
+BIND_BIN|PASS|草案 §1 的 BIN(297452 B, 23691e8d…)与仓库成品件一致
+BIND_AXF|PASS|草案 §1 的 AXF(1790048 B, 0f421595…)一致
+BIND_SOURCE_COMMIT|PASS|已签收源码 00718b4 可解析
+BIND_PRODUCT_TREE|PASS|草案 §10 的产品子树对象可解析
+BIND_R7F7_TIP|PASS|草案引用的 R7F7 tip 全 sha 一致且写在草案 §1.1/§10 里
+BIND_B502_HISTORICAL|PASS|草案把 b502 明文列为上一枚历史在板镜像
+E_READBACK_BYTE_EQUAL|PASS|草案: readback.bin 与签收 BIN 整文件逐字节相等 => 实测 297452 B 相等=True
+E_ARCHIVE_53|PASS|草案: 53 件现场清单条目(不含清单自身) => 清单 53 / 磁盘 53
+E_ROUND_100|PASS|草案: 本轮清单 100/100 => 实有 100 条
+E_PKG_29|PASS|草案: A 包原件 29/29 => 包内清单 28 条 + 清单自身 = 29
+E_BOOT_3468_75S|PASS|草案: 启动捕获 3468 B / 75 s 走满 => 实耗 75.0 原因 DRAIN_BUDGET_REACHED
+E_TS_77563_81594|PASS|草案的时间戳区间(learn 响应/终态查询)= 台账实测 77.563 / 81.594
+E_NO_CMD_IN_GAP|PASS|草案: 中间没有其他实发命令 => 开区间 (77.563, 81.594) 内 RX_DONE 数=0(终态查询自身在右端点, 不计入)
+E_ZERO_2055_2065|PASS|草案引用的零点范围在板端原文里
+E_STARTED_ID1|PASS|STARTED 行逐字一致
+E_TERMINAL_LINE|PASS|终态行逐字一致(草案也据此要求 F8 初态允许这枚遗留 FAILED)
+E_SAMPLES_0_OF_0|PASS|草案: 采样计数 0/0 成立
+E_ENN_CONSISTENT_BACKED|PASS|草案 §1.1 的 ENN 高且反馈一致有原文直证(motor_status 与 system_status 两侧都有 verdict=OK 短行)
+E_STATIC_FIELDS|PASS|草案列的静止/禁能字段全部在两份终态响应里
+E_ARM_MASK_0x18|PASS|草案的 arm mask=0x18 在原文里
+E_RAM_KEPT|PASS|草案: 板端 RAM 保留失败作业与零点凭据 => 全场 clear/config_save 均 0 次
+E_99_WITH_10_NEGATIVES|PASS|草案: B 的 99 条 PASS 含 10 条负控 => 实读判据总数与负控名数=10
+A_ZERO_RANGE|PASS|草案 §3 的 N_ZERO 32..256 | 锚点 diag_relative.c:2290 | 实读=if (!rel_parse_u32(argv[2], 32, 256, &n))
+A_LEARN_RANGE|PASS|草案 §3 的 N=8..32 | 锚点 diag_relative.c:2297 | 实读=if (!rel_parse_u32(argv[2], 8, 32, &n) || !rel_parse_u32(argv[3]
+A_INNER_WANT_RANGE|PASS|引擎内部 want 允许 8..256(shell 层更窄) | 锚点 diag_relative.c:1100 | 实读=if (want < 8u || want > 256u) return -RT_EINVAL;
+A_DEADLINE_12S|PASS|草案: 后台 deadline 仍为 12 s(编译期常量) | 锚点 diag_relative.c:1337 | 实读=#define REL_CMD_DEADLINE_MS 12000u
+A_TIMEOUT_DEADLINE|PASS|超时终态 st=TIMEOUT why=DEADLINE(F8 白名单要含此分支) | 锚点 diag_relative.c:1732 | 实读={ rel_job_term_locked((rt_uint8_t)REL_JOB_TIMEOUT, "DEADLINE"); 
+A_WINDOW_BROKEN|PASS|R7F7 用过的越窗失败字面量仍在原位 | 锚点 diag_relative.c:1745 | 实读={ rel_job_term_locked((rt_uint8_t)REL_JOB_FAILED, "WINDOW_BROKEN
+A_CANCEL_PENDING|PASS|草案: 取消有 REQUESTED 中间态 | 命中 diag_relative.c:[1422, 1553, 1601] 共 8 处
+A_CANCEL_REQUESTED_REPLY|PASS|草案: learn_cancel 不负责停电机(回包自带 motor untouched) | 锚点 diag_relative.c:2086 | 实读=rt_kprintf("[DIAG] cancel id=%u REQUESTED st=%s (motor untouched
+A_CANCEL_TERMINAL_REPLY|PASS|草案: 已 DONE 后回 NOT-CANCELLED, 不能算活动取消成功 | 锚点 diag_relative.c:2089 | 实读=rt_kprintf("[DIAG] cancel id=%u NOT-CANCELLED: already %s why=%s
+A_CANCEL_ELIGIBLE|PASS|只有 RUNNING/CANCEL_PENDING 可命中 => 取消窗口=后台一拍 | 命中 diag_relative.c:[1668, 2088] 共 2 处
+A_THREAD_10MS|PASS|Diagnosis Thread 10 ms 一拍 | 锚点 diagnosis.c:501 | 实读=rt_thread_mdelay(10);               /* 100Hz */
+A_ADVANCE_EARLY|PASS|每拍先推进作业再取新样本 | 锚点 diagnosis.c:455 | 实读=rel_job_advance(&in, have_frame, (rt_uint8_t)d_mode);
+A_SHELL_WAIT_20MS|PASS|shell 有界等 20 ms, 超即 BUSY 拒绝 | 锚点 diag_relative.c:1371 | 实读=#define REL_CTX_TAKE_MS   20u
+A_LEARN_INVALIDATES|PASS|草案: 新 learn 受理作废旧凭据(发生在拿到采集器之后, 失败不伤旧值) | 锚点 diag_relative.c:1647 | 实读=d_pending_learn = RT_FALSE;       /* 新学习受理: 旧 learn 成功凭据立即失效 */
+A_SIG_HAS_DRIVE_CFG|PASS|草案 §4.1: 驱动配置状态参与 profile 签名 | 命中 diag_relative.c:[200, 218, 1865] 共 3 处
+A_LEARN_MONITOR_ONLY|PASS|草案 §4.1: 学习在 MONITOR_ONLY 下进行(我逐字核对, 不接受被改成非 ACTIVE) | 锚点 diag_relative.c:2016 | 实读=if (diagnosis_get_mode() != DIAG_MODE_MONITOR_ONLY)
+A_LEARN_NEEDS_ZERO|PASS|learn 前要有效 zero 凭据 | 锚点 diag_relative.c:2013 | 实读={ rt_kprintf("[DIAG] learn REFUSED: run 'diag_profile zero N' fi
+A_MODE_RECHECK_TICK|PASS|后台每拍复核模式 => 草案: 不能到巡航后才临时切模式 | 锚点 diag_relative.c:1725 | 实读=if (mode != (rt_uint8_t)DIAG_MODE_MONITOR_ONLY)
+A_COMMIT_STATIC_TXN|PASS|草案: commit 要求静止事务 | 锚点 diag_relative.c:2160 | 实读=if (rel_txn_open("commit") != RT_EOK) return;
+A_COMMIT_NO_VERIFIED|PASS|草案: commit 不自动置 FIELD_VERIFIED | 锚点 diag_relative.c:2172 | 实读=cand.flags = (rt_uint16_t)((cand.flags & ~RPF_FIELD_VERIFIED) | 
+A_COMMIT_NO_FLASH|PASS|草案: commit 不自动写 Flash | 锚点 diag_relative.c:2227 | 实读=rt_kprintf("[DIAG] commit next: config_save to persist, then arm
+A_TRIP_DEMOTE|PASS|草案: 触发后回 MONITOR_ONLY | 命中 diagnosis.c:[468, 529] 共 2 处
+A_REARM_MSG|PASS|草案: 需人工重新建立保护代次 | 锚点 diagnosis.c:487 | 实读=rt_kprintf("[DIAG] REL trip ticket used; mode=MONITOR_ONLY rearm
+A_GEN_FIELDS|PASS|草案说的保护代次在源码里是 gen/gen_want/generation | 命中 diag_relative.h:[174] 共 1 处
+A_GENCTL|PASS|控制块里的当前代次字段 | 命中 diag_relative.h:[254, 267] 共 2 处
+A_GEN_DISCLOSED|PASS|代次披露行(草案 P3 要看得到) | 锚点 diagnosis.c:774 | 实读=rt_kprintf("[DIAG] rel cov=%s lost=%u gen=%u rearm=%d\n",
+A_NEW_GEN_ENTRY|PASS|唯一加代次入口 = diag_mode relative CONFIRM_EXPERIMENTAL | 锚点 diagnosis.c:630 | 实读=new_gen = RT_TRUE;                    /* 相对保护总是一次新的武装 */
+A_REASON_ENUM|PASS|草案 §4.2 的原因名是产品枚举原文 | 命中 diag_relative.h:[18, 108] 共 2 处
+A_IMPACT_ENUM|PASS|IMU 冲击枚举 | 命中 diag_relative.h:[114, 144] 共 2 处
+A_SEVERE_SET|PASS|草案需改: 这三类也同属 severe, 不是另一条路径 | 锚点 diag_relative.c:68 | 实读=r == REL_SENSOR_UNAVAILABLE || r == REL_OUT_OF_WINDOW ||
+A_TICKET_ONCE|PASS|一次武装只保护一次 => 三场刺激每场都要重建代次 | 命中 diag_relative.c:[965, 1058, 1061] 共 3 处
+A_PROTECT_EXIT|PASS|所有 severe 走同一保护出口 | 锚点 diag_relative.c:725 | 实读=rc = safety_post_event(EVT_MULTI_FAULT);           /* FIRST: 实际短
+A_SG_BASELINE|PASS|草案: SG 相对 run_sg_min 的下降量 | 锚点 diag_relative.c:537 | 实读=sg_drop = (rt_int32_t)p->run_sg_min - (rt_int32_t)in->sg;
+A_ADC_COUNT_HARD|PASS|草案需改: ADC 的新样本数在源码里硬编码 2, 不是 profile 参数 | 锚点 diag_relative.c:643 | 实读=e->adc_strong_run_ms >= p->dur_adc_ms && e->adc_strong_cnt >= 2u
+A_FUSED_ADC_2U|PASS|融合判据的 ADC 计数同样是 2 | 锚点 diag_relative.c:651 | 实读=e->adc_new_cnt >= 2u)
+A_IMPACT_PEAK|PASS|IMU 逐帧峰值比较(不是滑窗峰值) | 锚点 diag_relative.c:595 | 实读=imp_hit = ((rt_int32_t)in->vib_mg >= (rt_int32_t)p->impact_peak_
+A_IMPACT_CNT|PASS|IMU 独立新样本数(缺省 2) | 命中 diag_relative.c:[180, 608, 1886] 共 4 处
+A_IMPACT_DEFAULT|PASS|IMU 阈值缺省 2500 mg | 命中 project_config.c:[106] 共 1 处
+A_RAMP_COMMENT|PASS|源码注释的口径(见下一条: 与代码不符) | 锚点 diag_relative.c:493 | 实读=/* 正常启动加速/计划内减速 = 阶段例外: 只抑制 SG/负载判据, 不报错;
+A_RAMP_RETURN|PASS|加减速早退点, 在冲击/SG/ADC/融合判定之前 | 锚点 diag_relative.c:497 | 实读=return e->verdict;
+A_RECOVER_3SRC|PASS|草案需改: 恢复票据要 ADC+SG+IMU 三源均见新鲜正常帧, 不是两个源 | 锚点 diag_relative.c:385 | 实读=e->ok_src_seen == 3u) ? RT_TRUE : RT_FALSE;
+A_FAULT_NO_COUNT|PASS|fault_reset 的真实门是源电平/pad/复核, 无样本计数(见下一条) | 命中 safety_state.c:[771, 788, 831] 共 11 处
+A_RESET_PAD_GATE|PASS|草案 §4.3: 禁能复核 | 锚点 safety_state.c:831 | 实读=rt_kprintf("[SS] fault_reset REFUSED: DRV_ENABLE pad not confirm
+A_RESET_ENN_GATE|PASS|草案 §4.3: ENN 在禁能侧 | 命中 safety_state.c:[638, 842] 共 2 处
+A_RESET_SRC_GATE|PASS|草案 §5 P5.1: 不在活动故障源上反复 reset | 命中 safety_state.c:[852] 共 1 处
+A_RESET_SP_GATE|PASS|草案 §4.3: 停脉冲复核 | 命中 safety_state.c:[867] 共 1 处
+A_STOP_KEEPS_ARMED|PASS|草案 §4.3: stop 保持 armed | 锚点 motor.c:1692 | 实读=mot.target_hz = 0;      /* 斜坡自动减速到 0 → IDLE + RUN→READY(保持 armed
+A_START_NEEDS_ARMED|PASS|补充: start 只在未 armed 时拒绝, 已 armed 可再次 start => 草案额度表按场计 arm/start 会多算 | 锚点 motor.c:1564 | 实读=if (!armed)      { rt_kprintf("[MOT] start REFUSED: not armed\n"
+A_ARM_REST_GATE|PASS|arm 要求静止且未 armed => 下一场前必须先 disarm | 锚点 motor.c:1153 | 实读=rt_kprintf("[MOT] arm REFUSED: not at rest (state=%d armed=%d hz
+A_DISARM_LINE|PASS|disarm 披露行(含中文, 见长度风险一条) | 锚点 motor.c:1415 | 实读=rt_kprintf("[MOT] DISARM (动作已做: STEP %s / 许可 LOW %s / ENN feedba
+A_FB_VERDICTS|PASS|ENN verdict 六值枚举 | 锚点 safety_gpio.c:274 | 实读="OK", "TRANSITION", "CUT_BY_HARDWARE", "UNEXPECTED_ENABLE",
+A_FB_MOT_STATUS|PASS|取证短行(等价于 disarm 长行的可剪部分) | 锚点 motor.c:2491 | 实读=rt_kprintf("[MOT] expected_ENN=%s ENN_fb=%d %s verdict=%s\n",
+A_RAMP_ALSO_SUPPRESSES_IMPACT|PASS|草案需改: 加减速早退在 497 行, 冲击判定在 610 行之后 => 例外实际连 REL_IMPACT 一起抑制, 与 493 行注释和草案 §4.2 末段的口径都不同
+A_FAULT_RESET_HAS_NO_SAMPLE_GATE|PASS|草案需改: §4.3 把恢复计数的条件写成 fault_reset 的门; 源码 fault_reset 不做任何样本计数
+A_SOURCE_AGE_BEFORE_RAMP|PASS|草案: 源失效检查在加减速例外下仍有效(检查位于早退之前)成立
+X_POLL_GATE_SHAPE|PASS|结构性缺口: 轮询只在 [MOT] state 属 ACCEL/DECEL 时重试 | 锚点 m8r3_serial_chain.py:1939 | 实读=if not (v["verdict"] == "STOP" and v.get("code") in codes and st
+X_CMD_STATIC|PASS|命令文本静态取自 plan, 无捕获替换 | 锚点 m8r3_serial_chain.py:2083 | 实读=cmd = st["cmd"]
+X_START_ATTEMPT_TIMING|PASS|start 的硬截止从发送尝试起算(已实现) | 命中 m8r3_serial_chain.py:[901, 2181] 共 2 处
+X_STEP_BUDGET_BRANCH|PASS|草案需补: 只有 start 之后走运动预算; arm 本身无独立截止 | 命中 m8r3_serial_chain.py:[2120] 共 1 处
+X_CLEANUP_TRIPLE|PASS|草案 P2.6 要 stop/disarm 分开: 清理固定发这三条 | 命中 m8r3_serial_chain.py:[1413] 共 1 处
+X_DISABLE_CONTRACT|PASS|草案: 不能把失败的 UART 返回当禁能证明 => 执行器只认收口最后那份 motor_status 快照 | 命中 m8r3_serial_chain.py:[1411, 1520] 共 2 处
+X_QUOTA_EXHAUSTED_SENT_ANYWAY|PASS|草案 §7 的收口预留要按这条真实语义写(额度用尽仍发收口) | 命中 m8r3_serial_chain.py:[1638] 共 1 处
+X_ACTION_DISPATCH_TAIL|PASS|tools 后端只认 download/readback/reset/reboot | 命中 m8r3_serial_chain.py:[2311] 共 1 处
+X_DONE_POLL_NEEDS_OFFLINE_ADAPTATION|PASS|结论(草案 §8 前置 2): 有界轮询 learn_status 到 DONE 与 JOB_ID 动态取值**现结构不支持**; 唯一动态命令是 flash_dump => 需要先离线适配 + 反例, 不许现场拆错误门
+X_R7F7_STAGE_FORBID_LIST|PASS|R7F7 阶段把 learn_cancel/motor_*/fault_reset 列为禁用项 => F8 必须新阶段/新 plan, 不能复用 F7 阶段
+X_QUOTA_MAP_9_PAIRS_8_KEYS|PASS|命令前缀→额度键共 9 条映射 / 8 个不同键(极性确认与 IRQ 开共用 irq_polarity_prep); motor_stop/disarm/learn_cancel/fault_reset 不在表内(不发额度)
+NO_DEVICE_ACTION|PASS|本轮只读源码/仓库/草案原件; 未调用 pyOCD/Keil/串口/分析仪, 未开审批账
+NO_PRODUCT_CHANGE|PASS|产品与主机链改动=0 件
+M_IN_REPO_AND_DIFFERS_FROM_ORIGINAL|PASS|合并版 31807 B(收到的原件 24780 B 保持不动); 原件 sha=b572c1928f60… 合并版 sha=270383c12b1c…
+M_HAS_1_2_WITH_USER_REPORTED|PASS|§1.2 已并入: 额定电流 1.5 A 按 USER_REPORTED 登记且不解读为升流
+M_REVISION_ROW_ADDED|PASS|草案 §9 修订记录已加一行(保留旧行)
+M_P2_ORDER_CORRECTED|PASS|§5 P2 第 1 步已改为 dir→arm→确认→target→start, 旧的 arm 前设正目标写法不再出现在正文
+M_QUOTA_STILL_ZERO|PASS|§7 仍写全部 0/TBD, 并显式声明本补充不增加额度
+M_KEEPS_R7F7_HANDOVER_FACTS|PASS|承接事实(在板镜像/旧作业记录/凭据)保留在合并版里
+SRC_SET_TARGET_HAS_NO_ARMED_GATE|PASS|motor_set_target_hz 函数体内只校验 MOTOR_MAX_HZ, 不出现 armed => arm 之后再给 target 可行(操作者第 3 条成立)
+SRC_ARM_REQUIRES_TARGET_ZERO_VERBATIM|PASS|arm 的静止门含 target_hz != 0 => 旧写法(先给正目标再 arm)必被拒
+SRC_LEARN_WINDOW_BOUNDS|PASS|LO/HI 合法 1..20000、DIR 0|1 => 草案 §3 运行工况的取值范围源码已给, 具体值仍须操作者定
+REPO_RATED_CURRENT_WAS_UNCONFIRMED_BEFORE|PASS|来源等级要讲清: 本仓曾显式删除未确认的 1500 mA RMS 额定断言(reports/agent_handoffs/phase8-motor-chain-dev.md:32), 现在的 1.5 A 是操作者新报
+REPO_HAS_R110_VREF_ANCHOR|PASS|R110=0.11 Ω 与 VREF=1.37 V 的仓库锚点找到, 且原文注明这是相电流设定口径, 不得代进母线换算
+REPO_HAS_IRUN20_NO_RAISE_ANCHOR|PASS|IRUN20 沿用且不抬流的历史口径有锚点(与本轮不授权升流一致)
+REPO_HAS_M4_300HZ_60S_ANCHOR|PASS|M4 的 300 Hz/60 s 连续运行记录在 dev 交接里(只作台架能力依据)
+NO_R7F8_LEDGER_OPENED|PASS|核准根目录下 *R7F8* 匹配 0 件 => 本轮未消耗任何硬件额度
+DRAFT_STILL_HAS_ZERO_QUOTA_TABLE|PASS|草案 §7 仍是全 0 + 12 处 TBD 占位 => 不能据此开账或执行
+LEAK_PATTERNS_FIRE_ON_PROBE|PASS|模式在合成脏样本命中 3/3(不命中就无权宣布干净)
+ROUND_DIR_NO_IDENTITY_FORM|PASS|本轮目录命中=[]
+GITATTR_TEXT_RULE_FOR_ROUND_DIR|PASS|core.autocrlf=true 下必须靠 -text 规则保住原字节; .gitattributes 命中行=[143]
+GITATTR_MATCHER_FIRES_ON_KNOWN_RULE|PASS|同一匹配器在已入库的 R7F7 规则上命中(行 [142]) => 上一条 PASS 不是恒真
+GITATTR_MATCHER_IGNORES_COMMENTS|PASS|注释里的同形文本不算规则(否则真规则被删了也看不出来)
+PREFLIGHT_ALLOWED_PARSED_EXACTLY|PASS|预检白名单解析出 5 项(注释不进白名单, 含本轮新增的 .gitattributes): ['reports/reviews/phase8-m8-r7f8-closed-loop-draft/', 'reports/agent_handoffs/phase8-m8-r7f8-closed-loop-draft', 'reports/reviews/phase8-m8-r7f2b-safety-print-fix/run_record.md', 'reports/reviews/phase8-m8-r7f2b-safety-print-fix/SHA256SUMS.txt', '.gitattributes']
+PREFLIGHT_SCOPE_COVERS_ROUND_SET|PASS|本轮 git status 待提交 6 条, 预检白名单外 0 条: []
+PREFLIGHT_SCOPE_COMPARATOR_FIRES|PASS|合成一个白名单外的路径必须被判越界 => 上一条 PASS 才有意义
+R7F8_DRAFT_SUMMARY|判据=116|FAIL=0|none

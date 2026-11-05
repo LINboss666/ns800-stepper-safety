@@ -1,0 +1,67 @@
+{
+  "task_id": "M8R7F8E-offline-executor-adaptation-20261105",
+  "scope": "OFFLINE_DEVELOPMENT_ONLY_HARDWARE_ZERO",
+  "reviewed_tip": "d6bbc1b5795fc12d27ee8aaa0939f0408dc43699",
+  "accepted_product_commit": "00718b49e65546aa0bae84006059011d68284c4a",
+  "product_tree": "32470c7ed44ef6ef5f762490a5416912a336cdd9",
+  "source_bindings": [
+    {
+      "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diag_relative.c",
+      "bytes": 109262,
+      "sha256": "a95ab79363a2b383f6dc7db3fa0146954bb72692c12540427a2075233b9944e8"
+    },
+    {
+      "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diag_relative.h",
+      "bytes": 25522,
+      "sha256": "27b42031b934ff92dcc6daa4faca31a65cee3782dda489d428f26264c7738303"
+    },
+    {
+      "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/diagnosis.c",
+      "bytes": 54696,
+      "sha256": "4b69151e140b3a80dee4ff211aa935d51cf6e9de2611f6474b38f35a3836d281"
+    },
+    {
+      "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/motor.c",
+      "bytes": 131732,
+      "sha256": "497cc7f25154d4d45f7963d83fc3b502f66ca73a050535235b5fb82f7c4e8e85"
+    },
+    {
+      "path": "rt-thread-master/rt-thread-master/bsp/novosns/ns800/ns800rt7p65-nssinepad/applications/safety_state.c",
+      "bytes": 57122,
+      "sha256": "832d84b631cccb20776e09e976f661c5fe980be648714558e1f7f9483857e44a"
+    },
+    {
+      "path": "tests/host/rel_main.c",
+      "bytes": 209668,
+      "sha256": "d168d908df536c6dc13eed0e4bb8f5d7c99eaf6935a0427b6ea2e6c604f7cccf"
+    },
+    {
+      "path": "tests/host/shim_rel/rtthread.h",
+      "bytes": 5178,
+      "sha256": "b91bd867765487e9cb8e79970589cdf81b530fa4174205b878f3b4dc0359ff9e"
+    },
+    {
+      "path": "reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py",
+      "bytes": 219491,
+      "sha256": "33d3f0af8a4c9c33dcd4e013b395e4ba990a89e384130f9d0ffe50c71b34e8ca"
+    }
+  ],
+  "reviewed_round_sums": {
+    "entries": 8,
+    "failures": 0
+  },
+  "on_board_image_from_R7F7": "23691e8d8aa8c1d3ed6e6eff4b5c51fe27dd3a9169841406ecc627c0e807e963",
+  "updated_field_draft": {
+    "path": "R7F8_DRAFT_UPDATED.md",
+    "sha256": "1c7c94b3297ba2b06cc016b310611c1b5c315f995dc4644aea91b85ac7874ca4",
+    "bytes": 33703
+  },
+  "source_review_probe": {
+    "cases": 4,
+    "failures": 0,
+    "build_rc": 0,
+    "run_rc": 0,
+    "warnings": 1,
+    "hardware_actions": 0
+  }
+}

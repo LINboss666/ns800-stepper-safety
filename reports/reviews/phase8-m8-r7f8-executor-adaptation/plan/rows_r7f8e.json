@@ -1,0 +1,121 @@
+{
+ "_about": {
+  "kind": "SYNTHETIC_STUB_ROWS_NOT_BOARD_EVIDENCE",
+  "shape_source": "行形状逐字取自 motor.c / diag_relative.c / diag_profile 的打印语句(R7D1 签收轮已核对), 数值是本包为工装造的合成值",
+  "variant": "normal",
+  "job_ids": "取消试验 17 / DONE 试验 73, 均来自各自那一步的 STARTED 行, 计划里没有写死",
+  "hardware_actions": 0
+ },
+ "commands": {
+  "status_static": {
+   "healthy": [
+    "[MOT] state=0 name=OTHER",
+    "[MOT] cur_hz=0 tgt_hz=0 accel=0 decel=0 dir=0",
+    "[MOT] armed=0 drv_en_request=0 health=OK",
+    "[MOT] drv_request=LOW pad=0",
+    "[MOT] expected_ENN=HIGH ENN_fb=1 resolved verdict=OK",
+    "[MOT] diag_off_confirmed=YES"
+   ]
+  },
+  "motor_dir": {
+   "healthy": [
+    "[MOT] dir=0 requested"
+   ]
+  },
+  "motor_arm": {
+   "healthy": [
+    "[MOT] ARM ok armed=1"
+   ]
+  },
+  "motor_target": {
+   "healthy": [
+    "[MOT] target=100"
+   ]
+  },
+  "motor_start": {
+   "healthy": []
+  },
+  "status_accel": {
+   "healthy": [
+    "[MOT] state=1 name=ACCEL",
+    "[MOT] cur_hz=20 tgt_hz=100 accel=50 decel=50 dir=0",
+    "[MOT] armed=1 drv_en_request=1 health=OK",
+    "[MOT] drv_request=HIGH pad=1",
+    "[MOT] expected_ENN=HIGH ENN_fb=1 resolved verdict=OK",
+    "[MOT] diag_off_confirmed=NO"
+   ]
+  },
+  "status_cruise": {
+   "healthy": [
+    "[MOT] state=2 name=CRUISE",
+    "[MOT] cur_hz=100 tgt_hz=100 accel=50 decel=50 dir=0",
+    "[MOT] armed=1 drv_en_request=1 health=OK",
+    "[MOT] drv_request=HIGH pad=1",
+    "[MOT] expected_ENN=HIGH ENN_fb=1 resolved verdict=OK",
+    "[MOT] diag_off_confirmed=NO"
+   ]
+  },
+  "learn_cancel_trial": {
+   "healthy": [
+    "[DIAG] learn STARTED id=17 n=8 win=450..550 dir=0",
+    "[DIAG] learn async: query 'learn_status'; NOT learn OK yet FIELD_UNVERIFIED"
+   ]
+  },
+  "cancel_cmd": {
+   "healthy": [
+    "[DIAG] cancel id=17 REQUESTED st=CANCEL_PENDING (motor untouched)"
+   ]
+  },
+  "ls_cancelled": {
+   "healthy": [
+    "[DIAG] job id=17 st=CANCELLED why=USER_CANCEL owner=0 cred=1/0",
+    "[DIAG] job n=8/8 want=8 win=450..550 dir=0"
+   ]
+  },
+  "learn_done_trial": {
+   "healthy": [
+    "[DIAG] learn STARTED id=73 n=8 win=450..550 dir=0",
+    "[DIAG] learn async: query 'learn_status'; NOT learn OK yet FIELD_UNVERIFIED"
+   ]
+  },
+  "ls_running": {
+   "healthy": [
+    "[DIAG] job id=73 st=RUNNING why=NONE owner=1 cred=1/0",
+    "[DIAG] job n=8/8 want=8 win=450..550 dir=0"
+   ]
+  },
+  "ls_running2": {
+   "healthy": [
+    "[DIAG] job id=73 st=RUNNING why=NONE owner=1 cred=1/0",
+    "[DIAG] job n=6/6 want=8 win=450..550 dir=0"
+   ]
+  },
+  "ls_done": {
+   "healthy": [
+    "[DIAG] job id=73 st=DONE why=NONE owner=0 cred=1/1",
+    "[DIAG] job n=8/8 want=8 win=450..550 dir=0"
+   ]
+  },
+  "motor_stop": {
+   "healthy": [
+    "[MOT] stop requested target=0"
+   ]
+  },
+  "motor_disarm": {
+   "healthy": [
+    "[MOT] state=0 name=OTHER",
+    "[MOT] DISARM (done)"
+   ]
+  },
+  "motor_status": {
+   "healthy": [
+    "[MOT] state=0 name=OTHER",
+    "[MOT] cur_hz=0 tgt_hz=0 accel=0 decel=0 dir=0",
+    "[MOT] armed=0 drv_en_request=0 health=OK",
+    "[MOT] drv_request=LOW pad=0",
+    "[MOT] expected_ENN=HIGH ENN_fb=1 resolved verdict=OK",
+    "[MOT] diag_off_confirmed=YES"
+   ]
+  }
+ }
+}

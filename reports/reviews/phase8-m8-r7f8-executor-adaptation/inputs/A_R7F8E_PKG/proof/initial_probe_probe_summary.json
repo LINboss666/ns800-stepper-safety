@@ -1,0 +1,7 @@
+{
+  "build_rc": 0,
+  "warnings": 1,
+  "run_rc": 1,
+  "hardware_actions": 0,
+  "compatibility": "Empty unused windows.h include"
+}
