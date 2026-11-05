@@ -63,23 +63,63 @@ def started(jid):
             "[DIAG] learn async: query 'learn_status'; NOT learn OK yet FIELD_UNVERIFIED"]
 
 
-def job(jid, st, why="NONE", owner=1, cred="1/0", adc=8, sg=8, want=8, lo=450, hi=550, d=0):
+def job(jid, st, why=None, owner=None, cred=None, adc=8, sg=8, want=8, lo=450, hi=550, d=0):
+    """按**状态**取产品那一行的 why/owner/cred(定稿件与 F1 合同同源, 不再是手写"NONE"/owner=1)。
+
+    diag_relative.c:1637 `nj.why = REL_JOB_WHY_RUN` + :1643 `d_cap_owner = REL_CAP_BY_JOB`
+    => RUNNING 那一条印 `st=RUNNING why=RUNNING owner=2 cred=1/0`;
+    :1674 取消请求把 why 置 CANCEL_REQUESTED(仍 owner=2); :1719 取消终态 why=CANCELLED/owner 归还 0;
+    :1760 DONE 才 cred=1/1。之前这些合成值写的是 why=NONE/owner=1, 与产品不一致,
+    返修件的作业合同因此在这一步具名拒绝(那是**合成值写错**, 不是合同过严)。
+    """
+    shape = {"RUNNING": ("RUNNING", 2, "1/0"),
+             "CANCEL_PENDING": ("CANCEL_REQUESTED", 2, "1/0"),
+             "CANCELLED": ("CANCELLED", 0, "1/0"),
+             "DONE": ("COMPLETE", 0, "1/1"),
+             "FAILED": ("WINDOW_BROKEN", 0, "1/0"),
+             "TIMEOUT": ("DEADLINE", 0, "1/0"),
+             "IDLE": ("IDLE", 0, "1/0")}.get(st, ("NONE", 0, "1/0"))
+    why = shape[0] if why is None else why
+    owner = shape[1] if owner is None else owner
+    cred = shape[2] if cred is None else cred
     return ["[DIAG] job id=%d st=%s why=%s owner=%d cred=%s" % (jid, st, why, owner, cred),
             "[DIAG] job n=%d/%d want=%d win=%d..%d dir=%d" % (adc, sg, want, lo, hi, d)]
 
 
-DISABLED = ["[MOT] state=0 name=OTHER", "[MOT] cur_hz=0 tgt_hz=0 accel=0 decel=0 dir=0",
+DISABLED = ["[MOT] state=0 name=OTHER", "[MOT] cur_hz=0 tgt_hz=0 accel=2000 decel=2000 dir=0",
             "[MOT] armed=0 drv_en_request=0 health=OK", "[MOT] drv_request=LOW pad=0",
             "[MOT] expected_ENN=HIGH ENN_fb=1 resolved verdict=OK",
             "[MOT] diag_off_confirmed=YES"]
-ACCEL = ["[MOT] state=1 name=ACCEL", "[MOT] cur_hz=20 tgt_hz=100 accel=50 decel=50 dir=0",
+
+
+def done_full(jid, n=8, lo=450, hi=550, d=0, adc=None, sg=None):
+    """F1 要的**完整** DONE 证据: 产品只在 state==DONE 且候选有效时才打这三类行
+    (diag_relative.c:2056/2068/2074), 两行状态不构成"可提交"。"""
+    adc = n if adc is None else adc
+    sg = n if sg is None else sg
+    return job(jid, "DONE", adc=adc, sg=sg, want=n, lo=lo, hi=hi, d=d) + [
+        "[DIAG] job data adc[400..500]n%d nz2 sg[60..80]n%d seq101..%d" % (adc, sg, 100 + sg),
+        "[DIAG] job thr tier=1 dev=30/60 drop=15/40 FIELD_UNVERIFIED",
+        "[DIAG] job DONE result; cred zero=1 learn=1 commit is separate"]
+
+# R7F8F F4: 运行/加速那两行必须是**使能侧**合同——产品只在请求使能时打 expected_ENN=LOW
+# (motor.c:2491 `want ? "LOW" : "HIGH"`), 反馈 ENN_fb=0 才与 safety_gpio.c:273-296 的
+# want_enabled=1 一致。修前这两行写的是 HIGH/1 + verdict=OK(禁能侧才有的组合), 那是**合成值写错了**
+# 而不是产品会这么印: 返修件按 F4 判红之后, 本包必须换成真实形状, 而不是把判据放宽回去。
+ACCEL = ["[MOT] state=1 name=ACCEL", "[MOT] cur_hz=200 tgt_hz=300 accel=2000 decel=2000 dir=0",
          "[MOT] armed=1 drv_en_request=1 health=OK", "[MOT] drv_request=HIGH pad=1",
-         "[MOT] expected_ENN=HIGH ENN_fb=1 resolved verdict=OK",
+         "[MOT] expected_ENN=LOW ENN_fb=0 resolved verdict=OK",
          "[MOT] diag_off_confirmed=NO"]
-CRUISE = ["[MOT] state=2 name=CRUISE", "[MOT] cur_hz=100 tgt_hz=100 accel=50 decel=50 dir=0",
+CRUISE = ["[MOT] state=2 name=CRUISE", "[MOT] cur_hz=300 tgt_hz=300 accel=2000 decel=2000 dir=0",
           "[MOT] armed=1 drv_en_request=1 health=OK", "[MOT] drv_request=HIGH pad=1",
-          "[MOT] expected_ENN=HIGH ENN_fb=1 resolved verdict=OK",
+          "[MOT] expected_ENN=LOW ENN_fb=0 resolved verdict=OK",
           "[MOT] diag_off_confirmed=NO"]
+# 成功行同样取产品原文(motor.c:1328 arm / motor.c:1415 disarm): 义务只能被**整条**成功行解除,
+# "DISARM" 这种子串在 F3 之后不当证据。
+ARMED = ["[MOT] ARMED (drv_en request=HIGH readback verified, ENN feedback=LOW confirmed)"]
+DISARMED = ["[MOT] DISARM (动作已做: STEP DONE / 许可 LOW verified / ENN feedback=OK)"]
+STOPPED = ["[MOT] stop requested: target_hz=0 (软件命令值), STEP 实际关断结果见 "
+           "stop_result(当前=OFF_CONFIRMED)"]
 
 
 def rows_table(variant):
@@ -95,9 +135,8 @@ def rows_table(variant):
     cancel_state = (["[DIAG] job id=17 st=CANCEL\x00LED why=USER_CANCEL owner=0 cred=1/0",
                      "[DIAG] job n=8/8 want=8 win=450..550 dir=0"]
                     if variant == "corrupt"
-                    else job(17, "CANCELLED", why="USER_CANCEL", owner=0, cred="1/0"))
-    ls_done = (job(73, "DONE", owner=0, cred="1/1", adc=8, sg=8) if variant == "normal"
-               else job(73, "RUNNING", owner=1))
+                    else job(17, "CANCELLED"))
+    ls_done = (done_full(73) if variant == "normal" else job(73, "RUNNING"))
     return {
         "_about": {
             "kind": "SYNTHETIC_STUB_ROWS_NOT_BOARD_EVIDENCE",
@@ -109,7 +148,7 @@ def rows_table(variant):
         "commands": {
             "status_static": {"healthy": DISABLED},
             "motor_dir": {"healthy": ["[MOT] dir=0 requested"]},
-            "motor_arm": {"healthy": ["[MOT] ARM ok armed=1"]},
+            "motor_arm": {"healthy": ARMED},
             "motor_target": {"healthy": ["[MOT] target=100"]},
             "motor_start": {"healthy": []},
             "status_accel": {"healthy": ACCEL},
@@ -119,12 +158,12 @@ def rows_table(variant):
                                        "(motor untouched)"]},
             "ls_cancelled": {"healthy": cancel_state},
             "learn_done_trial": {"healthy": started(73)},
-            "ls_running": {"healthy": job(73, "RUNNING", owner=1)},
-            "ls_running2": {"healthy": job(73, "RUNNING", adc=6, sg=6, owner=1)},
+            "ls_running": {"healthy": job(73, "RUNNING", adc=3, sg=3)},
+            "ls_running2": {"healthy": job(73, "RUNNING", adc=6, sg=6)},
             "ls_done": {"healthy": ls_done},
             # 固定清理三条按**命令名**查表, 少一份就会变成假的 NO_RESPONSE。
-            "motor_stop": {"healthy": ["[MOT] stop requested target=0"]},
-            "motor_disarm": {"healthy": (DISABLED[:1] + ["[MOT] DISARM (done)"])},
+            "motor_stop": {"healthy": STOPPED},
+            "motor_disarm": {"healthy": DISARMED},
             "motor_status": {"healthy": DISABLED},
         }}
 
@@ -135,7 +174,8 @@ def steps():
          "expect_contains": ["state=0"]},
         {"as": "dir", "cmd": "motor_dir 0", "key": "motor_dir", "seconds": 2,
          "expect_contains": ["dir=0"]},
-        {"as": "arm", "cmd": "motor_arm", "seconds": 3, "expect_contains": ["armed=1"]},
+        {"as": "arm", "cmd": "motor_arm", "seconds": 3,
+         "expect_contains": ["ARMED (drv_en request=HIGH readback verified"]},
         {"as": "target", "cmd": "motor_target 100", "key": "motor_target", "seconds": 2,
          "expect_contains": ["target=100"]},
         {"as": "start", "cmd": "motor_start", "seconds": 2, "expect_absent": ["REFUSED"],

@@ -96,10 +96,21 @@ def main() -> int:
     note("旧判据一条都没被洗掉", not missing,
          "消失=%d 条%s" % (len(missing), (" | " + " ;; ".join(missing)[:300]) if missing else ""))
     added = [l for l in new_body if l not in set(old_body)]
-    not_ours = [l for l in added if not l.startswith("R7F8E_")]
+    # "本轮自己的门"不能只看前缀: R7F8F 的 F5b 把收口预留判据加进了离线整包门家族(PLAN_*)。
+    # 前缀放不开就得点名 —— 点名了就要验它确实出现, 否则白名单会变成"任何 PLAN_ 新行都免检"。
+    OURS_PREFIX = "R7F8E_"
+    OURS_NAMES = ("PLAN_CLEANUP_RESERVE",)
+    not_ours = [l for l in added
+                if not l.startswith(OURS_PREFIX) and l.split("|")[0] not in OURS_NAMES]
     note("新增行全部是本轮适配自己的门", not not_ours,
-         "新增=%d 条, 其中不是 R7F8E_ 形状的=%d 条%s"
-         % (len(added), len(not_ours), (" | " + " ;; ".join(not_ours)[:300]) if not_ours else ""))
+         "新增=%d 条, 其中既不是 %s 形状也不在点名表里的=%d 条%s"
+         % (len(added), OURS_PREFIX, len(not_ours),
+            (" | " + " ;; ".join(not_ours)[:300]) if not_ours else ""))
+    seen_names = set(l.split("|")[0] for l in added)
+    absent = [n for n in OURS_NAMES if n not in seen_names]
+    note("点名的本轮新门确实出现在新增行里(白名单非空转)", not absent,
+         "点名=%s 实到=%s 缺=%s" % (",".join(OURS_NAMES),
+                                    ",".join(sorted(seen_names)), ",".join(absent) or "-"))
     note("新增门条数与计数一致", nc == oc + len(added) and len(added) > 0,
          "旧 %d + 新增 %d = 新 %d" % (oc, len(added), nc))
     note("既有失败集合未变", of_ == nf,
@@ -123,7 +134,9 @@ def main() -> int:
     (repo / ROUND / "proof").mkdir(parents=True, exist_ok=True)
     (repo / ROUND / "proof/r7f8e_no_regression.txt").write_text(text, encoding="utf-8",
                                                                  newline="\n")
-    print(text, end="")
+    # 走 stdout.buffer 而不是 print: 控制台是 GBK, 而原文里带着从旧件 stdout 里 replace 出来的
+    # '\ufffd' —— print 会在这里抛 UnicodeEncodeError, 把"判据 9/0"伪装成"脚本自己炸了 rc=1"。
+    sys.stdout.buffer.write(text.encode("utf-8", "replace"))
     return 1 if fails else 0
 
 

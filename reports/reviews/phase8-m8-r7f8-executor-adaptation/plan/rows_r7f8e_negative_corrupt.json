@@ -10,7 +10,7 @@
   "status_static": {
    "healthy": [
     "[MOT] state=0 name=OTHER",
-    "[MOT] cur_hz=0 tgt_hz=0 accel=0 decel=0 dir=0",
+    "[MOT] cur_hz=0 tgt_hz=0 accel=2000 decel=2000 dir=0",
     "[MOT] armed=0 drv_en_request=0 health=OK",
     "[MOT] drv_request=LOW pad=0",
     "[MOT] expected_ENN=HIGH ENN_fb=1 resolved verdict=OK",
@@ -24,7 +24,7 @@
   },
   "motor_arm": {
    "healthy": [
-    "[MOT] ARM ok armed=1"
+    "[MOT] ARMED (drv_en request=HIGH readback verified, ENN feedback=LOW confirmed)"
    ]
   },
   "motor_target": {
@@ -38,20 +38,20 @@
   "status_accel": {
    "healthy": [
     "[MOT] state=1 name=ACCEL",
-    "[MOT] cur_hz=20 tgt_hz=100 accel=50 decel=50 dir=0",
+    "[MOT] cur_hz=200 tgt_hz=300 accel=2000 decel=2000 dir=0",
     "[MOT] armed=1 drv_en_request=1 health=OK",
     "[MOT] drv_request=HIGH pad=1",
-    "[MOT] expected_ENN=HIGH ENN_fb=1 resolved verdict=OK",
+    "[MOT] expected_ENN=LOW ENN_fb=0 resolved verdict=OK",
     "[MOT] diag_off_confirmed=NO"
    ]
   },
   "status_cruise": {
    "healthy": [
     "[MOT] state=2 name=CRUISE",
-    "[MOT] cur_hz=100 tgt_hz=100 accel=50 decel=50 dir=0",
+    "[MOT] cur_hz=300 tgt_hz=300 accel=2000 decel=2000 dir=0",
     "[MOT] armed=1 drv_en_request=1 health=OK",
     "[MOT] drv_request=HIGH pad=1",
-    "[MOT] expected_ENN=HIGH ENN_fb=1 resolved verdict=OK",
+    "[MOT] expected_ENN=LOW ENN_fb=0 resolved verdict=OK",
     "[MOT] diag_off_confirmed=NO"
    ]
   },
@@ -80,37 +80,36 @@
   },
   "ls_running": {
    "healthy": [
-    "[DIAG] job id=73 st=RUNNING why=NONE owner=1 cred=1/0",
-    "[DIAG] job n=8/8 want=8 win=450..550 dir=0"
+    "[DIAG] job id=73 st=RUNNING why=RUNNING owner=2 cred=1/0",
+    "[DIAG] job n=3/3 want=8 win=450..550 dir=0"
    ]
   },
   "ls_running2": {
    "healthy": [
-    "[DIAG] job id=73 st=RUNNING why=NONE owner=1 cred=1/0",
+    "[DIAG] job id=73 st=RUNNING why=RUNNING owner=2 cred=1/0",
     "[DIAG] job n=6/6 want=8 win=450..550 dir=0"
    ]
   },
   "ls_done": {
    "healthy": [
-    "[DIAG] job id=73 st=RUNNING why=NONE owner=1 cred=1/0",
+    "[DIAG] job id=73 st=RUNNING why=RUNNING owner=2 cred=1/0",
     "[DIAG] job n=8/8 want=8 win=450..550 dir=0"
    ]
   },
   "motor_stop": {
    "healthy": [
-    "[MOT] stop requested target=0"
+    "[MOT] stop requested: target_hz=0 (软件命令值), STEP 实际关断结果见 stop_result(当前=OFF_CONFIRMED)"
    ]
   },
   "motor_disarm": {
    "healthy": [
-    "[MOT] state=0 name=OTHER",
-    "[MOT] DISARM (done)"
+    "[MOT] DISARM (动作已做: STEP DONE / 许可 LOW verified / ENN feedback=OK)"
    ]
   },
   "motor_status": {
    "healthy": [
     "[MOT] state=0 name=OTHER",
-    "[MOT] cur_hz=0 tgt_hz=0 accel=0 decel=0 dir=0",
+    "[MOT] cur_hz=0 tgt_hz=0 accel=2000 decel=2000 dir=0",
     "[MOT] armed=0 drv_en_request=0 health=OK",
     "[MOT] drv_request=LOW pad=0",
     "[MOT] expected_ENN=HIGH ENN_fb=1 resolved verdict=OK",

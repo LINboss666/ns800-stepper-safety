@@ -1,4 +1,4 @@
-身份_派生件含四项适配的符号|PASS|265666 B sha=c48c6921f840… 缺=[]
+身份_派生件含四项适配的符号|PASS|274223 B sha=093c09fdec1d… 缺=[]
 身份_旧执行器未被动过|PASS|实读 219491 B sha=33d3f0af8a4c9c33…
 身份_A包绑定按Git blob复算|PASS|IDENTITY.json 的 8 条 source_bindings 与 HEAD blob 逐条相符; motor.c 盘上 134298 B(CRLF 检出) / blob 131732 B = A 登记值, CR 数 2566 = 行数
 B1_两枚非1的不同ID各自正确受理与取消|PASS|组=身份与绑定 rc=0 code=
@@ -72,6 +72,10 @@ H6_尾部没回CLOSED只追加披露不改撤能结论|PASS|组=R7F8F返修 rc=1
 H7_没开IRQ就不发尾部两条|PASS|组=R7F8F返修 rc=0 code=
 H9_清理后仍巡航必须判红(不是业务码独大)|PASS|组=R7F8F返修 rc=1 code=CLEANUP_UNCONFIRMED
 H8_会话截止不随步骤续期|PASS|组=R7F8F返修 rc=1 code=STEP_DEADLINE_BEFORE_WRITE
+H10_开过IRQ但从未arm也要收口(尾部两条照发)|PASS|组=R7F8F返修 rc=1 code=PROFILE_NOT_RUNNING
+H11_收口全部无响应时五条各有发送机会(7秒预留)|PASS|组=R7F8F返修 rc=1 code=CLEANUP_UNCONFIRMED
+H12_申报排不下五条的预留就在开口之前拒|PASS|组=R7F8F返修 rc=1 code=CLEANUP_RESERVE_CANNOT_COVER_ALL_SENDS
+H13_会话总截止夹短收口时事前具名披露|PASS|组=R7F8F返修 rc=1 code=CLEANUP_UNCONFIRMED
 X1_把JOB_ID固定成1|PASS|摘门后 code=CANCEL_ID_MISMATCH(原门检出=JOB_UNBOUND); 摘门后真实发出=True(应看到这条写尝试) 实发=['diag_profile learn_cancel 1']
 X2_把任何终态当成功|PASS|摘门后 code=JOB_STATE_TERMINAL_FAILURE(原门检出=FIELD_VALUE_MISMATCH); 要求新身份=JOB_STATE_TERMINAL_FAILURE 实际=JOB_STATE_TERMINAL_FAILURE
 X3_移除取消额度行|PASS|摘门后 code=(原门检出=QUOTA_STEP_UNDECLARED); 摘门后真实发出=True(应看到这条写尝试) 实发=['diag_profile learn 8 450 550 0', 'diag_profile learn_cancel 17']
@@ -89,4 +93,4 @@ M3_七原因共用一次票据(源码锚点)|PASS|源码侧同一出口/票据�
 M4_旧F7遗留FAILED只作只读披露|PASS|豁免按完整命令放行两条真只读查询, 不放宽 diag_profile 首词面
 自证_故意写错的预期必须被判红|PASS|judge() 对同一份真实输出报了 1 条不符 => 整张矩阵的绿不是恒真
 本轮无设备动作|PASS|全部 stub/sim 子进程与在进程内门函数; 未开串口/pyOCD/Keil/分析仪, 未建真实批准账
-R7F8E_MATRIX_SUMMARY|判据=91|FAIL=0|none
+R7F8E_MATRIX_SUMMARY|判据=95|FAIL=0|none

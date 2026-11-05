@@ -43,7 +43,11 @@ PLAN_APP_REL = ("rt-thread-master/rt-thread-master/bsp/novosns/ns800/"
 BAUD = 115200
 SLACK_SECONDS = 3
 WRITE_SECONDS = 2
-CLEANUP_RESERVE_SECONDS = 4          # 起转硬截止之后留给 stop+disarm+复核的时间
+# F5b(操作者实测第二项): 4 s 排不下**五条**各自的 1.2 s 确认窗(3 条电机 + 2 条 IRQ 尾部
+# = 6.0 s), 于是全部无响应时第五条 safety_irq_status 必被 IRQ_TAIL_HARD_DEADLINE_BEFORE_*
+# 跳过。本轮任务书 §5 明写"会话 90 s 含 7 s 收口预留", 这里落实成申报值 7 s;
+# exec_session 开口前用 CLEANUP_RESERVE_CANNOT_COVER_ALL_SENDS 拒掉任何 < 6.0 s 的申报。
+CLEANUP_RESERVE_SECONDS = 7          # 起转硬截止之后留给 stop+disarm+复核+IRQ 尾部的时间
 BOOT_CAP = 262144
 RESPONSE_CAP = 32768
 PROMPT_RE = re.compile(rb"(?:^|\r?\n|\r)msh\s*(?:>|/>)\s*\Z")
@@ -878,9 +882,12 @@ class MotionBudget:
     def __init__(self, clock, cap_seconds, reserve=CLEANUP_RESERVE_SECONDS):
         self.clock = clock
         self.cap = float(cap_seconds)
-        self.reserve = float(reserve)
+        self.reserve = float(reserve)   # F5b: 由会话/阶段**申报**, 不再只靠模块常量
         self.t0 = None
         self.actual = None
+        # F5b: 会话绝对截止(台账 t0 + 总时限)。cleanup_deadline() 用它把收口再夹一次,
+        # 落实"7 s 预留仍受会话总截止约束"——预留不是把会话无上限拉长的手段。
+        self.session_abs_dl = None
 
     @property
     def armed(self):
@@ -898,8 +905,17 @@ class MotionBudget:
         return min(self.clock.monotonic() + want_seconds + slack, hard)
 
     def cleanup_deadline(self):
-        return (self.t0 + self.cap + self.reserve) if self.t0 is not None \
+        """收口绝对截止 = 起转硬截止 + **申报的**收口预留, 再被会话总截止夹一次。
+
+        F5b 两项都在这里落地: 预留取申报值(本轮 7 s, 足够五条各 1.2 s 窗), 会话总截止仍然
+        封顶(不因为申报了预留就把 90 s 放宽)。被夹短到排不下时不静默少发——cleanup() 入口
+        先具名披露 CLEANUP_RESERVE_SHORT_BY_SESSION_DEADLINE, 每条自己的窗到点也照旧具名。
+        """
+        base = (self.t0 + self.cap + self.reserve) if self.t0 is not None \
             else self.clock.monotonic() + self.reserve
+        if self.session_abs_dl is not None:
+            return min(base, self.session_abs_dl)
+        return base
 
     def remaining(self):
         if self.t0 is None:
@@ -1690,7 +1706,7 @@ def _flush_deferred_ev(led, deferred, errors):
 
 def cleanup(port, led, clock, budget, transport, fixture, feed_hook=None,
             quota_box=None, overruns=None, used_box=None, approval=None, reservations=None,
-            energize=None, irq_attempted=False):
+            energize=None, irq_attempted=False, motor_obligation=True):
     """义务建立后的唯一清理路径(M6 语义 + R3-B 分段窗): motor_stop -> motor_disarm -> motor_status。
     返回 (disarm_state, errors); 本函数**绝不**抛: 主错由调用方保留, 清理失败单独记账。
     三条命令各有自己的确认窗(总保留量分三段), 任何一条没回都**不减少**后面一条的发送机会 ——
@@ -1707,7 +1723,29 @@ def cleanup(port, led, clock, budget, transport, fixture, feed_hook=None,
     hard = budget.cleanup_deadline()
     out_dir = led.out
     status_rows = []
-    for cmd in CLEANUP_CMDS:
+    # F5b①: 电机那三条只由**电机义务**决定发不发。"先开 IRQ、随后失败"这一类场里电机从未
+    # 武装, 那三条与本场义务无关(发它们既花额度又造出无关响应), 但 IRQ 尾部**必须**照发。
+    sends = list(CLEANUP_CMDS) if motor_obligation else []
+    chances = len(sends) + (len(IRQ_TAIL_CMDS) if irq_attempted else 0)
+    # F5b②: 会话总截止把预留夹短到排不下本场需要的全部发送窗时, 在**第一条清理命令之前**
+    # 就把这件事具名披露出来。修前只有第 N 条 *_HARD_DEADLINE_BEFORE_* 才露一手, 四条之内
+    # 看不出"第五条本来就来不及"——那是事后归因, 不是事前可见。
+    need_windows = chances * CLEANUP_WINDOW_SECONDS
+    left = hard - clock.monotonic()
+    if left < need_windows:
+        errors.append("CLEANUP_RESERVE_SHORT_BY_SESSION_DEADLINE " + json.dumps(
+            {"left_seconds": round(max(0.0, left), 3),
+             "required_seconds": round(need_windows, 3), "send_chances": chances,
+             "reserve_seconds": budget.reserve,
+             "session_abs_deadline_set": budget.session_abs_dl is not None},
+            ensure_ascii=False))
+    # 收口起点具名入台账: 之后每一条 TX 才**可判定**属于收口还是业务(判据不能靠命令名猜——
+    # 业务里也允许发 motor_status, 例如 disarm 后的相邻禁能快照)。
+    _ev_or_defer(led, deferred_ev, "CLEANUP_ENTERED", motor_obligation=bool(motor_obligation),
+                 irq_attempted=bool(irq_attempted), send_chances=chances,
+                 reserve_seconds=budget.reserve, hard_deadline=round(hard, 3),
+                 left_seconds=round(max(0.0, left), 3))
+    for cmd in sends:
         dl = min(hard, clock.monotonic() + CLEANUP_WINDOW_SECONDS)
         if clock.monotonic() >= hard:
             errors.append("CLEANUP_HARD_DEADLINE_BEFORE_" + cmd)
@@ -1755,16 +1793,23 @@ def cleanup(port, led, clock, budget, transport, fixture, feed_hook=None,
         errors.extend(errs)
         if cmd == "motor_status":
             status_rows = rows
-    summary, bad = disable_contract(status_rows)
-    _ev_or_defer(led, deferred_ev, "DISARM_FIELDS", fields=summary, unproven=" ".join(bad))
-    if bad:
-        errors.append("DISARM_NOT_CONFIRMED " + " ".join(bad))
+    if not motor_obligation:
+        # "不需要禁能"是**已知事实**(电机从未武装 => 终态 KNOWN), 不是"证实了禁能"。
+        # 这两个字符串不能互换: 把 NOT_ARMED 写成 CONFIRMED_DISABLED 就是替设备编证据。
+        state = "NOT_ARMED"
+        _ev_or_defer(led, deferred_ev, "CLEANUP_MOTOR_NOT_OBLIGATED",
+                     irq_attempted=bool(irq_attempted), sends=0)
     else:
-        state = "CONFIRMED_DISABLED"
-        if energize is not None and energize.await_disable_snapshot:
-            led.ev("ENERGIZE_DEADLINE_CLOSED", actual_s=round(energize.close(), 3),
-                   cap_seconds=energize.cap, basis="cleanup_status")
-            energize.await_disable_snapshot = False
+        summary, bad = disable_contract(status_rows)
+        _ev_or_defer(led, deferred_ev, "DISARM_FIELDS", fields=summary, unproven=" ".join(bad))
+        if bad:
+            errors.append("DISARM_NOT_CONFIRMED " + " ".join(bad))
+        else:
+            state = "CONFIRMED_DISABLED"
+            if energize is not None and energize.await_disable_snapshot:
+                led.ev("ENERGIZE_DEADLINE_CLOSED", actual_s=round(energize.close(), 3),
+                       cap_seconds=energize.cap, basis="cleanup_status")
+                energize.await_disable_snapshot = False
     # F5: 固定 IRQ 尾部排在**禁能判据算完之后** —— 尾部任何失败只追加具名披露,
     # 绝不回头改上面已经成立的 state, 也不吃掉撤能(任务书 §2: 尾部失败不能阻断前面的撤能)。
     if irq_attempted:
@@ -2501,7 +2546,7 @@ def arm_attempt_gate(energize, led, clock, asname, cmd):
 def exec_session(session_id, steps, outdir, transport, fixture, port_name,
                  total_deadline_seconds, clock, backend=None, motion_cap_seconds=None,
                  plan=None, quota_box=None, used_box=None, context=None, approval=None,
-                 approved=None, energize_cap_seconds=None):
+                 approved=None, energize_cap_seconds=None, cleanup_reserve_seconds=None):
     """一个会话 = 一个端口 = 一个写者。
 
     与 R1 交付版的三处实质差别:
@@ -2588,12 +2633,36 @@ def exec_session(session_id, steps, outdir, transport, fixture, port_name,
     session_abs_dl = clock.monotonic() + float(total_deadline_seconds)
     bindings = {}
     energize = EnergizeBudget(clock, energize_cap_seconds)
-    budget = MotionBudget(clock, motion_cap_seconds) if motion_cap_seconds else \
-        MotionBudget(clock, total_deadline_seconds)
+    # F5b②: 收口预留取**申报值**(没申报就用本轮常量 7 s)。类型在这里就判, 和
+    # PLAN_MANUAL_AFTER_MOTION 同一层: 畸形申报在台账/端口/账本之前拒, 一条命令都不发。
+    reserve_declared = CLEANUP_RESERVE_SECONDS if cleanup_reserve_seconds is None \
+        else cleanup_reserve_seconds
+    if isinstance(reserve_declared, bool) or \
+            not isinstance(reserve_declared, (int, float)):
+        raise Stop("CLEANUP_RESERVE_NOT_A_NUMBER",
+                   "cleanup_reserve_seconds=%r(%s)" % (reserve_declared,
+                                                       type(reserve_declared).__name__))
+    budget = MotionBudget(clock, motion_cap_seconds,
+                          reserve=reserve_declared) if motion_cap_seconds else \
+        MotionBudget(clock, total_deadline_seconds, reserve=reserve_declared)
+    # F5b②: 收口仍然被会话**绝对**截止封顶(修前 cleanup 只认 t0+cap+reserve, 总时限管不到它)。
+    budget.session_abs_dl = session_abs_dl
     silent = bool(fixture.get("inject", {}).get("port_silent"))
     port = None
     ret = None
     try:
+        # F5b②: 预留必须容得下**全部**必要发送各自的确认窗(3 条电机 + 2 条 IRQ 尾部 = 5 条
+        # × 1.2 s = 6.0 s)。修前的 4 s 常量正是这样静默吃掉第五条 safety_irq_status 的;
+        # 现在申报排不下就在第一条命令之前具名拒绝 —— 端口、额度、批准账三处仍然零副作用,
+        # 但这次拒绝本身进台账(可审计的"没发生", 而不是事后靠 stdout 抓一行)。
+        reserve_floor = (len(CLEANUP_CMDS) + len(IRQ_TAIL_CMDS)) * CLEANUP_WINDOW_SECONDS
+        if float(reserve_declared) + 1e-9 < reserve_floor:
+            raise Stop("CLEANUP_RESERVE_CANNOT_COVER_ALL_SENDS", json.dumps(
+                {"reserve_seconds": float(reserve_declared),
+                 "required_seconds": round(reserve_floor, 3),
+                 "send_chances": len(CLEANUP_CMDS) + len(IRQ_TAIL_CMDS),
+                 "window_seconds_each": CLEANUP_WINDOW_SECONDS,
+                 "checked_before": "port_open_and_quota"}, ensure_ascii=False))
         spend("port_open", 1)               # 先记账再尝试开口(尝试数 == 扣减数)
         if transport == "stub":
             script = [l.encode("utf-8") + b"\r\n" for l in fixture.get("boot_bytes", [])]
@@ -2834,14 +2903,19 @@ def exec_session(session_id, steps, outdir, transport, fixture, port_name,
         ret = {"status": "STOP", "code": primary.code, "detail": primary.detail}
         led.ev("SESSION_STOP", code=primary.code, detail=primary.detail)
     finally:
-        if obligation:                     # 不只是"起转成功之后": 潜在已武装同样清理
+        # F5b①(操作者实测第一项): 任务书 §2 要的是"**尝试过**开 IRQ 本身就建立尾部清理义务",
+        # 与电机义务无关。真实序列正是先 safety_irq_enable 再 motor_arm, 中间任何一步失败(查询
+        # 失败/判据红/截止)都落在 `obligation` 还是 False 的窗口里 => 修前一条 disable/status
+        # 都不发, IRQ 门留在 OPEN。电机那三条仍按 obligation 走(见 cleanup 的 motor_obligation)。
+        if obligation or irq_attempted:    # 潜在已武装**或**已尝试开 IRQ => 都要收口
             hook = _stub_feed(port, fixture) if transport == "stub" else None
             try:
                 disarm_state, cerr = cleanup(port, led, clock, budget, transport, fixture,
                                              hook, quota if plan else None,
                                              cleanup_overruns, used,
                                              approval=approval, reservations=reservations,
-                                             energize=energize, irq_attempted=irq_attempted)
+                                             energize=energize, irq_attempted=irq_attempted,
+                                             motor_obligation=obligation)
                 errors.extend(cerr)          # 清理错独立留账: 主错在 ret, 不能被吞成空成功
             except Exception as e:
                 # 清理框架自己炸了: 禁能一律 UNKNOWN(不猜"应该已经撤了"), 但端口仍要关
@@ -2907,6 +2981,11 @@ def exec_session(session_id, steps, outdir, transport, fixture, port_name,
                 "obligation": obligated, "success": success,
                 "cleanup_errors": errors, "cleanup_overruns": cleanup_overruns,
                 "budget_seconds": elapsed,
+                # F5b: 回执里带上**这一场实际生效**的收口预留与是否被会话截止夹过, 让 7 s
+                # 不只是文档里的字: 现场判读能直接看到申报值与绝对截止的差。
+                "cleanup_reserve_seconds": budget.reserve,
+                "cleanup_hard_deadline": round(budget.cleanup_deadline(), 6),
+                "session_abs_deadline": round(session_abs_dl, 6),
                 "energize_cap_seconds": energize.cap,
                 "energize_seconds_actual": energize.close(),
                 "job_bindings": {k: v["job_id"] for k, v in bindings.items()},
@@ -3475,6 +3554,36 @@ def validate_plan(plan, rows_doc, app_dir):
                ("PASS" if ok_t else "FAIL", caps, sum(c for _, c in caps), total, starts))
     if not ok_t:
         bad += 1
+    # F5b②(离线整包侧, 与 exec_session 里那条同一判据): 预留(a)容得下全部必要发送窗,
+    # (b)住在本阶段总窗之内(motion_cap + 预留 <= 总时限)——"仍受会话总截止约束"要在**申报**
+    # 阶段成立, 不能等现场清理时才发现排不下。只读盘上申报值, 不发任何命令。
+    floor_r = (len(CLEANUP_CMDS) + len(IRQ_TAIL_CMDS)) * CLEANUP_WINDOW_SECONDS
+
+    def _num_or_none(v):
+        if v is None or isinstance(v, bool) or not isinstance(v, (int, float)):
+            return None
+        return float(v)
+
+    for sg in plan["stages"]:
+        if sg.get("kind") != "serial_session":
+            continue
+        rs = _num_or_none(sg.get("cleanup_reserve_seconds", CLEANUP_RESERVE_SECONDS))
+        td = _num_or_none(sg.get("total_deadline_seconds"))
+        mc = _num_or_none(sg.get("motion_cap_seconds"))
+        bad_r = []
+        if rs is None:
+            bad_r.append("cleanup_reserve_seconds 不是数字(=%r)" % (sg.get("cleanup_reserve_seconds"),))
+        else:
+            if rs + 1e-9 < floor_r:
+                bad_r.append("预留=%s < 五条发送窗合计=%.1f" % (rs, floor_r))
+            if td is not None and mc is not None and mc + rs > td:
+                bad_r.append("motion_cap=%s + 预留=%s > 本阶段总窗=%s(预留排不进会话)"
+                             % (mc, rs, td))
+        out.append("PLAN_CLEANUP_RESERVE|%s|%s|reserve=%s floor=%.1f total=%s cap=%s%s" %
+                   (sg["id"], "PASS" if not bad_r else "FAIL", rs, floor_r, td, mc,
+                    "" if not bad_r else "|" + ";".join(bad_r)))
+        if bad_r:
+            bad += 1
     # ① 镜像身份: S0/下载/回读三处必须同源(离线就拒绝, 不等现场 READBACK_HASH_MISMATCH)
     ib = identity_consistency(plan)
     out.append("PLAN_IMAGE_IDENTITY_CONSISTENCY|all|%s|%s" %
@@ -4379,6 +4488,7 @@ def dispatch_plan(plan, transport, backend_name, outdir, clock, profile, port,
                                    backend=backend,
                                    motion_cap_seconds=cap,
                                    energize_cap_seconds=stg.get("arm_energize_deadline_seconds"),
+                                   cleanup_reserve_seconds=stg.get("cleanup_reserve_seconds"),
                                    plan=plan, quota_box=quota_box, used_box=used_box,
                                    context=recorded, approval=approval, approved=approved_pkg)
                 if transport == "real":
@@ -4564,6 +4674,9 @@ def main(argv=None):
     ap.add_argument("--motion-cap-seconds", type=int, default=0)
     ap.add_argument("--arm-energize-deadline-seconds", type=int, default=0,
                     help="E4: motor_arm 之后的通电保持截止(单会话工装入口; 整包按阶段申报)")
+    ap.add_argument("--cleanup-reserve-seconds", type=float, default=0.0,
+                    help="F5b: 收口预留(默认 %s s, 必须容得下五条各自的确认窗; 整包按阶段申报)"
+                         % CLEANUP_RESERVE_SECONDS)
     ap.add_argument("--plan", help="计划 JSON: 提供后额度在发送前真实扣减(quota)")
     ap.add_argument("--approval-token")
     ap.add_argument("--expected-token")
@@ -4759,6 +4872,7 @@ def main(argv=None):
                            a.total_deadline_seconds, clock, backend=backend,
                            motion_cap_seconds=a.motion_cap_seconds or None,
                            energize_cap_seconds=a.arm_energize_deadline_seconds or None,
+                           cleanup_reserve_seconds=a.cleanup_reserve_seconds or None,
                            plan=plan_doc, approval=session_approval)
     except Stop as e:
         print(json.dumps({"session": a.session, "status": "STOP", "code": e.code,

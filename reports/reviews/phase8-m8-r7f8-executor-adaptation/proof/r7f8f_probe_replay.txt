@@ -1,0 +1,19 @@
+REPLAY|REPAIRED|PASS|I1_P8意图_修前整条巡航合同(禁能侧ENN)判红|code=PROFILE_NOT_RUNNING|disarm=NOT_ARMED|reserve=7.0|tx=motor_status|
+REPLAY|F5B_BEFORE|PASS|I1_P8意图_修前整条巡航合同(禁能侧ENN)判红|code=PROFILE_NOT_RUNNING|disarm=NOT_ARMED|reserve=None|tx=motor_status|
+REPLAY|R7F8F_BEFORE|PASS|I1_P8意图_修前整条巡航合同(禁能侧ENN)判红|code=|disarm=NOT_ARMED|reserve=None|tx=motor_status|
+REPLAY|REPAIRED|PASS|I2_P7意图_第二次arm在写入尝试之前拒|code=ARM_SECOND_ATTEMPT_REFUSED|disarm=CONFIRMED_DISABLED|reserve=7.0|tx=motor_arm,motor_disarm,motor_status,motor_stop,motor_disarm,motor_status|
+REPLAY|F5B_BEFORE|PASS|I2_P7意图_第二次arm在写入尝试之前拒|code=ARM_SECOND_ATTEMPT_REFUSED|disarm=CONFIRMED_DISABLED|reserve=None|tx=motor_arm,motor_disarm,motor_status,motor_stop,motor_disarm,motor_status|
+REPLAY|R7F8F_BEFORE|PASS|I2_P7意图_第二次arm在写入尝试之前拒|code=|disarm=CONFIRMED_DISABLED|reserve=None|tx=motor_arm,motor_disarm,motor_status,motor_arm,motor_stop,motor_disarm,motor_status|
+REPLAY|REPAIRED|PASS|I3_P6意图_arm迟到回包在通电截止即进收口|code=MISSING_RESPONSE_PROMPT|disarm=UNKNOWN|reserve=7.0|tx=motor_arm,motor_stop,motor_disarm,motor_status|
+REPLAY|F5B_BEFORE|PASS|I3_P6意图_arm迟到回包在通电截止即进收口|code=MISSING_RESPONSE_PROMPT|disarm=UNKNOWN|reserve=None|tx=motor_arm,motor_stop,motor_disarm,motor_status|
+REPLAY|R7F8F_BEFORE|PASS|I3_P6意图_arm迟到回包在通电截止即进收口|code=|disarm=CONFIRMED_DISABLED|reserve=None|tx=motor_arm,motor_stop,motor_disarm,motor_status|
+REPLAY|REPAIRED|PASS|I4_F5b1_开IRQ后arm前失败_尾部disable与status仍发出|code=PROFILE_NOT_RUNNING|disarm=NOT_ARMED|reserve=7.0|tx=safety_irq_enable,motor_status,safety_irq_disable,safety_irq_status|
+REPLAY|F5B_BEFORE|PASS|I4_F5b1_开IRQ后arm前失败_尾部disable与status仍发出|code=PROFILE_NOT_RUNNING|disarm=NOT_ARMED|reserve=None|tx=safety_irq_enable,motor_status|
+REPLAY|R7F8F_BEFORE|PASS|I4_F5b1_开IRQ后arm前失败_尾部disable与status仍发出|code=PROFILE_NOT_RUNNING|disarm=NOT_ARMED|reserve=None|tx=safety_irq_enable,motor_status|
+REPLAY|REPAIRED|PASS|I5_F5b2_收口全部无响应_五条各有发送机会|code=CLEANUP_UNCONFIRMED|disarm=UNKNOWN|reserve=7.0|tx=motor_arm,safety_irq_enable,motor_start,motor_stop,motor_disarm,motor_status,safety_irq_disable,safety_irq_status|
+REPLAY|F5B_BEFORE|PASS|I5_F5b2_收口全部无响应_五条各有发送机会|code=CLEANUP_UNCONFIRMED|disarm=UNKNOWN|reserve=None|tx=motor_arm,safety_irq_enable,motor_start,motor_stop,motor_disarm,motor_status,safety_irq_disable|
+REPLAY|R7F8F_BEFORE|PASS|I5_F5b2_收口全部无响应_五条各有发送机会|code=CLEANUP_UNCONFIRMED|disarm=UNKNOWN|reserve=None|tx=motor_arm,safety_irq_enable,motor_start,motor_stop,motor_disarm,motor_status|
+REPLAY|REPAIRED|PASS|I6_F5b2_申报4秒预留在开口之前拒(旧件没有这条 CLI 申报口)|code=CLEANUP_RESERVE_CANNOT_COVER_ALL_SENDS|disarm=NOT_ARMED|reserve=4.0|tx=-|
+REPLAY|F5B_BEFORE|PASS|I6_F5b2_申报4秒预留在开口之前拒(旧件没有这条 CLI 申报口)|code=RUNNER_PARSE_FAILED|disarm=None|reserve=None|tx=-|
+REPLAY|R7F8F_BEFORE|PASS|I6_F5b2_申报4秒预留在开口之前拒(旧件没有这条 CLI 申报口)|code=RUNNER_PARSE_FAILED|disarm=None|reserve=None|tx=-|
+REPLAY_SUMMARY|件数=18|每条件数=3|FAIL=0|none

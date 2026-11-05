@@ -108,7 +108,7 @@
      "cmd": "motor_arm",
      "seconds": 3,
      "expect_contains": [
-      "armed=1"
+      "ARMED (drv_en request=HIGH readback verified"
      ]
     },
     {

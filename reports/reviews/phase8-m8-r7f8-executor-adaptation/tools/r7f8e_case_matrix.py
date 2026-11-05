@@ -137,6 +137,9 @@ MOT_ARMED_IDLE = ["[MOT] state=0 name=OTHER", "[MOT] cur_hz=0 tgt_hz=0 accel=200
                   "[MOT] armed=1 drv_en_request=1 health=OK", "[MOT] drv_request=HIGH pad=1",
                   "[MOT] expected_ENN=LOW ENN_fb=0 resolved verdict=OK",
                   "[MOT] diag_off_confirmed=NO"]
+# 收口的五条固定发送(3 条电机 + 2 条 IRQ 尾部): 跨度/条数判据按这个集合取台账 TX。
+CLEANUP_FIVE = ("motor_stop", "motor_disarm", "motor_status", "safety_irq_disable",
+                "safety_irq_status")
 JOB_ROW = (r"^\[DIAG\] job id=(?P<id>[0-9]+) st=(?P<st>[A-Z_]+) why=(?P<why>[A-Z_]+) "
            r"owner=(?P<owner>[0-9]+) cred=(?P<cred>[0-9]/[0-9])$")
 N_ROW = (r"^\[DIAG\] job n=(?P<adc>[0-9]+)/(?P<sg>[0-9]+) want=(?P<want>[0-9]+) "
@@ -729,7 +732,93 @@ def cases():
       dict(code="STEP_DEADLINE_BEFORE_WRITE", sent_count={"motor_status": 0}, watch_min=4.8,
            watch_max=5.05), extra=["--total-deadline-seconds", "5"])
 
+    # ------- F5b: 操作者 2026-11-05 实测确认的两条(开 IRQ 后 arm 前失败漏收口 / 4 秒预留排不下五条)
+    FIVE = ["motor_stop", "motor_disarm", "motor_status", "safety_irq_disable",
+            "safety_irq_status"]
+    # ①IRQ 尝试自己建立收口义务: 真实序列是先 safety_irq_enable 再 motor_arm, 中间任何失败
+    #   都落在电机 obligation 还是 False 的窗口里。修前的 `finally: if obligation:` 一条尾部
+    #   都不发 => IRQ 门留在 OPEN(操作者模拟"先开 IRQ、随后查询失败"实测到的形状)。
+    g("H10_开过IRQ但从未arm也要收口(尾部两条照发)",
+      [st_("irq", "safety_irq_enable", key="safety_irq_enable", seconds=2,
+           expect_contains=["IRQ"], quota={"name": "irq_polarity_prep", "n": 1}),
+       st_("boom", "motor_status", key="motor_status_running", seconds=2,
+           expect_profile="RUNNING")],
+      # 清理五条的响应**一律不配**: 电机那三条本来就不该发(发了就会多一条 NO_RESPONSE 错),
+      # 尾部两条配了才证"照发且读到了 CLOSED"。
+      fx(responses={"safety_irq_enable": IRQ_ON, "motor_status_running": STATUS_DISABLED,
+                    "safety_irq_disable": ["[SAFETY] IRQ gate stays CLOSED"],
+                    "safety_irq_status": IRQ_OFF}),
+      dict(code="PROFILE_NOT_RUNNING", obligation=False, success_false=True,
+           disarm="NOT_ARMED", status="STOP",
+           cleanup_tx=["safety_irq_disable", "safety_irq_status"],
+           cleanup_tx_none=["motor_stop", "motor_disarm"],
+           # motor_status 只允许**业务那一条**(boom 步发的查询): 若收口又把电机三条发出去,
+           # 这里会数到 2 条 => 判据把"无义务却发撤能"抓出来, 而不是靠 cleanup_tx_none 的
+           # 命令名(它会误伤业务查询本身)。
+           tx_count={"safety_irq_disable": 1, "safety_irq_status": 1},
+           sent_count={"motor_status": 1, "motor_stop": 0, "motor_disarm": 0},
+           cleanup_span=[2, 2, 0.0, 1.5],
+           closed_event="CLEANUP_MOTOR_NOT_OBLIGATED",
+           errors_none_contains=["DISARM_NOT_CONFIRMED", "IRQ_TAIL", "HARD_DEADLINE_BEFORE"]))
+    # ②本轮申报的 7 s 预留要真的容得下五条: 运动截止后全部无响应 => 每条在自己的 1.2 s 窗里
+    #   试完, 五次发送、跨度 4.8 s(=4 个窗), 收尾仍在预留 7 s 之内。修前的 4 s 常量只排得下
+    #   四条, 第五条 safety_irq_status 直接不出现在 TX 里(操作者实测到的形状)。
+    g("H11_收口全部无响应时五条各有发送机会(7秒预留)",
+      [st_("arm", "motor_arm", key="motor_arm", seconds=2,
+           expect_contains=["ARMED (drv_en request=HIGH readback verified"]),
+       st_("irq", "safety_irq_enable", key="safety_irq_enable", seconds=2,
+           expect_contains=["IRQ"], quota={"name": "irq_polarity_prep", "n": 1}),
+       st_("st", "motor_start", key="motor_start", seconds=2, expect_absent=["REFUSED"],
+            quota={"name": "motor_run", "n": 1}),
+       st_("w", "__watch__", key="__watch__", seconds=5)],
+      fx(responses={"motor_arm": ARM_OK, "safety_irq_enable": IRQ_ON,
+                    "motor_start": ["[MOT] step pwm enabled"],
+                    "__watch__": ["[DIAG] tick"]}),
+      dict(code="CLEANUP_UNCONFIRMED", obligation=True, success_false=True, status="OK",
+           disarm="UNKNOWN", cleanup_tx=FIVE, tx_count={k: 1 for k in FIVE},
+           cleanup_span=[5, 5, 4.7, 6.05],
+           errors_contains=["motor_stop:NO_RESPONSE", "motor_status:NO_RESPONSE",
+                            "IRQ_TAIL_safety_irq_status:NO_RESPONSE", "DISARM_NOT_CONFIRMED"],
+           errors_none_contains=["HARD_DEADLINE_BEFORE",
+                                 "CLEANUP_RESERVE_SHORT_BY_SESSION_DEADLINE"],
+           res_near={"cleanup_reserve_seconds": 7.0}),
+      extra=["--arm-energize-deadline-seconds", "30", "--motion-cap-seconds", "1",
+             "--total-deadline-seconds", "60"])
+    # ②的反向: 预留申报得排不下五条 => 在开口/记账之前具名拒绝(一条命令都不发),
+    #   而不是把电机转起来之后才发现收不了尾。这条同时是"7 秒不是随口写的数字"的锚点。
+    g("H12_申报排不下五条的预留就在开口之前拒",
+      [st_("arm", "motor_arm", key="motor_arm", seconds=2,
+           expect_contains=["ARMED (drv_en request=HIGH readback verified"]),
+       st_("irq", "safety_irq_enable", key="safety_irq_enable", seconds=2,
+           expect_contains=["IRQ"], quota={"name": "irq_polarity_prep", "n": 1})],
+      fx(responses={"motor_arm": ARM_OK, "safety_irq_enable": IRQ_ON,
+                    "safety_irq_disable": ["[SAFETY] IRQ gate stays CLOSED"],
+                    "safety_irq_status": IRQ_OFF, "motor_stop": STOP_OK,
+                    "motor_disarm": DISARM_OK, "motor_status": STATUS_DISABLED}),
+      dict(code="CLEANUP_RESERVE_CANNOT_COVER_ALL_SENDS", obligation=False,
+           success_false=True, cleanup_tx_none=FIVE, sent_none=["motor_arm"],
+           bad_contains=["required_seconds", "checked_before", "reserve_seconds"],
+           quota_used={"port_open": None}, closed_event="PORT_NEVER_OPENED",
+           res_near={"cleanup_reserve_seconds": 4.0}),
+      extra=["--arm-energize-deadline-seconds", "20", "--cleanup-reserve-seconds", "4"])
+    # ②的边界: 会话总截止确实**夹住**了收口(预留没被放宽)。少发是截止造成的, 但这件事在第一条
+    #   清理命令之前就以 CLEANUP_RESERVE_SHORT_BY_SESSION_DEADLINE 说清楚, 不靠事后归因。
+    g("H13_会话总截止夹短收口时事前具名披露",
+      [st_("arm", "motor_arm", key="motor_arm", seconds=2,
+           expect_contains=["ARMED (drv_en request=HIGH readback verified"]),
+       st_("irq", "safety_irq_enable", key="safety_irq_enable", seconds=2,
+           expect_contains=["IRQ"], quota={"name": "irq_polarity_prep", "n": 1})],
+      fx(responses={"motor_arm": ARM_OK, "safety_irq_enable": IRQ_ON}),
+      dict(code="CLEANUP_UNCONFIRMED", obligation=True, success_false=True,
+           disarm="UNKNOWN", cleanup_tx=["motor_stop"],
+           cleanup_span=[1, 4, 0.0, 4.0],
+           errors_contains=["CLEANUP_RESERVE_SHORT_BY_SESSION_DEADLINE"],
+           res_near={"cleanup_hard_deadline": 4.0, "session_abs_deadline": 4.0,
+                     "cleanup_reserve_seconds": 7.0}),
+      extra=["--arm-energize-deadline-seconds", "30", "--total-deadline-seconds", "4"])
+
     return C
+
 
 
 # ------------------------------------------------------------------ 元负控(任务书点名的四种破坏)
@@ -825,11 +914,15 @@ def run_case(repo, work, exe, c, tag):
         res = {"code": "RUNNER_PARSE_FAILED",
                "detail": (p.stdout + p.stderr)[-400:].decode("utf-8", "replace")}
     led = []
-    lp = pathlib.Path(res.get("ledger") or "")
-    if not lp.exists():
+    # runner 在**创建台账之前**就失败时(例如 argparse 不认这个开关 → rc=2, res 里没有 ledger),
+    # `Path("")` 在 Windows 上就是 `Path(".")` —— 上一版拿它去 read_text 直接 PermissionError,
+    # 把"runner 拒了这条 CLI"伪装成"判据脚本自己炸"。空串一律当"没有台账", 只回退到本例目录里找。
+    raw_led = str(res.get("ledger") or "")
+    lp = pathlib.Path(raw_led) if raw_led else None
+    if lp is None or not lp.is_file():
         cand = sorted(d.glob("*/ledger.jsonl"))
         lp = cand[0] if cand else None
-    if lp and lp.exists():
+    if lp and lp.is_file():
         for ln in lp.read_text(encoding="utf-8").splitlines():
             try:
                 led.append(json.loads(ln))
@@ -894,6 +987,45 @@ def judge(c, res, led):
         for needle in e["errors_contains"]:
             if needle not in errs:
                 bad.append("清理错误里没有 %s(errors=%s)" % (needle, errs[:160]))
+    # F5b: 预留排不下 / 截止夹短这类"少发"必须**只**在申报有问题时出现, 所以正向例要能判
+    # "这些具名披露一条都不许在"。只断言错误清单里有什么, 挡不住"多一条也算过"的漂移。
+    for needle in e.get("errors_none_contains") or []:
+        if needle in " ".join(res.get("cleanup_errors") or []):
+            bad.append("清理错误里出现了不该有的 %s(errors=%s)"
+                       % (needle, " ".join(res.get("cleanup_errors") or [])[:200]))
+    if "cleanup_span" in e:
+        # [条数下限, 条数上限, 首末发送跨度下限秒, 上限秒]: 五条各有发送机会 = 收口段 TX 里
+        # 五条都在, 且每条各等满自己的确认窗(修前 4 s 预留的缺陷正是第五条根本不发)。
+        # 只取 CLEANUP_ENTERED **之后**的 TX: 业务里也可能发 motor_status(相邻禁能快照),
+        # 按命令名全表取会把业务查询算进收口, 条数就虚高。
+        n_min, n_max, s_min, s_max = e["cleanup_span"]
+        ent = [i for i, x in enumerate(led) if x.get("kind") == "CLEANUP_ENTERED"]
+        tail = led[ent[-1]:] if ent else []
+        five = [x for x in tail if x.get("kind") == "TX" and
+                x.get("bytes", "").split(chr(13))[0].strip() in CLEANUP_FIVE]
+        got_n = len(five)
+        if not ent:
+            bad.append("台账没有 CLEANUP_ENTERED => 收口段 TX 无从判定")
+        elif not (n_min <= got_n <= n_max):
+            bad.append("收口实发 %d 条(=%s) 要求在 [%d,%d]"
+                       % (got_n, [x.get("bytes", "").split(chr(13))[0].strip() for x in five],
+                          n_min, n_max))
+        elif got_n >= 2:
+            span = float(five[-1].get("t_s", 0)) - float(five[0].get("t_s", 0))
+            if not (s_min <= span <= s_max):
+                bad.append("收口首末发送跨度=%.3fs 不在 [%s,%s](每条该各占自己的窗)"
+                           % (span, s_min, s_max))
+        elif s_max > 0:
+            bad.append("收口只有 %d 条发送, 跨度判据无从计算" % got_n)
+    for k, v in (e.get("res_near") or {}).items():
+        got = res.get(k)
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            if not isinstance(got, (int, float)) or isinstance(got, bool) or \
+                    abs(got - v) > 0.06:
+                bad.append("回执 %s=%r 要求≈%s" % (k, got, v))
+        elif got != v:
+            bad.append("回执 %s=%r 要求=%r" % (k, got, v))
+
     # R7F8F 修判据自身的坑: 原来 `cl` 只在 cleanup_min 分支里赋值, 而 cleanup_tx 的失败文案也用它
     # => 只申报 cleanup_tx 的用例(本轮 H5/H6)会先炸 UnboundLocalError, 而不是给出判红原因。
     cl = [c2 for c2 in cmds if c2.startswith(("motor_stop", "motor_disarm"))]

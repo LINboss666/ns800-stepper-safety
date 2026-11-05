@@ -1,0 +1,881 @@
+[
+  {
+    "case": "I1_P8意图_修前整条巡航合同(禁能侧ENN)判红",
+    "side": "REPAIRED",
+    "executor": "m8r3_serial_chain_r7f8.py",
+    "sha256_head": "093c09fdec1d",
+    "want": {
+      "status": "STOP",
+      "code": "PROFILE_NOT_RUNNING",
+      "reserve": 7.0
+    },
+    "bad": [],
+    "result": {
+      "name": "I1_P8意图_修前整条巡航合同(禁能侧ENN)判红",
+      "rc": 1,
+      "status": "STOP",
+      "code": "PROFILE_NOT_RUNNING",
+      "disarm": "NOT_ARMED",
+      "obligation": false,
+      "cleanup_errors": [],
+      "cleanup_reserve_seconds": 7.0,
+      "sent_results": [
+        "motor_status"
+      ],
+      "ledger_kinds": [
+        "PORT_OPEN",
+        "TX",
+        "RX_DONE",
+        "PROFILE_FAIL",
+        "SESSION_STOP",
+        "PORT_CLOSED"
+      ],
+      "tx": [
+        "motor_status"
+      ]
+    }
+  },
+  {
+    "case": "I1_P8意图_修前整条巡航合同(禁能侧ENN)判红",
+    "side": "F5B_BEFORE",
+    "executor": "m8r3_serial_chain_r7f8_pre_f5b.py",
+    "sha256_head": "c48c6921f840",
+    "want": {
+      "code": "PROFILE_NOT_RUNNING"
+    },
+    "bad": [],
+    "result": {
+      "name": "I1_P8意图_修前整条巡航合同(禁能侧ENN)判红",
+      "rc": 1,
+      "status": "STOP",
+      "code": "PROFILE_NOT_RUNNING",
+      "disarm": "NOT_ARMED",
+      "obligation": false,
+      "cleanup_errors": [],
+      "cleanup_reserve_seconds": null,
+      "sent_results": [
+        "motor_status"
+      ],
+      "ledger_kinds": [
+        "PORT_OPEN",
+        "TX",
+        "RX_DONE",
+        "PROFILE_FAIL",
+        "SESSION_STOP",
+        "PORT_CLOSED"
+      ],
+      "tx": [
+        "motor_status"
+      ]
+    }
+  },
+  {
+    "case": "I1_P8意图_修前整条巡航合同(禁能侧ENN)判红",
+    "side": "R7F8F_BEFORE",
+    "executor": "m8r3_serial_chain_r7f8_pre_r7f8f.py",
+    "sha256_head": "4c962170b235",
+    "want": {
+      "status": "OK",
+      "code": ""
+    },
+    "bad": [],
+    "result": {
+      "name": "I1_P8意图_修前整条巡航合同(禁能侧ENN)判红",
+      "rc": 0,
+      "status": "OK",
+      "code": "",
+      "disarm": "NOT_ARMED",
+      "obligation": false,
+      "cleanup_errors": [],
+      "cleanup_reserve_seconds": null,
+      "sent_results": [
+        "motor_status"
+      ],
+      "ledger_kinds": [
+        "PORT_OPEN",
+        "TX",
+        "RX_DONE",
+        "SESSION_OK",
+        "PORT_CLOSED"
+      ],
+      "tx": [
+        "motor_status"
+      ]
+    }
+  },
+  {
+    "case": "I2_P7意图_第二次arm在写入尝试之前拒",
+    "side": "REPAIRED",
+    "executor": "m8r3_serial_chain_r7f8.py",
+    "sha256_head": "093c09fdec1d",
+    "want": {
+      "code": "ARM_SECOND_ATTEMPT_REFUSED",
+      "tx_count": {
+        "motor_arm": 1
+      }
+    },
+    "bad": [],
+    "result": {
+      "name": "I2_P7意图_第二次arm在写入尝试之前拒",
+      "rc": 1,
+      "status": "STOP",
+      "code": "ARM_SECOND_ATTEMPT_REFUSED",
+      "disarm": "CONFIRMED_DISABLED",
+      "obligation": true,
+      "cleanup_errors": [],
+      "cleanup_reserve_seconds": 7.0,
+      "sent_results": [
+        "motor_arm",
+        "motor_disarm",
+        "motor_status"
+      ],
+      "ledger_kinds": [
+        "PORT_OPEN",
+        "ENERGIZE_OBLIGATION_SET",
+        "OBLIGATION_SET",
+        "TX",
+        "RX_DONE",
+        "TX",
+        "RX_DONE",
+        "DISARM_ACTION_DONE",
+        "TX",
+        "RX_DONE",
+        "ENERGIZE_DEADLINE_CLOSED",
+        "SESSION_STOP",
+        "CLEANUP_ENTERED",
+        "TX",
+        "CLEANUP_READ",
+        "TX",
+        "CLEANUP_READ",
+        "TX",
+        "CLEANUP_READ",
+        "DISARM_FIELDS",
+        "PORT_CLOSED"
+      ],
+      "tx": [
+        "motor_arm",
+        "motor_disarm",
+        "motor_status",
+        "motor_stop",
+        "motor_disarm",
+        "motor_status"
+      ]
+    }
+  },
+  {
+    "case": "I2_P7意图_第二次arm在写入尝试之前拒",
+    "side": "F5B_BEFORE",
+    "executor": "m8r3_serial_chain_r7f8_pre_f5b.py",
+    "sha256_head": "c48c6921f840",
+    "want": {
+      "code": "ARM_SECOND_ATTEMPT_REFUSED",
+      "tx_count": {
+        "motor_arm": 1
+      }
+    },
+    "bad": [],
+    "result": {
+      "name": "I2_P7意图_第二次arm在写入尝试之前拒",
+      "rc": 1,
+      "status": "STOP",
+      "code": "ARM_SECOND_ATTEMPT_REFUSED",
+      "disarm": "CONFIRMED_DISABLED",
+      "obligation": true,
+      "cleanup_errors": [],
+      "cleanup_reserve_seconds": null,
+      "sent_results": [
+        "motor_arm",
+        "motor_disarm",
+        "motor_status"
+      ],
+      "ledger_kinds": [
+        "PORT_OPEN",
+        "ENERGIZE_OBLIGATION_SET",
+        "OBLIGATION_SET",
+        "TX",
+        "RX_DONE",
+        "TX",
+        "RX_DONE",
+        "DISARM_ACTION_DONE",
+        "TX",
+        "RX_DONE",
+        "ENERGIZE_DEADLINE_CLOSED",
+        "SESSION_STOP",
+        "TX",
+        "CLEANUP_READ",
+        "TX",
+        "CLEANUP_READ",
+        "TX",
+        "CLEANUP_READ",
+        "DISARM_FIELDS",
+        "PORT_CLOSED"
+      ],
+      "tx": [
+        "motor_arm",
+        "motor_disarm",
+        "motor_status",
+        "motor_stop",
+        "motor_disarm",
+        "motor_status"
+      ]
+    }
+  },
+  {
+    "case": "I2_P7意图_第二次arm在写入尝试之前拒",
+    "side": "R7F8F_BEFORE",
+    "executor": "m8r3_serial_chain_r7f8_pre_r7f8f.py",
+    "sha256_head": "4c962170b235",
+    "want": {
+      "code": "",
+      "tx_count": {
+        "motor_arm": 2
+      }
+    },
+    "bad": [],
+    "result": {
+      "name": "I2_P7意图_第二次arm在写入尝试之前拒",
+      "rc": 0,
+      "status": "OK",
+      "code": "",
+      "disarm": "CONFIRMED_DISABLED",
+      "obligation": true,
+      "cleanup_errors": [],
+      "cleanup_reserve_seconds": null,
+      "sent_results": [
+        "motor_arm",
+        "motor_disarm",
+        "motor_status",
+        "motor_arm"
+      ],
+      "ledger_kinds": [
+        "PORT_OPEN",
+        "ENERGIZE_OBLIGATION_SET",
+        "OBLIGATION_SET",
+        "TX",
+        "RX_DONE",
+        "TX",
+        "RX_DONE",
+        "ENERGIZE_DEADLINE_CLOSED",
+        "TX",
+        "RX_DONE",
+        "ENERGIZE_OBLIGATION_SET",
+        "OBLIGATION_SET",
+        "TX",
+        "RX_DONE",
+        "SESSION_OK",
+        "TX",
+        "CLEANUP_READ",
+        "TX",
+        "CLEANUP_READ",
+        "TX",
+        "CLEANUP_READ",
+        "DISARM_FIELDS",
+        "PORT_CLOSED"
+      ],
+      "tx": [
+        "motor_arm",
+        "motor_disarm",
+        "motor_status",
+        "motor_arm",
+        "motor_stop",
+        "motor_disarm",
+        "motor_status"
+      ]
+    }
+  },
+  {
+    "case": "I3_P6意图_arm迟到回包在通电截止即进收口",
+    "side": "REPAIRED",
+    "executor": "m8r3_serial_chain_r7f8.py",
+    "sha256_head": "093c09fdec1d",
+    "want": {
+      "code": "MISSING_RESPONSE_PROMPT",
+      "tx_must": [
+        "motor_stop",
+        "motor_disarm",
+        "motor_status"
+      ],
+      "disarm": "UNKNOWN"
+    },
+    "bad": [],
+    "result": {
+      "name": "I3_P6意图_arm迟到回包在通电截止即进收口",
+      "rc": 1,
+      "status": "STOP",
+      "code": "MISSING_RESPONSE_PROMPT",
+      "disarm": "UNKNOWN",
+      "obligation": true,
+      "cleanup_errors": [
+        "DISARM_NOT_CONFIRMED FIELD_MISSING_state FIELD_MISSING_hz FIELD_MISSING_armed FIELD_MISSING_drvreq FIELD_MISSING_fb FIELD_MISSING_off"
+      ],
+      "cleanup_reserve_seconds": 7.0,
+      "sent_results": [],
+      "ledger_kinds": [
+        "PORT_OPEN",
+        "ENERGIZE_OBLIGATION_SET",
+        "OBLIGATION_SET",
+        "TX",
+        "PORT_BUSY_UNTIL",
+        "RX_DONE",
+        "SESSION_STOP",
+        "CLEANUP_ENTERED",
+        "TX",
+        "CLEANUP_READ",
+        "TX",
+        "CLEANUP_READ",
+        "TX",
+        "CLEANUP_READ",
+        "DISARM_FIELDS",
+        "PORT_CLOSED"
+      ],
+      "tx": [
+        "motor_arm",
+        "motor_stop",
+        "motor_disarm",
+        "motor_status"
+      ]
+    }
+  },
+  {
+    "case": "I3_P6意图_arm迟到回包在通电截止即进收口",
+    "side": "F5B_BEFORE",
+    "executor": "m8r3_serial_chain_r7f8_pre_f5b.py",
+    "sha256_head": "c48c6921f840",
+    "want": {
+      "code": "MISSING_RESPONSE_PROMPT",
+      "disarm": "UNKNOWN"
+    },
+    "bad": [],
+    "result": {
+      "name": "I3_P6意图_arm迟到回包在通电截止即进收口",
+      "rc": 1,
+      "status": "STOP",
+      "code": "MISSING_RESPONSE_PROMPT",
+      "disarm": "UNKNOWN",
+      "obligation": true,
+      "cleanup_errors": [
+        "DISARM_NOT_CONFIRMED FIELD_MISSING_state FIELD_MISSING_hz FIELD_MISSING_armed FIELD_MISSING_drvreq FIELD_MISSING_fb FIELD_MISSING_off"
+      ],
+      "cleanup_reserve_seconds": null,
+      "sent_results": [],
+      "ledger_kinds": [
+        "PORT_OPEN",
+        "ENERGIZE_OBLIGATION_SET",
+        "OBLIGATION_SET",
+        "TX",
+        "PORT_BUSY_UNTIL",
+        "RX_DONE",
+        "SESSION_STOP",
+        "TX",
+        "CLEANUP_READ",
+        "TX",
+        "CLEANUP_READ",
+        "TX",
+        "CLEANUP_READ",
+        "DISARM_FIELDS",
+        "PORT_CLOSED"
+      ],
+      "tx": [
+        "motor_arm",
+        "motor_stop",
+        "motor_disarm",
+        "motor_status"
+      ]
+    }
+  },
+  {
+    "case": "I3_P6意图_arm迟到回包在通电截止即进收口",
+    "side": "R7F8F_BEFORE",
+    "executor": "m8r3_serial_chain_r7f8_pre_r7f8f.py",
+    "sha256_head": "4c962170b235",
+    "want": {
+      "code": "",
+      "disarm": "CONFIRMED_DISABLED"
+    },
+    "bad": [],
+    "result": {
+      "name": "I3_P6意图_arm迟到回包在通电截止即进收口",
+      "rc": 0,
+      "status": "OK",
+      "code": "",
+      "disarm": "CONFIRMED_DISABLED",
+      "obligation": true,
+      "cleanup_errors": [],
+      "cleanup_reserve_seconds": null,
+      "sent_results": [
+        "motor_arm"
+      ],
+      "ledger_kinds": [
+        "PORT_OPEN",
+        "ENERGIZE_OBLIGATION_SET",
+        "OBLIGATION_SET",
+        "TX",
+        "PORT_BUSY_UNTIL",
+        "RX_DONE",
+        "SESSION_OK",
+        "TX",
+        "CLEANUP_READ",
+        "TX",
+        "CLEANUP_READ",
+        "TX",
+        "CLEANUP_READ",
+        "DISARM_FIELDS",
+        "PORT_CLOSED"
+      ],
+      "tx": [
+        "motor_arm",
+        "motor_stop",
+        "motor_disarm",
+        "motor_status"
+      ]
+    }
+  },
+  {
+    "case": "I4_F5b1_开IRQ后arm前失败_尾部disable与status仍发出",
+    "side": "REPAIRED",
+    "executor": "m8r3_serial_chain_r7f8.py",
+    "sha256_head": "093c09fdec1d",
+    "want": {
+      "code": "PROFILE_NOT_RUNNING",
+      "disarm": "NOT_ARMED",
+      "tx_must": [
+        "safety_irq_disable",
+        "safety_irq_status"
+      ],
+      "tx_must_none": [
+        "motor_stop",
+        "motor_disarm"
+      ],
+      "events_must": [
+        "CLEANUP_MOTOR_NOT_OBLIGATED"
+      ]
+    },
+    "bad": [],
+    "result": {
+      "name": "I4_F5b1_开IRQ后arm前失败_尾部disable与status仍发出",
+      "rc": 1,
+      "status": "STOP",
+      "code": "PROFILE_NOT_RUNNING",
+      "disarm": "NOT_ARMED",
+      "obligation": false,
+      "cleanup_errors": [],
+      "cleanup_reserve_seconds": 7.0,
+      "sent_results": [
+        "safety_irq_enable",
+        "motor_status"
+      ],
+      "ledger_kinds": [
+        "PORT_OPEN",
+        "IRQ_ENABLE_ATTEMPTED",
+        "TX",
+        "RX_DONE",
+        "TX",
+        "RX_DONE",
+        "PROFILE_FAIL",
+        "SESSION_STOP",
+        "CLEANUP_ENTERED",
+        "CLEANUP_MOTOR_NOT_OBLIGATED",
+        "TX",
+        "CLEANUP_READ",
+        "TX",
+        "CLEANUP_READ",
+        "IRQ_TAIL_STATE",
+        "PORT_CLOSED"
+      ],
+      "tx": [
+        "safety_irq_enable",
+        "motor_status",
+        "safety_irq_disable",
+        "safety_irq_status"
+      ]
+    }
+  },
+  {
+    "case": "I4_F5b1_开IRQ后arm前失败_尾部disable与status仍发出",
+    "side": "F5B_BEFORE",
+    "executor": "m8r3_serial_chain_r7f8_pre_f5b.py",
+    "sha256_head": "c48c6921f840",
+    "want": {
+      "code": "PROFILE_NOT_RUNNING",
+      "disarm": "NOT_ARMED",
+      "tx_must_none": [
+        "safety_irq_disable",
+        "safety_irq_status"
+      ]
+    },
+    "bad": [],
+    "result": {
+      "name": "I4_F5b1_开IRQ后arm前失败_尾部disable与status仍发出",
+      "rc": 1,
+      "status": "STOP",
+      "code": "PROFILE_NOT_RUNNING",
+      "disarm": "NOT_ARMED",
+      "obligation": false,
+      "cleanup_errors": [],
+      "cleanup_reserve_seconds": null,
+      "sent_results": [
+        "safety_irq_enable",
+        "motor_status"
+      ],
+      "ledger_kinds": [
+        "PORT_OPEN",
+        "IRQ_ENABLE_ATTEMPTED",
+        "TX",
+        "RX_DONE",
+        "TX",
+        "RX_DONE",
+        "PROFILE_FAIL",
+        "SESSION_STOP",
+        "PORT_CLOSED"
+      ],
+      "tx": [
+        "safety_irq_enable",
+        "motor_status"
+      ]
+    }
+  },
+  {
+    "case": "I4_F5b1_开IRQ后arm前失败_尾部disable与status仍发出",
+    "side": "R7F8F_BEFORE",
+    "executor": "m8r3_serial_chain_r7f8_pre_r7f8f.py",
+    "sha256_head": "4c962170b235",
+    "want": {
+      "code": "PROFILE_NOT_RUNNING",
+      "tx_must_none": [
+        "safety_irq_disable",
+        "safety_irq_status"
+      ]
+    },
+    "bad": [],
+    "result": {
+      "name": "I4_F5b1_开IRQ后arm前失败_尾部disable与status仍发出",
+      "rc": 1,
+      "status": "STOP",
+      "code": "PROFILE_NOT_RUNNING",
+      "disarm": "NOT_ARMED",
+      "obligation": false,
+      "cleanup_errors": [],
+      "cleanup_reserve_seconds": null,
+      "sent_results": [
+        "safety_irq_enable",
+        "motor_status"
+      ],
+      "ledger_kinds": [
+        "PORT_OPEN",
+        "TX",
+        "RX_DONE",
+        "TX",
+        "RX_DONE",
+        "PROFILE_FAIL",
+        "SESSION_STOP",
+        "PORT_CLOSED"
+      ],
+      "tx": [
+        "safety_irq_enable",
+        "motor_status"
+      ]
+    }
+  },
+  {
+    "case": "I5_F5b2_收口全部无响应_五条各有发送机会",
+    "side": "REPAIRED",
+    "executor": "m8r3_serial_chain_r7f8.py",
+    "sha256_head": "093c09fdec1d",
+    "want": {
+      "code": "CLEANUP_UNCONFIRMED",
+      "disarm": "UNKNOWN",
+      "reserve": 7.0,
+      "tx_must": [
+        "motor_stop",
+        "motor_disarm",
+        "motor_status",
+        "safety_irq_disable",
+        "safety_irq_status"
+      ],
+      "tx_none_contains": [
+        "HARD_DEADLINE_BEFORE",
+        "RESERVE_SHORT"
+      ],
+      "err_must": [
+        "motor_stop:NO_RESPONSE",
+        "IRQ_TAIL_safety_irq_status:NO_RESPONSE"
+      ]
+    },
+    "bad": [],
+    "result": {
+      "name": "I5_F5b2_收口全部无响应_五条各有发送机会",
+      "rc": 1,
+      "status": "OK",
+      "code": "CLEANUP_UNCONFIRMED",
+      "disarm": "UNKNOWN",
+      "obligation": true,
+      "cleanup_errors": [
+        "motor_stop:NO_RESPONSE",
+        "motor_disarm:NO_RESPONSE",
+        "motor_status:NO_RESPONSE",
+        "DISARM_NOT_CONFIRMED FIELD_MISSING_state FIELD_MISSING_hz FIELD_MISSING_armed FIELD_MISSING_drvreq FIELD_MISSING_fb FIELD_MISSING_off",
+        "IRQ_TAIL_safety_irq_disable:NO_RESPONSE",
+        "IRQ_TAIL_safety_irq_status:NO_RESPONSE",
+        "IRQ_TAIL_NOT_CLOSED"
+      ],
+      "cleanup_reserve_seconds": 7.0,
+      "sent_results": [
+        "motor_arm",
+        "safety_irq_enable",
+        "motor_start"
+      ],
+      "ledger_kinds": [
+        "PORT_OPEN",
+        "ENERGIZE_OBLIGATION_SET",
+        "OBLIGATION_SET",
+        "TX",
+        "RX_DONE",
+        "IRQ_ENABLE_ATTEMPTED",
+        "TX",
+        "RX_DONE",
+        "OBLIGATION_SET",
+        "TX",
+        "RX_DONE",
+        "WATCH_DONE",
+        "SESSION_OK",
+        "CLEANUP_ENTERED",
+        "TX",
+        "TX",
+        "TX",
+        "DISARM_FIELDS",
+        "TX",
+        "TX",
+        "IRQ_TAIL_STATE",
+        "PORT_CLOSED"
+      ],
+      "tx": [
+        "motor_arm",
+        "safety_irq_enable",
+        "motor_start",
+        "motor_stop",
+        "motor_disarm",
+        "motor_status",
+        "safety_irq_disable",
+        "safety_irq_status"
+      ]
+    }
+  },
+  {
+    "case": "I5_F5b2_收口全部无响应_五条各有发送机会",
+    "side": "F5B_BEFORE",
+    "executor": "m8r3_serial_chain_r7f8_pre_f5b.py",
+    "sha256_head": "c48c6921f840",
+    "want": {
+      "code": "CLEANUP_UNCONFIRMED",
+      "disarm": "UNKNOWN",
+      "tx_must": [
+        "motor_stop",
+        "motor_disarm",
+        "motor_status",
+        "safety_irq_disable"
+      ],
+      "tx_must_none": [
+        "safety_irq_status"
+      ],
+      "err_must": [
+        "IRQ_TAIL_HARD_DEADLINE_BEFORE_safety_irq_status"
+      ]
+    },
+    "bad": [],
+    "result": {
+      "name": "I5_F5b2_收口全部无响应_五条各有发送机会",
+      "rc": 1,
+      "status": "OK",
+      "code": "CLEANUP_UNCONFIRMED",
+      "disarm": "UNKNOWN",
+      "obligation": true,
+      "cleanup_errors": [
+        "motor_stop:NO_RESPONSE",
+        "motor_disarm:NO_RESPONSE",
+        "motor_status:NO_RESPONSE",
+        "DISARM_NOT_CONFIRMED FIELD_MISSING_state FIELD_MISSING_hz FIELD_MISSING_armed FIELD_MISSING_drvreq FIELD_MISSING_fb FIELD_MISSING_off",
+        "IRQ_TAIL_safety_irq_disable:NO_RESPONSE",
+        "IRQ_TAIL_HARD_DEADLINE_BEFORE_safety_irq_status"
+      ],
+      "cleanup_reserve_seconds": null,
+      "sent_results": [
+        "motor_arm",
+        "safety_irq_enable",
+        "motor_start"
+      ],
+      "ledger_kinds": [
+        "PORT_OPEN",
+        "ENERGIZE_OBLIGATION_SET",
+        "OBLIGATION_SET",
+        "TX",
+        "RX_DONE",
+        "IRQ_ENABLE_ATTEMPTED",
+        "TX",
+        "RX_DONE",
+        "OBLIGATION_SET",
+        "TX",
+        "RX_DONE",
+        "WATCH_DONE",
+        "SESSION_OK",
+        "TX",
+        "TX",
+        "TX",
+        "DISARM_FIELDS",
+        "TX",
+        "PORT_CLOSED"
+      ],
+      "tx": [
+        "motor_arm",
+        "safety_irq_enable",
+        "motor_start",
+        "motor_stop",
+        "motor_disarm",
+        "motor_status",
+        "safety_irq_disable"
+      ]
+    }
+  },
+  {
+    "case": "I5_F5b2_收口全部无响应_五条各有发送机会",
+    "side": "R7F8F_BEFORE",
+    "executor": "m8r3_serial_chain_r7f8_pre_r7f8f.py",
+    "sha256_head": "4c962170b235",
+    "want": {
+      "code": "CLEANUP_UNCONFIRMED",
+      "disarm": "UNKNOWN",
+      "tx_must": [
+        "motor_stop",
+        "motor_disarm",
+        "motor_status"
+      ],
+      "tx_must_none": [
+        "safety_irq_disable",
+        "safety_irq_status"
+      ]
+    },
+    "bad": [],
+    "result": {
+      "name": "I5_F5b2_收口全部无响应_五条各有发送机会",
+      "rc": 1,
+      "status": "OK",
+      "code": "CLEANUP_UNCONFIRMED",
+      "disarm": "UNKNOWN",
+      "obligation": true,
+      "cleanup_errors": [
+        "motor_stop:NO_RESPONSE",
+        "motor_disarm:NO_RESPONSE",
+        "motor_status:NO_RESPONSE",
+        "DISARM_NOT_CONFIRMED FIELD_MISSING_state FIELD_MISSING_hz FIELD_MISSING_armed FIELD_MISSING_drvreq FIELD_MISSING_fb FIELD_MISSING_off"
+      ],
+      "cleanup_reserve_seconds": null,
+      "sent_results": [
+        "motor_arm",
+        "safety_irq_enable",
+        "motor_start"
+      ],
+      "ledger_kinds": [
+        "PORT_OPEN",
+        "ENERGIZE_OBLIGATION_SET",
+        "OBLIGATION_SET",
+        "TX",
+        "RX_DONE",
+        "TX",
+        "RX_DONE",
+        "OBLIGATION_SET",
+        "TX",
+        "RX_DONE",
+        "WATCH_DONE",
+        "SESSION_OK",
+        "TX",
+        "TX",
+        "TX",
+        "DISARM_FIELDS",
+        "PORT_CLOSED"
+      ],
+      "tx": [
+        "motor_arm",
+        "safety_irq_enable",
+        "motor_start",
+        "motor_stop",
+        "motor_disarm",
+        "motor_status"
+      ]
+    }
+  },
+  {
+    "case": "I6_F5b2_申报4秒预留在开口之前拒(旧件没有这条 CLI 申报口)",
+    "side": "REPAIRED",
+    "executor": "m8r3_serial_chain_r7f8.py",
+    "sha256_head": "093c09fdec1d",
+    "want": {
+      "code": "CLEANUP_RESERVE_CANNOT_COVER_ALL_SENDS",
+      "reserve": 4.0,
+      "tx_must_none": [
+        "motor_arm"
+      ]
+    },
+    "bad": [],
+    "result": {
+      "name": "I6_F5b2_申报4秒预留在开口之前拒(旧件没有这条 CLI 申报口)",
+      "rc": 1,
+      "status": "STOP",
+      "code": "CLEANUP_RESERVE_CANNOT_COVER_ALL_SENDS",
+      "disarm": "NOT_ARMED",
+      "obligation": false,
+      "cleanup_errors": [],
+      "cleanup_reserve_seconds": 4.0,
+      "sent_results": [],
+      "ledger_kinds": [
+        "SESSION_STOP",
+        "PORT_NEVER_OPENED"
+      ],
+      "tx": []
+    }
+  },
+  {
+    "case": "I6_F5b2_申报4秒预留在开口之前拒(旧件没有这条 CLI 申报口)",
+    "side": "F5B_BEFORE",
+    "executor": "m8r3_serial_chain_r7f8_pre_f5b.py",
+    "sha256_head": "c48c6921f840",
+    "want": {
+      "code": "RUNNER_PARSE_FAILED"
+    },
+    "bad": [],
+    "result": {
+      "name": "I6_F5b2_申报4秒预留在开口之前拒(旧件没有这条 CLI 申报口)",
+      "rc": 2,
+      "status": null,
+      "code": "RUNNER_PARSE_FAILED",
+      "disarm": null,
+      "obligation": null,
+      "cleanup_errors": null,
+      "cleanup_reserve_seconds": null,
+      "sent_results": [],
+      "ledger_kinds": [],
+      "tx": []
+    }
+  },
+  {
+    "case": "I6_F5b2_申报4秒预留在开口之前拒(旧件没有这条 CLI 申报口)",
+    "side": "R7F8F_BEFORE",
+    "executor": "m8r3_serial_chain_r7f8_pre_r7f8f.py",
+    "sha256_head": "4c962170b235",
+    "want": {
+      "code": "RUNNER_PARSE_FAILED"
+    },
+    "bad": [],
+    "result": {
+      "name": "I6_F5b2_申报4秒预留在开口之前拒(旧件没有这条 CLI 申报口)",
+      "rc": 2,
+      "status": null,
+      "code": "RUNNER_PARSE_FAILED",
+      "disarm": null,
+      "obligation": null,
+      "cleanup_errors": null,
+      "cleanup_reserve_seconds": null,
+      "sent_results": [],
+      "ledger_kinds": [],
+      "tx": []
+    }
+  }
+]
