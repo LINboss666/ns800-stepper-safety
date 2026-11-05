@@ -1244,6 +1244,18 @@ config_save/clear/retry/物理刺激额度全 0；`polarity_measured=false`、`c
     （本轮 `proof/` 下、文件名含 `remote_readback`、且还没进 Git 的 .txt 不计），修完生成器幂等。
     这条是 04ddc38 推上去之后当场复跑发现并当场修的，未回改已交付的旧字节。
 
+22. 现场包的 `sys_pre`（`system_status`）**漏了 `status_lines_allow` 申报**，而产品
+    `supervisor.c:126` 无条件打门位评估行（`motor.h:92/93` 的 bit3|bit4 = 0x18 就是本会话第 1 步的
+    正常前态）=> 真机第一次开口就在第 1 步被判业务失败停止。现场事实与逐条判读见 §25；
+    电机从未带电，收口五条无需发。修法不在本轮自行放宽判据：要么在承接件里给该查询步补上
+    **整行锚定**的披露申报（并给起转类步骤明令禁止这条申报），要么请 A 判产品把"当前会被拒"
+    的门位评估换个不带 REFUSED 字样的措辞 —— 本轮按 §3.7 停下报告具体差异，等 A/操作者定。
+
+23. 这条更难看也更要紧：**47 条离线门全绿没抓到上一条**，因为 stub 回灌的是我自造的 rows，
+    而那份 rows 把 `mask=0x18` 写在了 TMC 写门行、板子把它打在 Motor 门位评估行 —— 替身替我
+    把错处圆过去了。已在 §25 登记行表与实拍的三处字段差异（`irq_gate` 大小写、`polarity` 值、
+    `protect_ready` 值），并把"用板子真字节回放 assert_step"列为下一步必须补的判据。
+
 ### 24.6 口径更正两件
 
 - 远端回读覆盖失败那一次的**首次失败原文未留存**（被第二次运行的输出覆盖了同一个文件）。
@@ -1348,3 +1360,50 @@ A 的裁定包内 `R7F8_LIVING_DRAFT.md`（38793 B / `14bafe13a8cd`，304 行，
 `polarity_measured=false` / `core_protection_verified=false` 保持原值；一次实机整包执行
 （F11）只等操作者对"R7F8F 及本预算裁定"的那句真实原话。令牌取自操作者回复，不由 agent 自造，
 也不借上一轮的批准。
+
+## 25 M8-R7F8F F11 真机一次整包（2026-11-05 21:23，COM5 唯一一次开口 → 第 1 步首错停止）
+
+操作者给出真实原话令牌「执行 F11 整包实机验证」（同时逐字确认 §4 机械/电气前置已核对、COM5 空闲），
+按裁定末段直接接同一包的真实会话。承接件 = `field/plan_r7f8f_2369_real_dispatch.json`
+（32832 B / `53c744213964…`）：与已交付原件 `eef417ce3152…` 的差别只有 9 个键（机械前置记 PROVIDED
+并写明来源=操作者原话、status 改名、approval 里记令牌与账本位置），38 步/额度/三段预算一字未动。
+`--approval-init` 先离线开账（绑三件身份：executor `093c8408a019…` / plan `53c744213964…` /
+镜像 `23691e8d…`），随后**一次** `--dispatch --transport real --backend real --profile response_driven`。
+
+- **结果 = 首错停止（不是通过）**：`status=STOP code=BUSINESS_FAILED as=sys_pre`，触发行
+  `[Motor] arm gate fail mask=0x18 (arm REFUSED)`；会话台账
+  `PORT_OPEN_ATTEMPT → PORT_OPEN(COM5,115200) → RX_DONE(983 B, nul=0, prompt_seen=true,
+  raw_sha256=73abf3012386…) → BUSINESS_OUTCOME → SESSION_STOP → PORT_CLOSED`，全程 0.156 s。
+- **板子回的是真字节，且回显证明只写出去一条查询**：捕获开头就是 `system_status\r\n` 的回显，
+  全文只出现这一条命令回显；`motor_arm / motor_start / safety_irq_enable / tmc_config_apply /
+  diag_profile_*` 一条都没写出去。**电机从未带电、从未起转**，收口五条因此无需发（义务未建立）。
+- **停止那一刻的板态（逐行取自原始捕获，非我的结论）**：`[Safety] state=READY fault=0
+  irq_gate=CLOSED polarity=not-confirmed protect_ready=NO`；`request=LOW pad=0 expected_ENN=HIGH
+  ENN_fb=1(resolved) verdict=OK`；`[Motor] state=0 cur=0 tgt=0 armed=0 drv_en_verified=0
+  health=OK`；`[TMC] OK drive_cfg=UNCONFIGURED`；`[ADC] DEGRADED cal=THEORETICAL`；
+  `[Diag] OK verdict=0 mode=MONITOR_ONLY`；`[UI] led/buzzer output=SAFE-OFF`。
+- **根因在包侧，不在板上，也不在产品**：`supervisor.c:126` 在 `system_status` 里**无条件**打印
+  门位评估行，`motor.h:92/93` 给出 `mask=0x18 = MOT_GATE_NOT_PROTECTED | MOT_GATE_NO_DRV_CONFIG` ——
+  即"这次开机还没开 IRQ 门、TMC 参数还没下发"，正是 §5 第 1 步本来就该看到的前态（开 IRQ 与
+  apply 都在后面）。而执行器早就提供了对应的申报口 `status_lines_allow`（整行锚定的状态披露行，
+  不参与业务失败扫描），我给 `sys_pre` 那一步**没写这条申报** => 被业务失败线判停。
+- **为什么 47 条离线门没抓到它（这条最要紧，别当运气好）**：stub 整包回灌的是我自己造的
+  `rows_r7f8f_real.json`——那份行表把 `mask=0x18` 写在了 **TMC 写门**那一行，而板子把它写在
+  **Motor 门位评估**那一行；假端口按我的行表回放，于是"包侧缺申报"这件事在离线里永远测不到。
+  这正是本仓已登记过的老毛病（注入替身必须覆盖装配层，单元假端口全绿≠现场能跑）。**现场第一次
+  真开口就是它的第一个证据**。
+- 行表与现场实拍的三处差异一并登记（同一条捕获）：`irq_gate=CLOSED`（我写 `closed`）、
+  `polarity=not-confirmed`（我写 `HARDWARE-PENDING`）、`protect_ready=NO`（我写 `YES`）——
+  我当时只回源码核到"形状"，没核到这三个字段的实值，`field_assertion_gaps` 里已声明只断言前缀，
+  没有据此判过任何东西。
+- 额度与纪律：`quota_used={"port_open":1}`，其余（含 `retry/download/readback/explicit_reset`）
+  全为 0；账本 `pending=0 commit_failures=[]`；**没有第二次开口、没有重试、没有重启、没有断电**；
+  设备按 §4 保持通电（`[UI] SAFE-OFF`、`armed=0`）。产品树与固件一字未动
+  （`PRODUCT_TREE_UNTOUCHED_AT_STOP`=PASS）。
+- 证据件（新工具 `tools/r7f8f_make_field_evidence.py`，数字全从落盘字节复算，11 条 FAIL=0）：
+  `proof/r7f8f_field_f11_sys_pre.rx.bin`（983 B 原始字节，目录 `-text` 保行尾）、
+  `…rx.txt`、`…ledger.jsonl`、`…dispatch_ledger.jsonl`（仓外路径掩成 `<WORK>`，掩码本身有判据）、
+  `…receipt.txt|.json`。
+- 整包离线门的同名判据因此改名收窄：`NO_HARDWARE_ACTIONS_THIS_ROUND` →
+  `NO_HARDWARE_ACTIONS_INSIDE_THIS_GATE`，并在详情里明写"本条不声明整轮无设备动作"——
+  现场那一次的动作与额度由本 §25 与 `field_run_f11` 块承担，两者不许混用。

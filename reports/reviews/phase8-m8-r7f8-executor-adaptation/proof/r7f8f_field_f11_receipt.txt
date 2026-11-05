@@ -1,0 +1,12 @@
+RX_RAW_VERBATIM_AND_MATCHES_LEDGER|PASS|983 B sha=73abf3012386… 台账 RX_DONE 记的 bytes/raw_sha256 与之相等=True nul=0 prompt_seen=True
+OFFLINE_PATHS_MASKED|PASS|残留文件=无(判据=文本里不得出现仓外根目录或盘符路径)
+STOP_IS_STEP1_QUERY_BUSINESS_RULE|PASS|code=BUSINESS_FAILED as=sys_pre 触发行='[Motor] arm gate fail mask=0x18 (arm REFUSED)' 该行确实逐字出现在捕获第 9 行
+ONLY_THE_QUERY_EVER_WRITTEN|PASS|捕获里的命令回显=['system_status'](1 条查询的回显; 电机/使能/配置/学习类命令一条都没写出去)
+QUOTA_SPENT_EXACTLY_PORT_OPEN|PASS|spent={"port_open": 1}(整本账只剩 port_open 被花; 不重试、不下载、不回读、不复位)
+BOARD_WAS_LEFT_SAFE_AT_STOP|PASS|[Motor] state=0 cur=0 tgt=0 armed=0 drv_en_verified=0 health=OK ;; [Safety] request=LOW pad=0 expected_ENN=HIGH ENN_fb=1(resolved) verdict=OK ;; [UI]     led/buzzer output=SAFE-OFF (polarity hardware-pending) ;; [Diag]   OK verdict=0 mode=MONITOR_ONLY
+ROOT_CAUSE_IS_PACKAGE_SIDE|PASS|supervisor.c:126 无条件打这行(motor.h 的 bit3=MOT_GATE_NOT_PROTECTED bit4=MOT_GATE_NO_DRV_CONFIG => 0x18 是"此刻还没开 IRQ 门 + TMC 参数还没下发", 正是 §5 第 1 步该看到的前态); 而计划 sys_pre={"as": "sys_pre", "cmd": "system_status", "expect_contains": ["=== SYSTEM STATUS ==="]} 里**没有** status_lines_allow 这条申报 => 执行器按业务失败线停了。离线那 47 条门没暴露它的原因是 stub 回灌的是我自己造的行表, 不是板子真打印。
+PRODUCT_TREE_UNTOUCHED_AT_STOP|PASS|git status 该产品目录待提交改动='空'
+ONE_PORT_OPEN_NO_SECOND_TRY|PASS|PORT_OPEN=1 PORT_CLOSED=1 APPROVAL_RESERVED=1(唯一一次开口已按账扣掉; 我没有开第二次)
+FIELD_IDENTITIES_BOUND_TO_DISPATCH_COPY|PASS|账本=<WORK>/approvals/approval_M8-R7F8F-F11-20261105.json 三件身份当场复算: plan=53c744213964…(=盘上承接件逐字节) executor 相符=True 镜像相符=True transport=real steps=38; 令牌原话记在承接件里=执行 F11 整包实机验证
+NOT_A_FIELD_ACCEPTANCE|PASS|DISPATCH_SUMMARY=STOP / FLOW_VS_VERIFICATION 两个 False 都在原文里 => 本件记录的是**首错停止的现场事实**, 不是保护闭环验收; 电机从未带电, 相对保护从未触发
+R7F8F_FIELD_F11_SUMMARY|判据=11|FAIL=0|none

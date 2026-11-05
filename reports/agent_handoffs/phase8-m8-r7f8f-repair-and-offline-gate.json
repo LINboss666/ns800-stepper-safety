@@ -4,7 +4,7 @@
  "task_book": "reports/reviews/phase8-m8-r7f8-executor-adaptation/inputs/A_R7F8F_PKG/R7F8F_REPAIR_AND_FIELD_TASK.md",
  "budget_ruling": "reports/reviews/phase8-m8-r7f8-executor-adaptation/inputs/A_R7F8F_BUDGET_PKG/R7F8F_A_BUDGET_RULING.md",
  "task_id": "M8R7F8F-repair-and-offline-gate-20261105",
- "status": "OFFLINE_GATE_ALL_GREEN / FIELD_PACKAGE_AUTHORITATIVE_PENDING_APPROVAL / HARDWARE_ACTIONS=0 / ONE_FIELD_APPROVAL_NOT_GRANTED",
+ "status": "OFFLINE_GATE_ALL_GREEN / FIELD_RUN_ONCE_DONE_STOPPED_AT_STEP1 (BUSINESS_FAILED, 包侧缺 status_lines_allow) / 电机从未带电、从未起转 / SECOND_FIELD_RUN_NEEDS_NEW_OPERATOR_APPROVAL",
  "repo_tip_at_start": "d6bbc1b5795fc12d27ee8aaa0939f0408dc43699",
  "branch": "feature/m8-r7d1-async-learn-offline",
  "inputs": {
@@ -283,12 +283,81 @@
   }
  },
  "self_injuries_registered": {
-  "count": 21,
+  "count": 23,
   "where": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/run_record.md §24.5（当场数出来的条目数）"
  },
+ "field_run_f11": {
+  "receipt": "reports/reviews/phase8-m8-r7f8-executor-adaptation/proof/r7f8f_field_f11_receipt.txt",
+  "receipt_gates": {
+   "checks": 11,
+   "fail": 0
+  },
+  "raw_capture": {
+   "path": "proof/r7f8f_field_f11_sys_pre.rx.bin",
+   "bytes": 983,
+   "sha256": "73abf3012386723ec2d5ec70e5b515bfb2cb3285d60c233a27b07e60d47408a7"
+  },
+  "stop": {
+   "code": "BUSINESS_FAILED",
+   "step": "sys_pre",
+   "trigger_line": "[Motor] arm gate fail mask=0x18 (arm REFUSED)"
+  },
+  "quota_spent": {
+   "approved_reboot": 0,
+   "blackbox_clear": 0,
+   "cleanup_motor_disarm": 0,
+   "cleanup_motor_status": 0,
+   "cleanup_motor_stop": 0,
+   "cleanup_safety_irq_disable": 0,
+   "cleanup_safety_irq_status": 0,
+   "config_save": 0,
+   "diag_profile_commit": 0,
+   "diag_profile_learn": 0,
+   "diag_profile_learn_cancel": 0,
+   "diag_profile_zero": 0,
+   "dispatch": 0,
+   "dmm_readings": 0,
+   "download": 0,
+   "explicit_reset": 0,
+   "irq_polarity_prep": 0,
+   "motion_cap_seconds_per_run": 0,
+   "motor_arm": 0,
+   "motor_dir": 0,
+   "motor_disarm": 0,
+   "motor_run": 0,
+   "motor_run_seconds_total": 0,
+   "motor_stop": 0,
+   "motor_target": 0,
+   "physical_collision": 0,
+   "port_open": 1,
+   "readback": 0,
+   "retry": 0,
+   "tmc_config_apply": 0
+  },
+  "dispatch_copy": {
+   "bytes": 32832,
+   "sha256": "53c744213964d9c5282427ee832847397ddea7ddc69403d6666cc16fd9f7d10e",
+   "path": "reports/reviews/phase8-m8-r7f8-executor-adaptation/field/plan_r7f8f_2369_real_dispatch.json"
+  },
+  "dispatch_copy_diff_vs_delivered_plan": [
+   "/approval/approval_id",
+   "/approval/dispatch_copy_note",
+   "/approval/ledger_root_offline",
+   "/approval/token_verbatim",
+   "/hardware_actions_this_round_note",
+   "/mechanical_prerequisites/bench_continuity/declared_by",
+   "/mechanical_prerequisites/bench_continuity/declared_verbatim",
+   "/mechanical_prerequisites/bench_continuity/status",
+   "/status"
+  ],
+  "token_verbatim": "执行 F11 整包实机验证",
+  "approval_id": "M8-R7F8F-F11-20261105",
+  "meaning": "真机跑过一次并在第 1 步首错停止: 唯一一次开口只写出一条只读查询 (捕获里仅此一条回显), 电机/arm/learn/apply 一条都没发 => 不是验收通过, 也不是板上危险状态; 根因与逐行板态见 run_record §25"
+ },
  "device_actions_this_round": {
-  "serial_port_open": 0,
-  "dispatch_real": 0,
+  "serial_port_open": 1,
+  "dispatch_real": 1,
+  "commands_written_to_port": 1,
   "download": 0,
   "readback": 0,
   "explicit_reset": 0,
@@ -301,7 +370,20 @@
   "power_switch": 0,
   "dispatch_stub_sessions": 7,
   "stub_whole_package_ran_green": true,
-  "evidence": "全部 dispatch 走 transport=stub/backend=sim 的 FakePort；离线门台账里每条 PORT_OPEN 都是 transport=stub 且 port 字段为空（NO_REAL_PORT_IN_ANY_LEDGER）；批准账只建在仓外 --work"
+  "evidence": "现场那一次的台账与额度逐条在 proof/r7f8f_field_f11_*.jsonl/receipt.json(真实 COM5, transport=real); 整包离线门自己的 47 条判据里 NO_REAL_PORT_IN_ANY_LEDGER 只声明**门内**那批 dispatch 全走 stub/FakePort —— 两条口径各管各的, 不许互相顶(见 run_record §25 末条)",
+  "receipt_gate_verdicts": {
+   "RX_RAW_VERBATIM_AND_MATCHES_LEDGER": "PASS",
+   "OFFLINE_PATHS_MASKED": "PASS",
+   "STOP_IS_STEP1_QUERY_BUSINESS_RULE": "PASS",
+   "ONLY_THE_QUERY_EVER_WRITTEN": "PASS",
+   "QUOTA_SPENT_EXACTLY_PORT_OPEN": "PASS",
+   "BOARD_WAS_LEFT_SAFE_AT_STOP": "PASS",
+   "ROOT_CAUSE_IS_PACKAGE_SIDE": "PASS",
+   "PRODUCT_TREE_UNTOUCHED_AT_STOP": "PASS",
+   "ONE_PORT_OPEN_NO_SECOND_TRY": "PASS",
+   "FIELD_IDENTITIES_BOUND_TO_DISPATCH_COPY": "PASS",
+   "NOT_A_FIELD_ACCEPTANCE": "PASS"
+  }
  },
  "boundaries_kept": {
   "product_code_changes": 0,
@@ -313,7 +395,7 @@
   "motion_cap_or_total_window_widened": false,
   "step_list_reduced_for_green": false,
   "run_record_sections": {
-   "total_sections": 24,
+   "total_sections": 25,
    "section_24_occurrences": 1
   }
  },

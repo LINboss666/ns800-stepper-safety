@@ -1,0 +1,114 @@
+{
+ "receipt": "field_f11",
+ "round": "M8-R7F8F",
+ "run_dir_offline": true,
+ "raw_capture": {
+  "path": "proof/r7f8f_field_f11_sys_pre.rx.bin",
+  "bytes": 983,
+  "sha256": "73abf3012386723ec2d5ec70e5b515bfb2cb3285d60c233a27b07e60d47408a7"
+ },
+ "stop": {
+  "code": "BUSINESS_FAILED",
+  "step": "sys_pre",
+  "trigger_line": "[Motor] arm gate fail mask=0x18 (arm REFUSED)"
+ },
+ "quota_spent": {
+  "approved_reboot": 0,
+  "blackbox_clear": 0,
+  "cleanup_motor_disarm": 0,
+  "cleanup_motor_status": 0,
+  "cleanup_motor_stop": 0,
+  "cleanup_safety_irq_disable": 0,
+  "cleanup_safety_irq_status": 0,
+  "config_save": 0,
+  "diag_profile_commit": 0,
+  "diag_profile_learn": 0,
+  "diag_profile_learn_cancel": 0,
+  "diag_profile_zero": 0,
+  "dispatch": 0,
+  "dmm_readings": 0,
+  "download": 0,
+  "explicit_reset": 0,
+  "irq_polarity_prep": 0,
+  "motion_cap_seconds_per_run": 0,
+  "motor_arm": 0,
+  "motor_dir": 0,
+  "motor_disarm": 0,
+  "motor_run": 0,
+  "motor_run_seconds_total": 0,
+  "motor_stop": 0,
+  "motor_target": 0,
+  "physical_collision": 0,
+  "port_open": 1,
+  "readback": 0,
+  "retry": 0,
+  "tmc_config_apply": 0
+ },
+ "gates": [
+  {
+   "name": "RX_RAW_VERBATIM_AND_MATCHES_LEDGER",
+   "verdict": "PASS",
+   "detail": "983 B sha=73abf3012386… 台账 RX_DONE 记的 bytes/raw_sha256 与之相等=True nul=0 prompt_seen=True"
+  },
+  {
+   "name": "OFFLINE_PATHS_MASKED",
+   "verdict": "PASS",
+   "detail": "残留文件=无(判据=文本里不得出现仓外根目录或盘符路径)"
+  },
+  {
+   "name": "STOP_IS_STEP1_QUERY_BUSINESS_RULE",
+   "verdict": "PASS",
+   "detail": "code=BUSINESS_FAILED as=sys_pre 触发行='[Motor] arm gate fail mask=0x18 (arm REFUSED)' 该行确实逐字出现在捕获第 9 行"
+  },
+  {
+   "name": "ONLY_THE_QUERY_EVER_WRITTEN",
+   "verdict": "PASS",
+   "detail": "捕获里的命令回显=['system_status'](1 条查询的回显; 电机/使能/配置/学习类命令一条都没写出去)"
+  },
+  {
+   "name": "QUOTA_SPENT_EXACTLY_PORT_OPEN",
+   "verdict": "PASS",
+   "detail": "spent={\"port_open\": 1}(整本账只剩 port_open 被花; 不重试、不下载、不回读、不复位)"
+  },
+  {
+   "name": "BOARD_WAS_LEFT_SAFE_AT_STOP",
+   "verdict": "PASS",
+   "detail": "[Motor] state=0 cur=0 tgt=0 armed=0 drv_en_verified=0 health=OK ;; [Safety] request=LOW pad=0 expected_ENN=HIGH ENN_fb=1(resolved) verdict=OK ;; [UI]     led/buzzer output=SAFE-OFF (polarity hardware-pending) ;; [Diag]   OK verdict=0 mode=MONITOR_ONLY"
+  },
+  {
+   "name": "ROOT_CAUSE_IS_PACKAGE_SIDE",
+   "verdict": "PASS",
+   "detail": "supervisor.c:126 无条件打这行(motor.h 的 bit3=MOT_GATE_NOT_PROTECTED bit4=MOT_GATE_NO_DRV_CONFIG => 0x18 是\"此刻还没开 IRQ 门 + TMC 参数还没下发\", 正是 §5 第 1 步该看到的前态); 而计划 sys_pre={\"as\": \"sys_pre\", \"cmd\": \"system_status\", \"expect_contains\": [\"=== SYSTEM STATUS ===\"]} 里**没有** status_lines_allow 这条申报 => 执行器按业务失败线停了。离线那 47 条门没暴露它的原因是 stub 回灌的是我自己造的行表, 不是板子真打印。"
+  },
+  {
+   "name": "PRODUCT_TREE_UNTOUCHED_AT_STOP",
+   "verdict": "PASS",
+   "detail": "git status 该产品目录待提交改动='空'"
+  },
+  {
+   "name": "ONE_PORT_OPEN_NO_SECOND_TRY",
+   "verdict": "PASS",
+   "detail": "PORT_OPEN=1 PORT_CLOSED=1 APPROVAL_RESERVED=1(唯一一次开口已按账扣掉; 我没有开第二次)"
+  },
+  {
+   "name": "FIELD_IDENTITIES_BOUND_TO_DISPATCH_COPY",
+   "verdict": "PASS",
+   "detail": "账本=<WORK>/approvals/approval_M8-R7F8F-F11-20261105.json 三件身份当场复算: plan=53c744213964…(=盘上承接件逐字节) executor 相符=True 镜像相符=True transport=real steps=38; 令牌原话记在承接件里=执行 F11 整包实机验证"
+  },
+  {
+   "name": "NOT_A_FIELD_ACCEPTANCE",
+   "verdict": "PASS",
+   "detail": "DISPATCH_SUMMARY=STOP / FLOW_VS_VERIFICATION 两个 False 都在原文里 => 本件记录的是**首错停止的现场事实**, 不是保护闭环验收; 电机从未带电, 相对保护从未触发"
+  }
+ ],
+ "summary": {
+  "checks": 11,
+  "fail": 0
+ },
+ "not_claimed": {
+  "flow_complete": false,
+  "core_protection_verified": false,
+  "polarity_measured": false,
+  "motor_ever_energized": false
+ }
+}

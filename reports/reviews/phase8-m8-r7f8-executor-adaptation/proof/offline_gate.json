@@ -183,7 +183,7 @@
     {
       "name": "STUB_NORMAL_DISPATCH_SUCCEEDS",
       "verdict": "PASS",
-      "detail": "rc=0 stage_status=OK success=True code= disarm=CONFIRMED_DISABLED terminal=KNOWN 结果条数=40(申报步骤 38; 轮询的多次尝试也各计一条) | le=healthy|branch=healthy|scenario_branches={}|prerequisite_skips=[]|actions_attempted=[]|ledger=D:\\ns800_r7f8f_offline\\gate_r3\\normal\\run\\dispatch_ledger.jsonl"
+      "detail": "rc=0 stage_status=OK success=True code= disarm=CONFIRMED_DISABLED terminal=KNOWN 结果条数=40(申报步骤 38; 轮询的多次尝试也各计一条) | le=healthy|branch=healthy|scenario_branches={}|prerequisite_skips=[]|actions_attempted=[]|ledger=D:\\ns800_r7f8f_offline\\gate_r4\\normal\\run\\dispatch_ledger.jsonl"
     },
     {
       "name": "STUB_NORMAL_TAIL_SENT",
@@ -256,9 +256,9 @@
       "detail": "台账里 6 条 PORT_OPEN 全是 transport=stub 且 port 字段为空(真开过 COM5 必然留下口名)"
     },
     {
-      "name": "NO_HARDWARE_ACTIONS_THIS_ROUND",
+      "name": "NO_HARDWARE_ACTIONS_INSIDE_THIS_GATE",
       "verdict": "PASS",
-      "detail": "全部 dispatch 走 transport=stub/backend=sim 的 FakePort; 未开 COM5, 未导入 pyserial 真后端, 未跑 pyOCD/Keil/Logic, 批准账只建在仓外 --work"
+      "detail": "本门自己跑的全部 dispatch 走 transport=stub/backend=sim 的 FakePort; 门内未开 COM5, 未导入 pyserial 真后端, 未跑 pyOCD/Keil/Logic, 批准账只建在仓外 --work。**范围声明**: 本条不声明整轮无设备动作 —— F11 真机那一次(若已发生)的证据与额度在 proof/r7f8f_field_f11_receipt.json, 由交接件 field_run_f11 块单独承担"
     },
     {
       "name": "JSON_RECEIPT_SHAPE_ALIGNED",

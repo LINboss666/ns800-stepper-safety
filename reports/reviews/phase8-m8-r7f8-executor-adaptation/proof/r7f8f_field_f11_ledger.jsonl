@@ -1,0 +1,8 @@
+{"kind": "APPROVED_PACKAGE_VERIFIED", "plan_sha256": "53c744213964d9c5282427ee832847397ddea7ddc69403d6666cc16fd9f7d10e", "stage": "S1", "steps": 38, "steps_sha256": "1905a459776260328e05ccdd73c748e5386ec53106888d7b4898c39645cbd65d", "t_s": 0.0, "transport": "real", "verified": true}
+{"approval_kind": "business", "approval_used": 1, "kind": "QUOTA_CONSUMED", "left": 0, "n": 1, "name": "port_open", "t_s": 0.016}
+{"baud": 115200, "kind": "PORT_OPEN_ATTEMPT", "port": "COM5", "t_s": 0.032}
+{"kind": "PORT_OPEN", "port": "COM5", "t_s": 0.032, "transport": "real"}
+{"bytes": 983, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "73abf3012386723ec2d5ec70e5b515bfb2cb3285d60c233a27b07e60d47408a7", "t_s": 0.125, "tail": "b'g)\\r\\nmsh >\\r\\nmsh >'"}
+{"allowed": false, "as": "sys_pre", "kind": "BUSINESS_OUTCOME", "lines": ["[Motor] arm gate fail mask=0x18 (arm REFUSED)"], "status_lines_allowed": [], "t_s": 0.125}
+{"code": "BUSINESS_FAILED", "detail": "{\"verdict\": \"STOP\", \"code\": \"BUSINESS_FAILED\", \"lines\": [\"[Motor] arm gate fail mask=0x18 (arm REFUSED)\"]}", "kind": "SESSION_STOP", "t_s": 0.125}
+{"kind": "PORT_CLOSED", "t_s": 0.141}

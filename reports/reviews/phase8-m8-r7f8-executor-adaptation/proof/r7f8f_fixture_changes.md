@@ -94,7 +94,7 @@
   - **新增** `META_MUTATION_ANCHOR_HIT` —— 元负控: 故意让镜像漂移/把双算加回来, 要求对应的门**必须变红** —— 证 F6 的新门不是恒绿(任务书 §3.2)。
   - **新增** `MOTION_AND_ENERGIZE_DEADLINES` —— §4 的四个固定数(12/18/90/7)逐字段核对, 并把它按三段拆开(A 的补充审核项)。
   - **新增** `NO_DEVICE_ACTIONS_DECLARED` —— 不变项与「本轮零设备动作」的机器核对(任务书 §3.1/§3.5): 额度申报、台账里的 PORT_OPEN 事件、以及每条 dispatch 都只走 FakePort。
-  - **新增** `NO_HARDWARE_ACTIONS_THIS_ROUND` —— 不变项与「本轮零设备动作」的机器核对(任务书 §3.1/§3.5): 额度申报、台账里的 PORT_OPEN 事件、以及每条 dispatch 都只走 FakePort。
+  - **新增** `NO_HARDWARE_ACTIONS_INSIDE_THIS_GATE` —— 不变项与「本轮零设备动作」的机器核对(任务书 §3.1/§3.5): 额度申报、台账里的 PORT_OPEN 事件、以及每条 dispatch 都只走 FakePort。
   - **新增** `NO_REAL_PORT_IN_ANY_LEDGER` —— 不变项与「本轮零设备动作」的机器核对(任务书 §3.1/§3.5): 额度申报、台账里的 PORT_OPEN 事件、以及每条 dispatch 都只走 FakePort。
   - **新增** `PLAN_BUSINESS_MIRROR_SAME_VALUE` —— 整包离线门里的计划侧判据(本轮新增家族): 只读 --validate-plan 的输出并按名字取数, 不在这个工具里另写一份算术。
   - **新增** `PLAN_BUSINESS_SEGMENTS_NO_DOUBLE_COUNT` —— 整包离线门里的计划侧判据(本轮新增家族): 只读 --validate-plan 的输出并按名字取数, 不在这个工具里另写一份算术。

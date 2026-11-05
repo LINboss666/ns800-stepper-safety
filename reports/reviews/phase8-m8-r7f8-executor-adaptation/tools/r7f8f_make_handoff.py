@@ -117,6 +117,27 @@ def main() -> int:
     if not pm:
         print("HANDOFF_REFUSE|合并件记录节里读不到上一版身份(格式变了 => 不许把旧字面量抄进交接)")
         return 1
+    ffp = repo / ROUND / "proof/r7f8f_field_f11_receipt.json"
+    field = json.loads(ffp.read_text(encoding="utf-8")) if ffp.is_file() else None
+    dcopy = repo / ROUND / "field/plan_r7f8f_2369_real_dispatch.json"
+    fq = {g["name"]: g for g in (field or {}).get("gates", [])}
+    diff_keys = []
+    if dcopy.is_file():
+        def flat(x, pre=""):
+            o = {}
+            if isinstance(x, dict):
+                for k, v in x.items():
+                    o.update(flat(v, pre + "/" + str(k)))
+            elif isinstance(x, list):
+                for i, v in enumerate(x):
+                    o.update(flat(v, pre + "/%d" % i))
+            else:
+                o[pre] = x
+            return o
+        fb = flat(plan)
+        fa = flat(json.loads(dcopy.read_text(encoding="utf-8")))
+        diff_keys = sorted(set(fb) ^ set(fa)) + sorted(k for k in set(fb) & set(fa)
+                                                       if fb[k] != fa[k])
     og = summary(repo, "proof/r7f8f_offline_gate.txt", "R7F8F_OFFLINE_GATE_SUMMARY")
     # 汇总行没有红项时写的是字面量 "none"，不是空串 —— 上一版直接把 "none".split(",") 当成名单
     # 去比 json 的空列表，全绿那天当场判 HANDOFF_CROSS_CHECK_FAILED。两边都归一成列表再比。
@@ -130,8 +151,12 @@ def main() -> int:
         "task_id": "M8R7F8F-repair-and-offline-gate-20261105",
         # 两条静态红已由 A 定口径并落地, 整包离线门全绿 => 状态是"待一次现场批准",
         # 不是"可上机已证"：现场判读仍未发生, 设备动作 0。
-        "status": "OFFLINE_GATE_ALL_GREEN / FIELD_PACKAGE_AUTHORITATIVE_PENDING_APPROVAL / "
-                  "HARDWARE_ACTIONS=0 / ONE_FIELD_APPROVAL_NOT_GRANTED",
+        "status": ("OFFLINE_GATE_ALL_GREEN / FIELD_RUN_ONCE_DONE_STOPPED_AT_STEP1 "
+                   "(BUSINESS_FAILED, 包侧缺 status_lines_allow) / 电机从未带电、从未起转 / "
+                   "SECOND_FIELD_RUN_NEEDS_NEW_OPERATOR_APPROVAL"
+                   if field else
+                   "OFFLINE_GATE_ALL_GREEN / FIELD_PACKAGE_AUTHORITATIVE_PENDING_APPROVAL / "
+                   "HARDWARE_ACTIONS=0 / ONE_FIELD_APPROVAL_NOT_GRANTED"),
         "repo_tip_at_start": "d6bbc1b5795fc12d27ee8aaa0939f0408dc43699",
         "branch": "feature/m8-r7d1-async-learn-offline",
         "inputs": {
@@ -271,17 +296,43 @@ def main() -> int:
             "original_untouched": ident(repo / ORIG)},
         "self_injuries_registered": {"count": injuries,
                                      "where": RUN_RECORD + " §24.5（当场数出来的条目数）"},
+        "field_run_f11": ({
+            "receipt": ROUND + "/proof/r7f8f_field_f11_receipt.txt",
+            "receipt_gates": field["summary"],
+            "raw_capture": field["raw_capture"],
+            "stop": field["stop"],
+            "quota_spent": field["quota_spent"],
+            "dispatch_copy": dict(ident(dcopy), path=ROUND + "/field/"
+                                  + "plan_r7f8f_2369_real_dispatch.json"),
+            "dispatch_copy_diff_vs_delivered_plan": diff_keys,
+            "token_verbatim": json.loads(dcopy.read_text(encoding="utf-8"))["approval"]
+            ["token_verbatim"] if dcopy.is_file() else None,
+            "approval_id": "M8-R7F8F-F11-20261105",
+            "meaning": "真机跑过一次并在第 1 步首错停止: 唯一一次开口只写出一条只读查询 "
+                       "(捕获里仅此一条回显), 电机/arm/learn/apply 一条都没发 => 不是验收通过, "
+                       "也不是板上危险状态; 根因与逐行板态见 run_record §25"
+        } if field else {"absent": "现场回执不在盘上 => 本轮尚未做过真实会话"}),
         "device_actions_this_round": {
-            "serial_port_open": 0, "dispatch_real": 0, "download": 0, "readback": 0,
+            "serial_port_open": (field["quota_spent"].get("port_open", 0) if field else 0),
+            "dispatch_real": (1 if field else 0),
+            # 写出去几条命令不靠我说: 现场回执里那条"捕获里只允许有 system_status 的回显"
+            # 判 PASS 才算 1 条查询; 电机/使能/配置/学习类回显一条都不许出现
+            "commands_written_to_port": (1 if fq.get("ONLY_THE_QUERY_EVER_WRITTEN", {}).get(
+                "verdict") == "PASS" else None) if field else 0,
+            "download": 0, "readback": 0,
             "explicit_reset": 0, "motor_arm": 0, "motor_start": 0, "learn": 0,
             "learn_cancel": 0, "logic_analyzer": 0, "keil_build": 0, "power_switch": 0,
             "dispatch_stub_sessions":
                 len([g for g in gate_json["gates"] if g["name"].startswith("FIRST_ERROR|")]) + 1,
             "stub_whole_package_ran_green":
                 bool(whole_gate) and whole_gate[0]["verdict"] == "PASS",
-            "evidence": "全部 dispatch 走 transport=stub/backend=sim 的 FakePort；离线门台账里每条 "
-                        "PORT_OPEN 都是 transport=stub 且 port 字段为空（NO_REAL_PORT_IN_ANY_LEDGER）"
-                        "；批准账只建在仓外 --work"},
+            "evidence": ("现场那一次的台账与额度逐条在 proof/r7f8f_field_f11_*.jsonl/"
+                         "receipt.json(真实 COM5, transport=real); 整包离线门自己的 47 条判据里 "
+                         "NO_REAL_PORT_IN_ANY_LEDGER 只声明**门内**那批 dispatch 全走 stub/"
+                         "FakePort —— 两条口径各管各的, 不许互相顶(见 run_record §25 末条)"),
+            "receipt_gate_verdicts": dict((k, v["verdict"])
+                                          for k, v in (fq or {}).items()),
+        },
         "boundaries_kept": {
             "product_code_changes": 0, "firmware_rebuilt": 0,
             "old_executor_modified": False, "old_evidence_modified": False,

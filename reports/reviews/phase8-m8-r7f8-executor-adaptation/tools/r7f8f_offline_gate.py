@@ -584,9 +584,13 @@ def main() -> int:
                                 for x in port_evs),
          "台账里 %d 条 PORT_OPEN 全是 transport=stub 且 port 字段为空(真开过 COM5 必然留下口名)"
          % len(port_evs))
-    note("NO_HARDWARE_ACTIONS_THIS_ROUND", True,
-         "全部 dispatch 走 transport=stub/backend=sim 的 FakePort; 未开 COM5, 未导入 pyserial "
-         "真后端, 未跑 pyOCD/Keil/Logic, 批准账只建在仓外 --work")
+    # 这条的口径在 F11 现场跑过之后必须收窄: 它证的是**本门自己的 46 次 dispatch 没有一次碰设备**,
+    # 不能读成"整轮没有设备动作" —— 那句现在归交接件里的 field_run_f11 块负责(有台账与额度账可核)。
+    note("NO_HARDWARE_ACTIONS_INSIDE_THIS_GATE", True,
+         "本门自己跑的全部 dispatch 走 transport=stub/backend=sim 的 FakePort; 门内未开 COM5, "
+         "未导入 pyserial 真后端, 未跑 pyOCD/Keil/Logic, 批准账只建在仓外 --work。"
+         "**范围声明**: 本条不声明整轮无设备动作 —— F11 真机那一次(若已发生)的证据与额度在 "
+         "proof/r7f8f_field_f11_receipt.json, 由交接件 field_run_f11 块单独承担")
     # 机器回执的形状本身也要判: 每条都有 PASS/FAIL、条数与文本行一致、FAIL 名单一致。
     # 同时量出"若仍按位切分会有几条把门名当判定值" —— 上一版 json 的 13 条错位就是这条没做。
     misaligned = [l for l in OUT if l.split("|", 2)[1] not in ("PASS", "FAIL")]
