@@ -1,0 +1,136 @@
+身份_派生件含四项适配的符号|PASS|328475 B sha=4363af36159b… 缺=[]
+身份_旧执行器未被动过|PASS|实读 219491 B sha=33d3f0af8a4c9c33…
+身份_A包绑定按Git blob复算|PASS|IDENTITY.json 的 8 条 source_bindings 与 HEAD blob 逐条相符; motor.c 盘上 134298 B(CRLF 检出) / blob 131732 B = A 登记值, CR 数 2566 = 行数
+B1_两枚非1的不同ID各自正确受理与取消|PASS|组=身份与绑定 rc=0 code=
+B2_缺STARTED就拒绝绑定|PASS|组=身份与绑定 rc=1 code=BUSINESS_FAILED
+B3_重复STARTED行拒绝绑定|PASS|组=身份与绑定 rc=1 code=JOB_BIND_NOT_UNIQUE
+B4_ID为0越界拒绝|PASS|组=身份与绑定 rc=1 code=JOB_ID_OUT_OF_RANGE
+B5_ID带命令字符拒绝|PASS|组=身份与绑定 rc=1 code=JOB_BIND_NOT_UNIQUE
+B6_跨作业错绑(回包id与绑定不符)|PASS|组=身份与绑定 rc=1 code=CANCEL_ID_MISMATCH
+B7_未定义引用在写前拒绝|PASS|组=身份与绑定 rc=1 code=JOB_UNBOUND
+B8_取消写死字面ID被拒(不接受固定1)|PASS|组=身份与绑定 rc=1 code=CANCEL_NEEDS_JOB_REF
+B9_非取消命令里出现@引用不发|PASS|组=身份与绑定 rc=1 code=JOB_REF_NOT_DECLARED
+D1_RUNNING两次后DONE正例(凭据/归属/样本都核)|PASS|组=正常DONE rc=0 code=
+D2_owner不是FREE立即拒|PASS|组=正常DONE rc=1 code=JOB_CONTRACT_VIOLATED
+D3_缺零点凭据立即拒|PASS|组=正常DONE rc=1 code=JOB_CONTRACT_VIOLATED
+D4_样本数不足不当成功|PASS|组=正常DONE rc=1 code=JOB_DONE_CANDIDATE_INCONSISTENT
+D5_旧ID的DONE不当本轮结果|PASS|组=正常DONE rc=1 code=JOB_ID_MISMATCH
+C1_STARTED→REQUESTED→CANCELLED同一作业|PASS|组=活动取消 rc=0 code=
+C2_已DONE后取消算未捕获活动取消|PASS|组=活动取消 rc=1 code=CANCEL_NOT_CAPTURED
+C2b_allowed_outcomes不能把已终态取消洗成成功|PASS|组=活动取消 rc=1 code=CANCEL_NOT_CAPTURED
+T1_FAILED按业务失败立即收口|PASS|组=异常终态 rc=1 code=JOB_STATE_TERMINAL_FAILURE
+T2_TIMEOUT不在进行中集合立即收口|PASS|组=异常终态 rc=1 code=JOB_STATE_TERMINAL_FAILURE
+T3_不该出现的CANCELLED不当DONE|PASS|组=异常终态 rc=1 code=JOB_CONTRACT_VIOLATED
+P1_时间窗到期具名结束|PASS|组=轮询边界 rc=1 code=POLL_WINDOW_EXPIRED
+P2_次数上限具名结束(窗口更长也停)|PASS|组=轮询边界 rc=1 code=POLL_ATTEMPTS_EXHAUSTED
+P3_矛盾字段(无[MOT]状态行)在旧运动门里立刻停|PASS|组=轮询边界 rc=1 code=PROFILE_NOT_RUNNING
+P3b_旧运动巡航轮询仍等到CRUISE(回归)|PASS|组=轮询边界 rc=0 code=
+P4_裸NUL首份坏响应即停|PASS|组=轮询边界 rc=1 code=NUL_BYTE_IN_RESPONSE
+P5_轮询首份坏字节响应即收口不重试|PASS|组=轮询边界 rc=1 code=NUL_BYTE_IN_RESPONSE
+P6_危险文本首份坏响应即停|PASS|组=轮询边界 rc=1 code=DANGER_TEXT_IN_STREAM
+P7_板子不回话按截止停并进清理|PASS|组=轮询边界 rc=1 code=MISSING_RESPONSE_PROMPT
+Q1_取消未申报额度不发|PASS|组=额度 rc=1 code=QUOTA_STEP_UNDECLARED
+Q2_取消错额度键不发|PASS|组=额度 rc=1 code=QUOTA_KEY_MISMATCH
+Q3_n不为1不发|PASS|组=额度 rc=1 code=QUOTA_N_MISMATCH
+Q4_额度为0先拒(缺省不自动升级)|PASS|组=额度 rc=1 code=QUOTA_EXHAUSTED
+Q5_learn_status不扣learn与cancel|PASS|组=额度 rc=0 code=
+Q6_已终态的取消仍消耗一次不退额|PASS|组=额度 rc=1 code=CANCEL_NOT_CAPTURED
+E1_arm后只等待不start也受通电截止|PASS|组=通电与运动 rc=1 code=ARM_ENERGIZE_DEADLINE_EXCEEDED
+E2_未申报arm时限在写前拒|PASS|组=通电与运动 rc=1 code=ARM_ENERGIZE_DEADLINE_UNDECLARED
+E3_正常stop后仍armed不清通电义务|PASS|组=通电与运动 rc=1 code=ARM_ENERGIZE_DEADLINE_EXCEEDED
+E4_start运动截止与arm通电截止各自独立|PASS|组=通电与运动 rc=1 code=POLL_WINDOW_EXPIRED
+E5_disarm成功后通电计时停住(不被误伤)|PASS|组=通电与运动 rc=0 code=
+L1_业务stop_disarm与固定三条分别记账|PASS|组=清理 rc=0 code=
+L2_丢stop回包仍继续disarm与状态取证|PASS|组=清理 rc=1 code=CLEANUP_ERRORS
+L3_清理预留耗尽仍撤能但本场不OK|PASS|组=清理 rc=1 code=CLEANUP_RESERVE_EXHAUSTED
+L4_无arm/start的静态段不发清理|PASS|组=清理 rc=0 code=
+M1_MONITOR_ONLY拒绝在成功场景是STOP|PASS|组=首因与拒绝 rc=1 code=BUSINESS_FAILED
+M2_同一行只在专门负控里作具名拒绝|PASS|组=首因与拒绝 rc=1 code=NAMED_REFUSAL
+G1_完整DONE正例(候选统计与进度一致)|PASS|组=R7F8F返修 rc=0 code=
+G5_计数单调上升的正例(3/3到6/6到DONE 8/8)|PASS|组=R7F8F返修 rc=0 code=
+G6_较快源超过N不是假上限(adc=12 而 want=8 仍算成功)|PASS|组=R7F8F返修 rc=0 code=
+G7_候选统计与进度行不符具名拒|PASS|组=R7F8F返修 rc=1 code=JOB_DONE_CANDIDATE_INCONSISTENT
+G2_受理n与实发n不符在绑定处拒|PASS|组=R7F8F返修 rc=1 code=JOB_ACCEPTED_NOT_SENT
+G3_取消前出现CANCEL_PENDING即矛盾|PASS|组=R7F8F返修 rc=1 code=JOB_CONTRACT_VIOLATED
+G4_取消后到CANCELLED为止都算进行中|PASS|组=R7F8F返修 rc=0 code=
+G8_巡航正例(使能侧与申报频率全项自洽)|PASS|组=R7F8F返修 rc=0 code=
+G9_单字段变错(expected_ENN=HIGH)|PASS|组=R7F8F返修 rc=1 code=PROFILE_NOT_RUNNING
+G10_单字段变错(ENN_fb=1)|PASS|组=R7F8F返修 rc=1 code=PROFILE_NOT_RUNNING
+G11_单字段变错(verdict=CUT_BY_HARDWARE)|PASS|组=R7F8F返修 rc=1 code=PROFILE_NOT_RUNNING
+G12_单字段变错(fb=UNRESOLVED)|PASS|组=R7F8F返修 rc=1 code=PROFILE_NOT_RUNNING
+G13_单字段变错(drv_request=LOW)|PASS|组=R7F8F返修 rc=1 code=PROFILE_NOT_RUNNING
+G14_单字段变错(armed=0)|PASS|组=R7F8F返修 rc=1 code=PROFILE_NOT_RUNNING
+G15_单字段变错(health=FAULT)|PASS|组=R7F8F返修 rc=1 code=PROFILE_NOT_RUNNING
+G16_单字段变错(!=tgt_hz)|PASS|组=R7F8F返修 rc=1 code=PROFILE_NOT_RUNNING
+G17_单字段变错(expect_running.dir)|PASS|组=R7F8F返修 rc=1 code=PROFILE_NOT_RUNNING
+H1_arm迟到回包在通电截止即进收口|PASS|组=R7F8F返修 rc=1 code=MISSING_RESPONSE_PROMPT
+H2_第二次arm在写入尝试之前拒|PASS|组=R7F8F返修 rc=1 code=ARM_SECOND_ATTEMPT_REFUSED
+H3_第二次start在写入尝试之前拒|PASS|组=R7F8F返修 rc=1 code=MOTOR_START_SECOND_REFUSED
+H4_泛匹配DISARM字样不解除通电义务|PASS|组=R7F8F返修 rc=1 code=DISARM_SUCCESS_ROW_UNPROVEN
+H5_开过IRQ则固定尾部各一条同一端口|PASS|组=R7F8F返修 rc=0 code=
+H6_尾部没回CLOSED只追加披露不改撤能结论|PASS|组=R7F8F返修 rc=1 code=CLEANUP_ERRORS
+H7_没开IRQ就不发尾部两条|PASS|组=R7F8F返修 rc=0 code=
+H9_清理后仍巡航必须判红(不是业务码独大)|PASS|组=R7F8F返修 rc=1 code=CLEANUP_UNCONFIRMED
+H8_会话截止不随步骤续期|PASS|组=R7F8F返修 rc=1 code=STEP_DEADLINE_BEFORE_WRITE
+H10_开过IRQ但从未arm也要收口(尾部两条照发)|PASS|组=R7F8F返修 rc=1 code=PROFILE_NOT_RUNNING
+H11_收口全部无响应时五条各有发送机会(7秒预留)|PASS|组=R7F8F返修 rc=1 code=CLEANUP_UNCONFIRMED
+H12_申报排不下五条的预留就在开口之前拒|PASS|组=R7F8F返修 rc=1 code=CLEANUP_RESERVE_CANNOT_COVER_ALL_SENDS
+H13_前置等待耗掉会话后业务在收口预留之前停下|PASS|组=R7F8F返修 rc=1 code=STEP_DEADLINE_BEFORE_WRITE
+H14_义务早建立且收口全静默_五条仍拿到预留窗口|PASS|组=R7F8F返修 rc=1 code=CLEANUP_UNCONFIRMED
+X1_把JOB_ID固定成1|PASS|摘门后 code=CANCEL_ID_MISMATCH(原门检出=JOB_UNBOUND); 摘门后真实发出=True(应看到这条写尝试) 实发=['diag_profile learn_cancel 1']
+X2_把任何终态当成功|PASS|摘门后 code=JOB_STATE_TERMINAL_FAILURE(原门检出=FIELD_VALUE_MISMATCH); 要求新身份=JOB_STATE_TERMINAL_FAILURE 实际=JOB_STATE_TERMINAL_FAILURE
+X3_移除取消额度行|PASS|摘门后 code=(原门检出=QUOTA_STEP_UNDECLARED); 摘门后真实发出=True(应看到这条写尝试) 实发=['diag_profile learn 8 450 550 0', 'diag_profile learn_cancel 17']
+X4_把arm截止改回start起算|PASS|摘门后 code=(原门检出=MISSING_RESPONSE_PROMPT); 摘门后真实发出=True(应看到这条写尝试) 实发=['motor_arm']
+X5_清理预留账改回旧写法|PASS|摘门后 code=(原门检出=CLEANUP_RESERVE_EXHAUSTED)
+X6_把收口预留从业务预算里抹掉_前置等待后arm仍放出去|PASS|摘门后 code=(原门检出=STEP_DEADLINE_BEFORE_WRITE); 摘门后真实发出=True(应看到这条写尝试) 实发=['motor_arm']
+X7_同一道门_静默收口时第五条发不出去|PASS|摘门后 code=CLEANUP_UNCONFIRMED(原门检出=-); 摘门后收口少发=['safety_irq_status'](预留被业务吃掉才会少发) 全部TX=['motor_arm', 'safety_irq_enable']
+R1_非法UTF8经会话读路径具名停止且原字节留证|PASS|code=ILLEGAL_BYTES_IN_RESPONSE rx.bin=23 B 与注入 23 B 逐字节相等=True
+R2_裸NUL经会话读路径具名停止且已读原字节留证|PASS|code=NUL_BYTE_IN_RESPONSE(裸 NUL 是合法 UTF-8, 只有显式 count(0) 门能抓); 门在读到第一段就停, 落盘=56 B 与该段逐字节相等, 后面的提示符本就不该被当成已收响应
+R3_危险文本先于解码判定(门顺序固定)|PASS|两种缺陷同批出现时 code=DANGER_TEXT_IN_STREAM 要求 DANGER_TEXT_IN_STREAM
+R4_多字节中文跨读块不误杀(回归)|PASS|code= 注入=609 B 读块=3 段 行1='[INFO] 安安安安安安安安安安安安安安安安安'
+K1_step_window_保留小数且不叠_SLACK|PASS|0.5 s 原样取用(= (0.5, 'step_total_seconds')); 未申报仍是 seconds+3(=(5, 'legacy_seconds_plus_slack'))
+K2_非法总窗逐项具名且轮询窗受本步总窗约束|PASS|六种非法值=["'BOOL_VALUE'", "'NOT_A_NUMBER(str)'", "'NON_POSITIVE(0)'", "'NON_POSITIVE(-1)'", "'NOT_FINITE(nan)'", "'NOT_FINITE(inf)'"]; until>total => POLL_UNTIL_EXCEEDS_STEP_TOTAL(until=2.0>total=1.0); until==total => None
+K3_零速合同只认完整自洽的新鲜快照|PASS|armed=1 自洽(裁定 §1 的典型 stop 后态)=> 通过; armed=0 自洽 => 通过; health=FAULT=>['health=FAULT']; CUT_BY_HARDWARE=>['verdict=CUT_BY_HARDWARE(硬件切断不作为正常完成证据)']; 使能侧矛盾=>["使能侧形状=('HIGH', 1, 'LOW', 1) 要求 ('HIGH', 1, 'LOW', 0)(armed=1 那一套自洽值)"]; 还在转=>['cur_hz=300/tgt_hz=300(要求 0/0)']; 字段重复=>['ZERO_SNAPSHOT_FIELDS_INCOMPLETE']
+K4_运动计时只在可信零速处结束_迟到不倒填_t0 不清|PASS|13 s 的零速=MOTION_ZERO_CONFIRMATION_LATE(不许倒填为按时); 9 s 的零速=接受 9.0; 第二次确认=MOTION_END_ALREADY_CONFIRMED; t0 仍是 20.0(=> 不能靠清空 t0 放行第二次 start); cap_active 现在=False
+K5_释放运动计时不释放通电计时_也不放开业务截止|PASS|同一个 20 s 的步窗: 释放前截止=32.0(被 t0+cap=32 夹住), 释放后=40.0(now+20, 不再被 cap 夹) 但仍受业务 83 s; 收口截止=从现在 + 预留 7 s 再被会话 90 s 封顶 => 27.0
+K6_已零速但仍带电到_18s_仍是到期停止业务|PASS|arm 起 18.5 s: 通电到期=True 而运动侧早已解除=True(运动剩余=-6.5) => 步骤循环里 ARM_ENERGIZE_DEADLINE_EXCEEDED 那条支路不看 cap_active, 因此释放运动计时不会放开通电门
+K7_38_步总窗逐条等于_A_的表_镜像同函数产出|PASS|三段 31.0/9.0/7.5, 合计 47.5; stop@7.5 零速@9.0 禁能@13.0; 保守式 57.5 / 16.0 —— 与 A 包 §3 那张表逐格相同, 且这些数就是执行器现算的(镜像同一个函数)
+K8_轮询步的总窗等于其 until_次数与间隔未动|PASS|4 个轮询步的申报窗=[1.0, 1.0, 2.0, 1.0]; 总窗=[1.0, 1.0, 2.0, 1.0](一一相等); 次数=[4, 3, 12, 5] —— 裁定二明令「轮询步骤的总窗等于原定 until_seconds, 原次数和间隔都不变」
+FB1_真字节经生产读路径逐字节留证且披露行在流里|PASS|捕获=983 B sha=73abf3012386… 落盘逐字节相等=True 行数=21 披露行在流=True
+FB2_正例_交付的 sys_pre 申报下真字节判 OK 且豁免行入台账|PASS|verdict=OK code=- 台账里被豁免的行=['[Motor] arm gate fail mask=0x18 (arm REFUSED)'] (豁免不是静默丢弃: BUSINESS_OUTCOME 必带原文)
+FB3_反例_同一段真字节喂给动作步仍具名业务失败|PASS|arm 步(cmd=motor_arm)未申报豁免=True => code=BUSINESS_FAILED 命中行=['[Motor] arm gate fail mask=0x18 (arm REFUSED)'] => 豁免是**按步**的, 不是一局通用的
+FB4_元负控_摘掉豁免同一份真字节必须翻红|PASS|摘掉后 code=BUSINESS_FAILED 命中行=['[Motor] arm gate fail mask=0x18 (arm REFUSED)'] => 这条豁免是承重的, 不是装饰(全绿不代表它没在起作用)
+FB5_反例_豁免未被正面要求时运行期具名停止(fail-closed)|PASS|把 expect_contains 里那条披露串删掉(保留豁免) => code=STATUS_ALLOW_NOT_POSITIVELY_REQUIRED 台账事件=1 条 => 豁免不能自带免检, 必须有本步的正面要求背书
+FB6_静态门_交付计划 PASS 且豁免只在预期非 0 的那几条查询步|PASS|门行=PLAN_STATUS_ALLOW|all|PASS|白名单都是锚定且被正面要求(要求串必须是该行的前缀)的状态行: S1:sys_pre,S1:mot_pre,S1:sys_after_apply,S1:cruise,S1:mot_after_cancel,S1:stopped ;; 全 38 步里申报豁免的只有=[('sys_pre', 'system_status'), ('mot_pre', 'motor_status'), ('sys_after_apply', 'system_status'), ('cruise', 'motor_status'), ('mot_after_cancel', 'motor_status'), ('stopped', 'motor_status')](预期 0x0 的 4 条查询步一条都没有)
+FB7_静态门元负控_抽掉正面要求计划门必须翻红|PASS|同一条真字节对应的计划形状, 只删 sys_pre 的正面要求 => PLAN_STATUS_ALLOW|all|FAIL|S1/sys_pre:豁免行的字面前缀 '[Motor] arm gate fail mask=0x18 (arm REFUSED)' 没被本步 expect_contains 正面要求 => 运行期会具名停 STATUS_ALLOW_NOT_POSITIVELY_REQUIRED
+MC0_包作者工具可导入(归档原件身份在它手里核过)|PASS|r7f8f_make_real_package 导入成功 => _observed_sys_ready/_observed_mot_rows 的字节与散列身份检查已通过(它检查的是**盘上归档件**, 不是我的记忆)
+MC1_全量覆盖_计划里每条状态查询都钉了 mask 且与契约表逐条相等|PASS|计划里查到 10 条(表=10) {"cruise": ["0x2"], "mot_after_cancel": ["0x2"], "mot_after_irq": ["0x0"], "mot_armed": ["0x0"], "mot_dir": ["0x0"], "mot_disabled": ["0x0"], "mot_pre": ["0x18"], "stopped": ["0x0", "0x2"], "sys_after_apply": ["0x8"], "sys_pre": ["0x18"]} ;; 豁免集合与预期 mask 不一致的=[]
+MC2_预期为0的步骤要求0且一条豁免都没有|PASS|预期 0x0 的=['mot_after_irq', 'mot_armed', 'mot_dir', 'mot_disabled'] 它们的 status_lines_allow={'mot_after_irq': [], 'mot_armed': [], 'mot_dir': [], 'mot_disabled': []}
+MC3_归档真实字节四份都在盘且身份逐字节相符|PASS|取到={"0x0": "648 B sha=10807f63f02a… @12_mot_open.rx.bin", "0x18": "1128 B sha=f0550d313164… @15_mot_final.rx.bin", "0x2": "1026 B sha=9005a306999a… @07_running_proof.poll02.rx.bin", "0x8": "1080 B sha=fa69aa5cf5a1… @05_mot_cfg.rx.bin"} 不符=[] ;; 0x18 那一份的口径按 A 的更正: **F20 本会话首次取得**, 而同一身份的字节早已在 5 次归档会话里(上一版把历史样本漏了)
+MC4_真字节正例_mot_pre 收到 0x18 归档行判 OK 且豁免行原文入台账|PASS|verdict=OK code=- 台账豁免行=['[MOT] arm_gate_mask=0x18 REFUSED'] (这一步就是 F20 停下来的地方)
+MC5_真字节反例_预期 0x0 的步收到 0x18 真行必须具名 STOP|PASS|code=BUSINESS_FAILED 命中行=['[MOT] arm_gate_mask=0x18 REFUSED'] => 豁免不是查询步通用的通行证, 按步+按值才免检
+MC6_边界步_stopped 的 0x0 与 0x2 各判 OK, 0x18 与 0x8-ALL-PASS 都停|PASS|0x2=OK(豁免行入台账=['[MOT] arm_gate_mask=0x2 REFUSED']) 0x0=OK 0x18=BUSINESS_FAILED 矛盾形状=FIELD_VALUE_NOT_IN_SET
+MC7_元负控_逐步摘掉 mask 判据静态门都点名翻红(10/10)|PASS|没点名的=无 ;; 摘判据是最小改动, 门必须在**那一步**上红, 不然就是只数总数
+MC8_反向_给预期 0x0 的步加一条通配豁免必须判红|PASS|门行=R7F8F_ARM_GATE_MASK|all|FAIL|S1/mot_after_irq:按预期 mask['0x0'] 应有的豁免=[], 实际申报=['^\\[MOT\\] arm_gate_mask=0x[0-9A-Fa-f]+ REFUSED$']
+MC9_历史包无契约标记只登记NA且不加新红|PASS|拿掉 arm_gate_mask_contract 后=R7F8F_ARM_GATE_MASK|all|NA|计划未申报 arm_gate_mask_contract=R7F8F_PER_STEP_V1(历史冻结包字节不回改, 只登记 NA)
+MC10_跨计划继承_六份冻结旧计划的每条披露豁免都在新计划里有落点|PASS|不吻合=[] ;; 新计划点名不继承但旧计划里找不到对应的=[]
+MC11_F20原始字节入档且与历史归档逐字节同一身份(口径=F20本会话首次取得)|PASS|{"mot_pre": "1128 B sha=f0550d313164 与历史归档逐字节相等=True", "sys_pre": "983 B sha=73abf3012386 与历史归档逐字节相等=True"} ;; 接线是否变化属于**操作者报告**(F20 批准原话第 1 段), 两次字节相同只证输出重复, 本判据不把它写成实测
+TG1_Python 内按严格 UTF-8 取原字节(不经控制台/shell 变量)|PASS|文件=743 B sha=e3b3a647a359… 取到=743 B sha=e3b3a647a359… 尾随 CR/LF 存在=False
+TG2_开账即绑令牌摘要, 且账本里不落原文|PASS|approval_token={"bytes": 743, "sha256": "e3b3a647a3597d80601fc8a2974d3832c4be2abe559de462074a0113ff60521e", "source": "file:r7f8f_field_f20_operator_verbatim.txt"} ;; 原文出现在账本里=False(必须 False) 令牌字节=743
+TG3_正路_原话文件/传入令牌/账本绑定三份摘要一致才放行|PASS|digests={"ledger_bound_sha256": "e3b3a647a359", "passed_token_bytes": 743, "passed_token_sha256": "e3b3a647a359", "verbatim_file_bytes": 743, "verbatim_file_sha256": "e3b3a647a359"}
+TG4_反例_传入令牌与账本绑定不符必须拒绝开口|PASS|code=TOKEN_DIGEST_MISMATCH detail=传入令牌=2749775d8d7f… != 账本绑定=e3b3a647a359… => 这就是 F20 那一类的字节漂移, 现在会在**开口之前**被拒
+TG5_元负控_账本没绑令牌摘要时必须拒绝开口|PASS|code=APPROVAL_TOKEN_NOT_BOUND => 摘要缺席是**开不了口**, 不是'当作一致'
+TG6_非 UTF-8 原话文件具名拒绝|PASS|code=TOKEN_VERBATIM_NOT_UTF8
+TG7_原话文件缺席时不猜内容|PASS|code=TOKEN_VERBATIM_FILE_ABSENT
+TG8_F20 那次开口按新门复算=令牌判据不成立|PASS|code=APPROVAL_TOKEN_NOT_BOUND ;; F20 账本里没有 approval_token 字段 => 当时**无从核对**开口用的是不是那句原话; 这一条单独判未通过(实体绑定另判)。原账/原话/两份 sha 全部保留不补改
+TG9_F20 的四件实体绑定单独判 PASS(与令牌那一判互不掩盖)|PASS|executor@44fa6c1=30c67a3e8dbe(315233 B)|plan@44fa6c1=e78519421149(33140 B)|rows@44fa6c1=c64fdee847af(10060 B) | image=23691e8d8aa8… ;; 这一条只证'批准绑在哪份字节上', **不证**'开口时用的是那句原话'
+TG10_CLI 真实分支被令牌门拦在 dispatch 之前(不导 pyserial、零台账零发送零开口)|PASS|rc=4 首行=TOKEN_CHAIN_REFUSED:APPROVAL_LEDGER_ABSENT|D:\ns800_r7f8f_offline\dir0_a\token_chain\approvals\approval_TG-CLI-NO-LEDGER ;; 台账文件=0 个 TX=0 条 开口=0 条 ;; 用的口名=COM_NONEXISTENT_M8R7F8F（现场真实口 COM5 出现在输出里=False）
+I1_绑定后改plan字节被拒|PASS|code=PLAN_BYTES_CHANGED_AFTER_APPROVAL
+I2_偷换步骤被拒|PASS|code=PLAN_BYTES_CHANGED_AFTER_APPROVAL
+I3_换执行器身份被拒|PASS|code=APPROVAL_IDENTITY_MISMATCH
+I4_派生命令不回写获批步骤|PASS|steps_sha 不变; 台账与实发记录派生命令: ['diag_profile learn 8 450 550 0', 'diag_profile learn_cancel 17', 'diag_profile learn 8 450 550 0', 'diag_profile learn_cancel 73']
+M3_七原因共用一次票据(源码锚点)|PASS|源码侧同一出口/票据的字样在位; 票据消耗顺序的行为级证据仍待现场(本轮不声称)
+M4_旧F7遗留FAILED只作只读披露|PASS|豁免按完整命令放行两条真只读查询, 不放宽 diag_profile 首词面
+自证_故意写错的预期必须被判红|PASS|judge() 对同一份真实输出报了 1 条不符 => 整张矩阵的绿不是恒真
+本轮无设备动作|PASS|本次 --work 下带口名的开口事件=0 条(全矩阵的 dispatch 都是 transport=stub/backend=sim 的 FakePort; 在进程内只调门函数)。批准账只在仓外临时目录用**假身份**建探针账(TG2), 未建/未动本轮现场批准账; TG10 那一次 CLI 用 transport=real 但在 dispatch 之前就被令牌门拒回, 且它给的是不存在的口名 COM_NONEXISTENT_M8R7F8F —— 门若有洞也碰不到 COM5。范围声明: 本条只覆盖**本轮离线判据**, 不覆盖 F11/F20 已发生的两次真机(见交接 field_run_* 块)
+R7F8E_MATRIX_SUMMARY|判据=135|FAIL=0|none

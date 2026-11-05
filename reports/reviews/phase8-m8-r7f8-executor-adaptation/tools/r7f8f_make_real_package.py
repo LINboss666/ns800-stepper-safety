@@ -823,9 +823,147 @@ def plan_doc():
             "steps": st}]}
 
 
+# ---------------------------------------------------------------- DIR0 变体派生(操作者 2026-11-06 现场指令)
+# 整包的"方向"不是一条运行期开关: 它写死在第 15/22/27 步的命令串里(motor_dir 1 /
+# diag_profile learn N 250 350 **1**)、写死在第 15/16 步的判据里([MOT] dir=1 / dir=1)、
+# 写死在行表 13 条 healthy 行与 4 处结构化 {"dir": 1} 里。执行器又在开口前比 plan 字节摘要
+# (m8r3_serial_chain_r7f8.py:2442), 所以"换方向"必然产出**新的 plan/rows 身份**, 不能拿旧的
+# 批准去跑。本函数只做 1=>0 这一个方向的值翻转, 并且:
+#   * 逐条规则按"先具体后笼统"排序, 避免 "dir=1" 这种短串把长串吃掉(本轮踩过一次计数判据的坑);
+#   * 翻完做**残留检查**——任何 dir=1 / motor_dir 1 / DIR1 / "dir": 1 / "350 1" 没翻掉就当场拒;
+#   * 正向要求: 翻不动(dir=1 原本就 0 处)同样当场拒, 不允许"空翻也报成功";
+#   * 说明性文字(_about.derived_shape_rows 与契约表 mot_dir 的 basis)不走文本替换, 显式整条换掉,
+#     否则会出现"行已退回逐字节原件、句子还说改成 1"的假陈述;
+#   * quota 里 "motor_dir": 1 是**次数**不是方向, 单独断言它没被误翻。
+DIR_FLIPS = [("motor_dir 1", "motor_dir 0"),
+             ("learn 32 250 350 1", "learn 32 250 350 0"),
+             ("learn 8 250 350 1", "learn 8 250 350 0"),
+             ("DIR1", "DIR0"),
+             ("dir=1", "dir=0")]
+
+
+def _flip_walk(node, stat):
+    if isinstance(node, dict):
+        for k in list(node.keys()):
+            v = node[k]
+            if k == "dir" and v == 1:
+                node[k] = 0
+                stat["params"] += 1
+            elif isinstance(v, str):
+                new = v
+                for old, rep in DIR_FLIPS:
+                    new = new.replace(old, rep)
+                if new != v:
+                    node[k] = new
+                    stat["strings"] += 1
+            else:
+                _flip_walk(v, stat)
+    elif isinstance(node, list):
+        for i, v in enumerate(node):
+            if isinstance(v, str):
+                new = v
+                for old, rep in DIR_FLIPS:
+                    new = new.replace(old, rep)
+                if new != v:
+                    node[i] = new
+                    stat["strings"] += 1
+            else:
+                _flip_walk(v, stat)
+    return node
+
+
+MOT_DIR_BASIS_DIR0 = (
+    "motor.c:894-917 的七门里没有方向项, motor_dir 不置任何门位 => 仍 0x0。DIR0 变体里这一步的"
+    "行表用 **648 B/10807f63f02a 的逐字节原件**(那份就是 dir=0 时抓的), 所以这一格没有值翻转, "
+    "比 DIR1 包少一处派生。")
+
+DERIVED_DIR0_READY = (
+    "motor_status_ready_dir —— 第 15 步(motor_dir 0 之后): 本包用 648 B/10807f63f02a 的"
+    "**逐字节原件 13 行**, 不做任何翻转(归档原件就是抓于 dir=0 时)。DIR1 交付件里这一格才是"
+    "翻转形状; 变体把它退回原件, provenance 更强。派生判据: 与 MOT_REAL_00 逐行相等, 不等就拒。")
+
+DERIVED_DIR0_RUNNING = (
+    "motor_status_cruise / motor_status_accel / motor_status_armed_ready / motor_status_armed_idle "
+    "—— DIR0 变体把这四行的 dir 列由 1 翻成 0。**归档的运行中真实件(1026 B/9005a306999a、"
+    "1025 B/57efcc7c90d5、1074 B/98abbf2d18df)全是 dir=1 抓的**, 所以 DIR0 包在运行态这几行是"
+    "'声明形状 + 已申报的值翻转', 不是实拍; 与 DIR1 交付件相比这一处 provenance 更弱, 明写在此。")
+
+
+def _dump(doc):
+    return (json.dumps(doc, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+
+
+def to_dir0_variant(plan, rows, repo):
+    """DIR0 变体只能从**已交付的 DIR1 字节**派生: 先逐字节证明"本次未翻转的生成结果 == 盘上交付件",
+    再翻值。这一步不是形式: 生成器若已漂移而变体照样出件, `derived_from_*_sha256` 就是在替一个
+    并不存在的基线作证。证明不了就当场拒。"""
+    lineage = {}
+    for rel, doc in ((PLAN_REL, plan), (ROWS_REL, rows)):
+        p = repo / rel
+        if not p.is_file():
+            raise SystemExit("REFUSED|找不到已交付的 DIR1 件, 变体没有可比的血统: %s" % rel)
+        disk, got = p.read_bytes(), _dump(doc)
+        if disk != got:
+            raise SystemExit("REFUSED|未翻转的生成结果与交付件字节不同(%s: 盘上 %d B / 本次 %d B) "
+                             "=> 先在 --dir 1 上把交付件收口, 不许从漂移的基线派生变体"
+                             % (rel, len(disk), len(got)))
+        lineage[rel] = hashlib.sha256(disk).hexdigest()
+    before = ((repo / PLAN_REL).read_text(encoding="utf-8")
+              + (repo / ROWS_REL).read_text(encoding="utf-8"))
+    if before.count("dir=1") + before.count('"dir": 1') == 0:
+        raise SystemExit("REFUSED|交付件里根本没有 dir=1: 值翻转无从谈起(空翻不许报成功)")
+    stat = {"strings": 0, "params": 0}
+    _flip_walk(plan, stat)
+    _flip_walk(rows, stat)
+    s_all = json.dumps(plan, ensure_ascii=False) + json.dumps(rows, ensure_ascii=False)
+    for pat in ("dir=1", "motor_dir 1", "DIR1", '"dir": 1', "350 1"):
+        if pat in s_all:
+            raise SystemExit("REFUSED|DIR0 变体里仍残留 %r: 有落点没翻到, 不许出件" % pat)
+    # 说明性文字: 显式整条替换(不走通用翻转), 且要求原句在位。
+    dsr = rows.get("_about", {}).get("derived_shape_rows")
+    if not isinstance(dsr, list) or not any(l.startswith("motor_status_ready_dir") for l in dsr):
+        raise SystemExit("REFUSED|rows._about.derived_shape_rows 里没有 ready_dir 那条说明, "
+                         "不敢凭空替换 provenance 文字")
+    rows["_about"]["derived_shape_rows"] = [DERIVED_DIR0_READY] + [
+        (DERIVED_DIR0_RUNNING if l.startswith("motor_status_armed_ready") else l)
+        for l in dsr if not l.startswith("motor_status_ready_dir")]
+    hit_basis = 0
+    for c in plan.get("arm_gate_mask_contract_steps") or []:
+        if c.get("as") == "mot_dir":
+            c["basis"] = MOT_DIR_BASIS_DIR0
+            hit_basis += 1
+    if hit_basis != 1:
+        raise SystemExit("REFUSED|契约表里 mot_dir 的 basis 命中 %d 条(应为 1); 不改这句就会留下"
+                         "'行已退回逐字节原件、文字还说改成 1'的假陈述" % hit_basis)
+    plan["package_variant"] = {"dir": 0,
+                               "derived_from_plan_sha256": lineage[PLAN_REL],
+                               "derived_from_rows_sha256": lineage[ROWS_REL],
+                               "flipped_strings": stat["strings"], "flipped_params": stat["params"],
+                               "unchanged_two": ["executor(派生件字节未变)",
+                                                 "image(产品一字未动, 未重建)"],
+                               "provenance_delta": "ready_dir 退回逐字节原件(更强); "
+                                                   "cruise/accel/armed_ready/armed_idle 四行改由"
+                                                   "已申报的值翻转给出(更弱, 归档运行中件都是 dir=1)",
+                               "asked_by": "操作者 2026-11-06 现场指令: 本次整包方向取 DIR0"}
+    if plan["quota"].get("motor_dir") != 1:
+        raise SystemExit("REFUSED|quota['motor_dir'] 被翻成了 %r: 那是**次数**不是方向"
+                         % plan["quota"].get("motor_dir"))
+    if rows["commands"]["motor_status_ready_dir"]["healthy"] != MOT_REAL_00:
+        raise SystemExit("REFUSED|ready_dir 翻完不等于 648 B 归档原件逐行: 这一格应当是零翻转, "
+                         "不等说明翻转规则过宽")
+    print("DIR0_FLIP|strings=%d|params=%d|残留=0|ready_dir==MOT_REAL_00=True|quota.motor_dir=1"
+          "|血统=%s/%s" % (stat["strings"], stat["params"],
+                           lineage[PLAN_REL][:12], lineage[ROWS_REL][:12]))
+    return plan, rows
+
+
 def main() -> int:
     ap = __import__("argparse").ArgumentParser()
     ap.add_argument("--repo", required=True, type=pathlib.Path)
+    ap.add_argument("--dir", choices=["1", "0"], default="1",
+                    help="1=交付件(默认, 写原路径且字节必须不变); 0=派生 DIR0 变体(必须 --tag)")
+    ap.add_argument("--tag", default="",
+                    help="变体文件名后缀, 例如 _dir0; --dir 0 时必填, 且绝不写回交付件路径")
     a = ap.parse_args()
     repo = a.repo.resolve()
     img = repo / IMAGE_REL
@@ -836,15 +974,25 @@ def main() -> int:
     IMAGE_SHA, IMAGE_BYTES = hashlib.sha256(b).hexdigest(), len(b)
     rows = rows_doc()
     plan = plan_doc()
-    for rel, doc in ((ROWS_REL, rows), (PLAN_REL, plan)):
+    if a.dir == "0":
+        if not a.tag:
+            raise SystemExit("REFUSED|--dir 0 必须带 --tag(变体不许写回已交付的 plan/rows 路径)")
+        plan, rows = to_dir0_variant(plan, rows, repo)
+        out_rows = ROWS_REL.replace(".json", a.tag + ".json")
+        out_plan = PLAN_REL.replace(".json", a.tag + ".json")
+    else:
+        out_rows, out_plan = ROWS_REL, PLAN_REL
+    for rel, doc in ((out_rows, rows), (out_plan, plan)):
         p = repo / rel
         p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(json.dumps(doc, ensure_ascii=False, indent=2) + "\n",
-                     encoding="utf-8", newline="\n")
+        raw_new = _dump(doc)
+        if p.is_file() and p.read_bytes() != raw_new:
+            raise SystemExit("REFUSED|目标已存在且字节不同: 不覆盖已交付产物(要出新件请换 --tag) %s" % rel)
+        p.write_bytes(raw_new)
         raw = p.read_bytes()
         print("WROTE|%s|bytes=%d|sha256=%s" % (rel, len(raw), hashlib.sha256(raw).hexdigest()))
-    print("PLAN|steps=%d|business_worst=%s|quota_keys=%d" %
-          (len(plan["stages"][0]["steps"]), plan["motion_budget"]["business_worst_declared_seconds"],
+    print("PLAN|dir=%s|steps=%d|business_worst=%s|quota_keys=%d" %
+          (a.dir, len(plan["stages"][0]["steps"]), plan["motion_budget"]["business_worst_declared_seconds"],
            len(plan["quota"])))
     print("IMAGE|bytes=%d|sha256=%s|在盘=%s" % (IMAGE_BYTES, IMAGE_SHA, img.is_file()))
     return 0

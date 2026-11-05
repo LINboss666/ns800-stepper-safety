@@ -977,6 +977,62 @@
    }
   }
  },
+ "dir0_variant": {
+  "plan": {
+   "bytes": 46128,
+   "sha256": "2f82bf93fddfee9f2cf36a727685612307f52d7166244b78040b58cdad11d662",
+   "path": "reports/reviews/phase8-m8-r7f8-executor-adaptation/field/plan_r7f8f_2369_real_dir0.json"
+  },
+  "rows": {
+   "bytes": 15734,
+   "sha256": "8dc0b5c06bbc4268652dcc9d5404636cbfbe8112686d297824dc9b73a61a1565",
+   "path": "reports/reviews/phase8-m8-r7f8-executor-adaptation/field/rows_r7f8f_real_dir0.json"
+  },
+  "rationale": {
+   "bytes": 7638,
+   "sha256": "b280e06b67d1dc0c7fcc1150655481aa4b19ad0b1c953febc32974c9fdbc37fd",
+   "path": "reports/reviews/phase8-m8-r7f8-executor-adaptation/field/DIR0_variant_rationale.md"
+  },
+  "package_variant": {
+   "dir": 0,
+   "derived_from_plan_sha256": "2259359ca3f775bc478fd8db30535485cc9e589d6a5c45d7ac9e948b40326a6b",
+   "derived_from_rows_sha256": "a8456159a45f229601e030b69d0034894d1b0df19b191ca4672a1fe0e5279737",
+   "flipped_strings": 20,
+   "flipped_params": 4,
+   "unchanged_two": [
+    "executor(派生件字节未变)",
+    "image(产品一字未动, 未重建)"
+   ],
+   "provenance_delta": "ready_dir 退回逐字节原件(更强); cruise/accel/armed_ready/armed_idle 四行改由已申报的值翻转给出(更弱, 归档运行中件都是 dir=1)",
+   "asked_by": "操作者 2026-11-06 现场指令: 本次整包方向取 DIR0"
+  },
+  "families_on_variant": {
+   "case_matrix_dir0": "R7F8E_MATRIX_SUMMARY|判据=135|FAIL=0|none",
+   "offline_gate_dir0": "R7F8F_OFFLINE_GATE_SUMMARY|判据=49|FAIL=0|none"
+  },
+  "executor_unchanged": {
+   "bytes": 328475,
+   "sha256": "4363af36159befa417647680cc27fb5bdb95785a404b14d77602ccdbe253962e",
+   "path": "reports/reviews/phase8-m8-r7f8-executor-adaptation/tools/m8r3_serial_chain_r7f8.py"
+  },
+  "image_unchanged": {
+   "path": "reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/rt-thread-motor-m1-candidate.bin",
+   "bytes": 297452,
+   "sha256": "23691e8d8aa8c1d3ed6e6eff4b5c51fe27dd3a9169841406ecc627c0e807e963",
+   "axf": {
+    "path": "reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/rt-thread-motor-m1.axf",
+    "bytes": 1790048,
+    "sha256": "0f421595ac940863c4d38a2791f31bc8811fc3b8fa40062782f2ac7505c317f6"
+   },
+   "note": "参照身份: R7F7 已证在板的镜像(逐字节回读在 R7F7-F1/R7F8 轮已闭合)。"
+  },
+  "dir_consuming_families": "只有反例矩阵(135)与整包离线门(49, 内含 validate-plan 147/0)真读被测包; stub(29)/无回归(9)/A 包复算(11)/三版本重放(21x3)读的是合成夹具、冻结的 R7F7 计划、A 的裁定包与 6f2b12f 的 blob, 与 DIR 无关 => 换变体不改变它们的判定对象",
+  "history_judgments_kept_frozen": "TG9(F20 四件实体绑定)与 MC10(六份冻结旧计划的披露豁免)继续读原始冻结字节, 不跟着 --package-tag 走",
+  "evidence_scope": "本轮结论按 dir=0 单方向申报。依据: diag_relative.c:2023 学习只置一个方向位(cand.dir_mask = 1u<<dir), diag_relative.c:334 判定只对方向位在 mask 内的样本生效, 产品注释 :2005 自己写明'只采一个方向却打 dir_mask=3 是第二条假证据链'。=> 不是双向已验。",
+  "safety_axis_check": "arm 七门(motor.c:894-917)里没有方向项, DIR 只在四道门通过后才写(motor.c:1470/1496) => 操作者'DIR 非安全相关轴'在**机械安全层成立**, 在**证据适用范围**上需要按上面那句收窄",
+  "device_actions": 0,
+  "next_approval_targets": "四件里 plan/rows = DIR0 变体两摘要; executor 与镜像不变。DIR1 交付件与其回执按字节冻结不回改, 变体用新文件名并存。"
+ },
  "device_actions_this_round": {
   "serial_port_open": 2,
   "dispatch_real": 2,
@@ -1039,7 +1095,7 @@
  },
  "next_step_owners": {
   "A": "无需再定口径：F21 三条补齐都已落地并全绿(矩阵 135/0、整包离线门 49/0、无回归 9/0)。只要求确认新包的门位契约表(10 步)与不继承那一格的**理由**是否成立；若真机再出现必须改产品的形状(例如 motor_status 打出预期外的 mask)，我按停止-报告处理，不绕过去",
-  "operator": "第三次现场尝试(用 F21 包)需要**一句新的真实原话**，对象 = 本轮四件新身份(见 package_fix_f21.identities_for_next_approval)，并在同一句里逐字重新声明机械/电气前置；F11/F20 那两句只覆盖了各自已用满的账(port_open=1)，不结转、不借它开新账",
+  "operator": "第三次现场尝试(用 **DIR0 变体包**, 见 dir0_variant 块)需要**一句新的真实原话**，对象 = plan 2f82bf93fddf… / rows 8dc0b5c06bbc… / executor 4363af36159b… / 镜像 23691e8d8aa8…，并在同一句里逐字重新声明机械/电气前置；F11/F20 那两句只覆盖了各自已用满的账(port_open=1)，不结转、不借它开新账",
   "me_after_approval": "按那句原话把承接件生成器指到本轮四件身份(--approved-prefixes 当场复算)，用 --approval-token-file 离线 --approval-init 新账(绑令牌摘要)，再一次 dispatch；F21 本轮 0 设备动作，未开第三个账"
  }
 }

@@ -336,4 +336,44 @@ A 包复算 11/0 · 三版本重放 21 件×3/0 · 夹具表族=5 problems=0 · 
   `core_protection_verified=false` 保持原值。90/12/18/7 s 与 38 步的算术**仍未被现场验证**——
   F11/F20 都停在只读查询，一次业务写入都没发生，裁定 §3 那张表现在仍是"窗口分配合同"。
   **本轮不是现场验收通过。**
+## 11. DIR0 变体包（操作者现场指令的方向变更，仍 0 设备动作）
+
+操作者随后判定「DIR 不是安全相关轴、方向处理已被既有测试覆盖，别为标注差异卡住现场」，选择
+**要 DIR0：先出变体再取批准**，并要求**完整重算摘要 + 原有六族离线门全过**。全文依据与身份在
+[`field/DIR0_variant_rationale.md`](file:///D:/ns800/reports/reviews/phase8-m8-r7f8-executor-adaptation/field/DIR0_variant_rationale.md)，
+机器可读那份在交接 JSON 的 `dir0_variant` 块；记录见 `run_record.md` §28。
+
+- **前提核对（按源码，逐条带出处）**：机械安全层成立——`motor.c:894-917` 七个 arm 门位里没有方向项，
+  `motor.c:1470/1496` 的 DIR 只在过门后才写；既有覆盖成立——板级 M3-3「DIR0 短转」与 M3-4「DIR1 短转」
+  都通过，主机级 `tests/host/{io,ps,rel,sd}_main.c` 里有 `motor_dir`/`DIR_MASK` 用例。
+  **但证据适用范围要收窄**：`diag_relative.c:2023` 学习只置一个方向位（`cand.dir_mask = 1u << dir`），
+  `:334` 判定引擎只对方向位在 mask 内的样本生效，`:126` 要求 `dir_mask ∈ {1,2}`，产品注释 `:2005`
+  自己写明"只采一个方向却打 `dir_mask=3` 是第二条假证据链"。所以本轮结论写成
+  **「dir=0 方向上的 SG/ADC 相对保护现场证据」**，不写成双向已验。
+- **变体怎么来的**：`tools/r7f8f_make_real_package.py --dir 0 --tag _dir0`。派生前先逐字节证明
+  "未翻转的生成结果 == 盘上 DIR1 交付件"（**血统门**，所以 `derived_from_*_sha256` 是算的不是写的）；
+  翻 20 处字符串 + 4 处 `{"dir":1}`；翻后做**残留检查**（`dir=1`/`motor_dir 1`/`DIR1`/`"dir": 1`/`350 1`
+  一种不剩）、**过宽检查**（`motor_status_ready_dir` 必须逐行等于 648 B/`10807f63f02a` 原件）与
+  **不越界检查**（`quota["motor_dir"]==1` 是次数不是方向）；两处说明性文字整条替换，命中数≠1 就拒。
+- **判据工具参数化**：只有反例矩阵与整包离线门真读被测包，各加 `--package-tag`，回执跟着换名
+  （`proof/r7f8e_case_matrix_dir0.txt`、`proof/r7f8f_offline_gate_dir0.txt`、`proof/offline_gate_dir0.json`），
+  已交付回执不覆盖。绑历史的判据（TG9 的 F20 四件、MC10 的六份冻结旧计划、A 包复算族与 `6f2b12f`
+  的 blob 比对）**继续读原始冻结字节**——换被测包就换错了对象。
+- **六族在变体上**：矩阵 **135/0** · 整包离线门 **49/0**（内含 validate-plan **147 项 0 红**）·
+  stub 29/0 · 无回归 9/0 · A 包复算 11/0 · 三版本重放 21×3/0 · 夹具表 problems=0。
+  其中后四族不读 real plan（合成夹具 / 冻结 R7F7 计划 / A 的裁定包与 blob / 执行器补丁前后字节），
+  与 DIR 无关。
+- **待批准的 DIR0 四件**：plan `field/plan_r7f8f_2369_real_dir0.json` 46128 B /
+  `2f82bf93fddfee9f2cf36a727685612307f52d7166244b78040b58cdad11d662`；
+  rows `field/rows_r7f8f_real_dir0.json` 15734 B /
+  `8dc0b5c06bbc4268652dcc9d5404636cbfbe8112686d297824dc9b73a61a1565`；
+  executor `4363af36159b…`（未变）；镜像 `23691e8d8aa8…`（未重建，仍是在板那枚）。
+  38 步、逐段窗口、30 条额度、10 步 mask 契约全部不变（方向不在七门里）。
+- **不变纪律**：DIR1 交付件与它的回执按字节冻结不回改，变体用新文件名并存；本轮仍未建账、
+  未开 COM5、未发任何字节；`polarity_measured=false`、`core_protection_verified=false` 保持原值。
+- **我（本轮判断偏差）**：第一次上报 DIR 冲突时，我把 provenance（四行运行态由实拍退回"声明形状 +
+  值翻转"）摆到接近阻断的位置，却没有先去读 `diag_relative.c` 的方向位语义——真正必须核的是
+  `dir_mask` 决定**证据适用范围**那一处。已随 §11 修正，登记在 `run_record.md` §28。
+
+
 

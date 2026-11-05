@@ -38,6 +38,72 @@ FAMILIES = [("case_matrix", "proof/r7f8e_case_matrix.txt", "R7F8E_MATRIX_SUMMARY
             ("offline_gate", "proof/r7f8f_offline_gate.txt", "R7F8F_OFFLINE_GATE_SUMMARY")]
 
 
+PLAN_DIR0 = ROUND + "/field/plan_r7f8f_2369_real_dir0.json"
+ROWS_DIR0 = ROUND + "/field/rows_r7f8f_real_dir0.json"
+RATIONALE_DIR0 = ROUND + "/field/DIR0_variant_rationale.md"
+DIR0_RECEIPTS = [("case_matrix_dir0", "proof/r7f8e_case_matrix_dir0.txt", "R7F8E_MATRIX_SUMMARY"),
+                 ("offline_gate_dir0", "proof/r7f8f_offline_gate_dir0.txt",
+                  "R7F8F_OFFLINE_GATE_SUMMARY")]
+
+
+def _refuse(msg):
+    print("HANDOFF_REFUSE|" + msg)
+    sys.exit(1)
+
+
+def _dir0_block(repo):
+    """DIR0 变体(操作者 2026-11-06 现场指令)的身份 + 它在**原有六族门**上的结果。
+    件从盘上读、血统与交付件摘要对账、回执必须自带 FAIL=0; 任一不符就拒产交接 ——
+    这三道跟本轮"派生件要逐字段重核继承事实"是同一条纪律。"""
+    out = {}
+    for name, rel in (("plan", PLAN_DIR0), ("rows", ROWS_DIR0), ("rationale", RATIONALE_DIR0)):
+        p = repo / rel
+        if not p.is_file():
+            _refuse("DIR0 变体缺件: %s" % rel)
+        out[name] = dict(ident(p), path=rel)
+    pv = json.loads((repo / PLAN_DIR0).read_text(encoding="utf-8"))
+    var = pv.get("package_variant") or {}
+    if var.get("dir") != 0:
+        _refuse("DIR0 计划里的 package_variant.dir=%r(应为 0)" % var.get("dir"))
+    if (var.get("derived_from_plan_sha256") != ident(repo / PLAN)["sha256"]
+            or var.get("derived_from_rows_sha256") != ident(repo / ROWS)["sha256"]):
+        _refuse("变体自报的血统摘要与盘上 DIR1 交付件不一致 => 它不是从被批准的那份字节派生的")
+    fam = {}
+    for name, rel, pre in DIR0_RECEIPTS:
+        rel = ROUND + "/" + rel
+        p = repo / rel
+        if not p.is_file():
+            _refuse("DIR0 回执缺失: %s" % rel)
+        lines = [l for l in p.read_text(encoding="utf-8").splitlines() if l.startswith(pre)]
+        if len(lines) != 1:
+            _refuse("%s 里汇总行 %d 条(应为 1)" % (rel, len(lines)))
+        if "|FAIL=0|" not in lines[0]:
+            _refuse("DIR0 变体在 %s 上不绿: %s" % (rel, lines[0][:120]))
+        fam[name] = lines[0]
+    out.update({
+        "package_variant": var,
+        "families_on_variant": fam,
+        "executor_unchanged": dict(ident(repo / EXE), path=EXE),
+        "image_unchanged": pv["identity_binding"]["image"],
+        "dir_consuming_families": "只有反例矩阵(135)与整包离线门(49, 内含 validate-plan 147/0)"
+                                  "真读被测包; stub(29)/无回归(9)/A 包复算(11)/三版本重放(21x3)"
+                                  "读的是合成夹具、冻结的 R7F7 计划、A 的裁定包与 6f2b12f 的 blob, "
+                                  "与 DIR 无关 => 换变体不改变它们的判定对象",
+        "history_judgments_kept_frozen": "TG9(F20 四件实体绑定)与 MC10(六份冻结旧计划的披露豁免)"
+                                         "继续读原始冻结字节, 不跟着 --package-tag 走",
+        "evidence_scope": "本轮结论按 dir=0 单方向申报。依据: diag_relative.c:2023 学习只置一个方向位"
+                          "(cand.dir_mask = 1u<<dir), diag_relative.c:334 判定只对方向位在 mask 内的"
+                          "样本生效, 产品注释 :2005 自己写明'只采一个方向却打 dir_mask=3 是第二条假"
+                          "证据链'。=> 不是双向已验。",
+        "safety_axis_check": "arm 七门(motor.c:894-917)里没有方向项, DIR 只在四道门通过后才写"
+                             "(motor.c:1470/1496) => 操作者'DIR 非安全相关轴'在**机械安全层成立**, "
+                             "在**证据适用范围**上需要按上面那句收窄",
+        "device_actions": 0,
+        "next_approval_targets": "四件里 plan/rows = DIR0 变体两摘要; executor 与镜像不变。"
+                                 "DIR1 交付件与其回执按字节冻结不回改, 变体用新文件名并存。"})
+    return out
+
+
 def ident(p):
     b = pathlib.Path(p).read_bytes()
     return {"bytes": len(b), "sha256": hashlib.sha256(b).hexdigest()}
@@ -519,6 +585,7 @@ def main() -> int:
                 "executor": dict(ident(repo / EXE), path=EXE),
                 "image": plan["identity_binding"]["image"]},
         },
+        "dir0_variant": _dir0_block(repo),
         "device_actions_this_round": {
             "serial_port_open": ((field or {}).get("quota_spent", {}).get("port_open", 0)
                                  + f20_led.get("spent", {}).get("port_open", 0)),
@@ -570,8 +637,9 @@ def main() -> int:
             "A": "无需再定口径：F21 三条补齐都已落地并全绿(矩阵 135/0、整包离线门 49/0、无回归 9/0)。"
                  "只要求确认新包的门位契约表(10 步)与不继承那一格的**理由**是否成立；若真机再出现必须"
                  "改产品的形状(例如 motor_status 打出预期外的 mask)，我按停止-报告处理，不绕过去",
-            "operator": "第三次现场尝试(用 F21 包)需要**一句新的真实原话**，对象 = 本轮四件新身份(见 "
-                        "package_fix_f21.identities_for_next_approval)，并在同一句里逐字重新声明"
+            "operator": "第三次现场尝试(用 **DIR0 变体包**, 见 dir0_variant 块)需要**一句新的真实原话**，"
+                        "对象 = plan 2f82bf93fddf… / rows 8dc0b5c06bbc… / executor 4363af36159b… / "
+                        "镜像 23691e8d8aa8…，并在同一句里逐字重新声明"
                         "机械/电气前置；F11/F20 那两句只覆盖了各自已用满的账(port_open=1)，不结转、"
                         "不借它开新账",
             "me_after_approval": "按那句原话把承接件生成器指到本轮四件身份(--approved-prefixes 当场"

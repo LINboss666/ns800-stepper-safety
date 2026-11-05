@@ -28,6 +28,7 @@ import sys
 
 ROUND = "reports/reviews/phase8-m8-r7f8-executor-adaptation"
 EXE_REL = ROUND + "/tools/m8r3_serial_chain_r7f8.py"
+PK_TAG = ""          # 由 --package-tag 设置(例如 "_dir0"); 空 = 被测的就是已交付的 DIR1 件
 OLD_REL = "reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py"
 OLD_SHA = "33d3f0af8a4c9c33dcd4e013b395e4ba990a89e384130f9d0ffe50c71b34e8ca"
 OLD_BYTES = 219491
@@ -35,6 +36,15 @@ APP = ("rt-thread-master/rt-thread-master/bsp/novosns/ns800/"
        "ns800rt7p65-nssinepad/applications")
 
 out, fails = [], []
+
+
+def pk(which):
+    """**被测包**的 plan/rows 路径。`--package-tag` 让整族判据能跑在派生变体(如 DIR0)上;
+    而绑历史的判据(TG9 的 F20 四件、MC10 的六份冻结旧计划)不走这里 —— 它们读的是已入库的
+    冻结字节, 换了被测包就换错了对象。"""
+    base = {"plan": ROUND + "/field/plan_r7f8f_2369_real",
+            "rows": ROUND + "/field/rows_r7f8f_real"}[which]
+    return base + PK_TAG + ".json"
 
 
 def note(name, ok, detail=""):
@@ -1295,8 +1305,7 @@ def ruling_probes(mod, repo, work):
          "arm 起 18.5 s: 通电到期=%s 而运动侧早已解除=%s(运动剩余=%s) => 步骤循环里 "
          "ARM_ENERGIZE_DEADLINE_EXCEEDED 那条支路不看 cap_active, 因此释放运动计时不会放开通电门" %
          (eg.expired(), not bud.cap_active, round(bud.remaining(), 3)))
-    ref = repo / ("reports/reviews/phase8-m8-r7f8-executor-adaptation/field/"
-                  "plan_r7f8f_2369_real.json")
+    ref = repo / pk("plan")
     doc = json.loads(ref.read_text(encoding="utf-8"))
     rl = mod.business_segments_ruling(doc["stages"][0]["steps"], cap=12, reserve=7, total=90)
     a_rows = json.loads((repo / "reports/reviews/phase8-m8-r7f8-executor-adaptation/inputs/"
@@ -1344,7 +1353,7 @@ def field_bytes_probes(mod, repo, work):
         shutil.rmtree(str(root), ignore_errors=True)
     root.mkdir(parents=True)
     cap_path = repo / ROUND / "proof/r7f8f_field_f11_sys_pre.rx.bin"
-    plan_path = repo / ROUND / "field/plan_r7f8f_2369_real.json"
+    plan_path = repo / pk("plan")
     if not (cap_path.is_file() and plan_path.is_file()):
         note("L0_现场捕获与交付计划都在盘", False, "缺=%s" %
              [str(p.relative_to(repo).as_posix()) for p in (cap_path, plan_path) if not p.is_file()])
@@ -1422,7 +1431,7 @@ def field_bytes_probes(mod, repo, work):
 
     # 静态侧: 同一份真字节对应的计划形状, 过 validate_plan 的门必须是"锚定+查询步+硬字段+正面要求"
     # 四条一起核; 把正面要求那一条偷偷拿掉, 门要当场翻红(否则计划能过、现场必停 = F11 的老路)。
-    rows_doc = json.loads((repo / ROUND / "field/rows_r7f8f_real.json").read_text(encoding="utf-8"))
+    rows_doc = json.loads((repo / pk("rows")).read_text(encoding="utf-8"))
 
     def sa_line(doc):
         out, _bad, _names = mod.validate_plan(doc, rows_doc, repo / APP)
@@ -1473,9 +1482,8 @@ def mask_contract_probes(mod, repo, work):
     note("MC0_包作者工具可导入(归档原件身份在它手里核过)", True,
          "r7f8f_make_real_package 导入成功 => _observed_sys_ready/_observed_mot_rows 的字节与"
          "散列身份检查已通过(它检查的是**盘上归档件**, 不是我的记忆)")
-    plan_doc = json.loads((repo / ROUND / "field/plan_r7f8f_2369_real.json").read_text(
-        encoding="utf-8"))
-    rows_doc = json.loads((repo / ROUND / "field/rows_r7f8f_real.json").read_text(encoding="utf-8"))
+    plan_doc = json.loads((repo / pk("plan")).read_text(encoding="utf-8"))
+    rows_doc = json.loads((repo / pk("rows")).read_text(encoding="utf-8"))
     steps = {s["as"]: s for s in plan_doc["stages"][0]["steps"]}
     order = [s["as"] for s in plan_doc["stages"][0]["steps"]]
     contract = {a: sorted(m) for a, m, _g, _b in pkg.ARM_GATE_CONTRACT}
@@ -1866,9 +1874,8 @@ def token_chain_probes(mod, repo, work):
     # 绝不碰 COM5 —— 本轮的"0 设备动作"不靠运气, 靠这个上界。
     d = root / "cli_real_refuse"
     d.mkdir()
-    shutil.copyfile(str(repo / ROUND / "field/plan_r7f8f_2369_real.json"), str(d / "plan.json"))
-    shutil.copyfile(str(repo / ROUND / "field/rows_r7f8f_real.json"),
-                    str(d / "rows_r7f8f_real.json"))
+    shutil.copyfile(str(repo / pk("plan")), str(d / "plan.json"))
+    shutil.copyfile(str(repo / pk("rows")), str(d / "rows_r7f8f_real.json"))
     rc = subprocess.run([sys.executable, str(repo / EXE_REL), "--dispatch", "--transport", "real",
                          "--backend", "real", "--port", "COM_NONEXISTENT_M8R7F8F",
                          "--profile", "response_driven",
@@ -1894,8 +1901,12 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--repo", required=True, type=pathlib.Path)
     ap.add_argument("--work", required=True, type=pathlib.Path)
+    ap.add_argument("--package-tag", default="",
+                    help="被测包后缀(如 _dir0); 空=已交付的 DIR1 件。绑历史的判据不受影响。")
     a = ap.parse_args()
     repo = a.repo.resolve()
+    global PK_TAG
+    PK_TAG = a.package_tag
     work = a.work
     work.mkdir(parents=True, exist_ok=True)
     exe = repo / EXE_REL
@@ -2065,7 +2076,8 @@ def main() -> int:
         len(out), len(fails), ",".join(fails) if fails else "none")
     text = "\n".join(out + [summary]) + "\n"
     (repo / ROUND / "proof").mkdir(parents=True, exist_ok=True)
-    (repo / ROUND / "proof/r7f8e_case_matrix.txt").write_text(text, encoding="utf-8", newline="\n")
+    (repo / ROUND / ("proof/r7f8e_case_matrix%s.txt" % PK_TAG)).write_text(
+        text, encoding="utf-8", newline="\n")
     print(text, end="")
     return 1 if fails else 0
 

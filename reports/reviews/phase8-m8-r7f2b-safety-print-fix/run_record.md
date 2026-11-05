@@ -1638,3 +1638,44 @@ F11 那份承接件按字节冻结在库里不回改（`53c744213964…`，与 �
 上限，F20 那本账不结转；等操作者对上面四件新身份给一句真实原话（含本轮逐字的机械/电气前置声明），
 再按 `--approval-token-file` 开新账并只跑一次整包。`polarity_measured=false` /
 `core_protection_verified=false` 保持原值；仍不是现场验收通过。
+>
+> （本段的"四件新身份"已被 §28 取代：操作者随后选了 DIR0，plan/rows 换成变体摘要，executor 与镜像不变。）
+
+## 28 DIR0 变体包（操作者现场指令的方向变更，仍 0 设备动作）
+
+- **经过**：操作者先给了一句针对 §27.5 四件的批准，但那句写 **DIR0**，而交付包第 15 步是
+  `motor_dir 1`。我把冲突列出来（并说明执行器在开口前比 plan 摘要，改一个字符就会让实跑字节
+  ≠ 被批准字节），操作者判定"DIR 不是安全相关轴、方向处理已被既有测试覆盖，别为标注差异卡住
+  现场进度"，并选「要 DIR0：先出变体再取批准」，要求**完整重算摘要 + 原有六族离线门全过**。
+- **我这个停点停对了一半**：方向确实不是机械安全轴（`motor.c:894-917` 七门里没有方向项），
+  但它**绑定证据**：`diag_relative.c:2023` 学习出的 profile 只置一个方向位
+  （`cand.dir_mask = 1u << dir`），`diag_relative.c:334` 判定引擎只对方向位在 mask 里的样本做
+  相对保护，产品注释（`:2005`）自己写明"只采一个方向却打 dir_mask=3 就是第二条假证据链"。
+  所以 DIR0 的结论要写成"**dir=0 方向上的**相对保护现场证据"，不能写成双向已验。逐条出处见
+  `phase8-m8-r7f8-executor-adaptation/field/DIR0_variant_rationale.md` §1。
+- **生成器改动**（单一来源，不手改产物）：`tools/r7f8f_make_real_package.py` 加 `--dir/--tag`，
+  派生前先逐字节证明"未翻转的生成结果 == 盘上 DIR1 交付件"（血统门），翻 20 处字符串 + 4 处
+  `{"dir":1}`，然后做**残留检查**（`dir=1`/`motor_dir 1`/`DIR1`/`"dir": 1`/`350 1` 一种都不许剩）、
+  **过宽检查**（`motor_status_ready_dir` 必须逐行等于 648 B/`10807f63f02a` 归档原件）与
+  **不越界检查**（`quota["motor_dir"]==1` 是次数不是方向）。说明性文字（`_about.derived_shape_rows`、
+  契约表 `mot_dir` 的 `basis`）整条替换，命中数≠1 就 `REFUSED`。
+- **判据工具的参数化**：只有两族真读被测包 —— `r7f8e_case_matrix.py` 与 `r7f8f_offline_gate.py`
+  各加 `--package-tag`（回执名跟着后缀走，不覆盖已交付回执）；绑历史的判据（TG9 的 F20 四件、
+  MC10 的六份冻结旧计划、A 包复算族与 6f2b12f 的 blob 比对）**继续读原始冻结字节**，
+  换被测包就换错了对象。
+- **六族在变体上的结果**：矩阵 **135/0**、整包离线门 **49/0**（内含 validate-plan **147 项 0 红**）、
+  stub 29/0、无回归 9/0、A 包复算 11/0、三版本重放 21×3/0、夹具表 problems=0。
+  回执：`proof/r7f8e_case_matrix_dir0.txt`、`proof/r7f8f_offline_gate_dir0.txt`、
+  `proof/offline_gate_dir0.json`。
+- **变体身份**：plan `field/plan_r7f8f_2369_real_dir0.json` 46128 B / `2f82bf93fddfee9f…`，
+  rows `field/rows_r7f8f_real_dir0.json` 15734 B / `8dc0b5c06bbc4268…`；executor `4363af36159b…`
+  与镜像 `23691e8d8aa8…` 未变（产品一字未动、未重建）。DIR1 交付件按字节冻结不回改，变体用新名并存。
+- **本轮我的一处判断偏差登记**：第一次冲突上报时我把 provenance（`cruise/accel` 四行由实拍退回
+  "声明形状+值翻转"）当成接近阻断级的理由，实际它是**非安全相关的标注代价**，代价是一句话可以说清的
+  证据标签；真正必须核的是 `dir_mask` 那一处（它决定结论适用范围），而我第一轮没去读
+  `diag_relative.c` 的 mask 语义就先把 provenance 摆上了台面。教训：**冲突上报前先把"这个差异落在
+  哪一层"读到源码**，否则容易把注解层的差异说成安全层的差异，反过来也会漏掉真正的适用范围问题。
+- **停点**：本轮设备动作 0 —— 未生成批准版、未建账、未开 COM5。等一句针对上面四件（DIR0 变体）
+  的真实原话 + 逐字重述的机械/电气前置。`polarity_measured=false`、`core_protection_verified=false`
+  保持原值；仍不是现场验收通过。
+

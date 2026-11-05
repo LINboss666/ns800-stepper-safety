@@ -1,0 +1,291 @@
+{
+  "receipt": "offline_gate",
+  "round": "M8-R7F8F",
+  "generated_offline": true,
+  "identities": {
+    "executor": {
+      "path": "reports/reviews/phase8-m8-r7f8-executor-adaptation/tools/m8r3_serial_chain_r7f8.py",
+      "bytes": 328475,
+      "sha256": "4363af36159befa417647680cc27fb5bdb95785a404b14d77602ccdbe253962e"
+    },
+    "plan": {
+      "path": "reports/reviews/phase8-m8-r7f8-executor-adaptation/field/plan_r7f8f_2369_real_dir0.json",
+      "bytes": 46128,
+      "sha256": "2f82bf93fddfee9f2cf36a727685612307f52d7166244b78040b58cdad11d662"
+    },
+    "rows": {
+      "path": "reports/reviews/phase8-m8-r7f8-executor-adaptation/field/rows_r7f8f_real_dir0.json",
+      "bytes": 15734,
+      "sha256": "8dc0b5c06bbc4268652dcc9d5404636cbfbe8112686d297824dc9b73a61a1565"
+    },
+    "board_image": {
+      "path": "reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/rt-thread-motor-m1-candidate.bin",
+      "bytes": 297452,
+      "sha256": "23691e8d8aa8c1d3ed6e6eff4b5c51fe27dd3a9169841406ecc627c0e807e963"
+    },
+    "executor_pre_r7f8f": {
+      "path": "reports\\reviews\\phase8-m8-r7f8-executor-adaptation\\tools\\m8r3_serial_chain_r7f8_pre_r7f8f.py",
+      "bytes": 245730,
+      "sha256": "4c962170b2357eef94afd73d43790d61880635a3d13287d29d543035768d6fed"
+    }
+  },
+  "gates": [
+    {
+      "name": "INPUTS_IN_PLACE",
+      "verdict": "PASS",
+      "detail": "五件齐全; 执行器=4363af36159b… plan=2f82bf93fddf… rows=8dc0b5c06bbc…"
+    },
+    {
+      "name": "PRE_EXECUTOR_BYTES_FROZEN",
+      "verdict": "PASS",
+      "detail": "修前件仍为 245730 B / 4c962170b2357eef…(一字节未动)"
+    },
+    {
+      "name": "FROZEN_OLD_EXECUTOR_UNCHANGED",
+      "verdict": "PASS",
+      "detail": "冻结旧件实读 219491 B sha=33d3f0af8a4c9c33…(派生件逐字节从它/它的后继派生, 旧件本身一字节未动)"
+    },
+    {
+      "name": "BOARD_IMAGE_IDENTITY_STILL_23691E8D",
+      "verdict": "PASS",
+      "detail": "§4 的在板镜像原件仍是 297452 B / 23691e8d…(本轮不下载/不回读, 身份只作参照)"
+    },
+    {
+      "name": "IMAGE_SHA_COMES_FROM_DISK_BYTES",
+      "verdict": "PASS",
+      "detail": "计划里写的镜像摘要 == 本工具当场对盘上原字节算出的摘要(不是手抄)"
+    },
+    {
+      "name": "PRODUCT_SOURCE_UNCHANGED",
+      "verdict": "PASS",
+      "detail": "applications/ 与 HEAD 一致(暂存区外也无改动); 计 45 个登记条目"
+    },
+    {
+      "name": "VALIDATE_PLAN_RAN",
+      "verdict": "PASS",
+      "detail": "PLAN_VALIDATE_SUMMARY|checks=147|fail=0|msh_commands=74|plan=D:\\ns800\\reports\\reviews\\phase8-m8-r7f8-executor-adaptation\\field\\plan_r7f8f_2369_real_dir0.json; FAIL 行=0"
+    },
+    {
+      "name": "VALIDATE_PLAN_FAIL_SET_EXACTLY_AS_REGISTERED",
+      "verdict": "PASS",
+      "detail": "实开=[] 登记=[](A 预算裁定 2026-11-05 落地后登记集合为空集; 上一版这里是两条红: PLAN_BUSINESS_RESERVE_SPLIT:S1 / PLAN_BUSINESS_WORST_CASE_FIT:S1) | 原文: "
+    },
+    {
+      "name": "GATE_PRESENT|PLAN_CLEANUP_RESERVE",
+      "verdict": "PASS",
+      "detail": "出现在 validate-plan 输出里"
+    },
+    {
+      "name": "GATE_PRESENT|PLAN_BUSINESS_RESERVE_SPLIT",
+      "verdict": "PASS",
+      "detail": "出现在 validate-plan 输出里"
+    },
+    {
+      "name": "GATE_PRESENT|PLAN_BUSINESS_WORST_CASE_FIT",
+      "verdict": "PASS",
+      "detail": "出现在 validate-plan 输出里"
+    },
+    {
+      "name": "GATE_PRESENT|PLAN_MOTION_CAP_BUDGET",
+      "verdict": "PASS",
+      "detail": "出现在 validate-plan 输出里"
+    },
+    {
+      "name": "GATE_PRESENT|PLAN_QUOTA_NEED",
+      "verdict": "PASS",
+      "detail": "出现在 validate-plan 输出里"
+    },
+    {
+      "name": "GATE_PRESENT|PLAN_IMAGE_IDENTITY_CONSISTENCY",
+      "verdict": "PASS",
+      "detail": "出现在 validate-plan 输出里"
+    },
+    {
+      "name": "GATE_PRESENT|PLAN_SPINUP_GATE_COVERAGE",
+      "verdict": "PASS",
+      "detail": "出现在 validate-plan 输出里"
+    },
+    {
+      "name": "GATE_PRESENT|R7F8E_ARM_ENERGIZE",
+      "verdict": "PASS",
+      "detail": "出现在 validate-plan 输出里"
+    },
+    {
+      "name": "GATE_PRESENT|PLAN_STEP_TOTAL_WINDOWS",
+      "verdict": "PASS",
+      "detail": "出现在 validate-plan 输出里"
+    },
+    {
+      "name": "GATE_PRESENT|R7F8F_ARM_GATE_MASK",
+      "verdict": "PASS",
+      "detail": "出现在 validate-plan 输出里"
+    },
+    {
+      "name": "ARM_GATE_MASK_GATE_IS_GREEN_AND_COVERS_EVERY_QUERY_STEP",
+      "verdict": "PASS",
+      "detail": "门行数=1 判定=PASS ;; 计划里独立数到 10 条(sys_pre,mot_pre,sys_after_apply,mot_after_irq,mot_dir,mot_armed,cruise,mot_after_cancel,stopped,mot_disabled) ;; 门详情点名 10 条 ;; 汇总话术里的条数对=True"
+    },
+    {
+      "name": "PLAN_RESERVE_ARITHMETIC",
+      "verdict": "PASS",
+      "detail": "PLAN_CLEANUP_RESERVE|S1|PASS|reserve=7.0 floor=6.0 total=90.0 cap=12.0"
+    },
+    {
+      "name": "PLAN_BUSINESS_SEGMENTS_NO_DOUBLE_COUNT",
+      "verdict": "PASS",
+      "detail": "三段步数 19+11+8==38(不重不漏) worst=43.0==pre_start 31.0 + cap 12.0(cap 只加一次) 总窗合计=47.5==三段之和"
+    },
+    {
+      "name": "PLAN_BUSINESS_MIRROR_SAME_VALUE",
+      "verdict": "PASS",
+      "detail": "计划申报镜像与执行器现算逐字段比对=有 | 这一行取 validate-plan 原文: PLAN_BUSINESS_RESERVE_SPLIT|S1|PASS|may_obligate=True spin@19 stop@28 zero@29 pre_start=31.0(19步) motion_active=9.0(11步) post_zero=7.5(8步) stop_after_start=7.5 zero_after_start=9.0 arm_to_disabled=13.0 cap=12.0 reserve=7.0 total=90.0 business_total=47.5 worst=43.0 cons_total=57.5 cons_arm=16.0 mirro"
+    },
+    {
+      "name": "PLAN_POST_SPIN_CONTENT_FITS_CAP",
+      "verdict": "PASS",
+      "detail": "裁定一之后的判法: 运动 cap 只管**起转→可信零速确认**这一段 => 活动内容=9.0 s <= cap=12.0 s; 零速确认那一步必须申报(否则运动计时不解除, 这条判红); 而停机后内容 7.5 s **不再**叠进 cap(改由 83 s 业务截止约束)。上一版这条红(23.0 > 12)的成因是旧语义\"stop 不解除运动计时\"; 旧数仍原样留在 validate-plan 的 LEGACY_SEMANTICS 行里"
+    },
+    {
+      "name": "PLAN_WORST_CASE_TAIL_FITS_SESSION",
+      "verdict": "PASS",
+      "detail": "裁定二之后的判法: 每步的总窗**已含全部等待与余量**(不再叠 SLACK), 所以核的是38 步总窗合计 + 预留 <= 总窗: PLAN_BUSINESS_WORST_CASE_FIT|S1|PASS|business_total=47.5 budget=83.0 cons_total=57.5 cons_arm=16.0; 单步总窗申报齐全性: PLAN_STEP_TOTAL_WINDOWS|S1|PASS|declared=38/38 legacy=0 非法=无 zero_evidence_as=stopped"
+    },
+    {
+      "name": "LEGACY_RED_TEXT_KEPT_VERBATIM",
+      "verdict": "PASS",
+      "detail": "A 的 §4 末条: 原来 91/23 两条红的原文继续保留并注明对应旧语义 => 转绿是语义变了, 不是把数改了: PLAN_BUSINESS_RESERVE_SPLIT_LEGACY_SEMANTICS|S1|INFO|对应旧口径: 每步再加 SLACK_SECONDS、且正常 stop 不解除运动计时 legacy_pre_bound=91.0 legacy_after_spin=23.0 本行不判红, 仅留档旧口径"
+    },
+    {
+      "name": "META_MIRROR_DRIFT_NAMED",
+      "verdict": "PASS",
+      "detail": "把计划镜像的 worst_declared 加 5 s 后执行器的判读=PLAN_BUSINESS_RESERVE_SPLIT|S1|FAIL|may_obligate=True spin@19 stop@28 zero@29 pre_start=31.0(19步) motion_active=9.0(11步) post_zero=7.5(8步) stop_after_start=7.5 zero_after_start=9.0 arm_to_disabled=13.0 cap=12.0 reserve=7.0 total=90.0 business_total=47.5 worst="
+    },
+    {
+      "name": "META_MUTATION_ANCHOR_HIT",
+      "verdict": "PASS",
+      "detail": "突变锚点(裁定后那条 act=活动内容)在派生件里恰好命中一次"
+    },
+    {
+      "name": "META_DOUBLE_COUNT_COMES_BACK_GOES_RED",
+      "verdict": "PASS",
+      "detail": "把停机后内容重新折进运动 cap(=旧语义)后, 现场计划判读=PLAN_BUSINESS_RESERVE_SPLIT|S1|FAIL|may_obligate=True spin@19 stop@28 zero@29 pre_start=31.0(19步) motion_active=9.0(11步) post_zero=7.5(8步) stop_after_start=7.5 zero_after_start=9.0 arm_to_disabled=13.0 cap=12.0 reserve=7.0 total=90.0 business_total=47.5 worst=43.0 cons_total=57.5 cons_arm=16.0 mirro"
+    },
+    {
+      "name": "FIELD_PLAN_PREREQ_NOT_SELF_CERTIFIED",
+      "verdict": "PASS",
+      "detail": "现场原件里 mechanical_prerequisites 的状态={\"bench_continuity\": \"DECLARED_BY_OPERATOR_AT_APPROVAL\"}(等操作者口头确认, 计划不许自证; 离线 dispatch 副本另置 PROVIDED 只为让行为判据有东西可判)"
+    },
+    {
+      "name": "NO_DEVICE_ACTIONS_DECLARED",
+      "verdict": "PASS",
+      "detail": "download/readback/reset/reboot/config_save/clear/retry/dmm/物理刺激额度全 0"
+    },
+    {
+      "name": "MOTION_AND_ENERGIZE_DEADLINES",
+      "verdict": "PASS",
+      "detail": "§4 固定值未动: cap=12 arm=18 total=90 reserve=7; 三段互不重叠的最坏业务(起转前申报 31.0 + cap 12)=43.0 s, 预留 7 s 由执行器 business_abs_dl=83 s 硬夹保住"
+    },
+    {
+      "name": "FIELD_FLAGS_STAY_FALSE",
+      "verdict": "PASS",
+      "detail": "polarity_measured / core_protection_verified 仍是 false(未动硬件)"
+    },
+    {
+      "name": "STUB_NORMAL_DISPATCH_SUCCEEDS",
+      "verdict": "PASS",
+      "detail": "rc=0 stage_status=OK success=True code= disarm=CONFIRMED_DISABLED terminal=KNOWN 结果条数=40(申报步骤 38; 轮询的多次尝试也各计一条) | ile=healthy|branch=healthy|scenario_branches={}|prerequisite_skips=[]|actions_attempted=[]|ledger=D:\\ns800_r7f8f_offline\\dir0_b\\normal\\run\\dispatch_ledger.jsonl"
+    },
+    {
+      "name": "STUB_NORMAL_TAIL_SENT",
+      "verdict": "PASS",
+      "detail": "收口段(CLEANUP_ENTERED 之后)实发=['motor_stop', 'motor_disarm', 'motor_status', 'safety_irq_disable', 'safety_irq_status'] 五条各一次且顺序固定=True"
+    },
+    {
+      "name": "STUB_NORMAL_RESERVE_AND_CLAMP_FIELDS",
+      "verdict": "PASS",
+      "detail": "整包 dispatch 的阶段回执里 reserve=7.0 reserved=True session_abs=90.0 business_abs=83.0 cleanup_hard=7.24"
+    },
+    {
+      "name": "FIRST_ERROR|tail_silent",
+      "verdict": "PASS",
+      "detail": "code=CLEANUP_ERRORS disarm=CONFIRMED_DISABLED terminal=KNOWN 收口TX=['motor_status', 'safety_irq_status', 'safety_irq_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_stop', 'motor_status', 'motor_disarm', 'motor_status', 'motor_stop', 'motor_disarm', 'motor_status', 'safety_irq_disable', 'safety_irq_status'] errors=IRQ_TAIL_DISABLE_NO_DETACH_LINE IRQ_TAIL_NOT_CLOSED"
+    },
+    {
+      "name": "FIRST_ERROR|learn_no_started_row",
+      "verdict": "PASS",
+      "detail": "code=EXPECTATION_NOT_MET disarm=CONFIRMED_DISABLED terminal=KNOWN 收口TX=['motor_status', 'safety_irq_status', 'safety_irq_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_stop', 'motor_disarm', 'motor_status', 'safety_irq_disable', 'safety_irq_status'] errors="
+    },
+    {
+      "name": "FIRST_ERROR|irq_before_arm_fails",
+      "verdict": "PASS",
+      "detail": "code=EXPECTATION_NOT_MET disarm=CONFIRMED_DISABLED terminal=KNOWN 收口TX=['motor_status', 'safety_irq_status', 'safety_irq_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_stop', 'motor_status', 'motor_stop', 'motor_disarm', 'motor_status', 'safety_irq_disable', 'safety_irq_status'] errors="
+    },
+    {
+      "name": "FIRST_ERROR|reserve_too_small",
+      "verdict": "PASS",
+      "detail": "code=CLEANUP_RESERVE_CANNOT_COVER_ALL_SENDS disarm=NOT_ARMED terminal=KNOWN 收口TX=[] errors="
+    },
+    {
+      "name": "FIRST_ERROR|session_too_short",
+      "verdict": "PASS",
+      "detail": "code=STEP_DEADLINE_BEFORE_WRITE disarm=NOT_ARMED terminal=KNOWN 收口TX=[] errors="
+    },
+    {
+      "name": "ROWS_BRANCH_MISSING_KNOWN_GAP",
+      "verdict": "PASS",
+      "detail": "畸形行表(healthy 分支整个缺席)在开端口之前裸 KeyError 退出: rc=1 台账无 TX; traceback 末行=KeyError: 'healthy'"
+    },
+    {
+      "name": "RUN_ZERO_SNAPSHOT_RELEASES_MOTION_TIMER",
+      "verdict": "PASS",
+      "detail": "整包正常场: 台账事件=['MOTOR_STOP_CONFIRMED', 'MOTION_TIMER_ENDED', 'DISARM_ACTION_DONE', 'DISARM_FIELDS'](先 stop 确认且 ends_motion_timer=False, 后由 as=stopped 那份可信零速快照解除运动计时), 且整场仍然成功收口(disarm=CONFIRMED_DISABLED) —— 证明释放点在实际执行路径上被证据门控制, 不是只在静态表上切开"
+    },
+    {
+      "name": "RUN_MOTION_TIMER_ELAPSED_WITHIN_CAP",
+      "verdict": "PASS",
+      "detail": "零速确认发生在起转后 0.2 s(cap 12 s 内), 且事件里明写 arm 通电截止**未被解除**=True"
+    },
+    {
+      "name": "FIRST_ERROR|zero_evidence_illegal_window",
+      "verdict": "PASS",
+      "detail": "code=STEP_TOTAL_SECONDS_INVALID disarm=CONFIRMED_DISABLED terminal=KNOWN 收口TX=['motor_status', 'safety_irq_status', 'safety_irq_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_stop', 'motor_stop', 'motor_disarm', 'motor_status', 'safety_irq_disable', 'safety_irq_status'] errors="
+    },
+    {
+      "name": "PRE_RULING_REFERENCE_PLAN_STILL_RED_UNCHANGED",
+      "verdict": "PASS",
+      "detail": "A 包里那份裁定前基准件(sha 66ca8a15…, 原字节复制到仓外后与原件逐字节相同)重跑仍是旧语义: 合取项={\"SPLIT红\": true, \"SPLIT里zero@None\": true, \"WORST红\": true, \"LEGACY行91/23在位\": true, \"基准件sha前缀66ca8a15\": true, \"仓外副本与原件逐字节相等\": true} ;; SPLIT=PLAN_BUSINESS_RESERVE_SPLIT|S1|FAIL|may_obligate=True spin@19 stop@28 zero@None pre_start=91(19步) motion_active=79(19步) post_zero=0.0(0步) stop_after_start=37.0 zero_after_start=None arm_to_disabled=68 ;; LEGACY=PLAN_BUSINESS_RESERVE_SPLIT_LEGACY_SEMANTICS|S1|INFO|对应旧口径: 每步再加 SLACK_SECONDS、且正常 stop 不解除运动计时 legacy_pre_bound=91.0 legacy_after_spin=23.0 本行不判红, 仅留 ;; WORST=PLAN_BUSINESS_WORST_CASE_FIT|S1|FAIL|business_total=170 budget=83.0 cons_total=110.0 cons_arm=None|38 步总窗合计=170 + 预留=7.0 > 总窗=90.0;38 步总窗合计=170 > 业务预算(validate-plan 的退出码不参与本判据: 它在有 FAIL 时仍返回 0, 红与绿一律看行里的 |FAIL|/|PASS|)"
+    },
+    {
+      "name": "PRE_RULING_BYTECMP_CLAUSE_FIRES_ON_MUTATION",
+      "verdict": "PASS",
+      "detail": "同一份原件 vs 逐字节副本=True / vs 尾部多一个空格的副本=False (True/False 才对: 这一项既不是恒真也不是恒假死码)"
+    },
+    {
+      "name": "NO_REAL_PORT_IN_ANY_LEDGER",
+      "verdict": "PASS",
+      "detail": "台账里 6 条 PORT_OPEN 全是 transport=stub 且 port 字段为空(真开过 COM5 必然留下口名)"
+    },
+    {
+      "name": "NO_HARDWARE_ACTIONS_INSIDE_THIS_GATE",
+      "verdict": "PASS",
+      "detail": "本门自己跑的全部 dispatch 走 transport=stub/backend=sim 的 FakePort; 门内未开 COM5, 未导入 pyserial 真后端, 未跑 pyOCD/Keil/Logic, 批准账只建在仓外 --work。**范围声明**: 本条不声明整轮无设备动作 —— F11 真机那一次(若已发生)的证据与额度在 proof/r7f8f_field_f11_receipt.json, 由交接件 field_run_f11 块单独承担"
+    },
+    {
+      "name": "JSON_RECEIPT_SHAPE_ALIGNED",
+      "verdict": "PASS",
+      "detail": "本条之前的 48 条结构化记账与文本 48 行逐条同数、判定值只可能是 PASS/FAIL、FAIL 名单与 none 一致(计入本条共 49 条); 旧的按位切分会让其中 16 条把门名当判定值(如 GATE_PRESENT|PLAN_CLEANUP_RESERVE|PASS|出现在 v)"
+    }
+  ],
+  "summary": {
+    "checks": 49,
+    "fail": 0,
+    "failed_names": [],
+    "overall": "ALL_GATES_PASS"
+  },
+  "not_claimed": {
+    "polarity_measured": false,
+    "core_protection_verified": false,
+    "board_evidence": "本回执不含任何板端实测; 现场判读只认现场台账"
+  },
+  "device_actions": 0
+}

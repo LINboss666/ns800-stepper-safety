@@ -124,7 +124,7 @@ TG6_非 UTF-8 原话文件具名拒绝|PASS|code=TOKEN_VERBATIM_NOT_UTF8
 TG7_原话文件缺席时不猜内容|PASS|code=TOKEN_VERBATIM_FILE_ABSENT
 TG8_F20 那次开口按新门复算=令牌判据不成立|PASS|code=APPROVAL_TOKEN_NOT_BOUND ;; F20 账本里没有 approval_token 字段 => 当时**无从核对**开口用的是不是那句原话; 这一条单独判未通过(实体绑定另判)。原账/原话/两份 sha 全部保留不补改
 TG9_F20 的四件实体绑定单独判 PASS(与令牌那一判互不掩盖)|PASS|executor@44fa6c1=30c67a3e8dbe(315233 B)|plan@44fa6c1=e78519421149(33140 B)|rows@44fa6c1=c64fdee847af(10060 B) | image=23691e8d8aa8… ;; 这一条只证'批准绑在哪份字节上', **不证**'开口时用的是那句原话'
-TG10_CLI 真实分支被令牌门拦在 dispatch 之前(不导 pyserial、零台账零发送零开口)|PASS|rc=4 首行=TOKEN_CHAIN_REFUSED:APPROVAL_LEDGER_ABSENT|D:\ns800_r7f8f_offline\f21i\token_chain\approvals\approval_TG-CLI-NO-LEDGER.j ;; 台账文件=0 个 TX=0 条 开口=0 条 ;; 用的口名=COM_NONEXISTENT_M8R7F8F（现场真实口 COM5 出现在输出里=False）
+TG10_CLI 真实分支被令牌门拦在 dispatch 之前(不导 pyserial、零台账零发送零开口)|PASS|rc=4 首行=TOKEN_CHAIN_REFUSED:APPROVAL_LEDGER_ABSENT|D:\ns800_r7f8f_offline\f21j\token_chain\approvals\approval_TG-CLI-NO-LEDGER.j ;; 台账文件=0 个 TX=0 条 开口=0 条 ;; 用的口名=COM_NONEXISTENT_M8R7F8F（现场真实口 COM5 出现在输出里=False）
 I1_绑定后改plan字节被拒|PASS|code=PLAN_BYTES_CHANGED_AFTER_APPROVAL
 I2_偷换步骤被拒|PASS|code=PLAN_BYTES_CHANGED_AFTER_APPROVAL
 I3_换执行器身份被拒|PASS|code=APPROVAL_IDENTITY_MISMATCH

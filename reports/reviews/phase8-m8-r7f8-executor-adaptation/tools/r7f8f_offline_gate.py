@@ -21,8 +21,11 @@ import subprocess
 import sys
 
 ROUND = "reports/reviews/phase8-m8-r7f8-executor-adaptation"
-PLAN_REL = ROUND + "/field/plan_r7f8f_2369_real.json"
-ROWS_REL = ROUND + "/field/rows_r7f8f_real.json"
+PLAN_BASE = ROUND + "/field/plan_r7f8f_2369_real"
+ROWS_BASE = ROUND + "/field/rows_r7f8f_real"
+PKG_TAG = ""                      # 由 --package-tag 设置(如 "_dir0"); 空 = 已交付的 DIR1 件
+PLAN_REL = PLAN_BASE + ".json"    # 在 main() 里按 PKG_TAG 重新绑定
+ROWS_REL = ROWS_BASE + ".json"
 EXE_REL = ROUND + "/tools/m8r3_serial_chain_r7f8.py"
 APP_REL = ("rt-thread-master/rt-thread-master/bsp/novosns/ns800/"
            "ns800rt7p65-nssinepad/applications")
@@ -156,7 +159,13 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--repo", required=True, type=pathlib.Path)
     ap.add_argument("--work", required=True, type=pathlib.Path)
+    ap.add_argument("--package-tag", default="",
+                    help="被测包后缀(如 _dir0); 空=已交付的 DIR1 件。回执名跟着后缀走, "
+                         "已交付的回执不覆盖。")
     a = ap.parse_args()
+    global PKG_TAG, PLAN_REL, ROWS_REL
+    PKG_TAG = a.package_tag
+    PLAN_REL, ROWS_REL = PLAN_BASE + PKG_TAG + ".json", ROWS_BASE + PKG_TAG + ".json"
     repo = a.repo.resolve()
     work = a.work.resolve()
     work.mkdir(parents=True, exist_ok=True)
@@ -620,7 +629,8 @@ def main() -> int:
     text = "\n".join(OUT) + "\n%s|判据=%d|FAIL=%d|%s\n" % (
         "R7F8F_OFFLINE_GATE_SUMMARY", len(OUT), len(FAILS), ",".join(FAILS) or "none")
     (repo / ROUND / "proof").mkdir(parents=True, exist_ok=True)
-    (repo / ROUND / "proof/r7f8f_offline_gate.txt").write_text(text, encoding="utf-8",
+    (repo / ROUND / ("proof/r7f8f_offline_gate%s.txt" % PKG_TAG)).write_text(
+        text, encoding="utf-8",
                                                                newline="\n")
     doc = {"receipt": "offline_gate", "round": "M8-R7F8F", "generated_offline": True,
            "identities": ident,
@@ -630,7 +640,7 @@ def main() -> int:
            "not_claimed": {"polarity_measured": False, "core_protection_verified": False,
                            "board_evidence": "本回执不含任何板端实测; 现场判读只认现场台账"},
            "device_actions": 0}
-    (repo / ROUND / "proof/offline_gate.json").write_text(
+    (repo / ROUND / ("proof/offline_gate%s.json" % PKG_TAG)).write_text(
         json.dumps(doc, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
     sys.stdout.buffer.write(text.encode("utf-8", "replace"))
     return 1 if FAILS else 0
