@@ -1,0 +1,323 @@
+[
+  {
+    "name": "POS_real_owner_2",
+    "rc": 0,
+    "status": "OK",
+    "code": "",
+    "expected": "Positive control / timing observation",
+    "gap_reproduced": false,
+    "polls": 2,
+    "energize_actual": null,
+    "sent": [
+      "diag_profile learn 8 450 550 0",
+      "diag_profile learn_status",
+      "diag_profile learn_status"
+    ],
+    "events": [
+      {
+        "bytes": "diag_profile learn 8 450 550 0\r\n",
+        "kind": "TX",
+        "t_s": 0.0
+      },
+      {
+        "bytes": "diag_profile learn_status\r\n",
+        "kind": "TX",
+        "t_s": 0.0
+      },
+      {
+        "bytes": "diag_profile learn_status\r\n",
+        "kind": "TX",
+        "t_s": 0.5
+      }
+    ]
+  },
+  {
+    "name": "P1_RUNNING_owner_FREE",
+    "rc": 0,
+    "status": "OK",
+    "code": "",
+    "expected": "First contradictory response must STOP",
+    "gap_reproduced": true,
+    "polls": 2,
+    "energize_actual": null,
+    "sent": [
+      "diag_profile learn 8 450 550 0",
+      "diag_profile learn_status",
+      "diag_profile learn_status"
+    ],
+    "events": [
+      {
+        "bytes": "diag_profile learn 8 450 550 0\r\n",
+        "kind": "TX",
+        "t_s": 0.0
+      },
+      {
+        "bytes": "diag_profile learn_status\r\n",
+        "kind": "TX",
+        "t_s": 0.0
+      },
+      {
+        "bytes": "diag_profile learn_status\r\n",
+        "kind": "TX",
+        "t_s": 0.5
+      }
+    ]
+  },
+  {
+    "name": "P2_RUNNING_wrong_want",
+    "rc": 0,
+    "status": "OK",
+    "code": "",
+    "expected": "First contradictory response must STOP",
+    "gap_reproduced": true,
+    "polls": 2,
+    "energize_actual": null,
+    "sent": [
+      "diag_profile learn 8 450 550 0",
+      "diag_profile learn_status",
+      "diag_profile learn_status"
+    ],
+    "events": [
+      {
+        "bytes": "diag_profile learn 8 450 550 0\r\n",
+        "kind": "TX",
+        "t_s": 0.0
+      },
+      {
+        "bytes": "diag_profile learn_status\r\n",
+        "kind": "TX",
+        "t_s": 0.0
+      },
+      {
+        "bytes": "diag_profile learn_status\r\n",
+        "kind": "TX",
+        "t_s": 0.5
+      }
+    ]
+  },
+  {
+    "name": "P3_RUNNING_wrong_direction",
+    "rc": 0,
+    "status": "OK",
+    "code": "",
+    "expected": "First contradictory response must STOP",
+    "gap_reproduced": true,
+    "polls": 2,
+    "energize_actual": null,
+    "sent": [
+      "diag_profile learn 8 450 550 0",
+      "diag_profile learn_status",
+      "diag_profile learn_status"
+    ],
+    "events": [
+      {
+        "bytes": "diag_profile learn 8 450 550 0\r\n",
+        "kind": "TX",
+        "t_s": 0.0
+      },
+      {
+        "bytes": "diag_profile learn_status\r\n",
+        "kind": "TX",
+        "t_s": 0.0
+      },
+      {
+        "bytes": "diag_profile learn_status\r\n",
+        "kind": "TX",
+        "t_s": 0.5
+      }
+    ]
+  },
+  {
+    "name": "P4_progress_decreases",
+    "rc": 0,
+    "status": "OK",
+    "code": "",
+    "expected": "First contradictory response must STOP",
+    "gap_reproduced": true,
+    "polls": 3,
+    "energize_actual": null,
+    "sent": [
+      "diag_profile learn 8 450 550 0",
+      "diag_profile learn_status",
+      "diag_profile learn_status",
+      "diag_profile learn_status"
+    ],
+    "events": [
+      {
+        "bytes": "diag_profile learn 8 450 550 0\r\n",
+        "kind": "TX",
+        "t_s": 0.0
+      },
+      {
+        "bytes": "diag_profile learn_status\r\n",
+        "kind": "TX",
+        "t_s": 0.0
+      },
+      {
+        "bytes": "diag_profile learn_status\r\n",
+        "kind": "TX",
+        "t_s": 0.5
+      },
+      {
+        "bytes": "diag_profile learn_status\r\n",
+        "kind": "TX",
+        "t_s": 1.0
+      }
+    ]
+  },
+  {
+    "name": "P5_DONE_wrong_window_and_no_candidate",
+    "rc": 0,
+    "status": "OK",
+    "code": "",
+    "expected": "First contradictory response must STOP",
+    "gap_reproduced": true,
+    "polls": 1,
+    "energize_actual": null,
+    "sent": [
+      "diag_profile learn 8 450 550 0",
+      "diag_profile learn_status"
+    ],
+    "events": [
+      {
+        "bytes": "diag_profile learn 8 450 550 0\r\n",
+        "kind": "TX",
+        "t_s": 0.0
+      },
+      {
+        "bytes": "diag_profile learn_status\r\n",
+        "kind": "TX",
+        "t_s": 0.0
+      }
+    ]
+  },
+  {
+    "name": "P6_arm_response_exceeds_2s",
+    "rc": 1,
+    "status": "OK",
+    "code": "CLEANUP_ERRORS",
+    "expected": "Positive control / timing observation",
+    "gap_reproduced": false,
+    "polls": 0,
+    "energize_actual": 5.424999999999907,
+    "sent": [
+      "motor_arm"
+    ],
+    "events": [
+      {
+        "cap_seconds": 2.0,
+        "kind": "ENERGIZE_OBLIGATION_SET",
+        "t_s": 0.0
+      },
+      {
+        "bytes": "motor_arm\r\n",
+        "kind": "TX",
+        "t_s": 0.0
+      },
+      {
+        "bytes": "motor_stop\r\n",
+        "kind": "TX",
+        "t_s": 3.005
+      },
+      {
+        "bytes": "motor_disarm\r\n",
+        "kind": "TX",
+        "t_s": 4.215
+      },
+      {
+        "bytes": "motor_status\r\n",
+        "kind": "TX",
+        "t_s": 5.425
+      }
+    ]
+  },
+  {
+    "name": "P7_second_arm_loses_timer",
+    "rc": 1,
+    "status": "OK",
+    "code": "CLEANUP_ERRORS",
+    "expected": "Positive control / timing observation",
+    "gap_reproduced": false,
+    "polls": 0,
+    "energize_actual": 0.0,
+    "sent": [
+      "motor_arm",
+      "motor_disarm",
+      "motor_arm",
+      "motor_status"
+    ],
+    "events": [
+      {
+        "cap_seconds": 2.0,
+        "kind": "ENERGIZE_OBLIGATION_SET",
+        "t_s": 0.0
+      },
+      {
+        "bytes": "motor_arm\r\n",
+        "kind": "TX",
+        "t_s": 0.0
+      },
+      {
+        "bytes": "motor_disarm\r\n",
+        "kind": "TX",
+        "t_s": 0.0
+      },
+      {
+        "actual_s": 0.0,
+        "cap_seconds": 2.0,
+        "kind": "ENERGIZE_DEADLINE_CLOSED",
+        "t_s": 0.0
+      },
+      {
+        "cap_seconds": 2.0,
+        "kind": "ENERGIZE_OBLIGATION_SET",
+        "t_s": 0.0
+      },
+      {
+        "bytes": "motor_arm\r\n",
+        "kind": "TX",
+        "t_s": 0.0
+      },
+      {
+        "bytes": "motor_status\r\n",
+        "kind": "TX",
+        "t_s": 8.0
+      },
+      {
+        "bytes": "motor_stop\r\n",
+        "kind": "TX",
+        "t_s": 8.0
+      },
+      {
+        "bytes": "motor_disarm\r\n",
+        "kind": "TX",
+        "t_s": 9.21
+      },
+      {
+        "bytes": "motor_status\r\n",
+        "kind": "TX",
+        "t_s": 9.21
+      }
+    ]
+  },
+  {
+    "name": "P8_RUNNING_with_ENN_disabled",
+    "rc": 0,
+    "status": "OK",
+    "code": "",
+    "expected": "First contradictory response must STOP",
+    "gap_reproduced": true,
+    "polls": 0,
+    "energize_actual": null,
+    "sent": [
+      "motor_status"
+    ],
+    "events": [
+      {
+        "bytes": "motor_status\r\n",
+        "kind": "TX",
+        "t_s": 0.0
+      }
+    ]
+  }
+]

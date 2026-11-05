@@ -1,0 +1,38 @@
+{
+  "reviewed_tip": "e97aaa4736208fa7fa7e9a86768d5305ab2e4cff",
+  "product_commit": "00718b49e65546aa0bae84006059011d68284c4a",
+  "product_tree_rt_thread_master": "32470c7ed44ef6ef5f762490a5416912a336cdd9",
+  "reviewed_executor": {
+    "bytes": 245730,
+    "sha256": "4c962170b2357eef94afd73d43790d61880635a3d13287d29d543035768d6fed"
+  },
+  "old_frozen_executor": {
+    "bytes": 219491,
+    "sha256": "33d3f0af8a4c9c33dcd4e013b395e4ba990a89e384130f9d0ffe50c71b34e8ca"
+  },
+  "board_bin": {
+    "bytes": 297452,
+    "sha256": "23691e8d8aa8c1d3ed6e6eff4b5c51fe27dd3a9169841406ecc627c0e807e963",
+    "basis": "R7F7 readback proof; no new hardware read this review"
+  },
+  "hardware_actions_this_review": 0,
+  "next_task": "R7F8F repair plus one real-field trial; pending operator authorization",
+  "field_parameters": {
+    "dir": 1,
+    "step_hz": 300,
+    "lo": 250,
+    "hi": 350,
+    "zero_n": 32,
+    "cancel_n": 32,
+    "done_n": 8,
+    "motion_cap_s": 12,
+    "energize_cap_s": 18,
+    "session_cap_s": 90,
+    "cleanup_reserve_s": 7,
+    "port_open": 1,
+    "motor_run": 1
+  },
+  "post_repair_executor_sha256": null,
+  "post_repair_plan_sha256": null,
+  "final_identity_rule": "B binds final executable and plan after fixed-scope offline gates, before one approval ledger init. No extra A software-signoff pause."
+}

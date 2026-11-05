@@ -1,0 +1,68 @@
+{
+  "checks": [
+    {
+      "name": "portable_probe_outputs_equal",
+      "pass": true
+    },
+    {
+      "name": "all_9_preimage_observations_OK",
+      "pass": true
+    },
+    {
+      "name": "six_contradiction_cases_wrongly_accepted",
+      "pass": true
+    },
+    {
+      "name": "P6_actual_exceeds_cap",
+      "pass": true
+    },
+    {
+      "name": "P7_second_arm_untimed",
+      "pass": true
+    },
+    {
+      "name": "replayed_matrix.txt",
+      "pass": true
+    },
+    {
+      "name": "replayed_stub_package.txt",
+      "pass": true
+    },
+    {
+      "name": "replayed_no_regression.txt",
+      "pass": true
+    },
+    {
+      "name": "reviewed_executor_identity",
+      "pass": true
+    },
+    {
+      "name": "remote_product_tree",
+      "pass": true
+    },
+    {
+      "name": "single_combined_task",
+      "pass": true
+    },
+    {
+      "name": "no_false_sample_upper_bound",
+      "pass": true
+    },
+    {
+      "name": "draft_same_bytes",
+      "pass": true
+    },
+    {
+      "name": "portable_tool_no_local_absolute_path",
+      "pass": true
+    },
+    {
+      "name": "portable_tool_compiles",
+      "pass": true
+    }
+  ],
+  "total": 15,
+  "fail": 0,
+  "hardware_actions": 0,
+  "note": "This checks review-package identity/observations; it does not claim the executor is fixed or the field trial has occurred."
+}
