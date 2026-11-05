@@ -44,6 +44,10 @@ ALLOWED = (
     "reports/reviews/phase8-m8-r7f8-closed-loop-draft/R7F8_DRAFT_MERGED.md",
     "reports/reviews/phase8-m8-r7f8-closed-loop-draft/ROUND_SHA256SUMS.txt",
     ".gitattributes",
+    # 新增条目一律**加在末尾**: 上面的 PREFLIGHT_ALLOWED_PARSED_EXACTLY 还按位置核 0/3/4/5/6
+    # 五条与常量一致, 往中间插会让那条位置同步判据假红(本轮踩过一次, 记在 run_record §24.5)。
+    "reports/agent_handoffs/phase8-m8-r7f8f-repair-and-offline-gate.md",
+    "reports/agent_handoffs/phase8-m8-r7f8f-repair-and-offline-gate.json",
 )
 UID_DEFAULT = "D:/ns800-m7-p0-20261030T182818/dap_uid_bare.txt"
 SLQ = "[" + chr(92) + chr(92) + "/]"

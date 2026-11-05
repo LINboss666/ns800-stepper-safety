@@ -1096,11 +1096,14 @@ E4 通电截止与固定清理对账（`EnergizeBudget` 在 `motor_arm` 写入�
   `PLAN_MOTION_CAP_BUDGET`（空运动链的既有检查器缺口，草案轮已登记）。
 - 三版本重放 `proof/r7f8f_probe_replay.txt`：**21 件 × 3 侧 / FAIL=0**（同一输入分别喂修后 /
   F5b 修前 / F5c 修前，按各件应有行为申报）。
-- 最终离线门 `proof/offline_gate.json` + `proof/r7f8f_offline_gate.txt`：**39 条判据 / FAIL=2**，
+- 最终离线门 `proof/offline_gate.json` + `proof/r7f8f_offline_gate.txt`：**40 条判据 / FAIL=2**，
   两条红的名字固定是 `PLAN_POST_SPIN_CONTENT_FITS_CAP` 与 `PLAN_WORST_CASE_TAIL_FITS_SESSION`；
   `overall` 因此是 FAIL，不写 PASS。validate-plan 自身：checks=144 / fail=2（就是这两条）。
-- 夹具逐项变更 `proof/r7f8f_fixture_changes.md|.json`：基线 42d7f7d 的判据名 65/27/8 一条不少
-  （removed=0），新增 33/2/1 条逐条带人写理由，同名判据无结论翻转，problems=0。
+  第 40 条 `JSON_RECEIPT_SHAPE_ALIGNED` 是本轮补的**回执形状判据**（见 §24.5 第 13 条），
+  补正前后同一输入的 PASS/FAIL 结论逐条一致。
+- 夹具逐项变更 `proof/r7f8f_fixture_changes.md|.json`：基线 42d7f7d 五个族的判据名逐条对齐
+  （65→98 / 27→29 / 32→36，另两件本轮新增文件 7 与 33 条），**removed=0**（基线一条不少），
+  新增 33/2/4/7/33 条逐条带人写理由，同名判据无结论翻转，problems=0。
 
 ### 24.3 现场包（已作者化，未获批准，未执行）
 
@@ -1174,6 +1177,20 @@ config_save/clear/retry/物理刺激额度全 0；`polarity_measured=false`、`c
     （抽掉一份在库回执 => `在库回执未列` 必须命中）。`DRAFT` 与 `R7F2B` 沿用各自原有的按文件名
     排除，不受影响。重算后条目数 80/8/228。
 
+13. 离线门的机器回执 `proof/offline_gate.json` 用 `l.split("|", 2)` 按位切文本行来还原
+    门名/判定值/详情，但门名本身就允许含竖线（`GATE_PRESENT|PLAN_CLEANUP_RESERVE`、
+    `FIRST_ERROR|tail_silent`），于是 **13 条把门名写进了 verdict 字段**（如
+    `verdict="PLAN_CLEANUP_RESERVE"`），`verdict != "PASS"` 的机器筛法会把这些误当成未通过。
+    已改成在 `note()` 记账时就分开三个字段，并新增第 40 条判据 `JSON_RECEIPT_SHAPE_ALIGNED`
+    （结构化条数=文本行数、判定值只会是 PASS/FAIL、FAIL 名单与汇总行一致），同输入重跑后
+    40 条的结论与补正前逐条一致（仍 FAIL=2，名字未变）。变更表工具当场把这条新判据拦了一次
+    "新增没有逐项理由"，补进 `REASONS` 后 `FIXTURE_TABLE|族=5|problems=0`。
+
+14. 给预检白名单加本轮两件新交接件时，我把它们**插在元组中间**，当场触发
+    `ALLOWED_LIST_NOT_PARSEABLE_EXACTLY` —— 那条判据除了"解析出的字面量集合 == 元组"，还按
+    **位置**核 `ALLOWED[0]/[3]/[4]/[5]/[6]` 与常量同步，中间插入会把位置整体挪一位。已改成
+    一律追加到末尾并在源码里写明这条约束（判据本身不动，位置口径是它自己定的）。
+
 ### 24.6 口径更正两件
 
 - 远端回读覆盖失败那一次的**首次失败原文未留存**（被第二次运行的输出覆盖了同一个文件）。
@@ -1183,6 +1200,10 @@ config_save/clear/retry/物理刺激额度全 0；`polarity_measured=false`、`c
   进去），该误算原因已登记；A 的原清单未回改。
 
 ### 24.7 停点
+
+本轮交接件：`reports/agent_handoffs/phase8-m8-r7f8f-repair-and-offline-gate.md` + 同名 `.json`
+（机器那份由 `tools/r7f8f_make_handoff.py` 当场从盘上算数字，含 `HANDOFF_CROSS_CHECK` 一条
+自证：json 判据条数=文本条数、红名单同源、判定值只会是 PASS/FAIL；找不到指定判据名直接拒产）。
 
 工具关键修复已验证（四族判据 + 整包门 + 逐项变更表全绿，除两条已点名的静态预算红）。
 **完整现场包尚未就绪，还不能称为现场验收通过**：上机前需要先有 A 对 §24.4 两条的口径答复。

@@ -70,14 +70,15 @@
 
 ## proof/r7f8f_offline_gate.txt
 - 家族: 最终离线门(real plan/rows 整包 + 全首错 + 不变项)
-- 基线判据名 无该件(本轮新增) 个 / 现在 32 个 / 同名保留 0 / 新增 32 / 移除 0 / 结论变化 0
-- 现在的汇总行: `R7F8F_OFFLINE_GATE_SUMMARY|判据=39|FAIL=2|PLAN_POST_SPIN_CONTENT_FITS_CAP,PLAN_WORST_CASE_TAIL_FITS_SESSION`
+- 基线判据名 无该件(本轮新增) 个 / 现在 33 个 / 同名保留 0 / 新增 33 / 移除 0 / 结论变化 0
+- 现在的汇总行: `R7F8F_OFFLINE_GATE_SUMMARY|判据=40|FAIL=2|PLAN_POST_SPIN_CONTENT_FITS_CAP,PLAN_WORST_CASE_TAIL_FITS_SESSION`
   - **新增** `BOARD_IMAGE_IDENTITY_STILL_23691E8D` —— 在板镜像原件仍是 297452 B / 23691e8d…, 本轮不下载/不回读, 身份只作参照(§4 第一行)。
   - **新增** `FIELD_FLAGS_STAY_FALSE` —— polarity_measured / core_protection_verified 保持 false(任务书硬边界: 软件 confirm 不升级为极性实测)。
   - **新增** `FIELD_PLAN_PREREQ_NOT_SELF_CERTIFIED` —— 机械前置门在现场原件里保持「等操作者口头确认」, 计划不自证; 离线 dispatch 副本另置 PROVIDED 只为了让行为判据有东西可判。
   - **新增** `FROZEN_OLD_EXECUTOR_UNCHANGED` —— 冻结件身份核对(§3.1): 旧执行器一字节未动。
   - **新增** `IMAGE_SHA_COMES_FROM_DISK_BYTES` —— 计划里的镜像摘要 == 本工具当场对盘上原字节算出的摘要(§4 的 23691e8d… 不是手抄)。
   - **新增** `INPUTS_IN_PLACE` —— 五件输入齐全且身份当场重算(执行器/plan/rows/修前件/BIN)。
+  - **新增** `JSON_RECEIPT_SHAPE_ALIGNED` —— 机器回执自身的形状判据: 每条判据在记账时就分成 门名/判定值/详情 三个字段。上一版 json 用按位切分解析文本行, 而门名本身可以含 "|"(GATE_PRESENT|X、FIRST_ERROR|tag), 于是 13 条把门名当成了判定值(如 verdict="PLAN_CLEANUP_RESERVE")。这条判据把"结构化条数=文本行数、判定值只会是 PASS/FAIL、FAIL 名单与汇总行一致"钉住, 属于回执可解析性补正, 不改任何行为判定; 同输入重跑后 40 条的 PASS/FAIL 与补正前的 39 条逐条一致。
   - **新增** `META_DOUBLE_COUNT_COMES_BACK_GOES_RED` —— 元负控: 故意让镜像漂移/把双算加回来, 要求对应的门**必须变红** —— 证 F6 的新门不是恒绿(任务书 §3.2)。
   - **新增** `META_MIRROR_DRIFT_NAMED` —— 元负控: 故意让镜像漂移/把双算加回来, 要求对应的门**必须变红** —— 证 F6 的新门不是恒绿(任务书 §3.2)。
   - **新增** `META_MUTATION_ANCHOR_HIT` —— 元负控: 故意让镜像漂移/把双算加回来, 要求对应的门**必须变红** —— 证 F6 的新门不是恒绿(任务书 §3.2)。

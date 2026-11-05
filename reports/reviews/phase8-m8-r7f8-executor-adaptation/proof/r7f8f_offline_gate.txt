@@ -26,7 +26,7 @@ FIELD_PLAN_PREREQ_NOT_SELF_CERTIFIED|PASS|现场原件里 mechanical_prerequisit
 NO_DEVICE_ACTIONS_DECLARED|PASS|download/readback/reset/reboot/config_save/clear/retry/dmm/物理刺激额度全 0
 MOTION_AND_ENERGIZE_DEADLINES|PASS|§4 固定值未动: cap=12 arm=18 total=90 reserve=7; 三段互不重叠的最坏业务(起转前申报 34.0 + cap 12)=46.0 s, 预留 7 s 由执行器 business_abs_dl=83 s 硬夹保住
 FIELD_FLAGS_STAY_FALSE|PASS|polarity_measured / core_protection_verified 仍是 false(未动硬件)
-STUB_NORMAL_DISPATCH_SUCCEEDS|PASS|rc=0 stage_status=OK success=True code= disarm=CONFIRMED_DISABLED terminal=KNOWN 结果条数=40(申报步骤 38; 轮询的多次尝试也各计一条) | ile=healthy|branch=healthy|scenario_branches={}|prerequisite_skips=[]|actions_attempted=[]|ledger=D:\ns800_r7f8f_offline\gate13\normal\run\dispatch_ledger.jsonl
+STUB_NORMAL_DISPATCH_SUCCEEDS|PASS|rc=0 stage_status=OK success=True code= disarm=CONFIRMED_DISABLED terminal=KNOWN 结果条数=40(申报步骤 38; 轮询的多次尝试也各计一条) | ile=healthy|branch=healthy|scenario_branches={}|prerequisite_skips=[]|actions_attempted=[]|ledger=D:\ns800_r7f8f_offline\gate14\normal\run\dispatch_ledger.jsonl
 STUB_NORMAL_TAIL_SENT|PASS|收口段(CLEANUP_ENTERED 之后)实发=['motor_stop', 'motor_disarm', 'motor_status', 'safety_irq_disable', 'safety_irq_status'] 五条各一次且顺序固定=True
 STUB_NORMAL_RESERVE_AND_CLAMP_FIELDS|PASS|整包 dispatch 的阶段回执里 reserve=7.0 reserved=True session_abs=90.0 business_abs=83.0 cleanup_hard=19.0
 FIRST_ERROR|tail_silent|PASS|code=CLEANUP_ERRORS disarm=CONFIRMED_DISABLED terminal=KNOWN 收口TX=['motor_status', 'safety_irq_status', 'safety_irq_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_stop', 'motor_status', 'motor_disarm', 'motor_status', 'motor_stop', 'motor_disarm', 'motor_status', 'safety_irq_disable', 'safety_irq_status'] errors=IRQ_TAIL_DISABLE_NO_DETACH_LINE IRQ_TAIL_NOT_CLOSED
@@ -37,4 +37,5 @@ FIRST_ERROR|session_too_short|PASS|code=STEP_DEADLINE_BEFORE_WRITE disarm=NOT_AR
 ROWS_BRANCH_MISSING_KNOWN_GAP|PASS|畸形行表(healthy 分支整个缺席)在开端口之前裸 KeyError 退出: rc=1 台账无 TX; traceback 末行=KeyError: 'healthy'
 NO_REAL_PORT_IN_ANY_LEDGER|PASS|台账里 5 条 PORT_OPEN 全是 transport=stub 且 port 字段为空(真开过 COM5 必然留下口名)
 NO_HARDWARE_ACTIONS_THIS_ROUND|PASS|全部 dispatch 走 transport=stub/backend=sim 的 FakePort; 未开 COM5, 未导入 pyserial 真后端, 未跑 pyOCD/Keil/Logic, 批准账只建在仓外 --work
-R7F8F_OFFLINE_GATE_SUMMARY|判据=39|FAIL=2|PLAN_POST_SPIN_CONTENT_FITS_CAP,PLAN_WORST_CASE_TAIL_FITS_SESSION
+JSON_RECEIPT_SHAPE_ALIGNED|PASS|结构化记账 39 条与文本 39 行逐条同数、判定值只可能是 PASS/FAIL、FAIL 名单与 PLAN_POST_SPIN_CONTENT_FITS_CAP,PLAN_WORST_CASE_TAIL_FITS_SESSION 一致; 旧的按位切分会让其中 13 条把门名当判定值(如 GATE_PRESENT|PLAN_CLEANUP_RESERVE|PASS|出现在 v)
+R7F8F_OFFLINE_GATE_SUMMARY|判据=40|FAIL=2|PLAN_POST_SPIN_CONTENT_FITS_CAP,PLAN_WORST_CASE_TAIL_FITS_SESSION

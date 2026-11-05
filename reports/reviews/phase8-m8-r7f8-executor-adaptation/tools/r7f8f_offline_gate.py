@@ -32,6 +32,7 @@ FIVE = ["motor_stop", "motor_disarm", "motor_status", "safety_irq_disable",
         "safety_irq_status"]
 
 OUT = []
+GATES = []
 FAILS = []
 
 
@@ -40,7 +41,11 @@ def sha(b):
 
 
 def note(name, ok, detail=""):
-    OUT.append("%s|%s|%s" % (name, "PASS" if ok else "FAIL", detail))
+    v = "PASS" if ok else "FAIL"
+    OUT.append("%s|%s|%s" % (name, v, detail))
+    # 机器回执**在记账时**就分开三个字段: 门名本身可以含 "|"(GATE_PRESENT|X、FIRST_ERROR|tag),
+    # 事后再按位切分会把门名当成判定值(上一版 json 里 13 条就是这样错位的)。
+    GATES.append({"name": name, "verdict": v, "detail": detail})
     if not ok:
         FAILS.append(name)
 
@@ -489,6 +494,16 @@ def main() -> int:
     note("NO_HARDWARE_ACTIONS_THIS_ROUND", True,
          "全部 dispatch 走 transport=stub/backend=sim 的 FakePort; 未开 COM5, 未导入 pyserial "
          "真后端, 未跑 pyOCD/Keil/Logic, 批准账只建在仓外 --work")
+    # 机器回执的形状本身也要判: 每条都有 PASS/FAIL、条数与文本行一致、FAIL 名单一致。
+    # 同时量出"若仍按位切分会有几条把门名当判定值" —— 上一版 json 的 13 条错位就是这条没做。
+    misaligned = [l for l in OUT if l.split("|", 2)[1] not in ("PASS", "FAIL")]
+    note("JSON_RECEIPT_SHAPE_ALIGNED",
+         len(GATES) == len(OUT) and all(g["verdict"] in ("PASS", "FAIL") for g in GATES)
+         and [g["name"] for g in GATES if g["verdict"] == "FAIL"] == FAILS,
+         "本条之前的 %d 条结构化记账与文本 %d 行逐条同数、判定值只可能是 PASS/FAIL、FAIL 名单与 %s "
+         "一致(计入本条共 %d 条); 旧的按位切分会让其中 %d 条把门名当判定值(如 %s)"
+         % (len(GATES), len(OUT), ",".join(FAILS) or "none", len(OUT) + 1, len(misaligned),
+            misaligned[0][:44] if misaligned else "-"))
     text = "\n".join(OUT) + "\n%s|判据=%d|FAIL=%d|%s\n" % (
         "R7F8F_OFFLINE_GATE_SUMMARY", len(OUT), len(FAILS), ",".join(FAILS) or "none")
     (repo / ROUND / "proof").mkdir(parents=True, exist_ok=True)
@@ -496,7 +511,7 @@ def main() -> int:
                                                                newline="\n")
     doc = {"receipt": "offline_gate", "round": "M8-R7F8F", "generated_offline": True,
            "identities": ident,
-           "gates": [dict(zip(("name", "verdict", "detail"), l.split("|", 2))) for l in OUT],
+           "gates": GATES,
            "summary": {"checks": len(OUT), "fail": len(FAILS), "failed_names": FAILS,
                        "overall": "FAIL" if FAILS else "ALL_GATES_PASS"},
            "not_claimed": {"polarity_measured": False, "core_protection_verified": False,

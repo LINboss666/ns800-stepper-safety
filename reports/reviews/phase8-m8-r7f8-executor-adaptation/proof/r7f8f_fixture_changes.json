@@ -99,7 +99,7 @@
       "family": "最终离线门(real plan/rows 整包 + 全首错 + 不变项)",
       "base_present": false,
       "base_count": 0,
-      "now_count": 32,
+      "now_count": 33,
       "added": [
         "BOARD_IMAGE_IDENTITY_STILL_23691E8D",
         "FIELD_FLAGS_STAY_FALSE",
@@ -107,6 +107,7 @@
         "FROZEN_OLD_EXECUTOR_UNCHANGED",
         "IMAGE_SHA_COMES_FROM_DISK_BYTES",
         "INPUTS_IN_PLACE",
+        "JSON_RECEIPT_SHAPE_ALIGNED",
         "META_DOUBLE_COUNT_COMES_BACK_GOES_RED",
         "META_MIRROR_DRIFT_NAMED",
         "META_MUTATION_ANCHOR_HIT",
@@ -137,7 +138,7 @@
       "removed": [],
       "kept": 0,
       "flipped": [],
-      "summary_line": "R7F8F_OFFLINE_GATE_SUMMARY|判据=39|FAIL=2|PLAN_POST_SPIN_CONTENT_FITS_CAP,PLAN_WORST_CASE_TAIL_FITS_SESSION"
+      "summary_line": "R7F8F_OFFLINE_GATE_SUMMARY|判据=40|FAIL=2|PLAN_POST_SPIN_CONTENT_FITS_CAP,PLAN_WORST_CASE_TAIL_FITS_SESSION"
     }
   },
   "problems": [],
