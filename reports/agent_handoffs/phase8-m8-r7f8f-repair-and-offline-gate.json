@@ -59,14 +59,14 @@
  },
  "derived_executor": {
   "path": "reports/reviews/phase8-m8-r7f8-executor-adaptation/tools/m8r3_serial_chain_r7f8.py",
-  "bytes": 312387,
-  "sha256": "093c8408a019b37898acb305fc91587fbb064f6a65ac154b0bac8f55dd4d334e",
-  "lines": 5480,
+  "bytes": 315233,
+  "sha256": "30c67a3e8dbe915214ca7e1f423cf3468594dba35772b4fa082b01b31893eef2",
+  "lines": 5525,
   "generator": "reports/reviews/phase8-m8-r7f8-executor-adaptation/tools/r7f8f_build_executor.py",
-  "edits": 70,
+  "edits": 73,
   "patch": {
-   "bytes": 92610,
-   "sha256": "058a75f153e52b15293f6d2ebafc5900d3f133f30db7970ebbe1e99fc2dd13e3",
+   "bytes": 96676,
+   "sha256": "ecbf6c37f7482e8dd55cc2fa697a694f59c946bb50b0671cad727094fa47678b",
    "path": "reports/reviews/phase8-m8-r7f8-executor-adaptation/patches/r7f8f_executor.patch"
   },
   "rebuild_verify": "VERIFY|PASS|仓外重建与仓库派生件逐字节相等（同输入两次一致）"
@@ -93,12 +93,12 @@
  "offline_verification": {
   "case_matrix": {
    "file": "proof/r7f8e_case_matrix.txt",
-   "predicates": 106,
+   "predicates": 113,
    "predicate_label": "判据",
    "per_case": [],
    "fail": 0,
    "failed_names": "none",
-   "last_line": "R7F8E_MATRIX_SUMMARY|判据=106|FAIL=0|none"
+   "last_line": "R7F8E_MATRIX_SUMMARY|判据=113|FAIL=0|none"
   },
   "stub_package": {
    "file": "proof/r7f8e_stub_package.txt",
@@ -155,9 +155,9 @@
   "families": {
    "proof/r7f8e_case_matrix.txt": {
     "base_count": 65,
-    "now_count": 106,
+    "now_count": 113,
     "kept": 65,
-    "added": 41,
+    "added": 48,
     "removed": 0,
     "verdict_flips": 0
    },
@@ -197,13 +197,13 @@
  },
  "field_package": {
   "plan": {
-   "bytes": 31712,
-   "sha256": "eef417ce31520a1c7edacbfc6210a1e5245aed62c019e45e9bfbe46139a2a92a",
+   "bytes": 33140,
+   "sha256": "e78519421149c9a09de0fea8c1cb381b6ac10fd9452959a1092b3a68c37b95a6",
    "path": "reports/reviews/phase8-m8-r7f8-executor-adaptation/field/plan_r7f8f_2369_real.json"
   },
   "rows": {
-   "bytes": 8168,
-   "sha256": "4022306df3ad5454666c2449519d667b812b516b6e30f941f314ab61fac5cbf2",
+   "bytes": 10060,
+   "sha256": "c64fdee847affe55ec9edc05e796d3befbc5731c30be7f96c6aa17b24ca23b70",
    "path": "reports/reviews/phase8-m8-r7f8-executor-adaptation/field/rows_r7f8f_real.json"
   },
   "steps": 38,
@@ -255,13 +255,13 @@
    "已按裁定二落地: 38 步逐条申报 step_total_seconds(含全部等待与余量), 由 step_window() 供执行器/计划门/镜像共同取值 => 不再每步叠 SLACK; 未申报的旧计划仍走 legacy。",
    "旧口径留档: 按「每步再叠 SLACK=3 s、stop 不解除运动计时」算, 起转前最坏合计 91.0 s、起转后申报内容 23.0 s —— 这两条就是上一版交 A 定口径的红, 现仅作为旧语义的对照数保留在本计划里。"
   ],
-  "approval": "本轮未取得现场批准，未开现场账，未发任何现场命令"
+  "approval": "F11 那次按操作者原话开过**一个**账并已用满 port_open=1；F19(本轮)未开新账、未发任何现场命令，四件身份已变 => 再一次真机需要一句新的真实原话"
  },
  "red_gates_remaining": [],
  "draft_sync": {
   "merged_file": "reports/reviews/phase8-m8-r7f8-closed-loop-draft/R7F8_DRAFT_MERGED.md",
-  "merged_bytes": 41144,
-  "merged_sha256": "db031f8aa5f3553c330d5633da237044f00068c600daf48e369ac917196fc5d9",
+  "merged_bytes": 41090,
+  "merged_sha256": "951c645ce6197980bc1a4aff0306c10be276721a0524a53766e785e7553d402f",
   "inherited_from": "reports/reviews/phase8-m8-r7f8-executor-adaptation/inputs/A_R7F8F_BUDGET_PKG/R7F8_LIVING_DRAFT.md",
   "inherited_from_identity": {
    "bytes": 38793,
@@ -271,9 +271,9 @@
   "inherit_equal": true,
   "inherit_scope": "本地磁盘字节逐字比对；远端 blob 的同一条见 tools/r7f8e_remote_readback.py 的回执",
   "previous_merged": {
-   "bytes": 40289,
-   "sha256_prefix": "bc3710e9917c",
-   "commit": "c9ad704",
+   "bytes": 41144,
+   "sha256_prefix": "db031f8aa5f3",
+   "commit": "fdfb511",
    "source": "从合并件自己的记录节正则读出（不再写死字面量）"
   },
   "agent_authored_part": "只有末尾那节「本次合并与修订记录」（含逐节差异计数表）；记录节之前的 304 行正文与 A 包活草案逐字相等",
@@ -284,7 +284,9 @@
  },
  "self_injuries_registered": {
   "count": 23,
-  "where": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/run_record.md §24.5（当场数出来的条目数）"
+  "where": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/run_record.md §24.5（当场数出来的条目数）",
+  "count_f19": 5,
+  "where_f19": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/run_record.md §26.5（F19 那五条：假判红被无回归族抓住、双引号截断、三引号嵌套、承接件改派生、判据族 L→FB 改名）"
  },
  "field_run_f11": {
   "receipt": "reports/reviews/phase8-m8-r7f8-executor-adaptation/proof/r7f8f_field_f11_receipt.txt",
@@ -347,12 +349,101 @@
    "/hardware_actions_this_round_note",
    "/mechanical_prerequisites/bench_continuity/declared_by",
    "/mechanical_prerequisites/bench_continuity/declared_verbatim",
+   "/stages/0/steps/0/expect_contains/1",
+   "/stages/0/steps/0/expect_values/0/must/fault",
+   "/stages/0/steps/0/expect_values/0/must/st",
+   "/stages/0/steps/0/expect_values/0/row",
+   "/stages/0/steps/0/expect_values/1/must/armed",
+   "/stages/0/steps/0/expect_values/1/must/cur",
+   "/stages/0/steps/0/expect_values/1/must/health",
+   "/stages/0/steps/0/expect_values/1/must/st",
+   "/stages/0/steps/0/expect_values/1/must/tgt",
+   "/stages/0/steps/0/expect_values/1/row",
+   "/stages/0/steps/0/status_lines_allow/0",
+   "/stages/0/steps/7/expect_contains/2",
+   "/stages/0/steps/7/expect_values/0/must/fault",
+   "/stages/0/steps/7/expect_values/0/must/st",
+   "/stages/0/steps/7/expect_values/0/row",
+   "/stages/0/steps/7/status_lines_allow/0",
    "/mechanical_prerequisites/bench_continuity/status",
    "/status"
   ],
   "token_verbatim": "执行 F11 整包实机验证",
   "approval_id": "M8-R7F8F-F11-20261105",
   "meaning": "真机跑过一次并在第 1 步首错停止: 唯一一次开口只写出一条只读查询 (捕获里仅此一条回显), 电机/arm/learn/apply 一条都没发 => 不是验收通过, 也不是板上危险状态; 根因与逐行板态见 run_record §25"
+ },
+ "package_fix_f19": {
+  "asked_by_operator": "两条处置: 修法=「补包侧申报(不动冻结源码)」; 离线盲区=「必做: 真字节回放三条」。产品树/固件/旧证据一字未动。",
+  "steps_declaring_allow": [
+   [
+    "sys_pre",
+    "system_status"
+   ],
+   [
+    "sys_after_apply",
+    "system_status"
+   ]
+  ],
+  "allow_patterns": [
+   "^\\[Motor\\] arm gate fail mask=0x[0-9A-Fa-f]+ \\(arm REFUSED\\)$",
+   "^\\[Motor\\] arm gate fail mask=0x[0-9A-Fa-f]+ \\(arm REFUSED\\)$"
+  ],
+  "product_grounding": "supervisor.c:126 在 system_status 里**无条件**打这一行; motor.h:92/93 定 bit3(0x8)/bit4(0x10); 现场前态实测 0x18 = 两位同置。mask=0 时该行不含 REFUSED, 不匹配豁免形状也不需要豁免。",
+  "rows_only_change": "SYS_READY_APPLIED(第 7 步切片): 补披露行 + 三处臆造值改回源码 token (irq_gate=CLOSED / polarity=not-confirmed / protect_ready=NO); 该行 mask=0x8 是**推导**(0x18 减去 apply 清零的 bit4), rows._about.derived_shape_rows 明写它不是实测。",
+  "runtime_gate": "STATUS_ALLOW_NOT_POSITIVELY_REQUIRED(派生件 recipe 第 71 项): 被放行的每一行必须含本步 expect_contains 的某个字面片段, 否则具名停。把 R7F8E 起写在注释里但从未核过的口径兑现成判据。",
+  "static_gate": "PLAN_STATUS_ALLOW 补第四条(recipe 第 72/73 项 + 新函数 status_allow_literal_prefix): 豁免模式的字面前缀必须被 expect_contains 命中 => 静态绿保证运行期那条门不会翻红(两边同一口径)。",
+  "real_bytes_replay": {
+   "FB1_真字节经生产读路径逐字节留证且披露行在流里": "PASS",
+   "FB2_正例_交付的 sys_pre 申报下真字节判 OK 且豁免行入台账": "PASS",
+   "FB3_反例_同一段真字节喂给动作步仍具名业务失败": "PASS",
+   "FB4_元负控_摘掉豁免同一份真字节必须翻红": "PASS",
+   "FB5_反例_豁免未被正面要求时运行期具名停止(fail-closed)": "PASS",
+   "FB6_静态门_交付计划 PASS 且豁免只在两条查询步": "PASS",
+   "FB7_静态门元负控_抽掉正面要求计划门必须翻红": "PASS"
+  },
+  "real_bytes_input": {
+   "path": "proof/r7f8f_field_f11_sys_pre.rx.bin",
+   "bytes": 983,
+   "sha256": "73abf3012386723ec2d5ec70e5b515bfb2cb3285d60c233a27b07e60d47408a7"
+  },
+  "identities_for_next_approval": {
+   "plan": {
+    "bytes": 33140,
+    "sha256": "e78519421149c9a09de0fea8c1cb381b6ac10fd9452959a1092b3a68c37b95a6",
+    "path": "reports/reviews/phase8-m8-r7f8-executor-adaptation/field/plan_r7f8f_2369_real.json"
+   },
+   "rows": {
+    "bytes": 10060,
+    "sha256": "c64fdee847affe55ec9edc05e796d3befbc5731c30be7f96c6aa17b24ca23b70",
+    "path": "reports/reviews/phase8-m8-r7f8-executor-adaptation/field/rows_r7f8f_real.json"
+   },
+   "executor": {
+    "bytes": 315233,
+    "sha256": "30c67a3e8dbe915214ca7e1f423cf3468594dba35772b4fa082b01b31893eef2",
+    "path": "reports/reviews/phase8-m8-r7f8-executor-adaptation/tools/m8r3_serial_chain_r7f8.py"
+   },
+   "image": {
+    "path": "reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/rt-thread-motor-m1-candidate.bin",
+    "bytes": 297452,
+    "sha256": "23691e8d8aa8c1d3ed6e6eff4b5c51fe27dd3a9169841406ecc627c0e807e963",
+    "axf": {
+     "path": "reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/rt-thread-motor-m1.axf",
+     "bytes": 1790048,
+     "sha256": "0f421595ac940863c4d38a2791f31bc8811fc3b8fa40062782f2ac7505c317f6"
+    },
+    "note": "参照身份: R7F7 已证在板的镜像(逐字节回读在 R7F7-F1/R7F8 轮已闭合)。"
+   }
+  },
+  "f20_dispatch_draft": {
+   "file": "reports/reviews/phase8-m8-r7f8-executor-adaptation/field/plan_r7f8f_2369_real_dispatch_f20_draft.json",
+   "bytes": 34898,
+   "sha256": "e59272b6fa8870a568a52715aa338487b10c4355c74ec7836badab62042a2d62",
+   "status": "FIELD_DISPATCH_DRAFT_NOT_APPROVED_NEW_PLAN_IDENTITY",
+   "token_verbatim": "NOT_ISSUED_等待操作者对新身份的真实原话",
+   "derived_by": "tools/r7f8f_make_dispatch_copy.py(只许 9 格差异, 写完扁平 diff 复算)",
+   "meaning": "**草案**: 本轮没有对新身份的第二句真实原话, 所以令牌位是 NOT_ISSUED; 机械前置那格沿用操作者 F11 会话里的事实声明并写明'未重新核对'。它不是批准件, 不许直接 dispatch。"
+  },
+  "f11_dispatch_copy_frozen": "F11 那份承接件按字节冻结不回改(见 field_run_f11), 与本轮交付计划已经**不再是同一身份**(差 9 格 + F19 那次 rows 修)。"
  },
  "device_actions_this_round": {
   "serial_port_open": 1,
@@ -395,7 +486,7 @@
   "motion_cap_or_total_window_widened": false,
   "step_list_reduced_for_green": false,
   "run_record_sections": {
-   "total_sections": 25,
+   "total_sections": 26,
    "section_24_occurrences": 1
   }
  },
@@ -414,7 +505,7 @@
  },
  "next_step_owners": {
   "A": "无需再定口径：两条静态红已按裁定落地并全绿。仅当真机跑出来必须改产品，或机械条件变了，才按裁定末段回报范围差异",
-  "operator": "一次现场批准的真实原话（对象 = R7F8F 及本预算裁定；未取得就不发任何现场命令）",
-  "me_after_approval": "接上机执行一次整包并交付原始字节与两级台账；本轮不做"
+  "operator": "F20 需要**一句新的真实原话**，对象 = 本轮四件新身份(见 package_fix_f19.identities_for_next_approval)；F11 那句只覆盖了已经用满的那一个账(port_open=1)，不借它开第二个账",
+  "me_after_approval": "按那句原话离线 --approval-init 新账(绑四件)，再一次 dispatch；本轮 0 设备动作，未开第二个账"
  }
 }

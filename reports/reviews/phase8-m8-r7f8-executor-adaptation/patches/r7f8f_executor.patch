@@ -21,7 +21,61 @@
  BOOT_CAP = 262144
  RESPONSE_CAP = 32768
  PROMPT_RE = re.compile(rb"(?:^|\r?\n|\r)msh\s*(?:>|/>)\s*\Z")
-@@ -512,31 +516,15 @@
+@@ -420,6 +424,32 @@
+     return pats
+ 
+ 
++def status_allow_literal_prefix(pat):
++    # 取模式串在第一个**真正通配**的结构之前的字面片段(去掉首尾锚点)。
++    # 给 PLAN_STATUS_ALLOW 用: 这段是"凡能被该模式 fullmatch 的行都必须以此开头"的确定前缀,
++    # 因此 expect_contains 里只要有它的子串, 运行期的正面要求门就一定成立。
++    # 反斜杠后面跟**字符类/断言**(d s w 与其大写、b B A Z)或反向引用才是通配; 跟在 \[ \] \(
++    # \) \. \* 以及**转义空格**后面的, 就是那个字符本身(冻结的 R7F7 计划整条模式都用反斜杠转义
++    # 空格, 把它当通配会把前缀截成 "[DIAG]" 而假判红)。
++    _CLS = "dDsSwWbBAZnrtfv0123456789"
++    s = pat[1:] if pat.startswith("^") else pat
++    out, i = [], 0
++    while i < len(s):
++        c = s[i]
++        if c == "\\" and i + 1 < len(s):
++            nxt = s[i + 1]
++            if nxt in _CLS:
++                break                               # 字符类/断言/反向引用: 不是字面
++            out.append(nxt)                         # 转义的字面字符(含转义空格)
++            i += 2
++            continue
++        if c in "$.*+?|{[(":
++            break
++        out.append(c)
++        i += 1
++    return "".join(out)
++
++
+ def assert_step(st, rows, asname, led, raw=None):
+     """把"响应完整"和"业务成功"分开判, 并把结论交给调度层。
+ 
+@@ -436,6 +466,20 @@
+     pats = status_lines_allow_patterns(st)
+     allow_hit = [r.strip() for r in rows
+                  if any(p.fullmatch(r.strip()) for p in pats)] if pats else []
++    # F11 现场补正(设备动作已发生那一次): 上面那句注释从 R7F8E 起就写着"必须同时被本步 expect
++    # 正面要求", 但**代码从来没核过** —— 于是写一条 status_lines_allow 实际等于"这步里凡是长得
++    # 像拒绝的行都免检"。计划侧那道门(validate-plan)要求锚定 + 硬字段, 运行期却没有对应强制,
++    # 两边口径不一致。这里把注释兑现成判据: 被放行的每一行都必须含本步 expect_contains 的某个
++    # 字面片段, 否则当场具名停止(fail-closed), 不做"看着像就放过"。
++    if allow_hit:
++        want = [e for e in st.get("expect_contains", []) if e]
++        loose = [l for l in allow_hit if not any(w in l for w in want)]
++        if loose:
++            led.ev("STATUS_ALLOW_NOT_POSITIVELY_REQUIRED",
++                   **{"as": asname, "lines": loose, "expect_contains": want})
++            raise Stop("STATUS_ALLOW_NOT_POSITIVELY_REQUIRED",
++                       "%s 用 status_lines_allow 放行了未被本步 expect_contains 正面要求的行: %s"
++                       % (asname, ";".join(loose)[:200]))
+     rest = [r for r in rows if r.strip() not in allow_hit]
+     # 业务层先判: 一条 FAILED/REFUSED/VOIDED 线是**业务结论**, 不能因为"这一步本来还想
+     # 看见别的字串"就先把它的具名结果盖掉(内容缺失与业务失败是两个不同层的问题)。
+@@ -512,31 +556,15 @@
              return {"verdict": "STOP", "code": "PROFILE_NOT_AT_REST", "bad": bad,
                      "fields": summ}
      elif st.get("expect_profile") == "RUNNING":
@@ -62,7 +116,7 @@
                      "fields": summ}
      # expect_flag_bits: 提交资格按**位**判, 不再把"字段字符串前后相同"当合法(审核 §2D 第 2 条)。
      # 0x0010 连 COMMITTED(bit0) 都没置, 却曾因为"两处都印 0010"被判成一致。
-@@ -888,15 +876,72 @@
+@@ -888,15 +916,72 @@
  
  
  # --------------------------------------------------------------------------- 起转硬截止
@@ -136,7 +190,7 @@
  
      @property
      def armed(self):
-@@ -906,16 +951,86 @@
+@@ -906,16 +991,86 @@
          if self.t0 is None:
              self.t0 = self.clock.monotonic()
  
@@ -230,7 +284,7 @@
  
      def remaining(self):
          if self.t0 is None:
-@@ -942,12 +1057,16 @@
+@@ -942,12 +1097,16 @@
          self.cap = float(cap_seconds) if cap_seconds else None
          self.t0 = None
          self.actual = None
@@ -247,7 +301,7 @@
          if self.cap is not None and self.t0 is None:
              self.t0 = self.clock.monotonic()
  
-@@ -966,6 +1085,179 @@
+@@ -966,6 +1125,179 @@
          if self.t0 is not None and self.actual is None:
              self.actual = self.clock.monotonic() - self.t0
          return self.actual
@@ -427,7 +481,7 @@
  
  
  class ApprovalLedger:
-@@ -1455,7 +1747,22 @@
+@@ -1455,7 +1787,22 @@
  SNAPSHOT_FAILED_ROW = "[MOT] snapshot failed"
  MOTION_OBLIGATION_CMDS = ("motor_arm", "motor_start")
  CLEANUP_CMDS = ("motor_stop", "motor_disarm", "motor_status")
@@ -451,7 +505,7 @@
  
  # 运动状态枚举与提交位都来自产品源码, 不是本轮自造的名字:
  #   motor.h:110-116  MOTOR_IDLE=0, ACCEL, CRUISE, DECEL, FAULT  (隐式递增)
-@@ -1598,6 +1905,140 @@
+@@ -1598,6 +1945,140 @@
      return summary, bad
  
  
@@ -592,7 +646,7 @@
  def _ev_or_defer(led, deferred, kind, **kw):
      """清理框架内的**记账写入**: 写不进去绝不许抛, 只把这份事件原样收进内存清单 `deferred`。
  
-@@ -1635,7 +2076,8 @@
+@@ -1635,7 +2116,8 @@
  
  
  def cleanup(port, led, clock, budget, transport, fixture, feed_hook=None,
@@ -602,7 +656,7 @@
      """义务建立后的唯一清理路径(M6 语义 + R3-B 分段窗): motor_stop -> motor_disarm -> motor_status。
      返回 (disarm_state, errors); 本函数**绝不**抛: 主错由调用方保留, 清理失败单独记账。
      三条命令各有自己的确认窗(总保留量分三段), 任何一条没回都**不减少**后面一条的发送机会 ——
-@@ -1652,7 +2094,29 @@
+@@ -1652,7 +2134,29 @@
      hard = budget.cleanup_deadline()
      out_dir = led.out
      status_rows = []
@@ -633,7 +687,7 @@
          dl = min(hard, clock.monotonic() + CLEANUP_WINDOW_SECONDS)
          if clock.monotonic() >= hard:
              errors.append("CLEANUP_HARD_DEADLINE_BEFORE_" + cmd)
-@@ -1700,12 +2164,68 @@
+@@ -1700,12 +2204,68 @@
          errors.extend(errs)
          if cmd == "motor_status":
              status_rows = rows
@@ -707,7 +761,7 @@
      # 三条必要撤能已经发完、禁能判据已经算完, 现在才回头尽力落证。失败也只是多一条披露:
      # **不**因为"日志写成功"而撤销已发送的事实, 也**不**因为写失败就把本场报成成功。
      _flush_deferred_ev(led, deferred_ev, errors)
-@@ -1909,7 +2429,13 @@
+@@ -1909,7 +2469,13 @@
              pass                        # 注入: 板子不回话 => 只能靠截止时间具名停止
          else:
              key = st.get("key") or cmd
@@ -722,7 +776,7 @@
              if seq:                     # 轮询用**申报过的**响应序列(如先 ACCEL 后 CRUISE), 越界取最后一份
                  resp = seq[min(attempt, len(seq)) - 1]
              else:
-@@ -2014,7 +2540,7 @@
+@@ -2014,7 +2580,7 @@
          raise Stop("JOB_BIND_TEXT_MISSING", str(txt_path))
  
  
@@ -731,7 +785,7 @@
      """E2: 把**这一步自己**的完整响应里唯一整行的 STARTED 绑成命名作业 ID。
      先过原字节门与步骤判据(调用点在 verdict OK 之后), 再发布绑定; 参数(n/lo/hi/dir)必须与
      计划里申报的一致 —— 否则"取消的是另一枚作业"这种错绑会在写之前被拒。"""
-@@ -2043,13 +2569,23 @@
+@@ -2043,13 +2609,23 @@
      if bad:
          raise Stop("JOB_PARAMS_MISMATCH",
                     "as=%s name=%s 受理参数与计划申报不符 %s" % (asname, name, bad))
@@ -756,7 +810,7 @@
             rx_sha256=sha_of(raw), row=bindings[name]["row"])
  
  
-@@ -2140,6 +2676,166 @@
+@@ -2140,6 +2716,166 @@
                 "as=%s 取消响应里没有可判定的受理/未捕获行(REFUSED 线在业务层已先停)" % asname)
  
  
@@ -923,7 +977,7 @@
  def poll_command_step(port, cmd, st, asname, idx, out, step_dl, transport, fixture, silent,
                        led, clock, budget, results, bindings=None):
      """起转后的**有限轮询**(审核 §2D 第 3 条): 一条立即查询或 tgt>0 都不算稳定巡航。
-@@ -2162,6 +2858,10 @@
+@@ -2162,6 +2898,10 @@
          results.append(dict({"as": asname, "kind": "command_poll", "cmd": cmd, "attempt": n,
                               "poll_gate": gate,
                               "rx_bytes": nbytes, "rx_sha256": sha_of(raw), "txt": txt}, **v))
@@ -934,7 +988,7 @@
          if v["verdict"] == "OK":
              check_job_expect(st, txt, bindings, asname)
              led.ev("POLL_OK", **{"as": asname, "attempts": n, "poll_gate": gate,
-@@ -2188,8 +2888,10 @@
+@@ -2188,8 +2928,10 @@
                  {"as": asname, "attempts": n, "max_attempts": int(max_attempts),
                   "last": v.get("code"), "state": state, "poll_gate": gate},
                  ensure_ascii=False))
@@ -947,7 +1001,7 @@
              raise Stop("POLL_WINDOW_EXPIRED", json.dumps(
                  {"as": asname, "attempts": n, "last": v.get("code"), "state": state,
                   "poll_gate": gate, "in_progress_states": list(in_states or []),
-@@ -2200,10 +2902,33 @@
+@@ -2200,10 +2942,33 @@
          clock.sleep(interval)
  
  
@@ -982,7 +1036,7 @@
      """一个会话 = 一个端口 = 一个写者。
  
      与 R1 交付版的三处实质差别:
-@@ -2245,6 +2970,9 @@
+@@ -2245,6 +3010,9 @@
      obligation = False
      cleanup_overruns = []
      reservations = []
@@ -992,7 +1046,7 @@
      used = used_box if used_box is not None else {}
      # 这本账在开口之前就要能用: "试了但没开成"也必须留痕, 所以 spend 定义在 try 之前。
      quota = quota_box if quota_box is not None else (dict(plan["quota"]) if plan else {})
-@@ -2284,14 +3012,48 @@
+@@ -2284,14 +3052,48 @@
          led.ev("QUOTA_CONSUMED", name=name, n=n, left=quota[name])
          return None
  
@@ -1043,7 +1097,7 @@
          spend("port_open", 1)               # 先记账再尝试开口(尝试数 == 扣减数)
          if transport == "stub":
              script = [l.encode("utf-8") + b"\r\n" for l in fixture.get("boot_bytes", [])]
-@@ -2360,6 +3122,10 @@
+@@ -2360,6 +3162,10 @@
                  if r["verdict"] != "OK":
                      raise Stop(r["code"], r.get("detail", ""))
                  continue
@@ -1054,7 +1108,7 @@
              # ---- R6A §4: 命令 -> 额度键的交叉核对, 缺声明/错键/n 不符都在这条 write 之前拒 ----
              need_key = quota_key_for_command(cmd)
              declared = st.get("quota")
-@@ -2379,19 +3145,46 @@
+@@ -2379,19 +3185,46 @@
                  raise Stop("QUOTA_STEP_UNDECLARED",
                             "as=%s cmd=%s 会改变设备/持久状态, 必须申报额度键 %s(n=1) 才允许发送"
                             % (asname, cmd, need_key))
@@ -1108,7 +1162,7 @@
              if budget.armed and step_dl <= clock.monotonic():
                  raise Stop("MOTION_BUDGET_EXHAUSTED", "as=%s want=%ds" % (asname, want))
              if cmd == "__watch__":
-@@ -2450,16 +3243,15 @@
+@@ -2450,16 +3283,15 @@
                  # 义务与截止起点都在**写之前**: 写异常/短写/应答丢失都照样走撤能清理
                  obligation = True
                  if cmd == "motor_start":
@@ -1133,7 +1187,7 @@
                  led.ev("OBLIGATION_SET", cmd=cmd, t_s=round(clock.monotonic() - led.t0, 3),
                         cap_seconds=budget.cap)
              if st.get("poll"):
-@@ -2467,6 +3259,9 @@
+@@ -2467,6 +3299,9 @@
                  _polled, polled_txt = poll_command_step(
                      port, cmd, st, asname, idx, out, step_dl, transport, fixture,
                      silent, led, clock, budget, results, bindings)
@@ -1143,7 +1197,7 @@
                  continue
              v, nbytes, txt = command_attempt(port, cmd, st, asname, raw, step_dl, transport,
                                               fixture, silent, led, clock)
-@@ -2490,11 +3285,34 @@
+@@ -2490,11 +3325,34 @@
              if v["verdict"] != "OK":
                  raise Stop(v["code"], json.dumps(v, ensure_ascii=False))
              # 到这里这条命令是**判据通过**的: 才允许绑定 ID、核对同作业断言, 也才允许认定撤能成立。
@@ -1181,7 +1235,7 @@
          if ret is None:
              led.ev("SESSION_OK", session=session_id, steps=len(results))
              ret = {"status": "OK", "code": ""}
-@@ -2507,13 +3325,19 @@
+@@ -2507,13 +3365,19 @@
          ret = {"status": "STOP", "code": primary.code, "detail": primary.detail}
          led.ev("SESSION_STOP", code=primary.code, detail=primary.detail)
      finally:
@@ -1203,7 +1257,7 @@
                  errors.extend(cerr)          # 清理错独立留账: 主错在 ret, 不能被吞成空成功
              except Exception as e:
                  # 清理框架自己炸了: 禁能一律 UNKNOWN(不猜"应该已经撤了"), 但端口仍要关
-@@ -2579,6 +3403,13 @@
+@@ -2579,6 +3443,13 @@
                  "obligation": obligated, "success": success,
                  "cleanup_errors": errors, "cleanup_overruns": cleanup_overruns,
                  "budget_seconds": elapsed,
@@ -1217,7 +1271,7 @@
                  "energize_cap_seconds": energize.cap,
                  "energize_seconds_actual": energize.close(),
                  "job_bindings": {k: v["job_id"] for k, v in bindings.items()},
-@@ -3147,6 +3978,187 @@
+@@ -3147,6 +4018,187 @@
                 ("PASS" if ok_t else "FAIL", caps, sum(c for _, c in caps), total, starts))
      if not ok_t:
          bad += 1
@@ -1405,21 +1459,33 @@
      # ① 镜像身份: S0/下载/回读三处必须同源(离线就拒绝, 不等现场 READBACK_HASH_MISMATCH)
      ib = identity_consistency(plan)
      out.append("PLAN_IMAGE_IDENTITY_CONSISTENCY|all|%s|%s" %
-@@ -3562,6 +4574,13 @@
+@@ -3287,6 +4339,11 @@
+                 elif not st.get("expect_values"):
+                     sa_bad.append("%s/%s:豁免步骤没有 expect_values 硬字段判据"
+                                   % (stg["id"], st.get("as")))
++                elif not any(w and w in status_allow_literal_prefix(p)
++                             for w in (st.get("expect_contains") or [])):
++                    sa_bad.append("%s/%s:豁免行的字面前缀 %r 没被本步 expect_contains 正面要求"
++                                  " => 运行期会具名停 STATUS_ALLOW_NOT_POSITIVELY_REQUIRED"
++                                  % (stg["id"], st.get("as"), status_allow_literal_prefix(p)))
+                 else:
+                     sa_seen.append("%s:%s" % (stg["id"], st.get("as")))
+     # 字节损坏口子的唯一形状: 坏响应不作数 + 同会话更靠后的干净步骤**正面**给出同一事实(离线核形状)。
+@@ -3561,6 +4618,13 @@
+     # 自己发的, 不是阶段步骤 —— 少一份响应就会变成"清理查不到东西"的假 NO_RESPONSE。
      for cmd in CLEANUP_CMDS:
          if cmd not in responses:
-             responses[cmd] = rows_for(table, cmd, profile)
++            responses[cmd] = rows_for(table, cmd, profile)
 +    # F6c: F5b 的 IRQ 尾部两条和上面三条一样是**执行器自己发的**, 不是阶段步骤。修前这里只给
 +    # CLEANUP_CMDS 兜底, 于是整包 stub 里 safety_irq_disable/safety_irq_status 永远无行可喂 =>
 +    # 本轮最想要的那条"整包跑到 IRQ 尾部并且确认 CLOSED"在离线**判不了**(只能在矩阵里手搓夹具)。
 +    # 只在行表确实带了这个键时才注入: 历史包的行表没有这两个键, 它们的字节行为一丁点都不变。
 +    for cmd in IRQ_TAIL_CMDS:
 +        if cmd not in responses and cmd in (table.get("commands") or {}):
-+            responses[cmd] = rows_for(table, cmd, profile)
+             responses[cmd] = rows_for(table, cmd, profile)
      return {"boot_bytes": list(stage.get("boot_bytes", [])), "responses": responses,
              "sequence": sequence, "block": block,
-             "post_reset_boot": list(stage.get("post_reset_boot", [])),
-@@ -4051,6 +5070,7 @@
+@@ -4051,6 +5115,7 @@
                                     backend=backend,
                                     motion_cap_seconds=cap,
                                     energize_cap_seconds=stg.get("arm_energize_deadline_seconds"),
@@ -1427,7 +1493,7 @@
                                     plan=plan, quota_box=quota_box, used_box=used_box,
                                     context=recorded, approval=approval, approved=approved_pkg)
                  if transport == "real":
-@@ -4135,7 +5155,16 @@
+@@ -4135,7 +5200,16 @@
                               "recorded": dict(recorded),
                               "success": res["success"], "disarm": res["disarm"],
                               "terminal": res["terminal"],
@@ -1444,7 +1510,7 @@
                               "expected_refusal": res.get("expected_refusal"),
                               "forensics": res.get("forensics"),
                               "first_cause": res.get("first_cause"),
-@@ -4236,6 +5265,9 @@
+@@ -4236,6 +5310,9 @@
      ap.add_argument("--motion-cap-seconds", type=int, default=0)
      ap.add_argument("--arm-energize-deadline-seconds", type=int, default=0,
                      help="E4: motor_arm 之后的通电保持截止(单会话工装入口; 整包按阶段申报)")
@@ -1454,7 +1520,7 @@
      ap.add_argument("--plan", help="计划 JSON: 提供后额度在发送前真实扣减(quota)")
      ap.add_argument("--approval-token")
      ap.add_argument("--expected-token")
-@@ -4431,6 +5463,7 @@
+@@ -4431,6 +5508,7 @@
                             a.total_deadline_seconds, clock, backend=backend,
                             motion_cap_seconds=a.motion_cap_seconds or None,
                             energize_cap_seconds=a.arm_energize_deadline_seconds or None,

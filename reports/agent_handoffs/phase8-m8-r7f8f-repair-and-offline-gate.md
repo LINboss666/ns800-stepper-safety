@@ -22,18 +22,21 @@
 
 | 件 | 身份 | 作用 |
 | --- | --- | --- |
-| `tools/m8r3_serial_chain_r7f8.py` | 312387 B / `093c8408a019…` / 5480 行 | 派生执行器（F1~F6 + F12 + 裁定一/二） |
-| `tools/r7f8f_build_executor.py` | 70 处逐字锚点替换；`--verify` 仓外重建逐字节相等 | 派生件可由冻结旧件 `33d3f0af…` 原字节复算 |
-| `patches/r7f8f_executor.patch` | 92610 B / `058a75f153e5…` | 与旧版的明确差异原件 |
-| `proof/r7f8e_case_matrix.txt` | **106 / FAIL=0** | §4 全组 + 五族反向 + 元负控 + 裁定 §5 的 K1~K8 进程内探针 |
+| `tools/m8r3_serial_chain_r7f8.py` | 315233 B / `30c67a3e8dbe…` / 5525 行 | 派生执行器（F1~F6 + F12 + 裁定一/二 + F19 的 G4/G5 两项豁免门） |
+| `tools/r7f8f_build_executor.py` | 73 处逐字锚点替换；`--verify` 仓外重建逐字节相等 | 派生件可由冻结旧件 `33d3f0af…` 原字节复算 |
+| `patches/r7f8f_executor.patch` | 96676 B / `ecbf6c37f748…` | 与旧版的明确差异原件 |
+| `proof/r7f8e_case_matrix.txt` | **113 / FAIL=0** | §4 全组 + 五族反向 + 元负控 + 裁定 §5 的 K1~K8 进程内探针 + **F19 的 FB1~FB7 真字节回放** |
 | `proof/r7f8e_stub_package.txt` | 29 / FAIL=0 | STUB_ONLY 整包与等价负例（含两条掩码判据） |
 | `proof/r7f8e_no_regression.txt` | 9 / FAIL=0 | 冻结 R7F7 定稿计划新旧逐行对照；旧判据一条未洗 |
 | `proof/r7f8f_probe_replay.txt` | 21 件 × 3 侧 / FAIL=0 | 同一输入喂修后 / F5b 修前 / F5c 修前 |
 | `proof/r7f8f_offline_gate.txt` + `proof/offline_gate.json` | **47 / FAIL=0** | 整包离线门；json 与文本条数同源、判定值只会是 PASS/FAIL、红条数与红名单一致 |
 | `proof/r7f8f_budget_package.txt\|.json` | 11 / FAIL=0 | A 裁定包 9 件复算 + A 的 `budget_check.py` 在本机真跑对账 + 三条等价突变负控 + 基准件按 `6f2b12f` blob 核 |
 | `proof/r7f8f_fixture_changes.md\|.json` | 族=5 / problems=0 | 基线 `42d7f7d` 判据名逐条对齐：removed=0，新增逐条带人写理由 |
-| `field/plan_r7f8f_2369_real.json` | 31712 B / `eef417ce3152…` | 最终现场计划（38 步、逐步 `step_total_seconds`、三段镜像、`normal_stop_send_by_seconds: 8`） |
-| `field/rows_r7f8f_real.json` | 8168 B / `4022306df3ad…` | 现场行表（停机位改成产品真实的"已零速但仍带电"形状 `motor_status_armed_idle`） |
+| `field/plan_r7f8f_2369_real.json` | 33140 B / `e78519421149…` | 最终现场计划（38 步、逐步 `step_total_seconds`、三段镜像、`normal_stop_send_by_seconds: 8`；F19 起两条 `system_status` 查询步带**整行锚定**的披露申报） |
+| `field/rows_r7f8f_real.json` | 10060 B / `c64fdee847af…` | 现场行表（前态 19 行 = 2026-11-05 F11 **实拍字节**；第 7 步切片按源码 token 校正并补披露行） |
+| `field/plan_r7f8f_2369_real_dispatch.json` | 32832 B / `53c744213964…` | F11 那一次真实 dispatch 的承接件：**按字节冻结不回改**（其计划身份已不等于本轮交付件） |
+| `field/plan_r7f8f_2369_real_dispatch_f20_draft.json` | 34898 B / `e59272b6fa88…` | 下一次(F20)承接件的**草案**：由 `tools/r7f8f_make_dispatch_copy.py` 派生，令牌位 `NOT_ISSUED`，未批准 |
+| `tools/r7f8f_make_field_evidence.py`、`tools/r7f8f_make_dispatch_copy.py` | — | F11 证据判读 / 承接件派生（9 格白名单 + 扁平 diff 复算 + 无令牌即草案） |
 | `tools/r7f8f_offline_gate.py`、`r7f8f_make_real_package.py`、`r7f8f_probe_replay.py`、`r7f8f_fixture_change_table.py`、`r7f8f_budget_package_checks.py`、`r7f8f_make_handoff.py`、`r7f8e_merge_draft.py` | — | 本轮工具（回执与交接的数字都从盘上算） |
 
 冻结未动：产品树 `32470c7ed44e…`（= 已签收 `00718b49…`）、旧执行器 `33d3f0af…` 219491 B、
@@ -41,10 +44,13 @@ A 任务包 13 件、A 裁定包 10 件（含其 `SHA256SUMS.txt`，清单不列
 裁定前基准件 `reference_plan_6f2b12f.json` 28090 B / `66ca8a15…`（重跑仍红，见 §3）、
 草案原件 `A_DRAFT_ORIGINAL.md` 24780 B / `b572c1928f60…`、
 在板镜像 `23691e8d…` 297452 B（只作身份引用，未回读）。
-草案合并件 `R7F8_DRAFT_MERGED.md` → **41144 B / `db031f8aa5f3…`**，正文 304 行逐字承接
+草案合并件 `R7F8_DRAFT_MERGED.md` → **41090 B / `951c645ce619…`**，正文 304 行逐字承接
 `inputs/A_R7F8F_BUDGET_PKG/R7F8_LIVING_DRAFT.md`（38793 B / `14bafe13a8cd…`，本地字节相等；
-远端逐 blob 的同一条在回读回执里）；上一版合并件 40289 B / `bc3710e9917c…`（提交 `c9ad704`）不回改。
-`run_record.md` 追加到 **§25**（§25 = F11 真机那一次的完整判读），§24.5 当场数出 **23** 条本轮自伤。
+远端逐 blob 的同一条在回读回执里）；上一版合并件 41144 B / `db031f8aa5f3…`（= HEAD `fdfb511` 的
+blob；合并工具现在**自己取 HEAD blob**，不再手写上一版身份）不回改，本轮内那份未提交的重合并
+(40732 B / `08f3c4d64b44…`) 作为留痕写在记录节里。
+`run_record.md` 追加到 **§26**（§25 = F11 真机那一次的完整判读，§26 = F19 修包与真字节回放），
+自伤登记 §24.5 **23** 条 + §26.5 **5** 条。
 新证据件由 `tools/r7f8f_make_field_evidence.py` 从落盘字节复算（11 条 FAIL=0）：
 `proof/r7f8f_field_f11_sys_pre.rx.bin`（983 B 板子原始字节）+ `…rx.txt` + 两份台账（仓外路径掩成
 `<WORK>`）+ `…receipt.txt|.json`。
@@ -125,11 +131,46 @@ stop 发送尝试排在起转后 7.5 s ≤ 申报的 8 s，可信零速在 9.0 s
 
 ## 7. 下一步归属
 
-- **A / 操作者**：§7bis 末的两条出路选一条（补申报 = 只动我这边的包；改产品措辞 = 动冻结源码）。
-  另外，那 90 s/12 s/18 s/7 s 与 38 步的算术**尚未被现场验证过**——第 1 步就停了，
-  一次业务写入都没发生，所以裁定 §3 那张表现在只是"窗口分配合同"，没有任何一段被实拍证明。
-- **操作者（若选补申报这条路）**：包身份会变（计划/行表两件），需要**再一次**真实原话批准才能
-  第二次开口；本次账本里 `port_open` 已花完，我不开第二本账、不借这次批准。
-- **我（下一步，离线）**：把"板子真字节回放 `assert_step`"补成判据（正反各一条 + 元负控），
-  并按选定的那条出路把包修好、四族判据与整包门重跑、清单/预检/提交/推送/逐 blob 回读。
+- **已定（2026-11-05 深夜，操作者选路）**：§7bis 的两条出路选**①补包侧申报**（不动冻结源码），
+  并要求"必做：真字节回放三条"补上离线盲区。落地见 §8。出路②（改产品措辞）未采纳，产品一字未动。
+- **操作者（第二次开口前）**：F20 需要**一句新的真实原话**，对象 = §8 末那四件新身份
+  （plan `e7851942…` / rows `c64fdee8…` / executor `30c67a3e…` / 镜像 `23691e8d…`）。
+  F11 那个账的 `port_open` 已用满；我不开第二本账、不借那次批准、不自己造令牌。
+- **A**：无需再定口径。仅当 F20 跑出来必须改产品、或机械条件变了，才按裁定末段回报范围差异。
+  另外那 90 s/12 s/18 s/7 s 与 38 步的算术**仍未被现场验证**——F11 在第 1 步就停，一次业务写入都没发生，
+  裁定 §3 那张表现在只是"窗口分配合同"。
 - **我（不做）**：不改产品源码、不构建固件、不重试、不第二次开口；设备保持通电。
+
+## 8. F19：修包侧披露申报 + 真字节回放（操作者两条处置的落地，仍 0 设备动作）
+
+- **包侧申报**：只有 `sys_pre` / `sys_after_apply` 两条 `system_status` 查询步带
+  `status_lines_allow = ["^\\[Motor\\] arm gate fail mask=0x[0-9A-Fa-f]+ \\(arm REFUSED\\)$"]`，
+  并把 `[Motor] arm gate fail mask=` 写进该步 `expect_contains`；`sys_pre` 另加 `[Motor] state=… armed=0
+  health=OK` 硬字段判据。依据是冻结源码（`supervisor.c:126` 无条件打这一行；`motor.h:92/93` 定 bit3/bit4；
+  现场前态实测 0x18 = 两位同置；mask=0 时该行不含 REFUSED，因此不匹配豁免、也不需要豁免）。
+- **行表**：前态 19 行改成 F11 实拍字节（去掉回显与提示符，工具拒绝凭记忆重造）；第 7 步切片补披露行并把
+  三处臆造 token 改回源码事实（`irq_gate=CLOSED`、`polarity=not-confirmed`、`protect_ready=NO`
+  —— safety_thread.c:315 要 irq_attached 且 polarity_validated，而第 10/11 步都在第 7 步之后）。
+  该行 `mask=0x8` 是**推导**（0x18 减去 apply 成功后清零的 bit4），`_about.derived_shape_rows` 明写不是实测。
+- **两道门同一口径**：运行期新增 `STATUS_ALLOW_NOT_POSITIVELY_REQUIRED`（被放行的每一行必须含本步
+  `expect_contains` 的某字面片段，兑现 R7F8E 起写在注释里却没核过的那句话）；静态 `PLAN_STATUS_ALLOW`
+  补第四条（豁免模式的字面前缀必须被 `expect_contains` 命中 ⇒ 静态绿保证运行期那条门不翻红）。
+  新函数 `status_allow_literal_prefix`；配方 73 项，`--verify` 仓外重建逐字节相等。
+- **FB1~FB7 真字节回放**（输入 = 板子发的 983 B，经生产读路径 `read_until_prompt`，不再是我写的行）：
+  FB1 落盘逐字节相等 + 披露行在流；FB2 正例 verdict=OK 且台账逐字记录被豁免行；
+  **FB3 反例**同一段字节喂 `motor_arm`（未申报）仍 `BUSINESS_FAILED`（豁免按步，不是一局通用）；
+  **FB4 元负控**摘掉豁免 → 同一份字节翻红（证明申报承重）；FB5 删正面要求保留豁免 → 运行器具名停止；
+  FB6 静态绿且 38 步里只有那两条查询步申报；FB7 只删正面要求 → 静态门翻红并写字面前缀。
+- **重跑后的数**：矩阵 113/0 · stub 29/0 · 无回归 9/0 · 整包离线门 47/0 · A 包复算 11/0 ·
+  三版本重放 21/0 · 夹具表族=5 problems=0 · validate-plan 146 项 0 红（交付件与 F20 草案件各一次）。
+- **两处我自己造的坑**（详见 `run_record.md` §26.5）：① 字面前缀函数把"反斜杠+空格"当通配，
+  把冻结的 R7F7 计划假判红（无回归 9/4、离线门 47/8）—— 是**无回归族**抓的，不是我重读代码；
+  ② 新判据族起名 `L1_`~`L7_` 与既有清理族 `L1_`~`L4_` 撞号，由我在交接工具里加的计数拒绝门抓住，
+  已全部改名 `FB1_`~`FB7_`。
+- **承接件改为派生**：新工具 `tools/r7f8f_make_dispatch_copy.py` 只允许那 9 格差异，写完立刻扁平 diff
+  复算，多一格/少一格都 `REFUSED|`；不给 `--token/--approval-id` 就只出草案（本轮就是草案，
+  `status=FIELD_DISPATCH_DRAFT_NOT_APPROVED_NEW_PLAN_IDENTITY`，令牌位 `NOT_ISSUED`）。
+  F11 那份承接件按字节冻结不回改，与本轮交付计划已不是同一身份（差 9 格 + F19 的 rows 修）。
+- **合并工具的基准不再手写**：`r7f8e_merge_draft.py` 的"上一版合并件身份"改成**自取 HEAD 的 blob**
+  （`fdfb511` 里那份 41144 B/`db031f8aa5f3…`），本轮内未提交的重合并（40732 B/`08f3c4d64b44…`）
+  作为留痕写在记录节里；交接工具里那条"数不到就拒"的正则同步跟了新格式。

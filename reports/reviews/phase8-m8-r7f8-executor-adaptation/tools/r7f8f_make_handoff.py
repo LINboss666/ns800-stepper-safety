@@ -100,6 +100,26 @@ def main() -> int:
               % (LIVING, inherit_lines, len(src_body)))
         return 1
 
+    # ---- F19: 真字节回放 L 族 + F20 草案 + §26.5 自伤数, 全部从盘上取, 取不到就拒 ----
+    mx = (repo / ROUND / "proof/r7f8e_case_matrix.txt").read_text(encoding="utf-8").splitlines()
+    l_gates = {}
+    for line in mx:
+        if re.match(r"^FB\d_[^|]*\|", line):
+            parts = line.split("|")
+            l_gates[parts[0]] = parts[1] if len(parts) > 1 else "NO_VERDICT"
+    if len(l_gates) != 7:
+        print("HANDOFF_REFUSE|矩阵回执里 L 族判据数=%d(应为 7: 正例/反例/元负控/静态两侧)"
+              % len(l_gates))
+        return 1
+    f20p = repo / ROUND / "field/plan_r7f8f_2369_real_dispatch_f20_draft.json"
+    f20 = json.loads(f20p.read_text(encoding="utf-8")) if f20p.is_file() else None
+    if f20 and f20["approval"]["token_verbatim"].startswith("NOT_ISSUED") is False:
+        print("HANDOFF_REFUSE|F20 草案里出现了令牌, 但本轮没有对新身份的真实原话 => 要么文件名错, "
+              "要么有人在交接工具里造批准")
+        return 1
+    m265 = re.search(r"(?m)^### 26\.5 .*?(?=^### |^## )", rr, re.M | re.S)
+    injuries_265 = len(re.findall(r"(?m)^\d+\. ", m265.group(0))) if m265 else 0
+
     # 整包 stub 那条判据的名字要能在回执里找到; 找不到就拒(改名不许静默降级成 False)
     whole_gate = [g for g in gate_json["gates"]
                   if g["name"] == "STUB_NORMAL_DISPATCH_SUCCEEDS"]
@@ -112,7 +132,7 @@ def main() -> int:
                                  .read_text(encoding="utf-8"))
     # 上一版合并件的身份**从合并件自己的记录节读**, 不再写死字面量(写死过一次, 结果裁定落地后
     # 交接里那两格停在 R7F8E 的值)。读不到就拒产。
-    pm = re.search(r"上一版合并件: (\d+) B, sha256 前缀 `([0-9a-f]{12})`（提交 `([0-9a-f]{7})`）",
+    pm = re.search(r"上一版合并件: (\d+) B, sha256 前缀 `([0-9a-f]{12})`（提交 `([0-9a-f]{7})`[^）]*）",
                    (repo / MERGED).read_text(encoding="utf-8"))
     if not pm:
         print("HANDOFF_REFUSE|合并件记录节里读不到上一版身份(格式变了 => 不许把旧字面量抄进交接)")
@@ -278,7 +298,8 @@ def main() -> int:
             "normal_stop_send_by_seconds":
                 plan["stages"][0].get("normal_stop_send_by_seconds"),
             "static_budget_items_after_ruling": plan.get("static_budget_open_items"),
-            "approval": "本轮未取得现场批准，未开现场账，未发任何现场命令"},
+            "approval": "F11 那次按操作者原话开过**一个**账并已用满 port_open=1；F19(本轮)未开新账、"
+                        "未发任何现场命令，四件身份已变 => 再一次真机需要一句新的真实原话"},
         "red_gates_remaining": [g for g in gate_json["gates"] if g["verdict"] == "FAIL"],
         "draft_sync": {
             "merged_file": MERGED, **({"merged_" + k: v for k, v in
@@ -295,7 +316,11 @@ def main() -> int:
                                    "记录节之前的 304 行正文与 A 包活草案逐字相等",
             "original_untouched": ident(repo / ORIG)},
         "self_injuries_registered": {"count": injuries,
-                                     "where": RUN_RECORD + " §24.5（当场数出来的条目数）"},
+                                    "where": RUN_RECORD + " §24.5（当场数出来的条目数）",
+                                    "count_f19": injuries_265,
+                                    "where_f19": RUN_RECORD + " §26.5（F19 那五条：假判红被无回归族"
+                                                             "抓住、双引号截断、三引号嵌套、承接件改派生、"
+                                                             "判据族 L→FB 改名）"},
         "field_run_f11": ({
             "receipt": ROUND + "/proof/r7f8f_field_f11_receipt.txt",
             "receipt_gates": field["summary"],
@@ -312,6 +337,48 @@ def main() -> int:
                        "(捕获里仅此一条回显), 电机/arm/learn/apply 一条都没发 => 不是验收通过, "
                        "也不是板上危险状态; 根因与逐行板态见 run_record §25"
         } if field else {"absent": "现场回执不在盘上 => 本轮尚未做过真实会话"}),
+        "package_fix_f19": ({
+            "asked_by_operator": "两条处置: 修法=「补包侧申报(不动冻结源码)」; 离线盲区=「必做: "
+                                 "真字节回放三条」。产品树/固件/旧证据一字未动。",
+            "steps_declaring_allow": [(s.get("as"), (s.get("cmd") or "").split(" ")[0])
+                                      for stg in plan.get("stages", [])
+                                      for s in (stg.get("steps") or [])
+                                      if s.get("status_lines_allow")],
+            "allow_patterns": [p for stg in plan.get("stages", [])
+                               for s in (stg.get("steps") or [])
+                               for p in (s.get("status_lines_allow") or [])],
+            "product_grounding": "supervisor.c:126 在 system_status 里**无条件**打这一行; "
+                                 "motor.h:92/93 定 bit3(0x8)/bit4(0x10); 现场前态实测 0x18 = 两位同置。"
+                                 "mask=0 时该行不含 REFUSED, 不匹配豁免形状也不需要豁免。",
+            "rows_only_change": "SYS_READY_APPLIED(第 7 步切片): 补披露行 + 三处臆造值改回源码 token "
+                                "(irq_gate=CLOSED / polarity=not-confirmed / protect_ready=NO); "
+                                "该行 mask=0x8 是**推导**(0x18 减去 apply 清零的 bit4), "
+                                "rows._about.derived_shape_rows 明写它不是实测。",
+            "runtime_gate": "STATUS_ALLOW_NOT_POSITIVELY_REQUIRED(派生件 recipe 第 71 项): "
+                            "被放行的每一行必须含本步 expect_contains 的某个字面片段, 否则具名停。"
+                            "把 R7F8E 起写在注释里但从未核过的口径兑现成判据。",
+            "static_gate": "PLAN_STATUS_ALLOW 补第四条(recipe 第 72/73 项 + 新函数 "
+                           "status_allow_literal_prefix): 豁免模式的字面前缀必须被 expect_contains 命中 "
+                           "=> 静态绿保证运行期那条门不会翻红(两边同一口径)。",
+            "real_bytes_replay": l_gates,
+            "real_bytes_input": (field or {}).get("raw_capture"),
+            "identities_for_next_approval": {
+                "plan": dict(ident(repo / PLAN), path=PLAN),
+                "rows": dict(ident(repo / ROWS), path=ROWS),
+                "executor": dict(ident(repo / EXE), path=EXE),
+                "image": plan["identity_binding"]["image"]},
+            "f20_dispatch_draft": ({
+                "file": ROUND + "/field/plan_r7f8f_2369_real_dispatch_f20_draft.json",
+                **ident(repo / (ROUND + "/field/plan_r7f8f_2369_real_dispatch_f20_draft.json")),
+                "status": f20["status"],
+                "token_verbatim": f20["approval"]["token_verbatim"],
+                "derived_by": "tools/r7f8f_make_dispatch_copy.py(只许 9 格差异, 写完扁平 diff 复算)",
+                "meaning": "**草案**: 本轮没有对新身份的第二句真实原话, 所以令牌位是 NOT_ISSUED; "
+                           "机械前置那格沿用操作者 F11 会话里的事实声明并写明'未重新核对'。"
+                           "它不是批准件, 不许直接 dispatch。"}) if f20 else {"absent": "未产出 F20 草案"},
+            "f11_dispatch_copy_frozen": "F11 那份承接件按字节冻结不回改(见 field_run_f11), "
+                                        "与本轮交付计划已经**不再是同一身份**(差 9 格 + F19 那次 rows 修)。",
+        }),
         "device_actions_this_round": {
             "serial_port_open": (field["quota_spent"].get("port_open", 0) if field else 0),
             "dispatch_real": (1 if field else 0),
@@ -356,8 +423,11 @@ def main() -> int:
         "next_step_owners": {
             "A": "无需再定口径：两条静态红已按裁定落地并全绿。仅当真机跑出来必须改产品，或机械"
                  "条件变了，才按裁定末段回报范围差异",
-            "operator": "一次现场批准的真实原话（对象 = R7F8F 及本预算裁定；未取得就不发任何现场命令）",
-            "me_after_approval": "接上机执行一次整包并交付原始字节与两级台账；本轮不做"}}
+            "operator": "F20 需要**一句新的真实原话**，对象 = 本轮四件新身份(见 "
+                        "package_fix_f19.identities_for_next_approval)；F11 那句只覆盖了已经用满的"
+                        "那一个账(port_open=1)，不借它开第二个账",
+            "me_after_approval": "按那句原话离线 --approval-init 新账(绑四件)，再一次 dispatch；"
+                                 "本轮 0 设备动作，未开第二个账"}}
 
     bad = [k for k, v in doc.items() if isinstance(v, tuple)]
     if bad:

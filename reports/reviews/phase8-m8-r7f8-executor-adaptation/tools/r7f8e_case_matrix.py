@@ -1325,7 +1325,126 @@ def ruling_probes(mod, repo, work):
           [s[win_note] for s in poll_steps], [s["poll"]["max_attempts"] for s in poll_steps]))
 
 
+# -------------------------------------------------- L 组: F11 现场真字节回放(本轮首错的唯一可复算输入)
+def field_bytes_probes(mod, repo, work):
+    """把 F11 那一次**板子真发的字节**灌进派生执行器的读路径与判定链, 判四条豁免口径。
+
+    为什么必须换成真字节: F11 整包在现场第 1 步就 STOP, 而 stub 家族当时全绿 —— 因为 stub 重放的
+    是我自己写的行, 我把 mask=0x18 记在了 `[TMC] runtime write gate` 那条上, 产品在 system_status
+    里其实另打一条 `[Motor] arm gate fail mask=0x18 (arm REFUSED)`。夹具行只能证"我的口径自洽",
+    证不了"和板子一致"。这里输入一律取磁盘上那份原始 rx.bin(经生产读路径解析), 不经过我重写。
+    """
+    root = work / "field_bytes"
+    if root.exists():
+        shutil.rmtree(str(root), ignore_errors=True)
+    root.mkdir(parents=True)
+    cap_path = repo / ROUND / "proof/r7f8f_field_f11_sys_pre.rx.bin"
+    plan_path = repo / ROUND / "field/plan_r7f8f_2369_real.json"
+    if not (cap_path.is_file() and plan_path.is_file()):
+        note("L0_现场捕获与交付计划都在盘", False, "缺=%s" %
+             [str(p.relative_to(repo).as_posix()) for p in (cap_path, plan_path) if not p.is_file()])
+        return
+    cap = cap_path.read_bytes()
+    plan_doc = json.loads(plan_path.read_text(encoding="utf-8"))
+    steps = {s["as"]: s for s in plan_doc["stages"][0]["steps"]}
+    sys_pre, arm = steps["sys_pre"], steps["arm"]
+    GATE = "[Motor] arm gate fail mask=0x18 (arm REFUSED)"
+
+    # 读路径: 真字节进, 行出来, 落盘必须与原捕获逐字节相同(判读之前先落证)。
+    d0 = root / "read_path"
+    d0.mkdir()
+    clock = mod.SimClock()
+    led0 = mod.Ledger(d0 / "events.jsonl", clock, out_dir=d0)
+    rows, _n = mod.read_until_prompt(mod.FakePort([cap], led0, clock=clock), 5, led0,
+                                     d0 / "rx.bin", clock)
+    led0.close()
+    rx = (d0 / "rx.bin").read_bytes()
+    note("FB1_真字节经生产读路径逐字节留证且披露行在流里",
+         rx == cap and len(rows) >= 15 and any(GATE in l for l in rows),
+         "捕获=%d B sha=%s… 落盘逐字节相等=%s 行数=%d 披露行在流=%s" %
+         (len(cap), sha(cap)[:12], rx == cap, len(rows), any(GATE in l for l in rows)))
+
+    def probe(label, st, asname):
+        d = root / label
+        d.mkdir(parents=True)
+        clk = mod.SimClock()
+        lg = mod.Ledger(d / "events.jsonl", clk, out_dir=d)
+        code, res = "", None
+        try:
+            res = mod.assert_step(st, rows, asname, lg, raw=cap)
+            code = res.get("code", "")
+        except mod.Stop as e:
+            code = e.code
+        except Exception as e:
+            code = "UNNAMED_%s" % e.__class__.__name__
+        lg.close()
+        evs = [json.loads(l) for l in (d / "events.jsonl").read_text(encoding="utf-8-sig")
+               .splitlines() if l.strip()]
+        return code, res, evs
+
+    code1, res1, evs1 = probe("sys_pre_as_delivered", sys_pre, "sys_pre")
+    allow_evs = [e for e in evs1 if e.get("kind") == "BUSINESS_OUTCOME"]
+    disclosed = [x for e in allow_evs for x in (e.get("status_lines_allowed") or [])]
+    note("FB2_正例_交付的 sys_pre 申报下真字节判 OK 且豁免行入台账",
+         code1 == "" and (res1 or {}).get("verdict") == "OK" and disclosed == [GATE],
+         "verdict=%s code=%s 台账里被豁免的行=%s (豁免不是静默丢弃: BUSINESS_OUTCOME 必带原文)" %
+         ((res1 or {}).get("verdict"), code1 or "-", disclosed))
+
+    code2, res2, _e2 = probe("same_bytes_on_arm_step", arm, "arm")
+    bad2 = [x for x in ((res2 or {}).get("lines") or [])]
+    note("FB3_反例_同一段真字节喂给动作步仍具名业务失败",
+         not arm.get("status_lines_allow") and code2 == "BUSINESS_FAILED" and bad2 == [GATE],
+         "arm 步(cmd=%s)未申报豁免=%s => code=%s 命中行=%s => 豁免是**按步**的, 不是一局通用的" %
+         (arm.get("cmd"), not arm.get("status_lines_allow"), code2, bad2))
+
+    no_allow = dict(sys_pre)
+    no_allow.pop("status_lines_allow", None)
+    code3, res3, _e3 = probe("sys_pre_without_allow", no_allow, "sys_pre")
+    note("FB4_元负控_摘掉豁免同一份真字节必须翻红",
+         code3 == "BUSINESS_FAILED" and (res3 or {}).get("lines") == [GATE],
+         "摘掉后 code=%s 命中行=%s => 这条豁免是承重的, 不是装饰(全绿不代表它没在起作用)" %
+         (code3, (res3 or {}).get("lines")))
+
+    loose = dict(sys_pre)
+    loose["expect_contains"] = [e for e in sys_pre.get("expect_contains", [])
+                                if "arm gate fail mask" not in e]
+    code4, _r4, evs4 = probe("sys_pre_not_positively_required", loose, "sys_pre")
+    fired = [e for e in evs4 if e.get("kind") == "STATUS_ALLOW_NOT_POSITIVELY_REQUIRED"]
+    note("FB5_反例_豁免未被正面要求时运行期具名停止(fail-closed)",
+         code4 == "STATUS_ALLOW_NOT_POSITIVELY_REQUIRED" and bool(fired),
+         "把 expect_contains 里那条披露串删掉(保留豁免) => code=%s 台账事件=%d 条 => "
+         "豁免不能自带免检, 必须有本步的正面要求背书" % (code4, len(fired)))
+
+    # 静态侧: 同一份真字节对应的计划形状, 过 validate_plan 的门必须是"锚定+查询步+硬字段+正面要求"
+    # 四条一起核; 把正面要求那一条偷偷拿掉, 门要当场翻红(否则计划能过、现场必停 = F11 的老路)。
+    rows_doc = json.loads((repo / ROUND / "field/rows_r7f8f_real.json").read_text(encoding="utf-8"))
+
+    def sa_line(doc):
+        out, _bad, _names = mod.validate_plan(doc, rows_doc, repo / APP)
+        return [l for l in out if l.startswith("PLAN_STATUS_ALLOW|")][0]
+
+    def allow_count(doc):
+        return [(s.get("as"), s.get("cmd")) for st in doc["stages"] for s in st.get("steps", [])
+                if s.get("status_lines_allow")]
+
+    line_ok = sa_line(plan_doc)
+    mutated = json.loads(json.dumps(plan_doc))
+    for s in mutated["stages"][0]["steps"]:
+        if s.get("as") == "sys_pre":
+            s["expect_contains"] = [e for e in s.get("expect_contains", [])
+                                    if "arm gate fail mask" not in e]
+    line_mut = sa_line(mutated)
+    note("FB6_静态门_交付计划 PASS 且豁免只在两条查询步",
+         "|PASS|" in line_ok and allow_count(plan_doc) == [("sys_pre", "system_status"),
+                                                          ("sys_after_apply", "system_status")],
+         "门行=%s ;; 全 38 步里申报豁免的只有=%s" % (line_ok[:150], allow_count(plan_doc)))
+    note("FB7_静态门元负控_抽掉正面要求计划门必须翻红",
+         "|FAIL|" in line_mut and "STATUS_ALLOW_NOT_POSITIVELY_REQUIRED" in line_mut,
+         "同一条真字节对应的计划形状, 只删 sys_pre 的正面要求 => %s" % line_mut[:220])
+
+
 def main() -> int:
+
     ap = argparse.ArgumentParser()
     ap.add_argument("--repo", required=True, type=pathlib.Path)
     ap.add_argument("--work", required=True, type=pathlib.Path)
@@ -1412,6 +1531,7 @@ def main() -> int:
 
     byte_probes(mod, work)
     ruling_probes(mod, repo, work)
+    field_bytes_probes(mod, repo, work)
 
     # ---------------------------------------------------------------- 在进程内的身份反例与源码锚点
     steps = [{"as": "a", "cmd": LS}]

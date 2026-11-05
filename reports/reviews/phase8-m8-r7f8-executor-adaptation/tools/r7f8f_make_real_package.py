@@ -102,13 +102,41 @@ IRQ_STILL = ["[SAFETY] IRQ gate stays CLOSED"]                                 #
 IRQ_STATUS_ARMED = ["[SAFETY] irq gate   = CLOSED (polled only)",
                     "[SAFETY] polarity   = NOT confirmed (HARDWARE-PENDING unless CONFIRMed)"]
 # supervisor.c:85/90/128 三条是本轮实读到的形状(字段值按 §4 工况给合成值)。
-SYS_READY = ["=== SYSTEM STATUS ===",
-             "[Safety] state=READY fault=0 irq_gate=closed polarity=HARDWARE-PENDING "
-             "protect_ready=YES",
-             "[TMC]    runtime write gate mask=0x18 (0=运行态条件全通,"]
+# F11 现场首错之后的更正(2026-11-05): 前态 system_status 的行**改成板子真字节**, 不再由我照
+# 源码形状手工拼 —— 上一版我拼的三格里有两格与现场实拍不符(irq_gate 大小写、protect_ready 的实值),
+# 更要紧的是把 mask=0x18 记在了 **TMC 写门**那一行, 而产品把它打在 **Motor 门位评估**那一行
+# (supervisor.c:126) —— 假端口因此永远测不到"披露行被判成业务拒绝"这件事。
+_F11_CAP = pathlib.Path(__file__).resolve().parents[1] /     "proof/r7f8f_field_f11_sys_pre.rx.bin"
+
+
+def _observed_sys_ready():
+    """从 2026-11-05 现场那份 983 B 原始捕获里取响应行(去掉首行回显与结尾提示符)。"""
+    if not _F11_CAP.is_file():
+        raise SystemExit("REFUSED|现场捕获不在盘上(%s): 前态行只能照实拍写, 不许凭记忆重造"
+                         % _F11_CAP.name)
+    ls = [l for l in _F11_CAP.read_bytes().decode("utf-8").splitlines() if l.strip()]
+    ls = [l for l in ls if l and l.strip() != "msh >" and l.strip() != "system_status"]
+    if not (ls[0] == "=== SYSTEM STATUS ==="
+            and any(l.startswith("[Motor] arm gate fail mask=") for l in ls)):
+        raise SystemExit("REFUSED|捕获头/披露行与预期不符, 不敢当成前态形状写进行表")
+    return ls
+
+
+SYS_READY = _observed_sys_ready()
+# 产品无条件打的"当前会被拒"门位评估行(supervisor.c:126): 查询步必须把它当**状态披露**,
+# 不当业务拒绝 —— 但只认这一条整行锚定的形状, 且下面还会强制它被本步 expect 正面要求。
+SYS_GATE_DISCLOSE = r"^\[Motor\] arm gate fail mask=0x[0-9A-Fa-f]+ \(arm REFUSED\)$"
+# apply 之后、safety_irq_enable(第 11 步)之前的 system_status 形状。三个字段一律回源码取值,
+# 不沿用上一版的臆造值(supervisor.c:90 只打 OPEN/CLOSED 与 CONFIRMED/not-confirmed,
+# safety_thread.c:315 的 protection_ready 要 st_irq_attached && st_polarity_validated 才 YES,
+# 而这两件事分别发生在第 11/10 步 => 第 7 步只能是否): 旧件里写着 closed / MARKED-VALIDATED /
+# protect_ready=YES, 既不是产品字面 token, 也和步序矛盾。
+# 披露行的 0x8 是**推导值**而不是实测值: 现场前态实测 0x18 = bit3(NOT_PROTECTED)|bit4(NO_DRV_CONFIG),
+# tmc_config_apply 成功后 motor.c:907 的 bit4 清零, bit3 仍置 => 0x8。工装用它, 板上真值以现场为准。
 SYS_READY_APPLIED = ["=== SYSTEM STATUS ===",
-                     "[Safety] state=READY fault=0 irq_gate=closed "
-                     "polarity=MARKED-VALIDATED protect_ready=YES",
+                     "[Safety] state=READY fault=0 irq_gate=CLOSED polarity=not-confirmed "
+                     "protect_ready=NO",
+                     "[Motor] arm gate fail mask=0x8 (arm REFUSED)",
                      "[TMC]    runtime write gate mask=0x8 (0=运行态条件全通,"]
 LEGACY_ROW = job(1, "FAILED", adc=0, sg=0, want=32, lo=250, hi=350)             # §5 行1 允许的旧终态
 
@@ -227,6 +255,18 @@ def rows_doc():
             "unverified_note": "这几条本轮**没有**回源码取到逐字打印形状, 因此行内容是回显占位, "
                                "对应步骤只断言前缀存在; §5 里对它们要求的字段判据一律没写 "
                                "(宁缺勿造), 已列进 plan.field_assertion_gaps 交 A 判。",
+            "board_observed_rows": ["system_status —— 这份的 19 行逐字取自 2026-11-05 21:23 "
+                                    "F11 现场捕获 proof/r7f8f_field_f11_sys_pre.rx.bin(983 B, "
+                                    "sha256 73abf3012386…; 去掉首行命令回显与结尾 msh 提示符)。"
+                                    "它不是工装造的: 上一版把 mask=0x18 记在 TMC 写门行、把 "
+                                    "protect_ready 写成 YES, 现场实拍证明两处都不对, 而正是这个"
+                                    "错位让离线 stub 测不到披露行被误判成业务拒绝。"],
+            "derived_shape_rows": ["system_status_applied —— 第 7 步(apply 后、irq_enable 前)的切片。"
+                                   "token 取 supervisor.c:90 的实际打印(OPEN/CLOSED、"
+                                   "CONFIRMED/not-confirmed), protect_ready 按 safety_thread.c:315 "
+                                   "取 NO(第 10/11 步都还没跑), 披露行 mask 由现场实测 0x18 减去 "
+                                   "apply 成功的 bit4(motor.c:907) 推得 0x8 —— 全部是**源码+前态推导**,"
+                                   " 不是这一步的板上实测。"],
             "hardware_actions": 0},
         "commands": c}
 
@@ -374,6 +414,31 @@ def steps():
         expect_contains=["stack size", "main"])
     add("heap", "free", key="free", seconds=1,
         expect_contains=["total    :", "used     :", "maximum  :", "available:"])
+
+    # F19(现场 F11 暴露): 所有 `system_status` 查询步统一带上"门位披露行"的正面对策 ——
+    # ① 把这条行写进 expect_contains(披露必须被正面要求, 与运行期新增的强制同一口径),
+    # ② 整行锚定地申报 status_lines_allow, ③ 带 expect_values 硬字段(计划门也要求这条)。
+    # 起转/使能类步骤**不会**被这个循环碰到: 循环按 cmd 精确匹配 system_status, 而 validate-plan
+    # 那道门本来也只放行状态查询步。
+    for st in s:
+        if (st.get("cmd") or "").split(" ")[0] != "system_status":
+            continue
+        ec = st.setdefault("expect_contains", [])
+        if "[Motor] arm gate fail mask=" not in ec:
+            ec.append("[Motor] arm gate fail mask=")
+        st["status_lines_allow"] = [SYS_GATE_DISCLOSE]
+        spec = [{"row": r"^(?P<head>\[Safety\] state=(?P<st>[A-Z_]+) fault=(?P<fault>[0-9])"
+                          r" irq_gate=(?P<irq>[A-Z_]+) polarity=(?P<pol>[A-Za-z-]+)"
+                          r" protect_ready=(?P<pr>[A-Z]+))$",
+                 "must": {"st": "READY", "fault": "0"}}]
+        if st.get("as") == "sys_pre":
+            # 前态必须真的"没带电、没在转" —— 这四格是 2026-11-05 实拍值, 也是 §5 行1 要核的东西
+            spec.append({"row": r"^\[Motor\] state=(?P<st>[0-9]) cur=(?P<cur>[0-9]+) "
+                                 r"tgt=(?P<tgt>[0-9]+) armed=(?P<armed>[0-9]) "
+                                 r"drv_en_verified=(?P<drv>[0-9]) health=(?P<health>[A-Z_]+)$",
+                         "must": {"st": "0", "cur": "0", "tgt": "0", "armed": "0",
+                                  "health": "OK"}})
+        st["expect_values"] = (st.get("expect_values") or []) + spec
     return s
 
 

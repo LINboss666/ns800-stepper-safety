@@ -306,7 +306,30 @@
           "key": "system_status",
           "seconds": 1,
           "expect_contains": [
-            "=== SYSTEM STATUS ==="
+            "=== SYSTEM STATUS ===",
+            "[Motor] arm gate fail mask="
+          ],
+          "status_lines_allow": [
+            "^\\[Motor\\] arm gate fail mask=0x[0-9A-Fa-f]+ \\(arm REFUSED\\)$"
+          ],
+          "expect_values": [
+            {
+              "row": "^(?P<head>\\[Safety\\] state=(?P<st>[A-Z_]+) fault=(?P<fault>[0-9]) irq_gate=(?P<irq>[A-Z_]+) polarity=(?P<pol>[A-Za-z-]+) protect_ready=(?P<pr>[A-Z]+))$",
+              "must": {
+                "st": "READY",
+                "fault": "0"
+              }
+            },
+            {
+              "row": "^\\[Motor\\] state=(?P<st>[0-9]) cur=(?P<cur>[0-9]+) tgt=(?P<tgt>[0-9]+) armed=(?P<armed>[0-9]) drv_en_verified=(?P<drv>[0-9]) health=(?P<health>[A-Z_]+)$",
+              "must": {
+                "st": "0",
+                "cur": "0",
+                "tgt": "0",
+                "armed": "0",
+                "health": "OK"
+              }
+            }
           ],
           "step_total_seconds": 1.0,
           "window_phase": "pre_start"
@@ -387,7 +410,20 @@
           "seconds": 1,
           "expect_contains": [
             "=== SYSTEM STATUS ===",
-            "runtime write gate mask=0x8"
+            "runtime write gate mask=0x8",
+            "[Motor] arm gate fail mask="
+          ],
+          "status_lines_allow": [
+            "^\\[Motor\\] arm gate fail mask=0x[0-9A-Fa-f]+ \\(arm REFUSED\\)$"
+          ],
+          "expect_values": [
+            {
+              "row": "^(?P<head>\\[Safety\\] state=(?P<st>[A-Z_]+) fault=(?P<fault>[0-9]) irq_gate=(?P<irq>[A-Z_]+) polarity=(?P<pol>[A-Za-z-]+) protect_ready=(?P<pr>[A-Z]+))$",
+              "must": {
+                "st": "READY",
+                "fault": "0"
+              }
+            }
           ],
           "step_total_seconds": 1.0,
           "window_phase": "pre_start"

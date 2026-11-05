@@ -5,8 +5,15 @@
       "family": "反例矩阵(计划驱动的执行器行为反例 + 元负控)",
       "base_present": true,
       "base_count": 65,
-      "now_count": 106,
+      "now_count": 113,
       "added": [
+        "FB1_真字节经生产读路径逐字节留证且披露行在流里",
+        "FB2_正例_交付的 sys_pre 申报下真字节判 OK 且豁免行入台账",
+        "FB3_反例_同一段真字节喂给动作步仍具名业务失败",
+        "FB4_元负控_摘掉豁免同一份真字节必须翻红",
+        "FB5_反例_豁免未被正面要求时运行期具名停止(fail-closed)",
+        "FB6_静态门_交付计划 PASS 且豁免只在两条查询步",
+        "FB7_静态门元负控_抽掉正面要求计划门必须翻红",
         "G10_单字段变错(ENN_fb=1)",
         "G11_单字段变错(verdict=CUT_BY_HARDWARE)",
         "G12_单字段变错(fb=UNRESOLVED)",
@@ -52,7 +59,7 @@
       "removed": [],
       "kept": 65,
       "flipped": [],
-      "summary_line": "R7F8E_MATRIX_SUMMARY|判据=106|FAIL=0|none"
+      "summary_line": "R7F8E_MATRIX_SUMMARY|判据=113|FAIL=0|none"
     },
     "proof/r7f8e_stub_package.txt": {
       "family": "stub 整包(合成计划过全部离线门 + 逐场首错)",

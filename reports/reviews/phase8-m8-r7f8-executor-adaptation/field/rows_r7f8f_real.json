@@ -13,20 +13,43 @@
       "ps/free 的表头取自 R7F7 已用过的形状, 阈值不判"
     ],
     "unverified_note": "这几条本轮**没有**回源码取到逐字打印形状, 因此行内容是回显占位, 对应步骤只断言前缀存在; §5 里对它们要求的字段判据一律没写 (宁缺勿造), 已列进 plan.field_assertion_gaps 交 A 判。",
+    "board_observed_rows": [
+      "system_status —— 这份的 19 行逐字取自 2026-11-05 21:23 F11 现场捕获 proof/r7f8f_field_f11_sys_pre.rx.bin(983 B, sha256 73abf3012386…; 去掉首行命令回显与结尾 msh 提示符)。它不是工装造的: 上一版把 mask=0x18 记在 TMC 写门行、把 protect_ready 写成 YES, 现场实拍证明两处都不对, 而正是这个错位让离线 stub 测不到披露行被误判成业务拒绝。"
+    ],
+    "derived_shape_rows": [
+      "system_status_applied —— 第 7 步(apply 后、irq_enable 前)的切片。token 取 supervisor.c:90 的实际打印(OPEN/CLOSED、CONFIRMED/not-confirmed), protect_ready 按 safety_thread.c:315 取 NO(第 10/11 步都还没跑), 披露行 mask 由现场实测 0x18 减去 apply 成功的 bit4(motor.c:907) 推得 0x8 —— 全部是**源码+前态推导**, 不是这一步的板上实测。"
+    ],
     "hardware_actions": 0
   },
   "commands": {
     "system_status": {
       "healthy": [
         "=== SYSTEM STATUS ===",
-        "[Safety] state=READY fault=0 irq_gate=closed polarity=HARDWARE-PENDING protect_ready=YES",
-        "[TMC]    runtime write gate mask=0x18 (0=运行态条件全通,"
+        "[Boot]   bootstrap-complete=YES abort-stage=0",
+        "[Safety] state=READY fault=0 irq_gate=CLOSED polarity=not-confirmed protect_ready=NO",
+        "[Safety] gpio_ready=YES thread=OK drv_en_pad_low=YES",
+        "[Safety] request=LOW pad=0 expected_ENN=HIGH ENN_fb=1(resolved) verdict=OK",
+        "[Safety] limit_inputs=DISABLED_BY_CONFIG (HIGH=safe/LOW=trigger when ENABLED); e-stop=hardware-only, no MCU e-stop input",
+        "[Motor] state=0 cur=0 tgt=0 armed=0 drv_en_verified=0 health=OK",
+        "[Motor] arm gate fail mask=0x18 (arm REFUSED)",
+        "[TMC]    runtime write gate mask=0x0 (0=运行态条件全通, 编译期门未翻转前仍然一位不写)",
+        "[Sensor] thread=OK",
+        "[TMC]    OK drive_cfg=UNCONFIGURED",
+        "[IMU]    OK",
+        "[ADC]    DEGRADED cal=THEORETICAL",
+        "[Flash]  storage bring-up=OK (spi1)",
+        "[Storage] OK (ns_params/log)",
+        "[Config] OK valid=YES cal_source=1",
+        "[Diag]   OK verdict=0 mode=MONITOR_ONLY",
+        "[Blackbox] OK",
+        "[UI]     led/buzzer output=SAFE-OFF (polarity hardware-pending)"
       ]
     },
     "system_status_applied": {
       "healthy": [
         "=== SYSTEM STATUS ===",
-        "[Safety] state=READY fault=0 irq_gate=closed polarity=MARKED-VALIDATED protect_ready=YES",
+        "[Safety] state=READY fault=0 irq_gate=CLOSED polarity=not-confirmed protect_ready=NO",
+        "[Motor] arm gate fail mask=0x8 (arm REFUSED)",
         "[TMC]    runtime write gate mask=0x8 (0=运行态条件全通,"
       ]
     },

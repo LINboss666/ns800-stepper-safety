@@ -1407,3 +1407,90 @@ A 的裁定包内 `R7F8_LIVING_DRAFT.md`（38793 B / `14bafe13a8cd`，304 行，
 - 整包离线门的同名判据因此改名收窄：`NO_HARDWARE_ACTIONS_THIS_ROUND` →
   `NO_HARDWARE_ACTIONS_INSIDE_THIS_GATE`，并在详情里明写"本条不声明整轮无设备动作"——
   现场那一次的动作与额度由本 §25 与 `field_run_f11` 块承担，两者不许混用。
+
+## 26 M8-R7F8F F19 包侧披露申报 + 真字节回放（2026-11-05 深夜，离线，设备动作 0）
+
+F11 那次停止的根因判定为**包侧缺申报**（§25），操作者给了两条处置：修法走「补包侧申报（不动冻结
+源码）」，离线盲区走「必做：真字节回放三条」。本轮按这两条落地，产品树/固件/旧证据一字未动。
+
+### 26.1 包侧申报（只加在两条 system_status 查询步）
+
+- `sys_pre` / `sys_after_apply` 各加：`status_lines_allow` 一条**整行锚定**的披露形状
+  `^\[Motor\] arm gate fail mask=0x[0-9A-Fa-f]+ \(arm REFUSED\)$`，并把 `[Motor] arm gate fail mask=`
+  写进 `expect_contains` 作正面要求；`sys_pre` 另加 `[Motor] state=… armed=0 health=OK` 那行的硬字段判据。
+  全 38 步里只有这两步申报豁免（`L6` 逐字核）。
+- 依据是冻结源码，不是我改判据：`supervisor.c:126` 在 `system_status` 里**无条件**打这一行
+  （`gates ? "arm REFUSED" : "all gate conditions pass…"`），`motor.h:92/93` 定 bit3/bit4；
+  现场前态实测 `0x18` = 两位同置。mask=0 时该行不含 REFUSED，因此不匹配豁免形状，也不需要豁免。
+- 同一轮把 `SYS_READY_APPLIED`（第 7 步切片）三处臆造值改回源码事实：`irq_gate=CLOSED`
+  （产品只打 OPEN/CLOSED，我原来写小写 closed）、`polarity=not-confirmed`（我原来写
+  `MARKED-VALIDATED`，产品没这个 token）、`protect_ready=NO`（safety_thread.c:315 要
+  irq_attached 且 polarity_validated，而第 10/11 步都在第 7 步之后）。该行 mask 值 `0x8` 是
+  **推导**（现场 0x18 减去 apply 成功后清零的 bit4），`_about.derived_shape_rows` 里明写它不是实测。
+- 派生件里补了一条运行期门（recipe 第 71 项 `G4_STATUS_ALLOW_MUST_BE_EXPECTED`）：被放行的每一行必须
+  含本步 `expect_contains` 的某个字面片段，否则具名停 `STATUS_ALLOW_NOT_POSITIVELY_REQUIRED`。这是把
+  R7F8E 起就写在注释里、但**代码从未核过**的那句话兑现成判据。
+
+### 26.2 静态与运行期同一口径（新门 G5 两项）
+
+`PLAN_STATUS_ALLOW` 的 PASS 话术一直写着「锚定且被正面要求」，静态代码却只核了锚定/查询步/硬字段三条
+—— 计划能过静态门、现场被运行期停住，正是 F11 的形状。本轮补上第四条：豁免模式的**字面前缀**必须
+被本步 `expect_contains` 命中（前缀是模式的确定部分 ⇒ 任何 fullmatch 行必含它 ⇒ 运行期那条门静态上
+就不会翻红）。新增函数 `status_allow_literal_prefix`（recipe 第 72/73 项）。
+
+**这一条我自己先写错了一次，被无回归族当场抓住**：初版把「反斜杠+空格」也当通配，于是冻结的 R7F7
+计划（整条模式用 `\` 转义空格）被截成前缀 `[DIAG]`，`no_regression` 从 9/0 掉到 9/4、整包离线门 8 条
+红。修成"只有字符类/断言/反向引用算通配"后两族复原（R7F7 计划仍是绿的 ⇒ 新门没有把历史件改红）。
+登记进 §24.5 风格的自伤清单见 §26.5。
+
+### 26.3 真字节回放 FB 族（7 条，输入是板子发的 983 B，不再是我写的行）
+
+`r7f8e_case_matrix.py` 新增 `field_bytes_probes`：把 `proof/r7f8f_field_f11_sys_pre.rx.bin`
+（983 B / `73abf3012386…`）经**生产读路径** `read_until_prompt` 解析后喂 `assert_step`。
+
+| 条 | 形状 | 读数 |
+| --- | --- | --- |
+| FB1 | 落盘字节与捕获逐字节相等，披露行确在流里 | PASS（21 行） |
+| FB2 | 正例：交付申报下 verdict=OK，台账 `status_lines_allowed` 逐字带原文 | PASS |
+| FB3 | 反例：同一段字节喂 `motor_arm`（未申报）仍 `BUSINESS_FAILED` | PASS（豁免按步） |
+| FB4 | 元负控：摘掉豁免 → 同一份字节翻回 `BUSINESS_FAILED` | PASS（豁免是承重的） |
+| FB5 | 反例：删正面要求保留豁免 → 运行器具名 `STATUS_ALLOW_NOT_POSITIVELY_REQUIRED` | PASS（台账 1 条） |
+| FB6 | 静态：交付计划 `PLAN_STATUS_ALLOW` 绿，且豁免只在两条查询步 | PASS |
+| FB7 | 静态元负控：只删正面要求 → 同一道门翻红并写字面前缀 | PASS |
+
+### 26.4 六族 + 计划 + 派生复算（现在的数）
+
+矩阵 113/0 · stub 整包 29/0 · 无回归 9/0 · 整包离线门 47/0 · A 包预算复算 11/0 · 三版本重放 21/0 ·
+夹具变更表 族=5 problems=0 · `--validate-plan` 146 项 fail=0（交付计划与 F20 草案件各一次）。
+派生件 `tools/m8r3_serial_chain_r7f8.py` 315233 B / `30c67a3e8dbe…` / 5525 行（recipe 73 项，
+`--verify` 仓外重建逐字节相等=True）；补丁 `patches/r7f8f_executor.patch` 96676 B / `ecbf6c37f748…`。
+现场包：plan 33140 B / `e78519421149…`（与 F11 那一版同一身份，本轮只动 rows）；
+rows 10060 B / `c64fdee847af…`（唯一变化 = 披露行 + 三处源码事实）。
+
+### 26.5 本轮自伤与新增工具（照单登记）
+
+1. `status_allow_literal_prefix` 初版把转义空格当通配 ⇒ 冻结 R7F7 计划假判红（9/4、47/8）。
+   由**无回归族**抓到，不是靠我重读代码。
+2. `r7f8f_fixture_change_table.py` 的 REASONS 里嵌入英文双引号导致 Python 字符串提前终止
+   （L 族 7 条理由写完即语法错），改用中文引号后过 AST 检查再跑。
+3. 往执行器 recipe 里插 helper 时用了 `"""` 文档串嵌在 `"""…"""` 里 ⇒ 派生脚本自身语法错；
+   换成 `#` 注释。**同一类**上一轮已犯过一次（heredoc 把 `\r\n` 写坏）。
+4. 新工具 `tools/r7f8f_make_dispatch_copy.py`：F11 那份承接件是我**手工编辑**的，计划身份一变就得
+   重抄，抄错一格等于把批准绑到别的字节上。改为派生：只允许那 9 格差异，写完立刻扁平 diff 复算，
+   多一格或少一格都 `REFUSED|`；令牌/批准 id 不从命令行给就只产出草案（`approved=False`）。
+5. 新判据族一开始起名 `L1_`~`L7_`，与矩阵里**已有**的清理族 `L1_`~`L4_` 撞号（交接工具按名字数 L 族，
+   数出 11 条 => 我加的 `HANDOFF_REFUSE|…L 族判据数` 当场拒绝，才去 grep 看到旧族）。全部改名 `FB1_`~`FB7_`
+   并重跑矩阵 113/0 + 夹具表 + 交接。**教训**：新增判据族前先 grep 名字空间，别用第二个字母表头。
+
+### 26.6 F20 承接草案（未批准，本轮没开第二个账）
+
+`field/plan_r7f8f_2369_real_dispatch_f20_draft.json` 34898 B / `e59272b6fa88…`：由新工具从
+`e78519421149…` 派生，9 格差异，`status=FIELD_DISPATCH_DRAFT_NOT_APPROVED_NEW_PLAN_IDENTITY`，
+`approval.token_verbatim=NOT_ISSUED_等待操作者对新身份的真实原话`。机械前置那格沿用操作者在 F11 会话里
+逐字给的**事实声明**并把来源写成"承 F11 那一次核对，未重新核对"；它**不是**新一轮批准。
+F11 那份承接件按字节冻结在库里不回改（`53c744213964…`，与 §25 的证据链一起保留）。
+
+停点：本账 `port_open` 额度 1 已用满（§25），第二次真机整包要操作者对**新身份**
+（plan `e7851942…` / rows `c64fdee8…` / executor `30c67a3e…` / 镜像 `23691e8d…` 四件）给一句新的真实
+原话。本轮设备动作 0：未开口、未写任何字节到 COM5、未建第二个批准账。
+`polarity_measured=false` / `core_protection_verified=false` 保持原值；仍不是现场验收通过。

@@ -5,18 +5,18 @@
   "identities": {
     "executor": {
       "path": "reports/reviews/phase8-m8-r7f8-executor-adaptation/tools/m8r3_serial_chain_r7f8.py",
-      "bytes": 312387,
-      "sha256": "093c8408a019b37898acb305fc91587fbb064f6a65ac154b0bac8f55dd4d334e"
+      "bytes": 315233,
+      "sha256": "30c67a3e8dbe915214ca7e1f423cf3468594dba35772b4fa082b01b31893eef2"
     },
     "plan": {
       "path": "reports/reviews/phase8-m8-r7f8-executor-adaptation/field/plan_r7f8f_2369_real.json",
-      "bytes": 31712,
-      "sha256": "eef417ce31520a1c7edacbfc6210a1e5245aed62c019e45e9bfbe46139a2a92a"
+      "bytes": 33140,
+      "sha256": "e78519421149c9a09de0fea8c1cb381b6ac10fd9452959a1092b3a68c37b95a6"
     },
     "rows": {
       "path": "reports/reviews/phase8-m8-r7f8-executor-adaptation/field/rows_r7f8f_real.json",
-      "bytes": 8168,
-      "sha256": "4022306df3ad5454666c2449519d667b812b516b6e30f941f314ab61fac5cbf2"
+      "bytes": 10060,
+      "sha256": "c64fdee847affe55ec9edc05e796d3befbc5731c30be7f96c6aa17b24ca23b70"
     },
     "board_image": {
       "path": "reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/rt-thread-motor-m1-candidate.bin",
@@ -33,7 +33,7 @@
     {
       "name": "INPUTS_IN_PLACE",
       "verdict": "PASS",
-      "detail": "五件齐全; 执行器=093c8408a019… plan=eef417ce3152… rows=4022306df3ad…"
+      "detail": "五件齐全; 执行器=30c67a3e8dbe… plan=e78519421149… rows=c64fdee847af…"
     },
     {
       "name": "PRE_EXECUTOR_BYTES_FROZEN",
@@ -183,7 +183,7 @@
     {
       "name": "STUB_NORMAL_DISPATCH_SUCCEEDS",
       "verdict": "PASS",
-      "detail": "rc=0 stage_status=OK success=True code= disarm=CONFIRMED_DISABLED terminal=KNOWN 结果条数=40(申报步骤 38; 轮询的多次尝试也各计一条) | le=healthy|branch=healthy|scenario_branches={}|prerequisite_skips=[]|actions_attempted=[]|ledger=D:\\ns800_r7f8f_offline\\gate_r4\\normal\\run\\dispatch_ledger.jsonl"
+      "detail": "rc=0 stage_status=OK success=True code= disarm=CONFIRMED_DISABLED terminal=KNOWN 结果条数=40(申报步骤 38; 轮询的多次尝试也各计一条) | ealthy|branch=healthy|scenario_branches={}|prerequisite_skips=[]|actions_attempted=[]|ledger=D:\\ns800_r7f8f_offline\\fam19\\gate3\\normal\\run\\dispatch_ledger.jsonl"
     },
     {
       "name": "STUB_NORMAL_TAIL_SENT",
@@ -193,7 +193,7 @@
     {
       "name": "STUB_NORMAL_RESERVE_AND_CLAMP_FIELDS",
       "verdict": "PASS",
-      "detail": "整包 dispatch 的阶段回执里 reserve=7.0 reserved=True session_abs=90.0 business_abs=83.0 cleanup_hard=7.2"
+      "detail": "整包 dispatch 的阶段回执里 reserve=7.0 reserved=True session_abs=90.0 business_abs=83.0 cleanup_hard=7.205"
     },
     {
       "name": "FIRST_ERROR|tail_silent",

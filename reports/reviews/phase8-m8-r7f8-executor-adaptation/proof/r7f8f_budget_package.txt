@@ -1,5 +1,5 @@
 A_MANIFEST_ITEMS_RECOMPUTE|PASS|A 清单登记 9 件(清单不列自身, 与 A 包上一版同一口径); 除清单外磁盘常规文件 9 件; 逐条复算不符=0 未列=[]
-REFERENCE_BYTES_EQUAL_6f2b12F_BLOB|PASS|A 的基准 plan 28090 B/66ca8a152ede… 与 6f2b12f(完整 6f2b12fa91fecb0a8d13449bdb2cf5ab125b41c8)的 Git blob(66ca8a152ede) 逐字节相等; rows 4022306df3ad… 同理() => 裁定钉的是**裁定前那个提交**, 不是当前工作树。工作树现状: plan 与基准相等=False (裁定落地后已改动), rows 与基准相等=True。上一版拿工作树比, 计划一改就假红, 本轮改为按 blob 复算。
+REFERENCE_BYTES_EQUAL_6f2b12F_BLOB|PASS|A 的基准 plan 28090 B/66ca8a152ede… 与 6f2b12f(完整 6f2b12fa91fecb0a8d13449bdb2cf5ab125b41c8)的 Git blob(66ca8a152ede) 逐字节相等; rows 4022306df3ad… 同理() => 裁定钉的是**裁定前那个提交**, 不是当前工作树。工作树现状: plan 与基准相等=False (裁定落地后已改动), rows 与基准相等=False。上一版拿工作树比, 计划一改就假红, 本轮改为按 blob 复算。
 WINDOW_TABLE_ALIGNS_38_STEPS|PASS|38 步的 (as, cmd) 与逐条对齐, 错位=0; 三段 {'motion_active': (11, 9.0), 'post_zero': (8, 7.5), 'pre_start': (19, 31.0)} => 合计 47.5 s
 LIMITS_UNCHANGED|PASS|四个固定数与 stop 8 s 上限逐字段核过未变(12/18/90/7/8); stop_request_index=28 zero_confirm_index=29(均 0 基)
 NO_NEGATIVE_OR_ZERO_WINDOWS|PASS|全部为正的浮点且 <= 13.0 s; 0.5 s 的小数在表里原样保留(不是整数化后的值)

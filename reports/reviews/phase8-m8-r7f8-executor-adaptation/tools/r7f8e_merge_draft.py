@@ -16,18 +16,26 @@ import difflib
 import hashlib
 import pathlib
 import re
+import subprocess
 import sys
 
 DRAFT_DIR = "reports/reviews/phase8-m8-r7f8-closed-loop-draft"
 MERGED_REL = DRAFT_DIR + "/R7F8_DRAFT_MERGED.md"
 ORIG_REL = DRAFT_DIR + "/A_DRAFT_ORIGINAL.md"
 ERRATA_REL = "reports/reviews/phase8-m8-r7f8-executor-adaptation/ERRATA_R7F8E.md"
-# R7F8F 预算裁定轮: 上一版合并件是 c9ad704 落下的 40289 B(承接 A_R7F8F_PKG 那份 36303 B 活草案)。
-# 每次重合并都要把这两行改成**当场盘上重算**的上一版身份, 否则工具会拒绝(这正是它的作用:
-# 不许在身份不明的时候悄悄覆盖)。
-OLD_MERGED_BYTES = 40289
-OLD_MERGED_SHA12 = "bc3710e9917c"
-OLD_MERGED_COMMIT = "c9ad704"
+# R7F8F: 上一版合并件的**字节身份不再手写**。曾经每轮手更这三行, 忘了就撞上"身份不明拒绝",
+# 更错就把差异算到别的版本上(§24.5 已登记过一次)。现在直接取 HEAD 里那份 blob 与其短号:
+# 承接对象因此永远是**已交付**的那一版, 未提交的重合并不会把基准悄悄换掉。
+def head_merged_blob(repo):
+    p = subprocess.run(["git", "-C", str(repo), "show", "HEAD:" + MERGED_REL],
+                       capture_output=True)
+    if p.returncode != 0:
+        raise SystemExit("REFUSED|取不到 HEAD 里的合并件 blob(%s): 不许在基准不明时覆盖 %s"
+                         % (p.stderr.decode("utf-8", "replace").strip()[:160], MERGED_REL))
+    c = subprocess.run(["git", "-C", str(repo), "rev-parse", "--short", "HEAD"],
+                       capture_output=True)
+    return p.stdout, c.stdout.decode("ascii", "replace").strip()
+
 OLD_ORIG_BYTES = 24780
 OLD_ORIG_SHA12 = "b572c1928f60"
 # 记录节里的本轮名与承接件路径由 --label / --updated 当场填, 不留上一轮的措辞。
@@ -68,19 +76,20 @@ def main() -> int:
         SRC_REL = updated_p.relative_to(repo).as_posix()
     except ValueError:
         SRC_REL = updated_p.name
-    txt_old = merged_p.read_text(encoding="utf-8")
     txt_new = updated_p.read_text(encoding="utf-8")
     orig = (repo / ORIG_REL).read_bytes()
+    old_blob, head_short = head_merged_blob(repo)
+    txt_old = old_blob.decode("utf-8")
+    old_merged_bytes, old_merged_sha12, old_merged_commit = \
+        len(old_blob), sha(old_blob)[:12], head_short
 
     fails = []
     # 1) 输入身份: A 包里的修订快照与上一版合并件都要点名, 且 A_DRAFT_ORIGINAL 未被动过。
     if len(orig) != OLD_ORIG_BYTES or not sha(orig).startswith(OLD_ORIG_SHA12):
         fails.append("A_DRAFT_ORIGINAL 身份与本包登记不符: %d B sha=%s"
                      % (len(orig), sha(orig)[:12]))
-    if len(txt_old.encode("utf-8")) != OLD_MERGED_BYTES or \
-            not sha(txt_old.encode("utf-8")).startswith(OLD_MERGED_SHA12):
-        fails.append("上一版合并件身份与登记不符: %d B sha=%s"
-                     % (len(txt_old.encode("utf-8")), sha(txt_old.encode("utf-8"))[:12]))
+    disk_merged = merged_p.read_bytes()
+    uncommitted = disk_merged != old_blob
     if fails:
         for f in fails:
             print("INPUT_REFUSED|%s" % f)
@@ -124,8 +133,13 @@ def main() -> int:
         "  去掉本记录节与它前面的分隔线之后，与承接件按行逐字节相等；",
         "  复算口径见本工具输出的 `INHERIT_EXACT|...` 一行。",
         "- 承接来源: `%s`（A 包内 SHA256SUMS 覆盖的原件, 本工具只读不改）。" % SRC_REL,
-        "- 上一版合并件: %d B, sha256 前缀 `%s`（提交 `%s`）。它的内容不回改, "
-        "历史身份由 Git blob 承担。" % (OLD_MERGED_BYTES, OLD_MERGED_SHA12, OLD_MERGED_COMMIT),
+        "- 上一版合并件: %d B, sha256 前缀 `%s`（提交 `%s` = 本工具取 HEAD 的 blob, 不再手写）。"
+        "它的内容不回改, 历史身份由 Git blob 承担。"
+        % (old_merged_bytes, old_merged_sha12, old_merged_commit),
+        ("" if not uncommitted else
+         "- 另有**未提交**的上一份盘上合并件: %d B, sha256 前缀 `%s` —— 差异仍按 HEAD 那份算基准, "
+         "这份只作本轮内重合并的留痕(不覆盖、不冒充已交付)。"
+         % (len(disk_merged), sha(disk_merged)[:12])),
         "- 草案原件 `A_DRAFT_ORIGINAL.md`: %d B, sha256 前缀 `%s` —— **本轮未改动**。"
         % (len(orig), sha(orig)[:12]),
         "- 本次修订快照: %d B, sha256 前缀 `%s`（盘上原字节直算）。"
@@ -134,7 +148,8 @@ def main() -> int:
         "新增节 %d 个, 消失节 %d 个。" % (changed, len(added_secs), len(dropped_secs)),
         "- 状态不变: **DRAFT_NOT_AUTHORIZED**。这份合并件本身不是可 dispatch 的对象; 能 dispatch 的"
         "是本轮现场包三件 —— 计划 %d B/`%s…`、行表 %d B/`%s…`、派生执行器 %d B/`%s…`（数字当场从盘"
-        "上重算）。离线门全绿之后仍要操作者**一次**整批准才动手; 本轮批准账未开、设备动作 0。"
+        "上重算）。离线门全绿之后仍要操作者**一次**整批准才动手; 本轮(F19)设备动作 0、未新增批准账"
+        "（F11 那一个账的 port_open=1 已用满, 不借它开第二次; 见交接件 field_run_f11 块）。"
         % (plan_b, plan_s, rows_b, rows_s, exe_b, exe_s),
         "- 本轮口径变化的来源是 A 的预算裁定原文 "
         "`inputs/A_R7F8F_BUDGET_PKG/R7F8F_A_BUDGET_RULING.md` 与裁定包独立复算回执 "

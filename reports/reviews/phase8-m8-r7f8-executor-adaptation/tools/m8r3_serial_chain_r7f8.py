@@ -424,6 +424,32 @@ def status_lines_allow_patterns(st):
     return pats
 
 
+def status_allow_literal_prefix(pat):
+    # 取模式串在第一个**真正通配**的结构之前的字面片段(去掉首尾锚点)。
+    # 给 PLAN_STATUS_ALLOW 用: 这段是"凡能被该模式 fullmatch 的行都必须以此开头"的确定前缀,
+    # 因此 expect_contains 里只要有它的子串, 运行期的正面要求门就一定成立。
+    # 反斜杠后面跟**字符类/断言**(d s w 与其大写、b B A Z)或反向引用才是通配; 跟在 \[ \] \(
+    # \) \. \* 以及**转义空格**后面的, 就是那个字符本身(冻结的 R7F7 计划整条模式都用反斜杠转义
+    # 空格, 把它当通配会把前缀截成 "[DIAG]" 而假判红)。
+    _CLS = "dDsSwWbBAZnrtfv0123456789"
+    s = pat[1:] if pat.startswith("^") else pat
+    out, i = [], 0
+    while i < len(s):
+        c = s[i]
+        if c == "\\" and i + 1 < len(s):
+            nxt = s[i + 1]
+            if nxt in _CLS:
+                break                               # 字符类/断言/反向引用: 不是字面
+            out.append(nxt)                         # 转义的字面字符(含转义空格)
+            i += 2
+            continue
+        if c in "$.*+?|{[(":
+            break
+        out.append(c)
+        i += 1
+    return "".join(out)
+
+
 def assert_step(st, rows, asname, led, raw=None):
     """把"响应完整"和"业务成功"分开判, 并把结论交给调度层。
 
@@ -440,6 +466,20 @@ def assert_step(st, rows, asname, led, raw=None):
     pats = status_lines_allow_patterns(st)
     allow_hit = [r.strip() for r in rows
                  if any(p.fullmatch(r.strip()) for p in pats)] if pats else []
+    # F11 现场补正(设备动作已发生那一次): 上面那句注释从 R7F8E 起就写着"必须同时被本步 expect
+    # 正面要求", 但**代码从来没核过** —— 于是写一条 status_lines_allow 实际等于"这步里凡是长得
+    # 像拒绝的行都免检"。计划侧那道门(validate-plan)要求锚定 + 硬字段, 运行期却没有对应强制,
+    # 两边口径不一致。这里把注释兑现成判据: 被放行的每一行都必须含本步 expect_contains 的某个
+    # 字面片段, 否则当场具名停止(fail-closed), 不做"看着像就放过"。
+    if allow_hit:
+        want = [e for e in st.get("expect_contains", []) if e]
+        loose = [l for l in allow_hit if not any(w in l for w in want)]
+        if loose:
+            led.ev("STATUS_ALLOW_NOT_POSITIVELY_REQUIRED",
+                   **{"as": asname, "lines": loose, "expect_contains": want})
+            raise Stop("STATUS_ALLOW_NOT_POSITIVELY_REQUIRED",
+                       "%s 用 status_lines_allow 放行了未被本步 expect_contains 正面要求的行: %s"
+                       % (asname, ";".join(loose)[:200]))
     rest = [r for r in rows if r.strip() not in allow_hit]
     # 业务层先判: 一条 FAILED/REFUSED/VOIDED 线是**业务结论**, 不能因为"这一步本来还想
     # 看见别的字串"就先把它的具名结果盖掉(内容缺失与业务失败是两个不同层的问题)。
@@ -4299,6 +4339,11 @@ def validate_plan(plan, rows_doc, app_dir):
                 elif not st.get("expect_values"):
                     sa_bad.append("%s/%s:豁免步骤没有 expect_values 硬字段判据"
                                   % (stg["id"], st.get("as")))
+                elif not any(w and w in status_allow_literal_prefix(p)
+                             for w in (st.get("expect_contains") or [])):
+                    sa_bad.append("%s/%s:豁免行的字面前缀 %r 没被本步 expect_contains 正面要求"
+                                  " => 运行期会具名停 STATUS_ALLOW_NOT_POSITIVELY_REQUIRED"
+                                  % (stg["id"], st.get("as"), status_allow_literal_prefix(p)))
                 else:
                     sa_seen.append("%s:%s" % (stg["id"], st.get("as")))
     # 字节损坏口子的唯一形状: 坏响应不作数 + 同会话更靠后的干净步骤**正面**给出同一事实(离线核形状)。
