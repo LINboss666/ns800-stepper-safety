@@ -1,0 +1,19 @@
+FETCH|PASS| tag]         v0.7-phase7-software-board-validated -> v0.7-phase7-software-board-validated
+TIP|PASS|49a4a39f92cf 期望=49a4a39f92cf
+REMOTE_BLOBS_READ|PASS|取到 16/16 件
+MANIFEST_RECOMPUTE|reports/reviews/phase8-m8-r7f8-executor-adaptation/ROUND_SHA256SUMS.txt|PASS|登记 94 条, 不符 0 条
+MANIFEST_RECOMPUTE|reports/reviews/phase8-m8-r7f8-closed-loop-draft/ROUND_SHA256SUMS.txt|PASS|登记 8 条, 不符 0 条
+MANIFEST_RECOMPUTE|reports/reviews/phase8-m8-r7f2b-safety-print-fix/SHA256SUMS.txt|PASS|登记 228 条, 不符 0 条
+MANIFEST_RECOMPUTE|reports/reviews/phase8-m8-r7f7-newimage-static/ROUND_SHA256SUMS.txt|PASS|登记 100 条, 不符 0 条
+BLOB_TOTAL|PASS|远端逐条复算 430/430 相符
+旧执行器在远端仍是 33d3f0af…|PASS|bytes=219491 sha=33d3f0af8a4c…
+派生件远端 blob == 本地原字节且 != 旧摘要|PASS|bytes=312387 sha=093c8408a019b378…
+产品子树(A 登记的那棵 = 顶层 rt-thread-master)仍为 A 登记值|PASS|32470c7ed44e 期望=32470c7ed44e(本轮 0 改产品; 路径口径见 A 包 TASK §1 与 R7F7 OFFLINE_REVIEW.md:53)
+applications 目录子树(我本机另算的一条, 非 A 登记值)|INFO|b052c480cf46 且与上一 tip d6bbc1b 相同=True
+SELFCHECK|产品子树判据会红|PASS|取不存在路径 rc=128(证明这条比对不是恒真)
+run_record §23 只出现一次|PASS|总节=24 §23=1
+草案合并件正文逐字承接远端那份修订快照|FAIL|正文行=304 快照行=290
+草案原件仍是 24780 B / b572c1928f60…|PASS|bytes=24780 sha=b572c1928f60…
+回读方式|INFO|逐件 cat-file -p <tip>:<path>(不做批量读取, 批量输出的分隔与内容换行不可靠)
+本地工作树未参与作证|INFO|所有比对都以远端 blob 为准; 本地只用于派生件字节一致性一条
+R7F8E_READBACK_SUMMARY|判据=18|FAIL=1|草案合并件正文逐字承接远端那份修订快照

@@ -159,18 +159,29 @@ def main() -> int:
         note("run_record §23 只出现一次", n23 == 1 and total >= 23,
              "总节=%d §23=%d" % (total, n23))
     md = got.get(DRAFT + "/R7F8_DRAFT_MERGED.md")
-    src = got.get(ROUND + "/inputs/A_R7F8F_PKG/R7F8_LIVING_DRAFT.md")
-    if md and src:
-        pre = md.decode("utf-8").splitlines()
-        i = [k for k, l in enumerate(pre) if l.startswith("## 本次合并与修订记录")]
-        body = pre[:i[0]] if i else []
-        while body and body[-1].strip() in ("", "---"):
-            body.pop()
-        note("草案合并件正文逐字承接远端那份修订快照",
-             body == src.decode("utf-8").splitlines(),
-             "正文行=%d 快照行=%d" % (len(body), len(src.decode("utf-8").splitlines())))
+    if md:
+        # 承接源**从远端合并件自己的记录节读**, 不再写死上一轮那个包路径: 上一版这里钉着
+        # inputs/A_R7F8F_PKG/R7F8_LIVING_DRAFT.md, 裁定包入库后这条就报"正文 304 vs 快照 290"
+        # —— 那是比对对象过期, 不是承接断了。
+        m = re.search(r"^- 承接来源: `([^`]+)`", md.decode("utf-8"), re.M)
+        src_rel = m.group(1) if m else None
+        src = blob(src_rel) if src_rel else None
+        if not src_rel:
+            note("草案合并件正文逐字承接远端那份修订快照", False,
+                 "远端合并件记录节里读不到「承接来源」那行(格式变了 => 不许退回写死的路径)")
+        else:
+            pre = md.decode("utf-8").splitlines()
+            i = [k for k, l in enumerate(pre) if l.startswith("## 本次合并与修订记录")]
+            body = pre[:i[0]] if i else []
+            while body and body[-1].strip() in ("", "---"):
+                body.pop()
+            note("草案合并件正文逐字承接远端那份修订快照",
+                 src is not None and body == src.decode("utf-8").splitlines(),
+                 "承接源=%s 正文行=%d 快照行=%s" % (
+                     src_rel, len(body),
+                     len(src.decode("utf-8").splitlines()) if src else "远端取不到"))
     else:
-        note("草案合并件正文逐字承接远端那份修订快照", False, "两件之一取不到")
+        note("草案合并件正文逐字承接远端那份修订快照", False, "远端取不到合并件")
     orig = got.get(DRAFT + "/A_DRAFT_ORIGINAL.md")
     note("草案原件仍是 24780 B / b572c1928f60…",
          orig is not None and len(orig) == 24780
