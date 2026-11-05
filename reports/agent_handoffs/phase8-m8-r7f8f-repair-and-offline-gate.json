@@ -283,7 +283,7 @@
   }
  },
  "self_injuries_registered": {
-  "count": 20,
+  "count": 21,
   "where": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/run_record.md §24.5（当场数出来的条目数）"
  },
  "device_actions_this_round": {

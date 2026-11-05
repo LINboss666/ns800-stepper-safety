@@ -1,5 +1,5 @@
 # sha256 * <仓库相对路径>(LF, 无 BOM; 本清单不哈希自身字节 —— 一条清单不能给自己的字节作证)
-# 生成方式: 对 reports/reviews/phase8-m8-r7f8-executor-adaptation/ 下每个常规文件直接读磁盘字节算 sha256(派生件/生成器/补丁/proof 19 份(含第一次回读判红原文)/合成计划与行表/inputs 里的 A 包原件 47 件全在内); 只排除 reports/reviews/phase8-m8-r7f8-executor-adaptation/proof/ 下**尚未进 Git** 且文件名含 remote_readback 的 .txt 回执 —— 它只能在推送之后才存在, 清单不能依赖自己交付之后的产物; 已提交的回执(如 first_attempt 判红原文)与工具件 tools/r7f8e_remote_readback.py 都是被交付的字节, 照常入列
+# 生成方式: 对 reports/reviews/phase8-m8-r7f8-executor-adaptation/ 下每个常规文件直接读磁盘字节算 sha256(派生件/生成器/补丁/proof 16 份(含第一次回读判红原文)/合成计划与行表/inputs 里的 A 包原件 47 件全在内); 只排除 reports/reviews/phase8-m8-r7f8-executor-adaptation/proof/ 下**尚未进 Git** 且文件名含 remote_readback 的 .txt 回执 —— 它只能在推送之后才存在, 清单不能依赖自己交付之后的产物; 已提交的回执(如 first_attempt 判红原文)与工具件 tools/r7f8e_remote_readback.py 都是被交付的字节, 照常入列
 # 条目数=95; 与 Git blob 的逐条复算由 reports/reviews/phase8-m8-r7f8-executor-adaptation/tools/r7f8e_staged_preflight.py(提交前)与 tools/r7f8e_remote_readback.py(推送后)完成
 # 重新生成: python reports/reviews/phase8-m8-r7f8-executor-adaptation/tools/r7f8e_make_sums.py --repo <仓库根>
 6740ba6a7cb934b7d8e6e5b8a0f85bc87d4e31644c8472d335b7e757211431e4  reports/reviews/phase8-m8-r7f8-executor-adaptation/ERRATA_R7F8E.md
@@ -84,7 +84,7 @@ c48c6921f840d4c5fdcdc2f7703870d3115b4fd98374e003ed3d81ace82fd066  reports/review
 cfb6487240052c79de279eb5f00786a03bd5e9dff5687a70997f789c6e9209ca  reports/reviews/phase8-m8-r7f8-executor-adaptation/tools/r7f8e_case_matrix.py
 e5c3fec8c4f41f16868cea8c1a381a060698bb72fb098138ec010214c65421a4  reports/reviews/phase8-m8-r7f8-executor-adaptation/tools/r7f8e_case_matrix_pre_r7f8f.py
 d6daaf82b5984548b4120691cb757cfeb3b6cd35d54be823406f184093aa4d89  reports/reviews/phase8-m8-r7f8-executor-adaptation/tools/r7f8e_make_handoff.py
-6857452b05da8fc834c393af27a52ade0a986bc91ce75e4a7957527f7de4f051  reports/reviews/phase8-m8-r7f8-executor-adaptation/tools/r7f8e_make_sums.py
+952756fed08ee6dc853b4443af4d8c5d8ce9d376197802b74692337ff6c31900  reports/reviews/phase8-m8-r7f8-executor-adaptation/tools/r7f8e_make_sums.py
 45b4de13c0d75d74afc6e4bd3225098f48fc49bfe6e8b5f7e092f380a2bb3b4f  reports/reviews/phase8-m8-r7f8-executor-adaptation/tools/r7f8e_merge_draft.py
 34db39e627cba9043f794507ae5c98ea5bc803157dca8317beb2b0be4d07019a  reports/reviews/phase8-m8-r7f8-executor-adaptation/tools/r7f8e_no_regression.py
 188058d4bdcab853734378f848398265163df31900fcaa4fdbf6a65d6162e8d3  reports/reviews/phase8-m8-r7f8-executor-adaptation/tools/r7f8e_remote_readback.py

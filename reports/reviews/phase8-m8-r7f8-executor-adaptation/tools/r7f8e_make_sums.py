@@ -79,13 +79,24 @@ def main() -> int:
     a = ap.parse_args()
     root = a.repo.resolve()
 
-    def nf(rel_dir):
+    def nf(rel_dir, skip_pending_receipts=False):
         """说明行里的**件数**一律当场数盘上常规文件, 不写字面量 —— 上一版写了"A 包原件 24 件",
-        裁定包入库后那句就过期了(过期数字混在清单头里, 审核者会以为清单没重算)。"""
+        裁定包入库后那句就过期了(过期数字混在清单头里, 审核者会以为清单没重算)。
+        proof 那一格还要跳过**推送后才存在的回读回执**(与清单排除同一条规则): 否则清单头依赖
+        一个只有交付之后才会出现的文件, 重跑一次就把已交付的字节改掉(本轮踩过, §24.5 第 21 条)。"""
         d = root / rel_dir
-        return len([p for p in d.rglob("*") if p.is_file()]) if d.is_dir() else 0
+        if not d.is_dir():
+            return 0
+        tk = tracked(root, root / ROUND)
+        ps = [p for p in d.rglob("*") if p.is_file()]
+        if skip_pending_receipts:
+            ps = [p for p in ps
+                  if not (p.relative_to(root).as_posix().startswith(ROUND + "/proof/")
+                          and "remote_readback" in p.name and p.suffix == ".txt"
+                          and p.relative_to(root).as_posix() not in tk)]
+        return len(ps)
 
-    inputs_n, proof_n = nf(ROUND + "/inputs"), nf(ROUND + "/proof")
+    inputs_n, proof_n = nf(ROUND + "/inputs"), nf(ROUND + "/proof", True)
     living = root / (ROUND + "/inputs/A_R7F8F_BUDGET_PKG/R7F8_LIVING_DRAFT.md")
     living_id = "%d B / %s…" % (living.stat().st_size, sha(living)[:12]) if living.is_file() \
         else "NA(不在盘上)"
