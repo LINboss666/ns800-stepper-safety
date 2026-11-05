@@ -166,23 +166,26 @@ def main() -> int:
     # 清单覆盖面: 本轮目录里每个磁盘文件要么在清单里, 要么是**声明排除的那一件**
     # (推送后才存在的回读回执)。回执本身不得入库 —— 否则清单就漏掉了一件已提交的字节。
     man_rel = set(r for _, r in entries(repo, ROUND + "/ROUND_SHA256SUMS.txt"))
-    EXCLUDED = ROUND + "/proof/r7f8e_remote_readback.txt"
+    # 推送之后才存在的远端回读回执一律排除(每轮写独立文件名, 所以按后缀族匹配而不是点名单一条)
+    EXCLUDED_PREFIX = ROUND + "/proof/"
+    def is_receipt(x):
+        return x.startswith(EXCLUDED_PREFIX) and "remote_readback" in x and x.endswith(".txt")
     SELF = ROUND + "/ROUND_SHA256SUMS.txt"
     disk_rel = set(p.relative_to(repo).as_posix() for p in (repo / ROUND).rglob("*")
                    if p.is_file() and "__pycache__" not in p.parts)
-    uncovered = sorted(x for x in disk_rel if x not in man_rel and x not in (EXCLUDED, SELF))
-    staged_excluded = EXCLUDED in staged
+    uncovered = sorted(x for x in disk_rel if x not in man_rel and x != SELF and not is_receipt(x))
+    staged_excluded = [x for x in staged if is_receipt(x)]
     print("MANIFEST_COVERAGE|磁盘=%d 清单=%d 未覆盖=%d %s|回执已暂存=%s"
-          % (len(disk_rel), len(man_rel), len(uncovered), uncovered[:5], staged_excluded))
+          % (len(disk_rel), len(man_rel), len(uncovered), uncovered[:5], bool(staged_excluded)))
     if uncovered or staged_excluded:
         problems.append("manifest_coverage")
     # 覆盖面判据自己的负控: 从清单里抽掉一条真实登记的件, **用同一段判定代码**再跑一次,
     # 它必须立刻出现在"未覆盖"里。(写成 `drop not in man_rel - {drop}` 是恒真, 不算负控。)
     if man_rel:
-        drop = sorted(man_rel - {EXCLUDED, SELF})[0]
+        drop = sorted(x for x in man_rel if x != SELF and not is_receipt(x))[0]
         reduced = man_rel - {drop}
         probe_uncovered = sorted(x for x in disk_rel
-                                 if x not in reduced and x not in (EXCLUDED, SELF))
+                                 if x not in reduced and x != SELF and not is_receipt(x))
         fired = drop in probe_uncovered
         print("SELFCHECK_COVERAGE|抽掉 %s 后重跑判定 => 未覆盖=%d 条, 抽掉的那条在其中=%s"
               % (drop[:46], len(probe_uncovered), fired))

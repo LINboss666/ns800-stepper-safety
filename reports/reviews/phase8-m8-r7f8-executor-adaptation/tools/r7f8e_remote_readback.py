@@ -67,6 +67,8 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--repo", required=True, type=pathlib.Path)
     ap.add_argument("--tip", default="")
+    ap.add_argument("--out-name", default="r7f8e_remote_readback.txt",
+                    help="回执文件名(每次运行写独立文件, 不覆盖上一轮的首次失败原文)")
     ap.add_argument("--work", type=pathlib.Path,
                     default=pathlib.Path("D:/ns800_r7f8e_readback"))
     a = ap.parse_args()
@@ -177,8 +179,8 @@ def main() -> int:
     text = "\n".join(out + ["R7F8E_READBACK_SUMMARY|判据=%d|FAIL=%d|%s"
                            % (len(out), len(fails), ",".join(fails) if fails else "none")]) + "\n"
     (repo / ROUND / "proof").mkdir(parents=True, exist_ok=True)
-    (repo / ROUND / "proof/r7f8e_remote_readback.txt").write_text(text, encoding="utf-8",
-                                                                   newline="\n")
+    (repo / ROUND / "proof" / a.out_name).write_text(text, encoding="utf-8",
+                                                     newline="\n")
     print(text, end="")
     try:
         shutil.rmtree(str(work), ignore_errors=False)
