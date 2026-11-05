@@ -1156,9 +1156,23 @@ config_save/clear/retry/物理刺激额度全 0；`polarity_measured=false`、`c
    `JOB_CONTRACT_VIOLATED` 停 —— 计划作者化时的漏项，已补 `post_cancel`。
 9. 一次编辑把离线门里 `FIELD_PLAN_PREREQ_NOT_SELF_CERTIFIED` 的参数行删掉（语法坏），另一次把
    变更表工具里的三元表达式连同引号一起改掉（打印出乱码字面量）。两处都在本轮内修好并重跑。
-10. 我自己的畸形行表突变（删掉整个 `healthy` 分支）让执行器在**开端口之前**抛裸 KeyError 带
+10. 上一轮留下的远端回读工具把"合并件正文应逐字承接 A 的修订快照"钉在 R7F8E 那份快照上；
+    本轮按 A 的 R7F8F 活草案重新合并之后，这条判据假红（正文 290 行 vs 旧快照 272 行）。改成
+    比对**当前**来源 `inputs/A_R7F8F_PKG/R7F8_LIVING_DRAFT.md`，旧快照仍在回读集合里保身份。
+
+11. 我自己的畸形行表突变（删掉整个 `healthy` 分支）让执行器在**开端口之前**抛裸 KeyError 带
     traceback 退出。这是继承自冻结件的既有行为，任务书没列这项，本轮不改语义，只在整包门里登记
     成 `ROWS_BRANCH_MISSING_KNOWN_GAP`（保留 rc=1 与 traceback 原文），交 A 定要不要单开一轮。
+
+12. 把清单的回执排除改成"按文件名族"之后，排除口开得过大两处：`tools/r7f8e_remote_readback.py`
+    （被交付的代码）被同一条规则排出清单，覆盖面判定当场报
+    `未覆盖=1 ['…/tools/r7f8e_remote_readback.py']`；把口子收到"本轮 `proof/` 下的 .txt"之后，
+    又发现 `proof/r7f8e_remote_readback_first_attempt.txt`（`e97aaa4` **已提交**的判红原文）也被
+    挤了出去 —— 在库证据没有清单条目等于覆盖面判据自己漏了一格。最终口径：只免
+    **本轮尚未进 Git 的那一份 proof 回执**（推送之后才存在，清单不能依赖自己交付之后的产物），
+    已提交的回执与工具件照常入列；生成器与预检用同一条规则，并给新判据加了元负控
+    （抽掉一份在库回执 => `在库回执未列` 必须命中）。`DRAFT` 与 `R7F2B` 沿用各自原有的按文件名
+    排除，不受影响。重算后条目数 80/8/228。
 
 ### 24.6 口径更正两件
 

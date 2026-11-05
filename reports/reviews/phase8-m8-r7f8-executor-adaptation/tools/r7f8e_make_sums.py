@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import pathlib
+import subprocess
 import sys
 
 ROUND = "reports/reviews/phase8-m8-r7f8-executor-adaptation"
@@ -27,12 +28,45 @@ def sha(p):
     return hashlib.sha256(p.read_bytes()).hexdigest()
 
 
-def write(root, target, out_name, notes, exclude_names=()):
+def tracked(root, target):
+    """Git 索引里的相对路径集合(含已暂存未提交的件)。"""
+    out = subprocess.run(["git", "-C", str(root), "ls-files", "--",
+                          target.relative_to(root).as_posix()],
+                         capture_output=True).stdout.decode("utf-8", "replace")
+    return set(x for x in out.splitlines() if x)
+
+
+def is_readback_receipt(root, target, p, tracked_rel):
+    """推送后才存在的回读回执不列入清单; 但**只认本轮 proof/ 下、且还没进 Git 的那些 .txt**。
+
+    两条收窄都有实例依据:
+      * 上一版按文件名族(名字含 remote_readback 一律排除)把 `tools/r7f8*_remote_readback.py`
+        这些**被交付的代码**也排除了, 覆盖面判定当场报未覆盖;
+      * 再收窄到 proof/ 后仍会把 `proof/r7f8e_remote_readback_first_attempt.txt`
+        (e97aaa4 已提交的判红原文)挤出清单 —— 已入库的证据字节必须继续有清单条目。
+    所以口径是"尚未进 Git 的回执"= 本轮推送之后才会存在的那一份; 一旦某轮回执被提交,
+    下一次的清单就把它列回去。与 r7f8e_staged_preflight.py 的 is_receipt 同一条规则。
+    """
+    rel = p.relative_to(root).as_posix()
+    return (rel.startswith((target.relative_to(root).as_posix()) + "/proof/")
+            and "remote_readback" in p.name and p.suffix == ".txt"
+            and rel not in tracked_rel)
+
+
+def write(root, target, out_name, notes, exclude_names=(), drop_receipts=False):
     self_rel = (target / out_name).relative_to(root).as_posix()
-    files = sorted(p for p in target.rglob("*") if p.is_file()
-                   and p.name not in exclude_names
-                   and p.relative_to(root).as_posix() != self_rel
-                   and "__pycache__" not in p.parts)
+    tk = tracked(root, target) if drop_receipts else set()
+    disk = [p for p in target.rglob("*") if p.is_file() and "__pycache__" not in p.parts]
+    dropped = sorted(p.relative_to(root).as_posix() for p in disk
+                     if drop_receipts and is_readback_receipt(root, target, p, tk))
+    files = sorted(p for p in disk if p.name not in exclude_names
+                   # 回执**按"本轮尚未入库的 proof 回执"**排除: 每轮写独立文件名(操作者要求
+                   # 不覆盖上一轮的首次失败原文), 只点名一条会让新一轮的回执被当成
+                   # 清单里的已交付字节。
+                   and not (drop_receipts and is_readback_receipt(root, target, p, tk))
+                   and p.relative_to(root).as_posix() != self_rel)
+    if dropped:
+        print("SUMS_EXCLUDED_RECEIPTS|%s" % ",".join(dropped))
     body = ["%s  %s" % (sha(p), p.relative_to(root).as_posix()) for p in files]
     with open(str(target / out_name), "wb") as f:
         f.write(("\n".join(notes(len(files)) + body) + "\n").encode("utf-8"))
@@ -48,12 +82,13 @@ def main() -> int:
         HEAD,
         "# 生成方式: 对 %s/ 下每个常规文件直接读磁盘字节算 sha256"
         "(派生件/生成器/补丁/四份 proof(含第一次回读判红原文)/合成计划与行表/A 包原件 24 件全在内); "
-        "按**文件名**排除 r7f8e_remote_readback.txt —— 它只能在推送之后才存在, "
-        "清单不能依赖自己交付之后的产物" % ROUND,
+        "只排除 %s/proof/ 下**尚未进 Git** 且文件名含 remote_readback 的 .txt 回执 —— 它只能在推送"
+        "之后才存在, 清单不能依赖自己交付之后的产物; 已提交的回执(如 first_attempt 判红原文)与"
+        "工具件 tools/r7f8e_remote_readback.py 都是被交付的字节, 照常入列" % (ROUND, ROUND),
         "# 条目数=%d; 与 Git blob 的逐条复算由 %s/tools/r7f8e_staged_preflight.py(提交前)"
         "与 tools/r7f8e_remote_readback.py(推送后)完成" % (n, ROUND),
         "# 重新生成: python %s/tools/r7f8e_make_sums.py --repo <仓库根>" % ROUND],
-        exclude_names=("r7f8e_remote_readback.txt",))
+        exclude_names=("r7f8e_remote_readback.txt",), drop_receipts=True)
     write(root, root / DRAFT, "ROUND_SHA256SUMS.txt", lambda n: [
         HEAD,
         "# 生成方式: 对 %s/ 下每个常规文件直接读磁盘字节算 sha256(草案原件/合并版/判据原文/工具全在内)" % DRAFT,

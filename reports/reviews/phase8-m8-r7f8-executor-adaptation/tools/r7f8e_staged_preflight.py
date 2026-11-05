@@ -166,26 +166,39 @@ def main() -> int:
     # 清单覆盖面: 本轮目录里每个磁盘文件要么在清单里, 要么是**声明排除的那一件**
     # (推送后才存在的回读回执)。回执本身不得入库 —— 否则清单就漏掉了一件已提交的字节。
     man_rel = set(r for _, r in entries(repo, ROUND + "/ROUND_SHA256SUMS.txt"))
-    # 推送之后才存在的远端回读回执一律排除(每轮写独立文件名, 所以按后缀族匹配而不是点名单一条)
+    # 排除口与 r7f8e_make_sums.py 逐字同一条规则: 只免"**还没进 Git** 的 proof 回执"(本轮推送
+    # 之后才存在的那一份)。按文件名族一律排除会连带免掉 ① 回读**工具**本身, ② e97aaa4 已提交
+    # 的 first_attempt 判红原文 —— 后者是在库证据, 必须有清单条目给它作证。
+    tracked_rel = set(x for x in subprocess.run(
+        ["git", "-C", str(repo), "ls-files", "--", ROUND], capture_output=True).stdout
+        .decode("utf-8", "replace").splitlines() if x)
     EXCLUDED_PREFIX = ROUND + "/proof/"
+    def is_new_receipt(x):
+        return (x.startswith(EXCLUDED_PREFIX) and "remote_readback" in x
+                and x.endswith(".txt") and x not in tracked_rel)
     def is_receipt(x):
-        return x.startswith(EXCLUDED_PREFIX) and "remote_readback" in x and x.endswith(".txt")
+        return (x.startswith(EXCLUDED_PREFIX) and "remote_readback" in x
+                and x.endswith(".txt"))
     SELF = ROUND + "/ROUND_SHA256SUMS.txt"
     disk_rel = set(p.relative_to(repo).as_posix() for p in (repo / ROUND).rglob("*")
                    if p.is_file() and "__pycache__" not in p.parts)
-    uncovered = sorted(x for x in disk_rel if x not in man_rel and x != SELF and not is_receipt(x))
-    staged_excluded = [x for x in staged if is_receipt(x)]
-    print("MANIFEST_COVERAGE|磁盘=%d 清单=%d 未覆盖=%d %s|回执已暂存=%s"
-          % (len(disk_rel), len(man_rel), len(uncovered), uncovered[:5], bool(staged_excluded)))
-    if uncovered or staged_excluded:
+    uncovered = sorted(x for x in disk_rel if x not in man_rel and x != SELF
+                       and not is_new_receipt(x))
+    tracked_missing = [x for x in sorted(t for t in tracked_rel if is_receipt(t))
+                       if x not in man_rel and x != SELF]
+    staged_excluded = [x for x in staged if is_new_receipt(x)]
+    print("MANIFEST_COVERAGE|磁盘=%d 清单=%d 未覆盖=%d %s|在库回执未列=%s|新回执已暂存=%s"
+          % (len(disk_rel), len(man_rel), len(uncovered), uncovered[:5],
+             tracked_missing, bool(staged_excluded)))
+    if uncovered or tracked_missing or staged_excluded:
         problems.append("manifest_coverage")
     # 覆盖面判据自己的负控: 从清单里抽掉一条真实登记的件, **用同一段判定代码**再跑一次,
     # 它必须立刻出现在"未覆盖"里。(写成 `drop not in man_rel - {drop}` 是恒真, 不算负控。)
     if man_rel:
-        drop = sorted(x for x in man_rel if x != SELF and not is_receipt(x))[0]
+        drop = sorted(x for x in man_rel if x != SELF and not is_new_receipt(x))[0]
         reduced = man_rel - {drop}
         probe_uncovered = sorted(x for x in disk_rel
-                                 if x not in reduced and x != SELF and not is_receipt(x))
+                                 if x not in reduced and x != SELF and not is_new_receipt(x))
         fired = drop in probe_uncovered
         print("SELFCHECK_COVERAGE|抽掉 %s 后重跑判定 => 未覆盖=%d 条, 抽掉的那条在其中=%s"
               % (drop[:46], len(probe_uncovered), fired))
@@ -193,6 +206,18 @@ def main() -> int:
             problems.append("coverage_comparator_dead")
     else:
         problems.append("coverage_comparator_dead")
+    # 新增那条"在库回执必须仍被列出"的判据也要自证会命中: 从清单里抽掉一份**已提交**的回执,
+    # 它必须立刻出现在 tracked_missing 里。没有可抽的件就如实报不适用, 不写成通过。
+    listed_tracked = [x for x in sorted(t for t in tracked_rel if is_receipt(t))
+                      if x in man_rel]
+    if listed_tracked:
+        probe2 = [x for x in listed_tracked if x not in (man_rel - {listed_tracked[0]})]
+        print("SELFCHECK_TRACKED_RECEIPT_LISTED|在库回执=%d 份, 抽掉 %s 后该判据命中=%s"
+              % (len(listed_tracked), listed_tracked[0][:46], bool(probe2)))
+        if not probe2:
+            problems.append("tracked_receipt_gate_dead")
+    else:
+        print("SELFCHECK_TRACKED_RECEIPT_LISTED|清单里没有已提交的回执可抽 => 不适用")
 
     # 派生件必须是"新身份": 等于旧摘要就是冒用, 等于 A 包登记值也是。
     new_blob = b.get(":" + NEW_EXE)

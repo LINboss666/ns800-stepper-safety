@@ -43,6 +43,9 @@ EXTRA = [NEW_EXE, OLD_EXE, R7F2B + "/run_record.md",
          ROUND + "/ERRATA_R7F8E.md", ROUND + "/R7F8E_DELIVERY.md",
          ROUND + "/inputs/A_R7F8E_PKG/TASK_R7F8E_EXECUTOR_OFFLINE.md",
          ROUND + "/inputs/A_R7F8E_PKG/R7F8_DRAFT_UPDATED.md",
+         # R7F8F 轮起, 草案的**当前**来源是 A 包里的活草案(上一版把承接比对钉在 R7F8E 的
+         # 快照上, 于是本轮合并件按新草案生成后这条判据就假红: 正文 290 行 vs 旧快照 272 行)。
+         ROUND + "/inputs/A_R7F8F_PKG/R7F8_LIVING_DRAFT.md",
          "reports/agent_handoffs/phase8-m8-r7f8-executor-adaptation.md",
          "reports/agent_handoffs/phase8-m8-r7f8-executor-adaptation.json"]
 
@@ -156,7 +159,7 @@ def main() -> int:
         note("run_record §23 只出现一次", n23 == 1 and total >= 23,
              "总节=%d §23=%d" % (total, n23))
     md = got.get(DRAFT + "/R7F8_DRAFT_MERGED.md")
-    src = got.get(ROUND + "/inputs/A_R7F8E_PKG/R7F8_DRAFT_UPDATED.md")
+    src = got.get(ROUND + "/inputs/A_R7F8F_PKG/R7F8_LIVING_DRAFT.md")
     if md and src:
         pre = md.decode("utf-8").splitlines()
         i = [k for k, l in enumerate(pre) if l.startswith("## 本次合并与修订记录")]
