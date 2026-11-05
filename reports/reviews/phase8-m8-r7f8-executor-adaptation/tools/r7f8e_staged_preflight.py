@@ -2,6 +2,8 @@
 """R7F8E 轮的提交前置检查(只读 git 暂存区, 不写任何被检文件)。
 
 六件事, 每件都带"必须会命中"的负控, 否则拒绝宣布干净:
+  0) 清单覆盖面: 本轮目录里每个磁盘文件都要么在清单里, 要么是两件声明排除项之一
+     (清单自身、推送后才存在的回读回执), 且该回执**不得被暂存**(提交了它, 清单就漏掉一件已入库的字节);
   1) 暂存 blob 的 sha256 与磁盘字节、与清单登记值三方对账(先把首条改坏, 确认比较器会报警);
   2) 暂存集里不得出现身份性形态: 私有 DAP UID 明文(两种大小写)/用户主目录片段/漫游数据目录片段;
      模式一律运行时拼装 —— 写成连续字面量会被本扫描抓到(检查器自己就是泄漏源);
@@ -160,6 +162,34 @@ def main() -> int:
     print("PRODUCT_CLEAN|产品与主机链待提交改动=%d 件" % len([x for x in rc.splitlines() if x]))
     if rc:
         problems.append("PRODUCT_DIRTY")
+
+    # 清单覆盖面: 本轮目录里每个磁盘文件要么在清单里, 要么是**声明排除的那一件**
+    # (推送后才存在的回读回执)。回执本身不得入库 —— 否则清单就漏掉了一件已提交的字节。
+    man_rel = set(r for _, r in entries(repo, ROUND + "/ROUND_SHA256SUMS.txt"))
+    EXCLUDED = ROUND + "/proof/r7f8e_remote_readback.txt"
+    SELF = ROUND + "/ROUND_SHA256SUMS.txt"
+    disk_rel = set(p.relative_to(repo).as_posix() for p in (repo / ROUND).rglob("*")
+                   if p.is_file() and "__pycache__" not in p.parts)
+    uncovered = sorted(x for x in disk_rel if x not in man_rel and x not in (EXCLUDED, SELF))
+    staged_excluded = EXCLUDED in staged
+    print("MANIFEST_COVERAGE|磁盘=%d 清单=%d 未覆盖=%d %s|回执已暂存=%s"
+          % (len(disk_rel), len(man_rel), len(uncovered), uncovered[:5], staged_excluded))
+    if uncovered or staged_excluded:
+        problems.append("manifest_coverage")
+    # 覆盖面判据自己的负控: 从清单里抽掉一条真实登记的件, **用同一段判定代码**再跑一次,
+    # 它必须立刻出现在"未覆盖"里。(写成 `drop not in man_rel - {drop}` 是恒真, 不算负控。)
+    if man_rel:
+        drop = sorted(man_rel - {EXCLUDED, SELF})[0]
+        reduced = man_rel - {drop}
+        probe_uncovered = sorted(x for x in disk_rel
+                                 if x not in reduced and x not in (EXCLUDED, SELF))
+        fired = drop in probe_uncovered
+        print("SELFCHECK_COVERAGE|抽掉 %s 后重跑判定 => 未覆盖=%d 条, 抽掉的那条在其中=%s"
+              % (drop[:46], len(probe_uncovered), fired))
+        if not fired:
+            problems.append("coverage_comparator_dead")
+    else:
+        problems.append("coverage_comparator_dead")
 
     # 派生件必须是"新身份": 等于旧摘要就是冒用, 等于 A 包登记值也是。
     new_blob = b.get(":" + NEW_EXE)

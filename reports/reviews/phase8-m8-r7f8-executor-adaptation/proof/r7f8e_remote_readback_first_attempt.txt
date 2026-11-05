@@ -1,0 +1,17 @@
+FETCH|PASS| tag]         v0.7-phase7-software-board-validated -> v0.7-phase7-software-board-validated
+TIP|PASS|42d7f7d76185 期望=42d7f7d76185
+REMOTE_BLOBS_READ|PASS|取到 15/15 件
+MANIFEST_RECOMPUTE|reports/reviews/phase8-m8-r7f8-executor-adaptation/ROUND_SHA256SUMS.txt|PASS|登记 47 条, 不符 0 条
+MANIFEST_RECOMPUTE|reports/reviews/phase8-m8-r7f8-closed-loop-draft/ROUND_SHA256SUMS.txt|PASS|登记 8 条, 不符 0 条
+MANIFEST_RECOMPUTE|reports/reviews/phase8-m8-r7f2b-safety-print-fix/SHA256SUMS.txt|PASS|登记 228 条, 不符 0 条
+MANIFEST_RECOMPUTE|reports/reviews/phase8-m8-r7f7-newimage-static/ROUND_SHA256SUMS.txt|PASS|登记 100 条, 不符 0 条
+BLOB_TOTAL|PASS|远端逐条复算 383/383 相符
+旧执行器在远端仍是 33d3f0af…|PASS|bytes=219491 sha=33d3f0af8a4c…
+派生件远端 blob == 本地原字节且 != 旧摘要|PASS|bytes=245730 sha=4c962170b2357eef…
+产品源码子树 tree 仍为 A 登记值|FAIL|b052c480cf46 期望=32470c7ed44e(本轮 0 改产品)
+run_record §23 只出现一次|PASS|总节=23 §23=1
+草案合并件正文逐字承接远端那份修订快照|PASS|正文行=272 快照行=272
+草案原件仍是 24780 B / b572c1928f60…|PASS|bytes=24780 sha=b572c1928f60…
+回读方式|INFO|逐件 cat-file -p <tip>:<path>(不做批量读取, 批量输出的分隔与内容换行不可靠)
+本地工作树未参与作证|INFO|所有比对都以远端 blob 为准; 本地只用于派生件字节一致性一条
+R7F8E_READBACK_SUMMARY|判据=16|FAIL=1|产品源码子树 tree 仍为 A 登记值

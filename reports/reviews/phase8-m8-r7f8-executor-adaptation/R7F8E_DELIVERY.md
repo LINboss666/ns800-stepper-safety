@@ -40,7 +40,7 @@ sha256 `4c962170b2357eef94afd73d43790d61880635a3d13287d29d543035768d6fed`。
 | --- | --- | --- |
 | `proof/r7f8e_case_matrix.txt` | **判据=65 FAIL=0** | B 身份与绑定 / D 正常 DONE / C 活动取消 / T 异常终态 / P 轮询边界与字节门 / Q 额度 / E 通电与运动 / L 清理对账 / M 首因与拒绝 / I 身份反例（进程内）/ R 原始字节探针，加 4 例源码锚点与"故意写错预期必须判红"的自证 |
 | 元负控（真运行被破坏副本） | **5 例全部命中** | `X1 固定 ID=1`（摘门后真的发出了 `diag_profile learn_cancel 1`）、`X2 把任何终态当成功`（TIMEOUT 被等成 `POLL_WINDOW_EXPIRED`）、`X3 移除取消额度行`（摘门后取消命令无账发出且会话变绿）、`X4 把 arm 截止改回 start 起算`（`ARM_ENERGIZE_DEADLINE_EXCEEDED` 消失）、`X5 清理预留账改回旧写法`（L3 错报 success=True）。没有一处是靠打印 "INJECTED" 代替执行 |
-| `proof/r7f8e_stub_package.txt` | **判据=27 FAIL=0** | STUB_ONLY 取消＋DONE 合成整包（JOB_ID 非固定，台账 `JOB_ID_BOUND={cancel_job:17, done_job:73}`，实发 `diag_profile learn_cancel 17`），加等价负例四场：`N1_拒绝=BUSINESS_FAILED`、`N2_次数上限=POLL_ATTEMPTS_EXHAUSTED`、`N2b_窗口到期=POLL_WINDOW_EXPIRED`、`N3_证据不完整=NUL_BYTE_IN_RESPONSE`；每场都给额度账、首错、清理与撤能披露。同一份合成计划走 `--transport real` 在**任何端口动作之前**被具名拒绝，台账里 0 条开口事件 |
+| `proof/r7f8e_stub_package.txt` | **判据=29 FAIL=0** | STUB_ONLY 取消＋DONE 合成整包（JOB_ID 非固定，台账 `JOB_ID_BOUND={cancel_job:17, done_job:73}`，实发 `diag_profile learn_cancel 17`），加等价负例四场：`N1_拒绝=BUSINESS_FAILED`、`N2_次数上限=POLL_ATTEMPTS_EXHAUSTED`、`N2b_窗口到期=POLL_WINDOW_EXPIRED`、`N3_证据不完整=NUL_BYTE_IN_RESPONSE`；每场都给额度账、首错、清理与撤能披露。同一份合成计划走 `--transport real` 在**任何端口动作之前**被具名拒绝，台账里 0 条开口事件 |
 | `proof/r7f8e_no_regression.txt` | **判据=8 FAIL=0** | 同一份冻结 R7F7 定稿计划：旧件 `checks=57 fail=1` → 派生件 `checks=62 fail=1`。旧判据 0 条被洗掉；新增 5 条全部以 `R7F8E_` 开头；唯一既有 FAIL 仍是 `PLAN_MOTION_CAP_BUDGET`（空运动链的既有检查器缺口，R7F8 草案轮已登记） |
 | `proof/r7f8e_case_matrix_before_fix.txt` | 修前基线（18 条 FAIL） | 本轮第一次真跑判红原文留档，含 T1 的 `Ledger.ev(kind=…)` TypeError 与清理段 TX 判据恒真空两处自伤 |
 
@@ -90,11 +90,32 @@ sha256 `4c962170b2357eef94afd73d43790d61880635a3d13287d29d543035768d6fed`。
   ⇒ 喂端口时 `join` 当场 TypeError；⑦ 首错去 `DISPATCH_SUMMARY` 里找 `code=`，而那一条在整包级恒空；
   ⑧ 把"额度未申报"与"作业未绑定"两道都在写前的门混着测，Q1–Q3 全部被无关门抢答；
   ⑨ 计划缺 `tools` 面时旧件崩溃而我没有先复算就以为是自己写错；⑩ 声明"逐字节承接"之前
-  没有让工具自己剪节复算一遍（现补 `INHERIT_EXACT` 一行）。
+  没有让工具自己剪节复算一遍（现补 `INHERIT_EXACT` 一行）；⑪ stub proof 里漏出仓外临时目录的
+  真实路径 ⇒ 四种斜杠形态逐一掩成 `<WORK>`，并把它写成两条可判红的断言（`交付件里不留仓外试验目录
+  (四种形态逐一掩成 <WORK>)` + `这条掩码判据不是恒真空(掩前确实出现过)`，实测 `掩前命中=3/4 种,
+  掩后残留=0 种`），另加一道不计入判据的末次硬门：合成后的整份文件里若仍出现任一形态就 `rc=2`
+  拒绝交付。这道硬门在本轮**第一次真跑就烧过**——掩码只作用在原文块上、没作用在判据行上，
+  被抓出来后改成对整份正文掩（这也是为什么掩码判据自己排在掩之后追加：它不能是被掩的对象）；
+  ⑫ 预检的白名单自解析判据按"恰好 11 个空格 + 行尾逗号"找字面量，而首元素写成 `ROUND + "/"`
+  拼接、末元素后面跟着收尾括号 ⇒ 只解析出 6/8 条，这条判据**把自己的白名单判成不相等**
+  （改为一行一条完整字面量，并加"字面量与常量同步"一条防两边漂移）；
+  ⑬ 回读的"产品子树"判据把 A 登记的 `32470c7e…` 当成 `applications` 全路径去取，第一次真跑
+  就报假 FAIL（实际取到 `b052c480cf46`）。这个路径口径在 R7F7 轮
+  `reports/reviews/phase8-m8-r7f7-newimage-static/OFFLINE_REVIEW.md:53` 已经写明是**顶层
+  `rt-thread-master` 子树**的对象号，我没回查就写判据；判据改正后另加一条 `SELFCHECK|产品子树判据会红`
+  （取一个不存在的路径，证明这条比对不是恒真），第一次真跑的判红原文留在
+  `proof/r7f8e_remote_readback_first_attempt.txt`；
+  ⑭ 回读的 §23 判据要从 `got` 里取 `run_record.md`，但 `EXTRA` 原本没有这件 ⇒ 必然报"远端取不到"，
+  这条是第一次真跑**之前**读自己脚本发现的、不是被执行抓到的（已补进 `EXTRA`）；
+  ⑮ 按目录 `git add` 时把**推送后才该存在的回读回执** `proof/r7f8e_remote_readback.txt` 一起暂存了，
+  而当时六项预检全绿也拦不住它（这条是我在 `git status` 里看到的，不是工具抓的）。现在补第 0 项
+  `MANIFEST_COVERAGE`：本轮目录里每个磁盘文件都要么在清单里、要么正是那件声明排除的回执，
+  且回执**不得入库**；它自带一个用同一段判定代码重跑的负控（从清单抽掉一条真实登记，那条必须
+  立刻出现在"未覆盖"里）—— 我第一版把负控写成 `drop not in man_rel - {drop}`，那是恒真，不算负控。
 - 材料缺口（如实登记）：任务书与被引用的现场草案最初不在会话附件里，我先按用户正文口径做了一版
   自设计适配；拿到 `NS800_R7F8E_Executor_Offline_Adaptation_20261105.zip` 后，那版自设计件
-  （`field/m8r4_serial_chain.py`、`tools/r7f8e_negative_checks.py` 及其 proof）已整体废弃删除，
-  本包全部命名、键名、门语义与交付清单按 A 的任务书 §3/§4/§5 重做。
+  （`field/m8r4_serial_chain.py`、`tools/r7f8e_negative_checks.py` 及其 proof）整体废弃，
+  已从仓库移到仓外 `ns800_r7f8e_superseded/` 不再被本包任何件引用（本轮目录里也没有它们的副本）。
 
 ## 6. 停止点
 

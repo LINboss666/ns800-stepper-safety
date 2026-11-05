@@ -47,7 +47,7 @@ def main() -> int:
     write(root, root / ROUND, "ROUND_SHA256SUMS.txt", lambda n: [
         HEAD,
         "# 生成方式: 对 %s/ 下每个常规文件直接读磁盘字节算 sha256"
-        "(派生件/生成器/补丁/三份 proof/合成计划与行表/A 包原件 24 件全在内); "
+        "(派生件/生成器/补丁/四份 proof(含第一次回读判红原文)/合成计划与行表/A 包原件 24 件全在内); "
         "按**文件名**排除 r7f8e_remote_readback.txt —— 它只能在推送之后才存在, "
         "清单不能依赖自己交付之后的产物" % ROUND,
         "# 条目数=%d; 与 Git blob 的逐条复算由 %s/tools/r7f8e_staged_preflight.py(提交前)"

@@ -27,9 +27,13 @@ R7F7 = "reports/reviews/phase8-m8-r7f7-newimage-static"
 OLD_EXE = "reports/reviews/phase8-m8-relative-protection-r3/field/m8r3_serial_chain.py"
 OLD_SHA = "33d3f0af8a4c9c33dcd4e013b395e4ba990a89e384130f9d0ffe50c71b34e8ca"
 NEW_EXE = ROUND + "/tools/m8r3_serial_chain_r7f8.py"
-APPS = ("rt-thread-master/rt-thread-master/bsp/novosns/ns800/"
-        "ns800rt7p65-nssinepad/applications")
+APPS = "rt-thread-master"
+# A 登记的"产品子树"32470c7e… 在 R7F7 轮 OFFLINE_REVIEW.md:53 已被实读确认为**顶层 rt-thread-master
+# 子树**的对象号, 不是 applications 目录(那条路径的对象号是另一个值)。上一版把路径写成
+# applications 全路径, 于是本轮第一次回读报假 FAIL —— 见 proof/r7f8e_remote_readback_first_attempt.txt。
 PRODUCT_TREE = "32470c7ed44ef6ef5f762490a5416912a336cdd9"
+APPS_SUBTREE = ("rt-thread-master/rt-thread-master/bsp/novosns/ns800/"
+                "ns800rt7p65-nssinepad/applications")
 URL = "https://github.com/LINboss666/ns800-stepper-safety.git"
 BRANCH = "refs/heads/feature/m8-r7d1-async-learn-offline"
 MANIFESTS = [ROUND + "/ROUND_SHA256SUMS.txt", DRAFT + "/ROUND_SHA256SUMS.txt",
@@ -124,8 +128,22 @@ def main() -> int:
          "bytes=%d sha=%s…" % (len(nb) if nb else 0, sha(nb)[:16] if nb else "-"))
     pt = subprocess.run(["git", "--git-dir", str(bare), "rev-parse", "%s:%s" % (tip, APPS)],
                         capture_output=True).stdout.decode("utf-8").strip()
-    note("产品源码子树 tree 仍为 A 登记值", pt == PRODUCT_TREE,
-         "%s 期望=%s(本轮 0 改产品)" % (pt[:12], PRODUCT_TREE[:12]))
+    note("产品子树(A 登记的那棵 = 顶层 rt-thread-master)仍为 A 登记值", pt == PRODUCT_TREE,
+         "%s 期望=%s(本轮 0 改产品; 路径口径见 A 包 TASK §1 与 R7F7 OFFLINE_REVIEW.md:53)"
+         % (pt[:12], PRODUCT_TREE[:12]))
+    at = subprocess.run(["git", "--git-dir", str(bare), "rev-parse", "%s:%s" % (tip, APPS_SUBTREE)],
+                        capture_output=True).stdout.decode("utf-8").strip()
+    at0 = subprocess.run(["git", "--git-dir", str(bare), "rev-parse",
+                          "d6bbc1b:%s" % APPS_SUBTREE], capture_output=True) \
+        .stdout.decode("utf-8").strip()
+    info("applications 目录子树(我本机另算的一条, 非 A 登记值)",
+         "%s 且与上一 tip d6bbc1b 相同=%s" % (at[:12], at == at0))
+    # 这条判据必须"会红": 把路径换成一个不存在的子树, 期望值就该对不上。
+    fake = subprocess.run(["git", "--git-dir", str(bare), "rev-parse",
+                           "%s:%s" % (tip, APPS + "/nonexistent-path")], capture_output=True)
+    note("SELFCHECK|产品子树判据会红", fake.returncode != 0 or
+         fake.stdout.decode("utf-8").strip() != PRODUCT_TREE,
+         "取不存在路径 rc=%s(证明这条比对不是恒真)" % fake.returncode)
     rr = got.get(R7F2B + "/run_record.md")
     if rr is None:
         note("run_record §23 只出现一次", False, "远端取不到 run_record.md")

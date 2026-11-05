@@ -490,24 +490,36 @@ def main() -> int:
          "台账里 0 条开口事件); 批准账只在 --work 仓外目录; 未开 COM/未跑 pyOCD/未跑 Keil/"
          "未启动分析仪")
 
-    lines = list(out) + [""]
+    lines = []
     for label in ("N0_正常", "N1_拒绝", "N2_次数上限", "N2b_窗口到期", "N3_证据不完整"):
         lines.append("== %s 的阶段行与 DISPATCH_SUMMARY 原文 ==" % label)
         lines.append(json.dumps(results[label]["stage"], ensure_ascii=False))
         lines.append(results[label]["summary"])
         lines.append("   rc=%d init_rc=%d" % (results[label]["rc"], results[label]["init_rc"]))
     # 仓外试验目录的路径不进交付件: 它既非仓库事实, 又把本机目录结构写进公开仓库。
-    text = ("\n".join(lines + ["R7F8E_STUB_SUMMARY|判据=%d|FAIL=%d|%s" %
-                              (len(out), len(fails),
-                               ",".join(fails) if fails else "none")]) + "\n")
-    for form in (str(work), str(work).replace("\\", "/"),
-                 str(work).replace("\\", "\\\\")):
-        text = text.replace(form, "<WORK>")
-    # 兜底: 试验目录名本身也不留在交付件里(JSON 转义形态多样, 只按名字清一次才可靠)。
-    text = text.replace(work.name, "<WORK>")
+    # 掩的是**整份正文**(判据行自己也可能带路径), 两条新判据的行在掩之后再追加。
+    body = list(out) + [""] + lines
+    text = "\n".join(body) + "\n"
+    forms = [str(work), str(work).replace("\\", "/"), str(work).replace("\\", "\\\\"), work.name]
+    hits = [f for f in forms if f in text]            # 掩之前必须真有, 否则这条判据恒真空
+    for f in forms:
+        text = text.replace(f, "<WORK>")
+    rest = [f for f in forms if f in text]
+    n_before = len(out)
+    # detail 里**不打印形态本身**: 打出来就是这条判据要防的那件泄漏, 只报数量。
+    note("交付件里不留仓外试验目录(四种形态逐一掩成 <WORK>)", not rest,
+         "掩前命中=%d/4 种, 掩后残留=%d 种" % (len(hits), len(rest)))
+    note("这条掩码判据不是恒真空(掩前确实出现过)", bool(hits), "掩前命中=%d/4 种" % len(hits))
+    full = text + "\n".join(out[n_before:]) + "\n" + "R7F8E_STUB_SUMMARY|判据=%d|FAIL=%d|%s\n" % (
+        len(out), len(fails), ",".join(fails) if fails else "none")
+    # 末道硬门(不计入判据, 只拒绝交付): 合成后的整份文件里仍不得出现任何仓外形态。
+    leaked = [i for i, f in enumerate(forms) if f in full]
+    if leaked:
+        print("STUB_PACKAGE_REFUSED|合成后仍残留 %d 种仓外路径形态 => 掩码顺序要修" % len(leaked))
+        return 2
     (repo / ROUND / "proof").mkdir(parents=True, exist_ok=True)
-    (repo / ROUND / "proof/r7f8e_stub_package.txt").write_text(text, encoding="utf-8", newline="\n")
-    print(text, end="")
+    (repo / ROUND / "proof/r7f8e_stub_package.txt").write_text(full, encoding="utf-8", newline="\n")
+    print(full, end="")
     return 1 if fails else 0
 
 

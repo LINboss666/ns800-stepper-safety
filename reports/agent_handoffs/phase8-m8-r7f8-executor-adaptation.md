@@ -8,7 +8,7 @@
 ## 1. 一句话
 
 按 A 的任务书把"异步学习的有界轮询 / 动态 JOB_ID / 取消显式额度 / arm 通电截止"四项落进一个
-**派生执行器**，并用 65 条矩阵判据、27 条整包判据、8 条无回归判据（全 FAIL=0）证明它会怎样收口；
+**派生执行器**，并用 65 条矩阵判据、29 条整包判据、8 条无回归判据（全 FAIL=0）证明它会怎样收口；
 顺带修掉两处被新反例照出来的既有工具缺口。**现场什么都没做**：设备动作 0、未构建固件、未开现场账。
 
 ## 2. 交付件（新目录 `reports/reviews/phase8-m8-r7f8-executor-adaptation/`）
@@ -20,7 +20,7 @@
 | `patches/r7f8e_executor.patch` | 38672 B / `27d3d49133721775…` | 与旧版的明确差异原件 |
 | `tools/r7f8e_case_matrix.py` + `proof/r7f8e_case_matrix.txt` | 判据 65 / FAIL 0 | §4 全 11 组 + 5 项元负控 + 4 项原始字节探针 + 4 项身份反例 + 自证 |
 | `proof/r7f8e_case_matrix_before_fix.txt` | 18 条 FAIL 原文 | 修前基线留档（含 T1 崩溃形状） |
-| `tools/r7f8e_stub_package.py` + `proof/r7f8e_stub_package.txt` + `plan/*` | 判据 27 / FAIL 0 | STUB_ONLY 取消＋DONE 整包与四场等价负例；合成计划/行表（无端口、无 UID、JOB_ID 非固定） |
+| `tools/r7f8e_stub_package.py` + `proof/r7f8e_stub_package.txt` + `plan/*` | 判据 29 / FAIL 0 | STUB_ONLY 取消＋DONE 整包与四场等价负例；合成计划/行表（无端口、无 UID、JOB_ID 非固定） |
 | `tools/r7f8e_no_regression.py` + `proof/r7f8e_no_regression.txt` | 判据 8 / FAIL 0 | 冻结 R7F7 定稿计划新旧逐行对照：旧 57 条 0 洗掉，新增 5 条全为 `R7F8E_` |
 | `ERRATA_R7F8E.md` | 9593 B / `6740ba6a7cb934b7…` | 三句旧解释逐字勘误 + T1–T4 工具缺口登记 |
 | `inputs/A_R7F8E_PKG/` | 24 文件 / 165145 B | A 的任务书、修订草案、IDENTITY、23 项输出、主机探针与失败首次尝试、包内清单 |

@@ -78,7 +78,7 @@
   },
   "stub_package": {
    "file": "reports/reviews/phase8-m8-r7f8-executor-adaptation/proof/r7f8e_stub_package.txt",
-   "predicates": 27,
+   "predicates": 29,
    "fail": 0,
    "failed_names": "none"
   },
