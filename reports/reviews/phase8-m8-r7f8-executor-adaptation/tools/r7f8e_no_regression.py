@@ -104,7 +104,10 @@ def main() -> int:
                   "PLAN_BUSINESS_WORST_CASE_FIT",
                   # A 的预算裁定把这一步拆成两条新门(旧口径只作 INFO 留档、单步总窗单独成门),
                   # 名字不是 R7F8E_ 前缀, 必须点名; 点名后下面那条"确实出现"会兜住空转。
-                  "PLAN_BUSINESS_RESERVE_SPLIT_LEGACY_SEMANTICS", "PLAN_STEP_TOTAL_WINDOWS")
+                  "PLAN_BUSINESS_RESERVE_SPLIT_LEGACY_SEMANTICS", "PLAN_STEP_TOTAL_WINDOWS",
+                  # F21 的 arm gate mask 逐步契约门: 冻结的 R7F7 计划**没申报**这份契约, 所以它对
+                  # 旧包只登记 NA(不加新红、不回改旧字节)。NA 行同样是"新增行", 必须点名。
+                  "R7F8F_ARM_GATE_MASK")
     not_ours = [l for l in added
                 if not l.startswith(OURS_PREFIX) and l.split("|")[0] not in OURS_NAMES]
     note("新增行全部是本轮适配自己的门", not not_ours,

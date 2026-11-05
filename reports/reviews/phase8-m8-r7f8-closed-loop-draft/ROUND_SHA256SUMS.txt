@@ -1,12 +1,13 @@
 # sha256 * <仓库相对路径>(LF, 无 BOM; 本清单不哈希自身字节 —— 一条清单不能给自己的字节作证)
 # 生成方式: 对 reports/reviews/phase8-m8-r7f8-closed-loop-draft/ 下每个常规文件直接读磁盘字节算 sha256(草案原件/合并版/判据原文/工具全在内)
 # 本轮变化: R7F8_DRAFT_MERGED.md 按 A **预算裁定包**的活草案(38793 B / 14bafe13a8cd…)逐字承接 304 行后重算; A_DRAFT_ORIGINAL.md 与旧冻结件未改, 上一版合并件身份只写进记录节不回改; 其余条目同一份规则
-# 条目数=8; 与 Git blob 的逐条复算由 tools/r7f8_staged_preflight.py(提交前)与推送后的远端逐 blob 回读完成
+# 条目数=9; 与 Git blob 的逐条复算由 tools/r7f8_staged_preflight.py(提交前)与推送后的远端逐 blob 回读完成
 # 重新生成: python reports/reviews/phase8-m8-r7f8-executor-adaptation/tools/r7f8e_make_sums.py --repo <仓库根>(上一版生成器 r7f8_make_sums.py 的说明行冻结在本轮之前的合并件, 再跑会丢掉本轮的承接说明)
 b572c1928f60148ea2e512d552fc45ceba9c41226924c9e1dde37d79ddfe9053  reports/reviews/phase8-m8-r7f8-closed-loop-draft/A_DRAFT_ORIGINAL.md
 f60f5df8acafbcbcf36c0901c872b4fa219a6340c59b6c776dfaca6ea97342fb  reports/reviews/phase8-m8-r7f8-closed-loop-draft/DRAFT_REVIEW.md
 f05d1f8f89c7443a116e0a694e222842ad62f384abf40e44ae76ea653a75c21c  reports/reviews/phase8-m8-r7f8-closed-loop-draft/proof/r7f8_draft_checks.txt
-951c645ce6197980bc1a4aff0306c10be276721a0524a53766e785e7553d402f  reports/reviews/phase8-m8-r7f8-closed-loop-draft/R7F8_DRAFT_MERGED.md
+f41be298e2bef291338c22f6140c7812e1bba5e90e53af0acc8799210cb55342  reports/reviews/phase8-m8-r7f8-closed-loop-draft/R7F8_DRAFT_MERGED.md
+1c0958ec5561a39ecb2398e97644d44c298e7e85c4e7373b95fc06d1e99324cd  reports/reviews/phase8-m8-r7f8-closed-loop-draft/R7F8_DRAFT_SNAPSHOT_F21.md
 49d96863a8c71ee6ffa1138ac7e86ecc7c5de0a91301f9941436cc8cc0c2c4cc  reports/reviews/phase8-m8-r7f8-closed-loop-draft/tools/r7f8_draft_checks.py
 df201f9dc8ca3cf645a59b76937b5d3ee75ebf33065a77e879a0900997cea108  reports/reviews/phase8-m8-r7f8-closed-loop-draft/tools/r7f8_make_sums.py
 b65e179af869205e8dd80096c3d30db9d47e6d43be756f203ccfcbc80ae30289  reports/reviews/phase8-m8-r7f8-closed-loop-draft/tools/r7f8_remote_readback.py

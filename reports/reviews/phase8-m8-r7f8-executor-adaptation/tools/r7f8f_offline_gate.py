@@ -236,8 +236,24 @@ def main() -> int:
     for must in ("PLAN_CLEANUP_RESERVE", "PLAN_BUSINESS_RESERVE_SPLIT",
                  "PLAN_BUSINESS_WORST_CASE_FIT", "PLAN_MOTION_CAP_BUDGET", "PLAN_QUOTA_NEED",
                  "PLAN_IMAGE_IDENTITY_CONSISTENCY", "PLAN_SPINUP_GATE_COVERAGE",
-                 "R7F8E_ARM_ENERGIZE", "PLAN_STEP_TOTAL_WINDOWS"):
+                 "R7F8E_ARM_ENERGIZE", "PLAN_STEP_TOTAL_WINDOWS", "R7F8F_ARM_GATE_MASK"):
         note("GATE_PRESENT|%s" % must, must in gate_names, "出现在 validate-plan 输出里")
+
+    # F21(A 第 1 点「按最终计划全量核查, 别只手工数几处」)的**交叉核对**: 这道门不只是要在,
+    # 还必须判绿, 而且它自己数出来的查询步集合要与**从计划 JSON 独立数出来的**逐条同名。
+    # 于是"门被悄悄删掉/退化成 NA/只数了一部分"三种情况都会在这里红, 不依赖矩阵那一族。
+    m_line = [l for l in vp.splitlines() if l.startswith("R7F8F_ARM_GATE_MASK|")]
+    q_as = [s.get("as") for s in json.loads((repo / PLAN_REL).read_text(encoding="utf-8"))
+            ["stages"][0]["steps"]
+            if (s.get("cmd") or "").split(" ")[0] in ("motor_status", "system_status")]
+    m_body = m_line[0] if m_line else ""
+    named = [a for a in q_as if ("%s=" % a) in m_body]
+    note("ARM_GATE_MASK_GATE_IS_GREEN_AND_COVERS_EVERY_QUERY_STEP",
+         len(m_line) == 1 and m_line[0].split("|")[2] == "PASS" and
+         named == q_as and ("覆盖 %d 条查询步" % len(q_as)) in m_body,
+         "门行数=%d 判定=%s ;; 计划里独立数到 %d 条(%s) ;; 门详情点名 %d 条 ;; 汇总话术里的条数对=%s" %
+         (len(m_line), (m_body.split("|")[2] if m_line else "-"), len(q_as), ",".join(q_as),
+          len(named), ("覆盖 %d 条查询步" % len(q_as)) in m_body))
 
     # 收口预留的**安全算术**: 预留容得下五条各自的确认窗, 且 cap+预留 排得进总窗。
     # 这条必须绿 —— 它是 F5b/F5c 的撤能窗口保证, 与"业务尾巴跑不跑得完"是两件事。

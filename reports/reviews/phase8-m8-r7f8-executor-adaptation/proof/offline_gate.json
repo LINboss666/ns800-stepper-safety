@@ -5,18 +5,18 @@
   "identities": {
     "executor": {
       "path": "reports/reviews/phase8-m8-r7f8-executor-adaptation/tools/m8r3_serial_chain_r7f8.py",
-      "bytes": 315233,
-      "sha256": "30c67a3e8dbe915214ca7e1f423cf3468594dba35772b4fa082b01b31893eef2"
+      "bytes": 328475,
+      "sha256": "4363af36159befa417647680cc27fb5bdb95785a404b14d77602ccdbe253962e"
     },
     "plan": {
       "path": "reports/reviews/phase8-m8-r7f8-executor-adaptation/field/plan_r7f8f_2369_real.json",
-      "bytes": 33140,
-      "sha256": "e78519421149c9a09de0fea8c1cb381b6ac10fd9452959a1092b3a68c37b95a6"
+      "bytes": 45398,
+      "sha256": "2259359ca3f775bc478fd8db30535485cc9e589d6a5c45d7ac9e948b40326a6b"
     },
     "rows": {
       "path": "reports/reviews/phase8-m8-r7f8-executor-adaptation/field/rows_r7f8f_real.json",
-      "bytes": 10060,
-      "sha256": "c64fdee847affe55ec9edc05e796d3befbc5731c30be7f96c6aa17b24ca23b70"
+      "bytes": 15460,
+      "sha256": "a8456159a45f229601e030b69d0034894d1b0df19b191ca4672a1fe0e5279737"
     },
     "board_image": {
       "path": "reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/rt-thread-motor-m1-candidate.bin",
@@ -33,7 +33,7 @@
     {
       "name": "INPUTS_IN_PLACE",
       "verdict": "PASS",
-      "detail": "五件齐全; 执行器=30c67a3e8dbe… plan=e78519421149… rows=c64fdee847af…"
+      "detail": "五件齐全; 执行器=4363af36159b… plan=2259359ca3f7… rows=a8456159a45f…"
     },
     {
       "name": "PRE_EXECUTOR_BYTES_FROZEN",
@@ -63,7 +63,7 @@
     {
       "name": "VALIDATE_PLAN_RAN",
       "verdict": "PASS",
-      "detail": "PLAN_VALIDATE_SUMMARY|checks=146|fail=0|msh_commands=74|plan=D:\\ns800\\reports\\reviews\\phase8-m8-r7f8-executor-adaptation\\field\\plan_r7f8f_2369_real.json; FAIL 行=0"
+      "detail": "PLAN_VALIDATE_SUMMARY|checks=147|fail=0|msh_commands=74|plan=D:\\ns800\\reports\\reviews\\phase8-m8-r7f8-executor-adaptation\\field\\plan_r7f8f_2369_real.json; FAIL 行=0"
     },
     {
       "name": "VALIDATE_PLAN_FAIL_SET_EXACTLY_AS_REGISTERED",
@@ -114,6 +114,16 @@
       "name": "GATE_PRESENT|PLAN_STEP_TOTAL_WINDOWS",
       "verdict": "PASS",
       "detail": "出现在 validate-plan 输出里"
+    },
+    {
+      "name": "GATE_PRESENT|R7F8F_ARM_GATE_MASK",
+      "verdict": "PASS",
+      "detail": "出现在 validate-plan 输出里"
+    },
+    {
+      "name": "ARM_GATE_MASK_GATE_IS_GREEN_AND_COVERS_EVERY_QUERY_STEP",
+      "verdict": "PASS",
+      "detail": "门行数=1 判定=PASS ;; 计划里独立数到 10 条(sys_pre,mot_pre,sys_after_apply,mot_after_irq,mot_dir,mot_armed,cruise,mot_after_cancel,stopped,mot_disabled) ;; 门详情点名 10 条 ;; 汇总话术里的条数对=True"
     },
     {
       "name": "PLAN_RESERVE_ARITHMETIC",
@@ -183,7 +193,7 @@
     {
       "name": "STUB_NORMAL_DISPATCH_SUCCEEDS",
       "verdict": "PASS",
-      "detail": "rc=0 stage_status=OK success=True code= disarm=CONFIRMED_DISABLED terminal=KNOWN 结果条数=40(申报步骤 38; 轮询的多次尝试也各计一条) | ealthy|branch=healthy|scenario_branches={}|prerequisite_skips=[]|actions_attempted=[]|ledger=D:\\ns800_r7f8f_offline\\fam19\\gate3\\normal\\run\\dispatch_ledger.jsonl"
+      "detail": "rc=0 stage_status=OK success=True code= disarm=CONFIRMED_DISABLED terminal=KNOWN 结果条数=40(申报步骤 38; 轮询的多次尝试也各计一条) | ofile=healthy|branch=healthy|scenario_branches={}|prerequisite_skips=[]|actions_attempted=[]|ledger=D:\\ns800_r7f8f_offline\\f21i\\normal\\run\\dispatch_ledger.jsonl"
     },
     {
       "name": "STUB_NORMAL_TAIL_SENT",
@@ -193,7 +203,7 @@
     {
       "name": "STUB_NORMAL_RESERVE_AND_CLAMP_FIELDS",
       "verdict": "PASS",
-      "detail": "整包 dispatch 的阶段回执里 reserve=7.0 reserved=True session_abs=90.0 business_abs=83.0 cleanup_hard=7.205"
+      "detail": "整包 dispatch 的阶段回执里 reserve=7.0 reserved=True session_abs=90.0 business_abs=83.0 cleanup_hard=7.24"
     },
     {
       "name": "FIRST_ERROR|tail_silent",
@@ -208,7 +218,7 @@
     {
       "name": "FIRST_ERROR|irq_before_arm_fails",
       "verdict": "PASS",
-      "detail": "code=EXPECTATION_NOT_MET disarm=CONFIRMED_DISABLED terminal=KNOWN 收口TX=['motor_status', 'safety_irq_status', 'safety_irq_status', 'motor_status', 'motor_status', 'motor_status', 'motor_stop', 'motor_disarm', 'motor_status', 'safety_irq_disable', 'safety_irq_status'] errors="
+      "detail": "code=EXPECTATION_NOT_MET disarm=CONFIRMED_DISABLED terminal=KNOWN 收口TX=['motor_status', 'safety_irq_status', 'safety_irq_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_stop', 'motor_status', 'motor_stop', 'motor_disarm', 'motor_status', 'safety_irq_disable', 'safety_irq_status'] errors="
     },
     {
       "name": "FIRST_ERROR|reserve_too_small",
@@ -253,7 +263,7 @@
     {
       "name": "NO_REAL_PORT_IN_ANY_LEDGER",
       "verdict": "PASS",
-      "detail": "台账里 6 条 PORT_OPEN 全是 transport=stub 且 port 字段为空(真开过 COM5 必然留下口名)"
+      "detail": "台账里 87 条 PORT_OPEN 全是 transport=stub 且 port 字段为空(真开过 COM5 必然留下口名)"
     },
     {
       "name": "NO_HARDWARE_ACTIONS_INSIDE_THIS_GATE",
@@ -263,11 +273,11 @@
     {
       "name": "JSON_RECEIPT_SHAPE_ALIGNED",
       "verdict": "PASS",
-      "detail": "本条之前的 46 条结构化记账与文本 46 行逐条同数、判定值只可能是 PASS/FAIL、FAIL 名单与 none 一致(计入本条共 47 条); 旧的按位切分会让其中 15 条把门名当判定值(如 GATE_PRESENT|PLAN_CLEANUP_RESERVE|PASS|出现在 v)"
+      "detail": "本条之前的 48 条结构化记账与文本 48 行逐条同数、判定值只可能是 PASS/FAIL、FAIL 名单与 none 一致(计入本条共 49 条); 旧的按位切分会让其中 16 条把门名当判定值(如 GATE_PRESENT|PLAN_CLEANUP_RESERVE|PASS|出现在 v)"
     }
   ],
   "summary": {
-    "checks": 47,
+    "checks": 49,
     "fail": 0,
     "failed_names": [],
     "overall": "ALL_GATES_PASS"

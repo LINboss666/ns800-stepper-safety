@@ -5,6 +5,189 @@
   "numbers_are_proposals_not_authorization": true,
   "hardware_actions_this_round": 0,
   "rows_file": "rows_r7f8f_real.json",
+  "arm_gate_mask_contract": "R7F8F_PER_STEP_V1",
+  "arm_gate_mask_contract_steps": [
+    {
+      "as": "sys_pre",
+      "cmd": "system_status",
+      "rows_key": "system_status",
+      "expect_arm_gate_mask": [
+        "0x18"
+      ],
+      "asserted_by": "must",
+      "source_grade": "REAL",
+      "basis": "supervisor.c:126 打的是同一个 motor_get_gate_fail_mask()(motor.c:894-917)。bit3 protection-not-ready | bit4 drive-config-not-applied: 极性确认在 10、开 IRQ 在 11、apply 在 6, 所以这一步四门里两门未过。原件 = 2026-11-05 F11/F20 现场两次逐字节相同的 983 B/73abf3012386 捕获(行表 system_status 就是它)。",
+      "status_lines_allow": [
+        "^\\[Motor\\] arm gate fail mask=0x18 \\(arm REFUSED\\)$"
+      ],
+      "positive_requirement": [
+        "[Motor] arm gate fail mask=0x18 (arm REFUSED)"
+      ]
+    },
+    {
+      "as": "mot_pre",
+      "cmd": "motor_status",
+      "rows_key": "motor_status_pre_apply",
+      "expect_arm_gate_mask": [
+        "0x18"
+      ],
+      "asserted_by": "must",
+      "source_grade": "REAL",
+      "basis": "motor.c:2479-2480 打 arm_gate_mask 与 REFUSED/ALL-PASS。原件 = 1128 B/f0550d313164, 在 5 次归档会话 + F20 本会话逐字节相同(F20 的第二个首错正是这一行被当成业务拒绝)。",
+      "status_lines_allow": [
+        "^\\[MOT\\] arm_gate_mask=0x18 REFUSED$"
+      ],
+      "positive_requirement": [
+        "[MOT] arm_gate_mask=0x18 REFUSED"
+      ]
+    },
+    {
+      "as": "sys_after_apply",
+      "cmd": "system_status",
+      "rows_key": "system_status_applied",
+      "expect_arm_gate_mask": [
+        "0x8"
+      ],
+      "asserted_by": "must",
+      "source_grade": "DERIVED",
+      "basis": "apply 成功清 bit4(motor.c:907 的 tmc2209_drive_config_ok_for_arm), 而 IRQ/极性仍未就绪 => 只剩 bit3=0x8。0x8 这个值本身有真实原件(motor_status 的 1080 B/fa69aa5cf5a1, gate5 tmc_drive_cfg=CONFIGURED), 但**这一步(system_status)的 0x8 没在板上抓过**。",
+      "status_lines_allow": [
+        "^\\[Motor\\] arm gate fail mask=0x8 \\(arm REFUSED\\)$"
+      ],
+      "positive_requirement": [
+        "[Motor] arm gate fail mask=0x8 (arm REFUSED)"
+      ]
+    },
+    {
+      "as": "mot_after_irq",
+      "cmd": "motor_status",
+      "rows_key": "motor_status_idle",
+      "expect_arm_gate_mask": [
+        "0x0"
+      ],
+      "asserted_by": "must",
+      "source_grade": "REAL",
+      "basis": "第 10 步极性 + 第 11 步开 IRQ => protection_ready(safety_thread.c:315 要 st_irq_attached && st_polarity_validated)成立, bit3 清零; bit4 已在第 6 步清。原件 = 648 B/10807f63f02a(9 次归档一致, 头行就是 arm_gate_mask=0x0 ALL-PASS)。",
+      "status_lines_allow": [],
+      "positive_requirement": [
+        "[MOT] arm_gate_mask=0x0"
+      ]
+    },
+    {
+      "as": "mot_dir",
+      "cmd": "motor_status",
+      "rows_key": "motor_status_ready_dir",
+      "expect_arm_gate_mask": [
+        "0x0"
+      ],
+      "asserted_by": "must",
+      "source_grade": "REAL",
+      "basis": "motor.c:894-917 的七门里没有方向项, motor_dir 不置任何门位 => 仍 0x0。行表用同一份 648 B 原件, 只把频率行的 dir 值按本步工况改成 1(登记在 derived_shape_rows)。",
+      "status_lines_allow": [],
+      "positive_requirement": [
+        "[MOT] arm_gate_mask=0x0"
+      ]
+    },
+    {
+      "as": "mot_armed",
+      "cmd": "motor_status",
+      "rows_key": "motor_status_armed_ready",
+      "expect_arm_gate_mask": [
+        "0x0"
+      ],
+      "asserted_by": "must",
+      "source_grade": "DERIVED",
+      "basis": "arm 之后 Safety 仍是 READY(进 RUN 的是 start 那一提交, motor.c:1674/1935 mot_commit_run_start), 七门里没有 armed 项 => 预期全通。真实的 armed 件(0x2/9005a306999a)同时显示 armed=1 与 mask=0x2, 说明置位的是 RUN 而不是 armed。**这一行没有归档原件**: 现网没抓过 armed 且 READY 的 motor_status。",
+      "status_lines_allow": [],
+      "positive_requirement": [
+        "[MOT] arm_gate_mask=0x0"
+      ]
+    },
+    {
+      "as": "cruise",
+      "cmd": "motor_status",
+      "rows_key": "motor_status_cruise",
+      "expect_arm_gate_mask": [
+        "0x2"
+      ],
+      "asserted_by": "must",
+      "source_grade": "REAL",
+      "basis": "start 提交 SAFETY_RUN => motor.c:899 那条 `safety_state_get() != SAFETY_READY` 置 bit1。原件 = 1026 B/9005a306999a 与 1025 B/57efcc7c90d5(运行中两次归档, 披露行都是 arm_gate_mask=0x2 REFUSED + gate_reason=safety-not-READY)。",
+      "status_lines_allow": [
+        "^\\[MOT\\] arm_gate_mask=0x2 REFUSED$"
+      ],
+      "positive_requirement": [
+        "[MOT] arm_gate_mask=0x2 REFUSED"
+      ]
+    },
+    {
+      "as": "mot_after_cancel",
+      "cmd": "motor_status",
+      "rows_key": "motor_status_cruise",
+      "expect_arm_gate_mask": [
+        "0x2"
+      ],
+      "asserted_by": "must",
+      "source_grade": "REAL",
+      "basis": "取消学习作业不动电机也不动 Safety(diag_relative.c 的 cancel 只终结作业) => 仍 RUN, 同上两份原件。",
+      "status_lines_allow": [
+        "^\\[MOT\\] arm_gate_mask=0x2 REFUSED$"
+      ],
+      "positive_requirement": [
+        "[MOT] arm_gate_mask=0x2 REFUSED"
+      ]
+    },
+    {
+      "as": "stopped",
+      "cmd": "motor_status",
+      "rows_key": "motor_status_armed_idle",
+      "expect_arm_gate_mask": [
+        "0x0",
+        "0x2"
+      ],
+      "asserted_by": "must_one_of",
+      "source_grade": "REAL",
+      "basis": "唯一一条**边界**, 按 A 的要求显式申报成枚举而不是统一放行: motor_stop 归零之后 RUN->READY 由 motor.c:1989 mot_commit_zero_ready 在 tick 里提交, 它要求 armed!=0 且 cur==tgt==0, 与本查询的先后不确定 => 两种值都合法。两个形状各自都有真实原件(0x2: 1074 B/98abbf2d18df 静止但 RUN 未落位的原件 + 上面两份运行中原件; 0x0: 648 B/10807f63f02a)。集合外的任何值(0x8/0x18/0x20/0x40)都算保护链掉了, 具名停止。",
+      "status_lines_allow": [
+        "^\\[MOT\\] arm_gate_mask=0x2 REFUSED$"
+      ],
+      "positive_requirement": [
+        "[MOT] arm_gate_mask="
+      ]
+    },
+    {
+      "as": "mot_disabled",
+      "cmd": "motor_status",
+      "rows_key": "motor_status_idle",
+      "expect_arm_gate_mask": [
+        "0x0"
+      ],
+      "asserted_by": "must",
+      "source_grade": "DERIVED",
+      "basis": "成功 disarm 把 Safety 收回 READY 是 R6-2 的产品修复, 已在板镜像 23691e8d 的源码里 => 这一步**必须** 0x0。归档里那份 post-disarm 仍打 0x2 的 1074 B/98abbf2d18df 属于 R6 之前的 idle-stack-r4 会话, 不能拿来当这一步的预期; 现场若真打 0x2, 判据按 FIELD_VALUE_MISMATCH 停并把原字节留在盘上 —— 那正是要取证的事。",
+      "status_lines_allow": [],
+      "positive_requirement": [
+        "[MOT] arm_gate_mask=0x0"
+      ]
+    }
+  ],
+  "arm_gate_mask_contract_note": "A F21 第 1 点: 原 38 步表里 motor_status 有 8 处(含 stopped / mot_disabled)、system_status 有 2 处, 这 10 处**逐条**申报预期 arm gate mask 与是否需要豁免; 预期 0x0 的 5 处一条豁免都没有(所以现场打出 REFUSED 会按 BUSINESS_FAILED 停), 唯一的边界步 stopped 用 must_one_of 枚举 0x0|0x2, 不给所有查询统一放行任意 REFUSED。动作被产品拒绝(motor_arm/motor_start/learn 的 REFUSED)与查询自身失败(diag_relative.c:2041 的 learn_status REFUSED)继续 STOP —— 豁免只给状态披露行。",
+  "arm_gate_mask_contract_not_inherited": [
+    {
+      "cmd": "motor_status",
+      "mask": "0x8",
+      "declared_by": [
+        "R7F4 plan_r7f4_b502_configured_reviewed.json/mot_post",
+        "R7F5 plan_r7f5_b502_blind_irq_static.json/mot_cfg"
+      ],
+      "reason": "本包在 tmc_config_apply(第 6 步)之后、safety_irq_enable(第 11 步)之前**不发 motor_status** —— 那段 0x8 窗口里唯一的查询是第 7 步 system_status, 它已按预期 0x8 申报豁免。所以不是一条豁免被删掉, 而是这个形状在本计划里没有对应的查询步; 现场若在别的时刻打出 motor_status 0x8, 按 BUSINESS_FAILED 停。",
+      "window_check": {
+        "after_step": "apply",
+        "before_step": "irq_en",
+        "cmd": "motor_status"
+      }
+    }
+  ],
   "needles_file": null,
   "scope_this_package": "在板固件 23691e8d… 身份连续(§4), 本轮唯一动作 = COM5 一次会话里跑 §5 的 15 步 + finally 固定收口。不下载、不回读、不复位、不动分析仪、不断送电、不重试。",
   "field_boundary": {
@@ -307,12 +490,19 @@
           "seconds": 1,
           "expect_contains": [
             "=== SYSTEM STATUS ===",
-            "[Motor] arm gate fail mask="
+            "[Motor] arm gate fail mask=0x18 (arm REFUSED)"
           ],
           "status_lines_allow": [
-            "^\\[Motor\\] arm gate fail mask=0x[0-9A-Fa-f]+ \\(arm REFUSED\\)$"
+            "^\\[Motor\\] arm gate fail mask=0x18 \\(arm REFUSED\\)$"
           ],
           "expect_values": [
+            {
+              "row": "^\\[Motor\\] arm gate fail mask=(?P<mask>0x[0-9A-F]+) \\((?P<tail>arm REFUSED|all gate conditions pass \\(incl\\. ENN feedback\\))\\)$",
+              "must": {
+                "mask": "0x18",
+                "tail": "arm REFUSED"
+              }
+            },
             {
               "row": "^(?P<head>\\[Safety\\] state=(?P<st>[A-Z_]+) fault=(?P<fault>[0-9]) irq_gate=(?P<irq>[A-Z_]+) polarity=(?P<pol>[A-Za-z-]+) protect_ready=(?P<pr>[A-Z]+))$",
               "must": {
@@ -337,11 +527,24 @@
         {
           "as": "mot_pre",
           "cmd": "motor_status",
-          "key": "motor_status_idle",
+          "key": "motor_status_pre_apply",
           "seconds": 1,
           "expect_contains": [
             "[MOT] state=0",
-            "[MOT] armed=0 drv_en_request=0"
+            "[MOT] armed=0 drv_en_request=0",
+            "[MOT] arm_gate_mask=0x18 REFUSED"
+          ],
+          "status_lines_allow": [
+            "^\\[MOT\\] arm_gate_mask=0x18 REFUSED$"
+          ],
+          "expect_values": [
+            {
+              "row": "^\\[MOT\\] arm_gate_mask=(?P<mask>0x[0-9A-F]+) (?P<tail>REFUSED|ALL-PASS)$",
+              "must": {
+                "mask": "0x18",
+                "tail": "REFUSED"
+              }
+            }
           ],
           "step_total_seconds": 1.0,
           "window_phase": "pre_start"
@@ -411,12 +614,19 @@
           "expect_contains": [
             "=== SYSTEM STATUS ===",
             "runtime write gate mask=0x8",
-            "[Motor] arm gate fail mask="
+            "[Motor] arm gate fail mask=0x8 (arm REFUSED)"
           ],
           "status_lines_allow": [
-            "^\\[Motor\\] arm gate fail mask=0x[0-9A-Fa-f]+ \\(arm REFUSED\\)$"
+            "^\\[Motor\\] arm gate fail mask=0x8 \\(arm REFUSED\\)$"
           ],
           "expect_values": [
+            {
+              "row": "^\\[Motor\\] arm gate fail mask=(?P<mask>0x[0-9A-F]+) \\((?P<tail>arm REFUSED|all gate conditions pass \\(incl\\. ENN feedback\\))\\)$",
+              "must": {
+                "mask": "0x8",
+                "tail": "arm REFUSED"
+              }
+            },
             {
               "row": "^(?P<head>\\[Safety\\] state=(?P<st>[A-Z_]+) fault=(?P<fault>[0-9]) irq_gate=(?P<irq>[A-Z_]+) polarity=(?P<pol>[A-Za-z-]+) protect_ready=(?P<pr>[A-Z]+))$",
               "must": {
@@ -503,7 +713,18 @@
           "seconds": 1,
           "expect_contains": [
             "[MOT] armed=0 drv_en_request=0",
-            "cur_hz=0 tgt_hz=0"
+            "cur_hz=0 tgt_hz=0",
+            "[MOT] arm_gate_mask=0x0"
+          ],
+          "status_lines_allow": [],
+          "expect_values": [
+            {
+              "row": "^\\[MOT\\] arm_gate_mask=(?P<mask>0x[0-9A-F]+) (?P<tail>REFUSED|ALL-PASS)$",
+              "must": {
+                "mask": "0x0",
+                "tail": "ALL-PASS"
+              }
+            }
           ],
           "step_total_seconds": 1.0,
           "window_phase": "pre_start"
@@ -526,12 +747,23 @@
         {
           "as": "mot_dir",
           "cmd": "motor_status",
-          "key": "motor_status_idle",
+          "key": "motor_status_ready_dir",
           "seconds": 1,
           "expect_contains": [
             "[MOT] state=0",
             "dir=1",
-            "armed=0"
+            "armed=0",
+            "[MOT] arm_gate_mask=0x0"
+          ],
+          "status_lines_allow": [],
+          "expect_values": [
+            {
+              "row": "^\\[MOT\\] arm_gate_mask=(?P<mask>0x[0-9A-F]+) (?P<tail>REFUSED|ALL-PASS)$",
+              "must": {
+                "mask": "0x0",
+                "tail": "ALL-PASS"
+              }
+            }
           ],
           "step_total_seconds": 1.0,
           "window_phase": "pre_start"
@@ -554,11 +786,22 @@
         {
           "as": "mot_armed",
           "cmd": "motor_status",
-          "key": "motor_status_armed_idle",
+          "key": "motor_status_armed_ready",
           "seconds": 1,
           "expect_contains": [
             "[MOT] armed=1 drv_en_request=1",
-            "expected_ENN=LOW ENN_fb=0"
+            "expected_ENN=LOW ENN_fb=0",
+            "[MOT] arm_gate_mask=0x0"
+          ],
+          "status_lines_allow": [],
+          "expect_values": [
+            {
+              "row": "^\\[MOT\\] arm_gate_mask=(?P<mask>0x[0-9A-F]+) (?P<tail>REFUSED|ALL-PASS)$",
+              "must": {
+                "mask": "0x0",
+                "tail": "ALL-PASS"
+              }
+            }
           ],
           "step_total_seconds": 1.0,
           "window_phase": "pre_start"
@@ -617,6 +860,21 @@
           "poll_sequence": [
             "motor_status_accel",
             "motor_status_cruise"
+          ],
+          "expect_contains": [
+            "[MOT] arm_gate_mask=0x2 REFUSED"
+          ],
+          "status_lines_allow": [
+            "^\\[MOT\\] arm_gate_mask=0x2 REFUSED$"
+          ],
+          "expect_values": [
+            {
+              "row": "^\\[MOT\\] arm_gate_mask=(?P<mask>0x[0-9A-F]+) (?P<tail>REFUSED|ALL-PASS)$",
+              "must": {
+                "mask": "0x2",
+                "tail": "REFUSED"
+              }
+            }
           ],
           "step_total_seconds": 1.0,
           "window_phase": "motion_active"
@@ -724,6 +982,21 @@
             "accel": 2000,
             "decel": 2000
           },
+          "expect_contains": [
+            "[MOT] arm_gate_mask=0x2 REFUSED"
+          ],
+          "status_lines_allow": [
+            "^\\[MOT\\] arm_gate_mask=0x2 REFUSED$"
+          ],
+          "expect_values": [
+            {
+              "row": "^\\[MOT\\] arm_gate_mask=(?P<mask>0x[0-9A-F]+) (?P<tail>REFUSED|ALL-PASS)$",
+              "must": {
+                "mask": "0x2",
+                "tail": "REFUSED"
+              }
+            }
+          ],
           "step_total_seconds": 1.0,
           "window_phase": "motion_active"
         },
@@ -827,7 +1100,8 @@
             "[MOT] cur_hz=0 tgt_hz=0",
             "[MOT] armed=1 drv_en_request=1 health=OK",
             "[MOT] drv_request=HIGH pad=1",
-            "[MOT] expected_ENN=LOW ENN_fb=0 resolved verdict=OK"
+            "[MOT] expected_ENN=LOW ENN_fb=0 resolved verdict=OK",
+            "[MOT] arm_gate_mask="
           ],
           "poll": {
             "until_seconds": 1.0,
@@ -837,6 +1111,24 @@
               "EXPECTATION_NOT_MET"
             ]
           },
+          "status_lines_allow": [
+            "^\\[MOT\\] arm_gate_mask=0x2 REFUSED$"
+          ],
+          "expect_values": [
+            {
+              "row": "^\\[MOT\\] arm_gate_mask=(?P<mask>0x[0-9A-F]+) (?P<tail>REFUSED|ALL-PASS)$",
+              "must_one_of": {
+                "mask": [
+                  "0x0",
+                  "0x2"
+                ],
+                "tail": [
+                  "ALL-PASS",
+                  "REFUSED"
+                ]
+              }
+            }
+          ],
           "step_total_seconds": 1.0,
           "window_phase": "motion_active"
         },
@@ -863,7 +1155,18 @@
           "expect_contains": [
             "[MOT] armed=0 drv_en_request=0",
             "expected_ENN=HIGH ENN_fb=1",
-            "verdict=OK"
+            "verdict=OK",
+            "[MOT] arm_gate_mask=0x0"
+          ],
+          "status_lines_allow": [],
+          "expect_values": [
+            {
+              "row": "^\\[MOT\\] arm_gate_mask=(?P<mask>0x[0-9A-F]+) (?P<tail>REFUSED|ALL-PASS)$",
+              "must": {
+                "mask": "0x0",
+                "tail": "ALL-PASS"
+              }
+            }
           ],
           "step_total_seconds": 1.0,
           "window_phase": "post_zero"

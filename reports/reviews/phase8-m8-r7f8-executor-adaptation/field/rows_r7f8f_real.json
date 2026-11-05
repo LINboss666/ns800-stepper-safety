@@ -14,10 +14,15 @@
     ],
     "unverified_note": "这几条本轮**没有**回源码取到逐字打印形状, 因此行内容是回显占位, 对应步骤只断言前缀存在; §5 里对它们要求的字段判据一律没写 (宁缺勿造), 已列进 plan.field_assertion_gaps 交 A 判。",
     "board_observed_rows": [
-      "system_status —— 这份的 19 行逐字取自 2026-11-05 21:23 F11 现场捕获 proof/r7f8f_field_f11_sys_pre.rx.bin(983 B, sha256 73abf3012386…; 去掉首行命令回显与结尾 msh 提示符)。它不是工装造的: 上一版把 mask=0x18 记在 TMC 写门行、把 protect_ready 写成 YES, 现场实拍证明两处都不对, 而正是这个错位让离线 stub 测不到披露行被误判成业务拒绝。"
+      "system_status —— 这份的 19 行逐字取自 2026-11-05 21:23 F11 现场捕获 proof/r7f8f_field_f11_sys_pre.rx.bin(983 B, sha256 73abf3012386…; 去掉首行命令回显与结尾 msh 提示符)。它不是工装造的: 上一版把 mask=0x18 记在 TMC 写门行、把 protect_ready 写成 YES, 现场实拍证明两处都不对, 而正是这个错位让离线 stub 测不到披露行被误判成业务拒绝。",
+      "motor_status_pre_apply / motor_status(清理那一条) / motor_status_idle —— 行内容改成 F21 读进来的**归档原件**: 1128 B/f0550d313164(R7F7 会话 15_mot_final.rx.bin, 与 R7F4 写前那份逐字节相同的归档共 5 次 + F20 本会话第 6 次)与 648 B/10807f63f02a(9 次归档一致)。口径按 A 的更正: 0x18 那一份是**F20 本会话首次取得**, 但同一身份的字节早已归档在 5 次会话里, 上一版把历史样本漏了。取件与核验在 _observed_mot_rows() 里, 字节或散列与登记不符就直接拒绝生成。"
     ],
     "derived_shape_rows": [
-      "system_status_applied —— 第 7 步(apply 后、irq_enable 前)的切片。token 取 supervisor.c:90 的实际打印(OPEN/CLOSED、CONFIRMED/not-confirmed), protect_ready 按 safety_thread.c:315 取 NO(第 10/11 步都还没跑), 披露行 mask 由现场实测 0x18 减去 apply 成功的 bit4(motor.c:907) 推得 0x8 —— 全部是**源码+前态推导**, 不是这一步的板上实测。"
+      "system_status_applied —— 第 7 步(apply 后、irq_enable 前)的切片。token 取 supervisor.c:90 的实际打印(OPEN/CLOSED、CONFIRMED/not-confirmed), protect_ready 按 safety_thread.c:315 取 NO(第 10/11 步都还没跑), 披露行 mask 由现场实测 0x18 减去 apply 成功的 bit4(motor.c:907) 推得 0x8 —— 全部是**源码+前态推导**, 不是这一步的板上实测。",
+      "motor_status_ready_dir —— 第 15 步(motor_dir 1 之后): 用 648 B/10807f63f02a 的原件 13 行, 只把频率行的 dir 值改成 1 (归档原件抓于 dir=0 时)。除这一格外逐字节同原件。",
+      "motor_status_armed_ready / motor_status_armed_idle —— 第 17/29 步的 armed 形状: 字段来自本包既有的声明形状(现网没抓过 armed 的 motor_status), 披露行 arm_gate_mask=0x0/0x2 逐字取归档原件的形状(648 B/10807f63f02a 与 1026 B/9005a306999a)。",
+      "motor_status_cruise / motor_status_accel —— 第 20/25 步与轮询: 300 Hz/CRUISE/ACCEL 的字段是本包工况值(归档运行件是 100 Hz 的会话), 只有披露行 arm_gate_mask=0x2 REFUSED 逐字取归档原件 (1026 B/9005a306999a、1025 B/57efcc7c90d5)。",
+      "行表里 motor_status 的披露行只给**那一条** —— 板上 mask≠0 时产品还会再打一条同名的裸行与 gate_reason/gate4..7 明细行(motor.c:935-960), 那些行不含 REFUSED, 不参与业务失败扫描; 整段真实字节由矩阵的 MC 家族直接喂 assert_step 判, 不在这里仿造。"
     ],
     "hardware_actions": 0
   },
@@ -53,24 +58,80 @@
         "[TMC]    runtime write gate mask=0x8 (0=运行态条件全通,"
       ]
     },
+    "motor_status_pre_apply": {
+      "healthy": [
+        "[MOT] state=0 name=OTHER",
+        "[MOT] cur_hz=0 tgt_hz=0 accel=2000 decel=2000 dir=0",
+        "[MOT] armed=0 drv_en_request=0 health=OK",
+        "[MOT] guard stops=0 reason=0",
+        "[MOT] guard reason map: 0=none 1=cfg-lost 2=integrity 3=txn-busy 4=enn-fb",
+        "[MOT] stop result=api-accepted(驱动接受关断, 非波形证明) src=init rc=0 latched=0",
+        "[MOT] diag_off_confirmed=YES",
+        "[MOT] arm_gate_mask=0x18 REFUSED",
+        "[MOT] arm_gate_mask=0x18",
+        "[MOT] gate_reason=protection-not-ready",
+        "[MOT] gate_reason=drive-config-not-applied",
+        "[MOT] gate4 irq_gate=CLOSED polarity=not-confirmed",
+        "[MOT] gate4 gpio_ready=YES",
+        "[MOT] gate5 tmc_drive_cfg=UNCONFIGURED",
+        "[MOT] gate6 request_basis=DISABLED",
+        "[MOT] gate6 enn_verdict=OK",
+        "[MOT] gate7 motor_stop=api-accepted(驱动接受关断, 非波形证明) src=init rc=0",
+        "[MOT] gate7 latched=no diag_off=YES",
+        "[MOT] note: current_hz=0 is a command value, not stop proof",
+        "[MOT] drv_request=LOW pad=0",
+        "[MOT] expected_ENN=HIGH ENN_fb=1 resolved verdict=OK",
+        "[MOT] limit_inputs=DISABLED_BY_CONFIG",
+        "[MOT] step_diag=GRANTED",
+        "[MOT] tmc_write_gate=0x0",
+        "[MOT] note: state/cur/tgt=0 does not prove physical STEP stopped"
+      ]
+    },
     "motor_status_idle": {
+      "healthy": [
+        "[MOT] state=0 name=OTHER",
+        "[MOT] cur_hz=0 tgt_hz=0 accel=2000 decel=2000 dir=0",
+        "[MOT] armed=0 drv_en_request=0 health=OK",
+        "[MOT] guard stops=0 reason=0",
+        "[MOT] guard reason map: 0=none 1=cfg-lost 2=integrity 3=txn-busy 4=enn-fb",
+        "[MOT] stop result=api-accepted(驱动接受关断, 非波形证明) src=init rc=0 latched=0",
+        "[MOT] diag_off_confirmed=YES",
+        "[MOT] arm_gate_mask=0x0 ALL-PASS",
+        "[MOT] drv_request=LOW pad=0",
+        "[MOT] expected_ENN=HIGH ENN_fb=1 resolved verdict=OK",
+        "[MOT] limit_inputs=DISABLED_BY_CONFIG",
+        "[MOT] step_diag=GRANTED",
+        "[MOT] tmc_write_gate=0x0",
+        "[MOT] note: state/cur/tgt=0 does not prove physical STEP stopped"
+      ]
+    },
+    "motor_status_ready_dir": {
       "healthy": [
         "[MOT] state=0 name=OTHER",
         "[MOT] cur_hz=0 tgt_hz=0 accel=2000 decel=2000 dir=1",
         "[MOT] armed=0 drv_en_request=0 health=OK",
+        "[MOT] guard stops=0 reason=0",
+        "[MOT] guard reason map: 0=none 1=cfg-lost 2=integrity 3=txn-busy 4=enn-fb",
+        "[MOT] stop result=api-accepted(驱动接受关断, 非波形证明) src=init rc=0 latched=0",
+        "[MOT] diag_off_confirmed=YES",
+        "[MOT] arm_gate_mask=0x0 ALL-PASS",
         "[MOT] drv_request=LOW pad=0",
         "[MOT] expected_ENN=HIGH ENN_fb=1 resolved verdict=OK",
-        "[MOT] diag_off_confirmed=YES"
+        "[MOT] limit_inputs=DISABLED_BY_CONFIG",
+        "[MOT] step_diag=GRANTED",
+        "[MOT] tmc_write_gate=0x0",
+        "[MOT] note: state/cur/tgt=0 does not prove physical STEP stopped"
       ]
     },
-    "motor_status_cruise": {
+    "motor_status_armed_ready": {
       "healthy": [
-        "[MOT] state=2 name=CRUISE",
-        "[MOT] cur_hz=300 tgt_hz=300 accel=2000 decel=2000 dir=1",
+        "[MOT] state=0 name=OTHER",
+        "[MOT] cur_hz=0 tgt_hz=0 accel=2000 decel=2000 dir=1",
         "[MOT] armed=1 drv_en_request=1 health=OK",
         "[MOT] drv_request=HIGH pad=1",
         "[MOT] expected_ENN=LOW ENN_fb=0 resolved verdict=OK",
-        "[MOT] diag_off_confirmed=NO"
+        "[MOT] diag_off_confirmed=NO",
+        "[MOT] arm_gate_mask=0x0 ALL-PASS"
       ]
     },
     "motor_status_armed_idle": {
@@ -80,7 +141,19 @@
         "[MOT] armed=1 drv_en_request=1 health=OK",
         "[MOT] drv_request=HIGH pad=1",
         "[MOT] expected_ENN=LOW ENN_fb=0 resolved verdict=OK",
-        "[MOT] diag_off_confirmed=NO"
+        "[MOT] diag_off_confirmed=NO",
+        "[MOT] arm_gate_mask=0x2 REFUSED"
+      ]
+    },
+    "motor_status_cruise": {
+      "healthy": [
+        "[MOT] state=2 name=CRUISE",
+        "[MOT] cur_hz=300 tgt_hz=300 accel=2000 decel=2000 dir=1",
+        "[MOT] armed=1 drv_en_request=1 health=OK",
+        "[MOT] drv_request=HIGH pad=1",
+        "[MOT] expected_ENN=LOW ENN_fb=0 resolved verdict=OK",
+        "[MOT] diag_off_confirmed=NO",
+        "[MOT] arm_gate_mask=0x2 REFUSED"
       ]
     },
     "motor_status_accel": {
@@ -90,7 +163,8 @@
         "[MOT] armed=1 drv_en_request=1 health=OK",
         "[MOT] drv_request=HIGH pad=1",
         "[MOT] expected_ENN=LOW ENN_fb=0 resolved verdict=OK",
-        "[MOT] diag_off_confirmed=NO"
+        "[MOT] diag_off_confirmed=NO",
+        "[MOT] arm_gate_mask=0x2 REFUSED"
       ]
     },
     "motor_arm": {
@@ -232,11 +306,19 @@
     "motor_status": {
       "healthy": [
         "[MOT] state=0 name=OTHER",
-        "[MOT] cur_hz=0 tgt_hz=0 accel=2000 decel=2000 dir=1",
+        "[MOT] cur_hz=0 tgt_hz=0 accel=2000 decel=2000 dir=0",
         "[MOT] armed=0 drv_en_request=0 health=OK",
+        "[MOT] guard stops=0 reason=0",
+        "[MOT] guard reason map: 0=none 1=cfg-lost 2=integrity 3=txn-busy 4=enn-fb",
+        "[MOT] stop result=api-accepted(驱动接受关断, 非波形证明) src=init rc=0 latched=0",
+        "[MOT] diag_off_confirmed=YES",
+        "[MOT] arm_gate_mask=0x0 ALL-PASS",
         "[MOT] drv_request=LOW pad=0",
         "[MOT] expected_ENN=HIGH ENN_fb=1 resolved verdict=OK",
-        "[MOT] diag_off_confirmed=YES"
+        "[MOT] limit_inputs=DISABLED_BY_CONFIG",
+        "[MOT] step_diag=GRANTED",
+        "[MOT] tmc_write_gate=0x0",
+        "[MOT] note: state/cur/tgt=0 does not prove physical STEP stopped"
       ]
     },
     "diag_status": {

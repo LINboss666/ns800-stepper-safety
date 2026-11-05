@@ -1,0 +1,10 @@
+{"kind": "APPROVED_PACKAGE_VERIFIED", "plan_sha256": "4da0aeb016e859c95c880e6763c1ed0bc1bfe7f0046b8acb7b2e383ea445f561", "stage": "S1", "steps": 38, "steps_sha256": "3a3f99563e6ec4412fc8ace470cee62dd322a6260b0ae1386f9912c1b92ba195", "t_s": 0.0, "transport": "real", "verified": true}
+{"approval_kind": "business", "approval_used": 1, "kind": "QUOTA_CONSUMED", "left": 0, "n": 1, "name": "port_open", "t_s": 0.015}
+{"baud": 115200, "kind": "PORT_OPEN_ATTEMPT", "port": "COM5", "t_s": 0.031}
+{"kind": "PORT_OPEN", "port": "COM5", "t_s": 0.047, "transport": "real"}
+{"bytes": 983, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "73abf3012386723ec2d5ec70e5b515bfb2cb3285d60c233a27b07e60d47408a7", "t_s": 0.125, "tail": "b'g)\\r\\nmsh >\\r\\nmsh >'"}
+{"allowed": false, "as": "sys_pre", "kind": "BUSINESS_OUTCOME", "lines": [], "status_lines_allowed": ["[Motor] arm gate fail mask=0x18 (arm REFUSED)"], "t_s": 0.14}
+{"bytes": 1128, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "f0550d3131642cd02408c88adc67f6fcb064a27ccba6ceec9c60b82e9cf0c3b5", "t_s": 0.234, "tail": "b'ed\\r\\nmsh >\\r\\nmsh >'"}
+{"allowed": false, "as": "mot_pre", "kind": "BUSINESS_OUTCOME", "lines": ["[MOT] arm_gate_mask=0x18 REFUSED"], "status_lines_allowed": [], "t_s": 0.25}
+{"code": "BUSINESS_FAILED", "detail": "{\"verdict\": \"STOP\", \"code\": \"BUSINESS_FAILED\", \"lines\": [\"[MOT] arm_gate_mask=0x18 REFUSED\"]}", "kind": "SESSION_STOP", "t_s": 0.25}
+{"kind": "PORT_CLOSED", "t_s": 0.25}

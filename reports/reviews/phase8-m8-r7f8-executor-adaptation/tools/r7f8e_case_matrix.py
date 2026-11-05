@@ -38,6 +38,11 @@ out, fails = [], []
 
 
 def note(name, ok, detail=""):
+    # 判据名里不许出现字段分隔符: MC6 曾把 "0x0|0x2" 写进名字, 于是回执的第三格被切成
+    # 名字+半截话, 下游按 parts[0]/parts[1] 读的人拿到的是 "PASS" 之外的东西(交接里那个
+    # 键就这么变成了 `MC6_..._0x0` 配上一段说明)。当场拒, 不留静默漂移。
+    if "|" in name:
+        raise ValueError("矩阵判据名含分隔符 '|': %s" % name)
     out.append("%s|%s|%s" % (name, "PASS" if ok else "FAIL", detail))
     if not ok:
         fails.append(name)
@@ -1434,13 +1439,454 @@ def field_bytes_probes(mod, repo, work):
             s["expect_contains"] = [e for e in s.get("expect_contains", [])
                                     if "arm gate fail mask" not in e]
     line_mut = sa_line(mutated)
-    note("FB6_静态门_交付计划 PASS 且豁免只在两条查询步",
-         "|PASS|" in line_ok and allow_count(plan_doc) == [("sys_pre", "system_status"),
-                                                          ("sys_after_apply", "system_status")],
-         "门行=%s ;; 全 38 步里申报豁免的只有=%s" % (line_ok[:150], allow_count(plan_doc)))
+    note("FB6_静态门_交付计划 PASS 且豁免只在预期非 0 的那几条查询步",
+         "|PASS|" in line_ok and allow_count(plan_doc) == [
+             ("sys_pre", "system_status"), ("mot_pre", "motor_status"),
+             ("sys_after_apply", "system_status"), ("cruise", "motor_status"),
+             ("mot_after_cancel", "motor_status"), ("stopped", "motor_status")],
+         "门行=%s ;; 全 38 步里申报豁免的只有=%s(预期 0x0 的 4 条查询步一条都没有)"
+         % (line_ok[:150], allow_count(plan_doc)))
     note("FB7_静态门元负控_抽掉正面要求计划门必须翻红",
          "|FAIL|" in line_mut and "STATUS_ALLOW_NOT_POSITIVELY_REQUIRED" in line_mut,
          "同一条真字节对应的计划形状, 只删 sys_pre 的正面要求 => %s" % line_mut[:220])
+
+
+# ============================================================ F21: 门位契约的全量/真字节/继承三判
+def mask_contract_probes(mod, repo, work):
+    """A F21 第 1、2 点: 契约**覆盖到每一步**、每一种 mask 都用**归档真实字节**判一遍、
+    并且证明新计划**继承**了旧计划声明过的披露合同(而不是只证明旧判据没被删)。
+
+    与 FB 家族的分工: FB 判的是 F11 那一次 system_status 那一条豁免的口径; 这一族判整张步骤表 ——
+    8 处 motor_status 一处都不许靠"给所有查询统一放行任意 REFUSED"过关。输入一律是盘上已归档的
+    rx.bin 与交付计划/行表本身, 不重写、不补造。真实设备动作: 0。
+    """
+    root = work / "mask_contract"
+    if root.exists():
+        shutil.rmtree(str(root), ignore_errors=True)
+    root.mkdir(parents=True)
+    sys.path.insert(0, str((repo / ROUND / "tools").resolve()))
+    try:
+        pkg = importlib.import_module("r7f8f_make_real_package")
+    except SystemExit as e:                     # 作者工具自己就拒绝在缺原件时导入
+        note("MC0_包作者工具可导入(归档原件身份在它手里核过)", False, "import 即拒绝: %s" % e)
+        return
+    note("MC0_包作者工具可导入(归档原件身份在它手里核过)", True,
+         "r7f8f_make_real_package 导入成功 => _observed_sys_ready/_observed_mot_rows 的字节与"
+         "散列身份检查已通过(它检查的是**盘上归档件**, 不是我的记忆)")
+    plan_doc = json.loads((repo / ROUND / "field/plan_r7f8f_2369_real.json").read_text(
+        encoding="utf-8"))
+    rows_doc = json.loads((repo / ROUND / "field/rows_r7f8f_real.json").read_text(encoding="utf-8"))
+    steps = {s["as"]: s for s in plan_doc["stages"][0]["steps"]}
+    order = [s["as"] for s in plan_doc["stages"][0]["steps"]]
+    contract = {a: sorted(m) for a, m, _g, _b in pkg.ARM_GATE_CONTRACT}
+    q_heads = set(mod.ARM_GATE_MASK_ROWS)
+
+    def allow_of(st, head, mask):
+        return mod.arm_gate_refused_allow(head, mask)
+
+    # 1) 覆盖: 从**计划字节**独立复算"该数的步数"与每步的 mask 集合/豁免集合, 不信任何手工计数。
+    got, allow_bad = {}, []
+    for st in steps.values():
+        head = (st.get("cmd") or "").split(" ")[0]
+        if head not in q_heads:
+            continue
+        row = mod.ARM_GATE_MASK_ROWS[head]
+        sp = [x for x in (st.get("expect_values") or []) if x.get("row") == row]
+        if len(sp) != 1:
+            got[st["as"]] = "逐值判据 %d 条" % len(sp)
+            continue
+        m = (sp[0].get("must") or {}).get("mask") or (sp[0].get("must_one_of") or {}).get("mask")
+        got[st["as"]] = sorted(m) if isinstance(m, list) else [m]
+        want = sorted(allow_of(st, head, x) for x in (sorted(m) if isinstance(m, list) else [m])
+                      if x != "0x0")
+        if want != sorted(st.get("status_lines_allow") or []):
+            allow_bad.append("%s:应有%s 实有%s" % (st["as"], want,
+                                                  sorted(st.get("status_lines_allow") or [])))
+    note("MC1_全量覆盖_计划里每条状态查询都钉了 mask 且与契约表逐条相等",
+         got == contract and len(got) == len(contract) == 10 and not allow_bad,
+         "计划里查到 %d 条(表=%d) %s ;; 豁免集合与预期 mask 不一致的=%s" %
+         (len(got), len(contract), json.dumps(got, ensure_ascii=False, sort_keys=True), allow_bad))
+    zero_steps = sorted(a for a, m in got.items() if m == ["0x0"])
+    note("MC2_预期为0的步骤要求0且一条豁免都没有",
+         zero_steps == ["mot_after_irq", "mot_armed", "mot_dir", "mot_disabled"] and
+         all(not steps[a].get("status_lines_allow") for a in zero_steps),
+         "预期 0x0 的=%s 它们的 status_lines_allow=%s" %
+         (zero_steps, {a: steps[a].get("status_lines_allow") for a in zero_steps}))
+
+    # 2) 归档真实字节: 每种 mask 形状取**原件文件**, 身份不符就整族判红(不静默跳过)。
+    arch = []
+    for mask in ("0x18", "0x0"):
+        rel, nbytes, sha12, _note = pkg._MASK_SAMPLES[mask]
+        arch.append((mask, rel, nbytes, sha12))
+    arch.append(("0x2", pkg.MOTOR_MASK_02_SRC, None, None))
+    arch.append(("0x8", pkg.MOTOR_MASK_08_SRC, None, None))
+    real_line, real_info, id_bad = {}, {}, []
+    for mask, rel, nbytes, sha12 in arch:
+        p = repo / rel
+        if not p.is_file():
+            id_bad.append("%s 缺件" % mask)
+            continue
+        b = p.read_bytes()
+        if nbytes is not None and (len(b) != nbytes or sha(b)[:12] != sha12):
+            id_bad.append("%s 身份不符(%d B sha=%s…)" % (mask, len(b), sha(b)[:12]))
+            continue
+        hits = [l for l in b.decode("utf-8").splitlines()
+                if l == pkg.MOT_MASK_LINE[mask]]
+        if not hits:
+            id_bad.append("%s 原件里取不到披露行 %r" % (mask, pkg.MOT_MASK_LINE[mask]))
+            continue
+        real_line[mask] = hits[0]
+        real_info[mask] = "%d B sha=%s… @%s" % (len(b), sha(b)[:12], p.name)
+    note("MC3_归档真实字节四份都在盘且身份逐字节相符",
+         sorted(real_line) == ["0x0", "0x18", "0x2", "0x8"] and not id_bad,
+         "取到=%s 不符=%s ;; 0x18 那一份的口径按 A 的更正: **F20 本会话首次取得**, 而同一身份的字节"
+         "早已在 5 次归档会话里(上一版把历史样本漏了)" %
+         (json.dumps(real_info, ensure_ascii=False, sort_keys=True), id_bad))
+
+    def judge(st, lines, label):
+        d = root / label
+        d.mkdir()
+        clk = mod.SimClock()
+        lg = mod.Ledger(d / "events.jsonl", clk, out_dir=d)
+        code, res = "", None
+        try:
+            res = mod.assert_step(st, lines, st["as"], lg,
+                                  raw="\r\n".join(lines).encode("utf-8"))
+            code = res.get("code", "")
+        except mod.Stop as e:
+            code = e.code
+        except Exception as e:
+            code = "UNNAMED_%s" % e.__class__.__name__
+        evs = [json.loads(l) for l in (d / "events.jsonl").read_text(encoding="utf-8-sig")
+               .splitlines() if l.strip()]
+        disclosed = [x for e in evs if e.get("kind") == "BUSINESS_OUTCOME"
+                     for x in (e.get("status_lines_allowed") or [])]
+        return code, res, disclosed
+
+    def real_rows(asname, mask):
+        """把某步**自己那份行表响应**里的披露行换成归档原件的那一行(其余字段保持本包申报形状)。
+
+        只换**带 tail 的那一条**: mask≠0 时产品还会再打一条同名的裸行(motor.c:937), 无脑按前缀换
+        会把裸行也换成 REFUSED 行, 于是同一行出现两次 —— 那正是逐值判据的 ROW_NOT_UNIQUE 要抓的。
+        """
+        head = (steps[asname].get("cmd") or "").split(" ")[0]
+        row_re = re.compile(mod.ARM_GATE_MASK_ROWS[head])
+        base = list(rows_doc["commands"][steps[asname].get("key") or steps[asname]["cmd"]]
+                    ["healthy"])
+        out = [real_line[mask] if row_re.match(l) else l for l in base]
+        if real_line[mask] not in out:
+            out.append(real_line[mask])
+        return out
+
+    # 3) 正例: 0x18 的归档原件喂给预期它的那一步 => OK, 且被豁免的行**带原文入台账**(不是静默丢弃)。
+    code_p, res_p, disc_p = judge(steps["mot_pre"], real_rows("mot_pre", "0x18"), "mot_pre_18")
+    note("MC4_真字节正例_mot_pre 收到 0x18 归档行判 OK 且豁免行原文入台账",
+         code_p == "" and (res_p or {}).get("verdict") == "OK" and
+         disc_p == [real_line["0x18"]],
+         "verdict=%s code=%s 台账豁免行=%s (这一步就是 F20 停下来的地方)" %
+         ((res_p or {}).get("verdict"), code_p or "-", disc_p))
+
+    # 4) 反例: 同一段 0x18 真字节喂给**预期 0x0** 的步 => 具名业务失败, 这就是"要求 0"在咬。
+    code_n, res_n, _dn = judge(steps["mot_after_irq"], real_rows("mot_after_irq", "0x18"),
+                               "mot_after_irq_18")
+    note("MC5_真字节反例_预期 0x0 的步收到 0x18 真行必须具名 STOP",
+         code_n == "BUSINESS_FAILED" and (res_n or {}).get("lines") == [real_line["0x18"]],
+         "code=%s 命中行=%s => 豁免不是查询步通用的通行证, 按步+按值才免检" %
+         (code_n, (res_n or {}).get("lines")))
+
+    # 5) 边界步 stopped: 0x0/0x2 都合法(各有真字节), 集合外的值必须停 —— 含"形状合法但矛盾"那一类。
+    b_ok2, _r2, bd2 = judge(steps["stopped"], real_rows("stopped", "0x2"), "stopped_0x2")
+    b_ok0, _r0, bd0 = judge(steps["stopped"], real_rows("stopped", "0x0"), "stopped_0x0")
+    b_18, _r18, _d18 = judge(steps["stopped"], real_rows("stopped", "0x18"), "stopped_0x18")
+    contra = [l for l in real_rows("stopped", "0x2")]
+    contra = [("[MOT] arm_gate_mask=0x8 ALL-PASS" if l == real_line["0x2"] else l)
+              for l in contra]
+    b_cf, _rc, _dc = judge(steps["stopped"], contra, "stopped_contradiction")
+    note("MC6_边界步_stopped 的 0x0 与 0x2 各判 OK, 0x18 与 0x8-ALL-PASS 都停",
+         b_ok2 == "" and bd2 == [real_line["0x2"]] and b_ok0 == "" and
+         b_18 == "BUSINESS_FAILED" and b_cf == "FIELD_VALUE_NOT_IN_SET",
+         "0x2=%s(豁免行入台账=%s) 0x0=%s 0x18=%s 矛盾形状=%s" %
+         (b_ok2 or "OK", bd2, b_ok0 or "OK", b_18, b_cf))
+
+    # 6) 元负控: 逐步摘掉那一条 mask 逐值判据 => 静态门必须点名该步翻红(证明每条都在承重)。
+    def gate_line(doc):
+        o, _bad, _n = mod.validate_plan(doc, rows_doc, repo / APP)
+        return [l for l in o if l.startswith("R7F8F_ARM_GATE_MASK|")][0]
+
+    named = []
+    for a in sorted(contract):
+        doc = json.loads(json.dumps(plan_doc))
+        for s in doc["stages"][0]["steps"]:
+            if s.get("as") == a:
+                row = mod.ARM_GATE_MASK_ROWS[(s.get("cmd") or "").split(" ")[0]]
+                s["expect_values"] = [x for x in (s.get("expect_values") or [])
+                                      if x.get("row") != row]
+        l = gate_line(doc)
+        if "|FAIL|" not in l or "/%s:" % a not in l:
+            named.append("%s=>%s" % (a, l[:90]))
+    note("MC7_元负控_逐步摘掉 mask 判据静态门都点名翻红(10/10)", not named,
+         "没点名的=%s ;; 摘判据是最小改动, 门必须在**那一步**上红, 不然就是只数总数" % (named or "无"))
+
+    # 7) 豁免 widened 成通配 hex(= A 明令禁止的"统一放行任意 REFUSED")必须被门判红。
+    doc = json.loads(json.dumps(plan_doc))
+    for s in doc["stages"][0]["steps"]:
+        if s.get("as") == "mot_after_irq":
+            s["status_lines_allow"] = [r"^\[MOT\] arm_gate_mask=0x[0-9A-Fa-f]+ REFUSED$"]
+    widened = gate_line(doc)
+    note("MC8_反向_给预期 0x0 的步加一条通配豁免必须判红",
+         "|FAIL|" in widened and "mot_after_irq" in widened,
+         "门行=%s" % widened[:200])
+
+    # 8) 契约标记缺席只登记 NA: 历史冻结包的字节不回改, 也不给它新红(与 observation_bounds 同处置)。
+    doc = json.loads(json.dumps(plan_doc))
+    doc.pop(mod.ARM_GATE_MASK_CONTRACT_KEY, None)
+    na = gate_line(doc)
+    note("MC9_历史包无契约标记只登记NA且不加新红", "|NA|" in na and "FAIL" not in na.split("|")[2],
+         "拿掉 %s 后=%s" % (mod.ARM_GATE_MASK_CONTRACT_KEY, na[:160]))
+
+    # 9) 跨计划继承: 冻结的旧计划里每一条披露豁免都必须能在新计划里找到同 cmd 的落点,
+    #    或者被新计划**点名不继承 + 给出可按步序复算的理由**。"旧判据没删"不算继承。
+    PREDS = ["reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/plan_r7f2b_newimage_draft.json",
+             "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/plan_r7f3_b502_reviewed.json",
+             "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/plan_r7f4_b502_configured_reviewed.json",
+             "reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/plan_r7f5_b502_blind_irq_static.json",
+             "reports/reviews/phase8-m8-r7f6-la-path-static/field/plan_r7f6_b502_readonly.json",
+             "reports/reviews/phase8-m8-r7f7-newimage-static/field/plan_r7f7_2369_static.json"]
+    covered_by_cmd = {}
+    for a, ms in contract.items():
+        head = (steps[a].get("cmd") or "").split(" ")[0]
+        covered_by_cmd.setdefault(head, set()).update(ms)
+    ex = plan_doc.get("arm_gate_mask_contract_not_inherited") or []
+    gaps, seen_ex = [], set()
+    for rel in PREDS:
+        p = repo / rel
+        if not p.is_file():
+            gaps.append("旧计划缺件 %s" % rel)
+            continue
+        od = json.loads(p.read_text(encoding="utf-8"))
+        for stg in od.get("stages", []):
+            for st in stg.get("steps", []):
+                head = (st.get("cmd") or "").split(" ")[0]
+                if head not in q_heads:
+                    continue
+                for pat in st.get("status_lines_allow") or []:
+                    prefix = mod.status_allow_literal_prefix(pat)
+                    m = re.search(r"mask=0x([0-9A-Fa-f]+)$|mask=0x([0-9A-Fa-f]+) ", prefix)
+                    if not m:
+                        # 旧计划给的是**通配 hex** 的泛形状(R7F2b/R7F3 那两条 system_status):
+                        # 没有具体值可比, 就要求新计划对这个 cmd 至少还有一条**非 0** 的豁免落点。
+                        # 泛形状本身不算继承证据, 也不因为"取不到值"就直接放过。
+                        if not [x for x in covered_by_cmd.get(head, set()) if x != "0x0"]:
+                            gaps.append("%s/%s/%s:泛形状豁免(%s)在新计划里对 %s 没有任何非 0 落点"
+                                        % (p.name, stg["id"], st.get("as"), pat, head))
+                        continue
+                    val = "0x" + (m.group(1) or m.group(2))
+                    if val in covered_by_cmd.get(head, set()):
+                        continue
+                    hit = [e for e in ex if e.get("cmd") == head and e.get("mask") == val]
+                    if not hit:
+                        gaps.append("%s 的 %s/%s 申报过 %s, 新计划既没覆盖也没点名不继承"
+                                    % (p.name, head, st.get("as"), val))
+                        continue
+                    seen_ex.add((head, val))
+                    w = hit[0].get("window_check") or {}
+                    i0 = order.index(w.get("after_step")) if w.get("after_step") in order else None
+                    i1 = order.index(w.get("before_step")) if w.get("before_step") in order else None
+                    inside = [x for x in order[(i0 + 1):i1] if i0 is not None and i1 is not None
+                              and (steps[x].get("cmd") or "").split(" ")[0] == w.get("cmd")]
+                    if not (i0 is not None and i1 is not None and i1 > i0 and not inside
+                            and hit[0].get("reason")):
+                        gaps.append("%s %s 的不继承理由复算不过: 窗口 %s..%s 里查到 %s"
+                                    % (head, val, w.get("after_step"), w.get("before_step"), inside))
+    unused = [e for e in ex if (e.get("cmd"), e.get("mask")) not in seen_ex]
+    note("MC10_跨计划继承_六份冻结旧计划的每条披露豁免都在新计划里有落点",
+         not gaps and not unused,
+         "不吻合=%s ;; 新计划点名不继承但旧计划里找不到对应的=%s" % (gaps[:4], unused))
+
+    # 11) F20 那一次的原始字节: 与历史归档**逐字节同一身份**才允许写"同一形状", 而且要按 A 的
+    # 更正把口径钉死 —— 这是"F20 本会话首次取得", 不是"历史上没抓过"; 而两次 system_status 字节
+    # 相同只证明**输出重复**, 证明不了接线没变(那一句属于操作者报告, 不能升格成实测)。
+    f20 = {"mot_pre": (repo / ROUND / "proof/r7f8f_field_f20_mot_pre.rx.bin", "0x18"),
+           "sys_pre": (repo / ROUND / "proof/r7f8f_field_f20_sys_pre.rx.bin", "0x18")}
+    same, diff = {}, []
+    for k, (p, mask) in sorted(f20.items()):
+        if not p.is_file():
+            diff.append("%s F20 原始字节缺件" % k)
+            continue
+        b = p.read_bytes()
+        ref = {"mot_pre": (repo / pkg._MASK_SAMPLES["0x18"][0]).read_bytes(),
+               "sys_pre": (repo / ROUND / "proof/r7f8f_field_f11_sys_pre.rx.bin").read_bytes()}[k]
+        same[k] = "%d B sha=%s 与历史归档逐字节相等=%s" % (len(b), sha(b)[:12], b == ref)
+        if b != ref:
+            diff.append("%s 与历史归档不等(sha %s vs %s)" % (k, sha(b)[:12], sha(ref)[:12]))
+    verbatim = repo / ROUND / "proof/r7f8f_field_f20_operator_verbatim.txt"
+    note("MC11_F20原始字节入档且与历史归档逐字节同一身份(口径=F20本会话首次取得)",
+         not diff and len(f20) == 2 and verbatim.is_file(),
+         "%s ;; 接线是否变化属于**操作者报告**(F20 批准原话第 1 段), 两次字节相同只证输出重复, "
+         "本判据不把它写成实测" % (json.dumps(same, ensure_ascii=False)))
+
+
+
+def token_chain_probes(mod, repo, work):
+    """A F21 第 3 点: **实体绑定**与**真用了原话令牌**分开判, 并把 F20 的不一致单独判未通过。
+
+    F20 的自伤不是"批准身份错了", 而是内层 python -c 把原话经控制台打印、再经 shell 变量转运成
+    命令行参数 —— 传进去的字节和批注里的原话不是同一份, 而当时**没有任何一道门会发现**: 账本里
+    没有令牌摘要可对照。这一族把那条链补成机器可判的: 开账绑摘要, 开口前三份摘要必须一致。
+    真实设备动作: 0(账本只建在仓外 --work, 真实分支探针在 dispatch_plan 之前就被拦下)。
+    """
+    root = work / "token_chain"
+    if root.exists():
+        shutil.rmtree(str(root), ignore_errors=True)
+    root.mkdir(parents=True)
+    led_root = root / "approvals"
+    led_root.mkdir()
+    verbatim = repo / ROUND / "proof/r7f8f_field_f20_operator_verbatim.txt"
+    if not verbatim.is_file():
+        note("TG0_F20 原话文件在盘", False, "缺 %s" % verbatim.name)
+        return
+    raw = verbatim.read_bytes()
+    canon = mod.token_bytes_from_file(verbatim)
+    note("TG1_Python 内按严格 UTF-8 取原字节(不经控制台/shell 变量)",
+         canon == raw.rstrip(b"\r\n") and len(canon) > 0 and
+         canon.decode("utf-8") == raw.decode("utf-8").rstrip("\r\n"),
+         "文件=%d B sha=%s… 取到=%d B sha=%s… 尾随 CR/LF 存在=%s" %
+         (len(raw), sha(raw)[:12], len(canon), sha(canon)[:12], raw != canon))
+
+    ids = {"plan_sha256": "a" * 64, "executor_sha256": "b" * 64, "image_sha256": "c" * 64}
+    caps = {"port_open": 1}
+    p = mod.approval_init(led_root, "TG-BOUND", ids, caps, note="离线探针",
+                          token_bytes=canon, token_source="file:%s" % verbatim.name)
+    txt = p.read_bytes().decode("utf-8-sig")
+    doc = json.loads(txt)
+    note("TG2_开账即绑令牌摘要, 且账本里不落原文",
+         (doc.get("approval_token") or {}).get("sha256") == sha(canon) and
+         canon.decode("utf-8")[:24] not in txt,
+         "approval_token=%s ;; 原文出现在账本里=%s(必须 False) 令牌字节=%d" %
+         (json.dumps(doc.get("approval_token"), ensure_ascii=False),
+          canon.decode("utf-8")[:24] in txt, len(canon)))
+
+    dig = mod.verify_token_chain(led_root, "TG-BOUND", canon, str(verbatim))
+    note("TG3_正路_原话文件/传入令牌/账本绑定三份摘要一致才放行",
+         len(set([dig["passed_token_sha256"], dig["verbatim_file_sha256"],
+                  dig["ledger_bound_sha256"]])) == 1,
+         "digests=%s" % json.dumps({k: (v[:12] if isinstance(v, str) else v)
+                                    for k, v in dig.items()}, sort_keys=True))
+
+    mangled = canon.decode("utf-8").replace("，", ",", 1).encode("utf-8")
+    try:
+        mod.verify_token_chain(led_root, "TG-BOUND", mangled, str(verbatim))
+        note("TG4_反例_传入令牌与账本绑定不符必须拒绝开口", False, "没抛异常")
+    except mod.Stop as e:
+        note("TG4_反例_传入令牌与账本绑定不符必须拒绝开口",
+             e.code == "TOKEN_DIGEST_MISMATCH",
+             "code=%s detail=%s => 这就是 F20 那一类的字节漂移, 现在会在**开口之前**被拒"
+             % (e.code, e.detail[:140]))
+    try:
+        mod.verify_token_chain(led_root, "TG-BOUND", canon, str(verbatim))
+        bad_doc = json.loads(p.read_bytes().decode("utf-8-sig"))
+        bad_doc.pop("approval_token", None)
+        p.write_text(json.dumps(bad_doc, ensure_ascii=False), encoding="utf-8")
+        mod.verify_token_chain(led_root, "TG-BOUND", canon, str(verbatim))
+        note("TG5_元负控_账本没绑令牌摘要时必须拒绝开口", False, "居然放行了(门是装饰)")
+    except mod.Stop as e:
+        note("TG5_元负控_账本没绑令牌摘要时必须拒绝开口",
+             e.code == "APPROVAL_TOKEN_NOT_BOUND",
+             "code=%s => 摘要缺席是**开不了口**, 不是'当作一致'" % e.code)
+
+    bad_enc = root / "not-utf8.txt"
+    bad_enc.write_bytes(b"\xff\xfe\x00\xb1\xca")   # 非法 UTF-8 序列(GBK 的"批准")
+    try:
+        mod.token_bytes_from_file(bad_enc)
+        note("TG6_非 UTF-8 原话文件具名拒绝", False, "没抛异常")
+    except mod.Stop as e:
+        note("TG6_非 UTF-8 原话文件具名拒绝", e.code == "TOKEN_VERBATIM_NOT_UTF8",
+             "code=%s" % e.code)
+    try:
+        mod.token_bytes_from_file(root / "absent.txt")
+        note("TG7_原话文件缺席时不猜内容", False, "没抛异常")
+    except mod.Stop as e:
+        note("TG7_原话文件缺席时不猜内容", e.code == "TOKEN_VERBATIM_FILE_ABSENT",
+             "code=%s" % e.code)
+
+    # F20 那一次的账(原样归档, 不补改): 用新门复算 => "实际使用了原话令牌"这一判就是不成立。
+    f20_led = repo / ROUND / "proof/r7f8f_field_f20_approval_ledger.json"
+    f20_root = root / "f20_ledger_copy"
+    f20_root.mkdir()
+    if not f20_led.is_file():
+        note("TG8_F20 那次开口按新门复算=令牌判据不成立", False,
+             "缺 proof/r7f8f_field_f20_approval_ledger.json(归档件不在盘上)")
+    else:
+        shutil.copyfile(str(f20_led),
+                        str(f20_root / "approval_M8-R7F8F-F20-20261105.json"))
+        try:
+            mod.verify_token_chain(f20_root, "M8-R7F8F-F20-20261105", canon, str(verbatim))
+            note("TG8_F20 那次开口按新门复算=令牌判据不成立", False, "居然放行了")
+        except mod.Stop as e:
+            note("TG8_F20 那次开口按新门复算=令牌判据不成立",
+                 e.code == "APPROVAL_TOKEN_NOT_BOUND",
+                 "code=%s ;; F20 账本里没有 approval_token 字段 => 当时**无从核对**开口用的是不是"
+                 "那句原话; 这一条单独判未通过(实体绑定另判)。原账/原话/两份 sha 全部保留不补改"
+                 % e.code)
+
+    # 实体绑定这一判: 批准句点名的四件前缀与**当时交付的 Git blob** / 盘上镜像逐字节相符。
+    def blob_with_sha(rel, prefix):
+        """> 在文件历史里找**内容散列**能对上批准句前缀的那次提交(不靠 HEAD: 本轮会改这些文件)。"""
+        hist = subprocess.run(["git", "-C", str(repo), "log", "--format=%H", "--", rel],
+                              capture_output=True)
+        for c in hist.stdout.decode("ascii", "replace").split()[:60]:
+            show = subprocess.run(["git", "-C", str(repo), "show", "%s:%s" % (c, rel)],
+                                  capture_output=True)
+            if show.returncode != 0:
+                continue
+            h = hashlib.sha256(show.stdout).hexdigest()
+            if h.startswith(prefix):
+                return c[:7], h[:12], len(show.stdout)
+        return None, None, 0
+
+    ent = {"plan": (ROUND + "/field/plan_r7f8f_2369_real.json", "e7851942"),
+           "rows": (ROUND + "/field/rows_r7f8f_real.json", "c64fdee8"),
+           "executor": (ROUND + "/tools/m8r3_serial_chain_r7f8.py", "30c67a3e")}
+    ent_detail, ent_ok = [], True
+    for k, (rel, pre) in sorted(ent.items()):
+        c, h, n = blob_with_sha(rel, pre)
+        ent_ok = ent_ok and bool(c)
+        ent_detail.append("%s@%s=%s(%d B)" % (k, c or "无匹配提交", h or "-", n))
+    pl = json.loads((repo / ROUND / "field/plan_r7f8f_2369_real.json").read_text(encoding="utf-8"))
+    img = (pl.get("identity_binding") or {}).get("image") or {}
+    img_p = repo / img.get("path", "")
+    img_h = hashlib.sha256(img_p.read_bytes()).hexdigest() if img_p.is_file() else ""
+    note("TG9_F20 的四件实体绑定单独判 PASS(与令牌那一判互不掩盖)",
+         ent_ok and img_h.startswith("23691e8d"),
+         "%s | image=%s… ;; 这一条只证'批准绑在哪份字节上', **不证**'开口时用的是那句原话'" %
+         ("|".join(ent_detail), img_h[:12] or "-"))
+
+    # CLI 级: 真实传输在 dispatch_plan **之前**被令牌门拦下 => 连 pyserial 都不会被导入。
+    # 端口故意给一个**不存在**的名字: 万一这道门被将来改掉, 也只会撞在一个不存在的口上,
+    # 绝不碰 COM5 —— 本轮的"0 设备动作"不靠运气, 靠这个上界。
+    d = root / "cli_real_refuse"
+    d.mkdir()
+    shutil.copyfile(str(repo / ROUND / "field/plan_r7f8f_2369_real.json"), str(d / "plan.json"))
+    shutil.copyfile(str(repo / ROUND / "field/rows_r7f8f_real.json"),
+                    str(d / "rows_r7f8f_real.json"))
+    rc = subprocess.run([sys.executable, str(repo / EXE_REL), "--dispatch", "--transport", "real",
+                         "--backend", "real", "--port", "COM_NONEXISTENT_M8R7F8F",
+                         "--profile", "response_driven",
+                         "--plan", str(d / "plan.json"), "--repo-root", str(repo),
+                         "--out", str(d / "run"), "--approval-id", "TG-CLI-NO-LEDGER",
+                         "--approval-token", "随便一句", "--expected-token", "随便一句",
+                         "--approval-root", str(led_root)], capture_output=True, cwd=str(repo))
+    blob = (rc.stdout + rc.stderr).decode("utf-8", "replace")
+    files = list(d.rglob("*.jsonl"))
+    tx = [f for f in files if '"TX"' in f.read_text(encoding="utf-8", errors="replace")]
+    port = [f for f in files if "PORT_OPEN" in f.read_text(encoding="utf-8", errors="replace")]
+    note("TG10_CLI 真实分支被令牌门拦在 dispatch 之前(不导 pyserial、零台账零发送零开口)",
+         rc.returncode == 4 and "TOKEN_CHAIN_REFUSED:APPROVAL_LEDGER_ABSENT" in blob
+         and not tx and not port and not files and "COM5" not in blob,
+         "rc=%d 首行=%s ;; 台账文件=%d 个 TX=%d 条 开口=%d 条 ;; 用的口名=COM_NONEXISTENT_M8R7F8F"
+         "（现场真实口 COM5 出现在输出里=%s）" %
+         (rc.returncode, (blob.splitlines() or ["-"])[0][:120], len(files), len(tx), len(port),
+          "COM5" in blob))
 
 
 def main() -> int:
@@ -1532,6 +1978,8 @@ def main() -> int:
     byte_probes(mod, work)
     ruling_probes(mod, repo, work)
     field_bytes_probes(mod, repo, work)
+    mask_contract_probes(mod, repo, work)
+    token_chain_probes(mod, repo, work)
 
     # ---------------------------------------------------------------- 在进程内的身份反例与源码锚点
     steps = [{"as": "a", "cmd": LS}]
@@ -1592,8 +2040,26 @@ def main() -> int:
     note("自证_故意写错的预期必须被判红", bool(judge(c0, res, led)),
          "judge() 对同一份真实输出报了 %d 条不符 => 整张矩阵的绿不是恒真" %
          len(judge(c0, res, led)))
-    note("本轮无设备动作", True,
-         "全部 stub/sim 子进程与在进程内门函数; 未开串口/pyOCD/Keil/分析仪, 未建真实批准账")
+    # "本轮无设备动作"要**自己算**, 不是照抄上一轮的措辞: 扫本次 work 下所有台账, 找有没有
+    # 任何一条带**口名**的开口事件(F11/F20 那两次真机口名是 COM5, 它们的账在仓外, 不归这里)。
+    port_named = []
+    for f in list(work.rglob("*.jsonl")):
+        for line in f.read_text(encoding="utf-8", errors="replace").splitlines():
+            if "PORT_OPEN" not in line:
+                continue
+            try:
+                e = json.loads(line)
+            except ValueError:
+                continue
+            if str(e.get("port") or "").strip():
+                port_named.append("%s:%s" % (f.name, e.get("port")))
+    note("本轮无设备动作", not port_named,
+         "本次 --work 下带口名的开口事件=%d 条(全矩阵的 dispatch 都是 transport=stub/backend=sim "
+         "的 FakePort; 在进程内只调门函数)。批准账只在仓外临时目录用**假身份**建探针账(TG2), "
+         "未建/未动本轮现场批准账; TG10 那一次 CLI 用 transport=real 但在 dispatch 之前就被令牌门"
+         "拒回, 且它给的是不存在的口名 COM_NONEXISTENT_M8R7F8F —— 门若有洞也碰不到 COM5。"
+         "范围声明: 本条只覆盖**本轮离线判据**, 不覆盖 F11/F20 已发生的两次真机(见交接 field_run_* 块)"
+         % len(port_named))
 
     summary = "R7F8E_MATRIX_SUMMARY|判据=%d|FAIL=%d|%s" % (
         len(out), len(fails), ",".join(fails) if fails else "none")

@@ -48,6 +48,10 @@ ALLOWED = (
     # 五条与常量一致, 往中间插会让那条位置同步判据假红(本轮踩过一次, 记在 run_record §24.5)。
     "reports/agent_handoffs/phase8-m8-r7f8f-repair-and-offline-gate.md",
     "reports/agent_handoffs/phase8-m8-r7f8f-repair-and-offline-gate.json",
+    # F21: 本轮交接的**承接源快照**(合并件正文逐字取自它, 合并工具按行数与字节双向核过)。
+    # 它是 agent 追加的 §11 快照, 不是 A 签收件 —— 交接 JSON 的 draft_sync.agent_authored_part 里
+    # 点名了这一点, 白名单只是让它能进暂存集。
+    "reports/reviews/phase8-m8-r7f8-closed-loop-draft/R7F8_DRAFT_SNAPSHOT_F21.md",
 )
 UID_DEFAULT = "D:/ns800-m7-p0-20261030T182818/dap_uid_bare.txt"
 SLQ = "[" + chr(92) + chr(92) + "/]"

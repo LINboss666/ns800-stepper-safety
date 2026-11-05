@@ -59,14 +59,14 @@
  },
  "derived_executor": {
   "path": "reports/reviews/phase8-m8-r7f8-executor-adaptation/tools/m8r3_serial_chain_r7f8.py",
-  "bytes": 315233,
-  "sha256": "30c67a3e8dbe915214ca7e1f423cf3468594dba35772b4fa082b01b31893eef2",
-  "lines": 5525,
+  "bytes": 328475,
+  "sha256": "4363af36159befa417647680cc27fb5bdb95785a404b14d77602ccdbe253962e",
+  "lines": 5735,
   "generator": "reports/reviews/phase8-m8-r7f8-executor-adaptation/tools/r7f8f_build_executor.py",
-  "edits": 73,
+  "edits": 83,
   "patch": {
-   "bytes": 96676,
-   "sha256": "ecbf6c37f7482e8dd55cc2fa697a694f59c946bb50b0671cad727094fa47678b",
+   "bytes": 113931,
+   "sha256": "e09d333b2f09b5e4e8e3eb8465ae4c6f6950ee39eb2e481ceafdba37d65b2479",
    "path": "reports/reviews/phase8-m8-r7f8-executor-adaptation/patches/r7f8f_executor.patch"
   },
   "rebuild_verify": "VERIFY|PASS|仓外重建与仓库派生件逐字节相等（同输入两次一致）"
@@ -93,12 +93,12 @@
  "offline_verification": {
   "case_matrix": {
    "file": "proof/r7f8e_case_matrix.txt",
-   "predicates": 113,
+   "predicates": 135,
    "predicate_label": "判据",
    "per_case": [],
    "fail": 0,
    "failed_names": "none",
-   "last_line": "R7F8E_MATRIX_SUMMARY|判据=113|FAIL=0|none"
+   "last_line": "R7F8E_MATRIX_SUMMARY|判据=135|FAIL=0|none"
   },
   "stub_package": {
    "file": "proof/r7f8e_stub_package.txt",
@@ -131,16 +131,16 @@
   },
   "offline_gate": {
    "file": "proof/r7f8f_offline_gate.txt",
-   "predicates": 47,
+   "predicates": 49,
    "predicate_label": "判据",
    "per_case": [],
    "fail": 0,
    "failed_names": "none",
-   "last_line": "R7F8F_OFFLINE_GATE_SUMMARY|判据=47|FAIL=0|none"
+   "last_line": "R7F8F_OFFLINE_GATE_SUMMARY|判据=49|FAIL=0|none"
   }
  },
  "gate_machine_receipt_cross_check": {
-  "json_gates": 47,
+  "json_gates": 49,
   "json_fail_names": [],
   "text_and_json_same_set": true,
   "text_failed_names_normalized": [],
@@ -155,9 +155,9 @@
   "families": {
    "proof/r7f8e_case_matrix.txt": {
     "base_count": 65,
-    "now_count": 113,
+    "now_count": 135,
     "kept": 65,
-    "added": 48,
+    "added": 70,
     "removed": 0,
     "verdict_flips": 0
    },
@@ -187,9 +187,9 @@
    },
    "proof/r7f8f_offline_gate.txt": {
     "base_count": 0,
-    "now_count": 39,
+    "now_count": 40,
     "kept": 0,
-    "added": 39,
+    "added": 40,
     "removed": 0,
     "verdict_flips": 0
    }
@@ -197,13 +197,13 @@
  },
  "field_package": {
   "plan": {
-   "bytes": 33140,
-   "sha256": "e78519421149c9a09de0fea8c1cb381b6ac10fd9452959a1092b3a68c37b95a6",
+   "bytes": 45398,
+   "sha256": "2259359ca3f775bc478fd8db30535485cc9e589d6a5c45d7ac9e948b40326a6b",
    "path": "reports/reviews/phase8-m8-r7f8-executor-adaptation/field/plan_r7f8f_2369_real.json"
   },
   "rows": {
-   "bytes": 10060,
-   "sha256": "c64fdee847affe55ec9edc05e796d3befbc5731c30be7f96c6aa17b24ca23b70",
+   "bytes": 15460,
+   "sha256": "a8456159a45f229601e030b69d0034894d1b0df19b191ca4672a1fe0e5279737",
    "path": "reports/reviews/phase8-m8-r7f8-executor-adaptation/field/rows_r7f8f_real.json"
   },
   "steps": 38,
@@ -255,28 +255,28 @@
    "已按裁定二落地: 38 步逐条申报 step_total_seconds(含全部等待与余量), 由 step_window() 供执行器/计划门/镜像共同取值 => 不再每步叠 SLACK; 未申报的旧计划仍走 legacy。",
    "旧口径留档: 按「每步再叠 SLACK=3 s、stop 不解除运动计时」算, 起转前最坏合计 91.0 s、起转后申报内容 23.0 s —— 这两条就是上一版交 A 定口径的红, 现仅作为旧语义的对照数保留在本计划里。"
   ],
-  "approval": "F11 那次按操作者原话开过**一个**账并已用满 port_open=1；F19(本轮)未开新账、未发任何现场命令，四件身份已变 => 再一次真机需要一句新的真实原话"
+  "approval": "F11 与 F20 各按操作者原话开过**一个**账, 两本的 port_open=1 都已用满; F21(本轮)未开新账、未发任何现场命令, 且四件身份已再次变(见 package_fix_f21.identities_for_next_approval) => 再一次真机需要一句新的真实原话, 并在同一句里逐字重新声明机械/电气前置"
  },
  "red_gates_remaining": [],
  "draft_sync": {
   "merged_file": "reports/reviews/phase8-m8-r7f8-closed-loop-draft/R7F8_DRAFT_MERGED.md",
-  "merged_bytes": 41090,
-  "merged_sha256": "951c645ce6197980bc1a4aff0306c10be276721a0524a53766e785e7553d402f",
-  "inherited_from": "reports/reviews/phase8-m8-r7f8-executor-adaptation/inputs/A_R7F8F_BUDGET_PKG/R7F8_LIVING_DRAFT.md",
+  "merged_bytes": 45498,
+  "merged_sha256": "f41be298e2bef291338c22f6140c7812e1bba5e90e53af0acc8799210cb55342",
+  "inherited_from": "reports/reviews/phase8-m8-r7f8-closed-loop-draft/R7F8_DRAFT_SNAPSHOT_F21.md",
   "inherited_from_identity": {
-   "bytes": 38793,
-   "sha256": "14bafe13a8cdf765286c6cc98f0c3eb2c741132f364312f1fa2f39b8bd7e00d6"
+   "bytes": 42268,
+   "sha256": "1c0958ec5561a39ecb2398e97644d44c298e7e85c4e7373b95fc06d1e99324cd"
   },
-  "inherit_lines": 304,
+  "inherit_lines": 346,
   "inherit_equal": true,
   "inherit_scope": "本地磁盘字节逐字比对；远端 blob 的同一条见 tools/r7f8e_remote_readback.py 的回执",
   "previous_merged": {
-   "bytes": 41144,
-   "sha256_prefix": "db031f8aa5f3",
-   "commit": "fdfb511",
+   "bytes": 41090,
+   "sha256_prefix": "951c645ce619",
+   "commit": "44fa6c1",
    "source": "从合并件自己的记录节正则读出（不再写死字面量）"
   },
-  "agent_authored_part": "只有末尾那节「本次合并与修订记录」（含逐节差异计数表）；记录节之前的 304 行正文与 A 包活草案逐字相等",
+  "agent_authored_part": "记录节(含逐节差异计数表)由本工具写；记录节之前 346 行正文与本次承接源逐字相等。F21 那次承接源是 **agent 追加的快照** (§11 那一节是我写的, 不是 A 签收件) —— 记录节里点名了这一点。",
   "original_untouched": {
    "bytes": 24780,
    "sha256": "b572c1928f60148ea2e512d552fc45ceba9c41226924c9e1dde37d79ddfe9053"
@@ -286,7 +286,10 @@
   "count": 23,
   "where": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/run_record.md §24.5（当场数出来的条目数）",
   "count_f19": 5,
-  "where_f19": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/run_record.md §26.5（F19 那五条：假判红被无回归族抓住、双引号截断、三引号嵌套、承接件改派生、判据族 L→FB 改名）"
+  "where_f19": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/run_record.md §26.5（F19 那五条：假判红被无回归族抓住、双引号截断、三引号嵌套、承接件改派生、判据族 L→FB 改名）",
+  "count_f21": 8,
+  "where_f21": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/run_record.md §27.6（F21 那 8 条：局部变量遮蔽把离线门六条判据带红、bytes 字面量含非 ASCII、真字节夹具把裸披露行也换掉造成行不唯一、F20 的 CLI 令牌字节没落进任何工件、承接件工具里写死上一轮现场原话、交接 JSON 把**通过**的第 1 步当成停止步(取值规则用了 [0])、矩阵判据名里带了字段分隔符 '|'(MC6 的 0x0|0x2), 回执第三格被切开、next_step_owners 里写了两条同名 'A' 键, 前一条被静默覆盖）",
+  "f20_registered_as_failed": "令牌字节链那一判在 F20 单独记未通过(TG8), 实体绑定那一判记通过(TG9)"
  },
  "field_run_f11": {
   "receipt": "reports/reviews/phase8-m8-r7f8-executor-adaptation/proof/r7f8f_field_f11_receipt.txt",
@@ -346,26 +349,170 @@
    "/approval/dispatch_copy_note",
    "/approval/ledger_root_offline",
    "/approval/token_verbatim",
+   "/arm_gate_mask_contract",
+   "/arm_gate_mask_contract_not_inherited/0/cmd",
+   "/arm_gate_mask_contract_not_inherited/0/declared_by/0",
+   "/arm_gate_mask_contract_not_inherited/0/declared_by/1",
+   "/arm_gate_mask_contract_not_inherited/0/mask",
+   "/arm_gate_mask_contract_not_inherited/0/reason",
+   "/arm_gate_mask_contract_not_inherited/0/window_check/after_step",
+   "/arm_gate_mask_contract_not_inherited/0/window_check/before_step",
+   "/arm_gate_mask_contract_not_inherited/0/window_check/cmd",
+   "/arm_gate_mask_contract_note",
+   "/arm_gate_mask_contract_steps/0/as",
+   "/arm_gate_mask_contract_steps/0/asserted_by",
+   "/arm_gate_mask_contract_steps/0/basis",
+   "/arm_gate_mask_contract_steps/0/cmd",
+   "/arm_gate_mask_contract_steps/0/expect_arm_gate_mask/0",
+   "/arm_gate_mask_contract_steps/0/positive_requirement/0",
+   "/arm_gate_mask_contract_steps/0/rows_key",
+   "/arm_gate_mask_contract_steps/0/source_grade",
+   "/arm_gate_mask_contract_steps/0/status_lines_allow/0",
+   "/arm_gate_mask_contract_steps/1/as",
+   "/arm_gate_mask_contract_steps/1/asserted_by",
+   "/arm_gate_mask_contract_steps/1/basis",
+   "/arm_gate_mask_contract_steps/1/cmd",
+   "/arm_gate_mask_contract_steps/1/expect_arm_gate_mask/0",
+   "/arm_gate_mask_contract_steps/1/positive_requirement/0",
+   "/arm_gate_mask_contract_steps/1/rows_key",
+   "/arm_gate_mask_contract_steps/1/source_grade",
+   "/arm_gate_mask_contract_steps/1/status_lines_allow/0",
+   "/arm_gate_mask_contract_steps/2/as",
+   "/arm_gate_mask_contract_steps/2/asserted_by",
+   "/arm_gate_mask_contract_steps/2/basis",
+   "/arm_gate_mask_contract_steps/2/cmd",
+   "/arm_gate_mask_contract_steps/2/expect_arm_gate_mask/0",
+   "/arm_gate_mask_contract_steps/2/positive_requirement/0",
+   "/arm_gate_mask_contract_steps/2/rows_key",
+   "/arm_gate_mask_contract_steps/2/source_grade",
+   "/arm_gate_mask_contract_steps/2/status_lines_allow/0",
+   "/arm_gate_mask_contract_steps/3/as",
+   "/arm_gate_mask_contract_steps/3/asserted_by",
+   "/arm_gate_mask_contract_steps/3/basis",
+   "/arm_gate_mask_contract_steps/3/cmd",
+   "/arm_gate_mask_contract_steps/3/expect_arm_gate_mask/0",
+   "/arm_gate_mask_contract_steps/3/positive_requirement/0",
+   "/arm_gate_mask_contract_steps/3/rows_key",
+   "/arm_gate_mask_contract_steps/3/source_grade",
+   "/arm_gate_mask_contract_steps/4/as",
+   "/arm_gate_mask_contract_steps/4/asserted_by",
+   "/arm_gate_mask_contract_steps/4/basis",
+   "/arm_gate_mask_contract_steps/4/cmd",
+   "/arm_gate_mask_contract_steps/4/expect_arm_gate_mask/0",
+   "/arm_gate_mask_contract_steps/4/positive_requirement/0",
+   "/arm_gate_mask_contract_steps/4/rows_key",
+   "/arm_gate_mask_contract_steps/4/source_grade",
+   "/arm_gate_mask_contract_steps/5/as",
+   "/arm_gate_mask_contract_steps/5/asserted_by",
+   "/arm_gate_mask_contract_steps/5/basis",
+   "/arm_gate_mask_contract_steps/5/cmd",
+   "/arm_gate_mask_contract_steps/5/expect_arm_gate_mask/0",
+   "/arm_gate_mask_contract_steps/5/positive_requirement/0",
+   "/arm_gate_mask_contract_steps/5/rows_key",
+   "/arm_gate_mask_contract_steps/5/source_grade",
+   "/arm_gate_mask_contract_steps/6/as",
+   "/arm_gate_mask_contract_steps/6/asserted_by",
+   "/arm_gate_mask_contract_steps/6/basis",
+   "/arm_gate_mask_contract_steps/6/cmd",
+   "/arm_gate_mask_contract_steps/6/expect_arm_gate_mask/0",
+   "/arm_gate_mask_contract_steps/6/positive_requirement/0",
+   "/arm_gate_mask_contract_steps/6/rows_key",
+   "/arm_gate_mask_contract_steps/6/source_grade",
+   "/arm_gate_mask_contract_steps/6/status_lines_allow/0",
+   "/arm_gate_mask_contract_steps/7/as",
+   "/arm_gate_mask_contract_steps/7/asserted_by",
+   "/arm_gate_mask_contract_steps/7/basis",
+   "/arm_gate_mask_contract_steps/7/cmd",
+   "/arm_gate_mask_contract_steps/7/expect_arm_gate_mask/0",
+   "/arm_gate_mask_contract_steps/7/positive_requirement/0",
+   "/arm_gate_mask_contract_steps/7/rows_key",
+   "/arm_gate_mask_contract_steps/7/source_grade",
+   "/arm_gate_mask_contract_steps/7/status_lines_allow/0",
+   "/arm_gate_mask_contract_steps/8/as",
+   "/arm_gate_mask_contract_steps/8/asserted_by",
+   "/arm_gate_mask_contract_steps/8/basis",
+   "/arm_gate_mask_contract_steps/8/cmd",
+   "/arm_gate_mask_contract_steps/8/expect_arm_gate_mask/0",
+   "/arm_gate_mask_contract_steps/8/expect_arm_gate_mask/1",
+   "/arm_gate_mask_contract_steps/8/positive_requirement/0",
+   "/arm_gate_mask_contract_steps/8/rows_key",
+   "/arm_gate_mask_contract_steps/8/source_grade",
+   "/arm_gate_mask_contract_steps/8/status_lines_allow/0",
+   "/arm_gate_mask_contract_steps/9/as",
+   "/arm_gate_mask_contract_steps/9/asserted_by",
+   "/arm_gate_mask_contract_steps/9/basis",
+   "/arm_gate_mask_contract_steps/9/cmd",
+   "/arm_gate_mask_contract_steps/9/expect_arm_gate_mask/0",
+   "/arm_gate_mask_contract_steps/9/positive_requirement/0",
+   "/arm_gate_mask_contract_steps/9/rows_key",
+   "/arm_gate_mask_contract_steps/9/source_grade",
    "/hardware_actions_this_round_note",
    "/mechanical_prerequisites/bench_continuity/declared_by",
    "/mechanical_prerequisites/bench_continuity/declared_verbatim",
    "/stages/0/steps/0/expect_contains/1",
-   "/stages/0/steps/0/expect_values/0/must/fault",
-   "/stages/0/steps/0/expect_values/0/must/st",
+   "/stages/0/steps/0/expect_values/0/must/mask",
+   "/stages/0/steps/0/expect_values/0/must/tail",
    "/stages/0/steps/0/expect_values/0/row",
-   "/stages/0/steps/0/expect_values/1/must/armed",
-   "/stages/0/steps/0/expect_values/1/must/cur",
-   "/stages/0/steps/0/expect_values/1/must/health",
+   "/stages/0/steps/0/expect_values/1/must/fault",
    "/stages/0/steps/0/expect_values/1/must/st",
-   "/stages/0/steps/0/expect_values/1/must/tgt",
    "/stages/0/steps/0/expect_values/1/row",
+   "/stages/0/steps/0/expect_values/2/must/armed",
+   "/stages/0/steps/0/expect_values/2/must/cur",
+   "/stages/0/steps/0/expect_values/2/must/health",
+   "/stages/0/steps/0/expect_values/2/must/st",
+   "/stages/0/steps/0/expect_values/2/must/tgt",
+   "/stages/0/steps/0/expect_values/2/row",
    "/stages/0/steps/0/status_lines_allow/0",
+   "/stages/0/steps/1/expect_contains/2",
+   "/stages/0/steps/1/expect_values/0/must/mask",
+   "/stages/0/steps/1/expect_values/0/must/tail",
+   "/stages/0/steps/1/expect_values/0/row",
+   "/stages/0/steps/1/status_lines_allow/0",
+   "/stages/0/steps/13/expect_contains/2",
+   "/stages/0/steps/13/expect_values/0/must/mask",
+   "/stages/0/steps/13/expect_values/0/must/tail",
+   "/stages/0/steps/13/expect_values/0/row",
+   "/stages/0/steps/15/expect_contains/3",
+   "/stages/0/steps/15/expect_values/0/must/mask",
+   "/stages/0/steps/15/expect_values/0/must/tail",
+   "/stages/0/steps/15/expect_values/0/row",
+   "/stages/0/steps/17/expect_contains/2",
+   "/stages/0/steps/17/expect_values/0/must/mask",
+   "/stages/0/steps/17/expect_values/0/must/tail",
+   "/stages/0/steps/17/expect_values/0/row",
+   "/stages/0/steps/20/expect_contains/0",
+   "/stages/0/steps/20/expect_values/0/must/mask",
+   "/stages/0/steps/20/expect_values/0/must/tail",
+   "/stages/0/steps/20/expect_values/0/row",
+   "/stages/0/steps/20/status_lines_allow/0",
+   "/stages/0/steps/25/expect_contains/0",
+   "/stages/0/steps/25/expect_values/0/must/mask",
+   "/stages/0/steps/25/expect_values/0/must/tail",
+   "/stages/0/steps/25/expect_values/0/row",
+   "/stages/0/steps/25/status_lines_allow/0",
+   "/stages/0/steps/29/expect_contains/5",
+   "/stages/0/steps/29/expect_values/0/must_one_of/mask/0",
+   "/stages/0/steps/29/expect_values/0/must_one_of/mask/1",
+   "/stages/0/steps/29/expect_values/0/must_one_of/tail/0",
+   "/stages/0/steps/29/expect_values/0/must_one_of/tail/1",
+   "/stages/0/steps/29/expect_values/0/row",
+   "/stages/0/steps/29/status_lines_allow/0",
+   "/stages/0/steps/31/expect_contains/3",
+   "/stages/0/steps/31/expect_values/0/must/mask",
+   "/stages/0/steps/31/expect_values/0/must/tail",
+   "/stages/0/steps/31/expect_values/0/row",
    "/stages/0/steps/7/expect_contains/2",
-   "/stages/0/steps/7/expect_values/0/must/fault",
-   "/stages/0/steps/7/expect_values/0/must/st",
+   "/stages/0/steps/7/expect_values/0/must/mask",
+   "/stages/0/steps/7/expect_values/0/must/tail",
    "/stages/0/steps/7/expect_values/0/row",
+   "/stages/0/steps/7/expect_values/1/must/fault",
+   "/stages/0/steps/7/expect_values/1/must/st",
+   "/stages/0/steps/7/expect_values/1/row",
    "/stages/0/steps/7/status_lines_allow/0",
    "/mechanical_prerequisites/bench_continuity/status",
+   "/stages/0/steps/1/key",
+   "/stages/0/steps/15/key",
+   "/stages/0/steps/17/key",
    "/status"
   ],
   "token_verbatim": "执行 F11 整包实机验证",
@@ -380,13 +527,33 @@
     "system_status"
    ],
    [
+    "mot_pre",
+    "motor_status"
+   ],
+   [
     "sys_after_apply",
     "system_status"
+   ],
+   [
+    "cruise",
+    "motor_status"
+   ],
+   [
+    "mot_after_cancel",
+    "motor_status"
+   ],
+   [
+    "stopped",
+    "motor_status"
    ]
   ],
   "allow_patterns": [
-   "^\\[Motor\\] arm gate fail mask=0x[0-9A-Fa-f]+ \\(arm REFUSED\\)$",
-   "^\\[Motor\\] arm gate fail mask=0x[0-9A-Fa-f]+ \\(arm REFUSED\\)$"
+   "^\\[Motor\\] arm gate fail mask=0x18 \\(arm REFUSED\\)$",
+   "^\\[MOT\\] arm_gate_mask=0x18 REFUSED$",
+   "^\\[Motor\\] arm gate fail mask=0x8 \\(arm REFUSED\\)$",
+   "^\\[MOT\\] arm_gate_mask=0x2 REFUSED$",
+   "^\\[MOT\\] arm_gate_mask=0x2 REFUSED$",
+   "^\\[MOT\\] arm_gate_mask=0x2 REFUSED$"
   ],
   "product_grounding": "supervisor.c:126 在 system_status 里**无条件**打这一行; motor.h:92/93 定 bit3(0x8)/bit4(0x10); 现场前态实测 0x18 = 两位同置。mask=0 时该行不含 REFUSED, 不匹配豁免形状也不需要豁免。",
   "rows_only_change": "SYS_READY_APPLIED(第 7 步切片): 补披露行 + 三处臆造值改回源码 token (irq_gate=CLOSED / polarity=not-confirmed / protect_ready=NO); 该行 mask=0x8 是**推导**(0x18 减去 apply 清零的 bit4), rows._about.derived_shape_rows 明写它不是实测。",
@@ -398,7 +565,7 @@
    "FB3_反例_同一段真字节喂给动作步仍具名业务失败": "PASS",
    "FB4_元负控_摘掉豁免同一份真字节必须翻红": "PASS",
    "FB5_反例_豁免未被正面要求时运行期具名停止(fail-closed)": "PASS",
-   "FB6_静态门_交付计划 PASS 且豁免只在两条查询步": "PASS",
+   "FB6_静态门_交付计划 PASS 且豁免只在预期非 0 的那几条查询步": "PASS",
    "FB7_静态门元负控_抽掉正面要求计划门必须翻红": "PASS"
   },
   "real_bytes_input": {
@@ -408,18 +575,18 @@
   },
   "identities_for_next_approval": {
    "plan": {
-    "bytes": 33140,
-    "sha256": "e78519421149c9a09de0fea8c1cb381b6ac10fd9452959a1092b3a68c37b95a6",
+    "bytes": 45398,
+    "sha256": "2259359ca3f775bc478fd8db30535485cc9e589d6a5c45d7ac9e948b40326a6b",
     "path": "reports/reviews/phase8-m8-r7f8-executor-adaptation/field/plan_r7f8f_2369_real.json"
    },
    "rows": {
-    "bytes": 10060,
-    "sha256": "c64fdee847affe55ec9edc05e796d3befbc5731c30be7f96c6aa17b24ca23b70",
+    "bytes": 15460,
+    "sha256": "a8456159a45f229601e030b69d0034894d1b0df19b191ca4672a1fe0e5279737",
     "path": "reports/reviews/phase8-m8-r7f8-executor-adaptation/field/rows_r7f8f_real.json"
    },
    "executor": {
-    "bytes": 315233,
-    "sha256": "30c67a3e8dbe915214ca7e1f423cf3468594dba35772b4fa082b01b31893eef2",
+    "bytes": 328475,
+    "sha256": "4363af36159befa417647680cc27fb5bdb95785a404b14d77602ccdbe253962e",
     "path": "reports/reviews/phase8-m8-r7f8-executor-adaptation/tools/m8r3_serial_chain_r7f8.py"
    },
    "image": {
@@ -434,20 +601,387 @@
     "note": "参照身份: R7F7 已证在板的镜像(逐字节回读在 R7F7-F1/R7F8 轮已闭合)。"
    }
   },
-  "f20_dispatch_draft": {
-   "file": "reports/reviews/phase8-m8-r7f8-executor-adaptation/field/plan_r7f8f_2369_real_dispatch_f20_draft.json",
-   "bytes": 34898,
-   "sha256": "e59272b6fa8870a568a52715aa338487b10c4355c74ec7836badab62042a2d62",
+  "f20_draft_became_approved_copy": {
+   "meaning": "F19 产出的 F20 草案在操作者给出真实原话后, 由同一工具生成批准版 (field/plan_r7f8f_2369_real_dispatch_f20.json) 并真机跑过一次; 两份都已冻结不回改, F20 的执行结果见 field_run_f20。",
+   "approved_copy": {
+    "bytes": 35536,
+    "sha256": "4da0aeb016e859c95c880e6763c1ed0bc1bfe7f0046b8acb7b2e383ea445f561",
+    "path": "reports/reviews/phase8-m8-r7f8-executor-adaptation/field/plan_r7f8f_2369_real_dispatch_f20.json"
+   }
+  },
+  "f11_dispatch_copy_frozen": "F11 那份承接件按字节冻结不回改(见 field_run_f11), 与本轮交付计划已经**不再是同一身份**(派生差异格 + 三轮的 rows/计划修订)。"
+ },
+ "field_run_f20": {
+  "status": "已执行并在第 2 条只读查询停止(电机从未带电, 收口照做, 保持通电)",
+  "stop_code": "BUSINESS_FAILED",
+  "stop_step_as": "mot_pre",
+  "query_steps": [
+   {
+    "as": "sys_pre",
+    "business_failed_lines": [],
+    "status_lines_allowed": [
+     "[Motor] arm gate fail mask=0x18 (arm REFUSED)"
+    ]
+   },
+   {
+    "as": "mot_pre",
+    "business_failed_lines": [
+     "[MOT] arm_gate_mask=0x18 REFUSED"
+    ],
+    "status_lines_allowed": []
+   }
+  ],
+  "stop_lines": [
+   "[MOT] arm_gate_mask=0x18 REFUSED"
+  ],
+  "status_lines_allowed_at_stop": [],
+  "not_run_stages": [
+   "S1"
+  ],
+  "captures": {
+   "r7f8f_field_f20_sys_pre.rx.bin": {
+    "bytes": 983,
+    "sha256": "73abf3012386723ec2d5ec70e5b515bfb2cb3285d60c233a27b07e60d47408a7"
+   },
+   "r7f8f_field_f20_mot_pre.rx.bin": {
+    "bytes": 1128,
+    "sha256": "f0550d3131642cd02408c88adc67f6fcb064a27ccba6ceec9c60b82e9cf0c3b5"
+   }
+  },
+  "operator_verbatim": {
+   "bytes": 743,
+   "sha256": "e3b3a647a3597d80601fc8a2974d3832c4be2abe559de462074a0113ff60521e"
+  },
+  "ledger": {
+   "approval_id": "M8-R7F8F-F20-20261105",
+   "identities": {
+    "executor_sha256": "30c67a3e8dbe915214ca7e1f423cf3468594dba35772b4fa082b01b31893eef2",
+    "image_sha256": "23691e8d8aa8c1d3ed6e6eff4b5c51fe27dd3a9169841406ecc627c0e807e963",
+    "plan_sha256": "4da0aeb016e859c95c880e6763c1ed0bc1bfe7f0046b8acb7b2e383ea445f561"
+   },
+   "spent": {
+    "approved_reboot": 0,
+    "blackbox_clear": 0,
+    "cleanup_motor_disarm": 0,
+    "cleanup_motor_status": 0,
+    "cleanup_motor_stop": 0,
+    "cleanup_safety_irq_disable": 0,
+    "cleanup_safety_irq_status": 0,
+    "config_save": 0,
+    "diag_profile_commit": 0,
+    "diag_profile_learn": 0,
+    "diag_profile_learn_cancel": 0,
+    "diag_profile_zero": 0,
+    "dispatch": 0,
+    "dmm_readings": 0,
+    "download": 0,
+    "explicit_reset": 0,
+    "irq_polarity_prep": 0,
+    "motion_cap_seconds_per_run": 0,
+    "motor_arm": 0,
+    "motor_dir": 0,
+    "motor_disarm": 0,
+    "motor_run": 0,
+    "motor_run_seconds_total": 0,
+    "motor_stop": 0,
+    "motor_target": 0,
+    "physical_collision": 0,
+    "port_open": 1,
+    "readback": 0,
+    "retry": 0,
+    "tmc_config_apply": 0
+   },
+   "approval_token_field_present": false
+  },
+  "meaning": "两次只读查询(system_status / motor_status)写出现场, 之后一条业务命令都没发; 第一条通过=**F19 的申报在真机生效**, 第二条停止=同类缺申报出现在 motor_status 上(见 run_record §27.1)。",
+  "token_verdict": "单独判**未通过**: 账本里没有 approval_token 格, 开口传入的令牌字节与原话文件散列不同(e3b3a647a359… vs 9701aa453fe5…), 当时没有门能发现 => 矩阵 TG8 判据把它钉成一条可复算的 FAIL 形状; 四件实体绑定另判 (TG9 PASS)。原账/原话/两份散列都保留不补改。",
+  "quota_carried_to_f21": false,
+  "evidence_judgments_in_this_receipt": {
+   "MC11_bytes_identity": "PASS",
+   "TG8_token_gate_recompute_on_f20_ledger": "PASS"
+  },
+  "note": "F20 那本账的 port_open=1 已用满, **不结转**给 F21(A 的原话)。"
+ },
+ "package_fix_f21": {
+  "asked_by_A": "三条补齐: (1) 按最终计划全量核查 8 处 motor_status 的预期 mask, 预期为 0 仍要求 0; (2) 纳入历史真实字节 + 补跨计划回归, 口径改为'F20 本会话首次取得'; (3) 令牌字节不一致单独判未通过, 开口前核原话文件/实际传入/账本绑定三份摘要。另: 两次 system_status 字节相同只证输出重复, 接线未变属操作者报告。",
+  "contract_version": "R7F8F_PER_STEP_V1",
+  "per_step_contract": [
+   {
+    "as": "sys_pre",
+    "cmd": "system_status",
+    "rows_key": "system_status",
+    "expect_arm_gate_mask": [
+     "0x18"
+    ],
+    "asserted_by": "must",
+    "source_grade": "REAL",
+    "basis": "supervisor.c:126 打的是同一个 motor_get_gate_fail_mask()(motor.c:894-917)。bit3 protection-not-ready | bit4 drive-config-not-applied: 极性确认在 10、开 IRQ 在 11、apply 在 6, 所以这一步四门里两门未过。原件 = 2026-11-05 F11/F20 现场两次逐字节相同的 983 B/73abf3012386 捕获(行表 system_status 就是它)。",
+    "status_lines_allow": [
+     "^\\[Motor\\] arm gate fail mask=0x18 \\(arm REFUSED\\)$"
+    ],
+    "positive_requirement": [
+     "[Motor] arm gate fail mask=0x18 (arm REFUSED)"
+    ]
+   },
+   {
+    "as": "mot_pre",
+    "cmd": "motor_status",
+    "rows_key": "motor_status_pre_apply",
+    "expect_arm_gate_mask": [
+     "0x18"
+    ],
+    "asserted_by": "must",
+    "source_grade": "REAL",
+    "basis": "motor.c:2479-2480 打 arm_gate_mask 与 REFUSED/ALL-PASS。原件 = 1128 B/f0550d313164, 在 5 次归档会话 + F20 本会话逐字节相同(F20 的第二个首错正是这一行被当成业务拒绝)。",
+    "status_lines_allow": [
+     "^\\[MOT\\] arm_gate_mask=0x18 REFUSED$"
+    ],
+    "positive_requirement": [
+     "[MOT] arm_gate_mask=0x18 REFUSED"
+    ]
+   },
+   {
+    "as": "sys_after_apply",
+    "cmd": "system_status",
+    "rows_key": "system_status_applied",
+    "expect_arm_gate_mask": [
+     "0x8"
+    ],
+    "asserted_by": "must",
+    "source_grade": "DERIVED",
+    "basis": "apply 成功清 bit4(motor.c:907 的 tmc2209_drive_config_ok_for_arm), 而 IRQ/极性仍未就绪 => 只剩 bit3=0x8。0x8 这个值本身有真实原件(motor_status 的 1080 B/fa69aa5cf5a1, gate5 tmc_drive_cfg=CONFIGURED), 但**这一步(system_status)的 0x8 没在板上抓过**。",
+    "status_lines_allow": [
+     "^\\[Motor\\] arm gate fail mask=0x8 \\(arm REFUSED\\)$"
+    ],
+    "positive_requirement": [
+     "[Motor] arm gate fail mask=0x8 (arm REFUSED)"
+    ]
+   },
+   {
+    "as": "mot_after_irq",
+    "cmd": "motor_status",
+    "rows_key": "motor_status_idle",
+    "expect_arm_gate_mask": [
+     "0x0"
+    ],
+    "asserted_by": "must",
+    "source_grade": "REAL",
+    "basis": "第 10 步极性 + 第 11 步开 IRQ => protection_ready(safety_thread.c:315 要 st_irq_attached && st_polarity_validated)成立, bit3 清零; bit4 已在第 6 步清。原件 = 648 B/10807f63f02a(9 次归档一致, 头行就是 arm_gate_mask=0x0 ALL-PASS)。",
+    "status_lines_allow": [],
+    "positive_requirement": [
+     "[MOT] arm_gate_mask=0x0"
+    ]
+   },
+   {
+    "as": "mot_dir",
+    "cmd": "motor_status",
+    "rows_key": "motor_status_ready_dir",
+    "expect_arm_gate_mask": [
+     "0x0"
+    ],
+    "asserted_by": "must",
+    "source_grade": "REAL",
+    "basis": "motor.c:894-917 的七门里没有方向项, motor_dir 不置任何门位 => 仍 0x0。行表用同一份 648 B 原件, 只把频率行的 dir 值按本步工况改成 1(登记在 derived_shape_rows)。",
+    "status_lines_allow": [],
+    "positive_requirement": [
+     "[MOT] arm_gate_mask=0x0"
+    ]
+   },
+   {
+    "as": "mot_armed",
+    "cmd": "motor_status",
+    "rows_key": "motor_status_armed_ready",
+    "expect_arm_gate_mask": [
+     "0x0"
+    ],
+    "asserted_by": "must",
+    "source_grade": "DERIVED",
+    "basis": "arm 之后 Safety 仍是 READY(进 RUN 的是 start 那一提交, motor.c:1674/1935 mot_commit_run_start), 七门里没有 armed 项 => 预期全通。真实的 armed 件(0x2/9005a306999a)同时显示 armed=1 与 mask=0x2, 说明置位的是 RUN 而不是 armed。**这一行没有归档原件**: 现网没抓过 armed 且 READY 的 motor_status。",
+    "status_lines_allow": [],
+    "positive_requirement": [
+     "[MOT] arm_gate_mask=0x0"
+    ]
+   },
+   {
+    "as": "cruise",
+    "cmd": "motor_status",
+    "rows_key": "motor_status_cruise",
+    "expect_arm_gate_mask": [
+     "0x2"
+    ],
+    "asserted_by": "must",
+    "source_grade": "REAL",
+    "basis": "start 提交 SAFETY_RUN => motor.c:899 那条 `safety_state_get() != SAFETY_READY` 置 bit1。原件 = 1026 B/9005a306999a 与 1025 B/57efcc7c90d5(运行中两次归档, 披露行都是 arm_gate_mask=0x2 REFUSED + gate_reason=safety-not-READY)。",
+    "status_lines_allow": [
+     "^\\[MOT\\] arm_gate_mask=0x2 REFUSED$"
+    ],
+    "positive_requirement": [
+     "[MOT] arm_gate_mask=0x2 REFUSED"
+    ]
+   },
+   {
+    "as": "mot_after_cancel",
+    "cmd": "motor_status",
+    "rows_key": "motor_status_cruise",
+    "expect_arm_gate_mask": [
+     "0x2"
+    ],
+    "asserted_by": "must",
+    "source_grade": "REAL",
+    "basis": "取消学习作业不动电机也不动 Safety(diag_relative.c 的 cancel 只终结作业) => 仍 RUN, 同上两份原件。",
+    "status_lines_allow": [
+     "^\\[MOT\\] arm_gate_mask=0x2 REFUSED$"
+    ],
+    "positive_requirement": [
+     "[MOT] arm_gate_mask=0x2 REFUSED"
+    ]
+   },
+   {
+    "as": "stopped",
+    "cmd": "motor_status",
+    "rows_key": "motor_status_armed_idle",
+    "expect_arm_gate_mask": [
+     "0x0",
+     "0x2"
+    ],
+    "asserted_by": "must_one_of",
+    "source_grade": "REAL",
+    "basis": "唯一一条**边界**, 按 A 的要求显式申报成枚举而不是统一放行: motor_stop 归零之后 RUN->READY 由 motor.c:1989 mot_commit_zero_ready 在 tick 里提交, 它要求 armed!=0 且 cur==tgt==0, 与本查询的先后不确定 => 两种值都合法。两个形状各自都有真实原件(0x2: 1074 B/98abbf2d18df 静止但 RUN 未落位的原件 + 上面两份运行中原件; 0x0: 648 B/10807f63f02a)。集合外的任何值(0x8/0x18/0x20/0x40)都算保护链掉了, 具名停止。",
+    "status_lines_allow": [
+     "^\\[MOT\\] arm_gate_mask=0x2 REFUSED$"
+    ],
+    "positive_requirement": [
+     "[MOT] arm_gate_mask="
+    ]
+   },
+   {
+    "as": "mot_disabled",
+    "cmd": "motor_status",
+    "rows_key": "motor_status_idle",
+    "expect_arm_gate_mask": [
+     "0x0"
+    ],
+    "asserted_by": "must",
+    "source_grade": "DERIVED",
+    "basis": "成功 disarm 把 Safety 收回 READY 是 R6-2 的产品修复, 已在板镜像 23691e8d 的源码里 => 这一步**必须** 0x0。归档里那份 post-disarm 仍打 0x2 的 1074 B/98abbf2d18df 属于 R6 之前的 idle-stack-r4 会话, 不能拿来当这一步的预期; 现场若真打 0x2, 判据按 FIELD_VALUE_MISMATCH 停并把原字节留在盘上 —— 那正是要取证的事。",
+    "status_lines_allow": [],
+    "positive_requirement": [
+     "[MOT] arm_gate_mask=0x0"
+    ]
+   }
+  ],
+  "not_inherited": [
+   {
+    "cmd": "motor_status",
+    "mask": "0x8",
+    "declared_by": [
+     "R7F4 plan_r7f4_b502_configured_reviewed.json/mot_post",
+     "R7F5 plan_r7f5_b502_blind_irq_static.json/mot_cfg"
+    ],
+    "reason": "本包在 tmc_config_apply(第 6 步)之后、safety_irq_enable(第 11 步)之前**不发 motor_status** —— 那段 0x8 窗口里唯一的查询是第 7 步 system_status, 它已按预期 0x8 申报豁免。所以不是一条豁免被删掉, 而是这个形状在本计划里没有对应的查询步; 现场若在别的时刻打出 motor_status 0x8, 按 BUSINESS_FAILED 停。",
+    "window_check": {
+     "after_step": "apply",
+     "before_step": "irq_en",
+     "cmd": "motor_status"
+    }
+   }
+  ],
+  "zero_expected_steps_without_allow": [
+   "mot_after_irq",
+   "mot_dir",
+   "mot_armed",
+   "mot_disabled"
+  ],
+  "product_grounding": "motor.c:894-917 七门(bit1 NOT_READY / bit3 NOT_PROTECTED / bit4 NO_DRV_CONFIG 是这里出现的三位); 披露行 motor.c:2479-2480 与 supervisor.c:126; RUN→READY 提交 motor.c:1989(要求 armed!=0 且 cur==tgt==0) => stopped 才是两点边界; bit1 出处 motor.c:899。",
+  "executor_gates": "recipe 76 项(新增 H0 常量/H1 must_one_of/H2 静态契约门 + T1~T7 令牌链): R7F8F_ARM_GATE_MASK 逐条核, FIELD_VALUE_NOT_IN_SET 新具名码, verify_token_chain 在 dispatch_plan 之前拦。",
+  "archived_real_bytes": {
+   "0x18": "1128 B/f0550d313164(5 次归档 + F20)",
+   "0x0": "648 B/10807f63f02a(9 次归档)",
+   "0x2": "1026 B/9005a306999a 与 1025 B/57efcc7c90d5",
+   "0x8": "1080 B/fa69aa5cf5a1",
+   "口径": "同一身份字节早已归档, 所以说'F20 本会话首次取得'而不是'史上第一次'"
+  },
+  "f21_dispatch_draft": {
+   "file": "reports/reviews/phase8-m8-r7f8-executor-adaptation/field/plan_r7f8f_2369_real_dispatch_f21_draft.json",
+   "bytes": 47318,
+   "sha256": "4a9460801b4659cc3db57f4d2e6e4b8e090caf71528d5d80f859cb29a4de7764",
    "status": "FIELD_DISPATCH_DRAFT_NOT_APPROVED_NEW_PLAN_IDENTITY",
    "token_verbatim": "NOT_ISSUED_等待操作者对新身份的真实原话",
-   "derived_by": "tools/r7f8f_make_dispatch_copy.py(只许 9 格差异, 写完扁平 diff 复算)",
-   "meaning": "**草案**: 本轮没有对新身份的第二句真实原话, 所以令牌位是 NOT_ISSUED; 机械前置那格沿用操作者 F11 会话里的事实声明并写明'未重新核对'。它不是批准件, 不许直接 dispatch。"
+   "mechanical_prerequisite_status": "NOT_REDECLINED_THIS_ROUND",
+   "derived_by": "tools/r7f8f_make_dispatch_copy.py(白名单 13 格, 含令牌来源与两份摘要; 机械前置的原话改成本轮必填参数, 不再沿用上一轮)",
+   "meaning": "**草案**: 本轮没有对新身份的真实原话 => 令牌位 NOT_ISSUED、机械前置写 NOT_REDECLINED_THIS_ROUND。它不是批准件, 不许直接 dispatch。"
   },
-  "f11_dispatch_copy_frozen": "F11 那份承接件按字节冻结不回改(见 field_run_f11), 与本轮交付计划已经**不再是同一身份**(差 9 格 + F19 那次 rows 修)。"
+  "families": {
+   "FB": {
+    "FB1_真字节经生产读路径逐字节留证且披露行在流里": "PASS",
+    "FB2_正例_交付的 sys_pre 申报下真字节判 OK 且豁免行入台账": "PASS",
+    "FB3_反例_同一段真字节喂给动作步仍具名业务失败": "PASS",
+    "FB4_元负控_摘掉豁免同一份真字节必须翻红": "PASS",
+    "FB5_反例_豁免未被正面要求时运行期具名停止(fail-closed)": "PASS",
+    "FB6_静态门_交付计划 PASS 且豁免只在预期非 0 的那几条查询步": "PASS",
+    "FB7_静态门元负控_抽掉正面要求计划门必须翻红": "PASS"
+   },
+   "MC": {
+    "MC0_包作者工具可导入(归档原件身份在它手里核过)": "PASS",
+    "MC1_全量覆盖_计划里每条状态查询都钉了 mask 且与契约表逐条相等": "PASS",
+    "MC2_预期为0的步骤要求0且一条豁免都没有": "PASS",
+    "MC3_归档真实字节四份都在盘且身份逐字节相符": "PASS",
+    "MC4_真字节正例_mot_pre 收到 0x18 归档行判 OK 且豁免行原文入台账": "PASS",
+    "MC5_真字节反例_预期 0x0 的步收到 0x18 真行必须具名 STOP": "PASS",
+    "MC6_边界步_stopped 的 0x0 与 0x2 各判 OK, 0x18 与 0x8-ALL-PASS 都停": "PASS",
+    "MC7_元负控_逐步摘掉 mask 判据静态门都点名翻红(10/10)": "PASS",
+    "MC8_反向_给预期 0x0 的步加一条通配豁免必须判红": "PASS",
+    "MC9_历史包无契约标记只登记NA且不加新红": "PASS",
+    "MC10_跨计划继承_六份冻结旧计划的每条披露豁免都在新计划里有落点": "PASS",
+    "MC11_F20原始字节入档且与历史归档逐字节同一身份(口径=F20本会话首次取得)": "PASS"
+   },
+   "TG": {
+    "TG1_Python 内按严格 UTF-8 取原字节(不经控制台/shell 变量)": "PASS",
+    "TG2_开账即绑令牌摘要, 且账本里不落原文": "PASS",
+    "TG3_正路_原话文件/传入令牌/账本绑定三份摘要一致才放行": "PASS",
+    "TG4_反例_传入令牌与账本绑定不符必须拒绝开口": "PASS",
+    "TG5_元负控_账本没绑令牌摘要时必须拒绝开口": "PASS",
+    "TG6_非 UTF-8 原话文件具名拒绝": "PASS",
+    "TG7_原话文件缺席时不猜内容": "PASS",
+    "TG8_F20 那次开口按新门复算=令牌判据不成立": "PASS",
+    "TG9_F20 的四件实体绑定单独判 PASS(与令牌那一判互不掩盖)": "PASS",
+    "TG10_CLI 真实分支被令牌门拦在 dispatch 之前(不导 pyserial、零台账零发送零开口)": "PASS"
+   }
+  },
+  "identities_for_next_approval": {
+   "plan": {
+    "bytes": 45398,
+    "sha256": "2259359ca3f775bc478fd8db30535485cc9e589d6a5c45d7ac9e948b40326a6b",
+    "path": "reports/reviews/phase8-m8-r7f8-executor-adaptation/field/plan_r7f8f_2369_real.json"
+   },
+   "rows": {
+    "bytes": 15460,
+    "sha256": "a8456159a45f229601e030b69d0034894d1b0df19b191ca4672a1fe0e5279737",
+    "path": "reports/reviews/phase8-m8-r7f8-executor-adaptation/field/rows_r7f8f_real.json"
+   },
+   "executor": {
+    "bytes": 328475,
+    "sha256": "4363af36159befa417647680cc27fb5bdb95785a404b14d77602ccdbe253962e",
+    "path": "reports/reviews/phase8-m8-r7f8-executor-adaptation/tools/m8r3_serial_chain_r7f8.py"
+   },
+   "image": {
+    "path": "reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/rt-thread-motor-m1-candidate.bin",
+    "bytes": 297452,
+    "sha256": "23691e8d8aa8c1d3ed6e6eff4b5c51fe27dd3a9169841406ecc627c0e807e963",
+    "axf": {
+     "path": "reports/firmware/phase8-m8-r7d1-ard4b-commit-txn/rt-thread-motor-m1.axf",
+     "bytes": 1790048,
+     "sha256": "0f421595ac940863c4d38a2791f31bc8811fc3b8fa40062782f2ac7505c317f6"
+    },
+    "note": "参照身份: R7F7 已证在板的镜像(逐字节回读在 R7F7-F1/R7F8 轮已闭合)。"
+   }
+  }
  },
  "device_actions_this_round": {
-  "serial_port_open": 1,
-  "dispatch_real": 1,
+  "serial_port_open": 2,
+  "dispatch_real": 2,
+  "history_note": "上面两个数是**F11 + F20 两次**现场轮的累计(各自账本里的 port_open), 本轮(F21)自己不新增任何设备动作; F21 沿原动作上限, F20 那本账不结转。",
+  "f20_commands_written": 2,
   "commands_written_to_port": 1,
   "download": 0,
   "readback": 0,
@@ -486,7 +1020,7 @@
   "motion_cap_or_total_window_widened": false,
   "step_list_reduced_for_green": false,
   "run_record_sections": {
-   "total_sections": 26,
+   "total_sections": 27,
    "section_24_occurrences": 1
   }
  },
@@ -504,8 +1038,8 @@
   ]
  },
  "next_step_owners": {
-  "A": "无需再定口径：两条静态红已按裁定落地并全绿。仅当真机跑出来必须改产品，或机械条件变了，才按裁定末段回报范围差异",
-  "operator": "F20 需要**一句新的真实原话**，对象 = 本轮四件新身份(见 package_fix_f19.identities_for_next_approval)；F11 那句只覆盖了已经用满的那一个账(port_open=1)，不借它开第二个账",
-  "me_after_approval": "按那句原话离线 --approval-init 新账(绑四件)，再一次 dispatch；本轮 0 设备动作，未开第二个账"
+  "A": "无需再定口径：F21 三条补齐都已落地并全绿(矩阵 135/0、整包离线门 49/0、无回归 9/0)。只要求确认新包的门位契约表(10 步)与不继承那一格的**理由**是否成立；若真机再出现必须改产品的形状(例如 motor_status 打出预期外的 mask)，我按停止-报告处理，不绕过去",
+  "operator": "第三次现场尝试(用 F21 包)需要**一句新的真实原话**，对象 = 本轮四件新身份(见 package_fix_f21.identities_for_next_approval)，并在同一句里逐字重新声明机械/电气前置；F11/F20 那两句只覆盖了各自已用满的账(port_open=1)，不结转、不借它开新账",
+  "me_after_approval": "按那句原话把承接件生成器指到本轮四件身份(--approved-prefixes 当场复算)，用 --approval-token-file 离线 --approval-init 新账(绑令牌摘要)，再一次 dispatch；F21 本轮 0 设备动作，未开第三个账"
  }
 }

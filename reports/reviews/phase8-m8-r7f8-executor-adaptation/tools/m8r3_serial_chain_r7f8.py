@@ -413,6 +413,36 @@ def business_failures(rows):
     return out
 
 
+# 产品这两行的出处: motor.c:2479-2480(cmd_motor_status 打 "arm_gate_mask=0x%X %s")与
+# supervisor.c:126-127(system_status 打 "arm gate fail mask=0x%X (%s)")。两处都走同一个
+# motor_get_gate_fail_mask()(motor.c:894), 且 tail 由 mask 是否为 0 唯一决定, 所以契约只钉
+# mask; motor.c:937 的 mot_print_gate_fail 还会再打一条**没有 tail** 的同名行, 下面的锚定正则
+# 把它排除在外(否则那条行会因为"同一行不唯一"把判据打死)。
+MOTOR_MASK_ROW = r"^\[MOT\] arm_gate_mask=(?P<mask>0x[0-9A-F]+) (?P<tail>REFUSED|ALL-PASS)$"
+SYS_MASK_ROW = (r"^\[Motor\] arm gate fail mask=(?P<mask>0x[0-9A-F]+) \((?P<tail>arm REFUSED"
+                r"|all gate conditions pass \(incl\. ENN feedback\))\)$")
+ARM_GATE_MASK_ROWS = {"motor_status": MOTOR_MASK_ROW, "system_status": SYS_MASK_ROW}
+# 两行的 tail 用词不同(motor.c:2480 打 REFUSED/ALL-PASS, supervisor.c:127 打 arm REFUSED/
+# all gate conditions pass...), 契约门按 cmd 取自己的那一对, 不拿一个词去判另一条行。
+ARM_GATE_MASK_TAILS = {"motor_status": ("REFUSED", "ALL-PASS"),
+                       "system_status": ("arm REFUSED",
+                                         "all gate conditions pass (incl. ENN feedback)")}
+# 计划侧声明这份契约的版本标记: 没标记的历史冻结包只登记 NA(不回改其字节, 也不给它新红,
+# 与 observation_bounds 同一处置); 带标记的计划**逐条硬判**, 一条没钉就 FAIL。
+ARM_GATE_MASK_CONTRACT_KEY = "arm_gate_mask_contract"
+ARM_GATE_MASK_CONTRACT_VERSION = "R7F8F_PER_STEP_V1"
+
+
+def arm_gate_refused_allow(cmd, mask):
+    # 按 cmd + 预期 mask 构造**整行锚定**的披露豁免: 只豁免"该 mask 那一条 REFUSED 行"。
+    # 预期 0x0 的步骤一条都不该有 —— 产品在那一行只会打 ALL-PASS, 打出 REFUSED 就是别的事。
+    if cmd == "motor_status":
+        return r"^\[MOT\] arm_gate_mask=%s REFUSED$" % mask
+    if cmd == "system_status":
+        return r"^\[Motor\] arm gate fail mask=%s \(arm REFUSED\)$" % mask
+    raise Stop("ARM_GATE_MASK_CMD_UNSUPPORTED", cmd)
+
+
 def status_lines_allow_patterns(st):
     """只允许"整行锚定"的状态披露行绕过业务失败扫描(见 assert_step)。"""
     pats = []
@@ -538,6 +568,20 @@ def assert_step(st, rows, asname, led, raw=None):
         if below:
             led.ev("VALUE_ASSERT_FAIL", **{"as": asname, "below_min": below})
             return {"verdict": "STOP", "code": "FIELD_VALUE_BELOW_MIN", "below_min": below}
+        # must_one_of: 观测值必须落在**本步申报的集合**里(边界步用)。不在集合里就具名停止,
+        # 并把观测值与允许的集合一起写进台账 —— "看着像一个合法值"不算判过。
+        not_in = {}
+        for k, allowed in (spec.get("must_one_of") or {}).items():
+            if k not in g:
+                unknown.append(k)
+                continue
+            if not isinstance(allowed, (list, tuple)) or not allowed:
+                not_in[k] = (g[k], "SET_NOT_DECLARED")
+            elif str(g[k]) not in [str(x) for x in allowed]:
+                not_in[k] = (g[k], [str(x) for x in allowed])
+        if not_in:
+            led.ev("VALUE_ASSERT_FAIL", **{"as": asname, "not_in_set": not_in})
+            return {"verdict": "STOP", "code": "FIELD_VALUE_NOT_IN_SET", "not_in_set": not_in}
         if wrong or loose or unknown:
             led.ev("VALUE_ASSERT_FAIL", **{"as": asname, "wrong": wrong, "forbidden_val": loose,
                                            "absent_groups": unknown})
@@ -1684,6 +1728,60 @@ def current_identities(plan, plan_path, repo_root, snapshot=None):
     return ids
 
 
+def token_bytes_from_file(path):
+    # 在 Python 内按**严格 UTF-8** 读原话文件, 只裁掉尾随 CR/LF。F20 那次是内层 python -c 把原话
+    # 经控制台(cp936)打印再经 shell 变量转运, 令牌字节与文件字节就不是同一份(9701aa45… vs
+    # e3b3a647…), 而账本与批准句都当时已花出去 —— 从这里取字节, 中间层就不存在了。
+    p = Path(path)
+    if not p.is_file():
+        raise Stop("TOKEN_VERBATIM_FILE_ABSENT", "%s => 拒绝(不猜原话内容)" % p)
+    canon = p.read_bytes().rstrip(b"\r\n")
+    try:
+        canon.decode("utf-8")
+    except UnicodeDecodeError as e:
+        raise Stop("TOKEN_VERBATIM_NOT_UTF8", "%s:%s" % (p.name, e))
+    return canon
+
+
+def verify_token_chain(root, approval_id, passed_bytes, verbatim_file=None):
+    """开口之前核三份摘要: **原话文件字节 / 实际传入的令牌字节 / 账本绑定的令牌摘要**。
+
+    任一对不上就具名拒绝, 一条命令都不发。返回三份摘要供落证(不返回"差不多")。
+    """
+    if not approval_id:
+        raise Stop("APPROVAL_ID_REQUIRED", "令牌核对需要批准身份(账本按它命名)")
+    if passed_bytes is None:
+        raise Stop("TOKEN_NOT_PROVIDED",
+                   "真实执行需要令牌字节: --approval-token 或 --approval-token-file 至少给一个")
+    dig = {"passed_token_sha256": sha_bytes(bytes(passed_bytes)),
+           "passed_token_bytes": len(passed_bytes)}
+    if verbatim_file:
+        v = token_bytes_from_file(verbatim_file)
+        dig["verbatim_file_sha256"] = sha_bytes(v)
+        dig["verbatim_file_bytes"] = len(v)
+    path = approval_path(root, approval_id)
+    if not path.is_file():
+        raise Stop("APPROVAL_LEDGER_ABSENT", "%s 不存在 => 拒绝开口" % path)
+    try:
+        doc = json.loads(path.read_bytes().decode("utf-8-sig"))
+    except (ValueError, UnicodeDecodeError) as e:
+        raise Stop("APPROVAL_LEDGER_CORRUPT", "令牌核对读账本失败:%s" % e.__class__.__name__)
+    bound = (doc.get("approval_token") or {}).get("sha256")
+    if not is_hex_sha(bound):
+        raise Stop("APPROVAL_TOKEN_NOT_BOUND",
+                   "账本 %s 没登记批准令牌摘要 => 拒绝开口(创建时给 --approval-token-file)"
+                   % approval_id)
+    dig["ledger_bound_sha256"] = bound
+    bad = []
+    if dig["passed_token_sha256"] != bound:
+        bad.append("传入令牌=%s… != 账本绑定=%s…" % (dig["passed_token_sha256"][:12], bound[:12]))
+    if "verbatim_file_sha256" in dig and dig["verbatim_file_sha256"] != bound:
+        bad.append("原话文件=%s… != 账本绑定=%s…" % (dig["verbatim_file_sha256"][:12], bound[:12]))
+    if bad:
+        raise Stop("TOKEN_DIGEST_MISMATCH", "; ".join(bad))
+    return dig
+
+
 def open_approval(transport, root, approval_id, identities, caps, led, clock):
     """返回 ApprovalLedger(stub 且没给身份 => None, 与旧的单次内存账一致)。
 
@@ -1710,7 +1808,8 @@ def open_approval(transport, root, approval_id, identities, caps, led, clock):
     return ApprovalLedger(path, approval_id, identities, caps, led, clock)
 
 
-def approval_init(root, approval_id, identities, caps, note=""):
+def approval_init(root, approval_id, identities, caps, note="", token_bytes=None,
+                  token_source=""):
     """离线**显式**开立一本账: 唯一允许"从空开始"的入口, 由人主动调用, 执行器顺手建不出来。
 
     R6A §3 的三条都在这一函数里:
@@ -1733,6 +1832,16 @@ def approval_init(root, approval_id, identities, caps, note=""):
            "identities": {k: identities[k] for k in APPROVAL_IDENTITY_KEYS},
            "caps": dict(caps), "spent": {k: 0 for k in caps}, "pending": [],
            "writes": 0, "created_by_action": "approval_init", "note": note}
+    # 批准令牌只登记**摘要与字节数**, 不落原文(原话是操作者的材料, 账本会进证据链)。
+    # 四件实体身份(identities)证的是"批准绑在哪份字节上"; 这一格证的是"这次开口用的确实是
+    # 那句原话" —— 两件事分开记, 缺这格就无法开口(见 verify_token_chain)。
+    if token_bytes is not None:
+        if not isinstance(token_bytes, (bytes, bytearray)):
+            raise Stop("TOKEN_BYTES_NOT_BINARY",
+                       "令牌必须按**字节**递进来(str 请在调用侧 encode('utf-8'))")
+        doc["approval_token"] = {"sha256": sha_bytes(bytes(token_bytes)),
+                                 "bytes": len(token_bytes),
+                                 "source": str(token_source or "caller")}
     validate_ledger_doc(doc, approval_id, identities, caps)
     try:
         Path(root).mkdir(parents=True, exist_ok=True)
@@ -4368,6 +4477,64 @@ def validate_plan(plan, rows_doc, app_dir):
                                      if sa_seen else "未使用(默认所有 REFUSED 线都算业务失败)")))
     if sa_bad:
         bad += 1
+    # 契约门: 凡 cmd 在 ARM_GATE_MASK_ROWS 里的查询步, 都必须 (a)有且只有一条钉 arm_gate_mask
+    # 的逐值判据(行正则与执行器常量逐字节相同), (b)mask 组被 must / must_one_of 钉死,
+    # (c)status_lines_allow 恰好等于"预期非 0 的那些 mask"各一条整行锚定模式。
+    # 于是"预期为 0 的步骤仍要求 0": 它没有豁免, 现场真打出 REFUSED 就按 BUSINESS_FAILED 停。
+    declared_mask = plan.get(ARM_GATE_MASK_CONTRACT_KEY) == ARM_GATE_MASK_CONTRACT_VERSION
+    if not declared_mask:
+        out.append("R7F8F_ARM_GATE_MASK|all|NA|计划未申报 %s=%s(历史冻结包字节不回改, 只登记 NA)"
+                   % (ARM_GATE_MASK_CONTRACT_KEY, ARM_GATE_MASK_CONTRACT_VERSION))
+    else:
+        mc_bad, mc_seen = [], []
+        for stg in plan["stages"]:
+            for st in stg.get("steps", []):
+                head = (st.get("cmd") or "").split(" ")[0]
+                row = ARM_GATE_MASK_ROWS.get(head)
+                if row is None:
+                    continue
+                nm = "%s/%s" % (stg["id"], st.get("as"))
+                refused_tail, pass_tail = ARM_GATE_MASK_TAILS[head]
+                specs = [sp for sp in (st.get("expect_values") or []) if sp.get("row") == row]
+                if len(specs) != 1:
+                    mc_bad.append("%s:arm_gate_mask 逐值判据要有且只有一条(实际 %d 条)"
+                                  % (nm, len(specs)))
+                    continue
+                sp = specs[0]
+                decl = {}
+                for grp in ("mask", "tail"):
+                    one = (sp.get("must") or {}).get(grp)
+                    setv = (sp.get("must_one_of") or {}).get(grp)
+                    if one is not None and setv is not None:
+                        mc_bad.append("%s:%s 同时给了 must 与 must_one_of" % (nm, grp))
+                    elif one is not None:
+                        decl[grp] = [str(one)]
+                    elif isinstance(setv, (list, tuple)) and setv:
+                        decl[grp] = [str(x) for x in setv]
+                    else:
+                        mc_bad.append("%s:%s 既没 must 也没 must_one_of(等于没在判)" % (nm, grp))
+                masks = decl.get("mask") or []
+                if not masks:
+                    continue
+                want = sorted(arm_gate_refused_allow(head, m) for m in masks if m != "0x0")
+                got = sorted(st.get("status_lines_allow") or [])
+                if want != got:
+                    mc_bad.append("%s:按预期 mask%s 应有的豁免=%s, 实际申报=%s"
+                                  % (nm, masks, want, got))
+                twant = ([pass_tail] if masks == ["0x0"] else
+                         ([pass_tail, refused_tail] if "0x0" in masks else [refused_tail]))
+                if decl.get("tail") and sorted(decl["tail"]) != sorted(twant):
+                    mc_bad.append("%s:tail 集合%s 与 mask 集合%s 不自洽(产品只在 mask=0 打 ALL-PASS)"
+                                  % (nm, decl.get("tail"), masks))
+                mc_seen.append("%s=%s" % (st.get("as"), "|".join(sorted(masks))))
+        if not mc_seen:
+            mc_bad.append("申报了契约却没有覆盖到任何 motor_status/system_status 查询步")
+        out.append("R7F8F_ARM_GATE_MASK|all|%s|%s" %
+                   ("PASS" if not mc_bad else "FAIL",
+                    ";".join(mc_bad) or ("覆盖 %d 条查询步, 每步都钉了预期 mask(预期 0 的步无豁免): %s"
+                                         % (len(mc_seen), ",".join(mc_seen)))))
+        if mc_bad:
+            bad += 1
     # R5 现场轮(field-20261101T142722Z)的观测窗教训: 计划申报的被动启动窗必须**真的走满**, 而且
     # "从复位/开口到第一条查询"的可观测总量要覆盖经验上成功过的启动窗(cont 轮 75 s 拿满整段启动)。
     # 未申报 observation_bounds 的历史包只登记 NA, 不回改它们的字节, 也不给红。
@@ -5316,6 +5483,12 @@ def main(argv=None):
     ap.add_argument("--plan", help="计划 JSON: 提供后额度在发送前真实扣减(quota)")
     ap.add_argument("--approval-token")
     ap.add_argument("--expected-token")
+    ap.add_argument("--approval-token-file",
+                    help="批准令牌原话**文件**(推荐): 在 Python 内按严格 UTF-8 取字节, "
+                         "不经控制台打印与 shell 变量转运; 与 --approval-token 同时给必须逐字节相等")
+    ap.add_argument("--token-verbatim-file",
+                    help="只参与对账的原话文件(不改令牌来源): 真实 dispatch 前核它的摘要是否"
+                         "等于账本绑定值")
     ap.add_argument("--approval-id", default="",
                     help="批准身份(令牌/审批记录名): 跨进程持久预占账按它命名, 真实执行必填")
     ap.add_argument("--approval-root", default="",
@@ -5399,10 +5572,24 @@ def main(argv=None):
             print("APPROVAL_INIT_REFUSED:approval_id_required", file=sys.stderr)
             return 4
         try:
+            # 开账时就把令牌摘要绑进账本: 之后每一次真实开口都要与它对账(不带令牌=不绑=开不了口)。
+            tb, tsrc = None, ""
+            if a.approval_token_file:
+                tb = token_bytes_from_file(a.approval_token_file)
+                tsrc = "file:%s" % a.approval_token_file
+                if a.approval_token is not None and a.approval_token.encode("utf-8") != tb:
+                    raise Stop("TOKEN_SOURCE_CONFLICT",
+                               "--approval-token 与 --approval-token-file 不是同一份原话字节")
+                text = tb.decode("utf-8")
+            else:
+                text = a.approval_token
+                if text:
+                    tb, tsrc = text.encode("utf-8"), "cli"
             p = approval_init(Path(a.approval_root or default_approval_root()), a.approval_id,
                               current_identities(plan_doc, a.plan, a.repo_root,
                                                  snapshot=plan_snap),
-                              plan_doc["quota"], note="offline --approval-init, no device action")
+                              plan_doc["quota"], note="offline --approval-init, no device action",
+                              token_bytes=tb, token_source=tsrc)
         except Stop as e:
             print("APPROVAL_INIT_REFUSED:%s|%s" % (e.code, e.detail), file=sys.stderr)
             return 4
@@ -5410,6 +5597,12 @@ def main(argv=None):
               (p, json.dumps(plan_doc["quota"], sort_keys=True),
                json.dumps(current_identities(plan_doc, a.plan, a.repo_root,
                                              snapshot=plan_snap), sort_keys=True)))
+        print("APPROVAL_INIT_TOKEN|%s" % json.dumps(
+            {"approval_id": a.approval_id,
+             "token_sha256": (tb and sha_bytes(tb)) or "NOT_BOUND",
+             "token_bytes": (tb and len(tb)) or 0, "source": tsrc or "-",
+             "note": "没绑令牌摘要的账本**开不了真实口**(verify_token_chain 具名拒绝)"},
+            ensure_ascii=False, sort_keys=True))
         return 0
     if a.validate_plan:
         app = a.app_dir or str(Path(a.repo_root) / PLAN_APP_REL)
@@ -5422,6 +5615,23 @@ def main(argv=None):
               (len(lines), bad, ncmd, a.plan))
         return 1 if bad else 0
     if a.dispatch:
+        if a.transport == "real":
+            # 开口之前的令牌门(F20 的自伤就在这里: 令牌与批注原话不是同一份字节, 而当时没有任何
+            # 一道门会发现)。stub 工装入口不经过这里 —— 它本来就不需要批准。
+            try:
+                tb = (token_bytes_from_file(a.approval_token_file) if a.approval_token_file
+                      else (a.approval_token.encode("utf-8") if a.approval_token else None))
+                if a.approval_token_file and a.approval_token is not None and \
+                        a.approval_token.encode("utf-8") != tb:
+                    raise Stop("TOKEN_SOURCE_CONFLICT",
+                               "--approval-token 与 --approval-token-file 不是同一份原话字节")
+                a.approval_token = tb.decode("utf-8") if tb is not None else a.approval_token
+                tc = verify_token_chain(Path(a.approval_root or default_approval_root()),
+                                        a.approval_id or None, tb, a.token_verbatim_file)
+                print("TOKEN_CHAIN_VERIFIED|%s" % json.dumps(tc, sort_keys=True))
+            except Stop as e:
+                print("TOKEN_CHAIN_REFUSED:%s|%s" % (e.code, e.detail), file=sys.stderr)
+                return 4
         clock = SimClock() if a.transport == "stub" else RealClock()
         try:
             res = dispatch_plan(plan_doc, a.transport, a.backend, a.out, clock, a.profile,

@@ -1494,3 +1494,147 @@ F11 那份承接件按字节冻结在库里不回改（`53c744213964…`，与 �
 （plan `e7851942…` / rows `c64fdee8…` / executor `30c67a3e…` / 镜像 `23691e8d…` 四件）给一句新的真实
 原话。本轮设备动作 0：未开口、未写任何字节到 COM5、未建第二个批准账。
 `polarity_measured=false` / `core_protection_verified=false` 保持原值；仍不是现场验收通过。
+
+## 27 M8-R7F8F F20 第二次真机停点 + F21 门位全量契约 / 真字节纳入 / 令牌门（2026-11-05 深夜～11-06 凌晨，设备动作 0）
+
+操作者批准了 F20 那一次整包（四件身份 + 本轮逐字机械前置声明在同一句里）。跑完的结果是
+**第二条只读查询停止**，随后 A 给了三条补齐要求（全量 mask、历史真字节 + 跨计划回归、令牌字节
+单独判未通过）并明确 F21 沿原范围/原时限/动作上限、旧账不结转、无需另开登记轮。本节先记现场，
+再记三件补齐。产品源码、固件、旧证据、F11/F20 两本账全部一字未动。
+
+### 27.1 F20 现场读回（一次开口，两条只读查询，电机从未带电）
+
+| 项 | 实测 |
+| --- | --- |
+| 第 1 步 `sys_pre` | **通过**（983 B / `73abf3012386…`，与 F11 那份逐字节相同）——F19 的披露申报在真机生效 |
+| 第 2 步 `mot_pre` | `code=BUSINESS_FAILED as=mot_pre`，命中行 `[MOT] arm_gate_mask=0x18 REFUSED`（1128 B / `f0550d313164…`） |
+| 之后的配置/学习/运动 | **一条都没发**（`DISPATCH_DONE` 里 `not_run=["S1"]`） |
+| 收口 | 固定收口照做，`disarm=NOT_ARMED`、`terminal=KNOWN`；电机从未 arm/start，板子保持禁能、保持通电 |
+| 额度 | 该账 `port_open` 1/1 用满，`retry=0`，未开第二个口、未复位、未下载 |
+
+同一类错在两个命令面上各暴露一次：F11 是 `system_status`，F20 是 `motor_status`。R7F7 定稿计划
+本来就带着 `^\[MOT\] arm_gate_mask=0x18 REFUSED$` 这条申报，我重建 R7F8F 计划时把它丢了。
+
+### 27.2 F21-a：门位 mask 逐步契约（8 处 motor_status + 2 处 system_status，不是手工数几处）
+
+步骤表里两类查询步共 **10 条**，逐条钉预期 `arm_gate_mask`（表随计划一起交付，字段
+`arm_gate_mask_contract_steps`；REAL=该形状在仓内归档真实字节里逐字存在，DERIVED=源码 + 前态推导）：
+
+| 步 | cmd | 预期 mask | 出处 | 豁免 |
+| --- | --- | --- | --- | --- |
+| `sys_pre` | system_status | `0x18` | REAL（F11/F20 983 B 两次实拍） | 有（锚定 `0x18`） |
+| `mot_pre` | motor_status | `0x18` | REAL（1128 B/`f0550d313164`，5 次归档 + F20） | 有 |
+| `sys_after_apply` | system_status | `0x8` | DERIVED（apply 清 bit4；0x8 形状另有 1080 B 真件） | 有 |
+| `mot_after_irq` | motor_status | `0x0` | REAL（648 B/`10807f63f02a`，9 次归档） | **无** |
+| `mot_dir` | motor_status | `0x0` | REAL（同上，仅 dir 值按工况改 1） | **无** |
+| `mot_armed` | motor_status | `0x0` | DERIVED（七门里没有 armed 项；这一步无归档原件） | **无** |
+| `cruise` | motor_status | `0x2` | REAL（1026 B/`9005a306999a`、1025 B/`57efcc7c90d5`） | 有（锚定 `0x2`） |
+| `mot_after_cancel` | motor_status | `0x2` | REAL（同上） | 有 |
+| `stopped` | motor_status | `0x0` **或** `0x2` | 唯一边界，两值各有真件 | 有（只锚 `0x2`） |
+| `mot_disabled` | motor_status | `0x0` | DERIVED（R6-2 收口已在板源码里；旧 0x2 件属 R6 之前会话，不作预期） | **无** |
+
+- 预期 0 的 4 步**一条豁免都没有**：现场真打出 `REFUSED` 就按 `BUSINESS_FAILED` 停，这就是"仍要求 0"
+  的实现方式；动作被产品拒绝与查询自身失败（`diag_relative.c:2041` 的 `learn_status REFUSED:`）
+  一律继续 STOP。
+- `stopped` 用新的 `expect_values.must_one_of`（枚举，不是通配）：集合外的值具名停
+  `FIELD_VALUE_NOT_IN_SET`；矩阵 MC6 连"形状合法但自相矛盾"的 `0x8 ALL-PASS` 也判停。
+- 计划侧新门 `R7F8F_ARM_GATE_MASK`（`validate-plan`）逐条核：每步有且只有一条 mask 逐值判据、
+  mask 被 `must`/`must_one_of` 钉死、豁免集合恰等于"预期非 0 的那些 mask"各一条整行锚定模式、
+  tail 与 mask 自洽。历史冻结包没申报契约标记时只登记 `NA`（与 `observation_bounds` 同一处置，
+  不给旧包新红，也不回改旧字节）—— 所以无回归族仍是 9/0。
+
+### 27.3 F21-b：历史真实字节纳入 + 跨计划披露合同继承
+
+- 行表不再只喂我手拼的六行：`motor_status_pre_apply` = 1128 B 归档原件 24 行逐字；
+  `motor_status_idle` / 清理那一条 `motor_status` = 648 B 原件 13 行逐字；`motor_status_ready_dir`
+  是原件 13 行 + 单格 `dir=1`；armed/运行中的两组是本包声明形状 + 真实披露行。哪些是实拍、
+  哪些是推导，全部写进行表 `_about.board_observed_rows` / `derived_shape_rows`。取件函数
+  `_observed_mot_rows()` 核字节数与 sha 前缀，不符就拒绝生成。
+- 口径按 A 的更正：`1128 B/f0550d313164…` 是"**F20 本会话首次取得**"，同一身份的字节早已在 5 次
+  归档会话（R7F2b 三次、R7F6、R7F7）里 —— 上一版把它写成像"历史上没抓过"，历史样本漏了。
+  F20 两段原始字节现在也归档进 `proof/`，MC11 逐字节比过。
+- 两次 `system_status` 字节相同**只证明输出重复**；"接线无新变化"是操作者报告，判据里明写不升格为实测。
+- 继承判据 MC10：把 R7F2b/R7F3/R7F4/R7F5/R7F6/R7F7 六份冻结计划里每条披露豁免取出来（按 cmd +
+  字面 mask），要求新计划在同 cmd 上覆盖该值，否则必须点名不继承并给**可按步序复算**的理由。
+  本包只有 `motor_status/0x8` 走不继承：第 6 步 apply 与第 11 步 irq_enable 之间没有 motor_status
+  查询步（那段窗口里唯一的查询是第 7 步 system_status，它已按 0x8 申报）。
+
+### 27.4 F21-c：令牌字节链（实体绑定与"真用了原话"分开判）
+
+- 新入口 `--approval-token-file` / `--token-verbatim-file`：`token_bytes_from_file()` 在 Python 内
+  读字节、只裁尾随 CR/LF、严格 UTF-8 解码 —— 不再有"打印到控制台再经 shell 变量"这一层。
+- `approval_init` 把令牌摘要（sha256 + 字节数 + 来源）写进账本的 `approval_token` 格；账本不落原文。
+- `verify_token_chain()` 在 **dispatch_plan 之前**核三份摘要：原话文件 / 实际传入令牌 / 账本绑定，
+  任一不符具名拒绝（`TOKEN_DIGEST_MISMATCH` / `APPROVAL_TOKEN_NOT_BOUND` / `TOKEN_SOURCE_CONFLICT` /
+  `TOKEN_VERBATIM_NOT_UTF8` / `TOKEN_VERBATIM_FILE_ABSENT`），一条命令都不发。
+- F20 那一判**单独记未通过**：TG8 拿归档的 F20 账本（`proof/r7f8f_field_f20_approval_ledger.json`，
+  原账不补改）用新门复算 => `APPROVAL_TOKEN_NOT_BOUND`，即当时"开口用的是不是那句原话"无从核对；
+  承接件里的 `token_verbatim` 与原话文件同 sha（`e3b3a647a359…`），而 CLI 侧实际传入的 sha 是
+  `9701aa453fe5…`，两份都登记保留。TG9 单独判四件**实体绑定** PASS：plan/rows/executor 三件在 Git
+  历史里能找到内容散列逐字节相符的 blob（`44fa6c1`，不靠 HEAD 因为本轮会改这些文件），镜像按盘上
+  字节复算 `23691e8d…`。两判互不掩盖。TG10 证 CLI 级拦截：rc=4、`TOKEN_CHAIN_REFUSED`、输出目录里
+  没有任何台账文件；探针给的是不存在的口名 `COM_NONEXISTENT_M8R7F8F`，门若被改坏也碰不到 COM5。
+- 承接件生成器跟着收紧：机械前置的声明人/逐字原话改成**必传参数**（旧版写死在源码里，默认值就是
+  F20 那句），草案一律写 `NOT_REDECLINED_THIS_ROUND`；派生差异白名单从 10 格改成 13 格（多出的
+  三格是令牌的来源与两份摘要），"9 格"这种硬编码话术改成按实际 diff 计。
+
+### 27.5 六族 + 计划 + 派生复算（定稿字节上重跑）
+
+| 族 | 数 |
+| --- | --- |
+| 反例矩阵 | **135/0**（新增 MC0~MC11 共 12 条 + TG1~TG10 共 10 条；FB6 因覆盖面变化改名） |
+| stub 整包 | 29/0 |
+| 无回归（冻结 R7F7 计划新旧对照） | 9/0（新门对旧包只登记 NA，点名表加 `R7F8F_ARM_GATE_MASK`） |
+| 三版本重放 | 21 件 × 3 侧 = 63 行 / 0 |
+| 整包离线门 | **49/0**（新增 GATE_PRESENT 与"门判绿且逐条点名 10 步"的交叉核对） |
+| 夹具变更表 | 5 族 problems=0 |
+| validate-plan | checks=147 fail=0 |
+| 派生复算 `--verify` | PASS（仓外重建 328475 B 与仓库派生件逐字节相等） |
+
+新身份（本轮交付，待一次现场批准）：
+
+| 件 | 字节 | sha256 前缀 |
+| --- | --- | --- |
+| 派生执行器 `tools/m8r3_serial_chain_r7f8.py` | 328475 | `4363af36159b…` |
+| 补丁 `patches/r7f8f_executor.patch`（83 条 edits） | 113931 | `e09d333b2f09…` |
+| real plan `field/plan_r7f8f_2369_real.json` | 45398 | `2259359ca3f7…` |
+| real rows `field/rows_r7f8f_real.json` | 15460 | `a8456159a45f…` |
+| F21 承接**草案**（未批准，非批准件） | 47318 | `4a9460801b46…` |
+| 在板镜像参照 | 297452 | `23691e8d8aa8…` |
+
+### 27.6 本轮自伤与工具缺口（照单登记，不粉饰）
+
+1. **变量遮蔽**：我在整包离线门里新加判据时把 validate-plan 的行表变量重命名成了 `body`，与后面
+   五条 `PLAN_*` 判据共用的同名变量冲突，导致六条判据一起红。修法是改名 `m_body`；教训是新增判据
+   不许复用局部变量名，跑完要复看"我动的那一族之外有没有跟着红"。
+2. `bytes` 字面量里放非 ASCII 字符 → SyntaxError（TG6 的 GBK 夹具），改成显式字节列表。
+3. 真字节夹具 `real_rows()` 一开始按前缀替换披露行，把 `motor.c:937` 那条**没有 tail 的裸行**也换成了
+   REFUSED 行 => 同一行出现两次，`ROW_NOT_UNIQUE` 把它自己判红。改成只用契约的行正则匹配那一条；
+   这条红反而证到了"逐值判据要求行唯一"是真的在判。
+4. 令牌原话的 CLI 侧字节（`9701aa453fe5…`）当时没有落进任何工件，现在只能作为"会话里打印过的摘要"
+   登记，无法从仓内复算 —— 这就是 §27.4 那三道摘要对账要补的洞；F20 的账与原话文件都保留原样。
+5. 承接件工具的历史默认值（写死 F20 的机械前置原话）属于"下一轮不传参就会悄悄沿用上一轮现场事实"
+   的形状，本轮改成必填参数 + 草案显式 `NOT_REDECLINED_THIS_ROUND`。
+6. **交接 JSON 把停止步写成了 `sys_pre`**：生成器用 `BUSINESS_OUTCOME` 的**第一条**当"停在哪一步"，
+   而台账里有两条（第 1 条通过、第 2 条才是首错）—— 结果是文档把通过的那一步说成了停止步，同一段
+   字节里 `lines=[]` 明明是"没有业务失败线"。本轮改成拿 `SESSION_STOP.detail.lines` 与
+   `BUSINESS_OUTCOME.lines` **求同源交集**来定停止步，交集为空就 `HANDOFF_REFUSE` 拒产，不回落
+   "最后一条"。这是本会话发现的，修在 `tools/r7f8f_make_handoff.py:139` 起的读取段；§27.1 表格本身
+   从头到尾写的是 `as=mot_pre`，与台账一致，未被这个 bug 污染。教训：**从归档字节派生的字段，取值
+   规则必须写明"凭哪个键"，`[0]` 不是判据。**
+7. **矩阵判据名里带了字段分隔符**：MC6 原名写成 `…stopped 的 0x0|0x2 各判 OK…`，而回执的行格式就是
+   `名字|PASS|详情` —— 于是那行的第二格变成 `0x2 各判 OK, …`，交接工具按 `parts[0]/parts[1]` 读出来
+   的键是 `MC6_…_0x0`、值是半截话（**PASS 丢了**）。135 条里只有这一条撞上有毒格式，靠肉眼看回执
+   数不出来的。已把名字改成 `0x0 与 0x2`，并在 `note()` 里加了"判据名含 `|` 当场 `ValueError`"的硬门
+   （`tools/r7f8e_case_matrix.py:40`）；重跑后矩阵仍 135/0。教训：**行式回执的字段名与分隔符是同一
+   个命名空间，写名字的那一行就该被门挡住，不该留给下游解析去发现。**
+8. **交接生成器的 `next_step_owners` 里写了两条同名的 `"A"` 键**：Python 字典字面量后写覆盖前写，
+   F19 那条（"无需再定口径。仅当…才按裁定末段回报"）被 F21 那条静默吃掉，JSON 里只剩一条、也不报错。
+   本轮删掉旧的那条并把归属改成"第三次现场尝试"，并在原位留了注释禁止再加同名键。教训与 §27.6 第 7 条
+   同类：**手写字面量的键集合也是判据的一部分，重复键不会红，只会少一条信息。**
+
+停点：本轮设备动作 0（未开口、未写任何字节到 COM5、未建本轮现场批准账；矩阵/门内出现的 dispatch
+全是 stub/sim 或真实分支的**开口前拒绝**）。板子保持禁能、保持通电。F21 沿原范围、原时限与动作
+上限，F20 那本账不结转；等操作者对上面四件新身份给一句真实原话（含本轮逐字的机械/电气前置声明），
+再按 `--approval-token-file` 开新账并只跑一次整包。`polarity_measured=false` /
+`core_protection_verified=false` 保持原值；仍不是现场验收通过。

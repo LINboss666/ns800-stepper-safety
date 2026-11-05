@@ -1,11 +1,11 @@
 输入在位|PASS|四件齐全; 计划=1de974bf2828819f 行表=5fee4060f4bde537
-两侧都跑完并给出汇总|PASS|旧 checks=57 fail=1 / 新 checks=67 fail=1
+两侧都跑完并给出汇总|PASS|旧 checks=57 fail=1 / 新 checks=68 fail=1
 旧判据一条都没被洗掉|PASS|消失=0 条
-新增行全部是本轮适配自己的门|PASS|新增=10 条, 其中既不是 R7F8E_ 形状也不在点名表里的=0 条
-点名的本轮新门确实出现在新增行里(白名单非空转)|PASS|点名=PLAN_CLEANUP_RESERVE,PLAN_BUSINESS_RESERVE_SPLIT,PLAN_BUSINESS_WORST_CASE_FIT,PLAN_BUSINESS_RESERVE_SPLIT_LEGACY_SEMANTICS,PLAN_STEP_TOTAL_WINDOWS 实到=PLAN_BUSINESS_RESERVE_SPLIT,PLAN_BUSINESS_RESERVE_SPLIT_LEGACY_SEMANTICS,PLAN_BUSINESS_WORST_CASE_FIT,PLAN_CLEANUP_RESERVE,PLAN_STEP_TOTAL_WINDOWS,R7F8E_GATE_SUMMARY,R7F8E_JOB_STATE_NAMES,R7F8E_LEARN_STATUS_READONLY,R7F8E_QUOTA_PREFIX_REAL,R7F8E_QUOTA_TABLE 缺=-
-新增门条数与计数一致|PASS|旧 57 + 新增 10 = 新 67
+新增行全部是本轮适配自己的门|PASS|新增=11 条, 其中既不是 R7F8E_ 形状也不在点名表里的=0 条
+点名的本轮新门确实出现在新增行里(白名单非空转)|PASS|点名=PLAN_CLEANUP_RESERVE,PLAN_BUSINESS_RESERVE_SPLIT,PLAN_BUSINESS_WORST_CASE_FIT,PLAN_BUSINESS_RESERVE_SPLIT_LEGACY_SEMANTICS,PLAN_STEP_TOTAL_WINDOWS,R7F8F_ARM_GATE_MASK 实到=PLAN_BUSINESS_RESERVE_SPLIT,PLAN_BUSINESS_RESERVE_SPLIT_LEGACY_SEMANTICS,PLAN_BUSINESS_WORST_CASE_FIT,PLAN_CLEANUP_RESERVE,PLAN_STEP_TOTAL_WINDOWS,R7F8E_GATE_SUMMARY,R7F8E_JOB_STATE_NAMES,R7F8E_LEARN_STATUS_READONLY,R7F8E_QUOTA_PREFIX_REAL,R7F8E_QUOTA_TABLE,R7F8F_ARM_GATE_MASK 缺=-
+新增门条数与计数一致|PASS|旧 57 + 新增 11 = 新 68
 既有失败集合未变|PASS|两侧 fail 计数 1 vs 1; 唯一既有 FAIL 是 PLAN_MOTION_CAP_BUDGET(空运动链的既有检查器缺口, R7F8 草案轮已登记)
-派生件身份已重登记(不冒用旧摘要)|PASS|旧 219491 B sha=33d3f0af8a4c9c33 / 新 315233 B sha=30c67a3e8dbe9152
+派生件身份已重登记(不冒用旧摘要)|PASS|旧 219491 B sha=33d3f0af8a4c9c33 / 新 328475 B sha=4363af36159befa4
 本轮无设备动作|PASS|两次 --validate-plan 都是纯静态读; 未开端口、未建批准账、未 dispatch
 
 == 旧执行器输出原文(58 行) ==
@@ -68,7 +68,7 @@ PLAN_STATUS_ALLOW|all|PASS|白名单都是锚定且被正面要求(要求串必�
 PLAN_BOOT_WINDOW_COVER|all|PASS|下界=75s, 覆盖: S3=75+6+3s=84s
 PLAN_VALIDATE_SUMMARY|checks=57|fail=1|msh_commands=74|plan=D:\ns800\reports\reviews\phase8-m8-r7f7-newimage-static\field\plan_r7f7_2369_static.json
 
-== 派生件输出原文(68 行) ==
+== 派生件输出原文(69 行) ==
 PLAN_MOTION_WINDOW|S0|PASS|人工门都在运动之前
 PLAN_MOTION_WINDOW|S1|PASS|人工门都在运动之前
 PLAN_MOTION_WINDOW|S2|PASS|人工门都在运动之前
@@ -130,13 +130,14 @@ PLAN_TARGET_CHANNEL|all|PASS|产品枚举=REL_ADC_SEVERE,REL_COVERAGE_LOST,REL_F
 PLAN_FIRST_CAUSE_LEGS|all|PASS|trip 链都有同次 REL TRIP/源样本/profile/新 session 四腿
 PLAN_BYTE_RECOVERY|all|PASS|计划未申报任何'损坏后可继续'例外 => 裸 NUL / 非法 UTF-8 / 危险文本一律即停(原字节仍先落盘)
 PLAN_STATUS_ALLOW|all|PASS|白名单都是锚定且被正面要求(要求串必须是该行的前缀)的状态行: S3:sys_initial,S3:mot_static,S3:job_failed,S3:sys_final,S3:mot_final
+R7F8F_ARM_GATE_MASK|all|NA|计划未申报 arm_gate_mask_contract=R7F8F_PER_STEP_V1(历史冻结包字节不回改, 只登记 NA)
 PLAN_BOOT_WINDOW_COVER|all|PASS|下界=75s, 覆盖: S3=75+6+3s=84s
 R7F8E_QUOTA_TABLE|all|PASS|pairs=10 keys=9 取消键=True
 R7F8E_QUOTA_PREFIX_REAL|all|PASS|产品里不存在的前缀=[](写错会静默永不命中, 于是动作被当成只读)
 R7F8E_LEARN_STATUS_READONLY|all|PASS|learn_status 不得算 learn/cancel; learn 请求与取消分别计数
 R7F8E_JOB_STATE_NAMES|all|PASS|源码 rel_job_state_name 状态名=CANCELLED,CANCEL_PENDING,DONE,FAILED,IDLE,RUNNING,TIMEOUT
 R7F8E_GATE_SUMMARY|all|PASS|fails=0
-PLAN_VALIDATE_SUMMARY|checks=67|fail=1|msh_commands=74|plan=D:\ns800\reports\reviews\phase8-m8-r7f7-newimage-static\field\plan_r7f7_2369_static.json
+PLAN_VALIDATE_SUMMARY|checks=68|fail=1|msh_commands=74|plan=D:\ns800\reports\reviews\phase8-m8-r7f7-newimage-static\field\plan_r7f7_2369_static.json
 
 == 新增行逐条 ==
 PLAN_CLEANUP_RESERVE|S3|PASS|reserve=7.0 floor=6.0 total=210.0 cap=None
@@ -144,6 +145,7 @@ PLAN_BUSINESS_RESERVE_SPLIT|S3|PASS|may_obligate=False spin@None stop@None zero@
 PLAN_BUSINESS_RESERVE_SPLIT_LEGACY_SEMANTICS|S3|INFO|对应旧口径: 每步再加 SLACK_SECONDS、且正常 stop 不解除运动计时 legacy_pre_bound=None legacy_after_spin=None 本行不判红, 仅留档旧口径
 PLAN_STEP_TOTAL_WINDOWS|S3|PASS|declared=0/14 legacy=14 非法=无 zero_evidence_as=NONE(运动计时不解除)
 PLAN_BUSINESS_WORST_CASE_FIT|S3|PASS|business_total=133 budget=203.0 cons_total=None cons_arm=None
+R7F8F_ARM_GATE_MASK|all|NA|计划未申报 arm_gate_mask_contract=R7F8F_PER_STEP_V1(历史冻结包字节不回改, 只登记 NA)
 R7F8E_QUOTA_TABLE|all|PASS|pairs=10 keys=9 取消键=True
 R7F8E_QUOTA_PREFIX_REAL|all|PASS|产品里不存在的前缀=[](写错会静默永不命中, 于是动作被当成只读)
 R7F8E_LEARN_STATUS_READONLY|all|PASS|learn_status 不得算 learn/cancel; learn 请求与取消分别计数

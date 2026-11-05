@@ -4,14 +4,14 @@
 
 ## proof/r7f8e_case_matrix.txt
 - 家族: 反例矩阵(计划驱动的执行器行为反例 + 元负控)
-- 基线判据名 65 个 / 现在 113 个 / 同名保留 65 / 新增 48 / 移除 0 / 结论变化 0
-- 现在的汇总行: `R7F8E_MATRIX_SUMMARY|判据=113|FAIL=0|none`
+- 基线判据名 65 个 / 现在 135 个 / 同名保留 65 / 新增 70 / 移除 0 / 结论变化 0
+- 现在的汇总行: `R7F8E_MATRIX_SUMMARY|判据=135|FAIL=0|none`
   - **新增** `FB1_真字节经生产读路径逐字节留证且披露行在流里` —— 输入换成 2026-11-05 F11 板子真发的 983 B(proof/r7f8f_field_f11_sys_pre.rx.bin), 经**生产读路径** read_until_prompt 解析, 落盘字节必须与原捕获逐字节相等, 且披露行确实出现在流里。为什么不能再用夹具行: 上一版把 mask=0x18 记在 [TMC] 写门行上, 夹具因此永远测不到现场首错。
   - **新增** `FB2_正例_交付的 sys_pre 申报下真字节判 OK 且豁免行入台账` —— 正例: 交付计划里 sys_pre 的申报(整行锚定豁免 + expect_contains 正面要求 + 两行硬字段)对真字节判 verdict=OK, 并且台账里 BUSINESS_OUTCOME.status_lines_allowed 逐字带上被豁免的那一行 —— 豁免必须留痕, 静默丢弃等于把判据藏起来。
   - **新增** `FB3_反例_同一段真字节喂给动作步仍具名业务失败` —— 反例(作用域): 同一份 rows 喂给 arm 步(motor_arm, 未申报豁免)必须仍判 BUSINESS_FAILED 且命中行就是那条披露行。证豁免是**按步**申报的, 不会把一局里所有 REFUSED 线洗白 —— 这正是操作者选的修法①里「动作步一律不许豁免」那一半。
   - **新增** `FB4_元负控_摘掉豁免同一份真字节必须翻红` —— 元负控: 把 sys_pre 的 status_lines_allow 摘掉, 同一份真字节必须翻回 BUSINESS_FAILED。红了才证明这条申报是承重的判据, 不是装饰; 也证明 F11 那一次停止的根因确实在包侧缺申报。
   - **新增** `FB5_反例_豁免未被正面要求时运行期具名停止(fail-closed)` —— 反例(新门本身): 保留豁免但删掉 expect_contains 里那条披露串, 运行期必须具名停 STATUS_ALLOW_NOT_POSITIVELY_REQUIRED 并留台账事件。R7F8E 起注释就写着「必须同时被本步 expect 正面要求」但代码从未核过, 这条就是兑现它 —— 否则写一条豁免等于「长得像拒绝的都免检」。
-  - **新增** `FB6_静态门_交付计划 PASS 且豁免只在两条查询步` —— 静态侧口径对齐: validate_plan 的 PLAN_STATUS_ALLOW 必须判绿, 且 38 步里申报豁免的**只有** sys_pre / sys_after_apply 两条 system_status 查询步。计划能过静态门却在现场被运行期停住, 就是 F11 那次的形状, 现在两边用同一条「正面要求」判据。
+  - **新增** `FB6_静态门_交付计划 PASS 且豁免只在预期非 0 的那几条查询步` —— 同一判据改名, 不是删覆盖: F19 版写死「豁免只在两条 system_status 查询步」, 而 F21 按 A 的第 1 点把 motor_status 的 8 处也纳入逐步契约后, 申报豁免的是 6 条(预期 0x0 的 4 条查询步一条豁免都没有)。旧名里的「两条」在新口径下本身就是错的, 保留旧名会让判据名与实际断言不一致。
   - **新增** `FB7_静态门元负控_抽掉正面要求计划门必须翻红` —— 静态门的元负控: 只删 sys_pre 的正面要求, PLAN_STATUS_ALLOW 必须翻 FAIL 并把字面前缀与运行期具名码写进详情。同时它也是新前缀函数 status_allow_literal_prefix 的现场靶子 —— 冻结的 R7F7 计划整条模式用反斜杠转义空格, 把「反斜杠+空格」当通配会把前缀截成 [DIAG] 而假判红(本机第一次跑就撞上, 已按字面转义修正, 无回归族 9/0 复证)。
   - **新增** `G10_单字段变错(ENN_fb=1)` —— F4 反向家族(G9~G17): 把巡航响应里**某一个**字段改成禁能侧或矛盾值, 逐个证 running_contract 的每一项都真在判 —— 只靠 state 数值一个门会在其余字段错时仍放行。
   - **新增** `G11_单字段变错(verdict=CUT_BY_HARDWARE)` —— F4 反向家族(G9~G17): 同上, 改的是 fb 判定链(硬件切断/未解析都不算巡航)。
@@ -52,6 +52,28 @@
   - **新增** `K6_已零速但仍带电到_18s_仍是到期停止业务` —— K5 的反向配对观察: 零速已解除运动计时(cap 剩余为负)时, 若带电拖到 18.5 s, ARM_ENERGIZE_DEADLINE_EXCEEDED 那条支路**不看** cap_active 仍然开火 => 两个计时器彼此独立不是口头声明。
   - **新增** `K7_38_步总窗逐条等于_A_的表_镜像同函数产出` —— 裁定 §3 那张表的机器化: 31.0/9.0/7.5 三段、合计 47.5、stop@7.5 / 零速@9.0 / 禁能@13.0、保守式 57.5 与 16.0 全部由执行器同一个函数现算, 计划里的镜像也由它产出 => 「检查器与执行器同一值」不是两边各写一遍再对拍。
   - **新增** `K8_轮询步的总窗等于其 until_次数与间隔未动` —— 裁定二末句的落实: 四个轮询步(巡航 4×0.1、取消 3×1、完成 12×2、停机 5×1)的申报总窗 == 原定 until_seconds(1/1/2/1), 次数与间隔一字未改 —— 防止用「缩窗」把尾巴塞进 cap。
+  - **新增** `MC0_包作者工具可导入(归档原件身份在它手里核过)` —— 本轮新增族(F21 第 1、2 点): 判据先证「行表里的真实字节是作者工具从盘上归档件读进来的」—— r7f8f_make_real_package 在 import 阶段就跑 _observed_sys_ready/_observed_mot_rows 的字节+散列核对, 缺件或身份不符直接 SystemExit。矩阵不复制那份检查, 只证它过不去时自己也红。
+  - **新增** `MC10_跨计划继承_六份冻结旧计划的每条披露豁免都在新计划里有落点` —— A 指出「旧计划判据未删, 还不足以证明新计划完整继承了其披露合同」。这条把六份冻结旧计划(R7F2b/R7F3/R7F4/R7F5/R7F6/R7F7)的每条 (cmd, 字面 mask) 豁免都取出来, 要求新计划要么在同 cmd 上覆盖那个值, 要么**点名不继承并给可按步序复算的理由**(window_check: 那两步之间不许有同类查询步)。本包只有 motor_status/0x8 走不继承那条, 理由是可复算的步序事实。
+  - **新增** `MC11_F20原始字节入档且与历史归档逐字节同一身份(口径=F20本会话首次取得)` —— F20 的两段原始字节(983 B/1128 B)从仓外运行目录归档进 proof/, 并与历史归档逐字节比: 0x18 那一份身份与 R7F7 等 5 次会话相同(口径按 A 的更正写「F20 本会话首次取得」, 不写成「第一次拿到」); 983 B 那一份与 F11 相同 —— 而这只证**输出重复**, 接线未变化属于操作者报告, 判据里明写不升格成实测。
+  - **新增** `MC1_全量覆盖_计划里每条状态查询都钉了 mask 且与契约表逐条相等` —— A 的原话是「按最终计划全量核查, 别只手工数 7 处」: 判据从**计划字节**自己数出 10 条查询步(8 处 motor_status 含 stopped/mot_disabled + 2 处 system_status), 并把每步的 mask 集合与豁免集合原样打在详情里供逐条对。契约表少一步或多一步都不算绿。
+  - **新增** `MC2_预期为0的步骤要求0且一条豁免都没有` —— A 的「预期为 0 的步骤仍要求 0, 不能给所有查询统一放行任意 REFUSED」的直接判据: mot_after_irq / mot_dir / mot_armed / mot_disabled 四步的预期都是 0x0, 它们的 status_lines_allow 必须是空列表 —— 豁免缺席才是「要求 0」的实现方式, 而不是靠一句说明。
+  - **新增** `MC3_归档真实字节四份都在盘且身份逐字节相符` —— F21 第 2 点「纳入历史真实字节」: 0x18/0x0/0x2/0x8 四种 mask 形状各取一份**仓内归档原件**(1128 B/f0550d313164、648 B/10807f63f02a、1026 B/9005a306999a、1080 B/fa69aa5cf5a1), 判字节数与sha 前缀, 并在原件里逐字找到那条披露行。取不到就整族红, 不允许改用我写的行继续跑。
+  - **新增** `MC4_真字节正例_mot_pre 收到 0x18 归档行判 OK 且豁免行原文入台账` —— F20 停下来的那一步(mot_pre)现在拿**同一段真字节**判绿, 且台账 status_lines_allowed 带上原文。这一条就是「F19 的修复方式在 motor_status 上也成立」的证据, 不是只在 system_status 上证过。
+  - **新增** `MC5_真字节反例_预期 0x0 的步收到 0x18 真行必须具名 STOP` —— 同一段 0x18 真字节喂给预期 0x0 的 mot_after_irq 必须判 BUSINESS_FAILED 并命中那一行。正例(MC4)与反例(MC5)用**同一份字节**分别判, 才证得到差别在「本步申报的预期值」上, 而不是在字节内容上。
+  - **新增** `MC6_边界步_stopped 的 0x0 与 0x2 各判 OK, 0x18 与 0x8-ALL-PASS 都停` —— 38 步里唯一的真边界(motor.c:1989 mot_commit_zero_ready 提交 RUN->READY 要 armed!=0 且 cur==tgt==0, 与本查询先后不定)。判据是**四个方向**: 0x2 真行判 OK 且留痕、0x0 真行判 OK、0x18 真行停、形状合法但自相矛盾的「0x8 ALL-PASS」按 FIELD_VALUE_NOT_IN_SET 停 —— 枚举而不是通配。
+  - **新增** `MC7_元负控_逐步摘掉 mask 判据静态门都点名翻红(10/10)` —— 对 10 条查询步**逐条**摘掉那一条 mask 逐值判据, 静态门必须在**那一步**上翻红并点名它。只数总数或只看是否变红不够: 红在别的步上等于这道门没在判这一步。
+  - **新增** `MC8_反向_给预期 0x0 的步加一条通配豁免必须判红` —— 反向: 给预期 0x0 的步加一条 0x[0-9A-Fa-f]+ 通配豁免(= A 明令禁止的「统一放行任意 REFUSED」), 门必须判红并把「应有的豁免=[]」与实有模式一起打出来。这条也是 MC2 那道静态门的元负控。
+  - **新增** `MC9_历史包无契约标记只登记NA且不加新红` —— 冻结的旧计划(含 R7F7 定稿件)没申报这份契约, 门只登记 NA、不判红 —— 与 observation_bounds 同一处置: 历史件字节不回改, 也不给它们新增失败(否则无回归族的「既有失败集合未变」会被我的新门自己打破)。
+  - **新增** `TG10_CLI 真实分支被令牌门拦在 dispatch 之前(不导 pyserial、零台账零发送零开口)` —— CLI 级证据: transport=real 时令牌门在 dispatch_plan **之前**拒回(rc=4, 名 TOKEN_CHAIN_REFUSED), 输出目录里没有任何台账文件 => 未导入 pyserial、未开口、未发送。探针给的是不存在的口名 COM_NONEXISTENT_M8R7F8F: 万一将来这道门被改坏, 也只会撞在一个不存在的口上, 碰不到现场口 COM5。
+  - **新增** `TG1_Python 内按严格 UTF-8 取原字节(不经控制台/shell 变量)` —— A 要求的修法本体: 「下一次直接在 Python 内读取严格 UTF-8 原字节」。token_bytes_from_file 只读文件、只裁尾随 CR/LF、非 UTF-8 即拒 —— 判据把文件 sha 与取到 sha 一起打, 并申报尾随换行是否存在。
+  - **新增** `TG2_开账即绑令牌摘要, 且账本里不落原文` —— approval_init 把令牌 sha256/字节数/来源写进账本的 approval_token 格(四件实体身份之外的一格)。同时判「原文不出现在账本文件里」: 原话是操作者的材料, 账本进证据链, 只登摘要不登原文。
+  - **新增** `TG3_正路_原话文件/传入令牌/账本绑定三份摘要一致才放行` —— 开口前核对**原话文件、实际传入令牌、账本绑定令牌**三份摘要, 判它们确实同值(输出三个 sha 前缀)。只比命令行两处的等号(A 之前指出的旧口径)不算: 那种比法对 F20 那种漂移是瞎的。
+  - **新增** `TG4_反例_传入令牌与账本绑定不符必须拒绝开口` —— 反例(漂移形状): 把原话里一个全角逗号换成半角(与 F20 同类的字节漂移) => TOKEN_DIGEST_MISMATCH。这一条证明三道门里「传入 vs 绑定」这一对真的在咬。
+  - **新增** `TG5_元负控_账本没绑令牌摘要时必须拒绝开口` —— 元负控: 把账本里的 approval_token 格删掉后必须 APPROVAL_TOKEN_NOT_BOUND。摘要缺席是**开不了口**, 不是「当作一致」放行 —— 否则这道门只要不调用 init 就自动失效。
+  - **新增** `TG6_非 UTF-8 原话文件具名拒绝` —— 反例: 原话文件不是合法 UTF-8(GBK 字节)时具名拒绝, 不猜内容。F20 的漂移正是「换编码」这一类。
+  - **新增** `TG7_原话文件缺席时不猜内容` —— 反例: 原话文件不存在时具名拒绝(TOKEN_VERBATIM_FILE_ABSENT), 不允许用「上一轮那句话」代替。
+  - **新增** `TG8_F20 那次开口按新门复算=令牌判据不成立` —— 把 F20 那本**已花掉的账**原样归档进 proof/ 后用新门复算: 账里没有 approval_token => 当时「开口用的是不是那句原话」无从核对 => 这一判单独记 FAIL 形状(码 APPROVAL_TOKEN_NOT_BOUND)。原账、原话、两份不同散列都保留不补改, 与新账并存供对账。
+  - **新增** `TG9_F20 的四件实体绑定单独判 PASS(与令牌那一判互不掩盖)` —— 实体绑定与令牌使用**分开判**的那一半: 批准句点名的 plan/rows/executor 三件在 Git 历史里能找到内容散列逐字节相符的 blob(不靠 HEAD, 因为本轮会改这些文件), 镜像按盘上字节复算 => 实体绑定 PASS。这条绿不掩盖 TG8 的红, 反之亦然。
   - **新增** `X6_把收口预留从业务预算里抹掉_前置等待后arm仍放出去` —— 元负控(F5c): 把 business_abs_dl 退回 session_abs_dl(等于抹掉收口预留), H13 必须因此失去 STEP_DEADLINE_BEFORE_WRITE 且 arm 真的被放出去 —— 证这道门不是写在纸上的。
   - **新增** `X7_同一道门_静默收口时第五条发不出去` —— 元负控(F5c): 同一道门在「收口第五条发不出去」那一面的形状, 必须让 H14 失去 safety_irq_status。
 
@@ -86,8 +108,9 @@
 
 ## proof/r7f8f_offline_gate.txt
 - 家族: 最终离线门(real plan/rows 整包 + 全首错 + 不变项)
-- 基线判据名 无该件(本轮新增) 个 / 现在 39 个 / 同名保留 0 / 新增 39 / 移除 0 / 结论变化 0
-- 现在的汇总行: `R7F8F_OFFLINE_GATE_SUMMARY|判据=47|FAIL=0|none`
+- 基线判据名 无该件(本轮新增) 个 / 现在 40 个 / 同名保留 0 / 新增 40 / 移除 0 / 结论变化 0
+- 现在的汇总行: `R7F8F_OFFLINE_GATE_SUMMARY|判据=49|FAIL=0|none`
+  - **新增** `ARM_GATE_MASK_GATE_IS_GREEN_AND_COVERS_EVERY_QUERY_STEP` —— 整包离线门里对 F21 新门的**交叉核对**(不只是「在不在」): validate-plan 输出里这一条必须只有一行、判绿, 且它自己数出来的查询步集合要与本工具从计划 JSON 独立数出的 10 条**同名同序**, 汇总话术里的条数也要相等。于是「门被删掉」「退化成 NA」「只数了一半」三种情况都会在这里红, 不依赖矩阵 MC 族那一套。
   - **新增** `BOARD_IMAGE_IDENTITY_STILL_23691E8D` —— 在板镜像原件仍是 297452 B / 23691e8d…, 本轮不下载/不回读, 身份只作参照(§4 第一行)。
   - **新增** `FIELD_FLAGS_STAY_FALSE` —— polarity_measured / core_protection_verified 保持 false(任务书硬边界: 软件 confirm 不升级为极性实测)。
   - **新增** `FIELD_PLAN_PREREQ_NOT_SELF_CERTIFIED` —— 机械前置门在现场原件里保持「等操作者口头确认」, 计划不自证; 离线 dispatch 副本另置 PROVIDED 只为了让行为判据有东西可判。
@@ -114,8 +137,8 @@
   - **新增** `PRODUCT_SOURCE_UNCHANGED` —— 产品树 applications/ 与 HEAD 一致(本轮「产品源码冻结」), 任何判据红都不许靠改产品消红。
   - **新增** `REPLAY|code=CLEANUP_ERRORS disarm=CONFIRMED_DISABLED terminal=KNOWN 收口TX=['motor_status', 'safety_irq_status', 'safety_irq_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_stop', 'motor_status', 'motor_disarm', 'motor_status', 'motor_stop', 'motor_disarm', 'motor_status', 'safety_irq_disable', 'safety_irq_status'] errors=IRQ_TAIL_DISABLE_NO_DETACH_LINE IRQ_TAIL_NOT_CLOSED` —— 三版本重放的逐条件行(本轮新增家族): 同一份输入喂给 修后 / F5b 修前 / F5c 修前 三个字节件, 每件按**该件应有的行为**申报期望, 用来证「修前误放行」。
   - **新增** `REPLAY|code=CLEANUP_RESERVE_CANNOT_COVER_ALL_SENDS disarm=NOT_ARMED terminal=KNOWN 收口TX=[] errors=` —— 三版本重放的逐条件行(本轮新增家族): 同一份输入喂给 修后 / F5b 修前 / F5c 修前 三个字节件, 每件按**该件应有的行为**申报期望, 用来证「修前误放行」。
+  - **新增** `REPLAY|code=EXPECTATION_NOT_MET disarm=CONFIRMED_DISABLED terminal=KNOWN 收口TX=['motor_status', 'safety_irq_status', 'safety_irq_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_stop', 'motor_status', 'motor_stop', 'motor_disarm', 'motor_status', 'safety_irq_disable', 'safety_irq_status'] errors=` —— 三版本重放的逐条件行(本轮新增家族): 同一份输入喂给 修后 / F5b 修前 / F5c 修前 三个字节件, 每件按**该件应有的行为**申报期望, 用来证「修前误放行」。
   - **新增** `REPLAY|code=EXPECTATION_NOT_MET disarm=CONFIRMED_DISABLED terminal=KNOWN 收口TX=['motor_status', 'safety_irq_status', 'safety_irq_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_stop', 'motor_disarm', 'motor_status', 'safety_irq_disable', 'safety_irq_status'] errors=` —— 三版本重放的逐条件行(本轮新增家族): 同一份输入喂给 修后 / F5b 修前 / F5c 修前 三个字节件, 每件按**该件应有的行为**申报期望, 用来证「修前误放行」。
-  - **新增** `REPLAY|code=EXPECTATION_NOT_MET disarm=CONFIRMED_DISABLED terminal=KNOWN 收口TX=['motor_status', 'safety_irq_status', 'safety_irq_status', 'motor_status', 'motor_status', 'motor_status', 'motor_stop', 'motor_disarm', 'motor_status', 'safety_irq_disable', 'safety_irq_status'] errors=` —— 三版本重放的逐条件行(本轮新增家族): 同一份输入喂给 修后 / F5b 修前 / F5c 修前 三个字节件, 每件按**该件应有的行为**申报期望, 用来证「修前误放行」。
   - **新增** `REPLAY|code=STEP_DEADLINE_BEFORE_WRITE disarm=NOT_ARMED terminal=KNOWN 收口TX=[] errors=` —— 三版本重放的逐条件行(本轮新增家族): 同一份输入喂给 修后 / F5b 修前 / F5c 修前 三个字节件, 每件按**该件应有的行为**申报期望, 用来证「修前误放行」。
   - **新增** `REPLAY|code=STEP_TOTAL_SECONDS_INVALID disarm=CONFIRMED_DISABLED terminal=KNOWN 收口TX=['motor_status', 'safety_irq_status', 'safety_irq_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_stop', 'motor_stop', 'motor_disarm', 'motor_status', 'safety_irq_disable', 'safety_irq_status'] errors=` —— 三版本重放的逐条件行(本轮新增家族): 同一份输入喂给 修后 / F5b 修前 / F5c 修前 三个字节件, 每件按**该件应有的行为**申报期望, 用来证「修前误放行」。
   - **新增** `REPLAY|出现在 validate-plan 输出里` —— 三版本重放的逐条件行(本轮新增家族): 同一份输入喂给 修后 / F5b 修前 / F5c 修前 三个字节件, 每件按**该件应有的行为**申报期望, 用来证「修前误放行」。

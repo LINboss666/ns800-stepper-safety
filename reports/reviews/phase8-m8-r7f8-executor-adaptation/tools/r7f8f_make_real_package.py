@@ -60,10 +60,8 @@ def done_full(jid, want=8, lo=250, hi=350, d=1):
         "[DIAG] job DONE result; cred zero=1 learn=1 commit is separate"]
 
 
-MOT_IDLE = ["[MOT] state=0 name=OTHER", "[MOT] cur_hz=0 tgt_hz=0 accel=2000 decel=2000 dir=1",
-            "[MOT] armed=0 drv_en_request=0 health=OK", "[MOT] drv_request=LOW pad=0",
-            "[MOT] expected_ENN=HIGH ENN_fb=1 resolved verdict=OK",
-            "[MOT] diag_off_confirmed=YES"]
+# 静止那一行不再手拼: F21 起 motor_status 的行一律取归档真实字节(MOT_REAL_*),
+# 只有"武装但零速"这种现网没抓过的形状才由下面的 MOT_ARMED_IDLE 声明形状 + 真实披露行拼出。
 # arm 之后、start 之前: 已武装但零目标(产品行形状同 motor.c:2455-2504; 使能侧 ENN LOW/0)。
 MOT_ARMED_IDLE = ["[MOT] state=0 name=OTHER",
                   "[MOT] cur_hz=0 tgt_hz=0 accel=2000 decel=2000 dir=1",
@@ -123,9 +121,70 @@ def _observed_sys_ready():
 
 
 SYS_READY = _observed_sys_ready()
-# 产品无条件打的"当前会被拒"门位评估行(supervisor.c:126): 查询步必须把它当**状态披露**,
-# 不当业务拒绝 —— 但只认这一条整行锚定的形状, 且下面还会强制它被本步 expect 正面要求。
-SYS_GATE_DISCLOSE = r"^\[Motor\] arm gate fail mask=0x[0-9A-Fa-f]+ \(arm REFUSED\)$"
+# 产品无条件打的"当前会被拒"门位评估行(supervisor.c:126)必须当**状态披露**而不是业务拒绝。
+# F19 在这里写的是一条通配 hex 的整行模式(任意 mask 都放行) —— F21 按 A 的要求取消它,
+# 改由下面的逐步契约表给"这一步那几个 mask"各一条整行锚定模式。
+
+
+# ---- F21(A 第 1 点): 逐步 arm gate mask 契约的**归档真实字节**来源 --------------------------
+# 上一版只对 system_status 前态做了"照实拍写", motor_status 的行还是我按源码形状手拼的六行 —— 于是
+# 离线工装永远看不见板上那 24 行里的重复披露行, F20 的第二个首错(motor_status 的 0x18 被当业务拒绝)
+# 就是这么漏掉的。这里把三种 mask 形状的**归档原件**读进来当行表内容, 取不到原件就拒绝生成。
+_MASK_SAMPLES = {
+    # mask -> (仓内归档路径, 字节数, sha256 前 12, 该形状在仓内的归档份数)
+    "0x18": ("reports/reviews/phase8-m8-r7f7-newimage-static/field/"
+             "field-20261104T201458Z-r7f7/15_mot_final.rx.bin", 1128, "f0550d313164",
+             "同一份 1128 B/f0550d313164 在 5 次归档会话 + F20 本会话里逐字节相同"),
+    "0x0": ("reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/"
+            "field-20261104T101046Z/S_S1/12_mot_open.rx.bin", 648, "10807f63f02a",
+            "同一份 648 B/10807f63f02a 在 9 次归档会话里逐字节相同"),
+}
+
+
+def _observed_mot_rows(mask):
+    """取某个 mask 形状的归档真实响应行(去命令回显与 msh 提示符), 并核它确实是这个 mask。"""
+    rel, nbytes, sha12, note = _MASK_SAMPLES[mask]
+    p = pathlib.Path(__file__).resolve().parents[4] / rel
+    if not p.is_file():
+        raise SystemExit("REFUSED|归档真实字节不在盘上(%s): mask=%s 的行只能照实拍写, "
+                         "不许凭记忆重造" % (rel, mask))
+    b = p.read_bytes()
+    if len(b) != nbytes or hashlib.sha256(b).hexdigest()[:12] != sha12:
+        raise SystemExit("REFUSED|归档件身份与登记不符(%s: %d B sha=%s…)"
+                         % (p.name, len(b), hashlib.sha256(b).hexdigest()[:12]))
+    ls = [l for l in b.decode("utf-8").splitlines() if l.strip()]
+    ls = [l for l in ls if l.strip() not in ("msh >", "motor_status")]
+    hits = [l for l in ls if l.startswith("[MOT] arm_gate_mask=")]
+    want = "[MOT] arm_gate_mask=%s" % mask
+    if not any(h == want + " REFUSED" or h == want + " ALL-PASS" for h in hits):
+        raise SystemExit("REFUSED|归档件里的披露行%s 与预期 mask=%s 形状不符, 不敢写进行表(%s)"
+                         % (hits, mask, note))
+    return ls
+
+
+MOT_REAL_18 = _observed_mot_rows("0x18")     # 写前(apply 之前, IRQ 未开)的 24 行原件
+MOT_REAL_00 = _observed_mot_rows("0x0")      # 保护就绪 + 配置已下发之后的 13 行原件
+# mot_dir 那一步在产品上是 dir=1(motor_dir 1 已生效), 而这两份原件都是 dir=0 时抓的。
+# 只改这一个数值, 其余逐字保留 —— 它是**在真实行上做一次已申报的值翻转**, 登记在 derived_shape_rows。
+MOT_REAL_00_DIR1 = [(l.replace("decel=2000 dir=0", "decel=2000 dir=1")
+                     if l.startswith("[MOT] cur_hz=") else l) for l in MOT_REAL_00]
+if MOT_REAL_00_DIR1 == MOT_REAL_00:
+    raise SystemExit("REFUSED|dir 值翻转没命中任何行: 归档行的频率形状变了, 不敢继续派生")
+# 披露行的另一种 mask: 运行中(Safety=RUN => bit1)与 apply 之后(仅 bit3)。这两份只取**披露行本身**
+# (其余字段按本包工况由既有声明形状给), 所以它们是"真实形状 + 本包工况值", 不是整包实拍。
+MOT_MASK_LINE = {"0x0": "[MOT] arm_gate_mask=0x0 ALL-PASS",
+                 "0x2": "[MOT] arm_gate_mask=0x2 REFUSED",
+                 "0x8": "[MOT] arm_gate_mask=0x8 REFUSED",
+                 "0x18": "[MOT] arm_gate_mask=0x18 REFUSED"}
+MOTOR_MASK_02_SRC = ("reports/reviews/phase8-m8-idle-stack-r4/field/"
+                     "field-20261101T154833Z/S_S4/07_running_proof.poll02.rx.bin")
+MOTOR_MASK_08_SRC = ("reports/reviews/phase8-m8-r7f2b-safety-print-fix/field/"
+                     "field-20261104T101046Z/S_S1/05_mot_cfg.rx.bin")
+for _m, _rel in (("0x2", MOTOR_MASK_02_SRC), ("0x8", MOTOR_MASK_08_SRC)):
+    _p = pathlib.Path(__file__).resolve().parents[4] / _rel
+    if not _p.is_file() or MOT_MASK_LINE[_m] not in _p.read_bytes().decode("utf-8").splitlines():
+        raise SystemExit("REFUSED|mask=%s 的披露行原件%s里取不到(只能照实拍写)" % (_m, _rel))
+
 # apply 之后、safety_irq_enable(第 11 步)之前的 system_status 形状。三个字段一律回源码取值,
 # 不沿用上一版的臆造值(supervisor.c:90 只打 OPEN/CLOSED 与 CONFIRMED/not-confirmed,
 # safety_thread.c:315 的 protection_ready 要 st_irq_attached && st_polarity_validated 才 YES,
@@ -139,6 +198,97 @@ SYS_READY_APPLIED = ["=== SYSTEM STATUS ===",
                      "[Motor] arm gate fail mask=0x8 (arm REFUSED)",
                      "[TMC]    runtime write gate mask=0x8 (0=运行态条件全通,"]
 LEGACY_ROW = job(1, "FAILED", adc=0, sg=0, want=32, lo=250, hi=350)             # §5 行1 允许的旧终态
+
+
+# ==== F21(A 第 1 点): 逐步 arm gate mask 契约表(8 处 motor_status + 2 处 system_status) ========
+# 出处等级只有两个词: REAL = 这个 mask 形状在**本仓库归档的板子原始字节**里逐字存在;
+# DERIVED = 由源码门位 + 前一步实测推出来, 板上这一步还没抓过这一行。两种都必须写明依据。
+ARM_GATE_CONTRACT = [
+    ("sys_pre", ["0x18"], "REAL",
+     "supervisor.c:126 打的是同一个 motor_get_gate_fail_mask()(motor.c:894-917)。"
+     "bit3 protection-not-ready | bit4 drive-config-not-applied: 极性确认在 10、开 IRQ 在 11、"
+     "apply 在 6, 所以这一步四门里两门未过。原件 = 2026-11-05 F11/F20 现场两次逐字节相同的 "
+     "983 B/73abf3012386 捕获(行表 system_status 就是它)。"),
+    ("mot_pre", ["0x18"], "REAL",
+     "motor.c:2479-2480 打 arm_gate_mask 与 REFUSED/ALL-PASS。原件 = 1128 B/f0550d313164, "
+     "在 5 次归档会话 + F20 本会话逐字节相同(F20 的第二个首错正是这一行被当成业务拒绝)。"),
+    ("sys_after_apply", ["0x8"], "DERIVED",
+     "apply 成功清 bit4(motor.c:907 的 tmc2209_drive_config_ok_for_arm), 而 IRQ/极性仍未就绪 "
+     "=> 只剩 bit3=0x8。0x8 这个值本身有真实原件(motor_status 的 1080 B/fa69aa5cf5a1, "
+     "gate5 tmc_drive_cfg=CONFIGURED), 但**这一步(system_status)的 0x8 没在板上抓过**。"),
+    ("mot_after_irq", ["0x0"], "REAL",
+     "第 10 步极性 + 第 11 步开 IRQ => protection_ready(safety_thread.c:315 要 "
+     "st_irq_attached && st_polarity_validated)成立, bit3 清零; bit4 已在第 6 步清。原件 = "
+     "648 B/10807f63f02a(9 次归档一致, 头行就是 arm_gate_mask=0x0 ALL-PASS)。"),
+    ("mot_dir", ["0x0"], "REAL",
+     "motor.c:894-917 的七门里没有方向项, motor_dir 不置任何门位 => 仍 0x0。行表用同一份 "
+     "648 B 原件, 只把频率行的 dir 值按本步工况改成 1(登记在 derived_shape_rows)。"),
+    ("mot_armed", ["0x0"], "DERIVED",
+     "arm 之后 Safety 仍是 READY(进 RUN 的是 start 那一提交, motor.c:1674/1935 "
+     "mot_commit_run_start), 七门里没有 armed 项 => 预期全通。真实的 armed 件"
+     "(0x2/9005a306999a)同时显示 armed=1 与 mask=0x2, 说明置位的是 RUN 而不是 armed。"
+     "**这一行没有归档原件**: 现网没抓过 armed 且 READY 的 motor_status。"),
+    ("cruise", ["0x2"], "REAL",
+     "start 提交 SAFETY_RUN => motor.c:899 那条 `safety_state_get() != SAFETY_READY` 置 bit1。"
+     "原件 = 1026 B/9005a306999a 与 1025 B/57efcc7c90d5(运行中两次归档, 披露行都是 "
+     "arm_gate_mask=0x2 REFUSED + gate_reason=safety-not-READY)。"),
+    ("mot_after_cancel", ["0x2"], "REAL",
+     "取消学习作业不动电机也不动 Safety(diag_relative.c 的 cancel 只终结作业) => 仍 RUN, "
+     "同上两份原件。"),
+    ("stopped", ["0x0", "0x2"], "REAL",
+     "唯一一条**边界**, 按 A 的要求显式申报成枚举而不是统一放行: motor_stop 归零之后 RUN->READY "
+     "由 motor.c:1989 mot_commit_zero_ready 在 tick 里提交, 它要求 armed!=0 且 cur==tgt==0, "
+     "与本查询的先后不确定 => 两种值都合法。两个形状各自都有真实原件(0x2: 1074 B/98abbf2d18df "
+     "静止但 RUN 未落位的原件 + 上面两份运行中原件; 0x0: 648 B/10807f63f02a)。"
+     "集合外的任何值(0x8/0x18/0x20/0x40)都算保护链掉了, 具名停止。"),
+    ("mot_disabled", ["0x0"], "DERIVED",
+     "成功 disarm 把 Safety 收回 READY 是 R6-2 的产品修复, 已在板镜像 23691e8d 的源码里 => "
+     "这一步**必须** 0x0。归档里那份 post-disarm 仍打 0x2 的 1074 B/98abbf2d18df 属于 R6 之前的 "
+     "idle-stack-r4 会话, 不能拿来当这一步的预期; 现场若真打 0x2, 判据按 FIELD_VALUE_MISMATCH "
+     "停并把原字节留在盘上 —— 那正是要取证的事。"),
+]
+ARM_GATE_MASKS = {a: m for a, m, _g, _b in ARM_GATE_CONTRACT}
+ARM_GATE_PROVENANCE = {a: (g, b) for a, _m, g, b in ARM_GATE_CONTRACT}
+
+
+def _exe():
+    """契约的行正则/豁免模式一律取执行器里的单点常量, 本工具不另写一份正则。"""
+    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+    import importlib
+    return importlib.import_module("m8r3_serial_chain_r7f8")
+
+
+def _mask_row_prefix(exe, cmd):
+    # 行正则在第一个通配结构(?P<mask>)之前的确定前缀, 与豁免模式用同一个取前缀函数 ——
+    # 直接把正则文本切一半会把反斜杠也带进 expect_contains("\\[MOT\\]..."), 那种针正面要求不了任何行。
+    return exe.status_allow_literal_prefix(exe.ARM_GATE_MASK_ROWS[cmd])
+
+
+def apply_arm_gate_contract(st):
+    """给一条状态查询步装上门位契约: 逐值判据 + 正面要求 + 恰好对应的整行豁免。"""
+    exe = _exe()
+    cmd = (st.get("cmd") or "").split(" ")[0]
+    masks = ARM_GATE_MASKS[st.get("as")]
+    row, (refused, passed) = exe.ARM_GATE_MASK_ROWS[cmd], exe.ARM_GATE_MASK_TAILS[cmd]
+    ec = st.setdefault("expect_contains", [])
+    if len(masks) == 1:
+        needle = (exe.status_allow_literal_prefix(exe.arm_gate_refused_allow(cmd, masks[0]))
+                  if masks[0] != "0x0" else _mask_row_prefix(exe, cmd) + masks[0])
+        spec = {"row": row, "must": {"mask": masks[0],
+                                     "tail": passed if masks[0] == "0x0" else refused}}
+    else:
+        # 边界步只能要求两种形状的**共同前缀**: 现场一次只会出现其中一条, 钉死任一条就成假红。
+        needle = _mask_row_prefix(exe, cmd)
+        tails = [passed, refused] if "0x0" in masks else [refused]
+        spec = {"row": row, "must_one_of": {"mask": sorted(masks), "tail": sorted(tails)}}
+    for w in (needle,):
+        if w not in ec:
+            ec.append(w)
+    st["status_lines_allow"] = sorted(exe.arm_gate_refused_allow(cmd, m)
+                                      for m in masks if m != "0x0")
+    st["expect_values"] = (st.get("expect_values") or []) + [spec]
+    return spec
+
 
 
 def _inherited_tools():
@@ -181,10 +331,13 @@ def rows_doc():
     c = {
         "system_status": {"healthy": SYS_READY},
         "system_status_applied": {"healthy": SYS_READY_APPLIED},
-        "motor_status_idle": {"healthy": MOT_IDLE},
-        "motor_status_cruise": {"healthy": MOT_CRUISE},
-        "motor_status_armed_idle": {"healthy": MOT_ARMED_IDLE},
-        "motor_status_accel": {"healthy": MOT_ACCEL},
+        "motor_status_pre_apply": {"healthy": MOT_REAL_18},
+        "motor_status_idle": {"healthy": MOT_REAL_00},
+        "motor_status_ready_dir": {"healthy": MOT_REAL_00_DIR1},
+        "motor_status_armed_ready": {"healthy": MOT_ARMED_IDLE + [MOT_MASK_LINE["0x0"]]},
+        "motor_status_armed_idle": {"healthy": MOT_ARMED_IDLE + [MOT_MASK_LINE["0x2"]]},
+        "motor_status_cruise": {"healthy": MOT_CRUISE + [MOT_MASK_LINE["0x2"]]},
+        "motor_status_accel": {"healthy": MOT_ACCEL + [MOT_MASK_LINE["0x2"]]},
         "motor_arm": {"healthy": ARM_OK},
         "motor_disarm": {"healthy": DISARM_OK},
         "motor_stop": {"healthy": STOP_OK},
@@ -229,7 +382,9 @@ def rows_doc():
         "ls_done8": {"healthy": done_full(57)},
         "__watch__": {"healthy": ["[DIAG] quiet"]},
         # 固定清理三条按**命令名**查表, 与业务段同一张表但要各给一份(禁能快照 = 静止那份)。
-        "motor_status": {"healthy": MOT_IDLE},
+        # 这一条改用 0x0 的归档原件(13 行逐字), 因为 disable_contract 要的六组字段它全都有;
+        # 上一版用的是我手拼的六行声明形状。
+        "motor_status": {"healthy": MOT_REAL_00},
         "diag_status": {"healthy": ["[DIAG] mode=MONITOR_ONLY", "[DIAG] live sig=0 owner=FREE"]},
         "diag_profile_show": {"healthy": ["[DIAG] profile UNCONFIGURED pending=VALID "
                                           "id=57 rev=1 FIELD_UNVERIFIED"]},
@@ -260,13 +415,37 @@ def rows_doc():
                                     "sha256 73abf3012386…; 去掉首行命令回显与结尾 msh 提示符)。"
                                     "它不是工装造的: 上一版把 mask=0x18 记在 TMC 写门行、把 "
                                     "protect_ready 写成 YES, 现场实拍证明两处都不对, 而正是这个"
-                                    "错位让离线 stub 测不到披露行被误判成业务拒绝。"],
+                                    "错位让离线 stub 测不到披露行被误判成业务拒绝。",
+                                    "motor_status_pre_apply / motor_status(清理那一条) / "
+                                    "motor_status_idle —— 行内容改成 F21 读进来的**归档原件**: "
+                                    "1128 B/f0550d313164(R7F7 会话 15_mot_final.rx.bin, 与 R7F4 "
+                                    "写前那份逐字节相同的归档共 5 次 + F20 本会话第 6 次)与 "
+                                    "648 B/10807f63f02a(9 次归档一致)。口径按 A 的更正: "
+                                    "0x18 那一份是**F20 本会话首次取得**, 但同一身份的字节早已"
+                                    "归档在 5 次会话里, 上一版把历史样本漏了。取件与核验在 "
+                                    "_observed_mot_rows() 里, 字节或散列与登记不符就直接拒绝生成。"],
             "derived_shape_rows": ["system_status_applied —— 第 7 步(apply 后、irq_enable 前)的切片。"
                                    "token 取 supervisor.c:90 的实际打印(OPEN/CLOSED、"
                                    "CONFIRMED/not-confirmed), protect_ready 按 safety_thread.c:315 "
                                    "取 NO(第 10/11 步都还没跑), 披露行 mask 由现场实测 0x18 减去 "
                                    "apply 成功的 bit4(motor.c:907) 推得 0x8 —— 全部是**源码+前态推导**,"
-                                   " 不是这一步的板上实测。"],
+                                   " 不是这一步的板上实测。",
+                                   "motor_status_ready_dir —— 第 15 步(motor_dir 1 之后): 用 "
+                                   "648 B/10807f63f02a 的原件 13 行, 只把频率行的 dir 值改成 1 "
+                                   "(归档原件抓于 dir=0 时)。除这一格外逐字节同原件。",
+                                   "motor_status_armed_ready / motor_status_armed_idle —— "
+                                   "第 17/29 步的 armed 形状: 字段来自本包既有的声明形状"
+                                   "(现网没抓过 armed 的 motor_status), 披露行 arm_gate_mask="
+                                   "0x0/0x2 逐字取归档原件的形状(648 B/10807f63f02a 与 "
+                                   "1026 B/9005a306999a)。",
+                                   "motor_status_cruise / motor_status_accel —— 第 20/25 步与轮询:"
+                                   " 300 Hz/CRUISE/ACCEL 的字段是本包工况值(归档运行件是 100 Hz 的"
+                                   "会话), 只有披露行 arm_gate_mask=0x2 REFUSED 逐字取归档原件 "
+                                   "(1026 B/9005a306999a、1025 B/57efcc7c90d5)。",
+                                   "行表里 motor_status 的披露行只给**那一条** —— 板上 mask≠0 时"
+                                   "产品还会再打一条同名的裸行与 gate_reason/gate4..7 明细行"
+                                   "(motor.c:935-960), 那些行不含 REFUSED, 不参与业务失败扫描; "
+                                   "整段真实字节由矩阵的 MC 家族直接喂 assert_step 判, 不在这里仿造。"],
             "hardware_actions": 0},
         "commands": c}
 
@@ -283,7 +462,7 @@ def steps():
     # 1) 前态核对(全只读)
     add("sys_pre", "system_status", key="system_status", seconds=1,
         expect_contains=["=== SYSTEM STATUS ==="])
-    add("mot_pre", "motor_status", key="motor_status_idle", seconds=1,
+    add("mot_pre", "motor_status", key="motor_status_pre_apply", seconds=1,
         expect_contains=["[MOT] state=0", "[MOT] armed=0 drv_en_request=0"])
     add("irq_pre", "safety_irq_status", key="safety_irq_status_closed", seconds=1,
         expect_contains=["[SAFETY] irq gate   = CLOSED"])
@@ -316,13 +495,13 @@ def steps():
     # 5) DIR1 与静止复核
     add("dir", "motor_dir 1", key="motor_dir", seconds=2, expect_contains=["[MOT] dir=1"],
         quota={"name": "motor_dir", "n": 1})
-    add("mot_dir", "motor_status", key="motor_status_idle", seconds=1,
+    add("mot_dir", "motor_status", key="motor_status_ready_dir", seconds=1,
         expect_contains=["[MOT] state=0", "dir=1", "armed=0"])
     # 6) arm + 相邻状态(F3: 一场一次 arm; 义务从写入尝试起算)
     add("arm", "motor_arm", key="motor_arm", seconds=1,
         expect_contains=["ARMED (drv_en request=HIGH readback verified"],
         quota={"name": "motor_arm", "n": 1})
-    add("mot_armed", "motor_status", key="motor_status_armed_idle", seconds=1,
+    add("mot_armed", "motor_status", key="motor_status_armed_ready", seconds=1,
         expect_contains=["[MOT] armed=1 drv_en_request=1", "expected_ENN=LOW ENN_fb=0"])
     # 7) target + start + 有界轮询到 CRUISE(§4: start 尝试起 12 s)
     add("target", "motor_target 300", key="motor_target", seconds=2,
@@ -415,18 +594,18 @@ def steps():
     add("heap", "free", key="free", seconds=1,
         expect_contains=["total    :", "used     :", "maximum  :", "available:"])
 
-    # F19(现场 F11 暴露): 所有 `system_status` 查询步统一带上"门位披露行"的正面对策 ——
-    # ① 把这条行写进 expect_contains(披露必须被正面要求, 与运行期新增的强制同一口径),
-    # ② 整行锚定地申报 status_lines_allow, ③ 带 expect_values 硬字段(计划门也要求这条)。
-    # 起转/使能类步骤**不会**被这个循环碰到: 循环按 cmd 精确匹配 system_status, 而 validate-plan
-    # 那道门本来也只放行状态查询步。
+    # F19(现场 F11 暴露)+ F21(A 第 1 点): 查询步的"门位披露行"正面对策统一由门位契约表装配。
+    # F19 只给 system_status 装了豁免, 而且用的是通配 hex 的形状(任意 REFUSED 都放行); F21 把它
+    # 换成**逐步钉死预期 mask** —— 8 处 motor_status 全部进表, 预期 0x0 的步骤一条豁免都没有。
+    # 起转/使能/学习类步骤**不会**被这个循环碰到: 循环按 cmd 精确匹配两条状态查询, 而且
+    # validate-plan 的 R7F8F_ARM_GATE_MASK 会独立把每一条数出来(见契约表与判据行的 mask 列表)。
+    for st in s:
+        if st.get("as") in ARM_GATE_MASKS:
+            apply_arm_gate_contract(st)
+    # system_status 另有两个硬字段(Safety 状态/前态 motor 快照)与门位无关, 仍按源码形状申报。
     for st in s:
         if (st.get("cmd") or "").split(" ")[0] != "system_status":
             continue
-        ec = st.setdefault("expect_contains", [])
-        if "[Motor] arm gate fail mask=" not in ec:
-            ec.append("[Motor] arm gate fail mask=")
-        st["status_lines_allow"] = [SYS_GATE_DISCLOSE]
         spec = [{"row": r"^(?P<head>\[Safety\] state=(?P<st>[A-Z_]+) fault=(?P<fault>[0-9])"
                           r" irq_gate=(?P<irq>[A-Z_]+) polarity=(?P<pol>[A-Za-z-]+)"
                           r" protect_ready=(?P<pr>[A-Z]+))$",
@@ -481,6 +660,27 @@ def plan_doc():
     if bad_poll:
         raise SystemExit("WINDOW_TABLE_REFUSED|申报的总窗过不了执行器自己的校验: %s" % bad_poll[:4])
     bs = exe.business_segments_ruling(st, cap=12, reserve=7, total=90)
+    # 门位契约表进计划: 每条都带预期 mask、出处等级(REAL/DERIVED)与依据, 复核者不需要信我手工数的
+    # "7 处"。下面这条拒绝先证**覆盖**: 计划里凡是 motor_status / system_status 的步, 都必须在这张
+    # 表里有一条; 少一步就不产出(契约表与步骤表分叉正是 F20 那两个首错的形状)。
+    contract_as = [a for a, _m, _g, _b in ARM_GATE_CONTRACT]
+    covered = [x.get("as") for x in st
+               if (x.get("cmd") or "").split(" ")[0] in exe.ARM_GATE_MASK_ROWS]
+    if sorted(covered) != sorted(contract_as):
+        raise SystemExit("MASK_CONTRACT_REFUSED|契约没覆盖全部状态查询步: 计划里=%s 契约表=%s"
+                         % (covered, contract_as))
+    by_as = {x.get("as"): x for x in st}
+    mask_table = []
+    for a, masks, grade, basis in ARM_GATE_CONTRACT:
+        step = by_as[a]
+        mask_table.append({
+            "as": a, "cmd": step["cmd"], "rows_key": step.get("key") or step["cmd"],
+            "expect_arm_gate_mask": masks,
+            "asserted_by": ("must_one_of" if len(masks) > 1 else "must"),
+            "source_grade": grade, "basis": basis,
+            "status_lines_allow": list(step.get("status_lines_allow") or []),
+            "positive_requirement": [w for w in (step.get("expect_contains") or [])
+                                     if "arm_gate_mask" in w or "arm gate fail mask" in w]})
     return {
         "package": "M8-R7F8F-FIELD-ONE-SESSION",
         "status": "OFFLINE_CANDIDATE_NOT_AUTHORIZED_NOT_EXECUTED",
@@ -488,6 +688,29 @@ def plan_doc():
         "numbers_are_proposals_not_authorization": True,
         "hardware_actions_this_round": 0,
         "rows_file": "rows_r7f8f_real.json",
+        exe.ARM_GATE_MASK_CONTRACT_KEY: exe.ARM_GATE_MASK_CONTRACT_VERSION,
+        "arm_gate_mask_contract_steps": mask_table,
+        "arm_gate_mask_contract_note": (
+            "A F21 第 1 点: 原 38 步表里 motor_status 有 8 处(含 stopped / mot_disabled)、"
+            "system_status 有 2 处, 这 10 处**逐条**申报预期 arm gate mask 与是否需要豁免; "
+            "预期 0x0 的 5 处一条豁免都没有(所以现场打出 REFUSED 会按 BUSINESS_FAILED 停), "
+            "唯一的边界步 stopped 用 must_one_of 枚举 0x0|0x2, 不给所有查询统一放行任意 REFUSED。"
+            "动作被产品拒绝(motor_arm/motor_start/learn 的 REFUSED)与查询自身失败"
+            "(diag_relative.c:2041 的 learn_status REFUSED)继续 STOP —— 豁免只给状态披露行。"),
+        # A F21 第 2 点: "旧计划判据没删"不等于新计划**继承**了旧披露合同。旧冻结计划里凡是本包
+        # 步序产生不出的披露形状, 都要在这里**点名不继承 + 给可按步序复算的理由**; 矩阵的 MC10
+        # 会拿这个 window_check 去步骤表里查那段窗口, 查到同类查询步就判红。
+        "arm_gate_mask_contract_not_inherited": [{
+            "cmd": "motor_status", "mask": "0x8",
+            "declared_by": ["R7F4 plan_r7f4_b502_configured_reviewed.json/mot_post",
+                            "R7F5 plan_r7f5_b502_blind_irq_static.json/mot_cfg"],
+            "reason": "本包在 tmc_config_apply(第 6 步)之后、safety_irq_enable(第 11 步)之前"
+                      "**不发 motor_status** —— 那段 0x8 窗口里唯一的查询是第 7 步 system_status, "
+                      "它已按预期 0x8 申报豁免。所以不是一条豁免被删掉, 而是这个形状在本计划里"
+                      "没有对应的查询步; 现场若在别的时刻打出 motor_status 0x8, 按 BUSINESS_FAILED 停。",
+            "window_check": {"after_step": "apply", "before_step": "irq_en",
+                             "cmd": "motor_status"}}],
+
         "needles_file": None,
         "scope_this_package": (
             "在板固件 23691e8d… 身份连续(§4), 本轮唯一动作 = COM5 一次会话里跑 §5 的 15 步 + "

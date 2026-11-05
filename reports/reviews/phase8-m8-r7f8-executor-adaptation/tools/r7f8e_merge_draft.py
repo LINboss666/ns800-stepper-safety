@@ -39,7 +39,11 @@ def head_merged_blob(repo):
 OLD_ORIG_BYTES = 24780
 OLD_ORIG_SHA12 = "b572c1928f60"
 # 记录节里的本轮名与承接件路径由 --label / --updated 当场填, 不留上一轮的措辞。
+# 快照的**作者**同样要当场说: 上一轮的快照是 A 包里的原件, 本轮(F21)的快照是我在上一版正文
+# 之上追加的修订 —— 那句话如果继续写"承接 A 的修订快照", 就是把 agent 的改动冒充成 A 签收件。
 LABEL = "R7F8F 预算裁定落地轮"
+DATE = "2026-11-05"
+SNAPSHOT_PROVENANCE = "A 包内 SHA256SUMS 覆盖的原件, 本工具只读不改"
 SRC_REL = "-"
 
 
@@ -66,12 +70,17 @@ def main() -> int:
     ap.add_argument("--updated", required=True, type=pathlib.Path)
     ap.add_argument("--label", default="R7F8F 预算裁定落地轮",
                     help="写进合并记录节标题的本轮名(每条判据的来源要能被复算)")
+    ap.add_argument("--date", default="2026-11-05", help="记录节标题里的本轮日期")
+    ap.add_argument("--snapshot-provenance",
+                    default="A 包内 SHA256SUMS 覆盖的原件, 本工具只读不改",
+                    help="本次修订快照是**谁**写的(A 签收件 / agent 在上一版正文上追加)——"
+                         "这句不能沿用上一轮, 否则把 agent 的改动冒充成 A 签收件")
     a = ap.parse_args()
     repo = a.repo.resolve()
     merged_p = repo / MERGED_REL
     updated_p = a.updated.resolve()
-    global LABEL, SRC_REL
-    LABEL = a.label
+    global LABEL, DATE, SNAPSHOT_PROVENANCE, SRC_REL
+    LABEL, DATE, SNAPSHOT_PROVENANCE = a.label, a.date, a.snapshot_provenance
     try:
         SRC_REL = updated_p.relative_to(repo).as_posix()
     except ValueError:
@@ -127,12 +136,12 @@ def main() -> int:
     exe_b, exe_s = disk_id(ADAPT + "tools/m8r3_serial_chain_r7f8.py")
     record = [
         "", "---", "",
-        "## 本次合并与修订记录（%s, 2026-11-05）" % LABEL,
+        "## 本次合并与修订记录（%s, %s）" % (LABEL, DATE),
         "",
-        "- 本节以下的**正文**逐字承接 A 的修订快照（不是我的重写，也不是脚本拼装）：",
+        "- 本节以下的**正文**逐字承接本次修订快照（%s）：" % SNAPSHOT_PROVENANCE,
         "  去掉本记录节与它前面的分隔线之后，与承接件按行逐字节相等；",
         "  复算口径见本工具输出的 `INHERIT_EXACT|...` 一行。",
-        "- 承接来源: `%s`（A 包内 SHA256SUMS 覆盖的原件, 本工具只读不改）。" % SRC_REL,
+        "- 承接来源: `%s`。" % SRC_REL,
         "- 上一版合并件: %d B, sha256 前缀 `%s`（提交 `%s` = 本工具取 HEAD 的 blob, 不再手写）。"
         "它的内容不回改, 历史身份由 Git blob 承担。"
         % (old_merged_bytes, old_merged_sha12, old_merged_commit),
