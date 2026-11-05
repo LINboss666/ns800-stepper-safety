@@ -222,19 +222,21 @@ def main() -> int:
     fails_line = [l for l in (vp + vpe).splitlines() if "|FAIL|" in l]
     note("VALIDATE_PLAN_RAN", rc in (0, 1) and bool(sm),
          "%s; FAIL 行=%d" % (sm[-1] if sm else "没有汇总行", len(fails_line)))
-    # 关键: 不写"FAIL 行必须为 0"这种一刀切门 —— 那会把**已知要报给 A 的两条静态预算红**藏进
-    # "工具自己没跑成"里。这里改成点名: 红项集合必须**恰好**等于登记的两条, 多一条少一条都判红。
+    # 关键: 不写"FAIL 行必须为 0"这种一刀切门 —— 上一版正是用它把**两条要报给 A 的静态预算红**
+    # 藏在"工具自己没跑成"里。改成点名: 红项集合必须**恰好**等于登记集合。裁定落地后登记集合是
+    # 空集 => 任何一条新红(包括有人把旧语义偷偷改回来)都会当场具名判红。
     opened = sorted({l.split("|")[0] + ":" + (l.split("|")[1] if len(l.split("|")) > 1 else "")
                      for l in fails_line})
-    expect_open = sorted(["PLAN_BUSINESS_RESERVE_SPLIT:S1", "PLAN_BUSINESS_WORST_CASE_FIT:S1"])
+    expect_open = sorted([])
     note("VALIDATE_PLAN_FAIL_SET_EXACTLY_AS_REGISTERED", opened == expect_open,
-         "实开=%s 登记=%s | 原文: %s" % (opened, expect_open,
-                                        " ;; ".join(l[:150] for l in fails_line)[:400]))
+         "实开=%s 登记=%s(A 预算裁定 2026-11-05 落地后登记集合为空集; 上一版这里是两条红: "
+         "PLAN_BUSINESS_RESERVE_SPLIT:S1 / PLAN_BUSINESS_WORST_CASE_FIT:S1) | 原文: %s"
+         % (opened, expect_open, " ;; ".join(l[:150] for l in fails_line)[:400]))
     gate_names = sorted({l.split("|")[0] for l in vp.splitlines() if "|" in l})
     for must in ("PLAN_CLEANUP_RESERVE", "PLAN_BUSINESS_RESERVE_SPLIT",
                  "PLAN_BUSINESS_WORST_CASE_FIT", "PLAN_MOTION_CAP_BUDGET", "PLAN_QUOTA_NEED",
                  "PLAN_IMAGE_IDENTITY_CONSISTENCY", "PLAN_SPINUP_GATE_COVERAGE",
-                 "R7F8E_ARM_ENERGIZE"):
+                 "R7F8E_ARM_ENERGIZE", "PLAN_STEP_TOTAL_WINDOWS"):
         note("GATE_PRESENT|%s" % must, must in gate_names, "出现在 validate-plan 输出里")
 
     # 收口预留的**安全算术**: 预留容得下五条各自的确认窗, 且 cap+预留 排得进总窗。
@@ -247,27 +249,30 @@ def main() -> int:
     sp = [l for l in body if l.startswith("PLAN_BUSINESS_RESERVE_SPLIT|S1|")]
     seg = {}
     if sp:
-        for mo in re.finditer(r"(pre|in_motion|post_stop)=([0-9.]+)/([0-9.]+)\((\d+)步\)", sp[0]):
-            seg[mo.group(1)] = {"declared": float(mo.group(2)), "bound": float(mo.group(3)),
-                                "steps": int(mo.group(4))}
+        for mo in re.finditer(r"(pre_start|motion_active|post_zero)=([0-9.]+)\((\d+)步\)", sp[0]):
+            seg[mo.group(1)] = {"declared": float(mo.group(2)), "steps": int(mo.group(3))}
         for mo in re.finditer(r"cap=([0-9.]+) reserve=([0-9.]+) total=([0-9.]+) "
-                              r"worst=([0-9.]+) after_spin=([0-9.]+)", sp[0]):
+                              r"business_total=([0-9.]+) worst=([0-9.]+) "
+                              r"cons_total=([0-9.]+) cons_arm=([0-9.]+|None)", sp[0]):
             seg["cap"], seg["reserve"], seg["total"] = (float(mo.group(1)), float(mo.group(2)),
                                                         float(mo.group(3)))
-            seg["worst"], seg["after_spin"] = float(mo.group(4)), float(mo.group(5))
+            seg["business_total"], seg["worst"] = float(mo.group(4)), float(mo.group(5))
+            seg["cons_total"], seg["cons_arm"] = float(mo.group(6)), mo.group(7)
     n_cmd = len([s for s in doc["stages"][0]["steps"] if s.get("cmd")])
     note("PLAN_BUSINESS_SEGMENTS_NO_DOUBLE_COUNT",
-         bool(seg) and set(seg) >= {"pre", "in_motion", "post_stop"} and
-         seg["pre"]["steps"] + seg["in_motion"]["steps"] + seg["post_stop"]["steps"] == n_cmd and
-         abs(seg["worst"] - (seg["pre"]["declared"] + seg["cap"])) < 1e-6 and
-         abs(seg["after_spin"] -
-             (seg["in_motion"]["declared"] + seg["post_stop"]["declared"])) < 1e-6,
-         "三段步数 %d+%d+%d==%d(不重不漏) worst=%s==pre_declared %s + cap %s(cap 只加一次) "
-         "after_spin=%s" % (seg.get("pre", {}).get("steps", -1),
-                            seg.get("in_motion", {}).get("steps", -1),
-                            seg.get("post_stop", {}).get("steps", -1), n_cmd,
-                            seg.get("worst"), seg.get("pre", {}).get("declared"),
-                            seg.get("cap"), seg.get("after_spin")))
+         bool(seg) and set(seg) >= {"pre_start", "motion_active", "post_zero"} and
+         seg["pre_start"]["steps"] + seg["motion_active"]["steps"] +
+         seg["post_zero"]["steps"] == n_cmd and
+         abs(seg["worst"] - (seg["pre_start"]["declared"] + seg["cap"])) < 1e-6 and
+         abs(seg["business_total"] - (seg["pre_start"]["declared"]
+                                      + seg["motion_active"]["declared"]
+                                      + seg["post_zero"]["declared"])) < 1e-6,
+         "三段步数 %d+%d+%d==%d(不重不漏) worst=%s==pre_start %s + cap %s(cap 只加一次) "
+         "总窗合计=%s==三段之和" % (seg.get("pre_start", {}).get("steps", -1),
+                                  seg.get("motion_active", {}).get("steps", -1),
+                                  seg.get("post_zero", {}).get("steps", -1), n_cmd,
+                                  seg.get("worst"), seg.get("pre_start", {}).get("declared"),
+                                  seg.get("cap"), seg.get("business_total")))
     note("PLAN_BUSINESS_MIRROR_SAME_VALUE",
          bool(sp) and "mirror=一致" in sp[0] and
          bool(doc["motion_budget"].get("business_segments")),
@@ -275,17 +280,31 @@ def main() -> int:
          ("有" if bool(doc["motion_budget"].get("business_segments")) else "无",
           (sp[0][:300] if sp else "没有 SPLIT 行")))
     note("PLAN_POST_SPIN_CONTENT_FITS_CAP",
-         bool(seg) and seg["after_spin"] <= seg["cap"] + 1e-9,
-         "§4 固定 cap=%s s, 而起转后申报内容=%s s(运动窗内 %s + 停机后 %s)。执行器在 motor_start "
-         "写入尝试时置 t0 且**正常 stop 不清**, 所以 §5 行 12 之后的 disarm/commit/ps/free 同被 "
-         "t0+cap 夹住 => 这一条要 A 定口径(放宽 cap / 认可零速确认后解除运动 cap / 把行 14-15 挪到"
-         "下一会话), 本轮不自行选择" % (seg.get("cap"), seg.get("after_spin"),
-                                        seg.get("in_motion", {}).get("declared"),
-                                        seg.get("post_stop", {}).get("declared")))
+         bool(seg) and sp and "|PASS|" in sp[0] and
+         seg["motion_active"]["declared"] <= seg["cap"] + 1e-9 and
+         "zero@None" not in sp[0] and
+         seg["motion_active"]["declared"] + seg["post_zero"]["declared"] > seg["cap"],
+         "裁定一之后的判法: 运动 cap 只管**起转→可信零速确认**这一段 => 活动内容=%s s <= cap=%s s; "
+         "零速确认那一步必须申报(否则运动计时不解除, 这条判红); 而停机后内容 %s s **不再**叠进 "
+         "cap(改由 83 s 业务截止约束)。上一版这条红(23.0 > 12)的成因是旧语义\"stop 不解除运动计时\"; "
+         "旧数仍原样留在 validate-plan 的 LEGACY_SEMANTICS 行里" %
+         (seg.get("motion_active", {}).get("declared"), seg.get("cap"),
+          seg.get("post_zero", {}).get("declared")))
     wc = [l for l in body if l.startswith("PLAN_BUSINESS_WORST_CASE_FIT|S1|")]
-    note("PLAN_WORST_CASE_TAIL_FITS_SESSION", bool(wc) and "|PASS|" in wc[0],
-         "每步都慢到 SLACK 上限时的最坏情况(与执行器同一条 min() 逐步仿真): %s" %
-         (wc[0][:320] if wc else "没有该行"))
+    stw = [l for l in body if l.startswith("PLAN_STEP_TOTAL_WINDOWS|S1|")]
+    note("PLAN_WORST_CASE_TAIL_FITS_SESSION",
+         bool(wc) and "|PASS|" in wc[0] and bool(seg) and
+         seg["business_total"] + seg["reserve"] <= seg["total"] + 1e-9 and
+         bool(stw) and "|PASS|" in stw[0] and "declared=38/38" in stw[0],
+         "裁定二之后的判法: 每步的总窗**已含全部等待与余量**(不再叠 SLACK), 所以核的是"
+         "38 步总窗合计 + 预留 <= 总窗: %s; 单步总窗申报齐全性: %s" %
+         (wc[0][:220] if wc else "没有 WORST_CASE_FIT 行",
+          stw[0][:170] if stw else "没有 STEP_TOTAL_WINDOWS 行"))
+    lg = [l for l in body if l.startswith("PLAN_BUSINESS_RESERVE_SPLIT_LEGACY_SEMANTICS|S1|")]
+    note("LEGACY_RED_TEXT_KEPT_VERBATIM",
+         bool(lg) and "legacy_pre_bound=91.0" in lg[0] and "legacy_after_spin=23.0" in lg[0],
+         "A 的 §4 末条: 原来 91/23 两条红的原文继续保留并注明对应旧语义 => 转绿是语义变了, "
+         "不是把数改了: %s" % (lg[0][:230] if lg else "没有 LEGACY_SEMANTICS 行"))
     # 两条元负控(A 的 §3.2: 新门必须能自证"不是恒绿"), 都只跑 --validate-plan(纯静态读):
     #   ① 计划申报的镜像**故意**漂一格 => 执行器必须点名 => "同一值"这条不是空转。
     #   ② 把执行器的 worst_declared 改回**重复计时**(起转前 + cap + 停机后) => 现场计划必须
@@ -309,20 +328,24 @@ def main() -> int:
                                                                  else "没有该行"))
     mut = work / "neg_double_count"
     mut.mkdir(parents=True, exist_ok=True)
+    # 元负控②(A 裁定后的新形状): 把"停机后内容"再折回**运动 cap** 里(= 不承认零速解除计时,
+    # 也就是裁定前的双算形状) => 现场计划必须因**算术**判红(不是靠镜像漂移)。锚点是裁定落地
+    # 后那条 `act = bs["motion_active_seconds"]` —— 改它等于把旧语义偷偷加回来。
     mtext = exe_b.decode("utf-8").replace(
-        'out["worst_declared"] = round(out["pre_declared"] + out["window_seconds"], 3)',
-        'out["worst_declared"] = round(out["pre_declared"] + out["window_seconds"]\n'
-        '                             + out["post_stop_declared"], 3)  # META: 把双算加回来')
+        '                act = bs["motion_active_seconds"]\n'
+        '                if bs["zero_confirm_index"] is None:',
+        '                act = round(bs["motion_active_seconds"] + bs["post_zero_seconds"], 3)\n'
+        '                if bs["zero_confirm_index"] is None:')
     note("META_MUTATION_ANCHOR_HIT", mtext != exe_b.decode("utf-8"),
-         "突变锚点(business_segments 里 worst_declared 那一行)在派生件里恰好命中一次")
+         "突变锚点(裁定后那条 act=活动内容)在派生件里恰好命中一次")
     (mut / "exe.py").write_text(mtext, encoding="utf-8", newline="\n")
     rc_m, vp_m, _em = run([sys.executable, str(mut / "exe.py"), "--validate-plan",
                            "--plan", str(plan), "--repo-root", str(repo),
                            "--app-dir", str(repo / APP_REL)], repo)
     sp_m = [l for l in vp_m.splitlines() if l.startswith("PLAN_BUSINESS_RESERVE_SPLIT|")]
     note("META_DOUBLE_COUNT_COMES_BACK_GOES_RED", bool(sp_m) and "|FAIL|" in sp_m[0] and
-         "漂移" in sp_m[0],
-         "把停机后那段重新加进 worst_declared(=修前的双算形状)后, 现场计划判读=%s" %
+         "活动内容" in sp_m[0] and "漂移" not in sp_m[0],
+         "把停机后内容重新折进运动 cap(=旧语义)后, 现场计划判读=%s" %
          (sp_m[0][:300] if sp_m else "没有该行"))
 
     note("FIELD_PLAN_PREREQ_NOT_SELF_CERTIFIED",
@@ -345,7 +368,7 @@ def main() -> int:
          doc["stages"][0]["cleanup_reserve_seconds"] == 7,
          "§4 固定值未动: cap=12 arm=18 total=90 reserve=7; 三段互不重叠的最坏业务"
          "(起转前申报 %s + cap 12)=%s s, 预留 7 s 由执行器 business_abs_dl=83 s 硬夹保住" %
-         (doc["motion_budget"]["business_segments"]["pre_declared"],
+         (doc["motion_budget"]["business_segments"]["pre_start_seconds"],
           doc["motion_budget"]["business_worst_declared_seconds"]))
     note("FIELD_FLAGS_STAY_FALSE",
          doc["field_boundary"]["polarity_measured"] is False and
@@ -476,6 +499,76 @@ def main() -> int:
          "畸形行表(healthy 分支整个缺席)在开端口之前裸 KeyError 退出: rc=%s 台账无 TX; "
          "traceback 末行=%s" % (probe["rc"],
                                [l for l in probe["err"].splitlines() if l.strip()][-1][:160]))
+
+    # -------------------------------------------------- G) 裁定一/二的整包侧行为(§5 相关项)
+    led0 = [x.get("kind") for x in r["led"]]
+    note("RUN_ZERO_SNAPSHOT_RELEASES_MOTION_TIMER",
+         "MOTION_TIMER_ENDED" in led0 and "MOTOR_STOP_CONFIRMED" in led0
+         and bool(res) and res.get("success") is True,
+         "整包正常场: 台账事件=%s(先 stop 确认且 ends_motion_timer=False, 后由 as=stopped 那份"
+         "可信零速快照解除运动计时), 且整场仍然成功收口(disarm=%s) —— 证明释放点在实际执行路径"
+         "上被证据门控制, 不是只在静态表上切开" %
+         ([e for e in led0 if e and ("MOTION" in e or "STOP_CONFIRM" in e or "DISARM" in e)],
+          res.get("disarm")))
+    ev0 = [x for x in r["led"] if x.get("kind") == "MOTION_TIMER_ENDED"]
+    note("RUN_MOTION_TIMER_ELAPSED_WITHIN_CAP",
+         bool(ev0) and float(ev0[0].get("elapsed_from_start_s", 99)) <= 12.0
+         and ev0[0].get("arm_deadline_kept") is True,
+         "零速确认发生在起转后 %s s(cap 12 s 内), 且事件里明写 arm 通电截止**未被解除**=%s" %
+         (ev0[0].get("elapsed_from_start_s") if ev0 else "-",
+          ev0[0].get("arm_deadline_kept") if ev0 else "-"))
+    variant("zero_evidence_illegal_window",
+            plan_patch=lambda d: d["stages"][0]["steps"][29].update(
+                {"step_total_seconds": 0}),
+            expect_contains=["STEP_TOTAL_SECONDS_INVALID"], expect_no_tx=["free"])
+    # 裁定二第 3 条"未申报的旧计划不改": 拿 A 包里的**裁定前基准件**再跑一次 validate-plan,
+    # 它必须仍然报 zero@None + 两条红 + 91/23 的旧口径 —— 这条证的正是"我没有回头改旧字节"。
+    # 基准件的 rows_file 是**相对计划文件**解析的, 所以把两件原字节并到一个仓外目录再跑;
+    # 跑之前先核原件 sha, 保证被测的就是 A 钉的那份字节。
+    ref = repo / "reports/reviews/phase8-m8-r7f8-executor-adaptation/inputs" \
+               "/A_R7F8F_BUDGET_PKG/reference_plan_6f2b12f.json"
+    ref_rows = repo / "reports/reviews/phase8-m8-r7f8-executor-adaptation/inputs" \
+                  "/A_R7F8F_BUDGET_PKG/reference_rows_6f2b12f.json"
+    rdir = work / "preruling_ref"
+    rdir.mkdir(parents=True, exist_ok=True)
+    (rdir / "rows_r7f8f_real.json").write_bytes(ref_rows.read_bytes())
+    (rdir / "plan.json").write_bytes(ref.read_bytes())
+    rc_r, vp_r, _e = run([sys.executable, str(exe), "--validate-plan",
+                          "--plan", str(rdir / "plan.json"), "--repo-root", str(repo),
+                          "--app-dir", str(repo / APP_REL)], repo)
+    line_r = [l for l in vp_r.splitlines() if l.startswith("PLAN_BUSINESS_RESERVE_SPLIT|S1|")]
+    wc_r = [l for l in vp_r.splitlines() if l.startswith("PLAN_BUSINESS_WORST_CASE_FIT|S1|")]
+    leg_r = [l for l in vp_r.splitlines()
+             if "LEGACY_SEMANTICS|S1|INFO" in l and "legacy_pre_bound=91.0" in l
+             and "legacy_after_spin=23.0" in l]
+    # 这条判据有 6 个合取项, 上一版红了却不说是哪一项红的 —— 逐条算出来并写进回执。
+    cla = {
+        "SPLIT红": bool(line_r) and "|FAIL|" in line_r[0],
+        "SPLIT里zero@None": bool(line_r) and "zero@None" in line_r[0],
+        "WORST红": bool(wc_r) and "|FAIL|" in wc_r[0],
+        "LEGACY行91/23在位": bool(leg_r),
+        "基准件sha前缀66ca8a15": hashlib.sha256(ref.read_bytes()).hexdigest().startswith("66ca8a15"),
+        "仓外副本与原件逐字节相等": hashlib.sha256((rdir / "plan.json").read_bytes()).hexdigest()
+        == hashlib.sha256(ref.read_bytes()).hexdigest(),
+    }
+    note("PRE_RULING_REFERENCE_PLAN_STILL_RED_UNCHANGED", all(cla.values()),
+         "A 包里那份裁定前基准件(sha 66ca8a15…, 原字节复制到仓外后与原件逐字节相同)重跑仍是旧"
+         "语义: 合取项=%s ;; SPLIT=%s ;; LEGACY=%s ;; WORST=%s(validate-plan 的退出码不参与本判据:"
+         " 它在有 FAIL 时仍返回 0, 红与绿一律看行里的 |FAIL|/|PASS|)" %
+         (json.dumps(cla, ensure_ascii=False),
+          line_r[0][:200] if line_r else "-", leg_r[0][:150] if leg_r else "-",
+          wc_r[0][:150] if wc_r else "-"))
+    # 上一版这条判据里的"逐字节相等"合取项写成了**两个 sha256 对象相比**(没有 .hexdigest()),
+    # 对象比较恒为 False => 这一项从写下那天起就是死码, 把整条判据钉成红。修好之后必须证明
+    # 它"会翻": 故意在副本尾部多写一个空格, 这一项就该假 —— 防止再出现恒真/恒假的合取项。
+    (rdir / "plan_mutated.json").write_bytes(ref.read_bytes() + b" ")
+    byte_cmp = lambda p: (hashlib.sha256(p.read_bytes()).hexdigest()
+                          == hashlib.sha256(ref.read_bytes()).hexdigest())
+    note("PRE_RULING_BYTECMP_CLAUSE_FIRES_ON_MUTATION",
+         byte_cmp(rdir / "plan.json") is True and byte_cmp(rdir / "plan_mutated.json") is False,
+         "同一份原件 vs 逐字节副本=%s / vs 尾部多一个空格的副本=%s (True/False 才对: 这一项既不是"
+         "恒真也不是恒假死码)" % (byte_cmp(rdir / "plan.json"),
+                                  byte_cmp(rdir / "plan_mutated.json")))
 
     # ---------------------------------------------------------------- 3) 本轮无设备动作
     # 不靠"我自己说没开端口": 把每一次 dispatch 的**台账里** PORT_OPEN 事件全捞出来判 ——

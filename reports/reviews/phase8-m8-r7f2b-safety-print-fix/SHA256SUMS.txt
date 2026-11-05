@@ -1,5 +1,5 @@
 # sha256 * <仓库相对路径>(LF, 无 BOM; 本清单不哈希自身字节 —— 一条清单不能给自己的字节作证)
-# 生成方式: 沿用该目录既有规则: 按**文件名**排除 SHA256SUMS.txt(含 a_review_r7f*/ 四份 A 包子清单)与 remote_readback.md; §20/§21 由 R7F7 轮追加, §22 由 R7F8 草案核对轮追加, §23 由 R7F8E 执行器离线适配轮追加, 条目集合不变
+# 生成方式: 沿用该目录既有规则: 按**文件名**排除 SHA256SUMS.txt(含 a_review_r7f*/ 四份 A 包子清单)与 remote_readback.md; §20/§21 由 R7F7 轮追加, §22 由 R7F8 草案核对轮追加, §23 由 R7F8E 执行器离线适配轮追加, §24 由 R7F8F 返修+整包轮追加(其中 §24.8~§24.11 是 A 预算裁定的落地记录), 条目集合不变
 # 条目数=228; 与 Git blob 的逐条复算由 tools/r7f8_staged_preflight.py(提交前)与推送后的远端逐 blob 回读完成
 # 重新生成: python reports/reviews/phase8-m8-r7f8-executor-adaptation/tools/r7f8e_make_sums.py --repo <仓库根>(上一版生成器 r7f8_make_sums.py 的说明行冻结在 §22, 再跑会把本节改回旧口径)
 37c18065f659b6c4d437e53753445b4d6c48765a23dff6322d060debbe9fb90e  reports/reviews/phase8-m8-r7f2b-safety-print-fix/a_review_r7f3/full_stub_dispatch_ledger.jsonl
@@ -220,7 +220,7 @@ ba3c9ce36fb3b1316c8e664c0088640389e804d4e4dc65f1ea9e4b95f1fa182f  reports/review
 41f00d4920d1424ec3a3e57d3ef25b499f674f96af31c39ed4ab260745fc5e43  reports/reviews/phase8-m8-r7f2b-safety-print-fix/offline_r7f5a/summary.json
 5aea0b01de0dd4e3a25128887dd1a68f07dd21e971acfc07e9a9b0cded82fbfd  reports/reviews/phase8-m8-r7f2b-safety-print-fix/offline_r7f5a/validate_plan_local.txt
 4127a53d10aa2b20faf30bcb0616f4a3dae0a12a7bf2ba8a689d34fdaacfe47a  reports/reviews/phase8-m8-r7f2b-safety-print-fix/remote_readback_r7f5a_at_531f255.txt
-6fe722b4814d6a16cd647d7686a2b4724ca2d593e679d3d5008ba268c23a6d9a  reports/reviews/phase8-m8-r7f2b-safety-print-fix/run_record.md
+85bb2bcf07104b3c2ff6912e98b0dd14997e63e18d10ec0d4bf0a66e5933df74  reports/reviews/phase8-m8-r7f2b-safety-print-fix/run_record.md
 224fbb493f63ebedaa1ba1e228a56dea31ce2f600af964d7c41e45cdf0a78223  reports/reviews/phase8-m8-r7f2b-safety-print-fix/tools/gen_handoff_r7f5_registered.py
 2d19bcb888d0de673e47e278a1cb160d014353cdda71c8e8708d2cc4f7eec0b2  reports/reviews/phase8-m8-r7f2b-safety-print-fix/tools/gen_handoff_r7f5a_registered.py
 daa2f0a30bab22f9b782cf5e089c371f3a16f25c2dcd074630e6563e5deeab64  reports/reviews/phase8-m8-r7f2b-safety-print-fix/tools/r7f5_registered_checks.py

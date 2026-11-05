@@ -207,38 +207,40 @@
     "arm_energize_deadline_seconds": 18,
     "session_total_seconds": 90,
     "cleanup_reserve_seconds": 7,
-    "business_worst_declared_seconds": 46.0,
+    "business_worst_declared_seconds": 43.0,
     "business_segments": {
+      "semantics": "A_BUDGET_RULING_20261105(motion ends at trusted zero snapshot; per-step total window without extra SLACK)",
       "spin_up_index": 19,
-      "stop_index": 28,
-      "pre_steps": 19,
-      "pre_declared": 34.0,
-      "pre_bound": 91.0,
-      "in_motion_steps": 9,
-      "in_motion_declared": 11.0,
-      "in_motion_bound": 38.0,
-      "post_stop_steps": 10,
-      "post_stop_declared": 12.0,
-      "post_stop_bound": 42.0,
-      "window_seconds": 12.0,
-      "worst_declared": 46.0,
-      "worst_bound": 171.0,
-      "after_spin_declared": 23.0,
-      "after_spin_bound": 80.0,
+      "stop_request_index": 28,
+      "zero_confirm_index": 29,
+      "arm_index": 16,
+      "disabled_confirm_index": 31,
+      "pre_start_steps": 19,
+      "motion_active_steps": 11,
+      "post_zero_steps": 8,
+      "pre_start_seconds": 31.0,
+      "motion_active_seconds": 9.0,
+      "post_zero_seconds": 7.5,
+      "window_seconds": 12,
+      "reserve_seconds": 7,
+      "session_total_seconds": 90,
+      "stop_send_after_start_s": 7.5,
+      "zero_confirm_after_start_s": 9.0,
+      "arm_to_disabled_s": 13.0,
+      "business_total_seconds": 47.5,
       "business_budget_seconds": 83.0,
-      "sim_end_seconds": 83.0,
-      "first_step_refused_before_write": {
-        "index": 18,
-        "as": "target",
-        "cmd": "motor_target 300",
-        "t_s": 83.0,
-        "want_seconds": 2.0,
-        "slack_seconds": 3.0,
-        "cap_or_budget_ceiling_s": 83.0
-      }
+      "worst_declared": 43.0,
+      "conservative_total_with_cap_s": 57.5,
+      "conservative_arm_with_cap_s": 16.0,
+      "steps_total": 38,
+      "legacy_semantics_note": "对应旧口径: 每步再加 SLACK_SECONDS、且正常 stop 不解除运动计时",
+      "legacy_pre_bound_seconds": 91.0,
+      "legacy_after_spin_declared_seconds": 23.0,
+      "legacy_slack_seconds": 3
     },
-    "segments_source": "由 tools/m8r3_serial_chain_r7f8.py 的 business_segments() 现算(cap=12/reserve=7/total=90 取任务书 §4 固定值); 本工具不另写一份算术, 计划门再逐字段比对这份镜像 => 检查器与执行器同一值",
-    "arithmetic": "会话绝对截止 = 90 s; 业务绝对截止 = 90 - 7 = 83 s(F5c 由执行器强制, 与运行时的收口预留保护同源); 运动截止从 motor_start 写入尝试起算 12 s 且**正常 stop 不清 t0**(执行器语义), 所以停机后的查询同被 t0+cap 夹住; 三段互不重叠: 起转前申报 34.0 s(最坏含每步 SLACK 91.0 s) + 运动 cap 12.0 s + 预留 7 s; 起转后申报内容 23.0 s 要与 cap 比, 不再重复累加一遍 cap"
+    "segments_source": "由 tools/m8r3_serial_chain_r7f8.py 的 business_segments_ruling() 现算(cap=12/reserve=7/total=90 取任务书 §4 固定值); 本工具不另写一份算术, 计划门再逐字段比对这份镜像 => 检查器与执行器同一值。语义 = A 预算裁定 2026-11-05",
+    "arithmetic": "会话绝对截止 = 90 s; 业务绝对截止 = 90 - 7 = 83 s(F5c 由执行器强制); 运动截止从 motor_start 写入尝试起算 12 s, **到本会话内那份通过 zero_speed_contract 的可信零速快照为止**(裁定一: stop 的回话不结束计时, 零速确认后也不再靠清空 t0 放行第二次 start); 零速之后的 commit/show/ps/free 受 83 s 业务截止与 arm 18 s 通电截止约束, 不再受 t0+12 夹; 三段互不重叠: 起转前 31.0 s(19 步) + 活动(起转→零速) 9.0 s(11 步, cap 12 s 只算一次) + 零速后 7.5 s(8 步) = 总窗合计 47.5 s; 保守式(整段 cap 替活动窗) = 57.5 s <= 90 s",
+    "step_windows_source": "inputs/A_R7F8F_BUDGET_PKG/step_total_windows.json(38 步逐条按 (as, cmd) 对齐后写入; 对不上本工具直接拒产)"
   },
   "observation_bounds": {
     "cruise_poll": "最多 4 次 / 间隔 0.1 s / 整步 1 s(§5 行7)",
@@ -247,8 +249,9 @@
     "stop_poll": "最多 5 次 / 1 s(§5 行12)"
   },
   "static_budget_open_items": [
-    "PLAN_BUSINESS_RESERVE_SPLIT: 起转后申报内容 23.0 s(运动窗内 11.0 + 停机后 12.0) > §4 的 cap=12 s。执行器在 motor_start 写入尝试时置 MotionBudget.t0 且**正常 stop 不清**, 所以 §5 行 12 之后(含 13 disarm / 14 commit / 15 ps+free)同被 t0+12 夹住; 按 §4\"stop 必须在 start 后 8 s 内发起\"排, 剩下约 4 s 排不下 6 条查询。要么 A 放宽 cap(会同时动 §6 的 motor_run_seconds_total=12), 要么 A 认可\"已确认零速后解除运动 cap\"的运行时语义改动, 要么把 §5 行 14/15 挪到下一个会话。本轮不自行选择。",
-    "PLAN_BUSINESS_WORST_CASE_FIT: 每步都慢到 SLACK=3 s 上限时, 起转前 19 步的最坏合计 91.0 s 已超业务预算 83.0 s, 第 19 步(motor_target 300)会在写之前被 STEP_DEADLINE_BEFORE_WRITE 拒绝 => §5 那 15 组(约 38 步)在**最坏到达**下跑不到起转。这是取证完整性风险, 不是撤能风险(收口预留由 business_abs_dl 硬夹保护, 与运行结果无关); 申报窗口本身合得下(worst_declared 46.0 + 预留 7 <= 90)。消红只有减步或放宽总窗两条路, 本轮都不自行做。"
+    "已按裁定一落地: 运动计时的结束点是本会话内 `as=stopped` 那份通过 zero_speed_contract 的可信零速快照(stop 的回话不算; 快照残缺/矛盾/迟到则 cap 继续生效), 之后 commit/show/ps/free 只受 83 s 业务截止与 arm 18 s 通电截止约束。cap/reserve/total/arm 四个固定数一字未动。",
+    "已按裁定二落地: 38 步逐条申报 step_total_seconds(含全部等待与余量), 由 step_window() 供执行器/计划门/镜像共同取值 => 不再每步叠 SLACK; 未申报的旧计划仍走 legacy。",
+    "旧口径留档: 按「每步再叠 SLACK=3 s、stop 不解除运动计时」算, 起转前最坏合计 91.0 s、起转后申报内容 23.0 s —— 这两条就是上一版交 A 定口径的红, 现仅作为旧语义的对照数保留在本计划里。"
   ],
   "field_assertion_gaps": [
     "diag_status: 只断言 [DIAG] 前缀回显(本轮未回源码核到该命令的字段行)",
@@ -285,6 +288,7 @@
       "motion_cap_seconds": 12,
       "arm_energize_deadline_seconds": 18,
       "cleanup_reserve_seconds": 7,
+      "normal_stop_send_by_seconds": 8,
       "forbidden_commands": [
         "config_save",
         "motor_run",
@@ -303,7 +307,9 @@
           "seconds": 1,
           "expect_contains": [
             "=== SYSTEM STATUS ==="
-          ]
+          ],
+          "step_total_seconds": 1.0,
+          "window_phase": "pre_start"
         },
         {
           "as": "mot_pre",
@@ -313,7 +319,9 @@
           "expect_contains": [
             "[MOT] state=0",
             "[MOT] armed=0 drv_en_request=0"
-          ]
+          ],
+          "step_total_seconds": 1.0,
+          "window_phase": "pre_start"
         },
         {
           "as": "irq_pre",
@@ -322,7 +330,9 @@
           "seconds": 1,
           "expect_contains": [
             "[SAFETY] irq gate   = CLOSED"
-          ]
+          ],
+          "step_total_seconds": 1.0,
+          "window_phase": "pre_start"
         },
         {
           "as": "diag_pre",
@@ -330,7 +340,9 @@
           "seconds": 1,
           "expect_contains": [
             "[DIAG]"
-          ]
+          ],
+          "step_total_seconds": 1.0,
+          "window_phase": "pre_start"
         },
         {
           "as": "ls_pre",
@@ -339,7 +351,9 @@
           "seconds": 1,
           "expect_contains": [
             "[DIAG] job id="
-          ]
+          ],
+          "step_total_seconds": 1.0,
+          "window_phase": "pre_start"
         },
         {
           "as": "cfg_pre",
@@ -347,7 +361,9 @@
           "seconds": 1,
           "expect_contains": [
             "[TMC]"
-          ]
+          ],
+          "step_total_seconds": 1.0,
+          "window_phase": "pre_start"
         },
         {
           "as": "apply",
@@ -360,7 +376,9 @@
           "quota": {
             "name": "tmc_config_apply",
             "n": 1
-          }
+          },
+          "step_total_seconds": 2.0,
+          "window_phase": "pre_start"
         },
         {
           "as": "sys_after_apply",
@@ -370,7 +388,9 @@
           "expect_contains": [
             "=== SYSTEM STATUS ===",
             "runtime write gate mask=0x8"
-          ]
+          ],
+          "step_total_seconds": 1.0,
+          "window_phase": "pre_start"
         },
         {
           "as": "zero",
@@ -383,7 +403,9 @@
           "quota": {
             "name": "diag_profile_zero",
             "n": 1
-          }
+          },
+          "step_total_seconds": 13.0,
+          "window_phase": "pre_start"
         },
         {
           "as": "zero_state",
@@ -392,7 +414,9 @@
           "seconds": 1,
           "expect_contains": [
             "[DIAG] job id="
-          ]
+          ],
+          "step_total_seconds": 1.0,
+          "window_phase": "pre_start"
         },
         {
           "as": "pol",
@@ -406,7 +430,9 @@
           "quota": {
             "name": "irq_polarity_prep",
             "n": 1
-          }
+          },
+          "step_total_seconds": 1.0,
+          "window_phase": "pre_start"
         },
         {
           "as": "irq_en",
@@ -419,7 +445,9 @@
           "quota": {
             "name": "irq_polarity_prep",
             "n": 1
-          }
+          },
+          "step_total_seconds": 1.0,
+          "window_phase": "pre_start"
         },
         {
           "as": "irq_state",
@@ -428,7 +456,9 @@
           "seconds": 1,
           "expect_contains": [
             "[SAFETY] irq gate   = OPEN"
-          ]
+          ],
+          "step_total_seconds": 1.0,
+          "window_phase": "pre_start"
         },
         {
           "as": "mot_after_irq",
@@ -438,7 +468,9 @@
           "expect_contains": [
             "[MOT] armed=0 drv_en_request=0",
             "cur_hz=0 tgt_hz=0"
-          ]
+          ],
+          "step_total_seconds": 1.0,
+          "window_phase": "pre_start"
         },
         {
           "as": "dir",
@@ -451,7 +483,9 @@
           "quota": {
             "name": "motor_dir",
             "n": 1
-          }
+          },
+          "step_total_seconds": 0.5,
+          "window_phase": "pre_start"
         },
         {
           "as": "mot_dir",
@@ -462,7 +496,9 @@
             "[MOT] state=0",
             "dir=1",
             "armed=0"
-          ]
+          ],
+          "step_total_seconds": 1.0,
+          "window_phase": "pre_start"
         },
         {
           "as": "arm",
@@ -475,7 +511,9 @@
           "quota": {
             "name": "motor_arm",
             "n": 1
-          }
+          },
+          "step_total_seconds": 1.0,
+          "window_phase": "pre_start"
         },
         {
           "as": "mot_armed",
@@ -485,7 +523,9 @@
           "expect_contains": [
             "[MOT] armed=1 drv_en_request=1",
             "expected_ENN=LOW ENN_fb=0"
-          ]
+          ],
+          "step_total_seconds": 1.0,
+          "window_phase": "pre_start"
         },
         {
           "as": "target",
@@ -498,7 +538,9 @@
           "quota": {
             "name": "motor_target",
             "n": 1
-          }
+          },
+          "step_total_seconds": 0.5,
+          "window_phase": "pre_start"
         },
         {
           "as": "start",
@@ -511,7 +553,9 @@
           "quota": {
             "name": "motor_run",
             "n": 1
-          }
+          },
+          "step_total_seconds": 0.5,
+          "window_phase": "motion_active"
         },
         {
           "as": "cruise",
@@ -537,7 +581,9 @@
           "poll_sequence": [
             "motor_status_accel",
             "motor_status_cruise"
-          ]
+          ],
+          "step_total_seconds": 1.0,
+          "window_phase": "motion_active"
         },
         {
           "as": "learn_cancel",
@@ -559,7 +605,9 @@
               "hi": 350,
               "dir": 1
             }
-          }
+          },
+          "step_total_seconds": 0.5,
+          "window_phase": "motion_active"
         },
         {
           "as": "ls_cancel_bound",
@@ -568,7 +616,9 @@
           "seconds": 1,
           "expect_contains": [
             "[DIAG] job id="
-          ]
+          ],
+          "step_total_seconds": 0.5,
+          "window_phase": "motion_active"
         },
         {
           "as": "cancel",
@@ -582,7 +632,9 @@
           "quota": {
             "name": "diag_profile_learn_cancel",
             "n": 1
-          }
+          },
+          "step_total_seconds": 0.5,
+          "window_phase": "motion_active"
         },
         {
           "as": "cancel_state",
@@ -619,7 +671,9 @@
               ]
             },
             "job_binding": "cancel_job"
-          }
+          },
+          "step_total_seconds": 1.0,
+          "window_phase": "motion_active"
         },
         {
           "as": "mot_after_cancel",
@@ -633,7 +687,9 @@
             "tgt": 300,
             "accel": 2000,
             "decel": 2000
-          }
+          },
+          "step_total_seconds": 1.0,
+          "window_phase": "motion_active"
         },
         {
           "as": "learn_done",
@@ -655,7 +711,9 @@
               "hi": 350,
               "dir": 1
             }
-          }
+          },
+          "step_total_seconds": 0.5,
+          "window_phase": "motion_active"
         },
         {
           "as": "wait_done",
@@ -703,7 +761,9 @@
           "poll_sequence": [
             "ls_run8a",
             "ls_done8"
-          ]
+          ],
+          "step_total_seconds": 2.0,
+          "window_phase": "motion_active"
         },
         {
           "as": "stop",
@@ -716,15 +776,22 @@
           "quota": {
             "name": "motor_stop",
             "n": 1
-          }
+          },
+          "step_total_seconds": 0.5,
+          "window_phase": "motion_active"
         },
         {
           "as": "stopped",
           "cmd": "motor_status",
-          "key": "motor_status_idle",
+          "key": "motor_status_armed_idle",
           "seconds": 1,
+          "motion_end_evidence": true,
           "expect_contains": [
-            "[MOT] cur_hz=0 tgt_hz=0"
+            "[MOT] state=0 name=",
+            "[MOT] cur_hz=0 tgt_hz=0",
+            "[MOT] armed=1 drv_en_request=1 health=OK",
+            "[MOT] drv_request=HIGH pad=1",
+            "[MOT] expected_ENN=LOW ENN_fb=0 resolved verdict=OK"
           ],
           "poll": {
             "until_seconds": 1.0,
@@ -733,7 +800,9 @@
             "retry_codes": [
               "EXPECTATION_NOT_MET"
             ]
-          }
+          },
+          "step_total_seconds": 1.0,
+          "window_phase": "motion_active"
         },
         {
           "as": "disarm",
@@ -746,7 +815,9 @@
           "quota": {
             "name": "motor_disarm",
             "n": 1
-          }
+          },
+          "step_total_seconds": 0.5,
+          "window_phase": "post_zero"
         },
         {
           "as": "mot_disabled",
@@ -757,7 +828,9 @@
             "[MOT] armed=0 drv_en_request=0",
             "expected_ENN=HIGH ENN_fb=1",
             "verdict=OK"
-          ]
+          ],
+          "step_total_seconds": 1.0,
+          "window_phase": "post_zero"
         },
         {
           "as": "show_pre",
@@ -766,7 +839,9 @@
           "seconds": 1,
           "expect_contains": [
             "[DIAG] profile"
-          ]
+          ],
+          "step_total_seconds": 1.0,
+          "window_phase": "post_zero"
         },
         {
           "as": "commit",
@@ -779,7 +854,9 @@
           "quota": {
             "name": "diag_profile_commit",
             "n": 1
-          }
+          },
+          "step_total_seconds": 1.0,
+          "window_phase": "post_zero"
         },
         {
           "as": "show_post",
@@ -788,7 +865,9 @@
           "seconds": 1,
           "expect_contains": [
             "[DIAG] profile"
-          ]
+          ],
+          "step_total_seconds": 1.0,
+          "window_phase": "post_zero"
         },
         {
           "as": "ls_post",
@@ -797,7 +876,9 @@
           "seconds": 1,
           "expect_contains": [
             "[DIAG] job id="
-          ]
+          ],
+          "step_total_seconds": 1.0,
+          "window_phase": "post_zero"
         },
         {
           "as": "threads",
@@ -807,7 +888,9 @@
           "expect_contains": [
             "stack size",
             "main"
-          ]
+          ],
+          "step_total_seconds": 1.0,
+          "window_phase": "post_zero"
         },
         {
           "as": "heap",
@@ -819,7 +902,9 @@
             "used     :",
             "maximum  :",
             "available:"
-          ]
+          ],
+          "step_total_seconds": 1.0,
+          "window_phase": "post_zero"
         }
       ]
     }

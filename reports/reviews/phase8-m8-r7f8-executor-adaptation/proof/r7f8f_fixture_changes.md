@@ -4,8 +4,8 @@
 
 ## proof/r7f8e_case_matrix.txt
 - 家族: 反例矩阵(计划驱动的执行器行为反例 + 元负控)
-- 基线判据名 65 个 / 现在 98 个 / 同名保留 65 / 新增 33 / 移除 0 / 结论变化 0
-- 现在的汇总行: `R7F8E_MATRIX_SUMMARY|判据=98|FAIL=0|none`
+- 基线判据名 65 个 / 现在 106 个 / 同名保留 65 / 新增 41 / 移除 0 / 结论变化 0
+- 现在的汇总行: `R7F8E_MATRIX_SUMMARY|判据=106|FAIL=0|none`
   - **新增** `G10_单字段变错(ENN_fb=1)` —— F4 反向家族(G9~G17): 把巡航响应里**某一个**字段改成禁能侧或矛盾值, 逐个证 running_contract 的每一项都真在判 —— 只靠 state 数值一个门会在其余字段错时仍放行。
   - **新增** `G11_单字段变错(verdict=CUT_BY_HARDWARE)` —— F4 反向家族(G9~G17): 同上, 改的是 fb 判定链(硬件切断/未解析都不算巡航)。
   - **新增** `G12_单字段变错(fb=UNRESOLVED)` —— F4 反向家族(G9~G17): 同上, 改的是 ENN 反馈解析状态。
@@ -37,6 +37,14 @@
   - **新增** `H7_没开IRQ就不发尾部两条` —— F5: 没开过 IRQ 就不发尾部两条(不发无关命令, 也不占额度)。
   - **新增** `H8_会话截止不随步骤续期` —— F2: 会话截止 = 台账 t0 + 总时限, 不随步骤续期(修前每步重新「当前时刻 + 总时限」)。
   - **新增** `H9_清理后仍巡航必须判红(不是业务码独大)` —— F3/F4: 清理之后仍看到巡航 => 判红, 不被业务成功码顶掉(两条结论各归各的门)。
+  - **新增** `K1_step_window_保留小数且不叠_SLACK` —— 裁定二的正面: 计划申报的 step_total_seconds 就是这一步的**整窗**(等待+余量都在里面), 执行器原样取用且保留小数; 只有**未申报**的旧计划才退回 seconds+SLACK(3 s)。这条把「同一值」的读取侧钉住, 否则检查器与执行器会各算一套。
+  - **新增** `K2_非法总窗逐项具名且轮询窗受本步总窗约束` —— 裁定二第 2 条的拒绝面: bool / 非数 / 非正 / nan / inf 六种非法申报值必须在**开端口之前**各自具名拒绝(不许静默退回默认窗); 同时轮询步的 until 若大于本步总窗 => POLL_UNTIL_EXCEEDS_STEP_TOTAL, until==总窗必须放行(否则会把合法申报判死)。
+  - **新增** `K3_零速合同只认完整自洽的新鲜快照` —— 裁定一里「可信零速」的**定义**: 只有 state/cur/tgt/health/armed/使能侧/verdict 全项自洽的那一行才算(armed=1 的「已零速但仍带电」正是 stop 之后的典型态, 也照认); FAULT / CUT_BY_HARDWARE / 使能侧矛盾一律不算 => 运动计时不解除。这一条不给「看见一个 0 就松手」留口子。
+  - **新增** `K4_运动计时只在可信零速处结束_迟到不倒填_t0 不清` —— 裁定一的第 1、2 点: 结束点是**正常 stop 成功之后第一份新鲜完整零速快照**; 13 s 才到的零速具名 MOTION_ZERO_CONFIRMATION_LATE(不许把它倒填成按时), 第二次确认具名MOTION_END_ALREADY_CONFIRMED; 且 MotionBudget.t0 保持不清(修前正是靠 stop 清 t0 才让第二次start 混过去)。
+  - **新增** `K5_释放运动计时不释放通电计时_也不放开业务截止` —— 裁定一的边界: 解除的只是 cap(那段不再被 t0+12 夹住), arm→禁能的 18 s 通电截止与业务绝对截止(总窗-预留)都**照旧**; 收口预留从「现在+7 s」起算但仍被会话 90 s 封顶。这条专门防止「为了排下尾巴把别的门一起放开」。
+  - **新增** `K6_已零速但仍带电到_18s_仍是到期停止业务` —— K5 的反向配对观察: 零速已解除运动计时(cap 剩余为负)时, 若带电拖到 18.5 s, ARM_ENERGIZE_DEADLINE_EXCEEDED 那条支路**不看** cap_active 仍然开火 => 两个计时器彼此独立不是口头声明。
+  - **新增** `K7_38_步总窗逐条等于_A_的表_镜像同函数产出` —— 裁定 §3 那张表的机器化: 31.0/9.0/7.5 三段、合计 47.5、stop@7.5 / 零速@9.0 / 禁能@13.0、保守式 57.5 与 16.0 全部由执行器同一个函数现算, 计划里的镜像也由它产出 => 「检查器与执行器同一值」不是两边各写一遍再对拍。
+  - **新增** `K8_轮询步的总窗等于其 until_次数与间隔未动` —— 裁定二末句的落实: 四个轮询步(巡航 4×0.1、取消 3×1、完成 12×2、停机 5×1)的申报总窗 == 原定 until_seconds(1/1/2/1), 次数与间隔一字未改 —— 防止用「缩窗」把尾巴塞进 cap。
   - **新增** `X6_把收口预留从业务预算里抹掉_前置等待后arm仍放出去` —— 元负控(F5c): 把 business_abs_dl 退回 session_abs_dl(等于抹掉收口预留), H13 必须因此失去 STEP_DEADLINE_BEFORE_WRITE 且 arm 真的被放出去 —— 证这道门不是写在纸上的。
   - **新增** `X7_同一道门_静默收口时第五条发不出去` —— 元负控(F5c): 同一道门在「收口第五条发不出去」那一面的形状, 必须让 H14 失去 safety_irq_status。
 
@@ -49,11 +57,12 @@
 
 ## proof/r7f8e_no_regression.txt
 - 家族: 无回归(冻结旧件 vs 派生件对同一份 R7F7 定稿计划逐行比)
-- 基线判据名 32 个 / 现在 36 个 / 同名保留 32 / 新增 4 / 移除 0 / 结论变化 0
+- 基线判据名 32 个 / 现在 37 个 / 同名保留 32 / 新增 5 / 移除 0 / 结论变化 0
 - 现在的汇总行: `R7F8E_NOREG_SUMMARY|判据=9|FAIL=0|none`
-  - **新增** `REPLAY|may_obligate=False spin@None stop@None pre=91.0/133.0(14步) in_motion=0/0(0步) post_stop=0/0(0步) cap=None reserve=7.0 total=210.0 worst=91.0 after_spin=0 mirror=NA(计划未申报 motion_budget.business_segments)` —— 三版本重放的逐条件行(本轮新增家族): 同一份输入喂给 修后 / F5b 修前 / F5c 修前 三个字节件, 每件按**该件应有的行为**申报期望, 用来证「修前误放行」。
+  - **新增** `REPLAY|business_total=133 budget=203.0 cons_total=None cons_arm=None` —— 三版本重放的逐条件行(本轮新增家族): 同一份输入喂给 修后 / F5b 修前 / F5c 修前 三个字节件, 每件按**该件应有的行为**申报期望, 用来证「修前误放行」。
+  - **新增** `REPLAY|declared=0/14 legacy=14 非法=无 zero_evidence_as=NONE(运动计时不解除)` —— 三版本重放的逐条件行(本轮新增家族): 同一份输入喂给 修后 / F5b 修前 / F5c 修前 三个字节件, 每件按**该件应有的行为**申报期望, 用来证「修前误放行」。
+  - **新增** `REPLAY|may_obligate=False spin@None stop@None zero@None pre_start=0.0(0步) motion_active=0.0(0步) post_zero=0.0(0步) stop_after_start=None zero_after_start=None arm_to_disabled=None cap=None reserve=7.0 total=210.0 business_total=133 worst=None cons_total=None cons_arm=None mirror=NA(计划未申报 motion_budget.business_segments)` —— 三版本重放的逐条件行(本轮新增家族): 同一份输入喂给 修后 / F5b 修前 / F5c 修前 三个字节件, 每件按**该件应有的行为**申报期望, 用来证「修前误放行」。
   - **新增** `REPLAY|reserve=7.0 floor=6.0 total=210.0 cap=None` —— 三版本重放的逐条件行(本轮新增家族): 同一份输入喂给 修后 / F5b 修前 / F5c 修前 三个字节件, 每件按**该件应有的行为**申报期望, 用来证「修前误放行」。
-  - **新增** `REPLAY|worst_bound=133.0 budget=203.0 sim_end=133.0 first_refused=NONE` —— 三版本重放的逐条件行(本轮新增家族): 同一份输入喂给 修后 / F5b 修前 / F5c 修前 三个字节件, 每件按**该件应有的行为**申报期望, 用来证「修前误放行」。
   - **新增** `点名的本轮新门确实出现在新增行里(白名单非空转)` —— 上一版白名单只按前缀放行, 新加的 PLAN_* 门被拒 => 改成点名。点名之后必须**反过来**验它真的出现过, 否则白名单退化成「任何 PLAN_ 新行都免检」。
 
 ## proof/r7f8f_probe_replay.txt
@@ -70,8 +79,8 @@
 
 ## proof/r7f8f_offline_gate.txt
 - 家族: 最终离线门(real plan/rows 整包 + 全首错 + 不变项)
-- 基线判据名 无该件(本轮新增) 个 / 现在 33 个 / 同名保留 0 / 新增 33 / 移除 0 / 结论变化 0
-- 现在的汇总行: `R7F8F_OFFLINE_GATE_SUMMARY|判据=40|FAIL=2|PLAN_POST_SPIN_CONTENT_FITS_CAP,PLAN_WORST_CASE_TAIL_FITS_SESSION`
+- 基线判据名 无该件(本轮新增) 个 / 现在 39 个 / 同名保留 0 / 新增 39 / 移除 0 / 结论变化 0
+- 现在的汇总行: `R7F8F_OFFLINE_GATE_SUMMARY|判据=47|FAIL=0|none`
   - **新增** `BOARD_IMAGE_IDENTITY_STILL_23691E8D` —— 在板镜像原件仍是 297452 B / 23691e8d…, 本轮不下载/不回读, 身份只作参照(§4 第一行)。
   - **新增** `FIELD_FLAGS_STAY_FALSE` —— polarity_measured / core_protection_verified 保持 false(任务书硬边界: 软件 confirm 不升级为极性实测)。
   - **新增** `FIELD_PLAN_PREREQ_NOT_SELF_CERTIFIED` —— 机械前置门在现场原件里保持「等操作者口头确认」, 计划不自证; 离线 dispatch 副本另置 PROVIDED 只为了让行为判据有东西可判。
@@ -79,6 +88,7 @@
   - **新增** `IMAGE_SHA_COMES_FROM_DISK_BYTES` —— 计划里的镜像摘要 == 本工具当场对盘上原字节算出的摘要(§4 的 23691e8d… 不是手抄)。
   - **新增** `INPUTS_IN_PLACE` —— 五件输入齐全且身份当场重算(执行器/plan/rows/修前件/BIN)。
   - **新增** `JSON_RECEIPT_SHAPE_ALIGNED` —— 机器回执自身的形状判据: 每条判据在记账时就分成 门名/判定值/详情 三个字段。上一版 json 用按位切分解析文本行, 而门名本身可以含 "|"(GATE_PRESENT|X、FIRST_ERROR|tag), 于是 13 条把门名当成了判定值(如 verdict="PLAN_CLEANUP_RESERVE")。这条判据把"结构化条数=文本行数、判定值只会是 PASS/FAIL、FAIL 名单与汇总行一致"钉住, 属于回执可解析性补正, 不改任何行为判定; 同输入重跑后 40 条的 PASS/FAIL 与补正前的 39 条逐条一致。
+  - **新增** `LEGACY_RED_TEXT_KEPT_VERBATIM` —— 裁定前的两条红(91 s / 23 s 那组数)原文照录在回执里, 不因为现在绿了就抹掉(任务书 §3.7 「保留失败原文」)。这条判的是**留痕本身**, 不参与任何放行。
   - **新增** `META_DOUBLE_COUNT_COMES_BACK_GOES_RED` —— 元负控: 故意让镜像漂移/把双算加回来, 要求对应的门**必须变红** —— 证 F6 的新门不是恒绿(任务书 §3.2)。
   - **新增** `META_MIRROR_DRIFT_NAMED` —— 元负控: 故意让镜像漂移/把双算加回来, 要求对应的门**必须变红** —— 证 F6 的新门不是恒绿(任务书 §3.2)。
   - **新增** `META_MUTATION_ANCHOR_HIT` —— 元负控: 故意让镜像漂移/把双算加回来, 要求对应的门**必须变红** —— 证 F6 的新门不是恒绿(任务书 §3.2)。
@@ -92,14 +102,19 @@
   - **新增** `PLAN_RESERVE_ARITHMETIC` —— 整包离线门里的计划侧判据(本轮新增家族): 只读 --validate-plan 的输出并按名字取数, 不在这个工具里另写一份算术。
   - **新增** `PLAN_WORST_CASE_TAIL_FITS_SESSION` —— 整包离线门里的计划侧判据(本轮新增家族): 只读 --validate-plan 的输出并按名字取数, 不在这个工具里另写一份算术。
   - **新增** `PRE_EXECUTOR_BYTES_FROZEN` —— 修前派生件(245730 B / 4c962170…)一字节未动 —— 返修的输入身份。
+  - **新增** `PRE_RULING_BYTECMP_CLAUSE_FIRES_ON_MUTATION` —— 上一条那个死码的元负控: 尾部多写一个空格的副本必须让「逐字节相等」翻 False, 原件副本为 True —— True/False 配对才算这一项既非恒真也非恒假。
+  - **新增** `PRE_RULING_REFERENCE_PLAN_STILL_RED_UNCHANGED` —— 裁定不是把旧字节改绿: 拿 A 包里的裁定前基准件(66ca8a15…)原字节复制到仓外重跑, 必须仍是 zero@None + 两条红 + 旧口径 91/23。红了才证明「绿是语义落地带来的, 不是回头改基准件或放宽阈值带来的」。上一版这条里「逐字节相等」写成两个 sha256 对象相比(没有 hexdigest), 属恒假死码, 本轮一并修掉。
   - **新增** `PRODUCT_SOURCE_UNCHANGED` —— 产品树 applications/ 与 HEAD 一致(本轮「产品源码冻结」), 任何判据红都不许靠改产品消红。
   - **新增** `REPLAY|code=CLEANUP_ERRORS disarm=CONFIRMED_DISABLED terminal=KNOWN 收口TX=['motor_status', 'safety_irq_status', 'safety_irq_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_stop', 'motor_status', 'motor_disarm', 'motor_status', 'motor_stop', 'motor_disarm', 'motor_status', 'safety_irq_disable', 'safety_irq_status'] errors=IRQ_TAIL_DISABLE_NO_DETACH_LINE IRQ_TAIL_NOT_CLOSED` —— 三版本重放的逐条件行(本轮新增家族): 同一份输入喂给 修后 / F5b 修前 / F5c 修前 三个字节件, 每件按**该件应有的行为**申报期望, 用来证「修前误放行」。
   - **新增** `REPLAY|code=CLEANUP_RESERVE_CANNOT_COVER_ALL_SENDS disarm=NOT_ARMED terminal=KNOWN 收口TX=[] errors=` —— 三版本重放的逐条件行(本轮新增家族): 同一份输入喂给 修后 / F5b 修前 / F5c 修前 三个字节件, 每件按**该件应有的行为**申报期望, 用来证「修前误放行」。
   - **新增** `REPLAY|code=EXPECTATION_NOT_MET disarm=CONFIRMED_DISABLED terminal=KNOWN 收口TX=['motor_status', 'safety_irq_status', 'safety_irq_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_stop', 'motor_disarm', 'motor_status', 'safety_irq_disable', 'safety_irq_status'] errors=` —— 三版本重放的逐条件行(本轮新增家族): 同一份输入喂给 修后 / F5b 修前 / F5c 修前 三个字节件, 每件按**该件应有的行为**申报期望, 用来证「修前误放行」。
   - **新增** `REPLAY|code=EXPECTATION_NOT_MET disarm=CONFIRMED_DISABLED terminal=KNOWN 收口TX=['motor_status', 'safety_irq_status', 'safety_irq_status', 'motor_status', 'motor_status', 'motor_status', 'motor_stop', 'motor_disarm', 'motor_status', 'safety_irq_disable', 'safety_irq_status'] errors=` —— 三版本重放的逐条件行(本轮新增家族): 同一份输入喂给 修后 / F5b 修前 / F5c 修前 三个字节件, 每件按**该件应有的行为**申报期望, 用来证「修前误放行」。
   - **新增** `REPLAY|code=STEP_DEADLINE_BEFORE_WRITE disarm=NOT_ARMED terminal=KNOWN 收口TX=[] errors=` —— 三版本重放的逐条件行(本轮新增家族): 同一份输入喂给 修后 / F5b 修前 / F5c 修前 三个字节件, 每件按**该件应有的行为**申报期望, 用来证「修前误放行」。
+  - **新增** `REPLAY|code=STEP_TOTAL_SECONDS_INVALID disarm=CONFIRMED_DISABLED terminal=KNOWN 收口TX=['motor_status', 'safety_irq_status', 'safety_irq_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_stop', 'motor_stop', 'motor_disarm', 'motor_status', 'safety_irq_disable', 'safety_irq_status'] errors=` —— 三版本重放的逐条件行(本轮新增家族): 同一份输入喂给 修后 / F5b 修前 / F5c 修前 三个字节件, 每件按**该件应有的行为**申报期望, 用来证「修前误放行」。
   - **新增** `REPLAY|出现在 validate-plan 输出里` —— 三版本重放的逐条件行(本轮新增家族): 同一份输入喂给 修后 / F5b 修前 / F5c 修前 三个字节件, 每件按**该件应有的行为**申报期望, 用来证「修前误放行」。
   - **新增** `ROWS_BRANCH_MISSING_KNOWN_GAP` —— 登记一条**观察到的既有缺口**: 行表缺整个 healthy 分支时build_session_fixture 抛裸 KeyError(开端口之前, 零发送)。不是本轮引入, 任务书没列这项, 交给 A 定。
+  - **新增** `RUN_MOTION_TIMER_ELAPSED_WITHIN_CAP` —— 释放时刻本身也要被核: MOTION_TIMER_ENDED 里的 elapsed_from_start_s 必须 <= 12 s(cap), 且事件明写 arm_deadline_kept=True —— 解除运动计时不等于解除通电计时(与 K5/K6 同一合同, 只是换成整包运行现场读)。
+  - **新增** `RUN_ZERO_SNAPSHOT_RELEASES_MOTION_TIMER` —— 整包正常场的台账侧证据: 事件顺序是先 MOTOR_STOP_CONFIRMED(ends_motion_timer=False) 再由 as=stopped 那份可信零速快照发 MOTION_TIMER_ENDED, 且整场仍成功收口(disarm CONFIRMED)。证释放点在实际 dispatch 路径上被证据门控制, 不是只存在于静态表。
   - **新增** `STUB_NORMAL_DISPATCH_SUCCEEDS` —— 整包离线门的正常流: 用 real plan/rows 在 stub 后端把 §5 全序跑一遍, 判成功/收口五条/预留与夹短回执字段(现场轮走的就是这条 dispatch 路径)。
   - **新增** `STUB_NORMAL_RESERVE_AND_CLAMP_FIELDS` —— 整包离线门的正常流: 用 real plan/rows 在 stub 后端把 §5 全序跑一遍, 判成功/收口五条/预留与夹短回执字段(现场轮走的就是这条 dispatch 路径)。
   - **新增** `STUB_NORMAL_TAIL_SENT` —— 整包离线门的正常流: 用 real plan/rows 在 stub 后端把 §5 全序跑一遍, 判成功/收口五条/预留与夹短回执字段(现场轮走的就是这条 dispatch 路径)。

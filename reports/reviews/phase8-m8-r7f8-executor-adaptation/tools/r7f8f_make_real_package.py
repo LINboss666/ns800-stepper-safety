@@ -341,8 +341,17 @@ def steps():
     # 12) 停机(start 后 8 s 内发起; 有界轮询到零速)
     add("stop", "motor_stop", key="motor_stop", seconds=2,
         expect_contains=["stop requested: target_hz=0"], quota={"name": "motor_stop", "n": 1})
-    s.append({"as": "stopped", "cmd": "motor_status", "key": "motor_status_idle", "seconds": 1,
-              "expect_contains": ["[MOT] cur_hz=0 tgt_hz=0"],
+    s.append({"as": "stopped", "cmd": "motor_status", "key": "motor_status_armed_idle",
+              "seconds": 1,
+              # 裁定一: 这一步就是**运动计时的结束点** —— 申报它承担那份可信零速快照,
+              # 执行器只在这一步的实际回包通过 zero_speed_contract 时才解除运动 cap。
+              "motion_end_evidence": True,
+              # 裁定 §4 末条: post-stop 行要单列真实"零速但仍 armed"的完整反馈形状,
+              # 不拿初态禁能快照(motor_status_idle: armed=0/LOW/pad0/ENN HIGH/1)顶替。
+              "expect_contains": ["[MOT] state=0 name=", "[MOT] cur_hz=0 tgt_hz=0",
+                                  "[MOT] armed=1 drv_en_request=1 health=OK",
+                                  "[MOT] drv_request=HIGH pad=1",
+                                  "[MOT] expected_ENN=LOW ENN_fb=0 resolved verdict=OK"],
               "poll": {"until_seconds": 1.0, "interval_seconds": 0.1, "max_attempts": 5,
                        "retry_codes": ["EXPECTATION_NOT_MET"]}})
     # 13) disarm + 相邻禁能快照(F3: 不凭 DISARM 子串解除义务)
@@ -385,7 +394,28 @@ def plan_doc():
     sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
     import importlib
     exe = importlib.import_module("m8r3_serial_chain_r7f8")
-    bs = exe.business_segments(st, cap=12, reserve=7, total=90)
+    # G(裁定二)落表: 38 步的**单步总窗**逐个取 A 包里 step_total_windows.json 的申报值。
+    # 逐条按 (as, cmd) 对齐才写入 —— 对不上就当场拒绝, 不"顺手"把窗口贴到别的步上。
+    tbl_path = pathlib.Path(__file__).resolve().parents[1] / \
+        "inputs/A_R7F8F_BUDGET_PKG/step_total_windows.json"
+    tbl = json.loads(tbl_path.read_text(encoding="utf-8"))
+    mis, ref_sha = [], tbl.get("reference_plan_sha256")
+    for t in tbl["steps"]:
+        i = t["index"]
+        if i >= len(st) or (st[i].get("as"), st[i].get("cmd")) != (t["as"], t["cmd"]):
+            mis.append("%d:表=%s/%s 计划=%s/%s" % (i, t["as"], t["cmd"],
+                                                   st[i].get("as") if i < len(st) else "-",
+                                                   st[i].get("cmd") if i < len(st) else "-"))
+            continue
+        st[i]["step_total_seconds"] = t["step_total_seconds"]
+        st[i]["window_phase"] = t["phase"]
+    if mis or len(tbl["steps"]) != len(st):
+        raise SystemExit("WINDOW_TABLE_REFUSED|A 的总窗表与本计划对不上: %s" % mis[:4])
+    bad_poll = [x.get("as") for x in st
+                if exe.step_total_problem(x)]
+    if bad_poll:
+        raise SystemExit("WINDOW_TABLE_REFUSED|申报的总窗过不了执行器自己的校验: %s" % bad_poll[:4])
+    bs = exe.business_segments_ruling(st, cap=12, reserve=7, total=90)
     return {
         "package": "M8-R7F8F-FIELD-ONE-SESSION",
         "status": "OFFLINE_CANDIDATE_NOT_AUTHORIZED_NOT_EXECUTED",
@@ -432,39 +462,44 @@ def plan_doc():
             "session_total_seconds": 90, "cleanup_reserve_seconds": 7,
             "business_worst_declared_seconds": bs["worst_declared"],
             "business_segments": bs,
-            "segments_source": "由 tools/m8r3_serial_chain_r7f8.py 的 business_segments() 现算"
-                               "(cap=12/reserve=7/total=90 取任务书 §4 固定值); 本工具不另写一份"
-                               "算术, 计划门再逐字段比对这份镜像 => 检查器与执行器同一值",
-            "arithmetic": "会话绝对截止 = 90 s; 业务绝对截止 = 90 - 7 = 83 s(F5c 由执行器强制, "
-                          "与运行时的收口预留保护同源); 运动截止从 motor_start 写入尝试起算 12 s "
-                          "且**正常 stop 不清 t0**(执行器语义), 所以停机后的查询同被 t0+cap 夹住; "
-                          "三段互不重叠: 起转前申报 %s s(最坏含每步 SLACK %s s) + 运动 cap %s s "
-                          "+ 预留 %s s; 起转后申报内容 %s s 要与 cap 比, 不再重复累加一遍 cap"
-                          % (bs["pre_declared"], bs["pre_bound"], bs["window_seconds"],
-                             7, bs["after_spin_declared"])},
+            "segments_source": "由 tools/m8r3_serial_chain_r7f8.py 的 "
+                               "business_segments_ruling() 现算(cap=12/reserve=7/total=90 取"
+                               "任务书 §4 固定值); 本工具不另写一份算术, 计划门再逐字段比对这份"
+                               "镜像 => 检查器与执行器同一值。语义 = A 预算裁定 2026-11-05",
+            "arithmetic": "会话绝对截止 = 90 s; 业务绝对截止 = 90 - 7 = 83 s(F5c 由执行器强制); "
+                          "运动截止从 motor_start 写入尝试起算 12 s, **到本会话内那份通过 "
+                          "zero_speed_contract 的可信零速快照为止**(裁定一: stop 的回话不结束计时, "
+                          "零速确认后也不再靠清空 t0 放行第二次 start); 零速之后的 commit/show/ps/"
+                          "free 受 83 s 业务截止与 arm 18 s 通电截止约束, 不再受 t0+12 夹; "
+                          "三段互不重叠: 起转前 %s s(%d 步) + 活动(起转→零速) %s s(%d 步, cap %s s "
+                          "只算一次) + 零速后 %s s(%d 步) = 总窗合计 %s s; 保守式(整段 cap 替活动窗) "
+                          "= %s s <= 90 s" % (bs["pre_start_seconds"], bs["pre_start_steps"],
+                                              bs["motion_active_seconds"],
+                                              bs["motion_active_steps"], bs["window_seconds"],
+                                              bs["post_zero_seconds"], bs["post_zero_steps"],
+                                              bs["business_total_seconds"],
+                                              bs["conservative_total_with_cap_s"]),
+            "step_windows_source": "inputs/A_R7F8F_BUDGET_PKG/step_total_windows.json"
+                                   "(38 步逐条按 (as, cmd) 对齐后写入; 对不上本工具直接拒产)"},
         "observation_bounds": {"cruise_poll": "最多 4 次 / 间隔 0.1 s / 整步 1 s(§5 行7)",
                                "cancel_poll": "最多 3 次 / 1 s(§5 行9)",
                                "done_poll": "最多 12 次 / 2 s(§5 行11)",
                                "stop_poll": "最多 5 次 / 1 s(§5 行12)"},
-        # F6 静态三段算完之后, 本包在**离线门**上留下的两条真实红项(不放宽 §4 的任何数,
-        # 也不靠负 seconds / 漏算余量消红)。两条都交给 A 定口径, 本工具只负责把它们算出来。
+        # A 预算裁定(2026-11-05)之后: 上一版交给 A 定口径的两条静态冲突**由裁定给出出口**,
+        # 本包按裁定落地 => 不再有"待 A 定口径"的未决项。旧口径的两个数(91.0 / 23.0)仍原样
+        # 留在 business_segments.legacy_* 与 validate-plan 的 LEGACY_SEMANTICS 行里, 注明它们
+        # 对应"每步再加 SLACK / stop 不解除运动计时", 转绿不是把数改掉。
         "static_budget_open_items": [
-            "PLAN_BUSINESS_RESERVE_SPLIT: 起转后申报内容 %s s(运动窗内 %s + 停机后 %s) > §4 的"
-            " cap=12 s。执行器在 motor_start 写入尝试时置 MotionBudget.t0 且**正常 stop 不清**, "
-            "所以 §5 行 12 之后(含 13 disarm / 14 commit / 15 ps+free)同被 t0+12 夹住; 按 §4"
-            "\"stop 必须在 start 后 8 s 内发起\"排, 剩下约 4 s 排不下 6 条查询。要么 A 放宽 cap"
-            "(会同时动 §6 的 motor_run_seconds_total=12), 要么 A 认可\"已确认零速后解除运动 cap\""
-            "的运行时语义改动, 要么把 §5 行 14/15 挪到下一个会话。本轮不自行选择。"
-            % (bs["after_spin_declared"], bs["in_motion_declared"], bs["post_stop_declared"]),
-            "PLAN_BUSINESS_WORST_CASE_FIT: 每步都慢到 SLACK=3 s 上限时, 起转前 19 步的最坏合计"
-            " %s s 已超业务预算 %s s, 第 %d 步(%s)会在写之前被 STEP_DEADLINE_BEFORE_WRITE 拒绝"
-            " => §5 那 15 组(约 38 步)在**最坏到达**下跑不到起转。这是取证完整性风险, 不是撤能"
-            "风险(收口预留由 business_abs_dl 硬夹保护, 与运行结果无关); 申报窗口本身合得下"
-            "(worst_declared %s + 预留 7 <= 90)。消红只有减步或放宽总窗两条路, 本轮都不自行做。"
-            % (bs["pre_bound"], bs["business_budget_seconds"],
-               (bs["first_step_refused_before_write"] or {}).get("index", -1) + 1,
-               (bs["first_step_refused_before_write"] or {}).get("cmd", "-"),
-               bs["worst_declared"])],
+            "已按裁定一落地: 运动计时的结束点是本会话内 `as=stopped` 那份通过 zero_speed_"
+            "contract 的可信零速快照(stop 的回话不算; 快照残缺/矛盾/迟到则 cap 继续生效), "
+            "之后 commit/show/ps/free 只受 83 s 业务截止与 arm 18 s 通电截止约束。cap/reserve/"
+            "total/arm 四个固定数一字未动。",
+            "已按裁定二落地: 38 步逐条申报 step_total_seconds(含全部等待与余量), 由 step_window()"
+            " 供执行器/计划门/镜像共同取值 => 不再每步叠 SLACK; 未申报的旧计划仍走 legacy。",
+            "旧口径留档: 按「每步再叠 SLACK=%s s、stop 不解除运动计时」算, 起转前最坏合计 %s s、"
+            "起转后申报内容 %s s —— 这两条就是上一版交 A 定口径的红, 现仅作为旧语义的对照数"
+            "保留在本计划里。" % (bs["legacy_slack_seconds"], bs["legacy_pre_bound_seconds"],
+                                  bs["legacy_after_spin_declared_seconds"])],
         "field_assertion_gaps": [
             "diag_status: 只断言 [DIAG] 前缀回显(本轮未回源码核到该命令的字段行)",
             "tmc_config_show: 只断言 [TMC] 前缀回显(档位实值核对留给 apply 后的 CONFIGURED 行)",
@@ -492,6 +527,9 @@ def plan_doc():
             "motion_cap_seconds": 12,
             "arm_energize_deadline_seconds": 18,
             "cleanup_reserve_seconds": 7,
+            # §4 "正常 stop 必须在 start 后 8 s 内发起"。A 的裁定把它保留为**业务规则**而不是
+            # cap 的推论, 所以由计划自己申报这个数, 门只判"申报了才核"; 合成夹具不申报 => 不判。
+            "normal_stop_send_by_seconds": 8,
             "forbidden_commands": ["config_save", "motor_run", "tmc_set", "fault_reset",
                                    "blackbox_clear", "diag_mode", "pwm_test", "safety_trip"],
             "steps": st}]}

@@ -1,0 +1,724 @@
+{
+  "scope": "Arithmetic/reference byte identities only; not executor/offline_gate/hardware validation",
+  "based_on_commit": "6f2b12f",
+  "hardware_actions": 0,
+  "actual_executor_changed": false,
+  "field_authorization_received": false,
+  "checks": [
+    {
+      "name": "BASE_PLAN_IDENTITY",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "BASE_ROWS_IDENTITY",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "SAME_38_COMMANDS_AND_ORDER",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "FINITE_POSITIVE_WINDOWS",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "POLL_WINDOWS_UNCHANGED",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "SEGMENTS_COVER_ONCE",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "STOP_REQUEST_WITHIN_8",
+      "passed": true,
+      "detail": 7.5
+    },
+    {
+      "name": "ZERO_CONFIRM_WITHIN_12",
+      "passed": true,
+      "detail": 9.0
+    },
+    {
+      "name": "DISABLED_WITHIN_ARM_18",
+      "passed": true,
+      "detail": 13.0
+    },
+    {
+      "name": "BUSINESS_FITS_83",
+      "passed": true,
+      "detail": 47.5
+    },
+    {
+      "name": "BUSINESS_PLUS_RESERVE_FITS_90",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "FULL_MOTION_CAP_PLUS_POST_ZERO_FITS_90",
+      "passed": true,
+      "detail": 57.5
+    },
+    {
+      "name": "ARM_WITH_FULL_MOTION_CAP_FITS_18",
+      "passed": true,
+      "detail": 16.0
+    },
+    {
+      "name": "CLEANUP_FIVE_WINDOWS_FIT_7",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "ZERO_DOES_NOT_RELEASE_ARM",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "ORIGINAL_FIXED_LIMITS",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "SOURCE_SHAPE_WIRE_LOWER_BOUND",
+      "passed": true,
+      "detail": "Source-shape lower bound only; not a measured complete response or Windows latency guarantee"
+    }
+  ],
+  "total": 17,
+  "fail": 0,
+  "phase_counts": {
+    "pre_start": 19,
+    "motion_active": 11,
+    "post_zero": 8
+  },
+  "bounds": {
+    "pre_start_s": 31.0,
+    "stop_request_after_start_s": 7.5,
+    "zero_confirm_after_start_s": 9.0,
+    "arm_to_disabled_s": 13.0,
+    "post_zero_s": 7.5,
+    "business_total_s": 47.5,
+    "total_with_cleanup_s": 54.5,
+    "conservative_total_with_full_motion_cap_s": 57.5,
+    "conservative_arm_with_full_motion_cap_s": 16.0
+  },
+  "timeline": [
+    {
+      "index": 0,
+      "as": "sys_pre",
+      "cmd": "system_status",
+      "step_total_seconds": 1.0,
+      "phase": "pre_start",
+      "start_s": 0.0,
+      "end_s": 1.0
+    },
+    {
+      "index": 1,
+      "as": "mot_pre",
+      "cmd": "motor_status",
+      "step_total_seconds": 1.0,
+      "phase": "pre_start",
+      "start_s": 1.0,
+      "end_s": 2.0
+    },
+    {
+      "index": 2,
+      "as": "irq_pre",
+      "cmd": "safety_irq_status",
+      "step_total_seconds": 1.0,
+      "phase": "pre_start",
+      "start_s": 2.0,
+      "end_s": 3.0
+    },
+    {
+      "index": 3,
+      "as": "diag_pre",
+      "cmd": "diag_status",
+      "step_total_seconds": 1.0,
+      "phase": "pre_start",
+      "start_s": 3.0,
+      "end_s": 4.0
+    },
+    {
+      "index": 4,
+      "as": "ls_pre",
+      "cmd": "diag_profile learn_status",
+      "step_total_seconds": 1.0,
+      "phase": "pre_start",
+      "start_s": 4.0,
+      "end_s": 5.0
+    },
+    {
+      "index": 5,
+      "as": "cfg_pre",
+      "cmd": "tmc_config_show",
+      "step_total_seconds": 1.0,
+      "phase": "pre_start",
+      "start_s": 5.0,
+      "end_s": 6.0
+    },
+    {
+      "index": 6,
+      "as": "apply",
+      "cmd": "tmc_config_apply CONFIRM",
+      "step_total_seconds": 2.0,
+      "phase": "pre_start",
+      "start_s": 6.0,
+      "end_s": 8.0
+    },
+    {
+      "index": 7,
+      "as": "sys_after_apply",
+      "cmd": "system_status",
+      "step_total_seconds": 1.0,
+      "phase": "pre_start",
+      "start_s": 8.0,
+      "end_s": 9.0
+    },
+    {
+      "index": 8,
+      "as": "zero",
+      "cmd": "diag_profile zero 32",
+      "step_total_seconds": 13.0,
+      "phase": "pre_start",
+      "start_s": 9.0,
+      "end_s": 22.0
+    },
+    {
+      "index": 9,
+      "as": "zero_state",
+      "cmd": "diag_profile learn_status",
+      "step_total_seconds": 1.0,
+      "phase": "pre_start",
+      "start_s": 22.0,
+      "end_s": 23.0
+    },
+    {
+      "index": 10,
+      "as": "pol",
+      "cmd": "safety_polarity_confirm CONFIRM",
+      "step_total_seconds": 1.0,
+      "phase": "pre_start",
+      "start_s": 23.0,
+      "end_s": 24.0
+    },
+    {
+      "index": 11,
+      "as": "irq_en",
+      "cmd": "safety_irq_enable",
+      "step_total_seconds": 1.0,
+      "phase": "pre_start",
+      "start_s": 24.0,
+      "end_s": 25.0
+    },
+    {
+      "index": 12,
+      "as": "irq_state",
+      "cmd": "safety_irq_status",
+      "step_total_seconds": 1.0,
+      "phase": "pre_start",
+      "start_s": 25.0,
+      "end_s": 26.0
+    },
+    {
+      "index": 13,
+      "as": "mot_after_irq",
+      "cmd": "motor_status",
+      "step_total_seconds": 1.0,
+      "phase": "pre_start",
+      "start_s": 26.0,
+      "end_s": 27.0
+    },
+    {
+      "index": 14,
+      "as": "dir",
+      "cmd": "motor_dir 1",
+      "step_total_seconds": 0.5,
+      "phase": "pre_start",
+      "start_s": 27.0,
+      "end_s": 27.5
+    },
+    {
+      "index": 15,
+      "as": "mot_dir",
+      "cmd": "motor_status",
+      "step_total_seconds": 1.0,
+      "phase": "pre_start",
+      "start_s": 27.5,
+      "end_s": 28.5
+    },
+    {
+      "index": 16,
+      "as": "arm",
+      "cmd": "motor_arm",
+      "step_total_seconds": 1.0,
+      "phase": "pre_start",
+      "start_s": 28.5,
+      "end_s": 29.5
+    },
+    {
+      "index": 17,
+      "as": "mot_armed",
+      "cmd": "motor_status",
+      "step_total_seconds": 1.0,
+      "phase": "pre_start",
+      "start_s": 29.5,
+      "end_s": 30.5
+    },
+    {
+      "index": 18,
+      "as": "target",
+      "cmd": "motor_target 300",
+      "step_total_seconds": 0.5,
+      "phase": "pre_start",
+      "start_s": 30.5,
+      "end_s": 31.0
+    },
+    {
+      "index": 19,
+      "as": "start",
+      "cmd": "motor_start",
+      "step_total_seconds": 0.5,
+      "phase": "motion_active",
+      "start_s": 31.0,
+      "end_s": 31.5
+    },
+    {
+      "index": 20,
+      "as": "cruise",
+      "cmd": "motor_status",
+      "step_total_seconds": 1.0,
+      "phase": "motion_active",
+      "start_s": 31.5,
+      "end_s": 32.5
+    },
+    {
+      "index": 21,
+      "as": "learn_cancel",
+      "cmd": "diag_profile learn 32 250 350 1",
+      "step_total_seconds": 0.5,
+      "phase": "motion_active",
+      "start_s": 32.5,
+      "end_s": 33.0
+    },
+    {
+      "index": 22,
+      "as": "ls_cancel_bound",
+      "cmd": "diag_profile learn_status",
+      "step_total_seconds": 0.5,
+      "phase": "motion_active",
+      "start_s": 33.0,
+      "end_s": 33.5
+    },
+    {
+      "index": 23,
+      "as": "cancel",
+      "cmd": "diag_profile learn_cancel @cancel_job",
+      "step_total_seconds": 0.5,
+      "phase": "motion_active",
+      "start_s": 33.5,
+      "end_s": 34.0
+    },
+    {
+      "index": 24,
+      "as": "cancel_state",
+      "cmd": "diag_profile learn_status",
+      "step_total_seconds": 1.0,
+      "phase": "motion_active",
+      "start_s": 34.0,
+      "end_s": 35.0
+    },
+    {
+      "index": 25,
+      "as": "mot_after_cancel",
+      "cmd": "motor_status",
+      "step_total_seconds": 1.0,
+      "phase": "motion_active",
+      "start_s": 35.0,
+      "end_s": 36.0
+    },
+    {
+      "index": 26,
+      "as": "learn_done",
+      "cmd": "diag_profile learn 8 250 350 1",
+      "step_total_seconds": 0.5,
+      "phase": "motion_active",
+      "start_s": 36.0,
+      "end_s": 36.5
+    },
+    {
+      "index": 27,
+      "as": "wait_done",
+      "cmd": "diag_profile learn_status",
+      "step_total_seconds": 2.0,
+      "phase": "motion_active",
+      "start_s": 36.5,
+      "end_s": 38.5
+    },
+    {
+      "index": 28,
+      "as": "stop",
+      "cmd": "motor_stop",
+      "step_total_seconds": 0.5,
+      "phase": "motion_active",
+      "start_s": 38.5,
+      "end_s": 39.0
+    },
+    {
+      "index": 29,
+      "as": "stopped",
+      "cmd": "motor_status",
+      "step_total_seconds": 1.0,
+      "phase": "motion_active",
+      "start_s": 39.0,
+      "end_s": 40.0
+    },
+    {
+      "index": 30,
+      "as": "disarm",
+      "cmd": "motor_disarm",
+      "step_total_seconds": 0.5,
+      "phase": "post_zero",
+      "start_s": 40.0,
+      "end_s": 40.5
+    },
+    {
+      "index": 31,
+      "as": "mot_disabled",
+      "cmd": "motor_status",
+      "step_total_seconds": 1.0,
+      "phase": "post_zero",
+      "start_s": 40.5,
+      "end_s": 41.5
+    },
+    {
+      "index": 32,
+      "as": "show_pre",
+      "cmd": "diag_profile show",
+      "step_total_seconds": 1.0,
+      "phase": "post_zero",
+      "start_s": 41.5,
+      "end_s": 42.5
+    },
+    {
+      "index": 33,
+      "as": "commit",
+      "cmd": "diag_profile commit",
+      "step_total_seconds": 1.0,
+      "phase": "post_zero",
+      "start_s": 42.5,
+      "end_s": 43.5
+    },
+    {
+      "index": 34,
+      "as": "show_post",
+      "cmd": "diag_profile show",
+      "step_total_seconds": 1.0,
+      "phase": "post_zero",
+      "start_s": 43.5,
+      "end_s": 44.5
+    },
+    {
+      "index": 35,
+      "as": "ls_post",
+      "cmd": "diag_profile learn_status",
+      "step_total_seconds": 1.0,
+      "phase": "post_zero",
+      "start_s": 44.5,
+      "end_s": 45.5
+    },
+    {
+      "index": 36,
+      "as": "threads",
+      "cmd": "ps",
+      "step_total_seconds": 1.0,
+      "phase": "post_zero",
+      "start_s": 45.5,
+      "end_s": 46.5
+    },
+    {
+      "index": 37,
+      "as": "heap",
+      "cmd": "free",
+      "step_total_seconds": 1.0,
+      "phase": "post_zero",
+      "start_s": 46.5,
+      "end_s": 47.5
+    }
+  ],
+  "source_shape_wire_bounds": [
+    {
+      "as_name": "sys_pre",
+      "key": "system_status",
+      "source_shape_bytes": 198,
+      "wire_lower_bound_s": 0.017188,
+      "step_total_seconds": 1.0
+    },
+    {
+      "as_name": "mot_pre",
+      "key": "motor_status_idle",
+      "source_shape_bytes": 253,
+      "wire_lower_bound_s": 0.021962,
+      "step_total_seconds": 1.0
+    },
+    {
+      "as_name": "irq_pre",
+      "key": "safety_irq_status_closed",
+      "source_shape_bytes": 216,
+      "wire_lower_bound_s": 0.01875,
+      "step_total_seconds": 1.0
+    },
+    {
+      "as_name": "diag_pre",
+      "key": "diag_status",
+      "source_shape_bytes": 74,
+      "wire_lower_bound_s": 0.006424,
+      "step_total_seconds": 1.0
+    },
+    {
+      "as_name": "ls_pre",
+      "key": "ls_idle",
+      "source_shape_bytes": 127,
+      "wire_lower_bound_s": 0.011024,
+      "step_total_seconds": 1.0
+    },
+    {
+      "as_name": "cfg_pre",
+      "key": "tmc_config_show",
+      "source_shape_bytes": 41,
+      "wire_lower_bound_s": 0.003559,
+      "step_total_seconds": 1.0
+    },
+    {
+      "as_name": "apply",
+      "key": "tmc_config_apply",
+      "source_shape_bytes": 52,
+      "wire_lower_bound_s": 0.004514,
+      "step_total_seconds": 2.0
+    },
+    {
+      "as_name": "sys_after_apply",
+      "key": "system_status_applied",
+      "source_shape_bytes": 197,
+      "wire_lower_bound_s": 0.017101,
+      "step_total_seconds": 1.0
+    },
+    {
+      "as_name": "zero",
+      "key": "diag_profile_zero",
+      "source_shape_bytes": 93,
+      "wire_lower_bound_s": 0.008073,
+      "step_total_seconds": 13.0
+    },
+    {
+      "as_name": "zero_state",
+      "key": "ls_idle",
+      "source_shape_bytes": 127,
+      "wire_lower_bound_s": 0.011024,
+      "step_total_seconds": 1.0
+    },
+    {
+      "as_name": "pol",
+      "key": "safety_polarity_confirm",
+      "source_shape_bytes": 168,
+      "wire_lower_bound_s": 0.014583,
+      "step_total_seconds": 1.0
+    },
+    {
+      "as_name": "irq_en",
+      "key": "safety_irq_enable",
+      "source_shape_bytes": 121,
+      "wire_lower_bound_s": 0.010503,
+      "step_total_seconds": 1.0
+    },
+    {
+      "as_name": "irq_state",
+      "key": "safety_irq_status_open",
+      "source_shape_bytes": 148,
+      "wire_lower_bound_s": 0.012847,
+      "step_total_seconds": 1.0
+    },
+    {
+      "as_name": "mot_after_irq",
+      "key": "motor_status_idle",
+      "source_shape_bytes": 253,
+      "wire_lower_bound_s": 0.021962,
+      "step_total_seconds": 1.0
+    },
+    {
+      "as_name": "dir",
+      "key": "motor_dir",
+      "source_shape_bytes": 41,
+      "wire_lower_bound_s": 0.003559,
+      "step_total_seconds": 0.5
+    },
+    {
+      "as_name": "mot_dir",
+      "key": "motor_status_idle",
+      "source_shape_bytes": 253,
+      "wire_lower_bound_s": 0.021962,
+      "step_total_seconds": 1.0
+    },
+    {
+      "as_name": "arm",
+      "key": "motor_arm",
+      "source_shape_bytes": 97,
+      "wire_lower_bound_s": 0.00842,
+      "step_total_seconds": 1.0
+    },
+    {
+      "as_name": "mot_armed",
+      "key": "motor_status_armed_idle",
+      "source_shape_bytes": 252,
+      "wire_lower_bound_s": 0.021875,
+      "step_total_seconds": 1.0
+    },
+    {
+      "as_name": "target",
+      "key": "motor_target",
+      "source_shape_bytes": 51,
+      "wire_lower_bound_s": 0.004427,
+      "step_total_seconds": 0.5
+    },
+    {
+      "as_name": "start",
+      "key": "motor_start",
+      "source_shape_bytes": 42,
+      "wire_lower_bound_s": 0.003646,
+      "step_total_seconds": 0.5
+    },
+    {
+      "as_name": "cruise",
+      "key": "motor_status_cruise",
+      "source_shape_bytes": 257,
+      "wire_lower_bound_s": 0.022309,
+      "step_total_seconds": 1.0
+    },
+    {
+      "as_name": "learn_cancel",
+      "key": "learn32",
+      "source_shape_bytes": 167,
+      "wire_lower_bound_s": 0.014497,
+      "step_total_seconds": 0.5
+    },
+    {
+      "as_name": "ls_cancel_bound",
+      "key": "ls_running32",
+      "source_shape_bytes": 135,
+      "wire_lower_bound_s": 0.011719,
+      "step_total_seconds": 0.5
+    },
+    {
+      "as_name": "cancel",
+      "key": "cancel_cmd",
+      "source_shape_bytes": 111,
+      "wire_lower_bound_s": 0.009635,
+      "step_total_seconds": 0.5
+    },
+    {
+      "as_name": "cancel_state",
+      "key": "ls_cancelled",
+      "source_shape_bytes": 141,
+      "wire_lower_bound_s": 0.01224,
+      "step_total_seconds": 1.0
+    },
+    {
+      "as_name": "mot_after_cancel",
+      "key": "motor_status_cruise",
+      "source_shape_bytes": 257,
+      "wire_lower_bound_s": 0.022309,
+      "step_total_seconds": 1.0
+    },
+    {
+      "as_name": "learn_done",
+      "key": "learn8",
+      "source_shape_bytes": 165,
+      "wire_lower_bound_s": 0.014323,
+      "step_total_seconds": 0.5
+    },
+    {
+      "as_name": "wait_done",
+      "key": "ls_done8",
+      "source_shape_bytes": 319,
+      "wire_lower_bound_s": 0.027691,
+      "step_total_seconds": 2.0
+    },
+    {
+      "as_name": "stop",
+      "key": "motor_stop",
+      "source_shape_bytes": 132,
+      "wire_lower_bound_s": 0.011458,
+      "step_total_seconds": 0.5
+    },
+    {
+      "as_name": "stopped",
+      "key": "motor_status_idle",
+      "source_shape_bytes": 253,
+      "wire_lower_bound_s": 0.021962,
+      "step_total_seconds": 1.0
+    },
+    {
+      "as_name": "disarm",
+      "key": "motor_disarm",
+      "source_shape_bytes": 99,
+      "wire_lower_bound_s": 0.008594,
+      "step_total_seconds": 0.5
+    },
+    {
+      "as_name": "mot_disabled",
+      "key": "motor_status_idle",
+      "source_shape_bytes": 253,
+      "wire_lower_bound_s": 0.021962,
+      "step_total_seconds": 1.0
+    },
+    {
+      "as_name": "show_pre",
+      "key": "diag_profile_show",
+      "source_shape_bytes": 96,
+      "wire_lower_bound_s": 0.008333,
+      "step_total_seconds": 1.0
+    },
+    {
+      "as_name": "commit",
+      "key": "diag_profile_commit",
+      "source_shape_bytes": 108,
+      "wire_lower_bound_s": 0.009375,
+      "step_total_seconds": 1.0
+    },
+    {
+      "as_name": "show_post",
+      "key": "diag_profile_show",
+      "source_shape_bytes": 96,
+      "wire_lower_bound_s": 0.008333,
+      "step_total_seconds": 1.0
+    },
+    {
+      "as_name": "ls_post",
+      "key": "ls_done8",
+      "source_shape_bytes": 319,
+      "wire_lower_bound_s": 0.027691,
+      "step_total_seconds": 1.0
+    },
+    {
+      "as_name": "threads",
+      "key": "ps",
+      "source_shape_bytes": 137,
+      "wire_lower_bound_s": 0.011892,
+      "step_total_seconds": 1.0
+    },
+    {
+      "as_name": "heap",
+      "key": "free",
+      "source_shape_bytes": 83,
+      "wire_lower_bound_s": 0.007205,
+      "step_total_seconds": 1.0
+    }
+  ]
+}

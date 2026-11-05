@@ -3,7 +3,7 @@
     "case": "I1_P8意图_修前整条巡航合同(禁能侧ENN)判红",
     "side": "REPAIRED",
     "executor": "m8r3_serial_chain_r7f8.py",
-    "sha256_head": "c7fe3896e829",
+    "sha256_head": "093c8408a019",
     "want": {
       "status": "STOP",
       "code": "PROFILE_NOT_RUNNING",
@@ -107,7 +107,7 @@
     "case": "I2_P7意图_第二次arm在写入尝试之前拒",
     "side": "REPAIRED",
     "executor": "m8r3_serial_chain_r7f8.py",
-    "sha256_head": "c7fe3896e829",
+    "sha256_head": "093c8408a019",
     "want": {
       "code": "ARM_SECOND_ATTEMPT_REFUSED",
       "tx_count": {
@@ -287,7 +287,7 @@
     "case": "I3_P6意图_arm迟到回包在通电截止即进收口",
     "side": "REPAIRED",
     "executor": "m8r3_serial_chain_r7f8.py",
-    "sha256_head": "c7fe3896e829",
+    "sha256_head": "093c8408a019",
     "want": {
       "code": "MISSING_RESPONSE_PROMPT",
       "tx_must": [
@@ -434,7 +434,7 @@
     "case": "I4_F5b1_开IRQ后arm前失败_尾部disable与status仍发出",
     "side": "REPAIRED",
     "executor": "m8r3_serial_chain_r7f8.py",
-    "sha256_head": "c7fe3896e829",
+    "sha256_head": "093c8408a019",
     "want": {
       "code": "PROFILE_NOT_RUNNING",
       "disarm": "NOT_ARMED",
@@ -580,7 +580,7 @@
     "case": "I5_F5b2_收口全部无响应_五条各有发送机会",
     "side": "REPAIRED",
     "executor": "m8r3_serial_chain_r7f8.py",
-    "sha256_head": "c7fe3896e829",
+    "sha256_head": "093c8408a019",
     "want": {
       "code": "CLEANUP_UNCONFIRMED",
       "disarm": "UNKNOWN",
@@ -615,6 +615,7 @@
         "motor_status:NO_RESPONSE",
         "DISARM_NOT_CONFIRMED FIELD_MISSING_state FIELD_MISSING_hz FIELD_MISSING_armed FIELD_MISSING_drvreq FIELD_MISSING_fb FIELD_MISSING_off",
         "IRQ_TAIL_safety_irq_disable:NO_RESPONSE",
+        "IRQ_TAIL_DISABLE_NO_DETACH_LINE",
         "IRQ_TAIL_safety_irq_status:NO_RESPONSE",
         "IRQ_TAIL_NOT_CLOSED"
       ],
@@ -806,7 +807,7 @@
     "case": "I6_F5b2_申报4秒预留在开口之前拒(旧件没有这条 CLI 申报口)",
     "side": "REPAIRED",
     "executor": "m8r3_serial_chain_r7f8.py",
-    "sha256_head": "c7fe3896e829",
+    "sha256_head": "093c8408a019",
     "want": {
       "code": "CLEANUP_RESERVE_CANNOT_COVER_ALL_SENDS",
       "reserve": 4.0,
@@ -882,7 +883,7 @@
     "case": "I7_F5c_前置等待后arm仍放出去_收口拿不到预留",
     "side": "REPAIRED",
     "executor": "m8r3_serial_chain_r7f8.py",
-    "sha256_head": "c7fe3896e829",
+    "sha256_head": "093c8408a019",
     "want": {
       "code": "STEP_DEADLINE_BEFORE_WRITE",
       "tx_must_none": [

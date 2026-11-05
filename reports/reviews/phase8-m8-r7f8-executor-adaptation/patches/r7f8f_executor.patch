@@ -62,7 +62,60 @@
                      "fields": summ}
      # expect_flag_bits: 提交资格按**位**判, 不再把"字段字符串前后相同"当合法(审核 §2D 第 2 条)。
      # 0x0010 连 COMMITTED(bit0) 都没置, 却曾因为"两处都印 0010"被判成一致。
-@@ -894,9 +882,14 @@
+@@ -888,15 +876,72 @@
+ 
+ 
+ # --------------------------------------------------------------------------- 起转硬截止
++STEP_TOTAL_KEY = "step_total_seconds"
++MOTION_END_KEY = "motion_end_evidence"
++# §4/裁定一: 正常 motor_stop 的**发送尝试**必须排在起转后 8 s 内 —— 这是计划侧的静态界,
++# 现场判读单独核实际 TX 时刻。常量放在这里让检查器与交接引用同一个数。
++NORMAL_STOP_SEND_SECONDS = 8
++
++
++def step_total_problem(st):
++    """裁定二第 1 条: 申报的单步总窗必须是**有限正数**(非 bool、不 int 截断)。
++
++    返回具名问题串, None=合法或没申报。轮询步骤还要求 `poll.until_seconds <= 本步总窗`
++    (裁定二第 2 条): 否则"总窗"含不住它自己申报的轮询时间, 就是漏算。
++    """
++    if STEP_TOTAL_KEY not in st:
++        return None
++    v = st[STEP_TOTAL_KEY]
++    if isinstance(v, bool):
++        return "BOOL_VALUE"
++    if not isinstance(v, (int, float)):
++        return "NOT_A_NUMBER(%s)" % type(v).__name__
++    f = float(v)
++    if f != f or abs(f) == float("inf"):
++        return "NOT_FINITE(%r)" % v
++    if f <= 0:
++        return "NON_POSITIVE(%r)" % v
++    p = st.get("poll") or {}
++    if p and float(p.get("until_seconds", 0) or 0) > f:
++        return "POLL_UNTIL_EXCEEDS_STEP_TOTAL(until=%r>total=%r)" % (
++            p.get("until_seconds"), v)
++    return None
++
++
++def step_window(st, slack=SLACK_SECONDS):
++    """这一步的等待上限(秒)与其来源 —— 执行器、计划校验、预算镜像与仿真**都调这里**。
++
++    * 申报了 `step_total_seconds`: 该值**已经包含本步全部等待与余量** => 原样取用(保留 0.5
++      这样的小数), **不再加 SLACK**(裁定二第 1 条);
++    * 没申报: 回到 legacy = 申报秒数 + SLACK_SECONDS —— 冻结的 R7F7 计划与旧计划一字不变
++      (裁定二第 3 条), 也不许把全局 SLACK 改成 0 来"统一"。
++    返回 (窗口秒数, 来源标签)。
++    """
++    v = st.get(STEP_TOTAL_KEY)
++    if v is not None:
++        return float(v), STEP_TOTAL_KEY
++    return int(st.get("seconds", 3)) + slack, "legacy_seconds_plus_slack"
++
++
+ class MotionBudget:
+     """motor_start 的发送尝试一旦建立, 后续任何动作只能用剩余预算; 清理另给保留段。"""
+ 
      def __init__(self, clock, cap_seconds, reserve=CLEANUP_RESERVE_SECONDS):
          self.clock = clock
          self.cap = float(cap_seconds)
@@ -75,12 +128,67 @@
 +        self.session_abs_dl = None
 +        # F5c: 业务侧绝对截止 = session_abs_dl - reserve(只有本会话可能建立收口义务时才设)。
 +        self.business_dl = None
++        # G1(A 裁定一): 可信零速快照的确认时刻(**相对 t0 的运动耗时**)与证据摘要。
++        # None => 运动 cap 仍约束后面的业务与清理; 置位后只解开**运动**那一项,
++        # arm 通电 18 s 与收口预留 7 s / 会话 90 s 封顶**一律不变**。
++        self.motion_end = None
++        self.motion_end_evidence = None
  
      @property
      def armed(self):
-@@ -907,15 +900,31 @@
+@@ -906,16 +951,86 @@
+         if self.t0 is None:
              self.t0 = self.clock.monotonic()
  
++    @property
++    def cap_active(self):
++        """运动 cap 是否还在约束本会话 —— 裁定一: 可信零速确认后**不再**约束停机后的业务。"""
++        return self.t0 is not None and self.motion_end is None
++
++    def confirm_zero_speed(self, elapsed_from_t0, evidence):
++        """裁定一: 唯一正常业务结束点。保留 t0(不许靠清空 t0 放行第二次 start), 记下结束时刻。"""
++        if self.t0 is None:
++            raise Stop("MOTION_END_WITHOUT_START", "运动计时还没起算就收到零速确认申报")
++        if self.motion_end is not None:
++            raise Stop("MOTION_END_ALREADY_CONFIRMED",
++                       json.dumps({"already_at_s": round(self.motion_end, 3),
++                                   "attempt_at_s": round(elapsed_from_t0, 3)}))
++        if elapsed_from_t0 > self.cap:
++            # "12 秒已到不能用一份迟到零速回包倒填为按时完成"。
++            raise Stop("MOTION_ZERO_CONFIRMATION_LATE", json.dumps(
++                {"elapsed_from_start_s": round(elapsed_from_t0, 3),
++                 "motion_cap_seconds": self.cap}, ensure_ascii=False))
++        self.motion_end = float(elapsed_from_t0)
++        self.motion_end_evidence = evidence
++        return self.motion_end
++
++    def past_business_hard_deadline(self):
++        """轮询/等待用: 现在是否已越过"仍生效的最早硬截止"。
++
++        等价于修前那句 `business_deadline(0) <= now`(cap 项 + 业务项), 但零速确认后 cap 项
++        自动退出 —— 停机后的 commit/show/ps/free 不该再被旧的 t_start+12 夹住。
++        """
++        now = self.clock.monotonic()
++        dl = []
++        if self.cap_active:
++            dl.append(self.t0 + self.cap)
++        if self.business_dl is not None:
++            dl.append(self.business_dl)
++        return bool(dl) and now >= min(dl)
++
++    def business_deadline_window(self, window_seconds):
++        """和 business_deadline() 同一组夹紧项, 但入参是**已解析好的单步总窗**(不再加 slack)。
++
++        裁定二第 3 条的落点: 检查器用总窗、执行器仍加旧 3 秒 是不允许的, 所以两边都走
++        step_window() 取值, 再由这个方法夹截止。legacy 计划传 want+SLACK 时与修前逐值相同。
++        """
++        base = self.clock.monotonic() + float(window_seconds)
++        if self.cap_active:
++            base = min(base, self.t0 + self.cap)
++        if self.business_dl is not None:
++            base = min(base, self.business_dl)
++        return base
++
      def business_deadline(self, want_seconds, slack=SLACK_SECONDS):
 -        """业务动作的截止 = min(本步想等的, 硬截止) ; 硬截止已过 => 0(不许再做业务动作)。"""
 -        if self.t0 is None:
@@ -102,21 +210,27 @@
  
      def cleanup_deadline(self):
 -        return (self.t0 + self.cap + self.reserve) if self.t0 is not None \
+-            else self.clock.monotonic() + self.reserve
 +        """收口绝对截止 = 起转硬截止 + **申报的**收口预留, 再被会话总截止夹一次。
 +
 +        F5b 两项都在这里落地: 预留取申报值(本轮 7 s, 足够五条各 1.2 s 窗), 会话总截止仍然
 +        封顶(不因为申报了预留就把 90 s 放宽)。被夹短到排不下时不静默少发——cleanup() 入口
 +        先具名披露 CLEANUP_RESERVE_SHORT_BY_SESSION_DEADLINE, 每条自己的窗到点也照旧具名。
 +        """
-+        base = (self.t0 + self.cap + self.reserve) if self.t0 is not None \
-             else self.clock.monotonic() + self.reserve
++        # 裁定一: 运动确认后不能再把收口夹在旧的 t_start+12(+7) 里 —— 改用"从现在起 7 秒预留",
++        # 但下面的 session_abs_dl 封顶一字不动(预留不是把会话拉长的手段)。
++        if self.motion_end is not None:
++            base = self.clock.monotonic() + self.reserve
++        else:
++            base = (self.t0 + self.cap + self.reserve) if self.t0 is not None \
++                else self.clock.monotonic() + self.reserve
 +        if self.session_abs_dl is not None:
 +            return min(base, self.session_abs_dl)
 +        return base
  
      def remaining(self):
          if self.t0 is None:
-@@ -942,12 +951,16 @@
+@@ -942,12 +1057,16 @@
          self.cap = float(cap_seconds) if cap_seconds else None
          self.t0 = None
          self.actual = None
@@ -133,7 +247,7 @@
          if self.cap is not None and self.t0 is None:
              self.t0 = self.clock.monotonic()
  
-@@ -966,6 +979,82 @@
+@@ -966,6 +1085,179 @@
          if self.t0 is not None and self.actual is None:
              self.actual = self.clock.monotonic() - self.t0
          return self.actual
@@ -213,10 +327,107 @@
 +    out["sim_end_seconds"] = round(t, 3)
 +    out["first_step_refused_before_write"] = first_refused
 +    return out
++
++
++
++
++def business_segments_ruling(steps, cap=None, reserve=None, total=None,
++                             slack=SLACK_SECONDS):
++    """A 预算裁定(2026-11-05)之后的静态三段: 起转前 / 活动(起转→可信零速) / 零速后。
++
++    与 business_segments() 的三点区别, 一一对应裁定的两句:
++      * 运动计时的**结束点**是申报 `motion_end_evidence` 的那一步(一份可信零速快照), 不是第一条
++        stop/disarm —— stop 的回话本身不结束运动计时(裁定一);
++      * 每步窗口取 step_window() 的**解析值**: 申报了 step_total_seconds 就是含全部等待与余量的
++        总窗, **不再叠 SLACK**(裁定二), 因此 declared==bound; 未申报的步仍按 seconds+SLACK;
++      * 旧语义算出来的 91.0/23.0 原样留在 `legacy` 字段里并写明它对应"每步再加 SLACK / stop 不
++        解除运动计时", 转绿不等于抹掉(A 的 §4 明令)。
++    时间轴与 A 的 `budget_check.py` 同一定义: 步的 start_s 是前面所有步窗口之和, end_s 再加上
++    本步窗口; stop/零速/禁能的界都按这个累计轴取。
++    """
++    rows = [s for s in steps if isinstance(s, dict) and s.get("cmd")]
++    cmd0 = [str(s.get("cmd", "")).split(" ")[0] for s in rows]
++    asname = [s.get("as") for s in rows]
++
++    def idx_of(name):
++        return asname.index(name) if name in asname else None
++
++    spin = cmd0.index("motor_start") if "motor_start" in cmd0 else None
++    zero = next((i for i, s in enumerate(rows) if s.get(MOTION_END_KEY)), None)
++    stop = next((i for i in range(spin if spin is not None else 0, len(rows))
++                 if cmd0[i] in ("motor_stop", "motor_disarm")), None)
++    arm = cmd0.index("motor_arm") if "motor_arm" in cmd0 else None
++    disabled = idx_of("mot_disabled")
++
++    win = [step_window(s, slack)[0] for s in rows]
++    starts, acc = [], 0.0
++    for w in win:
++        starts.append(acc)
++        acc += w
++    ends = [starts[i] + win[i] for i in range(len(rows))]
++
++    def seg(lo, hi):
++        """[lo, hi] 闭区间的 (步数, 申报总窗); 区间无效返回 (0, 0.0)。"""
++        if lo is None or hi is None or hi < lo:
++            return 0, 0.0
++        return hi - lo + 1, round(sum(win[lo:hi + 1]), 3)
++
++    pre_n, pre_w = seg(0, (spin - 1) if spin is not None else None)
++    act_n, act_w = seg(spin, zero)
++    post_n, post_w = seg((zero + 1) if zero is not None else None, len(rows) - 1)
++    if spin is not None and zero is None:
++        # 没有可信零速结束的申报 => 运动计时**不解除**, 起转之后所有内容都还在 t0+cap 里
++        # (这正是裁定一之前那条红的成因; 这里如实把它算回 cap, 不留绿灯)。
++        act_n, act_w = len(rows) - spin, round(sum(win[spin:]), 3)
++        post_n, post_w = 0, 0.0
++    business_total = round(sum(win), 3)
++    business_budget = (round(float(total) - float(reserve), 3)
++                       if total is not None and reserve is not None else None)
++    # 保守式(裁定 §3 最后一行): 用**整段 12 s cap** 替掉实际活动窗, 再加上停机后内容与预留。
++    conservative_total = (round(pre_w + float(cap) + post_w + float(reserve), 3)
++                          if cap is not None and reserve is not None else None)
++    conservative_arm = (round(starts[spin] - starts[arm] + float(cap)
++                              + (ends[disabled] - ends[zero]), 3)
++                        if (cap is not None and arm is not None and spin is not None
++                            and zero is not None and disabled is not None) else None)
++    # legacy: 修前(F6 那一版)的两个数, **只按旧的申报字段**算 —— 加进 step_total_seconds
++    # 之后这些步的 seconds/until 原字段不动(裁定二明令), 所以旧口径仍可原样复算。
++    def legacy_w(s):
++        return float((s.get("poll") or {}).get("until_seconds") or s.get("seconds") or 0)
++
++    legacy_pre_bound = (round(sum(legacy_w(s) + slack for s in rows[:spin]), 3)
++                        if spin is not None else None)
++    legacy_after_spin = (round(sum(legacy_w(s) for s in rows[spin:]), 3)
++                         if spin is not None else None)
++    return {
++        "semantics": "A_BUDGET_RULING_20261105(motion ends at trusted zero snapshot; "
++                     "per-step total window without extra SLACK)",
++        "spin_up_index": spin, "stop_request_index": stop, "zero_confirm_index": zero,
++        "arm_index": arm, "disabled_confirm_index": disabled,
++        "pre_start_steps": pre_n, "motion_active_steps": act_n, "post_zero_steps": post_n,
++        "pre_start_seconds": pre_w, "motion_active_seconds": act_w, "post_zero_seconds": post_w,
++        "window_seconds": cap, "reserve_seconds": reserve, "session_total_seconds": total,
++        "stop_send_after_start_s": (round(starts[stop] - starts[spin], 3)
++                                    if stop is not None and spin is not None else None),
++        "zero_confirm_after_start_s": (round(ends[zero] - starts[spin], 3)
++                                       if zero is not None and spin is not None else None),
++        "arm_to_disabled_s": (round(ends[disabled] - starts[arm], 3)
++                              if disabled is not None and arm is not None else None),
++        "business_total_seconds": business_total,
++        "business_budget_seconds": business_budget,
++        "worst_declared": (round(pre_w + float(cap), 3) if cap is not None else None),
++        "conservative_total_with_cap_s": conservative_total,
++        "conservative_arm_with_cap_s": conservative_arm,
++        "steps_total": len(rows),
++        "legacy_semantics_note": "对应旧口径: 每步再加 SLACK_SECONDS、且正常 stop 不解除运动计时",
++        "legacy_pre_bound_seconds": legacy_pre_bound,
++        "legacy_after_spin_declared_seconds": legacy_after_spin,
++        "legacy_slack_seconds": slack,
++    }
  
  
  class ApprovalLedger:
-@@ -1455,7 +1544,22 @@
+@@ -1455,7 +1747,22 @@
  SNAPSHOT_FAILED_ROW = "[MOT] snapshot failed"
  MOTION_OBLIGATION_CMDS = ("motor_arm", "motor_start")
  CLEANUP_CMDS = ("motor_stop", "motor_disarm", "motor_status")
@@ -240,7 +451,7 @@
  
  # 运动状态枚举与提交位都来自产品源码, 不是本轮自造的名字:
  #   motor.h:110-116  MOTOR_IDLE=0, ACCEL, CRUISE, DECEL, FAULT  (隐式递增)
-@@ -1598,6 +1702,66 @@
+@@ -1598,6 +1905,140 @@
      return summary, bad
  
  
@@ -304,10 +515,84 @@
 +    return True, ""
 +
 +
++ZERO_ARMED_TRUE_SHAPE = ("HIGH", 1, "LOW", 0)
++ZERO_ARMED_FALSE_SHAPE = ("LOW", 0, "HIGH", 1)
++
++
++def zero_speed_contract(rows):
++    """裁定一: "新鲜、完整、可信的零速快照" => (summary, bad)。
++
++    六项合同字段必须来自**同一份** motor_status 响应(复用 disable_contract 的唯一性/齐备要求,
++    不跨响应拼字段); 然后:
++      * `state=0`、`cur_hz=0`、`tgt_hz=0`、`health=OK`;
++      * 反馈解算必须 resolved 且判决不是 CUT_BY_HARDWARE;
++      * 使能侧两套自洽形状: 仍武装(armed=1) => 请求 HIGH/pad=1 且 ENN 预期 LOW/反馈 0;
++        已禁能(armed=0) => 请求 LOW/pad=0 且 ENN 预期 HIGH/反馈 1。别的组合一律不算。
++    注意这里**不**要求 diag_off_confirmed=YES —— 那是"禁能已证得"的字段, 不是零速字段,
++    stop 之后仍武装的那份真实回包就是 NO。
++    """
++    summ, _bad = disable_contract(rows)
++    if summ is None:
++        return None, ["ZERO_SNAPSHOT_FIELDS_INCOMPLETE"]
++    bad = []
++    if summ["state_num"] != 0:
++        bad.append("state=%d(要求 0)" % summ["state_num"])
++    if summ["cur_hz"] != 0 or summ["tgt_hz"] != 0:
++        bad.append("cur_hz=%d/tgt_hz=%d(要求 0/0)" % (summ["cur_hz"], summ["tgt_hz"]))
++    if summ["health"] != "OK":
++        bad.append("health=%s" % summ["health"])
++    if summ["fb_state"] != "resolved":
++        bad.append("fb=%s(未解算的不算可信快照)" % summ["fb_state"])
++    if summ["verdict"] == "CUT_BY_HARDWARE":
++        bad.append("verdict=CUT_BY_HARDWARE(硬件切断不作为正常完成证据)")
++    shape = ZERO_ARMED_TRUE_SHAPE if summ["armed"] == 1 else \
++        (ZERO_ARMED_FALSE_SHAPE if summ["armed"] == 0 else None)
++    if shape is None:
++        bad.append("armed=%d(只认 0/1)" % summ["armed"])
++    else:
++        got = (summ["drv_request"], summ["pad"], summ["expected_ENN"], summ["enn_fb"])
++        if got != shape:
++            bad.append("使能侧形状=%s 要求 %s(armed=%d 那一套自洽值)"
++                       % (got, shape, summ["armed"]))
++    return summ, bad
++
++
++def motion_end_gate(budget, st, cmd, txt, start_attempts, stop_confirmed, asname, led, clock):
++    """裁定一: 只在**实际执行路径**上按证据释放运动计时(不许只在静态表上切开)。
++
++    全部前提缺一不可: 本会话已尝试过那唯一一次 start; 其后有一条**正常 motor_stop** 已发送
++    并拿到成功响应(stop_confirmed 由调用点在判 OK 后置位); 这一步自己申报 motion_end_evidence;
++    命令就是 motor_status; 同一份回包通过 zero_speed_contract。任何一项没满足 => 运动 cap 继续。
++    """
++    if not st.get(MOTION_END_KEY) or cmd != "motor_status":
++        return None
++    miss = []
++    if start_attempts < 1:
++        miss.append("本会话没有 motor_start 的写入尝试(不能关闭一笔不存在的运动)")
++    if not stop_confirmed:
++        miss.append("本会话没有已发送且判 OK 的正常 motor_stop(回话本身不算零速)")
++    if not budget.armed:
++        miss.append("运动计时还没起算")
++    if miss:
++        raise Stop("MOTION_END_PRECONDITION_MISSING", json.dumps(
++            {"as": asname, "missing": miss}, ensure_ascii=False))
++    summ, bad = zero_speed_contract(_rows_of(txt))
++    if bad:
++        # 残缺/矛盾/旧形状的快照 => 运动义务照旧, 并给出具名原因(不静默放行)。
++        raise Stop("MOTION_END_SNAPSHOT_NOT_TRUSTWORTHY", json.dumps(
++            {"as": asname, "bad": bad, "snapshot": summ}, ensure_ascii=False))
++    elapsed = clock.monotonic() - budget.t0
++    budget.confirm_zero_speed(elapsed, {"as": asname, "snapshot": summ})
++    led.ev("MOTION_TIMER_ENDED", **{"as": asname, "elapsed_from_start_s": round(elapsed, 3),
++                                    "motion_cap_seconds": budget.cap,
++                                    "arm_deadline_kept": True})
++    return round(elapsed, 3)
++
++
  def _ev_or_defer(led, deferred, kind, **kw):
      """清理框架内的**记账写入**: 写不进去绝不许抛, 只把这份事件原样收进内存清单 `deferred`。
  
-@@ -1635,7 +1799,8 @@
+@@ -1635,7 +2076,8 @@
  
  
  def cleanup(port, led, clock, budget, transport, fixture, feed_hook=None,
@@ -317,7 +602,7 @@
      """义务建立后的唯一清理路径(M6 语义 + R3-B 分段窗): motor_stop -> motor_disarm -> motor_status。
      返回 (disarm_state, errors); 本函数**绝不**抛: 主错由调用方保留, 清理失败单独记账。
      三条命令各有自己的确认窗(总保留量分三段), 任何一条没回都**不减少**后面一条的发送机会 ——
-@@ -1652,7 +1817,29 @@
+@@ -1652,7 +2094,29 @@
      hard = budget.cleanup_deadline()
      out_dir = led.out
      status_rows = []
@@ -348,7 +633,7 @@
          dl = min(hard, clock.monotonic() + CLEANUP_WINDOW_SECONDS)
          if clock.monotonic() >= hard:
              errors.append("CLEANUP_HARD_DEADLINE_BEFORE_" + cmd)
-@@ -1700,12 +1887,68 @@
+@@ -1700,12 +2164,68 @@
          errors.extend(errs)
          if cmd == "motor_status":
              status_rows = rows
@@ -422,7 +707,7 @@
      # 三条必要撤能已经发完、禁能判据已经算完, 现在才回头尽力落证。失败也只是多一条披露:
      # **不**因为"日志写成功"而撤销已发送的事实, 也**不**因为写失败就把本场报成成功。
      _flush_deferred_ev(led, deferred_ev, errors)
-@@ -1909,7 +2152,13 @@
+@@ -1909,7 +2429,13 @@
              pass                        # 注入: 板子不回话 => 只能靠截止时间具名停止
          else:
              key = st.get("key") or cmd
@@ -437,7 +722,7 @@
              if seq:                     # 轮询用**申报过的**响应序列(如先 ACCEL 后 CRUISE), 越界取最后一份
                  resp = seq[min(attempt, len(seq)) - 1]
              else:
-@@ -2014,7 +2263,7 @@
+@@ -2014,7 +2540,7 @@
          raise Stop("JOB_BIND_TEXT_MISSING", str(txt_path))
  
  
@@ -446,7 +731,7 @@
      """E2: 把**这一步自己**的完整响应里唯一整行的 STARTED 绑成命名作业 ID。
      先过原字节门与步骤判据(调用点在 verdict OK 之后), 再发布绑定; 参数(n/lo/hi/dir)必须与
      计划里申报的一致 —— 否则"取消的是另一枚作业"这种错绑会在写之前被拒。"""
-@@ -2043,13 +2292,23 @@
+@@ -2043,13 +2569,23 @@
      if bad:
          raise Stop("JOB_PARAMS_MISMATCH",
                     "as=%s name=%s 受理参数与计划申报不符 %s" % (asname, name, bad))
@@ -471,7 +756,7 @@
             rx_sha256=sha_of(raw), row=bindings[name]["row"])
  
  
-@@ -2140,6 +2399,166 @@
+@@ -2140,6 +2676,166 @@
                 "as=%s 取消响应里没有可判定的受理/未捕获行(REFUSED 线在业务层已先停)" % asname)
  
  
@@ -638,7 +923,7 @@
  def poll_command_step(port, cmd, st, asname, idx, out, step_dl, transport, fixture, silent,
                        led, clock, budget, results, bindings=None):
      """起转后的**有限轮询**(审核 §2D 第 3 条): 一条立即查询或 tgt>0 都不算稳定巡航。
-@@ -2162,6 +2581,10 @@
+@@ -2162,6 +2858,10 @@
          results.append(dict({"as": asname, "kind": "command_poll", "cmd": cmd, "attempt": n,
                               "poll_gate": gate,
                               "rx_bytes": nbytes, "rx_sha256": sha_of(raw), "txt": txt}, **v))
@@ -649,7 +934,20 @@
          if v["verdict"] == "OK":
              check_job_expect(st, txt, bindings, asname)
              led.ev("POLL_OK", **{"as": asname, "attempts": n, "poll_gate": gate,
-@@ -2200,10 +2623,33 @@
+@@ -2188,8 +2888,10 @@
+                 {"as": asname, "attempts": n, "max_attempts": int(max_attempts),
+                  "last": v.get("code"), "state": state, "poll_gate": gate},
+                 ensure_ascii=False))
+-        if clock.monotonic() + interval >= until or (budget.armed and
+-                                                    budget.business_deadline(0) <= clock.monotonic()):
++        # G1/G2: 轮询的"最早硬截止"改走 past_business_hard_deadline() —— 与修前逐值等价
++        # (cap 项 + 收口前业务项), 但零速确认后 cap 项退出; 且**每份尝试共用同一个 until**,
++        # 不随次数刷新(裁定二第 1/5 条)。
++        if clock.monotonic() + interval >= until or budget.past_business_hard_deadline():
+             raise Stop("POLL_WINDOW_EXPIRED", json.dumps(
+                 {"as": asname, "attempts": n, "last": v.get("code"), "state": state,
+                  "poll_gate": gate, "in_progress_states": list(in_states or []),
+@@ -2200,10 +2902,33 @@
          clock.sleep(interval)
  
  
@@ -684,16 +982,17 @@
      """一个会话 = 一个端口 = 一个写者。
  
      与 R1 交付版的三处实质差别:
-@@ -2245,6 +2691,8 @@
+@@ -2245,6 +2970,9 @@
      obligation = False
      cleanup_overruns = []
      reservations = []
 +    start_attempts = 0
++    stop_confirmed = False         # G1: 业务步里"已发送且判 OK 的正常 motor_stop"(零速确认的前提之一)
 +    irq_attempted = False          # F5: 只记"是否**尝试过** safety_irq_enable", 决定固定尾部走不走
      used = used_box if used_box is not None else {}
      # 这本账在开口之前就要能用: "试了但没开成"也必须留痕, 所以 spend 定义在 try 之前。
      quota = quota_box if quota_box is not None else (dict(plan["quota"]) if plan else {})
-@@ -2284,14 +2732,48 @@
+@@ -2284,14 +3012,48 @@
          led.ev("QUOTA_CONSUMED", name=name, n=n, left=quota[name])
          return None
  
@@ -744,7 +1043,7 @@
          spend("port_open", 1)               # 先记账再尝试开口(尝试数 == 扣减数)
          if transport == "stub":
              script = [l.encode("utf-8") + b"\r\n" for l in fixture.get("boot_bytes", [])]
-@@ -2360,6 +2842,10 @@
+@@ -2360,6 +3122,10 @@
                  if r["verdict"] != "OK":
                      raise Stop(r["code"], r.get("detail", ""))
                  continue
@@ -755,7 +1054,7 @@
              # ---- R6A §4: 命令 -> 额度键的交叉核对, 缺声明/错键/n 不符都在这条 write 之前拒 ----
              need_key = quota_key_for_command(cmd)
              declared = st.get("quota")
-@@ -2379,19 +2865,32 @@
+@@ -2379,19 +3145,46 @@
                  raise Stop("QUOTA_STEP_UNDECLARED",
                             "as=%s cmd=%s 会改变设备/持久状态, 必须申报额度键 %s(n=1) 才允许发送"
                             % (asname, cmd, need_key))
@@ -766,11 +1065,21 @@
 -            step_dl = budget.business_deadline(want) if (cmd == "__watch__" or budget.armed) \
 -                else min(clock.monotonic() + want + SLACK_SECONDS,
 -                         clock.monotonic() + total_deadline_seconds)
++            # G2(裁定二): 单步窗口由 step_window() 给出 —— 申报了 step_total_seconds 就是那个
++            # 值(含全部等待与余量, **不再加 SLACK**, 也不 int 截断); 没申报走 legacy。
++            problem = step_total_problem(st)
++            if problem:
++                # 非法值在**开口与写入之前**具名拒绝(不等到超时才红)。
++                raise Stop("STEP_TOTAL_SECONDS_INVALID", json.dumps(
++                    {"as": asname, "cmd": cmd, "index": idx, "problem": problem,
++                     "declared": st.get(STEP_TOTAL_KEY)}, ensure_ascii=False))
++            window, window_src = step_window(st)
 +            # F5c: 这一步(以及它下面的读/轮询/等待)受**业务**截止约束, 不是会话总截止 ——
 +            # 差额就是留给五条收口的预留。may_obligate=False 的只读场两者相同。
-+            step_dl = min(clock.monotonic() + want + SLACK_SECONDS, business_abs_dl)
++            step_dl = min(clock.monotonic() + window, business_abs_dl)
 +            if cmd == "__watch__" or budget.armed:
-+                step_dl = min(step_dl, budget.business_deadline(want))
++                step_dl = min(step_dl, budget.business_deadline_window(window))
++            st_window_gate = dict(window_seconds=round(window, 3), window_from=window_src)
              if energize.armed:
 -                # 申报的等待窗要兑现, 但取会话/通电/运动三者最早的那个截止, 不在 read 或 sleep 里放宽。
                  step_dl = min(step_dl, energize.deadline())
@@ -784,6 +1093,10 @@
 +            if step_dl <= clock.monotonic():
 +                raise Stop("STEP_DEADLINE_BEFORE_WRITE", json.dumps(
 +                    {"as": asname, "want_seconds": want,
++                     # G2: 首错里同时给"这一步实际用的总窗与它的来源", 便于核对检查器与执行器
++                     # 用的是不是同一个值(裁定二明令不许两边不一致)。
++                     "step_window_seconds": st_window_gate["window_seconds"],
++                     "window_from": st_window_gate["window_from"],
 +                     "remaining_s": round(step_dl - clock.monotonic(), 3),
 +                     "session_remaining_s": round(session_abs_dl - clock.monotonic(), 3),
 +                     # F5c: 首错细节里同时给"会话还剩多少"和"收口前业务还剩多少", 让人一眼看出
@@ -795,7 +1108,7 @@
              if budget.armed and step_dl <= clock.monotonic():
                  raise Stop("MOTION_BUDGET_EXHAUSTED", "as=%s want=%ds" % (asname, want))
              if cmd == "__watch__":
-@@ -2450,16 +2949,15 @@
+@@ -2450,16 +3243,15 @@
                  # 义务与截止起点都在**写之前**: 写异常/短写/应答丢失都照样走撤能清理
                  obligation = True
                  if cmd == "motor_start":
@@ -820,13 +1133,30 @@
                  led.ev("OBLIGATION_SET", cmd=cmd, t_s=round(clock.monotonic() - led.t0, 3),
                         cap_seconds=budget.cap)
              if st.get("poll"):
-@@ -2490,11 +2988,27 @@
+@@ -2467,6 +3259,9 @@
+                 _polled, polled_txt = poll_command_step(
+                     port, cmd, st, asname, idx, out, step_dl, transport, fixture,
+                     silent, led, clock, budget, results, bindings)
++                # G1: 轮询到那份**新**零速快照之后同样走释放门(证据不齐就抛具名 STOP)。
++                motion_end_gate(budget, st, cmd, polled_txt, start_attempts, stop_confirmed,
++                                asname, led, clock)
+                 continue
+             v, nbytes, txt = command_attempt(port, cmd, st, asname, raw, step_dl, transport,
+                                              fixture, silent, led, clock)
+@@ -2490,11 +3285,34 @@
              if v["verdict"] != "OK":
                  raise Stop(v["code"], json.dumps(v, ensure_ascii=False))
              # 到这里这条命令是**判据通过**的: 才允许绑定 ID、核对同作业断言, 也才允许认定撤能成立。
 -            bind_job_id(st, txt, raw, bindings, led, asname)
 +            bind_job_id(st, txt, raw, bindings, led, asname, cmd)
              check_job_expect(st, txt, bindings, asname)
++            if cmd == "motor_stop":
++                # G1: stop 判 OK 只证"已请求且产品接单", 它**不**结束运动计时;
++                # 但它是随后那份零速快照的前提之一(裁定一第 1 条第 1 小项)。
++                stop_confirmed = True
++                led.ev("MOTOR_STOP_CONFIRMED", **{"as": asname, "ends_motion_timer": False})
++            motion_end_gate(budget, st, cmd, txt, start_attempts, stop_confirmed, asname,
++                            led, clock)
 +            if st.get("job_contract") and not st.get("poll"):
 +                job_contract(st, txt, bindings, led, asname)
              if cmd == "motor_disarm" and energize.armed:
@@ -851,7 +1181,7 @@
          if ret is None:
              led.ev("SESSION_OK", session=session_id, steps=len(results))
              ret = {"status": "OK", "code": ""}
-@@ -2507,13 +3021,19 @@
+@@ -2507,13 +3325,19 @@
          ret = {"status": "STOP", "code": primary.code, "detail": primary.detail}
          led.ev("SESSION_STOP", code=primary.code, detail=primary.detail)
      finally:
@@ -873,7 +1203,7 @@
                  errors.extend(cerr)          # 清理错独立留账: 主错在 ret, 不能被吞成空成功
              except Exception as e:
                  # 清理框架自己炸了: 禁能一律 UNKNOWN(不猜"应该已经撤了"), 但端口仍要关
-@@ -2579,6 +3099,13 @@
+@@ -2579,6 +3403,13 @@
                  "obligation": obligated, "success": success,
                  "cleanup_errors": errors, "cleanup_overruns": cleanup_overruns,
                  "budget_seconds": elapsed,
@@ -887,7 +1217,7 @@
                  "energize_cap_seconds": energize.cap,
                  "energize_seconds_actual": energize.close(),
                  "job_bindings": {k: v["job_id"] for k, v in bindings.items()},
-@@ -3147,6 +3674,111 @@
+@@ -3147,6 +3978,187 @@
                 ("PASS" if ok_t else "FAIL", caps, sum(c for _, c in caps), total, starts))
      if not ok_t:
          bad += 1
@@ -925,36 +1255,73 @@
 +        may_ob = [i for i, s in enumerate(steps_r) if isinstance(s, dict)
 +                  and str(s.get("cmd", "")).split(" ")[0] in
 +                  ("motor_arm", "motor_start", "safety_irq_enable")]
-+        bs = business_segments(steps_r, cap=mc, reserve=rs, total=td)
++        # G3(A 预算裁定): 静态三段改用**裁定语义**的函数(结束点=可信零速快照那一步,
++        # 单步窗=step_window() 的解析值)。旧函数 business_segments() 保留不删 —— 它是
++        # legacy 语义的参照实现, 交接里还要用它复算那 91/23 两个数。
++        bs = business_segments_ruling(steps_r, cap=mc, reserve=rs, total=td)
++        arm_dl = sg.get("arm_energize_deadline_seconds")
 +        bad_s = []
 +        if may_ob and td is not None and rs is not None:
 +            if bs["worst_declared"] + rs > td + 1e-9:
 +                bad_s.append("三段互不重叠合计(申报窗, cap 只算一次)=%s + 预留=%s > 总窗=%s"
 +                             % (bs["worst_declared"], rs, td))
-+            if bs["spin_up_index"] is not None and mc is not None and \
-+                    bs["after_spin_declared"] > mc + 1e-9:
-+                bad_s.append("起转后申报内容=%s(运动窗内 %s + 停机后 %s) > cap=%s"
-+                             "=> 执行器不会在 stop 清 t0, 这些步骤同被 t0+cap 夹住, 计划自己排不下"
-+                             % (bs["after_spin_declared"], bs["in_motion_declared"],
-+                                bs["post_stop_declared"], mc))
++            # 裁定一: 运动 cap 只约束**起转→可信零速确认**那一段; 零速之后的内容改由会话业务
++            # 截止(总窗-预留)约束, 不再叠在 cap 上。零速申报缺失(zero_confirm_index=None)时
++            # 运动计时不解除, 这条按旧口径判(活动+停机后都算进 cap) => 不给"忘了申报"留绿灯。
++            if bs["spin_up_index"] is not None and mc is not None:
++                act = bs["motion_active_seconds"]
++                if bs["zero_confirm_index"] is None:
++                    act = round(act + bs["post_zero_seconds"], 3)
++                if act > mc + 1e-9:
++                    bad_s.append("起转→可信零速确认的活动内容=%s > cap=%s"
++                                 "(裁定一后运动 cap 只管这一段)" % (act, mc))
++                if bs["post_zero_seconds"] > (bs["business_budget_seconds"] or 0.0) + 1e-9:
++                    bad_s.append("零速确认后内容=%s > 业务预算=%s"
++                                 % (bs["post_zero_seconds"], bs["business_budget_seconds"]))
++            if bs["stop_send_after_start_s"] is not None and \
++                    sg.get("normal_stop_send_by_seconds") is not None and \
++                    bs["stop_send_after_start_s"] > \
++                    float(sg["normal_stop_send_by_seconds"]) + 1e-9:
++                # 这条只在阶段**申报了**那个数时才判(现场包申报 §4 的 8 s): 合成夹具的窗口是按
++                # 它自己的场景放大的(62 s cap), 没申报这条业务规则, 不许拿现场的值去判它。
++                bad_s.append("正常 stop 的发送尝试排在起转后 %s s > 申报的 %s s"
++                             % (bs["stop_send_after_start_s"], sg["normal_stop_send_by_seconds"]))
++            if bs["zero_confirm_after_start_s"] is not None and mc is not None and \
++                    bs["zero_confirm_after_start_s"] > mc + 1e-9:
++                bad_s.append("按申报窗累计, 可信零速确认要到起转后 %s s > cap=%s"
++                             % (bs["zero_confirm_after_start_s"], mc))
++            if bs["arm_to_disabled_s"] is not None and \
++                    bs["arm_to_disabled_s"] > (arm_dl if arm_dl is not None else 1e9) + 1e-9:
++                bad_s.append("按申报窗累计, arm→可信禁能确认 %s s > 通电截止=%s"
++                             % (bs["arm_to_disabled_s"], arm_dl))
 +        bad_w = []
 +        if may_ob and bs["business_budget_seconds"] is not None:
-+            fr = bs["first_step_refused_before_write"]
-+            if fr is not None:
-+                bad_w.append("每步都慢到 SLACK=%s 上限时, 第 %d 步(%s)在写之前就没有时间"
-+                             "(已用 %s s, 上限 %s s); 总窗=%s 预留=%s"
-+                             % (bs.get("slack_seconds", SLACK_SECONDS), fr["index"] + 1,
-+                                fr["as"], fr["t_s"], fr["cap_or_budget_ceiling_s"], td, rs))
++            # 裁定二之后: 申报的**单步总窗已含余量**, 所以这里核的是"38 步总窗合计 + 预留
++            # 排不排得进总窗"以及"保守式(整段 cap)排不排得进总窗", 不再按每步叠 SLACK 推最坏。
++            if bs["business_total_seconds"] + float(rs) > float(td) + 1e-9:
++                bad_w.append("38 步总窗合计=%s + 预留=%s > 总窗=%s"
++                             % (bs["business_total_seconds"], rs, td))
++            if bs["business_total_seconds"] > bs["business_budget_seconds"] + 1e-9:
++                bad_w.append("38 步总窗合计=%s > 业务预算(总窗-预留)=%s"
++                             % (bs["business_total_seconds"], bs["business_budget_seconds"]))
++            if bs["conservative_total_with_cap_s"] is not None and \
++                    bs["conservative_total_with_cap_s"] > float(td) + 1e-9:
++                bad_w.append("保守式(起转前 + 整段 cap + 零速后 + 预留)=%s > 总窗=%s"
++                             % (bs["conservative_total_with_cap_s"], td))
 +        # 计划自己申报的三段镜像必须与这里现算的**同一套数**一致(A 的要求: 检查器与执行器
 +        # 使用同一值)。没申报镜像的历史包不判红 —— 它们字节冻结, 只登记 NA。
 +        decl = (plan.get("motion_budget") or {}).get("business_segments")
 +        mirror = "NA(计划未申报 motion_budget.business_segments)"
 +        if decl:
-+            keys = ("spin_up_index", "stop_index", "pre_steps", "in_motion_steps",
-+                    "post_stop_steps", "pre_declared", "pre_bound", "in_motion_declared",
-+                    "in_motion_bound", "post_stop_declared", "post_stop_bound",
-+                    "worst_declared", "worst_bound", "after_spin_declared",
-+                    "after_spin_bound", "window_seconds", "business_budget_seconds")
++            keys = ("spin_up_index", "stop_request_index", "zero_confirm_index",
++                    "pre_start_steps", "motion_active_steps", "post_zero_steps",
++                    "pre_start_seconds", "motion_active_seconds", "post_zero_seconds",
++                    "stop_send_after_start_s", "zero_confirm_after_start_s",
++                    "arm_to_disabled_s", "window_seconds", "reserve_seconds",
++                    "session_total_seconds", "business_total_seconds",
++                    "business_budget_seconds", "worst_declared",
++                    "conservative_total_with_cap_s", "conservative_arm_with_cap_s",
++                    "steps_total", "semantics")
 +            drift = []
 +            for k in keys:
 +                if k not in decl:
@@ -964,7 +1331,8 @@
 +                        drift.append("%s=%s!=%s" % (k, decl[k], bs[k]))
 +                elif decl[k] != bs[k]:
 +                    drift.append("%s=%r!=%r" % (k, decl[k], bs[k]))
-+            mirror = ("一致(17 项)" if not drift else "漂移: " + ",".join(drift[:6]))
++            mirror = ("一致(%d 项)" % len(keys) if not drift
++                      else "漂移: " + ",".join(drift[:6]))
 +            if drift:
 +                bad_s.append("计划申报的三段镜像与执行器现算不符 => %s" % ",".join(drift[:3]))
 +        out.append("PLAN_CLEANUP_RESERVE|%s|%s|reserve=%s floor=%.1f total=%s cap=%s%s" %
@@ -972,34 +1340,72 @@
 +                    "" if not bad_r else "|" + ";".join(bad_r)))
 +        if bad_r:
 +            bad += 1
-+        out.append("PLAN_BUSINESS_RESERVE_SPLIT|%s|%s|may_obligate=%s spin@%s stop@%s "
-+                   "pre=%s/%s(%d步) in_motion=%s/%s(%d步) post_stop=%s/%s(%d步) "
-+                   "cap=%s reserve=%s total=%s worst=%s after_spin=%s mirror=%s%s" %
++        out.append("PLAN_BUSINESS_RESERVE_SPLIT|%s|%s|may_obligate=%s spin@%s stop@%s zero@%s "
++                   "pre_start=%s(%d步) motion_active=%s(%d步) post_zero=%s(%d步) "
++                   "stop_after_start=%s zero_after_start=%s arm_to_disabled=%s "
++                   "cap=%s reserve=%s total=%s business_total=%s worst=%s cons_total=%s "
++                   "cons_arm=%s mirror=%s%s" %
 +                   (sg["id"], "PASS" if not bad_s else "FAIL", bool(may_ob),
-+                    bs["spin_up_index"], bs["stop_index"],
-+                    bs["pre_declared"], bs["pre_bound"], bs["pre_steps"],
-+                    bs["in_motion_declared"], bs["in_motion_bound"], bs["in_motion_steps"],
-+                    bs["post_stop_declared"], bs["post_stop_bound"], bs["post_stop_steps"],
-+                    mc, rs, td, bs["worst_declared"], bs["after_spin_declared"], mirror,
++                    bs["spin_up_index"], bs["stop_request_index"], bs["zero_confirm_index"],
++                    bs["pre_start_seconds"], bs["pre_start_steps"],
++                    bs["motion_active_seconds"], bs["motion_active_steps"],
++                    bs["post_zero_seconds"], bs["post_zero_steps"],
++                    bs["stop_send_after_start_s"], bs["zero_confirm_after_start_s"],
++                    bs["arm_to_disabled_s"], mc, rs, td, bs["business_total_seconds"],
++                    bs["worst_declared"], bs["conservative_total_with_cap_s"],
++                    bs["conservative_arm_with_cap_s"], mirror,
 +                    "" if not bad_s else "|" + ";".join(bad_s)))
++        # 旧口径的两个数继续留原文(A: 原来的 91/23 秒红原文继续保留, 注明对应旧语义),
++        # 这一行**不参与判红**(bad 不加), 只把"如果还按每步叠 SLACK / stop 不解除运动计时"
++        # 会算出的数摆在这里, 让人看见转绿是语义变了, 不是把数改了。
++        out.append("PLAN_BUSINESS_RESERVE_SPLIT_LEGACY_SEMANTICS|%s|INFO|%s "
++                   "legacy_pre_bound=%s legacy_after_spin=%s 本行不判红, 仅留档旧口径" %
++                   (sg["id"], bs["legacy_semantics_note"], bs["legacy_pre_bound_seconds"],
++                    bs["legacy_after_spin_declared_seconds"]))
++        # 裁定二第 1/2/3 条的静态面: 每一步的总窗必须合法、轮询窗不得超出本步总窗、
++        # 没申报的步继续走 legacy(冻结的 R7F7 计划因此一字不变)。非法值在这里就判红,
++        # 不等运行时开口(运行时那侧是 STEP_TOTAL_SECONDS_INVALID)。
++        bad_t = []
++        n_decl = 0
++        for s in steps_r:
++            if not isinstance(s, dict) or not s.get("cmd"):
++                continue
++            prob = step_total_problem(s)
++            if prob:
++                bad_t.append("%s:%s" % (s.get("as"), prob))
++            if STEP_TOTAL_KEY in s:
++                n_decl += 1
++        if may_ob and bs["zero_confirm_index"] is not None:
++            z = bs["zero_confirm_index"]
++            if str(steps_r[z].get("cmd", "")).split(" ")[0] != "motor_status":
++                bad_t.append("零速确认申报落在 %s(命令 %s), 裁定一只认 motor_status"
++                             % (steps_r[z].get("as"), steps_r[z].get("cmd")))
++        out.append("PLAN_STEP_TOTAL_WINDOWS|%s|%s|declared=%d/%d legacy=%d 非法=%s "
++                   "zero_evidence_as=%s%s" %
++                   (sg["id"], "PASS" if not bad_t else "FAIL", n_decl, bs["steps_total"],
++                    bs["steps_total"] - n_decl, bad_t[:4] or "无",
++                    steps_r[bs["zero_confirm_index"]].get("as")
++                    if bs["zero_confirm_index"] is not None else "NONE(运动计时不解除)",
++                    "" if not bad_t else "|" + ";".join(bad_t[:3])))
++        if bad_t:
++            bad += 1
 +        if bad_s:
 +            bad += 1
 +        # 最坏情况那条单独成门: 它不改运行时(收口预留始终由 business_abs_dl 硬夹保护),
 +        # 只回答"计划里的业务尾巴在最坏到达下跑到第几步" —— 红了就是**取证完整性**风险,
 +        # 不是撤能风险, 两者必须分开写, 不许混成一条"看起来更严"的判据。
-+        out.append("PLAN_BUSINESS_WORST_CASE_FIT|%s|%s|worst_bound=%s budget=%s sim_end=%s "
-+                   "first_refused=%s%s" %
-+                   (sg["id"], "PASS" if not bad_w else "FAIL", bs["worst_bound"],
-+                    bs["business_budget_seconds"], bs["sim_end_seconds"],
-+                    json.dumps(bs["first_step_refused_before_write"], ensure_ascii=False)
-+                    if bs["first_step_refused_before_write"] else "NONE",
++        out.append("PLAN_BUSINESS_WORST_CASE_FIT|%s|%s|business_total=%s budget=%s "
++                   "cons_total=%s cons_arm=%s%s" %
++                   (sg["id"], "PASS" if not bad_w else "FAIL", bs["business_total_seconds"],
++                    bs["business_budget_seconds"], bs["conservative_total_with_cap_s"],
++                    bs["conservative_arm_with_cap_s"],
 +                    "" if not bad_w else "|" + ";".join(bad_w)))
 +        if bad_w:
 +            bad += 1
      # ① 镜像身份: S0/下载/回读三处必须同源(离线就拒绝, 不等现场 READBACK_HASH_MISMATCH)
      ib = identity_consistency(plan)
      out.append("PLAN_IMAGE_IDENTITY_CONSISTENCY|all|%s|%s" %
-@@ -3562,6 +4194,13 @@
+@@ -3562,6 +4574,13 @@
      for cmd in CLEANUP_CMDS:
          if cmd not in responses:
              responses[cmd] = rows_for(table, cmd, profile)
@@ -1013,7 +1419,7 @@
      return {"boot_bytes": list(stage.get("boot_bytes", [])), "responses": responses,
              "sequence": sequence, "block": block,
              "post_reset_boot": list(stage.get("post_reset_boot", [])),
-@@ -4051,6 +4690,7 @@
+@@ -4051,6 +5070,7 @@
                                     backend=backend,
                                     motion_cap_seconds=cap,
                                     energize_cap_seconds=stg.get("arm_energize_deadline_seconds"),
@@ -1021,7 +1427,7 @@
                                     plan=plan, quota_box=quota_box, used_box=used_box,
                                     context=recorded, approval=approval, approved=approved_pkg)
                  if transport == "real":
-@@ -4135,7 +4775,16 @@
+@@ -4135,7 +5155,16 @@
                               "recorded": dict(recorded),
                               "success": res["success"], "disarm": res["disarm"],
                               "terminal": res["terminal"],
@@ -1038,7 +1444,7 @@
                               "expected_refusal": res.get("expected_refusal"),
                               "forensics": res.get("forensics"),
                               "first_cause": res.get("first_cause"),
-@@ -4236,6 +4885,9 @@
+@@ -4236,6 +5265,9 @@
      ap.add_argument("--motion-cap-seconds", type=int, default=0)
      ap.add_argument("--arm-energize-deadline-seconds", type=int, default=0,
                      help="E4: motor_arm 之后的通电保持截止(单会话工装入口; 整包按阶段申报)")
@@ -1048,7 +1454,7 @@
      ap.add_argument("--plan", help="计划 JSON: 提供后额度在发送前真实扣减(quota)")
      ap.add_argument("--approval-token")
      ap.add_argument("--expected-token")
-@@ -4431,6 +5083,7 @@
+@@ -4431,6 +5463,7 @@
                             a.total_deadline_seconds, clock, backend=backend,
                             motion_cap_seconds=a.motion_cap_seconds or None,
                             energize_cap_seconds=a.arm_energize_deadline_seconds or None,

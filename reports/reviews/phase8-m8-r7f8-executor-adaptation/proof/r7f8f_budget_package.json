@@ -1,0 +1,99 @@
+{
+  "receipt": "budget_package",
+  "round": "M8-R7F8F",
+  "package_dir": "reports/reviews/phase8-m8-r7f8-executor-adaptation/inputs/A_R7F8F_BUDGET_PKG",
+  "a_manifest_entries": 9,
+  "disk_files": 9,
+  "zip_reference": "zip 原件 42428 B / sha256 87c9d5ea76b3c008…(操作者会话附件, 不入仓)",
+  "gates": [
+    {
+      "name": "A_MANIFEST_ITEMS_RECOMPUTE",
+      "verdict": "PASS",
+      "detail": "A 清单登记 9 件(清单不列自身, 与 A 包上一版同一口径); 除清单外磁盘常规文件 9 件; 逐条复算不符=0 未列=[]"
+    },
+    {
+      "name": "REFERENCE_BYTES_EQUAL_6f2b12F_BLOB",
+      "verdict": "PASS",
+      "detail": "A 的基准 plan 28090 B/66ca8a152ede… 与 6f2b12f(完整 6f2b12fa91fecb0a8d13449bdb2cf5ab125b41c8)的 Git blob(66ca8a152ede) 逐字节相等; rows 4022306df3ad… 同理() => 裁定钉的是**裁定前那个提交**, 不是当前工作树。工作树现状: plan 与基准相等=False (裁定落地后已改动), rows 与基准相等=True。上一版拿工作树比, 计划一改就假红, 本轮改为按 blob 复算。"
+    },
+    {
+      "name": "WINDOW_TABLE_ALIGNS_38_STEPS",
+      "verdict": "PASS",
+      "detail": "38 步的 (as, cmd) 与逐条对齐, 错位=0; 三段 {'motion_active': (11, 9.0), 'post_zero': (8, 7.5), 'pre_start': (19, 31.0)} => 合计 47.5 s"
+    },
+    {
+      "name": "LIMITS_UNCHANGED",
+      "verdict": "PASS",
+      "detail": "四个固定数与 stop 8 s 上限逐字段核过未变(12/18/90/7/8); stop_request_index=28 zero_confirm_index=29(均 0 基)"
+    },
+    {
+      "name": "NO_NEGATIVE_OR_ZERO_WINDOWS",
+      "verdict": "PASS",
+      "detail": "全部为正的浮点且 <= 13.0 s; 0.5 s 的小数在表里原样保留(不是整数化后的值)"
+    },
+    {
+      "name": "A_BUDGET_CHECK_RAN_ON_MY_DISK_ITEMS",
+      "verdict": "PASS",
+      "detail": "A 的检查器 rc=0, 自报 {\"scope\": \"Arithmetic/reference byte identities only; not executor/offline_gate/hardware validation\", \"total\": 17, \"fail\": 0, \"bounds\": {\"pre_start_s\": 31.0, \"stop_request_after_start_s\": 7.5, \"zero_confirm_after_start_s"
+    },
+    {
+      "name": "BOUNDS_MATCH_A_PROOF_EXACTLY",
+      "verdict": "PASS",
+      "detail": "逐条 passed 序列相等=True; bounds 全等=True({\"pre_start_s\": 31.0, \"stop_request_after_start_s\": 7.5, \"zero_confirm_after_start_s\": 9.0, \"arm_to_disabled_s\": 13.0, \"post_zero_s\": 7.5, \"business_total_s\": 47.5, \"total_with_cleanup_s\": 54.5, \"cons)"
+    },
+    {
+      "name": "A_NEGATIVE_CONTROLS_RECORDED",
+      "verdict": "PASS",
+      "detail": "A 的三条元负控原文照录: missing_half_second_window=>STOP_REQUEST_WITHIN_8 / cleanup_shrunk=>CLEANUP_FIVE_WINDOWS_FIT_7 / command_changed=>SAME_38_COMMANDS_AND_ORDER"
+    },
+    {
+      "name": "MUT_double_every_window_expect_business_red",
+      "verdict": "PASS",
+      "detail": "突变后 A 检查器 rc=1(非零符合它的退出码约定), 未通过项=['POLL_WINDOWS_UNCHANGED', 'STOP_REQUEST_WITHIN_8', 'ZERO_CONFIRM_WITHIN_12', 'DISABLED_WITHIN_ARM_18', 'BUSINESS_FITS_83', 'BUSINESS_PLUS_RESERVE_FITS_90', 'FULL_MOTION_CAP_PLUS_POST_ZERO_FITS_90', 'ARM_WITH_FULL_MOTION_CAP_FITS_18'], 其中含 BUSINESS_FITS_83=True"
+    },
+    {
+      "name": "MUT_cleanup_reserve_four_expect_five_send_window_red",
+      "verdict": "PASS",
+      "detail": "突变后 A 检查器 rc=1(非零符合它的退出码约定), 未通过项=['CLEANUP_FIVE_WINDOWS_FIT_7', 'ORIGINAL_FIXED_LIMITS'], 其中含 CLEANUP_FIVE_WINDOWS_FIT_7=True"
+    },
+    {
+      "name": "MUT_rename_one_command_expect_identity_red",
+      "verdict": "PASS",
+      "detail": "突变后 A 检查器 rc=1(非零符合它的退出码约定), 未通过项=['SAME_38_COMMANDS_AND_ORDER'], 其中含 SAME_38_COMMANDS_AND_ORDER=True"
+    }
+  ],
+  "my_budget_check": {
+    "rc": 0,
+    "self_report": "{\"scope\": \"Arithmetic/reference byte identities only; not executor/offline_gate/hardware validation\", \"total\": 17, \"fail\": 0, \"bounds\": {\"pre_start_s\": 31.0, \"stop_request_after_start_s\": 7.5, \"zero_confirm_after_start_s\": 9.0, \"arm_to_disabled_s\": 13.0, \"post_zero_s\": 7.5, \"business_total_s\": 47.5, \"total_with_cleanup_s\": 54.5, \"conservative_total_with_full_motion_cap_s\": 57.5, \"conservative_arm_with_full_motion_cap_s\": 16.0}}",
+    "bounds": {
+      "pre_start_s": 31.0,
+      "stop_request_after_start_s": 7.5,
+      "zero_confirm_after_start_s": 9.0,
+      "arm_to_disabled_s": 13.0,
+      "post_zero_s": 7.5,
+      "business_total_s": 47.5,
+      "total_with_cleanup_s": 54.5,
+      "conservative_total_with_full_motion_cap_s": 57.5,
+      "conservative_arm_with_full_motion_cap_s": 16.0
+    },
+    "total": 17,
+    "fail": 0
+  },
+  "a_proof_reference": {
+    "total": 17,
+    "fail": 0,
+    "negative_controls": 3
+  },
+  "summary": {
+    "checks": 11,
+    "fail": 0,
+    "failed_names": []
+  },
+  "not_claimed": {
+    "executor_changed_by_this_receipt": false,
+    "offline_gate_covered_by_this_receipt": false,
+    "hardware_actions": 0,
+    "polarity_measured": false,
+    "core_protection_verified": false
+  }
+}

@@ -78,13 +78,26 @@ def main() -> int:
     ap.add_argument("--repo", required=True, type=pathlib.Path)
     a = ap.parse_args()
     root = a.repo.resolve()
+
+    def nf(rel_dir):
+        """说明行里的**件数**一律当场数盘上常规文件, 不写字面量 —— 上一版写了"A 包原件 24 件",
+        裁定包入库后那句就过期了(过期数字混在清单头里, 审核者会以为清单没重算)。"""
+        d = root / rel_dir
+        return len([p for p in d.rglob("*") if p.is_file()]) if d.is_dir() else 0
+
+    inputs_n, proof_n = nf(ROUND + "/inputs"), nf(ROUND + "/proof")
+    living = root / (ROUND + "/inputs/A_R7F8F_BUDGET_PKG/R7F8_LIVING_DRAFT.md")
+    living_id = "%d B / %s…" % (living.stat().st_size, sha(living)[:12]) if living.is_file() \
+        else "NA(不在盘上)"
     write(root, root / ROUND, "ROUND_SHA256SUMS.txt", lambda n: [
         HEAD,
         "# 生成方式: 对 %s/ 下每个常规文件直接读磁盘字节算 sha256"
-        "(派生件/生成器/补丁/四份 proof(含第一次回读判红原文)/合成计划与行表/A 包原件 24 件全在内); "
+        "(派生件/生成器/补丁/proof %d 份(含第一次回读判红原文)/合成计划与行表/inputs 里的 A 包原件 %d 件"
+        "全在内); "
         "只排除 %s/proof/ 下**尚未进 Git** 且文件名含 remote_readback 的 .txt 回执 —— 它只能在推送"
         "之后才存在, 清单不能依赖自己交付之后的产物; 已提交的回执(如 first_attempt 判红原文)与"
-        "工具件 tools/r7f8e_remote_readback.py 都是被交付的字节, 照常入列" % (ROUND, ROUND),
+        "工具件 tools/r7f8e_remote_readback.py 都是被交付的字节, 照常入列" % (ROUND, proof_n,
+                                                                              inputs_n, ROUND),
         "# 条目数=%d; 与 Git blob 的逐条复算由 %s/tools/r7f8e_staged_preflight.py(提交前)"
         "与 tools/r7f8e_remote_readback.py(推送后)完成" % (n, ROUND),
         "# 重新生成: python %s/tools/r7f8e_make_sums.py --repo <仓库根>" % ROUND],
@@ -92,8 +105,9 @@ def main() -> int:
     write(root, root / DRAFT, "ROUND_SHA256SUMS.txt", lambda n: [
         HEAD,
         "# 生成方式: 对 %s/ 下每个常规文件直接读磁盘字节算 sha256(草案原件/合并版/判据原文/工具全在内)" % DRAFT,
-        "# 本轮变化: R7F8_DRAFT_MERGED.md 按 A 包 R7F8_DRAFT_UPDATED.md 逐字承接后重算"
-        "(A_DRAFT_ORIGINAL.md 与旧冻结件未改); 其余条目同一份规则",
+        "# 本轮变化: R7F8_DRAFT_MERGED.md 按 A **预算裁定包**的活草案(%s)逐字承接 304 行后重算;"
+        " A_DRAFT_ORIGINAL.md 与旧冻结件未改, 上一版合并件身份只写进记录节不回改; 其余条目同一份规则"
+        % living_id,
         "# 条目数=%d; 与 Git blob 的逐条复算由 tools/r7f8_staged_preflight.py(提交前)与推送后的"
         "远端逐 blob 回读完成" % n,
         "# 重新生成: python %s/tools/r7f8e_make_sums.py --repo <仓库根>"
@@ -102,7 +116,8 @@ def main() -> int:
         HEAD,
         "# 生成方式: 沿用该目录既有规则: 按**文件名**排除 SHA256SUMS.txt(含 a_review_r7f*/ 四份 A 包子清单)"
         "与 remote_readback.md; §20/§21 由 R7F7 轮追加, §22 由 R7F8 草案核对轮追加, "
-        "§23 由 R7F8E 执行器离线适配轮追加, 条目集合不变",
+        "§23 由 R7F8E 执行器离线适配轮追加, §24 由 R7F8F 返修+整包轮追加(其中 §24.8~§24.11 是"
+        " A 预算裁定的落地记录), 条目集合不变",
         "# 条目数=%d; 与 Git blob 的逐条复算由 tools/r7f8_staged_preflight.py(提交前)与推送后的"
         "远端逐 blob 回读完成" % n,
         "# 重新生成: python %s/tools/r7f8e_make_sums.py --repo <仓库根>"

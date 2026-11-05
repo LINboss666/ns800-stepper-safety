@@ -5,7 +5,7 @@
       "family": "反例矩阵(计划驱动的执行器行为反例 + 元负控)",
       "base_present": true,
       "base_count": 65,
-      "now_count": 98,
+      "now_count": 106,
       "added": [
         "G10_单字段变错(ENN_fb=1)",
         "G11_单字段变错(verdict=CUT_BY_HARDWARE)",
@@ -38,13 +38,21 @@
         "H7_没开IRQ就不发尾部两条",
         "H8_会话截止不随步骤续期",
         "H9_清理后仍巡航必须判红(不是业务码独大)",
+        "K1_step_window_保留小数且不叠_SLACK",
+        "K2_非法总窗逐项具名且轮询窗受本步总窗约束",
+        "K3_零速合同只认完整自洽的新鲜快照",
+        "K4_运动计时只在可信零速处结束_迟到不倒填_t0 不清",
+        "K5_释放运动计时不释放通电计时_也不放开业务截止",
+        "K6_已零速但仍带电到_18s_仍是到期停止业务",
+        "K7_38_步总窗逐条等于_A_的表_镜像同函数产出",
+        "K8_轮询步的总窗等于其 until_次数与间隔未动",
         "X6_把收口预留从业务预算里抹掉_前置等待后arm仍放出去",
         "X7_同一道门_静默收口时第五条发不出去"
       ],
       "removed": [],
       "kept": 65,
       "flipped": [],
-      "summary_line": "R7F8E_MATRIX_SUMMARY|判据=98|FAIL=0|none"
+      "summary_line": "R7F8E_MATRIX_SUMMARY|判据=106|FAIL=0|none"
     },
     "proof/r7f8e_stub_package.txt": {
       "family": "stub 整包(合成计划过全部离线门 + 逐场首错)",
@@ -64,11 +72,12 @@
       "family": "无回归(冻结旧件 vs 派生件对同一份 R7F7 定稿计划逐行比)",
       "base_present": true,
       "base_count": 32,
-      "now_count": 36,
+      "now_count": 37,
       "added": [
-        "REPLAY|may_obligate=False spin@None stop@None pre=91.0/133.0(14步) in_motion=0/0(0步) post_stop=0/0(0步) cap=None reserve=7.0 total=210.0 worst=91.0 after_spin=0 mirror=NA(计划未申报 motion_budget.business_segments)",
+        "REPLAY|business_total=133 budget=203.0 cons_total=None cons_arm=None",
+        "REPLAY|declared=0/14 legacy=14 非法=无 zero_evidence_as=NONE(运动计时不解除)",
+        "REPLAY|may_obligate=False spin@None stop@None zero@None pre_start=0.0(0步) motion_active=0.0(0步) post_zero=0.0(0步) stop_after_start=None zero_after_start=None arm_to_disabled=None cap=None reserve=7.0 total=210.0 business_total=133 worst=None cons_total=None cons_arm=None mirror=NA(计划未申报 motion_budget.business_segments)",
         "REPLAY|reserve=7.0 floor=6.0 total=210.0 cap=None",
-        "REPLAY|worst_bound=133.0 budget=203.0 sim_end=133.0 first_refused=NONE",
         "点名的本轮新门确实出现在新增行里(白名单非空转)"
       ],
       "removed": [],
@@ -99,7 +108,7 @@
       "family": "最终离线门(real plan/rows 整包 + 全首错 + 不变项)",
       "base_present": false,
       "base_count": 0,
-      "now_count": 33,
+      "now_count": 39,
       "added": [
         "BOARD_IMAGE_IDENTITY_STILL_23691E8D",
         "FIELD_FLAGS_STAY_FALSE",
@@ -108,6 +117,7 @@
         "IMAGE_SHA_COMES_FROM_DISK_BYTES",
         "INPUTS_IN_PLACE",
         "JSON_RECEIPT_SHAPE_ALIGNED",
+        "LEGACY_RED_TEXT_KEPT_VERBATIM",
         "META_DOUBLE_COUNT_COMES_BACK_GOES_RED",
         "META_MIRROR_DRIFT_NAMED",
         "META_MUTATION_ANCHOR_HIT",
@@ -121,14 +131,19 @@
         "PLAN_RESERVE_ARITHMETIC",
         "PLAN_WORST_CASE_TAIL_FITS_SESSION",
         "PRE_EXECUTOR_BYTES_FROZEN",
+        "PRE_RULING_BYTECMP_CLAUSE_FIRES_ON_MUTATION",
+        "PRE_RULING_REFERENCE_PLAN_STILL_RED_UNCHANGED",
         "PRODUCT_SOURCE_UNCHANGED",
         "REPLAY|code=CLEANUP_ERRORS disarm=CONFIRMED_DISABLED terminal=KNOWN 收口TX=['motor_status', 'safety_irq_status', 'safety_irq_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_stop', 'motor_status', 'motor_disarm', 'motor_status', 'motor_stop', 'motor_disarm', 'motor_status', 'safety_irq_disable', 'safety_irq_status'] errors=IRQ_TAIL_DISABLE_NO_DETACH_LINE IRQ_TAIL_NOT_CLOSED",
         "REPLAY|code=CLEANUP_RESERVE_CANNOT_COVER_ALL_SENDS disarm=NOT_ARMED terminal=KNOWN 收口TX=[] errors=",
         "REPLAY|code=EXPECTATION_NOT_MET disarm=CONFIRMED_DISABLED terminal=KNOWN 收口TX=['motor_status', 'safety_irq_status', 'safety_irq_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_stop', 'motor_disarm', 'motor_status', 'safety_irq_disable', 'safety_irq_status'] errors=",
         "REPLAY|code=EXPECTATION_NOT_MET disarm=CONFIRMED_DISABLED terminal=KNOWN 收口TX=['motor_status', 'safety_irq_status', 'safety_irq_status', 'motor_status', 'motor_status', 'motor_status', 'motor_stop', 'motor_disarm', 'motor_status', 'safety_irq_disable', 'safety_irq_status'] errors=",
         "REPLAY|code=STEP_DEADLINE_BEFORE_WRITE disarm=NOT_ARMED terminal=KNOWN 收口TX=[] errors=",
+        "REPLAY|code=STEP_TOTAL_SECONDS_INVALID disarm=CONFIRMED_DISABLED terminal=KNOWN 收口TX=['motor_status', 'safety_irq_status', 'safety_irq_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_status', 'motor_stop', 'motor_stop', 'motor_disarm', 'motor_status', 'safety_irq_disable', 'safety_irq_status'] errors=",
         "REPLAY|出现在 validate-plan 输出里",
         "ROWS_BRANCH_MISSING_KNOWN_GAP",
+        "RUN_MOTION_TIMER_ELAPSED_WITHIN_CAP",
+        "RUN_ZERO_SNAPSHOT_RELEASES_MOTION_TIMER",
         "STUB_NORMAL_DISPATCH_SUCCEEDS",
         "STUB_NORMAL_RESERVE_AND_CLAMP_FIELDS",
         "STUB_NORMAL_TAIL_SENT",
@@ -138,7 +153,7 @@
       "removed": [],
       "kept": 0,
       "flipped": [],
-      "summary_line": "R7F8F_OFFLINE_GATE_SUMMARY|判据=40|FAIL=2|PLAN_POST_SPIN_CONTENT_FITS_CAP,PLAN_WORST_CASE_TAIL_FITS_SESSION"
+      "summary_line": "R7F8F_OFFLINE_GATE_SUMMARY|判据=47|FAIL=0|none"
     }
   },
   "problems": [],

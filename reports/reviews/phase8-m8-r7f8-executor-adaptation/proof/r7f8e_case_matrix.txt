@@ -1,4 +1,4 @@
-身份_派生件含四项适配的符号|PASS|289452 B sha=043d5bdd179c… 缺=[]
+身份_派生件含四项适配的符号|PASS|312387 B sha=093c8408a019… 缺=[]
 身份_旧执行器未被动过|PASS|实读 219491 B sha=33d3f0af8a4c9c33…
 身份_A包绑定按Git blob复算|PASS|IDENTITY.json 的 8 条 source_bindings 与 HEAD blob 逐条相符; motor.c 盘上 134298 B(CRLF 检出) / blob 131732 B = A 登记值, CR 数 2566 = 行数
 B1_两枚非1的不同ID各自正确受理与取消|PASS|组=身份与绑定 rc=0 code=
@@ -88,6 +88,14 @@ R1_非法UTF8经会话读路径具名停止且原字节留证|PASS|code=ILLEGAL_
 R2_裸NUL经会话读路径具名停止且已读原字节留证|PASS|code=NUL_BYTE_IN_RESPONSE(裸 NUL 是合法 UTF-8, 只有显式 count(0) 门能抓); 门在读到第一段就停, 落盘=56 B 与该段逐字节相等, 后面的提示符本就不该被当成已收响应
 R3_危险文本先于解码判定(门顺序固定)|PASS|两种缺陷同批出现时 code=DANGER_TEXT_IN_STREAM 要求 DANGER_TEXT_IN_STREAM
 R4_多字节中文跨读块不误杀(回归)|PASS|code= 注入=609 B 读块=3 段 行1='[INFO] 安安安安安安安安安安安安安安安安安'
+K1_step_window_保留小数且不叠_SLACK|PASS|0.5 s 原样取用(= (0.5, 'step_total_seconds')); 未申报仍是 seconds+3(=(5, 'legacy_seconds_plus_slack'))
+K2_非法总窗逐项具名且轮询窗受本步总窗约束|PASS|六种非法值=["'BOOL_VALUE'", "'NOT_A_NUMBER(str)'", "'NON_POSITIVE(0)'", "'NON_POSITIVE(-1)'", "'NOT_FINITE(nan)'", "'NOT_FINITE(inf)'"]; until>total => POLL_UNTIL_EXCEEDS_STEP_TOTAL(until=2.0>total=1.0); until==total => None
+K3_零速合同只认完整自洽的新鲜快照|PASS|armed=1 自洽(裁定 §1 的典型 stop 后态)=> 通过; armed=0 自洽 => 通过; health=FAULT=>['health=FAULT']; CUT_BY_HARDWARE=>['verdict=CUT_BY_HARDWARE(硬件切断不作为正常完成证据)']; 使能侧矛盾=>["使能侧形状=('HIGH', 1, 'LOW', 1) 要求 ('HIGH', 1, 'LOW', 0)(armed=1 那一套自洽值)"]; 还在转=>['cur_hz=300/tgt_hz=300(要求 0/0)']; 字段重复=>['ZERO_SNAPSHOT_FIELDS_INCOMPLETE']
+K4_运动计时只在可信零速处结束_迟到不倒填_t0 不清|PASS|13 s 的零速=MOTION_ZERO_CONFIRMATION_LATE(不许倒填为按时); 9 s 的零速=接受 9.0; 第二次确认=MOTION_END_ALREADY_CONFIRMED; t0 仍是 20.0(=> 不能靠清空 t0 放行第二次 start); cap_active 现在=False
+K5_释放运动计时不释放通电计时_也不放开业务截止|PASS|同一个 20 s 的步窗: 释放前截止=32.0(被 t0+cap=32 夹住), 释放后=40.0(now+20, 不再被 cap 夹) 但仍受业务 83 s; 收口截止=从现在 + 预留 7 s 再被会话 90 s 封顶 => 27.0
+K6_已零速但仍带电到_18s_仍是到期停止业务|PASS|arm 起 18.5 s: 通电到期=True 而运动侧早已解除=True(运动剩余=-6.5) => 步骤循环里 ARM_ENERGIZE_DEADLINE_EXCEEDED 那条支路不看 cap_active, 因此释放运动计时不会放开通电门
+K7_38_步总窗逐条等于_A_的表_镜像同函数产出|PASS|三段 31.0/9.0/7.5, 合计 47.5; stop@7.5 零速@9.0 禁能@13.0; 保守式 57.5 / 16.0 —— 与 A 包 §3 那张表逐格相同, 且这些数就是执行器现算的(镜像同一个函数)
+K8_轮询步的总窗等于其 until_次数与间隔未动|PASS|4 个轮询步的申报窗=[1.0, 1.0, 2.0, 1.0]; 总窗=[1.0, 1.0, 2.0, 1.0](一一相等); 次数=[4, 3, 12, 5] —— 裁定二明令「轮询步骤的总窗等于原定 until_seconds, 原次数和间隔都不变」
 I1_绑定后改plan字节被拒|PASS|code=PLAN_BYTES_CHANGED_AFTER_APPROVAL
 I2_偷换步骤被拒|PASS|code=PLAN_BYTES_CHANGED_AFTER_APPROVAL
 I3_换执行器身份被拒|PASS|code=APPROVAL_IDENTITY_MISMATCH
@@ -96,4 +104,4 @@ M3_七原因共用一次票据(源码锚点)|PASS|源码侧同一出口/票据�
 M4_旧F7遗留FAILED只作只读披露|PASS|豁免按完整命令放行两条真只读查询, 不放宽 diag_profile 首词面
 自证_故意写错的预期必须被判红|PASS|judge() 对同一份真实输出报了 1 条不符 => 整张矩阵的绿不是恒真
 本轮无设备动作|PASS|全部 stub/sim 子进程与在进程内门函数; 未开串口/pyOCD/Keil/分析仪, 未建真实批准账
-R7F8E_MATRIX_SUMMARY|判据=98|FAIL=0|none
+R7F8E_MATRIX_SUMMARY|判据=106|FAIL=0|none

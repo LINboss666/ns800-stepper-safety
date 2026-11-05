@@ -1198,6 +1198,133 @@ def byte_probes(mod, work):
          (code4, len(text4), len(chunks4), (rows4 or [""])[0][:24]))
 
 
+def ruling_probes(mod, repo, work):
+    """A 预算裁定的进程内判据(K 族): 单步总窗解析、零速合同、运动/通电计时独立性。
+
+    全部 in-process 调用**派生执行器本体**的函数(不另写一份门函数当证据), 用 SimClock 推进虚拟
+    时间; 不开端口、不发命令、不碰设备。A §5 的六项里"迟到零速不倒填/零速不解除通电计时/
+    0.5 秒保留小数不叠 SLACK/轮询总窗不随次数刷新"都只有在这里才可控地判得到。
+    """
+    note("K1_step_window_保留小数且不叠_SLACK",
+         mod.step_window({"step_total_seconds": 0.5}) == (0.5, "step_total_seconds")
+         and mod.step_window({"seconds": 2}) == (5, "legacy_seconds_plus_slack")
+         and mod.step_window({"step_total_seconds": 13.0}) == (13.0, "step_total_seconds"),
+         "0.5 s 原样取用(= %s); 未申报仍是 seconds+3(=%s)" %
+         (mod.step_window({"step_total_seconds": 0.5}), mod.step_window({"seconds": 2})))
+    bad_kind = [repr(mod.step_total_problem({k: v})) for k, v in
+                (("step_total_seconds", True), ("step_total_seconds", "2"),
+                 ("step_total_seconds", 0), ("step_total_seconds", -1),
+                 ("step_total_seconds", float("nan")), ("step_total_seconds", float("inf")))]
+    poll_over = mod.step_total_problem({"step_total_seconds": 1.0,
+                                         "poll": {"until_seconds": 2.0}})
+    poll_eq = mod.step_total_problem({"step_total_seconds": 2.0,
+                                      "poll": {"until_seconds": 2.0}})
+    note("K2_非法总窗逐项具名且轮询窗受本步总窗约束",
+         all("None" not in x for x in bad_kind) and len(set(bad_kind)) == 6
+         and "POLL_UNTIL_EXCEEDS_STEP_TOTAL" in poll_over and poll_eq is None,
+         "六种非法值=%s; until>total => %s; until==total => %s" %
+         (bad_kind, poll_over, poll_eq))
+
+    def zero_rows(armed=1, req="HIGH", pad=1, enn="LOW", fb=0, health="OK",
+                  verdict="OK", resolved="resolved", state=0, cur=0, tgt=0, off="NO"):
+        return ["[MOT] state=%d name=%s" % (state, "FAULT" if state == 4 else "OTHER"),
+                "[MOT] cur_hz=%d tgt_hz=%d accel=2000 decel=2000 dir=1" % (cur, tgt),
+                "[MOT] armed=%d drv_en_request=%d health=%s" % (armed, 1 if req == "HIGH" else 0,
+                                                                 health),
+                "[MOT] drv_request=%s pad=%d" % (req, pad),
+                "[MOT] expected_ENN=%s ENN_fb=%d %s verdict=%s" % (enn, fb, resolved, verdict),
+                "[MOT] diag_off_confirmed=%s" % off]
+
+    ok_armed, bad_armed = mod.zero_speed_contract(zero_rows())
+    ok_off, bad_off = mod.zero_speed_contract(zero_rows(armed=0, req="LOW", pad=0, enn="HIGH",
+                                                        fb=1, off="YES"))
+    n_health, b_health = mod.zero_speed_contract(zero_rows(health="FAULT"))
+    n_cut, b_cut = mod.zero_speed_contract(zero_rows(verdict="CUT_BY_HARDWARE"))
+    n_con, b_con = mod.zero_speed_contract(zero_rows(fb=1))
+    n_run, b_run = mod.zero_speed_contract(zero_rows(cur=300, tgt=300))
+    dup = zero_rows() + [zero_rows()[1]]
+    n_dup, b_dup = mod.zero_speed_contract(dup)
+    note("K3_零速合同只认完整自洽的新鲜快照",
+         bad_armed == [] and bad_off == [] and b_health and b_cut and b_con and b_run and b_dup,
+         "armed=1 自洽(裁定 §1 的典型 stop 后态)=> 通过; armed=0 自洽 => 通过; "
+         "health=FAULT=>%s; CUT_BY_HARDWARE=>%s; 使能侧矛盾=>%s; 还在转=>%s; 字段重复=>%s" %
+         (b_health, b_cut, b_con, b_run, b_dup))
+
+    clk = mod.SimClock()
+    bud = mod.MotionBudget(clk, 12, reserve=7)
+    bud.session_abs_dl = 90.0
+    bud.business_dl = 83.0
+    eg = mod.EnergizeBudget(clk, 18)
+    clk.sleep(20.0)
+    bud.start_attempt()                       # t0 = 20
+    eg.start_attempt()                        # 通电计时同一点起算, 但**独立**于运动计时
+    pre_release = bud.business_deadline_window(20.0)
+    late = None
+    try:
+        bud.confirm_zero_speed(13.0, {"why": "迟到的零速回包"})
+    except mod.Stop as e:
+        late = e.code
+    at9 = bud.confirm_zero_speed(9.0, {"as": "stopped", "snapshot": "ok"})
+    post_release = bud.business_deadline_window(20.0)
+    again = None
+    try:
+        bud.confirm_zero_speed(10.0, {})
+    except mod.Stop as e:
+        again = e.code
+    note("K4_运动计时只在可信零速处结束_迟到不倒填_t0 不清",
+         late == "MOTION_ZERO_CONFIRMATION_LATE" and at9 == 9.0 and again ==
+         "MOTION_END_ALREADY_CONFIRMED" and bud.t0 == 20.0 and not bud.cap_active,
+         "13 s 的零速=%s(不许倒填为按时); 9 s 的零速=接受 %s; 第二次确认=%s; t0 仍是 %s(=> 不能靠"
+         "清空 t0 放行第二次 start); cap_active 现在=%s" %
+         (late, at9, again, bud.t0, bud.cap_active))
+    note("K5_释放运动计时不释放通电计时_也不放开业务截止",
+         pre_release == 32.0 and post_release == 40.0
+         and bud.past_business_hard_deadline() is False
+         and bud.cleanup_deadline() == min(20.0 + 7.0, 90.0),
+         "同一个 20 s 的步窗: 释放前截止=%s(被 t0+cap=32 夹住), 释放后=%s(now+20, 不再被 cap 夹) "
+         "但仍受业务 83 s; 收口截止=从现在 + 预留 7 s 再被会话 90 s 封顶 => %s" %
+         (pre_release, post_release, bud.cleanup_deadline()))
+    clk.sleep(18.5)
+    note("K6_已零速但仍带电到_18s_仍是到期停止业务",
+         eg.armed and eg.expired() and not bud.cap_active and bud.remaining() < -6,
+         "arm 起 18.5 s: 通电到期=%s 而运动侧早已解除=%s(运动剩余=%s) => 步骤循环里 "
+         "ARM_ENERGIZE_DEADLINE_EXCEEDED 那条支路不看 cap_active, 因此释放运动计时不会放开通电门" %
+         (eg.expired(), not bud.cap_active, round(bud.remaining(), 3)))
+    ref = repo / ("reports/reviews/phase8-m8-r7f8-executor-adaptation/field/"
+                  "plan_r7f8f_2369_real.json")
+    doc = json.loads(ref.read_text(encoding="utf-8"))
+    rl = mod.business_segments_ruling(doc["stages"][0]["steps"], cap=12, reserve=7, total=90)
+    a_rows = json.loads((repo / "reports/reviews/phase8-m8-r7f8-executor-adaptation/inputs/"
+                                "A_R7F8F_BUDGET_PKG/step_total_windows.json")
+                        .read_text(encoding="utf-8"))
+    mine = [s["step_total_seconds"] for s in a_rows["steps"]]
+    note("K7_38_步总窗逐条等于_A_的表_镜像同函数产出",
+         len(mine) == 38 and all(abs(mod.step_window(s)[0] - w) < 1e-9
+                                 for s, w in zip(doc["stages"][0]["steps"], mine))
+         and rl["pre_start_seconds"] == 31.0 and rl["motion_active_seconds"] == 9.0
+         and rl["post_zero_seconds"] == 7.5 and rl["business_total_seconds"] == 47.5
+         and rl["conservative_total_with_cap_s"] == 57.5
+         and rl["conservative_arm_with_cap_s"] == 16.0
+         and (rl["stop_send_after_start_s"], rl["zero_confirm_after_start_s"],
+              rl["arm_to_disabled_s"]) == (7.5, 9.0, 13.0),
+         "三段 %s/%s/%s, 合计 %s; stop@%s 零速@%s 禁能@%s; 保守式 %s / %s —— 与 A 包 §3 那张表"
+         "逐格相同, 且这些数就是执行器现算的(镜像同一个函数)" %
+         (rl["pre_start_seconds"], rl["motion_active_seconds"], rl["post_zero_seconds"],
+          rl["business_total_seconds"], rl["stop_send_after_start_s"],
+          rl["zero_confirm_after_start_s"], rl["arm_to_disabled_s"],
+          rl["conservative_total_with_cap_s"], rl["conservative_arm_with_cap_s"]))
+    win_note = mod.STEP_TOTAL_KEY
+    pol = doc["stages"][0]["steps"]
+    poll_steps = [s for s in pol if s.get("poll")]
+    note("K8_轮询步的总窗等于其 until_次数与间隔未动",
+         all(s["poll"]["until_seconds"] == s[win_note] for s in poll_steps)
+         and all(s["poll"]["max_attempts"] > 1 for s in poll_steps),
+         "%d 个轮询步的申报窗=%s; 总窗=%s(一一相等); 次数=%s —— 裁定二明令「轮询步骤的总窗等于"
+         "原定 until_seconds, 原次数和间隔都不变」" %
+         (len(poll_steps), [s["poll"]["until_seconds"] for s in poll_steps],
+          [s[win_note] for s in poll_steps], [s["poll"]["max_attempts"] for s in poll_steps]))
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--repo", required=True, type=pathlib.Path)
@@ -1284,6 +1411,7 @@ def main() -> int:
         note(mname, ok, detail)
 
     byte_probes(mod, work)
+    ruling_probes(mod, repo, work)
 
     # ---------------------------------------------------------------- 在进程内的身份反例与源码锚点
     steps = [{"as": "a", "cmd": LS}]

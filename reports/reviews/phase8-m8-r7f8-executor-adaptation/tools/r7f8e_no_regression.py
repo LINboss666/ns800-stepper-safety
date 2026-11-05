@@ -101,7 +101,10 @@ def main() -> int:
     # 前缀放不开就得点名 —— 点名了就要验它确实出现, 否则白名单会变成"任何 PLAN_ 新行都免检"。
     OURS_PREFIX = "R7F8E_"
     OURS_NAMES = ("PLAN_CLEANUP_RESERVE", "PLAN_BUSINESS_RESERVE_SPLIT",
-                  "PLAN_BUSINESS_WORST_CASE_FIT")
+                  "PLAN_BUSINESS_WORST_CASE_FIT",
+                  # A 的预算裁定把这一步拆成两条新门(旧口径只作 INFO 留档、单步总窗单独成门),
+                  # 名字不是 R7F8E_ 前缀, 必须点名; 点名后下面那条"确实出现"会兜住空转。
+                  "PLAN_BUSINESS_RESERVE_SPLIT_LEGACY_SEMANTICS", "PLAN_STEP_TOTAL_WINDOWS")
     not_ours = [l for l in added
                 if not l.startswith(OURS_PREFIX) and l.split("|")[0] not in OURS_NAMES]
     note("新增行全部是本轮适配自己的门", not not_ours,

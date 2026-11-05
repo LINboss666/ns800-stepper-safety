@@ -1,0 +1,32 @@
+{
+  "scope": "Budget-checker controls only; no executor or device run",
+  "controls": [
+    {
+      "case": "missing_half_second_window",
+      "expected_failure": "STOP_REQUEST_WITHIN_8",
+      "observed_failures": [
+        "STOP_REQUEST_WITHIN_8"
+      ],
+      "detected": true
+    },
+    {
+      "case": "cleanup_shrunk",
+      "expected_failure": "CLEANUP_FIVE_WINDOWS_FIT_7",
+      "observed_failures": [
+        "CLEANUP_FIVE_WINDOWS_FIT_7",
+        "ORIGINAL_FIXED_LIMITS"
+      ],
+      "detected": true
+    },
+    {
+      "case": "command_changed",
+      "expected_failure": "SAME_38_COMMANDS_AND_ORDER",
+      "observed_failures": [
+        "SAME_38_COMMANDS_AND_ORDER"
+      ],
+      "detected": true
+    }
+  ],
+  "total": 3,
+  "fail": 0
+}

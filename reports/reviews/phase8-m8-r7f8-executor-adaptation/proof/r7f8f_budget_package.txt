@@ -1,0 +1,21 @@
+A_MANIFEST_ITEMS_RECOMPUTE|PASS|A 清单登记 9 件(清单不列自身, 与 A 包上一版同一口径); 除清单外磁盘常规文件 9 件; 逐条复算不符=0 未列=[]
+REFERENCE_BYTES_EQUAL_6f2b12F_BLOB|PASS|A 的基准 plan 28090 B/66ca8a152ede… 与 6f2b12f(完整 6f2b12fa91fecb0a8d13449bdb2cf5ab125b41c8)的 Git blob(66ca8a152ede) 逐字节相等; rows 4022306df3ad… 同理() => 裁定钉的是**裁定前那个提交**, 不是当前工作树。工作树现状: plan 与基准相等=False (裁定落地后已改动), rows 与基准相等=True。上一版拿工作树比, 计划一改就假红, 本轮改为按 blob 复算。
+WINDOW_TABLE_ALIGNS_38_STEPS|PASS|38 步的 (as, cmd) 与逐条对齐, 错位=0; 三段 {'motion_active': (11, 9.0), 'post_zero': (8, 7.5), 'pre_start': (19, 31.0)} => 合计 47.5 s
+LIMITS_UNCHANGED|PASS|四个固定数与 stop 8 s 上限逐字段核过未变(12/18/90/7/8); stop_request_index=28 zero_confirm_index=29(均 0 基)
+NO_NEGATIVE_OR_ZERO_WINDOWS|PASS|全部为正的浮点且 <= 13.0 s; 0.5 s 的小数在表里原样保留(不是整数化后的值)
+A_BUDGET_CHECK_RAN_ON_MY_DISK_ITEMS|PASS|A 的检查器 rc=0, 自报 {"scope": "Arithmetic/reference byte identities only; not executor/offline_gate/hardware validation", "total": 17, "fail": 0, "bounds": {"pre_start_s": 31.0, "stop_request_after_start_s": 7.5, "zero_confirm_after_start_s
+BOUNDS_MATCH_A_PROOF_EXACTLY|PASS|逐条 passed 序列相等=True; bounds 全等=True({"pre_start_s": 31.0, "stop_request_after_start_s": 7.5, "zero_confirm_after_start_s": 9.0, "arm_to_disabled_s": 13.0, "post_zero_s": 7.5, "business_total_s": 47.5, "total_with_cleanup_s": 54.5, "cons)
+A_NEGATIVE_CONTROLS_RECORDED|PASS|A 的三条元负控原文照录: missing_half_second_window=>STOP_REQUEST_WITHIN_8 / cleanup_shrunk=>CLEANUP_FIVE_WINDOWS_FIT_7 / command_changed=>SAME_38_COMMANDS_AND_ORDER
+MUT_double_every_window_expect_business_red|PASS|突变后 A 检查器 rc=1(非零符合它的退出码约定), 未通过项=['POLL_WINDOWS_UNCHANGED', 'STOP_REQUEST_WITHIN_8', 'ZERO_CONFIRM_WITHIN_12', 'DISABLED_WITHIN_ARM_18', 'BUSINESS_FITS_83', 'BUSINESS_PLUS_RESERVE_FITS_90', 'FULL_MOTION_CAP_PLUS_POST_ZERO_FITS_90', 'ARM_WITH_FULL_MOTION_CAP_FITS_18'], 其中含 BUSINESS_FITS_83=True
+MUT_cleanup_reserve_four_expect_five_send_window_red|PASS|突变后 A 检查器 rc=1(非零符合它的退出码约定), 未通过项=['CLEANUP_FIVE_WINDOWS_FIT_7', 'ORIGINAL_FIXED_LIMITS'], 其中含 CLEANUP_FIVE_WINDOWS_FIT_7=True
+MUT_rename_one_command_expect_identity_red|PASS|突变后 A 检查器 rc=1(非零符合它的退出码约定), 未通过项=['SAME_38_COMMANDS_AND_ORDER'], 其中含 SAME_38_COMMANDS_AND_ORDER=True
+PKG_ITEM|PROOF_arithmetic_negative_controls.json|753|dabf689b0b7e5c0b
+PKG_ITEM|PROOF_budget.json|16577|4d9e51dca8909168
+PKG_ITEM|R7F8F_A_BUDGET_RULING.md|8725|1e012c0c16840ed0
+PKG_ITEM|R7F8_LIVING_DRAFT.md|38793|14bafe13a8cdf765
+PKG_ITEM|README.md|1457|2e8349a291964e51
+PKG_ITEM|budget_check.py|6060|d26cf9afac515717
+PKG_ITEM|reference_plan_6f2b12f.json|28090|66ca8a152ede4a4a
+PKG_ITEM|reference_rows_6f2b12f.json|8168|4022306df3ad5454
+PKG_ITEM|step_total_windows.json|6637|794554410c1a06e3
+R7F8F_BUDGET_PKG_SUMMARY|判据=11|FAIL=0|none

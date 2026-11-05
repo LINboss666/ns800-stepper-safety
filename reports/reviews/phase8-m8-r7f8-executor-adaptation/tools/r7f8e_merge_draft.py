@@ -22,11 +22,17 @@ DRAFT_DIR = "reports/reviews/phase8-m8-r7f8-closed-loop-draft"
 MERGED_REL = DRAFT_DIR + "/R7F8_DRAFT_MERGED.md"
 ORIG_REL = DRAFT_DIR + "/A_DRAFT_ORIGINAL.md"
 ERRATA_REL = "reports/reviews/phase8-m8-r7f8-executor-adaptation/ERRATA_R7F8E.md"
-# R7F8F 轮: 上一版合并件是 §20.15/commit 0ba5035 落下的 36273 B(含 R7F8E 的勘误段)。
-OLD_MERGED_BYTES = 36273
-OLD_MERGED_SHA12 = "e9a5253de024"
+# R7F8F 预算裁定轮: 上一版合并件是 c9ad704 落下的 40289 B(承接 A_R7F8F_PKG 那份 36303 B 活草案)。
+# 每次重合并都要把这两行改成**当场盘上重算**的上一版身份, 否则工具会拒绝(这正是它的作用:
+# 不许在身份不明的时候悄悄覆盖)。
+OLD_MERGED_BYTES = 40289
+OLD_MERGED_SHA12 = "bc3710e9917c"
+OLD_MERGED_COMMIT = "c9ad704"
 OLD_ORIG_BYTES = 24780
 OLD_ORIG_SHA12 = "b572c1928f60"
+# 记录节里的本轮名与承接件路径由 --label / --updated 当场填, 不留上一轮的措辞。
+LABEL = "R7F8F 预算裁定落地轮"
+SRC_REL = "-"
 
 
 def sha(b):
@@ -50,10 +56,18 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--repo", required=True, type=pathlib.Path)
     ap.add_argument("--updated", required=True, type=pathlib.Path)
+    ap.add_argument("--label", default="R7F8F 预算裁定落地轮",
+                    help="写进合并记录节标题的本轮名(每条判据的来源要能被复算)")
     a = ap.parse_args()
     repo = a.repo.resolve()
     merged_p = repo / MERGED_REL
     updated_p = a.updated.resolve()
+    global LABEL, SRC_REL
+    LABEL = a.label
+    try:
+        SRC_REL = updated_p.relative_to(repo).as_posix()
+    except ValueError:
+        SRC_REL = updated_p.name
     txt_old = merged_p.read_text(encoding="utf-8")
     txt_new = updated_p.read_text(encoding="utf-8")
     orig = (repo / ORIG_REL).read_bytes()
@@ -91,27 +105,41 @@ def main() -> int:
         if ch:
             per_sec.append((n, "改动", ch, len(new_secs[n]) - eq))
 
+    def disk_id(rel):
+        p = repo / rel
+        if not p.is_file():
+            return 0, "NA(不在盘上)"
+        b = p.read_bytes()
+        return len(b), sha(b)[:12]
+
+    ADAPT = "reports/reviews/phase8-m8-r7f8-executor-adaptation/"
+    plan_b, plan_s = disk_id(ADAPT + "field/plan_r7f8f_2369_real.json")
+    rows_b, rows_s = disk_id(ADAPT + "field/rows_r7f8f_real.json")
+    exe_b, exe_s = disk_id(ADAPT + "tools/m8r3_serial_chain_r7f8.py")
     record = [
         "", "---", "",
-        "## 本次合并与修订记录（R7F8E 执行器离线适配轮, 2026-11-05）",
+        "## 本次合并与修订记录（%s, 2026-11-05）" % LABEL,
         "",
         "- 本节以下的**正文**逐字承接 A 的修订快照（不是我的重写，也不是脚本拼装）：",
-        "  去掉本记录节与它前面的分隔线之后，与 `R7F8_DRAFT_UPDATED.md` 按行逐字节相等；",
+        "  去掉本记录节与它前面的分隔线之后，与承接件按行逐字节相等；",
         "  复算口径见本工具输出的 `INHERIT_EXACT|...` 一行。",
-        "- 承接来源: 任务包附件 `R7F8_DRAFT_UPDATED.md`（本包内 SHA256SUMS 覆盖的原件）。",
-        "- 上一版合并件: %d B, sha256 前缀 `%s`（提交 `d6bbc1b5795f`）。它的内容不回改, "
-        "历史身份由 Git blob 承担。" % (OLD_MERGED_BYTES, OLD_MERGED_SHA12),
+        "- 承接来源: `%s`（A 包内 SHA256SUMS 覆盖的原件, 本工具只读不改）。" % SRC_REL,
+        "- 上一版合并件: %d B, sha256 前缀 `%s`（提交 `%s`）。它的内容不回改, "
+        "历史身份由 Git blob 承担。" % (OLD_MERGED_BYTES, OLD_MERGED_SHA12, OLD_MERGED_COMMIT),
         "- 草案原件 `A_DRAFT_ORIGINAL.md`: %d B, sha256 前缀 `%s` —— **本轮未改动**。"
         % (len(orig), sha(orig)[:12]),
         "- 本次修订快照: %d B, sha256 前缀 `%s`（盘上原字节直算）。"
         % (len(txt_new.encode("utf-8")), sha(txt_new.encode("utf-8"))[:12]),
         "- 与上一版合并件的差异（`difflib` 行级可复算）: 变更行数合计 **%d**; "
         "新增节 %d 个, 消失节 %d 个。" % (changed, len(added_secs), len(dropped_secs)),
-        "- 状态不变: **DRAFT_NOT_AUTHORIZED**。这份合并件仍不是可 dispatch 的现场计划, "
-        "本轮不生成 REAL_GO 计划, 不编入真实端口/UID, 不开 R7F8 的真实批准账。",
-        "- 本轮对草案口径的更正集中在 "
-        "`reports/reviews/phase8-m8-r7f8-executor-adaptation/ERRATA_R7F8E.md`"
-        "（三源恢复 / 取消只读 / 一拍窗口三条逐字旧句与源码、行为反证）。",
+        "- 状态不变: **DRAFT_NOT_AUTHORIZED**。这份合并件本身不是可 dispatch 的对象; 能 dispatch 的"
+        "是本轮现场包三件 —— 计划 %d B/`%s…`、行表 %d B/`%s…`、派生执行器 %d B/`%s…`（数字当场从盘"
+        "上重算）。离线门全绿之后仍要操作者**一次**整批准才动手; 本轮批准账未开、设备动作 0。"
+        % (plan_b, plan_s, rows_b, rows_s, exe_b, exe_s),
+        "- 本轮口径变化的来源是 A 的预算裁定原文 "
+        "`inputs/A_R7F8F_BUDGET_PKG/R7F8F_A_BUDGET_RULING.md` 与裁定包独立复算回执 "
+        "`proof/r7f8f_budget_package.txt`; R7F8E 那三条逐字勘误仍留在 `ERRATA_R7F8E.md`, "
+        "本轮没有改写它。",
         "",
         "### 逐节差异计数",
         "",

@@ -1,0 +1,292 @@
+{
+  "task": "R7F8F",
+  "status": "A_BUDGET_RULING_NOT_FIELD_APPROVAL",
+  "based_on_commit": "6f2b12f",
+  "reference_plan_sha256": "66ca8a152ede4a4a0c52a42010cc27c67069493fe077235c599bdb60e4aaadda",
+  "reference_rows_sha256": "4022306df3ad5454666c2449519d667b812b516b6e30f941f314ab61fac5cbf2",
+  "requires_runtime_support_for_step_total_seconds": true,
+  "legacy_plan_behavior": "unchanged when step_total_seconds is absent",
+  "motion_end_evidence_step": "stopped",
+  "motion_end_evidence_kind": "fresh_complete_zero_snapshot_after_normal_stop",
+  "motion_end_preserves_arm_deadline": true,
+  "stop_request_index": 28,
+  "zero_confirm_index": 29,
+  "limits": {
+    "normal_stop_send_by_s": 8,
+    "motion_to_zero_cap_s": 12,
+    "arm_to_disabled_cap_s": 18,
+    "session_total_s": 90,
+    "cleanup_reserve_s": 7,
+    "business_absolute_s": 83,
+    "port_open": 1,
+    "motor_run": 1
+  },
+  "steps": [
+    {
+      "index": 0,
+      "as": "sys_pre",
+      "cmd": "system_status",
+      "step_total_seconds": 1.0,
+      "phase": "pre_start"
+    },
+    {
+      "index": 1,
+      "as": "mot_pre",
+      "cmd": "motor_status",
+      "step_total_seconds": 1.0,
+      "phase": "pre_start"
+    },
+    {
+      "index": 2,
+      "as": "irq_pre",
+      "cmd": "safety_irq_status",
+      "step_total_seconds": 1.0,
+      "phase": "pre_start"
+    },
+    {
+      "index": 3,
+      "as": "diag_pre",
+      "cmd": "diag_status",
+      "step_total_seconds": 1.0,
+      "phase": "pre_start"
+    },
+    {
+      "index": 4,
+      "as": "ls_pre",
+      "cmd": "diag_profile learn_status",
+      "step_total_seconds": 1.0,
+      "phase": "pre_start"
+    },
+    {
+      "index": 5,
+      "as": "cfg_pre",
+      "cmd": "tmc_config_show",
+      "step_total_seconds": 1.0,
+      "phase": "pre_start"
+    },
+    {
+      "index": 6,
+      "as": "apply",
+      "cmd": "tmc_config_apply CONFIRM",
+      "step_total_seconds": 2.0,
+      "phase": "pre_start"
+    },
+    {
+      "index": 7,
+      "as": "sys_after_apply",
+      "cmd": "system_status",
+      "step_total_seconds": 1.0,
+      "phase": "pre_start"
+    },
+    {
+      "index": 8,
+      "as": "zero",
+      "cmd": "diag_profile zero 32",
+      "step_total_seconds": 13.0,
+      "phase": "pre_start"
+    },
+    {
+      "index": 9,
+      "as": "zero_state",
+      "cmd": "diag_profile learn_status",
+      "step_total_seconds": 1.0,
+      "phase": "pre_start"
+    },
+    {
+      "index": 10,
+      "as": "pol",
+      "cmd": "safety_polarity_confirm CONFIRM",
+      "step_total_seconds": 1.0,
+      "phase": "pre_start"
+    },
+    {
+      "index": 11,
+      "as": "irq_en",
+      "cmd": "safety_irq_enable",
+      "step_total_seconds": 1.0,
+      "phase": "pre_start"
+    },
+    {
+      "index": 12,
+      "as": "irq_state",
+      "cmd": "safety_irq_status",
+      "step_total_seconds": 1.0,
+      "phase": "pre_start"
+    },
+    {
+      "index": 13,
+      "as": "mot_after_irq",
+      "cmd": "motor_status",
+      "step_total_seconds": 1.0,
+      "phase": "pre_start"
+    },
+    {
+      "index": 14,
+      "as": "dir",
+      "cmd": "motor_dir 1",
+      "step_total_seconds": 0.5,
+      "phase": "pre_start"
+    },
+    {
+      "index": 15,
+      "as": "mot_dir",
+      "cmd": "motor_status",
+      "step_total_seconds": 1.0,
+      "phase": "pre_start"
+    },
+    {
+      "index": 16,
+      "as": "arm",
+      "cmd": "motor_arm",
+      "step_total_seconds": 1.0,
+      "phase": "pre_start"
+    },
+    {
+      "index": 17,
+      "as": "mot_armed",
+      "cmd": "motor_status",
+      "step_total_seconds": 1.0,
+      "phase": "pre_start"
+    },
+    {
+      "index": 18,
+      "as": "target",
+      "cmd": "motor_target 300",
+      "step_total_seconds": 0.5,
+      "phase": "pre_start"
+    },
+    {
+      "index": 19,
+      "as": "start",
+      "cmd": "motor_start",
+      "step_total_seconds": 0.5,
+      "phase": "motion_active"
+    },
+    {
+      "index": 20,
+      "as": "cruise",
+      "cmd": "motor_status",
+      "step_total_seconds": 1.0,
+      "phase": "motion_active"
+    },
+    {
+      "index": 21,
+      "as": "learn_cancel",
+      "cmd": "diag_profile learn 32 250 350 1",
+      "step_total_seconds": 0.5,
+      "phase": "motion_active"
+    },
+    {
+      "index": 22,
+      "as": "ls_cancel_bound",
+      "cmd": "diag_profile learn_status",
+      "step_total_seconds": 0.5,
+      "phase": "motion_active"
+    },
+    {
+      "index": 23,
+      "as": "cancel",
+      "cmd": "diag_profile learn_cancel @cancel_job",
+      "step_total_seconds": 0.5,
+      "phase": "motion_active"
+    },
+    {
+      "index": 24,
+      "as": "cancel_state",
+      "cmd": "diag_profile learn_status",
+      "step_total_seconds": 1.0,
+      "phase": "motion_active"
+    },
+    {
+      "index": 25,
+      "as": "mot_after_cancel",
+      "cmd": "motor_status",
+      "step_total_seconds": 1.0,
+      "phase": "motion_active"
+    },
+    {
+      "index": 26,
+      "as": "learn_done",
+      "cmd": "diag_profile learn 8 250 350 1",
+      "step_total_seconds": 0.5,
+      "phase": "motion_active"
+    },
+    {
+      "index": 27,
+      "as": "wait_done",
+      "cmd": "diag_profile learn_status",
+      "step_total_seconds": 2.0,
+      "phase": "motion_active"
+    },
+    {
+      "index": 28,
+      "as": "stop",
+      "cmd": "motor_stop",
+      "step_total_seconds": 0.5,
+      "phase": "motion_active"
+    },
+    {
+      "index": 29,
+      "as": "stopped",
+      "cmd": "motor_status",
+      "step_total_seconds": 1.0,
+      "phase": "motion_active"
+    },
+    {
+      "index": 30,
+      "as": "disarm",
+      "cmd": "motor_disarm",
+      "step_total_seconds": 0.5,
+      "phase": "post_zero"
+    },
+    {
+      "index": 31,
+      "as": "mot_disabled",
+      "cmd": "motor_status",
+      "step_total_seconds": 1.0,
+      "phase": "post_zero"
+    },
+    {
+      "index": 32,
+      "as": "show_pre",
+      "cmd": "diag_profile show",
+      "step_total_seconds": 1.0,
+      "phase": "post_zero"
+    },
+    {
+      "index": 33,
+      "as": "commit",
+      "cmd": "diag_profile commit",
+      "step_total_seconds": 1.0,
+      "phase": "post_zero"
+    },
+    {
+      "index": 34,
+      "as": "show_post",
+      "cmd": "diag_profile show",
+      "step_total_seconds": 1.0,
+      "phase": "post_zero"
+    },
+    {
+      "index": 35,
+      "as": "ls_post",
+      "cmd": "diag_profile learn_status",
+      "step_total_seconds": 1.0,
+      "phase": "post_zero"
+    },
+    {
+      "index": 36,
+      "as": "threads",
+      "cmd": "ps",
+      "step_total_seconds": 1.0,
+      "phase": "post_zero"
+    },
+    {
+      "index": 37,
+      "as": "heap",
+      "cmd": "free",
+      "step_total_seconds": 1.0,
+      "phase": "post_zero"
+    }
+  ]
+}

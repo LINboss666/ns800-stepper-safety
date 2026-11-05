@@ -1086,7 +1086,7 @@ E4 通电截止与固定清理对账（`EnergizeBudget` 在 `motor_arm` 写入�
 | F5e | IRQ 尾部的 CLOSED 证据按产品**两条真行**认：disable 打 :306 detach 行，status 打 :388 `irq gate   = CLOSED`；两行不再互相顶 | 矩阵 H5/H6/H10/H14 + 整包 STUB_NORMAL_TAIL_SENT |
 | F6b/F6c/F6d | 整包 dispatch 把 F5b/F5c 的回执字段带出来；stub 装配给 IRQ 尾部补行；申报过的响应序列只归轮询那一步用 | 整包门 STUB_NORMAL_* + FIRST_ERROR|* |
 
-### 24.2 四族判据与整包离线门（现在的数）
+### 24.2 四族判据与整包离线门（**裁定落地前**的数；落地后见 §24.9）
 
 - 反例矩阵 `proof/r7f8e_case_matrix.txt`：**98 条判据 / FAIL=0**（含元负控 X1~X7 与"故意写错的
   预期必须被判红"的自证）。
@@ -1105,7 +1105,7 @@ E4 通电截止与固定清理对账（`EnergizeBudget` 在 `motor_arm` 写入�
   （65→98 / 27→29 / 32→36，另两件本轮新增文件 7 与 33 条），**removed=0**（基线一条不少），
   新增 33/2/4/7/33 条逐条带人写理由，同名判据无结论翻转，problems=0。
 
-### 24.3 现场包（已作者化，未获批准，未执行）
+### 24.3 现场包（**裁定落地前**那一版；现件见 §24.9。已作者化，未获批准，未执行）
 
 `field/plan_r7f8f_2369_real.json`（28090 B，sha `66ca8a15…`）+ `field/rows_r7f8f_real.json`
 （8168 B，sha `4022306d…`），由 `tools/r7f8f_make_real_package.py` 产出：一个 COM5 会话、38 步、
@@ -1118,6 +1118,8 @@ config_save/clear/retry/物理刺激额度全 0；`polarity_measured=false`、`c
 `DECLARED_BY_OPERATOR_AT_APPROVAL`，计划不许自证（`FIELD_PLAN_PREREQ_NOT_SELF_CERTIFIED`）。
 
 ### 24.4 三段算术算出来的两条真红（交 A 定口径，本轮不自行选择）
+
+> 这两条的口径 A 已在预算裁定里给出，落地后的数与新语义见 §24.8/§24.9；本节原文保留，不改写、不删（裁定二末句也要求 91/23 的红原文继续留档）。
 
 1. **起转后内容排不进 §4 的 cap**：三段是 起转前 19 步（申报窗 34 s）/ 运动窗内 9 步（11 s）/
    停机后 10 步（12 s）。执行器在 `motor_start` 写入尝试时置 `MotionBudget.t0` 且**正常 stop 不
@@ -1191,6 +1193,42 @@ config_save/clear/retry/物理刺激额度全 0；`polarity_measured=false`、`c
     **位置**核 `ALLOWED[0]/[3]/[4]/[5]/[6]` 与常量同步，中间插入会把位置整体挪一位。已改成
     一律追加到末尾并在源码里写明这条约束（判据本身不动，位置口径是它自己定的）。
 
+15. 整包离线门的 `PRE_RULING_REFERENCE_PLAN_STILL_RED_UNCHANGED` 里，"仓外副本与原件逐字节相等"
+    写成了 `hashlib.sha256(A) == hashlib.sha256(B)` —— 比的是**两个哈希对象本身**（没有
+    `.hexdigest()`），恒为 False。也就是说这条判据从写下那天起就带着一格死码，无论基准件怎么
+    对都判红。是本轮把它拆成 6 个合取项逐项打印才暴露的（上一版的详情只贴 SPLIT/WORST 两行，
+    看不出红在哪一格）。修好后新增第 47 条元负控 `PRE_RULING_BYTECMP_CLAUSE_FIRES_ON_MUTATION`：
+    原件副本必须 True、尾部多一个空格的副本必须 False，True/False 配对才允许这项存在。
+    **教训**：复合判据不许只报总判定 —— 合取项要逐项记账，且每一项都要有一次能翻的证据。
+
+16. `tools/r7f8f_budget_package_checks.py` 的基准件身份判据拿 A 的基准 plan **与工作树里的现场包
+    文件**逐字节比。裁定一落地，计划必然改动，这条就当众报红（`FAIL=1`）—— 它证的根本不是
+    "A 钉的是哪份字节"。改成按 Git blob 复算（`git show 6f2b12f:<path>`），判据改名为
+    `REFERENCE_BYTES_EQUAL_6f2b12F_BLOB`，并把"工作树现状"两格（plan 已改、rows 未改）写进详情，
+    不藏这次改动。11 条重跑 FAIL=0。
+
+17. `tools/r7f8e_no_regression.py` 的本轮新门点名表停在 3 条，裁定新增的
+    `PLAN_BUSINESS_RESERVE_SPLIT_LEGACY_SEMANTICS` 与 `PLAN_STEP_TOTAL_WINDOWS` 会被当成
+    "不是本轮适配自己的门"。补进点名表（工具自带的"点名的门确实出现在新增行里"反过来兜住
+    白名单空转）；9/FAIL=0。
+
+18. `tools/r7f8e_merge_draft.py` 里两处上一轮的硬编码让它拒绝为本轮服务：
+    (a) "上一版合并件 = 36273 B / `e9a5253de024`（提交 `d6bbc1b5795f`）" —— 那是 R7F8E 时的值，
+        现件已是 40289 B / `bc3710e9917c`；先按 blob 核过（`git show c9ad704:<path>` 与盘上字节
+        sha 相同）才把常量改过来，不是"改到能通过为止"。
+    (b) 合并记录节把承接来源写死成 `R7F8_DRAFT_UPDATED.md`，并写着"本轮不生成 REAL_GO 计划,
+        不编入真实端口/UID" —— 本轮**确实**有可 dispatch 的现场包（只等操作者一次批准），这句
+        现在是不实陈述。改成 `--updated`/`--label` 当场填路径与轮名，并把三件交付物的
+        bytes/sha 从盘上重算写进记录节。
+    另外裁定新增的 13 条判据（矩阵 K1~K8 + 离线门 5 条）在逐项变更表里没有人写理由，被
+    `r7f8f_fixture_change_table.py` 判红 13 条 —— 补理由后 `problems=0`（这条拦得对：新增判据
+    必须说清为什么存在）。
+
+19. 运动 cap 结束点改到"可信零速快照"之后，我把 §4"正常 stop 必须在起转后 8 s 内发起"写成了
+    **无条件**判据，于是 stub 整包那套合成夹具（它自己的场景把 cap 放大到 62 s、从没申报这条
+    业务规则）被判红：`29/FAIL=2`。收到"阶段申报了才判"，并让现场包在阶段里显式申报
+    `normal_stop_send_by_seconds: 8` —— 规则本身没动，动的是"谁声明谁被核"。
+
 ### 24.6 口径更正两件
 
 - 远端回读覆盖失败那一次的**首次失败原文未留存**（被第二次运行的输出覆盖了同一个文件）。
@@ -1208,3 +1246,90 @@ config_save/clear/retry/物理刺激额度全 0；`polarity_measured=false`、`c
 工具关键修复已验证（四族判据 + 整包门 + 逐项变更表全绿，除两条已点名的静态预算红）。
 **完整现场包尚未就绪，还不能称为现场验收通过**：上机前需要先有 A 对 §24.4 两条的口径答复。
 设备动作为 0；一次现场批准仍未取得（未取得就不发任何现场命令）。
+
+### 24.8 A 的预算裁定落地（同轮后半，仍 0 设备动作）
+
+输入是操作者会话附件 `NS800_R7F8F_A_Budget_Ruling_20261105.zip`（42428 B / zip sha256
+`87c9d5ea76b3c008…`），解出 10 件入 `inputs/A_R7F8F_BUDGET_PKG/`（含 A 自己的
+`SHA256SUMS.txt`，登记 9 件、不列自身）。裁定承接 `6f2b12f` 的交接 §3 与 §24.4，明写"不另开
+离线任务、不增加现场动作、**不再另开登记轮或等 A 签第二次软件章**"，所以本轮把它的两条语义
+一次并入执行器、计划、判据与交接：
+
+- **裁定一（运动计时的结束点）**：从 `motor_start` 写入尝试起，到本次正常 `motor_stop` 之后
+  第一份**新鲜、完整、可信的零速快照**为止；stop 回话本身不算。落地形状：
+  `zero_speed_contract()`（`state/cur_hz/tgt_hz/health` 全零全 OK + armed/请求/pad/ENN 预期·
+  反馈·verdict 自洽；`CUT_BY_HARDWARE` 与残缺快照不算）+ `motion_end_gate()`（必须本场已尝试过
+  唯一一次 start 且随后 stop 成功；证据取自**同一份**响应）；超过 12 s 才到的零速具名
+  `MOTION_ZERO_CONFIRMATION_LATE`，第二次确认具名 `MOTION_END_ALREADY_CONFIRMED`；
+  `MotionBudget.t0` **不清**（不许靠清 t0 放行第二次 start）。台账新增
+  `MOTOR_STOP_CONFIRMED(ends_motion_timer=False)` 与 `MOTION_TIMER_ENDED(arm_deadline_kept=True)`。
+  arm 的 18 s 通电计时与业务 83 s 截止都**不随**零速确认放开（K5/K6 专门证这条），零速之后的
+  commit/show/ps/free 改由 `now+预留7` 起算、仍被会话 90 s 封顶。
+- **裁定二（单步总窗）**：计划新增申报 `step_total_seconds`，该值就是这一步的**整窗**（等待、
+  回读、余量都在内），由同一个 `step_window()` 供执行器、计划门、镜像与仿真使用；不再逐步叠加
+  `SLACK=3`。非法申报（bool / 非数 / 非正 / nan / inf / until>总窗）在**开端口之前**逐条具名拒绝
+  （`STEP_TOTAL_SECONDS_INVALID`、`POLL_UNTIL_EXCEEDS_STEP_TOTAL`）；未申报的旧计划仍按
+  `seconds+3` 的 legacy 规则跑（冻结的 R7F7 件一字未动，`PLAN_BUSINESS_RESERVE_SPLIT_LEGACY_SEMANTICS`
+  只留档不判红）。
+- 计划阶段另显式申报 §4 那条业务规则 `normal_stop_send_by_seconds: 8` —— 谁声明谁被核，合成夹具
+  没声明就不拿现场值判它（§24.5 第 19 条）。
+- 镜像三段改名并按 0 基下标点出结束位置：`pre_start`(19 步) / `motion_active`(11 步，含 stop 与
+  stopped) / `post_zero`(8 步)，`stop_request_index=28`、`zero_confirm_index=29`。行表的停机位
+  从"初态禁能快照"换成产品真实的**已零速但仍带电**形状（`motor_status_armed_idle`：armed=1、
+  drv HIGH/pad=1、expected_ENN=LOW、ENN_fb=0、resolved、verdict=OK）。
+
+裁定 §3 那张表不是抄进计划里的常数：执行器现算 == 计划镜像 == 检查器读数三处同一函数产出，
+K7 逐格核对 31.0 / 9.0 / 7.5、合计 47.5、stop@7.5、零速@9.0、禁能@13.0、保守式 57.5 与 16.0，
+与 A 表完全相同（这些是**窗口分配与计时合同**，不是硬件实测耗时，计划与交接都这么写）。
+
+### 24.9 裁定落地后的判据与现场包（现在的数）
+
+- 派生执行器 `tools/m8r3_serial_chain_r7f8.py`：**312387 B / sha256 `093c8408a019…` / 5480 行**，
+  配方 `tools/r7f8f_build_executor.py` 现 **70 处 edit**，`patches/r7f8f_executor.patch`
+  92610 B / `058a75f153e5`；`--verify` 在仓外重建逐字节相等 = True。修前件与各冻结件一字未动
+  （`FROZEN_*` / `PRE_EXECUTOR_BYTES_FROZEN` / `PRODUCT_SOURCE_UNCHANGED`）。
+- 反例矩阵 `proof/r7f8e_case_matrix.txt`：**106 / FAIL=0**（98 → 106，新增的是裁定 §5 六项对应的
+  K1~K8 进程内探针；K 组必须在进程内跑，因为它们核的是"同一时刻哪个截止还生效"这种运行时态）。
+- stub 整包 **29 / FAIL=0**；无回归 **9 / FAIL=0**（旧件 57 项 fail=1、派生件 67 项 fail=1，
+  唯一既有 FAIL 仍是 `PLAN_MOTION_CAP_BUDGET`）；三版本重放 **21 件 × 3 侧 / FAIL=0**。
+- 整包离线门 `proof/r7f8f_offline_gate.txt` + `offline_gate.json`：**47 条 / FAIL=0**
+  （40/FAIL=2 → 47/FAIL=0；新增 5 条中与裁定直接相关的是
+  `RUN_ZERO_SNAPSHOT_RELEASES_MOTION_TIMER`、`RUN_MOTION_TIMER_ELAPSED_WITHIN_CAP`、
+  `PRE_RULING_REFERENCE_PLAN_STILL_RED_UNCHANGED`、`PRE_RULING_BYTECMP_CLAUSE_FIRES_ON_MUTATION`、
+  `LEGACY_RED_TEXT_KEPT_VERBATIM`）。validate-plan 对现场包：**checks=146 / fail=0**。
+- **两条红的转绿是语义落地，不是把阈值放宽**：A 包里的裁定前基准件
+  （`reference_plan_6f2b12f.json` 28090 B / `66ca8a15…`）原字节复制到仓外重跑，仍然报
+  `zero@None` + `PLAN_BUSINESS_RESERVE_SPLIT|S1|FAIL` + `PLAN_BUSINESS_WORST_CASE_FIT|S1|FAIL` +
+  旧口径 91.0/23.0；91/23 的原文照录留在 `LEGACY_RED_TEXT_KEPT_VERBATIM`。§4 的 12/18/90/7 四个数
+  一字未动（`LIMITS_UNCHANGED`），没有负 `seconds`，没有减步骤。
+- 现场包：`field/plan_r7f8f_2369_real.json` **31712 B / `eef417ce3152…`**（38 步、逐条带
+  `step_total_seconds` 与三段镜像；由 `step_total_problem` + `(as,cmd)` 双核对 A 表的
+  `WINDOW_TABLE_REFUSED` 门把守）；`field/rows_r7f8f_real.json` **8168 B / `4022306df3ad…`**
+  字节未变。镜像参照仍是盘上 297452 B / `23691e8d…`（本轮不下载/不回读/不复位）。
+- 裁定包独立复算 `proof/r7f8f_budget_package.txt|.json`：**11 / FAIL=0**（A 清单 9 件逐条重算、
+  A 自己的 `budget_check.py` 在我这台机器上真跑并与 A 的 `PROOF_budget.json` 对账、三条等价突变
+  负控、基准件按 `6f2b12f` 的 Git blob 核）。
+- 逐项变更表 `proof/r7f8f_fixture_changes.md|.json`：基线 `42d7f7d` 五族逐名对齐，
+  矩阵 65→106、stub 27→29、无回归 32→37、重放(7 个判据名)与整包离线门(39 个判据名)为本轮新增
+  文件，**removed=0**、同名判据无结论翻转、新增逐条带人写理由，`problems=0`。
+
+### 24.10 活草案重合并
+
+A 的裁定包内 `R7F8_LIVING_DRAFT.md`（38793 B / `14bafe13a8cd`，304 行，含新写的 §7.3
+"预算定稿补充"）已重合并进
+`reports/reviews/phase8-m8-r7f8-closed-loop-draft/R7F8_DRAFT_MERGED.md`：新件 **41144 B /
+`db031f8aa5f3`**，`INHERIT_EXACT|equal=True|正文行=304|快照行=304`（剪掉记录节后与 A 的原件按行
+逐字节相等）；上一版合并件 40289 B / `bc3710e9917c`（提交 `c9ad704`）不回改，历史身份由 Git blob
+承担；`A_DRAFT_ORIGINAL.md` 24780 B / `b572c1928f60` 一字未动。合并记录节现在当场重算并写出三件
+可 dispatch 交付物的 bytes/sha，且明写 DRAFT_NOT_AUTHORIZED：合并件本身不是 dispatch 对象，
+上机仍需操作者**一次**整批准。
+
+### 24.11 停点（裁定落地后）
+
+§24.4 那两条的口径已由 A 给出并落地，整包离线门 **47/FAIL=0**、validate-plan **146/fail=0**、
+四族判据全绿、逐项变更表 problems=0 —— 对应裁定末段那句"**不再另开登记轮或等 A 签第二次软件章**"
+（原文在 `R7F8F_A_BUDGET_RULING.md` 第 83 行，§5 之后）。
+**但这不等于现场验收通过**：本轮设备动作仍为 0，批准账未开，
+`polarity_measured=false` / `core_protection_verified=false` 保持原值；一次实机整包执行
+（F11）只等操作者对"R7F8F 及本预算裁定"的那句真实原话。令牌取自操作者回复，不由 agent 自造，
+也不借上一轮的批准。
