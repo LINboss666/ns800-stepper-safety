@@ -1,11 +1,11 @@
 输入在位|PASS|四件齐全; 计划=1de974bf2828819f 行表=5fee4060f4bde537
-两侧都跑完并给出汇总|PASS|旧 checks=57 fail=1 / 新 checks=63 fail=1
+两侧都跑完并给出汇总|PASS|旧 checks=57 fail=1 / 新 checks=64 fail=1
 旧判据一条都没被洗掉|PASS|消失=0 条
-新增行全部是本轮适配自己的门|PASS|新增=6 条, 其中既不是 R7F8E_ 形状也不在点名表里的=0 条
-点名的本轮新门确实出现在新增行里(白名单非空转)|PASS|点名=PLAN_CLEANUP_RESERVE 实到=PLAN_CLEANUP_RESERVE,R7F8E_GATE_SUMMARY,R7F8E_JOB_STATE_NAMES,R7F8E_LEARN_STATUS_READONLY,R7F8E_QUOTA_PREFIX_REAL,R7F8E_QUOTA_TABLE 缺=-
-新增门条数与计数一致|PASS|旧 57 + 新增 6 = 新 63
+新增行全部是本轮适配自己的门|PASS|新增=7 条, 其中既不是 R7F8E_ 形状也不在点名表里的=0 条
+点名的本轮新门确实出现在新增行里(白名单非空转)|PASS|点名=PLAN_CLEANUP_RESERVE,PLAN_BUSINESS_RESERVE_SPLIT 实到=PLAN_BUSINESS_RESERVE_SPLIT,PLAN_CLEANUP_RESERVE,R7F8E_GATE_SUMMARY,R7F8E_JOB_STATE_NAMES,R7F8E_LEARN_STATUS_READONLY,R7F8E_QUOTA_PREFIX_REAL,R7F8E_QUOTA_TABLE 缺=-
+新增门条数与计数一致|PASS|旧 57 + 新增 7 = 新 64
 既有失败集合未变|PASS|两侧 fail 计数 1 vs 1; 唯一既有 FAIL 是 PLAN_MOTION_CAP_BUDGET(空运动链的既有检查器缺口, R7F8 草案轮已登记)
-派生件身份已重登记(不冒用旧摘要)|PASS|旧 219491 B sha=33d3f0af8a4c9c33 / 新 274223 B sha=093c09fdec1dc9fd
+派生件身份已重登记(不冒用旧摘要)|PASS|旧 219491 B sha=33d3f0af8a4c9c33 / 新 278068 B sha=c7fe3896e8298809
 本轮无设备动作|PASS|两次 --validate-plan 都是纯静态读; 未开端口、未建批准账、未 dispatch
 
 == 旧执行器输出原文(58 行) ==
@@ -68,7 +68,7 @@ PLAN_STATUS_ALLOW|all|PASS|����������ê���ұ����
 PLAN_BOOT_WINDOW_COVER|all|PASS|�½�=75s, ����: S3=75+6+3s=84s
 PLAN_VALIDATE_SUMMARY|checks=57|fail=1|msh_commands=74|plan=D:\ns800\reports\reviews\phase8-m8-r7f7-newimage-static\field\plan_r7f7_2369_static.json
 
-== 派生件输出原文(64 行) ==
+== 派生件输出原文(65 行) ==
 PLAN_MOTION_WINDOW|S0|PASS|�˹��Ŷ����˶�֮ǰ
 PLAN_MOTION_WINDOW|S1|PASS|�˹��Ŷ����˶�֮ǰ
 PLAN_MOTION_WINDOW|S2|PASS|�˹��Ŷ����˶�֮ǰ
@@ -111,6 +111,7 @@ PLAN_QUOTA_COVERAGE|all|PASS|used=diag_profile_learn,diag_profile_zero missing=
 PLAN_STATE_AND_FLAG_CONSTANTS|all|PASS|motor={'IDLE': 0, 'ACCEL': 1, 'CRUISE': 2, 'DECEL': 3, 'FAULT': 4} rpf={'COMMITTED': 1, 'FIELD_VERIFIED': 2, 'FROM_LEARN': 4} columns=14
 PLAN_MOTION_CAP_BUDGET|all|FAIL|caps=[] sum=0 total=0 starts=0
 PLAN_CLEANUP_RESERVE|S3|PASS|reserve=7.0 floor=6.0 total=210.0 cap=None
+PLAN_BUSINESS_RESERVE_SPLIT|S3|PASS|may_obligate=False first@[] business_worst=133.0 cap=None reserve=7.0 total=210.0
 PLAN_IMAGE_IDENTITY_CONSISTENCY|all|PASS|S0=download.axf=readback.bin ͬԴ�һض����Ͼɾ���
 PLAN_QUOTA_NEED|diag_profile_learn|PASS|need=1 declared=1
 PLAN_QUOTA_NEED|diag_profile_zero|PASS|need=1 declared=1
@@ -132,10 +133,11 @@ R7F8E_QUOTA_PREFIX_REAL|all|PASS|��Ʒ�ﲻ���ڵ�ǰ׺=[](д���
 R7F8E_LEARN_STATUS_READONLY|all|PASS|learn_status ������ learn/cancel; learn ������ȡ���ֱ����
 R7F8E_JOB_STATE_NAMES|all|PASS|Դ�� rel_job_state_name ״̬��=CANCELLED,CANCEL_PENDING,DONE,FAILED,IDLE,RUNNING,TIMEOUT
 R7F8E_GATE_SUMMARY|all|PASS|fails=0
-PLAN_VALIDATE_SUMMARY|checks=63|fail=1|msh_commands=74|plan=D:\ns800\reports\reviews\phase8-m8-r7f7-newimage-static\field\plan_r7f7_2369_static.json
+PLAN_VALIDATE_SUMMARY|checks=64|fail=1|msh_commands=74|plan=D:\ns800\reports\reviews\phase8-m8-r7f7-newimage-static\field\plan_r7f7_2369_static.json
 
 == 新增行逐条 ==
 PLAN_CLEANUP_RESERVE|S3|PASS|reserve=7.0 floor=6.0 total=210.0 cap=None
+PLAN_BUSINESS_RESERVE_SPLIT|S3|PASS|may_obligate=False first@[] business_worst=133.0 cap=None reserve=7.0 total=210.0
 R7F8E_QUOTA_TABLE|all|PASS|pairs=10 keys=9 ȡ����=True
 R7F8E_QUOTA_PREFIX_REAL|all|PASS|��Ʒ�ﲻ���ڵ�ǰ׺=[](д���ᾲĬ��������, ���Ƕ���������ֻ��)
 R7F8E_LEARN_STATUS_READONLY|all|PASS|learn_status ������ learn/cancel; learn ������ȡ���ֱ����

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""R7F8F 反例重放: A 的探针意图 + 操作者实测的两条 F5b 缺口, 在**三份件**上各跑一遍.
+"""R7F8F 反例重放: A 的探针意图 + A 的 stub 复现的两条 F5b 缺口, 在**三份件**上各跑一遍.
 
 三份件(全部只读盘上原件, 本脚本不修改任何件):
   REPAIRED        tools/m8r3_serial_chain_r7f8.py                     本轮返修件(含 F5b)
@@ -14,7 +14,7 @@
   重放, 每条同时声明三件期望——
     REPAIRED: 返修件必须给出的首错/补齐行为;
     F5B_BEFORE / R7F8F_BEFORE: 旧件必须**按各自缺什么复现什么**(否则重放工具本身没在测东西)。
-  操作者实测的两条缺口分别落在 F5B_BEFORE 上: I4 尾部一条都没发(缺口①), I5 第五条被
+  A 的 stub 复现的两条缺口分别落在 F5B_BEFORE 上: I4 尾部一条都没发(缺口①), I5 第五条被
   IRQ_TAIL_HARD_DEADLINE_BEFORE_safety_irq_status 跳过(缺口②)。
 
 真实设备动作: 0(全部 transport=stub / backend=sim, 假端口, 不开串口、不调 pyOCD/Keil/下载器)。
@@ -113,7 +113,7 @@ def cases():
                    "disarm": "UNKNOWN"},
                FB: {"code": "MISSING_RESPONSE_PROMPT", "disarm": "UNKNOWN"},
                RB: {"code": "", "disarm": "CONFIRMED_DISABLED"}}))
-    # ④操作者实测 F5b①: 先开 IRQ、随后查询失败(电机从未武装) => 尾部两条仍必须发出。
+    # ④A 的 stub 复现 F5b①: 先开 IRQ、随后查询失败(电机从未武装) => 尾部两条仍必须发出。
     C.append(("I4_F5b1_开IRQ后arm前失败_尾部disable与status仍发出",
               [m.st_("irq", "safety_irq_enable", key="safety_irq_enable", seconds=2,
                      expect_contains=["IRQ"], quota={"name": "irq_polarity_prep", "n": 1}),
@@ -132,7 +132,7 @@ def cases():
                     "tx_must_none": ["safety_irq_disable", "safety_irq_status"]},
                RB: {"code": "PROFILE_NOT_RUNNING",
                     "tx_must_none": ["safety_irq_disable", "safety_irq_status"]}}))
-    # ⑤操作者实测 F5b②: 收口全部无响应 => 五条各有发送机会(第五条不被 IRQ_TAIL_HARD_DEADLINE 跳过)。
+    # ⑤A 的 stub 复现 F5b②: 收口全部无响应 => 五条各有发送机会(第五条不被 IRQ_TAIL_HARD_DEADLINE 跳过)。
     C.append(("I5_F5b2_收口全部无响应_五条各有发送机会",
               [m.st_("arm", "motor_arm", key="motor_arm", seconds=2,
                      expect_contains=["ARMED (drv_en request=HIGH"]),
@@ -177,6 +177,24 @@ def cases():
                    "reserve": 4.0, "tx_must_none": ["motor_arm"]},
                FB: {"code": "RUNNER_PARSE_FAILED"},
                RB: {"code": "RUNNER_PARSE_FAILED"}}))
+    # ⑦A 的 stub 复现(F5c): 会话 10 s、预留 7 s、前置等待 2 s 后还要 arm。三份件的差别正好落在
+    #    这道门上: 只有返修件把业务截止提前到"总截止 - 预留", 两份旧件都会真的把 arm 写出去。
+    C.append(("I7_F5c_前置等待后arm仍放出去_收口拿不到预留",
+              [m.st_("pre", "__watch__", key="__watch__", seconds=2),
+               m.st_("arm", "motor_arm", key="motor_arm", seconds=2,
+                     expect_contains=["ARMED (drv_en request=HIGH"]),
+               m.st_("irq", "safety_irq_enable", key="safety_irq_enable", seconds=2,
+                     expect_contains=["IRQ"], quota={"name": "irq_polarity_prep", "n": 1})],
+              m.fx(responses={"__watch__": ["[DIAG] tick"], "motor_arm": m.ARM_OK,
+                              "safety_irq_enable": IRQ_ON}),
+              ["--total-deadline-seconds", "10", "--arm-energize-deadline-seconds", "30"],
+              {R: {"code": "STEP_DEADLINE_BEFORE_WRITE", "tx_must_none": ["motor_arm"],
+                   "reserve": 7.0},
+               FB: {"code": "CLEANUP_UNCONFIRMED", "tx_must": ["motor_arm", "safety_irq_enable",
+                                                               "safety_irq_disable"],
+                    "tx_must_none": ["safety_irq_status"]},
+               RB: {"code": "CLEANUP_UNCONFIRMED", "tx_must": ["motor_arm", "safety_irq_enable"],
+                    "tx_must_none": ["safety_irq_disable", "safety_irq_status"]}}))
     return C
 
 

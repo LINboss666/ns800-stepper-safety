@@ -43,7 +43,7 @@ PLAN_APP_REL = ("rt-thread-master/rt-thread-master/bsp/novosns/ns800/"
 BAUD = 115200
 SLACK_SECONDS = 3
 WRITE_SECONDS = 2
-# F5b(操作者实测第二项): 4 s 排不下**五条**各自的 1.2 s 确认窗(3 条电机 + 2 条 IRQ 尾部
+# F5b(A 的 stub 复现第二项): 4 s 排不下**五条**各自的 1.2 s 确认窗(3 条电机 + 2 条 IRQ 尾部
 # = 6.0 s), 于是全部无响应时第五条 safety_irq_status 必被 IRQ_TAIL_HARD_DEADLINE_BEFORE_*
 # 跳过。本轮任务书 §5 明写"会话 90 s 含 7 s 收口预留", 这里落实成申报值 7 s;
 # exec_session 开口前用 CLEANUP_RESERVE_CANNOT_COVER_ALL_SENDS 拒掉任何 < 6.0 s 的申报。
@@ -888,6 +888,8 @@ class MotionBudget:
         # F5b: 会话绝对截止(台账 t0 + 总时限)。cleanup_deadline() 用它把收口再夹一次,
         # 落实"7 s 预留仍受会话总截止约束"——预留不是把会话无上限拉长的手段。
         self.session_abs_dl = None
+        # F5c: 业务侧绝对截止 = session_abs_dl - reserve(只有本会话可能建立收口义务时才设)。
+        self.business_dl = None
 
     @property
     def armed(self):
@@ -898,11 +900,18 @@ class MotionBudget:
             self.t0 = self.clock.monotonic()
 
     def business_deadline(self, want_seconds, slack=SLACK_SECONDS):
-        """业务动作的截止 = min(本步想等的, 硬截止) ; 硬截止已过 => 0(不许再做业务动作)。"""
-        if self.t0 is None:
-            return self.clock.monotonic() + want_seconds + slack
-        hard = self.t0 + self.cap
-        return min(self.clock.monotonic() + want_seconds + slack, hard)
+        """业务动作的截止 = min(本步想等的+余量, 起转硬截止, **收口前的业务截止**)。
+
+        F5c: 第三条以前不存在。收口预留必须从业务时间里**先扣掉**, 否则前置步骤(等待/轮询/
+        只读查询)把会话跑到总截止, 收口剩 0 秒, 五条撤能/关 IRQ 全被 *_HARD_DEADLINE_BEFORE_*
+        跳过 —— 那时"具名判红"只是把失败写进账, 设备仍留在带电+IRQ OPEN。
+        """
+        base = self.clock.monotonic() + want_seconds + slack
+        if self.t0 is not None:
+            base = min(base, self.t0 + self.cap)
+        if self.business_dl is not None:
+            base = min(base, self.business_dl)
+        return base
 
     def cleanup_deadline(self):
         """收口绝对截止 = 起转硬截止 + **申报的**收口预留, 再被会话总截止夹一次。
@@ -2647,6 +2656,14 @@ def exec_session(session_id, steps, outdir, transport, fixture, port_name,
         MotionBudget(clock, total_deadline_seconds, reserve=reserve_declared)
     # F5b②: 收口仍然被会话**绝对**截止封顶(修前 cleanup 只认 t0+cap+reserve, 总时限管不到它)。
     budget.session_abs_dl = session_abs_dl
+    # F5c: 本会话**可能**建立收口义务(步骤里出现 motor_arm/motor_start/safety_irq_enable 任一)时,
+    # 业务绝对截止提前到"总截止 - 收口预留"。这条判据只看获批步骤里有没有这三条命令, 不看运行
+    # 结果: 义务还没建立也得先把撤能窗口留在预算外, 否则"能不能留出 7 秒"取决于前面跑顺不顺。
+    OBLIGATION_COMMANDS = ("motor_arm", "motor_start", "safety_irq_enable")
+    may_obligate = any(str(s.get("cmd", "")).split(" ")[0] in OBLIGATION_COMMANDS
+                       for s in steps if isinstance(s, dict))
+    business_abs_dl = (session_abs_dl - float(reserve_declared)) if may_obligate else session_abs_dl
+    budget.business_dl = business_abs_dl if may_obligate else None
     silent = bool(fixture.get("inject", {}).get("port_silent"))
     port = None
     ret = None
@@ -2757,7 +2774,9 @@ def exec_session(session_id, steps, outdir, transport, fixture, port_name,
             # ---- F2: 义务先立, 截止后算; 会话截止是**绝对**的 t0+总时限, 不逐步续期 ----
             arm_attempt_gate(energize, led, clock, asname, cmd)
             want = int(st.get("seconds", 3))
-            step_dl = min(clock.monotonic() + want + SLACK_SECONDS, session_abs_dl)
+            # F5c: 这一步(以及它下面的读/轮询/等待)受**业务**截止约束, 不是会话总截止 ——
+            # 差额就是留给五条收口的预留。may_obligate=False 的只读场两者相同。
+            step_dl = min(clock.monotonic() + want + SLACK_SECONDS, business_abs_dl)
             if cmd == "__watch__" or budget.armed:
                 step_dl = min(step_dl, budget.business_deadline(want))
             if energize.armed:
@@ -2772,6 +2791,11 @@ def exec_session(session_id, steps, outdir, transport, fixture, port_name,
                     {"as": asname, "want_seconds": want,
                      "remaining_s": round(step_dl - clock.monotonic(), 3),
                      "session_remaining_s": round(session_abs_dl - clock.monotonic(), 3),
+                     # F5c: 首错细节里同时给"会话还剩多少"和"收口前业务还剩多少", 让人一眼看出
+                     # 这条是被预留挡住的, 不是总截止到了才顺手红。
+                     "business_remaining_s": round(business_abs_dl - clock.monotonic(), 3),
+                     "cleanup_reserve_seconds": float(reserve_declared),
+                     "cleanup_reserved": bool(may_obligate),
                      "energize_remaining_s": energize.remaining()}, ensure_ascii=False))
             if budget.armed and step_dl <= clock.monotonic():
                 raise Stop("MOTION_BUDGET_EXHAUSTED", "as=%s want=%ds" % (asname, want))
@@ -2903,7 +2927,7 @@ def exec_session(session_id, steps, outdir, transport, fixture, port_name,
         ret = {"status": "STOP", "code": primary.code, "detail": primary.detail}
         led.ev("SESSION_STOP", code=primary.code, detail=primary.detail)
     finally:
-        # F5b①(操作者实测第一项): 任务书 §2 要的是"**尝试过**开 IRQ 本身就建立尾部清理义务",
+        # F5b①(A 的 stub 复现第一项): 任务书 §2 要的是"**尝试过**开 IRQ 本身就建立尾部清理义务",
         # 与电机义务无关。真实序列正是先 safety_irq_enable 再 motor_arm, 中间任何一步失败(查询
         # 失败/判据红/截止)都落在 `obligation` 还是 False 的窗口里 => 修前一条 disable/status
         # 都不发, IRQ 门留在 OPEN。电机那三条仍按 obligation 走(见 cleanup 的 motor_obligation)。
@@ -2986,6 +3010,8 @@ def exec_session(session_id, steps, outdir, transport, fixture, port_name,
                 "cleanup_reserve_seconds": budget.reserve,
                 "cleanup_hard_deadline": round(budget.cleanup_deadline(), 6),
                 "session_abs_deadline": round(session_abs_dl, 6),
+                "business_abs_deadline": round(business_abs_dl, 6),
+                "cleanup_reserved": bool(may_obligate),
                 "energize_cap_seconds": energize.cap,
                 "energize_seconds_actual": energize.close(),
                 "job_bindings": {k: v["job_id"] for k, v in bindings.items()},
@@ -3579,9 +3605,32 @@ def validate_plan(plan, rows_doc, app_dir):
             if td is not None and mc is not None and mc + rs > td:
                 bad_r.append("motion_cap=%s + 预留=%s > 本阶段总窗=%s(预留排不进会话)"
                              % (mc, rs, td))
+        # F5c: 只看 cap+reserve<=total 不够 —— 起转**之前**已经消耗的步骤时间同样吃会话预算。
+        # 这里按获批步骤自己申报的窗口求最坏情况(轮询取 until_seconds, 每条再加 SLACK 余量),
+        # 与 cap、reserve 一起必须住在本阶段总窗之内。只读阶段(无义务来源命令)不受这条约束。
+        steps_r = sg.get("steps", [])
+        may_ob = [i for i, s in enumerate(steps_r) if isinstance(s, dict)
+                  and str(s.get("cmd", "")).split(" ")[0] in
+                  ("motor_arm", "motor_start", "safety_irq_enable")]
+        pre = 0.0
+        for s in steps_r:
+            if not isinstance(s, dict) or not s.get("cmd"):
+                continue
+            w = ((s.get("poll") or {}).get("until_seconds") or s.get("seconds") or 0)
+            pre += float(w) + SLACK_SECONDS
+        if may_ob and td is not None and pre + (mc or 0.0) + (rs or 0.0) > td:
+            bad_r.append("业务最坏合计=%s + cap=%s + 预留=%s > 总窗=%s"
+                         "(起转前还要吃掉 %s 秒, 收口实际拿不到预留)"
+                         % (round(pre, 3), mc, rs, td, round(pre, 3)))
+        ok_split = not (may_ob and td is not None and pre + (mc or 0.0) + (rs or 0.0) > td)
         out.append("PLAN_CLEANUP_RESERVE|%s|%s|reserve=%s floor=%.1f total=%s cap=%s%s" %
                    (sg["id"], "PASS" if not bad_r else "FAIL", rs, floor_r, td, mc,
                     "" if not bad_r else "|" + ";".join(bad_r)))
+        # 同一条缺陷只进一个计数(上面已经计过), 这一行专门把"起转前已消耗多少"摊开给人看。
+        out.append("PLAN_BUSINESS_RESERVE_SPLIT|%s|%s|may_obligate=%s first@%s "
+                   "business_worst=%s cap=%s reserve=%s total=%s" %
+                   (sg["id"], "PASS" if ok_split else "FAIL(与 PLAN_CLEANUP_RESERVE 同一条)",
+                    bool(may_ob), may_ob[:1], round(pre, 3), mc, rs, td))
         if bad_r:
             bad += 1
     # ① 镜像身份: S0/下载/回读三处必须同源(离线就拒绝, 不等现场 READBACK_HASH_MISMATCH)

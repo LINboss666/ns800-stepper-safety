@@ -16,4 +16,7 @@ REPLAY|R7F8F_BEFORE|PASS|I5_F5b2_收口全部无响应_五条各有发送机会|
 REPLAY|REPAIRED|PASS|I6_F5b2_申报4秒预留在开口之前拒(旧件没有这条 CLI 申报口)|code=CLEANUP_RESERVE_CANNOT_COVER_ALL_SENDS|disarm=NOT_ARMED|reserve=4.0|tx=-|
 REPLAY|F5B_BEFORE|PASS|I6_F5b2_申报4秒预留在开口之前拒(旧件没有这条 CLI 申报口)|code=RUNNER_PARSE_FAILED|disarm=None|reserve=None|tx=-|
 REPLAY|R7F8F_BEFORE|PASS|I6_F5b2_申报4秒预留在开口之前拒(旧件没有这条 CLI 申报口)|code=RUNNER_PARSE_FAILED|disarm=None|reserve=None|tx=-|
-REPLAY_SUMMARY|件数=18|每条件数=3|FAIL=0|none
+REPLAY|REPAIRED|PASS|I7_F5c_前置等待后arm仍放出去_收口拿不到预留|code=STEP_DEADLINE_BEFORE_WRITE|disarm=NOT_ARMED|reserve=7.0|tx=-|
+REPLAY|F5B_BEFORE|PASS|I7_F5c_前置等待后arm仍放出去_收口拿不到预留|code=CLEANUP_UNCONFIRMED|disarm=UNKNOWN|reserve=None|tx=motor_arm,safety_irq_enable,motor_stop,motor_disarm,motor_status,safety_irq_disable|
+REPLAY|R7F8F_BEFORE|PASS|I7_F5c_前置等待后arm仍放出去_收口拿不到预留|code=CLEANUP_UNCONFIRMED|disarm=UNKNOWN|reserve=None|tx=motor_arm,safety_irq_enable,motor_stop,motor_disarm,motor_status|
+REPLAY_SUMMARY|件数=21|每条件数=3|FAIL=0|none

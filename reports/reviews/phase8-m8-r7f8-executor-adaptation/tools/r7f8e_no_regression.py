@@ -99,7 +99,7 @@ def main() -> int:
     # "本轮自己的门"不能只看前缀: R7F8F 的 F5b 把收口预留判据加进了离线整包门家族(PLAN_*)。
     # 前缀放不开就得点名 —— 点名了就要验它确实出现, 否则白名单会变成"任何 PLAN_ 新行都免检"。
     OURS_PREFIX = "R7F8E_"
-    OURS_NAMES = ("PLAN_CLEANUP_RESERVE",)
+    OURS_NAMES = ("PLAN_CLEANUP_RESERVE", "PLAN_BUSINESS_RESERVE_SPLIT")
     not_ours = [l for l in added
                 if not l.startswith(OURS_PREFIX) and l.split("|")[0] not in OURS_NAMES]
     note("新增行全部是本轮适配自己的门", not not_ours,

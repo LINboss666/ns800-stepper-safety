@@ -762,7 +762,7 @@ def cases():
            errors_none_contains=["DISARM_NOT_CONFIRMED", "IRQ_TAIL", "HARD_DEADLINE_BEFORE"]))
     # ②本轮申报的 7 s 预留要真的容得下五条: 运动截止后全部无响应 => 每条在自己的 1.2 s 窗里
     #   试完, 五次发送、跨度 4.8 s(=4 个窗), 收尾仍在预留 7 s 之内。修前的 4 s 常量只排得下
-    #   四条, 第五条 safety_irq_status 直接不出现在 TX 里(操作者实测到的形状)。
+    #   四条, 第五条 safety_irq_status 直接不出现在 TX 里(A 的 stub 复现到的形状)。
     g("H11_收口全部无响应时五条各有发送机会(7秒预留)",
       [st_("arm", "motor_arm", key="motor_arm", seconds=2,
            expect_contains=["ARMED (drv_en request=HIGH readback verified"]),
@@ -803,19 +803,46 @@ def cases():
       extra=["--arm-energize-deadline-seconds", "20", "--cleanup-reserve-seconds", "4"])
     # ②的边界: 会话总截止确实**夹住**了收口(预留没被放宽)。少发是截止造成的, 但这件事在第一条
     #   清理命令之前就以 CLEANUP_RESERVE_SHORT_BY_SESSION_DEADLINE 说清楚, 不靠事后归因。
-    g("H13_会话总截止夹短收口时事前具名披露",
+    # F5c(A 的 stub 复现): 会话 10 s、申报预留 7 s、前置等待 8 s。修前第 9 秒仍然允许 arm,
+    # 业务跑到第 10 秒才结束 => 收口剩 0 秒, 五条全被 *_HARD_DEADLINE_BEFORE_* 跳过(A 的形状)。
+    # 现在业务绝对截止 = 10 - 7 = 3.0 s: 等待自己在 3.0 收(它的申报秒数 2+SLACK 本来就 < 会话
+    # 总窗, 所以这条等待**只**能被预留挡住), 之后的 arm 在**写之前**被拒, 电机从未带电 =>
+    # 那 7 秒整段留在那里。等待若写成 8 s, 突变后的对照会撞在"会话总截止"上而不是"预留"上,
+    # 危害就看不见了(X6 第一版正是这样, 已按此改)。
+    g("H13_前置等待耗掉会话后业务在收口预留之前停下",
+      [st_("pre", "__watch__", key="__watch__", seconds=2),
+       st_("arm", "motor_arm", key="motor_arm", seconds=2,
+           expect_contains=["ARMED (drv_en request=HIGH readback verified"])],
+      fx(responses={"__watch__": ["[DIAG] tick"], "motor_arm": ARM_OK,
+                    "motor_status": STATUS_DISABLED, "motor_stop": STOP_OK,
+                    "motor_disarm": DISARM_OK}),
+      dict(code="STEP_DEADLINE_BEFORE_WRITE", obligation=False, success_false=True,
+           sent_count={"motor_arm": 0},
+           cleanup_tx_none=["motor_stop", "motor_disarm", "safety_irq_disable",
+                            "safety_irq_status"],
+           watch_done_at=[2.95, 3.15], bad_contains=["business_remaining_s"],
+           res_near={"cleanup_reserve_seconds": 7.0, "business_abs_deadline": 3.0,
+                     "cleanup_reserved": True}),
+      extra=["--total-deadline-seconds", "10", "--arm-energize-deadline-seconds", "30"])
+    # F5c 的正面对偶: 义务在业务截止之前建立, 收口全静默 => 五条仍各拿到自己的窗(首末跨度 4.8),
+    # 一条都不被截止跳过; 收口起点恰好落在"总截止 - 预留"= 3.0 s 上。
+    g("H14_义务早建立且收口全静默_五条仍拿到预留窗口",
       [st_("arm", "motor_arm", key="motor_arm", seconds=2,
            expect_contains=["ARMED (drv_en request=HIGH readback verified"]),
        st_("irq", "safety_irq_enable", key="safety_irq_enable", seconds=2,
-           expect_contains=["IRQ"], quota={"name": "irq_polarity_prep", "n": 1})],
-      fx(responses={"motor_arm": ARM_OK, "safety_irq_enable": IRQ_ON}),
+           expect_contains=["IRQ"], quota={"name": "irq_polarity_prep", "n": 1}),
+       st_("pre", "__watch__", key="__watch__", seconds=8)],
+      fx(responses={"motor_arm": ARM_OK, "safety_irq_enable": IRQ_ON,
+                    "__watch__": ["[DIAG] tick"]}),
       dict(code="CLEANUP_UNCONFIRMED", obligation=True, success_false=True,
-           disarm="UNKNOWN", cleanup_tx=["motor_stop"],
-           cleanup_span=[1, 4, 0.0, 4.0],
-           errors_contains=["CLEANUP_RESERVE_SHORT_BY_SESSION_DEADLINE"],
-           res_near={"cleanup_hard_deadline": 4.0, "session_abs_deadline": 4.0,
-                     "cleanup_reserve_seconds": 7.0}),
-      extra=["--arm-energize-deadline-seconds", "30", "--total-deadline-seconds", "4"])
+           disarm="UNKNOWN", cleanup_tx=FIVE, tx_count={k: 1 for k in FIVE},
+           cleanup_span=[5, 5, 4.7, 6.05],
+           errors_none_contains=["HARD_DEADLINE_BEFORE",
+                                 "CLEANUP_RESERVE_SHORT_BY_SESSION_DEADLINE"],
+           res_near={"cleanup_reserve_seconds": 7.0, "business_abs_deadline": 3.0,
+                     "cleanup_reserved": True},
+           closed_event="CLEANUP_ENTERED"),
+      extra=["--total-deadline-seconds", "10", "--arm-energize-deadline-seconds", "30"])
 
     return C
 
@@ -872,6 +899,21 @@ MUTATIONS = {
         find='hook, quota if plan else None,\n',
         repl='hook, quota_box if plan else None,\n',
         case="L3_清理预留耗尽仍撤能但本场不OK", gone="CLEANUP_RESERVE_EXHAUSTED"),
+    # F5c: "业务截止 = 总截止 - 收口预留"这道门的两条危害形状。突变点必须打在 **business_abs_dl**
+    # 本身(它是写前检查真正读的那个值), 只摘 budget.business_dl 不够 —— 上一版把锚点挂在后者,
+    # 两条突变都变成"摘了门也没变化", 证不到任何东西(自己踩完才发现, 已改)。
+    "X6_把收口预留从业务预算里抹掉_前置等待后arm仍放出去": dict(
+        find='    business_abs_dl = (session_abs_dl - float(reserve_declared)) if may_obligate '
+             'else session_abs_dl\n',
+        repl='    business_abs_dl = session_abs_dl\n',
+        case="H13_前置等待耗掉会话后业务在收口预留之前停下",
+        gone="STEP_DEADLINE_BEFORE_WRITE", sent_harm="motor_arm"),
+    "X7_同一道门_静默收口时第五条发不出去": dict(
+        find='    business_abs_dl = (session_abs_dl - float(reserve_declared)) if may_obligate '
+             'else session_abs_dl\n',
+        repl='    business_abs_dl = session_abs_dl\n',
+        case="H14_义务早建立且收口全静默_五条仍拿到预留窗口",
+        must_lose=["safety_irq_status"]),
 }
 
 
@@ -1069,6 +1111,19 @@ def judge(c, res, led):
             if got > e["cleanup_enter_max_s"]:
                 bad.append("收口第一条 TX 在 %ss > %.2fs(截止后还在等业务回包)" %
                            (got, e["cleanup_enter_max_s"]))
+    if "watch_done_at" in e:
+        # 观察窗**自己**落在绝对时刻上的判据(F5c)。watch_min 是"相对前一个业务事件"的差值,
+        # 而 H13 那条等待之前已经有 PORT_OPEN 的 OBLIGATION_SET 记在 3.0 s 上, 差值被判成 0
+        # —— 那是差值口径不适配这条时间线, 不是等待没走满, 所以这里直接钉 WATCH_DONE 的时刻。
+        lo, hi = e["watch_done_at"]
+        w = [x for x in led if x.get("kind") == "WATCH_DONE"]
+        if not w:
+            bad.append("没有 WATCH_DONE 事件")
+        else:
+            got = float(w[-1].get("t_s", -1))
+            if not (lo <= got <= hi):
+                bad.append("WATCH_DONE 落在 t=%.3fs 不在 [%s,%s](业务绝对截止=%s)"
+                           % (got, lo, hi, res.get("business_abs_deadline")))
     if "watch_min" in e:
         w = [x for x in led if x.get("kind") == "WATCH_DONE"]
         if not w:
@@ -1199,8 +1254,10 @@ def main() -> int:
             continue
         _rc, res, _led = run_case(repo, work, mp, case, "mut_" + mname[:2])
         code = res.get("code", "")
-        ok = bool(m["gone"]) and code != m["gone"]
-        detail = "摘门后 code=%s(原门检出=%s)" % (code, m["gone"])
+        # 原门的证据有两种形状: 换错误码(gone), 或**少发一条安全命令**(must_lose)。
+        # 只声明 must_lose 的突变不要求 code 改变 —— 收口被饿死时代码常常仍是同一个。
+        ok = (code != m["gone"]) if m.get("gone") else bool(m.get("must_lose"))
+        detail = "摘门后 code=%s(原门检出=%s)" % (code, m.get("gone") or "-")
         if m.get("mut_code"):
             same = code == m["mut_code"]
             ok = ok and same
@@ -1210,6 +1267,14 @@ def main() -> int:
             harm = m["sent_harm"] in sent
             ok = ok and harm
             detail += "; 摘门后真实发出=%s(应看到这条写尝试) 实发=%s" % (harm, sent)
+        if m.get("must_lose"):
+            # F5c 的元负控形状: 这道门的作用不是"换一个错误码", 而是"让五条收口真的发得出去"。
+            # 摘掉之后必须看到**少发**, 只报 INJECTED 或只换 code 都不算证到危害。
+            txs = [x.get("bytes", "").split(chr(13))[0].strip() for x in _led
+                   if x.get("kind") == "TX"]
+            lost = [c for c in m["must_lose"] if c not in txs]
+            ok = ok and bool(lost)
+            detail += "; 摘门后收口少发=%s(预留被业务吃掉才会少发) 全部TX=%s" % (lost, txs)
         if ok and m.get("also_case"):
             c2 = next(c for c in cases() if c["name"] == m["also_case"])
             _r2, res2, _l2 = run_case(repo, work, mp, c2, "mut_" + m["also_case"][:6])
