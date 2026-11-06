@@ -1,9 +1,10 @@
-# 交接：M8-R7F8F 返修+整包离线门轮（2026-11-05 起，含 A 的预算裁定落地、F11/F20 两次真机与 F21 补齐）
+# 交接：M8-R7F8F 返修+整包离线门轮（2026-11-05 起，含 A 的预算裁定落地、F11/F20/F22 三次真机与 F21 补齐）
 
-**状态：OFFLINE_GATE_ALL_GREEN / 真机已跑两次，两次都在只读查询步首错停止（F11 第 1 步
-`system_status`、F20 第 2 步 `motor_status`，都是包侧缺 `status_lines_allow` 申报）/ 电机从未带电、
-从未起转 / F21 已按 A 的三条补齐把 10 处状态查询的预期门位 mask 全量钉死并加了令牌门 /
-第三次现场尝试需要操作者对新身份（§10 末表）给一句真实原话**
+**状态：OFFLINE_GATE_ALL_GREEN / 真机已跑三次，三次都在只读查询步首错停止（F11 第 1 步
+`system_status` 缺披露申报、F20 第 2 步 `motor_status` 缺门位申报、F22 第 6 步 `tmc_config_show`
+的 `expect_contains` 写了产品不打的 `[TMC]` 前缀）/ 三轮首错全在**包侧申报**，产品一次都没给出
+预期外的行 / 电机从未带电、从未起转 / F22 是本会话第三次也是最后一次已批准的尝试，那本账
+`port_open` 1/1 已用满 / 下一步是 **F23 包侧修正（离线，0 设备动作）**，见 §12 末**
 **基线 `d6bbc1b5795f`；分支 `feature/m8-r7d1-async-learn-offline`；
 任务书 `reports/reviews/phase8-m8-r7f8-executor-adaptation/inputs/A_R7F8F_PKG/R7F8F_REPAIR_AND_FIELD_TASK.md`；
 预算裁定 `…/inputs/A_R7F8F_BUDGET_PKG/R7F8F_A_BUDGET_RULING.md`。**
@@ -15,7 +16,8 @@
 前半轮按 A 的 F1~F6（含 F5b/F5c 两项实测缺口）把派生执行器修到"该停的停在写之前、该收口的五条
 都拿得到自己的窗"，并把静态预算拆三段后**留下两条真红交 A 定口径**；后半轮把 A 的预算裁定
 （可信零速结束运动计时 + 显式单步总窗）落进执行器、计划、行表、判据与本交接，**两条红因此转绿**，
-整包离线门 47 条全绿、validate-plan 146 项 0 红。取得操作者真实原话令牌后跑了**一次**真机
+整包离线门 47 条全绿、validate-plan 146 项 0 红（**当时的条数**；F19/F21 追加判据后是 49 条 /
+147 项，见 §10 与 §11）。取得操作者真实原话令牌后跑了**一次**真机
 整包：唯一一次开口只写出一条只读查询，产品回的 `system_status` 门位披露行被我漏申报，于是按
 业务失败线在第 1 步停止（0.156 s）；`motor_arm / motor_start / learn / apply` 一条都没发出去，
 电机从未带电。现场事实与根因见 §7bis 与 `run_record.md` §25。
@@ -23,7 +25,12 @@
 在真机生效——但同一个混淆形状出现在第 2 步 `motor_status` 上，于是在两条只读查询之后停止，
 一条业务命令都没发（§9）。F21 按 A 的三条补齐做了三件事：把**全部 10 处状态查询步**的预期门位
 mask 逐条钉成机器可判的契约（预期为 0 的 4 步一条豁免都不给）、把历史真实字节接进回放与判定链并
-补跨计划继承门、以及把批准令牌的三份摘要绑成开口前的硬门（§10）。本轮设备动作 0。
+补跨计划继承门、以及把批准令牌的三份摘要绑成开口前的硬门（§10）。那一轮自己设备动作 0。
+F21 的新身份交现场后又跑了**第三次**真机（F22，§12）：F21 的门位契约把前两轮那两处首错都
+放过去了，前 5 步只读查询逐字节通过；第 6 步 `tmc_config_show` 因我给 `expect_contains` 写了
+产品根本不打的 `[TMC]` 前缀而停止 —— 这是三轮里最远的一次，`tmc_config_apply`、DIR、arm、
+起转、学习、commit、stop/disarm 一条都没发（台账 `actions_attempted` 为空）。三轮首错都落在
+**包侧申报**上，产品没给过任何预期外的行，故按停止-报告口径未动产品源码、未重构建。
 
 ## 2. 交付件（同一目录 `reports/reviews/phase8-m8-r7f8-executor-adaptation/`）
 
@@ -117,6 +124,12 @@ stop 发送尝试排在起转后 7.5 s ≤ 申报的 8 s，可信零速在 9.0 s
 `port_open` 花掉 1 次、`retry/download/readback/explicit_reset/motor_arm/motor_run/learn` 全 0；
 未构建、未下载、未回读、未复位、未动分析仪、未断送电；设备按 §4 保持通电，板态停在安全侧
 （`armed=0`、`request=LOW`、`[UI] SAFE-OFF`、`mode=MONITOR_ONLY`）。
+
+> **F20/F22 两次追加**：F20（第二次）与 F22（第三次）各自另开一本账、各花掉 1 次 `port_open`，
+> 三本账都在盘上且互不结转。F22 的动作集合是三轮里最大的一个：**仍只有 6 条只读查询**，
+> `actions_attempted=[]`、`disarm=NOT_ARMED`、`cleanup_errors=[]`、`tmc_config_apply` 0/1 ——
+> 逐条判据见 §12 与 `reports/agent_handoffs/phase8-m8-r7f8f-repair-and-offline-gate.json`
+> 的 `field_run_f22`（那一块全部从台账字节派生，取不到就拒产整份交接）。
 
 ## 7bis. F11 真机一次：结果、根因、以及离线为什么没抓到
 
@@ -338,6 +351,11 @@ A 包复算 11/0 · 三版本重放 21 件×3/0 · 夹具表族=5 problems=0 · 
   **本轮不是现场验收通过。**
 ## 11. DIR0 变体包（操作者现场指令的方向变更，仍 0 设备动作）
 
+> **本节产物最终未被使用**：操作者随后改回 DIR1（原话「DIR1现在可以了 前面是滑块在边缘容易堵转
+> 我前面电机已经装上去了 不方便拆下来」），第三次真机（§12）用的是 §10 末那四件 **DIR1 交付件**
+> 身份。DIR0 变体两件与它的两份回执按字节冻结留在盘上、不回改，作为"派生变体链"的存档；
+> 血统门（`package_variant.derived_from_*_sha256` 与盘上交付件摘要当场对账）仍然成立。
+
 操作者随后判定「DIR 不是安全相关轴、方向处理已被既有测试覆盖，别为标注差异卡住现场」，选择
 **要 DIR0：先出变体再取批准**，并要求**完整重算摘要 + 原有六族离线门全过**。全文依据与身份在
 [`field/DIR0_variant_rationale.md`](file:///D:/ns800/reports/reviews/phase8-m8-r7f8-executor-adaptation/field/DIR0_variant_rationale.md)，
@@ -374,6 +392,56 @@ A 包复算 11/0 · 三版本重放 21 件×3/0 · 夹具表族=5 problems=0 · 
 - **我（本轮判断偏差）**：第一次上报 DIR 冲突时，我把 provenance（四行运行态由实拍退回"声明形状 +
   值翻转"）摆到接近阻断的位置，却没有先去读 `diag_relative.c` 的方向位语义——真正必须核的是
   `dir_mask` 决定**证据适用范围**那一处。已随 §11 修正，登记在 `run_record.md` §28。
+
+## 12. F22：第三次真机整包（已执行，第 6 步只读查询停止；三轮最远；电机从未带电）
+
+- **批准与原话**：操作者本会话原话「**电机装在丝杆上 滑块在中间位置 继续按包执行**」逐字入档
+  `proof/r7f8f_field_f22_operator_verbatim.txt`（63 B / `3aa0d2fcb488…`；裁尾随 CR/LF 后
+  62 B / `5a26a1bf5ab4…`）。"按包"指向上一轮我逐字列出的四件 DIR1 交付件摘要，承接件当场复算相符：
+  `field/plan_r7f8f_2369_real_dispatch_f22.json` 47367 B / `32a5373eb5df…`，派生自
+  plan `field/plan_r7f8f_2369_real.json` 45398 B / `2259359ca3f7…` +
+  rows 15460 B / `a8456159a45f…`，executor 328475 B / `4363af36159b…`，
+  镜像 297452 B / `23691e8d8aa8…`（R7F7-F1 已逐字节证在板）。机械前置由草案的
+  `NOT_REDECLINED_THIS_ROUND` 变成 `PROVIDED` + 那句逐字原话（同一句，不另造）。
+- **令牌链（F21 的门第一次在真实分支上真跑）**：`TOKEN_CHAIN_VERIFIED` 里传入令牌 == 原话文件
+  裁尾 == 账本绑定 == 承接件申报，四份摘要同为 `5a26a1bf5ab4…`；字节由 Python 内从文件按严格
+  UTF-8 取得（runner 已归档），不经控制台、不经 shell 变量。账本 `approval_token` 这一格在，
+  就是 F21 那条 `APPROVAL_TOKEN_NOT_BOUND` 门补上之后的形状。
+- **结果**：`code=EXPECTATION_NOT_MET`，停在第 6 步 `cfg_pre` = `tmc_config_show`（只读），
+  `missing=["[TMC]"]`；`steps=6`、`disarm=NOT_ARMED`、`obligation=false`、`cleanup_errors=[]`、
+  `quota_used={port_open:1}`、`actions_attempted=[]`、`not_run=["S1"]`。通过的 5 步原始字节逐件在
+  `proof/r7f8f_field_f22_0*.rx.bin`：`sys_pre` 983/`73abf3012386`（与 F11/F20 **第三次逐字节相同**）、
+  `mot_pre` 1128/`f0550d313164`（同一身份第 6 次）、`irq_pre` 612/`25bef65c2b36`、
+  `diag_pre` 1169/`d515de38891b`、`ls_pre` 130/`acd145c616a2`；停止那步 `cfg_pre` 1011/`303eade7bb77`。
+- **三条根因全在包侧（源码锚点，`run_record.md` §29/§30）**：① `cfg_pre`/`apply` 的
+  `expect_contains` 写 `[TMC]`，而该命令族全部打 **`[TMC-CFG]`**（`tmc2209.c:3154/3158` show、
+  `:2844` CONFIGURED、`:2645/2791` 拒绝路径）——`[TMC]` 这个前缀只在 `system_status` 里由
+  `supervisor.c:128` 打；② 行表 `tmc_config_show`/`tmc_config_apply` 的 healthy 是我**手写的**
+  `"[TMC] config show"` / `"[TMC] apply CONFIRM"`，源码里没有这两行，所以假端口不可能暴露——这与
+  F11（漏申报披露行）、F20（漏 mask 申报）是同一个"我写的期望把自己圆过去"的形状，第三次；
+  ③ `sys_after_apply` 期望 `runtime write gate mask=0x8` 把 **arm 门位 mask**（`motor.c:894-917`
+  七门，`supervisor.c:126`）与 **TMC 写门 mask**（`tmc2209_get_write_gate_mask()`→
+  `tmc_cfg_gate_prod()`，`tmc2209.c:2874`，`supervisor.c:128`）当成同一个数；本次实拍写门 `0x0`，
+  apply 成功也不会把它变成 `0x8`。
+- **撞出来的工具洞（属 F21 覆盖洞，本轮未改码）**：真实传输预检查 `m8r3_serial_chain_r7f8.py:5530`
+  只认 `--approval-token`，不认 `--approval-token-file` => 第一次用纯文件令牌跑真实分支被
+  `REAL_TRANSPORT_REFUSED:approval_token_missing_or_mismatch` 拒在开口前（rc=4，账本 `spent` 合计 0，
+  未建执行根，确实 0 字节发出）。本轮**没为此改执行器字节**（改了就不是操作者批准那件），改为在
+  Python 内取规范字节同时喂四个令牌口——**这是绕行，不是修复**；F23 要补的正路判据见 §30.2 第 6 条。
+- **F22 那本账**：`M8-R7F8F-F22-20261106`，`port_open` 1/1 用满，其余全 0（含
+  `tmc_config_apply` 0/1、`motor_arm` 0/1、`diag_profile_learn` 0/2）；F11/F20 两本账原样不动，
+  三本都不结转到下一轮。板态：TMC `state=UNCONFIGURED`、drv 未使能、`live GCONF=00000101 /
+  CHOPCONF=15010053`，**保持通电**（未要断电动作，按既有收口口径）。
+- **交接工具这一轮新增的取证**（`tools/r7f8f_make_handoff.py` 的 `field_run_f22` 块，取不到就
+  拒产整份交接）：停止步只取台账里那条唯一的 `PROTOCOL_OR_CONTENT_FAIL` 并与 `SESSION_STOP`
+  的 `missing` 同源对账；6 份捕获按台账 `RX_DONE` 的**顺序+字节+散列**三重逐条对账，最后一步必须
+  等于停止步；`quota_used` 与账本 `spent` 归一到非零项后逐项相等；`actions_attempted` 必须为空
+  否则"电机从未带电"这句话就不许写；令牌四份摘要、账本三个身份摘要与承接件自报的"来源原件
+  N/摘要前缀"全部当场在盘上复算。另外点名引用的判据（TG10/MC11）若在回执里取不到 PASS 也拒产。
+- **停点**：本会话第三次、也是最后一次已批准的现场尝试已消耗。要继续到第 7 步之后需要
+  **F23 包侧修正**（离线，0 设备动作；清单见 `run_record.md` §30.2 与本文件 §12 上面的三条根因）
+  落地后的新四件身份 + 操作者一句**新的**真实原话并在同一句里逐字重述机械/电气前置。
+  `polarity_measured=false`、`core_protection_verified=false` 保持原值；仍不是现场验收通过。
 
 
 

@@ -1678,4 +1678,107 @@ F11 那份承接件按字节冻结在库里不回改（`53c744213964…`，与 �
 - **停点**：本轮设备动作 0 —— 未生成批准版、未建账、未开 COM5。等一句针对上面四件（DIR0 变体）
   的真实原话 + 逐字重述的机械/电气前置。`polarity_measured=false`、`core_protection_verified=false`
   保持原值；仍不是现场验收通过。
+  > （本停点已被 §29 取代：操作者随后说明 DIR0 的动因是滑块在边缘易堵转、电机现已装到丝杆上，
+  > 改回 **DIR1 交付件**执行；DIR0 变体已出但**不使用**，摘要留在盘上不回改。）
+
+## 29 F22 第三次真机整包（DIR1 交付件，已执行：第 6 步只读查询停止，电机从未带电）
+
+- **批准与原话**：操作者本会话第 7 条「**电机装在丝杆上 滑块在中间位置 继续按包执行**」，
+  逐字入档 `proof/r7f8f_field_f22_operator_verbatim.txt`（63 B / `3aa0d2fcb488…`，裁尾随 CR/LF 后
+  62 B / `5a26a1bf5ab4…`）。"按包"指向的是我上一条消息里逐字列出的四件完整摘要，承接件当场复算相符：
+  `field/plan_r7f8f_2369_real_dispatch_f22.json` 47367 B / `32a5373eb5df…`，`diff_paths=12`（在 13 格
+  白名单内），机械前置由草案的 `NOT_REDECLINED_THIS_ROUND` 变成本轮逐字的 `PROVIDED`。
+- **令牌三道摘要（F21 的门第一次在真实分支上真的跑起来）**：`TOKEN_CHAIN_VERIFIED` 里
+  `passed_token_sha256 == verbatim_file_sha256 == ledger_bound_sha256 == 5a26a1bf5ab4…`，
+  且都是 Python 内从文件按严格 UTF-8 取的字节（runner 存档
+  `proof/r7f8f_field_f22_dispatch_runner.py`），不经控制台打印、不经 shell 变量。
+- **结果**：`code=EXPECTATION_NOT_MET`，**停在第 6 步 `cfg_pre` = `tmc_config_show`（只读）**，
+  `missing=["[TMC]"]`；`steps=6`、`disarm=NOT_ARMED`、`obligation=false`、`cleanup_errors=[]`、
+  `quota_used={port_open:1}`、`not_run=["S1"]`。**`tmc_config_apply` 一条都没发**：DIR1、arm、
+  起转、学习 N32/N8、commit、stop/disarm 全 0，电机从未使能、从未带电，`tmc_config_apply` 额度
+  仍 0/1。这是三轮里最远的一次（F11 停在第 1 步、F20 停在第 2 步），**F21 的门位契约把那两步都放过去了**。
+- **通过的 5 步原始字节**（逐件在 `proof/r7f8f_field_f22_*.rx.bin`）：`sys_pre` 983 B/`73abf3012386`
+  （与 F11/F20 **第三次逐字节相同**）、`mot_pre` 1128 B/`f0550d313164`（同一身份第 6 次）、
+  `irq_pre` 612 B/`25bef65c2b36`、`diag_pre` 1169 B/`d515de38891b`、`ls_pre` 130 B/`acd145c616a2`；
+  停止那一步 `cfg_pre` 1011 B/`303eade7bb77`。
+- **根因是我包侧的三处判据错，不是产品**：
+  1. `cfg_pre`/`apply` 的 `expect_contains` 写成 `[TMC]`，而这个命令族全部打 **`[TMC-CFG]`**
+     （`tmc2209.c:3154/3158` 的 show、`:2844` 的 `CONFIGURED`、`:2645/2791` 的拒绝路径）；
+     `[TMC]` 这个前缀只在 `system_status` 里由 `supervisor.c:128` 打。实拍 15 行里第一行就是
+     `[TMC-CFG] state=UNCONFIGURED …`。
+  2. 行表 `tmc_config_show`/`tmc_config_apply` 的 healthy 是我**手写的** `"[TMC] config show"` 与
+     `"[TMC] apply CONFIRM"` —— 源码里没有这两行，所以假端口不可能暴露这个错（同 F11/F20 的形状）。
+  3. `sys_after_apply` 期望 `runtime write gate mask=0x8`：那是把 **arm 门位 mask**（`motor.c:894-917`
+     七门，`supervisor.c:126` 打）与 **TMC 写门 mask**（`tmc2209_get_write_gate_mask()`→
+     `tmc_cfg_gate_prod()`，`supervisor.c:128` 打）当成了同一个数。本次实拍写门 = `0x0`
+     （`tmc_config_show` 里 `runtime_gate_mask=0x0`），而 apply 成功不会把它变成 0x8。
+- **工具缺口（本轮撞出来的，属 F21 的覆盖洞）**：真实传输的预检查 `m8r3_serial_chain_r7f8.py:5530`
+  只认 `--approval-token`，`--approval-token-file` 要到 `dispatch` 内部才被读 => 我第一次用
+  纯文件令牌跑真实分支被 `REAL_TRANSPORT_REFUSED:approval_token_missing_or_mismatch` 拒在开口前
+  （rc=4，账本 `spent` 合计 0，未建执行根，确实一个字节都没发）。本轮没有为此改执行器字节
+  （改了就不是操作者批准的那件 `4363af36159b…`），而是在 Python 内从文件取严格 UTF-8 规范字节，
+  同时喂 `--approval-token/--expected-token/--approval-token-file/--token-verbatim-file` 四个口，
+  让 `TOKEN_SOURCE_CONFLICT` 与 `verify_token_chain` 自己把三道摘要钉住。**这是绕行，不是修复**；
+  TG 族当时测的是"`--approval-token` 直接给 + 台账缺席"的拒绝形状（TG10，拒绝码
+  `APPROVAL_LEDGER_ABSENT`），没测"文件令牌 + 真实预检查"这条通路，
+  所以绿里面藏了一条走不通的路 —— 该补的判据记在 §30。
+- **F22 那本账**：`M8-R7F8F-F22-20261106`，`port_open` 1/1 用满，其余全 0；F11/F20 两本账原样不动。
+  板态：`state=UNCONFIGURED`、drv 未使能、`live GCONF=00000101 / CHOPCONF=15010053`，保持通电。
+
+### 29.1 F22 这一段的自伤（条数由交接工具当场从本节数，写死会拒产）
+
+1. 把 **DIR 这个非安全轴的标注差异**升级成现场执行的卡点：我先要求为 DIR0 变体重新逐字声明
+   机械/电气前置并停在下一次开口前，操作者纠正「DIR 不是安全相关的轴，只是包内标注差异……
+   别纠结这个标注了」。产品的方向处理已被既有测试覆盖，我不该拿它当开口前置。
+2. F21 宣布"文件令牌路线可用"时，只在 CLI 的**拒绝形状**上证过（TG10 喂的是 `--approval-token`
+   加台账缺席），从未在 `transport=real` 的预检查路径上证过 => 真实分支第一次走到就撞
+   `approval_token_missing_or_mismatch`。绿的那条判据没有覆盖我据此行动的通路。
+3. 本节初稿把 TG10 的输入写成"文件令牌 + 台账缺席"，与 `tools/r7f8e_case_matrix.py:1884` 实际喂的
+   `--approval-token` 不符（上面已按源码更正）。判据的**输入形态**也要按字节读，不能按印象写。
+4. 交接工具第一版把汇总行的 `quota_used`（只列非零项）和账本的 `spent`（满键）直接判等 => 当场假红。
+   已改成"两边都归一到非零项再逐项比"；这条判据本身保留（不等就拒产），因为它同时也能抓到
+   "账本记了消耗但汇总没列"的真不一致。
+
+## 30 F22 撞出的缺口与 F23 包侧修正清单（本轮 0 改交付件，全部未执行）
+
+### 30.1 缺口（都属于我建的判据/工具的覆盖洞，本轮只登记）
+
+1. 真实传输预检查 `m8r3_serial_chain_r7f8.py:5530` 只认 `--approval-token`，不认
+   `--approval-token-file` => "文件令牌"这条我在 F21 交接里当作可用路线的写法，在真实分支上
+   走不到；修它要改执行器字节（新身份）。
+2. 包侧的 `expect_contains` 与行表 `healthy` 串**没有一条判据要求它能在产品源码字面量或已归档
+   实拍字节里找到出处**。同一个形状连撞三轮：F11 缺 `status_lines_allow`（`system_status` 披露行）、
+   F20 缺 `motor_status` 的 mask 契约、F22 用了不存在的 `[TMC]` 前缀加两行手写 healthy。前两轮我
+   各补了一条针对性门，都没补"期望串必须有出处"这个一般门，所以第三次换个形状又中。
+3. `runtime write gate mask`（`supervisor.c:128`，来自 `tmc2209_get_write_gate_mask()` →
+   `tmc_cfg_gate_prod()`，`tmc2209.c:2874`）与 `[Motor] arm gate fail mask`（`supervisor.c:126`，
+   来自 `motor.c:894-917` 七门）是两个不同的数，但计划里我按同一个数（`0x8`）申报，而六族没有
+   一条判据能把两者分开 => 静态门全绿照过。
+
+### 30.2 F23 修正清单（离线，0 设备动作；本轮未动任何交付件字节）
+
+1. `cfg_pre` 的 `expect_contains` 改 `[TMC-CFG] state=`，并把 F22 实拍
+   `proof/r7f8f_field_f22_06_cfg_pre.rx.bin`（1011 B / `303eade7bb77…`）逐字节入行表，作为
+   `tmc_config_show` 那行 healthy 的出处（真实字节，不是形状）。
+2. `apply`（`tmc_config_apply CONFIRM`）的 `expect_contains` 改 `[TMC-CFG] CONFIGURED`
+   （`tmc2209.c:2844`）；该行**从未实拍**，只能标 `source_shape`/`DERIVED`，不许写成实测。
+3. `sys_after_apply` 的 write gate 期望按 A 定的口径改成实际值（F22 实拍 apply 之前 = `0x0`；
+   apply 之后未观测，等 A 定），`[Motor] arm gate fail mask=0x8` 的整行锚定保持不动。
+4. 新增"两 mask 分离"判据：同一份捕获里分别断言 arm 门位与 TMC 写门两个字段，且两者期望值必须
+   不同（或显式 `NA`），使 §30.1 第 3 条那种"当成同一个数"在静态门就翻红。
+5. 新增"期望串出处"静态门：计划每条 `expect_contains`、行表每行 `healthy` 必须命中①产品源码里的
+   字面量（`rt-thread-master` 子树 `32470c7ed44e`，冻结）或②已归档的实拍字节；两样都不命中就具名
+   判红。这条要带元负控（把 `[TMC-CFG]` 换回 `[TMC]` 必须翻红）。
+6. TG 族补一条"文件令牌 + `transport=real` 预检查"的正路判据（当前实现只能证它**会**拒，
+   修 :5530 之后才能证它**放行**）=> 该条要么等执行器新身份，要么按停止-报告交给 A 定，
+   我不在包侧伪造绿。
+7. 六族判据在 F23 新身份上整圈重跑（矩阵 / 整包离线门 / stub 整包 / 无回归 / 预算包 / 三版本重放 /
+   夹具变更表），产物用新文件名与旧件并存；F22 那 18 件现场字节按字节冻结不回改。
+
+- **停点**：F22 是本会话第三次、也是最后一次已批准的现场尝试（那本账已用满）。要继续到第 7 步
+  之后需要 F23 落地后的**新四件身份** + 操作者一句新的真实原话，并在同一句里逐字重新声明机械/电气
+  前置。本轮设备动作：`port_open` 1（就是 F22 那唯一一次 dispatch），下载/回读/复位/
+  `tmc_config_apply`/使能/起转/学习全 0；`polarity_measured=false`、`core_protection_verified=false`
+  保持原值；仍不是现场验收通过。板保持通电、`UNCONFIGURED`、未使能。
+
 

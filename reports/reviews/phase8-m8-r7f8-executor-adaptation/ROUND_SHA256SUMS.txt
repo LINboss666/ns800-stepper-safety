@@ -1,6 +1,6 @@
 # sha256 * <仓库相对路径>(LF, 无 BOM; 本清单不哈希自身字节 —— 一条清单不能给自己的字节作证)
-# 生成方式: 对 reports/reviews/phase8-m8-r7f8-executor-adaptation/ 下每个常规文件直接读磁盘字节算 sha256(派生件/生成器/补丁/proof 34 份(含第一次回读判红原文)/合成计划与行表/inputs 里的 A 包原件 47 件全在内); 只排除 reports/reviews/phase8-m8-r7f8-executor-adaptation/proof/ 下**尚未进 Git** 且文件名含 remote_readback 的 .txt 回执 —— 它只能在推送之后才存在, 清单不能依赖自己交付之后的产物; 已提交的回执(如 first_attempt 判红原文)与工具件 tools/r7f8e_remote_readback.py 都是被交付的字节, 照常入列
-# 条目数=122; 与 Git blob 的逐条复算由 reports/reviews/phase8-m8-r7f8-executor-adaptation/tools/r7f8e_staged_preflight.py(提交前)与 tools/r7f8e_remote_readback.py(推送后)完成
+# 生成方式: 对 reports/reviews/phase8-m8-r7f8-executor-adaptation/ 下每个常规文件直接读磁盘字节算 sha256(派生件/生成器/补丁/proof 53 份(含第一次回读判红原文)/合成计划与行表/inputs 里的 A 包原件 47 件全在内); 只排除 reports/reviews/phase8-m8-r7f8-executor-adaptation/proof/ 下**尚未进 Git** 且文件名含 remote_readback 的 .txt 回执 —— 它只能在推送之后才存在, 清单不能依赖自己交付之后的产物; 已提交的回执(如 first_attempt 判红原文)与工具件 tools/r7f8e_remote_readback.py 都是被交付的字节, 照常入列
+# 条目数=142; 与 Git blob 的逐条复算由 reports/reviews/phase8-m8-r7f8-executor-adaptation/tools/r7f8e_staged_preflight.py(提交前)与 tools/r7f8e_remote_readback.py(推送后)完成
 # 重新生成: python reports/reviews/phase8-m8-r7f8-executor-adaptation/tools/r7f8e_make_sums.py --repo <仓库根>
 6740ba6a7cb934b7d8e6e5b8a0f85bc87d4e31644c8472d335b7e757211431e4  reports/reviews/phase8-m8-r7f8-executor-adaptation/ERRATA_R7F8E.md
 b280e06b67d1dc0c7fcc1150655481aa4b19ad0b1c953febc32974c9fdbc37fd  reports/reviews/phase8-m8-r7f8-executor-adaptation/field/DIR0_variant_rationale.md
@@ -10,6 +10,7 @@ b280e06b67d1dc0c7fcc1150655481aa4b19ad0b1c953febc32974c9fdbc37fd  reports/review
 4da0aeb016e859c95c880e6763c1ed0bc1bfe7f0046b8acb7b2e383ea445f561  reports/reviews/phase8-m8-r7f8-executor-adaptation/field/plan_r7f8f_2369_real_dispatch_f20.json
 e59272b6fa8870a568a52715aa338487b10c4355c74ec7836badab62042a2d62  reports/reviews/phase8-m8-r7f8-executor-adaptation/field/plan_r7f8f_2369_real_dispatch_f20_draft.json
 4a9460801b4659cc3db57f4d2e6e4b8e090caf71528d5d80f859cb29a4de7764  reports/reviews/phase8-m8-r7f8-executor-adaptation/field/plan_r7f8f_2369_real_dispatch_f21_draft.json
+32a5373eb5df93a287e0ef0f7123001717d60fd34bae922be5e30c4398d906d8  reports/reviews/phase8-m8-r7f8-executor-adaptation/field/plan_r7f8f_2369_real_dispatch_f22.json
 a8456159a45f229601e030b69d0034894d1b0df19b191ca4672a1fe0e5279737  reports/reviews/phase8-m8-r7f8-executor-adaptation/field/rows_r7f8f_real.json
 8dc0b5c06bbc4268652dcc9d5404636cbfbe8112686d297824dc9b73a61a1565  reports/reviews/phase8-m8-r7f8-executor-adaptation/field/rows_r7f8f_real_dir0.json
 971445573512864968c2324ee8c30f0f853104d9377f6c7b9284c08fe04612c3  reports/reviews/phase8-m8-r7f8-executor-adaptation/inputs/A_R7F8E_PKG/IDENTITY.json
@@ -92,6 +93,25 @@ e3b3a647a3597d80601fc8a2974d3832c4be2abe559de462074a0113ff60521e  reports/review
 bb3afae013a3242b4b568f054ef3fc90c7a62c4a9e3b1e382b915c8ef36ae858  reports/reviews/phase8-m8-r7f8-executor-adaptation/proof/r7f8f_field_f20_step_ledger.jsonl
 73abf3012386723ec2d5ec70e5b515bfb2cb3285d60c233a27b07e60d47408a7  reports/reviews/phase8-m8-r7f8-executor-adaptation/proof/r7f8f_field_f20_sys_pre.rx.bin
 38a8b6bf90a7b3f9c533f8934432e1810a80012354a7380f08c3d99592bed5ca  reports/reviews/phase8-m8-r7f8-executor-adaptation/proof/r7f8f_field_f20_sys_pre.rx.txt
+73abf3012386723ec2d5ec70e5b515bfb2cb3285d60c233a27b07e60d47408a7  reports/reviews/phase8-m8-r7f8-executor-adaptation/proof/r7f8f_field_f22_01_sys_pre.rx.bin
+38a8b6bf90a7b3f9c533f8934432e1810a80012354a7380f08c3d99592bed5ca  reports/reviews/phase8-m8-r7f8-executor-adaptation/proof/r7f8f_field_f22_01_sys_pre.rx.bin.bin.txt
+f0550d3131642cd02408c88adc67f6fcb064a27ccba6ceec9c60b82e9cf0c3b5  reports/reviews/phase8-m8-r7f8-executor-adaptation/proof/r7f8f_field_f22_02_mot_pre.rx.bin
+fcd210a1b752c1114fd60b4cfd93bede29dedf4c87bc2b87f2e667f4f180a00e  reports/reviews/phase8-m8-r7f8-executor-adaptation/proof/r7f8f_field_f22_02_mot_pre.rx.bin.bin.txt
+25bef65c2b365d5c42e13312de36e7ed1c890194d06684b70646eeccf76b4352  reports/reviews/phase8-m8-r7f8-executor-adaptation/proof/r7f8f_field_f22_03_irq_pre.rx.bin
+f40d0df0faf59a904c98905e07124f4c4cc4cade10370208a73a823ae41cf37a  reports/reviews/phase8-m8-r7f8-executor-adaptation/proof/r7f8f_field_f22_03_irq_pre.rx.bin.bin.txt
+d515de38891b49ed2db60dda862eb7a63d3507f6a80ddc8c563922f55620b781  reports/reviews/phase8-m8-r7f8-executor-adaptation/proof/r7f8f_field_f22_04_diag_pre.rx.bin
+d9a2dabb73acad447519541202da2da7ef5cd8d243b0958a11449d404a7fafad  reports/reviews/phase8-m8-r7f8-executor-adaptation/proof/r7f8f_field_f22_04_diag_pre.rx.bin.bin.txt
+acd145c616a2c0e438f986722b047ab673cb168df167a4aa3bcbe667aeb7bfdf  reports/reviews/phase8-m8-r7f8-executor-adaptation/proof/r7f8f_field_f22_05_ls_pre.rx.bin
+ecfcbe90a14a6c0ba5081be29f3a6d18cd0bc6319257949bfcc6e8b9b2eb8670  reports/reviews/phase8-m8-r7f8-executor-adaptation/proof/r7f8f_field_f22_05_ls_pre.rx.bin.bin.txt
+303eade7bb771e686519810c7f4d5073f318930c5757a00d9d3cf47decbbab2d  reports/reviews/phase8-m8-r7f8-executor-adaptation/proof/r7f8f_field_f22_06_cfg_pre.rx.bin
+ae1d971193ef24669f2ca20c504f8dd1b0a99683ca509675a1d88e594815e794  reports/reviews/phase8-m8-r7f8-executor-adaptation/proof/r7f8f_field_f22_06_cfg_pre.rx.bin.bin.txt
+a74c75ec8a78120cc6a3b433036666ee26888b2f02463ecfb9b0dac76ef448c3  reports/reviews/phase8-m8-r7f8-executor-adaptation/proof/r7f8f_field_f22_approval_ledger.json
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  reports/reviews/phase8-m8-r7f8-executor-adaptation/proof/r7f8f_field_f22_dispatch_err.txt
+91110296e5388ae91d989c3f546ba21b89e0d88d173244ec61f8278c68865408  reports/reviews/phase8-m8-r7f8-executor-adaptation/proof/r7f8f_field_f22_dispatch_ledger.jsonl
+5a560187c961dcc0b802626a4ecfcd6c55a6e57ab78019ff242da3ffd389a4fc  reports/reviews/phase8-m8-r7f8-executor-adaptation/proof/r7f8f_field_f22_dispatch_out.txt
+d63c98fcb2de4bb70a0ba6b5eb7758050528edf4810ef342970a5602a15e15c2  reports/reviews/phase8-m8-r7f8-executor-adaptation/proof/r7f8f_field_f22_dispatch_runner.py
+e0b68ced74444beec2b6fe1c2551e8bae255b7c21dccc8675e352efc6fd35338  reports/reviews/phase8-m8-r7f8-executor-adaptation/proof/r7f8f_field_f22_ledger.jsonl
+3aa0d2fcb48885a4d16281871fc103c9132ca2c8670abad6995d0c8c4294428a  reports/reviews/phase8-m8-r7f8-executor-adaptation/proof/r7f8f_field_f22_operator_verbatim.txt
 0916bb45b9751678026f90f397ef9f382402978d120dcb4f2487358fdac64740  reports/reviews/phase8-m8-r7f8-executor-adaptation/proof/r7f8f_fixture_changes.json
 a17f61d184f099ac94afb37b92479fa6d8e28fe686d38998514f9c244df0555b  reports/reviews/phase8-m8-r7f8-executor-adaptation/proof/r7f8f_fixture_changes.md
 d89fc2ec93b3b710349ae568bc1aac10540ebcc07c975676ca7562e00a98fd2f  reports/reviews/phase8-m8-r7f8-executor-adaptation/proof/r7f8f_offline_gate.txt
@@ -120,7 +140,7 @@ bae53a0d5a93d5e4869e6c41a3e7f05475bceb22876b906cd83884068b6a3a0a  reports/review
 436782d083bed310df23e4d8acd88e7c47d09f3accc747117f928f797d207159  reports/reviews/phase8-m8-r7f8-executor-adaptation/tools/r7f8f_fixture_change_table.py
 bf873f36323fcbf12fdd8ad21a091a75de895ac4fa8bdbdfca250e6b79dd9b87  reports/reviews/phase8-m8-r7f8-executor-adaptation/tools/r7f8f_make_dispatch_copy.py
 4755cea9f32415107676c3283b38c4b24fef18b919035524212cf611ca545bf2  reports/reviews/phase8-m8-r7f8-executor-adaptation/tools/r7f8f_make_field_evidence.py
-6b5e25886bf7dc8d05325a809d704159bd75351bbd2aa67df10ee570cfa04165  reports/reviews/phase8-m8-r7f8-executor-adaptation/tools/r7f8f_make_handoff.py
+d96ce4f19fc8b707bc4c34fb7a220b2c538f0ca876e4e3fa0dbfa40c5cccac15  reports/reviews/phase8-m8-r7f8-executor-adaptation/tools/r7f8f_make_handoff.py
 06e0c555c36aeaeaeead540ea74493fbfef1872113b13320e8bc49e7117552f1  reports/reviews/phase8-m8-r7f8-executor-adaptation/tools/r7f8f_make_real_package.py
 0c264e1b4778aafe74655f29ab87716b8848a5e09a7435ec90921781fb85a4c4  reports/reviews/phase8-m8-r7f8-executor-adaptation/tools/r7f8f_offline_gate.py
 6c2b19d5cfcb27d3f50416a37cd57923b55f05643c1b44e7c72810d22010af57  reports/reviews/phase8-m8-r7f8-executor-adaptation/tools/r7f8f_probe_replay.py

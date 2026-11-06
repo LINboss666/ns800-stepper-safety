@@ -1,0 +1,15 @@
+{"kind": "APPROVED_PACKAGE_VERIFIED", "plan_sha256": "32a5373eb5df93a287e0ef0f7123001717d60fd34bae922be5e30c4398d906d8", "stage": "S1", "steps": 38, "steps_sha256": "f8a3a9e4edb4a605d8e003b33cb5f5f2c91fc814060f99db825378735e79a30b", "t_s": 0.0, "transport": "real", "verified": true}
+{"approval_kind": "business", "approval_used": 1, "kind": "QUOTA_CONSUMED", "left": 0, "n": 1, "name": "port_open", "t_s": 0.0}
+{"baud": 115200, "kind": "PORT_OPEN_ATTEMPT", "port": "COM5", "t_s": 0.063}
+{"kind": "PORT_OPEN", "port": "COM5", "t_s": 0.063, "transport": "real"}
+{"bytes": 983, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "73abf3012386723ec2d5ec70e5b515bfb2cb3285d60c233a27b07e60d47408a7", "t_s": 0.156, "tail": "b'g)\\r\\nmsh >\\r\\nmsh >'"}
+{"allowed": false, "as": "sys_pre", "kind": "BUSINESS_OUTCOME", "lines": [], "status_lines_allowed": ["[Motor] arm gate fail mask=0x18 (arm REFUSED)"], "t_s": 0.156}
+{"bytes": 1128, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "f0550d3131642cd02408c88adc67f6fcb064a27ccba6ceec9c60b82e9cf0c3b5", "t_s": 0.266, "tail": "b'ed\\r\\nmsh >\\r\\nmsh >'"}
+{"allowed": false, "as": "mot_pre", "kind": "BUSINESS_OUTCOME", "lines": [], "status_lines_allowed": ["[MOT] arm_gate_mask=0x18 REFUSED"], "t_s": 0.281}
+{"bytes": 612, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "25bef65c2b365d5c42e13312de36e7ed1c890194d06684b70646eeccf76b4352", "t_s": 0.328, "tail": "b'it\\r\\nmsh >\\r\\nmsh >'"}
+{"bytes": 1169, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "d515de38891b49ed2db60dda862eb7a63d3507f6a80ddc8c563922f55620b781", "t_s": 0.453, "tail": "b'ne\\r\\nmsh >\\r\\nmsh >'"}
+{"bytes": 130, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "acd145c616a2c0e438f986722b047ab673cb168df167a4aa3bcbe667aeb7bfdf", "t_s": 0.469, "tail": "b'=0\\r\\nmsh >\\r\\nmsh >'"}
+{"bytes": 1011, "kind": "RX_DONE", "nul_bytes": 0, "prompt_seen": true, "raw_sha256": "303eade7bb771e686519810c7f4d5073f318930c5757a00d9d3cf47decbbab2d", "t_s": 0.563, "tail": "b'=5\\r\\nmsh >\\r\\nmsh >'"}
+{"as": "cfg_pre", "kind": "PROTOCOL_OR_CONTENT_FAIL", "missing": ["[TMC]"], "t_s": 0.578}
+{"code": "EXPECTATION_NOT_MET", "detail": "{\"verdict\": \"STOP\", \"code\": \"EXPECTATION_NOT_MET\", \"missing\": [\"[TMC]\"]}", "kind": "SESSION_STOP", "t_s": 0.578}
+{"kind": "PORT_CLOSED", "t_s": 0.578}

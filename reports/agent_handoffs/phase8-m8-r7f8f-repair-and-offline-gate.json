@@ -1,10 +1,10 @@
 {
- "round": "M8-R7F8F 返修+整包轮（A 包 NS800_R7F8F_Repair_And_Field_20261105 + A 预算裁定包 NS800_R7F8F_A_Budget_Ruling_20261105；设备动作 0）",
- "date_local": "2026-11-05",
+ "round": "M8-R7F8F 返修+整包轮（A 包 NS800_R7F8F_Repair_And_Field_20261105 + A 预算裁定包 NS800_R7F8F_A_Budget_Ruling_20261105；离线部分设备动作 0，真机部分已跑三次：F11/F20/F22 各一次开口，每次一本新账）",
+ "date_local": "2026-11-05 起（离线与 F11/F20）；F22 现场轮与本轮登记 = 2026-11-06",
  "task_book": "reports/reviews/phase8-m8-r7f8-executor-adaptation/inputs/A_R7F8F_PKG/R7F8F_REPAIR_AND_FIELD_TASK.md",
  "budget_ruling": "reports/reviews/phase8-m8-r7f8-executor-adaptation/inputs/A_R7F8F_BUDGET_PKG/R7F8F_A_BUDGET_RULING.md",
  "task_id": "M8R7F8F-repair-and-offline-gate-20261105",
- "status": "OFFLINE_GATE_ALL_GREEN / FIELD_RUN_ONCE_DONE_STOPPED_AT_STEP1 (BUSINESS_FAILED, 包侧缺 status_lines_allow) / 电机从未带电、从未起转 / SECOND_FIELD_RUN_NEEDS_NEW_OPERATOR_APPROVAL",
+ "status": "OFFLINE_GATE_ALL_GREEN / 真机已跑三次(F11 停在第 1 步, F20 停在第 2 步, F22 停在第 6 步 = 三轮最远) / 三轮首错全在包侧申报, 产品未给预期外的行 / 电机从未带电、从未起转 / 本会话第三次批准已用满 / 下一步=F23 包侧修正(离线)+新的真实原话，NOT_FIELD_READY",
  "repo_tip_at_start": "d6bbc1b5795fc12d27ee8aaa0939f0408dc43699",
  "branch": "feature/m8-r7d1-async-learn-offline",
  "inputs": {
@@ -255,7 +255,7 @@
    "已按裁定二落地: 38 步逐条申报 step_total_seconds(含全部等待与余量), 由 step_window() 供执行器/计划门/镜像共同取值 => 不再每步叠 SLACK; 未申报的旧计划仍走 legacy。",
    "旧口径留档: 按「每步再叠 SLACK=3 s、stop 不解除运动计时」算, 起转前最坏合计 91.0 s、起转后申报内容 23.0 s —— 这两条就是上一版交 A 定口径的红, 现仅作为旧语义的对照数保留在本计划里。"
   ],
-  "approval": "F11 与 F20 各按操作者原话开过**一个**账, 两本的 port_open=1 都已用满; F21(本轮)未开新账、未发任何现场命令, 且四件身份已再次变(见 package_fix_f21.identities_for_next_approval) => 再一次真机需要一句新的真实原话, 并在同一句里逐字重新声明机械/电气前置"
+  "approval": "F11 / F20 / F22 各按操作者原话开过**一个**账, 三本的 port_open=1 都已用满(F22 是本会话刚跑的那次); F21/DIR0 两轮未开新账、未发任何现场命令。**本会话第三次现场尝试的批准已消耗完毕**, 再一次真机需要先做 F23 包侧修正(见 tool_gaps_f22_and_f23_plan)并拿到针对新身份的一句真实原话, 并在同一句里逐字重新声明机械/电气前置"
  },
  "red_gates_remaining": [],
  "draft_sync": {
@@ -289,6 +289,17 @@
   "where_f19": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/run_record.md §26.5（F19 那五条：假判红被无回归族抓住、双引号截断、三引号嵌套、承接件改派生、判据族 L→FB 改名）",
   "count_f21": 8,
   "where_f21": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/run_record.md §27.6（F21 那 8 条：局部变量遮蔽把离线门六条判据带红、bytes 字面量含非 ASCII、真字节夹具把裸披露行也换掉造成行不唯一、F20 的 CLI 令牌字节没落进任何工件、承接件工具里写死上一轮现场原话、交接 JSON 把**通过**的第 1 步当成停止步(取值规则用了 [0])、矩阵判据名里带了字段分隔符 '|'(MC6 的 0x0|0x2), 回执第三格被切开、next_step_owners 里写了两条同名 'A' 键, 前一条被静默覆盖）",
+  "count_f22": 4,
+  "where_f22": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/run_record.md §29.1（F22 那 4 条：把 DIR 这个非安全轴的标注差异升级成现场执行的卡点, 被操作者纠正、F21 宣布'文件令牌路线可用'时只在 CLI 拒绝形状上证过, 真实分支那条通路没测过、§29 初稿把 TG10 的输入写成'文件令牌 + 台账缺席'(实为 --approval-token), 按印象写、交接工具把 quota_used(只列非零)与账本 spent(满键)直接判等 => 当场假红）",
+  "gaps_f22": {
+   "count": 3,
+   "where": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/run_record.md §30.1",
+   "titles": [
+    "真实传输预检查只认 --approval-token(文件令牌走不到真实分支)",
+    "包侧 expect_contains/行表 healthy 串没有'必须能在源码或实拍字节里找到出处'的静态门(同形状三轮复发)",
+    "arm 门位 mask 与 TMC 写门 mask 在计划里被当成同一个数, 没有判据把两者分开"
+   ]
+  },
   "f20_registered_as_failed": "令牌字节链那一判在 F20 单独记未通过(TG8), 实体绑定那一判记通过(TG9)"
  },
  "field_run_f11": {
@@ -702,6 +713,182 @@
   },
   "note": "F20 那本账的 port_open=1 已用满, **不结转**给 F21(A 的原话)。"
  },
+ "field_run_f22": {
+  "status": "已执行并在第 6 步只读查询停止(三轮里最远的一次; 电机从未带电, 保持通电)",
+  "stop_code": "EXPECTATION_NOT_MET",
+  "stop_step_as": "cfg_pre",
+  "stop_missing": [
+   "[TMC]"
+  ],
+  "steps_executed": 6,
+  "step_order_from_bytes": [
+   "sys_pre",
+   "mot_pre",
+   "irq_pre",
+   "diag_pre",
+   "ls_pre",
+   "cfg_pre"
+  ],
+  "passed_steps": [
+   "sys_pre",
+   "mot_pre",
+   "irq_pre",
+   "diag_pre",
+   "ls_pre"
+  ],
+  "business_outcome_steps": [
+   {
+    "as": "sys_pre",
+    "business_failed_lines": [],
+    "status_lines_allowed": [
+     "[Motor] arm gate fail mask=0x18 (arm REFUSED)"
+    ]
+   },
+   {
+    "as": "mot_pre",
+    "business_failed_lines": [],
+    "status_lines_allowed": [
+     "[MOT] arm_gate_mask=0x18 REFUSED"
+    ]
+   }
+  ],
+  "disarm": "NOT_ARMED",
+  "obligation": false,
+  "cleanup_errors": [],
+  "not_run_stages": [
+   "S1"
+  ],
+  "quota_used": {
+   "port_open": 1
+  },
+  "actions_attempted": [],
+  "captures": {
+   "r7f8f_field_f22_01_sys_pre.rx.bin": {
+    "bytes": 983,
+    "sha256": "73abf3012386723ec2d5ec70e5b515bfb2cb3285d60c233a27b07e60d47408a7"
+   },
+   "r7f8f_field_f22_02_mot_pre.rx.bin": {
+    "bytes": 1128,
+    "sha256": "f0550d3131642cd02408c88adc67f6fcb064a27ccba6ceec9c60b82e9cf0c3b5"
+   },
+   "r7f8f_field_f22_03_irq_pre.rx.bin": {
+    "bytes": 612,
+    "sha256": "25bef65c2b365d5c42e13312de36e7ed1c890194d06684b70646eeccf76b4352"
+   },
+   "r7f8f_field_f22_04_diag_pre.rx.bin": {
+    "bytes": 1169,
+    "sha256": "d515de38891b49ed2db60dda862eb7a63d3507f6a80ddc8c563922f55620b781"
+   },
+   "r7f8f_field_f22_05_ls_pre.rx.bin": {
+    "bytes": 130,
+    "sha256": "acd145c616a2c0e438f986722b047ab673cb168df167a4aa3bcbe667aeb7bfdf"
+   },
+   "r7f8f_field_f22_06_cfg_pre.rx.bin": {
+    "bytes": 1011,
+    "sha256": "303eade7bb771e686519810c7f4d5073f318930c5757a00d9d3cf47decbbab2d"
+   }
+  },
+  "operator_verbatim": {
+   "bytes": 63,
+   "sha256": "3aa0d2fcb48885a4d16281871fc103c9132ca2c8670abad6995d0c8c4294428a"
+  },
+  "token_chain": {
+   "verbatim_file_raw": {
+    "bytes": 63,
+    "sha256": "3aa0d2fcb48885a4d16281871fc103c9132ca2c8670abad6995d0c8c4294428a"
+   },
+   "canonical_after_crlf_strip": {
+    "bytes": 62,
+    "sha256": "5a26a1bf5ab493a42e91e20c03740480561d19883829cf2dde5ab84a7d3fab99"
+   },
+   "ledger_bound": {
+    "bytes": 62,
+    "sha256": "5a26a1bf5ab493a42e91e20c03740480561d19883829cf2dde5ab84a7d3fab99",
+    "source": "file:proof/r7f8f_field_f22_operator_verbatim.txt"
+   },
+   "dispatch_copy_declared": {
+    "token_sha256": "5a26a1bf5ab493a42e91e20c03740480561d19883829cf2dde5ab84a7d3fab99",
+    "token_file_raw_sha256": "3aa0d2fcb48885a4d16281871fc103c9132ca2c8670abad6995d0c8c4294428a",
+    "token_source": "file:D:/ns800/reports/reviews/phase8-m8-r7f8-executor-adaptation/proof/r7f8f_field_f22_operator_verbatim.txt"
+   },
+   "three_digests_equal": true,
+   "meaning": "F21 建的三道摘要门第一次在真实分支上跑通: 传入令牌 == 原话文件裁尾 == 账本绑定 == 承接件申报, 四个口都由 Python 内从同一文件取字节 (runner 已归档), 不经控制台、不经 shell 变量。"
+  },
+  "dispatch_copy": {
+   "file": "reports/reviews/phase8-m8-r7f8-executor-adaptation/field/plan_r7f8f_2369_real_dispatch_f22.json",
+   "bytes": 47367,
+   "sha256": "32a5373eb5df93a287e0ef0f7123001717d60fd34bae922be5e30c4398d906d8",
+   "mechanical_prerequisite_status": "PROVIDED",
+   "provenance_gate": "承接件自报的来源原件(N/摘要前缀)已当场与盘上交付件 复算相符; 账本里 plan/executor/image 三个摘要也各自在盘上/计划里复算相符(取不到就拒产本交接)。"
+  },
+  "ledger": {
+   "approval_id": "M8-R7F8F-F22-20261106",
+   "identities": {
+    "executor_sha256": "4363af36159befa417647680cc27fb5bdb95785a404b14d77602ccdbe253962e",
+    "image_sha256": "23691e8d8aa8c1d3ed6e6eff4b5c51fe27dd3a9169841406ecc627c0e807e963",
+    "plan_sha256": "32a5373eb5df93a287e0ef0f7123001717d60fd34bae922be5e30c4398d906d8"
+   },
+   "spent": {
+    "approved_reboot": 0,
+    "blackbox_clear": 0,
+    "cleanup_motor_disarm": 0,
+    "cleanup_motor_status": 0,
+    "cleanup_motor_stop": 0,
+    "cleanup_safety_irq_disable": 0,
+    "cleanup_safety_irq_status": 0,
+    "config_save": 0,
+    "diag_profile_commit": 0,
+    "diag_profile_learn": 0,
+    "diag_profile_learn_cancel": 0,
+    "diag_profile_zero": 0,
+    "dispatch": 0,
+    "dmm_readings": 0,
+    "download": 0,
+    "explicit_reset": 0,
+    "irq_polarity_prep": 0,
+    "motion_cap_seconds_per_run": 0,
+    "motor_arm": 0,
+    "motor_dir": 0,
+    "motor_disarm": 0,
+    "motor_run": 0,
+    "motor_run_seconds_total": 0,
+    "motor_stop": 0,
+    "motor_target": 0,
+    "physical_collision": 0,
+    "port_open": 1,
+    "readback": 0,
+    "retry": 0,
+    "tmc_config_apply": 0
+   },
+   "approval_token_field_present": true
+  },
+  "meaning": "前两轮的首错(F11 缺 status_lines_allow / F20 缺 mask 申报)这次都被 F21 的门位契约放过去了 => 前 5 步只读查询全过; 停止原因换成**包侧内容预期写错**(expect_contains 用了 [TMC] 而产品打 [TMC-CFG])。tmc_config_apply 一条没发, DIR1/arm/起转/学习/commit/stop/disarm 全 0, actions_attempted 为空。",
+  "root_causes_package_side": [
+   "cfg_pre/apply 的 expect_contains=[TMC] —— 该命令族全部打 [TMC-CFG](tmc2209.c:3154/3158 show、:2844 CONFIGURED、:2645/2791 拒绝路径); [TMC] 这个前缀只在 system_status 里由 supervisor.c:128 打。",
+   "行表 tmc_config_show/tmc_config_apply 的 healthy 串是我手写的 ('[TMC] config show' / '[TMC] apply CONFIRM'), 源码里不存在 => 假端口不可能暴露, 与 F11/F20 同形状(第三次)。",
+   "sys_after_apply 期望 runtime write gate mask=0x8: 把 arm 门位 mask(motor.c:894-917 七门, supervisor.c:126 打)与 TMC 写门 mask(tmc2209_get_write_gate_mask() -> tmc_cfg_gate_prod(), supervisor.c:128 打)当成同一个数。本次实拍写门 0x0, apply 成功也不会把它变成 0x8。"
+  ],
+  "not_product_defect": "三轮首错全部落在包侧申报/判据上, 产品一次都没给出预期外的行; 按停止-报告口径未改产品码, 也未重构建。",
+  "quota_carried_to_f23": false,
+  "note": "F22 那本账 port_open=1 已用满, 不结转; F11/F20/F22 三本原样不动。"
+ },
+ "tool_gaps_f22_and_f23_plan": {
+  "registered_in": "reports/reviews/phase8-m8-r7f2b-safety-print-fix/run_record.md §30.1",
+  "count": 3,
+  "titles": [
+   "真实传输预检查只认 --approval-token(文件令牌走不到真实分支)",
+   "包侧 expect_contains/行表 healthy 串没有'必须能在源码或实拍字节里找到出处'的静态门(同形状三轮复发)",
+   "arm 门位 mask 与 TMC 写门 mask 在计划里被当成同一个数, 没有判据把两者分开"
+  ],
+  "workaround_used": "本轮第一次用纯文件令牌跑真实分支被 REAL_TRANSPORT_REFUSED:approval_token_missing_or_mismatch 拒在开口前(rc=4, 账本 spent 合计 0, 未建执行根 => 确实 0 字节发出, 已复算)。随后在 Python 内从文件取严格 UTF-8 规范字节并同时喂四个令牌口, 让 TOKEN_SOURCE_CONFLICT / verify_token_chain 自己钉住三道摘要。**这是绕行, 不是修复**: 修 :5530 需要改执行器字节, 改了就不是操作者批准的 4363af36159b… 那件。",
+  "f23_scope_not_executed": "F23 = 包侧修正(三处期望 + 出处门 + 两 mask 分离判据 + TG 族补'文件令牌 + 真实预检查')。本轮**未动**交付件字节, 六族判据、清单与在库证据全部停在 F21/DIR0 身份。",
+  "evidence_judgments_in_this_receipt": {
+   "TG10_真实分支拦在_dispatch_之前": "PASS",
+   "TG10_的覆盖范围(重要)": "TG10 喂的是 --approval-token 且**账本缺席**, 拒绝码是 APPROVAL_LEDGER_ABSENT; F22 撞的是 REAL_TRANSPORT_REFUSED:approval_token_missing_or_mismatch 即'文件令牌 + 真实预检查'这条通路。六族里**没有**判据覆盖它 => 该洞属 F23 要补的 TG 判据, 现在不冒充成已覆盖。",
+   "MC11_历史字节入档口径": "PASS",
+   "F22_字节同一身份核对": "本交接 field_run_f22.captures 那段代码承担(归档件 vs 台账 RX_DONE 的顺序+字节+散列三重对账, 不符即拒产本交接); 矩阵里给 F22 的具名判据要到 F23 才有。"
+  }
+ },
  "package_fix_f21": {
   "asked_by_A": "三条补齐: (1) 按最终计划全量核查 8 处 motor_status 的预期 mask, 预期为 0 仍要求 0; (2) 纳入历史真实字节 + 补跨计划回归, 口径改为'F20 本会话首次取得'; (3) 令牌字节不一致单独判未通过, 开口前核原话文件/实际传入/账本绑定三份摘要。另: 两次 system_status 字节相同只证输出重复, 接线未变属操作者报告。",
   "contract_version": "R7F8F_PER_STEP_V1",
@@ -1010,6 +1197,20 @@
    "case_matrix_dir0": "R7F8E_MATRIX_SUMMARY|判据=135|FAIL=0|none",
    "offline_gate_dir0": "R7F8F_OFFLINE_GATE_SUMMARY|判据=49|FAIL=0|none"
   },
+  "family_counts_on_variant": {
+   "case_matrix": 135,
+   "offline_gate": 49,
+   "validate_plan_inside_offline_gate": {
+    "checks": 147,
+    "fail": 0
+   }
+  },
+  "families_not_re_read": {
+   "stub_package": 29,
+   "no_regression": 9,
+   "budget_package": 11,
+   "probe_replay": 21
+  },
   "executor_unchanged": {
    "bytes": 328475,
    "sha256": "4363af36159befa417647680cc27fb5bdb95785a404b14d77602ccdbe253962e",
@@ -1026,7 +1227,7 @@
    },
    "note": "参照身份: R7F7 已证在板的镜像(逐字节回读在 R7F7-F1/R7F8 轮已闭合)。"
   },
-  "dir_consuming_families": "只有反例矩阵(135)与整包离线门(49, 内含 validate-plan 147/0)真读被测包; stub(29)/无回归(9)/A 包复算(11)/三版本重放(21x3)读的是合成夹具、冻结的 R7F7 计划、A 的裁定包与 6f2b12f 的 blob, 与 DIR 无关 => 换变体不改变它们的判定对象",
+  "dir_consuming_families": "只有反例矩阵与整包离线门真读被测包(条数见 family_counts_on_variant, 其中离线门内含 validate-plan); stub / 无回归 / A 包复算 / 三版本重放读的是合成夹具、冻结的 R7F7 计划、A 的裁定包与 6f2b12f 的 blob, 与 DIR 无关 => 换变体不改变它们的判定对象(条数见 families_not_re_read)",
   "history_judgments_kept_frozen": "TG9(F20 四件实体绑定)与 MC10(六份冻结旧计划的披露豁免)继续读原始冻结字节, 不跟着 --package-tag 走",
   "evidence_scope": "本轮结论按 dir=0 单方向申报。依据: diag_relative.c:2023 学习只置一个方向位(cand.dir_mask = 1u<<dir), diag_relative.c:334 判定只对方向位在 mask 内的样本生效, 产品注释 :2005 自己写明'只采一个方向却打 dir_mask=3 是第二条假证据链'。=> 不是双向已验。",
   "safety_axis_check": "arm 七门(motor.c:894-917)里没有方向项, DIR 只在四道门通过后才写(motor.c:1470/1496) => 操作者'DIR 非安全相关轴'在**机械安全层成立**, 在**证据适用范围**上需要按上面那句收窄",
@@ -1034,10 +1235,29 @@
   "next_approval_targets": "四件里 plan/rows = DIR0 变体两摘要; executor 与镜像不变。DIR1 交付件与其回执按字节冻结不回改, 变体用新文件名并存。"
  },
  "device_actions_this_round": {
-  "serial_port_open": 2,
-  "dispatch_real": 2,
-  "history_note": "上面两个数是**F11 + F20 两次**现场轮的累计(各自账本里的 port_open), 本轮(F21)自己不新增任何设备动作; F21 沿原动作上限, F20 那本账不结转。",
+  "serial_port_open": 3,
+  "dispatch_real": 3,
+  "new_in_f22_registration": {
+   "port_open": 1,
+   "dispatch": 1,
+   "download": 0,
+   "readback": 0,
+   "explicit_reset": 0,
+   "tmc_config_apply": 0,
+   "note": "F22 那一次 dispatch 自己消耗的就是这一个开口额度; 上面两个累计键含 F11/F20, 别把累计当本轮新增。"
+  },
+  "history_note": "上面两个数是 **F11 + F20 + F22 三次**现场轮的累计(各自账本里的 port_open 与 dispatch), 三本账都在盘上、原样不回改; 本会话里 F21/DIR0 两轮自己不新增设备动作。F20 那本账不结转给 F21, F22 那本不结转给 F23。",
   "f20_commands_written": 2,
+  "f22_queries_written": 6,
+  "f22_query_steps": [
+   "sys_pre",
+   "mot_pre",
+   "irq_pre",
+   "diag_pre",
+   "ls_pre",
+   "cfg_pre"
+  ],
+  "f22_business_actions_attempted": 0,
   "commands_written_to_port": 1,
   "download": 0,
   "readback": 0,
@@ -1051,7 +1271,7 @@
   "power_switch": 0,
   "dispatch_stub_sessions": 7,
   "stub_whole_package_ran_green": true,
-  "evidence": "现场那一次的台账与额度逐条在 proof/r7f8f_field_f11_*.jsonl/receipt.json(真实 COM5, transport=real); 整包离线门自己的 47 条判据里 NO_REAL_PORT_IN_ANY_LEDGER 只声明**门内**那批 dispatch 全走 stub/FakePort —— 两条口径各管各的, 不许互相顶(见 run_record §25 末条)",
+  "evidence": "现场那一次的台账与额度逐条在 proof/r7f8f_field_f11_*.jsonl/receipt.json(真实 COM5, transport=real); 整包离线门自己的 49 条判据里 NO_REAL_PORT_IN_ANY_LEDGER 只声明**门内**那批 dispatch 全走 stub/FakePort —— 两条口径各管各的, 不许互相顶(见 run_record §25 末条)",
   "receipt_gate_verdicts": {
    "RX_RAW_VERBATIM_AND_MATCHES_LEDGER": "PASS",
    "OFFLINE_PATHS_MASKED": "PASS",
@@ -1076,8 +1296,10 @@
   "motion_cap_or_total_window_widened": false,
   "step_list_reduced_for_green": false,
   "run_record_sections": {
-   "total_sections": 27,
-   "section_24_occurrences": 1
+   "total_sections": 30,
+   "section_24_occurrences": 1,
+   "section_29_occurrences": 1,
+   "section_30_occurrences": 1
   }
  },
  "claims_not_made": {
@@ -1094,8 +1316,9 @@
   ]
  },
  "next_step_owners": {
-  "A": "无需再定口径：F21 三条补齐都已落地并全绿(矩阵 135/0、整包离线门 49/0、无回归 9/0)。只要求确认新包的门位契约表(10 步)与不继承那一格的**理由**是否成立；若真机再出现必须改产品的形状(例如 motor_status 打出预期外的 mask)，我按停止-报告处理，不绕过去",
-  "operator": "第三次现场尝试(用 **DIR0 变体包**, 见 dir0_variant 块)需要**一句新的真实原话**，对象 = plan 2f82bf93fddf… / rows 8dc0b5c06bbc… / executor 4363af36159b… / 镜像 23691e8d8aa8…，并在同一句里逐字重新声明机械/电气前置；F11/F20 那两句只覆盖了各自已用满的账(port_open=1)，不结转、不借它开新账",
-  "me_after_approval": "按那句原话把承接件生成器指到本轮四件身份(--approved-prefixes 当场复算)，用 --approval-token-file 离线 --approval-init 新账(绑令牌摘要)，再一次 dispatch；F21 本轮 0 设备动作，未开第三个账"
+  "A": "两轮全绿的离线判据没被第三次真机推翻, 但三轮首错全在包侧申报上。请定两条口径: (1) tmc_config_apply 成功之后 system_status 那行 `runtime write gate mask` **应当**是什么(源码只给形状: tmc2209_get_write_gate_mask() -> tmc_cfg_gate_prod(); F22 实拍 apply 之前 = 0x0, 成功后从未捕获过, 我不替产品猜); (2) F23 新增的'包侧期望串必须有出处'静态门, 是否要求 expect_contains 与行表 healthy 串逐条命中**产品源码字面量或已归档实拍字节**(我倾向后者, 但这会让我手写的期望从此不可用)。另: 若你认为 [TMC]/[TMC-CFG] 前缀属产品该改的形状, 那要走停止-报告改产品, 我不在包侧绕。",
+  "operator": "**本会话第三次整包批准已用完**(F22 账 M8-R7F8F-F22-20261106, port_open 1/1)。板现在 tmc_config state=UNCONFIGURED、drv 未使能、保持通电, 未做任何复位或下载。下一步 F23 是**离线包侧修正(0 设备动作)**; 修完的四件身份变了, 所以第四次真机还需要**一句新的真实原话**——对象 = F23 的 plan/rows 新摘要 + executor + 镜像, 并在同一句里逐字重新声明机械/电气前置(电机在丝杆上、滑块位置、供电/接线是否有变)。我不借 F22 那句开新账。",
+  "me_next_offline": "F23(离线, 未执行): cfg_pre 期望改 `[TMC-CFG] state=` 并把 F22 实拍 1011 B/303eade7bb77 入行表; apply 期望改 `[TMC-CFG] CONFIGURED`(tmc2209.c:2844, 标 source_shape/DERIVED, 因为从未实拍); sys_after_apply 的 write gate 期望按 A 定的口径改并保留 arm 门位那行的锚定; 加'两 mask 不同数'分离判据 + 期望串出处静态门 + TG 族补'文件令牌 + 真实预检查'那条通路(修执行器 :5530 会改执行器身份, 需 A 签第二次软件章或按停止-报告处理)。",
+  "me_after_approval": "按那句新原话把承接件生成器指到 F23 的四件身份(--approved-prefixes 当场复算), 用文件令牌离线 --approval-init 新账(绑令牌摘要), 再一次 dispatch; 本轮(F22 登记)自己不新增设备动作"
  }
 }

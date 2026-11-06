@@ -80,15 +80,44 @@ def _dir0_block(repo):
         if "|FAIL=0|" not in lines[0]:
             _refuse("DIR0 变体在 %s 上不绿: %s" % (rel, lines[0][:120]))
         fam[name] = lines[0]
+
+    def cnt(rel, pre, tag="判据"):
+        """从回执汇总行取条数; 取不到就拒产(写死字面量会随判据增减而失真, 本轮已错过一次)。"""
+        last = [l for l in (repo / (ROUND + "/" + rel)).read_text(encoding="utf-8")
+                .splitlines() if l.startswith(pre)]
+        if len(last) != 1:
+            _refuse("%s 汇总行 %d 条(应为 1), 条数无法当场复算" % (rel, len(last)))
+        m = re.search(r"\|%s=(\d+)" % tag, last[0])
+        if not m:
+            _refuse("%s 汇总行里没有 |%s=N 这一格" % (rel, tag))
+        return int(m.group(1))
+
+    vp = re.search(r"PLAN_VALIDATE_SUMMARY\|checks=(\d+)\|fail=(\d+)",
+                   (repo / (ROUND + "/proof/r7f8f_offline_gate_dir0.txt"))
+                   .read_text(encoding="utf-8"))
+    if not vp:
+        _refuse("DIR0 离线门回执里找不到 PLAN_VALIDATE_SUMMARY 的 checks/fail 格")
     out.update({
         "package_variant": var,
         "families_on_variant": fam,
+        "family_counts_on_variant": {
+            "case_matrix": cnt("proof/r7f8e_case_matrix_dir0.txt", "R7F8E_MATRIX_SUMMARY"),
+            "offline_gate": cnt("proof/r7f8f_offline_gate_dir0.txt", "R7F8F_OFFLINE_GATE_SUMMARY"),
+            "validate_plan_inside_offline_gate": {"checks": int(vp.group(1)),
+                                                  "fail": int(vp.group(2))}},
+        "families_not_re_read": {
+            "stub_package": cnt("proof/r7f8e_stub_package.txt", "R7F8E_STUB_SUMMARY"),
+            "no_regression": cnt("proof/r7f8e_no_regression.txt", "R7F8E_NOREG_SUMMARY"),
+            "budget_package": json.loads((repo / (ROUND + "/proof/r7f8f_budget_package.json"))
+                                         .read_text(encoding="utf-8"))["summary"]["checks"],
+            "probe_replay": cnt("proof/r7f8f_probe_replay.txt", "REPLAY_SUMMARY", "件数")},
         "executor_unchanged": dict(ident(repo / EXE), path=EXE),
         "image_unchanged": pv["identity_binding"]["image"],
-        "dir_consuming_families": "只有反例矩阵(135)与整包离线门(49, 内含 validate-plan 147/0)"
-                                  "真读被测包; stub(29)/无回归(9)/A 包复算(11)/三版本重放(21x3)"
-                                  "读的是合成夹具、冻结的 R7F7 计划、A 的裁定包与 6f2b12f 的 blob, "
-                                  "与 DIR 无关 => 换变体不改变它们的判定对象",
+        "dir_consuming_families": "只有反例矩阵与整包离线门真读被测包(条数见 "
+                                  "family_counts_on_variant, 其中离线门内含 validate-plan); "
+                                  "stub / 无回归 / A 包复算 / 三版本重放读的是合成夹具、冻结的 "
+                                  "R7F7 计划、A 的裁定包与 6f2b12f 的 blob, 与 DIR 无关 "
+                                  "=> 换变体不改变它们的判定对象(条数见 families_not_re_read)",
         "history_judgments_kept_frozen": "TG9(F20 四件实体绑定)与 MC10(六份冻结旧计划的披露豁免)"
                                          "继续读原始冻结字节, 不跟着 --package-tag 走",
         "evidence_scope": "本轮结论按 dir=0 单方向申报。依据: diag_relative.c:2023 学习只置一个方向位"
@@ -211,6 +240,20 @@ def main() -> int:
         print("HANDOFF_REFUSE|§27.6 实际 %d 条, 交接里的标题清单 %d 条 => 两边必须同数"
               % (injuries_276, len(inj_f21_titles)))
         return 1
+    # F22 这一段的自伤单独数(§29.1): 不与 F21 那 8 条混计, 也不许写死。
+    m291 = re.search(r"(?m)^### 29\.1 .*?(?=^### |^## |\Z)", rr, re.M | re.S)
+    injuries_291 = len(re.findall(re.compile(r"(?m)^\d+\. "), m291.group(0))) if m291 else 0
+    if not injuries_291:
+        print("HANDOFF_REFUSE|run_record 里没有 §29.1 自伤清单(F22 的登记缺失, 不许出交接)")
+        return 1
+    inj_f22_titles = ["把 DIR 这个非安全轴的标注差异升级成现场执行的卡点, 被操作者纠正",
+                      "F21 宣布'文件令牌路线可用'时只在 CLI 拒绝形状上证过, 真实分支那条通路没测过",
+                      "§29 初稿把 TG10 的输入写成'文件令牌 + 台账缺席'(实为 --approval-token), 按印象写",
+                      "交接工具把 quota_used(只列非零)与账本 spent(满键)直接判等 => 当场假红"]
+    if len(inj_f22_titles) != injuries_291:
+        print("HANDOFF_REFUSE|§29.1 实际 %d 条, 交接里的 F22 标题清单 %d 条 => 两边必须同数"
+              % (injuries_291, len(inj_f22_titles)))
+        return 1
     # F20 现场的三件产物**从归档字节读**(不抄我自己的结论): 步台账里的首错、dispatch 台账里的
     # 额度与 not_run、账本副本里没有 approval_token 这一格。
     f20_step = [json.loads(l) for l in (repo / ROUND / "proof/r7f8f_field_f20_step_ledger.jsonl")
@@ -240,6 +283,187 @@ def main() -> int:
                 for n in ("r7f8f_field_f20_sys_pre.rx.bin", "r7f8f_field_f20_mot_pre.rx.bin")}
     f20_verbatim = ident(repo / (ROUND + "/proof/r7f8f_field_f20_operator_verbatim.txt"))
     f20_draft_p = repo / ROUND / "field/plan_r7f8f_2369_real_dispatch_f20.json"
+
+    # ---- F22 第三次真机整包: 停止步/额度/令牌/捕获一律从归档字节 + 台账读, 对不上就拒产 ----
+    # F22 那次的首错形状与前两轮**不同**(不是业务失败, 是内容预期不匹配), 所以"停在哪一步"
+    # 只能由台账自己那行 PROTOCOL_OR_CONTENT_FAIL 说; 拿前两轮的同源算法套过来会取不到。
+    f22_step = [json.loads(l) for l in (repo / ROUND / "proof/r7f8f_field_f22_ledger.jsonl")
+                .read_text(encoding="utf-8-sig").splitlines() if l.strip()]
+    f22_disp = [json.loads(l) for l in (repo / ROUND / "proof/r7f8f_field_f22_dispatch_ledger.jsonl")
+                .read_text(encoding="utf-8-sig").splitlines() if l.strip()]
+    f22_led = json.loads((repo / ROUND / "proof/r7f8f_field_f22_approval_ledger.json")
+                         .read_text(encoding="utf-8-sig"))
+    f22_poc = [e for e in f22_step if e.get("kind") == "PROTOCOL_OR_CONTENT_FAIL"]
+    f22_sess = [e for e in f22_step if e.get("kind") == "SESSION_STOP"]
+    if len(f22_poc) != 1 or len(f22_sess) != 1:
+        print("HANDOFF_REFUSE|F22 台账里首错行=%d 会话停止行=%d(各应为 1) => 停止步不许凭记忆填"
+              % (len(f22_poc), len(f22_sess)))
+        return 1
+    f22_stop_as, f22_missing = f22_poc[0].get("as"), f22_poc[0].get("missing")
+    f22_sess_detail = json.loads(f22_sess[0].get("detail") or "{}")
+    if f22_sess_detail.get("missing") != f22_missing:
+        print("HANDOFF_REFUSE|F22 首错行的 missing=%r 与会话停止行的 %r 不同源" %
+              (f22_missing, f22_sess_detail.get("missing")))
+        return 1
+    f22_out = (repo / ROUND / "proof/r7f8f_field_f22_dispatch_out.txt").read_text(
+        encoding="utf-8", errors="replace").splitlines()
+    f22_rec_ln = [l for l in f22_out if l.startswith("DISPATCH|stage=S1|status=STOP")]
+    f22_sum_ln = [l for l in f22_out if l.startswith("DISPATCH_SUMMARY|")]
+    if len(f22_rec_ln) != 1 or len(f22_sum_ln) != 1:
+        print("HANDOFF_REFUSE|F22 dispatch_out 里整包结果行=%d 汇总行=%d(各应为 1)"
+              % (len(f22_rec_ln), len(f22_sum_ln)))
+        return 1
+    f22_rec = json.loads(f22_rec_ln[0][f22_rec_ln[0].index("{"):])
+
+    def f22_field(tag):
+        for g in f22_sum_ln[0].split("|"):
+            if g.startswith(tag + "="):
+                v = g[len(tag) + 1:]
+                return json.loads(v) if v.startswith(("{", "[")) else v
+        return None
+
+    f22_quota_used = f22_field("quota_used")
+    f22_attempted = f22_field("actions_attempted")
+    if f22_quota_used is None or f22_attempted is None:
+        print("HANDOFF_REFUSE|F22 汇总行里找不到 quota_used / actions_attempted(格式变了不许抄旧字段)")
+        return 1
+    # 汇总行的 quota_used 只列**非零**项, 账本的 spent 是满键: 归一化后必须逐项相等,
+    # 直接比会因键数不同而假红(本轮第一版就这样错过一次)。
+    f22_spent_nonzero = {k: v for k, v in (f22_led.get("spent") or {}).items() if v}
+    if f22_quota_used != f22_spent_nonzero:
+        print("HANDOFF_REFUSE|F22 汇总 quota_used=%r 与账本 spent 的非零项 %r 不等"
+              % (f22_quota_used, f22_spent_nonzero))
+        return 1
+    if f22_attempted:
+        print("HANDOFF_REFUSE|F22 汇总里 actions_attempted 非空(%r) => 电机未带电那句话就不许写"
+              % f22_attempted)
+        return 1
+    if f22_rec.get("code") != f22_sess[0].get("code"):
+        print("HANDOFF_REFUSE|F22 结果行的 code=%r 与会话停止行的 %r 不同源"
+              % (f22_rec.get("code"), f22_sess[0].get("code")))
+        return 1
+    # 逐字节捕获: 台账按时间顺序的 RX_DONE 与归档件名里的 01..NN 必须一一对上同一身份
+    # (顺序 + 字节 + 散列三样同时成立), 不靠我记得"哪一步是哪一步"。
+    f22_rxs = [e for e in f22_step if e.get("kind") == "RX_DONE"]
+    f22_capt_names = sorted(p.name for p in (repo / ROUND / "proof").glob("r7f8f_field_f22_0*.rx.bin"))
+    if len(f22_capt_names) != len(f22_rxs):
+        print("HANDOFF_REFUSE|F22 台账 RX_DONE=%d 条, 归档捕获=%d 件 => 同源核对不成立就不出交接"
+              % (len(f22_rxs), len(f22_capt_names)))
+        return 1
+    f22_capt, f22_step_order = {}, []
+    for i, (name, ev) in enumerate(zip(f22_capt_names, f22_rxs)):
+        got = ident(repo / (ROUND + "/proof/" + name))
+        if (got["bytes"], got["sha256"]) != (ev.get("bytes"), ev.get("raw_sha256")):
+            print("HANDOFF_REFUSE|F22 归档 %s 与台账第 %d 条 RX_DONE 不是同一身份: 盘上 %d B/%s… "
+                  "vs 台账 %s B/%s…" % (name, i + 1, got["bytes"], got["sha256"][:12],
+                                        ev.get("bytes"), str(ev.get("raw_sha256"))[:12]))
+            return 1
+        f22_capt[name] = got
+        mm = re.match(r"r7f8f_field_f22_\d+_(\w+)\.rx\.bin$", name)
+        if not mm:
+            print("HANDOFF_REFUSE|F22 归档件名 %s 提不出步标(命名规则变了)" % name)
+            return 1
+        f22_step_order.append(mm.group(1))
+    if f22_step_order[-1] != f22_stop_as:
+        print("HANDOFF_REFUSE|F22 最后一个捕获是 %s, 台账首错步是 %s => 停止步与字节不同源"
+              % (f22_step_order[-1], f22_stop_as))
+        return 1
+    if f22_rec.get("steps") != len(f22_rxs):
+        print("HANDOFF_REFUSE|F22 结果行 steps=%r 与捕获件数 %d 不等" % (f22_rec.get("steps"),
+                                                                        len(f22_rxs)))
+        return 1
+    f22_biz = [e for e in f22_step if e.get("kind") == "BUSINESS_OUTCOME"]
+    if any(e.get("lines") for e in f22_biz):
+        print("HANDOFF_REFUSE|F22 出现带业务失败行的查询步 => 本轮不是'前三步全过'的形状, 结论要重写")
+        return 1
+    f22_done = [e for e in f22_disp if e.get("kind") == "DISPATCH_DONE"]
+    if len(f22_done) != 1:
+        print("HANDOFF_REFUSE|F22 dispatch 台账里 DISPATCH_DONE=%d 条(应为 1)" % len(f22_done))
+        return 1
+    # 令牌三道摘要(F21 的门)在 F22 真分支上重新复算一遍: 原话文件裁尾 / 账本绑定 / 承接件申报
+    f22_verbatim_p = repo / ROUND / "proof/r7f8f_field_f22_operator_verbatim.txt"
+    f22_raw = f22_verbatim_p.read_bytes()
+    f22_canon = f22_raw.rstrip(b"\r\n")
+    f22_text = f22_canon.decode("utf-8")          # 严格 UTF-8: 解不开直接抛, 不猜内容
+    f22_tok = f22_led.get("approval_token") or {}
+    f22_copy_p = repo / ROUND / "field/plan_r7f8f_2369_real_dispatch_f22.json"
+    f22_copy = json.loads(f22_copy_p.read_text(encoding="utf-8"))
+    f22_ap = f22_copy.get("approval") or {}
+    if not f22_tok:
+        print("HANDOFF_REFUSE|F22 账本里没有 approval_token 格 => F21 的绑定门必须留下证据")
+        return 1
+    if not (f22_tok.get("sha256") == hashlib.sha256(f22_canon).hexdigest()
+            == f22_ap.get("token_sha256")):
+        print("HANDOFF_REFUSE|F22 令牌摘要不同源: 账本=%s… 原话裁尾=%s… 承接件=%s…"
+              % (str(f22_tok.get("sha256"))[:12], hashlib.sha256(f22_canon).hexdigest()[:12],
+                 str(f22_ap.get("token_sha256"))[:12]))
+        return 1
+    if f22_ap.get("token_file_raw_sha256") != hashlib.sha256(f22_raw).hexdigest():
+        print("HANDOFF_REFUSE|F22 承接件申报的原话**原始字节**摘要与盘上不等")
+        return 1
+    if f22_ap.get("token_verbatim") != f22_text:
+        print("HANDOFF_REFUSE|F22 承接件里的令牌文本与原话文件裁尾不等(逐字要求)")
+        return 1
+    f22_mech = (f22_copy.get("mechanical_prerequisites") or {}).get("bench_continuity") or {}
+    if f22_text != f22_mech.get("declared_verbatim"):
+        print("HANDOFF_REFUSE|F22 机械前置的逐字声明与令牌不是同一句 => 前置不许借批准句")
+        return 1
+    # 批准件的四件实体绑定: 账本里的三个摘要都要能在盘上/计划里复算出来
+    f22_ids = f22_led.get("identities") or {}
+    if f22_ids.get("executor_sha256") != hashlib.sha256((repo / EXE).read_bytes()).hexdigest():
+        print("HANDOFF_REFUSE|F22 账本绑的执行器摘要与盘上派生件不等 => 跑的不是交付那件")
+        return 1
+    if f22_ids.get("plan_sha256") != hashlib.sha256(f22_copy_p.read_bytes()).hexdigest():
+        print("HANDOFF_REFUSE|F22 账本绑的 plan 摘要与在盘承接件不等")
+        return 1
+    # 镜像: 承接件申报的 path+sha 与账本绑的值与盘上字节三方对账(本轮 0 下载/0 回读, 所以
+    # 这条只证"批准绑在哪枚镜像身份上", 不证板上的字节 = 那枚 —— 后者由 R7F7-F1 的回读承担)。
+    f22_img_decl = (f22_copy.get("identity_binding") or {}).get("image") or {}
+    f22_img_p = repo / f22_img_decl.get("path", "")
+    if not (f22_ids.get("image_sha256") == f22_img_decl.get("sha256")
+            and f22_img_p.is_file()
+            and hashlib.sha256(f22_img_p.read_bytes()).hexdigest() == f22_ids["image_sha256"]):
+        print("HANDOFF_REFUSE|F22 镜像摘要三方不同源: 账本=%s… 承接件申报=%s… 盘上(%s)=%s…"
+              % (str(f22_ids.get("image_sha256"))[:12], str(f22_img_decl.get("sha256"))[:12],
+                 f22_img_decl.get("path") or "-",
+                 hashlib.sha256(f22_img_p.read_bytes()).hexdigest()[:12]
+                 if f22_img_p.is_file() else "件不在盘"))
+        return 1
+    # 承接件自报"从已交付原件 N/前缀… 派生": 这串数字必须能在盘上的交付件上复算, 否则派生链断。
+    m_src = re.search(r"从已交付原件 (\d+)/([0-9a-f]{12})", f22_ap.get("dispatch_copy_note") or "")
+    disk_plan = ident(repo / PLAN)
+    if not m_src or int(m_src.group(1)) != disk_plan["bytes"] or \
+            not disk_plan["sha256"].startswith(m_src.group(2)):
+        print("HANDOFF_REFUSE|F22 承接件自报来源 %s 与盘上交付件 %d/%s… 不符 => 批准件不是交付件派生的"
+              % (m_src.group(0) if m_src else "读不到", disk_plan["bytes"],
+                 disk_plan["sha256"][:12]))
+        return 1
+    # 交接里**点名引用**的判据必须能在回执里取到 PASS: 名字写错(取到 None)或已翻红都当场拒产。
+    # 上一版差点引用了两条根本不存在的判据(MC12/TG10-F22), 那正是"自总结"的形态。
+    all_gates = dict(mc_gates); all_gates.update(tg_gates)
+    for nm in ("TG10_CLI 真实分支被令牌门拦在 dispatch 之前(不导 pyserial、零台账零发送零开口)",
+               "MC11_F20原始字节入档且与历史归档逐字节同一身份(口径=F20本会话首次取得)"):
+        if all_gates.get(nm) != "PASS":
+            print("HANDOFF_REFUSE|交接点名的判据 %s 在矩阵回执里取到的判定=%r(必须 PASS)"
+                  % (nm, all_gates.get(nm)))
+            return 1
+    m29 = re.search(r"(?m)^## 29 .*?(?=^## \d+ |\Z)", rr, re.M | re.S)
+    if not m29:
+        print("HANDOFF_REFUSE|run_record 里没有 §29(F22 的现场登记缺失, 不许出交接)")
+        return 1
+    m301 = re.search(r"(?m)^### 30\.1 .*?(?=^### |^## |\Z)", rr, re.M | re.S)
+    gaps_301 = len(re.findall(re.compile(r"(?m)^\d+\. "), m301.group(0))) if m301 else 0
+    if not gaps_301:
+        print("HANDOFF_REFUSE|run_record 里没有 §30.1 缺口清单(F22 撞出的工具洞没登记)")
+        return 1
+    gap_titles_f22 = ["真实传输预检查只认 --approval-token(文件令牌走不到真实分支)",
+                      "包侧 expect_contains/行表 healthy 串没有'必须能在源码或实拍字节里找到出处'"
+                      "的静态门(同形状三轮复发)",
+                      "arm 门位 mask 与 TMC 写门 mask 在计划里被当成同一个数, 没有判据把两者分开"]
+    if len(gap_titles_f22) != gaps_301:
+        print("HANDOFF_REFUSE|§30.1 实际 %d 条, 交接里的缺口标题清单 %d 条 => 两边必须同数"
+              % (gaps_301, len(gap_titles_f22)))
+        return 1
 
     # 整包 stub 那条判据的名字要能在回执里找到; 找不到就拒(改名不许静默降级成 False)
     whole_gate = [g for g in gate_json["gates"]
@@ -285,16 +509,19 @@ def main() -> int:
     txt_fails = [] if og["failed_names"] in (None, "none") else og["failed_names"].split(",")
     doc = {
         "round": "M8-R7F8F 返修+整包轮（A 包 NS800_R7F8F_Repair_And_Field_20261105 + A 预算裁定"
-                 "包 NS800_R7F8F_A_Budget_Ruling_20261105；设备动作 0）",
-        "date_local": "2026-11-05",
+                 "包 NS800_R7F8F_A_Budget_Ruling_20261105；离线部分设备动作 0，真机部分已跑三次："
+                 "F11/F20/F22 各一次开口，每次一本新账）",
+
+        "date_local": "2026-11-05 起（离线与 F11/F20）；F22 现场轮与本轮登记 = 2026-11-06",
         "task_book": PKG + "/R7F8F_REPAIR_AND_FIELD_TASK.md",
         "budget_ruling": BUDGET_PKG + "/R7F8F_A_BUDGET_RULING.md",
         "task_id": "M8R7F8F-repair-and-offline-gate-20261105",
         # 两条静态红已由 A 定口径并落地, 整包离线门全绿 => 状态是"待一次现场批准",
         # 不是"可上机已证"：现场判读仍未发生, 设备动作 0。
-        "status": ("OFFLINE_GATE_ALL_GREEN / FIELD_RUN_ONCE_DONE_STOPPED_AT_STEP1 "
-                   "(BUSINESS_FAILED, 包侧缺 status_lines_allow) / 电机从未带电、从未起转 / "
-                   "SECOND_FIELD_RUN_NEEDS_NEW_OPERATOR_APPROVAL"
+        "status": ("OFFLINE_GATE_ALL_GREEN / 真机已跑三次(F11 停在第 1 步, F20 停在第 2 步, "
+                   "F22 停在第 6 步 = 三轮最远) / 三轮首错全在包侧申报, 产品未给预期外的行 / "
+                   "电机从未带电、从未起转 / 本会话第三次批准已用满 / "
+                   "下一步=F23 包侧修正(离线)+新的真实原话，NOT_FIELD_READY"
                    if field else
                    "OFFLINE_GATE_ALL_GREEN / FIELD_PACKAGE_AUTHORITATIVE_PENDING_APPROVAL / "
                    "HARDWARE_ACTIONS=0 / ONE_FIELD_APPROVAL_NOT_GRANTED"),
@@ -419,9 +646,10 @@ def main() -> int:
             "normal_stop_send_by_seconds":
                 plan["stages"][0].get("normal_stop_send_by_seconds"),
             "static_budget_items_after_ruling": plan.get("static_budget_open_items"),
-            "approval": "F11 与 F20 各按操作者原话开过**一个**账, 两本的 port_open=1 都已用满; "
-                        "F21(本轮)未开新账、未发任何现场命令, 且四件身份已再次变(见 "
-                        "package_fix_f21.identities_for_next_approval) => 再一次真机需要一句新的真实原话, "
+            "approval": "F11 / F20 / F22 各按操作者原话开过**一个**账, 三本的 port_open=1 都已用满"
+                        "(F22 是本会话刚跑的那次); F21/DIR0 两轮未开新账、未发任何现场命令。"
+                        "**本会话第三次现场尝试的批准已消耗完毕**, 再一次真机需要先做 F23 包侧修正"
+                        "(见 tool_gaps_f22_and_f23_plan)并拿到针对新身份的一句真实原话, "
                         "并在同一句里逐字重新声明机械/电气前置"},
         "red_gates_remaining": [g for g in gate_json["gates"] if g["verdict"] == "FAIL"],
         "draft_sync": {
@@ -449,6 +677,12 @@ def main() -> int:
                                     "count_f21": injuries_276,
                                     "where_f21": RUN_RECORD + " §27.6（F21 那 %d 条：%s）"
                                                  % (injuries_276, "、".join(inj_f21_titles)),
+                                    "count_f22": injuries_291,
+                                    "where_f22": RUN_RECORD + " §29.1（F22 那 %d 条：%s）"
+                                                 % (injuries_291, "、".join(inj_f22_titles)),
+                                    "gaps_f22": {"count": gaps_301,
+                                                 "where": RUN_RECORD + " §30.1",
+                                                 "titles": gap_titles_f22},
                                     "f20_registered_as_failed": "令牌字节链那一判在 F20 单独记未通过"
                                                                 "(TG8), 实体绑定那一判记通过(TG9)"},
         "field_run_f11": ({
@@ -540,6 +774,93 @@ def main() -> int:
                     "TG8_F20 那次开口按新门复算=令牌判据不成立")},
             "note": "F20 那本账的 port_open=1 已用满, **不结转**给 F21(A 的原话)。"
         },
+        "field_run_f22": {
+            "status": "已执行并在第 6 步只读查询停止(三轮里最远的一次; 电机从未带电, 保持通电)",
+            "stop_code": f22_sess[0].get("code"),
+            "stop_step_as": f22_stop_as,
+            "stop_missing": f22_missing,
+            "steps_executed": f22_rec.get("steps"),
+            "step_order_from_bytes": f22_step_order,
+            "passed_steps": f22_step_order[:-1],
+            "business_outcome_steps": [{"as": e.get("as"), "business_failed_lines": e.get("lines") or [],
+                                        "status_lines_allowed": e.get("status_lines_allowed") or []}
+                                       for e in f22_biz],
+            "disarm": f22_rec.get("disarm"), "obligation": f22_rec.get("obligation"),
+            "cleanup_errors": f22_rec.get("cleanup_errors"),
+            "not_run_stages": [x for e in f22_done for x in (e.get("not_run") or [])],
+            "quota_used": f22_quota_used, "actions_attempted": f22_attempted,
+            "captures": f22_capt,
+            "operator_verbatim": ident(repo / f22_verbatim_p),
+            "token_chain": {
+                "verbatim_file_raw": {"bytes": len(f22_raw),
+                                      "sha256": hashlib.sha256(f22_raw).hexdigest()},
+                "canonical_after_crlf_strip": {"bytes": len(f22_canon),
+                                               "sha256": hashlib.sha256(f22_canon).hexdigest()},
+                "ledger_bound": f22_tok,
+                "dispatch_copy_declared": {"token_sha256": f22_ap.get("token_sha256"),
+                                           "token_file_raw_sha256": f22_ap.get("token_file_raw_sha256"),
+                                           "token_source": f22_ap.get("token_source")},
+                "three_digests_equal": True,
+                "meaning": "F21 建的三道摘要门第一次在真实分支上跑通: 传入令牌 == 原话文件裁尾 == "
+                           "账本绑定 == 承接件申报, 四个口都由 Python 内从同一文件取字节 "
+                           "(runner 已归档), 不经控制台、不经 shell 变量。"},
+            "dispatch_copy": {"file": ROUND + "/field/plan_r7f8f_2369_real_dispatch_f22.json",
+                              **ident(f22_copy_p),
+                              "mechanical_prerequisite_status": f22_mech.get("status"),
+                              "provenance_gate": "承接件自报的来源原件(N/摘要前缀)已当场与盘上交付件 "
+                                                 "复算相符; 账本里 plan/executor/image 三个摘要也各自"
+                                                 "在盘上/计划里复算相符(取不到就拒产本交接)。"},
+            "ledger": {"approval_id": f22_led.get("approval_id"),
+                       "identities": f22_ids, "spent": f22_led.get("spent"),
+                       "approval_token_field_present": "approval_token" in f22_led},
+            "meaning": "前两轮的首错(F11 缺 status_lines_allow / F20 缺 mask 申报)这次都被 F21 的"
+                       "门位契约放过去了 => 前 5 步只读查询全过; 停止原因换成**包侧内容预期写错**"
+                       "(expect_contains 用了 [TMC] 而产品打 [TMC-CFG])。tmc_config_apply 一条没发, "
+                       "DIR1/arm/起转/学习/commit/stop/disarm 全 0, actions_attempted 为空。",
+            "root_causes_package_side": [
+                "cfg_pre/apply 的 expect_contains=[TMC] —— 该命令族全部打 [TMC-CFG]"
+                "(tmc2209.c:3154/3158 show、:2844 CONFIGURED、:2645/2791 拒绝路径); "
+                "[TMC] 这个前缀只在 system_status 里由 supervisor.c:128 打。",
+                "行表 tmc_config_show/tmc_config_apply 的 healthy 串是我手写的 "
+                "('[TMC] config show' / '[TMC] apply CONFIRM'), 源码里不存在 => 假端口不可能暴露, "
+                "与 F11/F20 同形状(第三次)。",
+                "sys_after_apply 期望 runtime write gate mask=0x8: 把 arm 门位 mask"
+                "(motor.c:894-917 七门, supervisor.c:126 打)与 TMC 写门 mask"
+                "(tmc2209_get_write_gate_mask() -> tmc_cfg_gate_prod(), supervisor.c:128 打)当成同一"
+                "个数。本次实拍写门 0x0, apply 成功也不会把它变成 0x8。"],
+            "not_product_defect": "三轮首错全部落在包侧申报/判据上, 产品一次都没给出预期外的行; "
+                                  "按停止-报告口径未改产品码, 也未重构建。",
+            "quota_carried_to_f23": False,
+            "note": "F22 那本账 port_open=1 已用满, 不结转; F11/F20/F22 三本原样不动。"
+        },
+        "tool_gaps_f22_and_f23_plan": {
+            "registered_in": RUN_RECORD + " §30.1",
+            "count": gaps_301,
+            "titles": gap_titles_f22,
+            "workaround_used": "本轮第一次用纯文件令牌跑真实分支被 "
+                               "REAL_TRANSPORT_REFUSED:approval_token_missing_or_mismatch 拒在开口前"
+                               "(rc=4, 账本 spent 合计 0, 未建执行根 => 确实 0 字节发出, 已复算)。"
+                               "随后在 Python 内从文件取严格 UTF-8 规范字节并同时喂四个令牌口, "
+                               "让 TOKEN_SOURCE_CONFLICT / verify_token_chain 自己钉住三道摘要。"
+                               "**这是绕行, 不是修复**: 修 :5530 需要改执行器字节, 改了就不是"
+                               "操作者批准的 4363af36159b… 那件。",
+            "f23_scope_not_executed": "F23 = 包侧修正(三处期望 + 出处门 + 两 mask 分离判据 + "
+                                      "TG 族补'文件令牌 + 真实预检查')。本轮**未动**交付件字节, "
+                                      "六族判据、清单与在库证据全部停在 F21/DIR0 身份。",
+            "evidence_judgments_in_this_receipt": {
+                "TG10_真实分支拦在_dispatch_之前": tg_gates.get(
+                    "TG10_CLI 真实分支被令牌门拦在 dispatch 之前(不导 pyserial、零台账零发送零开口)"),
+                "TG10_的覆盖范围(重要)": "TG10 喂的是 --approval-token 且**账本缺席**, 拒绝码是 "
+                                        "APPROVAL_LEDGER_ABSENT; F22 撞的是 "
+                                        "REAL_TRANSPORT_REFUSED:approval_token_missing_or_mismatch "
+                                        "即'文件令牌 + 真实预检查'这条通路。六族里**没有**判据覆盖它 "
+                                        "=> 该洞属 F23 要补的 TG 判据, 现在不冒充成已覆盖。",
+                "MC11_历史字节入档口径": mc_gates.get(
+                    "MC11_F20原始字节入档且与历史归档逐字节同一身份(口径=F20本会话首次取得)"),
+                "F22_字节同一身份核对": "本交接 field_run_f22.captures 那段代码承担"
+                                       "(归档件 vs 台账 RX_DONE 的顺序+字节+散列三重对账, "
+                                       "不符即拒产本交接); 矩阵里给 F22 的具名判据要到 F23 才有。"},
+        },
         "package_fix_f21": {
             "asked_by_A": "三条补齐: (1) 按最终计划全量核查 8 处 motor_status 的预期 mask, 预期为 0 "
                           "仍要求 0; (2) 纳入历史真实字节 + 补跨计划回归, 口径改为'F20 本会话首次取得'; "
@@ -588,11 +909,22 @@ def main() -> int:
         "dir0_variant": _dir0_block(repo),
         "device_actions_this_round": {
             "serial_port_open": ((field or {}).get("quota_spent", {}).get("port_open", 0)
-                                 + f20_led.get("spent", {}).get("port_open", 0)),
-            "dispatch_real": (1 if field else 0) + 1,
-            "history_note": "上面两个数是**F11 + F20 两次**现场轮的累计(各自账本里的 port_open), "
-                            "本轮(F21)自己不新增任何设备动作; F21 沿原动作上限, F20 那本账不结转。",
+                                 + f20_led.get("spent", {}).get("port_open", 0)
+                                 + f22_led.get("spent", {}).get("port_open", 0)),
+            "dispatch_real": (1 if field else 0) + 2,
+            "new_in_f22_registration": {"port_open": f22_led.get("spent", {}).get("port_open", 0),
+                                        "dispatch": 1, "download": 0, "readback": 0,
+                                        "explicit_reset": 0, "tmc_config_apply": 0,
+                                        "note": "F22 那一次 dispatch 自己消耗的就是这一个开口额度; "
+                                                "上面两个累计键含 F11/F20, 别把累计当本轮新增。"},
+
+            "history_note": "上面两个数是 **F11 + F20 + F22 三次**现场轮的累计(各自账本里的 "
+                            "port_open 与 dispatch), 三本账都在盘上、原样不回改; 本会话里 F21/DIR0 "
+                            "两轮自己不新增设备动作。F20 那本账不结转给 F21, F22 那本不结转给 F23。",
             "f20_commands_written": 2,
+            "f22_queries_written": len(f22_rxs),
+            "f22_query_steps": f22_step_order,
+            "f22_business_actions_attempted": len(f22_attempted),
             # 写出去几条命令不靠我说: 现场回执里那条"捕获里只允许有 system_status 的回显"
             # 判 PASS 才算 1 条查询; 电机/使能/配置/学习类回显一条都不许出现
             "commands_written_to_port": (1 if fq.get("ONLY_THE_QUERY_EVER_WRITTEN", {}).get(
@@ -605,9 +937,11 @@ def main() -> int:
             "stub_whole_package_ran_green":
                 bool(whole_gate) and whole_gate[0]["verdict"] == "PASS",
             "evidence": ("现场那一次的台账与额度逐条在 proof/r7f8f_field_f11_*.jsonl/"
-                         "receipt.json(真实 COM5, transport=real); 整包离线门自己的 47 条判据里 "
+                         "receipt.json(真实 COM5, transport=real); 整包离线门自己的 %d 条判据里 "
                          "NO_REAL_PORT_IN_ANY_LEDGER 只声明**门内**那批 dispatch 全走 stub/"
-                         "FakePort —— 两条口径各管各的, 不许互相顶(见 run_record §25 末条)"),
+                         "FakePort —— 两条口径各管各的, 不许互相顶(见 run_record §25 末条)"
+                         % og["predicates"]),
+
             "receipt_gate_verdicts": dict((k, v["verdict"])
                                           for k, v in (fq or {}).items()),
         },
@@ -619,7 +953,11 @@ def main() -> int:
             "step_list_reduced_for_green": False,
             "run_record_sections": {"total_sections": len(re.findall(r"(?m)^## \d+ ", rr)),
                                     "section_24_occurrences":
-                                        len(re.findall(r"(?m)^## 24 ", rr))}},
+                                        len(re.findall(r"(?m)^## 24 ", rr)),
+                                    "section_29_occurrences":
+                                        len(re.findall(r"(?m)^## 29 ", rr)),
+                                    "section_30_occurrences":
+                                        len(re.findall(r"(?m)^## 30 ", rr))}},
         "claims_not_made": {
             "polarity_measured": False, "core_protection_verified": False,
             "field_acceptance": "本轮只是工具与离线判据；现场验收需真机一轮",
@@ -634,17 +972,30 @@ def main() -> int:
         "next_step_owners": {
             # 这里曾经有过两条 "A" 键(Python 字典字面量**后写覆盖前写**, 静默丢一条)。现在只留一条,
             # 改文案就改这一条, 不要再往上面加同名键。
-            "A": "无需再定口径：F21 三条补齐都已落地并全绿(矩阵 135/0、整包离线门 49/0、无回归 9/0)。"
-                 "只要求确认新包的门位契约表(10 步)与不继承那一格的**理由**是否成立；若真机再出现必须"
-                 "改产品的形状(例如 motor_status 打出预期外的 mask)，我按停止-报告处理，不绕过去",
-            "operator": "第三次现场尝试(用 **DIR0 变体包**, 见 dir0_variant 块)需要**一句新的真实原话**，"
-                        "对象 = plan 2f82bf93fddf… / rows 8dc0b5c06bbc… / executor 4363af36159b… / "
-                        "镜像 23691e8d8aa8…，并在同一句里逐字重新声明"
-                        "机械/电气前置；F11/F20 那两句只覆盖了各自已用满的账(port_open=1)，不结转、"
-                        "不借它开新账",
-            "me_after_approval": "按那句原话把承接件生成器指到本轮四件身份(--approved-prefixes 当场"
-                                 "复算)，用 --approval-token-file 离线 --approval-init 新账(绑令牌摘要)，"
-                                 "再一次 dispatch；F21 本轮 0 设备动作，未开第三个账"}}
+            "A": "两轮全绿的离线判据没被第三次真机推翻, 但三轮首错全在包侧申报上。请定两条口径: "
+                 "(1) tmc_config_apply 成功之后 system_status 那行 `runtime write gate mask` **应当**"
+                 "是什么(源码只给形状: tmc2209_get_write_gate_mask() -> tmc_cfg_gate_prod(); "
+                 "F22 实拍 apply 之前 = 0x0, 成功后从未捕获过, 我不替产品猜); "
+                 "(2) F23 新增的'包侧期望串必须有出处'静态门, 是否要求 expect_contains 与行表 "
+                 "healthy 串逐条命中**产品源码字面量或已归档实拍字节**(我倾向后者, 但这会让我手写"
+                 "的期望从此不可用)。另: 若你认为 [TMC]/[TMC-CFG] 前缀属产品该改的形状, 那要走"
+                 "停止-报告改产品, 我不在包侧绕。",
+            "operator": "**本会话第三次整包批准已用完**(F22 账 M8-R7F8F-F22-20261106, port_open 1/1)。"
+                        "板现在 tmc_config state=UNCONFIGURED、drv 未使能、保持通电, 未做任何复位或"
+                        "下载。下一步 F23 是**离线包侧修正(0 设备动作)**; 修完的四件身份变了, 所以"
+                        "第四次真机还需要**一句新的真实原话**——对象 = F23 的 plan/rows 新摘要 + "
+                        "executor + 镜像, 并在同一句里逐字重新声明机械/电气前置(电机在丝杆上、"
+                        "滑块位置、供电/接线是否有变)。我不借 F22 那句开新账。",
+            "me_next_offline": "F23(离线, 未执行): cfg_pre 期望改 `[TMC-CFG] state=` 并把 F22 实拍 "
+                               "1011 B/303eade7bb77 入行表; apply 期望改 `[TMC-CFG] CONFIGURED`"
+                               "(tmc2209.c:2844, 标 source_shape/DERIVED, 因为从未实拍); "
+                               "sys_after_apply 的 write gate 期望按 A 定的口径改并保留 arm 门位那行"
+                               "的锚定; 加'两 mask 不同数'分离判据 + 期望串出处静态门 + TG 族补"
+                               "'文件令牌 + 真实预检查'那条通路(修执行器 :5530 会改执行器身份, "
+                               "需 A 签第二次软件章或按停止-报告处理)。",
+            "me_after_approval": "按那句新原话把承接件生成器指到 F23 的四件身份(--approved-prefixes "
+                                 "当场复算), 用文件令牌离线 --approval-init 新账(绑令牌摘要), "
+                                 "再一次 dispatch; 本轮(F22 登记)自己不新增设备动作"}}
 
     bad = [k for k, v in doc.items() if isinstance(v, tuple)]
     if bad:
